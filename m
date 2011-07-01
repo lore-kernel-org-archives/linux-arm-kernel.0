@@ -1,97 +1,289 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Fri, 1 Jul 2011 22:54:07 +0200
-Subject: [PATCH v2 8/8] OMAP: hwmod: Move pr_debug to improve the readability
-In-Reply-To: <1309553647-14624-1-git-send-email-b-cousson@ti.com>
-References: <1309553647-14624-1-git-send-email-b-cousson@ti.com>
-Message-ID: <1309553647-14624-9-git-send-email-b-cousson@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 1 Jul 2011 22:09:15 +0100
+Subject: [PATCH v4] Add ARM cpu topology definition
+In-Reply-To: <1309499010-2049-1-git-send-email-vincent.guittot@linaro.org>
+References: <1309499010-2049-1-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <20110701210915.GE21898@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the pr_debug at the top of the function
-to trace the entry even if the first test is failing.
-That help understanding that we entered the function
-but failed in it.
+On Fri, Jul 01, 2011 at 07:43:30AM +0200, Vincent Guittot wrote:
+> Changes since v3 :
+> * Update the format of printk message
+> * Remove blank line
 
-Move the _enable last part out of the test to reduce
-indentation and improve readability.
+Can I trouble you to check the patch for more instances of the 'blank line
+at end of function' thing... Also, let's get rid of unnecessary parens.
 
-Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-Cc: Paul Walmsley <paul@pwsan.com>
----
- arch/arm/mach-omap2/omap_hwmod.c |   32 +++++++++++++++++---------------
- 1 files changed, 17 insertions(+), 15 deletions(-)
+> diff --git a/arch/arm/include/asm/topology.h b/arch/arm/include/asm/topology.h
+> index accbd7c..63a7454 100644
+> --- a/arch/arm/include/asm/topology.h
+> +++ b/arch/arm/include/asm/topology.h
+> @@ -1,6 +1,39 @@
+>  #ifndef _ASM_ARM_TOPOLOGY_H
+>  #define _ASM_ARM_TOPOLOGY_H
+>  
+> +#ifdef CONFIG_ARM_CPU_TOPOLOGY
+> +
+> +#include <linux/cpumask.h>
+> +
+> +struct cputopo_arm {
+> +	int thread_id;
+> +	int core_id;
+> +	int socket_id;
+> +	cpumask_t thread_sibling;
+> +	cpumask_t core_sibling;
+> +};
+> +
+> +extern struct cputopo_arm cpu_topology[NR_CPUS];
+> +
+> +#define topology_physical_package_id(cpu)	(cpu_topology[cpu].socket_id)
+> +#define topology_core_id(cpu)		(cpu_topology[cpu].core_id)
+> +#define topology_core_cpumask(cpu)	(&(cpu_topology[cpu].core_sibling))
+> +#define topology_thread_cpumask(cpu)	(&(cpu_topology[cpu].thread_sibling))
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index 64e9830..e530bcb 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -1242,6 +1242,8 @@ static int _enable(struct omap_hwmod *oh)
- {
- 	int r;
- 
-+	pr_debug("omap_hwmod: %s: enabling\n", oh->name);
-+
- 	if (oh->_state != _HWMOD_STATE_INITIALIZED &&
- 	    oh->_state != _HWMOD_STATE_IDLE &&
- 	    oh->_state != _HWMOD_STATE_DISABLED) {
-@@ -1250,8 +1252,6 @@ static int _enable(struct omap_hwmod *oh)
- 		return -EINVAL;
- 	}
- 
--	pr_debug("omap_hwmod: %s: enabling\n", oh->name);
--
- 	/* Mux pins for device runtime if populated */
- 	if (oh->mux && (!oh->mux->enabled ||
- 			((oh->_state == _HWMOD_STATE_IDLE) &&
-@@ -1271,19 +1271,21 @@ static int _enable(struct omap_hwmod *oh)
- 		_deassert_hardreset(oh, oh->rst_lines[0].name);
- 
- 	r = _wait_target_ready(oh);
--	if (!r) {
--		oh->_state = _HWMOD_STATE_ENABLED;
--
--		/* Access the sysconfig only if the target is ready */
--		if (oh->class->sysc) {
--			if (!(oh->_int_flags & _HWMOD_SYSCONFIG_LOADED))
--				_update_sysc_cache(oh);
--			_enable_sysc(oh);
--		}
--	} else {
--		_disable_clocks(oh);
-+	if (r) {
- 		pr_debug("omap_hwmod: %s: _wait_target_ready: %d\n",
- 			 oh->name, r);
-+		_disable_clocks(oh);
-+
-+		return r;
-+	}
-+
-+	oh->_state = _HWMOD_STATE_ENABLED;
-+
-+	/* Access the sysconfig only if the target is ready */
-+	if (oh->class->sysc) {
-+		if (!(oh->_int_flags & _HWMOD_SYSCONFIG_LOADED))
-+			_update_sysc_cache(oh);
-+		_enable_sysc(oh);
- 	}
- 
- 	return r;
-@@ -1299,14 +1301,14 @@ static int _enable(struct omap_hwmod *oh)
-  */
- static int _idle(struct omap_hwmod *oh)
- {
-+	pr_debug("omap_hwmod: %s: idling\n", oh->name);
-+
- 	if (oh->_state != _HWMOD_STATE_ENABLED) {
- 		WARN(1, "omap_hwmod: %s: idle state can only be entered from "
- 		     "enabled state\n", oh->name);
- 		return -EINVAL;
- 	}
- 
--	pr_debug("omap_hwmod: %s: idling\n", oh->name);
--
- 	if (oh->class->sysc)
- 		_idle_sysc(oh);
- 	_del_initiator_dep(oh, mpu_oh);
--- 
-1.7.0.4
+The inner-most parens aren't required.
+
+> +
+> +#define mc_capable()	(cpu_topology[0].socket_id != -1)
+> +#define smt_capable()	(cpu_topology[0].thread_id != -1)
+> +
+> +void init_cpu_topology(void);
+> +void store_cpu_topology(unsigned int cpuid);
+> +const struct cpumask *cpu_coregroup_mask(unsigned int cpu);
+> +
+> +#else
+> +
+> +static inline void init_cpu_topology(void) { };
+> +static inline void store_cpu_topology(unsigned int cpuid) { };
+
+Functions don't need a ; after the }
+
+> +
+> +#endif
+> +
+>  #include <asm-generic/topology.h>
+>  
+>  #endif /* _ASM_ARM_TOPOLOGY_H */
+> diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+> index a5b31af..816a481 100644
+> --- a/arch/arm/kernel/Makefile
+> +++ b/arch/arm/kernel/Makefile
+> @@ -61,6 +61,7 @@ obj-$(CONFIG_IWMMXT)		+= iwmmxt.o
+>  obj-$(CONFIG_CPU_HAS_PMU)	+= pmu.o
+>  obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o
+>  AFLAGS_iwmmxt.o			:= -Wa,-mcpu=iwmmxt
+> +obj-$(CONFIG_ARM_CPU_TOPOLOGY)  += topology.o
+>  
+>  ifneq ($(CONFIG_ARCH_EBSA110),y)
+>    obj-y		+= io.o
+> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+> index 344e52b..3e8dc3b 100644
+> --- a/arch/arm/kernel/smp.c
+> +++ b/arch/arm/kernel/smp.c
+> @@ -31,6 +31,7 @@
+>  #include <asm/cacheflush.h>
+>  #include <asm/cpu.h>
+>  #include <asm/cputype.h>
+> +#include <asm/topology.h>
+>  #include <asm/mmu_context.h>
+>  #include <asm/pgtable.h>
+>  #include <asm/pgalloc.h>
+> @@ -268,6 +269,9 @@ static void __cpuinit smp_store_cpu_info(unsigned int cpuid)
+>  	struct cpuinfo_arm *cpu_info = &per_cpu(cpu_data, cpuid);
+>  
+>  	cpu_info->loops_per_jiffy = loops_per_jiffy;
+> +
+> +	store_cpu_topology(cpuid);
+> +
+
+Don't need this blank line.
+
+>  }
+>  
+>  /*
+> @@ -354,6 +358,8 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
+>  {
+>  	unsigned int ncores = num_possible_cpus();
+>  
+> +	init_cpu_topology();
+> +
+>  	smp_store_cpu_info(smp_processor_id());
+>  
+>  	/*
+> diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
+> new file mode 100644
+> index 0000000..e8f3b95
+> --- /dev/null
+> +++ b/arch/arm/kernel/topology.c
+> @@ -0,0 +1,149 @@
+> +/*
+> + * arch/arm/kernel/topology.c
+> + *
+> + * Copyright (C) 2011 Linaro Limited.
+> + * Written by: Vincent Guittot
+> + *
+> + * based on arch/sh/kernel/topology.c
+> + *
+> + * This file is subject to the terms and conditions of the GNU General Public
+> + * License.  See the file "COPYING" in the main directory of this archive
+> + * for more details.
+> + */
+> +
+> +#include <linux/cpu.h>
+> +#include <linux/cpumask.h>
+> +#include <linux/init.h>
+> +#include <linux/percpu.h>
+> +#include <linux/node.h>
+> +#include <linux/nodemask.h>
+> +#include <linux/sched.h>
+> +
+> +#include <asm/cputype.h>
+> +#include <asm/topology.h>
+> +
+> +#define MPIDR_SMP_BITMASK (0x3 << 30)
+> +#define MPIDR_SMP_VALUE (0x2 << 30)
+> +
+> +#define MPIDR_MT_BITMASK (0x1 << 24)
+> +
+> +/*
+> + * These masks reflect the current use of the affinity levels.
+> + * The affinity level can be up to 16 bits according to ARM ARM
+> + */
+> +
+> +#define MPIDR_LEVEL0_MASK 0x3
+> +#define MPIDR_LEVEL0_SHIFT 0
+> +
+> +#define MPIDR_LEVEL1_MASK 0xF
+> +#define MPIDR_LEVEL1_SHIFT 8
+> +
+> +#define MPIDR_LEVEL2_MASK 0xFF
+> +#define MPIDR_LEVEL2_SHIFT 16
+> +
+> +struct cputopo_arm cpu_topology[NR_CPUS];
+> +
+> +const struct cpumask *cpu_coregroup_mask(unsigned int cpu)
+> +{
+> +	return &(cpu_topology[cpu].core_sibling);
+
+These parens aren't required.
+
+> +}
+> +
+> +/*
+> + * store_cpu_topology is called at boot when only one cpu is running
+> + * and with the mutex cpu_hotplug.lock locked, when several cpus have booted,
+> + * which prevents simultaneous write access to cpu_topology array
+> + */
+> +void store_cpu_topology(unsigned int cpuid)
+> +{
+> +	struct cputopo_arm *cpuid_topo = &(cpu_topology[cpuid]);
+
+Neither are these.
+
+> +	unsigned int mpidr;
+> +	unsigned int cpu;
+> +
+> +	/* If the cpu topology has been already set, just return */
+> +	if (cpuid_topo->core_id != -1)
+> +		return;
+> +
+> +	mpidr = read_cpuid_mpidr();
+> +
+> +	/* create cpu topology mapping */
+> +	if ((mpidr & MPIDR_SMP_BITMASK) == MPIDR_SMP_VALUE) {
+> +		/*
+> +		 * This is a multiprocessor system
+> +		 * multiprocessor format & multiprocessor mode field are set
+> +		 */
+> +
+> +		if (mpidr & MPIDR_MT_BITMASK) {
+> +			/* core performance interdependency */
+> +			cpuid_topo->thread_id = ((mpidr >> MPIDR_LEVEL0_SHIFT)
+> +				& MPIDR_LEVEL0_MASK);
+> +			cpuid_topo->core_id =  ((mpidr >> MPIDR_LEVEL1_SHIFT)
+> +				& MPIDR_LEVEL1_MASK);
+> +			cpuid_topo->socket_id = ((mpidr >> MPIDR_LEVEL2_SHIFT)
+> +				& MPIDR_LEVEL2_MASK);
+
+Outer set aren't required.
+
+> +		} else {
+> +			/* largely independent cores */
+> +			cpuid_topo->thread_id = -1;
+> +			cpuid_topo->core_id = ((mpidr >> MPIDR_LEVEL0_SHIFT)
+> +				& MPIDR_LEVEL0_MASK);
+> +			cpuid_topo->socket_id = ((mpidr >> MPIDR_LEVEL1_SHIFT)
+> +				& MPIDR_LEVEL1_MASK);
+
+Outer set aren't required.
+
+> +		}
+> +	} else {
+> +		/*
+> +		 * This is an uniprocessor system
+> +		 * we are in multiprocessor format but uniprocessor system
+> +		 * or in the old uniprocessor format
+> +		 */
+> +
+
+This blank line isn't necessary.
+
+> +		cpuid_topo->thread_id = -1;
+> +		cpuid_topo->core_id = 0;
+> +		cpuid_topo->socket_id = -1;
+> +	}
+> +
+> +	/* update core and thread sibling masks */
+> +	for_each_possible_cpu(cpu) {
+> +		struct cputopo_arm *cpu_topo = &(cpu_topology[cpu]);
+
+Parens not required.
+
+> +
+> +		if (cpuid_topo->socket_id == cpu_topo->socket_id) {
+> +			cpumask_set_cpu(cpuid, &cpu_topo->core_sibling);
+> +			if (cpu != cpuid)
+> +				cpumask_set_cpu(cpu,
+> +					&cpuid_topo->core_sibling);
+> +
+> +			if (cpuid_topo->core_id == cpu_topo->core_id) {
+> +				cpumask_set_cpu(cpuid,
+> +					&cpu_topo->thread_sibling);
+> +				if (cpu != cpuid)
+> +					cpumask_set_cpu(cpu,
+> +						&cpuid_topo->thread_sibling);
+> +			}
+> +		}
+> +	}
+> +	smp_wmb();
+> +
+> +	printk(KERN_INFO "CPU%u: thread %d, cpu %d, socket %d, mpidr %x\n",
+> +		cpuid, cpu_topology[cpuid].thread_id,
+> +		cpu_topology[cpuid].core_id,
+> +		cpu_topology[cpuid].socket_id, mpidr);
+
+Thanks for changing that.
+
+> +}
+> +
+> +/*
+> + * init_cpu_topology is called at boot when only one cpu is running
+> + * which prevent simultaneous write access to cpu_topology array
+> + */
+> +void init_cpu_topology(void)
+> +{
+> +	unsigned int cpu;
+> +
+> +	/* init core mask */
+> +	for_each_possible_cpu(cpu) {
+> +		struct cputopo_arm *cpu_topo = &(cpu_topology[cpu]);
+> +
+> +		cpu_topo->thread_id = -1;
+> +		cpu_topo->core_id =  -1;
+> +		cpu_topo->socket_id = -1;
+> +		cpumask_clear(&cpu_topo->core_sibling);
+> +		cpumask_clear(&cpu_topo->thread_sibling);
+> +	}
+> +	smp_wmb();
+> +}
