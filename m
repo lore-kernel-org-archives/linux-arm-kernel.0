@@ -1,77 +1,51 @@
 From: per.forlin@linaro.org (Per Forlin)
-Date: Fri, 1 Jul 2011 15:29:25 +0200
-Subject: [PATCH v8 05/12] mmc: mmc_test: add test for non-blocking
-	transfers
-In-Reply-To: <1309248717-14606-6-git-send-email-per.forlin@linaro.org>
+Date: Fri, 1 Jul 2011 15:33:19 +0200
+Subject: [PATCH v8 06/12] mmc: mmc_test: test to measure how sg_len affect
+	performance
+In-Reply-To: <1309248717-14606-7-git-send-email-per.forlin@linaro.org>
 References: <1309248717-14606-1-git-send-email-per.forlin@linaro.org>
-	<1309248717-14606-6-git-send-email-per.forlin@linaro.org>
-Message-ID: <BANLkTi=-Nn0HjLgmTsCs9zoQt4By-6-KZw@mail.gmail.com>
+	<1309248717-14606-7-git-send-email-per.forlin@linaro.org>
+Message-ID: <BANLkTimuvUcJyrO0S+Odmz2Vz0YDwyY9Mw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 28 June 2011 10:11, Per Forlin <per.forlin@linaro.org> wrote:
-> Add four tests for read and write performance per
-> different transfer size, 4k to 4M.
-> ?* Read using blocking mmc request
-> ?* Read using non-blocking mmc request
-> ?* Write using blocking mmc request
-> ?* Write using non-blocking mmc request
->
-> The host dirver must support pre_req() and post_req()
-> in order to run the non-blocking test cases.
+> test that measures how the mmc bandwidth depends on the numbers of sg elements
+> in the sg list. The transfer size if fixed and sg length goes from a few up
+> to 512. The purpose is to measure overhead caused by multiple sg elements.
 >
 > Signed-off-by: Per Forlin <per.forlin@linaro.org>
 > ---
-> ?drivers/mmc/card/mmc_test.c | ?311 +++++++++++++++++++++++++++++++++++++++++-
-> ?1 files changed, 303 insertions(+), 8 deletions(-)
+> ?drivers/mmc/card/mmc_test.c | ?151 +++++++++++++++++++++++++++++++++++++++----
+> ?1 files changed, 139 insertions(+), 12 deletions(-)
 >
 > diff --git a/drivers/mmc/card/mmc_test.c b/drivers/mmc/card/mmc_test.c
-> +static int mmc_test_nonblock_transfer(struct mmc_test_card *test,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct scatterlist *sg, unsigned sg_len,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? unsigned dev_addr, unsigned blocks,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? unsigned blksz, int write, int count)
-> +{
-> + ? ? ? struct mmc_request mrq1;
-> + ? ? ? struct mmc_command cmd1;
-> + ? ? ? struct mmc_command stop1;
-> + ? ? ? struct mmc_data data1;
-> +
-> + ? ? ? struct mmc_request mrq2;
-> + ? ? ? struct mmc_command cmd2;
-> + ? ? ? struct mmc_command stop2;
-> + ? ? ? struct mmc_data data2;
-> +
-> + ? ? ? struct mmc_test_async_req test_areq[2];
-> + ? ? ? struct mmc_async_req *done_areq;
-> + ? ? ? struct mmc_async_req *cur_areq = &test_areq[0].areq;
-> + ? ? ? struct mmc_async_req *other_areq = &test_areq[1].areq;
-> + ? ? ? int i;
-> + ? ? ? int ret;
-> +
-> + ? ? ? test_areq[0].test = test;
-> + ? ? ? test_areq[1].test = test;
-> +
-> + ? ? ? if (!test->card->host->ops->pre_req ||
-> + ? ? ? ? ? ? ? !test->card->host->ops->post_req)
-> + ? ? ? ? ? ? ? return -RESULT_UNSUP_HOST;
-Remove this error check. It is fine to run this test without these
-hooks, but there will be no performance gain compared to blocking
-request.
+> -static int mmc_test_map_sg(struct mmc_test_mem *mem, unsigned long sz,
+> +static int mmc_test_map_sg(struct mmc_test_mem *mem, unsigned long size,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? struct scatterlist *sglist, int repeat,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? unsigned int max_segs, unsigned int max_seg_sz,
+> - ? ? ? ? ? ? ? ? ? ? ? ? ?unsigned int *sg_len)
+> + ? ? ? ? ? ? ? ? ? ? ? ? ?unsigned int *sg_len, int min_sg_len)
+> ?{
+> ? ? ? ?struct scatterlist *sg = NULL;
+> ? ? ? ?unsigned int i;
+> + ? ? ? unsigned long sz = size;
+>
+> ? ? ? ?sg_init_table(sglist, max_segs);
+> + ? ? ? if (min_sg_len > max_segs)
+> + ? ? ? ? ? ? ? min_sg_len = max_segs;
+>
+> ? ? ? ?*sg_len = 0;
+> ? ? ? ?do {
+> ? ? ? ? ? ? ? ?for (i = 0; i < mem->cnt; i++) {
+> ? ? ? ? ? ? ? ? ? ? ? ?unsigned long len = PAGE_SIZE << mem->arr[i].order;
+>
+> + ? ? ? ? ? ? ? ? ? ? ? if (min_sg_len && (size / min_sg_len < len))
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? len = size / min_sg_len;
+Make aligned to 512
+len = ALIGN(size / min_sg_len, 512);
 
-...
-
-> +/*
-> + * Multiple blocking write 4k to 4 MB chunks
-> + */
-> +static int mmc_test_profile_mult_write_blocking_perf(struct mmc_test_card *test)
-> +{
-> + ? ? ? unsigned int bs[] = {1 << 12, 1 << 13, 1 << 14, 1 << 15, 1 << 16,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ?1 << 17, 1 << 18, 1 << 19, 1 << 20, 1 << 22};
-> + ? ? ? struct mmc_test_multiple_rw test_data = {
-> + ? ? ? ? ? ? ? .bs = bs,
-> + ? ? ? ? ? ? ? .size = 128*1024*1024,
-I got this comment from Linus W.
-Use TEST_AREA_MAX_SIZE instead of hard coded 128*1024*1024. update all
-relevant functions.
+I run into this issue running on arm realview with max test size 128k
+instead of 128M.
 
 /Per
