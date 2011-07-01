@@ -1,27 +1,50 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 1 Jul 2011 08:59:42 -0700
-Subject: [PATCH 2/3] Samsung SoC: ready to use NTC value inside kernel
-In-Reply-To: <BANLkTin3bu4Xf0cS0EkASvYXG0AdW+eprQ@mail.gmail.com>
-References: <1309422387-11546-1-git-send-email-myungjoo.ham@samsung.com>
-	<1309422387-11546-3-git-send-email-myungjoo.ham@samsung.com>
-	<20110630090013.GP21898@n2100.arm.linux.org.uk>
-	<BANLkTikC2zUPamzactXLdLb8Szgs2o9V7w@mail.gmail.com>
-	<BANLkTin3bu4Xf0cS0EkASvYXG0AdW+eprQ@mail.gmail.com>
-Message-ID: <20110701155941.GA23784@opensource.wolfsonmicro.com>
+From: hpa@zytor.com (H. Peter Anvin)
+Date: Fri, 01 Jul 2011 09:00:44 -0700
+Subject: [PATCH 00/10] Enhance /dev/mem to allow read/write of arbitrary
+	physical addresses
+In-Reply-To: <20110701153634.GA27407@elte.hu>
+References: <201106171038.25988.ptesarik@suse.cz>
+	<20110701144129.GA10052@infradead.org>
+	<20110701144641.GA23272@elte.hu>
+	<201107011654.06651.ptesarik@suse.cz>
+	<20110701153634.GA27407@elte.hu>
+Message-ID: <4E0DEF2C.3040504@zytor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 01, 2011 at 05:15:05PM +0200, Linus Walleij wrote:
+On 07/01/2011 08:36 AM, Ingo Molnar wrote:
+> 
+> So we could kill multiple birds with the same stone here:
+> 
+>  - remove various ugly uses of /dev/mem (including the rootkit usage),
+>    with or without strict-devmem
+> 
+>  - extending it to above-4G for inspection purposes
+> 
+>  - allowing to kill /dev/mem access runtime similar to the 
+>    disable_modules lock-down killswitch, for the so inclined.
+> 
+> Would you be interested in modifying your patch-set in such a 
+> fashion?
+> 
 
-> There is no clean nice ADC subsystem though, and *that* feels
-> like a big problem to drivers like this (and no I don't like the AB8500
-> GPADC living in MFD either) so if you'd like to create a ADC
-> subsystem just go ahead, there is something in drivers/staging/iio/adc
-> but that had another problem last time I looked: it was only intended
-> for userspace control, not in-kernel use.
+There is another use that I have looked at, as well: for testing
+purposes, it would be extremely good to be able to dirty and/or flush an
+arbitrary physical cache line for testing purposes.
 
-The other issue is that it's designed for high volume data and these
-AUXADCs tend to be relatively slow.  That said I've had some discussions
-with Jonathan about supporting these devices via IIO and he seems to be
-coming round to the idea that we could integrate support.  Not sure how
-fast IIO is progressing to mainline, though.
+This is very very similar to /dev/mem usage -- access to an arbitrary
+chunk of memory -- and a fully enabled /dev/mem can of course support
+this use (just mmap the page with the relevant cache line).  However, it
+could also be a separate device which could have looser permissions than
+/dev/mem; or a set of ioctls on /dev/mem with a separate kill switch,
+because no data would ever be have modified or returned to user space.
+
+Either way, though, we found that it would share a lot of code with the
+/dev/mem implementation, and as such fixing up the underlying machinery
+is the sanest way to upstream this.
+
+	-hpa
+
+-- 
+H. Peter Anvin, Intel Open Source Technology Center
+I work for Intel.  I don't speak on their behalf.
