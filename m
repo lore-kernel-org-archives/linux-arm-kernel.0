@@ -1,33 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 1 Jul 2011 17:09:40 +0200
-Subject: AT91: Fix pull requset
-In-Reply-To: <20110701065411.GD14408@game.jcrosoft.org>
-References: <20110701065411.GD14408@game.jcrosoft.org>
-Message-ID: <201107011709.40359.arnd@arndb.de>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Fri, 1 Jul 2011 18:13:54 +0300
+Subject: [RFC 7/8] drivers: introduce rpmsg,
+	a remote-processor messaging bus
+In-Reply-To: <BANLkTikJGHSwqMW2W2YA4EnvJ0yj+9C6ow@mail.gmail.com>
+References: <1308640714-17961-1-git-send-email-ohad@wizery.com>
+	<1308640714-17961-8-git-send-email-ohad@wizery.com>
+	<20110627222121.GD20865@ponder.secretlab.ca>
+	<BANLkTikt08CDJiKNxGF2mKmOhyxHfv21_g@mail.gmail.com>
+	<BANLkTim+CemMz7A3J94e1UywCNd0r1SABQ@mail.gmail.com>
+	<BANLkTi=16XEpvhWEAoUt_s5F41czeq2DVQ@mail.gmail.com>
+	<BANLkTikJGHSwqMW2W2YA4EnvJ0yj+9C6ow@mail.gmail.com>
+Message-ID: <BANLkTi=XBVNqNx_dvW87AHHqAKdMJMiMmQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 01 July 2011, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> HI Linus, Russell, Arnd
-> 
-> 	I do not known who can take this pull request
-> 
-> 	But this is some fix for at91 for the 3.0
+On Wed, Jun 29, 2011 at 6:43 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
+> So you are right that device_unregister drops the refcount to zero,
+> but the code still needs to be fixed to not call kfree() directly.
 
-I can take and forward these next week, possibly together with other bug
-fixes that come in for soc trees.
+Good point, thanks !
 
-One comment though:
+> It also looks like rpmsg_destroy_channel() needs to be fixed to remove
+> the kfree call
 
-> Jean-Christophe PLAGNIOL-VILLARD (3):
->       at91: fix at91_set_serial_console: use platform device id
->       atmel_serial: fix internal port num
+Yes, I need to remove this direct kfree as well, and indeed just let
+rpmsg_release_device do its thing when the last reference is dropped.
 
-These two patches look like they should apply to older kernels as well:
-The code you change has been in the kernel since 2006.
+I should also remove the direct kfree when device_register fails: in
+that case, I need only to put_device and let the release handler do
+its thing too.
 
-For every bug fix you commit, please check if it applies to older
-kernels as well, and mark with 'Cc: stable at kernel.org' if so. Do you
-want to update the changelog and send another pull request?
+> and an extra put_device() call.
 
-	Arnd
+We need that extra put_device in rpmsg_destroy_channel because
+device_find_child() is doing get_device before returning it.
+
+Thanks, Grant!
+
+Ohad.
