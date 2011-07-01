@@ -1,35 +1,60 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 1 Jul 2011 03:05:26 -0700
-Subject: [GIT PULL] omap iommu fixes for v3.0-rc
-In-Reply-To: <BANLkTikhZhUzyk=31cUOcV3Ygj=BHUrbew@mail.gmail.com>
-References: <BANLkTi=vd2TE6JjueGmY=ydRQRygo8-Q1Q@mail.gmail.com>
-	<20110701070056.GZ23145@atomide.com>
-	<BANLkTikhZhUzyk=31cUOcV3Ygj=BHUrbew@mail.gmail.com>
-Message-ID: <20110701100525.GK23145@atomide.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Fri, 1 Jul 2011 18:12:01 +0800
+Subject: [PATCH 1/1] net/fec: iMX53 needs gasket for both MII and RMII
+In-Reply-To: <4E0CC52C.6010306@boundarydevices.com>
+References: <1309387098-30680-1-git-send-email-troy.kisky@boundarydevices.com>
+	<20110630161935.GA7977@S2100-06.ap.freescale.net>
+	<4E0CC52C.6010306@boundarydevices.com>
+Message-ID: <20110701101200.GA8631@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Ohad Ben-Cohen <ohad@wizery.com> [110701 00:46]:
-> On Fri, Jul 1, 2011 at 10:00 AM, Tony Lindgren <tony@atomide.com> wrote:
-> > These look like real fixes, but can you please update the commits
-> > with something like "This fixes an issue with foo when doing bar".
+On Thu, Jun 30, 2011 at 11:49:16AM -0700, Troy Kisky wrote:
+> On 6/30/2011 9:19 AM, Shawn Guo wrote:
+> > Hi Troy,
+> > 
+> > On Wed, Jun 29, 2011 at 03:38:18PM -0700, Troy Kisky wrote:
+> >> Currently, only RMII interfaces are using the gasket.
+> >> But, the iMX53 needs to enable the gasket for MII
+> >> mode as well. The iMX51 has no gasket registers. So,
+> >> add a use_gasket field to fec_platform_data to not restrict
+> >> same kernel for both iMX51/53 boards.
+> >>
+> > 
+> > Right, on those early SoCs with fec, like imx27/35/51, there is no
+> > gasket, while on those recent ones, like imx25/50/53, there is gasket,
+> > and the gasket should be enabled for not only MII mode but also  RMII
+> > mode.  I guess you caught this problem when using a MII phy with
+> > imx53?
+> > 
+> > Though I agree this is something we need to fix, I'm unsure using
+> > platform_data is the best way.  IMO, this gasket is rather SoC
+> > specific thing than platform (board).  If we are running fec on
+> > imx25/50/53, we need to enable the gasket, no matter what boards
+> > we are using and how the boards are designed.
+> > 
+> > Since platform_device_id is already being used to distinguish imx28
+> > from other imx SoCs, maybe we can extend it to handle gasket too?
+> > 
+> > Regards,
+> > Shawn
+> > 
+> >> iMX28 boards don't need use_gasket, as they have
+> >> FEC_QUIRK_ENET_MAC.
 > 
-> Done, please tell me if it's OK now.
-
-OK thanks!
- 
-> > Otherwise it's easy to claim that these are "fixes for features that
-> > never worked" and it might be hard to justify them this late into
-> > the -rc cycle.
+> When I saw how FEC_QUIRK_ENET_MAC was handled, it thought about changing
+> to do it that way. It really does look better that way. But the current
+> change looks more efficient memory-wise. Though, I guess that would
+> depend on how many boards your kernel supports and whether more option
+> are to be added later.
 > 
-> It seems we did have these issues for quite some time, and these are not
-> explicit 3.0 regressions. So they might vaguely fall into the "fixes
-> for features that never worked" definition too in a sense.
+> I'm fine with redoing your way if I can get a tentative OK first.
 > 
-> If you prefer to take them into 3.1, that's OK too.
+> Is	.name = 'g-fec' OK?
+> 
+No.  Let code talk.  I just sent a patch with double sign-off (you
+and me).  Please take a look.
 
-Let's do that then.
-
+-- 
 Regards,
-
-Tony
+Shawn
