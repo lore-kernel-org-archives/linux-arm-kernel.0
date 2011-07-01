@@ -1,37 +1,28 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Fri, 1 Jul 2011 13:37:26 +0200
-Subject: [PATCH 2/3] Add tps65921 chip
-In-Reply-To: <20110701073557.GF23145@atomide.com>
-References: <1308066307-415-1-git-send-email-green@linuxhacker.ru>
-	<1308066307-415-3-git-send-email-green@linuxhacker.ru>
-	<20110701073557.GF23145@atomide.com>
-Message-ID: <20110701113726.GJ12106@sortiz-mobl>
+From: ch.naveen@samsung.com (Naveen Krishna Chatradhi)
+Date: Fri, 01 Jul 2011 17:03:10 +0530
+Subject: [PATCH 0/2] ARM: Samsung: I2C code cleanup
+Message-ID: <1309519992-3026-1-git-send-email-ch.naveen@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+Does the same job, while saving few lines of code.
 
-On Fri, Jul 01, 2011 at 12:35:58AM -0700, Tony Lindgren wrote:
-> Samuel,
-> 
-> * green at linuxhacker.ru <green@linuxhacker.ru> [110614 08:42]:
-> > From: Oleg Drokin <green@linuxhacker.ru>
-> > 
-> > Very similar to TPS65920
-> > List of differences: http://www.ti.com/litv/pdf/swcu066b
-> > 
-> > CC: sameo at linux.intel.com
-> > Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
-> 
-> Looks like this one can be merged independently of the rest of the
-> Nook patches via your mfd tree. Care to queue this?
-I asked Oleg to rebase this patch against my for-next branch as it was not
-applying cleanly. But I never got the fixed patch.
-I fixed it up now, and it's applied.
+ o To Kukjin Kim, Sangbeom Kim and Ben Dooks
 
-Cheers,
-Samuel.
+Naveen Krishna Chatradhi (2):
+  ARM: Samsung: Use generic set_plat_data function
+  ARM: Samsung: Cleanup I2C code in plat-samsung
+
+ arch/arm/plat-samsung/dev-i2c0.c         |   14 ++++++--------
+ arch/arm/plat-samsung/dev-i2c1.c         |   24 ++++++++----------------
+ arch/arm/plat-samsung/dev-i2c2.c         |   24 ++++++++----------------
+ arch/arm/plat-samsung/dev-i2c3.c         |   24 ++++++++----------------
+ arch/arm/plat-samsung/dev-i2c4.c         |   24 ++++++++----------------
+ arch/arm/plat-samsung/dev-i2c5.c         |   24 ++++++++----------------
+ arch/arm/plat-samsung/dev-i2c6.c         |   24 ++++++++----------------
+ arch/arm/plat-samsung/dev-i2c7.c         |   24 ++++++++----------------
+ arch/arm/plat-samsung/include/plat/iic.h |    2 ++
+ 9 files changed, 64 insertions(+), 120 deletions(-)
 
 -- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+1.7.2.3
