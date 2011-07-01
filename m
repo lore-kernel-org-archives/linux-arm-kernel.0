@@ -1,60 +1,37 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 1 Jul 2011 03:34:25 -0600 (MDT)
-Subject: [RFC 10/12] omap: mcbsp: Move sidetone clock management to
-	mach-omap2/mcbsp.c
-In-Reply-To: <4E0D92CC.5030006@ti.com>
-References: <1309510356-27147-1-git-send-email-jhnikula@gmail.com>
-	<1309510356-27147-11-git-send-email-jhnikula@gmail.com>
-	<alpine.DEB.2.00.1107010317460.27025@utopia.booyaka.com>
-	<4E0D92CC.5030006@ti.com>
-Message-ID: <alpine.DEB.2.00.1107010331230.27025@utopia.booyaka.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri,  1 Jul 2011 12:43:54 +0200
+Subject: [PATCH] ASoC: wm8731: set the ACTIVE bit if bias ON entered
+In-Reply-To: <ccd4b125244271af7978948689cf1dcef37bc06b.1309368631.git.nicolas.ferre@atmel.com>
+References: <ccd4b125244271af7978948689cf1dcef37bc06b.1309368631.git.nicolas.ferre@atmel.com>
+Message-ID: <1309517034-26110-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-cc'ing Kishon 
+Resuming from a suspend/resume cycle, the ACTIVE bit was not set even if a
+stream had actually been processing.
+Setting this bit at entering SND_SOC_BIAS_ON level will ensure this.
 
-On Fri, 1 Jul 2011, Cousson, Benoit wrote:
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+Supersed the wrong patch:
+"[PATCH 1/5] ASoC: wm8731: rework power management"
 
-> On 7/1/2011 11:23 AM, Paul Walmsley wrote:
-> > On Fri, 1 Jul 2011, Jarkko Nikula wrote:
-> > 
-> > > Active sidetone requires that McBSP interface clock doesn't idle and there
-> > > is no mechanism in hwmod to turn autoidling on/off in runtime. McBSP2 and
-> > > 3
-> > > in OMAP34xx share their interface clock with McBSP sidetone module and
-> > > that interface clock must be active when the sidetone is operating.
-> > > 
-> > > Sidetone has its own autoidle bit which should keep the interface clock
-> > > active but it is broken. Putting the McBSP core to no-idle mode when the
-> > > sidetone is active is no good either since it results to higher power
-> > > consumption when using the threshold based DMA transfers.
-> > 
-> > In the hwmod code/data, we've got the OCPIF_SWSUP_IDLE flag that can be
-> > set on a struct omap_hwmod_ocp_if.  I think this is probably what's needed
-> > here.  The only problem is that we haven't linked that to the clock code
-> > to deny idle on the interface clock yet (see omap_hwmod.c:_setup()).
-> > Adding that code in, plus adding that OCPIF_SWSUP_IDLE flag to the
-> > McBSP2/3 data, seems like the right approach here.
-> > 
-> > I guess we also will need some basic usecounting for denying idle in the
-> > clock code.
-> > 
-> > Otherwise these direct register manipulations of clock registers, outside
-> > the clock code, could turn into a mess :-(
-> 
-> AFAIR Kishon did submit some patches to expose this feature to the driver
-> through omap_device API. The point is that other broken IP like SDMA of USB
-> will require such feature.
-> 
-> Didn't we pull them?
+now based on broonie/sound-2.6 git tree branch: for-3.1.
 
-You sent him some comments on March 1 but it looks like the series never 
-got updated and reposted, at least not that I can find in my mail 
-archive.  Kishon?
+ sound/soc/codecs/wm8731.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-Anyway, those patches won't help in this case if the sidetone AUTOIDLE bit 
-is broken - looks like the interface clock autoidle bit is what needs to 
-change.
-
-
-- Paul
+diff --git a/sound/soc/codecs/wm8731.c b/sound/soc/codecs/wm8731.c
+index 2dc964b..ee4ec31 100644
+--- a/sound/soc/codecs/wm8731.c
++++ b/sound/soc/codecs/wm8731.c
+@@ -453,6 +453,7 @@ static int wm8731_set_bias_level(struct snd_soc_codec *codec,
+ 
+ 	switch (level) {
+ 	case SND_SOC_BIAS_ON:
++		snd_soc_write(codec, WM8731_ACTIVE, 0x0001);
+ 		break;
+ 	case SND_SOC_BIAS_PREPARE:
+ 		break;
+-- 
+1.7.3
