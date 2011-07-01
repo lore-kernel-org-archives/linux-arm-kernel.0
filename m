@@ -1,56 +1,24 @@
-From: mingo@elte.hu (Ingo Molnar)
-Date: Fri, 1 Jul 2011 16:46:41 +0200
-Subject: [PATCH 00/10] Enhance /dev/mem to allow read/write of arbitrary
-	physical addresses
-In-Reply-To: <20110701144129.GA10052@infradead.org>
-References: <201106171038.25988.ptesarik@suse.cz>
-	<20110617093032.GA19235@elte.hu>
-	<201106291106.00070.ptesarik@suse.cz>
-	<20110701125802.GE12605@elte.hu>
-	<20110701134705.GA6175@infradead.org>
-	<20110701143735.GA21367@elte.hu>
-	<20110701144129.GA10052@infradead.org>
-Message-ID: <20110701144641.GA23272@elte.hu>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 1 Jul 2011 16:52:48 +0200
+Subject: reply: [PATCH v5 1/3] ARM: mxs: add GPMI-NFC support for
+	imx23/imx28
+In-Reply-To: <4E0D8C04.6010409@freescale.com>
+References: <14C4E31473AF7E4B98176CB73615181C19FBD3@039-SN1MPN1-006.039d.mgd.msft.net>
+	<201107010029.51965.arnd@arndb.de> <4E0D8C04.6010409@freescale.com>
+Message-ID: <201107011652.48869.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Friday 01 July 2011, Huang Shijie wrote:
+> > On Thursday 30 June 2011 18:12:27 Huang Shijie-B32955 wrote:
+> >> I think gpmi-nfc is much better then gpmi-nand or gpmi-flash.
+> > Then how do you want to name the near field communication drivers?
+> >
+> what's meaning of "near field communication" ?
 
-* Christoph Hellwig <hch@infradead.org> wrote:
+See http://en.wikipedia.org/wiki/Near_field_communication
 
-> On Fri, Jul 01, 2011 at 04:37:35PM +0200, Ingo Molnar wrote:
->
-> > After initial modules have loaded i essentially disable crash.ko 
-> > via /proc/sys/kernel/modules_disabled so rootkits have to work a 
-> > bit harder than that.
-> 
-> Not sure for fedora as I don'[t have a kernel tree at hand right 
-> now, but for x86 systems at least RHEL6 has the module built in. 
-> [...]
+It's likely to be present in most future mobile phones. Think of it as
+a combination of bluetooth and RFID (oversimplified).
 
-Fedora Rawhide has it modular:
-
- # grep CRASH /boot/config-2.6.38-0.rc7.git2.3.fc16.x86_64
- CONFIG_CRASH=m
-
- # rpm -ql kernel-2.6.38-0.rc7.git2.3.fc16.x86_64 | grep crash
- /lib/modules/2.6.38-0.rc7.git2.3.fc16.x86_64/kernel/drivers/char/crash.ko
-
-> [...]  Either way we'll need some way to support crash properly in 
-> mainline, preferably in a boot-time opt-in way. [...]
-
-Yes, boot-time opt-in was what i suggested.
-
-> [...] I'd tend slightly toward optionally enabling /dev/mem for it 
-> instead of a separate driver, but if people prefer a different 
-> route I'm fine, too.
-
-No, sharing the driver is perfectly fine and sane as long as this 
-weird usage is not enabled widely.
-
-> Note that for normal crash usage read only access is just fine.
-
-That's true as well. Petr?
-
-Thanks,
-
-	Ingo
+	Arnd
