@@ -1,71 +1,129 @@
-From: bryan.wu@canonical.com (Bryan Wu)
-Date: Wed, 1 Jun 2011 11:43:17 +0800
-Subject: [RFC] Consolidation: Replace all led drivers in arch/arm to leds
-	trigger drivers
-Message-ID: <BANLkTimRM=Uq6FUN-tvGrf3HLN3BUYqmOQ@mail.gmail.com>
+From: junghi.min@samsung.com (JungHi Min)
+Date: Fri,  1 Jul 2011 13:29:15 +0900
+Subject: [PATCH] ARM: EXYNOS4: Add support Core1 Power On/Off with hotplug
+	in/out
+Message-ID: <1309494555-3001-1-git-send-email-junghi.min@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
+To insert the code for power on/off with pmu control to support hotplug in/out core1
+As for hotplug.c, the codes for core1 to be hotplug in/out is inserted.
+As for regs-pmu.h, S5P_CORE_LOCAL_PWR_EN is defined.
+As for platsmp.c, the codes for core1 to be powered on is inserted.
 
-After a quick review the led drivers in arch/arm, I found most of them
-are based on arch/arm/kernel/leds.c driver, which is a specific led
-event driver.
-In mainline 3.0-rc1:
---
-linux-2.6$ find arch/arm/ -name *led*
-arch/arm/mach-ks8695/leds.c
-arch/arm/mach-sa1100/leds.c
-arch/arm/mach-sa1100/leds-cerf.c
-arch/arm/mach-sa1100/leds-lart.c
-arch/arm/mach-sa1100/leds-hackkit.c
-arch/arm/mach-sa1100/leds.h
-arch/arm/mach-sa1100/leds-assabet.c
-arch/arm/mach-sa1100/leds-simpad.c
-arch/arm/mach-sa1100/leds-badge4.c
-arch/arm/mach-integrator/leds.c
-arch/arm/include/asm/leds.h
-arch/arm/mach-s3c2410/include/mach/leds-gpio.h
-arch/arm/mach-omap1/leds.c
-arch/arm/mach-omap1/leds.h
-arch/arm/mach-omap1/leds-h2p2-debug.c
-arch/arm/mach-omap1/leds-osk.c
-arch/arm/mach-omap1/leds-innovator.c
-arch/arm/mach-pxa/leds.c
-arch/arm/mach-pxa/leds-mainstone.c
-arch/arm/mach-pxa/leds-lubbock.c
-arch/arm/mach-pxa/leds-idp.c
-arch/arm/mach-pxa/leds.h
-arch/arm/kernel/leds.c
-arch/arm/plat-versatile/leds.c
-arch/arm/mach-ebsa110/leds.c
-arch/arm/plat-omap/include/plat/led.h
-arch/arm/plat-omap/debug-leds.c
-arch/arm/mach-kirkwood/include/mach/leds-netxbig.h
-arch/arm/mach-kirkwood/include/mach/leds-ns2.h
-arch/arm/mach-clps711x/p720t-leds.c
-arch/arm/mach-at91/leds.c
-arch/arm/mach-shark/leds.c
-arch/arm/mach-footbridge/netwinder-leds.c
-arch/arm/mach-footbridge/ebsa285-leds.c
---
+Signed-off-by: JungHi Min <junghi.min@samsung.com>
+---
+ arch/arm/mach-exynos4/hotplug.c               |   13 ++++++----
+ arch/arm/mach-exynos4/include/mach/regs-pmu.h |    1 +
+ arch/arm/mach-exynos4/platsmp.c               |   33 +++++++++++++++++++++++-
+ 3 files changed, 40 insertions(+), 7 deletions(-)
 
-Looks like these led drivers are mainly used in old ARM machines, I
-think at that time there is no led trigger driver.
-in arch/arm/kernel/leds.c, the led usages can be replaced to
-led trigger default-on
-led trigger heartbeat
-led trigger ide-disk
-led trigger timer
+diff --git a/arch/arm/mach-exynos4/hotplug.c b/arch/arm/mach-exynos4/hotplug.c
+index 2b5909e..7490789 100644
+--- a/arch/arm/mach-exynos4/hotplug.c
++++ b/arch/arm/mach-exynos4/hotplug.c
+@@ -13,9 +13,12 @@
+ #include <linux/kernel.h>
+ #include <linux/errno.h>
+ #include <linux/smp.h>
++#include <linux/io.h>
+ 
+ #include <asm/cacheflush.h>
+ 
++#include <mach/regs-pmu.h>
++
+ extern volatile int pen_release;
+ 
+ static inline void cpu_enter_lowpower(void)
+@@ -58,12 +61,12 @@ static inline void cpu_leave_lowpower(void)
+ 
+ static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
+ {
+-	/*
+-	 * there is no power-control hardware on this platform, so all
+-	 * we can do is put the core into WFI; this is safe as the calling
+-	 * code will have already disabled interrupts
+-	 */
+ 	for (;;) {
++
++		/* make cpu1 to be turned off at next WFI command */
++		if (cpu == 1)
++			__raw_writel(0, S5P_ARM_CORE1_CONFIGURATION);
++
+ 		/*
+ 		 * here's the WFI
+ 		 */
+diff --git a/arch/arm/mach-exynos4/include/mach/regs-pmu.h b/arch/arm/mach-exynos4/include/mach/regs-pmu.h
+index a964337..96de0e7 100644
+--- a/arch/arm/mach-exynos4/include/mach/regs-pmu.h
++++ b/arch/arm/mach-exynos4/include/mach/regs-pmu.h
+@@ -158,6 +158,7 @@
+ #define S5P_PMU_GPS_CONF			S5P_PMUREG(0x3CE0)
+ 
+ #define S5P_PMU_SATA_PHY_CONTROL_EN		0x1
++#define S5P_CORE_LOCAL_PWR_EN			0x3
+ #define S5P_INT_LOCAL_PWR_EN			0x7
 
-Or we can just delete some leds driver such as
-arch/arm/mach-ks8695/leds.c, since nobody is using that driver in
-ks8695.
-
-Any comments, thanks a lot.
+ define S5P_CHECK_SLEEP				0x00000BAD
+diff --git a/arch/arm/mach-exynos4/platsmp.c b/arch/arm/mach-exynos4/platsmp.c
+index c5e65a0..15aa2c0 100644
+--- a/arch/arm/mach-exynos4/platsmp.c
++++ b/arch/arm/mach-exynos4/platsmp.c
+@@ -28,9 +28,12 @@
+ 
+ #include <mach/hardware.h>
+ #include <mach/regs-clock.h>
++#include <mach/regs-pmu.h>
+ 
+ extern void exynos4_secondary_startup(void);
+ 
++#define CPU1_BOOT_REG S5P_VA_SYSRAM
++
+ /*
+  * control for which core is the next to come out of the secondary
+  * boot "holding pen"
+@@ -100,16 +103,41 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 	 */
+ 	write_pen_release(cpu);
+ 
++	if (!(__raw_readl(S5P_ARM_CORE1_STATUS) & S5P_CORE_LOCAL_PWR_EN)) {
++		__raw_writel(S5P_CORE_LOCAL_PWR_EN,
++			     S5P_ARM_CORE1_CONFIGURATION);
++
++		timeout = 10;
++
++		/* wait max 10 ms until cpu1 is on */
++		while ((__raw_readl(S5P_ARM_CORE1_STATUS)
++			& S5P_CORE_LOCAL_PWR_EN) != S5P_CORE_LOCAL_PWR_EN) {
++			if (timeout-- == 0)
++				break;
++
++			mdelay(1);
++		}
++
++		if (timeout == 0) {
++			printk(KERN_ERR "cpu1 power enable failed");
++			spin_unlock(&boot_lock);
++			return -ETIMEDOUT;
++		}
++	}
+ 	/*
+ 	 * Send the secondary CPU a soft interrupt, thereby causing
+ 	 * the boot monitor to read the system wide flags register,
+ 	 * and branch to the address found there.
+ 	 */
+-	gic_raise_softirq(cpumask_of(cpu), 1);
+ 
+ 	timeout = jiffies + (1 * HZ);
+ 	while (time_before(jiffies, timeout)) {
+ 		smp_rmb();
++
++		__raw_writel(BSYM(virt_to_phys(exynos4_secondary_startup)),
++			CPU1_BOOT_REG);
++		gic_raise_softirq(cpumask_of(cpu), 1);
++
+ 		if (pen_release == -1)
+ 			break;
+ 
 -- 
-Bryan Wu <bryan.wu@canonical.com>
-Kernel Developer ? ?+86.138-1617-6545 Mobile
-Ubuntu Kernel Team
-Canonical Ltd. ? ? ?www.canonical.com
-Ubuntu - Linux for human beings | www.ubuntu.com
+1.7.1
