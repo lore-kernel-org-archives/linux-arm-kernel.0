@@ -1,60 +1,33 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 1 Jul 2011 18:12:01 +0800
-Subject: [PATCH 1/1] net/fec: iMX53 needs gasket for both MII and RMII
-In-Reply-To: <4E0CC52C.6010306@boundarydevices.com>
-References: <1309387098-30680-1-git-send-email-troy.kisky@boundarydevices.com>
-	<20110630161935.GA7977@S2100-06.ap.freescale.net>
-	<4E0CC52C.6010306@boundarydevices.com>
-Message-ID: <20110701101200.GA8631@S2100-06.ap.freescale.net>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 1 Jul 2011 11:10:19 +0100
+Subject: Unnecessary cache-line flush on page table updates ?
+In-Reply-To: <BANLkTin7aJXjpEH_WzJi5zaAtH8kFcTZeg@mail.gmail.com>
+References: <BANLkTin7aJXjpEH_WzJi5zaAtH8kFcTZeg@mail.gmail.com>
+Message-ID: <20110701101019.GA1723@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 30, 2011 at 11:49:16AM -0700, Troy Kisky wrote:
-> On 6/30/2011 9:19 AM, Shawn Guo wrote:
-> > Hi Troy,
-> > 
-> > On Wed, Jun 29, 2011 at 03:38:18PM -0700, Troy Kisky wrote:
-> >> Currently, only RMII interfaces are using the gasket.
-> >> But, the iMX53 needs to enable the gasket for MII
-> >> mode as well. The iMX51 has no gasket registers. So,
-> >> add a use_gasket field to fec_platform_data to not restrict
-> >> same kernel for both iMX51/53 boards.
-> >>
-> > 
-> > Right, on those early SoCs with fec, like imx27/35/51, there is no
-> > gasket, while on those recent ones, like imx25/50/53, there is gasket,
-> > and the gasket should be enabled for not only MII mode but also  RMII
-> > mode.  I guess you caught this problem when using a MII phy with
-> > imx53?
-> > 
-> > Though I agree this is something we need to fix, I'm unsure using
-> > platform_data is the best way.  IMO, this gasket is rather SoC
-> > specific thing than platform (board).  If we are running fec on
-> > imx25/50/53, we need to enable the gasket, no matter what boards
-> > we are using and how the boards are designed.
-> > 
-> > Since platform_device_id is already being used to distinguish imx28
-> > from other imx SoCs, maybe we can extend it to handle gasket too?
-> > 
-> > Regards,
-> > Shawn
-> > 
-> >> iMX28 boards don't need use_gasket, as they have
-> >> FEC_QUIRK_ENET_MAC.
+On Fri, Jul 01, 2011 at 08:04:42AM +0100, heechul Yun wrote:
+> Based on TRM of Cortex A9, the MMU reads page table entries from L1-D
+> cache not from memory. Then I think we do not need to flush the cache
+> line in the following code because MMU will always see up-to-date view
+> of page table in both UP and SMP systems.
 > 
-> When I saw how FEC_QUIRK_ENET_MAC was handled, it thought about changing
-> to do it that way. It really does look better that way. But the current
-> change looks more efficient memory-wise. Though, I guess that would
-> depend on how many boards your kernel supports and whether more option
-> are to be added later.
+> linux/arch/arm/mm/proc-v7.S
 > 
-> I'm fine with redoing your way if I can get a tentative OK first.
+> ENTRY(cpu_v7_set_pte_ext)
+> 	...
+>         mcr     p15, 0, r0, c7, c10, 1          @ flush_pte from
+> D-cache // why we need this in A9?
+>         ?
 > 
-> Is	.name = 'g-fec' OK?
-> 
-No.  Let code talk.  I just sent a patch with double sign-off (you
-and me).  Please take a look.
+> If this is a necessary one, could you please explain the reason? Thanks.
 
--- 
-Regards,
-Shawn
+No, it's not necessary, only that this file is used by other processors
+as well. The solution below checks the ID_MMFR3[23:20] bits (coherent
+walk) and avoid flushing if the value is 1. The same could be done for
+PMD entries, though that's less critical than the PTEs.
+
+Please note that the patch is not fully tested.
+
+8<--------------------
