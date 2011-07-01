@@ -1,249 +1,294 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 1 Jul 2011 08:37:59 -0600
-Subject: [PATCH] DT: Use helper function to read u32 values
-In-Reply-To: <BANLkTin+WCRrxhOBNoL_AJJAkS-w9ybXqg@mail.gmail.com>
-References: <BANLkTin+WCRrxhOBNoL_AJJAkS-w9ybXqg@mail.gmail.com>
-Message-ID: <BANLkTikSnqPYxhrZv0YrhdZmTC=zrNNDRg@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 1 Jul 2011 16:39:23 +0200
+Subject: [PATCH v8 00/12] use nonblock mmc requests to minimize latency
+In-Reply-To: <1309248717-14606-1-git-send-email-per.forlin@linaro.org>
+References: <1309248717-14606-1-git-send-email-per.forlin@linaro.org>
+Message-ID: <BANLkTi=f1W=YGUkpTbOdHDhxgOvrHNYJ1w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 1, 2011 at 7:55 AM, Manjunatha GK <manjugk@ti.com> wrote:
-> Use helper function of_property_read_u32() in place of of_get_property
-> and be32_to_cpup() api's for code optimization.
->
-> Compile tested the changes.
->
-> Signed-off-by: G, Manjunath Kondaiah <manjugk@ti.com>
-> ---
-> ?drivers/of/irq.c???? |?? 37 ++++++++++++++++++++++---------------
-> ?drivers/of/of_i2c.c? |??? 8 +++-----
-> ?drivers/of/of_mdio.c |?? 16 ++++++----------
-> ?3 files changed, 31 insertions(+), 30 deletions(-)
->
-> diff --git a/drivers/of/irq.c b/drivers/of/irq.c
-> index 9f689f1..13c02e2 100644
-> --- a/drivers/of/irq.c
-> +++ b/drivers/of/irq.c
-> @@ -59,20 +59,20 @@ EXPORT_SYMBOL_GPL(irq_of_parse_and_map);
-> ?struct device_node *of_irq_find_parent(struct device_node *child)
-> ?{
-> ???? struct device_node *p;
-> -??? const __be32 *parp;
-> +??? u32 *parp = NULL;
->
-> ???? if (!of_node_get(child))
-> ???? ??? return NULL;
->
-> ???? do {
-> -??? ??? parp = of_get_property(child, "interrupt-parent", NULL);
-> +??? ??? of_property_read_u32(child, "interrupt-parent", parp);
-> ???? ??? if (parp == NULL)
-> ???? ??? ??? p = of_get_parent(child);
+On Tue, Jun 28, 2011 at 10:11 AM, Per Forlin <per.forlin@linaro.org> wrote:
 
-Hi Manjunatha.
+> This is done by making the issue_rw_rq() non-blocking.
+> The increase in throughput is proportional to the time it takes to
+> prepare (major part of preparations is dma_map_sg and dma_unmap_sg)
+> a request and how fast the memory is. The faster the MMC/SD is
+> the more significant the prepare request time becomes. Measurements on U5500
+> and Panda on eMMC and SD shows significant performance gain for large
+> reads when running DMA mode. In the PIO case the performance is unchanged.
 
-This won't work.  You must pass a valid pointer.  It needs to be done this way;
-        u32 parp;
-        if (of_property_read_u32(child, "interrupt-parent", &parp) == 0) {
-                ...
-        } else {
-                ...
-        }
+I compiled the patch set on top of latest mmc-next, had Per come over
+to my desk and fix some test cases, then ran the new stress tests
+on U300 plus mounted block device and performed read & write.
 
-> ???? ??? else {
-> ???? ??? ??? if (of_irq_workarounds & OF_IMAP_NO_PHANDLE)
-> ???? ??? ??? ??? p = of_node_get(of_irq_dflt_pic);
-> ???? ??? ??? else
-> -??? ??? ??? ??? p = of_find_node_by_phandle(be32_to_cpup(parp));
-> +??? ??? ??? ??? p = of_find_node_by_phandle(*parp);
-> ???? ??? }
-> ???? ??? of_node_put(child);
-> ???? ??? child = p;
-> @@ -100,7 +100,8 @@ int of_irq_map_raw(struct device_node *parent, const
-> __be32 *intspec,
-> ???? ??? ?? u32 ointsize, const __be32 *addr, struct of_irq *out_irq)
-> ?{
-> ???? struct device_node *ipar, *tnode, *old = NULL, *newpar = NULL;
-> -??? const __be32 *tmp, *imap, *imask;
-> +??? const __be32 *imap, *imask;
-> +??? u32 *tmp;
-> ???? u32 intsize = 1, addrsize, newintsize = 0, newaddrsize = 0;
-> ???? int imaplen, match, i;
->
-> @@ -115,9 +116,10 @@ int of_irq_map_raw(struct device_node *parent, const
-> __be32 *intspec,
-> ???? ?* is none, we are nice and just walk up the tree
-> ???? ?*/
-> ???? do {
-> -??? ??? tmp = of_get_property(ipar, "#interrupt-cells", NULL);
-> +??? ??? tmp = NULL;
-> +??? ??? of_property_read_u32(ipar, "#interrupt-cells", tmp);
-> ???? ??? if (tmp != NULL) {
-> -??? ??? ??? intsize = be32_to_cpu(*tmp);
-> +??? ??? ??? intsize = *tmp;
-> ???? ??? ??? break;
-> ???? ??? }
-> ???? ??? tnode = ipar;
-> @@ -139,14 +141,15 @@ int of_irq_map_raw(struct device_node *parent, const
-> __be32 *intspec,
-> ???? ?*/
-> ???? old = of_node_get(ipar);
-> ???? do {
-> -??? ??? tmp = of_get_property(old, "#address-cells", NULL);
-> +??? ??? tmp = NULL;
-> +??? ??? of_property_read_u32(old, "#address-cells", tmp);
-> ???? ??? tnode = of_get_parent(old);
-> ???? ??? of_node_put(old);
-> ???? ??? old = tnode;
-> ???? } while (old && tmp == NULL);
-> ???? of_node_put(old);
-> ???? old = NULL;
-> -??? addrsize = (tmp == NULL) ? 2 : be32_to_cpu(*tmp);
-> +??? addrsize = (tmp == NULL) ? 2 : (*tmp);
->
-> ???? pr_debug(" -> addrsize=%d\n", addrsize);
->
-> @@ -225,14 +228,16 @@ int of_irq_map_raw(struct device_node *parent, const
-> __be32 *intspec,
-> ???? ??? ??? /* Get #interrupt-cells and #address-cells of new
-> ???? ??? ??? ?* parent
-> ???? ??? ??? ?*/
-> -??? ??? ??? tmp = of_get_property(newpar, "#interrupt-cells", NULL);
-> +??? ??? ??? tmp = NULL;
-> +??? ??? ??? of_property_read_u32(newpar, "#interrupt-cells", tmp);
-> ???? ??? ??? if (tmp == NULL) {
-> ???? ??? ??? ??? pr_debug(" -> parent lacks #interrupt-cells!\n");
-> ???? ??? ??? ??? goto fail;
-> ???? ??? ??? }
-> -??? ??? ??? newintsize = be32_to_cpu(*tmp);
-> -??? ??? ??? tmp = of_get_property(newpar, "#address-cells", NULL);
-> -??? ??? ??? newaddrsize = (tmp == NULL) ? 0 : be32_to_cpu(*tmp);
-> +??? ??? ??? newintsize = *tmp;
-> +??? ??? ??? tmp = NULL;
-> +??? ??? ??? of_property_read_u32(newpar, "#address-cells", tmp);
-> +??? ??? ??? newaddrsize = (tmp == NULL) ? 0 : (*tmp);
->
-> ???? ??? ??? pr_debug(" -> newintsize=%d, newaddrsize=%d\n",
-> ???? ??? ??? ??? newintsize, newaddrsize);
-> @@ -284,7 +289,8 @@ EXPORT_SYMBOL_GPL(of_irq_map_raw);
-> ?int of_irq_map_one(struct device_node *device, int index, struct of_irq
-> *out_irq)
-> ?{
-> ???? struct device_node *p;
-> -??? const __be32 *intspec, *tmp, *addr;
-> +??? const __be32 *intspec, *addr;
-> +??? u32 *tmp;
-> ???? u32 intsize, intlen;
-> ???? int res = -EINVAL;
->
-> @@ -311,10 +317,11 @@ int of_irq_map_one(struct device_node *device, int
-> index, struct of_irq *out_irq
-> ???? ??? return -EINVAL;
->
-> ???? /* Get size of interrupt specifier */
-> -??? tmp = of_get_property(p, "#interrupt-cells", NULL);
-> +??? tmp = NULL;
-> +??? of_get_property(p, "#interrupt-cells", tmp);
-> ???? if (tmp == NULL)
-> ???? ??? goto out;
-> -??? intsize = be32_to_cpu(*tmp);
-> +??? intsize = *tmp;
->
-> ???? pr_debug(" intsize=%d intlen=%d\n", intsize, intlen);
->
-> diff --git a/drivers/of/of_i2c.c b/drivers/of/of_i2c.c
-> index f37fbeb..7113512 100644
-> --- a/drivers/of/of_i2c.c
-> +++ b/drivers/of/of_i2c.c
-> @@ -32,8 +32,7 @@ void of_i2c_register_devices(struct i2c_adapter *adap)
-> ???? for_each_child_of_node(adap->dev.of_node, node) {
-> ???? ??? struct i2c_board_info info = {};
-> ???? ??? struct dev_archdata dev_ad = {};
-> -??? ??? const __be32 *addr;
-> -??? ??? int len;
-> +??? ??? u32 *addr = NULL;
->
-> ???? ??? dev_dbg(&adap->dev, "of_i2c: register %s\n", node->full_name);
->
-> @@ -43,14 +42,13 @@ void of_i2c_register_devices(struct i2c_adapter *adap)
-> ???? ??? ??? continue;
-> ???? ??? }
->
-> -??? ??? addr = of_get_property(node, "reg", &len);
-> -??? ??? if (!addr || (len < sizeof(int))) {
-> +??? ??? if (of_get_property(node, "reg", addr)) {
-> ???? ??? ??? dev_err(&adap->dev, "of_i2c: invalid reg on %s\n",
-> ???? ??? ??? ??? node->full_name);
-> ???? ??? ??? continue;
-> ???? ??? }
->
-> -??? ??? info.addr = be32_to_cpup(addr);
-> +??? ??? info.addr = *addr;
-> ???? ??? if (info.addr > (1 << 10) - 1) {
-> ???? ??? ??? dev_err(&adap->dev, "of_i2c: invalid addr=%x on %s\n",
-> ???? ??? ??? ??? info.addr, node->full_name);
-> diff --git a/drivers/of/of_mdio.c b/drivers/of/of_mdio.c
-> index d35e300..d4b6503 100644
-> --- a/drivers/of/of_mdio.c
-> +++ b/drivers/of/of_mdio.c
-> @@ -52,19 +52,17 @@ int of_mdiobus_register(struct mii_bus *mdio, struct
-> device_node *np)
->
-> ???? /* Loop over the child nodes and register a phy_device for each one */
-> ???? for_each_child_of_node(np, child) {
-> -??? ??? const __be32 *paddr;
-> ???? ??? u32 addr;
-> -??? ??? int len;
-> +??? ??? u32 *paddr = NULL;
->
-> ???? ??? /* A PHY must have a reg property in the range [0-31] */
-> -??? ??? paddr = of_get_property(child, "reg", &len);
-> -??? ??? if (!paddr || len < sizeof(*paddr)) {
-> +??? ??? if (of_property_read_u32(child, "reg", paddr)) {
-> ???? ??? ??? dev_err(&mdio->dev, "%s has invalid PHY address\n",
-> ???? ??? ??? ??? child->full_name);
-> ???? ??? ??? continue;
-> ???? ??? }
->
-> -??? ??? addr = be32_to_cpup(paddr);
-> +??? ??? addr = *paddr;
-> ???? ??? if (addr >= 32) {
-> ???? ??? ??? dev_err(&mdio->dev, "%s PHY address %i is too large\n",
-> ???? ??? ??? ??? child->full_name, addr);
-> @@ -169,8 +167,7 @@ struct phy_device *of_phy_connect_fixed_link(struct
-> net_device *dev,
-> ???? struct device_node *net_np;
-> ???? char bus_id[MII_BUS_ID_SIZE + 3];
-> ???? struct phy_device *phy;
-> -??? const __be32 *phy_id;
-> -??? int sz;
-> +??? u32 *phy_id = NULL;
->
-> ???? if (!dev->dev.parent)
-> ???? ??? return NULL;
-> @@ -179,11 +176,10 @@ struct phy_device *of_phy_connect_fixed_link(struct
-> net_device *dev,
-> ???? if (!net_np)
-> ???? ??? return NULL;
->
-> -??? phy_id = of_get_property(net_np, "fixed-link", &sz);
-> -??? if (!phy_id || sz < sizeof(*phy_id))
-> +??? if (of_property_read_u32(net_np, "fixed-link", phy_id))
-> ???? ??? return NULL;
->
-> -??? sprintf(bus_id, PHY_ID_FMT, "0", be32_to_cpu(phy_id[0]));
-> +??? sprintf(bus_id, PHY_ID_FMT, "0", phy_id[0]);
->
-> ???? phy = phy_connect(dev, bus_id, hndlr, 0, iface);
-> ???? return IS_ERR(phy) ? NULL : phy;
-> --
-> 1.7.4.1
->
->
->
+I found a bug in COH901318 DMA on the way and now the tests
+runs run cleanly. (Patch will go to DMAengine maninainer Vinod.)
 
+Test results below: conclusion is that not much performance is
+gained on U300 with MMCI/PL180, this is because we have no
+L2 cache, but we still get a small improvement of 1/2 to 1 s per test
+case.
 
+The code looks good too.
 
--- 
-Grant Likely, B.Sc., P.Eng.
-Secret Lab Technologies Ltd.
+Tested/Acked-by: Linus Walleij <linus.walleij@linaro.org>
+
+[  331.601747] mmc0: Starting tests of card mmc0:e624...
+[  331.606902] mmc0: Test case 37. Write performance with blocking req
+4k to 4MB...
+[  378.117553] mmc0: Transfer of 32768 x 8 sectors (32768 x 4 KiB)
+took 46.502646972 seconds (2886 kB/s, 2818 KiB/s, 704.64 IOPS, sg_len
+1)
+[  413.659600] mmc0: Transfer of 16384 x 16 sectors (16384 x 8 KiB)
+took 35.529431000 seconds (3777 kB/s, 3689 KiB/s, 461.13 IOPS, sg_len
+1)
+[  443.270662] mmc0: Transfer of 8192 x 32 sectors (8192 x 16 KiB)
+took 29.598359002 seconds (4534 kB/s, 4428 KiB/s, 276.77 IOPS, sg_len
+1)
+[  469.837460] mmc0: Transfer of 4096 x 64 sectors (4096 x 32 KiB)
+took 26.554253999 seconds (5054 kB/s, 4936 KiB/s, 154.25 IOPS, sg_len
+1)
+[  497.702775] mmc0: Transfer of 2048 x 127 sectors (2048 x 63.5 KiB)
+took 27.852746003 seconds (4818 kB/s, 4705 KiB/s, 73.52 IOPS, sg_len
+1)
+[  525.100160] mmc0: Transfer of 2048 x 127 sectors (2048 x 63.5 KiB)
+took 27.384628001 seconds (4901 kB/s, 4786 KiB/s, 74.78 IOPS, sg_len
+1)
+[  552.955832] mmc0: Transfer of 2048 x 127 sectors (2048 x 63.5 KiB)
+took 27.842956000 seconds (4820 kB/s, 4707 KiB/s, 73.55 IOPS, sg_len
+1)
+[  580.339398] mmc0: Transfer of 2048 x 127 sectors (2048 x 63.5 KiB)
+took 27.370849000 seconds (4903 kB/s, 4788 KiB/s, 74.82 IOPS, sg_len
+1)
+[  607.985578] mmc0: Transfer of 2048 x 127 sectors (2048 x 63.5 KiB)
+took 27.633430000 seconds (4857 kB/s, 4743 KiB/s, 74.11 IOPS, sg_len
+1)
+[  635.512579] mmc0: Transfer of 2048 x 127 sectors (2048 x 63.5 KiB)
+took 27.514265002 seconds (4878 kB/s, 4763 KiB/s, 74.43 IOPS, sg_len
+1)
+[  635.525193] mmc0: Result: OK
+[  635.528368] mmc0: Tests completed.
+[  635.533104] mmc0: Starting tests of card mmc0:e624...
+[  635.538244] mmc0: Test case 38. Write performance with non-blocking
+req 4k to 4MB...
+[  681.296218] mmc0: Transfer of 32768 x 8 sectors (32768 x 4 KiB)
+took 45.749655000 seconds (2933 kB/s, 2864 KiB/s, 716.24 IOPS, sg_len
+1)
+[  716.089227] mmc0: Transfer of 16384 x 16 sectors (16384 x 8 KiB)
+took 34.780447000 seconds (3858 kB/s, 3768 KiB/s, 471.06 IOPS, sg_len
+1)
+[  744.828042] mmc0: Transfer of 8192 x 32 sectors (8192 x 16 KiB)
+took 28.726150001 seconds (4672 kB/s, 4562 KiB/s, 285.17 IOPS, sg_len
+1)
+[  771.174677] mmc0: Transfer of 4096 x 64 sectors (4096 x 32 KiB)
+took 26.334063000 seconds (5096 kB/s, 4977 KiB/s, 155.53 IOPS, sg_len
+1)
+[  798.191207] mmc0: Transfer of 2048 x 127 sectors (2048 x 63.5 KiB)
+took 27.003975000 seconds (4970 kB/s, 4853 KiB/s, 75.84 IOPS, sg_len
+1)
+[  825.588017] mmc0: Transfer of 2048 x 127 sectors (2048 x 63.5 KiB)
+took 27.384043001 seconds (4901 kB/s, 4786 KiB/s, 74.78 IOPS, sg_len
+1)
+[  852.277635] mmc0: Transfer of 2048 x 127 sectors (2048 x 63.5 KiB)
+took 26.676835000 seconds (5031 kB/s, 4913 KiB/s, 76.77 IOPS, sg_len
+1)
+[  879.488620] mmc0: Transfer of 2048 x 127 sectors (2048 x 63.5 KiB)
+took 27.198205999 seconds (4934 kB/s, 4819 KiB/s, 75.29 IOPS, sg_len
+1)
+[  906.495492] mmc0: Transfer of 2048 x 127 sectors (2048 x 63.5 KiB)
+took 26.994123001 seconds (4972 kB/s, 4855 KiB/s, 75.86 IOPS, sg_len
+1)
+[  933.427449] mmc0: Transfer of 2048 x 127 sectors (2048 x 63.5 KiB)
+took 26.919235001 seconds (4985 kB/s, 4869 KiB/s, 76.07 IOPS, sg_len
+1)
+[  933.440075] mmc0: Result: OK
+[  933.443247] mmc0: Tests completed.
+[  933.447856] mmc0: Starting tests of card mmc0:e624...
+[  933.453191] mmc0: Test case 39. Read performance with blocking req
+4k to 4MB...
+[  967.234708] mmc0: Transfer of 32768 x 8 sectors (32768 x 4 KiB)
+took 33.773703000 seconds (3974 kB/s, 3880 KiB/s, 970.22 IOPS, sg_len
+1)
+[  991.857781] mmc0: Transfer of 16384 x 16 sectors (16384 x 8 KiB)
+took 24.610504001 seconds (5453 kB/s, 5325 KiB/s, 665.73 IOPS, sg_len
+1)
+[ 1011.802479] mmc0: Transfer of 8192 x 32 sectors (8192 x 16 KiB)
+took 19.932036000 seconds (6733 kB/s, 6575 KiB/s, 410.99 IOPS, sg_len
+1)
+[ 1029.388711] mmc0: Transfer of 4096 x 64 sectors (4096 x 32 KiB)
+took 17.573680001 seconds (7637 kB/s, 7458 KiB/s, 233.07 IOPS, sg_len
+1)
+[ 1045.644443] mmc0: Transfer of 2048 x 127 sectors (2048 x 63.5 KiB)
+took 16.243148000 seconds (8262 kB/s, 8069 KiB/s, 126.08 IOPS, sg_len
+1)
+[ 1061.899985] mmc0: Transfer of 2048 x 127 sectors (2048 x 63.5 KiB)
+took 16.242733002 seconds (8263 kB/s, 8069 KiB/s, 126.08 IOPS, sg_len
+1)
+[ 1078.146701] mmc0: Transfer of 2048 x 127 sectors (2048 x 63.5 KiB)
+took 16.233908999 seconds (8267 kB/s, 8073 KiB/s, 126.15 IOPS, sg_len
+1)
+[ 1094.402387] mmc0: Transfer of 2048 x 127 sectors (2048 x 63.5 KiB)
+took 16.242875002 seconds (8263 kB/s, 8069 KiB/s, 126.08 IOPS, sg_len
+1)
+[ 1110.649158] mmc0: Transfer of 2048 x 127 sectors (2048 x 63.5 KiB)
+took 16.233967999 seconds (8267 kB/s, 8073 KiB/s, 126.15 IOPS, sg_len
+1)
+[ 1126.905416] mmc0: Transfer of 2048 x 127 sectors (2048 x 63.5 KiB)
+took 16.243438001 seconds (8262 kB/s, 8069 KiB/s, 126.08 IOPS, sg_len
+1)
+[ 1126.918129] mmc0: Result: OK
+[ 1126.921358] mmc0: Tests completed.
+[ 1126.925955] mmc0: Starting tests of card mmc0:e624...
+[ 1126.931289] mmc0: Test case 40. Read performance with non-blocking
+req 4k to 4MB...
+[ 1159.685208] mmc0: Transfer of 32768 x 8 sectors (32768 x 4 KiB)
+took 32.745868000 seconds (4098 kB/s, 4002 KiB/s, 1000.67 IOPS, sg_len
+1)
+[ 1183.516766] mmc0: Transfer of 16384 x 16 sectors (16384 x 8 KiB)
+took 23.818903999 seconds (5634 kB/s, 5502 KiB/s, 687.85 IOPS, sg_len
+1)
+[ 1202.827382] mmc0: Transfer of 8192 x 32 sectors (8192 x 16 KiB)
+took 19.297962001 seconds (6955 kB/s, 6792 KiB/s, 424.50 IOPS, sg_len
+1)
+[ 1219.886157] mmc0: Transfer of 4096 x 64 sectors (4096 x 32 KiB)
+took 17.046200000 seconds (7873 kB/s, 7689 KiB/s, 240.28 IOPS, sg_len
+1)
+[ 1235.638313] mmc0: Transfer of 2048 x 127 sectors (2048 x 63.5 KiB)
+took 15.739587001 seconds (8527 kB/s, 8327 KiB/s, 130.11 IOPS, sg_len
+1)
+[ 1251.391234] mmc0: Transfer of 2048 x 127 sectors (2048 x 63.5 KiB)
+took 15.740097000 seconds (8526 kB/s, 8327 KiB/s, 130.11 IOPS, sg_len
+1)
+[ 1267.143799] mmc0: Transfer of 2048 x 127 sectors (2048 x 63.5 KiB)
+took 15.739750001 seconds (8527 kB/s, 8327 KiB/s, 130.11 IOPS, sg_len
+1)
+[ 1282.896571] mmc0: Transfer of 2048 x 127 sectors (2048 x 63.5 KiB)
+took 15.739964000 seconds (8527 kB/s, 8327 KiB/s, 130.11 IOPS, sg_len
+1)
+[ 1298.649986] mmc0: Transfer of 2048 x 127 sectors (2048 x 63.5 KiB)
+took 15.740602001 seconds (8526 kB/s, 8326 KiB/s, 130.10 IOPS, sg_len
+1)
+[ 1314.394199] mmc0: Transfer of 2048 x 127 sectors (2048 x 63.5 KiB)
+took 15.731410000 seconds (8531 kB/s, 8331 KiB/s, 130.18 IOPS, sg_len
+1)
+[ 1314.406920] mmc0: Result: OK
+[ 1314.410167] mmc0: Tests completed.
+[ 1314.414783] mmc0: Starting tests of card mmc0:e624...
+[ 1314.420123] mmc0: Test case 41. Write performance blocking req 1 to
+512 sg elems...
+[ 1342.241715] mmc0: Transfer of 2048 x 127 sectors (2048 x 63.5 KiB)
+took 27.813536000 seconds (4825 kB/s, 4712 KiB/s, 73.63 IOPS, sg_len
+1)
+[ 1369.319673] mmc0: Transfer of 2048 x 127 sectors (2048 x 63.5 KiB)
+took 27.065227999 seconds (4958 kB/s, 4842 KiB/s, 75.66 IOPS, sg_len
+8)
+[ 1396.773703] mmc0: Transfer of 2048 x 127 sectors (2048 x 63.5 KiB)
+took 27.441285001 seconds (4891 kB/s, 4776 KiB/s, 74.63 IOPS, sg_len
+16)
+[ 1423.675432] mmc0: Transfer of 2048 x 127 sectors (2048 x 63.5 KiB)
+took 26.888910001 seconds (4991 kB/s, 4874 KiB/s, 76.16 IOPS, sg_len
+16)
+[ 1451.239203] mmc0: Transfer of 2048 x 127 sectors (2048 x 63.5 KiB)
+took 27.550955999 seconds (4871 kB/s, 4757 KiB/s, 74.33 IOPS, sg_len
+16)
+[ 1478.262309] mmc0: Transfer of 2048 x 127 sectors (2048 x 63.5 KiB)
+took 27.010269002 seconds (4969 kB/s, 4852 KiB/s, 75.82 IOPS, sg_len
+16)
+[ 1505.491671] mmc0: Transfer of 2048 x 127 sectors (2048 x 63.5 KiB)
+took 27.216503001 seconds (4931 kB/s, 4815 KiB/s, 75.24 IOPS, sg_len
+16)
+[ 1532.747882] mmc0: Transfer of 2048 x 127 sectors (2048 x 63.5 KiB)
+took 27.243356999 seconds (4926 kB/s, 4811 KiB/s, 75.17 IOPS, sg_len
+16)
+[ 1532.760607] mmc0: Result: OK
+[ 1532.763779] mmc0: Tests completed.
+[ 1532.768387] mmc0: Starting tests of card mmc0:e624...
+[ 1532.773722] mmc0: Test case 42. Write performance non-blocking req
+1 to 512 sg elems...
+[ 1559.686860] mmc0: Transfer of 2048 x 127 sectors (2048 x 63.5 KiB)
+took 26.904625000 seconds (4988 kB/s, 4871 KiB/s, 76.12 IOPS, sg_len
+1)
+[ 1586.632702] mmc0: Transfer of 2048 x 127 sectors (2048 x 63.5 KiB)
+took 26.933068001 seconds (4983 kB/s, 4866 KiB/s, 76.04 IOPS, sg_len
+8)
+[ 1613.014844] mmc0: Transfer of 2048 x 127 sectors (2048 x 63.5 KiB)
+took 26.369411000 seconds (5089 kB/s, 4970 KiB/s, 77.66 IOPS, sg_len
+16)
+[ 1640.120694] mmc0: Transfer of 2048 x 127 sectors (2048 x 63.5 KiB)
+took 27.092996001 seconds (4953 kB/s, 4837 KiB/s, 75.59 IOPS, sg_len
+16)
+[ 1666.593943] mmc0: Transfer of 2048 x 127 sectors (2048 x 63.5 KiB)
+took 26.460398000 seconds (5072 kB/s, 4953 KiB/s, 77.39 IOPS, sg_len
+16)
+[ 1693.477690] mmc0: Transfer of 2048 x 127 sectors (2048 x 63.5 KiB)
+took 26.870933000 seconds (4994 kB/s, 4877 KiB/s, 76.21 IOPS, sg_len
+16)
+[ 1719.918133] mmc0: Transfer of 2048 x 127 sectors (2048 x 63.5 KiB)
+took 26.427604001 seconds (5078 kB/s, 4959 KiB/s, 77.49 IOPS, sg_len
+16)
+[ 1746.761038] mmc0: Transfer of 2048 x 127 sectors (2048 x 63.5 KiB)
+took 26.830035002 seconds (5002 kB/s, 4885 KiB/s, 76.33 IOPS, sg_len
+16)
+[ 1746.773743] mmc0: Result: OK
+[ 1746.776905] mmc0: Tests completed.
+[ 1746.781603] mmc0: Starting tests of card mmc0:e624...
+[ 1746.786742] mmc0: Test case 43. Read performance blocking req 1 to
+512 sg elems...
+[ 1763.028662] mmc0: Transfer of 2048 x 127 sectors (2048 x 63.5 KiB)
+took 16.233791001 seconds (8267 kB/s, 8073 KiB/s, 126.15 IOPS, sg_len
+1)
+[ 1779.313875] mmc0: Transfer of 2048 x 127 sectors (2048 x 63.5 KiB)
+took 16.272372001 seconds (8248 kB/s, 8054 KiB/s, 125.85 IOPS, sg_len
+8)
+[ 1795.625488] mmc0: Transfer of 2048 x 127 sectors (2048 x 63.5 KiB)
+took 16.298793000 seconds (8234 kB/s, 8041 KiB/s, 125.65 IOPS, sg_len
+16)
+[ 1811.937588] mmc0: Transfer of 2048 x 127 sectors (2048 x 63.5 KiB)
+took 16.299186000 seconds (8234 kB/s, 8041 KiB/s, 125.65 IOPS, sg_len
+16)
+[ 1828.249349] mmc0: Transfer of 2048 x 127 sectors (2048 x 63.5 KiB)
+took 16.298847000 seconds (8234 kB/s, 8041 KiB/s, 125.65 IOPS, sg_len
+16)
+[ 1844.561499] mmc0: Transfer of 2048 x 127 sectors (2048 x 63.5 KiB)
+took 16.299234002 seconds (8234 kB/s, 8041 KiB/s, 125.65 IOPS, sg_len
+16)
+[ 1860.864668] mmc0: Transfer of 2048 x 127 sectors (2048 x 63.5 KiB)
+took 16.290268999 seconds (8239 kB/s, 8045 KiB/s, 125.71 IOPS, sg_len
+16)
+[ 1877.177045] mmc0: Transfer of 2048 x 127 sectors (2048 x 63.5 KiB)
+took 16.299461001 seconds (8234 kB/s, 8041 KiB/s, 125.64 IOPS, sg_len
+16)
+[ 1877.189848] mmc0: Result: OK
+[ 1877.193031] mmc0: Tests completed.
+[ 1877.197628] mmc0: Starting tests of card mmc0:e624...
+[ 1877.202958] mmc0: Test case 44. Read performance non-blocking req 1
+to 512 sg elems...
+[ 1892.939499] mmc0: Transfer of 2048 x 127 sectors (2048 x 63.5 KiB)
+took 15.728134000 seconds (8533 kB/s, 8333 KiB/s, 130.21 IOPS, sg_len
+1)
+[ 1908.693056] mmc0: Transfer of 2048 x 127 sectors (2048 x 63.5 KiB)
+took 15.740710002 seconds (8526 kB/s, 8326 KiB/s, 130.10 IOPS, sg_len
+8)
+[ 1924.437735] mmc0: Transfer of 2048 x 127 sectors (2048 x 63.5 KiB)
+took 15.731847999 seconds (8531 kB/s, 8331 KiB/s, 130.18 IOPS, sg_len
+16)
+[ 1940.190363] mmc0: Transfer of 2048 x 127 sectors (2048 x 63.5 KiB)
+took 15.739700003 seconds (8527 kB/s, 8327 KiB/s, 130.11 IOPS, sg_len
+16)
+[ 1955.935298] mmc0: Transfer of 2048 x 127 sectors (2048 x 63.5 KiB)
+took 15.732027999 seconds (8531 kB/s, 8331 KiB/s, 130.18 IOPS, sg_len
+16)
+[ 1971.688298] mmc0: Transfer of 2048 x 127 sectors (2048 x 63.5 KiB)
+took 15.740083001 seconds (8526 kB/s, 8327 KiB/s, 130.11 IOPS, sg_len
+16)
+[ 1987.441782] mmc0: Transfer of 2048 x 127 sectors (2048 x 63.5 KiB)
+took 15.740559000 seconds (8526 kB/s, 8326 KiB/s, 130.10 IOPS, sg_len
+16)
+[ 2003.195375] mmc0: Transfer of 2048 x 127 sectors (2048 x 63.5 KiB)
+took 15.740680001 seconds (8526 kB/s, 8326 KiB/s, 130.10 IOPS, sg_len
+16)
+[ 2003.208170] mmc0: Result: OK
+[ 2003.211401] mmc0: Tests completed.
+
+Yours,
+Linus Walleij
