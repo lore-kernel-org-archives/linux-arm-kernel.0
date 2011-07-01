@@ -1,38 +1,77 @@
-From: LW@KARO-electronics.de (=?utf-8?q?Lothar=20Wa=C3=9Fmann?=)
-Date: Fri,  1 Jul 2011 15:02:06 +0200
-Subject: [BUGFIX][PATCH] fix the parent of i2c[12]_clk
-Message-ID: <1309525326-4762-1-git-send-email-LW@KARO-electronics.de>
+From: per.forlin@linaro.org (Per Forlin)
+Date: Fri, 1 Jul 2011 15:29:25 +0200
+Subject: [PATCH v8 05/12] mmc: mmc_test: add test for non-blocking
+	transfers
+In-Reply-To: <1309248717-14606-6-git-send-email-per.forlin@linaro.org>
+References: <1309248717-14606-1-git-send-email-per.forlin@linaro.org>
+	<1309248717-14606-6-git-send-email-per.forlin@linaro.org>
+Message-ID: <BANLkTi=-Nn0HjLgmTsCs9zoQt4By-6-KZw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The clock from which the I2C timing is derived is the ipg_perclk not ipg_clk.
+On 28 June 2011 10:11, Per Forlin <per.forlin@linaro.org> wrote:
+> Add four tests for read and write performance per
+> different transfer size, 4k to 4M.
+> ?* Read using blocking mmc request
+> ?* Read using non-blocking mmc request
+> ?* Write using blocking mmc request
+> ?* Write using non-blocking mmc request
+>
+> The host dirver must support pre_req() and post_req()
+> in order to run the non-blocking test cases.
+>
+> Signed-off-by: Per Forlin <per.forlin@linaro.org>
+> ---
+> ?drivers/mmc/card/mmc_test.c | ?311 +++++++++++++++++++++++++++++++++++++++++-
+> ?1 files changed, 303 insertions(+), 8 deletions(-)
+>
+> diff --git a/drivers/mmc/card/mmc_test.c b/drivers/mmc/card/mmc_test.c
+> +static int mmc_test_nonblock_transfer(struct mmc_test_card *test,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct scatterlist *sg, unsigned sg_len,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? unsigned dev_addr, unsigned blocks,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? unsigned blksz, int write, int count)
+> +{
+> + ? ? ? struct mmc_request mrq1;
+> + ? ? ? struct mmc_command cmd1;
+> + ? ? ? struct mmc_command stop1;
+> + ? ? ? struct mmc_data data1;
+> +
+> + ? ? ? struct mmc_request mrq2;
+> + ? ? ? struct mmc_command cmd2;
+> + ? ? ? struct mmc_command stop2;
+> + ? ? ? struct mmc_data data2;
+> +
+> + ? ? ? struct mmc_test_async_req test_areq[2];
+> + ? ? ? struct mmc_async_req *done_areq;
+> + ? ? ? struct mmc_async_req *cur_areq = &test_areq[0].areq;
+> + ? ? ? struct mmc_async_req *other_areq = &test_areq[1].areq;
+> + ? ? ? int i;
+> + ? ? ? int ret;
+> +
+> + ? ? ? test_areq[0].test = test;
+> + ? ? ? test_areq[1].test = test;
+> +
+> + ? ? ? if (!test->card->host->ops->pre_req ||
+> + ? ? ? ? ? ? ? !test->card->host->ops->post_req)
+> + ? ? ? ? ? ? ? return -RESULT_UNSUP_HOST;
+Remove this error check. It is fine to run this test without these
+hooks, but there will be no performance gain compared to blocking
+request.
 
-I2C bus frequency was too low by a factor of ~8 due to the clock divider
-calculation being based on 66.5MHz IPG clock while the bus actually
-uses 8MHz ipg_perclk.
+...
 
-Kernel version: 3.0.0-rc2 branch 'imx-for-next' of git://git.pengutronix.de/git/imx/linux-2.6
+> +/*
+> + * Multiple blocking write 4k to 4 MB chunks
+> + */
+> +static int mmc_test_profile_mult_write_blocking_perf(struct mmc_test_card *test)
+> +{
+> + ? ? ? unsigned int bs[] = {1 << 12, 1 << 13, 1 << 14, 1 << 15, 1 << 16,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ?1 << 17, 1 << 18, 1 << 19, 1 << 20, 1 << 22};
+> + ? ? ? struct mmc_test_multiple_rw test_data = {
+> + ? ? ? ? ? ? ? .bs = bs,
+> + ? ? ? ? ? ? ? .size = 128*1024*1024,
+I got this comment from Linus W.
+Use TEST_AREA_MAX_SIZE instead of hard coded 128*1024*1024. update all
+relevant functions.
 
-Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
----
- arch/arm/mach-mx5/clock-mx51-mx53.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
-index 699b0d2..fe977d0 100644
---- a/arch/arm/mach-mx5/clock-mx51-mx53.c
-+++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
-@@ -1282,9 +1282,9 @@ DEFINE_CLOCK(pwm2_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG8_OFFSET,
- 
- /* I2C */
- DEFINE_CLOCK(i2c1_clk, 0, MXC_CCM_CCGR1, MXC_CCM_CCGRx_CG9_OFFSET,
--	NULL, NULL, &ipg_clk, NULL);
-+	NULL, NULL, &ipg_perclk, NULL);
- DEFINE_CLOCK(i2c2_clk, 1, MXC_CCM_CCGR1, MXC_CCM_CCGRx_CG10_OFFSET,
--	NULL, NULL, &ipg_clk, NULL);
-+	NULL, NULL, &ipg_perclk, NULL);
- DEFINE_CLOCK(hsi2c_clk, 0, MXC_CCM_CCGR1, MXC_CCM_CCGRx_CG11_OFFSET,
- 	NULL, NULL, &ipg_clk, NULL);
- DEFINE_CLOCK(i2c3_mx53_clk, 0, MXC_CCM_CCGR1, MXC_CCM_CCGRx_CG11_OFFSET,
--- 
-1.5.6.5
+/Per
