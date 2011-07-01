@@ -1,40 +1,25 @@
 From: b32955@freescale.com (Huang Shijie)
-Date: Fri, 1 Jul 2011 14:36:46 +0800
-Subject: reply: [PATCH v7 1/3] MTD : add the common code for GPMI-NFC
-	controller driver
-In-Reply-To: <20110630162636.GB21898@n2100.arm.linux.org.uk>
-References: <14C4E31473AF7E4B98176CB73615181C19FB3C@039-SN1MPN1-006.039d.mgd.msft.net>
-	<20110630162636.GB21898@n2100.arm.linux.org.uk>
-Message-ID: <4E0D6AFE.2060108@freescale.com>
+Date: Fri, 1 Jul 2011 14:47:05 +0800
+Subject: [PATCH v7 1/3] MTD : add the common code for GPMI-NFC controller
+	driver
+In-Reply-To: <1309498866.23597.201.camel@sauron>
+References: <1309335878-16678-1-git-send-email-b32955@freescale.com>	
+	<1309335878-16678-2-git-send-email-b32955@freescale.com>	
+	<20110630102728.GB1997@pengutronix.de>	
+	<20110630170432.GA20948@pengutronix.de>
+	<1309498866.23597.201.camel@sauron>
+Message-ID: <4E0D6D69.5090102@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi:
-> Please can to use a mailer which:
+? 2011?07?01? 13:41, Artem Bityutskiy ??:
+> On Thu, 2011-06-30 at 19:04 +0200, Wolfram Sang wrote:
+>> Why can't you define a nand_ecclayout with no free space?
+> Yes, this sounds like the right way to go.
 >
-> 1. Understands the convention for subject lines which are replies
->     (iow doesn't prefix it with "reply")
-> 2. Understands threading enough to put In-reply-to: and/or References:
->     headers into your emails.
-I feel sorry about this.
+ok. I will read the code again, and try to use the nand_ecclayout.
 
-I sometimes reply the mail in the home with the Microsoft's webmail GUI, 
-which make the mail
-like new threads.
-
-I will take care of it in the later mails.
-
-thanks.
+thanks
 
 Best Regards
 Huang Shijie
-> Your current mailer makes all your messages look like new threads of
-> conversation, and are completely disconnected from their real thread.
-> Not only does that makes it hard to follow the threads, but also
-> makes it harder to filter messages for reading.
->
-> With the amount of email on these mailing lists, this should be a
-> mandatory requirement for everyone sending messages there.
->
-> Thanks.
->
