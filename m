@@ -1,37 +1,64 @@
-From: joravec@drewtech.com (Joey Oravec)
-Date: Fri, 01 Jul 2011 15:14:48 -0400
-Subject: plat-orion multi purpose pins problem for mv78200
-Message-ID: <4E0E1CA8.7090200@drewtech.com>
+From: ptesarik@suse.cz (Petr Tesarik)
+Date: Fri, 1 Jul 2011 21:34:45 +0200
+Subject: [PATCH 00/10] Enhance /dev/mem to allow read/write of arbitrary
+	physical addresses
+In-Reply-To: <20110701161345.GA29775@elte.hu>
+References: <201106171038.25988.ptesarik@suse.cz> <4E0DEF2C.3040504@zytor.com>
+	<20110701161345.GA29775@elte.hu>
+Message-ID: <201107012134.45881.ptesarik@suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nicola, Lennert -
+Dne P? 1. ?ervence 2011 18:13:45 Ingo Molnar napsal(a):
+> * H. Peter Anvin <hpa@zytor.com> wrote:
+> > On 07/01/2011 08:36 AM, Ingo Molnar wrote:
+> > > So we could kill multiple birds with the same stone here:
+> > >  - remove various ugly uses of /dev/mem (including the rootkit usage),
+> > >  
+> > >    with or without strict-devmem
+> > >  
+> > >  - extending it to above-4G for inspection purposes
+> > >  
+> > >  - allowing to kill /dev/mem access runtime similar to the
+> > >  
+> > >    disable_modules lock-down killswitch, for the so inclined.
+> > > 
+> > > Would you be interested in modifying your patch-set in such a
+> > > fashion?
 
-There's a problem in 3.0-rc5 when calling mv78xx0_mpp_conf() on the 
-MV78200 processor. This processor has 49 multi purpose pins but only 31 
-GPIOs. MPP[31:0] map directly to GPIO[31:0] but the next 17 are a little 
-more complex:
+Yes, this works for me. How persistent should the kill-switch be? I assume it 
+doesn't make much sense to make a sysfs toggle, because then it would still be 
+open to abuse. I'd rather see it specified on boot and never changed. Agreed?
 
-MPP[39:32] = GPIO[7:0]
-MPP[46:40] = GPIO[23:17]
-MPP[47] = GPIO[16]
-MPP[48] = GPIO[8]
-MPP[49] = GPIO[9]
+Something like "enable_dev_mem" on the kenrel command line (default is 
+disabled).
 
-See arch/arm/plat-orion/mpp.c. Inside orion_mpp_conf() the array gets 
-processed by calling MPP_NUM() then calling orion_gpio_set_valid(). As 
-demonstrated above, the MPP number and GPIO number are not 
-interchangeable and on the MV78200 that's a problem when trying to setup 
-any MPP > 31.
+On a similar note, I should probably rip off write_mem() completely and 
+disallow PROT_WRITE mmapping of the device. Right?
 
-So we need to map each MPP to a given GPIO -- I don't know how the 
-mapping will differ across processors. We also need to keep-clear which 
-functions are called with an MPP number and which functions are called 
-with a GPIO number.
+> > There is another use that I have looked at, as well: for testing
+> > purposes, it would be extremely good to be able to dirty and/or
+> > flush an arbitrary physical cache line for testing purposes.
+> > 
+> > This is very very similar to /dev/mem usage -- access to an
+> > arbitrary chunk of memory -- and a fully enabled /dev/mem can of
+> > course support this use (just mmap the page with the relevant cache
+> > line).  However, it could also be a separate device which could
+> > have looser permissions than /dev/mem; or a set of ioctls on
+> > /dev/mem with a separate kill switch, because no data would ever be
+> > have modified or returned to user space.
+> > 
+> > Either way, though, we found that it would share a lot of code with
+> > the /dev/mem implementation, and as such fixing up the underlying
+> > machinery is the sanest way to upstream this.
+> 
+> To me that cache flush thing sounds obscure (but still useful) enough
+> to justify a new ioctl over /dev/mem.
+> 
+> Not sure it even needs a killswitch, unless there's some real
+> security problem related to it.
 
-Followup question -- Marvell has several SoC families, but Linux uess 
-plat-orion for everything. For example MV78200 isn't an Orion it's a 
-Discovery Innovation series. Would it make more sense to have separate 
-plat-* code for the separate families?
+It can be used for DoS, but if you have permission for the ioctl(), then you 
+probably also have easier ways to kill the system.
 
--joey
+Petr
