@@ -1,33 +1,37 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Fri, 01 Jul 2011 15:12:16 +0400
-Subject: [PATCH] ARM: DMA: Add missing semicolon for the define of
-	dma_alloc_area
-In-Reply-To: <1309509472.30642.1.camel@phoenix>
-References: <1309509472.30642.1.camel@phoenix>
-Message-ID: <4E0DAB90.9080708@mvista.com>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Fri, 1 Jul 2011 13:37:26 +0200
+Subject: [PATCH 2/3] Add tps65921 chip
+In-Reply-To: <20110701073557.GF23145@atomide.com>
+References: <1308066307-415-1-git-send-email-green@linuxhacker.ru>
+	<1308066307-415-3-git-send-email-green@linuxhacker.ru>
+	<20110701073557.GF23145@atomide.com>
+Message-ID: <20110701113726.GJ12106@sortiz-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Hi Tony,
 
-On 01-07-2011 12:37, Axel Lin wrote:
+On Fri, Jul 01, 2011 at 12:35:58AM -0700, Tony Lindgren wrote:
+> Samuel,
+> 
+> * green at linuxhacker.ru <green@linuxhacker.ru> [110614 08:42]:
+> > From: Oleg Drokin <green@linuxhacker.ru>
+> > 
+> > Very similar to TPS65920
+> > List of differences: http://www.ti.com/litv/pdf/swcu066b
+> > 
+> > CC: sameo at linux.intel.com
+> > Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
+> 
+> Looks like this one can be merged independently of the rest of the
+> Nook patches via your mfd tree. Care to queue this?
+I asked Oleg to rebase this patch against my for-next branch as it was not
+applying cleanly. But I never got the fixed patch.
+I fixed it up now, and it's applied.
 
-> I got below build error by: make at91x40_defconfig;make
-> Fix it by adding a missing semicolon for the define of dma_alloc_area.
+Cheers,
+Samuel.
 
->    CC      arch/arm/mm/dma-mapping.o
-> arch/arm/mm/dma-mapping.c:309: warning: 'struct dma_coherent_area' declared inside parameter list
-> arch/arm/mm/dma-mapping.c:309: warning: its scope is only this definition or declaration, which is probably not what you want
-> arch/arm/mm/dma-mapping.c: In function '__dma_alloc':
-> arch/arm/mm/dma-mapping.c:324: error: expected ';' before '}' token
-> arch/arm/mm/dma-mapping.c: At top level:
-> arch/arm/mm/dma-mapping.c:334: warning: 'struct dma_coherent_area' declared inside parameter list
-> arch/arm/mm/dma-mapping.c:374: warning: 'struct dma_coherent_area' declared inside parameter list
-> make[1]: *** [arch/arm/mm/dma-mapping.o] Error 1
-> make: *** [arch/arm/mm] Error 2
-
-    You didn't fix the warning though, so not clear why you cited them....
-
-> Signed-off-by: Axel Lin<axel.lin@gmail.com>
-
-WBR, Sergei
+-- 
+Intel Open Source Technology Centre
+http://oss.intel.com/
