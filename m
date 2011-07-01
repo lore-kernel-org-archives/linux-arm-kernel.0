@@ -1,72 +1,72 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 1 Jul 2011 22:38:47 +0200
-Subject: [PATCH 1/8] at91: introduce commom AT91_BASE_SYS
-In-Reply-To: <20110701172514.GG14408@game.jcrosoft.org>
-References: <1309502682-16897-1-git-send-email-plagnioj@jcrosoft.com>
-	<201107011746.57026.arnd@arndb.de>
-	<20110701172514.GG14408@game.jcrosoft.org>
-Message-ID: <201107012238.47355.arnd@arndb.de>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Fri, 1 Jul 2011 22:41:23 +0200
+Subject: [PATCH v2 00/18] OMAP4: PM data big spring cleanup and fixes
+Message-ID: <1309552901-8944-1-git-send-email-b-cousson@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 01 July 2011 19:25:14 Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 17:46 Fri 01 Jul     , Arnd Bergmann wrote:
-> > As a general comment, please start with a cover-letter (the PATCH 0/8)
-> > email that describes the overall intention of the series and holds
-> > the combined diffstat.
->
-> this detect dynamicly the soc and factorize the init of AT91 in one place
-> as all the soc have the same init
-> 
-> this patch series is just a first step as switch to the CLKDEV
+Hi Paul,
 
-Ok, thanks for the explanation.
+Here are a bunch of cleanups on almost every PRCM related data files.
+Some of them are purely code moves, and will look like a lot of
+noise for nothing, but this is needed if we want to keep the files
+aligned with generator tool and thus ease the future migration to
+whatever format (common clock framework + DT).
+Moreover, the diffstat is negative:-)
 
-> On 17:46 Fri 01 Jul     , Arnd Bergmann wrote:
-> > 
-> > I think it would be easier to turn this around and have a very short
-> > function here:
-> > 
-> > void __init at91_map_io(void)
-> > {
-> > 	/* Map peripherals */
-> > 	iotable_init(&at91_io_desc, 1);
-> > }
-> > 
-> > and then change each of the soc specific functions into
-> > 
-> > 
-> > -void __init at91cap9_map_io(void)
-> > +static void __init at91cap9_map_io(void)
-> >  {
-> > -       /* Map peripherals */
-> > -       iotable_init(at91cap9_io_desc, ARRAY_SIZE(at91cap9_io_desc));
-> > +	at91_boot_soc = at91cap9_soc;
-> > +	at91_map_io();
-> > +       iotable_init(at91cap9_sram_desc, ARRAY_SIZE(at91cap9_sram_desc));
-> >  }
-> > 
-> > This would keep the per-soc code local and still consolidate the
-> > common code without introducing (IMHO ugly) cpu_is_at91...() checks.
-> we detect it this is the whole idea
-> 
-> so not this way is the oposit of the whole idea
+I added as well the 2 fixes that Tomi did for the DSS pm_runtime
+migration. That series must then be merged before the DSS series.
 
-I wouldn't say the whole idea. An major part of your patches is to use the
-fact that you know the SoC, which is definitely useful. The change I mentioned
-above would only provide a simpler way to get to that information, based
-on the fact that you already know the specific board.
+The series is based on for_3.1/1_prcm_files_fixes and tested
+on OMAP4430 ES2.1 + SDP.
 
-What is the advantage that you see of using the CPU register over a pointer
-from the machine_desc?
+The patches are available here:
+git://gitorious.org/omap-pm/linux.git for_3.1/2_prcm_files_cleanup
 
-Obviously, it doesn't matter much any more once you do the conversion to
-device tree an end up with a of match table like
+Regards,
+Benoit
 
-struct of_device_id at91_match_table[] = {
-	{ .compatible = "atmel,at91cap9",  .data = &at91cap9_soc, },
-	{ .compatible = "atmel,at91rm9200, .data = &at91rm9200_soc, },
-	...
-};
 
-	Arnd
+Changes since v1:
+    - Add 2 patches for the DSS
+
+Benoit Cousson (12):
+  OMAP4: cm: Remove RESTORE macros to avoid access from SW
+  OMAP4: prcm_mpu: Fix indent in few macros
+  OMAP4: clockdomain data: Fix data order and wrong name
+  OMAP4: clock data: Add sddiv to USB DPLL
+  OMAP4: clock data: Remove usb_host_fs clkdev with NULL dev
+  OMAP4: clock data: Re-order some clock nodes and structure fields
+  OMAP4: clock data: Fix max mult and div for USB DPLL
+  OMAP4: prcm: Remove references to non-existant peripherals
+  OMAP4: hwmod data: Fix L3 interconnect data order and alignement
+  OMAP4: hwmod data: Remove un-needed parens
+  OMAP4: hwmod data: Fix bad alignement
+  OMAP4: hwmod data: Replace CHIP_IS_OMAP4430 by OMAP44XX
+
+Jon Hunter (2):
+  OMAP4: clock data: Remove McASP2, McASP3 and MMC6 clocks
+  OMAP4: clock data: Remove UNIPRO clock nodes
+
+Rajendra Nayak (2):
+  OMAP4: clock data: Rename clock flags from 443X to 44XX
+  OMAP4: clock data: Add missing divider selection for auxclks
+
+Tomi Valkeinen (2):
+  OMAP4: hwmod data: Modify DSS opt clocks
+  OMAP4: hwmod data: Change DSS main_clk scheme
+
+ arch/arm/mach-omap2/clock44xx.h               |    7 -
+ arch/arm/mach-omap2/clock44xx_data.c          | 1022 +++++++++++++------------
+ arch/arm/mach-omap2/clockdomains44xx_data.c   |  124 ++--
+ arch/arm/mach-omap2/cm-regbits-44xx.h         |  702 +++++++----------
+ arch/arm/mach-omap2/cm1_44xx.h                |   36 -
+ arch/arm/mach-omap2/cm2_44xx.h                |   90 ---
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c    |  312 +++++----
+ arch/arm/mach-omap2/prcm_mpu44xx.h            |   69 +-
+ arch/arm/mach-omap2/prm-regbits-44xx.h        |  178 +----
+ arch/arm/mach-omap2/prm44xx.h                 |   64 --
+ arch/arm/plat-omap/include/plat/clkdev_omap.h |    2 +
+ arch/arm/plat-omap/include/plat/clock.h       |    3 +-
+ arch/arm/plat-omap/include/plat/cpu.h         |    2 +
+ 13 files changed, 1130 insertions(+), 1481 deletions(-)
