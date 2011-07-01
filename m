@@ -1,164 +1,94 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Fri, 1 Jul 2011 23:27:06 +0200
-Subject: [PATCH v4 7/7] OMAP2+: hwmod: Follow the recommended PRCM module
-	enable sequence
-In-Reply-To: <1309555626-22608-1-git-send-email-b-cousson@ti.com>
-References: <1309555626-22608-1-git-send-email-b-cousson@ti.com>
-Message-ID: <1309555626-22608-8-git-send-email-b-cousson@ti.com>
+From: heechul@illinois.edu (heechul Yun)
+Date: Fri, 1 Jul 2011 14:42:00 -0700
+Subject: Unnecessary cache-line flush on page table updates ?
+In-Reply-To: <20110701101019.GA1723@e102109-lin.cambridge.arm.com>
+References: <BANLkTin7aJXjpEH_WzJi5zaAtH8kFcTZeg@mail.gmail.com>
+	<20110701101019.GA1723@e102109-lin.cambridge.arm.com>
+Message-ID: <BANLkTi=KVnzBKcd83c9T3P20VAv-ggqR4g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rajendra Nayak <rnayak@ti.com>
+Great.
 
-On OMAP4, the PRCM recommended sequence for enabling
-a module after power-on-reset is:
--1- Force clkdm to SW_WKUP
--2- Enabling the clocks
--3- Configure desired module mode to "enable" or "auto"
--4- Wait for the desired module idle status to be FUNC
--5- Program clkdm in HW_AUTO(if supported)
+Removing the PTE flush seems to have a noticeable performance
+difference in my test. The followings are lmbench 3.0a performance
+result measured on a Cortex A9 SMP platform. So far, I did not have
+any problem while doing various test.
 
-This sequence applies to all older OMAPs' as well,
-however since they use autodeps, it makes sure that
-no clkdm is in IDLE, and hence not requiring a force
-SW_WKUP when a module is being enabled.
+=========
+mm-patch:
+=========
+Pagefaults on /tmp/XXX: 3.0759 microseconds
+Process fork+exit: 464.5414 microseconds
+Process fork+execve: 785.4944 microseconds
+Process fork+/bin/sh -c: 488.6204 microseconds
 
-OMAP4 does not need to support autodeps, because
-of the dyanamic dependency feature, wherein
-the HW takes care of waking up a clockdomain from
-idle and hence the module, whenever an interconnect
-access happens to the given module.
+=========
+original:
+=========
+Pagefaults on /tmp/XXX: 3.6209 microseconds
+Process fork+exit: 485.5236 microseconds
+Process fork+execve: 820.0613 microseconds
+Process fork+/bin/sh -c: 2966.3828 microseconds
 
-Implementing the sequence for OMAP4 requires
-the clockdomain handling that is currently done in
-clock framework to be done as part of hwmod framework
-since the step -4- above to "Wait for the desired
-module idle status to be FUNC" is done as part of
-hwmod framework.
+Heechul
 
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-[b-cousson at ti.com: Adapt it to the new clkdm hwmod attribute and API]
-Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-Cc: Paul Walmsley <paul@pwsan.com>
----
- arch/arm/mach-omap2/clock.c      |   17 +----------------
- arch/arm/mach-omap2/omap_hwmod.c |   25 +++++++++++++++++++++++++
- 2 files changed, 26 insertions(+), 16 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/clock.c b/arch/arm/mach-omap2/clock.c
-index 180299e..2828d29 100644
---- a/arch/arm/mach-omap2/clock.c
-+++ b/arch/arm/mach-omap2/clock.c
-@@ -268,9 +268,6 @@ void omap2_clk_disable(struct clk *clk)
- 		clk->ops->disable(clk);
- 	}
- 
--	if (clk->clkdm)
--		clkdm_clk_disable(clk->clkdm, clk);
--
- 	if (clk->parent)
- 		omap2_clk_disable(clk->parent);
- }
-@@ -308,30 +305,18 @@ int omap2_clk_enable(struct clk *clk)
- 		}
- 	}
- 
--	if (clk->clkdm) {
--		ret = clkdm_clk_enable(clk->clkdm, clk);
--		if (ret) {
--			WARN(1, "clock: %s: could not enable clockdomain %s: "
--			     "%d\n", clk->name, clk->clkdm->name, ret);
--			goto oce_err2;
--		}
--	}
--
- 	if (clk->ops && clk->ops->enable) {
- 		trace_clock_enable(clk->name, 1, smp_processor_id());
- 		ret = clk->ops->enable(clk);
- 		if (ret) {
- 			WARN(1, "clock: %s: could not enable: %d\n",
- 			     clk->name, ret);
--			goto oce_err3;
-+			goto oce_err2;
- 		}
- 	}
- 
- 	return 0;
- 
--oce_err3:
--	if (clk->clkdm)
--		clkdm_clk_disable(clk->clkdm, clk);
- oce_err2:
- 	if (clk->parent)
- 		omap2_clk_disable(clk->parent);
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index 117a4d5..3d7a37e 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -1362,6 +1362,7 @@ static int _reset(struct omap_hwmod *oh)
- static int _enable(struct omap_hwmod *oh)
- {
- 	int r;
-+	int hwsup = 0;
- 
- 	pr_debug("omap_hwmod: %s: enabling\n", oh->name);
- 
-@@ -1380,6 +1381,19 @@ static int _enable(struct omap_hwmod *oh)
- 		omap_hwmod_mux(oh->mux, _HWMOD_STATE_ENABLED);
- 
- 	_add_initiator_dep(oh, mpu_oh);
-+
-+	/*
-+	 * A clockdomain must be in SW_SUP before enabling completely the
-+	 * module. The clockdomain can be set in HW_AUTO only when the module
-+	 * become ready.
-+	 */
-+	hwsup = clkdm_allows_idle(oh->clkdm);
-+	r = clkdm_hwmod_enable(oh->clkdm, oh);
-+	if (r) {
-+		WARN(1, "omap_hwmod: %s: could not enable clockdomain %s: %d\n",
-+		     oh->name, oh->clkdm->name, r);
-+		return r;
-+	}
- 	_enable_clocks(oh);
- 	_enable_module(oh);
- 
-@@ -1396,11 +1410,20 @@ static int _enable(struct omap_hwmod *oh)
- 	if (r) {
- 		pr_debug("omap_hwmod: %s: _wait_target_ready: %d\n",
- 			 oh->name, r);
-+
- 		_disable_clocks(oh);
-+		clkdm_hwmod_disable(oh->clkdm, oh);
- 
- 		return r;
- 	}
- 
-+	/*
-+	 * Set the clockdomain to HW_AUTO only if the target is ready,
-+	 * assuming that the previous state was HW_AUTO
-+	 */
-+	if (hwsup)
-+		clkdm_allow_idle(oh->clkdm);
-+
- 	oh->_state = _HWMOD_STATE_ENABLED;
- 
- 	/* Access the sysconfig only if the target is ready */
-@@ -1448,6 +1471,7 @@ static int _idle(struct omap_hwmod *oh)
- 	 * transition to complete properly.
- 	 */
- 	_disable_clocks(oh);
-+	clkdm_hwmod_disable(oh->clkdm, oh);
- 
- 	/* Mux pins for device idle if populated */
- 	if (oh->mux && oh->mux->pads_dynamic)
-@@ -1545,6 +1569,7 @@ static int _shutdown(struct omap_hwmod *oh)
- 			pr_debug("omap_hwmod: %s: _wait_target_disable failed\n",
- 				   oh->name);
- 		_disable_clocks(oh);
-+		clkdm_hwmod_disable(oh->clkdm, oh);
- 	}
- 	/* XXX Should this code also force-disable the optional clocks? */
- 
--- 
-1.7.0.4
+On Fri, Jul 1, 2011 at 3:10 AM, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Fri, Jul 01, 2011 at 08:04:42AM +0100, heechul Yun wrote:
+>> Based on TRM of Cortex A9, the MMU reads page table entries from L1-D
+>> cache not from memory. Then I think we do not need to flush the cache
+>> line in the following code because MMU will always see up-to-date view
+>> of page table in both UP and SMP systems.
+>>
+>> linux/arch/arm/mm/proc-v7.S
+>>
+>> ENTRY(cpu_v7_set_pte_ext)
+>> ? ? ? ...
+>> ? ? ? ? mcr ? ? p15, 0, r0, c7, c10, 1 ? ? ? ? ?@ flush_pte from
+>> D-cache // why we need this in A9?
+>> ? ? ? ? ?
+>>
+>> If this is a necessary one, could you please explain the reason? Thanks.
+>
+> No, it's not necessary, only that this file is used by other processors
+> as well. The solution below checks the ID_MMFR3[23:20] bits (coherent
+> walk) and avoid flushing if the value is 1. The same could be done for
+> PMD entries, though that's less critical than the PTEs.
+>
+> Please note that the patch is not fully tested.
+>
+> 8<--------------------
+>
+> From 67bd5ebdf622637f8293286146441e6292713c3d Mon Sep 17 00:00:00 2001
+> From: Catalin Marinas <catalin.marinas@arm.com>
+> Date: Fri, 1 Jul 2011 10:57:07 +0100
+> Subject: [PATCH] ARMv7: Do not clean the PTE coherent page table walk is supported
+>
+> This patch adds a check for the ID_MMFR3[23:20] bits (coherent walk) and
+> only cleans the D-cache corresponding to a PTE if coherent page table
+> walks are not supported.
+>
+> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> ---
+> ?arch/arm/mm/proc-v7.S | ? ?4 +++-
+> ?1 files changed, 3 insertions(+), 1 deletions(-)
+>
+> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+> index 8013afc..fc5b36f 100644
+> --- a/arch/arm/mm/proc-v7.S
+> +++ b/arch/arm/mm/proc-v7.S
+> @@ -166,7 +166,9 @@ ENTRY(cpu_v7_set_pte_ext)
+> ?ARM( ?str ? ? r3, [r0, #2048]! )
+> ?THUMB( ? ? ? ?add ? ? r0, r0, #2048 )
+> ?THUMB( ? ? ? ?str ? ? r3, [r0] )
+> - ? ? ? mcr ? ? p15, 0, r0, c7, c10, 1 ? ? ? ? ?@ flush_pte
+> + ? ? ? mrc ? ? p15, 0, r3, c0, c1, 7 ? ? ? ? ? @ read ID_MMFR3
+> + ? ? ? tst ? ? r3, #0xf << 20 ? ? ? ? ? ? ? ? ?@ check the coherent walk bits
+> + ? ? ? mcreq ? p15, 0, r0, c7, c10, 1 ? ? ? ? ?@ flush_pte
+> ?#endif
+> ? ? ? ?mov ? ? pc, lr
+> ?ENDPROC(cpu_v7_set_pte_ext)
+>
+> --
+> Catalin
+>
