@@ -1,75 +1,38 @@
-From: mingo@elte.hu (Ingo Molnar)
-Date: Fri, 1 Jul 2011 14:58:02 +0200
-Subject: [PATCH 00/10] Enhance /dev/mem to allow read/write of arbitrary
-	physical addresses
-In-Reply-To: <201106291106.00070.ptesarik@suse.cz>
-References: <201106171038.25988.ptesarik@suse.cz>
-	<20110617093032.GA19235@elte.hu>
-	<201106291106.00070.ptesarik@suse.cz>
-Message-ID: <20110701125802.GE12605@elte.hu>
+From: LW@KARO-electronics.de (=?utf-8?q?Lothar=20Wa=C3=9Fmann?=)
+Date: Fri,  1 Jul 2011 15:02:06 +0200
+Subject: [BUGFIX][PATCH] fix the parent of i2c[12]_clk
+Message-ID: <1309525326-4762-1-git-send-email-LW@KARO-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The clock from which the I2C timing is derived is the ipg_perclk not ipg_clk.
 
-* Petr Tesarik <ptesarik@suse.cz> wrote:
+I2C bus frequency was too low by a factor of ~8 due to the clock divider
+calculation being based on 66.5MHz IPG clock while the bus actually
+uses 8MHz ipg_perclk.
 
-> Dne P? 17. ?ervna 2011 11:30:32 Ingo Molnar napsal(a):
-> > * Petr Tesarik <ptesarik@suse.cz> wrote:
-> > > This patch series enhances /dev/mem, so that read and write is
-> > > possible at any address. The patchset includes actual
-> > > implementation for x86.
-> > 
-> > This series lacks a description of why this is desired.
-> >[...]
-> > 
-> > Are you aware of any legitimate usecases?
-> 
-> Looking back at the mail tread, I'd say there are people who have 
-> legitimate usecases. However, this may not be the most important 
-> question. At the moment, the /dev/mem interface is broken (it 
-> doesn't implement the specification correctly), and my patchset 
-> fixes it.
-> 
-> If there are no technical objections, [...]
+Kernel version: 3.0.0-rc2 branch 'imx-for-next' of git://git.pengutronix.de/git/imx/linux-2.6
 
-Well, my objections were entirely technical:
+Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+---
+ arch/arm/mach-mx5/clock-mx51-mx53.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
- - the device never implemented above-4G support upstream
-
- - there's colorful variants of abuse (drivers with binary-only
-   userspace) even if we ignore the obvious fact that the
-   main use of /dev/mem today is /dev/rootkit ...
-
-Now my objections might be outweighed by the advantages of improving 
-this driver, but you misrepresenting my position really does not help 
-that process.
-
-So what was not mentioned in your series, what is *your* motivation 
-and your usecase? Enabling closed-source userspace drivers? Enabling 
-the crash utility?
-
-If the former then shame on you, if the latter then how do you 
-explain that distros appear to disable the RAM aspect of /dev/mem:
-
- $ grep DEVMEM $(rpm -ql kernel-2.6.38-0.rc7.git2.3.fc16.x86_64 | grep config-2.6 )
- CONFIG_STRICT_DEVMEM=y
-
-So the crash utility use-case does not work on unpatched, default 
-kernels, right?
-
-As i said i have no problem with extending this, as long as it 
-couples to a non-default flag (for example !STRICT_DEVMEM or a boot 
-flag) and thus does not extend by default and does not extend the 
-abuse.
-
-> @Ingo: you can also send a patchset that rips off the /dev/mem 
-> driver completely if you believe that would get through. [...]
-
-Why would we want to do that? Existing users can become more and more 
-obsolete just fine.
-
-What i'm asking for is to not enable new abuse by default ...
-
-Thanks,
-
-	Ingo
+diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
+index 699b0d2..fe977d0 100644
+--- a/arch/arm/mach-mx5/clock-mx51-mx53.c
++++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
+@@ -1282,9 +1282,9 @@ DEFINE_CLOCK(pwm2_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG8_OFFSET,
+ 
+ /* I2C */
+ DEFINE_CLOCK(i2c1_clk, 0, MXC_CCM_CCGR1, MXC_CCM_CCGRx_CG9_OFFSET,
+-	NULL, NULL, &ipg_clk, NULL);
++	NULL, NULL, &ipg_perclk, NULL);
+ DEFINE_CLOCK(i2c2_clk, 1, MXC_CCM_CCGR1, MXC_CCM_CCGRx_CG10_OFFSET,
+-	NULL, NULL, &ipg_clk, NULL);
++	NULL, NULL, &ipg_perclk, NULL);
+ DEFINE_CLOCK(hsi2c_clk, 0, MXC_CCM_CCGR1, MXC_CCM_CCGRx_CG11_OFFSET,
+ 	NULL, NULL, &ipg_clk, NULL);
+ DEFINE_CLOCK(i2c3_mx53_clk, 0, MXC_CCM_CCGR1, MXC_CCM_CCGRx_CG11_OFFSET,
+-- 
+1.5.6.5
