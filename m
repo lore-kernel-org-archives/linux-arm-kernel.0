@@ -1,33 +1,90 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 1 Jul 2011 17:15:05 +0200
-Subject: [PATCH 2/3] Samsung SoC: ready to use NTC value inside kernel
-In-Reply-To: <BANLkTikC2zUPamzactXLdLb8Szgs2o9V7w@mail.gmail.com>
-References: <1309422387-11546-1-git-send-email-myungjoo.ham@samsung.com>
-	<1309422387-11546-3-git-send-email-myungjoo.ham@samsung.com>
-	<20110630090013.GP21898@n2100.arm.linux.org.uk>
-	<BANLkTikC2zUPamzactXLdLb8Szgs2o9V7w@mail.gmail.com>
-Message-ID: <BANLkTin3bu4Xf0cS0EkASvYXG0AdW+eprQ@mail.gmail.com>
+From: mingo@elte.hu (Ingo Molnar)
+Date: Fri, 1 Jul 2011 17:36:34 +0200
+Subject: [PATCH 00/10] Enhance /dev/mem to allow read/write of arbitrary
+	physical addresses
+In-Reply-To: <201107011654.06651.ptesarik@suse.cz>
+References: <201106171038.25988.ptesarik@suse.cz>
+	<20110701144129.GA10052@infradead.org>
+	<20110701144641.GA23272@elte.hu>
+	<201107011654.06651.ptesarik@suse.cz>
+Message-ID: <20110701153634.GA27407@elte.hu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 1, 2011 at 2:28 AM, MyungJoo Ham <myungjoo.ham@samsung.com> wrote:
 
-> Or if the values are only exported through sysfs (HWMON), is the only
-> clean way to read such values (w/o extending HWMON itself) to seperate
-> the HWMON device driver into two pieces: a platform driver that
-> provide values to somewhere sharable in kernel and a HWMON driver that
-> reads the values and exports them to sysfs?
+* Petr Tesarik <ptesarik@suse.cz> wrote:
 
-Sounds like you could very well separate out the ADC part and have
-functions for reading values off them? Compare
-drivers/mfd/ab8500-gpadc.c for example, this will be used by a
-yet to be submitted HWMON driver for doing ADC.
+> Dne P? 1. ?ervence 2011 16:46:41 Ingo Molnar napsal(a):
+> > * Christoph Hellwig <hch@infradead.org> wrote:
+> > > On Fri, Jul 01, 2011 at 04:37:35PM +0200, Ingo Molnar wrote:
+> > > > After initial modules have loaded i essentially disable crash.ko
+> > > > via /proc/sys/kernel/modules_disabled so rootkits have to work a
+> > > > bit harder than that.
+> > > 
+> > > Not sure for fedora as I don'[t have a kernel tree at hand right
+> > > now, but for x86 systems at least RHEL6 has the module built in.
+> > > [...]
+> > 
+> > Fedora Rawhide has it modular:
+> > 
+> >  # grep CRASH /boot/config-2.6.38-0.rc7.git2.3.fc16.x86_64
+> >  CONFIG_CRASH=m
+> > 
+> >  # rpm -ql kernel-2.6.38-0.rc7.git2.3.fc16.x86_64 | grep crash
+> >  /lib/modules/2.6.38-0.rc7.git2.3.fc16.x86_64/kernel/drivers/char/crash.ko
+> > 
+> > > [...]  Either way we'll need some way to support crash properly in
+> > > mainline, preferably in a boot-time opt-in way. [...]
+> > 
+> > Yes, boot-time opt-in was what i suggested.
+> > 
+> > > [...] I'd tend slightly toward optionally enabling /dev/mem for it
+> > > instead of a separate driver, but if people prefer a different
+> > > route I'm fine, too.
+> > 
+> > No, sharing the driver is perfectly fine and sane as long as this
+> > weird usage is not enabled widely.
+> 
+> Note that if you want to solve the Fedora case, you want to make 
+> STRICT_DEVMEM run-time configurable. My patch set does nothing 
+> about it. It merely tries to fix the highmem deficiency (actually, 
+> the first patch is a plain bugfix on any architecture where loff_t 
+> is larger than long).
 
-There is no clean nice ADC subsystem though, and *that* feels
-like a big problem to drivers like this (and no I don't like the AB8500
-GPADC living in MFD either) so if you'd like to create a ADC
-subsystem just go ahead, there is something in drivers/staging/iio/adc
-but that had another problem last time I looked: it was only intended
-for userspace control, not in-kernel use.
+I'm not focused on Fedora here (i brought it up as an example). I'd 
+like to improve upstream, and if that is done Fedora can just go use 
+it and symlink /dev/mem to /dev/crash.
 
-Linus Walleij
+> The STRICT_DEVMEM logic is implemented in range_is_allowed(), and I 
+> leave it as-is.
+> 
+> > > Note that for normal crash usage read only access is just fine.
+> > 
+> > That's true as well. Petr?
+> 
+> Yes, that's true. Although there is some write support in crash, I 
+> have never ever felt the need to use it, and I've been using crash 
+> a lot in the last 5 years.
+
+If you make it a read-only thing then that removes many of the 
+negative aspects of this feature.
+
+Also, does Xorg really need the first 1MB truly write-mapped? Last i 
+checked it needed it for the BIOS ...
+
+So we could kill multiple birds with the same stone here:
+
+ - remove various ugly uses of /dev/mem (including the rootkit usage),
+   with or without strict-devmem
+
+ - extending it to above-4G for inspection purposes
+
+ - allowing to kill /dev/mem access runtime similar to the 
+   disable_modules lock-down killswitch, for the so inclined.
+
+Would you be interested in modifying your patch-set in such a 
+fashion?
+
+Thanks,
+
+	Ingo
