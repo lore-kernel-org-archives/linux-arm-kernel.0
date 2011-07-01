@@ -1,37 +1,40 @@
-From: jhnikula@gmail.com (Jarkko Nikula)
-Date: Fri, 1 Jul 2011 17:05:17 +0300
-Subject: [RFC 07/12] omap: mcbsp: Get rid of remaining is_omap tests
-In-Reply-To: <CA+HSevrUgP8pKNjSgkpDB6hUX=cvCUOU8mpU2Ca5qa75Rnp36w@mail.gmail.com>
-References: <1309510356-27147-1-git-send-email-jhnikula@gmail.com>
-	<1309510356-27147-8-git-send-email-jhnikula@gmail.com>
-	<CA+HSevrUgP8pKNjSgkpDB6hUX=cvCUOU8mpU2Ca5qa75Rnp36w@mail.gmail.com>
-Message-ID: <20110701170517.8b13c94d.jhnikula@gmail.com>
+From: lrg@ti.com (Liam Girdwood)
+Date: Fri, 1 Jul 2011 15:18:20 +0100
+Subject: [PATCH] ASoC: wm8731: set the ACTIVE bit if bias ON entered
+In-Reply-To: <1309517034-26110-1-git-send-email-nicolas.ferre@atmel.com>
+References: <ccd4b125244271af7978948689cf1dcef37bc06b.1309368631.git.nicolas.ferre@atmel.com>
+	<1309517034-26110-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <4E0DD72C.3020209@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
-
-On Fri, 1 Jul 2011 16:41:23 +0530
-"Varadarajan, Charulatha" <charu@ti.com> wrote:
-
-> > @@ -712,7 +710,7 @@ static inline void omap34xx_mcbsp_free(struct omap_mcbsp *mcbsp)
-> > ? ? ? ?/*
-> > ? ? ? ? * Disable wakup behavior, smart idle and all wakeups
-> > ? ? ? ? */
-> > - ? ? ? if (cpu_is_omap34xx() || cpu_is_omap44xx()) {
-> > + ? ? ? if (mcbsp->mcbsp_config_type >= MCBSP_CONFIG_TYPE3) {
+On 01/07/11 11:43, Nicolas Ferre wrote:
+> Resuming from a suspend/resume cycle, the ACTIVE bit was not set even if a
+> stream had actually been processing.
+> Setting this bit at entering SND_SOC_BIAS_ON level will ensure this.
 > 
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> ---
+> Supersed the wrong patch:
+> "[PATCH 1/5] ASoC: wm8731: rework power management"
 > 
-> I think that it would be a good idea to not use
-> MCBSP_CONFIG_TYPE* in plat-omap/* as it is the .rev info.
-> At later point of time, this might make the code look uglier
-> as it happened with GPIO_METHOD_* flags in OMAP GPIO driver.
-> Instead use this .rev info in mach-omap*/ to fill the pdata and pass it
-> to driver.
+> now based on broonie/sound-2.6 git tree branch: for-3.1.
 > 
-Exactly and this is already a little uggly here. Kind of simple
-replacement for cpu_is_omap tests and definitely must be replaced with
-some feature flags before moving code outside of plat-omap.
+>  sound/soc/codecs/wm8731.c |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+> 
+> diff --git a/sound/soc/codecs/wm8731.c b/sound/soc/codecs/wm8731.c
+> index 2dc964b..ee4ec31 100644
+> --- a/sound/soc/codecs/wm8731.c
+> +++ b/sound/soc/codecs/wm8731.c
+> @@ -453,6 +453,7 @@ static int wm8731_set_bias_level(struct snd_soc_codec *codec,
+>  
+>  	switch (level) {
+>  	case SND_SOC_BIAS_ON:
+> +		snd_soc_write(codec, WM8731_ACTIVE, 0x0001);
+>  		break;
+>  	case SND_SOC_BIAS_PREPARE:
+>  		break;
 
--- 
-Jarkko
+
+Acked-by: Liam Girdwood <lrg@ti.com>
