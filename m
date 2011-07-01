@@ -1,19 +1,109 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 1 Jul 2011 09:15:07 -0700
-Subject: [PATCH] ASoC: wm8731: set the ACTIVE bit if bias ON entered
-In-Reply-To: <1309517034-26110-1-git-send-email-nicolas.ferre@atmel.com>
-References: <ccd4b125244271af7978948689cf1dcef37bc06b.1309368631.git.nicolas.ferre@atmel.com>
-	<1309517034-26110-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <20110701161506.GC23784@opensource.wolfsonmicro.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 1 Jul 2011 18:19:43 +0200
+Subject: [PATCH v2] ARM: CSR: Adding CSR SiRFprimaII board support
+In-Reply-To: <BANLkTikoMu3ccUxj5KRmKzdReQcBqK4Y9Q@mail.gmail.com>
+References: <1309231954-23260-1-git-send-email-bs14@csr.com>
+	<201106301236.25822.arnd@arndb.de>
+	<BANLkTikoMu3ccUxj5KRmKzdReQcBqK4Y9Q@mail.gmail.com>
+Message-ID: <201107011819.43316.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 01, 2011 at 12:43:54PM +0200, Nicolas Ferre wrote:
-> Resuming from a suspend/resume cycle, the ACTIVE bit was not set even if a
-> stream had actually been processing.
-> Setting this bit at entering SND_SOC_BIAS_ON level will ensure this.
+On Friday 01 July 2011, Barry Song wrote:
+> It looks like we can new a common function named as of_io_earlymap()
+> or something in drivers/of/address.c. of_iomap() does ioremap,
+> of_io_earlymap() does early static mapping?
+> Then all SoCs can call this function to do early static mapping. if
+> so, some lines can be deleted in sirfsoc_of_clk_init(). How do you
+> think about newing the function in drivers/of/address.c?
 
-This will set the bit even for analogue bypass paths which don't need
-it.  I'd suggest making the active bit a supply widget supplying the DAC
-and ADC rather than something open coded, that should do the right thing
-I think.
+I think that's a good idea, but the ARM specific implementation cannot
+be in common code. Other architectures have stuff similar to iotable_init
+in asm/fixmap.h. If we decide on a function prototype for this, the
+implementation can be arch/*/.
+
+How about this:
+
+extern void of_set_fixmap(struct device_node *np, int index,
+	unsigned long of_fixmap_offset, pgprot_t flags); 
+
+> For DEBUG_LL uart, i have moved the static mapping to a new file named
+> lluart.c too:
+> +#include <linux/kernel.h>
+> +#include <asm/page.h>
+> +#include <asm/mach/map.h>
+> +#include <mach/map.h>
+> +#include <mach/uart.h>
+> +
+> +void __init sirfsoc_map_lluart(void)
+> +{
+> +       struct map_desc sirfsoc_lluart_map = {
+> +               .virtual        = SIRFSOC_UART1_VA_BASE,
+> +               .pfn            = __phys_to_pfn(SIRFSOC_UART1_PA_BASE),
+> +               .length         = SIRFSOC_UART1_SIZE,
+> +               .type           = MT_DEVICE,
+> +       };
+> +
+> +       iotable_init(&sirfsoc_lluart_map, 1);
+> +}
+> +
+> 
+> only when DEBUG_LL is selected, this file will be compiled. Otherwise,
+> an empty sirfsoc_map_lluart is used:
+
+Ok, sounds good.
+
+> +/* TODO:
+> + * add APIs to control reset of every module
+> + */
+
+Hmm, how about this: You enumerate every bit in the reset registers, and
+then add a device tree property to the devices where this is needed containing
+the number. Then you just need a simple interface like
+
+void sirfsoc_reset_device(struct device *dev)
+{
+	int len, i;
+	unsigned int *reset_bits = of_get_property(dev->of_node, "reset-bit", &len);
+
+	for (i = 0; i<len/4; i++)
+		sirfsoc_reset_line(reset_bits[i]);
+}
+
+
+> +#include <linux/init.h>
+> +#include <linux/kernel.h>
+> +#include <asm/mach-types.h>
+> +#include <asm/mach/arch.h>
+> +#include <linux/of.h>
+> +#include <linux/of_platform.h>
+> +#include "common.h"
+> +
+> +static struct of_device_id sirfsoc_of_bus_ids[] __initdata = {
+> +       { .compatible = "simple-bus", },
+> +       {},
+> +};
+> +
+> +void __init sirfsoc_mach_init(void)
+> +{
+> +       of_platform_bus_probe(NULL, sirfsoc_of_bus_ids, NULL);
+> +}
+> +
+> +static const char *prima2cb_dt_match[] __initdata = {
+> +       "sirf,prima2-cb",
+> +       NULL
+> +};
+> +
+> +MACHINE_START(PRIMA2_EVB, "prima2cb")
+> +       .boot_params    = 0x00000100,
+> +       .init_early     = sirfsoc_of_clk_init,
+> +       .map_io         = sirfsoc_map_lluart,
+> +       .init_irq       = sirfsoc_of_irq_init,
+> +       .timer          = &sirfsoc_timer,
+> +       .init_machine   = sirfsoc_mach_init,
+> +       .dt_compat      = prima2cb_dt_match,
+> +MACHINE_END
+
+Very nice!
+
+	Arnd
