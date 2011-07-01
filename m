@@ -1,34 +1,37 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 1 Jul 2011 10:57:07 +0100
-Subject: [PATCH] ARMv7: Do not clean the PTE coherent page table walk is supported
-Message-ID: <mailman.2.1309515040.20020.linux-arm-kernel@lists.infradead.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 1 Jul 2011 11:10:28 +0100
+Subject: [PATCH v3 00/40] ARM: mm: Add generic macros for declaring
+	various CPU structs
+In-Reply-To: <1308851448-25139-1-git-send-email-dave.martin@linaro.org>
+References: <1308851448-25139-1-git-send-email-dave.martin@linaro.org>
+Message-ID: <20110701101027.GA976@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a check for the ID_MMFR3[23:20] bits (coherent walk) and
-only cleans the D-cache corresponding to a PTE if coherent page table
-walks are not supported.
+Hi Dave,
 
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm/mm/proc-v7.S |    4 +++-
- 1 files changed, 3 insertions(+), 1 deletions(-)
+On Thu, Jun 23, 2011 at 06:50:08PM +0100, Dave Martin wrote:
+> This series adds macros for declaring some CPU-related structured
+> defined in assembler, and ports the various processors, cache and
+> tlb implementations to use the macros.
+> 
+> Where multiple proc_info structures are defined by a single source
+> file, the common elements are collapsed out of these by defining
+> and invoking an additional local macro for this purpose.
+> 
+> A primary goal for this series is to introduce no API or binary
+> changes except for fixing the few obvious bugs which became apparent
+> when working on the series.
+> 
+> NOTE: There is an overlap between this series and Will/Pawel's patches
+> to include Cortex-A5 support (see
+> http://lists.arm.linux.org.uk/lurker/message/20110617.081930.2ed0934d.en.html).
+> Will has agreed to merge with my series in his tree so that it can all
+> be pulled from there, providing that my series has been accepted by
+> the community.
 
-diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index 8013afc..fc5b36f 100644
---- a/arch/arm/mm/proc-v7.S
-+++ b/arch/arm/mm/proc-v7.S
-@@ -166,7 +166,9 @@ ENTRY(cpu_v7_set_pte_ext)
-  ARM(	str	r3, [r0, #2048]! )
-  THUMB(	add	r0, r0, #2048 )
-  THUMB(	str	r3, [r0] )
--	mcr	p15, 0, r0, c7, c10, 1		@ flush_pte
-+	mrc	p15, 0, r3, c0, c1, 7		@ read ID_MMFR3
-+	tst	r3, #0xf << 20			@ check the coherent walk bits
-+	mcreq	p15, 0, r0, c7, c10, 1		@ flush_pte
- #endif
- 	mov	pc, lr
- ENDPROC(cpu_v7_set_pte_ext)
+It looks like this has settled down now so I'll pull your arm/proc-macros
+branch from git://git.linaro.org/people/dmart/linux-2.6-arm.git into my
+tree and rebase the A5/A15 stuff on top of it.
 
--- 
-Catalin
+Will
