@@ -1,129 +1,189 @@
-From: scott@jumpnowtek.com (Scott Ellis)
-Date: Fri, 01 Jul 2011 06:54:00 -0400
-Subject: [PATCH] DMA: OMAP: Remove extra looping from omap_request_dma
-In-Reply-To: <20110701071942.GC23145@atomide.com>
-References: <1309356549.3995.13.camel@quad>
-	<20110701071942.GC23145@atomide.com>
-Message-ID: <1309517640.2624.38.camel@quad>
+From: charu@ti.com (Varadarajan, Charulatha)
+Date: Fri, 1 Jul 2011 16:30:09 +0530
+Subject: [RFC 11/12] omap: mcbsp: Remove conditional compilation for OMAP3
+In-Reply-To: <1309510356-27147-12-git-send-email-jhnikula@gmail.com>
+References: <1309510356-27147-1-git-send-email-jhnikula@gmail.com>
+	<1309510356-27147-12-git-send-email-jhnikula@gmail.com>
+Message-ID: <CA+HSevqQhPP9YD=m_1Z7E=44hY0i4FFSoq7C1uP-aTsNXcMsiw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A free channel gets found correctly, that's not the problem. 
+Jarkko,
 
-The patch is to eliminate the extra passes through the loop after
-free_ch is assigned.
+On Fri, Jul 1, 2011 at 14:22, Jarkko Nikula <jhnikula@gmail.com> wrote:
+> Although this increases the build size a little for !OMAP3 builds it makes
+> the code one step more generic. For instance the threshold based DMA
+> transfers seems to be possible with OMAP4 too from quick look of the TRM.
+>
+> Signed-off-by: Jarkko Nikula <jhnikula@gmail.com>
+> ---
+> ?arch/arm/plat-omap/include/plat/mcbsp.h | ? 35 ++++--------------------------
+> ?arch/arm/plat-omap/mcbsp.c ? ? ? ? ? ? ?| ? 13 -----------
+> ?2 files changed, 5 insertions(+), 43 deletions(-)
+>
+> diff --git a/arch/arm/plat-omap/include/plat/mcbsp.h b/arch/arm/plat-omap/include/plat/mcbsp.h
+> index 2a7e8d5..720461c 100644
+> --- a/arch/arm/plat-omap/include/plat/mcbsp.h
+> +++ b/arch/arm/plat-omap/include/plat/mcbsp.h
+> @@ -26,9 +26,6 @@
+>
+> ?#include <linux/spinlock.h>
+>
+> -#include <mach/hardware.h>
+> -#include <plat/clock.h>
+> -
+> ?/* macro for building platform_device for McBSP ports */
+> ?#define OMAP_MCBSP_PLATFORM_DEVICE(port_nr) ? ? ? ? ? ?\
+> ?static struct platform_device omap_mcbsp##port_nr = { ?\
+> @@ -314,11 +311,11 @@ struct omap_mcbsp_platform_data {
+> ? ? ? ?u8 dma_rx_sync, dma_tx_sync;
+> ? ? ? ?u16 rx_irq, tx_irq;
+> ? ? ? ?struct omap_mcbsp_ops *ops;
+> -#ifdef CONFIG_ARCH_OMAP3
+> +
+> ? ? ? ?/* Sidetone block for McBSP 2 and 3 */
+> ? ? ? ?unsigned long phys_base_st;
+> ? ? ? ?int (*enable_st_clock)(unsigned int, bool);
+> -#endif
+> +
+> ? ? ? ?u16 buffer_size;
+> ? ? ? ?unsigned int mcbsp_config_type;
+> ? ? ? ?u8 reg_size;
+> @@ -354,12 +351,12 @@ struct omap_mcbsp {
+> ? ? ? ?spinlock_t lock;
+> ? ? ? ?struct omap_mcbsp_platform_data *pdata;
+> ? ? ? ?struct clk *fclk;
+> -#ifdef CONFIG_ARCH_OMAP3
+> +
+> ? ? ? ?struct omap_mcbsp_st_data *st_data;
+> ? ? ? ?int dma_op_mode;
+> ? ? ? ?u16 max_tx_thres;
+> ? ? ? ?u16 max_rx_thres;
+> -#endif
+> +
+> ? ? ? ?void *reg_cache;
+> ? ? ? ?unsigned int mcbsp_config_type;
+> ?};
+> @@ -380,7 +377,6 @@ extern int omap_mcbsp_count, omap_mcbsp_cache_size;
+>
+> ?int omap_mcbsp_init(void);
+> ?void omap_mcbsp_config(unsigned int id, const struct omap_mcbsp_reg_cfg * config);
+> -#ifdef CONFIG_ARCH_OMAP3
+> ?void omap_mcbsp_set_tx_threshold(unsigned int id, u16 threshold);
+> ?void omap_mcbsp_set_rx_threshold(unsigned int id, u16 threshold);
+> ?u16 omap_mcbsp_get_max_tx_threshold(unsigned int id);
+> @@ -389,18 +385,7 @@ u16 omap_mcbsp_get_fifo_size(unsigned int id);
+> ?u16 omap_mcbsp_get_tx_delay(unsigned int id);
+> ?u16 omap_mcbsp_get_rx_delay(unsigned int id);
+> ?int omap_mcbsp_get_dma_op_mode(unsigned int id);
+> -#else
+> -static inline void omap_mcbsp_set_tx_threshold(unsigned int id, u16 threshold)
+> -{ }
+> -static inline void omap_mcbsp_set_rx_threshold(unsigned int id, u16 threshold)
+> -{ }
+> -static inline u16 omap_mcbsp_get_max_tx_threshold(unsigned int id) { return 0; }
+> -static inline u16 omap_mcbsp_get_max_rx_threshold(unsigned int id) { return 0; }
+> -static inline u16 omap_mcbsp_get_fifo_size(unsigned int id) { return 0; }
+> -static inline u16 omap_mcbsp_get_tx_delay(unsigned int id) { return 0; }
+> -static inline u16 omap_mcbsp_get_rx_delay(unsigned int id) { return 0; }
+> -static inline int omap_mcbsp_get_dma_op_mode(unsigned int id) { return 0; }
+> -#endif
+> +
+> ?int omap_mcbsp_request(unsigned int id);
+> ?void omap_mcbsp_free(unsigned int id);
+> ?void omap_mcbsp_start(unsigned int id, int tx, int rx);
+> @@ -416,21 +401,11 @@ void omap2_mcbsp1_mux_fsr_src(u8 mux);
+> ?int omap_mcbsp_dma_ch_params(unsigned int id, unsigned int stream);
+> ?int omap_mcbsp_dma_reg_params(unsigned int id, unsigned int stream);
+>
+> -#ifdef CONFIG_ARCH_OMAP3
+> ?/* Sidetone specific API */
+> ?int omap_st_set_chgain(unsigned int id, int channel, s16 chgain);
+> ?int omap_st_get_chgain(unsigned int id, int channel, s16 *chgain);
+> ?int omap_st_enable(unsigned int id);
+> ?int omap_st_disable(unsigned int id);
+> ?int omap_st_is_enabled(unsigned int id);
+> -#else
+> -static inline int omap_st_set_chgain(unsigned int id, int channel,
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?s16 chgain) { return 0; }
+> -static inline int omap_st_get_chgain(unsigned int id, int channel,
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?s16 *chgain) { return 0; }
+> -static inline int omap_st_enable(unsigned int id) { return 0; }
+> -static inline int omap_st_disable(unsigned int id) { return 0; }
+> -static inline int omap_st_is_enabled(unsigned int id) { ?return 0; }
+> -#endif
+>
+> ?#endif
+> diff --git a/arch/arm/plat-omap/mcbsp.c b/arch/arm/plat-omap/mcbsp.c
+> index 1a7cfb3..d565b36 100644
+> --- a/arch/arm/plat-omap/mcbsp.c
+> +++ b/arch/arm/plat-omap/mcbsp.c
+> @@ -63,7 +63,6 @@ static int omap_mcbsp_read(struct omap_mcbsp *mcbsp, u16 reg, bool from_cache)
+> ? ? ? ?}
+> ?}
+>
+> -#ifdef CONFIG_ARCH_OMAP3
 
-I dropped some printk's into omap_request_dma()
+Are there any plans to move the functions  omap_mcbsp_st_*
+to mach-omap2/* as they are specific to OMAP3 only?
 
-[  158.375885] inside omap_request_dma()
-[  158.379577] dev_id = 61 ch = 0 free_ch = -1
-[  158.383789] dev_id = 61 ch = 1 free_ch = -1
-[  158.387969] dev_id = 61 ch = 2 free_ch = -1
-[  158.392181] dev_id = 61 ch = 3 free_ch = -1
-[  158.396392] dev_id = 61 ch = 4 free_ch = -1
-[  158.400573] set free_ch = 4 (could break now)
-[  158.403381] dev_id = 61 ch = 5 free_ch = 4
-[  158.407501] dev_id = 61 ch = 6 free_ch = 4
-[  158.411621] dev_id = 61 ch = 7 free_ch = 4
-[  158.415740] dev_id = 61 ch = 8 free_ch = 4
-[  158.419830] dev_id = 61 ch = 9 free_ch = 4
-[  158.423950] dev_id = 61 ch = 10 free_ch = 4
-[  158.428161] dev_id = 61 ch = 11 free_ch = 4
-[  158.432373] dev_id = 61 ch = 12 free_ch = 4
-[  158.436553] dev_id = 61 ch = 13 free_ch = 4
-[  158.440765] dev_id = 61 ch = 14 free_ch = 4
-[  158.444976] dev_id = 61 ch = 15 free_ch = 4
-[  158.449157] dev_id = 61 ch = 16 free_ch = 4
-[  158.453369] dev_id = 61 ch = 17 free_ch = 4
-[  158.457580] dev_id = 61 ch = 18 free_ch = 4
-[  158.461761] dev_id = 61 ch = 19 free_ch = 4
-[  158.465972] dev_id = 61 ch = 20 free_ch = 4
-[  158.470184] dev_id = 61 ch = 21 free_ch = 4
-[  158.474395] dev_id = 61 ch = 22 free_ch = 4
-[  158.478576] dev_id = 61 ch = 23 free_ch = 4
-[  158.482788] dev_id = 61 ch = 24 free_ch = 4
-[  158.486999] dev_id = 61 ch = 25 free_ch = 4
-[  158.491180] dev_id = 61 ch = 26 free_ch = 4
-[  158.495391] dev_id = 61 ch = 27 free_ch = 4
-[  158.499603] dev_id = 61 ch = 28 free_ch = 4
-[  158.503784] dev_id = 61 ch = 29 free_ch = 4
-[  158.507995] dev_id = 61 ch = 30 free_ch = 4
-[  158.512207] dev_id = 61 ch = 31 free_ch = 4
-...
-[    4.097991] inside omap_request_dma()
-[    4.101684] dev_id = 62 ch = 0 free_ch = -1
-[    4.105895] dev_id = 62 ch = 1 free_ch = -1
-[    4.110076] dev_id = 62 ch = 2 free_ch = -1
-[    4.114288] dev_id = 62 ch = 3 free_ch = -1
-[    4.118499] dev_id = 62 ch = 4 free_ch = -1
-[    4.122680] set free_ch = 4 (could break now)
-[    4.125488] dev_id = 62 ch = 5 free_ch = 4
-[    4.129608] dev_id = 62 ch = 6 free_ch = 4
-[    4.133728] dev_id = 62 ch = 7 free_ch = 4
-[    4.137847] dev_id = 62 ch = 8 free_ch = 4
-[    4.141937] dev_id = 62 ch = 9 free_ch = 4
-[    4.146057] dev_id = 62 ch = 10 free_ch = 4
-[    4.150268] dev_id = 62 ch = 11 free_ch = 4
-[    4.154479] dev_id = 62 ch = 12 free_ch = 4
-[    4.158660] dev_id = 62 ch = 13 free_ch = 4
-[    4.162872] dev_id = 62 ch = 14 free_ch = 4
-[    4.167083] dev_id = 62 ch = 15 free_ch = 4
-[    4.171264] dev_id = 62 ch = 16 free_ch = 4
-[    4.175476] dev_id = 62 ch = 17 free_ch = 4
-[    4.179687] dev_id = 62 ch = 18 free_ch = 4
-[    4.183868] dev_id = 62 ch = 19 free_ch = 4
-[    4.188079] dev_id = 62 ch = 20 free_ch = 4
-[    4.192291] dev_id = 62 ch = 21 free_ch = 4
-[    4.196502] dev_id = 62 ch = 22 free_ch = 4
-[    4.200683] dev_id = 62 ch = 23 free_ch = 4
-[    4.204895] dev_id = 62 ch = 24 free_ch = 4
-[    4.209106] dev_id = 62 ch = 25 free_ch = 4
-[    4.213287] dev_id = 62 ch = 26 free_ch = 4
-[    4.217498] dev_id = 62 ch = 27 free_ch = 4
-[    4.221710] dev_id = 62 ch = 28 free_ch = 4
-[    4.225891] dev_id = 62 ch = 29 free_ch = 4
-[    4.230102] dev_id = 62 ch = 30 free_ch = 4
-[    4.234313] dev_id = 62 ch = 31 free_ch = 4
-...
+-V Charulatha
 
-I was also wondering, what is special about dev_id == 0? The current
-code treats that special and does break immediately?
-
-Scott
-
-On Fri, 2011-07-01 at 00:19 -0700, Tony Lindgren wrote:
-> * Scott Ellis <scott@jumpnowtek.com> [110629 20:58]:
-> > Break from dma channel search when a free one is found.
-> 
-> Care to describe how the current code is not finding a
-> free channel currently?
-> 
-> Tony
-> 
->  
-> > Signed-off-by: Scott Ellis <scott@jumpnowtek.com>
-> > ---
-> >  arch/arm/plat-omap/dma.c |    5 ++---
-> >  1 files changed, 2 insertions(+), 3 deletions(-)
-> > 
-> > diff --git a/arch/arm/plat-omap/dma.c b/arch/arm/plat-omap/dma.c
-> > index c22217c..3d36fcf 100644
-> > --- a/arch/arm/plat-omap/dma.c
-> > +++ b/arch/arm/plat-omap/dma.c
-> > @@ -678,10 +678,9 @@ int omap_request_dma(int dev_id, const char *dev_name,
-> >  
-> >  	spin_lock_irqsave(&dma_chan_lock, flags);
-> >  	for (ch = 0; ch < dma_chan_count; ch++) {
-> > -		if (free_ch == -1 && dma_chan[ch].dev_id == -1) {
-> > +		if (dma_chan[ch].dev_id == -1) {
-> >  			free_ch = ch;
-> > -			if (dev_id == 0)
-> > -				break;
-> > +			break;
-> >  		}
-> >  	}
-> >  	if (free_ch == -1) {
-> > 
-
--- 
-Sent from my Linux box
+> ?static void omap_mcbsp_st_write(struct omap_mcbsp *mcbsp, u16 reg, u32 val)
+> ?{
+> ? ? ? ?__raw_writel(val, mcbsp->st_data->io_base_st + reg);
+> @@ -73,7 +72,6 @@ static int omap_mcbsp_st_read(struct omap_mcbsp *mcbsp, u16 reg)
+> ?{
+> ? ? ? ?return __raw_readl(mcbsp->st_data->io_base_st + reg);
+> ?}
+> -#endif
+>
+> ?#define MCBSP_READ(mcbsp, reg) \
+> ? ? ? ? ? ? ? ?omap_mcbsp_read(mcbsp, OMAP_MCBSP_REG_##reg, 0)
+> @@ -258,7 +256,6 @@ int omap_mcbsp_dma_reg_params(unsigned int id, unsigned int stream)
+> ?}
+> ?EXPORT_SYMBOL(omap_mcbsp_dma_reg_params);
+>
+> -#ifdef CONFIG_ARCH_OMAP3
+> ?static void omap_st_on(struct omap_mcbsp *mcbsp)
+> ?{
+> ? ? ? ?unsigned int w;
+> @@ -657,11 +654,6 @@ int omap_mcbsp_get_dma_op_mode(unsigned int id)
+> ?}
+> ?EXPORT_SYMBOL(omap_mcbsp_get_dma_op_mode);
+>
+> -#else
+> -static inline void omap_st_start(struct omap_mcbsp *mcbsp) {}
+> -static inline void omap_st_stop(struct omap_mcbsp *mcbsp) {}
+> -#endif
+> -
+> ?int omap_mcbsp_request(unsigned int id)
+> ?{
+> ? ? ? ?struct omap_mcbsp *mcbsp;
+> @@ -935,7 +927,6 @@ void omap2_mcbsp1_mux_fsr_src(u8 mux)
+> ?}
+> ?#endif
+>
+> -#ifdef CONFIG_ARCH_OMAP3
+> ?#define max_thres(m) ? ? ? ? ? ? ? ? ? (mcbsp->pdata->buffer_size)
+> ?#define valid_threshold(m, val) ? ? ? ? ? ? ? ?((val) <= max_thres(m))
+> ?#define THRESHOLD_PROP_BUILDER(prop) ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+> @@ -1205,10 +1196,6 @@ static inline void __devexit omap34xx_device_exit(struct omap_mcbsp *mcbsp)
+> ? ? ? ? ? ? ? ? ? ? ? ?omap_st_remove(mcbsp);
+> ? ? ? ?}
+> ?}
+> -#else
+> -static inline void __devinit omap34xx_device_init(struct omap_mcbsp *mcbsp) {}
+> -static inline void __devexit omap34xx_device_exit(struct omap_mcbsp *mcbsp) {}
+> -#endif /* CONFIG_ARCH_OMAP3 */
+>
+> ?/*
+> ?* McBSP1 and McBSP3 are directly mapped on 1610 and 1510.
+> --
+> 1.7.0.4
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>
