@@ -1,109 +1,36 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 1 Jul 2011 18:19:43 +0200
-Subject: [PATCH v2] ARM: CSR: Adding CSR SiRFprimaII board support
-In-Reply-To: <BANLkTikoMu3ccUxj5KRmKzdReQcBqK4Y9Q@mail.gmail.com>
-References: <1309231954-23260-1-git-send-email-bs14@csr.com>
-	<201106301236.25822.arnd@arndb.de>
-	<BANLkTikoMu3ccUxj5KRmKzdReQcBqK4Y9Q@mail.gmail.com>
-Message-ID: <201107011819.43316.arnd@arndb.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 1 Jul 2011 17:24:19 +0100
+Subject: [PATCH v6 00/18] ARM: Add support for the Large Physical
+	Address Extensions
+In-Reply-To: <1306273164-18217-1-git-send-email-catalin.marinas@arm.com>
+References: <1306273164-18217-1-git-send-email-catalin.marinas@arm.com>
+Message-ID: <20110701162419.GA3990@1n450.cable.virginmedia.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 01 July 2011, Barry Song wrote:
-> It looks like we can new a common function named as of_io_earlymap()
-> or something in drivers/of/address.c. of_iomap() does ioremap,
-> of_io_earlymap() does early static mapping?
-> Then all SoCs can call this function to do early static mapping. if
-> so, some lines can be deleted in sirfsoc_of_clk_init(). How do you
-> think about newing the function in drivers/of/address.c?
+Hi Russell,
 
-I think that's a good idea, but the ARM specific implementation cannot
-be in common code. Other architectures have stuff similar to iotable_init
-in asm/fixmap.h. If we decide on a function prototype for this, the
-implementation can be arch/*/.
+On Tue, May 24, 2011 at 10:39:06PM +0100, Catalin Marinas wrote:
+> Catalin Marinas (14):
+>   ARM: LPAE: Use long long printk format for displaying the pud
+>   ARM: LPAE: Use unsigned long for __phys_to_virt and __virt_to_phys
+>   ARM: LPAE: Use PMD_(SHIFT|SIZE|MASK) instead of PGDIR_*
+>   ARM: LPAE: Factor out 2-level page table definitions into separate
+>     files
+>   ARM: LPAE: Add (pte|pmd|pgd|pgprot)val_t type definitions as u32
+>   ARM: LPAE: Use a mask for physical addresses in page table entries
+[...]
+> Will Deacon (4):
+>   ARM: LPAE: add ISBs around MMU enabling code
+>   ARM: LPAE: Use generic dma_addr_t type definition
 
-How about this:
+Since the core LPAE patches haven't got a proper review yet, would you
+please consider merging some of the LPAE preparation patches during the
+upcoming window? Above is a list that I think it's relatively trivial
+(or we can have an even smaller set of patches, any progress would be
+good).
 
-extern void of_set_fixmap(struct device_node *np, int index,
-	unsigned long of_fixmap_offset, pgprot_t flags); 
+Thanks.
 
-> For DEBUG_LL uart, i have moved the static mapping to a new file named
-> lluart.c too:
-> +#include <linux/kernel.h>
-> +#include <asm/page.h>
-> +#include <asm/mach/map.h>
-> +#include <mach/map.h>
-> +#include <mach/uart.h>
-> +
-> +void __init sirfsoc_map_lluart(void)
-> +{
-> +       struct map_desc sirfsoc_lluart_map = {
-> +               .virtual        = SIRFSOC_UART1_VA_BASE,
-> +               .pfn            = __phys_to_pfn(SIRFSOC_UART1_PA_BASE),
-> +               .length         = SIRFSOC_UART1_SIZE,
-> +               .type           = MT_DEVICE,
-> +       };
-> +
-> +       iotable_init(&sirfsoc_lluart_map, 1);
-> +}
-> +
-> 
-> only when DEBUG_LL is selected, this file will be compiled. Otherwise,
-> an empty sirfsoc_map_lluart is used:
-
-Ok, sounds good.
-
-> +/* TODO:
-> + * add APIs to control reset of every module
-> + */
-
-Hmm, how about this: You enumerate every bit in the reset registers, and
-then add a device tree property to the devices where this is needed containing
-the number. Then you just need a simple interface like
-
-void sirfsoc_reset_device(struct device *dev)
-{
-	int len, i;
-	unsigned int *reset_bits = of_get_property(dev->of_node, "reset-bit", &len);
-
-	for (i = 0; i<len/4; i++)
-		sirfsoc_reset_line(reset_bits[i]);
-}
-
-
-> +#include <linux/init.h>
-> +#include <linux/kernel.h>
-> +#include <asm/mach-types.h>
-> +#include <asm/mach/arch.h>
-> +#include <linux/of.h>
-> +#include <linux/of_platform.h>
-> +#include "common.h"
-> +
-> +static struct of_device_id sirfsoc_of_bus_ids[] __initdata = {
-> +       { .compatible = "simple-bus", },
-> +       {},
-> +};
-> +
-> +void __init sirfsoc_mach_init(void)
-> +{
-> +       of_platform_bus_probe(NULL, sirfsoc_of_bus_ids, NULL);
-> +}
-> +
-> +static const char *prima2cb_dt_match[] __initdata = {
-> +       "sirf,prima2-cb",
-> +       NULL
-> +};
-> +
-> +MACHINE_START(PRIMA2_EVB, "prima2cb")
-> +       .boot_params    = 0x00000100,
-> +       .init_early     = sirfsoc_of_clk_init,
-> +       .map_io         = sirfsoc_map_lluart,
-> +       .init_irq       = sirfsoc_of_irq_init,
-> +       .timer          = &sirfsoc_timer,
-> +       .init_machine   = sirfsoc_mach_init,
-> +       .dt_compat      = prima2cb_dt_match,
-> +MACHINE_END
-
-Very nice!
-
-	Arnd
+-- 
+Catalin
