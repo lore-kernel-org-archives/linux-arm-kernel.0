@@ -1,52 +1,249 @@
-From: mingo@elte.hu (Ingo Molnar)
-Date: Fri, 1 Jul 2011 16:37:35 +0200
-Subject: [PATCH 00/10] Enhance /dev/mem to allow read/write of arbitrary
-	physical addresses
-In-Reply-To: <20110701134705.GA6175@infradead.org>
-References: <201106171038.25988.ptesarik@suse.cz>
-	<20110617093032.GA19235@elte.hu>
-	<201106291106.00070.ptesarik@suse.cz>
-	<20110701125802.GE12605@elte.hu>
-	<20110701134705.GA6175@infradead.org>
-Message-ID: <20110701143735.GA21367@elte.hu>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Fri, 1 Jul 2011 08:37:59 -0600
+Subject: [PATCH] DT: Use helper function to read u32 values
+In-Reply-To: <BANLkTin+WCRrxhOBNoL_AJJAkS-w9ybXqg@mail.gmail.com>
+References: <BANLkTin+WCRrxhOBNoL_AJJAkS-w9ybXqg@mail.gmail.com>
+Message-ID: <BANLkTikSnqPYxhrZv0YrhdZmTC=zrNNDRg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Jul 1, 2011 at 7:55 AM, Manjunatha GK <manjugk@ti.com> wrote:
+> Use helper function of_property_read_u32() in place of of_get_property
+> and be32_to_cpup() api's for code optimization.
+>
+> Compile tested the changes.
+>
+> Signed-off-by: G, Manjunath Kondaiah <manjugk@ti.com>
+> ---
+> ?drivers/of/irq.c???? |?? 37 ++++++++++++++++++++++---------------
+> ?drivers/of/of_i2c.c? |??? 8 +++-----
+> ?drivers/of/of_mdio.c |?? 16 ++++++----------
+> ?3 files changed, 31 insertions(+), 30 deletions(-)
+>
+> diff --git a/drivers/of/irq.c b/drivers/of/irq.c
+> index 9f689f1..13c02e2 100644
+> --- a/drivers/of/irq.c
+> +++ b/drivers/of/irq.c
+> @@ -59,20 +59,20 @@ EXPORT_SYMBOL_GPL(irq_of_parse_and_map);
+> ?struct device_node *of_irq_find_parent(struct device_node *child)
+> ?{
+> ???? struct device_node *p;
+> -??? const __be32 *parp;
+> +??? u32 *parp = NULL;
+>
+> ???? if (!of_node_get(child))
+> ???? ??? return NULL;
+>
+> ???? do {
+> -??? ??? parp = of_get_property(child, "interrupt-parent", NULL);
+> +??? ??? of_property_read_u32(child, "interrupt-parent", parp);
+> ???? ??? if (parp == NULL)
+> ???? ??? ??? p = of_get_parent(child);
 
-* Christoph Hellwig <hch@infradead.org> wrote:
+Hi Manjunatha.
 
-> On Fri, Jul 01, 2011 at 02:58:02PM +0200, Ingo Molnar wrote:
-> > So what was not mentioned in your series, what is *your* motivation 
-> > and your usecase? Enabling closed-source userspace drivers? Enabling 
-> > the crash utility?
-> 
-> He stated it pretty clearly in the thread, it's the crash utility.
+This won't work.  You must pass a valid pointer.  It needs to be done this way;
+        u32 parp;
+        if (of_property_read_u32(child, "interrupt-parent", &parp) == 0) {
+                ...
+        } else {
+                ...
+        }
 
-True. I only re-read the first patch and forgot about the resulting 
-discussion. Sorry Petr!
+> ???? ??? else {
+> ???? ??? ??? if (of_irq_workarounds & OF_IMAP_NO_PHANDLE)
+> ???? ??? ??? ??? p = of_node_get(of_irq_dflt_pic);
+> ???? ??? ??? else
+> -??? ??? ??? ??? p = of_find_node_by_phandle(be32_to_cpup(parp));
+> +??? ??? ??? ??? p = of_find_node_by_phandle(*parp);
+> ???? ??? }
+> ???? ??? of_node_put(child);
+> ???? ??? child = p;
+> @@ -100,7 +100,8 @@ int of_irq_map_raw(struct device_node *parent, const
+> __be32 *intspec,
+> ???? ??? ?? u32 ointsize, const __be32 *addr, struct of_irq *out_irq)
+> ?{
+> ???? struct device_node *ipar, *tnode, *old = NULL, *newpar = NULL;
+> -??? const __be32 *tmp, *imap, *imask;
+> +??? const __be32 *imap, *imask;
+> +??? u32 *tmp;
+> ???? u32 intsize = 1, addrsize, newintsize = 0, newaddrsize = 0;
+> ???? int imaplen, match, i;
+>
+> @@ -115,9 +116,10 @@ int of_irq_map_raw(struct device_node *parent, const
+> __be32 *intspec,
+> ???? ?* is none, we are nice and just walk up the tree
+> ???? ?*/
+> ???? do {
+> -??? ??? tmp = of_get_property(ipar, "#interrupt-cells", NULL);
+> +??? ??? tmp = NULL;
+> +??? ??? of_property_read_u32(ipar, "#interrupt-cells", tmp);
+> ???? ??? if (tmp != NULL) {
+> -??? ??? ??? intsize = be32_to_cpu(*tmp);
+> +??? ??? ??? intsize = *tmp;
+> ???? ??? ??? break;
+> ???? ??? }
+> ???? ??? tnode = ipar;
+> @@ -139,14 +141,15 @@ int of_irq_map_raw(struct device_node *parent, const
+> __be32 *intspec,
+> ???? ?*/
+> ???? old = of_node_get(ipar);
+> ???? do {
+> -??? ??? tmp = of_get_property(old, "#address-cells", NULL);
+> +??? ??? tmp = NULL;
+> +??? ??? of_property_read_u32(old, "#address-cells", tmp);
+> ???? ??? tnode = of_get_parent(old);
+> ???? ??? of_node_put(old);
+> ???? ??? old = tnode;
+> ???? } while (old && tmp == NULL);
+> ???? of_node_put(old);
+> ???? old = NULL;
+> -??? addrsize = (tmp == NULL) ? 2 : be32_to_cpu(*tmp);
+> +??? addrsize = (tmp == NULL) ? 2 : (*tmp);
+>
+> ???? pr_debug(" -> addrsize=%d\n", addrsize);
+>
+> @@ -225,14 +228,16 @@ int of_irq_map_raw(struct device_node *parent, const
+> __be32 *intspec,
+> ???? ??? ??? /* Get #interrupt-cells and #address-cells of new
+> ???? ??? ??? ?* parent
+> ???? ??? ??? ?*/
+> -??? ??? ??? tmp = of_get_property(newpar, "#interrupt-cells", NULL);
+> +??? ??? ??? tmp = NULL;
+> +??? ??? ??? of_property_read_u32(newpar, "#interrupt-cells", tmp);
+> ???? ??? ??? if (tmp == NULL) {
+> ???? ??? ??? ??? pr_debug(" -> parent lacks #interrupt-cells!\n");
+> ???? ??? ??? ??? goto fail;
+> ???? ??? ??? }
+> -??? ??? ??? newintsize = be32_to_cpu(*tmp);
+> -??? ??? ??? tmp = of_get_property(newpar, "#address-cells", NULL);
+> -??? ??? ??? newaddrsize = (tmp == NULL) ? 0 : be32_to_cpu(*tmp);
+> +??? ??? ??? newintsize = *tmp;
+> +??? ??? ??? tmp = NULL;
+> +??? ??? ??? of_property_read_u32(newpar, "#address-cells", tmp);
+> +??? ??? ??? newaddrsize = (tmp == NULL) ? 0 : (*tmp);
+>
+> ???? ??? ??? pr_debug(" -> newintsize=%d, newaddrsize=%d\n",
+> ???? ??? ??? ??? newintsize, newaddrsize);
+> @@ -284,7 +289,8 @@ EXPORT_SYMBOL_GPL(of_irq_map_raw);
+> ?int of_irq_map_one(struct device_node *device, int index, struct of_irq
+> *out_irq)
+> ?{
+> ???? struct device_node *p;
+> -??? const __be32 *intspec, *tmp, *addr;
+> +??? const __be32 *intspec, *addr;
+> +??? u32 *tmp;
+> ???? u32 intsize, intlen;
+> ???? int res = -EINVAL;
+>
+> @@ -311,10 +317,11 @@ int of_irq_map_one(struct device_node *device, int
+> index, struct of_irq *out_irq
+> ???? ??? return -EINVAL;
+>
+> ???? /* Get size of interrupt specifier */
+> -??? tmp = of_get_property(p, "#interrupt-cells", NULL);
+> +??? tmp = NULL;
+> +??? of_get_property(p, "#interrupt-cells", tmp);
+> ???? if (tmp == NULL)
+> ???? ??? goto out;
+> -??? intsize = be32_to_cpu(*tmp);
+> +??? intsize = *tmp;
+>
+> ???? pr_debug(" intsize=%d intlen=%d\n", intsize, intlen);
+>
+> diff --git a/drivers/of/of_i2c.c b/drivers/of/of_i2c.c
+> index f37fbeb..7113512 100644
+> --- a/drivers/of/of_i2c.c
+> +++ b/drivers/of/of_i2c.c
+> @@ -32,8 +32,7 @@ void of_i2c_register_devices(struct i2c_adapter *adap)
+> ???? for_each_child_of_node(adap->dev.of_node, node) {
+> ???? ??? struct i2c_board_info info = {};
+> ???? ??? struct dev_archdata dev_ad = {};
+> -??? ??? const __be32 *addr;
+> -??? ??? int len;
+> +??? ??? u32 *addr = NULL;
+>
+> ???? ??? dev_dbg(&adap->dev, "of_i2c: register %s\n", node->full_name);
+>
+> @@ -43,14 +42,13 @@ void of_i2c_register_devices(struct i2c_adapter *adap)
+> ???? ??? ??? continue;
+> ???? ??? }
+>
+> -??? ??? addr = of_get_property(node, "reg", &len);
+> -??? ??? if (!addr || (len < sizeof(int))) {
+> +??? ??? if (of_get_property(node, "reg", addr)) {
+> ???? ??? ??? dev_err(&adap->dev, "of_i2c: invalid reg on %s\n",
+> ???? ??? ??? ??? node->full_name);
+> ???? ??? ??? continue;
+> ???? ??? }
+>
+> -??? ??? info.addr = be32_to_cpup(addr);
+> +??? ??? info.addr = *addr;
+> ???? ??? if (info.addr > (1 << 10) - 1) {
+> ???? ??? ??? dev_err(&adap->dev, "of_i2c: invalid addr=%x on %s\n",
+> ???? ??? ??? ??? info.addr, node->full_name);
+> diff --git a/drivers/of/of_mdio.c b/drivers/of/of_mdio.c
+> index d35e300..d4b6503 100644
+> --- a/drivers/of/of_mdio.c
+> +++ b/drivers/of/of_mdio.c
+> @@ -52,19 +52,17 @@ int of_mdiobus_register(struct mii_bus *mdio, struct
+> device_node *np)
+>
+> ???? /* Loop over the child nodes and register a phy_device for each one */
+> ???? for_each_child_of_node(np, child) {
+> -??? ??? const __be32 *paddr;
+> ???? ??? u32 addr;
+> -??? ??? int len;
+> +??? ??? u32 *paddr = NULL;
+>
+> ???? ??? /* A PHY must have a reg property in the range [0-31] */
+> -??? ??? paddr = of_get_property(child, "reg", &len);
+> -??? ??? if (!paddr || len < sizeof(*paddr)) {
+> +??? ??? if (of_property_read_u32(child, "reg", paddr)) {
+> ???? ??? ??? dev_err(&mdio->dev, "%s has invalid PHY address\n",
+> ???? ??? ??? ??? child->full_name);
+> ???? ??? ??? continue;
+> ???? ??? }
+>
+> -??? ??? addr = be32_to_cpup(paddr);
+> +??? ??? addr = *paddr;
+> ???? ??? if (addr >= 32) {
+> ???? ??? ??? dev_err(&mdio->dev, "%s PHY address %i is too large\n",
+> ???? ??? ??? ??? child->full_name, addr);
+> @@ -169,8 +167,7 @@ struct phy_device *of_phy_connect_fixed_link(struct
+> net_device *dev,
+> ???? struct device_node *net_np;
+> ???? char bus_id[MII_BUS_ID_SIZE + 3];
+> ???? struct phy_device *phy;
+> -??? const __be32 *phy_id;
+> -??? int sz;
+> +??? u32 *phy_id = NULL;
+>
+> ???? if (!dev->dev.parent)
+> ???? ??? return NULL;
+> @@ -179,11 +176,10 @@ struct phy_device *of_phy_connect_fixed_link(struct
+> net_device *dev,
+> ???? if (!net_np)
+> ???? ??? return NULL;
+>
+> -??? phy_id = of_get_property(net_np, "fixed-link", &sz);
+> -??? if (!phy_id || sz < sizeof(*phy_id))
+> +??? if (of_property_read_u32(net_np, "fixed-link", phy_id))
+> ???? ??? return NULL;
+>
+> -??? sprintf(bus_id, PHY_ID_FMT, "0", be32_to_cpu(phy_id[0]));
+> +??? sprintf(bus_id, PHY_ID_FMT, "0", phy_id[0]);
+>
+> ???? phy = phy_connect(dev, bus_id, hndlr, 0, iface);
+> ???? return IS_ERR(phy) ? NULL : phy;
+> --
+> 1.7.4.1
+>
+>
+>
 
-> > If the former then shame on you, if the latter then how do you 
-> > explain that distros appear to disable the RAM aspect of 
-> > /dev/mem:
-> > 
-> >  $ grep DEVMEM $(rpm -ql kernel-2.6.38-0.rc7.git2.3.fc16.x86_64 | grep config-2.6 )
-> >  CONFIG_STRICT_DEVMEM=y
-> > 
-> > So the crash utility use-case does not work on unpatched, default 
-> > kernels, right?
-> 
-> Not if you have highmem.  That's why Redhat or Fedora to quote your
-> example patch in the /dev/crash driver, which totally defeats the
-> CONFIG_STRICT_DEVMEM setting.  But apparently it's good enough that no
-> one either noticed or at least doesn't care.
 
-After initial modules have loaded i essentially disable crash.ko via 
-/proc/sys/kernel/modules_disabled so rootkits have to work a bit 
-harder than that.
 
-But yeah, crash.ko is a rootkit-and-other-badness-enabler as it 
-stands today.
-
-Thanks,
-
-	Ingo
+-- 
+Grant Likely, B.Sc., P.Eng.
+Secret Lab Technologies Ltd.
