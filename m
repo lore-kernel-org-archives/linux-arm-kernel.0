@@ -1,55 +1,37 @@
-From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Fri, 01 Jul 2011 11:53:39 -0700
-Subject: [PATCH 2/2] ARM: plat-mxc: Fix pwm frequency
-In-Reply-To: <20110701080311.GS6069@pengutronix.de>
-References: <1309485035-5964-1-git-send-email-troy.kisky@boundarydevices.com>
-	<20110701080311.GS6069@pengutronix.de>
-Message-ID: <4E0E17B3.7050409@boundarydevices.com>
+From: joravec@drewtech.com (Joey Oravec)
+Date: Fri, 01 Jul 2011 15:14:48 -0400
+Subject: plat-orion multi purpose pins problem for mv78200
+Message-ID: <4E0E1CA8.7090200@drewtech.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/1/2011 1:03 AM, Sascha Hauer wrote:
-> On Thu, Jun 30, 2011 at 06:50:35PM -0700, Troy Kisky wrote:
->> The PWMPR register is number of clocks + 2, so include
->> a -2 when setting the register. There is currently no rounding
->> up, so this may give a higher frequency than requested.
-> 
-> Have you checked this applies to mx2/3 aswell?
-> 
-> Sascha
-> 
->>
->> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
->> ---
->>  arch/arm/plat-mxc/pwm.c |    8 +++++++-
->>  1 files changed, 7 insertions(+), 1 deletions(-)
->>
->> diff --git a/arch/arm/plat-mxc/pwm.c b/arch/arm/plat-mxc/pwm.c
->> index 73f17b2..844415e 100644
->> --- a/arch/arm/plat-mxc/pwm.c
->> +++ b/arch/arm/plat-mxc/pwm.c
->> @@ -76,7 +76,13 @@ int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
->>  		duty_cycles = c;
->>  
->>  		writel(duty_cycles, pwm->mmio_base + MX3_PWMSAR);
->> -		writel(period_cycles, pwm->mmio_base + MX3_PWMPR);
->> +		if (period_cycles < 2)
->> +			period_cycles = 2;
->> +		/*
->> +		 * manual says - "A value of zero in the PWMPR will result in
->> +		 * a period of two clock cycles for the output signal.
->> +		 */
->> +		writel(period_cycles - 2, pwm->mmio_base + MX3_PWMPR);
->>  
->>  		cr = MX3_PWMCR_PRESCALER(prescale) | MX3_PWMCR_EN;
->>  
->> -- 
->> 1.7.0.4
->>
->>
-> 
-I just checked. It applies to mx27, mx31, mx25, mx51, mx53.
+Nicola, Lennert -
 
-Thanks for the reminder.
+There's a problem in 3.0-rc5 when calling mv78xx0_mpp_conf() on the 
+MV78200 processor. This processor has 49 multi purpose pins but only 31 
+GPIOs. MPP[31:0] map directly to GPIO[31:0] but the next 17 are a little 
+more complex:
 
-Troy
+MPP[39:32] = GPIO[7:0]
+MPP[46:40] = GPIO[23:17]
+MPP[47] = GPIO[16]
+MPP[48] = GPIO[8]
+MPP[49] = GPIO[9]
+
+See arch/arm/plat-orion/mpp.c. Inside orion_mpp_conf() the array gets 
+processed by calling MPP_NUM() then calling orion_gpio_set_valid(). As 
+demonstrated above, the MPP number and GPIO number are not 
+interchangeable and on the MV78200 that's a problem when trying to setup 
+any MPP > 31.
+
+So we need to map each MPP to a given GPIO -- I don't know how the 
+mapping will differ across processors. We also need to keep-clear which 
+functions are called with an MPP number and which functions are called 
+with a GPIO number.
+
+Followup question -- Marvell has several SoC families, but Linux uess 
+plat-orion for everything. For example MV78200 isn't an Orion it's a 
+Discovery Innovation series. Would it make more sense to have separate 
+plat-* code for the separate families?
+
+-joey
