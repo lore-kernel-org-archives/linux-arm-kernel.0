@@ -1,28 +1,50 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 1 Jul 2011 08:44:14 +0100
-Subject: [PATCH 4/7] ARM: EXYNOS4: Support early wakeup while entering
-	sleep mode
-In-Reply-To: <017d01cc378a$c017edf0$4047c9d0$%kim@samsung.com>
-References: <1308732405-16664-1-git-send-email-kgene.kim@samsung.com>
-	<1308732405-16664-5-git-send-email-kgene.kim@samsung.com>
-	<20110622145715.GS23234@n2100.arm.linux.org.uk>
-	<007401cc3242$48947160$d9bd5420$%kim@samsung.com>
-	<20110624093750.GD23234@n2100.arm.linux.org.uk>
-	<20110624102246.GF23234@n2100.arm.linux.org.uk>
-	<017d01cc378a$c017edf0$4047c9d0$%kim@samsung.com>
-Message-ID: <20110701074414.GD21898@n2100.arm.linux.org.uk>
+From: b32955@freescale.com (Huang Shijie)
+Date: Fri, 1 Jul 2011 15:53:13 +0800
+Subject: [PATCH v5 1/3] ARM: mxs: add GPMI-NFC support for imx23/imx28
+In-Reply-To: <20110701060356.GA27039@pengutronix.de>
+References: <1309406028-2924-1-git-send-email-b32955@freescale.com>
+	<201106301555.19440.arnd@arndb.de>
+	<19980.36638.134045.743619@ipc1.ka-ro>
+	<201107010022.26597.arnd@arndb.de>
+	<20110701060356.GA27039@pengutronix.de>
+Message-ID: <4E0D7CE9.2030209@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 01, 2011 at 10:03:48AM +0900, Kukjin Kim wrote:
-> Russell thanks.
-> 
-> How do you think to add following for handling failure of cpu_suspend?
-> 
-> +	mov	r0, #-1
+Hi:
+> Hi Arnd,
+>
+>> If you really want to call out obsceneties, how about the fact that this
+>> driver comes with an 805 line patch to add a HAL for a single chip!
+>>
+>> Such abstractions should not be introduced as long as there is only
+>> a single instance of the hardware.
+> If I understood correctly, most if not all upcoming i.MX will have the GPMI
+> (mx50, mx6). Huang, do you already have a draft for the mx50-hal?
+>
+I have finished the code for mx50's GPMI.
+And I am coding for the MX6's GPMI recently.
 
-No.  -1 is not an error code, and I refuse to create functions which
-use an explicit -1 as a return code to indicate failure.
+I need a separate mx50-hal (or mx60-hal) to make the code tidy.
+The MX50 and mx60 support ONFI NAND and TOGGLE nand(which mx23/mx28 do 
+not support),
+they need a long code to initialize the TIMING register. What's more, 
+the READ/WRITE functions
+are different from the mx23/mx28.
 
-The code is designed so that the called finisher function can return
-a valid errno value.
+Frankly speaking, I can merge the mxs-hal.c file to the gpmi-nfc.c, but 
+don't you think it too
+messy?
+
+
+Best Regards
+Huang Shijie
+
+
+
+
+
+> Regards,
+>
+>     Wolfram
+>
