@@ -1,34 +1,45 @@
-From: hch@infradead.org (Christoph Hellwig)
-Date: Fri, 1 Jul 2011 09:47:05 -0400
-Subject: [PATCH 00/10] Enhance /dev/mem to allow read/write of arbitrary
-	physical addresses
-In-Reply-To: <20110701125802.GE12605@elte.hu>
-References: <201106171038.25988.ptesarik@suse.cz>
-	<20110617093032.GA19235@elte.hu>
-	<201106291106.00070.ptesarik@suse.cz>
-	<20110701125802.GE12605@elte.hu>
-Message-ID: <20110701134705.GA6175@infradead.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 1 Jul 2011 11:01:16 -0300
+Subject: [BUGFIX][PATCH] fix the parent of i2c[12]_clk
+In-Reply-To: <1309525326-4762-1-git-send-email-LW@KARO-electronics.de>
+References: <1309525326-4762-1-git-send-email-LW@KARO-electronics.de>
+Message-ID: <BANLkTi=hBamK2JE1KykAJQWiyrhC8qPB_g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 01, 2011 at 02:58:02PM +0200, Ingo Molnar wrote:
-> So what was not mentioned in your series, what is *your* motivation 
-> and your usecase? Enabling closed-source userspace drivers? Enabling 
-> the crash utility?
+On Fri, Jul 1, 2011 at 10:02 AM, Lothar Wa?mann <LW@karo-electronics.de> wrote:
+> The clock from which the I2C timing is derived is the ipg_perclk not ipg_clk.
+>
+> I2C bus frequency was too low by a factor of ~8 due to the clock divider
+> calculation being based on 66.5MHz IPG clock while the bus actually
+> uses 8MHz ipg_perclk.
+>
+> Kernel version: 3.0.0-rc2 branch 'imx-for-next' of git://git.pengutronix.de/git/imx/linux-2.6
+>
+> Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+> ---
+> ?arch/arm/mach-mx5/clock-mx51-mx53.c | ? ?4 ++--
+> ?1 files changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
+> index 699b0d2..fe977d0 100644
+> --- a/arch/arm/mach-mx5/clock-mx51-mx53.c
+> +++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
+> @@ -1282,9 +1282,9 @@ DEFINE_CLOCK(pwm2_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG8_OFFSET,
+>
+> ?/* I2C */
+> ?DEFINE_CLOCK(i2c1_clk, 0, MXC_CCM_CCGR1, MXC_CCM_CCGRx_CG9_OFFSET,
+> - ? ? ? NULL, NULL, &ipg_clk, NULL);
+> + ? ? ? NULL, NULL, &ipg_perclk, NULL);
+> ?DEFINE_CLOCK(i2c2_clk, 1, MXC_CCM_CCGR1, MXC_CCM_CCGRx_CG10_OFFSET,
+> - ? ? ? NULL, NULL, &ipg_clk, NULL);
+> + ? ? ? NULL, NULL, &ipg_perclk, NULL);
+> ?DEFINE_CLOCK(hsi2c_clk, 0, MXC_CCM_CCGR1, MXC_CCM_CCGRx_CG11_OFFSET,
+> ? ? ? ?NULL, NULL, &ipg_clk, NULL);
+> ?DEFINE_CLOCK(i2c3_mx53_clk, 0, MXC_CCM_CCGR1, MXC_CCM_CCGRx_CG11_OFFSET,
 
-He stated it pretty clearly in the thread, it's the crash utility.
+Shouldn't i2c3_mx53_clk have the same change applied?
 
-> 
-> If the former then shame on you, if the latter then how do you 
-> explain that distros appear to disable the RAM aspect of /dev/mem:
-> 
->  $ grep DEVMEM $(rpm -ql kernel-2.6.38-0.rc7.git2.3.fc16.x86_64 | grep config-2.6 )
->  CONFIG_STRICT_DEVMEM=y
-> 
-> So the crash utility use-case does not work on unpatched, default 
-> kernels, right?
+Regards,
 
-Not if you have highmem.  That's why Redhat or Fedora to quote your
-example patch in the /dev/crash driver, which totally defeats the
-CONFIG_STRICT_DEVMEM setting.  But apparently it's good enough that no
-one either noticed or at least doesn't care.
+Fabio Estevam
