@@ -1,49 +1,36 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Fri, 1 Jul 2011 11:26:36 +0200
-Subject: [RFC 10/12] omap: mcbsp: Move sidetone clock management to
-	mach-omap2/mcbsp.c
-In-Reply-To: <alpine.DEB.2.00.1107010317460.27025@utopia.booyaka.com>
-References: <1309510356-27147-1-git-send-email-jhnikula@gmail.com>
-	<1309510356-27147-11-git-send-email-jhnikula@gmail.com>
-	<alpine.DEB.2.00.1107010317460.27025@utopia.booyaka.com>
-Message-ID: <4E0D92CC.5030006@ti.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 01 Jul 2011 11:31:45 +0200
+Subject: [PATCH 1/5] ASoC: wm8731: rework power management
+In-Reply-To: <20110630152203.GB3249@opensource.wolfsonmicro.com>
+References: <1309370419-22810-1-git-send-email-nicolas.ferre@atmel.com>
+	<ccd4b125244271af7978948689cf1dcef37bc06b.1309368631.git.nicolas.ferre@atmel.com>
+	<20110629171148.GB10798@opensource.wolfsonmicro.com>
+	<4E0C80B8.7030006@atmel.com>
+	<20110630152203.GB3249@opensource.wolfsonmicro.com>
+Message-ID: <4E0D9401.1070300@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/1/2011 11:23 AM, Paul Walmsley wrote:
-> + Beno?t
->
-> Hello Jarkko
->
-> On Fri, 1 Jul 2011, Jarkko Nikula wrote:
->
->> Active sidetone requires that McBSP interface clock doesn't idle and there
->> is no mechanism in hwmod to turn autoidling on/off in runtime. McBSP2 and 3
->> in OMAP34xx share their interface clock with McBSP sidetone module and
->> that interface clock must be active when the sidetone is operating.
->>
->> Sidetone has its own autoidle bit which should keep the interface clock
->> active but it is broken. Putting the McBSP core to no-idle mode when the
->> sidetone is active is no good either since it results to higher power
->> consumption when using the threshold based DMA transfers.
->
-> In the hwmod code/data, we've got the OCPIF_SWSUP_IDLE flag that can be
-> set on a struct omap_hwmod_ocp_if.  I think this is probably what's needed
-> here.  The only problem is that we haven't linked that to the clock code
-> to deny idle on the interface clock yet (see omap_hwmod.c:_setup()).
-> Adding that code in, plus adding that OCPIF_SWSUP_IDLE flag to the
-> McBSP2/3 data, seems like the right approach here.
->
-> I guess we also will need some basic usecounting for denying idle in the
-> clock code.
->
-> Otherwise these direct register manipulations of clock registers, outside
-> the clock code, could turn into a mess :-(
+Le 30/06/2011 17:22, Mark Brown :
+> On Thu, Jun 30, 2011 at 03:57:12PM +0200, Nicolas Ferre wrote:
+> 
+> Please fix your mailer to line wrap within paragraphs.
+> 
+>> First of all, I experienced issues while not having OSC enabled during
+>> suspend/resume cycle. Am I right supposing that, if using oscillator
+>> to clock the codec, I have to keep it running during a suspend/resume
+>> cycle?
+> 
+> No, not at all.  What makes you believe that you would you need to do
+> that?
 
-AFAIR Kishon did submit some patches to expose this feature to the 
-driver through omap_device API. The point is that other broken IP like 
-SDMA of USB will require such feature.
+Ok, I re-tested and for sure I was totally wrong! So we forget this part
+of the patch.
+I guess that this belief may come from my first implementation on 2.6.35
+where OSC was not part of the DAPM... Sory for the noise.
 
-Didn't we pull them?
+I repost the "active bit" part real-soon-now.
 
-Benoit
+Thanks for your help, best regards,
+-- 
+Nicolas Ferre
