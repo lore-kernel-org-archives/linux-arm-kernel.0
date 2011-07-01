@@ -1,88 +1,70 @@
 From: b-cousson@ti.com (Benoit Cousson)
-Date: Fri, 1 Jul 2011 23:09:07 +0200
-Subject: [PATCH v3 02/13] OMAP2+: hwmod: Init clkdm field at boot time
-In-Reply-To: <1309554558-19819-1-git-send-email-b-cousson@ti.com>
-References: <1309554558-19819-1-git-send-email-b-cousson@ti.com>
-Message-ID: <1309554558-19819-3-git-send-email-b-cousson@ti.com>
+Date: Fri, 1 Jul 2011 23:09:05 +0200
+Subject: [PATCH v3 00/13] OMAP4: Add modulemode support to hwmod framework
+Message-ID: <1309554558-19819-1-git-send-email-b-cousson@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At boot time, lookup the clkdm_name to get the clkdm
-structure pointer for further usage.
+Hi Paul,
 
-Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-Cc: Paul Walmsley <paul@pwsan.com>
-Cc: Rajendra Nayak <rnayak@ti.com>
----
- arch/arm/mach-omap2/omap_hwmod.c             |   34 +++++++++++++++++++++++++-
- arch/arm/plat-omap/include/plat/omap_hwmod.h |    1 +
- 2 files changed, 34 insertions(+), 1 deletions(-)
+Here is the series that finally add the management of the modulemode
+directly from hwmod fmwk instead of using a fake clock node to represent
+the IP.
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index e530bcb..9b6b8c6 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -919,9 +919,40 @@ static struct omap_hwmod *_lookup(const char *name)
- 
- 	return oh;
- }
-+/**
-+ * _init_clkdm - look up a clockdomain name, store pointer in omap_hwmod
-+ * @oh: struct omap_hwmod *
-+ *
-+ * Convert a clockdomain name stored in a struct omap_hwmod into a
-+ * clockdomain pointer, and save it into the struct omap_hwmod.
-+ * return -EINVAL if clkdm_name does not exist or if the lookup failed.
-+ */
-+static int _init_clkdm(struct omap_hwmod *oh)
-+{
-+	if (cpu_is_omap24xx() || cpu_is_omap34xx())
-+		return 0;
-+
-+	if (!oh->clkdm_name) {
-+		pr_warning("omap_hwmod: %s: no clkdm_name\n", oh->name);
-+		return -EINVAL;
-+	}
-+
-+	oh->clkdm = clkdm_lookup(oh->clkdm_name);
-+	if (!oh->clkdm) {
-+		pr_warning("omap_hwmod: %s: could not associate to clkdm %s\n",
-+			oh->name, oh->clkdm_name);
-+		return -EINVAL;
-+	}
-+
-+	pr_debug("omap_hwmod: %s: associated to clkdm %s\n",
-+		oh->name, oh->clkdm_name);
-+
-+	return 0;
-+}
- 
- /**
-- * _init_clocks - clk_get() all clocks associated with this hwmod
-+ * _init_clocks - clk_get() all clocks associated with this hwmod. Retrieve as
-+ * well the clockdomain.
-  * @oh: struct omap_hwmod *
-  * @data: not used; pass NULL
-  *
-@@ -941,6 +972,7 @@ static int _init_clocks(struct omap_hwmod *oh, void *data)
- 	ret |= _init_main_clk(oh);
- 	ret |= _init_interface_clks(oh);
- 	ret |= _init_opt_clks(oh);
-+	ret |= _init_clkdm(oh);
- 
- 	if (!ret)
- 		oh->_state = _HWMOD_STATE_CLKS_INITED;
-diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-index 5d77c5b..28ea1c8 100644
---- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
-+++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-@@ -520,6 +520,7 @@ struct omap_hwmod {
- 	struct clk			*_clk;
- 	struct omap_hwmod_opt_clk	*opt_clks;
- 	char				*clkdm_name;
-+	struct clockdomain		*clkdm;
- 	char				*vdd_name;
- 	struct voltagedomain		*voltdm;
- 	struct omap_hwmod_ocp_if	**masters; /* connect to *_IA */
--- 
-1.7.0.4
+This v2 update is fixing a couple of regressions I introduced in the first
+release.
+
+A second series will clean most of the remaining data from the clock data
+file. Before that I have to rebase Rajendra's series to control the
+clockdomain from the hwmod framework, otherwise the modules will
+not be enabled properly since their clockdomain will not be changed
+to SW_SUP during enable.
+
+The series is based on for_3.1/3_hwmod_fixes and tested
+on OMAP4430 ES2.1 + SDP. It should not affect OMAP2 & 3, but some testing
+are definitively needed.
+
+The patches are available here:
+git://gitorious.org/omap-pm/linux.git for_3.1/4_hwmod_modulemode
+
+Regards,
+Benoit
+
+
+Change since v1: http://www.spinics.net/lists/linux-omap/msg53094.html
+    - Change pr_warning to pr_debug to reduce verbosity
+    - Fix hardreset APIs that were using mask instead of shift
+    - Remove cdoffs addition with clkctrl_offs since the the cdoffs
+      is already included in the register offset.
+
+Change since v2:
+    - Fix name in reset prm code
+
+
+Benoit Cousson (13):
+  OMAP4: hwmod data: Add clock domain attribute
+  OMAP2+: hwmod: Init clkdm field at boot time
+  OMAP4: hwmod: Replace CLKCTRL absolute address with offset macros
+  OMAP: hwmod: Wait the idle status to be disabled
+  OMAP2+: hwmod: Replace clkdm access from main_clk using hwmod attribute
+  OMAP4: hwmod: Replace RSTCTRL absolute address with offset macros
+  OMAP4: prm: Replace warm reset API with the offset based version
+  OMAP4: prm: Remove deprecated functions
+  OMAP4: hwmod data: Align interconnect format with regular modules
+  OMAP4: hwmod data: Add PRM context register offset
+  OMAP4: hwmod data: Add modulemode entry in omap_hwmod structure
+  OMAP4: cm: Add two new APIs for modulemode control
+  OMAP4: hwmod: Introduce the module control in hwmod control
+
+ arch/arm/mach-omap2/cm44xx.h                 |    3 +-
+ arch/arm/mach-omap2/cminst44xx.c             |   86 +++++-
+ arch/arm/mach-omap2/cminst44xx.h             |    8 +-
+ arch/arm/mach-omap2/omap_hwmod.c             |  196 +++++++++--
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c   |  457 ++++++++++++++++++++------
+ arch/arm/mach-omap2/prcm.c                   |    2 +-
+ arch/arm/mach-omap2/prm44xx.c                |  145 +--------
+ arch/arm/mach-omap2/prm44xx.h                |    6 -
+ arch/arm/mach-omap2/prminst44xx.c            |  108 ++++++-
+ arch/arm/mach-omap2/prminst44xx.h            |   12 +-
+ arch/arm/plat-omap/include/plat/omap_hwmod.h |   14 +-
+ 11 files changed, 738 insertions(+), 299 deletions(-)
