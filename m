@@ -1,347 +1,120 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Fri,  1 Jul 2011 07:43:30 +0200
-Subject: [PATCH v4] Add ARM cpu topology definition
-Message-ID: <1309499010-2049-1-git-send-email-vincent.guittot@linaro.org>
+From: padma.kvr@gmail.com (padma venkat)
+Date: Fri, 1 Jul 2011 11:16:11 +0530
+Subject: [PATCH 2/2] SPI: SAMSUNG: Bug fix for SPI with different FIFO
+	level
+In-Reply-To: <BANLkTinFnFwBGi693JTD_iDykA2VkV+HOw@mail.gmail.com>
+References: <1309437536-9315-1-git-send-email-padma.v@samsung.com>
+	<1309437536-9315-2-git-send-email-padma.v@samsung.com>
+	<BANLkTi=L7QeN75ebWFXdp_V5Pw1zEc-ZtA@mail.gmail.com>
+	<BANLkTimeWUbD2Ej16KKmuzwSCFz8HOhyKQ@mail.gmail.com>
+	<BANLkTi=9c5asfr=Jg6xwjQZW_a369UO64Q@mail.gmail.com>
+	<BANLkTinFnFwBGi693JTD_iDykA2VkV+HOw@mail.gmail.com>
+Message-ID: <BANLkTik0LERxBHmJc5ZnRotnD4CSveR-UQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The affinity between ARM processors is defined in the MPIDR register.
-We can identify which processors are in the same cluster,
-and which ones have performance interdependency. We can define the
-cpu topology of ARM platform, that is then used by sched_mc and sched_smt.
+Hi Tony,
 
-The default state of sched_mc and sched_smt config is disable.
-When enabled, the behavior of the scheduler can be modified with
-sched_mc_power_savings and sched_smt_power_savings sysfs interfaces.
+On Thu, Jun 30, 2011 at 4:30 PM, Tony Nadackal <tonykn@gmail.com> wrote:
+> Hi Padma,
+> With regards to your patch, even though one can check the tx done status
+> using the TX_DONE bit, the present macro itself would work perfectly fine if
+> the 'fifo_lvl_mask' is set properly.
+> For example in 6450 channel 1, the fifo_lvl_mask should be 0x1ff (for 9bits,
+> 15:23), while even in your patch, it is wrongly set as 0x7f(only 7bits).
+>
+> Thus, if this fifo_lvl_mask was defined correctly, the existing macro would
+> itself have worked.
+Thanks for your comment.
+I considered changing to the fifo_lvl_mask to 1ff as you mentioned.
+But I  think that the fifo_lvl_mask reflects the actual FIFO capacity
+in the SPI driver.
+For the failing channels the FIFO trigger level is 64 bytes and so i
+retained that value.
+In the driver it polls till the FIFO capacity level otherwise it goes
+for DMA.So if we keep
+the FIFO level as 1ff when the actual capacity is 7f then it fails.
 
-Changes since v3 :
-* Update the format of printk message
-* Remove blank line
+Jassi what do you think about this?
 
-Changes since v2 :
-* Update the commit message and some comments
+Thanks&Regards
+Padma
 
-Changes since v1 :
-* Update the commit message
-* Add read_cpuid_mpidr in arch/arm/include/asm/cputype.h
-* Modify header of arch/arm/kernel/topology.c
-* Modify tests and manipulation of MPIDR's bitfields
-* Modify the place and dependancy of the config
-* Modify Noop functions
-
-Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
-Reviewed-by: Amit Kucheria <amit.kucheria@linaro.org>
----
- arch/arm/Kconfig                |   25 +++++++
- arch/arm/include/asm/cputype.h  |    6 ++
- arch/arm/include/asm/topology.h |   33 +++++++++
- arch/arm/kernel/Makefile        |    1 +
- arch/arm/kernel/smp.c           |    6 ++
- arch/arm/kernel/topology.c      |  149 +++++++++++++++++++++++++++++++++++++++
- 6 files changed, 220 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/kernel/topology.c
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 9adc278..f327e55 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1344,6 +1344,31 @@ config SMP_ON_UP
- 
- 	  If you don't know what to do here, say Y.
- 
-+config ARM_CPU_TOPOLOGY
-+	bool "Support cpu topology definition"
-+	depends on SMP && CPU_V7
-+	default y
-+	help
-+	  Support ARM cpu topology definition. The MPIDR register defines
-+	  affinity between processors which is then used to describe the cpu
-+	  topology of an ARM System.
-+
-+config SCHED_MC
-+	bool "Multi-core scheduler support"
-+	depends on ARM_CPU_TOPOLOGY
-+	help
-+	  Multi-core scheduler support improves the CPU scheduler's decision
-+	  making when dealing with multi-core CPU chips at a cost of slightly
-+	  increased overhead in some places. If unsure say N here.
-+
-+config SCHED_SMT
-+	bool "SMT scheduler support"
-+	depends on ARM_CPU_TOPOLOGY
-+	help
-+	  Improves the CPU scheduler's decision making when dealing with
-+	  MultiThreading at a cost of slightly increased overhead in some
-+	  places. If unsure say N here.
-+
- config HAVE_ARM_SCU
- 	bool
- 	depends on SMP
-diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
-index cd4458f..cb47d28 100644
---- a/arch/arm/include/asm/cputype.h
-+++ b/arch/arm/include/asm/cputype.h
-@@ -8,6 +8,7 @@
- #define CPUID_CACHETYPE	1
- #define CPUID_TCM	2
- #define CPUID_TLBTYPE	3
-+#define CPUID_MPIDR	5
- 
- #define CPUID_EXT_PFR0	"c1, 0"
- #define CPUID_EXT_PFR1	"c1, 1"
-@@ -70,6 +71,11 @@ static inline unsigned int __attribute_const__ read_cpuid_tcmstatus(void)
- 	return read_cpuid(CPUID_TCM);
- }
- 
-+static inline unsigned int __attribute_const__ read_cpuid_mpidr(void)
-+{
-+	return read_cpuid(CPUID_MPIDR);
-+}
-+
- /*
-  * Intel's XScale3 core supports some v6 features (supersections, L2)
-  * but advertises itself as v5 as it does not support the v6 ISA.  For
-diff --git a/arch/arm/include/asm/topology.h b/arch/arm/include/asm/topology.h
-index accbd7c..63a7454 100644
---- a/arch/arm/include/asm/topology.h
-+++ b/arch/arm/include/asm/topology.h
-@@ -1,6 +1,39 @@
- #ifndef _ASM_ARM_TOPOLOGY_H
- #define _ASM_ARM_TOPOLOGY_H
- 
-+#ifdef CONFIG_ARM_CPU_TOPOLOGY
-+
-+#include <linux/cpumask.h>
-+
-+struct cputopo_arm {
-+	int thread_id;
-+	int core_id;
-+	int socket_id;
-+	cpumask_t thread_sibling;
-+	cpumask_t core_sibling;
-+};
-+
-+extern struct cputopo_arm cpu_topology[NR_CPUS];
-+
-+#define topology_physical_package_id(cpu)	(cpu_topology[cpu].socket_id)
-+#define topology_core_id(cpu)		(cpu_topology[cpu].core_id)
-+#define topology_core_cpumask(cpu)	(&(cpu_topology[cpu].core_sibling))
-+#define topology_thread_cpumask(cpu)	(&(cpu_topology[cpu].thread_sibling))
-+
-+#define mc_capable()	(cpu_topology[0].socket_id != -1)
-+#define smt_capable()	(cpu_topology[0].thread_id != -1)
-+
-+void init_cpu_topology(void);
-+void store_cpu_topology(unsigned int cpuid);
-+const struct cpumask *cpu_coregroup_mask(unsigned int cpu);
-+
-+#else
-+
-+static inline void init_cpu_topology(void) { };
-+static inline void store_cpu_topology(unsigned int cpuid) { };
-+
-+#endif
-+
- #include <asm-generic/topology.h>
- 
- #endif /* _ASM_ARM_TOPOLOGY_H */
-diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-index a5b31af..816a481 100644
---- a/arch/arm/kernel/Makefile
-+++ b/arch/arm/kernel/Makefile
-@@ -61,6 +61,7 @@ obj-$(CONFIG_IWMMXT)		+= iwmmxt.o
- obj-$(CONFIG_CPU_HAS_PMU)	+= pmu.o
- obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o
- AFLAGS_iwmmxt.o			:= -Wa,-mcpu=iwmmxt
-+obj-$(CONFIG_ARM_CPU_TOPOLOGY)  += topology.o
- 
- ifneq ($(CONFIG_ARCH_EBSA110),y)
-   obj-y		+= io.o
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 344e52b..3e8dc3b 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -31,6 +31,7 @@
- #include <asm/cacheflush.h>
- #include <asm/cpu.h>
- #include <asm/cputype.h>
-+#include <asm/topology.h>
- #include <asm/mmu_context.h>
- #include <asm/pgtable.h>
- #include <asm/pgalloc.h>
-@@ -268,6 +269,9 @@ static void __cpuinit smp_store_cpu_info(unsigned int cpuid)
- 	struct cpuinfo_arm *cpu_info = &per_cpu(cpu_data, cpuid);
- 
- 	cpu_info->loops_per_jiffy = loops_per_jiffy;
-+
-+	store_cpu_topology(cpuid);
-+
- }
- 
- /*
-@@ -354,6 +358,8 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
- {
- 	unsigned int ncores = num_possible_cpus();
- 
-+	init_cpu_topology();
-+
- 	smp_store_cpu_info(smp_processor_id());
- 
- 	/*
-diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
-new file mode 100644
-index 0000000..e8f3b95
---- /dev/null
-+++ b/arch/arm/kernel/topology.c
-@@ -0,0 +1,149 @@
-+/*
-+ * arch/arm/kernel/topology.c
-+ *
-+ * Copyright (C) 2011 Linaro Limited.
-+ * Written by: Vincent Guittot
-+ *
-+ * based on arch/sh/kernel/topology.c
-+ *
-+ * This file is subject to the terms and conditions of the GNU General Public
-+ * License.  See the file "COPYING" in the main directory of this archive
-+ * for more details.
-+ */
-+
-+#include <linux/cpu.h>
-+#include <linux/cpumask.h>
-+#include <linux/init.h>
-+#include <linux/percpu.h>
-+#include <linux/node.h>
-+#include <linux/nodemask.h>
-+#include <linux/sched.h>
-+
-+#include <asm/cputype.h>
-+#include <asm/topology.h>
-+
-+#define MPIDR_SMP_BITMASK (0x3 << 30)
-+#define MPIDR_SMP_VALUE (0x2 << 30)
-+
-+#define MPIDR_MT_BITMASK (0x1 << 24)
-+
-+/*
-+ * These masks reflect the current use of the affinity levels.
-+ * The affinity level can be up to 16 bits according to ARM ARM
-+ */
-+
-+#define MPIDR_LEVEL0_MASK 0x3
-+#define MPIDR_LEVEL0_SHIFT 0
-+
-+#define MPIDR_LEVEL1_MASK 0xF
-+#define MPIDR_LEVEL1_SHIFT 8
-+
-+#define MPIDR_LEVEL2_MASK 0xFF
-+#define MPIDR_LEVEL2_SHIFT 16
-+
-+struct cputopo_arm cpu_topology[NR_CPUS];
-+
-+const struct cpumask *cpu_coregroup_mask(unsigned int cpu)
-+{
-+	return &(cpu_topology[cpu].core_sibling);
-+}
-+
-+/*
-+ * store_cpu_topology is called@boot when only one cpu is running
-+ * and with the mutex cpu_hotplug.lock locked, when several cpus have booted,
-+ * which prevents simultaneous write access to cpu_topology array
-+ */
-+void store_cpu_topology(unsigned int cpuid)
-+{
-+	struct cputopo_arm *cpuid_topo = &(cpu_topology[cpuid]);
-+	unsigned int mpidr;
-+	unsigned int cpu;
-+
-+	/* If the cpu topology has been already set, just return */
-+	if (cpuid_topo->core_id != -1)
-+		return;
-+
-+	mpidr = read_cpuid_mpidr();
-+
-+	/* create cpu topology mapping */
-+	if ((mpidr & MPIDR_SMP_BITMASK) == MPIDR_SMP_VALUE) {
-+		/*
-+		 * This is a multiprocessor system
-+		 * multiprocessor format & multiprocessor mode field are set
-+		 */
-+
-+		if (mpidr & MPIDR_MT_BITMASK) {
-+			/* core performance interdependency */
-+			cpuid_topo->thread_id = ((mpidr >> MPIDR_LEVEL0_SHIFT)
-+				& MPIDR_LEVEL0_MASK);
-+			cpuid_topo->core_id =  ((mpidr >> MPIDR_LEVEL1_SHIFT)
-+				& MPIDR_LEVEL1_MASK);
-+			cpuid_topo->socket_id = ((mpidr >> MPIDR_LEVEL2_SHIFT)
-+				& MPIDR_LEVEL2_MASK);
-+		} else {
-+			/* largely independent cores */
-+			cpuid_topo->thread_id = -1;
-+			cpuid_topo->core_id = ((mpidr >> MPIDR_LEVEL0_SHIFT)
-+				& MPIDR_LEVEL0_MASK);
-+			cpuid_topo->socket_id = ((mpidr >> MPIDR_LEVEL1_SHIFT)
-+				& MPIDR_LEVEL1_MASK);
-+		}
-+	} else {
-+		/*
-+		 * This is an uniprocessor system
-+		 * we are in multiprocessor format but uniprocessor system
-+		 * or in the old uniprocessor format
-+		 */
-+
-+		cpuid_topo->thread_id = -1;
-+		cpuid_topo->core_id = 0;
-+		cpuid_topo->socket_id = -1;
-+	}
-+
-+	/* update core and thread sibling masks */
-+	for_each_possible_cpu(cpu) {
-+		struct cputopo_arm *cpu_topo = &(cpu_topology[cpu]);
-+
-+		if (cpuid_topo->socket_id == cpu_topo->socket_id) {
-+			cpumask_set_cpu(cpuid, &cpu_topo->core_sibling);
-+			if (cpu != cpuid)
-+				cpumask_set_cpu(cpu,
-+					&cpuid_topo->core_sibling);
-+
-+			if (cpuid_topo->core_id == cpu_topo->core_id) {
-+				cpumask_set_cpu(cpuid,
-+					&cpu_topo->thread_sibling);
-+				if (cpu != cpuid)
-+					cpumask_set_cpu(cpu,
-+						&cpuid_topo->thread_sibling);
-+			}
-+		}
-+	}
-+	smp_wmb();
-+
-+	printk(KERN_INFO "CPU%u: thread %d, cpu %d, socket %d, mpidr %x\n",
-+		cpuid, cpu_topology[cpuid].thread_id,
-+		cpu_topology[cpuid].core_id,
-+		cpu_topology[cpuid].socket_id, mpidr);
-+}
-+
-+/*
-+ * init_cpu_topology is called at boot when only one cpu is running
-+ * which prevent simultaneous write access to cpu_topology array
-+ */
-+void init_cpu_topology(void)
-+{
-+	unsigned int cpu;
-+
-+	/* init core mask */
-+	for_each_possible_cpu(cpu) {
-+		struct cputopo_arm *cpu_topo = &(cpu_topology[cpu]);
-+
-+		cpu_topo->thread_id = -1;
-+		cpu_topo->core_id =  -1;
-+		cpu_topo->socket_id = -1;
-+		cpumask_clear(&cpu_topo->core_sibling);
-+		cpumask_clear(&cpu_topo->thread_sibling);
-+	}
-+	smp_wmb();
-+}
--- 
-1.7.4.1
+> Thanks,
+> Tony
+>
+> On Thu, Jun 30, 2011 at 3:22 PM, Jassi Brar <jassisinghbrar@gmail.com>
+> wrote:
+>>
+>> On Thu, Jun 30, 2011 at 2:35 PM, padma venkat <padma.kvr@gmail.com> wrote:
+>> > Hi,
+>> >
+>> > On Thu, Jun 30, 2011 at 12:38 PM, Jassi Brar <jassisinghbrar@gmail.com>
+>> > wrote:
+>> >> On Thu, Jun 30, 2011 at 6:08 PM, Padmavathi Venna <padma.v@samsung.com>
+>> >> wrote:
+>> >>> Fixed the bug in transmission status check for 64 bytes FIFO
+>> >>> level.
+>> >>>
+>> >>> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+>> >>> ---
+>> >>> ?drivers/spi/spi_s3c64xx.c | ? ?4 +---
+>> >>> ?1 files changed, 1 insertions(+), 3 deletions(-)
+>> >>>
+>> >>> diff --git a/drivers/spi/spi_s3c64xx.c b/drivers/spi/spi_s3c64xx.hc
+>> >>> index 795828b..8945e20 100644
+>> >>> --- a/drivers/spi/spi_s3c64xx.c
+>> >>> +++ b/drivers/spi/spi_s3c64xx.c
+>> >>> @@ -116,9 +116,7 @@
+>> >>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?(((i)->fifo_lvl_mask + 1))) \
+>> >>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?? 1 : 0)
+>> >>>
+>> >>> -#define S3C64XX_SPI_ST_TX_DONE(v, i) ((((v) >> (i)->rx_lvl_offset) &
+>> >>> \
+>> >>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? (((i)->fifo_lvl_mask + 1) <<
+>> >>> 1)) \
+>> >>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 1 : 0)
+>> >>> +#define S3C64XX_SPI_ST_TX_DONE(v, i) (((v) & (1 << (i)->tx_st_done))
+>> >>> ? 1 : 0)
+>> >>
+>> >> IIRC the macro is already designed to deduct tx-done levels from other
+>> >> fields.
+>> >> Could you please _explain_ with one example where it fails ? It is
+>> >> difficult to see without
+>> >> numbers.
+>> > The existing macro fails for following scenarios.
+>> > 1) S5P64X0 channel 1
+>> > 2) S5PV210 channel 1
+>> > 3) S5PV310 channel 1 and channel 2
+>> >
+>> > The FIFO data level supported in the above SoCs either 64 or 256
+>> > bytes depending on the channel. Because of this the TX_DONE
+>> > is the 25 bit in the status register.
+>> >
+>> > The existing macro works for the following scenarios
+>> > 1) S3C6410 all channels
+>> > 2) S5PC100 all channels
+>> >
+>> > The FIFO data level supported in the above SoCs 64 bytes
+>> > on all the channels. Because of this the TX_DONE is the 21 bit
+>> > in the status register.
+>> >
+>> > So when we use the existing macro for the non-working SoCs
+>> > it is not anding with the TX_DONE bit but it is only anding the bits
+>> > earlier to TX_DONE bit.
+>> >
+>>
+>> I see.
+>> I don't have access to post s3c64xx datasheets. Please confirm if TX_DONE
+>> bit at same offset for all channels of an SoC. If so, I am OK with
+>> these 2 patches.
+>>
+>> Thanks,
+>> Jassi
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe
+>> linux-samsung-soc" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>
+>
