@@ -1,50 +1,28 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Fri, 1 Jul 2011 15:53:13 +0800
-Subject: [PATCH v5 1/3] ARM: mxs: add GPMI-NFC support for imx23/imx28
-In-Reply-To: <20110701060356.GA27039@pengutronix.de>
-References: <1309406028-2924-1-git-send-email-b32955@freescale.com>
-	<201106301555.19440.arnd@arndb.de>
-	<19980.36638.134045.743619@ipc1.ka-ro>
-	<201107010022.26597.arnd@arndb.de>
-	<20110701060356.GA27039@pengutronix.de>
-Message-ID: <4E0D7CE9.2030209@freescale.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Fri, 1 Jul 2011 10:51:06 +0300
+Subject: [GIT PULL] omap iommu fixes for v3.0-rc
+In-Reply-To: <20110701070056.GZ23145@atomide.com>
+References: <BANLkTi=vd2TE6JjueGmY=ydRQRygo8-Q1Q@mail.gmail.com>
+	<20110701070056.GZ23145@atomide.com>
+Message-ID: <BANLkTikhZhUzyk=31cUOcV3Ygj=BHUrbew@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi:
-> Hi Arnd,
->
->> If you really want to call out obsceneties, how about the fact that this
->> driver comes with an 805 line patch to add a HAL for a single chip!
->>
->> Such abstractions should not be introduced as long as there is only
->> a single instance of the hardware.
-> If I understood correctly, most if not all upcoming i.MX will have the GPMI
-> (mx50, mx6). Huang, do you already have a draft for the mx50-hal?
->
-I have finished the code for mx50's GPMI.
-And I am coding for the MX6's GPMI recently.
+On Fri, Jul 1, 2011 at 10:00 AM, Tony Lindgren <tony@atomide.com> wrote:
+> These look like real fixes, but can you please update the commits
+> with something like "This fixes an issue with foo when doing bar".
 
-I need a separate mx50-hal (or mx60-hal) to make the code tidy.
-The MX50 and mx60 support ONFI NAND and TOGGLE nand(which mx23/mx28 do 
-not support),
-they need a long code to initialize the TIMING register. What's more, 
-the READ/WRITE functions
-are different from the mx23/mx28.
+Done, please tell me if it's OK now.
 
-Frankly speaking, I can merge the mxs-hal.c file to the gpmi-nfc.c, but 
-don't you think it too
-messy?
+> Otherwise it's easy to claim that these are "fixes for features that
+> never worked" and it might be hard to justify them this late into
+> the -rc cycle.
 
+It seems we did have these issues for quite some time, and these are not
+explicit 3.0 regressions. So they might vaguely fall into the "fixes
+for features that never worked" definition too in a sense.
 
-Best Regards
-Huang Shijie
+If you prefer to take them into 3.1, that's OK too.
 
-
-
-
-
-> Regards,
->
->     Wolfram
->
+Thanks,
+Ohad.
