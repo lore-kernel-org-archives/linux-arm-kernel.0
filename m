@@ -1,30 +1,104 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 1 Jul 2011 08:44:25 +0200
-Subject: reply: [PATCH v5 1/3] ARM: mxs: add GPMI-NFC support for
-	imx23/imx28
-In-Reply-To: <201107010029.51965.arnd@arndb.de>
-References: <14C4E31473AF7E4B98176CB73615181C19FBD3@039-SN1MPN1-006.039d.mgd.msft.net>
-	<201107010029.51965.arnd@arndb.de>
-Message-ID: <20110701064425.GR11559@pengutronix.de>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Fri, 1 Jul 2011 09:52:00 +0300
+Subject: [GIT PULL] omap iommu fixes for v3.0-rc
+Message-ID: <BANLkTi=vd2TE6JjueGmY=ydRQRygo8-Q1Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Tony,
 
-On Fri, Jul 01, 2011 at 12:29:51AM +0200, Arnd Bergmann wrote:
-> On Thursday 30 June 2011 18:12:27 Huang Shijie-B32955 wrote:
-> > 
-> > I think gpmi-nfc is much better then gpmi-nand or gpmi-flash.
-> 
-> Then how do you want to name the near field communication drivers?
-I'm not aware that the i.MX23/28 has support for near field
-communication, still the i.MX28 Reference speaks about "GPMI NAND Mode".
-I couldn't find "NFC" in the document. So I vote for gpmi-nand, too.
-(IMHO gpmi-flash is too generic.)
+Please pull from:
 
-Best regards
-Uwe
+git://github.com/ohadbc/omap-iommu.git for-tony
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+To receive trivial iommu/iovmm fixes (iommu clk name fix, pte fix and
+a fix for iovmm's erroneous
+usage of sg_dma_len as reported by Russell).
+
+All three patches were submitted to linux-omap and linux-arm-kernel for review,
+and are also attached below for convenience.
+
+Thanks,
+Ohad.
+
+The following changes since commit c017d0d1351f916c0ced3f358afc491fdcf490b4:
+
+  Merge branch 'kvm-updates/3.0' of
+git://git.kernel.org/pub/scm/virt/kvm/kvm (2011-06-29 11:07:20 -0700)
+
+are available in the git repository at:
+
+  git://github.com/ohadbc/omap-iommu.git for-tony
+
+Ohad Ben-Cohen (2):
+      OMAP4: iommu: fix clock name
+      omap: iovmm: s/sg_dma_len(sg)/sg->length/
+
+Suman Anna (1):
+      omap: iommu: fix pte attributes for super section
+
+ arch/arm/mach-omap2/iommu2.c     |    4 ++--
+ arch/arm/mach-omap2/omap-iommu.c |    2 +-
+ arch/arm/plat-omap/iovmm.c       |    6 +++---
+ 3 files changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/iommu2.c b/arch/arm/mach-omap2/iommu2.c
+index adb083e..f286012 100644
+--- a/arch/arm/mach-omap2/iommu2.c
++++ b/arch/arm/mach-omap2/iommu2.c
+@@ -225,8 +225,8 @@ static u32 omap2_get_pte_attr(struct iotlb_entry *e)
+ 	attr = e->mixed << 5;
+ 	attr |= e->endian;
+ 	attr |= e->elsz >> 3;
+-	attr <<= ((e->pgsz & MMU_CAM_PGSZ_4K) ? 0 : 6);
+-
++	attr <<= (((e->pgsz == MMU_CAM_PGSZ_4K) ||
++			(e->pgsz == MMU_CAM_PGSZ_64K)) ? 0 : 6);
+ 	return attr;
+ }
+
+diff --git a/arch/arm/mach-omap2/omap-iommu.c b/arch/arm/mach-omap2/omap-iommu.c
+index 3fc5dc7..e61fead 100644
+--- a/arch/arm/mach-omap2/omap-iommu.c
++++ b/arch/arm/mach-omap2/omap-iommu.c
+@@ -67,7 +67,7 @@ static struct iommu_device omap4_devices[] = {
+ 		.pdata = {
+ 			.name = "ducati",
+ 			.nr_tlb_entries = 32,
+-			.clk_name = "ducati_ick",
++			.clk_name = "ipu_fck",
+ 			.da_start = 0x0,
+ 			.da_end = 0xFFFFF000,
+ 		},
+diff --git a/arch/arm/plat-omap/iovmm.c b/arch/arm/plat-omap/iovmm.c
+index 83a37c5..c60737c 100644
+--- a/arch/arm/plat-omap/iovmm.c
++++ b/arch/arm/plat-omap/iovmm.c
+@@ -72,7 +72,7 @@ static size_t sgtable_len(const struct sg_table *sgt)
+ 	for_each_sg(sgt->sgl, sg, sgt->nents, i) {
+ 		size_t bytes;
+
+-		bytes = sg_dma_len(sg);
++		bytes = sg->length;
+
+ 		if (!iopgsz_ok(bytes)) {
+ 			pr_err("%s: sg[%d] not iommu pagesize(%x)\n",
+@@ -198,7 +198,7 @@ static void *vmap_sg(const struct sg_table *sgt)
+ 		int err;
+
+ 		pa = sg_phys(sg);
+-		bytes = sg_dma_len(sg);
++		bytes = sg->length;
+
+ 		BUG_ON(bytes != PAGE_SIZE);
+
+@@ -476,7 +476,7 @@ static int map_iovm_area(struct iommu *obj, struct
+iovm_struct *new,
+ 		struct iotlb_entry e;
+
+ 		pa = sg_phys(sg);
+-		bytes = sg_dma_len(sg);
++		bytes = sg->length;
+
+ 		flags &= ~IOVMF_PGSZ_MASK;
+ 		pgsz = bytes_to_iopgsz(bytes);
