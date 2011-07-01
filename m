@@ -1,50 +1,72 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Fri, 1 Jul 2011 22:27:40 +0200
-Subject: [PATCH v2 5/5] OMAP4: powerdomain data: Remove unsupported MPU
-	powerdomain state
-In-Reply-To: <1309552060-4547-1-git-send-email-b-cousson@ti.com>
-References: <1309552060-4547-1-git-send-email-b-cousson@ti.com>
-Message-ID: <1309552060-4547-6-git-send-email-b-cousson@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 1 Jul 2011 22:38:47 +0200
+Subject: [PATCH 1/8] at91: introduce commom AT91_BASE_SYS
+In-Reply-To: <20110701172514.GG14408@game.jcrosoft.org>
+References: <1309502682-16897-1-git-send-email-plagnioj@jcrosoft.com>
+	<201107011746.57026.arnd@arndb.de>
+	<20110701172514.GG14408@game.jcrosoft.org>
+Message-ID: <201107012238.47355.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Santosh Shilimkar <santosh.shilimkar@ti.com>
+On Friday 01 July 2011 19:25:14 Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 17:46 Fri 01 Jul     , Arnd Bergmann wrote:
+> > As a general comment, please start with a cover-letter (the PATCH 0/8)
+> > email that describes the overall intention of the series and holds
+> > the combined diffstat.
+>
+> this detect dynamicly the soc and factorize the init of AT91 in one place
+> as all the soc have the same init
+> 
+> this patch series is just a first step as switch to the CLKDEV
 
-On OMAP4430 devices, because of boot ROM code bug, MPU OFF state can't
-be attempted independently. When coming out of MPU OFF state, ROM code
-disables the clocks of IVAHD, TESLA which is not desirable. Hence the
-MPU OFF state is not usable on OMAP4430 devices.
+Ok, thanks for the explanation.
 
-OMAP4460 onwards, MPU OFF state will be descoped completely because
-the DDR firewall falls in MPU power domain. When the MPU hit OFF state,
-DDR won't be accessible for other initiators. The deepest state supported
-is open switch retention (OSWR) just like CORE and PER PD on OMAP4430.
+> On 17:46 Fri 01 Jul     , Arnd Bergmann wrote:
+> > 
+> > I think it would be easier to turn this around and have a very short
+> > function here:
+> > 
+> > void __init at91_map_io(void)
+> > {
+> > 	/* Map peripherals */
+> > 	iotable_init(&at91_io_desc, 1);
+> > }
+> > 
+> > and then change each of the soc specific functions into
+> > 
+> > 
+> > -void __init at91cap9_map_io(void)
+> > +static void __init at91cap9_map_io(void)
+> >  {
+> > -       /* Map peripherals */
+> > -       iotable_init(at91cap9_io_desc, ARRAY_SIZE(at91cap9_io_desc));
+> > +	at91_boot_soc = at91cap9_soc;
+> > +	at91_map_io();
+> > +       iotable_init(at91cap9_sram_desc, ARRAY_SIZE(at91cap9_sram_desc));
+> >  }
+> > 
+> > This would keep the per-soc code local and still consolidate the
+> > common code without introducing (IMHO ugly) cpu_is_at91...() checks.
+> we detect it this is the whole idea
+> 
+> so not this way is the oposit of the whole idea
 
-So in summary MPU power domain OFF state is not supported on OMAP4
-and onwards designs. Thanks to new PRCM design, device off mode can
-still be achieved with power domains hitting OSWR state.
+I wouldn't say the whole idea. An major part of your patches is to use the
+fact that you know the SoC, which is definitely useful. The change I mentioned
+above would only provide a simpler way to get to that information, based
+on the fact that you already know the specific board.
 
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-[b-cousson at ti.com: Fix changelog typos]
-Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-Cc: Paul Walmsley <paul@pwsan.com>
----
- arch/arm/mach-omap2/powerdomains44xx_data.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+What is the advantage that you see of using the CPU register over a pointer
+from the machine_desc?
 
-diff --git a/arch/arm/mach-omap2/powerdomains44xx_data.c b/arch/arm/mach-omap2/powerdomains44xx_data.c
-index 8f46e7d..247e794 100644
---- a/arch/arm/mach-omap2/powerdomains44xx_data.c
-+++ b/arch/arm/mach-omap2/powerdomains44xx_data.c
-@@ -205,7 +205,7 @@ static struct powerdomain mpu_44xx_pwrdm = {
- 	.prcm_offs	  = OMAP4430_PRM_MPU_INST,
- 	.prcm_partition	  = OMAP4430_PRM_PARTITION,
- 	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
--	.pwrsts		  = PWRSTS_OFF_RET_ON,
-+	.pwrsts		  = PWRSTS_RET_ON,
- 	.pwrsts_logic_ret = PWRSTS_OFF_RET,
- 	.banks		  = 3,
- 	.pwrsts_mem_ret	= {
--- 
-1.7.0.4
+Obviously, it doesn't matter much any more once you do the conversion to
+device tree an end up with a of match table like
+
+struct of_device_id at91_match_table[] = {
+	{ .compatible = "atmel,at91cap9",  .data = &at91cap9_soc, },
+	{ .compatible = "atmel,at91rm9200, .data = &at91rm9200_soc, },
+	...
+};
+
+	Arnd
