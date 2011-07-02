@@ -1,116 +1,148 @@
-From: govindraj.raja@ti.com (Govindraj.R)
-Date: Sat, 2 Jul 2011 16:22:26 +0530
-Subject: [PATCH 2/2 v4] OMAP2+: hwmod: Add API to check IO PAD wakeup status
-In-Reply-To: <1309603946-25395-1-git-send-email-govindraj.raja@ti.com>
-References: <1309603946-25395-1-git-send-email-govindraj.raja@ti.com>
-Message-ID: <1309603946-25395-3-git-send-email-govindraj.raja@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 2 Jul 2011 13:19:28 +0100
+Subject: [PATCH v6 00/18] ARM: Add support for the Large Physical
+	Address Extensions
+In-Reply-To: <20110701162419.GA3990@1n450.cable.virginmedia.net>
+References: <1306273164-18217-1-git-send-email-catalin.marinas@arm.com>
+	<20110701162419.GA3990@1n450.cable.virginmedia.net>
+Message-ID: <20110702121928.GG21898@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add API to determine IO-PAD wakeup event status for a given
-hwmod dynamic_mux pad.
+On Fri, Jul 01, 2011 at 05:24:19PM +0100, Catalin Marinas wrote:
+> Hi Russell,
+> 
+> On Tue, May 24, 2011 at 10:39:06PM +0100, Catalin Marinas wrote:
+> > Catalin Marinas (14):
+> >   ARM: LPAE: Use long long printk format for displaying the pud
 
-Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
----
- arch/arm/mach-omap2/mux.c                    |   30 ++++++++++++++++++++++++++
- arch/arm/mach-omap2/mux.h                    |   13 +++++++++++
- arch/arm/mach-omap2/omap_hwmod.c             |    7 ++++++
- arch/arm/plat-omap/include/plat/omap_hwmod.h |    1 +
- 4 files changed, 51 insertions(+), 0 deletions(-)
+Ok.
 
-diff --git a/arch/arm/mach-omap2/mux.c b/arch/arm/mach-omap2/mux.c
-index c7fb22a..50ee806 100644
---- a/arch/arm/mach-omap2/mux.c
-+++ b/arch/arm/mach-omap2/mux.c
-@@ -351,6 +351,36 @@ err1:
- 	return NULL;
+> >   ARM: LPAE: Use unsigned long for __phys_to_virt and __virt_to_phys
+
+I don't like this; these macros are supposed to take unsigned long
+arguments (the hint is in their non-__ versions and __[vp]a, which
+contain the explicit casts.)  I'd much rather have their callers
+reduced in number, especially as this is a macro which platform classes
+may (and do) define.
+
+There are five places which use __phys_to_virt and one place which uses
+__virt_to_phys.
+
+Of the __virt_to_phys, this takes a u32 argument anyway, so that won't
+cause any concerns.
+
+Of the __phys_to_virt, the L2 cache handing files can use a void * for
+vaddr and use the standard phys_to_virt().  That leaves three in the core
+arch code, which can be dealt with by local casting.
+
+> >   ARM: LPAE: Use PMD_(SHIFT|SIZE|MASK) instead of PGDIR_*
+
+This one I think is fine, except the dependency on what we do about the
+dma coherent code...  Also, see the patch below which is something I've
+been thinking about to avoid the multiple-walking of the page table tree.
+However, can we guarantee what the L1 page table in LPAE will contain?
+
+> >   ARM: LPAE: Factor out 2-level page table definitions into separate
+> >     files
+> >   ARM: LPAE: Add (pte|pmd|pgd|pgprot)val_t type definitions as u32
+
+I'm unconvinced that this is the right solution to add all these val_t
+types, especially as u32.  It also creates some nonsense like assigning
+pmdval_t values to pgprotval_t, and misses converting some other stuff
+too.
+
+> >   ARM: LPAE: Use a mask for physical addresses in page table entries
+> [...]
+> > Will Deacon (4):
+> >   ARM: LPAE: add ISBs around MMU enabling code
+
+I still don't like this one - and I do think there's a solution without
+having to resort to isb there.  This also affects the cpu resume code
+too.
+
+> >   ARM: LPAE: Use generic dma_addr_t type definition
+
+This is already the case since:
+  commit 8547727756a7322b99aa313ce50fe15d8f858872
+  Author: FUJITA Tomonori <fujita.tomonori@lab.ntt.co.jp>
+  Date:   Wed Mar 23 16:43:28 2011 -0700
+
+    remove dma64_addr_t
+
+> Since the core LPAE patches haven't got a proper review yet, would you
+> please consider merging some of the LPAE preparation patches during the
+> upcoming window? Above is a list that I think it's relatively trivial
+> (or we can have an even smaller set of patches, any progress would be
+> good).
+> 
+> Thanks.
+> 
+> -- 
+> Catalin
+
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 6e7f67f..1892c3d 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -862,6 +862,29 @@ static void __init sanity_check_meminfo(void)
+ 	meminfo.nr_banks = j;
  }
  
-+/**
-+ * omap_hwmod_mux_get_wake_status - omap hwmod check pad wakeup
-+ * @hmux:		Pads for a hwmod
-+ *
-+ * Gets the wakeup status of given pad from omap-hwmod.
-+ * Returns true if wakeup event is set for pad else false
-+ * if wakeup is not occured or pads are not avialable.
-+ */
-+bool omap_hwmod_mux_get_wake_status(struct omap_hwmod_mux_info *hmux)
++static inline void pmd_clear_range(pgd_t *pgd, unsigned long addr, unsigned long end)
 +{
-+	int i;
-+	unsigned int val;
-+	u8 ret = false;
++	pmd_t *pmd;
 +
-+	for (i = 0; i < hmux->nr_pads; i++) {
-+		struct omap_device_pad *pad = &hmux->pads[i];
-+
-+		if (pad->flags & OMAP_DEVICE_PAD_WAKEUP) {
-+			val = omap_mux_read(pad->partition,
-+					pad->mux->reg_offset);
-+			if (val & OMAP_WAKEUP_EVENT) {
-+				ret = true;
-+				break;
-+			}
-+		}
-+	}
-+
-+	return ret;
++	pmd = pmd_offset(pgd, addr);
++	do {
++		addr = pmd_addr_end(addr, end);
++		pmd_clear(pmd);
++	} while (pmd++, addr != end);
 +}
 +
- /* Assumes the calling function takes care of locking */
- void omap_hwmod_mux(struct omap_hwmod_mux_info *hmux, u8 state)
- {
-diff --git a/arch/arm/mach-omap2/mux.h b/arch/arm/mach-omap2/mux.h
-index 2132308..8b2150a 100644
---- a/arch/arm/mach-omap2/mux.h
-+++ b/arch/arm/mach-omap2/mux.h
-@@ -225,8 +225,21 @@ omap_hwmod_mux_init(struct omap_device_pad *bpads, int nr_pads);
-  */
- void omap_hwmod_mux(struct omap_hwmod_mux_info *hmux, u8 state);
- 
-+/**
-+ * omap_hwmod_mux_get_wake_status - omap hwmod check pad wakeup
-+ * @hmux:		Pads for a hwmod
-+ *
-+ * Called only from omap_hwmod.c, do not use.
-+ */
-+bool omap_hwmod_mux_get_wake_status(struct omap_hwmod_mux_info *hmux);
- #else
- 
-+static inline bool
-+omap_hwmod_mux_get_wake_status(struct omap_hwmod_mux_info *hmux)
++static void pgd_clear_range(unsigned long addr, unsigned long end)
 +{
-+	return 0;
++	unsigned long next;
++	pgd_t *pgd;
++
++	pgd = pgd_offset_k(addr);
++	do {
++		next = pgd_addr_end(addr, end);
++		pmd_clear_range(pgd, addr, next);
++	} while (pgd++, addr = next, addr != end);
 +}
 +
- static inline int omap_mux_init_gpio(int gpio, int val)
+ static inline void prepare_page_table(void)
  {
- 	return 0;
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index 3b28e0a..f9495fe 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -2428,3 +2428,10 @@ int omap_hwmod_no_setup_reset(struct omap_hwmod *oh)
+ 	unsigned long addr;
+@@ -870,15 +893,15 @@ static inline void prepare_page_table(void)
+ 	/*
+ 	 * Clear out all the mappings below the kernel image.
+ 	 */
+-	for (addr = 0; addr < MODULES_VADDR; addr += PGDIR_SIZE)
+-		pmd_clear(pmd_off_k(addr));
++	pgd_clear_range(0, MODULES_VADDR);
  
- 	return 0;
+ #ifdef CONFIG_XIP_KERNEL
+ 	/* The XIP kernel is mapped in the module area -- skip over it */
+ 	addr = ((unsigned long)_etext + PGDIR_SIZE - 1) & PGDIR_MASK;
++#else
++	addr = MODULES_VADDR;
+ #endif
+-	for ( ; addr < PAGE_OFFSET; addr += PGDIR_SIZE)
+-		pmd_clear(pmd_off_k(addr));
++	pgd_clear_range(addr, PAGE_OFFSET);
+ 
+ 	/*
+ 	 * Find the end of the first block of lowmem.
+@@ -891,9 +914,7 @@ static inline void prepare_page_table(void)
+ 	 * Clear out all the kernel space mappings, except for the first
+ 	 * memory bank, up to the end of the vmalloc region.
+ 	 */
+-	for (addr = __phys_to_virt(end);
+-	     addr < VMALLOC_END; addr += PGDIR_SIZE)
+-		pmd_clear(pmd_off_k(addr));
++	pgd_clear_range(__phys_to_virt(end), VMALLOC_END);
  }
-+
-+int omap_hmwod_pad_get_wakeup_status(struct omap_hwmod *oh)
-+{
-+	if (oh && oh->mux)
-+		return omap_hwmod_mux_get_wake_status(oh->mux);
-+	return -EINVAL;
-+}
-diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-index 1adea9c..da6ab5c 100644
---- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
-+++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-@@ -602,6 +602,7 @@ u32 omap_hwmod_get_context_loss_count(struct omap_hwmod *oh);
  
- int omap_hwmod_no_setup_reset(struct omap_hwmod *oh);
- 
-+int omap_hmwod_pad_get_wakeup_status(struct omap_hwmod *oh);
  /*
-  * Chip variant-specific hwmod init routines - XXX should be converted
-  * to use initcalls once the initial boot ordering is straightened out
--- 
-1.7.4.1
