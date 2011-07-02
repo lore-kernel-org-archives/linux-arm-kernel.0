@@ -1,40 +1,70 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 2 Jul 2011 11:24:46 +0200
-Subject: [PATCH v2 0/6] ARM: make mach/hardware.h optional
-In-Reply-To: <1309366019-24379-1-git-send-email-robherring2@gmail.com>
-References: <1309366019-24379-1-git-send-email-robherring2@gmail.com>
-Message-ID: <201107021124.46953.arnd@arndb.de>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Sat, 02 Jul 2011 12:36:28 +0300
+Subject: [PATCH v2 17/18] OMAP4: hwmod data: Modify DSS opt clocks
+In-Reply-To: <1309598037.1846.3.camel@deskari>
+References: <1309552901-8944-1-git-send-email-b-cousson@ti.com>
+	<1309552901-8944-18-git-send-email-b-cousson@ti.com>
+	<1309598037.1846.3.camel@deskari>
+Message-ID: <1309599388.1846.12.camel@deskari>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 29 June 2011 18:46:53 Rob Herring wrote:
+On Sat, 2011-07-02 at 12:13 +0300, Tomi Valkeinen wrote:
+> Hi Benoit,
 > 
-> From: Rob Herring <rob.herring@calxeda.com>
+> On Fri, 2011-07-01 at 22:41 +0200, Benoit Cousson wrote:
+> > From: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> > 
+> > Add missing DSS optional clocks to HWMOD data for OMAP4xxx.
+> > 
+> > Add HWMOD_CONTROL_OPT_CLKS_IN_RESET flag for dispc to fix dispc reset.
+> > 
+> > Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> > [b-cousson at ti.com: Remove a comment and update the subject]
+> > Signed-off-by: Benoit Cousson <b-cousson@ti.com>
 > 
-> Currently, all ARM platforms must have a mach/hardware.h include. This is
-> because it is ultimately included by linux/pci.h which is included in many
-> places even for !CONFIG_PCI.
+> This patch adds "fck" opt-clocks for DSS. After your patch set
+> for_3.1/5_auto_fck_clkdev, in which you create "fck" automatically, I
+> see:
 > 
-> This could be fixed simply with an ifdef around the include of mach/hardware.h
-> in asm/pci.h. However, in the interest of fixing this for single kernel
-> binary builds, this series removes the include of mach/hardware.h outside of
-> mach-* and plat-*. What's used from hardware.h is a couple of PCI defines. 
-> Converting them to variables allows each platform to set the values as needed.
+> [    0.218231] omap_device: omapdss_dss: fck already exist
+> [    0.218261] omap_device: omapdss_dss: fck already exist
+> [    0.218261] omap_device: omapdss_dss: sys_clk already exist
+> [    0.218261] omap_device: omapdss_dss: tv_clk already exist
+> [    0.218322] omap_device: omapdss_dss: video_clk already exist
+> [    0.218627] omap_device: omapdss_dispc: fck already exist
+> [    0.219329] omap_device: omapdss_venc: fck already exist
+> [    0.219635] omap_device: omapdss_dsi1: fck already exist
+> [    0.219970] omap_device: omapdss_dsi2: fck already exist
+> [    0.220336] omap_device: omapdss_hdmi: fck already exist
 > 
-> This does not address the inclusion of mach/hardware.h under drivers/*. This
-> appears to be mostly older platforms. There could also be some indirect
-> inclusions from other mach/* headers.
-> 
+> So I think the "fck" clocks in this patch should be removed. I only
+> added them for compatibility, as I didn't have the automatic "fck"
+> creation patch in my tree.
 
-Hi Rob,
+Even after removing the "fck"s from the hwmod data, I see:
 
-This is very good work, I really like it. I've mentioned one idea for
-an improvement in patch 5, which you can still integrate, but otherwise
+[    0.218200] omap_device: omapdss_dss: fck already exist
+[    0.218231] omap_device: omapdss_dss: sys_clk already exist
+[    0.218231] omap_device: omapdss_dss: tv_clk already exist
+[    0.218292] omap_device: omapdss_dss: video_clk already exist
 
-Reviewed-by: Arnd Bergmann <arnd@arndb.de>
+I think those come from the clock44xxx_data.c. I believe those are more
+or less exact duplicates from the driver's point of view? If so, I guess
+the ones in clockdata could be removed after adding those to hwmod data?
 
-for the whole series.
+I also see that the main_clk for all dss hwmods is dss_dss_clk. Is that
+correct? In some earlier version the clocks were a bit different, and,
+at least according to TRM pictures, correct. For example, rfbi didn't
+have a main_clk at all, hdmi's main_clk was dss_48mhz_clk etc. Was that
+changed on purpose?
 
-Thanks,
+I've tested all the branches from 1 to 7 on OMAP4 SDP, and I'm able to
+boot all of them (branch 7 needed merging the mmc branch), and I was
+able to start the dss driver. I also merged my latest dss pmruntime
+branch, which worked fine.
 
-	Arnd
+I still need to test OMAP2/3, and the different outputs on OMAP4 (only
+DSI is tested so far).
+
+ Tomi
