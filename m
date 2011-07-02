@@ -1,70 +1,51 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Sat, 02 Jul 2011 12:36:28 +0300
-Subject: [PATCH v2 17/18] OMAP4: hwmod data: Modify DSS opt clocks
-In-Reply-To: <1309598037.1846.3.camel@deskari>
-References: <1309552901-8944-1-git-send-email-b-cousson@ti.com>
-	<1309552901-8944-18-git-send-email-b-cousson@ti.com>
-	<1309598037.1846.3.camel@deskari>
-Message-ID: <1309599388.1846.12.camel@deskari>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 2 Jul 2011 11:49:41 +0200
+Subject: [PATCH] AT91: add AT91SAM9X5 dummy configuration variable
+In-Reply-To: <4E0B43BA.803@atmel.com>
+References: <1309260927-11411-1-git-send-email-nicolas.ferre@atmel.com>
+	<20110628122650.GK2612@legolas.emea.dhcp.ti.com>
+	<4E0B43BA.803@atmel.com>
+Message-ID: <201107021149.41703.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2011-07-02 at 12:13 +0300, Tomi Valkeinen wrote:
-> Hi Benoit,
+On Wednesday 29 June 2011 17:24:42 Nicolas Ferre wrote:
+> > Here are a few questions:
+> > i) The drivers you're willing to send, are those for Atmel's IPs or are
+> >       the IPs sourced from some other company ?
+> > ii) Even if they are Atmel-specific, do you see the possibility of Atmel
+> >       licensing them ?
+> > iii) Does your driver current depend on asm/ or mach/ headers ?
+> > iv) Is there a generic header which you could use instead of asm/ mach/ ?
 > 
-> On Fri, 2011-07-01 at 22:41 +0200, Benoit Cousson wrote:
-> > From: Tomi Valkeinen <tomi.valkeinen@ti.com>
-> > 
-> > Add missing DSS optional clocks to HWMOD data for OMAP4xxx.
-> > 
-> > Add HWMOD_CONTROL_OPT_CLKS_IN_RESET flag for dispc to fix dispc reset.
-> > 
-> > Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
-> > [b-cousson at ti.com: Remove a comment and update the subject]
-> > Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-> 
-> This patch adds "fck" opt-clocks for DSS. After your patch set
-> for_3.1/5_auto_fck_clkdev, in which you create "fck" automatically, I
-> see:
-> 
-> [    0.218231] omap_device: omapdss_dss: fck already exist
-> [    0.218261] omap_device: omapdss_dss: fck already exist
-> [    0.218261] omap_device: omapdss_dss: sys_clk already exist
-> [    0.218261] omap_device: omapdss_dss: tv_clk already exist
-> [    0.218322] omap_device: omapdss_dss: video_clk already exist
-> [    0.218627] omap_device: omapdss_dispc: fck already exist
-> [    0.219329] omap_device: omapdss_venc: fck already exist
-> [    0.219635] omap_device: omapdss_dsi1: fck already exist
-> [    0.219970] omap_device: omapdss_dsi2: fck already exist
-> [    0.220336] omap_device: omapdss_hdmi: fck already exist
-> 
-> So I think the "fck" clocks in this patch should be removed. I only
-> added them for compatibility, as I didn't have the automatic "fck"
-> creation patch in my tree.
+> I just want to hide drivers that are not relevant for others: I have the feeling
+> that it is a good practice. This tiny patch will ease this during my publication
+> flow. Do you seriously care?
 
-Even after removing the "fck"s from the hwmod data, I see:
+I think Felipe is right on this one, but both views are common in the kernel
+today: Some people want dependencies to mean "you cannot build this driver
+unless the dependencies are fulfilled", others like them more broadly to
+mean "there is no point to ever enable this driver because I know you won't
+need it".
 
-[    0.218200] omap_device: omapdss_dss: fck already exist
-[    0.218231] omap_device: omapdss_dss: sys_clk already exist
-[    0.218231] omap_device: omapdss_dss: tv_clk already exist
-[    0.218292] omap_device: omapdss_dss: video_clk already exist
+Both views are understandable, but I favor the first one because
 
-I think those come from the clock44xxx_data.c. I believe those are more
-or less exact duplicates from the driver's point of view? If so, I guess
-the ones in clockdata could be removed after adding those to hwmod data?
+* it's the more common view these days and we should be consistent
 
-I also see that the main_clk for all dss hwmods is dss_dss_clk. Is that
-correct? In some earlier version the clocks were a bit different, and,
-at least according to TRM pictures, correct. For example, rfbi didn't
-have a main_clk at all, hdmi's main_clk was dss_48mhz_clk etc. Was that
-changed on purpose?
+* it exposes drivers to more build testing. If something changes in
+  the kernel that exposes new warnings in your driver or causes a
+  build error, that is more likely to get fixed when more people
+  find it by doing allyesconfig or randconfig builds.
 
-I've tested all the branches from 1 to 7 on OMAP4 SDP, and I'm able to
-boot all of them (branch 7 needed merging the mmc branch), and I was
-able to start the dss driver. I also merged my latest dss pmruntime
-branch, which worked fine.
+* If there is an actual build dependency between the driver and the
+  platform that causes you to need the explicit Kconfig depends, that
+  is in many cases a hint that the driver author is doing something
+  wrong, like hardcoding MMIO addresses or referencing custom
+  symbols exported by the platform.
 
-I still need to test OMAP2/3, and the different outputs on OMAP4 (only
-DSI is tested so far).
+I don't think anyone really objects your patch to introduce the extra
+Kconfig symbol, but I'd hope that we can eventually get a consensus
+on the idea that you shouldn't use Kconfig dependencies based on
+whether a driver is relevant or not.
 
- Tomi
+	Arnd
