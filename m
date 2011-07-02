@@ -1,148 +1,78 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 2 Jul 2011 13:19:28 +0100
-Subject: [PATCH v6 00/18] ARM: Add support for the Large Physical
-	Address Extensions
-In-Reply-To: <20110701162419.GA3990@1n450.cable.virginmedia.net>
-References: <1306273164-18217-1-git-send-email-catalin.marinas@arm.com>
-	<20110701162419.GA3990@1n450.cable.virginmedia.net>
-Message-ID: <20110702121928.GG21898@n2100.arm.linux.org.uk>
+From: simon@sequanux.org (Simon Guinot)
+Date: Sat, 2 Jul 2011 12:23:44 +0000
+Subject: plat-orion multi purpose pins problem for mv78200
+In-Reply-To: <4E0E1CA8.7090200@drewtech.com>
+References: <4E0E1CA8.7090200@drewtech.com>
+Message-ID: <20110702122344.GJ31228@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 01, 2011 at 05:24:19PM +0100, Catalin Marinas wrote:
-> Hi Russell,
+Hi Joey,
+
+On Fri, Jul 01, 2011 at 03:14:48PM -0400, Joey Oravec wrote:
+> Nicola, Lennert -
 > 
-> On Tue, May 24, 2011 at 10:39:06PM +0100, Catalin Marinas wrote:
-> > Catalin Marinas (14):
-> >   ARM: LPAE: Use long long printk format for displaying the pud
-
-Ok.
-
-> >   ARM: LPAE: Use unsigned long for __phys_to_virt and __virt_to_phys
-
-I don't like this; these macros are supposed to take unsigned long
-arguments (the hint is in their non-__ versions and __[vp]a, which
-contain the explicit casts.)  I'd much rather have their callers
-reduced in number, especially as this is a macro which platform classes
-may (and do) define.
-
-There are five places which use __phys_to_virt and one place which uses
-__virt_to_phys.
-
-Of the __virt_to_phys, this takes a u32 argument anyway, so that won't
-cause any concerns.
-
-Of the __phys_to_virt, the L2 cache handing files can use a void * for
-vaddr and use the standard phys_to_virt().  That leaves three in the core
-arch code, which can be dealt with by local casting.
-
-> >   ARM: LPAE: Use PMD_(SHIFT|SIZE|MASK) instead of PGDIR_*
-
-This one I think is fine, except the dependency on what we do about the
-dma coherent code...  Also, see the patch below which is something I've
-been thinking about to avoid the multiple-walking of the page table tree.
-However, can we guarantee what the L1 page table in LPAE will contain?
-
-> >   ARM: LPAE: Factor out 2-level page table definitions into separate
-> >     files
-> >   ARM: LPAE: Add (pte|pmd|pgd|pgprot)val_t type definitions as u32
-
-I'm unconvinced that this is the right solution to add all these val_t
-types, especially as u32.  It also creates some nonsense like assigning
-pmdval_t values to pgprotval_t, and misses converting some other stuff
-too.
-
-> >   ARM: LPAE: Use a mask for physical addresses in page table entries
-> [...]
-> > Will Deacon (4):
-> >   ARM: LPAE: add ISBs around MMU enabling code
-
-I still don't like this one - and I do think there's a solution without
-having to resort to isb there.  This also affects the cpu resume code
-too.
-
-> >   ARM: LPAE: Use generic dma_addr_t type definition
-
-This is already the case since:
-  commit 8547727756a7322b99aa313ce50fe15d8f858872
-  Author: FUJITA Tomonori <fujita.tomonori@lab.ntt.co.jp>
-  Date:   Wed Mar 23 16:43:28 2011 -0700
-
-    remove dma64_addr_t
-
-> Since the core LPAE patches haven't got a proper review yet, would you
-> please consider merging some of the LPAE preparation patches during the
-> upcoming window? Above is a list that I think it's relatively trivial
-> (or we can have an even smaller set of patches, any progress would be
-> good).
+> There's a problem in 3.0-rc5 when calling mv78xx0_mpp_conf() on the
+> MV78200 processor. This processor has 49 multi purpose pins but only
+> 31 GPIOs. MPP[31:0] map directly to GPIO[31:0] but the next 17 are a
+> little more complex:
 > 
-> Thanks.
-> 
-> -- 
-> Catalin
+> MPP[39:32] = GPIO[7:0]
+> MPP[46:40] = GPIO[23:17]
+> MPP[47] = GPIO[16]
+> MPP[48] = GPIO[8]
+> MPP[49] = GPIO[9]
 
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index 6e7f67f..1892c3d 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -862,6 +862,29 @@ static void __init sanity_check_meminfo(void)
- 	meminfo.nr_banks = j;
- }
- 
-+static inline void pmd_clear_range(pgd_t *pgd, unsigned long addr, unsigned long end)
-+{
-+	pmd_t *pmd;
-+
-+	pmd = pmd_offset(pgd, addr);
-+	do {
-+		addr = pmd_addr_end(addr, end);
-+		pmd_clear(pmd);
-+	} while (pmd++, addr != end);
-+}
-+
-+static void pgd_clear_range(unsigned long addr, unsigned long end)
-+{
-+	unsigned long next;
-+	pgd_t *pgd;
-+
-+	pgd = pgd_offset_k(addr);
-+	do {
-+		next = pgd_addr_end(addr, end);
-+		pmd_clear_range(pgd, addr, next);
-+	} while (pgd++, addr = next, addr != end);
-+}
-+
- static inline void prepare_page_table(void)
- {
- 	unsigned long addr;
-@@ -870,15 +893,15 @@ static inline void prepare_page_table(void)
- 	/*
- 	 * Clear out all the mappings below the kernel image.
- 	 */
--	for (addr = 0; addr < MODULES_VADDR; addr += PGDIR_SIZE)
--		pmd_clear(pmd_off_k(addr));
-+	pgd_clear_range(0, MODULES_VADDR);
- 
- #ifdef CONFIG_XIP_KERNEL
- 	/* The XIP kernel is mapped in the module area -- skip over it */
- 	addr = ((unsigned long)_etext + PGDIR_SIZE - 1) & PGDIR_MASK;
-+#else
-+	addr = MODULES_VADDR;
- #endif
--	for ( ; addr < PAGE_OFFSET; addr += PGDIR_SIZE)
--		pmd_clear(pmd_off_k(addr));
-+	pgd_clear_range(addr, PAGE_OFFSET);
- 
- 	/*
- 	 * Find the end of the first block of lowmem.
-@@ -891,9 +914,7 @@ static inline void prepare_page_table(void)
- 	 * Clear out all the kernel space mappings, except for the first
- 	 * memory bank, up to the end of the vmalloc region.
- 	 */
--	for (addr = __phys_to_virt(end);
--	     addr < VMALLOC_END; addr += PGDIR_SIZE)
--		pmd_clear(pmd_off_k(addr));
-+	pgd_clear_range(__phys_to_virt(end), VMALLOC_END);
- }
- 
- /*
+It doesn't seems the code was behaving differently before 3.0-rc. I mean
+before the MPP and GPIO consolidation work. It was ?
+
+> 
+> See arch/arm/plat-orion/mpp.c. Inside orion_mpp_conf() the array
+> gets processed by calling MPP_NUM() then calling
+> orion_gpio_set_valid(). As demonstrated above, the MPP number and
+> GPIO number are not interchangeable and on the MV78200 that's a
+> problem when trying to setup any MPP > 31.
+> 
+> So we need to map each MPP to a given GPIO -- I don't know how the
+> mapping will differ across processors. We also need to keep-clear
+> which functions are called with an MPP number and which functions
+> are called with a GPIO number.
+
+As I don't have access to either a MV78200 device or his specification
+document, let me ask you a few questions.
+
+Does hardware allows a configuration like MPP0_GE0_COL and MPP32_GPIO
+simultaneously ?
+
+If not (and only if not), the problem is simply mapping a MPP number on
+the correct GPIO number. Isn't it ?
+
+In that case, what about using the MPPxx_GPIO definitions (found in
+mach-mv78xx0/mpp.h) to map the right GPIO number ?
+
+For example:
+
+#define MPP32_GPIO        MPP(32, 0x1, 1, 1, 1)
+
+could be replaced by:
+
+#define MPP32_GPIO        MPP(0, 0x1, 1, 1, 1)
+
+> 
+> Followup question -- Marvell has several SoC families, but Linux
+> uess plat-orion for everything. For example MV78200 isn't an Orion
+> it's a Discovery Innovation series. Would it make more sense to have
+> separate plat-* code for the separate families?
+
+As far as possible, we have to share code between the SoCs families.
+
+Regards,
+
+Simon
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110702/c00680b4/attachment.sig>
