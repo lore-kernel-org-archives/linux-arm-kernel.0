@@ -1,51 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 2 Jul 2011 11:49:41 +0200
-Subject: [PATCH] AT91: add AT91SAM9X5 dummy configuration variable
-In-Reply-To: <4E0B43BA.803@atmel.com>
-References: <1309260927-11411-1-git-send-email-nicolas.ferre@atmel.com>
-	<20110628122650.GK2612@legolas.emea.dhcp.ti.com>
-	<4E0B43BA.803@atmel.com>
-Message-ID: <201107021149.41703.arnd@arndb.de>
+From: govindraj.raja@ti.com (Govindraj.R)
+Date: Sat, 2 Jul 2011 16:22:24 +0530
+Subject: [PATCH 0/2 v4] OMAP2+: hwmod: Add hwmod's API's for pad wakeup
+Message-ID: <1309603946-25395-1-git-send-email-govindraj.raja@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 29 June 2011 17:24:42 Nicolas Ferre wrote:
-> > Here are a few questions:
-> > i) The drivers you're willing to send, are those for Atmel's IPs or are
-> >       the IPs sourced from some other company ?
-> > ii) Even if they are Atmel-specific, do you see the possibility of Atmel
-> >       licensing them ?
-> > iii) Does your driver current depend on asm/ or mach/ headers ?
-> > iv) Is there a generic header which you could use instead of asm/ mach/ ?
-> 
-> I just want to hide drivers that are not relevant for others: I have the feeling
-> that it is a good practice. This tiny patch will ease this during my publication
-> flow. Do you seriously care?
+Add two API's to set IO Pad wakeup capability based on hwmod
+mux pins available and also to check the status of IO Pad wakeup
+event.
 
-I think Felipe is right on this one, but both views are common in the kernel
-today: Some people want dependencies to mean "you cannot build this driver
-unless the dependencies are fulfilled", others like them more broadly to
-mean "there is no point to ever enable this driver because I know you won't
-need it".
+This two patches are separated from uart_runtime patches posted
+earlier and uart_runtime adaptation relies on these two API's.
 
-Both views are understandable, but I favor the first one because
+Rebased on 3.0-rc5
 
-* it's the more common view these days and we should be consistent
+Changes from v3:
+---------------
+Hooked up enable/disable io-ring to hwmod enable/disable
 
-* it exposes drivers to more build testing. If something changes in
-  the kernel that exposes new warnings in your driver or causes a
-  build error, that is more likely to get fixed when more people
-  find it by doing allyesconfig or randconfig builds.
+Changes from v2:
+---------------
+http://www.mail-archive.com/linux-omap at vger.kernel.org/msg49194.html
 
-* If there is an actual build dependency between the driver and the
-  platform that causes you to need the explicit Kconfig depends, that
-  is in many cases a hint that the driver author is doing something
-  wrong, like hardcoding MMIO addresses or referencing custom
-  symbols exported by the platform.
+Changes from v1:
+---------------
+http://www.mail-archive.com/linux-omap at vger.kernel.org/msg49141.html
 
-I don't think anyone really objects your patch to introduce the extra
-Kconfig symbol, but I'd hope that we can eventually get a consensus
-on the idea that you shouldn't use Kconfig dependencies based on
-whether a driver is relevant or not.
+Reference to Discussion:
+------------------------
+http://www.mail-archive.com/linux-omap at vger.kernel.org/msg49000.html
+http://www.mail-archive.com/linux-omap at vger.kernel.org/msg49001.html
 
-	Arnd
+Govindraj.R (2):
+  OMAP2+: hwmod: Add API to enable IO ring wakeup.
+  OMAP2+: hwmod: Add API to check IO PAD wakeup status
+
+ arch/arm/mach-omap2/mux.c                    |   30 ++++++++++++
+ arch/arm/mach-omap2/mux.h                    |   13 +++++
+ arch/arm/mach-omap2/omap_hwmod.c             |   66 ++++++++++++++++++++++++++
+ arch/arm/plat-omap/include/plat/omap_hwmod.h |    1 +
+ 4 files changed, 110 insertions(+), 0 deletions(-)
+
+-- 
+1.7.4.1
