@@ -1,46 +1,67 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Sat, 02 Jul 2011 12:13:57 +0300
-Subject: [PATCH v2 17/18] OMAP4: hwmod data: Modify DSS opt clocks
-In-Reply-To: <1309552901-8944-18-git-send-email-b-cousson@ti.com>
-References: <1309552901-8944-1-git-send-email-b-cousson@ti.com>
-	<1309552901-8944-18-git-send-email-b-cousson@ti.com>
-Message-ID: <1309598037.1846.3.camel@deskari>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 2 Jul 2011 11:21:46 +0200
+Subject: [PATCH 5/6] ARM: convert PCI defines to variables
+In-Reply-To: <1309366019-24379-6-git-send-email-robherring2@gmail.com>
+References: <1309366019-24379-1-git-send-email-robherring2@gmail.com>
+	<1309366019-24379-6-git-send-email-robherring2@gmail.com>
+Message-ID: <201107021121.46701.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benoit,
+Hi Rob,
 
-On Fri, 2011-07-01 at 22:41 +0200, Benoit Cousson wrote:
-> From: Tomi Valkeinen <tomi.valkeinen@ti.com>
+On Wednesday 29 June 2011 18:46:58 Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
 > 
-> Add missing DSS optional clocks to HWMOD data for OMAP4xxx.
-> 
-> Add HWMOD_CONTROL_OPT_CLKS_IN_RESET flag for dispc to fix dispc reset.
-> 
-> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
-> [b-cousson at ti.com: Remove a comment and update the subject]
-> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+> Convert PCIBIOS_MIN_IO and PCIBIOS_MIN_MEM to variables to allow
+> multi-platform builds. This also removes the requirement for a platform to
+> have a mach/hardware.h.
 
-This patch adds "fck" opt-clocks for DSS. After your patch set
-for_3.1/5_auto_fck_clkdev, in which you create "fck" automatically, I
-see:
+Good idea.
 
-[    0.218231] omap_device: omapdss_dss: fck already exist
-[    0.218261] omap_device: omapdss_dss: fck already exist
-[    0.218261] omap_device: omapdss_dss: sys_clk already exist
-[    0.218261] omap_device: omapdss_dss: tv_clk already exist
-[    0.218322] omap_device: omapdss_dss: video_clk already exist
-[    0.218627] omap_device: omapdss_dispc: fck already exist
-[    0.219329] omap_device: omapdss_venc: fck already exist
-[    0.219635] omap_device: omapdss_dsi1: fck already exist
-[    0.219970] omap_device: omapdss_dsi2: fck already exist
-[    0.220336] omap_device: omapdss_hdmi: fck already exist
+> @@ -24,6 +23,12 @@ EXPORT_SYMBOL(ioport_unmap);
+>  #endif
+>  
+>  #ifdef CONFIG_PCI
+> +unsigned long pcibios_min_io;
+> +EXPORT_SYMBOL(pcibios_min_io);
+> +
+> +unsigned long pcibios_min_mem;
+> +EXPORT_SYMBOL(pcibios_min_mem);
+> +
 
-So I think the "fck" clocks in this patch should be removed. I only
-added them for compatibility, as I didn't have the automatic "fck"
-creation patch in my tree.
+How about setting these to sensible defaults that will work on
+most platforms, so that the majority won't have to set them at
+all?
 
-Also, either you didn't email the patch set in
-for_3.1/5_auto_fck_clkdev, or I'm just blind... 
+Basically, the defaults should clearly be 
 
- Tomi
+unsigned long pcibios_min_io  = 0x1000;
+unsigned long pcibios_min_mem = 0x01000000;
+
+This just gets us out of the ISA bus range, so an ISA card behind
+a bridge can use all cards correctly. Most of the ones that
+currently set both to zero can probably just use those defaults
+as well, but some architectures have multiple buses or don't start
+the memory range at zero, so they might need higher values.
+
+> --- a/arch/arm/mach-versatile/include/mach/hardware.h
+> +++ b/arch/arm/mach-versatile/include/mach/hardware.h
+> @@ -30,10 +30,6 @@
+>  #define VERSATILE_PCI_VIRT_BASE		(void __iomem *)0xe8000000ul
+>  #define VERSATILE_PCI_CFG_VIRT_BASE	(void __iomem *)0xe9000000ul
+>  
+> -/* CIK guesswork */
+> -#define PCIBIOS_MIN_IO			0x44000000
+> -#define PCIBIOS_MIN_MEM			0x50000000
+> -
+>  /* macro to get at IO space when running virtually */
+>  #define IO_ADDRESS(x)		(((x) & 0x0fffffff) + (((x) >> 4) & 0x0f000000) + 0xf0000000)
+>  
+
+This PCIBIOS_MIN_IO setting is wrong, and PIO doesn't work on versatile
+because of this. I have an older patch series that I should dig out again
+to fix them and make versatile use the defaults. Don't worry about this
+one.
+
+	Arnd
