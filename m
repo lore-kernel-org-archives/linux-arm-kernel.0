@@ -1,57 +1,58 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 3 Jul 2011 15:47:41 +0100
-Subject: [PATCH v6 00/11] mmc: use nonblock mmc requests to minimize
-	latency
-In-Reply-To: <BANLkTin80Z34=_uQaP=Dbv7eDxU1PH_qSw@mail.gmail.com>
-References: <1308518257-9783-1-git-send-email-per.forlin@linaro.org>
-	<20110621075319.GN26089@n2100.arm.linux.org.uk>
-	<BANLkTimnuEK_9RedmD1OgcunX3rPvd-O0Q@mail.gmail.com>
-	<20110627110234.GC16103@n2100.arm.linux.org.uk>
-	<BANLkTin80Z34=_uQaP=Dbv7eDxU1PH_qSw@mail.gmail.com>
-Message-ID: <20110703144741.GK21898@n2100.arm.linux.org.uk>
+Date: Sun, 3 Jul 2011 16:28:26 +0100
+Subject: [PATCH 1/8] ARM: dma-mapping: remove offset parameter to
+	prepare for generic dma_ops
+In-Reply-To: <1308556213-24970-2-git-send-email-m.szyprowski@samsung.com>
+References: <1308556213-24970-1-git-send-email-m.szyprowski@samsung.com>
+	<1308556213-24970-2-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20110703152826.GL21898@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 28, 2011 at 09:22:20AM +0300, saeed bishara wrote:
-> On Mon, Jun 27, 2011 at 2:02 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Mon, Jun 27, 2011 at 01:34:48PM +0300, saeed bishara wrote:
-> >> Russell,
-> >> ? I'm curious about the correctness of this patch for systems with
-> >> outer cache. shouldn't the dsb be issued before the outer cache
-> >> maintenance?
-> >
-> > Maybe we should do two passes over SG lists then - one for the inner and
-> > another for the outer cache?
-> >
-> > In effect we could do three passes:
-> >
-> > 1. Calculate the total size of the SG list to determine whether full
-> > ? cache flush is more efficient.
-> > 2. Flush inner cache
-> > ? Then dsb()
-> > 3. Flush outer cache
-> > ? Another dsb()
-> >
-> looking at l2x0 cache, it seems to me that it would be possible to do
-> asynchronous l2 cache maintenance for
-> range operations, so maybe that can be utilized in order to
-> parallelism between inner cache and outer cache maintenance,
-> so the flow can be:
-> 2. Flush sg buffer from inner cache
-> 3. dsb()
-> 4. start Flush outer cache for that buffer
-> 5. Flush next sg buffer from inner cache
-> 6. dsb
-> 7. goto 4.
-> 8. when no more buffers left, wait for outer cache operations
+On Mon, Jun 20, 2011 at 09:50:06AM +0200, Marek Szyprowski wrote:
+> This patch removes the need for offset parameter in dma bounce
+> functions. This is required to let dma-mapping framework on ARM
+> architecture use common, generic dma-mapping helpers.
 
-I'm not sure how practical that is given the architecture of the L2x0
-controllers - where we need to wait for the previous operation to
-complete by reading the operation specific register and then issue a
-sync.
+I really don't like this.  Really as in hate.  Why?  I've said in the past
+that the whole idea of getting rid of the sub-range functions is idiotic.
 
-Having looked at this again, I think trying to do any optimization of
-this code will be fraught, because of the dmabounce stuff getting in
-the way.  If only dmabounce didn't exist... if only crap hardware didn't
-exist...  dmabounce really needs to die.
+If you have to deal with cache coherence, what you _really_ want is an
+API which tells you the size of the original buffer and the section of
+that buffer which you want to handle - because the edges of the buffer
+need special handling.
+
+Lets say that you have a buffer which is 256 bytes long, misaligned to
+half a cache line.  Let's first look at the sequence for whole-buffer:
+
+1. You map it for DMA from the device.  This means you writeback the
+   first and last cache lines to perserve any data shared in the
+   overlapping cache line.  The remainder you can just invalidate.
+
+2. You want to access the buffer, so you use the sync_for_cpu function.
+   If your CPU doesn't do any speculative prefetching, then you don't
+   need to do anything.  If you do, you have to invalidate the buffer,
+   but you must preserve the overlapping cache lines which again must
+   be written back.
+
+3. You transfer ownership back to the device using sync_for_device.
+   As you may have caused cache lines to be read in, again you need to
+   invalidate, and the overlapping cache lines must be written back.
+
+Now, if you ask for a sub-section of the buffer to be sync'd, you can
+actually eliminate those writebacks which are potentially troublesome,
+and which could corrupt neighbouring data.
+
+If you get rid of the sub-buffer functions and start using the whole
+buffer functions for that purpose, you no longer know whether the
+partial cache lines are part of the buffer or not, so you have to write
+those back every time too.
+
+So far, we haven't had any reports of corruption of this type (maybe
+folk using the sync functions are rare on ARM - thankfully) but getting
+rid of the range sync functions means that solving this becomes a lot
+more difficult because we've lost the information to make the decision.
+
+So I've always believed - and continue to do so - that those who want
+to get rid of the range sync functions are misguided and are storing up
+problems for the future.
