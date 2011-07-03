@@ -1,58 +1,46 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 3 Jul 2011 16:28:26 +0100
-Subject: [PATCH 1/8] ARM: dma-mapping: remove offset parameter to
-	prepare for generic dma_ops
-In-Reply-To: <1308556213-24970-2-git-send-email-m.szyprowski@samsung.com>
-References: <1308556213-24970-1-git-send-email-m.szyprowski@samsung.com>
-	<1308556213-24970-2-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20110703152826.GL21898@n2100.arm.linux.org.uk>
+From: mingo@elte.hu (Ingo Molnar)
+Date: Sun, 3 Jul 2011 21:46:18 +0200
+Subject: [PATCH 00/10] Enhance /dev/mem to allow read/write of arbitrary
+	physical addresses
+In-Reply-To: <201107012244.57593.ptesarik@suse.cz>
+References: <201106171038.25988.ptesarik@suse.cz>
+	<201107012134.45881.ptesarik@suse.cz>
+	<20110701195629.GA19057@elte.hu>
+	<201107012244.57593.ptesarik@suse.cz>
+Message-ID: <20110703194618.GB27022@elte.hu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 20, 2011 at 09:50:06AM +0200, Marek Szyprowski wrote:
-> This patch removes the need for offset parameter in dma bounce
-> functions. This is required to let dma-mapping framework on ARM
-> architecture use common, generic dma-mapping helpers.
 
-I really don't like this.  Really as in hate.  Why?  I've said in the past
-that the whole idea of getting rid of the sub-range functions is idiotic.
+* Petr Tesarik <ptesarik@suse.cz> wrote:
 
-If you have to deal with cache coherence, what you _really_ want is an
-API which tells you the size of the original buffer and the section of
-that buffer which you want to handle - because the edges of the buffer
-need special handling.
+> > Do you expect distros to enable this boot option by default? I.e. 
+> > would SuSE be willing to ship with a restrictive /dev/mem by 
+> > default? That's really the wider goal we want to work towards.
+> 
+> I'm not really the decision-maker on this, but even though I don't 
+> need it for crash, there are several other users which would have 
+> to be fixed:
+> 
+> 1. hwinfo (EFI, MPTABLE and ACPI table parsing, analyzing video BIOS)
+> 2. dmidecode (SMBIOS, DMI)
+> 3. possibly others
 
-Lets say that you have a buffer which is 256 bytes long, misaligned to
-half a cache line.  Let's first look at the sequence for whole-buffer:
+But those tables wont be in regular RAM (they will be in ROM or in 
+RAM marked non-RAM in a special way in the e820 tables).
 
-1. You map it for DMA from the device.  This means you writeback the
-   first and last cache lines to perserve any data shared in the
-   overlapping cache line.  The remainder you can just invalidate.
+dmidecode certainly works on Fedora.
 
-2. You want to access the buffer, so you use the sync_for_cpu function.
-   If your CPU doesn't do any speculative prefetching, then you don't
-   need to do anything.  If you do, you have to invalidate the buffer,
-   but you must preserve the overlapping cache lines which again must
-   be written back.
+> > Hm, why would the ability "dirty and/or flush an arbitrary 
+> > physical cache line for testing purposes" be a DoS?
+> 
+> Effectively switching off CPU caches can slow things down quite a 
+> bit... especially on a large SMP system. ;)
 
-3. You transfer ownership back to the device using sync_for_device.
-   As you may have caused cache lines to be read in, again you need to
-   invalidate, and the overlapping cache lines must be written back.
+Flushing a cacheline isnt switching it off. You can already 'flush' 
+the cache from user-space as well, by trashing it for example. So i 
+don't see the DoS angle.
 
-Now, if you ask for a sub-section of the buffer to be sync'd, you can
-actually eliminate those writebacks which are potentially troublesome,
-and which could corrupt neighbouring data.
+Thanks,
 
-If you get rid of the sub-buffer functions and start using the whole
-buffer functions for that purpose, you no longer know whether the
-partial cache lines are part of the buffer or not, so you have to write
-those back every time too.
-
-So far, we haven't had any reports of corruption of this type (maybe
-folk using the sync functions are rare on ARM - thankfully) but getting
-rid of the range sync functions means that solving this becomes a lot
-more difficult because we've lost the information to make the decision.
-
-So I've always believed - and continue to do so - that those who want
-to get rid of the range sync functions are misguided and are storing up
-problems for the future.
+	Ingo
