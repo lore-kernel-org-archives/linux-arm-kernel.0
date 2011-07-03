@@ -1,151 +1,94 @@
-From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
-Date: Mon, 4 Jul 2011 01:08:02 +0200
-Subject: [RFC 04/12] omap: mcbsp: Merge OMAP1 and OMAP2+ McBSP register
-	definitions
-In-Reply-To: <1309510356-27147-5-git-send-email-jhnikula@gmail.com>
-References: <1309510356-27147-1-git-send-email-jhnikula@gmail.com>
-	<1309510356-27147-5-git-send-email-jhnikula@gmail.com>
-Message-ID: <201107040108.03317.jkrzyszt@tis.icnet.pl>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Mon,  4 Jul 2011 02:45:24 +0400
+Subject: [PATCH V3 1/2] gpio-vbus: support disabling D+ pullup on suspend
+In-Reply-To: <1309733125-10869-1-git-send-email-dbaryshkov@gmail.com>
+References: <1309733125-10869-1-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <1309733125-10869-2-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 1 Jul 2011 at 10:52:28 Jarkko Nikula wrote:
-> There is no need to have separate register definitions for OMAP1
-> since they are ordered similarly than in OMAP2+ and thus register
-> address offsets can be calculated from OMAP2+ register address
-> offsets.
+Some platforms would like to disable D+ pullup on suspend, to drain as
+low power, as possible. E.g. this was requested by mioa701 board
+maintainers.
 
-Hi Jarkko,
-This patch is missing a similiar change to the calculation of register 
-address returned by omap_mcbsp_dma_reg_params(), rendering it broken on 
-OMAP1. Otherwise, the whole series works for me on my Amstrad Delta. 
+Suspend/resume is done in _noirq path, to force handling of pullup after
+the main UDC driver suspend/before resume.
 
-For me, it would be more elegant to redefine all these symbols as 
-register serial numbers, not offsets, then multiply them by sub-platform 
-specific register width to get their offsets, instead of having offsets 
-already defined for one sub-platfrom only and mangle them to get correct 
-values on others.
+Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+---
+ drivers/usb/otg/gpio_vbus.c   |   42 +++++++++++++++++++++++++++++++++++++++++
+ include/linux/usb/gpio_vbus.h |    1 +
+ 2 files changed, 43 insertions(+), 0 deletions(-)
 
-Anyway, with the omap_mcbsp_dma_reg_params() fixed to return correct 
-address on OMAP1 as well, you can add my Tested-by: or Acked-by:, which 
-one you find more appropriate.
-
-Thanks,
-Janusz
-
-> Signed-off-by: Jarkko Nikula <jhnikula@gmail.com>
-> ---
->  arch/arm/plat-omap/include/plat/mcbsp.h |   50
-> ++++--------------------------- arch/arm/plat-omap/mcbsp.c          
->    |    2 +
->  2 files changed, 8 insertions(+), 44 deletions(-)
-> 
-> diff --git a/arch/arm/plat-omap/include/plat/mcbsp.h
-> b/arch/arm/plat-omap/include/plat/mcbsp.h index 9882c65..6db02b3
-> 100644
-> --- a/arch/arm/plat-omap/include/plat/mcbsp.h
-> +++ b/arch/arm/plat-omap/include/plat/mcbsp.h
-> @@ -51,54 +51,16 @@ static struct platform_device omap_mcbsp##port_nr
-> = {	\ #define OMAP1610_MCBSP2_BASE	0xfffb1000
->  #define OMAP1610_MCBSP3_BASE	0xe1017000
-> 
-> -#ifdef CONFIG_ARCH_OMAP1
-> -
-> -#define OMAP_MCBSP_REG_DRR2	0x00
-> -#define OMAP_MCBSP_REG_DRR1	0x02
-> -#define OMAP_MCBSP_REG_DXR2	0x04
-> -#define OMAP_MCBSP_REG_DXR1	0x06
-> -#define OMAP_MCBSP_REG_DRR	0x02
-> -#define OMAP_MCBSP_REG_DXR	0x06
-> -#define OMAP_MCBSP_REG_SPCR2	0x08
-> -#define OMAP_MCBSP_REG_SPCR1	0x0a
-> -#define OMAP_MCBSP_REG_RCR2	0x0c
-> -#define OMAP_MCBSP_REG_RCR1	0x0e
-> -#define OMAP_MCBSP_REG_XCR2	0x10
-> -#define OMAP_MCBSP_REG_XCR1	0x12
-> -#define OMAP_MCBSP_REG_SRGR2	0x14
-> -#define OMAP_MCBSP_REG_SRGR1	0x16
-> -#define OMAP_MCBSP_REG_MCR2	0x18
-> -#define OMAP_MCBSP_REG_MCR1	0x1a
-> -#define OMAP_MCBSP_REG_RCERA	0x1c
-> -#define OMAP_MCBSP_REG_RCERB	0x1e
-> -#define OMAP_MCBSP_REG_XCERA	0x20
-> -#define OMAP_MCBSP_REG_XCERB	0x22
-> -#define OMAP_MCBSP_REG_PCR0	0x24
-> -#define OMAP_MCBSP_REG_RCERC	0x26
-> -#define OMAP_MCBSP_REG_RCERD	0x28
-> -#define OMAP_MCBSP_REG_XCERC	0x2A
-> -#define OMAP_MCBSP_REG_XCERD	0x2C
-> -#define OMAP_MCBSP_REG_RCERE	0x2E
-> -#define OMAP_MCBSP_REG_RCERF	0x30
-> -#define OMAP_MCBSP_REG_XCERE	0x32
-> -#define OMAP_MCBSP_REG_XCERF	0x34
-> -#define OMAP_MCBSP_REG_RCERG	0x36
-> -#define OMAP_MCBSP_REG_RCERH	0x38
-> -#define OMAP_MCBSP_REG_XCERG	0x3A
-> -#define OMAP_MCBSP_REG_XCERH	0x3C
-> -
-> -/* Dummy defines, these are not available on omap1 */
-> -#define OMAP_MCBSP_REG_XCCR	0x00
-> -#define OMAP_MCBSP_REG_RCCR	0x00
-> -
-> -#else
-> -
-> +/* McBSP register addresses. OMAP1 address = address definition / 2
-> */ +/* OMAP1-OMAP2420 registers */
->  #define OMAP_MCBSP_REG_DRR2	0x00
->  #define OMAP_MCBSP_REG_DRR1	0x04
->  #define OMAP_MCBSP_REG_DXR2	0x08
->  #define OMAP_MCBSP_REG_DXR1	0x0C
-> +/* OMAP2430 and onwards */
->  #define OMAP_MCBSP_REG_DRR	0x00
->  #define OMAP_MCBSP_REG_DXR	0x08
-> +/* Common registers */
->  #define OMAP_MCBSP_REG_SPCR2	0x10
->  #define OMAP_MCBSP_REG_SPCR1	0x14
->  #define OMAP_MCBSP_REG_RCR2	0x18
-> @@ -126,6 +88,7 @@ static struct platform_device omap_mcbsp##port_nr
-> = {	\ #define OMAP_MCBSP_REG_RCERH	0x70
->  #define OMAP_MCBSP_REG_XCERG	0x74
->  #define OMAP_MCBSP_REG_XCERH	0x78
-> +/* OMAP2430 and onwards */
->  #define OMAP_MCBSP_REG_SYSCON	0x8C
->  #define OMAP_MCBSP_REG_THRSH2	0x90
->  #define OMAP_MCBSP_REG_THRSH1	0x94
-> @@ -138,6 +101,7 @@ static struct platform_device omap_mcbsp##port_nr
-> = {	\ #define OMAP_MCBSP_REG_RBUFFSTAT	0xB8
->  #define OMAP_MCBSP_REG_SSELCR	0xBC
-> 
-> +/* OMAP3 sidetone control registers */
->  #define OMAP_ST_REG_REV		0x00
->  #define OMAP_ST_REG_SYSCONFIG	0x10
->  #define OMAP_ST_REG_IRQSTATUS	0x18
-> @@ -146,8 +110,6 @@ static struct platform_device omap_mcbsp##port_nr
-> = {	\ #define OMAP_ST_REG_SFIRCR	0x28
->  #define OMAP_ST_REG_SSELCR	0x2C
-> 
-> -#endif
-> -
->  /************************** McBSP SPCR1 bit definitions
-> ***********************/ #define RRST			0x0001
->  #define RRDY			0x0002
-> diff --git a/arch/arm/plat-omap/mcbsp.c b/arch/arm/plat-omap/mcbsp.c
-> index 6c62af1..a7ced1b 100644
-> --- a/arch/arm/plat-omap/mcbsp.c
-> +++ b/arch/arm/plat-omap/mcbsp.c
-> @@ -37,6 +37,7 @@ int omap_mcbsp_count, omap_mcbsp_cache_size;
->  static void omap_mcbsp_write(struct omap_mcbsp *mcbsp, u16 reg, u32
-> val) {
->  	if (cpu_class_is_omap1()) {
-> +		reg /= 2;
->  		((u16 *)mcbsp->reg_cache)[reg / sizeof(u16)] = (u16)val;
->  		__raw_writew((u16)val, mcbsp->io_base + reg);
->  	} else if (cpu_is_omap2420()) {
-> @@ -51,6 +52,7 @@ static void omap_mcbsp_write(struct omap_mcbsp
-> *mcbsp, u16 reg, u32 val) static int omap_mcbsp_read(struct
-> omap_mcbsp *mcbsp, u16 reg, bool from_cache) {
->  	if (cpu_class_is_omap1()) {
-> +		reg /= 2;
->  		return !from_cache ? __raw_readw(mcbsp->io_base + reg) :
->  				((u16 *)mcbsp->reg_cache)[reg / sizeof(u16)];
->  	} else if (cpu_is_omap2420()) {
+diff --git a/drivers/usb/otg/gpio_vbus.c b/drivers/usb/otg/gpio_vbus.c
+index 52733d9..0754445 100644
+--- a/drivers/usb/otg/gpio_vbus.c
++++ b/drivers/usb/otg/gpio_vbus.c
+@@ -327,6 +327,47 @@ static int __exit gpio_vbus_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_PM
++static int gpio_vbus_suspend(struct device *dev)
++{
++	struct platform_device *pdev = to_platform_device(dev);
++	struct gpio_vbus_data *gpio_vbus = platform_get_drvdata(pdev);
++	struct gpio_vbus_mach_info *pdata = gpio_vbus->dev->platform_data;
++
++	if (gpio_vbus->otg.gadget && pdata->disconnect_on_suspend) {
++		/* optionally disable D+ pullup */
++		if (gpio_is_valid(pdata->gpio_pullup))
++			gpio_set_value(pdata->gpio_pullup,
++					pdata->gpio_pullup_inverted);
++
++		set_vbus_draw(gpio_vbus, 0);
++	}
++	return 0;
++}
++
++static int gpio_vbus_resume(struct device *dev)
++{
++	struct platform_device *pdev = to_platform_device(dev);
++	struct gpio_vbus_data *gpio_vbus = platform_get_drvdata(pdev);
++
++	if (gpio_vbus->otg.gadget)
++		schedule_work(&gpio_vbus->work);
++
++	return 0;
++}
++static const struct dev_pm_ops gpio_vbus_pm_ops = {
++	.suspend_noirq = gpio_vbus_suspend,
++	.resume_noirq = gpio_vbus_resume,
++	.freeze_noirq = gpio_vbus_suspend,
++	.thaw_noirq = gpio_vbus_resume,
++	.poweroff_noirq = gpio_vbus_suspend,
++	.restore_noirq = gpio_vbus_resume,
++};
++#define GPIO_VBUS_PM_OPS &gpio_vbus_pm_ops
++#else
++#define GPIO_VBUS_PM_OPS NULL
++#endif
++
+ /* NOTE:  the gpio-vbus device may *NOT* be hotplugged */
+ 
+ MODULE_ALIAS("platform:gpio-vbus");
+@@ -335,6 +376,7 @@ static struct platform_driver gpio_vbus_driver = {
+ 	.driver = {
+ 		.name  = "gpio-vbus",
+ 		.owner = THIS_MODULE,
++		.pm = GPIO_VBUS_PM_OPS,
+ 	},
+ 	.remove  = __exit_p(gpio_vbus_remove),
+ };
+diff --git a/include/linux/usb/gpio_vbus.h b/include/linux/usb/gpio_vbus.h
+index d9f03cc..2faa38d 100644
+--- a/include/linux/usb/gpio_vbus.h
++++ b/include/linux/usb/gpio_vbus.h
+@@ -27,4 +27,5 @@ struct gpio_vbus_mach_info {
+ 	int gpio_pullup;
+ 	bool gpio_vbus_inverted;
+ 	bool gpio_pullup_inverted;
++	bool disconnect_on_suspend;
+ };
+-- 
+1.7.5.4
