@@ -1,32 +1,24 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sun,  3 Jul 2011 16:30:48 +0800
-Subject: [PATCH 0/3] Add device tree probe for sdhci-esdhc-imx
-Message-ID: <1309681851-23052-1-git-send-email-shawn.guo@linaro.org>
+From: saeed.bishara@gmail.com (saeed bishara)
+Date: Sun, 3 Jul 2011 11:41:19 +0300
+Subject: [PATCH] genirq: replace irq_gc_ack with {set,clr}_bit variants
+In-Reply-To: <20110702123554.GK31228@kw.sim.vm.gnt>
+References: <20110630095223.GH31228@kw.sim.vm.gnt>
+	<1309469952-32242-1-git-send-email-simon@sequanux.org>
+	<20110702123554.GK31228@kw.sim.vm.gnt>
+Message-ID: <CAMAG_eesTRqOzOPbg=OqFLdiXZJvjFtTCPfZJTsoBJ34=JoDiw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The first patch removes the uses of cpu_is_mx(), and can be merged
-right away when review gets done.
-
-The second patch makes an independent fix on sdhci-pltfm.c which can
-be merged if it looks right to the gate keeper.
-
-The third patch adds device tree probe.  It uses the newly added dt
-api of_property_read_string which is sitting on Grant's devicetree/next
-branch with the out_string 'const' thing as a question mark.
-
-Shawn Guo (3):
-      mmc: sdhci-esdhc-imx: get rid of the uses of cpu_is_mx()
-      mmc: sdhci-pltfm: dt device does not pass parent to sdhci_alloc_host
-      mmc: sdhci-esdhc-imx: add device tree probe support
-
- .../devicetree/bindings/mmc/fsl-imx-esdhc.txt      |   40 ++++++
- arch/arm/mach-imx/clock-imx25.c                    |    4 +-
- arch/arm/mach-imx/clock-imx35.c                    |    6 +-
- arch/arm/mach-mx5/clock-mx51-mx53.c                |   16 +-
- arch/arm/mach-mx5/mx51_efika.c                     |    4 +-
- .../plat-mxc/devices/platform-sdhci-esdhc-imx.c    |   17 ++-
- arch/arm/plat-mxc/include/mach/devices-common.h    |    1 +
- drivers/mmc/host/sdhci-esdhc-imx.c                 |  144 ++++++++++++++++++--
- drivers/mmc/host/sdhci-pltfm.c                     |    3 +-
- 9 files changed, 202 insertions(+), 33 deletions(-)
+On Sat, Jul 2, 2011 at 3:35 PM, Simon Guinot <simon@sequanux.org> wrote:
+> Hi Thomas, Nicolas, Lennert and Saeed,
+>
+> On Thu, Jun 30, 2011 at 11:39:12PM +0200, Simon Guinot wrote:
+>> From: Simon Guinot <sguinot@lacie.com>
+>>
+>> This patch fix the edge GPIO interrupts support for Orion based SoCs.
+well, thet patch seems to touch non orion based SoCs (davinci, samsung).
+>> For this devices, edge interrupt acknowledgement is done by clearing a
+>> cause register. Replace irq_gc_ack with {set,clr}_bit variants allows
+>> to address such cases.
+>>
+saeed
