@@ -1,24 +1,28 @@
-From: saeed.bishara@gmail.com (saeed bishara)
-Date: Sun, 3 Jul 2011 11:41:19 +0300
-Subject: [PATCH] genirq: replace irq_gc_ack with {set,clr}_bit variants
-In-Reply-To: <20110702123554.GK31228@kw.sim.vm.gnt>
-References: <20110630095223.GH31228@kw.sim.vm.gnt>
-	<1309469952-32242-1-git-send-email-simon@sequanux.org>
-	<20110702123554.GK31228@kw.sim.vm.gnt>
-Message-ID: <CAMAG_eesTRqOzOPbg=OqFLdiXZJvjFtTCPfZJTsoBJ34=JoDiw@mail.gmail.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Sun, 03 Jul 2011 16:06:12 +0400
+Subject: [PATCH V2 0/2] Suspend for gpio-vbus support
+In-Reply-To: <1309615344-12714-1-git-send-email-dbaryshkov@gmail.com>
+References: <1309615344-12714-1-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <4E105B34.3080908@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 2, 2011 at 3:35 PM, Simon Guinot <simon@sequanux.org> wrote:
-> Hi Thomas, Nicolas, Lennert and Saeed,
->
-> On Thu, Jun 30, 2011 at 11:39:12PM +0200, Simon Guinot wrote:
->> From: Simon Guinot <sguinot@lacie.com>
->>
->> This patch fix the edge GPIO interrupts support for Orion based SoCs.
-well, thet patch seems to touch non orion based SoCs (davinci, samsung).
->> For this devices, edge interrupt acknowledgement is done by clearing a
->> cause register. Replace irq_gc_ack with {set,clr}_bit variants allows
->> to address such cases.
->>
-saeed
+Hello.
+
+On 02-07-2011 18:02, Dmitry Eremin-Solenikov wrote:
+
+> Previous version of these patches generated quite a lot of comments.
+> Now I'd like to present an updated version of this patchset.
+
+> Changes since V1:
+> * Switch to using dev_pm_ops instead of platform_driver hooks
+> * Move suspend/resume to _noirq (LATE) to be sure that otg transceiver
+>    suspends after the main UDC driver.
+
+    Frankly speaking, I don't see where you have done that...
+
+> Dmitry Eremin-Solenikov (2):
+>        gpio-vbus: support disabling D+ pullup on suspend
+>        mioa701: move gpio-pullup functionality to gpio-vbus
+
+WBR, Sergei
