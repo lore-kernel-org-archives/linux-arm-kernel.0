@@ -1,122 +1,118 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 4 Jul 2011 08:59:36 -0600
-Subject: [PATCH v2] ARM: CSR: Adding CSR SiRFprimaII board support
-In-Reply-To: <BANLkTinkHcuXuWpCxq3tnU_10trPTjDucg@mail.gmail.com>
-References: <1309231954-23260-1-git-send-email-bs14@csr.com>
-	<201106292329.44447.arnd@arndb.de>
-	<BANLkTinfKCMcutMDQ+mpdD4EUy9mCpZs+w@mail.gmail.com>
-	<201106301236.25822.arnd@arndb.de>
-	<BANLkTinkHcuXuWpCxq3tnU_10trPTjDucg@mail.gmail.com>
-Message-ID: <20110704145936.GA31822@ponder.secretlab.ca>
+Date: Mon, 4 Jul 2011 09:06:07 -0600
+Subject: [PATCH 2/2] SPI: SAMSUNG: Bug fix for SPI with different FIFO
+	level
+In-Reply-To: <005601cc3a32$64bd5fd0$2e381f70$%kim@samsung.com>
+References: <BANLkTi=9c5asfr=Jg6xwjQZW_a369UO64Q@mail.gmail.com>
+	<BANLkTinFnFwBGi693JTD_iDykA2VkV+HOw@mail.gmail.com>
+	<BANLkTik0LERxBHmJc5ZnRotnD4CSveR-UQ@mail.gmail.com>
+	<BANLkTim9wdrqDgXVUjxzMv9cdWViLww=Bg@mail.gmail.com>
+	<BANLkTim40x4X_--K0z7gdodDjor0MUam5Q@mail.gmail.com>
+	<BANLkTinf6ec1yXeaFkZjHMnqZp7yymDq-w@mail.gmail.com>
+	<20110704065501.GP15152@ponder.secretlab.ca>
+	<CACxGe6urrZ9=1OgcaYF6EtvJokAyFTbFCnHPWsCY+sETVze8-w@mail.gmail.com>
+	<005501cc3a30$6c916190$45b424b0$%kim@samsung.com>
+	<005601cc3a32$64bd5fd0$2e381f70$%kim@samsung.com>
+Message-ID: <20110704150607.GA29977@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 01, 2011 at 08:04:06AM +0800, Barry Song wrote:
-> 2011/6/30 Arnd Bergmann <arnd@arndb.de>:
-> > On Thursday 30 June 2011, Barry Song wrote:
-> >
-> >> > Is this really just one bus with a huge address space, or rather some
-> >> > nested buses? I'd prefer to have the device tree representation as
-> >> > close as possible to the actual layout.
-> >>
-> >> there are two AXI buses in prima2. AXI-1 connect to memory, AXI-2 is
-> >> transferred to CSR self-defined IOBUS by CPUIF, then 1 intterupt
-> >> controller and 9 IO bridges are connected to the IOBUS .
-> >> The 9 IO bridges are SYSIOBG, PERIIOBG,CPURTCIOBG, UUSIOBG, GRAPHIOBG,
-> >> MEDIAIOBG, DSPIOBG, DISPIOBG, MEMIOBG. Every iobrg connect to a group
-> >> of controllers.
-> >> For example, DISPIOBG connect to VPP and LCD, SYSIOBG connect to CLKC,
-> >> RSTC, RSC and CPHIFBG, DSPIOBG connect to DSPIF, GPS and DSP.
-> >> PERIIOBG connect to TIMER, NAND, AUDIO, UART0, UART1, UART2, USP0,
-> >> USP1, USP2, SPI0, I2C0, I2C1, GPIO, *SYS2PCI* and so on. Then
-> >> *SYS2PCI* connect to SD.
-> >>
-> >> The indendation descible the device hierarchy
-> >> AXI-1
-> >> ? ? ? ? ?Memory
-> >> AXI-2
-> >> ? ? ? ? ?interrupt controller
-> >> ? ? ? ? ?IOBG...
-> >> ? ? ? ? ? ? ? ? ? xxxx
-> >> ? ? ? ? ?IOBG...
-> >> ? ? ? ? ? ? ? ? ? xxxx
-> >> ? ? ? ? ?IOBG...
-> >> ? ? ? ? ? ? ? ? ? xxxx
-> >> ? ? ? ? ?IOBG...
-> >> ? ? ? ? ? ? ? ? ? xxxx
-> >> ? ? ? ? ?IOBG...
-> >> ? ? ? ? ? ? ? ? ? xxxx
-> >> ? ? ? ? ?IOBG...
-> >> ? ? ? ? ? ? ? ? ? SYS2PCI
-> >> ? ? ? ? ? ? ? ? ? ? ? ? ? ? SD
-> >>
-> >> i have get the IC guy Weizeng involved, maybe he can explain better than me :-)
-> >
-> > I think it would be good to represent the IOBG devices in the device tree then.
-> > You don't need to represent AXI-1 because memory is special anyway, and I would
-> > not bother to list SYS2PCI if the intention of that block was to hide the fact
-> > that it's PCI behind it. Properly instantiating it as a PCI bridge would be
-> > a lot of work that is probably not worth it.
-> >
-> > My usual plea to hardware developers: Please make the registers
-> > autodiscoverable from software! On an AMBA bus, please use the PrimeCell
-> > register layout. If you always have an IOBG device behind, they should
-> > all have the same identifier for that kind of bus bridge.
-> >
-> > For the IOBG, it would be ideal to have a similar way of finding and
-> > configuring the connected hardware, including:
-> >
-> > * unique identifier for each distinct IP block
-> > * revision of that block
-> > * MMIO ranges and sizes, relative to the bus
-> > * interrupt numbers, relative to a local interrupt controller
-> > * location identifier (like PCI bus/device/fn number) that can be
-> > ?referred to by other devices
-> > * clock management for that device
-> > * power management for that device
-> >
-> > If your IODB infrastructure already has this, you should create a new
-> > bus-type for this in Linux, which will let you detect all devices
-> > in a consistent manner without having to list them in the device tree.
-> >
-> >> > I think the namespace for the compatible values is supposed to start with
-> >> > the stock ticker name of the company making the device as a unique
-> >> > identifier. This means you'd have to use
-> >> > "csrxf,sirf-intc", "csrxf,sirf-prima2-intc" as the value, instead
-> >> > of starting with the product name. I don't know exactly how strictly
-> >> > we apply that rule, but I've taken the devicetree-discuss at lists.ozlabs.org
-> >> > mailing list on Cc, maybe someone can clarify.
-> >>
-> >> in fact, SiRF is a company name. it was merged into CSR 4 years ago.
-> >> Due to history reason, now the SoC names are still headed by sirf.
-> >> the logo in SiRFprimaII chip is CSR.
-> >> So the "SiRF" of SiRFprimaII should mean two things: old company name,
-> >> ?heritable CPU production-line. Anyway, "csr, sirf-intc" seems to make
-> >> more senses than "sirf, intc".
-> >>
-> >> could we change "csrxf,sirf-intc", "csrxf,sirf-prima2-intc" to
-> >> "csr,sirf-intc", "csr,sirf-prima2-intc"?
-> >
-> > Not sure how strict we interpret the rules about stock ticker symbols.
-> > 'CSR' on wallstreet is 'China Security & Surveillance Tech. Inc'. If they
-> > ever decide to produce embedded Linux machines, we'd get a conflict, unless
-> > they also use "csst" (their .com domain name) as a prefix.
-> 
-> Hi Arnd,
-> 
-> ha-ha.
-> 
-> except Wall St and stock, i really didn't realize CSR is something
-> related with 'China Security & Surveillance Tech. Inc' . it seems CSR
-> is much more extensively known as a company in Wireless Technology,
-> Audio, Connectivity and GPS.
-> if we lost this name, people might not know it came from *that* CSR
-> focusing on Wireless/Audio/Connectivity/GPS. people will ask, what is
-> CSRXF? if we really use stock sticker symbols, CSR.L is the more
-> normal symbol in UK market. if we move to stock sticker symbol, could
-> we use CSR.L?
+On Mon, Jul 04, 2011 at 07:08:55PM +0900, Kukjin Kim wrote:
+> Kukjin Kim wrote:
+> > 
+> > Grant Likely wrote:
+> > >
+> > > On Mon, Jul 4, 2011 at 12:55 AM, Grant Likely
+> <grant.likely@secretlab.ca>
+> > wrote:
+> > > > On Fri, Jul 01, 2011 at 11:43:08AM +0530, Jassi Brar wrote:
+> > > >> On Fri, Jul 1, 2011 at 11:29 AM, padma venkat <padma.kvr@gmail.com>
+> > wrote:
+> > > >> > Hi Jassi,
+> > > >> >
+> > > >> > On Fri, Jul 1, 2011 at 11:22 AM, Jassi Brar
+> > <jassisinghbrar@gmail.com> wrote:
+> > > >> >> On Fri, Jul 1, 2011 at 11:16 AM, padma venkat
+> <padma.kvr@gmail.com>
+> > > wrote:
+> > > >> >>> Hi Tony,
+> > > >> >>>
+> > > >> >>> On Thu, Jun 30, 2011 at 4:30 PM, Tony Nadackal <tonykn@gmail.com>
+> > > wrote:
+> > > >> >>>> Hi Padma,
+> > > >> >>>> With regards to your patch, even though one can check the tx
+> done
+> > > status
+> > > >> >>>> using the TX_DONE bit, the present macro itself would work
+> > perfectly
+> > > fine if
+> > > >> >>>> the 'fifo_lvl_mask' is set properly.
+> > > >> >>>> For example in 6450 channel 1, the fifo_lvl_mask should be 0x1ff
+> > (for
+> > > 9bits,
+> > > >> >>>> 15:23), while even in your patch, it is wrongly set as 0x7f(only
+> > 7bits).
+> > > >> >>>>
+> > > >> >>>> Thus, if this fifo_lvl_mask was defined correctly, the existing
+> > macro
+> > > would
+> > > >> >>>> itself have worked.
+> > > >> >>> Thanks for your comment.
+> > > >> >>> I considered changing to the fifo_lvl_mask to 1ff as you
+> mentioned.
+> > > >> >>> But I ?think that the fifo_lvl_mask reflects the actual FIFO
+> > capacity
+> > > >> >>> in the SPI driver.
+> > > >> >>> For the failing channels the FIFO trigger level is 64 bytes and
+> so
+> > i
+> > > >> >>> retained that value.
+> > > >> >>> In the driver it polls till the FIFO capacity level otherwise it
+> > goes
+> > > >> >>> for DMA.So if we keep
+> > > >> >>> the FIFO level as 1ff when the actual capacity is 7f then it
+> fails.
+> > > >> >>>
+> > > >> >>> Jassi what do you think about this?
+> > > >> >>>
+> > > >> >>
+> > > >> >> 'fifo_lvl_mask' is h/w specific and can't be set for convenience.
+> > > >> >>
+> > > >> >> I don't have access to post-s3c64xx datasheets.
+> > > >> >> Please check and reply if TX_DONE bit is at same offset for all
+> > > >> >> channels of an SoC, because
+> > > >> >> I suspect it's otherwise.
+> > > >> >>
+> > > >> > Yes. The TX_DONE bit is at the same offset for all the channels of
+> an
+> > SoC.
+> > > >> > in S5P64X0,S5PV210 and S5PV310 it is at offset 25.
+> > > >> >
+> > > >>
+> > > >> Then, Patches-1,2
+> > > >>
+> > > >> Acked-by: Jassi Brar <jassisinghbrar@gmail.com>
+> > > >
+> > > > Are these bug fixes that should be in v3.0, or do I queue them up for
+> > v3.1?
+> > >
+> > > Regardless, this one touches a lot of arch/arm files, so I'd rather
+> > > see both patches go through the samsung tree:
+> > >
+> > > Acked-by: Grant Likely <grant.likely@secretlab.ca>
+> > >
+> > 
+> > Thanks Grant, Jassi and all,
+> > 
+> > I will apply these 1 and 2 in my -fix tree for 3.0 with your acks.
+> > 
+> Oops, this needs previous 'cleanup spi platform specific code' so can't
+> apply -fix tree now.
 
-Fine by me.  Make sure it stays in uppercase when using the stock
-ticker symbol.
+There may also be conflicts with the heavy rework in the spi tree.
+Kgene, when you pick up this series, can you put it into a separate
+topic branch and merge that into your main tree?  That way if there
+are difficult conflicts, then I can also merge that same topic branch
+into spi/next to resolve them.
 
 g.
