@@ -1,55 +1,111 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 4 Jul 2011 01:55:04 -0700
-Subject: [PATCH] OMAP: hwmod: add kernel cmdline flag to avoid
-	resetting IP blocks during init
-In-Reply-To: <20110703010206.19046.85293.stgit@dusk>
-References: <20110703010204.19046.85186.stgit@dusk>
-	<20110703010206.19046.85293.stgit@dusk>
-Message-ID: <20110704085503.GQ23145@atomide.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Mon, 4 Jul 2011 17:05:27 +0800
+Subject: [PATCH 2/2] serial/imx: add device tree probe support
+In-Reply-To: <20110704073826.GC4338@pengutronix.de>
+References: <1309679760-22796-1-git-send-email-shawn.guo@linaro.org>
+	<1309679760-22796-3-git-send-email-shawn.guo@linaro.org>
+	<20110704065820.GY6069@pengutronix.de>
+	<20110704073826.GC4338@pengutronix.de>
+Message-ID: <20110704090527.GF10245@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [110702 17:58]:
-> On some boards, it's not possible to reset certain IP blocks during
-> kernel initialization.  Some boards connect GPIO lines to external
-> voltage controllers, so resetting them may cause voltage to drop on a
-> critical supply[1].  Other boards connect GPIO lines to reset pins on
-> external devices without open documentation, so if the GPIO blocks are
-> reset, the external devices cannot currently be reconfigured[2].
+On Mon, Jul 04, 2011 at 09:38:26AM +0200, Uwe Kleine-K?nig wrote:
+> On Mon, Jul 04, 2011 at 08:58:20AM +0200, Sascha Hauer wrote:
+> > On Sun, Jul 03, 2011 at 03:56:00PM +0800, Shawn Guo wrote:
+> > > It adds device tree probe support for imx tty/serial driver.
+> > > 
+> > > Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
+> > > Signed-off-by: Jason Liu <jason.hui@linaro.org>
+> > > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > > Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> > > Cc: Alan Cox <alan@lxorguk.ukuu.org.uk>
+> > > Cc: Grant Likely <grant.likely@secretlab.ca>
+> > > ---
+> > >  .../bindings/tty/serial/fsl-imx-uart.txt           |   19 +++++
+> > >  drivers/tty/serial/imx.c                           |   82 +++++++++++++++++---
+> > >  2 files changed, 91 insertions(+), 10 deletions(-)
+> > >  create mode 100644 Documentation/devicetree/bindings/tty/serial/fsl-imx-uart.txt
+> > > 
+> > > diff --git a/Documentation/devicetree/bindings/tty/serial/fsl-imx-uart.txt b/Documentation/devicetree/bindings/tty/serial/fsl-imx-uart.txt
+> > > new file mode 100644
+> > > index 0000000..a9c0406
+> > > --- /dev/null
+> > > +++ b/Documentation/devicetree/bindings/tty/serial/fsl-imx-uart.txt
+> > > @@ -0,0 +1,19 @@
+> > > +* Freescale i.MX Universal Asynchronous Receiver/Transmitter (UART)
+> > > +
+> > > +Required properties:
+> > > +- compatible : Should be "fsl,<soc>-uart"
+> > > +- reg : Address and length of the register set for the device
+> > > +- interrupts : Should contain uart interrupt
+> > > +
+> > > +Optional properties:
+> > > +- fsl,uart-has-rtscts : Indicate the uart has rts and cts
+> > > +- fsl,irda-mode : Indicate the uart supports irda mode
+> > > +
+> > > +Example:
+> > > +
+> > > +uart at 73fbc000 {
+> > > +	compatible = "fsl,imx51-uart", "fsl,imx21-uart";
+> > > +	reg = <0x73fbc000 0x4000>;
+> > > +	interrupts = <31>;
+> > > +	fsl,uart-has-rtscts;
+> > > +};
+> > > diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+> > > index 983f3bd..483c447 100644
+> > > --- a/drivers/tty/serial/imx.c
+> > > +++ b/drivers/tty/serial/imx.c
+> > > @@ -45,6 +45,8 @@
+> > >  #include <linux/delay.h>
+> > >  #include <linux/rational.h>
+> > >  #include <linux/slab.h>
+> > > +#include <linux/of.h>
+> > > +#include <linux/of_device.h>
+> > >  
+> > >  #include <asm/io.h>
+> > >  #include <asm/irq.h>
+> > > @@ -239,6 +241,12 @@ static struct platform_device_id imx_uart_devtype[] = {
+> > >  	}
+> > >  };
+> > >  
+> > > +static struct of_device_id imx_uart_dt_ids[] = {
+> > > +	{ .compatible = "fsl,imx1-uart", .data = &imx_uart_devdata[IMX1_UART], },
+> > > +	{ .compatible = "fsl,imx21-uart", .data = &imx_uart_devdata[IMX2_UART], },
+> > > +	{ /* sentinel */ },
+> > > +};
+> > 
+> > Isn't this table a bit too small? What about the other SoCs?
+> I'd expect that using fsl,imx21-uart on imx51 would result in a working
+> port, but it feels stange and if that's the intention the example above
+> needs fixing.
 > 
-> The correct way to fix these issues on OMAP is to add a
-> hwmod_no_setup_reset(hwmod) call to the board file, that references
-> the IP block that must preserve its state.  This allows the OMAP core
-> code to reset the remaining IP blocks.
-> 
-> However, during initial bring-up of a new board, it may be desirable
-> to not reset any IP block, for ease of debugging.  This patch adds a
-> kernel command line parameter, 'hwmod_no_setup_reset', that prevents
-> the OMAP hwmod code from resetting any IP block during init.
-> 
-> 1. Nayak, Rajendra.  _[PATCH 7/7] 4460sdp/blaze/panda: hwmod: Prevent
->    gpio1 reset during hwmod init_.  1 July 2011.  E-mail to the
->    linux-omap at vger.kernel.org mailing list.  Retrieved from
->    http://www.mail-archive.com/linux-omap at vger.kernel.org/msg51992.html
-> 
-> 2. Buesch, Michael.  _Nokia n810 LCD (MIPID/blizzard) on 2.6.38_.  28
->    Feb 2011.  E-mail to the linux-omap at vger.kernel.org mailing list.
->    Retrieved from http://www.spinics.net/lists/linux-omap/msg47277.html
+Here is what I have in dts file for uart.  The 'compatible' tells
+that it's a imx51-uart and compatible with imx21-uart.
 
-Also related is the gptimer12 on secure omaps as reported by Aaro.
- 
-> +	hwmod_no_setup_reset
-> +			[OMAP] During kernel initialization,
-> +			prevent the subarchitecture code from resetting
-> +			IP blocks before the driver loads.  Useful for
-> +			initial bring-up of boards which require some
-> +			bootloader configuration to be retained on GPIO or
-> +			other IP blocks.
-> +
+uart0: uart at 73fbc000 {
+	compatible = "fsl,imx51-uart", "fsl,imx21-uart";
+	reg = <0x73fbc000 0x4000>;
+	interrupts = <31>;
+	fsl,uart-has-rtscts;
+};
 
-How about just make it hwmod_reset=1 with 0 being the default value
-for now?
+I did not buy it until I got convinced by Grant here [1].  We do not
+need this long table until there are some soc specific thing to
+distinguish.  Currently, they are all compatible with imx21-uart and
+share imx_uart_devdata[IMX2_UART].
 
+{ .compatible = "fsl,imx21-uart", .data = &imx_uart_devdata[IMX2_UART], },
+{ .compatible = "fsl,imx25-uart", .data = &imx_uart_devdata[IMX2_UART], },
+{ .compatible = "fsl,imx27-uart", .data = &imx_uart_devdata[IMX2_UART], },
+{ .compatible = "fsl,imx31-uart", .data = &imx_uart_devdata[IMX2_UART], },
+{ .compatible = "fsl,imx35-uart", .data = &imx_uart_devdata[IMX2_UART], },
+{ .compatible = "fsl,imx50-uart", .data = &imx_uart_devdata[IMX2_UART], },
+{ .compatible = "fsl,imx51-uart", .data = &imx_uart_devdata[IMX2_UART], },
+{ .compatible = "fsl,imx53-uart", .data = &imx_uart_devdata[IMX2_UART], },
+
+[1] http://permalink.gmane.org/gmane.linux.network/198935
+
+-- 
 Regards,
-
-Tony
+Shawn
