@@ -1,147 +1,76 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 04 Jul 2011 11:37:01 +0200
-Subject: [PATCH for 3.0] AT91: Change nand buswidth logic to match hardware
-	default configuration
-In-Reply-To: <1309515924-22531-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1309515924-22531-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <4E1189BD.509@atmel.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 04 Jul 2011 18:38:08 +0900
+Subject: [PATCH 4/7] ARM: GIC: move gic_chip_data structure declaration to
+	header
+In-Reply-To: <1308555258-4322-5-git-send-email-chaos.youn@samsung.com>
+References: <1308555258-4322-1-git-send-email-chaos.youn@samsung.com>
+	<1308555258-4322-5-git-send-email-chaos.youn@samsung.com>
+Message-ID: <004f01cc3a2e$17710050$465300f0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 01/07/2011 12:25, Nicolas Ferre :
-> The recently modified nand buswitth configuration is not aligned with
-> board reality: the double footprint on boards is always populated with 8bits
-> buswidth nand flashes.
-> So we have to consider that without particular configuration the 8bits
-> buswidth is selected by default.
-> Moreover, the previous logic was always using !board_have_nand_8bit(), we
-> change it to a simpler: board_have_nand_16bit().
+Changhwan Youn wrote:
 > 
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Tested-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> Since Samsung EXYNOS4210 cannot support register banking in GIC,
+> so needs to update CPU interface base address.
+> The 'gic_chip_data' is used for it, this patch moves gic_chip_data
+> structure declaraton to arch/arm/include/asm/hardware/gic.h to use
+> it.
+> 
+> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
 
-Arnd,
+Russell, how do you think this?
 
-Can you please handle this parch for 3.0-final as a bug fix through the
-arm-soc.git tree?
+As I know, this is needed on Samsung SoC, EXYNOS4210.
 
-You can queue it in addition of the pull request sent by
-Jean-Christophe: "AT91: Fix pull requset".
+Thanks.
 
-Thanks, best regards,
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
 
+> Signed-off-by: Changhwan Youn <chaos.youn@samsung.com>
 > ---
->  arch/arm/mach-at91/board-cap9adk.c           |    2 +-
->  arch/arm/mach-at91/board-sam9260ek.c         |    2 +-
->  arch/arm/mach-at91/board-sam9261ek.c         |    2 +-
->  arch/arm/mach-at91/board-sam9263ek.c         |    2 +-
->  arch/arm/mach-at91/board-sam9g20ek.c         |    2 +-
->  arch/arm/mach-at91/board-sam9m10g45ek.c      |    2 +-
->  arch/arm/mach-at91/include/mach/system_rev.h |   10 +++++-----
->  7 files changed, 11 insertions(+), 11 deletions(-)
+>  arch/arm/common/gic.c               |    6 ------
+>  arch/arm/include/asm/hardware/gic.h |    6 ++++++
+>  2 files changed, 6 insertions(+), 6 deletions(-)
 > 
-> diff --git a/arch/arm/mach-at91/board-cap9adk.c b/arch/arm/mach-at91/board-cap9adk.c
-> index 1904fdf..cdb65d4 100644
-> --- a/arch/arm/mach-at91/board-cap9adk.c
-> +++ b/arch/arm/mach-at91/board-cap9adk.c
-> @@ -215,7 +215,7 @@ static void __init cap9adk_add_device_nand(void)
->  	csa = at91_sys_read(AT91_MATRIX_EBICSA);
->  	at91_sys_write(AT91_MATRIX_EBICSA, csa | AT91_MATRIX_EBI_VDDIOMSEL_3_3V);
->  
-> -	cap9adk_nand_data.bus_width_16 = !board_have_nand_8bit();
-> +	cap9adk_nand_data.bus_width_16 = board_have_nand_16bit();
->  	/* setup bus-width (8 or 16) */
->  	if (cap9adk_nand_data.bus_width_16)
->  		cap9adk_nand_smc_config.mode |= AT91_SMC_DBW_16;
-> diff --git a/arch/arm/mach-at91/board-sam9260ek.c b/arch/arm/mach-at91/board-sam9260ek.c
-> index d600dc1..5c24074 100644
-> --- a/arch/arm/mach-at91/board-sam9260ek.c
-> +++ b/arch/arm/mach-at91/board-sam9260ek.c
-> @@ -214,7 +214,7 @@ static struct sam9_smc_config __initdata ek_nand_smc_config = {
->  
->  static void __init ek_add_device_nand(void)
->  {
-> -	ek_nand_data.bus_width_16 = !board_have_nand_8bit();
-> +	ek_nand_data.bus_width_16 = board_have_nand_16bit();
->  	/* setup bus-width (8 or 16) */
->  	if (ek_nand_data.bus_width_16)
->  		ek_nand_smc_config.mode |= AT91_SMC_DBW_16;
-> diff --git a/arch/arm/mach-at91/board-sam9261ek.c b/arch/arm/mach-at91/board-sam9261ek.c
-> index f897f84..b60c22b 100644
-> --- a/arch/arm/mach-at91/board-sam9261ek.c
-> +++ b/arch/arm/mach-at91/board-sam9261ek.c
-> @@ -220,7 +220,7 @@ static struct sam9_smc_config __initdata ek_nand_smc_config = {
->  
->  static void __init ek_add_device_nand(void)
->  {
-> -	ek_nand_data.bus_width_16 = !board_have_nand_8bit();
-> +	ek_nand_data.bus_width_16 = board_have_nand_16bit();
->  	/* setup bus-width (8 or 16) */
->  	if (ek_nand_data.bus_width_16)
->  		ek_nand_smc_config.mode |= AT91_SMC_DBW_16;
-> diff --git a/arch/arm/mach-at91/board-sam9263ek.c b/arch/arm/mach-at91/board-sam9263ek.c
-> index 605b26f..9bbdc92 100644
-> --- a/arch/arm/mach-at91/board-sam9263ek.c
-> +++ b/arch/arm/mach-at91/board-sam9263ek.c
-> @@ -221,7 +221,7 @@ static struct sam9_smc_config __initdata ek_nand_smc_config = {
->  
->  static void __init ek_add_device_nand(void)
->  {
-> -	ek_nand_data.bus_width_16 = !board_have_nand_8bit();
-> +	ek_nand_data.bus_width_16 = board_have_nand_16bit();
->  	/* setup bus-width (8 or 16) */
->  	if (ek_nand_data.bus_width_16)
->  		ek_nand_smc_config.mode |= AT91_SMC_DBW_16;
-> diff --git a/arch/arm/mach-at91/board-sam9g20ek.c b/arch/arm/mach-at91/board-sam9g20ek.c
-> index 7624cf0..1325a50 100644
-> --- a/arch/arm/mach-at91/board-sam9g20ek.c
-> +++ b/arch/arm/mach-at91/board-sam9g20ek.c
-> @@ -198,7 +198,7 @@ static struct sam9_smc_config __initdata ek_nand_smc_config = {
->  
->  static void __init ek_add_device_nand(void)
->  {
-> -	ek_nand_data.bus_width_16 = !board_have_nand_8bit();
-> +	ek_nand_data.bus_width_16 = board_have_nand_16bit();
->  	/* setup bus-width (8 or 16) */
->  	if (ek_nand_data.bus_width_16)
->  		ek_nand_smc_config.mode |= AT91_SMC_DBW_16;
-> diff --git a/arch/arm/mach-at91/board-sam9m10g45ek.c b/arch/arm/mach-at91/board-sam9m10g45ek.c
-> index 063c95d..33eaa13 100644
-> --- a/arch/arm/mach-at91/board-sam9m10g45ek.c
-> +++ b/arch/arm/mach-at91/board-sam9m10g45ek.c
-> @@ -178,7 +178,7 @@ static struct sam9_smc_config __initdata ek_nand_smc_config = {
->  
->  static void __init ek_add_device_nand(void)
->  {
-> -	ek_nand_data.bus_width_16 = !board_have_nand_8bit();
-> +	ek_nand_data.bus_width_16 = board_have_nand_16bit();
->  	/* setup bus-width (8 or 16) */
->  	if (ek_nand_data.bus_width_16)
->  		ek_nand_smc_config.mode |= AT91_SMC_DBW_16;
-> diff --git a/arch/arm/mach-at91/include/mach/system_rev.h b/arch/arm/mach-at91/include/mach/system_rev.h
-> index b855ee7..8f48660 100644
-> --- a/arch/arm/mach-at91/include/mach/system_rev.h
-> +++ b/arch/arm/mach-at91/include/mach/system_rev.h
-> @@ -13,13 +13,13 @@
->   * the 16-31 bit are reserved for at91 generic information
->   *
->   * bit 31:
-> - *	0 => nand 16 bit
-> - *	1 => nand 8 bit
-> + *	0 => nand 8 bit
-> + *	1 => nand 16 bit
->   */
-> -#define BOARD_HAVE_NAND_8BIT	(1 << 31)
-> -static int inline board_have_nand_8bit(void)
-> +#define BOARD_HAVE_NAND_16BIT	(1 << 31)
-> +static inline int board_have_nand_16bit(void)
->  {
-> -	return system_rev & BOARD_HAVE_NAND_8BIT;
-> +	return system_rev & BOARD_HAVE_NAND_16BIT;
->  }
->  
->  #endif /* __ARCH_SYSTEM_REV_H__ */
-
-
--- 
-Nicolas Ferre
+> diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+> index 4ddd0a6..23564ed 100644
+> --- a/arch/arm/common/gic.c
+> +++ b/arch/arm/common/gic.c
+> @@ -38,12 +38,6 @@ static DEFINE_SPINLOCK(irq_controller_lock);
+>  /* Address of GIC 0 CPU interface */
+>  void __iomem *gic_cpu_base_addr __read_mostly;
+> 
+> -struct gic_chip_data {
+> -	unsigned int irq_offset;
+> -	void __iomem *dist_base;
+> -	void __iomem *cpu_base;
+> -};
+> -
+>  /*
+>   * Supported arch specific GIC irq extension.
+>   * Default make them NULL.
+> diff --git a/arch/arm/include/asm/hardware/gic.h
+> b/arch/arm/include/asm/hardware/gic.h
+> index 0691f9d..435d3f8 100644
+> --- a/arch/arm/include/asm/hardware/gic.h
+> +++ b/arch/arm/include/asm/hardware/gic.h
+> @@ -41,6 +41,12 @@ void gic_secondary_init(unsigned int);
+>  void gic_cascade_irq(unsigned int gic_nr, unsigned int irq);
+>  void gic_raise_softirq(const struct cpumask *mask, unsigned int irq);
+>  void gic_enable_ppi(unsigned int);
+> +
+> +struct gic_chip_data {
+> +	unsigned int irq_offset;
+> +	void __iomem *dist_base;
+> +	void __iomem *cpu_base;
+> +};
+>  #endif
+> 
+>  #endif
+> --
+> 1.7.1
