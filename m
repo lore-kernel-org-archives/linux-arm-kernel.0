@@ -1,64 +1,92 @@
-From: T.Mehnert@eckelmann.de (Mehnert, Torsten)
-Date: Mon, 4 Jul 2011 15:24:25 +0000
-Subject: mx25 gpt-clock issue, waits are too long
-Message-ID: <3F263ABB4EDE344D974E1983B56807734FF6B38D@EX-DAG01.eckelmann.group>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Mon, 4 Jul 2011 09:33:25 -0600
+Subject: [PATCH 2/2] serial/imx: add device tree probe support
+In-Reply-To: <20110704073826.GC4338@pengutronix.de>
+References: <1309679760-22796-1-git-send-email-shawn.guo@linaro.org>
+	<1309679760-22796-3-git-send-email-shawn.guo@linaro.org>
+	<20110704065820.GY6069@pengutronix.de>
+	<20110704073826.GC4338@pengutronix.de>
+Message-ID: <20110704153325.GC29977@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Jul 04, 2011 at 09:38:26AM +0200, Uwe Kleine-K?nig wrote:
+> On Mon, Jul 04, 2011 at 08:58:20AM +0200, Sascha Hauer wrote:
+> > On Sun, Jul 03, 2011 at 03:56:00PM +0800, Shawn Guo wrote:
+> > > It adds device tree probe support for imx tty/serial driver.
+> > > 
+> > > Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
+> > > Signed-off-by: Jason Liu <jason.hui@linaro.org>
+> > > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > > Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> > > Cc: Alan Cox <alan@lxorguk.ukuu.org.uk>
+> > > Cc: Grant Likely <grant.likely@secretlab.ca>
+> > > ---
+> > >  .../bindings/tty/serial/fsl-imx-uart.txt           |   19 +++++
+> > >  drivers/tty/serial/imx.c                           |   82 +++++++++++++++++---
+> > >  2 files changed, 91 insertions(+), 10 deletions(-)
+> > >  create mode 100644 Documentation/devicetree/bindings/tty/serial/fsl-imx-uart.txt
+> > > 
+> > > diff --git a/Documentation/devicetree/bindings/tty/serial/fsl-imx-uart.txt b/Documentation/devicetree/bindings/tty/serial/fsl-imx-uart.txt
+> > > new file mode 100644
+> > > index 0000000..a9c0406
+> > > --- /dev/null
+> > > +++ b/Documentation/devicetree/bindings/tty/serial/fsl-imx-uart.txt
+> > > @@ -0,0 +1,19 @@
+> > > +* Freescale i.MX Universal Asynchronous Receiver/Transmitter (UART)
+> > > +
+> > > +Required properties:
+> > > +- compatible : Should be "fsl,<soc>-uart"
+> > > +- reg : Address and length of the register set for the device
+> > > +- interrupts : Should contain uart interrupt
+> > > +
+> > > +Optional properties:
+> > > +- fsl,uart-has-rtscts : Indicate the uart has rts and cts
+> > > +- fsl,irda-mode : Indicate the uart supports irda mode
+> > > +
+> > > +Example:
+> > > +
+> > > +uart at 73fbc000 {
+> > > +	compatible = "fsl,imx51-uart", "fsl,imx21-uart";
+> > > +	reg = <0x73fbc000 0x4000>;
+> > > +	interrupts = <31>;
+> > > +	fsl,uart-has-rtscts;
+> > > +};
+> > > diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+> > > index 983f3bd..483c447 100644
+> > > --- a/drivers/tty/serial/imx.c
+> > > +++ b/drivers/tty/serial/imx.c
+> > > @@ -45,6 +45,8 @@
+> > >  #include <linux/delay.h>
+> > >  #include <linux/rational.h>
+> > >  #include <linux/slab.h>
+> > > +#include <linux/of.h>
+> > > +#include <linux/of_device.h>
+> > >  
+> > >  #include <asm/io.h>
+> > >  #include <asm/irq.h>
+> > > @@ -239,6 +241,12 @@ static struct platform_device_id imx_uart_devtype[] = {
+> > >  	}
+> > >  };
+> > >  
+> > > +static struct of_device_id imx_uart_dt_ids[] = {
+> > > +	{ .compatible = "fsl,imx1-uart", .data = &imx_uart_devdata[IMX1_UART], },
+> > > +	{ .compatible = "fsl,imx21-uart", .data = &imx_uart_devdata[IMX2_UART], },
+> > > +	{ /* sentinel */ },
+> > > +};
+> > 
+> > Isn't this table a bit too small? What about the other SoCs?
+> I'd expect that using fsl,imx21-uart on imx51 would result in a working
+> port, but it feels stange and if that's the intention the example above
+> needs fixing.
 
-i am using barebox and standard linux (2.6.39.1) on my mx25 board. Under linux i now have the problem
-that a sleepwait or busywait results in a factor 1.8 too long waiting time. So sleep(10) results in ~18 seconds
-of waiting.
+If the newer parts claim compatibility with the older, then have a
+terse of_device_id table is just fine.  ie, the compatible property
+for an imx51 would be:
 
-I see through the clock registers
-and found that the clock source of the general purpose timer is set to UPLL(240MHz), divided by 2 its 120MHz.
-So when 120Mhz is factor 1.8 too much, then the correct value should be 66MHz. As this value can't be divided from
-UPLL i changed the clock source to AHB_DIV(133MHz), get the 66MHz and my sleep(10) are the proper 10 seconds.
-I think that the clock-mx25.c expected the CCM_MCR register to be cleared completely, which it's not in my case.
+	compatible = "fsl,imx51-uart", "fsl,imx21-uart";
 
-I tested this issue again on the mx25-3stack evaluation board, with the same result.
+It would only be wrong if the device tree node omitted the
+"fsl,imx51-uart" value from the list.
 
-Old Kernel message: sched_clock: 32 bits at 120MHz, resolution 8ns, wraps every 35791ms
-New Kernel message: sched_clock: 32 bits at 66MHz, resolution 15ns, wraps every 64585ms
-
-
-This patch fixes this issue:
-
-Request for comment and feedback.
-
-From: T. Mehnert <t.mehnert@eckelmann.de>
-Date: Mon, 4 Jul 2011 15:53:30 +0200
-Subject: [PATCH] GPT clock fix: corrected the clock source
-
-This patch changes the clock source for the general purpose timer
-of the arm/mx25 from UPLL to AHB_DIV. This fixes the problem,
-that sleep/busy wating waits factor 1.8 too long.
-
-Signed-off-by: Torsten Mehnert <t.mehnert@eckelmann.de>
----
- arch/arm/mach-imx/clock-imx25.c |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-imx/clock-imx25.c b/arch/arm/mach-imx/clock-imx25.c
-index a65838f..bf1ecda 100644
---- a/arch/arm/mach-imx/clock-imx25.c
-+++ b/arch/arm/mach-imx/clock-imx25.c
-@@ -328,6 +328,10 @@ int __init mx25_clocks_init(void)
-        __raw_writel(__raw_readl(CRM_BASE+0x64) | (1 << 7) | (1 << 0),
-                        CRM_BASE + 0x64);
-
-+       /* Clock source for gpt is ahb_div */
-+       __raw_writel(__raw_readl(CRM_BASE+0x64) & ~(1 << 5),
-+                       CRM_BASE + 0x64);
-+
-        mxc_timer_init(&gpt_clk, MX25_IO_ADDRESS(MX25_GPT1_BASE_ADDR), 54);
-
-        return 0;
---
-1.7.0.4
-ECKELMANN AG
-Vorstand: Dr.-Ing. Gerd Eckelmann (Vorsitzender), Dr.-Ing. Peter Cordes, Dr.-Ing. Frank-Thomas Mellert
-Vorsitzender des Aufsichtsrats: Hubertus G. Krossa
-Sitz der Gesellschaft: Wiesbaden
-Amtsgericht Wiesbaden, HRB 12636
+g.
