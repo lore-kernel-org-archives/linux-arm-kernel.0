@@ -1,62 +1,59 @@
-From: julia@diku.dk (Julia Lawall)
-Date: Mon,  4 Jul 2011 16:11:43 +0200
-Subject: [PATCH 3/5] arch/arm/mach-omap2/smartreflex.c: add missing
-	error-handling code
-Message-ID: <1309788705-22278-3-git-send-email-julia@diku.dk>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 04 Jul 2011 16:41:39 +0200
+Subject: [PATCH for 3.0] AT91: Change nand buswidth logic to match hardware
+	default configuration
+In-Reply-To: <201107041625.25972.arnd@arndb.de>
+References: <1309515924-22531-1-git-send-email-nicolas.ferre@atmel.com>
+	<4E1189BD.509@atmel.com> <201107041625.25972.arnd@arndb.de>
+Message-ID: <4E11D123.9070409@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Julia Lawall <julia@diku.dk>
+Le 04/07/2011 16:25, Arnd Bergmann :
+> On Monday 04 July 2011, Nicolas Ferre wrote:
+>> Le 01/07/2011 12:25, Nicolas Ferre :
+>>> The recently modified nand buswitth configuration is not aligned with
+>>> board reality: the double footprint on boards is always populated with 8bits
+>>> buswidth nand flashes.
+>>> So we have to consider that without particular configuration the 8bits
+>>> buswidth is selected by default.
+>>> Moreover, the previous logic was always using !board_have_nand_8bit(), we
+>>> change it to a simpler: board_have_nand_16bit().
+>>>
+>>> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>>> Tested-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+>>
+>> Arnd,
+>>
+>> Can you please handle this parch for 3.0-final as a bug fix through the
+>> arm-soc.git tree?
+>>
+>> You can queue it in addition of the pull request sent by
+>> Jean-Christophe: "AT91: Fix pull requset".
+> 
+> Ok, I've integrated it in the branch and will send the pull request.
+> 
+> My preference would be to see fixes this late in the cycle more
+> minmal. This patch does two things: 1. change the polarity of the
+> system_rev bit as a bug fix and 2. change the polarity of the
+> function reading it as a cleanup. Both changes look absolutely
+> ok, but it's better to do the cleanup for the next kernel.
+> 
+> In this case, studying the patch more closely shows that it's
+> very harmless, but I'd rather not have to look that closely.
 
-At this point, the ioremap has taken place, so the error handling code at
-the label err_iounmap should be used rather than returning directly.
+Well, in fact it is a fix against what was introduced in a 3.0 patch
+which I found to be wrong.
+The reason because I do not want to be in next kernel is the fact that
+it can puzzle the user (people that want to use kernel without changing
+the system_rev between 2.6.39 -> 3.0 and again revert their changes for
+3.0 -> 3.1).
 
-The semantic match that finds this problem is as follows:
-(http://coccinelle.lip6.fr/)
+> Am I correct that the bug is a regression against 2.6.39?
 
-// <smpl>
-@r@
-identifier x;
-@@
+No, in fact it was introduced during 3.0 early -rc.
 
-kfree(x)
-
-@@
-identifier r.x;
-expression E1!=0,E2,E3,E4;
-statement S;
-@@
-
-(
-if (<+...x...+>) S
-|
-if (...) { ... when != kfree(x)
-               when != if (...) { ... kfree(x); ... }
-               when != x = E3
-* return E1;
-}
-... when != x = E2
-if (...) { ... when != x = E4
- kfree(x); ... return ...; }
-)
-// </smpl>
-
-Signed-off-by: Julia Lawall <julia@diku.dk>
-
----
- arch/arm/mach-omap2/smartreflex.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
-index fb7dc52..e8280df 100644
---- a/arch/arm/mach-omap2/smartreflex.c
-+++ b/arch/arm/mach-omap2/smartreflex.c
-@@ -891,7 +891,7 @@ static int __init omap_sr_probe(struct platform_device *pdev)
- 		ret = sr_late_init(sr_info);
- 		if (ret) {
- 			pr_warning("%s: Error in SR late init\n", __func__);
--			return ret;
-+			goto err_iounmap;
- 		}
- 	}
- 
+Anyway, thanks a lot Arnd.
+Best regards,
+-- 
+Nicolas Ferre
