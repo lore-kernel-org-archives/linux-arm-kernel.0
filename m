@@ -1,84 +1,166 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 4 Jul 2011 09:28:51 +0200
-Subject: ASoC: imx dma tx burst size set to 6 and to 4 ?
-In-Reply-To: <4E0C16D9.4040909@televic.com>
-References: <4E0C16D9.4040909@televic.com>
-Message-ID: <20110704072851.GC9349@pengutronix.de>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 4 Jul 2011 09:33:20 +0200
+Subject: [PATCH 1/2] serial/imx: get rid of the uses of cpu_is_mx1()
+In-Reply-To: <20110704021923.GA10245@S2100-06.ap.freescale.net>
+References: <1309679760-22796-1-git-send-email-shawn.guo@linaro.org>
+	<1309679760-22796-2-git-send-email-shawn.guo@linaro.org>
+	<20110703211007.GB13742@ponder.secretlab.ca>
+	<20110704021923.GA10245@S2100-06.ap.freescale.net>
+Message-ID: <20110704073320.GB4338@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(Added Javier to Cc)
-
-On Thu, Jun 30, 2011 at 08:25:29AM +0200, Lambrecht J?rgen wrote:
-> Hello,
+On Mon, Jul 04, 2011 at 10:19:25AM +0800, Shawn Guo wrote:
+> Hi Grant,
 > 
-> There is an inconsistency in this code:
+> Thanks for the review.
 > 
-> /sound/soc/imx/imx-ssi.c:         ssi->dma_params_tx.burstsize = 4;
-> /sound/soc/imx/imx-pcm-dma-mx2.c: ssi->dma_params_tx.burstsize = 6;
-> 
-> Datasheet:
-> This sets the field TFWM0 in register SFCSR (SSI_SFCSR_TFWM0): the 
-> number of data words needed to set the empty flag (TFE0). Can be set 
-> from 1 to 8; FIFO size is 8 words (of 24b). And this is also the DMA 
-> burst size.
-> 
-> Which is best depends on the application (the higher the more efficient, 
-> but the more risk for a FIFO underrun). I would take 4.
-> 
-> But I guess it should only be set at 1 place, and what is then the best 
-> place?
+> On Sun, Jul 03, 2011 at 03:10:07PM -0600, Grant Likely wrote:
+> > On Sun, Jul 03, 2011 at 03:55:59PM +0800, Shawn Guo wrote:
+> > > The patch removes all the uses of cpu_is_mx1().  Instead, it uses
+> > > the .id_table of platform_driver to distinguish the uart device type.
+> > > 
+> > > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > > Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> > > Cc: Alan Cox <alan@lxorguk.ukuu.org.uk>
+> > > ---
+> > >  arch/arm/mach-imx/clock-imx1.c                |    6 +-
+> > >  arch/arm/plat-mxc/devices/platform-imx-uart.c |    2 +-
+> > >  drivers/tty/serial/imx.c                      |   51 ++++++++++++++++++++++--
+> > >  3 files changed, 50 insertions(+), 9 deletions(-)
+> > > 
+> > > diff --git a/arch/arm/mach-imx/clock-imx1.c b/arch/arm/mach-imx/clock-imx1.c
+> > > index dcc4172..4aabeb2 100644
+> > > --- a/arch/arm/mach-imx/clock-imx1.c
+> > > +++ b/arch/arm/mach-imx/clock-imx1.c
+> > > @@ -587,9 +587,9 @@ static struct clk_lookup lookups[] __initdata = {
+> > >  	_REGISTER_CLOCK(NULL, "mma", mma_clk)
+> > >  	_REGISTER_CLOCK("imx_udc.0", NULL, usbd_clk)
+> > >  	_REGISTER_CLOCK(NULL, "gpt", gpt_clk)
+> > > -	_REGISTER_CLOCK("imx-uart.0", NULL, uart_clk)
+> > > -	_REGISTER_CLOCK("imx-uart.1", NULL, uart_clk)
+> > > -	_REGISTER_CLOCK("imx-uart.2", NULL, uart_clk)
+> > > +	_REGISTER_CLOCK("imx1-uart.0", NULL, uart_clk)
+> > > +	_REGISTER_CLOCK("imx1-uart.1", NULL, uart_clk)
+> > > +	_REGISTER_CLOCK("imx1-uart.2", NULL, uart_clk)
+> > >  	_REGISTER_CLOCK("imx-i2c.0", NULL, i2c_clk)
+> > >  	_REGISTER_CLOCK("imx1-cspi.0", NULL, spi_clk)
+> > >  	_REGISTER_CLOCK("imx1-cspi.1", NULL, spi_clk)
+> > > diff --git a/arch/arm/plat-mxc/devices/platform-imx-uart.c b/arch/arm/plat-mxc/devices/platform-imx-uart.c
+> > > index cfce8c9..477271a 100644
+> > > --- a/arch/arm/plat-mxc/devices/platform-imx-uart.c
+> > > +++ b/arch/arm/plat-mxc/devices/platform-imx-uart.c
+> > > @@ -152,7 +152,7 @@ struct platform_device *__init imx_add_imx_uart_3irq(
+> > >  		},
+> > >  	};
+> > >  
+> > > -	return imx_add_platform_device("imx-uart", data->id, res,
+> > > +	return imx_add_platform_device("imx1-uart", data->id, res,
+> > >  			ARRAY_SIZE(res), pdata, sizeof(*pdata));
+> > >  }
+> > >  
+> > > diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+> > > index 22fe801..983f3bd 100644
+> > > --- a/drivers/tty/serial/imx.c
+> > > +++ b/drivers/tty/serial/imx.c
+> > > @@ -48,7 +48,6 @@
+> > >  
+> > >  #include <asm/io.h>
+> > >  #include <asm/irq.h>
+> > > -#include <mach/hardware.h>
+> > >  #include <mach/imx-uart.h>
+> > >  
+> > >  /* Register definitions */
+> > > @@ -67,7 +66,8 @@
+> > >  #define UBMR  0xa8 /* BRM Modulator Register */
+> > >  #define UBRC  0xac /* Baud Rate Count Register */
+> > >  #define MX2_ONEMS 0xb0 /* One Millisecond register */
+> > > -#define UTS (cpu_is_mx1() ? 0xd0 : 0xb4) /* UART Test Register */
+> > > +#define MX1_UTS 0xd0 /* UART Test Register on mx1 */
+> > > +#define MX2_UTS 0xb4 /* UART Test Register on mx2 and later */
+> > >  
+> > >  /* UART Control Register Bit Fields.*/
+> > >  #define  URXD_CHARRDY    (1<<15)
+> > > @@ -181,6 +181,17 @@
+> > >  
+> > >  #define UART_NR 8
+> > >  
+> > > +enum imx_uart_type {
+> > > +	IMX1_UART,
+> > > +	IMX2_UART,
+> > > +};
+> > > +
+> > > +/* device type dependent stuff */
+> > > +struct imx_uart_data {
+> > > +	unsigned uts_reg;
+> > > +	enum imx_uart_type devtype;
+> > > +};
+> > > +
+> > >  struct imx_port {
+> > >  	struct uart_port	port;
+> > >  	struct timer_list	timer;
+> > > @@ -192,6 +203,7 @@ struct imx_port {
+> > >  	unsigned int		irda_inv_tx:1;
+> > >  	unsigned short		trcv_delay; /* transceiver delay */
+> > >  	struct clk		*clk;
+> > > +	struct imx_uart_data	*devdata;
+> > >  };
+> > >  
+> > >  #ifdef CONFIG_IRDA
+> > > @@ -200,6 +212,33 @@ struct imx_port {
+> > >  #define USE_IRDA(sport)	(0)
+> > >  #endif
+> > >  
+> > > +#define UTS (sport->devdata->uts_reg)
+> > > +#define IS_IMX1_UART() (sport->devdata->devtype == IMX1_UART)
+> > > +#define IS_IMX2_UART() (sport->devdata->devtype == IMX2_UART)
+> > > +
+> > > +static struct imx_uart_data imx_uart_devdata[] = {
+> > > +	[IMX1_UART] = {
+> > > +		.uts_reg = MX1_UTS,
+> > > +		.devtype = IMX1_UART,
+> > > +	},
+> > > +	[IMX2_UART] = {
+> > > +		.uts_reg = MX2_UTS,
+> > > +		.devtype = IMX2_UART,
+> > > +	},
+> > > +};
+> > > +
+> > > +static struct platform_device_id imx_uart_devtype[] = {
+> > > +	{
+> > > +		.name = "imx1-uart",
+> > > +		.driver_data = IMX1_UART,
+> > > +	}, {
+> > > +		.name = "imx-uart",
+> > > +		.driver_data = IMX2_UART,
+It feels strange to introduce IMX2 today meaning
+i.MX{21,25,27,31,35,50,51,53}. I didn't check the changes in detail, but
+if the only relevant change is that the UTS register is at a different
+location, I'd prefer to make it as follows:
 
-We need different burstsize settings for the FIQ driver and for the DMA
-driver. For this reason the original intention was to set these values
-in sound/soc/imx/imx-pcm-dma-mx2.c and in sound/soc/imx/imx-pcm-fiq.c.
+	#define IMX_UART_UTS_AT_D0	1
 
+	{
+		.name = "imx1-uart",
+		.driver_data = IMX_UART_UTS_AT_D0,
+	}, {
+		.name = "imx-uart",
+		.driver_data = 0,
+	}
 
-> commit 0a93421b6adf8ba127b3eafc4c16e3a14017e2ae
-> Author: Javier Martin <javier.martin@vista-silicon.com>
-> Date:   Tue Mar 1 15:02:06 2011 +0100
-> 
->     ASoC: Fix burstsize and DSP_B format problems in imx-ssi.
->     
->     When choosing IMX_DMA flag, burtsizes are set to its default
->     value (0) which leads to driver malfunction. Change them to 4.
->     
->     DSP_B interface needs additional flag to match DSP_B formats
->     as described in several codecs as wm8741 and aic3205.
->     
->     Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
->     Acked-by: Liam Girdwood <lrg@slimlogic.co.uk>
->     Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> 
-> diff --git a/sound/soc/imx/imx-ssi.c b/sound/soc/imx/imx-ssi.c
-> index 30894ea..bc92ec6 100644
-> --- a/sound/soc/imx/imx-ssi.c
-> +++ b/sound/soc/imx/imx-ssi.c
-> @@ -108,7 +108,7 @@ static int imx_ssi_set_dai_fmt(struct snd_soc_dai *cpu_dai, unsigned int fmt)
->  		break;
->  	case SND_SOC_DAIFMT_DSP_B:
->  		/* data on rising edge of bclk, frame high with data */
-> -		strcr |= SSI_STCR_TFSL;
-> +		strcr |= SSI_STCR_TFSL | SSI_STCR_TXBIT0;
->  		break;
->  	case SND_SOC_DAIFMT_DSP_A:
->  		/* data on rising edge of bclk, frame high 1clk before data */
-> @@ -656,6 +656,9 @@ static int imx_ssi_probe(struct platform_device *pdev)
->  	ssi->dma_params_rx.dma_addr = res->start + SSI_SRX0;
->  	ssi->dma_params_tx.dma_addr = res->start + SSI_STX0;
->  
-> +	ssi->dma_params_tx.burstsize = 4;
-> +	ssi->dma_params_rx.burstsize = 4;
-> +
+and then do
 
-Javier, is this hunk necessary? From what I see these values should be
-overwritten later anyway.
+	u32 imx_uart_read_UTS(...)
+	{
+		if (get_driver_data() & IMX_UART_UTS_AT_D0)
+			return read(0xd0);
+		else
+			return read(0xb4);
+	}
 
-Sascha
-
+Best regards
+Uwe
 
 -- 
-Pengutronix e.K.                           |                             |
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
 Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
