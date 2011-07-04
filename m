@@ -1,83 +1,28 @@
-From: ankita@in.ibm.com (Ankita Garg)
-Date: Mon, 4 Jul 2011 10:55:39 +0530
-Subject: [Linaro-mm-sig] [PATCH 08/10] mm: cma: Contiguous Memory
-	Allocator added
-In-Reply-To: <201106160006.07742.arnd@arndb.de>
-References: <1307699698-29369-1-git-send-email-m.szyprowski@samsung.com>
-	<000901cc2b37$4c21f030$e465d090$%szyprowski@samsung.com>
-	<20110615213958.GB28032@labbmf-linux.qualcomm.com>
-	<201106160006.07742.arnd@arndb.de>
-Message-ID: <20110704052539.GK12667@in.ibm.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Sun, 3 Jul 2011 23:38:28 -0600
+Subject: [PATCH 1/2] serial/imx: get rid of the uses of cpu_is_mx1()
+In-Reply-To: <20110704021923.GA10245@S2100-06.ap.freescale.net>
+References: <1309679760-22796-1-git-send-email-shawn.guo@linaro.org>
+	<1309679760-22796-2-git-send-email-shawn.guo@linaro.org>
+	<20110703211007.GB13742@ponder.secretlab.ca>
+	<20110704021923.GA10245@S2100-06.ap.freescale.net>
+Message-ID: <20110704053828.GB15152@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Jun 16, 2011 at 12:06:07AM +0200, Arnd Bergmann wrote:
-> On Wednesday 15 June 2011 23:39:58 Larry Bassel wrote:
-> > On 15 Jun 11 10:36, Marek Szyprowski wrote:
-> > > On Tuesday, June 14, 2011 10:42 PM Arnd Bergmann wrote:
-> > > 
-> > > > On Tuesday 14 June 2011 20:58:25 Zach Pfeffer wrote:
-> > > > > I've seen this split bank allocation in Qualcomm and TI SoCs, with
-> > > > > Samsung, that makes 3 major SoC vendors (I would be surprised if
-> > > > > Nvidia didn't also need to do this) - so I think some configurable
-> > > > > method to control allocations is necessarily. The chips can't do
-> > > > > decode without it (and by can't do I mean 1080P and higher decode is
-> > > > > not functionally useful). Far from special, this would appear to be
-> > > > > the default.
+On Mon, Jul 04, 2011 at 10:19:25AM +0800, Shawn Guo wrote:
+> > > @@ -689,7 +728,7 @@ static int imx_startup(struct uart_port *port)
+> > >  		}
+> > >  	}
+> > >  
+> > > -	if (!cpu_is_mx1()) {
+> > > +	if (IS_IMX2_UART()) {
 > > 
-> > We at Qualcomm have some platforms that have memory of different
-> > performance characteristics, some drivers will need a way of
-> > specifying that they need fast memory for an allocation (and would prefer
-> > an error if it is not available rather than a fallback to slower
-> > memory). It would also be bad if allocators who don't need fast
-> > memory got it "accidentally", depriving those who really need it.
-> 
-> Can you describe how the memory areas differ specifically?
-> Is there one that is always faster but very small, or are there
-> just specific circumstances under which some memory is faster than
-> another?
-> 
-> > > > The possible conflict that I still see with per-bank CMA regions are:
-> > > > 
-> > > > * It completely destroys memory power management in cases where that
-> > > >   is based on powering down entire memory banks.
-> > > 
-> We already established that we have to know something about the banks,
-> and your additional input makes it even clearer that we need to consider
-> the bigger picture here: We need to describe parts of memory separately
-> regarding general performance, device specific allocations and hotplug
-> characteristics.
-> 
-> It still sounds to me that this can be done using the NUMA properties
-> that Linux already understands, and teaching more subsystems about it,
-> but maybe the memory hotplug developers have already come up with
-> another scheme. The way that memory hotplug and CMA choose their
-> memory regions certainly needs to take both into account. As far as
-> I can see there are both conflicting and synergistic effects when
-> you combine the two.
-> 
+> > The logic is getting reversed here, is this really what you want to
+> > do?  I would think you'd want to preserve the !IS_IMX1_UART() logic.
+> > 
+> Maybe not.  I actually made a small improvement here.  The body of
+> the 'if' is really IMX2 specific code, so it makes more sense to use
+> IS_IMX2_UART() than !IS_IMX1_UART().
 
-Recently, we proposed a generic 'memory regions' framework to exploit
-the memory power management capabilities on the embedded boards. Think
-of some of the above CMA requirements could be met by this fraemwork.
-One of the main goals of regions is to make the VM aware of the hardware
-memory boundaries, like bank. For managing memory power consumption,
-memory regions are created aligned to the hardware granularity at which
-the power can be managed (ie, the memory power consumption operations
-like on/off can be performed). If attributed are associated with each of
-these regions, some of these regions could be marked as CMA-only,
-ensuring that only movable and per-bank memory is allocated. More
-details on the design can be found here:
-
-http://lkml.org/lkml/2011/5/27/177
-http://lkml.org/lkml/2011/6/29/202
-http://lwn.net/Articles/446493/
-
--- 
-Regards,
-Ankita Garg (ankita at in.ibm.com)
-Linux Technology Center
-IBM India Systems & Technology Labs,
-Bangalore, India
+Okay, it would probably be worth mentioning this change in the commit text.
