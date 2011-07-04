@@ -1,117 +1,109 @@
-From: heechul@illinois.edu (heechul Yun)
-Date: Mon, 4 Jul 2011 14:24:35 -0700
-Subject: Unnecessary cache-line flush on page table updates ?
-In-Reply-To: <BANLkTi=KVnzBKcd83c9T3P20VAv-ggqR4g@mail.gmail.com>
-References: <BANLkTin7aJXjpEH_WzJi5zaAtH8kFcTZeg@mail.gmail.com>
-	<20110701101019.GA1723@e102109-lin.cambridge.arm.com>
-	<BANLkTi=KVnzBKcd83c9T3P20VAv-ggqR4g@mail.gmail.com>
-Message-ID: <CAN_5kQAiZV-JCUkfnvxAVOH9OfE7OhJD7pgUu9J99=x5_nLy=g@mail.gmail.com>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Mon, 4 Jul 2011 22:39:22 +0100
+Subject: Future of S3C6410 platform
+In-Reply-To: <201107042239.41833.arnd@arndb.de>
+References: <2635745.FvrjgPkNLz@flatron> <201107042239.41833.arnd@arndb.de>
+Message-ID: <20110704213921.GL21138@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 1, 2011 at 2:42 PM, heechul Yun <heechul@illinois.edu> wrote:
-> Great.
->
-> Removing the PTE flush seems to have a noticeable performance
-> difference in my test. The followings are lmbench 3.0a performance
-> result measured on a Cortex A9 SMP platform. So far, I did not have
-> any problem while doing various test.
->
-> =========
-> mm-patch:
-> =========
-> Pagefaults on /tmp/XXX: 3.0759 microseconds
-> Process fork+exit: 464.5414 microseconds
-> Process fork+execve: 785.4944 microseconds
-> Process fork+/bin/sh -c: 488.6204 microseconds
+On Mon, Jul 04, 2011 at 10:39:41PM +0200, Arnd Bergmann wrote:
+> On Monday 04 July 2011 21:14:19 Tomasz Figa wrote:
+> > I am writing to ask what is the planned future for the (now obsolete?) S3C6410 
+> > platform. Is there any ongoing work on bringing more feature-complete support 
+> > for it?
+> 
+> I guess you should ask the maintainer directly, now on Cc. I wouldn't call
+> s3c6410 obsolete, we have much much older platforms that are still supported
+> well. Of course, many people are overworked and need to set priorities,
+> so it's understandable if there are fewer patches to improve the less
+> current platforms.
 
-I realized that I made a big mistake on the  fork+/bin/sh data (other
-numbers are fine). What happened was that there was no /bin/sh
-(android platform has /system/bin/sh instead). When I did the first
-test with the original kernel I made /bin as a symlink to /system/bin
-which I forgot to do after flashing the system with the new, patched,
-kernel.
+We've still got shipping products with these chips, they're actively used
+and still being manufactured.
+ 
+> > The platform is really far behind its newer friends and here is what bothers 
+> > me most:
+> > - missing basic features as NOHZ support
 
-The following is a result of the patched kernel after the correct symlink
+hardly a basic feature.
 
-Pagefaults on /tmp/XXX: 3.0991 microseconds
-Process fork+exit: 465.1620 microseconds
-Process fork+execve: 781.5077 microseconds
-Process fork+/bin/sh -c: 2804.2023 microseconds
+> > - buggy drivers (in mainline!, s3c-fb requesting irq before fully initializing 
+> > driver data, same goes for the adc driver)
 
-It's still noticeably better (about 5~15%) but not substantial.
-Sorry for the confusion.
+never seen any bug reports for these items.
 
-Heechul
+> > - totally broken usb gadget driver - I could not get it to work on my platform 
+> > in any way (Samsung GT-i5700 phone; I am getting a Tiny6410 soon, so I will 
+> > check whether it is not a board specific issue) without rewriting control 
+> > endpoint handling code, not even mentioning about DMA support, which I still 
+> > cannot get to work
+> > - poor OneNAND support (mostly in terms of performance)
 
->
-> =========
-> original:
-> =========
-> Pagefaults on /tmp/XXX: 3.6209 microseconds
-> Process fork+exit: 485.5236 microseconds
-> Process fork+execve: 820.0613 microseconds
-> Process fork+/bin/sh -c: 2966.3828 microseconds
->
-> Heechul
->
-> On Fri, Jul 1, 2011 at 3:10 AM, Catalin Marinas <catalin.marinas@arm.com> wrote:
->> On Fri, Jul 01, 2011 at 08:04:42AM +0100, heechul Yun wrote:
->>> Based on TRM of Cortex A9, the MMU reads page table entries from L1-D
->>> cache not from memory. Then I think we do not need to flush the cache
->>> line in the following code because MMU will always see up-to-date view
->>> of page table in both UP and SMP systems.
->>>
->>> linux/arch/arm/mm/proc-v7.S
->>>
->>> ENTRY(cpu_v7_set_pte_ext)
->>> ? ? ? ...
->>> ? ? ? ? mcr ? ? p15, 0, r0, c7, c10, 1 ? ? ? ? ?@ flush_pte from
->>> D-cache // why we need this in A9?
->>> ? ? ? ? ?
->>>
->>> If this is a necessary one, could you please explain the reason? Thanks.
->>
->> No, it's not necessary, only that this file is used by other processors
->> as well. The solution below checks the ID_MMFR3[23:20] bits (coherent
->> walk) and avoid flushing if the value is 1. The same could be done for
->> PMD entries, though that's less critical than the PTEs.
->>
->> Please note that the patch is not fully tested.
->>
->> 8<--------------------
->>
->> From 67bd5ebdf622637f8293286146441e6292713c3d Mon Sep 17 00:00:00 2001
->> From: Catalin Marinas <catalin.marinas@arm.com>
->> Date: Fri, 1 Jul 2011 10:57:07 +0100
->> Subject: [PATCH] ARMv7: Do not clean the PTE coherent page table walk is supported
->>
->> This patch adds a check for the ID_MMFR3[23:20] bits (coherent walk) and
->> only cleans the D-cache corresponding to a PTE if coherent page table
->> walks are not supported.
->>
->> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
->> ---
->> ?arch/arm/mm/proc-v7.S | ? ?4 +++-
->> ?1 files changed, 3 insertions(+), 1 deletions(-)
->>
->> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
->> index 8013afc..fc5b36f 100644
->> --- a/arch/arm/mm/proc-v7.S
->> +++ b/arch/arm/mm/proc-v7.S
->> @@ -166,7 +166,9 @@ ENTRY(cpu_v7_set_pte_ext)
->> ?ARM( ?str ? ? r3, [r0, #2048]! )
->> ?THUMB( ? ? ? ?add ? ? r0, r0, #2048 )
->> ?THUMB( ? ? ? ?str ? ? r3, [r0] )
->> - ? ? ? mcr ? ? p15, 0, r0, c7, c10, 1 ? ? ? ? ?@ flush_pte
->> + ? ? ? mrc ? ? p15, 0, r3, c0, c1, 7 ? ? ? ? ? @ read ID_MMFR3
->> + ? ? ? tst ? ? r3, #0xf << 20 ? ? ? ? ? ? ? ? ?@ check the coherent walk bits
->> + ? ? ? mcreq ? p15, 0, r0, c7, c10, 1 ? ? ? ? ?@ flush_pte
->> ?#endif
->> ? ? ? ?mov ? ? pc, lr
->> ?ENDPROC(cpu_v7_set_pte_ext)
->>
->> --
->> Catalin
->>
->
+I've not seen any s3c6410 systems with OnenNAND on.
+
+The UDC driver actually works most of the time for me, there are a few
+corner cases that require work on for cases where it does not handle
+unexpected events from the hardware. Newer SoCs do not tend to produce
+these cases due to different synthesis options, and thus not all are
+dealt with.
+
+> > - no power domain support
+
+runtime pm should make this easier.
+
+> > - no support for advanced features of the chip (ie. functionality provided by 
+> > old, and really _bad_, s3c modules)
+
+old? some of these IP blocks have not changed much since their original
+s3c2400 incarnations. The blocks that have changed have been re-written
+to deal with this.
+
+You're really endearing yourself to me by calling s3c modules "really _bad_".
+ 
+> > I have already added NOHZ support, fixed fb and adc bugs, refactored control 
+> > endpoint handling in udc driver (no DMA yet), done some improvement to OneNAND 
+> > driver (still a big work in progress though, this is a topic for another 
+> > message) and implemented power domain management + other minor changes/fixes. 
+
+the usb gadget driver already has some of the DMA support code in it,
+but the s3c6410 compilation of that hardware does not do unaligned
+buffers making it difficult to use for most of the current gadget
+drivers.  My view is that bounce-buffers are probably not going to
+help much, so it was never a priority.
+
+Unfortunately there's not a lot I can do with this driver as I am at the
+limit of the documenation I can currently get my hands on.
+
+Some of this will probably be obsoleted soon anyway due to the massive
+restructuring in arch/arm land.
+ 
+> In general, patches that fix bugs are always welcome, and so are patches
+> that add functionality and device drivers. Even device drivers that are
+> not good enough for inclusion can often get merged into the drivers/staging
+> directory, if there is hope that the quality of the code is improving
+> over time.
+
+drivers/staging is not in any 
+ 
+> > All of this is available in my tree at 
+> > git://github.com/tom3q/spica-2.6.38.git, but I am going to prepare patches 
+> > containing all the changes a bit later, after I rebase all my work to latest 
+> > Linux sources, as I worked mostly on Android 2.6.38 sources.
+
+Is there a browsable list of changes that you've got?
+ 
+> Yes, that is a necessary step for getting your code contributions into
+> the mainline kernel. You should also read Documentation/SubmittingPatches
+> carefully, to avoid a frustrating experience from the first submission of
+> a large patch set.
+> 
+> I would recommend that you have your patches reviewed in private by a person
+> you know first, and then post them on the mailing list for a broader review.
+> 
+> 	Arnd
+
+-- 
+Ben Dooks, ben at fluff.org, http://www.fluff.org/ben/
+
+Large Hadron Colada: A large Pina Colada that makes the universe disappear.
