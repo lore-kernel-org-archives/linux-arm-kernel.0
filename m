@@ -1,97 +1,145 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 4 Jul 2011 12:13:38 +0100
-Subject: Unnecessary cache-line flush on page table updates ?
-In-Reply-To: <20110704104329.GD19117@e102109-lin.cambridge.arm.com>
-References: <BANLkTin7aJXjpEH_WzJi5zaAtH8kFcTZeg@mail.gmail.com>
-	<20110701101019.GA1723@e102109-lin.cambridge.arm.com>
-	<BANLkTi=KVnzBKcd83c9T3P20VAv-ggqR4g@mail.gmail.com>
-	<20110704094531.GB19117@e102109-lin.cambridge.arm.com>
-	<20110704100221.GB8286@n2100.arm.linux.org.uk>
-	<20110704104329.GD19117@e102109-lin.cambridge.arm.com>
-Message-ID: <20110704111338.GD8286@n2100.arm.linux.org.uk>
+From: padma.v@samsung.com (Padmavathi Venna)
+Date: Mon, 04 Jul 2011 13:39:30 -0400
+Subject: [PATCH 1/2] ARM: SAMSUNG: Add tx_st_done variable in the
+Message-ID: <1309801171-19818-1-git-send-email-padma.v@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 04, 2011 at 11:43:29AM +0100, Catalin Marinas wrote:
-> According to the ARM ARM, the TLB invalidation sequence should be:
-> 
-> STR rx, [Translation table entry]          ; write new entry to the translation table
-> Clean cache line [Translation table entry] ; This operation is not required with the
->                                            ; Multiprocessing Extensions.
-> DSB            ; ensures visibility of the data cleaned from the D Cache
-> Invalidate TLB entry by MVA (and ASID if non-global) [page address]
-> Invalidate BTC
-> DSB            ; ensure completion of the Invalidate TLB operation
-> ISB            ; ensure table changes visible to instruction fetch
-> 
-> So we have a DSB and ISB (when we don't return to user) unconditionally.
+tx_st_done is required for checking the transmission status of SPI
+channels with different fifo levels
 
-That is the "cover all cases of following code" example sequence - it
-is intended that at the end of the sequence, the CPU will be able to
-execute whatever code irrespective of what it is.
+Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+Acked-by: Jassi Brar <jassisinghbrar at gmail.com
+Acked-by: Grant Likely <grant.likely@secretlab.ca>
+---
+ arch/arm/mach-s3c64xx/dev-spi.c                  |    2 ++
+ arch/arm/mach-s5p64x0/dev-spi.c                  |    4 ++++
+ arch/arm/mach-s5pc100/dev-spi.c                  |    3 +++
+ arch/arm/mach-s5pv210/dev-spi.c                  |    2 ++
+ arch/arm/plat-samsung/include/plat/s3c64xx-spi.h |    2 ++
+ 5 files changed, 13 insertions(+), 0 deletions(-)
 
-The clarity of that comes from reading the actual rules given before
-the example code:
-
-| For TLB maintenance, the translation table walk is treated as a separate
-| observer:
-| ? A write to the translation tables, after it has been cleaned from the
-|   cache if appropriate, is only guaranteed to be seen by a translation
-|   table walk caused by an explicit load or store after the execution of
-|   both a DSB and an ISB.
-|
-|   However, it is guaranteed that any writes to the translation tables are
-|   not seen by any explicit memory access that occurs in program order
-|   before the write to the translation tables.
-
-In other words, if we write to the translation tables to setup a new
-mapping where one did not previously exist, we only need an intervening
-DSB and ISB when we want to access data through that that mapping.  So,
-ioremap(), vmalloc(), vmap(), module allocation, etc would require this.
-
-If we are tearing down a mapping, then we don't need any barrier for
-individual PTE entries, but we do if we remove a higher-level (PMD/PUD)
-table.
-
-Note that it is irrelevant whether or not we had to clean the cache.
-
-That "However" clause is an interesting one though - it seems to imply
-that no barrier is required when we zero out a new page table, before
-we link the new page table into the higher order table.  The memory we
-allocated for the page table doesn't become a page table until it is
-linked into the page table tree.  It also raises the question about how
-the system knows that a particular store is to something that's a page
-table and something that isn't...  Given that normal memory accesses are
-unordered, I think this paragraph is misleading and wrong.
-
-So, I think we need a DSB+ISB in clean_pte_table() to ensure that the
-zeroing of that page will be visible to everyone coincidentally or before
-the table is linked into the page table tree.  Maybe the arch people can
-clarify that?
-
-| ? For the base ARMv7 architecture and versions of the architecture before
-|   ARMv7, if the translation tables are held in Write-Back Cacheable memory,
-|   the caches must be cleaned to the point of unification after writing to
-|   the translation tables and before the DSB instruction. This ensures that
-|   the updated translation table are visible to a hardware translation
-|   table walk.
-
-IOW, if ID_MMFR3 is implemented on ARMv7+ and it indicates that coherent
-walks are supported, we don't need to clean the cache entries for
-PUD/PMD/PTE tables.
-
-| ? A write to the translation tables, after it has been cleaned from the
-|   cache if appropriate, is only guaranteed to be seen by a translation
-|   table walk caused by the instruction fetch of an instruction that
-|   follows the write to the translation tables after both a DSB and an ISB.
-
-So we also need a DSB and ISB if we are going to execute code from the
-new mapping.  This applies to module_alloc() only.
-
-As far as the BTB goes, I wonder if we can postpone that for user TLB
-ops by setting a TIF_ flag and checking that before returning to userspace.
-That would avoid having to needlessly destroy the cached branch information
-for kernel space while looping over the page tables.  The only other place
-that needs to worry about that is module_alloc() and vmap/vmalloc with
-PROT_KERNEL_EXEC, all of which can be done in flush_cache_vmap().
-Thoughts?
+diff --git a/arch/arm/mach-s3c64xx/dev-spi.c b/arch/arm/mach-s3c64xx/dev-spi.c
+index 82db072..5e6b420 100644
+--- a/arch/arm/mach-s3c64xx/dev-spi.c
++++ b/arch/arm/mach-s3c64xx/dev-spi.c
+@@ -88,6 +88,7 @@ static struct s3c64xx_spi_info s3c64xx_spi0_pdata = {
+ 	.cfg_gpio = s3c64xx_spi_cfg_gpio,
+ 	.fifo_lvl_mask = 0x7f,
+ 	.rx_lvl_offset = 13,
++	.tx_st_done = 21,
+ };
+ 
+ static u64 spi_dmamask = DMA_BIT_MASK(32);
+@@ -132,6 +133,7 @@ static struct s3c64xx_spi_info s3c64xx_spi1_pdata = {
+ 	.cfg_gpio = s3c64xx_spi_cfg_gpio,
+ 	.fifo_lvl_mask = 0x7f,
+ 	.rx_lvl_offset = 13,
++	.tx_st_done = 21,
+ };
+ 
+ struct platform_device s3c64xx_device_spi1 = {
+diff --git a/arch/arm/mach-s5p64x0/dev-spi.c b/arch/arm/mach-s5p64x0/dev-spi.c
+index e78ee18..ac825e8 100644
+--- a/arch/arm/mach-s5p64x0/dev-spi.c
++++ b/arch/arm/mach-s5p64x0/dev-spi.c
+@@ -112,12 +112,14 @@ static struct s3c64xx_spi_info s5p6440_spi0_pdata = {
+ 	.cfg_gpio	= s5p6440_spi_cfg_gpio,
+ 	.fifo_lvl_mask	= 0x1ff,
+ 	.rx_lvl_offset	= 15,
++	.tx_st_done	= 25,
+ };
+ 
+ static struct s3c64xx_spi_info s5p6450_spi0_pdata = {
+ 	.cfg_gpio	= s5p6450_spi_cfg_gpio,
+ 	.fifo_lvl_mask	= 0x1ff,
+ 	.rx_lvl_offset	= 15,
++	.tx_st_done	= 25,
+ };
+ 
+ static u64 spi_dmamask = DMA_BIT_MASK(32);
+@@ -160,12 +162,14 @@ static struct s3c64xx_spi_info s5p6440_spi1_pdata = {
+ 	.cfg_gpio	= s5p6440_spi_cfg_gpio,
+ 	.fifo_lvl_mask	= 0x7f,
+ 	.rx_lvl_offset	= 15,
++	.tx_st_done	= 25,
+ };
+ 
+ static struct s3c64xx_spi_info s5p6450_spi1_pdata = {
+ 	.cfg_gpio	= s5p6450_spi_cfg_gpio,
+ 	.fifo_lvl_mask	= 0x7f,
+ 	.rx_lvl_offset	= 15,
++	.tx_st_done	= 25,
+ };
+ 
+ struct platform_device s5p64x0_device_spi1 = {
+diff --git a/arch/arm/mach-s5pc100/dev-spi.c b/arch/arm/mach-s5pc100/dev-spi.c
+index 57b1979..2b58c9a 100644
+--- a/arch/arm/mach-s5pc100/dev-spi.c
++++ b/arch/arm/mach-s5pc100/dev-spi.c
+@@ -90,6 +90,7 @@ static struct s3c64xx_spi_info s5pc100_spi0_pdata = {
+ 	.fifo_lvl_mask = 0x7f,
+ 	.rx_lvl_offset = 13,
+ 	.high_speed = 1,
++	.tx_st_done = 21,
+ };
+ 
+ static u64 spi_dmamask = DMA_BIT_MASK(32);
+@@ -134,6 +135,7 @@ static struct s3c64xx_spi_info s5pc100_spi1_pdata = {
+ 	.fifo_lvl_mask = 0x7f,
+ 	.rx_lvl_offset = 13,
+ 	.high_speed = 1,
++	.tx_st_done = 21,
+ };
+ 
+ struct platform_device s5pc100_device_spi1 = {
+@@ -176,6 +178,7 @@ static struct s3c64xx_spi_info s5pc100_spi2_pdata = {
+ 	.fifo_lvl_mask = 0x7f,
+ 	.rx_lvl_offset = 13,
+ 	.high_speed = 1,
++	.tx_st_done = 21,
+ };
+ 
+ struct platform_device s5pc100_device_spi2 = {
+diff --git a/arch/arm/mach-s5pv210/dev-spi.c b/arch/arm/mach-s5pv210/dev-spi.c
+index e3249a4..eaf9a7b 100644
+--- a/arch/arm/mach-s5pv210/dev-spi.c
++++ b/arch/arm/mach-s5pv210/dev-spi.c
+@@ -85,6 +85,7 @@ static struct s3c64xx_spi_info s5pv210_spi0_pdata = {
+ 	.fifo_lvl_mask = 0x1ff,
+ 	.rx_lvl_offset = 15,
+ 	.high_speed = 1,
++	.tx_st_done = 25,
+ };
+ 
+ static u64 spi_dmamask = DMA_BIT_MASK(32);
+@@ -129,6 +130,7 @@ static struct s3c64xx_spi_info s5pv210_spi1_pdata = {
+ 	.fifo_lvl_mask = 0x7f,
+ 	.rx_lvl_offset = 15,
+ 	.high_speed = 1,
++	.tx_st_done = 25,
+ };
+ 
+ struct platform_device s5pv210_device_spi1 = {
+diff --git a/arch/arm/plat-samsung/include/plat/s3c64xx-spi.h b/arch/arm/plat-samsung/include/plat/s3c64xx-spi.h
+index 0ffe34a..4c16fa3 100644
+--- a/arch/arm/plat-samsung/include/plat/s3c64xx-spi.h
++++ b/arch/arm/plat-samsung/include/plat/s3c64xx-spi.h
+@@ -39,6 +39,7 @@ struct s3c64xx_spi_csinfo {
+  * @fifo_lvl_mask: All tx fifo_lvl fields start at offset-6
+  * @rx_lvl_offset: Depends on tx fifo_lvl field and bus number
+  * @high_speed: If the controller supports HIGH_SPEED_EN bit
++ * @tx_st_done: Depends on tx fifo_lvl field
+  */
+ struct s3c64xx_spi_info {
+ 	int src_clk_nr;
+@@ -53,6 +54,7 @@ struct s3c64xx_spi_info {
+ 	int fifo_lvl_mask;
+ 	int rx_lvl_offset;
+ 	int high_speed;
++	int tx_st_done;
+ };
+ 
+ /**
+-- 
+1.7.0.4
