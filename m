@@ -1,132 +1,97 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 4 Jul 2011 14:06:52 +0300
-Subject: [PATCH V3] MMC: PM: add suspend/resume in atmel-mci
-In-Reply-To: <1309779505-25509-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1309530754.4373.3.camel@hcegtvedt.norway.atmel.com>
-	<1309779505-25509-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <20110704110651.GC2820@legolas.emea.dhcp.ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 4 Jul 2011 12:13:38 +0100
+Subject: Unnecessary cache-line flush on page table updates ?
+In-Reply-To: <20110704104329.GD19117@e102109-lin.cambridge.arm.com>
+References: <BANLkTin7aJXjpEH_WzJi5zaAtH8kFcTZeg@mail.gmail.com>
+	<20110701101019.GA1723@e102109-lin.cambridge.arm.com>
+	<BANLkTi=KVnzBKcd83c9T3P20VAv-ggqR4g@mail.gmail.com>
+	<20110704094531.GB19117@e102109-lin.cambridge.arm.com>
+	<20110704100221.GB8286@n2100.arm.linux.org.uk>
+	<20110704104329.GD19117@e102109-lin.cambridge.arm.com>
+Message-ID: <20110704111338.GD8286@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, Jul 04, 2011 at 01:38:25PM +0200, Nicolas Ferre wrote:
-> Take care of slots while going to suspend state.
+On Mon, Jul 04, 2011 at 11:43:29AM +0100, Catalin Marinas wrote:
+> According to the ARM ARM, the TLB invalidation sequence should be:
 > 
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> ---
-> V3: take care of each slot SUSPENDED state
->     (adding a status bit in the slot "flags")
-> V2: move to pm_ops
+> STR rx, [Translation table entry]          ; write new entry to the translation table
+> Clean cache line [Translation table entry] ; This operation is not required with the
+>                                            ; Multiprocessing Extensions.
+> DSB            ; ensures visibility of the data cleaned from the D Cache
+> Invalidate TLB entry by MVA (and ASID if non-global) [page address]
+> Invalidate BTC
+> DSB            ; ensure completion of the Invalidate TLB operation
+> ISB            ; ensure table changes visible to instruction fetch
 > 
->  drivers/mmc/host/atmel-mci.c |   60 ++++++++++++++++++++++++++++++++++++++++++
->  1 files changed, 60 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
-> index aa8039f..ed63bcd 100644
-> --- a/drivers/mmc/host/atmel-mci.c
-> +++ b/drivers/mmc/host/atmel-mci.c
-> @@ -203,6 +203,7 @@ struct atmel_mci_slot {
->  #define ATMCI_CARD_PRESENT	0
->  #define ATMCI_CARD_NEED_INIT	1
->  #define ATMCI_SHUTDOWN		2
-> +#define ATMCI_SUSPENDED		3
->  
->  	int			detect_pin;
->  	int			wp_pin;
-> @@ -1878,10 +1879,69 @@ static int __exit atmci_remove(struct platform_device *pdev)
->  	return 0;
->  }
->  
-> +#ifdef CONFIG_PM
-> +static int atmci_suspend(struct device *dev)
-> +{
-> +	struct atmel_mci *host = dev_get_drvdata(dev);
-> +	int i;
-> +
-> +	 for (i = 0; i < ATMEL_MCI_MAX_NR_SLOTS; i++) {
-> +		struct atmel_mci_slot *slot = host->slot[i];
-> +		int ret;
-> +
-> +		if (!slot)
-> +			continue;
-> +		ret = mmc_suspend_host(slot->mmc);
-> +		if (ret < 0) {
-> +			while (--i >= 0) {
-> +				slot = host->slot[i];
-> +				if (slot
-> +				&& test_bit(ATMCI_SUSPENDED, &slot->flags)) {
-> +					mmc_resume_host(host->slot[i]->mmc);
-> +					clear_bit(ATMCI_SUSPENDED, &slot->flags);
-> +				}
-> +			}
-> +			return ret;
-> +		} else {
-> +			set_bit(ATMCI_SUSPENDED, &slot->flags);
-> +		}
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static int atmci_resume(struct device *dev)
-> +{
-> +	struct atmel_mci *host = dev_get_drvdata(dev);
-> +	int i;
-> +	int ret = 0;
-> +
-> +	for (i = 0; i < ATMEL_MCI_MAX_NR_SLOTS; i++) {
-> +		struct atmel_mci_slot *slot = host->slot[i];
-> +		int err;
-> +
-> +		slot = host->slot[i];
-> +		if (!slot)
-> +			continue;
-> +		if (!test_bit(ATMCI_SUSPENDED, &slot->flags))
-> +			continue;
-> +		err = mmc_resume_host(slot->mmc);
-> +		if (err < 0)
-> +			ret = err;
-> +		else
-> +			clear_bit(ATMCI_SUSPENDED, &slot->flags);
-> +	}
-> +
-> +	return ret;
-> +}
-> +#endif
-> +static SIMPLE_DEV_PM_OPS(atmci_pm, atmci_suspend, atmci_resume);
+> So we have a DSB and ISB (when we don't return to user) unconditionally.
 
-if you disable CONFIG_PM this won't work. atmci_resume and atmci_suspend
-will be undefined.
+That is the "cover all cases of following code" example sequence - it
+is intended that at the end of the sequence, the CPU will be able to
+execute whatever code irrespective of what it is.
 
->  static struct platform_driver atmci_driver = {
->  	.remove		= __exit_p(atmci_remove),
->  	.driver		= {
->  		.name		= "atmel_mci",
-> +		.pm		= &atmci_pm,
+The clarity of that comes from reading the actual rules given before
+the example code:
 
-this pointer will also be invalid.
+| For TLB maintenance, the translation table walk is treated as a separate
+| observer:
+| ? A write to the translation tables, after it has been cleaned from the
+|   cache if appropriate, is only guaranteed to be seen by a translation
+|   table walk caused by an explicit load or store after the execution of
+|   both a DSB and an ISB.
+|
+|   However, it is guaranteed that any writes to the translation tables are
+|   not seen by any explicit memory access that occurs in program order
+|   before the write to the translation tables.
 
-what most people do is:
+In other words, if we write to the translation tables to setup a new
+mapping where one did not previously exist, we only need an intervening
+DSB and ISB when we want to access data through that that mapping.  So,
+ioremap(), vmalloc(), vmap(), module allocation, etc would require this.
 
-#ifdef CONFIG_PM
+If we are tearing down a mapping, then we don't need any barrier for
+individual PTE entries, but we do if we remove a higher-level (PMD/PUD)
+table.
 
-suspend()
-resume()
+Note that it is irrelevant whether or not we had to clean the cache.
 
-static SIMPLE_DEV_PM_OPS(atmci_pm, suspend, resume);
+That "However" clause is an interesting one though - it seems to imply
+that no barrier is required when we zero out a new page table, before
+we link the new page table into the higher order table.  The memory we
+allocated for the page table doesn't become a page table until it is
+linked into the page table tree.  It also raises the question about how
+the system knows that a particular store is to something that's a page
+table and something that isn't...  Given that normal memory accesses are
+unordered, I think this paragraph is misleading and wrong.
 
-#define DEV_PM_OPS	(&atmci_pm)
-#else
-#define DEV_PM_OPS	NULL
-#endif
+So, I think we need a DSB+ISB in clean_pte_table() to ensure that the
+zeroing of that page will be visible to everyone coincidentally or before
+the table is linked into the page table tree.  Maybe the arch people can
+clarify that?
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 490 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110704/8894dd1f/attachment.sig>
+| ? For the base ARMv7 architecture and versions of the architecture before
+|   ARMv7, if the translation tables are held in Write-Back Cacheable memory,
+|   the caches must be cleaned to the point of unification after writing to
+|   the translation tables and before the DSB instruction. This ensures that
+|   the updated translation table are visible to a hardware translation
+|   table walk.
+
+IOW, if ID_MMFR3 is implemented on ARMv7+ and it indicates that coherent
+walks are supported, we don't need to clean the cache entries for
+PUD/PMD/PTE tables.
+
+| ? A write to the translation tables, after it has been cleaned from the
+|   cache if appropriate, is only guaranteed to be seen by a translation
+|   table walk caused by the instruction fetch of an instruction that
+|   follows the write to the translation tables after both a DSB and an ISB.
+
+So we also need a DSB and ISB if we are going to execute code from the
+new mapping.  This applies to module_alloc() only.
+
+As far as the BTB goes, I wonder if we can postpone that for user TLB
+ops by setting a TIF_ flag and checking that before returning to userspace.
+That would avoid having to needlessly destroy the cached branch information
+for kernel space while looping over the page tables.  The only other place
+that needs to worry about that is module_alloc() and vmap/vmalloc with
+PROT_KERNEL_EXEC, all of which can be done in flush_cache_vmap().
+Thoughts?
