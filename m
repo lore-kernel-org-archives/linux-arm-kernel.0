@@ -1,96 +1,87 @@
-From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Mon, 4 Jul 2011 21:51:43 +0200
-Subject: [PATCH 6/7] spi/s3c64xx: Add support DMA engine API
-In-Reply-To: <20110704170217.GH28042@ponder.secretlab.ca>
-References: <1309781915-31549-1-git-send-email-kgene.kim@samsung.com>
-	<201107041859.11548.heiko@sntech.de>
-	<20110704170217.GH28042@ponder.secretlab.ca>
-Message-ID: <201107042151.44075.heiko@sntech.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 4 Jul 2011 20:58:19 +0100
+Subject: Unnecessary cache-line flush on page table updates ?
+In-Reply-To: <20110704155835.GA30189@e102109-lin.cambridge.arm.com>
+References: <BANLkTin7aJXjpEH_WzJi5zaAtH8kFcTZeg@mail.gmail.com>
+	<20110701101019.GA1723@e102109-lin.cambridge.arm.com>
+	<BANLkTi=KVnzBKcd83c9T3P20VAv-ggqR4g@mail.gmail.com>
+	<20110704094531.GB19117@e102109-lin.cambridge.arm.com>
+	<20110704100221.GB8286@n2100.arm.linux.org.uk>
+	<20110704104329.GD19117@e102109-lin.cambridge.arm.com>
+	<20110704111338.GD8286@n2100.arm.linux.org.uk>
+	<20110704155835.GA30189@e102109-lin.cambridge.arm.com>
+Message-ID: <20110704195819.GG8286@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag 04 Juli 2011, 19:02:17 schrieb Grant Likely:
-> On Mon, Jul 04, 2011 at 06:59:11PM +0200, Heiko St?bner wrote:
-> > Am Montag 04 Juli 2011, 18:42:51 schrieb Grant Likely:
-> > > On Mon, Jul 04, 2011 at 09:18:34PM +0900, Kukjin Kim wrote:
-> > > > +#if defined(CONFIG_DMADEV_PL330)
-> > > > +			memset(&slave_config, 0, sizeof(slave_config));
-> > > > +			slave_config.direction = DMA_TO_DEVICE;
-> > > > +			slave_config.src_addr = xfer->tx_dma;
-> > > > +			slave_config.dst_addr =
-> > > > +				sdd->sfr_start + S3C64XX_SPI_TX_DATA;
-> > > > +			slave_config.dst_addr_width = sdd->cur_bpw / 8;
-> > > > +			dmaengine_slave_config(sdd->tx_chan, &slave_config);
-> > > > +
-> > > > +			sg_init_table(&tx_sg, 1);
-> > > > +			sg_set_page(&tx_sg, pfn_to_page(PFN_DOWN(xfer-
->tx_dma)),
-> > > > +				xfer->len, offset_in_page(xfer->tx_dma));
-> > > > +			sg_dma_len(&tx_sg) =  xfer->len;
-> > > > +			sg_dma_address(&tx_sg) = xfer->tx_dma;
-> > > > +			sdd->tx_desc =
-> > > > +				sdd->tx_chan->device->device_prep_slave_sg(
-> > > > +				sdd->tx_chan, &tx_sg, 1, DMA_TO_DEVICE,
-> > > > +				DMA_PREP_INTERRUPT);
-> > > > +			sdd->tx_desc->callback = s3c64xx_spi_dma_txcb;
-> > > > +			sdd->tx_desc->callback_param = sdd;
-> > > > +			dmaengine_submit(sdd->tx_desc);
-> > > > +			dma_async_issue_pending(sdd->tx_chan);
-> > > > +#else
-> > > > 
-> > > >  			s3c2410_dma_config(sdd->tx_dmach, sdd->cur_bpw / 8);
-> > > >  			s3c2410_dma_enqueue(sdd->tx_dmach, (void *)sdd,
-> > > >  			
-> > > >  						xfer->tx_dma, xfer->len);
-> > > >  			
-> > > >  			s3c2410_dma_ctrl(sdd->tx_dmach, S3C2410_DMAOP_START);
-> > > > 
-> > > > +#endif
-> > > 
-> > > Hmmm, this is not pretty.  The driver behaviour is entirely different
-> > > depending on if CONFIG_DMADEV_PL330 is enabled?  When we get to
-> > > multiplatform kernels, is this going to break on some hardware?
-> > > 
-> > > > @@ -802,8 +951,13 @@ static void s3c64xx_spi_work(struct work_struct
-> > > > *work)
-> > > > 
-> > > >  	spin_unlock_irqrestore(&sdd->lock, flags);
-> > > >  	
-> > > >  	/* Free DMA channels */
-> > > > 
-> > > > +#if defined(CONFIG_DMADEV_PL330)
-> > > > +	dma_release_channel(sdd->tx_chan);
-> > > > +	dma_release_channel(sdd->rx_chan);
-> > > > +#else
-> > > > 
-> > > >  	s3c2410_dma_free(sdd->tx_dmach, &s3c64xx_spi_dma_client);
-> > > >  	s3c2410_dma_free(sdd->rx_dmach, &s3c64xx_spi_dma_client);
-> > > > 
-> > > > +#endif
-> > > 
-> > > Wow.  A lot of #ifdefs here.  It does not look multiplatform friendly
-> > > at all.  Are the s3c2410_dma functions obsolete when DMADEV_PL330 is
-> > > selected?  If so, can they be removed entirely, or are they required
-> > > to support certain hardware?
-> > 
-> > The spi_s3c64xx driver can also support the SPI controller of the
-> > S3C2416/S3C2443 line of SoCs.
-> > As I'm currently working on a S3C2416 based project, my small wish from
-> > the sidelines would be to not break this support with whatever solution
-> > you will decide on :-) .
+On Mon, Jul 04, 2011 at 04:58:35PM +0100, Catalin Marinas wrote:
+> On Mon, Jul 04, 2011 at 12:13:38PM +0100, Russell King - ARM Linux wrote:
+> > If we are tearing down a mapping, then we don't need any barrier for
+> > individual PTE entries, but we do if we remove a higher-level (PMD/PUD)
+> > table.
 > 
-> I will not merge a patch that either breaks a platform, or requires
-> a compile time either/or choice of device support (enabling support
-> for one device should not break support for another).
+> It depends on the use, I don't think we can generally assume that any
+> tearing down is fine since there are cases where we need a guaranteed
+> fault (zap_vma_ptes may only tear down PTE entries but the driver using
+> it expects a fault if something else tries to access that location). A
+> DSB would be enough.
 
-The patch above seems to contain the support for both SoCs (i.e. s3c2410_dma_* 
-for S3C2416 etc), so it wouldn't break the support.
-But this form will definitly break future multiplatform kernels when the 2416 
-and some variant using the DMADEV_PL330 are selected at the same time.
+It depends whether we're unmapping due to munmap or for kernel internal
+stuff, or whether we're doing it as a result of disposing with the
+page tables.  In the latter case, avoiding the DSBs would be a good
+trick to pull.
 
-The 2416/2443 seem to be the first Samsung-SoCs to have a SPI-controller of 
-this type. Implementing the DMA engine stuff for these SoCs would obviously 
-solve the ifdef-problem but I don't know if this is possible to do.
+> > That "However" clause is an interesting one though - it seems to imply
+> > that no barrier is required when we zero out a new page table, before
+> > we link the new page table into the higher order table.  The memory we
+> > allocated for the page table doesn't become a page table until it is
+> > linked into the page table tree. 
+> 
+> That's my understanding of that clause as well.
+> 
+> > It also raises the question about how
+> > the system knows that a particular store is to something that's a page
+> > table and something that isn't...  Given that normal memory accesses are
+> > unordered, I think this paragraph is misleading and wrong.
+> 
+> Reordering of accesses can happen because of load speculation, store
+> reordering in the write buffer or delays on the bus outside the CPU. The
+> ARM processors do not issue stores speculatively. When a memory access
+> is issued, it checks the TLB and may perform a PTW (otherwise the
+> external bus wouldn't know the address. For explicit accesses, if the
+> PTW fails, it raises a fault (and we also need a precise abort).
 
+I think you missed my point.  The order in which stores to normal memory
+appear is not determinable.  In the case of writeback caches, it depends
+on the cache replacement algorithm, the state of the cache and its
+allocation behaviour.
 
-Heiko
+It is entirely possible that the store to the page tables _could_ appear
+in memory (and therefore visible to the MMU) before the stores to the
+new page table initializing it to zeros.
+
+For instance, lets say that the L1 writeback cache is read allocate only,
+and does not read entries from the L1 cache.
+
+The new page table happens to contain some L1 cache lines, but the upper
+table entry is not in the L1 cache.  This means that stores to the new
+page table hit the L1 cache lines, which become dirty.  The store to the
+upper table entry bypasses the L1 cache and is immediately placed into
+the write buffer.
+
+This means in all probability that the MMU will see the new page table
+before it is visibly initialized.
+
+> > As far as the BTB goes, I wonder if we can postpone that for user TLB
+> > ops by setting a TIF_ flag and checking that before returning to userspace.
+> > That would avoid having to needlessly destroy the cached branch information
+> > for kernel space while looping over the page tables.  The only other place
+> > that needs to worry about that is module_alloc() and vmap/vmalloc with
+> > PROT_KERNEL_EXEC, all of which can be done in flush_cache_vmap().
+> 
+> With setting and checking the TIF_ flag we penalise newer hardware
+> (Cortex-A8 onwards) where the BTB invalidation is a no-op. But I'll
+> check with the people here if there are any implications with deferring
+> the BTB invalidation.
+
+Thanks.
