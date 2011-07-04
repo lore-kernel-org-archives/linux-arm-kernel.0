@@ -1,83 +1,84 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 4 Jul 2011 08:58:20 +0200
-Subject: [PATCH 2/2] serial/imx: add device tree probe support
-In-Reply-To: <1309679760-22796-3-git-send-email-shawn.guo@linaro.org>
-References: <1309679760-22796-1-git-send-email-shawn.guo@linaro.org>
-	<1309679760-22796-3-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20110704065820.GY6069@pengutronix.de>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Mon, 4 Jul 2011 00:58:02 -0600
+Subject: [PATCH 2/2] SPI: SAMSUNG: Bug fix for SPI with different FIFO
+	level
+In-Reply-To: <20110704065501.GP15152@ponder.secretlab.ca>
+References: <1309437536-9315-1-git-send-email-padma.v@samsung.com>
+	<1309437536-9315-2-git-send-email-padma.v@samsung.com>
+	<BANLkTi=L7QeN75ebWFXdp_V5Pw1zEc-ZtA@mail.gmail.com>
+	<BANLkTimeWUbD2Ej16KKmuzwSCFz8HOhyKQ@mail.gmail.com>
+	<BANLkTi=9c5asfr=Jg6xwjQZW_a369UO64Q@mail.gmail.com>
+	<BANLkTinFnFwBGi693JTD_iDykA2VkV+HOw@mail.gmail.com>
+	<BANLkTik0LERxBHmJc5ZnRotnD4CSveR-UQ@mail.gmail.com>
+	<BANLkTim9wdrqDgXVUjxzMv9cdWViLww=Bg@mail.gmail.com>
+	<BANLkTim40x4X_--K0z7gdodDjor0MUam5Q@mail.gmail.com>
+	<BANLkTinf6ec1yXeaFkZjHMnqZp7yymDq-w@mail.gmail.com>
+	<20110704065501.GP15152@ponder.secretlab.ca>
+Message-ID: <CACxGe6urrZ9=1OgcaYF6EtvJokAyFTbFCnHPWsCY+sETVze8-w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 03, 2011 at 03:56:00PM +0800, Shawn Guo wrote:
-> It adds device tree probe support for imx tty/serial driver.
-> 
-> Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
-> Signed-off-by: Jason Liu <jason.hui@linaro.org>
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> Cc: Alan Cox <alan@lxorguk.ukuu.org.uk>
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> ---
->  .../bindings/tty/serial/fsl-imx-uart.txt           |   19 +++++
->  drivers/tty/serial/imx.c                           |   82 +++++++++++++++++---
->  2 files changed, 91 insertions(+), 10 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/tty/serial/fsl-imx-uart.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/tty/serial/fsl-imx-uart.txt b/Documentation/devicetree/bindings/tty/serial/fsl-imx-uart.txt
-> new file mode 100644
-> index 0000000..a9c0406
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/tty/serial/fsl-imx-uart.txt
-> @@ -0,0 +1,19 @@
-> +* Freescale i.MX Universal Asynchronous Receiver/Transmitter (UART)
-> +
-> +Required properties:
-> +- compatible : Should be "fsl,<soc>-uart"
-> +- reg : Address and length of the register set for the device
-> +- interrupts : Should contain uart interrupt
-> +
-> +Optional properties:
-> +- fsl,uart-has-rtscts : Indicate the uart has rts and cts
-> +- fsl,irda-mode : Indicate the uart supports irda mode
-> +
-> +Example:
-> +
-> +uart at 73fbc000 {
-> +	compatible = "fsl,imx51-uart", "fsl,imx21-uart";
-> +	reg = <0x73fbc000 0x4000>;
-> +	interrupts = <31>;
-> +	fsl,uart-has-rtscts;
-> +};
-> diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-> index 983f3bd..483c447 100644
-> --- a/drivers/tty/serial/imx.c
-> +++ b/drivers/tty/serial/imx.c
-> @@ -45,6 +45,8 @@
->  #include <linux/delay.h>
->  #include <linux/rational.h>
->  #include <linux/slab.h>
-> +#include <linux/of.h>
-> +#include <linux/of_device.h>
->  
->  #include <asm/io.h>
->  #include <asm/irq.h>
-> @@ -239,6 +241,12 @@ static struct platform_device_id imx_uart_devtype[] = {
->  	}
->  };
->  
-> +static struct of_device_id imx_uart_dt_ids[] = {
-> +	{ .compatible = "fsl,imx1-uart", .data = &imx_uart_devdata[IMX1_UART], },
-> +	{ .compatible = "fsl,imx21-uart", .data = &imx_uart_devdata[IMX2_UART], },
-> +	{ /* sentinel */ },
-> +};
+On Mon, Jul 4, 2011 at 12:55 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
+> On Fri, Jul 01, 2011 at 11:43:08AM +0530, Jassi Brar wrote:
+>> On Fri, Jul 1, 2011 at 11:29 AM, padma venkat <padma.kvr@gmail.com> wrote:
+>> > Hi Jassi,
+>> >
+>> > On Fri, Jul 1, 2011 at 11:22 AM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+>> >> On Fri, Jul 1, 2011 at 11:16 AM, padma venkat <padma.kvr@gmail.com> wrote:
+>> >>> Hi Tony,
+>> >>>
+>> >>> On Thu, Jun 30, 2011 at 4:30 PM, Tony Nadackal <tonykn@gmail.com> wrote:
+>> >>>> Hi Padma,
+>> >>>> With regards to your patch, even though one can check the tx done status
+>> >>>> using the TX_DONE bit, the present macro itself would work perfectly fine if
+>> >>>> the 'fifo_lvl_mask' is set properly.
+>> >>>> For example in 6450 channel 1, the fifo_lvl_mask should be 0x1ff (for 9bits,
+>> >>>> 15:23), while even in your patch, it is wrongly set as 0x7f(only 7bits).
+>> >>>>
+>> >>>> Thus, if this fifo_lvl_mask was defined correctly, the existing macro would
+>> >>>> itself have worked.
+>> >>> Thanks for your comment.
+>> >>> I considered changing to the fifo_lvl_mask to 1ff as you mentioned.
+>> >>> But I ?think that the fifo_lvl_mask reflects the actual FIFO capacity
+>> >>> in the SPI driver.
+>> >>> For the failing channels the FIFO trigger level is 64 bytes and so i
+>> >>> retained that value.
+>> >>> In the driver it polls till the FIFO capacity level otherwise it goes
+>> >>> for DMA.So if we keep
+>> >>> the FIFO level as 1ff when the actual capacity is 7f then it fails.
+>> >>>
+>> >>> Jassi what do you think about this?
+>> >>>
+>> >>
+>> >> 'fifo_lvl_mask' is h/w specific and can't be set for convenience.
+>> >>
+>> >> I don't have access to post-s3c64xx datasheets.
+>> >> Please check and reply if TX_DONE bit is at same offset for all
+>> >> channels of an SoC, because
+>> >> I suspect it's otherwise.
+>> >>
+>> > Yes. The TX_DONE bit is at the same offset for all the channels of an SoC.
+>> > in S5P64X0,S5PV210 and S5PV310 it is at offset 25.
+>> >
+>>
+>> Then, Patches-1,2
+>>
+>> Acked-by: Jassi Brar <jassisinghbrar@gmail.com>
+>
+> Are these bug fixes that should be in v3.0, or do I queue them up for v3.1?
 
-Isn't this table a bit too small? What about the other SoCs?
+Regardless, this one touches a lot of arch/arm files, so I'd rather
+see both patches go through the samsung tree:
 
-Sascha
+Acked-by: Grant Likely <grant.likely@secretlab.ca>
+
+>
+> g.
+>
+>
+
 
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Grant Likely, B.Sc., P.Eng.
+Secret Lab Technologies Ltd.
