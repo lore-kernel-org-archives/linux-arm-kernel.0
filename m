@@ -1,47 +1,52 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 4 Jul 2011 09:50:25 +0200
-Subject: [PATCH 1/1] ARM: mxc: Fix gpio interrupts for mx53
-In-Reply-To: <1309561479-31909-1-git-send-email-troy.kisky@boundarydevices.com>
-References: <1309561479-31909-1-git-send-email-troy.kisky@boundarydevices.com>
-Message-ID: <20110704075025.GB6069@pengutronix.de>
+Date: Mon, 4 Jul 2011 09:52:58 +0200
+Subject: GIT PULL: i.MX fixes for -rc
+Message-ID: <20110704075258.GC6069@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Grant,
+Russell,
 
-Just to let you know:
-When this patch hits mainline you will get a merge conflict in
-arch/arm/plat-mxc/gpio.c as this file is deleted in you gpio
-tree. The correct solution is to remove just arch/arm/plat-mxc/gpio.c
-as this issue is fixed in your tree already.
+Please pull the following patches for -rc. It contains some fixes
+for section mismatches and some board specific fixes.
 
 Sascha
 
-On Fri, Jul 01, 2011 at 04:04:39PM -0700, Troy Kisky wrote:
-> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
-> ---
->  arch/arm/plat-mxc/gpio.c |    3 ++-
->  1 files changed, 2 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/plat-mxc/gpio.c b/arch/arm/plat-mxc/gpio.c
-> index 6cd6d7f..1955eeb 100644
-> --- a/arch/arm/plat-mxc/gpio.c
-> +++ b/arch/arm/plat-mxc/gpio.c
-> @@ -336,7 +336,8 @@ int __init mxc_gpio_init(struct mxc_gpio_port *port, int cnt)
->  		/* its a serious configuration bug when it fails */
->  		BUG_ON( gpiochip_add(&port[i].chip) < 0 );
->  
-> -		if (cpu_is_mx1() || cpu_is_mx3() || cpu_is_mx25() || cpu_is_mx51()) {
-> +		if (cpu_is_mx1() || cpu_is_mx3() || cpu_is_mx25()
-> +				|| cpu_is_mx51() || cpu_is_mx53()) {
->  			/* setup one handler for each entry */
->  			irq_set_chained_handler(port[i].irq,
->  						mx3_gpio_irq_handler);
-> -- 
-> 1.7.0.4
-> 
-> 
 
+The following changes since commit 56299378726d5f2ba8d3c8cbbd13cb280ba45e4f:
+
+  Linux 3.0-rc4 (2011-06-20 20:25:46 -0700)
+
+are available in the git repository at:
+  git://git.pengutronix.de/git/imx/linux-2.6.git for-rmk
+
+Arnaud Patard (3):
+      efikasb/mx: fix usbh1 initialisation
+      efikasb: fix gpio keys.
+      efika: Fix board id detection
+
+Eric Miao (1):
+      ARM: mx53: add pad configuration for I2C signals
+
+Fabio Estevam (2):
+      ARM: mach-imx/mx31ads: Fix section mismatches
+      ARM: mach-imx/mx31lilly: Fix section mismatches
+
+Javier Martin (1):
+      Add tlv320aic32x4 platform data to Visstrim_M10.
+
+Troy Kisky (1):
+      ARM: mxc: Fix gpio interrupts for mx53
+
+ arch/arm/mach-imx/mach-imx27_visstrim_m10.c |   13 +++++++++++
+ arch/arm/mach-imx/mach-mx31ads.c            |    4 +-
+ arch/arm/mach-imx/mach-mx31lilly.c          |    2 +-
+ arch/arm/mach-mx5/board-mx51_efikamx.c      |    6 ++--
+ arch/arm/mach-mx5/board-mx51_efikasb.c      |   15 +++++++------
+ arch/arm/mach-mx5/mx51_efika.c              |    2 +-
+ arch/arm/plat-mxc/gpio.c                    |    3 +-
+ arch/arm/plat-mxc/include/mach/iomux-mx53.h |   31 ++++++++++++++------------
+ 8 files changed, 47 insertions(+), 29 deletions(-)
 -- 
 Pengutronix e.K.                           |                             |
 Industrial Linux Solutions                 | http://www.pengutronix.de/  |
