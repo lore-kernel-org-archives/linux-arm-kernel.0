@@ -1,40 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 4 Jul 2011 15:53:07 +0200
-Subject: [PATCH 1/3] PWM: add pwm framework support
-In-Reply-To: <20110704110523.GB316@e-circ.dyndns.org>
-References: <201106301441.24493.arnd@arndb.de> <4E11994B.7070103@gmail.com>
-	<20110704110523.GB316@e-circ.dyndns.org>
-Message-ID: <201107041553.07643.arnd@arndb.de>
+From: LW@KARO-electronics.de (=?utf-8?q?Lothar=20Wa=C3=9Fmann?=)
+Date: Mon,  4 Jul 2011 15:52:17 +0200
+Subject: [BUGFIX][PATCH] mach-mx5: fix the I2C clock parents
+In-Reply-To: <19985.49912.927038.73866@ipc1.ka-ro>
+References: <19985.49912.927038.73866@ipc1.ka-ro>
+Message-ID: <1309787537-20664-1-git-send-email-LW@KARO-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 04 July 2011, Kurt Van Dijck wrote:
-> > 
-> > The pwm framework needs to incorporate at least the following:
-> >  - sysfs access (ep93xx driver)
-> >  - Multiple channels per device (atmel driver)
-> 
-> These are 2 very hardware dependant additions. Is this really the job
-> for a framework to incorporate this?
-> IMHO, the job of a framework is to allow such things. Creating a framework
-> that does all special things of all vendors makes such thing
-> complicated.
+The clock from which the I2C timing is derived is the ipg_perclk not ipg_clk.
 
-I think you shouldn't make it too easy for drivers to add extra
-sysfs files. If at all possible, the default should be to add
-them to the core, and define them in a way that makes sense for
-future similar drivers.
+I2C bus frequency was lower by a factor of ~8 due to the clock divider
+calculation being based on 66.5MHz IPG clock while the bus actually
+uses 8MHz ipg_perclk.
 
-We need to be careful to avoid a situation where multiple driver
-writers introduce the same feature with a sysfs attribute, but do
-so in an incompatible way.
+Kernel version: 3.0.0-rc2 branch 'imx-for-next' of git://git.pengutronix.de/git/imx/linux-2.6
 
-> With socketCAN, we encountered a similar problem. Every chip maker
-> tries to create added value by means of special options. You can't
-> support them all in the framework. Therefore, sysfs can be added
-> to configure special things.
+Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+---
+ arch/arm/mach-mx5/clock-mx51-mx53.c |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
 
-I would expect that pwm is much simpler than CAN, so the amount
-of creativity there is also limited.
-
-	Arnd
+diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
+index 699b0d2..ff16d86 100644
+--- a/arch/arm/mach-mx5/clock-mx51-mx53.c
++++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
+@@ -1282,13 +1282,13 @@ DEFINE_CLOCK(pwm2_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG8_OFFSET,
+ 
+ /* I2C */
+ DEFINE_CLOCK(i2c1_clk, 0, MXC_CCM_CCGR1, MXC_CCM_CCGRx_CG9_OFFSET,
+-	NULL, NULL, &ipg_clk, NULL);
++	NULL, NULL, &ipg_perclk, NULL);
+ DEFINE_CLOCK(i2c2_clk, 1, MXC_CCM_CCGR1, MXC_CCM_CCGRx_CG10_OFFSET,
+-	NULL, NULL, &ipg_clk, NULL);
++	NULL, NULL, &ipg_perclk, NULL);
+ DEFINE_CLOCK(hsi2c_clk, 0, MXC_CCM_CCGR1, MXC_CCM_CCGRx_CG11_OFFSET,
+ 	NULL, NULL, &ipg_clk, NULL);
+ DEFINE_CLOCK(i2c3_mx53_clk, 0, MXC_CCM_CCGR1, MXC_CCM_CCGRx_CG11_OFFSET,
+-	NULL, NULL, &ipg_clk, NULL);
++	NULL, NULL, &ipg_perclk, NULL);
+ 
+ /* FEC */
+ DEFINE_CLOCK(fec_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG12_OFFSET,
+-- 
+1.5.6.5
