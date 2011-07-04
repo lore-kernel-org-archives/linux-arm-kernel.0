@@ -1,41 +1,36 @@
 From: axel.lin@gmail.com (Axel Lin)
-Date: Mon, 4 Jul 2011 16:10:50 +0800
-Subject: [PATCH] ARM: DMA: Add missing semicolon for the define of
-	dma_alloc_area
-In-Reply-To: <4E0DAB90.9080708@mvista.com>
-References: <1309509472.30642.1.camel@phoenix> <4E0DAB90.9080708@mvista.com>
-Message-ID: <CAF+7xW=7PM2+e1xxqfL++NGaCZjA3JoHn11vCrcK05+CVBjN7w@mail.gmail.com>
+Date: Mon, 04 Jul 2011 16:12:21 +0800
+Subject: [PATCH] ARM: DMA: Silence declared inside parameter list warning
+	for !CONFIG_MMU
+Message-ID: <1309767141.3964.1.camel@phoenix>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/7/1 Sergei Shtylyov <sshtylyov@mvista.com>:
-> Hello.
->
-> On 01-07-2011 12:37, Axel Lin wrote:
->
->> I got below build error by: make at91x40_defconfig;make
->> Fix it by adding a missing semicolon for the define of dma_alloc_area.
->
->> ? CC ? ? ?arch/arm/mm/dma-mapping.o
->> arch/arm/mm/dma-mapping.c:309: warning: 'struct dma_coherent_area'
->> declared inside parameter list
->> arch/arm/mm/dma-mapping.c:309: warning: its scope is only this definition
->> or declaration, which is probably not what you want
->> arch/arm/mm/dma-mapping.c: In function '__dma_alloc':
->> arch/arm/mm/dma-mapping.c:324: error: expected ';' before '}' token
->> arch/arm/mm/dma-mapping.c: At top level:
->> arch/arm/mm/dma-mapping.c:334: warning: 'struct dma_coherent_area'
->> declared inside parameter list
->> arch/arm/mm/dma-mapping.c:374: warning: 'struct dma_coherent_area'
->> declared inside parameter list
->> make[1]: *** [arch/arm/mm/dma-mapping.o] Error 1
->> make: *** [arch/arm/mm] Error 2
->
-> ? You didn't fix the warning though, so not clear why you cited them....
-Because it's a copy-paste from the output of make.
-I just think I should not manually edit the log.
+Fix below warning, the struct dma_coherent_area takes no space if !CONFIG_MMU.
 
-Well, a patch to fix the warning is on the way.
+  CC      arch/arm/mm/dma-mapping.o
+arch/arm/mm/dma-mapping.c:309: warning: 'struct dma_coherent_area' declared inside parameter list
+arch/arm/mm/dma-mapping.c:309: warning: its scope is only this definition or declaration, which is probably not what you want
+arch/arm/mm/dma-mapping.c:334: warning: 'struct dma_coherent_area' declared inside parameter list
+arch/arm/mm/dma-mapping.c:374: warning: 'struct dma_coherent_area' declared inside parameter list
 
-Regards,
-Axel
+Signed-off-by: Axel Lin <axel.lin@gmail.com>
+---
+ arch/arm/mm/dma-mapping.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index 8089499..da3b33a 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -297,6 +297,8 @@ static void dma_free_area(void *cpu_addr, size_t size, struct dma_coherent_area
+ #define coherent_wc_area NULL
+ #define coherent_dma_area NULL
+ 
++struct dma_coherent_area { };
++
+ void dma_coherent_reserve(void)
+ {
+ }
+-- 
+1.7.4.1
