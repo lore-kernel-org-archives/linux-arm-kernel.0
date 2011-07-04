@@ -1,122 +1,31 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 4 Jul 2011 18:44:57 +0200
-Subject: [PATCH 1/2] gpio/mxc: get rid of the uses of cpu_is_mx()
-In-Reply-To: <20110704102008.GH10245@S2100-06.ap.freescale.net>
-References: <1309681017-22970-1-git-send-email-shawn.guo@linaro.org>
-	<1309681017-22970-2-git-send-email-shawn.guo@linaro.org>
-	<20110704064603.GW6069@pengutronix.de>
-	<20110704092800.GG10245@S2100-06.ap.freescale.net>
-	<20110704094921.GG6069@pengutronix.de>
-	<20110704102008.GH10245@S2100-06.ap.freescale.net>
-Message-ID: <20110704164457.GJ6069@pengutronix.de>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Mon, 4 Jul 2011 10:48:28 -0600
+Subject: [PATCH 0/5] remove spi-s3c24xx-gpio driver
+In-Reply-To: <1309265357-15879-1-git-send-email-jacmet@sunsite.dk>
+References: <1309265357-15879-1-git-send-email-jacmet@sunsite.dk>
+Message-ID: <20110704164828.GE28042@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 04, 2011 at 06:20:09PM +0800, Shawn Guo wrote:
-> On Mon, Jul 04, 2011 at 11:49:21AM +0200, Sascha Hauer wrote:
-> > On Mon, Jul 04, 2011 at 05:28:01PM +0800, Shawn Guo wrote:
-> > > On Mon, Jul 04, 2011 at 08:46:03AM +0200, Sascha Hauer wrote:
-> > > > On Sun, Jul 03, 2011 at 04:16:56PM +0800, Shawn Guo wrote:
-> > > > > The patch removes all the uses of cpu_is_mx().  Instead, it utilizes
-> > > > > platform_device_id to distinguish the gpio differences among SoCs.
-> > > > > 
-> > > > > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > > > > Cc: Grant Likely <grant.likely@secretlab.ca>
-> > > > > Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> > > > > ---
-> > > > >  arch/arm/mach-imx/mm-imx1.c                   |    8 +-
-> > > > >  arch/arm/mach-imx/mm-imx21.c                  |   12 +-
-> > > > >  arch/arm/mach-imx/mm-imx25.c                  |    8 +-
-> > > > >  arch/arm/mach-imx/mm-imx27.c                  |   12 +-
-> > > > >  arch/arm/mach-imx/mm-imx31.c                  |    6 +-
-> > > > >  arch/arm/mach-imx/mm-imx35.c                  |    6 +-
-> > > > >  arch/arm/mach-mx5/mm-mx50.c                   |   12 +-
-> > > > >  arch/arm/mach-mx5/mm.c                        |   22 ++--
-> > > > >  arch/arm/plat-mxc/devices/platform-gpio-mxc.c |    4 +-
-> > > > >  arch/arm/plat-mxc/include/mach/common.h       |    2 +-
-> > > > >  drivers/gpio/gpio-mxc.c                       |  123 +++++++++++++++++++++----
-> > > > >  11 files changed, 151 insertions(+), 64 deletions(-)
-> > > > 
-> > > > 
-> > > > Summarizing the renames up:
-> > > > 
-> > > > i.MX1  -> imx1-gpio
-> > > > i.MX21 -> imx2-gpio
-> > > > i.MX25 -> imx-gpio
-> > > > i.MX27 -> imx2-gpio
-> > > > i.MX31 -> imx-gpio
-> > > > i.MX35 -> imx-gpio
-> > > > i.MX50 -> imx-gpio
-> > > > i.MX51 -> imx-gpio
-> > > > i.MX53 -> imx-gpio
-> > > > 
-> > > > This is not consitent. Please either use the full SoC name for all
-> > > > device ids or use something like imx-gpio-v1, v2...
-> > > > It's not good that the i.MX25 is not a imx2 and that the 'modern'
-> > > > i.MXs only have imx-gpio. We all know that your hardware designers
-> > > > will be creative enough to change the register layout again in the
-> > > > future.
-> > > > 
-> > > Ok, here it is.  It's avoid confusion in machine code, but every
-> > > time we add a new soc we need to change touch this table, even if
-> > > the new soc has a total compatible gpio to IMX_GPIO.  I'm fine with
-> > > either way.
-> > 
-> > I'm also fine with imx1-gpio, imx21-gpio and imx31-gpio and all others
-> > get a compatible entry with these like you did in the uart driver.
-> > I only want to avoid to have a imx2-gpio when a i.MX25 is incompatible
-> > with this.
-> > When we do so it's probably worth to put this into a comment somewhere
-> > next to the id table. I can imagine people wonder why only such ancient
-> > SoCs are supported.
-> > 
-> So I'm going to do the following to address your concern.  Please let
-> me know if you still do not buy it.
+On Tue, Jun 28, 2011 at 02:49:12PM +0200, Peter Korsgaard wrote:
+> The spi-s3c24xx-gpio driver is functionally equivalent to the spi-gpio
+> driver (but precedes it). The driver has seen very little development 
+> since it got added back in 2006, and there's only 2 in-tree users of it.
 > 
-> static struct platform_device_id mxc_gpio_devtype[] = {
->         {
->                 .name = "imx1-gpio",
->                 .driver_data = IMX1_GPIO,
->         }, {
->                 .name = "imx21-gpio",
->                 .driver_data = IMX2_GPIO,
->         }, {
->                 .name = "imx25-gpio",
->                 .driver_data = IMX_GPIO,
->         }, {
->                 .name = "imx27-gpio",
->                 .driver_data = IMX2_GPIO,
->         }, {
->                 .name = "imx-gpio",
->                 .driver_data = IMX_GPIO,
->         }, {
->                 /* sentinel */
->         }
-> };
+> This patch series moves the remaining users to the spi-gpio driver and
+> then finally removes the driver.
+> 
+> Compile tested only as I don't have access to the hardware.
+> 
+>  arch/arm/mach-s3c2410/include/mach/spi-gpio.h |   28 ----
+>  arch/arm/mach-s3c2410/mach-qt2410.c           |   34 +----
+>  arch/arm/mach-s3c2412/mach-jive.c             |   41 ++----
+>  arch/arm/mach-s3c2440/mach-gta02.c            |    1 -
+>  drivers/spi/Kconfig                           |   10 --
+>  drivers/spi/Makefile                          |    1 -
+>  drivers/spi/spi-s3c24xx-gpio.c                |  200 -------------------------
 
-Read again. We have three different types of gpio irq controllers, they
-are first seen in the imx1, imx21 and imx31. So all others can be made
-compatible with these three. No need for imx-gpio, imx25-gpio and
-imx27-gpio. The mxc_gpio_devtype would look like this:
+I'm tempted to merge this, just because I like the diffstat.  Kgene,
+what say you?
 
-static struct platform_device_id mxc_gpio_devtype[] = {
-	{
-		.name = "imx1-gpio",
-		.driver_data = IMX1_GPIO,
-	}, {
-		.name = "imx21-gpio",
-		.driver_data = IMX21_GPIO,
-	}, {
-		.name = "imx31-gpio",
-		.driver_data = IMX31_GPIO,
-	}, {
-	}
-};
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+g.
