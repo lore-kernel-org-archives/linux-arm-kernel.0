@@ -1,87 +1,68 @@
-From: sudhakar.raj@ti.com (Rajashekhara, Sudhakar)
-Date: Mon, 4 Jul 2011 18:37:18 +0530
-Subject: [PATCH v2] davinci: da850 EVM: read mac address from SPI flash
-Message-ID: <1309784838-30903-1-git-send-email-sudhakar.raj@ti.com>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Mon, 4 Jul 2011 15:32:00 +0200
+Subject: [PATCH] arm: mxs: add mmc-device for mach-tx28
+In-Reply-To: <1309532041-24452-1-git-send-email-w.sang@pengutronix.de>
+References: <1309532041-24452-1-git-send-email-w.sang@pengutronix.de>
+Message-ID: <19985.49360.840885.73657@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DA850/OMAP-L138 EMAC driver uses random mac address instead of
-a fixed one because the mac address is not stuffed into EMAC
-platform data.
+Wolfram Sang writes:
+> Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
+> ---
+>  arch/arm/mach-mxs/Kconfig     |    1 +
+>  arch/arm/mach-mxs/mach-tx28.c |    6 ++++++
+>  2 files changed, 7 insertions(+), 0 deletions(-)
+> 
+Acked-by: Lothar Wa?mann <LW@KARO-electronics.de>
 
-This patch provides a function which reads the mac address
-stored in SPI flash (registered as MTD device) and populates the
-EMAC platform data. The function which reads the mac address is
-registered as a callback which gets called upon addition of MTD
-device.
-
-NOTE: In case the MAC address stored in SPI flash is erased, follow
-the instructions at [1] to restore it.
-
-[1] http://processors.wiki.ti.com/index.php/GSG:_OMAP-L138_DVEVM_Additional_Procedures#Restoring_MAC_address_on_SPI_Flash
-
-Signed-off-by: Rajashekhara, Sudhakar <sudhakar.raj@ti.com>
----
-Since v1:
-     Guarded registering the mtd_notifier only when MTD is enabled.
-     Earlier this was handled using mtd_has_partitions() call, but
-     this has been removed in Linux v3.0.
-
- arch/arm/mach-davinci/board-da850-evm.c |   28 ++++++++++++++++++++++++++++
- 1 files changed, 28 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
-index a7b41bf..f994a1f 100644
---- a/arch/arm/mach-davinci/board-da850-evm.c
-+++ b/arch/arm/mach-davinci/board-da850-evm.c
-@@ -115,6 +115,23 @@ static struct spi_board_info da850evm_spi_info[] = {
- 	},
- };
- 
-+static void da850_evm_m25p80_notify_add(struct mtd_info *mtd)
-+{
-+	char *mac_addr = davinci_soc_info.emac_pdata->mac_addr;
-+	size_t retlen;
-+
-+	if (!strcmp(mtd->name, "MAC-Address")) {
-+		mtd->read(mtd, 0, ETH_ALEN, &retlen, mac_addr);
-+		if (retlen == ETH_ALEN)
-+			pr_info("Read MAC addr from SPI Flash: %pM\n",
-+				mac_addr);
-+	}
-+}
-+
-+static struct mtd_notifier da850evm_spi_notifier = {
-+	.add	= da850_evm_m25p80_notify_add,
-+};
-+
- static struct mtd_partition da850_evm_norflash_partition[] = {
- 	{
- 		.name           = "bootloaders + env",
-@@ -1117,6 +1134,15 @@ static __init int da850_evm_init_cpufreq(void)
- static __init int da850_evm_init_cpufreq(void) { return 0; }
- #endif
- 
-+#ifdef CONFIG_MTD
-+static void da850_evm_register_mtd_user(struct mtd_notifier *notify)
-+{
-+	register_mtd_user(notify);
-+}
-+#else
-+static void da850_evm_register_mtd_user(struct mtd_notifier *notify) { }
-+#endif
-+
- static __init void da850_evm_init(void)
- {
- 	int ret;
-@@ -1237,6 +1263,8 @@ static __init void da850_evm_init(void)
- 	if (ret)
- 		pr_warning("da850_evm_init: spi 1 registration failed: %d\n",
- 				ret);
-+
-+	da850_evm_register_mtd_user(&da850evm_spi_notifier);
- }
- 
- #ifdef CONFIG_SERIAL_8250_CONSOLE
+> diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
+> index f114960..73556f0 100644
+> --- a/arch/arm/mach-mxs/Kconfig
+> +++ b/arch/arm/mach-mxs/Kconfig
+> @@ -59,6 +59,7 @@ config MODULE_TX28
+>  	select MXS_HAVE_PLATFORM_AUART
+>  	select MXS_HAVE_PLATFORM_FEC
+>  	select MXS_HAVE_PLATFORM_MXS_I2C
+> +	select MXS_HAVE_PLATFORM_MXS_MMC
+>  	select MXS_HAVE_PLATFORM_MXS_PWM
+>  
+>  config MACH_TX28
+> diff --git a/arch/arm/mach-mxs/mach-tx28.c b/arch/arm/mach-mxs/mach-tx28.c
+> index b65e371..91a4b78 100644
+> --- a/arch/arm/mach-mxs/mach-tx28.c
+> +++ b/arch/arm/mach-mxs/mach-tx28.c
+> @@ -147,6 +147,11 @@ static struct i2c_board_info tx28_stk5v3_i2c_boardinfo[] __initdata = {
+>  	},
+>  };
+>  
+> +static struct mxs_mmc_platform_data tx28_mmc0_pdata __initdata = {
+> +       .wp_gpio = -EINVAL,
+> +       .flags = SLOTF_4_BIT_CAPABLE,
+> +};
+> +
+>  static void __init tx28_stk5v3_init(void)
+>  {
+>  	mxs_iomux_setup_multiple_pads(tx28_stk5v3_pads,
+> @@ -164,6 +169,7 @@ static void __init tx28_stk5v3_init(void)
+>  	mx28_add_mxs_i2c(0);
+>  	i2c_register_board_info(0, tx28_stk5v3_i2c_boardinfo,
+>  			ARRAY_SIZE(tx28_stk5v3_i2c_boardinfo));
+> +	mx28_add_mxs_mmc(0, &tx28_mmc0_pdata);
+>  }
+>  
+>  static void __init tx28_timer_init(void)
+> -- 
+> 1.7.5.3
+> 
+Lothar Wa?mann
 -- 
-1.7.1
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
