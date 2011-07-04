@@ -1,117 +1,76 @@
-From: govindraj.raja@ti.com (Govindraj.R)
-Date: Mon, 4 Jul 2011 10:32:17 +0530
-Subject: [REPOST PATCH 2/2 v4] OMAP2+: hwmod: Add API to check IO PAD wakeup
-	status
-In-Reply-To: <1309603946-25395-3-git-send-email-govindraj.raja@ti.com>
-References: <1309603946-25395-3-git-send-email-govindraj.raja@ti.com>
-Message-ID: <1309755737-28661-1-git-send-email-govindraj.raja@ti.com>
+From: myungjoo.ham@gmail.com (MyungJoo Ham)
+Date: Mon, 4 Jul 2011 13:56:21 +0900
+Subject: [rtc-linux] [PATCH 2/3] rtc: rtc-s3c: Disable alarm entries that
+	are not chosen.
+In-Reply-To: <013101cc39f3$9b44b830$d1ce2890$%youn@samsung.com>
+References: <1309175006-9218-1-git-send-email-myungjoo.ham@samsung.com>
+	<1309175006-9218-3-git-send-email-myungjoo.ham@samsung.com>
+	<013101cc39f3$9b44b830$d1ce2890$%youn@samsung.com>
+Message-ID: <CAJ0PZbRf-Q3r9D9EbhSG+VuzLWWbWqXKJ4A1byLUGn5On=ArVg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add API to determine IO-PAD wakeup event status for a given
-hwmod dynamic_mux pad.
+On Mon, Jul 4, 2011 at 11:39 AM, Changhwan Youn <chaos.youn@samsung.com> wrote:
+> MyungJoo Ham wrote:
+>> When rtc_setalarm is called, the entries that are not chosen (entries
+>> without valid time values) should be disabled. However, in the previous
+>> rtc-s3c driver, they are not explicitly disabled (did not changed). This
+>> patch allows to disable such entries even if they were previously used.
+>
+> This has already been implemented by current code.
+> The original code you modified only leaves alarm enable bit.
+> You may misunderstand the code.
 
-Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
----
- arch/arm/mach-omap2/mux.c                    |   30 ++++++++++++++++++++++++++
- arch/arm/mach-omap2/mux.h                    |   13 +++++++++++
- arch/arm/mach-omap2/omap_hwmod.c             |    7 ++++++
- arch/arm/plat-omap/include/plat/omap_hwmod.h |    1 +
- 4 files changed, 51 insertions(+), 0 deletions(-)
+Ah.. sorry. I misunderstood when I was writing the commit message.
 
-diff --git a/arch/arm/mach-omap2/mux.c b/arch/arm/mach-omap2/mux.c
-index c7fb22a..50ee806 100644
---- a/arch/arm/mach-omap2/mux.c
-+++ b/arch/arm/mach-omap2/mux.c
-@@ -351,6 +351,36 @@ err1:
- 	return NULL;
- }
- 
-+/**
-+ * omap_hwmod_mux_get_wake_status - omap hwmod check pad wakeup
-+ * @hmux:		Pads for a hwmod
-+ *
-+ * Gets the wakeup status of given pad from omap-hwmod.
-+ * Returns true if wakeup event is set for pad else false
-+ * if wakeup is not occured or pads are not avialable.
-+ */
-+bool omap_hwmod_mux_get_wake_status(struct omap_hwmod_mux_info *hmux)
-+{
-+	int i;
-+	unsigned int val;
-+	u8 ret = false;
-+
-+	for (i = 0; i < hmux->nr_pads; i++) {
-+		struct omap_device_pad *pad = &hmux->pads[i];
-+
-+		if (pad->flags & OMAP_DEVICE_PAD_WAKEUP) {
-+			val = omap_mux_read(pad->partition,
-+					pad->mux->reg_offset);
-+			if (val & OMAP_WAKEUP_EVENT) {
-+				ret = true;
-+				break;
-+			}
-+		}
-+	}
-+
-+	return ret;
-+}
-+
- /* Assumes the calling function takes care of locking */
- void omap_hwmod_mux(struct omap_hwmod_mux_info *hmux, u8 state)
- {
-diff --git a/arch/arm/mach-omap2/mux.h b/arch/arm/mach-omap2/mux.h
-index 2132308..8b2150a 100644
---- a/arch/arm/mach-omap2/mux.h
-+++ b/arch/arm/mach-omap2/mux.h
-@@ -225,8 +225,21 @@ omap_hwmod_mux_init(struct omap_device_pad *bpads, int nr_pads);
-  */
- void omap_hwmod_mux(struct omap_hwmod_mux_info *hmux, u8 state);
- 
-+/**
-+ * omap_hwmod_mux_get_wake_status - omap hwmod check pad wakeup
-+ * @hmux:		Pads for a hwmod
-+ *
-+ * Called only from omap_hwmod.c, do not use.
-+ */
-+bool omap_hwmod_mux_get_wake_status(struct omap_hwmod_mux_info *hmux);
- #else
- 
-+static inline bool
-+omap_hwmod_mux_get_wake_status(struct omap_hwmod_mux_info *hmux)
-+{
-+	return 0;
-+}
-+
- static inline int omap_mux_init_gpio(int gpio, int val)
- {
- 	return 0;
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index 3b28e0a..f9495fe 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -2428,3 +2428,10 @@ int omap_hwmod_no_setup_reset(struct omap_hwmod *oh)
- 
- 	return 0;
- }
-+
-+int omap_hwmod_pad_get_wakeup_status(struct omap_hwmod *oh)
-+{
-+	if (oh && oh->mux)
-+		return omap_hwmod_mux_get_wake_status(oh->mux);
-+	return -EINVAL;
-+}
-diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-index 1adea9c..da6ab5c 100644
---- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
-+++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-@@ -602,6 +602,7 @@ u32 omap_hwmod_get_context_loss_count(struct omap_hwmod *oh);
- 
- int omap_hwmod_no_setup_reset(struct omap_hwmod *oh);
- 
-+int omap_hwmod_pad_get_wakeup_status(struct omap_hwmod *oh);
- /*
-  * Chip variant-specific hwmod init routines - XXX should be converted
-  * to use initcalls once the initial boot ordering is straightened out
+It is not about the enable bits of each time entry. It is about the enable bit.
+
+However, as rtc->ops->set_alarm is not called when alarm->enabled is
+false, the patch becomes meaningless.
+
+Please never mind this patch.
+
+>
+> Regards,
+> Changhwan
+>>
+>> Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
+>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+>> ---
+>> ?drivers/rtc/rtc-s3c.c | ? ?3 ++-
+>> ?1 files changed, 2 insertions(+), 1 deletions(-)
+>>
+>> diff --git a/drivers/rtc/rtc-s3c.c b/drivers/rtc/rtc-s3c.c
+>> index 3c8dfa7..be85ea5 100644
+>> --- a/drivers/rtc/rtc-s3c.c
+>> +++ b/drivers/rtc/rtc-s3c.c
+>> @@ -273,7 +273,8 @@ static int s3c_rtc_setalarm(struct device *dev, struct
+>> rtc_wkalrm *alrm)
+>> ? ? ? ? ? ? ? ?1900 + tm->tm_year, tm->tm_mon + 1, tm->tm_mday,
+>> ? ? ? ? ? ? ? ?tm->tm_hour, tm->tm_min, tm->tm_sec);
+>>
+>> - ? ? alrm_en = readb(base + S3C2410_RTCALM) & S3C2410_RTCALM_ALMEN;
+>> + ? ? /* Disable entires that are not chosen by alrm */
+>> + ? ? alrm_en = S3C2410_RTCALM_ALMEN;
+>> ? ? ? writeb(0x00, base + S3C2410_RTCALM);
+>>
+>> ? ? ? if (tm->tm_sec < 60 && tm->tm_sec >= 0) {
+>> --
+>> 1.7.4.1
+>>
+>> --
+>> You received this message because you are subscribed to "rtc-linux".
+>> Membership options at http://groups.google.com/group/rtc-linux .
+>> Please read http://groups.google.com/group/rtc-linux/web/checklist
+>> before submitting a driver.
+>
+>
+
+
+
 -- 
-1.7.4.1
+MyungJoo Ham, Ph.D.
+Mobile Software Platform Lab,
+Digital Media and Communications (DMC) Business
+Samsung Electronics
+cell: 82-10-6714-2858
