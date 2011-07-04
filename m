@@ -1,5 +1,5 @@
-From: padma.kvr@gmail.com (padma venkat)
-Date: Mon, 4 Jul 2011 15:34:19 +0530
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 04 Jul 2011 19:08:55 +0900
 Subject: [PATCH 2/2] SPI: SAMSUNG: Bug fix for SPI with different FIFO
 	level
 In-Reply-To: <005501cc3a30$6c916190$45b424b0$%kim@samsung.com>
@@ -16,104 +16,109 @@ References: <1309437536-9315-1-git-send-email-padma.v@samsung.com>
 	<20110704065501.GP15152@ponder.secretlab.ca>
 	<CACxGe6urrZ9=1OgcaYF6EtvJokAyFTbFCnHPWsCY+sETVze8-w@mail.gmail.com>
 	<005501cc3a30$6c916190$45b424b0$%kim@samsung.com>
-Message-ID: <CAAgF-BdB6j83Db6X4vEWvO3YiOaOD4NAhtvWHbu8sbgErshr_Q@mail.gmail.com>
+Message-ID: <005601cc3a32$64bd5fd0$2e381f70$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Hi Kukjin,
-
-On Mon, Jul 4, 2011 at 3:24 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+Kukjin Kim wrote:
+> 
 > Grant Likely wrote:
->>
->> On Mon, Jul 4, 2011 at 12:55 AM, Grant Likely <grant.likely@secretlab.ca>
+> >
+> > On Mon, Jul 4, 2011 at 12:55 AM, Grant Likely
+<grant.likely@secretlab.ca>
 > wrote:
->> > On Fri, Jul 01, 2011 at 11:43:08AM +0530, Jassi Brar wrote:
->> >> On Fri, Jul 1, 2011 at 11:29 AM, padma venkat <padma.kvr@gmail.com>
+> > > On Fri, Jul 01, 2011 at 11:43:08AM +0530, Jassi Brar wrote:
+> > >> On Fri, Jul 1, 2011 at 11:29 AM, padma venkat <padma.kvr@gmail.com>
 > wrote:
->> >> > Hi Jassi,
->> >> >
->> >> > On Fri, Jul 1, 2011 at 11:22 AM, Jassi Brar
+> > >> > Hi Jassi,
+> > >> >
+> > >> > On Fri, Jul 1, 2011 at 11:22 AM, Jassi Brar
 > <jassisinghbrar@gmail.com> wrote:
->> >> >> On Fri, Jul 1, 2011 at 11:16 AM, padma venkat <padma.kvr@gmail.com>
->> wrote:
->> >> >>> Hi Tony,
->> >> >>>
->> >> >>> On Thu, Jun 30, 2011 at 4:30 PM, Tony Nadackal <tonykn@gmail.com>
->> wrote:
->> >> >>>> Hi Padma,
->> >> >>>> With regards to your patch, even though one can check the tx done
->> status
->> >> >>>> using the TX_DONE bit, the present macro itself would work
+> > >> >> On Fri, Jul 1, 2011 at 11:16 AM, padma venkat
+<padma.kvr@gmail.com>
+> > wrote:
+> > >> >>> Hi Tony,
+> > >> >>>
+> > >> >>> On Thu, Jun 30, 2011 at 4:30 PM, Tony Nadackal <tonykn@gmail.com>
+> > wrote:
+> > >> >>>> Hi Padma,
+> > >> >>>> With regards to your patch, even though one can check the tx
+done
+> > status
+> > >> >>>> using the TX_DONE bit, the present macro itself would work
 > perfectly
->> fine if
->> >> >>>> the 'fifo_lvl_mask' is set properly.
->> >> >>>> For example in 6450 channel 1, the fifo_lvl_mask should be 0x1ff
+> > fine if
+> > >> >>>> the 'fifo_lvl_mask' is set properly.
+> > >> >>>> For example in 6450 channel 1, the fifo_lvl_mask should be 0x1ff
 > (for
->> 9bits,
->> >> >>>> 15:23), while even in your patch, it is wrongly set as 0x7f(only
+> > 9bits,
+> > >> >>>> 15:23), while even in your patch, it is wrongly set as 0x7f(only
 > 7bits).
->> >> >>>>
->> >> >>>> Thus, if this fifo_lvl_mask was defined correctly, the existing
+> > >> >>>>
+> > >> >>>> Thus, if this fifo_lvl_mask was defined correctly, the existing
 > macro
->> would
->> >> >>>> itself have worked.
->> >> >>> Thanks for your comment.
->> >> >>> I considered changing to the fifo_lvl_mask to 1ff as you mentioned.
->> >> >>> But I ?think that the fifo_lvl_mask reflects the actual FIFO
+> > would
+> > >> >>>> itself have worked.
+> > >> >>> Thanks for your comment.
+> > >> >>> I considered changing to the fifo_lvl_mask to 1ff as you
+mentioned.
+> > >> >>> But I ?think that the fifo_lvl_mask reflects the actual FIFO
 > capacity
->> >> >>> in the SPI driver.
->> >> >>> For the failing channels the FIFO trigger level is 64 bytes and so
+> > >> >>> in the SPI driver.
+> > >> >>> For the failing channels the FIFO trigger level is 64 bytes and
+so
 > i
->> >> >>> retained that value.
->> >> >>> In the driver it polls till the FIFO capacity level otherwise it
+> > >> >>> retained that value.
+> > >> >>> In the driver it polls till the FIFO capacity level otherwise it
 > goes
->> >> >>> for DMA.So if we keep
->> >> >>> the FIFO level as 1ff when the actual capacity is 7f then it fails.
->> >> >>>
->> >> >>> Jassi what do you think about this?
->> >> >>>
->> >> >>
->> >> >> 'fifo_lvl_mask' is h/w specific and can't be set for convenience.
->> >> >>
->> >> >> I don't have access to post-s3c64xx datasheets.
->> >> >> Please check and reply if TX_DONE bit is at same offset for all
->> >> >> channels of an SoC, because
->> >> >> I suspect it's otherwise.
->> >> >>
->> >> > Yes. The TX_DONE bit is at the same offset for all the channels of an
+> > >> >>> for DMA.So if we keep
+> > >> >>> the FIFO level as 1ff when the actual capacity is 7f then it
+fails.
+> > >> >>>
+> > >> >>> Jassi what do you think about this?
+> > >> >>>
+> > >> >>
+> > >> >> 'fifo_lvl_mask' is h/w specific and can't be set for convenience.
+> > >> >>
+> > >> >> I don't have access to post-s3c64xx datasheets.
+> > >> >> Please check and reply if TX_DONE bit is at same offset for all
+> > >> >> channels of an SoC, because
+> > >> >> I suspect it's otherwise.
+> > >> >>
+> > >> > Yes. The TX_DONE bit is at the same offset for all the channels of
+an
 > SoC.
->> >> > in S5P64X0,S5PV210 and S5PV310 it is at offset 25.
->> >> >
->> >>
->> >> Then, Patches-1,2
->> >>
->> >> Acked-by: Jassi Brar <jassisinghbrar@gmail.com>
->> >
->> > Are these bug fixes that should be in v3.0, or do I queue them up for
+> > >> > in S5P64X0,S5PV210 and S5PV310 it is at offset 25.
+> > >> >
+> > >>
+> > >> Then, Patches-1,2
+> > >>
+> > >> Acked-by: Jassi Brar <jassisinghbrar@gmail.com>
+> > >
+> > > Are these bug fixes that should be in v3.0, or do I queue them up for
 > v3.1?
->>
->> Regardless, this one touches a lot of arch/arm files, so I'd rather
->> see both patches go through the samsung tree:
->>
->> Acked-by: Grant Likely <grant.likely@secretlab.ca>
->>
->
+> >
+> > Regardless, this one touches a lot of arch/arm files, so I'd rather
+> > see both patches go through the samsung tree:
+> >
+> > Acked-by: Grant Likely <grant.likely@secretlab.ca>
+> >
+> 
 > Thanks Grant, Jassi and all,
->
+> 
 > I will apply these 1 and 2 in my -fix tree for 3.0 with your acks.
->
-> Thanks.
->
-> Best regards,
-> Kgene.
-> --
-> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-> SW Solution Development Team, Samsung Electronics Co., Ltd.
->
->
-These patches are based on new SPI code(on which I tried to make
-common dev-spi for all SoCs). SO I will remake these two patches based
-on old code and will send the same.
+> 
+Oops, this needs previous 'cleanup spi platform specific code' so can't
+apply -fix tree now.
 
-Thanks&Regards
-Padma
+Padmavathi, I will apply these 1 and 2 on -next for 3.1 after your updated
+'cleanup spi' patches...
+If any problems, please let me know.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
