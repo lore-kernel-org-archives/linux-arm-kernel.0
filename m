@@ -1,122 +1,53 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 4 Jul 2011 22:55:07 +0100
-Subject: Unnecessary cache-line flush on page table updates ?
-In-Reply-To: <20110704111338.GD8286@n2100.arm.linux.org.uk>
-References: <BANLkTin7aJXjpEH_WzJi5zaAtH8kFcTZeg@mail.gmail.com>
-	<20110701101019.GA1723@e102109-lin.cambridge.arm.com>
-	<BANLkTi=KVnzBKcd83c9T3P20VAv-ggqR4g@mail.gmail.com>
-	<20110704094531.GB19117@e102109-lin.cambridge.arm.com>
-	<20110704100221.GB8286@n2100.arm.linux.org.uk>
-	<20110704104329.GD19117@e102109-lin.cambridge.arm.com>
-	<20110704111338.GD8286@n2100.arm.linux.org.uk>
-Message-ID: <20110704215507.GH8286@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 4 Jul 2011 23:53:22 +0200
+Subject: [GIT PULL] arm soc tree, at91 patches for 3.0
+Message-ID: <201107042353.22970.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 04, 2011 at 12:13:38PM +0100, Russell King - ARM Linux wrote:
-> As far as the BTB goes, I wonder if we can postpone that for user TLB
-> ops by setting a TIF_ flag and checking that before returning to userspace.
-> That would avoid having to needlessly destroy the cached branch information
-> for kernel space while looping over the page tables.  The only other place
-> that needs to worry about that is module_alloc() and vmap/vmalloc with
-> PROT_KERNEL_EXEC, all of which can be done in flush_cache_vmap().
+Hi Linus,
 
-Actually, we don't need to do BTC invalidate in flush_cache_vmap(),
-but we do need to do a dsb+isb.
+This is the first pull request for the new arm-soc tree. These are all bug
+fixes for the at91 subarchitecture that we'd still like to see merged in 3.0.
 
-Firstly, the majority of mappings are created with NX set, so the BTC
-can't be involved in anything created there (as we can't execute code
-there.)
+	Arnd
 
-Secondly, if we're loading a code into kernel space to execute, then we
-need to ensure I/D coherency via flush_icache_range(), which has to
-happen after the mappings have been created, and this already does our
-BTC invalidate+dsb+isb.
+The following changes since commit c66a86d0cdce3bad2da794f114cc37377d242c3d:
 
-So, as far as kernel space TLB invalidation goes, my conclusion is that
-we do not have to touch the BTC at all there, and we can leave that to
-flush_icache_range() (and therefore cpu..coherent_kern_range) to deal
-with.
+  Merge branch 'drm-intel-fixes' of git://git.kernel.org/pub/scm/linux/kernel/git/keithp/linux-2.6 (2011-07-01 16:38:59 -0700)
 
-Practically, testing it out on Versatile Express loading/unloading a
-few modules shows no ill effects from dropping the BTC invalidates from
-the kernel TLB invalidate ops.
+are available in the git repository at:
 
-8<----------
-From: Russell King <rmk+kernel@arm.linux.org.uk>
-ARM: btc: avoid invalidating the branch target cache on kernel TLB maintanence
+  git+ssh://master.kernel.org/pub/scm/linux/kernel/git/arm/linux-2.6-arm-soc.git/ at91/fixes
 
-Kernel space needs very little in the way of BTC maintanence as most
-mappings which are created and destroyed are non-executable, and so
-could never enter the instruction stream.
+Jean-Christophe PLAGNIOL-VILLARD (3):
+      at91: fix at91_set_serial_console: use platform device id
+      atmel_serial: fix internal port num
+      at91: fix udc, ehci and mmc clock device name for cap9/9g45/9rl
 
-The case which does warrant BTC maintanence is when a module is loaded.
-This creates a new executable mapping, but at that point the pages have
-not been initialized with code and data, so at that point they contain
-unpredictable information.  Invalidating the BTC at this stage serves
-little useful purpose.
+Joachim Eastwood (1):
+      at91: Use "pclk" as con_id on at91cap9 and at91rm9200
 
-Before we execute module code, we call flush_icache_range(), which deals
-with the BTC maintanence requirements.  This ensures that we have a BTC
-maintanence operation before we execute code via the newly created
-mapping.
+Nicolas Ferre (1):
+      AT91: Change nand buswidth logic to match hardware default configuration
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/include/asm/tlbflush.h |   23 -----------------------
- arch/arm/mm/tlb-v6.S            |    1 -
- arch/arm/mm/tlb-v7.S            |    4 ----
- 3 files changed, 0 insertions(+), 28 deletions(-)
-
-diff --git a/arch/arm/include/asm/tlbflush.h b/arch/arm/include/asm/tlbflush.h
-index 9aeddce..3704d03 100644
---- a/arch/arm/include/asm/tlbflush.h
-+++ b/arch/arm/include/asm/tlbflush.h
-@@ -481,19 +481,6 @@ static inline void local_flush_tlb_kernel_page(unsigned long kaddr)
- 		asm("mcr p15, 0, %0, c8, c5, 1" : : "r" (kaddr) : "cc");
- 	if (tlb_flag(TLB_V7_UIS_PAGE))
- 		asm("mcr p15, 0, %0, c8, c3, 1" : : "r" (kaddr) : "cc");
--
--	if (tlb_flag(TLB_BTB)) {
--		/* flush the branch target cache */
--		asm("mcr p15, 0, %0, c7, c5, 6" : : "r" (zero) : "cc");
--		dsb();
--		isb();
--	}
--	if (tlb_flag(TLB_V7_IS_BTB)) {
--		/* flush the branch target cache */
--		asm("mcr p15, 0, %0, c7, c1, 6" : : "r" (zero) : "cc");
--		dsb();
--		isb();
--	}
- }
- 
- /*
-diff --git a/arch/arm/mm/tlb-v6.S b/arch/arm/mm/tlb-v6.S
-index 73d7d89..cdbfda5 100644
---- a/arch/arm/mm/tlb-v6.S
-+++ b/arch/arm/mm/tlb-v6.S
-@@ -83,7 +83,6 @@ ENTRY(v6wbi_flush_kern_tlb_range)
- 	add	r0, r0, #PAGE_SZ
- 	cmp	r0, r1
- 	blo	1b
--	mcr	p15, 0, r2, c7, c5, 6		@ flush BTAC/BTB
- 	mcr	p15, 0, r2, c7, c10, 4		@ data synchronization barrier
- 	mcr	p15, 0, r2, c7, c5, 4		@ prefetch flush
- 	mov	pc, lr
-diff --git a/arch/arm/mm/tlb-v7.S b/arch/arm/mm/tlb-v7.S
-index 53cd5b4..dc84f72 100644
---- a/arch/arm/mm/tlb-v7.S
-+++ b/arch/arm/mm/tlb-v7.S
-@@ -75,11 +75,7 @@ ENTRY(v7wbi_flush_kern_tlb_range)
- 	add	r0, r0, #PAGE_SZ
- 	cmp	r0, r1
- 	blo	1b
--	mov	r2, #0
--	ALT_SMP(mcr	p15, 0, r2, c7, c1, 6)	@ flush BTAC/BTB Inner Shareable
--	ALT_UP(mcr	p15, 0, r2, c7, c5, 6)	@ flush BTAC/BTB
- 	dsb
--	isb
- 	mov	pc, lr
- ENDPROC(v7wbi_flush_kern_tlb_range)
- 
+ arch/arm/mach-at91/at91cap9.c                |    8 ++++----
+ arch/arm/mach-at91/at91cap9_devices.c        |    2 +-
+ arch/arm/mach-at91/at91rm9200.c              |    6 +++---
+ arch/arm/mach-at91/at91rm9200_devices.c      |    2 +-
+ arch/arm/mach-at91/at91sam9260_devices.c     |    2 +-
+ arch/arm/mach-at91/at91sam9261_devices.c     |    2 +-
+ arch/arm/mach-at91/at91sam9263_devices.c     |    2 +-
+ arch/arm/mach-at91/at91sam9g45.c             |   10 +++++-----
+ arch/arm/mach-at91/at91sam9g45_devices.c     |    2 +-
+ arch/arm/mach-at91/at91sam9rl.c              |    4 ++--
+ arch/arm/mach-at91/at91sam9rl_devices.c      |    2 +-
+ arch/arm/mach-at91/board-cap9adk.c           |    2 +-
+ arch/arm/mach-at91/board-sam9260ek.c         |    2 +-
+ arch/arm/mach-at91/board-sam9261ek.c         |    2 +-
+ arch/arm/mach-at91/board-sam9263ek.c         |    2 +-
+ arch/arm/mach-at91/board-sam9g20ek.c         |    2 +-
+ arch/arm/mach-at91/board-sam9m10g45ek.c      |    2 +-
+ arch/arm/mach-at91/include/mach/system_rev.h |   10 +++++-----
+ drivers/tty/serial/atmel_serial.c            |    3 ++-
+ 19 files changed, 34 insertions(+), 33 deletions(-)
