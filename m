@@ -1,34 +1,27 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 04 Jul 2011 09:50:17 +0100
-Subject: [PATCH 08/10] ARM: dmabounce: correct unmap_single dev_dbg
-In-Reply-To: <20110704084711.GN21898@n2100.arm.linux.org.uk>
-References: <20110704084711.GN21898@n2100.arm.linux.org.uk>
-Message-ID: <E1QderB-0000ZZ-0A@rmk-PC.arm.linux.org.uk>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Mon, 4 Jul 2011 08:50:11 +0000 (UTC)
+Subject: [PATCH 1/3] PWM: add pwm framework support
+References: <1309430517-23821-2-git-send-email-s.hauer@pengutronix.de>
+	<BANLkTikQGFA7XcuAtEEi7_4m-j6-00sZ6Q@mail.gmail.com>
+	<201106301441.24493.arnd@arndb.de>
+	<BANLkTin_htv2z3D9Bbf6N8Y7UKFRvPtvOg@mail.gmail.com>
+	<20110630170229.GP6069@pengutronix.de> <4E0D0595.5070205@gmail.com>
+	<20110701073755.GR6069@pengutronix.de> <4E0D8540.2020200@gmail.com>
+	<20110701085414.GV6069@pengutronix.de> <4E0E6916.50406@gmail.com>
+	<20110704075556.GD6069@pengutronix.de>
+Message-ID: <iurus2$ias$1@dough.gmane.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DMA addresses should not be casted to void * for printing.  Fix
-that to be consistent with the rest of the file.
+Sascha Hauer wrote:
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/common/dmabounce.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+> I am tired of discussing this. It seems we can't agree and unless
+> someone else jumps in here we will probably have to wait for another
+> year until something moves in the PWM area.
 
-diff --git a/arch/arm/common/dmabounce.c b/arch/arm/common/dmabounce.c
-index b4a8759..4f13505 100644
---- a/arch/arm/common/dmabounce.c
-+++ b/arch/arm/common/dmabounce.c
-@@ -345,8 +345,8 @@ void __dma_unmap_page(struct device *dev, dma_addr_t dma_addr, size_t size,
- {
- 	struct safe_buffer *buf;
- 
--	dev_dbg(dev, "%s(ptr=%p,size=%d,dir=%x)\n",
--		__func__, (void *) dma_addr, size, dir);
-+	dev_dbg(dev, "%s(dma=%#x,size=%d,dir=%x)\n",
-+		__func__, dma_addr, size, dir);
- 
- 	buf = find_safe_buffer_dev(dev, dma_addr, __func__);
- 	if (!buf) {
+Please continue your work on PWM area! Patch reviews show a really
+positive attitute towards merging your patchset. Please don't stop here!
+
 -- 
-1.7.4.4
+With best wishes
+Dmitry
