@@ -1,55 +1,30 @@
-From: heechul@illinois.edu (heechul Yun)
-Date: Mon, 4 Jul 2011 07:59:59 -0700
-Subject: Unnecessary cache-line flush on page table updates ?
-In-Reply-To: <20110704094531.GB19117@e102109-lin.cambridge.arm.com>
-References: <BANLkTin7aJXjpEH_WzJi5zaAtH8kFcTZeg@mail.gmail.com>
-	<20110701101019.GA1723@e102109-lin.cambridge.arm.com>
-	<BANLkTi=KVnzBKcd83c9T3P20VAv-ggqR4g@mail.gmail.com>
-	<20110704094531.GB19117@e102109-lin.cambridge.arm.com>
-Message-ID: <CAN_5kQC3S+QB6MwNC0BUQ5_tqxrUmwKwN5pnPffBE=4V+9ZupQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 4 Jul 2011 17:13:23 +0200
+Subject: [PATCH for 3.0] AT91: Change nand buswidth logic to match
+	hardware default configuration
+In-Reply-To: <4E11D123.9070409@atmel.com>
+References: <1309515924-22531-1-git-send-email-nicolas.ferre@atmel.com>
+	<201107041625.25972.arnd@arndb.de> <4E11D123.9070409@atmel.com>
+Message-ID: <201107041713.23982.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 4, 2011 at 2:45 AM, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Fri, Jul 01, 2011 at 10:42:00PM +0100, heechul Yun wrote:
->> Great.
->>
->> Removing the PTE flush seems to have a noticeable performance
->> difference in my test. The followings are lmbench 3.0a performance
->> result measured on a Cortex A9 SMP platform. So far, I did not have
->> any problem while doing various test.
->>
->> =========
->> mm-patch:
->> =========
->> Pagefaults on /tmp/XXX: 3.0759 microseconds
->> Process fork+exit: 464.5414 microseconds
->> Process fork+execve: 785.4944 microseconds
->> Process fork+/bin/sh -c: 488.6204 microseconds
->>
->> =========
->> original:
->> =========
->> Pagefaults on /tmp/XXX: 3.6209 microseconds
->> Process fork+exit: 485.5236 microseconds
->> Process fork+execve: 820.0613 microseconds
->> Process fork+/bin/sh -c: 2966.3828 microseconds
->
-> Given these results, I think it's worth merging the patch. Can I add
-> your Tested-by?
+On Monday 04 July 2011, Nicolas Ferre wrote:
+> > In this case, studying the patch more closely shows that it's
+> > very harmless, but I'd rather not have to look that closely.
+> 
+> Well, in fact it is a fix against what was introduced in a 3.0 patch
+> which I found to be wrong.
+> The reason because I do not want to be in next kernel is the fact that
+> it can puzzle the user (people that want to use kernel without changing
+> the system_rev between 2.6.39 -> 3.0 and again revert their changes for
+> 3.0 -> 3.1).
+> 
+> > Am I correct that the bug is a regression against 2.6.39?
+> 
+> No, in fact it was introduced during 3.0 early -rc.
 
-Yes you can.
-I think this patch will be valuable for many applications (e.g.,
-server applications).
+That's what I mean by 'regression against 2.6.39': it was working in 2.6.39,
+but later kernels are broken without this fix.
 
-Heechul
-
->
-> I think there can be a few other optimisations in the TLB area but it
-> needs some digging.
->
-> Thanks.
->
-> --
-> Catalin
->
+	Arnd
