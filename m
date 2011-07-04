@@ -1,46 +1,45 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 04 Jul 2011 18:42:08 +0900
-Subject: [PATCH 4/7] ARM: EXYNOS4: Support early wakeup while entering
-	sleep mode
-In-Reply-To: <20110701074414.GD21898@n2100.arm.linux.org.uk>
-References: <1308732405-16664-1-git-send-email-kgene.kim@samsung.com>
-	<1308732405-16664-5-git-send-email-kgene.kim@samsung.com>
-	<20110622145715.GS23234@n2100.arm.linux.org.uk>
-	<007401cc3242$48947160$d9bd5420$%kim@samsung.com>
-	<20110624093750.GD23234@n2100.arm.linux.org.uk>
-	<20110624102246.GF23234@n2100.arm.linux.org.uk>
-	<017d01cc378a$c017edf0$4047c9d0$%kim@samsung.com>
-	<20110701074414.GD21898@n2100.arm.linux.org.uk>
-Message-ID: <005001cc3a2e$a6689480$f339bd80$%kim@samsung.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 4 Jul 2011 10:45:32 +0100
+Subject: Unnecessary cache-line flush on page table updates ?
+In-Reply-To: <BANLkTi=KVnzBKcd83c9T3P20VAv-ggqR4g@mail.gmail.com>
+References: <BANLkTin7aJXjpEH_WzJi5zaAtH8kFcTZeg@mail.gmail.com>
+	<20110701101019.GA1723@e102109-lin.cambridge.arm.com>
+	<BANLkTi=KVnzBKcd83c9T3P20VAv-ggqR4g@mail.gmail.com>
+Message-ID: <20110704094531.GB19117@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
+On Fri, Jul 01, 2011 at 10:42:00PM +0100, heechul Yun wrote:
+> Great.
 > 
-> On Fri, Jul 01, 2011 at 10:03:48AM +0900, Kukjin Kim wrote:
-> > Russell thanks.
-> >
-> > How do you think to add following for handling failure of cpu_suspend?
-> >
-> > +	mov	r0, #-1
+> Removing the PTE flush seems to have a noticeable performance
+> difference in my test. The followings are lmbench 3.0a performance
+> result measured on a Cortex A9 SMP platform. So far, I did not have
+> any problem while doing various test.
 > 
-> No.  -1 is not an error code, and I refuse to create functions which
-> use an explicit -1 as a return code to indicate failure.
+> =========
+> mm-patch:
+> =========
+> Pagefaults on /tmp/XXX: 3.0759 microseconds
+> Process fork+exit: 464.5414 microseconds
+> Process fork+execve: 785.4944 microseconds
+> Process fork+/bin/sh -c: 488.6204 microseconds
 > 
-I used wrong words, 'handling failure' :(
+> =========
+> original:
+> =========
+> Pagefaults on /tmp/XXX: 3.6209 microseconds
+> Process fork+exit: 485.5236 microseconds
+> Process fork+execve: 820.0613 microseconds
+> Process fork+/bin/sh -c: 2966.3828 microseconds
 
-Actually, it means handling other case, like early wakeup but we will
-address comments from you :)
+Given these results, I think it's worth merging the patch. Can I add
+your Tested-by?
 
-> The code is designed so that the called finisher function can return
-> a valid errno value.
-
-OK, I see.
+I think there can be a few other optimisations in the TLB area but it
+needs some digging.
 
 Thanks.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+-- 
+Catalin
