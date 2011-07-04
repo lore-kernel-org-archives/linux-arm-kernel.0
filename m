@@ -1,73 +1,98 @@
-From: rmallon@gmail.com (Ryan Mallon)
-Date: Mon, 04 Jul 2011 20:43:23 +1000
-Subject: [PATCH 1/3] PWM: add pwm framework support
-In-Reply-To: <20110704075556.GD6069@pengutronix.de>
-References: <1309430517-23821-2-git-send-email-s.hauer@pengutronix.de>
-	<BANLkTikQGFA7XcuAtEEi7_4m-j6-00sZ6Q@mail.gmail.com>
-	<201106301441.24493.arnd@arndb.de>
-	<BANLkTin_htv2z3D9Bbf6N8Y7UKFRvPtvOg@mail.gmail.com>
-	<20110630170229.GP6069@pengutronix.de> <4E0D0595.5070205@gmail.com>
-	<20110701073755.GR6069@pengutronix.de> <4E0D8540.2020200@gmail.com>
-	<20110701085414.GV6069@pengutronix.de> <4E0E6916.50406@gmail.com>
-	<20110704075556.GD6069@pengutronix.de>
-Message-ID: <4E11994B.7070103@gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 4 Jul 2011 11:43:29 +0100
+Subject: Unnecessary cache-line flush on page table updates ?
+In-Reply-To: <20110704100221.GB8286@n2100.arm.linux.org.uk>
+References: <BANLkTin7aJXjpEH_WzJi5zaAtH8kFcTZeg@mail.gmail.com>
+	<20110701101019.GA1723@e102109-lin.cambridge.arm.com>
+	<BANLkTi=KVnzBKcd83c9T3P20VAv-ggqR4g@mail.gmail.com>
+	<20110704094531.GB19117@e102109-lin.cambridge.arm.com>
+	<20110704100221.GB8286@n2100.arm.linux.org.uk>
+Message-ID: <20110704104329.GD19117@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/07/11 17:55, Sascha Hauer wrote:
-> I am tired of discussing this. It seems we can't agree and unless
-> someone else jumps in here we will probably have to wait for another
-> year until something moves in the PWM area.
+On Mon, Jul 04, 2011 at 11:02:21AM +0100, Russell King - ARM Linux wrote:
+> On Mon, Jul 04, 2011 at 10:45:32AM +0100, Catalin Marinas wrote:
+> > Given these results, I think it's worth merging the patch. Can I add
+> > your Tested-by?
+> 
+> If we're going to make this change to use the coherent information,
+> let's address all the places in one go, which are:
+> 
+>         clean_pmd_entry
+>         flush_pmd_entry
+>         clean_pte_table
+> 
+> These require a little more thought as we aren't guaranteed to have
+> ID_MMFR3 in place - maybe they should be callbacks into the per-CPU
+> code.
 
-If we are going to introduce a new framework for pwms then we should
-create one which meets the needs of at least all of the in kernel
-drivers. This patch series provides no solution for either the atmel or
-ep93xx drivers, so it is not a complete solution. At some point the
-api/framework _must_ be changed. If we can introduce transition layers
-then we should do that now so they we can provide a common framework
-along with some forward thinking about how the other drivers are going
-to be migrated to the new framework. This patch series doesn't even
-migrate _any_ of the existing drivers.
+For the first two, can we not clear the TLB_DCLEAN bit in
+__cpu_tlb_flags (only a single check at boot time?).
 
-It doesn't have to be an all or nothing approach. Possibly Bill's series
-is perhaps too involved by changing the api, introducing sysfs support
-and reworking the pwm users. But your series is at the opposite end of
-the spectrum. It does too little. It will take a few release cycles to
-get all of the existing drivers migrated and since we can't change the
-api until that happens the atmel and ep93xx drivers will take longer
-still. At the very least your series should migrate some of the drivers.
+For the last one, we could add a tlb_flags() check.
 
-The timeline argument is a bit poor. Yes, there has been discussion for
-a lengthy time about how the pwm api should be developed, but I think
-that is because it is non-trivial to come up with a framework which is
-good enough to support all of the pwm hardware (some of which is already
-in the mainline). Getting something merged now just because it can be
-done quickly is not a good idea if it all has to get reworked in the
-future so that it can support all the hardware.
+> It would also be a good idea to change the comment from "flush_pte"
+> to "Clean data cache to PoU".
 
-The pwm framework needs to incorporate at least the following:
- - sysfs access (ep93xx driver)
- - Multiple channels per device (atmel driver)
+OK.
 
-The mxs driver you introduce looks like it could be implemented as a
-single device (continuous mmio space) with multiple channels rather than
-the pwm core/driver approach you have. I also can't see anything in this
-patch set which hooks up the mxs pwms to an actual board (i.e. nothing
-calls mxs_add_mxs_pwm)?
+> > I think there can be a few other optimisations in the TLB area but it
+> > needs some digging.
+> 
+> The single-TLB model works fairly well, but as I thought the lack of
+> mcr%? processing by GCC makes the asm/tlbflush.h code fairly disgusting
+> even for a v6+v7 kernel.  Luckily, we can play some tricks and sort
+> some of that out.  The patch below is not complete (and can result in
+> some rules of the architecture being violated - namely the requirement
+> for an ISB after the BTB flush without a branch between) but it
+> illustrates the idea:
 
-The other nice things to have for the pwm framework are:
- - More fine grained control of pwms: pwm_period_ns, period_duty_ns, etc
- - Polarity control
- - Synchronisation support for multi-channel devices
- - Interrupt handler support
- - Sleeping vs non-sleeping configuration api
+I'm not sure about this rule, I can ask for some clarification (we are
+not changing the memory map of the branch we execute).
 
-The fine-grained control api could be added now. pwm_config could be
-left as is for the time being (the new api could be a wrapper around it
-to start with). Polarity control and interrupt handling apis could also
-be defined without affecting the drivers which don't need to implement
-them. Multiple channels and the sleeping/non-sleeping api are the more
-difficult ones, but at least having some sort of indication about how
-these plan to be solved would be useful.
+According to the ARM ARM, the TLB invalidation sequence should be:
 
-~Ryan
+STR rx, [Translation table entry]          ; write new entry to the translation table
+Clean cache line [Translation table entry] ; This operation is not required with the
+                                           ; Multiprocessing Extensions.
+DSB            ; ensures visibility of the data cleaned from the D Cache
+Invalidate TLB entry by MVA (and ASID if non-global) [page address]
+Invalidate BTC
+DSB            ; ensure completion of the Invalidate TLB operation
+ISB            ; ensure table changes visible to instruction fetch
+
+So we have a DSB and ISB (when we don't return to user) unconditionally.
+
+Starting with Cortex-A8 (well, unless you enable some errata
+workarounds), the BTB is a no-op anyway, so maybe we could have the BTB
+unconditionally as well (for ARMv6/v7). The only problem is the inner
+shareable if we are on SMP - maybe we can do some run-time code patching
+for it.
+
+> diff --git a/arch/arm/include/asm/tlbflush.h b/arch/arm/include/asm/tlbflush.h
+> index d2005de..252874c 100644
+> --- a/arch/arm/include/asm/tlbflush.h
+> +++ b/arch/arm/include/asm/tlbflush.h
+> @@ -34,15 +34,15 @@
+>  #define TLB_V6_D_ASID  (1 << 17)
+>  #define TLB_V6_I_ASID  (1 << 18)
+> 
+> -#define TLB_BTB                (1 << 28)
+> -
+>  /* Unified Inner Shareable TLB operations (ARMv7 MP extensions) */
+>  #define TLB_V7_UIS_PAGE        (1 << 19)
+>  #define TLB_V7_UIS_FULL (1 << 20)
+>  #define TLB_V7_UIS_ASID (1 << 21)
+> 
+>  /* Inner Shareable BTB operation (ARMv7 MP extensions) */
+> -#define TLB_V7_IS_BTB  (1 << 22)
+> +#define TLB_V7_IS_BTB  (1 << 26)
+> +#define TLB_BTB                (1 << 27)
+> +#define TLB_BTB_BARRIER        (1 << 28)
+
+I won't comment on the BTB changes until we clarify the conditionality
+of barriers and BTB.
+
+-- 
+Catalin
