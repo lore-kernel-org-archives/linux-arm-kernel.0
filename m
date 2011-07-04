@@ -1,84 +1,84 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 4 Jul 2011 00:58:02 -0600
-Subject: [PATCH 2/2] SPI: SAMSUNG: Bug fix for SPI with different FIFO
-	level
-In-Reply-To: <20110704065501.GP15152@ponder.secretlab.ca>
-References: <1309437536-9315-1-git-send-email-padma.v@samsung.com>
-	<1309437536-9315-2-git-send-email-padma.v@samsung.com>
-	<BANLkTi=L7QeN75ebWFXdp_V5Pw1zEc-ZtA@mail.gmail.com>
-	<BANLkTimeWUbD2Ej16KKmuzwSCFz8HOhyKQ@mail.gmail.com>
-	<BANLkTi=9c5asfr=Jg6xwjQZW_a369UO64Q@mail.gmail.com>
-	<BANLkTinFnFwBGi693JTD_iDykA2VkV+HOw@mail.gmail.com>
-	<BANLkTik0LERxBHmJc5ZnRotnD4CSveR-UQ@mail.gmail.com>
-	<BANLkTim9wdrqDgXVUjxzMv9cdWViLww=Bg@mail.gmail.com>
-	<BANLkTim40x4X_--K0z7gdodDjor0MUam5Q@mail.gmail.com>
-	<BANLkTinf6ec1yXeaFkZjHMnqZp7yymDq-w@mail.gmail.com>
-	<20110704065501.GP15152@ponder.secretlab.ca>
-Message-ID: <CACxGe6urrZ9=1OgcaYF6EtvJokAyFTbFCnHPWsCY+sETVze8-w@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 4 Jul 2011 09:28:51 +0200
+Subject: ASoC: imx dma tx burst size set to 6 and to 4 ?
+In-Reply-To: <4E0C16D9.4040909@televic.com>
+References: <4E0C16D9.4040909@televic.com>
+Message-ID: <20110704072851.GC9349@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 4, 2011 at 12:55 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
-> On Fri, Jul 01, 2011 at 11:43:08AM +0530, Jassi Brar wrote:
->> On Fri, Jul 1, 2011 at 11:29 AM, padma venkat <padma.kvr@gmail.com> wrote:
->> > Hi Jassi,
->> >
->> > On Fri, Jul 1, 2011 at 11:22 AM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
->> >> On Fri, Jul 1, 2011 at 11:16 AM, padma venkat <padma.kvr@gmail.com> wrote:
->> >>> Hi Tony,
->> >>>
->> >>> On Thu, Jun 30, 2011 at 4:30 PM, Tony Nadackal <tonykn@gmail.com> wrote:
->> >>>> Hi Padma,
->> >>>> With regards to your patch, even though one can check the tx done status
->> >>>> using the TX_DONE bit, the present macro itself would work perfectly fine if
->> >>>> the 'fifo_lvl_mask' is set properly.
->> >>>> For example in 6450 channel 1, the fifo_lvl_mask should be 0x1ff (for 9bits,
->> >>>> 15:23), while even in your patch, it is wrongly set as 0x7f(only 7bits).
->> >>>>
->> >>>> Thus, if this fifo_lvl_mask was defined correctly, the existing macro would
->> >>>> itself have worked.
->> >>> Thanks for your comment.
->> >>> I considered changing to the fifo_lvl_mask to 1ff as you mentioned.
->> >>> But I ?think that the fifo_lvl_mask reflects the actual FIFO capacity
->> >>> in the SPI driver.
->> >>> For the failing channels the FIFO trigger level is 64 bytes and so i
->> >>> retained that value.
->> >>> In the driver it polls till the FIFO capacity level otherwise it goes
->> >>> for DMA.So if we keep
->> >>> the FIFO level as 1ff when the actual capacity is 7f then it fails.
->> >>>
->> >>> Jassi what do you think about this?
->> >>>
->> >>
->> >> 'fifo_lvl_mask' is h/w specific and can't be set for convenience.
->> >>
->> >> I don't have access to post-s3c64xx datasheets.
->> >> Please check and reply if TX_DONE bit is at same offset for all
->> >> channels of an SoC, because
->> >> I suspect it's otherwise.
->> >>
->> > Yes. The TX_DONE bit is at the same offset for all the channels of an SoC.
->> > in S5P64X0,S5PV210 and S5PV310 it is at offset 25.
->> >
->>
->> Then, Patches-1,2
->>
->> Acked-by: Jassi Brar <jassisinghbrar@gmail.com>
->
-> Are these bug fixes that should be in v3.0, or do I queue them up for v3.1?
+(Added Javier to Cc)
 
-Regardless, this one touches a lot of arch/arm files, so I'd rather
-see both patches go through the samsung tree:
+On Thu, Jun 30, 2011 at 08:25:29AM +0200, Lambrecht J?rgen wrote:
+> Hello,
+> 
+> There is an inconsistency in this code:
+> 
+> /sound/soc/imx/imx-ssi.c:         ssi->dma_params_tx.burstsize = 4;
+> /sound/soc/imx/imx-pcm-dma-mx2.c: ssi->dma_params_tx.burstsize = 6;
+> 
+> Datasheet:
+> This sets the field TFWM0 in register SFCSR (SSI_SFCSR_TFWM0): the 
+> number of data words needed to set the empty flag (TFE0). Can be set 
+> from 1 to 8; FIFO size is 8 words (of 24b). And this is also the DMA 
+> burst size.
+> 
+> Which is best depends on the application (the higher the more efficient, 
+> but the more risk for a FIFO underrun). I would take 4.
+> 
+> But I guess it should only be set at 1 place, and what is then the best 
+> place?
 
-Acked-by: Grant Likely <grant.likely@secretlab.ca>
+We need different burstsize settings for the FIQ driver and for the DMA
+driver. For this reason the original intention was to set these values
+in sound/soc/imx/imx-pcm-dma-mx2.c and in sound/soc/imx/imx-pcm-fiq.c.
 
->
-> g.
->
->
 
+> commit 0a93421b6adf8ba127b3eafc4c16e3a14017e2ae
+> Author: Javier Martin <javier.martin@vista-silicon.com>
+> Date:   Tue Mar 1 15:02:06 2011 +0100
+> 
+>     ASoC: Fix burstsize and DSP_B format problems in imx-ssi.
+>     
+>     When choosing IMX_DMA flag, burtsizes are set to its default
+>     value (0) which leads to driver malfunction. Change them to 4.
+>     
+>     DSP_B interface needs additional flag to match DSP_B formats
+>     as described in several codecs as wm8741 and aic3205.
+>     
+>     Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
+>     Acked-by: Liam Girdwood <lrg@slimlogic.co.uk>
+>     Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> 
+> diff --git a/sound/soc/imx/imx-ssi.c b/sound/soc/imx/imx-ssi.c
+> index 30894ea..bc92ec6 100644
+> --- a/sound/soc/imx/imx-ssi.c
+> +++ b/sound/soc/imx/imx-ssi.c
+> @@ -108,7 +108,7 @@ static int imx_ssi_set_dai_fmt(struct snd_soc_dai *cpu_dai, unsigned int fmt)
+>  		break;
+>  	case SND_SOC_DAIFMT_DSP_B:
+>  		/* data on rising edge of bclk, frame high with data */
+> -		strcr |= SSI_STCR_TFSL;
+> +		strcr |= SSI_STCR_TFSL | SSI_STCR_TXBIT0;
+>  		break;
+>  	case SND_SOC_DAIFMT_DSP_A:
+>  		/* data on rising edge of bclk, frame high 1clk before data */
+> @@ -656,6 +656,9 @@ static int imx_ssi_probe(struct platform_device *pdev)
+>  	ssi->dma_params_rx.dma_addr = res->start + SSI_SRX0;
+>  	ssi->dma_params_tx.dma_addr = res->start + SSI_STX0;
+>  
+> +	ssi->dma_params_tx.burstsize = 4;
+> +	ssi->dma_params_rx.burstsize = 4;
+> +
+
+Javier, is this hunk necessary? From what I see these values should be
+overwritten later anyway.
+
+Sascha
 
 
 -- 
-Grant Likely, B.Sc., P.Eng.
-Secret Lab Technologies Ltd.
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
