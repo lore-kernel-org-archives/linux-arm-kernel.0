@@ -1,49 +1,55 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 04 Jul 2011 09:50:57 +0100
-Subject: [PATCH 10/10] ARM: dmabounce: no need to check dev->bus type in
-	needs_bounce function
-In-Reply-To: <20110704084711.GN21898@n2100.arm.linux.org.uk>
-References: <20110704084711.GN21898@n2100.arm.linux.org.uk>
-Message-ID: <E1Qderp-0000Zi-7l@rmk-PC.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 4 Jul 2011 01:55:04 -0700
+Subject: [PATCH] OMAP: hwmod: add kernel cmdline flag to avoid
+	resetting IP blocks during init
+In-Reply-To: <20110703010206.19046.85293.stgit@dusk>
+References: <20110703010204.19046.85186.stgit@dusk>
+	<20110703010206.19046.85293.stgit@dusk>
+Message-ID: <20110704085503.GQ23145@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the needs_bounce function is passed at DMA bounce register time,
-we already know what the device bus type is, so we don't need to check
-it each time the needs_bounce function is called.
+* Paul Walmsley <paul@pwsan.com> [110702 17:58]:
+> On some boards, it's not possible to reset certain IP blocks during
+> kernel initialization.  Some boards connect GPIO lines to external
+> voltage controllers, so resetting them may cause voltage to drop on a
+> critical supply[1].  Other boards connect GPIO lines to reset pins on
+> external devices without open documentation, so if the GPIO blocks are
+> reset, the external devices cannot currently be reconfigured[2].
+> 
+> The correct way to fix these issues on OMAP is to add a
+> hwmod_no_setup_reset(hwmod) call to the board file, that references
+> the IP block that must preserve its state.  This allows the OMAP core
+> code to reset the remaining IP blocks.
+> 
+> However, during initial bring-up of a new board, it may be desirable
+> to not reset any IP block, for ease of debugging.  This patch adds a
+> kernel command line parameter, 'hwmod_no_setup_reset', that prevents
+> the OMAP hwmod code from resetting any IP block during init.
+> 
+> 1. Nayak, Rajendra.  _[PATCH 7/7] 4460sdp/blaze/panda: hwmod: Prevent
+>    gpio1 reset during hwmod init_.  1 July 2011.  E-mail to the
+>    linux-omap at vger.kernel.org mailing list.  Retrieved from
+>    http://www.mail-archive.com/linux-omap at vger.kernel.org/msg51992.html
+> 
+> 2. Buesch, Michael.  _Nokia n810 LCD (MIPID/blizzard) on 2.6.38_.  28
+>    Feb 2011.  E-mail to the linux-omap at vger.kernel.org mailing list.
+>    Retrieved from http://www.spinics.net/lists/linux-omap/msg47277.html
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/common/it8152.c          |    3 +--
- arch/arm/mach-ixp4xx/common-pci.c |    2 +-
- 2 files changed, 2 insertions(+), 3 deletions(-)
+Also related is the gptimer12 on secure omaps as reported by Aaro.
+ 
+> +	hwmod_no_setup_reset
+> +			[OMAP] During kernel initialization,
+> +			prevent the subarchitecture code from resetting
+> +			IP blocks before the driver loads.  Useful for
+> +			initial bring-up of boards which require some
+> +			bootloader configuration to be retained on GPIO or
+> +			other IP blocks.
+> +
 
-diff --git a/arch/arm/common/it8152.c b/arch/arm/common/it8152.c
-index 80b49e1..14ad62e 100644
---- a/arch/arm/common/it8152.c
-+++ b/arch/arm/common/it8152.c
-@@ -247,8 +247,7 @@ static int it8152_needs_bounce(struct device *dev, dma_addr_t dma_addr, size_t s
- {
- 	dev_dbg(dev, "%s: dma_addr %08x, size %08x\n",
- 		__func__, dma_addr, size);
--	return dev->bus == &pci_bus_type &&
--		(dma_addr + size - PHYS_OFFSET) >= SZ_64M;
-+	return (dma_addr + size - PHYS_OFFSET) >= SZ_64M;
- }
- 
- /*
-diff --git a/arch/arm/mach-ixp4xx/common-pci.c b/arch/arm/mach-ixp4xx/common-pci.c
-index d7db10c..e2e98bb 100644
---- a/arch/arm/mach-ixp4xx/common-pci.c
-+++ b/arch/arm/mach-ixp4xx/common-pci.c
-@@ -318,7 +318,7 @@ static int abort_handler(unsigned long addr, unsigned int fsr, struct pt_regs *r
- 
- static int ixp4xx_needs_bounce(struct device *dev, dma_addr_t dma_addr, size_t size)
- {
--	return dev->bus == &pci_bus_type && (dma_addr + size) >= SZ_64M;
-+	return (dma_addr + size) >= SZ_64M;
- }
- 
- /*
--- 
-1.7.4.4
+How about just make it hwmod_reset=1 with 0 being the default value
+for now?
+
+Regards,
+
+Tony
