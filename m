@@ -1,46 +1,32 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Mon, 4 Jul 2011 13:55:51 +0200
-Subject: [RFC PATCH 0/3] base board consolidation
-In-Reply-To: <20110704103820.GC8286@n2100.arm.linux.org.uk>
-References: <20110701094403.GT11559@pengutronix.de>
-	<CACTFLAPsaiF8KEXeDGOX72dcAvzegHDUQcPEPNxywwYewrHsUw@mail.gmail.com>
-	<20110704103820.GC8286@n2100.arm.linux.org.uk>
-Message-ID: <201107041355.52025.marek.vasut@gmail.com>
+From: padma.v@samsung.com (Padmavathi Venna)
+Date: Mon, 04 Jul 2011 13:44:35 -0400
+Subject: [PATCH 1/2] SPI: S5PC100: Enable the SPI driver for S5PC100
+Message-ID: <1309801476-29678-1-git-send-email-padma.v@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, July 04, 2011 12:38:20 PM Russell King - ARM Linux wrote:
-> On Mon, Jul 04, 2011 at 12:20:08PM +0200, Daniel Mack wrote:
-> > Yes, I would also much more like to see these boards being supported
-> > by DT, and eventually, we can probably provide static tree definitions
-> > for these boards and get rid of the whole code entirely.
-> 
-> While some of that can be done, I think the idea of getting rid of all
-> the code is a pipedream - things like detecting the LCD panel is
-> something which has to be in code.
-> 
-> Having separate DT blobs because you happen to have connected a different
-> LCD display is not sane when you can detect the LCD type at run time -
-> from either the support perspective or the maintainence perspective.
-> 
-> There's also a similar issue where the ethernet controller may be of
-> two different types, which can only be detected at runtime - and again
-> having different DT blobs would be a nightmare.
+From: padmavathi venna <padma.v@samsung.com>
 
-Which leads me to a question (likely quite off-topic here). Working on a pxa-
-device tree support, there're a lot of procedures called during init doing 
-exactly this -- how do you handle this via device tree ? Is there any way to 
-call them ? Or does the kernel need to patch device tree on run-time ? Or how?
+The SPI module on S5PC100 is similar to the earlier Samsung SoCs like
+S3C64XX. Enable the existing SPI driver for use on S5PC100.
 
-Thanks
-> 
-> With that alone, you're talking about 10 different DT blobs (5 different
-> CLCD panel configs + 2 ethernet configs) for just one Realview board.
-> 
-> There's also the matter of the platform specific registers setting the
-> clock speed for the SP804 timers.
-> 
-> So no, I don't think that we'll ever get rid of all the code for ARMs
-> development platforms without losing functionality/utility, but we should
-> be able to get rid of quite an amount like I've already done by
-> consolidating across the entire set with plat-versatile.
+Signed-off-by: padmavathi venna <padma.v@samsung.com>
+---
+ drivers/spi/Kconfig |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
+index de35c3a..91d607b 100644
+--- a/drivers/spi/Kconfig
++++ b/drivers/spi/Kconfig
+@@ -340,7 +340,7 @@ config SPI_S3C24XX_GPIO
+ 
+ config SPI_S3C64XX
+ 	tristate "Samsung S3C64XX series type SPI"
+-	depends on (ARCH_S3C64XX || ARCH_S5P64X0)
++	depends on (ARCH_S3C64XX || ARCH_S5P64X0 || ARCH_S5PC100)
+ 	select S3C64XX_DMA if ARCH_S3C64XX
+ 	help
+ 	  SPI driver for Samsung S3C64XX and newer SoCs.
+-- 
+1.7.0.4
