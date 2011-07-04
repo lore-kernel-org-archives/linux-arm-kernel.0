@@ -1,101 +1,23 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 4 Jul 2011 11:10:27 +0200
-Subject: [PATCH 2/2] serial/imx: add device tree probe support
-In-Reply-To: <20110704090527.GF10245@S2100-06.ap.freescale.net>
-References: <1309679760-22796-1-git-send-email-shawn.guo@linaro.org>
-	<1309679760-22796-3-git-send-email-shawn.guo@linaro.org>
-	<20110704065820.GY6069@pengutronix.de>
-	<20110704073826.GC4338@pengutronix.de>
-	<20110704090527.GF10245@S2100-06.ap.freescale.net>
-Message-ID: <20110704091027.GG4338@pengutronix.de>
+From: christian.glindkamp@taskit.de (Christian Glindkamp)
+Date: Mon, 4 Jul 2011 11:19:31 +0200
+Subject: [PATCH 2/8] at91: factorize at91 interrupts init to soc
+In-Reply-To: <1309502682-16897-2-git-send-email-plagnioj@jcrosoft.com>
+References: <1309502682-16897-1-git-send-email-plagnioj@jcrosoft.com>
+	<1309502682-16897-2-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <20110704091931.GB5509@taskit.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 04, 2011 at 05:05:27PM +0800, Shawn Guo wrote:
-> On Mon, Jul 04, 2011 at 09:38:26AM +0200, Uwe Kleine-K?nig wrote:
-> > On Mon, Jul 04, 2011 at 08:58:20AM +0200, Sascha Hauer wrote:
-> > > On Sun, Jul 03, 2011 at 03:56:00PM +0800, Shawn Guo wrote:
-> > > > It adds device tree probe support for imx tty/serial driver.
-> > > > 
-> > > > Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
-> > > > Signed-off-by: Jason Liu <jason.hui@linaro.org>
-> > > > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > > > Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> > > > Cc: Alan Cox <alan@lxorguk.ukuu.org.uk>
-> > > > Cc: Grant Likely <grant.likely@secretlab.ca>
-> > > > ---
-> > > >  .../bindings/tty/serial/fsl-imx-uart.txt           |   19 +++++
-> > > >  drivers/tty/serial/imx.c                           |   82 +++++++++++++++++---
-> > > >  2 files changed, 91 insertions(+), 10 deletions(-)
-> > > >  create mode 100644 Documentation/devicetree/bindings/tty/serial/fsl-imx-uart.txt
-> > > > 
-> > > > diff --git a/Documentation/devicetree/bindings/tty/serial/fsl-imx-uart.txt b/Documentation/devicetree/bindings/tty/serial/fsl-imx-uart.txt
-> > > > new file mode 100644
-> > > > index 0000000..a9c0406
-> > > > --- /dev/null
-> > > > +++ b/Documentation/devicetree/bindings/tty/serial/fsl-imx-uart.txt
-> > > > @@ -0,0 +1,19 @@
-> > > > +* Freescale i.MX Universal Asynchronous Receiver/Transmitter (UART)
-> > > > +
-> > > > +Required properties:
-> > > > +- compatible : Should be "fsl,<soc>-uart"
-> > > > +- reg : Address and length of the register set for the device
-> > > > +- interrupts : Should contain uart interrupt
-> > > > +
-> > > > +Optional properties:
-> > > > +- fsl,uart-has-rtscts : Indicate the uart has rts and cts
-> > > > +- fsl,irda-mode : Indicate the uart supports irda mode
-> > > > +
-> > > > +Example:
-> > > > +
-> > > > +uart at 73fbc000 {
-> > > > +	compatible = "fsl,imx51-uart", "fsl,imx21-uart";
-> > > > +	reg = <0x73fbc000 0x4000>;
-> > > > +	interrupts = <31>;
-> > > > +	fsl,uart-has-rtscts;
-> > > > +};
-> > > > diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-> > > > index 983f3bd..483c447 100644
-> > > > --- a/drivers/tty/serial/imx.c
-> > > > +++ b/drivers/tty/serial/imx.c
-> > > > @@ -45,6 +45,8 @@
-> > > >  #include <linux/delay.h>
-> > > >  #include <linux/rational.h>
-> > > >  #include <linux/slab.h>
-> > > > +#include <linux/of.h>
-> > > > +#include <linux/of_device.h>
-> > > >  
-> > > >  #include <asm/io.h>
-> > > >  #include <asm/irq.h>
-> > > > @@ -239,6 +241,12 @@ static struct platform_device_id imx_uart_devtype[] = {
-> > > >  	}
-> > > >  };
-> > > >  
-> > > > +static struct of_device_id imx_uart_dt_ids[] = {
-> > > > +	{ .compatible = "fsl,imx1-uart", .data = &imx_uart_devdata[IMX1_UART], },
-> > > > +	{ .compatible = "fsl,imx21-uart", .data = &imx_uart_devdata[IMX2_UART], },
-> > > > +	{ /* sentinel */ },
-> > > > +};
-> > > 
-> > > Isn't this table a bit too small? What about the other SoCs?
-> > I'd expect that using fsl,imx21-uart on imx51 would result in a working
-> > port, but it feels stange and if that's the intention the example above
-> > needs fixing.
-> > 
-> Here is what I have in dts file for uart.  The 'compatible' tells
-> that it's a imx51-uart and compatible with imx21-uart.
+On 2011-07-01 08:44, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> they are the same except the default priority
 > 
-> uart0: uart at 73fbc000 {
-> 	compatible = "fsl,imx51-uart", "fsl,imx21-uart";
-> 	reg = <0x73fbc000 0x4000>;
-> 	interrupts = <31>;
-> 	fsl,uart-has-rtscts;
-> };
-/me learned something new about dt. Sorry for the noise.
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Cc: Patrice Vilchez <patrice.vilchez@atmel.com>
+> ---
+>  arch/arm/mach-at91/board-gsia18s.c      |    5 -----
+>  arch/arm/mach-at91/board-pcontrol-g20.c |    7 -------
+>  arch/arm/mach-at91/board-stamp9g20.c    |    6 ------
 
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Aren't you breaking these boards? You remove their init_irq function
+without updating the machine structure.
