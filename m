@@ -1,348 +1,528 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Mon,  4 Jul 2011 18:49:45 +0200
-Subject: [PATCH v5] Add ARM cpu topology definition
-Message-ID: <1309798185-1984-1-git-send-email-vincent.guittot@linaro.org>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 5 Jul 2011 00:56:29 +0800
+Subject: [PATCH 1/2] gpio/mxc: get rid of the uses of cpu_is_mx()
+In-Reply-To: <20110704061028.GE15152@ponder.secretlab.ca>
+References: <1309681017-22970-1-git-send-email-shawn.guo@linaro.org>
+	<1309681017-22970-2-git-send-email-shawn.guo@linaro.org>
+	<20110704061028.GE15152@ponder.secretlab.ca>
+Message-ID: <20110704165627.GA10594@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The affinity between ARM processors is defined in the MPIDR register.
-We can identify which processors are in the same cluster,
-and which ones have performance interdependency. We can define the
-cpu topology of ARM platform, that is then used by sched_mc and sched_smt.
+On Mon, Jul 04, 2011 at 12:10:28AM -0600, Grant Likely wrote:
+> On Sun, Jul 03, 2011 at 04:16:56PM +0800, Shawn Guo wrote:
+> > The patch removes all the uses of cpu_is_mx().  Instead, it utilizes
+> > platform_device_id to distinguish the gpio differences among SoCs.
+> > 
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > Cc: Grant Likely <grant.likely@secretlab.ca>
+> > Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> > ---
+> >  arch/arm/mach-imx/mm-imx1.c                   |    8 +-
+> >  arch/arm/mach-imx/mm-imx21.c                  |   12 +-
+> >  arch/arm/mach-imx/mm-imx25.c                  |    8 +-
+> >  arch/arm/mach-imx/mm-imx27.c                  |   12 +-
+> >  arch/arm/mach-imx/mm-imx31.c                  |    6 +-
+> >  arch/arm/mach-imx/mm-imx35.c                  |    6 +-
+> >  arch/arm/mach-mx5/mm-mx50.c                   |   12 +-
+> >  arch/arm/mach-mx5/mm.c                        |   22 ++--
+> >  arch/arm/plat-mxc/devices/platform-gpio-mxc.c |    4 +-
+> >  arch/arm/plat-mxc/include/mach/common.h       |    2 +-
+> >  drivers/gpio/gpio-mxc.c                       |  123 +++++++++++++++++++++----
+> >  11 files changed, 151 insertions(+), 64 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-imx/mm-imx1.c b/arch/arm/mach-imx/mm-imx1.c
+> > index f2a6566..2bded59 100644
+> > --- a/arch/arm/mach-imx/mm-imx1.c
+> > +++ b/arch/arm/mach-imx/mm-imx1.c
+> > @@ -50,12 +50,12 @@ void __init mx1_init_irq(void)
+> >  
+> >  void __init imx1_soc_init(void)
+> >  {
+> > -	mxc_register_gpio(0, MX1_GPIO1_BASE_ADDR, SZ_256,
+> > +	mxc_register_gpio("imx1-gpio", 0, MX1_GPIO1_BASE_ADDR, SZ_256,
+> >  						MX1_GPIO_INT_PORTA, 0);
+> > -	mxc_register_gpio(1, MX1_GPIO2_BASE_ADDR, SZ_256,
+> > +	mxc_register_gpio("imx1-gpio", 1, MX1_GPIO2_BASE_ADDR, SZ_256,
+> >  						MX1_GPIO_INT_PORTB, 0);
+> > -	mxc_register_gpio(2, MX1_GPIO3_BASE_ADDR, SZ_256,
+> > +	mxc_register_gpio("imx1-gpio", 2, MX1_GPIO3_BASE_ADDR, SZ_256,
+> >  						MX1_GPIO_INT_PORTC, 0);
+> > -	mxc_register_gpio(3, MX1_GPIO4_BASE_ADDR, SZ_256,
+> > +	mxc_register_gpio("imx1-gpio", 3, MX1_GPIO4_BASE_ADDR, SZ_256,
+> >  						MX1_GPIO_INT_PORTD, 0);
+> >  }
+> > diff --git a/arch/arm/mach-imx/mm-imx21.c b/arch/arm/mach-imx/mm-imx21.c
+> > index 4f32a8a..d02e20d 100644
+> > --- a/arch/arm/mach-imx/mm-imx21.c
+> > +++ b/arch/arm/mach-imx/mm-imx21.c
+> > @@ -77,12 +77,12 @@ void __init mx21_init_irq(void)
+> >  
+> >  void __init imx21_soc_init(void)
+> >  {
+> > -	mxc_register_gpio(0, MX21_GPIO1_BASE_ADDR, SZ_256, MX21_INT_GPIO, 0);
+> > -	mxc_register_gpio(1, MX21_GPIO2_BASE_ADDR, SZ_256, MX21_INT_GPIO, 0);
+> > -	mxc_register_gpio(2, MX21_GPIO3_BASE_ADDR, SZ_256, MX21_INT_GPIO, 0);
+> > -	mxc_register_gpio(3, MX21_GPIO4_BASE_ADDR, SZ_256, MX21_INT_GPIO, 0);
+> > -	mxc_register_gpio(4, MX21_GPIO5_BASE_ADDR, SZ_256, MX21_INT_GPIO, 0);
+> > -	mxc_register_gpio(5, MX21_GPIO6_BASE_ADDR, SZ_256, MX21_INT_GPIO, 0);
+> > +	mxc_register_gpio("imx2-gpio", 0, MX21_GPIO1_BASE_ADDR, SZ_256, MX21_INT_GPIO, 0);
+> > +	mxc_register_gpio("imx2-gpio", 1, MX21_GPIO2_BASE_ADDR, SZ_256, MX21_INT_GPIO, 0);
+> > +	mxc_register_gpio("imx2-gpio", 2, MX21_GPIO3_BASE_ADDR, SZ_256, MX21_INT_GPIO, 0);
+> > +	mxc_register_gpio("imx2-gpio", 3, MX21_GPIO4_BASE_ADDR, SZ_256, MX21_INT_GPIO, 0);
+> > +	mxc_register_gpio("imx2-gpio", 4, MX21_GPIO5_BASE_ADDR, SZ_256, MX21_INT_GPIO, 0);
+> > +	mxc_register_gpio("imx2-gpio", 5, MX21_GPIO6_BASE_ADDR, SZ_256, MX21_INT_GPIO, 0);
+> >  
+> >  	imx_add_imx_dma();
+> >  }
+> > diff --git a/arch/arm/mach-imx/mm-imx25.c b/arch/arm/mach-imx/mm-imx25.c
+> > index 1e0c956..bbe93a5 100644
+> > --- a/arch/arm/mach-imx/mm-imx25.c
+> > +++ b/arch/arm/mach-imx/mm-imx25.c
+> > @@ -86,10 +86,10 @@ static struct sdma_platform_data imx25_sdma_pdata __initdata = {
+> >  
+> >  void __init imx25_soc_init(void)
+> >  {
+> > -	mxc_register_gpio(0, MX25_GPIO1_BASE_ADDR, SZ_16K, MX25_INT_GPIO1, 0);
+> > -	mxc_register_gpio(1, MX25_GPIO2_BASE_ADDR, SZ_16K, MX25_INT_GPIO2, 0);
+> > -	mxc_register_gpio(2, MX25_GPIO3_BASE_ADDR, SZ_16K, MX25_INT_GPIO3, 0);
+> > -	mxc_register_gpio(3, MX25_GPIO4_BASE_ADDR, SZ_16K, MX25_INT_GPIO4, 0);
+> > +	mxc_register_gpio("imx-gpio", 0, MX25_GPIO1_BASE_ADDR, SZ_16K, MX25_INT_GPIO1, 0);
+> > +	mxc_register_gpio("imx-gpio", 1, MX25_GPIO2_BASE_ADDR, SZ_16K, MX25_INT_GPIO2, 0);
+> > +	mxc_register_gpio("imx-gpio", 2, MX25_GPIO3_BASE_ADDR, SZ_16K, MX25_INT_GPIO3, 0);
+> > +	mxc_register_gpio("imx-gpio", 3, MX25_GPIO4_BASE_ADDR, SZ_16K, MX25_INT_GPIO4, 0);
+> >  
+> >  	imx_add_imx_sdma(MX25_SDMA_BASE_ADDR, MX25_INT_SDMA, &imx25_sdma_pdata);
+> >  }
+> > diff --git a/arch/arm/mach-imx/mm-imx27.c b/arch/arm/mach-imx/mm-imx27.c
+> > index 944e02d..5a62969 100644
+> > --- a/arch/arm/mach-imx/mm-imx27.c
+> > +++ b/arch/arm/mach-imx/mm-imx27.c
+> > @@ -77,12 +77,12 @@ void __init mx27_init_irq(void)
+> >  
+> >  void __init imx27_soc_init(void)
+> >  {
+> > -	mxc_register_gpio(0, MX27_GPIO1_BASE_ADDR, SZ_256, MX27_INT_GPIO, 0);
+> > -	mxc_register_gpio(1, MX27_GPIO2_BASE_ADDR, SZ_256, MX27_INT_GPIO, 0);
+> > -	mxc_register_gpio(2, MX27_GPIO3_BASE_ADDR, SZ_256, MX27_INT_GPIO, 0);
+> > -	mxc_register_gpio(3, MX27_GPIO4_BASE_ADDR, SZ_256, MX27_INT_GPIO, 0);
+> > -	mxc_register_gpio(4, MX27_GPIO5_BASE_ADDR, SZ_256, MX27_INT_GPIO, 0);
+> > -	mxc_register_gpio(5, MX27_GPIO6_BASE_ADDR, SZ_256, MX27_INT_GPIO, 0);
+> > +	mxc_register_gpio("imx2-gpio", 0, MX27_GPIO1_BASE_ADDR, SZ_256, MX27_INT_GPIO, 0);
+> > +	mxc_register_gpio("imx2-gpio", 1, MX27_GPIO2_BASE_ADDR, SZ_256, MX27_INT_GPIO, 0);
+> > +	mxc_register_gpio("imx2-gpio", 2, MX27_GPIO3_BASE_ADDR, SZ_256, MX27_INT_GPIO, 0);
+> > +	mxc_register_gpio("imx2-gpio", 3, MX27_GPIO4_BASE_ADDR, SZ_256, MX27_INT_GPIO, 0);
+> > +	mxc_register_gpio("imx2-gpio", 4, MX27_GPIO5_BASE_ADDR, SZ_256, MX27_INT_GPIO, 0);
+> > +	mxc_register_gpio("imx2-gpio", 5, MX27_GPIO6_BASE_ADDR, SZ_256, MX27_INT_GPIO, 0);
+> >  
+> >  	imx_add_imx_dma();
+> >  }
+> > diff --git a/arch/arm/mach-imx/mm-imx31.c b/arch/arm/mach-imx/mm-imx31.c
+> > index a1ff96f..7017c4a 100644
+> > --- a/arch/arm/mach-imx/mm-imx31.c
+> > +++ b/arch/arm/mach-imx/mm-imx31.c
+> > @@ -78,9 +78,9 @@ void __init imx31_soc_init(void)
+> >  {
+> >  	int to_version = mx31_revision() >> 4;
+> >  
+> > -	mxc_register_gpio(0, MX31_GPIO1_BASE_ADDR, SZ_16K, MX31_INT_GPIO1, 0);
+> > -	mxc_register_gpio(1, MX31_GPIO2_BASE_ADDR, SZ_16K, MX31_INT_GPIO2, 0);
+> > -	mxc_register_gpio(2, MX31_GPIO3_BASE_ADDR, SZ_16K, MX31_INT_GPIO3, 0);
+> > +	mxc_register_gpio("imx-gpio", 0, MX31_GPIO1_BASE_ADDR, SZ_16K, MX31_INT_GPIO1, 0);
+> > +	mxc_register_gpio("imx-gpio", 1, MX31_GPIO2_BASE_ADDR, SZ_16K, MX31_INT_GPIO2, 0);
+> > +	mxc_register_gpio("imx-gpio", 2, MX31_GPIO3_BASE_ADDR, SZ_16K, MX31_INT_GPIO3, 0);
+> >  
+> >  	if (to_version == 1) {
+> >  		strncpy(imx31_sdma_pdata.fw_name, "sdma-imx31-to1.bin",
+> > diff --git a/arch/arm/mach-imx/mm-imx35.c b/arch/arm/mach-imx/mm-imx35.c
+> > index da530ca..568a5c6 100644
+> > --- a/arch/arm/mach-imx/mm-imx35.c
+> > +++ b/arch/arm/mach-imx/mm-imx35.c
+> > @@ -95,9 +95,9 @@ void __init imx35_soc_init(void)
+> >  {
+> >  	int to_version = mx35_revision() >> 4;
+> >  
+> > -	mxc_register_gpio(0, MX35_GPIO1_BASE_ADDR, SZ_16K, MX35_INT_GPIO1, 0);
+> > -	mxc_register_gpio(1, MX35_GPIO2_BASE_ADDR, SZ_16K, MX35_INT_GPIO2, 0);
+> > -	mxc_register_gpio(2, MX35_GPIO3_BASE_ADDR, SZ_16K, MX35_INT_GPIO3, 0);
+> > +	mxc_register_gpio("imx-gpio", 0, MX35_GPIO1_BASE_ADDR, SZ_16K, MX35_INT_GPIO1, 0);
+> > +	mxc_register_gpio("imx-gpio", 1, MX35_GPIO2_BASE_ADDR, SZ_16K, MX35_INT_GPIO2, 0);
+> > +	mxc_register_gpio("imx-gpio", 2, MX35_GPIO3_BASE_ADDR, SZ_16K, MX35_INT_GPIO3, 0);
+> >  
+> >  	if (to_version == 1) {
+> >  		strncpy(imx35_sdma_pdata.fw_name, "sdma-imx35-to1.bin",
+> > diff --git a/arch/arm/mach-mx5/mm-mx50.c b/arch/arm/mach-mx5/mm-mx50.c
+> > index 28c3f60..39e4a17 100644
+> > --- a/arch/arm/mach-mx5/mm-mx50.c
+> > +++ b/arch/arm/mach-mx5/mm-mx50.c
+> > @@ -62,10 +62,10 @@ void __init mx50_init_irq(void)
+> >  
+> >  void __init imx50_soc_init(void)
+> >  {
+> > -	mxc_register_gpio(0, MX50_GPIO1_BASE_ADDR, SZ_16K, MX50_INT_GPIO1_LOW, MX50_INT_GPIO1_HIGH);
+> > -	mxc_register_gpio(1, MX50_GPIO2_BASE_ADDR, SZ_16K, MX50_INT_GPIO2_LOW, MX50_INT_GPIO2_HIGH);
+> > -	mxc_register_gpio(2, MX50_GPIO3_BASE_ADDR, SZ_16K, MX50_INT_GPIO3_LOW, MX50_INT_GPIO3_HIGH);
+> > -	mxc_register_gpio(3, MX50_GPIO4_BASE_ADDR, SZ_16K, MX50_INT_GPIO4_LOW, MX50_INT_GPIO4_HIGH);
+> > -	mxc_register_gpio(4, MX50_GPIO5_BASE_ADDR, SZ_16K, MX50_INT_GPIO5_LOW, MX50_INT_GPIO5_HIGH);
+> > -	mxc_register_gpio(5, MX50_GPIO6_BASE_ADDR, SZ_16K, MX50_INT_GPIO6_LOW, MX50_INT_GPIO6_HIGH);
+> > +	mxc_register_gpio("imx-gpio", 0, MX50_GPIO1_BASE_ADDR, SZ_16K, MX50_INT_GPIO1_LOW, MX50_INT_GPIO1_HIGH);
+> > +	mxc_register_gpio("imx-gpio", 1, MX50_GPIO2_BASE_ADDR, SZ_16K, MX50_INT_GPIO2_LOW, MX50_INT_GPIO2_HIGH);
+> > +	mxc_register_gpio("imx-gpio", 2, MX50_GPIO3_BASE_ADDR, SZ_16K, MX50_INT_GPIO3_LOW, MX50_INT_GPIO3_HIGH);
+> > +	mxc_register_gpio("imx-gpio", 3, MX50_GPIO4_BASE_ADDR, SZ_16K, MX50_INT_GPIO4_LOW, MX50_INT_GPIO4_HIGH);
+> > +	mxc_register_gpio("imx-gpio", 4, MX50_GPIO5_BASE_ADDR, SZ_16K, MX50_INT_GPIO5_LOW, MX50_INT_GPIO5_HIGH);
+> > +	mxc_register_gpio("imx-gpio", 5, MX50_GPIO6_BASE_ADDR, SZ_16K, MX50_INT_GPIO6_LOW, MX50_INT_GPIO6_HIGH);
+> >  }
+> > diff --git a/arch/arm/mach-mx5/mm.c b/arch/arm/mach-mx5/mm.c
+> > index 1b7059f..1444140 100644
+> > --- a/arch/arm/mach-mx5/mm.c
+> > +++ b/arch/arm/mach-mx5/mm.c
+> > @@ -142,23 +142,23 @@ static struct sdma_platform_data imx53_sdma_pdata __initdata = {
+> >  
+> >  void __init imx51_soc_init(void)
+> >  {
+> > -	mxc_register_gpio(0, MX51_GPIO1_BASE_ADDR, SZ_16K, MX51_MXC_INT_GPIO1_LOW, MX51_MXC_INT_GPIO1_HIGH);
+> > -	mxc_register_gpio(1, MX51_GPIO2_BASE_ADDR, SZ_16K, MX51_MXC_INT_GPIO2_LOW, MX51_MXC_INT_GPIO2_HIGH);
+> > -	mxc_register_gpio(2, MX51_GPIO3_BASE_ADDR, SZ_16K, MX51_MXC_INT_GPIO3_LOW, MX51_MXC_INT_GPIO3_HIGH);
+> > -	mxc_register_gpio(3, MX51_GPIO4_BASE_ADDR, SZ_16K, MX51_MXC_INT_GPIO4_LOW, MX51_MXC_INT_GPIO4_HIGH);
+> > +	mxc_register_gpio("imx-gpio", 0, MX51_GPIO1_BASE_ADDR, SZ_16K, MX51_MXC_INT_GPIO1_LOW, MX51_MXC_INT_GPIO1_HIGH);
+> > +	mxc_register_gpio("imx-gpio", 1, MX51_GPIO2_BASE_ADDR, SZ_16K, MX51_MXC_INT_GPIO2_LOW, MX51_MXC_INT_GPIO2_HIGH);
+> > +	mxc_register_gpio("imx-gpio", 2, MX51_GPIO3_BASE_ADDR, SZ_16K, MX51_MXC_INT_GPIO3_LOW, MX51_MXC_INT_GPIO3_HIGH);
+> > +	mxc_register_gpio("imx-gpio", 3, MX51_GPIO4_BASE_ADDR, SZ_16K, MX51_MXC_INT_GPIO4_LOW, MX51_MXC_INT_GPIO4_HIGH);
+> >  
+> >  	imx_add_imx_sdma(MX51_SDMA_BASE_ADDR, MX51_INT_SDMA, &imx51_sdma_pdata);
+> >  }
+> >  
+> >  void __init imx53_soc_init(void)
+> >  {
+> > -	mxc_register_gpio(0, MX53_GPIO1_BASE_ADDR, SZ_16K, MX53_INT_GPIO1_LOW, MX53_INT_GPIO1_HIGH);
+> > -	mxc_register_gpio(1, MX53_GPIO2_BASE_ADDR, SZ_16K, MX53_INT_GPIO2_LOW, MX53_INT_GPIO2_HIGH);
+> > -	mxc_register_gpio(2, MX53_GPIO3_BASE_ADDR, SZ_16K, MX53_INT_GPIO3_LOW, MX53_INT_GPIO3_HIGH);
+> > -	mxc_register_gpio(3, MX53_GPIO4_BASE_ADDR, SZ_16K, MX53_INT_GPIO4_LOW, MX53_INT_GPIO4_HIGH);
+> > -	mxc_register_gpio(4, MX53_GPIO5_BASE_ADDR, SZ_16K, MX53_INT_GPIO5_LOW, MX53_INT_GPIO5_HIGH);
+> > -	mxc_register_gpio(5, MX53_GPIO6_BASE_ADDR, SZ_16K, MX53_INT_GPIO6_LOW, MX53_INT_GPIO6_HIGH);
+> > -	mxc_register_gpio(6, MX53_GPIO7_BASE_ADDR, SZ_16K, MX53_INT_GPIO7_LOW, MX53_INT_GPIO7_HIGH);
+> > +	mxc_register_gpio("imx-gpio", 0, MX53_GPIO1_BASE_ADDR, SZ_16K, MX53_INT_GPIO1_LOW, MX53_INT_GPIO1_HIGH);
+> > +	mxc_register_gpio("imx-gpio", 1, MX53_GPIO2_BASE_ADDR, SZ_16K, MX53_INT_GPIO2_LOW, MX53_INT_GPIO2_HIGH);
+> > +	mxc_register_gpio("imx-gpio", 2, MX53_GPIO3_BASE_ADDR, SZ_16K, MX53_INT_GPIO3_LOW, MX53_INT_GPIO3_HIGH);
+> > +	mxc_register_gpio("imx-gpio", 3, MX53_GPIO4_BASE_ADDR, SZ_16K, MX53_INT_GPIO4_LOW, MX53_INT_GPIO4_HIGH);
+> > +	mxc_register_gpio("imx-gpio", 4, MX53_GPIO5_BASE_ADDR, SZ_16K, MX53_INT_GPIO5_LOW, MX53_INT_GPIO5_HIGH);
+> > +	mxc_register_gpio("imx-gpio", 5, MX53_GPIO6_BASE_ADDR, SZ_16K, MX53_INT_GPIO6_LOW, MX53_INT_GPIO6_HIGH);
+> > +	mxc_register_gpio("imx-gpio", 6, MX53_GPIO7_BASE_ADDR, SZ_16K, MX53_INT_GPIO7_LOW, MX53_INT_GPIO7_HIGH);
+> >  
+> >  	imx_add_imx_sdma(MX53_SDMA_BASE_ADDR, MX53_INT_SDMA, &imx53_sdma_pdata);
+> >  }
+> > diff --git a/arch/arm/plat-mxc/devices/platform-gpio-mxc.c b/arch/arm/plat-mxc/devices/platform-gpio-mxc.c
+> > index cf1b7fd..a7919a2 100644
+> > --- a/arch/arm/plat-mxc/devices/platform-gpio-mxc.c
+> > +++ b/arch/arm/plat-mxc/devices/platform-gpio-mxc.c
+> > @@ -8,7 +8,7 @@
+> >   */
+> >  #include <mach/devices-common.h>
+> >  
+> > -struct platform_device *__init mxc_register_gpio(int id,
+> > +struct platform_device *__init mxc_register_gpio(char *name, int id,
+> >  	resource_size_t iobase, resource_size_t iosize, int irq, int irq_high)
+> >  {
+> >  	struct resource res[] = {
+> > @@ -28,5 +28,5 @@ struct platform_device *__init mxc_register_gpio(int id,
+> >  	};
+> >  
+> >  	return platform_device_register_resndata(&mxc_aips_bus,
+> > -			"gpio-mxc", id, res, ARRAY_SIZE(res), NULL, 0);
+> > +			name, id, res, ARRAY_SIZE(res), NULL, 0);
+> >  }
+> > diff --git a/arch/arm/plat-mxc/include/mach/common.h b/arch/arm/plat-mxc/include/mach/common.h
+> > index 91fa263..4e3d978 100644
+> > --- a/arch/arm/plat-mxc/include/mach/common.h
+> > +++ b/arch/arm/plat-mxc/include/mach/common.h
+> > @@ -64,7 +64,7 @@ extern int mx51_clocks_init(unsigned long ckil, unsigned long osc,
+> >  			unsigned long ckih1, unsigned long ckih2);
+> >  extern int mx53_clocks_init(unsigned long ckil, unsigned long osc,
+> >  			unsigned long ckih1, unsigned long ckih2);
+> > -extern struct platform_device *mxc_register_gpio(int id,
+> > +extern struct platform_device *mxc_register_gpio(char *name, int id,
+> >  	resource_size_t iobase, resource_size_t iosize, int irq, int irq_high);
+> >  extern int mxc_register_device(struct platform_device *pdev, void *data);
+> >  extern void mxc_set_cpu_type(unsigned int type);
+> > diff --git a/drivers/gpio/gpio-mxc.c b/drivers/gpio/gpio-mxc.c
+> > index 2f6a81b..7ae71d6 100644
+> > --- a/drivers/gpio/gpio-mxc.c
+> > +++ b/drivers/gpio/gpio-mxc.c
+> > @@ -27,9 +27,34 @@
+> >  #include <linux/platform_device.h>
+> >  #include <linux/slab.h>
+> >  #include <linux/basic_mmio_gpio.h>
+> > -#include <mach/hardware.h>
+> >  #include <asm-generic/bug.h>
+> >  
+> > +enum mxc_gpio_type {
+> > +	IMX1_GPIO,
+> > +	IMX2_GPIO,
+> > +	IMX_GPIO,
+> > +};
+> > +
+> > +/* device type dependent stuff */
+> > +struct mxc_gpio_hwdata {
+> > +	unsigned dr_reg;
+> > +	unsigned gdir_reg;
+> > +	unsigned psr_reg;
+> > +	unsigned icr1_reg;
+> > +	unsigned icr2_reg;
+> > +	unsigned imr_reg;
+> > +	unsigned isr_reg;
+> > +	unsigned low_level;
+> > +	unsigned high_level;
+> > +	unsigned rise_edge;
+> > +	unsigned fall_edge;
+> > +};
+> > +
+> > +struct mxc_gpio_data {
+> > +	struct mxc_gpio_hwdata *hwdata;
+> > +	enum mxc_gpio_type devtype;
+> > +};
+> > +
+> >  struct mxc_gpio_port {
+> >  	struct list_head node;
+> >  	void __iomem *base;
+> > @@ -38,6 +63,82 @@ struct mxc_gpio_port {
+> >  	int virtual_irq_start;
+> >  	struct bgpio_chip bgc;
+> >  	u32 both_edges;
+> > +	struct mxc_gpio_data *devdata;
+> > +};
+> > +
+> > +#define IS_IMX2_GPIO()	(port->devdata->devtype == IMX2_GPIO)
+> 
+> 'tis better to program in C than CPP. :)  A static inline would go better
+> here.
+> 
+> Also, when you change to using discrete mxc_gpio_hwdata
+> instances instead of a single table, you can change this test to be:
+> 
+> static inline int is_imx2_gpio(port) {
+> 	return port->devdata == &imx2_gpio_hwdata;
+> }
+> 
+imx1 and imx2 shares the same hwdata, so we can not use the approach
+to distinguish imx2 from imx1.
 
-The default state of sched_mc and sched_smt config is disable.
-When enabled, the behavior of the scheduler can be modified with
-sched_mc_power_savings and sched_smt_power_savings sysfs interfaces.
+Anyway, I'm killing IS_IMX2_GPIO since it's only used once and does
+not deserve a macro or inline function.
 
-Changes since v4 :
-*  Remove unnecessary parentheses and blank lines
+> > +
+> > +#define GPIO_DR		(port->devdata->hwdata->dr_reg)
+> > +#define GPIO_GDIR	(port->devdata->hwdata->gdir_reg)
+> > +#define GPIO_PSR	(port->devdata->hwdata->psr_reg)
+> > +#define GPIO_ICR1	(port->devdata->hwdata->icr1_reg)
+> > +#define GPIO_ICR2	(port->devdata->hwdata->icr2_reg)
+> > +#define GPIO_IMR	(port->devdata->hwdata->imr_reg)
+> > +#define GPIO_ISR	(port->devdata->hwdata->isr_reg)
+> > +
+> > +#define GPIO_INT_LOW_LEV	(port->devdata->hwdata->low_level)
+> > +#define GPIO_INT_HIGH_LEV	(port->devdata->hwdata->high_level)
+> > +#define GPIO_INT_RISE_EDGE	(port->devdata->hwdata->rise_edge)
+> > +#define GPIO_INT_FALL_EDGE	(port->devdata->hwdata->fall_edge)
+> > +#define GPIO_INT_NONE		0x4
+> 
+> This ends up creating a lot more indirection in the driver which may
+> have a measurable have a performance impact.  Plus, these new macros
+> depend on local context that will break in unexpected ways if someone
+> changes the 'port' name.
+> 
+> Unfortunately, to fix this property will require a lot more lines of
+> code change because every GPIO_* reference will need to be fixed, but
+> I'd rather see that than a set of ugly macros that just happen to be
+> convenient in the short term.
+> 
+The comments remind me one fact that these stuff are actually soc
+dependent than port, because we can never run on a soc that gets
+UART1 as IMX1_GPIO while UART2 as IMX2_GPIO.  The fact is if we are
+running on IMX1, all UART ports must be IMX1_GPIO, and if on IMX2,
+all ports must be IMX2_GPIO.  Based on this observation, we can
+define global static variables for hwdata and hwtype and get them
+set up during probe for only one port, so that your above two concerns
+can be address without touch every GPIO_* lines.  Here is the patch.
+Please let me know what you think.
 
-Changes since v3 :
-* Update the format of printk message
-* Remove blank line
-
-Changes since v2 :
-* Update the commit message and some comments
-
-Changes since v1 :
-* Update the commit message
-* Add read_cpuid_mpidr in arch/arm/include/asm/cputype.h
-* Modify header of arch/arm/kernel/topology.c
-* Modify tests and manipulation of MPIDR's bitfields
-* Modify the place and dependancy of the config
-* Modify Noop functions
-
-Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
-Reviewed-by: Amit Kucheria <amit.kucheria@linaro.org>
----
- arch/arm/Kconfig                |   25 +++++++
- arch/arm/include/asm/cputype.h  |    6 ++
- arch/arm/include/asm/topology.h |   33 +++++++++
- arch/arm/kernel/Makefile        |    1 +
- arch/arm/kernel/smp.c           |    5 ++
- arch/arm/kernel/topology.c      |  148 +++++++++++++++++++++++++++++++++++++++
- 6 files changed, 218 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/kernel/topology.c
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 9adc278..f327e55 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1344,6 +1344,31 @@ config SMP_ON_UP
+---8<-----------
+diff --git a/drivers/gpio/gpio-mxc.c b/drivers/gpio/gpio-mxc.c
+index 2f6a81b..19a173c 100644
+--- a/drivers/gpio/gpio-mxc.c
++++ b/drivers/gpio/gpio-mxc.c
+@@ -27,9 +27,29 @@
+ #include <linux/platform_device.h>
+ #include <linux/slab.h>
+ #include <linux/basic_mmio_gpio.h>
+-#include <mach/hardware.h>
+ #include <asm-generic/bug.h>
  
- 	  If you don't know what to do here, say Y.
- 
-+config ARM_CPU_TOPOLOGY
-+	bool "Support cpu topology definition"
-+	depends on SMP && CPU_V7
-+	default y
-+	help
-+	  Support ARM cpu topology definition. The MPIDR register defines
-+	  affinity between processors which is then used to describe the cpu
-+	  topology of an ARM System.
-+
-+config SCHED_MC
-+	bool "Multi-core scheduler support"
-+	depends on ARM_CPU_TOPOLOGY
-+	help
-+	  Multi-core scheduler support improves the CPU scheduler's decision
-+	  making when dealing with multi-core CPU chips at a cost of slightly
-+	  increased overhead in some places. If unsure say N here.
-+
-+config SCHED_SMT
-+	bool "SMT scheduler support"
-+	depends on ARM_CPU_TOPOLOGY
-+	help
-+	  Improves the CPU scheduler's decision making when dealing with
-+	  MultiThreading at a cost of slightly increased overhead in some
-+	  places. If unsure say N here.
-+
- config HAVE_ARM_SCU
- 	bool
- 	depends on SMP
-diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
-index cd4458f..cb47d28 100644
---- a/arch/arm/include/asm/cputype.h
-+++ b/arch/arm/include/asm/cputype.h
-@@ -8,6 +8,7 @@
- #define CPUID_CACHETYPE	1
- #define CPUID_TCM	2
- #define CPUID_TLBTYPE	3
-+#define CPUID_MPIDR	5
- 
- #define CPUID_EXT_PFR0	"c1, 0"
- #define CPUID_EXT_PFR1	"c1, 1"
-@@ -70,6 +71,11 @@ static inline unsigned int __attribute_const__ read_cpuid_tcmstatus(void)
- 	return read_cpuid(CPUID_TCM);
- }
- 
-+static inline unsigned int __attribute_const__ read_cpuid_mpidr(void)
-+{
-+	return read_cpuid(CPUID_MPIDR);
-+}
-+
- /*
-  * Intel's XScale3 core supports some v6 features (supersections, L2)
-  * but advertises itself as v5 as it does not support the v6 ISA.  For
-diff --git a/arch/arm/include/asm/topology.h b/arch/arm/include/asm/topology.h
-index accbd7c..a7e457e 100644
---- a/arch/arm/include/asm/topology.h
-+++ b/arch/arm/include/asm/topology.h
-@@ -1,6 +1,39 @@
- #ifndef _ASM_ARM_TOPOLOGY_H
- #define _ASM_ARM_TOPOLOGY_H
- 
-+#ifdef CONFIG_ARM_CPU_TOPOLOGY
-+
-+#include <linux/cpumask.h>
-+
-+struct cputopo_arm {
-+	int thread_id;
-+	int core_id;
-+	int socket_id;
-+	cpumask_t thread_sibling;
-+	cpumask_t core_sibling;
++enum mxc_gpio_hwtype {
++	IMX1_GPIO,
++	IMX2_GPIO,
++	IMX_GPIO,
 +};
 +
-+extern struct cputopo_arm cpu_topology[NR_CPUS];
++/* device type dependent stuff */
++struct mxc_gpio_hwdata {
++	unsigned dr_reg;
++	unsigned gdir_reg;
++	unsigned psr_reg;
++	unsigned icr1_reg;
++	unsigned icr2_reg;
++	unsigned imr_reg;
++	unsigned isr_reg;
++	unsigned low_level;
++	unsigned high_level;
++	unsigned rise_edge;
++	unsigned fall_edge;
++};
 +
-+#define topology_physical_package_id(cpu)	(cpu_topology[cpu].socket_id)
-+#define topology_core_id(cpu)		(cpu_topology[cpu].core_id)
-+#define topology_core_cpumask(cpu)	(&cpu_topology[cpu].core_sibling)
-+#define topology_thread_cpumask(cpu)	(&cpu_topology[cpu].thread_sibling)
-+
-+#define mc_capable()	(cpu_topology[0].socket_id != -1)
-+#define smt_capable()	(cpu_topology[0].thread_id != -1)
-+
-+void init_cpu_topology(void);
-+void store_cpu_topology(unsigned int cpuid);
-+const struct cpumask *cpu_coregroup_mask(unsigned int cpu);
-+
-+#else
-+
-+static inline void init_cpu_topology(void) { }
-+static inline void store_cpu_topology(unsigned int cpuid) { }
-+
-+#endif
-+
- #include <asm-generic/topology.h>
+ struct mxc_gpio_port {
+ 	struct list_head node;
+ 	void __iomem *base;
+@@ -40,6 +60,72 @@ struct mxc_gpio_port {
+ 	u32 both_edges;
+ };
  
- #endif /* _ASM_ARM_TOPOLOGY_H */
-diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-index a5b31af..816a481 100644
---- a/arch/arm/kernel/Makefile
-+++ b/arch/arm/kernel/Makefile
-@@ -61,6 +61,7 @@ obj-$(CONFIG_IWMMXT)		+= iwmmxt.o
- obj-$(CONFIG_CPU_HAS_PMU)	+= pmu.o
- obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o
- AFLAGS_iwmmxt.o			:= -Wa,-mcpu=iwmmxt
-+obj-$(CONFIG_ARM_CPU_TOPOLOGY)  += topology.o
- 
- ifneq ($(CONFIG_ARCH_EBSA110),y)
-   obj-y		+= io.o
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 344e52b..051fd36 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -31,6 +31,7 @@
- #include <asm/cacheflush.h>
- #include <asm/cpu.h>
- #include <asm/cputype.h>
-+#include <asm/topology.h>
- #include <asm/mmu_context.h>
- #include <asm/pgtable.h>
- #include <asm/pgalloc.h>
-@@ -268,6 +269,8 @@ static void __cpuinit smp_store_cpu_info(unsigned int cpuid)
- 	struct cpuinfo_arm *cpu_info = &per_cpu(cpu_data, cpuid);
- 
- 	cpu_info->loops_per_jiffy = loops_per_jiffy;
++static struct mxc_gpio_hwdata imx1_imx2_gpio_hwdata = {
++	.dr_reg		= 0x1c,
++	.gdir_reg	= 0x00,
++	.psr_reg	= 0x24,
++	.icr1_reg	= 0x28,
++	.icr2_reg	= 0x2c,
++	.imr_reg	= 0x30,
++	.isr_reg	= 0x34,
++	.low_level	= 0x03,
++	.high_level	= 0x02,
++	.rise_edge	= 0x00,
++	.fall_edge	= 0x01,
++};
 +
-+	store_cpu_topology(cpuid);
++static struct mxc_gpio_hwdata imx_gpio_hwdata = {
++	.dr_reg		= 0x00,
++	.gdir_reg	= 0x04,
++	.psr_reg	= 0x08,
++	.icr1_reg	= 0x0c,
++	.icr2_reg	= 0x10,
++	.imr_reg	= 0x14,
++	.isr_reg	= 0x18,
++	.low_level	= 0x00,
++	.high_level	= 0x01,
++	.rise_edge	= 0x02,
++	.fall_edge	= 0x03,
++};
++
++static enum mxc_gpio_hwtype mxs_gpio_hwtype;
++static struct mxc_gpio_hwdata *mxc_gpio_hwdata;
++
++#define GPIO_DR			(mxc_gpio_hwdata->dr_reg)
++#define GPIO_GDIR		(mxc_gpio_hwdata->gdir_reg)
++#define GPIO_PSR		(mxc_gpio_hwdata->psr_reg)
++#define GPIO_ICR1		(mxc_gpio_hwdata->icr1_reg)
++#define GPIO_ICR2		(mxc_gpio_hwdata->icr2_reg)
++#define GPIO_IMR		(mxc_gpio_hwdata->imr_reg)
++#define GPIO_ISR		(mxc_gpio_hwdata->isr_reg)
++
++#define GPIO_INT_LOW_LEV	(mxc_gpio_hwdata->low_level)
++#define GPIO_INT_HIGH_LEV	(mxc_gpio_hwdata->high_level)
++#define GPIO_INT_RISE_EDGE	(mxc_gpio_hwdata->rise_edge)
++#define GPIO_INT_FALL_EDGE	(mxc_gpio_hwdata->fall_edge)
++#define GPIO_INT_NONE		0x4
++
++static struct platform_device_id mxc_gpio_devtype[] = {
++	{
++		.name = "imx1-gpio",
++		.driver_data = IMX1_GPIO,
++	}, {
++		.name = "imx21-gpio",
++		.driver_data = IMX2_GPIO,
++	}, {
++		.name = "imx25-gpio",
++		.driver_data = IMX_GPIO,
++	}, {
++		.name = "imx27-gpio",
++		.driver_data = IMX2_GPIO,
++	}, {
++		.name = "imx-gpio",
++		.driver_data = IMX_GPIO,
++	}, {
++		/* sentinel */
++	}
++};
++
+ /*
+  * MX2 has one interrupt *for all* gpio ports. The list is used
+  * to save the references to all ports, so that mx2_gpio_irq_handler
+@@ -47,22 +133,6 @@ struct mxc_gpio_port {
+  */
+ static LIST_HEAD(mxc_gpio_ports);
+ 
+-#define cpu_is_mx1_mx2()	(cpu_is_mx1() || cpu_is_mx2())
+-
+-#define GPIO_DR		(cpu_is_mx1_mx2() ? 0x1c : 0x00)
+-#define GPIO_GDIR	(cpu_is_mx1_mx2() ? 0x00 : 0x04)
+-#define GPIO_PSR	(cpu_is_mx1_mx2() ? 0x24 : 0x08)
+-#define GPIO_ICR1	(cpu_is_mx1_mx2() ? 0x28 : 0x0C)
+-#define GPIO_ICR2	(cpu_is_mx1_mx2() ? 0x2C : 0x10)
+-#define GPIO_IMR	(cpu_is_mx1_mx2() ? 0x30 : 0x14)
+-#define GPIO_ISR	(cpu_is_mx1_mx2() ? 0x34 : 0x18)
+-
+-#define GPIO_INT_LOW_LEV	(cpu_is_mx1_mx2() ? 0x3 : 0x0)
+-#define GPIO_INT_HIGH_LEV	(cpu_is_mx1_mx2() ? 0x2 : 0x1)
+-#define GPIO_INT_RISE_EDGE	(cpu_is_mx1_mx2() ? 0x0 : 0x2)
+-#define GPIO_INT_FALL_EDGE	(cpu_is_mx1_mx2() ? 0x1 : 0x3)
+-#define GPIO_INT_NONE		0x4
+-
+ /* Note: This driver assumes 32 GPIOs are handled in one register */
+ 
+ static int gpio_set_irq_type(struct irq_data *d, u32 type)
+@@ -236,12 +306,27 @@ static void __init mxc_gpio_init_gc(struct mxc_gpio_port *port)
+ 			       IRQ_NOREQUEST, 0);
  }
  
- /*
-@@ -354,6 +357,8 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
- {
- 	unsigned int ncores = num_possible_cpus();
- 
-+	init_cpu_topology();
-+
- 	smp_store_cpu_info(smp_processor_id());
- 
- 	/*
-diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
-new file mode 100644
-index 0000000..1040c00
---- /dev/null
-+++ b/arch/arm/kernel/topology.c
-@@ -0,0 +1,148 @@
-+/*
-+ * arch/arm/kernel/topology.c
-+ *
-+ * Copyright (C) 2011 Linaro Limited.
-+ * Written by: Vincent Guittot
-+ *
-+ * based on arch/sh/kernel/topology.c
-+ *
-+ * This file is subject to the terms and conditions of the GNU General Public
-+ * License.  See the file "COPYING" in the main directory of this archive
-+ * for more details.
-+ */
-+
-+#include <linux/cpu.h>
-+#include <linux/cpumask.h>
-+#include <linux/init.h>
-+#include <linux/percpu.h>
-+#include <linux/node.h>
-+#include <linux/nodemask.h>
-+#include <linux/sched.h>
-+
-+#include <asm/cputype.h>
-+#include <asm/topology.h>
-+
-+#define MPIDR_SMP_BITMASK (0x3 << 30)
-+#define MPIDR_SMP_VALUE (0x2 << 30)
-+
-+#define MPIDR_MT_BITMASK (0x1 << 24)
-+
-+/*
-+ * These masks reflect the current use of the affinity levels.
-+ * The affinity level can be up to 16 bits according to ARM ARM
-+ */
-+
-+#define MPIDR_LEVEL0_MASK 0x3
-+#define MPIDR_LEVEL0_SHIFT 0
-+
-+#define MPIDR_LEVEL1_MASK 0xF
-+#define MPIDR_LEVEL1_SHIFT 8
-+
-+#define MPIDR_LEVEL2_MASK 0xFF
-+#define MPIDR_LEVEL2_SHIFT 16
-+
-+struct cputopo_arm cpu_topology[NR_CPUS];
-+
-+const struct cpumask *cpu_coregroup_mask(unsigned int cpu)
++static void __devinit mxc_gpio_get_hw(struct platform_device *pdev)
 +{
-+	return &cpu_topology[cpu].core_sibling;
-+}
-+
-+/*
-+ * store_cpu_topology is called@boot when only one cpu is running
-+ * and with the mutex cpu_hotplug.lock locked, when several cpus have booted,
-+ * which prevents simultaneous write access to cpu_topology array
-+ */
-+void store_cpu_topology(unsigned int cpuid)
-+{
-+	struct cputopo_arm *cpuid_topo = &cpu_topology[cpuid];
-+	unsigned int mpidr;
-+	unsigned int cpu;
-+
-+	/* If the cpu topology has been already set, just return */
-+	if (cpuid_topo->core_id != -1)
++	if (mxc_gpio_hwdata)
 +		return;
 +
-+	mpidr = read_cpuid_mpidr();
++	mxs_gpio_hwtype = pdev->id_entry->driver_data;
 +
-+	/* create cpu topology mapping */
-+	if ((mpidr & MPIDR_SMP_BITMASK) == MPIDR_SMP_VALUE) {
-+		/*
-+		 * This is a multiprocessor system
-+		 * multiprocessor format & multiprocessor mode field are set
-+		 */
-+
-+		if (mpidr & MPIDR_MT_BITMASK) {
-+			/* core performance interdependency */
-+			cpuid_topo->thread_id = (mpidr >> MPIDR_LEVEL0_SHIFT)
-+				& MPIDR_LEVEL0_MASK;
-+			cpuid_topo->core_id = (mpidr >> MPIDR_LEVEL1_SHIFT)
-+				& MPIDR_LEVEL1_MASK;
-+			cpuid_topo->socket_id = (mpidr >> MPIDR_LEVEL2_SHIFT)
-+				& MPIDR_LEVEL2_MASK;
-+		} else {
-+			/* largely independent cores */
-+			cpuid_topo->thread_id = -1;
-+			cpuid_topo->core_id = (mpidr >> MPIDR_LEVEL0_SHIFT)
-+				& MPIDR_LEVEL0_MASK;
-+			cpuid_topo->socket_id = (mpidr >> MPIDR_LEVEL1_SHIFT)
-+				& MPIDR_LEVEL1_MASK;
-+		}
-+	} else {
-+		/*
-+		 * This is an uniprocessor system
-+		 * we are in multiprocessor format but uniprocessor system
-+		 * or in the old uniprocessor format
-+		 */
-+		cpuid_topo->thread_id = -1;
-+		cpuid_topo->core_id = 0;
-+		cpuid_topo->socket_id = -1;
-+	}
-+
-+	/* update core and thread sibling masks */
-+	for_each_possible_cpu(cpu) {
-+		struct cputopo_arm *cpu_topo = &cpu_topology[cpu];
-+
-+		if (cpuid_topo->socket_id == cpu_topo->socket_id) {
-+			cpumask_set_cpu(cpuid, &cpu_topo->core_sibling);
-+			if (cpu != cpuid)
-+				cpumask_set_cpu(cpu,
-+					&cpuid_topo->core_sibling);
-+
-+			if (cpuid_topo->core_id == cpu_topo->core_id) {
-+				cpumask_set_cpu(cpuid,
-+					&cpu_topo->thread_sibling);
-+				if (cpu != cpuid)
-+					cpumask_set_cpu(cpu,
-+						&cpuid_topo->thread_sibling);
-+			}
-+		}
-+	}
-+	smp_wmb();
-+
-+	printk(KERN_INFO "CPU%u: thread %d, cpu %d, socket %d, mpidr %x\n",
-+		cpuid, cpu_topology[cpuid].thread_id,
-+		cpu_topology[cpuid].core_id,
-+		cpu_topology[cpuid].socket_id, mpidr);
++	if (mxs_gpio_hwtype == IMX1_GPIO || mxs_gpio_hwtype == IMX2_GPIO)
++		mxc_gpio_hwdata = &imx1_imx2_gpio_hwdata;
++	else
++		mxc_gpio_hwdata = &imx_gpio_hwdata;
 +}
 +
-+/*
-+ * init_cpu_topology is called at boot when only one cpu is running
-+ * which prevent simultaneous write access to cpu_topology array
-+ */
-+void init_cpu_topology(void)
-+{
-+	unsigned int cpu;
+ static int __devinit mxc_gpio_probe(struct platform_device *pdev)
+ {
+ 	struct mxc_gpio_port *port;
+ 	struct resource *iores;
+ 	int err;
+ 
++	mxc_gpio_get_hw(pdev);
 +
-+	/* init core mask */
-+	for_each_possible_cpu(cpu) {
-+		struct cputopo_arm *cpu_topo = &(cpu_topology[cpu]);
-+
-+		cpu_topo->thread_id = -1;
-+		cpu_topo->core_id =  -1;
-+		cpu_topo->socket_id = -1;
-+		cpumask_clear(&cpu_topo->core_sibling);
-+		cpumask_clear(&cpu_topo->thread_sibling);
-+	}
-+	smp_wmb();
-+}
+ 	port = kzalloc(sizeof(struct mxc_gpio_port), GFP_KERNEL);
+ 	if (!port)
+ 		return -ENOMEM;
+@@ -280,7 +365,7 @@ static int __devinit mxc_gpio_probe(struct platform_device *pdev)
+ 	/* gpio-mxc can be a generic irq chip */
+ 	mxc_gpio_init_gc(port);
+ 
+-	if (cpu_is_mx2()) {
++	if (mxs_gpio_hwtype == IMX2_GPIO) {
+ 		/* setup one handler for all GPIO interrupts */
+ 		if (pdev->id == 0)
+ 			irq_set_chained_handler(port->irq,
+@@ -332,6 +417,7 @@ static struct platform_driver mxc_gpio_driver = {
+ 		.owner	= THIS_MODULE,
+ 	},
+ 	.probe		= mxc_gpio_probe,
++	.id_table	= mxc_gpio_devtype,
+ };
+ 
+ static int __init gpio_mxc_init(void)
 -- 
 1.7.4.1
+-- 
+Regards,
+Shawn
