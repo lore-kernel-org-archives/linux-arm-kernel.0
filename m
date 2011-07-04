@@ -1,103 +1,56 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon,  4 Jul 2011 16:17:53 +0200
-Subject: [PATCH V2] MTD: atmel_nand: optimize read/write buffer functions
-In-Reply-To: <1309261856-27402-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1309261856-27402-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <1309789073-14593-1-git-send-email-nicolas.ferre@atmel.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 4 Jul 2011 14:15:34 +0100
+Subject: Unnecessary cache-line flush on page table updates ?
+In-Reply-To: <20110704130521.GF8286@n2100.arm.linux.org.uk>
+References: <BANLkTin7aJXjpEH_WzJi5zaAtH8kFcTZeg@mail.gmail.com>
+	<20110701101019.GA1723@e102109-lin.cambridge.arm.com>
+	<BANLkTi=KVnzBKcd83c9T3P20VAv-ggqR4g@mail.gmail.com>
+	<20110704094531.GB19117@e102109-lin.cambridge.arm.com>
+	<20110704100221.GB8286@n2100.arm.linux.org.uk>
+	<20110704104329.GD19117@e102109-lin.cambridge.arm.com>
+	<20110704130521.GF8286@n2100.arm.linux.org.uk>
+Message-ID: <20110704131533.GA27320@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For PIO NAND access functions, we use the features of the SMC:
-- no need to take into account the NAND bus width: SMC will deal with this
-- use of an IO memcpy on the NAND chip-select space is able to generate
-  proper SMC behavior.
+On Mon, Jul 04, 2011 at 02:05:21PM +0100, Russell King - ARM Linux wrote:
+> On Mon, Jul 04, 2011 at 11:43:29AM +0100, Catalin Marinas wrote:
+> > On Mon, Jul 04, 2011 at 11:02:21AM +0100, Russell King - ARM Linux wrote:
+> > > The single-TLB model works fairly well, but as I thought the lack of
+> > > mcr%? processing by GCC makes the asm/tlbflush.h code fairly disgusting
+> > > even for a v6+v7 kernel.  Luckily, we can play some tricks and sort
+> > > some of that out.  The patch below is not complete (and can result in
+> > > some rules of the architecture being violated - namely the requirement
+> > > for an ISB after the BTB flush without a branch between) but it
+> > > illustrates the idea:
+> > 
+> > I'm not sure about this rule, I can ask for some clarification (we are
+> > not changing the memory map of the branch we execute).
+> 
+> There's no need for clarification on the BTB and branch issue, the
+> ARM ARM is quite clear on this topic:
+> 
+> Branch predictor maintenance operations and the memory order model
+> The following rule describes the effect of the memory order model on
+> the branch predictor maintenance operations:
+> ? Any invalidation of the branch predictor is guaranteed to take effect only
+>   after one of the following:
+>   ? execution of a ISB instruction
+>   ? taking an exception
+>   ? return from an exception.
+> Therefore, if a branch instruction appears between an invalidate branch
+> prediction instruction and an ISB operation, exception entry or exception
+> return, it is UNPREDICTABLE whether the branch instruction is affected by
+> the invalidate. Software must avoid this ordering of instructions, because
+> it might lead to UNPREDICTABLE behavior.
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
-V2: use of memcpy_fromio/memcpy_toio for proper handling of memory types.
+So my this rule should we always use an ISB even if we only flushed user
+TLB entries? Otherwise we get some branches before the exception return.
 
- drivers/mtd/nand/atmel_nand.c |   45 +++-------------------------------------
- 1 files changed, 4 insertions(+), 41 deletions(-)
+My reading is that it only affects the branch in the TLB op function for
+which we don't change any mapping, so there isn't any risk of
+mis-prediction. That's why I think I should ask for clarification if we
+can't avoid the branch.
 
-diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
-index bbdf062..37b2f70 100644
---- a/drivers/mtd/nand/atmel_nand.c
-+++ b/drivers/mtd/nand/atmel_nand.c
-@@ -160,37 +160,6 @@ static int atmel_nand_device_ready(struct mtd_info *mtd)
-                 !!host->board->rdy_pin_active_low;
- }
- 
--/*
-- * Minimal-overhead PIO for data access.
-- */
--static void atmel_read_buf8(struct mtd_info *mtd, u8 *buf, int len)
--{
--	struct nand_chip	*nand_chip = mtd->priv;
--
--	__raw_readsb(nand_chip->IO_ADDR_R, buf, len);
--}
--
--static void atmel_read_buf16(struct mtd_info *mtd, u8 *buf, int len)
--{
--	struct nand_chip	*nand_chip = mtd->priv;
--
--	__raw_readsw(nand_chip->IO_ADDR_R, buf, len / 2);
--}
--
--static void atmel_write_buf8(struct mtd_info *mtd, const u8 *buf, int len)
--{
--	struct nand_chip	*nand_chip = mtd->priv;
--
--	__raw_writesb(nand_chip->IO_ADDR_W, buf, len);
--}
--
--static void atmel_write_buf16(struct mtd_info *mtd, const u8 *buf, int len)
--{
--	struct nand_chip	*nand_chip = mtd->priv;
--
--	__raw_writesw(nand_chip->IO_ADDR_W, buf, len / 2);
--}
--
- static void dma_complete_func(void *completion)
- {
- 	complete(completion);
-@@ -265,33 +234,27 @@ err_buf:
- static void atmel_read_buf(struct mtd_info *mtd, u8 *buf, int len)
- {
- 	struct nand_chip *chip = mtd->priv;
--	struct atmel_nand_host *host = chip->priv;
- 
- 	if (use_dma && len > mtd->oobsize)
- 		/* only use DMA for bigger than oob size: better performances */
- 		if (atmel_nand_dma_op(mtd, buf, len, 1) == 0)
- 			return;
- 
--	if (host->board->bus_width_16)
--		atmel_read_buf16(mtd, buf, len);
--	else
--		atmel_read_buf8(mtd, buf, len);
-+	/* if no DMA operation possible, use PIO */
-+	memcpy_fromio(buf, chip->IO_ADDR_R, len);
- }
- 
- static void atmel_write_buf(struct mtd_info *mtd, const u8 *buf, int len)
- {
- 	struct nand_chip *chip = mtd->priv;
--	struct atmel_nand_host *host = chip->priv;
- 
- 	if (use_dma && len > mtd->oobsize)
- 		/* only use DMA for bigger than oob size: better performances */
- 		if (atmel_nand_dma_op(mtd, (void *)buf, len, 0) == 0)
- 			return;
- 
--	if (host->board->bus_width_16)
--		atmel_write_buf16(mtd, buf, len);
--	else
--		atmel_write_buf8(mtd, buf, len);
-+	/* if no DMA operation possible, use PIO */
-+	memcpy_toio(chip->IO_ADDR_W, buf, len);
- }
- 
- /*
 -- 
-1.7.3
+Catalin
