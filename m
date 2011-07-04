@@ -1,33 +1,21 @@
-From: padma.v@samsung.com (Padmavathi Venna)
-Date: Mon, 04 Jul 2011 13:44:36 -0400
-Subject: [PATCH 2/2] SPI: S5PV210: Enable the SPI driver for S5PV210
-In-Reply-To: <1309801476-29678-1-git-send-email-padma.v@samsung.com>
-References: <1309801476-29678-1-git-send-email-padma.v@samsung.com>
-Message-ID: <1309801476-29678-2-git-send-email-padma.v@samsung.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon,  4 Jul 2011 21:18:28 +0900
+Subject: [PATCH 0/7] ARM: S5P: Use generic DMA APIs
+Message-ID: <1309781915-31549-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SPI module on S5PV210 is similar to the earlier Samsung SoCs like
-S3C64XX. Enable the existing SPI driver for use on S5PV210.
+This patch makes EXYNOS4210 SoC use generic DMA APIs instead of
+Samsung specific DMA APIs. The DMA client drivers such as spi and
+sound are requried to change the usage for it.
 
-Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
----
- drivers/spi/Kconfig |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
+NOTE: We will also apply this on other S5P SoCs soon so we can
+remove s3c-pl330 specific driver at the same time.
 
-diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
-index 91d607b..ed1ebea 100644
---- a/drivers/spi/Kconfig
-+++ b/drivers/spi/Kconfig
-@@ -340,7 +340,8 @@ config SPI_S3C24XX_GPIO
- 
- config SPI_S3C64XX
- 	tristate "Samsung S3C64XX series type SPI"
--	depends on (ARCH_S3C64XX || ARCH_S5P64X0 || ARCH_S5PC100)
-+	depends on (ARCH_S3C64XX || ARCH_S5P64X0 || ARCH_S5PC100 \
-+			|| ARCH_S5PV210)
- 	select S3C64XX_DMA if ARCH_S3C64XX
- 	help
- 	  SPI driver for Samsung S3C64XX and newer SoCs.
--- 
-1.7.0.4
+[PATCH 1/7] DMA: PL330: Add support runtime PM for PL330 DMAC
+[PATCH 2/7] DMA: PL330: Update PL330 DMA API driver
+[PATCH 3/7] DMA: PL330: Add DMA capabilities
+[PATCH 4/7] ARM: SAMSUNG: Update to use PL330-DMA driver
+[PATCH 5/7] ARM: EXYNOS4: Use generic DMA PL330 driver
+[PATCH 6/7] spi/s3c64xx: Add support DMA engine API
+[PATCH 7/7] ASoC: Samsung: Update DMA interface
