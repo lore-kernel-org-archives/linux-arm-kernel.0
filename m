@@ -1,27 +1,41 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 04 Jul 2011 18:38:08 +0900
-Subject: [PATCH 4/7] ARM: GIC: move gic_chip_data structure declaration to
-	header
-In-Reply-To: <1308555258-4322-5-git-send-email-chaos.youn@samsung.com>
-References: <1308555258-4322-1-git-send-email-chaos.youn@samsung.com>
-	<1308555258-4322-5-git-send-email-chaos.youn@samsung.com>
-Message-ID: <004f01cc3a2e$17710050$465300f0$%kim@samsung.com>
+Date: Mon, 04 Jul 2011 18:42:08 +0900
+Subject: [PATCH 4/7] ARM: EXYNOS4: Support early wakeup while entering
+	sleep mode
+In-Reply-To: <20110701074414.GD21898@n2100.arm.linux.org.uk>
+References: <1308732405-16664-1-git-send-email-kgene.kim@samsung.com>
+	<1308732405-16664-5-git-send-email-kgene.kim@samsung.com>
+	<20110622145715.GS23234@n2100.arm.linux.org.uk>
+	<007401cc3242$48947160$d9bd5420$%kim@samsung.com>
+	<20110624093750.GD23234@n2100.arm.linux.org.uk>
+	<20110624102246.GF23234@n2100.arm.linux.org.uk>
+	<017d01cc378a$c017edf0$4047c9d0$%kim@samsung.com>
+	<20110701074414.GD21898@n2100.arm.linux.org.uk>
+Message-ID: <005001cc3a2e$a6689480$f339bd80$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changhwan Youn wrote:
+Russell King - ARM Linux wrote:
 > 
-> Since Samsung EXYNOS4210 cannot support register banking in GIC,
-> so needs to update CPU interface base address.
-> The 'gic_chip_data' is used for it, this patch moves gic_chip_data
-> structure declaraton to arch/arm/include/asm/hardware/gic.h to use
-> it.
+> On Fri, Jul 01, 2011 at 10:03:48AM +0900, Kukjin Kim wrote:
+> > Russell thanks.
+> >
+> > How do you think to add following for handling failure of cpu_suspend?
+> >
+> > +	mov	r0, #-1
 > 
-> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+> No.  -1 is not an error code, and I refuse to create functions which
+> use an explicit -1 as a return code to indicate failure.
+> 
+I used wrong words, 'handling failure' :(
 
-Russell, how do you think this?
+Actually, it means handling other case, like early wakeup but we will
+address comments from you :)
 
-As I know, this is needed on Samsung SoC, EXYNOS4210.
+> The code is designed so that the called finisher function can return
+> a valid errno value.
+
+OK, I see.
 
 Thanks.
 
@@ -30,47 +44,3 @@ Kgene.
 --
 Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
 SW Solution Development Team, Samsung Electronics Co., Ltd.
-
-> Signed-off-by: Changhwan Youn <chaos.youn@samsung.com>
-> ---
->  arch/arm/common/gic.c               |    6 ------
->  arch/arm/include/asm/hardware/gic.h |    6 ++++++
->  2 files changed, 6 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
-> index 4ddd0a6..23564ed 100644
-> --- a/arch/arm/common/gic.c
-> +++ b/arch/arm/common/gic.c
-> @@ -38,12 +38,6 @@ static DEFINE_SPINLOCK(irq_controller_lock);
->  /* Address of GIC 0 CPU interface */
->  void __iomem *gic_cpu_base_addr __read_mostly;
-> 
-> -struct gic_chip_data {
-> -	unsigned int irq_offset;
-> -	void __iomem *dist_base;
-> -	void __iomem *cpu_base;
-> -};
-> -
->  /*
->   * Supported arch specific GIC irq extension.
->   * Default make them NULL.
-> diff --git a/arch/arm/include/asm/hardware/gic.h
-> b/arch/arm/include/asm/hardware/gic.h
-> index 0691f9d..435d3f8 100644
-> --- a/arch/arm/include/asm/hardware/gic.h
-> +++ b/arch/arm/include/asm/hardware/gic.h
-> @@ -41,6 +41,12 @@ void gic_secondary_init(unsigned int);
->  void gic_cascade_irq(unsigned int gic_nr, unsigned int irq);
->  void gic_raise_softirq(const struct cpumask *mask, unsigned int irq);
->  void gic_enable_ppi(unsigned int);
-> +
-> +struct gic_chip_data {
-> +	unsigned int irq_offset;
-> +	void __iomem *dist_base;
-> +	void __iomem *cpu_base;
-> +};
->  #endif
-> 
->  #endif
-> --
-> 1.7.1
