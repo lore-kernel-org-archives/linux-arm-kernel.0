@@ -1,45 +1,40 @@
-From: LW@KARO-electronics.de (=?utf-8?q?Lothar=20Wa=C3=9Fmann?=)
-Date: Mon,  4 Jul 2011 15:52:17 +0200
-Subject: [BUGFIX][PATCH] mach-mx5: fix the I2C clock parents
-In-Reply-To: <19985.49912.927038.73866@ipc1.ka-ro>
-References: <19985.49912.927038.73866@ipc1.ka-ro>
-Message-ID: <1309787537-20664-1-git-send-email-LW@KARO-electronics.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 4 Jul 2011 16:07:10 +0200
+Subject: [PATCH 1/3] PWM: add pwm framework support
+In-Reply-To: <20110704124318.GI6069@pengutronix.de>
+References: <201106301441.24493.arnd@arndb.de> <4E11994B.7070103@gmail.com>
+	<20110704124318.GI6069@pengutronix.de>
+Message-ID: <201107041607.10265.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The clock from which the I2C timing is derived is the ipg_perclk not ipg_clk.
+On Monday 04 July 2011, Sascha Hauer wrote:
+> On Mon, Jul 04, 2011 at 08:43:23PM +1000, Ryan Mallon wrote:
+>
+> > The fine-grained control api could be added now. pwm_config could be
+> > left as is for the time being (the new api could be a wrapper around it
+> > to start with). Polarity control and interrupt handling apis could also
+> > be defined without affecting the drivers which don't need to implement
+> > them. Multiple channels and the sleeping/non-sleeping api are the more
+> > difficult ones, but at least having some sort of indication about how
+> > these plan to be solved would be useful.
+> 
+> Again, why should we add these *now*? It only raises the chance that
+> there's more discussion.
 
-I2C bus frequency was lower by a factor of ~8 due to the clock divider
-calculation being based on 66.5MHz IPG clock while the bus actually
-uses 8MHz ipg_perclk.
+My impression is that there are a lot of things that could easily be
+done to improve the state of PWM drivers, but I don't care about the
+order in which they are done. My main issue is the lack of a subsystem
+core driver, which both you and Bill have patches for. It's clear that
+other people have other issues and want to see their problems addressed
+first.
 
-Kernel version: 3.0.0-rc2 branch 'imx-for-next' of git://git.pengutronix.de/git/imx/linux-2.6
+I also think that the pwm code is simple enough that we don't have
+to worry too much about the order that things are done in. Any patch
+that is making the code better should just get in and not have to
+wait for something else to be completed first.
 
-Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
----
- arch/arm/mach-mx5/clock-mx51-mx53.c |    6 +++---
- 1 files changed, 3 insertions(+), 3 deletions(-)
+What we do need now is a maintainer that can coordinate the patches
+and merge the ones that have been agreed on. Or multiple maintainers.
 
-diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
-index 699b0d2..ff16d86 100644
---- a/arch/arm/mach-mx5/clock-mx51-mx53.c
-+++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
-@@ -1282,13 +1282,13 @@ DEFINE_CLOCK(pwm2_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG8_OFFSET,
- 
- /* I2C */
- DEFINE_CLOCK(i2c1_clk, 0, MXC_CCM_CCGR1, MXC_CCM_CCGRx_CG9_OFFSET,
--	NULL, NULL, &ipg_clk, NULL);
-+	NULL, NULL, &ipg_perclk, NULL);
- DEFINE_CLOCK(i2c2_clk, 1, MXC_CCM_CCGR1, MXC_CCM_CCGRx_CG10_OFFSET,
--	NULL, NULL, &ipg_clk, NULL);
-+	NULL, NULL, &ipg_perclk, NULL);
- DEFINE_CLOCK(hsi2c_clk, 0, MXC_CCM_CCGR1, MXC_CCM_CCGRx_CG11_OFFSET,
- 	NULL, NULL, &ipg_clk, NULL);
- DEFINE_CLOCK(i2c3_mx53_clk, 0, MXC_CCM_CCGR1, MXC_CCM_CCGRx_CG11_OFFSET,
--	NULL, NULL, &ipg_clk, NULL);
-+	NULL, NULL, &ipg_perclk, NULL);
- 
- /* FEC */
- DEFINE_CLOCK(fec_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG12_OFFSET,
--- 
-1.5.6.5
+	Arnd
