@@ -1,98 +1,132 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 4 Jul 2011 11:43:29 +0100
-Subject: Unnecessary cache-line flush on page table updates ?
-In-Reply-To: <20110704100221.GB8286@n2100.arm.linux.org.uk>
-References: <BANLkTin7aJXjpEH_WzJi5zaAtH8kFcTZeg@mail.gmail.com>
-	<20110701101019.GA1723@e102109-lin.cambridge.arm.com>
-	<BANLkTi=KVnzBKcd83c9T3P20VAv-ggqR4g@mail.gmail.com>
-	<20110704094531.GB19117@e102109-lin.cambridge.arm.com>
-	<20110704100221.GB8286@n2100.arm.linux.org.uk>
-Message-ID: <20110704104329.GD19117@e102109-lin.cambridge.arm.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 4 Jul 2011 14:06:52 +0300
+Subject: [PATCH V3] MMC: PM: add suspend/resume in atmel-mci
+In-Reply-To: <1309779505-25509-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1309530754.4373.3.camel@hcegtvedt.norway.atmel.com>
+	<1309779505-25509-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <20110704110651.GC2820@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 04, 2011 at 11:02:21AM +0100, Russell King - ARM Linux wrote:
-> On Mon, Jul 04, 2011 at 10:45:32AM +0100, Catalin Marinas wrote:
-> > Given these results, I think it's worth merging the patch. Can I add
-> > your Tested-by?
+Hi,
+
+On Mon, Jul 04, 2011 at 01:38:25PM +0200, Nicolas Ferre wrote:
+> Take care of slots while going to suspend state.
 > 
-> If we're going to make this change to use the coherent information,
-> let's address all the places in one go, which are:
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> ---
+> V3: take care of each slot SUSPENDED state
+>     (adding a status bit in the slot "flags")
+> V2: move to pm_ops
 > 
->         clean_pmd_entry
->         flush_pmd_entry
->         clean_pte_table
+>  drivers/mmc/host/atmel-mci.c |   60 ++++++++++++++++++++++++++++++++++++++++++
+>  1 files changed, 60 insertions(+), 0 deletions(-)
 > 
-> These require a little more thought as we aren't guaranteed to have
-> ID_MMFR3 in place - maybe they should be callbacks into the per-CPU
-> code.
+> diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
+> index aa8039f..ed63bcd 100644
+> --- a/drivers/mmc/host/atmel-mci.c
+> +++ b/drivers/mmc/host/atmel-mci.c
+> @@ -203,6 +203,7 @@ struct atmel_mci_slot {
+>  #define ATMCI_CARD_PRESENT	0
+>  #define ATMCI_CARD_NEED_INIT	1
+>  #define ATMCI_SHUTDOWN		2
+> +#define ATMCI_SUSPENDED		3
+>  
+>  	int			detect_pin;
+>  	int			wp_pin;
+> @@ -1878,10 +1879,69 @@ static int __exit atmci_remove(struct platform_device *pdev)
+>  	return 0;
+>  }
+>  
+> +#ifdef CONFIG_PM
+> +static int atmci_suspend(struct device *dev)
+> +{
+> +	struct atmel_mci *host = dev_get_drvdata(dev);
+> +	int i;
+> +
+> +	 for (i = 0; i < ATMEL_MCI_MAX_NR_SLOTS; i++) {
+> +		struct atmel_mci_slot *slot = host->slot[i];
+> +		int ret;
+> +
+> +		if (!slot)
+> +			continue;
+> +		ret = mmc_suspend_host(slot->mmc);
+> +		if (ret < 0) {
+> +			while (--i >= 0) {
+> +				slot = host->slot[i];
+> +				if (slot
+> +				&& test_bit(ATMCI_SUSPENDED, &slot->flags)) {
+> +					mmc_resume_host(host->slot[i]->mmc);
+> +					clear_bit(ATMCI_SUSPENDED, &slot->flags);
+> +				}
+> +			}
+> +			return ret;
+> +		} else {
+> +			set_bit(ATMCI_SUSPENDED, &slot->flags);
+> +		}
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static int atmci_resume(struct device *dev)
+> +{
+> +	struct atmel_mci *host = dev_get_drvdata(dev);
+> +	int i;
+> +	int ret = 0;
+> +
+> +	for (i = 0; i < ATMEL_MCI_MAX_NR_SLOTS; i++) {
+> +		struct atmel_mci_slot *slot = host->slot[i];
+> +		int err;
+> +
+> +		slot = host->slot[i];
+> +		if (!slot)
+> +			continue;
+> +		if (!test_bit(ATMCI_SUSPENDED, &slot->flags))
+> +			continue;
+> +		err = mmc_resume_host(slot->mmc);
+> +		if (err < 0)
+> +			ret = err;
+> +		else
+> +			clear_bit(ATMCI_SUSPENDED, &slot->flags);
+> +	}
+> +
+> +	return ret;
+> +}
+> +#endif
+> +static SIMPLE_DEV_PM_OPS(atmci_pm, atmci_suspend, atmci_resume);
 
-For the first two, can we not clear the TLB_DCLEAN bit in
-__cpu_tlb_flags (only a single check at boot time?).
+if you disable CONFIG_PM this won't work. atmci_resume and atmci_suspend
+will be undefined.
 
-For the last one, we could add a tlb_flags() check.
+>  static struct platform_driver atmci_driver = {
+>  	.remove		= __exit_p(atmci_remove),
+>  	.driver		= {
+>  		.name		= "atmel_mci",
+> +		.pm		= &atmci_pm,
 
-> It would also be a good idea to change the comment from "flush_pte"
-> to "Clean data cache to PoU".
+this pointer will also be invalid.
 
-OK.
+what most people do is:
 
-> > I think there can be a few other optimisations in the TLB area but it
-> > needs some digging.
-> 
-> The single-TLB model works fairly well, but as I thought the lack of
-> mcr%? processing by GCC makes the asm/tlbflush.h code fairly disgusting
-> even for a v6+v7 kernel.  Luckily, we can play some tricks and sort
-> some of that out.  The patch below is not complete (and can result in
-> some rules of the architecture being violated - namely the requirement
-> for an ISB after the BTB flush without a branch between) but it
-> illustrates the idea:
+#ifdef CONFIG_PM
 
-I'm not sure about this rule, I can ask for some clarification (we are
-not changing the memory map of the branch we execute).
+suspend()
+resume()
 
-According to the ARM ARM, the TLB invalidation sequence should be:
+static SIMPLE_DEV_PM_OPS(atmci_pm, suspend, resume);
 
-STR rx, [Translation table entry]          ; write new entry to the translation table
-Clean cache line [Translation table entry] ; This operation is not required with the
-                                           ; Multiprocessing Extensions.
-DSB            ; ensures visibility of the data cleaned from the D Cache
-Invalidate TLB entry by MVA (and ASID if non-global) [page address]
-Invalidate BTC
-DSB            ; ensure completion of the Invalidate TLB operation
-ISB            ; ensure table changes visible to instruction fetch
-
-So we have a DSB and ISB (when we don't return to user) unconditionally.
-
-Starting with Cortex-A8 (well, unless you enable some errata
-workarounds), the BTB is a no-op anyway, so maybe we could have the BTB
-unconditionally as well (for ARMv6/v7). The only problem is the inner
-shareable if we are on SMP - maybe we can do some run-time code patching
-for it.
-
-> diff --git a/arch/arm/include/asm/tlbflush.h b/arch/arm/include/asm/tlbflush.h
-> index d2005de..252874c 100644
-> --- a/arch/arm/include/asm/tlbflush.h
-> +++ b/arch/arm/include/asm/tlbflush.h
-> @@ -34,15 +34,15 @@
->  #define TLB_V6_D_ASID  (1 << 17)
->  #define TLB_V6_I_ASID  (1 << 18)
-> 
-> -#define TLB_BTB                (1 << 28)
-> -
->  /* Unified Inner Shareable TLB operations (ARMv7 MP extensions) */
->  #define TLB_V7_UIS_PAGE        (1 << 19)
->  #define TLB_V7_UIS_FULL (1 << 20)
->  #define TLB_V7_UIS_ASID (1 << 21)
-> 
->  /* Inner Shareable BTB operation (ARMv7 MP extensions) */
-> -#define TLB_V7_IS_BTB  (1 << 22)
-> +#define TLB_V7_IS_BTB  (1 << 26)
-> +#define TLB_BTB                (1 << 27)
-> +#define TLB_BTB_BARRIER        (1 << 28)
-
-I won't comment on the BTB changes until we clarify the conditionality
-of barriers and BTB.
+#define DEV_PM_OPS	(&atmci_pm)
+#else
+#define DEV_PM_OPS	NULL
+#endif
 
 -- 
-Catalin
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 490 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110704/8894dd1f/attachment.sig>
