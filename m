@@ -1,250 +1,156 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 4 Jul 2011 00:25:48 -0600
-Subject: [PATCH 3/3] mmc: sdhci-esdhc-imx: add device tree probe support
-In-Reply-To: <1309681851-23052-4-git-send-email-shawn.guo@linaro.org>
-References: <1309681851-23052-1-git-send-email-shawn.guo@linaro.org>
-	<1309681851-23052-4-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20110704062548.GI15152@ponder.secretlab.ca>
+Date: Mon, 4 Jul 2011 00:19:45 -0600
+Subject: [PATCH 2/2] gpio/mxc: add device tree probe support
+In-Reply-To: <1309681017-22970-3-git-send-email-shawn.guo@linaro.org>
+References: <1309681017-22970-1-git-send-email-shawn.guo@linaro.org>
+	<1309681017-22970-3-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20110704061945.GF15152@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 03, 2011 at 04:30:51PM +0800, Shawn Guo wrote:
-> The patch adds device tree probe support for sdhci-esdhc-imx driver.
+On Sun, Jul 03, 2011 at 04:16:57PM +0800, Shawn Guo wrote:
+> The patch adds device tree probe support for gpio-mxc driver.
 > 
 > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Wolfram Sang <w.sang@pengutronix.de>
-> Cc: Chris Ball <cjb@laptop.org>
 > Cc: Grant Likely <grant.likely@secretlab.ca>
+
+Hi Shawn,
+
+comments below.
+
+g.
+
 > ---
->  .../devicetree/bindings/mmc/fsl-imx-esdhc.txt      |   40 ++++++++
->  drivers/mmc/host/sdhci-esdhc-imx.c                 |   99 +++++++++++++++++++-
->  2 files changed, 134 insertions(+), 5 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt
+>  .../devicetree/bindings/gpio/fsl-imx-gpio.txt      |   22 ++++++++++
+>  drivers/gpio/gpio-mxc.c                            |   42 +++++++++++++++++++-
+>  2 files changed, 63 insertions(+), 1 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/gpio/fsl-imx-gpio.txt
 > 
-> diff --git a/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt b/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt
+> diff --git a/Documentation/devicetree/bindings/gpio/fsl-imx-gpio.txt b/Documentation/devicetree/bindings/gpio/fsl-imx-gpio.txt
 > new file mode 100644
-> index 0000000..e182e7c
+> index 0000000..4363ae4
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt
-> @@ -0,0 +1,40 @@
-> +* Freescale Enhanced Secure Digital Host Controller (eSDHC) for i.MX
-> +
-> +The Enhanced Secure Digital Host Controller on Freescale i.MX family
-> +provides an interface for MMC, SD, and SDIO types of memory cards.
+> +++ b/Documentation/devicetree/bindings/gpio/fsl-imx-gpio.txt
+> @@ -0,0 +1,22 @@
+> +* Freescale i.MX/MXC GPIO controller
 > +
 > +Required properties:
-> +- compatible : Should be "fsl,<chip>-esdhc"
-> +- reg : Should contain eSDHC registers location and length
-> +- interrupts : Should contain eSDHC interrupt
-> +- cd-type : String, card detection (CD) method.  Supported values are:
-
-Similar to previous comments, use the "fsl," prefix to this property name.
-
-> +    "none" : No CD
-> +    "controller" : Uses eSDHC controller internal CD signal
-> +    "gpio" : Uses GPIO pin for CD
-
-I would say the presence of a "cd-gpios" property would implicitly
-mean gpio is to be used for the CD pin.
-
-> +    "permanent" : No CD because card is permanently wired to host
-> +- wp-type : String, write protection (WP) method.  Supported values are:
-> +    "none" : No WP
-> +    "controller" : Uses eSDHC controller internal WP signal 
-> +    "gpio" : Uses GPIO pin for WP
-
-Ditto comments here.
-
-> +- gpios : Should specify GPIOs in this order: CD GPIO, WP GPIO, if
-> +  properties cd-type and wp-type are "gpio".
-
-The gpios binding has been extended to allow named gpios now.  You can
-uses something like "cd-gpios" and "wp-gpios".
-
+> +- compatible : Should be "fsl,<soc>-gpio"
+> +- reg : Address and length of the register set for the device
+> +- interrupts : Should be the port interrupt shared by all 32 pins, if
+> +  one number.  If two numbers, the first one is the interrupt shared
+> +  by low 16 pins and the second one is for high 16 pins.
+> +- gpio-controller : Marks the device node as a gpio controller.
+> +- #gpio-cells : Should be two.  The first cell is the pin number and
+> +  the second cell is used to specify optional parameters (currently
+> +  unused).
 > +
-> +Examples:
+> +Example:
 > +
-> +esdhc at 70004000 {
-> +	compatible = "fsl,imx51-esdhc";
-> +	reg = <0x70004000 0x4000>;
-> +	interrupts = <1>;
-> +	cd-type = "controller";
-> +	wp-type = "controller";
+> +gpio0: gpio at 73f84000 {
+> +	compatible = "fsl,imx51-gpio", "fsl,imx31-gpio";
+> +	reg = <0x73f84000 0x4000>;
+> +	interrupts = <50 51>;
+> +	gpio-controller;
+> +	#gpio-cells = <2>;
 > +};
-> +
-> +esdhc at 70008000 {
-> +	compatible = "fsl,imx51-esdhc";
-> +	reg = <0x70008000 0x4000>;
-> +	interrupts = <2>;
-> +	cd-type = "gpio";
-> +	wp-type = "gpio";
-> +	gpios = <&gpio0 6 0>, /* CD, GPIO1_6 */
-> +		<&gpio0 5 0>; /* WP, GPIO1_5 */
-> +};
-> diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-> index 705d670..57793e3 100644
-> --- a/drivers/mmc/host/sdhci-esdhc-imx.c
-> +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-> @@ -20,6 +20,9 @@
->  #include <linux/mmc/host.h>
->  #include <linux/mmc/mmc.h>
->  #include <linux/mmc/sdio.h>
+> diff --git a/drivers/gpio/gpio-mxc.c b/drivers/gpio/gpio-mxc.c
+> index 7ae71d6..b42204f 100644
+> --- a/drivers/gpio/gpio-mxc.c
+> +++ b/drivers/gpio/gpio-mxc.c
+> @@ -27,6 +27,8 @@
+>  #include <linux/platform_device.h>
+>  #include <linux/slab.h>
+>  #include <linux/basic_mmio_gpio.h>
 > +#include <linux/of.h>
 > +#include <linux/of_device.h>
-> +#include <linux/of_gpio.h>
->  #include <mach/esdhc.h>
->  #include "sdhci-pltfm.h"
->  #include "sdhci-esdhc.h"
-> @@ -78,6 +81,14 @@ static struct platform_device_id imx_esdhc_devtype[] = {
->  };
->  MODULE_DEVICE_TABLE(platform, imx_esdhc_devtype);
+>  #include <asm-generic/bug.h>
 >  
-> +static const struct of_device_id imx_esdhc_dt_ids[] = {
-> +	{ .compatible = "fsl,imx25-esdhc", .data = &imx_esdhc_devtype[IMX25_ESDHC], },
-> +	{ .compatible = "fsl,imx35-esdhc", .data = &imx_esdhc_devtype[IMX35_ESDHC], },
-> +	{ .compatible = "fsl,imx51-esdhc", .data = &imx_esdhc_devtype[IMX51_ESDHC], },
-> +	{ .compatible = "fsl,imx53-esdhc", .data = &imx_esdhc_devtype[IMX53_ESDHC], },
+>  enum mxc_gpio_type {
+> @@ -141,6 +143,13 @@ static struct platform_device_id mxc_gpio_devtype[] = {
+>  	}
+>  };
+>  
+> +static const struct of_device_id mxc_gpio_dt_ids[] = {
+> +	{ .compatible = "fsl,imx1-gpio", .data = &mxc_gpio_devdata[IMX1_GPIO], },
+> +	{ .compatible = "fsl,imx2-gpio", .data = &mxc_gpio_devdata[IMX2_GPIO], },
+> +	{ .compatible = "fsl,imx31-gpio", .data = &mxc_gpio_devdata[IMX_GPIO], },
 > +	{ /* sentinel */ },
 > +};
 > +
->  static unsigned int esdhc_pltfm_get_max_blk_size(struct sdhci_host *host)
->  {
->  	/* Force 2048 bytes, which is the maximum supported size in SDHCI. */
-> @@ -290,24 +301,93 @@ static irqreturn_t cd_irq(int irq, void *data)
->  	return IRQ_HANDLED;
->  };
+>  /*
+>   * MX2 has one interrupt *for all* gpio ports. The list is used
+>   * to save the references to all ports, so that mx2_gpio_irq_handler
+> @@ -321,6 +330,33 @@ static void __init mxc_gpio_init_gc(struct mxc_gpio_port *port)
+>  			       IRQ_NOREQUEST, 0);
+>  }
 >  
 > +#ifdef CONFIG_OF
-> +static int __devinit sdhci_esdhc_imx_probe_dt(struct platform_device *pdev)
+> +static int mxc_gpio_probe_dt(struct mxc_gpio_port *port,
+> +			     struct platform_device *pdev)
 > +{
-> +	const struct of_device_id *of_id =
-> +			of_match_device(imx_esdhc_dt_ids, &pdev->dev);
 > +	struct device_node *np = pdev->dev.of_node;
-> +	struct esdhc_platform_data *boarddata;
-> +	int err, i;
-> +	const char *cd, *cd_types[] = {
-> +		[ESDHC_CD_NONE]		= "none",
-> +		[ESDHC_CD_CONTROLLER]	= "controller",
-> +		[ESDHC_CD_GPIO]		= "gpio",
-> +		[ESDHC_CD_PERMANENT]	= "permanent",
-> +	};
-> +	const char *wp, *wp_types[] = {
-> +		[ESDHC_WP_NONE]		= "none",
-> +		[ESDHC_WP_CONTROLLER]	= "controller",
-> +		[ESDHC_WP_GPIO]		= "gpio",
-> +	};
+> +	const struct of_device_id *of_id =
+> +			of_match_device(mxc_gpio_dt_ids, &pdev->dev);
 > +
 > +	if (!np)
 > +		return -ENODEV;
 > +
-> +	boarddata = kzalloc(sizeof(*boarddata), GFP_KERNEL);
-> +	if (!boarddata)
-> +		return -ENOMEM;
-> +	pdev->dev.platform_data = boarddata;
+> +	pdev->id = of_alias_get_id(np, "gpio");
+> +	if (pdev->id < 0)
+> +		return -ENODEV;
+
+I really doubt this is wanted or needed.  First, after a
+platform_device is registered, pdev->id is immutable.  It must not be
+changed.
+
+Second, when using the DT, there is absolutely no need for a preset
+range of gpio numbers.  The gpio core assigns ranges dynamically, and
+all GPIO references are via device tree phandles that don't use the
+Linux global gpio number space.
+
+The driver needs to be fixed to dynamically assign its gpio range when
+probed from the DT.
+
 > +
-> +	err = of_property_read_string(np, "cd-type", &cd);
-> +	if (err)
-> +		return err;
-> +	for (i = 0; i < ARRAY_SIZE(cd_types); i++)
-> +		if (!strcasecmp(cd, cd_types[i])) {
-> +			boarddata->cd_type = i;
-> +			break;
-> +		}
-> +
-> +	err = of_property_read_string(np, "wp-type", &wp);
-> +	if (err)
-> +		return err;
-> +	for (i = 0; i < ARRAY_SIZE(wp_types); i++)
-> +		if (!strcasecmp(wp, wp_types[i])) {
-> +			boarddata->wp_type = i;
-> +			break;
-> +		}
-> +
-> +	boarddata->cd_gpio = of_get_gpio(np, 0);
-> +	boarddata->wp_gpio = of_get_gpio(np, 1);
-> +
-> +	pdev->id_entry = (struct platform_device_id *) of_id->data;
+> +	port->devdata = of_id->data;
 > +
 > +	return 0;
 > +}
 > +#else
-> +static inline int sdhci_esdhc_imx_probe_dt(struct platform_device *pdev)
+> +static inline int mxc_gpio_probe_dt(struct mxc_gpio_port *port,
+> +				    struct platform_device *pdev)
 > +{
-> +	return 0;
+> +	return -ENODEV;
 > +}
 > +#endif
 > +
->  static int __devinit sdhci_esdhc_imx_probe(struct platform_device *pdev)
+>  static int __devinit mxc_gpio_probe(struct platform_device *pdev)
 >  {
-> +	struct device_node *np = pdev->dev.of_node;
->  	struct sdhci_pltfm_host *pltfm_host;
->  	struct sdhci_host *host;
-> -	struct esdhc_platform_data *boarddata;
-> +	struct esdhc_platform_data *boarddata = NULL;
->  	struct clk *clk;
->  	int err;
->  	struct pltfm_imx_data *imx_data;
+>  	struct mxc_gpio_port *port;
+> @@ -331,7 +367,10 @@ static int __devinit mxc_gpio_probe(struct platform_device *pdev)
+>  	if (!port)
+>  		return -ENOMEM;
 >  
-> +	err = sdhci_esdhc_imx_probe_dt(pdev);
-> +	if (err)
-> +		return err;
+> -	port->devdata = &mxc_gpio_devdata[pdev->id_entry->driver_data];
+> +	err = mxc_gpio_probe_dt(port, pdev);
+> +	if (err == -ENODEV)
+> +		port->devdata = &mxc_gpio_devdata[pdev->id_entry->driver_data];
 > +
->  	host = sdhci_pltfm_init(pdev, &sdhci_esdhc_imx_pdata);
-> -	if (IS_ERR(host))
-> -		return PTR_ERR(host);
-> +	if (IS_ERR(host)) {
-> +		err = PTR_ERR(host);
-> +		goto err_sdhci_pltfm;
-> +	}
+
+What if id_entry is NULL?
+
+>  	port->virtual_irq_start = MXC_GPIO_IRQ_START + pdev->id * 32;
 >  
->  	pltfm_host = sdhci_priv(host);
->  
->  	imx_data = kzalloc(sizeof(struct pltfm_imx_data), GFP_KERNEL);
-> -	if (!imx_data)
-> -		return -ENOMEM;
-> +	if (!imx_data) {
-> +		err = -ENOMEM;
-> +		goto err_imx_data;
-> +	}
->  
->  	imx_data->devtype = pdev->id_entry->driver_data;
->  	pltfm_host->priv = imx_data;
-> @@ -401,12 +481,17 @@ no_board_data:
->  	clk_put(pltfm_host->clk);
->  err_clk_get:
->  	kfree(imx_data);
-> +err_imx_data:
->  	sdhci_pltfm_free(pdev);
-> +err_sdhci_pltfm:
-> +	if (np)
-> +		kfree(boarddata);
->  	return err;
->  }
->  
->  static int __devexit sdhci_esdhc_imx_remove(struct platform_device *pdev)
->  {
-> +	struct device_node *np = pdev->dev.of_node;
->  	struct sdhci_host *host = platform_get_drvdata(pdev);
->  	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
->  	struct esdhc_platform_data *boarddata = host->mmc->parent->platform_data;
-> @@ -429,6 +514,9 @@ static int __devexit sdhci_esdhc_imx_remove(struct platform_device *pdev)
->  
->  	sdhci_pltfm_free(pdev);
->  
-> +	if (np)
-> +		kfree(boarddata);
-> +
->  	return 0;
->  }
->  
-> @@ -436,6 +524,7 @@ static struct platform_driver sdhci_esdhc_imx_driver = {
+>  	iores = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> @@ -416,6 +455,7 @@ static struct platform_driver mxc_gpio_driver = {
 >  	.driver		= {
->  		.name	= "sdhci-esdhc-imx",
+>  		.name	= "gpio-mxc",
 >  		.owner	= THIS_MODULE,
-> +		.of_match_table = imx_esdhc_dt_ids,
+> +		.of_match_table = mxc_gpio_dt_ids,
 >  	},
->  	.id_table	= imx_esdhc_devtype,
->  	.probe		= sdhci_esdhc_imx_probe,
+>  	.probe		= mxc_gpio_probe,
+>  	.id_table	= mxc_gpio_devtype,
 > -- 
 > 1.7.4.1
 > 
