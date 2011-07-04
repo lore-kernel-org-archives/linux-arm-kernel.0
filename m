@@ -1,52 +1,108 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 4 Jul 2011 09:52:58 +0200
-Subject: GIT PULL: i.MX fixes for -rc
-Message-ID: <20110704075258.GC6069@pengutronix.de>
+Date: Mon, 4 Jul 2011 09:55:56 +0200
+Subject: [PATCH 1/3] PWM: add pwm framework support
+In-Reply-To: <4E0E6916.50406@gmail.com>
+References: <1309430517-23821-2-git-send-email-s.hauer@pengutronix.de>
+	<BANLkTikQGFA7XcuAtEEi7_4m-j6-00sZ6Q@mail.gmail.com>
+	<201106301441.24493.arnd@arndb.de>
+	<BANLkTin_htv2z3D9Bbf6N8Y7UKFRvPtvOg@mail.gmail.com>
+	<20110630170229.GP6069@pengutronix.de> <4E0D0595.5070205@gmail.com>
+	<20110701073755.GR6069@pengutronix.de> <4E0D8540.2020200@gmail.com>
+	<20110701085414.GV6069@pengutronix.de> <4E0E6916.50406@gmail.com>
+Message-ID: <20110704075556.GD6069@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
+On Sat, Jul 02, 2011 at 10:40:54AM +1000, Ryan Mallon wrote:
+> On 01/07/11 18:54, Sascha Hauer wrote:
+> >> At _any_ point that you change the pwm api you will need to change all
+> >> of the drivers. How do you plan to adapt the api in the future to
+> >> support the oddball pwm drivers without having to change all of the
+> >> drivers in one go?
+> > It is a framework between hardware drivers and user drivers and as such
+> > it is able to abstract between the API to the hardware drivers and the
+> > API to the user drivers. You can change one of those without touching
+> > the other.
+> 
+> You are missing the point. For example, the current in-kernel api to
+> configure a pwm is this:
+> 
+> int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns);
+> 
+> Bill's proposed change to the api, which is more flexible, looks like this:
+> 
+> int pwm_config(struct pwm_channel *p,
+>         struct pwm_channel_config *c)
+> 
+> If you want to change the api in this way at any time, you will need to
+> change all of the pwm drivers and all of the users (pwm-bl, pwm-leds,
+> etc) at the same time, or introduce some sort of wrapper layer to ease
+> the conversion. Either way, if you do it now or do it after your patch
+> set it is still the same amount of work.
+> 
+> We do want a better api for pwm drivers, if only to support oddball
+> hardware like the atmel. The process I see is this if we go with Bill's
+> patches:
+>  - Introduce new api with common framework
 
-Please pull the following patches for -rc. It contains some fixes
-for section mismatches and some board specific fixes.
+I'm repeating myself. At this point you can't convert any of the old
+drivers because it breaks the support we already have.
+
+>  - Move drivers to new api
+
+And that's one single step. To be really bisectible have would have to
+convert *all* PWM drivers in a single patch, not even a patch series
+as it would break bisectibility in between.
+
+> 
+> With your patches we get this:
+>  - Introduce common framework
+
+And still everything works
+
+>  - Move drivers to common framework
+
+One after another, still everything works
+
+>  - Modify api
+>  - Rewrite drivers for new api
+
+There are two of them. One for the hardware drivers and one for the
+users. You can change them independently, introduce wrappers where
+necessary, you have all the time in the world to do this.
+
+Your aim is to change the API? Then you have to clean up first. People
+like Thomas have cleaned up in all areas of the kernel to reach their
+goal of merging the RT stuff. They wouldn't have got anywhere with
+a here's-a-patch-that-changes-everything approach.
+
+> 
+> The problem we have seen with these processes in the past is they get
+> left half way with some drivers moving to the new framework and some
+> trailing behind and some having their own hand-rolled approach because
+> the common api doesn't meet their needs.
+
+With two competing APIs it's even worse because you can't go anywhere
+without converting everything in tree.
+
+Just imagine Bill or someone else comes up with a series
+
+PATCH: introduce new pwm framework with completely changed API, sysfs
+interface and interrupt support, also convert leds-pwm, pwm_bl, pwm-beeper
+to new API and convert all hardware drivers to new API aswell.
+
+What do you think would happen? I can think of two things: Either no
+reaction at all from others or a huge thread with no result at all
+because we can't agree on details. Then someone comes up with the
+recommendation to start small and do it in little steps.
+
+
+I am tired of discussing this. It seems we can't agree and unless
+someone else jumps in here we will probably have to wait for another
+year until something moves in the PWM area.
 
 Sascha
 
-
-The following changes since commit 56299378726d5f2ba8d3c8cbbd13cb280ba45e4f:
-
-  Linux 3.0-rc4 (2011-06-20 20:25:46 -0700)
-
-are available in the git repository at:
-  git://git.pengutronix.de/git/imx/linux-2.6.git for-rmk
-
-Arnaud Patard (3):
-      efikasb/mx: fix usbh1 initialisation
-      efikasb: fix gpio keys.
-      efika: Fix board id detection
-
-Eric Miao (1):
-      ARM: mx53: add pad configuration for I2C signals
-
-Fabio Estevam (2):
-      ARM: mach-imx/mx31ads: Fix section mismatches
-      ARM: mach-imx/mx31lilly: Fix section mismatches
-
-Javier Martin (1):
-      Add tlv320aic32x4 platform data to Visstrim_M10.
-
-Troy Kisky (1):
-      ARM: mxc: Fix gpio interrupts for mx53
-
- arch/arm/mach-imx/mach-imx27_visstrim_m10.c |   13 +++++++++++
- arch/arm/mach-imx/mach-mx31ads.c            |    4 +-
- arch/arm/mach-imx/mach-mx31lilly.c          |    2 +-
- arch/arm/mach-mx5/board-mx51_efikamx.c      |    6 ++--
- arch/arm/mach-mx5/board-mx51_efikasb.c      |   15 +++++++------
- arch/arm/mach-mx5/mx51_efika.c              |    2 +-
- arch/arm/plat-mxc/gpio.c                    |    3 +-
- arch/arm/plat-mxc/include/mach/iomux-mx53.h |   31 ++++++++++++++------------
- 8 files changed, 47 insertions(+), 29 deletions(-)
 -- 
 Pengutronix e.K.                           |                             |
 Industrial Linux Solutions                 | http://www.pengutronix.de/  |
