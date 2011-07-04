@@ -1,25 +1,37 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Mon, 04 Jul 2011 18:48:17 +0400
-Subject: [BUGFIX][PATCH] mach-mx5: fix the I2C clock parents
-In-Reply-To: <1309787537-20664-1-git-send-email-LW@KARO-electronics.de>
-References: <19985.49912.927038.73866@ipc1.ka-ro>
-	<1309787537-20664-1-git-send-email-LW@KARO-electronics.de>
-Message-ID: <4E11D2B1.8030505@mvista.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 4 Jul 2011 16:53:50 +0200
+Subject: [PATCH v2] ARM: CSR: Adding CSR SiRFprimaII board support
+In-Reply-To: <CAGsJ_4yHrYRQKO7tMeJhjj_aEhV69xnJSZzuHhq8hnBrmnG+dg@mail.gmail.com>
+References: <1309231954-23260-1-git-send-email-bs14@csr.com>
+	<201107011819.43316.arnd@arndb.de>
+	<CAGsJ_4yHrYRQKO7tMeJhjj_aEhV69xnJSZzuHhq8hnBrmnG+dg@mail.gmail.com>
+Message-ID: <201107041653.50962.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lothar Wa?mann wrote:
+On Monday 04 July 2011, Barry Song wrote:
+> Great idea. in fact there is only one reset bit for every device. So
+> maybe the rstc.c can be
+> ...
 
-> The clock from which the I2C timing is derived is the ipg_perclk not ipg_clk.
+Yes, looks good.
 
-> I2C bus frequency was lower by a factor of ~8 due to the clock divider
-> calculation being based on 66.5MHz IPG clock while the bus actually
-> uses 8MHz ipg_perclk.
+>         /*
+>          * Writing 1 to this bit resets corresponding block.
+>          * Writing 0 to this bit de-asserts reset signal of
+>          * the corresponding block.
+>          */
+>         writel(sirfsoc_rstc_base + (reset_bit / 32) * 4,
+>                 readl(sirfsoc_rstc_base + (reset_bit / 32) * 4) | reset_bit);
+>         msleep(10);
+>         writel(sirfsoc_rstc_base + (reset_bit / 32) * 4,
+>                 readl(sirfsoc_rstc_base + (reset_bit / 32) * 4) & ~reset_bit);
 
-> Kernel version: 3.0.0-rc2 branch 'imx-for-next' of git://git.pengutronix.de/git/imx/linux-2.6
+One remark about the msleep here: I find arbitrary wait periods a
+bit unclean, and most hardware allows you to poll whether it's
+done by reading back the register you have just written.
 
-    Shouldn't this info be specified rather after the --- tear-line?
+If your hardware can do that, you can replace the msleep() with a
+single readl or a readl()/msleep(1) loop?
 
-> Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
-
-WBR, Sergei
+	Arnd
