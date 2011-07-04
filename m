@@ -1,40 +1,107 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 4 Jul 2011 10:52:14 +0100
-Subject: [PATCH 4/7] ARM: EXYNOS4: Support early wakeup while entering
-	sleep mode
-In-Reply-To: <005001cc3a2e$a6689480$f339bd80$%kim@samsung.com>
-References: <1308732405-16664-1-git-send-email-kgene.kim@samsung.com>
-	<1308732405-16664-5-git-send-email-kgene.kim@samsung.com>
-	<20110622145715.GS23234@n2100.arm.linux.org.uk>
-	<007401cc3242$48947160$d9bd5420$%kim@samsung.com>
-	<20110624093750.GD23234@n2100.arm.linux.org.uk>
-	<20110624102246.GF23234@n2100.arm.linux.org.uk>
-	<017d01cc378a$c017edf0$4047c9d0$%kim@samsung.com>
-	<20110701074414.GD21898@n2100.arm.linux.org.uk>
-	<005001cc3a2e$a6689480$f339bd80$%kim@samsung.com>
-Message-ID: <20110704095214.GA8286@n2100.arm.linux.org.uk>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 04 Jul 2011 18:54:48 +0900
+Subject: [PATCH 2/2] SPI: SAMSUNG: Bug fix for SPI with different FIFO
+	level
+In-Reply-To: <CACxGe6urrZ9=1OgcaYF6EtvJokAyFTbFCnHPWsCY+sETVze8-w@mail.gmail.com>
+References: <1309437536-9315-1-git-send-email-padma.v@samsung.com>
+	<1309437536-9315-2-git-send-email-padma.v@samsung.com>
+	<BANLkTi=L7QeN75ebWFXdp_V5Pw1zEc-ZtA@mail.gmail.com>
+	<BANLkTimeWUbD2Ej16KKmuzwSCFz8HOhyKQ@mail.gmail.com>
+	<BANLkTi=9c5asfr=Jg6xwjQZW_a369UO64Q@mail.gmail.com>
+	<BANLkTinFnFwBGi693JTD_iDykA2VkV+HOw@mail.gmail.com>
+	<BANLkTik0LERxBHmJc5ZnRotnD4CSveR-UQ@mail.gmail.com>
+	<BANLkTim9wdrqDgXVUjxzMv9cdWViLww=Bg@mail.gmail.com>
+	<BANLkTim40x4X_--K0z7gdodDjor0MUam5Q@mail.gmail.com>
+	<BANLkTinf6ec1yXeaFkZjHMnqZp7yymDq-w@mail.gmail.com>
+	<20110704065501.GP15152@ponder.secretlab.ca>
+	<CACxGe6urrZ9=1OgcaYF6EtvJokAyFTbFCnHPWsCY+sETVze8-w@mail.gmail.com>
+Message-ID: <005501cc3a30$6c916190$45b424b0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 04, 2011 at 06:42:08PM +0900, Kukjin Kim wrote:
-> Russell King - ARM Linux wrote:
-> > 
-> > On Fri, Jul 01, 2011 at 10:03:48AM +0900, Kukjin Kim wrote:
-> > > Russell thanks.
-> > >
-> > > How do you think to add following for handling failure of cpu_suspend?
-> > >
-> > > +	mov	r0, #-1
-> > 
-> > No.  -1 is not an error code, and I refuse to create functions which
-> > use an explicit -1 as a return code to indicate failure.
-> > 
-> I used wrong words, 'handling failure' :(
+Grant Likely wrote:
 > 
-> Actually, it means handling other case, like early wakeup but we will
-> address comments from you :)
+> On Mon, Jul 4, 2011 at 12:55 AM, Grant Likely <grant.likely@secretlab.ca>
+wrote:
+> > On Fri, Jul 01, 2011 at 11:43:08AM +0530, Jassi Brar wrote:
+> >> On Fri, Jul 1, 2011 at 11:29 AM, padma venkat <padma.kvr@gmail.com>
+wrote:
+> >> > Hi Jassi,
+> >> >
+> >> > On Fri, Jul 1, 2011 at 11:22 AM, Jassi Brar
+<jassisinghbrar@gmail.com> wrote:
+> >> >> On Fri, Jul 1, 2011 at 11:16 AM, padma venkat <padma.kvr@gmail.com>
+> wrote:
+> >> >>> Hi Tony,
+> >> >>>
+> >> >>> On Thu, Jun 30, 2011 at 4:30 PM, Tony Nadackal <tonykn@gmail.com>
+> wrote:
+> >> >>>> Hi Padma,
+> >> >>>> With regards to your patch, even though one can check the tx done
+> status
+> >> >>>> using the TX_DONE bit, the present macro itself would work
+perfectly
+> fine if
+> >> >>>> the 'fifo_lvl_mask' is set properly.
+> >> >>>> For example in 6450 channel 1, the fifo_lvl_mask should be 0x1ff
+(for
+> 9bits,
+> >> >>>> 15:23), while even in your patch, it is wrongly set as 0x7f(only
+7bits).
+> >> >>>>
+> >> >>>> Thus, if this fifo_lvl_mask was defined correctly, the existing
+macro
+> would
+> >> >>>> itself have worked.
+> >> >>> Thanks for your comment.
+> >> >>> I considered changing to the fifo_lvl_mask to 1ff as you mentioned.
+> >> >>> But I ?think that the fifo_lvl_mask reflects the actual FIFO
+capacity
+> >> >>> in the SPI driver.
+> >> >>> For the failing channels the FIFO trigger level is 64 bytes and so
+i
+> >> >>> retained that value.
+> >> >>> In the driver it polls till the FIFO capacity level otherwise it
+goes
+> >> >>> for DMA.So if we keep
+> >> >>> the FIFO level as 1ff when the actual capacity is 7f then it fails.
+> >> >>>
+> >> >>> Jassi what do you think about this?
+> >> >>>
+> >> >>
+> >> >> 'fifo_lvl_mask' is h/w specific and can't be set for convenience.
+> >> >>
+> >> >> I don't have access to post-s3c64xx datasheets.
+> >> >> Please check and reply if TX_DONE bit is at same offset for all
+> >> >> channels of an SoC, because
+> >> >> I suspect it's otherwise.
+> >> >>
+> >> > Yes. The TX_DONE bit is at the same offset for all the channels of an
+SoC.
+> >> > in S5P64X0,S5PV210 and S5PV310 it is at offset 25.
+> >> >
+> >>
+> >> Then, Patches-1,2
+> >>
+> >> Acked-by: Jassi Brar <jassisinghbrar@gmail.com>
+> >
+> > Are these bug fixes that should be in v3.0, or do I queue them up for
+v3.1?
+> 
+> Regardless, this one touches a lot of arch/arm files, so I'd rather
+> see both patches go through the samsung tree:
+> 
+> Acked-by: Grant Likely <grant.likely@secretlab.ca>
+> 
 
-Bear in mind that others may wish to return negative errno codes
-through this, so if you want to indicate 'no need to resume and
-restore state' then I guess using a small positive number would be
-acceptable to distinguish it from a real error.
+Thanks Grant, Jassi and all,
+
+I will apply these 1 and 2 in my -fix tree for 3.0 with your acks.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
