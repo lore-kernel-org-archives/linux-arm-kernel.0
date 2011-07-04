@@ -1,104 +1,38 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon,  4 Jul 2011 13:38:25 +0200
-Subject: [PATCH V3] MMC: PM: add suspend/resume in atmel-mci
-In-Reply-To: <1309530754.4373.3.camel@hcegtvedt.norway.atmel.com>
-References: <1309530754.4373.3.camel@hcegtvedt.norway.atmel.com>
-Message-ID: <1309779505-25509-1-git-send-email-nicolas.ferre@atmel.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 4 Jul 2011 11:38:20 +0100
+Subject: [RFC PATCH 0/3] base board consolidation
+In-Reply-To: <CACTFLAPsaiF8KEXeDGOX72dcAvzegHDUQcPEPNxywwYewrHsUw@mail.gmail.com>
+References: <20110701094403.GT11559@pengutronix.de>
+	<20110704082722.GM21898@n2100.arm.linux.org.uk>
+	<CACTFLAPsaiF8KEXeDGOX72dcAvzegHDUQcPEPNxywwYewrHsUw@mail.gmail.com>
+Message-ID: <20110704103820.GC8286@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Take care of slots while going to suspend state.
+On Mon, Jul 04, 2011 at 12:20:08PM +0200, Daniel Mack wrote:
+> Yes, I would also much more like to see these boards being supported
+> by DT, and eventually, we can probably provide static tree definitions
+> for these boards and get rid of the whole code entirely.
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
-V3: take care of each slot SUSPENDED state
-    (adding a status bit in the slot "flags")
-V2: move to pm_ops
+While some of that can be done, I think the idea of getting rid of all
+the code is a pipedream - things like detecting the LCD panel is
+something which has to be in code.
 
- drivers/mmc/host/atmel-mci.c |   60 ++++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 60 insertions(+), 0 deletions(-)
+Having separate DT blobs because you happen to have connected a different
+LCD display is not sane when you can detect the LCD type at run time -
+from either the support perspective or the maintainence perspective.
 
-diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
-index aa8039f..ed63bcd 100644
---- a/drivers/mmc/host/atmel-mci.c
-+++ b/drivers/mmc/host/atmel-mci.c
-@@ -203,6 +203,7 @@ struct atmel_mci_slot {
- #define ATMCI_CARD_PRESENT	0
- #define ATMCI_CARD_NEED_INIT	1
- #define ATMCI_SHUTDOWN		2
-+#define ATMCI_SUSPENDED		3
- 
- 	int			detect_pin;
- 	int			wp_pin;
-@@ -1878,10 +1879,69 @@ static int __exit atmci_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+#ifdef CONFIG_PM
-+static int atmci_suspend(struct device *dev)
-+{
-+	struct atmel_mci *host = dev_get_drvdata(dev);
-+	int i;
-+
-+	 for (i = 0; i < ATMEL_MCI_MAX_NR_SLOTS; i++) {
-+		struct atmel_mci_slot *slot = host->slot[i];
-+		int ret;
-+
-+		if (!slot)
-+			continue;
-+		ret = mmc_suspend_host(slot->mmc);
-+		if (ret < 0) {
-+			while (--i >= 0) {
-+				slot = host->slot[i];
-+				if (slot
-+				&& test_bit(ATMCI_SUSPENDED, &slot->flags)) {
-+					mmc_resume_host(host->slot[i]->mmc);
-+					clear_bit(ATMCI_SUSPENDED, &slot->flags);
-+				}
-+			}
-+			return ret;
-+		} else {
-+			set_bit(ATMCI_SUSPENDED, &slot->flags);
-+		}
-+	}
-+
-+	return 0;
-+}
-+
-+static int atmci_resume(struct device *dev)
-+{
-+	struct atmel_mci *host = dev_get_drvdata(dev);
-+	int i;
-+	int ret = 0;
-+
-+	for (i = 0; i < ATMEL_MCI_MAX_NR_SLOTS; i++) {
-+		struct atmel_mci_slot *slot = host->slot[i];
-+		int err;
-+
-+		slot = host->slot[i];
-+		if (!slot)
-+			continue;
-+		if (!test_bit(ATMCI_SUSPENDED, &slot->flags))
-+			continue;
-+		err = mmc_resume_host(slot->mmc);
-+		if (err < 0)
-+			ret = err;
-+		else
-+			clear_bit(ATMCI_SUSPENDED, &slot->flags);
-+	}
-+
-+	return ret;
-+}
-+#endif
-+static SIMPLE_DEV_PM_OPS(atmci_pm, atmci_suspend, atmci_resume);
-+
- static struct platform_driver atmci_driver = {
- 	.remove		= __exit_p(atmci_remove),
- 	.driver		= {
- 		.name		= "atmel_mci",
-+		.pm		= &atmci_pm,
- 	},
- };
- 
--- 
-1.7.3
+There's also a similar issue where the ethernet controller may be of
+two different types, which can only be detected at runtime - and again
+having different DT blobs would be a nightmare.
+
+With that alone, you're talking about 10 different DT blobs (5 different
+CLCD panel configs + 2 ethernet configs) for just one Realview board.
+
+There's also the matter of the platform specific registers setting the
+clock speed for the SP804 timers.
+
+So no, I don't think that we'll ever get rid of all the code for ARMs
+development platforms without losing functionality/utility, but we should
+be able to get rid of quite an amount like I've already done by
+consolidating across the entire set with plat-versatile.
