@@ -1,106 +1,45 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 4 Jul 2011 17:27:58 -0600
-Subject: [PATCH 6/7] spi/s3c64xx: Add support DMA engine API
-In-Reply-To: <201107042151.44075.heiko@sntech.de>
-References: <1309781915-31549-1-git-send-email-kgene.kim@samsung.com>
-	<201107041859.11548.heiko@sntech.de>
-	<20110704170217.GH28042@ponder.secretlab.ca>
-	<201107042151.44075.heiko@sntech.de>
-Message-ID: <20110704232758.GB12824@ponder.secretlab.ca>
+From: pullip.cho@samsung.com (KyongHo Cho)
+Date: Tue, 5 Jul 2011 08:38:17 +0900
+Subject: [PATCH 0/6+1] ARM: EXYNOS4: SYSMMU: Improvements on SYSMMU driver
+In-Reply-To: <000001cc3a16$4cec0710$e6c41530$%szyprowski@samsung.com>
+References: <1309743708-1505-1-git-send-email-pullip.cho@samsung.com>
+	<000001cc3a16$4cec0710$e6c41530$%szyprowski@samsung.com>
+Message-ID: <CAHQjnOPMCMh3fO7RXP7pbD8_nuDEG9ksLhtCcAy=2Z2bTarT9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 04, 2011 at 09:51:43PM +0200, Heiko St?bner wrote:
-> Am Montag 04 Juli 2011, 19:02:17 schrieb Grant Likely:
-> > On Mon, Jul 04, 2011 at 06:59:11PM +0200, Heiko St?bner wrote:
-> > > Am Montag 04 Juli 2011, 18:42:51 schrieb Grant Likely:
-> > > > On Mon, Jul 04, 2011 at 09:18:34PM +0900, Kukjin Kim wrote:
-> > > > > +#if defined(CONFIG_DMADEV_PL330)
-> > > > > +			memset(&slave_config, 0, sizeof(slave_config));
-> > > > > +			slave_config.direction = DMA_TO_DEVICE;
-> > > > > +			slave_config.src_addr = xfer->tx_dma;
-> > > > > +			slave_config.dst_addr =
-> > > > > +				sdd->sfr_start + S3C64XX_SPI_TX_DATA;
-> > > > > +			slave_config.dst_addr_width = sdd->cur_bpw / 8;
-> > > > > +			dmaengine_slave_config(sdd->tx_chan, &slave_config);
-> > > > > +
-> > > > > +			sg_init_table(&tx_sg, 1);
-> > > > > +			sg_set_page(&tx_sg, pfn_to_page(PFN_DOWN(xfer-
-> >tx_dma)),
-> > > > > +				xfer->len, offset_in_page(xfer->tx_dma));
-> > > > > +			sg_dma_len(&tx_sg) =  xfer->len;
-> > > > > +			sg_dma_address(&tx_sg) = xfer->tx_dma;
-> > > > > +			sdd->tx_desc =
-> > > > > +				sdd->tx_chan->device->device_prep_slave_sg(
-> > > > > +				sdd->tx_chan, &tx_sg, 1, DMA_TO_DEVICE,
-> > > > > +				DMA_PREP_INTERRUPT);
-> > > > > +			sdd->tx_desc->callback = s3c64xx_spi_dma_txcb;
-> > > > > +			sdd->tx_desc->callback_param = sdd;
-> > > > > +			dmaengine_submit(sdd->tx_desc);
-> > > > > +			dma_async_issue_pending(sdd->tx_chan);
-> > > > > +#else
-> > > > > 
-> > > > >  			s3c2410_dma_config(sdd->tx_dmach, sdd->cur_bpw / 8);
-> > > > >  			s3c2410_dma_enqueue(sdd->tx_dmach, (void *)sdd,
-> > > > >  			
-> > > > >  						xfer->tx_dma, xfer->len);
-> > > > >  			
-> > > > >  			s3c2410_dma_ctrl(sdd->tx_dmach, S3C2410_DMAOP_START);
-> > > > > 
-> > > > > +#endif
-> > > > 
-> > > > Hmmm, this is not pretty.  The driver behaviour is entirely different
-> > > > depending on if CONFIG_DMADEV_PL330 is enabled?  When we get to
-> > > > multiplatform kernels, is this going to break on some hardware?
-> > > > 
-> > > > > @@ -802,8 +951,13 @@ static void s3c64xx_spi_work(struct work_struct
-> > > > > *work)
-> > > > > 
-> > > > >  	spin_unlock_irqrestore(&sdd->lock, flags);
-> > > > >  	
-> > > > >  	/* Free DMA channels */
-> > > > > 
-> > > > > +#if defined(CONFIG_DMADEV_PL330)
-> > > > > +	dma_release_channel(sdd->tx_chan);
-> > > > > +	dma_release_channel(sdd->rx_chan);
-> > > > > +#else
-> > > > > 
-> > > > >  	s3c2410_dma_free(sdd->tx_dmach, &s3c64xx_spi_dma_client);
-> > > > >  	s3c2410_dma_free(sdd->rx_dmach, &s3c64xx_spi_dma_client);
-> > > > > 
-> > > > > +#endif
-> > > > 
-> > > > Wow.  A lot of #ifdefs here.  It does not look multiplatform friendly
-> > > > at all.  Are the s3c2410_dma functions obsolete when DMADEV_PL330 is
-> > > > selected?  If so, can they be removed entirely, or are they required
-> > > > to support certain hardware?
-> > > 
-> > > The spi_s3c64xx driver can also support the SPI controller of the
-> > > S3C2416/S3C2443 line of SoCs.
-> > > As I'm currently working on a S3C2416 based project, my small wish from
-> > > the sidelines would be to not break this support with whatever solution
-> > > you will decide on :-) .
-> > 
-> > I will not merge a patch that either breaks a platform, or requires
-> > a compile time either/or choice of device support (enabling support
-> > for one device should not break support for another).
-> 
-> The patch above seems to contain the support for both SoCs (i.e. s3c2410_dma_* 
-> for S3C2416 etc), so it wouldn't break the support.
-> But this form will definitly break future multiplatform kernels when the 2416 
-> and some variant using the DMADEV_PL330 are selected at the same time.
+Hi.
+On Mon, Jul 4, 2011 at 3:47 PM, Marek Szyprowski
+<m.szyprowski@samsung.com> wrote:
+> Hello,
+>
+> I really don't get why do You persist in creating one monster platform
+> device with resources for ALL SYSMMU/IOMMU controllers that are available
+> on Exynos4 CPU. We (SPRC, see Andrzej's SYSMMU patches) already proposed
+> a clean solution for making the SYSMMU controllers independent of each
+> other as well as making the main SYSMMU driver simpler and more
+> independent of the particular Exynos4 platform definition. In Linux
+> device model if the device/controller exist in the system in more than
+> one instance, there should by one generic driver for it and a set of
+> platform definitions for each instance.
+>
+Did you find this patch? "[PATCH 3/6] ARM: EXYNOS4: SYSMMU"
+I Cced you because it includes your suggestion.
 
-Yes, that's the breakage I'm talking about.
+> Here is the link to our SYSMMU updated driver (implementing common
+> iommu API):
+> http://www.spinics.net/lists/linux-samsung-soc/msg04508.html
+> The driver still needs some cleanup, but this has been delayed until
+> the dma-mapping framework update is finished.
+>
+> I also don't get why do you want to keep the completely custom sysmmu
+> driver and implement iommu API on top of it. Is it really required for
+> anything? Mainline kernel is not a place for custom APIs if there is
+> already a common, generic one.
 
-> The 2416/2443 seem to be the first Samsung-SoCs to have a SPI-controller of 
-> this type. Implementing the DMA engine stuff for these SoCs would obviously 
-> solve the ifdef-problem but I don't know if this is possible to do.
-
-Of course it's possible, it's just software.  :-D
-
-If a config option is either/or then it needs to be really well
-justified before I will accept it.  Most either/or options I've seen
-aren't for any strong technical reason other than it was easier to
-code that way.
-
-g.
+I did not exposed any custom API.
+The global function in the last patch is just for IOMMU API implemenation.
+The header file in the last patch is not for the device drivers but
+for the IOMMU API implementation.
+Actually, they can be merged into one single file.
+But I just wanted to change the kernel code stepwise.
