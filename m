@@ -1,182 +1,147 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Mon, 4 Jul 2011 10:55:55 +0800
-Subject: [PATCH v2] ARM: CSR: Adding CSR SiRFprimaII board support
-In-Reply-To: <201107011819.43316.arnd@arndb.de>
-References: <1309231954-23260-1-git-send-email-bs14@csr.com>
-	<201106301236.25822.arnd@arndb.de>
-	<BANLkTikoMu3ccUxj5KRmKzdReQcBqK4Y9Q@mail.gmail.com>
-	<201107011819.43316.arnd@arndb.de>
-Message-ID: <CAGsJ_4yHrYRQKO7tMeJhjj_aEhV69xnJSZzuHhq8hnBrmnG+dg@mail.gmail.com>
+From: chaos.youn@samsung.com (Changhwan Youn)
+Date: Mon, 04 Jul 2011 12:40:44 +0900
+Subject: [PATCH 3/3] rtc: rtc-s3c: allow multiple open / allow
+	no-ioctl-open'ed rtc to have irq.
+In-Reply-To: <1309175006-9218-4-git-send-email-myungjoo.ham@samsung.com>
+References: <1309175006-9218-1-git-send-email-myungjoo.ham@samsung.com>
+	<1309175006-9218-4-git-send-email-myungjoo.ham@samsung.com>
+Message-ID: <014001cc39fc$27cb52c0$7761f840$%youn@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/7/2 Arnd Bergmann <arnd@arndb.de>:
-> On Friday 01 July 2011, Barry Song wrote:
->> It looks like we can new a common function named as of_io_earlymap()
->> or something in drivers/of/address.c. of_iomap() does ioremap,
->> of_io_earlymap() does early static mapping?
->> Then all SoCs can call this function to do early static mapping. if
->> so, some lines can be deleted in sirfsoc_of_clk_init(). How do you
->> think about newing the function in drivers/of/address.c?
->
-> I think that's a good idea, but the ARM specific implementation cannot
-> be in common code. Other architectures have stuff similar to iotable_init
-> in asm/fixmap.h. If we decide on a function prototype for this, the
-> implementation can be arch/*/.
->
-> How about this:
->
-> extern void of_set_fixmap(struct device_node *np, int index,
-> ? ? ? ?unsigned long of_fixmap_offset, pgprot_t flags);
->
->> For DEBUG_LL uart, i have moved the static mapping to a new file named
->> lluart.c too:
->> +#include <linux/kernel.h>
->> +#include <asm/page.h>
->> +#include <asm/mach/map.h>
->> +#include <mach/map.h>
->> +#include <mach/uart.h>
->> +
->> +void __init sirfsoc_map_lluart(void)
->> +{
->> + ? ? ? struct map_desc sirfsoc_lluart_map = {
->> + ? ? ? ? ? ? ? .virtual ? ? ? ?= SIRFSOC_UART1_VA_BASE,
->> + ? ? ? ? ? ? ? .pfn ? ? ? ? ? ?= __phys_to_pfn(SIRFSOC_UART1_PA_BASE),
->> + ? ? ? ? ? ? ? .length ? ? ? ? = SIRFSOC_UART1_SIZE,
->> + ? ? ? ? ? ? ? .type ? ? ? ? ? = MT_DEVICE,
->> + ? ? ? };
->> +
->> + ? ? ? iotable_init(&sirfsoc_lluart_map, 1);
->> +}
->> +
->>
->> only when DEBUG_LL is selected, this file will be compiled. Otherwise,
->> an empty sirfsoc_map_lluart is used:
->
-> Ok, sounds good.
->
->> +/* TODO:
->> + * add APIs to control reset of every module
->> + */
->
-> Hmm, how about this: You enumerate every bit in the reset registers, and
-> then add a device tree property to the devices where this is needed containing
-> the number. Then you just need a simple interface like
->
-> void sirfsoc_reset_device(struct device *dev)
-> {
-> ? ? ? ?int len, i;
-> ? ? ? ?unsigned int *reset_bits = of_get_property(dev->of_node, "reset-bit", &len);
->
-> ? ? ? ?for (i = 0; i<len/4; i++)
-> ? ? ? ? ? ? ? ?sirfsoc_reset_line(reset_bits[i]);
-> }
+AbwBwAGUAbgAgAC8AIAB
+	hAGwAbABvAHcAIABuAG8ALQBpAG8AYwB0AGwALQBvAHAAZQBuACcAZQBkACAAcgB0AGMAIAB0AG8AIABoAGEAdgBlACAAaQByAHEALgA=
+x-cr-puzzleid: {71A23705-5400-4E21-9C23-2B1E96E33A68}
 
-Great idea. in fact there is only one reset bit for every device. So
-maybe the rstc.c can be:
-/*
- * reset controller for CSR SiRFprimaII
- *
- * Copyright (c) 2011 Cambridge Silicon Radio Limited, a CSR plc group company.
- *
- * Licensed under GPLv2 or later.
- */
+MyungJoo Ham wrote:
+> The previous rtc-s3c had two issues related with its IRQ.
+> 1. Users cannot open rtc multiple times because an open operation calls
+> request_irq on the same IRQ. (e.g., two user processes wants to open and
+> read RTC time from rtc-s3c at the same time)
+> 2. If alarm is set and no one has the rtc opened with filesystem
+> (either the alarm is set by kernel/boot-loader or user set an alarm
+> and closed rtc dev file), the pending bit is not cleared and no further
+> interrupt is invoked. When the alarm is used by the system itself such
+> as a resume from suspend-to-RAM or other Low-power modes/idle, this is a
+> critical issue.
+> 
+> This patch mitigates these issue by calling request_irq at probe and
+> free_irq at remove.
+> 
+> Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  drivers/rtc/rtc-s3c.c |   63
+++++++++++++++-------------------------------
+> ---
+>  1 files changed, 19 insertions(+), 44 deletions(-)
+> 
+> diff --git a/drivers/rtc/rtc-s3c.c b/drivers/rtc/rtc-s3c.c
+> index be85ea5..8d2807f 100644
+> --- a/drivers/rtc/rtc-s3c.c
+> +++ b/drivers/rtc/rtc-s3c.c
+> @@ -320,50 +320,7 @@ static int s3c_rtc_proc(struct device *dev, struct
+> seq_file *seq)
+>  	return 0;
+>  }
+> 
+> -static int s3c_rtc_open(struct device *dev)
+> -{
+> -	struct platform_device *pdev = to_platform_device(dev);
+> -	struct rtc_device *rtc_dev = platform_get_drvdata(pdev);
+> -	int ret;
+> -
+> -	ret = request_irq(s3c_rtc_alarmno, s3c_rtc_alarmirq,
+> -			  IRQF_DISABLED,  "s3c2410-rtc alarm", rtc_dev);
+> -
+> -	if (ret) {
+> -		dev_err(dev, "IRQ%d error %d\n", s3c_rtc_alarmno, ret);
+> -		return ret;
+> -	}
+> -
+> -	ret = request_irq(s3c_rtc_tickno, s3c_rtc_tickirq,
+> -			  IRQF_DISABLED,  "s3c2410-rtc tick", rtc_dev);
+> -
+> -	if (ret) {
+> -		dev_err(dev, "IRQ%d error %d\n", s3c_rtc_tickno, ret);
+> -		goto tick_err;
+> -	}
+> -
+> -	return ret;
+> -
+> - tick_err:
+> -	free_irq(s3c_rtc_alarmno, rtc_dev);
+> -	return ret;
+> -}
+> -
+> -static void s3c_rtc_release(struct device *dev)
+> -{
+> -	struct platform_device *pdev = to_platform_device(dev);
+> -	struct rtc_device *rtc_dev = platform_get_drvdata(pdev);
+> -
+> -	/* do not clear AIE here, it may be needed for wake */
+> -
+> -	free_irq(s3c_rtc_alarmno, rtc_dev);
+> -	free_irq(s3c_rtc_tickno, rtc_dev);
+> -}
+> -
+> -
+>  static const struct rtc_class_ops s3c_rtcops = {
+> -	.open		= s3c_rtc_open,
+> -	.release	= s3c_rtc_release,
+>  	.read_time	= s3c_rtc_gettime,
+>  	.set_time	= s3c_rtc_settime,
+>  	.read_alarm	= s3c_rtc_getalarm,
+> @@ -427,6 +384,9 @@ static int __devexit s3c_rtc_remove(struct
+> platform_device *dev)
+>  {
+>  	struct rtc_device *rtc = platform_get_drvdata(dev);
+> 
+> +	free_irq(s3c_rtc_alarmno, rtc);
+> +	free_irq(s3c_rtc_tickno, rtc);
+> +
+>  	platform_set_drvdata(dev, NULL);
+>  	rtc_device_unregister(rtc);
+> 
+> @@ -553,8 +513,23 @@ static int __devinit s3c_rtc_probe(struct
+> platform_device *pdev)
+> 
+>  	clk_disable(rtc_clk);
+> 
+> -	return 0;
+> +	ret = request_irq(s3c_rtc_alarmno, s3c_rtc_alarmirq,
+> +			  IRQF_DISABLED,  "s3c2410-rtc alarm", rtc);
+> 
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "IRQ%d error %d\n", s3c_rtc_alarmno,
+> ret);
+> +		return ret;
+> +	}
+> +
+> +	ret = request_irq(s3c_rtc_tickno, s3c_rtc_tickirq,
+> +			  IRQF_DISABLED,  "s3c2410-rtc tick", rtc);
+> +
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "IRQ%d error %d\n", s3c_rtc_tickno,
+ret);
+> +		free_irq(s3c_rtc_alarmno, rtc);
+> +	}
+> +
+> +	return ret;
 
-#include <linux/kernel.h>
-#include <linux/mutex.h>
-#include <linux/io.h>
-#include <linux/delay.h>
-#include <linux/device.h>
-#include <linux/of.h>
-#include <linux/of_address.h>
+You need proper error handlings.
 
-void __iomem *sirfsoc_rstc_base;
-static DEFINE_MUTEX(rstc_lock);
+Regards,
+Changhwan
 
-static struct of_device_id rstc_ids[]  = {
-	{ .compatible = "sirf,rstc" },
-};
-
-static int __init sirfsoc_of_rstc_init(void)
-{
-	struct device_node *np;
-
-	np = of_find_matching_node(NULL, rstc_ids);
-	if (!np)
-		panic("unable to find compatible rstc node in dtb\n");
-
-	sirfsoc_rstc_base = of_iomap(np, 0);
-	if (!sirfsoc_rstc_base)
-		panic("unable to map rstc cpu registers\n");
-
-	of_node_put(np);
-
-	return 0;
-}
-early_initcall(sirfsoc_of_rstc_init);
-
-int sirfsoc_reset_device(struct device *dev)
-{
-	const unsigned int *prop = of_get_property(dev->of_node, "reset-bit", NULL);
-	unsigned int reset_bit;
-
-	if (!prop)
-		return -ENODEV;
-
-	reset_bit = be32_to_cpup(prop);
-
-	mutex_lock(&rstc_lock);
-
-	/*
-	 * Writing 1 to this bit resets corresponding block.
-	 * Writing 0 to this bit de-asserts reset signal of
-	 * the corresponding block.
-	 */
-	writel(sirfsoc_rstc_base + (reset_bit / 32) * 4,
-		readl(sirfsoc_rstc_base + (reset_bit / 32) * 4) | reset_bit);
-	msleep(10);
-	writel(sirfsoc_rstc_base + (reset_bit / 32) * 4,
-		readl(sirfsoc_rstc_base + (reset_bit / 32) * 4) & ~reset_bit);
-
-	mutex_unlock(&rstc_lock);
-
-	return 0;
-}
->
->
->> +#include <linux/init.h>
->> +#include <linux/kernel.h>
->> +#include <asm/mach-types.h>
->> +#include <asm/mach/arch.h>
->> +#include <linux/of.h>
->> +#include <linux/of_platform.h>
->> +#include "common.h"
->> +
->> +static struct of_device_id sirfsoc_of_bus_ids[] __initdata = {
->> + ? ? ? { .compatible = "simple-bus", },
->> + ? ? ? {},
->> +};
->> +
->> +void __init sirfsoc_mach_init(void)
->> +{
->> + ? ? ? of_platform_bus_probe(NULL, sirfsoc_of_bus_ids, NULL);
->> +}
->> +
->> +static const char *prima2cb_dt_match[] __initdata = {
->> + ? ? ? "sirf,prima2-cb",
->> + ? ? ? NULL
->> +};
->> +
->> +MACHINE_START(PRIMA2_EVB, "prima2cb")
->> + ? ? ? .boot_params ? ?= 0x00000100,
->> + ? ? ? .init_early ? ? = sirfsoc_of_clk_init,
->> + ? ? ? .map_io ? ? ? ? = sirfsoc_map_lluart,
->> + ? ? ? .init_irq ? ? ? = sirfsoc_of_irq_init,
->> + ? ? ? .timer ? ? ? ? ?= &sirfsoc_timer,
->> + ? ? ? .init_machine ? = sirfsoc_mach_init,
->> + ? ? ? .dt_compat ? ? ?= prima2cb_dt_match,
->> +MACHINE_END
->
-> Very nice!
->
-> ? ? ? ?Arnd
+>   err_nortc:
+>  	s3c_rtc_enable(pdev, 0);
+>  	clk_disable(rtc_clk);
+> --
+> 1.7.4.1
+> 
+> --
+> You received this message because you are subscribed to "rtc-linux".
+> Membership options at http://groups.google.com/group/rtc-linux .
+> Please read http://groups.google.com/group/rtc-linux/web/checklist
+> before submitting a driver.
