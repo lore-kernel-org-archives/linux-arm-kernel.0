@@ -1,52 +1,72 @@
-From: adrian.wenl@gmail.com (Lei Wen)
-Date: Mon, 4 Jul 2011 17:27:16 +0800
-Subject: [PATCH V3 0/9] pxa3xx_nand: add two chip select support
-In-Reply-To: <1309342805.23597.136.camel@sauron>
-References: <1309246361.23597.30.camel@sauron>
-	<1309319494-17951-1-git-send-email-leiwen@marvell.com>
-	<4E0AE9B0.7000908@compulab.co.il>
-	<1309342805.23597.136.camel@sauron>
-Message-ID: <CALZhoSSHx_TB3UvAC6r86cPhY09+6sit5sK8OOJU8mqCg6YwAA@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 4 Jul 2011 11:28:05 +0200
+Subject: [PATCH 1/2] serial/imx: get rid of the uses of cpu_is_mx1()
+In-Reply-To: <20110704084324.GE10245@S2100-06.ap.freescale.net>
+References: <1309679760-22796-1-git-send-email-shawn.guo@linaro.org>
+	<1309679760-22796-2-git-send-email-shawn.guo@linaro.org>
+	<20110703211007.GB13742@ponder.secretlab.ca>
+	<20110704021923.GA10245@S2100-06.ap.freescale.net>
+	<20110704073320.GB4338@pengutronix.de>
+	<20110704084324.GE10245@S2100-06.ap.freescale.net>
+Message-ID: <20110704092805.GH4338@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Artem & Igor,
+Hello Shawn,
 
-On Wed, Jun 29, 2011 at 6:20 PM, Artem Bityutskiy <dedekind1@gmail.com> wrote:
-> On Wed, 2011-06-29 at 12:00 +0300, Igor Grinberg wrote:
->> Hi Lei,
->>
->> On 06/29/11 06:51, Lei Wen wrote:
->>
->> > V2:
->> > Choose to at most keep original pxa3xx_nand_info structure to reduce
->> > patch size
->> >
->> > V3:
->> > Seperate original one patch into a patch set
->> >
->> > Lei Wen (9):
->> > ? MTD: pxa3xx_nand: convert all printk into dev_*
->> > ? MTD: pxa3xx_nand: enable multiple chip select support
->> > ? ARM: aspenite: fix nand platform data
->> > ? ARM: cm-x300: fix nand platform data
->> > ? ARM: colibri-pxa3xx: fix nand platform data
->> > ? ARM: littleton: fix nand platform data
->> > ? ARM: mxm8x10: fix nand platform data
->> > ? ARM: raumfeld: fix nand platform data
->> > ? ARM: zylonite: fix nand platform data
->>
->> While I agree with Artem, that reviewing patch sets are much more easier,
->> than a one single big patch, I think you should keep the
->> "fix nand platform data" changes all in one patch.
->> All of them do the same change, but for different boards.
->
-> Yeah, I did not suggest to split a large patch to a number of
-> micro-patches plus another large patch :-) My suggestion is to have a
-> set of easily reviewable patches. If you do the same thing in many
-> platform data structures, it is reviewable and can be in one patch.
->
-V4 patch set has been pushed. Hope this time would be better. :)
+On Mon, Jul 04, 2011 at 04:43:25PM +0800, Shawn Guo wrote:
+> On Mon, Jul 04, 2011 at 09:33:20AM +0200, Uwe Kleine-K?nig wrote:
+> > On Mon, Jul 04, 2011 at 10:19:25AM +0800, Shawn Guo wrote:
+> > > > > +static struct platform_device_id imx_uart_devtype[] = {
+> > > > > +	{
+> > > > > +		.name = "imx1-uart",
+> > > > > +		.driver_data = IMX1_UART,
+> > > > > +	}, {
+> > > > > +		.name = "imx-uart",
+> > > > > +		.driver_data = IMX2_UART,
+> > It feels strange to introduce IMX2 today meaning
+> > i.MX{21,25,27,31,35,50,51,53}. I didn't check the changes in detail, but
+> > if the only relevant change is that the UTS register is at a different
+> 
+> No, it's not the only relevant change.  The patch also changes a couple of
+> 'if (!cpu_is_imx1())' to 'if (IS_IMX2_UART())'.
+> 
+> The 'IMX2' in 'IMX2_UART' does not necessarily mean i.MX{21,25,27,
+> 31,35,50,51,53}.  It actually means i.MX{21,25,27,31,35,50,51,53} all
+> have the same UART block which was firstly introduced on IMX2.
+This is ugly. IMHO something like imx_uart_v2 would be much better.
+For a driver that supports all i.MX generations
 
-Thanks,
-Lei
+	if (IS_IMX2_UART())
+
+is simply misleading. Even if you had documented at the definition
+of imx_uart_type (and/or IS_IMX2_UART) that IMX2_UART means everything
+currently known but MX1, just looking at the if condition yields wrong
+expectations.
+
+	if (cpu_is_imx1())
+
+is much better (in this aspect). (At least until Freescale comes up with
+a new SOC in the mx1 family that includes a completely new UART block
+:-)
+
+With
+
+	if (somehow_get_current_driver_data() & SOME_FLAG)
+		do_the(things, that, "are only needed with SOME_FLAG");
+
+you can have both, even local understandable code and no dependency on
+the cpu_is_... stuff.
+
+> It's actually a change respecting the existing code, which defines
+> MX2_ONEMS for all imx except imx1.
+IMHO that's a bad excuse. Take it the other way 'round: You can do
+better than the existing code (and even fix it on the go if you're
+motivated).
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
