@@ -1,72 +1,83 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 4 Jul 2011 11:28:05 +0200
-Subject: [PATCH 1/2] serial/imx: get rid of the uses of cpu_is_mx1()
-In-Reply-To: <20110704084324.GE10245@S2100-06.ap.freescale.net>
-References: <1309679760-22796-1-git-send-email-shawn.guo@linaro.org>
-	<1309679760-22796-2-git-send-email-shawn.guo@linaro.org>
-	<20110703211007.GB13742@ponder.secretlab.ca>
-	<20110704021923.GA10245@S2100-06.ap.freescale.net>
-	<20110704073320.GB4338@pengutronix.de>
-	<20110704084324.GE10245@S2100-06.ap.freescale.net>
-Message-ID: <20110704092805.GH4338@pengutronix.de>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Mon,  4 Jul 2011 11:29:10 +0200
+Subject: [PATCH RESEND] arm: mach-vt8500: add forgotten irq_data conversion
+Message-ID: <1309771750-30178-1-git-send-email-w.sang@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Shawn,
+This platform has not been converted to 'struct irq_data' when the big
+pile was done. It fails to compile nowadays, because the compatibility
+code has gone. Add the missing conversion. Tested on a JayPC-Tablet.
 
-On Mon, Jul 04, 2011 at 04:43:25PM +0800, Shawn Guo wrote:
-> On Mon, Jul 04, 2011 at 09:33:20AM +0200, Uwe Kleine-K?nig wrote:
-> > On Mon, Jul 04, 2011 at 10:19:25AM +0800, Shawn Guo wrote:
-> > > > > +static struct platform_device_id imx_uart_devtype[] = {
-> > > > > +	{
-> > > > > +		.name = "imx1-uart",
-> > > > > +		.driver_data = IMX1_UART,
-> > > > > +	}, {
-> > > > > +		.name = "imx-uart",
-> > > > > +		.driver_data = IMX2_UART,
-> > It feels strange to introduce IMX2 today meaning
-> > i.MX{21,25,27,31,35,50,51,53}. I didn't check the changes in detail, but
-> > if the only relevant change is that the UTS register is at a different
-> 
-> No, it's not the only relevant change.  The patch also changes a couple of
-> 'if (!cpu_is_imx1())' to 'if (IS_IMX2_UART())'.
-> 
-> The 'IMX2' in 'IMX2_UART' does not necessarily mean i.MX{21,25,27,
-> 31,35,50,51,53}.  It actually means i.MX{21,25,27,31,35,50,51,53} all
-> have the same UART block which was firstly introduced on IMX2.
-This is ugly. IMHO something like imx_uart_v2 would be much better.
-For a driver that supports all i.MX generations
+Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
+Acked-by: Alexey Charkov <alchark@gmail.com>
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+---
 
-	if (IS_IMX2_UART())
+This is a build-fix and is acked by the platform maintainer. It would be
+good to have that in Linux 3.0 IMO. Russell, I already put it into your
+patch system but got unsure if this has to go via the new arm platform
+maintainer group (CCing tglx)?
 
-is simply misleading. Even if you had documented at the definition
-of imx_uart_type (and/or IS_IMX2_UART) that IMX2_UART means everything
-currently known but MX1, just looking at the if condition yields wrong
-expectations.
-
-	if (cpu_is_imx1())
-
-is much better (in this aspect). (At least until Freescale comes up with
-a new SOC in the mx1 family that includes a completely new UART block
-:-)
-
-With
-
-	if (somehow_get_current_driver_data() & SOME_FLAG)
-		do_the(things, that, "are only needed with SOME_FLAG");
-
-you can have both, even local understandable code and no dependency on
-the cpu_is_... stuff.
-
-> It's actually a change respecting the existing code, which defines
-> MX2_ONEMS for all imx except imx1.
-IMHO that's a bad excuse. Take it the other way 'round: You can do
-better than the existing code (and even fix it on the go if you're
-motivated).
-
-Best regards
-Uwe
-
+diff --git a/arch/arm/mach-vt8500/irq.c b/arch/arm/mach-vt8500/irq.c
+index 245140c..642de04 100644
+--- a/arch/arm/mach-vt8500/irq.c
++++ b/arch/arm/mach-vt8500/irq.c
+@@ -39,9 +39,10 @@
+ static void __iomem *ic_regbase;
+ static void __iomem *sic_regbase;
+ 
+-static void vt8500_irq_mask(unsigned int irq)
++static void vt8500_irq_mask(struct irq_data *d)
+ {
+ 	void __iomem *base = ic_regbase;
++	unsigned irq = d->irq;
+ 	u8 edge;
+ 
+ 	if (irq >= 64) {
+@@ -64,9 +65,10 @@ static void vt8500_irq_mask(unsigned int irq)
+ 	}
+ }
+ 
+-static void vt8500_irq_unmask(unsigned int irq)
++static void vt8500_irq_unmask(struct irq_data *d)
+ {
+ 	void __iomem *base = ic_regbase;
++	unsigned irq = d->irq;
+ 	u8 dctr;
+ 
+ 	if (irq >= 64) {
+@@ -78,10 +80,11 @@ static void vt8500_irq_unmask(unsigned int irq)
+ 	writeb(dctr, base + VT8500_IC_DCTR + irq);
+ }
+ 
+-static int vt8500_irq_set_type(unsigned int irq, unsigned int flow_type)
++static int vt8500_irq_set_type(struct irq_data *d, unsigned int flow_type)
+ {
+ 	void __iomem *base = ic_regbase;
+-	unsigned int orig_irq = irq;
++	unsigned irq = d->irq;
++	unsigned orig_irq = irq;
+ 	u8 dctr;
+ 
+ 	if (irq >= 64) {
+@@ -114,11 +117,11 @@ static int vt8500_irq_set_type(unsigned int irq, unsigned int flow_type)
+ }
+ 
+ static struct irq_chip vt8500_irq_chip = {
+-	.name      = "vt8500",
+-	.ack       = vt8500_irq_mask,
+-	.mask      = vt8500_irq_mask,
+-	.unmask    = vt8500_irq_unmask,
+-	.set_type  = vt8500_irq_set_type,
++	.name = "vt8500",
++	.irq_ack = vt8500_irq_mask,
++	.irq_mask = vt8500_irq_mask,
++	.irq_unmask = vt8500_irq_unmask,
++	.irq_set_type = vt8500_irq_set_type,
+ };
+ 
+ void __init vt8500_init_irq(void)
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.7.2.5
