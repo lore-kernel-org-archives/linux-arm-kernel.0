@@ -1,110 +1,99 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 4 Jul 2011 09:55:56 +0200
-Subject: [PATCH 1/3] PWM: add pwm framework support
-In-Reply-To: <4E0E6916.50406@gmail.com>
-References: <1309430517-23821-2-git-send-email-s.hauer@pengutronix.de>
-	<BANLkTikQGFA7XcuAtEEi7_4m-j6-00sZ6Q@mail.gmail.com>
-	<201106301441.24493.arnd@arndb.de>
-	<BANLkTin_htv2z3D9Bbf6N8Y7UKFRvPtvOg@mail.gmail.com>
-	<20110630170229.GP6069@pengutronix.de> <4E0D0595.5070205@gmail.com>
-	<20110701073755.GR6069@pengutronix.de> <4E0D8540.2020200@gmail.com>
-	<20110701085414.GV6069@pengutronix.de> <4E0E6916.50406@gmail.com>
-Message-ID: <20110704075556.GD6069@pengutronix.de>
+From: javier.martin@vista-silicon.com (javier Martin)
+Date: Mon, 4 Jul 2011 10:00:34 +0200
+Subject: ASoC: imx dma tx burst size set to 6 and to 4 ?
+In-Reply-To: <20110704072851.GC9349@pengutronix.de>
+References: <4E0C16D9.4040909@televic.com>
+	<20110704072851.GC9349@pengutronix.de>
+Message-ID: <CACKLOr1Cv4TVRthYmKh8a=OA6VbHRUhucxxNF9AyBwAhBOfFOg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 02, 2011 at 10:40:54AM +1000, Ryan Mallon wrote:
-> On 01/07/11 18:54, Sascha Hauer wrote:
-> >> At _any_ point that you change the pwm api you will need to change all
-> >> of the drivers. How do you plan to adapt the api in the future to
-> >> support the oddball pwm drivers without having to change all of the
-> >> drivers in one go?
-> > It is a framework between hardware drivers and user drivers and as such
-> > it is able to abstract between the API to the hardware drivers and the
-> > API to the user drivers. You can change one of those without touching
-> > the other.
-> 
-> You are missing the point. For example, the current in-kernel api to
-> configure a pwm is this:
-> 
-> int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns);
-> 
-> Bill's proposed change to the api, which is more flexible, looks like this:
-> 
-> int pwm_config(struct pwm_channel *p,
->         struct pwm_channel_config *c)
-> 
-> If you want to change the api in this way at any time, you will need to
-> change all of the pwm drivers and all of the users (pwm-bl, pwm-leds,
-> etc) at the same time, or introduce some sort of wrapper layer to ease
-> the conversion. Either way, if you do it now or do it after your patch
-> set it is still the same amount of work.
-> 
-> We do want a better api for pwm drivers, if only to support oddball
-> hardware like the atmel. The process I see is this if we go with Bill's
-> patches:
->  - Introduce new api with common framework
+2011/7/4 Sascha Hauer <s.hauer@pengutronix.de>:
+> (Added Javier to Cc)
+>
+> On Thu, Jun 30, 2011 at 08:25:29AM +0200, Lambrecht J?rgen wrote:
+>> Hello,
+>>
+>> There is an inconsistency in this code:
+>>
+>> /sound/soc/imx/imx-ssi.c: ? ? ? ? ssi->dma_params_tx.burstsize = 4;
+>> /sound/soc/imx/imx-pcm-dma-mx2.c: ssi->dma_params_tx.burstsize = 6;
+>>
+>> Datasheet:
+>> This sets the field TFWM0 in register SFCSR (SSI_SFCSR_TFWM0): the
+>> number of data words needed to set the empty flag (TFE0). Can be set
+>> from 1 to 8; FIFO size is 8 words (of 24b). And this is also the DMA
+>> burst size.
+>>
+>> Which is best depends on the application (the higher the more efficient,
+>> but the more risk for a FIFO underrun). I would take 4.
+>>
+>> But I guess it should only be set at 1 place, and what is then the best
+>> place?
+>
+> We need different burstsize settings for the FIQ driver and for the DMA
+> driver. For this reason the original intention was to set these values
+> in sound/soc/imx/imx-pcm-dma-mx2.c and in sound/soc/imx/imx-pcm-fiq.c.
+>
+>
+>> commit 0a93421b6adf8ba127b3eafc4c16e3a14017e2ae
+>> Author: Javier Martin <javier.martin@vista-silicon.com>
+>> Date: ? Tue Mar 1 15:02:06 2011 +0100
+>>
+>> ? ? ASoC: Fix burstsize and DSP_B format problems in imx-ssi.
+>>
+>> ? ? When choosing IMX_DMA flag, burtsizes are set to its default
+>> ? ? value (0) which leads to driver malfunction. Change them to 4.
+>>
+>> ? ? DSP_B interface needs additional flag to match DSP_B formats
+>> ? ? as described in several codecs as wm8741 and aic3205.
+>>
+>> ? ? Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
+>> ? ? Acked-by: Liam Girdwood <lrg@slimlogic.co.uk>
+>> ? ? Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+>>
+>> diff --git a/sound/soc/imx/imx-ssi.c b/sound/soc/imx/imx-ssi.c
+>> index 30894ea..bc92ec6 100644
+>> --- a/sound/soc/imx/imx-ssi.c
+>> +++ b/sound/soc/imx/imx-ssi.c
+>> @@ -108,7 +108,7 @@ static int imx_ssi_set_dai_fmt(struct snd_soc_dai *cpu_dai, unsigned int fmt)
+>> ? ? ? ? ? ? ? break;
+>> ? ? ? case SND_SOC_DAIFMT_DSP_B:
+>> ? ? ? ? ? ? ? /* data on rising edge of bclk, frame high with data */
+>> - ? ? ? ? ? ? strcr |= SSI_STCR_TFSL;
+>> + ? ? ? ? ? ? strcr |= SSI_STCR_TFSL | SSI_STCR_TXBIT0;
+>> ? ? ? ? ? ? ? break;
+>> ? ? ? case SND_SOC_DAIFMT_DSP_A:
+>> ? ? ? ? ? ? ? /* data on rising edge of bclk, frame high 1clk before data */
+>> @@ -656,6 +656,9 @@ static int imx_ssi_probe(struct platform_device *pdev)
+>> ? ? ? ssi->dma_params_rx.dma_addr = res->start + SSI_SRX0;
+>> ? ? ? ssi->dma_params_tx.dma_addr = res->start + SSI_STX0;
+>>
+>> + ? ? ssi->dma_params_tx.burstsize = 4;
+>> + ? ? ssi->dma_params_rx.burstsize = 4;
+>> +
+>
+> Javier, is this hunk necessary? From what I see these values should be
+> overwritten later anyway.
+>
+> Sascha
 
-I'm repeating myself. At this point you can't convert any of the old
-drivers because it breaks the support we already have.
+Hi,
+without this hunk, both burstsizes where set to 0. This was checked
+experimentally:
 
->  - Move drivers to new api
+- Audio didn't work properly.
+- Some runtime printk's showed that burstsizes where set to 0.
 
-And that's one single step. To be really bisectible have would have to
-convert *all* PWM drivers in a single patch, not even a patch series
-as it would break bisectibility in between.
+It seems assignments in imx-pcm-dma-mx2.c file are done at a place
+they do not take effect.
 
-> 
-> With your patches we get this:
->  - Introduce common framework
-
-And still everything works
-
->  - Move drivers to common framework
-
-One after another, still everything works
-
->  - Modify api
->  - Rewrite drivers for new api
-
-There are two of them. One for the hardware drivers and one for the
-users. You can change them independently, introduce wrappers where
-necessary, you have all the time in the world to do this.
-
-Your aim is to change the API? Then you have to clean up first. People
-like Thomas have cleaned up in all areas of the kernel to reach their
-goal of merging the RT stuff. They wouldn't have got anywhere with
-a here's-a-patch-that-changes-everything approach.
-
-> 
-> The problem we have seen with these processes in the past is they get
-> left half way with some drivers moving to the new framework and some
-> trailing behind and some having their own hand-rolled approach because
-> the common api doesn't meet their needs.
-
-With two competing APIs it's even worse because you can't go anywhere
-without converting everything in tree.
-
-Just imagine Bill or someone else comes up with a series
-
-PATCH: introduce new pwm framework with completely changed API, sysfs
-interface and interrupt support, also convert leds-pwm, pwm_bl, pwm-beeper
-to new API and convert all hardware drivers to new API aswell.
-
-What do you think would happen? I can think of two things: Either no
-reaction at all from others or a huge thread with no result at all
-because we can't agree on details. Then someone comes up with the
-recommendation to start small and do it in little steps.
-
-
-I am tired of discussing this. It seems we can't agree and unless
-someone else jumps in here we will probably have to wait for another
-year until something moves in the PWM area.
-
-Sascha
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Javier Martin
+Vista Silicon S.L.
+CDTUC - FASE C - Oficina S-345
+Avda de los Castros s/n
+39005- Santander. Cantabria. Spain
++34 942 25 32 60
+www.vista-silicon.com
