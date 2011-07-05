@@ -1,27 +1,44 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Tue, 05 Jul 2011 01:40:04 +0200
-Subject: Future of S3C6410 platform
-In-Reply-To: <20110704232515.GL8286@n2100.arm.linux.org.uk>
-References: <2635745.FvrjgPkNLz@flatron> <1695702.ThOPKvqyiE@flatron>
-	<20110704232515.GL8286@n2100.arm.linux.org.uk>
-Message-ID: <1937503.ug88JfFd8A@flatron>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Tue, 5 Jul 2011 09:32:20 +0800
+Subject: [PATCH v2] ARM: CSR: Adding CSR SiRFprimaII board support
+In-Reply-To: <201107041653.50962.arnd@arndb.de>
+References: <1309231954-23260-1-git-send-email-bs14@csr.com>
+	<201107011819.43316.arnd@arndb.de>
+	<CAGsJ_4yHrYRQKO7tMeJhjj_aEhV69xnJSZzuHhq8hnBrmnG+dg@mail.gmail.com>
+	<201107041653.50962.arnd@arndb.de>
+Message-ID: <CAGsJ_4wf0Lhe2yHg1fE2QAF40=J6ZoubpfLFWQ6X9o3db0O8LQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 05 of July 2011 00:25:15 Russell King - ARM Linux wrote:
-> On Tue, Jul 05, 2011 at 01:10:11AM +0200, Tomasz Figa wrote:
-> > For me (on GT-i5700) both fb and adc, after leaving the bootloader, end
-> > up with unhandled interrupts and calling request_irq leads to kernel
-> > crash because an interrupt fires before all driver data get
-> > initialized.
-> 
-> We really should have a debug mode for that so developers can find
-> that stuff really easily.  We already do this for IRQF_SHARED
-> interrupts, but not !IRQF_SHARED.  Thomas, any opinion?
+2011/7/4 Arnd Bergmann <arnd@arndb.de>:
+> On Monday 04 July 2011, Barry Song wrote:
+>> Great idea. in fact there is only one reset bit for every device. So
+>> maybe the rstc.c can be
+>> ...
+>
+> Yes, looks good.
+>
+>> ? ? ? ? /*
+>> ? ? ? ? ?* Writing 1 to this bit resets corresponding block.
+>> ? ? ? ? ?* Writing 0 to this bit de-asserts reset signal of
+>> ? ? ? ? ?* the corresponding block.
+>> ? ? ? ? ?*/
+>> ? ? ? ? writel(sirfsoc_rstc_base + (reset_bit / 32) * 4,
+>> ? ? ? ? ? ? ? ? readl(sirfsoc_rstc_base + (reset_bit / 32) * 4) | reset_bit);
+>> ? ? ? ? msleep(10);
+>> ? ? ? ? writel(sirfsoc_rstc_base + (reset_bit / 32) * 4,
+>> ? ? ? ? ? ? ? ? readl(sirfsoc_rstc_base + (reset_bit / 32) * 4) & ~reset_bit);
+>
+> One remark about the msleep here: I find arbitrary wait periods a
+> bit unclean, and most hardware allows you to poll whether it's
+> done by reading back the register you have just written.
+>
+> If your hardware can do that, you can replace the msleep() with a
+> single readl or a readl()/msleep(1) loop?
 
-Would it be possible to simulate that in a realistic way? I mean, usually when 
-an interrupt fires, the driver checks the detailed cause in hardware 
-registers. If we would just simulate an interrupt, wouldn't it just end up 
-with finding no interrupt cause, something which shouldn't happen normally 
-with "exclusive" interrupts? This also implies that not all code paths would 
-be tested with such test case.
+i can't agree more. if there is such a register in chip, we would have
+used it. ic guys confirmed there isn't such a register. so..delay...
+
+>
+> ? ? ? ?Arnd
+>
