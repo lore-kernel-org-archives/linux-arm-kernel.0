@@ -1,174 +1,32 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Tue, 05 Jul 2011 12:36:48 +0200
-Subject: [PATCH 1/6] microblaze: move pci flag functions into asm-generic
-In-Reply-To: <1309366019-24379-2-git-send-email-robherring2@gmail.com>
-References: <1309366019-24379-1-git-send-email-robherring2@gmail.com>
-	<1309366019-24379-2-git-send-email-robherring2@gmail.com>
-Message-ID: <4E12E940.8040602@monstr.eu>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 5 Jul 2011 11:48:58 +0100
+Subject: Unnecessary cache-line flush on page table updates ?
+In-Reply-To: <20110705092600.GB25956@e102109-lin.cambridge.arm.com>
+References: <BANLkTin7aJXjpEH_WzJi5zaAtH8kFcTZeg@mail.gmail.com>
+	<20110701101019.GA1723@e102109-lin.cambridge.arm.com>
+	<BANLkTi=KVnzBKcd83c9T3P20VAv-ggqR4g@mail.gmail.com>
+	<20110704094531.GB19117@e102109-lin.cambridge.arm.com>
+	<20110704100221.GB8286@n2100.arm.linux.org.uk>
+	<20110704104329.GD19117@e102109-lin.cambridge.arm.com>
+	<20110704111338.GD8286@n2100.arm.linux.org.uk>
+	<20110704215507.GH8286@n2100.arm.linux.org.uk>
+	<20110705092600.GB25956@e102109-lin.cambridge.arm.com>
+Message-ID: <20110705104858.GV8286@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd and Ben,
+On Tue, Jul 05, 2011 at 10:26:00AM +0100, Catalin Marinas wrote:
+> AFAIK the branch predictor is transparent on Cortex-A9 and the BTB
+> maintenance are no-ops. You wouldn't notice any issues if you remove
+> them (you can check ID_MMFR1[31:28].
 
-Ben: how is it going with your OF pci redesigning patches?
+It's not transparent:
 
-Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
-> 
-> Move pci_set_flags, pci_add_flags, and pci_has_flag into
-> asm-generic/pci-bridge.h so other archs can use them.
- >
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-> Cc: Jesse Barnes <jbarnes@virtuousgeek.org>
-> ---
->  arch/microblaze/include/asm/pci-bridge.h |   36 +-----------------
->  include/asm-generic/pci-bridge.h         |   62 ++++++++++++++++++++++++++++++
->  2 files changed, 63 insertions(+), 35 deletions(-)
->  create mode 100644 include/asm-generic/pci-bridge.h
-> 
-> diff --git a/arch/microblaze/include/asm/pci-bridge.h b/arch/microblaze/include/asm/pci-bridge.h
-> index 746df91..ad1480f 100644
-> --- a/arch/microblaze/include/asm/pci-bridge.h
-> +++ b/arch/microblaze/include/asm/pci-bridge.h
-> @@ -10,6 +10,7 @@
->  #include <linux/pci.h>
->  #include <linux/list.h>
->  #include <linux/ioport.h>
-> +#include <asm-generic/pci-bridge.h>
->  
->  struct device_node;
->  
-> @@ -164,40 +165,5 @@ extern struct pci_controller *pcibios_alloc_controller(struct device_node *dev);
->  extern void pcibios_free_controller(struct pci_controller *phb);
->  extern void pcibios_setup_phb_resources(struct pci_controller *hose);
->  
-> -#ifdef CONFIG_PCI
-> -extern unsigned int pci_flags;
-> -
-> -static inline void pci_set_flags(int flags)
-> -{
-> -	pci_flags = flags;
-> -}
-> -
-> -static inline void pci_add_flags(int flags)
-> -{
-> -	pci_flags |= flags;
-> -}
-> -
-> -static inline int pci_has_flag(int flag)
-> -{
-> -	return pci_flags & flag;
-> -}
-> -
-> -extern struct list_head hose_list;
-> -
-> -extern int pcibios_vaddr_is_ioport(void __iomem *address);
-> -#else
-> -static inline int pcibios_vaddr_is_ioport(void __iomem *address)
-> -{
-> -	return 0;
-> -}
-> -
-> -static inline void pci_set_flags(int flags) { }
-> -static inline void pci_add_flags(int flags) { }
-> -static inline int pci_has_flag(int flag)
-> -{
-> -	return 0;
-> -}
-> -#endif	/* CONFIG_PCI */
-> -
->  #endif	/* __KERNEL__ */
->  #endif	/* _ASM_MICROBLAZE_PCI_BRIDGE_H */
-> diff --git a/include/asm-generic/pci-bridge.h b/include/asm-generic/pci-bridge.h
-> new file mode 100644
-> index 0000000..4a5aca2
-> --- /dev/null
-> +++ b/include/asm-generic/pci-bridge.h
-> @@ -0,0 +1,62 @@
-> +/*
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License
-> + * as published by the Free Software Foundation; either version
-> + * 2 of the License, or (at your option) any later version.
-> + */
-> +#ifndef _ASM_GENERIC_PCI_BRIDGE_H
-> +#define _ASM_GENERIC_PCI_BRIDGE_H
-> +
-> +#ifdef __KERNEL__
-> +
-> +enum {
-> +	/* Force re-assigning all resources (ignore firmware
-> +	 * setup completely)
-> +	 */
-> +	PCI_REASSIGN_ALL_RSRC	= 0x00000001,
-> +
-> +	/* Re-assign all bus numbers */
-> +	PCI_REASSIGN_ALL_BUS	= 0x00000002,
-> +
-> +	/* Do not try to assign, just use existing setup */
-> +	PCI_PROBE_ONLY		= 0x00000004,
-> +
-> +	/* Don't bother with ISA alignment unless the bridge has
-> +	 * ISA forwarding enabled
-> +	 */
-> +	PCI_CAN_SKIP_ISA_ALIGN	= 0x00000008,
-> +
-> +	/* Enable domain numbers in /proc */
-> +	PCI_ENABLE_PROC_DOMAINS	= 0x00000010,
-> +	/* ... except for domain 0 */
-> +	PCI_COMPAT_DOMAIN_0	= 0x00000020,
-> +};
-> +
-> +#ifdef CONFIG_PCI
-> +extern unsigned int pci_flags;
-> +
-> +static inline void pci_set_flags(int flags)
-> +{
-> +	pci_flags = flags;
-> +}
-> +
-> +static inline void pci_add_flags(int flags)
-> +{
-> +	pci_flags |= flags;
-> +}
-> +
-> +static inline int pci_has_flag(int flag)
-> +{
-> +	return pci_flags & flag;
-> +}
-> +#else
-> +static inline void pci_set_flags(int flags) { }
-> +static inline void pci_add_flags(int flags) { }
-> +static inline int pci_has_flag(int flag)
-> +{
-> +	return 0;
-> +}
-> +#endif	/* CONFIG_PCI */
-> +
-> +#endif	/* __KERNEL__ */
-> +#endif	/* _ASM_GENERIC_PCI_BRIDGE_H */
+CPU: MMFR0=0x00100103 MMFR1=0x20000000 MMFR2=0x01230000 MMFR3=0x00102111
 
-
-Rob has sent some patches about introducing asm-generic/pci-bridge.h.
-Interesting is that Microblaze doesn't use that functions (pci_set/add/has_flag).
-There are some points where we could use that generic functions.
-
-Almost the same case is for ppc - especially pci_has_flag function should be 
-used more.
-
-New pci-bridge could be used just by Microblaze. For PPC you will have to change 
-variable name.
-
-Anyway. If you want to add this patch to the mainline you should change ppc code 
-  and get ACK from them. I am not pci expert to tell you if is the right thing 
-to do it. Ben?
-
-Thanks,
-Michal
-
--- 
-Michal Simek, Ing. (M.Eng)
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel 2.6 Microblaze Linux - http://www.monstr.eu/fdt/
-Microblaze U-BOOT custodian
+0b0010 Branch predictor requires flushing on:
+	? enabling or disabling the MMU
+	? writing new data to instruction locations
+	? writing new mappings to the translation tables
+	? any change to the TTBR0, TTBR1, or TTBCR registers without a
+	  corresponding change to the FCSE ProcessID or ContextID.
