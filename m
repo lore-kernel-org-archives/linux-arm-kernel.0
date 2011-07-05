@@ -1,44 +1,34 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Tue, 5 Jul 2011 09:32:20 +0800
-Subject: [PATCH v2] ARM: CSR: Adding CSR SiRFprimaII board support
-In-Reply-To: <201107041653.50962.arnd@arndb.de>
-References: <1309231954-23260-1-git-send-email-bs14@csr.com>
-	<201107011819.43316.arnd@arndb.de>
-	<CAGsJ_4yHrYRQKO7tMeJhjj_aEhV69xnJSZzuHhq8hnBrmnG+dg@mail.gmail.com>
-	<201107041653.50962.arnd@arndb.de>
-Message-ID: <CAGsJ_4wf0Lhe2yHg1fE2QAF40=J6ZoubpfLFWQ6X9o3db0O8LQ@mail.gmail.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 04 Jul 2011 21:51:47 -0400 (EDT)
+Subject: what about mach-shark?
+In-Reply-To: <20110704222442.GJ8286@n2100.arm.linux.org.uk>
+References: <alpine.LFD.2.00.1107041545480.14596@xanadu.home>
+	<20110704220521.GI8286@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1107041812410.14596@xanadu.home>
+	<20110704222442.GJ8286@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1107042146440.14596@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/7/4 Arnd Bergmann <arnd@arndb.de>:
-> On Monday 04 July 2011, Barry Song wrote:
->> Great idea. in fact there is only one reset bit for every device. So
->> maybe the rstc.c can be
->> ...
->
-> Yes, looks good.
->
->> ? ? ? ? /*
->> ? ? ? ? ?* Writing 1 to this bit resets corresponding block.
->> ? ? ? ? ?* Writing 0 to this bit de-asserts reset signal of
->> ? ? ? ? ?* the corresponding block.
->> ? ? ? ? ?*/
->> ? ? ? ? writel(sirfsoc_rstc_base + (reset_bit / 32) * 4,
->> ? ? ? ? ? ? ? ? readl(sirfsoc_rstc_base + (reset_bit / 32) * 4) | reset_bit);
->> ? ? ? ? msleep(10);
->> ? ? ? ? writel(sirfsoc_rstc_base + (reset_bit / 32) * 4,
->> ? ? ? ? ? ? ? ? readl(sirfsoc_rstc_base + (reset_bit / 32) * 4) & ~reset_bit);
->
-> One remark about the msleep here: I find arbitrary wait periods a
-> bit unclean, and most hardware allows you to poll whether it's
-> done by reading back the register you have just written.
->
-> If your hardware can do that, you can replace the msleep() with a
-> single readl or a readl()/msleep(1) loop?
+On Mon, 4 Jul 2011, Russell King - ARM Linux wrote:
 
-i can't agree more. if there is such a register in chip, we would have
-used it. ic guys confirmed there isn't such a register. so..delay...
+> On Mon, Jul 04, 2011 at 06:20:25PM -0400, Nicolas Pitre wrote:
+> > OK.  In that case, UNCACHEABLE_ADDR is not truly "uncacheable", which 
+> > might inhibit clock switching in cpu_sa110_do_idle, no?
+> 
+> Possibly, and this may be a bug which was never noticed - the same
+> aflicts RiscPC too which has no ill effects noticed.  That's been
+> well hammered over the years with that code as it stands.
 
->
-> ? ? ? ?Arnd
->
+The only effect might be less than optimal power consumption when idle.  
+But I guess that RiscPC and Shark are not battery powered machines 
+and therefore no one cared much.
+
+> It's probably less risky to leave it be rather than trying to fix it.
+
+Problem is that this is getting in the way of some cleanups I'm doing.  
+So this is going to be fixed as a side effect of one of my patches.  
+Hopefully someone with the hardware will be able to test it.
+
+
+Nicolas
