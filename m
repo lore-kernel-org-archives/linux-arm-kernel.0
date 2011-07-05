@@ -1,52 +1,32 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Tue, 5 Jul 2011 15:20:53 +0800
-Subject: [PATCH v2] arm: mach-mmp: brownstone.c support multiple sd slots
-In-Reply-To: <CAMj5BkiK17RMY-vEENDqQiDOmfG0Esnp7QDooKWVrhkQL4g6Ow@mail.gmail.com>
-References: <59C2B513-EC04-4CA2-818B-9901CAF3E554@marvell.com>
-	<20110427093328.GU17290@n2100.arm.linux.org.uk>
-	<161C3F6C-0986-4364-B458-DBA4D08456FD@marvell.com>
-	<1F336A22-BAC3-41E3-8D4E-5DF27874D1EA@marvell.com>
-	<20110428095127.GX17290@n2100.arm.linux.org.uk>
-	<3BFCE791-3BAD-42ED-BC87-A27F40D6C77C@marvell.com>
-	<CAMPhdO-TTRP-k7J-zrG2_rQJsmNDRhTgpqiiX2yqW+Egf8+t2A@mail.gmail.com>
-	<CAMj5BkiK17RMY-vEENDqQiDOmfG0Esnp7QDooKWVrhkQL4g6Ow@mail.gmail.com>
-Message-ID: <CAMPhdO-b_dpC2ueexEFujr6p_NRb2JwDc0-UEx3cfOSVcZ-d6w@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 05 Jul 2011 16:26:19 +0900
+Subject: [PATCH 1/7] DMA: PL330: Add support runtime PM for PL330 DMAC
+In-Reply-To: <CAGOxZ50KGjHM6hUJQ1uEJsQqAzZ7aV+TcYRyhDB=sWQvtTDTxg@mail.gmail.com>
+References: <1309781915-31549-1-git-send-email-kgene.kim@samsung.com>
+	<1309781915-31549-2-git-send-email-kgene.kim@samsung.com>
+	<CAGOxZ50KGjHM6hUJQ1uEJsQqAzZ7aV+TcYRyhDB=sWQvtTDTxg@mail.gmail.com>
+Message-ID: <00c001cc3ae4$d82464c0$886d2e40$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 5, 2011 at 3:05 PM, zhangfei gao <zhangfei.gao@gmail.com> wrote:
-> On Tue, Jul 5, 2011 at 2:52 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
->> On Fri, Apr 29, 2011 at 4:45 AM, Philip Rakity <prakity@marvell.com> wrote:
->>>
->>> Support multiple sd/eMMC interfaces. enable mmc1, 2, and 3.
->>> mmc2 is used eMMC and slot is marked PERMANENT and 8 bit device.
->>> mmc1 is used for Wifi and slot is marked PERMANENT
->>>
->>> Note: eMMC (mmc2) is set to initialize first to workaround a problem
->>> where booting in logical order requires mmc create work queue
->>> to be multi-threaded otherwise boot process hangs. ?BUG report
->>> send to linux-mmc and linux-kernel mailing list.
->>>
->>> Wifi (mmc1) requires we enable power on the device by toggling
->>> the gpio lines for power and reset.
->>>
->>> Signed-off-by: Philip Rakity <prakity@marvell.com>
->>
->> Applied. Though the email client was fiddling the spaces/CR-LF a bit.
->>
->>> ---
->>> ?arch/arm/mach-mmp/brownstone.c | ? 52 +++++++++++++++++++++++++++++++++++++++-
->>> ?1 files changed, 51 insertions(+), 1 deletions(-)
->>>
->
-> Hi, Eric
->
-> arch/arm/mach-mmp/brownstone.c has already been modified from
-> mmc-next, here will have conflict.
-> Sorry for inconvenience.
+Alim Akhtar wrote:
+> > + ? ? ? /* enable dma clk */
+> > + ? ? ? clk = clk_get(&adev->dev, "dma");
+> 
+> Does this really needed here?
+> AFAIR, amba_get_enable_pclk() does the same thing, provided clock name
+> as "apb_pclk"
+> please have a look at drivers/amba/bus.c
+> 
+As I know, you can access Samsung datasheet, please check it.
 
-'K, I'll drop it then.
+Actually, the 'apb_pclk' should be dummy clock on current S5P SoCs so can't
+use it now.
 
->
-> Thanks
->
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
