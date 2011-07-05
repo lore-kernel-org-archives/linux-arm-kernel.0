@@ -1,28 +1,47 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 5 Jul 2011 12:20:49 +0100
-Subject: [PATCH 2/4] mmci: adjust calculation of f_min
-In-Reply-To: <1309247853-17143-1-git-send-email-linus.walleij@stericsson.com>
-References: <1309247853-17143-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <20110705112049.GX8286@n2100.arm.linux.org.uk>
+From: naveenkrishna.ch@gmail.com (Naveen Krishna Ch)
+Date: Tue, 5 Jul 2011 16:54:41 +0530
+Subject: [PATCH 0/2] ARM: Samsung: I2C code cleanup
+In-Reply-To: <1309519992-3026-1-git-send-email-ch.naveen@samsung.com>
+References: <1309519992-3026-1-git-send-email-ch.naveen@samsung.com>
+Message-ID: <CAHfPSqA6YtSeb-A7QPTuVSgjFuPyF52REw=Vit6xU31B+RenHg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 28, 2011 at 09:57:33AM +0200, Linus Walleij wrote:
-> From: Ulf Hansson <ulf.hansson@stericsson.com>
-> 
-> For the st_clkdiv variant f_min is too low for practical cases,
-> there is a heuristic calculation that appear to set the min
-> frequency to mclk rounded up with 512, for our practical use
-> cases dividing by 257 gives a reasonable floor value on the
-> ST Micro version of the clock divider.
+Hi Kukjin,
 
-The only requirement with f_min is that the hardware is capable of
-producing a clock at that rate.  Having it smaller than 'practical'
-is not a problem, and may help some cards be detected.
+Can you kindly, review the following patchset and let me know the comments.
 
-The core tries clocks at 400kHz, 300, 200 and 100kHz during probe,
-and that's the lowest frequency that will be attempted (provided
-the card doesn't actualy say it wants something slower.)
+On 1 July 2011 17:03, Naveen Krishna Chatradhi <ch.naveen@samsung.com> wrote:
+> Does the same job, while saving few lines of code.
+>
+> ?o To Kukjin Kim, Sangbeom Kim and Ben Dooks
+>
+> Naveen Krishna Chatradhi (2):
+> ?ARM: Samsung: Use generic set_plat_data function
+> ?ARM: Samsung: Cleanup I2C code in plat-samsung
+>
+> ?arch/arm/plat-samsung/dev-i2c0.c ? ? ? ? | ? 14 ++++++--------
+> ?arch/arm/plat-samsung/dev-i2c1.c ? ? ? ? | ? 24 ++++++++----------------
+> ?arch/arm/plat-samsung/dev-i2c2.c ? ? ? ? | ? 24 ++++++++----------------
+> ?arch/arm/plat-samsung/dev-i2c3.c ? ? ? ? | ? 24 ++++++++----------------
+> ?arch/arm/plat-samsung/dev-i2c4.c ? ? ? ? | ? 24 ++++++++----------------
+> ?arch/arm/plat-samsung/dev-i2c5.c ? ? ? ? | ? 24 ++++++++----------------
+> ?arch/arm/plat-samsung/dev-i2c6.c ? ? ? ? | ? 24 ++++++++----------------
+> ?arch/arm/plat-samsung/dev-i2c7.c ? ? ? ? | ? 24 ++++++++----------------
+> ?arch/arm/plat-samsung/include/plat/iic.h | ? ?2 ++
+> ?9 files changed, 64 insertions(+), 120 deletions(-)
+>
+> --
+> 1.7.2.3
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>
 
-So unless there is a reason not to (eg, divisors above 257 are invalid)
-its better to leave it as is.
+
+
+-- 
+Shine bright,
+(: Nav :)
