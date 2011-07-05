@@ -1,24 +1,33 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 5 Jul 2011 12:27:55 +0100
-Subject: [PATCH 6/7] spi/s3c64xx: Add support DMA engine API
-In-Reply-To: <CABb+yY3UqrbBNS1J1X1gCxPLp8Kv8JSe92Pnb7JpE9x9kqTPiA@mail.gmail.com>
-References: <1309781915-31549-1-git-send-email-kgene.kim@samsung.com>
-	<201107041859.11548.heiko@sntech.de>
-	<20110704170217.GH28042@ponder.secretlab.ca>
-	<201107042151.44075.heiko@sntech.de>
-	<20110704232758.GB12824@ponder.secretlab.ca>
-	<00bd01cc3ae1$f1dbfac0$d593f040$%kim@samsung.com>
-	<CABb+yY3UqrbBNS1J1X1gCxPLp8Kv8JSe92Pnb7JpE9x9kqTPiA@mail.gmail.com>
-Message-ID: <20110705112755.GZ8286@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 5 Jul 2011 13:30:07 +0200
+Subject: [PATCH 2/8] mm: alloc_contig_freed_pages() added
+In-Reply-To: <1309851710-3828-3-git-send-email-m.szyprowski@samsung.com>
+References: <1309851710-3828-1-git-send-email-m.szyprowski@samsung.com>
+	<1309851710-3828-3-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <201107051330.07443.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 05, 2011 at 04:46:47PM +0530, Jassi Brar wrote:
-> Ideally, like PL330 for S5Pxxxx, drivers/dma/pl080 should be enabled
-> for s3c64xx And new generic dma api drivers written for S3C24xx in
-> drivers/dma/
+On Tuesday 05 July 2011, Marek Szyprowski wrote:
+> From: KAMEZAWA Hiroyuki <kamezawa.hiroyu@jp.fujitsu.com>
+> 
+> This commit introduces alloc_contig_freed_pages() function
+> which allocates (ie. removes from buddy system) free pages
+> in range.  Caller has to guarantee that all pages in range
+> are in buddy system.
+> 
+> Along with this function, a free_contig_pages() function is
+> provided which frees all (or a subset of) pages allocated
+> with alloc_contig_free_pages().
+> 
+> Michal Nazarewicz has modified the function to make it easier
+> to allocate not MAX_ORDER_NR_PAGES aligned pages by making it
+> return pfn of one-past-the-last allocated page.
+> 
+> Signed-off-by: KAMEZAWA Hiroyuki <kamezawa.hiroyu@jp.fujitsu.com>
+> Signed-off-by: Michal Nazarewicz <m.nazarewicz@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> CC: Michal Nazarewicz <mina86@mina86.com>
 
-Another solution would be to write a DMA engine driver which massages
-the Samsung DMA API into the DMA engine way of doing things.  You can
-then convert all the Samsung drivers to using DMA engine, and then
-sort out the Samsung DMA API as a separate issue.
+Acked-by: Arnd Bergmann <arnd@arndb.de>
