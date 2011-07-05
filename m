@@ -1,63 +1,174 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 05 Jul 2011 12:24:58 +0200
-Subject: [PATCH 6/8] drivers: add Contiguous Memory Allocator
-In-Reply-To: <1309851710-3828-7-git-send-email-m.szyprowski@samsung.com>
-References: <1309851710-3828-1-git-send-email-m.szyprowski@samsung.com>
-	<1309851710-3828-7-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <000101cc3afd$cac46ff0$604d4fd0$%szyprowski@samsung.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Tue, 05 Jul 2011 12:36:48 +0200
+Subject: [PATCH 1/6] microblaze: move pci flag functions into asm-generic
+In-Reply-To: <1309366019-24379-2-git-send-email-robherring2@gmail.com>
+References: <1309366019-24379-1-git-send-email-robherring2@gmail.com>
+	<1309366019-24379-2-git-send-email-robherring2@gmail.com>
+Message-ID: <4E12E940.8040602@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Arnd and Ben,
 
-On Tuesday, July 05, 2011 9:42 AM Marek Szyprowski wrote:
+Ben: how is it going with your OF pci redesigning patches?
 
-> The Contiguous Memory Allocator is a set of helper functions for DMA
-> mapping framework that improves allocations of contiguous memory chunks.
+Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
 > 
-> CMA grabs memory on system boot, marks it with CMA_MIGRATE_TYPE and
-> gives back to the system. Kernel is allowed to allocate movable pages
-> within CMA's managed memory so that it can be used for example for page
-> cache when DMA mapping do not use it. On dma_alloc_from_contiguous()
-> request such pages are migrated out of CMA area to free required
-> contiguous block and fulfill the request. This allows to allocate large
-> contiguous chunks of memory at any time assuming that there is enough
-> free memory available in the system.
-> 
-> This code is heavily based on earlier works by Michal Nazarewicz.
-> 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> CC: Michal Nazarewicz <mina86@mina86.com>
+> Move pci_set_flags, pci_add_flags, and pci_has_flag into
+> asm-generic/pci-bridge.h so other archs can use them.
+ >
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+> Cc: Jesse Barnes <jbarnes@virtuousgeek.org>
 > ---
->  drivers/base/Kconfig           |   77 +++++++++
->  drivers/base/Makefile          |    1 +
->  drivers/base/dma-contiguous.c  |  367
-> ++++++++++++++++++++++++++++++++++++++++
->  include/linux/dma-contiguous.h |  104 +++++++++++
->  4 files changed, 549 insertions(+), 0 deletions(-)
->  create mode 100644 drivers/base/dma-contiguous.c
->  create mode 100644 include/linux/dma-contiguous.h
+>  arch/microblaze/include/asm/pci-bridge.h |   36 +-----------------
+>  include/asm-generic/pci-bridge.h         |   62 ++++++++++++++++++++++++++++++
+>  2 files changed, 63 insertions(+), 35 deletions(-)
+>  create mode 100644 include/asm-generic/pci-bridge.h
 > 
-> diff --git a/drivers/base/Kconfig b/drivers/base/Kconfig
-> index d57e8d0..95ae1a7 100644
-> --- a/drivers/base/Kconfig
-> +++ b/drivers/base/Kconfig
-> @@ -168,4 +168,81 @@ config SYS_HYPERVISOR
->  	bool
->  	default n
-> 
-> +config CMA
-> +	bool "Contiguous Memory Allocator"
-> +	depends HAVE_DMA_CONTIGUOUS && HAVE_MEMBLOCK
+> diff --git a/arch/microblaze/include/asm/pci-bridge.h b/arch/microblaze/include/asm/pci-bridge.h
+> index 746df91..ad1480f 100644
+> --- a/arch/microblaze/include/asm/pci-bridge.h
+> +++ b/arch/microblaze/include/asm/pci-bridge.h
+> @@ -10,6 +10,7 @@
+>  #include <linux/pci.h>
+>  #include <linux/list.h>
+>  #include <linux/ioport.h>
+> +#include <asm-generic/pci-bridge.h>
+>  
+>  struct device_node;
+>  
+> @@ -164,40 +165,5 @@ extern struct pci_controller *pcibios_alloc_controller(struct device_node *dev);
+>  extern void pcibios_free_controller(struct pci_controller *phb);
+>  extern void pcibios_setup_phb_resources(struct pci_controller *hose);
+>  
+> -#ifdef CONFIG_PCI
+> -extern unsigned int pci_flags;
+> -
+> -static inline void pci_set_flags(int flags)
+> -{
+> -	pci_flags = flags;
+> -}
+> -
+> -static inline void pci_add_flags(int flags)
+> -{
+> -	pci_flags |= flags;
+> -}
+> -
+> -static inline int pci_has_flag(int flag)
+> -{
+> -	return pci_flags & flag;
+> -}
+> -
+> -extern struct list_head hose_list;
+> -
+> -extern int pcibios_vaddr_is_ioport(void __iomem *address);
+> -#else
+> -static inline int pcibios_vaddr_is_ioport(void __iomem *address)
+> -{
+> -	return 0;
+> -}
+> -
+> -static inline void pci_set_flags(int flags) { }
+> -static inline void pci_add_flags(int flags) { }
+> -static inline int pci_has_flag(int flag)
+> -{
+> -	return 0;
+> -}
+> -#endif	/* CONFIG_PCI */
+> -
+>  #endif	/* __KERNEL__ */
+>  #endif	/* _ASM_MICROBLAZE_PCI_BRIDGE_H */
+> diff --git a/include/asm-generic/pci-bridge.h b/include/asm-generic/pci-bridge.h
+> new file mode 100644
+> index 0000000..4a5aca2
+> --- /dev/null
+> +++ b/include/asm-generic/pci-bridge.h
+> @@ -0,0 +1,62 @@
+> +/*
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License
+> + * as published by the Free Software Foundation; either version
+> + * 2 of the License, or (at your option) any later version.
+> + */
+> +#ifndef _ASM_GENERIC_PCI_BRIDGE_H
+> +#define _ASM_GENERIC_PCI_BRIDGE_H
+> +
+> +#ifdef __KERNEL__
+> +
+> +enum {
+> +	/* Force re-assigning all resources (ignore firmware
+> +	 * setup completely)
+> +	 */
+> +	PCI_REASSIGN_ALL_RSRC	= 0x00000001,
+> +
+> +	/* Re-assign all bus numbers */
+> +	PCI_REASSIGN_ALL_BUS	= 0x00000002,
+> +
+> +	/* Do not try to assign, just use existing setup */
+> +	PCI_PROBE_ONLY		= 0x00000004,
+> +
+> +	/* Don't bother with ISA alignment unless the bridge has
+> +	 * ISA forwarding enabled
+> +	 */
+> +	PCI_CAN_SKIP_ISA_ALIGN	= 0x00000008,
+> +
+> +	/* Enable domain numbers in /proc */
+> +	PCI_ENABLE_PROC_DOMAINS	= 0x00000010,
+> +	/* ... except for domain 0 */
+> +	PCI_COMPAT_DOMAIN_0	= 0x00000020,
+> +};
+> +
+> +#ifdef CONFIG_PCI
+> +extern unsigned int pci_flags;
+> +
+> +static inline void pci_set_flags(int flags)
+> +{
+> +	pci_flags = flags;
+> +}
+> +
+> +static inline void pci_add_flags(int flags)
+> +{
+> +	pci_flags |= flags;
+> +}
+> +
+> +static inline int pci_has_flag(int flag)
+> +{
+> +	return pci_flags & flag;
+> +}
+> +#else
+> +static inline void pci_set_flags(int flags) { }
+> +static inline void pci_add_flags(int flags) { }
+> +static inline int pci_has_flag(int flag)
+> +{
+> +	return 0;
+> +}
+> +#endif	/* CONFIG_PCI */
+> +
+> +#endif	/* __KERNEL__ */
+> +#endif	/* _ASM_GENERIC_PCI_BRIDGE_H */
 
-The above line should be obviously "depends on HAVE_DMA_CONTIGUOUS &&
-HAVE_MEMBLOCK".
-I'm sorry for posting broken version. 
 
-(snipped)
+Rob has sent some patches about introducing asm-generic/pci-bridge.h.
+Interesting is that Microblaze doesn't use that functions (pci_set/add/has_flag).
+There are some points where we could use that generic functions.
 
-Best regards
+Almost the same case is for ppc - especially pci_has_flag function should be 
+used more.
+
+New pci-bridge could be used just by Microblaze. For PPC you will have to change 
+variable name.
+
+Anyway. If you want to add this patch to the mainline you should change ppc code 
+  and get ACK from them. I am not pci expert to tell you if is the right thing 
+to do it. Ben?
+
+Thanks,
+Michal
+
 -- 
-Marek Szyprowski
-Samsung Poland R&D Center
+Michal Simek, Ing. (M.Eng)
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel 2.6 Microblaze Linux - http://www.monstr.eu/fdt/
+Microblaze U-BOOT custodian
