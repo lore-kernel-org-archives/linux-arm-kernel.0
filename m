@@ -1,41 +1,68 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  5 Jul 2011 09:49:01 +0100
-Subject: [PATCH v8 00/14] Consolidating GIC per-cpu interrupts
-Message-ID: <1309855755-6261-1-git-send-email-marc.zyngier@arm.com>
+Date: Tue,  5 Jul 2011 09:49:03 +0100
+Subject: [PATCH v8 02/14] ARM: smp: add interrupt handler for local timers
+In-Reply-To: <1309855755-6261-1-git-send-email-marc.zyngier@arm.com>
+References: <1309855755-6261-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1309855755-6261-3-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current GIC per-cpu interrupts (aka PPIs) suffer from a number of
-problems:
+Provide a "normal" interrupt handler for local timers.
+It is expected that most timer implementations will use this
+handler unless they have more specific requirements.
 
-- They use a completely separate scheme to handle the interrupts,
-  mostly because the PPI concept doesn't really match the kernel view
-  of an interrupt.
-- PPIs can only be used by the timer code, unless we add more low-level
-  assembly code.
-- The local timer code can only be used by devices generating PPIs,
-  and not SPIs.
-- At least one platform (msm) has started implementing its own
-  alternative scheme.
-- Some low-level code gets duplicated, as usual...
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/include/asm/localtimer.h |    6 ++++++
+ arch/arm/kernel/smp.c             |   12 ++++++++++++
+ 2 files changed, 18 insertions(+), 0 deletions(-)
 
-The proposed solution is to let the GIC code expose the PPIs as
-something that the kernel can manage. Instead of having a single
-interrupt number shared on all cores, make the interrupt number be
-different on each CPU.
-
-This enables the use of the normal kernel API (request_irq() and
-friends) and the elimination of some low level code. It also serves as
-the basis of the GIC device tree support code. On the other side, it
-causes quite a bit of churn in the timer code.
-
-Previous versions of this series have received ACKs from some platform
-maintainers, but so far there has been very little comment on the core
-code. As I now have quite a large number of patches relying on this
-series (local timers as devices, device tree support for GIC and TWD),
-I'd be grateful for at least a hint indicating that this is going in
-the right direction. Or not.
-
-This patch set is based on 3.0-rc5. Tested on PB-11MP, Tegra2
-(Harmony) and SMDK-V310. Also available in the "gic_ppi_map" branch of
-git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git
+diff --git a/arch/arm/include/asm/localtimer.h b/arch/arm/include/asm/localtimer.h
+index 080d74f..bef44b3 100644
+--- a/arch/arm/include/asm/localtimer.h
++++ b/arch/arm/include/asm/localtimer.h
+@@ -10,6 +10,8 @@
+ #ifndef __ASM_ARM_LOCALTIMER_H
+ #define __ASM_ARM_LOCALTIMER_H
+ 
++#include <linux/interrupt.h>
++
+ struct clock_event_device;
+ 
+ /*
+@@ -22,6 +24,10 @@ void percpu_timer_setup(void);
+  */
+ asmlinkage void do_local_timer(struct pt_regs *);
+ 
++/*
++ * Per-cpu timer IRQ handler
++ */
++irqreturn_t percpu_timer_handler(int irq, void *dev_id);
+ 
+ #ifdef CONFIG_LOCAL_TIMERS
+ 
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index e7f92a4..a35b38d 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -464,6 +464,18 @@ asmlinkage void __exception_irq_entry do_local_timer(struct pt_regs *regs)
+ 	set_irq_regs(old_regs);
+ }
+ 
++irqreturn_t percpu_timer_handler(int irq, void *dev_id)
++{
++	struct clock_event_device *evt = dev_id;
++
++	if (local_timer_ack()) {
++		evt->event_handler(evt);
++		return IRQ_HANDLED;
++	}
++
++	return IRQ_NONE;
++}
++
+ void show_local_irqs(struct seq_file *p, int prec)
+ {
+ 	unsigned int cpu;
+-- 
+1.7.0.4
