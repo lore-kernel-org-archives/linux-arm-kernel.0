@@ -1,50 +1,127 @@
-From: bjorn.forsman@gmail.com (=?UTF-8?Q?Bj=C3=B8rn_Forsman?=)
-Date: Tue, 5 Jul 2011 23:42:09 +0200
-Subject: [PATCH v2] ARM: kirkwood: Add support for Buffalo LS-XHL
-In-Reply-To: <201107042250.42500.michael@walle.cc>
-References: <1307655488-12811-1-git-send-email-michael@walle.cc>
-	<1307655488-12811-2-git-send-email-michael@walle.cc>
-	<BANLkTim-qB+ArwxX0o8dAqU3--Uex4TWBw@mail.gmail.com>
-	<201107042250.42500.michael@walle.cc>
-Message-ID: <CAEYzJUHfu=PCjW1FfuEZ4BwJ9qrrv8ZLNGKfoOXp6bcE_nuGAA@mail.gmail.com>
+From: per.forlin@linaro.org (Per Forlin)
+Date: Tue,  5 Jul 2011 23:35:32 +0200
+Subject: [PATCH v4] mmc: documentation of mmc non-blocking request usage and
+	design.
+Message-ID: <1309901732-3735-1-git-send-email-per.forlin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/7/4 Michael Walle <michael@walle.cc>:
-> Am Donnerstag 30 Juni 2011, 22:58:15 schrieb Bj?rn Forsman:
->> Hi Michael,
-> [..]
->> So, the power switch also seem to suffer from some interrupt overload;
->> 10154532 IRQs for Power-auto Switch is not right...right?
->>
->> Have you seen this behaviour?
-> Nope, the interrupt behaves normally for me. But i'm running this patch with
-> kernel 2.6.32 and tested it briefly with 2.6.39.
->
-> Could you verify, if you are triggering the bug Simon posted above?
+Documentation about the background and the design of mmc non-blocking.
+Host driver guidelines to minimize request preparation overhead.
 
-Yes, it must be the same bug. I reverted
-e59347a1d15c0b1d9fdc510520f8fa78d7d19a5b (arm: orion: Use generic irq
-chip) on top of "3.0-rc5 + this LS-XHL patch" and the IRQ issues are
-gone.
+Signed-off-by: Per Forlin <per.forlin@linaro.org>
+---
+ChangeLog:
+ v2: - Minor updates after proofreading comments from Chris
+ v3: - Minor updates after more comments from Chris
+ v4: - Minor updates after comments from Randy
 
-$ cat /proc/interrupts   # after toggling the buttons and setting fan
-speed to 0 a few times
-...
-104:          4  orion_gpio_irq  GPIO fan alarm
-105:          4  orion_gpio_irq  Function Button
-106:          6  orion_gpio_irq  Power-auto Switch
-107:          4  orion_gpio_irq  Power-on Switch
+ Documentation/mmc/00-INDEX          |    2 +
+ Documentation/mmc/mmc-async-req.txt |   86 +++++++++++++++++++++++++++++++++++
+ 2 files changed, 88 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/mmc/mmc-async-req.txt
 
-No system hang/reboot/lockups :-)
-
-Compare that with /proc/interrupts from the bugged version; it lists
-"-" instead of "orion_gpio_irq" as IRQ handler:
-
-104:     100000         -  GPIO fan alarm
-105:          0         -  Function Button
-106:          0         -  Power-auto Switch
-107:          0         -  Power-on Switch
-
-Best regards,
-Bj?rn Forsman
+diff --git a/Documentation/mmc/00-INDEX b/Documentation/mmc/00-INDEX
+index 93dd7a7..a9ba672 100644
+--- a/Documentation/mmc/00-INDEX
++++ b/Documentation/mmc/00-INDEX
+@@ -4,3 +4,5 @@ mmc-dev-attrs.txt
+         - info on SD and MMC device attributes
+ mmc-dev-parts.txt
+         - info on SD and MMC device partitions
++mmc-async-req.txt
++        - info on mmc asynchronous requests
+diff --git a/Documentation/mmc/mmc-async-req.txt b/Documentation/mmc/mmc-async-req.txt
+new file mode 100644
+index 0000000..4877f29
+--- /dev/null
++++ b/Documentation/mmc/mmc-async-req.txt
+@@ -0,0 +1,86 @@
++Rationale
++=========
++
++How significant is the cache maintenance overhead?
++It depends. Fast eMMC and multiple cache levels with speculative cache
++pre-fetch makes the cache overhead relatively significant. If the DMA
++preparations for the next request are done in parallel with the current
++transfer, the DMA preparation overhead would not affect the MMC performance.
++The intention of non-blocking (asynchronous) MMC requests is to minimize the
++time between when an MMC request ends and another MMC request begins.
++Using mmc_wait_for_req(), the MMC controller is idle while dma_map_sg and
++dma_unmap_sg are processing. Using non-blocking MMC requests makes it
++possible to prepare the caches for next job in parallel with an active
++MMC request.
++
++MMC block driver
++================
++
++The issue_rw_rq() in the MMC block driver is made non-blocking.
++The increase in throughput is proportional to the time it takes to
++prepare (major part of preparations are dma_map_sg and dma_unmap_sg)
++a request and how fast the memory is. The faster the MMC/SD is
++the more significant the prepare request time becomes. Roughly the expected
++performance gain is 5% for large writes and 10% on large reads on a L2 cache
++platform. In power save mode, when clocks run on a lower frequency, the DMA
++preparation may cost even more. As long as these slower preparations are run
++in parallel with the transfer performance wont be affected.
++
++Details on measurements from IOZone and mmc_test
++================================================
++
++https://wiki.linaro.org/WorkingGroups/Kernel/Specs/StoragePerfMMC-async-req
++
++MMC core API extension
++======================
++
++There is one new public function mmc_start_req().
++It starts a new MMC command request for a host. The function isn't
++truly non-blocking. If there is on ongoing async request it waits
++for completion of that request and starts the new one and returns. It
++doesn't wait for the new request to complete. If there is no ongoing
++request it starts the new request and returns immediately.
++
++MMC host extensions
++===================
++
++There are two optional hooks -- pre_req() and post_req() -- that the host
++driver may implement in order to move work to before and after the actual
++mmc_request function is called. In the DMA case pre_req() may do
++dma_map_sg() and prepare the DMA descriptor, and post_req runs
++the dma_unmap_sg.
++
++Optimize for the first request
++==============================
++
++The first request in a series of requests can't be prepared in parallel with
++the previous transfer, since there is no previous request.
++The argument is_first_req in pre_req() indicates that there is no previous
++request. The host driver may optimize for this scenario to minimize
++the performance loss. A way to optimize for this is to split the current
++request in two chunks, prepare the first chunk and start the request,
++and finally prepare the second chunk and start the transfer.
++
++Pseudocode to handle is_first_req scenario with minimal prepare overhead:
++if (is_first_req && req->size > threshold)
++   /* start MMC transfer for the complete transfer size */
++   mmc_start_command(MMC_CMD_TRANSFER_FULL_SIZE);
++
++   /*
++    * Begin to prepare DMA while cmd is being processed by MMC.
++    * The first chunk of the request should take the same time
++    * to prepare as the "MMC process command time".
++    * If prepare time exceeds MMC cmd time
++    * the transfer is delayed, guesstimate max 4k as first chunk size.
++    */
++    prepare_1st_chunk_for_dma(req);
++    /* flush pending desc to the DMAC (dmaengine.h) */
++    dma_issue_pending(req->dma_desc);
++
++    prepare_2nd_chunk_for_dma(req);
++    /*
++     * The second issue_pending should be called before MMC runs out
++     * of the first chunk. If the MMC runs out of the first data chunk
++     * before this call, the transfer is delayed.
++     */
++    dma_issue_pending(req->dma_desc);
+-- 
+1.7.4.1
