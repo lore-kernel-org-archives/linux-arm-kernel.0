@@ -1,33 +1,27 @@
-From: parkch98@gmail.com (Chanho Park)
-Date: Tue, 5 Jul 2011 17:08:33 +0900
-Subject: [PATCH 3/7] DMA: PL330: Add DMA capabilities
-In-Reply-To: <00be01cc3ae2$9d3b7080$d7b25180$%kim@samsung.com>
+From: sangwook.lee@linaro.org (Sangwook Lee)
+Date: Tue, 5 Jul 2011 09:30:31 +0100
+Subject: [PATCH 5/7] ARM: EXYNOS4: Use generic DMA PL330 driver
+In-Reply-To: <CAGOxZ50-L9X-aGwdi7XyGpJhS-GENmk6Q7XwyD85=OJzs7Juqg@mail.gmail.com>
 References: <1309781915-31549-1-git-send-email-kgene.kim@samsung.com>
-	<1309781915-31549-4-git-send-email-kgene.kim@samsung.com>
-	<CAPTzV15Y7JFDKsec8x-M0C1AFLOMp39QvHpRCsO=E001P_tH9A@mail.gmail.com>
-	<00be01cc3ae2$9d3b7080$d7b25180$%kim@samsung.com>
-Message-ID: <CAPTzV17yr5hw=QukGdWJr_0uS2O4VwdCQsgZb1euzonVCLj+6w@mail.gmail.com>
+	<1309781915-31549-6-git-send-email-kgene.kim@samsung.com>
+	<CAGOxZ50-L9X-aGwdi7XyGpJhS-GENmk6Q7XwyD85=OJzs7Juqg@mail.gmail.com>
+Message-ID: <CADPsn1aAhs=DueizDFNCrS4Acxy7SEYtM66ZNKcmVwC5XcdsUA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->
-> Basically, src_addr_width is defined as a 'enum dma_slave_buswidth' so I
-> think we don't need to consider it.
->
+>> @@ -47,6 +47,11 @@ static struct clk clk_sclk_usbphy1 = {
+>> ? ? ? ?.id ? ? ? ? ? ? = -1,
+>> ?};
+>>
+>> +static struct clk dummy_apb_pclk = {
+>> + ? ? ? .name ? ? ? ? ? = "apb_pclk",
+>> + ? ? ? .id ? ? ? ? ? ? = -1,
+>> +};
+>> +
+> What is the need to?creating "dummy_apb_pclk"??
 
-Client D/D normally uses 'enum dma_slave_buswidth' type.
-However, dmaengine driver cannot guarantee all client D/D uses it.
-See below your spi driver. Thus, the dmaengine driver check it correctly.
+I guess this is right, because amba device should call amba_device_reigster and
+this function requires apb_pclk, even if that is dummy clock.
 
-+#if defined(CONFIG_DMADEV_PL330)
-+                       memset(&slave_config, 0, sizeof(slave_config));
-+                       slave_config.direction = DMA_TO_DEVICE;
-+                       slave_config.src_addr = xfer->tx_dma;
-+                       slave_config.dst_addr =
-+                               sdd->sfr_start + S3C64XX_SPI_TX_DATA;
-+                       slave_config.dst_addr_width = sdd->cur_bpw / 8;
-+                       dmaengine_slave_config(sdd->tx_chan, &slave_config);
-
--- 
-Best Regards,
-Chanho Park
+>>
+>> ?static int exynos4_clksrc_mask_top_ctrl(struct clk *clk, int enable)
