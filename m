@@ -1,16 +1,37 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 5 Jul 2011 14:10:30 +0100
-Subject: [PATCH 0/9] PL08x further cleanups
-Message-ID: <20110705131030.GE8286@n2100.arm.linux.org.uk>
+Date: Tue, 05 Jul 2011 14:10:51 +0100
+Subject: [PATCH 1/9] DMA: PL08x: remove unused constants
+In-Reply-To: <20110705131030.GE8286@n2100.arm.linux.org.uk>
+References: <20110705131030.GE8286@n2100.arm.linux.org.uk>
+Message-ID: <E1Qe5Ot-0005NB-59@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series is the remainder of the PL08x work I did earlier
-this year while trying to get the ARM platforms working with DMA.
+PL08X_WQ_PERIODMIN and PL08X_MAX_ALLOCS are not used, remove them.
 
-Unfortunately, due to the state of the hardware, I was not able to
-properly test these changes.  However, they do compile, and I think
-if others are going to be looking at the PL08x DMA engine driver,
-they're worth having.
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ drivers/dma/amba-pl08x.c |    4 ----
+ 1 files changed, 0 insertions(+), 4 deletions(-)
 
-Linus, can you check these out on your hardware please?
+diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
+index e6d7228..90db51f 100644
+--- a/drivers/dma/amba-pl08x.c
++++ b/drivers/dma/amba-pl08x.c
+@@ -156,14 +156,10 @@ struct pl08x_driver_data {
+ #define PL08X_BOUNDARY_SHIFT		(10)	/* 1KB 0x400 */
+ #define PL08X_BOUNDARY_SIZE		(1 << PL08X_BOUNDARY_SHIFT)
+ 
+-/* Minimum period between work queue runs */
+-#define PL08X_WQ_PERIODMIN	20
+-
+ /* Size (bytes) of each LLI buffer allocated for one transfer */
+ # define PL08X_LLI_TSFR_SIZE	0x2000
+ 
+ /* Maximum times we call dma_pool_alloc on this pool without freeing */
+-#define PL08X_MAX_ALLOCS	0x40
+ #define MAX_NUM_TSFR_LLIS	(PL08X_LLI_TSFR_SIZE/sizeof(struct pl08x_lli))
+ #define PL08X_ALIGN		8
+ 
+-- 
+1.7.4.4
