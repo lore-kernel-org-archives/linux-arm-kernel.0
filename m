@@ -1,29 +1,44 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 5 Jul 2011 16:49:32 +0300
-Subject: [PATCH 15/15] pxa2[57]x_udc: drop gpio_pullup handling
-In-Reply-To: <1309871321-11305-16-git-send-email-dbaryshkov@gmail.com>
-References: <1309871321-11305-1-git-send-email-dbaryshkov@gmail.com>
-	<1309871321-11305-16-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <20110705134931.GL2820@legolas.emea.dhcp.ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 5 Jul 2011 14:54:24 +0100
+Subject: Unnecessary cache-line flush on page table updates ?
+In-Reply-To: <20110705104858.GV8286@n2100.arm.linux.org.uk>
+References: <BANLkTin7aJXjpEH_WzJi5zaAtH8kFcTZeg@mail.gmail.com>
+	<20110701101019.GA1723@e102109-lin.cambridge.arm.com>
+	<BANLkTi=KVnzBKcd83c9T3P20VAv-ggqR4g@mail.gmail.com>
+	<20110704094531.GB19117@e102109-lin.cambridge.arm.com>
+	<20110704100221.GB8286@n2100.arm.linux.org.uk>
+	<20110704104329.GD19117@e102109-lin.cambridge.arm.com>
+	<20110704111338.GD8286@n2100.arm.linux.org.uk>
+	<20110704215507.GH8286@n2100.arm.linux.org.uk>
+	<20110705092600.GB25956@e102109-lin.cambridge.arm.com>
+	<20110705104858.GV8286@n2100.arm.linux.org.uk>
+Message-ID: <20110705135424.GC32718@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 05, 2011 at 05:08:41PM +0400, Dmitry Eremin-Solenikov wrote:
-> Now as all drivers were converted to using gpio-vbus, drop gpio-pullup
-> handling from pxa UDC drivers, thus simplifying them a bit.
+On Tue, Jul 05, 2011 at 11:48:58AM +0100, Russell King - ARM Linux wrote:
+> On Tue, Jul 05, 2011 at 10:26:00AM +0100, Catalin Marinas wrote:
+> > AFAIK the branch predictor is transparent on Cortex-A9 and the BTB
+> > maintenance are no-ops. You wouldn't notice any issues if you remove
+> > them (you can check ID_MMFR1[31:28].
 > 
-> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+> It's not transparent:
+> 
+> CPU: MMFR0=0x00100103 MMFR1=0x20000000 MMFR2=0x01230000 MMFR3=0x00102111
+> 
+> 0b0010 Branch predictor requires flushing on:
+> 	? enabling or disabling the MMU
+> 	? writing new data to instruction locations
+> 	? writing new mappings to the translation tables
+> 	? any change to the TTBR0, TTBR1, or TTBCR registers without a
+> 	  corresponding change to the FCSE ProcessID or ContextID.
 
-for drivers/usb/gadget:
+OK, it makes sense. But what's really confusing - the A8 has the same
+value for ID_MMFR1 (according to the TRM) but the BTB instructions are
+no-ops (can can be enabled by the ACTLR.IBE bit). I suspect the ID_MMFR1
+is wrong in this case.
 
-Acked-by: Felipe Balbi <balbi@ti.com>
+Anyway, as long as we stick to the ARM ARM requirements we should be OK.
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 490 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110705/e06a378e/attachment.sig>
+Catalin
