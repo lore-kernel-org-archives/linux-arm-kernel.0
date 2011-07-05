@@ -1,152 +1,92 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  5 Jul 2011 09:49:14 +0100
-Subject: [PATCH v8 13/14] ARM: SMP: automatically select ARM_GIC_PPI_MAP
+Date: Tue,  5 Jul 2011 09:49:05 +0100
+Subject: [PATCH v8 04/14] ARM: omap4: use remapped PPI interrupts for local
+	timer
 In-Reply-To: <1309855755-6261-1-git-send-email-marc.zyngier@arm.com>
 References: <1309855755-6261-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1309855755-6261-14-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1309855755-6261-5-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All SMP platforms are selecting ARM_GIC_PPI_MAP.
-Instead, make SMP select ARM_GIC_PPI_MAP and remove select statements
-from the platform code.
+Use the normal interrupt scheme for the local timers by using
+a remapped PPI interrupt.
 
+Tested on a Pandaboard.
+
+Cc: Tony Lindgren <tony@atomide.com>
+Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Tested-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/Kconfig               |    1 +
- arch/arm/mach-msm/Kconfig      |    2 --
- arch/arm/mach-omap2/Kconfig    |    1 -
- arch/arm/mach-realview/Kconfig |    2 --
- arch/arm/mach-shmobile/Kconfig |    1 -
- arch/arm/mach-tegra/Kconfig    |    1 -
- arch/arm/mach-ux500/Kconfig    |    1 -
- arch/arm/mach-vexpress/Kconfig |    1 -
- arch/arm/plat-s5p/Kconfig      |    1 -
- 9 files changed, 1 insertions(+), 10 deletions(-)
+ arch/arm/mach-omap2/Kconfig                    |    1 +
+ arch/arm/mach-omap2/include/mach/entry-macro.S |   14 +-------------
+ arch/arm/mach-omap2/timer-mpu.c                |    3 ++-
+ 3 files changed, 4 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 9adc278..a06ab26 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1313,6 +1313,7 @@ config SMP
- 		 ARCH_EXYNOS4 || ARCH_TEGRA || ARCH_U8500 || ARCH_VEXPRESS_CA9X4 || \
- 		 ARCH_MSM_SCORPIONMP || ARCH_SHMOBILE
- 	select USE_GENERIC_SMP_HELPERS
-+	select ARM_GIC_PPI_MAP
- 	select HAVE_ARM_SCU if !ARCH_MSM_SCORPIONMP
- 	help
- 	  This enables support for systems with more than one CPU. If you have
-diff --git a/arch/arm/mach-msm/Kconfig b/arch/arm/mach-msm/Kconfig
-index 5be3ee9..1516896 100644
---- a/arch/arm/mach-msm/Kconfig
-+++ b/arch/arm/mach-msm/Kconfig
-@@ -42,7 +42,6 @@ config ARCH_MSM8X60
- 				  && !MACH_MSM8X60_FFA)
- 	select ARCH_MSM_SCORPIONMP
- 	select ARM_GIC
--	select ARM_GIC_PPI_MAP
- 	select CPU_V7
- 	select MSM_V2_TLMM
- 	select MSM_GPIOMUX
-@@ -53,7 +52,6 @@ config ARCH_MSM8960
- 	select ARCH_MSM_SCORPIONMP
- 	select MACH_MSM8960_SIM if (!MACH_MSM8960_RUMI3)
- 	select ARM_GIC
--	select ARM_GIC_PPI_MAP
- 	select CPU_V7
- 	select MSM_V2_TLMM
- 	select MSM_GPIOMUX
 diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index 833717f..19d5891 100644
+index 19d5891..833717f 100644
 --- a/arch/arm/mach-omap2/Kconfig
 +++ b/arch/arm/mach-omap2/Kconfig
-@@ -44,7 +44,6 @@ config ARCH_OMAP4
+@@ -44,6 +44,7 @@ config ARCH_OMAP4
  	depends on ARCH_OMAP2PLUS
  	select CPU_V7
  	select ARM_GIC
--	select ARM_GIC_PPI_MAP
++	select ARM_GIC_PPI_MAP
  	select LOCAL_TIMERS if SMP
  	select PL310_ERRATA_588369
  	select PL310_ERRATA_727915
-diff --git a/arch/arm/mach-realview/Kconfig b/arch/arm/mach-realview/Kconfig
-index b236996..b9a9805 100644
---- a/arch/arm/mach-realview/Kconfig
-+++ b/arch/arm/mach-realview/Kconfig
-@@ -38,7 +38,6 @@ config MACH_REALVIEW_PB11MP
- 	bool "Support RealView(R) Platform Baseboard for ARM11MPCore"
- 	select CPU_V6K
- 	select ARM_GIC
--	select ARM_GIC_PPI_MAP
- 	select HAVE_PATA_PLATFORM
- 	select ARCH_HAS_BARRIERS if SMP
- 	help
-@@ -77,7 +76,6 @@ config MACH_REALVIEW_PBA8
- config MACH_REALVIEW_PBX
- 	bool "Support RealView(R) Platform Baseboard Explore"
- 	select ARM_GIC
--	select ARM_GIC_PPI_MAP
- 	select HAVE_PATA_PLATFORM
- 	select ARCH_SPARSEMEM_ENABLE if CPU_V7 && !REALVIEW_HIGH_PHYS_OFFSET
- 	select ZONE_DMA if SPARSEMEM
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index ca8e06c..0c8f6cf 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -26,7 +26,6 @@ config ARCH_SH73A0
- 	select SH_CLK_CPG
- 	select ARCH_WANT_OPTIONAL_GPIOLIB
- 	select ARM_GIC
--	select ARM_GIC_PPI_MAP
+diff --git a/arch/arm/mach-omap2/include/mach/entry-macro.S b/arch/arm/mach-omap2/include/mach/entry-macro.S
+index a48690b..22d86ef 100644
+--- a/arch/arm/mach-omap2/include/mach/entry-macro.S
++++ b/arch/arm/mach-omap2/include/mach/entry-macro.S
+@@ -78,7 +78,7 @@
+ 4401:		ldr     \irqstat, [\base, #GIC_CPU_INTACK]
+ 		ldr     \tmp, =1021
+ 		bic     \irqnr, \irqstat, #0x1c00
+-		cmp     \irqnr, #29
++		cmp     \irqnr, #15
+ 		cmpcc   \irqnr, \irqnr
+ 		cmpne   \irqnr, \tmp
+ 		cmpcs   \irqnr, \irqnr
+@@ -101,18 +101,6 @@
+ 		it	cs
+ 		cmpcs	\irqnr, \irqnr
+ 		.endm
+-
+-		/* As above, this assumes that irqstat and base are preserved */
+-
+-		.macro test_for_ltirq, irqnr, irqstat, base, tmp
+-		bic	\irqnr, \irqstat, #0x1c00
+-		mov 	\tmp, #0
+-		cmp	\irqnr, #29
+-		itt	eq
+-		moveq	\tmp, #1
+-		streq	\irqstat, [\base, #GIC_CPU_EOI]
+-		cmp	\tmp, #0
+-		.endm
+ #endif	/* CONFIG_SMP */
  
- comment "SH-Mobile Board Type"
+ #else	/* MULTI_OMAP2 */
+diff --git a/arch/arm/mach-omap2/timer-mpu.c b/arch/arm/mach-omap2/timer-mpu.c
+index 31c0ac4..61b57fb 100644
+--- a/arch/arm/mach-omap2/timer-mpu.c
++++ b/arch/arm/mach-omap2/timer-mpu.c
+@@ -22,6 +22,7 @@
+ #include <asm/irq.h>
+ #include <asm/smp_twd.h>
+ #include <asm/localtimer.h>
++#include <asm/hardware/gic.h>
  
-diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
-index dad8f6a..5ec1846 100644
---- a/arch/arm/mach-tegra/Kconfig
-+++ b/arch/arm/mach-tegra/Kconfig
-@@ -9,7 +9,6 @@ config ARCH_TEGRA_2x_SOC
- 	bool "Tegra 2 family"
- 	select CPU_V7
- 	select ARM_GIC
--	select ARM_GIC_PPI_MAP
- 	select ARCH_REQUIRE_GPIOLIB
- 	select USB_ARCH_HAS_EHCI if USB_SUPPORT
- 	select USB_ULPI if USB_SUPPORT
-diff --git a/arch/arm/mach-ux500/Kconfig b/arch/arm/mach-ux500/Kconfig
-index a48b83c..f8b9392 100644
---- a/arch/arm/mach-ux500/Kconfig
-+++ b/arch/arm/mach-ux500/Kconfig
-@@ -4,7 +4,6 @@ config UX500_SOC_COMMON
- 	bool
- 	default y
- 	select ARM_GIC
--	select ARM_GIC_PPI_MAP
- 	select HAS_MTU
- 	select ARM_ERRATA_753970
+ /*
+  * Setup the local clock events for a CPU.
+@@ -32,7 +33,7 @@ int __cpuinit local_timer_setup(struct clock_event_device *evt)
+ 	if (omap_rev() == OMAP4430_REV_ES1_0)
+ 		return -ENXIO;
  
-diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
-index fb34d1e..9311484 100644
---- a/arch/arm/mach-vexpress/Kconfig
-+++ b/arch/arm/mach-vexpress/Kconfig
-@@ -5,7 +5,6 @@ config ARCH_VEXPRESS_CA9X4
- 	bool "Versatile Express Cortex-A9x4 tile"
- 	select CPU_V7
- 	select ARM_GIC
--	select ARM_GIC_PPI_MAP
- 	select ARM_ERRATA_720789
- 	select ARM_ERRATA_751472
- 	select ARM_ERRATA_753970
-diff --git a/arch/arm/plat-s5p/Kconfig b/arch/arm/plat-s5p/Kconfig
-index 40e6e45..e98f5c5 100644
---- a/arch/arm/plat-s5p/Kconfig
-+++ b/arch/arm/plat-s5p/Kconfig
-@@ -11,7 +11,6 @@ config PLAT_S5P
- 	default y
- 	select ARM_VIC if !ARCH_EXYNOS4
- 	select ARM_GIC if ARCH_EXYNOS4
--	select ARM_GIC_PPI_MAP if ARCH_EXYNOS4
- 	select NO_IOPORT
- 	select ARCH_REQUIRE_GPIOLIB
- 	select S3C_GPIO_TRACK
+-	evt->irq = OMAP44XX_IRQ_LOCALTIMER;
++	evt->irq = gic_ppi_map(OMAP44XX_IRQ_LOCALTIMER);
+ 	twd_timer_setup(evt);
+ 	return 0;
+ }
 -- 
 1.7.0.4
