@@ -1,48 +1,72 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 5 Jul 2011 11:19:18 +0100
-Subject: Ooops with 2.6.39.2 on pxa270
-In-Reply-To: <201107042158.05767.anarsoul@gmail.com>
-References: <201107042158.05767.anarsoul@gmail.com>
-Message-ID: <20110705101918.GU8286@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 5 Jul 2011 03:23:50 -0700
+Subject: [GIT PULL] non-critical omap fixes for v3.1 merge window
+Message-ID: <20110705102349.GE5783@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 04, 2011 at 09:58:05PM +0300, Vasily Khoruzhick wrote:
-> Hi there, I'm getting following oops on my device (Zipit Z2 with PXA270)
-> with 2.6.39.2. And I have no idea what can be wrong :( Ooops is not 100% 
-> reproducible, it happens in 50% of cases.
+Hi Arnd,
 
-Short answer is I can't say for certain.  My compiler produces the
-following for get_task_pid:
+Please pull some fixes from:
 
-00000248 <get_task_pid>:
- 248:   e1a0c00d        mov     ip, sp
- 24c:   e92dd800        push    {fp, ip, lr, pc}
- 250:   e24cb004        sub     fp, ip, #4      ; 0x4
- 254:   e3510000        cmp     r1, #0  ; 0x0
- 258:   159000e8        ldrne   r0, [r0, #232]
- 25c:   e3a0300c        mov     r3, #12 ; 0xc
- 260:   e0230391        mla     r3, r1, r3, r0
- 264:   e5930104        ldr     r0, [r3, #260]
- 268:   e3500000        cmp     r0, #0  ; 0x0
+git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git devel-fixes
 
- 26c:   0a000006        beq     28c <get_task_pid+0x44>
- 270:   e10f2000        mrs     r2, CPSR
- 274:   e3823080        orr     r3, r2, #128    ; 0x80
- 278:   e121f003        msr     CPSR_c, r3
- 27c:   e5903000        ldr     r3, [r0]		 <== faulting insn
+These are intented for the merge window, there's no rush for
+these to go in during the -rc cycle this late. I have one fix
+queued for the -rc cycle still that I'll send separately.
 
- 280:   e2833001        add     r3, r3, #1      ; 0x1
- 284:   e5803000        str     r3, [r0]
- 288:   e121f002        msr     CPSR_c, r2
- 28c:   e89da800        ldm     sp, {fp, sp, pc}
+The dmtimer fix in this series has a dependency to the cleanup
+series you pulled earlier.
 
-which is close enough to your code line (except my r3 is your r1).
+Regards,
 
-We know that the passed r1 value was PIDTYPE_PID, wihch means the ldrne
-wasn't executed.
+Tony
 
-My first guess is that something has overwritten task->pids - either
-memory corruption, memory wrap-around due to the kernel thinking it has
-more memory than physically fitted, or a buggy driver stamping over
-memory it shouldn't.
+
+The following changes since commit 48cb1258e8b0f8c81cfb699b42326c5b2147b3f8:
+  Tony Lindgren (1):
+        Merge branch 'for_3.1/pm-misc' of git://git.kernel.org/.../khilman/linux-omap-pm into devel-cleanup
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git devel-fixes
+
+Ambresh K (1):
+      OMAP4: DMTIMER: enable autoidle mode
+
+Charulatha V (1):
+      omap: ZOOM: QUART: Request reset GPIO
+
+Daniel Mack (1):
+      omap: Overo: remove duplicate call to overo_ads7846_init()
+
+Igor Grinberg (2):
+      arm: omap3: cm-t35: minor comments fixes
+      arm: omap3: cm-t35: fix slow path warning
+
+Julia Lawall (1):
+      arch/arm/mach-omap2/clock.c: add missing clk_put
+
+Ohad Ben-Cohen (2):
+      omap: iovmm: s/sg_dma_len(sg)/sg->length/
+      OMAP4: iommu: fix clock name
+
+Silesh C V (1):
+      omap: HSMMC: Fix GPIO muxing
+
+Suman Anna (1):
+      omap: iommu: fix pte programming
+
+Tony Lindgren (1):
+      Merge branch 'iommu-for-tony' of git://github.com/ohadbc/omap-iommu into devel-fixes
+
+ arch/arm/mach-omap2/board-cm-t35.c          |   18 +++++++-----------
+ arch/arm/mach-omap2/board-overo.c           |    1 -
+ arch/arm/mach-omap2/board-zoom-debugboard.c |    9 +++++++++
+ arch/arm/mach-omap2/clock.c                 |    1 +
+ arch/arm/mach-omap2/hsmmc.c                 |    7 +++----
+ arch/arm/mach-omap2/iommu2.c                |    4 ++--
+ arch/arm/mach-omap2/omap-iommu.c            |    2 +-
+ arch/arm/plat-omap/dmtimer.c                |    4 ++--
+ arch/arm/plat-omap/iovmm.c                  |    6 +++---
+ 9 files changed, 28 insertions(+), 24 deletions(-)
