@@ -1,172 +1,75 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 05 Jul 2011 16:34:39 -0700
-Subject: [PATCH] ARM: poison initmem when it is freed
-In-Reply-To: <alpine.LFD.2.00.1107051540550.14596@xanadu.home>
-References: <20110705184254.GH8286@n2100.arm.linux.org.uk>	<alpine.LFD.2.00.1107051509490.14596@xanadu.home>	<20110705192656.GJ8286@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1107051540550.14596@xanadu.home>
-Message-ID: <4E139F8F.7060809@codeaurora.org>
+From: pullip.cho@samsung.com (KyongHo Cho)
+Date: Wed, 6 Jul 2011 08:51:35 +0900
+Subject: [PATCH 0/6+1] ARM: EXYNOS4: SYSMMU: Improvements on SYSMMU driver
+In-Reply-To: <000201cc3b04$aca7fc60$05f7f520$%szyprowski@samsung.com>
+References: <1309743708-1505-1-git-send-email-pullip.cho@samsung.com>
+	<000001cc3a16$4cec0710$e6c41530$%szyprowski@samsung.com>
+	<CAHQjnOPMCMh3fO7RXP7pbD8_nuDEG9ksLhtCcAy=2Z2bTarT9A@mail.gmail.com>
+	<000201cc3b04$aca7fc60$05f7f520$%szyprowski@samsung.com>
+Message-ID: <CAHQjnOMRMyRB3hgREu+-spx3mk_eWG4ar4VD54x5j+PibebJPw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/05/2011 12:48 PM, Nicolas Pitre wrote:
-> On Tue, 5 Jul 2011, Russell King - ARM Linux wrote:
+On Tue, Jul 5, 2011 at 8:14 PM, Marek Szyprowski
+<m.szyprowski@samsung.com> wrote:
+> Hello,
 >
->> On Tue, Jul 05, 2011 at 03:17:33PM -0400, Nicolas Pitre wrote:
->>> On Tue, 5 Jul 2011, Russell King - ARM Linux wrote:
->>>
->>>> When the initmem is freed, we can no longer rely on its contents.  In
->>>> lightly loaded systems, this memory may persist for some time, making
->>>> it harder discover run-time issues (caused by the build warnings being
->>>> ignored.)
->>>>
->>>> Poison the initmem at the point where it is freed to encourage run-time
->>>> problems when initmem is dereferenced as an aid to finding such problems.
->>>>
->>>> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
->>> The default poison doesn't appear to be a judicious choice for ARM.
->>>
->>> include/linux/poison.h:#define POISON_FREE_INITMEM      0xcc
->>>
->>>    0:   cccccccc        stclgt  12, cr12, [ip], {204}   ; 0xcc
->>>
->>> So if the gt condition is false this will execute nops until it falls 
->>> out of the initmem section.  Would be nicer if a fault could be 
->>> generated right at the accessed address which could be looked up.
->> Have you tried to find a byte-based poison value which would fault
->> yet still cause a pointer dereference?  You're limited to 0xeN on
->> ARM, of which there's almost nothing to chose from:
+> On Tuesday, July 05, 2011 1:38 AM KyongHo Cho wrote:
+>
+>> On Mon, Jul 4, 2011 at 3:47 PM, Marek Szyprowski
+>> <m.szyprowski@samsung.com> wrote:
+>> > Hello,
+>> >
+>> > I really don't get why do You persist in creating one monster platform
+>> > device with resources for ALL SYSMMU/IOMMU controllers that are available
+>> > on Exynos4 CPU. We (SPRC, see Andrzej's SYSMMU patches) already proposed
+>> > a clean solution for making the SYSMMU controllers independent of each
+>> > other as well as making the main SYSMMU driver simpler and more
+>> > independent of the particular Exynos4 platform definition. In Linux
+>> > device model if the device/controller exist in the system in more than
+>> > one instance, there should by one generic driver for it and a set of
+>> > platform definitions for each instance.
+>> >
+>> Did you find this patch? "[PATCH 3/6] ARM: EXYNOS4: SYSMMU"
+>> I Cced you because it includes your suggestion.
+>
+> Right, I'm really sorry. It looks that I'm too busy and misunderstood your
+> patches in a brief look.
+
+No problem with that :)
+
+>> > Here is the link to our SYSMMU updated driver (implementing common
+>> > iommu API):
+>> > http://www.spinics.net/lists/linux-samsung-soc/msg04508.html
+>> > The driver still needs some cleanup, but this has been delayed until
+>> > the dma-mapping framework update is finished.
+>> >
+>> > I also don't get why do you want to keep the completely custom sysmmu
+>> > driver and implement iommu API on top of it. Is it really required for
+>> > anything? Mainline kernel is not a place for custom APIs if there is
+>> > already a common, generic one.
 >>
->>    0:   e0e0e0e0        rsc     lr, r0, r0, ror #1
->>    4:   e1e1e1e1        mvn     lr, r1, ror #3
->>    8:   e2e2e2e2        rsc     lr, r2, #536870926      ; 0x2000000e
->>    c:   e3e3e3e3        mvn     lr, #-1946157053        ; 0x8c000003
->>   10:   e4e4e4e4        strbt   lr, [r4], #1252
->>   14:   e5e5e5e5        strb    lr, [r5, #1509]!
->>   18:   e6e6e6e6        strbt   lr, [r6], r6, ror #13
->>   1c:   e7e7e7e7        strb    lr, [r7, r7, ror #15]!
->>   20:   e8e8e8e8        stmia   r8!, {r3, r5, r6, r7, fp, sp, lr, pc}^
->>   24:   e9e9e9e9        stmib   r9!, {r0, r3, r5, r6, r7, r8, fp, sp, lr, pc}^
->>   28:   eaeaeaea        b       0xffababd8
->>   2c:   ebebebeb        bl      0xffafafe0
->>   30:   ecececec        stcl    12, cr14, [ip], #944
->>   34:   edededed        stcl    13, cr14, [sp, #948]!
->>   38:   eeeeeeee        cdp     14, 14, cr14, cr14, cr14, {7}
->>   3c:   efefefef        svc     0x00efefef
->>
->> 0xefefefef looks to be about the best alternative.
-> Right.  Does it have to be a byte?  Having a word (or half-word if 
-> Thumb2) would be much more convenient.
+>> I did not exposed any custom API.
+>> The global function in the last patch is just for IOMMU API implemenation.
+>> The header file in the last patch is not for the device drivers but
+>> for the IOMMU API implementation.
+>> Actually, they can be merged into one single file.
+>> But I just wanted to change the kernel code stepwise.
 >
->> It then brings up whether POISON_FREE_INITMEM should be changed or not,
->> as 0xcc is the expected value for this at the moment.
-> I would think that this should be a per architecture value to actually 
-> be useful.
->
+> What about arch/arm/plat-s5p/sysmmu.c ? I didn't notice any commit which
+> removes this file. Also both drivers/iommu/exynos4_sysmmu.c and
+> drivers/iommu/exynos_iommu.c should be merged together.
 
-Didn't I already post this patch about 6 months ago?
+It will be removed.
+And.. omitting removal of that file is my mistake :(
+Since clkdev for Exynos4 is not applied to of Joerg Roedel's iommu git
+and drivers/iommu is not created in Samsung SOC git,
+it is not simple to apply patch for both.
 
-https://lkml.org/lkml/2011/1/11/1
+Thanks for pointing out it and I'll send a patch to remove those files
+immediately.
 
-Here it is, the only downside I see is the memset isn't really efficient
-as the assembler optimized one.
+On the other hands, merging those files will be also considered.
 
-------8<------->8-------
-
-Subject: [PATCH] arm: mm: Poison freed init memory
-
-Poisoning __init marked memory can be useful when tracking down
-obscure memory corruption bugs. Therefore, poison init memory
-with 0xe7fddef0 to catch bugs earlier. The poison value is an
-undefined instruction in ARM mode and branch to an undefined
-instruction in Thumb mode.
-
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- arch/arm/mm/init.c |   24 +++++++++++++++++-------
- 1 files changed, 17 insertions(+), 7 deletions(-)
-
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index cddd684..8b9d678 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -364,7 +364,8 @@ void __init bootmem_init(void)
- 	max_pfn = max_high - PHYS_PFN_OFFSET;
- }
- 
--static inline int free_area(unsigned long pfn, unsigned long end, char *s)
-+static inline int free_area(unsigned long pfn, unsigned long end, char *s,
-+		bool init_mem)
- {
- 	unsigned int pages = 0, size = (end - pfn) << (PAGE_SHIFT - 10);
- 
-@@ -372,6 +373,14 @@ static inline int free_area(unsigned long pfn, unsigned long end, char *s)
- 		struct page *page = pfn_to_page(pfn);
- 		ClearPageReserved(page);
- 		init_page_count(page);
-+		if (init_mem) {
-+			u32 *mem = __va(__pfn_to_phys(pfn));
-+			u32 *end = (void *)mem + PAGE_SIZE;
-+
-+			do {
-+				*mem++ = 0xe7fddef0;
-+			} while (mem < end);
-+		}
- 		__free_page(page);
- 		pages++;
- 	}
-@@ -478,7 +487,7 @@ static void __init free_highpages(void)
- 				res_end = end;
- 			if (res_start != start)
- 				totalhigh_pages += free_area(start, res_start,
--							     NULL);
-+							     NULL, false);
- 			start = res_end;
- 			if (start == end)
- 				break;
-@@ -486,7 +495,7 @@ static void __init free_highpages(void)
- 
- 		/* And now free anything which remains */
- 		if (start < end)
--			totalhigh_pages += free_area(start, end, NULL);
-+			totalhigh_pages += free_area(start, end, NULL, false);
- 	}
- 	totalram_pages += totalhigh_pages;
- #endif
-@@ -518,7 +527,8 @@ void __init mem_init(void)
- #ifdef CONFIG_SA1111
- 	/* now that our DMA memory is actually so designated, we can free it */
- 	totalram_pages += free_area(PHYS_PFN_OFFSET,
--				    __phys_to_pfn(__pa(swapper_pg_dir)), NULL);
-+				    __phys_to_pfn(__pa(swapper_pg_dir)), NULL,
-+				    false);
- #endif
- 
- 	free_highpages();
-@@ -650,13 +660,13 @@ void free_initmem(void)
- 
- 	totalram_pages += free_area(__phys_to_pfn(__pa(&__tcm_start)),
- 				    __phys_to_pfn(__pa(&__tcm_end)),
--				    "TCM link");
-+				    "TCM link", true);
- #endif
- 
- 	if (!machine_is_integrator() && !machine_is_cintegrator())
- 		totalram_pages += free_area(__phys_to_pfn(__pa(__init_begin)),
- 					    __phys_to_pfn(__pa(__init_end)),
--					    "init");
-+					    "init", true);
- }
- 
- #ifdef CONFIG_BLK_DEV_INITRD
-@@ -668,7 +678,7 @@ void free_initrd_mem(unsigned long start, unsigned long end)
- 	if (!keep_initrd)
- 		totalram_pages += free_area(__phys_to_pfn(__pa(start)),
- 					    __phys_to_pfn(__pa(end)),
--					    "initrd");
-+					    "initrd", true);
- }
- 
- static int __init keepinitrd_setup(char *__unused)
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Regards,
+KyongHo Cho.
