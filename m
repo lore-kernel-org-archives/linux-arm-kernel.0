@@ -1,119 +1,117 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 05 Jul 2011 09:58:30 +0200
-Subject: [PATCH] ASoC: wm8731: set the ACTIVE bit if bias ON entered
-In-Reply-To: <20110704172856.GF28726@opensource.wolfsonmicro.com>
-References: <ccd4b125244271af7978948689cf1dcef37bc06b.1309368631.git.nicolas.ferre@atmel.com>
-	<1309517034-26110-1-git-send-email-nicolas.ferre@atmel.com>
-	<20110701161506.GC23784@opensource.wolfsonmicro.com>
-	<4E118BF6.6010205@atmel.com>
-	<20110704172856.GF28726@opensource.wolfsonmicro.com>
-Message-ID: <4E12C426.8050501@atmel.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 5 Jul 2011 09:04:30 +0100
+Subject: [PATCH 1/7] DMA: PL330: Add support runtime PM for PL330 DMAC
+In-Reply-To: <1309781915-31549-2-git-send-email-kgene.kim@samsung.com>
+References: <1309781915-31549-1-git-send-email-kgene.kim@samsung.com>
+	<1309781915-31549-2-git-send-email-kgene.kim@samsung.com>
+Message-ID: <20110705080430.GP8286@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 04/07/2011 19:29, Mark Brown :
-> On Mon, Jul 04, 2011 at 11:46:30AM +0200, Nicolas Ferre wrote:
-> 
->> Ah, ok... but I fear that I do not know the whole system enough for this
->> addition ;-(
->> Do you think you can code this modification, I will be happy to test it,
->> if you want...
-> 
-> It's pretty trivial - try the below (Liam, are you OK with this if it
-> tests OK?):
-> 
->>From 1dd054eb530641dadbf71525ee517c847f19e161 Mon Sep 17 00:00:00 2001
-> From: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> Date: Mon, 4 Jul 2011 10:27:51 -0700
-> Subject: [PATCH] ASoC: Manage WM8731 ACTIVE bit as a supply widget
-> 
-> Now we have supply widgets there's no need to open code the handling of
-> the ACTIVE bit.
-> 
-> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> ---
->  sound/soc/codecs/wm8731.c |   29 +++--------------------------
->  1 files changed, 3 insertions(+), 26 deletions(-)
-> 
-> diff --git a/sound/soc/codecs/wm8731.c b/sound/soc/codecs/wm8731.c
-> index 2dc964b..59d9e59 100644
-> --- a/sound/soc/codecs/wm8731.c
-> +++ b/sound/soc/codecs/wm8731.c
-> @@ -175,6 +175,7 @@ static const struct snd_kcontrol_new wm8731_input_mux_controls =
->  SOC_DAPM_ENUM("Input Select", wm8731_insel_enum);
+On Mon, Jul 04, 2011 at 09:18:29PM +0900, Kukjin Kim wrote:
+> @@ -666,6 +667,7 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
+>  	struct dma_device *pd;
+>  	struct resource *res;
+>  	int i, ret, irq;
+> +	struct clk* clk;
+
+Please use checkpatch.  'struct clk *clk;'
+
+> @@ -696,6 +698,28 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
+>  		goto probe_err1;
+>  	}
 >  
->  static const struct snd_soc_dapm_widget wm8731_dapm_widgets[] = {
-> +SND_SOC_DAPM_SUPPLY("Active",WM8731_ACTIVE, 0, 0, NULL, 0),
 
-------------------------^^^^^^^
-I have replaced this with ACTIVE to match the route declaration.
+Get the clock here and save its pointer.  put the clock in the remove function.
 
-*With this modification* it works, so you can add my:
-
-Tested-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-
->  SND_SOC_DAPM_SUPPLY("OSC", WM8731_PWR, 5, 1, NULL, 0),
->  SND_SOC_DAPM_MIXER("Output Mixer", WM8731_PWR, 4, 1,
->  	&wm8731_output_mixer_controls[0],
-> @@ -204,6 +205,8 @@ static int wm8731_check_osc(struct snd_soc_dapm_widget *source,
->  static const struct snd_soc_dapm_route wm8731_intercon[] = {
->  	{"DAC", NULL, "OSC", wm8731_check_osc},
->  	{"ADC", NULL, "OSC", wm8731_check_osc},
-> +	{"DAC", NULL, "ACTIVE"},
-> +	{"ADC", NULL, "ACTIVE"},
+> +#ifdef CONFIG_PM_RUNTIME
+> +	/* to use the runtime PM helper functions */
+> +	pm_runtime_enable(&adev->dev);
+> +
+> +	/* enable the power domain */
+> +	if (pm_runtime_get_sync(&adev->dev)) {
+> +		dev_err(&adev->dev, "failed to get runtime pm\n");
+> +		ret = -ENODEV;
+> +		goto probe_err1;
+> +	}
+> +#else
+> +	/* enable dma clk */
+> +	clk = clk_get(&adev->dev, "dma");
+> +
+> +	if (IS_ERR(clk)) {
+> +		dev_err(&adev->dev, "Cannot get operation clock.\n");
+> +		ret = -EINVAL;
+> +		goto probe_err1;
+> +	}
+> +	clk_enable(clk);
+> +#endif
+> +
+>  	irq = adev->irq[0];
+>  	ret = request_irq(irq, pl330_irq_handler, 0,
+>  			dev_name(&adev->dev), pi);
+> @@ -838,10 +862,47 @@ static struct amba_id pl330_ids[] = {
+>  	{ 0, 0 },
+>  };
 >  
->  	/* output mixer */
->  	{"Output Mixer", "Line Bypass Switch", "Line Input"},
-> @@ -315,29 +318,6 @@ static int wm8731_hw_params(struct snd_pcm_substream *substream,
->  	return 0;
->  }
->  
-> -static int wm8731_pcm_prepare(struct snd_pcm_substream *substream,
-> -			      struct snd_soc_dai *dai)
-> -{
-> -	struct snd_soc_codec *codec = dai->codec;
-> -
-> -	/* set active */
-> -	snd_soc_write(codec, WM8731_ACTIVE, 0x0001);
-> -
-> -	return 0;
-> -}
-> -
-> -static void wm8731_shutdown(struct snd_pcm_substream *substream,
-> -			    struct snd_soc_dai *dai)
-> -{
-> -	struct snd_soc_codec *codec = dai->codec;
-> -
-> -	/* deactivate */
-> -	if (!codec->active) {
-> -		udelay(50);
-> -		snd_soc_write(codec, WM8731_ACTIVE, 0x0);
-> -	}
-> -}
-> -
->  static int wm8731_mute(struct snd_soc_dai *dai, int mute)
->  {
->  	struct snd_soc_codec *codec = dai->codec;
-> @@ -480,7 +460,6 @@ static int wm8731_set_bias_level(struct snd_soc_codec *codec,
->  		snd_soc_write(codec, WM8731_PWR, reg | 0x0040);
->  		break;
->  	case SND_SOC_BIAS_OFF:
-> -		snd_soc_write(codec, WM8731_ACTIVE, 0x0);
->  		snd_soc_write(codec, WM8731_PWR, 0xffff);
->  		regulator_bulk_disable(ARRAY_SIZE(wm8731->supplies),
->  				       wm8731->supplies);
-> @@ -496,9 +475,7 @@ static int wm8731_set_bias_level(struct snd_soc_codec *codec,
->  	SNDRV_PCM_FMTBIT_S24_LE)
->  
->  static struct snd_soc_dai_ops wm8731_dai_ops = {
-> -	.prepare	= wm8731_pcm_prepare,
->  	.hw_params	= wm8731_hw_params,
-> -	.shutdown	= wm8731_shutdown,
->  	.digital_mute	= wm8731_mute,
->  	.set_sysclk	= wm8731_set_dai_sysclk,
->  	.set_fmt	= wm8731_set_dai_fmt,
+> +#ifdef CONFIG_PM_RUNTIME
+> +static int pl330_runtime_suspend(struct device *dev)
+> +{
+> +	struct clk *dmaclk = clk_get(dev, "dma");
+> +
+> +	if (dmaclk == NULL) {
+> +		dev_err(dev, "failed to find dma clock source\n");
+> +		return -ENODEV;
+> +	}
 
+Obviously wrong.
 
--- 
-Nicolas Ferre
+Use the clock you got in the probe function here.
+
+> +
+> +	clk_disable(dmaclk);
+> +	return 0;
+> +}
+> +
+> +static int pl330_runtime_resume(struct device *dev)
+> +{
+> +	struct clk *dmaclk = clk_get(dev, "dma");
+> +
+> +	if (dmaclk == NULL) {
+> +		dev_err(dev, "failed to find dma clock source\n");
+> +		return -ENODEV;
+> +	}
+
+Obviously wrong as well.
+
+Use the clock you got in the probe function here too.
+
+> +
+> +	clk_enable(dmaclk);
+> +	return 0;
+> +}
+> +#else
+> +#define pl330_runtime_suspend	NULL
+> +#define pl330_runtime_resume	NULL
+> +#endif /* CONFIG_PM_RUNTIME */
+> +
+> +static const struct dev_pm_ops pl330_pm_ops = {
+> +	.runtime_suspend = pl330_runtime_suspend,
+> +	.runtime_resume = pl330_runtime_resume,
+> +};
+> +
+>  static struct amba_driver pl330_driver = {
+>  	.drv = {
+>  		.owner = THIS_MODULE,
+>  		.name = "dma-pl330",
+> +		.pm = &pl330_pm_ops,
+>  	},
+>  	.id_table = pl330_ids,
+>  	.probe = pl330_probe,
+> -- 
+> 1.7.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
