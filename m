@@ -1,74 +1,94 @@
 From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Tue,  5 Jul 2011 17:08:37 +0400
-Subject: [PATCH 11/15] h5000: convert to use gpio-pullup
+Date: Tue,  5 Jul 2011 17:08:38 +0400
+Subject: [PATCH 12/15] gpio-vbus: support disabling D+ pullup on suspend
 In-Reply-To: <1309871321-11305-1-git-send-email-dbaryshkov@gmail.com>
 References: <1309871321-11305-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <1309871321-11305-12-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <1309871321-11305-13-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert to use gpio-pullup transceiver instead of relying on UDC driver managing GPIO.
+Some platforms would like to disable D+ pullup on suspend, to drain as
+low power, as possible. E.g. this was requested by mioa701 board
+maintainers.
+
+Suspend/resume is done in _noirq path, to force handling of pullup after
+the main UDC driver suspend/before resume.
 
 Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
 ---
- arch/arm/mach-pxa/h5000.c |   14 +++++++++++---
- 1 files changed, 11 insertions(+), 3 deletions(-)
+ drivers/usb/otg/gpio_vbus.c   |   42 +++++++++++++++++++++++++++++++++++++++++
+ include/linux/usb/gpio_vbus.h |    1 +
+ 2 files changed, 43 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-pxa/h5000.c b/arch/arm/mach-pxa/h5000.c
-index 657db46..4b3ca92 100644
---- a/arch/arm/mach-pxa/h5000.c
-+++ b/arch/arm/mach-pxa/h5000.c
-@@ -24,6 +24,7 @@
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/partitions.h>
- #include <linux/mtd/physmap.h>
-+#include <linux/usb/gpio_vbus.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -31,7 +32,6 @@
- 
- #include <mach/pxa25x.h>
- #include <mach/h5000.h>
--#include <mach/udc.h>
- #include <mach/smemc.h>
- 
- #include "generic.h"
-@@ -117,10 +117,18 @@ static struct platform_device h5000_flash[] = {
-  * USB Device Controller
-  */
- 
--static struct pxa2xx_udc_mach_info h5000_udc_mach_info __initdata = {
-+static struct gpio_vbus_mach_info h5000_udc_mach_info = {
- 	.gpio_pullup = H5000_GPIO_USB_PULLUP,
- };
- 
-+static struct platform_device h5000_gpio_pullup = {
-+	.name	= "gpio-pullup",
-+	.id	= -1,
-+	.dev	= {
-+		.platform_data	= &h5000_udc_mach_info,
-+	},
-+};
-+
- /*
-  * GPIO setup
-  */
-@@ -187,6 +195,7 @@ static void fix_msc(void)
- static struct platform_device *devices[] __initdata = {
- 	&h5000_flash[0],
- 	&h5000_flash[1],
-+	&h5000_gpio_pullup,
- };
- 
- static void __init h5000_init(void)
-@@ -197,7 +206,6 @@ static void __init h5000_init(void)
- 	pxa_set_ffuart_info(NULL);
- 	pxa_set_btuart_info(NULL);
- 	pxa_set_stuart_info(NULL);
--	pxa_set_udc_info(&h5000_udc_mach_info);
- 	platform_add_devices(ARRAY_AND_SIZE(devices));
+diff --git a/drivers/usb/otg/gpio_vbus.c b/drivers/usb/otg/gpio_vbus.c
+index 52733d9..3b27b1f 100644
+--- a/drivers/usb/otg/gpio_vbus.c
++++ b/drivers/usb/otg/gpio_vbus.c
+@@ -327,6 +327,47 @@ static int __exit gpio_vbus_remove(struct platform_device *pdev)
+ 	return 0;
  }
  
++#ifdef CONFIG_PM
++static int gpio_vbus_suspend(struct device *dev)
++{
++	struct platform_device *pdev = to_platform_device(dev);
++	struct gpio_vbus_data *gpio_vbus = platform_get_drvdata(pdev);
++	struct gpio_vbus_mach_info *pdata = gpio_vbus->dev->platform_data;
++
++	if (gpio_vbus->otg.gadget && pdata->disconnect_on_suspend) {
++		/* optionally disable D+ pullup */
++		if (gpio_is_valid(pdata->gpio_pullup))
++			gpio_set_value(pdata->gpio_pullup,
++					pdata->gpio_pullup_inverted);
++
++		set_vbus_draw(gpio_vbus, 0);
++	}
++	return 0;
++}
++
++static int gpio_vbus_resume(struct device *dev)
++{
++	struct platform_device *pdev = to_platform_device(dev);
++	struct gpio_vbus_data *gpio_vbus = platform_get_drvdata(pdev);
++
++	if (gpio_vbus->otg.gadget)
++		schedule_work(&gpio_vbus->work);
++
++	return 0;
++}
++static const struct dev_pm_ops gpio_vbus_pm_ops = {
++	.suspend_noirq = gpio_vbus_suspend,
++	.resume_noirq = gpio_vbus_resume,
++	.freeze_noirq = gpio_vbus_suspend,
++	.thaw_noirq = gpio_vbus_resume,
++	.poweroff_noirq = gpio_vbus_suspend,
++	.restore_noirq = gpio_vbus_resume,
++};
++#define GPIO_VBUS_PM_OPS (&gpio_vbus_pm_ops)
++#else
++#define GPIO_VBUS_PM_OPS NULL
++#endif
++
+ /* NOTE:  the gpio-vbus device may *NOT* be hotplugged */
+ 
+ MODULE_ALIAS("platform:gpio-vbus");
+@@ -335,6 +376,7 @@ static struct platform_driver gpio_vbus_driver = {
+ 	.driver = {
+ 		.name  = "gpio-vbus",
+ 		.owner = THIS_MODULE,
++		.pm = GPIO_VBUS_PM_OPS,
+ 	},
+ 	.remove  = __exit_p(gpio_vbus_remove),
+ };
+diff --git a/include/linux/usb/gpio_vbus.h b/include/linux/usb/gpio_vbus.h
+index d9f03cc..2faa38d 100644
+--- a/include/linux/usb/gpio_vbus.h
++++ b/include/linux/usb/gpio_vbus.h
+@@ -27,4 +27,5 @@ struct gpio_vbus_mach_info {
+ 	int gpio_pullup;
+ 	bool gpio_vbus_inverted;
+ 	bool gpio_pullup_inverted;
++	bool disconnect_on_suspend;
+ };
 -- 
 1.7.5.4
