@@ -1,56 +1,89 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 05 Jul 2011 14:11:11 +0100
-Subject: [PATCH 2/9] DMA: PL08x: select LLI bus only once per LLI setup
+Date: Tue, 05 Jul 2011 14:11:31 +0100
+Subject: [PATCH 3/9] DMA: PL08x: clean up LLI debugging
 In-Reply-To: <20110705131030.GE8286@n2100.arm.linux.org.uk>
 References: <20110705131030.GE8286@n2100.arm.linux.org.uk>
-Message-ID: <E1Qe5PD-0005NG-AL@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1Qe5PX-0005NK-Dk@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Avoid re-selecting the LLI bus each time we create an LLI.  Move it out
-of the LLI setup loops.
+Clean up debugging when setting up the LLI list.  This reduces the
+amount of output while preserving the information, and makes it easier
+to read.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/dma/amba-pl08x.c |    7 +++----
- 1 files changed, 3 insertions(+), 4 deletions(-)
+ drivers/dma/amba-pl08x.c |   33 ++++++++++++++++-----------------
+ 1 files changed, 16 insertions(+), 17 deletions(-)
 
 diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
-index 90db51f..c28eebf 100644
+index c28eebf..f043284 100644
 --- a/drivers/dma/amba-pl08x.c
 +++ b/drivers/dma/amba-pl08x.c
-@@ -491,10 +491,10 @@ static inline u32 pl08x_cctl_bits(u32 cctl, u8 srcwidth, u8 dstwidth,
+@@ -617,25 +617,15 @@ static int pl08x_fill_llis_for_desc(struct pl08x_driver_data *pl08x,
+ 	/* Set up the bus widths to the maximum */
+ 	bd.srcbus.buswidth = bd.srcbus.maxwidth;
+ 	bd.dstbus.buswidth = bd.dstbus.maxwidth;
+-	dev_vdbg(&pl08x->adev->dev,
+-		 "%s source bus is %d bytes wide, dest bus is %d bytes wide\n",
+-		 __func__, bd.srcbus.buswidth, bd.dstbus.buswidth);
+-
  
- struct pl08x_lli_build_data {
- 	struct pl08x_txd *txd;
--	struct pl08x_driver_data *pl08x;
- 	struct pl08x_bus_data srcbus;
- 	struct pl08x_bus_data dstbus;
- 	size_t remainder;
-+	u32 lli_bus;
- };
+ 	/*
+ 	 * Bytes transferred == tsize * MIN(buswidths), not max(buswidths)
+ 	 */
+ 	max_bytes_per_lli = min(bd.srcbus.buswidth, bd.dstbus.buswidth) *
+ 		PL080_CONTROL_TRANSFER_SIZE_MASK;
+-	dev_vdbg(&pl08x->adev->dev,
+-		 "%s max bytes per lli = %zu\n",
+-		 __func__, max_bytes_per_lli);
  
- /*
-@@ -547,8 +547,7 @@ static void pl08x_fill_lli_for_desc(struct pl08x_lli_build_data *bd,
- 	llis_va[num_llis].src = bd->srcbus.addr;
- 	llis_va[num_llis].dst = bd->dstbus.addr;
- 	llis_va[num_llis].lli = llis_bus + (num_llis + 1) * sizeof(struct pl08x_lli);
--	if (bd->pl08x->lli_buses & PL08X_AHB2)
--		llis_va[num_llis].lli |= PL080_LLI_LM_AHB2;
-+	llis_va[num_llis].lli |= bd.lli_bus;
+ 	/* We need to count this down to zero */
+ 	bd.remainder = txd->len;
+-	dev_vdbg(&pl08x->adev->dev,
+-		 "%s remainder = %zu\n",
+-		 __func__, bd.remainder);
  
- 	if (cctl & PL080_CONTROL_SRC_INCR)
- 		bd->srcbus.addr += len;
-@@ -601,9 +600,9 @@ static int pl08x_fill_llis_for_desc(struct pl08x_driver_data *pl08x,
- 	cctl = txd->cctl;
+ 	/*
+ 	 * Choose bus to align to
+@@ -644,6 +634,16 @@ static int pl08x_fill_llis_for_desc(struct pl08x_driver_data *pl08x,
+ 	 */
+ 	pl08x_choose_master_bus(&bd, &mbus, &sbus, cctl);
  
- 	bd.txd = txd;
--	bd.pl08x = pl08x;
- 	bd.srcbus.addr = txd->src_addr;
- 	bd.dstbus.addr = txd->dst_addr;
-+	bd.lli_bus = (pl08x->lli_buses & PL08X_AHB2) ? PL080_LLI_LM_AHB2 : 0;
++	dev_vdbg(&pl08x->adev->dev, "src=0x%08x%s/%u dst=0x%08x%s/%u len=%zu llimax=%zu\n",
++		 bd.srcbus.addr, cctl & PL080_CONTROL_SRC_INCR ? "+" : "",
++		 bd.srcbus.buswidth,
++		 bd.dstbus.addr, cctl & PL080_CONTROL_DST_INCR ? "+" : "",
++		 bd.dstbus.buswidth,
++		 bd.remainder, max_bytes_per_lli);
++	dev_vdbg(&pl08x->adev->dev, "mbus=%s sbus=%s\n",
++		 mbus == &bd.srcbus ? "src" : "dst",
++		 sbus == &bd.srcbus ? "src" : "dst");
++
+ 	if (txd->len < mbus->buswidth) {
+ 		/* Less than a bus width available - send as single bytes */
+ 		while (bd.remainder) {
+@@ -835,15 +835,14 @@ static int pl08x_fill_llis_for_desc(struct pl08x_driver_data *pl08x,
+ 	{
+ 		int i;
  
- 	/* Find maximum width of the source bus */
- 	bd.srcbus.maxwidth =
++		dev_vdbg(&pl08x->adev->dev,
++			 "%-3s %-9s  %-10s %-10s %-10s %s\n",
++			 "lli", "", "csrc", "cdst", "clli", "cctl");
+ 		for (i = 0; i < num_llis; i++) {
+ 			dev_vdbg(&pl08x->adev->dev,
+-				 "lli %d @%p: csrc=0x%08x, cdst=0x%08x, cctl=0x%08x, clli=0x%08x\n",
+-				 i,
+-				 &llis_va[i],
+-				 llis_va[i].src,
+-				 llis_va[i].dst,
+-				 llis_va[i].cctl,
+-				 llis_va[i].lli
++				 "%3d @%p: 0x%08x 0x%08x 0x%08x 0x%08x\n",
++				 i, &llis_va[i], llis_va[i].src,
++				 llis_va[i].dst, llis_va[i].lli, llis_va[i].cctl
+ 				);
+ 		}
+ 	}
 -- 
 1.7.4.4
