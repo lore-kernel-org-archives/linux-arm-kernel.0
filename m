@@ -1,36 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 5 Jul 2011 12:25:33 +0100
-Subject: [PATCH 3/4] mmci: sync DATAEND irq with dma|pio transfer done
-In-Reply-To: <1309247860-17181-1-git-send-email-linus.walleij@stericsson.com>
-References: <1309247860-17181-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <20110705112533.GY8286@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 5 Jul 2011 13:25:47 +0200
+Subject: [PATCH] AT91: add AT91SAM9X5 dummy configuration variable
+In-Reply-To: <20110705053229.GC27909@game.jcrosoft.org>
+References: <1309260927-11411-1-git-send-email-nicolas.ferre@atmel.com>
+	<4E118679.4090908@atmel.com>
+	<20110705053229.GC27909@game.jcrosoft.org>
+Message-ID: <201107051325.47417.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 28, 2011 at 09:57:40AM +0200, Linus Walleij wrote:
-> From: Ulf Hansson <ulf.hansson@stericsson.com>
-> 
-> The end of a dma|pio data transfer is synced with the
-> DATAEND irq. This will prevent the mmci driver from ending
-> the request before the dma|pio job is completely done.
-> 
-> For dma we use DMA_PREP_INTERRUPT to register a callback
-> function which is called when dma driver is done with job.
-> 
-> To also make sure we prevent hanging forever, waiting for
-> DATAEND irq or a dma|pio transfer to be done, we setup a timer
-> when either a DATAEND or dma|pio job is done. Once both
-> conditions have occured, the timer is cancelled and the data
-> transfer is completed.
-> 
-> If a timeout occurs, the data transfer is terminated in a
-> controlled manner and EAGAIN is returned to the framework.
-> A timeout value of 50 ms has been found to work well for
-> our usecases.
+On Tuesday 05 July 2011, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > You have convinced me.
+> > But I will have to remove the other dependencies that I mentioned before
+> > in the thread.
+> > 
+> > We can drop this patch.
+> I prefer to hide the platform specific driver other wise we will have a huge
+> menu entry in Kconfig with unrelated drivers that can not be used at all on
+> the selected mach
 
-What is the framework supposed to do with that error code?  Magic the
-driver into disabling DMA by some non-existant callback?
+I fear it's too late for that. You already have to decide on many thousands
+of configuration options, most of which are totally irrelevant for a
+particular system.
 
-Please, stop introducing magic new error codes which have no meaning to
-the upper levels unless you're also going to add some handling of those
-error conditions as well.
+IMHO, the two much better ways to deal with SOC-specific device drivers
+are defconfig files and/or specific defaults, like
+
+config ABX500_CORE
+        bool "ST-Ericsson ABX500 Mixed Signal Circuit register functions"
+        default ARCH_U300 || ARCH_U8500
+
+This lets everybody choose whether they would like to build the driver
+or not, which is very useful for allyesconfig/allnoconfig/randconfig
+builds. At the same time, the default gets it right in almost all
+other cases.
+
+	Arnd
