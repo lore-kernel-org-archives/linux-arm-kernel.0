@@ -1,22 +1,34 @@
-From: hpa@zytor.com (H. Peter Anvin)
-Date: Tue, 05 Jul 2011 15:35:46 -0700
-Subject: [RFC] virtio: expose for non-virtualization users too
-In-Reply-To: <1309874774-31689-1-git-send-email-ohad@wizery.com>
-References: <1309874774-31689-1-git-send-email-ohad@wizery.com>
-Message-ID: <4E1391C2.2090904@zytor.com>
+From: rdunlap@xenotime.net (Randy Dunlap)
+Date: Tue, 5 Jul 2011 16:27:05 -0700
+Subject: [PATCH v4] mmc: documentation of mmc non-blocking request usage
+	and design.
+In-Reply-To: <1309901732-3735-1-git-send-email-per.forlin@linaro.org>
+References: <1309901732-3735-1-git-send-email-per.forlin@linaro.org>
+Message-ID: <20110705162705.c3081299.rdunlap@xenotime.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/05/2011 07:06 AM, Ohad Ben-Cohen wrote:
-> virtio has been so far used only in the context of virtualization,
-> and the virtio Kconfig was sourced directly by the relevant arch
-> Kconfigs when VIRTUALIZATION was selected.
-> 
-> Now that we start using virtio for inter-processor communications,
-> we need to source the virtio Kconfig outside of the virtualization
-> scope too.
-> 
+On Tue,  5 Jul 2011 23:35:32 +0200 Per Forlin wrote:
 
-Seems reasonable to me.
+> +MMC block driver
+> +================
+> +
+> +The issue_rw_rq() in the MMC block driver is made non-blocking.
+> +The increase in throughput is proportional to the time it takes to
+> +prepare (major part of preparations are dma_map_sg and dma_unmap_sg)
+> +a request and how fast the memory is. The faster the MMC/SD is
+> +the more significant the prepare request time becomes. Roughly the expected
+> +performance gain is 5% for large writes and 10% on large reads on a L2 cache
+> +platform. In power save mode, when clocks run on a lower frequency, the DMA
+> +preparation may cost even more. As long as these slower preparations are run
+> +in parallel with the transfer performance wont be affected.
 
-	-hpa
+                                             won't
+
+Acked-by: Randy Dunlap <rdunlap@xenotime.net>
+
+
+thanks.
+---
+~Randy
+*** Remember to use Documentation/SubmitChecklist when testing your code ***
