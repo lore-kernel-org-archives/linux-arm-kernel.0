@@ -1,72 +1,43 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Tue,  5 Jul 2011 14:29:22 -0600
-Subject: [PATCH 3/3] dt: docs: tegra: Use engineering names in DT compatible
-	property
-In-Reply-To: <1309897762-23564-1-git-send-email-swarren@nvidia.com>
-References: <1309897762-23564-1-git-send-email-swarren@nvidia.com>
-Message-ID: <1309897762-23564-4-git-send-email-swarren@nvidia.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Tue, 05 Jul 2011 22:42:19 +0200
+Subject: [PATCH 15/15] pxa2[57]x_udc: drop gpio_pullup handling
+In-Reply-To: <1309871321-11305-16-git-send-email-dbaryshkov@gmail.com>
+References: <1309871321-11305-1-git-send-email-dbaryshkov@gmail.com>
+	<1309871321-11305-16-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <4E13772B.2090406@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Engineering names are more stable than marketing names. Hence, use them
-for Device Tree compatible properties instead.
+On 07/05/2011 03:08 PM, Dmitry Eremin-Solenikov wrote:
+> Now as all drivers were converted to using gpio-vbus, drop gpio-pullup
+> handling from pxa UDC drivers, thus simplifying them a bit.
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
- Documentation/devicetree/usage-model |   12 ++++++------
- 1 files changed, 6 insertions(+), 6 deletions(-)
+Is this patch compliant with USB 2 specification regarding maximum time 
+between pullup triggering and UDC ready to answer the "RESET" packet and 
+be assigned an address ?
 
-diff --git a/Documentation/devicetree/usage-model b/Documentation/devicetree/usage-model
-index 03a56b3..45e03b8 100644
---- a/Documentation/devicetree/usage-model
-+++ b/Documentation/devicetree/usage-model
-@@ -240,7 +240,7 @@ About now is a good time to lay out an example.  Here is part of the
- device tree for the NVIDIA Tegra board.
- 
- /{
--	compatible = "nvidia,harmony", "nvidia,tegra250";
-+	compatible = "nvidia,harmony", "nvidia,tegra20";
- 	#address-cells = <1>;
- 	#size-cells = <1>;
- 	interrupt-parent = <&intc>;
-@@ -254,33 +254,33 @@ device tree for the NVIDIA Tegra board.
- 	};
- 
- 	soc {
--		compatible = "nvidia,tegra250-soc", "simple-bus";
-+		compatible = "nvidia,tegra20-soc", "simple-bus";
- 		#address-cells = <1>;
- 		#size-cells = <1>;
- 		ranges;
- 
- 		intc: interrupt-controller at 50041000 {
--			compatible = "nvidia,tegra250-gic";
-+			compatible = "nvidia,tegra20-gic";
- 			interrupt-controller;
- 			#interrupt-cells = <1>;
- 			reg = <0x50041000 0x1000>, < 0x50040100 0x0100 >;
- 		};
- 
- 		serial at 70006300 {
--			compatible = "nvidia,tegra250-uart";
-+			compatible = "nvidia,tegra20-uart";
- 			reg = <0x70006300 0x100>;
- 			interrupts = <122>;
- 		};
- 
- 		i2s-1: i2s at 70002800 {
--			compatible = "nvidia,tegra250-i2s";
-+			compatible = "nvidia,tegra20-i2s";
- 			reg = <0x70002800 0x100>;
- 			interrupts = <77>;
- 			codec = <&wm8903>;
- 		};
- 
- 		i2c at 7000c000 {
--			compatible = "nvidia,tegra250-i2c";
-+			compatible = "nvidia,tegra20-i2c";
- 			#address-cells = <1>;
- 			#size-cells = <1>;
- 			reg = <0x7000c000 0x100>;
--- 
-1.7.0.4
+This is the sequence I'm worried about :
+  (1) The gpio-vbus is loaded
+  (2) The pxa27x_udc is loaded
+  (3) USB cable is plugged
+      => VBUS is sensed
+  (4) gpio-vbus pulls up the D+ (Dmitry, is that right ?)
+  (5) the host waits for UDC to settle (100 ms ?)
+  (5) set address packet(s) are sent from host to UDC
+  (6) UDC is not enabled, as no gadget is registered
+      => UDC doesn't answer
+      => usb host cannot assign it an address
+  (7) a gadget is loaded (g_ether for example)
+      => UDC is enabled, but too late
+
+Alan, Gregh, could you confirm point (5) about a maximum time between D+ 
+line activation and UDC duty to repond to "set address" packets, as well 
+as the consequence of point (6) where the usb device is rejected because 
+no address could be assigned ?
+
+Dmitry, could you confirm the the D+ pullup is done at point (4) ?
+
+Cheers.
+
+--
+Robert
