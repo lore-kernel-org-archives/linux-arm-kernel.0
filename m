@@ -1,24 +1,25 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 5 Jul 2011 21:27:09 +0100
-Subject: [alsa-devel] [PATCH] ASoC: wm8731: set the ACTIVE bit if bias
-	ON entered
-In-Reply-To: <4E12C426.8050501@atmel.com>
-References: <ccd4b125244271af7978948689cf1dcef37bc06b.1309368631.git.nicolas.ferre@atmel.com>
-	<1309517034-26110-1-git-send-email-nicolas.ferre@atmel.com>
-	<20110701161506.GC23784@opensource.wolfsonmicro.com>
-	<4E118BF6.6010205@atmel.com>
-	<20110704172856.GF28726@opensource.wolfsonmicro.com>
-	<4E12C426.8050501@atmel.com>
-Message-ID: <20110705202709.GA26404@sirena.org.uk>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Tue,  5 Jul 2011 14:29:19 -0600
+Subject: [PATCH 0/3] tegra: Use engineering names in DT compatible properties
+Message-ID: <1309897762-23564-1-git-send-email-swarren@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 05, 2011 at 09:58:30AM +0200, Nicolas Ferre wrote:
+Grant, these 3 patches are for the devicetree/test branch. I kept them
+separated in the hope they'll squash into existing patches already there.
 
-> I have replaced this with ACTIVE to match the route declaration.
+Stephen Warren (3):
+  mmc/tegra: Use engineering names in DT compatible property
+  ARM: tegra: Use engineering names in DT compatible property
+  dt: docs: tegra: Use engineering names in DT compatible property
 
-> *With this modification* it works, so you can add my:
-
-> Tested-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-Great, thanks.
+ Documentation/devicetree/usage-model |   12 ++--
+ arch/arm/boot/dts/tegra-harmony.dts  |    4 +-
+ arch/arm/boot/dts/tegra-seaboard.dts |    4 +-
+ arch/arm/boot/dts/tegra20.dtsi       |  162 ++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/tegra250.dtsi      |  162 ----------------------------------
+ arch/arm/mach-tegra/board-dt.c       |   32 ++++----
+ drivers/mmc/host/sdhci-pltfm.c       |    2 +-
+ 7 files changed, 189 insertions(+), 189 deletions(-)
+ create mode 100644 arch/arm/boot/dts/tegra20.dtsi
+ delete mode 100644 arch/arm/boot/dts/tegra250.dtsi
