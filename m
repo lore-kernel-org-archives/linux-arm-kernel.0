@@ -1,117 +1,33 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 5 Jul 2011 09:04:30 +0100
-Subject: [PATCH 1/7] DMA: PL330: Add support runtime PM for PL330 DMAC
-In-Reply-To: <1309781915-31549-2-git-send-email-kgene.kim@samsung.com>
+From: parkch98@gmail.com (Chanho Park)
+Date: Tue, 5 Jul 2011 17:08:33 +0900
+Subject: [PATCH 3/7] DMA: PL330: Add DMA capabilities
+In-Reply-To: <00be01cc3ae2$9d3b7080$d7b25180$%kim@samsung.com>
 References: <1309781915-31549-1-git-send-email-kgene.kim@samsung.com>
-	<1309781915-31549-2-git-send-email-kgene.kim@samsung.com>
-Message-ID: <20110705080430.GP8286@n2100.arm.linux.org.uk>
+	<1309781915-31549-4-git-send-email-kgene.kim@samsung.com>
+	<CAPTzV15Y7JFDKsec8x-M0C1AFLOMp39QvHpRCsO=E001P_tH9A@mail.gmail.com>
+	<00be01cc3ae2$9d3b7080$d7b25180$%kim@samsung.com>
+Message-ID: <CAPTzV17yr5hw=QukGdWJr_0uS2O4VwdCQsgZb1euzonVCLj+6w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 04, 2011 at 09:18:29PM +0900, Kukjin Kim wrote:
-> @@ -666,6 +667,7 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
->  	struct dma_device *pd;
->  	struct resource *res;
->  	int i, ret, irq;
-> +	struct clk* clk;
+>
+> Basically, src_addr_width is defined as a 'enum dma_slave_buswidth' so I
+> think we don't need to consider it.
+>
 
-Please use checkpatch.  'struct clk *clk;'
+Client D/D normally uses 'enum dma_slave_buswidth' type.
+However, dmaengine driver cannot guarantee all client D/D uses it.
+See below your spi driver. Thus, the dmaengine driver check it correctly.
 
-> @@ -696,6 +698,28 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
->  		goto probe_err1;
->  	}
->  
++#if defined(CONFIG_DMADEV_PL330)
++                       memset(&slave_config, 0, sizeof(slave_config));
++                       slave_config.direction = DMA_TO_DEVICE;
++                       slave_config.src_addr = xfer->tx_dma;
++                       slave_config.dst_addr =
++                               sdd->sfr_start + S3C64XX_SPI_TX_DATA;
++                       slave_config.dst_addr_width = sdd->cur_bpw / 8;
++                       dmaengine_slave_config(sdd->tx_chan, &slave_config);
 
-Get the clock here and save its pointer.  put the clock in the remove function.
-
-> +#ifdef CONFIG_PM_RUNTIME
-> +	/* to use the runtime PM helper functions */
-> +	pm_runtime_enable(&adev->dev);
-> +
-> +	/* enable the power domain */
-> +	if (pm_runtime_get_sync(&adev->dev)) {
-> +		dev_err(&adev->dev, "failed to get runtime pm\n");
-> +		ret = -ENODEV;
-> +		goto probe_err1;
-> +	}
-> +#else
-> +	/* enable dma clk */
-> +	clk = clk_get(&adev->dev, "dma");
-> +
-> +	if (IS_ERR(clk)) {
-> +		dev_err(&adev->dev, "Cannot get operation clock.\n");
-> +		ret = -EINVAL;
-> +		goto probe_err1;
-> +	}
-> +	clk_enable(clk);
-> +#endif
-> +
->  	irq = adev->irq[0];
->  	ret = request_irq(irq, pl330_irq_handler, 0,
->  			dev_name(&adev->dev), pi);
-> @@ -838,10 +862,47 @@ static struct amba_id pl330_ids[] = {
->  	{ 0, 0 },
->  };
->  
-> +#ifdef CONFIG_PM_RUNTIME
-> +static int pl330_runtime_suspend(struct device *dev)
-> +{
-> +	struct clk *dmaclk = clk_get(dev, "dma");
-> +
-> +	if (dmaclk == NULL) {
-> +		dev_err(dev, "failed to find dma clock source\n");
-> +		return -ENODEV;
-> +	}
-
-Obviously wrong.
-
-Use the clock you got in the probe function here.
-
-> +
-> +	clk_disable(dmaclk);
-> +	return 0;
-> +}
-> +
-> +static int pl330_runtime_resume(struct device *dev)
-> +{
-> +	struct clk *dmaclk = clk_get(dev, "dma");
-> +
-> +	if (dmaclk == NULL) {
-> +		dev_err(dev, "failed to find dma clock source\n");
-> +		return -ENODEV;
-> +	}
-
-Obviously wrong as well.
-
-Use the clock you got in the probe function here too.
-
-> +
-> +	clk_enable(dmaclk);
-> +	return 0;
-> +}
-> +#else
-> +#define pl330_runtime_suspend	NULL
-> +#define pl330_runtime_resume	NULL
-> +#endif /* CONFIG_PM_RUNTIME */
-> +
-> +static const struct dev_pm_ops pl330_pm_ops = {
-> +	.runtime_suspend = pl330_runtime_suspend,
-> +	.runtime_resume = pl330_runtime_resume,
-> +};
-> +
->  static struct amba_driver pl330_driver = {
->  	.drv = {
->  		.owner = THIS_MODULE,
->  		.name = "dma-pl330",
-> +		.pm = &pl330_pm_ops,
->  	},
->  	.id_table = pl330_ids,
->  	.probe = pl330_probe,
-> -- 
-> 1.7.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+Best Regards,
+Chanho Park
