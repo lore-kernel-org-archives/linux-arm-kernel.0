@@ -1,45 +1,60 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 5 Jul 2011 16:23:19 +0200
-Subject: [PATCH 2/3] at91-ohci: support overcurrent notification
-In-Reply-To: <1309856728-8265-2-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1309856728-8265-1-git-send-email-thomas.petazzoni@free-electrons.com>
-	<1309856728-8265-2-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20110705142319.GA17137@game.jcrosoft.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 5 Jul 2011 15:40:08 +0100
+Subject: Unnecessary cache-line flush on page table updates ?
+In-Reply-To: <20110705141510.GG8286@n2100.arm.linux.org.uk>
+References: <BANLkTi=KVnzBKcd83c9T3P20VAv-ggqR4g@mail.gmail.com>
+	<20110704094531.GB19117@e102109-lin.cambridge.arm.com>
+	<20110704100221.GB8286@n2100.arm.linux.org.uk>
+	<20110704104329.GD19117@e102109-lin.cambridge.arm.com>
+	<20110704111338.GD8286@n2100.arm.linux.org.uk>
+	<20110704215507.GH8286@n2100.arm.linux.org.uk>
+	<20110705092600.GB25956@e102109-lin.cambridge.arm.com>
+	<20110705104858.GV8286@n2100.arm.linux.org.uk>
+	<20110705135424.GC32718@e102109-lin.cambridge.arm.com>
+	<20110705141510.GG8286@n2100.arm.linux.org.uk>
+Message-ID: <20110705144008.GD32718@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11:05 Tue 05 Jul     , Thomas Petazzoni wrote:
-> Several USB power switches (AIC1526 or MIC2026) have a digital output
-> that is used to notify that an overcurrent situation is taking
-> place. This digital outputs are typically connected to GPIO inputs of
-> the processor and can be used to be notified of those overcurrent
-> situations.
+On Tue, Jul 05, 2011 at 03:15:10PM +0100, Russell King - ARM Linux wrote:
+> On Tue, Jul 05, 2011 at 02:54:24PM +0100, Catalin Marinas wrote:
+> > On Tue, Jul 05, 2011 at 11:48:58AM +0100, Russell King - ARM Linux wrote:
+> > > On Tue, Jul 05, 2011 at 10:26:00AM +0100, Catalin Marinas wrote:
+> > > > AFAIK the branch predictor is transparent on Cortex-A9 and the BTB
+> > > > maintenance are no-ops. You wouldn't notice any issues if you remove
+> > > > them (you can check ID_MMFR1[31:28].
+> > > 
+> > > It's not transparent:
+> > > 
+> > > CPU: MMFR0=0x00100103 MMFR1=0x20000000 MMFR2=0x01230000 MMFR3=0x00102111
+> > > 
+> > > 0b0010 Branch predictor requires flushing on:
+> > > 	? enabling or disabling the MMU
+> > > 	? writing new data to instruction locations
+> > > 	? writing new mappings to the translation tables
+> > > 	? any change to the TTBR0, TTBR1, or TTBCR registers without a
+> > > 	  corresponding change to the FCSE ProcessID or ContextID.
+> > 
+> > OK, it makes sense. But what's really confusing - the A8 has the same
+> > value for ID_MMFR1 (according to the TRM) but the BTB instructions are
+> > no-ops (can can be enabled by the ACTLR.IBE bit). I suspect the ID_MMFR1
+> > is wrong in this case.
 > 
-> Therefore, we add a new overcurrent_pin[] array in the at91_usbh_data
-> structure so that boards can tell the AT91 OHCI driver which pins are
-> used for the overcurrent notification. The AT91 OHCI driver simply
-> registers an interrupt handler which will log the entry and exit of an
-> overcurrent situation in the kernel logs.
+> Grumble.  This kind of thing worries me.
 > 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: Andrew Victor <linux@maxim.org.za>
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-> ---
->  arch/arm/mach-at91/include/mach/board.h |    1 +
->  drivers/usb/host/ohci-at91.c            |   37 +++++++++++++++++++++++++++++++
->  2 files changed, 38 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-at91/include/mach/board.h b/arch/arm/mach-at91/include/mach/board.h
-> index 61d52dc..1f90d79 100644
-> --- a/arch/arm/mach-at91/include/mach/board.h
-> +++ b/arch/arm/mach-at91/include/mach/board.h
-> @@ -99,6 +99,7 @@ struct at91_usbh_data {
->  	u8		ports;		/* number of ports on root hub */
->  	u8		vbus_pin[2];	/* port power-control pin */
->  	u8              vbus_pin_inverted;
-> +	u8              overcurrent_pin[2]; /* over-current signal pins */
-please use named resourcees and provide the irq number
+> If the ID registers are wrong, then they can't be relied upon by software
+> making decisions about what can be skipped.  
 
-Best Regards,
-J.
+It could be because the BTB operations are configurable via an ACTLR
+bit, but the ID registers are fixed values.
+
+> So how can we be confident
+> that MMFR3 23:20 != 0 really does mean that we don't need to clean the
+> cache when writing the page tables, and is not a result of some bug?
+
+Well, you can get other bugs, you can never guarantee anything. But when
+they are found, there are errata workarounds. This would actually be a
+very easy to detect issue.
+
+-- 
+Catalin
