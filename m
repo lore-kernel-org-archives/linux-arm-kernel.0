@@ -1,46 +1,31 @@
-From: zhangfei.gao@gmail.com (zhangfei gao)
-Date: Tue, 5 Jul 2011 15:05:17 +0800
-Subject: [PATCH v2] arm: mach-mmp: brownstone.c support multiple sd slots
-In-Reply-To: <CAMPhdO-TTRP-k7J-zrG2_rQJsmNDRhTgpqiiX2yqW+Egf8+t2A@mail.gmail.com>
-References: <59C2B513-EC04-4CA2-818B-9901CAF3E554@marvell.com>
-	<20110427093328.GU17290@n2100.arm.linux.org.uk>
-	<161C3F6C-0986-4364-B458-DBA4D08456FD@marvell.com>
-	<1F336A22-BAC3-41E3-8D4E-5DF27874D1EA@marvell.com>
-	<20110428095127.GX17290@n2100.arm.linux.org.uk>
-	<3BFCE791-3BAD-42ED-BC87-A27F40D6C77C@marvell.com>
-	<CAMPhdO-TTRP-k7J-zrG2_rQJsmNDRhTgpqiiX2yqW+Egf8+t2A@mail.gmail.com>
-Message-ID: <CAMj5BkiK17RMY-vEENDqQiDOmfG0Esnp7QDooKWVrhkQL4g6Ow@mail.gmail.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Tue, 5 Jul 2011 15:14:07 +0800
+Subject: [PATCH 9/9] ARM: mmp: enable max7312 gpio expander in dkb
+In-Reply-To: <20110401183627.GD8482@n2100.arm.linux.org.uk>
+References: <1301625568-16583-1-git-send-email-haojian.zhuang@marvell.com>
+	<1301625568-16583-2-git-send-email-haojian.zhuang@marvell.com>
+	<1301625568-16583-3-git-send-email-haojian.zhuang@marvell.com>
+	<1301625568-16583-4-git-send-email-haojian.zhuang@marvell.com>
+	<1301625568-16583-5-git-send-email-haojian.zhuang@marvell.com>
+	<1301625568-16583-6-git-send-email-haojian.zhuang@marvell.com>
+	<1301625568-16583-7-git-send-email-haojian.zhuang@marvell.com>
+	<1301625568-16583-8-git-send-email-haojian.zhuang@marvell.com>
+	<1301625568-16583-9-git-send-email-haojian.zhuang@marvell.com>
+	<20110401183627.GD8482@n2100.arm.linux.org.uk>
+Message-ID: <CAMPhdO8KG2NC48oRifbiT3a8Lv-ZBo3k1QCpNPx3i8O7ypJp+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 5, 2011 at 2:52 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
-> On Fri, Apr 29, 2011 at 4:45 AM, Philip Rakity <prakity@marvell.com> wrote:
->>
->> Support multiple sd/eMMC interfaces. enable mmc1, 2, and 3.
->> mmc2 is used eMMC and slot is marked PERMANENT and 8 bit device.
->> mmc1 is used for Wifi and slot is marked PERMANENT
->>
->> Note: eMMC (mmc2) is set to initialize first to workaround a problem
->> where booting in logical order requires mmc create work queue
->> to be multi-threaded otherwise boot process hangs. ?BUG report
->> send to linux-mmc and linux-kernel mailing list.
->>
->> Wifi (mmc1) requires we enable power on the device by toggling
->> the gpio lines for power and reset.
->>
->> Signed-off-by: Philip Rakity <prakity@marvell.com>
+On Sat, Apr 2, 2011 at 2:36 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, Apr 01, 2011 at 10:39:28AM +0800, Haojian Zhuang wrote:
+>> ?#include <asm/mach-types.h>
+>> ?#include <asm/mach/arch.h>
+>> ?#include <asm/mach/flash.h>
+>> ?#include <mach/addr-map.h>
+>> +#include <mach/gpio.h>
 >
-> Applied. Though the email client was fiddling the spaces/CR-LF a bit.
+> linux/gpio.h
 >
->> ---
->> ?arch/arm/mach-mmp/brownstone.c | ? 52 +++++++++++++++++++++++++++++++++++++++-
->> ?1 files changed, 51 insertions(+), 1 deletions(-)
->>
 
-Hi, Eric
-
-arch/arm/mach-mmp/brownstone.c has already been modified from
-mmc-next, here will have conflict.
-Sorry for inconvenience.
-
-Thanks
+Applied with the above change.
