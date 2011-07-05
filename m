@@ -1,25 +1,39 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 6 Jul 2011 00:11:29 +0800
-Subject: [GIT PULL] pxa: fixing patches for v3.0-rc6
-Message-ID: <CAMPhdO_6CqVn_SdX-tPBtmHjkKH6kiWzuRkCDWkxaCUacReQhg@mail.gmail.com>
+From: greg@kroah.com (Greg KH)
+Date: Tue, 5 Jul 2011 09:15:58 -0700
+Subject: [PATCH v5 1/1] drivers:staging:pruss: add pruss staging mfd
+	driver.
+In-Reply-To: <20110628210112.GA31081@kroah.com>
+References: <1306827939-4133-1-git-send-email-subhasish@mistralsolutions.com>
+	<1306827939-4133-2-git-send-email-subhasish@mistralsolutions.com>
+	<20110628210112.GA31081@kroah.com>
+Message-ID: <20110705161558.GA26309@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit fe0d42203cb5616eeff68b14576a0f7e2dd56625:
+On Tue, Jun 28, 2011 at 02:01:12PM -0700, Greg KH wrote:
+> On Tue, May 31, 2011 at 01:15:39PM +0530, Subhasish Ghosh wrote:
+> > This patch adds the pruss MFD driver and associated include files.
+> > For details regarding the PRUSS please refer the folowing link:
+> > http://processors.wiki.ti.com/index.php/Programmable_Realtime_Unit_Subsystem
+> > 
+> > The rational behind the MFD driver being the fact that multiple devices can
+> > be implemented on the cores independently. This is determined by the nature
+> > of the program which is loaded into the PRU's instruction memory.
+> > A device may be de-initialized and another loaded or two different devices
+> > can be run simultaneously on the two cores.
+> > It's also possible, as in our case, to implement a single device on both
+> > the PRU's resulting in improved load sharing.
+> > 
+> > Signed-off-by: Subhasish Ghosh <subhasish@mistralsolutions.com>
+> 
+> Please refresh my memory as to why this can't get merged into the
+> "normal" part of the kernel?
 
-  Linux 3.0-rc6 (2011-07-04 15:56:24 -0700)
+Dropped from my queue due to lack of response :(
 
-are available in the git repository at:
-  git://git.kernel.org/pub/scm/linux/kernel/git/ycmiao/pxa-linux-2.6.git fix
+Please resend when you get the chance, and address the above comment in
+your changelog entry (and in your TODO file as well.)
 
-Lei Wen (2):
-      ARM: pxa910: correct nand pmu setting
-      ARM: pxa168: correct nand pmu setting
+thanks,
 
-Paul Parsons (1):
-      ARM: pxa: fix PGSR register address calculation
-
- arch/arm/mach-mmp/pxa168.c     |    2 +-
- arch/arm/mach-mmp/pxa910.c     |    2 +-
- arch/arm/mach-pxa/mfp-pxa2xx.c |    4 ++--
- 3 files changed, 4 insertions(+), 4 deletions(-)
+greg k-h
