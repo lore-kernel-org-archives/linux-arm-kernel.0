@@ -1,58 +1,41 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  5 Jul 2011 09:49:09 +0100
-Subject: [PATCH v8 08/14] ARM: tegra: use remapped PPI interrupts for local
-	timer
-In-Reply-To: <1309855755-6261-1-git-send-email-marc.zyngier@arm.com>
-References: <1309855755-6261-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1309855755-6261-9-git-send-email-marc.zyngier@arm.com>
+Date: Tue,  5 Jul 2011 09:49:01 +0100
+Subject: [PATCH v8 00/14] Consolidating GIC per-cpu interrupts
+Message-ID: <1309855755-6261-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the normal interrupt scheme for the local timers by using
-a remapped PPI interrupt.
+The current GIC per-cpu interrupts (aka PPIs) suffer from a number of
+problems:
 
-Tested on a Harmony Tegra-2 board.
+- They use a completely separate scheme to handle the interrupts,
+  mostly because the PPI concept doesn't really match the kernel view
+  of an interrupt.
+- PPIs can only be used by the timer code, unless we add more low-level
+  assembly code.
+- The local timer code can only be used by devices generating PPIs,
+  and not SPIs.
+- At least one platform (msm) has started implementing its own
+  alternative scheme.
+- Some low-level code gets duplicated, as usual...
 
-Cc: Colin Cross <ccross@android.com>
-Cc: Erik Gilling <konkers@android.com>
-Cc: Olof Johansson <olof@lixom.net>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/mach-tegra/Kconfig      |    1 +
- arch/arm/mach-tegra/localtimer.c |    3 ++-
- 2 files changed, 3 insertions(+), 1 deletions(-)
+The proposed solution is to let the GIC code expose the PPIs as
+something that the kernel can manage. Instead of having a single
+interrupt number shared on all cores, make the interrupt number be
+different on each CPU.
 
-diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
-index 5ec1846..dad8f6a 100644
---- a/arch/arm/mach-tegra/Kconfig
-+++ b/arch/arm/mach-tegra/Kconfig
-@@ -9,6 +9,7 @@ config ARCH_TEGRA_2x_SOC
- 	bool "Tegra 2 family"
- 	select CPU_V7
- 	select ARM_GIC
-+	select ARM_GIC_PPI_MAP
- 	select ARCH_REQUIRE_GPIOLIB
- 	select USB_ARCH_HAS_EHCI if USB_SUPPORT
- 	select USB_ULPI if USB_SUPPORT
-diff --git a/arch/arm/mach-tegra/localtimer.c b/arch/arm/mach-tegra/localtimer.c
-index e91d681..d148a25 100644
---- a/arch/arm/mach-tegra/localtimer.c
-+++ b/arch/arm/mach-tegra/localtimer.c
-@@ -14,13 +14,14 @@
- #include <asm/irq.h>
- #include <asm/smp_twd.h>
- #include <asm/localtimer.h>
-+#include <asm/hardware/gic.h>
- 
- /*
-  * Setup the local clock events for a CPU.
-  */
- int __cpuinit local_timer_setup(struct clock_event_device *evt)
- {
--	evt->irq = IRQ_LOCALTIMER;
-+	evt->irq = gic_ppi_map(IRQ_LOCALTIMER);
- 	twd_timer_setup(evt);
- 	return 0;
- }
--- 
-1.7.0.4
+This enables the use of the normal kernel API (request_irq() and
+friends) and the elimination of some low level code. It also serves as
+the basis of the GIC device tree support code. On the other side, it
+causes quite a bit of churn in the timer code.
+
+Previous versions of this series have received ACKs from some platform
+maintainers, but so far there has been very little comment on the core
+code. As I now have quite a large number of patches relying on this
+series (local timers as devices, device tree support for GIC and TWD),
+I'd be grateful for at least a hint indicating that this is going in
+the right direction. Or not.
+
+This patch set is based on 3.0-rc5. Tested on PB-11MP, Tegra2
+(Harmony) and SMDK-V310. Also available in the "gic_ppi_map" branch of
+git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git
