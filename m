@@ -1,38 +1,83 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 5 Jul 2011 13:54:55 +0200
-Subject: [PATCH 1/3] ohci-at91: add vbus_pin_inverted platform attribute
-In-Reply-To: <4E12F7E6.7080604@mvista.com>
-References: <1309856728-8265-1-git-send-email-thomas.petazzoni@free-electrons.com>
-	<4E12F7E6.7080604@mvista.com>
-Message-ID: <20110705135455.5fa643cc@skate>
+From: tommy.lin.1101@gmail.com (Tommy Lin)
+Date: Tue,  5 Jul 2011 20:03:02 +0800
+Subject: [PATCH 1/2] watchdog: Add MPcore watchdog support for cns3xxx SOCs
+Message-ID: <1309867382-7806-1-git-send-email-tommy.lin@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le Tue, 05 Jul 2011 15:39:18 +0400,
-Sergei Shtylyov <sshtylyov@mvista.com> a ?crit :
+1. Made the connection between CNS3xxx SOCs(ARCH_CNS3xxx) and MPcore watchdog
+   since the CNS3xxx SOCs have ARM11 MPcore CPU.
+2. Enable mpcore_watchdog option as module to default configuration at
+   arch/arm/configs/cns3420vb_defconfig.
 
-> > -			gpio_direction_output(pdata->vbus_pin[i], 0);
-> > +			gpio_direction_output(pdata->vbus_pin[i], 0 ^ pdata->vbus_pin_inverted);
-> 
->     Why not simply 'pdata->vbus_pin_inverted'?
+Signed-off-by: Tommy Lin <tommy.lin@caviumnetworks.com>
+---
+ arch/arm/Kconfig                     |    1 +
+ arch/arm/configs/cns3420vb_defconfig |    2 ++
+ arch/arm/mach-cns3xxx/cns3420vb.c    |   22 ++++++++++++++++++++++
+ 3 files changed, 25 insertions(+), 0 deletions(-)
 
-> > -			gpio_direction_output(pdata->vbus_pin[i], 1);
-> > +			gpio_direction_output(pdata->vbus_pin[i], 1 ^ pdata->vbus_pin_inverted);
-> 
->     Why not simply '!pdata->vbus_pin_inverted'?
-
-Ah, correct. The 0 and 1 were present before, and I just wanted to xor
-them with vbus_pin_inverted, but obviously, there's a simpler way of
-writing things, as you suggest.
-
-I'll update my patch and send a new version after gathering comments
-from other reviewers.
-
-Thanks!
-
-Thomas
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 9adc278..3262b15 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -326,6 +326,7 @@ config ARCH_CNS3XXX
+ 	select ARM_GIC
+ 	select MIGHT_HAVE_PCI
+ 	select PCI_DOMAINS if PCI
++	select HAVE_ARM_TWD
+ 	help
+ 	  Support for Cavium Networks CNS3XXX platform.
+ 
+diff --git a/arch/arm/configs/cns3420vb_defconfig b/arch/arm/configs/cns3420vb_defconfig
+index 313627a..bd0a355 100644
+--- a/arch/arm/configs/cns3420vb_defconfig
++++ b/arch/arm/configs/cns3420vb_defconfig
+@@ -53,6 +53,8 @@ CONFIG_LEGACY_PTY_COUNT=16
+ # CONFIG_HW_RANDOM is not set
+ # CONFIG_HWMON is not set
+ # CONFIG_VGA_CONSOLE is not set
++CONFIG_WATCHDOG=y
++CONFIG_MPCORE_WATCHDOG=m
+ # CONFIG_HID_SUPPORT is not set
+ # CONFIG_USB_SUPPORT is not set
+ CONFIG_MMC=y
+diff --git a/arch/arm/mach-cns3xxx/cns3420vb.c b/arch/arm/mach-cns3xxx/cns3420vb.c
+index 08e5c87..09f20fe 100644
+--- a/arch/arm/mach-cns3xxx/cns3420vb.c
++++ b/arch/arm/mach-cns3xxx/cns3420vb.c
+@@ -159,10 +159,32 @@ static struct platform_device cns3xxx_usb_ohci_device = {
+ 	},
+ };
+ 
++/* Watchdog */
++static struct resource cns3xxx_watchdog_resources[] = {
++	[0] = {
++		.start = CNS3XXX_TC11MP_TWD_BASE,
++		.end   = CNS3XXX_TC11MP_TWD_BASE + PAGE_SIZE - 1,
++		.flags = IORESOURCE_MEM,
++	},
++	[1] = {
++		.start = IRQ_LOCALWDOG,
++		.end   = IRQ_LOCALWDOG,
++		.flags = IORESOURCE_IRQ,
++	}
++};
++
++static struct platform_device cns3xxx_watchdog_device = {
++	.name		= "mpcore_wdt",
++	.id		= -1,
++	.num_resources	= ARRAY_SIZE(cns3xxx_watchdog_resources),
++	.resource	= cns3xxx_watchdog_resources,
++};
++
+ /*
+  * Initialization
+  */
+ static struct platform_device *cns3420_pdevs[] __initdata = {
++	&cns3xxx_watchdog_device,
+ 	&cns3420_nor_pdev,
+ 	&cns3xxx_usb_ehci_device,
+ 	&cns3xxx_usb_ohci_device,
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.7.6
