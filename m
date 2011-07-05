@@ -1,36 +1,41 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 05 Jul 2011 11:42:15 -0700
-Subject: [PATCH] ARM: omap4: rename gpmc clock to gpmc_ick
-In-Reply-To: <87oc18r2y3.fsf@ti.com>
-References: <1309868377-22379-1-git-send-email-j.weitzel@phytec.de>	<4E1340AA.2020007@ti.com>
-	<87oc18r2y3.fsf@ti.com>
-Message-ID: <4E135B07.80801@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 5 Jul 2011 19:42:54 +0100
+Subject: [PATCH] ARM: poison initmem when it is freed
+Message-ID: <20110705184254.GH8286@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/5/2011 11:35 AM, Kevin Hilman wrote:
-> Santosh Shilimkar<santosh.shilimkar@ti.com>  writes:
->
->> + Benoit
->>
->> On 7/5/2011 5:19 AM, Jan Weitzel wrote:
->>> The gpmc clock on omap44xx is called gpmc_ick not gpmc_ck in
->>> clock44xx_data.c
->>>
->>> Signed-off-by: Jan Weitzel<j.weitzel@phytec.de>
->> This happened after renaming the clock-nodes some time back.
->> Looks good to me as a fix though in long run GPMC should be
->> moved to hwmod to avoid such naming issues
->
-> In fact, Benoit has already done it[1] as part of his last series:
-> [PATCH v2 0/4] OMAP4: Add modulemode support to hwmod framework (part 2)
->
-Ohh yes. I remember now about the discussion with him on the GPMC patch
-which he did as a followup patch to mine similar clock framework
-patch [1]
+When the initmem is freed, we can no longer rely on its contents.  In
+lightly loaded systems, this memory may persist for some time, making
+it harder discover run-time issues (caused by the build warnings being
+ignored.)
 
-Thanks for the link.
+Poison the initmem at the point where it is freed to encourage run-time
+problems when initmem is dereferenced as an aid to finding such problems.
 
-Regards
-Santosh
-[1] https://patchwork.kernel.org/patch/937422/
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/mm/init.c |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index 2c2cce9..46c39bd 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -19,6 +19,7 @@
+ #include <linux/highmem.h>
+ #include <linux/gfp.h>
+ #include <linux/memblock.h>
++#include <linux/poison.h>
+ #include <linux/sort.h>
+ 
+ #include <asm/mach-types.h>
+@@ -701,6 +702,8 @@ void free_initmem(void)
+ 				    "TCM link");
+ #endif
+ 
++	memset(__init_begin, POISON_FREE_INITMEM, __init_end - __init_begin);
++
+ 	if (!machine_is_integrator() && !machine_is_cintegrator())
+ 		totalram_pages += free_area(__phys_to_pfn(__pa(__init_begin)),
+ 					    __phys_to_pfn(__pa(__init_end)),
