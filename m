@@ -1,59 +1,80 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 5 Jul 2011 18:59:03 +0200
-Subject: [PATCH] ARM: mxs/tx28: according to the TX28's datasheet D4-D7
-	are not used for MMC0
-In-Reply-To: <1309860396-9219-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1309860396-9219-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20110705165903.GL6069@pengutronix.de>
+From: matthieu.castet@parrot.com (Matthieu CASTET)
+Date: Tue, 5 Jul 2011 19:09:19 +0200
+Subject: [RFC PATCH v5] ARM hibernation / suspend-to-disk (fwd)
+In-Reply-To: <2C577202CB5719438D4E9608C565CB2C01B69D7F@NL-EXC-07.intra.local>
+References: <alpine.DEB.2.00.1106131303290.25153@localhost6.localdomain6>	<20110613122601.GC12325@n2100.arm.linux.org.uk>	<alpine.DEB.2.00.1106131400090.25153@localhost6.localdomain6>	<20110613164452.GE13643@n2100.arm.linux.org.uk>
+	<alpine.DEB.2.00.1106151349520.11405@localhost6.localdomain6>
+	<4E13059A.4060606@parrot.com>
+	<2C577202CB5719438D4E9608C565CB2C01B69D7F@NL-EXC-07.intra.local>
+Message-ID: <4E13453F.1000009@parrot.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 05, 2011 at 12:06:36PM +0200, Uwe Kleine-K?nig wrote:
-> The pins are actually used (not in mainline yet):
+Frank Hofmann a ?crit :
+> -----Original Message-----
+> From: Matthieu CASTET [mailto:matthieu.castet at parrot.com]
+> Frank Hofmann a ?crit :
+>> [ ... ]
+>> > +static void notrace __swsusp_arch_restore_image(void)
+>> > +{
+>> > +   extern struct pbe *restore_pblist;
+>> > +   struct pbe *pbe;
+>> > +
+>> > +   cpu_switch_mm(swapper_pg_dir, &init_mm);
+>> > +
+>> > +   for (pbe = restore_pblist; pbe; pbe = pbe->next)
+>> > +           copy_page(pbe->orig_address, pbe->address);
+>> > +
+>>
+>> One question : isn't dangerous to modify the code where we are running ?
+>>
+>> I believe the code shouldn't change too much between the kernel that
+> do the
+>> resume and the resumed kernel and the copy routine should fit in the
+> instruction
+>> cache, but I want to be sure it doesn't cause any problem on recent
+> arm cores
+>> (instruction prefetching , ...)
+>>
+>>
+>> Matthieu
 > 
-> 	D4 -> SSP2_D0
-> 	D5 -> GPIO
-> 	D6 -> GPIO
-> 	D7 -> GPIO for owire
+> Hi Matthieu,
 > 
-> so their pinmapping for SSP0 is wrong.
-> 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> this isn't new behaviour to _this_ rev of the patch ...
+yes
 
-Applied for next.
-
-Sascha
-
-> ---
->  arch/arm/mach-mxs/mach-tx28.c |    8 --------
->  1 files changed, 0 insertions(+), 8 deletions(-)
 > 
-> diff --git a/arch/arm/mach-mxs/mach-tx28.c b/arch/arm/mach-mxs/mach-tx28.c
-> index b65e371..068e540 100644
-> --- a/arch/arm/mach-mxs/mach-tx28.c
-> +++ b/arch/arm/mach-mxs/mach-tx28.c
-> @@ -101,14 +101,6 @@ static const iomux_cfg_t tx28_stk5v3_pads[] __initconst = {
->  		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
->  	MX28_PAD_SSP0_DATA3__SSP0_D3 |
->  		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
-> -	MX28_PAD_SSP0_DATA4__SSP0_D4 |
-> -		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
-> -	MX28_PAD_SSP0_DATA5__SSP0_D5 |
-> -		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
-> -	MX28_PAD_SSP0_DATA6__SSP0_D6 |
-> -		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
-> -	MX28_PAD_SSP0_DATA7__SSP0_D7 |
-> -		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
->  	MX28_PAD_SSP0_CMD__SSP0_CMD |
->  		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
->  	MX28_PAD_SSP0_DETECT__SSP0_CARD_DETECT |
-> -- 
-> 1.7.5.4
-> 
-> 
+> and yes, it is dangerous to modify code where you're running. Except
+> that this isn't happening in the current environment;
+You are modifying it by putting the same code (modulo dynamic patching on the
+code (ftrace, kprobe, ...)).
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+
+> If you're resuming via some other
+> mechanism but the kernel's snapshot image loading code (and only jump
+> into swsusp_arch_resume to kickstart resume) then it's up to you how you
+> get the kernel text into place.
+Yes.
+
+> I've not experimented with resuming "foreign" images; how would one
+> create such, and bypass the checks on load ?
+I wasn't suggesting that.
+
+> 
+> It's less of a problem for the copy loop itself, really, as that's
+> definitely cache-hot. But it's an issue for what happens _after_ the
+> copy loop. If the code for cpu_resume / cpu_reset is not at the places
+> where the resum-ing code expects it to be (i.e. if there's a mismatch in
+> the resuming and to-be-resumed kernels wrt. to that), then things will
+> jump to code nirvana.
+> 
+> Why are you asking about this ?
+While reading the code I was surprised of that. And that there weren't any
+comment about it.
+
+Looking at other implementations, only x86_64 seems to need to relocate the copy
+code.
+
+
+Matthieu
