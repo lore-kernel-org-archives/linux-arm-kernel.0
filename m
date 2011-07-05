@@ -1,67 +1,87 @@
 From: vkuzmichev@mvista.com (Vitaly Kuzmichev)
-Date: Tue,  5 Jul 2011 23:00:38 +0400
-Subject: [PATCH V2 4/6] mpcore_wdt: Fix timer mode setup
+Date: Tue,  5 Jul 2011 23:00:39 +0400
+Subject: [PATCH V2 5/6] mpcore_wdt: Add cpufreq notifier to reload counter
 In-Reply-To: <1286185540-19569-1-git-send-email-vkuzmichev@mvista.com>
 References: <1286185540-19569-1-git-send-email-vkuzmichev@mvista.com>
-Message-ID: <1309892440-3260-5-git-send-email-vkuzmichev@mvista.com>
+Message-ID: <1309892440-3260-6-git-send-email-vkuzmichev@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow watchdog to set its iterrupt as pending when it is configured
-for timer mode (in other words, allow emitting interrupt).
-Also add macros for all Watchdog Control Register flags.
+In the case if CPU frequency is changed when watchdog is working it begins to
+acount faster or slower. To avoid watchdog triggering before the margin time
+the watchdog counter needs to be reloaded.
 
 Signed-off-by: Vitaly Kuzmichev <vkuzmichev@mvista.com>
 ---
- drivers/watchdog/mpcore_wdt.c |   21 +++++++++++++++++----
- 1 files changed, 17 insertions(+), 4 deletions(-)
+ drivers/watchdog/mpcore_wdt.c |   31 ++++++++++++++++++++++++++++++-
+ 1 files changed, 30 insertions(+), 1 deletions(-)
 
 diff --git a/drivers/watchdog/mpcore_wdt.c b/drivers/watchdog/mpcore_wdt.c
-index b330a0a..11c70df 100644
+index 11c70df..38b9119 100644
 --- a/drivers/watchdog/mpcore_wdt.c
 +++ b/drivers/watchdog/mpcore_wdt.c
-@@ -42,6 +42,12 @@ unsigned long twd_timer_get_rate(void);
- #define TWD_WDOG_RESETSTAT		0x30
- #define TWD_WDOG_DISABLE		0x34
+@@ -32,6 +32,7 @@
+ #include <linux/uaccess.h>
+ #include <linux/slab.h>
+ #include <linux/io.h>
++#include <linux/cpufreq.h>
  
-+#define TWD_WDOG_CONTROL_ENABLE		(1 << 0)
-+#define TWD_WDOG_CONTROL_PERIODIC	(1 << 1)
-+#define TWD_WDOG_CONTROL_IT_ENABLE	(1 << 2)
-+#define TWD_WDOG_CONTROL_TIMER_MODE	(0 << 3)
-+#define TWD_WDOG_CONTROL_WATCHDOG_MODE	(1 << 3)
-+
- struct mpcore_wdt {
- 	unsigned long	timer_alive;
- 	struct device	*dev;
-@@ -125,18 +131,25 @@ static void mpcore_wdt_stop(struct mpcore_wdt *wdt)
+ unsigned long twd_timer_get_rate(void);
  
- static void mpcore_wdt_start(struct mpcore_wdt *wdt)
- {
-+	u32 mode;
-+
- 	dev_printk(KERN_INFO, wdt->dev, "enabling watchdog.\n");
- 
- 	/* This loads the count register but does NOT start the count yet */
- 	mpcore_wdt_keepalive(wdt);
- 
-+	/* Setup watchdog - prescale=256, enable=1 */
-+	mode = (255 << 8) | TWD_WDOG_CONTROL_ENABLE;
-+
- 	if (mpcore_noboot) {
--		/* Enable watchdog - prescale=256, watchdog mode=0, enable=1 */
--		writel(0x0000FF01, wdt->base + TWD_WDOG_CONTROL);
-+		/* timer mode, send interrupt */
-+		mode |=	TWD_WDOG_CONTROL_TIMER_MODE
-+		     |  TWD_WDOG_CONTROL_IT_ENABLE;
- 	} else {
--		/* Enable watchdog - prescale=256, watchdog mode=1, enable=1 */
--		writel(0x0000FF09, wdt->base + TWD_WDOG_CONTROL);
-+		/* watchdog mode */
-+		mode |=	TWD_WDOG_CONTROL_WATCHDOG_MODE;
- 	}
-+	writel(mode, wdt->base + TWD_WDOG_CONTROL);
+@@ -426,6 +427,25 @@ static int __devexit mpcore_wdt_remove(struct platform_device *dev)
+ 	return 0;
  }
  
- static int mpcore_wdt_set_heartbeat(int t)
++static int mpcore_wdt_notify(struct notifier_block *nb,
++				unsigned long state, void *data)
++{
++	struct mpcore_wdt *wdt = platform_get_drvdata(mpcore_wdt_dev);
++	/*
++	 * The mpcore_wdt counter register must be reloaded to account
++	 * properly with the new frequency.
++	 */
++	if (mpcore_wdt_dev && wdt && (state == CPUFREQ_POSTCHANGE ||
++					state == CPUFREQ_RESUMECHANGE))
++		mpcore_wdt_keepalive(wdt);
++
++	return NOTIFY_OK;
++}
++
++static struct notifier_block mpcore_wdt_nb = {
++	.notifier_call = mpcore_wdt_notify,
++};
++
+ /* work with hotplug and coldplug */
+ MODULE_ALIAS("platform:mpcore_wdt");
+ 
+@@ -444,6 +464,7 @@ static char banner[] __initdata = KERN_INFO "MPcore Watchdog Timer: 0.1. "
+ 
+ static int __init mpcore_wdt_init(void)
+ {
++	int ret = 0;
+ 	/*
+ 	 * Check that the margin value is within it's range;
+ 	 * if not reset to the default
+@@ -456,11 +477,19 @@ static int __init mpcore_wdt_init(void)
+ 
+ 	printk(banner, mpcore_noboot, mpcore_margin, nowayout);
+ 
+-	return platform_driver_register(&mpcore_wdt_driver);
++	ret = platform_driver_register(&mpcore_wdt_driver);
++
++	if (!ret)
++		ret = cpufreq_register_notifier(&mpcore_wdt_nb,
++						CPUFREQ_TRANSITION_NOTIFIER);
++
++	return ret;
+ }
+ 
+ static void __exit mpcore_wdt_exit(void)
+ {
++	cpufreq_unregister_notifier(&mpcore_wdt_nb,
++					CPUFREQ_TRANSITION_NOTIFIER);
+ 	platform_driver_unregister(&mpcore_wdt_driver);
+ }
+ 
 -- 
 1.7.3.4
