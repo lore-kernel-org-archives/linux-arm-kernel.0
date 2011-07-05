@@ -1,218 +1,106 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue,  5 Jul 2011 10:29:17 -0700
-Subject: [PATCHv2] arm: platsmp: Allow secondary cpu hotplug with maxcpus=1
-Message-ID: <1309886957-7548-1-git-send-email-sboyd@codeaurora.org>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Tue, 5 Jul 2011 11:35:12 -0600
+Subject: [PATCH v2 1/3] dt/net: add helper function of_get_phy_mode
+In-Reply-To: <1309878839-25743-2-git-send-email-shawn.guo@linaro.org>
+References: <1309878839-25743-1-git-send-email-shawn.guo@linaro.org>
+	<1309878839-25743-2-git-send-email-shawn.guo@linaro.org>
+Message-ID: <CACxGe6sA5XRJXpJTYC_ZrFUM_YrQOtzJbXK6ANg5W_E3fi0vEg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If an ARM system has multiple cpus in the same socket and the
-kernel is booted with maxcpus=1, secondary cpus are possible but
-not present due to how platform_smp_prepare_cpus() is called.
-Since most typical ARM processors don't actually support physical
-hotplug, initialize the present map to be equal to the possible
-map in generic ARM SMP code. Also, always call
-platform_smp_prepare_cpus() as long as max_cpus is non-zero (0
-means no SMP) to allow platform code to do any SMP setup.
+On Tue, Jul 5, 2011 at 9:13 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> It adds the helper function of_get_phy_mode getting phy interface
+> from device tree.
+>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
 
-After applying this patch it's possible to boot an ARM system
-with maxcpus=1 on the command line and then hotplug in secondary
-cpus via sysfs. This is more in line with how x86 does things.
+Acked-by: Grant Likely <grant.likely@secretlab.ca>
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-Cc: Paul Mundt <lethal@linux-sh.org>
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Cc: David Brown <davidb@codeaurora.org>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
-Cc: Linus Walleij <linus.walleij@stericsson.com>
----
+Dave, this should probably get merged via your tree since the rest of
+this series depends on it.
 
-Changes since V1:
- * Pulled up init_cpu_present() to arm/kernel/smp.c instead of
-   in each platform_smp_prepare_cpus()
+g.
 
- arch/arm/kernel/smp.c             |   11 +++++++++--
- arch/arm/mach-exynos4/platsmp.c   |    8 --------
- arch/arm/mach-msm/platsmp.c       |    8 --------
- arch/arm/mach-omap2/omap-smp.c    |    8 --------
- arch/arm/mach-realview/platsmp.c  |    8 --------
- arch/arm/mach-shmobile/platsmp.c  |    5 -----
- arch/arm/mach-tegra/platsmp.c     |    8 --------
- arch/arm/mach-ux500/platsmp.c     |    8 --------
- arch/arm/mach-vexpress/ct-ca9x4.c |    4 ----
- 9 files changed, 9 insertions(+), 59 deletions(-)
+> ---
+> ?drivers/of/of_net.c ? ?| ? 43 +++++++++++++++++++++++++++++++++++++++++++
+> ?include/linux/of_net.h | ? ?1 +
+> ?2 files changed, 44 insertions(+), 0 deletions(-)
+>
+> diff --git a/drivers/of/of_net.c b/drivers/of/of_net.c
+> index 86f334a..cc117db 100644
+> --- a/drivers/of/of_net.c
+> +++ b/drivers/of/of_net.c
+> @@ -8,6 +8,49 @@
+> ?#include <linux/etherdevice.h>
+> ?#include <linux/kernel.h>
+> ?#include <linux/of_net.h>
+> +#include <linux/phy.h>
+> +
+> +/**
+> + * It maps 'enum phy_interface_t' found in include/linux/phy.h
+> + * into the device tree binding of 'phy-mode', so that Ethernet
+> + * device driver can get phy interface from device tree.
+> + */
+> +static const char *phy_modes[] = {
+> + ? ? ? [PHY_INTERFACE_MODE_MII] ? ? ? ?= "mii",
+> + ? ? ? [PHY_INTERFACE_MODE_GMII] ? ? ? = "gmii",
+> + ? ? ? [PHY_INTERFACE_MODE_SGMII] ? ? ?= "sgmii",
+> + ? ? ? [PHY_INTERFACE_MODE_TBI] ? ? ? ?= "tbi",
+> + ? ? ? [PHY_INTERFACE_MODE_RMII] ? ? ? = "rmii",
+> + ? ? ? [PHY_INTERFACE_MODE_RGMII] ? ? ?= "rgmii",
+> + ? ? ? [PHY_INTERFACE_MODE_RGMII_ID] ? = "rgmii-id",
+> + ? ? ? [PHY_INTERFACE_MODE_RGMII_RXID] = "rgmii-rxid",
+> + ? ? ? [PHY_INTERFACE_MODE_RGMII_TXID] = "rgmii-txid",
+> + ? ? ? [PHY_INTERFACE_MODE_RTBI] ? ? ? = "rtbi",
+> +};
+> +
+> +/**
+> + * of_get_phy_mode - Get phy mode for given device_node
+> + * @np: ? ? ? ?Pointer to the given device_node
+> + *
+> + * The function gets phy interface string from property 'phy-mode',
+> + * and return its index in phy_modes table, or errno in error case.
+> + */
+> +const int of_get_phy_mode(struct device_node *np)
+> +{
+> + ? ? ? const char *pm;
+> + ? ? ? int err, i;
+> +
+> + ? ? ? err = of_property_read_string(np, "phy-mode", &pm);
+> + ? ? ? if (err < 0)
+> + ? ? ? ? ? ? ? return err;
+> +
+> + ? ? ? for (i = 0; i < ARRAY_SIZE(phy_modes); i++)
+> + ? ? ? ? ? ? ? if (!strcasecmp(pm, phy_modes[i]))
+> + ? ? ? ? ? ? ? ? ? ? ? return i;
+> +
+> + ? ? ? return -ENODEV;
+> +}
+> +EXPORT_SYMBOL_GPL(of_get_phy_mode);
+>
+> ?/**
+> ?* Search the device tree for the best MAC address to use. ?'mac-address' is
+> diff --git a/include/linux/of_net.h b/include/linux/of_net.h
+> index e913081..f474641 100644
+> --- a/include/linux/of_net.h
+> +++ b/include/linux/of_net.h
+> @@ -9,6 +9,7 @@
+>
+> ?#ifdef CONFIG_OF_NET
+> ?#include <linux/of.h>
+> +extern const int of_get_phy_mode(struct device_node *np);
+> ?extern const void *of_get_mac_address(struct device_node *np);
+> ?#endif
+>
+> --
+> 1.7.4.1
+>
+>
+>
 
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index e7f92a4..167e3cb 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -365,8 +365,7 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
- 	 */
- 	if (max_cpus > ncores)
- 		max_cpus = ncores;
--
--	if (max_cpus > 1) {
-+	if (ncores > 1 && max_cpus) {
- 		/*
- 		 * Enable the local timer or broadcast device for the
- 		 * boot CPU, but only if we have more than one CPU.
-@@ -374,6 +373,14 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
- 		percpu_timer_setup();
- 
- 		/*
-+		 * Initialise the present map, which describes the set of CPUs
-+		 * actually populated at the present time. A platform should
-+		 * re-initialize the map in platform_smp_prepare_cpus() if
-+		 * present != possible (e.g. physical hotplug).
-+		 */
-+		init_cpu_present(&cpu_possible_map);
-+
-+		/*
- 		 * Initialise the SCU if there are more than one CPU
- 		 * and let them know where to start.
- 		 */
-diff --git a/arch/arm/mach-exynos4/platsmp.c b/arch/arm/mach-exynos4/platsmp.c
-index c5e65a0..b68d5bd 100644
---- a/arch/arm/mach-exynos4/platsmp.c
-+++ b/arch/arm/mach-exynos4/platsmp.c
-@@ -154,14 +154,6 @@ void __init smp_init_cpus(void)
- 
- void __init platform_smp_prepare_cpus(unsigned int max_cpus)
- {
--	int i;
--
--	/*
--	 * Initialise the present map, which describes the set of CPUs
--	 * actually populated at the present time.
--	 */
--	for (i = 0; i < max_cpus; i++)
--		set_cpu_present(i, true);
- 
- 	scu_enable(scu_base_addr());
- 
-diff --git a/arch/arm/mach-msm/platsmp.c b/arch/arm/mach-msm/platsmp.c
-index 2034098..315b9f3 100644
---- a/arch/arm/mach-msm/platsmp.c
-+++ b/arch/arm/mach-msm/platsmp.c
-@@ -157,12 +157,4 @@ void __init smp_init_cpus(void)
- 
- void __init platform_smp_prepare_cpus(unsigned int max_cpus)
- {
--	int i;
--
--	/*
--	 * Initialise the present map, which describes the set of CPUs
--	 * actually populated at the present time.
--	 */
--	for (i = 0; i < max_cpus; i++)
--		set_cpu_present(i, true);
- }
-diff --git a/arch/arm/mach-omap2/omap-smp.c b/arch/arm/mach-omap2/omap-smp.c
-index ecfe93c..ce65e93 100644
---- a/arch/arm/mach-omap2/omap-smp.c
-+++ b/arch/arm/mach-omap2/omap-smp.c
-@@ -125,14 +125,6 @@ void __init smp_init_cpus(void)
- 
- void __init platform_smp_prepare_cpus(unsigned int max_cpus)
- {
--	int i;
--
--	/*
--	 * Initialise the present map, which describes the set of CPUs
--	 * actually populated at the present time.
--	 */
--	for (i = 0; i < max_cpus; i++)
--		set_cpu_present(i, true);
- 
- 	/*
- 	 * Initialise the SCU and wake up the secondary core using
-diff --git a/arch/arm/mach-realview/platsmp.c b/arch/arm/mach-realview/platsmp.c
-index 963bf0d..4ae943b 100644
---- a/arch/arm/mach-realview/platsmp.c
-+++ b/arch/arm/mach-realview/platsmp.c
-@@ -68,14 +68,6 @@ void __init smp_init_cpus(void)
- 
- void __init platform_smp_prepare_cpus(unsigned int max_cpus)
- {
--	int i;
--
--	/*
--	 * Initialise the present map, which describes the set of CPUs
--	 * actually populated at the present time.
--	 */
--	for (i = 0; i < max_cpus; i++)
--		set_cpu_present(i, true);
- 
- 	scu_enable(scu_base_addr());
- 
-diff --git a/arch/arm/mach-shmobile/platsmp.c b/arch/arm/mach-shmobile/platsmp.c
-index f3888fe..66f9806 100644
---- a/arch/arm/mach-shmobile/platsmp.c
-+++ b/arch/arm/mach-shmobile/platsmp.c
-@@ -64,10 +64,5 @@ void __init smp_init_cpus(void)
- 
- void __init platform_smp_prepare_cpus(unsigned int max_cpus)
- {
--	int i;
--
--	for (i = 0; i < max_cpus; i++)
--		set_cpu_present(i, true);
--
- 	shmobile_smp_prepare_cpus();
- }
-diff --git a/arch/arm/mach-tegra/platsmp.c b/arch/arm/mach-tegra/platsmp.c
-index b8ae3c9..1a594dc 100644
---- a/arch/arm/mach-tegra/platsmp.c
-+++ b/arch/arm/mach-tegra/platsmp.c
-@@ -129,14 +129,6 @@ void __init smp_init_cpus(void)
- 
- void __init platform_smp_prepare_cpus(unsigned int max_cpus)
- {
--	int i;
--
--	/*
--	 * Initialise the present map, which describes the set of CPUs
--	 * actually populated at the present time.
--	 */
--	for (i = 0; i < max_cpus; i++)
--		set_cpu_present(i, true);
- 
- 	scu_enable(scu_base);
- }
-diff --git a/arch/arm/mach-ux500/platsmp.c b/arch/arm/mach-ux500/platsmp.c
-index 0c527fe..a33df5f 100644
---- a/arch/arm/mach-ux500/platsmp.c
-+++ b/arch/arm/mach-ux500/platsmp.c
-@@ -172,14 +172,6 @@ void __init smp_init_cpus(void)
- 
- void __init platform_smp_prepare_cpus(unsigned int max_cpus)
- {
--	int i;
--
--	/*
--	 * Initialise the present map, which describes the set of CPUs
--	 * actually populated@the present time.
--	 */
--	for (i = 0; i < max_cpus; i++)
--		set_cpu_present(i, true);
- 
- 	scu_enable(scu_base_addr());
- 	wakeup_secondary();
-diff --git a/arch/arm/mach-vexpress/ct-ca9x4.c b/arch/arm/mach-vexpress/ct-ca9x4.c
-index 765a71f..bfd32f5 100644
---- a/arch/arm/mach-vexpress/ct-ca9x4.c
-+++ b/arch/arm/mach-vexpress/ct-ca9x4.c
-@@ -229,10 +229,6 @@ static void ct_ca9x4_init_cpu_map(void)
- 
- static void ct_ca9x4_smp_enable(unsigned int max_cpus)
- {
--	int i;
--	for (i = 0; i < max_cpus; i++)
--		set_cpu_present(i, true);
--
- 	scu_enable(MMIO_P2V(A9_MPCORE_SCU));
- }
- #endif
+
+
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Grant Likely, B.Sc., P.Eng.
+Secret Lab Technologies Ltd.
