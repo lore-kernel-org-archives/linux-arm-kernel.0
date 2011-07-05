@@ -1,37 +1,53 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 05 Jul 2011 09:49:46 -0700
-Subject: [PATCH] ARM: omap4: rename gpmc clock to gpmc_ick
-In-Reply-To: <1309868377-22379-1-git-send-email-j.weitzel@phytec.de>
-References: <1309868377-22379-1-git-send-email-j.weitzel@phytec.de>
-Message-ID: <4E1340AA.2020007@ti.com>
+From: mgrosen@ti.com (Grosen, Mark)
+Date: Tue, 5 Jul 2011 16:54:14 +0000
+Subject: [RFC 5/8] remoteproc: add davinci implementation
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024D91A2BE@dbde02.ent.ti.com>
+References: <1308640714-17961-1-git-send-email-ohad@wizery.com>
+	<1308640714-17961-6-git-send-email-ohad@wizery.com>
+	<4E035B78.3080200@mvista.com>
+	<FFF198FBBF957F4393BA834040FEFFA202D66E@DFLE35.ent.ti.com>
+	<4E04A9AE.3030801@mvista.com>
+	<B85A65D85D7EB246BE421B3FB0FBB593024D6C2F29@dbde02.ent.ti.com>
+	<FFF198FBBF957F4393BA834040FEFFA202EC99@DFLE35.ent.ti.com>
+	<B85A65D85D7EB246BE421B3FB0FBB593024D91A2BE@dbde02.ent.ti.com>
+Message-ID: <FFF198FBBF957F4393BA834040FEFFA2032F69@DFLE35.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Benoit
+> From: Nori, Sekhar
+> Sent: Monday, July 04, 2011 10:30 PM
 
-On 7/5/2011 5:19 AM, Jan Weitzel wrote:
-> The gpmc clock on omap44xx is called gpmc_ick not gpmc_ck in
-> clock44xx_data.c
->
-> Signed-off-by: Jan Weitzel<j.weitzel@phytec.de>
-This happened after renaming the clock-nodes some time back.
-Looks good to me as a fix though in long run GPMC should be
-moved to hwmod to avoid such naming issues
+...
+> > > https://patchwork.kernel.org/patch/662941/
+> >
+> > Yes, I like this idea - much cleaner. For example, the start() method
+> > becomes (pseudo-code):
+> >
+> > start()
+> > {
+> >     /* bootaddrreg derived from platform data */
+> >     bootaddrreg = boot_address;
+> >
+> >     clk_enable();
+> > }
+> >
+> > Referring to your patch above, would it be better to just pass
+> > the flags into the davinci_psc_config() function rather than breaking
+> out more
+> > arguments for each flag?
+> 
+> I did dwell on this quite a bit while writing that
+> patch, but finally decided on passing an argument
+> instead since I was not sure if there are going
+> to be more modifiers required.
+> 
+> Now that you have the need for one more flag, I
+> think we should go ahead and pass the flags directly
+> to davinci_psc_config(). My original patch is not
+> upstream yet. I will re-spin it and you can build
+> on top of it.
 
-> ---
->   arch/arm/mach-omap2/gpmc.c |    2 +-
->   1 files changed, 1 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
-> index 130034b..34bcd17 100644
-> --- a/arch/arm/mach-omap2/gpmc.c
-> +++ b/arch/arm/mach-omap2/gpmc.c
-> @@ -708,7 +708,7 @@ static int __init gpmc_init(void)
->   		l = OMAP34XX_GPMC_BASE;
->   		gpmc_irq = INT_34XX_GPMC_IRQ;
->   	} else if (cpu_is_omap44xx()) {
-> -		ck = "gpmc_ck";
-> +		ck = "gpmc_ick";
->   		l = OMAP44XX_GPMC_BASE;
->   		gpmc_irq = OMAP44XX_IRQ_GPMC;
->   	}
+Thanks, Sekhar, this sounds good. I'll look for your patch and utilize
+it in the next rev of this patch.
+
+Mark
