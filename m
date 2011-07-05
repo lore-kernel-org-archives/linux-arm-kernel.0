@@ -1,72 +1,63 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 5 Jul 2011 03:23:50 -0700
-Subject: [GIT PULL] non-critical omap fixes for v3.1 merge window
-Message-ID: <20110705102349.GE5783@atomide.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 05 Jul 2011 12:24:58 +0200
+Subject: [PATCH 6/8] drivers: add Contiguous Memory Allocator
+In-Reply-To: <1309851710-3828-7-git-send-email-m.szyprowski@samsung.com>
+References: <1309851710-3828-1-git-send-email-m.szyprowski@samsung.com>
+	<1309851710-3828-7-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <000101cc3afd$cac46ff0$604d4fd0$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hello,
 
-Please pull some fixes from:
+On Tuesday, July 05, 2011 9:42 AM Marek Szyprowski wrote:
 
-git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git devel-fixes
+> The Contiguous Memory Allocator is a set of helper functions for DMA
+> mapping framework that improves allocations of contiguous memory chunks.
+> 
+> CMA grabs memory on system boot, marks it with CMA_MIGRATE_TYPE and
+> gives back to the system. Kernel is allowed to allocate movable pages
+> within CMA's managed memory so that it can be used for example for page
+> cache when DMA mapping do not use it. On dma_alloc_from_contiguous()
+> request such pages are migrated out of CMA area to free required
+> contiguous block and fulfill the request. This allows to allocate large
+> contiguous chunks of memory at any time assuming that there is enough
+> free memory available in the system.
+> 
+> This code is heavily based on earlier works by Michal Nazarewicz.
+> 
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> CC: Michal Nazarewicz <mina86@mina86.com>
+> ---
+>  drivers/base/Kconfig           |   77 +++++++++
+>  drivers/base/Makefile          |    1 +
+>  drivers/base/dma-contiguous.c  |  367
+> ++++++++++++++++++++++++++++++++++++++++
+>  include/linux/dma-contiguous.h |  104 +++++++++++
+>  4 files changed, 549 insertions(+), 0 deletions(-)
+>  create mode 100644 drivers/base/dma-contiguous.c
+>  create mode 100644 include/linux/dma-contiguous.h
+> 
+> diff --git a/drivers/base/Kconfig b/drivers/base/Kconfig
+> index d57e8d0..95ae1a7 100644
+> --- a/drivers/base/Kconfig
+> +++ b/drivers/base/Kconfig
+> @@ -168,4 +168,81 @@ config SYS_HYPERVISOR
+>  	bool
+>  	default n
+> 
+> +config CMA
+> +	bool "Contiguous Memory Allocator"
+> +	depends HAVE_DMA_CONTIGUOUS && HAVE_MEMBLOCK
 
-These are intented for the merge window, there's no rush for
-these to go in during the -rc cycle this late. I have one fix
-queued for the -rc cycle still that I'll send separately.
+The above line should be obviously "depends on HAVE_DMA_CONTIGUOUS &&
+HAVE_MEMBLOCK".
+I'm sorry for posting broken version. 
 
-The dmtimer fix in this series has a dependency to the cleanup
-series you pulled earlier.
+(snipped)
 
-Regards,
-
-Tony
-
-
-The following changes since commit 48cb1258e8b0f8c81cfb699b42326c5b2147b3f8:
-  Tony Lindgren (1):
-        Merge branch 'for_3.1/pm-misc' of git://git.kernel.org/.../khilman/linux-omap-pm into devel-cleanup
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git devel-fixes
-
-Ambresh K (1):
-      OMAP4: DMTIMER: enable autoidle mode
-
-Charulatha V (1):
-      omap: ZOOM: QUART: Request reset GPIO
-
-Daniel Mack (1):
-      omap: Overo: remove duplicate call to overo_ads7846_init()
-
-Igor Grinberg (2):
-      arm: omap3: cm-t35: minor comments fixes
-      arm: omap3: cm-t35: fix slow path warning
-
-Julia Lawall (1):
-      arch/arm/mach-omap2/clock.c: add missing clk_put
-
-Ohad Ben-Cohen (2):
-      omap: iovmm: s/sg_dma_len(sg)/sg->length/
-      OMAP4: iommu: fix clock name
-
-Silesh C V (1):
-      omap: HSMMC: Fix GPIO muxing
-
-Suman Anna (1):
-      omap: iommu: fix pte programming
-
-Tony Lindgren (1):
-      Merge branch 'iommu-for-tony' of git://github.com/ohadbc/omap-iommu into devel-fixes
-
- arch/arm/mach-omap2/board-cm-t35.c          |   18 +++++++-----------
- arch/arm/mach-omap2/board-overo.c           |    1 -
- arch/arm/mach-omap2/board-zoom-debugboard.c |    9 +++++++++
- arch/arm/mach-omap2/clock.c                 |    1 +
- arch/arm/mach-omap2/hsmmc.c                 |    7 +++----
- arch/arm/mach-omap2/iommu2.c                |    4 ++--
- arch/arm/mach-omap2/omap-iommu.c            |    2 +-
- arch/arm/plat-omap/dmtimer.c                |    4 ++--
- arch/arm/plat-omap/iovmm.c                  |    6 +++---
- 9 files changed, 28 insertions(+), 24 deletions(-)
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
