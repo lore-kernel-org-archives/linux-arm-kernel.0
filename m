@@ -1,61 +1,202 @@
-From: joravec@drewtech.com (Joey Oravec)
-Date: Tue, 05 Jul 2011 11:37:57 -0400
-Subject: plat-orion multi purpose pins problem for mv78200
-In-Reply-To: <CAMAG_eexDoKrPsrd7+3bpsN3y0pptqwhFRP2NKqd_Nny+M+NGg@mail.gmail.com>
-References: <4E0E1CA8.7090200@drewtech.com>	<20110702122344.GJ31228@kw.sim.vm.gnt>
-	<CAMAG_eexDoKrPsrd7+3bpsN3y0pptqwhFRP2NKqd_Nny+M+NGg@mail.gmail.com>
-Message-ID: <4E132FD5.1090409@drewtech.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Tue, 5 Jul 2011 18:52:53 +0300
+Subject: [PATCH] Add 'config IMX_NFC_V1_BISWAP' to swap the Bad block
+	Indicator, and use for imx27pdk nand support.
+In-Reply-To: <1309872828-13942-1-git-send-email-J.Lambrecht@televic.com>
+References: <1309872828-13942-1-git-send-email-J.Lambrecht@televic.com>
+Message-ID: <20110705155253.GB2331@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/3/2011 8:46 AM, saeed bishara wrote:
->> It doesn't seems the code was behaving differently before 3.0-rc. I mean
->> before the MPP and GPIO consolidation work. It was ?
-> that's right, this issue was before the consolidation work.
-Agreed. I only meant to say that the MPP code is broken for mv78200 in 
-3.0-rc5, so the maintainers should consider a short-term fix of 
-disabling the checks in orion_gpio_is_valid().
+Hi J?rgen,
 
->> Does hardware allows a configuration like MPP0_GE0_COL and MPP32_GPIO
->> simultaneously ?
-> yes, this is possible.
-Agreed. MPP is the pin that can be mux'ed to 7 resources. GPIO is just 
-one of those resources. Yes the hardware supports your example. Most 
-resources can be routed to several different pins to allow flexibility 
-in board design.
+Please add Sascha Hauer <kernel@pengutronix.de> to Cc on i.MX related patches.  
+See the MAINTAINERS file.
 
-Since MPP is just a pin-mux, it's possible for Marvell to build an SoC 
-in the future that can route a few different GPIOs onto a given MPP pin. 
-It seems like any solution should account for this.
+On Tue, Jul 05, 2011 at 03:33:48PM +0200, J?rgen Lambrecht wrote:
+> - Swap the BI-byte on position 0x7D0 with a data byte at 0x835.  To fix a bug
+>   in Freescale imx NFC v1 SoC's for 2K page NAND flashes: imx27 and imx31.
+>   Warning: The same solution needs to be applied to the boot loader and the
+>   flash programmer.
+> - Enable NAND support for the imx27pdk (3ds), and use BISWAP.
+> 
+> Signed-off-by: J?rgen Lambrecht <J.Lambrecht@televic.com>
+> ---
+>  arch/arm/mach-imx/Kconfig         |   30 ++++++++++++++++++++++++++++--
+>  arch/arm/mach-imx/mach-mx27_3ds.c |   14 ++++++++++++++
+>  drivers/mtd/nand/mxc_nand.c       |   29 +++++++++++++++++++++++++++++
+>  3 files changed, 71 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+> index 0519dd7..e8b16a9 100644
+> --- a/arch/arm/mach-imx/Kconfig
+> +++ b/arch/arm/mach-imx/Kconfig
+> @@ -274,7 +274,7 @@ config MACH_EUKREA_MBIMX27_BASEBOARD
+>  endchoice
+>  
+>  config MACH_MX27_3DS
+> -	bool "MX27PDK platform"
+> +	bool "MX27PDK (3DS) platform"
 
->> If not (and only if not), the problem is simply mapping a MPP number on
->> the correct GPIO number. Isn't it ?
->>
->> In that case, what about using the MPPxx_GPIO definitions (found in
->> mach-mv78xx0/mpp.h) to map the right GPIO number ?
->>
->> For example:
->>
->> #define MPP32_GPIO        MPP(32, 0x1, 1, 1, 1)
->>
->> could be replaced by:
->>
->> #define MPP32_GPIO        MPP(0, 0x1, 1, 1, 1)
-> that won't work because the num (first number) is used as the mpp
-> index. see orion_mpp_conf() implementation.
-> I think the solution is to extend the MPP define to include the
-> explicit gpio number, so it will look like:
-> #define MPP(_num, _gpio _sel, _in, _out, _78100_A0)
-That could work as long as a value is reserved to mean "not gpio" like:
+This change is not related to this patch.
 
-#define MPP0_GPIO        MPP(0, 0, 0x0, 1, 1, 1)
-#define MPP0_GE0_COL        MPP(0, -1, 0x1, 1, 0, 1)
+>  	select SOC_IMX27
+>  	select IMX_HAVE_PLATFORM_FSL_USB2_UDC
+>  	select IMX_HAVE_PLATFORM_IMX2_WDT
+> @@ -284,13 +284,39 @@ config MACH_MX27_3DS
+>  	select IMX_HAVE_PLATFORM_IMX_UART
+>  	select IMX_HAVE_PLATFORM_MXC_EHCI
+>  	select IMX_HAVE_PLATFORM_MXC_MMC
+> +	select IMX_HAVE_PLATFORM_MXC_NAND
+>  	select IMX_HAVE_PLATFORM_SPI_IMX
+>  	select MXC_DEBUG_BOARD
+>  	select MXC_ULPI if USB_ULPI
+>  	help
+> -	  Include support for MX27PDK platform. This includes specific
+> +	  Include support for MX27PDK (3DS) platform. This includes specific
 
-Note that orion_gpio_set_valid() and orion_gpio_is_valid() would both 
-need rework. The functions need to handle that a GPIO can be mux'ed onto 
-any MPP pin. I described this problem in another email on the thread.
+Ditto.
 
-There has been some discussion of a pinmux API. Does this API offer any 
-simpler solution?
+>  	  configurations for the board and its peripherals.
+>  
+> +config MACH_MXC_NAND_USE_BBT
 
--joey
+The name of this option should indicate somehow that it's an i.MX27 specific 
+hack.
+
+> +	bool "Make the MXC NAND driver use the in flash Bad Block Table"
+> +	depends on MACH_MX27_3DS
+> +	depends on MTD_NAND_MXC
+> +	help
+> +	  Enable this if you want that the MXC NAND driver uses the in flash
+> +	  Bad Block Table to know what blocks are bad instead of scanning the
+> +	  entire flash looking for bad block markers.
+> +
+> +config IMX_NFC_V1_BISWAP
+> +	bool "Make the MXC 2kB-page NAND driver swap the Bad Block Indicator"
+> +	depends on MACH_MX27_3DS
+
+Not PDK 3DS specific. Should be 'depends on SOC_IMX27 || SOC_IMX31'.
+
+> +	depends on MTD_NAND_MXC
+> +	help
+> +	  Enable this if you want that the MXC NAND driver swaps the Bad Block
+> +	  Indicator (BBI) byte. The IMX NFC v1 (present in IMX27 and IMX31)
+> +	  contains a bug for 2kB-page flashes: the 2kB page is read out in
+> +	  4x512B chunks, so also the spare area is read out in 4
+> +	  chunks. Therefore the data area and the spare area becomes
+> +	  mixed. This causes a problem for the factory programmed BBI: it
+> +	  appears in the data area instead of the spare area, and is
+> +	  overwritten. This patch swaps that byte to the "real" spare
+> +	  area. WARNING: then also the bootloader and the flash programmer must
+> +	  be patched!!
+> +
+>  config MACH_IMX27_VISSTRIM_M10
+>  	bool "Vista Silicon i.MX27 Visstrim_m10"
+>  	select SOC_IMX27
+> diff --git a/arch/arm/mach-imx/mach-mx27_3ds.c b/arch/arm/mach-imx/mach-mx27_3ds.c
+> index 526cbe1..84114aa 100644
+> --- a/arch/arm/mach-imx/mach-mx27_3ds.c
+> +++ b/arch/arm/mach-imx/mach-mx27_3ds.c
+> @@ -40,6 +40,7 @@
+>  #include <mach/ulpi.h>
+>  #include <mach/irqs.h>
+>  #include <mach/3ds_debugboard.h>
+> +#include <mach/mxc_nand.h>
+>  
+>  #include "devices-imx27.h"
+>  
+> @@ -369,6 +370,18 @@ static struct spi_board_info mx27_3ds_spi_devs[] __initdata = {
+>  	},
+>  };
+>  
+> +/*
+> + * NAND Flash
+> + */
+> +static const struct mxc_nand_platform_data
+> +mx27_3ds_nand_board_info __initconst = {
+> +	.width		= 1,
+> +	.hw_ecc		= 1,
+> +#ifdef MACH_MXC_NAND_USE_BBT
+
+CONFIG_MACH_MXC_NAND_USE_BBT ?
+
+> +	.flash_bbt	= 1,
+> +#endif
+> +};
+> +
+>  static const struct imxi2c_platform_data mx27_3ds_i2c0_data __initconst = {
+>  	.bitrate = 100000,
+>  };
+> @@ -380,6 +393,7 @@ static void __init mx27pdk_init(void)
+>  	mxc_gpio_setup_multiple_pins(mx27pdk_pins, ARRAY_SIZE(mx27pdk_pins),
+>  		"mx27pdk");
+>  	mx27_3ds_sdhc1_enable_level_translator();
+> +	imx27_add_mxc_nand(&mx27_3ds_nand_board_info);
+
+This should also be in a separate patch.
+
+>  	imx27_add_imx_uart0(&uart_pdata);
+>  	imx27_add_fec(NULL);
+>  	imx27_add_imx_keypad(&mx27_3ds_keymap_data);
+> diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
+> index 90df34c..83f54d6 100644
+> --- a/drivers/mtd/nand/mxc_nand.c
+> +++ b/drivers/mtd/nand/mxc_nand.c
+> @@ -612,6 +612,30 @@ static int mxc_nand_calculate_ecc(struct mtd_info *mtd, const u_char *dat,
+>  	return 0;
+>  }
+>  
+> +/*
+> + * Swap the BI-byte on position 0x7D0 with a data byte at 0x835.
+> + * To fix a bug in NFC v1 SoC's for 2K page NAND flashes: imx27 and imx31.
+> + * Warning: The same solution needs to be applied to the boot loader and the
+> + * flash programmer.
+> + */
+> +#ifdef CONFIG_IMX_NFC_V1_BISWAP
+> +static void imx_bi_swap(struct mtd_info *mtd)
+> +{
+> +	struct nand_chip *nand_chip = mtd->priv;
+> +	struct mxc_nand_host *host = nand_chip->priv;
+> +	unsigned short temp1, temp2, new_temp1;
+> +
+> +	temp1 = *((volatile unsigned short*)(host->main_area0 + 0x7D0));
+> +	temp2 = *((volatile unsigned short*)(host->main_area0 + 0x834));
+> +	new_temp1 = (temp1 & 0xFF00) | (temp2 >> 8);
+> +	temp2 = (temp2 & 0x00FF) | (temp1 << 8);
+> +	*((volatile unsigned short*)(host->main_area0 + 0x7D0)) = new_temp1;
+> +	*((volatile unsigned short*)(host->main_area0 + 0x834)) = temp2;
+> +}
+> +#else
+> +static inline void imx_bi_swap(struct mtd_info *mtd) {}
+> +#endif
+> +
+>  static u_char mxc_nand_read_byte(struct mtd_info *mtd)
+>  {
+>  	struct nand_chip *nand_chip = mtd->priv;
+> @@ -971,6 +995,9 @@ static void mxc_nand_command(struct mtd_info *mtd, unsigned command,
+>  
+>  		host->send_page(mtd, NFC_OUTPUT);
+>  
+> +		if ((mtd->writesize > 512) && nfc_is_v1())
+> +			imx_bi_swap(mtd);
+> +
+>  		memcpy(host->data_buf, host->main_area0, mtd->writesize);
+>  		copy_spare(mtd, true);
+>  		break;
+> @@ -989,6 +1016,8 @@ static void mxc_nand_command(struct mtd_info *mtd, unsigned command,
+>  	case NAND_CMD_PAGEPROG:
+>  		memcpy(host->main_area0, host->data_buf, mtd->writesize);
+>  		copy_spare(mtd, false);
+> +		if ((mtd->writesize > 512) && nfc_is_v1())
+> +			imx_bi_swap(mtd);
+>  		host->send_page(mtd, NFC_INPUT);
+>  		host->send_cmd(host, command, true);
+>  		mxc_do_addr_cycle(mtd, column, page_addr);
+
+baruch
+
+-- 
+                                                     ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
