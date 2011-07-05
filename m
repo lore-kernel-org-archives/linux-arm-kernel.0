@@ -1,22 +1,24 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Tue, 05 Jul 2011 18:47:06 +0400
-Subject: [PATCH 05/15] ARM: pxa/lubbock: switch to using lubbock_usb_xceiv
-	transceiver
-In-Reply-To: <1309871321-11305-6-git-send-email-dbaryshkov@gmail.com>
-References: <1309871321-11305-1-git-send-email-dbaryshkov@gmail.com>
-	<1309871321-11305-6-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <4E1323EA.1070902@mvista.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 5 Jul 2011 23:05:36 +0800
+Subject: [PATCH v2 0/2] Add device tree probe support for tty/serial/imx
+Message-ID: <1309878338-25697-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+The first patch removes the use of cpu_is_mx1().  The second patch
+adds device tree probe with a dependency on the following patch.
 
-Dmitry Eremin-Solenikov wrote:
+  http://article.gmane.org/gmane.linux.drivers.devicetree/6128
 
-> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
-> Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
-> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+Changes since v1:
+ * Address review comments given by Grant and Uwe
 
-    One signoff was enough. :-)
+Shawn Guo (2):
+      serial/imx: get rid of the uses of cpu_is_mx1()
+      serial/imx: add device tree probe support
 
-WBR, Sergei
+ .../bindings/tty/serial/fsl-imx-uart.txt           |   19 +++
+ arch/arm/mach-imx/clock-imx1.c                     |    6 +-
+ arch/arm/plat-mxc/devices/platform-imx-uart.c      |    2 +-
+ drivers/tty/serial/imx.c                           |  148 +++++++++++++++++---
+ 4 files changed, 149 insertions(+), 26 deletions(-)
