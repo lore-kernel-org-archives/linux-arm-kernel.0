@@ -1,150 +1,33 @@
-From: prakity@marvell.com (Philip Rakity)
-Date: Tue, 5 Jul 2011 13:20:37 -0700
-Subject: [PATCH v3] arm: mach-mmp: brownstone.c support multiple sd slots
-In-Reply-To: <CAMPhdO-b_dpC2ueexEFujr6p_NRb2JwDc0-UEx3cfOSVcZ-d6w@mail.gmail.com>
-References: <59C2B513-EC04-4CA2-818B-9901CAF3E554@marvell.com>
-	<20110427093328.GU17290@n2100.arm.linux.org.uk>
-	<161C3F6C-0986-4364-B458-DBA4D08456FD@marvell.com>
-	<1F336A22-BAC3-41E3-8D4E-5DF27874D1EA@marvell.com>
-	<20110428095127.GX17290@n2100.arm.linux.org.uk>
-	<3BFCE791-3BAD-42ED-BC87-A27F40D6C77C@marvell.com>
-	<CAMPhdO-TTRP-k7J-zrG2_rQJsmNDRhTgpqiiX2yqW+Egf8+t2A@mail.gmail.com>
-	<CAMj5BkiK17RMY-vEENDqQiDOmfG0Esnp7QDooKWVrhkQL4g6Ow@mail.gmail.com>
-	<CAMPhdO-b_dpC2ueexEFujr6p_NRb2JwDc0-UEx3cfOSVcZ-d6w@mail.gmail.com>
-Message-ID: <67F311C7-B489-41E6-BC85-C06DACC7263A@marvell.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Tue,  5 Jul 2011 14:21:46 -0600
+Subject: [PATCH] i2c: tegra: Use engineering names in DT compatible property
+Message-ID: <1309897306-22953-1-git-send-email-swarren@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Subject: [PATCH V3] arm: mach-mmp: brownstone.c support multiple sd slots
+Engineering names are more stable than marketing names. Hence, use them
+for Device Tree compatible properties instead.
 
-V3
-==
-Change since V2 -- delete mmc3 since it was committed
-to linux next.
-
-enable mmc1 used for wifi (8688) and marked PERMANENT.
-Wifi requires enabling of power on the device by
-toggling the gpio lines for power and reset.  Enable eMMC first to work
-around problem in booting order due to workqueue bug.
-
-Signed-off-by: Philip Rakity <prakity@marvell.com>
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
- arch/arm/mach-mmp/brownstone.c |   41 +++++++++++++++++++++++++++++++++++++++-
- 1 files changed, 40 insertions(+), 1 deletions(-)
+Grant, this is against devicetree/arm and also makes sense for
+devicetree/test.
 
-diff --git a/arch/arm/mach-mmp/brownstone.c b/arch/arm/mach-mmp/brownstone.c
-index c79162a..940982c 100644
---- a/arch/arm/mach-mmp/brownstone.c
-+++ b/arch/arm/mach-mmp/brownstone.c
-@@ -19,6 +19,7 @@
- #include <linux/regulator/max8649.h>
- #include <linux/regulator/fixed.h>
- #include <linux/mfd/max8925.h>
-+#include <linux/delay.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -180,6 +181,11 @@ static struct sdhci_pxa_platdata mmp2_sdh_platdata_mmc0 = {
- 	.clk_delay_cycles = 0x1f,
+ drivers/i2c/busses/i2c-tegra.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/i2c/busses/i2c-tegra.c b/drivers/i2c/busses/i2c-tegra.c
+index 8914bd1..99b1b6d 100644
+--- a/drivers/i2c/busses/i2c-tegra.c
++++ b/drivers/i2c/busses/i2c-tegra.c
+@@ -716,7 +716,7 @@ static int tegra_i2c_resume(struct platform_device *pdev)
+ #if defined(CONFIG_OF)
+ /* Match table for of_platform binding */
+ static const struct of_device_id tegra_i2c_of_match[] __devinitconst = {
+-	{ .compatible = "nvidia,tegra250-i2c", },
++	{ .compatible = "nvidia,tegra20-i2c", },
+ 	{},
  };
- 
-+static struct sdhci_pxa_platdata mmp2_sdh_platdata_mmc1 = {
-+	.clk_delay_cycles = 0x1f,
-+	.flags		= PXA_FLAG_CARD_PERMANENT,
-+};
-+
- static struct sdhci_pxa_platdata mmp2_sdh_platdata_mmc2 = {
- 	.clk_delay_cycles = 0x1f,
- 	.flags = PXA_FLAG_CARD_PERMANENT
-@@ -187,6 +193,38 @@ static struct sdhci_pxa_platdata mmp2_sdh_platdata_mmc2 = {
- };
- 
- 
-+static void __init mmc_sdio_wifi(void)
-+{
-+	int poweron;
-+	int reset;
-+
-+	poweron = mfp_to_gpio(GPIO57_GPIO);
-+	reset = mfp_to_gpio(GPIO58_GPIO);
-+
-+	if (gpio_request(reset, "sd8xxx reset")) {
-+		printk(KERN_INFO "gpio %d request failed\n", reset);
-+		return;
-+	}
-+
-+	if (gpio_request(poweron, "sd8xxx PDn")) {
-+		gpio_free(reset);
-+		printk(KERN_INFO "gpio %d request failed\n", poweron);
-+		return;
-+	}
-+
-+	gpio_direction_output(poweron, 0);
-+	msleep(1);
-+	gpio_direction_output(poweron, 1);
-+	msleep(1);
-+	gpio_direction_output(reset, 0);
-+	msleep(1);
-+	gpio_direction_output(reset, 1);
-+	gpio_free(reset);
-+	gpio_free(poweron);
-+
-+	mmp2_add_sdhost(1, &mmp2_sdh_platdata_mmc1); /* Wifi */
-+}
-+
- static void __init brownstone_init(void)
- {
- 	mfp_config(ARRAY_AND_SIZE(brownstone_pin_config));
-@@ -195,8 +233,9 @@ static void __init brownstone_init(void)
- 	mmp2_add_uart(1);
- 	mmp2_add_uart(3);
- 	mmp2_add_twsi(1, NULL, ARRAY_AND_SIZE(brownstone_twsi1_info));
--	mmp2_add_sdhost(0, &mmp2_sdh_platdata_mmc0); /* SD/MMC */
- 	mmp2_add_sdhost(2, &mmp2_sdh_platdata_mmc2); /* eMMC */
-+	mmp2_add_sdhost(0, &mmp2_sdh_platdata_mmc0); /* SD/MMC */
-+	mmc_sdio_wifi();
- 
- 	/* enable 5v regulator */
- 	platform_device_register(&brownstone_v_5vp_device);
+ MODULE_DEVICE_TABLE(of, tegra_i2c_of_match);
 -- 
 1.7.0.4
-
-
-On Jul 5, 2011, at 12:20 AM, Eric Miao wrote:
-
-> On Tue, Jul 5, 2011 at 3:05 PM, zhangfei gao <zhangfei.gao@gmail.com> wrote:
->> On Tue, Jul 5, 2011 at 2:52 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
->>> On Fri, Apr 29, 2011 at 4:45 AM, Philip Rakity <prakity@marvell.com> wrote:
->>>> 
->>>> Support multiple sd/eMMC interfaces. enable mmc1, 2, and 3.
->>>> mmc2 is used eMMC and slot is marked PERMANENT and 8 bit device.
->>>> mmc1 is used for Wifi and slot is marked PERMANENT
->>>> 
->>>> Note: eMMC (mmc2) is set to initialize first to workaround a problem
->>>> where booting in logical order requires mmc create work queue
->>>> to be multi-threaded otherwise boot process hangs.  BUG report
->>>> send to linux-mmc and linux-kernel mailing list.
->>>> 
->>>> Wifi (mmc1) requires we enable power on the device by toggling
->>>> the gpio lines for power and reset.
->>>> 
->>>> Signed-off-by: Philip Rakity <prakity@marvell.com>
->>> 
->>> Applied. Though the email client was fiddling the spaces/CR-LF a bit.
->>> 
->>>> ---
->>>>  arch/arm/mach-mmp/brownstone.c |   52 +++++++++++++++++++++++++++++++++++++++-
->>>>  1 files changed, 51 insertions(+), 1 deletions(-)
->>>> 
->> 
->> Hi, Eric
->> 
->> arch/arm/mach-mmp/brownstone.c has already been modified from
->> mmc-next, here will have conflict.
->> Sorry for inconvenience.
-> 
-> 'K, I'll drop it then.
-> 
->> 
->> Thanks
->> 
