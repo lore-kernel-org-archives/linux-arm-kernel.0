@@ -1,38 +1,58 @@
-From: parkch98@gmail.com (Chanho Park)
-Date: Tue, 5 Jul 2011 17:39:50 +0900
-Subject: [PATCH 6/7] spi/s3c64xx: Add support DMA engine API
-In-Reply-To: <1309781915-31549-7-git-send-email-kgene.kim@samsung.com>
-References: <1309781915-31549-1-git-send-email-kgene.kim@samsung.com>
-	<1309781915-31549-7-git-send-email-kgene.kim@samsung.com>
-Message-ID: <CAPTzV16XF5tVJrw0UO+kM9uz+49b3jtCi9QHVm8eDbd8kbueBA@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue,  5 Jul 2011 09:49:09 +0100
+Subject: [PATCH v8 08/14] ARM: tegra: use remapped PPI interrupts for local
+	timer
+In-Reply-To: <1309855755-6261-1-git-send-email-marc.zyngier@arm.com>
+References: <1309855755-6261-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1309855755-6261-9-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> ?static int acquire_dma(struct s3c64xx_spi_driver_data *sdd)
-> ?{
-> +#if defined(CONFIG_DMADEV_PL330)
-> + ? ? ? dma_cap_mask_t mask;
-> + ? ? ? dma_cap_zero(mask);
-> + ? ? ? dma_cap_set(DMA_SLAVE, mask);
-> + ? ? ? sdd->rx_chan =
-> + ? ? ? ? ? ? ? dma_request_channel(mask, rxfilter, (void *)sdd);
-> + ? ? ? if (!sdd->rx_chan) {
-> + ? ? ? ? ? ? ? dev_err(&sdd->pdev->dev, "cannot get RxDMA\n");
-> + ? ? ? ? ? ? ? return 0;
-> + ? ? ? }
-> + ? ? ? sdd->tx_chan =
-> + ? ? ? ? ? ? ? dma_request_channel(mask, txfilter, (void *)sdd);
-> + ? ? ? if (!sdd->tx_chan) {
-> + ? ? ? ? ? ? ? dev_err(&sdd->pdev->dev, "cannot get TxDMA\n");
-> + ? ? ? ? ? ? ? return 0;
-> + ? ? ? }
-> +#else
+Use the normal interrupt scheme for the local timers by using
+a remapped PPI interrupt.
 
-When acquiring tx_chan is failed, you must release a rx_chan before
-error return.
-If not, the rx_chan is always busy because it was allocated in the
-previous attempt.
+Tested on a Harmony Tegra-2 board.
 
+Cc: Colin Cross <ccross@android.com>
+Cc: Erik Gilling <konkers@android.com>
+Cc: Olof Johansson <olof@lixom.net>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/mach-tegra/Kconfig      |    1 +
+ arch/arm/mach-tegra/localtimer.c |    3 ++-
+ 2 files changed, 3 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
+index 5ec1846..dad8f6a 100644
+--- a/arch/arm/mach-tegra/Kconfig
++++ b/arch/arm/mach-tegra/Kconfig
+@@ -9,6 +9,7 @@ config ARCH_TEGRA_2x_SOC
+ 	bool "Tegra 2 family"
+ 	select CPU_V7
+ 	select ARM_GIC
++	select ARM_GIC_PPI_MAP
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select USB_ARCH_HAS_EHCI if USB_SUPPORT
+ 	select USB_ULPI if USB_SUPPORT
+diff --git a/arch/arm/mach-tegra/localtimer.c b/arch/arm/mach-tegra/localtimer.c
+index e91d681..d148a25 100644
+--- a/arch/arm/mach-tegra/localtimer.c
++++ b/arch/arm/mach-tegra/localtimer.c
+@@ -14,13 +14,14 @@
+ #include <asm/irq.h>
+ #include <asm/smp_twd.h>
+ #include <asm/localtimer.h>
++#include <asm/hardware/gic.h>
+ 
+ /*
+  * Setup the local clock events for a CPU.
+  */
+ int __cpuinit local_timer_setup(struct clock_event_device *evt)
+ {
+-	evt->irq = IRQ_LOCALTIMER;
++	evt->irq = gic_ppi_map(IRQ_LOCALTIMER);
+ 	twd_timer_setup(evt);
+ 	return 0;
+ }
 -- 
-Best Regards,
-Chanho Park
+1.7.0.4
