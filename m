@@ -1,45 +1,42 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 05 Jul 2011 12:00:56 -0700
-Subject: [PATCH v4 00/18] I2C: OMAP: I2C fixes, removal of cpu_is...
-	from driver
-In-Reply-To: <1309212918.6231.16.camel@vence>
-References: <1306973984-15165-1-git-send-email-khilman@ti.com>
-	<20110615213637.GH15795@trinity.fluff.org>  <87k4cm1xgj.fsf@ti.com>
-	<1309212726.6231.14.camel@vence>  <1309212918.6231.16.camel@vence>
-Message-ID: <1309892457.3077.8.camel@vence>
+From: vkuzmichev@mvista.com (Vitaly Kuzmichev)
+Date: Tue,  5 Jul 2011 23:00:37 +0400
+Subject: [PATCH V2 3/6] mpcore_wdt: Fix WDIOC_SETOPTIONS handling
+In-Reply-To: <1286185540-19569-1-git-send-email-vkuzmichev@mvista.com>
+References: <1286185540-19569-1-git-send-email-vkuzmichev@mvista.com>
+Message-ID: <1309892440-3260-4-git-send-email-vkuzmichev@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ben,
+According to the include/linux/watchdog.h WDIOC_SETOPTIONS is
+classified as 'read from device' ioctl call:
+  #define WDIOC_SETOPTIONS        _IOR(WATCHDOG_IOCTL_BASE, 4, int)
 
-On Mon, 2011-06-27 at 15:15 -0700, Kevin Hilman wrote:
-> On Mon, 2011-06-27 at 15:12 -0700, Kevin Hilman wrote:
-> 
-> > Ping.  I don't see this in linux-next yet.
-> > 
-> > Are you planning to queue this for v3.1?
-> > 
-> 
-> Oops, pushed send too soon on this...
-> 
-> As this series touches various data files in arch/arm/mach-omap2/* and
-> we have a handful of other changes to that data for this merge window, I
-> think it would be better for conflict avoidance if this series is merged
-> via Tony's linux-omap tree.
-> 
-> With your Ack, we'll merge it via OMAP.
+However, the driver 'mpcore_wdt' performs 'copy_from_user' only if
+_IOC_WRITE is set, thus the local variable 'uarg' which is used in
+WDIOC_SETOPTIONS handling remains uninitialized.
 
-I see that the same day I sent this, you merged it into your next-i2c
-branch.  Guess I was too late with my request.
+The proper way to fix this is to bind WDIOC_SETOPTIONS to _IOW,
+but this will break compatibility.
+So adding additional condition for performing 'copy_from_user'.
 
-As I mentioned above, we will have several conflicts with the
-arch/arm/mach-omap2 changes in this series, so we would prefer to merge
-them via the OMAP tree if at all possible so we can properly handle the
-conflicts.
+Signed-off-by: Vitaly Kuzmichev <vkuzmichev@mvista.com>
+---
+ drivers/watchdog/mpcore_wdt.c |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
 
-Do you mind dropping it from your next-i2c so we can merge it via
-linux-omap (with your Ack.)
-
-Thanks,
-
-Kevin
+diff --git a/drivers/watchdog/mpcore_wdt.c b/drivers/watchdog/mpcore_wdt.c
+index 7a3d6b2..b330a0a 100644
+--- a/drivers/watchdog/mpcore_wdt.c
++++ b/drivers/watchdog/mpcore_wdt.c
+@@ -240,7 +240,8 @@ static long mpcore_wdt_ioctl(struct file *file, unsigned int cmd,
+ 	if (_IOC_DIR(cmd) && _IOC_SIZE(cmd) > sizeof(uarg))
+ 		return -ENOTTY;
+ 
+-	if (_IOC_DIR(cmd) & _IOC_WRITE) {
++	if (_IOC_DIR(cmd) & _IOC_WRITE
++			|| cmd == WDIOC_SETOPTIONS) {
+ 		ret = copy_from_user(&uarg, (void __user *)arg, _IOC_SIZE(cmd));
+ 		if (ret)
+ 			return -EFAULT;
+-- 
+1.7.3.4
