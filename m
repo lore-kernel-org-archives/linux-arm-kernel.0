@@ -1,83 +1,28 @@
-From: tommy.lin.1101@gmail.com (Tommy Lin)
-Date: Tue,  5 Jul 2011 20:03:02 +0800
-Subject: [PATCH 1/2] watchdog: Add MPcore watchdog support for cns3xxx SOCs
-Message-ID: <1309867382-7806-1-git-send-email-tommy.lin@caviumnetworks.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 5 Jul 2011 14:07:17 +0200
+Subject: [PATCHv11 0/8] Contiguous Memory Allocator
+In-Reply-To: <1309851710-3828-1-git-send-email-m.szyprowski@samsung.com>
+References: <1309851710-3828-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <201107051407.17249.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-1. Made the connection between CNS3xxx SOCs(ARCH_CNS3xxx) and MPcore watchdog
-   since the CNS3xxx SOCs have ARM11 MPcore CPU.
-2. Enable mpcore_watchdog option as module to default configuration at
-   arch/arm/configs/cns3420vb_defconfig.
+On Tuesday 05 July 2011, Marek Szyprowski wrote:
+> This is yet another round of Contiguous Memory Allocator patches. I hope
+> that I've managed to resolve all the items discussed during the Memory
+> Management summit at Linaro Meeting in Budapest and pointed later on
+> mailing lists. The goal is to integrate it as tight as possible with
+> other kernel subsystems (like memory management and dma-mapping) and
+> finally merge to mainline.
 
-Signed-off-by: Tommy Lin <tommy.lin@caviumnetworks.com>
----
- arch/arm/Kconfig                     |    1 +
- arch/arm/configs/cns3420vb_defconfig |    2 ++
- arch/arm/mach-cns3xxx/cns3420vb.c    |   22 ++++++++++++++++++++++
- 3 files changed, 25 insertions(+), 0 deletions(-)
+You have certainly addressed all of my concerns, this looks really good now!
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 9adc278..3262b15 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -326,6 +326,7 @@ config ARCH_CNS3XXX
- 	select ARM_GIC
- 	select MIGHT_HAVE_PCI
- 	select PCI_DOMAINS if PCI
-+	select HAVE_ARM_TWD
- 	help
- 	  Support for Cavium Networks CNS3XXX platform.
- 
-diff --git a/arch/arm/configs/cns3420vb_defconfig b/arch/arm/configs/cns3420vb_defconfig
-index 313627a..bd0a355 100644
---- a/arch/arm/configs/cns3420vb_defconfig
-+++ b/arch/arm/configs/cns3420vb_defconfig
-@@ -53,6 +53,8 @@ CONFIG_LEGACY_PTY_COUNT=16
- # CONFIG_HW_RANDOM is not set
- # CONFIG_HWMON is not set
- # CONFIG_VGA_CONSOLE is not set
-+CONFIG_WATCHDOG=y
-+CONFIG_MPCORE_WATCHDOG=m
- # CONFIG_HID_SUPPORT is not set
- # CONFIG_USB_SUPPORT is not set
- CONFIG_MMC=y
-diff --git a/arch/arm/mach-cns3xxx/cns3420vb.c b/arch/arm/mach-cns3xxx/cns3420vb.c
-index 08e5c87..09f20fe 100644
---- a/arch/arm/mach-cns3xxx/cns3420vb.c
-+++ b/arch/arm/mach-cns3xxx/cns3420vb.c
-@@ -159,10 +159,32 @@ static struct platform_device cns3xxx_usb_ohci_device = {
- 	},
- };
- 
-+/* Watchdog */
-+static struct resource cns3xxx_watchdog_resources[] = {
-+	[0] = {
-+		.start = CNS3XXX_TC11MP_TWD_BASE,
-+		.end   = CNS3XXX_TC11MP_TWD_BASE + PAGE_SIZE - 1,
-+		.flags = IORESOURCE_MEM,
-+	},
-+	[1] = {
-+		.start = IRQ_LOCALWDOG,
-+		.end   = IRQ_LOCALWDOG,
-+		.flags = IORESOURCE_IRQ,
-+	}
-+};
-+
-+static struct platform_device cns3xxx_watchdog_device = {
-+	.name		= "mpcore_wdt",
-+	.id		= -1,
-+	.num_resources	= ARRAY_SIZE(cns3xxx_watchdog_resources),
-+	.resource	= cns3xxx_watchdog_resources,
-+};
-+
- /*
-  * Initialization
-  */
- static struct platform_device *cns3420_pdevs[] __initdata = {
-+	&cns3xxx_watchdog_device,
- 	&cns3420_nor_pdev,
- 	&cns3xxx_usb_ehci_device,
- 	&cns3xxx_usb_ohci_device,
--- 
-1.7.6
+Andrew, can you add this to your -mm tree? What's your opinion on the
+current state, do you think this is ready for merging in 3.1 or would
+you want to have more reviews from core memory management people?
+
+My reviews were mostly on the driver and platform API side, and I think
+we're fine there now, but I don't really understand the impacts this has
+in mm.
+
+	Arnd
