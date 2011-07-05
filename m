@@ -1,32 +1,25 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 05 Jul 2011 16:26:19 +0900
-Subject: [PATCH 1/7] DMA: PL330: Add support runtime PM for PL330 DMAC
-In-Reply-To: <CAGOxZ50KGjHM6hUJQ1uEJsQqAzZ7aV+TcYRyhDB=sWQvtTDTxg@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 5 Jul 2011 08:36:29 +0100
+Subject: [PATCH 2/7] DMA: PL330: Update PL330 DMA API driver
+In-Reply-To: <1309781915-31549-3-git-send-email-kgene.kim@samsung.com>
 References: <1309781915-31549-1-git-send-email-kgene.kim@samsung.com>
-	<1309781915-31549-2-git-send-email-kgene.kim@samsung.com>
-	<CAGOxZ50KGjHM6hUJQ1uEJsQqAzZ7aV+TcYRyhDB=sWQvtTDTxg@mail.gmail.com>
-Message-ID: <00c001cc3ae4$d82464c0$886d2e40$%kim@samsung.com>
+	<1309781915-31549-3-git-send-email-kgene.kim@samsung.com>
+Message-ID: <20110705073629.GM8286@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Alim Akhtar wrote:
-> > + ? ? ? /* enable dma clk */
-> > + ? ? ? clk = clk_get(&adev->dev, "dma");
-> 
-> Does this really needed here?
-> AFAIR, amba_get_enable_pclk() does the same thing, provided clock name
-> as "apb_pclk"
-> please have a look at drivers/amba/bus.c
-> 
-As I know, you can access Samsung datasheet, please check it.
+On Mon, Jul 04, 2011 at 09:18:30PM +0900, Kukjin Kim wrote:
+> diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
+> index 25cf327..9b7f15a 100644
+> --- a/drivers/dma/Kconfig
+> +++ b/drivers/dma/Kconfig
+> @@ -193,7 +193,8 @@ config ARCH_HAS_ASYNC_TX_FIND_CHANNEL
+>  config PL330_DMA
+>  	tristate "DMA API Driver for PL330"
+>  	select DMA_ENGINE
+> -	depends on PL330
+> +	select ARM_AMBA
 
-Actually, the 'apb_pclk' should be dummy clock on current S5P SoCs so can't
-use it now.
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+This is the wrong way around.  If your SoC supports Primecells, then you are
+supposed to select ARM_AMBA from the SoC to allow the Primecell drivers to be
+enabled.  Primecell drivers should then depend on ARM_AMBA.
