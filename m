@@ -1,136 +1,59 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 05 Jul 2011 14:13:32 +0100
-Subject: [PATCH 9/9] DMA: PL08x: cleanup selection of burst size
-In-Reply-To: <20110705131030.GE8286@n2100.arm.linux.org.uk>
-References: <20110705131030.GE8286@n2100.arm.linux.org.uk>
-Message-ID: <E1Qe5RU-0005Ni-3q@rmk-PC.arm.linux.org.uk>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Tue,  5 Jul 2011 17:08:26 +0400
+Subject: [PATCH 00/15] Big pxa2[57]x_udc cleanup
+Message-ID: <1309871321-11305-1-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- drivers/dma/amba-pl08x.c |   58 ++++++++++++++++++++++-----------------------
- 1 files changed, 28 insertions(+), 30 deletions(-)
+Hello colleagues,
 
-diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
-index 4e139d7..e734fe6 100644
---- a/drivers/dma/amba-pl08x.c
-+++ b/drivers/dma/amba-pl08x.c
-@@ -1048,50 +1048,42 @@ pl08x_dma_tx_status(struct dma_chan *chan,
- 
- /* PrimeCell DMA extension */
- struct burst_table {
--	int burstwords;
-+	u32 burstwords;
- 	u32 reg;
- };
- 
- static const struct burst_table burst_sizes[] = {
- 	{
- 		.burstwords = 256,
--		.reg = (PL080_BSIZE_256 << PL080_CONTROL_SB_SIZE_SHIFT) |
--			(PL080_BSIZE_256 << PL080_CONTROL_DB_SIZE_SHIFT),
-+		.reg = PL080_BSIZE_256,
- 	},
- 	{
- 		.burstwords = 128,
--		.reg = (PL080_BSIZE_128 << PL080_CONTROL_SB_SIZE_SHIFT) |
--			(PL080_BSIZE_128 << PL080_CONTROL_DB_SIZE_SHIFT),
-+		.reg = PL080_BSIZE_128,
- 	},
- 	{
- 		.burstwords = 64,
--		.reg = (PL080_BSIZE_64 << PL080_CONTROL_SB_SIZE_SHIFT) |
--			(PL080_BSIZE_64 << PL080_CONTROL_DB_SIZE_SHIFT),
-+		.reg = PL080_BSIZE_64,
- 	},
- 	{
- 		.burstwords = 32,
--		.reg = (PL080_BSIZE_32 << PL080_CONTROL_SB_SIZE_SHIFT) |
--			(PL080_BSIZE_32 << PL080_CONTROL_DB_SIZE_SHIFT),
-+		.reg = PL080_BSIZE_32,
- 	},
- 	{
- 		.burstwords = 16,
--		.reg = (PL080_BSIZE_16 << PL080_CONTROL_SB_SIZE_SHIFT) |
--			(PL080_BSIZE_16 << PL080_CONTROL_DB_SIZE_SHIFT),
-+		.reg = PL080_BSIZE_16,
- 	},
- 	{
- 		.burstwords = 8,
--		.reg = (PL080_BSIZE_8 << PL080_CONTROL_SB_SIZE_SHIFT) |
--			(PL080_BSIZE_8 << PL080_CONTROL_DB_SIZE_SHIFT),
-+		.reg = PL080_BSIZE_8,
- 	},
- 	{
- 		.burstwords = 4,
--		.reg = (PL080_BSIZE_4 << PL080_CONTROL_SB_SIZE_SHIFT) |
--			(PL080_BSIZE_4 << PL080_CONTROL_DB_SIZE_SHIFT),
-+		.reg = PL080_BSIZE_4,
- 	},
- 	{
--		.burstwords = 1,
--		.reg = (PL080_BSIZE_1 << PL080_CONTROL_SB_SIZE_SHIFT) |
--			(PL080_BSIZE_1 << PL080_CONTROL_DB_SIZE_SHIFT),
-+		.burstwords = 0,
-+		.reg = PL080_BSIZE_1,
- 	},
- };
- 
-@@ -1135,15 +1127,25 @@ static u32 pl08x_width(enum dma_slave_buswidth width)
- 	return ~0;
- }
- 
-+static u32 pl08x_burst(u32 maxburst)
-+{
-+	int i;
-+
-+	for (i = 0; i < ARRAY_SIZE(burst_sizes); i++)
-+		if (burst_sizes[i].burstwords <= maxburst)
-+			break;
-+
-+	return burst_sizes[i].reg;
-+}
-+
- static int dma_set_runtime_config(struct dma_chan *chan,
- 				  struct dma_slave_config *config)
- {
- 	struct pl08x_dma_chan *plchan = to_pl08x_chan(chan);
- 	struct pl08x_driver_data *pl08x = plchan->host;
- 	enum dma_slave_buswidth addr_width;
--	u32 width, maxburst;
-+	u32 width, burst, maxburst;
- 	u32 cctl = 0;
--	int i;
- 
- 	if (!plchan->slave)
- 		return -EINVAL;
-@@ -1173,20 +1175,16 @@ static int dma_set_runtime_config(struct dma_chan *chan,
- 	cctl |= width << PL080_CONTROL_DWIDTH_SHIFT;
- 
- 	/*
--	 * Now decide on a maxburst:
- 	 * If this channel will only request single transfers, set this
- 	 * down to ONE element.  Also select one element if no maxburst
- 	 * is specified.
- 	 */
--	if (plchan->cd->single || maxburst == 0) {
--		cctl |= (PL080_BSIZE_1 << PL080_CONTROL_SB_SIZE_SHIFT) |
--			(PL080_BSIZE_1 << PL080_CONTROL_DB_SIZE_SHIFT);
--	} else {
--		for (i = 0; i < ARRAY_SIZE(burst_sizes); i++)
--			if (burst_sizes[i].burstwords <= maxburst)
--				break;
--		cctl |= burst_sizes[i].reg;
--	}
-+	if (plchan->cd->single)
-+		maxburst = 1;
-+
-+	burst = pl08x_burst(maxburst);
-+	cctl |= burst << PL080_CONTROL_SB_SIZE_SHIFT;
-+	cctl |= burst << PL080_CONTROL_DB_SIZE_SHIFT;
- 
- 	if (plchan->runtime_direction == DMA_FROM_DEVICE) {
- 		plchan->src_addr = config->src_addr;
--- 
-1.7.4.4
+Please review the following patch serie. It's major task is removal of code
+and functionality duplication between pxa2[57]x_udc drivers and OTG
+transceivers subsystem.
+
+The following changes since commit fe0d42203cb5616eeff68b14576a0f7e2dd56625:
+
+  Linux 3.0-rc6 (2011-07-04 15:56:24 -0700)
+
+are available in the git repository at:
+  git://git.kernel.org/pub/scm/linux/kernel/git/lumag/tosa-2.6.git misc/pxa-udc-cleanup
+
+Dmitry Eremin-Solenikov (15):
+      ARM: pxa/balloon3: drop udc_is_connected
+      ARM: pxa/mioa701: drop udc_is_connected
+      ARM: pxa/stargate2: drop udc_is_connected
+      ARM: pxa25x_udc: separate lubbock handling to lubbock-usb transceiver
+      ARM: pxa/lubbock: switch to using lubbock_usb_xceiv transceiver
+      pxa: drop handling of udc_is_connected
+      pxa25x_udc: drop support for udc_command
+      otg: add gpio_pullup OTG transceiver for devices with no VBUS sensing
+      corgi: convert to use gpio-pullup
+      poodle: convert to use gpio-pullup
+      h5000: convert to use gpio-pullup
+      gpio-vbus: support disabling D+ pullup on suspend
+      mioa701: move gpio-pullup functionality to gpio-vbus
+      gpio-pullup: support disabling D+ pullup on suspend
+      pxa2[57]x_udc: drop gpio_pullup handling
+
+ arch/arm/include/asm/mach/udc_pxa2xx.h |    9 --
+ arch/arm/mach-pxa/balloon3.c           |    7 -
+ arch/arm/mach-pxa/colibri-pxa320.c     |    1 -
+ arch/arm/mach-pxa/corgi.c              |   14 ++-
+ arch/arm/mach-pxa/devices.c            |    2 +-
+ arch/arm/mach-pxa/h5000.c              |   14 ++-
+ arch/arm/mach-pxa/lubbock.c            |   17 +--
+ arch/arm/mach-pxa/mioa701.c            |   19 +--
+ arch/arm/mach-pxa/poodle.c             |   13 ++-
+ arch/arm/mach-pxa/stargate2.c          |    6 -
+ arch/arm/mach-pxa/vpac270.c            |    1 -
+ drivers/usb/gadget/pxa25x_udc.c        |  132 ---------------------
+ drivers/usb/gadget/pxa27x_udc.c        |   27 +----
+ drivers/usb/otg/Kconfig                |   18 +++
+ drivers/usb/otg/Makefile               |    2 +
+ drivers/usb/otg/gpio_pullup.c          |  204 ++++++++++++++++++++++++++++++++
+ drivers/usb/otg/gpio_vbus.c            |   42 +++++++
+ drivers/usb/otg/lubbock-usb.c          |  178 ++++++++++++++++++++++++++++
+ include/linux/usb/gpio_vbus.h          |    1 +
+ 19 files changed, 493 insertions(+), 214 deletions(-)
+ create mode 100644 drivers/usb/otg/gpio_pullup.c
+ create mode 100644 drivers/usb/otg/lubbock-usb.c
