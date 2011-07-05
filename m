@@ -1,56 +1,46 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 05 Jul 2011 16:10:21 +0900
-Subject: [PATCH 3/7] DMA: PL330: Add DMA capabilities
-In-Reply-To: <CAPTzV15Y7JFDKsec8x-M0C1AFLOMp39QvHpRCsO=E001P_tH9A@mail.gmail.com>
-References: <1309781915-31549-1-git-send-email-kgene.kim@samsung.com>
-	<1309781915-31549-4-git-send-email-kgene.kim@samsung.com>
-	<CAPTzV15Y7JFDKsec8x-M0C1AFLOMp39QvHpRCsO=E001P_tH9A@mail.gmail.com>
-Message-ID: <00be01cc3ae2$9d3b7080$d7b25180$%kim@samsung.com>
+From: zhangfei.gao@gmail.com (zhangfei gao)
+Date: Tue, 5 Jul 2011 15:05:17 +0800
+Subject: [PATCH v2] arm: mach-mmp: brownstone.c support multiple sd slots
+In-Reply-To: <CAMPhdO-TTRP-k7J-zrG2_rQJsmNDRhTgpqiiX2yqW+Egf8+t2A@mail.gmail.com>
+References: <59C2B513-EC04-4CA2-818B-9901CAF3E554@marvell.com>
+	<20110427093328.GU17290@n2100.arm.linux.org.uk>
+	<161C3F6C-0986-4364-B458-DBA4D08456FD@marvell.com>
+	<1F336A22-BAC3-41E3-8D4E-5DF27874D1EA@marvell.com>
+	<20110428095127.GX17290@n2100.arm.linux.org.uk>
+	<3BFCE791-3BAD-42ED-BC87-A27F40D6C77C@marvell.com>
+	<CAMPhdO-TTRP-k7J-zrG2_rQJsmNDRhTgpqiiX2yqW+Egf8+t2A@mail.gmail.com>
+Message-ID: <CAMj5BkiK17RMY-vEENDqQiDOmfG0Esnp7QDooKWVrhkQL4g6Ow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Chanho Park wrote:
-> 
-> Kukjin Kim <kgene.kim <at> samsung.com> writes:
-> 
-> (snip)
-> 
-> > +             if (slave_config->direction == DMA_TO_DEVICE) {
-> > +                     if (slave_config->dst_addr)
-> > +                             peri->fifo_addr = slave_config->dst_addr;
-> > +                     if (slave_config->dst_addr_width) {
-> > +                             i = 0;
-> > +                             while (slave_config->dst_addr_width != (1
-<<
-> i))
-> > +                                     i++;
-> > +                             peri->burst_sz = i;
-> > +                     }
-> > +             } else if (slave_config->direction == DMA_FROM_DEVICE) {
-> > +                     if (slave_config->src_addr)
-> > +                             peri->fifo_addr = slave_config->src_addr;
-> > +                     if (slave_config->src_addr_width) {
-> > +                             i = 0;
-> > +                             while (slave_config->src_addr_width != (1
-<<
-> i))
-> > +                                     i++;
-> > +                             peri->burst_sz = i;
-> 
-> Re-send including cc and mailing lists
-> --
-> pl330 dmac only supports 1/2/4/8/16 bytes burst size.
-> If some bad D/D doesn't use powers of 2 width,
-> dmaengine is going to infinite loop.
-> You'd better check it instead of running loop.
+On Tue, Jul 5, 2011 at 2:52 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
+> On Fri, Apr 29, 2011 at 4:45 AM, Philip Rakity <prakity@marvell.com> wrote:
+>>
+>> Support multiple sd/eMMC interfaces. enable mmc1, 2, and 3.
+>> mmc2 is used eMMC and slot is marked PERMANENT and 8 bit device.
+>> mmc1 is used for Wifi and slot is marked PERMANENT
+>>
+>> Note: eMMC (mmc2) is set to initialize first to workaround a problem
+>> where booting in logical order requires mmc create work queue
+>> to be multi-threaded otherwise boot process hangs. ?BUG report
+>> send to linux-mmc and linux-kernel mailing list.
+>>
+>> Wifi (mmc1) requires we enable power on the device by toggling
+>> the gpio lines for power and reset.
+>>
+>> Signed-off-by: Philip Rakity <prakity@marvell.com>
+>
+> Applied. Though the email client was fiddling the spaces/CR-LF a bit.
+>
+>> ---
+>> ?arch/arm/mach-mmp/brownstone.c | ? 52 +++++++++++++++++++++++++++++++++++++++-
+>> ?1 files changed, 51 insertions(+), 1 deletions(-)
+>>
 
-Basically, src_addr_width is defined as a 'enum dma_slave_buswidth' so I
-think we don't need to consider it.
+Hi, Eric
 
-Thanks.
+arch/arm/mach-mmp/brownstone.c has already been modified from
+mmc-next, here will have conflict.
+Sorry for inconvenience.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Thanks
