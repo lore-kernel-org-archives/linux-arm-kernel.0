@@ -1,25 +1,32 @@
 From: swarren@nvidia.com (Stephen Warren)
-Date: Tue,  5 Jul 2011 14:29:19 -0600
-Subject: [PATCH 0/3] tegra: Use engineering names in DT compatible properties
-Message-ID: <1309897762-23564-1-git-send-email-swarren@nvidia.com>
+Date: Tue,  5 Jul 2011 14:29:20 -0600
+Subject: [PATCH 1/3] mmc/tegra: Use engineering names in DT compatible property
+In-Reply-To: <1309897762-23564-1-git-send-email-swarren@nvidia.com>
+References: <1309897762-23564-1-git-send-email-swarren@nvidia.com>
+Message-ID: <1309897762-23564-2-git-send-email-swarren@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Grant, these 3 patches are for the devicetree/test branch. I kept them
-separated in the hope they'll squash into existing patches already there.
+Engineering names are more stable than marketing names. Hence, use them
+for Device Tree compatible properties instead.
 
-Stephen Warren (3):
-  mmc/tegra: Use engineering names in DT compatible property
-  ARM: tegra: Use engineering names in DT compatible property
-  dt: docs: tegra: Use engineering names in DT compatible property
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+ drivers/mmc/host/sdhci-pltfm.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
- Documentation/devicetree/usage-model |   12 ++--
- arch/arm/boot/dts/tegra-harmony.dts  |    4 +-
- arch/arm/boot/dts/tegra-seaboard.dts |    4 +-
- arch/arm/boot/dts/tegra20.dtsi       |  162 ++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/tegra250.dtsi      |  162 ----------------------------------
- arch/arm/mach-tegra/board-dt.c       |   32 ++++----
- drivers/mmc/host/sdhci-pltfm.c       |    2 +-
- 7 files changed, 189 insertions(+), 189 deletions(-)
- create mode 100644 arch/arm/boot/dts/tegra20.dtsi
- delete mode 100644 arch/arm/boot/dts/tegra250.dtsi
+diff --git a/drivers/mmc/host/sdhci-pltfm.c b/drivers/mmc/host/sdhci-pltfm.c
+index 9cc92b0..0cf16bb 100644
+--- a/drivers/mmc/host/sdhci-pltfm.c
++++ b/drivers/mmc/host/sdhci-pltfm.c
+@@ -52,7 +52,7 @@ static struct sdhci_ops sdhci_pltfm_ops = {
+ #if defined(CONFIG_OF)
+ #include <linux/of_device.h>
+ static const struct of_device_id sdhci_dt_ids[] = {
+-	{ .compatible = "nvidia,tegra250-sdhci", .data = &sdhci_tegra_dt_pdata },
++	{ .compatible = "nvidia,tegra20-sdhci", .data = &sdhci_tegra_dt_pdata },
+ 	{ }
+ };
+ MODULE_DEVICE_TABLE(platform, sdhci_dt_ids);
+-- 
+1.7.0.4
