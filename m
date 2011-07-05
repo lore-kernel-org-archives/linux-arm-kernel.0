@@ -1,47 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 5 Jul 2011 15:15:10 +0100
-Subject: Unnecessary cache-line flush on page table updates ?
-In-Reply-To: <20110705135424.GC32718@e102109-lin.cambridge.arm.com>
-References: <20110701101019.GA1723@e102109-lin.cambridge.arm.com>
-	<BANLkTi=KVnzBKcd83c9T3P20VAv-ggqR4g@mail.gmail.com>
-	<20110704094531.GB19117@e102109-lin.cambridge.arm.com>
-	<20110704100221.GB8286@n2100.arm.linux.org.uk>
-	<20110704104329.GD19117@e102109-lin.cambridge.arm.com>
-	<20110704111338.GD8286@n2100.arm.linux.org.uk>
-	<20110704215507.GH8286@n2100.arm.linux.org.uk>
-	<20110705092600.GB25956@e102109-lin.cambridge.arm.com>
-	<20110705104858.GV8286@n2100.arm.linux.org.uk>
-	<20110705135424.GC32718@e102109-lin.cambridge.arm.com>
-Message-ID: <20110705141510.GG8286@n2100.arm.linux.org.uk>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Tue, 5 Jul 2011 22:29:09 +0800
+Subject: [PATCH] pxa/magician: fix MAGICIAN_EGPIO_BASE,
+	align with NR_BUILTIN_GPIO
+In-Reply-To: <20110705100355.GS8286@n2100.arm.linux.org.uk>
+References: <1303394226.16309.1.camel@flow>
+	<CAMPhdO-xQ614Rs-tTEY0v7i6_Q=aNUtoCo3AZ33nc1LsKoTn4w@mail.gmail.com>
+	<20110705100355.GS8286@n2100.arm.linux.org.uk>
+Message-ID: <CAMPhdO9Zh2b=i5qqY01D_PMNwt=-9hqTRJTHvq4pmEPfUFb9-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 05, 2011 at 02:54:24PM +0100, Catalin Marinas wrote:
-> On Tue, Jul 05, 2011 at 11:48:58AM +0100, Russell King - ARM Linux wrote:
-> > On Tue, Jul 05, 2011 at 10:26:00AM +0100, Catalin Marinas wrote:
-> > > AFAIK the branch predictor is transparent on Cortex-A9 and the BTB
-> > > maintenance are no-ops. You wouldn't notice any issues if you remove
-> > > them (you can check ID_MMFR1[31:28].
-> > 
-> > It's not transparent:
-> > 
-> > CPU: MMFR0=0x00100103 MMFR1=0x20000000 MMFR2=0x01230000 MMFR3=0x00102111
-> > 
-> > 0b0010 Branch predictor requires flushing on:
-> > 	? enabling or disabling the MMU
-> > 	? writing new data to instruction locations
-> > 	? writing new mappings to the translation tables
-> > 	? any change to the TTBR0, TTBR1, or TTBCR registers without a
-> > 	  corresponding change to the FCSE ProcessID or ContextID.
-> 
-> OK, it makes sense. But what's really confusing - the A8 has the same
-> value for ID_MMFR1 (according to the TRM) but the BTB instructions are
-> no-ops (can can be enabled by the ACTLR.IBE bit). I suspect the ID_MMFR1
-> is wrong in this case.
+On Tue, Jul 5, 2011 at 6:03 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Jul 05, 2011 at 03:46:12PM +0800, Eric Miao wrote:
+>> On Thu, Apr 21, 2011 at 9:57 PM, Philipp Zabel <pzabel@gmx.de> wrote:
+>> > Commit a0a4dcbca73a418477f439e812193e2591b46751
+>> > "ARM: pxa: align NR_BUILTIN_GPIO with GPIO interrupt number"
+>> > increased NR_BUILTIN_GPIO from 128 to PXA_GPIO_IRQ_NUM (192).
+>> > Adjust the previously hardcoded MAGICIAN_EGPIO_BASE accordingly.
+>> >
+>> > Signed-off-by: Philipp Zabel <philipp.zabel@gmail.com>
+>>
+>> Applied.
+>>
+>> > ---
+>> > ?arch/arm/mach-pxa/include/mach/magician.h | ? ?3 ++-
+>> > ?1 files changed, 2 insertions(+), 1 deletions(-)
+>> >
+>> > diff --git a/arch/arm/mach-pxa/include/mach/magician.h b/arch/arm/mach-pxa/include/mach/magician.h
+>> > index 0a2efcf..e9e6162 100644
+>> > --- a/arch/arm/mach-pxa/include/mach/magician.h
+>> > +++ b/arch/arm/mach-pxa/include/mach/magician.h
+>> > @@ -12,6 +12,7 @@
+>> > ?#ifndef _MAGICIAN_H_
+>> > ?#define _MAGICIAN_H_
+>> >
+>> > +#include <mach/gpio.h>
+>
+> Note that there's yet another mach/gpio.h here.
+>
 
-Grumble.  This kind of thing worries me.
-
-If the ID registers are wrong, then they can't be relied upon by software
-making decisions about what can be skipped.  So how can we be confident
-that MMFR3 23:20 != 0 really does mean that we don't need to clean the
-cache when writing the page tables, and is not a result of some bug?
+Fixed.
