@@ -1,68 +1,51 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 5 Jul 2011 07:32:29 +0200
-Subject: [PATCH] AT91: add AT91SAM9X5 dummy configuration variable
-In-Reply-To: <4E118679.4090908@atmel.com>
-References: <1309260927-11411-1-git-send-email-nicolas.ferre@atmel.com>
-	<20110628122650.GK2612@legolas.emea.dhcp.ti.com>
-	<4E0B43BA.803@atmel.com> <201107021149.41703.arnd@arndb.de>
-	<4E118679.4090908@atmel.com>
-Message-ID: <20110705053229.GC27909@game.jcrosoft.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 05 Jul 2011 14:51:08 +0900
+Subject: [PATCH 2/2] SPI: SAMSUNG: Bug fix for SPI with different FIFO
+	level
+In-Reply-To: <20110704150607.GA29977@ponder.secretlab.ca>
+References: <BANLkTi=9c5asfr=Jg6xwjQZW_a369UO64Q@mail.gmail.com>
+	<BANLkTinFnFwBGi693JTD_iDykA2VkV+HOw@mail.gmail.com>
+	<BANLkTik0LERxBHmJc5ZnRotnD4CSveR-UQ@mail.gmail.com>
+	<BANLkTim9wdrqDgXVUjxzMv9cdWViLww=Bg@mail.gmail.com>
+	<BANLkTim40x4X_--K0z7gdodDjor0MUam5Q@mail.gmail.com>
+	<BANLkTinf6ec1yXeaFkZjHMnqZp7yymDq-w@mail.gmail.com>
+	<20110704065501.GP15152@ponder.secretlab.ca>
+	<CACxGe6urrZ9=1OgcaYF6EtvJokAyFTbFCnHPWsCY+sETVze8-w@mail.gmail.com>
+	<005501cc3a30$6c916190$45b424b0$%kim@samsung.com>
+	<005601cc3a32$64bd5fd0$2e381f70$%kim@samsung.com>
+	<20110704150607.GA29977@ponder.secretlab.ca>
+Message-ID: <009f01cc3ad7$8e350200$aa9f0600$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11:23 Mon 04 Jul     , Nicolas Ferre wrote:
-> Le 02/07/2011 11:49, Arnd Bergmann :
-> > On Wednesday 29 June 2011 17:24:42 Nicolas Ferre wrote:
-> >>> Here are a few questions:
-> >>> i) The drivers you're willing to send, are those for Atmel's IPs or are
-> >>>       the IPs sourced from some other company ?
-> >>> ii) Even if they are Atmel-specific, do you see the possibility of Atmel
-> >>>       licensing them ?
-> >>> iii) Does your driver current depend on asm/ or mach/ headers ?
-> >>> iv) Is there a generic header which you could use instead of asm/ mach/ ?
-> >>
-> >> I just want to hide drivers that are not relevant for others: I have the feeling
-> >> that it is a good practice. This tiny patch will ease this during my publication
-> >> flow. Do you seriously care?
-> > 
-> > I think Felipe is right on this one, but both views are common in the kernel
-> > today: Some people want dependencies to mean "you cannot build this driver
-> > unless the dependencies are fulfilled", others like them more broadly to
-> > mean "there is no point to ever enable this driver because I know you won't
-> > need it".
-> > 
-> > Both views are understandable, but I favor the first one because
-> > 
-> > * it's the more common view these days and we should be consistent
-> > 
-> > * it exposes drivers to more build testing. If something changes in
-> >   the kernel that exposes new warnings in your driver or causes a
-> >   build error, that is more likely to get fixed when more people
-> >   find it by doing allyesconfig or randconfig builds.
-> > 
-> > * If there is an actual build dependency between the driver and the
-> >   platform that causes you to need the explicit Kconfig depends, that
-> >   is in many cases a hint that the driver author is doing something
-> >   wrong, like hardcoding MMIO addresses or referencing custom
-> >   symbols exported by the platform.
-> > 
-> > I don't think anyone really objects your patch to introduce the extra
-> > Kconfig symbol, but I'd hope that we can eventually get a consensus
-> > on the idea that you shouldn't use Kconfig dependencies based on
-> > whether a driver is relevant or not.
+Grant Likely wrote:
 > 
-> Arnd, Felipe,
+> On Mon, Jul 04, 2011 at 07:08:55PM +0900, Kukjin Kim wrote:
+> > Kukjin Kim wrote:
+> > >
+> > > Thanks Grant, Jassi and all,
+> > >
+> > > I will apply these 1 and 2 in my -fix tree for 3.0 with your acks.
+> > >
+> > Oops, this needs previous 'cleanup spi platform specific code' so can't
+> > apply -fix tree now.
 > 
-> You have convinced me.
-> But I will have to remove the other dependencies that I mentioned before
-> in the thread.
+> There may also be conflicts with the heavy rework in the spi tree.
+> Kgene, when you pick up this series, can you put it into a separate
+> topic branch and merge that into your main tree?  That way if there
+> are difficult conflicts, then I can also merge that same topic branch
+> into spi/next to resolve them.
 > 
-> We can drop this patch.
-I prefer to hide the platform specific driver other wise we will have a huge
-menu entry in Kconfig with unrelated drivers that can not be used at all on
-the selected mach
+Hi Grant,
 
-This is really annoying
+Sure, no problem. I'm waiting for Padmavathi's new patch which is based on
+old code not new SPI code. When I merge topic branch for this into my tree,
+let you know immediately. Then if any problems, let's talk again :)
 
-Best Regards,
-J.
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
