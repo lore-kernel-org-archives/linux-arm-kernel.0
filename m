@@ -1,618 +1,197 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 05 Jul 2011 09:41:48 +0200
-Subject: [PATCH 6/8] drivers: add Contiguous Memory Allocator
+Date: Tue, 05 Jul 2011 09:41:45 +0200
+Subject: [PATCH 3/8] mm: alloc_contig_range() added
 In-Reply-To: <1309851710-3828-1-git-send-email-m.szyprowski@samsung.com>
 References: <1309851710-3828-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1309851710-3828-7-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1309851710-3828-4-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Contiguous Memory Allocator is a set of helper functions for DMA
-mapping framework that improves allocations of contiguous memory chunks.
+From: Michal Nazarewicz <m.nazarewicz@samsung.com>
 
-CMA grabs memory on system boot, marks it with CMA_MIGRATE_TYPE and
-gives back to the system. Kernel is allowed to allocate movable pages
-within CMA's managed memory so that it can be used for example for page
-cache when DMA mapping do not use it. On dma_alloc_from_contiguous()
-request such pages are migrated out of CMA area to free required
-contiguous block and fulfill the request. This allows to allocate large
-contiguous chunks of memory at any time assuming that there is enough
-free memory available in the system.
+This commit adds the alloc_contig_range() function which tries
+to allecate given range of pages.  It tries to migrate all
+already allocated pages that fall in the range thus freeing them.
+Once all pages in the range are freed they are removed from the
+buddy system thus allocated for the caller to use.
 
-This code is heavily based on earlier works by Michal Nazarewicz.
-
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Signed-off-by: Michal Nazarewicz <m.nazarewicz@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+[m.szyprowski: renamed some variables for easier code reading]
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 CC: Michal Nazarewicz <mina86@mina86.com>
 ---
- drivers/base/Kconfig           |   77 +++++++++
- drivers/base/Makefile          |    1 +
- drivers/base/dma-contiguous.c  |  367 ++++++++++++++++++++++++++++++++++++++++
- include/linux/dma-contiguous.h |  104 +++++++++++
- 4 files changed, 549 insertions(+), 0 deletions(-)
- create mode 100644 drivers/base/dma-contiguous.c
- create mode 100644 include/linux/dma-contiguous.h
+ include/linux/page-isolation.h |    2 +
+ mm/page_alloc.c                |  144 ++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 146 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/base/Kconfig b/drivers/base/Kconfig
-index d57e8d0..95ae1a7 100644
---- a/drivers/base/Kconfig
-+++ b/drivers/base/Kconfig
-@@ -168,4 +168,81 @@ config SYS_HYPERVISOR
- 	bool
- 	default n
+diff --git a/include/linux/page-isolation.h b/include/linux/page-isolation.h
+index f1417ed..c5d1a7c 100644
+--- a/include/linux/page-isolation.h
++++ b/include/linux/page-isolation.h
+@@ -34,6 +34,8 @@ extern int set_migratetype_isolate(struct page *page);
+ extern void unset_migratetype_isolate(struct page *page);
+ extern unsigned long alloc_contig_freed_pages(unsigned long start,
+ 					      unsigned long end, gfp_t flag);
++extern int alloc_contig_range(unsigned long start, unsigned long end,
++			      gfp_t flags);
+ extern void free_contig_pages(struct page *page, int nr_pages);
  
-+config CMA
-+	bool "Contiguous Memory Allocator"
-+	depends HAVE_DMA_CONTIGUOUS && HAVE_MEMBLOCK
-+	select MIGRATION
-+	select CMA_MIGRATE_TYPE
-+	help
-+	  This enables the Contiguous Memory Allocator which allows drivers
-+	  to allocate big physically-contiguous blocks of memory for use with
-+	  hardware components that do not support I/O map nor scatter-gather.
-+
-+	  For more information see <include/linux/dma-contiguous.h>.
-+	  If unsure, say "n".
-+
-+if CMA
-+
-+config CMA_DEBUG
-+	bool "CMA debug messages (DEVELOPEMENT)"
-+	help
-+	  Turns on debug messages in CMA.  This produces KERN_DEBUG
-+	  messages for every CMA call as well as various messages while
-+	  processing calls such as dma_alloc_from_contiguous().
-+	  This option does not affect warning and error messages.
-+
-+comment "Default contiguous memory area size:"
-+
-+config CMA_SIZE_ABSOLUTE
-+	int "Absolute size (in MiB)"
-+	default 16
-+	help
-+	  Defines the size (in MiB) of the default memory area for Contiguous
-+	  Memory Allocator.
-+
-+config CMA_SIZE_PERCENTAGE
-+	int "Percentage of total memory"
-+	default 10
-+	help
-+	  Defines the size of the default memory area for Contiguous Memory
-+	  Allocator as a percentage of the total memory in the system.
-+
-+choice
-+	prompt "Selected region size"
-+	default CMA_SIZE_SEL_ABSOLUTE
-+
-+config CMA_SIZE_SEL_ABSOLUTE
-+	bool "Use absolute value only"
-+
-+config CMA_SIZE_SEL_PERCENTAGE
-+	bool "Use percentage value only"
-+
-+config CMA_SIZE_SEL_MIN
-+	bool "Use lower value (minimum)"
-+
-+config CMA_SIZE_SEL_MAX
-+	bool "Use higher value (maximum)"
-+
-+endchoice
-+
-+config CMA_ALIGNMENT
-+	int "Maximum PAGE_SIZE order of alignment for contiguous buffers"
-+	range 4 9
-+	default 8
-+	help
-+	  DMA mapping framework by default aligns all buffers to the smallest
-+	  PAGE_SIZE order which is greater than or equal to the requested buffer
-+	  size. This works well for buffers up to a few hundreds kilobytes, but
-+	  for larger buffers it just a memory waste. With this parameter you can
-+	  specify the maximum PAGE_SIZE order for contiguous buffers. Larger
-+	  buffers will be aligned only to this specified order. The order is
-+	  expressed as a power of two multiplied by the PAGE_SIZE.
-+
-+	  For example, if your system defaults to 4KiB pages, the order value
-+	  of 8 means that the buffers will be aligned up to 1MiB only.
-+
-+	  If unsure, leave the default value "8".
-+
-+endif
-+
- endmenu
-diff --git a/drivers/base/Makefile b/drivers/base/Makefile
-index 4c5701c..be6aab4 100644
---- a/drivers/base/Makefile
-+++ b/drivers/base/Makefile
-@@ -5,6 +5,7 @@ obj-y			:= core.o sys.o bus.o dd.o syscore.o \
- 			   cpu.o firmware.o init.o map.o devres.o \
- 			   attribute_container.o transport_class.o
- obj-$(CONFIG_DEVTMPFS)	+= devtmpfs.o
-+obj-$(CONFIG_CMA) += dma-contiguous.o
- obj-y			+= power/
- obj-$(CONFIG_HAS_DMA)	+= dma-mapping.o
- obj-$(CONFIG_HAVE_GENERIC_DMA_COHERENT) += dma-coherent.o
-diff --git a/drivers/base/dma-contiguous.c b/drivers/base/dma-contiguous.c
-new file mode 100644
-index 0000000..707b901
---- /dev/null
-+++ b/drivers/base/dma-contiguous.c
-@@ -0,0 +1,367 @@
-+/*
-+ * Contiguous Memory Allocator for DMA mapping framework
-+ * Copyright (c) 2010-2011 by Samsung Electronics.
-+ * Written by:
-+ *	Marek Szyprowski <m.szyprowski@samsung.com>
-+ *	Michal Nazarewicz <mina86@mina86.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation; either version 2 of the
-+ * License or (at your optional) any later version of the license.
-+ */
-+
-+#define pr_fmt(fmt) "cma: " fmt
-+
-+#ifdef CONFIG_CMA_DEBUG
-+#ifndef DEBUG
-+#  define DEBUG
-+#endif
-+#endif
-+
-+#include <asm/page.h>
-+#include <asm/sizes.h>
-+
-+#include <linux/memblock.h>
-+#include <linux/err.h>
-+#include <linux/mm.h>
-+#include <linux/module.h>
-+#include <linux/mutex.h>
-+#include <linux/page-isolation.h>
-+#include <linux/slab.h>
-+#include <linux/swap.h>
-+#include <linux/mm_types.h>
-+#include <linux/dma-mapping.h>
-+#include <linux/dma-contiguous.h>
-+
-+struct cma {
-+	unsigned long	base_pfn;
-+	unsigned long	count;
-+	unsigned long	*bitmap;
-+};
-+
-+struct cma *dma_contiguous_default_area;
-+
-+static unsigned long size_abs = CONFIG_CMA_SIZE_ABSOLUTE * SZ_1M;
-+static unsigned long size_percent = CONFIG_CMA_SIZE_PERCENTAGE;
-+static long size_cmdline = -1;
-+
-+static int __init early_cma(char *p)
+ /*
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index 00e9b24..2cea044 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -5638,6 +5638,150 @@ unsigned long alloc_contig_freed_pages(unsigned long start, unsigned long end,
+ 	return pfn;
+ }
+ 
++static unsigned long pfn_to_maxpage(unsigned long pfn)
 +{
-+	pr_debug("%s(%s)\n", __func__, p);
-+	size_cmdline = memparse(p, &p);
-+	return 0;
++	return pfn & ~(MAX_ORDER_NR_PAGES - 1);
 +}
-+early_param("cma", early_cma);
 +
-+/**
-+ * dma_contiguous_reserve() - reserve area for contiguous memory handling
-+ *
-+ * This funtion reserves memory from memblock subsystem. It should be
-+ * called by arch specific code once a memblock allocator has been activated
-+ * and all other subsystems have already allocated/reserved memory.
-+ */
-+void __init dma_contiguous_reserve(void)
++static unsigned long pfn_to_maxpage_up(unsigned long pfn)
 +{
-+	struct memblock_region *reg;
-+	unsigned long selected_size = 0;
-+	unsigned long total_pages = 0;
++	return ALIGN(pfn, MAX_ORDER_NR_PAGES);
++}
 +
-+	pr_debug("%s()\n", __func__);
++#define MIGRATION_RETRY	5
++static int __alloc_contig_migrate_range(unsigned long start, unsigned long end)
++{
++	int migration_failed = 0, ret;
++	unsigned long pfn = start;
 +
 +	/*
-+	 * We cannot use memblock_phys_mem_size() here, because
-+	 * memblock_analyze() has not been called yet.
++	 * Some code "borrowed" from KAMEZAWA Hiroyuki's
++	 * __alloc_contig_pages().
 +	 */
-+	for_each_memblock(memory, reg)
-+		total_pages += memblock_region_memory_end_pfn(reg) -
-+			       memblock_region_memory_base_pfn(reg);
 +
-+	size_percent *= (total_pages << PAGE_SHIFT) / 100;
++	for (;;) {
++		pfn = scan_lru_pages(pfn, end);
++		if (!pfn || pfn >= end)
++			break;
 +
-+	pr_debug("%s: available phys mem: %ld MiB\n", __func__,
-+		 (total_pages << PAGE_SHIFT) / SZ_1M);
-+
-+#ifdef CONFIG_CMA_SIZE_SEL_ABSOLUTE
-+	selected_size = size_abs;
-+#endif
-+#ifdef CONFIG_CMA_SIZE_SEL_PERCENTAGE
-+	selected_size = size_percent;
-+#endif
-+#ifdef CONFIG_CMA_SIZE_SEL_MIN
-+	selected_size = min(size_abs, size_percent);
-+#endif
-+#ifdef CONFIG_CMA_SIZE_SEL_MAX
-+	selected_size = max(size_abs, size_percent);
-+#endif
-+
-+	if (size_cmdline != -1)
-+		selected_size = size_cmdline;
-+
-+	if (!selected_size)
-+		return;
-+
-+	pr_debug("%s: reserving %ld MiB for global area\n", __func__,
-+		 selected_size / SZ_1M);
-+
-+	dma_declare_contiguous(NULL, selected_size, 0);
-+};
-+
-+static DEFINE_MUTEX(cma_mutex);
-+
-+#ifdef CONFIG_DEBUG_VM
-+
-+static int __cma_activate_area(unsigned long base_pfn, unsigned long count)
-+{
-+	unsigned long pfn = base_pfn;
-+	unsigned i = count;
-+	struct zone *zone;
-+
-+	pr_debug("%s(0x%08lx+0x%lx)\n", __func__, base_pfn, count);
-+
-+	VM_BUG_ON(!pfn_valid(pfn));
-+	zone = page_zone(pfn_to_page(pfn));
-+
-+	do {
-+		VM_BUG_ON(!pfn_valid(pfn));
-+		VM_BUG_ON(page_zone(pfn_to_page(pfn)) != zone);
-+		if (!(pfn & (pageblock_nr_pages - 1)))
-+			init_cma_reserved_pageblock(pfn_to_page(pfn));
-+		++pfn;
-+	} while (--i);
-+
-+	return 0;
-+}
-+
-+#else
-+
-+static int __cma_activate_area(unsigned long base_pfn, unsigned long count)
-+{
-+	unsigned i = count >> pageblock_order;
-+	struct page *p = pfn_to_page(base_pfn);
-+
-+	pr_debug("%s(0x%08lx+0x%lx)\n", __func__, base_pfn, count);
-+
-+	do {
-+		init_cma_reserved_pageblock(p);
-+		p += pageblock_nr_pages;
-+	} while (--i);
-+
-+	return 0;
-+}
-+
-+#endif
-+
-+static struct cma *__cma_create_area(unsigned long base_pfn,
-+				     unsigned long count)
-+{
-+	int bitmap_size = BITS_TO_LONGS(count) * sizeof(long);
-+	struct cma *cma;
-+
-+	pr_debug("%s(0x%08lx+0x%lx)\n", __func__, base_pfn, count);
-+
-+	cma = kmalloc(sizeof *cma, GFP_KERNEL);
-+	if (!cma)
-+		return ERR_PTR(-ENOMEM);
-+
-+	cma->base_pfn = base_pfn;
-+	cma->count = count;
-+	cma->bitmap = kzalloc(bitmap_size, GFP_KERNEL);
-+
-+	if (!cma->bitmap)
-+		goto no_mem;
-+
-+	__cma_activate_area(base_pfn, count);
-+
-+	pr_debug("%s: returning <%p>\n", __func__, (void *)cma);
-+	return cma;
-+
-+no_mem:
-+	kfree(cma);
-+	return ERR_PTR(-ENOMEM);
-+}
-+
-+static struct cma_reserved {
-+	unsigned long start;
-+	unsigned long size;
-+	struct device *dev;
-+} cma_reserved[8] __initdata;
-+static unsigned cma_reserved_count __initdata;
-+
-+static int __init __cma_init_reserved_areas(void)
-+{
-+	struct cma_reserved *r = cma_reserved;
-+	unsigned i = cma_reserved_count;
-+
-+	pr_debug("%s()\n", __func__);
-+
-+	for (; i; --i, ++r) {
-+		struct cma *cma;
-+		cma = __cma_create_area(page_to_pfn(phys_to_page(r->start)),
-+					r->size >> PAGE_SHIFT);
-+		if (!IS_ERR(cma)) {
-+			pr_debug("%s: created area %p\n", __func__, cma);
-+			if (r->dev)
-+				set_dev_cma_area(r->dev, cma);
-+			else
-+				dma_contiguous_default_area = cma;
-+		}
-+	}
-+	return 0;
-+}
-+core_initcall(__cma_init_reserved_areas);
-+
-+/**
-+ * dma_declare_contiguous() - reserve area for contiguous memory handling
-+ *			      for particular device
-+ * @dev:   Pointer to device structure.
-+ * @size:  Size of the reserved memory.
-+ * @start: Start address of the reserved memory (optional, 0 for any).
-+ *
-+ * This funtion reserves memory for specified device. It should be
-+ * called by board specific code once a memblock allocator has been activated
-+ * and all other subsystems have already allocated/reserved memory.
-+ */
-+int __init dma_declare_contiguous(struct device *dev, unsigned long size,
-+				  phys_addr_t start)
-+{
-+	struct cma_reserved *r = &cma_reserved[cma_reserved_count];
-+	unsigned long alignment;
-+
-+	pr_debug("%s(%p+%p)\n", __func__, (void *)start, (void *)size);
-+
-+	/* Sanity checks */
-+	if (cma_reserved_count == ARRAY_SIZE(cma_reserved))
-+		return -ENOSPC;
-+
-+	if (!size)
-+		return -EINVAL;
-+
-+	/* Sanitise input arguments */
-+	alignment = PAGE_SIZE << (MAX_ORDER + 1);
-+	start = ALIGN(start, alignment);
-+	size  = ALIGN(size , alignment);
-+
-+	/* Reserve memory */
-+	if (start) {
-+		if (memblock_is_region_reserved(start, size) ||
-+		    memblock_reserve(start, size) < 0)
-+			return -EBUSY;
-+	} else {
-+		/*
-+		 * Use __memblock_alloc_base() since
-+		 * memblock_alloc_base() panic()s.
-+		 */
-+		u64 addr = __memblock_alloc_base(size, alignment, 0);
-+		if (!addr) {
-+			return -ENOMEM;
-+		} else if (addr + size > ~(unsigned long)0) {
-+			memblock_free(addr, size);
-+			return -EOVERFLOW;
++		ret = do_migrate_range(pfn, end);
++		if (!ret) {
++			migration_failed = 0;
++		} else if (ret != -EBUSY
++			|| ++migration_failed >= MIGRATION_RETRY) {
++			return ret;
 +		} else {
-+			start = addr;
++			/* There are unstable pages.on pagevec. */
++			lru_add_drain_all();
++			/*
++			 * there may be pages on pcplist before
++			 * we mark the range as ISOLATED.
++			 */
++			drain_all_pages();
 +		}
++		cond_resched();
 +	}
 +
-+	/*
-+	 * Each reserved area must be initialised later, when more kernel
-+	 * subsystems (like slab allocator) are available.
-+	 */
-+	r->start = start;
-+	r->size = size;
-+	r->dev = dev;
-+	cma_reserved_count++;
-+	printk(KERN_INFO "%s: reserved %ld MiB area at 0x%p\n", __func__,
-+	       size / SZ_1M, (void *)start);
++	if (!migration_failed) {
++		/* drop all pages in pagevec and pcp list */
++		lru_add_drain_all();
++		drain_all_pages();
++	}
++
++	/* Make sure all pages are isolated */
++	if (WARN_ON(test_pages_isolated(start, end)))
++		return -EBUSY;
++
 +	return 0;
 +}
 +
 +/**
-+ * dma_alloc_from_contiguous() - allocate pages from contiguous area
-+ * @dev:   Pointer to device for which the allocation is performed.
-+ * @count: Requested number of pages.
-+ * @align: Requested alignment of pages (in PAGE_SIZE order).
++ * alloc_contig_range() -- tries to allocate given range of pages
++ * @start:	start PFN to allocate
++ * @end:	one-past-the-last PFN to allocate
++ * @flags:	flags passed to alloc_contig_freed_pages().
 + *
-+ * This funtion allocates memory buffer for specified device. It uses
-+ * device specific contiguous memory area if available or the default
-+ * global one. Requires architecture specific get_dev_cma_area() helper
-+ * function.
++ * The PFN range does not have to be pageblock or MAX_ORDER_NR_PAGES
++ * aligned, hovewer it's callers responsibility to guarantee that we
++ * are the only thread that changes migrate type of pageblocks the
++ * pages fall in.
++ *
++ * Returns zero on success or negative error code.  On success all
++ * pages which PFN is in (start, end) are allocated for the caller and
++ * need to be freed with free_contig_pages().
 + */
-+struct page *dma_alloc_from_contiguous(struct device *dev, int count,
-+				       unsigned int align)
++int alloc_contig_range(unsigned long start, unsigned long end,
++		       gfp_t flags)
 +{
-+	struct cma *cma = get_dev_cma_area(dev);
-+	unsigned long pfn, pageno;
++	unsigned long outer_start, outer_end;
 +	int ret;
 +
-+	if (!cma)
-+		return NULL;
++	/*
++	 * What we do here is we mark all pageblocks in range as
++	 * MIGRATE_ISOLATE.  Because of the way page allocator work, we
++	 * align the range to MAX_ORDER pages so that page allocator
++	 * won't try to merge buddies from different pageblocks and
++	 * change MIGRATE_ISOLATE to some other migration type.
++	 *
++	 * Once the pageblocks are marked as MIGRATE_ISOLATE, we
++	 * migrate the pages from an unaligned range (ie. pages that
++	 * we are interested in).  This will put all the pages in
++	 * range back to page allocator as MIGRATE_ISOLATE.
++	 *
++	 * When this is done, we take the pages in range from page
++	 * allocator removing them from the buddy system.  This way
++	 * page allocator will never consider using them.
++	 *
++	 * This lets us mark the pageblocks back as
++	 * MIGRATE_CMA/MIGRATE_MOVABLE so that free pages in the
++	 * MAX_ORDER aligned range but not in the unaligned, original
++	 * range are put back to page allocator so that buddy can use
++	 * them.
++	 */
 +
-+	if (align > CONFIG_CMA_ALIGNMENT)
-+		align = CONFIG_CMA_ALIGNMENT;
-+
-+	pr_debug("%s(<%p>, %d/%d)\n", __func__, (void *)cma, count, align);
-+
-+	if (!count)
-+		return NULL;
-+
-+	mutex_lock(&cma_mutex);
-+
-+	pageno = bitmap_find_next_zero_area(cma->bitmap, cma->count, 0, count,
-+					    align);
-+	if (pageno >= cma->count) {
-+		ret = -ENOMEM;
-+		goto error;
-+	}
-+	bitmap_set(cma->bitmap, pageno, count);
-+
-+	pfn = cma->base_pfn + pageno;
-+	ret = alloc_contig_range(pfn, pfn + count, 0, MIGRATE_CMA);
++	ret = start_isolate_page_range(pfn_to_maxpage(start),
++				       pfn_to_maxpage_up(end));
 +	if (ret)
-+		goto free;
++		goto done;
 +
-+	mutex_unlock(&cma_mutex);
++	ret = __alloc_contig_migrate_range(start, end);
++	if (ret)
++		goto done;
 +
-+	pr_debug("%s(): returning [%ld]\n", __func__, pfn);
-+	return pfn_to_page(pfn);
-+free:
-+	bitmap_clear(cma->bitmap, pageno, count);
-+error:
-+	mutex_unlock(&cma_mutex);
-+	return NULL;
++	/*
++	 * Pages from [start, end) are within a MAX_ORDER_NR_PAGES
++	 * aligned blocks that are marked as MIGRATE_ISOLATE.  What's
++	 * more, all pages in [start, end) are free in page allocator.
++	 * What we are going to do is to allocate all pages from
++	 * [start, end) (that is remove them from page allocater).
++	 *
++	 * The only problem is that pages at the beginning and at the
++	 * end of interesting range may be not aligned with pages that
++	 * page allocator holds, ie. they can be part of higher order
++	 * pages.  Because of this, we reserve the bigger range and
++	 * once this is done free the pages we are not interested in.
++	 */
++
++	ret = 0;
++	while (!PageBuddy(pfn_to_page(start & (~0UL << ret))))
++		if (WARN_ON(++ret >= MAX_ORDER))
++			return -EINVAL;
++
++	outer_start = start & (~0UL << ret);
++	outer_end   = alloc_contig_freed_pages(outer_start, end, flags);
++
++	/* Free head and tail (if any) */
++	if (start != outer_start)
++		free_contig_pages(pfn_to_page(outer_start), start - outer_start);
++	if (end != outer_end)
++		free_contig_pages(pfn_to_page(end), outer_end - end);
++
++	ret = 0;
++done:
++	undo_isolate_page_range(pfn_to_maxpage(start), pfn_to_maxpage_up(end));
++	return ret;
 +}
 +
-+/**
-+ * dma_release_from_contiguous() - release allocated pages
-+ * @dev:   Pointer to device for which the pages were allocated.
-+ * @pages: Allocated pages.
-+ * @count: Number of allocated pages.
-+ *
-+ * This funtion reserves memory for specified device. It should be
-+ * called by board specific code once a memblock allocator has been activated
-+ * and all other subsystems have already allocated/reserved memory.
-+ */
-+int dma_release_from_contiguous(struct device *dev, struct page *pages,
-+				int count)
-+{
-+	struct cma *cma = get_dev_cma_area(dev);
-+	unsigned long pfn;
-+
-+	if (!cma || !pages)
-+		return 0;
-+
-+	pr_debug("%s([%p])\n", __func__, (void *)pages);
-+
-+	pfn = page_to_pfn(pages);
-+
-+	if (pfn < cma->base_pfn || pfn >= cma->base_pfn + count)
-+		return 0;
-+
-+	mutex_lock(&cma_mutex);
-+
-+	bitmap_clear(cma->bitmap, pfn - cma->base_pfn, count);
-+	free_contig_pages(pages, count);
-+
-+	mutex_unlock(&cma_mutex);
-+	return 1;
-+}
-diff --git a/include/linux/dma-contiguous.h b/include/linux/dma-contiguous.h
-new file mode 100644
-index 0000000..98312c9
---- /dev/null
-+++ b/include/linux/dma-contiguous.h
-@@ -0,0 +1,104 @@
-+#ifndef __LINUX_CMA_H
-+#define __LINUX_CMA_H
-+
-+/*
-+ * Contiguous Memory Allocator for DMA mapping framework
-+ * Copyright (c) 2010-2011 by Samsung Electronics.
-+ * Written by:
-+ *	Marek Szyprowski <m.szyprowski@samsung.com>
-+ *	Michal Nazarewicz <mina86@mina86.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation; either version 2 of the
-+ * License or (at your optional) any later version of the license.
-+ */
-+
-+/*
-+ * Contiguous Memory Allocator
-+ *
-+ *   The Contiguous Memory Allocator (CMA) makes it possible to
-+ *   allocate big contiguous chunks of memory after the system has
-+ *   booted.
-+ *
-+ * Why is it needed?
-+ *
-+ *   Various devices on embedded systems have no scatter-getter and/or
-+ *   IO map support and require contiguous blocks of memory to
-+ *   operate.  They include devices such as cameras, hardware video
-+ *   coders, etc.
-+ *
-+ *   Such devices often require big memory buffers (a full HD frame
-+ *   is, for instance, more then 2 mega pixels large, i.e. more than 6
-+ *   MB of memory), which makes mechanisms such as kmalloc() or
-+ *   alloc_page() ineffective.
-+ *
-+ *   At the same time, a solution where a big memory region is
-+ *   reserved for a device is suboptimal since often more memory is
-+ *   reserved then strictly required and, moreover, the memory is
-+ *   inaccessible to page system even if device drivers don't use it.
-+ *
-+ *   CMA tries to solve this issue by operating on memory regions
-+ *   where only movable pages can be allocated from.  This way, kernel
-+ *   can use the memory for pagecache and when device driver requests
-+ *   it, allocated pages can be migrated.
-+ *
-+ * Driver usage
-+ *
-+ *   CMA should not be used by the device drivers directly. It is
-+ *   only a helper framework for dma-mapping subsystem.
-+ *
-+ *   For more information, see kernel-docs in drivers/base/dma-contiguous.c
-+ */
-+
-+#ifdef __KERNEL__
-+
-+struct cma;
-+struct page;
-+struct device;
-+
-+#ifdef CONFIG_CMA
-+
-+extern struct cma *dma_contiguous_default_area;
-+
-+void dma_contiguous_reserve(void);
-+int dma_declare_contiguous(struct device *dev, unsigned long size,
-+			   phys_addr_t base);
-+
-+struct page *dma_alloc_from_contiguous(struct device *dev, int count,
-+				       unsigned int order);
-+int dma_release_from_contiguous(struct device *dev, struct page *pages,
-+				int count);
-+
-+#else
-+
-+#define dna_contiguous_default_area NULL
-+
-+static inline void dma_contiguous_reserve(void) { }
-+
-+static inline
-+int dma_declare_contiguous(struct device *dev, unsigned long size,
-+			   unsigned long base)
-+{
-+	return -EINVAL;
-+}
-+
-+static inline
-+struct page *dma_alloc_from_contiguous(struct device *dev, int count,
-+				       unsigned int order)
-+{
-+	return NULL;
-+}
-+
-+static inline
-+int dma_release_from_contiguous(struct device *dev, struct page *pages,
-+				int count)
-+{
-+	return 0;
-+}
-+
-+#endif
-+
-+#endif
-+
-+#endif
+ void free_contig_pages(struct page *page, int nr_pages)
+ {
+ 	for (; nr_pages; --nr_pages, ++page)
 -- 
 1.7.1.569.g6f426
