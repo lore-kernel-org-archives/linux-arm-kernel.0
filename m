@@ -1,58 +1,40 @@
-From: rmallon@gmail.com (Ryan Mallon)
-Date: Tue, 05 Jul 2011 16:15:44 +1000
-Subject: [RFC/RFT 1/2] gpio/basic_mmio: add support for enable register
-In-Reply-To: <83915224c24e43224272b1bf570cddb9545279a6.1309840042.git.nsekhar@ti.com>
-References: <cover.1309840042.git.nsekhar@ti.com>
-	<83915224c24e43224272b1bf570cddb9545279a6.1309840042.git.nsekhar@ti.com>
-Message-ID: <4E12AC10.9020206@gmail.com>
+From: parkch98@gmail.com (Chanho Park)
+Date: Tue, 5 Jul 2011 15:33:49 +0900
+Subject: [PATCH 3/7] DMA: PL330: Add DMA capabilities
+In-Reply-To: <1309781915-31549-4-git-send-email-kgene.kim@samsung.com>
+References: <1309781915-31549-1-git-send-email-kgene.kim@samsung.com>
+	<1309781915-31549-4-git-send-email-kgene.kim@samsung.com>
+Message-ID: <CAPTzV15Y7JFDKsec8x-M0C1AFLOMp39QvHpRCsO=E001P_tH9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/07/11 15:10, Sekhar Nori wrote:
-> Some GPIO controllers have an enable register
-> which needs to be written to before a GPIO
-> can be used.
->
-> Add support for enabling the GPIO. At this
-> time inverted logic for enabling the GPIO
-> is not supported. This can be done by adding
-> a disable register as and when a controller
-> with this comes along.
->
-> Signed-off-by: Sekhar Nori<nsekhar@ti.com>
-> ---
->
-<snip>
+Kukjin Kim <kgene.kim <at> samsung.com> writes:
 
-> static int bgpio_setup_io(struct bgpio_chip *bgc,
->   			  void __iomem *dat,
-> @@ -369,6 +401,7 @@ int __devinit bgpio_init(struct bgpio_chip *bgc,
->   			 void __iomem *clr,
->   			 void __iomem *dirout,
->   			 void __iomem *dirin,
-> +			 void __iomem *en,
->   			 bool big_endian)
+(snip)
 
-The arguments to this function are getting a bit unwieldy :-). Maybe we 
-need to introduce something like:
+> +             if (slave_config->direction == DMA_TO_DEVICE) {
+> +                     if (slave_config->dst_addr)
+> +                             peri->fifo_addr = slave_config->dst_addr;
+> +                     if (slave_config->dst_addr_width) {
+> +                             i = 0;
+> +                             while (slave_config->dst_addr_width != (1 <<
+i))
+> +                                     i++;
+> +                             peri->burst_sz = i;
+> +                     }
+> +             } else if (slave_config->direction == DMA_FROM_DEVICE) {
+> +                     if (slave_config->src_addr)
+> +                             peri->fifo_addr = slave_config->src_addr;
+> +                     if (slave_config->src_addr_width) {
+> +                             i = 0;
+> +                             while (slave_config->src_addr_width != (1 <<
+i))
+> +                                     i++;
+> +                             peri->burst_sz = i;
 
-struct bgpio_chip_info {
-     struct device *dev;
-     unsigned long sz;
-     void __iomem *dat;
-     void __iomem *set;
-     void __iomem *clr;
-     void __iomem *dirout;
-     void __iomem *dirin;
-     void __iomem *en;
-     bool big_endian;
-};
-
-and pass that to bgpio_init instead. It would have the added benefits of 
-making the drivers more readable and that bgpio_chip_info structs in the 
-drivers can probably be marked __initdata also.
-
-Since you are already having to touch all of the call sites for 
-bgpio_init this could be done as a separate patch along with this series.
-
-~Ryan
+Re-send including cc and mailing lists
+--
+pl330 dmac only supports 1/2/4/8/16 bytes burst size.
+If some bad D/D doesn't use powers of 2 width,
+dmaengine is going to infinite loop.
+You'd better check it instead of running loop.
