@@ -1,32 +1,33 @@
-From: johlstei@codeaurora.org (Jeff Ohlstein)
-Date: Tue, 05 Jul 2011 12:15:41 -0700
-Subject: [stable] [PATCH v2] msm: timer: compensate for timer shift in
-	msm_read_timer_count
-In-Reply-To: <20110621162427.GA28836@kroah.com>
-References: <1308344138-2862-1-git-send-email-johlstei@codeaurora.org>	<20110620215922.GA21909@kroah.com>	<8ya7h8gozhn.fsf@huya.qualcomm.com>
-	<20110621162427.GA28836@kroah.com>
-Message-ID: <4E1362DD.7030001@codeaurora.org>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 05 Jul 2011 15:17:33 -0400 (EDT)
+Subject: [PATCH] ARM: poison initmem when it is freed
+In-Reply-To: <20110705184254.GH8286@n2100.arm.linux.org.uk>
+References: <20110705184254.GH8286@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1107051509490.14596@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Greg KH wrote:
-> On Mon, Jun 20, 2011 at 04:27:16PM -0700, David Brown wrote:
->> I don't think this patch was intended for stable in the first place.
->> Jeff, this is a fix for 3.0-rcx, right?
-> 
-> Then why was it sent to stable at kernel.org?
-> 
-> confused,
-> 
-> greg k-h
-> 
+On Tue, 5 Jul 2011, Russell King - ARM Linux wrote:
 
-Sorry, this was indeed intended for stable. I will include the Cc: tag
-in future patches stable. However, since this was already picked up in
-Linus's tree, how should I proceed to get it into stable?
+> When the initmem is freed, we can no longer rely on its contents.  In
+> lightly loaded systems, this memory may persist for some time, making
+> it harder discover run-time issues (caused by the build warnings being
+> ignored.)
+> 
+> Poison the initmem at the point where it is freed to encourage run-time
+> problems when initmem is dereferenced as an aid to finding such problems.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-Jeff
+The default poison doesn't appear to be a judicious choice for ARM.
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+include/linux/poison.h:#define POISON_FREE_INITMEM      0xcc
+
+   0:   cccccccc        stclgt  12, cr12, [ip], {204}   ; 0xcc
+
+So if the gt condition is false this will execute nops until it falls 
+out of the initmem section.  Would be nicer if a fault could be 
+generated right at the accessed address which could be looked up.
+
+
+Nicolas
