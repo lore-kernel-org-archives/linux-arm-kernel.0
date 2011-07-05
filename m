@@ -1,124 +1,70 @@
-From: per.forlin@linaro.org (Per Forlin)
-Date: Tue,  5 Jul 2011 21:43:28 +0200
-Subject: [PATCH v3] mmc: documentation of mmc non-blocking request usage and
-	design.
-In-Reply-To: <1309895008-2587-1-git-send-email-per.forlin@linaro.org>
-References: <1309895008-2587-1-git-send-email-per.forlin@linaro.org>
-Message-ID: <1309895008-2587-2-git-send-email-per.forlin@linaro.org>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 05 Jul 2011 15:48:06 -0400 (EDT)
+Subject: [PATCH] ARM: poison initmem when it is freed
+In-Reply-To: <20110705192656.GJ8286@n2100.arm.linux.org.uk>
+References: <20110705184254.GH8286@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1107051509490.14596@xanadu.home>
+	<20110705192656.GJ8286@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1107051540550.14596@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Documentation about the background and the design of mmc non-blocking.
-Host driver guidelines to minimize request preparation overhead.
+On Tue, 5 Jul 2011, Russell King - ARM Linux wrote:
 
-Signed-off-by: Per Forlin <per.forlin@linaro.org>
----
- Documentation/mmc/00-INDEX          |    2 +
- Documentation/mmc/mmc-async-req.txt |   86 +++++++++++++++++++++++++++++++++++
- 2 files changed, 88 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/mmc/mmc-async-req.txt
+> On Tue, Jul 05, 2011 at 03:17:33PM -0400, Nicolas Pitre wrote:
+> > On Tue, 5 Jul 2011, Russell King - ARM Linux wrote:
+> > 
+> > > When the initmem is freed, we can no longer rely on its contents.  In
+> > > lightly loaded systems, this memory may persist for some time, making
+> > > it harder discover run-time issues (caused by the build warnings being
+> > > ignored.)
+> > > 
+> > > Poison the initmem at the point where it is freed to encourage run-time
+> > > problems when initmem is dereferenced as an aid to finding such problems.
+> > > 
+> > > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> > 
+> > The default poison doesn't appear to be a judicious choice for ARM.
+> > 
+> > include/linux/poison.h:#define POISON_FREE_INITMEM      0xcc
+> > 
+> >    0:   cccccccc        stclgt  12, cr12, [ip], {204}   ; 0xcc
+> > 
+> > So if the gt condition is false this will execute nops until it falls 
+> > out of the initmem section.  Would be nicer if a fault could be 
+> > generated right at the accessed address which could be looked up.
+> 
+> Have you tried to find a byte-based poison value which would fault
+> yet still cause a pointer dereference?  You're limited to 0xeN on
+> ARM, of which there's almost nothing to chose from:
+> 
+>    0:   e0e0e0e0        rsc     lr, r0, r0, ror #1
+>    4:   e1e1e1e1        mvn     lr, r1, ror #3
+>    8:   e2e2e2e2        rsc     lr, r2, #536870926      ; 0x2000000e
+>    c:   e3e3e3e3        mvn     lr, #-1946157053        ; 0x8c000003
+>   10:   e4e4e4e4        strbt   lr, [r4], #1252
+>   14:   e5e5e5e5        strb    lr, [r5, #1509]!
+>   18:   e6e6e6e6        strbt   lr, [r6], r6, ror #13
+>   1c:   e7e7e7e7        strb    lr, [r7, r7, ror #15]!
+>   20:   e8e8e8e8        stmia   r8!, {r3, r5, r6, r7, fp, sp, lr, pc}^
+>   24:   e9e9e9e9        stmib   r9!, {r0, r3, r5, r6, r7, r8, fp, sp, lr, pc}^
+>   28:   eaeaeaea        b       0xffababd8
+>   2c:   ebebebeb        bl      0xffafafe0
+>   30:   ecececec        stcl    12, cr14, [ip], #944
+>   34:   edededed        stcl    13, cr14, [sp, #948]!
+>   38:   eeeeeeee        cdp     14, 14, cr14, cr14, cr14, {7}
+>   3c:   efefefef        svc     0x00efefef
+> 
+> 0xefefefef looks to be about the best alternative.
 
-diff --git a/Documentation/mmc/00-INDEX b/Documentation/mmc/00-INDEX
-index 93dd7a7..11bc2cf 100644
---- a/Documentation/mmc/00-INDEX
-+++ b/Documentation/mmc/00-INDEX
-@@ -4,3 +4,5 @@ mmc-dev-attrs.txt
-         - info on SD and MMC device attributes
- mmc-dev-parts.txt
-         - info on SD and MMC device partitions
-+mmc-async-req.txt
-+        - info on mmc asynchronous request
-diff --git a/Documentation/mmc/mmc-async-req.txt b/Documentation/mmc/mmc-async-req.txt
-new file mode 100644
-index 0000000..d7e7698
---- /dev/null
-+++ b/Documentation/mmc/mmc-async-req.txt
-@@ -0,0 +1,86 @@
-+Rationale
-+=========
-+
-+How significant is the cache maintenance overhead?
-+It depends, fast eMMC and multiple cache levels with speculative cache
-+pre-fetch makes the cache overhead relatively significant. If the DMA
-+preparations for the next request are done in parallel to the current
-+transfer the DMA preparation overhead would not affect the MMC performance.
-+The intention of non-blocking (asynchronous) mmc requests is to minimize the
-+time between when an mmc request ends and another mmc request begins.
-+Using mmc_wait_for_req() the MMC controller is idle while dma_map_sg and
-+dma_unmap_sg is processing. Using non-blocking mmc requests makes it
-+possible to prepare the caches for next job in parallel to an active
-+mmc request.
-+
-+MMC block driver
-+================
-+
-+The issue_rw_rq() in the mmc block driver is made non-blocking.
-+The increase in throughput is proportional to the time it takes to
-+prepare (major part of preparations is dma_map_sg and dma_unmap_sg)
-+a request and how fast the memory is. The faster the MMC/SD is
-+the more significant the prepare request time becomes. Roughly the expected
-+performance gain is 5% for large writes and 10% on large reads on a L2 cache
-+platform. In power save mode, when clocks run on a lower frequency, the DMA
-+preparation may cost even more. As long as these slower preparations are run
-+in parallel to the transfer performance wont be affected.
-+
-+Details on measurements from IOZone and mmc_test
-+================================================
-+
-+https://wiki.linaro.org/WorkingGroups/Kernel/Specs/StoragePerfMMC-async-req
-+
-+MMC core API extension
-+======================
-+
-+There is one new public function mmc_start_req()
-+It starts a new MMC command request for a host. The function isn't
-+truly non-blocking. If there is on ongoing async request it waits
-+for completion of that request and starts the new one and returns. It
-+doesn't wait for the new request to complete. If there is no ongoing
-+request it starts the new request and returns immediately.
-+
-+MMC host extensions
-+===================
-+
-+There are two optional hooks pre_req() and post_req() that the host driver
-+may implement in order to move work to before and after the actual
-+mmc_request function is called. In the DMA case pre_req() may do
-+dma_map_sg() and prepare the dma descriptor, and post_req runs
-+the dma_unmap_sg.
-+
-+Optimize for the first request
-+==============================
-+
-+The first request in a series of requests can't be prepared in parallel to
-+the previous transfer, since there is no previous request.
-+The argument is_first_req in pre_req() indicates that there is no previous
-+request. The host driver may optimize for this scenario to minimize
-+the performance loss. A way to optimize for this is to split the current
-+request in two chunks, prepare the first chunk and start the request,
-+and finally prepare the second chunk and start the transfer.
-+
-+Pseudocode to handle is_first_req scenario with minimal prepare overhead:
-+if (is_first_req && req->size > threshold)
-+   /* start MMC transfer for the complete transfer size */
-+   mmc_start_command(MMC_CMD_TRANSFER_FULL_SIZE)
-+
-+   /*
-+    * Begin to prepare DMA while cmd is being processed by MMC.
-+    * The first chunk of the request should take the same time
-+    * to prepare as the "MMC process command time".
-+    * If prepare time exceeds MMC cmd time
-+    * the transfer is delayed, guesstimate max 4k as first chunk size.
-+    */
-+    prepare_1st_chunk_for_dma(req)
-+    /* flush pending desc to the DMAC (dmaengine.h) */
-+    dma_issue_pending(req->dma_desc)
-+
-+    prepare_2nd_chunk_for_dma(req)
-+    /*
-+     * The second issue_pending should be called before MMC runs out
-+     * of the first chunk. If the MMC runs out of the first data chunk
-+     * before this call, the transfer is delayed.
-+     */
-+    dma_issue_pending(req->dma_desc)
--- 
-1.7.4.1
+Right.  Does it have to be a byte?  Having a word (or half-word if 
+Thumb2) would be much more convenient.
+
+> It then brings up whether POISON_FREE_INITMEM should be changed or not,
+> as 0xcc is the expected value for this at the moment.
+
+I would think that this should be a per architecture value to actually 
+be useful.
+
+
+Nicolas
