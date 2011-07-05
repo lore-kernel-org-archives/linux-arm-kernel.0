@@ -1,37 +1,16 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 5 Jul 2011 11:03:55 +0100
-Subject: [PATCH] pxa/magician: fix MAGICIAN_EGPIO_BASE, align with
-	NR_BUILTIN_GPIO
-In-Reply-To: <CAMPhdO-xQ614Rs-tTEY0v7i6_Q=aNUtoCo3AZ33nc1LsKoTn4w@mail.gmail.com>
-References: <1303394226.16309.1.camel@flow>
-	<CAMPhdO-xQ614Rs-tTEY0v7i6_Q=aNUtoCo3AZ33nc1LsKoTn4w@mail.gmail.com>
-Message-ID: <20110705100355.GS8286@n2100.arm.linux.org.uk>
+Date: Tue, 5 Jul 2011 11:05:06 +0100
+Subject: [PATCH 1/2] SPI: S5PC100: Enable the SPI driver for S5PC100
+In-Reply-To: <1309801476-29678-1-git-send-email-padma.v@samsung.com>
+References: <1309801476-29678-1-git-send-email-padma.v@samsung.com>
+Message-ID: <20110705100506.GT8286@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 05, 2011 at 03:46:12PM +0800, Eric Miao wrote:
-> On Thu, Apr 21, 2011 at 9:57 PM, Philipp Zabel <pzabel@gmx.de> wrote:
-> > Commit a0a4dcbca73a418477f439e812193e2591b46751
-> > "ARM: pxa: align NR_BUILTIN_GPIO with GPIO interrupt number"
-> > increased NR_BUILTIN_GPIO from 128 to PXA_GPIO_IRQ_NUM (192).
-> > Adjust the previously hardcoded MAGICIAN_EGPIO_BASE accordingly.
-> >
-> > Signed-off-by: Philipp Zabel <philipp.zabel@gmail.com>
-> 
-> Applied.
-> 
-> > ---
-> > ?arch/arm/mach-pxa/include/mach/magician.h | ? ?3 ++-
-> > ?1 files changed, 2 insertions(+), 1 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-pxa/include/mach/magician.h b/arch/arm/mach-pxa/include/mach/magician.h
-> > index 0a2efcf..e9e6162 100644
-> > --- a/arch/arm/mach-pxa/include/mach/magician.h
-> > +++ b/arch/arm/mach-pxa/include/mach/magician.h
-> > @@ -12,6 +12,7 @@
-> > ?#ifndef _MAGICIAN_H_
-> > ?#define _MAGICIAN_H_
-> >
-> > +#include <mach/gpio.h>
+On Mon, Jul 04, 2011 at 01:44:35PM -0400, Padmavathi Venna wrote:
+>  config SPI_S3C64XX
+>  	tristate "Samsung S3C64XX series type SPI"
+> -	depends on (ARCH_S3C64XX || ARCH_S5P64X0)
+> +	depends on (ARCH_S3C64XX || ARCH_S5P64X0 || ARCH_S5PC100)
 
-Note that there's yet another mach/gpio.h here.
+Just get rid of the unnecessary parens here.
