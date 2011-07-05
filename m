@@ -1,191 +1,30 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 5 Jul 2011 23:05:38 +0800
-Subject: [PATCH v2 2/2] serial/imx: add device tree probe support
-In-Reply-To: <1309878338-25697-1-git-send-email-shawn.guo@linaro.org>
-References: <1309878338-25697-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1309878338-25697-3-git-send-email-shawn.guo@linaro.org>
+Date: Tue, 5 Jul 2011 23:13:56 +0800
+Subject: [PATCH v2 0/3] Add device tree probe support for imx fec driver
+Message-ID: <1309878839-25743-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It adds device tree probe support for imx tty/serial driver.
+The first two patches are a little off topic.  Patch #1 adds a helper
+function of_get_phy_mode into of_net, and #2 converts ibm_newemac net
+driver to use this helper function.  Patch #3 is the actual one adding
+tree probe support for imx fec driver, with of_get_phy_mode being used.
 
-Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
-Signed-off-by: Jason Liu <jason.hui@linaro.org>
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
-Cc: Alan Cox <alan@lxorguk.ukuu.org.uk>
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Acked-by: Grant Likely <grant.likely@secretlab.ca>
----
- .../bindings/tty/serial/fsl-imx-uart.txt           |   19 +++++
- drivers/tty/serial/imx.c                           |   85 +++++++++++++++++---
- 2 files changed, 94 insertions(+), 10 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/tty/serial/fsl-imx-uart.txt
+Changes since v1:
+ * Address review comments given by Grant
+ * Add patch #1 and #2
 
-diff --git a/Documentation/devicetree/bindings/tty/serial/fsl-imx-uart.txt b/Documentation/devicetree/bindings/tty/serial/fsl-imx-uart.txt
-new file mode 100644
-index 0000000..a9c0406
---- /dev/null
-+++ b/Documentation/devicetree/bindings/tty/serial/fsl-imx-uart.txt
-@@ -0,0 +1,19 @@
-+* Freescale i.MX Universal Asynchronous Receiver/Transmitter (UART)
-+
-+Required properties:
-+- compatible : Should be "fsl,<soc>-uart"
-+- reg : Address and length of the register set for the device
-+- interrupts : Should contain uart interrupt
-+
-+Optional properties:
-+- fsl,uart-has-rtscts : Indicate the uart has rts and cts
-+- fsl,irda-mode : Indicate the uart supports irda mode
-+
-+Example:
-+
-+uart at 73fbc000 {
-+	compatible = "fsl,imx51-uart", "fsl,imx21-uart";
-+	reg = <0x73fbc000 0x4000>;
-+	interrupts = <31>;
-+	fsl,uart-has-rtscts;
-+};
-diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-index ddebb5c..edafd1f 100644
---- a/drivers/tty/serial/imx.c
-+++ b/drivers/tty/serial/imx.c
-@@ -45,6 +45,8 @@
- #include <linux/delay.h>
- #include <linux/rational.h>
- #include <linux/slab.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
- 
- #include <asm/io.h>
- #include <asm/irq.h>
-@@ -237,6 +239,12 @@ static struct platform_device_id imx_uart_devtype[] = {
- 	}
- };
- 
-+static struct of_device_id imx_uart_dt_ids[] = {
-+	{ .compatible = "fsl,imx1-uart", .data = &imx_uart_devdata[IMX1_UART], },
-+	{ .compatible = "fsl,imx21-uart", .data = &imx_uart_devdata[IMX_UART], },
-+	{ /* sentinel */ }
-+};
-+
- /*
-  * Handle any change of modem status signal since we were last called.
-  */
-@@ -1259,6 +1267,61 @@ static int serial_imx_resume(struct platform_device *dev)
- 	return 0;
- }
- 
-+#ifdef CONFIG_OF
-+static int serial_imx_probe_dt(struct imx_port *sport,
-+		struct platform_device *pdev)
-+{
-+	struct device_node *np = pdev->dev.of_node;
-+	const struct of_device_id *of_id =
-+			of_match_device(imx_uart_dt_ids, &pdev->dev);
-+
-+	if (!np)
-+		return -ENODEV;
-+
-+	pdev->id = of_alias_get_id(np, "serial");
-+	if (pdev->id < 0) {
-+		pr_err("%s: failed to get alias id, errno %d\n",
-+			__func__, pdev->id);
-+		return -ENODEV;
-+	}
-+
-+	if (of_get_property(np, "fsl,uart-has-rtscts", NULL))
-+		sport->have_rtscts = 1;
-+
-+	if (of_get_property(np, "fsl,irda-mode", NULL))
-+		sport->use_irda = 1;
-+
-+	sport->devdata = of_id->data;
-+
-+	return 0;
-+}
-+#else
-+static inline int serial_imx_probe_dt(struct imx_port *sport,
-+		struct platform_device *pdev)
-+{
-+	return -ENODEV;
-+}
-+#endif
-+
-+static int serial_imx_probe_pdata(struct imx_port *sport,
-+		struct platform_device *pdev)
-+{
-+	struct imxuart_platform_data *pdata = pdev->dev.platform_data;
-+
-+	if (!pdata)
-+		return 0;
-+
-+	if (pdata->flags & IMXUART_HAVE_RTSCTS)
-+		sport->have_rtscts = 1;
-+
-+	if (pdata->flags & IMXUART_IRDA)
-+		sport->use_irda = 1;
-+
-+	sport->devdata = (struct imx_uart_data	*) pdev->id_entry->driver_data;
-+
-+	return 0;
-+}
-+
- static int serial_imx_probe(struct platform_device *pdev)
- {
- 	struct imx_port *sport;
-@@ -1271,6 +1334,12 @@ static int serial_imx_probe(struct platform_device *pdev)
- 	if (!sport)
- 		return -ENOMEM;
- 
-+	ret = serial_imx_probe_dt(sport, pdev);
-+	if (ret == -ENODEV)
-+		ret = serial_imx_probe_pdata(sport, pdev);
-+	if (ret)
-+		goto free;
-+
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	if (!res) {
- 		ret = -ENODEV;
-@@ -1299,7 +1368,6 @@ static int serial_imx_probe(struct platform_device *pdev)
- 	init_timer(&sport->timer);
- 	sport->timer.function = imx_timeout;
- 	sport->timer.data     = (unsigned long)sport;
--	sport->devdata = (struct imx_uart_data	*) pdev->id_entry->driver_data;
- 
- 	sport->clk = clk_get(&pdev->dev, "uart");
- 	if (IS_ERR(sport->clk)) {
-@@ -1310,17 +1378,13 @@ static int serial_imx_probe(struct platform_device *pdev)
- 
- 	sport->port.uartclk = clk_get_rate(sport->clk);
- 
--	imx_ports[pdev->id] = sport;
-+	if (imx_ports[sport->port.line]) {
-+		ret = -EBUSY;
-+		goto clkput;
-+	}
-+	imx_ports[sport->port.line] = sport;
- 
- 	pdata = pdev->dev.platform_data;
--	if (pdata && (pdata->flags & IMXUART_HAVE_RTSCTS))
--		sport->have_rtscts = 1;
--
--#ifdef CONFIG_IRDA
--	if (pdata && (pdata->flags & IMXUART_IRDA))
--		sport->use_irda = 1;
--#endif
--
- 	if (pdata && pdata->init) {
- 		ret = pdata->init(pdev);
- 		if (ret)
-@@ -1382,6 +1446,7 @@ static struct platform_driver serial_imx_driver = {
- 	.driver		= {
- 		.name	= "imx-uart",
- 		.owner	= THIS_MODULE,
-+		.of_match_table = imx_uart_dt_ids,
- 	},
- };
- 
--- 
-1.7.4.1
+Shawn Guo (3):
+      dt/net: add helper function of_get_phy_mode
+      net: ibm_newemac: convert it to use of_get_phy_mode
+      net/fec: add device tree probe support
+
+ Documentation/devicetree/bindings/net/fsl-fec.txt |   24 +++++
+ drivers/net/fec.c                                 |   99 +++++++++++++++++++-
+ drivers/net/ibm_newemac/core.c                    |   33 +------
+ drivers/net/ibm_newemac/emac.h                    |   19 ++--
+ drivers/net/ibm_newemac/phy.c                     |    7 +-
+ drivers/of/of_net.c                               |   45 +++++++++
+ include/linux/of_net.h                            |    1 +
+ include/linux/phy.h                               |    4 +-
+ 8 files changed, 186 insertions(+), 46 deletions(-)
