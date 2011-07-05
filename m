@@ -1,21 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 5 Jul 2011 13:51:26 +0200
-Subject: [PATCH 8/8] ARM: S5PV210: example of CMA private area for FIMC
-	device on Goni board
-In-Reply-To: <1309851710-3828-9-git-send-email-m.szyprowski@samsung.com>
-References: <1309851710-3828-1-git-send-email-m.szyprowski@samsung.com>
-	<1309851710-3828-9-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <201107051351.26634.arnd@arndb.de>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 5 Jul 2011 13:54:55 +0200
+Subject: [PATCH 1/3] ohci-at91: add vbus_pin_inverted platform attribute
+In-Reply-To: <4E12F7E6.7080604@mvista.com>
+References: <1309856728-8265-1-git-send-email-thomas.petazzoni@free-electrons.com>
+	<4E12F7E6.7080604@mvista.com>
+Message-ID: <20110705135455.5fa643cc@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 05 July 2011, Marek Szyprowski wrote:
-> 
-> This patch is an example how device private CMA area can be activated.
-> It creates one CMA region and assigns it to the first s5p-fimc device on
-> Samsung Goni S5PC110 board.
-> 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+Le Tue, 05 Jul 2011 15:39:18 +0400,
+Sergei Shtylyov <sshtylyov@mvista.com> a ?crit :
 
-Reviewed-by: Arnd Bergmann <arnd@arndb.de>
+> > -			gpio_direction_output(pdata->vbus_pin[i], 0);
+> > +			gpio_direction_output(pdata->vbus_pin[i], 0 ^ pdata->vbus_pin_inverted);
+> 
+>     Why not simply 'pdata->vbus_pin_inverted'?
+
+> > -			gpio_direction_output(pdata->vbus_pin[i], 1);
+> > +			gpio_direction_output(pdata->vbus_pin[i], 1 ^ pdata->vbus_pin_inverted);
+> 
+>     Why not simply '!pdata->vbus_pin_inverted'?
+
+Ah, correct. The 0 and 1 were present before, and I just wanted to xor
+them with vbus_pin_inverted, but obviously, there's a simpler way of
+writing things, as you suggest.
+
+I'll update my patch and send a new version after gathering comments
+from other reviewers.
+
+Thanks!
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
