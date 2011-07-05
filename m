@@ -1,214 +1,34 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 5 Jul 2011 23:13:59 +0800
-Subject: [PATCH v2 3/3] net/fec: add device tree probe support
-In-Reply-To: <1309878839-25743-1-git-send-email-shawn.guo@linaro.org>
-References: <1309878839-25743-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1309878839-25743-4-git-send-email-shawn.guo@linaro.org>
+Date: Tue, 5 Jul 2011 23:19:23 +0800
+Subject: [PATCH v2 0/2] Add device tree probe for imx/mxc gpio
+Message-ID: <1309879166-25788-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It adds device tree probe support for fec driver.
+The first patch removes the uses of cpu_is_mx(), and the second one
+adds device tree probe support.
 
-Signed-off-by: Jason Liu <jason.hui@linaro.org>
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-Cc: David S. Miller <davem@davemloft.net>
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Acked-by: Grant Likely <grant.likely@secretlab.ca>
----
- Documentation/devicetree/bindings/net/fsl-fec.txt |   24 +++++
- drivers/net/fec.c                                 |   99 +++++++++++++++++++-
- 2 files changed, 118 insertions(+), 5 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/net/fsl-fec.txt
+Changes since v1:
+ * Address review comments given by Grant and Sascha
+ * Add patch #1 to get gpio range/base from gpio core
 
-diff --git a/Documentation/devicetree/bindings/net/fsl-fec.txt b/Documentation/devicetree/bindings/net/fsl-fec.txt
-new file mode 100644
-index 0000000..1dad888
---- /dev/null
-+++ b/Documentation/devicetree/bindings/net/fsl-fec.txt
-@@ -0,0 +1,24 @@
-+* Freescale Fast Ethernet Controller (FEC)
-+
-+Required properties:
-+- compatible : Should be "fsl,<soc>-fec"
-+- reg : Address and length of the register set for the device
-+- interrupts : Should contain fec interrupt
-+- phy-mode : String, operation mode of the PHY interface.
-+  Supported values are: "mii", "gmii", "sgmii", "tbi", "rmii",
-+  "rgmii", "rgmii-id", "rgmii-rxid", "rgmii-txid", "rtbi".
-+- gpios : Should specify the gpio for phy reset
-+
-+Optional properties:
-+- local-mac-address : 6 bytes, mac address
-+
-+Example:
-+
-+fec at 83fec000 {
-+	compatible = "fsl,imx51-fec", "fsl,imx27-fec";
-+	reg = <0x83fec000 0x4000>;
-+	interrupts = <87>;
-+	phy-mode = "mii";
-+	gpios = <&gpio1 14 0>; /* phy-reset, GPIO2_14 */
-+	local-mac-address = [00 04 9F 01 1B B9];
-+};
-diff --git a/drivers/net/fec.c b/drivers/net/fec.c
-index 7ae3f28..dec94f4 100644
---- a/drivers/net/fec.c
-+++ b/drivers/net/fec.c
-@@ -44,6 +44,10 @@
- #include <linux/platform_device.h>
- #include <linux/phy.h>
- #include <linux/fec.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/of_gpio.h>
-+#include <linux/of_net.h>
- 
- #include <asm/cacheflush.h>
- 
-@@ -78,6 +82,17 @@ static struct platform_device_id fec_devtype[] = {
- 	{ }
- };
- 
-+enum fec_type {
-+	IMX27_FEC,
-+	IMX28_FEC,
-+};
-+
-+static const struct of_device_id fec_dt_ids[] = {
-+	{ .compatible = "fsl,imx27-fec", .data = &fec_devtype[IMX27_FEC], },
-+	{ .compatible = "fsl,imx28-fec", .data = &fec_devtype[IMX28_FEC], },
-+	{ /* sentinel */ }
-+};
-+
- static unsigned char macaddr[ETH_ALEN];
- module_param_array(macaddr, byte, NULL, 0);
- MODULE_PARM_DESC(macaddr, "FEC Ethernet MAC address");
-@@ -734,8 +749,22 @@ static void __inline__ fec_get_mac(struct net_device *ndev)
- 	 */
- 	iap = macaddr;
- 
-+#ifdef CONFIG_OF
-+	/*
-+	 * 2) from device tree data
-+	 */
-+	if (!is_valid_ether_addr(iap)) {
-+		struct device_node *np = fep->pdev->dev.of_node;
-+		if (np) {
-+			const char *mac = of_get_mac_address(np);
-+			if (mac)
-+				iap = (unsigned char *) mac;
-+		}
-+	}
-+#endif
-+
- 	/*
--	 * 2) from flash or fuse (via platform data)
-+	 * 3) from flash or fuse (via platform data)
- 	 */
- 	if (!is_valid_ether_addr(iap)) {
- #ifdef CONFIG_M5272
-@@ -748,7 +777,7 @@ static void __inline__ fec_get_mac(struct net_device *ndev)
- 	}
- 
- 	/*
--	 * 3) FEC mac registers set by bootloader
-+	 * 4) FEC mac registers set by bootloader
- 	 */
- 	if (!is_valid_ether_addr(iap)) {
- 		*((unsigned long *) &tmpaddr[0]) =
-@@ -1358,6 +1387,53 @@ static int fec_enet_init(struct net_device *ndev)
- 	return 0;
- }
- 
-+#ifdef CONFIG_OF
-+static int __devinit fec_get_phy_mode_dt(struct platform_device *pdev)
-+{
-+	struct device_node *np = pdev->dev.of_node;
-+
-+	if (np)
-+		return of_get_phy_mode(np);
-+
-+	return -ENODEV;
-+}
-+
-+static int __devinit fec_reset_phy(struct platform_device *pdev)
-+{
-+	int err, phy_reset;
-+	struct device_node *np = pdev->dev.of_node;
-+
-+	if (!np)
-+		return -ENODEV;
-+
-+	phy_reset = of_get_gpio(np, 0);
-+	err = gpio_request_one(phy_reset, GPIOF_OUT_INIT_LOW, "phy-reset");
-+	if (err) {
-+		pr_warn("FEC: failed to get gpio phy-reset: %d\n", err);
-+		return err;
-+	}
-+
-+	msleep(1);
-+	gpio_set_value(phy_reset, 1);
-+
-+	return 0;
-+}
-+#else /* CONFIG_OF */
-+static inline int fec_get_phy_mode_dt(struct platform_device *pdev)
-+{
-+	return -ENODEV;
-+}
-+
-+static inline int fec_reset_phy(struct platform_device *pdev)
-+{
-+	/*
-+	 * In case of platform probe, the reset has been done
-+	 * by machine code.
-+	 */
-+	return 0;
-+}
-+#endif /* CONFIG_OF */
-+
- static int __devinit
- fec_probe(struct platform_device *pdev)
- {
-@@ -1366,6 +1442,11 @@ fec_probe(struct platform_device *pdev)
- 	struct net_device *ndev;
- 	int i, irq, ret = 0;
- 	struct resource *r;
-+	const struct of_device_id *of_id;
-+
-+	of_id = of_match_device(fec_dt_ids, &pdev->dev);
-+	if (of_id)
-+		pdev->id_entry = of_id->data;
- 
- 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	if (!r)
-@@ -1397,9 +1478,16 @@ fec_probe(struct platform_device *pdev)
- 
- 	platform_set_drvdata(pdev, ndev);
- 
--	pdata = pdev->dev.platform_data;
--	if (pdata)
--		fep->phy_interface = pdata->phy;
-+	fep->phy_interface = fec_get_phy_mode_dt(pdev);
-+	if (fep->phy_interface < 0) {
-+		pdata = pdev->dev.platform_data;
-+		if (pdata)
-+			fep->phy_interface = pdata->phy;
-+		else
-+			fep->phy_interface = PHY_INTERFACE_MODE_MII;
-+	}
-+
-+	fec_reset_phy(pdev);
- 
- 	/* This device has up to three irqs on some platforms */
- 	for (i = 0; i < 3; i++) {
-@@ -1534,6 +1622,7 @@ static struct platform_driver fec_driver = {
- #ifdef CONFIG_PM
- 		.pm	= &fec_pm_ops,
- #endif
-+		.of_match_table = fec_dt_ids,
- 	},
- 	.id_table = fec_devtype,
- 	.probe	= fec_probe,
--- 
-1.7.4.1
+Shawn Guo (3):
+      gpio/mxc: get gpio range/base from gpio core
+      gpio/mxc: get rid of the uses of cpu_is_mx()
+      gpio/mxc: add device tree probe support
+
+ .../devicetree/bindings/gpio/fsl-imx-gpio.txt      |   22 +++
+ arch/arm/mach-imx/mm-imx1.c                        |    8 +-
+ arch/arm/mach-imx/mm-imx21.c                       |   12 +-
+ arch/arm/mach-imx/mm-imx25.c                       |    8 +-
+ arch/arm/mach-imx/mm-imx27.c                       |   12 +-
+ arch/arm/mach-imx/mm-imx31.c                       |    6 +-
+ arch/arm/mach-imx/mm-imx35.c                       |    6 +-
+ arch/arm/mach-mx5/mm-mx50.c                        |   12 +-
+ arch/arm/mach-mx5/mm.c                             |   22 ++--
+ arch/arm/plat-mxc/devices/platform-gpio-mxc.c      |    4 +-
+ arch/arm/plat-mxc/include/mach/common.h            |    2 +-
+ arch/arm/plat-mxc/include/mach/gpio.h              |   13 +-
+ arch/arm/plat-mxc/include/mach/irqs.h              |   21 +--
+ drivers/gpio/gpio-mxc.c                            |  165 ++++++++++++++++---
+ 14 files changed, 219 insertions(+), 94 deletions(-)
