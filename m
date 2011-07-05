@@ -1,58 +1,186 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 5 Jul 2011 15:58:39 +0200
-Subject: [PATCH 6/8] drivers: add Contiguous Memory Allocator
-In-Reply-To: <20110705123035.GD8286@n2100.arm.linux.org.uk>
-References: <1309851710-3828-1-git-send-email-m.szyprowski@samsung.com>
-	<201107051427.44899.arnd@arndb.de>
-	<20110705123035.GD8286@n2100.arm.linux.org.uk>
-Message-ID: <201107051558.39344.arnd@arndb.de>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Tue,  5 Jul 2011 17:06:14 +0300
+Subject: [RFC] virtio: expose for non-virtualization users too
+Message-ID: <1309874774-31689-1-git-send-email-ohad@wizery.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 05 July 2011, Russell King - ARM Linux wrote:
-> On Tue, Jul 05, 2011 at 02:27:44PM +0200, Arnd Bergmann wrote:
-> > It's also a preexisting problem as far as I can tell, and it needs
-> > to be solved in __dma_alloc for both cases, dma_alloc_from_contiguous
-> > and __alloc_system_pages as introduced in patch 7.
-> 
-> Which is now resolved in linux-next, and has been through this cycle
-> as previously discussed.
-> 
-> It's taken some time because the guy who tested the patch for me said
-> he'd review other platforms but never did, so I've just about given up
-> waiting and stuffed it in ready for the 3.1 merge window irrespective
-> of anything else.
+virtio has been so far used only in the context of virtualization,
+and the virtio Kconfig was sourced directly by the relevant arch
+Kconfigs when VIRTUALIZATION was selected.
 
-Ah, sorry I missed that patch on the mailing list, found it now in
-your for-next branch.
+Now that we start using virtio for inter-processor communications,
+we need to source the virtio Kconfig outside of the virtualization
+scope too.
 
-If I'm reading your "ARM: DMA: steal memory for DMA coherent mappings"
-correctly, the idea is to have a per-platform compile-time amount
-of memory that is reserved purely for coherent allocations and
-taking out of the buddy allocator, right?
+Moreover, some architectures might use virtio for both virtualization
+and inter-processor communications, so directly sourcing virtio
+might yield unexpected results due to conflicting selections.
 
-As you say, this solves the problem for the non-CMA case, and does
-not apply to CMA because the entire point of CMA is not to remove
-the pages from the buddy allocator in order to preserve memory.
+The simple solution offered by this patch is to always source virtio's
+Kconfig in drivers/Kconfig, and remove it from the appropriate arch
+Kconfigs. Additionally, a virtio menu entry has been added so virtio
+drivers don't show up in the general drivers menu.
 
-So with your patch getting merged, patch 7/8 obviously has both a
-conflict and introduces a regression against the fix you did.
-Consequently that patch needs to be redone in a way that fits on
-top of your patch and avoids the double-mapping problem.
+This way anyone can use virtio, though it's arguably less accessible
+(and neat!) for virtualization users now.
 
-What about the rest? As I mentioned in private, adding invasive features
-to core code is obviously not nice if it can be avoided, but my feeling
-is that we can no longer claim that there is no need for this with so
-much hardware relying on large contiguous memory ranges for DMA.
-The patches have come a long way since the first version, especially
-regarding the device driver interface and I think they are about as
-good as it gets in that regard.
+Note: some architectures (mips and sh) seem to have a VIRTUALIZATION
+menu merely for sourcing virtio's Kconfig, so that menu is removed too.
 
-I do understand that without patch 7, there isn't a single architecture
-using the feature, which is somewhat silly, but I'm also convinced
-that other architectures will start using it, and that a solution for the
-double mapping in the ways I mentioned in my previous mail is going
-to happen. Probably not in 3.1 then, but we could put the patches into
--mm anyway until we get there.
+Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
+---
+The motivation behind this patch is: https://lkml.org/lkml/2011/6/21/47
 
-	Arnd
+If the general approach is agreed upon, we can either merge the patch
+independently, or add it to the AMP patch set.
+
+ arch/ia64/kvm/Kconfig    |    1 -
+ arch/mips/Kconfig        |   16 ----------------
+ arch/powerpc/kvm/Kconfig |    1 -
+ arch/s390/kvm/Kconfig    |    1 -
+ arch/sh/Kconfig          |   16 ----------------
+ arch/tile/kvm/Kconfig    |    1 -
+ arch/x86/kvm/Kconfig     |    1 -
+ drivers/Kconfig          |    2 ++
+ drivers/virtio/Kconfig   |    3 +++
+ 9 files changed, 5 insertions(+), 37 deletions(-)
+
+diff --git a/arch/ia64/kvm/Kconfig b/arch/ia64/kvm/Kconfig
+index fa4d1e5..9806e55 100644
+--- a/arch/ia64/kvm/Kconfig
++++ b/arch/ia64/kvm/Kconfig
+@@ -49,6 +49,5 @@ config KVM_INTEL
+ 	  extensions.
+ 
+ source drivers/vhost/Kconfig
+-source drivers/virtio/Kconfig
+ 
+ endif # VIRTUALIZATION
+diff --git a/arch/mips/Kconfig b/arch/mips/Kconfig
+index 653da62..a627a2c 100644
+--- a/arch/mips/Kconfig
++++ b/arch/mips/Kconfig
+@@ -2489,20 +2489,4 @@ source "security/Kconfig"
+ 
+ source "crypto/Kconfig"
+ 
+-menuconfig VIRTUALIZATION
+-	bool "Virtualization"
+-	default n
+-	---help---
+-	  Say Y here to get to see options for using your Linux host to run other
+-	  operating systems inside virtual machines (guests).
+-	  This option alone does not add any kernel code.
+-
+-	  If you say N, all options in this submenu will be skipped and disabled.
+-
+-if VIRTUALIZATION
+-
+-source drivers/virtio/Kconfig
+-
+-endif # VIRTUALIZATION
+-
+ source "lib/Kconfig"
+diff --git a/arch/powerpc/kvm/Kconfig b/arch/powerpc/kvm/Kconfig
+index b7baff7..105b691 100644
+--- a/arch/powerpc/kvm/Kconfig
++++ b/arch/powerpc/kvm/Kconfig
+@@ -99,6 +99,5 @@ config KVM_E500
+ 	  If unsure, say N.
+ 
+ source drivers/vhost/Kconfig
+-source drivers/virtio/Kconfig
+ 
+ endif # VIRTUALIZATION
+diff --git a/arch/s390/kvm/Kconfig b/arch/s390/kvm/Kconfig
+index f66a1bd..a216341 100644
+--- a/arch/s390/kvm/Kconfig
++++ b/arch/s390/kvm/Kconfig
+@@ -37,6 +37,5 @@ config KVM
+ # OK, it's a little counter-intuitive to do this, but it puts it neatly under
+ # the virtualization menu.
+ source drivers/vhost/Kconfig
+-source drivers/virtio/Kconfig
+ 
+ endif # VIRTUALIZATION
+diff --git a/arch/sh/Kconfig b/arch/sh/Kconfig
+index bbdeb48..748ff19 100644
+--- a/arch/sh/Kconfig
++++ b/arch/sh/Kconfig
+@@ -897,20 +897,4 @@ source "security/Kconfig"
+ 
+ source "crypto/Kconfig"
+ 
+-menuconfig VIRTUALIZATION
+-	bool "Virtualization"
+-	default n
+-	---help---
+-	  Say Y here to get to see options for using your Linux host to run other
+-	  operating systems inside virtual machines (guests).
+-	  This option alone does not add any kernel code.
+-
+-	  If you say N, all options in this submenu will be skipped and disabled.
+-
+-if VIRTUALIZATION
+-
+-source drivers/virtio/Kconfig
+-
+-endif # VIRTUALIZATION
+-
+ source "lib/Kconfig"
+diff --git a/arch/tile/kvm/Kconfig b/arch/tile/kvm/Kconfig
+index b88f9c0..669fcdb 100644
+--- a/arch/tile/kvm/Kconfig
++++ b/arch/tile/kvm/Kconfig
+@@ -33,6 +33,5 @@ config KVM
+ 	  If unsure, say N.
+ 
+ source drivers/vhost/Kconfig
+-source drivers/virtio/Kconfig
+ 
+ endif # VIRTUALIZATION
+diff --git a/arch/x86/kvm/Kconfig b/arch/x86/kvm/Kconfig
+index 50f6364..65cf823 100644
+--- a/arch/x86/kvm/Kconfig
++++ b/arch/x86/kvm/Kconfig
+@@ -76,6 +76,5 @@ config KVM_MMU_AUDIT
+ # the virtualization menu.
+ source drivers/vhost/Kconfig
+ source drivers/lguest/Kconfig
+-source drivers/virtio/Kconfig
+ 
+ endif # VIRTUALIZATION
+diff --git a/drivers/Kconfig b/drivers/Kconfig
+index 3bb154d..795218e 100644
+--- a/drivers/Kconfig
++++ b/drivers/Kconfig
+@@ -114,6 +114,8 @@ source "drivers/uio/Kconfig"
+ 
+ source "drivers/vlynq/Kconfig"
+ 
++source "drivers/virtio/Kconfig"
++
+ source "drivers/xen/Kconfig"
+ 
+ source "drivers/staging/Kconfig"
+diff --git a/drivers/virtio/Kconfig b/drivers/virtio/Kconfig
+index 3dd6294..57e493b 100644
+--- a/drivers/virtio/Kconfig
++++ b/drivers/virtio/Kconfig
+@@ -7,6 +7,8 @@ config VIRTIO_RING
+ 	tristate
+ 	depends on VIRTIO
+ 
++menu "Virtio drivers"
++
+ config VIRTIO_PCI
+ 	tristate "PCI driver for virtio devices (EXPERIMENTAL)"
+ 	depends on PCI && EXPERIMENTAL
+@@ -33,3 +35,4 @@ config VIRTIO_BALLOON
+ 
+ 	 If unsure, say M.
+ 
++endmenu
+-- 
+1.7.1
