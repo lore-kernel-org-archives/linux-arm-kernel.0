@@ -1,7 +1,8 @@
 From: swarren@nvidia.com (Stephen Warren)
-Date: Tue,  5 Jul 2011 14:21:46 -0600
-Subject: [PATCH] i2c: tegra: Use engineering names in DT compatible property
-Message-ID: <1309897306-22953-1-git-send-email-swarren@nvidia.com>
+Date: Tue,  5 Jul 2011 14:23:28 -0600
+Subject: [PATCH] ARM: tegra: Harmony: Use engineering names in DT compatible
+	property
+Message-ID: <1309897408-23085-1-git-send-email-swarren@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -10,24 +11,23 @@ for Device Tree compatible properties instead.
 
 Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
-Grant, this is against devicetree/arm and also makes sense for
-devicetree/test.
+Grant, this is against devicetree/arm, and only makes sense there; I'll
+send a separate patch for the equivalent change in devicetree/test, since
+the file is radically different there.
 
- drivers/i2c/busses/i2c-tegra.c |    2 +-
+ arch/arm/boot/dts/tegra-harmony.dts |    2 +-
  1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/drivers/i2c/busses/i2c-tegra.c b/drivers/i2c/busses/i2c-tegra.c
-index 8914bd1..99b1b6d 100644
---- a/drivers/i2c/busses/i2c-tegra.c
-+++ b/drivers/i2c/busses/i2c-tegra.c
-@@ -716,7 +716,7 @@ static int tegra_i2c_resume(struct platform_device *pdev)
- #if defined(CONFIG_OF)
- /* Match table for of_platform binding */
- static const struct of_device_id tegra_i2c_of_match[] __devinitconst = {
--	{ .compatible = "nvidia,tegra250-i2c", },
-+	{ .compatible = "nvidia,tegra20-i2c", },
- 	{},
+diff --git a/arch/arm/boot/dts/tegra-harmony.dts b/arch/arm/boot/dts/tegra-harmony.dts
+index 81032e7..4ad8ade 100644
+--- a/arch/arm/boot/dts/tegra-harmony.dts
++++ b/arch/arm/boot/dts/tegra-harmony.dts
+@@ -3,5 +3,5 @@
+ 
+ / {
+ 	model = "NVIDIA Tegra2 Harmony evaluation board";
+-	compatible = "nvidia,harmony", "nvidia,tegra250";
++	compatible = "nvidia,harmony", "nvidia,tegra20";
  };
- MODULE_DEVICE_TABLE(of, tegra_i2c_of_match);
 -- 
 1.7.0.4
