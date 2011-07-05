@@ -1,39 +1,52 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 05 Jul 2011 16:19:05 +0900
-Subject: [PATCH 7/7] ASoC: Samsung: Update DMA interface
-In-Reply-To: <20110704170259.GC28726@opensource.wolfsonmicro.com>
-References: <1309781915-31549-1-git-send-email-kgene.kim@samsung.com>
-	<1309781915-31549-8-git-send-email-kgene.kim@samsung.com>
-	<20110704170259.GC28726@opensource.wolfsonmicro.com>
-Message-ID: <00bf01cc3ae3$d5a29150$80e7b3f0$%kim@samsung.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Tue, 5 Jul 2011 15:20:53 +0800
+Subject: [PATCH v2] arm: mach-mmp: brownstone.c support multiple sd slots
+In-Reply-To: <CAMj5BkiK17RMY-vEENDqQiDOmfG0Esnp7QDooKWVrhkQL4g6Ow@mail.gmail.com>
+References: <59C2B513-EC04-4CA2-818B-9901CAF3E554@marvell.com>
+	<20110427093328.GU17290@n2100.arm.linux.org.uk>
+	<161C3F6C-0986-4364-B458-DBA4D08456FD@marvell.com>
+	<1F336A22-BAC3-41E3-8D4E-5DF27874D1EA@marvell.com>
+	<20110428095127.GX17290@n2100.arm.linux.org.uk>
+	<3BFCE791-3BAD-42ED-BC87-A27F40D6C77C@marvell.com>
+	<CAMPhdO-TTRP-k7J-zrG2_rQJsmNDRhTgpqiiX2yqW+Egf8+t2A@mail.gmail.com>
+	<CAMj5BkiK17RMY-vEENDqQiDOmfG0Esnp7QDooKWVrhkQL4g6Ow@mail.gmail.com>
+Message-ID: <CAMPhdO-b_dpC2ueexEFujr6p_NRb2JwDc0-UEx3cfOSVcZ-d6w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown wrote:
-> 
-Hi Mark,
+On Tue, Jul 5, 2011 at 3:05 PM, zhangfei gao <zhangfei.gao@gmail.com> wrote:
+> On Tue, Jul 5, 2011 at 2:52 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
+>> On Fri, Apr 29, 2011 at 4:45 AM, Philip Rakity <prakity@marvell.com> wrote:
+>>>
+>>> Support multiple sd/eMMC interfaces. enable mmc1, 2, and 3.
+>>> mmc2 is used eMMC and slot is marked PERMANENT and 8 bit device.
+>>> mmc1 is used for Wifi and slot is marked PERMANENT
+>>>
+>>> Note: eMMC (mmc2) is set to initialize first to workaround a problem
+>>> where booting in logical order requires mmc create work queue
+>>> to be multi-threaded otherwise boot process hangs. ?BUG report
+>>> send to linux-mmc and linux-kernel mailing list.
+>>>
+>>> Wifi (mmc1) requires we enable power on the device by toggling
+>>> the gpio lines for power and reset.
+>>>
+>>> Signed-off-by: Philip Rakity <prakity@marvell.com>
+>>
+>> Applied. Though the email client was fiddling the spaces/CR-LF a bit.
+>>
+>>> ---
+>>> ?arch/arm/mach-mmp/brownstone.c | ? 52 +++++++++++++++++++++++++++++++++++++++-
+>>> ?1 files changed, 51 insertions(+), 1 deletions(-)
+>>>
+>
+> Hi, Eric
+>
+> arch/arm/mach-mmp/brownstone.c has already been modified from
+> mmc-next, here will have conflict.
+> Sorry for inconvenience.
 
-Please refer to my other comment which includes block diagram, it can help
-our understanding about current Samsung DMA usage.
+'K, I'll drop it then.
 
-> Two questions here:
-> 
-> - It looks like a lot of this code can be shared between all the drivers
->   using the dmaengine API.  Is there any reason not to factor it out?
-
-Hmm...I'm not sure, but let us think/check your suggestions. Thanks :)
-
-> - Should this not be adding a new driver for dmaengine based Samsung
->   CPUs?  The ifdefs are very big.
-
-OK, we will try.
-
-Grant, I think, Mark's suggestion can support multiple platform...
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+>
+> Thanks
+>
