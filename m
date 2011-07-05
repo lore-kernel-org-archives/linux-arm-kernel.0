@@ -1,39 +1,33 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Tue,  5 Jul 2011 17:08:27 +0400
-Subject: [PATCH 01/15] ARM: pxa/balloon3: drop udc_is_connected
-In-Reply-To: <1309871321-11305-1-git-send-email-dbaryshkov@gmail.com>
-References: <1309871321-11305-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <1309871321-11305-2-git-send-email-dbaryshkov@gmail.com>
+From: juergen.lambrecht@gmail.com (=?UTF-8?q?J=C3=BCrgen=20Lambrecht?=)
+Date: Tue,  5 Jul 2011 15:35:31 +0200
+Subject: [PATCH] Enable RTC driver.
+Message-ID: <1309872931-13999-1-git-send-email-J.Lambrecht@televic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Balloon3 is a pxa270 machins and pxa27x_udc driver doesn't pay any attention
-to udc_is_connected, so drop it.
+The MC13783 MFD also contains an RTC. Enable it.
+To avoid "No RTC device found, ALARM timers will not wake from suspend",
+this patch is needed:
+http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=commitdiff;h=c008ba58af24dc5d0d8e9fe6e59d876910254761
 
-Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
-Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
+Signed-off-by: J?rgen Lambrecht <J.Lambrecht@televic.com>
 ---
- arch/arm/mach-pxa/balloon3.c |    6 ------
- 1 files changed, 0 insertions(+), 6 deletions(-)
+ arch/arm/mach-imx/mach-mx27_3ds.c |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-pxa/balloon3.c b/arch/arm/mach-pxa/balloon3.c
-index 810a982..4d0d8c3 100644
---- a/arch/arm/mach-pxa/balloon3.c
-+++ b/arch/arm/mach-pxa/balloon3.c
-@@ -316,14 +316,8 @@ static void balloon3_udc_command(int cmd)
- 		UP2OCR &= ~UP2OCR_DPPUE;
- }
+diff --git a/arch/arm/mach-imx/mach-mx27_3ds.c b/arch/arm/mach-imx/mach-mx27_3ds.c
+index 84114aa..00bbb6b 100644
+--- a/arch/arm/mach-imx/mach-mx27_3ds.c
++++ b/arch/arm/mach-imx/mach-mx27_3ds.c
+@@ -294,7 +294,8 @@ static struct mc13xxx_platform_data mc13783_pdata = {
+ 		.num_regulators = ARRAY_SIZE(mx27_3ds_regulators),
  
--static int balloon3_udc_is_connected(void)
--{
--	return 1;
--}
--
- static struct pxa2xx_udc_mach_info balloon3_udc_info __initdata = {
- 	.udc_command		= balloon3_udc_command,
--	.udc_is_connected	= balloon3_udc_is_connected,
- 	.gpio_pullup		= -1,
+ 	},
+-	.flags  = MC13783_USE_REGULATOR | MC13783_USE_TOUCHSCREEN,
++	.flags  = MC13783_USE_REGULATOR | MC13783_USE_TOUCHSCREEN |
++	MC13783_USE_RTC,
  };
  
+ /* SPI */
 -- 
-1.7.5.4
+1.7.1
