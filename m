@@ -1,47 +1,36 @@
-From: naveenkrishna.ch@gmail.com (Naveen Krishna Ch)
-Date: Tue, 5 Jul 2011 16:54:41 +0530
-Subject: [PATCH 0/2] ARM: Samsung: I2C code cleanup
-In-Reply-To: <1309519992-3026-1-git-send-email-ch.naveen@samsung.com>
-References: <1309519992-3026-1-git-send-email-ch.naveen@samsung.com>
-Message-ID: <CAHfPSqA6YtSeb-A7QPTuVSgjFuPyF52REw=Vit6xU31B+RenHg@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 5 Jul 2011 12:25:33 +0100
+Subject: [PATCH 3/4] mmci: sync DATAEND irq with dma|pio transfer done
+In-Reply-To: <1309247860-17181-1-git-send-email-linus.walleij@stericsson.com>
+References: <1309247860-17181-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20110705112533.GY8286@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin,
+On Tue, Jun 28, 2011 at 09:57:40AM +0200, Linus Walleij wrote:
+> From: Ulf Hansson <ulf.hansson@stericsson.com>
+> 
+> The end of a dma|pio data transfer is synced with the
+> DATAEND irq. This will prevent the mmci driver from ending
+> the request before the dma|pio job is completely done.
+> 
+> For dma we use DMA_PREP_INTERRUPT to register a callback
+> function which is called when dma driver is done with job.
+> 
+> To also make sure we prevent hanging forever, waiting for
+> DATAEND irq or a dma|pio transfer to be done, we setup a timer
+> when either a DATAEND or dma|pio job is done. Once both
+> conditions have occured, the timer is cancelled and the data
+> transfer is completed.
+> 
+> If a timeout occurs, the data transfer is terminated in a
+> controlled manner and EAGAIN is returned to the framework.
+> A timeout value of 50 ms has been found to work well for
+> our usecases.
 
-Can you kindly, review the following patchset and let me know the comments.
+What is the framework supposed to do with that error code?  Magic the
+driver into disabling DMA by some non-existant callback?
 
-On 1 July 2011 17:03, Naveen Krishna Chatradhi <ch.naveen@samsung.com> wrote:
-> Does the same job, while saving few lines of code.
->
-> ?o To Kukjin Kim, Sangbeom Kim and Ben Dooks
->
-> Naveen Krishna Chatradhi (2):
-> ?ARM: Samsung: Use generic set_plat_data function
-> ?ARM: Samsung: Cleanup I2C code in plat-samsung
->
-> ?arch/arm/plat-samsung/dev-i2c0.c ? ? ? ? | ? 14 ++++++--------
-> ?arch/arm/plat-samsung/dev-i2c1.c ? ? ? ? | ? 24 ++++++++----------------
-> ?arch/arm/plat-samsung/dev-i2c2.c ? ? ? ? | ? 24 ++++++++----------------
-> ?arch/arm/plat-samsung/dev-i2c3.c ? ? ? ? | ? 24 ++++++++----------------
-> ?arch/arm/plat-samsung/dev-i2c4.c ? ? ? ? | ? 24 ++++++++----------------
-> ?arch/arm/plat-samsung/dev-i2c5.c ? ? ? ? | ? 24 ++++++++----------------
-> ?arch/arm/plat-samsung/dev-i2c6.c ? ? ? ? | ? 24 ++++++++----------------
-> ?arch/arm/plat-samsung/dev-i2c7.c ? ? ? ? | ? 24 ++++++++----------------
-> ?arch/arm/plat-samsung/include/plat/iic.h | ? ?2 ++
-> ?9 files changed, 64 insertions(+), 120 deletions(-)
->
-> --
-> 1.7.2.3
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
-
-
-
--- 
-Shine bright,
-(: Nav :)
+Please, stop introducing magic new error codes which have no meaning to
+the upper levels unless you're also going to add some handling of those
+error conditions as well.
