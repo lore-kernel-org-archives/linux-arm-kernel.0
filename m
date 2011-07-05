@@ -1,71 +1,106 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Tue, 5 Jul 2011 16:59:25 +0800
-Subject: [PATCH] pxa/hx4700: Avoid unbalanced irq wakeup enables/disables
-In-Reply-To: <55815.35947.qm@web29005.mail.ird.yahoo.com>
-References: <20110514211305.GB16305@rainbow>
-	<55815.35947.qm@web29005.mail.ird.yahoo.com>
-Message-ID: <CAMPhdO_v+vXBJPdkp_zFoKrPA2-2Y_r+RUXLpoCuWmUaEXcgJA@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue,  5 Jul 2011 11:05:27 +0200
+Subject: [PATCH 2/3] at91-ohci: support overcurrent notification
+In-Reply-To: <1309856728-8265-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1309856728-8265-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1309856728-8265-2-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 15, 2011 at 7:20 AM, Paul Parsons <lost.distance@yahoo.com> wrote:
-> Hi Dmitry,
->
->> Well, you right here - GPIO94 and GPIO99 can't be enabled
->> as wake-up
->> sources in PWER on PXA270. But they can be enabled in PKWR,
->> according to
->> section 3.8.1.15 of PXA27x Developer's Manual. And there's
->> a proof: WinCE
->> happily wakes on MAIL/CONTACTS presses. Though probably
->> these pins will
->> need some configuration in MFP table to work as wake-up
->> sources...
->
-> Ah, another wake-up enable register; I missed that! Yes, that should work via tweaks to the MFP table.
->
->> Anyway, I have no strong opinion about whether to disable
->> just ASIC3
->> buttons, or to leave only POWER as wakeup source. So I
->> think your patch is
->> fine as the solution to unbalanced irq wakeup problem and
->> may go in, unless
->> Philipp or Eric have objections.
->
-> My feeling is that it should be all or nothing; we either get all other 5 buttons working as wake-ups or we disable them. Perhaps Russell's comments are the clincher.
->
+Several USB power switches (AIC1526 or MIC2026) have a digital output
+that is used to notify that an overcurrent situation is taking
+place. This digital outputs are typically connected to GPIO inputs of
+the processor and can be used to be notified of those overcurrent
+situations.
 
-To use GPIOs in PKWR, you need to do two things:
+Therefore, we add a new overcurrent_pin[] array in the at91_usbh_data
+structure so that boards can tell the AT91 OHCI driver which pins are
+used for the overcurrent notification. The AT91 OHCI driver simply
+registers an interrupt handler which will log the entry and exit of an
+overcurrent situation in the kernel logs.
 
-1. WAKEUP_ON_LEVEL_HIGH or'ed with the pin configuration (see mfp-pxa2xx.h)
-2. enable_irq_wakeup() will eventually invoke gpio_set_wake() in
-mfp-pxa2xx.c, and that function will handle the PKWR setting.
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: Andrew Victor <linux@maxim.org.za>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+---
+ arch/arm/mach-at91/include/mach/board.h |    1 +
+ drivers/usb/host/ohci-at91.c            |   37 +++++++++++++++++++++++++++++++
+ 2 files changed, 38 insertions(+), 0 deletions(-)
 
-> While on the subject, it turns out that the reset button (= GPIO reset) also acts as a wake-up on my unit. But the PXA27x manual says this:
->
-> "In standby, sleep, and deep-sleep modes, GPIO reset is first treated as a wake-up event."
->
-> Does this mean that both the SMR and GPR bits the RCSR register are set? And if so, does the bootloader then decide whether to wake-up the unit or whether to reset it?
->
-
-The full statement is:
-
-In standby, sleep, and deep-sleep modes, GPIO reset is first treated
-as a wake-up event. It is then
-recognized as a GPIO reset if held asserted for more than 1 ms after
-all power supplies are stable.
-
-And my understanding of this is - an assertion on GPIO<1> will firstly be
-treated as a wake-up event and cause the sleep-exit. SMR in RCSR will
-be set. A normal resume process begins from software perspective. If
-the assertion is a pulse less than 1ms, no reset will happen. However,
-if the assertion is more than 1ms, then GPIO reset will happen wherever
-the software resuming process is. SMR will most likely be cleared during
-this reset process.
-
-In other word, the whole process is transparent to software including
-the bootloader.
-
-> Regards,
-> Paul
->
+diff --git a/arch/arm/mach-at91/include/mach/board.h b/arch/arm/mach-at91/include/mach/board.h
+index 61d52dc..1f90d79 100644
+--- a/arch/arm/mach-at91/include/mach/board.h
++++ b/arch/arm/mach-at91/include/mach/board.h
+@@ -99,6 +99,7 @@ struct at91_usbh_data {
+ 	u8		ports;		/* number of ports on root hub */
+ 	u8		vbus_pin[2];	/* port power-control pin */
+ 	u8              vbus_pin_inverted;
++	u8              overcurrent_pin[2]; /* over-current signal pins */
+ };
+ extern void __init at91_add_device_usbh(struct at91_usbh_data *data);
+ extern void __init at91_add_device_usbh_ohci(struct at91_usbh_data *data);
+diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
+index 52e50ba..2801c77 100644
+--- a/drivers/usb/host/ohci-at91.c
++++ b/drivers/usb/host/ohci-at91.c
+@@ -269,6 +269,19 @@ static const struct hc_driver ohci_at91_hc_driver = {
+ 
+ /*-------------------------------------------------------------------------*/
+ 
++static irqreturn_t ohci_hcd_at91_overcurrent_irq(int irq, void *data)
++{
++	struct platform_device *pdev = data;
++	int val;
++
++	val = gpio_get_value(irq_to_gpio(irq));
++	dev_err(& pdev->dev, "overcurrent situation %s\n",
++		val ? "exited" : "notified");
++	return IRQ_HANDLED;
++}
++
++/*-------------------------------------------------------------------------*/
++
+ static int ohci_hcd_at91_drv_probe(struct platform_device *pdev)
+ {
+ 	struct at91_usbh_data	*pdata = pdev->dev.platform_data;
+@@ -286,6 +299,23 @@ static int ohci_hcd_at91_drv_probe(struct platform_device *pdev)
+ 			gpio_request(pdata->vbus_pin[i], "ohci_vbus");
+ 			gpio_direction_output(pdata->vbus_pin[i], 0 ^ pdata->vbus_pin_inverted);
+ 		}
++
++		for (i = 0; i < ARRAY_SIZE(pdata->overcurrent_pin); i++) {
++			int ret;
++
++			if (pdata->overcurrent_pin[i] <= 0)
++				continue;
++			gpio_request(pdata->overcurrent_pin[i], "ohci_overcurrent");
++			gpio_direction_input(pdata->overcurrent_pin[i]);
++
++			ret = request_irq(gpio_to_irq(pdata->overcurrent_pin[i]),
++					  ohci_hcd_at91_overcurrent_irq,
++					  IRQF_SHARED, "ohci_overcurrent", pdev);
++			if (ret) {
++				gpio_free(pdata->overcurrent_pin[i]);
++				dev_warn(& pdev->dev, "cannot get GPIO IRQ for overcurrent\n");
++			}
++		}
+ 	}
+ 
+ 	device_init_wakeup(&pdev->dev, 1);
+@@ -304,6 +334,13 @@ static int ohci_hcd_at91_drv_remove(struct platform_device *pdev)
+ 			gpio_direction_output(pdata->vbus_pin[i], 1 ^ pdata->vbus_pin_inverted);
+ 			gpio_free(pdata->vbus_pin[i]);
+ 		}
++
++		for (i = 0; i < ARRAY_SIZE(pdata->overcurrent_pin); i++) {
++			if (pdata->overcurrent_pin[i] <= 0)
++				continue;
++			free_irq(gpio_to_irq(pdata->overcurrent_pin[i]), pdev);
++			gpio_free(pdata->overcurrent_pin[i]);
++		}
+ 	}
+ 
+ 	device_init_wakeup(&pdev->dev, 0);
+-- 
+1.7.4.1
