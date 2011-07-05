@@ -1,59 +1,41 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Tue,  5 Jul 2011 17:08:26 +0400
-Subject: [PATCH 00/15] Big pxa2[57]x_udc cleanup
-Message-ID: <1309871321-11305-1-git-send-email-dbaryshkov@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 05 Jul 2011 14:12:31 +0100
+Subject: [PATCH 6/9] DMA: PL08x: constify plchan->cd and plat->slave_channels
+In-Reply-To: <20110705131030.GE8286@n2100.arm.linux.org.uk>
+References: <20110705131030.GE8286@n2100.arm.linux.org.uk>
+Message-ID: <E1Qe5QV-0005NW-Oa@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello colleagues,
+We no longer write to the channel data structure, so we can make it
+const throughout the driver.
 
-Please review the following patch serie. It's major task is removal of code
-and functionality duplication between pxa2[57]x_udc drivers and OTG
-transceivers subsystem.
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ include/linux/amba/pl08x.h |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-The following changes since commit fe0d42203cb5616eeff68b14576a0f7e2dd56625:
-
-  Linux 3.0-rc6 (2011-07-04 15:56:24 -0700)
-
-are available in the git repository at:
-  git://git.kernel.org/pub/scm/linux/kernel/git/lumag/tosa-2.6.git misc/pxa-udc-cleanup
-
-Dmitry Eremin-Solenikov (15):
-      ARM: pxa/balloon3: drop udc_is_connected
-      ARM: pxa/mioa701: drop udc_is_connected
-      ARM: pxa/stargate2: drop udc_is_connected
-      ARM: pxa25x_udc: separate lubbock handling to lubbock-usb transceiver
-      ARM: pxa/lubbock: switch to using lubbock_usb_xceiv transceiver
-      pxa: drop handling of udc_is_connected
-      pxa25x_udc: drop support for udc_command
-      otg: add gpio_pullup OTG transceiver for devices with no VBUS sensing
-      corgi: convert to use gpio-pullup
-      poodle: convert to use gpio-pullup
-      h5000: convert to use gpio-pullup
-      gpio-vbus: support disabling D+ pullup on suspend
-      mioa701: move gpio-pullup functionality to gpio-vbus
-      gpio-pullup: support disabling D+ pullup on suspend
-      pxa2[57]x_udc: drop gpio_pullup handling
-
- arch/arm/include/asm/mach/udc_pxa2xx.h |    9 --
- arch/arm/mach-pxa/balloon3.c           |    7 -
- arch/arm/mach-pxa/colibri-pxa320.c     |    1 -
- arch/arm/mach-pxa/corgi.c              |   14 ++-
- arch/arm/mach-pxa/devices.c            |    2 +-
- arch/arm/mach-pxa/h5000.c              |   14 ++-
- arch/arm/mach-pxa/lubbock.c            |   17 +--
- arch/arm/mach-pxa/mioa701.c            |   19 +--
- arch/arm/mach-pxa/poodle.c             |   13 ++-
- arch/arm/mach-pxa/stargate2.c          |    6 -
- arch/arm/mach-pxa/vpac270.c            |    1 -
- drivers/usb/gadget/pxa25x_udc.c        |  132 ---------------------
- drivers/usb/gadget/pxa27x_udc.c        |   27 +----
- drivers/usb/otg/Kconfig                |   18 +++
- drivers/usb/otg/Makefile               |    2 +
- drivers/usb/otg/gpio_pullup.c          |  204 ++++++++++++++++++++++++++++++++
- drivers/usb/otg/gpio_vbus.c            |   42 +++++++
- drivers/usb/otg/lubbock-usb.c          |  178 ++++++++++++++++++++++++++++
- include/linux/usb/gpio_vbus.h          |    1 +
- 19 files changed, 493 insertions(+), 214 deletions(-)
- create mode 100644 drivers/usb/otg/gpio_pullup.c
- create mode 100644 drivers/usb/otg/lubbock-usb.c
+diff --git a/include/linux/amba/pl08x.h b/include/linux/amba/pl08x.h
+index 47cfe31..e6e28f3 100644
+--- a/include/linux/amba/pl08x.h
++++ b/include/linux/amba/pl08x.h
+@@ -172,7 +172,7 @@ struct pl08x_dma_chan {
+ 	int phychan_hold;
+ 	struct tasklet_struct tasklet;
+ 	char *name;
+-	struct pl08x_channel_data *cd;
++	const struct pl08x_channel_data *cd;
+ 	dma_addr_t src_addr;
+ 	dma_addr_t dst_addr;
+ 	u32 src_cctl;
+@@ -205,7 +205,7 @@ struct pl08x_dma_chan {
+  * @mem_buses: buses which memory can be accessed from: PL08X_AHB1 | PL08X_AHB2
+  */
+ struct pl08x_platform_data {
+-	struct pl08x_channel_data *slave_channels;
++	const struct pl08x_channel_data *slave_channels;
+ 	unsigned int num_slave_channels;
+ 	struct pl08x_channel_data memcpy_channel;
+ 	int (*get_signal)(struct pl08x_dma_chan *);
+-- 
+1.7.4.4
