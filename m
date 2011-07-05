@@ -1,133 +1,119 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Tue, 5 Jul 2011 15:57:27 +0800
-Subject: [PATCH v3] pxa/magician: use gpio arrays for backlight and global
-	gpio initialization
-In-Reply-To: <1304022066.6554.4.camel@flow>
-References: <1303329323.21545.6.camel@flow> <1303930204.14964.6.camel@flow>
-	<1304022066.6554.4.camel@flow>
-Message-ID: <CAMPhdO83W40zu4oHrx-rNBVYa0exkoMj=46cfpLnu6r7w0u5cA@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 05 Jul 2011 09:58:30 +0200
+Subject: [PATCH] ASoC: wm8731: set the ACTIVE bit if bias ON entered
+In-Reply-To: <20110704172856.GF28726@opensource.wolfsonmicro.com>
+References: <ccd4b125244271af7978948689cf1dcef37bc06b.1309368631.git.nicolas.ferre@atmel.com>
+	<1309517034-26110-1-git-send-email-nicolas.ferre@atmel.com>
+	<20110701161506.GC23784@opensource.wolfsonmicro.com>
+	<4E118BF6.6010205@atmel.com>
+	<20110704172856.GF28726@opensource.wolfsonmicro.com>
+Message-ID: <4E12C426.8050501@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 29, 2011 at 4:21 AM, Philipp Zabel <philipp.zabel@gmail.com> wrote:
-> Use gpio_request_array() / gpio_free_array() in backlight init and exit
-> functions and global gpio initialization.
->
-> Signed-off-by: Philipp Zabel <philipp.zabel@gmail.com>
-
-Applied.
-
+Le 04/07/2011 19:29, Mark Brown :
+> On Mon, Jul 04, 2011 at 11:46:30AM +0200, Nicolas Ferre wrote:
+> 
+>> Ah, ok... but I fear that I do not know the whole system enough for this
+>> addition ;-(
+>> Do you think you can code this modification, I will be happy to test it,
+>> if you want...
+> 
+> It's pretty trivial - try the below (Liam, are you OK with this if it
+> tests OK?):
+> 
+>>From 1dd054eb530641dadbf71525ee517c847f19e161 Mon Sep 17 00:00:00 2001
+> From: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> Date: Mon, 4 Jul 2011 10:27:51 -0700
+> Subject: [PATCH] ASoC: Manage WM8731 ACTIVE bit as a supply widget
+> 
+> Now we have supply widgets there's no need to open code the handling of
+> the ACTIVE bit.
+> 
+> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 > ---
-> ?arch/arm/mach-pxa/magician.c | ? 57 +++++++++++++++++-------------------------
-> ?1 files changed, 23 insertions(+), 34 deletions(-)
->
-> diff --git a/arch/arm/mach-pxa/magician.c b/arch/arm/mach-pxa/magician.c
-> index 9984ef7..1be25c7 100644
-> --- a/arch/arm/mach-pxa/magician.c
-> +++ b/arch/arm/mach-pxa/magician.c
-> @@ -344,22 +344,14 @@ static struct pxafb_mach_info samsung_info = {
-> ?* Backlight
-> ?*/
->
-> +static struct gpio magician_bl_gpios[] = {
-> + ? ? ? { EGPIO_MAGICIAN_BL_POWER, ?GPIOF_DIR_OUT, "Backlight power" },
-> + ? ? ? { EGPIO_MAGICIAN_BL_POWER2, GPIOF_DIR_OUT, "Backlight power 2" },
-> +};
-> +
-> ?static int magician_backlight_init(struct device *dev)
-> ?{
-> - ? ? ? int ret;
+>  sound/soc/codecs/wm8731.c |   29 +++--------------------------
+>  1 files changed, 3 insertions(+), 26 deletions(-)
+> 
+> diff --git a/sound/soc/codecs/wm8731.c b/sound/soc/codecs/wm8731.c
+> index 2dc964b..59d9e59 100644
+> --- a/sound/soc/codecs/wm8731.c
+> +++ b/sound/soc/codecs/wm8731.c
+> @@ -175,6 +175,7 @@ static const struct snd_kcontrol_new wm8731_input_mux_controls =
+>  SOC_DAPM_ENUM("Input Select", wm8731_insel_enum);
+>  
+>  static const struct snd_soc_dapm_widget wm8731_dapm_widgets[] = {
+> +SND_SOC_DAPM_SUPPLY("Active",WM8731_ACTIVE, 0, 0, NULL, 0),
+
+------------------------^^^^^^^
+I have replaced this with ACTIVE to match the route declaration.
+
+*With this modification* it works, so you can add my:
+
+Tested-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+
+>  SND_SOC_DAPM_SUPPLY("OSC", WM8731_PWR, 5, 1, NULL, 0),
+>  SND_SOC_DAPM_MIXER("Output Mixer", WM8731_PWR, 4, 1,
+>  	&wm8731_output_mixer_controls[0],
+> @@ -204,6 +205,8 @@ static int wm8731_check_osc(struct snd_soc_dapm_widget *source,
+>  static const struct snd_soc_dapm_route wm8731_intercon[] = {
+>  	{"DAC", NULL, "OSC", wm8731_check_osc},
+>  	{"ADC", NULL, "OSC", wm8731_check_osc},
+> +	{"DAC", NULL, "ACTIVE"},
+> +	{"ADC", NULL, "ACTIVE"},
+>  
+>  	/* output mixer */
+>  	{"Output Mixer", "Line Bypass Switch", "Line Input"},
+> @@ -315,29 +318,6 @@ static int wm8731_hw_params(struct snd_pcm_substream *substream,
+>  	return 0;
+>  }
+>  
+> -static int wm8731_pcm_prepare(struct snd_pcm_substream *substream,
+> -			      struct snd_soc_dai *dai)
+> -{
+> -	struct snd_soc_codec *codec = dai->codec;
 > -
-> - ? ? ? ret = gpio_request(EGPIO_MAGICIAN_BL_POWER, "BL_POWER");
-> - ? ? ? if (ret)
-> - ? ? ? ? ? ? ? goto err;
-> - ? ? ? ret = gpio_request(EGPIO_MAGICIAN_BL_POWER2, "BL_POWER2");
-> - ? ? ? if (ret)
-> - ? ? ? ? ? ? ? goto err2;
-> - ? ? ? return 0;
+> -	/* set active */
+> -	snd_soc_write(codec, WM8731_ACTIVE, 0x0001);
 > -
-> -err2:
-> - ? ? ? gpio_free(EGPIO_MAGICIAN_BL_POWER);
-> -err:
-> - ? ? ? return ret;
-> + ? ? ? return gpio_request_array(ARRAY_AND_SIZE(magician_bl_gpios));
-> ?}
->
-> ?static int magician_backlight_notify(struct device *dev, int brightness)
-> @@ -376,8 +368,7 @@ static int magician_backlight_notify(struct device *dev, int brightness)
->
-> ?static void magician_backlight_exit(struct device *dev)
-> ?{
-> - ? ? ? gpio_free(EGPIO_MAGICIAN_BL_POWER);
-> - ? ? ? gpio_free(EGPIO_MAGICIAN_BL_POWER2);
-> + ? ? ? gpio_free_array(ARRAY_AND_SIZE(magician_bl_gpios));
-> ?}
->
-> ?static struct platform_pwm_backlight_data backlight_data = {
-> @@ -712,16 +703,25 @@ static struct platform_device *devices[] __initdata = {
-> ? ? ? ?&leds_gpio,
-> ?};
->
-> +static struct gpio magician_global_gpios[] = {
-> + ? ? ? { GPIO13_MAGICIAN_CPLD_IRQ, ? GPIOF_IN, "CPLD_IRQ" },
-> + ? ? ? { GPIO107_MAGICIAN_DS1WM_IRQ, GPIOF_IN, "DS1WM_IRQ" },
-> + ? ? ? { GPIO104_MAGICIAN_LCD_POWER_1, GPIOF_OUT_INIT_LOW, "LCD power 1" },
-> + ? ? ? { GPIO105_MAGICIAN_LCD_POWER_2, GPIOF_OUT_INIT_LOW, "LCD power 2" },
-> + ? ? ? { GPIO106_MAGICIAN_LCD_POWER_3, GPIOF_OUT_INIT_LOW, "LCD power 3" },
-> + ? ? ? { GPIO83_MAGICIAN_nIR_EN, GPIOF_OUT_INIT_HIGH, "nIR_EN" },
-> +};
-> +
-> ?static void __init magician_init(void)
-> ?{
-> ? ? ? ?void __iomem *cpld;
-> ? ? ? ?int lcd_select;
-> ? ? ? ?int err;
->
-> - ? ? ? gpio_request(GPIO13_MAGICIAN_CPLD_IRQ, "CPLD_IRQ");
-> - ? ? ? gpio_request(GPIO107_MAGICIAN_DS1WM_IRQ, "DS1WM_IRQ");
+> -	return 0;
+> -}
 > -
-> ? ? ? ?pxa2xx_mfp_config(ARRAY_AND_SIZE(magician_pin_config));
-> + ? ? ? err = gpio_request_array(ARRAY_AND_SIZE(magician_global_gpios));
-> + ? ? ? if (err)
-> + ? ? ? ? ? ? ? pr_err("magician: Failed to request GPIOs: %d\n", err);
->
-> ? ? ? ?pxa_set_ffuart_info(NULL);
-> ? ? ? ?pxa_set_btuart_info(NULL);
-> @@ -729,11 +729,7 @@ static void __init magician_init(void)
->
-> ? ? ? ?platform_add_devices(ARRAY_AND_SIZE(devices));
->
-> - ? ? ? err = gpio_request(GPIO83_MAGICIAN_nIR_EN, "nIR_EN");
-> - ? ? ? if (!err) {
-> - ? ? ? ? ? ? ? gpio_direction_output(GPIO83_MAGICIAN_nIR_EN, 1);
-> - ? ? ? ? ? ? ? pxa_set_ficp_info(&magician_ficp_info);
-> - ? ? ? }
-> + ? ? ? pxa_set_ficp_info(&magician_ficp_info);
-> ? ? ? ?pxa27x_set_i2c_power_info(NULL);
-> ? ? ? ?pxa_set_i2c_info(&i2c_info);
-> ? ? ? ?pxa_set_mci_info(&magician_mci_info);
-> @@ -747,16 +743,9 @@ static void __init magician_init(void)
-> ? ? ? ? ? ? ? ?system_rev = board_id & 0x7;
-> ? ? ? ? ? ? ? ?lcd_select = board_id & 0x8;
-> ? ? ? ? ? ? ? ?pr_info("LCD type: %s\n", lcd_select ? "Samsung" : "Toppoly");
-> - ? ? ? ? ? ? ? if (lcd_select && (system_rev < 3)) {
-> - ? ? ? ? ? ? ? ? ? ? ? gpio_request(GPIO75_MAGICIAN_SAMSUNG_POWER, "SAMSUNG_POWER");
-> - ? ? ? ? ? ? ? ? ? ? ? gpio_direction_output(GPIO75_MAGICIAN_SAMSUNG_POWER, 0);
-> - ? ? ? ? ? ? ? }
-> - ? ? ? ? ? ? ? gpio_request(GPIO104_MAGICIAN_LCD_POWER_1, "LCD_POWER_1");
-> - ? ? ? ? ? ? ? gpio_request(GPIO105_MAGICIAN_LCD_POWER_2, "LCD_POWER_2");
-> - ? ? ? ? ? ? ? gpio_request(GPIO106_MAGICIAN_LCD_POWER_3, "LCD_POWER_3");
-> - ? ? ? ? ? ? ? gpio_direction_output(GPIO104_MAGICIAN_LCD_POWER_1, 0);
-> - ? ? ? ? ? ? ? gpio_direction_output(GPIO105_MAGICIAN_LCD_POWER_2, 0);
-> - ? ? ? ? ? ? ? gpio_direction_output(GPIO106_MAGICIAN_LCD_POWER_3, 0);
-> + ? ? ? ? ? ? ? if (lcd_select && (system_rev < 3))
-> + ? ? ? ? ? ? ? ? ? ? ? gpio_request_one(GPIO75_MAGICIAN_SAMSUNG_POWER,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?GPIOF_OUT_INIT_LOW, "SAMSUNG_POWER");
-> ? ? ? ? ? ? ? ?pxa_set_fb_info(NULL, lcd_select ? &samsung_info : &toppoly_info);
-> ? ? ? ?} else
-> ? ? ? ? ? ? ? ?pr_err("LCD detection: CPLD mapping failed\n");
-> --
-> 1.7.4.4
->
->
->
+> -static void wm8731_shutdown(struct snd_pcm_substream *substream,
+> -			    struct snd_soc_dai *dai)
+> -{
+> -	struct snd_soc_codec *codec = dai->codec;
+> -
+> -	/* deactivate */
+> -	if (!codec->active) {
+> -		udelay(50);
+> -		snd_soc_write(codec, WM8731_ACTIVE, 0x0);
+> -	}
+> -}
+> -
+>  static int wm8731_mute(struct snd_soc_dai *dai, int mute)
+>  {
+>  	struct snd_soc_codec *codec = dai->codec;
+> @@ -480,7 +460,6 @@ static int wm8731_set_bias_level(struct snd_soc_codec *codec,
+>  		snd_soc_write(codec, WM8731_PWR, reg | 0x0040);
+>  		break;
+>  	case SND_SOC_BIAS_OFF:
+> -		snd_soc_write(codec, WM8731_ACTIVE, 0x0);
+>  		snd_soc_write(codec, WM8731_PWR, 0xffff);
+>  		regulator_bulk_disable(ARRAY_SIZE(wm8731->supplies),
+>  				       wm8731->supplies);
+> @@ -496,9 +475,7 @@ static int wm8731_set_bias_level(struct snd_soc_codec *codec,
+>  	SNDRV_PCM_FMTBIT_S24_LE)
+>  
+>  static struct snd_soc_dai_ops wm8731_dai_ops = {
+> -	.prepare	= wm8731_pcm_prepare,
+>  	.hw_params	= wm8731_hw_params,
+> -	.shutdown	= wm8731_shutdown,
+>  	.digital_mute	= wm8731_mute,
+>  	.set_sysclk	= wm8731_set_dai_sysclk,
+>  	.set_fmt	= wm8731_set_dai_fmt,
+
+
+-- 
+Nicolas Ferre
