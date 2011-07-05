@@ -1,124 +1,82 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue,  5 Jul 2011 11:05:28 +0200
-Subject: [PATCH 3/3] at91-ohci: configure overcurrent pins as GPIOs
-In-Reply-To: <1309856728-8265-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1309856728-8265-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1309856728-8265-3-git-send-email-thomas.petazzoni@free-electrons.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 5 Jul 2011 10:26:00 +0100
+Subject: Unnecessary cache-line flush on page table updates ?
+In-Reply-To: <20110704215507.GH8286@n2100.arm.linux.org.uk>
+References: <BANLkTin7aJXjpEH_WzJi5zaAtH8kFcTZeg@mail.gmail.com>
+	<20110701101019.GA1723@e102109-lin.cambridge.arm.com>
+	<BANLkTi=KVnzBKcd83c9T3P20VAv-ggqR4g@mail.gmail.com>
+	<20110704094531.GB19117@e102109-lin.cambridge.arm.com>
+	<20110704100221.GB8286@n2100.arm.linux.org.uk>
+	<20110704104329.GD19117@e102109-lin.cambridge.arm.com>
+	<20110704111338.GD8286@n2100.arm.linux.org.uk>
+	<20110704215507.GH8286@n2100.arm.linux.org.uk>
+Message-ID: <20110705092600.GB25956@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As a new overcurrent_pin[] array has been added to the at91_usbh_data
-structure, those pins must be muxed to work properly. This commit
-implements this muxing for all AT91 SoCs that support the AT91 OHCI.
+On Mon, Jul 04, 2011 at 10:55:07PM +0100, Russell King - ARM Linux wrote:
+> On Mon, Jul 04, 2011 at 12:13:38PM +0100, Russell King - ARM Linux wrote:
+> > As far as the BTB goes, I wonder if we can postpone that for user TLB
+> > ops by setting a TIF_ flag and checking that before returning to userspace.
+> > That would avoid having to needlessly destroy the cached branch information
+> > for kernel space while looping over the page tables.  The only other place
+> > that needs to worry about that is module_alloc() and vmap/vmalloc with
+> > PROT_KERNEL_EXEC, all of which can be done in flush_cache_vmap().
+> 
+> Actually, we don't need to do BTC invalidate in flush_cache_vmap(),
+> but we do need to do a dsb+isb.
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: Andrew Victor <linux@maxim.org.za>
-Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
----
- arch/arm/mach-at91/at91cap9_devices.c    |    5 +++++
- arch/arm/mach-at91/at91rm9200_devices.c  |    5 +++++
- arch/arm/mach-at91/at91sam9260_devices.c |    5 +++++
- arch/arm/mach-at91/at91sam9261_devices.c |    5 +++++
- arch/arm/mach-at91/at91sam9263_devices.c |    5 +++++
- arch/arm/mach-at91/at91sam9g45_devices.c |    5 +++++
- 6 files changed, 30 insertions(+), 0 deletions(-)
+Why would we need an ISB?
 
-diff --git a/arch/arm/mach-at91/at91cap9_devices.c b/arch/arm/mach-at91/at91cap9_devices.c
-index dba0d8d..db7173a 100644
---- a/arch/arm/mach-at91/at91cap9_devices.c
-+++ b/arch/arm/mach-at91/at91cap9_devices.c
-@@ -80,6 +80,11 @@ void __init at91_add_device_usbh(struct at91_usbh_data *data)
- 			at91_set_gpio_output(data->vbus_pin[i], 0);
- 	}
- 
-+	for (i = 0; i < data->ports; i++) {
-+		if (data->overcurrent_pin[i])
-+			at91_set_GPIO_periph(data->overcurrent_pin[i], 1);
-+	}
-+
- 	usbh_data = *data;
- 	platform_device_register(&at91_usbh_device);
- }
-diff --git a/arch/arm/mach-at91/at91rm9200_devices.c b/arch/arm/mach-at91/at91rm9200_devices.c
-index 7227755..6a1d564 100644
---- a/arch/arm/mach-at91/at91rm9200_devices.c
-+++ b/arch/arm/mach-at91/at91rm9200_devices.c
-@@ -63,6 +63,11 @@ void __init at91_add_device_usbh(struct at91_usbh_data *data)
- 	if (!data)
- 		return;
- 
-+	for (i = 0; i < data->ports; i++) {
-+		if (data->overcurrent_pin[i])
-+			at91_set_GPIO_periph(data->overcurrent_pin[i], 1);
-+	}
-+
- 	usbh_data = *data;
- 	platform_device_register(&at91rm9200_usbh_device);
- }
-diff --git a/arch/arm/mach-at91/at91sam9260_devices.c b/arch/arm/mach-at91/at91sam9260_devices.c
-index 39f81f4..3a77508 100644
---- a/arch/arm/mach-at91/at91sam9260_devices.c
-+++ b/arch/arm/mach-at91/at91sam9260_devices.c
-@@ -64,6 +64,11 @@ void __init at91_add_device_usbh(struct at91_usbh_data *data)
- 	if (!data)
- 		return;
- 
-+	for (i = 0; i < data->ports; i++) {
-+		if (data->overcurrent_pin[i])
-+			at91_set_GPIO_periph(data->overcurrent_pin[i], 1);
-+	}
-+
- 	usbh_data = *data;
- 	platform_device_register(&at91_usbh_device);
- }
-diff --git a/arch/arm/mach-at91/at91sam9261_devices.c b/arch/arm/mach-at91/at91sam9261_devices.c
-index 5004bf0..57b3fa7 100644
---- a/arch/arm/mach-at91/at91sam9261_devices.c
-+++ b/arch/arm/mach-at91/at91sam9261_devices.c
-@@ -67,6 +67,11 @@ void __init at91_add_device_usbh(struct at91_usbh_data *data)
- 	if (!data)
- 		return;
- 
-+	for (i = 0; i < data->ports; i++) {
-+		if (data->overcurrent_pin[i])
-+			at91_set_GPIO_periph(data->overcurrent_pin[i], 1);
-+	}
-+
- 	usbh_data = *data;
- 	platform_device_register(&at91sam9261_usbh_device);
- }
-diff --git a/arch/arm/mach-at91/at91sam9263_devices.c b/arch/arm/mach-at91/at91sam9263_devices.c
-index a050f41..f0fcc93 100644
---- a/arch/arm/mach-at91/at91sam9263_devices.c
-+++ b/arch/arm/mach-at91/at91sam9263_devices.c
-@@ -74,6 +74,11 @@ void __init at91_add_device_usbh(struct at91_usbh_data *data)
- 			at91_set_gpio_output(data->vbus_pin[i], 0);
- 	}
- 
-+	for (i = 0; i < data->ports; i++) {
-+		if (data->overcurrent_pin[i])
-+			at91_set_GPIO_periph(data->overcurrent_pin[i], 1);
-+	}
-+
- 	usbh_data = *data;
- 	platform_device_register(&at91_usbh_device);
- }
-diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
-index 600bffb..4f2d774 100644
---- a/arch/arm/mach-at91/at91sam9g45_devices.c
-+++ b/arch/arm/mach-at91/at91sam9g45_devices.c
-@@ -124,6 +124,11 @@ void __init at91_add_device_usbh_ohci(struct at91_usbh_data *data)
- 			at91_set_gpio_output(data->vbus_pin[i], 0);
- 	}
- 
-+	for (i = 0; i < data->ports; i++) {
-+		if (data->overcurrent_pin[i])
-+			at91_set_GPIO_periph(data->overcurrent_pin[i], 1);
-+	}
-+
- 	usbh_ohci_data = *data;
- 	platform_device_register(&at91_usbh_ohci_device);
- }
+> Firstly, the majority of mappings are created with NX set, so the BTC
+> can't be involved in anything created there (as we can't execute code
+> there.)
+
+OK.
+
+> Secondly, if we're loading a code into kernel space to execute, then we
+> need to ensure I/D coherency via flush_icache_range(), which has to
+> happen after the mappings have been created, and this already does our
+> BTC invalidate+dsb+isb.
+
+OK.
+
+> So, as far as kernel space TLB invalidation goes, my conclusion is that
+> we do not have to touch the BTC at all there, and we can leave that to
+> flush_icache_range() (and therefore cpu..coherent_kern_range) to deal
+> with.
+> 
+> Practically, testing it out on Versatile Express loading/unloading a
+> few modules shows no ill effects from dropping the BTC invalidates from
+> the kernel TLB invalidate ops.
+
+AFAIK the branch predictor is transparent on Cortex-A9 and the BTB
+maintenance are no-ops. You wouldn't notice any issues if you remove
+them (you can check ID_MMFR1[31:28].
+
+> 8<----------
+> From: Russell King <rmk+kernel@arm.linux.org.uk>
+> ARM: btc: avoid invalidating the branch target cache on kernel TLB maintanence
+> 
+> Kernel space needs very little in the way of BTC maintanence as most
+> mappings which are created and destroyed are non-executable, and so
+> could never enter the instruction stream.
+> 
+> The case which does warrant BTC maintanence is when a module is loaded.
+> This creates a new executable mapping, but at that point the pages have
+> not been initialized with code and data, so at that point they contain
+> unpredictable information.  Invalidating the BTC at this stage serves
+> little useful purpose.
+> 
+> Before we execute module code, we call flush_icache_range(), which deals
+> with the BTC maintanence requirements.  This ensures that we have a BTC
+> maintanence operation before we execute code via the newly created
+> mapping.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+
+The patch looks fine (it would be good if we get some testing on an
+ARM11 platform).
+
 -- 
-1.7.4.1
+Catalin
