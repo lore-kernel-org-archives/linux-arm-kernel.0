@@ -1,73 +1,31 @@
-From: toddpoynor@google.com (Todd Poynor)
-Date: Tue, 5 Jul 2011 11:21:44 -0700
-Subject: [PATCH v3 04/13] OMAP: hwmod: Wait the idle status to be disabled
-In-Reply-To: <1309554558-19819-5-git-send-email-b-cousson@ti.com>
-References: <1309554558-19819-1-git-send-email-b-cousson@ti.com>
-	<1309554558-19819-5-git-send-email-b-cousson@ti.com>
-Message-ID: <20110705182144.GA10846@google.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Tue, 5 Jul 2011 11:22:30 -0700
+Subject: Tegra device name for device tree
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF049E21BE97@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 01, 2011 at 11:09:09PM +0200, Benoit Cousson wrote:
-> It is mandatory to wait for a module to be in disabled state before
-> potentially disabling source clock or re-asserting a reset.
-> 
-> omap_hwmod_idle and omap_hwmod_shutdown does not wait for
-> the module to be fully idle.
-> 
-> Add a cm_xxx accessor to wait the clkctrl idle status to be disabled.
-> Fix hwmod_[idle|shutdown] to use this API.
-...
-> +int omap4_cm_wait_module_idle(u8 part, u16 inst, s16 cdoffs, u16 clkctrl_offs)
+Grant et. al.,
 
-Technically this waits for a module slave to enter "full idle" --
-"interface idle" not good enough, and if the module is also a master
-its standby status could possibly be different... personally, these
-details make my brain hurt, but thought I'd mention this in case
-the naming of this interface should capture any of these distinctions.
+It recently dawned on me that all the Tegra DeviceTree support is using a
+marketing name for the SoC ("tegra250"). NVIDIA would prefer that we use
+engineering names for the SoC (e.g. "tegra20" now, "tegra30" for an
+upcoming SoC). The primary motivation for this is that engineering names
+tend to be more stable and map more directly to the HW design.
 
-> +{
-> +	int i = 0;
-> +
-> +	if (!clkctrl_offs)
-> +		return 0;
-> +
-> +	omap_test_timeout(
-> +		_clkctrl_idlest(part, inst, cdoffs, clkctrl_offs) == 0x3,
-> +		MAX_MODULE_READY_TIME, i);
+Is it still possible to make this change, if I submit the appropriate
+patches to do this? 
 
-The numeric constant may already have an equivalent symbol defined, or
-suggest adding one.
+So, far, I see devicetree/next only refers to the Tegra serial port,
+whereas devicetree/arm and devicetree/test refer to more Tegra devices in
+this way. I'm not quite sure how the flow of patches works between these 3
+trees. For the serial port, I obviously need to submit a patch against
+devicetree/next, but I'm not so sure about which of devicetree/arm or
+devicetree/test to target for the other devices.
 
->  /**
-> + * _wait_target_disable - wait for a module to be disabled
-> + * @oh: struct omap_hwmod *
-> + *
-> + * Wait for a module @oh to leave slave idle.  Returns 0 if the module
-> + * does not have an IDLEST bit or if the module successfully leaves
-> + * slave idle; otherwise, pass along the return value of the
-> + * appropriate *_cm_wait_module_ready() function.
+Sorry for bringing this up so late in the game.
 
-This paragraph probably c&p from a function with opposite meaning.
+Thanks!
 
-...
->  static int _idle(struct omap_hwmod *oh)
->  {
-> +	int ret;
-> +
->  	pr_debug("omap_hwmod: %s: idling\n", oh->name);
->  
->  	if (oh->_state != _HWMOD_STATE_ENABLED) {
-> @@ -1351,6 +1383,10 @@ static int _idle(struct omap_hwmod *oh)
->  		_idle_sysc(oh);
->  	_del_initiator_dep(oh, mpu_oh);
->  	_disable_clocks(oh);
-> +	ret = _wait_target_disable(oh);
-> +	if (ret)
-> +		pr_debug("omap_hwmod: %s: _wait_target_disable failed\n",
-> +			   oh->name);
-
-Should callers see an error function return in this case?
-
-
-Todd
+-- 
+nvpublic
