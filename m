@@ -1,214 +1,104 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 05 Jul 2011 09:41:49 +0200
-Subject: [PATCH 7/8] ARM: integrate CMA with dma-mapping subsystem
-In-Reply-To: <1309851710-3828-1-git-send-email-m.szyprowski@samsung.com>
-References: <1309851710-3828-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1309851710-3828-8-git-send-email-m.szyprowski@samsung.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Tue, 5 Jul 2011 15:43:11 +0800
+Subject: [PATCH] pxa/magician: use gpio arrays for backlight and lcd power
+	init
+In-Reply-To: <1303329323.21545.6.camel@flow>
+References: <1303329323.21545.6.camel@flow>
+Message-ID: <CAMPhdO_iP_gbjwoEZx8m8sUSpZXPAac_NgYTPAe4RonOGWBoCw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for CMA to dma-mapping subsystem for ARM
-architecture. By default a global CMA area is used, but specific devices
-are allowed to have their private memory areas if required (they can be
-created with dma_declare_contiguous() function during board
-initialization).
+On Thu, Apr 21, 2011 at 3:55 AM, Philipp Zabel <philipp.zabel@gmail.com> wrote:
+> Use gpio_request_array() / gpio_free_array() in backlight init and exit
+> functions and lcd power initialization.
+>
+> Signed-off-by: Philipp Zabel <philipp.zabel@gmail.com>
 
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- arch/arm/Kconfig                   |    1 +
- arch/arm/include/asm/device.h      |    3 ++
- arch/arm/include/asm/dma-mapping.h |   20 ++++++++++++++
- arch/arm/mm/dma-mapping.c          |   51 +++++++++++++++++++++++++++--------
- arch/arm/mm/init.c                 |    3 ++
- 5 files changed, 66 insertions(+), 12 deletions(-)
+Applied.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 9adc278..3cca8cc 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -3,6 +3,7 @@ config ARM
- 	default y
- 	select HAVE_AOUT
- 	select HAVE_DMA_API_DEBUG
-+	select HAVE_DMA_CONTIGUOUS
- 	select HAVE_IDE
- 	select HAVE_MEMBLOCK
- 	select RTC_LIB
-diff --git a/arch/arm/include/asm/device.h b/arch/arm/include/asm/device.h
-index 9f390ce..942913e 100644
---- a/arch/arm/include/asm/device.h
-+++ b/arch/arm/include/asm/device.h
-@@ -10,6 +10,9 @@ struct dev_archdata {
- #ifdef CONFIG_DMABOUNCE
- 	struct dmabounce_device_info *dmabounce;
- #endif
-+#ifdef CONFIG_CMA
-+	struct cma *cma_area;
-+#endif
- };
- 
- struct pdev_archdata {
-diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
-index 4fff837..a3e1e48c 100644
---- a/arch/arm/include/asm/dma-mapping.h
-+++ b/arch/arm/include/asm/dma-mapping.h
-@@ -6,6 +6,7 @@
- #include <linux/mm_types.h>
- #include <linux/scatterlist.h>
- #include <linux/dma-debug.h>
-+#include <linux/dma-contiguous.h>
- 
- #include <asm-generic/dma-coherent.h>
- #include <asm/memory.h>
-@@ -14,6 +15,25 @@
- #error Please update to __arch_pfn_to_dma
- #endif
- 
-+#ifdef CONFIG_CMA
-+static inline struct cma *get_dev_cma_area(struct device *dev)
-+{
-+	if (dev->archdata.cma_area)
-+		return dev->archdata.cma_area;
-+	return dma_contiguous_default_area;
-+}
-+
-+static inline void set_dev_cma_area(struct device *dev, struct cma *cma)
-+{
-+	dev->archdata.cma_area = cma;
-+}
-+#else
-+static inline struct cma *get_dev_cma_area(struct device *dev)
-+{
-+	return NULL;
-+}
-+#endif
-+
- /*
-  * dma_to_pfn/pfn_to_dma/dma_to_virt/virt_to_dma are architecture private
-  * functions used internally by the DMA-mapping API to provide DMA
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index 82a093c..1d4e916 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -17,6 +17,7 @@
- #include <linux/init.h>
- #include <linux/device.h>
- #include <linux/dma-mapping.h>
-+#include <linux/dma-contiguous.h>
- #include <linux/highmem.h>
- 
- #include <asm/memory.h>
-@@ -52,16 +53,35 @@ static u64 get_coherent_dma_mask(struct device *dev)
- 	return mask;
- }
- 
-+
-+static struct page *__alloc_system_pages(size_t count, unsigned int order, gfp_t gfp)
-+{
-+	struct page *page, *p, *e;
-+
-+	page = alloc_pages(gfp, order);
-+	if (!page)
-+		return NULL;
-+
-+	/*
-+	 * Now split the huge page and free the excess pages
-+	 */
-+	split_page(page, order);
-+	for (p = page + count, e = page + (1 << order); p < e; p++)
-+		__free_page(p);
-+	return page;
-+}
-+
- /*
-  * Allocate a DMA buffer for 'dev' of size 'size' using the
-  * specified gfp mask.  Note that 'size' must be page aligned.
-  */
- static struct page *__dma_alloc_buffer(struct device *dev, size_t size, gfp_t gfp)
- {
--	unsigned long order = get_order(size);
--	struct page *page, *p, *e;
-+	struct page *page;
-+	size_t count = size >> PAGE_SHIFT;
- 	void *ptr;
- 	u64 mask = get_coherent_dma_mask(dev);
-+	unsigned long order = get_order(count << PAGE_SHIFT);
- 
- #ifdef CONFIG_DMA_API_DEBUG
- 	u64 limit = (mask + 1) & ~mask;
-@@ -78,16 +98,19 @@ static struct page *__dma_alloc_buffer(struct device *dev, size_t size, gfp_t gf
- 	if (mask < 0xffffffffULL)
- 		gfp |= GFP_DMA;
- 
--	page = alloc_pages(gfp, order);
--	if (!page)
--		return NULL;
-+	/*
-+	 * First, try to allocate memory from contiguous area
-+	 */
-+	page = dma_alloc_from_contiguous(dev, count, order);
- 
- 	/*
--	 * Now split the huge page and free the excess pages
-+	 * Fallback if contiguous alloc fails or is not available
- 	 */
--	split_page(page, order);
--	for (p = page + (size >> PAGE_SHIFT), e = page + (1 << order); p < e; p++)
--		__free_page(p);
-+	if (!page)
-+		page = __alloc_system_pages(count, order, gfp);
-+
-+	if (!page)
-+		return NULL;
- 
- 	/*
- 	 * Ensure that the allocated pages are zeroed, and that any data
-@@ -104,9 +127,13 @@ static struct page *__dma_alloc_buffer(struct device *dev, size_t size, gfp_t gf
- /*
-  * Free a DMA buffer.  'size' must be page aligned.
-  */
--static void __dma_free_buffer(struct page *page, size_t size)
-+static void __dma_free_buffer(struct device *dev, struct page *page, size_t size)
- {
--	struct page *e = page + (size >> PAGE_SHIFT);
-+	size_t count = size >> PAGE_SHIFT;
-+	struct page *e = page + count;
-+
-+	if (dma_release_from_contiguous(dev, page, count))
-+		return;
- 
- 	while (page < e) {
- 		__free_page(page);
-@@ -416,7 +443,7 @@ void dma_free_coherent(struct device *dev, size_t size, void *cpu_addr, dma_addr
- 	if (!arch_is_coherent())
- 		__dma_free_remap(cpu_addr, size);
- 
--	__dma_free_buffer(pfn_to_page(dma_to_pfn(dev, handle)), size);
-+	__dma_free_buffer(dev, pfn_to_page(dma_to_pfn(dev, handle)), size);
- }
- EXPORT_SYMBOL(dma_free_coherent);
- 
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index c19571c..b2dfdeb 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -20,6 +20,7 @@
- #include <linux/gfp.h>
- #include <linux/memblock.h>
- #include <linux/sort.h>
-+#include <linux/dma-contiguous.h>
- 
- #include <asm/mach-types.h>
- #include <asm/prom.h>
-@@ -358,6 +359,8 @@ void __init arm_memblock_init(struct meminfo *mi, struct machine_desc *mdesc)
- 	if (mdesc->reserve)
- 		mdesc->reserve();
- 
-+	dma_contiguous_reserve();
-+
- 	memblock_analyze();
- 	memblock_dump_all();
- }
--- 
-1.7.1.569.g6f426
+> ---
+> ?arch/arm/mach-pxa/magician.c | ? 43 ++++++++++++++++-------------------------
+> ?1 files changed, 17 insertions(+), 26 deletions(-)
+>
+> diff --git a/arch/arm/mach-pxa/magician.c b/arch/arm/mach-pxa/magician.c
+> index 9984ef7..22da1e9 100644
+> --- a/arch/arm/mach-pxa/magician.c
+> +++ b/arch/arm/mach-pxa/magician.c
+> @@ -344,22 +344,14 @@ static struct pxafb_mach_info samsung_info = {
+> ?* Backlight
+> ?*/
+>
+> +static struct gpio magician_bl_gpios[] = {
+> + ? ? ? ?{ EGPIO_MAGICIAN_BL_POWER, ?GPIOF_DIR_OUT, "Backlight power" },
+> + ? ? ? ?{ EGPIO_MAGICIAN_BL_POWER2, GPIOF_DIR_OUT, "Backlight power 2" },
+> +};
+> +
+> ?static int magician_backlight_init(struct device *dev)
+> ?{
+> - ? ? ? int ret;
+> -
+> - ? ? ? ret = gpio_request(EGPIO_MAGICIAN_BL_POWER, "BL_POWER");
+> - ? ? ? if (ret)
+> - ? ? ? ? ? ? ? goto err;
+> - ? ? ? ret = gpio_request(EGPIO_MAGICIAN_BL_POWER2, "BL_POWER2");
+> - ? ? ? if (ret)
+> - ? ? ? ? ? ? ? goto err2;
+> - ? ? ? return 0;
+> -
+> -err2:
+> - ? ? ? gpio_free(EGPIO_MAGICIAN_BL_POWER);
+> -err:
+> - ? ? ? return ret;
+> + ? ? ? return gpio_request_array(ARRAY_AND_SIZE(magician_bl_gpios));
+> ?}
+>
+> ?static int magician_backlight_notify(struct device *dev, int brightness)
+> @@ -376,8 +368,7 @@ static int magician_backlight_notify(struct device *dev, int brightness)
+>
+> ?static void magician_backlight_exit(struct device *dev)
+> ?{
+> - ? ? ? gpio_free(EGPIO_MAGICIAN_BL_POWER);
+> - ? ? ? gpio_free(EGPIO_MAGICIAN_BL_POWER2);
+> + ? ? ? gpio_free_array(ARRAY_AND_SIZE(magician_bl_gpios));
+> ?}
+>
+> ?static struct platform_pwm_backlight_data backlight_data = {
+> @@ -712,6 +703,12 @@ static struct platform_device *devices[] __initdata = {
+> ? ? ? ?&leds_gpio,
+> ?};
+>
+> +static struct gpio magician_lcd_gpios[] = {
+> + ? ? ? { GPIO104_MAGICIAN_LCD_POWER_1, GPIOF_OUT_INIT_LOW, "LCD power 1" },
+> + ? ? ? { GPIO105_MAGICIAN_LCD_POWER_2, GPIOF_OUT_INIT_LOW, "LCD power 2" },
+> + ? ? ? { GPIO106_MAGICIAN_LCD_POWER_3, GPIOF_OUT_INIT_LOW, "LCD power 3" }
+> +};
+> +
+> ?static void __init magician_init(void)
+> ?{
+> ? ? ? ?void __iomem *cpld;
+> @@ -747,16 +744,10 @@ static void __init magician_init(void)
+> ? ? ? ? ? ? ? ?system_rev = board_id & 0x7;
+> ? ? ? ? ? ? ? ?lcd_select = board_id & 0x8;
+> ? ? ? ? ? ? ? ?pr_info("LCD type: %s\n", lcd_select ? "Samsung" : "Toppoly");
+> - ? ? ? ? ? ? ? if (lcd_select && (system_rev < 3)) {
+> - ? ? ? ? ? ? ? ? ? ? ? gpio_request(GPIO75_MAGICIAN_SAMSUNG_POWER, "SAMSUNG_POWER");
+> - ? ? ? ? ? ? ? ? ? ? ? gpio_direction_output(GPIO75_MAGICIAN_SAMSUNG_POWER, 0);
+> - ? ? ? ? ? ? ? }
+> - ? ? ? ? ? ? ? gpio_request(GPIO104_MAGICIAN_LCD_POWER_1, "LCD_POWER_1");
+> - ? ? ? ? ? ? ? gpio_request(GPIO105_MAGICIAN_LCD_POWER_2, "LCD_POWER_2");
+> - ? ? ? ? ? ? ? gpio_request(GPIO106_MAGICIAN_LCD_POWER_3, "LCD_POWER_3");
+> - ? ? ? ? ? ? ? gpio_direction_output(GPIO104_MAGICIAN_LCD_POWER_1, 0);
+> - ? ? ? ? ? ? ? gpio_direction_output(GPIO105_MAGICIAN_LCD_POWER_2, 0);
+> - ? ? ? ? ? ? ? gpio_direction_output(GPIO106_MAGICIAN_LCD_POWER_3, 0);
+> + ? ? ? ? ? ? ? if (lcd_select && (system_rev < 3))
+> + ? ? ? ? ? ? ? ? ? ? ? gpio_request_one(GPIO75_MAGICIAN_SAMSUNG_POWER,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?GPIOF_OUT_INIT_LOW, "SAMSUNG_POWER");
+> + ? ? ? ? ? ? ? gpio_request_array(ARRAY_AND_SIZE(magician_lcd_gpios));
+> ? ? ? ? ? ? ? ?pxa_set_fb_info(NULL, lcd_select ? &samsung_info : &toppoly_info);
+> ? ? ? ?} else
+> ? ? ? ? ? ? ? ?pr_err("LCD detection: CPLD mapping failed\n");
+> --
+> 1.7.4.4
+>
+>
+>
