@@ -1,172 +1,58 @@
-From: sangwook.lee@linaro.org (Sangwook Lee)
-Date: Wed, 6 Jul 2011 09:31:46 +0100
-Subject: [PATCH] ARM:SAMSUNG: DMA Cleanup as per sparse
-In-Reply-To: <00c001cc3ba3$34558670$9d009350$%kim@samsung.com>
-References: <1309428980-20176-1-git-send-email-sangwook.lee@linaro.org>
-	<00c001cc3ba3$34558670$9d009350$%kim@samsung.com>
-Message-ID: <CADPsn1bM191O44B2ffohQU+qD859yDcNHAZqF2=D824oQYD8sg@mail.gmail.com>
+From: penberg@kernel.org (Pekka Enberg)
+Date: Wed, 6 Jul 2011 11:45:41 +0300
+Subject: [PATCH 00/10] mm: Linux VM Infrastructure to support Memory Power
+	Management
+In-Reply-To: <20110629130038.GA7909@in.ibm.com>
+References: <1306499498-14263-1-git-send-email-ankita@in.ibm.com>
+	<20110629130038.GA7909@in.ibm.com>
+Message-ID: <CAOJsxLHQP=-srK_uYYBsPb7+rUBnPZG7bzwtCd-rRaQa4ikUFg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I can reproduce this errors and let me see how to fix those.
+Hi Ankita,
 
+[ I don't really know anything about memory power management but
+  here's my two cents since you asked for it. ]
 
-On 6 July 2011 07:08, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> Kukjin Kim wrote:
->>
->> Sangwook Lee wrote:
->> >
->> > Function declaration differs between file:s3c-pl330.c and file:dma.h
->> > and SPARSE (Documentation/sparse.txt) gives error messages
->> >
->> > Signed-off-by: Sangwook Lee <sangwook.lee@linaro.org>
->> > ---
->> > ?arch/arm/plat-samsung/include/plat/dma.h | ? 16 ++++++++--------
->> > ?1 files changed, 8 insertions(+), 8 deletions(-)
->> >
->> > diff --git a/arch/arm/plat-samsung/include/plat/dma.h b/arch/arm/plat-
->> > samsung/include/plat/dma.h
->> > index 2e8f8c6..7365f46 100644
->> > --- a/arch/arm/plat-samsung/include/plat/dma.h
->> > +++ b/arch/arm/plat-samsung/include/plat/dma.h
->> > @@ -62,7 +62,7 @@ typedef int ?(*s3c2410_dma_opfn_t)(struct
->> > s3c2410_dma_chan *,
->> > ? * request a dma channel exclusivley
->> > ?*/
->> >
->> > -extern int s3c2410_dma_request(unsigned int channel,
->> > +extern int s3c2410_dma_request(enum dma_ch id,
->> > ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct s3c2410_dma_client *, void *dev);
->> >
->> >
->> > @@ -71,14 +71,14 @@ extern int s3c2410_dma_request(unsigned int channel,
->> > ? * change the state of the dma channel
->> > ?*/
->> >
->> > -extern int s3c2410_dma_ctrl(unsigned int channel, enum s3c2410_chan_op
-> op);
->> > +extern int s3c2410_dma_ctrl(enum dma_ch id, enum s3c2410_chan_op op);
->> >
->> > ?/* s3c2410_dma_setflags
->> > ? *
->> > ? * set the channel's flags to a given state
->> > ?*/
->> >
->> > -extern int s3c2410_dma_setflags(unsigned int channel,
->> > +extern int s3c2410_dma_setflags(enum dma_ch id,
->> > ? ? ? ? ? ? ? ? ? ? ? ? ? ? unsigned int flags);
->> >
->> > ?/* s3c2410_dma_free
->> > @@ -86,7 +86,7 @@ extern int s3c2410_dma_setflags(unsigned int channel,
->> > ? * free the dma channel (will also abort any outstanding operations)
->> > ?*/
->> >
->> > -extern int s3c2410_dma_free(unsigned int channel, struct
-> s3c2410_dma_client *);
->> > +extern int s3c2410_dma_free(enum dma_ch id, struct s3c2410_dma_client
-> *);
->> >
->> > ?/* s3c2410_dma_enqueue
->> > ? *
->> > @@ -95,7 +95,7 @@ extern int s3c2410_dma_free(unsigned int channel,
-> struct
->> > s3c2410_dma_client *);
->> > ? * drained before the buffer is given to the DMA system.
->> > ?*/
->> >
->> > -extern int s3c2410_dma_enqueue(unsigned int channel, void *id,
->> > +extern int s3c2410_dma_enqueue(enum dma_ch idx, void *id,
->> > ? ? ? ? ? ? ? ? ? ? ? ? ? ?dma_addr_t data, int size);
->> >
->> > ?/* s3c2410_dma_config
->> > @@ -103,14 +103,14 @@ extern int s3c2410_dma_enqueue(unsigned int
-> channel,
->> > void *id,
->> > ? * configure the dma channel
->> > ?*/
->> >
->> > -extern int s3c2410_dma_config(unsigned int channel, int xferunit);
->> > +extern int s3c2410_dma_config(enum dma_ch id, int xferunit);
->> >
->> > ?/* s3c2410_dma_devconfig
->> > ? *
->> > ? * configure the device we're talking to
->> > ?*/
->> >
->> > -extern int s3c2410_dma_devconfig(unsigned int channel,
->> > +extern int s3c2410_dma_devconfig(enum dma_ch id,
->> > ? ? ? ? ? ? enum s3c2410_dmasrc source, unsigned long devaddr);
->> >
->> > ?/* s3c2410_dma_getposition
->> > @@ -118,7 +118,7 @@ extern int s3c2410_dma_devconfig(unsigned int
-> channel,
->> > ? * get the position that the dma transfer is currently at
->> > ?*/
->> >
->> > -extern int s3c2410_dma_getposition(unsigned int channel,
->> > +extern int s3c2410_dma_getposition(enum dma_ch id,
->> > ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?dma_addr_t *src, dma_addr_t *dest);
->> >
->> > ?extern int s3c2410_dma_set_opfn(unsigned int, s3c2410_dma_opfn_t rtn);
->> > --
+On Wed, Jun 29, 2011 at 4:00 PM, Ankita Garg <ankita@in.ibm.com> wrote:
+> I) Dynamic Power Transition
 >
-> Hi Sangwook Lee,
+> The goal here is to ensure that as much as possible, on an idle system,
+> the memory references do not get spread across the entire RAM, a problem
+> similar to memory fragmentation. The proposed approach is as below:
 >
-> I reverted this in my -fix tree just now because this makes following error
-> with s3c2410_defconfig.
->
-> arch/arm/plat-samsung/include/plat/dma.h:66: warning: 'enum dma_ch' declared
-> inside parameter list
-> arch/arm/plat-samsung/include/plat/dma.h:66: warning: its scope is only this
-> definition or declaration, which is probably not what you want
-> arch/arm/plat-samsung/include/plat/dma.h:74: warning: 'enum dma_ch' declared
-> inside parameter list
-> arch/arm/plat-samsung/include/plat/dma.h:82: warning: 'enum dma_ch' declared
-> inside parameter list
-> arch/arm/plat-samsung/include/plat/dma.h:89: warning: 'enum dma_ch' declared
-> inside parameter list
-> arch/arm/plat-samsung/include/plat/dma.h:99: warning: 'enum dma_ch' declared
-> inside parameter list
-> arch/arm/plat-samsung/include/plat/dma.h:106: warning: 'enum dma_ch'
-> declared inside parameter list
-> arch/arm/plat-samsung/include/plat/dma.h:114: warning: 'enum dma_ch'
-> declared inside parameter list
-> arch/arm/plat-samsung/include/plat/dma.h:122: warning: 'enum dma_ch'
-> declared inside parameter list
-> drivers/mmc/host/s3cmci.c: In function 'finalize_request':
-> drivers/mmc/host/s3cmci.c:889: error: type of formal parameter 1 is
-> incomplete
-> drivers/mmc/host/s3cmci.c: In function 's3cmci_dma_setup':
-> drivers/mmc/host/s3cmci.c:927: error: type of formal parameter 1 is
-> incomplete
-> drivers/mmc/host/s3cmci.c:930: error: type of formal parameter 1 is
-> incomplete
-> drivers/mmc/host/s3cmci.c:933: error: type of formal parameter 1 is
-> incomplete
-> drivers/mmc/host/s3cmci.c: In function 's3cmci_prepare_dma':
-> drivers/mmc/host/s3cmci.c:1091: error: type of formal parameter 1 is
-> incomplete
-> drivers/mmc/host/s3cmci.c:1111: error: type of formal parameter 1 is
-> incomplete
-> drivers/mmc/host/s3cmci.c:1114: error: type of formal parameter 1 is
-> incomplete
-> drivers/mmc/host/s3cmci.c:1119: error: type of formal parameter 1 is
-> incomplete
-> drivers/mmc/host/s3cmci.c: In function 's3cmci_probe':
-> drivers/mmc/host/s3cmci.c:1692: error: type of formal parameter 1 is
-> incomplete
-> drivers/mmc/host/s3cmci.c:1778: error: type of formal parameter 1 is
-> incomplete
-> drivers/mmc/host/s3cmci.c: In function 's3cmci_remove':
-> drivers/mmc/host/s3cmci.c:1840: error: type of formal parameter 1 is
-> incomplete
->
-> Thanks.
->
-> Best regards,
-> Kgene.
-> --
-> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-> SW Solution Development Team, Samsung Electronics Co., Ltd.
->
->
+> 1) One of the first things is to ensure that the memory allocations do
+> not spill over to more number of regions. Thus the allocator needs to
+> be aware of the address boundary of the different regions.
+
+Why does the allocator need to know about address boundaries? Why
+isn't it enough to make the page allocator and reclaim policies favor using
+memory from lower addresses as aggressively as possible? That'd mean
+we'd favor the first memory banks and could keep the remaining ones
+powered off as much as possible.
+
+IOW, why do we need to support scenarios such as this:
+
+   bank 0     bank 1   bank 2    bank3
+ | online  | offline | online  | offline |
+
+instead of using memory compaction and possibly something like the
+SLUB defragmentation patches to turn the memory map into this:
+
+   bank 0     bank 1   bank 2   bank3
+ | online  | online  | offline | offline |
+
+> 2) At the time of allocation, before spilling over allocations to the
+> next logical region, the allocator needs to make a best attempt to
+> reclaim some memory from within the existing region itself first. The
+> reclaim here needs to be in LRU order within the region. ?However, if
+> it is ascertained that the reclaim would take a lot of time, like there
+> are quite a fe write-backs needed, then we can spill over to the next
+> memory region (just like our NUMA node allocation policy now).
+
+I think a much more important question is what happens _after_ we've
+allocated and free'd tons of memory few times. AFAICT, memory
+regions don't help with that kind of fragmentation that will eventually
+happen anyway.
+
+					Pekka
