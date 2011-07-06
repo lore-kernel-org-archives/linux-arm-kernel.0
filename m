@@ -1,31 +1,56 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 06 Jul 2011 11:23:10 +0100
-Subject: [PATCH 1/7] ARM: ensure tag tables are const
+Date: Wed, 06 Jul 2011 11:23:30 +0100
+Subject: [PATCH 2/7] ARM: decompressor: use better output sections
 In-Reply-To: <20110706102245.GO8286@n2100.arm.linux.org.uk>
 References: <20110706102245.GO8286@n2100.arm.linux.org.uk>
-Message-ID: <E1QePGA-0004zY-2l@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1QePGU-0004zd-9e@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nothing should ever modify a tag table entry, so mark these const.
+Place read-only data in a .rodata output section, and the compressed
+piggy data in .piggydata.  Place the .got.plt section before the .got
+section as is standard ELF practise.
+
+This allows the piggydata to be more easily extracted from the
+compressed vmlinux file for verification purposes.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/include/asm/setup.h |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/boot/compressed/vmlinux.lds.in |   12 ++++++++----
+ 1 files changed, 8 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/include/asm/setup.h b/arch/arm/include/asm/setup.h
-index ee2ad8a..c3b5c79 100644
---- a/arch/arm/include/asm/setup.h
-+++ b/arch/arm/include/asm/setup.h
-@@ -187,7 +187,7 @@ struct tagtable {
+diff --git a/arch/arm/boot/compressed/vmlinux.lds.in b/arch/arm/boot/compressed/vmlinux.lds.in
+index ea80abe..4e72883 100644
+--- a/arch/arm/boot/compressed/vmlinux.lds.in
++++ b/arch/arm/boot/compressed/vmlinux.lds.in
+@@ -33,20 +33,24 @@ SECTIONS
+     *(.text.*)
+     *(.fixup)
+     *(.gnu.warning)
++    *(.glue_7t)
++    *(.glue_7)
++  }
++  .rodata : {
+     *(.rodata)
+     *(.rodata.*)
+-    *(.glue_7)
+-    *(.glue_7t)
++  }
++  .piggydata : {
+     *(.piggydata)
+-    . = ALIGN(4);
+   }
  
- #define __tag __used __attribute__((__section__(".taglist.init")))
- #define __tagtable(tag, fn) \
--static struct tagtable __tagtable_##fn __tag = { tag, fn }
-+static const struct tagtable __tagtable_##fn __tag = { tag, fn }
++  . = ALIGN(4);
+   _etext = .;
  
- /*
-  * Memory map description
++  .got.plt		: { *(.got.plt) }
+   _got_start = .;
+   .got			: { *(.got) }
+   _got_end = .;
+-  .got.plt		: { *(.got.plt) }
+   _edata = .;
+ 
+   . = BSS_START;
 -- 
 1.7.4.4
