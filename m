@@ -1,208 +1,126 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Wed, 6 Jul 2011 13:58:10 +0800
-Subject: [PATCH v2] ARM: CSR: Adding CSR SiRFprimaII board support
-In-Reply-To: <20110706053026.GB9978@ponder.secretlab.ca>
-References: <1309231954-23260-1-git-send-email-bs14@csr.com>
-	<201106292329.44447.arnd@arndb.de>
-	<BANLkTinfKCMcutMDQ+mpdD4EUy9mCpZs+w@mail.gmail.com>
-	<201106301236.25822.arnd@arndb.de>
-	<BANLkTikoMu3ccUxj5KRmKzdReQcBqK4Y9Q@mail.gmail.com>
-	<CAGsJ_4wSKP6EUihOVbUJJ+HUynWGp8PA=8J_WhgmOtVhpd5_Lg@mail.gmail.com>
-	<20110706053026.GB9978@ponder.secretlab.ca>
-Message-ID: <CAGsJ_4xV7ecdqnB5gJDUDSg4nvebgubBj4qGJGaCtcpbj-b0gQ@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 5 Jul 2011 23:59:43 -0600 (MDT)
+Subject: [PATCH v2 3/5] OMAP4: powerdomain data: Fix core mem states and
+	missing cefuse flag
+In-Reply-To: <1309552060-4547-4-git-send-email-b-cousson@ti.com>
+References: <1309552060-4547-1-git-send-email-b-cousson@ti.com>
+	<1309552060-4547-4-git-send-email-b-cousson@ti.com>
+Message-ID: <alpine.DEB.2.00.1107052358450.4217@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/7/6 Grant Likely <grant.likely@secretlab.ca>:
-> On Tue, Jul 05, 2011 at 04:34:05PM +0800, Barry Song wrote:
->> Hi Arnd,
->>
->> 2011/7/1 Barry Song <21cnbao@gmail.com>:
->> > Hi Arnd,
->> >
->> > 2011/6/30 Arnd Bergmann <arnd@arndb.de>:
->> >> On Thursday 30 June 2011, Barry Song wrote:
->> >>
->> >>> > Is this really just one bus with a huge address space, or rather some
->> >>> > nested buses? I'd prefer to have the device tree representation as
->> >>> > close as possible to the actual layout.
->> >>>
->> >>> there are two AXI buses in prima2. AXI-1 connect to memory, AXI-2 is
->> >>> transferred to CSR self-defined IOBUS by CPUIF, then 1 intterupt
->> >>> controller and 9 IO bridges are connected to the IOBUS .
->> >>> The 9 IO bridges are SYSIOBG, PERIIOBG,CPURTCIOBG, UUSIOBG, GRAPHIOBG,
->> >>> MEDIAIOBG, DSPIOBG, DISPIOBG, MEMIOBG. Every iobrg connect to a group
->> >>> of controllers.
->> >>> For example, DISPIOBG connect to VPP and LCD, SYSIOBG connect to CLKC,
->> >>> RSTC, RSC and CPHIFBG, DSPIOBG connect to DSPIF, GPS and DSP.
->> >>> PERIIOBG connect to TIMER, NAND, AUDIO, UART0, UART1, UART2, USP0,
->> >>> USP1, USP2, SPI0, I2C0, I2C1, GPIO, *SYS2PCI* and so on. Then
->> >>> *SYS2PCI* connect to SD.
->> >>>
->> >>> The indendation descible the device hierarchy
->> >>> AXI-1
->> >>> ? ? ? ? ?Memory
->> >>> AXI-2
->> >>> ? ? ? ? ?interrupt controller
->> >>> ? ? ? ? ?IOBG...
->> >>> ? ? ? ? ? ? ? ? ? xxxx
->> >>> ? ? ? ? ?IOBG...
->> >>> ? ? ? ? ? ? ? ? ? xxxx
->> >>> ? ? ? ? ?IOBG...
->> >>> ? ? ? ? ? ? ? ? ? xxxx
->> >>> ? ? ? ? ?IOBG...
->> >>> ? ? ? ? ? ? ? ? ? xxxx
->> >>> ? ? ? ? ?IOBG...
->> >>> ? ? ? ? ? ? ? ? ? xxxx
->> >>> ? ? ? ? ?IOBG...
->> >>> ? ? ? ? ? ? ? ? ? SYS2PCI
->> >>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? SD
->> >>>
->> >>> i have get the IC guy Weizeng involved, maybe he can explain better than me :-)
->> >>
->> >> I think it would be good to represent the IOBG devices in the device tree then.
->> >> You don't need to represent AXI-1 because memory is special anyway, and I would
->> >> not bother to list SYS2PCI if the intention of that block was to hide the fact
->> >> that it's PCI behind it. Properly instantiating it as a PCI bridge would be
->> >> a lot of work that is probably not worth it.
->> >>
->> >> My usual plea to hardware developers: Please make the registers
->> >> autodiscoverable from software! On an AMBA bus, please use the PrimeCell
->> >> register layout. If you always have an IOBG device behind, they should
->> >> all have the same identifier for that kind of bus bridge.
->> >>
->> >> For the IOBG, it would be ideal to have a similar way of finding and
->> >> configuring the connected hardware, including:
->> >>
->> >> * unique identifier for each distinct IP block
->> >> * revision of that block
->> >> * MMIO ranges and sizes, relative to the bus
->> >> * interrupt numbers, relative to a local interrupt controller
->> >> * location identifier (like PCI bus/device/fn number) that can be
->> >> ?referred to by other devices
->> >> * clock management for that device
->> >> * power management for that device
->> >>
->> >> If your IODB infrastructure already has this, you should create a new
->> >> bus-type for this in Linux, which will let you detect all devices
->> >> in a consistent manner without having to list them in the device tree.
->> >
->> > IO bridges in prima2 don't have that. Configuration is hardcoded now.
->> > but we have learned so much from you and hope to improve our future IC
->> > design.
->>
->>
->> i have tried to figure out the full DT:
->>
->> /dts-v1/;
->> / {
->> ? ? ? model = "SiRF Prima2 EVB";
->> ? ? ? compatible = "sirf,prima2-cb", "sirf,prima2";
->> ? ? ? #address-cells = <1>;
->> ? ? ? #size-cells = <1>;
->> ? ? ? interrupt-parent = <&intc>;
->>
->> ? ? ? memory {
->
-> memory at 0
->
->> ? ? ? ? ? ? ? reg = <0x00000000 0x20000000>;
->> ? ? ? };
->>
->> ? ? ? chosen {
->> ? ? ? ? ? ? ? bootargs = "mem=512M real_root=/dev/mmcblk0p2 console=ttyS0 panel=1
->> bootsplash=true bpp=16 androidboot.console=ttyS1";
->> ? ? ? ? ? ? ? linux,stdout-path = &uart1;
->> ? ? ? };
->>
->> ? ? ? cpus {
->> ? ? ? ? ? ? ? #address-cells = <1>;
->> ? ? ? ? ? ? ? #size-cells = <0>;
->>
->> ? ? ? ? ? ? ? ARM-CortexA9,SiRFprimaII at 0 {
->
-> cpu at 0 {
->
-> Don't duplicate the crack that powerpc did for cpu node names. ?Use a
-> compatible property to identify the specific CPU model.
->
->> ? ? ? ? ? ? ? ? ? ? ? device_type = "cpu";
->
-> Drop device_type here.
->
->> ? ? ? ? ? ? ? ? ? ? ? reg = <0x0>;
->> ? ? ? ? ? ? ? ? ? ? ? d-cache-line-size = <32>;
->> ? ? ? ? ? ? ? ? ? ? ? i-cache-line-size = <32>;
->> ? ? ? ? ? ? ? ? ? ? ? d-cache-size = <32768>;
->> ? ? ? ? ? ? ? ? ? ? ? i-cache-size = <32768>;
->> ? ? ? ? ? ? ? ? ? ? ? /* from bootloader */
->> ? ? ? ? ? ? ? ? ? ? ? timebase-frequency = <0>;
->> ? ? ? ? ? ? ? ? ? ? ? bus-frequency = <0>;
->> ? ? ? ? ? ? ? ? ? ? ? clock-frequency = <0>;
->> ? ? ? ? ? ? ? };
->> ? ? ? };
->>
->> ? ? ? axi {
->> ? ? ? ? ? ? ? compatible = "simple-bus";
->> ? ? ? ? ? ? ? #address-cells = <1>;
->> ? ? ? ? ? ? ? #size-cells = <1>;
->> ? ? ? ? ? ? ? ranges = <0x40000000 0x40000000 0x80000000>;
->>
->> ? ? ? ? ? ? ? l2-cache-controller at 0x80040000 {
->
-> l2-cache-controller at 80040000 ?(Drop the '0x' from node names; address
-> in the node name is always hex.
->
->> ? ? ? ? ? ? ? ? ? ? ? compatible = "arm,pl310-cache", "cache";
->
-> Drop the "cache" compatible value here.
->
->> ? ? ? ? ? ? ? ? ? ? ? reg = <0x80040000 0x1000>;
->> ? ? ? ? ? ? ? ? ? ? ? interrupts = <59>;
->> ? ? ? ? ? ? ? };
->>
->> ? ? ? ? ? ? ? sirfsoc-iobus {
->> ? ? ? ? ? ? ? ? ? ? ? compatible = "simple-bus";
->> ? ? ? ? ? ? ? ? ? ? ? #address-cells = <1>;
->> ? ? ? ? ? ? ? ? ? ? ? #size-cells = <1>;
->> ? ? ? ? ? ? ? ? ? ? ? ranges = <0x56000000 0x56000000 0x1b0000
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 0x80010000 0x80010000 0x30000
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 0x88000000 0x88000000 0x40040000>;
->>
->> ? ? ? ? ? ? ? ? ? ? ? intc: interrupt-controller at 0x80020000 {
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? #interrupt-cells = <1>;
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? interrupt-controller;
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? compatible = "sirf,intc", "sirf,prima2-intc";
->
-> This looks backwards. ?Most specific values should appear first.
-> "sirf,intc" looks to be generic when compared to "sirf,prima2-intc".
-> I'm also concerned that "sirf,intc" is trying to be too generic. ?As
-> much as possible compatible values should reflect a real
-> implementation of the interface, not a generic abstract name. ?Future
-> hardware can always claim compatibility with existing older hardware.
-> You're probably better off dropping "sirf,intc" entirely, and doing
-> the same for similar properties throughout the file.
+Hi
 
-i have been confused by compatible in dts and drivers for some time.
-if an intc ip core is shared by two chips, for example, prima2 and
-atlas6. is the following right?
+I split the indentation changes into the following patch, queued for 3.1 
+at git://git.pwsan.com/linux-2.6 in the 'prcm_cleanup_a_3.1' branch.
 
-in dts for prima2: compatible = "sirf,prima2-intc";
-in dts for atlas6:  compatible = "sirf,prima2-atlas6";
-in intc drivers shared for both:     compatible = "sirf,prima2-intc",
-"sirf,prima2-atlas6";
 
-in my understanding, dts for special soc/board contains special
-compatible for the chip, drivers shared by multi-soc/board contain all
-compatible lists which can be supported by them?
+- Paul
 
-what's the generic way for this?
+From: Benoit Cousson <b-cousson@ti.com>
+Date: Tue, 5 Jul 2011 23:44:32 -0600
+Subject: [PATCH] OMAP4: powerdomain data: Fix indentation
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
 
->
-> Also, for every new compatible value make sure you add documentation
-> for it to Documentation/devicetree/bindings. (You may have already
-> done so, it's just something I remind people about a lot).
->
-> These comments also apply through the rest of the file.
->
->
+Indent flags to be aligned with other fields.
+
+Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+Cc: Paul Walmsley <paul@pwsan.com>
+Cc: Rajendra Nayak <rnayak@ti.com>
+Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+[paul at pwsan.com: split this patch from an earlier patch by Beno?t;
+ edited commit message]
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+---
+ arch/arm/mach-omap2/powerdomains44xx_data.c |   18 +++++++++---------
+ 1 files changed, 9 insertions(+), 9 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/powerdomains44xx_data.c b/arch/arm/mach-omap2/powerdomains44xx_data.c
+index c4222c7..3a7e678 100644
+--- a/arch/arm/mach-omap2/powerdomains44xx_data.c
++++ b/arch/arm/mach-omap2/powerdomains44xx_data.c
+@@ -53,7 +53,7 @@ static struct powerdomain core_44xx_pwrdm = {
+ 		[3] = PWRSTS_ON,	/* ducati_l2ram */
+ 		[4] = PWRSTS_ON,	/* ducati_unicache */
+ 	},
+-	.flags		= PWRDM_HAS_LOWPOWERSTATECHANGE,
++	.flags		  = PWRDM_HAS_LOWPOWERSTATECHANGE,
+ };
+ 
+ /* gfx_44xx_pwrdm: 3D accelerator power domain */
+@@ -70,7 +70,7 @@ static struct powerdomain gfx_44xx_pwrdm = {
+ 	.pwrsts_mem_on	= {
+ 		[0] = PWRSTS_ON,	/* gfx_mem */
+ 	},
+-	.flags		= PWRDM_HAS_LOWPOWERSTATECHANGE,
++	.flags		  = PWRDM_HAS_LOWPOWERSTATECHANGE,
+ };
+ 
+ /* abe_44xx_pwrdm: Audio back end power domain */
+@@ -90,7 +90,7 @@ static struct powerdomain abe_44xx_pwrdm = {
+ 		[0] = PWRSTS_ON,	/* aessmem */
+ 		[1] = PWRSTS_ON,	/* periphmem */
+ 	},
+-	.flags		= PWRDM_HAS_LOWPOWERSTATECHANGE,
++	.flags		  = PWRDM_HAS_LOWPOWERSTATECHANGE,
+ };
+ 
+ /* dss_44xx_pwrdm: Display subsystem power domain */
+@@ -108,7 +108,7 @@ static struct powerdomain dss_44xx_pwrdm = {
+ 	.pwrsts_mem_on	= {
+ 		[0] = PWRSTS_ON,	/* dss_mem */
+ 	},
+-	.flags		= PWRDM_HAS_LOWPOWERSTATECHANGE,
++	.flags		  = PWRDM_HAS_LOWPOWERSTATECHANGE,
+ };
+ 
+ /* tesla_44xx_pwrdm: Tesla processor power domain */
+@@ -130,7 +130,7 @@ static struct powerdomain tesla_44xx_pwrdm = {
+ 		[1] = PWRSTS_ON,	/* tesla_l1 */
+ 		[2] = PWRSTS_ON,	/* tesla_l2 */
+ 	},
+-	.flags		= PWRDM_HAS_LOWPOWERSTATECHANGE,
++	.flags		  = PWRDM_HAS_LOWPOWERSTATECHANGE,
+ };
+ 
+ /* wkup_44xx_pwrdm: Wake-up power domain */
+@@ -241,7 +241,7 @@ static struct powerdomain ivahd_44xx_pwrdm = {
+ 		[2] = PWRSTS_ON,	/* tcm1_mem */
+ 		[3] = PWRSTS_ON,	/* tcm2_mem */
+ 	},
+-	.flags		= PWRDM_HAS_LOWPOWERSTATECHANGE,
++	.flags		  = PWRDM_HAS_LOWPOWERSTATECHANGE,
+ };
+ 
+ /* cam_44xx_pwrdm: Camera subsystem power domain */
+@@ -258,7 +258,7 @@ static struct powerdomain cam_44xx_pwrdm = {
+ 	.pwrsts_mem_on	= {
+ 		[0] = PWRSTS_ON,	/* cam_mem */
+ 	},
+-	.flags		= PWRDM_HAS_LOWPOWERSTATECHANGE,
++	.flags		  = PWRDM_HAS_LOWPOWERSTATECHANGE,
+ };
+ 
+ /* l3init_44xx_pwrdm: L3 initators pheripherals power domain  */
+@@ -276,7 +276,7 @@ static struct powerdomain l3init_44xx_pwrdm = {
+ 	.pwrsts_mem_on	= {
+ 		[0] = PWRSTS_ON,	/* l3init_bank1 */
+ 	},
+-	.flags		= PWRDM_HAS_LOWPOWERSTATECHANGE,
++	.flags		  = PWRDM_HAS_LOWPOWERSTATECHANGE,
+ };
+ 
+ /* l4per_44xx_pwrdm: Target peripherals power domain */
+@@ -296,7 +296,7 @@ static struct powerdomain l4per_44xx_pwrdm = {
+ 		[0] = PWRSTS_ON,	/* nonretained_bank */
+ 		[1] = PWRSTS_ON,	/* retained_bank */
+ 	},
+-	.flags		= PWRDM_HAS_LOWPOWERSTATECHANGE,
++	.flags		  = PWRDM_HAS_LOWPOWERSTATECHANGE,
+ };
+ 
+ /*
+-- 
+1.7.5.4
