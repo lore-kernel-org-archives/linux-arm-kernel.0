@@ -1,59 +1,57 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 6 Jul 2011 15:10:54 -0600
-Subject: [RFC/RFT 1/2] gpio/basic_mmio: add support for enable register
-In-Reply-To: <4E12AC10.9020206@gmail.com>
-References: <cover.1309840042.git.nsekhar@ti.com>
-	<83915224c24e43224272b1bf570cddb9545279a6.1309840042.git.nsekhar@ti.com>
-	<4E12AC10.9020206@gmail.com>
-Message-ID: <20110706211054.GE5371@ponder.secretlab.ca>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 6 Jul 2011 22:14:42 +0100
+Subject: [PATCH] ARM: fix regression in IXP4xx clocksource
+In-Reply-To: <m3liwb15t2.fsf@intrepid.localdomain>
+References: <m3liwb15t2.fsf@intrepid.localdomain>
+Message-ID: <20110706211442.GY8286@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 05, 2011 at 04:15:44PM +1000, Ryan Mallon wrote:
-> On 05/07/11 15:10, Sekhar Nori wrote:
-> >Some GPIO controllers have an enable register
-> >which needs to be written to before a GPIO
-> >can be used.
-> >
-> >Add support for enabling the GPIO. At this
-> >time inverted logic for enabling the GPIO
-> >is not supported. This can be done by adding
-> >a disable register as and when a controller
-> >with this comes along.
-> >
-> >Signed-off-by: Sekhar Nori<nsekhar@ti.com>
-> >---
-> >
-> <snip>
-> 
-> >static int bgpio_setup_io(struct bgpio_chip *bgc,
-> >  			  void __iomem *dat,
-> >@@ -369,6 +401,7 @@ int __devinit bgpio_init(struct bgpio_chip *bgc,
-> >  			 void __iomem *clr,
-> >  			 void __iomem *dirout,
-> >  			 void __iomem *dirin,
-> >+			 void __iomem *en,
-> >  			 bool big_endian)
-> 
-> The arguments to this function are getting a bit unwieldy :-). Maybe
-> we need to introduce something like:
-> 
-> struct bgpio_chip_info {
->     struct device *dev;
->     unsigned long sz;
->     void __iomem *dat;
->     void __iomem *set;
->     void __iomem *clr;
->     void __iomem *dirout;
->     void __iomem *dirin;
->     void __iomem *en;
->     bool big_endian;
-> };
-> 
-> and pass that to bgpio_init instead. It would have the added
-> benefits of making the drivers more readable and that
-> bgpio_chip_info structs in the drivers can probably be marked
-> __initdata also.
+Did you see Thomas' reply to your last patch?  Would you mind responding
+to that please, before asking Linus to merge this?
 
-Or, what may be better is to make callers directly update the
-bgpio_chip structure.
+On Wed, Jul 06, 2011 at 11:02:17PM +0200, Krzysztof Halasa wrote:
+> From: Richard Cochran <richardcochran@gmail.com>
+> 
+> Commit 234b6ceddb4fc2a4bc5b9a7670f070f6e69e0868
+> 
+>    clocksource: convert ARM 32-bit up counting clocksources
+> 
+> broke the build for ixp4xx and made big endian operation impossible.
+> This commit restores the original behaviour.
+> 
+> Signed-off-by: Richard Cochran <richard.cochran@omicron.at>
+> Signed-off-by: Krzysztof Ha?asa <khc@pm.waw.pl>
+> 
+> diff --git a/arch/arm/mach-ixp4xx/common.c b/arch/arm/mach-ixp4xx/common.c
+> index 74ed81a..0777257 100644
+> --- a/arch/arm/mach-ixp4xx/common.c
+> +++ b/arch/arm/mach-ixp4xx/common.c
+> @@ -419,14 +419,20 @@ static void notrace ixp4xx_update_sched_clock(void)
+>  /*
+>   * clocksource
+>   */
+> +
+> +static cycle_t ixp4xx_clocksource_read(struct clocksource *c)
+> +{
+> +	return *IXP4XX_OSTS;
+> +}
+> +
+>  unsigned long ixp4xx_timer_freq = IXP4XX_TIMER_FREQ;
+>  EXPORT_SYMBOL(ixp4xx_timer_freq);
+>  static void __init ixp4xx_clocksource_init(void)
+>  {
+>  	init_sched_clock(&cd, ixp4xx_update_sched_clock, 32, ixp4xx_timer_freq);
+>  
+> -	clocksource_mmio_init(&IXP4XX_OSTS, "OSTS", ixp4xx_timer_freq, 200, 32,
+> -			clocksource_mmio_readl_up);
+> +	clocksource_mmio_init(NULL, "OSTS", ixp4xx_timer_freq, 200, 32,
+> +			ixp4xx_clocksource_read);
+>  }
+>  
+>  /*
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
