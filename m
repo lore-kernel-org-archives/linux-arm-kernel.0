@@ -1,89 +1,51 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Thu, 7 Jul 2011 00:12:19 +0800
-Subject: [PATCH v4] arm: mach-mmp: brownstone.c support multiple sd slots
-In-Reply-To: <6AAC67C8-1C8F-4F15-9CED-5BA83CA21C39@marvell.com>
-References: <59C2B513-EC04-4CA2-818B-9901CAF3E554@marvell.com>
-	<20110427093328.GU17290@n2100.arm.linux.org.uk>
-	<161C3F6C-0986-4364-B458-DBA4D08456FD@marvell.com>
-	<1F336A22-BAC3-41E3-8D4E-5DF27874D1EA@marvell.com>
-	<20110428095127.GX17290@n2100.arm.linux.org.uk>
-	<3BFCE791-3BAD-42ED-BC87-A27F40D6C77C@marvell.com>
-	<CAMPhdO-TTRP-k7J-zrG2_rQJsmNDRhTgpqiiX2yqW+Egf8+t2A@mail.gmail.com>
-	<CAMj5BkiK17RMY-vEENDqQiDOmfG0Esnp7QDooKWVrhkQL4g6Ow@mail.gmail.com>
-	<CAMPhdO-b_dpC2ueexEFujr6p_NRb2JwDc0-UEx3cfOSVcZ-d6w@mail.gmail.com>
-	<67F311C7-B489-41E6-BC85-C06DACC7263A@marvell.com>
-	<6AAC67C8-1C8F-4F15-9CED-5BA83CA21C39@marvell.com>
-Message-ID: <CAMPhdO-M9wsnop_1s3inO4LcDE_USTjGSpE-JisRKLvPr3UVSQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 6 Jul 2011 18:13:19 +0200
+Subject: [PATCH 1/3] ARM: CSR: Adding CSR SiRFprimaII board support
+In-Reply-To: <20110706152546.GE8286@n2100.arm.linux.org.uk>
+References: <1309945678-18813-1-git-send-email-bs14@csr.com>
+	<201107061641.05569.arnd@arndb.de>
+	<20110706152546.GE8286@n2100.arm.linux.org.uk>
+Message-ID: <201107061813.19933.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 7, 2011 at 12:08 AM, Philip Rakity <prakity@marvell.com> wrote:
-> Eric,
->
-> Not sure what to suggest.
->
-> If it makes more sense to take V3 which powers on the wifi card but does not do power handling per
-> new spec take that. ?At least wifi card works and then wait for power code. ?New code could delete
-> power code as part of the mod.
->
-> If it makes more sense to wait for power code -- take V4.
->
+On Wednesday 06 July 2011, Russell King - ARM Linux wrote:
+> Ha, you've no idea what kind of messed up ideas hardware people come up
+> with then.  Take this - this is real hardware which I've had Linux
+> running on continuously for the last 13 years.  Here is the /proc/ioports:
+> 
+< skipped lots of interesting information about how messed up the hardware can be>
 
-No worries. I'll wait for v4.
+> So, if you do an ioport_map() to convert from the ISA address to a bus
+> specific address, and then add the device specific offset, you end up
+> with information lost, and you no longer know how to manipulate the
+> cookie into the correct bus address and access type.
+> 
+> The alternative is you keep the returned ioport cookie the same as the
+> ISA address, and do all the conversion in ioread/iowrite - that's even
+> more horrible than how it's already doing because then you need to know
+> if its real MMIO or IO, and whether it's an 8 bit IO device, 16-bit
+> low byte lane IO device, or a 16-bit both byte lane IO device.  Plus
+> whether the MMIO is in the broken PCMCIA controller IO space (CPU
+> address bit 11 missing and CPU address bit 19 mapped to two bus
+> address bits...)
 
-> Philip
->
->
->
->
-> V4
-> ==
-> remove code to enable power for wifi. ?Coming in separate patch
-> (by others) that conforms to new power architecture.
->
-> V3
-> ==
-> Change since V2 -- delete mmc3 since it was committed
-> to linux next.
->
-> enable mmc1 used for wifi (8688) and marked PERMANENT.
-> Wifi requires enabling of power on the device by
-> toggling the gpio lines for power and reset.
->
-> Signed-off-by: Philip Rakity <prakity@marvell.com>
-> ---
-> ?arch/arm/mach-mmp/brownstone.c | ? ?8 +++++++-
-> ?1 files changed, 7 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/mach-mmp/brownstone.c b/arch/arm/mach-mmp/brownstone.c
-> index c79162a..7634b2f 100644
-> --- a/arch/arm/mach-mmp/brownstone.c
-> +++ b/arch/arm/mach-mmp/brownstone.c
-> @@ -180,6 +180,11 @@ static struct sdhci_pxa_platdata mmp2_sdh_platdata_mmc0 = {
-> ? ? ? ?.clk_delay_cycles = 0x1f,
-> ?};
->
-> +static struct sdhci_pxa_platdata mmp2_sdh_platdata_mmc1 = {
-> + ? ? ? .clk_delay_cycles = 0x1f,
-> + ? ? ? .flags ? ? ? ? ?= PXA_FLAG_CARD_PERMANENT,
-> +};
-> +
-> ?static struct sdhci_pxa_platdata mmp2_sdh_platdata_mmc2 = {
-> ? ? ? ?.clk_delay_cycles = 0x1f,
-> ? ? ? ?.flags = PXA_FLAG_CARD_PERMANENT
-> @@ -195,8 +200,9 @@ static void __init brownstone_init(void)
-> ? ? ? ?mmp2_add_uart(1);
-> ? ? ? ?mmp2_add_uart(3);
-> ? ? ? ?mmp2_add_twsi(1, NULL, ARRAY_AND_SIZE(brownstone_twsi1_info));
-> - ? ? ? mmp2_add_sdhost(0, &mmp2_sdh_platdata_mmc0); /* SD/MMC */
-> ? ? ? ?mmp2_add_sdhost(2, &mmp2_sdh_platdata_mmc2); /* eMMC */
-> + ? ? ? mmp2_add_sdhost(0, &mmp2_sdh_platdata_mmc0); /* SD/MMC */
-> + ? ? ? mmp2_add_sdhost(1, &mmp2_sdh_platdata_mmc1); /* Wifi */
->
-> ? ? ? ?/* enable 5v regulator */
-> ? ? ? ?platform_device_register(&brownstone_v_5vp_device);
-> --
-> 1.7.0.4
->
->
->
+Well, first of all, I never suggested converting drivers to use
+iowrite, you brought that up. So as long as the 16-bit ISA driver
+keep using inb/outb, an iowrite implementation would not need to
+bother about this specific problem and don't even need a private
+iowrite implementation but instead move that platform over to use
+CONFIG_GENERIC_IOMAP.
+
+What lib/iomap.c does is indeed to look at the address, by default
+it assumes that __iomem tokens below 0x10000 are IO ports, while
+larger values are MMIO addresses. This appears to work fine on x86,
+and AFAICT, it should still work with both the botched PIO mapping
+(minus the 16-bit devices) and the botched MMIO mapping, since both
+will just end up calling the fixups in arch/arm/mach-ebsa110/io.c.
+
+The only problem you will hit is when there are ISA devices with
+MMIO addresses below 0x40000, which is impossible on PCs but
+perhaps not on arbitrarily incompatible ISA buses.
+
+	Arnd
