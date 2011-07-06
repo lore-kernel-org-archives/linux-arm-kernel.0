@@ -1,228 +1,265 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 05 Jul 2011 22:47:04 -0400
-Subject: [PATCH 19/52] ARM: mach-ixp4xx: convert boot_params to atag_offset
+Date: Tue, 05 Jul 2011 22:47:05 -0400
+Subject: [PATCH 20/52] ARM: mach-kirkwood: convert boot_params to atag_offset
 In-Reply-To: <1309920457-21913-1-git-send-email-nicolas.pitre@linaro.org>
 References: <1309920457-21913-1-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <1309920457-21913-19-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <1309920457-21913-20-git-send-email-nicolas.pitre@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 ---
- arch/arm/mach-ixp4xx/avila-setup.c       |    4 ++--
- arch/arm/mach-ixp4xx/coyote-setup.c      |    4 ++--
- arch/arm/mach-ixp4xx/dsmg600-setup.c     |    2 +-
- arch/arm/mach-ixp4xx/fsg-setup.c         |    2 +-
- arch/arm/mach-ixp4xx/gateway7001-setup.c |    2 +-
- arch/arm/mach-ixp4xx/goramo_mlr.c        |    2 +-
- arch/arm/mach-ixp4xx/gtwx5715-setup.c    |    2 +-
- arch/arm/mach-ixp4xx/ixdp425-setup.c     |    8 ++++----
- arch/arm/mach-ixp4xx/nas100d-setup.c     |    2 +-
- arch/arm/mach-ixp4xx/nslu2-setup.c       |    2 +-
- arch/arm/mach-ixp4xx/vulcan-setup.c      |    2 +-
- arch/arm/mach-ixp4xx/wg302v2-setup.c     |    2 +-
- 12 files changed, 17 insertions(+), 17 deletions(-)
+ arch/arm/mach-kirkwood/d2net_v2-setup.c        |    2 +-
+ arch/arm/mach-kirkwood/db88f6281-bp-setup.c    |    2 +-
+ arch/arm/mach-kirkwood/dockstar-setup.c        |    2 +-
+ arch/arm/mach-kirkwood/guruplug-setup.c        |    2 +-
+ arch/arm/mach-kirkwood/mv88f6281gtw_ge-setup.c |    2 +-
+ arch/arm/mach-kirkwood/netspace_v2-setup.c     |    6 +++---
+ arch/arm/mach-kirkwood/netxbig_v2-setup.c      |    4 ++--
+ arch/arm/mach-kirkwood/openrd-setup.c          |    6 +++---
+ arch/arm/mach-kirkwood/rd88f6192-nas-setup.c   |    2 +-
+ arch/arm/mach-kirkwood/rd88f6281-setup.c       |    2 +-
+ arch/arm/mach-kirkwood/sheevaplug-setup.c      |    4 ++--
+ arch/arm/mach-kirkwood/t5325-setup.c           |    2 +-
+ arch/arm/mach-kirkwood/ts219-setup.c           |    2 +-
+ arch/arm/mach-kirkwood/ts41x-setup.c           |    2 +-
+ 14 files changed, 20 insertions(+), 20 deletions(-)
 
-diff --git a/arch/arm/mach-ixp4xx/avila-setup.c b/arch/arm/mach-ixp4xx/avila-setup.c
-index 05bf40d..8133f24 100644
---- a/arch/arm/mach-ixp4xx/avila-setup.c
-+++ b/arch/arm/mach-ixp4xx/avila-setup.c
-@@ -167,7 +167,7 @@ MACHINE_START(AVILA, "Gateworks Avila Network Platform")
- 	.map_io		= ixp4xx_map_io,
- 	.init_irq	= ixp4xx_init_irq,
- 	.timer		= &ixp4xx_timer,
--	.boot_params	= 0x0100,
-+	.atag_offset	= 0x100,
- 	.init_machine	= avila_init,
- #if defined(config_PCI) && !defined(CONFIG_IXP4XX_INDIRECT_PCI)
- 	.dma_zone_size	= SZ_64M,
-@@ -185,7 +185,7 @@ MACHINE_START(LOFT, "Giant Shoulder Inc Loft board")
- 	.map_io		= ixp4xx_map_io,
- 	.init_irq	= ixp4xx_init_irq,
- 	.timer		= &ixp4xx_timer,
--	.boot_params	= 0x0100,
-+	.atag_offset	= 0x100,
- 	.init_machine	= avila_init,
- #if defined(config_PCI) && !defined(CONFIG_IXP4XX_INDIRECT_PCI)
- 	.dma_zone_size	= SZ_64M,
-diff --git a/arch/arm/mach-ixp4xx/coyote-setup.c b/arch/arm/mach-ixp4xx/coyote-setup.c
-index 0adf01b..b1d9ef0 100644
---- a/arch/arm/mach-ixp4xx/coyote-setup.c
-+++ b/arch/arm/mach-ixp4xx/coyote-setup.c
-@@ -112,7 +112,7 @@ MACHINE_START(ADI_COYOTE, "ADI Engineering Coyote")
- 	.map_io		= ixp4xx_map_io,
- 	.init_irq	= ixp4xx_init_irq,
- 	.timer		= &ixp4xx_timer,
--	.boot_params	= 0x0100,
-+	.atag_offset	= 0x100,
- 	.init_machine	= coyote_init,
- #if defined(config_PCI) && !defined(CONFIG_IXP4XX_INDIRECT_PCI)
- 	.dma_zone_size	= SZ_64M,
-@@ -130,7 +130,7 @@ MACHINE_START(IXDPG425, "Intel IXDPG425")
- 	.map_io		= ixp4xx_map_io,
- 	.init_irq	= ixp4xx_init_irq,
- 	.timer		= &ixp4xx_timer,
--	.boot_params	= 0x0100,
-+	.atag_offset	= 0x100,
- 	.init_machine	= coyote_init,
- MACHINE_END
- #endif
-diff --git a/arch/arm/mach-ixp4xx/dsmg600-setup.c b/arch/arm/mach-ixp4xx/dsmg600-setup.c
-index 3eb8861..d927e11 100644
---- a/arch/arm/mach-ixp4xx/dsmg600-setup.c
-+++ b/arch/arm/mach-ixp4xx/dsmg600-setup.c
-@@ -279,7 +279,7 @@ static void __init dsmg600_init(void)
+diff --git a/arch/arm/mach-kirkwood/d2net_v2-setup.c b/arch/arm/mach-kirkwood/d2net_v2-setup.c
+index 043cfd5..f457e07 100644
+--- a/arch/arm/mach-kirkwood/d2net_v2-setup.c
++++ b/arch/arm/mach-kirkwood/d2net_v2-setup.c
+@@ -221,7 +221,7 @@ static void __init d2net_v2_init(void)
+ }
  
- MACHINE_START(DSMG600, "D-Link DSM-G600 RevA")
- 	/* Maintainer: www.nslu2-linux.org */
+ MACHINE_START(D2NET_V2, "LaCie d2 Network v2")
 -	.boot_params	= 0x00000100,
 +	.atag_offset	= 0x100,
- 	.map_io		= ixp4xx_map_io,
- 	.init_irq	= ixp4xx_init_irq,
- 	.timer          = &dsmg600_timer,
-diff --git a/arch/arm/mach-ixp4xx/fsg-setup.c b/arch/arm/mach-ixp4xx/fsg-setup.c
-index d26bd4b..65544d3 100644
---- a/arch/arm/mach-ixp4xx/fsg-setup.c
-+++ b/arch/arm/mach-ixp4xx/fsg-setup.c
-@@ -273,7 +273,7 @@ MACHINE_START(FSG, "Freecom FSG-3")
- 	.map_io		= ixp4xx_map_io,
- 	.init_irq	= ixp4xx_init_irq,
- 	.timer		= &ixp4xx_timer,
--	.boot_params	= 0x0100,
-+	.atag_offset	= 0x100,
- 	.init_machine	= fsg_init,
- #if defined(config_PCI) && !defined(CONFIG_IXP4XX_INDIRECT_PCI)
- 	.dma_zone_size	= SZ_64M,
-diff --git a/arch/arm/mach-ixp4xx/gateway7001-setup.c b/arch/arm/mach-ixp4xx/gateway7001-setup.c
-index 85e179e..27849d4 100644
---- a/arch/arm/mach-ixp4xx/gateway7001-setup.c
-+++ b/arch/arm/mach-ixp4xx/gateway7001-setup.c
-@@ -99,7 +99,7 @@ MACHINE_START(GATEWAY7001, "Gateway 7001 AP")
- 	.map_io		= ixp4xx_map_io,
- 	.init_irq	= ixp4xx_init_irq,
- 	.timer		= &ixp4xx_timer,
--	.boot_params	= 0x0100,
-+	.atag_offset	= 0x100,
- 	.init_machine	= gateway7001_init,
- #if defined(config_PCI) && !defined(CONFIG_IXP4XX_INDIRECT_PCI)
- 	.dma_zone_size	= SZ_64M,
-diff --git a/arch/arm/mach-ixp4xx/goramo_mlr.c b/arch/arm/mach-ixp4xx/goramo_mlr.c
-index 34955e8..5a85b0f 100644
---- a/arch/arm/mach-ixp4xx/goramo_mlr.c
-+++ b/arch/arm/mach-ixp4xx/goramo_mlr.c
-@@ -499,7 +499,7 @@ MACHINE_START(GORAMO_MLR, "MultiLink")
- 	.map_io		= ixp4xx_map_io,
- 	.init_irq	= ixp4xx_init_irq,
- 	.timer		= &ixp4xx_timer,
--	.boot_params	= 0x0100,
-+	.atag_offset	= 0x100,
- 	.init_machine	= gmlr_init,
- #if defined(config_PCI) && !defined(CONFIG_IXP4XX_INDIRECT_PCI)
- 	.dma_zone_size	= SZ_64M,
-diff --git a/arch/arm/mach-ixp4xx/gtwx5715-setup.c b/arch/arm/mach-ixp4xx/gtwx5715-setup.c
-index 283e128..92dfa7e 100644
---- a/arch/arm/mach-ixp4xx/gtwx5715-setup.c
-+++ b/arch/arm/mach-ixp4xx/gtwx5715-setup.c
-@@ -167,7 +167,7 @@ MACHINE_START(GTWX5715, "Gemtek GTWX5715 (Linksys WRV54G)")
- 	.map_io		= ixp4xx_map_io,
- 	.init_irq	= ixp4xx_init_irq,
- 	.timer		= &ixp4xx_timer,
--	.boot_params	= 0x0100,
-+	.atag_offset	= 0x100,
- 	.init_machine	= gtwx5715_init,
- #if defined(config_PCI) && !defined(CONFIG_IXP4XX_INDIRECT_PCI)
- 	.dma_zone_size	= SZ_64M,
-diff --git a/arch/arm/mach-ixp4xx/ixdp425-setup.c b/arch/arm/mach-ixp4xx/ixdp425-setup.c
-index d89e11f..5454b66 100644
---- a/arch/arm/mach-ixp4xx/ixdp425-setup.c
-+++ b/arch/arm/mach-ixp4xx/ixdp425-setup.c
-@@ -256,7 +256,7 @@ MACHINE_START(IXDP425, "Intel IXDP425 Development Platform")
- 	.map_io		= ixp4xx_map_io,
- 	.init_irq	= ixp4xx_init_irq,
- 	.timer		= &ixp4xx_timer,
--	.boot_params	= 0x0100,
-+	.atag_offset	= 0x100,
- 	.init_machine	= ixdp425_init,
- #if defined(config_PCI) && !defined(CONFIG_IXP4XX_INDIRECT_PCI)
- 	.dma_zone_size	= SZ_64M,
-@@ -270,7 +270,7 @@ MACHINE_START(IXDP465, "Intel IXDP465 Development Platform")
- 	.map_io		= ixp4xx_map_io,
- 	.init_irq	= ixp4xx_init_irq,
- 	.timer		= &ixp4xx_timer,
--	.boot_params	= 0x0100,
-+	.atag_offset	= 0x100,
- 	.init_machine	= ixdp425_init,
- #if defined(config_PCI) && !defined(CONFIG_IXP4XX_INDIRECT_PCI)
- 	.dma_zone_size	= SZ_64M,
-@@ -284,7 +284,7 @@ MACHINE_START(IXCDP1100, "Intel IXCDP1100 Development Platform")
- 	.map_io		= ixp4xx_map_io,
- 	.init_irq	= ixp4xx_init_irq,
- 	.timer		= &ixp4xx_timer,
--	.boot_params	= 0x0100,
-+	.atag_offset	= 0x100,
- 	.init_machine	= ixdp425_init,
- #if defined(config_PCI) && !defined(CONFIG_IXP4XX_INDIRECT_PCI)
- 	.dma_zone_size	= SZ_64M,
-@@ -298,7 +298,7 @@ MACHINE_START(KIXRP435, "Intel KIXRP435 Reference Platform")
- 	.map_io		= ixp4xx_map_io,
- 	.init_irq	= ixp4xx_init_irq,
- 	.timer		= &ixp4xx_timer,
--	.boot_params	= 0x0100,
-+	.atag_offset	= 0x100,
- 	.init_machine	= ixdp425_init,
- #if defined(config_PCI) && !defined(CONFIG_IXP4XX_INDIRECT_PCI)
- 	.dma_zone_size	= SZ_64M,
-diff --git a/arch/arm/mach-ixp4xx/nas100d-setup.c b/arch/arm/mach-ixp4xx/nas100d-setup.c
-index 5cb107b..be70a49 100644
---- a/arch/arm/mach-ixp4xx/nas100d-setup.c
-+++ b/arch/arm/mach-ixp4xx/nas100d-setup.c
-@@ -314,7 +314,7 @@ static void __init nas100d_init(void)
+ 	.init_machine	= d2net_v2_init,
+ 	.map_io		= kirkwood_map_io,
+ 	.init_early	= kirkwood_init_early,
+diff --git a/arch/arm/mach-kirkwood/db88f6281-bp-setup.c b/arch/arm/mach-kirkwood/db88f6281-bp-setup.c
+index bff04e0..ff4c21c 100644
+--- a/arch/arm/mach-kirkwood/db88f6281-bp-setup.c
++++ b/arch/arm/mach-kirkwood/db88f6281-bp-setup.c
+@@ -97,7 +97,7 @@ subsys_initcall(db88f6281_pci_init);
  
- MACHINE_START(NAS100D, "Iomega NAS 100d")
- 	/* Maintainer: www.nslu2-linux.org */
+ MACHINE_START(DB88F6281_BP, "Marvell DB-88F6281-BP Development Board")
+ 	/* Maintainer: Saeed Bishara <saeed@marvell.com> */
 -	.boot_params	= 0x00000100,
 +	.atag_offset	= 0x100,
- 	.map_io		= ixp4xx_map_io,
- 	.init_irq	= ixp4xx_init_irq,
- 	.timer          = &ixp4xx_timer,
-diff --git a/arch/arm/mach-ixp4xx/nslu2-setup.c b/arch/arm/mach-ixp4xx/nslu2-setup.c
-index 446375d..12a5949 100644
---- a/arch/arm/mach-ixp4xx/nslu2-setup.c
-+++ b/arch/arm/mach-ixp4xx/nslu2-setup.c
-@@ -300,7 +300,7 @@ static void __init nslu2_init(void)
+ 	.init_machine	= db88f6281_init,
+ 	.map_io		= kirkwood_map_io,
+ 	.init_early	= kirkwood_init_early,
+diff --git a/arch/arm/mach-kirkwood/dockstar-setup.c b/arch/arm/mach-kirkwood/dockstar-setup.c
+index f14dfb8..e4d199b 100644
+--- a/arch/arm/mach-kirkwood/dockstar-setup.c
++++ b/arch/arm/mach-kirkwood/dockstar-setup.c
+@@ -102,7 +102,7 @@ static void __init dockstar_init(void)
+ }
  
- MACHINE_START(NSLU2, "Linksys NSLU2")
- 	/* Maintainer: www.nslu2-linux.org */
+ MACHINE_START(DOCKSTAR, "Seagate FreeAgent DockStar")
 -	.boot_params	= 0x00000100,
 +	.atag_offset	= 0x100,
- 	.map_io		= ixp4xx_map_io,
- 	.init_irq	= ixp4xx_init_irq,
- 	.timer          = &nslu2_timer,
-diff --git a/arch/arm/mach-ixp4xx/vulcan-setup.c b/arch/arm/mach-ixp4xx/vulcan-setup.c
-index 4a2d4e7..b9aa133 100644
---- a/arch/arm/mach-ixp4xx/vulcan-setup.c
-+++ b/arch/arm/mach-ixp4xx/vulcan-setup.c
-@@ -239,7 +239,7 @@ MACHINE_START(ARCOM_VULCAN, "Arcom/Eurotech Vulcan")
- 	.map_io		= ixp4xx_map_io,
- 	.init_irq	= ixp4xx_init_irq,
- 	.timer		= &ixp4xx_timer,
--	.boot_params	= 0x0100,
+ 	.init_machine	= dockstar_init,
+ 	.map_io		= kirkwood_map_io,
+ 	.init_early	= kirkwood_init_early,
+diff --git a/arch/arm/mach-kirkwood/guruplug-setup.c b/arch/arm/mach-kirkwood/guruplug-setup.c
+index 41d1b40..6c40f78 100644
+--- a/arch/arm/mach-kirkwood/guruplug-setup.c
++++ b/arch/arm/mach-kirkwood/guruplug-setup.c
+@@ -121,7 +121,7 @@ static void __init guruplug_init(void)
+ 
+ MACHINE_START(GURUPLUG, "Marvell GuruPlug Reference Board")
+ 	/* Maintainer: Siddarth Gore <gores@marvell.com> */
+-	.boot_params	= 0x00000100,
 +	.atag_offset	= 0x100,
- 	.init_machine	= vulcan_init,
- #if defined(config_PCI) && !defined(CONFIG_IXP4XX_INDIRECT_PCI)
- 	.dma_zone_size	= SZ_64M,
-diff --git a/arch/arm/mach-ixp4xx/wg302v2-setup.c b/arch/arm/mach-ixp4xx/wg302v2-setup.c
-index 5397237..fcd04f8 100644
---- a/arch/arm/mach-ixp4xx/wg302v2-setup.c
-+++ b/arch/arm/mach-ixp4xx/wg302v2-setup.c
-@@ -100,7 +100,7 @@ MACHINE_START(WG302V2, "Netgear WG302 v2 / WAG302 v2")
- 	.map_io		= ixp4xx_map_io,
- 	.init_irq	= ixp4xx_init_irq,
- 	.timer		= &ixp4xx_timer,
--	.boot_params	= 0x0100,
+ 	.init_machine	= guruplug_init,
+ 	.map_io		= kirkwood_map_io,
+ 	.init_early	= kirkwood_init_early,
+diff --git a/arch/arm/mach-kirkwood/mv88f6281gtw_ge-setup.c b/arch/arm/mach-kirkwood/mv88f6281gtw_ge-setup.c
+index 00cca22..9a1e917 100644
+--- a/arch/arm/mach-kirkwood/mv88f6281gtw_ge-setup.c
++++ b/arch/arm/mach-kirkwood/mv88f6281gtw_ge-setup.c
+@@ -163,7 +163,7 @@ subsys_initcall(mv88f6281gtw_ge_pci_init);
+ 
+ MACHINE_START(MV88F6281GTW_GE, "Marvell 88F6281 GTW GE Board")
+ 	/* Maintainer: Lennert Buytenhek <buytenh@marvell.com> */
+-	.boot_params	= 0x00000100,
 +	.atag_offset	= 0x100,
- 	.init_machine	= wg302v2_init,
- #if defined(config_PCI) && !defined(CONFIG_IXP4XX_INDIRECT_PCI)
- 	.dma_zone_size	= SZ_64M,
+ 	.init_machine	= mv88f6281gtw_ge_init,
+ 	.map_io		= kirkwood_map_io,
+ 	.init_early	= kirkwood_init_early,
+diff --git a/arch/arm/mach-kirkwood/netspace_v2-setup.c b/arch/arm/mach-kirkwood/netspace_v2-setup.c
+index 7cdab57..8849bcc 100644
+--- a/arch/arm/mach-kirkwood/netspace_v2-setup.c
++++ b/arch/arm/mach-kirkwood/netspace_v2-setup.c
+@@ -258,7 +258,7 @@ static void __init netspace_v2_init(void)
+ 
+ #ifdef CONFIG_MACH_NETSPACE_V2
+ MACHINE_START(NETSPACE_V2, "LaCie Network Space v2")
+-	.boot_params	= 0x00000100,
++	.atag_offset	= 0x100,
+ 	.init_machine	= netspace_v2_init,
+ 	.map_io		= kirkwood_map_io,
+ 	.init_early	= kirkwood_init_early,
+@@ -269,7 +269,7 @@ MACHINE_END
+ 
+ #ifdef CONFIG_MACH_INETSPACE_V2
+ MACHINE_START(INETSPACE_V2, "LaCie Internet Space v2")
+-	.boot_params	= 0x00000100,
++	.atag_offset	= 0x100,
+ 	.init_machine	= netspace_v2_init,
+ 	.map_io		= kirkwood_map_io,
+ 	.init_early	= kirkwood_init_early,
+@@ -280,7 +280,7 @@ MACHINE_END
+ 
+ #ifdef CONFIG_MACH_NETSPACE_MAX_V2
+ MACHINE_START(NETSPACE_MAX_V2, "LaCie Network Space Max v2")
+-	.boot_params	= 0x00000100,
++	.atag_offset	= 0x100,
+ 	.init_machine	= netspace_v2_init,
+ 	.map_io		= kirkwood_map_io,
+ 	.init_early	= kirkwood_init_early,
+diff --git a/arch/arm/mach-kirkwood/netxbig_v2-setup.c b/arch/arm/mach-kirkwood/netxbig_v2-setup.c
+index 6be627d..1ba12c4 100644
+--- a/arch/arm/mach-kirkwood/netxbig_v2-setup.c
++++ b/arch/arm/mach-kirkwood/netxbig_v2-setup.c
+@@ -399,7 +399,7 @@ static void __init netxbig_v2_init(void)
+ 
+ #ifdef CONFIG_MACH_NET2BIG_V2
+ MACHINE_START(NET2BIG_V2, "LaCie 2Big Network v2")
+-	.boot_params	= 0x00000100,
++	.atag_offset	= 0x100,
+ 	.init_machine	= netxbig_v2_init,
+ 	.map_io		= kirkwood_map_io,
+ 	.init_early	= kirkwood_init_early,
+@@ -410,7 +410,7 @@ MACHINE_END
+ 
+ #ifdef CONFIG_MACH_NET5BIG_V2
+ MACHINE_START(NET5BIG_V2, "LaCie 5Big Network v2")
+-	.boot_params	= 0x00000100,
++	.atag_offset	= 0x100,
+ 	.init_machine	= netxbig_v2_init,
+ 	.map_io		= kirkwood_map_io,
+ 	.init_early	= kirkwood_init_early,
+diff --git a/arch/arm/mach-kirkwood/openrd-setup.c b/arch/arm/mach-kirkwood/openrd-setup.c
+index f69beef..5660ca6 100644
+--- a/arch/arm/mach-kirkwood/openrd-setup.c
++++ b/arch/arm/mach-kirkwood/openrd-setup.c
+@@ -214,7 +214,7 @@ subsys_initcall(openrd_pci_init);
+ #ifdef CONFIG_MACH_OPENRD_BASE
+ MACHINE_START(OPENRD_BASE, "Marvell OpenRD Base Board")
+ 	/* Maintainer: Dhaval Vasa <dhaval.vasa@einfochips.com> */
+-	.boot_params	= 0x00000100,
++	.atag_offset	= 0x100,
+ 	.init_machine	= openrd_init,
+ 	.map_io		= kirkwood_map_io,
+ 	.init_early	= kirkwood_init_early,
+@@ -226,7 +226,7 @@ MACHINE_END
+ #ifdef CONFIG_MACH_OPENRD_CLIENT
+ MACHINE_START(OPENRD_CLIENT, "Marvell OpenRD Client Board")
+ 	/* Maintainer: Dhaval Vasa <dhaval.vasa@einfochips.com> */
+-	.boot_params	= 0x00000100,
++	.atag_offset	= 0x100,
+ 	.init_machine	= openrd_init,
+ 	.map_io		= kirkwood_map_io,
+ 	.init_early	= kirkwood_init_early,
+@@ -238,7 +238,7 @@ MACHINE_END
+ #ifdef CONFIG_MACH_OPENRD_ULTIMATE
+ MACHINE_START(OPENRD_ULTIMATE, "Marvell OpenRD Ultimate Board")
+ 	/* Maintainer: Dhaval Vasa <dhaval.vasa@einfochips.com> */
+-	.boot_params	= 0x00000100,
++	.atag_offset	= 0x100,
+ 	.init_machine	= openrd_init,
+ 	.map_io		= kirkwood_map_io,
+ 	.init_early	= kirkwood_init_early,
+diff --git a/arch/arm/mach-kirkwood/rd88f6192-nas-setup.c b/arch/arm/mach-kirkwood/rd88f6192-nas-setup.c
+index 75c6601..6663869 100644
+--- a/arch/arm/mach-kirkwood/rd88f6192-nas-setup.c
++++ b/arch/arm/mach-kirkwood/rd88f6192-nas-setup.c
+@@ -79,7 +79,7 @@ subsys_initcall(rd88f6192_pci_init);
+ 
+ MACHINE_START(RD88F6192_NAS, "Marvell RD-88F6192-NAS Development Board")
+ 	/* Maintainer: Saeed Bishara <saeed@marvell.com> */
+-	.boot_params	= 0x00000100,
++	.atag_offset	= 0x100,
+ 	.init_machine	= rd88f6192_init,
+ 	.map_io		= kirkwood_map_io,
+ 	.init_early	= kirkwood_init_early,
+diff --git a/arch/arm/mach-kirkwood/rd88f6281-setup.c b/arch/arm/mach-kirkwood/rd88f6281-setup.c
+index 0f75494..66b3c05 100644
+--- a/arch/arm/mach-kirkwood/rd88f6281-setup.c
++++ b/arch/arm/mach-kirkwood/rd88f6281-setup.c
+@@ -115,7 +115,7 @@ subsys_initcall(rd88f6281_pci_init);
+ 
+ MACHINE_START(RD88F6281, "Marvell RD-88F6281 Reference Board")
+ 	/* Maintainer: Saeed Bishara <saeed@marvell.com> */
+-	.boot_params	= 0x00000100,
++	.atag_offset	= 0x100,
+ 	.init_machine	= rd88f6281_init,
+ 	.map_io		= kirkwood_map_io,
+ 	.init_early	= kirkwood_init_early,
+diff --git a/arch/arm/mach-kirkwood/sheevaplug-setup.c b/arch/arm/mach-kirkwood/sheevaplug-setup.c
+index 17de0bf..8b102d6 100644
+--- a/arch/arm/mach-kirkwood/sheevaplug-setup.c
++++ b/arch/arm/mach-kirkwood/sheevaplug-setup.c
+@@ -138,7 +138,7 @@ static void __init sheevaplug_init(void)
+ #ifdef CONFIG_MACH_SHEEVAPLUG
+ MACHINE_START(SHEEVAPLUG, "Marvell SheevaPlug Reference Board")
+ 	/* Maintainer: shadi Ammouri <shadi@marvell.com> */
+-	.boot_params	= 0x00000100,
++	.atag_offset	= 0x100,
+ 	.init_machine	= sheevaplug_init,
+ 	.map_io		= kirkwood_map_io,
+ 	.init_early	= kirkwood_init_early,
+@@ -149,7 +149,7 @@ MACHINE_END
+ 
+ #ifdef CONFIG_MACH_ESATA_SHEEVAPLUG
+ MACHINE_START(ESATA_SHEEVAPLUG, "Marvell eSATA SheevaPlug Reference Board")
+-	.boot_params	= 0x00000100,
++	.atag_offset	= 0x100,
+ 	.init_machine	= sheevaplug_init,
+ 	.map_io		= kirkwood_map_io,
+ 	.init_early	= kirkwood_init_early,
+diff --git a/arch/arm/mach-kirkwood/t5325-setup.c b/arch/arm/mach-kirkwood/t5325-setup.c
+index e6b9b1b..ea104fb 100644
+--- a/arch/arm/mach-kirkwood/t5325-setup.c
++++ b/arch/arm/mach-kirkwood/t5325-setup.c
+@@ -201,7 +201,7 @@ subsys_initcall(hp_t5325_pci_init);
+ 
+ MACHINE_START(T5325, "HP t5325 Thin Client")
+ 	/* Maintainer: Martin Michlmayr <tbm@cyrius.com> */
+-	.boot_params	= 0x00000100,
++	.atag_offset	= 0x100,
+ 	.init_machine	= hp_t5325_init,
+ 	.map_io		= kirkwood_map_io,
+ 	.init_early	= kirkwood_init_early,
+diff --git a/arch/arm/mach-kirkwood/ts219-setup.c b/arch/arm/mach-kirkwood/ts219-setup.c
+index 68f32f2..262c034 100644
+--- a/arch/arm/mach-kirkwood/ts219-setup.c
++++ b/arch/arm/mach-kirkwood/ts219-setup.c
+@@ -132,7 +132,7 @@ subsys_initcall(ts219_pci_init);
+ 
+ MACHINE_START(TS219, "QNAP TS-119/TS-219")
+ 	/* Maintainer: Martin Michlmayr <tbm@cyrius.com> */
+-	.boot_params	= 0x00000100,
++	.atag_offset	= 0x100,
+ 	.init_machine	= qnap_ts219_init,
+ 	.map_io		= kirkwood_map_io,
+ 	.init_early	= kirkwood_init_early,
+diff --git a/arch/arm/mach-kirkwood/ts41x-setup.c b/arch/arm/mach-kirkwood/ts41x-setup.c
+index d5d0099..b68f5b4 100644
+--- a/arch/arm/mach-kirkwood/ts41x-setup.c
++++ b/arch/arm/mach-kirkwood/ts41x-setup.c
+@@ -176,7 +176,7 @@ subsys_initcall(ts41x_pci_init);
+ 
+ MACHINE_START(TS41X, "QNAP TS-41x")
+ 	/* Maintainer: Martin Michlmayr <tbm@cyrius.com> */
+-	.boot_params	= 0x00000100,
++	.atag_offset	= 0x100,
+ 	.init_machine	= qnap_ts41x_init,
+ 	.map_io		= kirkwood_map_io,
+ 	.init_early	= kirkwood_init_early,
 -- 
 1.7.4
