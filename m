@@ -1,161 +1,56 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 6 Jul 2011 13:08:03 -0600
-Subject: [RFC PATCH 5/5] OMAP: I2C: Convert I2C driver to use device tree
-In-Reply-To: <1309426647-31587-6-git-send-email-manjugk@ti.com>
-References: <1309426647-31587-1-git-send-email-manjugk@ti.com>
-	<1309426647-31587-6-git-send-email-manjugk@ti.com>
-Message-ID: <20110706190803.GN4871@ponder.secretlab.ca>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 6 Jul 2011 15:10:07 -0400 (EDT)
+Subject: [PATCH 6/8] drivers: add Contiguous Memory Allocator
+In-Reply-To: <201107061831.59739.arnd@arndb.de>
+References: <1309851710-3828-1-git-send-email-m.szyprowski@samsung.com>
+	<201107061651.49824.arnd@arndb.de>
+	<20110706154857.GG8286@n2100.arm.linux.org.uk>
+	<201107061831.59739.arnd@arndb.de>
+Message-ID: <alpine.LFD.2.00.1107061459520.14596@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 30, 2011 at 03:07:27PM +0500, G, Manjunath Kondaiah wrote:
+On Wed, 6 Jul 2011, Arnd Bergmann wrote:
+
+> On Wednesday 06 July 2011, Russell King - ARM Linux wrote:
+> > On Wed, Jul 06, 2011 at 04:51:49PM +0200, Arnd Bergmann wrote:
+> > > On Wednesday 06 July 2011, Russell King - ARM Linux wrote:
+> > > 
+> > > I don't see how. The pages get allocated from an unmapped area
+> > > or memory, mapped into the kernel address space as uncached or wc
+> > > and then cleared. This should be the same for lowmem or highmem
+> > > pages.
+> > 
+> > You don't want to clear them via their uncached or WC mapping, but via
+> > their cached mapping _before_ they get their alternative mapping, and
+> > flush any cached out of that mapping - both L1 and L2 caches.
 > 
-> The OMAP I2C driver is modified to use platform_device data from
-> device tree data structures.
+> But there can't be any other mapping, which is the whole point of
+> the exercise to use highmem.
+> Quoting from the new dma_alloc_area() function:
 > 
-> Signed-off-by: G, Manjunath Kondaiah <manjugk@ti.com>
-
-Mostly looks good, but a few things that need to be fixed.  You can
-probably even get this change merged for v3.1
-
-> ---
->  drivers/i2c/busses/i2c-omap.c |   30 +++++++++++++++++++++++++++++-
->  1 files changed, 29 insertions(+), 1 deletions(-)
+>         c = arm_vmregion_alloc(&area->vm, align, size,
+>                             gfp & ~(__GFP_DMA | __GFP_HIGHMEM));
+>         if (!c)
+>                 return NULL;
+>         memset((void *)c->vm_start, 0, size);
 > 
-> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-> index ae1545b..d4ccc52 100644
-> --- a/drivers/i2c/busses/i2c-omap.c
-> +++ b/drivers/i2c/busses/i2c-omap.c
-> @@ -38,9 +38,13 @@
->  #include <linux/clk.h>
->  #include <linux/io.h>
->  #include <linux/of_i2c.h>
-> +#include <linux/of_irq.h>
-> +#include <linux/of_platform.h>
-> +#include <linux/of_address.h>
->  #include <linux/slab.h>
->  #include <linux/i2c-omap.h>
->  #include <linux/pm_runtime.h>
-> +#include <plat/i2c.h>
->  
->  /* I2C controller revisions */
->  #define OMAP_I2C_REV_2			0x20
-> @@ -972,6 +976,7 @@ static const struct i2c_algorithm omap_i2c_algo = {
->  	.functionality	= omap_i2c_func,
->  };
->  
-> +static const struct of_device_id omap_i2c_of_match[];
->  static int __devinit
->  omap_i2c_probe(struct platform_device *pdev)
->  {
-> @@ -979,10 +984,15 @@ omap_i2c_probe(struct platform_device *pdev)
->  	struct i2c_adapter	*adap;
->  	struct resource		*mem, *irq, *ioarea;
->  	struct omap_i2c_bus_platform_data *pdata = pdev->dev.platform_data;
-> +	const struct of_device_id *match;
->  	irq_handler_t isr;
->  	int r;
->  	u32 speed = 0;
->  
-> +	match = of_match_device(omap_i2c_of_match, &pdev->dev);
-> +	if (!match)
-> +		dev_err(&pdev->dev, "DT: i2c device match not found.......\n");
-> +
+> area->vm here points to an uncached location, which means that
+> we already zero the data through the uncached mapping. I don't
+> see how it's getting worse than it is already.
 
-This isn't an error.  It just mean that the device wasn't registered
-from the device tree, and it needs to get its configuration from
-pdata.
+If you get a highmem page, because the cache is VIPT, that page might 
+still be cached even if it wasn't mapped.  With a VIVT cache we must 
+flush the cache whenever a highmem page is unmapped.  There is no such 
+restriction with VIPT i.e. ARMv6 and above.  Therefore to make sure the 
+highmem page you get doesn't have cache lines associated to it, you must 
+first map it cacheable, then perform cache invalidation on it, and 
+eventually remap it as non-cacheable.  This is necessary because there 
+is no way to perform cache maintenance on L1 cache using physical 
+addresses unfortunately.  See commit 7e5a69e83b for an example of what 
+this entails (fortunately commit 3e4d3af501 made things much easier and 
+therefore commit 39af22a79 greatly simplified things).
 
-In fact, you don't even need this block since the driver never uses
-the match entry returned by of_match_device()
 
->  	/* NOTE: driver uses the static register mapping */
->  	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->  	if (!mem) {
-> @@ -1007,10 +1017,19 @@ omap_i2c_probe(struct platform_device *pdev)
->  		r = -ENOMEM;
->  		goto err_release_region;
->  	}
-> -
 
-Don't drop the empty line.
-
-> +	/* I2C device without DT might use this */
-
-No need for the comment.
-
->  	if (pdata != NULL) {
->  		speed = pdata->clkrate;
->  		dev->set_mpu_wkup_lat = pdata->set_mpu_wkup_lat;
-> +	} else if (pdev->dev.of_node) {
-> +		const unsigned int *prop;
-> +		prop = of_get_property(pdev->dev.of_node,
-> +				"clock-frequency", NULL);
-> +		if (prop)
-> +			speed = be32_to_cpup(prop);
-> +		else
-> +			speed = 100;
-
-There is a new function that makes this easier.  Do this instead:
-
-	speed = 100;
-	if (of_property_read_u32(pdev->dev.of_node, "clock-frequency", &prop)
-		speed = prop / 1000000; /* speed in Hz, this might be wrong */
-
-> +		dev->set_mpu_wkup_lat = NULL;
-
-dev is kzalloced, which means set_mpu_wkup_lat is already NULL.
-
->  	} else {
->  		speed = 100;	/* Default speed */
->  		dev->set_mpu_wkup_lat = NULL;
-> @@ -1045,6 +1064,7 @@ omap_i2c_probe(struct platform_device *pdev)
->  
->  	dev->rev = omap_i2c_read_reg(dev, OMAP_I2C_REV_REG) & 0xff;
->  
-> +
-
-Drop the unrelated whitespace change.
-
->  	if (dev->rev <= OMAP_I2C_REV_ON_3430)
->  		dev->errata |= I2C_OMAP3_1P153;
->  
-> @@ -1073,6 +1093,7 @@ omap_i2c_probe(struct platform_device *pdev)
->  				       (1000 * speed / 8);
->  	}
->  
-> +
-
-Ditto.
-
->  	/* reset ASAP, clearing any IRQs */
->  	omap_i2c_init(dev);
->  
-> @@ -1162,6 +1183,12 @@ static int omap_i2c_resume(struct device *dev)
->  	return 0;
->  }
->  
-> +static const struct of_device_id omap_i2c_of_match[] = {
-> +	{.compatible = "ti,omap_i2c", },
-> +	{},
-> +}
-> +MODULE_DEVICE_TABLE(of, omap_i2c_of_match);
-> +
-
-This needs to be protected with #ifdef CONFIG_OF/#else/#endif.  Don't
-break non-dt builds.
-
->  static struct dev_pm_ops omap_i2c_pm_ops = {
->  	.suspend = omap_i2c_suspend,
->  	.resume = omap_i2c_resume,
-> @@ -1178,6 +1205,7 @@ static struct platform_driver omap_i2c_driver = {
->  		.name	= "omap_i2c",
->  		.owner	= THIS_MODULE,
->  		.pm	= OMAP_I2C_PM_OPS,
-> +		.of_match_table = omap_i2c_of_match,
->  	},
->  };
->  
-> -- 
-> 1.7.4.1
-> 
+Nicolas
