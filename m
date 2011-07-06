@@ -1,66 +1,172 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 6 Jul 2011 11:28:09 +0300
-Subject: [PATCH V4] MMC: PM: add suspend/resume in atmel-mci
-In-Reply-To: <1309944696-6415-1-git-send-email-nicolas.ferre@atmel.com>
-References: <4E11B57B.4040000@atmel.com>
-	<1309944696-6415-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <20110706082808.GF10729@legolas.emea.dhcp.ti.com>
+From: sangwook.lee@linaro.org (Sangwook Lee)
+Date: Wed, 6 Jul 2011 09:31:46 +0100
+Subject: [PATCH] ARM:SAMSUNG: DMA Cleanup as per sparse
+In-Reply-To: <00c001cc3ba3$34558670$9d009350$%kim@samsung.com>
+References: <1309428980-20176-1-git-send-email-sangwook.lee@linaro.org>
+	<00c001cc3ba3$34558670$9d009350$%kim@samsung.com>
+Message-ID: <CADPsn1bM191O44B2ffohQU+qD859yDcNHAZqF2=D824oQYD8sg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+I can reproduce this errors and let me see how to fix those.
 
-On Wed, Jul 06, 2011 at 11:31:36AM +0200, Nicolas Ferre wrote:
-> Take care of slots while going to suspend state.
-> 
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-FWIW:
-
-Reviewed-by: Felipe Balbi <balbi@ti.com>
-
-> @@ -1878,10 +1879,72 @@ static int __exit atmci_remove(struct platform_device *pdev)
->  	return 0;
->  }
->  
-> +#ifdef CONFIG_PM
-> +static int atmci_suspend(struct device *dev)
-> +{
-> +	struct atmel_mci *host = dev_get_drvdata(dev);
-> +	int i;
-> +
-> +	 for (i = 0; i < ATMEL_MCI_MAX_NR_SLOTS; i++) {
-> +		struct atmel_mci_slot *slot = host->slot[i];
-> +		int ret;
-> +
-> +		if (!slot)
-> +			continue;
-> +		ret = mmc_suspend_host(slot->mmc);
-> +		if (ret < 0) {
-> +			while (--i >= 0) {
-> +				slot = host->slot[i];
-> +				if (slot
-> +				&& test_bit(ATMCI_SUSPENDED, &slot->flags)) {
-> +					mmc_resume_host(host->slot[i]->mmc);
-> +					clear_bit(ATMCI_SUSPENDED, &slot->flags);
-> +				}
-> +			}
-> +			return ret;
-> +		} else {
-> +			set_bit(ATMCI_SUSPENDED, &slot->flags);
-> +		}
-
-just one small nitpicking which you can ignore if you like, but you
-don't really need the else branch here. If you fall into if (ret < 0)
-you will return early anyway, so you can save two lines and an
-indentation level :-p
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 490 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110706/74a3c1a9/attachment-0001.sig>
+On 6 July 2011 07:08, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> Kukjin Kim wrote:
+>>
+>> Sangwook Lee wrote:
+>> >
+>> > Function declaration differs between file:s3c-pl330.c and file:dma.h
+>> > and SPARSE (Documentation/sparse.txt) gives error messages
+>> >
+>> > Signed-off-by: Sangwook Lee <sangwook.lee@linaro.org>
+>> > ---
+>> > ?arch/arm/plat-samsung/include/plat/dma.h | ? 16 ++++++++--------
+>> > ?1 files changed, 8 insertions(+), 8 deletions(-)
+>> >
+>> > diff --git a/arch/arm/plat-samsung/include/plat/dma.h b/arch/arm/plat-
+>> > samsung/include/plat/dma.h
+>> > index 2e8f8c6..7365f46 100644
+>> > --- a/arch/arm/plat-samsung/include/plat/dma.h
+>> > +++ b/arch/arm/plat-samsung/include/plat/dma.h
+>> > @@ -62,7 +62,7 @@ typedef int ?(*s3c2410_dma_opfn_t)(struct
+>> > s3c2410_dma_chan *,
+>> > ? * request a dma channel exclusivley
+>> > ?*/
+>> >
+>> > -extern int s3c2410_dma_request(unsigned int channel,
+>> > +extern int s3c2410_dma_request(enum dma_ch id,
+>> > ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct s3c2410_dma_client *, void *dev);
+>> >
+>> >
+>> > @@ -71,14 +71,14 @@ extern int s3c2410_dma_request(unsigned int channel,
+>> > ? * change the state of the dma channel
+>> > ?*/
+>> >
+>> > -extern int s3c2410_dma_ctrl(unsigned int channel, enum s3c2410_chan_op
+> op);
+>> > +extern int s3c2410_dma_ctrl(enum dma_ch id, enum s3c2410_chan_op op);
+>> >
+>> > ?/* s3c2410_dma_setflags
+>> > ? *
+>> > ? * set the channel's flags to a given state
+>> > ?*/
+>> >
+>> > -extern int s3c2410_dma_setflags(unsigned int channel,
+>> > +extern int s3c2410_dma_setflags(enum dma_ch id,
+>> > ? ? ? ? ? ? ? ? ? ? ? ? ? ? unsigned int flags);
+>> >
+>> > ?/* s3c2410_dma_free
+>> > @@ -86,7 +86,7 @@ extern int s3c2410_dma_setflags(unsigned int channel,
+>> > ? * free the dma channel (will also abort any outstanding operations)
+>> > ?*/
+>> >
+>> > -extern int s3c2410_dma_free(unsigned int channel, struct
+> s3c2410_dma_client *);
+>> > +extern int s3c2410_dma_free(enum dma_ch id, struct s3c2410_dma_client
+> *);
+>> >
+>> > ?/* s3c2410_dma_enqueue
+>> > ? *
+>> > @@ -95,7 +95,7 @@ extern int s3c2410_dma_free(unsigned int channel,
+> struct
+>> > s3c2410_dma_client *);
+>> > ? * drained before the buffer is given to the DMA system.
+>> > ?*/
+>> >
+>> > -extern int s3c2410_dma_enqueue(unsigned int channel, void *id,
+>> > +extern int s3c2410_dma_enqueue(enum dma_ch idx, void *id,
+>> > ? ? ? ? ? ? ? ? ? ? ? ? ? ?dma_addr_t data, int size);
+>> >
+>> > ?/* s3c2410_dma_config
+>> > @@ -103,14 +103,14 @@ extern int s3c2410_dma_enqueue(unsigned int
+> channel,
+>> > void *id,
+>> > ? * configure the dma channel
+>> > ?*/
+>> >
+>> > -extern int s3c2410_dma_config(unsigned int channel, int xferunit);
+>> > +extern int s3c2410_dma_config(enum dma_ch id, int xferunit);
+>> >
+>> > ?/* s3c2410_dma_devconfig
+>> > ? *
+>> > ? * configure the device we're talking to
+>> > ?*/
+>> >
+>> > -extern int s3c2410_dma_devconfig(unsigned int channel,
+>> > +extern int s3c2410_dma_devconfig(enum dma_ch id,
+>> > ? ? ? ? ? ? enum s3c2410_dmasrc source, unsigned long devaddr);
+>> >
+>> > ?/* s3c2410_dma_getposition
+>> > @@ -118,7 +118,7 @@ extern int s3c2410_dma_devconfig(unsigned int
+> channel,
+>> > ? * get the position that the dma transfer is currently at
+>> > ?*/
+>> >
+>> > -extern int s3c2410_dma_getposition(unsigned int channel,
+>> > +extern int s3c2410_dma_getposition(enum dma_ch id,
+>> > ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?dma_addr_t *src, dma_addr_t *dest);
+>> >
+>> > ?extern int s3c2410_dma_set_opfn(unsigned int, s3c2410_dma_opfn_t rtn);
+>> > --
+>
+> Hi Sangwook Lee,
+>
+> I reverted this in my -fix tree just now because this makes following error
+> with s3c2410_defconfig.
+>
+> arch/arm/plat-samsung/include/plat/dma.h:66: warning: 'enum dma_ch' declared
+> inside parameter list
+> arch/arm/plat-samsung/include/plat/dma.h:66: warning: its scope is only this
+> definition or declaration, which is probably not what you want
+> arch/arm/plat-samsung/include/plat/dma.h:74: warning: 'enum dma_ch' declared
+> inside parameter list
+> arch/arm/plat-samsung/include/plat/dma.h:82: warning: 'enum dma_ch' declared
+> inside parameter list
+> arch/arm/plat-samsung/include/plat/dma.h:89: warning: 'enum dma_ch' declared
+> inside parameter list
+> arch/arm/plat-samsung/include/plat/dma.h:99: warning: 'enum dma_ch' declared
+> inside parameter list
+> arch/arm/plat-samsung/include/plat/dma.h:106: warning: 'enum dma_ch'
+> declared inside parameter list
+> arch/arm/plat-samsung/include/plat/dma.h:114: warning: 'enum dma_ch'
+> declared inside parameter list
+> arch/arm/plat-samsung/include/plat/dma.h:122: warning: 'enum dma_ch'
+> declared inside parameter list
+> drivers/mmc/host/s3cmci.c: In function 'finalize_request':
+> drivers/mmc/host/s3cmci.c:889: error: type of formal parameter 1 is
+> incomplete
+> drivers/mmc/host/s3cmci.c: In function 's3cmci_dma_setup':
+> drivers/mmc/host/s3cmci.c:927: error: type of formal parameter 1 is
+> incomplete
+> drivers/mmc/host/s3cmci.c:930: error: type of formal parameter 1 is
+> incomplete
+> drivers/mmc/host/s3cmci.c:933: error: type of formal parameter 1 is
+> incomplete
+> drivers/mmc/host/s3cmci.c: In function 's3cmci_prepare_dma':
+> drivers/mmc/host/s3cmci.c:1091: error: type of formal parameter 1 is
+> incomplete
+> drivers/mmc/host/s3cmci.c:1111: error: type of formal parameter 1 is
+> incomplete
+> drivers/mmc/host/s3cmci.c:1114: error: type of formal parameter 1 is
+> incomplete
+> drivers/mmc/host/s3cmci.c:1119: error: type of formal parameter 1 is
+> incomplete
+> drivers/mmc/host/s3cmci.c: In function 's3cmci_probe':
+> drivers/mmc/host/s3cmci.c:1692: error: type of formal parameter 1 is
+> incomplete
+> drivers/mmc/host/s3cmci.c:1778: error: type of formal parameter 1 is
+> incomplete
+> drivers/mmc/host/s3cmci.c: In function 's3cmci_remove':
+> drivers/mmc/host/s3cmci.c:1840: error: type of formal parameter 1 is
+> incomplete
+>
+> Thanks.
+>
+> Best regards,
+> Kgene.
+> --
+> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+> SW Solution Development Team, Samsung Electronics Co., Ltd.
+>
+>
