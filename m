@@ -1,56 +1,39 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 6 Jul 2011 15:10:07 -0400 (EDT)
-Subject: [PATCH 6/8] drivers: add Contiguous Memory Allocator
-In-Reply-To: <201107061831.59739.arnd@arndb.de>
-References: <1309851710-3828-1-git-send-email-m.szyprowski@samsung.com>
-	<201107061651.49824.arnd@arndb.de>
-	<20110706154857.GG8286@n2100.arm.linux.org.uk>
-	<201107061831.59739.arnd@arndb.de>
-Message-ID: <alpine.LFD.2.00.1107061459520.14596@xanadu.home>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 6 Jul 2011 20:10:00 +0100
+Subject: [PATCH 1/3] ARM: CSR: Adding CSR SiRFprimaII board support
+In-Reply-To: <CAGsJ_4xntJHz_CzCaTuyCbDrePzxO+esPFxTfZZ1TTnZFy4w=Q@mail.gmail.com>
+References: <1309945678-18813-1-git-send-email-bs14@csr.com>
+	<1309945678-18813-2-git-send-email-bs14@csr.com>
+	<20110706122501.GU8286@n2100.arm.linux.org.uk>
+	<CAGsJ_4xntJHz_CzCaTuyCbDrePzxO+esPFxTfZZ1TTnZFy4w=Q@mail.gmail.com>
+Message-ID: <20110706191000.GN8286@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 6 Jul 2011, Arnd Bergmann wrote:
-
-> On Wednesday 06 July 2011, Russell King - ARM Linux wrote:
-> > On Wed, Jul 06, 2011 at 04:51:49PM +0200, Arnd Bergmann wrote:
-> > > On Wednesday 06 July 2011, Russell King - ARM Linux wrote:
-> > > 
-> > > I don't see how. The pages get allocated from an unmapped area
-> > > or memory, mapped into the kernel address space as uncached or wc
-> > > and then cleared. This should be the same for lowmem or highmem
-> > > pages.
-> > 
-> > You don't want to clear them via their uncached or WC mapping, but via
-> > their cached mapping _before_ they get their alternative mapping, and
-> > flush any cached out of that mapping - both L1 and L2 caches.
+On Thu, Jul 07, 2011 at 12:09:24AM +0800, Barry Song wrote:
+> if you define that in asm/io.h as you said:
 > 
-> But there can't be any other mapping, which is the whole point of
-> the exercise to use highmem.
-> Quoting from the new dma_alloc_area() function:
+> #ifndef IO_SPACE_LIMIT
+> #if defined(PCMCIA_SOC_COMMON)
+> #define  IO_SPACE_LIMIT ((resource_size_t)0xffffffff)
+> #else
+> #if defined(CONFIG_PCI) || defined(CONFIG_ISA) || defined(CONFIG_PCCARD)
+> #define IO_SPACE_LIMIT ((resource_size_t)0xffff)
+> #else
+> #define IO_SPACE_LIMIT ((resource_size_t)0)
+> #endif
+> #endif
+> #endif
 > 
->         c = arm_vmregion_alloc(&area->vm, align, size,
->                             gfp & ~(__GFP_DMA | __GFP_HIGHMEM));
->         if (!c)
->                 return NULL;
->         memset((void *)c->vm_start, 0, size);
-> 
-> area->vm here points to an uncached location, which means that
-> we already zero the data through the uncached mapping. I don't
-> see how it's getting worse than it is already.
+> i'd like to delete IO_SPACE_LIMIT in my io.h.
+>
+> otherwise, i'd like to try "#define IO_SPACE_LIMIT
+> ((resource_size_t)0)" in my io.h since i have no real
+> CONFIG_PCI/ISA/PCCARD/PCMCIA_SOC_COMMON.
 
-If you get a highmem page, because the cache is VIPT, that page might 
-still be cached even if it wasn't mapped.  With a VIVT cache we must 
-flush the cache whenever a highmem page is unmapped.  There is no such 
-restriction with VIPT i.e. ARMv6 and above.  Therefore to make sure the 
-highmem page you get doesn't have cache lines associated to it, you must 
-first map it cacheable, then perform cache invalidation on it, and 
-eventually remap it as non-cacheable.  This is necessary because there 
-is no way to perform cache maintenance on L1 cache using physical 
-addresses unfortunately.  See commit 7e5a69e83b for an example of what 
-this entails (fortunately commit 3e4d3af501 made things much easier and 
-therefore commit 39af22a79 greatly simplified things).
+Thanks - stopping the 0xffffffff madness in new platforms is great.
 
-
-
-Nicolas
+If you also omit the definition for __io() and set NO_IOPORT in your
+Kconfig, you should also end up with inb() et.al. undefined by asm/io.h,
+which should cause build-time failures if an ISA/PCI/PCMCIA driver
+attempts to build.
