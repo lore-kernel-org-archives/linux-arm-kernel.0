@@ -1,32 +1,30 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 6 Jul 2011 15:23:45 +0100
-Subject: [PATCH 6/8] drivers: add Contiguous Memory Allocator
-In-Reply-To: <201107061609.29996.arnd@arndb.de>
-References: <1309851710-3828-1-git-send-email-m.szyprowski@samsung.com>
-	<20110705113345.GA8286@n2100.arm.linux.org.uk>
-	<006301cc3be4$daab1850$900148f0$%szyprowski@samsung.com>
-	<201107061609.29996.arnd@arndb.de>
-Message-ID: <20110706142345.GC8286@n2100.arm.linux.org.uk>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Wed, 6 Jul 2011 14:24:16 +0000 (UTC)
+Subject: [PATCH] ARM: get rid of a few StrongARM cache-related build	time
+	constants
+References: <1309919636-20546-1-git-send-email-nicolas.pitre@linaro.org>
+	<20110706075542.GK8286@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1107060912490.14596@xanadu.home>
+	<20110706134102.GZ8286@n2100.arm.linux.org.uk>
+Message-ID: <iv1r6g$oj1$1@dough.gmane.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 06, 2011 at 04:09:29PM +0200, Arnd Bergmann wrote:
-> Maybe you can simply adapt the default location of the contiguous memory
-> are like this:
-> - make CONFIG_CMA depend on CONFIG_HIGHMEM on ARM, at compile time
-> - if ZONE_HIGHMEM exist during boot, put the CMA area in there
-> - otherwise, put the CMA area at the top end of lowmem, and change
->   the zone sizes so ZONE_HIGHMEM stretches over all of the CMA memory.
+Russell King - ARM Linux wrote:
 
-One of the requirements of the allocator is that the returned memory
-should be zero'd (because it can be exposed to userspace via ALSA
-and frame buffers.)
+> On Wed, Jul 06, 2011 at 09:21:33AM -0400, Nicolas Pitre wrote:
+>> Oops.  Here's a fixed patch.
+>> 
+>> Could you test this patch as well?  You're the only one I know who might 
+>> still have access to the affected hardware.
+>
+> Will do - the assabet is still running as a test machine.  The ebsa110 is
+> still alive but as that's (still) the firewall I won't run a test on that
+> until a quiet weekend.  I can also test the Netwinder and RiscPC...
 
-Zeroing the memory from all the contexts which dma_alloc_coherent
-is called from is a trivial matter if its in lowmem, but highmem is
-harder.
+Sorry to break in: does somebody know if there is still a way to
+purchase/gain assabet and mainstone boards?
 
-Another issue is that when a platform has restricted DMA regions,
-they typically don't fall into the highmem zone.  As the dmabounce
-code allocates from the DMA coherent allocator to provide it with
-guaranteed DMA-able memory, that would be rather inconvenient.
+-- 
+With best wishes
+Dmitry
