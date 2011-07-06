@@ -1,110 +1,59 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 05 Jul 2011 23:30:08 -0400
-Subject: [PATCH 24/37] ARM: spear: remove mach/memory.h and plat/memory.h
+Date: Tue, 05 Jul 2011 23:29:58 -0400
+Subject: [PATCH 14/37] ARM: mach-w90x900: remove mach/memory.h
 In-Reply-To: <1309923021-23487-1-git-send-email-nicolas.pitre@linaro.org>
 References: <1309923021-23487-1-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <1309923021-23487-24-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <1309923021-23487-14-git-send-email-nicolas.pitre@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 ---
- arch/arm/Kconfig                             |    1 +
- arch/arm/mach-spear3xx/include/mach/memory.h |   19 -------------------
- arch/arm/mach-spear6xx/include/mach/memory.h |   19 -------------------
- arch/arm/plat-spear/include/plat/memory.h    |   20 --------------------
- 4 files changed, 1 insertions(+), 58 deletions(-)
- delete mode 100644 arch/arm/mach-spear3xx/include/mach/memory.h
- delete mode 100644 arch/arm/mach-spear6xx/include/mach/memory.h
- delete mode 100644 arch/arm/plat-spear/include/plat/memory.h
+ arch/arm/Kconfig                            |    1 +
+ arch/arm/mach-w90x900/include/mach/memory.h |   23 -----------------------
+ 2 files changed, 1 insertions(+), 23 deletions(-)
+ delete mode 100644 arch/arm/mach-w90x900/include/mach/memory.h
 
 diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 44e8fdd..755a85d 100644
+index 8690b96..af416fc 100644
 --- a/arch/arm/Kconfig
 +++ b/arch/arm/Kconfig
-@@ -899,6 +899,7 @@ config PLAT_SPEAR
+@@ -587,6 +587,7 @@ config ARCH_W90X900
+ 	select CLKDEV_LOOKUP
  	select CLKSRC_MMIO
  	select GENERIC_CLOCKEVENTS
- 	select HAVE_CLK
 +	select NO_MACH_MEMORY_H
  	help
- 	  Support for ST's SPEAr platform (SPEAr3xx, SPEAr6xx and SPEAr13xx).
- 
-diff --git a/arch/arm/mach-spear3xx/include/mach/memory.h b/arch/arm/mach-spear3xx/include/mach/memory.h
+ 	  Support for Nuvoton (Winbond logic dept.) ARM9 processor,
+ 	  At present, the w90x900 has been renamed nuc900, regarding
+diff --git a/arch/arm/mach-w90x900/include/mach/memory.h b/arch/arm/mach-w90x900/include/mach/memory.h
 deleted file mode 100644
-index 5173522..0000000
---- a/arch/arm/mach-spear3xx/include/mach/memory.h
+index f02905b..0000000
+--- a/arch/arm/mach-w90x900/include/mach/memory.h
 +++ /dev/null
-@@ -1,19 +0,0 @@
+@@ -1,23 +0,0 @@
 -/*
-- * arch/arm/mach-spear3xx/include/mach/memory.h
+- * arch/arm/mach-w90x900/include/mach/memory.h
 - *
-- * Memory map for SPEAr3xx machine family
+- * Copyright (c) 2008 Nuvoton technology corporation
+- * All rights reserved.
 - *
-- * Copyright (C) 2009 ST Microelectronics
-- * Viresh Kumar<viresh.kumar@st.com>
+- * Wan ZongShun <mcuos.com@gmail.com>
 - *
-- * This file is licensed under the terms of the GNU General Public
-- * License version 2. This program is licensed "as is" without any
-- * warranty of any kind, whether express or implied.
+- * Based on arch/arm/mach-s3c2410/include/mach/memory.h
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
 - */
 -
--#ifndef __MACH_MEMORY_H
--#define __MACH_MEMORY_H
+-#ifndef __ASM_ARCH_MEMORY_H
+-#define __ASM_ARCH_MEMORY_H
 -
--#include <plat/memory.h>
+-#define PLAT_PHYS_OFFSET	UL(0x00000000)
 -
--#endif /* __MACH_MEMORY_H */
-diff --git a/arch/arm/mach-spear6xx/include/mach/memory.h b/arch/arm/mach-spear6xx/include/mach/memory.h
-deleted file mode 100644
-index 781f088..0000000
---- a/arch/arm/mach-spear6xx/include/mach/memory.h
-+++ /dev/null
-@@ -1,19 +0,0 @@
--/*
-- * arch/arm/mach-spear6xx/include/mach/memory.h
-- *
-- * Memory map for SPEAr6xx machine family
-- *
-- * Copyright (C) 2009 ST Microelectronics
-- * Rajeev Kumar<rajeev-dlh.kumar@st.com>
-- *
-- * This file is licensed under the terms of the GNU General Public
-- * License version 2. This program is licensed "as is" without any
-- * warranty of any kind, whether express or implied.
-- */
--
--#ifndef __MACH_MEMORY_H
--#define __MACH_MEMORY_H
--
--#include <plat/memory.h>
--
--#endif	/* __MACH_MEMORY_H */
-diff --git a/arch/arm/plat-spear/include/plat/memory.h b/arch/arm/plat-spear/include/plat/memory.h
-deleted file mode 100644
-index 7e3599e..0000000
---- a/arch/arm/plat-spear/include/plat/memory.h
-+++ /dev/null
-@@ -1,20 +0,0 @@
--/*
-- * arch/arm/plat-spear/include/plat/memory.h
-- *
-- * Memory map for SPEAr platform
-- *
-- * Copyright (C) 2009 ST Microelectronics
-- * Viresh Kumar<viresh.kumar@st.com>
-- *
-- * This file is licensed under the terms of the GNU General Public
-- * License version 2. This program is licensed "as is" without any
-- * warranty of any kind, whether express or implied.
-- */
--
--#ifndef __PLAT_MEMORY_H
--#define __PLAT_MEMORY_H
--
--/* Physical DRAM offset */
--#define PLAT_PHYS_OFFSET		UL(0x00000000)
--
--#endif /* __PLAT_MEMORY_H */
+-#endif
 -- 
 1.7.4
