@@ -1,63 +1,53 @@
-From: padma.kvr@gmail.com (padma venkat)
-Date: Wed, 6 Jul 2011 13:13:51 +0530
-Subject: [PATCH] ARM: S5PC100: Fix for compilation error
-In-Reply-To: <00c201cc3ba6$901a62c0$b04f2840$%kim@samsung.com>
-References: <1309801312-27377-1-git-send-email-padma.v@samsung.com>
-	<00c201cc3ba6$901a62c0$b04f2840$%kim@samsung.com>
-Message-ID: <CAAgF-BdC2qOYdqHJqfO1J-wnm2Ph6M+bhLw2is7RSU_d=qwJ7g@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 6 Jul 2011 09:50:52 +0200
+Subject: [PATCH] Enable RTC driver.
+In-Reply-To: <1309872931-13999-1-git-send-email-J.Lambrecht@televic.com>
+References: <1309872931-13999-1-git-send-email-J.Lambrecht@televic.com>
+Message-ID: <20110706075052.GB26347@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin,
+On Tue, Jul 05, 2011 at 03:35:31PM +0200, J?rgen Lambrecht wrote:
+> The MC13783 MFD also contains an RTC. Enable it.
+> To avoid "No RTC device found, ALARM timers will not wake from suspend",
+> this patch is needed:
+> http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=commitdiff;h=c008ba58af24dc5d0d8e9fe6e59d876910254761
+> 
+> Signed-off-by: J?rgen Lambrecht <J.Lambrecht@televic.com>
 
-On Wed, Jul 6, 2011 at 12:02 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> Padmavathi Venna wrote:
->>
->> From: padmavathi venna <padma.v@samsung.com>
->>
->> S5PC100 Compilation fails without this patch
->>
->> Signed-off-by: padmavathi venna <padma.v@samsung.com>
->> ---
->> ?arch/arm/mach-s5pc100/dev-spi.c | ? ?1 +
->> ?1 files changed, 1 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/mach-s5pc100/dev-spi.c
-> b/arch/arm/mach-s5pc100/dev-spi.c
->> index 2b58c9a..e5d6c4d 100644
->> --- a/arch/arm/mach-s5pc100/dev-spi.c
->> +++ b/arch/arm/mach-s5pc100/dev-spi.c
->> @@ -15,6 +15,7 @@
->> ?#include <mach/dma.h>
->> ?#include <mach/map.h>
->> ?#include <mach/spi-clocks.h>
->> +#include <mach/irqs.h>
->>
->> ?#include <plat/s3c64xx-spi.h>
->> ?#include <plat/gpio-cfg.h>
->> --
->> 1.7.0.4
->
-> Ok, will apply in -fix tree.
->
-> But, I'm not sure you really need to use your name ' padmavathi venna'
-> here...you used "Padmavathi Venna" in other patch.
-Thanks for your pointing out. I am going to send a new patch by
-removing the parenthesis. In that I will also correct my name.
+Applied for next. Please Cc me in the future for i.MX specific changes.
 
-Thanks&Regards
-Padma
->
-> Thanks.
->
-> Best regards,
-> Kgene.
-> --
-> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-> SW Solution Development Team, Samsung Electronics Co., Ltd.
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+Sascha
+
+> ---
+>  arch/arm/mach-imx/mach-mx27_3ds.c |    3 ++-
+>  1 files changed, 2 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/mach-mx27_3ds.c b/arch/arm/mach-imx/mach-mx27_3ds.c
+> index 84114aa..00bbb6b 100644
+> --- a/arch/arm/mach-imx/mach-mx27_3ds.c
+> +++ b/arch/arm/mach-imx/mach-mx27_3ds.c
+> @@ -294,7 +294,8 @@ static struct mc13xxx_platform_data mc13783_pdata = {
+>  		.num_regulators = ARRAY_SIZE(mx27_3ds_regulators),
+>  
+>  	},
+> -	.flags  = MC13783_USE_REGULATOR | MC13783_USE_TOUCHSCREEN,
+> +	.flags  = MC13783_USE_REGULATOR | MC13783_USE_TOUCHSCREEN |
+> +	MC13783_USE_RTC,
+>  };
+>  
+>  /* SPI */
+> -- 
+> 1.7.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
