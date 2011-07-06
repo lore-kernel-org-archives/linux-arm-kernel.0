@@ -1,51 +1,49 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 6 Jul 2011 18:13:19 +0200
-Subject: [PATCH 1/3] ARM: CSR: Adding CSR SiRFprimaII board support
-In-Reply-To: <20110706152546.GE8286@n2100.arm.linux.org.uk>
-References: <1309945678-18813-1-git-send-email-bs14@csr.com>
-	<201107061641.05569.arnd@arndb.de>
-	<20110706152546.GE8286@n2100.arm.linux.org.uk>
-Message-ID: <201107061813.19933.arnd@arndb.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 6 Jul 2011 17:15:42 +0100
+Subject: Unnecessary cache-line flush on page table updates ?
+In-Reply-To: <20110706155525.GH8286@n2100.arm.linux.org.uk>
+References: <BANLkTi=KVnzBKcd83c9T3P20VAv-ggqR4g@mail.gmail.com>
+	<20110704094531.GB19117@e102109-lin.cambridge.arm.com>
+	<20110704100221.GB8286@n2100.arm.linux.org.uk>
+	<20110704104329.GD19117@e102109-lin.cambridge.arm.com>
+	<20110704111338.GD8286@n2100.arm.linux.org.uk>
+	<20110704215507.GH8286@n2100.arm.linux.org.uk>
+	<20110705092600.GB25956@e102109-lin.cambridge.arm.com>
+	<20110705094652.GQ8286@n2100.arm.linux.org.uk>
+	<20110706155214.GG32020@e102109-lin.cambridge.arm.com>
+	<20110706155525.GH8286@n2100.arm.linux.org.uk>
+Message-ID: <20110706161542.GI32020@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 06 July 2011, Russell King - ARM Linux wrote:
-> Ha, you've no idea what kind of messed up ideas hardware people come up
-> with then.  Take this - this is real hardware which I've had Linux
-> running on continuously for the last 13 years.  Here is the /proc/ioports:
+On Wed, Jul 06, 2011 at 04:55:25PM +0100, Russell King - ARM Linux wrote:
+> On Wed, Jul 06, 2011 at 04:52:14PM +0100, Catalin Marinas wrote:
+> > On Tue, Jul 05, 2011 at 10:46:52AM +0100, Russell King - ARM Linux wrote:
+> > > I've since added the dsb+isbs back to the TLB ops because the ARM ARM
+> > > is qutie explicit that both are required to ensure that explicit
+> > > accesses see the effect of the TLB operation.  To me it is rather
+> > > perverse that an ISB is required to ensure that this sequence works:
+> > > 
+> > > 	write page table entry
+> > > 	clean
+> > > 	dsb
+> > > 	flush tlb entry
+> > > 	dsb
+> > > 	isb
+> > > 	read/write new page
+> > 
+> > The same requirement can be found in latest (internal only) ARM ARM as
+> > well. I think the reason is that some memory access already in the
+> > pipeline (but after the TLB flush) may have sampled the state of the
+> > page table using an old TLB entry, even though the actual memory access
+> > will happen after the DSB.
 > 
-< skipped lots of interesting information about how messed up the hardware can be>
+> It would be useful to have a statement from RG on this.  Could you
+> pass this to him please?
 
-> So, if you do an ioport_map() to convert from the ISA address to a bus
-> specific address, and then add the device specific offset, you end up
-> with information lost, and you no longer know how to manipulate the
-> cookie into the correct bus address and access type.
-> 
-> The alternative is you keep the returned ioport cookie the same as the
-> ISA address, and do all the conversion in ioread/iowrite - that's even
-> more horrible than how it's already doing because then you need to know
-> if its real MMIO or IO, and whether it's an 8 bit IO device, 16-bit
-> low byte lane IO device, or a 16-bit both byte lane IO device.  Plus
-> whether the MMIO is in the broken PCMCIA controller IO space (CPU
-> address bit 11 missing and CPU address bit 19 mapped to two bus
-> address bits...)
+Just checked - it is required as per the ARM ARM and there are cores
+that rely on the ISB. As I said, it depends on the pipeline
+implementation.
 
-Well, first of all, I never suggested converting drivers to use
-iowrite, you brought that up. So as long as the 16-bit ISA driver
-keep using inb/outb, an iowrite implementation would not need to
-bother about this specific problem and don't even need a private
-iowrite implementation but instead move that platform over to use
-CONFIG_GENERIC_IOMAP.
-
-What lib/iomap.c does is indeed to look at the address, by default
-it assumes that __iomem tokens below 0x10000 are IO ports, while
-larger values are MMIO addresses. This appears to work fine on x86,
-and AFAICT, it should still work with both the botched PIO mapping
-(minus the 16-bit devices) and the botched MMIO mapping, since both
-will just end up calling the fixups in arch/arm/mach-ebsa110/io.c.
-
-The only problem you will hit is when there are ISA devices with
-MMIO addresses below 0x40000, which is impossible on PCs but
-perhaps not on arbitrarily incompatible ISA buses.
-
-	Arnd
+-- 
+Catalin
