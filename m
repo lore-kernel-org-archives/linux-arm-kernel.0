@@ -1,48 +1,31 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 6 Jul 2011 14:48:06 +0100
-Subject: [PATCH V2 3/6] mpcore_wdt: Fix WDIOC_SETOPTIONS handling
-In-Reply-To: <1309892440-3260-4-git-send-email-vkuzmichev@mvista.com>
-References: <1286185540-19569-1-git-send-email-vkuzmichev@mvista.com>
-	<1309892440-3260-4-git-send-email-vkuzmichev@mvista.com>
-Message-ID: <20110706134806.GA8286@n2100.arm.linux.org.uk>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 6 Jul 2011 09:47:28 -0400 (EDT)
+Subject: [PATCH 00/17] Introduce a led trigger for CPU activity
+In-Reply-To: <20110706131600.GW8286@n2100.arm.linux.org.uk>
+References: <1309955687-19365-1-git-send-email-bryan.wu@canonical.com>
+	<CAMPhdO-Ln7BmU8jYfEEp3RPa9sgJueTVfsm1phs=NXTC3FPgNw@mail.gmail.com>
+	<20110706131600.GW8286@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1107060944040.14596@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 05, 2011 at 11:00:37PM +0400, Vitaly Kuzmichev wrote:
-> According to the include/linux/watchdog.h WDIOC_SETOPTIONS is
-> classified as 'read from device' ioctl call:
->   #define WDIOC_SETOPTIONS        _IOR(WATCHDOG_IOCTL_BASE, 4, int)
+On Wed, 6 Jul 2011, Russell King - ARM Linux wrote:
+
+> On Wed, Jul 06, 2011 at 09:13:14PM +0800, Eric Miao wrote:
+> > > ?drivers/leds/ledtrig-cpu.c ? ? ? ? ? ? ? ? ? ? | ?144 ++++++++++++
+> > > ?include/linux/leds.h ? ? ? ? ? ? ? ? ? ? ? ? ? | ? 15 ++
+> > > ?105 files changed, 1532 insertions(+), 3119 deletions(-)
+> > 
+> > Not bad, I like the numbers here. This is definitely a good move.
+> > I had long ago wanted to remove those legacy LED code in mach-pxa.
 > 
-> However, the driver 'mpcore_wdt' performs 'copy_from_user' only if
-> _IOC_WRITE is set, thus the local variable 'uarg' which is used in
-> WDIOC_SETOPTIONS handling remains uninitialized.
-> 
-> The proper way to fix this is to bind WDIOC_SETOPTIONS to _IOW,
-> but this will break compatibility.
-> So adding additional condition for performing 'copy_from_user'.
+> The down-side is that through these moves we've lost functionality each
+> time.  For example, the blinking heartbeat LED on the Assabet and
+> Netwinder which I always enabled to let me know whether the machines
+> were still alove has long since gone.
 
-That looks like something which needs fixing in watchdog land.  And it's
-not too difficult:
+There exists a generic heartbeat LED trigger for that.  Making it the 
+default for a particular LED should be trivial.
 
-1. Change the existing WDIOC_SETOPTIONS to WDIOC_SETOPTIONS_OLD
-2. Add a new, correctly defined WDIOC_SETOPTIONS.
-3. Update all drivers to use WDIOC_SETOPTIONS.
-4. Provide a helper which deals with WDIOC_SETOPTIONS_OLD and translates
-   it to the proper WDIOC_SETOPTIONS call (this could be just:
 
-	if (cmd == WDIOC_SETOPTIONS_OLD) {
-		static int first = 1;
-		if (first)
-			pr_warn("%s:%d used old WDIOC_SETOPTIONS call.  Please rebuild\n",
-				current->comm, current->pid);
-		first = 0;
-		cmd = WDIOC_SETOPTIONS;
-	}
-
-   before any argument copies.
-
-This means you preserve existing compatibility with userspace, yet gain
-a path to a non-broken ioctl interface.
-
-As stuff gets rebuilt and replaced, you'll eventually be able to remove
-the above.  That period used to be two years for such simple changes.
+Nicolas
