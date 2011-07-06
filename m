@@ -1,58 +1,36 @@
-From: gregkh@suse.de (Greg KH)
-Date: Tue, 5 Jul 2011 19:00:49 -0700
-Subject: [PATCH v5 1/1] drivers:staging:pruss: add pruss staging mfd
-	driver.
-In-Reply-To: <131E5DFBE7373E4C8D813795A6AA7F08034B5C4C48@dlee06.ent.ti.com>
-References: <1306827939-4133-1-git-send-email-subhasish@mistralsolutions.com>
-	<1306827939-4133-2-git-send-email-subhasish@mistralsolutions.com>
-	<20110628210112.GA31081@kroah.com>
-	<20110705161558.GA26309@kroah.com>
-	<131E5DFBE7373E4C8D813795A6AA7F08034B5C4C48@dlee06.ent.ti.com>
-Message-ID: <20110706020049.GB15988@suse.de>
+From: greg@kroah.com (Greg KH)
+Date: Tue, 5 Jul 2011 19:45:25 -0700
+Subject: [stable] [PATCH v2] msm: timer: compensate for timer shift in
+	msm_read_timer_count
+In-Reply-To: <4E1362DD.7030001@codeaurora.org>
+References: <1308344138-2862-1-git-send-email-johlstei@codeaurora.org>
+	<20110620215922.GA21909@kroah.com>
+	<8ya7h8gozhn.fsf@huya.qualcomm.com>
+	<20110621162427.GA28836@kroah.com>
+	<4E1362DD.7030001@codeaurora.org>
+Message-ID: <20110706024525.GB24734@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 05, 2011 at 01:43:03PM -0500, Watkins, Melissa wrote:
-> On Tue, Jun 28, 2011 at 02:01:12PM -0700, Greg KH wrote:
-> > On Tue, May 31, 2011 at 01:15:39PM +0530, Subhasish Ghosh wrote:
-> > > > This patch adds the pruss MFD driver and associated include files.
-> > > > For details regarding the PRUSS please refer the folowing link:
-> > > > http://processors.wiki.ti.com/index.php/Programmable_Realtime_Unit_Subsystem
-> > > > 
-> > > > The rational behind the MFD driver being the fact that multiple devices can
-> > > > be implemented on the cores independently. This is determined by the nature
-> > > > of the program which is loaded into the PRU's instruction memory.
-> > > > A device may be de-initialized and another loaded or two different devices
-> > > > can be run simultaneously on the two cores.
-> > > > It's also possible, as in our case, to implement a single device on both
-> > > > the PRU's resulting in improved load sharing.
-> > > > 
-> > > > Signed-off-by: Subhasish Ghosh <subhasish@mistralsolutions.com>
-> > > 
+On Tue, Jul 05, 2011 at 12:15:41PM -0700, Jeff Ohlstein wrote:
+> Greg KH wrote:
+> > On Mon, Jun 20, 2011 at 04:27:16PM -0700, David Brown wrote:
+> >> I don't think this patch was intended for stable in the first place.
+> >> Jeff, this is a fix for 3.0-rcx, right?
+> > 
+> > Then why was it sent to stable at kernel.org?
+> > 
+> > confused,
+> > 
+> > greg k-h
+> > 
 > 
-> [MW] Greg, thanks for reviewing Mistral's patch submission.  I have
-> been following the traffic on their patches and will provide an
-> initial response to address some of your questions. 
-> 
-> > > Please refresh my memory as to why this can't get merged into the
-> > > "normal" part of the kernel?
-> 
-> [MW] Arnd had recommended moving the driver to the staging area until
-> all interfaces have stabilized.  One of the main reasons it cannot
-> currently be merged in the "normal" part of the kernel is the question
-> of how firmware should be configured and loaded.
-> (https://lkml.org/lkml/2011/5/24/230,
-> https://lkml.org/lkml/2011/5/10/463)
-> 
-> > Dropped from my queue due to lack of response :(
-> 
-> > Please resend when you get the chance, and address the above comment in
-> > your changelog entry (and in your TODO file as well.)
-> 
-> [MW] Please let us know if Mistral still needs to resubmit their patch
-> or if we can continue discussions on this submission.
+> Sorry, this was indeed intended for stable. I will include the Cc: tag
+> in future patches stable. However, since this was already picked up in
+> Linus's tree, how should I proceed to get it into stable?
 
-Please resend it, with the above information in the changelog and in the
-TODO file.
+Take a look at Documentation/stable_kernel_rules.txt for how to do this
+(hint, send the git commit id to stable at kernel.org and let us know what
+kernels you want it applied to.)
 
 greg k-h
