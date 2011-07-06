@@ -1,52 +1,36 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 6 Jul 2011 08:54:25 -0400 (EDT)
-Subject: [PATCH 01/52] ARM: introduce atag_offset to replace
- boot_params
-In-Reply-To: <4E13E46D.3050205@codeaurora.org>
-References: <1309920457-21913-1-git-send-email-nicolas.pitre@linaro.org>
-	<4E13E46D.3050205@codeaurora.org>
-Message-ID: <alpine.LFD.2.00.1107060845140.14596@xanadu.home>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 6 Jul 2011 14:09:40 +0100
+Subject: [PATCH 1/3] ARM: CSR: Adding CSR SiRFprimaII board support
+In-Reply-To: <201107061442.05182.arnd@arndb.de>
+References: <1309945678-18813-1-git-send-email-bs14@csr.com>
+	<1309945678-18813-2-git-send-email-bs14@csr.com>
+	<20110706122501.GU8286@n2100.arm.linux.org.uk>
+	<201107061442.05182.arnd@arndb.de>
+Message-ID: <20110706130940.GV8286@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 5 Jul 2011, Stephen Boyd wrote:
+On Wed, Jul 06, 2011 at 02:42:04PM +0200, Arnd Bergmann wrote:
+> Good idea. The related change that I want to do is to conditionalize
+> all drivers that require PC-style I/O on the respective bus they
+> use, so we can also remove the __io macro for platforms that don't
+> need it and catch all drivers using inb/outb at compile time.
 
-> On 07/05/2011 07:46 PM, Nicolas Pitre wrote:
-> > diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
-> > index 7b79a00..1bdf6e1 100644
-> > --- a/arch/arm/include/asm/mach/arch.h
-> > +++ b/arch/arm/include/asm/mach/arch.h
-> > @@ -18,6 +18,7 @@ struct machine_desc {
-> >  	unsigned int		nr;		/* architecture number	*/
-> >  	const char		*name;		/* architecture name	*/
-> >  	unsigned long		boot_params;	/* tagged list		*/
-> > +	unsigned long		atag_offset;	/* tagged list (relative) */
-> >  	const char		**dt_compat;	/* array of device tree
-> >  						 * 'compatible' strings	*/
-> >  
-> > diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> > index e0db84d..4cc3e2b 100644
-> > --- a/arch/arm/kernel/setup.c
-> > +++ b/arch/arm/kernel/setup.c
-> > @@ -816,6 +816,8 @@ static struct machine_desc * __init setup_machine_tags(unsigned int nr)
-> >  
-> >  	if (__atags_pointer)
-> >  		tags = phys_to_virt(__atags_pointer);
-> > +	else if(mdesc->atag_offset)
-> > +		tags = PAGE_OFFSET + mdesc->atag_offset;
-> >  	else if (mdesc->boot_params) {
-> >  #ifdef CONFIG_MMU
-> >  		/*
-> 
-> Would it make sense to drop the atag_offset in most board files and
-> default it to 0x100 in the MACHINE_START macro itself? It's almost a
-> universal value and would cut down on hundreds of lines.
+And what about those which use ioport_map() and ioread/write ?
 
-Well, no more than 50 lines actually.
+The approach of setting IO_SPACE_LIMIT to zero makes those harmless
+even if inb/outb are provided.
 
-And there are those cases where that value is not set to anything, and 
-therefore I'd prefer we don't start always assuming something at 0x*100 
-for them.  IOW, this is meant to be functionally transparent.
+> To do that, I'm working on a patch set that splits the 8250
+> driver into separate parts for platform drivers (mostly MMIO)
+> and ISA drivers (mostly PIO), since that seems to be the only
+> driver that we need on non-PIO platforms that uses inb/outb
+> directly.
 
+I don't really see the point of that given the ioread/iowrite et.al.
+semantics.
 
-Nicolas
+And note that ioread/iowrite are unsupportable on some ARM platforms
+with ISA because of weird addressing techniques (and that renders
+PATA unsupportable on those platforms, while the old IDE stuff can
+continue to work with CF cards.)
