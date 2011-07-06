@@ -1,52 +1,49 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Wed, 6 Jul 2011 20:29:46 +0800
-Subject: [PATCH 2/3] ARM: CSR: mapping early DEBUG_LL uart
-In-Reply-To: <20110706121026.GT8286@n2100.arm.linux.org.uk>
-References: <1309945678-18813-1-git-send-email-bs14@csr.com>
-	<1309945678-18813-3-git-send-email-bs14@csr.com>
-	<20110706110522.GQ8286@n2100.arm.linux.org.uk>
-	<CAGsJ_4xRxWXL=xPRgkaLMFxpBtr-bP6xV9iD1UomfzyKmHhSJA@mail.gmail.com>
-	<20110706121026.GT8286@n2100.arm.linux.org.uk>
-Message-ID: <CAGsJ_4zPCpAm_aR9qwvhvAz_s5uUq5uz_34oL2gvjcZJjqPQdw@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 6 Jul 2011 13:34:17 +0100
+Subject: [PATCH 1/6 v8] ARM: Add basic architecture support for
+	VIA/WonderMedia 85xx SoC's
+In-Reply-To: <20101219174017.GA31832@alchark-u3s>
+References: <1289147348-31969-1-git-send-email-alchark@gmail.com>
+	<20101107165745.GB1759@n2100.arm.linux.org.uk>
+	<AANLkTimFJ=Brx4pDiUqZOKDfABaDg0s_yFC7EkZGi7D8@mail.gmail.com>
+	<20101107171726.GF1759@n2100.arm.linux.org.uk>
+	<20101108171930.GA1471@alchark-u3s.lan>
+	<20101111212322.GA15533@alchark-u3s.lan>
+	<20101111234957.GA28735@n2100.arm.linux.org.uk>
+	<20101219174017.GA31832@alchark-u3s>
+Message-ID: <20110706123417.GA25400@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On Sun, Dec 19, 2010 at 08:40:17PM +0300, Alexey Charkov wrote:
+> +static struct map_desc vt8500_io_desc[] __initdata = {
+> +	/* SoC MMIO registers, to be filled in later */
+> +	[0] = {
+> +		.type		= MT_DEVICE
+> +	},
+> +	/* PCI I/O space, numbers tied to those in <mach/io.h> */
+> +	[1] = {
+> +		.virtual	= 0xf0000000,
+> +		.pfn		= __phys_to_pfn(0xc0000000),
+> +		.length		= SZ_64K,
+> +		.type		= MT_DEVICE
+> +	},
+> +};
+...
+> diff --git a/arch/arm/mach-vt8500/include/mach/io.h b/arch/arm/mach-vt8500/include/mach/io.h
+> new file mode 100644
+> index 0000000..8dd55c8
+> --- /dev/null
+> +++ b/arch/arm/mach-vt8500/include/mach/io.h
+> +#ifndef __ASM_ARM_ARCH_IO_H
+> +#define __ASM_ARM_ARCH_IO_H
+> +
+> +#define IO_SPACE_LIMIT 0xffff
+> +
+> +#define __io(a)		((void __iomem *)((a) + 0xf0000000))
+> +#define __mem_pci(a)	(a)
+
+Can you explain why you seem to have PCI IO space, yet don't have CONFIG_PCI
+selected?  Do you have any drivers which use this space without CONFIG_PCI=y?
+
 Thanks.
-
-2011/7/6 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Wed, Jul 06, 2011 at 07:53:14PM +0800, Barry Song wrote:
->> hi Russell,
->>
->> 2011/7/6 Russell King - ARM Linux <linux@arm.linux.org.uk>:
->> > On Wed, Jul 06, 2011 at 02:47:57AM -0700, Barry Song wrote:
->> >> Signed-off-by: Barry Song <bs14@csr.com>
->> >
->> > Surely this should be part of the first patch, which won't build without
->> > this one if DEBUG_LL is enabled?
->>
->> i guess that can get fixed by:
->>
->> static void __init sirfsoc_map_io(void)
->> {
->> ? ? ? ? sirfsoc_map_lluart();
->> }
->>
->> MACHINE_START(PRIMA2_EVB, "prima2cb")
->> ? ? ? ...
->> ? ? ? ?.map_io ? ? ? ? = sirfsoc_map_io,
->> ? ? ? ...
->> MACHINE_END
->
-> That doesn't really change anything. ?If you build the first patch without
-> the second patch with DEBUG_LL enabled, you'll get a build failure because
-> sirfsoc_map_lluart is not defined.
->
-> Either omit the .map_io initializer in the first patch and add it in the
-> second patch, or combine the two patches together.
-
-real. thanks! to keep this as a separate patch as required in earlier
-thread, i will omit the .map_io initializer in the first patch.
-
->
-barry
