@@ -1,26 +1,115 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 6 Jul 2011 00:29:01 -0600
-Subject: [PATCH v2 0/3] Add device tree probe support for imx fec driver
-In-Reply-To: <20110705.232252.897826991160254269.davem@davemloft.net>
-References: <20110705.194854.1875695946300840388.davem@davemloft.net>
-	<20110705.223045.738515407552627580.davem@davemloft.net>
-	<20110706061901.GH9978@ponder.secretlab.ca>
-	<20110705.232252.897826991160254269.davem@davemloft.net>
-Message-ID: <20110706062901.GJ9978@ponder.secretlab.ca>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Wed, 6 Jul 2011 14:38:35 +0800
+Subject: [PATCH 01/37] ARM: prepare for removal of a bunch of
+	<mach/memory.h> files
+In-Reply-To: <1309923021-23487-1-git-send-email-nicolas.pitre@linaro.org>
+References: <1309923021-23487-1-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <CAGsJ_4yLmvjYkOavbBXXAFNavstsqQqwTJ-fkGni19vAoKRL_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 05, 2011 at 11:22:52PM -0700, David Miller wrote:
-> From: Grant Likely <grant.likely@secretlab.ca>
-> Date: Wed, 6 Jul 2011 00:19:01 -0600
-> 
-> > Sorry about that, I missed the reference to that function which is
-> > currently in my devicetree/next branch.  I can either take the series
-> > via devicetree/next, or I can provide you with a topic branch
-> > containing the needed commit that you can merge.  Whichever you prefer.
-> 
-> Please just take the series, thanks.
+2011/7/6 Nicolas Pitre <nicolas.pitre@linaro.org>:
+> When the CONFIG_NO_MACH_MEMORY_H symbol is selected by a particular
+> machine class, the machine specific memory.h include file is no longer
+> used and can be removed. ?In that case the equivalent information can
+> be obtained dynamically at runtime by enabling CONFIG_ARM_PATCH_PHYS_VIRT
+> or by specifying the physical memory address at kernel configuration time.
+>
+> If/when all instances of mach/memory.h are removed then this symbol could
+> be removed.
 
-Will do.
+guess the main reason for this is that physical memory address should
+not be hard-coded in kernel. and it will cause issues while crossing
+platforms/boards.
+i noticed PLAT_PHYS_OFFSET is referred much early in head.S with
+CONFIG_XIP_KERNEL.
 
-g.
+#ifndef CONFIG_XIP_KERNEL
+        adr     r3, 2f
+        ldmia   r3, {r4, r8}
+        sub     r4, r3, r4                      @ (PHYS_OFFSET - PAGE_OFFSET)
+        add     r8, r8, r4                      @ PHYS_OFFSET
+#else
+        ldr     r8, =PLAT_PHYS_OFFSET
+#endif
+
+
+>
+> Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+> ---
+> ?arch/arm/Kconfig ? ? ? ? ? ? ?| ? 15 ++++++++++++++-
+> ?arch/arm/include/asm/memory.h | ? ?6 +++++-
+> ?2 files changed, 19 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 9adc278..9fc052c 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -191,11 +191,17 @@ config VECTORS_BASE
+> ? ? ? ?help
+> ? ? ? ? ?The base address of exception vectors.
+>
+> +config NO_MACH_MEMORY_H
+> + ? ? ? bool
+> + ? ? ? help
+> + ? ? ? ? Select this when mach/memory.h is removed.
+> +
+> ?config ARM_PATCH_PHYS_VIRT
+> ? ? ? ?bool "Patch physical to virtual translations at runtime (EXPERIMENTAL)"
+> - ? ? ? depends on EXPERIMENTAL
+> + ? ? ? depends on EXPERIMENTAL || NO_MACH_MEMORY_H
+> ? ? ? ?depends on !XIP_KERNEL && MMU
+> ? ? ? ?depends on !ARCH_REALVIEW || !SPARSEMEM
+> + ? ? ? default y if NO_MACH_MEMORY_H
+> ? ? ? ?help
+> ? ? ? ? ?Patch phys-to-virt and virt-to-phys translation functions at
+> ? ? ? ? ?boot and module load time according to the position of the
+> @@ -213,6 +219,13 @@ config ARM_PATCH_PHYS_VIRT_16BIT
+> ? ? ? ? ?to allow physical memory down to a theoretical minimum of 64K
+> ? ? ? ? ?boundaries.
+>
+> +config PHYS_OFFSET
+> + ? ? ? hex "Physical address of main memory"
+> + ? ? ? depends on !ARM_PATCH_PHYS_VIRT && NO_MACH_MEMORY_H
+> + ? ? ? help
+> + ? ? ? ? Please provide the physical address corresponding to the
+> + ? ? ? ? location of main memory in your system.
+> +
+> ?source "init/Kconfig"
+>
+> ?source "kernel/Kconfig.freezer"
+> diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+> index deb2eaa..2d21414 100644
+> --- a/arch/arm/include/asm/memory.h
+> +++ b/arch/arm/include/asm/memory.h
+> @@ -16,7 +16,6 @@
+> ?#include <linux/compiler.h>
+> ?#include <linux/const.h>
+> ?#include <linux/types.h>
+> -#include <mach/memory.h>
+> ?#include <asm/sizes.h>
+>
+> ?/*
+> @@ -200,8 +199,13 @@ static inline unsigned long __phys_to_virt(unsigned long x)
+> ?#endif
+>
+> ?#ifndef PHYS_OFFSET
+> +#ifdef CONFIG_NO_MACH_MEMORY_H
+> +#define PHYS_OFFSET ? ?UL(CONFIG_PHYS_OFFSET)
+> +#else
+> +#include <mach/memory.h>
+> ?#define PHYS_OFFSET ? ?PLAT_PHYS_OFFSET
+> ?#endif
+> +#endif
+>
+> ?/*
+> ?* The DMA mask corresponding to the maximum bus address allocatable
+> --
+> 1.7.4
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
