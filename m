@@ -1,25 +1,36 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Wed, 06 Jul 2011 09:58:11 +0300
-Subject: [PATCH V2] MTD: atmel_nand: optimize read/write buffer functions
-In-Reply-To: <1309789073-14593-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1309261856-27402-1-git-send-email-nicolas.ferre@atmel.com>
-	<1309789073-14593-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <1309935496.3149.73.camel@sauron>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 6 Jul 2011 00:59:12 -0600 (MDT)
+Subject: [PATCH v2 09/18] OMAP4: clock data: Remove McASP2, McASP3 and
+	MMC6 clocks
+In-Reply-To: <1309552901-8944-10-git-send-email-b-cousson@ti.com>
+References: <1309552901-8944-1-git-send-email-b-cousson@ti.com>
+	<1309552901-8944-10-git-send-email-b-cousson@ti.com>
+Message-ID: <alpine.DEB.2.00.1107060057100.4217@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2011-07-04 at 16:17 +0200, Nicolas Ferre wrote:
-> For PIO NAND access functions, we use the features of the SMC:
-> - no need to take into account the NAND bus width: SMC will deal with this
-> - use of an IO memcpy on the NAND chip-select space is able to generate
->   proper SMC behavior.
+On Fri, 1 Jul 2011, Benoit Cousson wrote:
+
+> From: Jon Hunter <jon-hunter@ti.com>
 > 
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> ---
-> V2: use of memcpy_fromio/memcpy_toio for proper handling of memory types.
+> McASP2, 3 and MMC6 modules are not present in the OMAP4 family.
+> Remove the fclk and the clksel related to these nodes.
+> Rename the references that were potentially re-used in order nodes.
+> 
+> Remove related macros in prcm header files.
+> 
+> Update TI copyright date.
+> 
+> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+> [b-cousson at ti.com: Update the patch according to autogen output]
+> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
 
-Pushed to l2-mtd-2.6.git, thanks!
+The PRCM data changes in this patch have been separated from the clock
+data changes.  The PRCM data changes have been queued for 3.1 at 
+git://git.pwsan.com/linux-2.6 in the 'prcm_cleanup_a_3.1' branch.
+The clock data changes have been queued for 3.1 at
+git://git.pwsan.com/linux-2.6 in the 'clock_cleanup_a_3.1' branch.
 
--- 
-Best Regards,
-Artem Bityutskiy
+Thanks,
+
+- Paul
