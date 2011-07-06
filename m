@@ -1,101 +1,109 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 6 Jul 2011 10:09:42 +0200
-Subject: [PATCH] Add 'config IMX_NFC_V1_BISWAP' to swap the Bad block
-	Indicator, and use for imx27pdk nand support.
-In-Reply-To: <1309872828-13942-1-git-send-email-J.Lambrecht@televic.com>
-References: <1309872828-13942-1-git-send-email-J.Lambrecht@televic.com>
-Message-ID: <20110706080942.GC26347@pengutronix.de>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed,  6 Jul 2011 11:31:36 +0200
+Subject: [PATCH V4] MMC: PM: add suspend/resume in atmel-mci
+In-Reply-To: <4E11B57B.4040000@atmel.com>
+References: <4E11B57B.4040000@atmel.com>
+Message-ID: <1309944696-6415-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 05, 2011 at 03:33:48PM +0200, J?rgen Lambrecht wrote:
-> - Swap the BI-byte on position 0x7D0 with a data byte at 0x835.  To fix a bug
->   in Freescale imx NFC v1 SoC's for 2K page NAND flashes: imx27 and imx31.
->   Warning: The same solution needs to be applied to the boot loader and the
->   flash programmer.
-> - Enable NAND support for the imx27pdk (3ds), and use BISWAP.
-> 
-> Signed-off-by: J?rgen Lambrecht <J.Lambrecht@televic.com>
-> ---
->  arch/arm/mach-imx/Kconfig         |   30 ++++++++++++++++++++++++++++--
->  arch/arm/mach-imx/mach-mx27_3ds.c |   14 ++++++++++++++
->  drivers/mtd/nand/mxc_nand.c       |   29 +++++++++++++++++++++++++++++
->  3 files changed, 71 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-> index 0519dd7..e8b16a9 100644
-> --- a/arch/arm/mach-imx/Kconfig
-> +++ b/arch/arm/mach-imx/Kconfig
-> @@ -274,7 +274,7 @@ config MACH_EUKREA_MBIMX27_BASEBOARD
->  endchoice
->  
->  config MACH_MX27_3DS
-> -	bool "MX27PDK platform"
-> +	bool "MX27PDK (3DS) platform"
->  	select SOC_IMX27
->  	select IMX_HAVE_PLATFORM_FSL_USB2_UDC
->  	select IMX_HAVE_PLATFORM_IMX2_WDT
-> @@ -284,13 +284,39 @@ config MACH_MX27_3DS
->  	select IMX_HAVE_PLATFORM_IMX_UART
->  	select IMX_HAVE_PLATFORM_MXC_EHCI
->  	select IMX_HAVE_PLATFORM_MXC_MMC
-> +	select IMX_HAVE_PLATFORM_MXC_NAND
->  	select IMX_HAVE_PLATFORM_SPI_IMX
->  	select MXC_DEBUG_BOARD
->  	select MXC_ULPI if USB_ULPI
->  	help
-> -	  Include support for MX27PDK platform. This includes specific
-> +	  Include support for MX27PDK (3DS) platform. This includes specific
->  	  configurations for the board and its peripherals.
->  
-> +config MACH_MXC_NAND_USE_BBT
-> +	bool "Make the MXC NAND driver use the in flash Bad Block Table"
-> +	depends on MACH_MX27_3DS
-> +	depends on MTD_NAND_MXC
-> +	help
-> +	  Enable this if you want that the MXC NAND driver uses the in flash
-> +	  Bad Block Table to know what blocks are bad instead of scanning the
-> +	  entire flash looking for bad block markers.
+Take care of slots while going to suspend state.
 
-Besides the fact that we have too many kconfig options there's another
-problem. We try to build kernels which run on as many boards as
-possible. Adding options like this limit a kernel for a particular
-usecase (bbt vs. scanning)
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+V4: make CONFIG_PM logic work even if not selected
+V3: take care of each slot SUSPENDED state
+    (adding a status bit in the slot "flags")
+V2: move to pm_ops
 
-> +
-> +config IMX_NFC_V1_BISWAP
-> +	bool "Make the MXC 2kB-page NAND driver swap the Bad Block Indicator"
-> +	depends on MACH_MX27_3DS
-> +	depends on MTD_NAND_MXC
-> +	help
-> +	  Enable this if you want that the MXC NAND driver swaps the Bad Block
-> +	  Indicator (BBI) byte. The IMX NFC v1 (present in IMX27 and IMX31)
-> +	  contains a bug for 2kB-page flashes: the 2kB page is read out in
-> +	  4x512B chunks, so also the spare area is read out in 4
-> +	  chunks. Therefore the data area and the spare area becomes
-> +	  mixed. This causes a problem for the factory programmed BBI: it
-> +	  appears in the data area instead of the spare area, and is
-> +	  overwritten. This patch swaps that byte to the "real" spare
-> +	  area. WARNING: then also the bootloader and the flash programmer must
-> +	  be patched!!
 
-I don't like this approach. IMO some code should be run on a virgin
-flash which is aware of this issue and creates a correct bad block
-table. You run this once and forget about this afterwards and every
-kernel/bootloader can run without patching. Otherwise if you accidently
-or intentionally start an older (unpatched) kernel your Nand gets
-corrupted.
+ drivers/mmc/host/atmel-mci.c |   63 ++++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 63 insertions(+), 0 deletions(-)
 
-Also, my comment above applies here too. You added a 'depends on the
-board I care of', but usually my kernels have all available boards
-compiled in. So I can select this option and it will change the
-behaviour of all boards I might run the kernel on, not only the
-ones you depend on above.
-
-Sascha
-
+diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
+index aa8039f..fa8cae1 100644
+--- a/drivers/mmc/host/atmel-mci.c
++++ b/drivers/mmc/host/atmel-mci.c
+@@ -203,6 +203,7 @@ struct atmel_mci_slot {
+ #define ATMCI_CARD_PRESENT	0
+ #define ATMCI_CARD_NEED_INIT	1
+ #define ATMCI_SHUTDOWN		2
++#define ATMCI_SUSPENDED		3
+ 
+ 	int			detect_pin;
+ 	int			wp_pin;
+@@ -1878,10 +1879,72 @@ static int __exit atmci_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_PM
++static int atmci_suspend(struct device *dev)
++{
++	struct atmel_mci *host = dev_get_drvdata(dev);
++	int i;
++
++	 for (i = 0; i < ATMEL_MCI_MAX_NR_SLOTS; i++) {
++		struct atmel_mci_slot *slot = host->slot[i];
++		int ret;
++
++		if (!slot)
++			continue;
++		ret = mmc_suspend_host(slot->mmc);
++		if (ret < 0) {
++			while (--i >= 0) {
++				slot = host->slot[i];
++				if (slot
++				&& test_bit(ATMCI_SUSPENDED, &slot->flags)) {
++					mmc_resume_host(host->slot[i]->mmc);
++					clear_bit(ATMCI_SUSPENDED, &slot->flags);
++				}
++			}
++			return ret;
++		} else {
++			set_bit(ATMCI_SUSPENDED, &slot->flags);
++		}
++	}
++
++	return 0;
++}
++
++static int atmci_resume(struct device *dev)
++{
++	struct atmel_mci *host = dev_get_drvdata(dev);
++	int i;
++	int ret = 0;
++
++	for (i = 0; i < ATMEL_MCI_MAX_NR_SLOTS; i++) {
++		struct atmel_mci_slot *slot = host->slot[i];
++		int err;
++
++		slot = host->slot[i];
++		if (!slot)
++			continue;
++		if (!test_bit(ATMCI_SUSPENDED, &slot->flags))
++			continue;
++		err = mmc_resume_host(slot->mmc);
++		if (err < 0)
++			ret = err;
++		else
++			clear_bit(ATMCI_SUSPENDED, &slot->flags);
++	}
++
++	return ret;
++}
++static SIMPLE_DEV_PM_OPS(atmci_pm, atmci_suspend, atmci_resume);
++#define ATMCI_PM_OPS	(&atmci_pm)
++#else
++#define ATMCI_PM_OPS	NULL
++#endif
++
+ static struct platform_driver atmci_driver = {
+ 	.remove		= __exit_p(atmci_remove),
+ 	.driver		= {
+ 		.name		= "atmel_mci",
++		.pm		= ATMCI_PM_OPS,
+ 	},
+ };
+ 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.3
