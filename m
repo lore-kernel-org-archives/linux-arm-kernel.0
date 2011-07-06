@@ -1,27 +1,22 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 6 Jul 2011 20:45:41 +0100
-Subject: [PATCH 1/4] mmci: use StartBitErr to detect bad connections
-In-Reply-To: <20110705111611.GW8286@n2100.arm.linux.org.uk>
-References: <1309247845-17105-1-git-send-email-linus.walleij@stericsson.com>
-	<20110705111611.GW8286@n2100.arm.linux.org.uk>
-Message-ID: <20110706194541.GQ8286@n2100.arm.linux.org.uk>
+Date: Wed, 6 Jul 2011 20:46:00 +0100
+Subject: [PATCH RESEND 2] arm: mach-vt8500: add forgotten irq_data
+	conversion
+In-Reply-To: <20110706193303.GP8286@n2100.arm.linux.org.uk>
+References: <1309979227-24578-1-git-send-email-w.sang@pengutronix.de>
+	<20110706193303.GP8286@n2100.arm.linux.org.uk>
+Message-ID: <20110706194559.GR8286@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 05, 2011 at 12:16:11PM +0100, Russell King - ARM Linux wrote:
-> On Tue, Jun 28, 2011 at 09:57:25AM +0200, Linus Walleij wrote:
-> > Stresstesting insert/remove of SD-cards can trigger
-> > a StartBitErr. This made the driver to hang in forever
-> > waiting for a non ocurring data timeout.
-> > 
-> > This bit and interrupt is documented in the original
-> > PL180 TRM, just never implemented until now.
-> > 
-> > Signed-off-by: Ulf Hansson <ulf.hansson@stericsson.com>
-> > Reviewed-by: Linus Walleij <linus.walleij@stericsson.com>
-> > Reviewed-by: Jonas Aberg <jonas.aberg@stericsson.com>
-> > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+On Wed, Jul 06, 2011 at 08:33:03PM +0100, Russell King - ARM Linux wrote:
+> On Wed, Jul 06, 2011 at 09:07:07PM +0200, Wolfram Sang wrote:
+> > This fixes a build failure and is acked by the platform maintainer. As
+> > there might be no -rc7 and the release might be soon, I'll try adding
+> > two more people to CC to increase chances to have that issue sorted out
+> > in 3.0
 > 
-> Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> I'd much rather tglx Acked this as the irq maintainer and Arnd picked
+> it up...
 
-Ok, I've taken this into my fixes branch.
+I've taken this into my fixes branch as well...
