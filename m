@@ -1,111 +1,81 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Thu, 7 Jul 2011 00:09:24 +0800
-Subject: [PATCH 1/3] ARM: CSR: Adding CSR SiRFprimaII board support
-In-Reply-To: <20110706122501.GU8286@n2100.arm.linux.org.uk>
-References: <1309945678-18813-1-git-send-email-bs14@csr.com>
-	<1309945678-18813-2-git-send-email-bs14@csr.com>
-	<20110706122501.GU8286@n2100.arm.linux.org.uk>
-Message-ID: <CAGsJ_4xntJHz_CzCaTuyCbDrePzxO+esPFxTfZZ1TTnZFy4w=Q@mail.gmail.com>
+From: prakity@marvell.com (Philip Rakity)
+Date: Wed, 6 Jul 2011 09:08:45 -0700
+Subject: [PATCH v4] arm: mach-mmp: brownstone.c support multiple sd slots
+In-Reply-To: <67F311C7-B489-41E6-BC85-C06DACC7263A@marvell.com>
+References: <59C2B513-EC04-4CA2-818B-9901CAF3E554@marvell.com>
+	<20110427093328.GU17290@n2100.arm.linux.org.uk>
+	<161C3F6C-0986-4364-B458-DBA4D08456FD@marvell.com>
+	<1F336A22-BAC3-41E3-8D4E-5DF27874D1EA@marvell.com>
+	<20110428095127.GX17290@n2100.arm.linux.org.uk>
+	<3BFCE791-3BAD-42ED-BC87-A27F40D6C77C@marvell.com>
+	<CAMPhdO-TTRP-k7J-zrG2_rQJsmNDRhTgpqiiX2yqW+Egf8+t2A@mail.gmail.com>
+	<CAMj5BkiK17RMY-vEENDqQiDOmfG0Esnp7QDooKWVrhkQL4g6Ow@mail.gmail.com>
+	<CAMPhdO-b_dpC2ueexEFujr6p_NRb2JwDc0-UEx3cfOSVcZ-d6w@mail.gmail.com>
+	<67F311C7-B489-41E6-BC85-C06DACC7263A@marvell.com>
+Message-ID: <6AAC67C8-1C8F-4F15-9CED-5BA83CA21C39@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/7/6 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Wed, Jul 06, 2011 at 02:47:56AM -0700, Barry Song wrote:
->> diff --git a/arch/arm/mach-prima2/include/mach/io.h b/arch/arm/mach-prima2/include/mach/io.h
->> new file mode 100644
->> index 0000000..fc54f16
->> --- /dev/null
->> +++ b/arch/arm/mach-prima2/include/mach/io.h
->> @@ -0,0 +1,21 @@
->> +/*
->> + * arch/arm/mach-prima2/include/mach/io.h
->> + *
->> + * Copyright (c) 2011 Cambridge Silicon Radio Limited, a CSR plc group company.
->> + *
->> + * Licensed under GPLv2 or later.
->> + */
->> +
->> +#ifndef __MACH_PRIMA2_IO_H
->> +#define __MACH_PRIMA2_IO_H
->> +
->> +#define IO_SPACE_LIMIT 0xffffffff
->
-> Can folk please start putting comments in their io.h file explaining their
-> choice for this definition? ?Looking through the existing files, it is
-> almost impossible to infer the reason the value was picked, which makes
-> future maintanence a headache.
->
-> IO_SPACE_LIMIT sets the upper bound for the PCI/ISA style IO accessor
-> macros (inb, et.al.)
->
-> My guidance is:
->
-> 1. If you have no support for ISA/PCI/PC card drivers, then set this to
-> ? zero to prevent ISA/PCI drivers reserving IO port space. ?You should
-> ? be able to leave __io() set to __typesafe_io() without risking any
-> ? ISA driver stamping on memory as those drivers should no longer
-> ? successfully initialize with this set to zero.
->
-> 2. If you have MMIO-mapped IO space (eg, a PCI bridge which forwards
-> ? MMIO accesses in a window to PCI IO space) or equivalent, then set
-> ? this to the size of the window, or 64K-1. ?Explain this.
->
-> 3. If you have MMIO-mapped IO space which is scattered (eg, multiple
-> ? PC cards with their IO space individually mapped as separate 64K
-> ? blocks) then explain this and set it to 0xffffffff for the time
-> ? being.
->
-> In any case, having the chosen value documented, and if it is for
-> specific devices on the board, documenting that too, would really
-> help.
->
-> I shall be making this change to asm/io.h shortly:
->
-> ?#include <mach/io.h>
->
-> +/*
-> + * This is the limit of PCI/ISA/PC card IO space, which is by default
-> + * 64K if we have PC card, PCI or ISA support. ?Otherwise, default to
-> + * zero to prevent ISA/PCI drivers claiming IO space (and potentially
-> + * oopsing.)
-> + *
-> + * Only set this larger if you really need inb() et.al. to operate over
-> + * a larger address space (eg, for multiple MMIO-mapped PC card sockets
-> + * as found on SA11x0 and PXA.)
-> + */
-> +#ifndef IO_SPACE_LIMIT
-> +#if defined(CONFIG_PCI) || defined(CONFIG_ISA) || defined(CONFIG_PCCARD)
-> +#define IO_SPACE_LIMIT ((resource_size_t)0xffff)
-> +#else
-> +#define IO_SPACE_LIMIT ((resource_size_t)0)
-> +#endif
-> +#endif
+Eric,
 
-if you define that in asm/io.h as you said:
+Not sure what to suggest.
 
-#ifndef IO_SPACE_LIMIT
-#if defined(PCMCIA_SOC_COMMON)
-#define  IO_SPACE_LIMIT ((resource_size_t)0xffffffff)
-#else
-#if defined(CONFIG_PCI) || defined(CONFIG_ISA) || defined(CONFIG_PCCARD)
-#define IO_SPACE_LIMIT ((resource_size_t)0xffff)
-#else
-#define IO_SPACE_LIMIT ((resource_size_t)0)
-#endif
-#endif
-#endif
+If it makes more sense to take V3 which powers on the wifi card but does not do power handling per
+new spec take that.  At least wifi card works and then wait for power code.  New code could delete
+power code as part of the mod.
 
-i'd like to delete IO_SPACE_LIMIT in my io.h.
+If it makes more sense to wait for power code -- take V4.
 
-otherwise, i'd like to try "#define IO_SPACE_LIMIT
-((resource_size_t)0)" in my io.h since i have no real
-CONFIG_PCI/ISA/PCCARD/PCMCIA_SOC_COMMON.
+Philip
 
->
-> Thanks.
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+
+
+
+V4
+==
+remove code to enable power for wifi.  Coming in separate patch
+(by others) that conforms to new power architecture.
+
+V3
+==
+Change since V2 -- delete mmc3 since it was committed
+to linux next.
+
+enable mmc1 used for wifi (8688) and marked PERMANENT.
+Wifi requires enabling of power on the device by
+toggling the gpio lines for power and reset.
+
+Signed-off-by: Philip Rakity <prakity@marvell.com>
+---
+ arch/arm/mach-mmp/brownstone.c |    8 +++++++-
+ 1 files changed, 7 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-mmp/brownstone.c b/arch/arm/mach-mmp/brownstone.c
+index c79162a..7634b2f 100644
+--- a/arch/arm/mach-mmp/brownstone.c
++++ b/arch/arm/mach-mmp/brownstone.c
+@@ -180,6 +180,11 @@ static struct sdhci_pxa_platdata mmp2_sdh_platdata_mmc0 = {
+ 	.clk_delay_cycles = 0x1f,
+ };
+ 
++static struct sdhci_pxa_platdata mmp2_sdh_platdata_mmc1 = {
++	.clk_delay_cycles = 0x1f,
++	.flags		= PXA_FLAG_CARD_PERMANENT,
++};
++
+ static struct sdhci_pxa_platdata mmp2_sdh_platdata_mmc2 = {
+ 	.clk_delay_cycles = 0x1f,
+ 	.flags = PXA_FLAG_CARD_PERMANENT
+@@ -195,8 +200,9 @@ static void __init brownstone_init(void)
+ 	mmp2_add_uart(1);
+ 	mmp2_add_uart(3);
+ 	mmp2_add_twsi(1, NULL, ARRAY_AND_SIZE(brownstone_twsi1_info));
+-	mmp2_add_sdhost(0, &mmp2_sdh_platdata_mmc0); /* SD/MMC */
+ 	mmp2_add_sdhost(2, &mmp2_sdh_platdata_mmc2); /* eMMC */
++	mmp2_add_sdhost(0, &mmp2_sdh_platdata_mmc0); /* SD/MMC */
++	mmp2_add_sdhost(1, &mmp2_sdh_platdata_mmc1); /* Wifi */
+ 
+ 	/* enable 5v regulator */
+ 	platform_device_register(&brownstone_v_5vp_device);
+-- 
+1.7.0.4
