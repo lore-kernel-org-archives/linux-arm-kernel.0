@@ -1,28 +1,46 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 6 Jul 2011 15:51:11 +0100
-Subject: [PATCH 1/3] ARM: CSR: Adding CSR SiRFprimaII board support
-In-Reply-To: <201107061442.05182.arnd@arndb.de>
-References: <1309945678-18813-1-git-send-email-bs14@csr.com>
-	<1309945678-18813-2-git-send-email-bs14@csr.com>
-	<20110706122501.GU8286@n2100.arm.linux.org.uk>
-	<201107061442.05182.arnd@arndb.de>
-Message-ID: <20110706145111.GD8286@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 6 Jul 2011 16:51:49 +0200
+Subject: [PATCH 6/8] drivers: add Contiguous Memory Allocator
+In-Reply-To: <20110706142345.GC8286@n2100.arm.linux.org.uk>
+References: <1309851710-3828-1-git-send-email-m.szyprowski@samsung.com>
+	<201107061609.29996.arnd@arndb.de>
+	<20110706142345.GC8286@n2100.arm.linux.org.uk>
+Message-ID: <201107061651.49824.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 06, 2011 at 02:42:04PM +0200, Arnd Bergmann wrote:
-> Right now, the only platforms that use a value other than 0xffffffff
-> are ones that actually have PCI and set it to 0xffff.
+On Wednesday 06 July 2011, Russell King - ARM Linux wrote:
+> On Wed, Jul 06, 2011 at 04:09:29PM +0200, Arnd Bergmann wrote:
+> > Maybe you can simply adapt the default location of the contiguous memory
+> > are like this:
+> > - make CONFIG_CMA depend on CONFIG_HIGHMEM on ARM, at compile time
+> > - if ZONE_HIGHMEM exist during boot, put the CMA area in there
+> > - otherwise, put the CMA area at the top end of lowmem, and change
+> >   the zone sizes so ZONE_HIGHMEM stretches over all of the CMA memory.
+> 
+> One of the requirements of the allocator is that the returned memory
+> should be zero'd (because it can be exposed to userspace via ALSA
+> and frame buffers.)
+> 
+> Zeroing the memory from all the contexts which dma_alloc_coherent
+> is called from is a trivial matter if its in lowmem, but highmem is
+> harder.
 
-Note that those platforms using soc_common need to have their inb() et.al.
-defined to be compatible with readb() et.al. as soc_common ioremaps the
-IO resource and passes that into the PCMCIA layer as the per-socket IO
-offset.
+I don't see how. The pages get allocated from an unmapped area
+or memory, mapped into the kernel address space as uncached or wc
+and then cleared. This should be the same for lowmem or highmem
+pages.
 
-The alternative is to rip that out, and use fixed mappings and fixed
-per-SoC IO offsets.
+What am I missing?
 
-So, I think as part of this idea, we should - for the time being -
-default IO_SPACE_LIMIT to 0xffffffff if PCMCIA_SOC_COMMON is enabled in
-any way.  The plus side is that we get that condition documented, and
-so can do something about it later.
+> Another issue is that when a platform has restricted DMA regions,
+> they typically don't fall into the highmem zone.  As the dmabounce
+> code allocates from the DMA coherent allocator to provide it with
+> guaranteed DMA-able memory, that would be rather inconvenient.
+
+True. The dmabounce code would consequently have to allocate
+the memory through an internal function that avoids the
+contiguous allocation area and goes straight to ZONE_DMA memory
+as it does today.
+
+	Arnd
