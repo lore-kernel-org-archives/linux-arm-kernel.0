@@ -1,41 +1,46 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 6 Jul 2011 15:01:49 -0600 (MDT)
-Subject: [PATCH] OMAP: hwmod: add kernel cmdline flag to avoid resetting
-	IP blocks during init
-In-Reply-To: <20110706064326.GI5783@atomide.com>
-References: <20110703010204.19046.85186.stgit@dusk>
-	<20110703010206.19046.85293.stgit@dusk>
-	<20110704085503.GQ23145@atomide.com>
-	<alpine.DEB.2.00.1107051936250.4217@utopia.booyaka.com>
-	<alpine.DEB.2.00.1107051955450.4217@utopia.booyaka.com>
-	<20110706064326.GI5783@atomide.com>
-Message-ID: <alpine.DEB.2.00.1107061458460.4217@utopia.booyaka.com>
+From: khc@pm.waw.pl (Krzysztof Halasa)
+Date: Wed, 06 Jul 2011 23:02:17 +0200
+Subject: [PATCH] ARM: fix regression in IXP4xx clocksource
+Message-ID: <m3liwb15t2.fsf@intrepid.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 5 Jul 2011, Tony Lindgren wrote:
+From: Richard Cochran <richardcochran@gmail.com>
 
-> * Paul Walmsley <paul@pwsan.com> [110705 18:55]:
-> > On Tue, 5 Jul 2011, Paul Walmsley wrote:
-> > 
-> > > For this case, we probably need some board file function to tell the 
-> > > hwmod code to disregard a device completely, to tell the kernel to 
-> > > pretend that the device does not exist.
-> > 
-> > ... and the other problem here is that we currently probe devices via an 
-> > arch_initcall(), and the board file init_machine is also an arch_initcall.
-> > Either we'll need to be very careful about Makefile ordering, or we should 
-> > just call omap2_init_devices() from the board file init_machine directly.
-> > The latter makes the most sense to me.
-> 
-> And that can then be passed the list of devices with the special flags
-> for noreset, disabled and reserved. Then the late_initcall can optionally
-> reset the rest of the devices.
+Commit 234b6ceddb4fc2a4bc5b9a7670f070f6e69e0868
 
-'disabled' can probably be the default for a device that doesn't have a 
-driver associated with it, once the runtime PM conversion is complete.  
-That's what the late_initcall would do.  Then if a driver is dynamically 
-loaded for one of those devices, the hwmod code would just re-enable it.
+   clocksource: convert ARM 32-bit up counting clocksources
 
+broke the build for ixp4xx and made big endian operation impossible.
+This commit restores the original behaviour.
 
-- Paul
+Signed-off-by: Richard Cochran <richard.cochran@omicron.at>
+Signed-off-by: Krzysztof Ha?asa <khc@pm.waw.pl>
+
+diff --git a/arch/arm/mach-ixp4xx/common.c b/arch/arm/mach-ixp4xx/common.c
+index 74ed81a..0777257 100644
+--- a/arch/arm/mach-ixp4xx/common.c
++++ b/arch/arm/mach-ixp4xx/common.c
+@@ -419,14 +419,20 @@ static void notrace ixp4xx_update_sched_clock(void)
+ /*
+  * clocksource
+  */
++
++static cycle_t ixp4xx_clocksource_read(struct clocksource *c)
++{
++	return *IXP4XX_OSTS;
++}
++
+ unsigned long ixp4xx_timer_freq = IXP4XX_TIMER_FREQ;
+ EXPORT_SYMBOL(ixp4xx_timer_freq);
+ static void __init ixp4xx_clocksource_init(void)
+ {
+ 	init_sched_clock(&cd, ixp4xx_update_sched_clock, 32, ixp4xx_timer_freq);
+ 
+-	clocksource_mmio_init(&IXP4XX_OSTS, "OSTS", ixp4xx_timer_freq, 200, 32,
+-			clocksource_mmio_readl_up);
++	clocksource_mmio_init(NULL, "OSTS", ixp4xx_timer_freq, 200, 32,
++			ixp4xx_clocksource_read);
+ }
+ 
+ /*
