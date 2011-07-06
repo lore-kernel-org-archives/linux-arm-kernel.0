@@ -1,29 +1,42 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 5 Jul 2011 23:12:16 -0400 (EDT)
-Subject: [PATCH 01/10] ARM: change ARM_DMA_ZONE_SIZE into a variable
-In-Reply-To: <CAGsJ_4xfZvZcXCfRk==iVmc-_GsyavB+cmnKztEvmRx-VLbLPg@mail.gmail.com>
-References: <1309919442-20451-1-git-send-email-nicolas.pitre@linaro.org>
-	<CAGsJ_4xfZvZcXCfRk==iVmc-_GsyavB+cmnKztEvmRx-VLbLPg@mail.gmail.com>
-Message-ID: <alpine.LFD.2.00.1107052308340.14596@xanadu.home>
+From: tushar.behera@linaro.org (Tushar Behera)
+Date: Wed, 06 Jul 2011 08:45:46 +0530
+Subject: [PATCH 2/2] SPI: S5PV210: Enable the SPI driver for S5PV210
+In-Reply-To: <1309801476-29678-2-git-send-email-padma.v@samsung.com>
+References: <1309801476-29678-1-git-send-email-padma.v@samsung.com>
+	<1309801476-29678-2-git-send-email-padma.v@samsung.com>
+Message-ID: <4E13D362.7010107@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 6 Jul 2011, Barry Song wrote:
+Hi,
 
-> 2011/7/6 Nicolas Pitre <nicolas.pitre@linaro.org>:
-> > Having this value defined at compile time prevents multiple machines with
-> > conflicting definitions to coexist. ?Move it to a variable in preparation
-> > for having a per machine value selected at run time. ?This is relevant
-> > only when CONFIG_ZONE_DMA is selected.
-> >
-> > Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-> 
-> that is definitely good. i am not sure whether it will be better if
-> dma zone becomes a property in memory node of DT.
+Patch 1/2 looks redundant as both changes can be very well accommodated 
+in a single patch.
 
-Certainly.  But one thing at a time.  This is the first step. Then, 
-those machines that are converted to DT could more easily provide the 
-information via this mechanism if they so desire.
+On Monday 04 July 2011 11:14 PM, Padmavathi Venna wrote:
+> The SPI module on S5PV210 is similar to the earlier Samsung SoCs like
+> S3C64XX. Enable the existing SPI driver for use on S5PV210.
+>
+> Signed-off-by: Padmavathi Venna<padma.v@samsung.com>
+> ---
+>   drivers/spi/Kconfig |    3 ++-
+>   1 files changed, 2 insertions(+), 1 deletions(-)
+>
+> diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
+> index 91d607b..ed1ebea 100644
+> --- a/drivers/spi/Kconfig
+> +++ b/drivers/spi/Kconfig
+> @@ -340,7 +340,8 @@ config SPI_S3C24XX_GPIO
+>
+>   config SPI_S3C64XX
+>   	tristate "Samsung S3C64XX series type SPI"
+> -	depends on (ARCH_S3C64XX || ARCH_S5P64X0 || ARCH_S5PC100)
+> +	depends on (ARCH_S3C64XX || ARCH_S5P64X0 || ARCH_S5PC100 \
+> +			|| ARCH_S5PV210)
+>   	select S3C64XX_DMA if ARCH_S3C64XX
+>   	help
+>   	  SPI driver for Samsung S3C64XX and newer SoCs.
 
 
-Nicolas
+-- 
+Tushar Behera
