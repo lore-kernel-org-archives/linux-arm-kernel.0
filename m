@@ -1,43 +1,21 @@
-From: anemo@mba.ocn.ne.jp (Atsushi Nemoto)
-Date: Wed, 06 Jul 2011 22:41:01 +0900 (JST)
-Subject: PAD_CTL_DVS bit on MX51
-Message-ID: <20110706.224101.253170565.anemo@mba.ocn.ne.jp>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 6 Jul 2011 14:41:02 +0100
+Subject: [PATCH] ARM: get rid of a few StrongARM cache-related build
+	time constants
+In-Reply-To: <alpine.LFD.2.00.1107060912490.14596@xanadu.home>
+References: <1309919636-20546-1-git-send-email-nicolas.pitre@linaro.org>
+	<20110706075542.GK8286@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1107060912490.14596@xanadu.home>
+Message-ID: <20110706134102.GZ8286@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I have question about MX51 pin settings.
-There is PAD_CTL_DVS definition in iomux-v3.h:
+On Wed, Jul 06, 2011 at 09:21:33AM -0400, Nicolas Pitre wrote:
+> Oops.  Here's a fixed patch.
+> 
+> Could you test this patch as well?  You're the only one I know who might 
+> still have access to the affected hardware.
 
-#define PAD_CTL_DVS			(1 << 13)
-
-I'm not sure what "DVS" mean, but I suppose this is HVE bit in MX51
-reference manual.
-
-HVE: High / Low Output Voltage Range. This bit selects the output
-     voltage mode for XXX.
-    0 High output voltage mode
-    1 Low output voltage mode
-
-Currently there are several usages of this definition in iomux-mx51.h.
-MX51_SDHCI_PAD_CTRL is used for SD pins, and MX51_PAD_CTRL_4 and
-MX51_PAD_CTRL_5 are used for FEC pins.
-
-If I understand correctly the MX51 EVK hardware, FEC pins are 1.8V and
-SD pins are 3.15V, so it is strange that all those pins use
-PAD_CTL_DVS.
-
-Is MX51_SDHCI_PAD_CTRL (MX51 EVK SD pins) really needs PAD_CTL_DVS
-bit?
-I want to know expected pin settings for these signals.
-
-
-And also, I know there are following definitions in u-boot iomux.h:
-	PAD_CTL_DRV_VOT_LOW = 0x0 << 13, /* Low voltage mode */
-	PAD_CTL_DRV_VOT_HIGH = 0x1 << 13,/* High voltage mode */
-These symbols are reversed from reference manual.
-It seems there are some confusion about meaning of the bit...
-
-Any comments from MX51 experts are welcome.  Thanks.
-
----
-Atsushi Nemoto
+Will do - the assabet is still running as a test machine.  The ebsa110 is
+still alive but as that's (still) the firewall I won't run a test on that
+until a quiet weekend.  I can also test the Netwinder and RiscPC...
