@@ -1,62 +1,61 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 05 Jul 2011 23:30:05 -0400
-Subject: [PATCH 21/37] ARM: mach-lpc32xx: remove mach/memory.h
+Date: Tue, 05 Jul 2011 23:30:11 -0400
+Subject: [PATCH 27/37] ARM: mach-cns3xxx: remove mach/memory.h
 In-Reply-To: <1309923021-23487-1-git-send-email-nicolas.pitre@linaro.org>
 References: <1309923021-23487-1-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <1309923021-23487-21-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <1309923021-23487-27-git-send-email-nicolas.pitre@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 ---
  arch/arm/Kconfig                            |    1 +
- arch/arm/mach-lpc32xx/include/mach/memory.h |   27 ---------------------------
- 2 files changed, 1 insertions(+), 27 deletions(-)
- delete mode 100644 arch/arm/mach-lpc32xx/include/mach/memory.h
+ arch/arm/mach-cns3xxx/include/mach/memory.h |   26 --------------------------
+ 2 files changed, 1 insertions(+), 26 deletions(-)
+ delete mode 100644 arch/arm/mach-cns3xxx/include/mach/memory.h
 
 diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 95396dc..cecbc51 100644
+index a3577a2..ab78899 100644
 --- a/arch/arm/Kconfig
 +++ b/arch/arm/Kconfig
-@@ -532,6 +532,7 @@ config ARCH_LPC32XX
- 	select CLKDEV_LOOKUP
- 	select GENERIC_TIME
- 	select GENERIC_CLOCKEVENTS
+@@ -341,6 +341,7 @@ config ARCH_CNS3XXX
+ 	select ARM_GIC
+ 	select MIGHT_HAVE_PCI
+ 	select PCI_DOMAINS if PCI
 +	select NO_MACH_MEMORY_H
  	help
- 	  Support for the NXP LPC32XX family of processors
+ 	  Support for Cavium Networks CNS3XXX platform.
  
-diff --git a/arch/arm/mach-lpc32xx/include/mach/memory.h b/arch/arm/mach-lpc32xx/include/mach/memory.h
+diff --git a/arch/arm/mach-cns3xxx/include/mach/memory.h b/arch/arm/mach-cns3xxx/include/mach/memory.h
 deleted file mode 100644
-index a647dd6..0000000
---- a/arch/arm/mach-lpc32xx/include/mach/memory.h
+index dc16c5c..0000000
+--- a/arch/arm/mach-cns3xxx/include/mach/memory.h
 +++ /dev/null
-@@ -1,27 +0,0 @@
+@@ -1,26 +0,0 @@
 -/*
-- * arch/arm/mach-lpc32xx/include/mach/memory.h
+- * Copyright 2003 ARM Limited
+- * Copyright 2008 Cavium Networks
 - *
-- * Author: Kevin Wells <kevin.wells@nxp.com>
-- *
-- * Copyright (C) 2010 NXP Semiconductors
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
+- * This file is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License, Version 2, as
+- * published by the Free Software Foundation.
 - */
 -
--#ifndef __ASM_ARCH_MEMORY_H
--#define __ASM_ARCH_MEMORY_H
+-#ifndef __MACH_MEMORY_H
+-#define __MACH_MEMORY_H
 -
 -/*
-- * Physical DRAM offset of bank 0
+- * Physical DRAM offset.
 - */
--#define PLAT_PHYS_OFFSET	UL(0x80000000)
+-#define PLAT_PHYS_OFFSET		UL(0x00000000)
+-
+-#define __phys_to_bus(x)	((x) + PHYS_OFFSET)
+-#define __bus_to_phys(x)	((x) - PHYS_OFFSET)
+-
+-#define __virt_to_bus(v)	__phys_to_bus(__virt_to_phys(v))
+-#define __bus_to_virt(b)	__phys_to_virt(__bus_to_phys(b))
+-#define __pfn_to_bus(p)		__phys_to_bus(__pfn_to_phys(p))
+-#define __bus_to_pfn(b)		__phys_to_pfn(__bus_to_phys(b))
 -
 -#endif
 -- 
