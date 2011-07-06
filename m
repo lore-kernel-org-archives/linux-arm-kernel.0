@@ -1,56 +1,38 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 06 Jul 2011 10:53:23 +0100
-Subject: [PATCH v8 00/14] Consolidating GIC per-cpu interrupts
-In-Reply-To: <20110706054615.GC26324@S2100-06.ap.freescale.net>
-References: <1309855755-6261-1-git-send-email-marc.zyngier@arm.com>
-	<20110706054615.GC26324@S2100-06.ap.freescale.net>
-Message-ID: <4E143093.6010706@arm.com>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Wed, 6 Jul 2011 15:29:10 +0530
+Subject: [PATCH 1/1] davinci: dm646x: move vpif related code to driver
+	core	header from platform
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024D6262FF@dbde02.ent.ti.com>
+References: <1305899929-2509-1-git-send-email-manjunath.hadli@ti.com>
+	<B85A65D85D7EB246BE421B3FB0FBB593024D2D28E3@dbde02.ent.ti.com>
+	<B85A65D85D7EB246BE421B3FB0FBB593024D6262FF@dbde02.ent.ti.com>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024D91ABC6@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/07/11 06:46, Shawn Guo wrote:
-> On Tue, Jul 05, 2011 at 09:49:01AM +0100, Marc Zyngier wrote:
->> The current GIC per-cpu interrupts (aka PPIs) suffer from a number of
->> problems:
->>
->> - They use a completely separate scheme to handle the interrupts,
->>   mostly because the PPI concept doesn't really match the kernel view
->>   of an interrupt.
->> - PPIs can only be used by the timer code, unless we add more low-level
->>   assembly code.
->> - The local timer code can only be used by devices generating PPIs,
->>   and not SPIs.
->> - At least one platform (msm) has started implementing its own
->>   alternative scheme.
->> - Some low-level code gets duplicated, as usual...
->>
->> The proposed solution is to let the GIC code expose the PPIs as
->> something that the kernel can manage. Instead of having a single
->> interrupt number shared on all cores, make the interrupt number be
->> different on each CPU.
->>
->> This enables the use of the normal kernel API (request_irq() and
->> friends) and the elimination of some low level code. It also serves as
->> the basis of the GIC device tree support code. On the other side, it
->> causes quite a bit of churn in the timer code.
->>
->> Previous versions of this series have received ACKs from some platform
->> maintainers, but so far there has been very little comment on the core
->> code. As I now have quite a large number of patches relying on this
->> series (local timers as devices, device tree support for GIC and TWD),
->> I'd be grateful for at least a hint indicating that this is going in
->> the right direction. Or not.
->>
-> I'm about to start mainlining Freescale i.MX6 core code.  It will be
-> wonderful if these great consolidation works could hit v3.1 merge
-> window, so that I can base i.MX6 off them in the next cycle.
+Hi Mauro,
 
-I'd love to see this being merged, but so far there has been no comment
-from Russell about this, and there is no way this is going move forward
-without his approval.
+On Wed, Jun 22, 2011 at 09:35:58, Nori, Sekhar wrote:
+> On Thu, Jun 02, 2011 at 22:51:58, Nori, Sekhar wrote:
+> > Hi Mauro,
+> > 
+> > On Fri, May 20, 2011 at 19:28:49, Hadli, Manjunath wrote:
+> > > move vpif related code for capture and display drivers
+> > > from dm646x platform header file to vpif.h as these definitions
+> > > are related to driver code more than the platform or board.
+> > > 
+> > > Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
+> > 
+> > Will you be taking this patch through your tree?
+> > 
+> > If not, with your ack, I can queue it for inclusion
+> > through the ARM tree.
+> > 
+> 
+> Ping :)
 
-Cheers,
+Can you please provide your ack so that I can
+queue this for v3.1?
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Thanks,
+Sekhar
