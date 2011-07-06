@@ -1,27 +1,29 @@
-From: davem@davemloft.net (David Miller)
-Date: Tue, 05 Jul 2011 19:48:54 -0700 (PDT)
-Subject: [PATCH v2 0/3] Add device tree probe support for imx fec driver
-In-Reply-To: <1309878839-25743-1-git-send-email-shawn.guo@linaro.org>
-References: <1309878839-25743-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20110705.194854.1875695946300840388.davem@davemloft.net>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 05 Jul 2011 22:47:27 -0400
+Subject: [PATCH 42/52] ARM: mach-shark: convert boot_params to atag_offset
+In-Reply-To: <1309920457-21913-1-git-send-email-nicolas.pitre@linaro.org>
+References: <1309920457-21913-1-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <1309920457-21913-42-git-send-email-nicolas.pitre@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shawn Guo <shawn.guo@linaro.org>
-Date: Tue, 5 Jul 2011 23:13:56 +0800
+Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+---
+ arch/arm/mach-shark/core.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-> The first two patches are a little off topic.  Patch #1 adds a helper
-> function of_get_phy_mode into of_net, and #2 converts ibm_newemac net
-> driver to use this helper function.  Patch #3 is the actual one adding
-> tree probe support for imx fec driver, with of_get_phy_mode being used.
-> 
-> Changes since v1:
->  * Address review comments given by Grant
->  * Add patch #1 and #2
-> 
-> Shawn Guo (3):
->       dt/net: add helper function of_get_phy_mode
->       net: ibm_newemac: convert it to use of_get_phy_mode
->       net/fec: add device tree probe support
-
-All applied to net-next-2.6, thanks.
+diff --git a/arch/arm/mach-shark/core.c b/arch/arm/mach-shark/core.c
+index 1173082..042d5d8 100644
+--- a/arch/arm/mach-shark/core.c
++++ b/arch/arm/mach-shark/core.c
+@@ -154,7 +154,7 @@ static struct sys_timer shark_timer = {
+ 
+ MACHINE_START(SHARK, "Shark")
+ 	/* Maintainer: Alexander Schulz */
+-	.boot_params	= 0x08003000,
++	.atag_offset	= 0x3000,
+ 	.map_io		= shark_map_io,
+ 	.init_irq	= shark_init_irq,
+ 	.timer		= &shark_timer,
+-- 
+1.7.4
