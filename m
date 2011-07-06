@@ -1,38 +1,34 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Thu, 7 Jul 2011 00:19:02 +0800
-Subject: [GIT PULL] pxa: fixing patches for v3.0-rc6
-In-Reply-To: <201107061653.27756.arnd@arndb.de>
-References: <CAMPhdO_6CqVn_SdX-tPBtmHjkKH6kiWzuRkCDWkxaCUacReQhg@mail.gmail.com>
-	<201107061556.23356.arnd@arndb.de>
-	<CAMPhdO_krAn-tQYfwAh7a+Q+_xRU-DdwQn+gAi-LW3oFQauBmw@mail.gmail.com>
-	<201107061653.27756.arnd@arndb.de>
-Message-ID: <CAMPhdO-qNN2f9AarV5_T0xiUw1SXaESG5qRPMfAnksX8_K4uQw@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 7 Jul 2011 00:30:12 +0800
+Subject: [PATCH v3 0/2] Add device tree probe support for tty/serial/imx
+Message-ID: <1309969814-13195-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 6, 2011 at 10:53 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday 06 July 2011, Eric Miao wrote:
->> >
->> > I'll wait a few days for other soc maintainers to send fixes and then
->> > send a consolidated pull request.
->> >
->> > I noticed that none of these have a cc:stable at kernel.org tag, but the
->> > code that you patch has been in the same state since 2009 or early 2010,
->> > respectively. Are you sure the fixes are not needed on older kernels?
->> >
->>
->> They are. Can I do a rebase and send another git-pull?
->
-> Yes, that would be good.
+The first patch removes the use of cpu_is_mx1().  The second patch
+adds device tree probe with a dependency on the following patch.
 
-OK, stable Cc'ed and patches re-submitted.
+  http://article.gmane.org/gmane.linux.drivers.devicetree/6128
 
-Branch 'fix' has been updated, please re-pull. (Please try a bit later,
-it's going to take a while syncing between master and git.k.o, looks
-like it's becoming worse these days).
+Changes since v2:
+ * Not use generic naming imx-uart, instead use specific soc name
+   to show uart type compatibility (Sascha's suggestion)
 
->
-> Thanks,
->
-> ? ? ? ?Arnd
->
+Changes since v1:
+ * Address review comments given by Grant and Uwe
+
+Shawn Guo (2):
+      serial/imx: get rid of the uses of cpu_is_mx1()
+      serial/imx: add device tree probe support
+
+ .../bindings/tty/serial/fsl-imx-uart.txt           |   19 +++
+ arch/arm/mach-imx/clock-imx1.c                     |    6 +-
+ arch/arm/mach-imx/clock-imx21.c                    |    8 +-
+ arch/arm/mach-imx/clock-imx25.c                    |   11 +-
+ arch/arm/mach-imx/clock-imx27.c                    |   13 +-
+ arch/arm/mach-imx/clock-imx31.c                    |   11 +-
+ arch/arm/mach-imx/clock-imx35.c                    |    7 +-
+ arch/arm/mach-mx5/clock-mx51-mx53.c                |   18 ++-
+ arch/arm/plat-mxc/devices/platform-imx-uart.c      |    7 +-
+ drivers/tty/serial/imx.c                           |  149 +++++++++++++++++---
+ 10 files changed, 190 insertions(+), 59 deletions(-)
