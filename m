@@ -1,55 +1,60 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 05 Jul 2011 23:30:06 -0400
-Subject: [PATCH 22/37] ARM: mach-gemini: remove mach/memory.h
+Date: Tue, 05 Jul 2011 23:30:09 -0400
+Subject: [PATCH 25/37] ARM: mach-mxs: remove mach/memory.h
 In-Reply-To: <1309923021-23487-1-git-send-email-nicolas.pitre@linaro.org>
 References: <1309923021-23487-1-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <1309923021-23487-22-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <1309923021-23487-25-git-send-email-nicolas.pitre@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 ---
- arch/arm/Kconfig                           |    1 +
- arch/arm/mach-gemini/include/mach/memory.h |   19 -------------------
- 2 files changed, 1 insertions(+), 19 deletions(-)
- delete mode 100644 arch/arm/mach-gemini/include/mach/memory.h
+ arch/arm/Kconfig                        |    1 +
+ arch/arm/mach-mxs/include/mach/memory.h |   24 ------------------------
+ 2 files changed, 1 insertions(+), 24 deletions(-)
+ delete mode 100644 arch/arm/mach-mxs/include/mach/memory.h
 
 diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index cecbc51..8495852 100644
+index 755a85d..a2e96e8 100644
 --- a/arch/arm/Kconfig
 +++ b/arch/arm/Kconfig
-@@ -349,6 +349,7 @@ config ARCH_GEMINI
- 	select CPU_FA526
+@@ -404,6 +404,7 @@ config ARCH_MXS
  	select ARCH_REQUIRE_GPIOLIB
- 	select ARCH_USES_GETTIMEOFFSET
+ 	select CLKDEV_LOOKUP
+ 	select CLKSRC_MMIO
 +	select NO_MACH_MEMORY_H
  	help
- 	  Support for the Cortina Systems Gemini family SoCs
+ 	  Support for Freescale MXS-based family of processors
  
-diff --git a/arch/arm/mach-gemini/include/mach/memory.h b/arch/arm/mach-gemini/include/mach/memory.h
+diff --git a/arch/arm/mach-mxs/include/mach/memory.h b/arch/arm/mach-mxs/include/mach/memory.h
 deleted file mode 100644
-index a50915f..0000000
---- a/arch/arm/mach-gemini/include/mach/memory.h
+index b5420a5..0000000
+--- a/arch/arm/mach-mxs/include/mach/memory.h
 +++ /dev/null
-@@ -1,19 +0,0 @@
+@@ -1,24 +0,0 @@
 -/*
-- *  Copyright (C) 2001-2006 Storlink, Corp.
-- *  Copyright (C) 2008-2009 Paulius Zaleckas <paulius.zaleckas@teltonika.lt>
+- * Copyright (C) 2009-2010 Freescale Semiconductor, Inc. All Rights Reserved.
 - *
 - * This program is free software; you can redistribute it and/or modify
 - * it under the terms of the GNU General Public License as published by
 - * the Free Software Foundation; either version 2 of the License, or
 - * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License along
+- * with this program; if not, write to the Free Software Foundation, Inc.,
+- * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 - */
--#ifndef __MACH_MEMORY_H
--#define __MACH_MEMORY_H
 -
--#ifdef CONFIG_GEMINI_MEM_SWAP
--# define PLAT_PHYS_OFFSET	UL(0x00000000)
--#else
--# define PLAT_PHYS_OFFSET	UL(0x10000000)
--#endif
+-#ifndef __MACH_MXS_MEMORY_H__
+-#define __MACH_MXS_MEMORY_H__
 -
--#endif /* __MACH_MEMORY_H */
+-#define PHYS_OFFSET		UL(0x40000000)
+-
+-#endif /* __MACH_MXS_MEMORY_H__ */
 -- 
 1.7.4
