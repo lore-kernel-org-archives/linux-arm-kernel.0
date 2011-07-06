@@ -1,29 +1,51 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 6 Jul 2011 14:52:19 +0100
-Subject: [PATCH V2 3/6] mpcore_wdt: Fix WDIOC_SETOPTIONS handling
-In-Reply-To: <20110706134806.GA8286@n2100.arm.linux.org.uk>
-References: <1286185540-19569-1-git-send-email-vkuzmichev@mvista.com>
-	<1309892440-3260-4-git-send-email-vkuzmichev@mvista.com>
-	<20110706134806.GA8286@n2100.arm.linux.org.uk>
-Message-ID: <20110706135219.GB8286@n2100.arm.linux.org.uk>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Wed, 6 Jul 2011 15:53:05 +0200
+Subject: [PATCH] Add 'config IMX_NFC_V1_BISWAP' to swap the Bad block
+	Indicator, and use for imx27pdk nand support.
+In-Reply-To: <4E145789.8040801@televic.com>
+References: <1309872828-13942-1-git-send-email-J.Lambrecht@televic.com>
+	<20110706080942.GC26347@pengutronix.de>
+	<4E142B18.60407@televic.com> <19988.19315.787284.113228@ipc1.ka-ro>
+	<4E145789.8040801@televic.com>
+Message-ID: <19988.26817.208939.223896@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hopefully, someone can let Wim know his email is broken... Also deleted
-the broken arm at kernel.org address.
+Hi,
 
-This is the mail system at host ylaen.iguana.be.
+Lambrecht J?rgen writes:
+> On 07/06/2011 01:48 PM, Lothar Wa?mann wrote:
+> > > Am I correct that all nfc-v1's have that bug, so only imx27 and imx51?
+> > > The application note we finally got from freescale only mentions "FSL
+> > > IMX NFC".
+> > >
+> > It's not exactly a bug (which would be possible to get fixed), but an
+> > inherent feature of the controller which handles NAND flash with a
+> > page size larger than 512 byte like it has n pages of 512 byte.
+> >
+> OK, a "hardware bug" then (can be fixed with a re-write of the 
+> VHDL/Verilog code of the NFC, giving v2). It seems to me Freescale tried 
+> to enhance their 512B-page controller with to possibility to also handle 
+> 2kB pages, but they forgot about the Factory Bad Block byte (n=4 only).
+> So to reply to your next mail: only the imx27 and imx31 (thanks sascha, 
+> it was a typo to mention 51) have the NFC v1, I believe all the others 
+> have NFC v2, which are fixed.
+> 
+How do you come to that conclusion? All the controllers share the same
+flash buffer layout and map it to the actual flash data in the same
+way. Thus the problem exists for all of them.
+And the original Freescale code for i.MX5 et al. handles the bad block
+markers in the same way as for i.MX2 or i.MX3.
 
-I'm sorry to have to inform you that your message could not
-be delivered to one or more recipients. It's attached below.
 
-For further assistance, please send mail to <postmaster>
+Lothar Wa?mann
+-- 
+___________________________________________________________
 
-If you do so, please include this problem report. You can
-delete your own text from the attached returned message.
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
 
-                   The mail system
-
-<wim@infomag.iguana.be> (expanded from <wim@iguana.be>): Host or domain name
-    not found. Name service error for name=infomag.iguana.be type=AAAA: Host
-    found but no data record of requested type
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
