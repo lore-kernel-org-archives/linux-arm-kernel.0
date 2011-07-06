@@ -1,36 +1,80 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 7 Jul 2011 00:47:46 +0800
-Subject: [PATCH v3 0/4] Add device tree probe for sdhci-esdhc-imx
-Message-ID: <1309970870-13336-1-git-send-email-shawn.guo@linaro.org>
+From: svaidy@linux.vnet.ibm.com (Vaidyanathan Srinivasan)
+Date: Wed, 6 Jul 2011 22:11:46 +0530
+Subject: [PATCH 00/10] mm: Linux VM Infrastructure to support Memory
+	Power Management
+In-Reply-To: <CAOJsxLHQP=-srK_uYYBsPb7+rUBnPZG7bzwtCd-rRaQa4ikUFg@mail.gmail.com>
+References: <1306499498-14263-1-git-send-email-ankita@in.ibm.com>
+	<20110629130038.GA7909@in.ibm.com>
+	<CAOJsxLHQP=-srK_uYYBsPb7+rUBnPZG7bzwtCd-rRaQa4ikUFg@mail.gmail.com>
+Message-ID: <20110706164146.GD4356@dirshya.in.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The first patch copies platform data into driver private data, and
-do not reference platform data after probe.  The second one removes
-the uses of cpu_is_mx().  The third one makes a dt related fix on
-sdhci-pltfm.c, and the last one adds actual device tree probe for
-sdhci-esdhc-imx driver.
+* Pekka Enberg <penberg@kernel.org> [2011-07-06 11:45:41]:
 
-Changes since v2:
- * Add patch #1
- * Do not use Linux details of cd-type and wp-type for binding
+> Hi Ankita,
+> 
+> [ I don't really know anything about memory power management but
+>   here's my two cents since you asked for it. ]
+> 
+> On Wed, Jun 29, 2011 at 4:00 PM, Ankita Garg <ankita@in.ibm.com> wrote:
+> > I) Dynamic Power Transition
+> >
+> > The goal here is to ensure that as much as possible, on an idle system,
+> > the memory references do not get spread across the entire RAM, a problem
+> > similar to memory fragmentation. The proposed approach is as below:
+> >
+> > 1) One of the first things is to ensure that the memory allocations do
+> > not spill over to more number of regions. Thus the allocator needs to
+> > be aware of the address boundary of the different regions.
+> 
+> Why does the allocator need to know about address boundaries? Why
+> isn't it enough to make the page allocator and reclaim policies favor using
+> memory from lower addresses as aggressively as possible? That'd mean
+> we'd favor the first memory banks and could keep the remaining ones
+> powered off as much as possible.
 
-Changes since v1:
- * Address review comments given by Grant
+Yes, this will work to a limited extent when we have few regions to
+account for.  However if applications start and stop leaving large
+holes in the address map, it may not worth the effort of migrating
+pages to lower addresses to pack the holes.
 
-Shawn Guo (4):
-      mmc: sdhci-esdhc-imx: do not reference platform data after probe
-      mmc: sdhci-esdhc-imx: get rid of the uses of cpu_is_mx()
-      mmc: sdhci-pltfm: dt device does not pass parent to sdhci_alloc_host
-      mmc: sdhci-esdhc-imx: add device tree probe support
+> IOW, why do we need to support scenarios such as this:
+> 
+>    bank 0     bank 1   bank 2    bank3
+>  | online  | offline | online  | offline |
+> 
+> instead of using memory compaction and possibly something like the
+> SLUB defragmentation patches to turn the memory map into this:
+> 
+>    bank 0     bank 1   bank 2   bank3
+>  | online  | online  | offline | offline |
 
- .../devicetree/bindings/mmc/fsl-imx-esdhc.txt      |   34 +++++
- arch/arm/mach-imx/clock-imx25.c                    |    4 +-
- arch/arm/mach-imx/clock-imx35.c                    |    6 +-
- arch/arm/mach-mx5/clock-mx51-mx53.c                |   16 +-
- arch/arm/mach-mx5/mx51_efika.c                     |    4 +-
- .../plat-mxc/devices/platform-sdhci-esdhc-imx.c    |   17 ++-
- arch/arm/plat-mxc/include/mach/devices-common.h    |    1 +
- drivers/mmc/host/sdhci-esdhc-imx.c                 |  151 +++++++++++++++++---
- drivers/mmc/host/sdhci-pltfm.c                     |    3 +-
- 9 files changed, 194 insertions(+), 42 deletions(-)
+Yes, this is what we need, but also have a notion of how many pages
+are used in each bank so that we can pack pages from under utilized
+banks into a reasonably used bank and thereby free more banks.
+
+Freeing more banks + clustering all used or free banks gives us more
+power saving benefits.
+
+> > 2) At the time of allocation, before spilling over allocations to the
+> > next logical region, the allocator needs to make a best attempt to
+> > reclaim some memory from within the existing region itself first. The
+> > reclaim here needs to be in LRU order within the region. ?However, if
+> > it is ascertained that the reclaim would take a lot of time, like there
+> > are quite a fe write-backs needed, then we can spill over to the next
+> > memory region (just like our NUMA node allocation policy now).
+> 
+> I think a much more important question is what happens _after_ we've
+> allocated and free'd tons of memory few times. AFAICT, memory
+> regions don't help with that kind of fragmentation that will eventually
+> happen anyway.
+ 
+Memory regions allow us to have a zone per-region.  This helps in the
+cases were allocations are fragments into multiple regions by
+potentially reclaiming very low utilized regions and packing the pages
+into higher utilized regions.  The requirement is a standard
+de-fragmentation approach, except that the cluster of allocations
+should fall within a region (any region) as much as possible.
+
+--Vaidy
