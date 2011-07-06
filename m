@@ -1,157 +1,248 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 06 Jul 2011 12:18:42 +0100
-Subject: [PATCH v8 00/14] Consolidating GIC per-cpu interrupts
-In-Reply-To: <20110706111142.GR8286@n2100.arm.linux.org.uk>
-References: <1309855755-6261-1-git-send-email-marc.zyngier@arm.com>
-	<4E1440C2.2000203@arm.com>
-	<20110706111142.GR8286@n2100.arm.linux.org.uk>
-Message-ID: <4E144492.5090607@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 6 Jul 2011 13:41:38 +0200
+Subject: [PATCH 1/3] ARM: CSR: Adding CSR SiRFprimaII board support
+In-Reply-To: <1309945678-18813-2-git-send-email-bs14@csr.com>
+References: <1309945678-18813-1-git-send-email-bs14@csr.com>
+	<1309945678-18813-2-git-send-email-bs14@csr.com>
+Message-ID: <201107061341.38591.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/07/11 12:11, Russell King - ARM Linux wrote:
-> On Wed, Jul 06, 2011 at 12:02:26PM +0100, Marc Zyngier wrote:
->> On 05/07/11 09:49, Marc Zyngier wrote:
->>> The current GIC per-cpu interrupts (aka PPIs) suffer from a number of
->>> problems:
->>>
->>> - They use a completely separate scheme to handle the interrupts,
->>>   mostly because the PPI concept doesn't really match the kernel view
->>>   of an interrupt.
->>> - PPIs can only be used by the timer code, unless we add more low-level
->>>   assembly code.
->>> - The local timer code can only be used by devices generating PPIs,
->>>   and not SPIs.
->>> - At least one platform (msm) has started implementing its own
->>>   alternative scheme.
->>> - Some low-level code gets duplicated, as usual...
->>>
->>> The proposed solution is to let the GIC code expose the PPIs as
->>> something that the kernel can manage. Instead of having a single
->>> interrupt number shared on all cores, make the interrupt number be
->>> different on each CPU.
->>>
->>> This enables the use of the normal kernel API (request_irq() and
->>> friends) and the elimination of some low level code. It also serves as
->>> the basis of the GIC device tree support code. On the other side, it
->>> causes quite a bit of churn in the timer code.
->>>
->>> Previous versions of this series have received ACKs from some platform
->>> maintainers, but so far there has been very little comment on the core
->>> code. As I now have quite a large number of patches relying on this
->>> series (local timers as devices, device tree support for GIC and TWD),
->>> I'd be grateful for at least a hint indicating that this is going in
->>> the right direction. Or not.
->>>
->>> This patch set is based on 3.0-rc5. Tested on PB-11MP, Tegra2
->>> (Harmony) and SMDK-V310. Also available in the "gic_ppi_map" branch of
->>> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git
->>>
->>> From v7:
->>> - Rebased on v3.0-rc5
->>> - Rename gic_ppi_to_vppi() to gic_ppi_map()
->>> - Rename CONFIG_ARM_GIC_VPPI to CONFIG_ARM_GIC_PPI_MAP
->>> - Add gic_ppi_map_on_cpu()
->>>
->>> From v6:
->>> - Fix compilation when !CONFIG_PM.
->>>
->>> From v5:
->>> - Update Exynos4 MCT to use the local timer infrastructure, now that
->>>   it doesn't depend on PPIs anymore. Untested, as the board I have
->>>   doesn't implement MCT (EVT0 syndrome).
->>>
->>> From v4:
->>> - Fix arch/arm/common/Kconfig indentation
->>> - Fix MSM warning when building UP.
->>>
->>> From v3:
->>> - Fix yet another CPU_HOTPLUG problem: instead of calling free_irq()
->>>   on timer halt, just disable the interrupt. On timer restart, detect
->>>   that the interrupt has been requested already and just enable the
->>>   interrupt back. This avoid doing a request_irq() with preemption
->>>   disabled, which triggers an ugly warning. Reported by Stephen Boyd.
->>>
->>> From v2:
->>> - More MSM fixes
->>> - Dropped MSM interrupt handler removal, as this requires more discussion,
->>>   and will be addressed in a separate series.
->>> - Moved introduction of percpu_timer_handler to a separate patch
->>>
->>> From v1:
->>> - Fix crash while hotpluging a CPU
->>> - Use handle_percpu_irq() instead of handle_fasteoi_irq()
->>> - MSM fixes courtesy of Stephen Boyd
->>> - MSM switched to percpu_timer_handler()
->>> - Remove local timer interrupt accounting
->>> - Restructure patches #1 and #2
->>>
->>> Marc Zyngier (14):
->>>   ARM: gic: add per-cpu interrupt mapping
->>>   ARM: smp: add interrupt handler for local timers
->>>   ARM: smp_twd: add support for remapped PPI interrupts
->>>   ARM: omap4: use remapped PPI interrupts for local timer
->>>   ARM: versatile: use remapped PPI interrupts for local timer
->>>   ARM: shmobile: use remapped PPI interrupts for local timer
->>>   ARM: ux500: use remapped PPI interrupts for local timer
->>>   ARM: tegra: use remapped PPI interrupts for local timer
->>>   ARM: msm: use remapped PPI interrupts for local timer
->>>   ARM: exynos4: use remapped PPI interrupts for local timer
->>>   ARM: gic: remove previous local timer interrupt handling
->>>   ARM: gic: add compute_irqnr macro for exynos4
->>>   ARM: SMP: automatically select ARM_GIC_PPI_MAP
->>>   ARM: gic: add gic_ppi_map_on_cpu()
->>>
->>>  arch/arm/Kconfig                                  |    1 +
->>>  arch/arm/common/Kconfig                           |    5 +
->>>  arch/arm/common/gic.c                             |  152 +++++++++++++++++++--
->>>  arch/arm/include/asm/entry-macro-multi.S          |    7 -
->>>  arch/arm/include/asm/hardirq.h                    |    3 -
->>>  arch/arm/include/asm/hardware/entry-macro-gic.S   |   31 ++---
->>>  arch/arm/include/asm/hardware/gic.h               |   11 ++-
->>>  arch/arm/include/asm/localtimer.h                 |    7 +-
->>>  arch/arm/include/asm/smp.h                        |    5 -
->>>  arch/arm/kernel/irq.c                             |   11 +-
->>>  arch/arm/kernel/smp.c                             |   27 +---
->>>  arch/arm/kernel/smp_twd.c                         |   25 +++-
->>>  arch/arm/mach-exynos4/include/mach/entry-macro.S  |   70 +---------
->>>  arch/arm/mach-exynos4/localtimer.c                |    3 +-
->>>  arch/arm/mach-msm/board-msm8x60.c                 |   11 --
->>>  arch/arm/mach-msm/include/mach/entry-macro-qgic.S |   73 +----------
->>>  arch/arm/mach-msm/timer.c                         |   58 ++++----
->>>  arch/arm/mach-omap2/include/mach/entry-macro.S    |   14 +--
->>>  arch/arm/mach-omap2/timer-mpu.c                   |    3 +-
->>>  arch/arm/mach-shmobile/entry-intc.S               |    3 -
->>>  arch/arm/mach-shmobile/include/mach/entry-macro.S |    3 -
->>>  arch/arm/mach-shmobile/localtimer.c               |    3 +-
->>>  arch/arm/mach-tegra/localtimer.c                  |    3 +-
->>>  arch/arm/mach-ux500/localtimer.c                  |    3 +-
->>>  arch/arm/plat-versatile/localtimer.c              |    3 +-
->>>  25 files changed, 253 insertions(+), 282 deletions(-)
->>
->> Russell,
->>
->> Unless you have any objection, I'd like to push this to Arnd's arm-soc
->> tree. Would that be OK with you?
+On Wednesday 06 July 2011, Barry Song wrote:
+> From: Binghua Duan <binghua.duan@csr.com>
 > 
-> I've yet to look at any of these patches in any depth - my immediate
-> concern is gobbling up soo many IRQ numbers for the per-cpu stuff
-> (which also eats up memory for all the irq structures) when this
-> isn't really necessary.
+> SiRFprimaII is the latest generation application processor from CSR?s
+> Multifunction SoC product family. Designed around an ARM cortex A9 core,
+> high-speed memory bus, advanced 3D accelerator and full-HD multi-format
+> video decoder, SiRFprimaII is able to meet the needs of complicated
+> applications for modern multifunction devices that require heavy concurrent
+> applications and fluid user experience. Integrated with GPS baseband,
+> analog and PMU, this new platform is designed to provide a cost effective
+> solution for Automotive and Consumer markets.
+> 
+> This patch adds the basic support for this SoC and EVB board based on device
+> tree. It is following the ZYNQ of Grant Likely in some degree.
+> 
+> Signed-off-by: Binghua Duan <Binghua.Duan@csr.com>
+> Signed-off-by: Rongjun Ying <Rongjun.Ying@csr.com>
+> Signed-off-by: Zhiwu Song <Zhiwu.Song@csr.com>
+> Signed-off-by: Yuping Luo <Yuping.Luo@csr.com>
+> Signed-off-by: Bin Shi <Bin.Shi@csr.com>
+> Signed-off-by: Huayi Li <Huayi.Li@csr.com>
+> Signed-off-by: Barry Song <Baohua.Song@csr.com>
 
-Note that this mandates SPARSE_IRQ, so the number of allocated irq
-structures is actually very limited (most platforms only allocate 3
-structures per CPU for PPI #29, 30 and 31).
+Reviewed-by: Arnd Bergmann <arnd@arndb.de>
 
-> Plus is this patch set core stuff or SoC stuff?  It looks more core
-> to me, so that means it should come through my tree rather than
-> Arnd's.
+I think this is good for 3.1, but there are still a few things about
+the device tree file could be improved.
 
-Fair enough, I have no problem with you merging it once you're happy
-with it.
+> +	axi {
+> +		compatible = "simple-bus";
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges = <0x40000000 0x40000000 0x80000000>;
+> +
+> +		sirfsoc-iobus {
+> +			compatible = "simple-bus";
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			ranges = <0x40000000 0x40000000 0x80000000>;
+> +
+> +			l2-cache-controller at 0x80040000 {
+> +				compatible = "arm,pl310-cache";
+> +				reg = <0x80040000 0x1000>;
+> +				interrupts = <59>;
+> +			};
+> +
+> +			intc: interrupt-controller at 0x80020000 {
+> +				#interrupt-cells = <1>;
+> +				interrupt-controller;
+> +				compatible = "sirf,prima2-intc";
+> +				reg = <0x80020000 0x1000>;
+> +			};
+> +
+> +                     sys-iobg {
+> +                             compatible = "simple-bus";
+> +                             #address-cells = <1>;
+> +                             #size-cells = <1>;
+> +                             ranges = <0x88000000 0x88000000 0x40000>;
+> +
+> +                             clock-controller at 0x88000000 {
+> +                                     compatible = "sirf,prima2-clkc";
+> +                                     reg = <0x88000000 0x1000>;
+> +                                     interrupts = <3>;
+> +                             };
 
-Cheers,
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+The axi bus and the sirfsoc-iobus seem to be identical in their scope,
+so it's probably enough to model one of them.
+
+I would normally recommend defining the ranges so that addresses are local
+to the respective bus, like
+
+	axi {
+		ranges = <0 0x40000000 0x80000000>;
+
+		sys-iobg {
+			ranges = <0 0x48000000 0x40000>;
+                        clock-controller at 0x88000000 {
+                               compatible = "sirf,prima2-clkc";
+                               reg = <0 0x1000>;
+			}
+
+                        reset-controller at 0x88010000 {
+                               compatible = "sirf,prima2-rstc";
+                               reg = <0x10000 0x1000>;
+                        };
+		}
+	}
+
+
+> +			disp-iobg {
+> +				compatible = "simple-bus";
+> +				#address-cells = <1>;
+> +				#size-cells = <1>;
+> +				ranges = <0x90010000 0x90010000 0x30000>;
+> +
+> +				display at 0x90010000 {
+> +					compatible = "sirf,prima2-lcd";
+> +					reg = <0x90010000 0x20000>;
+> +					interrupts = <30>;
+> +				};
+> +
+> +				vpp at 0x90020000 {
+> +					compatible = "sirf,prima2-vpp";
+> +					reg = <0x90020000 0x10000>;
+> +					interrupts = <31>;
+> +				};
+> +			};
+> +
+> +			graphics-iobg {
+> +				compatible = "simple-bus";
+> +				#address-cells = <1>;
+> +				#size-cells = <1>;
+> +				ranges = <0x98000000 0x98000000 0x8000000>;
+> +
+> +				graphics at 0x98000000 {
+> +					compatible = "sirf,prima2-graphics";
+> +					reg = <0x98000000 0x8000000>;
+> +					interrupts = <6>;
+> +				};
+> +			};
+
+Are the display and graphics units CSR developments? If the GPU is
+in fact licensed from someone else (powervr, arm, ...), you should
+probably list the actual name of the device.
+
+> +			multimedia-iobg {
+> +				compatible = "simple-bus";
+> +				#address-cells = <1>;
+> +				#size-cells = <1>;
+> +				ranges = <0xa0000000 0xa0000000 0x8000000>;
+> +
+> +				multimedia at 0xa0000000 {
+> +					compatible = "sirf,prima2-multimedia";
+> +					reg = <0xa0000000 0x8000000>;
+> +					interrupts = <5>;
+> +				};
+> +			};
+
+"multimedia" sounds like a too generic term. What does this do?
+
+> +				uart0: uart at 0xb0050000 {
+> +					cell-index = <0>;
+> +					compatible = "sirf,prima2-uart";
+> +					reg = <0xb0050000 0x10000>;
+> +					interrupts = <17>;
+> +				};
+> +
+> +	 			uart1: uart at 0xb0060000 {
+> +					cell-index = <1>;
+> +					compatible = "sirf,prima2-uart";
+> +					reg = <0xb0060000 0x10000>;
+> +					interrupts = <18>;
+> +				};
+> +
+> +	 			uart2: uart at 0xb0070000 {
+> +					cell-index = <2>;
+> +					compatible = "sirf,prima2-uart";
+> +					reg = <0xb0070000 0x10000>;
+> +					interrupts = <19>;
+> +				};
+
+Are these proprietary uarts, or are they compatible to 8250 and the
+like? You might want to set a clock-frequency property as of_serial.c
+uses.
+
+> +			rtc-iobg {
+> +				compatible = "sirf,prima2-rtciobg", "simple-bus";
+> +				#address-cells = <1>;
+> +				#size-cells = <1>;
+> +				reg = <0x80030000 0x10000>;
+> +
+> +				gpsrtc at 0x1000 {
+> +					compatible = "sirf,prima2-gpsrtc";
+> +					reg = <0x1000 0x1000>;
+> +					interrupts = <55 56 57>;
+> +				};
+> +
+> +				sysrtc at 0x2000 {
+> +					compatible = "sirf,prima2-sysrtc";
+> +					reg = <0x2000 0x1000>;
+> +					interrupts = <52 53 54>;
+> +				};
+> +
+> +				pwrc at 0x3000 {
+> +					compatible = "sirf,prima2-pwrc";
+> +					reg = <0x3000 0x1000>;
+> +					interrupts = <32>;
+> +				};
+> +			};
+
+Are these rtc implementations related? From the register layout, I would
+guess that they are supposed to be used by the same driver, so it's
+probably a good idea to add a "compatible" property with a common name
+for all three.
+
+> +			uus-iobg {
+> +				compatible = "simple-bus";
+> +				#address-cells = <1>;
+> +				#size-cells = <1>;
+> +				ranges = <0xb8000000 0xb8000000 0x40000>;
+> +
+> +	 			usb0: usb at 0xb00E0000 {
+> +					compatible = "sirf,prima2-usb";
+> +					reg = <0xb8000000 0x10000>;
+> +					interrupts = <10>;
+> +				};
+> +
+> +	 			usb1: usb at 0xb00f0000 {
+> +					compatible = "sirf,prima2-usb";
+> +					reg = <0xb8010000 0x10000>;
+> +					interrupts = <11>;
+> +				};
+
+Is the usb implementation compatible to an existing one? Many SoCs
+use one of ehci, ohci or musb. If that's the case, you should look
+at the respective bindings.
+
+> +				sata at 0xb00f0000 {
+> +					compatible = "sirf,prima2-sata";
+> +					reg = <0xb8020000 0x10000>;
+> +					interrupts = <37>;
+> +				};
+
+Same thing here. Most sata controllers are compatible to some
+standard implementation.
+
+> +				security at 0xb00f0000 {
+> +					compatible = "sirf,prima2-security";
+> +					reg = <0xb8030000 0x10000>;
+> +					interrupts = <42>;
+> +				};
+> +			};
+> +		};
+> +	};
+> +};
+
+	Arnd
