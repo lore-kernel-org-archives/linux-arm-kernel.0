@@ -1,75 +1,61 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Wed, 06 Jul 2011 11:30:52 +0400
-Subject: [PATCH 15/15] pxa2[57]x_udc: drop gpio_pullup handling
-In-Reply-To: <20110706072042.GC10729@legolas.emea.dhcp.ti.com>
-References: <1309871321-11305-1-git-send-email-dbaryshkov@gmail.com>
-	<1309871321-11305-16-git-send-email-dbaryshkov@gmail.com>
-	<4E13772B.2090406@free.fr>
-	<CALT56yP5yNPZoJ_+6a4t2t6rY_hmej5fc-NG02Jef-QiXHrc=Q@mail.gmail.com>
-	<20110706072042.GC10729@legolas.emea.dhcp.ti.com>
-Message-ID: <4E140F2C.2010900@gmail.com>
+From: padma.kvr@gmail.com (padma venkat)
+Date: Wed, 6 Jul 2011 13:08:40 +0530
+Subject: [PATCH 2/2] SPI: S5PV210: Enable the SPI driver for S5PV210
+In-Reply-To: <4E13D362.7010107@linaro.org>
+References: <1309801476-29678-1-git-send-email-padma.v@samsung.com>
+	<1309801476-29678-2-git-send-email-padma.v@samsung.com>
+	<4E13D362.7010107@linaro.org>
+Message-ID: <CAAgF-Bf8X8zoVn=UaQx-b4neinTJcHNr92F7q3nFdyyEo4kgOw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06.07.2011 11:20, Felipe Balbi wrote:
-> hi,
+Hi Tushar,
+
+On Wed, Jul 6, 2011 at 8:45 AM, Tushar Behera <tushar.behera@linaro.org> wrote:
+> Hi,
 >
-> On Wed, Jul 06, 2011 at 12:58:48AM +0400, Dmitry Eremin-Solenikov wrote:
->> On 7/6/11, Robert Jarzmik<robert.jarzmik@free.fr>  wrote:
->>> On 07/05/2011 03:08 PM, Dmitry Eremin-Solenikov wrote:
->>>> Now as all drivers were converted to using gpio-vbus, drop gpio-pullup
->>>> handling from pxa UDC drivers, thus simplifying them a bit.
->>>
->>> Is this patch compliant with USB 2 specification regarding maximum time
->>> between pullup triggering and UDC ready to answer the "RESET" packet and
->>> be assigned an address ?
->>>
->>> This is the sequence I'm worried about :
->>>    (1) The gpio-vbus is loaded
->>>    (2) The pxa27x_udc is loaded
->>>    (3) USB cable is plugged
->>>        =>  VBUS is sensed
->>>    (4) gpio-vbus pulls up the D+ (Dmitry, is that right ?)
->>>    (5) the host waits for UDC to settle (100 ms ?)
->>>    (5) set address packet(s) are sent from host to UDC
->>>    (6) UDC is not enabled, as no gadget is registered
->>>        =>  UDC doesn't answer
->>>        =>  usb host cannot assign it an address
->>>    (7) a gadget is loaded (g_ether for example)
->>>        =>  UDC is enabled, but too late
->>>
->>> Alan, Gregh, could you confirm point (5) about a maximum time between D+
->>> line activation and UDC duty to repond to "set address" packets, as well
->>> as the consequence of point (6) where the usb device is rejected because
->>> no address could be assigned ?
->>>
->>> Dmitry, could you confirm the the D+ pullup is done at point (4) ?
+> Patch 1/2 looks redundant as both changes can be very well accommodated in a
+> single patch.
+I thought it would be better to have seperate patch for two different
+SoCs. So I made
+the patches like that.
+
+Hi Kukjin,
+
+Please comment on this. Shall I make a single patch for both of the SoCs?
+
+>
+> On Monday 04 July 2011 11:14 PM, Padmavathi Venna wrote:
 >>
->> No, I can't confirm this. IIUC, evrything happens in abit different way:
->> (4) trancseiver notifies udc about VBUS sense
->> (5) a gadget is loaded (g_ether for example)
->> (6) gadget asks udc to enale  pullup
->> (7) udc tells gpio_vbus to enable pullup.
+>> The SPI module on S5PV210 is similar to the earlier Samsung SoCs like
+>> S3C64XX. Enable the existing SPI driver for use on S5PV210.
+>>
+>> Signed-off-by: Padmavathi Venna<padma.v@samsung.com>
+>> ---
+>> ?drivers/spi/Kconfig | ? ?3 ++-
+>> ?1 files changed, 2 insertions(+), 1 deletions(-)
+>>
+>> diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
+>> index 91d607b..ed1ebea 100644
+>> --- a/drivers/spi/Kconfig
+>> +++ b/drivers/spi/Kconfig
+>> @@ -340,7 +340,8 @@ config SPI_S3C24XX_GPIO
+>>
+>> ?config SPI_S3C64XX
+>> ? ? ? ?tristate "Samsung S3C64XX series type SPI"
+>> - ? ? ? depends on (ARCH_S3C64XX || ARCH_S5P64X0 || ARCH_S5PC100)
+>> + ? ? ? depends on (ARCH_S3C64XX || ARCH_S5P64X0 || ARCH_S5PC100 \
+>> + ? ? ? ? ? ? ? ? ? ? ? || ARCH_S5PV210)
+>> ? ? ? ?select S3C64XX_DMA if ARCH_S3C64XX
+>> ? ? ? ?help
+>> ? ? ? ? ?SPI driver for Samsung S3C64XX and newer SoCs.
 >
-> yeah, with udc-core.c we only enable pullup after gadget driver is
-> loaded.
 >
-> 290                 ret = bind(udc->gadget);
-> 291                 if (ret)
-> 292                         goto err1;
-> 293                 ret = usb_gadget_udc_start(udc->gadget, driver);
-> 294                 if (ret) {
-> 295                         driver->unbind(udc->gadget);
-> 296                         goto err1;
-> 297                 }
-> 298                 usb_gadget_connect(udc->gadget);
+> --
+> Tushar Behera
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc"
+> in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
 >
-> but this is the new style bind() and many UDCs still need to be
-> converted.
-
-This was working before the udc-core. If it doesn't work now for 
-unconverted drivers (PXA e.g.) that's really a huge regression!
-
--- 
-With best wishes
-Dmitry
