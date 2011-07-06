@@ -1,33 +1,28 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 5 Jul 2011 23:57:57 -0600 (MDT)
-Subject: [PATCH v2 1/5] OMAP4: prcm: Fix errors in few defines name
-In-Reply-To: <1309552060-4547-2-git-send-email-b-cousson@ti.com>
+Date: Tue, 5 Jul 2011 23:58:34 -0600 (MDT)
+Subject: [PATCH v2 2/5] OMAP4: prm: Remove wrong clockdomain offsets
+In-Reply-To: <1309552060-4547-3-git-send-email-b-cousson@ti.com>
 References: <1309552060-4547-1-git-send-email-b-cousson@ti.com>
-	<1309552060-4547-2-git-send-email-b-cousson@ti.com>
-Message-ID: <alpine.DEB.2.00.1107052357190.4217@utopia.booyaka.com>
+	<1309552060-4547-3-git-send-email-b-cousson@ti.com>
+Message-ID: <alpine.DEB.2.00.1107052358160.4217@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Fri, 1 Jul 2011, Benoit Cousson wrote:
 
-> A couple of macros were wrongly changed during the _MOD to _INST
-> rename done in the following commit:
+> The following commit introduced new macros to define an offset
+> per clock domain in an instance.
 > 
->   OMAP4: PRCM: rename _MOD macros to _INST
->   cdb54c4457d68994da7c2e16907adfbfc130060d
+> commit e4156ee52fe617c2c2d80b5db993ff4bf07d7c3c
 > 
-> Fix them to their original name.
+>     OMAP4: CM instances: add clockdomain register offsets
 > 
-> Some CM and PRM instances were not well aligned. Align them.
-> 
-> Remove one blank line in cm2_44xx.h to align the output with
-> the other (cm1_44xx.h, prm44xx.h) files.
-> 
-> Update header copyright date.
+> The PRM contains only two clock controls management entities:
+> EMU and WKUP.
+> Remove the other ones.
 > 
 > Signed-off-by: Benoit Cousson <b-cousson@ti.com>
 > Reviewed-by: Paul Walmsley <paul@pwsan.com>
-> Cc: Rajendra Nayak <rnayak@ti.com>
 
 
 Thanks, this patch has been queued for 3.1 at 
