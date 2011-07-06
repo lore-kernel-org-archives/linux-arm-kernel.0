@@ -1,52 +1,68 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 6 Jul 2011 09:56:56 +0100
-Subject: A few other cache related optimizations for Cortex-A9.
-In-Reply-To: <CAN_5kQBszi=hV1RVjyKO6gOhOuymGjsMwLk6ORaWpkaL-4USxA@mail.gmail.com>
-References: <CAN_5kQBszi=hV1RVjyKO6gOhOuymGjsMwLk6ORaWpkaL-4USxA@mail.gmail.com>
-Message-ID: <20110706085656.GA32020@e102109-lin.cambridge.arm.com>
+From: penberg@kernel.org (Pekka Enberg)
+Date: Wed, 6 Jul 2011 12:01:45 +0300
+Subject: [PATCH 00/10] mm: Linux VM Infrastructure to support Memory Power
+	Management
+In-Reply-To: <CAOJsxLHQP=-srK_uYYBsPb7+rUBnPZG7bzwtCd-rRaQa4ikUFg@mail.gmail.com>
+References: <1306499498-14263-1-git-send-email-ankita@in.ibm.com>
+	<20110629130038.GA7909@in.ibm.com>
+	<CAOJsxLHQP=-srK_uYYBsPb7+rUBnPZG7bzwtCd-rRaQa4ikUFg@mail.gmail.com>
+Message-ID: <CAOJsxLF0me+=Rk8RnxNS=9=_pmwwAntu1c930F6ySEUD2zZkGw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 06, 2011 at 04:14:57AM +0100, heechul Yun wrote:
-> I found a few other places which, I believe, are not necessary for Cortex-A9.
-> 
-> diff --git a/arch/arm/mm/copypage-v6.c b/arch/arm/mm/copypage-v6.c
-> index bdba6c6..6d5a847 100644
-> --- a/arch/arm/mm/copypage-v6.c
-> +++ b/arch/arm/mm/copypage-v6.c
-> @@ -41,7 +41,9 @@ static void v6_copy_user_highpage_nonaliasing(struct page *to,
->         kfrom = kmap_atomic(from, KM_USER0);
->         kto = kmap_atomic(to, KM_USER1);
->         copy_page(kto, kfrom);
-> +#ifndef CONFIG_CPU_CACHE_V7
->         __cpuc_flush_dcache_area(kto, PAGE_SIZE);
-> +#endif
->         kunmap_atomic(kto, KM_USER1);
->         kunmap_atomic(kfrom, KM_USER0);
->  }
-> 
-> On handling COW page fault, the above function is called to copy the
-> page content of the parent to a newly allocate page frame for the
-> child. Again, since D cache of A9 is PIPT, we do not need to flush the
-> page as in x86. This modification improves lmbench (fork/exec/shell)
-> performance by 4-6%.
+On Wed, Jul 6, 2011 at 11:45 AM, Pekka Enberg <penberg@kernel.org> wrote:
+> Hi Ankita,
+>
+> [ I don't really know anything about memory power management but
+> ?here's my two cents since you asked for it. ]
+>
+> On Wed, Jun 29, 2011 at 4:00 PM, Ankita Garg <ankita@in.ibm.com> wrote:
+>> I) Dynamic Power Transition
+>>
+>> The goal here is to ensure that as much as possible, on an idle system,
+>> the memory references do not get spread across the entire RAM, a problem
+>> similar to memory fragmentation. The proposed approach is as below:
+>>
+>> 1) One of the first things is to ensure that the memory allocations do
+>> not spill over to more number of regions. Thus the allocator needs to
+>> be aware of the address boundary of the different regions.
+>
+> Why does the allocator need to know about address boundaries? Why
+> isn't it enough to make the page allocator and reclaim policies favor using
+> memory from lower addresses as aggressively as possible? That'd mean
+> we'd favor the first memory banks and could keep the remaining ones
+> powered off as much as possible.
+>
+> IOW, why do we need to support scenarios such as this:
+>
+> ? bank 0 ? ? bank 1 ? bank 2 ? ?bank3
+> ?| online ?| offline | online ?| offline |
+>
+> instead of using memory compaction and possibly something like the
+> SLUB defragmentation patches to turn the memory map into this:
+>
+> ? bank 0 ? ? bank 1 ? bank 2 ? bank3
+> ?| online ?| online ?| offline | offline |
+>
+>> 2) At the time of allocation, before spilling over allocations to the
+>> next logical region, the allocator needs to make a best attempt to
+>> reclaim some memory from within the existing region itself first. The
+>> reclaim here needs to be in LRU order within the region. ?However, if
+>> it is ascertained that the reclaim would take a lot of time, like there
+>> are quite a fe write-backs needed, then we can spill over to the next
+>> memory region (just like our NUMA node allocation policy now).
+>
+> I think a much more important question is what happens _after_ we've
+> allocated and free'd tons of memory few times. AFAICT, memory
+> regions don't help with that kind of fragmentation that will eventually
+> happen anyway.
 
-See commit 115b2247 introducing this. We indeed have a PIPT like cache
-on A9 but it is a Harvard architecture with separate I and D caches. It
-happened in the past that we got a COW for text page and the I and D
-cache became incoherent. Since then, the dynamic linker has been fixed
-and no longer causes this. We could add a check for VM_EXEC in
-vma->vm_flags.
+Btw, I'd also decouple the 'memory map' required for PASR from
+memory region data structure and use page allocator hooks for letting
+the PASR driver know about allocated and unallocated memory. That
+way the PASR driver could automatically detect if full banks are
+unused and power them off. That'd make memory power management
+transparent to the VM regardless of whether we're using hardware or
+software poweroff.
 
-But I wonder whether we still need this flush after commit c0177800
-where we assume that a new page cache page has dirty D-cache (and we
-later flush the caches via set_pte_at).
-
-> I think above two patches work for least Cortex-A9 although I am not
-> sure the use of CONFIG_CPU_CACHE_V7 is appropriate.
-
-We need to check the ID_MMFR1 register as there are other ARMv7 cores
-that cannot do page table walks in the L1 cache.
-
--- 
-Catalin
+                        Pekka
