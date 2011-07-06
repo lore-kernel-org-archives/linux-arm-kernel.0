@@ -1,248 +1,142 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 6 Jul 2011 13:41:38 +0200
-Subject: [PATCH 1/3] ARM: CSR: Adding CSR SiRFprimaII board support
-In-Reply-To: <1309945678-18813-2-git-send-email-bs14@csr.com>
-References: <1309945678-18813-1-git-send-email-bs14@csr.com>
-	<1309945678-18813-2-git-send-email-bs14@csr.com>
-Message-ID: <201107061341.38591.arnd@arndb.de>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Wed, 6 Jul 2011 13:48:03 +0200
+Subject: [PATCH] Add 'config IMX_NFC_V1_BISWAP' to swap the Bad block
+	Indicator, and use for imx27pdk nand support.
+In-Reply-To: <4E142B18.60407@televic.com>
+References: <1309872828-13942-1-git-send-email-J.Lambrecht@televic.com>
+	<20110706080942.GC26347@pengutronix.de>
+	<4E142B18.60407@televic.com>
+Message-ID: <19988.19315.787284.113228@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 06 July 2011, Barry Song wrote:
-> From: Binghua Duan <binghua.duan@csr.com>
+Hi,
+
+Lambrecht J?rgen writes:
+> On 07/06/2011 10:09 AM, Sascha Hauer wrote:
+> > On Tue, Jul 05, 2011 at 03:33:48PM +0200, J?rgen Lambrecht wrote:
+> > > - Swap the BI-byte on position 0x7D0 with a data byte at 0x835.  To 
+> > fix a bug
+> > >   in Freescale imx NFC v1 SoC's for 2K page NAND flashes: imx27 and 
+> > imx31.
+> > >   Warning: The same solution needs to be applied to the boot loader 
+> > and the
+> > >   flash programmer.
+> > > - Enable NAND support for the imx27pdk (3ds), and use BISWAP.
+> > >
+> > > Signed-off-by: J?rgen Lambrecht <J.Lambrecht@televic.com>
+> > > ---
+> > >  arch/arm/mach-imx/Kconfig         |   30 ++++++++++++++++++++++++++++--
+> > >  arch/arm/mach-imx/mach-mx27_3ds.c |   14 ++++++++++++++
+> > >  drivers/mtd/nand/mxc_nand.c       |   29 +++++++++++++++++++++++++++++
+> > >  3 files changed, 71 insertions(+), 2 deletions(-)
+> > >
+> > [snip]
+> >
+> > > +
+> > > +config IMX_NFC_V1_BISWAP
+> > > +     bool "Make the MXC 2kB-page NAND driver swap the Bad Block 
+> > Indicator"
+> > > +     depends on MACH_MX27_3DS
+> > > +     depends on MTD_NAND_MXC
+> > > +     help
+> > > +       Enable this if you want that the MXC NAND driver swaps the 
+> > Bad Block
+> > > +       Indicator (BBI) byte. The IMX NFC v1 (present in IMX27 and 
+> > IMX31)
+> > > +       contains a bug for 2kB-page flashes: the 2kB page is read out in
+> > > +       4x512B chunks, so also the spare area is read out in 4
+> > > +       chunks. Therefore the data area and the spare area becomes
+> > > +       mixed. This causes a problem for the factory programmed BBI: it
+> > > +       appears in the data area instead of the spare area, and is
+> > > +       overwritten. This patch swaps that byte to the "real" spare
+> > > +       area. WARNING: then also the bootloader and the flash 
+> > programmer must
+> > > +       be patched!!
+> >
+> > I don't like this approach. IMO some code should be run on a virgin
+> > flash which is aware of this issue and creates a correct bad block
+> > table. You run this once and forget about this afterwards and every
+> > kernel/bootloader can run without patching. Otherwise if you accidently
+> > or intentionally start an older (unpatched) kernel your Nand gets
+> > corrupted.
+> >
+> I see 3 solutions: rely on the quality of the NAND flash driver (1), 
+> patch the SW (2) or patch the HW (3).
 > 
-> SiRFprimaII is the latest generation application processor from CSR?s
-> Multifunction SoC product family. Designed around an ARM cortex A9 core,
-> high-speed memory bus, advanced 3D accelerator and full-HD multi-format
-> video decoder, SiRFprimaII is able to meet the needs of complicated
-> applications for modern multifunction devices that require heavy concurrent
-> applications and fluid user experience. Integrated with GPS baseband,
-> analog and PMU, this new platform is designed to provide a cost effective
-> solution for Automotive and Consumer markets.
+> 1. A normal NAND flash driver relies on the ECC to detect a 
+> (potentially) bad block. But a factory bad block can have more bad bits 
+> that the specified ECC bits.
+>     Solution is to check after each write if the data was written 
+> reliable: a write/read-back policy. (linux kernel option: Device Drivers 
+> -> MTD support -> NAND Device Support -> Verify NAND page writes)
+>     This will of course slow-down writing a lot.
+> 2. The Freescale solution: patch the SW:
+>        1. flash programmer
+>        2. boot-loader NAND driver
+>        3. OS NAND driver
+> 3. For the HW patch, a special SW must be written that must be executed 
+> before the board is programmed. That special SW must run in RAM and copy 
+> the BBI byte to the "swapped" place, so that after swapping, the BBI is 
+> at the good place. Then the SW must not be patched.
+>     Risk: if this step is skipped, the factory BBI information is lost, 
+> and if the SW has no write/read-back policy (solution 1), data will be 
+> lost in some point in time.
 > 
-> This patch adds the basic support for this SoC and EVB board based on device
-> tree. It is following the ZYNQ of Grant Likely in some degree.
+That's nonsense. You cannot copy a byte inside a page that is not
+programmable (that's what Bad Blocks are).
+You only need to check the byte in a well known location once and
+create a BBT in flash that carries the bad block information. After
+that you need not check for any bad block markers any more, but simply
+use the BBT.
+Since you need to program the bootloader with some external tool
+anyway, that tool is the right instance to do the bad block scan and
+create the BBT.
+That's what we at Ka-Ro are doing since the early days of the i.MX27
+for all our i.MX boards.
+
+> Your solution is (3), but for the linux rootfs partition only, using the 
+> BBT. Of course bootloader partitions and the linux kernel binary are not 
+> written often, but I read (several times, and also been told) that even 
+> when only reading a nand flash it can become bad!
+> I still have to investigate this for how to solve this in the bootloader..
 > 
-> Signed-off-by: Binghua Duan <Binghua.Duan@csr.com>
-> Signed-off-by: Rongjun Ying <Rongjun.Ying@csr.com>
-> Signed-off-by: Zhiwu Song <Zhiwu.Song@csr.com>
-> Signed-off-by: Yuping Luo <Yuping.Luo@csr.com>
-> Signed-off-by: Bin Shi <Bin.Shi@csr.com>
-> Signed-off-by: Huayi Li <Huayi.Li@csr.com>
-> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+You are mixing up two different things. The Bad block markers in
+certain locations in the OOB area mark 'Factory bad blocks'
+i.e. blocks that are already bad when you apply power to the flash for
+the first time. The manufacturer guarantees that initial bad blocks
+can be detected by checking those locations for a non-FF value.
+There is no guarantee that you may be able to write any specific value
+to a certain byte in a block that has turned bad due to wearout or
+whatever at any later time. Thus bad blocks that appear due to wearout
+should be kept track of in the BBT, not by writing any 'bad block
+markers' to the defective blocks themselves.
 
-Reviewed-by: Arnd Bergmann <arnd@arndb.de>
-
-I think this is good for 3.1, but there are still a few things about
-the device tree file could be improved.
-
-> +	axi {
-> +		compatible = "simple-bus";
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges = <0x40000000 0x40000000 0x80000000>;
-> +
-> +		sirfsoc-iobus {
-> +			compatible = "simple-bus";
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +			ranges = <0x40000000 0x40000000 0x80000000>;
-> +
-> +			l2-cache-controller at 0x80040000 {
-> +				compatible = "arm,pl310-cache";
-> +				reg = <0x80040000 0x1000>;
-> +				interrupts = <59>;
-> +			};
-> +
-> +			intc: interrupt-controller at 0x80020000 {
-> +				#interrupt-cells = <1>;
-> +				interrupt-controller;
-> +				compatible = "sirf,prima2-intc";
-> +				reg = <0x80020000 0x1000>;
-> +			};
-> +
-> +                     sys-iobg {
-> +                             compatible = "simple-bus";
-> +                             #address-cells = <1>;
-> +                             #size-cells = <1>;
-> +                             ranges = <0x88000000 0x88000000 0x40000>;
-> +
-> +                             clock-controller at 0x88000000 {
-> +                                     compatible = "sirf,prima2-clkc";
-> +                                     reg = <0x88000000 0x1000>;
-> +                                     interrupts = <3>;
-> +                             };
+> > Also, my comment above applies here too. You added a 'depends on the
+> > board I care of', but usually my kernels have all available boards
+> > compiled in. So I can select this option and it will change the
+> > behaviour of all boards I might run the kernel on, not only the
+> > ones you depend on above.
+> Ok, i should then find a better way to do it.
+> But, the mxc_nand.c code contains this to protect it: 'if 
+> ((mtd->writesize > 512) && nfc_is_v1())'.
+> Am I correct that all nfc-v1's have that bug, so only imx27 and imx51?
+> The application note we finally got from freescale only mentions "FSL 
+> IMX NFC".
+>
+It's not exactly a bug (which would be possible to get fixed), but an
+inherent feature of the controller which handles NAND flash with a
+page size larger than 512 byte like it has n pages of 512 byte.
 
 
-The axi bus and the sirfsoc-iobus seem to be identical in their scope,
-so it's probably enough to model one of them.
+Lothar Wa?mann
+-- 
+___________________________________________________________
 
-I would normally recommend defining the ranges so that addresses are local
-to the respective bus, like
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
 
-	axi {
-		ranges = <0 0x40000000 0x80000000>;
-
-		sys-iobg {
-			ranges = <0 0x48000000 0x40000>;
-                        clock-controller at 0x88000000 {
-                               compatible = "sirf,prima2-clkc";
-                               reg = <0 0x1000>;
-			}
-
-                        reset-controller at 0x88010000 {
-                               compatible = "sirf,prima2-rstc";
-                               reg = <0x10000 0x1000>;
-                        };
-		}
-	}
-
-
-> +			disp-iobg {
-> +				compatible = "simple-bus";
-> +				#address-cells = <1>;
-> +				#size-cells = <1>;
-> +				ranges = <0x90010000 0x90010000 0x30000>;
-> +
-> +				display at 0x90010000 {
-> +					compatible = "sirf,prima2-lcd";
-> +					reg = <0x90010000 0x20000>;
-> +					interrupts = <30>;
-> +				};
-> +
-> +				vpp at 0x90020000 {
-> +					compatible = "sirf,prima2-vpp";
-> +					reg = <0x90020000 0x10000>;
-> +					interrupts = <31>;
-> +				};
-> +			};
-> +
-> +			graphics-iobg {
-> +				compatible = "simple-bus";
-> +				#address-cells = <1>;
-> +				#size-cells = <1>;
-> +				ranges = <0x98000000 0x98000000 0x8000000>;
-> +
-> +				graphics at 0x98000000 {
-> +					compatible = "sirf,prima2-graphics";
-> +					reg = <0x98000000 0x8000000>;
-> +					interrupts = <6>;
-> +				};
-> +			};
-
-Are the display and graphics units CSR developments? If the GPU is
-in fact licensed from someone else (powervr, arm, ...), you should
-probably list the actual name of the device.
-
-> +			multimedia-iobg {
-> +				compatible = "simple-bus";
-> +				#address-cells = <1>;
-> +				#size-cells = <1>;
-> +				ranges = <0xa0000000 0xa0000000 0x8000000>;
-> +
-> +				multimedia at 0xa0000000 {
-> +					compatible = "sirf,prima2-multimedia";
-> +					reg = <0xa0000000 0x8000000>;
-> +					interrupts = <5>;
-> +				};
-> +			};
-
-"multimedia" sounds like a too generic term. What does this do?
-
-> +				uart0: uart at 0xb0050000 {
-> +					cell-index = <0>;
-> +					compatible = "sirf,prima2-uart";
-> +					reg = <0xb0050000 0x10000>;
-> +					interrupts = <17>;
-> +				};
-> +
-> +	 			uart1: uart at 0xb0060000 {
-> +					cell-index = <1>;
-> +					compatible = "sirf,prima2-uart";
-> +					reg = <0xb0060000 0x10000>;
-> +					interrupts = <18>;
-> +				};
-> +
-> +	 			uart2: uart at 0xb0070000 {
-> +					cell-index = <2>;
-> +					compatible = "sirf,prima2-uart";
-> +					reg = <0xb0070000 0x10000>;
-> +					interrupts = <19>;
-> +				};
-
-Are these proprietary uarts, or are they compatible to 8250 and the
-like? You might want to set a clock-frequency property as of_serial.c
-uses.
-
-> +			rtc-iobg {
-> +				compatible = "sirf,prima2-rtciobg", "simple-bus";
-> +				#address-cells = <1>;
-> +				#size-cells = <1>;
-> +				reg = <0x80030000 0x10000>;
-> +
-> +				gpsrtc at 0x1000 {
-> +					compatible = "sirf,prima2-gpsrtc";
-> +					reg = <0x1000 0x1000>;
-> +					interrupts = <55 56 57>;
-> +				};
-> +
-> +				sysrtc at 0x2000 {
-> +					compatible = "sirf,prima2-sysrtc";
-> +					reg = <0x2000 0x1000>;
-> +					interrupts = <52 53 54>;
-> +				};
-> +
-> +				pwrc at 0x3000 {
-> +					compatible = "sirf,prima2-pwrc";
-> +					reg = <0x3000 0x1000>;
-> +					interrupts = <32>;
-> +				};
-> +			};
-
-Are these rtc implementations related? From the register layout, I would
-guess that they are supposed to be used by the same driver, so it's
-probably a good idea to add a "compatible" property with a common name
-for all three.
-
-> +			uus-iobg {
-> +				compatible = "simple-bus";
-> +				#address-cells = <1>;
-> +				#size-cells = <1>;
-> +				ranges = <0xb8000000 0xb8000000 0x40000>;
-> +
-> +	 			usb0: usb at 0xb00E0000 {
-> +					compatible = "sirf,prima2-usb";
-> +					reg = <0xb8000000 0x10000>;
-> +					interrupts = <10>;
-> +				};
-> +
-> +	 			usb1: usb at 0xb00f0000 {
-> +					compatible = "sirf,prima2-usb";
-> +					reg = <0xb8010000 0x10000>;
-> +					interrupts = <11>;
-> +				};
-
-Is the usb implementation compatible to an existing one? Many SoCs
-use one of ehci, ohci or musb. If that's the case, you should look
-at the respective bindings.
-
-> +				sata at 0xb00f0000 {
-> +					compatible = "sirf,prima2-sata";
-> +					reg = <0xb8020000 0x10000>;
-> +					interrupts = <37>;
-> +				};
-
-Same thing here. Most sata controllers are compatible to some
-standard implementation.
-
-> +				security at 0xb00f0000 {
-> +					compatible = "sirf,prima2-security";
-> +					reg = <0xb8030000 0x10000>;
-> +					interrupts = <42>;
-> +				};
-> +			};
-> +		};
-> +	};
-> +};
-
-	Arnd
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
