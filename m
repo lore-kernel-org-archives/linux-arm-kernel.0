@@ -1,38 +1,52 @@
-From: vkuzmichev@mvista.com (Vitaly Kuzmichev)
-Date: Wed, 06 Jul 2011 16:27:41 +0400
-Subject: [PATCH V2 0/6] arm_smp_twd: mpcore_wdt: Fix MPCORE watchdog setup
-In-Reply-To: <4E14337F.1050101@arm.com>
-References: <1286185540-19569-1-git-send-email-vkuzmichev@mvista.com>
-	<1309892440-3260-1-git-send-email-vkuzmichev@mvista.com>
-	<4E14337F.1050101@arm.com>
-Message-ID: <4E1454BD.7050607@mvista.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Wed, 6 Jul 2011 20:29:46 +0800
+Subject: [PATCH 2/3] ARM: CSR: mapping early DEBUG_LL uart
+In-Reply-To: <20110706121026.GT8286@n2100.arm.linux.org.uk>
+References: <1309945678-18813-1-git-send-email-bs14@csr.com>
+	<1309945678-18813-3-git-send-email-bs14@csr.com>
+	<20110706110522.GQ8286@n2100.arm.linux.org.uk>
+	<CAGsJ_4xRxWXL=xPRgkaLMFxpBtr-bP6xV9iD1UomfzyKmHhSJA@mail.gmail.com>
+	<20110706121026.GT8286@n2100.arm.linux.org.uk>
+Message-ID: <CAGsJ_4zPCpAm_aR9qwvhvAz_s5uUq5uz_34oL2gvjcZJjqPQdw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+Hi Russell,
+Thanks.
 
-On 07/06/2011 02:05 PM, Marc Zyngier wrote:
-[...]
->> The series of patches is based on arm-platforms.git/local_timers_as_devices
->> branch since it looks like that it is going to be merged into the mainline.
-> 
-> Be careful here. This branch is a work in progress, likely to change
-> very quickly, contains code that has not been posted to the ML yet, and
-> will probably eat your pet for breakfast. As far as mainline merging is
-> concerned, there is still a long way to go (see the GIC consolidation
-> patches, on which the local_timers_as_devices branch relies).
+2011/7/6 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> On Wed, Jul 06, 2011 at 07:53:14PM +0800, Barry Song wrote:
+>> hi Russell,
+>>
+>> 2011/7/6 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+>> > On Wed, Jul 06, 2011 at 02:47:57AM -0700, Barry Song wrote:
+>> >> Signed-off-by: Barry Song <bs14@csr.com>
+>> >
+>> > Surely this should be part of the first patch, which won't build without
+>> > this one if DEBUG_LL is enabled?
+>>
+>> i guess that can get fixed by:
+>>
+>> static void __init sirfsoc_map_io(void)
+>> {
+>> ? ? ? ? sirfsoc_map_lluart();
+>> }
+>>
+>> MACHINE_START(PRIMA2_EVB, "prima2cb")
+>> ? ? ? ...
+>> ? ? ? ?.map_io ? ? ? ? = sirfsoc_map_io,
+>> ? ? ? ...
+>> MACHINE_END
+>
+> That doesn't really change anything. ?If you build the first patch without
+> the second patch with DEBUG_LL enabled, you'll get a build failure because
+> sirfsoc_map_lluart is not defined.
+>
+> Either omit the .map_io initializer in the first patch and add it in the
+> second patch, or combine the two patches together.
 
-I understand.
-When do you plan to finish this job?
-Would not it be better to prepare two sets of patches: first one for
-linux-2.6/master with exported function, second for arm-platforms.git
-with removing exported function and replacing use of it by
-clk_get_rate(smp_twd) call?
-Is there a chance in this case, that my patches will be merged much
-earlier than yours?
-If not, I will just rework patch 2/6 to remove exported and use only
-clock interface.
+real. thanks! to keep this as a separate patch as required in earlier
+thread, i will omit the .map_io initializer in the first patch.
 
-
-Thanks,
-Vitaly.
+>
+barry
