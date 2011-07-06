@@ -1,96 +1,40 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 06 Jul 2011 13:10:39 -0500
-Subject: [PATCH] ARM: cns3xxx: Add support for L2 Cache Controller
-In-Reply-To: <20110706140832.GA15946@oksana.dev.rtsoft.ru>
-References: <20110706140832.GA15946@oksana.dev.rtsoft.ru>
-Message-ID: <4E14A51F.4030108@gmail.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 06 Jul 2011 14:11:29 -0400 (EDT)
+Subject: [PATCH 1/3] ARM: CSR: Adding CSR SiRFprimaII board support
+In-Reply-To: <201107061959.45225.arnd@arndb.de>
+References: <1309945678-18813-1-git-send-email-bs14@csr.com>
+	<alpine.LFD.2.00.1107061228250.14596@xanadu.home>
+	<20110706174248.GK8286@n2100.arm.linux.org.uk>
+	<201107061959.45225.arnd@arndb.de>
+Message-ID: <alpine.LFD.2.00.1107061409580.14596@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/06/2011 09:08 AM, Anton Vorontsov wrote:
-> CNS3xxx SOCs have L310-compatible cache controller, so let's use it.
-> 
-> With this patch benchmarking with 'gzip' shows that performance is
-> doubled, and I'm still able to boot full-fledged userland over NFS
-> (using PCIe NIC), so the support should be pretty robust.
-> 
-> Signed-off-by: Anton Vorontsov <avorontsov@mvista.com>
-> ---
-> 
-> I'm going to apply it to linux-cns3xxx.git tree and push it (via Arnd)
-> for v3.1 , if there will be no complains, of course.
-> 
-> Thanks,
-> 
->  arch/arm/mach-cns3xxx/cns3420vb.c |    2 +
->  arch/arm/mach-cns3xxx/core.c      |   39 +++++++++++++++++++++++++++++++++++++
->  arch/arm/mach-cns3xxx/core.h      |    1 +
->  arch/arm/mm/Kconfig               |    2 +-
->  4 files changed, 43 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-cns3xxx/cns3420vb.c b/arch/arm/mach-cns3xxx/cns3420vb.c
-> index 08e5c87..4b804ba 100644
-> --- a/arch/arm/mach-cns3xxx/cns3420vb.c
-> +++ b/arch/arm/mach-cns3xxx/cns3420vb.c
-> @@ -170,6 +170,8 @@ static struct platform_device *cns3420_pdevs[] __initdata = {
->  
->  static void __init cns3420_init(void)
->  {
-> +	cns3xxx_l2x0_init();
-> +
->  	platform_add_devices(cns3420_pdevs, ARRAY_SIZE(cns3420_pdevs));
->  
->  	cns3xxx_ahci_init();
-> diff --git a/arch/arm/mach-cns3xxx/core.c b/arch/arm/mach-cns3xxx/core.c
-> index da30078..49f3a51 100644
-> --- a/arch/arm/mach-cns3xxx/core.c
-> +++ b/arch/arm/mach-cns3xxx/core.c
-> @@ -16,6 +16,7 @@
->  #include <asm/mach/time.h>
->  #include <asm/mach/irq.h>
->  #include <asm/hardware/gic.h>
-> +#include <asm/hardware/cache-l2x0.h>
->  #include <mach/cns3xxx.h>
->  #include "core.h"
->  
-> @@ -244,3 +245,41 @@ static void __init cns3xxx_timer_init(void)
->  struct sys_timer cns3xxx_timer = {
->  	.init = cns3xxx_timer_init,
->  };
-> +
-> +void __init cns3xxx_l2x0_init(void)
-> +{
-> +	void __iomem *base = ioremap(CNS3XXX_L2C_BASE, SZ_4K);
-> +	u32 val;
-> +
-> +	if (WARN_ON(!base))
-> +		return;
-> +
-> +	/*
-> +	 * Tag RAM Control register
-> +	 *
-> +	 * bit[10:8]	- 1 cycle of write accesses latency
-> +	 * bit[6:4]	- 1 cycle of read accesses latency
-> +	 * bit[3:0]	- 1 cycle of setup latency
-> +	 *
-> +	 * 1 cycle of latency for setup, read and write accesses
-> +	 */
-> +	val = readl(base + L2X0_TAG_LATENCY_CTRL);
-> +	val &= 0xfffff888;
-> +	writel(val, base + L2X0_TAG_LATENCY_CTRL);
-> +
-> +	/*
-> +	 * Data RAM Control register
-> +	 *
-> +	 * bit[10:8]	- 1 cycles of write accesses latency
-> +	 * bit[6:4]	- 1 cycles of read accesses latency
-> +	 * bit[3:0]	- 1 cycle of setup latency
-> +	 *
-> +	 * 1 cycle of setup latency, 2 cycles of read and write accesses latency
-> +	 */
-> +	val = readl(base + L2X0_DATA_LATENCY_CTRL);
-> +	val &= 0xfffff888;
+On Wed, 6 Jul 2011, Arnd Bergmann wrote:
 
-You're missing a "val |= 0x110" or your comment is wrong.
+> On Wednesday 06 July 2011 19:42:48 Russell King - ARM Linux wrote:
+> > On Wed, Jul 06, 2011 at 12:35:54PM -0400, Nicolas Pitre wrote:
+> > > In the spirit of removing as much machine specific and globally used 
+> > > defines (see my patch series removing a bunch of mach/memory.h 
+> > > instances), I'd like to see a solution that would make IO_SPACE_LIMIT 
+> > > into a variable, or having the same definition with a fixed mapping, for 
+> > > as many SOCs as possible.
+> > 
+> > In theory it should be possible to have it defined as 64K across
+> > everything.  ISTR that you were against that with SA1100 platforms
+> > because of the PCMCIA problem though...
+> 
+> If the problem is only with a few platforms, my preference would be
+> to hardcode this to 64k or 0, and leave the platforms that require
+> something else out of the common zImage for now.
+> 
+> For all platforms that only need the 64k window and don't have any
+> of other special needs, I would also like to hardcode the virtual
+> address window eventually, so that inb/outb can still be a single
+> instruction.
 
-Rob
+I would say that hardcoding the virtual mapping is probably the first 
+thing to do.  That would certainly simplify the rest of the kernel.
+
+
+Nicolas
