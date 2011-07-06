@@ -1,48 +1,42 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 05 Jul 2011 23:29:49 -0400
-Subject: [PATCH 05/37] ARM: mach-orion5x: remove mach/memory.h
+Date: Tue, 05 Jul 2011 23:29:50 -0400
+Subject: [PATCH 06/37] ARM: plat-omap: remove
+	CONFIG_FB_OMAP_CONSISTENT_DMA_SIZE related code
 In-Reply-To: <1309923021-23487-1-git-send-email-nicolas.pitre@linaro.org>
 References: <1309923021-23487-1-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <1309923021-23487-5-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <1309923021-23487-6-git-send-email-nicolas.pitre@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+There is simply no such Kconfig entry in the tree. This is dead code.
+
 Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 ---
- arch/arm/Kconfig                            |    1 +
- arch/arm/mach-orion5x/include/mach/memory.h |   12 ------------
- 2 files changed, 1 insertions(+), 12 deletions(-)
- delete mode 100644 arch/arm/mach-orion5x/include/mach/memory.h
+ arch/arm/plat-omap/include/plat/memory.h |   13 -------------
+ 1 files changed, 0 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index fd6d633..e8004b4 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -547,6 +547,7 @@ config ARCH_ORION5X
- 	select ARCH_REQUIRE_GPIOLIB
- 	select GENERIC_CLOCKEVENTS
- 	select PLAT_ORION
-+	select NO_MACH_MEMORY_H
- 	help
- 	  Support for the following Marvell Orion 5x series SoCs:
- 	  Orion-1 (5181), Orion-VoIP (5181L), Orion-NAS (5182),
-diff --git a/arch/arm/mach-orion5x/include/mach/memory.h b/arch/arm/mach-orion5x/include/mach/memory.h
-deleted file mode 100644
-index 6769917..0000000
---- a/arch/arm/mach-orion5x/include/mach/memory.h
-+++ /dev/null
-@@ -1,12 +0,0 @@
--/*
-- * arch/arm/mach-orion5x/include/mach/memory.h
-- *
-- * Marvell Orion memory definitions
-- */
+diff --git a/arch/arm/plat-omap/include/plat/memory.h b/arch/arm/plat-omap/include/plat/memory.h
+index e6720aa..7f9df6f 100644
+--- a/arch/arm/plat-omap/include/plat/memory.h
++++ b/arch/arm/plat-omap/include/plat/memory.h
+@@ -85,18 +85,5 @@
+ 
+ #endif	/* CONFIG_ARCH_OMAP15XX */
+ 
+-/* Override the ARM default */
+-#ifdef CONFIG_FB_OMAP_CONSISTENT_DMA_SIZE
 -
--#ifndef __ASM_ARCH_MEMORY_H
--#define __ASM_ARCH_MEMORY_H
+-#if (CONFIG_FB_OMAP_CONSISTENT_DMA_SIZE == 0)
+-#undef CONFIG_FB_OMAP_CONSISTENT_DMA_SIZE
+-#define CONFIG_FB_OMAP_CONSISTENT_DMA_SIZE 2
+-#endif
 -
--#define PLAT_PHYS_OFFSET	UL(0x00000000)
+-#define CONSISTENT_DMA_SIZE \
+-	(((CONFIG_FB_OMAP_CONSISTENT_DMA_SIZE + 1) & ~1) * 1024 * 1024)
 -
 -#endif
+-
+ #endif
+ 
 -- 
 1.7.4
