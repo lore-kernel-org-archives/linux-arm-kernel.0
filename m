@@ -1,49 +1,44 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 06 Jul 2011 12:35:54 -0400 (EDT)
-Subject: [PATCH 1/3] ARM: CSR: Adding CSR SiRFprimaII board support
-In-Reply-To: <201107061442.05182.arnd@arndb.de>
-References: <1309945678-18813-1-git-send-email-bs14@csr.com>
-	<1309945678-18813-2-git-send-email-bs14@csr.com>
-	<20110706122501.GU8286@n2100.arm.linux.org.uk>
-	<201107061442.05182.arnd@arndb.de>
-Message-ID: <alpine.LFD.2.00.1107061228250.14596@xanadu.home>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Wed, 6 Jul 2011 22:06:45 +0530
+Subject: [PATCH v2] davinci: da850: add a .set_rate method to ref_clk
+In-Reply-To: <1309273851-9238-1-git-send-email-christian.riesch@omicron.at>
+References: <B85A65D85D7EB246BE421B3FB0FBB593024D7939D4@dbde02.ent.ti.com>
+	<1309273851-9238-1-git-send-email-christian.riesch@omicron.at>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024D9B4CB6@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 6 Jul 2011, Arnd Bergmann wrote:
-> On Wednesday 06 July 2011, Russell King - ARM Linux wrote:
-> > I shall be making this change to asm/io.h shortly:
-> > 
-> >  #include <mach/io.h>
-> > 
-> > +/*
-> > + * This is the limit of PCI/ISA/PC card IO space, which is by default
-> > + * 64K if we have PC card, PCI or ISA support.  Otherwise, default to
-> > + * zero to prevent ISA/PCI drivers claiming IO space (and potentially
-> > + * oopsing.)
-> > + *
-> > + * Only set this larger if you really need inb() et.al. to operate over
-> > + * a larger address space (eg, for multiple MMIO-mapped PC card sockets
-> > + * as found on SA11x0 and PXA.)
-> > + */
-> > +#ifndef IO_SPACE_LIMIT
-> > +#if defined(CONFIG_PCI) || defined(CONFIG_ISA) || defined(CONFIG_PCCARD)
-> > +#define IO_SPACE_LIMIT ((resource_size_t)0xffff)
-> > +#else
-> > +#define IO_SPACE_LIMIT ((resource_size_t)0)
-> > +#endif
-> > +#endif
+Hi Christian,
+
+On Tue, Jun 28, 2011 at 20:40:51, Christian Riesch wrote:
+> This patch allows setting the input clock frequency of the SoC from
+> the board specific code using the davinci_set_refclk_rate function.
 > 
-> Good idea. The related change that I want to do is to conditionalize
-> all drivers that require PC-style I/O on the respective bus they
-> use, so we can also remove the __io macro for platforms that don't
-> need it and catch all drivers using inb/outb at compile time.
+> Suggested-by: Kevin Hilman <khilman@ti.com>
+> Signed-off-by: Christian Riesch <christian.riesch@omicron.at>
+> ---
+> 
+> v2: fixed the commit message and indentation.
+> Regards, Christian
+> 
+>  arch/arm/mach-davinci/da850.c |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+> index 133aac4..27fe3ac 100644
+> --- a/arch/arm/mach-davinci/da850.c
+> +++ b/arch/arm/mach-davinci/da850.c
+> @@ -58,6 +58,7 @@ static struct pll_data pll0_data = {
+>  static struct clk ref_clk = {
+>  	.name		= "ref_clk",
+>  	.rate		= DA850_REF_FREQ,
+> +	.set_rate	= davinci_simple_set_rate,
+>  };
+>  
+>  static struct clk pll0_clk = {
 
-In the spirit of removing as much machine specific and globally used 
-defines (see my patch series removing a bunch of mach/memory.h 
-instances), I'd like to see a solution that would make IO_SPACE_LIMIT 
-into a variable, or having the same definition with a fixed mapping, for 
-as many SOCs as possible.
+Thanks, will queue this as a 'feature' for
+next merge window.
 
-
-Nicolas
+Thanks,
+Sekhar
