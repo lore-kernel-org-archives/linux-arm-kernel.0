@@ -1,216 +1,86 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 7 Jul 2011 00:22:33 +0800
-Subject: [PATCH RESEND v2 3/3] net/fec: add device tree probe support
-In-Reply-To: <1309878839-25743-4-git-send-email-shawn.guo@linaro.org>
-References: <1309878839-25743-4-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1309969353-13128-1-git-send-email-shawn.guo@linaro.org>
+From: simon@sequanux.org (Simon Guinot)
+Date: Wed, 6 Jul 2011 16:18:23 +0000
+Subject: plat-orion multi purpose pins problem for mv78200
+In-Reply-To: <4E132FD5.1090409@drewtech.com>
+References: <4E0E1CA8.7090200@drewtech.com>
+	<20110702122344.GJ31228@kw.sim.vm.gnt>
+	<CAMAG_eexDoKrPsrd7+3bpsN3y0pptqwhFRP2NKqd_Nny+M+NGg@mail.gmail.com>
+	<4E132FD5.1090409@drewtech.com>
+Message-ID: <20110706161823.GB22857@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It adds device tree probe support for fec driver.
+On Tue, Jul 05, 2011 at 11:37:57AM -0400, Joey Oravec wrote:
+> On 7/3/2011 8:46 AM, saeed bishara wrote:
+> >>It doesn't seems the code was behaving differently before 3.0-rc. I mean
+> >>before the MPP and GPIO consolidation work. It was ?
+> >that's right, this issue was before the consolidation work.
+> Agreed. I only meant to say that the MPP code is broken for mv78200
+> in 3.0-rc5, so the maintainers should consider a short-term fix of
+> disabling the checks in orion_gpio_is_valid().
 
-Signed-off-by: Jason Liu <jason.hui@linaro.org>
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-Cc: David S. Miller <davem@davemloft.net>
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Acked-by: Grant Likely <grant.likely@secretlab.ca>
----
-Resend with changes:
- * use of_get_named_gpio for phy-reset-gpios
+And break code relying on the orion_gpio_is_valid() correctness ?
+IMHO, this kind of workaround is just not acceptable.
 
- Documentation/devicetree/bindings/net/fsl-fec.txt |   24 +++++
- drivers/net/fec.c                                 |   98 +++++++++++++++++++-
- 2 files changed, 117 insertions(+), 5 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/net/fsl-fec.txt
+> 
+> >>Does hardware allows a configuration like MPP0_GE0_COL and MPP32_GPIO
+> >>simultaneously ?
+> >yes, this is possible.
+> Agreed. MPP is the pin that can be mux'ed to 7 resources. GPIO is
+> just one of those resources. Yes the hardware supports your example.
+> Most resources can be routed to several different pins to allow
+> flexibility in board design.
+> 
+> Since MPP is just a pin-mux, it's possible for Marvell to build an
+> SoC in the future that can route a few different GPIOs onto a given
+> MPP pin. It seems like any solution should account for this.
+> 
+> >>If not (and only if not), the problem is simply mapping a MPP number on
+> >>the correct GPIO number. Isn't it ?
+> >>
+> >>In that case, what about using the MPPxx_GPIO definitions (found in
+> >>mach-mv78xx0/mpp.h) to map the right GPIO number ?
+> >>
+> >>For example:
+> >>
+> >>#define MPP32_GPIO        MPP(32, 0x1, 1, 1, 1)
+> >>
+> >>could be replaced by:
+> >>
+> >>#define MPP32_GPIO        MPP(0, 0x1, 1, 1, 1)
+> >that won't work because the num (first number) is used as the mpp
+> >index. see orion_mpp_conf() implementation.
+> >I think the solution is to extend the MPP define to include the
+> >explicit gpio number, so it will look like:
+> >#define MPP(_num, _gpio _sel, _in, _out, _78100_A0)
+> That could work as long as a value is reserved to mean "not gpio" like:
+> 
+> #define MPP0_GPIO        MPP(0, 0, 0x0, 1, 1, 1)
+> #define MPP0_GE0_COL        MPP(0, -1, 0x1, 1, 0, 1)
 
-diff --git a/Documentation/devicetree/bindings/net/fsl-fec.txt b/Documentation/devicetree/bindings/net/fsl-fec.txt
-new file mode 100644
-index 0000000..de43951
---- /dev/null
-+++ b/Documentation/devicetree/bindings/net/fsl-fec.txt
-@@ -0,0 +1,24 @@
-+* Freescale Fast Ethernet Controller (FEC)
-+
-+Required properties:
-+- compatible : Should be "fsl,<soc>-fec"
-+- reg : Address and length of the register set for the device
-+- interrupts : Should contain fec interrupt
-+- phy-mode : String, operation mode of the PHY interface.
-+  Supported values are: "mii", "gmii", "sgmii", "tbi", "rmii",
-+  "rgmii", "rgmii-id", "rgmii-rxid", "rgmii-txid", "rtbi", "smii".
-+- phy-reset-gpios : Should specify the gpio for phy reset
-+
-+Optional properties:
-+- local-mac-address : 6 bytes, mac address
-+
-+Example:
-+
-+fec at 83fec000 {
-+	compatible = "fsl,imx51-fec", "fsl,imx27-fec";
-+	reg = <0x83fec000 0x4000>;
-+	interrupts = <87>;
-+	phy-mode = "mii";
-+	phy-reset-gpios = <&gpio1 14 0>; /* GPIO2_14 */
-+	local-mac-address = [00 04 9F 01 1B B9];
-+};
-diff --git a/drivers/net/fec.c b/drivers/net/fec.c
-index 7ae3f28..720aa63 100644
---- a/drivers/net/fec.c
-+++ b/drivers/net/fec.c
-@@ -44,6 +44,10 @@
- #include <linux/platform_device.h>
- #include <linux/phy.h>
- #include <linux/fec.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/of_gpio.h>
-+#include <linux/of_net.h>
- 
- #include <asm/cacheflush.h>
- 
-@@ -78,6 +82,17 @@ static struct platform_device_id fec_devtype[] = {
- 	{ }
- };
- 
-+enum fec_type {
-+	IMX27_FEC,
-+	IMX28_FEC,
-+};
-+
-+static const struct of_device_id fec_dt_ids[] = {
-+	{ .compatible = "fsl,imx27-fec", .data = &fec_devtype[IMX27_FEC], },
-+	{ .compatible = "fsl,imx28-fec", .data = &fec_devtype[IMX28_FEC], },
-+	{ /* sentinel */ }
-+};
-+
- static unsigned char macaddr[ETH_ALEN];
- module_param_array(macaddr, byte, NULL, 0);
- MODULE_PARM_DESC(macaddr, "FEC Ethernet MAC address");
-@@ -734,8 +749,22 @@ static void __inline__ fec_get_mac(struct net_device *ndev)
- 	 */
- 	iap = macaddr;
- 
-+#ifdef CONFIG_OF
-+	/*
-+	 * 2) from device tree data
-+	 */
-+	if (!is_valid_ether_addr(iap)) {
-+		struct device_node *np = fep->pdev->dev.of_node;
-+		if (np) {
-+			const char *mac = of_get_mac_address(np);
-+			if (mac)
-+				iap = (unsigned char *) mac;
-+		}
-+	}
-+#endif
-+
- 	/*
--	 * 2) from flash or fuse (via platform data)
-+	 * 3) from flash or fuse (via platform data)
- 	 */
- 	if (!is_valid_ether_addr(iap)) {
- #ifdef CONFIG_M5272
-@@ -748,7 +777,7 @@ static void __inline__ fec_get_mac(struct net_device *ndev)
- 	}
- 
- 	/*
--	 * 3) FEC mac registers set by bootloader
-+	 * 4) FEC mac registers set by bootloader
- 	 */
- 	if (!is_valid_ether_addr(iap)) {
- 		*((unsigned long *) &tmpaddr[0]) =
-@@ -1358,6 +1387,52 @@ static int fec_enet_init(struct net_device *ndev)
- 	return 0;
- }
- 
-+#ifdef CONFIG_OF
-+static int __devinit fec_get_phy_mode_dt(struct platform_device *pdev)
-+{
-+	struct device_node *np = pdev->dev.of_node;
-+
-+	if (np)
-+		return of_get_phy_mode(np);
-+
-+	return -ENODEV;
-+}
-+
-+static int __devinit fec_reset_phy(struct platform_device *pdev)
-+{
-+	int err, phy_reset;
-+	struct device_node *np = pdev->dev.of_node;
-+
-+	if (!np)
-+		return -ENODEV;
-+
-+	phy_reset = of_get_named_gpio(np, "phy-reset-gpios", 0);
-+	err = gpio_request_one(phy_reset, GPIOF_OUT_INIT_LOW, "phy-reset");
-+	if (err) {
-+		pr_warn("FEC: failed to get gpio phy-reset: %d\n", err);
-+		return err;
-+	}
-+
-+	gpio_set_value(phy_reset, 1);
-+
-+	return 0;
-+}
-+#else /* CONFIG_OF */
-+static inline int fec_get_phy_mode_dt(struct platform_device *pdev)
-+{
-+	return -ENODEV;
-+}
-+
-+static inline int fec_reset_phy(struct platform_device *pdev)
-+{
-+	/*
-+	 * In case of platform probe, the reset has been done
-+	 * by machine code.
-+	 */
-+	return 0;
-+}
-+#endif /* CONFIG_OF */
-+
- static int __devinit
- fec_probe(struct platform_device *pdev)
- {
-@@ -1366,6 +1441,11 @@ fec_probe(struct platform_device *pdev)
- 	struct net_device *ndev;
- 	int i, irq, ret = 0;
- 	struct resource *r;
-+	const struct of_device_id *of_id;
-+
-+	of_id = of_match_device(fec_dt_ids, &pdev->dev);
-+	if (of_id)
-+		pdev->id_entry = of_id->data;
- 
- 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	if (!r)
-@@ -1397,9 +1477,16 @@ fec_probe(struct platform_device *pdev)
- 
- 	platform_set_drvdata(pdev, ndev);
- 
--	pdata = pdev->dev.platform_data;
--	if (pdata)
--		fep->phy_interface = pdata->phy;
-+	fep->phy_interface = fec_get_phy_mode_dt(pdev);
-+	if (fep->phy_interface < 0) {
-+		pdata = pdev->dev.platform_data;
-+		if (pdata)
-+			fep->phy_interface = pdata->phy;
-+		else
-+			fep->phy_interface = PHY_INTERFACE_MODE_MII;
-+	}
-+
-+	fec_reset_phy(pdev);
- 
- 	/* This device has up to three irqs on some platforms */
- 	for (i = 0; i < 3; i++) {
-@@ -1534,6 +1621,7 @@ static struct platform_driver fec_driver = {
- #ifdef CONFIG_PM
- 		.pm	= &fec_pm_ops,
- #endif
-+		.of_match_table = fec_dt_ids,
- 	},
- 	.id_table = fec_devtype,
- 	.probe	= fec_probe,
--- 
-1.7.4.1
+Maybe we could add a function pointer to the parameter list for
+orion_mpp_conf(). Something like: int (*mpp_to_gpio) (unsigned int num).
+
+If given to orion_mpp_conf(), the function would be used to perform the
+MPP to GPIO conversion. And if NULL, a 1:1 GPIO to MPP mapping would be
+used (current code).
+
+A such solution would let almost unchanged the code found in
+mach-{kirkwood,orion5x,dove}.
+
+> 
+> Note that orion_gpio_set_valid() and orion_gpio_is_valid() would
+> both need rework. The functions need to handle that a GPIO can be
+> mux'ed onto any MPP pin. I described this problem in another email
+> on the thread.
+
+I don't understand what's wrong with the GPIO array.
+
+Simon
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110706/7c8a4a63/attachment.sig>
