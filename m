@@ -1,49 +1,36 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 7 Jul 2011 00:47:49 +0800
-Subject: [PATCH v3 3/4] mmc: sdhci-pltfm: dt device does not pass parent to
-	sdhci_alloc_host
-In-Reply-To: <1309970870-13336-1-git-send-email-shawn.guo@linaro.org>
-References: <1309970870-13336-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1309970870-13336-4-git-send-email-shawn.guo@linaro.org>
+Date: Thu, 7 Jul 2011 00:47:46 +0800
+Subject: [PATCH v3 0/4] Add device tree probe for sdhci-esdhc-imx
+Message-ID: <1309970870-13336-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Neither platform based nor dt based device needs to pass the parent
-to sdhci_alloc_host.  There is no difference between platform and dt
-on this point.
+The first patch copies platform data into driver private data, and
+do not reference platform data after probe.  The second one removes
+the uses of cpu_is_mx().  The third one makes a dt related fix on
+sdhci-pltfm.c, and the last one adds actual device tree probe for
+sdhci-esdhc-imx driver.
 
-The patch makes the change to pass device itself than its parent to
-sdhci_alloc_host for dt case too.  Otherwise the probe function of
-sdhci based drivers which is shared between platform and dt will
-fail on dt case.
+Changes since v2:
+ * Add patch #1
+ * Do not use Linux details of cd-type and wp-type for binding
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-Acked-by: Grant Likely <grant.likely@secretlab.ca>
-Cc: Chris Ball <cjb@laptop.org>
----
- drivers/mmc/host/sdhci-pltfm.c |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
+Changes since v1:
+ * Address review comments given by Grant
 
-diff --git a/drivers/mmc/host/sdhci-pltfm.c b/drivers/mmc/host/sdhci-pltfm.c
-index 71c0ce1..6414efe 100644
---- a/drivers/mmc/host/sdhci-pltfm.c
-+++ b/drivers/mmc/host/sdhci-pltfm.c
-@@ -85,6 +85,7 @@ struct sdhci_host *sdhci_pltfm_init(struct platform_device *pdev,
- {
- 	struct sdhci_host *host;
- 	struct sdhci_pltfm_host *pltfm_host;
-+	struct device_node *np = pdev->dev.of_node;
- 	struct resource *iomem;
- 	int ret;
- 
-@@ -98,7 +99,7 @@ struct sdhci_host *sdhci_pltfm_init(struct platform_device *pdev,
- 		dev_err(&pdev->dev, "Invalid iomem size!\n");
- 
- 	/* Some PCI-based MFD need the parent here */
--	if (pdev->dev.parent != &platform_bus)
-+	if (pdev->dev.parent != &platform_bus && !np)
- 		host = sdhci_alloc_host(pdev->dev.parent, sizeof(*pltfm_host));
- 	else
- 		host = sdhci_alloc_host(&pdev->dev, sizeof(*pltfm_host));
--- 
-1.7.4.1
+Shawn Guo (4):
+      mmc: sdhci-esdhc-imx: do not reference platform data after probe
+      mmc: sdhci-esdhc-imx: get rid of the uses of cpu_is_mx()
+      mmc: sdhci-pltfm: dt device does not pass parent to sdhci_alloc_host
+      mmc: sdhci-esdhc-imx: add device tree probe support
+
+ .../devicetree/bindings/mmc/fsl-imx-esdhc.txt      |   34 +++++
+ arch/arm/mach-imx/clock-imx25.c                    |    4 +-
+ arch/arm/mach-imx/clock-imx35.c                    |    6 +-
+ arch/arm/mach-mx5/clock-mx51-mx53.c                |   16 +-
+ arch/arm/mach-mx5/mx51_efika.c                     |    4 +-
+ .../plat-mxc/devices/platform-sdhci-esdhc-imx.c    |   17 ++-
+ arch/arm/plat-mxc/include/mach/devices-common.h    |    1 +
+ drivers/mmc/host/sdhci-esdhc-imx.c                 |  151 +++++++++++++++++---
+ drivers/mmc/host/sdhci-pltfm.c                     |    3 +-
+ 9 files changed, 194 insertions(+), 42 deletions(-)
