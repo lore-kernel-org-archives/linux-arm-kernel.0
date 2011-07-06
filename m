@@ -1,31 +1,47 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 6 Jul 2011 22:23:01 +0200
-Subject: [Linaro-mm-sig] [PATCH 6/8] drivers: add Contiguous Memory
-	Allocator
-In-Reply-To: <alpine.LFD.2.00.1107061459520.14596@xanadu.home>
-References: <1309851710-3828-1-git-send-email-m.szyprowski@samsung.com>
-	<201107061831.59739.arnd@arndb.de>
-	<alpine.LFD.2.00.1107061459520.14596@xanadu.home>
-Message-ID: <201107062223.01940.arnd@arndb.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 6 Jul 2011 21:31:03 +0100
+Subject: [PATCH] ARM: DMA: Silence declared inside parameter list
+	warning for !CONFIG_MMU
+In-Reply-To: <1309767141.3964.1.camel@phoenix>
+References: <1309767141.3964.1.camel@phoenix>
+Message-ID: <20110706203103.GT8286@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 06 July 2011 21:10:07 Nicolas Pitre wrote:
-> If you get a highmem page, because the cache is VIPT, that page might 
-> still be cached even if it wasn't mapped.  With a VIVT cache we must 
-> flush the cache whenever a highmem page is unmapped.  There is no such 
-> restriction with VIPT i.e. ARMv6 and above.  Therefore to make sure the 
-> highmem page you get doesn't have cache lines associated to it, you must 
-> first map it cacheable, then perform cache invalidation on it, and 
-> eventually remap it as non-cacheable.  This is necessary because there 
-> is no way to perform cache maintenance on L1 cache using physical 
-> addresses unfortunately.  See commit 7e5a69e83b for an example of what 
-> this entails (fortunately commit 3e4d3af501 made things much easier and 
-> therefore commit 39af22a79 greatly simplified things).
+On Mon, Jul 04, 2011 at 04:12:21PM +0800, Axel Lin wrote:
+> Fix below warning, the struct dma_coherent_area takes no space if !CONFIG_MMU.
+> 
+>   CC      arch/arm/mm/dma-mapping.o
+> arch/arm/mm/dma-mapping.c:309: warning: 'struct dma_coherent_area' declared inside parameter list
+> arch/arm/mm/dma-mapping.c:309: warning: its scope is only this definition or declaration, which is probably not what you want
+> arch/arm/mm/dma-mapping.c:334: warning: 'struct dma_coherent_area' declared inside parameter list
+> arch/arm/mm/dma-mapping.c:374: warning: 'struct dma_coherent_area' declared inside parameter list
+> 
+> Signed-off-by: Axel Lin <axel.lin@gmail.com>
 
-Ok, thanks for the explanation. This definitely makes the highmem approach
-much harder to get right, and slower. Let's hope then that Marek's approach
-of using small pages for the contiguous memory region and changing their
-attributes on the fly works out better than this.
+Ok, can you put this in the patch system please?
 
-	Arnd
+Thanks.
+
+> ---
+>  arch/arm/mm/dma-mapping.c |    2 ++
+>  1 files changed, 2 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> index 8089499..da3b33a 100644
+> --- a/arch/arm/mm/dma-mapping.c
+> +++ b/arch/arm/mm/dma-mapping.c
+> @@ -297,6 +297,8 @@ static void dma_free_area(void *cpu_addr, size_t size, struct dma_coherent_area
+>  #define coherent_wc_area NULL
+>  #define coherent_dma_area NULL
+>  
+> +struct dma_coherent_area { };
+> +
+>  void dma_coherent_reserve(void)
+>  {
+>  }
+> -- 
+> 1.7.4.1
+> 
+> 
+> 
