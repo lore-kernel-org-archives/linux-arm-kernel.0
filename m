@@ -1,57 +1,54 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 05 Jul 2011 22:47:10 -0400
-Subject: [PATCH 25/52] ARM: mach-mv78xx0: convert boot_params to atag_offset
+Date: Tue, 05 Jul 2011 22:47:36 -0400
+Subject: [PATCH 51/52] ARM: mach-w90x900: remove useless boot_params entries
 In-Reply-To: <1309920457-21913-1-git-send-email-nicolas.pitre@linaro.org>
 References: <1309920457-21913-1-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <1309920457-21913-25-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <1309920457-21913-51-git-send-email-nicolas.pitre@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 ---
- arch/arm/mach-mv78xx0/buffalo-wxl-setup.c  |    2 +-
- arch/arm/mach-mv78xx0/db78x00-bp-setup.c   |    2 +-
- arch/arm/mach-mv78xx0/rd78x00-masa-setup.c |    2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/mach-w90x900/mach-nuc910evb.c |    1 -
+ arch/arm/mach-w90x900/mach-nuc950evb.c |    1 -
+ arch/arm/mach-w90x900/mach-nuc960evb.c |    1 -
+ 3 files changed, 0 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-mv78xx0/buffalo-wxl-setup.c b/arch/arm/mach-mv78xx0/buffalo-wxl-setup.c
-index 20f3f12..0e94268 100644
---- a/arch/arm/mach-mv78xx0/buffalo-wxl-setup.c
-+++ b/arch/arm/mach-mv78xx0/buffalo-wxl-setup.c
-@@ -145,7 +145,7 @@ subsys_initcall(wxl_pci_init);
+diff --git a/arch/arm/mach-w90x900/mach-nuc910evb.c b/arch/arm/mach-w90x900/mach-nuc910evb.c
+index 30fccde..31c1090 100644
+--- a/arch/arm/mach-w90x900/mach-nuc910evb.c
++++ b/arch/arm/mach-w90x900/mach-nuc910evb.c
+@@ -34,7 +34,6 @@ static void __init nuc910evb_init(void)
  
- MACHINE_START(TERASTATION_WXL, "Buffalo Nas WXL")
- 	/* Maintainer: Sebastien Requiem <sebastien@requiem.fr> */
--	.boot_params	= 0x00000100,
-+	.atag_offset	= 0x100,
- 	.init_machine	= wxl_init,
- 	.map_io		= mv78xx0_map_io,
- 	.init_early	= mv78xx0_init_early,
-diff --git a/arch/arm/mach-mv78xx0/db78x00-bp-setup.c b/arch/arm/mach-mv78xx0/db78x00-bp-setup.c
-index df5aebe..50b85ae 100644
---- a/arch/arm/mach-mv78xx0/db78x00-bp-setup.c
-+++ b/arch/arm/mach-mv78xx0/db78x00-bp-setup.c
-@@ -93,7 +93,7 @@ subsys_initcall(db78x00_pci_init);
+ MACHINE_START(W90P910EVB, "W90P910EVB")
+ 	/* Maintainer: Wan ZongShun */
+-	.boot_params	= 0,
+ 	.map_io		= nuc910evb_map_io,
+ 	.init_irq	= nuc900_init_irq,
+ 	.init_machine	= nuc910evb_init,
+diff --git a/arch/arm/mach-w90x900/mach-nuc950evb.c b/arch/arm/mach-w90x900/mach-nuc950evb.c
+index 590c99b..4062e55 100644
+--- a/arch/arm/mach-w90x900/mach-nuc950evb.c
++++ b/arch/arm/mach-w90x900/mach-nuc950evb.c
+@@ -37,7 +37,6 @@ static void __init nuc950evb_init(void)
  
- MACHINE_START(DB78X00_BP, "Marvell DB-78x00-BP Development Board")
- 	/* Maintainer: Lennert Buytenhek <buytenh@marvell.com> */
--	.boot_params	= 0x00000100,
-+	.atag_offset	= 0x100,
- 	.init_machine	= db78x00_init,
- 	.map_io		= mv78xx0_map_io,
- 	.init_early	= mv78xx0_init_early,
-diff --git a/arch/arm/mach-mv78xx0/rd78x00-masa-setup.c b/arch/arm/mach-mv78xx0/rd78x00-masa-setup.c
-index d927f14..e85222e 100644
---- a/arch/arm/mach-mv78xx0/rd78x00-masa-setup.c
-+++ b/arch/arm/mach-mv78xx0/rd78x00-masa-setup.c
-@@ -78,7 +78,7 @@ subsys_initcall(rd78x00_pci_init);
+ MACHINE_START(W90P950EVB, "W90P950EVB")
+ 	/* Maintainer: Wan ZongShun */
+-	.boot_params	= 0,
+ 	.map_io		= nuc950evb_map_io,
+ 	.init_irq	= nuc900_init_irq,
+ 	.init_machine	= nuc950evb_init,
+diff --git a/arch/arm/mach-w90x900/mach-nuc960evb.c b/arch/arm/mach-w90x900/mach-nuc960evb.c
+index e09c645..0ab9995 100644
+--- a/arch/arm/mach-w90x900/mach-nuc960evb.c
++++ b/arch/arm/mach-w90x900/mach-nuc960evb.c
+@@ -34,7 +34,6 @@ static void __init nuc960evb_init(void)
  
- MACHINE_START(RD78X00_MASA, "Marvell RD-78x00-MASA Development Board")
- 	/* Maintainer: Lennert Buytenhek <buytenh@marvell.com> */
--	.boot_params	= 0x00000100,
-+	.atag_offset	= 0x100,
- 	.init_machine	= rd78x00_masa_init,
- 	.map_io		= mv78xx0_map_io,
- 	.init_early	= mv78xx0_init_early,
+ MACHINE_START(W90N960EVB, "W90N960EVB")
+ 	/* Maintainer: Wan ZongShun */
+-	.boot_params	= 0,
+ 	.map_io		= nuc960evb_map_io,
+ 	.init_irq	= nuc900_init_irq,
+ 	.init_machine	= nuc960evb_init,
 -- 
 1.7.4
