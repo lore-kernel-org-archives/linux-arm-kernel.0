@@ -1,121 +1,33 @@
-From: avorontsov@mvista.com (Anton Vorontsov)
-Date: Wed, 6 Jul 2011 18:08:32 +0400
-Subject: [PATCH] ARM: cns3xxx: Add support for L2 Cache Controller
-Message-ID: <20110706140832.GA15946@oksana.dev.rtsoft.ru>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 6 Jul 2011 16:09:29 +0200
+Subject: [PATCH 6/8] drivers: add Contiguous Memory Allocator
+In-Reply-To: <006301cc3be4$daab1850$900148f0$%szyprowski@samsung.com>
+References: <1309851710-3828-1-git-send-email-m.szyprowski@samsung.com>
+	<20110705113345.GA8286@n2100.arm.linux.org.uk>
+	<006301cc3be4$daab1850$900148f0$%szyprowski@samsung.com>
+Message-ID: <201107061609.29996.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CNS3xxx SOCs have L310-compatible cache controller, so let's use it.
+On Wednesday 06 July 2011, Marek Szyprowski wrote:
+> The only problem that might need to be resolved is GFP_ATOMIC allocation
+> (updating page properties probably requires some locking), but it can be
+> served from a special area which is created on boot without low-memory
+> mapping at all. None sane driver will call dma_alloc_coherent(GFP_ATOMIC)
+> for large buffers anyway.
 
-With this patch benchmarking with 'gzip' shows that performance is
-doubled, and I'm still able to boot full-fledged userland over NFS
-(using PCIe NIC), so the support should be pretty robust.
+Would it be easier to start with a version that only allocated from memory
+without a low-memory mapping at first?
 
-Signed-off-by: Anton Vorontsov <avorontsov@mvista.com>
----
+This would be similar to the approach that Russell's fix for the regular
+dma_alloc_coherent has taken, except that you need to also allow the memory
+to be used as highmem user pages.
 
-I'm going to apply it to linux-cns3xxx.git tree and push it (via Arnd)
-for v3.1 , if there will be no complains, of course.
+Maybe you can simply adapt the default location of the contiguous memory
+are like this:
+- make CONFIG_CMA depend on CONFIG_HIGHMEM on ARM, at compile time
+- if ZONE_HIGHMEM exist during boot, put the CMA area in there
+- otherwise, put the CMA area at the top end of lowmem, and change
+  the zone sizes so ZONE_HIGHMEM stretches over all of the CMA memory.
 
-Thanks,
-
- arch/arm/mach-cns3xxx/cns3420vb.c |    2 +
- arch/arm/mach-cns3xxx/core.c      |   39 +++++++++++++++++++++++++++++++++++++
- arch/arm/mach-cns3xxx/core.h      |    1 +
- arch/arm/mm/Kconfig               |    2 +-
- 4 files changed, 43 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-cns3xxx/cns3420vb.c b/arch/arm/mach-cns3xxx/cns3420vb.c
-index 08e5c87..4b804ba 100644
---- a/arch/arm/mach-cns3xxx/cns3420vb.c
-+++ b/arch/arm/mach-cns3xxx/cns3420vb.c
-@@ -170,6 +170,8 @@ static struct platform_device *cns3420_pdevs[] __initdata = {
- 
- static void __init cns3420_init(void)
- {
-+	cns3xxx_l2x0_init();
-+
- 	platform_add_devices(cns3420_pdevs, ARRAY_SIZE(cns3420_pdevs));
- 
- 	cns3xxx_ahci_init();
-diff --git a/arch/arm/mach-cns3xxx/core.c b/arch/arm/mach-cns3xxx/core.c
-index da30078..49f3a51 100644
---- a/arch/arm/mach-cns3xxx/core.c
-+++ b/arch/arm/mach-cns3xxx/core.c
-@@ -16,6 +16,7 @@
- #include <asm/mach/time.h>
- #include <asm/mach/irq.h>
- #include <asm/hardware/gic.h>
-+#include <asm/hardware/cache-l2x0.h>
- #include <mach/cns3xxx.h>
- #include "core.h"
- 
-@@ -244,3 +245,41 @@ static void __init cns3xxx_timer_init(void)
- struct sys_timer cns3xxx_timer = {
- 	.init = cns3xxx_timer_init,
- };
-+
-+void __init cns3xxx_l2x0_init(void)
-+{
-+	void __iomem *base = ioremap(CNS3XXX_L2C_BASE, SZ_4K);
-+	u32 val;
-+
-+	if (WARN_ON(!base))
-+		return;
-+
-+	/*
-+	 * Tag RAM Control register
-+	 *
-+	 * bit[10:8]	- 1 cycle of write accesses latency
-+	 * bit[6:4]	- 1 cycle of read accesses latency
-+	 * bit[3:0]	- 1 cycle of setup latency
-+	 *
-+	 * 1 cycle of latency for setup, read and write accesses
-+	 */
-+	val = readl(base + L2X0_TAG_LATENCY_CTRL);
-+	val &= 0xfffff888;
-+	writel(val, base + L2X0_TAG_LATENCY_CTRL);
-+
-+	/*
-+	 * Data RAM Control register
-+	 *
-+	 * bit[10:8]	- 1 cycles of write accesses latency
-+	 * bit[6:4]	- 1 cycles of read accesses latency
-+	 * bit[3:0]	- 1 cycle of setup latency
-+	 *
-+	 * 1 cycle of setup latency, 2 cycles of read and write accesses latency
-+	 */
-+	val = readl(base + L2X0_DATA_LATENCY_CTRL);
-+	val &= 0xfffff888;
-+	writel(val, base + L2X0_DATA_LATENCY_CTRL);
-+
-+	/* 32 KiB, 8-way, parity disable */
-+	l2x0_init(base, 0x00540000, 0xfe000fff);
-+}
-diff --git a/arch/arm/mach-cns3xxx/core.h b/arch/arm/mach-cns3xxx/core.h
-index ffeb3a8..13635ca 100644
---- a/arch/arm/mach-cns3xxx/core.h
-+++ b/arch/arm/mach-cns3xxx/core.h
-@@ -14,6 +14,7 @@
- extern struct sys_timer cns3xxx_timer;
- 
- void __init cns3xxx_map_io(void);
-+void __init cns3xxx_l2x0_init(void);
- void __init cns3xxx_init_irq(void);
- void cns3xxx_power_off(void);
- 
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index 0074b8d..cb26d49 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -821,7 +821,7 @@ config CACHE_L2X0
- 	depends on REALVIEW_EB_ARM11MP || MACH_REALVIEW_PB11MP || MACH_REALVIEW_PB1176 || \
- 		   REALVIEW_EB_A9MP || SOC_IMX35 || SOC_IMX31 || MACH_REALVIEW_PBX || \
- 		   ARCH_NOMADIK || ARCH_OMAP4 || ARCH_EXYNOS4 || ARCH_TEGRA || \
--		   ARCH_U8500 || ARCH_VEXPRESS_CA9X4 || ARCH_SHMOBILE
-+		   ARCH_U8500 || ARCH_VEXPRESS_CA9X4 || ARCH_SHMOBILE || ARCH_CNS3XXX
- 	default y
- 	select OUTER_CACHE
- 	select OUTER_CACHE_SYNC
--- 
-1.7.5.3
+	Arnd
