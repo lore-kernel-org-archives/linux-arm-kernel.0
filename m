@@ -1,36 +1,49 @@
-From: greg@kroah.com (Greg KH)
-Date: Tue, 5 Jul 2011 19:45:25 -0700
-Subject: [stable] [PATCH v2] msm: timer: compensate for timer shift in
-	msm_read_timer_count
-In-Reply-To: <4E1362DD.7030001@codeaurora.org>
-References: <1308344138-2862-1-git-send-email-johlstei@codeaurora.org>
-	<20110620215922.GA21909@kroah.com>
-	<8ya7h8gozhn.fsf@huya.qualcomm.com>
-	<20110621162427.GA28836@kroah.com>
-	<4E1362DD.7030001@codeaurora.org>
-Message-ID: <20110706024525.GB24734@kroah.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 05 Jul 2011 22:46:46 -0400
+Subject: [PATCH 01/52] ARM: introduce atag_offset to replace boot_params
+Message-ID: <1309920457-21913-1-git-send-email-nicolas.pitre@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 05, 2011 at 12:15:41PM -0700, Jeff Ohlstein wrote:
-> Greg KH wrote:
-> > On Mon, Jun 20, 2011 at 04:27:16PM -0700, David Brown wrote:
-> >> I don't think this patch was intended for stable in the first place.
-> >> Jeff, this is a fix for 3.0-rcx, right?
-> > 
-> > Then why was it sent to stable at kernel.org?
-> > 
-> > confused,
-> > 
-> > greg k-h
-> > 
-> 
-> Sorry, this was indeed intended for stable. I will include the Cc: tag
-> in future patches stable. However, since this was already picked up in
-> Linus's tree, how should I proceed to get it into stable?
+The boot_params member of the mdesc structure is used to provide a
+default physical address for the ATAG list.  Since this value is fixed
+at compile time and often based on ARCH_PHYS_OFFSET, it gets in the way
+of runtime PHYS_OFFSET usage.
 
-Take a look at Documentation/stable_kernel_rules.txt for how to do this
-(hint, send the git commit id to stable at kernel.org and let us know what
-kernels you want it applied to.)
+Let's introduce atag_offset which should contains only the relative
+offset from start of memory instead of an absolute value, in preparation
+to move all instance of boot_params over to it.
 
-greg k-h
+Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+---
+ arch/arm/include/asm/mach/arch.h |    1 +
+ arch/arm/kernel/setup.c          |    2 ++
+ 2 files changed, 3 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
+index 7b79a00..1bdf6e1 100644
+--- a/arch/arm/include/asm/mach/arch.h
++++ b/arch/arm/include/asm/mach/arch.h
+@@ -18,6 +18,7 @@ struct machine_desc {
+ 	unsigned int		nr;		/* architecture number	*/
+ 	const char		*name;		/* architecture name	*/
+ 	unsigned long		boot_params;	/* tagged list		*/
++	unsigned long		atag_offset;	/* tagged list (relative) */
+ 	const char		**dt_compat;	/* array of device tree
+ 						 * 'compatible' strings	*/
+ 
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index e0db84d..4cc3e2b 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -816,6 +816,8 @@ static struct machine_desc * __init setup_machine_tags(unsigned int nr)
+ 
+ 	if (__atags_pointer)
+ 		tags = phys_to_virt(__atags_pointer);
++	else if(mdesc->atag_offset)
++		tags = PAGE_OFFSET + mdesc->atag_offset;
+ 	else if (mdesc->boot_params) {
+ #ifdef CONFIG_MMU
+ 		/*
+-- 
+1.7.4
