@@ -1,88 +1,832 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 6 Jul 2011 14:42:04 +0200
-Subject: [PATCH 1/3] ARM: CSR: Adding CSR SiRFprimaII board support
-In-Reply-To: <20110706122501.GU8286@n2100.arm.linux.org.uk>
-References: <1309945678-18813-1-git-send-email-bs14@csr.com>
-	<1309945678-18813-2-git-send-email-bs14@csr.com>
-	<20110706122501.GU8286@n2100.arm.linux.org.uk>
-Message-ID: <201107061442.05182.arnd@arndb.de>
+From: bryan.wu@canonical.com (Bryan Wu)
+Date: Wed,  6 Jul 2011 20:34:42 +0800
+Subject: [PATCH 12/17] mach-pxa: retire custom LED code
+In-Reply-To: <1309955687-19365-1-git-send-email-bryan.wu@canonical.com>
+References: <1309955687-19365-1-git-send-email-bryan.wu@canonical.com>
+Message-ID: <1309955687-19365-13-git-send-email-bryan.wu@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 06 July 2011, Russell King - ARM Linux wrote:
-> On Wed, Jul 06, 2011 at 02:47:56AM -0700, Barry Song wrote:
-> > diff --git a/arch/arm/mach-prima2/include/mach/io.h b/arch/arm/mach-
-> > +
-> > +#ifndef __MACH_PRIMA2_IO_H
-> > +#define __MACH_PRIMA2_IO_H
-> > +
-> > +#define IO_SPACE_LIMIT 0xffffffff
-> 
-> Can folk please start putting comments in their io.h file explaining their
-> choice for this definition?  Looking through the existing files, it is
-> almost impossible to infer the reason the value was picked, which makes
-> future maintanence a headache.
+Signed-off-by: Bryan Wu <bryan.wu@canonical.com>
+---
+ arch/arm/mach-pxa/Kconfig          |   17 +++++
+ arch/arm/mach-pxa/Makefile         |    8 --
+ arch/arm/mach-pxa/idp.c            |   76 ++++++++++++++++++++++
+ arch/arm/mach-pxa/leds-idp.c       |  116 ---------------------------------
+ arch/arm/mach-pxa/leds-lubbock.c   |  125 ------------------------------------
+ arch/arm/mach-pxa/leds-mainstone.c |  120 ----------------------------------
+ arch/arm/mach-pxa/leds.c           |   32 ---------
+ arch/arm/mach-pxa/leds.h           |   13 ----
+ arch/arm/mach-pxa/lubbock.c        |   90 ++++++++++++++++++++++++++
+ arch/arm/mach-pxa/mainstone.c      |   89 +++++++++++++++++++++++++
+ 10 files changed, 272 insertions(+), 414 deletions(-)
+ delete mode 100644 arch/arm/mach-pxa/leds-idp.c
+ delete mode 100644 arch/arm/mach-pxa/leds-lubbock.c
+ delete mode 100644 arch/arm/mach-pxa/leds-mainstone.c
+ delete mode 100644 arch/arm/mach-pxa/leds.c
+ delete mode 100644 arch/arm/mach-pxa/leds.h
 
-I had the same comment for one of the earlier versions of the patch
-set, but we agreed that I'd come up with a way to remove this at a
-later stage for all platforms that don't have PC-style PIO.
-
-Right now, the only platforms that use a value other than 0xffffffff
-are ones that actually have PCI and set it to 0xffff.
-
-> IO_SPACE_LIMIT sets the upper bound for the PCI/ISA style IO accessor
-> macros (inb, et.al.)
-> 
-> My guidance is:
-> 
-> 1. If you have no support for ISA/PCI/PC card drivers, then set this to
->    zero to prevent ISA/PCI drivers reserving IO port space.  You should
->    be able to leave __io() set to __typesafe_io() without risking any
->    ISA driver stamping on memory as those drivers should no longer
->    successfully initialize with this set to zero.
-> 
-> 2. If you have MMIO-mapped IO space (eg, a PCI bridge which forwards
->    MMIO accesses in a window to PCI IO space) or equivalent, then set
->    this to the size of the window, or 64K-1.  Explain this.
-> 
-> 3. If you have MMIO-mapped IO space which is scattered (eg, multiple
->    PC cards with their IO space individually mapped as separate 64K
->    blocks) then explain this and set it to 0xffffffff for the time
->    being.
-
-Sounds good.
-
-> I shall be making this change to asm/io.h shortly:
-> 
->  #include <mach/io.h>
-> 
-> +/*
-> + * This is the limit of PCI/ISA/PC card IO space, which is by default
-> + * 64K if we have PC card, PCI or ISA support.  Otherwise, default to
-> + * zero to prevent ISA/PCI drivers claiming IO space (and potentially
-> + * oopsing.)
-> + *
-> + * Only set this larger if you really need inb() et.al. to operate over
-> + * a larger address space (eg, for multiple MMIO-mapped PC card sockets
-> + * as found on SA11x0 and PXA.)
-> + */
-> +#ifndef IO_SPACE_LIMIT
-> +#if defined(CONFIG_PCI) || defined(CONFIG_ISA) || defined(CONFIG_PCCARD)
-> +#define IO_SPACE_LIMIT ((resource_size_t)0xffff)
-> +#else
-> +#define IO_SPACE_LIMIT ((resource_size_t)0)
-> +#endif
-> +#endif
-
-Good idea. The related change that I want to do is to conditionalize
-all drivers that require PC-style I/O on the respective bus they
-use, so we can also remove the __io macro for platforms that don't
-need it and catch all drivers using inb/outb at compile time.
-
-To do that, I'm working on a patch set that splits the 8250
-driver into separate parts for platform drivers (mostly MMIO)
-and ISA drivers (mostly PIO), since that seems to be the only
-driver that we need on non-PIO platforms that uses inb/outb
-directly.
-
-	Arnd
+diff --git a/arch/arm/mach-pxa/Kconfig b/arch/arm/mach-pxa/Kconfig
+index cd19309..111ade4 100644
+--- a/arch/arm/mach-pxa/Kconfig
++++ b/arch/arm/mach-pxa/Kconfig
+@@ -8,11 +8,23 @@ config ARCH_LUBBOCK
+ 	bool "Intel DBPXA250 Development Platform (aka Lubbock)"
+ 	select PXA25x
+ 	select SA1111
++	select NEW_LEDS
++	select LEDS_CLASS
++	select LEDS_TRIGGERS
++	select LEDS_TRIGGER_CPU
++	select LEDS_TRIGGER_HEARTBEAT
++	select LEDS_TRIGGER_DEFAULT_ON
+ 
+ config MACH_MAINSTONE
+ 	bool "Intel HCDDBBVA0 Development Platform (aka Mainstone)"
+ 	select PXA27x
+ 	select HAVE_PWM
++	select NEW_LEDS
++	select LEDS_CLASS
++	select LEDS_TRIGGERS
++	select LEDS_TRIGGER_CPU
++	select LEDS_TRIGGER_HEARTBEAT
++	select LEDS_TRIGGER_DEFAULT_ON
+ 
+ config MACH_ZYLONITE
+ 	bool
+@@ -59,6 +71,11 @@ comment "Third Party Dev Platforms (sorted by vendor name)"
+ config ARCH_PXA_IDP
+ 	bool "Accelent Xscale IDP"
+ 	select PXA25x
++	select NEW_LEDS
++	select LEDS_CLASS
++	select LEDS_TRIGGERS
++	select LEDS_TRIGGER_CPU
++	select LEDS_TRIGGER_HEARTBEAT
+ 
+ config ARCH_VIPER
+ 	bool "Arcom/Eurotech VIPER SBC"
+diff --git a/arch/arm/mach-pxa/Makefile b/arch/arm/mach-pxa/Makefile
+index cc39d17..2d42d23 100644
+--- a/arch/arm/mach-pxa/Makefile
++++ b/arch/arm/mach-pxa/Makefile
+@@ -95,12 +95,4 @@ obj-$(CONFIG_MACH_RAUMFELD_CONNECTOR)	+= raumfeld.o
+ obj-$(CONFIG_MACH_RAUMFELD_SPEAKER)	+= raumfeld.o
+ obj-$(CONFIG_MACH_ZIPIT2)	+= z2.o
+ 
+-# Support for blinky lights
+-led-y := leds.o
+-led-$(CONFIG_ARCH_LUBBOCK)	+= leds-lubbock.o
+-led-$(CONFIG_MACH_MAINSTONE)	+= leds-mainstone.o
+-led-$(CONFIG_ARCH_PXA_IDP)	+= leds-idp.o
+-
+-obj-$(CONFIG_LEDS)		+= $(led-y)
+-
+ obj-$(CONFIG_TOSA_BT)		+= tosa-bt.o
+diff --git a/arch/arm/mach-pxa/idp.c b/arch/arm/mach-pxa/idp.c
+index f7fb64f..105f4d2 100644
+--- a/arch/arm/mach-pxa/idp.c
++++ b/arch/arm/mach-pxa/idp.c
+@@ -191,6 +191,82 @@ static void __init idp_map_io(void)
+ 	iotable_init(idp_io_desc, ARRAY_SIZE(idp_io_desc));
+ }
+ 
++/* LEDs */
++struct idp_led {
++	struct led_classdev     cdev;
++	u8                      mask;
++};
++
++/*
++ * The triggers lines up below will only be used if the
++ * LED triggers are compiled in.
++ */
++static const struct {
++	const char *name;
++	const char *trigger;
++} idp_leds[] = {
++	{ "idp:green", "heartbeat", },
++	{ "idp:red", "cpu", },
++};
++
++static void idp_led_set(struct led_classdev *cdev,
++		enum led_brightness b)
++{
++	struct idp_led *led = container_of(cdev,
++			struct idp_led, cdev);
++	u32 reg = IDP_CPLD_LED_CONTROL;
++
++	if (b != LED_OFF)
++		reg &= ~led->mask;
++	else
++		reg |= led->mask;
++
++	IDP_CPLD_LED_CONTROL = reg;
++}
++
++static enum led_brightness idp_led_get(struct led_classdev *cdev)
++{
++	struct idp_led *led = container_of(cdev,
++			struct idp_led, cdev);
++
++	return (IDP_CPLD_LED_CONTROL & led->mask) ? LED_OFF : LED_FULL;
++}
++
++static int __init idp_leds_init(void)
++{
++	int i;
++
++	for (i = 0; i < ARRAY_SIZE(idp_leds); i++) {
++		struct idp_led *led;
++
++		led = kzalloc(sizeof(*led), GFP_KERNEL);
++		if (!led)
++			break;
++
++		led->cdev.name = idp_leds[i].name;
++		led->cdev.brightness_set = idp_led_set;
++		led->cdev.brightness_get = idp_led_get;
++		led->cdev.default_trigger = idp_leds[i].trigger;
++
++		if (i == 0)
++			led->mask = IDP_HB_LED;
++		else
++			led->mask = IDP_BUSY_LED;
++
++		if (led_classdev_register(NULL, &led->cdev) < 0) {
++			kfree(led);
++			break;
++		}
++	}
++
++	return 0;
++}
++
++/*
++ * Since we may have triggers on any subsystem, defer registration
++ * until after subsystem_init.
++ */
++fs_initcall(idp_leds_init);
+ 
+ MACHINE_START(PXA_IDP, "Vibren PXA255 IDP")
+ 	/* Maintainer: Vibren Technologies */
+diff --git a/arch/arm/mach-pxa/leds-idp.c b/arch/arm/mach-pxa/leds-idp.c
+deleted file mode 100644
+index 8b9c171..0000000
+--- a/arch/arm/mach-pxa/leds-idp.c
++++ /dev/null
+@@ -1,116 +0,0 @@
+-/*
+- * linux/arch/arm/mach-pxa/leds-idp.c
+- *
+- * Copyright (C) 2000 John Dorsey <john+@cs.cmu.edu>
+- *
+- * Copyright (c) 2001 Jeff Sutherland <jeffs@accelent.com>
+- *
+- * Original (leds-footbridge.c) by Russell King
+- *
+- * Macros for actual LED manipulation should be in machine specific
+- * files in this 'mach' directory.
+- */
+-
+-
+-#include <linux/init.h>
+-
+-#include <mach/hardware.h>
+-#include <asm/leds.h>
+-#include <asm/system.h>
+-
+-#include <mach/pxa25x.h>
+-#include <mach/idp.h>
+-
+-#include "leds.h"
+-
+-#define LED_STATE_ENABLED	1
+-#define LED_STATE_CLAIMED	2
+-
+-static unsigned int led_state;
+-static unsigned int hw_led_state;
+-
+-void idp_leds_event(led_event_t evt)
+-{
+-	unsigned long flags;
+-
+-	local_irq_save(flags);
+-
+-	switch (evt) {
+-	case led_start:
+-		hw_led_state = IDP_HB_LED | IDP_BUSY_LED;
+-		led_state = LED_STATE_ENABLED;
+-		break;
+-
+-	case led_stop:
+-		led_state &= ~LED_STATE_ENABLED;
+-		break;
+-
+-	case led_claim:
+-		led_state |= LED_STATE_CLAIMED;
+-		hw_led_state = IDP_HB_LED | IDP_BUSY_LED;
+-		break;
+-
+-	case led_release:
+-		led_state &= ~LED_STATE_CLAIMED;
+-		hw_led_state = IDP_HB_LED | IDP_BUSY_LED;
+-		break;
+-
+-#ifdef CONFIG_LEDS_TIMER
+-	case led_timer:
+-		if (!(led_state & LED_STATE_CLAIMED))
+-			hw_led_state ^= IDP_HB_LED;
+-		break;
+-#endif
+-
+-#ifdef CONFIG_LEDS_CPU
+-	case led_idle_start:
+-		if (!(led_state & LED_STATE_CLAIMED))
+-			hw_led_state &= ~IDP_BUSY_LED;
+-		break;
+-
+-	case led_idle_end:
+-		if (!(led_state & LED_STATE_CLAIMED))
+-			hw_led_state |= IDP_BUSY_LED;
+-		break;
+-#endif
+-
+-	case led_halted:
+-		break;
+-
+-	case led_green_on:
+-		if (led_state & LED_STATE_CLAIMED)
+-			hw_led_state |= IDP_HB_LED;
+-		break;
+-
+-	case led_green_off:
+-		if (led_state & LED_STATE_CLAIMED)
+-			hw_led_state &= ~IDP_HB_LED;
+-		break;
+-
+-	case led_amber_on:
+-		break;
+-
+-	case led_amber_off:
+-		break;
+-
+-	case led_red_on:
+-		if (led_state & LED_STATE_CLAIMED)
+-			hw_led_state |= IDP_BUSY_LED;
+-		break;
+-
+-	case led_red_off:
+-		if (led_state & LED_STATE_CLAIMED)
+-			hw_led_state &= ~IDP_BUSY_LED;
+-		break;
+-
+-	default:
+-		break;
+-	}
+-
+-	if  (led_state & LED_STATE_ENABLED)
+-		IDP_CPLD_LED_CONTROL = ( (IDP_CPLD_LED_CONTROL | IDP_LEDS_MASK) & ~hw_led_state);
+-	else
+-		IDP_CPLD_LED_CONTROL |= IDP_LEDS_MASK;
+-
+-	local_irq_restore(flags);
+-}
+diff --git a/arch/arm/mach-pxa/leds-lubbock.c b/arch/arm/mach-pxa/leds-lubbock.c
+deleted file mode 100644
+index e26d5ef..0000000
+--- a/arch/arm/mach-pxa/leds-lubbock.c
++++ /dev/null
+@@ -1,125 +0,0 @@
+-/*
+- * linux/arch/arm/mach-pxa/leds-lubbock.c
+- *
+- * Copyright (C) 2000 John Dorsey <john+@cs.cmu.edu>
+- *
+- * Copyright (c) 2001 Jeff Sutherland <jeffs@accelent.com>
+- *
+- * Original (leds-footbridge.c) by Russell King
+- *
+- * Major surgery on April 2004 by Nicolas Pitre for less global
+- * namespace collision.  Mostly adapted the Mainstone version.
+- */
+-
+-#include <linux/init.h>
+-
+-#include <mach/hardware.h>
+-#include <asm/leds.h>
+-#include <asm/system.h>
+-#include <mach/pxa25x.h>
+-#include <mach/lubbock.h>
+-
+-#include "leds.h"
+-
+-/*
+- * 8 discrete leds available for general use:
+- *
+- * Note: bits [15-8] are used to enable/blank the 8 7 segment hex displays
+- * so be sure to not monkey with them here.
+- */
+-
+-#define D28			(1 << 0)
+-#define D27			(1 << 1)
+-#define D26			(1 << 2)
+-#define D25			(1 << 3)
+-#define D24			(1 << 4)
+-#define D23			(1 << 5)
+-#define D22			(1 << 6)
+-#define D21			(1 << 7)
+-
+-#define LED_STATE_ENABLED	1
+-#define LED_STATE_CLAIMED	2
+-
+-static unsigned int led_state;
+-static unsigned int hw_led_state;
+-
+-void lubbock_leds_event(led_event_t evt)
+-{
+-	unsigned long flags;
+-
+-	local_irq_save(flags);
+-
+-	switch (evt) {
+-	case led_start:
+-		hw_led_state = 0;
+-		led_state = LED_STATE_ENABLED;
+-		break;
+-
+-	case led_stop:
+-		led_state &= ~LED_STATE_ENABLED;
+-		break;
+-
+-	case led_claim:
+-		led_state |= LED_STATE_CLAIMED;
+-		hw_led_state = 0;
+-		break;
+-
+-	case led_release:
+-		led_state &= ~LED_STATE_CLAIMED;
+-		hw_led_state = 0;
+-		break;
+-
+-#ifdef CONFIG_LEDS_TIMER
+-	case led_timer:
+-		hw_led_state ^= D26;
+-		break;
+-#endif
+-
+-#ifdef CONFIG_LEDS_CPU
+-	case led_idle_start:
+-		hw_led_state &= ~D27;
+-		break;
+-
+-	case led_idle_end:
+-		hw_led_state |= D27;
+-		break;
+-#endif
+-
+-	case led_halted:
+-		break;
+-
+-	case led_green_on:
+-		hw_led_state |= D21;
+-		break;
+-
+-	case led_green_off:
+-		hw_led_state &= ~D21;
+-		break;
+-
+-	case led_amber_on:
+-		hw_led_state |= D22;
+-		break;
+-
+-	case led_amber_off:
+-		hw_led_state &= ~D22;
+-		break;
+-
+-	case led_red_on:
+-		hw_led_state |= D23;
+-		break;
+-
+-	case led_red_off:
+-		hw_led_state &= ~D23;
+-		break;
+-
+-	default:
+-		break;
+-	}
+-
+-	if  (led_state & LED_STATE_ENABLED)
+-		LUB_DISC_BLNK_LED = (LUB_DISC_BLNK_LED | 0xff) & ~hw_led_state;
+-	else
+-		LUB_DISC_BLNK_LED |= 0xff;
+-
+-	local_irq_restore(flags);
+-}
+diff --git a/arch/arm/mach-pxa/leds-mainstone.c b/arch/arm/mach-pxa/leds-mainstone.c
+deleted file mode 100644
+index db4af5e..0000000
+--- a/arch/arm/mach-pxa/leds-mainstone.c
++++ /dev/null
+@@ -1,120 +0,0 @@
+-/*
+- * linux/arch/arm/mach-pxa/leds-mainstone.c
+- *
+- * Author:     Nicolas Pitre
+- * Created:    Nov 05, 2002
+- * Copyright:  MontaVista Software Inc.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
+-
+-#include <linux/init.h>
+-
+-#include <mach/hardware.h>
+-#include <asm/leds.h>
+-#include <asm/system.h>
+-
+-#include <mach/pxa27x.h>
+-#include <mach/mainstone.h>
+-
+-#include "leds.h"
+-
+-
+-/* 8 discrete leds available for general use: */
+-#define D28			(1 << 0)
+-#define D27			(1 << 1)
+-#define D26			(1 << 2)
+-#define D25			(1 << 3)
+-#define D24			(1 << 4)
+-#define D23			(1 << 5)
+-#define D22			(1 << 6)
+-#define D21			(1 << 7)
+-
+-#define LED_STATE_ENABLED	1
+-#define LED_STATE_CLAIMED	2
+-
+-static unsigned int led_state;
+-static unsigned int hw_led_state;
+-
+-void mainstone_leds_event(led_event_t evt)
+-{
+-	unsigned long flags;
+-
+-	local_irq_save(flags);
+-
+-	switch (evt) {
+-	case led_start:
+-		hw_led_state = 0;
+-		led_state = LED_STATE_ENABLED;
+-		break;
+-
+-	case led_stop:
+-		led_state &= ~LED_STATE_ENABLED;
+-		break;
+-
+-	case led_claim:
+-		led_state |= LED_STATE_CLAIMED;
+-		hw_led_state = 0;
+-		break;
+-
+-	case led_release:
+-		led_state &= ~LED_STATE_CLAIMED;
+-		hw_led_state = 0;
+-		break;
+-
+-#ifdef CONFIG_LEDS_TIMER
+-	case led_timer:
+-		hw_led_state ^= D26;
+-		break;
+-#endif
+-
+-#ifdef CONFIG_LEDS_CPU
+-	case led_idle_start:
+-		hw_led_state &= ~D27;
+-		break;
+-
+-	case led_idle_end:
+-		hw_led_state |= D27;
+-		break;
+-#endif
+-
+-	case led_halted:
+-		break;
+-
+-	case led_green_on:
+-		hw_led_state |= D21;
+-		break;
+-
+-	case led_green_off:
+-		hw_led_state &= ~D21;
+-		break;
+-
+-	case led_amber_on:
+-		hw_led_state |= D22;
+-		break;
+-
+-	case led_amber_off:
+-		hw_led_state &= ~D22;
+-		break;
+-
+-	case led_red_on:
+-		hw_led_state |= D23;
+-		break;
+-
+-	case led_red_off:
+-		hw_led_state &= ~D23;
+-		break;
+-
+-	default:
+-		break;
+-	}
+-
+-	if  (led_state & LED_STATE_ENABLED)
+-		MST_LEDCTRL = (MST_LEDCTRL | 0xff) & ~hw_led_state;
+-	else
+-		MST_LEDCTRL |= 0xff;
+-
+-	local_irq_restore(flags);
+-}
+diff --git a/arch/arm/mach-pxa/leds.c b/arch/arm/mach-pxa/leds.c
+deleted file mode 100644
+index bbe4d5f..0000000
+--- a/arch/arm/mach-pxa/leds.c
++++ /dev/null
+@@ -1,32 +0,0 @@
+-/*
+- * linux/arch/arm/mach-pxa/leds.c
+- *
+- * xscale LEDs dispatcher
+- *
+- * Copyright (C) 2001 Nicolas Pitre
+- *
+- * Copyright (c) 2001 Jeff Sutherland, Accelent Systems Inc.
+- */
+-#include <linux/compiler.h>
+-#include <linux/init.h>
+-
+-#include <asm/leds.h>
+-#include <asm/mach-types.h>
+-
+-#include "leds.h"
+-
+-static int __init
+-pxa_leds_init(void)
+-{
+-	if (machine_is_lubbock())
+-		leds_event = lubbock_leds_event;
+-	if (machine_is_mainstone())
+-		leds_event = mainstone_leds_event;
+-	if (machine_is_pxa_idp())
+-		leds_event = idp_leds_event;
+-
+-	leds_event(led_start);
+-	return 0;
+-}
+-
+-core_initcall(pxa_leds_init);
+diff --git a/arch/arm/mach-pxa/leds.h b/arch/arm/mach-pxa/leds.h
+deleted file mode 100644
+index 7f0dfe0..0000000
+--- a/arch/arm/mach-pxa/leds.h
++++ /dev/null
+@@ -1,13 +0,0 @@
+-/*
+- * arch/arm/mach-pxa/leds.h
+- *
+- * Copyright (c) 2001 Jeff Sutherland, Accelent Systems Inc.
+- *
+- * blinky lights for various PXA-based systems:
+- *
+- */
+-
+-extern void idp_leds_event(led_event_t evt);
+-extern void lubbock_leds_event(led_event_t evt);
+-extern void mainstone_leds_event(led_event_t evt);
+-extern void trizeps4_leds_event(led_event_t evt);
+diff --git a/arch/arm/mach-pxa/lubbock.c b/arch/arm/mach-pxa/lubbock.c
+index e10ddb8..3795a32 100644
+--- a/arch/arm/mach-pxa/lubbock.c
++++ b/arch/arm/mach-pxa/lubbock.c
+@@ -14,6 +14,7 @@
+ #include <linux/module.h>
+ #include <linux/kernel.h>
+ #include <linux/init.h>
++#include <linux/io.h>
+ #include <linux/platform_device.h>
+ #include <linux/syscore_ops.h>
+ #include <linux/major.h>
+@@ -22,6 +23,8 @@
+ #include <linux/mtd/mtd.h>
+ #include <linux/mtd/partitions.h>
+ #include <linux/smc91x.h>
++#include <linux/slab.h>
++#include <linux/leds.h>
+ 
+ #include <linux/spi/spi.h>
+ #include <linux/spi/ads7846.h>
+@@ -548,6 +551,93 @@ static void __init lubbock_map_io(void)
+ 	PCFR |= PCFR_OPDE;
+ }
+ 
++/*
++ * Driver for the 8 discrete LEDs available for general use:
++ * Note: bits [15-8] are used to enable/blank the 8 7 segment hex displays
++ * so be sure to not monkey with them here.
++ */
++
++struct lubbock_led {
++	struct led_classdev	cdev;
++	u8			mask;
++};
++
++/*
++ * The triggers lines up below will only be used if the
++ * LED triggers are compiled in.
++ */
++static const struct {
++	const char *name;
++	const char *trigger;
++} lubbock_leds[] = {
++	{ "lubbock:D28", "default-on", },
++	{ "lubbock:D27", "cpu", },
++	{ "lubbock:D26", "heartbeat" },
++	{ "lubbock:D25", },
++	{ "lubbock:D24", },
++	{ "lubbock:D23", },
++	{ "lubbock:D22", },
++	{ "lubbock:D21", },
++};
++
++static void lubbock_led_set(struct led_classdev *cdev,
++			      enum led_brightness b)
++{
++	struct lubbock_led *led = container_of(cdev,
++					 struct lubbock_led, cdev);
++	u32 reg = LUB_DISC_BLNK_LED;
++
++	if (b != LED_OFF)
++		reg |= led->mask;
++	else
++		reg &= ~led->mask;
++
++	LUB_DISC_BLNK_LED = reg;
++}
++
++static enum led_brightness lubbock_led_get(struct led_classdev *cdev)
++{
++	struct lubbock_led *led = container_of(cdev,
++					 struct lubbock_led, cdev);
++	u32 reg = LUB_DISC_BLNK_LED;
++
++	return (reg & led->mask) ? LED_FULL : LED_OFF;
++}
++
++static int __init lubbock_leds_init(void)
++{
++	int i;
++
++	/* All ON */
++	LUB_DISC_BLNK_LED |= 0xff;
++	for (i = 0; i < ARRAY_SIZE(lubbock_leds); i++) {
++		struct lubbock_led *led;
++
++		led = kzalloc(sizeof(*led), GFP_KERNEL);
++		if (!led)
++			break;
++
++		led->cdev.name = lubbock_leds[i].name;
++		led->cdev.brightness_set = lubbock_led_set;
++		led->cdev.brightness_get = lubbock_led_get;
++		led->cdev.default_trigger = lubbock_leds[i].trigger;
++		led->mask = BIT(i);
++
++		if (led_classdev_register(NULL, &led->cdev) < 0) {
++			kfree(led);
++			break;
++		}
++	}
++
++	return 0;
++}
++
++/*
++ * Since we may have triggers on any subsystem, defer registration
++ * until after subsystem_init.
++ */
++fs_initcall(lubbock_leds_init);
++
+ MACHINE_START(LUBBOCK, "Intel DBPXA250 Development Platform (aka Lubbock)")
+ 	/* Maintainer: MontaVista Software Inc. */
+ 	.map_io		= lubbock_map_io,
+diff --git a/arch/arm/mach-pxa/mainstone.c b/arch/arm/mach-pxa/mainstone.c
+index 3479e2b..437fdcf 100644
+--- a/arch/arm/mach-pxa/mainstone.c
++++ b/arch/arm/mach-pxa/mainstone.c
+@@ -28,6 +28,8 @@
+ #include <linux/pwm_backlight.h>
+ #include <linux/smc91x.h>
+ #include <linux/i2c/pxa-i2c.h>
++#include <linux/slab.h>
++#include <linux/leds.h>
+ 
+ #include <asm/types.h>
+ #include <asm/setup.h>
+@@ -614,6 +616,93 @@ static void __init mainstone_map_io(void)
+  	PCFR = 0x66;
+ }
+ 
++/*
++ * Driver for the 8 discrete LEDs available for general use:
++ * Note: bits [15-8] are used to enable/blank the 8 7 segment hex displays
++ * so be sure to not monkey with them here.
++ */
++
++struct mainstone_led {
++	struct led_classdev	cdev;
++	u8			mask;
++};
++
++/*
++ * The triggers lines up below will only be used if the
++ * LED triggers are compiled in.
++ */
++static const struct {
++	const char *name;
++	const char *trigger;
++} mainstone_leds[] = {
++	{ "mainstone:D28", "default-on", },
++	{ "mainstone:D27", "cpu", },
++	{ "mainstone:D26", "heartbeat" },
++	{ "mainstone:D25", },
++	{ "mainstone:D24", },
++	{ "mainstone:D23", },
++	{ "mainstone:D22", },
++	{ "mainstone:D21", },
++};
++
++static void mainstone_led_set(struct led_classdev *cdev,
++			      enum led_brightness b)
++{
++	struct mainstone_led *led = container_of(cdev,
++					 struct mainstone_led, cdev);
++	u32 reg = MST_LEDCTRL;
++
++	if (b != LED_OFF)
++		reg |= led->mask;
++	else
++		reg &= ~led->mask;
++
++	MST_LEDCTRL = reg;
++}
++
++static enum led_brightness mainstone_led_get(struct led_classdev *cdev)
++{
++	struct mainstone_led *led = container_of(cdev,
++					 struct mainstone_led, cdev);
++	u32 reg = MST_LEDCTRL;
++
++	return (reg & led->mask) ? LED_FULL : LED_OFF;
++}
++
++static int __init mainstone_leds_init(void)
++{
++	int i;
++
++	/* All ON */
++	MST_LEDCTRL |= 0xff;
++	for (i = 0; i < ARRAY_SIZE(mainstone_leds); i++) {
++		struct mainstone_led *led;
++
++		led = kzalloc(sizeof(*led), GFP_KERNEL);
++		if (!led)
++			break;
++
++		led->cdev.name = mainstone_leds[i].name;
++		led->cdev.brightness_set = mainstone_led_set;
++		led->cdev.brightness_get = mainstone_led_get;
++		led->cdev.default_trigger = mainstone_leds[i].trigger;
++		led->mask = BIT(i);
++
++		if (led_classdev_register(NULL, &led->cdev) < 0) {
++			kfree(led);
++			break;
++		}
++	}
++
++	return 0;
++}
++
++/*
++ * Since we may have triggers on any subsystem, defer registration
++ * until after subsystem_init.
++ */
++fs_initcall(mainstone_leds_init);
++
+ MACHINE_START(MAINSTONE, "Intel HCDDBBVA0 Development Platform (aka Mainstone)")
+ 	/* Maintainer: MontaVista Software Inc. */
+ 	.boot_params	= 0xa0000100,	/* BLOB boot parameter setting */
+-- 
+1.7.5
