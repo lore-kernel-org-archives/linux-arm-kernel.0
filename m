@@ -1,45 +1,36 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 5 Jul 2011 23:39:41 -0600
-Subject: [PATCH] i2c: tegra: Use engineering names in DT compatible
-	property
-In-Reply-To: <1309897306-22953-1-git-send-email-swarren@nvidia.com>
-References: <1309897306-22953-1-git-send-email-swarren@nvidia.com>
-Message-ID: <20110706053941.GE9978@ponder.secretlab.ca>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 6 Jul 2011 13:53:32 +0800
+Subject: [PATCH v2 1/2] serial/imx: get rid of the uses of cpu_is_mx1()
+In-Reply-To: <CACxGe6v+izZiANbzvhnTvrLU9+XgXD=W8FNGfTLzGXLNuCjZcg@mail.gmail.com>
+References: <1309878338-25697-1-git-send-email-shawn.guo@linaro.org>
+	<1309878338-25697-2-git-send-email-shawn.guo@linaro.org>
+	<CACxGe6v+izZiANbzvhnTvrLU9+XgXD=W8FNGfTLzGXLNuCjZcg@mail.gmail.com>
+Message-ID: <20110706055331.GD26324@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 05, 2011 at 02:21:46PM -0600, Stephen Warren wrote:
-> Engineering names are more stable than marketing names. Hence, use them
-> for Device Tree compatible properties instead.
+On Tue, Jul 05, 2011 at 11:27:55AM -0600, Grant Likely wrote:
+> On Tue, Jul 5, 2011 at 9:05 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> > The patch removes all the uses of cpu_is_mx1(). ?Instead, it uses
+> > the .id_table of platform_driver to distinguish the uart device type.
+> >
+> > A couple of !cpu_is_mx1() logic gets turned into IS_IMX_UART, as the
+> > codes wrapped there are really IMX specific.
+> >
+> > It also removes macro MX1_UCR3_REF25 and MX1_UCR3_REF30 which are
+> > not used anywhere.
+> >
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> > Cc: Alan Cox <alan@lxorguk.ukuu.org.uk>
 > 
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> ---
-> Grant, this is against devicetree/arm and also makes sense for
-> devicetree/test.
-
-Acked-by: Grant Likely <grant.likely@secretlab.ca>
-
-Ben is the one to pick up this patch.
-
-g.
-
+> Acked-by: Grant Likely <grant.likely@secretlab.ca>
 > 
->  drivers/i2c/busses/i2c-tegra.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
+> Who's tree is this one going to get merged through?
 > 
-> diff --git a/drivers/i2c/busses/i2c-tegra.c b/drivers/i2c/busses/i2c-tegra.c
-> index 8914bd1..99b1b6d 100644
-> --- a/drivers/i2c/busses/i2c-tegra.c
-> +++ b/drivers/i2c/busses/i2c-tegra.c
-> @@ -716,7 +716,7 @@ static int tegra_i2c_resume(struct platform_device *pdev)
->  #if defined(CONFIG_OF)
->  /* Match table for of_platform binding */
->  static const struct of_device_id tegra_i2c_of_match[] __devinitconst = {
-> -	{ .compatible = "nvidia,tegra250-i2c", },
-> +	{ .compatible = "nvidia,tegra20-i2c", },
->  	{},
->  };
->  MODULE_DEVICE_TABLE(of, tegra_i2c_of_match);
-> -- 
-> 1.7.0.4
-> 
+I think it will be easier to go Sascha's tree.  Alan, Sascha, what
+do you think?
+
+-- 
+Regards,
+Shawn
