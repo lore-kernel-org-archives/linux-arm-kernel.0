@@ -1,91 +1,102 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 06 Jul 2011 11:23:50 +0100
-Subject: [PATCH 3/7] ARM: vmlinux.lds: move discarded sections to beginning
+Date: Wed, 06 Jul 2011 11:24:10 +0100
+Subject: [PATCH 4/7] ARM: vmlinux.lds: rearrange .init output section
 In-Reply-To: <20110706102245.GO8286@n2100.arm.linux.org.uk>
 References: <20110706102245.GO8286@n2100.arm.linux.org.uk>
-Message-ID: <E1QePGo-0004zh-D2@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1QePH8-0004zl-Gf@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rather than scattering the discarded sections throughout the linker
-file, move them to the start.
+Keep the various linker tables as separate output sections rather
+than combining them together into one big .init section.  This
+makes the 'vmlinux' easier to see what is placed where.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/kernel/vmlinux.lds.S |   47 +++++++++++++++++++---------------------
- 1 files changed, 22 insertions(+), 25 deletions(-)
+ arch/arm/kernel/vmlinux.lds.S |   47 +++++++++++++++++++++++++---------------
+ 1 files changed, 29 insertions(+), 18 deletions(-)
 
 diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-index e5287f2..cb46a9b 100644
+index cb46a9b..c8bb9b7 100644
 --- a/arch/arm/kernel/vmlinux.lds.S
 +++ b/arch/arm/kernel/vmlinux.lds.S
-@@ -38,6 +38,28 @@ jiffies = jiffies_64 + 4;
- 
- SECTIONS
- {
-+	/*
-+	 * unwind exit sections must be discarded before the rest of the
-+	 * unwind sections get included.
-+	 */
-+	/DISCARD/ : {
-+		*(.ARM.exidx.exit.text)
-+		*(.ARM.extab.exit.text)
-+		ARM_CPU_DISCARD(*(.ARM.exidx.cpuexit.text))
-+		ARM_CPU_DISCARD(*(.ARM.extab.cpuexit.text))
-+#ifndef CONFIG_HOTPLUG
-+		*(.ARM.exidx.devexit.text)
-+		*(.ARM.extab.devexit.text)
-+#endif
-+#ifndef CONFIG_MMU
-+		*(.fixup)
-+		*(__ex_table)
-+#endif
-+#ifndef CONFIG_SMP_ON_UP
-+		*(.alt.smp.init)
-+#endif
-+	}
-+
- #ifdef CONFIG_XIP_KERNEL
- 	. = XIP_VIRT_ADDR(CONFIG_XIP_PHYS_ADDR);
+@@ -65,48 +65,59 @@ SECTIONS
  #else
-@@ -89,25 +111,6 @@ SECTIONS
+ 	. = PAGE_OFFSET + TEXT_OFFSET;
+ #endif
+-
+-	.init : {			/* Init code and data		*/
++	.head.text : {
+ 		_stext = .;
+-		_sinittext = .;
+-			HEAD_TEXT
+-			INIT_TEXT
+-			ARM_EXIT_KEEP(EXIT_TEXT)
+-		_einittext = .;
++		HEAD_TEXT
++	}
++	INIT_TEXT_SECTION(8)
++	.exit.text : {
++		ARM_EXIT_KEEP(EXIT_TEXT)
++	}
++	.init.proc.info : {
+ 		ARM_CPU_DISCARD(PROC_INFO)
++	}
++	.init.arch.info : {
+ 		__arch_info_begin = .;
+-			*(.arch.info.init)
++		*(.arch.info.init)
+ 		__arch_info_end = .;
++	}
++	.init.tagtable : {
+ 		__tagtable_begin = .;
+-			*(.taglist.init)
++		*(.taglist.init)
+ 		__tagtable_end = .;
++	}
+ #ifdef CONFIG_SMP_ON_UP
++	.init.smpalt : {
+ 		__smpalt_begin = .;
+-			*(.alt.smp.init)
++		*(.alt.smp.init)
+ 		__smpalt_end = .;
++	}
+ #endif
+-
++	.init.pv_table : {
+ 		__pv_table_begin = .;
+-			*(.pv_table)
++		*(.pv_table)
+ 		__pv_table_end = .;
+-
++	}
++	.init.data : {
++#ifndef CONFIG_XIP_KERNEL
++		INIT_DATA
++#endif
+ 		INIT_SETUP(16)
+-
+ 		INIT_CALLS
+ 		CON_INITCALL
+ 		SECURITY_INITCALL
+ 		INIT_RAM_FS
+-
++	}
+ #ifndef CONFIG_XIP_KERNEL
+-		__init_begin = _stext;
+-		INIT_DATA
++	.exit.data : {
+ 		ARM_EXIT_KEEP(EXIT_DATA)
+-#endif
+ 	}
++#endif
+ 
+ 	PERCPU_SECTION(32)
+ 
+ #ifndef CONFIG_XIP_KERNEL
++	__init_begin = _stext;
+ 	. = ALIGN(PAGE_SIZE);
  	__init_end = .;
  #endif
- 
--	/*
--	 * unwind exit sections must be discarded before the rest of the
--	 * unwind sections get included.
--	 */
--	/DISCARD/ : {
--		*(.ARM.exidx.exit.text)
--		*(.ARM.extab.exit.text)
--		ARM_CPU_DISCARD(*(.ARM.exidx.cpuexit.text))
--		ARM_CPU_DISCARD(*(.ARM.extab.cpuexit.text))
--#ifndef CONFIG_HOTPLUG
--		*(.ARM.exidx.devexit.text)
--		*(.ARM.extab.devexit.text)
--#endif
--#ifndef CONFIG_MMU
--		*(.fixup)
--		*(__ex_table)
--#endif
--	}
--
- 	.text : {			/* Real text segment		*/
- 		_text = .;		/* Text and read-only data	*/
- 			__exception_text_start = .;
-@@ -270,12 +273,6 @@ SECTIONS
- 
- 	/* Default discards */
- 	DISCARDS
--
--#ifndef CONFIG_SMP_ON_UP
--	/DISCARD/ : {
--		*(.alt.smp.init)
--	}
--#endif
- }
- 
- /*
 -- 
 1.7.4.4
