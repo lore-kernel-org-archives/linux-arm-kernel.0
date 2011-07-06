@@ -1,503 +1,279 @@
 From: bryan.wu@canonical.com (Bryan Wu)
-Date: Wed,  6 Jul 2011 20:34:32 +0800
-Subject: [PATCH 02/17] arm: at91: convert old leds drivers to gpio_led and
-	led_trigger drivers
+Date: Wed,  6 Jul 2011 20:34:33 +0800
+Subject: [PATCH 03/17] mach-realview: retire custom LED code
 In-Reply-To: <1309955687-19365-1-git-send-email-bryan.wu@canonical.com>
 References: <1309955687-19365-1-git-send-email-bryan.wu@canonical.com>
-Message-ID: <1309955687-19365-3-git-send-email-bryan.wu@canonical.com>
+Message-ID: <1309955687-19365-4-git-send-email-bryan.wu@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Build with at91 defconfigs successfully
+From: Linus Walleij <linus.walleij@linaro.org>
 
+This replaces the custom LED trigger code in mach-realview with
+some overarching platform code for the plat-versatile family that
+will lock down LEDs 2 thru 5 for CPU activity indication. The
+day we have 8 core ARM systems the plat-versatile code will have
+to become more elaborate.
+
+Tested on RealView PB11MPCore by invoking four different CPU
+hogs (yes > /dev/null&) and see the LEDs go on one at a time.
+They all go off as the hogs are killed. Tested on the PB1176
+as well - just one activity led (led 2) goes on and off with
+CPU activity.
+
+(bryan.wu at canonical.com: use ledtrig-cpu instead of ledtrig-arm-cpu)
+
+Cc: Richard Purdie <rpurdie@rpsys.net>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Bryan Wu <bryan.wu@canonical.com>
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Acked-by: Pawel Moll <pawel.moll@arm.com>
 ---
- arch/arm/mach-at91/board-cap9adk.c      |   21 ++++++-
- arch/arm/mach-at91/board-csb337.c       |    3 -
- arch/arm/mach-at91/board-ecbat91.c      |   18 +++++-
- arch/arm/mach-at91/board-eco920.c       |   23 ++++++-
- arch/arm/mach-at91/board-kafa.c         |   17 ++++-
- arch/arm/mach-at91/board-kb9202.c       |   23 ++++++-
- arch/arm/mach-at91/board-rm9200dk.c     |    3 -
- arch/arm/mach-at91/board-rm9200ek.c     |    3 -
- arch/arm/mach-at91/board-sam9-l9260.c   |   23 ++++++-
- arch/arm/mach-at91/board-sam9261ek.c    |    3 -
- arch/arm/mach-at91/board-yl-9200.c      |    3 -
- arch/arm/mach-at91/include/mach/board.h |    1 -
- arch/arm/mach-at91/leds.c               |  105 -------------------------------
- 13 files changed, 108 insertions(+), 138 deletions(-)
+ arch/arm/mach-realview/core.c            |   39 ------------------------------
+ arch/arm/mach-realview/core.h            |    2 -
+ arch/arm/mach-realview/realview_eb.c     |    4 ---
+ arch/arm/mach-realview/realview_pb1176.c |    4 ---
+ arch/arm/mach-realview/realview_pb11mp.c |    4 ---
+ arch/arm/mach-realview/realview_pba8.c   |    4 ---
+ arch/arm/mach-realview/realview_pbx.c    |    4 ---
+ arch/arm/plat-versatile/Kconfig          |    6 ++++-
+ arch/arm/plat-versatile/leds.c           |   13 +++++++---
+ 9 files changed, 14 insertions(+), 66 deletions(-)
 
-diff --git a/arch/arm/mach-at91/board-cap9adk.c b/arch/arm/mach-at91/board-cap9adk.c
-index cdb65d4..7a6a32b 100644
---- a/arch/arm/mach-at91/board-cap9adk.c
-+++ b/arch/arm/mach-at91/board-cap9adk.c
-@@ -55,8 +55,6 @@ static void __init cap9adk_init_early(void)
- 	/* Initialize processor: 12 MHz crystal */
- 	at91cap9_initialize(12000000);
- 
--	/* Setup the LEDs: USER1 and USER2 LED for cpu/timer... */
--	at91_init_leds(AT91_PIN_PA10, AT91_PIN_PA11);
- 	/* ... POWER LED always on */
- 	at91_set_gpio_output(AT91_PIN_PC29, 1);
- 
-@@ -365,6 +363,23 @@ static struct ac97c_platform_data cap9adk_ac97_data = {
- //	.reset_pin	= ... not connected
- };
- 
-+/*
-+ * LEDs
-+ */
-+static struct gpio_led cap9adk_leds[] = {
-+	{	/* D1 */
-+		.name			= "led1",
-+		.gpio			= AT91_PIN_PA10,
-+		.active_low		= 1,
-+		.default_trigger	= "heartbeat",
-+	},
-+	{	/* D2 */
-+		.name			= "led2",
-+		.gpio			= AT91_PIN_PA11,
-+		.active_low		= 1,
-+		.default_trigger	= "timer",
-+	}
-+};
- 
- static void __init cap9adk_board_init(void)
- {
-@@ -392,6 +407,8 @@ static void __init cap9adk_board_init(void)
- 	at91_add_device_lcdc(&cap9adk_lcdc_data);
- 	/* AC97 */
- 	at91_add_device_ac97(&cap9adk_ac97_data);
-+	/* LEDs */
-+	at91_gpio_leds(cap9adk_leds, ARRAY_SIZE(cap9adk_leds));
- }
- 
- MACHINE_START(AT91CAP9ADK, "Atmel AT91CAP9A-DK")
-diff --git a/arch/arm/mach-at91/board-csb337.c b/arch/arm/mach-at91/board-csb337.c
-index d98bcec..da3fb48 100644
---- a/arch/arm/mach-at91/board-csb337.c
-+++ b/arch/arm/mach-at91/board-csb337.c
-@@ -48,9 +48,6 @@ static void __init csb337_init_early(void)
- 	/* Initialize processor: 3.6864 MHz crystal */
- 	at91rm9200_initialize(3686400);
- 
--	/* Setup the LEDs */
--	at91_init_leds(AT91_PIN_PB0, AT91_PIN_PB1);
--
- 	/* DBGU on ttyS0 */
- 	at91_register_uart(0, 0, 0);
- 
-diff --git a/arch/arm/mach-at91/board-ecbat91.c b/arch/arm/mach-at91/board-ecbat91.c
-index a6f57fa..e82d024 100644
---- a/arch/arm/mach-at91/board-ecbat91.c
-+++ b/arch/arm/mach-at91/board-ecbat91.c
-@@ -51,9 +51,6 @@ static void __init ecb_at91init_early(void)
- 	/* Initialize processor: 18.432 MHz crystal */
- 	at91rm9200_initialize(18432000);
- 
--	/* Setup the LEDs */
--	at91_init_leds(AT91_PIN_PC7, AT91_PIN_PC7);
--
- 	/* DBGU on ttyS0. (Rx & Tx only) */
- 	at91_register_uart(0, 0, 0);
- 
-@@ -149,6 +146,18 @@ static struct spi_board_info __initdata ecb_at91spi_devices[] = {
- 	},
- };
- 
-+/*
-+ * LEDs
-+ */
-+static struct gpio_led ecb_leds[] = {
-+	{	/* D1 */
-+		.name			= "led1",
-+		.gpio			= AT91_PIN_PC7,
-+		.active_low		= 1,
-+		.default_trigger	= "heartbeat",
-+	}
-+};
-+
- static void __init ecb_at91board_init(void)
- {
- 	/* Serial */
-@@ -168,6 +177,9 @@ static void __init ecb_at91board_init(void)
- 
- 	/* SPI */
- 	at91_add_device_spi(ecb_at91spi_devices, ARRAY_SIZE(ecb_at91spi_devices));
-+
-+	/* LEDs */
-+	at91_gpio_leds(ecb_leds, ARRAY_SIZE(ecb_leds));
- }
- 
- MACHINE_START(ECBAT91, "emQbit's ECB_AT91")
-diff --git a/arch/arm/mach-at91/board-eco920.c b/arch/arm/mach-at91/board-eco920.c
-index bfc0062..60fd9e6 100644
---- a/arch/arm/mach-at91/board-eco920.c
-+++ b/arch/arm/mach-at91/board-eco920.c
-@@ -37,9 +37,6 @@ static void __init eco920_init_early(void)
- 
- 	at91rm9200_initialize(18432000);
- 
--	/* Setup the LEDs */
--	at91_init_leds(AT91_PIN_PB0, AT91_PIN_PB1);
--
- 	/* DBGU on ttyS0. (Rx & Tx only */
- 	at91_register_uart(0, 0, 0);
- 
-@@ -100,6 +97,24 @@ static struct spi_board_info eco920_spi_devices[] = {
- 	},
- };
- 
-+/*
-+ * LEDs
-+ */
-+static struct gpio_led eco920_leds[] = {
-+	{	/* D1 */
-+		.name			= "led1",
-+		.gpio			= AT91_PIN_PB0,
-+		.active_low		= 1,
-+		.default_trigger	= "heartbeat",
-+	},
-+	{	/* D2 */
-+		.name			= "led2",
-+		.gpio			= AT91_PIN_PB1,
-+		.active_low		= 1,
-+		.default_trigger	= "timer",
-+	}
-+};
-+
- static void __init eco920_board_init(void)
- {
- 	at91_add_device_serial();
-@@ -130,6 +145,8 @@ static void __init eco920_board_init(void)
- 	);
- 
- 	at91_add_device_spi(eco920_spi_devices, ARRAY_SIZE(eco920_spi_devices));
-+	/* LEDs */
-+	at91_gpio_leds(eco920_leds, ARRAY_SIZE(eco920_leds));
- }
- 
- MACHINE_START(ECO920, "eco920")
-diff --git a/arch/arm/mach-at91/board-kafa.c b/arch/arm/mach-at91/board-kafa.c
-index 9b003ff..5a46902 100644
---- a/arch/arm/mach-at91/board-kafa.c
-+++ b/arch/arm/mach-at91/board-kafa.c
-@@ -48,9 +48,6 @@ static void __init kafa_init_early(void)
- 	/* Initialize processor: 18.432 MHz crystal */
- 	at91rm9200_initialize(18432000);
- 
--	/* Set up the LEDs */
--	at91_init_leds(AT91_PIN_PB4, AT91_PIN_PB4);
--
- 	/* DBGU on ttyS0. (Rx & Tx only) */
- 	at91_register_uart(0, 0, 0);
- 
-@@ -80,6 +77,18 @@ static struct at91_udc_data __initdata kafa_udc_data = {
- 	.pullup_pin	= AT91_PIN_PB7,
- };
- 
-+/*
-+ * LEDs
-+ */
-+static struct gpio_led kafa_leds[] = {
-+	{	/* D1 */
-+		.name			= "led1",
-+		.gpio			= AT91_PIN_PB4,
-+		.active_low		= 1,
-+		.default_trigger	= "heartbeat",
-+	},
-+};
-+
- static void __init kafa_board_init(void)
- {
- 	/* Serial */
-@@ -94,6 +103,8 @@ static void __init kafa_board_init(void)
- 	at91_add_device_i2c(NULL, 0);
- 	/* SPI */
- 	at91_add_device_spi(NULL, 0);
-+	/* LEDs */
-+	at91_gpio_leds(kafa_leds, ARRAY_SIZE(kafa_leds));
- }
- 
- MACHINE_START(KAFA, "Sperry-Sun KAFA")
-diff --git a/arch/arm/mach-at91/board-kb9202.c b/arch/arm/mach-at91/board-kb9202.c
-index a813a74..1a62283 100644
---- a/arch/arm/mach-at91/board-kb9202.c
-+++ b/arch/arm/mach-at91/board-kb9202.c
-@@ -50,9 +50,6 @@ static void __init kb9202_init_early(void)
- 	/* Initialize processor: 10 MHz crystal */
- 	at91rm9200_initialize(10000000);
- 
--	/* Set up the LEDs */
--	at91_init_leds(AT91_PIN_PC19, AT91_PIN_PC18);
--
- 	/* DBGU on ttyS0. (Rx & Tx only) */
- 	at91_register_uart(0, 0, 0);
- 
-@@ -117,6 +114,24 @@ static struct atmel_nand_data __initdata kb9202_nand_data = {
- 	.partition_info	= nand_partitions,
- };
- 
-+/*
-+ * LEDs
-+ */
-+static struct gpio_led kb9202_leds[] = {
-+	{	/* D1 */
-+		.name			= "led1",
-+		.gpio			= AT91_PIN_PC19,
-+		.active_low		= 1,
-+		.default_trigger	= "heartbeat",
-+	},
-+	{	/* D2 */
-+		.name			= "led2",
-+		.gpio			= AT91_PIN_PC18,
-+		.active_low		= 1,
-+		.default_trigger	= "timer",
-+	}
-+};
-+
- static void __init kb9202_board_init(void)
- {
- 	/* Serial */
-@@ -135,6 +150,8 @@ static void __init kb9202_board_init(void)
- 	at91_add_device_spi(NULL, 0);
- 	/* NAND */
- 	at91_add_device_nand(&kb9202_nand_data);
-+	/* LEDs */
-+	at91_gpio_leds(kb9202_leds, ARRAY_SIZE(kb9202_leds));
- }
- 
- MACHINE_START(KB9200, "KB920x")
-diff --git a/arch/arm/mach-at91/board-rm9200dk.c b/arch/arm/mach-at91/board-rm9200dk.c
-index aef9627..029e487 100644
---- a/arch/arm/mach-at91/board-rm9200dk.c
-+++ b/arch/arm/mach-at91/board-rm9200dk.c
-@@ -50,9 +50,6 @@ static void __init dk_init_early(void)
- 	/* Initialize processor: 18.432 MHz crystal */
- 	at91rm9200_initialize(18432000);
- 
--	/* Setup the LEDs */
--	at91_init_leds(AT91_PIN_PB2, AT91_PIN_PB2);
--
- 	/* DBGU on ttyS0. (Rx & Tx only) */
- 	at91_register_uart(0, 0, 0);
- 
-diff --git a/arch/arm/mach-at91/board-rm9200ek.c b/arch/arm/mach-at91/board-rm9200ek.c
-index 015a021..0452f85 100644
---- a/arch/arm/mach-at91/board-rm9200ek.c
-+++ b/arch/arm/mach-at91/board-rm9200ek.c
-@@ -50,9 +50,6 @@ static void __init ek_init_early(void)
- 	/* Initialize processor: 18.432 MHz crystal */
- 	at91rm9200_initialize(18432000);
- 
--	/* Setup the LEDs */
--	at91_init_leds(AT91_PIN_PB1, AT91_PIN_PB2);
--
- 	/* DBGU on ttyS0. (Rx & Tx only) */
- 	at91_register_uart(0, 0, 0);
- 
-diff --git a/arch/arm/mach-at91/board-sam9-l9260.c b/arch/arm/mach-at91/board-sam9-l9260.c
-index aaf1bf0..a4c2de3 100644
---- a/arch/arm/mach-at91/board-sam9-l9260.c
-+++ b/arch/arm/mach-at91/board-sam9-l9260.c
-@@ -49,9 +49,6 @@ static void __init ek_init_early(void)
- 	/* Initialize processor: 18.432 MHz crystal */
- 	at91sam9260_initialize(18432000);
- 
--	/* Setup the LEDs */
--	at91_init_leds(AT91_PIN_PA9, AT91_PIN_PA6);
--
- 	/* DBGU on ttyS0. (Rx & Tx only) */
- 	at91_register_uart(0, 0, 0);
- 
-@@ -190,6 +187,24 @@ static struct at91_mmc_data __initdata ek_mmc_data = {
- //	.vcc_pin	= ... not connected
- };
- 
-+/*
-+ * LEDs
-+ */
-+static struct gpio_led ek_leds[] = {
-+	{	/* D1 */
-+		.name			= "led1",
-+		.gpio			= AT91_PIN_PA9,
-+		.active_low		= 1,
-+		.default_trigger	= "heartbeat",
-+	},
-+	{	/* D2 */
-+		.name			= "led2",
-+		.gpio			= AT91_PIN_PA6,
-+		.active_low		= 1,
-+		.default_trigger	= "timer",
-+	}
-+};
-+
- static void __init ek_board_init(void)
- {
- 	/* Serial */
-@@ -208,6 +223,8 @@ static void __init ek_board_init(void)
- 	at91_add_device_mmc(0, &ek_mmc_data);
- 	/* I2C */
- 	at91_add_device_i2c(NULL, 0);
-+	/* LEDs */
-+	at91_gpio_leds(ek_leds, ARRAY_SIZE(ek_leds));
- }
- 
- MACHINE_START(SAM9_L9260, "Olimex SAM9-L9260")
-diff --git a/arch/arm/mach-at91/board-sam9261ek.c b/arch/arm/mach-at91/board-sam9261ek.c
-index b60c22b..00cc106 100644
---- a/arch/arm/mach-at91/board-sam9261ek.c
-+++ b/arch/arm/mach-at91/board-sam9261ek.c
-@@ -59,9 +59,6 @@ static void __init ek_init_early(void)
- 	/* Initialize processor: 18.432 MHz crystal */
- 	at91sam9261_initialize(18432000);
- 
--	/* Setup the LEDs */
--	at91_init_leds(AT91_PIN_PA13, AT91_PIN_PA14);
--
- 	/* DBGU on ttyS0. (Rx & Tx only) */
- 	at91_register_uart(0, 0, 0);
- 
-diff --git a/arch/arm/mach-at91/board-yl-9200.c b/arch/arm/mach-at91/board-yl-9200.c
-index c208cc3..8a905a7 100644
---- a/arch/arm/mach-at91/board-yl-9200.c
-+++ b/arch/arm/mach-at91/board-yl-9200.c
-@@ -58,9 +58,6 @@ static void __init yl9200_init_early(void)
- 	/* Initialize processor: 18.432 MHz crystal */
- 	at91rm9200_initialize(18432000);
- 
--	/* Setup the LEDs D2=PB17 (timer), D3=PB16 (cpu) */
--	at91_init_leds(AT91_PIN_PB16, AT91_PIN_PB17);
--
- 	/* DBGU on ttyS0. (Rx & Tx only) */
- 	at91_register_uart(0, 0, 0);
- 
-diff --git a/arch/arm/mach-at91/include/mach/board.h b/arch/arm/mach-at91/include/mach/board.h
-index ed544a0..c2a7746 100644
---- a/arch/arm/mach-at91/include/mach/board.h
-+++ b/arch/arm/mach-at91/include/mach/board.h
-@@ -200,7 +200,6 @@ struct at91_can_data {
- extern void __init at91_add_device_can(struct at91_can_data *data);
- 
-  /* LEDs */
--extern void __init at91_init_leds(u8 cpu_led, u8 timer_led);
- extern void __init at91_gpio_leds(struct gpio_led *leds, int nr);
- extern void __init at91_pwm_leds(struct gpio_led *leds, int nr);
- 
-diff --git a/arch/arm/mach-at91/leds.c b/arch/arm/mach-at91/leds.c
-index 0415a839..844aef8 100644
---- a/arch/arm/mach-at91/leds.c
-+++ b/arch/arm/mach-at91/leds.c
-@@ -90,108 +90,3 @@ void __init at91_pwm_leds(struct gpio_led *leds, int nr)
- #else
- void __init at91_pwm_leds(struct gpio_led *leds, int nr){}
- #endif
--
--
--/* ------------------------------------------------------------------------- */
--
--#if defined(CONFIG_LEDS)
--
+diff --git a/arch/arm/mach-realview/core.c b/arch/arm/mach-realview/core.c
+index 5c23450..3a12b6b 100644
+--- a/arch/arm/mach-realview/core.c
++++ b/arch/arm/mach-realview/core.c
+@@ -36,7 +36,6 @@
+ #include <asm/system.h>
+ #include <mach/hardware.h>
+ #include <asm/irq.h>
 -#include <asm/leds.h>
+ #include <asm/mach-types.h>
+ #include <asm/hardware/arm_timer.h>
+ #include <asm/hardware/icst.h>
+@@ -437,44 +436,6 @@ struct clcd_board clcd_plat_data = {
+ 	.remove		= versatile_clcd_remove_dma,
+ };
+ 
+-#ifdef CONFIG_LEDS
+-#define VA_LEDS_BASE (__io_address(REALVIEW_SYS_BASE) + REALVIEW_SYS_LED_OFFSET)
 -
--/*
-- * Old ARM-specific LED framework; not fully functional when generic time is
-- * in use.
-- */
--
--static u8 at91_leds_cpu;
--static u8 at91_leds_timer;
--
--static inline void at91_led_on(unsigned int led)
--{
--	at91_set_gpio_value(led, 0);
--}
--
--static inline void at91_led_off(unsigned int led)
--{
--	at91_set_gpio_value(led, 1);
--}
--
--static inline void at91_led_toggle(unsigned int led)
--{
--	unsigned long is_off = at91_get_gpio_value(led);
--	if (is_off)
--		at91_led_on(led);
--	else
--		at91_led_off(led);
--}
--
--
--/*
-- * Handle LED events.
-- */
--static void at91_leds_event(led_event_t evt)
+-void realview_leds_event(led_event_t ledevt)
 -{
 -	unsigned long flags;
+-	u32 val;
+-	u32 led = 1 << smp_processor_id();
 -
 -	local_irq_save(flags);
+-	val = readl(VA_LEDS_BASE);
 -
--	switch(evt) {
--	case led_start:		/* System startup */
--		at91_led_on(at91_leds_cpu);
+-	switch (ledevt) {
+-	case led_idle_start:
+-		val = val & ~led;
 -		break;
 -
--	case led_stop:		/* System stop / suspend */
--		at91_led_off(at91_leds_cpu);
+-	case led_idle_end:
+-		val = val | led;
 -		break;
 -
--#ifdef CONFIG_LEDS_TIMER
--	case led_timer:		/* Every 50 timer ticks */
--		at91_led_toggle(at91_leds_timer);
--		break;
--#endif
--
--#ifdef CONFIG_LEDS_CPU
--	case led_idle_start:	/* Entering idle state */
--		at91_led_off(at91_leds_cpu);
+-	case led_timer:
+-		val = val ^ REALVIEW_SYS_LED7;
 -		break;
 -
--	case led_idle_end:	/* Exit idle state */
--		at91_led_on(at91_leds_cpu);
+-	case led_halted:
+-		val = 0;
 -		break;
--#endif
 -
 -	default:
 -		break;
 -	}
 -
+-	writel(val, VA_LEDS_BASE);
 -	local_irq_restore(flags);
 -}
+-#endif	/* CONFIG_LEDS */
 -
--
--static int __init leds_init(void)
--{
--	if (!at91_leds_timer || !at91_leds_cpu)
--		return -ENODEV;
--
--	leds_event = at91_leds_event;
--
--	leds_event(led_start);
--	return 0;
--}
--
--__initcall(leds_init);
--
--
--void __init at91_init_leds(u8 cpu_led, u8 timer_led)
--{
--	/* Enable GPIO to access the LEDs */
--	at91_set_gpio_output(cpu_led, 1);
--	at91_set_gpio_output(timer_led, 1);
--
--	at91_leds_cpu	= cpu_led;
--	at91_leds_timer	= timer_led;
--}
--
--#else
--void __init at91_init_leds(u8 cpu_led, u8 timer_led) {}
+ /*
+  * Where is the timer (VA)?
+  */
+diff --git a/arch/arm/mach-realview/core.h b/arch/arm/mach-realview/core.h
+index 5c83d1e..47ee3bc 100644
+--- a/arch/arm/mach-realview/core.h
++++ b/arch/arm/mach-realview/core.h
+@@ -26,7 +26,6 @@
+ #include <linux/io.h>
+ 
+ #include <asm/setup.h>
+-#include <asm/leds.h>
+ 
+ #define AMBA_DEVICE(name,busid,base,plat)			\
+ static struct amba_device name##_device = {			\
+@@ -57,7 +56,6 @@ extern void __iomem *timer1_va_base;
+ extern void __iomem *timer2_va_base;
+ extern void __iomem *timer3_va_base;
+ 
+-extern void realview_leds_event(led_event_t ledevt);
+ extern void realview_timer_init(unsigned int timer_irq);
+ extern int realview_flash_register(struct resource *res, u32 num);
+ extern int realview_eth_register(const char *name, struct resource *res);
+diff --git a/arch/arm/mach-realview/realview_eb.c b/arch/arm/mach-realview/realview_eb.c
+index 10e75fa..2fb438a 100644
+--- a/arch/arm/mach-realview/realview_eb.c
++++ b/arch/arm/mach-realview/realview_eb.c
+@@ -30,7 +30,6 @@
+ 
+ #include <mach/hardware.h>
+ #include <asm/irq.h>
+-#include <asm/leds.h>
+ #include <asm/mach-types.h>
+ #include <asm/pmu.h>
+ #include <asm/pgtable.h>
+@@ -455,9 +454,6 @@ static void __init realview_eb_init(void)
+ 		amba_device_register(d, &iomem_resource);
+ 	}
+ 
+-#ifdef CONFIG_LEDS
+-	leds_event = realview_leds_event;
 -#endif
+ 	realview_reset = realview_eb_reset;
+ }
+ 
+diff --git a/arch/arm/mach-realview/realview_pb1176.c b/arch/arm/mach-realview/realview_pb1176.c
+index eab6070..2e0350a 100644
+--- a/arch/arm/mach-realview/realview_pb1176.c
++++ b/arch/arm/mach-realview/realview_pb1176.c
+@@ -30,7 +30,6 @@
+ 
+ #include <mach/hardware.h>
+ #include <asm/irq.h>
+-#include <asm/leds.h>
+ #include <asm/mach-types.h>
+ #include <asm/pmu.h>
+ #include <asm/pgtable.h>
+@@ -350,9 +349,6 @@ static void __init realview_pb1176_init(void)
+ 		amba_device_register(d, &iomem_resource);
+ 	}
+ 
+-#ifdef CONFIG_LEDS
+-	leds_event = realview_leds_event;
+-#endif
+ 	realview_reset = realview_pb1176_reset;
+ }
+ 
+diff --git a/arch/arm/mach-realview/realview_pb11mp.c b/arch/arm/mach-realview/realview_pb11mp.c
+index b2985fc..9dd929a 100644
+--- a/arch/arm/mach-realview/realview_pb11mp.c
++++ b/arch/arm/mach-realview/realview_pb11mp.c
+@@ -30,7 +30,6 @@
+ 
+ #include <mach/hardware.h>
+ #include <asm/irq.h>
+-#include <asm/leds.h>
+ #include <asm/mach-types.h>
+ #include <asm/pmu.h>
+ #include <asm/pgtable.h>
+@@ -352,9 +351,6 @@ static void __init realview_pb11mp_init(void)
+ 		amba_device_register(d, &iomem_resource);
+ 	}
+ 
+-#ifdef CONFIG_LEDS
+-	leds_event = realview_leds_event;
+-#endif
+ 	realview_reset = realview_pb11mp_reset;
+ }
+ 
+diff --git a/arch/arm/mach-realview/realview_pba8.c b/arch/arm/mach-realview/realview_pba8.c
+index fb68665..d1bcd5f 100644
+--- a/arch/arm/mach-realview/realview_pba8.c
++++ b/arch/arm/mach-realview/realview_pba8.c
+@@ -29,7 +29,6 @@
+ #include <linux/io.h>
+ 
+ #include <asm/irq.h>
+-#include <asm/leds.h>
+ #include <asm/mach-types.h>
+ #include <asm/pmu.h>
+ #include <asm/pgtable.h>
+@@ -302,9 +301,6 @@ static void __init realview_pba8_init(void)
+ 		amba_device_register(d, &iomem_resource);
+ 	}
+ 
+-#ifdef CONFIG_LEDS
+-	leds_event = realview_leds_event;
+-#endif
+ 	realview_reset = realview_pba8_reset;
+ }
+ 
+diff --git a/arch/arm/mach-realview/realview_pbx.c b/arch/arm/mach-realview/realview_pbx.c
+index 92ace2c..797a509 100644
+--- a/arch/arm/mach-realview/realview_pbx.c
++++ b/arch/arm/mach-realview/realview_pbx.c
+@@ -28,7 +28,6 @@
+ #include <linux/io.h>
+ 
+ #include <asm/irq.h>
+-#include <asm/leds.h>
+ #include <asm/mach-types.h>
+ #include <asm/pmu.h>
+ #include <asm/smp_twd.h>
+@@ -385,9 +384,6 @@ static void __init realview_pbx_init(void)
+ 		amba_device_register(d, &iomem_resource);
+ 	}
+ 
+-#ifdef CONFIG_LEDS
+-	leds_event = realview_leds_event;
+-#endif
+ 	realview_reset = realview_pbx_reset;
+ }
+ 
+diff --git a/arch/arm/plat-versatile/Kconfig b/arch/arm/plat-versatile/Kconfig
+index 52353be..c600420 100644
+--- a/arch/arm/plat-versatile/Kconfig
++++ b/arch/arm/plat-versatile/Kconfig
+@@ -7,8 +7,12 @@ config PLAT_VERSATILE_FPGA_IRQ
+ 	bool
+ 
+ config PLAT_VERSATILE_LEDS
+-	def_bool y if LEDS_CLASS
++	def_bool y
+ 	depends on ARCH_REALVIEW || ARCH_VERSATILE
++	select NEW_LEDS
++	select LEDS_CLASS
++	select LEDS_TRIGGERS
++	select LEDS_TRIGGER_CPU
+ 
+ config PLAT_VERSATILE_SCHED_CLOCK
+ 	def_bool y if !ARCH_INTEGRATOR_AP
+diff --git a/arch/arm/plat-versatile/leds.c b/arch/arm/plat-versatile/leds.c
+index 3169fa5..a617a8f 100644
+--- a/arch/arm/plat-versatile/leds.c
++++ b/arch/arm/plat-versatile/leds.c
+@@ -37,10 +37,10 @@ static const struct {
+ } versatile_leds[] = {
+ 	{ "versatile:0", "heartbeat", },
+ 	{ "versatile:1", "mmc0", },
+-	{ "versatile:2", },
+-	{ "versatile:3", },
+-	{ "versatile:4", },
+-	{ "versatile:5", },
++	{ "versatile:2", "cpu" },
++	{ "versatile:3", "cpu" },
++	{ "versatile:4", "cpu" },
++	{ "versatile:5", "cpu" },
+ 	{ "versatile:6", },
+ 	{ "versatile:7", },
+ };
+@@ -85,6 +85,11 @@ static int __init versatile_leds_init(void)
+ 		led->cdev.brightness_set = versatile_led_set;
+ 		led->cdev.brightness_get = versatile_led_get;
+ 		led->cdev.default_trigger = versatile_leds[i].trigger;
++		/* Some trigger data for CPU LEDs */
++		if (i >= 2 && i <= 5) {
++			/* This is the CPU number actually */
++			led->cdev.trigger_data = (void *) i - 2;
++		}
+ 		led->mask = BIT(i);
+ 
+ 		if (led_classdev_register(NULL, &led->cdev) < 0) {
 -- 
 1.7.5
