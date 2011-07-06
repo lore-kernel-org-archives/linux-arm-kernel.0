@@ -1,58 +1,129 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 6 Jul 2011 00:30:27 -0600
-Subject: [PATCH 2/2] SPI: SAMSUNG: Bug fix for SPI with different FIFO
-	level
-In-Reply-To: <00c101cc3ba5$0b573910$2205ab30$%kim@samsung.com>
-References: <BANLkTik0LERxBHmJc5ZnRotnD4CSveR-UQ@mail.gmail.com>
-	<BANLkTim9wdrqDgXVUjxzMv9cdWViLww=Bg@mail.gmail.com>
-	<BANLkTim40x4X_--K0z7gdodDjor0MUam5Q@mail.gmail.com>
-	<BANLkTinf6ec1yXeaFkZjHMnqZp7yymDq-w@mail.gmail.com>
-	<20110704065501.GP15152@ponder.secretlab.ca>
-	<CACxGe6urrZ9=1OgcaYF6EtvJokAyFTbFCnHPWsCY+sETVze8-w@mail.gmail.com>
-	<005501cc3a30$6c916190$45b424b0$%kim@samsung.com>
-	<005601cc3a32$64bd5fd0$2e381f70$%kim@samsung.com>
-	<20110704150607.GA29977@ponder.secretlab.ca>
-	<00c101cc3ba5$0b573910$2205ab30$%kim@samsung.com>
-Message-ID: <20110706063027.GK9978@ponder.secretlab.ca>
+From: per.forlin@linaro.org (Per Forlin)
+Date: Wed,  6 Jul 2011 08:30:06 +0200
+Subject: [PATCH v5] mmc: documentation of mmc non-blocking request usage and
+	design.
+Message-ID: <1309933806-2346-1-git-send-email-per.forlin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 06, 2011 at 03:22:08PM +0900, Kukjin Kim wrote:
-> Kukjin Kim wrote:
-> > 
-> > Grant Likely wrote:
-> > >
-> > > On Mon, Jul 04, 2011 at 07:08:55PM +0900, Kukjin Kim wrote:
-> > > > Kukjin Kim wrote:
-> > > > >
-> > > > > Thanks Grant, Jassi and all,
-> > > > >
-> > > > > I will apply these 1 and 2 in my -fix tree for 3.0 with your acks.
-> > > > >
-> > > > Oops, this needs previous 'cleanup spi platform specific code' so
-> can't
-> > > > apply -fix tree now.
-> > >
-> > > There may also be conflicts with the heavy rework in the spi tree.
-> > > Kgene, when you pick up this series, can you put it into a separate
-> > > topic branch and merge that into your main tree?  That way if there
-> > > are difficult conflicts, then I can also merge that same topic branch
-> > > into spi/next to resolve them.
-> > >
-> > Hi Grant,
-> > 
-> > Sure, no problem. I'm waiting for Padmavathi's new patch which is based on
-> old
-> > code not new SPI code. When I merge topic branch for this into my tree,
-> let you
-> > know immediately. Then if any problems, let's talk again :)
-> 
-> Hi,
-> 
-> I made topic branch for this based on 3.0-rc6.
-> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> #for-spi
+Documentation about the background and the design of mmc non-blocking.
+Host driver guidelines to minimize request preparation overhead.
 
-Okay.  If there are problems, then I'll merge it.  Thanks.
+Signed-off-by: Per Forlin <per.forlin@linaro.org>
+Acked-by: Randy Dunlap <rdunlap@xenotime.net>
+---
+ChangeLog:
+ v2: - Minor updates after proofreading comments from Chris
+ v3: - Minor updates after more comments from Chris
+ v4: - Minor updates after comments from Randy
+ v5: - Fixed one more comment and Acked-by from Randy
 
-g.
+ Documentation/mmc/00-INDEX          |    2 +
+ Documentation/mmc/mmc-async-req.txt |   86 +++++++++++++++++++++++++++++++++++
+ 2 files changed, 88 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/mmc/mmc-async-req.txt
+
+diff --git a/Documentation/mmc/00-INDEX b/Documentation/mmc/00-INDEX
+index 93dd7a7..a9ba672 100644
+--- a/Documentation/mmc/00-INDEX
++++ b/Documentation/mmc/00-INDEX
+@@ -4,3 +4,5 @@ mmc-dev-attrs.txt
+         - info on SD and MMC device attributes
+ mmc-dev-parts.txt
+         - info on SD and MMC device partitions
++mmc-async-req.txt
++        - info on mmc asynchronous requests
+diff --git a/Documentation/mmc/mmc-async-req.txt b/Documentation/mmc/mmc-async-req.txt
+new file mode 100644
+index 0000000..b7a52ea
+--- /dev/null
++++ b/Documentation/mmc/mmc-async-req.txt
+@@ -0,0 +1,86 @@
++Rationale
++=========
++
++How significant is the cache maintenance overhead?
++It depends. Fast eMMC and multiple cache levels with speculative cache
++pre-fetch makes the cache overhead relatively significant. If the DMA
++preparations for the next request are done in parallel with the current
++transfer, the DMA preparation overhead would not affect the MMC performance.
++The intention of non-blocking (asynchronous) MMC requests is to minimize the
++time between when an MMC request ends and another MMC request begins.
++Using mmc_wait_for_req(), the MMC controller is idle while dma_map_sg and
++dma_unmap_sg are processing. Using non-blocking MMC requests makes it
++possible to prepare the caches for next job in parallel with an active
++MMC request.
++
++MMC block driver
++================
++
++The issue_rw_rq() in the MMC block driver is made non-blocking.
++The increase in throughput is proportional to the time it takes to
++prepare (major part of preparations are dma_map_sg and dma_unmap_sg)
++a request and how fast the memory is. The faster the MMC/SD is
++the more significant the prepare request time becomes. Roughly the expected
++performance gain is 5% for large writes and 10% on large reads on a L2 cache
++platform. In power save mode, when clocks run on a lower frequency, the DMA
++preparation may cost even more. As long as these slower preparations are run
++in parallel with the transfer performance won't be affected.
++
++Details on measurements from IOZone and mmc_test
++================================================
++
++https://wiki.linaro.org/WorkingGroups/Kernel/Specs/StoragePerfMMC-async-req
++
++MMC core API extension
++======================
++
++There is one new public function mmc_start_req().
++It starts a new MMC command request for a host. The function isn't
++truly non-blocking. If there is on ongoing async request it waits
++for completion of that request and starts the new one and returns. It
++doesn't wait for the new request to complete. If there is no ongoing
++request it starts the new request and returns immediately.
++
++MMC host extensions
++===================
++
++There are two optional hooks -- pre_req() and post_req() -- that the host
++driver may implement in order to move work to before and after the actual
++mmc_request function is called. In the DMA case pre_req() may do
++dma_map_sg() and prepare the DMA descriptor, and post_req runs
++the dma_unmap_sg.
++
++Optimize for the first request
++==============================
++
++The first request in a series of requests can't be prepared in parallel with
++the previous transfer, since there is no previous request.
++The argument is_first_req in pre_req() indicates that there is no previous
++request. The host driver may optimize for this scenario to minimize
++the performance loss. A way to optimize for this is to split the current
++request in two chunks, prepare the first chunk and start the request,
++and finally prepare the second chunk and start the transfer.
++
++Pseudocode to handle is_first_req scenario with minimal prepare overhead:
++if (is_first_req && req->size > threshold)
++   /* start MMC transfer for the complete transfer size */
++   mmc_start_command(MMC_CMD_TRANSFER_FULL_SIZE);
++
++   /*
++    * Begin to prepare DMA while cmd is being processed by MMC.
++    * The first chunk of the request should take the same time
++    * to prepare as the "MMC process command time".
++    * If prepare time exceeds MMC cmd time
++    * the transfer is delayed, guesstimate max 4k as first chunk size.
++    */
++    prepare_1st_chunk_for_dma(req);
++    /* flush pending desc to the DMAC (dmaengine.h) */
++    dma_issue_pending(req->dma_desc);
++
++    prepare_2nd_chunk_for_dma(req);
++    /*
++     * The second issue_pending should be called before MMC runs out
++     * of the first chunk. If the MMC runs out of the first data chunk
++     * before this call, the transfer is delayed.
++     */
++    dma_issue_pending(req->dma_desc);
+-- 
+1.7.4.1
