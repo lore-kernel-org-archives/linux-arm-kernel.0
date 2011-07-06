@@ -1,55 +1,62 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 05 Jul 2011 23:30:17 -0400
-Subject: [PATCH 33/37] ARM: mach-shark: remove mach/memory.h
+Date: Tue, 05 Jul 2011 23:30:05 -0400
+Subject: [PATCH 21/37] ARM: mach-lpc32xx: remove mach/memory.h
 In-Reply-To: <1309923021-23487-1-git-send-email-nicolas.pitre@linaro.org>
 References: <1309923021-23487-1-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <1309923021-23487-33-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <1309923021-23487-21-git-send-email-nicolas.pitre@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 ---
- arch/arm/Kconfig                          |    1 +
- arch/arm/mach-shark/include/mach/memory.h |   20 --------------------
- 2 files changed, 1 insertions(+), 20 deletions(-)
- delete mode 100644 arch/arm/mach-shark/include/mach/memory.h
+ arch/arm/Kconfig                            |    1 +
+ arch/arm/mach-lpc32xx/include/mach/memory.h |   27 ---------------------------
+ 2 files changed, 1 insertions(+), 27 deletions(-)
+ delete mode 100644 arch/arm/mach-lpc32xx/include/mach/memory.h
 
 diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index d6b8c92..8e0763b 100644
+index 95396dc..cecbc51 100644
 --- a/arch/arm/Kconfig
 +++ b/arch/arm/Kconfig
-@@ -820,6 +820,7 @@ config ARCH_SHARK
- 	select ZONE_DMA
- 	select PCI
- 	select ARCH_USES_GETTIMEOFFSET
+@@ -532,6 +532,7 @@ config ARCH_LPC32XX
+ 	select CLKDEV_LOOKUP
+ 	select GENERIC_TIME
+ 	select GENERIC_CLOCKEVENTS
 +	select NO_MACH_MEMORY_H
  	help
- 	  Support for the StrongARM based Digital DNARD machine, also known
- 	  as "Shark" (<http://www.shark-linux.de/shark.html>).
-diff --git a/arch/arm/mach-shark/include/mach/memory.h b/arch/arm/mach-shark/include/mach/memory.h
+ 	  Support for the NXP LPC32XX family of processors
+ 
+diff --git a/arch/arm/mach-lpc32xx/include/mach/memory.h b/arch/arm/mach-lpc32xx/include/mach/memory.h
 deleted file mode 100644
-index e19df6f..0000000
---- a/arch/arm/mach-shark/include/mach/memory.h
+index a647dd6..0000000
+--- a/arch/arm/mach-lpc32xx/include/mach/memory.h
 +++ /dev/null
-@@ -1,20 +0,0 @@
+@@ -1,27 +0,0 @@
 -/*
-- * arch/arm/mach-shark/include/mach/memory.h
+- * arch/arm/mach-lpc32xx/include/mach/memory.h
 - *
-- * by Alexander Schulz
+- * Author: Kevin Wells <kevin.wells@nxp.com>
 - *
-- * derived from:
-- * arch/arm/mach-ebsa110/include/mach/memory.h
-- * Copyright (c) 1996-1999 Russell King.
+- * Copyright (C) 2010 NXP Semiconductors
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
 - */
+-
 -#ifndef __ASM_ARCH_MEMORY_H
 -#define __ASM_ARCH_MEMORY_H
 -
--#include <asm/sizes.h>
--
 -/*
-- * Physical DRAM offset.
+- * Physical DRAM offset of bank 0
 - */
--#define PLAT_PHYS_OFFSET     UL(0x08000000)
+-#define PLAT_PHYS_OFFSET	UL(0x80000000)
 -
 -#endif
 -- 
