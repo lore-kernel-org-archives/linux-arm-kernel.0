@@ -1,54 +1,48 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 5 Jul 2011 23:38:59 -0600
-Subject: [PATCH] spi/tegra: Use engineering names in DT compatible property
-In-Reply-To: <1309897082-22695-1-git-send-email-swarren@nvidia.com>
-References: <1309897082-22695-1-git-send-email-swarren@nvidia.com>
-Message-ID: <20110706053859.GD9978@ponder.secretlab.ca>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 6 Jul 2011 13:46:16 +0800
+Subject: [PATCH v8 00/14] Consolidating GIC per-cpu interrupts
+In-Reply-To: <1309855755-6261-1-git-send-email-marc.zyngier@arm.com>
+References: <1309855755-6261-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20110706054615.GC26324@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 05, 2011 at 02:18:02PM -0600, Stephen Warren wrote:
-> Engineering names are more stable than marketing names. Hence, use them
-> for Device Tree compatible properties instead.
+On Tue, Jul 05, 2011 at 09:49:01AM +0100, Marc Zyngier wrote:
+> The current GIC per-cpu interrupts (aka PPIs) suffer from a number of
+> problems:
 > 
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> ---
-> Grant, this is against devicetree/arm, and also makes sense for
-> devicetree/test.
+> - They use a completely separate scheme to handle the interrupts,
+>   mostly because the PPI concept doesn't really match the kernel view
+>   of an interrupt.
+> - PPIs can only be used by the timer code, unless we add more low-level
+>   assembly code.
+> - The local timer code can only be used by devices generating PPIs,
+>   and not SPIs.
+> - At least one platform (msm) has started implementing its own
+>   alternative scheme.
+> - Some low-level code gets duplicated, as usual...
+> 
+> The proposed solution is to let the GIC code expose the PPIs as
+> something that the kernel can manage. Instead of having a single
+> interrupt number shared on all cores, make the interrupt number be
+> different on each CPU.
+> 
+> This enables the use of the normal kernel API (request_irq() and
+> friends) and the elimination of some low level code. It also serves as
+> the basis of the GIC device tree support code. On the other side, it
+> causes quite a bit of churn in the timer code.
+> 
+> Previous versions of this series have received ACKs from some platform
+> maintainers, but so far there has been very little comment on the core
+> code. As I now have quite a large number of patches relying on this
+> series (local timers as devices, device tree support for GIC and TWD),
+> I'd be grateful for at least a hint indicating that this is going in
+> the right direction. Or not.
+> 
+I'm about to start mainlining Freescale i.MX6 core code.  It will be
+wonderful if these great consolidation works could hit v3.1 merge
+window, so that I can base i.MX6 off them in the next cycle.
 
-Applied to spi/next, thanks.
-
-g.
-
-> 
->  .../devicetree/bindings/spi/spi_nvidia.txt         |    2 +-
->  drivers/spi/spi_tegra.c                            |    2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/spi/spi_nvidia.txt b/Documentation/devicetree/bindings/spi/spi_nvidia.txt
-> index bde450b..6b9e518 100644
-> --- a/Documentation/devicetree/bindings/spi/spi_nvidia.txt
-> +++ b/Documentation/devicetree/bindings/spi/spi_nvidia.txt
-> @@ -1,5 +1,5 @@
->  NVIDIA Tegra 2 SPI device
->  
->  Required properties:
-> -- compatible : should be "nvidia,tegra250-spi".
-> +- compatible : should be "nvidia,tegra20-spi".
->  - gpios : should specify GPIOs used for chipselect.
-> diff --git a/drivers/spi/spi_tegra.c b/drivers/spi/spi_tegra.c
-> index 1e7de98..b0e3586 100644
-> --- a/drivers/spi/spi_tegra.c
-> +++ b/drivers/spi/spi_tegra.c
-> @@ -598,7 +598,7 @@ MODULE_ALIAS("platform:spi_tegra");
->  
->  #ifdef CONFIG_OF
->  static struct of_device_id spi_tegra_of_match_table[] __devinitdata = {
-> -	{ .compatible = "nvidia,tegra250-spi", },
-> +	{ .compatible = "nvidia,tegra20-spi", },
->  	{}
->  };
->  MODULE_DEVICE_TABLE(of, spi_tegra_of_match_table);
-> -- 
-> 1.7.0.4
-> 
+-- 
+Regards,
+Shawn
