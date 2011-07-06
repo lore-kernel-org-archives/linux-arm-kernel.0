@@ -1,62 +1,39 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 6 Jul 2011 16:55:25 +0100
-Subject: Unnecessary cache-line flush on page table updates ?
-In-Reply-To: <20110706155214.GG32020@e102109-lin.cambridge.arm.com>
-References: <20110701101019.GA1723@e102109-lin.cambridge.arm.com>
-	<BANLkTi=KVnzBKcd83c9T3P20VAv-ggqR4g@mail.gmail.com>
-	<20110704094531.GB19117@e102109-lin.cambridge.arm.com>
-	<20110704100221.GB8286@n2100.arm.linux.org.uk>
-	<20110704104329.GD19117@e102109-lin.cambridge.arm.com>
-	<20110704111338.GD8286@n2100.arm.linux.org.uk>
-	<20110704215507.GH8286@n2100.arm.linux.org.uk>
-	<20110705092600.GB25956@e102109-lin.cambridge.arm.com>
-	<20110705094652.GQ8286@n2100.arm.linux.org.uk>
-	<20110706155214.GG32020@e102109-lin.cambridge.arm.com>
-Message-ID: <20110706155525.GH8286@n2100.arm.linux.org.uk>
+From: cl@linux.com (Christoph Lameter)
+Date: Wed, 6 Jul 2011 11:05:00 -0500 (CDT)
+Subject: [PATCH 6/8] drivers: add Contiguous Memory Allocator
+In-Reply-To: <20110706154857.GG8286@n2100.arm.linux.org.uk>
+References: <1309851710-3828-1-git-send-email-m.szyprowski@samsung.com>
+	<201107061609.29996.arnd@arndb.de>
+	<20110706142345.GC8286@n2100.arm.linux.org.uk>
+	<201107061651.49824.arnd@arndb.de>
+	<20110706154857.GG8286@n2100.arm.linux.org.uk>
+Message-ID: <alpine.DEB.2.00.1107061100290.17624@router.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 06, 2011 at 04:52:14PM +0100, Catalin Marinas wrote:
-> On Tue, Jul 05, 2011 at 10:46:52AM +0100, Russell King - ARM Linux wrote:
-> > On Tue, Jul 05, 2011 at 10:26:00AM +0100, Catalin Marinas wrote:
-> > > On Mon, Jul 04, 2011 at 10:55:07PM +0100, Russell King - ARM Linux wrote:
-> > > > On Mon, Jul 04, 2011 at 12:13:38PM +0100, Russell King - ARM Linux wrote:
-> > > > > As far as the BTB goes, I wonder if we can postpone that for user TLB
-> > > > > ops by setting a TIF_ flag and checking that before returning to userspace.
-> > > > > That would avoid having to needlessly destroy the cached branch information
-> > > > > for kernel space while looping over the page tables.  The only other place
-> > > > > that needs to worry about that is module_alloc() and vmap/vmalloc with
-> > > > > PROT_KERNEL_EXEC, all of which can be done in flush_cache_vmap().
-> > > > 
-> > > > Actually, we don't need to do BTC invalidate in flush_cache_vmap(),
-> > > > but we do need to do a dsb+isb.
-> > > 
-> > > Why would we need an ISB?
-> > 
-> > Because the ARM ARM tells us that we must do a dsb+isb to ensure that
-> > instructions are visible to the instruction stream after a change to
-> > the page tables.
-> > 
-> > I've since added the dsb+isbs back to the TLB ops because the ARM ARM
-> > is qutie explicit that both are required to ensure that explicit
-> > accesses see the effect of the TLB operation.  To me it is rather
-> > perverse that an ISB is required to ensure that this sequence works:
-> > 
-> > 	write page table entry
-> > 	clean
-> > 	dsb
-> > 	flush tlb entry
-> > 	dsb
-> > 	isb
-> > 	read/write new page
-> 
-> The same requirement can be found in latest (internal only) ARM ARM as
-> well. I think the reason is that some memory access already in the
-> pipeline (but after the TLB flush) may have sampled the state of the
-> page table using an old TLB entry, even though the actual memory access
-> will happen after the DSB.
+On Wed, 6 Jul 2011, Russell King - ARM Linux wrote:
 
-It would be useful to have a statement from RG on this.  Could you
-pass this to him please?
+> > > they typically don't fall into the highmem zone.  As the dmabounce
+> > > code allocates from the DMA coherent allocator to provide it with
+> > > guaranteed DMA-able memory, that would be rather inconvenient.
+> >
+> > True. The dmabounce code would consequently have to allocate
+> > the memory through an internal function that avoids the
+> > contiguous allocation area and goes straight to ZONE_DMA memory
+> > as it does today.
+>
+> CMA's whole purpose for existing is to provide _dma-able_ contiguous
+> memory for things like cameras and such like found on crippled non-
+> scatter-gather hardware.  If that memory is not DMA-able what's the
+> point?
 
-Thanks.
+ZONE_DMA is a zone for memory of legacy (crippled) devices that cannot DMA
+into all of memory (and so is ZONE_DMA32). Memory from ZONE_NORMAL can be
+used for DMA as well and a fully capable device would be expected to
+handle any memory in the system for DMA transfers.
+
+"guaranteed" dmaable memory? DMA abilities are device specific. Well maybe
+you can call ZONE_DMA memory to be guaranteed if you guarantee that any
+device must at mininum be able to perform DMA into ZONE_DMA memory. But
+there may not be much of that memory around so you would want to limit
+the use of that scarce resource.
