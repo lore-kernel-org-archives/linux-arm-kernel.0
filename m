@@ -1,150 +1,92 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Wed, 06 Jul 2011 10:29:16 +0300
-Subject: [PATCH 2/4] MTD: pxa3xx_nand: sperate each chip individual info
-In-Reply-To: <1309771536-10597-3-git-send-email-leiwen@marvell.com>
-References: <1309319494-17951-1-git-send-email-leiwen@marvell.com>
-	<1309771536-10597-3-git-send-email-leiwen@marvell.com>
-Message-ID: <4E140ECC.2000400@compulab.co.il>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 6 Jul 2011 10:34:02 +0300
+Subject: [PATCH 15/15] pxa2[57]x_udc: drop gpio_pullup handling
+In-Reply-To: <4E140F2C.2010900@gmail.com>
+References: <1309871321-11305-1-git-send-email-dbaryshkov@gmail.com>
+	<1309871321-11305-16-git-send-email-dbaryshkov@gmail.com>
+	<4E13772B.2090406@free.fr>
+	<CALT56yP5yNPZoJ_+6a4t2t6rY_hmej5fc-NG02Jef-QiXHrc=Q@mail.gmail.com>
+	<20110706072042.GC10729@legolas.emea.dhcp.ti.com>
+	<4E140F2C.2010900@gmail.com>
+Message-ID: <20110706073401.GE10729@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lei,
+Hi,
 
+On Wed, Jul 06, 2011 at 11:30:52AM +0400, Dmitry Eremin-Solenikov wrote:
+> On 06.07.2011 11:20, Felipe Balbi wrote:
+> >hi,
+> >
+> >On Wed, Jul 06, 2011 at 12:58:48AM +0400, Dmitry Eremin-Solenikov wrote:
+> >>On 7/6/11, Robert Jarzmik<robert.jarzmik@free.fr>  wrote:
+> >>>On 07/05/2011 03:08 PM, Dmitry Eremin-Solenikov wrote:
+> >>>>Now as all drivers were converted to using gpio-vbus, drop gpio-pullup
+> >>>>handling from pxa UDC drivers, thus simplifying them a bit.
+> >>>
+> >>>Is this patch compliant with USB 2 specification regarding maximum time
+> >>>between pullup triggering and UDC ready to answer the "RESET" packet and
+> >>>be assigned an address ?
+> >>>
+> >>>This is the sequence I'm worried about :
+> >>>   (1) The gpio-vbus is loaded
+> >>>   (2) The pxa27x_udc is loaded
+> >>>   (3) USB cable is plugged
+> >>>       =>  VBUS is sensed
+> >>>   (4) gpio-vbus pulls up the D+ (Dmitry, is that right ?)
+> >>>   (5) the host waits for UDC to settle (100 ms ?)
+> >>>   (5) set address packet(s) are sent from host to UDC
+> >>>   (6) UDC is not enabled, as no gadget is registered
+> >>>       =>  UDC doesn't answer
+> >>>       =>  usb host cannot assign it an address
+> >>>   (7) a gadget is loaded (g_ether for example)
+> >>>       =>  UDC is enabled, but too late
+> >>>
+> >>>Alan, Gregh, could you confirm point (5) about a maximum time between D+
+> >>>line activation and UDC duty to repond to "set address" packets, as well
+> >>>as the consequence of point (6) where the usb device is rejected because
+> >>>no address could be assigned ?
+> >>>
+> >>>Dmitry, could you confirm the the D+ pullup is done at point (4) ?
+> >>
+> >>No, I can't confirm this. IIUC, evrything happens in abit different way:
+> >>(4) trancseiver notifies udc about VBUS sense
+> >>(5) a gadget is loaded (g_ether for example)
+> >>(6) gadget asks udc to enale  pullup
+> >>(7) udc tells gpio_vbus to enable pullup.
+> >
+> >yeah, with udc-core.c we only enable pullup after gadget driver is
+> >loaded.
+> >
+> >290                 ret = bind(udc->gadget);
+> >291                 if (ret)
+> >292                         goto err1;
+> >293                 ret = usb_gadget_udc_start(udc->gadget, driver);
+> >294                 if (ret) {
+> >295                         driver->unbind(udc->gadget);
+> >296                         goto err1;
+> >297                 }
+> >298                 usb_gadget_connect(udc->gadget);
+> >
+> >but this is the new style bind() and many UDCs still need to be
+> >converted.
+> 
+> This was working before the udc-core. If it doesn't work now for
+> unconverted drivers (PXA e.g.) that's really a huge regression!
 
-You are going to resubmit the series to merge patches 3 and 4, so
-
-a small nitpick below
-
-
-On 07/04/11 12:25, Lei Wen wrote:
-
-> For support two chip select, we seperate chip specific info in this
-> patch.
->
-> Signed-off-by: Lei Wen <leiwen@marvell.com>
-> ---
->  drivers/mtd/nand/pxa3xx_nand.c |  281 ++++++++++++++++++++++------------------
->  1 files changed, 154 insertions(+), 127 deletions(-)
-
-[...]
-
->  
->  static int pxa3xx_nand_detect_config(struct pxa3xx_nand_info *info)
->  {
-> +	struct pxa3xx_nand_host *host = info->host;
->  	uint32_t ndcr = nand_readl(info, NDCR);
-> -	info->page_size = ndcr & NDCR_PAGE_SZ ? 2048 : 512;
-> -	/* set info fields needed to read id */
-> -	info->read_id_bytes = (info->page_size == 2048) ? 4 : 2;
-> -	info->reg_ndcr = ndcr & ~NDCR_INT_MASK;
-> -	info->cmdset = &default_cmdset;
->  
-> -	info->ndtr0cs0 = nand_readl(info, NDTR0CS0);
-> -	info->ndtr1cs0 = nand_readl(info, NDTR1CS0);
-> +	if (ndcr & NDCR_PAGE_SZ) {
-> +		host->page_size = 2048;
-> +		host->read_id_bytes = 4;
-> +	} else {
-> +		host->page_size = 512;
-> +		host->read_id_bytes = 2;
-> +	}
-
-empty line would be nice here
-
-> +	host->reg_ndcr = ndcr & ~NDCR_INT_MASK;
-> +	host->cmdset = &default_cmdset;
-> +
-> +	host->ndtr0cs0 = nand_readl(info, NDTR0CS0);
-> +	host->ndtr1cs0 = nand_readl(info, NDTR1CS0);
->  
->  	return 0;
->  }
-
-[...]
-
->  
-> @@ -933,14 +947,17 @@ static int pxa3xx_nand_scan(struct mtd_info *mtd)
->  	}
->  
->  	if (i >= (ARRAY_SIZE(builtin_flash_types) + pdata->num_flash - 1)) {
-> -		kfree(mtd);
-> -		info->mtd = NULL;
-> +		host->mtd = NULL;
->  		dev_err(&info->pdev->dev, "ERROR!! flash not defined!!!\n");
->  
->  		return -EINVAL;
->  	}
->  
-> -	pxa3xx_nand_config_flash(info, f);
-> +	ret = pxa3xx_nand_config_flash(info, f);
-> +	if (ret) {
-> +		dev_err(&info->pdev->dev, "ERROR! Configure failed\n");
-> +		return ret;
-> +	}
-
-and here
-
->  	pxa3xx_flash_ids[0].name = f->name;
->  	pxa3xx_flash_ids[0].id = (f->chip_id >> 8) & 0xffff;
->  	pxa3xx_flash_ids[0].pagesize = f->page_size;
-> @@ -955,44 +972,52 @@ KEEP_CONFIG:
->  	if (nand_scan_ident(mtd, 1, def))
->  		return -ENODEV;
->  	/* calculate addressing information */
-> -	info->col_addr_cycles = (mtd->writesize >= 2048) ? 2 : 1;
-> +	if (mtd->writesize >= 2048)
-> +		host->col_addr_cycles = 2;
-> +	else
-> +		host->col_addr_cycles = 1;
-
-and here
-
->  	info->oob_buff = info->data_buff + mtd->writesize;
->  	if ((mtd->size >> chip->page_shift) > 65536)
-> -		info->row_addr_cycles = 3;
-> +		host->row_addr_cycles = 3;
->  	else
-> -		info->row_addr_cycles = 2;
-> +		host->row_addr_cycles = 2;
-
-also here
-
->  	mtd->name = mtd_names[0];
->  	chip->ecc.mode = NAND_ECC_HW;
-> -	chip->ecc.size = info->page_size;
-> +	chip->ecc.size = host->page_size;
->  
-> -	chip->options = (info->reg_ndcr & NDCR_DWIDTH_M) ? NAND_BUSWIDTH_16 : 0;
-> +	chip->options = 0;
-> +	if (host->reg_ndcr & NDCR_DWIDTH_M)
-> +		chip->options = NAND_BUSWIDTH_16;
->  	chip->options |= NAND_NO_AUTOINCR;
->  	chip->options |= NAND_NO_READRDY;
-
-here, you can just reorder the bit operations, so you won't need to do options = 0.
-And empty line after if, would be great.
-
->  
->  	return nand_scan_tail(mtd);
->  }
->  
-
-[...]
-
->  static int pxa3xx_nand_remove(struct platform_device *pdev)
->  {
->  	struct pxa3xx_nand_info *info = platform_get_drvdata(pdev);
-> -	struct mtd_info *mtd = info->mtd;
->  	struct resource *r;
->  	int irq;
->  
-> +	if (!info)
-> +		return 0;
-
-and here (empty line)
-
-apart from that nitpicking, the patch should be fine.
+the difference is that before every UDC had to implement that by itself
+and now we're moving the common parts to a generic layer. If your UDC
+already implemented it this way when exporting
+usb_gadget_probe_driver(), then no changes for you, but I guarantee
+there where UDCs which didn't mind being careful with data pullups and
+would connect even though a gadget driver was nowhere to be seen ;-)
 
 -- 
-Regards,
-Igor.
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 490 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110706/a135c906/attachment.sig>
