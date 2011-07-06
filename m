@@ -1,30 +1,40 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Wed, 6 Jul 2011 14:24:16 +0000 (UTC)
-Subject: [PATCH] ARM: get rid of a few StrongARM cache-related build	time
-	constants
-References: <1309919636-20546-1-git-send-email-nicolas.pitre@linaro.org>
-	<20110706075542.GK8286@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1107060912490.14596@xanadu.home>
-	<20110706134102.GZ8286@n2100.arm.linux.org.uk>
-Message-ID: <iv1r6g$oj1$1@dough.gmane.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 6 Jul 2011 16:26:44 +0200
+Subject: [PATCH 17/17] ARM: use new LEDS CPU trigger stub to replace old
+	one
+In-Reply-To: <1309955687-19365-18-git-send-email-bryan.wu@canonical.com>
+References: <1309955687-19365-1-git-send-email-bryan.wu@canonical.com>
+	<1309955687-19365-18-git-send-email-bryan.wu@canonical.com>
+Message-ID: <201107061626.44256.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
+On Wednesday 06 July 2011, Bryan Wu wrote:
+> 
+>  #include <asm/cacheflush.h>
+> -#include <asm/leds.h>
+>  #include <asm/processor.h>
+>  #include <asm/system.h>
+>  #include <asm/thread_notify.h>
+> @@ -183,7 +183,7 @@ void cpu_idle(void)
+>         /* endless idle loop with no priority at all */
+>         while (1) {
+>                 tick_nohz_stop_sched_tick(1);
+> -               leds_event(led_idle_start);
+> +               ledtrig_cpu(CPU_LED_IDLE_START);
+>                 while (!need_resched()) {
+>  #ifdef CONFIG_HOTPLUG_CPU
+>                         if (cpu_is_offline(smp_processor_id()))
+> @@ -207,7 +207,7 @@ void cpu_idle(void)
+>                                 local_irq_enable();
+>                         }
+>                 }
+> -               leds_event(led_idle_end);
+> +               ledtrig_cpu(CPU_LED_IDLE_END);
+>                 tick_nohz_restart_sched_tick();
+>                 preempt_enable_no_resched();
+>                 schedule();
 
-> On Wed, Jul 06, 2011 at 09:21:33AM -0400, Nicolas Pitre wrote:
->> Oops.  Here's a fixed patch.
->> 
->> Could you test this patch as well?  You're the only one I know who might 
->> still have access to the affected hardware.
->
-> Will do - the assabet is still running as a test machine.  The ebsa110 is
-> still alive but as that's (still) the firewall I won't run a test on that
-> until a quiet weekend.  I can also test the Netwinder and RiscPC...
+Nevermind my previous comment about the place where this is used. I've found it now ;-)
 
-Sorry to break in: does somebody know if there is still a way to
-purchase/gain assabet and mainstone boards?
-
--- 
-With best wishes
-Dmitry
+	Arnd
