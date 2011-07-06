@@ -1,240 +1,217 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 6 Jul 2011 11:31:23 +0530
-Subject: [PATCH v3 4/5] davinci: da850: add support for SATA interface
-In-Reply-To: <cover.1309927427.git.nsekhar@ti.com>
-References: <cover.1309927427.git.nsekhar@ti.com>
-Message-ID: <a3e9af8d16c7e37ad39200f7506a6a937920725b.1309927428.git.nsekhar@ti.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Wed, 6 Jul 2011 14:01:24 +0800
+Subject: [PATCH v2] ARM: CSR: Adding CSR SiRFprimaII board support
+In-Reply-To: <CAGsJ_4xV7ecdqnB5gJDUDSg4nvebgubBj4qGJGaCtcpbj-b0gQ@mail.gmail.com>
+References: <1309231954-23260-1-git-send-email-bs14@csr.com>
+	<201106292329.44447.arnd@arndb.de>
+	<BANLkTinfKCMcutMDQ+mpdD4EUy9mCpZs+w@mail.gmail.com>
+	<201106301236.25822.arnd@arndb.de>
+	<BANLkTikoMu3ccUxj5KRmKzdReQcBqK4Y9Q@mail.gmail.com>
+	<CAGsJ_4wSKP6EUihOVbUJJ+HUynWGp8PA=8J_WhgmOtVhpd5_Lg@mail.gmail.com>
+	<20110706053026.GB9978@ponder.secretlab.ca>
+	<CAGsJ_4xV7ecdqnB5gJDUDSg4nvebgubBj4qGJGaCtcpbj-b0gQ@mail.gmail.com>
+Message-ID: <CAGsJ_4yxUzMr4EJd5i0oW1tOa2oK7jicAehKVXXiU_SMDpTQ0Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for SATA controller on the
-DA850/OMAP-L138/AM18x devices.
+2011/7/6 Barry Song <21cnbao@gmail.com>:
+> 2011/7/6 Grant Likely <grant.likely@secretlab.ca>:
+>> On Tue, Jul 05, 2011 at 04:34:05PM +0800, Barry Song wrote:
+>>> Hi Arnd,
+>>>
+>>> 2011/7/1 Barry Song <21cnbao@gmail.com>:
+>>> > Hi Arnd,
+>>> >
+>>> > 2011/6/30 Arnd Bergmann <arnd@arndb.de>:
+>>> >> On Thursday 30 June 2011, Barry Song wrote:
+>>> >>
+>>> >>> > Is this really just one bus with a huge address space, or rather some
+>>> >>> > nested buses? I'd prefer to have the device tree representation as
+>>> >>> > close as possible to the actual layout.
+>>> >>>
+>>> >>> there are two AXI buses in prima2. AXI-1 connect to memory, AXI-2 is
+>>> >>> transferred to CSR self-defined IOBUS by CPUIF, then 1 intterupt
+>>> >>> controller and 9 IO bridges are connected to the IOBUS .
+>>> >>> The 9 IO bridges are SYSIOBG, PERIIOBG,CPURTCIOBG, UUSIOBG, GRAPHIOBG,
+>>> >>> MEDIAIOBG, DSPIOBG, DISPIOBG, MEMIOBG. Every iobrg connect to a group
+>>> >>> of controllers.
+>>> >>> For example, DISPIOBG connect to VPP and LCD, SYSIOBG connect to CLKC,
+>>> >>> RSTC, RSC and CPHIFBG, DSPIOBG connect to DSPIF, GPS and DSP.
+>>> >>> PERIIOBG connect to TIMER, NAND, AUDIO, UART0, UART1, UART2, USP0,
+>>> >>> USP1, USP2, SPI0, I2C0, I2C1, GPIO, *SYS2PCI* and so on. Then
+>>> >>> *SYS2PCI* connect to SD.
+>>> >>>
+>>> >>> The indendation descible the device hierarchy
+>>> >>> AXI-1
+>>> >>> ? ? ? ? ?Memory
+>>> >>> AXI-2
+>>> >>> ? ? ? ? ?interrupt controller
+>>> >>> ? ? ? ? ?IOBG...
+>>> >>> ? ? ? ? ? ? ? ? ? xxxx
+>>> >>> ? ? ? ? ?IOBG...
+>>> >>> ? ? ? ? ? ? ? ? ? xxxx
+>>> >>> ? ? ? ? ?IOBG...
+>>> >>> ? ? ? ? ? ? ? ? ? xxxx
+>>> >>> ? ? ? ? ?IOBG...
+>>> >>> ? ? ? ? ? ? ? ? ? xxxx
+>>> >>> ? ? ? ? ?IOBG...
+>>> >>> ? ? ? ? ? ? ? ? ? xxxx
+>>> >>> ? ? ? ? ?IOBG...
+>>> >>> ? ? ? ? ? ? ? ? ? SYS2PCI
+>>> >>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? SD
+>>> >>>
+>>> >>> i have get the IC guy Weizeng involved, maybe he can explain better than me :-)
+>>> >>
+>>> >> I think it would be good to represent the IOBG devices in the device tree then.
+>>> >> You don't need to represent AXI-1 because memory is special anyway, and I would
+>>> >> not bother to list SYS2PCI if the intention of that block was to hide the fact
+>>> >> that it's PCI behind it. Properly instantiating it as a PCI bridge would be
+>>> >> a lot of work that is probably not worth it.
+>>> >>
+>>> >> My usual plea to hardware developers: Please make the registers
+>>> >> autodiscoverable from software! On an AMBA bus, please use the PrimeCell
+>>> >> register layout. If you always have an IOBG device behind, they should
+>>> >> all have the same identifier for that kind of bus bridge.
+>>> >>
+>>> >> For the IOBG, it would be ideal to have a similar way of finding and
+>>> >> configuring the connected hardware, including:
+>>> >>
+>>> >> * unique identifier for each distinct IP block
+>>> >> * revision of that block
+>>> >> * MMIO ranges and sizes, relative to the bus
+>>> >> * interrupt numbers, relative to a local interrupt controller
+>>> >> * location identifier (like PCI bus/device/fn number) that can be
+>>> >> ?referred to by other devices
+>>> >> * clock management for that device
+>>> >> * power management for that device
+>>> >>
+>>> >> If your IODB infrastructure already has this, you should create a new
+>>> >> bus-type for this in Linux, which will let you detect all devices
+>>> >> in a consistent manner without having to list them in the device tree.
+>>> >
+>>> > IO bridges in prima2 don't have that. Configuration is hardcoded now.
+>>> > but we have learned so much from you and hope to improve our future IC
+>>> > design.
+>>>
+>>>
+>>> i have tried to figure out the full DT:
+>>>
+>>> /dts-v1/;
+>>> / {
+>>> ? ? ? model = "SiRF Prima2 EVB";
+>>> ? ? ? compatible = "sirf,prima2-cb", "sirf,prima2";
+>>> ? ? ? #address-cells = <1>;
+>>> ? ? ? #size-cells = <1>;
+>>> ? ? ? interrupt-parent = <&intc>;
+>>>
+>>> ? ? ? memory {
+>>
+>> memory at 0
+>>
+>>> ? ? ? ? ? ? ? reg = <0x00000000 0x20000000>;
+>>> ? ? ? };
+>>>
+>>> ? ? ? chosen {
+>>> ? ? ? ? ? ? ? bootargs = "mem=512M real_root=/dev/mmcblk0p2 console=ttyS0 panel=1
+>>> bootsplash=true bpp=16 androidboot.console=ttyS1";
+>>> ? ? ? ? ? ? ? linux,stdout-path = &uart1;
+>>> ? ? ? };
+>>>
+>>> ? ? ? cpus {
+>>> ? ? ? ? ? ? ? #address-cells = <1>;
+>>> ? ? ? ? ? ? ? #size-cells = <0>;
+>>>
+>>> ? ? ? ? ? ? ? ARM-CortexA9,SiRFprimaII at 0 {
+>>
+>> cpu at 0 {
+>>
+>> Don't duplicate the crack that powerpc did for cpu node names. ?Use a
+>> compatible property to identify the specific CPU model.
+>>
+>>> ? ? ? ? ? ? ? ? ? ? ? device_type = "cpu";
+>>
+>> Drop device_type here.
+>>
+>>> ? ? ? ? ? ? ? ? ? ? ? reg = <0x0>;
+>>> ? ? ? ? ? ? ? ? ? ? ? d-cache-line-size = <32>;
+>>> ? ? ? ? ? ? ? ? ? ? ? i-cache-line-size = <32>;
+>>> ? ? ? ? ? ? ? ? ? ? ? d-cache-size = <32768>;
+>>> ? ? ? ? ? ? ? ? ? ? ? i-cache-size = <32768>;
+>>> ? ? ? ? ? ? ? ? ? ? ? /* from bootloader */
+>>> ? ? ? ? ? ? ? ? ? ? ? timebase-frequency = <0>;
+>>> ? ? ? ? ? ? ? ? ? ? ? bus-frequency = <0>;
+>>> ? ? ? ? ? ? ? ? ? ? ? clock-frequency = <0>;
+>>> ? ? ? ? ? ? ? };
+>>> ? ? ? };
+>>>
+>>> ? ? ? axi {
+>>> ? ? ? ? ? ? ? compatible = "simple-bus";
+>>> ? ? ? ? ? ? ? #address-cells = <1>;
+>>> ? ? ? ? ? ? ? #size-cells = <1>;
+>>> ? ? ? ? ? ? ? ranges = <0x40000000 0x40000000 0x80000000>;
+>>>
+>>> ? ? ? ? ? ? ? l2-cache-controller at 0x80040000 {
+>>
+>> l2-cache-controller at 80040000 ?(Drop the '0x' from node names; address
+>> in the node name is always hex.
+>>
+>>> ? ? ? ? ? ? ? ? ? ? ? compatible = "arm,pl310-cache", "cache";
+>>
+>> Drop the "cache" compatible value here.
+>>
+>>> ? ? ? ? ? ? ? ? ? ? ? reg = <0x80040000 0x1000>;
+>>> ? ? ? ? ? ? ? ? ? ? ? interrupts = <59>;
+>>> ? ? ? ? ? ? ? };
+>>>
+>>> ? ? ? ? ? ? ? sirfsoc-iobus {
+>>> ? ? ? ? ? ? ? ? ? ? ? compatible = "simple-bus";
+>>> ? ? ? ? ? ? ? ? ? ? ? #address-cells = <1>;
+>>> ? ? ? ? ? ? ? ? ? ? ? #size-cells = <1>;
+>>> ? ? ? ? ? ? ? ? ? ? ? ranges = <0x56000000 0x56000000 0x1b0000
+>>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 0x80010000 0x80010000 0x30000
+>>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 0x88000000 0x88000000 0x40040000>;
+>>>
+>>> ? ? ? ? ? ? ? ? ? ? ? intc: interrupt-controller at 0x80020000 {
+>>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? #interrupt-cells = <1>;
+>>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? interrupt-controller;
+>>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? compatible = "sirf,intc", "sirf,prima2-intc";
+>>
+>> This looks backwards. ?Most specific values should appear first.
+>> "sirf,intc" looks to be generic when compared to "sirf,prima2-intc".
+>> I'm also concerned that "sirf,intc" is trying to be too generic. ?As
+>> much as possible compatible values should reflect a real
+>> implementation of the interface, not a generic abstract name. ?Future
+>> hardware can always claim compatibility with existing older hardware.
+>> You're probably better off dropping "sirf,intc" entirely, and doing
+>> the same for similar properties throughout the file.
+>
+> i have been confused by compatible in dts and drivers for some time.
+> if an intc ip core is shared by two chips, for example, prima2 and
+> atlas6. is the following right?
+>
+> in dts for prima2: compatible = "sirf,prima2-intc";
+> in dts for atlas6: ?compatible = "sirf,prima2-atlas6";
 
-The patch adds the necessary clocks, platform
-resources and a routine to initialize the SATA
-controller.
+sorry for typo. in dts for atlas6:  compatible = "sirf,atlas6-intc";
 
-The PHY configuration in this patch is
-courtesy the work done by Zegeye Alemu,
-Swaminathan and Mansoor Ahamed from TI.
+> in intc drivers shared for both: ? ? compatible = "sirf,prima2-intc",
+> "sirf,prima2-atlas6";
 
-While testing this patch, enable port multiplier
-support iff you are actually using one. The
-reasons of this behaviour are discussed
-here: http://patchwork.ozlabs.org/patch/78163/
+sorry for typo.  compatible = "sirf,prima2-intc", "sirf,atlas6-intc";
 
-ChangeLog:
-v3:
-Removed fields which were being initialized
-to zero in PHY configuration. Moved SATA base
-address definition to the top of the file to
-make it inline with what is done for the rest
-of the modules.
-v2:
-Addressed comments from Sergei. Removed unnecessary
-braces and removed unnecessary else after goto.
-
-Signed-off-by: Sekhar Nori <nsekhar@ti.com>
----
- arch/arm/mach-davinci/da850.c              |    9 ++
- arch/arm/mach-davinci/devices-da8xx.c      |  126 ++++++++++++++++++++++++++++
- arch/arm/mach-davinci/include/mach/da8xx.h |    2 +
- 3 files changed, 137 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
-index 133aac4..2c1fad5 100644
---- a/arch/arm/mach-davinci/da850.c
-+++ b/arch/arm/mach-davinci/da850.c
-@@ -373,6 +373,14 @@ static struct clk spi1_clk = {
- 	.flags		= DA850_CLK_ASYNC3,
- };
- 
-+static struct clk sata_clk = {
-+	.name		= "sata",
-+	.parent		= &pll0_sysclk2,
-+	.lpsc		= DA850_LPSC1_SATA,
-+	.gpsc		= 1,
-+	.flags		= PSC_FORCE,
-+};
-+
- static struct clk_lookup da850_clks[] = {
- 	CLK(NULL,		"ref",		&ref_clk),
- 	CLK(NULL,		"pll0",		&pll0_clk),
-@@ -419,6 +427,7 @@ static struct clk_lookup da850_clks[] = {
- 	CLK(NULL,		"usb20",	&usb20_clk),
- 	CLK("spi_davinci.0",	NULL,		&spi0_clk),
- 	CLK("spi_davinci.1",	NULL,		&spi1_clk),
-+	CLK("ahci",		NULL,		&sata_clk),
- 	CLK(NULL,		NULL,		NULL),
- };
- 
-diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
-index fc4e98e..2f7e719 100644
---- a/arch/arm/mach-davinci/devices-da8xx.c
-+++ b/arch/arm/mach-davinci/devices-da8xx.c
-@@ -14,6 +14,8 @@
- #include <linux/platform_device.h>
- #include <linux/dma-mapping.h>
- #include <linux/serial_8250.h>
-+#include <linux/ahci_platform.h>
-+#include <linux/clk.h>
- 
- #include <mach/cputype.h>
- #include <mach/common.h>
-@@ -33,6 +35,7 @@
- #define DA8XX_SPI0_BASE			0x01c41000
- #define DA830_SPI1_BASE			0x01e12000
- #define DA8XX_LCD_CNTRL_BASE		0x01e13000
-+#define DA850_SATA_BASE			0x01e18000
- #define DA850_MMCSD1_BASE		0x01e1b000
- #define DA8XX_EMAC_CPPI_PORT_BASE	0x01e20000
- #define DA8XX_EMAC_CPGMACSS_BASE	0x01e22000
-@@ -842,3 +845,126 @@ int __init da8xx_register_spi(int instance, struct spi_board_info *info,
- 
- 	return platform_device_register(&da8xx_spi_device[instance]);
- }
-+
-+#ifdef CONFIG_ARCH_DAVINCI_DA850
-+
-+static struct resource da850_sata_resources[] = {
-+	{
-+		.start	= DA850_SATA_BASE,
-+		.end	= DA850_SATA_BASE + 0x1fff,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	{
-+		.start	= IRQ_DA850_SATAINT,
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+};
-+
-+/* SATA PHY Control Register offset from AHCI base */
-+#define SATA_P0PHYCR_REG	0x178
-+
-+#define SATA_PHY_MPY(x)		((x) << 0)
-+#define SATA_PHY_LOS(x)		((x) << 6)
-+#define SATA_PHY_RXCDR(x)	((x) << 10)
-+#define SATA_PHY_RXEQ(x)	((x) << 13)
-+#define SATA_PHY_TXSWING(x)	((x) << 19)
-+#define SATA_PHY_ENPLL(x)	((x) << 31)
-+
-+static struct clk *da850_sata_clk;
-+static unsigned long da850_sata_refclkpn;
-+
-+/* Supported DA850 SATA crystal frequencies */
-+#define KHZ_TO_HZ(freq) ((freq) * 1000)
-+static unsigned long da850_sata_xtal[] = {
-+	KHZ_TO_HZ(300000),
-+	KHZ_TO_HZ(250000),
-+	0,			/* Reserved */
-+	KHZ_TO_HZ(187500),
-+	KHZ_TO_HZ(150000),
-+	KHZ_TO_HZ(125000),
-+	KHZ_TO_HZ(120000),
-+	KHZ_TO_HZ(100000),
-+	KHZ_TO_HZ(75000),
-+	KHZ_TO_HZ(60000),
-+};
-+
-+static int da850_sata_init(struct device *dev, void __iomem *addr)
-+{
-+	int i, ret;
-+	unsigned int val;
-+
-+	da850_sata_clk = clk_get(dev, NULL);
-+	if (IS_ERR(da850_sata_clk))
-+		return PTR_ERR(da850_sata_clk);
-+
-+	ret = clk_enable(da850_sata_clk);
-+	if (ret)
-+		goto err0;
-+
-+	/* Enable SATA clock receiver */
-+	val = __raw_readl(DA8XX_SYSCFG1_VIRT(DA8XX_PWRDN_REG));
-+	val &= ~BIT(0);
-+	__raw_writel(val, DA8XX_SYSCFG1_VIRT(DA8XX_PWRDN_REG));
-+
-+	/* Get the multiplier needed for 1.5GHz PLL output */
-+	for (i = 0; i < ARRAY_SIZE(da850_sata_xtal); i++)
-+		if (da850_sata_xtal[i] == da850_sata_refclkpn)
-+			break;
-+
-+	if (i == ARRAY_SIZE(da850_sata_xtal)) {
-+		ret = -EINVAL;
-+		goto err1;
-+	}
-+
-+	val = SATA_PHY_MPY(i + 1) |
-+		SATA_PHY_LOS(1) |
-+		SATA_PHY_RXCDR(4) |
-+		SATA_PHY_RXEQ(1) |
-+		SATA_PHY_TXSWING(3) |
-+		SATA_PHY_ENPLL(1);
-+
-+	__raw_writel(val, addr + SATA_P0PHYCR_REG);
-+
-+	return 0;
-+
-+err1:
-+	clk_disable(da850_sata_clk);
-+err0:
-+	clk_put(da850_sata_clk);
-+	return ret;
-+}
-+
-+static void da850_sata_exit(struct device *dev)
-+{
-+	clk_disable(da850_sata_clk);
-+	clk_put(da850_sata_clk);
-+}
-+
-+static struct ahci_platform_data da850_sata_pdata = {
-+	.init	= da850_sata_init,
-+	.exit	= da850_sata_exit,
-+};
-+
-+static u64 da850_sata_dmamask = DMA_BIT_MASK(32);
-+
-+static struct platform_device da850_sata_device = {
-+	.name	= "ahci",
-+	.id	= -1,
-+	.dev	= {
-+		.platform_data		= &da850_sata_pdata,
-+		.dma_mask		= &da850_sata_dmamask,
-+		.coherent_dma_mask	= DMA_BIT_MASK(32),
-+	},
-+	.num_resources	= ARRAY_SIZE(da850_sata_resources),
-+	.resource	= da850_sata_resources,
-+};
-+
-+int __init da850_register_sata(unsigned long refclkpn)
-+{
-+	da850_sata_refclkpn = refclkpn;
-+	if (!da850_sata_refclkpn)
-+		return -EINVAL;
-+
-+	return platform_device_register(&da850_sata_device);
-+}
-+#endif
-diff --git a/arch/arm/mach-davinci/include/mach/da8xx.h b/arch/arm/mach-davinci/include/mach/da8xx.h
-index ad64da7..eaca7d8 100644
---- a/arch/arm/mach-davinci/include/mach/da8xx.h
-+++ b/arch/arm/mach-davinci/include/mach/da8xx.h
-@@ -57,6 +57,7 @@ extern unsigned int da850_max_speed;
- #define DA8XX_SYSCFG1_BASE	(IO_PHYS + 0x22C000)
- #define DA8XX_SYSCFG1_VIRT(x)	(da8xx_syscfg1_base + (x))
- #define DA8XX_DEEPSLEEP_REG	0x8
-+#define DA8XX_PWRDN_REG		0x18
- 
- #define DA8XX_PSC0_BASE		0x01c10000
- #define DA8XX_PLL0_BASE		0x01c11000
-@@ -89,6 +90,7 @@ int da850_register_cpufreq(char *async_clk);
- int da8xx_register_cpuidle(void);
- void __iomem * __init da8xx_get_mem_ctlr(void);
- int da850_register_pm(struct platform_device *pdev);
-+int __init da850_register_sata(unsigned long refclkpn);
- 
- extern struct platform_device da8xx_serial_device;
- extern struct emac_platform_data da8xx_emac_pdata;
--- 
-1.7.3.2
+>
+> in my understanding, dts for special soc/board contains special
+> compatible for the chip, drivers shared by multi-soc/board contain all
+> compatible lists which can be supported by them?
+>
+> what's the generic way for this?
+>
+>>
+>> Also, for every new compatible value make sure you add documentation
+>> for it to Documentation/devicetree/bindings. (You may have already
+>> done so, it's just something I remind people about a lot).
+>>
+>> These comments also apply through the rest of the file.
+>>
+>>
+>
