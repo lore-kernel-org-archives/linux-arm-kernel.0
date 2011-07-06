@@ -1,27 +1,28 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 6 Jul 2011 15:33:16 -0600 (MDT)
-Subject: [PATCH v2 0/8] OMAP2+: hwmod framework fixes
-In-Reply-To: <1309553647-14624-1-git-send-email-b-cousson@ti.com>
-References: <1309553647-14624-1-git-send-email-b-cousson@ti.com>
-Message-ID: <alpine.DEB.2.00.1107061532390.31498@utopia.booyaka.com>
+From: tim.bird@am.sony.com (Tim Bird)
+Date: Wed, 6 Jul 2011 14:45:43 -0700
+Subject: [PATCH] ARM: poison initmem when it is freed
+In-Reply-To: <20110706210106.GX8286@n2100.arm.linux.org.uk>
+References: <20110705184254.GH8286@n2100.arm.linux.org.uk>	<alpine.LFD.2.00.1107051509490.14596@xanadu.home>	<20110705192656.GJ8286@n2100.arm.linux.org.uk>	<alpine.LFD.2.00.1107051540550.14596@xanadu.home>	<4E139F8F.7060809@codeaurora.org>	<20110706203427
+Message-ID: <4E14D787.4060003@am.sony.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
-
-On Fri, 1 Jul 2011, Benoit Cousson wrote:
-
-> Here are the latest bug fixes done on the hwmod framework.
-> There are mainly around wakeup capability added in OMAP4.
+On 07/06/2011 02:01 PM, Russell King - ARM Linux wrote:
+> On Wed, Jul 06, 2011 at 01:55:54PM -0700, Stephen Boyd wrote:
+>> Should it include the initrd too? At least x86 poisons that memory but I
+>> don't know who would be using that incorrectly.
 > 
-> The series is based on for_3.1/2_prcm_files_cleanup and tested
-> on OMAP4430 ES2.1 + SDP.
-> 
-> The patches are available here:
-> git://gitorious.org/omap-pm/linux.git for_3.1/3_hwmod_fixes
+> It could do - I don't see any harm in not doing so.  The only issue
+> is that people may want to disable this stuff if they're after
+> squeezing every last ms out of the boot time.
 
-Thanks, this series has been queued for 3.1 at 
-git://git.pwsan.com/linux-2.6 in the 'hwmod_core_cleanup_a_3.1' branch.
+I'd appreciate that.  I think the ability to poison is nice.
+But if it takes any time at all it would be nice to be
+able to disable it to avoid an increase in boot time.
+ -- Tim
 
-
-- Paul
+=============================
+Tim Bird
+Architecture Group Chair, CE Workgroup of the Linux Foundation
+Senior Staff Engineer, Sony Network Entertainment
+=============================
