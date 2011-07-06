@@ -1,172 +1,236 @@
 From: bryan.wu@canonical.com (Bryan Wu)
-Date: Wed,  6 Jul 2011 20:34:30 +0800
-Subject: [PATCH 00/17] Introduce a led trigger for CPU activity 
-Message-ID: <1309955687-19365-1-git-send-email-bryan.wu@canonical.com>
+Date: Wed,  6 Jul 2011 20:34:31 +0800
+Subject: [PATCH 01/17] leds: create a trigger for CPU activity
+In-Reply-To: <1309955687-19365-1-git-send-email-bryan.wu@canonical.com>
+References: <1309955687-19365-1-git-send-email-bryan.wu@canonical.com>
+Message-ID: <1309955687-19365-2-git-send-email-bryan.wu@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Based on Linus Walleij's ARM LED consolidation work, this patchset introduce a
-new generic led trigger for CPU not only for ARM but also for others.
+Attempting to consolidate the ARM LED code, this removes the
+custom RealView LED trigger code to turn LEDs on and off in
+response to CPU activity and replace it with a standard trigger.
 
-For enabling CPU idle event, CPU arch code should call ledtrig_cpu() stub to
-trigger idle start or idle end event.
+(bryan.wu at canonical.com:
+It moves arch/arm/kernel/leds.c syscore stubs into this trigger.
+It also provides ledtrig_cpu trigger event stub in <linux/leds.h>.
+Although it was inspired by ARM work, it can be used in other arch.)
 
-These patches convert old style LED driver in arch/arm to gpio_led or new led
-driver interface. Against 3.0-rc6 and build successfully for all the machines.
-
-Bryan Wu (15):
-  leds: create a trigger for CPU activity
-  arm: at91: convert old leds drivers to gpio_led and led_trigger
-    drivers
-  mach-ks8695: remove leds driver, since nobody use it
-  mach-shark: retire custom LED code
-  mach-orion5x: convert custom LED code to gpio_led and LED CPU trigger
-  mach-integrator: retire custom LED code
-  mach-clps711x: retire custom LED code of P720T machine
-  mach-ebsa110: retire custom LED code
-  mach-footbridge: retire custom LED code
-  mach-pxa: retire custom LED code
-  plat-samsung: remove including old leds event API header file
-  mach-pnx4008: remove including old leds event API header file
-  mach-omap1: retire custom LED code
-  mach-sa1100: retire custom LED code
-  ARM: use new LEDS CPU trigger stub to replace old one
-
-Linus Walleij (2):
-  mach-realview: retire custom LED code
-  mach-versatile: retire custom LED code
-
- arch/arm/Kconfig                               |   70 ++-----
- arch/arm/configs/orion5x_defconfig             |    1 +
- arch/arm/include/asm/leds.h                    |   50 ----
- arch/arm/kernel/Makefile                       |    1 -
- arch/arm/kernel/leds.c                         |  119 ----------
- arch/arm/kernel/process.c                      |    6 +-
- arch/arm/kernel/time.c                         |   17 --
- arch/arm/mach-at91/board-cap9adk.c             |   21 ++-
- arch/arm/mach-at91/board-csb337.c              |    3 -
- arch/arm/mach-at91/board-ecbat91.c             |   18 ++-
- arch/arm/mach-at91/board-eco920.c              |   23 ++-
- arch/arm/mach-at91/board-kafa.c                |   17 ++-
- arch/arm/mach-at91/board-kb9202.c              |   23 ++-
- arch/arm/mach-at91/board-rm9200dk.c            |    3 -
- arch/arm/mach-at91/board-rm9200ek.c            |    3 -
- arch/arm/mach-at91/board-sam9-l9260.c          |   23 ++-
- arch/arm/mach-at91/board-sam9261ek.c           |    3 -
- arch/arm/mach-at91/board-yl-9200.c             |    3 -
- arch/arm/mach-at91/include/mach/board.h        |    1 -
- arch/arm/mach-at91/leds.c                      |  105 ---------
- arch/arm/mach-clps711x/Kconfig                 |    5 +
- arch/arm/mach-clps711x/Makefile                |    2 -
- arch/arm/mach-clps711x/include/mach/time.h     |    2 -
- arch/arm/mach-clps711x/p720t-leds.c            |   67 ------
- arch/arm/mach-clps711x/p720t.c                 |   57 +++++
- arch/arm/mach-clps711x/time.c                  |    1 -
- arch/arm/mach-ebsa110/Makefile                 |    4 +-
- arch/arm/mach-ebsa110/leds.c                   |   77 ++++---
- arch/arm/mach-footbridge/Kconfig               |   16 ++
- arch/arm/mach-footbridge/Makefile              |    4 -
- arch/arm/mach-footbridge/ebsa285-leds.c        |  139 -----------
- arch/arm/mach-footbridge/ebsa285.c             |   76 ++++++
- arch/arm/mach-footbridge/include/mach/system.h |    1 -
- arch/arm/mach-footbridge/netwinder-hw.c        |  102 +++++++--
- arch/arm/mach-footbridge/netwinder-leds.c      |  139 -----------
- arch/arm/mach-integrator/Makefile              |    3 +-
- arch/arm/mach-integrator/core.c                |    1 -
- arch/arm/mach-integrator/leds.c                |  147 ++++++------
- arch/arm/mach-ks8695/Makefile                  |    3 -
- arch/arm/mach-ks8695/devices.c                 |   21 --
- arch/arm/mach-ks8695/include/mach/devices.h    |    5 -
- arch/arm/mach-ks8695/leds.c                    |   93 --------
- arch/arm/mach-omap1/Kconfig                    |   21 ++
- arch/arm/mach-omap1/Makefile                   |    8 -
- arch/arm/mach-omap1/board-h2.c                 |   34 +++-
- arch/arm/mach-omap1/board-h3.c                 |   34 +++-
- arch/arm/mach-omap1/board-osk.c                |   33 +++
- arch/arm/mach-omap1/leds-h2p2-debug.c          |  167 --------------
- arch/arm/mach-omap1/leds-innovator.c           |   99 --------
- arch/arm/mach-omap1/leds-osk.c                 |  115 ----------
- arch/arm/mach-omap1/leds.c                     |   69 ------
- arch/arm/mach-omap1/leds.h                     |    3 -
- arch/arm/mach-omap1/time.c                     |    1 -
- arch/arm/mach-omap1/timer32k.c                 |    1 -
- arch/arm/mach-orion5x/rd88f5181l-fxo-setup.c   |    1 -
- arch/arm/mach-orion5x/rd88f5181l-ge-setup.c    |    1 -
- arch/arm/mach-orion5x/rd88f5182-setup.c        |   74 ++----
- arch/arm/mach-orion5x/rd88f6183ap-ge-setup.c   |    1 -
- arch/arm/mach-pnx4008/time.c                   |    1 -
- arch/arm/mach-pxa/Kconfig                      |   17 ++
- arch/arm/mach-pxa/Makefile                     |    8 -
- arch/arm/mach-pxa/idp.c                        |   76 ++++++
- arch/arm/mach-pxa/leds-idp.c                   |  116 ----------
- arch/arm/mach-pxa/leds-lubbock.c               |  125 ----------
- arch/arm/mach-pxa/leds-mainstone.c             |  120 ----------
- arch/arm/mach-pxa/leds.c                       |   32 ---
- arch/arm/mach-pxa/leds.h                       |   13 -
- arch/arm/mach-pxa/lubbock.c                    |   90 ++++++++
- arch/arm/mach-pxa/mainstone.c                  |   89 +++++++
- arch/arm/mach-realview/core.c                  |   39 ----
- arch/arm/mach-realview/core.h                  |    2 -
- arch/arm/mach-realview/realview_eb.c           |    4 -
- arch/arm/mach-realview/realview_pb1176.c       |    4 -
- arch/arm/mach-realview/realview_pb11mp.c       |    4 -
- arch/arm/mach-realview/realview_pba8.c         |    4 -
- arch/arm/mach-realview/realview_pbx.c          |    4 -
- arch/arm/mach-sa1100/Kconfig                   |   29 +++
- arch/arm/mach-sa1100/Makefile                  |   10 -
- arch/arm/mach-sa1100/assabet.c                 |   75 ++++++
- arch/arm/mach-sa1100/badge4.c                  |   30 +++
- arch/arm/mach-sa1100/cerf.c                    |   42 ++++
- arch/arm/mach-sa1100/hackkit.c                 |   32 +++
- arch/arm/mach-sa1100/lart.c                    |   26 ++
- arch/arm/mach-sa1100/leds-assabet.c            |  114 ---------
- arch/arm/mach-sa1100/leds-badge4.c             |  111 ---------
- arch/arm/mach-sa1100/leds-cerf.c               |  110 ---------
- arch/arm/mach-sa1100/leds-hackkit.c            |  112 ---------
- arch/arm/mach-sa1100/leds-lart.c               |  101 --------
- arch/arm/mach-sa1100/leds-simpad.c             |  100 --------
- arch/arm/mach-sa1100/leds.c                    |   52 -----
- arch/arm/mach-sa1100/leds.h                    |   14 --
- arch/arm/mach-sa1100/simpad.c                  |   48 ++++
- arch/arm/mach-shark/Makefile                   |    4 +-
- arch/arm/mach-shark/core.c                     |    1 -
- arch/arm/mach-shark/leds.c                     |  222 +++++++-----------
- arch/arm/mach-versatile/core.c                 |   42 ----
- arch/arm/plat-omap/Kconfig                     |    9 +-
- arch/arm/plat-omap/debug-leds.c                |  292 ++++++------------------
- arch/arm/plat-samsung/time.c                   |    1 -
- arch/arm/plat-versatile/Kconfig                |    6 +-
- arch/arm/plat-versatile/leds.c                 |   13 +-
- drivers/leds/Kconfig                           |   10 +
- drivers/leds/Makefile                          |    1 +
- drivers/leds/ledtrig-cpu.c                     |  144 ++++++++++++
- include/linux/leds.h                           |   15 ++
- 105 files changed, 1532 insertions(+), 3119 deletions(-)
- delete mode 100644 arch/arm/include/asm/leds.h
- delete mode 100644 arch/arm/kernel/leds.c
- delete mode 100644 arch/arm/mach-clps711x/p720t-leds.c
- delete mode 100644 arch/arm/mach-footbridge/ebsa285-leds.c
- delete mode 100644 arch/arm/mach-footbridge/netwinder-leds.c
- delete mode 100644 arch/arm/mach-ks8695/leds.c
- delete mode 100644 arch/arm/mach-omap1/leds-h2p2-debug.c
- delete mode 100644 arch/arm/mach-omap1/leds-innovator.c
- delete mode 100644 arch/arm/mach-omap1/leds-osk.c
- delete mode 100644 arch/arm/mach-omap1/leds.c
- delete mode 100644 arch/arm/mach-omap1/leds.h
- delete mode 100644 arch/arm/mach-pxa/leds-idp.c
- delete mode 100644 arch/arm/mach-pxa/leds-lubbock.c
- delete mode 100644 arch/arm/mach-pxa/leds-mainstone.c
- delete mode 100644 arch/arm/mach-pxa/leds.c
- delete mode 100644 arch/arm/mach-pxa/leds.h
- delete mode 100644 arch/arm/mach-sa1100/leds-assabet.c
- delete mode 100644 arch/arm/mach-sa1100/leds-badge4.c
- delete mode 100644 arch/arm/mach-sa1100/leds-cerf.c
- delete mode 100644 arch/arm/mach-sa1100/leds-hackkit.c
- delete mode 100644 arch/arm/mach-sa1100/leds-lart.c
- delete mode 100644 arch/arm/mach-sa1100/leds-simpad.c
- delete mode 100644 arch/arm/mach-sa1100/leds.c
- delete mode 100644 arch/arm/mach-sa1100/leds.h
+Cc: Richard Purdie <rpurdie@rpsys.net>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Bryan Wu <bryan.wu@canonical.com>
+---
+ drivers/leds/Kconfig       |   10 +++
+ drivers/leds/Makefile      |    1 +
+ drivers/leds/ledtrig-cpu.c |  144 ++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/leds.h       |   15 +++++
+ 4 files changed, 170 insertions(+), 0 deletions(-)
  create mode 100644 drivers/leds/ledtrig-cpu.c
 
+diff --git a/drivers/leds/Kconfig b/drivers/leds/Kconfig
+index 713d43b..186000a 100644
+--- a/drivers/leds/Kconfig
++++ b/drivers/leds/Kconfig
+@@ -446,6 +446,16 @@ config LEDS_TRIGGER_BACKLIGHT
+ 
+ 	  If unsure, say N.
+ 
++config LEDS_TRIGGER_CPU
++	bool "LED CPU Trigger"
++	depends on LEDS_TRIGGERS
++	help
++	  This allows LEDs to be controlled by active CPUs. This shows
++	  the active CPUs across an array of LEDs so you can see what
++	  CPUs are active on the system at any given moment.
++
++	  If unsure, say N.
++
+ config LEDS_TRIGGER_GPIO
+ 	tristate "LED GPIO Trigger"
+ 	depends on LEDS_TRIGGERS
+diff --git a/drivers/leds/Makefile b/drivers/leds/Makefile
+index bbfd2e3..5e70d2e 100644
+--- a/drivers/leds/Makefile
++++ b/drivers/leds/Makefile
+@@ -53,4 +53,5 @@ obj-$(CONFIG_LEDS_TRIGGER_IDE_DISK)	+= ledtrig-ide-disk.o
+ obj-$(CONFIG_LEDS_TRIGGER_HEARTBEAT)	+= ledtrig-heartbeat.o
+ obj-$(CONFIG_LEDS_TRIGGER_BACKLIGHT)	+= ledtrig-backlight.o
+ obj-$(CONFIG_LEDS_TRIGGER_GPIO)		+= ledtrig-gpio.o
++obj-$(CONFIG_LEDS_TRIGGER_CPU)		+= ledtrig-cpu.o
+ obj-$(CONFIG_LEDS_TRIGGER_DEFAULT_ON)	+= ledtrig-default-on.o
+diff --git a/drivers/leds/ledtrig-cpu.c b/drivers/leds/ledtrig-cpu.c
+new file mode 100644
+index 0000000..4d63ada
+--- /dev/null
++++ b/drivers/leds/ledtrig-cpu.c
+@@ -0,0 +1,144 @@
++/*
++ * ledtrig-cpu.c - LED trigger based on CPU activity
++ *
++ * Copyright 2011 Linus Walleij <linus.walleij@linaro.org>
++ * Copyright 2011 Bryan Wu <bryan.wu@canonical.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ */
++
++#include <linux/module.h>
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/slab.h>
++#include <linux/percpu.h>
++#include <linux/syscore_ops.h>
++#include "leds.h"
++
++struct cpu_trig_data {
++	struct led_classdev *led;
++};
++
++static DEFINE_PER_CPU(struct cpu_trig_data *, cpu_triggers);
++
++void ledtrig_cpu(enum cpu_led_event ledevt)
++{
++	struct cpu_trig_data *trigdata = __get_cpu_var(cpu_triggers);
++
++	if (!trigdata)
++		return;
++
++	/* Locate the correct CPU LED */
++
++	switch (ledevt) {
++	case CPU_LED_START:
++	case CPU_LED_IDLE_START:
++		/* Will turn the LED on, max brightness */
++		if (trigdata->led)
++			led_set_brightness(trigdata->led,
++					   trigdata->led->max_brightness);
++		break;
++
++	case CPU_LED_STOP:
++	case CPU_LED_IDLE_END:
++	case CPU_LED_HALTED:
++		/* Will turn the LED off */
++		if (trigdata->led)
++			led_set_brightness(trigdata->led, LED_OFF);
++		break;
++
++	default:
++		/* Will leave the LED as it is */
++		break;
++	}
++}
++EXPORT_SYMBOL(ledtrig_cpu);
++
++static void cpu_trig_activate_cpu(void *data)
++{
++	struct cpu_trig_data *cpu_data;
++	struct led_classdev *led = data;
++	int my_cpu = smp_processor_id();
++	unsigned long target_cpu = (unsigned long) led->trigger_data;
++
++	if (target_cpu != my_cpu)
++		return;
++
++	cpu_data = kzalloc(sizeof(*cpu_data), GFP_KERNEL);
++	if (!cpu_data)
++		return;
++
++	dev_info(led->dev, "led %s indicate activity on CPU %d\n",
++		 led->name, my_cpu);
++
++	cpu_data->led = led;
++	__get_cpu_var(cpu_triggers) = cpu_data;
++}
++
++static void cpu_trig_activate(struct led_classdev *led)
++{
++	on_each_cpu(cpu_trig_activate_cpu, led, 1);
++}
++
++static void cpu_trig_deactivate(struct led_classdev *led)
++{
++	struct cpu_trig_data *cpu_data = led->trigger_data;
++
++	kfree(cpu_data);
++}
++
++static struct led_trigger cpu_led_trigger = {
++	.name		= "cpu",
++	.activate	= cpu_trig_activate,
++	.deactivate	= cpu_trig_deactivate,
++};
++
++
++static int cpu_syscore_suspend(void)
++{
++	ledtrig_cpu(CPU_LED_STOP);
++	return 0;
++}
++
++static void cpu_syscore_resume(void)
++{
++	ledtrig_cpu(CPU_LED_START);
++}
++
++static void cpu_syscore_shutdown(void)
++{
++	ledtrig_cpu(CPU_LED_HALTED);
++}
++
++static struct syscore_ops cpu_syscore_ops = {
++	.shutdown	= cpu_syscore_shutdown,
++	.suspend	= cpu_syscore_suspend,
++	.resume		= cpu_syscore_resume,
++};
++
++static int __init cpu_trig_init(void)
++{
++	int ret;
++
++	ret = led_trigger_register(&cpu_led_trigger);
++	if (!ret)
++		register_syscore_ops(&cpu_syscore_ops);
++
++	return ret;
++}
++module_init(cpu_trig_init);
++
++static void __exit cpu_trig_exit(void)
++{
++	unregister_syscore_ops(&cpu_syscore_ops);
++	led_trigger_unregister(&cpu_led_trigger);
++}
++module_exit(cpu_trig_exit);
++
++MODULE_AUTHOR("Linus Walleij <linus.walleij@linaro.org>");
++MODULE_AUTHOR("Bryan Wu <bryan.wu@canonical.com>");
++MODULE_DESCRIPTION("CPU LED trigger");
++MODULE_LICENSE("GPL");
+diff --git a/include/linux/leds.h b/include/linux/leds.h
+index 5884def..94cdb9a 100644
+--- a/include/linux/leds.h
++++ b/include/linux/leds.h
+@@ -210,4 +210,19 @@ struct gpio_led_platform_data {
+ struct platform_device *gpio_led_register_device(
+ 		int id, const struct gpio_led_platform_data *pdata);
+ 
++#ifdef CONFIG_LEDS_TRIGGER_CPU
++enum cpu_led_event {
++	CPU_LED_IDLE_START,
++	CPU_LED_IDLE_END,
++	CPU_LED_START,
++	CPU_LED_STOP,
++	CPU_LED_HALTED
++};
++
++/* Use this routine to handle LEDs */
++extern void ledtrig_cpu(enum cpu_led_event evt);
++#else
++#define ledtrig_cpu(evt) do {} while (0)
++#endif
++
+ #endif		/* __LINUX_LEDS_H_INCLUDED */
 -- 
 1.7.5
