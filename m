@@ -1,34 +1,63 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 6 Jul 2011 00:19:01 -0600
-Subject: [PATCH v2 0/3] Add device tree probe support for imx fec driver
-In-Reply-To: <20110705.223045.738515407552627580.davem@davemloft.net>
-References: <1309878839-25743-1-git-send-email-shawn.guo@linaro.org>
-	<20110705.194854.1875695946300840388.davem@davemloft.net>
-	<20110705.223045.738515407552627580.davem@davemloft.net>
-Message-ID: <20110706061901.GH9978@ponder.secretlab.ca>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 06 Jul 2011 15:22:08 +0900
+Subject: [PATCH 2/2] SPI: SAMSUNG: Bug fix for SPI with different FIFO
+	level
+References: <BANLkTi=9c5asfr=Jg6xwjQZW_a369UO64Q@mail.gmail.com>
+	<BANLkTinFnFwBGi693JTD_iDykA2VkV+HOw@mail.gmail.com>
+	<BANLkTik0LERxBHmJc5ZnRotnD4CSveR-UQ@mail.gmail.com>
+	<BANLkTim9wdrqDgXVUjxzMv9cdWViLww=Bg@mail.gmail.com>
+	<BANLkTim40x4X_--K0z7gdodDjor0MUam5Q@mail.gmail.com>
+	<BANLkTinf6ec1yXeaFkZjHMnqZp7yymDq-w@mail.gmail.com>
+	<20110704065501.GP15152@ponder.secretlab.ca>
+	<CACxGe6urrZ9=1OgcaYF6EtvJokAyFTbFCnHPWsCY+sETVze8-w@mail.gmail.com>
+	<005501cc3a30$6c916190$45b424b0$%kim@samsung.com>
+	<005601cc3a32$64bd5fd0$2e381f70$%kim@samsung.com>
+	<20110704150607.GA29977@ponder.secretlab.ca>
+Message-ID: <00c101cc3ba5$0b573910$2205ab30$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 05, 2011 at 10:30:45PM -0700, David Miller wrote:
-> From: David Miller <davem@davemloft.net>
-> Date: Tue, 05 Jul 2011 19:48:54 -0700 (PDT)
+Kukjin Kim wrote:
 > 
-> > All applied to net-next-2.6, thanks.
+> Grant Likely wrote:
+> >
+> > On Mon, Jul 04, 2011 at 07:08:55PM +0900, Kukjin Kim wrote:
+> > > Kukjin Kim wrote:
+> > > >
+> > > > Thanks Grant, Jassi and all,
+> > > >
+> > > > I will apply these 1 and 2 in my -fix tree for 3.0 with your acks.
+> > > >
+> > > Oops, this needs previous 'cleanup spi platform specific code' so
+can't
+> > > apply -fix tree now.
+> >
+> > There may also be conflicts with the heavy rework in the spi tree.
+> > Kgene, when you pick up this series, can you put it into a separate
+> > topic branch and merge that into your main tree?  That way if there
+> > are difficult conflicts, then I can also merge that same topic branch
+> > into spi/next to resolve them.
+> >
+> Hi Grant,
 > 
-> Come on guys:
-> 
-> drivers/of/of_net.c: In function 'of_get_phy_mode':
-> drivers/of/of_net.c:45: error: implicit declaration of function 'of_property_read_string'
-> 
-> This is completely rediculious.
-> 
-> Don't tell me that it's appropriate to merge something into
-> my net tree when it uses interfaces that don't even exist
-> in Linus's tree.
+> Sure, no problem. I'm waiting for Padmavathi's new patch which is based on
+old
+> code not new SPI code. When I merge topic branch for this into my tree,
+let you
+> know immediately. Then if any problems, let's talk again :)
 
-Sorry about that, I missed the reference to that function which is
-currently in my devicetree/next branch.  I can either take the series
-via devicetree/next, or I can provide you with a topic branch
-containing the needed commit that you can merge.  Whichever you prefer.
+Hi,
 
-g.
+I made topic branch for this based on 3.0-rc6.
+git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+#for-spi
+
+If any problems, please let me know :)
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
