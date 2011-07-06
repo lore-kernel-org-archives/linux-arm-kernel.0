@@ -1,31 +1,30 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 7 Jul 2011 00:12:59 +0100
-Subject: [PATCH 05/10] ARM: mach-ixp4xx: move from ARM_DMA_ZONE_SIZE to
-	mdesc->dma_zone_size
-In-Reply-To: <1309919442-20451-5-git-send-email-nicolas.pitre@linaro.org>
+Date: Thu, 7 Jul 2011 00:15:21 +0100
+Subject: [PATCH 07/10] ARM: mach-realview: move from ARM_DMA_ZONE_SIZE
+	to mdesc->dma_zone_size
+In-Reply-To: <1309919442-20451-7-git-send-email-nicolas.pitre@linaro.org>
 References: <1309919442-20451-1-git-send-email-nicolas.pitre@linaro.org>
-	<1309919442-20451-5-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <20110706231259.GC8286@n2100.arm.linux.org.uk>
+	<1309919442-20451-7-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <20110706231521.GD8286@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 05, 2011 at 10:30:37PM -0400, Nicolas Pitre wrote:
-> +#if defined(config_PCI) && !defined(CONFIG_IXP4XX_INDIRECT_PCI)
-
-This won't fly.  CONFIG has to be upper case.  Multiple instances of
-that in this patch.
-
-> diff --git a/arch/arm/mach-ixp4xx/include/mach/memory.h b/arch/arm/mach-ixp4xx/include/mach/memory.h
-> index 34e7940..4caf176 100644
-> --- a/arch/arm/mach-ixp4xx/include/mach/memory.h
-> +++ b/arch/arm/mach-ixp4xx/include/mach/memory.h
-> @@ -14,8 +14,4 @@
->   */
->  #define PLAT_PHYS_OFFSET	UL(0x00000000)
->  
-> -#ifdef CONFIG_PCI
-> -#define ARM_DMA_ZONE_SIZE	SZ_64M
+On Tue, Jul 05, 2011 at 10:30:39PM -0400, Nicolas Pitre wrote:
+> -#ifdef CONFIG_ZONE_DMA
+> -#define ARM_DMA_ZONE_SIZE	SZ_256M
 > -#endif
+...
+> +	.dma_zone_size	= SZ_128M,
+> +	.dma_zone_size	= SZ_128M,
+> +	.dma_zone_size	= SZ_128M,
+> +	.dma_zone_size	= SZ_128M,
+> +	.dma_zone_size	= SZ_128M,
 
-And the addition of dependence on CONFIG_IXP4XX_INDIRECT_PCI needs someone
-from the IXP4xx folk to ACK as that's a functional change.
+Too small...
+
+I think you're rushing to get these patches ready for the 3.1 merge
+window...
+
+Given that these patches have only just appeared, and the number of
+sillies in them, they should wait for the next merge window _unless_
+they get a thorough review and test.
