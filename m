@@ -1,101 +1,161 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Wed,  6 Jul 2011 21:07:07 +0200
-Subject: [PATCH RESEND 2] arm: mach-vt8500: add forgotten irq_data conversion
-Message-ID: <1309979227-24578-1-git-send-email-w.sang@pengutronix.de>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 6 Jul 2011 13:08:03 -0600
+Subject: [RFC PATCH 5/5] OMAP: I2C: Convert I2C driver to use device tree
+In-Reply-To: <1309426647-31587-6-git-send-email-manjugk@ti.com>
+References: <1309426647-31587-1-git-send-email-manjugk@ti.com>
+	<1309426647-31587-6-git-send-email-manjugk@ti.com>
+Message-ID: <20110706190803.GN4871@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This platform has not been converted to 'struct irq_data' when the big
-pile was done. It fails to compile nowadays, because the compatibility
-code has gone.
+On Thu, Jun 30, 2011 at 03:07:27PM +0500, G, Manjunath Kondaiah wrote:
+> 
+> The OMAP I2C driver is modified to use platform_device data from
+> device tree data structures.
+> 
+> Signed-off-by: G, Manjunath Kondaiah <manjugk@ti.com>
 
-  CC      arch/arm/mach-vt8500/irq.o
-arch/arm/mach-vt8500/irq.c:118:2: error: unknown field 'ack' specified in initializer
-arch/arm/mach-vt8500/irq.c:118:2: warning: initialization from incompatible pointer type
-arch/arm/mach-vt8500/irq.c:119:2: error: unknown field 'mask' specified in initializer
-arch/arm/mach-vt8500/irq.c:119:2: warning: initialization from incompatible pointer type
-arch/arm/mach-vt8500/irq.c:120:2: error: unknown field 'unmask' specified in initializer
-arch/arm/mach-vt8500/irq.c:120:2: warning: initialization from incompatible pointer type
-arch/arm/mach-vt8500/irq.c:121:2: error: unknown field 'set_type' specified in initializer
-arch/arm/mach-vt8500/irq.c:121:2: warning: initialization from incompatible pointer type
-make[1]: *** [arch/arm/mach-vt8500/irq.o] Error 1
+Mostly looks good, but a few things that need to be fixed.  You can
+probably even get this change merged for v3.1
 
-Add the missing conversion. Tested on a JayPC-Tablet.
+> ---
+>  drivers/i2c/busses/i2c-omap.c |   30 +++++++++++++++++++++++++++++-
+>  1 files changed, 29 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+> index ae1545b..d4ccc52 100644
+> --- a/drivers/i2c/busses/i2c-omap.c
+> +++ b/drivers/i2c/busses/i2c-omap.c
+> @@ -38,9 +38,13 @@
+>  #include <linux/clk.h>
+>  #include <linux/io.h>
+>  #include <linux/of_i2c.h>
+> +#include <linux/of_irq.h>
+> +#include <linux/of_platform.h>
+> +#include <linux/of_address.h>
+>  #include <linux/slab.h>
+>  #include <linux/i2c-omap.h>
+>  #include <linux/pm_runtime.h>
+> +#include <plat/i2c.h>
+>  
+>  /* I2C controller revisions */
+>  #define OMAP_I2C_REV_2			0x20
+> @@ -972,6 +976,7 @@ static const struct i2c_algorithm omap_i2c_algo = {
+>  	.functionality	= omap_i2c_func,
+>  };
+>  
+> +static const struct of_device_id omap_i2c_of_match[];
+>  static int __devinit
+>  omap_i2c_probe(struct platform_device *pdev)
+>  {
+> @@ -979,10 +984,15 @@ omap_i2c_probe(struct platform_device *pdev)
+>  	struct i2c_adapter	*adap;
+>  	struct resource		*mem, *irq, *ioarea;
+>  	struct omap_i2c_bus_platform_data *pdata = pdev->dev.platform_data;
+> +	const struct of_device_id *match;
+>  	irq_handler_t isr;
+>  	int r;
+>  	u32 speed = 0;
+>  
+> +	match = of_match_device(omap_i2c_of_match, &pdev->dev);
+> +	if (!match)
+> +		dev_err(&pdev->dev, "DT: i2c device match not found.......\n");
+> +
 
-Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
-Acked-by: Alexey Charkov <alchark@gmail.com>
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Andrew Morton <akpm@linux-foundation.org>
----
+This isn't an error.  It just mean that the device wasn't registered
+from the device tree, and it needs to get its configuration from
+pdata.
 
-This fixes a build failure and is acked by the platform maintainer. As
-there might be no -rc7 and the release might be soon, I'll try adding
-two more people to CC to increase chances to have that issue sorted out
-in 3.0
+In fact, you don't even need this block since the driver never uses
+the match entry returned by of_match_device()
 
- arch/arm/mach-vt8500/irq.c |   21 ++++++++++++---------
- 1 files changed, 12 insertions(+), 9 deletions(-)
+>  	/* NOTE: driver uses the static register mapping */
+>  	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>  	if (!mem) {
+> @@ -1007,10 +1017,19 @@ omap_i2c_probe(struct platform_device *pdev)
+>  		r = -ENOMEM;
+>  		goto err_release_region;
+>  	}
+> -
 
-diff --git a/arch/arm/mach-vt8500/irq.c b/arch/arm/mach-vt8500/irq.c
-index 245140c..642de04 100644
---- a/arch/arm/mach-vt8500/irq.c
-+++ b/arch/arm/mach-vt8500/irq.c
-@@ -39,9 +39,10 @@
- static void __iomem *ic_regbase;
- static void __iomem *sic_regbase;
- 
--static void vt8500_irq_mask(unsigned int irq)
-+static void vt8500_irq_mask(struct irq_data *d)
- {
- 	void __iomem *base = ic_regbase;
-+	unsigned irq = d->irq;
- 	u8 edge;
- 
- 	if (irq >= 64) {
-@@ -64,9 +65,10 @@ static void vt8500_irq_mask(unsigned int irq)
- 	}
- }
- 
--static void vt8500_irq_unmask(unsigned int irq)
-+static void vt8500_irq_unmask(struct irq_data *d)
- {
- 	void __iomem *base = ic_regbase;
-+	unsigned irq = d->irq;
- 	u8 dctr;
- 
- 	if (irq >= 64) {
-@@ -78,10 +80,11 @@ static void vt8500_irq_unmask(unsigned int irq)
- 	writeb(dctr, base + VT8500_IC_DCTR + irq);
- }
- 
--static int vt8500_irq_set_type(unsigned int irq, unsigned int flow_type)
-+static int vt8500_irq_set_type(struct irq_data *d, unsigned int flow_type)
- {
- 	void __iomem *base = ic_regbase;
--	unsigned int orig_irq = irq;
-+	unsigned irq = d->irq;
-+	unsigned orig_irq = irq;
- 	u8 dctr;
- 
- 	if (irq >= 64) {
-@@ -114,11 +117,11 @@ static int vt8500_irq_set_type(unsigned int irq, unsigned int flow_type)
- }
- 
- static struct irq_chip vt8500_irq_chip = {
--	.name      = "vt8500",
--	.ack       = vt8500_irq_mask,
--	.mask      = vt8500_irq_mask,
--	.unmask    = vt8500_irq_unmask,
--	.set_type  = vt8500_irq_set_type,
-+	.name = "vt8500",
-+	.irq_ack = vt8500_irq_mask,
-+	.irq_mask = vt8500_irq_mask,
-+	.irq_unmask = vt8500_irq_unmask,
-+	.irq_set_type = vt8500_irq_set_type,
- };
- 
- void __init vt8500_init_irq(void)
--- 
-1.7.2.5
+Don't drop the empty line.
+
+> +	/* I2C device without DT might use this */
+
+No need for the comment.
+
+>  	if (pdata != NULL) {
+>  		speed = pdata->clkrate;
+>  		dev->set_mpu_wkup_lat = pdata->set_mpu_wkup_lat;
+> +	} else if (pdev->dev.of_node) {
+> +		const unsigned int *prop;
+> +		prop = of_get_property(pdev->dev.of_node,
+> +				"clock-frequency", NULL);
+> +		if (prop)
+> +			speed = be32_to_cpup(prop);
+> +		else
+> +			speed = 100;
+
+There is a new function that makes this easier.  Do this instead:
+
+	speed = 100;
+	if (of_property_read_u32(pdev->dev.of_node, "clock-frequency", &prop)
+		speed = prop / 1000000; /* speed in Hz, this might be wrong */
+
+> +		dev->set_mpu_wkup_lat = NULL;
+
+dev is kzalloced, which means set_mpu_wkup_lat is already NULL.
+
+>  	} else {
+>  		speed = 100;	/* Default speed */
+>  		dev->set_mpu_wkup_lat = NULL;
+> @@ -1045,6 +1064,7 @@ omap_i2c_probe(struct platform_device *pdev)
+>  
+>  	dev->rev = omap_i2c_read_reg(dev, OMAP_I2C_REV_REG) & 0xff;
+>  
+> +
+
+Drop the unrelated whitespace change.
+
+>  	if (dev->rev <= OMAP_I2C_REV_ON_3430)
+>  		dev->errata |= I2C_OMAP3_1P153;
+>  
+> @@ -1073,6 +1093,7 @@ omap_i2c_probe(struct platform_device *pdev)
+>  				       (1000 * speed / 8);
+>  	}
+>  
+> +
+
+Ditto.
+
+>  	/* reset ASAP, clearing any IRQs */
+>  	omap_i2c_init(dev);
+>  
+> @@ -1162,6 +1183,12 @@ static int omap_i2c_resume(struct device *dev)
+>  	return 0;
+>  }
+>  
+> +static const struct of_device_id omap_i2c_of_match[] = {
+> +	{.compatible = "ti,omap_i2c", },
+> +	{},
+> +}
+> +MODULE_DEVICE_TABLE(of, omap_i2c_of_match);
+> +
+
+This needs to be protected with #ifdef CONFIG_OF/#else/#endif.  Don't
+break non-dt builds.
+
+>  static struct dev_pm_ops omap_i2c_pm_ops = {
+>  	.suspend = omap_i2c_suspend,
+>  	.resume = omap_i2c_resume,
+> @@ -1178,6 +1205,7 @@ static struct platform_driver omap_i2c_driver = {
+>  		.name	= "omap_i2c",
+>  		.owner	= THIS_MODULE,
+>  		.pm	= OMAP_I2C_PM_OPS,
+> +		.of_match_table = omap_i2c_of_match,
+>  	},
+>  };
+>  
+> -- 
+> 1.7.4.1
+> 
