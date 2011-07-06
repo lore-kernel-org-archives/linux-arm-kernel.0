@@ -1,154 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 6 Jul 2011 15:44:20 +0200
-Subject: [PATCH 1/3] ARM: CSR: Adding CSR SiRFprimaII board support
-In-Reply-To: <CAGsJ_4zzrsKZRR4KCaeFGL9iT5OfMdhKjJE1wG3CGh8M2U4-UQ@mail.gmail.com>
-References: <1309945678-18813-1-git-send-email-bs14@csr.com>
-	<201107061341.38591.arnd@arndb.de>
-	<CAGsJ_4zzrsKZRR4KCaeFGL9iT5OfMdhKjJE1wG3CGh8M2U4-UQ@mail.gmail.com>
-Message-ID: <201107061544.20859.arnd@arndb.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 6 Jul 2011 14:48:06 +0100
+Subject: [PATCH V2 3/6] mpcore_wdt: Fix WDIOC_SETOPTIONS handling
+In-Reply-To: <1309892440-3260-4-git-send-email-vkuzmichev@mvista.com>
+References: <1286185540-19569-1-git-send-email-vkuzmichev@mvista.com>
+	<1309892440-3260-4-git-send-email-vkuzmichev@mvista.com>
+Message-ID: <20110706134806.GA8286@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 06 July 2011, Barry Song wrote:
-
-> > I would normally recommend defining the ranges so that addresses are local
-> > to the respective bus, like
-> >
-> >        axi {
-> >                ranges = <0 0x40000000 0x80000000>;
-> >
-> >                sys-iobg {
-> >                        ranges = <0 0x48000000 0x40000>;
-> >                        clock-controller at 0x88000000 {
-> >                               compatible = "sirf,prima2-clkc";
-> >                               reg = <0 0x1000>;
-> >                        }
-> >
-> >                        reset-controller at 0x88010000 {
-> >                               compatible = "sirf,prima2-rstc";
-> >                               reg = <0x10000 0x1000>;
-> >                        };
-> >                }
-> >        }
+On Tue, Jul 05, 2011 at 11:00:37PM +0400, Vitaly Kuzmichev wrote:
+> According to the include/linux/watchdog.h WDIOC_SETOPTIONS is
+> classified as 'read from device' ioctl call:
+>   #define WDIOC_SETOPTIONS        _IOR(WATCHDOG_IOCTL_BASE, 4, int)
 > 
-> i am not sure whether it make us a little more difficult to know the
-> real address at first glance.we will need to calculate.
-> all addresses are 1:1 mapped in this chip. bus map can work even
-> though we only give "ranges;" without real "ranges = <0x....>;".
-
-So each iobg still passes down the entire 32-bit address?
-
-Note that you never have to do the calculation in the driver
-source, of_iomap and the resource logic both take care of this.
-
-There are multiple ways to handle this, and an empty ranges property
-usually works fine, but I find that less readable.
-
-Another way to handle these is to have a separate range for
-each child bus, as in arch/powerpc/boot/dts/gef_ppc9a.dts
-
-To stay in the example, this would mean doing something like
-
-        axi {
-		#address-cells = <2>;
-                #size-cells = <1>;
-
-                ranges = <0 0 0x80000000 0x08000000 // axi devices
-			  1 0 0x88000000 0x08000000 // sys-iobg
-			  2 0 0x90000000 0x00010000 // mem-iobg
-			  3 0 0x90010000 0x07fe0000 // disp-iobg
-                          ... >;
-
-                l2-cache-controller at 80040000 {
-                        compatible = "arm,pl310-cache";
-                        reg = <0 0x40000 0x1000>;
-                        interrupts = <59>;
-                };
-
-                sys-iobg {
-			#address-cells = <1>;
-        	        #size-cells = <1>;
-                        ranges = <1 0 0 0x40000>;
-                        clock-controller at 88000000 {
-                               compatible = "sirf,prima2-clkc";
-                               reg = <0 0x1000>;
-                        }
-
-                        reset-controller at 88010000 {
-                               compatible = "sirf,prima2-rstc";
-                               reg = <0x10000 0x1000>;
-                        };
-                }
-        }
-
-
-
-> >> +
-> >> +                     graphics-iobg {
-> >> +                             compatible = "simple-bus";
-> >> +                             #address-cells = <1>;
-> >> +                             #size-cells = <1>;
-> >> +                             ranges = <0x98000000 0x98000000 0x8000000>;
-> >> +
-> >> +                             graphics at 0x98000000 {
-> >> +                                     compatible = "sirf,prima2-graphics";
-> >> +                                     reg = <0x98000000 0x8000000>;
-> >> +                                     interrupts = <6>;
-> >> +                             };
-> >> +                     };
-> >
-> > Are the display and graphics units CSR developments? If the GPU is
-> > in fact licensed from someone else (powervr, arm, ...), you should
-> > probably list the actual name of the device.
+> However, the driver 'mpcore_wdt' performs 'copy_from_user' only if
+> _IOC_WRITE is set, thus the local variable 'uarg' which is used in
+> WDIOC_SETOPTIONS handling remains uninitialized.
 > 
-> GPU is powervr sgx 531, so could we define compatible as "powervr,sgx531"?
+> The proper way to fix this is to bind WDIOC_SETOPTIONS to _IOW,
+> but this will break compatibility.
+> So adding additional condition for performing 'copy_from_user'.
 
-Probably yes. You should have a look if there are already bindings for
-this that define other attributes. Also, if there is any customization
-inside of the chip, you should have another more specific identifier
-that makes it possible that this is the version that csr has modified.
+That looks like something which needs fixing in watchdog land.  And it's
+not too difficult:
 
-> >> +                     multimedia-iobg {
-> >> +                             compatible = "simple-bus";
-> >> +                             #address-cells = <1>;
-> >> +                             #size-cells = <1>;
-> >> +                             ranges = <0xa0000000 0xa0000000 0x8000000>;
-> >> +
-> >> +                             multimedia at 0xa0000000 {
-> >> +                                     compatible = "sirf,prima2-multimedia";
-> >> +                                     reg = <0xa0000000 0x8000000>;
-> >> +                                     interrupts = <5>;
-> >> +                             };
-> >> +                     };
-> >
-> > "multimedia" sounds like a too generic term. What does this do?
-> 
->  video decoding.
+1. Change the existing WDIOC_SETOPTIONS to WDIOC_SETOPTIONS_OLD
+2. Add a new, correctly defined WDIOC_SETOPTIONS.
+3. Update all drivers to use WDIOC_SETOPTIONS.
+4. Provide a helper which deals with WDIOC_SETOPTIONS_OLD and translates
+   it to the proper WDIOC_SETOPTIONS call (this could be just:
 
-sirf,prima2-video-codec is probably better than, but if anyone has other
-suggestions, you could use something else.
+	if (cmd == WDIOC_SETOPTIONS_OLD) {
+		static int first = 1;
+		if (first)
+			pr_warn("%s:%d used old WDIOC_SETOPTIONS call.  Please rebuild\n",
+				current->comm, current->pid);
+		first = 0;
+		cmd = WDIOC_SETOPTIONS;
+	}
 
-> > Are these proprietary uarts, or are they compatible to 8250 and the
-> > like? You might want to set a clock-frequency property as of_serial.c
-> > uses.
-> 
-> it is not compatible with 8250 .
+   before any argument copies.
 
-ok
+This means you preserve existing compatibility with userspace, yet gain
+a path to a non-broken ioctl interface.
 
-> > Are these rtc implementations related? From the register layout, I would
-> > guess that they are supposed to be used by the same driver, so it's
-> > probably a good idea to add a "compatible" property with a common name
-> > for all three.
-> 
-> in fact, because they are slow, they can't be accessed by mapped
-> address directly, the only common point they have is we need to access
-> them through mapped address in rtc-iobg indirectly just like we access
-> i2c/spi/nand devices.
-> 
-> they are three different devices with different purpose and register
-> layout in fact.
-
-Ok.
-
-	Arnd
+As stuff gets rebuilt and replaced, you'll eventually be able to remove
+the above.  That period used to be two years for such simple changes.
