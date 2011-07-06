@@ -1,35 +1,19 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 6 Jul 2011 14:48:48 +0200
-Subject: [PATCH V2 6/6] mpcore_wdt: Move declarations in a separate header
-In-Reply-To: <4E1456D9.8090003@mvista.com>
-References: <1286185540-19569-1-git-send-email-vkuzmichev@mvista.com>
-	<201107061358.48496.arnd@arndb.de> <4E1456D9.8090003@mvista.com>
-Message-ID: <201107061448.49092.arnd@arndb.de>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Wed, 6 Jul 2011 20:50:21 +0800
+Subject: [GIT PULL] pxa: fixing patches for v3.0-rc6
+In-Reply-To: <20110706091518.GL8286@n2100.arm.linux.org.uk>
+References: <CAMPhdO_6CqVn_SdX-tPBtmHjkKH6kiWzuRkCDWkxaCUacReQhg@mail.gmail.com>
+	<20110706091518.GL8286@n2100.arm.linux.org.uk>
+Message-ID: <CAMPhdO98E3z83zj_mWU2X16_7hhYzMAsa0pExui1oLoPaNXeSQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 06 July 2011, Vitaly Kuzmichev wrote:
-> The patch is aimed to resolve checkpatch warning on "extern" function
-> prototype:
-> 
-> WARNING: externs should be avoided in .c files
-> #44: FILE: drivers/watchdog/mpcore_wdt.c:37:
-> +unsigned long twd_timer_get_rate(void);
-> 
-> If it's ok to leave this warning I would also like to throw out this patch.
-
-Ah, I see. That part is indeed an interface, so the declaration should be
-in a header file that gets included by both the clocksource and the watchdog
-driver.
-
-However, you should not put all the local declarations in the header,
-and the header needs to be in a location that gets included by
-drivers/clocksource/arm_smp_twd.c as well. In this case, I think
-it makes more sense to name that header based on the driver that
-exports the function, not based on the driver that uses it,
-or you can add it to an *appropriate* existing header file, if you
-can find one.
-
-An obvious choice would be arch/arm/include/asm/smp_twd.h.
-
-	Arnd
+On Wed, Jul 6, 2011 at 5:15 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Jul 06, 2011 at 12:11:29AM +0800, Eric Miao wrote:
+>> The following changes since commit fe0d42203cb5616eeff68b14576a0f7e2dd56625:
+>>
+>> ? Linux 3.0-rc6 (2011-07-04 15:56:24 -0700)
+>
+> Please send to Arnd.
+>
