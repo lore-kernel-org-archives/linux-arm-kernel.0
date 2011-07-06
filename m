@@ -1,243 +1,203 @@
-From: bryan.wu@canonical.com (Bryan Wu)
-Date: Wed,  6 Jul 2011 20:34:38 +0800
-Subject: [PATCH 08/17] mach-integrator: retire custom LED code
-In-Reply-To: <1309955687-19365-1-git-send-email-bryan.wu@canonical.com>
-References: <1309955687-19365-1-git-send-email-bryan.wu@canonical.com>
-Message-ID: <1309955687-19365-9-git-send-email-bryan.wu@canonical.com>
+From: J.Lambrecht@TELEVIC.com (=?utf-8?B?TGFtYnJlY2h0IErDvHJnZW4=?=)
+Date: Wed, 6 Jul 2011 14:39:37 +0200
+Subject: [PATCH] Add 'config IMX_NFC_V1_BISWAP' to swap the Bad block
+	Indicator, and use for imx27pdk nand support.
+In-Reply-To: <19988.19315.787284.113228@ipc1.ka-ro>
+References: <1309872828-13942-1-git-send-email-J.Lambrecht@televic.com>
+	<20110706080942.GC26347@pengutronix.de>	<4E142B18.60407@televic.com>
+	<19988.19315.787284.113228@ipc1.ka-ro>
+Message-ID: <4E145789.8040801@televic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use 4 LEDs in baseboard instead of the LED in core module.
+On 07/06/2011 01:48 PM, Lothar Wa?mann wrote:
+>
+> Hi,
+>
+> Lambrecht J?rgen writes:
+> > On 07/06/2011 10:09 AM, Sascha Hauer wrote:
+> > > On Tue, Jul 05, 2011 at 03:33:48PM +0200, J?rgen Lambrecht wrote:
+> > > > - Swap the BI-byte on position 0x7D0 with a data byte at 0x835.  To
+> > > fix a bug
+> > > >   in Freescale imx NFC v1 SoC's for 2K page NAND flashes: imx27 and
+> > > imx31.
+> > > >   Warning: The same solution needs to be applied to the boot loader
+> > > and the
+> > > >   flash programmer.
+> > > > - Enable NAND support for the imx27pdk (3ds), and use BISWAP.
+> > > >
+> > > > Signed-off-by: J?rgen Lambrecht <J.Lambrecht@televic.com>
+> > > > ---
+> > > >  arch/arm/mach-imx/Kconfig         |   30 
+> ++++++++++++++++++++++++++++--
+> > > >  arch/arm/mach-imx/mach-mx27_3ds.c |   14 ++++++++++++++
+> > > >  drivers/mtd/nand/mxc_nand.c       |   29 
+> +++++++++++++++++++++++++++++
+> > > >  3 files changed, 71 insertions(+), 2 deletions(-)
+> > > >
+> > > [snip]
+> > >
+> > > > +
+> > > > +config IMX_NFC_V1_BISWAP
+> > > > +     bool "Make the MXC 2kB-page NAND driver swap the Bad Block
+> > > Indicator"
+> > > > +     depends on MACH_MX27_3DS
+> > > > +     depends on MTD_NAND_MXC
+> > > > +     help
+> > > > +       Enable this if you want that the MXC NAND driver swaps the
+> > > Bad Block
+> > > > +       Indicator (BBI) byte. The IMX NFC v1 (present in IMX27 and
+> > > IMX31)
+> > > > +       contains a bug for 2kB-page flashes: the 2kB page is 
+> read out in
+> > > > +       4x512B chunks, so also the spare area is read out in 4
+> > > > +       chunks. Therefore the data area and the spare area becomes
+> > > > +       mixed. This causes a problem for the factory programmed 
+> BBI: it
+> > > > +       appears in the data area instead of the spare area, and is
+> > > > +       overwritten. This patch swaps that byte to the "real" spare
+> > > > +       area. WARNING: then also the bootloader and the flash
+> > > programmer must
+> > > > +       be patched!!
+> > >
+> > > I don't like this approach. IMO some code should be run on a virgin
+> > > flash which is aware of this issue and creates a correct bad block
+> > > table. You run this once and forget about this afterwards and every
+> > > kernel/bootloader can run without patching. Otherwise if you 
+> accidently
+> > > or intentionally start an older (unpatched) kernel your Nand gets
+> > > corrupted.
+> > >
+> > I see 3 solutions: rely on the quality of the NAND flash driver (1),
+> > patch the SW (2) or patch the HW (3).
+> >
+> > 1. A normal NAND flash driver relies on the ECC to detect a
+> > (potentially) bad block. But a factory bad block can have more bad bits
+> > that the specified ECC bits.
+> >     Solution is to check after each write if the data was written
+> > reliable: a write/read-back policy. (linux kernel option: Device Drivers
+> > -> MTD support -> NAND Device Support -> Verify NAND page writes)
+> >     This will of course slow-down writing a lot.
+> > 2. The Freescale solution: patch the SW:
+> >        1. flash programmer
+> >        2. boot-loader NAND driver
+> >        3. OS NAND driver
+> > 3. For the HW patch, a special SW must be written that must be executed
+> > before the board is programmed. That special SW must run in RAM and copy
+> > the BBI byte to the "swapped" place, so that after swapping, the BBI is
+> > at the good place. Then the SW must not be patched.
+> >     Risk: if this step is skipped, the factory BBI information is lost,
+> > and if the SW has no write/read-back policy (solution 1), data will be
+> > lost in some point in time.
+> >
+> That's nonsense. You cannot copy a byte inside a page that is not
+> programmable (that's what Bad Blocks are).
+>
+No, a Factory Bad Block is a block that when tested under worst-case 
+conditions has more erroneous bits that the ECC correctable ones. So 
+anyhow only those bits cannot be written, and under normal conditions 
+(room temperature..) it is best possible that all bits are again ok (my 
+Micron datasheets even warns that you should not erase a Factory Bad 
+Block, because there is a risk that it succeeds, hence also erasing the 
+bad block mark).
 
-The CPU activity LED is now handled by the trigger in the leds
-subsystem, retire this old CONFIG_LEDS-based code.
+But having investigated the matter further that i already had done, you 
+are indeed right that my 3d solution is a bit wrong: it may not be 
+possible to write that "swapped" place. But then the next page of the 
+block can be taken, as there are many pages, and only a few bad bits, 
+that will work.
+>
+> You only need to check the byte in a well known location once and
+> create a BBT in flash that carries the bad block information. After
+> that you need not check for any bad block markers any more, but simply
+> use the BBT.
+> Since you need to program the bootloader with some external tool
+> anyway, that tool is the right instance to do the bad block scan and
+> create the BBT.
+> That's what we at Ka-Ro are doing since the early days of the i.MX27
+> for all our i.MX boards.
+>
+Seems indeed the best solution. (but we took another solution because of 
+time, and being new to linux)
+But am I right that the BBT is a file-system dependent meta data?
+>
+>
+> > Your solution is (3), but for the linux rootfs partition only, using the
+> > BBT. Of course bootloader partitions and the linux kernel binary are not
+> > written often, but I read (several times, and also been told) that even
+> > when only reading a nand flash it can become bad!
+> > I still have to investigate this for how to solve this in the 
+> bootloader..
+> >
+> You are mixing up two different things. The Bad block markers in
+> certain locations in the OOB area mark 'Factory bad blocks'
+> i.e. blocks that are already bad when you apply power to the flash for
+> the first time. The manufacturer guarantees that initial bad blocks
+> can be detected by checking those locations for a non-FF value.
+> There is no guarantee that you may be able to write any specific value
+> to a certain byte in a block that has turned bad due to wearout or
+> whatever at any later time. Thus bad blocks that appear due to wearout
+> should be kept track of in the BBT, not by writing any 'bad block
+> markers' to the defective blocks themselves.
+>
+Same remark: not completely right: only some bits are wrong (number of 
+ECC bits +1, and as you do not touch the block anymore, no more bits 
+will get corrupted).
+But indeed the byte of the bad-block-marker location in the first page 
+could contain erroneous bits. And to comment on Artem Bityutskiy's mail, 
+then the next page of that (bad) block can be tried (and so on), finally 
+it will work. But then of course the flash file system must be designed 
+to do that.
+However, I agree that bad blocks should be kept track of in the BBT.
+>
+>
+> > > Also, my comment above applies here too. You added a 'depends on the
+> > > board I care of', but usually my kernels have all available boards
+> > > compiled in. So I can select this option and it will change the
+> > > behaviour of all boards I might run the kernel on, not only the
+> > > ones you depend on above.
+> > Ok, i should then find a better way to do it.
+> > But, the mxc_nand.c code contains this to protect it: 'if
+> > ((mtd->writesize > 512) && nfc_is_v1())'.
+> > Am I correct that all nfc-v1's have that bug, so only imx27 and imx51?
+> > The application note we finally got from freescale only mentions "FSL
+> > IMX NFC".
+> >
+> It's not exactly a bug (which would be possible to get fixed), but an
+> inherent feature of the controller which handles NAND flash with a
+> page size larger than 512 byte like it has n pages of 512 byte.
+>
+OK, a "hardware bug" then (can be fixed with a re-write of the 
+VHDL/Verilog code of the NFC, giving v2). It seems to me Freescale tried 
+to enhance their 512B-page controller with to possibility to also handle 
+2kB pages, but they forgot about the Factory Bad Block byte (n=4 only).
+So to reply to your next mail: only the imx27 and imx31 (thanks sascha, 
+it was a typo to mention 51) have the NFC v1, I believe all the others 
+have NFC v2, which are fixed.
 
-Signed-off-by: Bryan Wu <bryan.wu@canonical.com>
----
- arch/arm/Kconfig                  |    7 ++
- arch/arm/mach-integrator/Makefile |    3 +-
- arch/arm/mach-integrator/core.c   |    1 -
- arch/arm/mach-integrator/leds.c   |  147 +++++++++++++++++++------------------
- 4 files changed, 84 insertions(+), 74 deletions(-)
+Kind regards,
+J?rgen
+>
+>
+>
+> Lothar Wa?mann
+> --
+> ___________________________________________________________
+>
+> Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+> Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+> Gesch?ftsf?hrer: Matthias Kaussen
+> Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+>
+> www.karo-electronics.de | info at karo-electronics.de
+> ___________________________________________________________
+>
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index df971c7..066009a 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -243,6 +243,13 @@ config ARCH_INTEGRATOR
- 	select GENERIC_CLOCKEVENTS
- 	select PLAT_VERSATILE
- 	select PLAT_VERSATILE_FPGA_IRQ
-+	select NEW_LEDS
-+	select LEDS_CLASS
-+	select LEDS_TRIGGERS
-+	select LEDS_TRIGGER_CPU
-+	select LEDS_TRIGGER_HEARTBEAT
-+	select LEDS_TRIGGER_DEFAULT_ON
-+
- 	help
- 	  Support for ARM's Integrator platform.
- 
-diff --git a/arch/arm/mach-integrator/Makefile b/arch/arm/mach-integrator/Makefile
-index ebeef96..5521d18 100644
---- a/arch/arm/mach-integrator/Makefile
-+++ b/arch/arm/mach-integrator/Makefile
-@@ -4,11 +4,10 @@
- 
- # Object file lists.
- 
--obj-y					:= core.o lm.o
-+obj-y					:= core.o lm.o leds.o
- obj-$(CONFIG_ARCH_INTEGRATOR_AP)	+= integrator_ap.o
- obj-$(CONFIG_ARCH_INTEGRATOR_CP)	+= integrator_cp.o
- 
--obj-$(CONFIG_LEDS)			+= leds.o
- obj-$(CONFIG_PCI)			+= pci_v3.o pci.o
- obj-$(CONFIG_CPU_FREQ_INTEGRATOR)	+= cpu.o
- obj-$(CONFIG_INTEGRATOR_IMPD1)		+= impd1.o
-diff --git a/arch/arm/mach-integrator/core.c b/arch/arm/mach-integrator/core.c
-index 77315b9..c4753d8 100644
---- a/arch/arm/mach-integrator/core.c
-+++ b/arch/arm/mach-integrator/core.c
-@@ -28,7 +28,6 @@
- #include <asm/irq.h>
- #include <mach/cm.h>
- #include <asm/system.h>
--#include <asm/leds.h>
- #include <asm/mach/time.h>
- #include <asm/pgtable.h>
- 
-diff --git a/arch/arm/mach-integrator/leds.c b/arch/arm/mach-integrator/leds.c
-index 28be186..21a5d97 100644
---- a/arch/arm/mach-integrator/leds.c
-+++ b/arch/arm/mach-integrator/leds.c
-@@ -1,91 +1,96 @@
- /*
-- *  linux/arch/arm/mach-integrator/leds.c
-+ * Driver for the 4 user LEDs found on the Integrator AP/CP baseboard
-+ * Based on Versatile and RealView machine LED code
-  *
-- *  Integrator/AP and Integrator/CP LED control routines
-- *
-- *  Copyright (C) 1999 ARM Limited
-- *  Copyright (C) 2000 Deep Blue Solutions Ltd
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-+ * License terms: GNU General Public License (GPL) version 2
-+ * Author: Bryan Wu <bryan.wu@canonical.com>
-  */
- #include <linux/kernel.h>
- #include <linux/init.h>
--#include <linux/smp.h>
--#include <linux/spinlock.h>
- #include <linux/io.h>
-+#include <linux/slab.h>
-+#include <linux/leds.h>
- 
- #include <mach/hardware.h>
- #include <mach/platform.h>
--#include <asm/leds.h>
--#include <asm/system.h>
--#include <asm/mach-types.h>
--#include <mach/cm.h>
- 
--static int saved_leds;
-+#define ALPHA_REG __io_address(INTEGRATOR_DBG_BASE)
-+#define LEDREG	(__io_address(INTEGRATOR_DBG_BASE) + INTEGRATOR_DBG_LEDS_OFFSET)
-+
-+struct integrator_led {
-+	struct led_classdev	cdev;
-+	u8			mask;
-+};
-+
-+/*
-+ * The triggers lines up below will only be used if the
-+ * LED triggers are compiled in.
-+ */
-+static const struct {
-+	const char *name;
-+	const char *trigger;
-+} integrator_leds[] = {
-+	{ "integrator:green0", "heartbeat", },
-+	{ "integrator:yellow", "cpu", },
-+	{ "integrator:red", "default-on" },
-+	{ "integrator:green1", },
-+};
- 
--static void integrator_leds_event(led_event_t ledevt)
-+static void integrator_led_set(struct led_classdev *cdev,
-+			      enum led_brightness b)
- {
--	unsigned long flags;
--	const unsigned int dbg_base = IO_ADDRESS(INTEGRATOR_DBG_BASE);
--	unsigned int update_alpha_leds;
--
--	// yup, change the LEDs
--	local_irq_save(flags);
--	update_alpha_leds = 0;
--
--	switch(ledevt) {
--	case led_idle_start:
--		cm_control(CM_CTRL_LED, 0);
--		break;
--
--	case led_idle_end:
--		cm_control(CM_CTRL_LED, CM_CTRL_LED);
--		break;
--
--	case led_timer:
--		saved_leds ^= GREEN_LED;
--		update_alpha_leds = 1;
--		break;
--
--	case led_red_on:
--		saved_leds |= RED_LED;
--		update_alpha_leds = 1;
--		break;
--
--	case led_red_off:
--		saved_leds &= ~RED_LED;
--		update_alpha_leds = 1;
--		break;
--
--	default:
--		break;
--	}
-+	struct integrator_led *led = container_of(cdev,
-+						 struct integrator_led, cdev);
-+	u32 reg = __raw_readl(LEDREG);
- 
--	if (update_alpha_leds) {
--		while (__raw_readl(dbg_base + INTEGRATOR_DBG_ALPHA_OFFSET) & 1);
--		__raw_writel(saved_leds, dbg_base + INTEGRATOR_DBG_LEDS_OFFSET);
--	}
--	local_irq_restore(flags);
-+	if (b != LED_OFF)
-+		reg |= led->mask;
-+	else
-+		reg &= ~led->mask;
-+
-+	while (__raw_readl(ALPHA_REG) & 1)
-+		cpu_relax();
-+
-+	__raw_writel(reg, LEDREG);
- }
- 
--static int __init leds_init(void)
-+static enum led_brightness integrator_led_get(struct led_classdev *cdev)
- {
--	if (machine_is_integrator() || machine_is_cintegrator())
--		leds_event = integrator_leds_event;
-+	struct integrator_led *led = container_of(cdev,
-+						 struct integrator_led, cdev);
-+	u32 reg = __raw_readl(LEDREG);
-+
-+	return (reg & led->mask) ? LED_FULL : LED_OFF;
-+}
-+
-+static int __init integrator_leds_init(void)
-+{
-+	int i;
-+
-+	for (i = 0; i < ARRAY_SIZE(integrator_leds); i++) {
-+		struct integrator_led *led;
-+
-+		led = kzalloc(sizeof(*led), GFP_KERNEL);
-+		if (!led)
-+			break;
-+
-+		led->cdev.name = integrator_leds[i].name;
-+		led->cdev.brightness_set = integrator_led_set;
-+		led->cdev.brightness_get = integrator_led_get;
-+		led->cdev.default_trigger = integrator_leds[i].trigger;
-+		led->mask = BIT(i);
-+
-+		if (led_classdev_register(NULL, &led->cdev) < 0) {
-+			kfree(led);
-+			break;
-+		}
-+	}
- 
- 	return 0;
- }
- 
--core_initcall(leds_init);
-+/*
-+ * Since we may have triggers on any subsystem, defer registration
-+ * until after subsystem_init.
-+ */
-+fs_initcall(integrator_leds_init);
+
 -- 
-1.7.5
+J?rgen Lambrecht
+R&D Associate
+Tel: +32 (0)51 303045    Fax: +32 (0)51 310670
+http://www.televic-rail.com
+Televic Rail NV - Leo Bekaertlaan 1 - 8870 Izegem - Belgium
+Company number 0825.539.581 - RPR Kortrijk
