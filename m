@@ -1,26 +1,28 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 6 Jul 2011 23:55:50 +0100
-Subject: [PATCHv2] arm: platsmp: Allow secondary cpu hotplug with maxcpus=1
-In-Reply-To: <1309886957-7548-1-git-send-email-sboyd@codeaurora.org>
-References: <1309886957-7548-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20110706225550.GA28957@n2100.arm.linux.org.uk>
+Date: Thu, 7 Jul 2011 00:04:55 +0100
+Subject: [PATCH 01/10] ARM: change ARM_DMA_ZONE_SIZE into a variable
+In-Reply-To: <1309919442-20451-1-git-send-email-nicolas.pitre@linaro.org>
+References: <1309919442-20451-1-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <20110706230455.GZ8286@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 05, 2011 at 10:29:17AM -0700, Stephen Boyd wrote:
-> If an ARM system has multiple cpus in the same socket and the
-> kernel is booted with maxcpus=1, secondary cpus are possible but
-> not present due to how platform_smp_prepare_cpus() is called.
-> Since most typical ARM processors don't actually support physical
-> hotplug, initialize the present map to be equal to the possible
-> map in generic ARM SMP code. Also, always call
-> platform_smp_prepare_cpus() as long as max_cpus is non-zero (0
-> means no SMP) to allow platform code to do any SMP setup.
-> 
-> After applying this patch it's possible to boot an ARM system
-> with maxcpus=1 on the command line and then hotplug in secondary
-> cpus via sysfs. This is more in line with how x86 does things.
+On Tue, Jul 05, 2011 at 10:30:33PM -0400, Nicolas Pitre wrote:
+> +extern unsigned long arm_dma_zone_size;
+> +#define MAX_DMA_ADDRESS	(PAGE_OFFSET + arm_dma_zone_size)
+...
+> -#ifndef ARM_DMA_ZONE_SIZE
+> +#ifndef CONFIG_ZONE_DMA
+>  #define ISA_DMA_THRESHOLD	(0xffffffffULL)
+>  #else
+> -#define ISA_DMA_THRESHOLD	(PHYS_OFFSET + ARM_DMA_ZONE_SIZE - 1)
+> +#define ISA_DMA_THRESHOLD	({ \
+> +	extern unsigned long arm_dma_zone_size; \
+> +	arm_dma_zone_size ? \
+> +		(PHYS_OFFSET + arm_dma_zone_size - 1) : 0xffffffffULL; })
 
-Ok - how about putting this in the patch system?
-
-Thanks.
+These two usages do not agree.  With unrestricted DMA, both
+MAX_DMA_ADDRESS and ISA_DMA_THRESHOLD should be 0xffffffff.  However,
+you get that with arm_dma_zone_size=0 for ISA_DMA_THRESHOLD, which
+then gives a MAX_DMA_ADDRESS of PAGE_OFFSET.  So this potentially
+changes the behaviour of these macros.
