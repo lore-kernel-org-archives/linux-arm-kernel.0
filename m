@@ -1,51 +1,37 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Wed, 6 Jul 2011 15:53:05 +0200
-Subject: [PATCH] Add 'config IMX_NFC_V1_BISWAP' to swap the Bad block
-	Indicator, and use for imx27pdk nand support.
-In-Reply-To: <4E145789.8040801@televic.com>
-References: <1309872828-13942-1-git-send-email-J.Lambrecht@televic.com>
-	<20110706080942.GC26347@pengutronix.de>
-	<4E142B18.60407@televic.com> <19988.19315.787284.113228@ipc1.ka-ro>
-	<4E145789.8040801@televic.com>
-Message-ID: <19988.26817.208939.223896@ipc1.ka-ro>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 6 Jul 2011 15:56:23 +0200
+Subject: [GIT PULL] pxa: fixing patches for v3.0-rc6
+In-Reply-To: <CAMPhdO_6CqVn_SdX-tPBtmHjkKH6kiWzuRkCDWkxaCUacReQhg@mail.gmail.com>
+References: <CAMPhdO_6CqVn_SdX-tPBtmHjkKH6kiWzuRkCDWkxaCUacReQhg@mail.gmail.com>
+Message-ID: <201107061556.23356.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Lambrecht J?rgen writes:
-> On 07/06/2011 01:48 PM, Lothar Wa?mann wrote:
-> > > Am I correct that all nfc-v1's have that bug, so only imx27 and imx51?
-> > > The application note we finally got from freescale only mentions "FSL
-> > > IMX NFC".
-> > >
-> > It's not exactly a bug (which would be possible to get fixed), but an
-> > inherent feature of the controller which handles NAND flash with a
-> > page size larger than 512 byte like it has n pages of 512 byte.
-> >
-> OK, a "hardware bug" then (can be fixed with a re-write of the 
-> VHDL/Verilog code of the NFC, giving v2). It seems to me Freescale tried 
-> to enhance their 512B-page controller with to possibility to also handle 
-> 2kB pages, but they forgot about the Factory Bad Block byte (n=4 only).
-> So to reply to your next mail: only the imx27 and imx31 (thanks sascha, 
-> it was a typo to mention 51) have the NFC v1, I believe all the others 
-> have NFC v2, which are fixed.
+On Tuesday 05 July 2011, Eric Miao wrote:
+> The following changes since commit fe0d42203cb5616eeff68b14576a0f7e2dd56625:
 > 
-How do you come to that conclusion? All the controllers share the same
-flash buffer layout and map it to the actual flash data in the same
-way. Thus the problem exists for all of them.
-And the original Freescale code for i.MX5 et al. handles the bad block
-markers in the same way as for i.MX2 or i.MX3.
+>   Linux 3.0-rc6 (2011-07-04 15:56:24 -0700)
+> 
+> are available in the git repository at:
+>   git://git.kernel.org/pub/scm/linux/kernel/git/ycmiao/pxa-linux-2.6.git fix
+> 
+> Lei Wen (2):
+>       ARM: pxa910: correct nand pmu setting
+>       ARM: pxa168: correct nand pmu setting
+> 
+> Paul Parsons (1):
+>       ARM: pxa: fix PGSR register address calculation
+> 
 
+Merged into arm/soc#pxa/fixes
 
-Lothar Wa?mann
--- 
-___________________________________________________________
+I'll wait a few days for other soc maintainers to send fixes and then
+send a consolidated pull request.
 
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+I noticed that none of these have a cc:stable at kernel.org tag, but the
+code that you patch has been in the same state since 2009 or early 2010,
+respectively. Are you sure the fixes are not needed on older kernels?
 
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Thanks,
+
+	Arnd
