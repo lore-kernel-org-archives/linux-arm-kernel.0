@@ -1,79 +1,47 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 6 Jul 2011 18:57:51 +0200
-Subject: [GIT PULL] pxa: patches for v3.1
-In-Reply-To: <CAMPhdO-Xy69r5P-GZivUjsho81k1b_m_mAYM2hxtBt2X3W=42A@mail.gmail.com>
-References: <CAMPhdO-Xy69r5P-GZivUjsho81k1b_m_mAYM2hxtBt2X3W=42A@mail.gmail.com>
-Message-ID: <201107061857.51896.arnd@arndb.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 6 Jul 2011 18:02:29 +0100
+Subject: [PATCH 6/8] drivers: add Contiguous Memory Allocator
+In-Reply-To: <alpine.DEB.2.00.1107061100290.17624@router.home>
+References: <1309851710-3828-1-git-send-email-m.szyprowski@samsung.com>
+	<201107061609.29996.arnd@arndb.de>
+	<20110706142345.GC8286@n2100.arm.linux.org.uk>
+	<201107061651.49824.arnd@arndb.de>
+	<20110706154857.GG8286@n2100.arm.linux.org.uk>
+	<alpine.DEB.2.00.1107061100290.17624@router.home>
+Message-ID: <20110706170229.GI8286@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 05 July 2011, Eric Miao wrote:
-> The following changes since commit fe0d42203cb5616eeff68b14576a0f7e2dd56625:
+On Wed, Jul 06, 2011 at 11:05:00AM -0500, Christoph Lameter wrote:
+> On Wed, 6 Jul 2011, Russell King - ARM Linux wrote:
+> 
+> > > > they typically don't fall into the highmem zone.  As the dmabounce
+> > > > code allocates from the DMA coherent allocator to provide it with
+> > > > guaranteed DMA-able memory, that would be rather inconvenient.
+> > >
+> > > True. The dmabounce code would consequently have to allocate
+> > > the memory through an internal function that avoids the
+> > > contiguous allocation area and goes straight to ZONE_DMA memory
+> > > as it does today.
+> >
+> > CMA's whole purpose for existing is to provide _dma-able_ contiguous
+> > memory for things like cameras and such like found on crippled non-
+> > scatter-gather hardware.  If that memory is not DMA-able what's the
+> > point?
+> 
+> ZONE_DMA is a zone for memory of legacy (crippled) devices that cannot DMA
+> into all of memory (and so is ZONE_DMA32). Memory from ZONE_NORMAL can be
+> used for DMA as well and a fully capable device would be expected to
+> handle any memory in the system for DMA transfers.
+> 
+> "guaranteed" dmaable memory? DMA abilities are device specific. Well maybe
+> you can call ZONE_DMA memory to be guaranteed if you guarantee that any
+> device must at mininum be able to perform DMA into ZONE_DMA memory. But
+> there may not be much of that memory around so you would want to limit
+> the use of that scarce resource.
 
-Hi Eric,
-
-You are mixing very different kinds of patches here, I'd much prefer to
-get separate pull requests for them by category. Looking at the changelogs, it
-seems that there should be three of these:
-
-Bug fixes:
-> Jonathan Cameron (2):
->       pcmcia: pxa2xx/vpac270: free gpios on exist rather than requesting
-> Daniel Mack (1):
->       ARM: pxa/raumfeld: fix device name for codec ak4104
-> Sven Neumann (2):
->       ARM: pxa/raumfeld: adapt to upcoming hardware change
->       ARM: pxa/raumfeld: display initialisation fixes
-> Linus Walleij (1):
->       ARM: pxa: fix gpio_to_chip() clash with gpiolib namespace
-
-Cleanups:
-> Jonathan Cameron (2):
->       pcmcia: pxa2xx/trizeps4: remove unnecessary ifdefs
-> Dmitry Eremin-Solenikov (1):
->       ARM: scoop: drop pcmcia_init callback
-> Philipp Zabel (4):
->       ARM: pxa/magician: fix MAGICIAN_EGPIO_BASE, align with NR_BUILTIN_GPIO
->       ARM: pxa/magician: use gpio arrays for backlight and global gpios
->       ARM: pxa/hx4700: use gpio arrays for global gpios
->       ARM: pxa/mioa701: use gpio arrays for global and gsm gpios
-> Igor Grinberg (4):
->       ARM: pxa/cm-x300: fix V3020 RTC functionality
->       ARM: pxa/cm-x300: GPIO cleanup
->       ARM: pxa/cm-x300: minor style cleanup
->       ARM: pxa/cm-x300: update cm_x300_defconfig
-> Eric Miao (7):
->       ARM: pxa: enable AUTO_ZRELADDR
->       ARM: pxa: add common header file for pxa3xx
->       ARM: pxa: move declarations from generic.h to <soc>.h
->       ARM: pxa/saarb: make use of pxa3xx_map_io()
-
-Features:
-> Haojian Zhuang (2):
->       ARM: mmp/dkb: enable max7312 gpio expander
-> Tanmay Upadhyay (3):
->       ARM: pxa168: Add support for UART3
->       ARM: pxa168: Add support for Ethernet
->       ARM: pxa168: Add board support for gplugD
-> Vasily Khoruzhick (1):
->       ARM: pxa/z2: add poweroff function
-> Haojian Zhuang (2):
->       ARM: pxa: add clk_set_rate()
-> Eric Miao (7):
->       ARM: pxa: avoid accessing interrupt registers directly
->       ARM: pxa: introduce {icip,ichp}_handle_irq() to prepare MULTI_IRQ_HANDLER
->       ARM: pxa: enable MULTI_IRQ_HANDLER for all boards
-
-Can you split up the series roughly along these lines and send me
-new pull requests? I'd like to be able to mix and match these with
-stuff for the other SoCs where it makes sense, when I send a pull
-request to Linus. That way, if there is too much pushback on new features,
-we can still get all the cleanups and bug fixes in, and don't end up with
-some platforms getting lucky because they are sent first, while the others
-are too much and don't get anything in.
-
-Obviously I hope to get everything merged, but if a pull request looks
-like the one you sent me, I'd rather not take it at all. The individual
-patches all look good to me though, no objection there.
-
-	Arnd
+Precisely, which is what ZONE_DMA is all about.  I *have* been a Linux
+kernel hacker for the last 18 years and do know these things, especially
+as ARM has had various issues with DMA memory limitations over those
+years - and have successfully had platforms working reliably given that
+and ZONE_DMA.
