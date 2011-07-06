@@ -1,49 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 6 Jul 2011 14:35:01 +0100
-Subject: [PATCH 01/17] leds: create a trigger for CPU activity
-In-Reply-To: <CAMPhdO9QmCpGFB8fd5Rp-a0iAv1ByA962FZKOwc59R86OTpxAQ@mail.gmail.com>
-References: <1309955687-19365-1-git-send-email-bryan.wu@canonical.com>
-	<1309955687-19365-2-git-send-email-bryan.wu@canonical.com>
-	<CAMPhdO9QmCpGFB8fd5Rp-a0iAv1ByA962FZKOwc59R86OTpxAQ@mail.gmail.com>
-Message-ID: <20110706133501.GY8286@n2100.arm.linux.org.uk>
+From: anemo@mba.ocn.ne.jp (Atsushi Nemoto)
+Date: Wed, 06 Jul 2011 22:41:01 +0900 (JST)
+Subject: PAD_CTL_DVS bit on MX51
+Message-ID: <20110706.224101.253170565.anemo@mba.ocn.ne.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 06, 2011 at 09:16:47PM +0800, Eric Miao wrote:
-> On Wed, Jul 6, 2011 at 8:34 PM, Bryan Wu <bryan.wu@canonical.com> wrote:
-> > + ? ? ? switch (ledevt) {
-> > + ? ? ? case CPU_LED_START:
-> > + ? ? ? case CPU_LED_IDLE_START:
-> > + ? ? ? ? ? ? ? /* Will turn the LED on, max brightness */
-> > + ? ? ? ? ? ? ? if (trigdata->led)
-> > + ? ? ? ? ? ? ? ? ? ? ? led_set_brightness(trigdata->led,
-> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?trigdata->led->max_brightness);
-> > + ? ? ? ? ? ? ? break;
-> > +
-> > + ? ? ? case CPU_LED_STOP:
-> > + ? ? ? case CPU_LED_IDLE_END:
-> > + ? ? ? case CPU_LED_HALTED:
-> > + ? ? ? ? ? ? ? /* Will turn the LED off */
-> > + ? ? ? ? ? ? ? if (trigdata->led)
-> > + ? ? ? ? ? ? ? ? ? ? ? led_set_brightness(trigdata->led, LED_OFF);
-> > + ? ? ? ? ? ? ? break;
-> > +
-> > + ? ? ? default:
-> > + ? ? ? ? ? ? ? /* Will leave the LED as it is */
-> > + ? ? ? ? ? ? ? break;
-> > + ? ? ? }
-> > +}
-> 
-> I'm a bit worrying about the LED brightness hardcoded here, what if
-> a platform requires different behavior, e.g. LED_OFF when IDLE_START.
+I have question about MX51 pin settings.
+There is PAD_CTL_DVS definition in iomux-v3.h:
 
-Indeed - there are platforms (Netwinder, Assabet etc) which use LED=ON
-to mean that the system is not idle - and also turn the LED on when
-halted.
+#define PAD_CTL_DVS			(1 << 13)
 
-A change of behaviour could be fairly disasterous too.  Eg, some people
-use Netwinders in a stand-alone mode, and getting the LED behaviour correct
-is _critical_ as it is the only display that some people may see - and
-they may use that display to decide whether they can pull the power after
-shutdown.  Changing it may mean that they end up pulling the power while
-the system is still alive.
+I'm not sure what "DVS" mean, but I suppose this is HVE bit in MX51
+reference manual.
+
+HVE: High / Low Output Voltage Range. This bit selects the output
+     voltage mode for XXX.
+    0 High output voltage mode
+    1 Low output voltage mode
+
+Currently there are several usages of this definition in iomux-mx51.h.
+MX51_SDHCI_PAD_CTRL is used for SD pins, and MX51_PAD_CTRL_4 and
+MX51_PAD_CTRL_5 are used for FEC pins.
+
+If I understand correctly the MX51 EVK hardware, FEC pins are 1.8V and
+SD pins are 3.15V, so it is strange that all those pins use
+PAD_CTL_DVS.
+
+Is MX51_SDHCI_PAD_CTRL (MX51 EVK SD pins) really needs PAD_CTL_DVS
+bit?
+I want to know expected pin settings for these signals.
+
+
+And also, I know there are following definitions in u-boot iomux.h:
+	PAD_CTL_DRV_VOT_LOW = 0x0 << 13, /* Low voltage mode */
+	PAD_CTL_DRV_VOT_HIGH = 0x1 << 13,/* High voltage mode */
+These symbols are reversed from reference manual.
+It seems there are some confusion about meaning of the bit...
+
+Any comments from MX51 experts are welcome.  Thanks.
+
+---
+Atsushi Nemoto
