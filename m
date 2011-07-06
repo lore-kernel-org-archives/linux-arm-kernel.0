@@ -1,99 +1,61 @@
 From: bs14@csr.com (Barry Song)
-Date: Wed, 6 Jul 2011 02:47:55 -0700
-Subject: [PATCH 0/3] ARM: CSR: Adding CSR SiRFprimaII platform
-Message-ID: <1309945678-18813-1-git-send-email-bs14@csr.com>
+Date: Wed, 6 Jul 2011 02:47:57 -0700
+Subject: [PATCH 2/3] ARM: CSR: mapping early DEBUG_LL uart
+In-Reply-To: <1309945678-18813-1-git-send-email-bs14@csr.com>
+References: <1309945678-18813-1-git-send-email-bs14@csr.com>
+Message-ID: <1309945678-18813-3-git-send-email-bs14@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changelogs:
--v3:
-full DT file
-delete all static mapping table in common.c
-rename common.c to prima2.c
-delete board file board_dt.c
-split DEBUG_LL and L2 cache to seperate patch
--v2:
- 1. clock: use dev_id instead of con_id
- 2. Kconfig: delete ISA_DMA
- 3. irq: implement int controller based on DT
-        move to GENERIC_IRQ_CHIP framework
- 4. timer: implement timer based on DT
- 5. entry-macro.S: use get_irqnr_preamble to load the base address only once
-   per IRQ exception.
- 6. others:
-       use readl_relaxed instead of __raw_readl
-       adjust Kconfig order for PRIMA2
-       use clk_get_sys instead of clk_get for system level clock
-       use BUG_ON(IS_ERR(clk)) instead of BUG_ON(IS_ERR_OR_NULL(clk));
-       fix typo for CLOCK_TICK_RATE
-       ("sirf,xxx", "sirf,prima2-xxx")  instead of ("sirf,xxx") in dts
-
-Note:
-   For L2 cache, if Rob's patch is merged, the whole file can be deleted
-
-Barry Song (1):
-  ARM: CSR: mapping early DEBUG_LL uart
-
-Binghua Duan (1):
-  ARM: CSR: Adding CSR SiRFprimaII board support
-
-Rongjun Ying (1):
-  ARM: CSR: initilized L2 cache
-
- Documentation/devicetree/bindings/arm/sirf.txt  |    3 +
- arch/arm/Kconfig                                |   13 +
- arch/arm/Makefile                               |    1 +
- arch/arm/boot/dts/prima2-cb.dts                 |  423 +++++++++++++++++++
- arch/arm/mach-prima2/Makefile                   |    7 +
- arch/arm/mach-prima2/Makefile.boot              |    3 +
- arch/arm/mach-prima2/clock.c                    |  509 +++++++++++++++++++++++
- arch/arm/mach-prima2/common.h                   |   26 ++
- arch/arm/mach-prima2/include/mach/clkdev.h      |   15 +
- arch/arm/mach-prima2/include/mach/debug-macro.S |   29 ++
- arch/arm/mach-prima2/include/mach/entry-macro.S |   29 ++
- arch/arm/mach-prima2/include/mach/hardware.h    |   15 +
- arch/arm/mach-prima2/include/mach/io.h          |   21 +
- arch/arm/mach-prima2/include/mach/irqs.h        |   17 +
- arch/arm/mach-prima2/include/mach/map.h         |   16 +
- arch/arm/mach-prima2/include/mach/memory.h      |   21 +
- arch/arm/mach-prima2/include/mach/system.h      |   29 ++
- arch/arm/mach-prima2/include/mach/timex.h       |   14 +
- arch/arm/mach-prima2/include/mach/uart.h        |   23 +
- arch/arm/mach-prima2/include/mach/uncompress.h  |   40 ++
- arch/arm/mach-prima2/include/mach/vmalloc.h     |   14 +
- arch/arm/mach-prima2/irq.c                      |   71 ++++
- arch/arm/mach-prima2/l2x0.c                     |   59 +++
- arch/arm/mach-prima2/lluart.c                   |   25 ++
- arch/arm/mach-prima2/prima2.c                   |   40 ++
- arch/arm/mach-prima2/rstc.c                     |   69 +++
- arch/arm/mach-prima2/timer.c                    |  219 ++++++++++
- arch/arm/mm/Kconfig                             |    2 +-
- 28 files changed, 1752 insertions(+), 1 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/sirf.txt
- create mode 100644 arch/arm/boot/dts/prima2-cb.dts
- create mode 100644 arch/arm/mach-prima2/Makefile
- create mode 100644 arch/arm/mach-prima2/Makefile.boot
- create mode 100644 arch/arm/mach-prima2/clock.c
- create mode 100644 arch/arm/mach-prima2/common.h
- create mode 100644 arch/arm/mach-prima2/include/mach/clkdev.h
- create mode 100644 arch/arm/mach-prima2/include/mach/debug-macro.S
- create mode 100644 arch/arm/mach-prima2/include/mach/entry-macro.S
- create mode 100644 arch/arm/mach-prima2/include/mach/hardware.h
- create mode 100644 arch/arm/mach-prima2/include/mach/io.h
- create mode 100644 arch/arm/mach-prima2/include/mach/irqs.h
- create mode 100644 arch/arm/mach-prima2/include/mach/map.h
- create mode 100644 arch/arm/mach-prima2/include/mach/memory.h
- create mode 100644 arch/arm/mach-prima2/include/mach/system.h
- create mode 100644 arch/arm/mach-prima2/include/mach/timex.h
- create mode 100644 arch/arm/mach-prima2/include/mach/uart.h
- create mode 100644 arch/arm/mach-prima2/include/mach/uncompress.h
- create mode 100644 arch/arm/mach-prima2/include/mach/vmalloc.h
- create mode 100644 arch/arm/mach-prima2/irq.c
- create mode 100644 arch/arm/mach-prima2/l2x0.c
+Signed-off-by: Barry Song <bs14@csr.com>
+---
+ arch/arm/mach-prima2/Makefile |    1 +
+ arch/arm/mach-prima2/lluart.c |   25 +++++++++++++++++++++++++
+ 2 files changed, 26 insertions(+), 0 deletions(-)
  create mode 100644 arch/arm/mach-prima2/lluart.c
- create mode 100644 arch/arm/mach-prima2/prima2.c
- create mode 100644 arch/arm/mach-prima2/rstc.c
- create mode 100644 arch/arm/mach-prima2/timer.c
+
+diff --git a/arch/arm/mach-prima2/Makefile b/arch/arm/mach-prima2/Makefile
+index d44f7ae..f2fba66 100644
+--- a/arch/arm/mach-prima2/Makefile
++++ b/arch/arm/mach-prima2/Makefile
+@@ -3,3 +3,4 @@ obj-y += irq.o
+ obj-y += clock.o
+ obj-y += rstc.o
+ obj-y += prima2.o
++obj-$(CONFIG_DEBUG_LL) += lluart.o
+diff --git a/arch/arm/mach-prima2/lluart.c b/arch/arm/mach-prima2/lluart.c
+new file mode 100644
+index 0000000..a89f9b3
+--- /dev/null
++++ b/arch/arm/mach-prima2/lluart.c
+@@ -0,0 +1,25 @@
++/*
++ * Static memory mapping for DEBUG_LL
++ *
++ * Copyright (c) 2011 Cambridge Silicon Radio Limited, a CSR plc group company.
++ *
++ * Licensed under GPLv2 or later.
++ */
++
++#include <linux/kernel.h>
++#include <asm/page.h>
++#include <asm/mach/map.h>
++#include <mach/map.h>
++#include <mach/uart.h>
++
++void __init sirfsoc_map_lluart(void)
++{
++	struct map_desc sirfsoc_lluart_map = {
++		.virtual        = SIRFSOC_UART1_VA_BASE,
++		.pfn            = __phys_to_pfn(SIRFSOC_UART1_PA_BASE),
++		.length         = SIRFSOC_UART1_SIZE,
++		.type           = MT_DEVICE,
++	};
++
++	iotable_init(&sirfsoc_lluart_map, 1);
++}
+-- 
+1.7.1
 
 
 
