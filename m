@@ -1,42 +1,57 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Wed, 06 Jul 2011 08:45:46 +0530
-Subject: [PATCH 2/2] SPI: S5PV210: Enable the SPI driver for S5PV210
-In-Reply-To: <1309801476-29678-2-git-send-email-padma.v@samsung.com>
-References: <1309801476-29678-1-git-send-email-padma.v@samsung.com>
-	<1309801476-29678-2-git-send-email-padma.v@samsung.com>
-Message-ID: <4E13D362.7010107@linaro.org>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 05 Jul 2011 22:47:12 -0400
+Subject: [PATCH 27/52] ARM: mach-netx: convert boot_params to atag_offset
+In-Reply-To: <1309920457-21913-1-git-send-email-nicolas.pitre@linaro.org>
+References: <1309920457-21913-1-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <1309920457-21913-27-git-send-email-nicolas.pitre@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+---
+ arch/arm/mach-netx/nxdb500.c    |    2 +-
+ arch/arm/mach-netx/nxdkn.c      |    2 +-
+ arch/arm/mach-netx/nxeb500hmi.c |    2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
 
-Patch 1/2 looks redundant as both changes can be very well accommodated 
-in a single patch.
-
-On Monday 04 July 2011 11:14 PM, Padmavathi Venna wrote:
-> The SPI module on S5PV210 is similar to the earlier Samsung SoCs like
-> S3C64XX. Enable the existing SPI driver for use on S5PV210.
->
-> Signed-off-by: Padmavathi Venna<padma.v@samsung.com>
-> ---
->   drivers/spi/Kconfig |    3 ++-
->   1 files changed, 2 insertions(+), 1 deletions(-)
->
-> diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
-> index 91d607b..ed1ebea 100644
-> --- a/drivers/spi/Kconfig
-> +++ b/drivers/spi/Kconfig
-> @@ -340,7 +340,8 @@ config SPI_S3C24XX_GPIO
->
->   config SPI_S3C64XX
->   	tristate "Samsung S3C64XX series type SPI"
-> -	depends on (ARCH_S3C64XX || ARCH_S5P64X0 || ARCH_S5PC100)
-> +	depends on (ARCH_S3C64XX || ARCH_S5P64X0 || ARCH_S5PC100 \
-> +			|| ARCH_S5PV210)
->   	select S3C64XX_DMA if ARCH_S3C64XX
->   	help
->   	  SPI driver for Samsung S3C64XX and newer SoCs.
-
-
+diff --git a/arch/arm/mach-netx/nxdb500.c b/arch/arm/mach-netx/nxdb500.c
+index ca8b203..90903dd 100644
+--- a/arch/arm/mach-netx/nxdb500.c
++++ b/arch/arm/mach-netx/nxdb500.c
+@@ -200,7 +200,7 @@ static void __init nxdb500_init(void)
+ }
+ 
+ MACHINE_START(NXDB500, "Hilscher nxdb500")
+-	.boot_params	= 0x80000100,
++	.atag_offset	= 0x100,
+ 	.map_io		= netx_map_io,
+ 	.init_irq	= netx_init_irq,
+ 	.timer		= &netx_timer,
+diff --git a/arch/arm/mach-netx/nxdkn.c b/arch/arm/mach-netx/nxdkn.c
+index d775cbe..c63384a 100644
+--- a/arch/arm/mach-netx/nxdkn.c
++++ b/arch/arm/mach-netx/nxdkn.c
+@@ -93,7 +93,7 @@ static void __init nxdkn_init(void)
+ }
+ 
+ MACHINE_START(NXDKN, "Hilscher nxdkn")
+-	.boot_params	= 0x80000100,
++	.atag_offset	= 0x100,
+ 	.map_io		= netx_map_io,
+ 	.init_irq	= netx_init_irq,
+ 	.timer		= &netx_timer,
+diff --git a/arch/arm/mach-netx/nxeb500hmi.c b/arch/arm/mach-netx/nxeb500hmi.c
+index de369cd..8f548ec 100644
+--- a/arch/arm/mach-netx/nxeb500hmi.c
++++ b/arch/arm/mach-netx/nxeb500hmi.c
+@@ -177,7 +177,7 @@ static void __init nxeb500hmi_init(void)
+ }
+ 
+ MACHINE_START(NXEB500HMI, "Hilscher nxeb500hmi")
+-	.boot_params	= 0x80000100,
++	.atag_offset	= 0x100,
+ 	.map_io		= netx_map_io,
+ 	.init_irq	= netx_init_irq,
+ 	.timer		= &netx_timer,
 -- 
-Tushar Behera
+1.7.4
