@@ -1,45 +1,63 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 6 Jul 2011 13:14:07 +0800
-Subject: [PATCH] net/fec: gasket needs to be enabled for some i.mx
-In-Reply-To: <20110704065523.GX6069@pengutronix.de>
-References: <20110630161935.GA7977@S2100-06.ap.freescale.net>
-	<1309515082-7386-1-git-send-email-shawn.guo@linaro.org>
-	<20110704065523.GX6069@pengutronix.de>
-Message-ID: <20110706051406.GA26324@S2100-06.ap.freescale.net>
+Date: Wed, 6 Jul 2011 13:21:53 +0800
+Subject: [PATCH 1/2] gpio/mxc: get rid of the uses of cpu_is_mx()
+In-Reply-To: <20110705164238.GA26347@pengutronix.de>
+References: <1309681017-22970-2-git-send-email-shawn.guo@linaro.org>
+	<20110704064603.GW6069@pengutronix.de>
+	<20110704092800.GG10245@S2100-06.ap.freescale.net>
+	<20110704094921.GG6069@pengutronix.de>
+	<20110704102008.GH10245@S2100-06.ap.freescale.net>
+	<20110704164457.GJ6069@pengutronix.de>
+	<20110705030121.GB10594@S2100-06.ap.freescale.net>
+	<CACxGe6vHF-k+xCXAYwuQnuRXceD9eJC4ZpSbNXey8cnkX1J2-Q@mail.gmail.com>
+	<20110705033227.GC10594@S2100-06.ap.freescale.net>
+	<20110705164238.GA26347@pengutronix.de>
+Message-ID: <20110706052152.GB26324@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 04, 2011 at 08:55:23AM +0200, Sascha Hauer wrote:
-> David,
+On Tue, Jul 05, 2011 at 06:42:38PM +0200, Sascha Hauer wrote:
+> On Tue, Jul 05, 2011 at 11:32:28AM +0800, Shawn Guo wrote:
+> > On Mon, Jul 04, 2011 at 09:04:55PM -0600, Grant Likely wrote:
+> > > On Mon, Jul 4, 2011 at 9:01 PM, Shawn Guo <shawn.guo@freescale.com> wrote:
+> > > > On Mon, Jul 04, 2011 at 06:44:57PM +0200, Sascha Hauer wrote:
+> > > >> Read again. We have three different types of gpio irq controllers, they
+> > > >> are first seen in the imx1, imx21 and imx31. So all others can be made
+> > > >> compatible with these three. No need for imx-gpio, imx25-gpio and
+> > > >> imx27-gpio. The mxc_gpio_devtype would look like this:
+> > > >>
+> > > >> static struct platform_device_id mxc_gpio_devtype[] = {
+> > > >> ? ? ? {
+> > > >> ? ? ? ? ? ? ? .name = "imx1-gpio",
+> > > >> ? ? ? ? ? ? ? .driver_data = IMX1_GPIO,
+> > > >> ? ? ? }, {
+> > > >> ? ? ? ? ? ? ? .name = "imx21-gpio",
+> > > >> ? ? ? ? ? ? ? .driver_data = IMX21_GPIO,
+> > > >> ? ? ? }, {
+> > > >> ? ? ? ? ? ? ? .name = "imx31-gpio",
+> > > >> ? ? ? ? ? ? ? .driver_data = IMX31_GPIO,
+> > > >> ? ? ? }, {
+> > > >> ? ? ? }
+> > > >> };
+> > > >>
+> > > > This is really what I want to do with dt match table. ?But before we
+> > > > totally remove platform device probe and switch it over to dt, I'm
+> > > > unsure we want to do this. ?It will require the following changes on
+> > > > platform device code registration right now. ?I guess this is
+> > > > something you do not want, right?
+> > > 
+> > > What is the problem with the below changes?  I see no issue with
+> > > changing the static platform_device registrations in this way.
+> > > 
+> > We end up to register "imx21-gpio" in imx27_soc_init, and "imx31-gpio"
+> > in imx25/35/50/51/53 per-soc-init function.  The may confuse people
+> > who only look at platform device registration code.  This is something
+> > may concern Sascha.  Let's see what he thinks.
 > 
-> On Fri, Jul 01, 2011 at 06:11:22PM +0800, Shawn Guo wrote:
-> > On the recent i.mx (mx25/50/53), there is a gasket inside fec
-> > controller which needs to be enabled no matter phy works in MII
-> > or RMII mode.
-> > 
-> > The current code enables the gasket only when phy interface is RMII.
-> > It's broken when the driver works with a MII phy.  The patch uses
-> > platform_device_id to distinguish the SoCs that have the gasket and
-> > enables it on these SoCs for both MII and RMII mode.
-> > 
-> > Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
-> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > Cc: David S. Miller <davem@davemloft.net>
-> > Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> > ---
-> >  arch/arm/mach-imx/clock-imx25.c                 |    2 +-
-> >  arch/arm/mach-imx/clock-imx27.c                 |    2 +-
-> >  arch/arm/mach-imx/clock-imx35.c                 |    2 +-
-> >  arch/arm/mach-mx5/clock-mx51-mx53.c             |    4 +-
-> >  arch/arm/plat-mxc/devices/platform-fec.c        |   17 ++++++++-------
-> >  arch/arm/plat-mxc/include/mach/devices-common.h |    1 +
-> >  drivers/net/fec.c                               |   26 ++++++++++++++++++++--
+> If we vote for doing this in the device tree then I see no problem doing
+> so in the platform registration code aswell.
 > 
-> I either need your Ack for this or we need to split this up into two
-> patches. Pushing this through the net tree is probably not a good idea.
-> 
-I need to do another rebase on 'next' as David just applied the dt
-series.
+That's great.  Will do so in the v3.
 
 -- 
 Regards,
