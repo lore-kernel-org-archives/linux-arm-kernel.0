@@ -1,71 +1,30 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 6 Jul 2011 16:19:27 +0200
-Subject: [PATCH V2 3/6] mpcore_wdt: Fix WDIOC_SETOPTIONS handling
-In-Reply-To: <20110706135219.GB8286@n2100.arm.linux.org.uk>
-References: <1286185540-19569-1-git-send-email-vkuzmichev@mvista.com>
-	<20110706134806.GA8286@n2100.arm.linux.org.uk>
-	<20110706135219.GB8286@n2100.arm.linux.org.uk>
-Message-ID: <201107061619.27580.arnd@arndb.de>
+Date: Wed, 6 Jul 2011 16:23:51 +0200
+Subject: [PATCH] ARM: cns3xxx: Add support for L2 Cache Controller
+In-Reply-To: <20110706140832.GA15946@oksana.dev.rtsoft.ru>
+References: <20110706140832.GA15946@oksana.dev.rtsoft.ru>
+Message-ID: <201107061623.51969.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 06 July 2011, Russell King - ARM Linux wrote:
-> That looks like something which needs fixing in watchdog land.  And it's
-> not too difficult:
+On Wednesday 06 July 2011, Anton Vorontsov wrote:
+> CNS3xxx SOCs have L310-compatible cache controller, so let's use it.
 > 
-> 1. Change the existing WDIOC_SETOPTIONS to WDIOC_SETOPTIONS_OLD
-> 2. Add a new, correctly defined WDIOC_SETOPTIONS.
-> 3. Update all drivers to use WDIOC_SETOPTIONS.
-> 4. Provide a helper which deals with WDIOC_SETOPTIONS_OLD and translates
->    it to the proper WDIOC_SETOPTIONS call (this could be just:
+> With this patch benchmarking with 'gzip' shows that performance is
+> doubled, and I'm still able to boot full-fledged userland over NFS
+> (using PCIe NIC), so the support should be pretty robust.
 > 
->         if (cmd == WDIOC_SETOPTIONS_OLD) {
->                 static int first = 1;
->                 if (first)
->                         pr_warn("%s:%d used old WDIOC_SETOPTIONS call.  Please rebuild\n",
->                                 current->comm, current->pid);
->                 first = 0;
->                 cmd = WDIOC_SETOPTIONS;
->         }
+> Signed-off-by: Anton Vorontsov <avorontsov@mvista.com>
+> ---
 > 
->    before any argument copies.
-> 
-> This means you preserve existing compatibility with userspace, yet gain
-> a path to a non-broken ioctl interface.
-> 
-> As stuff gets rebuilt and replaced, you'll eventually be able to remove
-> the above.  That period used to be two years for such simple changes.
+> I'm going to apply it to linux-cns3xxx.git tree and push it (via Arnd)
+> for v3.1 , if there will be no complains, of course.
 
-Since Wim is currently doing a new core driver to be used by watchdog
-drivers anyway, that sounds like a good idea to fix afterwards.
-Note that the mpcore_wdt is the only driver that checks the direction
-bit, so it's unlikely to cause problems for anything else.
+I think there is a small problem you should fix first, but otherwise
+it's ok.
 
-> Hopefully, someone can let Wim know his email is broken...
-
-This should get through to him I hope. Wim, see below.
-
-> Also deleted
-> the broken arm at kernel.org address.
-
-Ok, sorry about that. I need to finally ask the kernel.org team to
-set that up, I announced it too early.
+The problem is that CONFIG_CACHE_L2X0 is a compile-time option that
+can be disabled. Your code will not link correctly if it's turned off,
+so you need to contitionalize it on that Kconfig symbol.
 
 	Arnd
-
-> This is the mail system at host ylaen.iguana.be.
-> 
-> I'm sorry to have to inform you that your message could not
-> be delivered to one or more recipients. It's attached below.
-> 
-> For further assistance, please send mail to <postmaster>
-> 
-> If you do so, please include this problem report. You can
-> delete your own text from the attached returned message.
-> 
->                    The mail system
-> 
-> <wim@infomag.iguana.be> (expanded from <wim@iguana.be>): Host or domain name
->     not found. Name service error for name=infomag.iguana.be type=AAAA: Host
->     found but no data record of requested type
-> 
