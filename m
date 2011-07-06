@@ -1,23 +1,33 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Wed, 6 Jul 2011 14:20:21 +0200
-Subject: [PATCH 3/3 v2] ARM: pxa168: Add board support for gplugD
-In-Reply-To: <453554c85ebd364f14cd10953730171d6814d009.1308721057.git.tanmay.upadhyay@einfochips.com>
-References: <1304316000-869-1-git-send-email-tanmay.upadhyay@einfochips.com>
-	<453554c85ebd364f14cd10953730171d6814d009.1308721057.git.tanmay.upadhyay@einfochips.com>
-Message-ID: <CACTFLANNMPS68OQ6tjOjZjw+aH2GHEV7uHjcjOj7RLNZFtMGZQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 6 Jul 2011 14:22:38 +0200
+Subject: [PATCH V2 3/6] mpcore_wdt: Fix WDIOC_SETOPTIONS handling
+In-Reply-To: <1309892440-3260-4-git-send-email-vkuzmichev@mvista.com>
+References: <1286185540-19569-1-git-send-email-vkuzmichev@mvista.com>
+	<1309892440-3260-4-git-send-email-vkuzmichev@mvista.com>
+Message-ID: <201107061422.38705.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 22, 2011 at 7:55 AM, Tanmay Upadhyay
-<tanmay.upadhyay@einfochips.com> wrote:
-> Tested UART console, Ethernet & I2C interfaces
->
-> v2 - move definitions from mfp-gplugd.h to mfp-pxa168.h
->
-> Signed-off-by: Tanmay Upadhyay <tanmay.upadhyay@einfochips.com>
+On Tuesday 05 July 2011, Vitaly Kuzmichev wrote:
+> 
+> According to the include/linux/watchdog.h WDIOC_SETOPTIONS is
+> classified as 'read from device' ioctl call:
+>   #define WDIOC_SETOPTIONS        _IOR(WATCHDOG_IOCTL_BASE, 4, int)
+> 
+> However, the driver 'mpcore_wdt' performs 'copy_from_user' only if
+> _IOC_WRITE is set, thus the local variable 'uarg' which is used in
+> WDIOC_SETOPTIONS handling remains uninitialized.
+> 
+> The proper way to fix this is to bind WDIOC_SETOPTIONS to _IOW,
+> but this will break compatibility.
+> So adding additional condition for performing 'copy_from_user'.
+> 
+> Signed-off-by: Vitaly Kuzmichev <vkuzmichev@mvista.com>
 
-Thank you for this patch. Are you working on support for more
-components of this device, for example the display controller?
+Is the new watchdog driver core ready for 3.1? If so, the best
+solution would be to get rid of the entire ioctl function in
+the mpcore_wdt driver and just use the core for that.
 
+Otherwise, this patch is probably the best solution in the meantime.
 
-Daniel
+	Arnd
