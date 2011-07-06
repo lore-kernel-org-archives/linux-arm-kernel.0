@@ -1,51 +1,71 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 6 Jul 2011 10:11:21 -0400 (EDT)
-Subject: [PATCH 01/17] leds: create a trigger for CPU activity
-In-Reply-To: <20110706133501.GY8286@n2100.arm.linux.org.uk>
-References: <1309955687-19365-1-git-send-email-bryan.wu@canonical.com>
-	<1309955687-19365-2-git-send-email-bryan.wu@canonical.com>
-	<CAMPhdO9QmCpGFB8fd5Rp-a0iAv1ByA962FZKOwc59R86OTpxAQ@mail.gmail.com>
-	<20110706133501.GY8286@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1107061005420.14596@xanadu.home>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 6 Jul 2011 16:19:27 +0200
+Subject: [PATCH V2 3/6] mpcore_wdt: Fix WDIOC_SETOPTIONS handling
+In-Reply-To: <20110706135219.GB8286@n2100.arm.linux.org.uk>
+References: <1286185540-19569-1-git-send-email-vkuzmichev@mvista.com>
+	<20110706134806.GA8286@n2100.arm.linux.org.uk>
+	<20110706135219.GB8286@n2100.arm.linux.org.uk>
+Message-ID: <201107061619.27580.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 6 Jul 2011, Russell King - ARM Linux wrote:
-
-> On Wed, Jul 06, 2011 at 09:16:47PM +0800, Eric Miao wrote:
-> > On Wed, Jul 6, 2011 at 8:34 PM, Bryan Wu <bryan.wu@canonical.com> wrote:
-> > > + ? ? ? switch (ledevt) {
-> > > + ? ? ? case CPU_LED_START:
-> > > + ? ? ? case CPU_LED_IDLE_START:
-> > > + ? ? ? ? ? ? ? /* Will turn the LED on, max brightness */
-> > > + ? ? ? ? ? ? ? if (trigdata->led)
-> > > + ? ? ? ? ? ? ? ? ? ? ? led_set_brightness(trigdata->led,
-> > > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?trigdata->led->max_brightness);
-> > > + ? ? ? ? ? ? ? break;
-> > > +
-> > > + ? ? ? case CPU_LED_STOP:
-> > > + ? ? ? case CPU_LED_IDLE_END:
-> > > + ? ? ? case CPU_LED_HALTED:
-> > > + ? ? ? ? ? ? ? /* Will turn the LED off */
-> > > + ? ? ? ? ? ? ? if (trigdata->led)
-> > > + ? ? ? ? ? ? ? ? ? ? ? led_set_brightness(trigdata->led, LED_OFF);
-> > > + ? ? ? ? ? ? ? break;
-> > > +
-> > > + ? ? ? default:
-> > > + ? ? ? ? ? ? ? /* Will leave the LED as it is */
-> > > + ? ? ? ? ? ? ? break;
-> > > + ? ? ? }
-> > > +}
-> > 
-> > I'm a bit worrying about the LED brightness hardcoded here, what if
-> > a platform requires different behavior, e.g. LED_OFF when IDLE_START.
+On Wednesday 06 July 2011, Russell King - ARM Linux wrote:
+> That looks like something which needs fixing in watchdog land.  And it's
+> not too difficult:
 > 
-> Indeed - there are platforms (Netwinder, Assabet etc) which use LED=ON
-> to mean that the system is not idle - and also turn the LED on when
-> halted.
+> 1. Change the existing WDIOC_SETOPTIONS to WDIOC_SETOPTIONS_OLD
+> 2. Add a new, correctly defined WDIOC_SETOPTIONS.
+> 3. Update all drivers to use WDIOC_SETOPTIONS.
+> 4. Provide a helper which deals with WDIOC_SETOPTIONS_OLD and translates
+>    it to the proper WDIOC_SETOPTIONS call (this could be just:
+> 
+>         if (cmd == WDIOC_SETOPTIONS_OLD) {
+>                 static int first = 1;
+>                 if (first)
+>                         pr_warn("%s:%d used old WDIOC_SETOPTIONS call.  Please rebuild\n",
+>                                 current->comm, current->pid);
+>                 first = 0;
+>                 cmd = WDIOC_SETOPTIONS;
+>         }
+> 
+>    before any argument copies.
+> 
+> This means you preserve existing compatibility with userspace, yet gain
+> a path to a non-broken ioctl interface.
+> 
+> As stuff gets rebuilt and replaced, you'll eventually be able to remove
+> the above.  That period used to be two years for such simple changes.
 
-What about simply setting active_low to 1 in the struct gpio_led 
-instance for those particular LEDs (or invert it if it is already set)?
+Since Wim is currently doing a new core driver to be used by watchdog
+drivers anyway, that sounds like a good idea to fix afterwards.
+Note that the mpcore_wdt is the only driver that checks the direction
+bit, so it's unlikely to cause problems for anything else.
 
+> Hopefully, someone can let Wim know his email is broken...
 
-Nicolas
+This should get through to him I hope. Wim, see below.
+
+> Also deleted
+> the broken arm at kernel.org address.
+
+Ok, sorry about that. I need to finally ask the kernel.org team to
+set that up, I announced it too early.
+
+	Arnd
+
+> This is the mail system at host ylaen.iguana.be.
+> 
+> I'm sorry to have to inform you that your message could not
+> be delivered to one or more recipients. It's attached below.
+> 
+> For further assistance, please send mail to <postmaster>
+> 
+> If you do so, please include this problem report. You can
+> delete your own text from the attached returned message.
+> 
+>                    The mail system
+> 
+> <wim@infomag.iguana.be> (expanded from <wim@iguana.be>): Host or domain name
+>     not found. Name service error for name=infomag.iguana.be type=AAAA: Host
+>     found but no data record of requested type
+> 
