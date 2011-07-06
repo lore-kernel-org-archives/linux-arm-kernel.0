@@ -1,93 +1,58 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 6 Jul 2011 00:28:38 -0600
-Subject: [PATCH v2] ARM: CSR: Adding CSR SiRFprimaII board support
-In-Reply-To: <CAGsJ_4yxUzMr4EJd5i0oW1tOa2oK7jicAehKVXXiU_SMDpTQ0Q@mail.gmail.com>
-References: <1309231954-23260-1-git-send-email-bs14@csr.com>
-	<201106292329.44447.arnd@arndb.de>
-	<BANLkTinfKCMcutMDQ+mpdD4EUy9mCpZs+w@mail.gmail.com>
-	<201106301236.25822.arnd@arndb.de>
-	<BANLkTikoMu3ccUxj5KRmKzdReQcBqK4Y9Q@mail.gmail.com>
-	<CAGsJ_4wSKP6EUihOVbUJJ+HUynWGp8PA=8J_WhgmOtVhpd5_Lg@mail.gmail.com>
-	<20110706053026.GB9978@ponder.secretlab.ca>
-	<CAGsJ_4xV7ecdqnB5gJDUDSg4nvebgubBj4qGJGaCtcpbj-b0gQ@mail.gmail.com>
-	<CAGsJ_4yxUzMr4EJd5i0oW1tOa2oK7jicAehKVXXiU_SMDpTQ0Q@mail.gmail.com>
-Message-ID: <20110706062838.GI9978@ponder.secretlab.ca>
+Date: Wed, 6 Jul 2011 00:30:27 -0600
+Subject: [PATCH 2/2] SPI: SAMSUNG: Bug fix for SPI with different FIFO
+	level
+In-Reply-To: <00c101cc3ba5$0b573910$2205ab30$%kim@samsung.com>
+References: <BANLkTik0LERxBHmJc5ZnRotnD4CSveR-UQ@mail.gmail.com>
+	<BANLkTim9wdrqDgXVUjxzMv9cdWViLww=Bg@mail.gmail.com>
+	<BANLkTim40x4X_--K0z7gdodDjor0MUam5Q@mail.gmail.com>
+	<BANLkTinf6ec1yXeaFkZjHMnqZp7yymDq-w@mail.gmail.com>
+	<20110704065501.GP15152@ponder.secretlab.ca>
+	<CACxGe6urrZ9=1OgcaYF6EtvJokAyFTbFCnHPWsCY+sETVze8-w@mail.gmail.com>
+	<005501cc3a30$6c916190$45b424b0$%kim@samsung.com>
+	<005601cc3a32$64bd5fd0$2e381f70$%kim@samsung.com>
+	<20110704150607.GA29977@ponder.secretlab.ca>
+	<00c101cc3ba5$0b573910$2205ab30$%kim@samsung.com>
+Message-ID: <20110706063027.GK9978@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 06, 2011 at 02:01:24PM +0800, Barry Song wrote:
-> 2011/7/6 Barry Song <21cnbao@gmail.com>:
-> > 2011/7/6 Grant Likely <grant.likely@secretlab.ca>:
-> >>> ? ? ? ? ? ? ? ? ? ? ? intc: interrupt-controller at 0x80020000 {
-> >>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? #interrupt-cells = <1>;
-> >>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? interrupt-controller;
-> >>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? compatible = "sirf,intc", "sirf,prima2-intc";
-> >>
-> >> This looks backwards. ?Most specific values should appear first.
-> >> "sirf,intc" looks to be generic when compared to "sirf,prima2-intc".
-> >> I'm also concerned that "sirf,intc" is trying to be too generic. ?As
-> >> much as possible compatible values should reflect a real
-> >> implementation of the interface, not a generic abstract name. ?Future
-> >> hardware can always claim compatibility with existing older hardware.
-> >> You're probably better off dropping "sirf,intc" entirely, and doing
-> >> the same for similar properties throughout the file.
-> >
-> > i have been confused by compatible in dts and drivers for some time.
-> > if an intc ip core is shared by two chips, for example, prima2 and
-> > atlas6. is the following right?
-> >
-> > in dts for prima2: compatible = "sirf,prima2-intc";
-> > in dts for atlas6: ?compatible = "sirf,prima2-atlas6";
+On Wed, Jul 06, 2011 at 03:22:08PM +0900, Kukjin Kim wrote:
+> Kukjin Kim wrote:
+> > 
+> > Grant Likely wrote:
+> > >
+> > > On Mon, Jul 04, 2011 at 07:08:55PM +0900, Kukjin Kim wrote:
+> > > > Kukjin Kim wrote:
+> > > > >
+> > > > > Thanks Grant, Jassi and all,
+> > > > >
+> > > > > I will apply these 1 and 2 in my -fix tree for 3.0 with your acks.
+> > > > >
+> > > > Oops, this needs previous 'cleanup spi platform specific code' so
+> can't
+> > > > apply -fix tree now.
+> > >
+> > > There may also be conflicts with the heavy rework in the spi tree.
+> > > Kgene, when you pick up this series, can you put it into a separate
+> > > topic branch and merge that into your main tree?  That way if there
+> > > are difficult conflicts, then I can also merge that same topic branch
+> > > into spi/next to resolve them.
+> > >
+> > Hi Grant,
+> > 
+> > Sure, no problem. I'm waiting for Padmavathi's new patch which is based on
+> old
+> > code not new SPI code. When I merge topic branch for this into my tree,
+> let you
+> > know immediately. Then if any problems, let's talk again :)
 > 
-> sorry for typo. in dts for atlas6:  compatible = "sirf,atlas6-intc";
+> Hi,
 > 
-> > in intc drivers shared for both: ? ? compatible = "sirf,prima2-intc",
-> > "sirf,prima2-atlas6";
-> 
-> sorry for typo.  compatible = "sirf,prima2-intc", "sirf,atlas6-intc";
-> 
+> I made topic branch for this based on 3.0-rc6.
+> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> #for-spi
 
-Yes, that is one way to do it, just specify all the implementations
-using the IP core.  If there are only a few, then this is easy.  If
-there are a lot of implementations using the same core, then the list
-gets rather large in a hurry.
+Okay.  If there are problems, then I'll merge it.  Thanks.
 
-The intent of compatible is to allow one device to claim compatibility
-with another.  So, if the prima2 was already supported, and you were adding
-atlas6 support, you could put the following into the atlas6 .dts:
-
-	compatible = "sirf,atlas6-intc", "airf,prima2-intc";
-
-and the existing driver would work.
-
-The other option when working with IP cores it so encode the version
-of the IP block into the compatible values, and make both boards use
-that.  ie.  "sirf,intc-1.32".  *however* doing so requires that the
-hardware folks actually do a good job of documenting the core versions
-so that the compatible value you use accurately describes the
-hardware.
-
-It is also completely valid for a newer IP core to claim compatibility
-with an older one in the .dts:
-
-	ie: compatible = "sirf,intc-1.32", "sirf,intc-1.00";
-
-Personally, I prefer anchoring compatible values to the specific
-hardware implmentation rather than the IP core version.
-
-> >
-> > in my understanding, dts for special soc/board contains special
-> > compatible for the chip, drivers shared by multi-soc/board contain all
-> > compatible lists which can be supported by them?
-> >
-> > what's the generic way for this?
-> >
-> >>
-> >> Also, for every new compatible value make sure you add documentation
-> >> for it to Documentation/devicetree/bindings. (You may have already
-> >> done so, it's just something I remind people about a lot).
-> >>
-> >> These comments also apply through the rest of the file.
-> >>
-> >>
-> >
+g.
