@@ -1,197 +1,103 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 7 Jul 2011 00:47:50 +0800
-Subject: [PATCH v3 4/4] mmc: sdhci-esdhc-imx: add device tree probe support
-In-Reply-To: <1309970870-13336-1-git-send-email-shawn.guo@linaro.org>
-References: <1309970870-13336-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1309970870-13336-5-git-send-email-shawn.guo@linaro.org>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 7 Jul 2011 00:50:08 +0800
+Subject: [PATCH v3 1/2] serial/imx: get rid of the uses of cpu_is_mx1()
+In-Reply-To: <20110706163740.GW6069@pengutronix.de>
+References: <1309969814-13195-1-git-send-email-shawn.guo@linaro.org>
+	<1309969814-13195-2-git-send-email-shawn.guo@linaro.org>
+	<20110706163740.GW6069@pengutronix.de>
+Message-ID: <20110706165007.GD4034@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch adds device tree probe support for sdhci-esdhc-imx driver.
+On Wed, Jul 06, 2011 at 06:37:40PM +0200, Sascha Hauer wrote:
+> On Thu, Jul 07, 2011 at 12:30:13AM +0800, Shawn Guo wrote:
+> > The patch removes all the uses of cpu_is_mx1().  Instead, it uses
+> > the .id_table of platform_driver to distinguish the uart device type,
+> > IMX1_UART and IMX21_UART.  The IMX21_UART type runs on all i.mx
+> > except i.mx1.
+> > 
+> > A couple of !cpu_is_mx1() logic gets turned into IS_IMX21_UART,
+> > as the codes wrapped there are really IMX21 type uart specific.
+> > 
+> > It also removes macro MX1_UCR3_REF25 and MX1_UCR3_REF30 which are
+> > not used anywhere.
+> 
+> Two typos and one minor nitpick, otherwise I'm fine with it. Should go
+> via the i.MX tree rather than the serial tree. Alan?
+> 
+> 
+> > 
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> > Cc: Alan Cox <alan@linux.intel.com>
+> > Acked-by: Grant Likely <grant.likely@secretlab.ca>
+> > ---
+> >  arch/arm/mach-imx/clock-imx1.c                |    6 +-
+> >  arch/arm/mach-imx/clock-imx21.c               |    8 ++--
+> >  arch/arm/mach-imx/clock-imx25.c               |   11 ++--
+> >  arch/arm/mach-imx/clock-imx27.c               |   13 +++--
+> >  arch/arm/mach-imx/clock-imx31.c               |   11 ++--
+> >  arch/arm/mach-imx/clock-imx35.c               |    7 ++-
+> >  arch/arm/mach-mx5/clock-mx51-mx53.c           |   18 ++++---
+> >  arch/arm/plat-mxc/devices/platform-imx-uart.c |    7 ++-
+> >  drivers/tty/serial/imx.c                      |   66 ++++++++++++++++++++-----
+> >  9 files changed, 97 insertions(+), 50 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-imx/clock-imx25.c b/arch/arm/mach-imx/clock-imx25.c
+> > index a65838f..42ef76a 100644
+> > --- a/arch/arm/mach-imx/clock-imx25.c
+> > +++ b/arch/arm/mach-imx/clock-imx25.c
+> > @@ -272,11 +272,12 @@ DEFINE_CLOCK(can2_clk,	 1, CCM_CGCR1,  3, get_rate_ipg, NULL, NULL);
+> >  	},
+> >  
+> > diff --git a/arch/arm/plat-mxc/devices/platform-imx-uart.c b/arch/arm/plat-mxc/devices/platform-imx-uart.c
+> > index cfce8c9..a425a5a 100644
+> > --- a/arch/arm/plat-mxc/devices/platform-imx-uart.c
+> > +++ b/arch/arm/plat-mxc/devices/platform-imx-uart.c
+> > @@ -152,7 +152,7 @@ struct platform_device *__init imx_add_imx_uart_3irq(
+> >  		},
+> >  	};
+> >  
+> > -	return imx_add_platform_device("imx-uart", data->id, res,
+> > +	return imx_add_platform_device("imx1-uart", data->id, res,
+> >  			ARRAY_SIZE(res), pdata, sizeof(*pdata));
+> >  }
+> >  
+> > @@ -172,6 +172,7 @@ struct platform_device *__init imx_add_imx_uart_1irq(
+> >  		},
+> >  	};
+> >  
+> > -	return imx_add_platform_device("imx-uart", data->id, res, ARRAY_SIZE(res),
+> > -			pdata, sizeof(*pdata));
+> > +	/* i.mx21 type uart runs on all i.mx expcept i.mx1 */
+> 
+> s/expcept/except/
+> >  #define  UCR3_AIRINTEN   (1<<5)  /* Async IR wake interrupt enable */
+> >  #define  UCR3_AWAKEN	 (1<<4)  /* Async wake interrupt enable */
+> > -#define  MX1_UCR3_REF25 	 (1<<3)  /* Ref freq 25 MHz, only on mx1 */
+> > -#define  MX1_UCR3_REF30 	 (1<<2)  /* Ref Freq 30 MHz, only on mx1 */
+> > -#define  MX2_UCR3_RXDMUXSEL	 (1<<2)  /* RXD Muxed Input Select, on mx2/mx3 */
+> > +#define  IMX21_UCR3_RXDMUXSEL	 (1<<2)  /* RXD Muxed Input Select */
+> >  #define  UCR3_INVT  	 (1<<1)  /* Inverted Infrared transmission */
+> >  #define  UCR3_BPEN  	 (1<<0)  /* Preset registers enable */
+> >  #define  UCR4_CTSTL_SHF  10      /* CTS trigger level shift */
+> > @@ -181,6 +179,18 @@
+> >  
+> >  #define UART_NR 8
+> >  
+> > +/* i.mx21 type uart runs on all i.mx expcept i.mx1 */
+> 
+> ditto
+> 
+> >  
+> > +#define UTS (sport->devdata->uts_reg)
+> > +#define IS_IMX1_UART()	(sport->devdata->devtype == IMX1_UART)
+> > +#define IS_IMX21_UART()	(sport->devdata->devtype == IMX21_UART)
+> 
+> Can we make this a static inline function?
+> 
+Ok, will resend it right now to get these fixed.
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-Cc: Wolfram Sang <w.sang@pengutronix.de>
-Cc: Chris Ball <cjb@laptop.org>
-Cc: Grant Likely <grant.likely@secretlab.ca>
----
- .../devicetree/bindings/mmc/fsl-imx-esdhc.txt      |   34 +++++++++
- drivers/mmc/host/sdhci-esdhc-imx.c                 |   77 +++++++++++++++++---
- 2 files changed, 102 insertions(+), 9 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt
-
-diff --git a/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt b/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt
-new file mode 100644
-index 0000000..ab22fe6
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt
-@@ -0,0 +1,34 @@
-+* Freescale Enhanced Secure Digital Host Controller (eSDHC) for i.MX
-+
-+The Enhanced Secure Digital Host Controller on Freescale i.MX family
-+provides an interface for MMC, SD, and SDIO types of memory cards.
-+
-+Required properties:
-+- compatible : Should be "fsl,<chip>-esdhc"
-+- reg : Should contain eSDHC registers location and length
-+- interrupts : Should contain eSDHC interrupt
-+
-+Optional properties:
-+- fsl,card-wired : Indicate the card is wired to host permanently
-+- fsl,cd-internal : Indicate to use controller internal card detection
-+- fsl,wp-internal : Indicate to use controller internal write protection
-+- cd-gpios : Specify GPIOs for card detection
-+- wp-gpios : Specify GPIOs for write protection
-+
-+Examples:
-+
-+esdhc at 70004000 {
-+	compatible = "fsl,imx51-esdhc";
-+	reg = <0x70004000 0x4000>;
-+	interrupts = <1>;
-+	fsl,cd-internal;
-+	fsl,wp-internal;
-+};
-+
-+esdhc at 70008000 {
-+	compatible = "fsl,imx51-esdhc";
-+	reg = <0x70008000 0x4000>;
-+	interrupts = <2>;
-+	cd-gpios = <&gpio0 6 0>; /* GPIO1_6 */
-+	wp-gpios = <&gpio0 5 0>; /* GPIO1_5 */
-+};
-diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-index f3efb3b..cbdd91f 100644
---- a/drivers/mmc/host/sdhci-esdhc-imx.c
-+++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-@@ -20,6 +20,9 @@
- #include <linux/mmc/host.h>
- #include <linux/mmc/mmc.h>
- #include <linux/mmc/sdio.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/of_gpio.h>
- #include <mach/esdhc.h>
- #include "sdhci-pltfm.h"
- #include "sdhci-esdhc.h"
-@@ -73,6 +76,14 @@ static struct platform_device_id imx_esdhc_devtype[] = {
- 	}
- };
- 
-+static const struct of_device_id imx_esdhc_dt_ids[] = {
-+	{ .compatible = "fsl,imx25-esdhc", .data = &imx_esdhc_devtype[IMX25_ESDHC], },
-+	{ .compatible = "fsl,imx35-esdhc", .data = &imx_esdhc_devtype[IMX35_ESDHC], },
-+	{ .compatible = "fsl,imx51-esdhc", .data = &imx_esdhc_devtype[IMX51_ESDHC], },
-+	{ .compatible = "fsl,imx53-esdhc", .data = &imx_esdhc_devtype[IMX53_ESDHC], },
-+	{ /* sentinel */ }
-+};
-+
- static inline int is_imx25_esdhc(struct pltfm_imx_data *data)
- {
- 	return data->devtype == IMX25_ESDHC;
-@@ -307,8 +318,48 @@ static irqreturn_t cd_irq(int irq, void *data)
- 	return IRQ_HANDLED;
- };
- 
-+#ifdef CONFIG_OF
-+static int __devinit
-+sdhci_esdhc_imx_probe_dt(struct platform_device *pdev,
-+			 struct esdhc_platform_data *boarddata)
-+{
-+	struct device_node *np = pdev->dev.of_node;
-+
-+	if (!np)
-+		return -ENODEV;
-+
-+	if (of_get_property(np, "fsl,card-wired", NULL))
-+		boarddata->cd_type = ESDHC_CD_PERMANENT;
-+
-+	if (of_get_property(np, "fsl,cd-controller", NULL))
-+		boarddata->cd_type = ESDHC_CD_CONTROLLER;
-+
-+	if (of_get_property(np, "fsl,wp-controller", NULL))
-+		boarddata->wp_type = ESDHC_WP_CONTROLLER;
-+
-+	boarddata->cd_gpio = of_get_named_gpio(np, "cd-gpios", 0);
-+	if (gpio_is_valid(boarddata->cd_gpio))
-+		boarddata->cd_type = ESDHC_CD_GPIO;
-+
-+	boarddata->wp_gpio = of_get_named_gpio(np, "wp-gpios", 0);
-+	if (gpio_is_valid(boarddata->wp_gpio))
-+		boarddata->wp_type = ESDHC_WP_GPIO;
-+
-+	return 0;
-+}
-+#else
-+static inline int
-+sdhci_esdhc_imx_probe_dt(struct platform_device *pdev,
-+			 struct esdhc_platform_data *boarddata)
-+{
-+	return -ENODEV;
-+}
-+#endif
-+
- static int __devinit sdhci_esdhc_imx_probe(struct platform_device *pdev)
- {
-+	const struct of_device_id *of_id =
-+			of_match_device(imx_esdhc_dt_ids, &pdev->dev);
- 	struct sdhci_pltfm_host *pltfm_host;
- 	struct sdhci_host *host;
- 	struct esdhc_platform_data *boarddata;
-@@ -323,9 +374,13 @@ static int __devinit sdhci_esdhc_imx_probe(struct platform_device *pdev)
- 	pltfm_host = sdhci_priv(host);
- 
- 	imx_data = kzalloc(sizeof(struct pltfm_imx_data), GFP_KERNEL);
--	if (!imx_data)
--		return -ENOMEM;
-+	if (!imx_data) {
-+		err = -ENOMEM;
-+		goto err_imx_data;
-+	}
- 
-+	if (of_id)
-+		pdev->id_entry = of_id->data;
- 	imx_data->devtype = pdev->id_entry->driver_data;
- 	pltfm_host->priv = imx_data;
- 
-@@ -344,14 +399,16 @@ static int __devinit sdhci_esdhc_imx_probe(struct platform_device *pdev)
- 	if (is_imx53_esdhc(imx_data))
- 		imx_data->flags |= ESDHC_FLAG_MULTIBLK_NO_INT;
- 
--	if (!host->mmc->parent->platform_data) {
--		dev_err(mmc_dev(host->mmc), "no board data!\n");
--		err = -EINVAL;
--		goto no_board_data;
--	}
--	imx_data->boarddata = *((struct esdhc_platform_data *)
--				host->mmc->parent->platform_data);
- 	boarddata = &imx_data->boarddata;
-+	if (sdhci_esdhc_imx_probe_dt(pdev, boarddata) < 0) {
-+		if (!host->mmc->parent->platform_data) {
-+			dev_err(mmc_dev(host->mmc), "no board data!\n");
-+			err = -EINVAL;
-+			goto no_board_data;
-+		}
-+		imx_data->boarddata = *((struct esdhc_platform_data *)
-+					host->mmc->parent->platform_data);
-+	}
- 
- 	/* write_protect */
- 	if (boarddata->wp_type == ESDHC_WP_GPIO) {
-@@ -420,6 +477,7 @@ no_board_data:
- 	clk_put(pltfm_host->clk);
- err_clk_get:
- 	kfree(imx_data);
-+err_imx_data:
- 	sdhci_pltfm_free(pdev);
- 	return err;
- }
-@@ -455,6 +513,7 @@ static struct platform_driver sdhci_esdhc_imx_driver = {
- 	.driver		= {
- 		.name	= "sdhci-esdhc-imx",
- 		.owner	= THIS_MODULE,
-+		.of_match_table = imx_esdhc_dt_ids,
- 	},
- 	.id_table	= imx_esdhc_devtype,
- 	.probe		= sdhci_esdhc_imx_probe,
 -- 
-1.7.4.1
+Regards,
+Shawn
