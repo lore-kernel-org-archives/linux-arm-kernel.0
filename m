@@ -1,47 +1,51 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 6 Jul 2011 21:31:03 +0100
-Subject: [PATCH] ARM: DMA: Silence declared inside parameter list
-	warning for !CONFIG_MMU
-In-Reply-To: <1309767141.3964.1.camel@phoenix>
-References: <1309767141.3964.1.camel@phoenix>
-Message-ID: <20110706203103.GT8286@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 6 Jul 2011 22:31:50 +0200
+Subject: [PATCH 1/3] ARM: CSR: Adding CSR SiRFprimaII board support
+In-Reply-To: <20110706191000.GN8286@n2100.arm.linux.org.uk>
+References: <1309945678-18813-1-git-send-email-bs14@csr.com>
+	<CAGsJ_4xntJHz_CzCaTuyCbDrePzxO+esPFxTfZZ1TTnZFy4w=Q@mail.gmail.com>
+	<20110706191000.GN8286@n2100.arm.linux.org.uk>
+Message-ID: <201107062231.51117.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 04, 2011 at 04:12:21PM +0800, Axel Lin wrote:
-> Fix below warning, the struct dma_coherent_area takes no space if !CONFIG_MMU.
+On Wednesday 06 July 2011 21:10:00 Russell King - ARM Linux wrote:
+> On Thu, Jul 07, 2011 at 12:09:24AM +0800, Barry Song wrote:
+> > if you define that in asm/io.h as you said:
+> > 
+> > #ifndef IO_SPACE_LIMIT
+> > #if defined(PCMCIA_SOC_COMMON)
+> > #define  IO_SPACE_LIMIT ((resource_size_t)0xffffffff)
+> > #else
+> > #if defined(CONFIG_PCI) || defined(CONFIG_ISA) || defined(CONFIG_PCCARD)
+> > #define IO_SPACE_LIMIT ((resource_size_t)0xffff)
+> > #else
+> > #define IO_SPACE_LIMIT ((resource_size_t)0)
+> > #endif
+> > #endif
+> > #endif
+> > 
+> > i'd like to delete IO_SPACE_LIMIT in my io.h.
+> >
+> > otherwise, i'd like to try "#define IO_SPACE_LIMIT
+> > ((resource_size_t)0)" in my io.h since i have no real
+> > CONFIG_PCI/ISA/PCCARD/PCMCIA_SOC_COMMON.
 > 
->   CC      arch/arm/mm/dma-mapping.o
-> arch/arm/mm/dma-mapping.c:309: warning: 'struct dma_coherent_area' declared inside parameter list
-> arch/arm/mm/dma-mapping.c:309: warning: its scope is only this definition or declaration, which is probably not what you want
-> arch/arm/mm/dma-mapping.c:334: warning: 'struct dma_coherent_area' declared inside parameter list
-> arch/arm/mm/dma-mapping.c:374: warning: 'struct dma_coherent_area' declared inside parameter list
-> 
-> Signed-off-by: Axel Lin <axel.lin@gmail.com>
+> Thanks - stopping the 0xffffffff madness in new platforms is great.
 
-Ok, can you put this in the patch system please?
+FWIW, I've double-checked the Xilinx zynq platform that I've already queued
+up for 3.1: this one defines IO_SPACE_LIMIT to 0xffff because PCI support
+will get merged later, so that's fine.
 
-Thanks.
+> If you also omit the definition for __io() and set NO_IOPORT in your
+> Kconfig, you should also end up with inb() et.al. undefined by asm/io.h,
+> which should cause build-time failures if an ISA/PCI/PCMCIA driver
+> attempts to build.
 
-> ---
->  arch/arm/mm/dma-mapping.c |    2 ++
->  1 files changed, 2 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> index 8089499..da3b33a 100644
-> --- a/arch/arm/mm/dma-mapping.c
-> +++ b/arch/arm/mm/dma-mapping.c
-> @@ -297,6 +297,8 @@ static void dma_free_area(void *cpu_addr, size_t size, struct dma_coherent_area
->  #define coherent_wc_area NULL
->  #define coherent_dma_area NULL
->  
-> +struct dma_coherent_area { };
-> +
->  void dma_coherent_reserve(void)
->  {
->  }
-> -- 
-> 1.7.4.1
-> 
-> 
-> 
+Just as a follow-up, this is what I was referring to in the other
+sub-thread. Setting NO_IOPORT and removing __io does work for a lot
+of things today, but breaks randconfig builds left and right. I want
+to clean that up by adding 'depends on HAS_IOPORT' at the correct places
+and then switch all platforms that don't need it to remove __io.
+
+	Arnd
