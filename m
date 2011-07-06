@@ -1,35 +1,41 @@
-From: joravec@drewtech.com (Joey Oravec)
-Date: Wed, 06 Jul 2011 14:49:53 -0400
-Subject: plat-orion multi purpose pins problem for mv78200
-In-Reply-To: <20110706161823.GB22857@kw.sim.vm.gnt>
-References: <4E0E1CA8.7090200@drewtech.com>
-	<20110702122344.GJ31228@kw.sim.vm.gnt>
-	<CAMAG_eexDoKrPsrd7+3bpsN3y0pptqwhFRP2NKqd_Nny+M+NGg@mail.gmail.com>
-	<4E132FD5.1090409@drewtech.com>
-	<20110706161823.GB22857@kw.sim.vm.gnt>
-Message-ID: <4E14AE51.5070003@drewtech.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 6 Jul 2011 12:49:49 -0600
+Subject: [RFC PATCH 1/5] OMAP3:I2C: Add device tree nodes for beagle board
+In-Reply-To: <20110630142702.GV23145@atomide.com>
+References: <1309426647-31587-1-git-send-email-manjugk@ti.com>
+	<1309426647-31587-2-git-send-email-manjugk@ti.com>
+	<20110630142702.GV23145@atomide.com>
+Message-ID: <20110706184949.GI4871@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/6/2011 12:18 PM, Simon Guinot wrote:
->> Note that orion_gpio_set_valid() and orion_gpio_is_valid() would
->> both need rework. The functions need to handle that a GPIO can be
->> mux'ed onto any MPP pin. I described this problem in another email
->> on the thread.
-> I don't understand what's wrong with the GPIO array.
+On Thu, Jun 30, 2011 at 07:27:02AM -0700, Tony Lindgren wrote:
+> Hi,
+> 
+> Few comments on the .dts data layout below.
+> 
+> * G, Manjunath Kondaiah <manjugk@ti.com> [110630 02:44]:
+> > --- a/arch/arm/boot/dts/omap3-beagle-nunchuck.dts
+> > +++ b/arch/arm/boot/dts/omap3-beagle-nunchuck.dts
+> > @@ -2,11 +2,6 @@
+> >  
+> >  / {
+> >  	i2c at 48072000 {
+> > -		compatible = "ti,omap3-i2c";
+> > -		reg = <0x48072000 0x80>;
+> > -		#address-cells = <1>;
+> > -		#size-cells = <0>;
+> > -
+> >  		eeprom at 50 {
+> >  			compatible = "at,at24c01";
+> >  			reg = < 0x50 >;
+> 
+> The board .dts file should include the omap3 SoC .dts file.
+> 
+> The omap3 SoC .dts file should have the devices mapped to L3 and L4
+> busses, and the then i2c at 1 would just contain the bus offset.
+> 
+> Then the i2c at 1 entry would be repeated in the board specific
+> .dts and tell that the i2c at 1 is enabled.
 
-I tried to describe the case in my reply: 
-http://lists.arm.linux.org.uk/lurker/message/20110701.215657.7efe0a42.en.html
-
-Assume that we've solved the mpp_to_gpio mapping. Then imagine you pass 
-a large array to mv78xx0_mpp_conf() that includes:
-
-MPP16_GPIO (this mpp corresponds to GPIO16)
-MPP47_UNUSED (this mpp corresponds to GPIO16)
-
-The code today processes the array in-order. When it processes 
-MPP16_GPIO it will mark the GPIO16 valid. When it processes MPP47_UNUSED 
-it would currently mark GPIO16 invalid. This is a problem because it 
-still assumes a 1:1 relationship.
-
--joey
+yup.
