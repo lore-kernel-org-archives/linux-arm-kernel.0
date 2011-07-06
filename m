@@ -1,91 +1,181 @@
 From: bryan.wu@canonical.com (Bryan Wu)
-Date: Wed,  6 Jul 2011 20:34:34 +0800
-Subject: [PATCH 04/17] mach-versatile: retire custom LED code
+Date: Wed,  6 Jul 2011 20:34:35 +0800
+Subject: [PATCH 05/17] mach-ks8695: remove leds driver, since nobody use it
 In-Reply-To: <1309955687-19365-1-git-send-email-bryan.wu@canonical.com>
 References: <1309955687-19365-1-git-send-email-bryan.wu@canonical.com>
-Message-ID: <1309955687-19365-5-git-send-email-bryan.wu@canonical.com>
+Message-ID: <1309955687-19365-6-git-send-email-bryan.wu@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
-
-The CPU activity LED is now handled by the trigger in the leds
-subsystem, retire this old CONFIG_LEDS-based code.
-
-Cc: Richard Purdie <rpurdie@rpsys.net>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Bryan Wu <bryan.wu@canonical.com>
-Acked-by: Pawel Moll <pawel.moll@arm.com>
 ---
- arch/arm/mach-versatile/core.c |   42 ----------------------------------------
- 1 files changed, 0 insertions(+), 42 deletions(-)
+ arch/arm/mach-ks8695/Makefile               |    3 -
+ arch/arm/mach-ks8695/devices.c              |   21 ------
+ arch/arm/mach-ks8695/include/mach/devices.h |    5 --
+ arch/arm/mach-ks8695/leds.c                 |   93 ---------------------------
+ 4 files changed, 0 insertions(+), 122 deletions(-)
+ delete mode 100644 arch/arm/mach-ks8695/leds.c
 
-diff --git a/arch/arm/mach-versatile/core.c b/arch/arm/mach-versatile/core.c
-index 0c99cf0..b9ff8ff 100644
---- a/arch/arm/mach-versatile/core.c
-+++ b/arch/arm/mach-versatile/core.c
-@@ -36,7 +36,6 @@
+diff --git a/arch/arm/mach-ks8695/Makefile b/arch/arm/mach-ks8695/Makefile
+index 7e3e816..39c7d3c 100644
+--- a/arch/arm/mach-ks8695/Makefile
++++ b/arch/arm/mach-ks8695/Makefile
+@@ -11,9 +11,6 @@ obj-				:=
+ # PCI support is optional
+ obj-$(CONFIG_PCI)		+= pci.o
  
- #include <asm/system.h>
- #include <asm/irq.h>
--#include <asm/leds.h>
- #include <asm/hardware/arm_timer.h>
- #include <asm/hardware/icst.h>
- #include <asm/hardware/vic.h>
-@@ -646,43 +645,6 @@ static struct amba_device *amba_devs[] __initdata = {
- 	&kmi1_device,
- };
- 
--#ifdef CONFIG_LEDS
--#define VA_LEDS_BASE (__io_address(VERSATILE_SYS_BASE) + VERSATILE_SYS_LED_OFFSET)
+-# LEDs
+-obj-$(CONFIG_LEDS)		+= leds.o
 -
--static void versatile_leds_event(led_event_t ledevt)
+ # Board-specific support
+ obj-$(CONFIG_MACH_KS8695)	+= board-micrel.o
+ obj-$(CONFIG_MACH_DSM320)	+= board-dsm320.o
+diff --git a/arch/arm/mach-ks8695/devices.c b/arch/arm/mach-ks8695/devices.c
+index b89fb6d..5ebf45d 100644
+--- a/arch/arm/mach-ks8695/devices.c
++++ b/arch/arm/mach-ks8695/devices.c
+@@ -181,27 +181,6 @@ static void __init ks8695_add_device_watchdog(void)
+ }
+ 
+ 
+-/* --------------------------------------------------------------------
+- *  LEDs
+- * -------------------------------------------------------------------- */
+-
+-#if defined(CONFIG_LEDS)
+-short ks8695_leds_cpu = -1;
+-short ks8695_leds_timer = -1;
+-
+-void __init ks8695_init_leds(u8 cpu_led, u8 timer_led)
+-{
+-	/* Enable GPIO to access the LEDs */
+-	gpio_direction_output(cpu_led, 1);
+-	gpio_direction_output(timer_led, 1);
+-
+-	ks8695_leds_cpu	  = cpu_led;
+-	ks8695_leds_timer = timer_led;
+-}
+-#else
+-void __init ks8695_init_leds(u8 cpu_led, u8 timer_led) {}
+-#endif
+-
+ /* -------------------------------------------------------------------- */
+ 
+ /*
+diff --git a/arch/arm/mach-ks8695/include/mach/devices.h b/arch/arm/mach-ks8695/include/mach/devices.h
+index 2744fec..6e0c94a 100644
+--- a/arch/arm/mach-ks8695/include/mach/devices.h
++++ b/arch/arm/mach-ks8695/include/mach/devices.h
+@@ -18,11 +18,6 @@ extern void __init ks8695_add_device_wan(void);
+ extern void __init ks8695_add_device_lan(void);
+ extern void __init ks8695_add_device_hpna(void);
+ 
+- /* LEDs */
+-extern short ks8695_leds_cpu;
+-extern short ks8695_leds_timer;
+-extern void __init ks8695_init_leds(u8 cpu_led, u8 timer_led);
+-
+  /* PCI */
+ #define KS8695_MODE_PCI		0
+ #define KS8695_MODE_MINIPCI	1
+diff --git a/arch/arm/mach-ks8695/leds.c b/arch/arm/mach-ks8695/leds.c
+deleted file mode 100644
+index 184ef74..0000000
+--- a/arch/arm/mach-ks8695/leds.c
++++ /dev/null
+@@ -1,93 +0,0 @@
+-/*
+- * LED driver for KS8695-based boards.
+- *
+- * Copyright (C) Andrew Victor
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
+-
+-#include <linux/kernel.h>
+-#include <linux/module.h>
+-#include <linux/init.h>
+-
+-#include <asm/leds.h>
+-#include <mach/devices.h>
+-#include <mach/gpio.h>
+-
+-
+-static inline void ks8695_led_on(unsigned int led)
+-{
+-	gpio_set_value(led, 0);
+-}
+-
+-static inline void ks8695_led_off(unsigned int led)
+-{
+-	gpio_set_value(led, 1);
+-}
+-
+-static inline void ks8695_led_toggle(unsigned int led)
+-{
+-	unsigned long is_off = gpio_get_value(led);
+-	if (is_off)
+-		ks8695_led_on(led);
+-	else
+-		ks8695_led_off(led);
+-}
+-
+-
+-/*
+- * Handle LED events.
+- */
+-static void ks8695_leds_event(led_event_t evt)
 -{
 -	unsigned long flags;
--	u32 val;
 -
 -	local_irq_save(flags);
--	val = readl(VA_LEDS_BASE);
 -
--	switch (ledevt) {
--	case led_idle_start:
--		val = val & ~VERSATILE_SYS_LED0;
+-	switch(evt) {
+-	case led_start:		/* System startup */
+-		ks8695_led_on(ks8695_leds_cpu);
 -		break;
 -
--	case led_idle_end:
--		val = val | VERSATILE_SYS_LED0;
+-	case led_stop:		/* System stop / suspend */
+-		ks8695_led_off(ks8695_leds_cpu);
 -		break;
 -
--	case led_timer:
--		val = val ^ VERSATILE_SYS_LED1;
+-#ifdef CONFIG_LEDS_TIMER
+-	case led_timer:		/* Every 50 timer ticks */
+-		ks8695_led_toggle(ks8695_leds_timer);
+-		break;
+-#endif
+-
+-#ifdef CONFIG_LEDS_CPU
+-	case led_idle_start:	/* Entering idle state */
+-		ks8695_led_off(ks8695_leds_cpu);
 -		break;
 -
--	case led_halted:
--		val = 0;
+-	case led_idle_end:	/* Exit idle state */
+-		ks8695_led_on(ks8695_leds_cpu);
 -		break;
+-#endif
 -
 -	default:
 -		break;
 -	}
 -
--	writel(val, VA_LEDS_BASE);
 -	local_irq_restore(flags);
 -}
--#endif	/* CONFIG_LEDS */
 -
- /* Early initializations */
- void __init versatile_init_early(void)
- {
-@@ -707,10 +669,6 @@ void __init versatile_init(void)
- 		struct amba_device *d = amba_devs[i];
- 		amba_device_register(d, &iomem_resource);
- 	}
 -
--#ifdef CONFIG_LEDS
--	leds_event = versatile_leds_event;
--#endif
- }
- 
- /*
+-static int __init leds_init(void)
+-{
+-	if ((ks8695_leds_timer == -1) || (ks8695_leds_cpu == -1))
+-		return -ENODEV;
+-
+-	leds_event = ks8695_leds_event;
+-
+-	leds_event(led_start);
+-	return 0;
+-}
+-
+-__initcall(leds_init);
 -- 
 1.7.5
