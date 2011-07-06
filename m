@@ -1,139 +1,95 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 05 Jul 2011 23:29:51 -0400
-Subject: [PATCH 07/37] ARM: OMAP: move OMAP1 memory config from plat/memory.h
-	to its mach/memory.h
+Date: Tue, 05 Jul 2011 23:29:52 -0400
+Subject: [PATCH 08/37] ARM: mach-omap2: remove mach/memory.h
 In-Reply-To: <1309923021-23487-1-git-send-email-nicolas.pitre@linaro.org>
 References: <1309923021-23487-1-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <1309923021-23487-7-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <1309923021-23487-8-git-send-email-nicolas.pitre@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 ---
- arch/arm/mach-omap1/include/mach/memory.h |   54 ++++++++++++++++++++++++++++-
- arch/arm/plat-omap/include/plat/memory.h  |   45 +-----------------------
- 2 files changed, 54 insertions(+), 45 deletions(-)
+ arch/arm/mach-omap2/include/mach/memory.h |    5 ---
+ arch/arm/plat-omap/Kconfig                |    1 +
+ arch/arm/plat-omap/include/plat/memory.h  |   46 -----------------------------
+ 3 files changed, 1 insertions(+), 51 deletions(-)
+ delete mode 100644 arch/arm/mach-omap2/include/mach/memory.h
+ delete mode 100644 arch/arm/plat-omap/include/plat/memory.h
 
-diff --git a/arch/arm/mach-omap1/include/mach/memory.h b/arch/arm/mach-omap1/include/mach/memory.h
-index e9b600c..5f96515 100644
---- a/arch/arm/mach-omap1/include/mach/memory.h
-+++ b/arch/arm/mach-omap1/include/mach/memory.h
-@@ -2,4 +2,56 @@
-  * arch/arm/mach-omap1/include/mach/memory.h
-  */
- 
+diff --git a/arch/arm/mach-omap2/include/mach/memory.h b/arch/arm/mach-omap2/include/mach/memory.h
+deleted file mode 100644
+index ca6d32a..0000000
+--- a/arch/arm/mach-omap2/include/mach/memory.h
++++ /dev/null
+@@ -1,5 +0,0 @@
+-/*
+- * arch/arm/mach-omap2/include/mach/memory.h
+- */
+-
 -#include <plat/memory.h>
-+#ifndef __ASM_ARCH_MEMORY_H
-+#define __ASM_ARCH_MEMORY_H
-+
-+/*
-+ * Physical DRAM offset.
-+ */
-+#define PLAT_PHYS_OFFSET		UL(0x10000000)
-+
-+/*
-+ * Bus address is physical address, except for OMAP-1510 Local Bus.
-+ * OMAP-1510 bus address is translated into a Local Bus address if the
-+ * OMAP bus type is lbus. We do the address translation based on the
-+ * device overriding the defaults used in the dma-mapping API.
-+ * Note that the is_lbus_device() test is not very efficient on 1510
-+ * because of the strncmp().
-+ */
-+#ifdef CONFIG_ARCH_OMAP15XX
-+
-+/*
-+ * OMAP-1510 Local Bus address offset
-+ */
-+#define OMAP1510_LB_OFFSET	UL(0x30000000)
-+
-+#define virt_to_lbus(x)		((x) - PAGE_OFFSET + OMAP1510_LB_OFFSET)
-+#define lbus_to_virt(x)		((x) - OMAP1510_LB_OFFSET + PAGE_OFFSET)
-+#define is_lbus_device(dev)	(cpu_is_omap15xx() && dev && (strncmp(dev_name(dev), "ohci", 4) == 0))
-+
-+#define __arch_pfn_to_dma(dev, pfn)	\
-+	({ dma_addr_t __dma = __pfn_to_phys(pfn); \
-+	   if (is_lbus_device(dev)) \
-+		__dma = __dma - PHYS_OFFSET + OMAP1510_LB_OFFSET; \
-+	   __dma; })
-+
-+#define __arch_dma_to_pfn(dev, addr)	\
-+	({ dma_addr_t __dma = addr;				\
-+	   if (is_lbus_device(dev))				\
-+		__dma += PHYS_OFFSET - OMAP1510_LB_OFFSET;	\
-+	   __phys_to_pfn(__dma);				\
-+	})
-+
-+#define __arch_dma_to_virt(dev, addr)	({ (void *) (is_lbus_device(dev) ? \
-+						lbus_to_virt(addr) : \
-+						__phys_to_virt(addr)); })
-+
-+#define __arch_virt_to_dma(dev, addr)	({ unsigned long __addr = (unsigned long)(addr); \
-+					   (dma_addr_t) (is_lbus_device(dev) ? \
-+						virt_to_lbus(__addr) : \
-+						__virt_to_phys(__addr)); })
-+
-+#endif	/* CONFIG_ARCH_OMAP15XX */
-+
-+#endif
-+
+diff --git a/arch/arm/plat-omap/Kconfig b/arch/arm/plat-omap/Kconfig
+index 49a4c75..db30a1d 100644
+--- a/arch/arm/plat-omap/Kconfig
++++ b/arch/arm/plat-omap/Kconfig
+@@ -21,6 +21,7 @@ config ARCH_OMAP2PLUS
+ 	select CLKDEV_LOOKUP
+ 	select GENERIC_IRQ_CHIP
+ 	select OMAP_DM_TIMER
++	select NO_MACH_MEMORY_H
+ 	help
+ 	  "Systems based on OMAP2, OMAP3 or OMAP4"
+ 
 diff --git a/arch/arm/plat-omap/include/plat/memory.h b/arch/arm/plat-omap/include/plat/memory.h
-index 7f9df6f..5b1a86d 100644
+deleted file mode 100644
+index 5b1a86d..0000000
 --- a/arch/arm/plat-omap/include/plat/memory.h
-+++ b/arch/arm/plat-omap/include/plat/memory.h
-@@ -37,53 +37,10 @@
-  * Physical DRAM offset.
-  */
- #if defined(CONFIG_ARCH_OMAP1)
--#define PLAT_PHYS_OFFSET		UL(0x10000000)
-+#error "OMAP1 should not be including this"
- #else
- #define PLAT_PHYS_OFFSET		UL(0x80000000)
- #endif
- 
++++ /dev/null
+@@ -1,46 +0,0 @@
 -/*
-- * Bus address is physical address, except for OMAP-1510 Local Bus.
-- * OMAP-1510 bus address is translated into a Local Bus address if the
-- * OMAP bus type is lbus. We do the address translation based on the
-- * device overriding the defaults used in the dma-mapping API.
-- * Note that the is_lbus_device() test is not very efficient on 1510
-- * because of the strncmp().
+- * arch/arm/plat-omap/include/mach/memory.h
+- *
+- * Memory map for OMAP-1510 and 1610
+- *
+- * Copyright (C) 2000 RidgeRun, Inc.
+- * Author: Greg Lonnon <glonnon@ridgerun.com>
+- *
+- * This file was derived from arch/arm/mach-intergrator/include/mach/memory.h
+- * Copyright (C) 1999 ARM Limited
+- *
+- * This program is free software; you can redistribute it and/or modify it
+- * under the terms of the GNU General Public License as published by the
+- * Free Software Foundation; either version 2 of the License, or (at your
+- * option) any later version.
+- *
+- * THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESS OR IMPLIED
+- * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+- * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
+- * NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
+- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+- * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
+- * USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+- * ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+- * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+- *
+- * You should have received a copy of the GNU General Public License along
+- * with this program; if not, write to the Free Software Foundation, Inc.,
+- * 675 Mass Ave, Cambridge, MA 02139, USA.
 - */
--#ifdef CONFIG_ARCH_OMAP15XX
+-
+-#ifndef __ASM_ARCH_MEMORY_H
+-#define __ASM_ARCH_MEMORY_H
 -
 -/*
-- * OMAP-1510 Local Bus address offset
+- * Physical DRAM offset.
 - */
--#define OMAP1510_LB_OFFSET	UL(0x30000000)
+-#if defined(CONFIG_ARCH_OMAP1)
+-#error "OMAP1 should not be including this"
+-#else
+-#define PLAT_PHYS_OFFSET		UL(0x80000000)
+-#endif
 -
--#define virt_to_lbus(x)		((x) - PAGE_OFFSET + OMAP1510_LB_OFFSET)
--#define lbus_to_virt(x)		((x) - OMAP1510_LB_OFFSET + PAGE_OFFSET)
--#define is_lbus_device(dev)	(cpu_is_omap15xx() && dev && (strncmp(dev_name(dev), "ohci", 4) == 0))
+-#endif
 -
--#define __arch_pfn_to_dma(dev, pfn)	\
--	({ dma_addr_t __dma = __pfn_to_phys(pfn); \
--	   if (is_lbus_device(dev)) \
--		__dma = __dma - PHYS_OFFSET + OMAP1510_LB_OFFSET; \
--	   __dma; })
--
--#define __arch_dma_to_pfn(dev, addr)	\
--	({ dma_addr_t __dma = addr;				\
--	   if (is_lbus_device(dev))				\
--		__dma += PHYS_OFFSET - OMAP1510_LB_OFFSET;	\
--	   __phys_to_pfn(__dma);				\
--	})
--
--#define __arch_dma_to_virt(dev, addr)	({ (void *) (is_lbus_device(dev) ? \
--						lbus_to_virt(addr) : \
--						__phys_to_virt(addr)); })
--
--#define __arch_virt_to_dma(dev, addr)	({ unsigned long __addr = (unsigned long)(addr); \
--					   (dma_addr_t) (is_lbus_device(dev) ? \
--						virt_to_lbus(__addr) : \
--						__virt_to_phys(__addr)); })
--
--#endif	/* CONFIG_ARCH_OMAP15XX */
--
- #endif
- 
 -- 
 1.7.4
