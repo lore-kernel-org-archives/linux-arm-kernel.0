@@ -1,24 +1,23 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Wed, 06 Jul 2011 16:11:05 +0400
-Subject: [PATCH V2 6/6] mpcore_wdt: Move declarations in a separate header
-In-Reply-To: <1309892440-3260-7-git-send-email-vkuzmichev@mvista.com>
-References: <1286185540-19569-1-git-send-email-vkuzmichev@mvista.com>
-	<1309892440-3260-7-git-send-email-vkuzmichev@mvista.com>
-Message-ID: <4E1450D9.3040601@mvista.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Wed, 6 Jul 2011 14:20:21 +0200
+Subject: [PATCH 3/3 v2] ARM: pxa168: Add board support for gplugD
+In-Reply-To: <453554c85ebd364f14cd10953730171d6814d009.1308721057.git.tanmay.upadhyay@einfochips.com>
+References: <1304316000-869-1-git-send-email-tanmay.upadhyay@einfochips.com>
+	<453554c85ebd364f14cd10953730171d6814d009.1308721057.git.tanmay.upadhyay@einfochips.com>
+Message-ID: <CACTFLANNMPS68OQ6tjOjZjw+aH2GHEV7uHjcjOj7RLNZFtMGZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Wed, Jun 22, 2011 at 7:55 AM, Tanmay Upadhyay
+<tanmay.upadhyay@einfochips.com> wrote:
+> Tested UART console, Ethernet & I2C interfaces
+>
+> v2 - move definitions from mfp-gplugd.h to mfp-pxa168.h
+>
+> Signed-off-by: Tanmay Upadhyay <tanmay.upadhyay@einfochips.com>
 
-On 05-07-2011 23:00, Vitaly Kuzmichev wrote:
+Thank you for this patch. Are you working on support for more
+components of this device, for example the display controller?
 
-> Signed-off-by: Vitaly Kuzmichev<vkuzmichev@mvista.com>
-> ---
->   drivers/watchdog/mpcore_wdt.c |   26 +-------------------------
->   drivers/watchdog/mpcore_wdt.h |   40 ++++++++++++++++++++++++++++++++++++++++
->   2 files changed, 41 insertions(+), 25 deletions(-)
->   create mode 100644 drivers/watchdog/mpcore_wdt.h
 
-    Are the declarations only used by mpcore_wdt.c? If so, why we need a header?
-
-WBR, Sergei
+Daniel
