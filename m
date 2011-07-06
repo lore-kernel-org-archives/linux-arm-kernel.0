@@ -1,105 +1,52 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 6 Jul 2011 21:00:04 +0800
-Subject: [PATCH v2 1/3] gpio/mxc: get gpio range/base from gpio core
-In-Reply-To: <CACxGe6u-Yk98iRViGM+xDDRQrWBsPPavRVfjAe8VAyP2GQNBqQ@mail.gmail.com>
-References: <1309879166-25788-1-git-send-email-shawn.guo@linaro.org>
-	<1309879166-25788-2-git-send-email-shawn.guo@linaro.org>
-	<20110705165657.GK6069@pengutronix.de>
-	<CACxGe6u-Yk98iRViGM+xDDRQrWBsPPavRVfjAe8VAyP2GQNBqQ@mail.gmail.com>
-Message-ID: <20110706130004.GB4034@S2100-06.ap.freescale.net>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 6 Jul 2011 08:54:25 -0400 (EDT)
+Subject: [PATCH 01/52] ARM: introduce atag_offset to replace
+ boot_params
+In-Reply-To: <4E13E46D.3050205@codeaurora.org>
+References: <1309920457-21913-1-git-send-email-nicolas.pitre@linaro.org>
+	<4E13E46D.3050205@codeaurora.org>
+Message-ID: <alpine.LFD.2.00.1107060845140.14596@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 05, 2011 at 11:24:13AM -0600, Grant Likely wrote:
-> On Tue, Jul 5, 2011 at 10:56 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> > On Tue, Jul 05, 2011 at 11:19:24PM +0800, Shawn Guo wrote:
-> >> Instead of assigning the gpio range based on pdev->id, the patch
-> >> makes changes to get the range from gpio core that is dynamically
-> >> allocated.
-> >>
-> >> As a result, the uses of pdev->id can be removed from the driver.
-> >> This will make dt migration of the driver easier.
-> >>
-> >> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> >> Cc: Grant Likely <grant.likely@secretlab.ca>
-> >> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> >> ---
-> >> ?arch/arm/plat-mxc/include/mach/gpio.h | ? 13 +++++++++----
-> >> ?arch/arm/plat-mxc/include/mach/irqs.h | ? 21 +++------------------
-> >> ?drivers/gpio/gpio-mxc.c ? ? ? ? ? ? ? | ? 18 ++++++++++--------
-> >> ?3 files changed, 22 insertions(+), 30 deletions(-)
-> >>
-> >> diff --git a/arch/arm/plat-mxc/include/mach/gpio.h b/arch/arm/plat-mxc/include/mach/gpio.h
-> >> index 31c820c..abdf5d7 100644
-> >> --- a/arch/arm/plat-mxc/include/mach/gpio.h
-> >> +++ b/arch/arm/plat-mxc/include/mach/gpio.h
-> >> @@ -23,10 +23,15 @@
-> >> ?#include <mach/hardware.h>
-> >> ?#include <asm-generic/gpio.h>
-> >>
-> >> -
-> >> -/* There's a off-by-one betweem the gpio bank number and the gpiochip */
-> >> -/* range e.g. GPIO_1_5 is gpio 5 under linux */
-> >> -#define IMX_GPIO_NR(bank, nr) ? ? ? ? ? ? ? ?(((bank) - 1) * 32 + (nr))
-> >> +/*
-> >> + * There's a off-by-one betweem the gpio bank number and the gpiochip
-> >> + * range e.g. GPIO_1_5 is gpio 5 under linux.
-> >> + *
-> >> + * When gpio core allocates gpio range for a bank, it starts from the
-> >> + * end of the total range. ?That is to say, bank 0 will get a higher
-> >> + * gpio range than bank 1.
-> >> + */
-> >> +#define IMX_GPIO_NR(bank, nr) ? ? ? ?(ARCH_NR_GPIOS - (bank) * 32 + (nr))
-> >
-> > That is not a good idea. First of all not all boards use this macro.
-> > This could be fixed, but it is a no go to allocate the gpios dynamically
-> > and add a macro which makes assumptions on the range which gets
-> > allocated.
+On Tue, 5 Jul 2011, Stephen Boyd wrote:
+
+> On 07/05/2011 07:46 PM, Nicolas Pitre wrote:
+> > diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
+> > index 7b79a00..1bdf6e1 100644
+> > --- a/arch/arm/include/asm/mach/arch.h
+> > +++ b/arch/arm/include/asm/mach/arch.h
+> > @@ -18,6 +18,7 @@ struct machine_desc {
+> >  	unsigned int		nr;		/* architecture number	*/
+> >  	const char		*name;		/* architecture name	*/
+> >  	unsigned long		boot_params;	/* tagged list		*/
+> > +	unsigned long		atag_offset;	/* tagged list (relative) */
+> >  	const char		**dt_compat;	/* array of device tree
+> >  						 * 'compatible' strings	*/
+> >  
+> > diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> > index e0db84d..4cc3e2b 100644
+> > --- a/arch/arm/kernel/setup.c
+> > +++ b/arch/arm/kernel/setup.c
+> > @@ -816,6 +816,8 @@ static struct machine_desc * __init setup_machine_tags(unsigned int nr)
+> >  
+> >  	if (__atags_pointer)
+> >  		tags = phys_to_virt(__atags_pointer);
+> > +	else if(mdesc->atag_offset)
+> > +		tags = PAGE_OFFSET + mdesc->atag_offset;
+> >  	else if (mdesc->boot_params) {
+> >  #ifdef CONFIG_MMU
+> >  		/*
 > 
-> Plus it makes the assumption that the imx gpio controllers will be the
-> first ones registered, and that the allocation scheme will not change
-> some time in the future.  You don't actually need to change this
-> anyway since existing static platform_device registrations can still
-> use the pdev->id value.  It is only the DT use case that should
-> dynamically assign the gpio number because all uses in that case can
-> use a DT gpio specifier instead of a hard coded number.
-> 
-Yeah, right.  Will drop all the changes in this patch but except the
-following lines.
+> Would it make sense to drop the atag_offset in most board files and
+> default it to 0x100 in the MACHINE_START macro itself? It's almost a
+> universal value and would cut down on hundreds of lines.
 
------8<-------------
--/* these are ordered by size to support multi-SoC kernels */
--#if defined CONFIG_SOC_IMX53
--#define MXC_GPIO_IRQS          (32 * 7)
--#elif defined CONFIG_ARCH_MX2
--#define MXC_GPIO_IRQS          (32 * 6)
--#elif defined CONFIG_SOC_IMX50
--#define MXC_GPIO_IRQS          (32 * 6)
--#elif defined CONFIG_ARCH_MX1
--#define MXC_GPIO_IRQS          (32 * 4)
--#elif defined CONFIG_ARCH_MX25
--#define MXC_GPIO_IRQS          (32 * 4)
--#elif defined CONFIG_SOC_IMX51
--#define MXC_GPIO_IRQS          (32 * 4)
--#elif defined CONFIG_ARCH_MX3
--#define MXC_GPIO_IRQS          (32 * 3)
--#endif
--
- /*
-  * The next 16 interrupts are for board specific purposes.  Since
-  * the kernel can only run on one machine@a time, we can re-use
-  * these.  If you need more, increase MXC_BOARD_IRQS, but keep it
-  * within sensible limits.
-  */
--#define MXC_BOARD_IRQ_START    (MXC_INTERNAL_IRQS + MXC_GPIO_IRQS)
-+#define MXC_BOARD_IRQ_START    (MXC_INTERNAL_IRQS + ARCH_NR_GPIOS)
----------------------
+Well, no more than 50 lines actually.
 
-I have to keep above changes not only because it makes code a little
-bit cleaner, but also it's needed to get dt irq work, as dt code
-gets gpio range from gpio core which dynamically allocates number
-from ARCH_NR_GPIOS to 0.
+And there are those cases where that value is not set to anything, and 
+therefore I'd prefer we don't start always assuming something at 0x*100 
+for them.  IOW, this is meant to be functionally transparent.
 
--- 
-Regards,
-Shawn
+
+Nicolas
