@@ -1,44 +1,76 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 6 Jul 2011 01:19:38 -0600 (MDT)
-Subject: [PATCH v2 00/18] OMAP4: PM data big spring cleanup and fixes
-In-Reply-To: <1309552901-8944-1-git-send-email-b-cousson@ti.com>
-References: <1309552901-8944-1-git-send-email-b-cousson@ti.com>
-Message-ID: <alpine.DEB.2.00.1107060017480.4217@utopia.booyaka.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 6 Jul 2011 10:20:43 +0300
+Subject: [PATCH 15/15] pxa2[57]x_udc: drop gpio_pullup handling
+In-Reply-To: <CALT56yP5yNPZoJ_+6a4t2t6rY_hmej5fc-NG02Jef-QiXHrc=Q@mail.gmail.com>
+References: <1309871321-11305-1-git-send-email-dbaryshkov@gmail.com>
+	<1309871321-11305-16-git-send-email-dbaryshkov@gmail.com>
+	<4E13772B.2090406@free.fr>
+	<CALT56yP5yNPZoJ_+6a4t2t6rY_hmej5fc-NG02Jef-QiXHrc=Q@mail.gmail.com>
+Message-ID: <20110706072042.GC10729@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+hi,
 
-On Fri, 1 Jul 2011, Benoit Cousson wrote:
+On Wed, Jul 06, 2011 at 12:58:48AM +0400, Dmitry Eremin-Solenikov wrote:
+> On 7/6/11, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
+> > On 07/05/2011 03:08 PM, Dmitry Eremin-Solenikov wrote:
+> >> Now as all drivers were converted to using gpio-vbus, drop gpio-pullup
+> >> handling from pxa UDC drivers, thus simplifying them a bit.
+> >
+> > Is this patch compliant with USB 2 specification regarding maximum time
+> > between pullup triggering and UDC ready to answer the "RESET" packet and
+> > be assigned an address ?
+> >
+> > This is the sequence I'm worried about :
+> >   (1) The gpio-vbus is loaded
+> >   (2) The pxa27x_udc is loaded
+> >   (3) USB cable is plugged
+> >       => VBUS is sensed
+> >   (4) gpio-vbus pulls up the D+ (Dmitry, is that right ?)
+> >   (5) the host waits for UDC to settle (100 ms ?)
+> >   (5) set address packet(s) are sent from host to UDC
+> >   (6) UDC is not enabled, as no gadget is registered
+> >       => UDC doesn't answer
+> >       => usb host cannot assign it an address
+> >   (7) a gadget is loaded (g_ether for example)
+> >       => UDC is enabled, but too late
+> >
+> > Alan, Gregh, could you confirm point (5) about a maximum time between D+
+> > line activation and UDC duty to repond to "set address" packets, as well
+> > as the consequence of point (6) where the usb device is rejected because
+> > no address could be assigned ?
+> >
+> > Dmitry, could you confirm the the D+ pullup is done at point (4) ?
+> 
+> No, I can't confirm this. IIUC, evrything happens in abit different way:
+> (4) trancseiver notifies udc about VBUS sense
+> (5) a gadget is loaded (g_ether for example)
+> (6) gadget asks udc to enale  pullup
+> (7) udc tells gpio_vbus to enable pullup.
 
-> Here are a bunch of cleanups on almost every PRCM related data files.
-> Some of them are purely code moves, and will look like a lot of
-> noise for nothing, but this is needed if we want to keep the files
-> aligned with generator tool and thus ease the future migration to
-> whatever format (common clock framework + DT).
+yeah, with udc-core.c we only enable pullup after gadget driver is
+loaded.
 
-Thanks.  I'll split these up into smaller topic branches, I think
-that's what Tony wants for this window.
+290                 ret = bind(udc->gadget);
+291                 if (ret)
+292                         goto err1;
+293                 ret = usb_gadget_udc_start(udc->gadget, driver);
+294                 if (ret) {
+295                         driver->unbind(udc->gadget);
+296                         goto err1;
+297                 }
+298                 usb_gadget_connect(udc->gadget);
 
-Patches 1-3 and 12 have been queued for 3.1 at 
-git://git.pwsan.com/linux-2.6 in the 'prcm_cleanup_a_3.1' branch.
+but this is the new style bind() and many UDCs still need to be
+converted.
 
-Patches 4-8 and 11 have been queued for 3.1 at
-git://git.pwsan.com/linux-2.6 in the 'clock_cleanup_a_3.1' branch.
-
-Patches 9 and 10 have been split into PRCM changes and clock changes. The 
-PRCM changes have been queued for 3.1 at git://git.pwsan.com/linux-2.6 in 
-the 'prcm_cleanup_a_3.1' branch.  The clock changes have been queued for 
-3.1 at git://git.pwsan.com/linux-2.6 in the 'clock_cleanup_a_3.1' branch.
-
-Patches 13-15 have been queued for 3.1 at
-git://git.pwsan.com/linux-2.6 in the 'hwmod_cleanup_a_3.1' branch.
-
-Patches 17-18 have been queued for 3.1 at
-git://git.pwsan.com/linux-2.6 in the 'hwmod_dss_fix_3.1' branch.
-
-Patch 16, to me, belongs best with the 4460 support series and so I'll see 
-if it makes sense to fit it in there somewhere.
-
-
-- Paul
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 490 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110706/eb2b3213/attachment.sig>
