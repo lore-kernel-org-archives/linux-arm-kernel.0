@@ -1,34 +1,61 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 06 Jul 2011 17:47:27 +0200
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 6 Jul 2011 16:48:57 +0100
 Subject: [PATCH 6/8] drivers: add Contiguous Memory Allocator
-In-Reply-To: <20110706153704.GF8286@n2100.arm.linux.org.uk>
+In-Reply-To: <201107061651.49824.arnd@arndb.de>
 References: <1309851710-3828-1-git-send-email-m.szyprowski@samsung.com>
-	<20110705113345.GA8286@n2100.arm.linux.org.uk>
-	<006301cc3be4$daab1850$900148f0$%szyprowski@samsung.com>
 	<201107061609.29996.arnd@arndb.de>
-	<007101cc3bec$dfbba8c0$9f32fa40$%szyprowski@samsung.com>
-	<20110706153704.GF8286@n2100.arm.linux.org.uk>
-Message-ID: <007801cc3bf4$01fdefe0$05f9cfa0$%szyprowski@samsung.com>
+	<20110706142345.GC8286@n2100.arm.linux.org.uk>
+	<201107061651.49824.arnd@arndb.de>
+Message-ID: <20110706154857.GG8286@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Wednesday, July 06, 2011 5:37 PM Russell King - ARM Linux wrote:
-
-> On Wed, Jul 06, 2011 at 04:56:23PM +0200, Marek Szyprowski wrote:
-> > This will not solve our problems. We need CMA also to create at least one
-> > device private area that for sure will be in low memory (video codec).
+On Wed, Jul 06, 2011 at 04:51:49PM +0200, Arnd Bergmann wrote:
+> On Wednesday 06 July 2011, Russell King - ARM Linux wrote:
+> > On Wed, Jul 06, 2011 at 04:09:29PM +0200, Arnd Bergmann wrote:
+> > > Maybe you can simply adapt the default location of the contiguous memory
+> > > are like this:
+> > > - make CONFIG_CMA depend on CONFIG_HIGHMEM on ARM, at compile time
+> > > - if ZONE_HIGHMEM exist during boot, put the CMA area in there
+> > > - otherwise, put the CMA area at the top end of lowmem, and change
+> > >   the zone sizes so ZONE_HIGHMEM stretches over all of the CMA memory.
+> > 
+> > One of the requirements of the allocator is that the returned memory
+> > should be zero'd (because it can be exposed to userspace via ALSA
+> > and frame buffers.)
+> > 
+> > Zeroing the memory from all the contexts which dma_alloc_coherent
+> > is called from is a trivial matter if its in lowmem, but highmem is
+> > harder.
 > 
-> You make these statements but you don't say why.  Can you please
-> explain why the video codec needs low memory - does it have a
-> restricted number of memory address bits which it can manipulate?
+> I don't see how. The pages get allocated from an unmapped area
+> or memory, mapped into the kernel address space as uncached or wc
+> and then cleared. This should be the same for lowmem or highmem
+> pages.
 
-Nope, it only needs to put some type of memory buffers in first bank 
-(effectively in 30000000-34ffffff area) and the others in the second bank
-(40000000-57ffffff area). The values are given for Samsung GONI board.
+You don't want to clear them via their uncached or WC mapping, but via
+their cached mapping _before_ they get their alternative mapping, and
+flush any cached out of that mapping - both L1 and L2 caches.
 
-Best regards
--- 
-Marek Szyprowski
-Samsung Poland R&D Center
+For lowmem pages, that's easy.  For highmem pages, they need to be
+individually kmap'd to zero them etc.  (alloc_pages() warns on
+GFP_HIGHMEM + GFP_ZERO from atomic contexts - and dma_alloc_coherent
+must be callable from such contexts.)
+
+That may be easier now that we don't have the explicit indicies for
+kmap_atomics, but at that time it wasn't easily possible.
+
+> > Another issue is that when a platform has restricted DMA regions,
+> > they typically don't fall into the highmem zone.  As the dmabounce
+> > code allocates from the DMA coherent allocator to provide it with
+> > guaranteed DMA-able memory, that would be rather inconvenient.
+> 
+> True. The dmabounce code would consequently have to allocate
+> the memory through an internal function that avoids the
+> contiguous allocation area and goes straight to ZONE_DMA memory
+> as it does today.
+
+CMA's whole purpose for existing is to provide _dma-able_ contiguous
+memory for things like cameras and such like found on crippled non-
+scatter-gather hardware.  If that memory is not DMA-able what's the
+point?
