@@ -1,38 +1,36 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed,  6 Jul 2011 23:52:27 +0800
-Subject: [PATCH 1/3] ARM: pxa: fix PGSR register address calculation
-Message-ID: <1309967549-3394-1-git-send-email-eric.y.miao@gmail.com>
+Date: Wed,  6 Jul 2011 23:52:28 +0800
+Subject: [PATCH 2/3] ARM: pxa910: correct nand pmu setting
+In-Reply-To: <1309967549-3394-1-git-send-email-eric.y.miao@gmail.com>
+References: <1309967549-3394-1-git-send-email-eric.y.miao@gmail.com>
+Message-ID: <1309967549-3394-2-git-send-email-eric.y.miao@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Paul Parsons <lost.distance@yahoo.com>
+From: Lei Wen <leiwen@marvell.com>
 
-The file mfp-pxa2xx.c defines a macro, PGSR(), which translates a gpio
-bank number to a PGSR register address. The function pxa2xx_mfp_suspend()
-erroneously passed in a gpio number instead of a gpio bank number.
+The original pair of <0x01db, 208000000> is invalid.
+Correct to the valid value.
 
-Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
+Signed-off-by: Lei Wen <leiwen@marvell.com>
 Cc: stable at kernel.org
 Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
 ---
- arch/arm/mach-pxa/mfp-pxa2xx.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-mmp/pxa910.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-pxa/mfp-pxa2xx.c b/arch/arm/mach-pxa/mfp-pxa2xx.c
-index 87ae312..b27544b 100644
---- a/arch/arm/mach-pxa/mfp-pxa2xx.c
-+++ b/arch/arm/mach-pxa/mfp-pxa2xx.c
-@@ -347,9 +347,9 @@ static int pxa2xx_mfp_suspend(void)
- 		if ((gpio_desc[i].config & MFP_LPM_KEEP_OUTPUT) &&
- 		    (GPDR(i) & GPIO_bit(i))) {
- 			if (GPLR(i) & GPIO_bit(i))
--				PGSR(i) |= GPIO_bit(i);
-+				PGSR(gpio_to_bank(i)) |= GPIO_bit(i);
- 			else
--				PGSR(i) &= ~GPIO_bit(i);
-+				PGSR(gpio_to_bank(i)) &= ~GPIO_bit(i);
- 		}
- 	}
+diff --git a/arch/arm/mach-mmp/pxa910.c b/arch/arm/mach-mmp/pxa910.c
+index 8f92ccd..1464607 100644
+--- a/arch/arm/mach-mmp/pxa910.c
++++ b/arch/arm/mach-mmp/pxa910.c
+@@ -110,7 +110,7 @@ static APBC_CLK(pwm2, PXA910_PWM2, 1, 13000000);
+ static APBC_CLK(pwm3, PXA910_PWM3, 1, 13000000);
+ static APBC_CLK(pwm4, PXA910_PWM4, 1, 13000000);
  
+-static APMU_CLK(nand, NAND, 0x01db, 208000000);
++static APMU_CLK(nand, NAND, 0x19b, 156000000);
+ static APMU_CLK(u2o, USB, 0x1b, 480000000);
+ 
+ /* device and clock bindings */
 -- 
 1.7.4.1
