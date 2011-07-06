@@ -1,35 +1,27 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 6 Jul 2011 23:26:53 +0200
-Subject: [PATCH v4 2/2] ARM: l2x0: Add OF based initialization
-In-Reply-To: <20110706210237.GB5371@ponder.secretlab.ca>
-References: <1309984979-8847-1-git-send-email-robherring2@gmail.com>
-	<1309984979-8847-2-git-send-email-robherring2@gmail.com>
-	<20110706210237.GB5371@ponder.secretlab.ca>
-Message-ID: <201107062326.53737.arnd@arndb.de>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 6 Jul 2011 15:33:16 -0600 (MDT)
+Subject: [PATCH v2 0/8] OMAP2+: hwmod framework fixes
+In-Reply-To: <1309553647-14624-1-git-send-email-b-cousson@ti.com>
+References: <1309553647-14624-1-git-send-email-b-cousson@ti.com>
+Message-ID: <alpine.DEB.2.00.1107061532390.31498@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 06 July 2011 23:02:37 Grant Likely wrote:
-> 
-> On Wed, Jul 06, 2011 at 03:42:59PM -0500, Rob Herring wrote:
-> > From: Rob Herring <rob.herring@calxeda.com>
-> > 
-> > This adds probing for ARM L2x0 cache controllers via device tree. Support
-> > includes the L210, L220, and PL310 controllers. The binding allows setting
-> > up cache RAM latencies and filter addresses (PL310 only).
-> > 
-> > Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> 
-> Acked-by: Grant Likely <grant.likely@secretlab.ca>
-> 
-> By rights, this should go via the arm tree, but it depends on patches
-> that are already in devicetree/next.  Arnd, how do you want to handle
-> this?  I want to avoid rebasing devicetree/next.
+Hi
 
-It's outside of the scope of the arm-soc tree really, the l2x0 code
-is clearly core arm stuff, so it belongs into Russell's tree.
+On Fri, 1 Jul 2011, Benoit Cousson wrote:
 
-I think it's best if Russell can provide an Ack for this and you
-put it in the tree that already has the dependencies.
+> Here are the latest bug fixes done on the hwmod framework.
+> There are mainly around wakeup capability added in OMAP4.
+> 
+> The series is based on for_3.1/2_prcm_files_cleanup and tested
+> on OMAP4430 ES2.1 + SDP.
+> 
+> The patches are available here:
+> git://gitorious.org/omap-pm/linux.git for_3.1/3_hwmod_fixes
 
-	Arnd
+Thanks, this series has been queued for 3.1 at 
+git://git.pwsan.com/linux-2.6 in the 'hwmod_core_cleanup_a_3.1' branch.
+
+
+- Paul
