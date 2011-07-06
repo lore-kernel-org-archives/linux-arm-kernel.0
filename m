@@ -1,39 +1,82 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Wed, 6 Jul 2011 18:48:02 +0200
-Subject: [PATCH] Add 'config IMX_NFC_V1_BISWAP' to swap the Bad block
-	Indicator, and use for imx27pdk nand support.
-In-Reply-To: <20110706162935.GV6069@pengutronix.de>
-References: <1309872828-13942-1-git-send-email-J.Lambrecht@televic.com>
-	<20110706080942.GC26347@pengutronix.de>
-	<4E142B18.60407@televic.com> <19988.19315.787284.113228@ipc1.ka-ro>
-	<4E145789.8040801@televic.com>
-	<19988.26817.208939.223896@ipc1.ka-ro>
-	<20110706162935.GV6069@pengutronix.de>
-Message-ID: <19988.37314.985572.31361@ipc1.ka-ro>
+From: svaidy@linux.vnet.ibm.com (Vaidyanathan Srinivasan)
+Date: Wed, 6 Jul 2011 22:20:04 +0530
+Subject: [PATCH 00/10] mm: Linux VM Infrastructure to support Memory
+	Power Management
+In-Reply-To: <CAOJsxLF0me+=Rk8RnxNS=9=_pmwwAntu1c930F6ySEUD2zZkGw@mail.gmail.com>
+References: <1306499498-14263-1-git-send-email-ankita@in.ibm.com>
+	<20110629130038.GA7909@in.ibm.com>
+	<CAOJsxLHQP=-srK_uYYBsPb7+rUBnPZG7bzwtCd-rRaQa4ikUFg@mail.gmail.com>
+	<CAOJsxLF0me+=Rk8RnxNS=9=_pmwwAntu1c930F6ySEUD2zZkGw@mail.gmail.com>
+Message-ID: <20110706165004.GE4356@dirshya.in.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+* Pekka Enberg <penberg@kernel.org> [2011-07-06 12:01:45]:
 
-Sascha Hauer writes:
-> On Wed, Jul 06, 2011 at 03:53:05PM +0200, Lothar Wa?mann wrote:
-[...]
-> Not calling this a bug makes me think you work for the Freescale
-> marketing department ;)
+> On Wed, Jul 6, 2011 at 11:45 AM, Pekka Enberg <penberg@kernel.org> wrote:
+> > Hi Ankita,
+> >
+> > [ I don't really know anything about memory power management but
+> > ?here's my two cents since you asked for it. ]
+> >
+> > On Wed, Jun 29, 2011 at 4:00 PM, Ankita Garg <ankita@in.ibm.com> wrote:
+> >> I) Dynamic Power Transition
+> >>
+> >> The goal here is to ensure that as much as possible, on an idle system,
+> >> the memory references do not get spread across the entire RAM, a problem
+> >> similar to memory fragmentation. The proposed approach is as below:
+> >>
+> >> 1) One of the first things is to ensure that the memory allocations do
+> >> not spill over to more number of regions. Thus the allocator needs to
+> >> be aware of the address boundary of the different regions.
+> >
+> > Why does the allocator need to know about address boundaries? Why
+> > isn't it enough to make the page allocator and reclaim policies favor using
+> > memory from lower addresses as aggressively as possible? That'd mean
+> > we'd favor the first memory banks and could keep the remaining ones
+> > powered off as much as possible.
+> >
+> > IOW, why do we need to support scenarios such as this:
+> >
+> > ? bank 0 ? ? bank 1 ? bank 2 ? ?bank3
+> > ?| online ?| offline | online ?| offline |
+> >
+> > instead of using memory compaction and possibly something like the
+> > SLUB defragmentation patches to turn the memory map into this:
+> >
+> > ? bank 0 ? ? bank 1 ? bank 2 ? bank3
+> > ?| online ?| online ?| offline | offline |
+> >
+> >> 2) At the time of allocation, before spilling over allocations to the
+> >> next logical region, the allocator needs to make a best attempt to
+> >> reclaim some memory from within the existing region itself first. The
+> >> reclaim here needs to be in LRU order within the region. ?However, if
+> >> it is ascertained that the reclaim would take a lot of time, like there
+> >> are quite a fe write-backs needed, then we can spill over to the next
+> >> memory region (just like our NUMA node allocation policy now).
+> >
+> > I think a much more important question is what happens _after_ we've
+> > allocated and free'd tons of memory few times. AFAICT, memory
+> > regions don't help with that kind of fragmentation that will eventually
+> > happen anyway.
 > 
-A bug can normally be fixed somehow. This 'feature' is an inherent
-design flaw from the 'broken-by-design' category that cannot easily
-be fixed. That's why I wouldn't call it a bug.
+> Btw, I'd also decouple the 'memory map' required for PASR from
+> memory region data structure and use page allocator hooks for letting
+> the PASR driver know about allocated and unallocated memory. That
+> way the PASR driver could automatically detect if full banks are
+> unused and power them off. That'd make memory power management
+> transparent to the VM regardless of whether we're using hardware or
+> software poweroff.
 
+Having a 'memory map' to track blocks of memory for the purpose of
+exploiting PASR is a good alternative.  However having the notion of
+regions allows us to free more such banks and probably reclaim last
+few pages in a block and mark it free.  A method to keep allocations
+within a block and also reclaim all pages from certain blocks will
+improve PASR usage apart from aiding other use cases.
 
-Lothar Wa?mann
--- 
-___________________________________________________________
+Without affecting allocation and reclaim, the tracking part can be
+implemented in a less intrusive way, but it will be great to design
+a less intrusive method to bias the allocations and reclaims as well.
 
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+--Vaidy
