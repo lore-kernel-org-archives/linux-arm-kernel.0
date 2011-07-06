@@ -1,29 +1,25 @@
-From: adrian.wenl@gmail.com (Lei Wen)
-Date: Wed, 6 Jul 2011 14:54:39 +0800
-Subject: [PATCH 3/4] MTD: pxa3xx_nand: enable multiple chip select support
-In-Reply-To: <1309935216.3149.72.camel@sauron>
-References: <1309319494-17951-1-git-send-email-leiwen@marvell.com>
-	<1309771536-10597-4-git-send-email-leiwen@marvell.com>
-	<1309935216.3149.72.camel@sauron>
-Message-ID: <CALZhoSSJmcCxEtMXMtfsBKpeOJzqbAt56_RB_Vpqihhuk3Aw=w@mail.gmail.com>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Wed, 06 Jul 2011 09:58:11 +0300
+Subject: [PATCH V2] MTD: atmel_nand: optimize read/write buffer functions
+In-Reply-To: <1309789073-14593-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1309261856-27402-1-git-send-email-nicolas.ferre@atmel.com>
+	<1309789073-14593-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <1309935496.3149.73.camel@sauron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 6, 2011 at 2:53 PM, Artem Bityutskiy <dedekind1@gmail.com> wrote:
-> The problem is that in this patch you change ?struct pxa3xx_nand_platform_data,
-> and in the next patch you amend the platform data declarations, which means that
-> the kernel will not compile between patches 3 and 4...
+On Mon, 2011-07-04 at 16:17 +0200, Nicolas Ferre wrote:
+> For PIO NAND access functions, we use the features of the SMC:
+> - no need to take into account the NAND bus width: SMC will deal with this
+> - use of an IO memcpy on the NAND chip-select space is able to generate
+>   proper SMC behavior.
+> 
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> ---
+> V2: use of memcpy_fromio/memcpy_toio for proper handling of memory types.
 
-So... how about merge the patch 3 and 4 together?
+Pushed to l2-mtd-2.6.git, thanks!
 
->
-> On Mon, 2011-07-04 at 02:25 -0700, Lei Wen wrote:
->> + ? ? ? ? ? ? ? dev_info(&info->pdev->dev, "There is no nand chip on cs %d!\n"
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? , info->cs);
->
-> Nitpick - keep the comma at the first line.
-
-Opps, sorry for this.
-
-Thanks,
-Lei
+-- 
+Best Regards,
+Artem Bityutskiy
