@@ -1,87 +1,58 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Wed,  6 Jul 2011 12:26:17 -0700
-Subject: [PATCH] OMAP: omap_device: replace _find_by_pdev() with
-	to_omap_device()
-Message-ID: <1309980377-5964-1-git-send-email-khilman@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 6 Jul 2011 20:30:55 +0100
+Subject: A few other cache related optimizations for Cortex-A9.
+In-Reply-To: <20110706085656.GA32020@e102109-lin.cambridge.arm.com>
+References: <CAN_5kQBszi=hV1RVjyKO6gOhOuymGjsMwLk6ORaWpkaL-4USxA@mail.gmail.com>
+	<20110706085656.GA32020@e102109-lin.cambridge.arm.com>
+Message-ID: <20110706193055.GO8286@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The omap_device layer currently has two ways of getting an omap_device
-pointer from a platform_device pointer.
+On Wed, Jul 06, 2011 at 09:56:56AM +0100, Catalin Marinas wrote:
+> On Wed, Jul 06, 2011 at 04:14:57AM +0100, heechul Yun wrote:
+> > I found a few other places which, I believe, are not necessary for Cortex-A9.
+> > 
+> > diff --git a/arch/arm/mm/copypage-v6.c b/arch/arm/mm/copypage-v6.c
+> > index bdba6c6..6d5a847 100644
+> > --- a/arch/arm/mm/copypage-v6.c
+> > +++ b/arch/arm/mm/copypage-v6.c
+> > @@ -41,7 +41,9 @@ static void v6_copy_user_highpage_nonaliasing(struct page *to,
+> >         kfrom = kmap_atomic(from, KM_USER0);
+> >         kto = kmap_atomic(to, KM_USER1);
+> >         copy_page(kto, kfrom);
+> > +#ifndef CONFIG_CPU_CACHE_V7
+> >         __cpuc_flush_dcache_area(kto, PAGE_SIZE);
+> > +#endif
+> >         kunmap_atomic(kto, KM_USER1);
+> >         kunmap_atomic(kfrom, KM_USER0);
+> >  }
+> > 
+> > On handling COW page fault, the above function is called to copy the
+> > page content of the parent to a newly allocate page frame for the
+> > child. Again, since D cache of A9 is PIPT, we do not need to flush the
+> > page as in x86. This modification improves lmbench (fork/exec/shell)
+> > performance by 4-6%.
+> 
+> See commit 115b2247 introducing this. We indeed have a PIPT like cache
+> on A9 but it is a Harvard architecture with separate I and D caches. It
+> happened in the past that we got a COW for text page and the I and D
+> cache became incoherent. Since then, the dynamic linker has been fixed
+> and no longer causes this. We could add a check for VM_EXEC in
+> vma->vm_flags.
+> 
+> But I wonder whether we still need this flush after commit c0177800
+> where we assume that a new page cache page has dirty D-cache (and we
+> later flush the caches via set_pte_at).
 
-Replace current usage of _find_by_pdev() with to_omap_device() since
-to_omap_device() is more familiar to the existing to_platform_device()
-used when getting a platform_device pointer from a struct device pointer.
+I don't think we need that flush there after c0177800 either.  I/D
+coherency implies that pte_exec() is set, which will get us through
+to the checking of PG_arch_1 in __sync_icache_dcache(), where we'll
+call __flush_dcache_page for this page.
 
-Cc: Felipe Balbi <balbi@ti.com>
-Signed-off-by: Kevin Hilman <khilman@ti.com>
----
-Paul, please consider this minor cleanup for the v3.1 merge window.
-Applies to v3.0-c6.
+We don't need this flush anymore, so let's simply kill it outright.
 
- arch/arm/plat-omap/omap_device.c |   15 +++++----------
- 1 files changed, 5 insertions(+), 10 deletions(-)
+Heechul (sorry, is that the correct way of addressing you?) could
+you please submit a patch removing the __cpuc_flush_dcache_area()
+from v6_copy_user_highpage_nonaliasing() entirely please?
 
-diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
-index 49fc0df..c8b9cd1 100644
---- a/arch/arm/plat-omap/omap_device.c
-+++ b/arch/arm/plat-omap/omap_device.c
-@@ -236,11 +236,6 @@ static int _omap_device_deactivate(struct omap_device *od, u8 ignore_lat)
- 	return 0;
- }
- 
--static inline struct omap_device *_find_by_pdev(struct platform_device *pdev)
--{
--	return container_of(pdev, struct omap_device, pdev);
--}
--
- /**
-  * _add_optional_clock_clkdev - Add clkdev entry for hwmod optional clocks
-  * @od: struct omap_device *od
-@@ -316,7 +311,7 @@ u32 omap_device_get_context_loss_count(struct platform_device *pdev)
- 	struct omap_device *od;
- 	u32 ret = 0;
- 
--	od = _find_by_pdev(pdev);
-+	od = to_omap_device(pdev);
- 
- 	if (od->hwmods_cnt)
- 		ret = omap_hwmod_get_context_loss_count(od->hwmods[0]);
-@@ -611,7 +606,7 @@ int omap_device_enable(struct platform_device *pdev)
- 	int ret;
- 	struct omap_device *od;
- 
--	od = _find_by_pdev(pdev);
-+	od = to_omap_device(pdev);
- 
- 	if (od->_state == OMAP_DEVICE_STATE_ENABLED) {
- 		WARN(1, "omap_device: %s.%d: %s() called from invalid state %d\n",
-@@ -650,7 +645,7 @@ int omap_device_idle(struct platform_device *pdev)
- 	int ret;
- 	struct omap_device *od;
- 
--	od = _find_by_pdev(pdev);
-+	od = to_omap_device(pdev);
- 
- 	if (od->_state != OMAP_DEVICE_STATE_ENABLED) {
- 		WARN(1, "omap_device: %s.%d: %s() called from invalid state %d\n",
-@@ -681,7 +676,7 @@ int omap_device_shutdown(struct platform_device *pdev)
- 	int ret, i;
- 	struct omap_device *od;
- 
--	od = _find_by_pdev(pdev);
-+	od = to_omap_device(pdev);
- 
- 	if (od->_state != OMAP_DEVICE_STATE_ENABLED &&
- 	    od->_state != OMAP_DEVICE_STATE_IDLE) {
-@@ -722,7 +717,7 @@ int omap_device_align_pm_lat(struct platform_device *pdev,
- 	int ret = -EINVAL;
- 	struct omap_device *od;
- 
--	od = _find_by_pdev(pdev);
-+	od = to_omap_device(pdev);
- 
- 	if (new_wakeup_lat_limit == od->dev_wakeup_lat)
- 		return 0;
--- 
-1.7.6
+Thanks.
