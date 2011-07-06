@@ -1,31 +1,31 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 6 Jul 2011 09:47:28 -0400 (EDT)
-Subject: [PATCH 00/17] Introduce a led trigger for CPU activity
-In-Reply-To: <20110706131600.GW8286@n2100.arm.linux.org.uk>
-References: <1309955687-19365-1-git-send-email-bryan.wu@canonical.com>
-	<CAMPhdO-Ln7BmU8jYfEEp3RPa9sgJueTVfsm1phs=NXTC3FPgNw@mail.gmail.com>
-	<20110706131600.GW8286@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1107060944040.14596@xanadu.home>
+Date: Wed, 6 Jul 2011 09:51:36 -0400 (EDT)
+Subject: [PATCH] ARM: get rid of a few StrongARM cache-related build time
+	constants
+In-Reply-To: <20110706134102.GZ8286@n2100.arm.linux.org.uk>
+References: <1309919636-20546-1-git-send-email-nicolas.pitre@linaro.org>
+	<20110706075542.GK8286@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1107060912490.14596@xanadu.home>
+	<20110706134102.GZ8286@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1107060948430.14596@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wed, 6 Jul 2011, Russell King - ARM Linux wrote:
 
-> On Wed, Jul 06, 2011 at 09:13:14PM +0800, Eric Miao wrote:
-> > > ?drivers/leds/ledtrig-cpu.c ? ? ? ? ? ? ? ? ? ? | ?144 ++++++++++++
-> > > ?include/linux/leds.h ? ? ? ? ? ? ? ? ? ? ? ? ? | ? 15 ++
-> > > ?105 files changed, 1532 insertions(+), 3119 deletions(-)
+> On Wed, Jul 06, 2011 at 09:21:33AM -0400, Nicolas Pitre wrote:
+> > Oops.  Here's a fixed patch.
 > > 
-> > Not bad, I like the numbers here. This is definitely a good move.
-> > I had long ago wanted to remove those legacy LED code in mach-pxa.
+> > Could you test this patch as well?  You're the only one I know who might 
+> > still have access to the affected hardware.
 > 
-> The down-side is that through these moves we've lost functionality each
-> time.  For example, the blinking heartbeat LED on the Assabet and
-> Netwinder which I always enabled to let me know whether the machines
-> were still alove has long since gone.
+> Will do - the assabet is still running as a test machine.  The ebsa110 is
+> still alive but as that's (still) the firewall I won't run a test on that
+> until a quiet weekend.  I can also test the Netwinder and RiscPC...
 
-There exists a generic heartbeat LED trigger for that.  Making it the 
-default for a particular LED should be trivial.
+Thanks.  The Assabet covers SA1100, Netwinder is good for SA110, and 
+RiscPC would also confirm that the change for the uncached mapping is 
+harmless.  That should provide enough confidence in the patch.
 
 
 Nicolas
