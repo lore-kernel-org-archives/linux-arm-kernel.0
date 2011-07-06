@@ -1,58 +1,55 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 6 Jul 2011 20:30:55 +0100
-Subject: A few other cache related optimizations for Cortex-A9.
-In-Reply-To: <20110706085656.GA32020@e102109-lin.cambridge.arm.com>
-References: <CAN_5kQBszi=hV1RVjyKO6gOhOuymGjsMwLk6ORaWpkaL-4USxA@mail.gmail.com>
-	<20110706085656.GA32020@e102109-lin.cambridge.arm.com>
-Message-ID: <20110706193055.GO8286@n2100.arm.linux.org.uk>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Wed, 06 Jul 2011 12:31:44 -0700
+Subject: [PATCH v2 00/18] OMAP4: PM data big spring cleanup and fixes
+In-Reply-To: <alpine.DEB.2.00.1107060017480.4217@utopia.booyaka.com>
+References: <1309552901-8944-1-git-send-email-b-cousson@ti.com>
+	<alpine.DEB.2.00.1107060017480.4217@utopia.booyaka.com>
+Message-ID: <4E14B820.6070202@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 06, 2011 at 09:56:56AM +0100, Catalin Marinas wrote:
-> On Wed, Jul 06, 2011 at 04:14:57AM +0100, heechul Yun wrote:
-> > I found a few other places which, I believe, are not necessary for Cortex-A9.
-> > 
-> > diff --git a/arch/arm/mm/copypage-v6.c b/arch/arm/mm/copypage-v6.c
-> > index bdba6c6..6d5a847 100644
-> > --- a/arch/arm/mm/copypage-v6.c
-> > +++ b/arch/arm/mm/copypage-v6.c
-> > @@ -41,7 +41,9 @@ static void v6_copy_user_highpage_nonaliasing(struct page *to,
-> >         kfrom = kmap_atomic(from, KM_USER0);
-> >         kto = kmap_atomic(to, KM_USER1);
-> >         copy_page(kto, kfrom);
-> > +#ifndef CONFIG_CPU_CACHE_V7
-> >         __cpuc_flush_dcache_area(kto, PAGE_SIZE);
-> > +#endif
-> >         kunmap_atomic(kto, KM_USER1);
-> >         kunmap_atomic(kfrom, KM_USER0);
-> >  }
-> > 
-> > On handling COW page fault, the above function is called to copy the
-> > page content of the parent to a newly allocate page frame for the
-> > child. Again, since D cache of A9 is PIPT, we do not need to flush the
-> > page as in x86. This modification improves lmbench (fork/exec/shell)
-> > performance by 4-6%.
-> 
-> See commit 115b2247 introducing this. We indeed have a PIPT like cache
-> on A9 but it is a Harvard architecture with separate I and D caches. It
-> happened in the past that we got a COW for text page and the I and D
-> cache became incoherent. Since then, the dynamic linker has been fixed
-> and no longer causes this. We could add a check for VM_EXEC in
-> vma->vm_flags.
-> 
-> But I wonder whether we still need this flush after commit c0177800
-> where we assume that a new page cache page has dirty D-cache (and we
-> later flush the caches via set_pte_at).
+On 7/6/2011 12:19 AM, Paul Walmsley wrote:
+> Hi,
+>
+> On Fri, 1 Jul 2011, Benoit Cousson wrote:
+>
+>> Here are a bunch of cleanups on almost every PRCM related data files.
+>> Some of them are purely code moves, and will look like a lot of
+>> noise for nothing, but this is needed if we want to keep the files
+>> aligned with generator tool and thus ease the future migration to
+>> whatever format (common clock framework + DT).
+>
+> Thanks.  I'll split these up into smaller topic branches, I think
+> that's what Tony wants for this window.
+>
+> Patches 1-3 and 12 have been queued for 3.1 at
+> git://git.pwsan.com/linux-2.6 in the 'prcm_cleanup_a_3.1' branch.
+>
+> Patches 4-8 and 11 have been queued for 3.1 at
+> git://git.pwsan.com/linux-2.6 in the 'clock_cleanup_a_3.1' branch.
+>
+> Patches 9 and 10 have been split into PRCM changes and clock changes. The
+> PRCM changes have been queued for 3.1 at git://git.pwsan.com/linux-2.6 in
+> the 'prcm_cleanup_a_3.1' branch.  The clock changes have been queued for
+> 3.1 at git://git.pwsan.com/linux-2.6 in the 'clock_cleanup_a_3.1' branch.
+>
+> Patches 13-15 have been queued for 3.1 at
+> git://git.pwsan.com/linux-2.6 in the 'hwmod_cleanup_a_3.1' branch.
+>
+> Patches 17-18 have been queued for 3.1 at
+> git://git.pwsan.com/linux-2.6 in the 'hwmod_dss_fix_3.1' branch.
+>
+> Patch 16, to me, belongs best with the 4460 support series and so I'll see
+> if it makes sense to fit it in there somewhere.
 
-I don't think we need that flush there after c0177800 either.  I/D
-coherency implies that pte_exec() is set, which will get us through
-to the checking of PG_arch_1 in __sync_icache_dcache(), where we'll
-call __flush_dcache_page for this page.
+Paul,
 
-We don't need this flush anymore, so let's simply kill it outright.
+Do you want me to base the 4460 support series on one of your branches
+and re-post including the above patch?
 
-Heechul (sorry, is that the correct way of addressing you?) could
-you please submit a patch removing the __cpuc_flush_dcache_area()
-from v6_copy_user_highpage_nonaliasing() entirely please?
+regards,
+Rajendra
 
-Thanks.
+>
+>
+> - Paul
