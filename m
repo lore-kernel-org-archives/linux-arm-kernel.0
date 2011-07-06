@@ -1,203 +1,48 @@
-From: J.Lambrecht@TELEVIC.com (=?utf-8?B?TGFtYnJlY2h0IErDvHJnZW4=?=)
-Date: Wed, 6 Jul 2011 14:39:37 +0200
-Subject: [PATCH] Add 'config IMX_NFC_V1_BISWAP' to swap the Bad block
-	Indicator, and use for imx27pdk nand support.
-In-Reply-To: <19988.19315.787284.113228@ipc1.ka-ro>
-References: <1309872828-13942-1-git-send-email-J.Lambrecht@televic.com>
-	<20110706080942.GC26347@pengutronix.de>	<4E142B18.60407@televic.com>
-	<19988.19315.787284.113228@ipc1.ka-ro>
-Message-ID: <4E145789.8040801@televic.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 06 Jul 2011 13:39:35 +0100
+Subject: [PATCH V2 0/6] arm_smp_twd: mpcore_wdt: Fix MPCORE watchdog setup
+In-Reply-To: <4E1454BD.7050607@mvista.com>
+References: <1286185540-19569-1-git-send-email-vkuzmichev@mvista.com>
+	<1309892440-3260-1-git-send-email-vkuzmichev@mvista.com>
+	<4E14337F.1050101@arm.com> <4E1454BD.7050607@mvista.com>
+Message-ID: <4E145787.9080600@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/06/2011 01:48 PM, Lothar Wa?mann wrote:
->
-> Hi,
->
-> Lambrecht J?rgen writes:
-> > On 07/06/2011 10:09 AM, Sascha Hauer wrote:
-> > > On Tue, Jul 05, 2011 at 03:33:48PM +0200, J?rgen Lambrecht wrote:
-> > > > - Swap the BI-byte on position 0x7D0 with a data byte at 0x835.  To
-> > > fix a bug
-> > > >   in Freescale imx NFC v1 SoC's for 2K page NAND flashes: imx27 and
-> > > imx31.
-> > > >   Warning: The same solution needs to be applied to the boot loader
-> > > and the
-> > > >   flash programmer.
-> > > > - Enable NAND support for the imx27pdk (3ds), and use BISWAP.
-> > > >
-> > > > Signed-off-by: J?rgen Lambrecht <J.Lambrecht@televic.com>
-> > > > ---
-> > > >  arch/arm/mach-imx/Kconfig         |   30 
-> ++++++++++++++++++++++++++++--
-> > > >  arch/arm/mach-imx/mach-mx27_3ds.c |   14 ++++++++++++++
-> > > >  drivers/mtd/nand/mxc_nand.c       |   29 
-> +++++++++++++++++++++++++++++
-> > > >  3 files changed, 71 insertions(+), 2 deletions(-)
-> > > >
-> > > [snip]
-> > >
-> > > > +
-> > > > +config IMX_NFC_V1_BISWAP
-> > > > +     bool "Make the MXC 2kB-page NAND driver swap the Bad Block
-> > > Indicator"
-> > > > +     depends on MACH_MX27_3DS
-> > > > +     depends on MTD_NAND_MXC
-> > > > +     help
-> > > > +       Enable this if you want that the MXC NAND driver swaps the
-> > > Bad Block
-> > > > +       Indicator (BBI) byte. The IMX NFC v1 (present in IMX27 and
-> > > IMX31)
-> > > > +       contains a bug for 2kB-page flashes: the 2kB page is 
-> read out in
-> > > > +       4x512B chunks, so also the spare area is read out in 4
-> > > > +       chunks. Therefore the data area and the spare area becomes
-> > > > +       mixed. This causes a problem for the factory programmed 
-> BBI: it
-> > > > +       appears in the data area instead of the spare area, and is
-> > > > +       overwritten. This patch swaps that byte to the "real" spare
-> > > > +       area. WARNING: then also the bootloader and the flash
-> > > programmer must
-> > > > +       be patched!!
-> > >
-> > > I don't like this approach. IMO some code should be run on a virgin
-> > > flash which is aware of this issue and creates a correct bad block
-> > > table. You run this once and forget about this afterwards and every
-> > > kernel/bootloader can run without patching. Otherwise if you 
-> accidently
-> > > or intentionally start an older (unpatched) kernel your Nand gets
-> > > corrupted.
-> > >
-> > I see 3 solutions: rely on the quality of the NAND flash driver (1),
-> > patch the SW (2) or patch the HW (3).
-> >
-> > 1. A normal NAND flash driver relies on the ECC to detect a
-> > (potentially) bad block. But a factory bad block can have more bad bits
-> > that the specified ECC bits.
-> >     Solution is to check after each write if the data was written
-> > reliable: a write/read-back policy. (linux kernel option: Device Drivers
-> > -> MTD support -> NAND Device Support -> Verify NAND page writes)
-> >     This will of course slow-down writing a lot.
-> > 2. The Freescale solution: patch the SW:
-> >        1. flash programmer
-> >        2. boot-loader NAND driver
-> >        3. OS NAND driver
-> > 3. For the HW patch, a special SW must be written that must be executed
-> > before the board is programmed. That special SW must run in RAM and copy
-> > the BBI byte to the "swapped" place, so that after swapping, the BBI is
-> > at the good place. Then the SW must not be patched.
-> >     Risk: if this step is skipped, the factory BBI information is lost,
-> > and if the SW has no write/read-back policy (solution 1), data will be
-> > lost in some point in time.
-> >
-> That's nonsense. You cannot copy a byte inside a page that is not
-> programmable (that's what Bad Blocks are).
->
-No, a Factory Bad Block is a block that when tested under worst-case 
-conditions has more erroneous bits that the ECC correctable ones. So 
-anyhow only those bits cannot be written, and under normal conditions 
-(room temperature..) it is best possible that all bits are again ok (my 
-Micron datasheets even warns that you should not erase a Factory Bad 
-Block, because there is a risk that it succeeds, hence also erasing the 
-bad block mark).
+On 06/07/11 13:27, Vitaly Kuzmichev wrote:
+> Hi Marc,
+> 
+> On 07/06/2011 02:05 PM, Marc Zyngier wrote:
+> [...]
+>>> The series of patches is based on arm-platforms.git/local_timers_as_devices
+>>> branch since it looks like that it is going to be merged into the mainline.
+>>
+>> Be careful here. This branch is a work in progress, likely to change
+>> very quickly, contains code that has not been posted to the ML yet, and
+>> will probably eat your pet for breakfast. As far as mainline merging is
+>> concerned, there is still a long way to go (see the GIC consolidation
+>> patches, on which the local_timers_as_devices branch relies).
+> 
+> I understand.
+> When do you plan to finish this job?
+> Would not it be better to prepare two sets of patches: first one for
+> linux-2.6/master with exported function, second for arm-platforms.git
+> with removing exported function and replacing use of it by
+> clk_get_rate(smp_twd) call?
+> Is there a chance in this case, that my patches will be merged much
+> earlier than yours?
 
-But having investigated the matter further that i already had done, you 
-are indeed right that my 3d solution is a bit wrong: it may not be 
-possible to write that "swapped" place. But then the next page of the 
-block can be taken, as there are many pages, and only a few bad bits, 
-that will work.
->
-> You only need to check the byte in a well known location once and
-> create a BBT in flash that carries the bad block information. After
-> that you need not check for any bad block markers any more, but simply
-> use the BBT.
-> Since you need to program the bootloader with some external tool
-> anyway, that tool is the right instance to do the bad block scan and
-> create the BBT.
-> That's what we at Ka-Ro are doing since the early days of the i.MX27
-> for all our i.MX boards.
->
-Seems indeed the best solution. (but we took another solution because of 
-time, and being new to linux)
-But am I right that the BBT is a file-system dependent meta data?
->
->
-> > Your solution is (3), but for the linux rootfs partition only, using the
-> > BBT. Of course bootloader partitions and the linux kernel binary are not
-> > written often, but I read (several times, and also been told) that even
-> > when only reading a nand flash it can become bad!
-> > I still have to investigate this for how to solve this in the 
-> bootloader..
-> >
-> You are mixing up two different things. The Bad block markers in
-> certain locations in the OOB area mark 'Factory bad blocks'
-> i.e. blocks that are already bad when you apply power to the flash for
-> the first time. The manufacturer guarantees that initial bad blocks
-> can be detected by checking those locations for a non-FF value.
-> There is no guarantee that you may be able to write any specific value
-> to a certain byte in a block that has turned bad due to wearout or
-> whatever at any later time. Thus bad blocks that appear due to wearout
-> should be kept track of in the BBT, not by writing any 'bad block
-> markers' to the defective blocks themselves.
->
-Same remark: not completely right: only some bits are wrong (number of 
-ECC bits +1, and as you do not touch the block anymore, no more bits 
-will get corrupted).
-But indeed the byte of the bad-block-marker location in the first page 
-could contain erroneous bits. And to comment on Artem Bityutskiy's mail, 
-then the next page of that (bad) block can be tried (and so on), finally 
-it will work. But then of course the flash file system must be designed 
-to do that.
-However, I agree that bad blocks should be kept track of in the BBT.
->
->
-> > > Also, my comment above applies here too. You added a 'depends on the
-> > > board I care of', but usually my kernels have all available boards
-> > > compiled in. So I can select this option and it will change the
-> > > behaviour of all boards I might run the kernel on, not only the
-> > > ones you depend on above.
-> > Ok, i should then find a better way to do it.
-> > But, the mxc_nand.c code contains this to protect it: 'if
-> > ((mtd->writesize > 512) && nfc_is_v1())'.
-> > Am I correct that all nfc-v1's have that bug, so only imx27 and imx51?
-> > The application note we finally got from freescale only mentions "FSL
-> > IMX NFC".
-> >
-> It's not exactly a bug (which would be possible to get fixed), but an
-> inherent feature of the controller which handles NAND flash with a
-> page size larger than 512 byte like it has n pages of 512 byte.
->
-OK, a "hardware bug" then (can be fixed with a re-write of the 
-VHDL/Verilog code of the NFC, giving v2). It seems to me Freescale tried 
-to enhance their 512B-page controller with to possibility to also handle 
-2kB pages, but they forgot about the Factory Bad Block byte (n=4 only).
-So to reply to your next mail: only the imx27 and imx31 (thanks sascha, 
-it was a typo to mention 51) have the NFC v1, I believe all the others 
-have NFC v2, which are fixed.
+Your guess is as good as mine. It all depends on people's bandwidth to
+review long series of patches (the particular branch you used is a merge
+of 3 different series), so I'd expect a smaller, less intrusive series
+to make it quicker than my monster patch sets... ;-)
 
-Kind regards,
-J?rgen
->
->
->
-> Lothar Wa?mann
-> --
-> ___________________________________________________________
->
-> Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-> Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-> Gesch?ftsf?hrer: Matthias Kaussen
-> Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
->
-> www.karo-electronics.de | info at karo-electronics.de
-> ___________________________________________________________
->
+> If not, I will just rework patch 2/6 to remove exported and use only
+> clock interface.
 
+Make sure all TWD users are updated with the new clock before you merge
+it then, or people are going to be surprised.
 
+	M.
 -- 
-J?rgen Lambrecht
-R&D Associate
-Tel: +32 (0)51 303045    Fax: +32 (0)51 310670
-http://www.televic-rail.com
-Televic Rail NV - Leo Bekaertlaan 1 - 8870 Izegem - Belgium
-Company number 0825.539.581 - RPR Kortrijk
+Jazz is not dead. It just smells funny...
