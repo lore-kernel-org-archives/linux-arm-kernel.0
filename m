@@ -1,41 +1,48 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 05 Jul 2011 22:30:41 -0400
-Subject: [PATCH 09/10] ARM: mach-shark: move ARM_DMA_ZONE_SIZE to
-	mdesc->dma_zone_size
+Date: Tue, 05 Jul 2011 22:30:42 -0400
+Subject: [PATCH 10/10] ARM: ARM_DMA_ZONE_SIZE is no more
 In-Reply-To: <1309919442-20451-1-git-send-email-nicolas.pitre@linaro.org>
 References: <1309919442-20451-1-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <1309919442-20451-9-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <1309919442-20451-10-git-send-email-nicolas.pitre@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+One less dependency on mach/memory.h.
+
 Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 ---
- arch/arm/mach-shark/core.c                |    1 +
- arch/arm/mach-shark/include/mach/memory.h |    2 --
- 2 files changed, 1 insertions(+), 2 deletions(-)
+ arch/arm/include/asm/dma.h |    2 --
+ arch/arm/mm/init.c         |    4 ----
+ 2 files changed, 0 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-shark/core.c b/arch/arm/mach-shark/core.c
-index 5cf7f94..ac2873c 100644
---- a/arch/arm/mach-shark/core.c
-+++ b/arch/arm/mach-shark/core.c
-@@ -156,4 +156,5 @@ MACHINE_START(SHARK, "Shark")
- 	.map_io		= shark_map_io,
- 	.init_irq	= shark_init_irq,
- 	.timer		= &shark_timer,
-+	.dma_zone_size	= SZ_4M,
- MACHINE_END
-diff --git a/arch/arm/mach-shark/include/mach/memory.h b/arch/arm/mach-shark/include/mach/memory.h
-index 4c0831f8..1cf8d69 100644
---- a/arch/arm/mach-shark/include/mach/memory.h
-+++ b/arch/arm/mach-shark/include/mach/memory.h
-@@ -17,8 +17,6 @@
-  */
- #define PLAT_PHYS_OFFSET     UL(0x08000000)
+diff --git a/arch/arm/include/asm/dma.h b/arch/arm/include/asm/dma.h
+index 1d34c11..04c162f 100644
+--- a/arch/arm/include/asm/dma.h
++++ b/arch/arm/include/asm/dma.h
+@@ -1,8 +1,6 @@
+ #ifndef __ASM_ARM_DMA_H
+ #define __ASM_ARM_DMA_H
  
--#define ARM_DMA_ZONE_SIZE	SZ_4M
+-#include <asm/memory.h>
 -
  /*
-  * Cache flushing area
+  * This is the maximum virtual address which can be DMA'd from.
   */
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index a14caff..d7d9011 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -35,11 +35,7 @@
+ #include "mm.h"
+ 
+ #ifdef CONFIG_ZONE_DMA
+-#ifdef ARM_DMA_ZONE_SIZE
+-unsigned long arm_dma_zone_size = ARM_DMA_ZONE_SIZE;
+-#else
+ unsigned long arm_dma_zone_size __read_mostly;
+-#endif
+ EXPORT_SYMBOL(arm_dma_zone_size);
+ #endif
+ 
 -- 
 1.7.4
