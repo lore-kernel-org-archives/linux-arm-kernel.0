@@ -1,33 +1,51 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 6 Jul 2011 16:09:29 +0200
-Subject: [PATCH 6/8] drivers: add Contiguous Memory Allocator
-In-Reply-To: <006301cc3be4$daab1850$900148f0$%szyprowski@samsung.com>
-References: <1309851710-3828-1-git-send-email-m.szyprowski@samsung.com>
-	<20110705113345.GA8286@n2100.arm.linux.org.uk>
-	<006301cc3be4$daab1850$900148f0$%szyprowski@samsung.com>
-Message-ID: <201107061609.29996.arnd@arndb.de>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 6 Jul 2011 10:11:21 -0400 (EDT)
+Subject: [PATCH 01/17] leds: create a trigger for CPU activity
+In-Reply-To: <20110706133501.GY8286@n2100.arm.linux.org.uk>
+References: <1309955687-19365-1-git-send-email-bryan.wu@canonical.com>
+	<1309955687-19365-2-git-send-email-bryan.wu@canonical.com>
+	<CAMPhdO9QmCpGFB8fd5Rp-a0iAv1ByA962FZKOwc59R86OTpxAQ@mail.gmail.com>
+	<20110706133501.GY8286@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1107061005420.14596@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 06 July 2011, Marek Szyprowski wrote:
-> The only problem that might need to be resolved is GFP_ATOMIC allocation
-> (updating page properties probably requires some locking), but it can be
-> served from a special area which is created on boot without low-memory
-> mapping at all. None sane driver will call dma_alloc_coherent(GFP_ATOMIC)
-> for large buffers anyway.
+On Wed, 6 Jul 2011, Russell King - ARM Linux wrote:
 
-Would it be easier to start with a version that only allocated from memory
-without a low-memory mapping at first?
+> On Wed, Jul 06, 2011 at 09:16:47PM +0800, Eric Miao wrote:
+> > On Wed, Jul 6, 2011 at 8:34 PM, Bryan Wu <bryan.wu@canonical.com> wrote:
+> > > + ? ? ? switch (ledevt) {
+> > > + ? ? ? case CPU_LED_START:
+> > > + ? ? ? case CPU_LED_IDLE_START:
+> > > + ? ? ? ? ? ? ? /* Will turn the LED on, max brightness */
+> > > + ? ? ? ? ? ? ? if (trigdata->led)
+> > > + ? ? ? ? ? ? ? ? ? ? ? led_set_brightness(trigdata->led,
+> > > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?trigdata->led->max_brightness);
+> > > + ? ? ? ? ? ? ? break;
+> > > +
+> > > + ? ? ? case CPU_LED_STOP:
+> > > + ? ? ? case CPU_LED_IDLE_END:
+> > > + ? ? ? case CPU_LED_HALTED:
+> > > + ? ? ? ? ? ? ? /* Will turn the LED off */
+> > > + ? ? ? ? ? ? ? if (trigdata->led)
+> > > + ? ? ? ? ? ? ? ? ? ? ? led_set_brightness(trigdata->led, LED_OFF);
+> > > + ? ? ? ? ? ? ? break;
+> > > +
+> > > + ? ? ? default:
+> > > + ? ? ? ? ? ? ? /* Will leave the LED as it is */
+> > > + ? ? ? ? ? ? ? break;
+> > > + ? ? ? }
+> > > +}
+> > 
+> > I'm a bit worrying about the LED brightness hardcoded here, what if
+> > a platform requires different behavior, e.g. LED_OFF when IDLE_START.
+> 
+> Indeed - there are platforms (Netwinder, Assabet etc) which use LED=ON
+> to mean that the system is not idle - and also turn the LED on when
+> halted.
 
-This would be similar to the approach that Russell's fix for the regular
-dma_alloc_coherent has taken, except that you need to also allow the memory
-to be used as highmem user pages.
+What about simply setting active_low to 1 in the struct gpio_led 
+instance for those particular LEDs (or invert it if it is already set)?
 
-Maybe you can simply adapt the default location of the contiguous memory
-are like this:
-- make CONFIG_CMA depend on CONFIG_HIGHMEM on ARM, at compile time
-- if ZONE_HIGHMEM exist during boot, put the CMA area in there
-- otherwise, put the CMA area at the top end of lowmem, and change
-  the zone sizes so ZONE_HIGHMEM stretches over all of the CMA memory.
 
-	Arnd
+Nicolas
