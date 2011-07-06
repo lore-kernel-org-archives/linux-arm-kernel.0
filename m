@@ -1,27 +1,31 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 6 Jul 2011 17:27:27 -0600 (MDT)
-Subject: [PATCH v3 05/13] OMAP2+: hwmod: Replace clkdm access from main_clk
-	using hwmod attribute
-In-Reply-To: <1309554558-19819-6-git-send-email-b-cousson@ti.com>
-References: <1309554558-19819-1-git-send-email-b-cousson@ti.com>
-	<1309554558-19819-6-git-send-email-b-cousson@ti.com>
-Message-ID: <alpine.DEB.2.00.1107061726480.31498@utopia.booyaka.com>
+From: mkl0301@gmail.com (Lin Mac)
+Date: Thu, 7 Jul 2011 07:57:11 +0800
+Subject: [PATCH] ARM: cns3xxx: Add support for L2 Cache Controller
+In-Reply-To: <20110706140832.GA15946@oksana.dev.rtsoft.ru>
+References: <20110706140832.GA15946@oksana.dev.rtsoft.ru>
+Message-ID: <CAK1hUK-gFwcHzEqFz8+T8Vm7CL5GnHAXureVizfNOBm=8h2mRw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+2011/7/6 Anton Vorontsov <avorontsov@mvista.com>:
+> CNS3xxx SOCs have L310-compatible cache controller, so let's use it.
+>
+> With this patch benchmarking with 'gzip' shows that performance is
+> doubled, and I'm still able to boot full-fledged userland over NFS
+> (using PCIe NIC), so the support should be pretty robust.
+>
+> Signed-off-by: Anton Vorontsov <avorontsov@mvista.com>
 
-On Fri, 1 Jul 2011, Benoit Cousson wrote:
+CNS3xxx have PL310. Would you mind to enable CONFIG_CACHE_PL310 by
+default as well? It is default disabled by !CPU_V6 of CACHE_PL310.
 
-> Since the clkdm is now part of the omap_hwmod structure, there is no need
-> to retrieve it from the main_clock or interface clock.
-> The code can be simplified a little bit with a direct access.
-> 
-> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-> Cc: Paul Walmsley <paul@pwsan.com>
-> Cc: Rajendra Nayak <rnayak@ti.com>
+@@ -795,6 +795,7 @@ config CACHE_L2X0
+        default y
+        select OUTER_CACHE
+        select OUTER_CACHE_SYNC
++       select CACHE_PL310 if ARCH_CNS3XXX
+        help
+          This option enables the L2x0 PrimeCell.
 
-this won't work on OMAP2/3, so, dropping.
-
-
-- Paul
+Best Regards,
+Mac Lin
