@@ -1,33 +1,41 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 6 Jul 2011 22:01:06 +0100
-Subject: [PATCH] ARM: poison initmem when it is freed
-In-Reply-To: <4E14CBDA.8@codeaurora.org>
-References: <20110705184254.GH8286@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1107051509490.14596@xanadu.home>
-	<20110705192656.GJ8286@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1107051540550.14596@xanadu.home>
-	<4E139F8F.7060809@codeaurora.org>
-	<20110706203427.GU8286@n2100.arm.linux.org.uk>
-	<4E14CBDA.8@codeaurora.org>
-Message-ID: <20110706210106.GX8286@n2100.arm.linux.org.uk>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 6 Jul 2011 15:01:49 -0600 (MDT)
+Subject: [PATCH] OMAP: hwmod: add kernel cmdline flag to avoid resetting
+	IP blocks during init
+In-Reply-To: <20110706064326.GI5783@atomide.com>
+References: <20110703010204.19046.85186.stgit@dusk>
+	<20110703010206.19046.85293.stgit@dusk>
+	<20110704085503.GQ23145@atomide.com>
+	<alpine.DEB.2.00.1107051936250.4217@utopia.booyaka.com>
+	<alpine.DEB.2.00.1107051955450.4217@utopia.booyaka.com>
+	<20110706064326.GI5783@atomide.com>
+Message-ID: <alpine.DEB.2.00.1107061458460.4217@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 06, 2011 at 01:55:54PM -0700, Stephen Boyd wrote:
-> Should it include the initrd too? At least x86 poisons that memory but I
-> don't know who would be using that incorrectly.
+On Tue, 5 Jul 2011, Tony Lindgren wrote:
 
-It could do - I don't see any harm in not doing so.  The only issue
-is that people may want to disable this stuff if they're after
-squeezing every last ms out of the boot time.
+> * Paul Walmsley <paul@pwsan.com> [110705 18:55]:
+> > On Tue, 5 Jul 2011, Paul Walmsley wrote:
+> > 
+> > > For this case, we probably need some board file function to tell the 
+> > > hwmod code to disregard a device completely, to tell the kernel to 
+> > > pretend that the device does not exist.
+> > 
+> > ... and the other problem here is that we currently probe devices via an 
+> > arch_initcall(), and the board file init_machine is also an arch_initcall.
+> > Either we'll need to be very careful about Makefile ordering, or we should 
+> > just call omap2_init_devices() from the board file init_machine directly.
+> > The latter makes the most sense to me.
+> 
+> And that can then be passed the list of devices with the special flags
+> for noreset, disabled and reserved. Then the late_initcall can optionally
+> reset the rest of the devices.
 
-> How about a free_init_area() function which calls free_area() after
-> poisoning the memory?
+'disabled' can probably be the default for a device that doesn't have a 
+driver associated with it, once the runtime PM conversion is complete.  
+That's what the late_initcall would do.  Then if a driver is dynamically 
+loaded for one of those devices, the hwmod code would just re-enable it.
 
-I need to go back and look at the Integrator etc situation with regard
-to reorganizing the vmlinux layout - it may be that the omission of
-freeing .init memory can now be removed (it was there to stop the
-memory being used as the first K of memory wasn't DMA-able.)
 
-Assuming it has to stay though, we still should arrange for the initrd
-memory to be poisoned even if it isn't freed.
+- Paul
