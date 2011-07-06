@@ -1,38 +1,66 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 06 Jul 2011 11:09:44 -0400 (EDT)
-Subject: [PATCH 0/7] Re-organize linker layouts
-In-Reply-To: <20110706102245.GO8286@n2100.arm.linux.org.uk>
-References: <20110706102245.GO8286@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1107061108240.14596@xanadu.home>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Wed, 6 Jul 2011 23:16:00 +0800
+Subject: [PATCH 1/3] ARM: CSR: Adding CSR SiRFprimaII board support
+In-Reply-To: <20110706110439.GP8286@n2100.arm.linux.org.uk>
+References: <1309945678-18813-1-git-send-email-bs14@csr.com>
+	<1309945678-18813-2-git-send-email-bs14@csr.com>
+	<20110706110439.GP8286@n2100.arm.linux.org.uk>
+Message-ID: <CAGsJ_4yGJQjBufSxNCJowh_oQMBt7q15tAMRa9r_4Yu+Pzk2vw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 6 Jul 2011, Russell King - ARM Linux wrote:
+2011/7/6 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> On Wed, Jul 06, 2011 at 02:47:56AM -0700, Barry Song wrote:
+>> +static int sirfsoc_timer_set_next_event(unsigned long delta,
+>> + ? ? struct clock_event_device *ce)
+>> +{
+>> + ? ? unsigned long now, next;
+>> +
+>> + ? ? writel_relaxed(SIRFSOC_TIMER_LATCH_BIT, sirfsoc_timer_base + SIRFSOC_TIMER_LATCH);
+>> + ? ? now = readl_relaxed(sirfsoc_timer_base + SIRFSOC_TIMER_LATCHED_LO);
+>> + ? ? do {
+>> + ? ? ? ? ? ? next = now + delta;
+>> + ? ? ? ? ? ? writel_relaxed(next, sirfsoc_timer_base + SIRFSOC_TIMER_MATCH_0);
+>> + ? ? ? ? ? ? writel_relaxed(SIRFSOC_TIMER_LATCH_BIT, sirfsoc_timer_base + SIRFSOC_TIMER_LATCH);
+>> + ? ? ? ? ? ? now = readl_relaxed(sirfsoc_timer_base + SIRFSOC_TIMER_LATCHED_LO);
+>> + ? ? } while ((next - now) > delta);
+>> +
+>> + ? ? return 0;
+>> +}
+>
+> Please have a look at any of the callsites of clockevents_program_event()
+> in kernel/time/. ?You'll notice that they loop in some fashion should your
+> set_next_event() return -ETIME.
 
-> The following series of patches are targetted at two issues:
-> 
-> 1. Fixing large initramfs causing PC24 relocations to become out of
->    range.  This fixes both modules and link-time errors.
-> 
-> 2. Making the vmlinux easier to pinpoint the various section-built
->    data structures and inspect them later.
-> 
-> For the main kernel, this allows the size of various sections to be
-> determined via objdump -h.  This also aids objdump -d and -s usage
-> when asking it to target a particular section.
-> 
-> For the decompressor, it means that it is now trivially possible to copy
-> out the compressed kernel vmlinux image by:
-> 
->   arm-linux-objcopy -O binary -j .piggydata arch/arm/boot/compressed/vmlinux \
-> 	piggy.gz
-> 
-> and thereby obtain the binary kernel image (the Image file) which was
-> originally used.
+ok. looks like the function can be fixed to:
 
-Looks good.  For the whole series:
+static int sirfsoc_timer_set_next_event(unsigned long delta,
+                struct clock_event_device *ce)
+{
+        unsigned long now, next;
 
-Acked-by: nicolas Pitre <nicolas.pitre@linaro.org>
+        writel_relaxed(SIRFSOC_TIMER_LATCH_BIT, sirfsoc_timer_base +
+SIRFSOC_TIMER_LATCH);
+        now = readl_relaxed(sirfsoc_timer_base + SIRFSOC_TIMER_LATCHED_LO);
+
+        next = now + delta;
+        writel_relaxed(next, sirfsoc_timer_base + SIRFSOC_TIMER_MATCH_0);
+        writel_relaxed(SIRFSOC_TIMER_LATCH_BIT, sirfsoc_timer_base +
+SIRFSOC_TIMER_LATCH);
+        now = readl_relaxed(sirfsoc_timer_base + SIRFSOC_TIMER_LATCHED_LO);
+
+        return next - now > delta ? -ETIME : 0;
+}
 
 
-Nicolas
+>
+> As there is the possibility that if you can't program the event (because
+> it has already passed) then it is likely that there is some work which
+> needs to be done before the next event is set. ?So the repeat logic should
+> stay in the common code and not be duplicated in each platform.
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
