@@ -1,48 +1,91 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 05 Jul 2011 23:29:53 -0400
-Subject: [PATCH 09/37] ARM: mach-iop33x: remove mach/memory.h
+Date: Tue, 05 Jul 2011 23:29:55 -0400
+Subject: [PATCH 11/37] ARM: mach-s3c2410: remove memory.h
 In-Reply-To: <1309923021-23487-1-git-send-email-nicolas.pitre@linaro.org>
 References: <1309923021-23487-1-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <1309923021-23487-9-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <1309923021-23487-11-git-send-email-nicolas.pitre@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This also removes the mach/s3c2400 version which was probably never used
+due to the fact that we have this line in arch/arm/Makefile:
+
+machine-$(CONFIG_ARCH_S3C2410)          := s3c2410 s3c2400 [...]
+
+This is later used to construct the search path for:
+
+The compiler would be looking into mach-s3c2410 and picking up this
+version first.  Any config that was actually expecting the mach-s3c2400
+version was therefore producing a broken kernel binary.  Not relying on
+any of them anymore would fix that issue.
+
 Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 ---
- arch/arm/Kconfig                           |    1 +
- arch/arm/mach-iop33x/include/mach/memory.h |   13 -------------
- 2 files changed, 1 insertions(+), 13 deletions(-)
- delete mode 100644 arch/arm/mach-iop33x/include/mach/memory.h
+ arch/arm/Kconfig                            |    1 +
+ arch/arm/mach-s3c2400/include/mach/memory.h |   20 --------------------
+ arch/arm/mach-s3c2410/include/mach/memory.h |   16 ----------------
+ 3 files changed, 1 insertions(+), 36 deletions(-)
+ delete mode 100644 arch/arm/mach-s3c2400/include/mach/memory.h
+ delete mode 100644 arch/arm/mach-s3c2410/include/mach/memory.h
 
 diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index e8004b4..c4b6e4a 100644
+index 48b2e88..869c7b6 100644
 --- a/arch/arm/Kconfig
 +++ b/arch/arm/Kconfig
-@@ -448,6 +448,7 @@ config ARCH_IOP33X
- 	select PLAT_IOP
- 	select PCI
- 	select ARCH_REQUIRE_GPIOLIB
+@@ -704,6 +704,7 @@ config ARCH_S3C2410
+ 	select HAVE_CLK
+ 	select ARCH_USES_GETTIMEOFFSET
+ 	select HAVE_S3C2410_I2C if I2C
 +	select NO_MACH_MEMORY_H
  	help
- 	  Support for Intel's IOP33X (XScale) family of processors.
- 
-diff --git a/arch/arm/mach-iop33x/include/mach/memory.h b/arch/arm/mach-iop33x/include/mach/memory.h
+ 	  Samsung S3C2410X CPU based systems, such as the Simtec Electronics
+ 	  BAST (<http://www.simtec.co.uk/products/EB110ITX/>), the IPAQ 1940 or
+diff --git a/arch/arm/mach-s3c2400/include/mach/memory.h b/arch/arm/mach-s3c2400/include/mach/memory.h
 deleted file mode 100644
-index 8e1daf7..0000000
---- a/arch/arm/mach-iop33x/include/mach/memory.h
+index 3f33670..0000000
+--- a/arch/arm/mach-s3c2400/include/mach/memory.h
 +++ /dev/null
-@@ -1,13 +0,0 @@
--/*
-- * arch/arm/mach-iop33x/include/mach/memory.h
-- */
+@@ -1,20 +0,0 @@
+-/* arch/arm/mach-s3c2400/include/mach/memory.h
+- *  from arch/arm/mach-rpc/include/mach/memory.h
+- *
+- *  Copyright 2007 Simtec Electronics
+- *	http://armlinux.simtec.co.uk/
+- *	Ben Dooks <ben@simtec.co.uk>
+- *
+- *  Copyright (C) 1996,1997,1998 Russell King.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+-*/
 -
--#ifndef __MEMORY_H
--#define __MEMORY_H
+-#ifndef __ASM_ARCH_MEMORY_H
+-#define __ASM_ARCH_MEMORY_H
 -
--/*
-- * Physical DRAM offset.
-- */
--#define PLAT_PHYS_OFFSET	UL(0x00000000)
+-#define PLAT_PHYS_OFFSET	UL(0x0C000000)
+-
+-#endif
+diff --git a/arch/arm/mach-s3c2410/include/mach/memory.h b/arch/arm/mach-s3c2410/include/mach/memory.h
+deleted file mode 100644
+index f92b97b..0000000
+--- a/arch/arm/mach-s3c2410/include/mach/memory.h
++++ /dev/null
+@@ -1,16 +0,0 @@
+-/* arch/arm/mach-s3c2410/include/mach/memory.h
+- *  from arch/arm/mach-rpc/include/mach/memory.h
+- *
+- *  Copyright (C) 1996,1997,1998 Russell King.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+-*/
+-
+-#ifndef __ASM_ARCH_MEMORY_H
+-#define __ASM_ARCH_MEMORY_H
+-
+-#define PLAT_PHYS_OFFSET	UL(0x30000000)
 -
 -#endif
 -- 
