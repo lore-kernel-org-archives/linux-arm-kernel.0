@@ -1,57 +1,57 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 6 Jul 2011 22:14:42 +0100
-Subject: [PATCH] ARM: fix regression in IXP4xx clocksource
-In-Reply-To: <m3liwb15t2.fsf@intrepid.localdomain>
-References: <m3liwb15t2.fsf@intrepid.localdomain>
-Message-ID: <20110706211442.GY8286@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 6 Jul 2011 23:21:14 +0200
+Subject: [PATCH 1/3] ARM: CSR: Adding CSR SiRFprimaII board support
+In-Reply-To: <20110706205059.GW8286@n2100.arm.linux.org.uk>
+References: <1309945678-18813-1-git-send-email-bs14@csr.com>
+	<201107062231.51117.arnd@arndb.de>
+	<20110706205059.GW8286@n2100.arm.linux.org.uk>
+Message-ID: <201107062321.15102.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Did you see Thomas' reply to your last patch?  Would you mind responding
-to that please, before asking Linus to merge this?
+On Wednesday 06 July 2011 22:50:59 Russell King - ARM Linux wrote:
+> On Wed, Jul 06, 2011 at 10:31:50PM +0200, Arnd Bergmann wrote:
+> > Just as a follow-up, this is what I was referring to in the other
+> > sub-thread. Setting NO_IOPORT and removing __io does work for a lot
+> > of things today, but breaks randconfig builds left and right. I want
+> > to clean that up by adding 'depends on HAS_IOPORT' at the correct places
+> > and then switch all platforms that don't need it to remove __io.
+> 
+> It's not that easy.  NO_IOPORT was brought in by Viro to work around
+> various platforms which broke - such as RiscPC.  Viro was well aware
+> of that platform, and we had a discussion about it.
+> 
+> The conclusion (I think) was that NO_IOPORT was to prevent ioport_map()
+> et.al. on platforms which couldn't provide a sane definition - eg:
+> 
+> (11 Feb 2007)...
+> 19:50 < rmk> inb(port) | inb(port + 1) << 8 is not identical to addr = ioport_map(port); readb(addr) | readb(addr + 1)
+> 19:51 < rmk> inb(port) | inb(port + 1) << 8 is identical to addr = ioport_map(port); readb(addr) | readb(addr + (1 << 2))
+> 19:53 < rmk> inw(port) | inw(port + 2) equates to addr = ioport_map(port); readw(addr) | readw(addr + (2 << 2))
+> 
+> So, while the above referred to platform uses inb etc, it sets
+> NO_IOPORT to stop the devres breakage, which in turn disables
+> HAS_IOPORT.
+> 
+> So, HAS_IOPORT does not mean the ISA/PCI accessors are not provided.
+> It means there will be no devres support for it and ioport_map() is
+> probably missing.
+> 
+> I've added Viro to this thread in case he'd like to correct me (if he
+> remembers the background to HAS_IOPORT/NO_IOPORT etc.)
 
-On Wed, Jul 06, 2011 at 11:02:17PM +0200, Krzysztof Halasa wrote:
-> From: Richard Cochran <richardcochran@gmail.com>
-> 
-> Commit 234b6ceddb4fc2a4bc5b9a7670f070f6e69e0868
-> 
->    clocksource: convert ARM 32-bit up counting clocksources
-> 
-> broke the build for ixp4xx and made big endian operation impossible.
-> This commit restores the original behaviour.
-> 
-> Signed-off-by: Richard Cochran <richard.cochran@omicron.at>
-> Signed-off-by: Krzysztof Ha?asa <khc@pm.waw.pl>
-> 
-> diff --git a/arch/arm/mach-ixp4xx/common.c b/arch/arm/mach-ixp4xx/common.c
-> index 74ed81a..0777257 100644
-> --- a/arch/arm/mach-ixp4xx/common.c
-> +++ b/arch/arm/mach-ixp4xx/common.c
-> @@ -419,14 +419,20 @@ static void notrace ixp4xx_update_sched_clock(void)
->  /*
->   * clocksource
->   */
-> +
-> +static cycle_t ixp4xx_clocksource_read(struct clocksource *c)
-> +{
-> +	return *IXP4XX_OSTS;
-> +}
-> +
->  unsigned long ixp4xx_timer_freq = IXP4XX_TIMER_FREQ;
->  EXPORT_SYMBOL(ixp4xx_timer_freq);
->  static void __init ixp4xx_clocksource_init(void)
->  {
->  	init_sched_clock(&cd, ixp4xx_update_sched_clock, 32, ixp4xx_timer_freq);
->  
-> -	clocksource_mmio_init(&IXP4XX_OSTS, "OSTS", ixp4xx_timer_freq, 200, 32,
-> -			clocksource_mmio_readl_up);
-> +	clocksource_mmio_init(NULL, "OSTS", ixp4xx_timer_freq, 200, 32,
-> +			ixp4xx_clocksource_read);
->  }
->  
->  /*
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Thanks for the exact reference. You've mentioned this before and I tried
+to find the discussion but couldn't.
+
+I understand that the original meaning of NO_IOPORT/HAS_IOPORT is very
+limited, and I would like to extend it in a way to allow both the
+scenario with inb/outb but without ioport_map and the case where you
+have no PIO space at all.
+
+CONFIG_HAS_IOPORT is nice in that it mirrors CONFIG_HAS_IOMEM for
+readl/writel, so my preferred solution would be to repurpose that
+symbol to mean that inb/outb are available, while introducing a
+new symbol to mean that ioport_map is also available, e.g.
+CONFIG_HAS_IOPORT_MAP for the cases where we now use CONFIG_HAS_IOPORT.
+
+	Arnd
