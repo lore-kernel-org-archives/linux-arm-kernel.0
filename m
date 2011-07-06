@@ -1,82 +1,46 @@
-From: J.Lambrecht@TELEVIC.com (=?iso-8859-15?Q?Lambrecht_J=FCrgen?=)
-Date: Wed, 6 Jul 2011 11:06:53 +0200
-Subject: [PATCH] Add 'config IMX_NFC_V1_BISWAP' to swap the Bad block
-	Indicator, and use for imx27pdk nand support.
-In-Reply-To: <20110706080942.GC26347@pengutronix.de>
-References: <1309872828-13942-1-git-send-email-J.Lambrecht@televic.com>
-	<20110706080942.GC26347@pengutronix.de>
-Message-ID: <4E1425AD.5050603@televic.com>
+From: tixy@yxit.co.uk (Tixy)
+Date: Wed, 06 Jul 2011 10:08:20 +0100
+Subject: [PATCH] ARM: poison initmem when it is freed
+In-Reply-To: <alpine.LFD.2.00.1107051540550.14596@xanadu.home>
+References: <20110705184254.GH8286@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1107051509490.14596@xanadu.home>
+	<20110705192656.GJ8286@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1107051540550.14596@xanadu.home>
+Message-ID: <1309943300.2279.9.camel@computer2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/06/2011 10:09 AM, Sascha Hauer wrote:
->
-> On Tue, Jul 05, 2011 at 03:33:48PM +0200, J?rgen Lambrecht wrote:
-> > - Swap the BI-byte on position 0x7D0 with a data byte at 0x835.  To
-> fix a bug
-> >   in Freescale imx NFC v1 SoC's for 2K page NAND flashes: imx27 and
-> imx31.
-> >   Warning: The same solution needs to be applied to the boot loader
-> and the
-> >   flash programmer.
-> > - Enable NAND support for the imx27pdk (3ds), and use BISWAP.
-> >
-> > Signed-off-by: J?rgen Lambrecht <J.Lambrecht@televic.com>
-> > ---
-> >  arch/arm/mach-imx/Kconfig         |   30 ++++++++++++++++++++++++++++--
-> >  arch/arm/mach-imx/mach-mx27_3ds.c |   14 ++++++++++++++
-> >  drivers/mtd/nand/mxc_nand.c       |   29 +++++++++++++++++++++++++++++
-> >  3 files changed, 71 insertions(+), 2 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-> > index 0519dd7..e8b16a9 100644
-> > --- a/arch/arm/mach-imx/Kconfig
-> > +++ b/arch/arm/mach-imx/Kconfig
-> > @@ -274,7 +274,7 @@ config MACH_EUKREA_MBIMX27_BASEBOARD
-> >  endchoice
-> >
-> >  config MACH_MX27_3DS
-> > -     bool "MX27PDK platform"
-> > +     bool "MX27PDK (3DS) platform"
-> >       select SOC_IMX27
-> >       select IMX_HAVE_PLATFORM_FSL_USB2_UDC
-> >       select IMX_HAVE_PLATFORM_IMX2_WDT
-> > @@ -284,13 +284,39 @@ config MACH_MX27_3DS
-> >       select IMX_HAVE_PLATFORM_IMX_UART
-> >       select IMX_HAVE_PLATFORM_MXC_EHCI
-> >       select IMX_HAVE_PLATFORM_MXC_MMC
-> > +     select IMX_HAVE_PLATFORM_MXC_NAND
-> >       select IMX_HAVE_PLATFORM_SPI_IMX
-> >       select MXC_DEBUG_BOARD
-> >       select MXC_ULPI if USB_ULPI
-> >       help
-> > -       Include support for MX27PDK platform. This includes specific
-> > +       Include support for MX27PDK (3DS) platform. This includes
-> specific
-> >         configurations for the board and its peripherals.
-> >
-> > +config MACH_MXC_NAND_USE_BBT
-> > +     bool "Make the MXC NAND driver use the in flash Bad Block Table"
-> > +     depends on MACH_MX27_3DS
-> > +     depends on MTD_NAND_MXC
-> > +     help
-> > +       Enable this if you want that the MXC NAND driver uses the in
-> flash
-> > +       Bad Block Table to know what blocks are bad instead of
-> scanning the
-> > +       entire flash looking for bad block markers.
->
-> Besides the fact that we have too many kconfig options there's another
-> problem. We try to build kernels which run on as many boards as
-> possible. Adding options like this limit a kernel for a particular
-> usecase (bbt vs. scanning)
->
-Indeed. I just copied it from MACH_MX31_3DS_MXC_NAND_USE_BBT, and 
-thought it was good to do the same.
-If I want to use it, better just do it without that option, as other 
-_3ds boards do (and davinci and atmel also do in another way).
-I will remove the option in a separate nand patch for imx27pdk.
+On Tue, 2011-07-05 at 15:48 -0400, Nicolas Pitre wrote:
+> On Tue, 5 Jul 2011, Russell King - ARM Linux wrote:
+> > Have you tried to find a byte-based poison value which would fault
+> > yet still cause a pointer dereference?  You're limited to 0xeN on
+> > ARM, of which there's almost nothing to chose from:
+> > 
+> >    0:   e0e0e0e0        rsc     lr, r0, r0, ror #1
+> >    4:   e1e1e1e1        mvn     lr, r1, ror #3
+> >    8:   e2e2e2e2        rsc     lr, r2, #536870926      ; 0x2000000e
+> >    c:   e3e3e3e3        mvn     lr, #-1946157053        ; 0x8c000003
+> >   10:   e4e4e4e4        strbt   lr, [r4], #1252
+> >   14:   e5e5e5e5        strb    lr, [r5, #1509]!
+> >   18:   e6e6e6e6        strbt   lr, [r6], r6, ror #13
+> >   1c:   e7e7e7e7        strb    lr, [r7, r7, ror #15]!
+> >   20:   e8e8e8e8        stmia   r8!, {r3, r5, r6, r7, fp, sp, lr, pc}^
+> >   24:   e9e9e9e9        stmib   r9!, {r0, r3, r5, r6, r7, r8, fp, sp, lr, pc}^
+> >   28:   eaeaeaea        b       0xffababd8
+> >   2c:   ebebebeb        bl      0xffafafe0
+> >   30:   ecececec        stcl    12, cr14, [ip], #944
+> >   34:   edededed        stcl    13, cr14, [sp, #948]!
+> >   38:   eeeeeeee        cdp     14, 14, cr14, cr14, cr14, {7}
+> >   3c:   efefefef        svc     0x00efefef
+> > 
+> > 0xefefefef looks to be about the best alternative.
+> 
+> Right.  Does it have to be a byte?  Having a word (or half-word if 
+> Thumb2) would be much more convenient.
 
-Regards,
-J?rgen
-[snip]
+For Thumb, 0xde?? is Permanently UNDEFINED, so we could have 0xdede for
+a single byte pattern or an even more descriptive 0xdead if we don't
+have that restriction.
+
+-- 
+Tixy
