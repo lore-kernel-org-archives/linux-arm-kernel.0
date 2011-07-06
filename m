@@ -1,67 +1,44 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 6 Jul 2011 10:18:36 +0300
-Subject: [RFC][PATCH 4/5] ARM: S5P64x0: Adding OTG PHY control code
-In-Reply-To: <CAD6zSYOYUPpnovsxGWxiazKr3QnHhG78dfkctp3huvuNzdT4aw@mail.gmail.com>
-References: <0LN400HTOZEQDIL0@mailout1.samsung.com>
-	<BANLkTikDDBQjE2RCeeBB50vokSTcnCO46A@mail.gmail.com>
-	<20110622094923.GA23598@legolas.emea.dhcp.ti.com>
-	<CAD6zSYOYUPpnovsxGWxiazKr3QnHhG78dfkctp3huvuNzdT4aw@mail.gmail.com>
-Message-ID: <20110706071834.GB10729@legolas.emea.dhcp.ti.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 6 Jul 2011 01:19:38 -0600 (MDT)
+Subject: [PATCH v2 00/18] OMAP4: PM data big spring cleanup and fixes
+In-Reply-To: <1309552901-8944-1-git-send-email-b-cousson@ti.com>
+References: <1309552901-8944-1-git-send-email-b-cousson@ti.com>
+Message-ID: <alpine.DEB.2.00.1107060017480.4217@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Wed, Jul 06, 2011 at 11:03:10AM +0530, Praveen Paneri wrote:
-> >> > drivers should not live in arch/arm/*, why don't you move this to
-> >> > drivers/usb/otg where the PHYs are staying right now ?
-> >> PHY init/exit code can vary across SoCs. Wouldn't it be better to have it in the
-> >> SoC specific location?
-> >
-> > It will vary how ? If it's only regarding e.g. a different GPIO pin or a
-> > different IRQ number, you handle that by passing data down to driver
-> > (via platform_data or struct resource), now if it varies because a
-> > different board uses a different PHY, then another driver should be
-> > written (well, as long as it's really different from the one you have
-> > now, otherwise you should see if it's worth making the existing driver
-> > more flexible).
-> We have only 4 registers which are used for phy control. The bit structure
-> of these registers vary across the SoCs.
-> 1) PHY power control
-> 2) PHY clock control
-> 3) OTG reset control
-> 4) PHY tune
-> 
-> To init/de-init the phy we just need to set the above 4 registers appropriately.
-> Do you still think there is a necessity for a separate driver ?
+On Fri, 1 Jul 2011, Benoit Cousson wrote:
 
-well, we do have the otg utilities on drivers/usb/otg/ ;-)
+> Here are a bunch of cleanups on almost every PRCM related data files.
+> Some of them are purely code moves, and will look like a lot of
+> noise for nothing, but this is needed if we want to keep the files
+> aligned with generator tool and thus ease the future migration to
+> whatever format (common clock framework + DT).
 
-> I have gone through the reference drivers suggested by you.
-> Functionality of this PHY
-> control remains very less relative to those drivers.
+Thanks.  I'll split these up into smaller topic branches, I think
+that's what Tony wants for this window.
 
-on OMAP4 we have one "PHY" which actually only handle VBUS and ID pin
-detection :-p
+Patches 1-3 and 12 have been queued for 3.1 at 
+git://git.pwsan.com/linux-2.6 in the 'prcm_cleanup_a_3.1' branch.
 
-> I have removed a lot of ifdefery from the initial patches. The only
-> problem I am facing is
-> in implementing a generic register I/O method which can work for both
-> ARM and PPC.
-> Existing code for PPC was using following funtions
-> in_le32, in_be32, out_le32, out_be32
-> while in ARM readl and writel functions are used.
-> kindly suggest a way out of it.
+Patches 4-8 and 11 have been queued for 3.1 at
+git://git.pwsan.com/linux-2.6 in the 'clock_cleanup_a_3.1' branch.
 
-Can you use the versions on include/asm-generic/io.h ?
-ioread8(addr), ioread16(addr), ioread32(addr)
+Patches 9 and 10 have been split into PRCM changes and clock changes. The 
+PRCM changes have been queued for 3.1 at git://git.pwsan.com/linux-2.6 in 
+the 'prcm_cleanup_a_3.1' branch.  The clock changes have been queued for 
+3.1 at git://git.pwsan.com/linux-2.6 in the 'clock_cleanup_a_3.1' branch.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 490 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110706/f9eb3262/attachment.sig>
+Patches 13-15 have been queued for 3.1 at
+git://git.pwsan.com/linux-2.6 in the 'hwmod_cleanup_a_3.1' branch.
+
+Patches 17-18 have been queued for 3.1 at
+git://git.pwsan.com/linux-2.6 in the 'hwmod_dss_fix_3.1' branch.
+
+Patch 16, to me, belongs best with the 4460 support series and so I'll see 
+if it makes sense to fit it in there somewhere.
+
+
+- Paul
