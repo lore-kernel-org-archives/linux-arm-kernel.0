@@ -1,112 +1,79 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 05 Jul 2011 23:30:21 -0400
-Subject: [PATCH 37/37] ARM: mach-pxa: remove mach/memory.h
-In-Reply-To: <1309923021-23487-1-git-send-email-nicolas.pitre@linaro.org>
-References: <1309923021-23487-1-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <1309923021-23487-37-git-send-email-nicolas.pitre@linaro.org>
+From: heechul@illinois.edu (heechul Yun)
+Date: Tue, 5 Jul 2011 20:14:57 -0700
+Subject: A few other cache related optimizations for Cortex-A9.
+Message-ID: <CAN_5kQBszi=hV1RVjyKO6gOhOuymGjsMwLk6ORaWpkaL-4USxA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
----
- arch/arm/Kconfig                        |    1 +
- arch/arm/mach-pxa/include/mach/memory.h |   20 --------------------
- arch/arm/mach-pxa/pxa25x.c              |    2 +-
- arch/arm/mach-pxa/pxa27x.c              |    2 +-
- arch/arm/mach-pxa/pxa3xx.c              |    2 +-
- arch/arm/mach-pxa/zeus.c                |    2 +-
- 6 files changed, 5 insertions(+), 24 deletions(-)
- delete mode 100644 arch/arm/mach-pxa/include/mach/memory.h
+I found a few other places which, I believe, are not necessary for Cortex-A9.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 46d4c84..ec1c799 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -655,6 +655,7 @@ config ARCH_PXA
- 	select TICK_ONESHOT
- 	select PLAT_PXA
- 	select SPARSE_IRQ
-+	select NO_MACH_MEMORY_H
- 	help
- 	  Support for Intel/Marvell's PXA2xx/PXA3xx processor line.
- 
-diff --git a/arch/arm/mach-pxa/include/mach/memory.h b/arch/arm/mach-pxa/include/mach/memory.h
-deleted file mode 100644
-index d05a597..0000000
---- a/arch/arm/mach-pxa/include/mach/memory.h
-+++ /dev/null
-@@ -1,20 +0,0 @@
--/*
-- *  arch/arm/mach-pxa/include/mach/memory.h
-- *
-- * Author:	Nicolas Pitre
-- * Copyright:	(C) 2001 MontaVista Software Inc.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--
--#ifndef __ASM_ARCH_MEMORY_H
--#define __ASM_ARCH_MEMORY_H
--
--/*
-- * Physical DRAM offset.
-- */
--#define PLAT_PHYS_OFFSET	UL(0xa0000000)
--
--#endif
-diff --git a/arch/arm/mach-pxa/pxa25x.c b/arch/arm/mach-pxa/pxa25x.c
-index fed363c..8b18ccc 100644
---- a/arch/arm/mach-pxa/pxa25x.c
-+++ b/arch/arm/mach-pxa/pxa25x.c
-@@ -244,7 +244,7 @@ static void pxa25x_cpu_pm_enter(suspend_state_t state)
- 
- 	switch (state) {
- 	case PM_SUSPEND_MEM:
--		pxa25x_cpu_suspend(PWRMODE_SLEEP, PLAT_PHYS_OFFSET - PAGE_OFFSET);
-+		pxa25x_cpu_suspend(PWRMODE_SLEEP, PHYS_OFFSET - PAGE_OFFSET);
- 		break;
- 	}
+diff --git a/arch/arm/mm/copypage-v6.c b/arch/arm/mm/copypage-v6.c
+index bdba6c6..6d5a847 100644
+--- a/arch/arm/mm/copypage-v6.c
++++ b/arch/arm/mm/copypage-v6.c
+@@ -41,7 +41,9 @@ static void v6_copy_user_highpage_nonaliasing(struct page *to,
+        kfrom = kmap_atomic(from, KM_USER0);
+        kto = kmap_atomic(to, KM_USER1);
+        copy_page(kto, kfrom);
++#ifndef CONFIG_CPU_CACHE_V7
+        __cpuc_flush_dcache_area(kto, PAGE_SIZE);
++#endif
+        kunmap_atomic(kto, KM_USER1);
+        kunmap_atomic(kfrom, KM_USER0);
  }
-diff --git a/arch/arm/mach-pxa/pxa27x.c b/arch/arm/mach-pxa/pxa27x.c
-index 2fecbec..81e0052 100644
---- a/arch/arm/mach-pxa/pxa27x.c
-+++ b/arch/arm/mach-pxa/pxa27x.c
-@@ -299,7 +299,7 @@ void pxa27x_cpu_pm_enter(suspend_state_t state)
- 		pxa_cpu_standby();
- 		break;
- 	case PM_SUSPEND_MEM:
--		pxa27x_cpu_suspend(pwrmode, PLAT_PHYS_OFFSET - PAGE_OFFSET);
-+		pxa27x_cpu_suspend(pwrmode, PHYS_OFFSET - PAGE_OFFSET);
- 		break;
- 	}
- }
-diff --git a/arch/arm/mach-pxa/pxa3xx.c b/arch/arm/mach-pxa/pxa3xx.c
-index 8521d7d..4d48321 100644
---- a/arch/arm/mach-pxa/pxa3xx.c
-+++ b/arch/arm/mach-pxa/pxa3xx.c
-@@ -162,7 +162,7 @@ static void pxa3xx_cpu_pm_suspend(void)
- 	/* overwrite with the resume address */
- 	*p = virt_to_phys(cpu_resume);
- 
--	pxa3xx_cpu_suspend(PLAT_PHYS_OFFSET - PAGE_OFFSET);
-+	pxa3xx_cpu_suspend(PHYS_OFFSET - PAGE_OFFSET);
- 
- 	*p = saved_data;
- 
-diff --git a/arch/arm/mach-pxa/zeus.c b/arch/arm/mach-pxa/zeus.c
-index 56fa747..c48b558 100644
---- a/arch/arm/mach-pxa/zeus.c
-+++ b/arch/arm/mach-pxa/zeus.c
-@@ -676,7 +676,7 @@ static struct pxa2xx_udc_mach_info zeus_udc_info = {
- static void zeus_power_off(void)
- {
- 	local_irq_disable();
--	pxa27x_cpu_suspend(PWRMODE_DEEPSLEEP, PLAT_PHYS_OFFSET - PAGE_OFFSET);
-+	pxa27x_cpu_suspend(PWRMODE_DEEPSLEEP, PHYS_OFFSET - PAGE_OFFSET);
- }
- #else
- #define zeus_power_off   NULL
--- 
-1.7.4
+
+On handling COW page fault, the above function is called to copy the
+page content of the parent to a newly allocate page frame for the
+child. Again, since D cache of A9 is PIPT, we do not need to flush the
+page as in x86. This modification improves lmbench (fork/exec/shell)
+performance by 4-6%.
+
+diff --git a/arch/arm/include/asm/pgalloc.h b/arch/arm/include/asm/pgalloc.h
+index b12cc98..bff9858 100644
+--- a/arch/arm/include/asm/pgalloc.h
++++ b/arch/arm/include/asm/pgalloc.h
+@@ -61,7 +61,9 @@ pte_alloc_one_kernel(struct mm_struct *mm, unsigned long addr)
+
+        pte = (pte_t *)__get_free_page(PGALLOC_GFP);
+        if (pte) {
++#if !CONFIG_CPU_CACHE_V7
+                clean_dcache_area(pte, sizeof(pte_t) * PTRS_PER_PTE);
++#endif
+                pte += PTRS_PER_PTE;
+        }
+
+@@ -81,7 +83,9 @@ pte_alloc_one(struct mm_struct *mm, unsigned long addr)
+        if (pte) {
+                if (!PageHighMem(pte)) {
+                        void *page = page_address(pte);
++#if !CONFIG_CPU_CACHE_V7
+                        clean_dcache_area(page, sizeof(pte_t) * PTRS_PER_PTE);
++#endif
+                }
+                pgtable_page_ctor(pte);
+        }
+diff --git a/arch/arm/mm/pgd.c b/arch/arm/mm/pgd.c
+index be5f58e..343df1b 100644
+--- a/arch/arm/mm/pgd.c
++++ b/arch/arm/mm/pgd.c
+@@ -41,8 +41,9 @@ pgd_t *get_pgd_slow(struct mm_struct *mm)
+        memcpy(new_pgd + FIRST_KERNEL_PGD_NR, init_pgd + FIRST_KERNEL_PGD_NR,
+                       (PTRS_PER_PGD - FIRST_KERNEL_PGD_NR) * sizeof(pgd_t));
+
++#if !CONFIG_CPU_CACHE_V7
+        clean_dcache_area(new_pgd, PTRS_PER_PGD * sizeof(pgd_t));
+-
++#endif
+        if (!vectors_high()) {
+                /*
+                 * On ARM, first page must always be allocated since it
+
+Creating page tables also do not need to clean cache-line because of
+the same reason as above.
+This patch improves lmbench3 (fork/exec/shell) performance by 10%~20%
+in my test.
+
+I think above two patches work for least Cortex-A9 although I am not
+sure the use of CONFIG_CPU_CACHE_V7 is appropriate.
+
+Thanks
