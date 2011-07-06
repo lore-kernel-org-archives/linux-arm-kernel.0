@@ -1,46 +1,28 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 6 Jul 2011 16:51:49 +0200
-Subject: [PATCH 6/8] drivers: add Contiguous Memory Allocator
-In-Reply-To: <20110706142345.GC8286@n2100.arm.linux.org.uk>
-References: <1309851710-3828-1-git-send-email-m.szyprowski@samsung.com>
-	<201107061609.29996.arnd@arndb.de>
-	<20110706142345.GC8286@n2100.arm.linux.org.uk>
-Message-ID: <201107061651.49824.arnd@arndb.de>
+Date: Wed, 6 Jul 2011 16:53:27 +0200
+Subject: [GIT PULL] pxa: fixing patches for v3.0-rc6
+In-Reply-To: <CAMPhdO_krAn-tQYfwAh7a+Q+_xRU-DdwQn+gAi-LW3oFQauBmw@mail.gmail.com>
+References: <CAMPhdO_6CqVn_SdX-tPBtmHjkKH6kiWzuRkCDWkxaCUacReQhg@mail.gmail.com>
+	<201107061556.23356.arnd@arndb.de>
+	<CAMPhdO_krAn-tQYfwAh7a+Q+_xRU-DdwQn+gAi-LW3oFQauBmw@mail.gmail.com>
+Message-ID: <201107061653.27756.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 06 July 2011, Russell King - ARM Linux wrote:
-> On Wed, Jul 06, 2011 at 04:09:29PM +0200, Arnd Bergmann wrote:
-> > Maybe you can simply adapt the default location of the contiguous memory
-> > are like this:
-> > - make CONFIG_CMA depend on CONFIG_HIGHMEM on ARM, at compile time
-> > - if ZONE_HIGHMEM exist during boot, put the CMA area in there
-> > - otherwise, put the CMA area at the top end of lowmem, and change
-> >   the zone sizes so ZONE_HIGHMEM stretches over all of the CMA memory.
+On Wednesday 06 July 2011, Eric Miao wrote:
+> >
+> > I'll wait a few days for other soc maintainers to send fixes and then
+> > send a consolidated pull request.
+> >
+> > I noticed that none of these have a cc:stable at kernel.org tag, but the
+> > code that you patch has been in the same state since 2009 or early 2010,
+> > respectively. Are you sure the fixes are not needed on older kernels?
+> >
 > 
-> One of the requirements of the allocator is that the returned memory
-> should be zero'd (because it can be exposed to userspace via ALSA
-> and frame buffers.)
-> 
-> Zeroing the memory from all the contexts which dma_alloc_coherent
-> is called from is a trivial matter if its in lowmem, but highmem is
-> harder.
+> They are. Can I do a rebase and send another git-pull?
 
-I don't see how. The pages get allocated from an unmapped area
-or memory, mapped into the kernel address space as uncached or wc
-and then cleared. This should be the same for lowmem or highmem
-pages.
+Yes, that would be good.
 
-What am I missing?
-
-> Another issue is that when a platform has restricted DMA regions,
-> they typically don't fall into the highmem zone.  As the dmabounce
-> code allocates from the DMA coherent allocator to provide it with
-> guaranteed DMA-able memory, that would be rather inconvenient.
-
-True. The dmabounce code would consequently have to allocate
-the memory through an internal function that avoids the
-contiguous allocation area and goes straight to ZONE_DMA memory
-as it does today.
+Thanks,
 
 	Arnd
