@@ -1,126 +1,44 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 5 Jul 2011 23:59:43 -0600 (MDT)
-Subject: [PATCH v2 3/5] OMAP4: powerdomain data: Fix core mem states and
-	missing cefuse flag
-In-Reply-To: <1309552060-4547-4-git-send-email-b-cousson@ti.com>
-References: <1309552060-4547-1-git-send-email-b-cousson@ti.com>
-	<1309552060-4547-4-git-send-email-b-cousson@ti.com>
-Message-ID: <alpine.DEB.2.00.1107052358450.4217@utopia.booyaka.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 6 Jul 2011 11:31:24 +0530
+Subject: [PATCH 5/5] davinci: da850 evm: register SATA device
+In-Reply-To: <cover.1309927427.git.nsekhar@ti.com>
+References: <cover.1309927427.git.nsekhar@ti.com>
+Message-ID: <f4ad660e93a6b8f573e1f25b1e3717985d19ddca.1309927428.git.nsekhar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+Register the platform device for SATA interface
+present on the DA850/OMAP-L138/AM18x EVM.
 
-I split the indentation changes into the following patch, queued for 3.1 
-at git://git.pwsan.com/linux-2.6 in the 'prcm_cleanup_a_3.1' branch.
-
-
-- Paul
-
-From: Benoit Cousson <b-cousson@ti.com>
-Date: Tue, 5 Jul 2011 23:44:32 -0600
-Subject: [PATCH] OMAP4: powerdomain data: Fix indentation
-MIME-Version: 1.0
-Content-Type: text/plain; charset=UTF-8
-Content-Transfer-Encoding: 8bit
-
-Indent flags to be aligned with other fields.
-
-Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-Cc: Paul Walmsley <paul@pwsan.com>
-Cc: Rajendra Nayak <rnayak@ti.com>
-Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-[paul at pwsan.com: split this patch from an earlier patch by Beno?t;
- edited commit message]
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Signed-off-by: Sekhar Nori <nsekhar@ti.com>
 ---
- arch/arm/mach-omap2/powerdomains44xx_data.c |   18 +++++++++---------
- 1 files changed, 9 insertions(+), 9 deletions(-)
+ arch/arm/mach-davinci/board-da850-evm.c |    7 +++++++
+ 1 files changed, 7 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/powerdomains44xx_data.c b/arch/arm/mach-omap2/powerdomains44xx_data.c
-index c4222c7..3a7e678 100644
---- a/arch/arm/mach-omap2/powerdomains44xx_data.c
-+++ b/arch/arm/mach-omap2/powerdomains44xx_data.c
-@@ -53,7 +53,7 @@ static struct powerdomain core_44xx_pwrdm = {
- 		[3] = PWRSTS_ON,	/* ducati_l2ram */
- 		[4] = PWRSTS_ON,	/* ducati_unicache */
- 	},
--	.flags		= PWRDM_HAS_LOWPOWERSTATECHANGE,
-+	.flags		  = PWRDM_HAS_LOWPOWERSTATECHANGE,
- };
+diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
+index a7b41bf..3d2c0d7 100644
+--- a/arch/arm/mach-davinci/board-da850-evm.c
++++ b/arch/arm/mach-davinci/board-da850-evm.c
+@@ -1117,6 +1117,8 @@ static __init int da850_evm_init_cpufreq(void)
+ static __init int da850_evm_init_cpufreq(void) { return 0; }
+ #endif
  
- /* gfx_44xx_pwrdm: 3D accelerator power domain */
-@@ -70,7 +70,7 @@ static struct powerdomain gfx_44xx_pwrdm = {
- 	.pwrsts_mem_on	= {
- 		[0] = PWRSTS_ON,	/* gfx_mem */
- 	},
--	.flags		= PWRDM_HAS_LOWPOWERSTATECHANGE,
-+	.flags		  = PWRDM_HAS_LOWPOWERSTATECHANGE,
- };
++#define DA850EVM_SATA_REFCLKPN_RATE	(100 * 1000 * 1000)
++
+ static __init void da850_evm_init(void)
+ {
+ 	int ret;
+@@ -1237,6 +1239,11 @@ static __init void da850_evm_init(void)
+ 	if (ret)
+ 		pr_warning("da850_evm_init: spi 1 registration failed: %d\n",
+ 				ret);
++
++	ret = da850_register_sata(DA850EVM_SATA_REFCLKPN_RATE);
++	if (ret)
++		pr_warning("da850_evm_init: sata registration failed: %d\n",
++				ret);
+ }
  
- /* abe_44xx_pwrdm: Audio back end power domain */
-@@ -90,7 +90,7 @@ static struct powerdomain abe_44xx_pwrdm = {
- 		[0] = PWRSTS_ON,	/* aessmem */
- 		[1] = PWRSTS_ON,	/* periphmem */
- 	},
--	.flags		= PWRDM_HAS_LOWPOWERSTATECHANGE,
-+	.flags		  = PWRDM_HAS_LOWPOWERSTATECHANGE,
- };
- 
- /* dss_44xx_pwrdm: Display subsystem power domain */
-@@ -108,7 +108,7 @@ static struct powerdomain dss_44xx_pwrdm = {
- 	.pwrsts_mem_on	= {
- 		[0] = PWRSTS_ON,	/* dss_mem */
- 	},
--	.flags		= PWRDM_HAS_LOWPOWERSTATECHANGE,
-+	.flags		  = PWRDM_HAS_LOWPOWERSTATECHANGE,
- };
- 
- /* tesla_44xx_pwrdm: Tesla processor power domain */
-@@ -130,7 +130,7 @@ static struct powerdomain tesla_44xx_pwrdm = {
- 		[1] = PWRSTS_ON,	/* tesla_l1 */
- 		[2] = PWRSTS_ON,	/* tesla_l2 */
- 	},
--	.flags		= PWRDM_HAS_LOWPOWERSTATECHANGE,
-+	.flags		  = PWRDM_HAS_LOWPOWERSTATECHANGE,
- };
- 
- /* wkup_44xx_pwrdm: Wake-up power domain */
-@@ -241,7 +241,7 @@ static struct powerdomain ivahd_44xx_pwrdm = {
- 		[2] = PWRSTS_ON,	/* tcm1_mem */
- 		[3] = PWRSTS_ON,	/* tcm2_mem */
- 	},
--	.flags		= PWRDM_HAS_LOWPOWERSTATECHANGE,
-+	.flags		  = PWRDM_HAS_LOWPOWERSTATECHANGE,
- };
- 
- /* cam_44xx_pwrdm: Camera subsystem power domain */
-@@ -258,7 +258,7 @@ static struct powerdomain cam_44xx_pwrdm = {
- 	.pwrsts_mem_on	= {
- 		[0] = PWRSTS_ON,	/* cam_mem */
- 	},
--	.flags		= PWRDM_HAS_LOWPOWERSTATECHANGE,
-+	.flags		  = PWRDM_HAS_LOWPOWERSTATECHANGE,
- };
- 
- /* l3init_44xx_pwrdm: L3 initators pheripherals power domain  */
-@@ -276,7 +276,7 @@ static struct powerdomain l3init_44xx_pwrdm = {
- 	.pwrsts_mem_on	= {
- 		[0] = PWRSTS_ON,	/* l3init_bank1 */
- 	},
--	.flags		= PWRDM_HAS_LOWPOWERSTATECHANGE,
-+	.flags		  = PWRDM_HAS_LOWPOWERSTATECHANGE,
- };
- 
- /* l4per_44xx_pwrdm: Target peripherals power domain */
-@@ -296,7 +296,7 @@ static struct powerdomain l4per_44xx_pwrdm = {
- 		[0] = PWRSTS_ON,	/* nonretained_bank */
- 		[1] = PWRSTS_ON,	/* retained_bank */
- 	},
--	.flags		= PWRDM_HAS_LOWPOWERSTATECHANGE,
-+	.flags		  = PWRDM_HAS_LOWPOWERSTATECHANGE,
- };
- 
- /*
+ #ifdef CONFIG_SERIAL_8250_CONSOLE
 -- 
-1.7.5.4
+1.7.3.2
