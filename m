@@ -1,30 +1,71 @@
 From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 6 Jul 2011 11:31:19 +0530
-Subject: [PATCH 0/5] davinci: da850: add SATA support
-Message-ID: <cover.1309927427.git.nsekhar@ti.com>
+Date: Wed, 6 Jul 2011 11:31:22 +0530
+Subject: [PATCH v2 3/5] davinci: enable forced transitions on PSC
+In-Reply-To: <cover.1309927427.git.nsekhar@ti.com>
+References: <cover.1309927427.git.nsekhar@ti.com>
+Message-ID: <16e4a0ff95e42ddbe4a031af5f7a236f6837effd.1309927428.git.nsekhar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series add support for platform AHCI driver on
-DA850/OMAP-L138/AM18x. Towards this purpose, it also
-adds support for forced module transtitions on PSC.
+Some DaVinci modules like the SATA on DA850
+need forced module state transitions.
 
-Sekhar Nori (5):
-  davinci: psc.h: clean up indentation done using spaces
-  davinci: pass clock flags to davinci_psc_config()
-  davinci: enable forced transitions on PSC
-  davinci: da850: add support for SATA interface
-  davinci: da850 evm: register SATA device
+Define a "force" flag which can be passed to
+the PSC config function to enable it to make
+forced transitions.
 
- arch/arm/mach-davinci/board-da850-evm.c    |    7 ++
- arch/arm/mach-davinci/clock.c              |    8 +-
- arch/arm/mach-davinci/clock.h              |    1 +
- arch/arm/mach-davinci/da850.c              |    9 ++
- arch/arm/mach-davinci/devices-da8xx.c      |  126 +++++++++++++++++++++++
- arch/arm/mach-davinci/include/mach/da8xx.h |    2 +
- arch/arm/mach-davinci/include/mach/psc.h   |  151 ++++++++++++++--------------
- arch/arm/mach-davinci/psc.c                |   14 +++-
- 8 files changed, 237 insertions(+), 81 deletions(-)
+Forced transitions shouldn't normally be attempted,
+unless the TRM explicitly specifies its usage.
 
+ChangeLog:
+v2:
+Modified to take care of the fact that
+davinci_psc_config() now takes the flags
+directly.
+
+Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+---
+ arch/arm/mach-davinci/clock.h            |    1 +
+ arch/arm/mach-davinci/include/mach/psc.h |    1 +
+ arch/arm/mach-davinci/psc.c              |    2 ++
+ 3 files changed, 4 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-davinci/clock.h b/arch/arm/mach-davinci/clock.h
+index 0dd2203..48ee462 100644
+--- a/arch/arm/mach-davinci/clock.h
++++ b/arch/arm/mach-davinci/clock.h
+@@ -111,6 +111,7 @@ struct clk {
+ #define CLK_PLL			BIT(4) /* PLL-derived clock */
+ #define PRE_PLL			BIT(5) /* source is before PLL mult/div */
+ #define PSC_SWRSTDISABLE	BIT(6) /* Disable state is SwRstDisable */
++#define PSC_FORCE		BIT(7) /* Force module state transtition */
+ 
+ #define CLK(dev, con, ck) 	\
+ 	{			\
+diff --git a/arch/arm/mach-davinci/include/mach/psc.h b/arch/arm/mach-davinci/include/mach/psc.h
+index be9d63e..47fd0bc 100644
+--- a/arch/arm/mach-davinci/include/mach/psc.h
++++ b/arch/arm/mach-davinci/include/mach/psc.h
+@@ -244,6 +244,7 @@
+ #define PSC_STATE_ENABLE	3
+ 
+ #define MDSTAT_STATE_MASK	0x1f
++#define MDCTL_FORCE		BIT(31)
+ 
+ #ifndef __ASSEMBLER__
+ 
+diff --git a/arch/arm/mach-davinci/psc.c b/arch/arm/mach-davinci/psc.c
+index 823cb1b..1fb6bdf 100644
+--- a/arch/arm/mach-davinci/psc.c
++++ b/arch/arm/mach-davinci/psc.c
+@@ -75,6 +75,8 @@ void davinci_psc_config(unsigned int domain, unsigned int ctlr,
+ 	mdctl = __raw_readl(psc_base + MDCTL + 4 * id);
+ 	mdctl &= ~MDSTAT_STATE_MASK;
+ 	mdctl |= next_state;
++	if (flags & PSC_FORCE)
++		mdctl |= MDCTL_FORCE;
+ 	__raw_writel(mdctl, psc_base + MDCTL + 4 * id);
+ 
+ 	pdstat = __raw_readl(psc_base + PDSTAT);
 -- 
 1.7.3.2
