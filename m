@@ -1,20 +1,23 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 6 Jul 2011 16:41:57 -0600 (MDT)
-Subject: [PATCH v2 00/18] OMAP4: PM data big spring cleanup and fixes
-In-Reply-To: <alpine.DEB.2.00.1107060017480.4217@utopia.booyaka.com>
-References: <1309552901-8944-1-git-send-email-b-cousson@ti.com>
-	<alpine.DEB.2.00.1107060017480.4217@utopia.booyaka.com>
-Message-ID: <alpine.DEB.2.00.1107061641280.31498@utopia.booyaka.com>
+Date: Wed, 6 Jul 2011 16:42:08 -0600 (MDT)
+Subject: [PATCH v3 09/13] OMAP4: hwmod data: Align interconnect format
+	with regular modules
+In-Reply-To: <1309554558-19819-10-git-send-email-b-cousson@ti.com>
+References: <1309554558-19819-1-git-send-email-b-cousson@ti.com>
+	<1309554558-19819-10-git-send-email-b-cousson@ti.com>
+Message-ID: <alpine.DEB.2.00.1107061640100.31498@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 6 Jul 2011, Paul Walmsley wrote:
+On Fri, 1 Jul 2011, Benoit Cousson wrote:
 
-> Patches 13-15 have been queued for 3.1 at
-> git://git.pwsan.com/linux-2.6 in the 'hwmod_cleanup_a_3.1' branch.
+> The interconnect modules were using a slightly different layout than
+> the regular modules.
+> Align the layout for better consitency.
 
-This branch has been renamed to 'omap4_hwmod_data_cleanup_a_3.1' to better 
-express its content.
+Thanks, this patch has been queued for 3.1 at 
+git://git.pwsan.com/linux-2.6 in the 'omap4_hwmod_data_cleanup_a_3.1' 
+branch.
 
 
 - Paul
