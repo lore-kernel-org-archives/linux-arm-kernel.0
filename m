@@ -1,30 +1,32 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 6 Jul 2011 16:23:51 +0200
-Subject: [PATCH] ARM: cns3xxx: Add support for L2 Cache Controller
-In-Reply-To: <20110706140832.GA15946@oksana.dev.rtsoft.ru>
-References: <20110706140832.GA15946@oksana.dev.rtsoft.ru>
-Message-ID: <201107061623.51969.arnd@arndb.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 6 Jul 2011 15:23:45 +0100
+Subject: [PATCH 6/8] drivers: add Contiguous Memory Allocator
+In-Reply-To: <201107061609.29996.arnd@arndb.de>
+References: <1309851710-3828-1-git-send-email-m.szyprowski@samsung.com>
+	<20110705113345.GA8286@n2100.arm.linux.org.uk>
+	<006301cc3be4$daab1850$900148f0$%szyprowski@samsung.com>
+	<201107061609.29996.arnd@arndb.de>
+Message-ID: <20110706142345.GC8286@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 06 July 2011, Anton Vorontsov wrote:
-> CNS3xxx SOCs have L310-compatible cache controller, so let's use it.
-> 
-> With this patch benchmarking with 'gzip' shows that performance is
-> doubled, and I'm still able to boot full-fledged userland over NFS
-> (using PCIe NIC), so the support should be pretty robust.
-> 
-> Signed-off-by: Anton Vorontsov <avorontsov@mvista.com>
-> ---
-> 
-> I'm going to apply it to linux-cns3xxx.git tree and push it (via Arnd)
-> for v3.1 , if there will be no complains, of course.
+On Wed, Jul 06, 2011 at 04:09:29PM +0200, Arnd Bergmann wrote:
+> Maybe you can simply adapt the default location of the contiguous memory
+> are like this:
+> - make CONFIG_CMA depend on CONFIG_HIGHMEM on ARM, at compile time
+> - if ZONE_HIGHMEM exist during boot, put the CMA area in there
+> - otherwise, put the CMA area at the top end of lowmem, and change
+>   the zone sizes so ZONE_HIGHMEM stretches over all of the CMA memory.
 
-I think there is a small problem you should fix first, but otherwise
-it's ok.
+One of the requirements of the allocator is that the returned memory
+should be zero'd (because it can be exposed to userspace via ALSA
+and frame buffers.)
 
-The problem is that CONFIG_CACHE_L2X0 is a compile-time option that
-can be disabled. Your code will not link correctly if it's turned off,
-so you need to contitionalize it on that Kconfig symbol.
+Zeroing the memory from all the contexts which dma_alloc_coherent
+is called from is a trivial matter if its in lowmem, but highmem is
+harder.
 
-	Arnd
+Another issue is that when a platform has restricted DMA regions,
+they typically don't fall into the highmem zone.  As the dmabounce
+code allocates from the DMA coherent allocator to provide it with
+guaranteed DMA-able memory, that would be rather inconvenient.
