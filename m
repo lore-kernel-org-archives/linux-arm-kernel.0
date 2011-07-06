@@ -1,256 +1,32 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 6 Jul 2011 21:16:47 +0800
-Subject: [PATCH 01/17] leds: create a trigger for CPU activity
-In-Reply-To: <1309955687-19365-2-git-send-email-bryan.wu@canonical.com>
+Date: Wed, 6 Jul 2011 21:19:43 +0800
+Subject: [PATCH 00/17] Introduce a led trigger for CPU activity
+In-Reply-To: <20110706131600.GW8286@n2100.arm.linux.org.uk>
 References: <1309955687-19365-1-git-send-email-bryan.wu@canonical.com>
-	<1309955687-19365-2-git-send-email-bryan.wu@canonical.com>
-Message-ID: <CAMPhdO9QmCpGFB8fd5Rp-a0iAv1ByA962FZKOwc59R86OTpxAQ@mail.gmail.com>
+	<CAMPhdO-Ln7BmU8jYfEEp3RPa9sgJueTVfsm1phs=NXTC3FPgNw@mail.gmail.com>
+	<20110706131600.GW8286@n2100.arm.linux.org.uk>
+Message-ID: <CAMPhdO_w3s9ktjdT_epX0EOYZ31tTRrdaUKgQEFxRZbB2b5=XQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 6, 2011 at 8:34 PM, Bryan Wu <bryan.wu@canonical.com> wrote:
-> Attempting to consolidate the ARM LED code, this removes the
-> custom RealView LED trigger code to turn LEDs on and off in
-> response to CPU activity and replace it with a standard trigger.
+On Wed, Jul 6, 2011 at 9:16 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Jul 06, 2011 at 09:13:14PM +0800, Eric Miao wrote:
+>> > ?drivers/leds/ledtrig-cpu.c ? ? ? ? ? ? ? ? ? ? | ?144 ++++++++++++
+>> > ?include/linux/leds.h ? ? ? ? ? ? ? ? ? ? ? ? ? | ? 15 ++
+>> > ?105 files changed, 1532 insertions(+), 3119 deletions(-)
+>>
+>> Not bad, I like the numbers here. This is definitely a good move.
+>> I had long ago wanted to remove those legacy LED code in mach-pxa.
 >
-> (bryan.wu at canonical.com:
-> It moves arch/arm/kernel/leds.c syscore stubs into this trigger.
-> It also provides ledtrig_cpu trigger event stub in <linux/leds.h>.
-> Although it was inspired by ARM work, it can be used in other arch.)
+> The down-side is that through these moves we've lost functionality each
+> time. ?For example, the blinking heartbeat LED on the Assabet and
+> Netwinder which I always enabled to let me know whether the machines
+> were still alove has long since gone.
 >
-> Cc: Richard Purdie <rpurdie@rpsys.net>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> Signed-off-by: Bryan Wu <bryan.wu@canonical.com>
-> ---
-> ?drivers/leds/Kconfig ? ? ? | ? 10 +++
-> ?drivers/leds/Makefile ? ? ?| ? ?1 +
-> ?drivers/leds/ledtrig-cpu.c | ?144 ++++++++++++++++++++++++++++++++++++++++++++
-> ?include/linux/leds.h ? ? ? | ? 15 +++++
-> ?4 files changed, 170 insertions(+), 0 deletions(-)
-> ?create mode 100644 drivers/leds/ledtrig-cpu.c
+> I hope that this series restores that functionality on those platforms
+> where it has been lost.
 >
-> diff --git a/drivers/leds/Kconfig b/drivers/leds/Kconfig
-> index 713d43b..186000a 100644
-> --- a/drivers/leds/Kconfig
-> +++ b/drivers/leds/Kconfig
-> @@ -446,6 +446,16 @@ config LEDS_TRIGGER_BACKLIGHT
->
-> ? ? ? ? ?If unsure, say N.
->
-> +config LEDS_TRIGGER_CPU
-> + ? ? ? bool "LED CPU Trigger"
-> + ? ? ? depends on LEDS_TRIGGERS
-> + ? ? ? help
-> + ? ? ? ? This allows LEDs to be controlled by active CPUs. This shows
-> + ? ? ? ? the active CPUs across an array of LEDs so you can see what
-> + ? ? ? ? CPUs are active on the system at any given moment.
-> +
-> + ? ? ? ? If unsure, say N.
-> +
-> ?config LEDS_TRIGGER_GPIO
-> ? ? ? ?tristate "LED GPIO Trigger"
-> ? ? ? ?depends on LEDS_TRIGGERS
-> diff --git a/drivers/leds/Makefile b/drivers/leds/Makefile
-> index bbfd2e3..5e70d2e 100644
-> --- a/drivers/leds/Makefile
-> +++ b/drivers/leds/Makefile
-> @@ -53,4 +53,5 @@ obj-$(CONFIG_LEDS_TRIGGER_IDE_DISK) ? += ledtrig-ide-disk.o
-> ?obj-$(CONFIG_LEDS_TRIGGER_HEARTBEAT) ? += ledtrig-heartbeat.o
-> ?obj-$(CONFIG_LEDS_TRIGGER_BACKLIGHT) ? += ledtrig-backlight.o
-> ?obj-$(CONFIG_LEDS_TRIGGER_GPIO) ? ? ? ? ? ? ? ?+= ledtrig-gpio.o
-> +obj-$(CONFIG_LEDS_TRIGGER_CPU) ? ? ? ? += ledtrig-cpu.o
-> ?obj-$(CONFIG_LEDS_TRIGGER_DEFAULT_ON) ?+= ledtrig-default-on.o
-> diff --git a/drivers/leds/ledtrig-cpu.c b/drivers/leds/ledtrig-cpu.c
-> new file mode 100644
-> index 0000000..4d63ada
-> --- /dev/null
-> +++ b/drivers/leds/ledtrig-cpu.c
-> @@ -0,0 +1,144 @@
-> +/*
-> + * ledtrig-cpu.c - LED trigger based on CPU activity
-> + *
-> + * Copyright 2011 Linus Walleij <linus.walleij@linaro.org>
-> + * Copyright 2011 Bryan Wu <bryan.wu@canonical.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + */
-> +
-> +#include <linux/module.h>
-> +#include <linux/kernel.h>
-> +#include <linux/init.h>
-> +#include <linux/slab.h>
-> +#include <linux/percpu.h>
-> +#include <linux/syscore_ops.h>
-> +#include "leds.h"
-> +
-> +struct cpu_trig_data {
-> + ? ? ? struct led_classdev *led;
-> +};
-> +
-> +static DEFINE_PER_CPU(struct cpu_trig_data *, cpu_triggers);
-> +
-> +void ledtrig_cpu(enum cpu_led_event ledevt)
-> +{
-> + ? ? ? struct cpu_trig_data *trigdata = __get_cpu_var(cpu_triggers);
-> +
-> + ? ? ? if (!trigdata)
-> + ? ? ? ? ? ? ? return;
-> +
-> + ? ? ? /* Locate the correct CPU LED */
-> +
-> + ? ? ? switch (ledevt) {
-> + ? ? ? case CPU_LED_START:
-> + ? ? ? case CPU_LED_IDLE_START:
-> + ? ? ? ? ? ? ? /* Will turn the LED on, max brightness */
-> + ? ? ? ? ? ? ? if (trigdata->led)
-> + ? ? ? ? ? ? ? ? ? ? ? led_set_brightness(trigdata->led,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?trigdata->led->max_brightness);
-> + ? ? ? ? ? ? ? break;
-> +
-> + ? ? ? case CPU_LED_STOP:
-> + ? ? ? case CPU_LED_IDLE_END:
-> + ? ? ? case CPU_LED_HALTED:
-> + ? ? ? ? ? ? ? /* Will turn the LED off */
-> + ? ? ? ? ? ? ? if (trigdata->led)
-> + ? ? ? ? ? ? ? ? ? ? ? led_set_brightness(trigdata->led, LED_OFF);
-> + ? ? ? ? ? ? ? break;
-> +
-> + ? ? ? default:
-> + ? ? ? ? ? ? ? /* Will leave the LED as it is */
-> + ? ? ? ? ? ? ? break;
-> + ? ? ? }
-> +}
 
-I'm a bit worrying about the LED brightness hardcoded here, what if
-a platform requires different behavior, e.g. LED_OFF when IDLE_START.
-
-> +EXPORT_SYMBOL(ledtrig_cpu);
-> +
-> +static void cpu_trig_activate_cpu(void *data)
-> +{
-> + ? ? ? struct cpu_trig_data *cpu_data;
-> + ? ? ? struct led_classdev *led = data;
-> + ? ? ? int my_cpu = smp_processor_id();
-> + ? ? ? unsigned long target_cpu = (unsigned long) led->trigger_data;
-> +
-> + ? ? ? if (target_cpu != my_cpu)
-> + ? ? ? ? ? ? ? return;
-> +
-> + ? ? ? cpu_data = kzalloc(sizeof(*cpu_data), GFP_KERNEL);
-> + ? ? ? if (!cpu_data)
-> + ? ? ? ? ? ? ? return;
-> +
-> + ? ? ? dev_info(led->dev, "led %s indicate activity on CPU %d\n",
-> + ? ? ? ? ? ? ? ?led->name, my_cpu);
-> +
-> + ? ? ? cpu_data->led = led;
-> + ? ? ? __get_cpu_var(cpu_triggers) = cpu_data;
-> +}
-> +
-> +static void cpu_trig_activate(struct led_classdev *led)
-> +{
-> + ? ? ? on_each_cpu(cpu_trig_activate_cpu, led, 1);
-> +}
-> +
-> +static void cpu_trig_deactivate(struct led_classdev *led)
-> +{
-> + ? ? ? struct cpu_trig_data *cpu_data = led->trigger_data;
-> +
-> + ? ? ? kfree(cpu_data);
-> +}
-> +
-> +static struct led_trigger cpu_led_trigger = {
-> + ? ? ? .name ? ? ? ? ? = "cpu",
-> + ? ? ? .activate ? ? ? = cpu_trig_activate,
-> + ? ? ? .deactivate ? ? = cpu_trig_deactivate,
-> +};
-> +
-> +
-> +static int cpu_syscore_suspend(void)
-> +{
-> + ? ? ? ledtrig_cpu(CPU_LED_STOP);
-> + ? ? ? return 0;
-> +}
-> +
-> +static void cpu_syscore_resume(void)
-> +{
-> + ? ? ? ledtrig_cpu(CPU_LED_START);
-> +}
-> +
-> +static void cpu_syscore_shutdown(void)
-> +{
-> + ? ? ? ledtrig_cpu(CPU_LED_HALTED);
-> +}
-> +
-> +static struct syscore_ops cpu_syscore_ops = {
-> + ? ? ? .shutdown ? ? ? = cpu_syscore_shutdown,
-> + ? ? ? .suspend ? ? ? ?= cpu_syscore_suspend,
-> + ? ? ? .resume ? ? ? ? = cpu_syscore_resume,
-> +};
-
-Even this is static, I think naming of ledtrig_cpu_syscore_* will be better
-here, causing less confusion. As cpu_syscore_shutdown really gave me a
-first impression it's about the action when the CPU shuts down.
-
-> +
-> +static int __init cpu_trig_init(void)
-> +{
-> + ? ? ? int ret;
-> +
-> + ? ? ? ret = led_trigger_register(&cpu_led_trigger);
-> + ? ? ? if (!ret)
-> + ? ? ? ? ? ? ? register_syscore_ops(&cpu_syscore_ops);
-> +
-> + ? ? ? return ret;
-> +}
-> +module_init(cpu_trig_init);
-> +
-> +static void __exit cpu_trig_exit(void)
-> +{
-> + ? ? ? unregister_syscore_ops(&cpu_syscore_ops);
-> + ? ? ? led_trigger_unregister(&cpu_led_trigger);
-> +}
-> +module_exit(cpu_trig_exit);
-
-ledtrig_cpu_exit?
-
-> +
-> +MODULE_AUTHOR("Linus Walleij <linus.walleij@linaro.org>");
-> +MODULE_AUTHOR("Bryan Wu <bryan.wu@canonical.com>");
-> +MODULE_DESCRIPTION("CPU LED trigger");
-> +MODULE_LICENSE("GPL");
-> diff --git a/include/linux/leds.h b/include/linux/leds.h
-> index 5884def..94cdb9a 100644
-> --- a/include/linux/leds.h
-> +++ b/include/linux/leds.h
-> @@ -210,4 +210,19 @@ struct gpio_led_platform_data {
-> ?struct platform_device *gpio_led_register_device(
-> ? ? ? ? ? ? ? ?int id, const struct gpio_led_platform_data *pdata);
->
-> +#ifdef CONFIG_LEDS_TRIGGER_CPU
-> +enum cpu_led_event {
-> + ? ? ? CPU_LED_IDLE_START,
-> + ? ? ? CPU_LED_IDLE_END,
-> + ? ? ? CPU_LED_START,
-> + ? ? ? CPU_LED_STOP,
-> + ? ? ? CPU_LED_HALTED
-> +};
-
-A brief block of comments explaining these events would be
-very helpful for passing correct parameters to ledtrig_cpu()
-
-> +
-> +/* Use this routine to handle LEDs */
-> +extern void ledtrig_cpu(enum cpu_led_event evt);
-> +#else
-> +#define ledtrig_cpu(evt) do {} while (0)
-> +#endif
-> +
-> ?#endif ? ? ? ? /* __LINUX_LEDS_H_INCLUDED */
-> --
-> 1.7.5
->
->
+Yeah, I have the same concern. So probably extending the current simple
+API to allow a more flexible behavior would be better.
