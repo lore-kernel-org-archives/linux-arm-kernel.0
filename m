@@ -1,28 +1,74 @@
-From: wim@iguana.be (Wim Van Sebroeck)
-Date: Wed, 6 Jul 2011 19:28:41 +0200
-Subject: [PATCH V2 3/6] mpcore_wdt: Fix WDIOC_SETOPTIONS handling
-In-Reply-To: <201107061727.08359.arnd@arndb.de>
-References: <1286185540-19569-1-git-send-email-vkuzmichev@mvista.com>
-	<20110706135219.GB8286@n2100.arm.linux.org.uk>
-	<201107061619.27580.arnd@arndb.de>
-	<201107061727.08359.arnd@arndb.de>
-Message-ID: <20110706172841.GM29245@infomag.iguana.be>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 6 Jul 2011 11:30:44 -0600
+Subject: [PATCH 2/2] SPI: SAMSUNG: Bug fix for SPI with different FIFO
+	level
+In-Reply-To: <00cf01cc3bac$b81fd790$285f86b0$%kim@samsung.com>
+References: <BANLkTim40x4X_--K0z7gdodDjor0MUam5Q@mail.gmail.com>
+	<BANLkTinf6ec1yXeaFkZjHMnqZp7yymDq-w@mail.gmail.com>
+	<20110704065501.GP15152@ponder.secretlab.ca>
+	<CACxGe6urrZ9=1OgcaYF6EtvJokAyFTbFCnHPWsCY+sETVze8-w@mail.gmail.com>
+	<005501cc3a30$6c916190$45b424b0$%kim@samsung.com>
+	<005601cc3a32$64bd5fd0$2e381f70$%kim@samsung.com>
+	<20110704150607.GA29977@ponder.secretlab.ca>
+	<00c101cc3ba5$0b573910$2205ab30$%kim@samsung.com>
+	<20110706063027.GK9978@ponder.secretlab.ca>
+	<00cf01cc3bac$b81fd790$285f86b0$%kim@samsung.com>
+Message-ID: <20110706173044.GK5805@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
-
-> No, same thing here:
+On Wed, Jul 06, 2011 at 04:17:05PM +0900, Kukjin Kim wrote:
+> Grant Likely wrote:
+> > 
+> > On Wed, Jul 06, 2011 at 03:22:08PM +0900, Kukjin Kim wrote:
+> > > Kukjin Kim wrote:
+> > > >
+> > > > Grant Likely wrote:
+> > > > >
+> > > > > On Mon, Jul 04, 2011 at 07:08:55PM +0900, Kukjin Kim wrote:
+> > > > > > Kukjin Kim wrote:
+> > > > > > >
+> > > > > > > Thanks Grant, Jassi and all,
+> > > > > > >
+> > > > > > > I will apply these 1 and 2 in my -fix tree for 3.0 with your
+> acks.
+> > > > > > >
+> > > > > > Oops, this needs previous 'cleanup spi platform specific code' so
+> > > can't
+> > > > > > apply -fix tree now.
+> > > > >
+> > > > > There may also be conflicts with the heavy rework in the spi tree.
+> > > > > Kgene, when you pick up this series, can you put it into a separate
+> > > > > topic branch and merge that into your main tree?  That way if there
+> > > > > are difficult conflicts, then I can also merge that same topic
+> branch
+> > > > > into spi/next to resolve them.
+> > > > >
+> > > > Hi Grant,
+> > > >
+> > > > Sure, no problem. I'm waiting for Padmavathi's new patch which is
+> based on
+> > > old
+> > > > code not new SPI code. When I merge topic branch for this into my
+> tree,
+> > > let you
+> > > > know immediately. Then if any problems, let's talk again :)
+> > >
+> > > Hi,
+> > >
+> > > I made topic branch for this based on 3.0-rc6.
+> > > git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> > > #for-spi
+> > 
+> > Okay.  If there are problems, then I'll merge it.  Thanks.
+> > 
 > 
-> On Wednesday 06 July 2011, Mail Delivery System wrote:
-> > This is the mail system at host ylaen.iguana.be.
-> > 
-> > I'm sorry to have to inform you that your message could not
-> > be delivered to one or more recipients. It's attached below.
-> > 
+> Maybe 'If there are not problems'?
 
-Should be fixed now. It was something DNS related on ylaen.iguana.be apparently.
-I hope I didn't miss to much e-mail...
+If there are no problems, then I don't need to merge the topic branch.
+It is only if merge conflicts show up in linux-next that I'll need to
+merge the topic branch.  (regardless, I'm expecting you to merge the
+topic branch into one of your trees to actually get it into mainline
+or linux-next).
 
-Kind regards,
-Wim.
+g.
