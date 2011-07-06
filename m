@@ -1,63 +1,56 @@
-From: bs14@csr.com (Barry Song)
-Date: Wed, 6 Jul 2011 02:47:57 -0700
-Subject: [PATCH 2/3] ARM: CSR: mapping early DEBUG_LL uart
-In-Reply-To: <1309945678-18813-1-git-send-email-bs14@csr.com>
-References: <1309945678-18813-1-git-send-email-bs14@csr.com>
-Message-ID: <1309945678-18813-3-git-send-email-bs14@csr.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 06 Jul 2011 10:53:23 +0100
+Subject: [PATCH v8 00/14] Consolidating GIC per-cpu interrupts
+In-Reply-To: <20110706054615.GC26324@S2100-06.ap.freescale.net>
+References: <1309855755-6261-1-git-send-email-marc.zyngier@arm.com>
+	<20110706054615.GC26324@S2100-06.ap.freescale.net>
+Message-ID: <4E143093.6010706@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Barry Song <bs14@csr.com>
----
- arch/arm/mach-prima2/Makefile |    1 +
- arch/arm/mach-prima2/lluart.c |   25 +++++++++++++++++++++++++
- 2 files changed, 26 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-prima2/lluart.c
+On 06/07/11 06:46, Shawn Guo wrote:
+> On Tue, Jul 05, 2011 at 09:49:01AM +0100, Marc Zyngier wrote:
+>> The current GIC per-cpu interrupts (aka PPIs) suffer from a number of
+>> problems:
+>>
+>> - They use a completely separate scheme to handle the interrupts,
+>>   mostly because the PPI concept doesn't really match the kernel view
+>>   of an interrupt.
+>> - PPIs can only be used by the timer code, unless we add more low-level
+>>   assembly code.
+>> - The local timer code can only be used by devices generating PPIs,
+>>   and not SPIs.
+>> - At least one platform (msm) has started implementing its own
+>>   alternative scheme.
+>> - Some low-level code gets duplicated, as usual...
+>>
+>> The proposed solution is to let the GIC code expose the PPIs as
+>> something that the kernel can manage. Instead of having a single
+>> interrupt number shared on all cores, make the interrupt number be
+>> different on each CPU.
+>>
+>> This enables the use of the normal kernel API (request_irq() and
+>> friends) and the elimination of some low level code. It also serves as
+>> the basis of the GIC device tree support code. On the other side, it
+>> causes quite a bit of churn in the timer code.
+>>
+>> Previous versions of this series have received ACKs from some platform
+>> maintainers, but so far there has been very little comment on the core
+>> code. As I now have quite a large number of patches relying on this
+>> series (local timers as devices, device tree support for GIC and TWD),
+>> I'd be grateful for at least a hint indicating that this is going in
+>> the right direction. Or not.
+>>
+> I'm about to start mainlining Freescale i.MX6 core code.  It will be
+> wonderful if these great consolidation works could hit v3.1 merge
+> window, so that I can base i.MX6 off them in the next cycle.
 
-diff --git a/arch/arm/mach-prima2/Makefile b/arch/arm/mach-prima2/Makefile
-index d44f7ae..f2fba66 100644
---- a/arch/arm/mach-prima2/Makefile
-+++ b/arch/arm/mach-prima2/Makefile
-@@ -3,3 +3,4 @@ obj-y += irq.o
- obj-y += clock.o
- obj-y += rstc.o
- obj-y += prima2.o
-+obj-$(CONFIG_DEBUG_LL) += lluart.o
-diff --git a/arch/arm/mach-prima2/lluart.c b/arch/arm/mach-prima2/lluart.c
-new file mode 100644
-index 0000000..a89f9b3
---- /dev/null
-+++ b/arch/arm/mach-prima2/lluart.c
-@@ -0,0 +1,25 @@
-+/*
-+ * Static memory mapping for DEBUG_LL
-+ *
-+ * Copyright (c) 2011 Cambridge Silicon Radio Limited, a CSR plc group company.
-+ *
-+ * Licensed under GPLv2 or later.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <asm/page.h>
-+#include <asm/mach/map.h>
-+#include <mach/map.h>
-+#include <mach/uart.h>
-+
-+void __init sirfsoc_map_lluart(void)
-+{
-+	struct map_desc sirfsoc_lluart_map = {
-+		.virtual        = SIRFSOC_UART1_VA_BASE,
-+		.pfn            = __phys_to_pfn(SIRFSOC_UART1_PA_BASE),
-+		.length         = SIRFSOC_UART1_SIZE,
-+		.type           = MT_DEVICE,
-+	};
-+
-+	iotable_init(&sirfsoc_lluart_map, 1);
-+}
+I'd love to see this being merged, but so far there has been no comment
+from Russell about this, and there is no way this is going move forward
+without his approval.
+
+Cheers,
+
+	M.
 -- 
-1.7.1
-
-
-
-Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
-More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
+Jazz is not dead. It just smells funny...
