@@ -1,63 +1,55 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 05 Jul 2011 23:30:01 -0400
-Subject: [PATCH 17/37] ARM: mach-nomadik: remove mach/memory.h
+Date: Tue, 05 Jul 2011 23:30:17 -0400
+Subject: [PATCH 33/37] ARM: mach-shark: remove mach/memory.h
 In-Reply-To: <1309923021-23487-1-git-send-email-nicolas.pitre@linaro.org>
 References: <1309923021-23487-1-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <1309923021-23487-17-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <1309923021-23487-33-git-send-email-nicolas.pitre@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 ---
- arch/arm/Kconfig                            |    1 +
- arch/arm/mach-nomadik/include/mach/memory.h |   28 ---------------------------
- 2 files changed, 1 insertions(+), 28 deletions(-)
- delete mode 100644 arch/arm/mach-nomadik/include/mach/memory.h
+ arch/arm/Kconfig                          |    1 +
+ arch/arm/mach-shark/include/mach/memory.h |   20 --------------------
+ 2 files changed, 1 insertions(+), 20 deletions(-)
+ delete mode 100644 arch/arm/mach-shark/include/mach/memory.h
 
 diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 8a23334..eef880d 100644
+index d6b8c92..8e0763b 100644
 --- a/arch/arm/Kconfig
 +++ b/arch/arm/Kconfig
-@@ -857,6 +857,7 @@ config ARCH_NOMADIK
- 	select CLKDEV_LOOKUP
- 	select GENERIC_CLOCKEVENTS
- 	select ARCH_REQUIRE_GPIOLIB
+@@ -820,6 +820,7 @@ config ARCH_SHARK
+ 	select ZONE_DMA
+ 	select PCI
+ 	select ARCH_USES_GETTIMEOFFSET
 +	select NO_MACH_MEMORY_H
  	help
- 	  Support for the Nomadik platform by ST-Ericsson
- 
-diff --git a/arch/arm/mach-nomadik/include/mach/memory.h b/arch/arm/mach-nomadik/include/mach/memory.h
+ 	  Support for the StrongARM based Digital DNARD machine, also known
+ 	  as "Shark" (<http://www.shark-linux.de/shark.html>).
+diff --git a/arch/arm/mach-shark/include/mach/memory.h b/arch/arm/mach-shark/include/mach/memory.h
 deleted file mode 100644
-index d332521..0000000
---- a/arch/arm/mach-nomadik/include/mach/memory.h
+index e19df6f..0000000
+--- a/arch/arm/mach-shark/include/mach/memory.h
 +++ /dev/null
-@@ -1,28 +0,0 @@
+@@ -1,20 +0,0 @@
 -/*
-- *  mach-nomadik/include/mach/memory.h
+- * arch/arm/mach-shark/include/mach/memory.h
 - *
-- *  Copyright (C) 1999 ARM Limited
+- * by Alexander Schulz
 - *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+- * derived from:
+- * arch/arm/mach-ebsa110/include/mach/memory.h
+- * Copyright (c) 1996-1999 Russell King.
 - */
 -#ifndef __ASM_ARCH_MEMORY_H
 -#define __ASM_ARCH_MEMORY_H
 -
+-#include <asm/sizes.h>
+-
 -/*
 - * Physical DRAM offset.
 - */
--#define PLAT_PHYS_OFFSET	UL(0x00000000)
+-#define PLAT_PHYS_OFFSET     UL(0x08000000)
 -
 -#endif
 -- 
