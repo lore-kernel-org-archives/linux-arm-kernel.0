@@ -1,30 +1,27 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 7 Jul 2011 16:36:50 -0600 (MDT)
-Subject: [PATCH v4 3/7] OMAP2+: PM: Initialise sleep_switch to a non-valid
-	value
-In-Reply-To: <1309555626-22608-4-git-send-email-b-cousson@ti.com>
+Date: Thu, 7 Jul 2011 16:37:26 -0600 (MDT)
+Subject: [PATCH v4 4/7] OMAP2+: PM: idle clkdms only if already in idle
+In-Reply-To: <1309555626-22608-5-git-send-email-b-cousson@ti.com>
 References: <1309555626-22608-1-git-send-email-b-cousson@ti.com>
-	<1309555626-22608-4-git-send-email-b-cousson@ti.com>
-Message-ID: <alpine.DEB.2.00.1107071635230.2647@utopia.booyaka.com>
+	<1309555626-22608-5-git-send-email-b-cousson@ti.com>
+Message-ID: <alpine.DEB.2.00.1107071636540.2647@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-cc'ing Kevin, since this touches mach-omap2/pm.c - an ack would be great 
+cc'ing Kevin, since this touches mach-omap2/pm.c - an ack would be great  
 if you have the chance
 
 On Fri, 1 Jul 2011, Benoit Cousson wrote:
 
 > From: Rajendra Nayak <rnayak@ti.com>
 > 
-> sleep_switch which is initialised to 0 in omap_set_pwrdm_state
-> happens to be a valid sleep_switch type (FORCEWAKEUP_SWITCH)
-> which are defined as:
-> 
->  #define FORCEWAKEUP_SWITCH      0
->  #define LOWPOWERSTATE_SWITCH    1
-> 
-> This causes the function to wrongly program some clock domains
-> even when the Powerdomain is in ON state.
+> The omap_set_pwrdm_state function forces clockdomains
+> to idle, without checking the existing idle state
+> programmed, instead based solely on the HW capability
+> of the clockdomain to support idle.
+> This is wrong and the clockdomains should be idled
+> post a state_switch *only* if idle transitions on the
+> clockdomain were already enabled.
 > 
 > Signed-off-by: Rajendra Nayak <rnayak@ti.com>
 > Cc: Paul Walmsley <paul@pwsan.com>
