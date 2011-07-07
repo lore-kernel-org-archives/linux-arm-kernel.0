@@ -1,72 +1,53 @@
-From: vkuzmichev@mvista.com (Vitaly Kuzmichev)
-Date: Thu,  7 Jul 2011 16:23:16 +0400
-Subject: [PATCH V3 4/4] ARM: mpcore_wdt: Fix timer mode setup
-In-Reply-To: <1310041339-2348-1-git-send-email-vkuzmichev@mvista.com>
-References: <1310041339-2348-1-git-send-email-vkuzmichev@mvista.com>
-Message-ID: <1310041396-2461-4-git-send-email-vkuzmichev@mvista.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 7 Jul 2011 15:10:42 +0300
+Subject: [PATCH v2 00/18] OMAP4: PM data big spring cleanup and fixes
+In-Reply-To: <E9AF1FACCF71F448B55E58D9AED1B0F40E626BEE32@staex7mb2.telecom.sna.samsung.com>
+References: <1309552901-8944-1-git-send-email-b-cousson@ti.com>
+	<alpine.DEB.2.00.1107060017480.4217@utopia.booyaka.com>
+	<4E14B820.6070202@ti.com> <20110707055549.GC15815@atomide.com>
+	<E9AF1FACCF71F448B55E58D9AED1B0F40E626BEE32@staex7mb2.telecom.sna.samsung.com>
+Message-ID: <20110707121040.GF15815@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow watchdog to set its iterrupt as pending when it is configured
-for timer mode (in other words, allow emitting interrupt).
-Also add macros for all Watchdog Control Register flags.
+* Martin Fouts <mfouts@sta.samsung.com> [110707 10:20]:
+> > Do we really need to do that patching right now to add base 4460 support?
+> 
+> It should be done sometime, but I see no need for it to be right now.
+> 
+> > If we're just doing a bunch of renames all over the place to add support
+> > for a new processor variant, something is wrong. This is exactly the kind
+> > of "crazy churn" Linus was complaining about. In this case the crazy churn
+> > is "let's rename 4430 to 44XX all over the place".
+> 
+> To me, this is not 'crazy churn', but rather, correcting an earlier oversight. I did not understand Linus to say "never fix a naming oversight", but "don't change names without a good reason."
 
-Signed-off-by: Vitaly Kuzmichev <vkuzmichev@mvista.com>
----
- arch/arm/include/asm/smp_twd.h |    6 ++++++
- drivers/watchdog/mpcore_wdt.c  |   15 +++++++++++----
- 2 files changed, 17 insertions(+), 4 deletions(-)
+I think this is crazy churn. It does not fix the problem we have, which
+is "how can we support lots of SoCs in a sane way". It just postpones
+fixing the problem until the next SoC variant comes around. And now
+we already have the exact same problem with both the am3505 support
+and 4460 support.
 
-diff --git a/arch/arm/include/asm/smp_twd.h b/arch/arm/include/asm/smp_twd.h
-index 38130b1..42d4557 100644
---- a/arch/arm/include/asm/smp_twd.h
-+++ b/arch/arm/include/asm/smp_twd.h
-@@ -18,6 +18,12 @@
- #define TWD_TIMER_CONTROL_PERIODIC	(1 << 1)
- #define TWD_TIMER_CONTROL_IT_ENABLE	(1 << 2)
+The second problem we have here is "why does adding 4460 support depend
+on a cosmetic clean-up patch". That dependency should not exist at all
+as it seems the 4460 patches should work even without this patch.
  
-+#define TWD_WDOG_CONTROL_ENABLE		(1 << 0)
-+#define TWD_WDOG_CONTROL_PERIODIC	(1 << 1)
-+#define TWD_WDOG_CONTROL_IT_ENABLE	(1 << 2)
-+#define TWD_WDOG_CONTROL_TIMER_MODE	(0 << 3)
-+#define TWD_WDOG_CONTROL_WATCHDOG_MODE	(1 << 3)
-+
- struct clock_event_device;
- 
- extern void __iomem *twd_base;
-diff --git a/drivers/watchdog/mpcore_wdt.c b/drivers/watchdog/mpcore_wdt.c
-index f99e49e..23bafb1 100644
---- a/drivers/watchdog/mpcore_wdt.c
-+++ b/drivers/watchdog/mpcore_wdt.c
-@@ -118,18 +118,25 @@ static void mpcore_wdt_stop(struct mpcore_wdt *wdt)
- 
- static void mpcore_wdt_start(struct mpcore_wdt *wdt)
- {
-+	u32 mode;
-+
- 	dev_printk(KERN_INFO, wdt->dev, "enabling watchdog.\n");
- 
- 	/* This loads the count register but does NOT start the count yet */
- 	mpcore_wdt_keepalive(wdt);
- 
-+	/* Setup watchdog - prescale=256, enable=1 */
-+	mode = (255 << 8) | TWD_WDOG_CONTROL_ENABLE;
-+
- 	if (mpcore_noboot) {
--		/* Enable watchdog - prescale=256, watchdog mode=0, enable=1 */
--		writel(0x0000FF01, wdt->base + TWD_WDOG_CONTROL);
-+		/* timer mode, send interrupt */
-+		mode |=	TWD_WDOG_CONTROL_TIMER_MODE |
-+				TWD_WDOG_CONTROL_IT_ENABLE;
- 	} else {
--		/* Enable watchdog - prescale=256, watchdog mode=1, enable=1 */
--		writel(0x0000FF09, wdt->base + TWD_WDOG_CONTROL);
-+		/* watchdog mode */
-+		mode |=	TWD_WDOG_CONTROL_WATCHDOG_MODE;
- 	}
-+	writel(mode, wdt->base + TWD_WDOG_CONTROL);
- }
- 
- static int mpcore_wdt_set_heartbeat(int t)
--- 
-1.7.3.4
+> > To me it's sane to assume that we can have most of 4430 features on 4460
+> > and don't need to rename 4430 to 44XX for that. Adding 4460 should be
+> > just add few new 4460 defines, then do an arch_initcall to fixup things
+> > between 4430 and 4460.
+> 
+> This is a topic upon which mileage varies.  My experience has made we wary of making such assumptions, because too often they have turned out to be wrong.  It is much better to make it clear that the same code supports both than to leave people guessing.  Saying so in the filename is useful. It is also consistent with the naming scheme used in much of the kernel.
+> 
+> I don't feel a sense of urgency to correct this, nor a need to hit a merge window, but from my mileage, I would prefer that it be corrected within a reasonable time frame.
+> 
+> It seems to me that there is also a bullet to bite here. To achieve the sort of rationalization across the arm architecture that is envisioned, inconsistencies in naming styles between platforms will have to be reconciled and resolved, lest the habit continue.
+
+Sure things should be fixed, but things should be fixed properly. Here
+we are repeating the CHIP_IS flag in hundreds of places where it really
+should be only checked once after SoC is detected. And then based on
+that a SoC specifc list of devices can then be initialized.
+
+Regards,
+
+Tony
