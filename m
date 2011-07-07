@@ -1,56 +1,71 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 7 Jul 2011 11:25:50 -0400 (EDT)
-Subject: [PATCH 08/37] ARM: mach-omap2: remove mach/memory.h
-In-Reply-To: <201107071708.36668.arnd@arndb.de>
-References: <1309923021-23487-1-git-send-email-nicolas.pitre@linaro.org>
-	<1309923021-23487-8-git-send-email-nicolas.pitre@linaro.org>
-	<201107071708.36668.arnd@arndb.de>
-Message-ID: <alpine.LFD.2.00.1107071113410.14596@xanadu.home>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Thu, 7 Jul 2011 16:27:40 +0100
+Subject: ARM cortex A9 performance issue
+In-Reply-To: <CAE_nTV4VgcNB0gc64zEPEfHp-hnDBsw6QsM=GqEObXAwzMTzTA@mail.gmail.com>
+References: <CAE_nTV4VgcNB0gc64zEPEfHp-hnDBsw6QsM=GqEObXAwzMTzTA@mail.gmail.com>
+Message-ID: <20110707152740.GG2486@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 7 Jul 2011, Arnd Bergmann wrote:
-
-> On Wednesday 06 July 2011, Nicolas Pitre wrote:
-> > -/*
-> > - * Physical DRAM offset.
-> > - */
-> > -#if defined(CONFIG_ARCH_OMAP1)
-> > -#error "OMAP1 should not be including this"
-> > -#else
-> > -#define PLAT_PHYS_OFFSET               UL(0x80000000)
-> > -#endif
-> > -
-> > -#endif
+On Thu, Jul 07, 2011 at 02:48:05PM +0530, rd bairva wrote:
+> Hi,
 > 
-> This breaks if you disable ARM_PATCH_PHYS_VIRT and don't know
-> enter the correct PHYS_OFFSET in Kconfig, right?
-
-Right.  However the plan is to make ARM_PATCH_PHYS_VIRT the default and 
-you should really have a good reason to disable it (i.e. you must know 
-what you're doing).
-
-> I wonder if it's worth adding defaults for CONFIG_PHYS_OFFSET
-> based on the platform, like
+> We are trying to benchmark ARM cortex A9 dual core behavior with
+> respect to single core
+> performance and also measuring it with respect to x86 dual core/single core.
+> Please find attached with the mail is c app which we are using for benchmarking.
 > 
-> config PHYS_OFFSET
-> 	depends on !ARM_PATCH_PHYS_VIRT && NO_MACH_MEMORY_H
-> 	default 0x80000000 if ARCH_OMAP2 || ARCH_PNX4008 || ARCH_NETX || ARCH_LPC32XX
-> 	default 0xa0000000 if ARCH_IOP32X
-> 	default 0x10000000 if ARCH_GEMINI && !GEMINI_MEM_SWAP
-> 	default 0x00000000
+> Simple overview of C application:
+> - It creates a shared memory area using shm_open().
+>   in this shm area, it declares 2 Process shared pthread mutex, lets say L1, L2.
+> - then it forks to create a server_task and client task.
+> - server_task takes L1 lock, touches a shm area, unlock L2, in a loop.
+> - client_task takes L2 lock, touches a shm area, unlock L1, in a loop.
+> - This loop runs for N number of times that we measure.
 
-Maybe, however this is part of the board specific info we wish to move 
-out of the tree.  Gathering that info for different boards close 
-together is also a potential merge conflict spot.
+The behaviour of pthread_mutex_unlock is unspecified if an attempt is made
+to ulock a mutex from a thread which doesn't currently own that mutex.
+You probably need to re-code your test to avoid this incorrect use of
+the ABI before an interpretation can be placed on the results.
 
-The only reason why you might want to use a build time PHYS_OFFSET at 
-that point is for running the kernel XIP in ROM, or if you have very 
-special requirements.  And for that you really must know what you're 
-doing.  Some people have indicated that CONFIG_XIP_KERNEL is still 
-useful for them.  So I left the ability there to preserve some 
-flexibility, otherwise I probably would have made ARM_PATCH_PHYS_VIRT 
-unconditional in that case.
+See pthread_mutexattr_init(3) for details.
 
 
-Nicolas
+
+Some people have been reported issues related to  process shared mutexes
+on ARM recently:
+
+https://bugs.launchpad.net/ubuntu/+source/apr/+bug/604753
+
+I'm not sure of the current status of that though, and I don't know
+whether it would affect your test or not.
+
+Cheers
+---Dave
+
+> 
+> Here are the results for N/sec for different CPUs.
+> 
+> Platform              Up cores              req/sec                cpuload
+> Cortexa9                    2                              ~44000
+>             100%
+> Cortexa9                    1                              ~18000
+>             100%
+> X86                            2                              ~64000
+>                35%
+> X86                            1                              ~458886
+>              100%     (1 cpu down by sysfs)
+> 
+> we are not able to understand the results.
+> - why for coretx A9 both dual/single core we are getting 100% cpu usage.
+> - why in case of x86, N/sec is very high for single core than dual core.
+> - why single core N/s is 1/3 in case of CortexA9.
+> 
+> Thanks,
+> Ramdayal
+
+
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
