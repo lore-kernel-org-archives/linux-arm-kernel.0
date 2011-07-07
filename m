@@ -1,46 +1,53 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Thu, 7 Jul 2011 11:23:28 +0800
-Subject: [PATCH] dmaengine: mxs-dma: skip request_irq for NO_IRQ
-In-Reply-To: <20110707032441.GF4034@S2100-06.ap.freescale.net>
-References: <20110630052855.GE25931@S2100-06.ap.freescale.net>
-	<1309421193-7785-1-git-send-email-shawn.guo@linaro.org>
-	<20110707001530.GE4034@S2100-06.ap.freescale.net>
-	<1310004360.20150.16.camel@psiaudioba-mobl1>
-	<20110707032441.GF4034@S2100-06.ap.freescale.net>
-Message-ID: <4E1526B0.5060308@freescale.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 6 Jul 2011 23:31:25 -0400 (EDT)
+Subject: [PATCH 05/10] ARM: mach-ixp4xx: move from ARM_DMA_ZONE_SIZE to
+	mdesc->dma_zone_size
+In-Reply-To: <20110706231259.GC8286@n2100.arm.linux.org.uk>
+References: <1309919442-20451-1-git-send-email-nicolas.pitre@linaro.org>
+	<1309919442-20451-5-git-send-email-nicolas.pitre@linaro.org>
+	<20110706231259.GC8286@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1107062300080.14596@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2011?07?07? 11:24, Shawn Guo ??:
-> On Thu, Jul 07, 2011 at 07:36:00AM +0530, Vinod Koul wrote:
->> On Thu, 2011-07-07 at 08:15 +0800, Shawn Guo wrote:
->>> On Thu, Jun 30, 2011 at 04:06:33PM +0800, Shawn Guo wrote:
->>>> In general, the mxs-dma users get separate irq for each channel,
->>>> but gpmi is special one which has only one irq shared by all gpmi
->>>> channels.  It causes mxs_dma channel allocation function fail for
->>>> all other gpmi channels except the first one calling into the
->>>> function.
->>>>
->>>> The patch gets request_irq call skipped for NO_IRQ case, and leaves
->>>> this gpmi specific quirk to gpmi driver to sort out.  It will fix
->>>> above problem if gpmi driver sets chan_irq as gpmi irq for only one
->>>> channel and NO_IRQ for all the rest channels.
->>>>
->>>> Signed-off-by: Shawn Guo<shawn.guo@linaro.org>
->>>> Cc: Vinod Koul<vinod.koul@intel.com>
->>>> ---
->>> Hi Vinod,
->>>
->>> Can you please take this patch?
->>>
->>> Regards,
->>> Shawn
->> Looks okay to me. Have queued it up and should show up in my tree latest by early next week.
->> I am on road, hence the delay...
->>
-> No problem.  Thanks, Vinod.
->
-thanks. I will submit the next GPMI version which will based this patch.
+On Thu, 7 Jul 2011, Russell King - ARM Linux wrote:
 
-Best Regards
-Huang Shijie
+> On Tue, Jul 05, 2011 at 10:30:37PM -0400, Nicolas Pitre wrote:
+> > +#if defined(config_PCI) && !defined(CONFIG_IXP4XX_INDIRECT_PCI)
+> 
+> This won't fly.  CONFIG has to be upper case.  Multiple instances of
+> that in this patch.
+
+Okay... Obviously the fact that one's unidimensional 40x1 display made 
+of mechanically raised pixels might have some of those pixels stuck in 
+their set position is enough to confuse lower and upper case braille 
+characters (yes I should have it fixed).
+
+Fixed the code in the mean time, and compile tested it.  turns out that 
+an unrelated file doesn't compile:
+
+arch/arm/mach-ixp4xx/common.c: In function 'ixp4xx_clocksource_init':
+arch/arm/mach-ixp4xx/common.c:428:2: error: lvalue required as unary '&' operand
+
+> > diff --git a/arch/arm/mach-ixp4xx/include/mach/memory.h b/arch/arm/mach-ixp4xx/include/mach/memory.h
+> > index 34e7940..4caf176 100644
+> > --- a/arch/arm/mach-ixp4xx/include/mach/memory.h
+> > +++ b/arch/arm/mach-ixp4xx/include/mach/memory.h
+> > @@ -14,8 +14,4 @@
+> >   */
+> >  #define PLAT_PHYS_OFFSET	UL(0x00000000)
+> >  
+> > -#ifdef CONFIG_PCI
+> > -#define ARM_DMA_ZONE_SIZE	SZ_64M
+> > -#endif
+> 
+> And the addition of dependence on CONFIG_IXP4XX_INDIRECT_PCI needs someone
+> from the IXP4xx folk to ACK as that's a functional change.
+
+The motivation for this change can be found in the Kconfig help text for 
+IXP4XX_INDIRECT_PCI which looked pretty clear.  But this would be best 
+if done in a separate patch so I've reverted this patch to the single 
+CONFIG_PCI dependency.
+
+
+Nicolas
