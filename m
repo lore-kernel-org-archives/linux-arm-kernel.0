@@ -1,39 +1,50 @@
 From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Thu,  7 Jul 2011 12:18:38 +0200
-Subject: [PATCH 3/4] arm: mach-s3c2440: dma: fix section mismatch
+Date: Thu,  7 Jul 2011 12:18:36 +0200
+Subject: [PATCH 1/4] arm: plat-s3c24xx: dma: don't use uninitialized variable
 In-Reply-To: <1310033919-4245-1-git-send-email-w.sang@pengutronix.de>
 References: <1310033919-4245-1-git-send-email-w.sang@pengutronix.de>
-Message-ID: <1310033919-4245-4-git-send-email-w.sang@pengutronix.de>
+Message-ID: <1310033919-4245-2-git-send-email-w.sang@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If s3c2440_dma_add() and s3c2440_dma_init() are in __init, then the
-struct s3c2440_dma_driver they are using should be __initdata, too.
-
+Commit 8970ef47 (S3C24XX: Remove hardware specific registers from DMA
+calls) removed the parameter dcon in s3c2410_dma_config() and calculates
+it on its own. So the debug-output for the old parameter can go, too.
 Fixes:
 
-WARNING: vmlinux.o(.data+0x14ac): Section mismatch in reference from the variable s3c2440_dma_driver to the function .init.text:s3c2440_dma_add()
-The variable s3c2440_dma_driver references the function __init s3c2440_dma_add()
+arch/arm/plat-s3c24xx/dma.c: In function 's3c2410_dma_config':
+arch/arm/plat-s3c24xx/dma.c:1030:2: warning: 'dcon' is used uninitialized in this function
 
 Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
 Cc: Ben Dooks <ben-linux@fluff.org>
 Cc: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/mach-s3c2440/dma.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/plat-s3c24xx/dma.c |    8 ++------
+ 1 files changed, 2 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-s3c2440/dma.c b/arch/arm/mach-s3c2440/dma.c
-index 3b0529f..f417959 100644
---- a/arch/arm/mach-s3c2440/dma.c
-+++ b/arch/arm/mach-s3c2440/dma.c
-@@ -198,7 +198,7 @@ static int __init s3c2440_dma_add(struct sys_device *sysdev)
- 	return s3c24xx_dma_init_map(&s3c2440_dma_sel);
- }
+diff --git a/arch/arm/plat-s3c24xx/dma.c b/arch/arm/plat-s3c24xx/dma.c
+index 2abf966..a5b3684 100644
+--- a/arch/arm/plat-s3c24xx/dma.c
++++ b/arch/arm/plat-s3c24xx/dma.c
+@@ -1027,17 +1027,13 @@ int s3c2410_dma_config(unsigned int channel,
+ 	struct s3c2410_dma_chan *chan = s3c_dma_lookup_channel(channel);
+ 	unsigned int dcon;
  
--static struct sysdev_driver s3c2440_dma_driver = {
-+static struct sysdev_driver __initdata s3c2440_dma_driver = {
- 	.add	= s3c2440_dma_add,
- };
+-	pr_debug("%s: chan=%d, xfer_unit=%d, dcon=%08x\n",
+-		 __func__, channel, xferunit, dcon);
++	pr_debug("%s: chan=%d, xfer_unit=%d\n", __func__, channel, xferunit);
  
+ 	if (chan == NULL)
+ 		return -EINVAL;
+ 
+-	pr_debug("%s: Initial dcon is %08x\n", __func__, dcon);
+-
+ 	dcon = chan->dcon & dma_sel.dcon_mask;
+-
+-	pr_debug("%s: New dcon is %08x\n", __func__, dcon);
++	pr_debug("%s: dcon is %08x\n", __func__, dcon);
+ 
+ 	switch (chan->req_ch) {
+ 	case DMACH_I2S_IN:
 -- 
 1.7.5.4
