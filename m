@@ -1,40 +1,40 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Thu,  7 Jul 2011 15:27:12 +0100
-Subject: [PATCH v4 05/40] ARM: mm: cache-v4: Use the new processor struct
-	macros
-In-Reply-To: <1310048867-14172-1-git-send-email-dave.martin@linaro.org>
-References: <1310048867-14172-1-git-send-email-dave.martin@linaro.org>
-Message-ID: <1310048867-14172-6-git-send-email-dave.martin@linaro.org>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 7 Jul 2011 23:13:32 +0800
+Subject: [PATCH v3 2/3] ARM: mxc: use ARCH_NR_GPIOS to define gpio number
+In-Reply-To: <20110707074755.GX6069@pengutronix.de>
+References: <1309970263-13239-1-git-send-email-shawn.guo@linaro.org>
+	<1309970263-13239-3-git-send-email-shawn.guo@linaro.org>
+	<20110707074755.GX6069@pengutronix.de>
+Message-ID: <20110707151331.GB12722@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Dave Martin <dave.martin@linaro.org>
----
- arch/arm/mm/cache-v4.S |   15 ++-------------
- 1 files changed, 2 insertions(+), 13 deletions(-)
+On Thu, Jul 07, 2011 at 09:47:55AM +0200, Sascha Hauer wrote:
+> On Thu, Jul 07, 2011 at 12:37:42AM +0800, Shawn Guo wrote:
+> > The patch removes MXC_GPIO_IRQS and instead uses ARCH_NR_GPIOS to
+> > define gpio number.  This change is need when we change mxc gpio
+> > driver to be device tree aware.  When migrating the driver to device
+> > tree, pdev->id becomes unusable.  It requires driver get gpio range
+> > from gpio core, which will dynamically allocates number from
+> > ARCH_NR_GPIOS to 0.
+> > 
+> > As a bonus point, it removes lines of '#if' and make the code a
+> > little bit cleaner.  The side effect is the waste of number.  But
+> > this is not a point when we go single image.
+> 
+> I'm not sure whether we really should depend on an externally defined
+> ARCH_NR_GPIOS. Someone might get the idea to change this to a lower
+> value. Maybe we should define this ourselves instead.
+> 
+Good point.  We should not depend on the externally defined one.  But
+the reason in my mind is different from yours.  Right now, i.mx50 gets
+192 and i.mx6 gets 224 gpios.  I do not see the point to lower the
+value (no lower than 224), since we will go single image soon.  The
+thing concerning me is that someday we may have a soc coming out with
+more than 256 gpios.  Then we have to override ARCH_NR_GPIOS with our
+own definition.
 
-diff --git a/arch/arm/mm/cache-v4.S b/arch/arm/mm/cache-v4.S
-index a8fefb5..fd9bb7a 100644
---- a/arch/arm/mm/cache-v4.S
-+++ b/arch/arm/mm/cache-v4.S
-@@ -141,16 +141,5 @@ ENDPROC(v4_dma_map_area)
- 
- 	__INITDATA
- 
--	.type	v4_cache_fns, #object
--ENTRY(v4_cache_fns)
--	.long	v4_flush_icache_all
--	.long	v4_flush_kern_cache_all
--	.long	v4_flush_user_cache_all
--	.long	v4_flush_user_cache_range
--	.long	v4_coherent_kern_range
--	.long	v4_coherent_user_range
--	.long	v4_flush_kern_dcache_area
--	.long	v4_dma_map_area
--	.long	v4_dma_unmap_area
--	.long	v4_dma_flush_range
--	.size	v4_cache_fns, . - v4_cache_fns
-+	@ define struct cpu_cache_fns (see <asm/cacheflush.h> and proc-macros.S)
-+	define_cache_functions v4
--- 
-1.7.4.1
+Please take a look at the updated patch below.  If it looks fine to
+you, I will resend the patch.
+
+8<----
