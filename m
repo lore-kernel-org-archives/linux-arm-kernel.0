@@ -1,35 +1,57 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Fri,  8 Jul 2011 01:10:11 +0300
-Subject: [PATCH] ARM: omap2: cm-t3730: convert boot_params to atag_offset
-In-Reply-To: <201107072240.58987.arnd@arndb.de>
-References: <201107072240.58987.arnd@arndb.de>
-Message-ID: <1310076611-10135-1-git-send-email-grinberg@compulab.co.il>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 07 Jul 2011 15:34:38 -0700
+Subject: [PATCH 0/3] Add generic idle notifiers
+In-Reply-To: <20110707201748.GB32199@google.com> (Todd Poynor's message of
+	"Thu, 7 Jul 2011 13:17:48 -0700")
+References: <1309229190-25006-1-git-send-email-toddpoynor@google.com>
+	<87ei22dnsp.fsf@ti.com> <20110707201748.GB32199@google.com>
+Message-ID: <87tyaxd8jl.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Todd Poynor <toddpoynor@google.com> writes:
 
-Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
----
-Hi Arnd,
-This one should apply cleanly on top of Nicolas' series
-and does the missing change for cm-t3730.
-If it somehow helps/saves you an effort, here it is.
+> On Thu, Jul 07, 2011 at 10:05:10AM -0700, Kevin Hilman wrote:
+>> Todd Poynor <toddpoynor@google.com> writes:
+>> 
+>> > Add notifiers for idle entry and exit, called with IDLE_START when a
+>> > CPU goes idle and IDLE_END when it goes out of idle, based on the
+>> > existing idle notifiers for the x86_64 arch.
+>> >
+>> > Convert x86_64 to use these notifiers, and call the notifiers on ARM.
+>> >
+>> > Convert the ARM LEDs events for idle start/end to these notifiers.
+>> 
+>> Is this intended to replace the more general CPU PM notifiers proposed
+>> by Colin:
+>> 
+>> http://lists.infradead.org/pipermail/linux-arm-kernel/2011-June/052827.html
+>
+> This is intended to coexist with the CPU PM notifiers.  The idle
+> notifiers proposed here are notifying of a change in kernel scheduler
+> state: the scheduler has no task to run and is entering its "idle
+> loop", or now has something to run and is exiting idle state.
+> Things that can use this include power management hints such as the
+> existing drivers/idle/i7300_idle.c usage, the ARM LEDs idle triggers,
+> and there's probably other existing potential uses in other arch'es that
+> I should go track down.
+>
+> The CPU PM notifiers notify of changes in hardware power state that
+> affect the CPU and closely associated IP blocks (such as an OMAP
+> power state transition that causes one or more CPU power domains to
+> hit OFF).  These changes may be due to cpuidle power state management
+> when the system is idle, or may be due to suspending or resuming the
+> system (such as a suspend-to-RAM), or may be due to a CPU hotplug event.
+> In the case of an idle loop entry, if cpuidle decides it is not
+> appropriate to change CPU power state (as when insufficient time
+> remains until next timer expiry to enter such a power state due to
+> entry and exit latency), there may be no CPU PM notification
+> generated.  The callbacks for CPU PM notifiers on ARM do things such
+> as save/restore GIC interrupt controller state and VFP floating-point
+> coprocessor state.
+>
+> That's the intent, anyhow, but ideas are welcome, thanks,
 
- arch/arm/mach-omap2/board-cm-t35.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+OK, thanks for the clarification.
 
-diff --git a/arch/arm/mach-omap2/board-cm-t35.c b/arch/arm/mach-omap2/board-cm-t35.c
-index fcd4032..e7d48e8 100644
---- a/arch/arm/mach-omap2/board-cm-t35.c
-+++ b/arch/arm/mach-omap2/board-cm-t35.c
-@@ -679,7 +679,7 @@ MACHINE_START(CM_T35, "Compulab CM-T35")
- MACHINE_END
- 
- MACHINE_START(CM_T3730, "Compulab CM-T3730")
--	.boot_params    = 0x80000100,
-+	.atag_offset	= 0x100,
- 	.reserve        = omap_reserve,
- 	.map_io         = omap3_map_io,
- 	.init_early     = cm_t35_init_early,
--- 
-1.7.3.4
+Kevin
