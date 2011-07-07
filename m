@@ -1,43 +1,55 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Thu,  7 Jul 2011 14:44:05 +0100
-Subject: [PATCH] ARM: xscale: Always build the kernel in multi cache model mode
-Message-ID: <1310046245-10518-1-git-send-email-dave.martin@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 7 Jul 2011 15:12:54 +0100
+Subject: [PATCH 1/3] ARM: CSR: Adding CSR SiRFprimaII board support
+In-Reply-To: <201107071521.07070.arnd@arndb.de>
+References: <1309945678-18813-1-git-send-email-bs14@csr.com>
+	<201107071343.03591.arnd@arndb.de>
+	<20110707123707.GN8286@n2100.arm.linux.org.uk>
+	<201107071521.07070.arnd@arndb.de>
+Message-ID: <20110707141254.GR8286@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-xscale defines an alternate set of cache functions including a
-workaround which is required for certain processor revisions.
+On Thu, Jul 07, 2011 at 03:21:06PM +0200, Arnd Bergmann wrote:
+> What's left then are basically the headers. There is significant
+> room for consolidation there, and I think most of them have been
+> looked at by people before or are currently being worked on.
+> Below is the complete diff between the headers of the two platforms
+> as they are being proposed now.
 
-If a single cache model kernel is built, cache maintenance
-operations may be statically resolved to the wrong functions,
-resulting in incorrect cache maintenance for those processor
-revisions which require the workaround.
+Thanks for that.  diff -w might be a good idea on these to eliminate
+changes due to whitespace differences.  It has found one thing which
+should be fixed...
 
-This patch unconditionally defines MULTI_CACHE for xscale, so that
-the correct cache functions will get called at runtime (as already
-done for feroceon).
+> diff -urN arch/arm/mach-prima2/include/mach/vmalloc.h arch/arm/mach-zynq/include/mach/vmalloc.h
+> --- arch/arm/mach-prima2/include/mach/vmalloc.h	2011-07-07 13:21:41.000000000 +0000
+> +++ arch/arm/mach-zynq/include/mach/vmalloc.h	2011-07-07 13:22:07.000000000 +0000
+> @@ -1,14 +1,20 @@
+> -/*
+> - * arch/arm/ach-prima2/include/mach/vmalloc.h
+> +/* arch/arm/mach-zynq/include/mach/vmalloc.h
+>   *
+> - * Copyright (c) 2010 ??? 2011 Cambridge Silicon Radio Limited, a CSR plc group company.
+> + *  Copyright (C) 2011 Xilinx
+>   *
+> - * Licensed under GPLv2 or later.
+> + * This software is licensed under the terms of the GNU General Public
+> + * License version 2, as published by the Free Software Foundation, and
+> + * may be copied, distributed, and modified under those terms.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+>   */
+>  
+> -#ifndef __MACH_VMALLOC_H
+> -#define __MACH_VMALLOC_H
+> +#ifndef __MACH_VMALLOC_H__
+> +#define __MACH_VMALLOC_H__
+>  
+> -#define VMALLOC_END	0xFEC00000
+> +#define VMALLOC_END       0xE0000000UL
 
-Signed-off-by: Dave Martin <dave.martin@linaro.org>
----
- arch/arm/include/asm/glue-cache.h |    6 +-----
- 1 files changed, 1 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm/include/asm/glue-cache.h b/arch/arm/include/asm/glue-cache.h
-index 7e30874..51bb184 100644
---- a/arch/arm/include/asm/glue-cache.h
-+++ b/arch/arm/include/asm/glue-cache.h
-@@ -82,11 +82,7 @@
- #endif
- 
- #if defined(CONFIG_CPU_XSCALE)
--# ifdef _CACHE
--#  define MULTI_CACHE 1
--# else
--#  define _CACHE xscale
--# endif
-+# define MULTI_CACHE 1
- #endif
- 
- #if defined(CONFIG_CPU_XSC3)
--- 
-1.7.4.1
+Prima2 should add a UL suffix to VMALLOC_END to ensure that it is
+properly typed.
