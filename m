@@ -1,31 +1,32 @@
 From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Thu, 07 Jul 2011 15:30:42 +0400
-Subject: [PATCH v2 0/2] Add device tree probe for imx/mxc gpio
-In-Reply-To: <1309879166-25788-1-git-send-email-shawn.guo@linaro.org>
-References: <1309879166-25788-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <4E1598E2.4080205@mvista.com>
+Date: Thu, 07 Jul 2011 15:33:15 +0400
+Subject: [PATCH v2 2/3] mmc: sdhci-pltfm: dt device does not pass parent
+	to sdhci_alloc_host
+In-Reply-To: <1309879568-25837-3-git-send-email-shawn.guo@linaro.org>
+References: <1309879568-25837-1-git-send-email-shawn.guo@linaro.org>
+	<1309879568-25837-3-git-send-email-shawn.guo@linaro.org>
+Message-ID: <4E15997B.6080804@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello.
 
-On 05-07-2011 19:19, Shawn Guo wrote:
+On 05-07-2011 19:26, Shawn Guo wrote:
 
-> The first patch removes the uses of cpu_is_mx(),
+> Neither platform based nor dt based device needs to pass the parent
+> to sdhci_alloc_host.  There is no difference between platform and dt
+> on this point.
 
-    There are 3 patches total. And this is the second patch...
+> The patch makes the change to pass device itself than its parent to
 
-> and the second one adds device tree probe support.
+    Maybe "rather than"?
 
-    ... and this is the third.
+> sdhci_alloc_host for dt case too.  Otherwise the probe function of
+> sdhci based drivers which is shared between platform and dt will
+> fail on dt case.
 
-> Changes since v1:
->   * Address review comments given by Grant and Sascha
->   * Add patch #1 to get gpio range/base from gpio core
-
-> Shawn Guo (3):
->        gpio/mxc: get gpio range/base from gpio core
->        gpio/mxc: get rid of the uses of cpu_is_mx()
->        gpio/mxc: add device tree probe support
+> Signed-off-by: Shawn Guo<shawn.guo@linaro.org>
+> Acked-by: Grant Likely<grant.likely@secretlab.ca>
+> Cc: Chris Ball<cjb@laptop.org>
 
 WBR, Sergei
