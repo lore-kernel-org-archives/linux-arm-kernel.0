@@ -1,135 +1,42 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 7 Jul 2011 19:35:51 +0100
-Subject: [GIT PULL v2] Cortex-A5 and Cortex-A15 support
-Message-ID: <20110707183551.GD13534@e102144-lin.cambridge.arm.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 7 Jul 2011 14:43:15 -0400 (EDT)
+Subject: [PATCH] ARM: get rid of a few StrongARM cache-related build time
+	constants
+In-Reply-To: <20110707170631.GB20403@n2100.arm.linux.org.uk>
+References: <1309919636-20546-1-git-send-email-nicolas.pitre@linaro.org>
+	<20110706075542.GK8286@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1107060912490.14596@xanadu.home>
+	<20110707170631.GB20403@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1107071438200.14596@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On Thu, 7 Jul 2011, Russell King - ARM Linux wrote:
 
-Firstly, thanks for the quick turnaround on Dave's patches; much
-appreciated. Here's a new pull request for the updated branch.
+> On Wed, Jul 06, 2011 at 09:21:33AM -0400, Nicolas Pitre wrote:
+> > Could you test this patch as well?  You're the only one I know who might 
+> > still have access to the affected hardware.
+> 
+> Tested on Assabet, and unfortunately, this doesn't work on its own because
+> we don't permit iotable_init() to create pages with MT_CACHECLEAN and
+> MT_MINICLEAN.
+> 
+> <4>BUG: map for 0xe0000000 at 0xfffe0000 can not be mapped using pages, ignoring.
+> <4>BUG: map for 0xe0004000 at 0xfffe4000 can not be mapped using pages, ignoring.
+> <4>BUG: map for 0xe0008000 at 0xfffe8000 can not be mapped using pages, ignoring.
+> <4>BUG: map for 0xe000c000 at 0xfffec000 can not be mapped using pages, ignoring.
+> 
+> The fix is below (probably with offsets):
 
-In case anybody's interested, the original pull request is here:
+Great. Are you providing an ACK or tested-by with this patch folded in?
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2011-July/056547.html
+> @@ -506,16 +488,8 @@ static void __init build_mem_type_table(void)
+>  	mem_types[MT_MEMORY].prot_pte |= kern_pgprot;
+>  	mem_types[MT_MEMORY_NONCACHED].prot_sect |= ecc_mask;
+>  	mem_types[MT_ROM].prot_sect |= cp->pmd;
+> +	mem_types[MT_CACHECLEAN].prot_pte |= kern_pgprot;
+>  
+Doesn't MT_MINICLEAN require kern_pgprot as well?
 
-Cheers,
 
-Will
-
-
-
-The following changes since commit b0af8dfdd67699e25083478c63eedef2e72ebd85:
-  Linus Torvalds (1):
-        Linux 3.0-rc5
-
-are available in the git repository at:
-
-  git://linux-arm.org/linux-2.6-wd.git for-rmk
-
-Dave Martin (40):
-      ARM: mm: proc-macros: Add generic proc/cache/tlb struct definition macros
-      ARM: assembler.h: Add string declaration macro
-      ARM: mm: cache-fa: Use the new processor struct macros
-      ARM: mm: cache-v3: Use the new processor struct macros
-      ARM: mm: cache-v4: Use the new processor struct macros
-      ARM: mm: cache-v4wb: Use the new processor struct macros
-      ARM: mm: cache-v4wt: Use the new processor struct macros
-      ARM: mm: cache-v6: Use the new processor struct macros
-      ARM: mm: cache-v7: Use the new processor struct macros
-      ARM: mm: proc-arm1020: Use the new processor struct macros
-      ARM: mm: proc-arm1020e: Use the new processor struct macros
-      ARM: mm: proc-arm1022: Use the new processor struct macros
-      ARM: mm: proc-arm1026: Use the new processor struct macros
-      ARM: mm: proc-arm6_7: Use the new processor struct macros
-      ARM: mm: proc-arm720: Use the new processor struct macros
-      ARM: mm: proc-arm740: Use the new processor struct macros
-      ARM: mm: proc-arm7tdmi: Use the new processor struct macros
-      ARM: mm: proc-arm920: Use the new processor struct macros
-      ARM: mm: proc-arm922: Use the new processor struct macros
-      ARM: mm: proc-arm925: Use the new processor struct macros
-      ARM: mm: proc-arm926: Use the new processor struct macros
-      ARM: mm: proc-arm940: Use the new processor struct macros
-      ARM: mm: proc-arm946: Use the new processor struct macros
-      ARM: mm: proc-arm9tdmi: Use the new processor struct macros
-      ARM: mm: proc-fa526: Use the new processor struct macros
-      ARM: mm: proc-feroceon: Use the new processor struct macros
-      ARM: mm: proc-mohawk: Use the new processor struct macros
-      ARM: mm: proc-sa110: Use the new processor struct macros
-      ARM: mm: proc-sa1100: Use the new processor struct macros
-      ARM: mm: proc-v6: Use the new processor struct macros
-      ARM: mm: proc-v7: Use the new processor struct macros
-      ARM: mm: proc-xsc3: Use new generic struct definition macros
-      ARM: mm: proc-xscale: Use new generic struct definition macros
-      ARM: mm: tlb-fa: Use the new processor struct macros
-      ARM: mm: tlb-v3: Use the new processor struct macros
-      ARM: mm: tlb-v4: Use the new processor struct macros
-      ARM: mm: tlb-v4wb: Use the new processor struct macros
-      ARM: mm: tlb-v4wbi: Use the new processor struct macros
-      ARM: mm: tlb-v6: Use the new processor struct macros
-      ARM: mm: tlb-v7: Use the new processor struct macros
-
-Pawel Moll (2):
-      ARM: proc: convert v7 proc infos into a common macro
-      ARM: proc: add Cortex-A5 proc info
-
-Will Deacon (10):
-      Merge branch 'arm/proc-macros' of git://git.linaro.org/people/dmart/linux-2.6-arm into for-rmk
-      ARM: hwcaps: use shifts instead of hardcoded constants
-      ARM: hwcaps: add new HWCAP defines for ARMv7-A
-      ARM: vfp: add VFPv4 capability detection and populate elf_hwcap
-      ARM: proc: add proc info for Cortex-A15MP using classic page tables
-      ARM: perf: remove confusing comment from v7 perf events backend
-      ARM: perf: add PMUv2 common event definitions
-      ARM: perf: add support for the Cortex-A5 PMU
-      ARM: perf: add support for the Cortex-A15 PMU
-      ARM: proc: add definition of cpu_reset for ARMv6 and ARMv7 cores
-
- arch/arm/include/asm/assembler.h  |    9 +
- arch/arm/include/asm/hwcap.h      |   36 ++--
- arch/arm/include/asm/perf_event.h |    2 +
- arch/arm/kernel/perf_event.c      |    6 +
- arch/arm/kernel/perf_event_v7.c   |  344 +++++++++++++++++++++++--
- arch/arm/kernel/setup.c           |    4 +
- arch/arm/mm/cache-fa.S            |   15 +-
- arch/arm/mm/cache-v3.S            |   15 +-
- arch/arm/mm/cache-v4.S            |   15 +-
- arch/arm/mm/cache-v4wb.S          |   15 +-
- arch/arm/mm/cache-v4wt.S          |   15 +-
- arch/arm/mm/cache-v6.S            |   15 +-
- arch/arm/mm/cache-v7.S            |   15 +-
- arch/arm/mm/proc-arm1020.S        |   45 +---
- arch/arm/mm/proc-arm1020e.S       |   52 +----
- arch/arm/mm/proc-arm1022.S        |   52 +----
- arch/arm/mm/proc-arm1026.S        |   53 +----
- arch/arm/mm/proc-arm6_7.S         |  166 +++----------
- arch/arm/mm/proc-arm720.S         |   85 ++-----
- arch/arm/mm/proc-arm740.S         |   42 +---
- arch/arm/mm/proc-arm7tdmi.S       |  216 +++-------------
- arch/arm/mm/proc-arm920.S         |   53 +----
- arch/arm/mm/proc-arm922.S         |   53 +----
- arch/arm/mm/proc-arm925.S         |   88 ++------
- arch/arm/mm/proc-arm926.S         |   51 +----
- arch/arm/mm/proc-arm940.S         |   51 +----
- arch/arm/mm/proc-arm946.S         |   53 +----
- arch/arm/mm/proc-arm9tdmi.S       |   78 ++-----
- arch/arm/mm/proc-fa526.S          |   38 +---
- arch/arm/mm/proc-feroceon.S       |  202 ++++-----------
- arch/arm/mm/proc-macros.S         |   63 +++++
- arch/arm/mm/proc-mohawk.S         |   61 ++---
- arch/arm/mm/proc-sa110.S          |   39 +---
- arch/arm/mm/proc-sa1100.S         |   84 ++-----
- arch/arm/mm/proc-v6.S             |   39 +--
- arch/arm/mm/proc-v7.S             |  136 +++++-----
- arch/arm/mm/proc-xsc3.S           |   90 ++------
- arch/arm/mm/proc-xscale.S         |  507 ++++++-------------------------------
- arch/arm/mm/tlb-fa.S              |    8 +-
- arch/arm/mm/tlb-v3.S              |    8 +-
- arch/arm/mm/tlb-v4.S              |    8 +-
- arch/arm/mm/tlb-v4wb.S            |    8 +-
- arch/arm/mm/tlb-v4wbi.S           |    8 +-
- arch/arm/mm/tlb-v6.S              |    8 +-
- arch/arm/mm/tlb-v7.S              |    9 +-
- arch/arm/vfp/vfpmodule.c          |    6 +-
- 46 files changed, 913 insertions(+), 2053 deletions(-)
+Nicolas
