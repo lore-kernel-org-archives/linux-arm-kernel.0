@@ -1,23 +1,24 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 7 Jul 2011 17:32:16 +0300
-Subject: [PATCH v8 04/14] ARM: omap4: use remapped PPI interrupts for
-	local timer
-In-Reply-To: <1309855755-6261-5-git-send-email-marc.zyngier@arm.com>
-References: <1309855755-6261-1-git-send-email-marc.zyngier@arm.com>
-	<1309855755-6261-5-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20110707143213.GN15815@atomide.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 7 Jul 2011 15:49:21 +0100
+Subject: [PATCHv2] remove unnecessary cache flush on v6 copypage
+In-Reply-To: <20110707143019.GA16819@heechul-desktop>
+References: <20110707143019.GA16819@heechul-desktop>
+Message-ID: <20110707144921.GA15429@1n450.cable.virginmedia.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Marc Zyngier <marc.zyngier@arm.com> [110705 11:45]:
-> Use the normal interrupt scheme for the local timers by using
-> a remapped PPI interrupt.
-> 
-> Tested on a Pandaboard.
-> 
-> Cc: Tony Lindgren <tony@atomide.com>
-> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Tested-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+On Thu, Jul 07, 2011 at 09:30:19AM -0500, Heechul Yun wrote:
+> ARM: mm: remove unnecessary cache flush on v6 copypage
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+Just move this line in the subject and remove it from the body.
+
+> Originally introduced to maintain coherency between icache and dcache
+> in v6 nonaliasing mode. This is now handled by __sync_icache_dcache since
+> c0177800, therefore unneceary in this function.  
+
+Minor typo - "unnecessary".
+
+Thanks.
+
+-- 
+Catalin
