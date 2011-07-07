@@ -1,48 +1,29 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Thu,  7 Jul 2011 12:18:37 +0200
-Subject: [PATCH 2/4] arm: plat-s3c24xx: dma: drop return codes in void function
-In-Reply-To: <1310033919-4245-1-git-send-email-w.sang@pengutronix.de>
-References: <1310033919-4245-1-git-send-email-w.sang@pengutronix.de>
-Message-ID: <1310033919-4245-3-git-send-email-w.sang@pengutronix.de>
+From: kaloz@openwrt.org (Imre Kaloz)
+Date: Thu,  7 Jul 2011 12:19:09 +0200
+Subject: [PATCH] ARM: make CNS3XXX select CPU_V6K
+Message-ID: <1310033949-25590-1-git-send-email-kaloz@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit bb072c3c (ARM / Samsung: Use struct syscore_ops for "core" power
-management) turned s3c2410_dma_resume_chan() from int to void. So, drop
-the actual return values, too. Fixes:
+CNS3XXX is based on MPCore, so select the right CPU option for it.
 
-arch/arm/plat-s3c24xx/dma.c: In function 's3c2410_dma_resume_chan':
-arch/arm/plat-s3c24xx/dma.c:1238:3: warning: 'return' with a value, in function returning void
-arch/arm/plat-s3c24xx/dma.c:1250:2: warning: 'return' with a value, in function returning void
-
-Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
-Cc: Rafael J. Wysocki <rjw@sisk.pl>
-Cc: Kukjin Kim <kgene.kim@samsung.com>
+Signed-off-by: Imre Kaloz <kaloz@openwrt.org>
 ---
- arch/arm/plat-s3c24xx/dma.c |    4 +---
- 1 files changed, 1 insertions(+), 3 deletions(-)
+ arch/arm/Kconfig |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/plat-s3c24xx/dma.c b/arch/arm/plat-s3c24xx/dma.c
-index a5b3684..a79a8cc 100644
---- a/arch/arm/plat-s3c24xx/dma.c
-+++ b/arch/arm/plat-s3c24xx/dma.c
-@@ -1231,7 +1231,7 @@ static void s3c2410_dma_resume_chan(struct s3c2410_dma_chan *cp)
- 	/* restore channel's hardware configuration */
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 9adc278..c2e5f3d 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -321,7 +321,7 @@ config ARCH_CLPS711X
  
- 	if (!cp->in_use)
--		return 0;
-+		return;
- 
- 	printk(KERN_INFO "dma%d: restoring configuration\n", cp->number);
- 
-@@ -1242,8 +1242,6 @@ static void s3c2410_dma_resume_chan(struct s3c2410_dma_chan *cp)
- 
- 	if (cp->map != NULL)
- 		dma_sel.select(cp, cp->map);
--
--	return 0;
- }
- 
- static void s3c2410_dma_resume(void)
+ config ARCH_CNS3XXX
+ 	bool "Cavium Networks CNS3XXX family"
+-	select CPU_V6
++	select CPU_V6K
+ 	select GENERIC_CLOCKEVENTS
+ 	select ARM_GIC
+ 	select MIGHT_HAVE_PCI
 -- 
-1.7.5.4
+1.7.1
