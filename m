@@ -1,40 +1,126 @@
-From: buytenh@wantstofly.org (Lennert Buytenhek)
-Date: Thu, 7 Jul 2011 14:09:18 +0200
-Subject: [PATCH 3/8] ARM: dma-mapping: use asm-generic/dma-mapping-common.h
-In-Reply-To: <201106271519.43581.arnd@arndb.de>
-References: <1308556213-24970-1-git-send-email-m.szyprowski@samsung.com>
-	<201106241736.43576.arnd@arndb.de>
-	<000601cc34c4$430f91f0$c92eb5d0$%szyprowski@samsung.com>
-	<201106271519.43581.arnd@arndb.de>
-Message-ID: <20110707120918.GF7810@wantstofly.org>
+From: sundaram@ti.com (Raju, Sundaram)
+Date: Thu, 7 Jul 2011 17:45:04 +0530
+Subject: [RFC] dmaengine: add new api for preparing simple slave transfer
+In-Reply-To: <1308203119.10976.234.camel@vkoul-udesk3>
+References: <E0D41E29EB0DAC4E9F3FF173962E9E940301FE2DED@dbde02.ent.ti.com>
+	<20110609124723.GA24636@n2100.arm.linux.org.uk>
+	<E0D41E29EB0DAC4E9F3FF173962E9E940301FE2EFB@dbde02.ent.ti.com>
+	<1307686140.10976.111.camel@vkoul-udesk3>
+	<E0D41E29EB0DAC4E9F3FF173962E9E940301FE3405@dbde02.ent.ti.com>
+	<1307724439.10976.188.camel@vkoul-udesk3>
+	<E0D41E29EB0DAC4E9F3FF173962E9E9403020B7C2A@dbde02.ent.ti.com>
+	<1308203119.10976.234.camel@vkoul-udesk3>
+Message-ID: <E0D41E29EB0DAC4E9F3FF173962E9E9403024F5420@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 27, 2011 at 03:19:43PM +0200, Arnd Bergmann wrote:
-
-> > > I suppose for the majority of the cases, the overhead of the indirect
-> > > function call is near-zero, compared to the overhead of the cache
-> > > management operation, so it would only make a difference for coherent
-> > > systems without an IOMMU. Do we care about micro-optimizing those?
-
-FWIW, when I was hacking on ARM access point routing performance some
-time ago, turning the L1/L2 cache maintenance operations into inline
-functions (inlined into the ethernet driver) gave me a significant and
-measurable performance boost.
-
-Such things can remain product-specific hacks, though.
-
-
-> > Even in coherent case, the overhead caused by additional function call
-> > should have really negligible impact on drivers performance.
+> -----Original Message-----
+> From: Koul, Vinod [mailto:vinod.koul at intel.com]
+> Sent: Thursday, June 16, 2011 11:15 AM
+> To: Raju, Sundaram
+> Cc: Russell King - ARM Linux; Linus Walleij; Dan; davinci-linux-open-
+> source at linux.davincidsp.com; linux-omap at vger.kernel.org; linux-
+> kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Subject: RE: [RFC] dmaengine: add new api for preparing simple slave transfer
 > 
-> What about object code size? I guess since ixp23xx is the only platform
-> that announces itself as coherent, we probably don't need to worry about
-> it too much either. Lennert?
+> On Tue, 2011-06-14 at 12:12 +0530, Raju, Sundaram wrote:
 
-I don't think so.  ixp23xx isn't a very popular platform anymore either,
-having been discontinued some time ago.
+<snip>
 
+> Okay now things are more clear on what you are trying to do...
 
-thanks,
-Lennert
+Vinod, 
+Sorry for the delayed response. I was OOO and not well.
+Thanks for going through the design documents and giving options.
+
+>
+> 2) I think this can be achieved in two ways:
+> a) you use current standard sg_list mechanism, the dmac driver parses
+> the list and  programs the dma offsets into dmac
+> Pros: you can use existing APIs, no changes to i/f.
+> If dmac has this capability they program dmac accordingly
+> Cons: you need to create sg-list in client driver
+>
+
+This option does not satisfy the requirements.
+As Russell has pointed out
+
+> > >
+> > > The overall conclusion which I'm coming to is that we already support
+> > > what you're asking for, but the problem is that we're using different
+> > > (and I'd argue standard) terminology to describe what we have.
+> > >
+> > > The only issue which I see that we don't cover is the case where you want
+> > > to describe a single buffer which is organised as N bytes to be transferred,
+> > > M following bytes to be skipped, N bytes to be transferred, M bytes to be
+> > > skipped.  I doubt there are many controllers which can be programmed with
+> > > both 'N' and 'M' parameters directly.
+> > >
+> >
+> > Yes this is what I wanted to communicate and discuss in the list.
+> > Thanks for describing it in the standard terminology, and pointing me in the
+> > right direction.
+> >
+
+The sg_list caters to all the parameters that a client driver has to pass
+to the DMAC driver except for the STRIDE related info of skipping certain
+bytes within a single buffer entry of the sg_list.
+
+> 
+> b) create a new api to describe these offset values, something like:
+> prep_buffer_offset(struct offset_description *buffer,.....)
+> I would not like to change the current API for this and rather have a
+> new API for this, this should better then overriding current.
+> 
+
+Yes, it would be better not to change the existing API.
+This option seems good. But new API has to be added for this option.
+Linus, had suggested something similar, but different,
+Using the control API with a new dma_ctrl_cmd enum
+defined for TI DMAC special configuration to be passed.
+ 
+| Sundaram is this how your controller works?
+| I mean the hardware can skip over sequences like this?
+| 
+| When we added the config interface to DMAengine I originally included
+| a "custom config" call, but Dan wanted me to keep it out until we
+| had some specific usecase for it. FSLDMA recently started
+| to use it.
+| 
+| Notice how dmaengine_slave_config() is implemented:
+| 
+| static inline int dmaengine_slave_config(struct dma_chan *chan,
+| 					  struct dma_slave_config *config)
+| {
+| 	return dmaengine_device_control(chan, DMA_SLAVE_CONFIG,
+| 			(unsigned long)config);
+| }
+| 
+| So what is passed to the driver is just an unsigned long.
+| 
+| This is actually modeled to be ioctl()-like so you can pass in a
+| custom config to the same callback on the device driver,
+| just use some other enumerator than DMA_SLAVE_CONFIG,
+| say like FSLDMA already does with FSLDMA_EXTERNAL_START.
+| 
+| Just put some enumerator in enum dma_ctrl_cmd in
+| dmaengine.h such as SDMA_TEXAS_STRIDE_CONFIG and call
+| like this:
+| 
+| /* However that config struct needs to look, basically */
+| static struct sdma_ti_stride_cgf = {
+|      take = M,
+|      skip = N,
+| };
+| 
+| ret = chan->device->device_control(chan, SDMA_TEXAS_STRIDE_CONFIG,
+| &sdma_ti_stride_cfg);
+| 
+| Or something like this.
+
+I think this is better option than your 2b. This requires just an addition of
+one more enum in the dma_ctrl_cmd. What do you think about this?
+If Dan and you are okay with this I will send a small patch for this asap.
+
+Regards,
+Sundaram
