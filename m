@@ -1,62 +1,75 @@
 From: dave.martin@linaro.org (Dave Martin)
-Date: Thu,  7 Jul 2011 15:27:23 +0100
-Subject: [PATCH v4 16/40] ARM: mm: proc-arm740: Use the new processor struct
+Date: Thu,  7 Jul 2011 15:27:25 +0100
+Subject: [PATCH v4 18/40] ARM: mm: proc-arm920: Use the new processor struct
 	macros
 In-Reply-To: <1310048867-14172-1-git-send-email-dave.martin@linaro.org>
 References: <1310048867-14172-1-git-send-email-dave.martin@linaro.org>
-Message-ID: <1310048867-14172-17-git-send-email-dave.martin@linaro.org>
+Message-ID: <1310048867-14172-19-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Dave Martin <dave.martin@linaro.org>
 ---
- arch/arm/mm/proc-arm740.S |   42 +++++++-----------------------------------
- 1 files changed, 7 insertions(+), 35 deletions(-)
+ arch/arm/mm/proc-arm920.S |   53 ++++++---------------------------------------
+ 1 files changed, 7 insertions(+), 46 deletions(-)
 
-diff --git a/arch/arm/mm/proc-arm740.S b/arch/arm/mm/proc-arm740.S
-index 6f9d12e..4506be3 100644
---- a/arch/arm/mm/proc-arm740.S
-+++ b/arch/arm/mm/proc-arm740.S
-@@ -17,6 +17,8 @@
- #include <asm/pgtable.h>
- #include <asm/ptrace.h>
+diff --git a/arch/arm/mm/proc-arm920.S b/arch/arm/mm/proc-arm920.S
+index bf8a1d1..0dea376 100644
+--- a/arch/arm/mm/proc-arm920.S
++++ b/arch/arm/mm/proc-arm920.S
+@@ -315,18 +315,8 @@ ENTRY(arm920_dma_unmap_area)
+ 	mov	pc, lr
+ ENDPROC(arm920_dma_unmap_area)
  
-+#include "proc-macros.S"
-+
- 	.text
- /*
-  * cpu_arm740_proc_init()
-@@ -115,42 +117,14 @@ __arm740_setup:
+-ENTRY(arm920_cache_fns)
+-	.long	arm920_flush_icache_all
+-	.long	arm920_flush_kern_cache_all
+-	.long	arm920_flush_user_cache_all
+-	.long	arm920_flush_user_cache_range
+-	.long	arm920_coherent_kern_range
+-	.long	arm920_coherent_user_range
+-	.long	arm920_flush_kern_dcache_area
+-	.long	arm920_dma_map_area
+-	.long	arm920_dma_unmap_area
+-	.long	arm920_dma_flush_range
+-
++	@ define struct cpu_cache_fns (see <asm/cacheflush.h> and proc-macros.S)
++	define_cache_functions arm920
+ #endif
+ 
+ 
+@@ -450,43 +440,14 @@ arm920_crval:
+ 	crval	clear=0x00003f3f, mmuset=0x00003135, ucset=0x00001130
  
  	__INITDATA
- 
+-
 -/*
 - * Purpose : Function pointers used to access above functions - all calls
 - *	     come through these
 - */
--	.type	arm740_processor_functions, #object
--ENTRY(arm740_processor_functions)
--	.word	v4t_late_abort
+-	.type	arm920_processor_functions, #object
+-arm920_processor_functions:
+-	.word	v4t_early_abort
 -	.word	legacy_pabort
--	.word	cpu_arm740_proc_init
--	.word	cpu_arm740_proc_fin
--	.word	cpu_arm740_reset
--	.word   cpu_arm740_do_idle
--	.word	cpu_arm740_dcache_clean_area
--	.word	cpu_arm740_switch_mm
--	.word	0			@ cpu_*_set_pte
--	.word	0
--	.word	0
--	.word	0
--	.size	arm740_processor_functions, . - arm740_processor_functions
+-	.word	cpu_arm920_proc_init
+-	.word	cpu_arm920_proc_fin
+-	.word	cpu_arm920_reset
+-	.word   cpu_arm920_do_idle
+-	.word	cpu_arm920_dcache_clean_area
+-	.word	cpu_arm920_switch_mm
+-	.word	cpu_arm920_set_pte_ext
+-	.word	cpu_arm920_suspend_size
+-	.word	cpu_arm920_do_suspend
+-	.word	cpu_arm920_do_resume
+-	.size	arm920_processor_functions, . - arm920_processor_functions
 +	@ define struct processor (see <asm/proc-fns.h> and proc-macros.S)
-+	define_processor_functions arm740, dabort=v4t_late_abort, pabort=legacy_pabort, nommu=1
++	define_processor_functions arm920, dabort=v4t_early_abort, pabort=legacy_pabort, suspend=1
  
  	.section ".rodata"
  
 -	.type	cpu_arch_name, #object
 -cpu_arch_name:
--	.asciz	"armv4"
+-	.asciz	"armv4t"
 -	.size	cpu_arch_name, . - cpu_arch_name
 -
 -	.type	cpu_elf_name, #object
@@ -64,21 +77,15 @@ index 6f9d12e..4506be3 100644
 -	.asciz	"v4"
 -	.size	cpu_elf_name, . - cpu_elf_name
 -
--	.type	cpu_arm740_name, #object
--cpu_arm740_name:
--	.ascii	"ARM740T"
--	.size	cpu_arm740_name, . - cpu_arm740_name
-+	string	cpu_arch_name, "armv4"
+-	.type	cpu_arm920_name, #object
+-cpu_arm920_name:
+-	.asciz	"ARM920T"
+-	.size	cpu_arm920_name, . - cpu_arm920_name
++	string	cpu_arch_name, "armv4t"
 +	string	cpu_elf_name, "v4"
-+	string	cpu_arm740_name, "ARM740T"
++	string	cpu_arm920_name, "ARM920T"
  
  	.align
  
-@@ -170,5 +144,3 @@ __arm740_proc_info:
- 	.long	0
- 	.long	v3_cache_fns			@ cache model
- 	.size	__arm740_proc_info, . - __arm740_proc_info
--
--
 -- 
 1.7.4.1
