@@ -1,35 +1,22 @@
-From: vkuzmichev@mvista.com (Vitaly Kuzmichev)
-Date: Thu, 07 Jul 2011 20:20:49 +0400
-Subject: [PATCH V3 1/4] ARM: smp_twd: Fix typo in 'twd_timer_rate' printing
-In-Reply-To: <20110707123907.GP8286@n2100.arm.linux.org.uk>
-References: <1310041339-2348-1-git-send-email-vkuzmichev@mvista.com>
-	<1310041396-2461-1-git-send-email-vkuzmichev@mvista.com>
-	<20110707123907.GP8286@n2100.arm.linux.org.uk>
-Message-ID: <4E15DCE1.8010201@mvista.com>
+From: jochen@scram.de (Jochen Friedrich)
+Date: Thu, 07 Jul 2011 18:23:27 +0200
+Subject: [PATCH 16/17] mach-sa1100: retire custom LED code
+In-Reply-To: <CAK5ve-JQhJxWOL=UiX9SUxa5Rw8VrANyd05nuRJbytoZRR+EzA@mail.gmail.com>
+References: <1309955687-19365-1-git-send-email-bryan.wu@canonical.com>	<1309955687-19365-17-git-send-email-bryan.wu@canonical.com>	<4E146B7C.7060607@scram.de>
+	<CAK5ve-JQhJxWOL=UiX9SUxa5Rw8VrANyd05nuRJbytoZRR+EzA@mail.gmail.com>
+Message-ID: <4E15DD7F.3050702@scram.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Hi Bryan,
 
-On 07/07/2011 04:39 PM, Russell King - ARM Linux wrote:
-> On Thu, Jul 07, 2011 at 04:23:13PM +0400, Vitaly Kuzmichev wrote:
->> To get hundredths of MHz the rate needs to be divided by 10'000.
->> Here is an example:
->>  twd_timer_rate = 123456789
->>  Before the patch:
->>     twd_timer_rate / 1000000 = 123
->>     (twd_timer_rate / 1000000) % 100 = 23
->>     Result: 123.23MHz.
->>  After being fixed:
->>     twd_timer_rate / 1000000 = 123
->>     (twd_timer_rate / 10000) % 100 = 45
->>     Result: 123.45MHz.
->>
->> Signed-off-by: Vitaly Kuzmichev <vkuzmichev@mvista.com>
-> 
-> -> patch system please.
+> This looks good and it's the right way to do that. We need gpiolib
+> supporting firstly. How's status of your patchset, I guess you're
+> trying to update it.
 
-Should I submit other patches into this system too?
+I've resubmitted it yesterday for another review. In parallel, I'll 
+retest this on top of 3.0-rc5 on real hardware and ask Russell if it's 
+OK to submit to his patch tracker.
 
 Thanks,
-Vitaly.
+Jochen
