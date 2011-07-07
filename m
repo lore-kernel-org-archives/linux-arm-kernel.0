@@ -1,42 +1,64 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 7 Jul 2011 21:41:58 +0800
-Subject: [PATCH] net/fec: gasket needs to be enabled for some i.mx
-In-Reply-To: <20110707.041257.670268148869400054.davem@davemloft.net>
-References: <20110630161935.GA7977@S2100-06.ap.freescale.net>
-	<1309515082-7386-1-git-send-email-shawn.guo@linaro.org>
-	<20110707.041257.670268148869400054.davem@davemloft.net>
-Message-ID: <20110707134157.GA12722@S2100-06.ap.freescale.net>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Thu, 7 Jul 2011 21:37:29 +0800
+Subject: [PATCH v4 0/3] ARM: CSR: Adding CSR SiRFprimaII platform
+In-Reply-To: <201107071531.18623.arnd@arndb.de>
+References: <1310020616-27856-1-git-send-email-bs14@csr.com>
+	<201107071311.29643.arnd@arndb.de>
+	<CAGsJ_4yd8i2V1FeKcELFrdRd+UxY9WLVV-dG9XnJmkxrYs8j5A@mail.gmail.com>
+	<201107071531.18623.arnd@arndb.de>
+Message-ID: <CAGsJ_4zqny8_AYBTEnjOoERSrYxD_KOeWx1fPgpbP-yaQDbTZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 07, 2011 at 04:12:57AM -0700, David Miller wrote:
-> From: Shawn Guo <shawn.guo@linaro.org>
-> Date: Fri,  1 Jul 2011 18:11:22 +0800
-> 
-> > On the recent i.mx (mx25/50/53), there is a gasket inside fec
-> > controller which needs to be enabled no matter phy works in MII
-> > or RMII mode.
-> > 
-> > The current code enables the gasket only when phy interface is RMII.
-> > It's broken when the driver works with a MII phy.  The patch uses
-> > platform_device_id to distinguish the SoCs that have the gasket and
-> > enables it on these SoCs for both MII and RMII mode.
-> > 
-> > Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
-> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> 
-> Acked-by: David S. Miller <davem@davemloft.net>
-> --
+2011/7/7 Arnd Bergmann <arnd@arndb.de>:
+> On Thursday 07 July 2011, Barry Song wrote:
+>> > Note that when you get a 'Reviewed-by', 'Acked-by' or 'Tested-by'
+>> > reply to one of your mails, you should add that in the patch
+>> > changelog below your own 'Signed-off-by' in order to document
+>> > it for the future. This ususally still holds true when you make
+>> > further changes, just not when rewriting major parts of the patch.
+>>
+>> i am sure i know reviewed-by/acked-by/tested-by should be added to the
+>> end. what make me confused here is you are also the maintainer who
+>> will merge these changes into arm-soc and finally make them pulled by
+>> linus. generically,you will get the last signed-off-by too. if i list
+>> "reviewed-by you", you might need to replace it by signed-off-by
+>> finally.
+>> anyway, i'm really not sure whether i am understanding right about that :-)
+>
+> The point is mostly that I tend to pull in patches from git, so I don't
+> add an explicit Signed-off-by to each patch. Also, the meaning of
+> Reviewed-by is stronger than just pulling a git tree, it means that
+> I looked at the code in much detail and am happy with the end result.
 
-Thanks, David.  I will try to get it through Sascha's tree after
-the rebase again dt series.
+ok, i see, thank!
+i will add your reviewed-by to change log in the tree which i will use
+to send pull request to you. we are building the opensource.csr.com
+website. and i will place CSR's kernel there and build a for-arnd
+branch. you can easily pull the for-arnd branch.
 
-Hi Sascha,
-
-How should we proceed?  It seems Grant will take the fec-dt series
-on his tree.  Would you then merge that tree into yours, so that I
-can rebase this patch on your tree and get it go through there?
-
--- 
-Regards,
-Shawn
+>
+> Simply pulling the patches can mean either that, or that I trust you
+> enough that I didn't bother looking (and/or don't care about the quality).
+>
+>> > For the Signed-off-by list, that should normally include only the
+>> > people that have handled the specific patch, it doesn't imply
+>> > authorship. Having seven people listed as Signed-off-by seems a bit
+>> > strange in this context, but there is no clear rule against it.
+>> > I would probably use 'Acked-by' or plain 'Cc' in the changelog for
+>> > some of the people, depending in what way they were involved.
+>>
+>> yes. i understand signed-off-by should only be given to people who
+>> make the essential code changes in the special patch and people who
+>> send or merge the special patch, but not the original author of the
+>> original source files. for the 1st patch which is the basic board
+>> support, in the long history of coding sirfprimaii, all the listed
+>> people have contributed codes. so i get the names of all of them
+>> shown. anyway, it is really too long....
+>>
+>
+> Not a problem. I basically wanted to make sure you know the rules,
+> and it seemed odd. It's probably ok to leave the list as it is.
+>
+> ? ? ? ?Arnd
+>
