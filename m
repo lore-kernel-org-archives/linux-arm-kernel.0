@@ -1,126 +1,115 @@
-From: sundaram@ti.com (Raju, Sundaram)
-Date: Thu, 7 Jul 2011 17:45:04 +0530
-Subject: [RFC] dmaengine: add new api for preparing simple slave transfer
-In-Reply-To: <1308203119.10976.234.camel@vkoul-udesk3>
-References: <E0D41E29EB0DAC4E9F3FF173962E9E940301FE2DED@dbde02.ent.ti.com>
-	<20110609124723.GA24636@n2100.arm.linux.org.uk>
-	<E0D41E29EB0DAC4E9F3FF173962E9E940301FE2EFB@dbde02.ent.ti.com>
-	<1307686140.10976.111.camel@vkoul-udesk3>
-	<E0D41E29EB0DAC4E9F3FF173962E9E940301FE3405@dbde02.ent.ti.com>
-	<1307724439.10976.188.camel@vkoul-udesk3>
-	<E0D41E29EB0DAC4E9F3FF173962E9E9403020B7C2A@dbde02.ent.ti.com>
-	<1308203119.10976.234.camel@vkoul-udesk3>
-Message-ID: <E0D41E29EB0DAC4E9F3FF173962E9E9403024F5420@dbde02.ent.ti.com>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Thu, 7 Jul 2011 17:48:32 +0530
+Subject: [RFC/RFT 2/2] davinci: use generic memory mapped gpio for
+	tnetv107x
+In-Reply-To: <20110706220240.GF5371@ponder.secretlab.ca>
+References: <cover.1309840042.git.nsekhar@ti.com>
+	<6639b07562e3e6643dd07d5ed3907cb5158ce16b.1309840042.git.nsekhar@ti.com>
+	<20110706220240.GF5371@ponder.secretlab.ca>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024D9B523F@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Koul, Vinod [mailto:vinod.koul at intel.com]
-> Sent: Thursday, June 16, 2011 11:15 AM
-> To: Raju, Sundaram
-> Cc: Russell King - ARM Linux; Linus Walleij; Dan; davinci-linux-open-
-> source at linux.davincidsp.com; linux-omap at vger.kernel.org; linux-
-> kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: RE: [RFC] dmaengine: add new api for preparing simple slave transfer
+Hi Grant,
+
+On Thu, Jul 07, 2011 at 03:32:40, Grant Likely wrote:
+> On Tue, Jul 05, 2011 at 10:41:00AM +0530, Sekhar Nori wrote:
+
+> > +#define TNETV107X_N_GPIO_DEV	DIV_ROUND_UP(TNETV107X_N_GPIO, 32)
+> > +
+> > +static struct resource gpio_resources[TNETV107X_N_GPIO_DEV][4] = {
+> > +	[0 ... TNETV107X_N_GPIO_DEV - 1] = {
 > 
-> On Tue, 2011-06-14 at 12:12 +0530, Raju, Sundaram wrote:
+> If all the data is identical, why does this need to be an array?
 
-<snip>
+The data is initialized identically, but there is
+a loop down below which updates the start and end
+address for each GPIO device. This way I get to
+initialize the name and flags statically.
 
-> Okay now things are more clear on what you are trying to do...
-
-Vinod, 
-Sorry for the delayed response. I was OOO and not well.
-Thanks for going through the design documents and giving options.
-
->
-> 2) I think this can be achieved in two ways:
-> a) you use current standard sg_list mechanism, the dmac driver parses
-> the list and  programs the dma offsets into dmac
-> Pros: you can use existing APIs, no changes to i/f.
-> If dmac has this capability they program dmac accordingly
-> Cons: you need to create sg-list in client driver
->
-
-This option does not satisfy the requirements.
-As Russell has pointed out
-
-> > >
-> > > The overall conclusion which I'm coming to is that we already support
-> > > what you're asking for, but the problem is that we're using different
-> > > (and I'd argue standard) terminology to describe what we have.
-> > >
-> > > The only issue which I see that we don't cover is the case where you want
-> > > to describe a single buffer which is organised as N bytes to be transferred,
-> > > M following bytes to be skipped, N bytes to be transferred, M bytes to be
-> > > skipped.  I doubt there are many controllers which can be programmed with
-> > > both 'N' and 'M' parameters directly.
-> > >
-> >
-> > Yes this is what I wanted to communicate and discuss in the list.
-> > Thanks for describing it in the standard terminology, and pointing me in the
-> > right direction.
-> >
-
-The sg_list caters to all the parameters that a client driver has to pass
-to the DMAC driver except for the STRIDE related info of skipping certain
-bytes within a single buffer entry of the sg_list.
+BTW, I just noticed that I forgot to initialize the
+flags in the resource structure below. Will fix
+that.
 
 > 
-> b) create a new api to describe these offset values, something like:
-> prep_buffer_offset(struct offset_description *buffer,.....)
-> I would not like to change the current API for this and rather have a
-> new API for this, this should better then overriding current.
+> > +		{
+> > +			.name	= "dat",
+> > +			.start	= TNETV107X_GPIO_BASE + 0x4,
+> > +			.end	= TNETV107X_GPIO_BASE + 0x4 + 0x4 - 1,
+> > +		},
+> > +		{
+> > +			.name	= "set",
+> > +			.start	= TNETV107X_GPIO_BASE + 0x10,
+> > +			.end	= TNETV107X_GPIO_BASE + 0x10 + 0x4 - 1,
+> > +		},
+> > +		{
+> > +			.name	= "dirin",
+> > +			.start	= TNETV107X_GPIO_BASE + 0x1c,
+> > +			.end	= TNETV107X_GPIO_BASE + 0x1c + 0x4 - 1,
+> > +		},
+> > +		{
+> > +			.name	= "en",
+> > +			.start	= TNETV107X_GPIO_BASE + 0x28,
+> > +			.end	= TNETV107X_GPIO_BASE + 0x28 + 0x4 - 1,
+> > +		},
+> > +	},
+> > +};
 > 
+> Wow, this ends up looking horrible. (yes, I know it is not your
+> fault).  I backed off earlier on using resources for the offsets, but
+> I want to change my mind again and make interface a register range +
+> offsets to the control registers.
 
-Yes, it would be better not to change the existing API.
-This option seems good. But new API has to be added for this option.
-Linus, had suggested something similar, but different,
-Using the control API with a new dma_ctrl_cmd enum
-defined for TI DMAC special configuration to be passed.
- 
-| Sundaram is this how your controller works?
-| I mean the hardware can skip over sequences like this?
-| 
-| When we added the config interface to DMAengine I originally included
-| a "custom config" call, but Dan wanted me to keep it out until we
-| had some specific usecase for it. FSLDMA recently started
-| to use it.
-| 
-| Notice how dmaengine_slave_config() is implemented:
-| 
-| static inline int dmaengine_slave_config(struct dma_chan *chan,
-| 					  struct dma_slave_config *config)
-| {
-| 	return dmaengine_device_control(chan, DMA_SLAVE_CONFIG,
-| 			(unsigned long)config);
-| }
-| 
-| So what is passed to the driver is just an unsigned long.
-| 
-| This is actually modeled to be ioctl()-like so you can pass in a
-| custom config to the same callback on the device driver,
-| just use some other enumerator than DMA_SLAVE_CONFIG,
-| say like FSLDMA already does with FSLDMA_EXTERNAL_START.
-| 
-| Just put some enumerator in enum dma_ctrl_cmd in
-| dmaengine.h such as SDMA_TEXAS_STRIDE_CONFIG and call
-| like this:
-| 
-| /* However that config struct needs to look, basically */
-| static struct sdma_ti_stride_cgf = {
-|      take = M,
-|      skip = N,
-| };
-| 
-| ret = chan->device->device_control(chan, SDMA_TEXAS_STRIDE_CONFIG,
-| &sdma_ti_stride_cfg);
-| 
-| Or something like this.
+Okay. More work on cleaning the generic driver :)
 
-I think this is better option than your 2b. This requires just an addition of
-one more enum in the dma_ctrl_cmd. What do you think about this?
-If Dan and you are okay with this I will send a small patch for this asap.
+> 
+> > +
+> > +static struct platform_device gpio_device[] = {
+> > +	[0 ... TNETV107X_N_GPIO_DEV - 1] = {
+> > +		.name		= "basic-mmio-gpio",
+> > +		.num_resources	= 4,
+> > +	},
+> > +};
+> > +
+> > +static struct bgpio_pdata gpio_pdata[TNETV107X_N_GPIO_DEV];
+> > +
+> > +static void __init tnetv107x_gpio_init(void)
+> > +{
+> > +	int i, j;
+> > +
+> > +	for (i = 1; i < TNETV107X_N_GPIO_DEV; i++) {
+> > +		for (j = 0; j < 4; j++) {
+> > +			gpio_resources[i][j].start += 0x4 * i;
+> > +			gpio_resources[i][j].end += 0x4 * i;
+> > +		}
+> > +	}
+> > +
+> > +	for (i = 0; i < TNETV107X_N_GPIO_DEV; i++) {
+> > +		int base = i * 32;
+> > +
+> > +		gpio_device[i].id = i;
+> > +		gpio_device[i].resource = gpio_resources[i];
+> > +
+> > +		gpio_pdata[i].base = base;
+> > +		gpio_pdata[i].ngpio = TNETV107X_N_GPIO - base;
+> 
+> ?  This doesn't look right.  Shouldn't ngpio be the same for each gpio
+> controller instance?
 
-Regards,
-Sundaram
+Yes, ngpio is same (32) for each GPIO device except for
+the last GPIO device which may have lesser number of
+valid GPIO pins. The if statement below takes care of that.
+
+> 
+> > +		if (gpio_pdata[i].ngpio > 32)
+> > +			gpio_pdata[i].ngpio = 32;
+> > +
+> > +		gpio_device[i].dev.platform_data = &gpio_pdata[i];
+> > +
+> > +		platform_device_register(&gpio_device[i]);
+> > +	}
+> > +}
+> > +
+
+Thanks,
+Sekhar
