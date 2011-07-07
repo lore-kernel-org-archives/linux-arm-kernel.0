@@ -1,169 +1,20 @@
-From: manjugk@ti.com (G, Manjunath Kondaiah)
-Date: Thu, 7 Jul 2011 22:43:49 +0530
-Subject: [RFC PATCH 5/5] OMAP: I2C: Convert I2C driver to use device tree
-In-Reply-To: <20110706190803.GN4871@ponder.secretlab.ca>
-References: <1309426647-31587-1-git-send-email-manjugk@ti.com>
-	<1309426647-31587-6-git-send-email-manjugk@ti.com>
-	<20110706190803.GN4871@ponder.secretlab.ca>
-Message-ID: <20110707171349.GC3124@manju-desktop>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 7 Jul 2011 18:15:30 +0100
+Subject: [RFC PATCH 00/17] ARM: common idle infrastructure
+In-Reply-To: <1310053830-23779-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1310053830-23779-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <20110707171530.GC20403@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 06, 2011 at 01:08:03PM -0600, Grant Likely wrote:
-> On Thu, Jun 30, 2011 at 03:07:27PM +0500, G, Manjunath Kondaiah wrote:
-> > 
-> > The OMAP I2C driver is modified to use platform_device data from
-> > device tree data structures.
-> > 
-> > Signed-off-by: G, Manjunath Kondaiah <manjugk@ti.com>
-> 
-> Mostly looks good, but a few things that need to be fixed.  You can
-> probably even get this change merged for v3.1
+On Thu, Jul 07, 2011 at 04:50:13PM +0100, Lorenzo Pieralisi wrote:
+> This patchset is a first attempt at providing a consolidation of idle
+> code for the ARM processor architecture and a request for comment on
+> the provided methodology.
+> It relies and it is based on kernel features such as suspend/resume,
+> pm notifiers and common code for cpu_reset().
 
-Thanks. I will fix the review comments and we can have these changes with
-board-omapx-dt.c file so that dt and not dt builds can co exist.
+Please delay this for the next merge window - there's too much going on
+at the moment to even start looking at this patch set.
 
-For complete functionality with dt build, omap hwmod needs to be handled
-through DT framework. I am waiting for comments from omap hwmod maintainers.
-
-> 
-> > ---
-> >  drivers/i2c/busses/i2c-omap.c |   30 +++++++++++++++++++++++++++++-
-> >  1 files changed, 29 insertions(+), 1 deletions(-)
-> > 
-> > diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-> > index ae1545b..d4ccc52 100644
-> > --- a/drivers/i2c/busses/i2c-omap.c
-> > +++ b/drivers/i2c/busses/i2c-omap.c
-> > @@ -38,9 +38,13 @@
-> >  #include <linux/clk.h>
-> >  #include <linux/io.h>
-> >  #include <linux/of_i2c.h>
-> > +#include <linux/of_irq.h>
-> > +#include <linux/of_platform.h>
-> > +#include <linux/of_address.h>
-> >  #include <linux/slab.h>
-> >  #include <linux/i2c-omap.h>
-> >  #include <linux/pm_runtime.h>
-> > +#include <plat/i2c.h>
-> >  
-> >  /* I2C controller revisions */
-> >  #define OMAP_I2C_REV_2			0x20
-> > @@ -972,6 +976,7 @@ static const struct i2c_algorithm omap_i2c_algo = {
-> >  	.functionality	= omap_i2c_func,
-> >  };
-> >  
-> > +static const struct of_device_id omap_i2c_of_match[];
-> >  static int __devinit
-> >  omap_i2c_probe(struct platform_device *pdev)
-> >  {
-> > @@ -979,10 +984,15 @@ omap_i2c_probe(struct platform_device *pdev)
-> >  	struct i2c_adapter	*adap;
-> >  	struct resource		*mem, *irq, *ioarea;
-> >  	struct omap_i2c_bus_platform_data *pdata = pdev->dev.platform_data;
-> > +	const struct of_device_id *match;
-> >  	irq_handler_t isr;
-> >  	int r;
-> >  	u32 speed = 0;
-> >  
-> > +	match = of_match_device(omap_i2c_of_match, &pdev->dev);
-> > +	if (!match)
-> > +		dev_err(&pdev->dev, "DT: i2c device match not found.......\n");
-> > +
-> 
-> This isn't an error.  It just mean that the device wasn't registered
-> from the device tree, and it needs to get its configuration from
-> pdata.
-> 
-> In fact, you don't even need this block since the driver never uses
-> the match entry returned by of_match_device()
-
-ok. I will remove this.
-> 
-> >  	/* NOTE: driver uses the static register mapping */
-> >  	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> >  	if (!mem) {
-> > @@ -1007,10 +1017,19 @@ omap_i2c_probe(struct platform_device *pdev)
-> >  		r = -ENOMEM;
-> >  		goto err_release_region;
-> >  	}
-> > -
-> 
-> Don't drop the empty line.
-> 
-> > +	/* I2C device without DT might use this */
-> 
-> No need for the comment.
-ok
-> 
-> >  	if (pdata != NULL) {
-> >  		speed = pdata->clkrate;
-> >  		dev->set_mpu_wkup_lat = pdata->set_mpu_wkup_lat;
-> > +	} else if (pdev->dev.of_node) {
-> > +		const unsigned int *prop;
-> > +		prop = of_get_property(pdev->dev.of_node,
-> > +				"clock-frequency", NULL);
-> > +		if (prop)
-> > +			speed = be32_to_cpup(prop);
-> > +		else
-> > +			speed = 100;
-> 
-> There is a new function that makes this easier.  Do this instead:
-> 
-> 	speed = 100;
-> 	if (of_property_read_u32(pdev->dev.of_node, "clock-frequency", &prop)
-> 		speed = prop / 1000000; /* speed in Hz, this might be wrong */
-These patches got merged after posting this series. I will take care of it in
-the next version.
-
-BTW, I have posted seperate patch to use above API for code optimization.
-
-
-> 
-> > +		dev->set_mpu_wkup_lat = NULL;
-> 
-> dev is kzalloced, which means set_mpu_wkup_lat is already NULL.
-> 
-> >  	} else {
-> >  		speed = 100;	/* Default speed */
-> >  		dev->set_mpu_wkup_lat = NULL;
-> > @@ -1045,6 +1064,7 @@ omap_i2c_probe(struct platform_device *pdev)
-> >  
-> >  	dev->rev = omap_i2c_read_reg(dev, OMAP_I2C_REV_REG) & 0xff;
-> >  
-> > +
-> 
-> Drop the unrelated whitespace change.
-> 
-> >  	if (dev->rev <= OMAP_I2C_REV_ON_3430)
-> >  		dev->errata |= I2C_OMAP3_1P153;
-> >  
-> > @@ -1073,6 +1093,7 @@ omap_i2c_probe(struct platform_device *pdev)
-> >  				       (1000 * speed / 8);
-> >  	}
-> >  
-> > +
-> 
-> Ditto.
-> 
-> >  	/* reset ASAP, clearing any IRQs */
-> >  	omap_i2c_init(dev);
-> >  
-> > @@ -1162,6 +1183,12 @@ static int omap_i2c_resume(struct device *dev)
-> >  	return 0;
-> >  }
-> >  
-> > +static const struct of_device_id omap_i2c_of_match[] = {
-> > +	{.compatible = "ti,omap_i2c", },
-> > +	{},
-> > +}
-> > +MODULE_DEVICE_TABLE(of, omap_i2c_of_match);
-> > +
-> 
-> This needs to be protected with #ifdef CONFIG_OF/#else/#endif.  Don't
-> break non-dt builds.
-> 
-
-ok. Thanks.
-
--Manjunath
+Thanks.
