@@ -1,27 +1,24 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 7 Jul 2011 18:17:11 +0200
-Subject: [PATCH 01/10] ARM: change ARM_DMA_ZONE_SIZE into a variable
-In-Reply-To: <alpine.LFD.2.00.1107062246130.14596@xanadu.home>
-References: <1309919442-20451-1-git-send-email-nicolas.pitre@linaro.org>
-	<20110706230945.GA8286@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1107062246130.14596@xanadu.home>
-Message-ID: <201107071817.11842.arnd@arndb.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 7 Jul 2011 17:22:18 +0100
+Subject: [PATCH v4 00/40] ARM: mm: Add generic macros for declaring
+	various CPU structs
+In-Reply-To: <1310048867-14172-1-git-send-email-dave.martin@linaro.org>
+References: <1310048867-14172-1-git-send-email-dave.martin@linaro.org>
+Message-ID: <20110707162218.GA20403@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 07 July 2011, Nicolas Pitre wrote:
-> > What is hardware specific is that the DMA devices can only address a
-> > limited range of memory.  IMHO it's that which should be described in
-> > DT, not that we'll have a DMA zone of X bytes in size.
-> 
-> I think that we all agree on the principle.  I certainly never intended 
-> to suggest that the DMA zone size be stored as is in the device tree.
+On Thu, Jul 07, 2011 at 03:27:07PM +0100, Dave Martin wrote:
+> This series adds macros for declaring some CPU-related structured
+> defined in assembler, and ports the various processors, cache and
+> tlb implementations to use the macros.
 
-There is a way to specify DMA address ranges in the device tree, though
-I forgot the exact format. It comes down to saying the device sees
-memory range XXX to YYY as its local address AAA to BBB. We could use
-that information at boot time to determine what the largest range
-of memory is that is visible by all devices (and hope that it's at
-the start of physical memory).
+I think this now looks fine - I don't have time to test it at the moment
+600+ messages on the list yesterday (I spent most of yesterday _only_
+replying to email), new large patch sets on the list today, and
+struggling to test some of these changes...
 
-	Arnd
+(It's no wonder people feel that they get ignored - generally if I don't
+process things on the day they're sent, I hardly go looking back through
+my mailbox... it's only Will's pull request which made me go back and
+look at yours.)
