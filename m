@@ -1,33 +1,36 @@
 From: cbouatmailru@gmail.com (Anton Vorontsov)
-Date: Thu, 7 Jul 2011 20:51:11 +0400
-Subject: [PATCH] ARM: cns3xxx: Add support for L2 Cache Controller
-In-Reply-To: <4E14A51F.4030108@gmail.com>
-References: <20110706140832.GA15946@oksana.dev.rtsoft.ru>
-	<4E14A51F.4030108@gmail.com>
-Message-ID: <20110707165111.GA1242@oksana.dev.rtsoft.ru>
+Date: Thu, 7 Jul 2011 20:51:32 +0400
+Subject: [PATCH] ARM: make CNS3XXX select CPU_V6K
+In-Reply-To: <1310033949-25590-1-git-send-email-kaloz@openwrt.org>
+References: <1310033949-25590-1-git-send-email-kaloz@openwrt.org>
+Message-ID: <20110707165131.GB1242@oksana.dev.rtsoft.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 06, 2011 at 01:10:39PM -0500, Rob Herring wrote:
-[...]
-> > +	 * 1 cycle of setup latency, 2 cycles of read and write accesses latency
-> > +	 */
-> > +	val = readl(base + L2X0_DATA_LATENCY_CTRL);
-> > +	val &= 0xfffff888;
+On Thu, Jul 07, 2011 at 12:19:09PM +0200, Imre Kaloz wrote:
+> CNS3XXX is based on MPCore, so select the right CPU option for it.
 > 
-> You're missing a "val |= 0x110" or your comment is wrong.
+> Signed-off-by: Imre Kaloz <kaloz@openwrt.org>
+> ---
 
-Thanks for spotting this.
+Applied, thanks!
 
-These values were taken from the BSP* code, which was tested
-the most (and apparently works), I tend to leave the value as is
-and fixup the comment.
-
-Thanks!
-
-* The BSP does not use L2X0 driver, instead, it contains 'L2CC'
-  driver with these values hard-coded. But nowadays the L2CC driver
-  is unneeded as L2X0 supports PL310 controllers.
+>  arch/arm/Kconfig |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 9adc278..c2e5f3d 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -321,7 +321,7 @@ config ARCH_CLPS711X
+>  
+>  config ARCH_CNS3XXX
+>  	bool "Cavium Networks CNS3XXX family"
+> -	select CPU_V6
+> +	select CPU_V6K
+>  	select GENERIC_CLOCKEVENTS
+>  	select ARM_GIC
+>  	select MIGHT_HAVE_PCI
 
 -- 
 Anton Vorontsov
