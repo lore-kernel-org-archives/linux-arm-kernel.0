@@ -1,46 +1,92 @@
-From: adrian.wenl@gmail.com (Lei Wen)
-Date: Thu, 7 Jul 2011 14:26:23 +0800
-Subject: [PATCH 3/4] MTD: pxa3xx_nand: enable multiple chip select support
-In-Reply-To: <4E1411BB.4010000@compulab.co.il>
-References: <1309319494-17951-1-git-send-email-leiwen@marvell.com>
-	<1309771536-10597-4-git-send-email-leiwen@marvell.com>
-	<4E1411BB.4010000@compulab.co.il>
-Message-ID: <CALZhoSQgoMS7bSRx1V-tMX+aG4idF6Z-Xr3CorFSXwPMHvacXw@mail.gmail.com>
+From: bs14@csr.com (Barry Song)
+Date: Wed, 6 Jul 2011 23:36:55 -0700
+Subject: [PATCH v4 2/3] ARM: CSR: mapping early DEBUG_LL uart
+In-Reply-To: <1310020616-27856-1-git-send-email-bs14@csr.com>
+References: <1310020616-27856-1-git-send-email-bs14@csr.com>
+Message-ID: <1310020616-27856-3-git-send-email-bs14@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Igor && Daniel,
+Signed-off-by: Barry Song <baohua.song@csr.com>
+---
+ arch/arm/mach-prima2/Makefile |    1 +
+ arch/arm/mach-prima2/common.h |    6 ++++++
+ arch/arm/mach-prima2/lluart.c |   25 +++++++++++++++++++++++++
+ arch/arm/mach-prima2/prima2.c |    1 +
+ 4 files changed, 33 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-prima2/lluart.c
 
-On Wed, Jul 6, 2011 at 3:41 PM, Igor Grinberg <grinberg@compulab.co.il> wrote:
-> On 07/04/11 12:25, Lei Wen wrote:
->
->> ?#ifdef CONFIG_PM
->> @@ -1203,8 +1259,12 @@ static int pxa3xx_nand_resume(struct platform_device *pdev)
->> ?{
->> ? ? ? struct pxa3xx_nand_info *info = platform_get_drvdata(pdev);
->>
->> - ? ? nand_writel(info, NDTR0CS0, info->host->ndtr0cs0);
->> - ? ? nand_writel(info, NDTR1CS0, info->host->ndtr1cs0);
->> + ? ? /*
->> + ? ? ?* Directly set the chip select to a invalid value,
->> + ? ? ?* then the driver would reset the timing according
->> + ? ? ?* to current chip select at the beginning of cmdfunc
->> + ? ? ?*/
->> + ? ? info->cs = 0xff;
->
-> Thinking of this for the second (or third) time,
-> If you have keep config enabled and have only one nand chip,
-> this will brake the keep config...
->
-> Daniel,
->
-> have you tested the suspend/resume with this patch?
-> (and keep_config on?)
->
+diff --git a/arch/arm/mach-prima2/Makefile b/arch/arm/mach-prima2/Makefile
+index d44f7ae..f2fba66 100644
+--- a/arch/arm/mach-prima2/Makefile
++++ b/arch/arm/mach-prima2/Makefile
+@@ -3,3 +3,4 @@ obj-y += irq.o
+ obj-y += clock.o
+ obj-y += rstc.o
+ obj-y += prima2.o
++obj-$(CONFIG_DEBUG_LL) += lluart.o
+diff --git a/arch/arm/mach-prima2/common.h b/arch/arm/mach-prima2/common.h
+index fa4a3b5..83e5d21 100644
+--- a/arch/arm/mach-prima2/common.h
++++ b/arch/arm/mach-prima2/common.h
+@@ -17,4 +17,10 @@ extern struct sys_timer sirfsoc_timer;
+ extern void __init sirfsoc_of_irq_init(void);
+ extern void __init sirfsoc_of_clk_init(void);
+ 
++#ifndef CONFIG_DEBUG_LL
++static inline void sirfsoc_map_lluart(void)  {}
++#else
++extern void __init sirfsoc_map_lluart(void);
++#endif
++
+ #endif
+diff --git a/arch/arm/mach-prima2/lluart.c b/arch/arm/mach-prima2/lluart.c
+new file mode 100644
+index 0000000..a89f9b3
+--- /dev/null
++++ b/arch/arm/mach-prima2/lluart.c
+@@ -0,0 +1,25 @@
++/*
++ * Static memory mapping for DEBUG_LL
++ *
++ * Copyright (c) 2011 Cambridge Silicon Radio Limited, a CSR plc group company.
++ *
++ * Licensed under GPLv2 or later.
++ */
++
++#include <linux/kernel.h>
++#include <asm/page.h>
++#include <asm/mach/map.h>
++#include <mach/map.h>
++#include <mach/uart.h>
++
++void __init sirfsoc_map_lluart(void)
++{
++	struct map_desc sirfsoc_lluart_map = {
++		.virtual        = SIRFSOC_UART1_VA_BASE,
++		.pfn            = __phys_to_pfn(SIRFSOC_UART1_PA_BASE),
++		.length         = SIRFSOC_UART1_SIZE,
++		.type           = MT_DEVICE,
++	};
++
++	iotable_init(&sirfsoc_lluart_map, 1);
++}
+diff --git a/arch/arm/mach-prima2/prima2.c b/arch/arm/mach-prima2/prima2.c
+index c26947d..f57124b 100644
+--- a/arch/arm/mach-prima2/prima2.c
++++ b/arch/arm/mach-prima2/prima2.c
+@@ -33,6 +33,7 @@ MACHINE_START(PRIMA2_EVB, "prima2cb")
+ 	/* Maintainer: Barry Song <baohua.song@csr.com> */
+ 	.boot_params	= 0x00000100,
+ 	.init_early     = sirfsoc_of_clk_init,
++	.map_io         = sirfsoc_map_lluart,
+ 	.init_irq	= sirfsoc_of_irq_init,
+ 	.timer		= &sirfsoc_timer,
+ 	.init_machine	= sirfsoc_mach_init,
+-- 
+1.7.1
 
-Do you still have concern with this change?
-If not, I would push the next round of patch set including merging
-patch 3 and 4.
 
-Thanks,
-Lei
+
+Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
+More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
