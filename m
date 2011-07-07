@@ -1,43 +1,53 @@
-From: LW@KARO-electronics.de (=?utf-8?q?Lothar=20Wa=C3=9Fmann?=)
-Date: Thu,  7 Jul 2011 14:50:16 +0200
-Subject: [PATCH] plat-mxc: add missing initialisation of basic_mmio_gpio
-	shadow variables
-Message-ID: <1310043016-1121-1-git-send-email-LW@KARO-electronics.de>
+From: bryan.wu@canonical.com (Bryan Wu)
+Date: Thu, 7 Jul 2011 20:54:25 +0800
+Subject: [PATCH 00/17] Introduce a led trigger for CPU activity
+In-Reply-To: <20110706131600.GW8286@n2100.arm.linux.org.uk>
+References: <1309955687-19365-1-git-send-email-bryan.wu@canonical.com>
+	<CAMPhdO-Ln7BmU8jYfEEp3RPa9sgJueTVfsm1phs=NXTC3FPgNw@mail.gmail.com>
+	<20110706131600.GW8286@n2100.arm.linux.org.uk>
+Message-ID: <CAK5ve-L02jEjQBKaL5+YzUev4znATx=ELp-kZZQiFtF3afo4QQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The bgpio_init() function does not initialise the shadow register for
-the GPIO direction register. Thus, when configuring the first GPIO with
-gpio_set_direction() all other GPIOs of the same bank will be
-configured as inputs. Since the bgpio layer cannot know whether the
-register is readable, the initialisation should be done by the caller
-of bgpio_init().
+On Wed, Jul 6, 2011 at 9:16 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Jul 06, 2011 at 09:13:14PM +0800, Eric Miao wrote:
+>> > ?drivers/leds/ledtrig-cpu.c ? ? ? ? ? ? ? ? ? ? | ?144 ++++++++++++
+>> > ?include/linux/leds.h ? ? ? ? ? ? ? ? ? ? ? ? ? | ? 15 ++
+>> > ?105 files changed, 1532 insertions(+), 3119 deletions(-)
+>>
+>> Not bad, I like the numbers here. This is definitely a good move.
+>> I had long ago wanted to remove those legacy LED code in mach-pxa.
+>
+> The down-side is that through these moves we've lost functionality each
+> time. ?For example, the blinking heartbeat LED on the Assabet and
+> Netwinder which I always enabled to let me know whether the machines
+> were still alove has long since gone.
+>
+> I hope that this series restores that functionality on those platforms
+> where it has been lost.
+>
 
-Also, the 'data' shadow variable that is used inside basic_mmio_gpio
-to cache the current value of the GPIO_DR register is initialised from
-the GPIO_PSR register within bgpio_init(). Thus when setting the
-output value of a certain GPIO, the other GPIO outputs of the same
-bank will be set or cleared depending on the pin state of the GPIO
-inputs during bgpio_init().
+I chose the 'heartbeat' and 'cpu' triggers as default triggers of
+Assabet 2 LEDs.
++/*
++ * The triggers lines up below will only be used if the
++ * LED triggers are compiled in.
++ */
++static const struct {
++       const char *name;
++       const char *trigger;
++} assabet_leds[] = {
++       { "assabet:red", "cpu",},
++       { "assabet:green", "heartbeat", },
++};
 
+But it can be changed on the fly via sysfs. Does this replacement make sense?
 
-Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
----
- drivers/gpio/gpio-mxc.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
-
-diff --git a/drivers/gpio/gpio-mxc.c b/drivers/gpio/gpio-mxc.c
-index b351952..f7944ca 100644
---- a/drivers/gpio/gpio-mxc.c
-+++ b/drivers/gpio/gpio-mxc.c
-@@ -337,6 +337,8 @@ static int __devinit mxc_gpio_probe(struct platform_device *pdev)
- 		goto out_iounmap;
- 
- 	port->bgc.gc.base = pdev->id * 32;
-+	port->bgc.dir = port->bgc.read_reg(port->bgc.reg_dir);
-+	port->bgc.data = port->bgc.read_reg(port->bgc.reg_set);
- 
- 	err = gpiochip_add(&port->bgc.gc);
- 	if (err)
+Thanks,
 -- 
-1.5.6.5
+Bryan Wu <bryan.wu@canonical.com>
+Kernel Developer ? ?+86.138-1617-6545 Mobile
+Ubuntu Kernel Team
+Canonical Ltd. ? ? ?www.canonical.com
+Ubuntu - Linux for human beings | www.ubuntu.com
