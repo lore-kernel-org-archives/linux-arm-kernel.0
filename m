@@ -1,41 +1,80 @@
 From: vkuzmichev@mvista.com (Vitaly Kuzmichev)
-Date: Thu,  7 Jul 2011 16:23:13 +0400
-Subject: [PATCH V3 1/4] ARM: smp_twd: Fix typo in 'twd_timer_rate' printing
+Date: Thu,  7 Jul 2011 16:23:14 +0400
+Subject: [PATCH V3 2/4] ARM: smp_twd: mpcore_wdt: Fix watchdog counter loading
 In-Reply-To: <1310041339-2348-1-git-send-email-vkuzmichev@mvista.com>
 References: <1310041339-2348-1-git-send-email-vkuzmichev@mvista.com>
-Message-ID: <1310041396-2461-1-git-send-email-vkuzmichev@mvista.com>
+Message-ID: <1310041396-2461-2-git-send-email-vkuzmichev@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To get hundredths of MHz the rate needs to be divided by 10'000.
-Here is an example:
- twd_timer_rate = 123456789
- Before the patch:
-    twd_timer_rate / 1000000 = 123
-    (twd_timer_rate / 1000000) % 100 = 23
-    Result: 123.23MHz.
- After being fixed:
-    twd_timer_rate / 1000000 = 123
-    (twd_timer_rate / 10000) % 100 = 45
-    Result: 123.45MHz.
+Although the commit "98af057092f8f0dabe63c5df08adc2bbfbddb1d2
+ ARM: 6126/1: ARM mpcore_wdt: fix build failure and other fixes"
+resolved long standing mpcore_wdt driver build problems, it
+introduced an error in the relationship between the MPcore watchdog
+timer clock rate and mpcore_margin, "MPcore timer margin in seconds",
+such that watchdog timeouts are now arbitrary rather than the number
+of seconds specified by mpcore_margin.
 
+This change restores mpcore_wdt_keepalive() to its equivalent
+implementation prior to commit 98af057 such that watchdog timeouts now
+occur as specified by mpcore_margin.
+
+The variable 'mpcore_timer_rate' which caused that build failure was
+replaced by 'twd_timer_rate'. Adding exported function to obtain
+'twd_timer_rate' value in mpcore_wdt driver.
+
+MPCORE_WATCHDOG needed to build 'mpcore_wdt' already depends on
+HAVE_ARM_TWD needed to build 'smp_twd', so from the point of view of
+'mpcore_wdt' driver the exported function will always exist.
+
+Signed-off-by: Valentine Barshak <vbarshak@mvista.com>
 Signed-off-by: Vitaly Kuzmichev <vkuzmichev@mvista.com>
 ---
- arch/arm/kernel/smp_twd.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/include/asm/smp_twd.h |    1 +
+ arch/arm/kernel/smp_twd.c      |    7 +++++++
+ drivers/watchdog/mpcore_wdt.c  |    4 +---
+ 3 files changed, 9 insertions(+), 3 deletions(-)
 
+diff --git a/arch/arm/include/asm/smp_twd.h b/arch/arm/include/asm/smp_twd.h
+index fed9981..38130b1 100644
+--- a/arch/arm/include/asm/smp_twd.h
++++ b/arch/arm/include/asm/smp_twd.h
+@@ -24,5 +24,6 @@ extern void __iomem *twd_base;
+ 
+ int twd_timer_ack(void);
+ void twd_timer_setup(struct clock_event_device *);
++unsigned long twd_timer_get_rate(void);
+ 
+ #endif
 diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-index 60636f4..2c277d4 100644
+index 2c277d4..c341ebc 100644
 --- a/arch/arm/kernel/smp_twd.c
 +++ b/arch/arm/kernel/smp_twd.c
-@@ -115,7 +115,7 @@ static void __cpuinit twd_calibrate_rate(void)
- 		twd_timer_rate = (0xFFFFFFFFU - count) * (HZ / 5);
+@@ -142,3 +142,10 @@ void __cpuinit twd_timer_setup(struct clock_event_device *clk)
  
- 		printk("%lu.%02luMHz.\n", twd_timer_rate / 1000000,
--			(twd_timer_rate / 1000000) % 100);
-+			(twd_timer_rate / 10000) % 100);
- 	}
+ 	clockevents_register_device(clk);
  }
++
++/* Needed by mpcore_wdt */
++unsigned long twd_timer_get_rate(void)
++{
++	return twd_timer_rate;
++}
++EXPORT_SYMBOL(twd_timer_get_rate);
+diff --git a/drivers/watchdog/mpcore_wdt.c b/drivers/watchdog/mpcore_wdt.c
+index 2b4af22..efde50b 100644
+--- a/drivers/watchdog/mpcore_wdt.c
++++ b/drivers/watchdog/mpcore_wdt.c
+@@ -99,9 +99,7 @@ static void mpcore_wdt_keepalive(struct mpcore_wdt *wdt)
  
+ 	spin_lock(&wdt_lock);
+ 	/* Assume prescale is set to 256 */
+-	count =  __raw_readl(wdt->base + TWD_WDOG_COUNTER);
+-	count = (0xFFFFFFFFU - count) * (HZ / 5);
+-	count = (count / 256) * mpcore_margin;
++	count = (twd_timer_get_rate() / 256) * mpcore_margin;
+ 
+ 	/* Reload the counter */
+ 	writel(count + wdt->perturb, wdt->base + TWD_WDOG_LOAD);
 -- 
 1.7.3.4
