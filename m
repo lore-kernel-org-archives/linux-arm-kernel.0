@@ -1,66 +1,307 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 7 Jul 2011 18:48:37 +0300
-Subject: [PATCH v2 00/18] OMAP4: PM data big spring cleanup and fixes
-In-Reply-To: <E9AF1FACCF71F448B55E58D9AED1B0F40E626BEE34@staex7mb2.telecom.sna.samsung.com>
-References: <1309552901-8944-1-git-send-email-b-cousson@ti.com>
-	<alpine.DEB.2.00.1107060017480.4217@utopia.booyaka.com>
-	<4E14B820.6070202@ti.com> <20110707055549.GC15815@atomide.com>
-	<E9AF1FACCF71F448B55E58D9AED1B0F40E626BEE32@staex7mb2.telecom.sna.samsung.com>
-	<20110707121040.GF15815@atomide.com>
-	<E9AF1FACCF71F448B55E58D9AED1B0F40E626BEE34@staex7mb2.telecom.sna.samsung.com>
-Message-ID: <20110707154834.GP15815@atomide.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu,  7 Jul 2011 16:50:15 +0100
+Subject: [PATCH 02/17] ARM: Add cpu power management notifiers
+In-Reply-To: <1310053830-23779-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1310053830-23779-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1310053830-23779-3-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Martin Fouts <mfouts@sta.samsung.com> [110707 17:26]:
-> From: Tony Lindgren [tony at atomide.com]
-> 
-> >> * Martin Fouts <mfouts@sta.samsung.com> [110707 10:20]:
-> 
-> >>>From: Tony Lindgren [tony at atomide.com]
-> 
-> >> > If we're just doing a bunch of renames all over the place to add support
-> >> > for a new processor variant, something is wrong. This is exactly the kind
-> >> > of "crazy churn" Linus was complaining about. In this case the crazy churn
-> >> > is "let's rename 4430 to 44XX all over the place".
-> >
-> >> To me, this is not 'crazy churn', but rather, correcting an earlier oversight. I did not understand Linus to say 
-> >> "never fix a naming oversight", but "don't change names without a good reason."
-> 
-> > I think this is crazy churn. It does not fix the problem we have, which
-> > is "how can we support lots of SoCs in a sane way". It just postpones
-> > fixing the problem until the next SoC variant comes around. And now
-> > we already have the exact same problem with both the am3505 support
-> > and 4460 support.
-> 
-> We are looking at different aspects of the problem. "How can we support lots of SoCs in a sane way" is obviously the key problem.  I was referring to the smaller, ongoing problem that every device dependent piece of code has: "how do we best communicate what variants are supported by this code."
+From: Colin Cross <ccross@android.com>
 
-Heh I see :) Yes that's a problem too, we still have mach-omap2 as
-the subach name..
+During some CPU power modes entered during idle, hotplug and
+suspend, peripherals located in the CPU power domain, such as
+the GIC and VFP, may be powered down.  Add a notifier chain
+that allows drivers for those peripherals to be notified
+before and after they may be reset.
+
+Signed-off-by: Colin Cross <ccross@android.com>
+Tested-by: Kevin Hilman <khilman@ti.com>
+---
+ arch/arm/Kconfig              |    7 ++
+ arch/arm/include/asm/cpu_pm.h |   54 ++++++++++++
+ arch/arm/kernel/Makefile      |    1 +
+ arch/arm/kernel/cpu_pm.c      |  181 +++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 243 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/include/asm/cpu_pm.h
+ create mode 100644 arch/arm/kernel/cpu_pm.c
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 9adc278..356f266 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -183,6 +183,13 @@ config FIQ
+ config ARCH_MTD_XIP
+ 	bool
  
-> > The second problem we have here is "why does adding 4460 support depend
-> > on a cosmetic clean-up patch". That dependency should not exist at all
-> > as it seems the 4460 patches should work even without this patch.
-> 
-> I agree. Had the original submitter had the foresight to realize that the code should work for all 44xx family processors, we would have no issue at all.  Do we promulgate that oversight and introduce ambiguity about what is really supported in those files, or do we correct it?
-
-Well sounds like we might be able to get rid of CHIP_IS in the *_data.c
-files if we use SoC variant specific lists. Of course Paul might have
-some other ideas here.
++config ARCH_USES_CPU_PM
++       bool
++
++config CPU_PM
++       def_bool y
++       depends on ARCH_USES_CPU_PM && (PM || CPU_IDLE)
++
+ config VECTORS_BASE
+ 	hex
+ 	default 0xffff0000 if MMU || CPU_HIGH_VECTOR
+diff --git a/arch/arm/include/asm/cpu_pm.h b/arch/arm/include/asm/cpu_pm.h
+new file mode 100644
+index 0000000..b4bb715
+--- /dev/null
++++ b/arch/arm/include/asm/cpu_pm.h
+@@ -0,0 +1,54 @@
++/*
++ * Copyright (C) 2011 Google, Inc.
++ *
++ * Author:
++ *	Colin Cross <ccross@android.com>
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++
++#ifndef _ASMARM_CPU_PM_H
++#define _ASMARM_CPU_PM_H
++
++#include <linux/kernel.h>
++#include <linux/notifier.h>
++
++/* Event codes passed as unsigned long val to notifier calls */
++enum cpu_pm_event {
++	/* A single cpu is entering a low power state */
++	CPU_PM_ENTER,
++
++	/* A single cpu failed to enter a low power state */
++	CPU_PM_ENTER_FAILED,
++
++	/* A single cpu is exiting a low power state */
++	CPU_PM_EXIT,
++
++	/* A cpu power domain is entering a low power state */
++	CPU_COMPLEX_PM_ENTER,
++
++	/* A cpu power domain failed to enter a low power state */
++	CPU_COMPLEX_PM_ENTER_FAILED,
++
++	/* A cpu power domain is exiting a low power state */
++	CPU_COMPLEX_PM_EXIT,
++};
++
++int cpu_pm_register_notifier(struct notifier_block *nb);
++int cpu_pm_unregister_notifier(struct notifier_block *nb);
++
++int cpu_pm_enter(void);
++int cpu_pm_exit(void);
++
++int cpu_complex_pm_enter(void);
++int cpu_complex_pm_exit(void);
++
++#endif
+diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+index a5b31af..8b42d58 100644
+--- a/arch/arm/kernel/Makefile
++++ b/arch/arm/kernel/Makefile
+@@ -60,6 +60,7 @@ obj-$(CONFIG_CPU_PJ4)		+= pj4-cp0.o
+ obj-$(CONFIG_IWMMXT)		+= iwmmxt.o
+ obj-$(CONFIG_CPU_HAS_PMU)	+= pmu.o
+ obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o
++obj-$(CONFIG_CPU_PM)		+= cpu_pm.o
+ AFLAGS_iwmmxt.o			:= -Wa,-mcpu=iwmmxt
  
-> >> It seems to me that there is also a bullet to bite here. To achieve the sort of rationalization across the arm architecture that is
-> >> envisioned, inconsistencies in naming styles between platforms will have to be reconciled and resolved, lest the habit continue.
-> 
-> > Sure things should be fixed, but things should be fixed properly. Here
-> > we are repeating the CHIP_IS flag in hundreds of places where it really
-> > should be only checked once after SoC is detected. And then based on
-> > that a SoC specifc list of devices can then be initialized.
-> 
-> Yes.  I was unclear.  I didn't mean we should duplicate the 4430 code and make small changes to it, to create nearly identical 4460 code. I only meant that the unified code that works for 4430 and 4460 should not rely on names that make it appear that one SoC is supported but not the other. I do not feel that the later is cosmetic, although I agree it can be postponed.--
-
-I think if this clean-up is not absolutely necessary we should queue the
-clean-up separately just to avoid the dependency between various patches.
-
-Regards,
-
-Tony
+ ifneq ($(CONFIG_ARCH_EBSA110),y)
+diff --git a/arch/arm/kernel/cpu_pm.c b/arch/arm/kernel/cpu_pm.c
+new file mode 100644
+index 0000000..48a5b53
+--- /dev/null
++++ b/arch/arm/kernel/cpu_pm.c
+@@ -0,0 +1,181 @@
++/*
++ * Copyright (C) 2011 Google, Inc.
++ *
++ * Author:
++ *	Colin Cross <ccross@android.com>
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/notifier.h>
++#include <linux/spinlock.h>
++
++#include <asm/cpu_pm.h>
++
++/*
++ * When a CPU goes to a low power state that turns off power to the CPU's
++ * power domain, the contents of some blocks (floating point coprocessors,
++ * interrutp controllers, caches, timers) in the same power domain can
++ * be lost.  The cpm_pm notifiers provide a method for platform idle, suspend,
++ * and hotplug implementations to notify the drivers for these blocks that
++ * they may be reset.
++ *
++ * All cpu_pm notifications must be called with interrupts disabled.
++ *
++ * The notifications are split into two classes, CPU notifications and CPU
++ * complex notifications.
++ *
++ * CPU notifications apply to a single CPU, and must be called on the affected
++ * CPU.  They are used to save per-cpu context for affected blocks.
++ *
++ * CPU complex notifications apply to all CPUs in a single power domain. They
++ * are used to save any global context for affected blocks, and must be called
++ * after all the CPUs in the power domain have been notified of the low power
++ * state.
++ *
++ */
++
++static DEFINE_RWLOCK(cpu_pm_notifier_lock);
++static RAW_NOTIFIER_HEAD(cpu_pm_notifier_chain);
++
++int cpu_pm_register_notifier(struct notifier_block *nb)
++{
++	unsigned long flags;
++	int ret;
++
++	write_lock_irqsave(&cpu_pm_notifier_lock, flags);
++	ret = raw_notifier_chain_register(&cpu_pm_notifier_chain, nb);
++	write_unlock_irqrestore(&cpu_pm_notifier_lock, flags);
++
++	return ret;
++}
++EXPORT_SYMBOL_GPL(cpu_pm_register_notifier);
++
++int cpu_pm_unregister_notifier(struct notifier_block *nb)
++{
++	unsigned long flags;
++	int ret;
++
++	write_lock_irqsave(&cpu_pm_notifier_lock, flags);
++	ret = raw_notifier_chain_unregister(&cpu_pm_notifier_chain, nb);
++	write_unlock_irqrestore(&cpu_pm_notifier_lock, flags);
++
++	return ret;
++}
++EXPORT_SYMBOL_GPL(cpu_pm_unregister_notifier);
++
++static int cpu_pm_notify(enum cpu_pm_event event, int nr_to_call, int *nr_calls)
++{
++	int ret;
++
++	ret = __raw_notifier_call_chain(&cpu_pm_notifier_chain, event, NULL,
++		nr_to_call, nr_calls);
++
++	return notifier_to_errno(ret);
++}
++
++/**
++ * cpm_pm_enter
++ *
++ * Notifies listeners that a single cpu is entering a low power state that may
++ * cause some blocks in the same power domain as the cpu to reset.
++ *
++ * Must be called on the affected cpu with interrupts disabled.  Platform is
++ * responsible for ensuring that cpu_pm_enter is not called twice on the same
++ * cpu before cpu_pm_exit is called.
++ */
++int cpu_pm_enter(void)
++{
++	int nr_calls;
++	int ret = 0;
++
++	read_lock(&cpu_pm_notifier_lock);
++	ret = cpu_pm_notify(CPU_PM_ENTER, -1, &nr_calls);
++	if (ret)
++		cpu_pm_notify(CPU_PM_ENTER_FAILED, nr_calls - 1, NULL);
++	read_unlock(&cpu_pm_notifier_lock);
++
++	return ret;
++}
++EXPORT_SYMBOL_GPL(cpu_pm_enter);
++
++/**
++ * cpm_pm_exit
++ *
++ * Notifies listeners that a single cpu is exiting a low power state that may
++ * have caused some blocks in the same power domain as the cpu to reset.
++ *
++ * Must be called on the affected cpu with interrupts disabled.
++ */
++int cpu_pm_exit(void)
++{
++	int ret;
++
++	read_lock(&cpu_pm_notifier_lock);
++	ret = cpu_pm_notify(CPU_PM_EXIT, -1, NULL);
++	read_unlock(&cpu_pm_notifier_lock);
++
++	return ret;
++}
++EXPORT_SYMBOL_GPL(cpu_pm_exit);
++
++/**
++ * cpm_complex_pm_enter
++ *
++ * Notifies listeners that all cpus in a power domain are entering a low power
++ * state that may cause some blocks in the same power domain to reset.
++ *
++ * Must be called after cpu_pm_enter has been called on all cpus in the power
++ * domain, and before cpu_pm_exit has been called on any cpu in the power
++ * domain.
++ *
++ * Must be called with interrupts disabled.
++ */
++int cpu_complex_pm_enter(void)
++{
++	int nr_calls;
++	int ret = 0;
++
++	read_lock(&cpu_pm_notifier_lock);
++	ret = cpu_pm_notify(CPU_COMPLEX_PM_ENTER, -1, &nr_calls);
++	if (ret)
++		cpu_pm_notify(CPU_COMPLEX_PM_ENTER_FAILED, nr_calls - 1, NULL);
++	read_unlock(&cpu_pm_notifier_lock);
++
++	return ret;
++}
++EXPORT_SYMBOL_GPL(cpu_complex_pm_enter);
++
++/**
++ * cpm_pm_enter
++ *
++ * Notifies listeners that a single cpu is entering a low power state that may
++ * cause some blocks in the same power domain as the cpu to reset.
++ *
++ * Must be called after cpu_pm_enter has been called on all cpus in the power
++ * domain, and before cpu_pm_exit has been called on any cpu in the power
++ * domain.
++ *
++ * Must be called with interrupts disabled.
++ */
++int cpu_complex_pm_exit(void)
++{
++	int ret;
++
++	read_lock(&cpu_pm_notifier_lock);
++	ret = cpu_pm_notify(CPU_COMPLEX_PM_EXIT, -1, NULL);
++	read_unlock(&cpu_pm_notifier_lock);
++
++	return ret;
++}
++EXPORT_SYMBOL_GPL(cpu_complex_pm_exit);
+-- 
+1.7.4.4
