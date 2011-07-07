@@ -1,188 +1,121 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu,  7 Jul 2011 16:50:24 +0100
-Subject: [RFC PATCH 11/17] ARM: kernel: add support for Lamport's bakery locks
+Date: Thu,  7 Jul 2011 16:50:25 +0100
+Subject: [RFC PATCH 12/17] ARM: kernel: add SCU reset hook
 In-Reply-To: <1310053830-23779-1-git-send-email-lorenzo.pieralisi@arm.com>
 References: <1310053830-23779-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1310053830-23779-12-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1310053830-23779-13-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-NOTE: This toy locking algorithm is there waiting for a warm-boot protocol
-to be defined for ARM SMP platforms. It is there to prevent races
-that will never show up in real platforms (ie multiple CPUs coming
-out of low-power at once from cluster shutdown with no HW/SW control
-so that they might try to renable shared resources like SCU
-concurrently). When a warm-boot protocol is defined this patch
-can be and must be simply ignored; it is provided for completeness.
+When a CLUSTER is powered down the SCU must be reinitialized on
+warm-boot.
+This patch adds a hook to reset the SCU, which implies invalidating
+TAG RAMs and renabling it.
 
-The current implementation of spinlocks on ARM relies on ldrex/strex
-which are only functional if and only if the D$ is looked-up and the CPU
-is within the coherency domain. When a CPU has to be powered down, it
-has to turn off D$ look-up to clean and invalidate L1 dirty lines, and on
-an SMP system it must be taken out of the coherency domain it belongs
-to.
-This means that after the point of no return on power down (cache
-look-up disabled and SMP bit cleared) ldrex/strex cacheable spinlocks become
-unusable. Normal non-cacheable memory based ldrex/strex require a global
-monitor which is not available in all HW configurations.
+The scu virtual address is saved in a static variable when the SCU
+is first enabled at boot; this allows common idle code to be
+generic and avoid relying on platform code to get the address at
+run-time.
+On warm-boot the SCU TAG RAM is invalidated and the SCU enabled if
+it is not already enabled.
 
-In order to ensure atomicity of complex operations like
-cleaning/invalidating/disabling L2 and reset the SCU, this patch adds
-the Lamport's bakery algorithm, which does not rely on any low-level
-atomic operation, to the Linux kernel.
+The reset can be skipped altogether thanks to save/restore
+framework flags.
 
-Unless restrictions are put in place in HW, processors can be powered
-down and powered up at random times (e.g IRQ), which means that the ordering
-is not really controlled by SW, so lock coordination is required to make the
-code generic.
-Memory allocated to LB spinlocks must be strongly ordered and the
-algorithm relies on strongly and coherent writes ordering among
-processors to guarantee atomicity.
+Flushing D$ cache is cumbersome since the system just comes out of
+reset, which invalidates caches in the process if needed (A9), that
+is why the scu_enable function is not reused as it is to reset the SCU.
 
-It is slow and it must be avoided (see NOTE); it is not meant to provide
-a definitive solution.
-
-Tested on dual-core A9 with processors being powered-down and up
-according to CPU idle workloads.
+If the init function is extended, there might not be a need for
+a SCU specific hook, since the init function can be reused to
+reinitialize the SCU at boot provided it is removed from the init
+section and kept in memory.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 ---
- arch/arm/include/asm/lb_lock.h |   34 ++++++++++++++++
- arch/arm/kernel/lb_lock.c      |   85 ++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 119 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/include/asm/lb_lock.h
- create mode 100644 arch/arm/kernel/lb_lock.c
+ arch/arm/include/asm/smp_scu.h |    3 ++-
+ arch/arm/kernel/smp_scu.c      |   33 ++++++++++++++++++++++++++++++---
+ 2 files changed, 32 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/include/asm/lb_lock.h b/arch/arm/include/asm/lb_lock.h
-new file mode 100644
-index 0000000..2ed722c
---- /dev/null
-+++ b/arch/arm/include/asm/lb_lock.h
-@@ -0,0 +1,34 @@
-+/*
-+ * Copyright (C) 2008-2011 ARM Limited
-+ *
-+ * Author(s): Jon Callan, Lorenzo Pieralisi
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ */
-+
-+#ifndef __ASM_ARM_LB_LOCK_H
-+#define __ASM_ARM_LB_LOCK_H
-+
-+/*
-+ * Lamport's Bakery algorithm for spinlock handling
-+ *
-+ * Note that the algorithm requires the bakery struct
-+ * to be in Strongly-Ordered memory.
-+ */
-+
-+/*
-+ * Bakery structure - declare/allocate one of these for each lock.
-+ * A pointer to this struct is passed to the lock/unlock functions.
-+ */
-+struct bakery {
-+	unsigned int number[CONFIG_NR_CPUS];
-+	char entering[CONFIG_NR_CPUS];
-+};
-+
-+extern void initialize_spinlock(struct bakery *bakery);
-+extern void get_spinlock(unsigned cpuid, struct bakery *bakery);
-+extern void release_spinlock(unsigned cpuid, struct bakery *bakery);
-+#endif
-diff --git a/arch/arm/kernel/lb_lock.c b/arch/arm/kernel/lb_lock.c
-new file mode 100644
-index 0000000..199e79e
---- /dev/null
-+++ b/arch/arm/kernel/lb_lock.c
-@@ -0,0 +1,85 @@
-+/*
-+ * Copyright (C) 2008-2011 ARM Limited
-+ *
-+ * Author(s): Jon Callan, Lorenzo Pieralisi
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * Lamport's Bakery algorithm for spinlock handling
-+ *
-+ * Note that the algorithm requires the bakery struct to be in
-+ * Strongly-Ordered memory.
-+ */
-+
-+#include <asm/system.h>
-+#include <asm/string.h>
-+#include <asm/lb_lock.h>
-+#include <asm/io.h>
+diff --git a/arch/arm/include/asm/smp_scu.h b/arch/arm/include/asm/smp_scu.h
+index 4eb6d00..cfaa68e 100644
+--- a/arch/arm/include/asm/smp_scu.h
++++ b/arch/arm/include/asm/smp_scu.h
+@@ -8,7 +8,8 @@
+ #ifndef __ASSEMBLER__
+ unsigned int scu_get_core_count(void __iomem *);
+ void scu_enable(void __iomem *);
+-int scu_power_mode(void __iomem *, unsigned int);
++int scu_power_mode(unsigned int);
++void scu_reset(void);
+ #endif
+ 
+ #endif
+diff --git a/arch/arm/kernel/smp_scu.c b/arch/arm/kernel/smp_scu.c
+index a1e757c..980ced9 100644
+--- a/arch/arm/kernel/smp_scu.c
++++ b/arch/arm/kernel/smp_scu.c
+@@ -20,6 +20,7 @@
+ #define SCU_INVALIDATE		0x0c
+ #define SCU_FPGA_REVISION	0x10
+ 
++static void __iomem *scu_va;
+ /*
+  * Get the number of CPU cores from the SCU configuration
+  */
+@@ -36,6 +37,7 @@ void __init scu_enable(void __iomem *scu_base)
+ {
+ 	u32 scu_ctrl;
+ 
++	scu_va = scu_base;
+ 	scu_ctrl = __raw_readl(scu_base + SCU_CTRL);
+ 	/* already enabled? */
+ 	if (scu_ctrl & 1)
+@@ -59,7 +61,7 @@ void __init scu_enable(void __iomem *scu_base)
+  * has the side effect of disabling coherency, caches must have been
+  * flushed.  Interrupts must also have been disabled.
+  */
+-int scu_power_mode(void __iomem *scu_base, unsigned int mode)
++int scu_power_mode(unsigned int mode)
+ {
+ 	unsigned int val;
+ 	int cpu = smp_processor_id();
+@@ -67,9 +69,34 @@ int scu_power_mode(void __iomem *scu_base, unsigned int mode)
+ 	if (mode > 3 || mode == 1 || cpu > 3)
+ 		return -EINVAL;
+ 
+-	val = __raw_readb(scu_base + SCU_CPU_STATUS + cpu) & ~0x03;
++	val = __raw_readb(scu_va + SCU_CPU_STATUS + cpu) & ~0x03;
+ 	val |= mode;
+-	__raw_writeb(val, scu_base + SCU_CPU_STATUS + cpu);
++	__raw_writeb(val, scu_va + SCU_CPU_STATUS + cpu);
+ 
+ 	return 0;
+ }
 +
 +/*
-+ * Initialize a bakery - only required if the bakery is
-+ * on the stack or heap, as static data is zeroed anyway.
++ * Reinitialise the SCU after power-down
 + */
-+void  initialize_spinlock(struct bakery *bakery)
++
++void scu_reset(void)
 +{
-+	memset(bakery, 0, sizeof(struct bakery));
-+}
++	u32 scu_ctrl;
 +
-+/*
-+ * Claim a bakery lock. Function does not return until
-+ * lock has been obtained.
-+ */
-+void notrace get_spinlock(unsigned cpuid, struct bakery *bakery)
-+{
-+	unsigned i, my_full_number, his_full_number, max = 0;
-+
-+	/* Get a ticket */
-+	__raw_writeb(1, bakery->entering + cpuid);
++	scu_ctrl = __raw_readl(scu_va + SCU_CTRL);
++	/* already enabled? */
++	if (scu_ctrl & 1)
++		return;
 +	/*
-+	 * The order of writes is paramount to the algorithm
-+	 * dsb() ensures the write happens in order here
++	 * SCU TAGS should be invalidated on boot-up
 +	 */
-+	dsb();
-+	for (i = 0; i < CONFIG_NR_CPUS; ++i) {
-+		if (__raw_readl(bakery->number + i) > max)
-+			max = __raw_readl(bakery->number + i);
-+	}
-+	++max;
++	__raw_writel(0xffff, scu_va + SCU_INVALIDATE);
 +	/*
-+	 * The order of writes is paramount to the algorithm
-+	 * dsb() ensures the write happens in order here
++	 *  Coming out of reset, dcache invalidated
++	 *  no need to go through the whole hog again
++	 *  just enable the SCU and pop out
 +	 */
-+	__raw_writel(max, bakery->number + cpuid);
-+	dsb();
-+	__raw_writeb(0, bakery->entering + cpuid);
-+
-+	/* Wait for our turn */
-+	my_full_number = (max << 8) + cpuid;
-+	for (i = 0; i < CONFIG_NR_CPUS; ++i) {
-+		while (__raw_readb(bakery->entering + i))
-+			;
-+				/*
-+				 * Wait since another CPU might be taking our
-+				 * same ticket number and have higher priority
-+				 */
-+		do {
-+			his_full_number = __raw_readl(bakery->number + i);
-+			if (his_full_number)
-+				his_full_number =
-+				    (his_full_number << 8) + i;
-+
-+		} while (his_full_number && (his_full_number < my_full_number));
-+	}
-+	dsb();
-+}
-+
-+/*
-+ * Release a bakery lock.
-+ */
-+void  release_spinlock(unsigned cpuid, struct bakery *bakery)
-+{
-+	dsb();
-+	__raw_writel(0, bakery->number + cpuid);
++	scu_ctrl |= 1;
++	__raw_writel(scu_ctrl, scu_va + SCU_CTRL);
 +}
 -- 
 1.7.4.4
