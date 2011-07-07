@@ -1,41 +1,36 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 7 Jul 2011 23:36:20 +0100
-Subject: [PATCH 0/7] Re-organize linker layouts
-In-Reply-To: <4E15ECB6.40100@codeaurora.org>
-References: <20110706102245.GO8286@n2100.arm.linux.org.uk>
-	<4E15ECB6.40100@codeaurora.org>
-Message-ID: <20110707223620.GG20403@n2100.arm.linux.org.uk>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 7 Jul 2011 16:36:50 -0600 (MDT)
+Subject: [PATCH v4 3/7] OMAP2+: PM: Initialise sleep_switch to a non-valid
+	value
+In-Reply-To: <1309555626-22608-4-git-send-email-b-cousson@ti.com>
+References: <1309555626-22608-1-git-send-email-b-cousson@ti.com>
+	<1309555626-22608-4-git-send-email-b-cousson@ti.com>
+Message-ID: <alpine.DEB.2.00.1107071635230.2647@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 07, 2011 at 10:28:22AM -0700, Stephen Boyd wrote:
-> On 07/06/2011 03:22 AM, Russell King - ARM Linux wrote:
-> > The following series of patches are targetted at two issues:
-> >
-> > 1. Fixing large initramfs causing PC24 relocations to become out of
-> >    range.  This fixes both modules and link-time errors.
-> >
-> > 2. Making the vmlinux easier to pinpoint the various section-built
-> >    data structures and inspect them later.
-> >
-> > For the main kernel, this allows the size of various sections to be
-> > determined via objdump -h.  This also aids objdump -d and -s usage
-> > when asking it to target a particular section.
-> >
-> > For the decompressor, it means that it is now trivially possible to copy
-> > out the compressed kernel vmlinux image by:
-> >
-> >   arm-linux-objcopy -O binary -j .piggydata arch/arm/boot/compressed/vmlinux \
-> > 	piggy.gz
-> >
-> > and thereby obtain the binary kernel image (the Image file) which was
-> > originally used.
-> 
-> I gave this series a test with my poison initmem patch and all looks well
-> 
-> Tested-by: Stephen Boyd <sboyd@codeaurora.org>
-> 
-> except for patch 2 as I didn't use a zImage.
+cc'ing Kevin, since this touches mach-omap2/pm.c - an ack would be great 
+if you have the chance
 
-Oh, what did you use instead?  I thought no one used the Image files
-anymore...
+On Fri, 1 Jul 2011, Benoit Cousson wrote:
+
+> From: Rajendra Nayak <rnayak@ti.com>
+> 
+> sleep_switch which is initialised to 0 in omap_set_pwrdm_state
+> happens to be a valid sleep_switch type (FORCEWAKEUP_SWITCH)
+> which are defined as:
+> 
+>  #define FORCEWAKEUP_SWITCH      0
+>  #define LOWPOWERSTATE_SWITCH    1
+> 
+> This causes the function to wrongly program some clock domains
+> even when the Powerdomain is in ON state.
+> 
+> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> Cc: Paul Walmsley <paul@pwsan.com>
+
+Thanks, this patch has been queued for 3.1 at 
+git://git.pwsan.com/linux-2.6 in the 'powerdomain_fixes_3.1' branch.
+
+
+- Paul
