@@ -1,24 +1,40 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 7 Jul 2011 15:49:21 +0100
-Subject: [PATCHv2] remove unnecessary cache flush on v6 copypage
-In-Reply-To: <20110707143019.GA16819@heechul-desktop>
-References: <20110707143019.GA16819@heechul-desktop>
-Message-ID: <20110707144921.GA15429@1n450.cable.virginmedia.net>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Thu,  7 Jul 2011 15:27:12 +0100
+Subject: [PATCH v4 05/40] ARM: mm: cache-v4: Use the new processor struct
+	macros
+In-Reply-To: <1310048867-14172-1-git-send-email-dave.martin@linaro.org>
+References: <1310048867-14172-1-git-send-email-dave.martin@linaro.org>
+Message-ID: <1310048867-14172-6-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 07, 2011 at 09:30:19AM -0500, Heechul Yun wrote:
-> ARM: mm: remove unnecessary cache flush on v6 copypage
+Signed-off-by: Dave Martin <dave.martin@linaro.org>
+---
+ arch/arm/mm/cache-v4.S |   15 ++-------------
+ 1 files changed, 2 insertions(+), 13 deletions(-)
 
-Just move this line in the subject and remove it from the body.
-
-> Originally introduced to maintain coherency between icache and dcache
-> in v6 nonaliasing mode. This is now handled by __sync_icache_dcache since
-> c0177800, therefore unneceary in this function.  
-
-Minor typo - "unnecessary".
-
-Thanks.
-
+diff --git a/arch/arm/mm/cache-v4.S b/arch/arm/mm/cache-v4.S
+index a8fefb5..fd9bb7a 100644
+--- a/arch/arm/mm/cache-v4.S
++++ b/arch/arm/mm/cache-v4.S
+@@ -141,16 +141,5 @@ ENDPROC(v4_dma_map_area)
+ 
+ 	__INITDATA
+ 
+-	.type	v4_cache_fns, #object
+-ENTRY(v4_cache_fns)
+-	.long	v4_flush_icache_all
+-	.long	v4_flush_kern_cache_all
+-	.long	v4_flush_user_cache_all
+-	.long	v4_flush_user_cache_range
+-	.long	v4_coherent_kern_range
+-	.long	v4_coherent_user_range
+-	.long	v4_flush_kern_dcache_area
+-	.long	v4_dma_map_area
+-	.long	v4_dma_unmap_area
+-	.long	v4_dma_flush_range
+-	.size	v4_cache_fns, . - v4_cache_fns
++	@ define struct cpu_cache_fns (see <asm/cacheflush.h> and proc-macros.S)
++	define_cache_functions v4
 -- 
-Catalin
+1.7.4.1
