@@ -1,55 +1,62 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Wed, 6 Jul 2011 19:43:07 -0500
-Subject: [PATCH 01/52] ARM: introduce atag_offset to replace boot_params
-In-Reply-To: <1309920457-21913-1-git-send-email-nicolas.pitre@linaro.org>
-References: <1309920457-21913-1-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <ADE657CA350FB648AAC2C43247A983F001F383D6CD4D@AUSP01VMBX24.collaborationhost.net>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Thu, 7 Jul 2011 09:20:29 +0800
+Subject: [PATCH 1/3] ARM: CSR: Adding CSR SiRFprimaII board support
+In-Reply-To: <201107062231.51117.arnd@arndb.de>
+References: <1309945678-18813-1-git-send-email-bs14@csr.com>
+	<CAGsJ_4xntJHz_CzCaTuyCbDrePzxO+esPFxTfZZ1TTnZFy4w=Q@mail.gmail.com>
+	<20110706191000.GN8286@n2100.arm.linux.org.uk>
+	<201107062231.51117.arnd@arndb.de>
+Message-ID: <CAGsJ_4wi3My=7M2sTwDNTAPxr+JFFAMrDDfBMy08ztjD3soWrQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, July 05, 2011 7:47 PM, Nicolas Pitre wrote:
-> The boot_params member of the mdesc structure is used to provide a
-> default physical address for the ATAG list.  Since this value is fixed
-> at compile time and often based on ARCH_PHYS_OFFSET, it gets in the way
-> of runtime PHYS_OFFSET usage.
-> 
-> Let's introduce atag_offset which should contains only the relative
-> offset from start of memory instead of an absolute value, in preparation
-> to move all instance of boot_params over to it.
-> 
-> Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-> ---
->  arch/arm/include/asm/mach/arch.h |    1 +
->  arch/arm/kernel/setup.c          |    2 ++
->  2 files changed, 3 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
-> index 7b79a00..1bdf6e1 100644
-> --- a/arch/arm/include/asm/mach/arch.h
-> +++ b/arch/arm/include/asm/mach/arch.h
-> @@ -18,6 +18,7 @@ struct machine_desc {
->  	unsigned int		nr;		/* architecture number	*/
->  	const char		*name;		/* architecture name	*/
->  	unsigned long		boot_params;	/* tagged list		*/
-> +	unsigned long		atag_offset;	/* tagged list (relative) */
->  	const char		**dt_compat;	/* array of device tree
->  						 * 'compatible' strings	*/
->  
-> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> index e0db84d..4cc3e2b 100644
-> --- a/arch/arm/kernel/setup.c
-> +++ b/arch/arm/kernel/setup.c
-> @@ -816,6 +816,8 @@ static struct machine_desc * __init setup_machine_tags(unsigned int nr)
->  
->  	if (__atags_pointer)
->  		tags = phys_to_virt(__atags_pointer);
-> +	else if(mdesc->atag_offset)
-> +		tags = PAGE_OFFSET + mdesc->atag_offset;
+2011/7/7 Arnd Bergmann <arnd@arndb.de>:
+> On Wednesday 06 July 2011 21:10:00 Russell King - ARM Linux wrote:
+>> On Thu, Jul 07, 2011 at 12:09:24AM +0800, Barry Song wrote:
+>> > if you define that in asm/io.h as you said:
+>> >
+>> > #ifndef IO_SPACE_LIMIT
+>> > #if defined(PCMCIA_SOC_COMMON)
+>> > #define ?IO_SPACE_LIMIT ((resource_size_t)0xffffffff)
+>> > #else
+>> > #if defined(CONFIG_PCI) || defined(CONFIG_ISA) || defined(CONFIG_PCCARD)
+>> > #define IO_SPACE_LIMIT ((resource_size_t)0xffff)
+>> > #else
+>> > #define IO_SPACE_LIMIT ((resource_size_t)0)
+>> > #endif
+>> > #endif
+>> > #endif
+>> >
+>> > i'd like to delete IO_SPACE_LIMIT in my io.h.
+>> >
+>> > otherwise, i'd like to try "#define IO_SPACE_LIMIT
+>> > ((resource_size_t)0)" in my io.h since i have no real
+>> > CONFIG_PCI/ISA/PCCARD/PCMCIA_SOC_COMMON.
+>>
+>> Thanks - stopping the 0xffffffff madness in new platforms is great.
+>
+> FWIW, I've double-checked the Xilinx zynq platform that I've already queued
+> up for 3.1: this one defines IO_SPACE_LIMIT to 0xffff because PCI support
+> will get merged later, so that's fine.
 
-This results in a warning...
+as far as i know, zynq still has some static mapping tables and board
+file board_dt.c. as you have reviewed csr platform very carefully, i
+guess those can get fixed in zynq later too :-)
+xilinx zynq and csr prima2 should be the pioneering two new SoCs to
+move to DT in arm for the moment. at least, these two things can try
+to get same.
 
-arch/arm/kernel/setup.c: In function 'setup_arch':
-arch/arm/kernel/setup.c:820: warning: assignment makes pointer from integer without a cast
-
-Regards,
-Hartley
+>
+>> If you also omit the definition for __io() and set NO_IOPORT in your
+>> Kconfig, you should also end up with inb() et.al. undefined by asm/io.h,
+>> which should cause build-time failures if an ISA/PCI/PCMCIA driver
+>> attempts to build.
+>
+> Just as a follow-up, this is what I was referring to in the other
+> sub-thread. Setting NO_IOPORT and removing __io does work for a lot
+> of things today, but breaks randconfig builds left and right. I want
+> to clean that up by adding 'depends on HAS_IOPORT' at the correct places
+> and then switch all platforms that don't need it to remove __io.
+>
+> ? ? ? ?Arnd
+>
