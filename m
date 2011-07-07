@@ -1,30 +1,116 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 7 Jul 2011 19:40:24 +0200
-Subject: [PATCH 01/10] ARM: change ARM_DMA_ZONE_SIZE into a variable
-In-Reply-To: <81e4ac16-db7b-47a0-9f93-632a5d9f898d@VA3EHSMHS028.ehs.local>
-References: <1309919442-20451-1-git-send-email-nicolas.pitre@linaro.org>
-	<201107071817.11842.arnd@arndb.de>
-	<81e4ac16-db7b-47a0-9f93-632a5d9f898d@VA3EHSMHS028.ehs.local>
-Message-ID: <201107071940.24964.arnd@arndb.de>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Thu, 07 Jul 2011 13:41:05 -0400 (EDT)
+Subject: [PATCHv2] arm: mm: Poison freed init memory
+In-Reply-To: <1310057247-4933-1-git-send-email-sboyd@codeaurora.org>
+References: <20110706210106.GX8286@n2100.arm.linux.org.uk>
+	<1310057247-4933-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <alpine.LFD.2.00.1107071340420.14596@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 07 July 2011 19:08:38 John Linn wrote:
-> > There is a way to specify DMA address ranges in the device tree,
-> though
-> > I forgot the exact format. It comes down to saying the device sees
-> > memory range XXX to YYY as its local address AAA to BBB. We could use
-> > that information at boot time to determine what the largest range
-> > of memory is that is visible by all devices (and hope that it's at
-> > the start of physical memory).
-> 
-> If I'm following this right....
-> 
-> We have a hole at the start of physical memory (when it's at 0) so that
-> DMA can't DMA into it.  Sounds like that won't work for us?
+On Thu, 7 Jul 2011, Stephen Boyd wrote:
 
-A whole in physical memory should not be a problem. It's only a problem
-if you have a device that can do DMA only to to some memory range that
-is not the start of your RAM, e.g. only the second 256MB but not the first.
+> Poisoning __init marked memory can be useful when tracking down
+> obscure memory corruption bugs. Therefore, poison init memory
+> with 0xe7fddef0 to catch bugs earlier. The poison value is an
+> undefined instruction in ARM mode and branch to an undefined
+> instruction in Thumb mode.
+> 
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 
-	Arnd
+Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+
+
+
+> ---
+> 
+> On 7/6/2011 2:01 PM, Russell King - ARM Linux wrote:
+> > On Wed, Jul 06, 2011 at 01:55:54PM -0700, Stephen Boyd wrote:
+> >> Should it include the initrd too? At least x86 poisons that memory but I
+> >> don't know who would be using that incorrectly.
+> >
+> > It could do - I don't see any harm in not doing so.  The only issue
+> > is that people may want to disable this stuff if they're after
+> > squeezing every last ms out of the boot time.
+> 
+> I haven't done this. I hope a follow up patch will suffice.
+> 
+> >
+> >> How about a free_init_area() function which calls free_area() after
+> >> poisoning the memory?
+> >
+> > I need to go back and look at the Integrator etc situation with regard
+> > to reorganizing the vmlinux layout - it may be that the omission of
+> > freeing .init memory can now be removed (it was there to stop the
+> > memory being used as the first K of memory wasn't DMA-able.)
+> >
+> > Assuming it has to stay though, we still should arrange for the initrd
+> > memory to be poisoned even if it isn't freed.
+> 
+> Is this is patch what you're saying? I would have liked to do a
+> free_init_area() wrapper, but until the Integrator situation can be
+> sorted it doesn't look worthwhile.
+> 
+>  arch/arm/mm/init.c |   17 ++++++++++++++++-
+>  1 files changed, 16 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+> index c19571c..d6360b1 100644
+> --- a/arch/arm/mm/init.c
+> +++ b/arch/arm/mm/init.c
+> @@ -422,6 +422,17 @@ static inline int free_area(unsigned long pfn, unsigned long end, char *s)
+>  	return pages;
+>  }
+>  
+> +/*
+> + * Poison init memory with an undefined instruction (ARM) or a branch to an
+> + * undefined instruction (Thumb).
+> + */
+> +static inline void poison_init_mem(void *s, size_t count)
+> +{
+> +	u32 *p = (u32 *)s;
+> +	while ((count = count - 4))
+> +		*p++ = 0xe7fddef0;
+> +}
+> +
+>  static inline void
+>  free_memmap(unsigned long start_pfn, unsigned long end_pfn)
+>  {
+> @@ -704,11 +715,13 @@ void free_initmem(void)
+>  #ifdef CONFIG_HAVE_TCM
+>  	extern char __tcm_start, __tcm_end;
+>  
+> +	poison_init_mem(&__tcm_start, &__tcm_end - &__tcm_start);
+>  	totalram_pages += free_area(__phys_to_pfn(__pa(&__tcm_start)),
+>  				    __phys_to_pfn(__pa(&__tcm_end)),
+>  				    "TCM link");
+>  #endif
+>  
+> +	poison_init_mem(__init_begin, __init_end - __init_begin);
+>  	if (!machine_is_integrator() && !machine_is_cintegrator())
+>  		totalram_pages += free_area(__phys_to_pfn(__pa(__init_begin)),
+>  					    __phys_to_pfn(__pa(__init_end)),
+> @@ -721,10 +734,12 @@ static int keep_initrd;
+>  
+>  void free_initrd_mem(unsigned long start, unsigned long end)
+>  {
+> -	if (!keep_initrd)
+> +	if (!keep_initrd) {
+> +		poison_init_mem((void *)start, PAGE_ALIGN(end) - start);
+>  		totalram_pages += free_area(__phys_to_pfn(__pa(start)),
+>  					    __phys_to_pfn(__pa(end)),
+>  					    "initrd");
+> +	}
+>  }
+>  
+>  static int __init keepinitrd_setup(char *__unused)
+> -- 
+> Sent by an employee of the Qualcomm Innovation Center, Inc.
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+> 
