@@ -1,52 +1,46 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 7 Jul 2011 13:27:05 -0600
-Subject: [PATCH v3 0/3] Add device tree probe for imx/mxc gpio
-In-Reply-To: <1309970263-13239-1-git-send-email-shawn.guo@linaro.org>
-References: <1309970263-13239-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20110707192705.GL2824@ponder.secretlab.ca>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 7 Jul 2011 21:37:53 +0200
+Subject: [RFC] dmaengine: add new api for preparing simple slave transfer
+In-Reply-To: <E0D41E29EB0DAC4E9F3FF173962E9E9403024F5420@dbde02.ent.ti.com>
+References: <E0D41E29EB0DAC4E9F3FF173962E9E940301FE2DED@dbde02.ent.ti.com>
+	<20110609124723.GA24636@n2100.arm.linux.org.uk>
+	<E0D41E29EB0DAC4E9F3FF173962E9E940301FE2EFB@dbde02.ent.ti.com>
+	<1307686140.10976.111.camel@vkoul-udesk3>
+	<E0D41E29EB0DAC4E9F3FF173962E9E940301FE3405@dbde02.ent.ti.com>
+	<1307724439.10976.188.camel@vkoul-udesk3>
+	<E0D41E29EB0DAC4E9F3FF173962E9E9403020B7C2A@dbde02.ent.ti.com>
+	<1308203119.10976.234.camel@vkoul-udesk3>
+	<E0D41E29EB0DAC4E9F3FF173962E9E9403024F5420@dbde02.ent.ti.com>
+Message-ID: <CAKnu2MorpLQuzwDGBJ7uSt6NOk=9vgeBN4f+Zx=CSU9okqzvGw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 07, 2011 at 12:37:40AM +0800, Shawn Guo wrote:
-> The first patch removes the uses of cpu_is_mx(), the second one
-> changes mxc gpio number macro, and the third one adds actual device
-> tree probe support.
-> 
-> Changes since v2:
->  * Keep platform case gpio range code path unchanged, and get range
->    from gpio core only for dt case.
-> 
-> Changes since v1:
->  * Address review comments given by Grant and Sascha
->  * Add patch #1 to get gpio range/base from gpio core
-> 
-> Shawn Guo (3):
->       gpio/mxc: get rid of the uses of cpu_is_mx()
->       ARM: mxc: use ARCH_NR_GPIOS to define gpio number
->       gpio/mxc: add device tree probe support
+2011/7/7 Raju, Sundaram <sundaram@ti.com>:
 
-Sascha; so are we good?  Should I merge this series?
+> | Just put some enumerator in enum dma_ctrl_cmd in
+> | dmaengine.h such as SDMA_TEXAS_STRIDE_CONFIG and call
+> | like this:
+> |
+> | /* However that config struct needs to look, basically */
+> | static struct sdma_ti_stride_cgf = {
+> | ? ? ?take = M,
+> | ? ? ?skip = N,
+> | };
+> |
+> | ret = chan->device->device_control(chan, SDMA_TEXAS_STRIDE_CONFIG,
+> | &sdma_ti_stride_cfg);
+> |
+> | Or something like this.
+>
+> I think this is better option than your 2b. This requires just an addition of
+> one more enum in the dma_ctrl_cmd. What do you think about this?
+> If Dan and you are okay with this I will send a small patch for this asap.
 
-g.
+I think this is the best way to solve it atleast. It's clear what is
+being done, and it's easy for a client trying to create such a slave
+transfer to back out if it turns out that the DMAC in use does not
+support this striding.
 
-> 
->  .../devicetree/bindings/gpio/fsl-imx-gpio.txt      |   22 +++
->  arch/arm/mach-imx/mm-imx1.c                        |    8 +-
->  arch/arm/mach-imx/mm-imx21.c                       |   12 +-
->  arch/arm/mach-imx/mm-imx25.c                       |    9 +-
->  arch/arm/mach-imx/mm-imx27.c                       |   13 +-
->  arch/arm/mach-imx/mm-imx31.c                       |    6 +-
->  arch/arm/mach-imx/mm-imx35.c                       |    7 +-
->  arch/arm/mach-mx5/mm-mx50.c                        |   13 +-
->  arch/arm/mach-mx5/mm.c                             |   24 ++--
->  arch/arm/plat-mxc/devices/platform-gpio-mxc.c      |    4 +-
->  arch/arm/plat-mxc/include/mach/common.h            |    2 +-
->  arch/arm/plat-mxc/include/mach/irqs.h              |   21 +---
->  drivers/gpio/gpio-mxc.c                            |  157 +++++++++++++++++---
->  13 files changed, 211 insertions(+), 87 deletions(-)
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+Send a patch out and I'll Ack it, FWIW.
+
+Linus Walleij
