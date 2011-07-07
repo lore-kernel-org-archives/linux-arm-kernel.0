@@ -1,42 +1,40 @@
 From: dave.martin@linaro.org (Dave Martin)
-Date: Thu,  7 Jul 2011 15:27:09 +0100
-Subject: [PATCH v4 02/40] ARM: assembler.h: Add string declaration macro
+Date: Thu,  7 Jul 2011 15:27:13 +0100
+Subject: [PATCH v4 06/40] ARM: mm: cache-v4wb: Use the new processor struct
+	macros
 In-Reply-To: <1310048867-14172-1-git-send-email-dave.martin@linaro.org>
 References: <1310048867-14172-1-git-send-email-dave.martin@linaro.org>
-Message-ID: <1310048867-14172-3-git-send-email-dave.martin@linaro.org>
+Message-ID: <1310048867-14172-7-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Declaring strings in assembler source involves a certain amount of
-tedious boilerplate code in order to annotate the resulting symbol
-correctly.
-
-Encapsulating this boilerplate in a macro should help to avoid some
-duplication and the occasional mistake.
-
 Signed-off-by: Dave Martin <dave.martin@linaro.org>
-Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 ---
- arch/arm/include/asm/assembler.h |    9 +++++++++
- 1 files changed, 9 insertions(+), 0 deletions(-)
+ arch/arm/mm/cache-v4wb.S |   15 ++-------------
+ 1 files changed, 2 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
-index 65c3f24..29035e8 100644
---- a/arch/arm/include/asm/assembler.h
-+++ b/arch/arm/include/asm/assembler.h
-@@ -293,4 +293,13 @@
- 	.macro	ldrusr, reg, ptr, inc, cond=al, rept=1, abort=9001f
- 	usracc	ldr, \reg, \ptr, \inc, \cond, \rept, \abort
- 	.endm
-+
-+/* Utility macro for declaring string literals */
-+	.macro	string name:req, string
-+	.type \name , #object
-+\name:
-+	.asciz "\string"
-+	.size \name , . - \name
-+	.endm
-+
- #endif /* __ASM_ASSEMBLER_H__ */
+diff --git a/arch/arm/mm/cache-v4wb.S b/arch/arm/mm/cache-v4wb.S
+index f40c696..4f2c141 100644
+--- a/arch/arm/mm/cache-v4wb.S
++++ b/arch/arm/mm/cache-v4wb.S
+@@ -253,16 +253,5 @@ ENDPROC(v4wb_dma_unmap_area)
+ 
+ 	__INITDATA
+ 
+-	.type	v4wb_cache_fns, #object
+-ENTRY(v4wb_cache_fns)
+-	.long	v4wb_flush_icache_all
+-	.long	v4wb_flush_kern_cache_all
+-	.long	v4wb_flush_user_cache_all
+-	.long	v4wb_flush_user_cache_range
+-	.long	v4wb_coherent_kern_range
+-	.long	v4wb_coherent_user_range
+-	.long	v4wb_flush_kern_dcache_area
+-	.long	v4wb_dma_map_area
+-	.long	v4wb_dma_unmap_area
+-	.long	v4wb_dma_flush_range
+-	.size	v4wb_cache_fns, . - v4wb_cache_fns
++	@ define struct cpu_cache_fns (see <asm/cacheflush.h> and proc-macros.S)
++	define_cache_functions v4wb
 -- 
 1.7.4.1
