@@ -1,81 +1,68 @@
 From: vkoul@infradead.org (Vinod Koul)
-Date: Thu, 07 Jul 2011 07:36:00 +0530
-Subject: [PATCH] dmaengine: mxs-dma: skip request_irq for NO_IRQ
-In-Reply-To: <20110707001530.GE4034@S2100-06.ap.freescale.net>
-References: <20110630052855.GE25931@S2100-06.ap.freescale.net>
-	<1309421193-7785-1-git-send-email-shawn.guo@linaro.org>
-	<20110707001530.GE4034@S2100-06.ap.freescale.net>
-Message-ID: <1310004360.20150.16.camel@psiaudioba-mobl1>
+Date: Thu, 07 Jul 2011 08:03:45 +0530
+Subject: [PATCH 3/3] dmaengine: at_hdmac: add slave config operation
+In-Reply-To: <1151852b20789636633095406a180335364f4afb.1309259835.git.nicolas.ferre@atmel.com>
+References: <fb4657207f9eb34784c10333e11c48b5638542ed.1309259835.git.nicolas.ferre@atmel.com>
+	<1151852b20789636633095406a180335364f4afb.1309259835.git.nicolas.ferre@atmel.com>
+Message-ID: <1310006025.20150.29.camel@psiaudioba-mobl1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-07-07 at 08:15 +0800, Shawn Guo wrote:
-> On Thu, Jun 30, 2011 at 04:06:33PM +0800, Shawn Guo wrote:
-> > In general, the mxs-dma users get separate irq for each channel,
-> > but gpmi is special one which has only one irq shared by all gpmi
-> > channels.  It causes mxs_dma channel allocation function fail for
-> > all other gpmi channels except the first one calling into the
-> > function.
-> > 
-> > The patch gets request_irq call skipped for NO_IRQ case, and leaves
-> > this gpmi specific quirk to gpmi driver to sort out.  It will fix
-> > above problem if gpmi driver sets chan_irq as gpmi irq for only one
-> > channel and NO_IRQ for all the rest channels.
-> > 
-> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > Cc: Vinod Koul <vinod.koul@intel.com>
-> > ---
-> 
-> Hi Vinod,
-> 
-> Can you please take this patch?
-> 
-> Regards,
-> Shawn
-Looks okay to me. Have queued it up and should show up in my tree latest by early next week.
-I am on road, hence the delay...
+On Tue, 2011-06-28 at 13:17 +0200, Nicolas Ferre wrote:
+> Only change source/destination peripheral register access width.
+How about a little more explainable change log
 
-
-> >  drivers/dma/mxs-dma.c |   10 ++++++----
-> >  1 files changed, 6 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
-> > index 88aad4f..2870d91 100644
-> > --- a/drivers/dma/mxs-dma.c
-> > +++ b/drivers/dma/mxs-dma.c
-> > @@ -327,10 +327,12 @@ static int mxs_dma_alloc_chan_resources(struct dma_chan *chan)
-> >  
-> >  	memset(mxs_chan->ccw, 0, PAGE_SIZE);
-> >  
-> > -	ret = request_irq(mxs_chan->chan_irq, mxs_dma_int_handler,
-> > -				0, "mxs-dma", mxs_dma);
-> > -	if (ret)
-> > -		goto err_irq;
-> > +	if (mxs_chan->chan_irq != NO_IRQ) {
-> > +		ret = request_irq(mxs_chan->chan_irq, mxs_dma_int_handler,
-> > +					0, "mxs-dma", mxs_dma);
-> > +		if (ret)
-> > +			goto err_irq;
-> > +	}
-> >  
-> >  	ret = clk_enable(mxs_dma->clk);
-> >  	if (ret)
-> > -- 
-> > 1.7.4.1
-> > 
-> > 
-> > 
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> > 
 > 
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> ---
+>  drivers/dma/at_hdmac.c |   29 +++++++++++++++++++++++++++++
+>  1 files changed, 29 insertions(+), 0 deletions(-)
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
+> index 7096adb..9cb8044 100644
+> --- a/drivers/dma/at_hdmac.c
+> +++ b/drivers/dma/at_hdmac.c
+> @@ -954,6 +954,35 @@ static int atc_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+>  		clear_bit(ATC_IS_PAUSED, &atchan->status);
+>  
+>  		spin_unlock_irqrestore(&atchan->lock, flags);
+> +	} else if (cmd == DMA_SLAVE_CONFIG) {
+> +		struct dma_slave_config *dmaengine_cfg = (void *)arg;
+> +		struct at_dma_slave	*atslave = chan->private;
+This API was created to remove chan->private, so this doesn't make sense
+at all. If your intent is to have a channels internal data, then you
+should consider embedding dma_chan into this structure (the way other
+dma drivers do) rather than using private field.
+> +		enum dma_slave_buswidth sdma_width;
+> +		enum at_dma_slave_width	atdma_width;
+> +
+> +		/* only modify transfer size width */
+> +		if (!atslave)
+> +			return -ENXIO;
+> +
+> +		if (dmaengine_cfg->direction == DMA_FROM_DEVICE)
+> +			sdma_width = dmaengine_cfg->src_addr_width;
+> +		else
+> +			sdma_width = dmaengine_cfg->dst_addr_width;
+> +
+> +		switch (sdma_width) {
+> +		case DMA_SLAVE_BUSWIDTH_1_BYTE:
+> +			atdma_width = AT_DMA_SLAVE_WIDTH_8BIT;
+> +			break;
+> +		case DMA_SLAVE_BUSWIDTH_2_BYTES:
+> +			atdma_width = AT_DMA_SLAVE_WIDTH_16BIT;
+> +			break;
+> +		case DMA_SLAVE_BUSWIDTH_4_BYTES:
+> +			atdma_width = AT_DMA_SLAVE_WIDTH_32BIT;
+> +			break;
+> +		default:
+> +			return -EINVAL;
+> +		}
+> +		atslave->reg_width = atdma_width;
+>  	} else if (cmd == DMA_TERMINATE_ALL) {
+>  		struct at_desc	*desc, *_desc;
+>  		/*
 
 -- 
 ~Vinod Koul
