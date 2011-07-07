@@ -1,42 +1,63 @@
 From: dave.martin@linaro.org (Dave Martin)
-Date: Thu, 7 Jul 2011 11:11:38 +0100
-Subject: [PATCH v3 14/40] Subject: ARM: mm: proc-arm6_7: Use the new
+Date: Thu, 7 Jul 2011 11:14:06 +0100
+Subject: [PATCH v3 26/40] Subject: ARM: mm: proc-feroceon: Use the new
 	processor struct macros
-In-Reply-To: <20110707091019.GI8286@n2100.arm.linux.org.uk>
+In-Reply-To: <20110707091436.GK8286@n2100.arm.linux.org.uk>
 References: <1308851448-25139-1-git-send-email-dave.martin@linaro.org>
-	<1308851448-25139-15-git-send-email-dave.martin@linaro.org>
-	<20110707091019.GI8286@n2100.arm.linux.org.uk>
-Message-ID: <20110707101138.GC2486@arm.com>
+	<1308851448-25139-27-git-send-email-dave.martin@linaro.org>
+	<20110707091436.GK8286@n2100.arm.linux.org.uk>
+Message-ID: <20110707101406.GD2486@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 07, 2011 at 10:10:19AM +0100, Russell King - ARM Linux wrote:
-> On Thu, Jun 23, 2011 at 06:50:22PM +0100, Dave Martin wrote:
-> > +.macro arm67_proc_info name:req, cpu_val:req, cpu_mask:req, cpu_name:req, \
-> > +	cpu_mm_mmu_flags:req, cpu_flush:req, cpu_proc_funcs:req
-> > +		.type	__\name\()_proc_info, #object
-> > +__\name\()_proc_info:
-> > +		.long	\cpu_val
-> > +		.long	\cpu_mask
-> > +		.long	\cpu_mm_mmu_flags
-> >  		.long   PMD_TYPE_SECT | \
-> >  			PMD_BIT4 | \
-> >  			PMD_SECT_AP_WRITE | \
-> >  			PMD_SECT_AP_READ
-> > -		b	__arm6_setup
-> > +		b	\cpu_flush
-> >  		.long	cpu_arch_name
-> >  		.long	cpu_elf_name
-> >  		.long	HWCAP_SWP | HWCAP_26BIT
-> > -		.long	cpu_arm6_name
-> > -		.long	arm6_processor_functions
-> > +		.long	\cpu_name\()
+On Thu, Jul 07, 2011 at 10:14:36AM +0100, Russell King - ARM Linux wrote:
+> On Thu, Jun 23, 2011 at 06:50:34PM +0100, Dave Martin wrote:
+> > -ENTRY(feroceon_cache_fns)
+> > -	.long	feroceon_flush_icache_all
+> > -	.long	feroceon_flush_kern_cache_all
+> > -	.long	feroceon_flush_user_cache_all
+> > -	.long	feroceon_flush_user_cache_range
+> > -	.long	feroceon_coherent_kern_range
+> > -	.long	feroceon_coherent_user_range
+> > -	.long	feroceon_flush_kern_dcache_area
+> > -	.long	feroceon_dma_map_area
+> > -	.long	feroceon_dma_unmap_area
+> > -	.long	feroceon_dma_flush_range
+> > -
+> > -ENTRY(feroceon_range_cache_fns)
+> > -	.long	feroceon_flush_icache_all
+> > -	.long	feroceon_flush_kern_cache_all
+> > -	.long	feroceon_flush_user_cache_all
+> > -	.long	feroceon_flush_user_cache_range
+> > -	.long	feroceon_coherent_kern_range
+> > -	.long	feroceon_coherent_user_range
+> > -	.long	feroceon_range_flush_kern_dcache_area
+> > -	.long	feroceon_range_dma_map_area
+> > -	.long	feroceon_dma_unmap_area
+> > -	.long	feroceon_range_dma_flush_range
+> > +	@ define struct cpu_cache_fns (see <asm/cacheflush.h> and proc-macros.S)
+> > +	define_cache_functions feroceon, default=feroceon
+> > +	define_cache_functions feroceon_range, default=feroceon, \
+> > +		flush_kern_dcache_area=feroceon_range_flush_kern_dcache_area, \
+> > +		dma_map_area=feroceon_range_dma_map_area, \
+> > +		dma_flush_range=feroceon_range_dma_flush_range
 > 
-> I don't think you want the extra \() there.
+> That's unique enough that it can be left as-is I think, rather than
+> having to add that special knowledge into the macro.
+> 
+> A solution to this would be to alias (using .equ) the feroceon_xxx
+> functions to feroceon_range_xxx, and then use the standard
+> define_cache_functions macro, which would be more in keeping with
+> the way these things are supposed to work.
 
-Hmm, quite right.  Not sure where that come from.
+Agreed.  That sounds sensible.
 
-I've fixed it locally for now pending repost.
+I'll await your views on
+
+[PATCH v3 01/40] Subject: ARM: mm: proc-macros Add generic
+	proc/cache/tlb struct definition macros
+
+before addressing this, since the issues involved overlap.
 
 Cheers
 ---Dave
