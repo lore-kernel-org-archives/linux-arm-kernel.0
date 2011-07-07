@@ -1,62 +1,161 @@
 From: 21cnbao@gmail.com (Barry Song)
-Date: Thu, 7 Jul 2011 09:20:29 +0800
+Date: Thu, 7 Jul 2011 10:26:11 +0800
 Subject: [PATCH 1/3] ARM: CSR: Adding CSR SiRFprimaII board support
-In-Reply-To: <201107062231.51117.arnd@arndb.de>
+In-Reply-To: <201107061544.20859.arnd@arndb.de>
 References: <1309945678-18813-1-git-send-email-bs14@csr.com>
-	<CAGsJ_4xntJHz_CzCaTuyCbDrePzxO+esPFxTfZZ1TTnZFy4w=Q@mail.gmail.com>
-	<20110706191000.GN8286@n2100.arm.linux.org.uk>
-	<201107062231.51117.arnd@arndb.de>
-Message-ID: <CAGsJ_4wi3My=7M2sTwDNTAPxr+JFFAMrDDfBMy08ztjD3soWrQ@mail.gmail.com>
+	<201107061341.38591.arnd@arndb.de>
+	<CAGsJ_4zzrsKZRR4KCaeFGL9iT5OfMdhKjJE1wG3CGh8M2U4-UQ@mail.gmail.com>
+	<201107061544.20859.arnd@arndb.de>
+Message-ID: <CAGsJ_4zeuPJdGX8w3jFW_XRQ7WU_kH9tA=WFh0=LQBeSHcVrdQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/7/7 Arnd Bergmann <arnd@arndb.de>:
-> On Wednesday 06 July 2011 21:10:00 Russell King - ARM Linux wrote:
->> On Thu, Jul 07, 2011 at 12:09:24AM +0800, Barry Song wrote:
->> > if you define that in asm/io.h as you said:
+2011/7/6 Arnd Bergmann <arnd@arndb.de>:
+> On Wednesday 06 July 2011, Barry Song wrote:
+>
+>> > I would normally recommend defining the ranges so that addresses are local
+>> > to the respective bus, like
 >> >
->> > #ifndef IO_SPACE_LIMIT
->> > #if defined(PCMCIA_SOC_COMMON)
->> > #define ?IO_SPACE_LIMIT ((resource_size_t)0xffffffff)
->> > #else
->> > #if defined(CONFIG_PCI) || defined(CONFIG_ISA) || defined(CONFIG_PCCARD)
->> > #define IO_SPACE_LIMIT ((resource_size_t)0xffff)
->> > #else
->> > #define IO_SPACE_LIMIT ((resource_size_t)0)
->> > #endif
->> > #endif
->> > #endif
+>> > ? ? ? ?axi {
+>> > ? ? ? ? ? ? ? ?ranges = <0 0x40000000 0x80000000>;
 >> >
->> > i'd like to delete IO_SPACE_LIMIT in my io.h.
+>> > ? ? ? ? ? ? ? ?sys-iobg {
+>> > ? ? ? ? ? ? ? ? ? ? ? ?ranges = <0 0x48000000 0x40000>;
+>> > ? ? ? ? ? ? ? ? ? ? ? ?clock-controller at 0x88000000 {
+>> > ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? compatible = "sirf,prima2-clkc";
+>> > ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? reg = <0 0x1000>;
+>> > ? ? ? ? ? ? ? ? ? ? ? ?}
 >> >
->> > otherwise, i'd like to try "#define IO_SPACE_LIMIT
->> > ((resource_size_t)0)" in my io.h since i have no real
->> > CONFIG_PCI/ISA/PCCARD/PCMCIA_SOC_COMMON.
+>> > ? ? ? ? ? ? ? ? ? ? ? ?reset-controller at 0x88010000 {
+>> > ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? compatible = "sirf,prima2-rstc";
+>> > ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? reg = <0x10000 0x1000>;
+>> > ? ? ? ? ? ? ? ? ? ? ? ?};
+>> > ? ? ? ? ? ? ? ?}
+>> > ? ? ? ?}
 >>
->> Thanks - stopping the 0xffffffff madness in new platforms is great.
+>> i am not sure whether it make us a little more difficult to know the
+>> real address at first glance.we will need to calculate.
+>> all addresses are 1:1 mapped in this chip. bus map can work even
+>> though we only give "ranges;" without real "ranges = <0x....>;".
 >
-> FWIW, I've double-checked the Xilinx zynq platform that I've already queued
-> up for 3.1: this one defines IO_SPACE_LIMIT to 0xffff because PCI support
-> will get merged later, so that's fine.
+> So each iobg still passes down the entire 32-bit address?
 
-as far as i know, zynq still has some static mapping tables and board
-file board_dt.c. as you have reviewed csr platform very carefully, i
-guess those can get fixed in zynq later too :-)
-xilinx zynq and csr prima2 should be the pioneering two new SoCs to
-move to DT in arm for the moment. at least, these two things can try
-to get same.
+yes. each iobg is basically transparent for address transferring.
+ranges = <0x40000000 0x40000000 0x80000000>; should be ok.
 
 >
->> If you also omit the definition for __io() and set NO_IOPORT in your
->> Kconfig, you should also end up with inb() et.al. undefined by asm/io.h,
->> which should cause build-time failures if an ISA/PCI/PCMCIA driver
->> attempts to build.
+> Note that you never have to do the calculation in the driver
+> source, of_iomap and the resource logic both take care of this.
 >
-> Just as a follow-up, this is what I was referring to in the other
-> sub-thread. Setting NO_IOPORT and removing __io does work for a lot
-> of things today, but breaks randconfig builds left and right. I want
-> to clean that up by adding 'depends on HAS_IOPORT' at the correct places
-> and then switch all platforms that don't need it to remove __io.
+> There are multiple ways to handle this, and an empty ranges property
+> usually works fine, but I find that less readable.
+>
+> Another way to handle these is to have a separate range for
+> each child bus, as in arch/powerpc/boot/dts/gef_ppc9a.dts
+>
+> To stay in the example, this would mean doing something like
+>
+> ? ? ? ?axi {
+> ? ? ? ? ? ? ? ?#address-cells = <2>;
+> ? ? ? ? ? ? ? ?#size-cells = <1>;
+>
+> ? ? ? ? ? ? ? ?ranges = <0 0 0x80000000 0x08000000 // axi devices
+> ? ? ? ? ? ? ? ? ? ? ? ? ?1 0 0x88000000 0x08000000 // sys-iobg
+> ? ? ? ? ? ? ? ? ? ? ? ? ?2 0 0x90000000 0x00010000 // mem-iobg
+> ? ? ? ? ? ? ? ? ? ? ? ? ?3 0 0x90010000 0x07fe0000 // disp-iobg
+> ? ? ? ? ? ? ? ? ? ? ? ? ?... >;
+>
+> ? ? ? ? ? ? ? ?l2-cache-controller at 80040000 {
+> ? ? ? ? ? ? ? ? ? ? ? ?compatible = "arm,pl310-cache";
+> ? ? ? ? ? ? ? ? ? ? ? ?reg = <0 0x40000 0x1000>;
+> ? ? ? ? ? ? ? ? ? ? ? ?interrupts = <59>;
+> ? ? ? ? ? ? ? ?};
+>
+> ? ? ? ? ? ? ? ?sys-iobg {
+> ? ? ? ? ? ? ? ? ? ? ? ?#address-cells = <1>;
+> ? ? ? ? ? ? ? ? ? ? ? ?#size-cells = <1>;
+> ? ? ? ? ? ? ? ? ? ? ? ?ranges = <1 0 0 0x40000>;
+> ? ? ? ? ? ? ? ? ? ? ? ?clock-controller at 88000000 {
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? compatible = "sirf,prima2-clkc";
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? reg = <0 0x1000>;
+> ? ? ? ? ? ? ? ? ? ? ? ?}
+>
+> ? ? ? ? ? ? ? ? ? ? ? ?reset-controller at 88010000 {
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? compatible = "sirf,prima2-rstc";
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? reg = <0x10000 0x1000>;
+> ? ? ? ? ? ? ? ? ? ? ? ?};
+> ? ? ? ? ? ? ? ?}
+> ? ? ? ?}
+>
+>
+>
+>> >> +
+>> >> + ? ? ? ? ? ? ? ? ? ? graphics-iobg {
+>> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? compatible = "simple-bus";
+>> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? #address-cells = <1>;
+>> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? #size-cells = <1>;
+>> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ranges = <0x98000000 0x98000000 0x8000000>;
+>> >> +
+>> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? graphics at 0x98000000 {
+>> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? compatible = "sirf,prima2-graphics";
+>> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? reg = <0x98000000 0x8000000>;
+>> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? interrupts = <6>;
+>> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? };
+>> >> + ? ? ? ? ? ? ? ? ? ? };
+>> >
+>> > Are the display and graphics units CSR developments? If the GPU is
+>> > in fact licensed from someone else (powervr, arm, ...), you should
+>> > probably list the actual name of the device.
+>>
+>> GPU is powervr sgx 531, so could we define compatible as "powervr,sgx531"?
+>
+> Probably yes. You should have a look if there are already bindings for
+> this that define other attributes. Also, if there is any customization
+> inside of the chip, you should have another more specific identifier
+> that makes it possible that this is the version that csr has modified.
+>
+>> >> + ? ? ? ? ? ? ? ? ? ? multimedia-iobg {
+>> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? compatible = "simple-bus";
+>> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? #address-cells = <1>;
+>> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? #size-cells = <1>;
+>> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ranges = <0xa0000000 0xa0000000 0x8000000>;
+>> >> +
+>> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? multimedia at 0xa0000000 {
+>> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? compatible = "sirf,prima2-multimedia";
+>> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? reg = <0xa0000000 0x8000000>;
+>> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? interrupts = <5>;
+>> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? };
+>> >> + ? ? ? ? ? ? ? ? ? ? };
+>> >
+>> > "multimedia" sounds like a too generic term. What does this do?
+>>
+>> ?video decoding.
+>
+> sirf,prima2-video-codec is probably better than, but if anyone has other
+> suggestions, you could use something else.
+>
+>> > Are these proprietary uarts, or are they compatible to 8250 and the
+>> > like? You might want to set a clock-frequency property as of_serial.c
+>> > uses.
+>>
+>> it is not compatible with 8250 .
+>
+> ok
+>
+>> > Are these rtc implementations related? From the register layout, I would
+>> > guess that they are supposed to be used by the same driver, so it's
+>> > probably a good idea to add a "compatible" property with a common name
+>> > for all three.
+>>
+>> in fact, because they are slow, they can't be accessed by mapped
+>> address directly, the only common point they have is we need to access
+>> them through mapped address in rtc-iobg indirectly just like we access
+>> i2c/spi/nand devices.
+>>
+>> they are three different devices with different purpose and register
+>> layout in fact.
+>
+> Ok.
 >
 > ? ? ? ?Arnd
 >
