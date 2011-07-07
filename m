@@ -1,66 +1,33 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 7 Jul 2011 09:29:11 -0700
-Subject: [GIT PULL] omap board updates for v3.1 merge window
-Message-ID: <20110707162911.GL5783@atomide.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Thu, 7 Jul 2011 11:32:32 -0500
+Subject: [PATCH 07/52] ARM: mach-ep93xx: convert boot_params to atag_offset
+In-Reply-To: <1309920457-21913-7-git-send-email-nicolas.pitre@linaro.org>
+References: <1309920457-21913-1-git-send-email-nicolas.pitre@linaro.org>
+	<1309920457-21913-7-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F001F383D6CED9@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Tuesday, July 05, 2011 7:47 PM, Nicolas Pitre wrote:
+>
+> Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+> ---
+>  arch/arm/mach-ep93xx/adssphere.c   |    2 +-
+>  arch/arm/mach-ep93xx/edb93xx.c     |   16 ++++++++--------
+>  arch/arm/mach-ep93xx/gesbc9312.c   |    2 +-
+>  arch/arm/mach-ep93xx/micro9.c      |    8 ++++----
+>  arch/arm/mach-ep93xx/simone.c      |    2 +-
+>  arch/arm/mach-ep93xx/snappercl15.c |    2 +-
+>  arch/arm/mach-ep93xx/ts72xx.c      |    2 +-
+>  7 files changed, 17 insertions(+), 17 deletions(-)
 
-Please pull omap board updates from:
+For ep93xx, this appears to be dependant on your patch:
 
-git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git devel-board
+[PATCH 10/37] ARM: mach-ep93xx: remove mach/memory.h and Kconfig selection of SDRAM bank
 
-These are currently on top of the fixes you pulled earlier but
-could be also rebased on the earlier cleanup if you prefer that.
+Please make sure that the merge order of these patches does not
+break anything...
 
-Please note that the board-cm-t35.c change will need a minor fix
-when merging with the atag_offset patch series. In MACHINE_START
-the .boot_params needs to be replaced with .atag_offset = 0x100.
+Other than that, for the ep93xx part.
 
-Also note that this series is missing the Nook Color board
-support as that one is waiting on the machine_id patch.
-
-Regards,
-
-Tony
-
-
-The following changes since commit fdcc205fb9ba006bcd37f72e1b1b904704257351:
-  Tony Lindgren (1):
-        Merge branch 'iommu-for-tony' of git://github.com/ohadbc/omap-iommu into devel-fixes
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git devel-board
-
-Ameya Palande (1):
-      omap: rx51: Platform support for lp5523 led chip
-
-Igor Grinberg (1):
-      arm: omap3: cm-t35: add support for cm-t3730
-
-Joel A Fernandes (1):
-      OMAP3: beagle: add support for beagleboard xM revision C
-
-Kalle Jokiniemi (1):
-      OMAP3: rx-51: Add full regulator definitions
-
-Shubhrajyoti Datta (1):
-      OMAP4: Keyboard: Mux changes in the board file
-
-Silesh C V (1):
-      omap: 4430SDP: Register the card detect GPIO properly
-
-Vishal Mahaveer (1):
-      omap: blaze: add mmc5/wl1283 device support
-
- arch/arm/mach-omap2/Kconfig                    |    6 +-
- arch/arm/mach-omap2/board-4430sdp.c            |  149 +++++++++++++++++++++++-
- arch/arm/mach-omap2/board-cm-t35.c             |   77 ++++++++++---
- arch/arm/mach-omap2/board-omap3beagle.c        |   78 ++++++++-----
- arch/arm/mach-omap2/board-rx51-peripherals.c   |  135 +++++++++++++++++++++
- arch/arm/mach-omap2/devices.c                  |    3 +-
- arch/arm/plat-omap/include/plat/omap4-keypad.h |    3 +-
- arch/arm/plat-omap/include/plat/uncompress.h   |    1 +
- 8 files changed, 405 insertions(+), 47 deletions(-)
+Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
