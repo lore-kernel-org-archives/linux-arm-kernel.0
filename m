@@ -1,52 +1,27 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Thu, 7 Jul 2011 21:51:20 +0200
-Subject: [PATCH 2/4] arm: plat-s3c24xx: dma: drop return codes in void
-	function
-In-Reply-To: <1310033919-4245-3-git-send-email-w.sang@pengutronix.de>
-References: <1310033919-4245-1-git-send-email-w.sang@pengutronix.de>
-	<1310033919-4245-3-git-send-email-w.sang@pengutronix.de>
-Message-ID: <201107072151.20618.rjw@sisk.pl>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 7 Jul 2011 21:51:57 +0200
+Subject: [PATCH 0/9] PL08x further cleanups
+In-Reply-To: <20110705131030.GE8286@n2100.arm.linux.org.uk>
+References: <20110705131030.GE8286@n2100.arm.linux.org.uk>
+Message-ID: <CAKnu2MpoxmmGNMCwOi46VQ2pHYO7tdi1rh3nvsncpwb1ydNObQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, July 07, 2011, Wolfram Sang wrote:
-> Commit bb072c3c (ARM / Samsung: Use struct syscore_ops for "core" power
-> management) turned s3c2410_dma_resume_chan() from int to void. So, drop
-> the actual return values, too. Fixes:
-> 
-> arch/arm/plat-s3c24xx/dma.c: In function 's3c2410_dma_resume_chan':
-> arch/arm/plat-s3c24xx/dma.c:1238:3: warning: 'return' with a value, in function returning void
-> arch/arm/plat-s3c24xx/dma.c:1250:2: warning: 'return' with a value, in function returning void
-> 
-> Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
+2011/7/5 Russell King - ARM Linux <linux@arm.linux.org.uk>:
 
-Acked-by: Rafael J. Wysocki <rjw@sisk.pl>
+> Linus, can you check these out on your hardware please?
 
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> ---
->  arch/arm/plat-s3c24xx/dma.c |    4 +---
->  1 files changed, 1 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/plat-s3c24xx/dma.c b/arch/arm/plat-s3c24xx/dma.c
-> index a5b3684..a79a8cc 100644
-> --- a/arch/arm/plat-s3c24xx/dma.c
-> +++ b/arch/arm/plat-s3c24xx/dma.c
-> @@ -1231,7 +1231,7 @@ static void s3c2410_dma_resume_chan(struct s3c2410_dma_chan *cp)
->  	/* restore channel's hardware configuration */
->  
->  	if (!cp->in_use)
-> -		return 0;
-> +		return;
->  
->  	printk(KERN_INFO "dma%d: restoring configuration\n", cp->number);
->  
-> @@ -1242,8 +1242,6 @@ static void s3c2410_dma_resume_chan(struct s3c2410_dma_chan *cp)
->  
->  	if (cp->map != NULL)
->  		dma_sel.select(cp, cp->map);
-> -
-> -	return 0;
->  }
->  
->  static void s3c2410_dma_resume(void)
-> 
+Sadly I'm on vacation in the Wilderness and that PB11MPCore
+sits miles away. I will not be able to test the patches until
+august.
+
+However, I think we have no boards configuring in the platform
+data for these RealViews/Versatiles yet, I just have some
+platform data patches boiling that I was working on the other
+week for testing this stuff, so I think the patches should just
+be applied, if I find regressions I can surely fix them easily.
+
+So for all of these:
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+
+Linus Walleij
