@@ -1,115 +1,36 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Thu, 7 Jul 2011 17:48:32 +0530
-Subject: [RFC/RFT 2/2] davinci: use generic memory mapped gpio for
-	tnetv107x
-In-Reply-To: <20110706220240.GF5371@ponder.secretlab.ca>
-References: <cover.1309840042.git.nsekhar@ti.com>
-	<6639b07562e3e6643dd07d5ed3907cb5158ce16b.1309840042.git.nsekhar@ti.com>
-	<20110706220240.GF5371@ponder.secretlab.ca>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024D9B523F@dbde02.ent.ti.com>
+From: vkuzmichev@mvista.com (Vitaly Kuzmichev)
+Date: Thu,  7 Jul 2011 16:22:19 +0400
+Subject: [PATCH V3 0/4] ARM: smp_twd: mpcore_wdt: Fix MPCORE watchdog setup
+In-Reply-To: <1286185540-19569-1-git-send-email-vkuzmichev@mvista.com>
+References: <1286185540-19569-1-git-send-email-vkuzmichev@mvista.com>
+Message-ID: <1310041339-2348-1-git-send-email-vkuzmichev@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grant,
+The series of patches fixes various bugs in ARM MPCORE watchdog setup.
+They also introduce some changes in common SMP_TWD timer setup code.
+The PATCH V3 2/4 adds an exported function to obtain twd timer rate in
+mpcore_wdt. It was decided that this solution is the best at this time,
+and later it will be removed while conversion smp_twd driver into
+the clocksource/arm_smp_twd as well as calibration loop will be replaced
+by smp_twd clock. The mpcore_wdt will also use clk interface instead.
 
-On Thu, Jul 07, 2011 at 03:32:40, Grant Likely wrote:
-> On Tue, Jul 05, 2011 at 10:41:00AM +0530, Sekhar Nori wrote:
+In comparing with V2 series this (V3) is based on linux-2.6/master branch.
+Also the patches PATCH V2 5/6 and PATCH V2 6/6 were thrown out since they
+are useless with current swp_twd driver.
+Also it was decided to keep PATCH V2 3/6 as is due to upcoming restructuring
+of watchdog drivers, but added parentheses inside 'if' condition.
 
-> > +#define TNETV107X_N_GPIO_DEV	DIV_ROUND_UP(TNETV107X_N_GPIO, 32)
-> > +
-> > +static struct resource gpio_resources[TNETV107X_N_GPIO_DEV][4] = {
-> > +	[0 ... TNETV107X_N_GPIO_DEV - 1] = {
-> 
-> If all the data is identical, why does this need to be an array?
+Vitaly Kuzmichev (4):
+  ARM: smp_twd: Fix typo in 'twd_timer_rate' printing
+  ARM: smp_twd: mpcore_wdt: Fix watchdog counter loading
+  ARM: mpcore_wdt: Fix WDIOC_SETOPTIONS handling
+  ARM: mpcore_wdt: Fix timer mode setup
 
-The data is initialized identically, but there is
-a loop down below which updates the start and end
-address for each GPIO device. This way I get to
-initialize the name and flags statically.
+ arch/arm/include/asm/smp_twd.h |    7 +++++++
+ arch/arm/kernel/smp_twd.c      |    9 ++++++++-
+ drivers/watchdog/mpcore_wdt.c  |   22 ++++++++++++++--------
+ 3 files changed, 29 insertions(+), 9 deletions(-)
 
-BTW, I just noticed that I forgot to initialize the
-flags in the resource structure below. Will fix
-that.
-
-> 
-> > +		{
-> > +			.name	= "dat",
-> > +			.start	= TNETV107X_GPIO_BASE + 0x4,
-> > +			.end	= TNETV107X_GPIO_BASE + 0x4 + 0x4 - 1,
-> > +		},
-> > +		{
-> > +			.name	= "set",
-> > +			.start	= TNETV107X_GPIO_BASE + 0x10,
-> > +			.end	= TNETV107X_GPIO_BASE + 0x10 + 0x4 - 1,
-> > +		},
-> > +		{
-> > +			.name	= "dirin",
-> > +			.start	= TNETV107X_GPIO_BASE + 0x1c,
-> > +			.end	= TNETV107X_GPIO_BASE + 0x1c + 0x4 - 1,
-> > +		},
-> > +		{
-> > +			.name	= "en",
-> > +			.start	= TNETV107X_GPIO_BASE + 0x28,
-> > +			.end	= TNETV107X_GPIO_BASE + 0x28 + 0x4 - 1,
-> > +		},
-> > +	},
-> > +};
-> 
-> Wow, this ends up looking horrible. (yes, I know it is not your
-> fault).  I backed off earlier on using resources for the offsets, but
-> I want to change my mind again and make interface a register range +
-> offsets to the control registers.
-
-Okay. More work on cleaning the generic driver :)
-
-> 
-> > +
-> > +static struct platform_device gpio_device[] = {
-> > +	[0 ... TNETV107X_N_GPIO_DEV - 1] = {
-> > +		.name		= "basic-mmio-gpio",
-> > +		.num_resources	= 4,
-> > +	},
-> > +};
-> > +
-> > +static struct bgpio_pdata gpio_pdata[TNETV107X_N_GPIO_DEV];
-> > +
-> > +static void __init tnetv107x_gpio_init(void)
-> > +{
-> > +	int i, j;
-> > +
-> > +	for (i = 1; i < TNETV107X_N_GPIO_DEV; i++) {
-> > +		for (j = 0; j < 4; j++) {
-> > +			gpio_resources[i][j].start += 0x4 * i;
-> > +			gpio_resources[i][j].end += 0x4 * i;
-> > +		}
-> > +	}
-> > +
-> > +	for (i = 0; i < TNETV107X_N_GPIO_DEV; i++) {
-> > +		int base = i * 32;
-> > +
-> > +		gpio_device[i].id = i;
-> > +		gpio_device[i].resource = gpio_resources[i];
-> > +
-> > +		gpio_pdata[i].base = base;
-> > +		gpio_pdata[i].ngpio = TNETV107X_N_GPIO - base;
-> 
-> ?  This doesn't look right.  Shouldn't ngpio be the same for each gpio
-> controller instance?
-
-Yes, ngpio is same (32) for each GPIO device except for
-the last GPIO device which may have lesser number of
-valid GPIO pins. The if statement below takes care of that.
-
-> 
-> > +		if (gpio_pdata[i].ngpio > 32)
-> > +			gpio_pdata[i].ngpio = 32;
-> > +
-> > +		gpio_device[i].dev.platform_data = &gpio_pdata[i];
-> > +
-> > +		platform_device_register(&gpio_device[i]);
-> > +	}
-> > +}
-> > +
-
-Thanks,
-Sekhar
+-- 
+1.7.3.4
