@@ -1,49 +1,87 @@
-From: ankita@in.ibm.com (Ankita Garg)
-Date: Thu, 7 Jul 2011 10:24:20 +0530
-Subject: [PATCH 00/10] mm: Linux VM Infrastructure to support Memory
-	Power Management
-In-Reply-To: <alpine.DEB.2.02.1107061318190.2535@asgard.lang.hm>
-References: <1306499498-14263-1-git-send-email-ankita@in.ibm.com>
-	<20110629130038.GA7909@in.ibm.com>
-	<CAOJsxLHQP=-srK_uYYBsPb7+rUBnPZG7bzwtCd-rRaQa4ikUFg@mail.gmail.com>
-	<alpine.DEB.2.02.1107061318190.2535@asgard.lang.hm>
-Message-ID: <20110707045420.GA23595@in.ibm.com>
+From: sudhakar.raj@ti.com (Rajashekhara, Sudhakar)
+Date: Thu, 7 Jul 2011 10:57:26 +0530
+Subject: [PATCH v2] davinci: da850 EVM: read mac address from SPI flash
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024D9B4C96@dbde02.ent.ti.com>
+References: <1309784838-30903-1-git-send-email-sudhakar.raj@ti.com>
+	<B85A65D85D7EB246BE421B3FB0FBB593024D9B4C96@dbde02.ent.ti.com>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024D9B4E4E@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 06, 2011 at 01:20:55PM -0700, david at lang.hm wrote:
-> On Wed, 6 Jul 2011, Pekka Enberg wrote:
-> 
-> >Why does the allocator need to know about address boundaries? Why
-> >isn't it enough to make the page allocator and reclaim policies favor using
-> >memory from lower addresses as aggressively as possible? That'd mean
-> >we'd favor the first memory banks and could keep the remaining ones
-> >powered off as much as possible.
-> >
-> >IOW, why do we need to support scenarios such as this:
-> >
-> >  bank 0     bank 1   bank 2    bank3
-> >| online  | offline | online  | offline |
-> 
-> I believe that there are memory allocations that cannot be moved
-> after they are made (think about regions allocated to DMA from
-> hardware where the hardware has already been given the address space
-> to DMA into)
->
+Hi Sekhar,
 
-Thats true. These are kernel allocations which are not movable. However,
-the ZONE_MOVABLE would enable us to create complete movable zones and
-the ones that have the kernel allocations could be flagged as kernelcore
-zone.
- 
-> As a result, you may not be able to take bank 2 offline, so your
-> option is to either leave banks 0-2 all online, or support emptying
-> bank 1 and taking it offline.
+On Wed, Jul 06, 2011 at 21:22:52, Nori, Sekhar wrote:
+> Hi Sudhakar,
+> 
+> On Mon, Jul 04, 2011 at 18:37:18, Rajashekhara, Sudhakar wrote:
+> > DA850/OMAP-L138 EMAC driver uses random mac address instead of
+> > a fixed one because the mac address is not stuffed into EMAC
+> > platform data.
+> > 
+> > This patch provides a function which reads the mac address
+> > stored in SPI flash (registered as MTD device) and populates the
+> > EMAC platform data. The function which reads the mac address is
+> > registered as a callback which gets called upon addition of MTD
+> > device.
+> > 
+> > NOTE: In case the MAC address stored in SPI flash is erased, follow
+> > the instructions at [1] to restore it.
+> > 
+> > [1] http://processors.wiki.ti.com/index.php/GSG:_OMAP-L138_DVEVM_Additional_Procedures#Restoring_MAC_address_on_SPI_Flash
+> > 
+> > Signed-off-by: Rajashekhara, Sudhakar <sudhakar.raj@ti.com>
+> > ---
+> > Since v1:
+> >      Guarded registering the mtd_notifier only when MTD is enabled.
+> >      Earlier this was handled using mtd_has_partitions() call, but
+> >      this has been removed in Linux v3.0.
+> 
+> Current trend is to include the change log into the
+> commit message itself. It might be useful to examine
+> at a later time what transformation the patch went
+> through. It also simplifies things for you since you
+> don't have to maintain this separately.
 > 
 
--- 
-Regards,
-Ankita Garg (ankita at in.ibm.com)
-Linux Technology Center
-IBM India Systems & Technology Labs,
-Bangalore, India
+You are right, this is very helpful. I'll move the change log into the commit message.
+
+> > +static void da850_evm_m25p80_notify_add(struct mtd_info *mtd)
+> > +{
+> > +	char *mac_addr = davinci_soc_info.emac_pdata->mac_addr;
+> > +	size_t retlen;
+> > +
+> > +	if (!strcmp(mtd->name, "MAC-Address")) {
+> > +		mtd->read(mtd, 0, ETH_ALEN, &retlen, mac_addr);
+> > +		if (retlen == ETH_ALEN)
+> > +			pr_info("Read MAC addr from SPI Flash: %pM\n",
+> > +				mac_addr);
+> > +	}
+> > +}
+> > +
+> > +static struct mtd_notifier da850evm_spi_notifier = {
+> > +	.add	= da850_evm_m25p80_notify_add,
+> > +};
+> 
+> The function and data structure above are not required
+> when CONFIG_MTD is not defined so these should be
+> under #ifdef CONFIG_MTD too. Towards this..
+> 
+
+Ok.
+
+> > +#ifdef CONFIG_MTD
+> > +static void da850_evm_register_mtd_user(struct mtd_notifier *notify)
+> > +{
+> > +	register_mtd_user(notify);
+> > +}
+> 
+> .. rename this function as something like da850_evm_setup_mac_addr() and
+> make it take void as argument and use:
+> 
+> 	register_mtd_user(&da850evm_spi_notifier);
+> 
+
+Agreed. I'll include these modifications and send the updated version.
+
+Thanks,
+Sudhakar
