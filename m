@@ -1,41 +1,43 @@
-From: wim@iguana.be (Wim Van Sebroeck)
-Date: Thu, 7 Jul 2011 14:46:27 +0200
-Subject: [PATCH V3 0/4] ARM: smp_twd: mpcore_wdt: Fix MPCORE watchdog setup
-In-Reply-To: <1310041339-2348-1-git-send-email-vkuzmichev@mvista.com>
-References: <1286185540-19569-1-git-send-email-vkuzmichev@mvista.com>
-	<1310041339-2348-1-git-send-email-vkuzmichev@mvista.com>
-Message-ID: <20110707124627.GQ29245@infomag.iguana.be>
+From: LW@KARO-electronics.de (=?utf-8?q?Lothar=20Wa=C3=9Fmann?=)
+Date: Thu,  7 Jul 2011 14:50:16 +0200
+Subject: [PATCH] plat-mxc: add missing initialisation of basic_mmio_gpio
+	shadow variables
+Message-ID: <1310043016-1121-1-git-send-email-LW@KARO-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vitaly,
+The bgpio_init() function does not initialise the shadow register for
+the GPIO direction register. Thus, when configuring the first GPIO with
+gpio_set_direction() all other GPIOs of the same bank will be
+configured as inputs. Since the bgpio layer cannot know whether the
+register is readable, the initialisation should be done by the caller
+of bgpio_init().
 
-> The series of patches fixes various bugs in ARM MPCORE watchdog setup.
-> They also introduce some changes in common SMP_TWD timer setup code.
-> The PATCH V3 2/4 adds an exported function to obtain twd timer rate in
-> mpcore_wdt. It was decided that this solution is the best at this time,
-> and later it will be removed while conversion smp_twd driver into
-> the clocksource/arm_smp_twd as well as calibration loop will be replaced
-> by smp_twd clock. The mpcore_wdt will also use clk interface instead.
-> 
-> In comparing with V2 series this (V3) is based on linux-2.6/master branch.
-> Also the patches PATCH V2 5/6 and PATCH V2 6/6 were thrown out since they
-> are useless with current swp_twd driver.
-> Also it was decided to keep PATCH V2 3/6 as is due to upcoming restructuring
-> of watchdog drivers, but added parentheses inside 'if' condition.
-> 
-> Vitaly Kuzmichev (4):
->   ARM: smp_twd: Fix typo in 'twd_timer_rate' printing
->   ARM: smp_twd: mpcore_wdt: Fix watchdog counter loading
->   ARM: mpcore_wdt: Fix WDIOC_SETOPTIONS handling
->   ARM: mpcore_wdt: Fix timer mode setup
-> 
->  arch/arm/include/asm/smp_twd.h |    7 +++++++
->  arch/arm/kernel/smp_twd.c      |    9 ++++++++-
->  drivers/watchdog/mpcore_wdt.c  |   22 ++++++++++++++--------
->  3 files changed, 29 insertions(+), 9 deletions(-)
+Also, the 'data' shadow variable that is used inside basic_mmio_gpio
+to cache the current value of the GPIO_DR register is initialised from
+the GPIO_PSR register within bgpio_init(). Thus when setting the
+output value of a certain GPIO, the other GPIO outputs of the same
+bank will be set or cleared depending on the pin state of the GPIO
+inputs during bgpio_init().
 
-Acked-by: Wim Van Sebroeck <wim@iguana.be>
 
-Kind regards,
-Wim.
+Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+---
+ drivers/gpio/gpio-mxc.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/gpio/gpio-mxc.c b/drivers/gpio/gpio-mxc.c
+index b351952..f7944ca 100644
+--- a/drivers/gpio/gpio-mxc.c
++++ b/drivers/gpio/gpio-mxc.c
+@@ -337,6 +337,8 @@ static int __devinit mxc_gpio_probe(struct platform_device *pdev)
+ 		goto out_iounmap;
+ 
+ 	port->bgc.gc.base = pdev->id * 32;
++	port->bgc.dir = port->bgc.read_reg(port->bgc.reg_dir);
++	port->bgc.data = port->bgc.read_reg(port->bgc.reg_set);
+ 
+ 	err = gpiochip_add(&port->bgc.gc);
+ 	if (err)
+-- 
+1.5.6.5
