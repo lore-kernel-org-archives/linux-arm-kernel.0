@@ -1,46 +1,52 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 7 Jul 2011 21:37:53 +0200
-Subject: [RFC] dmaengine: add new api for preparing simple slave transfer
-In-Reply-To: <E0D41E29EB0DAC4E9F3FF173962E9E9403024F5420@dbde02.ent.ti.com>
-References: <E0D41E29EB0DAC4E9F3FF173962E9E940301FE2DED@dbde02.ent.ti.com>
-	<20110609124723.GA24636@n2100.arm.linux.org.uk>
-	<E0D41E29EB0DAC4E9F3FF173962E9E940301FE2EFB@dbde02.ent.ti.com>
-	<1307686140.10976.111.camel@vkoul-udesk3>
-	<E0D41E29EB0DAC4E9F3FF173962E9E940301FE3405@dbde02.ent.ti.com>
-	<1307724439.10976.188.camel@vkoul-udesk3>
-	<E0D41E29EB0DAC4E9F3FF173962E9E9403020B7C2A@dbde02.ent.ti.com>
-	<1308203119.10976.234.camel@vkoul-udesk3>
-	<E0D41E29EB0DAC4E9F3FF173962E9E9403024F5420@dbde02.ent.ti.com>
-Message-ID: <CAKnu2MorpLQuzwDGBJ7uSt6NOk=9vgeBN4f+Zx=CSU9okqzvGw@mail.gmail.com>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Thu, 7 Jul 2011 21:51:20 +0200
+Subject: [PATCH 2/4] arm: plat-s3c24xx: dma: drop return codes in void
+	function
+In-Reply-To: <1310033919-4245-3-git-send-email-w.sang@pengutronix.de>
+References: <1310033919-4245-1-git-send-email-w.sang@pengutronix.de>
+	<1310033919-4245-3-git-send-email-w.sang@pengutronix.de>
+Message-ID: <201107072151.20618.rjw@sisk.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/7/7 Raju, Sundaram <sundaram@ti.com>:
+On Thursday, July 07, 2011, Wolfram Sang wrote:
+> Commit bb072c3c (ARM / Samsung: Use struct syscore_ops for "core" power
+> management) turned s3c2410_dma_resume_chan() from int to void. So, drop
+> the actual return values, too. Fixes:
+> 
+> arch/arm/plat-s3c24xx/dma.c: In function 's3c2410_dma_resume_chan':
+> arch/arm/plat-s3c24xx/dma.c:1238:3: warning: 'return' with a value, in function returning void
+> arch/arm/plat-s3c24xx/dma.c:1250:2: warning: 'return' with a value, in function returning void
+> 
+> Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
 
-> | Just put some enumerator in enum dma_ctrl_cmd in
-> | dmaengine.h such as SDMA_TEXAS_STRIDE_CONFIG and call
-> | like this:
-> |
-> | /* However that config struct needs to look, basically */
-> | static struct sdma_ti_stride_cgf = {
-> | ? ? ?take = M,
-> | ? ? ?skip = N,
-> | };
-> |
-> | ret = chan->device->device_control(chan, SDMA_TEXAS_STRIDE_CONFIG,
-> | &sdma_ti_stride_cfg);
-> |
-> | Or something like this.
->
-> I think this is better option than your 2b. This requires just an addition of
-> one more enum in the dma_ctrl_cmd. What do you think about this?
-> If Dan and you are okay with this I will send a small patch for this asap.
+Acked-by: Rafael J. Wysocki <rjw@sisk.pl>
 
-I think this is the best way to solve it atleast. It's clear what is
-being done, and it's easy for a client trying to create such a slave
-transfer to back out if it turns out that the DMAC in use does not
-support this striding.
-
-Send a patch out and I'll Ack it, FWIW.
-
-Linus Walleij
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> ---
+>  arch/arm/plat-s3c24xx/dma.c |    4 +---
+>  1 files changed, 1 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/plat-s3c24xx/dma.c b/arch/arm/plat-s3c24xx/dma.c
+> index a5b3684..a79a8cc 100644
+> --- a/arch/arm/plat-s3c24xx/dma.c
+> +++ b/arch/arm/plat-s3c24xx/dma.c
+> @@ -1231,7 +1231,7 @@ static void s3c2410_dma_resume_chan(struct s3c2410_dma_chan *cp)
+>  	/* restore channel's hardware configuration */
+>  
+>  	if (!cp->in_use)
+> -		return 0;
+> +		return;
+>  
+>  	printk(KERN_INFO "dma%d: restoring configuration\n", cp->number);
+>  
+> @@ -1242,8 +1242,6 @@ static void s3c2410_dma_resume_chan(struct s3c2410_dma_chan *cp)
+>  
+>  	if (cp->map != NULL)
+>  		dma_sel.select(cp, cp->map);
+> -
+> -	return 0;
+>  }
+>  
+>  static void s3c2410_dma_resume(void)
+> 
