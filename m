@@ -1,65 +1,76 @@
 From: dave.martin@linaro.org (Dave Martin)
-Date: Thu,  7 Jul 2011 15:27:34 +0100
-Subject: [PATCH v4 27/40] ARM: mm: proc-mohawk: Use the new processor struct
+Date: Thu,  7 Jul 2011 15:27:33 +0100
+Subject: [PATCH v4 26/40] ARM: mm: proc-feroceon: Use the new processor struct
 	macros
 In-Reply-To: <1310048867-14172-1-git-send-email-dave.martin@linaro.org>
 References: <1310048867-14172-1-git-send-email-dave.martin@linaro.org>
-Message-ID: <1310048867-14172-28-git-send-email-dave.martin@linaro.org>
+Message-ID: <1310048867-14172-27-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch also defines a suitable flush_icache_all implementation
-which would otherwise be missing, resulting in a link failure.
-Thanks to Nicolas Pitre for suggesting the code for this.
-
 Signed-off-by: Dave Martin <dave.martin@linaro.org>
-Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 ---
- arch/arm/mm/proc-mohawk.S |   61 +++++++++++++-------------------------------
- 1 files changed, 18 insertions(+), 43 deletions(-)
+ arch/arm/mm/proc-feroceon.S |  202 +++++++++++--------------------------------
+ 1 files changed, 49 insertions(+), 153 deletions(-)
 
-diff --git a/arch/arm/mm/proc-mohawk.S b/arch/arm/mm/proc-mohawk.S
-index 9d4f2ae..db52b0f 100644
---- a/arch/arm/mm/proc-mohawk.S
-+++ b/arch/arm/mm/proc-mohawk.S
-@@ -93,6 +93,17 @@ ENTRY(cpu_mohawk_do_idle)
+diff --git a/arch/arm/mm/proc-feroceon.S b/arch/arm/mm/proc-feroceon.S
+index d3883ee..8a6c2f7 100644
+--- a/arch/arm/mm/proc-feroceon.S
++++ b/arch/arm/mm/proc-feroceon.S
+@@ -411,29 +411,28 @@ ENTRY(feroceon_dma_unmap_area)
  	mov	pc, lr
+ ENDPROC(feroceon_dma_unmap_area)
  
- /*
-+ *	flush_icache_all()
-+ *
-+ *	Unconditionally clean and invalidate the entire icache.
-+ */
-+ENTRY(mohawk_flush_icache_all)
-+	mov	r0, #0
-+	mcr	p15, 0, r0, c7, c5, 0		@ invalidate I cache
-+	mov	pc, lr
-+ENDPROC(mohawk_flush_icache_all)
+-ENTRY(feroceon_cache_fns)
+-	.long	feroceon_flush_icache_all
+-	.long	feroceon_flush_kern_cache_all
+-	.long	feroceon_flush_user_cache_all
+-	.long	feroceon_flush_user_cache_range
+-	.long	feroceon_coherent_kern_range
+-	.long	feroceon_coherent_user_range
+-	.long	feroceon_flush_kern_dcache_area
+-	.long	feroceon_dma_map_area
+-	.long	feroceon_dma_unmap_area
+-	.long	feroceon_dma_flush_range
+-
+-ENTRY(feroceon_range_cache_fns)
+-	.long	feroceon_flush_icache_all
+-	.long	feroceon_flush_kern_cache_all
+-	.long	feroceon_flush_user_cache_all
+-	.long	feroceon_flush_user_cache_range
+-	.long	feroceon_coherent_kern_range
+-	.long	feroceon_coherent_user_range
+-	.long	feroceon_range_flush_kern_dcache_area
+-	.long	feroceon_range_dma_map_area
+-	.long	feroceon_dma_unmap_area
+-	.long	feroceon_range_dma_flush_range
++	@ define struct cpu_cache_fns (see <asm/cacheflush.h> and proc-macros.S)
++	define_cache_functions feroceon
++
++.macro range_alias basename
++	.globl feroceon_range_\basename
++	.type feroceon_range_\basename , %function
++	.equ feroceon_range_\basename , feroceon_\basename
++.endm
 +
 +/*
-  *	flush_user_cache_all()
-  *
-  *	Clean and invalidate all cache entries in a particular
-@@ -288,16 +299,8 @@ ENTRY(mohawk_dma_unmap_area)
- 	mov	pc, lr
- ENDPROC(mohawk_dma_unmap_area)
++ * Most of the cache functions are unchanged for this case.
++ * Export suitable alias symbols for the unchanged functions:
++ */
++	range_alias flush_icache_all
++	range_alias flush_user_cache_all
++	range_alias flush_kern_cache_all
++	range_alias flush_user_cache_range
++	range_alias coherent_kern_range
++	range_alias coherent_user_range
++	range_alias dma_unmap_area
++
++	define_cache_functions feroceon_range
  
--ENTRY(mohawk_cache_fns)
--	.long	mohawk_flush_kern_cache_all
--	.long	mohawk_flush_user_cache_all
--	.long	mohawk_flush_user_cache_range
--	.long	mohawk_coherent_kern_range
--	.long	mohawk_coherent_user_range
--	.long	mohawk_flush_kern_dcache_area
--	.long	mohawk_dma_map_area
--	.long	mohawk_dma_unmap_area
--	.long	mohawk_dma_flush_range
-+	@ define struct cpu_cache_fns (see <asm/cacheflush.h> and proc-macros.S)
-+	define_cache_functions mohawk
- 
- ENTRY(cpu_mohawk_dcache_clean_area)
- 1:	mcr	p15, 0, r0, c7, c10, 1		@ clean D entry
-@@ -373,42 +376,14 @@ mohawk_crval:
+ 	.align	5
+ ENTRY(cpu_feroceon_dcache_clean_area)
+@@ -539,93 +538,27 @@ feroceon_crval:
  
  	__INITDATA
  
@@ -67,23 +78,23 @@ index 9d4f2ae..db52b0f 100644
 - * Purpose : Function pointers used to access above functions - all calls
 - *	     come through these
 - */
--	.type	mohawk_processor_functions, #object
--mohawk_processor_functions:
+-	.type	feroceon_processor_functions, #object
+-feroceon_processor_functions:
 -	.word	v5t_early_abort
 -	.word	legacy_pabort
--	.word	cpu_mohawk_proc_init
--	.word	cpu_mohawk_proc_fin
--	.word	cpu_mohawk_reset
--	.word	cpu_mohawk_do_idle
--	.word	cpu_mohawk_dcache_clean_area
--	.word	cpu_mohawk_switch_mm
--	.word	cpu_mohawk_set_pte_ext
+-	.word	cpu_feroceon_proc_init
+-	.word	cpu_feroceon_proc_fin
+-	.word	cpu_feroceon_reset
+-	.word	cpu_feroceon_do_idle
+-	.word	cpu_feroceon_dcache_clean_area
+-	.word	cpu_feroceon_switch_mm
+-	.word	cpu_feroceon_set_pte_ext
 -	.word	0
 -	.word	0
 -	.word	0
--	.size	mohawk_processor_functions, . - mohawk_processor_functions
+-	.size	feroceon_processor_functions, . - feroceon_processor_functions
 +	@ define struct processor (see <asm/proc-fns.h> and proc-macros.S)
-+	define_processor_functions mohawk, dabort=v5t_early_abort, pabort=legacy_pabort
++	define_processor_functions feroceon, dabort=v5t_early_abort, pabort=legacy_pabort
  
  	.section ".rodata"
  
@@ -97,15 +108,148 @@ index 9d4f2ae..db52b0f 100644
 -	.asciz	"v5"
 -	.size	cpu_elf_name, . - cpu_elf_name
 -
--	.type	cpu_mohawk_name, #object
--cpu_mohawk_name:
--	.asciz	"Marvell 88SV331x"
--	.size	cpu_mohawk_name, . - cpu_mohawk_name
+-	.type	cpu_feroceon_name, #object
+-cpu_feroceon_name:
+-	.asciz	"Feroceon"
+-	.size	cpu_feroceon_name, . - cpu_feroceon_name
+-
+-	.type	cpu_88fr531_name, #object
+-cpu_88fr531_name:
+-	.asciz	"Feroceon 88FR531-vd"
+-	.size	cpu_88fr531_name, . - cpu_88fr531_name
+-
+-	.type	cpu_88fr571_name, #object
+-cpu_88fr571_name:
+-	.asciz	"Feroceon 88FR571-vd"
+-	.size	cpu_88fr571_name, . - cpu_88fr571_name
+-
+-	.type	cpu_88fr131_name, #object
+-cpu_88fr131_name:
+-	.asciz	"Feroceon 88FR131"
+-	.size	cpu_88fr131_name, . - cpu_88fr131_name
 +	string	cpu_arch_name, "armv5te"
 +	string	cpu_elf_name, "v5"
-+	string	cpu_mohawk_name, "Marvell 88SV331x"
++	string	cpu_feroceon_name, "Feroceon"
++	string	cpu_88fr531_name, "Feroceon 88FR531-vd"
++	string	cpu_88fr571_name, "Feroceon 88FR571-vd"
++	string	cpu_88fr131_name, "Feroceon 88FR131"
  
  	.align
  
+ 	.section ".proc.info.init", #alloc, #execinstr
+ 
+-#ifdef CONFIG_CPU_FEROCEON_OLD_ID
+-	.type	__feroceon_old_id_proc_info,#object
+-__feroceon_old_id_proc_info:
+-	.long	0x41009260
+-	.long	0xff00fff0
+-	.long	PMD_TYPE_SECT | \
+-		PMD_SECT_BUFFERABLE | \
+-		PMD_SECT_CACHEABLE | \
+-		PMD_BIT4 | \
+-		PMD_SECT_AP_WRITE | \
+-		PMD_SECT_AP_READ
+-	.long	PMD_TYPE_SECT | \
+-		PMD_BIT4 | \
+-		PMD_SECT_AP_WRITE | \
+-		PMD_SECT_AP_READ
+-	b	__feroceon_setup
+-	.long	cpu_arch_name
+-	.long	cpu_elf_name
+-	.long	HWCAP_SWP|HWCAP_HALF|HWCAP_THUMB|HWCAP_FAST_MULT|HWCAP_EDSP
+-	.long	cpu_feroceon_name
+-	.long	feroceon_processor_functions
+-	.long	v4wbi_tlb_fns
+-	.long	feroceon_user_fns
+-	.long	feroceon_cache_fns
+-	.size	__feroceon_old_id_proc_info, . - __feroceon_old_id_proc_info
+-#endif
+-
+-	.type	__88fr531_proc_info,#object
+-__88fr531_proc_info:
+-	.long	0x56055310
+-	.long	0xfffffff0
++.macro feroceon_proc_info name:req, cpu_val:req, cpu_mask:req, cpu_name:req, cache:req
++	.type	__\name\()_proc_info,#object
++__\name\()_proc_info:
++	.long	\cpu_val
++	.long	\cpu_mask
+ 	.long	PMD_TYPE_SECT | \
+ 		PMD_SECT_BUFFERABLE | \
+ 		PMD_SECT_CACHEABLE | \
+@@ -640,59 +573,22 @@ __88fr531_proc_info:
+ 	.long	cpu_arch_name
+ 	.long	cpu_elf_name
+ 	.long	HWCAP_SWP|HWCAP_HALF|HWCAP_THUMB|HWCAP_FAST_MULT|HWCAP_EDSP
+-	.long	cpu_88fr531_name
++	.long	\cpu_name
+ 	.long	feroceon_processor_functions
+ 	.long	v4wbi_tlb_fns
+ 	.long	feroceon_user_fns
+-	.long	feroceon_cache_fns
+-	.size	__88fr531_proc_info, . - __88fr531_proc_info
++	.long	\cache
++	 .size	__\name\()_proc_info, . - __\name\()_proc_info
++.endm
+ 
+-	.type	__88fr571_proc_info,#object
+-__88fr571_proc_info:
+-	.long	0x56155710
+-	.long	0xfffffff0
+-	.long	PMD_TYPE_SECT | \
+-		PMD_SECT_BUFFERABLE | \
+-		PMD_SECT_CACHEABLE | \
+-		PMD_BIT4 | \
+-		PMD_SECT_AP_WRITE | \
+-		PMD_SECT_AP_READ
+-	.long	PMD_TYPE_SECT | \
+-		PMD_BIT4 | \
+-		PMD_SECT_AP_WRITE | \
+-		PMD_SECT_AP_READ
+-	b	__feroceon_setup
+-	.long	cpu_arch_name
+-	.long	cpu_elf_name
+-	.long	HWCAP_SWP|HWCAP_HALF|HWCAP_THUMB|HWCAP_FAST_MULT|HWCAP_EDSP
+-	.long	cpu_88fr571_name
+-	.long	feroceon_processor_functions
+-	.long	v4wbi_tlb_fns
+-	.long	feroceon_user_fns
+-	.long	feroceon_range_cache_fns
+-	.size	__88fr571_proc_info, . - __88fr571_proc_info
++#ifdef CONFIG_CPU_FEROCEON_OLD_ID
++	feroceon_proc_info feroceon_old_id, 0x41009260, 0xff00fff0, \
++		cpu_name=cpu_feroceon_name, cache=feroceon_cache_fns
++#endif
+ 
+-	.type	__88fr131_proc_info,#object
+-__88fr131_proc_info:
+-	.long	0x56251310
+-	.long	0xfffffff0
+-	.long	PMD_TYPE_SECT | \
+-		PMD_SECT_BUFFERABLE | \
+-		PMD_SECT_CACHEABLE | \
+-		PMD_BIT4 | \
+-		PMD_SECT_AP_WRITE | \
+-		PMD_SECT_AP_READ
+-	.long	PMD_TYPE_SECT | \
+-		PMD_BIT4 | \
+-		PMD_SECT_AP_WRITE | \
+-		PMD_SECT_AP_READ
+-	b	__feroceon_setup
+-	.long	cpu_arch_name
+-	.long	cpu_elf_name
+-	.long	HWCAP_SWP|HWCAP_HALF|HWCAP_THUMB|HWCAP_FAST_MULT|HWCAP_EDSP
+-	.long	cpu_88fr131_name
+-	.long	feroceon_processor_functions
+-	.long	v4wbi_tlb_fns
+-	.long	feroceon_user_fns
+-	.long	feroceon_range_cache_fns
+-	.size	__88fr131_proc_info, . - __88fr131_proc_info
++	feroceon_proc_info 88fr531, 0x56055310, 0xfffffff0, cpu_88fr531_name, \
++		cache=feroceon_cache_fns
++	feroceon_proc_info 88fr571, 0x56155710, 0xfffffff0, cpu_88fr571_name, \
++		cache=feroceon_range_cache_fns
++	feroceon_proc_info 88fr131, 0x56251310, 0xfffffff0, cpu_88fr131_name, \
++		cache=feroceon_range_cache_fns
 -- 
 1.7.4.1
