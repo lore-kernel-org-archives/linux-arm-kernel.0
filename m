@@ -1,37 +1,26 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 7 Jul 2011 13:11:29 +0200
-Subject: [PATCH v4 0/3] ARM: CSR: Adding CSR SiRFprimaII platform
-In-Reply-To: <1310020616-27856-1-git-send-email-bs14@csr.com>
-References: <1310020616-27856-1-git-send-email-bs14@csr.com>
-Message-ID: <201107071311.29643.arnd@arndb.de>
+From: davem@davemloft.net (David Miller)
+Date: Thu, 07 Jul 2011 04:12:57 -0700 (PDT)
+Subject: [PATCH] net/fec: gasket needs to be enabled for some i.mx
+In-Reply-To: <1309515082-7386-1-git-send-email-shawn.guo@linaro.org>
+References: <20110630161935.GA7977@S2100-06.ap.freescale.net>
+	<1309515082-7386-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20110707.041257.670268148869400054.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 07 July 2011, Barry Song wrote:
-> Changelogs:
-> -v4:
-> v3 got "Reviewed-by: Arnd Bergmann <arnd@arndb.de>"
-> stopping the 0xffffffff madness for IO_SPACE_LIMIT
-> fix .map_io compiling issue in the 1st patch
-> fix set_next_event in timer.c
-> rename GPU, USB, multimedia and SATA nodes in DTS
-> delete redundant 0x in DTS
+From: Shawn Guo <shawn.guo@linaro.org>
+Date: Fri,  1 Jul 2011 18:11:22 +0800
 
-Note that when you get a 'Reviewed-by', 'Acked-by' or 'Tested-by'
-reply to one of your mails, you should add that in the patch
-changelog below your own 'Signed-off-by' in order to document
-it for the future. This ususally still holds true when you make
-further changes, just not when rewriting major parts of the patch.
+> On the recent i.mx (mx25/50/53), there is a gasket inside fec
+> controller which needs to be enabled no matter phy works in MII
+> or RMII mode.
+> 
+> The current code enables the gasket only when phy interface is RMII.
+> It's broken when the driver works with a MII phy.  The patch uses
+> platform_device_id to distinguish the SoCs that have the gasket and
+> enables it on these SoCs for both MII and RMII mode.
+> 
+> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 
-For the Signed-off-by list, that should normally include only the
-people that have handled the specific patch, it doesn't imply
-authorship. Having seven people listed as Signed-off-by seems a bit
-strange in this context, but there is no clear rule against it.
-I would probably use 'Acked-by' or plain 'Cc' in the changelog for
-some of the people, depending in what way they were involved.
-
-At the least, you should have 'Signed-off-by' the person that wrote
-most of the code, followed by the person that sends the patch at
-the bottom of the list (as you did correctly).
-
-	Arnd
+Acked-by: David S. Miller <davem@davemloft.net>
