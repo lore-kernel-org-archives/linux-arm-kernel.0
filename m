@@ -1,63 +1,38 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Thu, 7 Jul 2011 11:14:06 +0100
-Subject: [PATCH v3 26/40] Subject: ARM: mm: proc-feroceon: Use the new
-	processor struct macros
-In-Reply-To: <20110707091436.GK8286@n2100.arm.linux.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 7 Jul 2011 11:16:43 +0100
+Subject: [PATCH v3 01/40] Subject: ARM: mm: proc-macros Add generic
+	proc/cache/tlb struct definition macros
+In-Reply-To: <20110707100715.GB2486@arm.com>
 References: <1308851448-25139-1-git-send-email-dave.martin@linaro.org>
-	<1308851448-25139-27-git-send-email-dave.martin@linaro.org>
-	<20110707091436.GK8286@n2100.arm.linux.org.uk>
-Message-ID: <20110707101406.GD2486@arm.com>
+	<1308851448-25139-2-git-send-email-dave.martin@linaro.org>
+	<20110707082251.GH8286@n2100.arm.linux.org.uk>
+	<20110707100715.GB2486@arm.com>
+Message-ID: <20110707101643.GL8286@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 07, 2011 at 10:14:36AM +0100, Russell King - ARM Linux wrote:
-> On Thu, Jun 23, 2011 at 06:50:34PM +0100, Dave Martin wrote:
-> > -ENTRY(feroceon_cache_fns)
-> > -	.long	feroceon_flush_icache_all
-> > -	.long	feroceon_flush_kern_cache_all
-> > -	.long	feroceon_flush_user_cache_all
-> > -	.long	feroceon_flush_user_cache_range
-> > -	.long	feroceon_coherent_kern_range
-> > -	.long	feroceon_coherent_user_range
-> > -	.long	feroceon_flush_kern_dcache_area
-> > -	.long	feroceon_dma_map_area
-> > -	.long	feroceon_dma_unmap_area
-> > -	.long	feroceon_dma_flush_range
-> > -
-> > -ENTRY(feroceon_range_cache_fns)
-> > -	.long	feroceon_flush_icache_all
-> > -	.long	feroceon_flush_kern_cache_all
-> > -	.long	feroceon_flush_user_cache_all
-> > -	.long	feroceon_flush_user_cache_range
-> > -	.long	feroceon_coherent_kern_range
-> > -	.long	feroceon_coherent_user_range
-> > -	.long	feroceon_range_flush_kern_dcache_area
-> > -	.long	feroceon_range_dma_map_area
-> > -	.long	feroceon_dma_unmap_area
-> > -	.long	feroceon_range_dma_flush_range
-> > +	@ define struct cpu_cache_fns (see <asm/cacheflush.h> and proc-macros.S)
-> > +	define_cache_functions feroceon, default=feroceon
-> > +	define_cache_functions feroceon_range, default=feroceon, \
-> > +		flush_kern_dcache_area=feroceon_range_flush_kern_dcache_area, \
-> > +		dma_map_area=feroceon_range_dma_map_area, \
-> > +		dma_flush_range=feroceon_range_dma_flush_range
+On Thu, Jul 07, 2011 at 11:07:15AM +0100, Dave Martin wrote:
+> On Thu, Jul 07, 2011 at 09:22:51AM +0100, Russell King - ARM Linux wrote:
+> > If they don't conform to the "<cachename>_<functionname>" pattern then
+> > single-cache model kernels will not compile.
 > 
-> That's unique enough that it can be left as-is I think, rather than
-> having to add that special knowledge into the macro.
-> 
-> A solution to this would be to alias (using .equ) the feroceon_xxx
-> functions to feroceon_range_xxx, and then use the standard
-> define_cache_functions macro, which would be more in keeping with
-> the way these things are supposed to work.
+> I added this override capability purely because some proc-*.S define multiple
+> sets of cache functions which are mostly common but have some differences.
+> This facility is actually just used by feroceon and xscale, so you're probably
+> right -- it may be better to fix those than encourage deviation elsewhere.
 
-Agreed.  That sounds sensible.
+I think so.
 
-I'll await your views on
+> For xscale, there is no unconditional MULTI_CACHE, so it looks as though if
+> a single cache model kernel is built, xscale_dma_map_area may get used
+> unconditionally instead of xscale_dma_a0_map_area even for the buggy A0/A1
+> processor revisions.  That won't result in a compile failure, just some
+> incorrect cache maintenance at runtime -- if so, it looks like a bug.
 
-[PATCH v3 01/40] Subject: ARM: mm: proc-macros Add generic
-	proc/cache/tlb struct definition macros
+That sounds like there needs to be a separate patch preceding this series
+which sets MULTI_CACHE unconditionally for Xscale.
 
-before addressing this, since the issues involved overlap.
+> Do you think we need a generic check for such situations?
 
-Cheers
----Dave
+No, I think that would be incredibly hard, and for two processors out of
+the number we already support, I don't think its worth it.
