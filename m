@@ -1,78 +1,37 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 7 Jul 2011 08:27:40 +0300
-Subject: [PATCH] OMAP: hwmod: add kernel cmdline flag to avoid
-	resetting IP blocks during init
-In-Reply-To: <alpine.DEB.2.00.1107060155250.4217@utopia.booyaka.com>
-References: <20110703010204.19046.85186.stgit@dusk>
-	<20110703010206.19046.85293.stgit@dusk>
-	<20110704085503.GQ23145@atomide.com>
-	<alpine.DEB.2.00.1107051936250.4217@utopia.booyaka.com>
-	<20110706064116.GH5783@atomide.com>
-	<alpine.DEB.2.00.1107060155250.4217@utopia.booyaka.com>
-Message-ID: <20110707052735.GB15815@atomide.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 7 Jul 2011 01:29:05 -0400 (EDT)
+Subject: [Linaro-mm-sig] [PATCH 6/8] drivers: add Contiguous Memory
+	Allocator
+In-Reply-To: <201107062223.01940.arnd@arndb.de>
+References: <1309851710-3828-1-git-send-email-m.szyprowski@samsung.com>
+	<201107061831.59739.arnd@arndb.de>
+	<alpine.LFD.2.00.1107061459520.14596@xanadu.home>
+	<201107062223.01940.arnd@arndb.de>
+Message-ID: <alpine.LFD.2.00.1107070126440.14596@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [110706 23:52]:
-> Hi Tony
-> 
-> On Tue, 5 Jul 2011, Tony Lindgren wrote:
-> 
-> > So basically we want to tell the following from the board file or board
-> > specific .dts file:
-> > 
-> > - Device is being used on the board and can be reset and configured.
-> >   This is the usual case.
-> 
-> By 'used', you mean, have a Linux driver associated with them, right?
+On Wed, 6 Jul 2011, Arnd Bergmann wrote:
 
-Right.
- 
-> > - Device is being used on the board but can't be reset. This is the
-> >   case for booting Linux from other operating systems initially where
-> >   you want to keep the LCD on for debug console.
+> On Wednesday 06 July 2011 21:10:07 Nicolas Pitre wrote:
+> > If you get a highmem page, because the cache is VIPT, that page might 
+> > still be cached even if it wasn't mapped.  With a VIVT cache we must 
+> > flush the cache whenever a highmem page is unmapped.  There is no such 
+> > restriction with VIPT i.e. ARMv6 and above.  Therefore to make sure the 
+> > highmem page you get doesn't have cache lines associated to it, you must 
+> > first map it cacheable, then perform cache invalidation on it, and 
+> > eventually remap it as non-cacheable.  This is necessary because there 
+> > is no way to perform cache maintenance on L1 cache using physical 
+> > addresses unfortunately.  See commit 7e5a69e83b for an example of what 
+> > this entails (fortunately commit 3e4d3af501 made things much easier and 
+> > therefore commit 39af22a79 greatly simplified things).
 > 
-> Or, to use examples that would be needed in a production device, the 
-> 4460/N810 GPIO examples discussed earlier.  
-> 
-> Based on our current experience, there are a very small number of these 
-> cases, and they are board-specific.  So it seems to make sense to 
-> explicitly state these exceptions in the board files, via 
-> omap_hwmod_no_setup_reset() or something similar.
+> Ok, thanks for the explanation. This definitely makes the highmem approach
+> much harder to get right, and slower. Let's hope then that Marek's approach
+> of using small pages for the contiguous memory region and changing their
+> attributes on the fly works out better than this.
 
-Yeah they should be all board specific. One more example comes to mind
-was to keep the bootup logo around from bootloader on the LCD that the
-DSS code was doing earlier.
- 
-> > - Device is not being used on the board but can be reset for decent PM.
-> >   This is often needed in cases where the bootloader just enables all the
-> >   clocks.
-> 
-> Yeah.  And it's not just bootloaders, it's also the previous kernel in the 
-> case of something like kexec.  Since we don't know what devices the 
-> bootloader or previous kernel touched, it seems to make sense to reset all 
-> of these devices by default, once the drivers are converted to use runtime 
-> PM.
-> 
-> The current issue here is that some drivers aren't yet converted, so the 
-> hwmod code might think that some devices are 'unused' when they are 
-> actually in use by a non-runtime-PM-based driver.
->  
-> > - Device is reserved by secure mode or a coprocessor. In this case
-> >   the device can't be reset.
-> 
-> Indeed - or even accessed.
-> 
-> > So I guess that makes the flags noreset, disabled and unavailable?
-> 
-> I think we only need 'no reset' and 'unavailable'?  Once the runtime PM 
-> driver conversion is complete, I don't think there's any reason to keep 
-> the 'hwmod_unused_reset' command line flag around, since it can be the 
-> default.  That's because the hwmod code would then be able to track which 
-> devices were actually used.
+I would say that both approaches have fairly equivalent complexity.
 
-Sounds doable to me.
 
-Regards,
-
-Tony
+Nicolas
