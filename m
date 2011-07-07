@@ -1,23 +1,55 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 6 Jul 2011 17:20:31 -0700
-Subject: [PATCH v4 2/2] ARM: l2x0: Add OF based initialization
-In-Reply-To: <1309984979-8847-2-git-send-email-robherring2@gmail.com>
-References: <1309984979-8847-1-git-send-email-robherring2@gmail.com>
-	<1309984979-8847-2-git-send-email-robherring2@gmail.com>
-Message-ID: <CAOesGMhVuOVVeZQmt3fW3uXML0Op_f3x5e=-OeECJsWeybk9Ag@mail.gmail.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Wed, 6 Jul 2011 19:43:07 -0500
+Subject: [PATCH 01/52] ARM: introduce atag_offset to replace boot_params
+In-Reply-To: <1309920457-21913-1-git-send-email-nicolas.pitre@linaro.org>
+References: <1309920457-21913-1-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F001F383D6CD4D@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 6, 2011 at 1:42 PM, Rob Herring <robherring2@gmail.com> wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
->
-> This adds probing for ARM L2x0 cache controllers via device tree. Support
-> includes the L210, L220, and PL310 controllers. The binding allows setting
-> up cache RAM latencies and filter addresses (PL310 only).
->
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+On Tuesday, July 05, 2011 7:47 PM, Nicolas Pitre wrote:
+> The boot_params member of the mdesc structure is used to provide a
+> default physical address for the ATAG list.  Since this value is fixed
+> at compile time and often based on ARCH_PHYS_OFFSET, it gets in the way
+> of runtime PHYS_OFFSET usage.
+> 
+> Let's introduce atag_offset which should contains only the relative
+> offset from start of memory instead of an absolute value, in preparation
+> to move all instance of boot_params over to it.
+> 
+> Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+> ---
+>  arch/arm/include/asm/mach/arch.h |    1 +
+>  arch/arm/kernel/setup.c          |    2 ++
+>  2 files changed, 3 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
+> index 7b79a00..1bdf6e1 100644
+> --- a/arch/arm/include/asm/mach/arch.h
+> +++ b/arch/arm/include/asm/mach/arch.h
+> @@ -18,6 +18,7 @@ struct machine_desc {
+>  	unsigned int		nr;		/* architecture number	*/
+>  	const char		*name;		/* architecture name	*/
+>  	unsigned long		boot_params;	/* tagged list		*/
+> +	unsigned long		atag_offset;	/* tagged list (relative) */
+>  	const char		**dt_compat;	/* array of device tree
+>  						 * 'compatible' strings	*/
+>  
+> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> index e0db84d..4cc3e2b 100644
+> --- a/arch/arm/kernel/setup.c
+> +++ b/arch/arm/kernel/setup.c
+> @@ -816,6 +816,8 @@ static struct machine_desc * __init setup_machine_tags(unsigned int nr)
+>  
+>  	if (__atags_pointer)
+>  		tags = phys_to_virt(__atags_pointer);
+> +	else if(mdesc->atag_offset)
+> +		tags = PAGE_OFFSET + mdesc->atag_offset;
 
-Acked-by: Olof Johansson <olof@lixom.net>
+This results in a warning...
 
+arch/arm/kernel/setup.c: In function 'setup_arch':
+arch/arm/kernel/setup.c:820: warning: assignment makes pointer from integer without a cast
 
--Olof
+Regards,
+Hartley
