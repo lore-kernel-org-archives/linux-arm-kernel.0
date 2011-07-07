@@ -1,36 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 7 Jul 2011 09:36:34 +0200
-Subject: [PATCHv11 0/8] Contiguous Memory Allocator
-In-Reply-To: <20110706151112.5c619431.akpm@linux-foundation.org>
-References: <1309851710-3828-1-git-send-email-m.szyprowski@samsung.com>
-	<201107051407.17249.arnd@arndb.de>
-	<20110706151112.5c619431.akpm@linux-foundation.org>
-Message-ID: <201107070936.34469.arnd@arndb.de>
+From: LW@KARO-electronics.de (=?utf-8?q?Lothar=20Wa=C3=9Fmann?=)
+Date: Thu,  7 Jul 2011 09:43:12 +0200
+Subject: [BUGFIX][PATCH] plat-mxc: [cpufreq] Fix section mismatch due to
+	incorrect __init attributes
+Message-ID: <1310024592-31272-1-git-send-email-LW@KARO-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 07 July 2011 00:11:12 Andrew Morton wrote:
-> I could review it and put it in there on a preliminary basis for some
-> runtime testing.  But the question in my mind is how different will the
-> code be after the problems which rmk has identified have been fixed?
-> 
-> If "not very different" then that effort and testing will have been
-> worthwhile.
-> 
-> If "very different" or "unworkable" then it was all for naught.
-> 
-> So.  Do we have a feeling for the magnitude of the changes which will
-> be needed to fix these things up?
+The mxc_cpufreq_init() function is incorrectly labeled __init while
+the real __init function mxc_cpufreq_driver_init() is labeled __devinit.
 
-As far as I can tell, the changes that we still need are mostly in the 
-ARM specific portion of the series. All architectures that have cache
-coherent DMA by default (most of the other interesting ones) can just
-call dma_alloc_from_contiguous() from their dma_alloc_coherent()
-function without having to do extra work.
+Signed-off-by: Lothar Wa??mann <LW@KARO-electronics.de>
+---
+ arch/arm/plat-mxc/cpufreq.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-It's possible that there will be small changes to simplify to the
-first six patches in order to simplify the ARM port, but I expect
-them to stay basically as they are, unless someone complains about
-them.
-
-	Arnd
+diff --git a/arch/arm/plat-mxc/cpufreq.c b/arch/arm/plat-mxc/cpufreq.c
+index 74aac96..e0107e9 100644
+--- a/arch/arm/plat-mxc/cpufreq.c
++++ b/arch/arm/plat-mxc/cpufreq.c
+@@ -97,7 +97,7 @@ static int mxc_set_target(struct cpufreq_policy *policy,
+ 	return ret;
+ }
+ 
+-static int __init mxc_cpufreq_init(struct cpufreq_policy *policy)
++static int __devinit mxc_cpufreq_init(struct cpufreq_policy *policy)
+ {
+ 	int ret;
+ 	int i;
+@@ -187,7 +187,7 @@ static struct cpufreq_driver mxc_driver = {
+ 	.name = "imx",
+ };
+ 
+-static int __devinit mxc_cpufreq_driver_init(void)
++static int __init mxc_cpufreq_driver_init(void)
+ {
+ 	return cpufreq_register_driver(&mxc_driver);
+ }
+-- 
+1.5.6.5
