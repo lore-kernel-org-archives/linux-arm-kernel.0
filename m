@@ -1,35 +1,46 @@
-From: mike@compulab.co.il (Mike Rapoport)
-Date: Thu,  7 Jul 2011 09:04:32 +0300
-Subject: [GIT PULL v3 0/3] TrimSlice updates for 3.1
-Message-ID: <cover.1309955711.git.mike@compulab.co.il>
+From: adrian.wenl@gmail.com (Lei Wen)
+Date: Thu, 7 Jul 2011 14:26:23 +0800
+Subject: [PATCH 3/4] MTD: pxa3xx_nand: enable multiple chip select support
+In-Reply-To: <4E1411BB.4010000@compulab.co.il>
+References: <1309319494-17951-1-git-send-email-leiwen@marvell.com>
+	<1309771536-10597-4-git-send-email-leiwen@marvell.com>
+	<4E1411BB.4010000@compulab.co.il>
+Message-ID: <CALZhoSQgoMS7bSRx1V-tMX+aG4idF6Z-Xr3CorFSXwPMHvacXw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Colin,
-Please consider pulling TrimSlice updates for 3.1 merge window.
-These patches add registration of i2c, audio and USB devices.
+Hi Igor && Daniel,
 
-v3 changes:
-- rebased on top of current Linus tree
+On Wed, Jul 6, 2011 at 3:41 PM, Igor Grinberg <grinberg@compulab.co.il> wrote:
+> On 07/04/11 12:25, Lei Wen wrote:
+>
+>> ?#ifdef CONFIG_PM
+>> @@ -1203,8 +1259,12 @@ static int pxa3xx_nand_resume(struct platform_device *pdev)
+>> ?{
+>> ? ? ? struct pxa3xx_nand_info *info = platform_get_drvdata(pdev);
+>>
+>> - ? ? nand_writel(info, NDTR0CS0, info->host->ndtr0cs0);
+>> - ? ? nand_writel(info, NDTR1CS0, info->host->ndtr1cs0);
+>> + ? ? /*
+>> + ? ? ?* Directly set the chip select to a invalid value,
+>> + ? ? ?* then the driver would reset the timing according
+>> + ? ? ?* to current chip select at the beginning of cmdfunc
+>> + ? ? ?*/
+>> + ? ? info->cs = 0xff;
+>
+> Thinking of this for the second (or third) time,
+> If you have keep config enabled and have only one nand chip,
+> this will brake the keep config...
+>
+> Daniel,
+>
+> have you tested the suspend/resume with this patch?
+> (and keep_config on?)
+>
 
-v2 changes:
-- update CDEV1 pinmux as per Stephen suggestion
-- use GPIO table for USB-related GPIOs
+Do you still have concern with this change?
+If not, I would push the next round of patch set including merging
+patch 3 and 4.
 
-The following changes since commit a2fa83faf47b514ab947cea916d3691b66525073:
-
-  Merge branch 'usb-linus' of git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/usb-2.6 (2011-07-05 20:57:45 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/rppt/linux-tegra.git trimslice/upstream
-
-Mike Rapoport (3):
-      ARM: tegra: trimslice: register i2c busses and devices
-      ARM: tegra: trimslice: add audio devices and clocks
-      ARM: tegra: trimslice: enable USB ports
-
- arch/arm/mach-tegra/board-trimslice-pinmux.c |    7 ++-
- arch/arm/mach-tegra/board-trimslice.c        |   92 ++++++++++++++++++++++++++
- arch/arm/mach-tegra/board-trimslice.h        |    3 +
- 3 files changed, 100 insertions(+), 2 deletions(-)
+Thanks,
+Lei
