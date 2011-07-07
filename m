@@ -1,40 +1,27 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 7 Jul 2011 17:57:23 +0200
-Subject: reply: [PATCH v5 1/3] ARM: mxs: add GPMI-NFC support
-	=?iso-8859-1?q?for=09imx23/imx28?=
-In-Reply-To: <4E1574A1.4050502@freescale.com>
-References: <14C4E31473AF7E4B98176CB73615181C19FBD3@039-SN1MPN1-006.039d.mgd.msft.net>
-	<201107011109.27206.arnd@arndb.de> <4E1574A1.4050502@freescale.com>
-Message-ID: <201107071757.23405.arnd@arndb.de>
+Date: Thu, 7 Jul 2011 18:17:11 +0200
+Subject: [PATCH 01/10] ARM: change ARM_DMA_ZONE_SIZE into a variable
+In-Reply-To: <alpine.LFD.2.00.1107062246130.14596@xanadu.home>
+References: <1309919442-20451-1-git-send-email-nicolas.pitre@linaro.org>
+	<20110706230945.GA8286@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1107062246130.14596@xanadu.home>
+Message-ID: <201107071817.11842.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 07 July 2011, Huang Shijie wrote:
-> > On Friday 01 July 2011 10:57:40 Huang Shijie wrote:
-> >>>> It's annoying, but it really saves some lines.
-> >>> It would save more lines if you introduce the macros globally and
-> >>> convert all existing resource definitions ;-)
-> >> The origin code did not use any macros.
-> >> Some one suggested me to use macros.
-> >> So i used the macros.
-> >>
-> >> Do i have to drop the macros?
-> > Can you find out who made the suggestion? Let's first reach consensus
-> > about how we want to do these things in the future.
-> http://www.spinics.net/lists/arm-kernel/msg121384.html
+On Thursday 07 July 2011, Nicolas Pitre wrote:
+> > What is hardware specific is that the DMA devices can only address a
+> > limited range of memory.  IMHO it's that which should be described in
+> > DT, not that we'll have a DMA zone of X bytes in size.
 > 
+> I think that we all agree on the principle.  I certainly never intended 
+> to suggest that the DMA zone size be stored as is in the device tree.
 
-Ok, so Uwe made a rather generic comment that he'd prefer you to use
-macros for that part. I think your original code actually looks cleaner
-in this case, mostly because it doesn't obfuscate the identifiers
-and because the macro is specific to this file.
-
-Uwe, do you think it's worthwhile introducing a global macro for
-everyone to use for defining resources? Clearly this is not an
-mxs specific problem, and I'd much rather have the same solution
-everywhere.
-
-I'm thinking that if we want to solve this, the macro should live
-in include/linux/ioport.h along with struct resource.
+There is a way to specify DMA address ranges in the device tree, though
+I forgot the exact format. It comes down to saying the device sees
+memory range XXX to YYY as its local address AAA to BBB. We could use
+that information at boot time to determine what the largest range
+of memory is that is visible by all devices (and hope that it's at
+the start of physical memory).
 
 	Arnd
