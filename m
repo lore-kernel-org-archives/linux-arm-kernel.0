@@ -1,42 +1,42 @@
-From: vkuzmichev@mvista.com (Vitaly Kuzmichev)
-Date: Thu, 07 Jul 2011 17:31:21 +0400
-Subject: [PATCH V3 1/4] ARM: smp_twd: Fix typo in 'twd_timer_rate' printing
-In-Reply-To: <4E15ABA6.4000202@mvista.com>
-References: <1310041339-2348-1-git-send-email-vkuzmichev@mvista.com>
-	<1310041396-2461-1-git-send-email-vkuzmichev@mvista.com>
-	<20110707123907.GP8286@n2100.arm.linux.org.uk>
-	<4E15ABA6.4000202@mvista.com>
-Message-ID: <4E15B529.9070808@mvista.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 7 Jul 2011 21:41:58 +0800
+Subject: [PATCH] net/fec: gasket needs to be enabled for some i.mx
+In-Reply-To: <20110707.041257.670268148869400054.davem@davemloft.net>
+References: <20110630161935.GA7977@S2100-06.ap.freescale.net>
+	<1309515082-7386-1-git-send-email-shawn.guo@linaro.org>
+	<20110707.041257.670268148869400054.davem@davemloft.net>
+Message-ID: <20110707134157.GA12722@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 07/07/2011 04:50 PM, Vitaly Kuzmichev wrote:
-> Hi Russell,
+On Thu, Jul 07, 2011 at 04:12:57AM -0700, David Miller wrote:
+> From: Shawn Guo <shawn.guo@linaro.org>
+> Date: Fri,  1 Jul 2011 18:11:22 +0800
 > 
-> On 07/07/2011 04:39 PM, Russell King - ARM Linux wrote:
->> On Thu, Jul 07, 2011 at 04:23:13PM +0400, Vitaly Kuzmichev wrote:
->>> To get hundredths of MHz the rate needs to be divided by 10'000.
->>> Here is an example:
->>>  twd_timer_rate = 123456789
->>>  Before the patch:
->>>     twd_timer_rate / 1000000 = 123
->>>     (twd_timer_rate / 1000000) % 100 = 23
->>>     Result: 123.23MHz.
->>>  After being fixed:
->>>     twd_timer_rate / 1000000 = 123
->>>     (twd_timer_rate / 10000) % 100 = 45
->>>     Result: 123.45MHz.
->>>
->>> Signed-off-by: Vitaly Kuzmichev <vkuzmichev@mvista.com>
->>
->> -> patch system please.
+> > On the recent i.mx (mx25/50/53), there is a gasket inside fec
+> > controller which needs to be enabled no matter phy works in MII
+> > or RMII mode.
+> > 
+> > The current code enables the gasket only when phy interface is RMII.
+> > It's broken when the driver works with a MII phy.  The patch uses
+> > platform_device_id to distinguish the SoCs that have the gasket and
+> > enables it on these SoCs for both MII and RMII mode.
+> > 
+> > Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 > 
-> For a such newbie as me it's hard to understand this comment, sorry :)
-> Could you explain, please?
+> Acked-by: David S. Miller <davem@davemloft.net>
+> --
 
-Ignore my question, I've learned.
+Thanks, David.  I will try to get it through Sascha's tree after
+the rebase again dt series.
 
-Thanks,
-Vitaly.
+Hi Sascha,
+
+How should we proceed?  It seems Grant will take the fec-dt series
+on his tree.  Would you then merge that tree into yours, so that I
+can rebase this patch on your tree and get it go through there?
+
+-- 
+Regards,
+Shawn
