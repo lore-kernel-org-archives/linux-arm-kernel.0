@@ -1,41 +1,81 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Thu, 7 Jul 2011 17:37:55 +0100
-Subject: [PATCH v4 00/40] ARM: mm: Add generic macros for declaring
-	various CPU structs
-In-Reply-To: <20110707162218.GA20403@n2100.arm.linux.org.uk>
-References: <1310048867-14172-1-git-send-email-dave.martin@linaro.org>
-	<20110707162218.GA20403@n2100.arm.linux.org.uk>
-Message-ID: <20110707163755.GH2486@arm.com>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Thu, 7 Jul 2011 22:15:31 +0530
+Subject: [RFC/RFT 1/2] gpio/basic_mmio: add support for enable register
+In-Reply-To: <20110706211054.GE5371@ponder.secretlab.ca>
+References: <cover.1309840042.git.nsekhar@ti.com>
+	<83915224c24e43224272b1bf570cddb9545279a6.1309840042.git.nsekhar@ti.com>
+	<4E12AC10.9020206@gmail.com>
+	<20110706211054.GE5371@ponder.secretlab.ca>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024D9B5379@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 07, 2011 at 05:22:18PM +0100, Russell King - ARM Linux wrote:
-> On Thu, Jul 07, 2011 at 03:27:07PM +0100, Dave Martin wrote:
-> > This series adds macros for declaring some CPU-related structured
-> > defined in assembler, and ports the various processors, cache and
-> > tlb implementations to use the macros.
+Hi Grant,
+
+On Thu, Jul 07, 2011 at 02:40:54, Grant Likely wrote:
+> On Tue, Jul 05, 2011 at 04:15:44PM +1000, Ryan Mallon wrote:
+> > On 05/07/11 15:10, Sekhar Nori wrote:
+> > >Some GPIO controllers have an enable register
+> > >which needs to be written to before a GPIO
+> > >can be used.
+> > >
+> > >Add support for enabling the GPIO. At this
+> > >time inverted logic for enabling the GPIO
+> > >is not supported. This can be done by adding
+> > >a disable register as and when a controller
+> > >with this comes along.
+> > >
+> > >Signed-off-by: Sekhar Nori<nsekhar@ti.com>
+> > >---
+> > >
+> > <snip>
+> > 
+> > >static int bgpio_setup_io(struct bgpio_chip *bgc,
+> > >  			  void __iomem *dat,
+> > >@@ -369,6 +401,7 @@ int __devinit bgpio_init(struct bgpio_chip *bgc,
+> > >  			 void __iomem *clr,
+> > >  			 void __iomem *dirout,
+> > >  			 void __iomem *dirin,
+> > >+			 void __iomem *en,
+> > >  			 bool big_endian)
+> > 
+> > The arguments to this function are getting a bit unwieldy :-). Maybe
+> > we need to introduce something like:
+> > 
+> > struct bgpio_chip_info {
+> >     struct device *dev;
+> >     unsigned long sz;
+> >     void __iomem *dat;
+> >     void __iomem *set;
+> >     void __iomem *clr;
+> >     void __iomem *dirout;
+> >     void __iomem *dirin;
+> >     void __iomem *en;
+> >     bool big_endian;
+> > };
+> > 
+> > and pass that to bgpio_init instead. It would have the added
+> > benefits of making the drivers more readable and that
+> > bgpio_chip_info structs in the drivers can probably be marked
+> > __initdata also.
 > 
-> I think this now looks fine - I don't have time to test it at the moment
-> 600+ messages on the list yesterday (I spent most of yesterday _only_
-> replying to email), new large patch sets on the list today, and
-> struggling to test some of these changes...
-> 
-> (It's no wonder people feel that they get ignored - generally if I don't
-> process things on the day they're sent, I hardly go looking back through
-> my mailbox... it's only Will's pull request which made me go back and
-> look at yours.)
+> Or, what may be better is to make callers directly update the
+> bgpio_chip structure.
 
-Thanks for taking a look anyhow.
+I started implementing it this way, but felt that the bgpio_chip
+structure also has many internal members (like the spinlock) and
+this method will require users to spend quite a bit of time figuring
+out which structure members they should initialize and which to leave
+for bgpio_init() to do for them.
 
-Unfortunately this series was a lot of noise, but I didn't like to
-merge those patches together, due to the many orthogonal changes between
-the different CPUs.
+There is also the case of direction register which is set from
+either dirout or dirin depending upon whether the logic is inverted
+or not. The bgpio_chip however needs to deal with a single direction
+register offset.
 
-Are you happy for these patches to appear in Will's pull request now?
-I'm as confident as I can reasonably be that they don't break anything,
-due to the policy of not changing the resulting .o files in any material
-way.  I've also tested on a couple of real platforms (though by no
-means the full set).
+Considering these, I am getting inclined towards Ryan's suggestion.
 
-Cheers
----Dave
+Thoughts?
+
+Thanks,
+Sekhar
