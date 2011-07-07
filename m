@@ -1,81 +1,101 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Thu, 7 Jul 2011 11:46:22 -0500
-Subject: [PATCH 10/37] ARM: mach-ep93xx: remove mach/memory.h and
-	Kconfig	selection of SDRAM bank
-In-Reply-To: <1309923021-23487-10-git-send-email-nicolas.pitre@linaro.org>
-References: <1309923021-23487-1-git-send-email-nicolas.pitre@linaro.org>
-	<1309923021-23487-10-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <ADE657CA350FB648AAC2C43247A983F001F383D6CEEA@AUSP01VMBX24.collaborationhost.net>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu,  7 Jul 2011 09:47:27 -0700
+Subject: [PATCHv2] arm: mm: Poison freed init memory
+In-Reply-To: <20110706210106.GX8286@n2100.arm.linux.org.uk>
+References: <20110706210106.GX8286@n2100.arm.linux.org.uk>
+Message-ID: <1310057247-4933-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, July 05, 2011 8:30 PM, Nicolas Pitre wrote:
+Poisoning __init marked memory can be useful when tracking down
+obscure memory corruption bugs. Therefore, poison init memory
+with 0xe7fddef0 to catch bugs earlier. The poison value is an
+undefined instruction in ARM mode and branch to an undefined
+instruction in Thumb mode.
+
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+
+On 7/6/2011 2:01 PM, Russell King - ARM Linux wrote:
+> On Wed, Jul 06, 2011 at 01:55:54PM -0700, Stephen Boyd wrote:
+>> Should it include the initrd too? At least x86 poisons that memory but I
+>> don't know who would be using that incorrectly.
 >
-> This all can be selected automatically by default at run time.
+> It could do - I don't see any harm in not doing so.  The only issue
+> is that people may want to disable this stuff if they're after
+> squeezing every last ms out of the boot time.
 
-How?  It would be nice if you mentioned that this patch makes ARCH_EP93XX
-use ARM_PATCH_PHYS_VIRT.  It took a bit of digging for me to figure out
-where PHYS_OFFSET was now getting set.
+I haven't done this. I hope a follow up patch will suffice.
 
-> Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-> ---
->  arch/arm/Kconfig                           |    2 +
->  arch/arm/mach-ep93xx/Kconfig               |   53 ----------------------------
->  arch/arm/mach-ep93xx/Makefile.boot         |   14 -------
->  arch/arm/mach-ep93xx/include/mach/memory.h |   22 -----------
->  4 files changed, 2 insertions(+), 89 deletions(-)
->  delete mode 100644 arch/arm/mach-ep93xx/include/mach/memory.h
 >
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index c4b6e4a..48b2e88 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -371,6 +371,8 @@ config ARCH_EP93XX
->  	select ARCH_REQUIRE_GPIOLIB
->  	select ARCH_HAS_HOLES_MEMORYMODEL
->  	select ARCH_USES_GETTIMEOFFSET
-> +	select NO_MACH_MEMORY_H
-> +	select AUTO_ZRELADDR if !ZBOOT_ROM
+>> How about a free_init_area() function which calls free_area() after
+>> poisoning the memory?
+>
+> I need to go back and look at the Integrator etc situation with regard
+> to reorganizing the vmlinux layout - it may be that the omission of
+> freeing .init memory can now be removed (it was there to stop the
+> memory being used as the first K of memory wasn't DMA-able.)
+>
+> Assuming it has to stay though, we still should arrange for the initrd
+> memory to be poisoned even if it isn't freed.
 
-I would like to see a:
+Is this is patch what you're saying? I would have liked to do a
+free_init_area() wrapper, but until the Integrator situation can be
+sorted it doesn't look worthwhile.
 
-+	select ARM_PATCH_PHYS_VIRT
+ arch/arm/mm/init.c |   17 ++++++++++++++++-
+ 1 files changed, 16 insertions(+), 1 deletions(-)
 
-here.  I realize that the select of NO_MACH_MEMORY_H will cause the selection
-but it's a bit hidden.
-
-[snip]
-
-> diff --git a/arch/arm/mach-ep93xx/Makefile.boot b/arch/arm/mach-ep93xx/Makefile.boot
-> index 0ad33f1..e69de29 100644
-> --- a/arch/arm/mach-ep93xx/Makefile.boot
-> +++ b/arch/arm/mach-ep93xx/Makefile.boot
-> @@ -1,14 +0,0 @@
-> -   zreladdr-$(CONFIG_EP93XX_SDCE3_SYNC_PHYS_OFFSET)	:= 0x00008000
-> -params_phys-$(CONFIG_EP93XX_SDCE3_SYNC_PHYS_OFFSET)	:= 0x00000100
-> -
-> -   zreladdr-$(CONFIG_EP93XX_SDCE0_PHYS_OFFSET)		:= 0xc0008000
-> -params_phys-$(CONFIG_EP93XX_SDCE0_PHYS_OFFSET)		:= 0xc0000100
-> -
-> -   zreladdr-$(CONFIG_EP93XX_SDCE1_PHYS_OFFSET)		:= 0xd0008000
-> -params_phys-$(CONFIG_EP93XX_SDCE1_PHYS_OFFSET)		:= 0xd0000100
-> -
-> -   zreladdr-$(CONFIG_EP93XX_SDCE2_PHYS_OFFSET)		:= 0xe0008000
-> -params_phys-$(CONFIG_EP93XX_SDCE2_PHYS_OFFSET)		:= 0xe0000100
-> -
-> -   zreladdr-$(CONFIG_EP93XX_SDCE3_ASYNC_PHYS_OFFSET)	:= 0xf0008000
-> -params_phys-$(CONFIG_EP93XX_SDCE3_ASYNC_PHYS_OFFSET)	:= 0xf0000100
-
-Is Makefile.boot still needed for anything?
-
-Other than those comments.  I have boot tested this on a couple ep93xx
-boards and everything looks fine.
-
-Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-
-BTW, scripts/get_maintainer.pl is you friend... It would have been nice to
-be CC'ed for the ep93xx specific parts of you patches.  I just happened to
-notice them in my inbox yesterday...
-
-Regards,
-Hartley
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index c19571c..d6360b1 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -422,6 +422,17 @@ static inline int free_area(unsigned long pfn, unsigned long end, char *s)
+ 	return pages;
+ }
+ 
++/*
++ * Poison init memory with an undefined instruction (ARM) or a branch to an
++ * undefined instruction (Thumb).
++ */
++static inline void poison_init_mem(void *s, size_t count)
++{
++	u32 *p = (u32 *)s;
++	while ((count = count - 4))
++		*p++ = 0xe7fddef0;
++}
++
+ static inline void
+ free_memmap(unsigned long start_pfn, unsigned long end_pfn)
+ {
+@@ -704,11 +715,13 @@ void free_initmem(void)
+ #ifdef CONFIG_HAVE_TCM
+ 	extern char __tcm_start, __tcm_end;
+ 
++	poison_init_mem(&__tcm_start, &__tcm_end - &__tcm_start);
+ 	totalram_pages += free_area(__phys_to_pfn(__pa(&__tcm_start)),
+ 				    __phys_to_pfn(__pa(&__tcm_end)),
+ 				    "TCM link");
+ #endif
+ 
++	poison_init_mem(__init_begin, __init_end - __init_begin);
+ 	if (!machine_is_integrator() && !machine_is_cintegrator())
+ 		totalram_pages += free_area(__phys_to_pfn(__pa(__init_begin)),
+ 					    __phys_to_pfn(__pa(__init_end)),
+@@ -721,10 +734,12 @@ static int keep_initrd;
+ 
+ void free_initrd_mem(unsigned long start, unsigned long end)
+ {
+-	if (!keep_initrd)
++	if (!keep_initrd) {
++		poison_init_mem((void *)start, PAGE_ALIGN(end) - start);
+ 		totalram_pages += free_area(__phys_to_pfn(__pa(start)),
+ 					    __phys_to_pfn(__pa(end)),
+ 					    "initrd");
++	}
+ }
+ 
+ static int __init keepinitrd_setup(char *__unused)
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
