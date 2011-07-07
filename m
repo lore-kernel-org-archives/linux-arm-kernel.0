@@ -1,43 +1,54 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Thu, 7 Jul 2011 16:56:01 +0800
-Subject: reply: [PATCH v5 1/3] ARM: mxs: add GPMI-NFC support
-	for	imx23/imx28
-In-Reply-To: <201107011109.27206.arnd@arndb.de>
-References: <14C4E31473AF7E4B98176CB73615181C19FBD3@039-SN1MPN1-006.039d.mgd.msft.net>	<201107010029.51965.arnd@arndb.de>
-	<4E0D8C04.6010409@freescale.com> <201107011109.27206.arnd@arndb.de>
-Message-ID: <4E1574A1.4050502@freescale.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Thu, 07 Jul 2011 11:59:13 +0300
+Subject: [PATCH 3/4] MTD: pxa3xx_nand: enable multiple chip select support
+In-Reply-To: <CALZhoSQgoMS7bSRx1V-tMX+aG4idF6Z-Xr3CorFSXwPMHvacXw@mail.gmail.com>
+References: <1309319494-17951-1-git-send-email-leiwen@marvell.com>	<1309771536-10597-4-git-send-email-leiwen@marvell.com>	<4E1411BB.4010000@compulab.co.il>
+	<CALZhoSQgoMS7bSRx1V-tMX+aG4idF6Z-Xr3CorFSXwPMHvacXw@mail.gmail.com>
+Message-ID: <4E157561.6060600@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi:
-> On Friday 01 July 2011 10:57:40 Huang Shijie wrote:
->>>> It's annoying, but it really saves some lines.
->>> It would save more lines if you introduce the macros globally and
->>> convert all existing resource definitions ;-)
->> The origin code did not use any macros.
->> Some one suggested me to use macros.
->> So i used the macros.
+On 07/07/11 09:26, Lei Wen wrote:
+
+> Hi Igor && Daniel,
+>
+> On Wed, Jul 6, 2011 at 3:41 PM, Igor Grinberg <grinberg@compulab.co.il> wrote:
+>> On 07/04/11 12:25, Lei Wen wrote:
 >>
->> Do i have to drop the macros?
-> Can you find out who made the suggestion? Let's first reach consensus
-> about how we want to do these things in the future.
-http://www.spinics.net/lists/arm-kernel/msg121384.html
+>>>  #ifdef CONFIG_PM
+>>> @@ -1203,8 +1259,12 @@ static int pxa3xx_nand_resume(struct platform_device *pdev)
+>>>  {
+>>>       struct pxa3xx_nand_info *info = platform_get_drvdata(pdev);
+>>>
+>>> -     nand_writel(info, NDTR0CS0, info->host->ndtr0cs0);
+>>> -     nand_writel(info, NDTR1CS0, info->host->ndtr1cs0);
+>>> +     /*
+>>> +      * Directly set the chip select to a invalid value,
+>>> +      * then the driver would reset the timing according
+>>> +      * to current chip select at the beginning of cmdfunc
+>>> +      */
+>>> +     info->cs = 0xff;
+>> Thinking of this for the second (or third) time,
+>> If you have keep config enabled and have only one nand chip,
+>> this will brake the keep config...
+>>
+>> Daniel,
+>>
+>> have you tested the suspend/resume with this patch?
+>> (and keep_config on?)
+>>
+> Do you still have concern with this change?
+> If not, I would push the next round of patch set including merging
+> patch 3 and 4.
 
-Thanks to your comments.
+Though I can't test it right now, but yes it looks like it breaks
+the keep_config after the resume (actually it disables the keep_config silently).
+
+I think you need here some kind of check if keep_config is enabled.
+keep_config is enabled means that only one chip select is used for NAND
+and you don't need to reset the timings.
 
 
-Best Regards
-Huang Shijie
-> My opinion is that we should not have macros like these in any platform
-> specific code: If the macros are a good idea, we should define them
-> globally and let everyone use the same macros. If we decide not to have
-> them in global code, it would be even worse to have them in specific
-> platforms.
->
-> 	Arnd
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+-- 
+Regards,
+Igor.
