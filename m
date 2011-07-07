@@ -1,100 +1,40 @@
 From: dave.martin@linaro.org (Dave Martin)
-Date: Thu,  7 Jul 2011 15:27:08 +0100
-Subject: [PATCH v4 01/40] ARM: mm: proc-macros: Add generic proc/cache/tlb
-	struct definition macros
+Date: Thu,  7 Jul 2011 15:27:14 +0100
+Subject: [PATCH v4 07/40] ARM: mm: cache-v4wt: Use the new processor struct
+	macros
 In-Reply-To: <1310048867-14172-1-git-send-email-dave.martin@linaro.org>
 References: <1310048867-14172-1-git-send-email-dave.martin@linaro.org>
-Message-ID: <1310048867-14172-2-git-send-email-dave.martin@linaro.org>
+Message-ID: <1310048867-14172-8-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds some generic macros to reduce boilerplate when
-declaring certain common structures in arch/arm/mm/*.S
-
-Thanks to Russell King for outlining what the
-define_processor_functions macro could look like.
-
-Currently, only a few things can be overriden when invoking the
-macros, based on the overrides actually required by the existing
-CPUs.  More overrides arguments can be added in the future, if
-needed.
-
 Signed-off-by: Dave Martin <dave.martin@linaro.org>
-Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 ---
- arch/arm/mm/proc-macros.S |   63 +++++++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 63 insertions(+), 0 deletions(-)
+ arch/arm/mm/cache-v4wt.S |   15 ++-------------
+ 1 files changed, 2 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/mm/proc-macros.S b/arch/arm/mm/proc-macros.S
-index 34261f9..4ae9b44 100644
---- a/arch/arm/mm/proc-macros.S
-+++ b/arch/arm/mm/proc-macros.S
-@@ -254,3 +254,66 @@
- 	mcr	p15, 0, r0, c7, c10, 1		@ clean L1 D line
- 	mcr	p15, 0, ip, c7, c10, 4		@ data write barrier
- 	.endm
-+
-+.macro define_processor_functions name:req, dabort:req, pabort:req, nommu=0, suspend=0
-+	.type	\name\()_processor_functions, #object
-+	.align 2
-+ENTRY(\name\()_processor_functions)
-+	.word	\dabort
-+	.word	\pabort
-+	.word	cpu_\name\()_proc_init
-+	.word	cpu_\name\()_proc_fin
-+	.word	cpu_\name\()_reset
-+	.word	cpu_\name\()_do_idle
-+	.word	cpu_\name\()_dcache_clean_area
-+	.word	cpu_\name\()_switch_mm
-+
-+	.if \nommu
-+	.word	0
-+	.else
-+	.word	cpu_\name\()_set_pte_ext
-+	.endif
-+
-+	.if \suspend
-+	.word	cpu_\name\()_suspend_size
-+	.word	cpu_\name\()_do_suspend
-+	.word	cpu_\name\()_do_resume
-+	.else
-+	.word	0
-+	.word	0
-+	.word	0
-+	.endif
-+
-+	.size	\name\()_processor_functions, . - \name\()_processor_functions
-+.endm
-+
-+.macro define_cache_functions name:req
-+	.align 2
-+	.type	\name\()_cache_fns, #object
-+ENTRY(\name\()_cache_fns)
-+	.long	\name\()_flush_icache_all
-+	.long	\name\()_flush_kern_cache_all
-+	.long	\name\()_flush_user_cache_all
-+	.long	\name\()_flush_user_cache_range
-+	.long	\name\()_coherent_kern_range
-+	.long	\name\()_coherent_user_range
-+	.long	\name\()_flush_kern_dcache_area
-+	.long	\name\()_dma_map_area
-+	.long	\name\()_dma_unmap_area
-+	.long	\name\()_dma_flush_range
-+	.size	\name\()_cache_fns, . - \name\()_cache_fns
-+.endm
-+
-+.macro define_tlb_functions name:req, flags_up:req, flags_smp
-+	.type	\name\()_tlb_fns, #object
-+ENTRY(\name\()_tlb_fns)
-+	.long	\name\()_flush_user_tlb_range
-+	.long	\name\()_flush_kern_tlb_range
-+	.ifnb \flags_smp
-+		ALT_SMP(.long	\flags_smp )
-+		ALT_UP(.long	\flags_up )
-+	.else
-+		.long	\flags_up
-+	.endif
-+	.size	\name\()_tlb_fns, . - \name\()_tlb_fns
-+.endm
+diff --git a/arch/arm/mm/cache-v4wt.S b/arch/arm/mm/cache-v4wt.S
+index a7b276d..4d7b467 100644
+--- a/arch/arm/mm/cache-v4wt.S
++++ b/arch/arm/mm/cache-v4wt.S
+@@ -197,16 +197,5 @@ ENDPROC(v4wt_dma_map_area)
+ 
+ 	__INITDATA
+ 
+-	.type	v4wt_cache_fns, #object
+-ENTRY(v4wt_cache_fns)
+-	.long	v4wt_flush_icache_all
+-	.long	v4wt_flush_kern_cache_all
+-	.long	v4wt_flush_user_cache_all
+-	.long	v4wt_flush_user_cache_range
+-	.long	v4wt_coherent_kern_range
+-	.long	v4wt_coherent_user_range
+-	.long	v4wt_flush_kern_dcache_area
+-	.long	v4wt_dma_map_area
+-	.long	v4wt_dma_unmap_area
+-	.long	v4wt_dma_flush_range
+-	.size	v4wt_cache_fns, . - v4wt_cache_fns
++	@ define struct cpu_cache_fns (see <asm/cacheflush.h> and proc-macros.S)
++	define_cache_functions v4wt
 -- 
 1.7.4.1
