@@ -1,50 +1,30 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 7 Jul 2011 18:36:45 +0100
-Subject: [PATCHv2] arm: mm: Poison freed init memory
-In-Reply-To: <1310057247-4933-1-git-send-email-sboyd@codeaurora.org>
-References: <20110706210106.GX8286@n2100.arm.linux.org.uk>
-	<1310057247-4933-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20110707173645.GD20403@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 7 Jul 2011 19:40:24 +0200
+Subject: [PATCH 01/10] ARM: change ARM_DMA_ZONE_SIZE into a variable
+In-Reply-To: <81e4ac16-db7b-47a0-9f93-632a5d9f898d@VA3EHSMHS028.ehs.local>
+References: <1309919442-20451-1-git-send-email-nicolas.pitre@linaro.org>
+	<201107071817.11842.arnd@arndb.de>
+	<81e4ac16-db7b-47a0-9f93-632a5d9f898d@VA3EHSMHS028.ehs.local>
+Message-ID: <201107071940.24964.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 07, 2011 at 09:47:27AM -0700, Stephen Boyd wrote:
-> Poisoning __init marked memory can be useful when tracking down
-> obscure memory corruption bugs. Therefore, poison init memory
-> with 0xe7fddef0 to catch bugs earlier. The poison value is an
-> undefined instruction in ARM mode and branch to an undefined
-> instruction in Thumb mode.
+On Thursday 07 July 2011 19:08:38 John Linn wrote:
+> > There is a way to specify DMA address ranges in the device tree,
+> though
+> > I forgot the exact format. It comes down to saying the device sees
+> > memory range XXX to YYY as its local address AAA to BBB. We could use
+> > that information at boot time to determine what the largest range
+> > of memory is that is visible by all devices (and hope that it's at
+> > the start of physical memory).
 > 
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
+> If I'm following this right....
 > 
-> On 7/6/2011 2:01 PM, Russell King - ARM Linux wrote:
-> > On Wed, Jul 06, 2011 at 01:55:54PM -0700, Stephen Boyd wrote:
-> >> Should it include the initrd too? At least x86 poisons that memory but I
-> >> don't know who would be using that incorrectly.
-> >
-> > It could do - I don't see any harm in not doing so.  The only issue
-> > is that people may want to disable this stuff if they're after
-> > squeezing every last ms out of the boot time.
-> 
-> I haven't done this. I hope a follow up patch will suffice.
-> 
-> >
-> >> How about a free_init_area() function which calls free_area() after
-> >> poisoning the memory?
-> >
-> > I need to go back and look at the Integrator etc situation with regard
-> > to reorganizing the vmlinux layout - it may be that the omission of
-> > freeing .init memory can now be removed (it was there to stop the
-> > memory being used as the first K of memory wasn't DMA-able.)
-> >
-> > Assuming it has to stay though, we still should arrange for the initrd
-> > memory to be poisoned even if it isn't freed.
-> 
-> Is this is patch what you're saying? I would have liked to do a
-> free_init_area() wrapper, but until the Integrator situation can be
-> sorted it doesn't look worthwhile.
+> We have a hole at the start of physical memory (when it's at 0) so that
+> DMA can't DMA into it.  Sounds like that won't work for us?
 
-Yes, thanks.  This looks fine for the time being.  Have you been able
-to test it?  If yes, then please put it in the patch system and I'll
-see about giving it a test too.
+A whole in physical memory should not be a problem. It's only a problem
+if you have a device that can do DMA only to to some memory range that
+is not the start of your RAM, e.g. only the second 256MB but not the first.
+
+	Arnd
