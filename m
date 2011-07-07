@@ -1,38 +1,40 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Thu, 07 Jul 2011 15:37:22 +0400
-Subject: [PATCH 01/52] ARM: introduce atag_offset to replace boot_params
-In-Reply-To: <1309920457-21913-1-git-send-email-nicolas.pitre@linaro.org>
-References: <1309920457-21913-1-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <4E159A72.1070503@mvista.com>
+From: buytenh@wantstofly.org (Lennert Buytenhek)
+Date: Thu, 7 Jul 2011 14:09:18 +0200
+Subject: [PATCH 3/8] ARM: dma-mapping: use asm-generic/dma-mapping-common.h
+In-Reply-To: <201106271519.43581.arnd@arndb.de>
+References: <1308556213-24970-1-git-send-email-m.szyprowski@samsung.com>
+	<201106241736.43576.arnd@arndb.de>
+	<000601cc34c4$430f91f0$c92eb5d0$%szyprowski@samsung.com>
+	<201106271519.43581.arnd@arndb.de>
+Message-ID: <20110707120918.GF7810@wantstofly.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Mon, Jun 27, 2011 at 03:19:43PM +0200, Arnd Bergmann wrote:
 
-On 06-07-2011 6:46, Nicolas Pitre wrote:
+> > > I suppose for the majority of the cases, the overhead of the indirect
+> > > function call is near-zero, compared to the overhead of the cache
+> > > management operation, so it would only make a difference for coherent
+> > > systems without an IOMMU. Do we care about micro-optimizing those?
 
-> The boot_params member of the mdesc structure is used to provide a
-> default physical address for the ATAG list.  Since this value is fixed
-> at compile time and often based on ARCH_PHYS_OFFSET, it gets in the way
-> of runtime PHYS_OFFSET usage.
+FWIW, when I was hacking on ARM access point routing performance some
+time ago, turning the L1/L2 cache maintenance operations into inline
+functions (inlined into the ethernet driver) gave me a significant and
+measurable performance boost.
 
-> Let's introduce atag_offset which should contains only the relative
-> offset from start of memory instead of an absolute value, in preparation
-> to move all instance of boot_params over to it.
+Such things can remain product-specific hacks, though.
 
-> Signed-off-by: Nicolas Pitre<nicolas.pitre@linaro.org>
-[...]
 
-> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> index e0db84d..4cc3e2b 100644
-> --- a/arch/arm/kernel/setup.c
-> +++ b/arch/arm/kernel/setup.c
-> @@ -816,6 +816,8 @@ static struct machine_desc * __init setup_machine_tags(unsigned int nr)
->
->   	if (__atags_pointer)
->   		tags = phys_to_virt(__atags_pointer);
-> +	else if(mdesc->atag_offset)
+> > Even in coherent case, the overhead caused by additional function call
+> > should have really negligible impact on drivers performance.
+> 
+> What about object code size? I guess since ixp23xx is the only platform
+> that announces itself as coherent, we probably don't need to worry about
+> it too much either. Lennert?
 
-    Should be space after *if* -- checkpatch.pl should have complained.
+I don't think so.  ixp23xx isn't a very popular platform anymore either,
+having been discontinued some time ago.
 
-WBR, Sergei
+
+thanks,
+Lennert
