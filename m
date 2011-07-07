@@ -1,51 +1,61 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 6 Jul 2011 23:59:41 -0400 (EDT)
-Subject: [PATCH 07/10] ARM: mach-realview: move from ARM_DMA_ZONE_SIZE
-	to mdesc->dma_zone_size
-In-Reply-To: <20110706231521.GD8286@n2100.arm.linux.org.uk>
-References: <1309919442-20451-1-git-send-email-nicolas.pitre@linaro.org>
-	<1309919442-20451-7-git-send-email-nicolas.pitre@linaro.org>
-	<20110706231521.GD8286@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1107062340130.14596@xanadu.home>
+Date: Thu, 7 Jul 2011 00:04:26 -0400 (EDT)
+Subject: [PATCH 01/52] ARM: introduce atag_offset to replace
+ boot_params
+In-Reply-To: <ADE657CA350FB648AAC2C43247A983F001F383D6CD4D@AUSP01VMBX24.collaborationhost.net>
+References: <1309920457-21913-1-git-send-email-nicolas.pitre@linaro.org>
+	<ADE657CA350FB648AAC2C43247A983F001F383D6CD4D@AUSP01VMBX24.collaborationhost.net>
+Message-ID: <alpine.LFD.2.00.1107070003410.14596@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 7 Jul 2011, Russell King - ARM Linux wrote:
+On Wed, 6 Jul 2011, H Hartley Sweeten wrote:
 
-> On Tue, Jul 05, 2011 at 10:30:39PM -0400, Nicolas Pitre wrote:
-> > -#ifdef CONFIG_ZONE_DMA
-> > -#define ARM_DMA_ZONE_SIZE	SZ_256M
-> > -#endif
-> ...
-> > +	.dma_zone_size	= SZ_128M,
-> > +	.dma_zone_size	= SZ_128M,
-> > +	.dma_zone_size	= SZ_128M,
-> > +	.dma_zone_size	= SZ_128M,
-> > +	.dma_zone_size	= SZ_128M,
+> On Tuesday, July 05, 2011 7:47 PM, Nicolas Pitre wrote:
+> > The boot_params member of the mdesc structure is used to provide a
+> > default physical address for the ATAG list.  Since this value is fixed
+> > at compile time and often based on ARCH_PHYS_OFFSET, it gets in the way
+> > of runtime PHYS_OFFSET usage.
+> > 
+> > Let's introduce atag_offset which should contains only the relative
+> > offset from start of memory instead of an absolute value, in preparation
+> > to move all instance of boot_params over to it.
+> > 
+> > Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+> > ---
+> >  arch/arm/include/asm/mach/arch.h |    1 +
+> >  arch/arm/kernel/setup.c          |    2 ++
+> >  2 files changed, 3 insertions(+), 0 deletions(-)
+> > 
+> > diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
+> > index 7b79a00..1bdf6e1 100644
+> > --- a/arch/arm/include/asm/mach/arch.h
+> > +++ b/arch/arm/include/asm/mach/arch.h
+> > @@ -18,6 +18,7 @@ struct machine_desc {
+> >  	unsigned int		nr;		/* architecture number	*/
+> >  	const char		*name;		/* architecture name	*/
+> >  	unsigned long		boot_params;	/* tagged list		*/
+> > +	unsigned long		atag_offset;	/* tagged list (relative) */
+> >  	const char		**dt_compat;	/* array of device tree
+> >  						 * 'compatible' strings	*/
+> >  
+> > diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> > index e0db84d..4cc3e2b 100644
+> > --- a/arch/arm/kernel/setup.c
+> > +++ b/arch/arm/kernel/setup.c
+> > @@ -816,6 +816,8 @@ static struct machine_desc * __init setup_machine_tags(unsigned int nr)
+> >  
+> >  	if (__atags_pointer)
+> >  		tags = phys_to_virt(__atags_pointer);
+> > +	else if(mdesc->atag_offset)
+> > +		tags = PAGE_OFFSET + mdesc->atag_offset;
 > 
-> Too small...
+> This results in a warning...
+> 
+> arch/arm/kernel/setup.c: In function 'setup_arch':
+> arch/arm/kernel/setup.c:820: warning: assignment makes pointer from integer without a cast
 
-OK, fixed.
-
-> I think you're rushing to get these patches ready for the 3.1 merge
-> window...
-
-I'm not rushing anything.  I've been working on and off on this series 
-for over a month and simply just completed it now.  Mechanical changes 
-like this might sometimes have mistakes but they are usually pretty easy 
-to spot by someone with a fresh look.
-
-> Given that these patches have only just appeared, and the number of
-> sillies in them, they should wait for the next merge window _unless_
-> they get a thorough review and test.
-
-I don't mind waiting for the next merge window.  It is not like this is 
-going to be the last of such patch series in order to enable a single 
-zImage anyway.  However the next merge window is probably going to see 
-even more of those patches as a Linaro concerted effort is being 
-organized to accelerate that work.  Hence I was hoping to spread the 
-patch load by submitting those ones now in order to reduce the size of 
-the next windo's submission.
+Bleh.  Fixed, thanks.
 
 
 Nicolas
