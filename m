@@ -1,203 +1,77 @@
-From: johnlinn@comcast.net (johnlinn at comcast.net)
-Date: Thu, 7 Jul 2011 13:48:54 +0000 (UTC)
-Subject: [PATCH 1/3] ARM: CSR: Adding CSR SiRFprimaII board support
-In-Reply-To: <e66253df-b34a-4c32-bddf-31b1332c716c@VA3EHSMHS031.ehs.local>
-Message-ID: <1716451481.306769.1310046534202.JavaMail.root@sz0140a.emeryville.ca.mail.comcast.net>
+From: joravec@drewtech.com (Joey Oravec)
+Date: Thu, 07 Jul 2011 09:49:59 -0400
+Subject: plat-orion multi purpose pins problem for mv78200
+In-Reply-To: <CAMAG_eeO5EXML=nEfKkvbqz__UFQifUujjFrb4YKiOxZzdFhjA@mail.gmail.com>
+References: <4E0E1CA8.7090200@drewtech.com>	<20110702122344.GJ31228@kw.sim.vm.gnt>	<CAMAG_eexDoKrPsrd7+3bpsN3y0pptqwhFRP2NKqd_Nny+M+NGg@mail.gmail.com>	<4E132FD5.1090409@drewtech.com>	<20110706161823.GB22857@kw.sim.vm.gnt>	<4E14AE51.5070003@drewtech.com>
+	<CAMAG_eeO5EXML=nEfKkvbqz__UFQifUujjFrb4YKiOxZzdFhjA@mail.gmail.com>
+Message-ID: <4E15B987.1060208@drewtech.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> From: linux-arm-kernel-bounces at lists.infradead.org
-> [mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf Of
-> Arnd
-> Bergmann
-> Sent: Thursday, July 07, 2011 5:43 AM
-> To: Barry Song
-> Cc: Russell King - ARM Linux; nico at fluxnic.net; Bin Shi; Barry Song;
-> workgroup.linux at csr.com; Zhiwu Song; grant.likely at secretlab.ca;
-> Rongjun
-> Ying; Binghua Duan; Barry Song; tglx at linutronix.de; Yuping Luo; John
-> Linn; Huayi Li; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH 1/3] ARM: CSR: Adding CSR SiRFprimaII board
-> support
-> 
-> On Thursday 07 July 2011, Barry Song wrote:
-> > > FWIW, I've double-checked the Xilinx zynq platform that I've
-> > > already
-> queued
-> > > up for 3.1: this one defines IO_SPACE_LIMIT to 0xffff because PCI
-> support
-> > > will get merged later, so that's fine.
-> >
-> > as far as i know, zynq still has some static mapping tables and
-> > board
-> > file board_dt.c. as you have reviewed csr platform very carefully, i
-> > guess those can get fixed in zynq later too :-)
-> > xilinx zynq and csr prima2 should be the pioneering two new SoCs to
-> > move to DT in arm for the moment. at least, these two things can try
-> > to get same.
-> 
-> Good point. I'm not planning to change the initial xilinx code, since
-> it's already in the tree, but I'd like to apply the patch below
-> to make it do the same as prima2 in this regard.
-> John, can you ack this patch?
-> 
+On 7/7/2011 2:40 AM, saeed bishara wrote:
+>>>> Note that orion_gpio_set_valid() and orion_gpio_is_valid() would
+>>>> both need rework. The functions need to handle that a GPIO can be
+>>>> mux'ed onto any MPP pin. I described this problem in another email
+>>>> on the thread.
+>>> I don't understand what's wrong with the GPIO array.
+>> I tried to describe the case in my reply:
+>> http://lists.arm.linux.org.uk/lurker/message/20110701.215657.7efe0a42.en.html
+>>
+>> Assume that we've solved the mpp_to_gpio mapping. Then imagine you pass a
+>> large array to mv78xx0_mpp_conf() that includes:
+>>
+>> MPP16_GPIO (this mpp corresponds to GPIO16)
+>> MPP47_UNUSED (this mpp corresponds to GPIO16)
+>>
+>> The code today processes the array in-order. When it processes MPP16_GPIO it
+>> will mark the GPIO16 valid. When it processes MPP47_UNUSED it would
+>> currently mark GPIO16 invalid. This is a problem because it still assumes a
+>> 1:1 relationship.
+> I agree, this is why we need some method to make the orion_mpp_conf()
+> know which mpps are gpios, when that done, then the gpio of MPP47 in
+> your case will not be set as invalid.
+> one option to do that is to assume that mpp with _in == out_ == 0 is
+> not a gpio. so the orion_mpp_conf() will look like this:
+> --- a/arch/arm/plat-orion/mpp.c
+> +++ b/arch/arm/plat-orion/mpp.c
+> @@ -41,6 +41,7 @@ void __init orion_mpp_conf(unsigned int *mpp_list,
+> unsigned int variant_mask,
+>          for ( ; *mpp_list; mpp_list++) {
+>                  unsigned int num = MPP_NUM(*mpp_list);
+>                  unsigned int sel = MPP_SEL(*mpp_list);
+> +               unsigned int gpio_num = MPP_GPIO(*mpp_list);
+>                  int shift, gpio_mode;
+>
+>                  if (num>  mpp_max) {
+> @@ -64,9 +65,8 @@ void __init orion_mpp_conf(unsigned int *mpp_list,
+> unsigned int variant_mask,
+>                          gpio_mode |= GPIO_INPUT_OK;
+>                  if (*mpp_list&  MPP_OUTPUT_MASK)
+>                          gpio_mode |= GPIO_OUTPUT_OK;
+> -               if (sel != 0)
+> -                       gpio_mode = 0;
+> -               orion_gpio_set_valid(num, gpio_mode);
+> +               if (gpio_mode != 0)
+> +                       orion_gpio_set_valid(gpio_num, gpio_mode);
+>          }
+>
+>
+> and of course this will require that any non gpio mpp will have to
+> have the _in and _out set to 0.
 
-Sure, thanks Arnd.
+Yes this proposal is better for mv78xx0 than the current code, but it 
+may fail if you call orion_mpp_conf() multiple times. Imagine you setup 
+the MPP16_GPIO as described, then a subsequent call wants to configure 
+differently and sets:
 
-> For the iotable, it would also be good to remove that from zynq,
-> but it's harder to do for me when I can't test it. I'll try to split
-> out the serial setup, and I'd hope that John can do the others
-> along the lines of what you have done in sirfprima2.
+MPP16_UNUSED (this mpp corresponds to GPIO16)
 
-I'll take a look.
+Note orion_gpio_set_valid() contains code to mark GPIOs as valid or 
+invalid, but proposed change will only make a call to mark a GPIO as 
+valid. This example would reconfigure the MPP but leave the GPIO marked 
+valid.
 
-> 
-> 8<----
-> Subject: [PATCH] ARM: Xilinx: merge board file into main platform code
-> 
-> The zynq platform will never have board files other than the
-> device tree one, so there is no point splitting it from common.c.
-> 
-> This makes the code more compact.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Eventually, we would need to handle this example to implement the 
+proposed pinmux API. Right?
 
-Acked-by: John Linn <johnlinn@comcast.net>
-
-> ---
-> arch/arm/mach-zynq/board_dt.c | 37
-> -------------------------------------
-> arch/arm/mach-zynq/common.c | 22 +++++++++++++++++++---
-> arch/arm/mach-zynq/common.h | 5 -----
-> 3 files changed, 19 insertions(+), 45 deletions(-)
-> 
-> diff --git a/arch/arm/mach-zynq/board_dt.c
-> b/arch/arm/mach-zynq/board_dt.c
-> index 5b4710d..e69de29 100644
-> --- a/arch/arm/mach-zynq/board_dt.c
-> +++ b/arch/arm/mach-zynq/board_dt.c
-> @@ -1,37 +0,0 @@
-> -/*
-> - * This file contains code for boards with device tree support.
-> - *
-> - * Copyright (C) 2011 Xilinx
-> - *
-> - * based on arch/arm/mach-realview/core.c
-> - *
-> - * Copyright (C) 1999 - 2003 ARM Limited
-> - * Copyright (C) 2000 Deep Blue Solutions Ltd
-> - *
-> - * This software is licensed under the terms of the GNU General
-> Public
-> - * License version 2, as published by the Free Software Foundation,
-> and
-> - * may be copied, distributed, and modified under those terms.
-> - *
-> - * This program is distributed in the hope that it will be useful,
-> - * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-> - * GNU General Public License for more details.
-> - */
-> -
-> -#include <linux/of.h>
-> -#include <asm/mach/arch.h>
-> -#include <asm/mach-types.h>
-> -#include "common.h"
-> -
-> -static const char *xilinx_dt_match[] = {
-> - "xlnx,zynq-ep107",
-> - NULL
-> -};
-> -
-> -MACHINE_START(XILINX_EP107, "Xilinx Zynq Platform")
-> - .map_io = xilinx_map_io,
-> - .init_irq = xilinx_irq_init,
-> - .init_machine = xilinx_init_machine,
-> - .timer = &xttcpss_sys_timer,
-> - .dt_compat = xilinx_dt_match,
-> -MACHINE_END
-> diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
-> index b3ac5c2..73e9368 100644
-> --- a/arch/arm/mach-zynq/common.c
-> +++ b/arch/arm/mach-zynq/common.c
-> @@ -21,8 +21,11 @@
-> #include <linux/clk.h>
-> #include <linux/of_irq.h>
-> #include <linux/of_platform.h>
-> +#include <linux/of.h>
-> 
-> +#include <asm/mach/arch.h>
-> #include <asm/mach/map.h>
-> +#include <asm/mach-types.h>
-> #include <asm/page.h>
-> #include <asm/hardware/gic.h>
-> #include <asm/hardware/cache-l2x0.h>
-> @@ -40,7 +43,7 @@ static struct of_device_id zynq_of_bus_ids[]
-> __initdata = {
-> * xilinx_init_machine() - System specific initialization, intended to
-> be
-> * called from board specific initialization.
-> */
-> -void __init xilinx_init_machine(void)
-> +static void __init xilinx_init_machine(void)
-> {
-> #ifdef CONFIG_CACHE_L2X0
-> /*
-> @@ -55,7 +58,7 @@ void __init xilinx_init_machine(void)
-> /**
-> * xilinx_irq_init() - Interrupt controller initialization for the GIC.
-> */
-> -void __init xilinx_irq_init(void)
-> +static void __init xilinx_irq_init(void)
-> {
-> gic_init(0, 29, SCU_GIC_DIST_BASE, SCU_GIC_CPU_BASE);
-> }
-> @@ -96,7 +99,20 @@ static struct map_desc io_desc[] __initdata = {
-> /**
-> * xilinx_map_io() - Create memory mappings needed for early I/O.
-> */
-> -void __init xilinx_map_io(void)
-> +static void __init xilinx_map_io(void)
-> {
-> iotable_init(io_desc, ARRAY_SIZE(io_desc));
-> }
-> +
-> +static const char *xilinx_dt_match[] = {
-> + "xlnx,zynq-ep107",
-> + NULL
-> +};
-> +
-> +MACHINE_START(XILINX_EP107, "Xilinx Zynq Platform")
-> + .map_io = xilinx_map_io,
-> + .init_irq = xilinx_irq_init,
-> + .init_machine = xilinx_init_machine,
-> + .timer = &xttcpss_sys_timer,
-> + .dt_compat = xilinx_dt_match,
-> +MACHINE_END
-> diff --git a/arch/arm/mach-zynq/common.h b/arch/arm/mach-zynq/common.h
-> index bca2196..a009644 100644
-> --- a/arch/arm/mach-zynq/common.h
-> +++ b/arch/arm/mach-zynq/common.h
-> @@ -17,13 +17,8 @@
-> #ifndef __MACH_ZYNQ_COMMON_H__
-> #define __MACH_ZYNQ_COMMON_H__
-> 
-> -#include <linux/init.h>
-> #include <asm/mach/time.h>
-> 
-> -extern void xilinx_init_machine(void);
-> -extern void xilinx_irq_init(void);
-> -extern void xilinx_map_io(void);
-> -
-> extern struct sys_timer xttcpss_sys_timer;
-> 
-> #endif
-> --
-> 1.7.4.1
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-joey
