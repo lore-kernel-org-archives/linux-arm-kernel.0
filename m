@@ -1,36 +1,27 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 7 Jul 2011 13:37:07 +0100
-Subject: [PATCH 1/3] ARM: CSR: Adding CSR SiRFprimaII board support
-In-Reply-To: <201107071343.03591.arnd@arndb.de>
-References: <1309945678-18813-1-git-send-email-bs14@csr.com>
-	<201107062231.51117.arnd@arndb.de>
-	<CAGsJ_4wi3My=7M2sTwDNTAPxr+JFFAMrDDfBMy08ztjD3soWrQ@mail.gmail.com>
-	<201107071343.03591.arnd@arndb.de>
-Message-ID: <20110707123707.GN8286@n2100.arm.linux.org.uk>
+Date: Thu, 7 Jul 2011 13:38:25 +0100
+Subject: [PATCH 3/8] ARM: dma-mapping: use asm-generic/dma-mapping-common.h
+In-Reply-To: <20110707120918.GF7810@wantstofly.org>
+References: <1308556213-24970-1-git-send-email-m.szyprowski@samsung.com>
+	<201106241736.43576.arnd@arndb.de>
+	<000601cc34c4$430f91f0$c92eb5d0$%szyprowski@samsung.com>
+	<201106271519.43581.arnd@arndb.de>
+	<20110707120918.GF7810@wantstofly.org>
+Message-ID: <20110707123825.GO8286@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 07, 2011 at 01:43:03PM +0200, Arnd Bergmann wrote:
-> On Thursday 07 July 2011, Barry Song wrote:
-> > > FWIW, I've double-checked the Xilinx zynq platform that I've already queued
-> > > up for 3.1: this one defines IO_SPACE_LIMIT to 0xffff because PCI support
-> > > will get merged later, so that's fine.
-> > 
-> > as far as i know, zynq still has some static mapping tables and board
-> > file board_dt.c. as you have reviewed csr platform very carefully, i
-> > guess those can get fixed in zynq later too :-)
-> > xilinx zynq and csr prima2 should be the pioneering two new SoCs to
-> > move to DT in arm for the moment. at least, these two things can try
-> > to get same.
+On Thu, Jul 07, 2011 at 02:09:18PM +0200, Lennert Buytenhek wrote:
+> On Mon, Jun 27, 2011 at 03:19:43PM +0200, Arnd Bergmann wrote:
 > 
-> Good point. I'm not planning to change the initial xilinx code, since
-> it's already in the tree, but I'd like to apply the patch below
-> to make it do the same as prima2 in this regard.
-> John, can you ack this patch?
+> > > > I suppose for the majority of the cases, the overhead of the indirect
+> > > > function call is near-zero, compared to the overhead of the cache
+> > > > management operation, so it would only make a difference for coherent
+> > > > systems without an IOMMU. Do we care about micro-optimizing those?
+> 
+> FWIW, when I was hacking on ARM access point routing performance some
+> time ago, turning the L1/L2 cache maintenance operations into inline
+> functions (inlined into the ethernet driver) gave me a significant and
+> measurable performance boost.
 
-How similar are prima2 and zynq after this patch and a diff between
-their two subdirectories?  Are there any differences which can be
-eliminated?  Is there any commonality which can be factored out from
-the two?  Should the two be occupying separate mach directories?
-
-I think this is something we need to pay attention to now.
+On what architecture?  Can you show what you did to gain that?
