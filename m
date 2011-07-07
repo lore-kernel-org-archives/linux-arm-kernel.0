@@ -1,189 +1,79 @@
-From: vkoul@infradead.org (Vinod Koul)
-Date: Thu, 07 Jul 2011 07:50:22 +0530
-Subject: [PATCH 2/3] dmaengine: at_hdmac: improve power management routines
-In-Reply-To: <e8b0dceb5995556214d03477662f4ff7caf734e1.1309259835.git.nicolas.ferre@atmel.com>
-References: <fb4657207f9eb34784c10333e11c48b5638542ed.1309259835.git.nicolas.ferre@atmel.com>
-	<e8b0dceb5995556214d03477662f4ff7caf734e1.1309259835.git.nicolas.ferre@atmel.com>
-Message-ID: <1310005222.20150.23.camel@psiaudioba-mobl1>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 6 Jul 2011 22:46:03 -0400 (EDT)
+Subject: [PATCH 01/10] ARM: change ARM_DMA_ZONE_SIZE into a variable
+In-Reply-To: <20110706230455.GZ8286@n2100.arm.linux.org.uk>
+References: <1309919442-20451-1-git-send-email-nicolas.pitre@linaro.org>
+	<20110706230455.GZ8286@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1107062043180.14596@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2011-06-28 at 13:17 +0200, Nicolas Ferre wrote:
-> Save/restore dma controller state across a suspend-resume sequence.
-> The prepare() function will wait for the non-cyclic channels to become idle.
-> It also deals with cyclic operations with the start at next period while
-> resuming.
-> 
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> ---
->  drivers/dma/at_hdmac.c      |   88 ++++++++++++++++++++++++++++++++++++++++++-
->  drivers/dma/at_hdmac_regs.h |    7 +++
->  2 files changed, 94 insertions(+), 1 deletions(-)
-> 
-> diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
-> index fd87b96..7096adb 100644
-> --- a/drivers/dma/at_hdmac.c
-> +++ b/drivers/dma/at_hdmac.c
-> @@ -1385,27 +1385,113 @@ static void at_dma_shutdown(struct platform_device *pdev)
->  	clk_disable(atdma->clk);
->  }
->  
-> +static int at_dma_prepare(struct device *dev)
-> +{
-> +	struct platform_device *pdev = to_platform_device(dev);
-> +	struct at_dma *atdma = platform_get_drvdata(pdev);
-> +	struct dma_chan *chan, *_chan;
-> +
-> +	list_for_each_entry_safe(chan, _chan, &atdma->dma_common.channels,
-> +			device_node) {
-> +		struct at_dma_chan *atchan = to_at_dma_chan(chan);
-> +		/* wait for transaction completion (except in cyclic case) */
-> +		if (atc_chan_is_enabled(atchan) &&
-> +			!test_bit(ATC_IS_CYCLIC, &atchan->status))
-> +			return -EAGAIN;
-pls fix indent here
-> +	}
-> +	return 0;
-> +}
-> +
-> +static void atc_suspend_cyclic(struct at_dma_chan *atchan)
-> +{
-> +	struct dma_chan	*chan = &atchan->chan_common;
-> +
-> +	/* Channel should be paused by user
-> +	 * do it anyway even if it is not done already */
-> +	if (!test_bit(ATC_IS_PAUSED, &atchan->status)) {
-> +		dev_warn(chan2dev(chan),
-> +		"cyclic channel not paused, should be done by channel user\n");
-> +		atc_control(chan, DMA_PAUSE, 0);
-> +	}
-> +
-> +	/* now preserve additional data for cyclic operations */
-> +	/* next descriptor address in the cyclic list */
-> +	atchan->save_dscr = channel_readl(atchan, DSCR);
-> +
-> +	vdbg_dump_regs(atchan);
-> +}
-> +
->  static int at_dma_suspend_noirq(struct device *dev)
->  {
->  	struct platform_device *pdev = to_platform_device(dev);
->  	struct at_dma *atdma = platform_get_drvdata(pdev);
-> +	struct dma_chan *chan, *_chan;
->  
-> -	at_dma_off(platform_get_drvdata(pdev));
-> +	/* preserve data */
-> +	list_for_each_entry_safe(chan, _chan, &atdma->dma_common.channels,
-> +			device_node) {
-> +		struct at_dma_chan *atchan = to_at_dma_chan(chan);
-> +
-> +		if (test_bit(ATC_IS_CYCLIC, &atchan->status))
-> +			atc_suspend_cyclic(atchan);
-> +		atchan->save_cfg = channel_readl(atchan, CFG);
-> +	}
-> +	atdma->save_imr = dma_readl(atdma, EBCIMR);
-> +
-> +	/* disable DMA controller */
-> +	at_dma_off(atdma);
->  	clk_disable(atdma->clk);
->  	return 0;
->  }
->  
-> +static void atc_resume_cyclic(struct at_dma_chan *atchan)
-> +{
-> +	struct at_dma	*atdma = to_at_dma(atchan->chan_common.device);
-> +
-> +	/* restore channel status for cyclic descriptors list:
-> +	 * next descriptor in the cyclic list at the time of suspend */
-> +	channel_writel(atchan, SADDR, 0);
-> +	channel_writel(atchan, DADDR, 0);
-> +	channel_writel(atchan, CTRLA, 0);
-> +	channel_writel(atchan, CTRLB, 0);
-> +	channel_writel(atchan, DSCR, atchan->save_dscr);
-> +	dma_writel(atdma, CHER, atchan->mask);
-> +
-> +	/* channel pause status should be removed by channel user
-> +	 * We cannot take the initiative to do it here */
-> +
-> +	vdbg_dump_regs(atchan);
-> +}
-> +
->  static int at_dma_resume_noirq(struct device *dev)
->  {
->  	struct platform_device *pdev = to_platform_device(dev);
->  	struct at_dma *atdma = platform_get_drvdata(pdev);
-> +	struct dma_chan *chan, *_chan;
->  
-> +	/* bring back DMA controller */
->  	clk_enable(atdma->clk);
->  	dma_writel(atdma, EN, AT_DMA_ENABLE);
-> +
-> +	/* clear any pending interrupt */
-> +	while (dma_readl(atdma, EBCISR))
-> +		cpu_relax();
-> +
-> +	/* restore saved data */
-> +	dma_writel(atdma, EBCIER, atdma->save_imr);
-> +	list_for_each_entry_safe(chan, _chan, &atdma->dma_common.channels,
-> +			device_node) {
-> +		struct at_dma_chan *atchan = to_at_dma_chan(chan);
-> +
-> +		channel_writel(atchan, CFG, atchan->save_cfg);
-> +		if (test_bit(ATC_IS_CYCLIC, &atchan->status))
-> +			atc_resume_cyclic(atchan);
-This testing on bits seems to be reused few times how about wrapping it
-up in a routine?
+On Thu, 7 Jul 2011, Russell King - ARM Linux wrote:
 
-> +	}
->  	return 0;
->  }
->  
->  static const struct dev_pm_ops at_dma_dev_pm_ops = {
-> +	.prepare = at_dma_prepare,
->  	.suspend_noirq = at_dma_suspend_noirq,
->  	.resume_noirq = at_dma_resume_noirq,
->  };
-> diff --git a/drivers/dma/at_hdmac_regs.h b/drivers/dma/at_hdmac_regs.h
-> index 087dbf1..6f0c4a3 100644
-> --- a/drivers/dma/at_hdmac_regs.h
-> +++ b/drivers/dma/at_hdmac_regs.h
-> @@ -204,6 +204,9 @@ enum atc_status {
->   * @status: transmit status information from irq/prep* functions
->   *                to tasklet (use atomic operations)
->   * @tasklet: bottom half to finish transaction work
-> + * @save_cfg: configuration register that is saved on suspend/resume cycle
-> + * @save_dscr: for cyclic operations, preserve next descriptor address in
-> + *             the cyclic list on suspend/resume cycle
->   * @lock: serializes enqueue/dequeue operations to descriptors lists
->   * @completed_cookie: identifier for the most recently completed operation
->   * @active_list: list of descriptors dmaengine is being running on
-> @@ -218,6 +221,8 @@ struct at_dma_chan {
->  	u8			mask;
->  	unsigned long		status;
->  	struct tasklet_struct	tasklet;
-> +	u32			save_cfg;
-> +	u32			save_dscr;
->  
->  	spinlock_t		lock;
->  
-> @@ -248,6 +253,7 @@ static inline struct at_dma_chan *to_at_dma_chan(struct dma_chan *dchan)
->   * @chan_common: common dmaengine dma_device object members
->   * @ch_regs: memory mapped register base
->   * @clk: dma controller clock
-> + * @save_imr: interrupt mask register that is saved on suspend/resume cycle
->   * @all_chan_mask: all channels availlable in a mask
->   * @dma_desc_pool: base of DMA descriptor region (DMA address)
->   * @chan: channels table to store at_dma_chan structures
-> @@ -256,6 +262,7 @@ struct at_dma {
->  	struct dma_device	dma_common;
->  	void __iomem		*regs;
->  	struct clk		*clk;
-> +	u32			save_imr;
->  
->  	u8			all_chan_mask;
->  
+> On Tue, Jul 05, 2011 at 10:30:33PM -0400, Nicolas Pitre wrote:
+> > +extern unsigned long arm_dma_zone_size;
+> > +#define MAX_DMA_ADDRESS	(PAGE_OFFSET + arm_dma_zone_size)
+> ...
+> > -#ifndef ARM_DMA_ZONE_SIZE
+> > +#ifndef CONFIG_ZONE_DMA
+> >  #define ISA_DMA_THRESHOLD	(0xffffffffULL)
+> >  #else
+> > -#define ISA_DMA_THRESHOLD	(PHYS_OFFSET + ARM_DMA_ZONE_SIZE - 1)
+> > +#define ISA_DMA_THRESHOLD	({ \
+> > +	extern unsigned long arm_dma_zone_size; \
+> > +	arm_dma_zone_size ? \
+> > +		(PHYS_OFFSET + arm_dma_zone_size - 1) : 0xffffffffULL; })
+> 
+> These two usages do not agree.  With unrestricted DMA, both
+> MAX_DMA_ADDRESS and ISA_DMA_THRESHOLD should be 0xffffffff.  However,
+> you get that with arm_dma_zone_size=0 for ISA_DMA_THRESHOLD, which
+> then gives a MAX_DMA_ADDRESS of PAGE_OFFSET.  So this potentially
+> changes the behaviour of these macros.
 
--- 
-~Vinod Koul
-Intel Corp.
+Looking at what other architectures do, we have:
+
+avr32, parisc, powerpc, sparc -> 0xffffffff
+
+cris, frv, h8300, m68k, mips -> PAGE_OFFSET
+
+microblaze, score, xtensa -> 0
+
+So I wonder if this macro makes any sense when there is no DMA zone.  
+
+OTOH, since it is almost never used, it is best to make it behave 
+like the original. Fixed tusly in my tree:
+
+diff --git a/arch/arm/include/asm/dma.h b/arch/arm/include/asm/dma.h
+index 1d34c11..fcf15de 100644
+--- a/arch/arm/include/asm/dma.h
++++ b/arch/arm/include/asm/dma.h
+@@ -9,8 +9,10 @@
+ #ifndef CONFIG_ZONE_DMA
+ #define MAX_DMA_ADDRESS	0xffffffffUL
+ #else
+-extern unsigned long arm_dma_zone_size;
+-#define MAX_DMA_ADDRESS	(PAGE_OFFSET + arm_dma_zone_size)
++#define MAX_DMA_ADDRESS	({ \
++	extern unsigned long arm_dma_zone_size; \
++	arm_dma_zone_size ? \
++		(PAGE_OFFSET + arm_dma_zone_size) : 0xffffffffUL; })
+ #endif
+ 
+ #ifdef CONFIG_ISA_DMA_API
+
+Yet, excluding sound/oss/dmabuf.c, this is used by only 6 drivers in the 
+whole tree which appear to be old ISA based drivers which would use a a 
+DMA zone already.  The exception is cs89x0.c, however MAX_DMA_ADDRESS is 
+only used in the context of ISA DMA.
+
+What is more worrisome is its usage in a few places in the mm code where 
+it is always passed to __pa().  Certainly __pa(0xffffffff) is not going 
+to produce sensible results.
+
+One thing is for sure: ISA_DMA_THRESHOLD is not used anywhere in the 
+whole tree except in arch/arm/mm/dma-mapping.c:get_coherent_dma_mask() 
+and arch/arm/include/asm/dma-mapping.h:dma_supported() where its usage 
+is certainly not ISA specific.  Maybe this should be renamed?
+
+
+Nicolas
