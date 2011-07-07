@@ -1,61 +1,111 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 7 Jul 2011 00:04:26 -0400 (EDT)
-Subject: [PATCH 01/52] ARM: introduce atag_offset to replace
- boot_params
-In-Reply-To: <ADE657CA350FB648AAC2C43247A983F001F383D6CD4D@AUSP01VMBX24.collaborationhost.net>
-References: <1309920457-21913-1-git-send-email-nicolas.pitre@linaro.org>
-	<ADE657CA350FB648AAC2C43247A983F001F383D6CD4D@AUSP01VMBX24.collaborationhost.net>
-Message-ID: <alpine.LFD.2.00.1107070003410.14596@xanadu.home>
+From: gdavis@mvista.com (George G. Davis)
+Date: Thu, 7 Jul 2011 00:25:40 -0400
+Subject: parallel load of modules on an ARM multicore
+In-Reply-To: <20110621155030.GA21245@1n450.cable.virginmedia.net>
+References: <274124B9C6907D4B8CE985903EAA19E9185A92923E@SI-MBX06.de.bosch.com>
+	<20110621155030.GA21245@1n450.cable.virginmedia.net>
+Message-ID: <20110707042540.GH402@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 6 Jul 2011, H Hartley Sweeten wrote:
+Hi,
 
-> On Tuesday, July 05, 2011 7:47 PM, Nicolas Pitre wrote:
-> > The boot_params member of the mdesc structure is used to provide a
-> > default physical address for the ATAG list.  Since this value is fixed
-> > at compile time and often based on ARCH_PHYS_OFFSET, it gets in the way
-> > of runtime PHYS_OFFSET usage.
-> > 
-> > Let's introduce atag_offset which should contains only the relative
-> > offset from start of memory instead of an absolute value, in preparation
-> > to move all instance of boot_params over to it.
-> > 
-> > Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-> > ---
-> >  arch/arm/include/asm/mach/arch.h |    1 +
-> >  arch/arm/kernel/setup.c          |    2 ++
-> >  2 files changed, 3 insertions(+), 0 deletions(-)
-> > 
-> > diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
-> > index 7b79a00..1bdf6e1 100644
-> > --- a/arch/arm/include/asm/mach/arch.h
-> > +++ b/arch/arm/include/asm/mach/arch.h
-> > @@ -18,6 +18,7 @@ struct machine_desc {
-> >  	unsigned int		nr;		/* architecture number	*/
-> >  	const char		*name;		/* architecture name	*/
-> >  	unsigned long		boot_params;	/* tagged list		*/
-> > +	unsigned long		atag_offset;	/* tagged list (relative) */
-> >  	const char		**dt_compat;	/* array of device tree
-> >  						 * 'compatible' strings	*/
-> >  
-> > diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> > index e0db84d..4cc3e2b 100644
-> > --- a/arch/arm/kernel/setup.c
-> > +++ b/arch/arm/kernel/setup.c
-> > @@ -816,6 +816,8 @@ static struct machine_desc * __init setup_machine_tags(unsigned int nr)
-> >  
-> >  	if (__atags_pointer)
-> >  		tags = phys_to_virt(__atags_pointer);
-> > +	else if(mdesc->atag_offset)
-> > +		tags = PAGE_OFFSET + mdesc->atag_offset;
+On Tue, Jun 21, 2011 at 04:50:30PM +0100, Catalin Marinas wrote:
+
+// CUT
+
+> ARM: Allow lazy cache flushing on ARM11MPCore
 > 
-> This results in a warning...
+> From: Catalin Marinas <catalin.marinas@arm.com>
 > 
-> arch/arm/kernel/setup.c: In function 'setup_arch':
-> arch/arm/kernel/setup.c:820: warning: assignment makes pointer from integer without a cast
+> The ARM11MPCore doesn't broadcast the cache maintenance operations in
+> hardware, therefore the flush_dcache_page() currently performs the cache
+> flushing non-lazily. But since not all drivers call this function after
+> writing to a page cache page, the kernel needs a different approach like
+> using read-for-ownership on the CPU flushing the cache to force the
+> dirty cache lines migration from other CPUs. This way the cache flushing
+> operation can be done lazily via __sync_icache_dcache().
+> 
+> Since we cannot force read-for-ownership on the I-cache, the patch
+> invalidates the whole I-cache when a thread migrates to another CPU.
+> 
+> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> ---
+>  arch/arm/include/asm/mmu_context.h |    3 ++-
+>  arch/arm/mm/cache-v6.S             |    8 ++++++++
+>  arch/arm/mm/flush.c                |    3 +--
+>  3 files changed, 11 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/mmu_context.h b/arch/arm/include/asm/mmu_context.h
+> index 71605d9..d116a23 100644
+> --- a/arch/arm/include/asm/mmu_context.h
+> +++ b/arch/arm/include/asm/mmu_context.h
+> @@ -114,7 +114,8 @@ switch_mm(struct mm_struct *prev, struct mm_struct *next,
+>  #ifdef CONFIG_SMP
+>  	/* check for possible thread migration */
+>  	if (!cpumask_empty(mm_cpumask(next)) &&
+> -	    !cpumask_test_cpu(cpu, mm_cpumask(next)))
+> +	    (cache_ops_need_broadcast() ||
+> +	     !cpumask_test_cpu(cpu, mm_cpumask(next))))
+>  		__flush_icache_all();
+>  #endif
+>  	if (!cpumask_test_and_set_cpu(cpu, mm_cpumask(next)) || prev != next) {
+> diff --git a/arch/arm/mm/cache-v6.S b/arch/arm/mm/cache-v6.S
+> index 73b4a8b..bdc1cc1 100644
+> --- a/arch/arm/mm/cache-v6.S
+> +++ b/arch/arm/mm/cache-v6.S
+> @@ -133,6 +133,10 @@ ENTRY(v6_coherent_user_range)
+>  #ifdef HARVARD_CACHE
+>  	bic	r0, r0, #CACHE_LINE_SIZE - 1
+>  1:
+> +#ifdef CONFIG_SMP
 
-Bleh.  Fixed, thanks.
+s/CONFIG_SMP/CONFIG_RWFO/
+
+> +	/* no cache maintenance broadcasting on ARM11MPCore */
+> + USER(	ldr	r2, [r0]		)	@ read for ownership
+> +#endif
+>   USER(	mcr	p15, 0, r0, c7, c10, 1	)	@ clean D line
+>  	add	r0, r0, #CACHE_LINE_SIZE
+>  2:
+> @@ -178,6 +182,10 @@ ENTRY(v6_flush_kern_dcache_area)
+>  	add	r1, r0, r1
+>  	bic	r0, r0, #D_CACHE_LINE_SIZE - 1
+>  1:
+> +#ifdef CONFIG_SMP
+
+s/CONFIG_SMP/CONFIG_RWFO/
 
 
-Nicolas
+--
+Regards,
+George
+
+> +	/* no cache maintenance broadcasting on ARM11MPCore */
+> +	ldr	r2, [r0]			@ read for ownership
+> +#endif
+>  #ifdef HARVARD_CACHE
+>  	mcr	p15, 0, r0, c7, c14, 1		@ clean & invalidate D line
+>  #else
+> diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
+> index 1a8d4aa..72f9333 100644
+> --- a/arch/arm/mm/flush.c
+> +++ b/arch/arm/mm/flush.c
+> @@ -291,8 +291,7 @@ void flush_dcache_page(struct page *page)
+>  
+>  	mapping = page_mapping(page);
+>  
+> -	if (!cache_ops_need_broadcast() &&
+> -	    mapping && !mapping_mapped(mapping))
+> +	if (mapping && !mapping_mapped(mapping))
+>  		clear_bit(PG_dcache_clean, &page->flags);
+>  	else {
+>  		__flush_dcache_page(mapping, page);
+> 
+> -- 
+> Catalin
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
