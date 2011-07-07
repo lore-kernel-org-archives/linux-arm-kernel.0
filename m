@@ -1,39 +1,37 @@
-From: penberg@kernel.org (Pekka Enberg)
-Date: Thu, 7 Jul 2011 21:00:44 +0300 (EEST)
-Subject: [PATCH 00/10] mm: Linux VM Infrastructure to support Memory
-	Power Management
-In-Reply-To: <alpine.DEB.2.02.1107061318190.2535@asgard.lang.hm>
-References: <1306499498-14263-1-git-send-email-ankita@in.ibm.com>
-	<20110629130038.GA7909@in.ibm.com>
-	<CAOJsxLHQP=-srK_uYYBsPb7+rUBnPZG7bzwtCd-rRaQa4ikUFg@mail.gmail.com>
-	<alpine.DEB.2.02.1107061318190.2535@asgard.lang.hm>
-Message-ID: <alpine.DEB.2.00.1107072058390.5978@tiger>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 7 Jul 2011 12:15:26 -0600
+Subject: [PATCH 01/10] ARM: change ARM_DMA_ZONE_SIZE into a variable
+In-Reply-To: <201107071817.11842.arnd@arndb.de>
+References: <1309919442-20451-1-git-send-email-nicolas.pitre@linaro.org>
+	<20110706230945.GA8286@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1107062246130.14596@xanadu.home>
+	<201107071817.11842.arnd@arndb.de>
+Message-ID: <20110707181526.GB2824@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 6 Jul 2011, Pekka Enberg wrote:
->> Why does the allocator need to know about address boundaries? Why
->> isn't it enough to make the page allocator and reclaim policies favor using
->> memory from lower addresses as aggressively as possible? That'd mean
->> we'd favor the first memory banks and could keep the remaining ones
->> powered off as much as possible.
->> 
->> IOW, why do we need to support scenarios such as this:
->>
->>   bank 0     bank 1   bank 2    bank3
->> | online  | offline | online  | offline |
->
-On Wed, 6 Jul 2011, david at lang.hm wrote:
-> I believe that there are memory allocations that cannot be moved after they 
-> are made (think about regions allocated to DMA from hardware where the 
-> hardware has already been given the address space to DMA into)
->
-> As a result, you may not be able to take bank 2 offline, so your option is to 
-> either leave banks 0-2 all online, or support emptying bank 1 and taking it 
-> offline.
+On Thu, Jul 07, 2011 at 06:17:11PM +0200, Arnd Bergmann wrote:
+> On Thursday 07 July 2011, Nicolas Pitre wrote:
+> > > What is hardware specific is that the DMA devices can only address a
+> > > limited range of memory.  IMHO it's that which should be described in
+> > > DT, not that we'll have a DMA zone of X bytes in size.
+> > 
+> > I think that we all agree on the principle.  I certainly never intended 
+> > to suggest that the DMA zone size be stored as is in the device tree.
+> 
+> There is a way to specify DMA address ranges in the device tree, though
+> I forgot the exact format. It comes down to saying the device sees
+> memory range XXX to YYY as its local address AAA to BBB. We could use
+> that information at boot time to determine what the largest range
+> of memory is that is visible by all devices (and hope that it's at
+> the start of physical memory).
 
-But drivers allocate DMA memory for hardware during module load and stay 
-pinned there until the driver is unloaded, no? So in practice DMA buffers 
-are going to be in banks 0-1?
+It's called dma-ranges, and it has the same syntax as the ranges
+property.  See section 2.3.9 on page 30 in ePAPR:
 
- 				Pekka
+http://www.power.org/resources/downloads/Power_ePAPR_APPROVED_v1.0.pdf
+
+This describes the hardware constraints, not the DMA zone size or
+any software decisions like that.
+
+g.
