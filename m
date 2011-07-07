@@ -1,24 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 7 Jul 2011 17:22:18 +0100
-Subject: [PATCH v4 00/40] ARM: mm: Add generic macros for declaring
-	various CPU structs
-In-Reply-To: <1310048867-14172-1-git-send-email-dave.martin@linaro.org>
-References: <1310048867-14172-1-git-send-email-dave.martin@linaro.org>
-Message-ID: <20110707162218.GA20403@n2100.arm.linux.org.uk>
+From: vkuzmichev@mvista.com (Vitaly Kuzmichev)
+Date: Thu, 07 Jul 2011 20:20:49 +0400
+Subject: [PATCH V3 1/4] ARM: smp_twd: Fix typo in 'twd_timer_rate' printing
+In-Reply-To: <20110707123907.GP8286@n2100.arm.linux.org.uk>
+References: <1310041339-2348-1-git-send-email-vkuzmichev@mvista.com>
+	<1310041396-2461-1-git-send-email-vkuzmichev@mvista.com>
+	<20110707123907.GP8286@n2100.arm.linux.org.uk>
+Message-ID: <4E15DCE1.8010201@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 07, 2011 at 03:27:07PM +0100, Dave Martin wrote:
-> This series adds macros for declaring some CPU-related structured
-> defined in assembler, and ports the various processors, cache and
-> tlb implementations to use the macros.
+Hi Russell,
 
-I think this now looks fine - I don't have time to test it at the moment
-600+ messages on the list yesterday (I spent most of yesterday _only_
-replying to email), new large patch sets on the list today, and
-struggling to test some of these changes...
+On 07/07/2011 04:39 PM, Russell King - ARM Linux wrote:
+> On Thu, Jul 07, 2011 at 04:23:13PM +0400, Vitaly Kuzmichev wrote:
+>> To get hundredths of MHz the rate needs to be divided by 10'000.
+>> Here is an example:
+>>  twd_timer_rate = 123456789
+>>  Before the patch:
+>>     twd_timer_rate / 1000000 = 123
+>>     (twd_timer_rate / 1000000) % 100 = 23
+>>     Result: 123.23MHz.
+>>  After being fixed:
+>>     twd_timer_rate / 1000000 = 123
+>>     (twd_timer_rate / 10000) % 100 = 45
+>>     Result: 123.45MHz.
+>>
+>> Signed-off-by: Vitaly Kuzmichev <vkuzmichev@mvista.com>
+> 
+> -> patch system please.
 
-(It's no wonder people feel that they get ignored - generally if I don't
-process things on the day they're sent, I hardly go looking back through
-my mailbox... it's only Will's pull request which made me go back and
-look at yours.)
+Should I submit other patches into this system too?
+
+Thanks,
+Vitaly.
