@@ -1,30 +1,26 @@
 From: khc@pm.waw.pl (Krzysztof Halasa)
-Date: Thu, 07 Jul 2011 08:59:59 +0200
-Subject: [PATCH] arm: fix regression in ixp4xx clocksource
-In-Reply-To: <alpine.LFD.2.02.1107041120190.2917@ionos> (Thomas Gleixner's
-	message of "Mon, 4 Jul 2011 11:21:12 +0200 (CEST)")
-References: <20110530084307.GA28953@riccoc20.at.omicron.at>
-	<20110601225826.GR3660@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.02.1106020100200.3078@ionos>
-	<alpine.LFD.2.02.1107041120190.2917@ionos>
-Message-ID: <m3oc16h8y8.fsf@intrepid.localdomain>
+Date: Thu, 07 Jul 2011 09:06:54 +0200
+Subject: [PATCH] ARM: fix regression in IXP4xx clocksource
+In-Reply-To: <20110706211442.GY8286@n2100.arm.linux.org.uk> (Russell King's
+	message of "Wed, 6 Jul 2011 22:14:42 +0100")
+References: <m3liwb15t2.fsf@intrepid.localdomain>
+	<20110706211442.GY8286@n2100.arm.linux.org.uk>
+Message-ID: <m3k4buh8mp.fsf@intrepid.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas Gleixner <tglx@linutronix.de> writes:
+Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
 
-> Thinking more about it we should add BE accessor functions to the mmio
-> clocksource as this might be useful for other architectures as well.
+> Did you see Thomas' reply to your last patch?  Would you mind responding
+> to that please, before asking Linus to merge this?
 
-Why not simply use a value-preserving accessors like readl/writel?
-Aren't they value-preserving on all ARM CPUs?
+I like the BE (or endian-neutral value-preserving) accessor idea.
+Nevertheless Linux on IXP4xx doesn't even build at this time and I think
+fixing this before 3.0 is well worth it.
 
-IMHO the CPU/platform code should supply certain accessors (value- and
-order-preserving), and the generic code should simply use the correct
-one.
+I assume changing the common ARM code to use new accessors will happen
+post-3.0.
 
-Perhaps we should have (for ARM only) another set of register_readl()
-etc.? (PCI and register endianness may differ, a separate set would mean
-no runtime overhead in such case).
+(BTW that was Richard Cochran's patch)
 -- 
 Krzysztof Halasa
