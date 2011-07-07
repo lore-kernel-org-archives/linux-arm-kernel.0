@@ -1,55 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 7 Jul 2011 15:12:54 +0100
-Subject: [PATCH 1/3] ARM: CSR: Adding CSR SiRFprimaII board support
-In-Reply-To: <201107071521.07070.arnd@arndb.de>
-References: <1309945678-18813-1-git-send-email-bs14@csr.com>
-	<201107071343.03591.arnd@arndb.de>
-	<20110707123707.GN8286@n2100.arm.linux.org.uk>
-	<201107071521.07070.arnd@arndb.de>
-Message-ID: <20110707141254.GR8286@n2100.arm.linux.org.uk>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Thu,  7 Jul 2011 15:27:10 +0100
+Subject: [PATCH v4 03/40] ARM: mm: cache-fa: Use the new processor struct
+	macros
+In-Reply-To: <1310048867-14172-1-git-send-email-dave.martin@linaro.org>
+References: <1310048867-14172-1-git-send-email-dave.martin@linaro.org>
+Message-ID: <1310048867-14172-4-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 07, 2011 at 03:21:06PM +0200, Arnd Bergmann wrote:
-> What's left then are basically the headers. There is significant
-> room for consolidation there, and I think most of them have been
-> looked at by people before or are currently being worked on.
-> Below is the complete diff between the headers of the two platforms
-> as they are being proposed now.
+Signed-off-by: Dave Martin <dave.martin@linaro.org>
+---
+ arch/arm/mm/cache-fa.S |   15 ++-------------
+ 1 files changed, 2 insertions(+), 13 deletions(-)
 
-Thanks for that.  diff -w might be a good idea on these to eliminate
-changes due to whitespace differences.  It has found one thing which
-should be fixed...
-
-> diff -urN arch/arm/mach-prima2/include/mach/vmalloc.h arch/arm/mach-zynq/include/mach/vmalloc.h
-> --- arch/arm/mach-prima2/include/mach/vmalloc.h	2011-07-07 13:21:41.000000000 +0000
-> +++ arch/arm/mach-zynq/include/mach/vmalloc.h	2011-07-07 13:22:07.000000000 +0000
-> @@ -1,14 +1,20 @@
-> -/*
-> - * arch/arm/ach-prima2/include/mach/vmalloc.h
-> +/* arch/arm/mach-zynq/include/mach/vmalloc.h
->   *
-> - * Copyright (c) 2010 ??? 2011 Cambridge Silicon Radio Limited, a CSR plc group company.
-> + *  Copyright (C) 2011 Xilinx
->   *
-> - * Licensed under GPLv2 or later.
-> + * This software is licensed under the terms of the GNU General Public
-> + * License version 2, as published by the Free Software Foundation, and
-> + * may be copied, distributed, and modified under those terms.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
->   */
->  
-> -#ifndef __MACH_VMALLOC_H
-> -#define __MACH_VMALLOC_H
-> +#ifndef __MACH_VMALLOC_H__
-> +#define __MACH_VMALLOC_H__
->  
-> -#define VMALLOC_END	0xFEC00000
-> +#define VMALLOC_END       0xE0000000UL
-
-Prima2 should add a UL suffix to VMALLOC_END to ensure that it is
-properly typed.
+diff --git a/arch/arm/mm/cache-fa.S b/arch/arm/mm/cache-fa.S
+index 1fa6f71..0720163 100644
+--- a/arch/arm/mm/cache-fa.S
++++ b/arch/arm/mm/cache-fa.S
+@@ -242,16 +242,5 @@ ENDPROC(fa_dma_unmap_area)
+ 
+ 	__INITDATA
+ 
+-	.type	fa_cache_fns, #object
+-ENTRY(fa_cache_fns)
+-	.long	fa_flush_icache_all
+-	.long	fa_flush_kern_cache_all
+-	.long	fa_flush_user_cache_all
+-	.long	fa_flush_user_cache_range
+-	.long	fa_coherent_kern_range
+-	.long	fa_coherent_user_range
+-	.long	fa_flush_kern_dcache_area
+-	.long	fa_dma_map_area
+-	.long	fa_dma_unmap_area
+-	.long	fa_dma_flush_range
+-	.size	fa_cache_fns, . - fa_cache_fns
++	@ define struct cpu_cache_fns (see <asm/cacheflush.h> and proc-macros.S)
++	define_cache_functions fa
+-- 
+1.7.4.1
