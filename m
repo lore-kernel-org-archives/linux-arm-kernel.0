@@ -1,87 +1,78 @@
-From: sudhakar.raj@ti.com (Rajashekhara, Sudhakar)
-Date: Thu, 7 Jul 2011 10:57:26 +0530
-Subject: [PATCH v2] davinci: da850 EVM: read mac address from SPI flash
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024D9B4C96@dbde02.ent.ti.com>
-References: <1309784838-30903-1-git-send-email-sudhakar.raj@ti.com>
-	<B85A65D85D7EB246BE421B3FB0FBB593024D9B4C96@dbde02.ent.ti.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024D9B4E4E@dbde02.ent.ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 7 Jul 2011 08:27:40 +0300
+Subject: [PATCH] OMAP: hwmod: add kernel cmdline flag to avoid
+	resetting IP blocks during init
+In-Reply-To: <alpine.DEB.2.00.1107060155250.4217@utopia.booyaka.com>
+References: <20110703010204.19046.85186.stgit@dusk>
+	<20110703010206.19046.85293.stgit@dusk>
+	<20110704085503.GQ23145@atomide.com>
+	<alpine.DEB.2.00.1107051936250.4217@utopia.booyaka.com>
+	<20110706064116.GH5783@atomide.com>
+	<alpine.DEB.2.00.1107060155250.4217@utopia.booyaka.com>
+Message-ID: <20110707052735.GB15815@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sekhar,
-
-On Wed, Jul 06, 2011 at 21:22:52, Nori, Sekhar wrote:
-> Hi Sudhakar,
+* Paul Walmsley <paul@pwsan.com> [110706 23:52]:
+> Hi Tony
 > 
-> On Mon, Jul 04, 2011 at 18:37:18, Rajashekhara, Sudhakar wrote:
-> > DA850/OMAP-L138 EMAC driver uses random mac address instead of
-> > a fixed one because the mac address is not stuffed into EMAC
-> > platform data.
+> On Tue, 5 Jul 2011, Tony Lindgren wrote:
+> 
+> > So basically we want to tell the following from the board file or board
+> > specific .dts file:
 > > 
-> > This patch provides a function which reads the mac address
-> > stored in SPI flash (registered as MTD device) and populates the
-> > EMAC platform data. The function which reads the mac address is
-> > registered as a callback which gets called upon addition of MTD
-> > device.
-> > 
-> > NOTE: In case the MAC address stored in SPI flash is erased, follow
-> > the instructions at [1] to restore it.
-> > 
-> > [1] http://processors.wiki.ti.com/index.php/GSG:_OMAP-L138_DVEVM_Additional_Procedures#Restoring_MAC_address_on_SPI_Flash
-> > 
-> > Signed-off-by: Rajashekhara, Sudhakar <sudhakar.raj@ti.com>
-> > ---
-> > Since v1:
-> >      Guarded registering the mtd_notifier only when MTD is enabled.
-> >      Earlier this was handled using mtd_has_partitions() call, but
-> >      this has been removed in Linux v3.0.
+> > - Device is being used on the board and can be reset and configured.
+> >   This is the usual case.
 > 
-> Current trend is to include the change log into the
-> commit message itself. It might be useful to examine
-> at a later time what transformation the patch went
-> through. It also simplifies things for you since you
-> don't have to maintain this separately.
-> 
+> By 'used', you mean, have a Linux driver associated with them, right?
 
-You are right, this is very helpful. I'll move the change log into the commit message.
-
-> > +static void da850_evm_m25p80_notify_add(struct mtd_info *mtd)
-> > +{
-> > +	char *mac_addr = davinci_soc_info.emac_pdata->mac_addr;
-> > +	size_t retlen;
-> > +
-> > +	if (!strcmp(mtd->name, "MAC-Address")) {
-> > +		mtd->read(mtd, 0, ETH_ALEN, &retlen, mac_addr);
-> > +		if (retlen == ETH_ALEN)
-> > +			pr_info("Read MAC addr from SPI Flash: %pM\n",
-> > +				mac_addr);
-> > +	}
-> > +}
-> > +
-> > +static struct mtd_notifier da850evm_spi_notifier = {
-> > +	.add	= da850_evm_m25p80_notify_add,
-> > +};
+Right.
+ 
+> > - Device is being used on the board but can't be reset. This is the
+> >   case for booting Linux from other operating systems initially where
+> >   you want to keep the LCD on for debug console.
 > 
-> The function and data structure above are not required
-> when CONFIG_MTD is not defined so these should be
-> under #ifdef CONFIG_MTD too. Towards this..
+> Or, to use examples that would be needed in a production device, the 
+> 4460/N810 GPIO examples discussed earlier.  
 > 
+> Based on our current experience, there are a very small number of these 
+> cases, and they are board-specific.  So it seems to make sense to 
+> explicitly state these exceptions in the board files, via 
+> omap_hwmod_no_setup_reset() or something similar.
 
-Ok.
-
-> > +#ifdef CONFIG_MTD
-> > +static void da850_evm_register_mtd_user(struct mtd_notifier *notify)
-> > +{
-> > +	register_mtd_user(notify);
-> > +}
+Yeah they should be all board specific. One more example comes to mind
+was to keep the bootup logo around from bootloader on the LCD that the
+DSS code was doing earlier.
+ 
+> > - Device is not being used on the board but can be reset for decent PM.
+> >   This is often needed in cases where the bootloader just enables all the
+> >   clocks.
 > 
-> .. rename this function as something like da850_evm_setup_mac_addr() and
-> make it take void as argument and use:
+> Yeah.  And it's not just bootloaders, it's also the previous kernel in the 
+> case of something like kexec.  Since we don't know what devices the 
+> bootloader or previous kernel touched, it seems to make sense to reset all 
+> of these devices by default, once the drivers are converted to use runtime 
+> PM.
 > 
-> 	register_mtd_user(&da850evm_spi_notifier);
+> The current issue here is that some drivers aren't yet converted, so the 
+> hwmod code might think that some devices are 'unused' when they are 
+> actually in use by a non-runtime-PM-based driver.
+>  
+> > - Device is reserved by secure mode or a coprocessor. In this case
+> >   the device can't be reset.
 > 
+> Indeed - or even accessed.
+> 
+> > So I guess that makes the flags noreset, disabled and unavailable?
+> 
+> I think we only need 'no reset' and 'unavailable'?  Once the runtime PM 
+> driver conversion is complete, I don't think there's any reason to keep 
+> the 'hwmod_unused_reset' command line flag around, since it can be the 
+> default.  That's because the hwmod code would then be able to track which 
+> devices were actually used.
 
-Agreed. I'll include these modifications and send the updated version.
+Sounds doable to me.
 
-Thanks,
-Sudhakar
+Regards,
+
+Tony
