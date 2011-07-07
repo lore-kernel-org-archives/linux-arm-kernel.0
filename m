@@ -1,121 +1,86 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu,  7 Jul 2011 16:50:25 +0100
-Subject: [RFC PATCH 12/17] ARM: kernel: add SCU reset hook
+Date: Thu,  7 Jul 2011 16:50:20 +0100
+Subject: [RFC PATCH 07/17] ARM: kernel: save/restore v7 assembly helpers
 In-Reply-To: <1310053830-23779-1-git-send-email-lorenzo.pieralisi@arm.com>
 References: <1310053830-23779-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1310053830-23779-13-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1310053830-23779-8-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When a CLUSTER is powered down the SCU must be reinitialized on
-warm-boot.
-This patch adds a hook to reset the SCU, which implies invalidating
-TAG RAMs and renabling it.
+This patch provides v7 assembly functions to disable-clean-invalidate
+D$ and programme the SCU CPU power status register.
 
-The scu virtual address is saved in a static variable when the SCU
-is first enabled at boot; this allows common idle code to be
-generic and avoid relying on platform code to get the address at
-run-time.
-On warm-boot the SCU TAG RAM is invalidated and the SCU enabled if
-it is not already enabled.
+The function to disable/clean/invalidate D$ is just a shim that
+clears the C bit and jump to the respective function defined in proc
+info.
 
-The reset can be skipped altogether thanks to save/restore
-framework flags.
+SCU CPU power mode is there to programme the register from an MMU off
+path where the C environment is not up and running.
 
-Flushing D$ cache is cumbersome since the system just comes out of
-reset, which invalidates caches in the process if needed (A9), that
-is why the scu_enable function is not reused as it is to reset the SCU.
-
-If the init function is extended, there might not be a need for
-a SCU specific hook, since the init function can be reused to
-reinitialize the SCU at boot provided it is removed from the init
-section and kept in memory.
+Using scu_power_mode(...) is not possible, or at least hairy,
+since it relies on the smp_processor_id() (so the kernel stack) to be up
+and running, and it might not access any static data (since gcc inserts
+virtual addresses constants into the code, making it impossible to call
+when MMU is off and virtual translation is still not up and running).
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 ---
- arch/arm/include/asm/smp_scu.h |    3 ++-
- arch/arm/kernel/smp_scu.c      |   33 ++++++++++++++++++++++++++++++---
- 2 files changed, 32 insertions(+), 4 deletions(-)
+ arch/arm/kernel/sr_v7_helpers.S |   47 +++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 47 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/kernel/sr_v7_helpers.S
 
-diff --git a/arch/arm/include/asm/smp_scu.h b/arch/arm/include/asm/smp_scu.h
-index 4eb6d00..cfaa68e 100644
---- a/arch/arm/include/asm/smp_scu.h
-+++ b/arch/arm/include/asm/smp_scu.h
-@@ -8,7 +8,8 @@
- #ifndef __ASSEMBLER__
- unsigned int scu_get_core_count(void __iomem *);
- void scu_enable(void __iomem *);
--int scu_power_mode(void __iomem *, unsigned int);
-+int scu_power_mode(unsigned int);
-+void scu_reset(void);
- #endif
- 
- #endif
-diff --git a/arch/arm/kernel/smp_scu.c b/arch/arm/kernel/smp_scu.c
-index a1e757c..980ced9 100644
---- a/arch/arm/kernel/smp_scu.c
-+++ b/arch/arm/kernel/smp_scu.c
-@@ -20,6 +20,7 @@
- #define SCU_INVALIDATE		0x0c
- #define SCU_FPGA_REVISION	0x10
- 
-+static void __iomem *scu_va;
- /*
-  * Get the number of CPU cores from the SCU configuration
-  */
-@@ -36,6 +37,7 @@ void __init scu_enable(void __iomem *scu_base)
- {
- 	u32 scu_ctrl;
- 
-+	scu_va = scu_base;
- 	scu_ctrl = __raw_readl(scu_base + SCU_CTRL);
- 	/* already enabled? */
- 	if (scu_ctrl & 1)
-@@ -59,7 +61,7 @@ void __init scu_enable(void __iomem *scu_base)
-  * has the side effect of disabling coherency, caches must have been
-  * flushed.  Interrupts must also have been disabled.
-  */
--int scu_power_mode(void __iomem *scu_base, unsigned int mode)
-+int scu_power_mode(unsigned int mode)
- {
- 	unsigned int val;
- 	int cpu = smp_processor_id();
-@@ -67,9 +69,34 @@ int scu_power_mode(void __iomem *scu_base, unsigned int mode)
- 	if (mode > 3 || mode == 1 || cpu > 3)
- 		return -EINVAL;
- 
--	val = __raw_readb(scu_base + SCU_CPU_STATUS + cpu) & ~0x03;
-+	val = __raw_readb(scu_va + SCU_CPU_STATUS + cpu) & ~0x03;
- 	val |= mode;
--	__raw_writeb(val, scu_base + SCU_CPU_STATUS + cpu);
-+	__raw_writeb(val, scu_va + SCU_CPU_STATUS + cpu);
- 
- 	return 0;
- }
-+
+diff --git a/arch/arm/kernel/sr_v7_helpers.S b/arch/arm/kernel/sr_v7_helpers.S
+new file mode 100644
+index 0000000..6443918
+--- /dev/null
++++ b/arch/arm/kernel/sr_v7_helpers.S
+@@ -0,0 +1,47 @@
 +/*
-+ * Reinitialise the SCU after power-down
++ * Copyright (c) 2008-2011 ARM Ltd
++ *
++ * Author(s): Jon Callan, Lorenzo Pieralisi
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
 + */
 +
-+void scu_reset(void)
-+{
-+	u32 scu_ctrl;
++#include <linux/linkage.h>
++#include <asm/assembler.h>
 +
-+	scu_ctrl = __raw_readl(scu_va + SCU_CTRL);
-+	/* already enabled? */
-+	if (scu_ctrl & 1)
-+		return;
-+	/*
-+	 * SCU TAGS should be invalidated on boot-up
-+	 */
-+	__raw_writel(0xffff, scu_va + SCU_INVALIDATE);
-+	/*
-+	 *  Coming out of reset, dcache invalidated
-+	 *  no need to go through the whole hog again
-+	 *  just enable the SCU and pop out
-+	 */
-+	scu_ctrl |= 1;
-+	__raw_writel(scu_ctrl, scu_va + SCU_CTRL);
-+}
++	.text
++	@ this function disables data caching, then cleans and invalidates
++	@ the whole data cache. Apart from the preamble to clear the C bit it
++	@ uses kernel flushing function provided for v7
++
++ENTRY(disable_clean_inv_dcache_v7_all)
++ ARM(	stmfd	sp!, {r4-r5, r7, r9-r11, lr}	)
++ THUMB(	stmfd	sp!, {r4-r7, r9-r11, lr}	)
++
++	dsb
++	mrc	p15, 0, r3, c1, c0, 0
++	bic	r3, #4			   @ clear C bit
++	mcr	p15, 0, r3, c1, c0, 0
++	dsb
++
++	bl	v7_flush_dcache_all
++ ARM(	ldmfd	sp!, {r4-r5, r7, r9-r11, lr}	)
++ THUMB(	ldmfd	sp!, {r4-r7, r9-r11, lr}	)
++	mov	pc, lr
++ENDPROC(disable_clean_inv_dcache_v7_all)
++
++	@ Resetting the SCU CPU power register when the MMU is off
++	@ must be done in assembly since the C environment is not
++	@ set-up yet
++ENTRY(scu_cpu_mode)
++	ALT_SMP(mrc p15, 0, r2, c0, c0, 5)
++	ALT_UP(mov r2, #0)
++	and	r2, r2, #15
++	strb	r1, [r0, r2]
++	mov	pc, lr
++ENDPROC(scu_cpu_mode)
++	.end
++
 -- 
 1.7.4.4
