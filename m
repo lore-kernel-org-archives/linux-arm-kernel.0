@@ -1,57 +1,41 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 07 Jul 2011 15:34:38 -0700
-Subject: [PATCH 0/3] Add generic idle notifiers
-In-Reply-To: <20110707201748.GB32199@google.com> (Todd Poynor's message of
-	"Thu, 7 Jul 2011 13:17:48 -0700")
-References: <1309229190-25006-1-git-send-email-toddpoynor@google.com>
-	<87ei22dnsp.fsf@ti.com> <20110707201748.GB32199@google.com>
-Message-ID: <87tyaxd8jl.fsf@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 7 Jul 2011 23:36:20 +0100
+Subject: [PATCH 0/7] Re-organize linker layouts
+In-Reply-To: <4E15ECB6.40100@codeaurora.org>
+References: <20110706102245.GO8286@n2100.arm.linux.org.uk>
+	<4E15ECB6.40100@codeaurora.org>
+Message-ID: <20110707223620.GG20403@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Todd Poynor <toddpoynor@google.com> writes:
+On Thu, Jul 07, 2011 at 10:28:22AM -0700, Stephen Boyd wrote:
+> On 07/06/2011 03:22 AM, Russell King - ARM Linux wrote:
+> > The following series of patches are targetted at two issues:
+> >
+> > 1. Fixing large initramfs causing PC24 relocations to become out of
+> >    range.  This fixes both modules and link-time errors.
+> >
+> > 2. Making the vmlinux easier to pinpoint the various section-built
+> >    data structures and inspect them later.
+> >
+> > For the main kernel, this allows the size of various sections to be
+> > determined via objdump -h.  This also aids objdump -d and -s usage
+> > when asking it to target a particular section.
+> >
+> > For the decompressor, it means that it is now trivially possible to copy
+> > out the compressed kernel vmlinux image by:
+> >
+> >   arm-linux-objcopy -O binary -j .piggydata arch/arm/boot/compressed/vmlinux \
+> > 	piggy.gz
+> >
+> > and thereby obtain the binary kernel image (the Image file) which was
+> > originally used.
+> 
+> I gave this series a test with my poison initmem patch and all looks well
+> 
+> Tested-by: Stephen Boyd <sboyd@codeaurora.org>
+> 
+> except for patch 2 as I didn't use a zImage.
 
-> On Thu, Jul 07, 2011 at 10:05:10AM -0700, Kevin Hilman wrote:
->> Todd Poynor <toddpoynor@google.com> writes:
->> 
->> > Add notifiers for idle entry and exit, called with IDLE_START when a
->> > CPU goes idle and IDLE_END when it goes out of idle, based on the
->> > existing idle notifiers for the x86_64 arch.
->> >
->> > Convert x86_64 to use these notifiers, and call the notifiers on ARM.
->> >
->> > Convert the ARM LEDs events for idle start/end to these notifiers.
->> 
->> Is this intended to replace the more general CPU PM notifiers proposed
->> by Colin:
->> 
->> http://lists.infradead.org/pipermail/linux-arm-kernel/2011-June/052827.html
->
-> This is intended to coexist with the CPU PM notifiers.  The idle
-> notifiers proposed here are notifying of a change in kernel scheduler
-> state: the scheduler has no task to run and is entering its "idle
-> loop", or now has something to run and is exiting idle state.
-> Things that can use this include power management hints such as the
-> existing drivers/idle/i7300_idle.c usage, the ARM LEDs idle triggers,
-> and there's probably other existing potential uses in other arch'es that
-> I should go track down.
->
-> The CPU PM notifiers notify of changes in hardware power state that
-> affect the CPU and closely associated IP blocks (such as an OMAP
-> power state transition that causes one or more CPU power domains to
-> hit OFF).  These changes may be due to cpuidle power state management
-> when the system is idle, or may be due to suspending or resuming the
-> system (such as a suspend-to-RAM), or may be due to a CPU hotplug event.
-> In the case of an idle loop entry, if cpuidle decides it is not
-> appropriate to change CPU power state (as when insufficient time
-> remains until next timer expiry to enter such a power state due to
-> entry and exit latency), there may be no CPU PM notification
-> generated.  The callbacks for CPU PM notifiers on ARM do things such
-> as save/restore GIC interrupt controller state and VFP floating-point
-> coprocessor state.
->
-> That's the intent, anyhow, but ideas are welcome, thanks,
-
-OK, thanks for the clarification.
-
-Kevin
+Oh, what did you use instead?  I thought no one used the Image files
+anymore...
