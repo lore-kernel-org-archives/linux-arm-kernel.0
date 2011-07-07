@@ -1,59 +1,49 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 7 Jul 2011 11:24:19 +0100
-Subject: [PATCH 3/4] arm: mach-s3c2440: dma: fix section mismatch
-In-Reply-To: <1310033919-4245-4-git-send-email-w.sang@pengutronix.de>
-References: <1310033919-4245-1-git-send-email-w.sang@pengutronix.de>
-	<1310033919-4245-4-git-send-email-w.sang@pengutronix.de>
-Message-ID: <20110707102419.GM8286@n2100.arm.linux.org.uk>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Thu, 7 Jul 2011 11:25:28 +0100
+Subject: [PATCH v3 01/40] Subject: ARM: mm: proc-macros Add generic
+	proc/cache/tlb struct definition macros
+In-Reply-To: <20110707101643.GL8286@n2100.arm.linux.org.uk>
+References: <1308851448-25139-1-git-send-email-dave.martin@linaro.org>
+	<1308851448-25139-2-git-send-email-dave.martin@linaro.org>
+	<20110707082251.GH8286@n2100.arm.linux.org.uk>
+	<20110707100715.GB2486@arm.com>
+	<20110707101643.GL8286@n2100.arm.linux.org.uk>
+Message-ID: <20110707102528.GF2486@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 07, 2011 at 12:18:38PM +0200, Wolfram Sang wrote:
-> If s3c2440_dma_add() and s3c2440_dma_init() are in __init, then the
-> struct s3c2440_dma_driver they are using should be __initdata, too.
+On Thu, Jul 07, 2011 at 11:16:43AM +0100, Russell King - ARM Linux wrote:
+> On Thu, Jul 07, 2011 at 11:07:15AM +0100, Dave Martin wrote:
+> > On Thu, Jul 07, 2011 at 09:22:51AM +0100, Russell King - ARM Linux wrote:
+> > > If they don't conform to the "<cachename>_<functionname>" pattern then
+> > > single-cache model kernels will not compile.
+> > 
+> > I added this override capability purely because some proc-*.S define multiple
+> > sets of cache functions which are mostly common but have some differences.
+> > This facility is actually just used by feroceon and xscale, so you're probably
+> > right -- it may be better to fix those than encourage deviation elsewhere.
 > 
-> Fixes:
+> I think so.
 > 
-> WARNING: vmlinux.o(.data+0x14ac): Section mismatch in reference from the variable s3c2440_dma_driver to the function .init.text:s3c2440_dma_add()
-> The variable s3c2440_dma_driver references the function __init s3c2440_dma_add()
+> > For xscale, there is no unconditional MULTI_CACHE, so it looks as though if
+> > a single cache model kernel is built, xscale_dma_map_area may get used
+> > unconditionally instead of xscale_dma_a0_map_area even for the buggy A0/A1
+> > processor revisions.  That won't result in a compile failure, just some
+> > incorrect cache maintenance at runtime -- if so, it looks like a bug.
+> 
+> That sounds like there needs to be a separate patch preceding this series
+> which sets MULTI_CACHE unconditionally for Xscale.
 
-No, this is soo wrong (and illustrates why its important to check
-before adding __init stuff.)
+OK, I'll submit a separate patch for that.  It's an orthogonal issue really.
 
-> diff --git a/arch/arm/mach-s3c2440/dma.c b/arch/arm/mach-s3c2440/dma.c
-> index 3b0529f..f417959 100644
-> --- a/arch/arm/mach-s3c2440/dma.c
-> +++ b/arch/arm/mach-s3c2440/dma.c
-> @@ -198,7 +198,7 @@ static int __init s3c2440_dma_add(struct sys_device *sysdev)
->  	return s3c24xx_dma_init_map(&s3c2440_dma_sel);
->  }
->  
-> -static struct sysdev_driver s3c2440_dma_driver = {
-> +static struct sysdev_driver __initdata s3c2440_dma_driver = {
->  	.add	= s3c2440_dma_add,
->  };
+> > Do you think we need a generic check for such situations?
+> 
+> No, I think that would be incredibly hard, and for two processors out of
+> the number we already support, I don't think its worth it.
 
-The code does this:
+OK -- that was my view too.
 
-static int __init s3c2440_dma_init(void)
-{
-        return sysdev_driver_register(&s3c2440_sysclass, &s3c2440_dma_driver);
-}
+I'll rework the series and repost.  The changes shouldn't be invasive.
 
-So, this registers the s3c2440_dma_driver structure.  Internally,
-sysdev_driver_register() does this:
-
-                list_add_tail(&drv->entry, &cls->drivers);
-
-which adds s3c2440_dma_driver to a list of sysdev drivers.  Whenever
-a sysdev is added, the code does this:
-
-                /* Notify class auxiliary drivers */
-                list_for_each_entry(drv, &cls->drivers, entry) {
-                        if (drv->add)
-                                drv->add(sysdev);
-                }
-
-What do you think will happen when this list is walked, but your
-s3c2440_dma_driver structure has been discarded with the init section
-and replaced with random data?
+Cheers
+---Dave
