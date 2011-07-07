@@ -1,83 +1,136 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 7 Jul 2011 10:08:46 +0200
-Subject: [GIT PULL] i.MX fixes
-Message-ID: <20110707080846.GD26347@pengutronix.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 7 Jul 2011 09:08:47 +0100
+Subject: [GIT PULL] Cortex-A5 and Cortex-A15 support
+Message-ID: <20110707080847.GA9338@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd,
+Hi Russell,
 
-Please pull the following i.MX fixes. I'd say it's not utterly important
-to get these into 3.0.
+Please can you pull this for the next merge window? It contains the
+Cortex-A5 and Cortex-A15 support, as well as all of the proc macro patches
+from Pawel and Dave.
+
+Please let me know if you have trouble pulling; the server has recently been
+moved onto some new hardware and you get to be the lucky one to try and pull
+from it first.
+
+Thanks,
+
+Will
 
 
-The following changes since commit a2fa83faf47b514ab947cea916d3691b66525073:
 
-  Merge branch 'usb-linus' of git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/usb-2.6 (2011-07-05 20:57:45 -0700)
+The following changes since commit b0af8dfdd67699e25083478c63eedef2e72ebd85:
+  Linus Torvalds (1):
+        Linux 3.0-rc5
 
 are available in the git repository at:
 
-  git://git.pengutronix.de/git/imx/linux-2.6.git fixes
+  git://linux-arm.org/linux-2.6-wd.git for-rmk
 
-Axel Lin (1):
-      ARM i.MX23/28: platform-mxsfb: Add missing include of linux/dma-mapping.h
+Dave Martin (40):
+      ARM: mm: proc-macros: Add generic proc/cache/tlb struct definition macros
+      ARM: assembler.h: Add string declaration macro
+      ARM: mm: cache-fa: Use the new processor struct macros
+      ARM: mm: cache-v3: Use the new processor struct macros
+      ARM: mm: cache-v4: Use the new processor struct macros
+      ARM: mm: cache-v4wb: Use the new processor struct macros
+      ARM: mm: cache-v4wt: Use the new processor struct macros
+      ARM: mm: cache-v6: Use the new processor struct macros
+      ARM: mm: cache-v7: Use the new processor struct macros
+      ARM: mm: proc-arm1020: Use the new processor struct macros
+      ARM: mm: proc-arm1020e: Use the new processor struct macros
+      ARM: mm: proc-arm1022: Use the new processor struct macros
+      ARM: mm: proc-arm1026: Use the new processor struct macros
+      ARM: mm: proc-arm6_7: Use the new processor struct macros
+      ARM: mm: proc-arm720: Use the new processor struct macros
+      ARM: mm: proc-arm740: Use the new processor struct macros
+      ARM: mm: proc-arm7tdmi: Use the new processor struct macros
+      ARM: mm: proc-arm920: Use the new processor struct macros
+      ARM: mm: proc-arm922: Use the new processor struct macros
+      ARM: mm: proc-arm925: Use the new processor struct macros
+      ARM: mm: proc-arm926: Use the new processor struct macros
+      ARM: mm: proc-arm940: Use the new processor struct macros
+      ARM: mm: proc-arm946: Use the new processor struct macros
+      ARM: mm: proc-arm9tdmi: Use the new processor struct macros
+      ARM: mm: proc-fa526: Use the new processor struct macros
+      ARM: mm: proc-feroceon: Use the new processor struct macros
+      ARM: mm: proc-mohawk: Use the new processor struct macros
+      ARM: mm: proc-sa110: Use the new processor struct macros
+      ARM: mm: proc-sa1100: Use the new processor struct macros
+      ARM: mm: proc-v6: Use the new processor struct macros
+      ARM: mm: proc-v7: Use the new processor struct macros
+      ARM: mm: proc-xsc3: Use new generic struct definition macros
+      ARM: mm: proc-xscale: Use new generic struct definition macros
+      ARM: mm: tlb-fa: Use the new processor struct macros
+      ARM: mm: tlb-v3: Use the new processor struct macros
+      ARM: mm: tlb-v4: Use the new processor struct macros
+      ARM: mm: tlb-v4wb: Use the new processor struct macros
+      ARM: mm: tlb-v4wbi: Use the new processor struct macros
+      ARM: mm: tlb-v6: Use the new processor struct macros
+      ARM: mm: tlb-v7: Use the new processor struct macros
 
-Fabio Estevam (10):
-      mx51: Let USB Storage be built by default
-      ARM: mx53: Fix alternate modes for MX53_PAD_PATA_DATA6
-      ARM: mx53: Fix the chip select addresses
-      ARM: mach-imx/mx27_3ds: Use the standard i.MX macro for GPIO numbering
-      ARM: mach-imx/mx31_3ds: Fix IOMUX for SPI1 signals
-      mxc: iomuxv1: Do not use gpio_request when setting the pin as GPIO
-      ARM: mach-imx/mx27_3ds: Fix regulator support
-      ARM: mxc: iomux-v1: Fix build warning
-      ARM: mx51: Fix the address space length for SSI
-      ARM: mx53: Fix some interrupts marked as reserved.
+Pawel Moll (2):
+      ARM: proc: convert v7 proc infos into a common macro
+      ARM: proc: add Cortex-A5 proc info
 
-Lothar Wa?mann (1):
-      mach-mx5: fix the I2C clock parents
+Will Deacon (10):
+      Merge branch 'arm/proc-macros' of git://git.linaro.org/people/dmart/linux-2.6-arm into for-rmk
+      ARM: hwcaps: use shifts instead of hardcoded constants
+      ARM: hwcaps: add new HWCAP defines for ARMv7-A
+      ARM: vfp: add VFPv4 capability detection and populate elf_hwcap
+      ARM: proc: add proc info for Cortex-A15MP using classic page tables
+      ARM: perf: remove confusing comment from v7 perf events backend
+      ARM: perf: add PMUv2 common event definitions
+      ARM: perf: add support for the Cortex-A5 PMU
+      ARM: perf: add support for the Cortex-A15 PMU
+      ARM: proc: add definition of cpu_reset for ARMv6 and ARMv7 cores
 
-Marc Kleine-Budde (1):
-      ARM: mx53: Fix the base addresses for the DDR memory regions
-
-Sascha Hauer (1):
-      ARM i.MX dma: Fix burstsize settings
-
-Shawn Guo (5):
-      ARM: mxs_defconfig: Change CONFIG_RTC_CLASS 'm' to 'y'
-      ARM: mxc: imx-sdma device gets 16K iosize than 4K
-      ARM: mxc: sdma on imx25 is a V2 block
-      ARM: mxc: change imx-dma default to_version to 1
-      ARM: mxc: imx-dma on imx25 has no other TO version but TO1
-
-Troy Kisky (2):
-      MXC: iomux-v3: correct NO_PAD_CTRL definition
-      ARM: i.MX53: Fix IOMUX type o's
-
-Uwe Kleine-K?nig (1):
-      ARM: mxs/tx28: according to the TX28's datasheet D4-D7 are not used for MMC0
-
- arch/arm/configs/mx51_defconfig              |    3 +-
- arch/arm/configs/mxs_defconfig               |    2 +-
- arch/arm/mach-imx/mach-mx27_3ds.c            |   29 ++++++++++++++++++----
- arch/arm/mach-imx/mach-mx31_3ds.c            |   10 ++++----
- arch/arm/mach-mx5/clock-mx51-mx53.c          |    4 +-
- arch/arm/mach-mxs/devices/platform-mxsfb.c   |    1 +
- arch/arm/mach-mxs/mach-tx28.c                |    8 ------
- arch/arm/plat-mxc/devices/platform-imx-dma.c |   14 +++++-----
- arch/arm/plat-mxc/devices/platform-imx-ssi.c |    2 +-
- arch/arm/plat-mxc/include/mach/iomux-mx53.h  |   14 +++++-----
- arch/arm/plat-mxc/include/mach/iomux-v1.h    |    1 -
- arch/arm/plat-mxc/include/mach/iomux-v3.h    |    2 +-
- arch/arm/plat-mxc/include/mach/mx53.h        |   26 ++++++++++----------
- arch/arm/plat-mxc/iomux-v1.c                 |   34 +-------------------------
- drivers/dma/imx-dma.c                        |    3 +-
- drivers/mmc/host/mxcmmc.c                    |    8 +++---
- sound/soc/imx/imx-pcm-dma-mx2.c              |    4 +-
- 17 files changed, 73 insertions(+), 92 deletions(-)
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+ arch/arm/include/asm/assembler.h  |    9 +
+ arch/arm/include/asm/hwcap.h      |   36 ++--
+ arch/arm/include/asm/perf_event.h |    2 +
+ arch/arm/kernel/perf_event.c      |    6 +
+ arch/arm/kernel/perf_event_v7.c   |  344 +++++++++++++++++++++++++--
+ arch/arm/kernel/setup.c           |    4 +
+ arch/arm/mm/cache-fa.S            |   15 +-
+ arch/arm/mm/cache-v3.S            |   15 +-
+ arch/arm/mm/cache-v4.S            |   15 +-
+ arch/arm/mm/cache-v4wb.S          |   15 +-
+ arch/arm/mm/cache-v4wt.S          |   15 +-
+ arch/arm/mm/cache-v6.S            |   15 +-
+ arch/arm/mm/cache-v7.S            |   15 +-
+ arch/arm/mm/proc-arm1020.S        |   45 +---
+ arch/arm/mm/proc-arm1020e.S       |   52 +----
+ arch/arm/mm/proc-arm1022.S        |   52 +----
+ arch/arm/mm/proc-arm1026.S        |   53 +----
+ arch/arm/mm/proc-arm6_7.S         |  166 +++----------
+ arch/arm/mm/proc-arm720.S         |   85 ++-----
+ arch/arm/mm/proc-arm740.S         |   42 +---
+ arch/arm/mm/proc-arm7tdmi.S       |  216 +++--------------
+ arch/arm/mm/proc-arm920.S         |   53 +----
+ arch/arm/mm/proc-arm922.S         |   53 +----
+ arch/arm/mm/proc-arm925.S         |   88 ++------
+ arch/arm/mm/proc-arm926.S         |   51 +----
+ arch/arm/mm/proc-arm940.S         |   51 +----
+ arch/arm/mm/proc-arm946.S         |   53 +----
+ arch/arm/mm/proc-arm9tdmi.S       |   78 ++-----
+ arch/arm/mm/proc-fa526.S          |   38 +---
+ arch/arm/mm/proc-feroceon.S       |  186 +++------------
+ arch/arm/mm/proc-macros.S         |   76 ++++++
+ arch/arm/mm/proc-mohawk.S         |   61 ++----
+ arch/arm/mm/proc-sa110.S          |   39 +---
+ arch/arm/mm/proc-sa1100.S         |   84 ++-----
+ arch/arm/mm/proc-v6.S             |   39 +---
+ arch/arm/mm/proc-v7.S             |  136 +++++------
+ arch/arm/mm/proc-xsc3.S           |   90 ++------
+ arch/arm/mm/proc-xscale.S         |  484 +++++--------------------------------
+ arch/arm/mm/tlb-fa.S              |    8 +-
+ arch/arm/mm/tlb-v3.S              |    8 +-
+ arch/arm/mm/tlb-v4.S              |    8 +-
+ arch/arm/mm/tlb-v4wb.S            |    8 +-
+ arch/arm/mm/tlb-v4wbi.S           |    8 +-
+ arch/arm/mm/tlb-v6.S              |    8 +-
+ arch/arm/mm/tlb-v7.S              |    9 +-
+ arch/arm/vfp/vfpmodule.c          |    6 +-
+ 46 files changed, 889 insertions(+), 2051 deletions(-)
