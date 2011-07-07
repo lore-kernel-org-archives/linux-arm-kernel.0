@@ -1,85 +1,52 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 7 Jul 2011 22:48:33 +0200
-Subject: reply: [PATCH v5 1/3] ARM: mxs: add GPMI-NFC support
-	for?imx23/imx28
-In-Reply-To: <201107071757.23405.arnd@arndb.de>
-References: <14C4E31473AF7E4B98176CB73615181C19FBD3@039-SN1MPN1-006.039d.mgd.msft.net>
-	<201107011109.27206.arnd@arndb.de> <4E1574A1.4050502@freescale.com>
-	<201107071757.23405.arnd@arndb.de>
-Message-ID: <20110707204833.GL29624@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 7 Jul 2011 21:53:04 +0100
+Subject: [PATCH] ARM: get rid of a few StrongARM cache-related build
+	time constants
+In-Reply-To: <alpine.LFD.2.00.1107071438200.14596@xanadu.home>
+References: <1309919636-20546-1-git-send-email-nicolas.pitre@linaro.org>
+	<20110706075542.GK8286@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1107060912490.14596@xanadu.home>
+	<20110707170631.GB20403@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1107071438200.14596@xanadu.home>
+Message-ID: <20110707205304.GF20403@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 07, 2011 at 05:57:23PM +0200, Arnd Bergmann wrote:
-> On Thursday 07 July 2011, Huang Shijie wrote:
-> > > On Friday 01 July 2011 10:57:40 Huang Shijie wrote:
-> > >>>> It's annoying, but it really saves some lines.
-> > >>> It would save more lines if you introduce the macros globally and
-> > >>> convert all existing resource definitions ;-)
-> > >> The origin code did not use any macros.
-> > >> Some one suggested me to use macros.
-> > >> So i used the macros.
-> > >>
-> > >> Do i have to drop the macros?
-> > > Can you find out who made the suggestion? Let's first reach consensus
-> > > about how we want to do these things in the future.
-> > http://www.spinics.net/lists/arm-kernel/msg121384.html
+On Thu, Jul 07, 2011 at 02:43:15PM -0400, Nicolas Pitre wrote:
+> On Thu, 7 Jul 2011, Russell King - ARM Linux wrote:
+> 
+> > On Wed, Jul 06, 2011 at 09:21:33AM -0400, Nicolas Pitre wrote:
+> > > Could you test this patch as well?  You're the only one I know who might 
+> > > still have access to the affected hardware.
 > > 
+> > Tested on Assabet, and unfortunately, this doesn't work on its own because
+> > we don't permit iotable_init() to create pages with MT_CACHECLEAN and
+> > MT_MINICLEAN.
+> > 
+> > <4>BUG: map for 0xe0000000 at 0xfffe0000 can not be mapped using pages, ignoring.
+> > <4>BUG: map for 0xe0004000 at 0xfffe4000 can not be mapped using pages, ignoring.
+> > <4>BUG: map for 0xe0008000 at 0xfffe8000 can not be mapped using pages, ignoring.
+> > <4>BUG: map for 0xe000c000 at 0xfffec000 can not be mapped using pages, ignoring.
+> > 
+> > The fix is below (probably with offsets):
 > 
-> Ok, so Uwe made a rather generic comment that he'd prefer you to use
-> macros for that part. I think your original code actually looks cleaner
-> in this case, mostly because it doesn't obfuscate the identifiers
-> and because the macro is specific to this file.
+> Great. Are you providing an ACK or tested-by with this patch folded in?
 > 
-> Uwe, do you think it's worthwhile introducing a global macro for
-> everyone to use for defining resources? Clearly this is not an
-> mxs specific problem, and I'd much rather have the same solution
-> everywhere.
-The thing I didn't like in the original code is that there are two
-nearly identical data definitions. With the macros introduced here
-(one example to ease the discussion:
+> > @@ -506,16 +488,8 @@ static void __init build_mem_type_table(void)
+> >  	mem_types[MT_MEMORY].prot_pte |= kern_pgprot;
+> >  	mem_types[MT_MEMORY_NONCACHED].prot_sect |= ecc_mask;
+> >  	mem_types[MT_ROM].prot_sect |= cp->pmd;
+> > +	mem_types[MT_CACHECLEAN].prot_pte |= kern_pgprot;
+> >  
+> Doesn't MT_MINICLEAN require kern_pgprot as well?
 
-	#define RES_MEM(soc, _id, _s, _n)				\
-		{							\
-			.start = soc ##_## _id ## _BASE_ADDR,		\
-			.end   = soc ##_## _id ## _BASE_ADDR + (_s) - 1,\
-			.name  = (_n),					\
-			.flags = IORESOURCE_MEM,			\
-		}
+Only if you think the result of orring:
 
-)
+#define L_PTE_MT_WRITEBACK      (_AT(pteval_t, 0x03) << 2)      /* 0011 */
+#define L_PTE_MT_MINICACHE      (_AT(pteval_t, 0x06) << 2)      /* 0110 (sa1100, xscale) */
 
-My thoughts on this is that it should better go to where struct resource
-is defined (<linux/ioports.h>, as Arndt suggested) but then probably a
-bit more generic as:
+together would make sense... it'd make it:
 
-	#define RES_MEM_NAMED(_start, _end, _name)			\
-		{							\
-			.start = _start,				\
-			.end = _end,					\
-			.name = _name,					\
-			.flags = IORESOURCE_MEM,			\
-		}
-	#define RES_MEM(_start, _end)					\
-		RES_MEM_NAMED(_start, _end, NULL)
+#define L_PTE_MT_WRITEALLOC     (_AT(pteval_t, 0x07) << 2)      /* 0111 */
 
-(Maybe alternatively take a _size parameter instead of _end?)
-While this makes the repetition shorter, it's still there.
-
-I thought this could be shrinked down to
-
-	const struct resource res_imx23[] __initconst = something_magic(MX23);
-	const struct resource res_imx28[] __initconst = something_magic(MX28);
-
-While this part looks nice, I agree that it's not as easy to understand
-(for a human) as the expanded version. Knowing not everybody agrees with
-me, I still prefer the shrinked representation.
-But as I'm not willing to argue about that: Please use the expanded version
-if you prefer it.
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+though, so I don't think so.
