@@ -1,30 +1,32 @@
-From: heechul@illinois.edu (heechul Yun)
-Date: Wed, 6 Jul 2011 19:19:59 -0700
-Subject: [PATCH] remove unnecessary cache flush on v6 copypage
-Message-ID: <CAN_5kQDTweB2GLvwgjN+BQuqnhFUp+MOcQr=ZW=8C6XSsC8XtA@mail.gmail.com>
+From: vkoul@infradead.org (Vinod Koul)
+Date: Thu, 07 Jul 2011 07:05:28 +0530
+Subject: [PATCH] ARM i.MX dma: Fix burstsize settings
+In-Reply-To: <20110706150356.GA11993@opensource.wolfsonmicro.com>
+References: <20110706091833.GT6069@pengutronix.de>
+	<20110706150356.GA11993@opensource.wolfsonmicro.com>
+Message-ID: <1310002528.20150.3.camel@psiaudioba-mobl1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM: mm: remove unnecessary cache flush on v6 copypage
+On Wed, 2011-07-06 at 08:03 -0700, Mark Brown wrote:
+> On Wed, Jul 06, 2011 at 11:18:33AM +0200, Sascha Hauer wrote:
+> > dmaengine expects the maxburst parameter in words, not bytes.
+> > The imxdma driver and its users do this wrong. Fix this.
+> > 
+> > As a side note the imx-pcm-dma-mx2 driver was 'fixed' to work
+> > with imx-dma. This broke the driver with imx-sdma support which
+> > correctly takes the maxburst parameter in words. This patch
+> > puts the sdma based sound back to work.
+> 
+> Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Acked-by: Vinod Koul <vinod.koul@intel.com>
 
-Signed-off-by: Heechul Yun <heechul@illinois.edu>
---
-arch/arm/mm/copypage-v6.c |    1 -
- 1 files changed, 0 insertions(+), 1 deletions(-)
+> 
+> Probably makes sense to send via the ARM tree unless there's merge
+> issues?
+Sure, I dont have naything on this driver in my next and previous
+updates for Sascha went thru imx tree, so would make sense for these to
+go that way as well
 
-diff --git a/arch/arm/mm/copypage-v6.c b/arch/arm/mm/copypage-v6.c
-index bdba6c6..63cca00 100644
---- a/arch/arm/mm/copypage-v6.c
-+++ b/arch/arm/mm/copypage-v6.c
-@@ -41,7 +41,6 @@ static void v6_copy_user_highpage_nonaliasing(struct page *to,
-       kfrom = kmap_atomic(from, KM_USER0);
-       kto = kmap_atomic(to, KM_USER1);
-       copy_page(kto, kfrom);
--       __cpuc_flush_dcache_area(kto, PAGE_SIZE);
-       kunmap_atomic(kto, KM_USER1);
-       kunmap_atomic(kfrom, KM_USER0);
- }
-
---
-
-Heechul
+~Vinod Koul
+Intel Corp.
