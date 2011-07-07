@@ -1,53 +1,44 @@
-From: toddpoynor@google.com (Todd Poynor)
-Date: Thu, 7 Jul 2011 13:17:48 -0700
-Subject: [PATCH 0/3] Add generic idle notifiers
-In-Reply-To: <87ei22dnsp.fsf@ti.com>
-References: <1309229190-25006-1-git-send-email-toddpoynor@google.com>
-	<87ei22dnsp.fsf@ti.com>
-Message-ID: <20110707201748.GB32199@google.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu,  7 Jul 2011 22:27:35 +0200
+Subject: [PATCH] mmci: adjust calculation of f_min
+Message-ID: <1310070455-26418-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 07, 2011 at 10:05:10AM -0700, Kevin Hilman wrote:
-> Todd Poynor <toddpoynor@google.com> writes:
-> 
-> > Add notifiers for idle entry and exit, called with IDLE_START when a
-> > CPU goes idle and IDLE_END when it goes out of idle, based on the
-> > existing idle notifiers for the x86_64 arch.
-> >
-> > Convert x86_64 to use these notifiers, and call the notifiers on ARM.
-> >
-> > Convert the ARM LEDs events for idle start/end to these notifiers.
-> 
-> Is this intended to replace the more general CPU PM notifiers proposed
-> by Colin:
-> 
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2011-June/052827.html
+From: Ulf Hansson <ulf.hansson@stericsson.com>
 
-This is intended to coexist with the CPU PM notifiers.  The idle
-notifiers proposed here are notifying of a change in kernel scheduler
-state: the scheduler has no task to run and is entering its "idle
-loop", or now has something to run and is exiting idle state.
-Things that can use this include power management hints such as the
-existing drivers/idle/i7300_idle.c usage, the ARM LEDs idle triggers,
-and there's probably other existing potential uses in other arch'es that
-I should go track down.
+The ARM version maximum clock divider is 512 whereas for the ST
+variants it's 257. Let's use DIV_ROUND_UP() for both cases so we
+can see clearly what's going on here.
 
-The CPU PM notifiers notify of changes in hardware power state that
-affect the CPU and closely associated IP blocks (such as an OMAP
-power state transition that causes one or more CPU power domains to
-hit OFF).  These changes may be due to cpuidle power state management
-when the system is idle, or may be due to suspending or resuming the
-system (such as a suspend-to-RAM), or may be due to a CPU hotplug event.
-In the case of an idle loop entry, if cpuidle decides it is not
-appropriate to change CPU power state (as when insufficient time
-remains until next timer expiry to enter such a power state due to
-entry and exit latency), there may be no CPU PM notification
-generated.  The callbacks for CPU PM notifiers on ARM do things such
-as save/restore GIC interrupt controller state and VFP floating-point
-coprocessor state.
+Signed-off-by: Ulf Hansson <ulf.hansson@stericsson.com>
+Reviewed-by: Sebastian Rasmussen <sebastian.rasmussen@stericsson.com>
+[Use DIV_ROUND_UP to clarify elder code]
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/mmc/host/mmci.c |   10 +++++++++-
+ 1 files changed, 9 insertions(+), 1 deletions(-)
 
-That's the intent, anyhow, but ideas are welcome, thanks,
-
-
-Todd
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index fe14072..50f4f77 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -1063,7 +1063,15 @@ static int __devinit mmci_probe(struct amba_device *dev,
+ 	}
+ 
+ 	mmc->ops = &mmci_ops;
+-	mmc->f_min = (host->mclk + 511) / 512;
++	/*
++	 * The ARM and ST versions of the block have slightly different
++	 * clock divider equations which means that the minimum divider
++	 * differs too.
++	 */
++	if (variant->st_clkdiv)
++		mmc->f_min = DIV_ROUND_UP(host->mclk, 257);
++	else
++		mmc->f_min = DIV_ROUND_UP(host->mclk, 512);
+ 	/*
+ 	 * If the platform data supplies a maximum operating
+ 	 * frequency, this takes precedence. Else, we fall back
+-- 
+1.7.6
