@@ -1,38 +1,44 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 6 Jul 2011 22:59:39 -0400 (EDT)
-Subject: [PATCH 02/10] ARM: add dma_zone_size to the machine_desc structure
-In-Reply-To: <20110706231034.GB8286@n2100.arm.linux.org.uk>
-References: <1309919442-20451-1-git-send-email-nicolas.pitre@linaro.org>
-	<1309919442-20451-2-git-send-email-nicolas.pitre@linaro.org>
-	<20110706231034.GB8286@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1107062252460.14596@xanadu.home>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 7 Jul 2011 11:24:42 +0800
+Subject: [PATCH] dmaengine: mxs-dma: skip request_irq for NO_IRQ
+In-Reply-To: <1310004360.20150.16.camel@psiaudioba-mobl1>
+References: <20110630052855.GE25931@S2100-06.ap.freescale.net>
+	<1309421193-7785-1-git-send-email-shawn.guo@linaro.org>
+	<20110707001530.GE4034@S2100-06.ap.freescale.net>
+	<1310004360.20150.16.camel@psiaudioba-mobl1>
+Message-ID: <20110707032441.GF4034@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 7 Jul 2011, Russell King - ARM Linux wrote:
-
-> On Tue, Jul 05, 2011 at 10:30:34PM -0400, Nicolas Pitre wrote:
-> > Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-> > ---
-> >  arch/arm/include/asm/mach/arch.h |    4 ++++
-> >  arch/arm/kernel/setup.c          |    6 ++++++
-> >  2 files changed, 10 insertions(+), 0 deletions(-)
+On Thu, Jul 07, 2011 at 07:36:00AM +0530, Vinod Koul wrote:
+> On Thu, 2011-07-07 at 08:15 +0800, Shawn Guo wrote:
+> > On Thu, Jun 30, 2011 at 04:06:33PM +0800, Shawn Guo wrote:
+> > > In general, the mxs-dma users get separate irq for each channel,
+> > > but gpmi is special one which has only one irq shared by all gpmi
+> > > channels.  It causes mxs_dma channel allocation function fail for
+> > > all other gpmi channels except the first one calling into the
+> > > function.
+> > > 
+> > > The patch gets request_irq call skipped for NO_IRQ case, and leaves
+> > > this gpmi specific quirk to gpmi driver to sort out.  It will fix
+> > > above problem if gpmi driver sets chan_irq as gpmi irq for only one
+> > > channel and NO_IRQ for all the rest channels.
+> > > 
+> > > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > > Cc: Vinod Koul <vinod.koul@intel.com>
+> > > ---
 > > 
-> > diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
-> > index 946f4d7..7b79a00 100644
-> > --- a/arch/arm/include/asm/mach/arch.h
-> > +++ b/arch/arm/include/asm/mach/arch.h
-> > @@ -23,6 +23,10 @@ struct machine_desc {
-> >  
-> >  	unsigned int		nr_irqs;	/* number of IRQs */
-> >  
-> > +#ifdef CONFIG_ZONE_DMA
-> > +	unsigned long dma_zone_size;		/* size of DMA-able area */
+> > Hi Vinod,
+> > 
+> > Can you please take this patch?
+> > 
+> > Regards,
+> > Shawn
+> Looks okay to me. Have queued it up and should show up in my tree latest by early next week.
+> I am on road, hence the delay...
 > 
-> Please try to keep the formatting the same.
+No problem.  Thanks, Vinod.
 
-Oops, sure.  That's what might happens when your "screen" is effectively 
-a unidimensional 40x1 character display. Fixed.
-
-
-Nicolas
+-- 
+Regards,
+Shawn
