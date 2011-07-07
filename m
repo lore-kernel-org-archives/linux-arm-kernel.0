@@ -1,58 +1,40 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Thu, 7 Jul 2011 12:20:32 -0500
-Subject: [PATCH 07/52] ARM: mach-ep93xx: convert boot_params to atag_offset
-In-Reply-To: <alpine.LFD.2.00.1107071247140.14596@xanadu.home>
-References: <1309920457-21913-1-git-send-email-nicolas.pitre@linaro.org>
-	<1309920457-21913-7-git-send-email-nicolas.pitre@linaro.org>
-	<ADE657CA350FB648AAC2C43247A983F001F383D6CED9@AUSP01VMBX24.collaborationhost.net>
-	<alpine.LFD.2.00.1107071247140.14596@xanadu.home>
-Message-ID: <ADE657CA350FB648AAC2C43247A983F001F383D6CF20@AUSP01VMBX24.collaborationhost.net>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 07 Jul 2011 10:28:22 -0700
+Subject: [PATCH 0/7] Re-organize linker layouts
+In-Reply-To: <20110706102245.GO8286@n2100.arm.linux.org.uk>
+References: <20110706102245.GO8286@n2100.arm.linux.org.uk>
+Message-ID: <4E15ECB6.40100@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, July 07, 2011 10:00 AM, Nicolas Pitre wrote:
-> On Thu, 7 Jul 2011, H Hartley Sweeten wrote:
->> On Tuesday, July 05, 2011 7:47 PM, Nicolas Pitre wrote:
->>>
->>> Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
->>> ---
->>>  arch/arm/mach-ep93xx/adssphere.c   |    2 +-
->>>  arch/arm/mach-ep93xx/edb93xx.c     |   16 ++++++++--------
->>>  arch/arm/mach-ep93xx/gesbc9312.c   |    2 +-
->>>  arch/arm/mach-ep93xx/micro9.c      |    8 ++++----
->>>  arch/arm/mach-ep93xx/simone.c      |    2 +-
->>>  arch/arm/mach-ep93xx/snappercl15.c |    2 +-
->>>  arch/arm/mach-ep93xx/ts72xx.c      |    2 +-
->>>  7 files changed, 17 insertions(+), 17 deletions(-)
->> 
->> For ep93xx, this appears to be dependant on your patch:
->> 
->> [PATCH 10/37] ARM: mach-ep93xx: remove mach/memory.h and Kconfig selection of SDRAM bank
+On 07/06/2011 03:22 AM, Russell King - ARM Linux wrote:
+> The following series of patches are targetted at two issues:
 >
-> Actually this should be the other way around: this is a prerequisite for 
-> the removal patch, but this should only depend on the first patch (1/52) 
-> of the series.
+> 1. Fixing large initramfs causing PC24 relocations to become out of
+>    range.  This fixes both modules and link-time errors.
 >
->> Please make sure that the merge order of these patches does not
->> break anything...
+> 2. Making the vmlinux easier to pinpoint the various section-built
+>    data structures and inspect them later.
 >
-> Obviously.  I'm carrying them linearly in the same branch because of the 
-> ordering dependencies.
-
-Sounds good.
-
->> Other than that, for the ep93xx part.
->> 
->> Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+> For the main kernel, this allows the size of various sections to be
+> determined via objdump -h.  This also aids objdump -d and -s usage
+> when asking it to target a particular section.
 >
-> Is this valid for both patches?
+> For the decompressor, it means that it is now trivially possible to copy
+> out the compressed kernel vmlinux image by:
+>
+>   arm-linux-objcopy -O binary -j .piggydata arch/arm/boot/compressed/vmlinux \
+> 	piggy.gz
+>
+> and thereby obtain the binary kernel image (the Image file) which was
+> originally used.
 
-No. This patch only.
+I gave this series a test with my poison initmem patch and all looks well
 
-For patch 01/52 of this series, please fix the checkpatch.pl issue pointed
-out by Sergei Shtylyov and the build warning I pointed out.
+Tested-by: Stephen Boyd <sboyd@codeaurora.org>
 
-Once I see and test that updated patch I'll probably give you a Tested-by.
+except for patch 2 as I didn't use a zImage.
 
-Thanks,
-Hartley
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
