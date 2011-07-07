@@ -1,37 +1,44 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 7 Jul 2011 12:15:26 -0600
-Subject: [PATCH 01/10] ARM: change ARM_DMA_ZONE_SIZE into a variable
-In-Reply-To: <201107071817.11842.arnd@arndb.de>
-References: <1309919442-20451-1-git-send-email-nicolas.pitre@linaro.org>
-	<20110706230945.GA8286@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1107062246130.14596@xanadu.home>
-	<201107071817.11842.arnd@arndb.de>
-Message-ID: <20110707181526.GB2824@ponder.secretlab.ca>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 7 Jul 2011 14:20:03 -0400 (EDT)
+Subject: [PATCH 07/52] ARM: mach-ep93xx: convert boot_params to atag_offset
+In-Reply-To: <ADE657CA350FB648AAC2C43247A983F001F383D6CF20@AUSP01VMBX24.collaborationhost.net>
+References: <1309920457-21913-1-git-send-email-nicolas.pitre@linaro.org>
+	<1309920457-21913-7-git-send-email-nicolas.pitre@linaro.org>
+	<ADE657CA350FB648AAC2C43247A983F001F383D6CED9@AUSP01VMBX24.collaborationhost.net>
+	<alpine.LFD.2.00.1107071247140.14596@xanadu.home>
+	<ADE657CA350FB648AAC2C43247A983F001F383D6CF20@AUSP01VMBX24.collaborationhost.net>
+Message-ID: <alpine.LFD.2.00.1107071411550.14596@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 07, 2011 at 06:17:11PM +0200, Arnd Bergmann wrote:
-> On Thursday 07 July 2011, Nicolas Pitre wrote:
-> > > What is hardware specific is that the DMA devices can only address a
-> > > limited range of memory.  IMHO it's that which should be described in
-> > > DT, not that we'll have a DMA zone of X bytes in size.
-> > 
-> > I think that we all agree on the principle.  I certainly never intended 
-> > to suggest that the DMA zone size be stored as is in the device tree.
+On Thu, 7 Jul 2011, H Hartley Sweeten wrote:
+
+> On Thursday, July 07, 2011 10:00 AM, Nicolas Pitre wrote:
+> >> Other than that, for the ep93xx part.
+> >> 
+> >> Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+> >
+> > Is this valid for both patches?
 > 
-> There is a way to specify DMA address ranges in the device tree, though
-> I forgot the exact format. It comes down to saying the device sees
-> memory range XXX to YYY as its local address AAA to BBB. We could use
-> that information at boot time to determine what the largest range
-> of memory is that is visible by all devices (and hope that it's at
-> the start of physical memory).
+> No. This patch only.
+> 
+> For patch 01/52 of this series, please fix the checkpatch.pl issue pointed
+> out by Sergei Shtylyov and the build warning I pointed out.
 
-It's called dma-ranges, and it has the same syntax as the ranges
-property.  See section 2.3.9 on page 30 in ePAPR:
+Both were fixed.
 
-http://www.power.org/resources/downloads/Power_ePAPR_APPROVED_v1.0.pdf
+> Once I see and test that updated patch I'll probably give you a Tested-by.
 
-This describes the hardware constraints, not the DMA zone size or
-any software decisions like that.
+Due to the number of patches, I won't repost them unless a major change 
+happens.  However you can see their latest incarnation here:
 
-g.
+	http://git.linaro.org/gitweb?p=people/nico/linux.git;a=shortlog;h=refs/heads/redux
+
+or pull them from here:
+
+	git://git.linaro.org/people/nico/linux.git redux
+
+Note that this branch is still going through frequent rebasing.
+
+
+Nicolas
