@@ -1,41 +1,63 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 7 Jul 2011 02:17:48 -0600 (MDT)
-Subject: [PATCH v3 00/13] OMAP4: Add modulemode support to hwmod framework
-In-Reply-To: <1309554558-19819-1-git-send-email-b-cousson@ti.com>
-References: <1309554558-19819-1-git-send-email-b-cousson@ti.com>
-Message-ID: <alpine.DEB.2.00.1107070205010.30028@utopia.booyaka.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 7 Jul 2011 09:22:51 +0100
+Subject: [PATCH v3 01/40] Subject: ARM: mm: proc-macros Add generic
+	proc/cache/tlb struct definition macros
+In-Reply-To: <1308851448-25139-2-git-send-email-dave.martin@linaro.org>
+References: <1308851448-25139-1-git-send-email-dave.martin@linaro.org>
+	<1308851448-25139-2-git-send-email-dave.martin@linaro.org>
+Message-ID: <20110707082251.GH8286@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 1 Jul 2011, Benoit Cousson wrote:
+On Thu, Jun 23, 2011 at 06:50:09PM +0100, Dave Martin wrote:
+> +.macro define_cache_functions name:req, default:req, \
+> +		flush_kern_dcache_area, dma_map_area, dma_flush_range
+> +	.align 2
+> + 	.type	\name\()_cache_fns, #object
+> +ENTRY(\name\()_cache_fns)
+> +	.long	\default\()_flush_icache_all
+> +	.long	\default\()_flush_kern_cache_all
+> +	.long	\default\()_flush_user_cache_all
+> +	.long	\default\()_flush_user_cache_range
+> +	.long	\default\()_coherent_kern_range
+> +	.long	\default\()_coherent_user_range
+> +	.ifb \flush_kern_dcache_area
+> +		.long	\default\()_flush_kern_dcache_area
+> +	.else
+> +		.long	\flush_kern_dcache_area
+> +	.endif
+> +	.ifb \dma_map_area
+> +		.long	\default\()_dma_map_area
+> +	.else
+> +		.long	\dma_map_area
+> +	.endif
+> +	.long	\default\()_dma_unmap_area
+> +	.ifb \dma_flush_range
+> +		.long	\default\()_dma_flush_range
+> +	.else
+> +		.long	\dma_flush_range
+> +	.endif
+> +	.size	\name\()_cache_fns, . - \name\()_cache_fns
+> +.endm
 
-> Here is the series that finally add the management of the modulemode
-> directly from hwmod fmwk instead of using a fake clock node to represent
-> the IP.
-> 
-> This v2 update is fixing a couple of regressions I introduced in the first
-> release.
-> 
-> A second series will clean most of the remaining data from the clock data
-> file. Before that I have to rebase Rajendra's series to control the
-> clockdomain from the hwmod framework, otherwise the modules will
-> not be enabled properly since their clockdomain will not be changed
-> to SW_SUP during enable.
-> 
-> The series is based on for_3.1/3_hwmod_fixes and tested
-> on OMAP4430 ES2.1 + SDP. It should not affect OMAP2 & 3, but some testing
-> are definitively needed.
+This looks wrong.  The flush_kern_dcache_area and DMA stuff can't be
+any different:
 
-Okay.  So I've changed this series to be based on v3.0-rc6, so it can be 
-considered independently of cleanups, as is my understanding of what Tony 
-wants.  As mentioned before, I've also dropped some code that breaks on 
-OMAP2/3.  Some of Todd's comments have been addressed.  Also, functions in 
-cminst*.c now have 'cminst' in their name, to conform to the rest of the 
-functions in those files.  Not sure how I missed that the first time.
+#define __cpuc_flush_icache_all         __glue(_CACHE,_flush_icache_all)
+#define __cpuc_flush_kern_all           __glue(_CACHE,_flush_kern_cache_all)
+#define __cpuc_flush_user_all           __glue(_CACHE,_flush_user_cache_all)
+#define __cpuc_flush_user_range         __glue(_CACHE,_flush_user_cache_range)
+#define __cpuc_coherent_kern_range      __glue(_CACHE,_coherent_kern_range)
+#define __cpuc_coherent_user_range      __glue(_CACHE,_coherent_user_range)
+#define __cpuc_flush_dcache_area        __glue(_CACHE,_flush_kern_dcache_area)
 
-The updated series has been queued for 3.1 at 
-git://git.pwsan.com/linux-2.6 in the 'omap4_hwmod_modulemode_a_3.1' 
-branch.
+#define dmac_map_area                   __glue(_CACHE,_dma_map_area)
+#define dmac_unmap_area                 __glue(_CACHE,_dma_unmap_area)
+#define dmac_flush_range                __glue(_CACHE,_dma_flush_range)
 
+If they don't conform to the "<cachename>_<functionname>" pattern then
+single-cache model kernels will not compile.
 
-- Paul
+As these macros are supposed to be about correctness, they should be
+enforcing that too, and not allowing certain functions to be overriden
+by different names.
