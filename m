@@ -1,40 +1,42 @@
 From: dave.martin@linaro.org (Dave Martin)
-Date: Thu,  7 Jul 2011 15:27:10 +0100
-Subject: [PATCH v4 03/40] ARM: mm: cache-fa: Use the new processor struct
-	macros
+Date: Thu,  7 Jul 2011 15:27:09 +0100
+Subject: [PATCH v4 02/40] ARM: assembler.h: Add string declaration macro
 In-Reply-To: <1310048867-14172-1-git-send-email-dave.martin@linaro.org>
 References: <1310048867-14172-1-git-send-email-dave.martin@linaro.org>
-Message-ID: <1310048867-14172-4-git-send-email-dave.martin@linaro.org>
+Message-ID: <1310048867-14172-3-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Dave Martin <dave.martin@linaro.org>
----
- arch/arm/mm/cache-fa.S |   15 ++-------------
- 1 files changed, 2 insertions(+), 13 deletions(-)
+Declaring strings in assembler source involves a certain amount of
+tedious boilerplate code in order to annotate the resulting symbol
+correctly.
 
-diff --git a/arch/arm/mm/cache-fa.S b/arch/arm/mm/cache-fa.S
-index 1fa6f71..0720163 100644
---- a/arch/arm/mm/cache-fa.S
-+++ b/arch/arm/mm/cache-fa.S
-@@ -242,16 +242,5 @@ ENDPROC(fa_dma_unmap_area)
- 
- 	__INITDATA
- 
--	.type	fa_cache_fns, #object
--ENTRY(fa_cache_fns)
--	.long	fa_flush_icache_all
--	.long	fa_flush_kern_cache_all
--	.long	fa_flush_user_cache_all
--	.long	fa_flush_user_cache_range
--	.long	fa_coherent_kern_range
--	.long	fa_coherent_user_range
--	.long	fa_flush_kern_dcache_area
--	.long	fa_dma_map_area
--	.long	fa_dma_unmap_area
--	.long	fa_dma_flush_range
--	.size	fa_cache_fns, . - fa_cache_fns
-+	@ define struct cpu_cache_fns (see <asm/cacheflush.h> and proc-macros.S)
-+	define_cache_functions fa
+Encapsulating this boilerplate in a macro should help to avoid some
+duplication and the occasional mistake.
+
+Signed-off-by: Dave Martin <dave.martin@linaro.org>
+Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+---
+ arch/arm/include/asm/assembler.h |    9 +++++++++
+ 1 files changed, 9 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
+index 65c3f24..29035e8 100644
+--- a/arch/arm/include/asm/assembler.h
++++ b/arch/arm/include/asm/assembler.h
+@@ -293,4 +293,13 @@
+ 	.macro	ldrusr, reg, ptr, inc, cond=al, rept=1, abort=9001f
+ 	usracc	ldr, \reg, \ptr, \inc, \cond, \rept, \abort
+ 	.endm
++
++/* Utility macro for declaring string literals */
++	.macro	string name:req, string
++	.type \name , #object
++\name:
++	.asciz "\string"
++	.size \name , . - \name
++	.endm
++
+ #endif /* __ASM_ASSEMBLER_H__ */
 -- 
 1.7.4.1
