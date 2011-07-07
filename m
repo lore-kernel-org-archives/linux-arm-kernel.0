@@ -1,108 +1,98 @@
 From: bs14@csr.com (Barry Song)
-Date: Wed, 6 Jul 2011 23:36:53 -0700
-Subject: [PATCH v4 0/3] ARM: CSR: Adding CSR SiRFprimaII platform
-Message-ID: <1310020616-27856-1-git-send-email-bs14@csr.com>
+Date: Wed, 6 Jul 2011 23:36:56 -0700
+Subject: [PATCH v4 3/3] ARM: CSR: initializing L2 cache
+In-Reply-To: <1310020616-27856-1-git-send-email-bs14@csr.com>
+References: <1310020616-27856-1-git-send-email-bs14@csr.com>
+Message-ID: <1310020616-27856-4-git-send-email-bs14@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changelogs:
--v4:
-v3 got "Reviewed-by: Arnd Bergmann <arnd@arndb.de>"
-stopping the 0xffffffff madness for IO_SPACE_LIMIT
-fix .map_io compiling issue in the 1st patch
-fix set_next_event in timer.c
-rename GPU, USB, multimedia and SATA nodes in DTS
-delete redundant 0x in DTS
+From: Rongjun Ying <rongjun.ying@csr.com>
 
--v3:
-full DT file
-delete all static mapping table in common.c
-rename common.c to prima2.c
-delete board file board_dt.c
-split DEBUG_LL and L2 cache to seperate patch
-
--v2:
- 1. clock: use dev_id instead of con_id
- 2. Kconfig: delete ISA_DMA
- 3. irq: implement int controller based on DT
-        move to GENERIC_IRQ_CHIP framework
- 4. timer: implement timer based on DT
- 5. entry-macro.S: use get_irqnr_preamble to load the base address only once
-   per IRQ exception.
- 6. others:
-       use readl_relaxed instead of __raw_readl
-       adjust Kconfig order for PRIMA2
-       use clk_get_sys instead of clk_get for system level clock
-       use BUG_ON(IS_ERR(clk)) instead of BUG_ON(IS_ERR_OR_NULL(clk));
-       fix typo for CLOCK_TICK_RATE
-       ("sirf,xxx", "sirf,prima2-xxx")  instead of ("sirf,xxx") in dts
-
-Note:
-   For L2 cache, if Rob's patch is merged, the whole file can be deleted
-
-Barry Song (1):
-  ARM: CSR: mapping early DEBUG_LL uart
-
-Binghua Duan (1):
-  ARM: CSR: Adding CSR SiRFprimaII board support
-
-Rongjun Ying (1):
-  ARM: CSR: initializing L2 cache
-
- Documentation/devicetree/bindings/arm/sirf.txt  |    3 +
- arch/arm/Kconfig                                |   14 +
- arch/arm/Makefile                               |    1 +
- arch/arm/boot/dts/prima2-cb.dts                 |  416 ++++++++++++++++++
- arch/arm/mach-prima2/Makefile                   |    7 +
- arch/arm/mach-prima2/Makefile.boot              |    3 +
- arch/arm/mach-prima2/clock.c                    |  509 +++++++++++++++++++++++
- arch/arm/mach-prima2/common.h                   |   26 ++
- arch/arm/mach-prima2/include/mach/clkdev.h      |   15 +
- arch/arm/mach-prima2/include/mach/debug-macro.S |   29 ++
- arch/arm/mach-prima2/include/mach/entry-macro.S |   29 ++
- arch/arm/mach-prima2/include/mach/hardware.h    |   15 +
- arch/arm/mach-prima2/include/mach/io.h          |   16 +
- arch/arm/mach-prima2/include/mach/irqs.h        |   17 +
- arch/arm/mach-prima2/include/mach/map.h         |   16 +
- arch/arm/mach-prima2/include/mach/memory.h      |   21 +
- arch/arm/mach-prima2/include/mach/system.h      |   29 ++
- arch/arm/mach-prima2/include/mach/timex.h       |   14 +
- arch/arm/mach-prima2/include/mach/uart.h        |   23 +
- arch/arm/mach-prima2/include/mach/uncompress.h  |   40 ++
- arch/arm/mach-prima2/include/mach/vmalloc.h     |   14 +
- arch/arm/mach-prima2/irq.c                      |   71 ++++
- arch/arm/mach-prima2/l2x0.c                     |   59 +++
- arch/arm/mach-prima2/lluart.c                   |   25 ++
- arch/arm/mach-prima2/prima2.c                   |   41 ++
- arch/arm/mach-prima2/rstc.c                     |   69 +++
- arch/arm/mach-prima2/timer.c                    |  217 ++++++++++
- arch/arm/mm/Kconfig                             |    2 +-
- 28 files changed, 1740 insertions(+), 1 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/sirf.txt
- create mode 100644 arch/arm/boot/dts/prima2-cb.dts
- create mode 100644 arch/arm/mach-prima2/Makefile
- create mode 100644 arch/arm/mach-prima2/Makefile.boot
- create mode 100644 arch/arm/mach-prima2/clock.c
- create mode 100644 arch/arm/mach-prima2/common.h
- create mode 100644 arch/arm/mach-prima2/include/mach/clkdev.h
- create mode 100644 arch/arm/mach-prima2/include/mach/debug-macro.S
- create mode 100644 arch/arm/mach-prima2/include/mach/entry-macro.S
- create mode 100644 arch/arm/mach-prima2/include/mach/hardware.h
- create mode 100644 arch/arm/mach-prima2/include/mach/io.h
- create mode 100644 arch/arm/mach-prima2/include/mach/irqs.h
- create mode 100644 arch/arm/mach-prima2/include/mach/map.h
- create mode 100644 arch/arm/mach-prima2/include/mach/memory.h
- create mode 100644 arch/arm/mach-prima2/include/mach/system.h
- create mode 100644 arch/arm/mach-prima2/include/mach/timex.h
- create mode 100644 arch/arm/mach-prima2/include/mach/uart.h
- create mode 100644 arch/arm/mach-prima2/include/mach/uncompress.h
- create mode 100644 arch/arm/mach-prima2/include/mach/vmalloc.h
- create mode 100644 arch/arm/mach-prima2/irq.c
+Signed-off-by: Rongjun Ying <rongjun.ying@csr.com>
+Signed-off-by: Barry Song <baohua.song@csr.com>
+---
+ arch/arm/mach-prima2/Makefile |    1 +
+ arch/arm/mach-prima2/l2x0.c   |   59 +++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 60 insertions(+), 0 deletions(-)
  create mode 100644 arch/arm/mach-prima2/l2x0.c
- create mode 100644 arch/arm/mach-prima2/lluart.c
- create mode 100644 arch/arm/mach-prima2/prima2.c
- create mode 100644 arch/arm/mach-prima2/rstc.c
- create mode 100644 arch/arm/mach-prima2/timer.c
+
+diff --git a/arch/arm/mach-prima2/Makefile b/arch/arm/mach-prima2/Makefile
+index f2fba66..7af7fc0 100644
+--- a/arch/arm/mach-prima2/Makefile
++++ b/arch/arm/mach-prima2/Makefile
+@@ -4,3 +4,4 @@ obj-y += clock.o
+ obj-y += rstc.o
+ obj-y += prima2.o
+ obj-$(CONFIG_DEBUG_LL) += lluart.o
++obj-$(CONFIG_CACHE_L2X0) += l2x0.o
+diff --git a/arch/arm/mach-prima2/l2x0.c b/arch/arm/mach-prima2/l2x0.c
+new file mode 100644
+index 0000000..9cda205
+--- /dev/null
++++ b/arch/arm/mach-prima2/l2x0.c
+@@ -0,0 +1,59 @@
++/*
++ * l2 cache initialization for CSR SiRFprimaII
++ *
++ * Copyright (c) 2011 Cambridge Silicon Radio Limited, a CSR plc group company.
++ *
++ * Licensed under GPLv2 or later.
++ */
++
++#include <linux/init.h>
++#include <linux/kernel.h>
++#include <linux/io.h>
++#include <linux/errno.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <asm/hardware/cache-l2x0.h>
++#include <mach/memory.h>
++
++#define L2X0_ADDR_FILTERING_START       0xC00
++#define L2X0_ADDR_FILTERING_END         0xC04
++
++static struct of_device_id l2x_ids[]  = {
++	{ .compatible = "arm,pl310-cache" },
++};
++
++static int __init sirfsoc_of_l2x_init(void)
++{
++	struct device_node *np;
++	void __iomem *sirfsoc_l2x_base;
++
++	np = of_find_matching_node(NULL, l2x_ids);
++	if (!np)
++		panic("unable to find compatible l2x node in dtb\n");
++
++	sirfsoc_l2x_base = of_iomap(np, 0);
++	if (!sirfsoc_l2x_base)
++		panic("unable to map l2x cpu registers\n");
++
++	of_node_put(np);
++
++	if (!(readl_relaxed(sirfsoc_l2x_base + L2X0_CTRL) & 1)) {
++		/*
++		 * set the physical memory windows L2 cache will cover
++		 */
++		writel_relaxed(PLAT_PHYS_OFFSET + 1024 * 1024 * 1024,
++			sirfsoc_l2x_base + L2X0_ADDR_FILTERING_END);
++		writel_relaxed(PLAT_PHYS_OFFSET | 0x1,
++			sirfsoc_l2x_base + L2X0_ADDR_FILTERING_START);
++
++		writel_relaxed(0,
++			sirfsoc_l2x_base + L2X0_TAG_LATENCY_CTRL);
++		writel_relaxed(0,
++			sirfsoc_l2x_base + L2X0_DATA_LATENCY_CTRL);
++	}
++	l2x0_init((void __iomem *)sirfsoc_l2x_base, 0x00040000,
++		0x00000000);
++
++	return 0;
++}
++early_initcall(sirfsoc_of_l2x_init);
+-- 
+1.7.1
 
 
 
