@@ -1,136 +1,257 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 7 Jul 2011 09:08:47 +0100
-Subject: [GIT PULL] Cortex-A5 and Cortex-A15 support
-Message-ID: <20110707080847.GA9338@e102144-lin.cambridge.arm.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 7 Jul 2011 02:10:52 -0600 (MDT)
+Subject: [PATCH v3 04/13] OMAP: hwmod: Wait the idle status to be disabled
+In-Reply-To: <20110705182144.GA10846@google.com>
+References: <1309554558-19819-1-git-send-email-b-cousson@ti.com>
+	<1309554558-19819-5-git-send-email-b-cousson@ti.com>
+	<20110705182144.GA10846@google.com>
+Message-ID: <alpine.DEB.2.00.1107070029570.31498@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Hi Todd,
 
-Please can you pull this for the next merge window? It contains the
-Cortex-A5 and Cortex-A15 support, as well as all of the proc macro patches
-from Pawel and Dave.
+Beno?t is away right now, so I'll deal with the straightforward aspects of 
+your comments, and leave the more complex parts for him when he gets 
+back.
 
-Please let me know if you have trouble pulling; the server has recently been
-moved onto some new hardware and you get to be the lucky one to try and pull
-from it first.
+On Tue, 5 Jul 2011, Todd Poynor wrote:
 
-Thanks,
+> On Fri, Jul 01, 2011 at 11:09:09PM +0200, Benoit Cousson wrote:
+> > It is mandatory to wait for a module to be in disabled state before
+> > potentially disabling source clock or re-asserting a reset.
+> > 
+> > omap_hwmod_idle and omap_hwmod_shutdown does not wait for
+> > the module to be fully idle.
+> > 
+> > Add a cm_xxx accessor to wait the clkctrl idle status to be disabled.
+> > Fix hwmod_[idle|shutdown] to use this API.
+> ...
+> > +int omap4_cm_wait_module_idle(u8 part, u16 inst, s16 cdoffs, u16 clkctrl_offs)
+> 
+> Technically this waits for a module slave to enter "full idle" --
+> "interface idle" not good enough, and if the module is also a master
+> its standby status could possibly be different... personally, these
+> details make my brain hurt, but thought I'd mention this in case
+> the naming of this interface should capture any of these distinctions.
 
-Will
+This is probably going to need clarification from someone who knows the 
+PRCM state machine.
+
+> 
+> > +{
+> > +	int i = 0;
+> > +
+> > +	if (!clkctrl_offs)
+> > +		return 0;
+> > +
+> > +	omap_test_timeout(
+> > +		_clkctrl_idlest(part, inst, cdoffs, clkctrl_offs) == 0x3,
+> > +		MAX_MODULE_READY_TIME, i);
+> 
+> The numeric constant may already have an equivalent symbol defined, or
+> suggest adding one.
+
+Added.
+
+> 
+> >  /**
+> > + * _wait_target_disable - wait for a module to be disabled
+> > + * @oh: struct omap_hwmod *
+> > + *
+> > + * Wait for a module @oh to leave slave idle.  Returns 0 if the module
+> > + * does not have an IDLEST bit or if the module successfully leaves
+> > + * slave idle; otherwise, pass along the return value of the
+> > + * appropriate *_cm_wait_module_ready() function.
+> 
+> This paragraph probably c&p from a function with opposite meaning.
+
+Fixed.
+
+> >  static int _idle(struct omap_hwmod *oh)
+> >  {
+> > +	int ret;
+> > +
+> >  	pr_debug("omap_hwmod: %s: idling\n", oh->name);
+> >  
+> >  	if (oh->_state != _HWMOD_STATE_ENABLED) {
+> > @@ -1351,6 +1383,10 @@ static int _idle(struct omap_hwmod *oh)
+> >  		_idle_sysc(oh);
+> >  	_del_initiator_dep(oh, mpu_oh);
+> >  	_disable_clocks(oh);
+> > +	ret = _wait_target_disable(oh);
+> > +	if (ret)
+> > +		pr_debug("omap_hwmod: %s: _wait_target_disable failed\n",
+> > +			   oh->name);
+> 
+> Should callers see an error function return in this case?
+
+I don't know, but I've changed the pr_debug() to pr_warn() so that these 
+aren't hidden.  That will result in some warnings on boot.  The goal is to 
+'inspire' someone to fix those issues in the -rc series or 3.2.
+
+The updated patch is below.
 
 
+- Paul
 
-The following changes since commit b0af8dfdd67699e25083478c63eedef2e72ebd85:
-  Linus Torvalds (1):
-        Linux 3.0-rc5
+From: Benoit Cousson <b-cousson@ti.com>
+Date: Fri, 1 Jul 2011 23:09:09 +0200
+Subject: [PATCH] OMAP: hwmod: Wait the idle status to be disabled
 
-are available in the git repository at:
+It is mandatory to wait for a module to be in disabled state before
+potentially disabling source clock or re-asserting a reset.
 
-  git://linux-arm.org/linux-2.6-wd.git for-rmk
+omap_hwmod_idle and omap_hwmod_shutdown does not wait for
+the module to be fully idle.
 
-Dave Martin (40):
-      ARM: mm: proc-macros: Add generic proc/cache/tlb struct definition macros
-      ARM: assembler.h: Add string declaration macro
-      ARM: mm: cache-fa: Use the new processor struct macros
-      ARM: mm: cache-v3: Use the new processor struct macros
-      ARM: mm: cache-v4: Use the new processor struct macros
-      ARM: mm: cache-v4wb: Use the new processor struct macros
-      ARM: mm: cache-v4wt: Use the new processor struct macros
-      ARM: mm: cache-v6: Use the new processor struct macros
-      ARM: mm: cache-v7: Use the new processor struct macros
-      ARM: mm: proc-arm1020: Use the new processor struct macros
-      ARM: mm: proc-arm1020e: Use the new processor struct macros
-      ARM: mm: proc-arm1022: Use the new processor struct macros
-      ARM: mm: proc-arm1026: Use the new processor struct macros
-      ARM: mm: proc-arm6_7: Use the new processor struct macros
-      ARM: mm: proc-arm720: Use the new processor struct macros
-      ARM: mm: proc-arm740: Use the new processor struct macros
-      ARM: mm: proc-arm7tdmi: Use the new processor struct macros
-      ARM: mm: proc-arm920: Use the new processor struct macros
-      ARM: mm: proc-arm922: Use the new processor struct macros
-      ARM: mm: proc-arm925: Use the new processor struct macros
-      ARM: mm: proc-arm926: Use the new processor struct macros
-      ARM: mm: proc-arm940: Use the new processor struct macros
-      ARM: mm: proc-arm946: Use the new processor struct macros
-      ARM: mm: proc-arm9tdmi: Use the new processor struct macros
-      ARM: mm: proc-fa526: Use the new processor struct macros
-      ARM: mm: proc-feroceon: Use the new processor struct macros
-      ARM: mm: proc-mohawk: Use the new processor struct macros
-      ARM: mm: proc-sa110: Use the new processor struct macros
-      ARM: mm: proc-sa1100: Use the new processor struct macros
-      ARM: mm: proc-v6: Use the new processor struct macros
-      ARM: mm: proc-v7: Use the new processor struct macros
-      ARM: mm: proc-xsc3: Use new generic struct definition macros
-      ARM: mm: proc-xscale: Use new generic struct definition macros
-      ARM: mm: tlb-fa: Use the new processor struct macros
-      ARM: mm: tlb-v3: Use the new processor struct macros
-      ARM: mm: tlb-v4: Use the new processor struct macros
-      ARM: mm: tlb-v4wb: Use the new processor struct macros
-      ARM: mm: tlb-v4wbi: Use the new processor struct macros
-      ARM: mm: tlb-v6: Use the new processor struct macros
-      ARM: mm: tlb-v7: Use the new processor struct macros
+Add a cm_xxx accessor to wait the clkctrl idle status to be disabled.
+Fix hwmod_[idle|shutdown] to use this API.
 
-Pawel Moll (2):
-      ARM: proc: convert v7 proc infos into a common macro
-      ARM: proc: add Cortex-A5 proc info
+Based on Rajendra's initial patch.
 
-Will Deacon (10):
-      Merge branch 'arm/proc-macros' of git://git.linaro.org/people/dmart/linux-2.6-arm into for-rmk
-      ARM: hwcaps: use shifts instead of hardcoded constants
-      ARM: hwcaps: add new HWCAP defines for ARMv7-A
-      ARM: vfp: add VFPv4 capability detection and populate elf_hwcap
-      ARM: proc: add proc info for Cortex-A15MP using classic page tables
-      ARM: perf: remove confusing comment from v7 perf events backend
-      ARM: perf: add PMUv2 common event definitions
-      ARM: perf: add support for the Cortex-A5 PMU
-      ARM: perf: add support for the Cortex-A15 PMU
-      ARM: proc: add definition of cpu_reset for ARMv6 and ARMv7 cores
+Please note that most interconnects hwmod will return one timeout because
+it is impossible for them to be in idle since the processor is accessing
+the registers though the interconnect.
 
- arch/arm/include/asm/assembler.h  |    9 +
- arch/arm/include/asm/hwcap.h      |   36 ++--
- arch/arm/include/asm/perf_event.h |    2 +
- arch/arm/kernel/perf_event.c      |    6 +
- arch/arm/kernel/perf_event_v7.c   |  344 +++++++++++++++++++++++++--
- arch/arm/kernel/setup.c           |    4 +
- arch/arm/mm/cache-fa.S            |   15 +-
- arch/arm/mm/cache-v3.S            |   15 +-
- arch/arm/mm/cache-v4.S            |   15 +-
- arch/arm/mm/cache-v4wb.S          |   15 +-
- arch/arm/mm/cache-v4wt.S          |   15 +-
- arch/arm/mm/cache-v6.S            |   15 +-
- arch/arm/mm/cache-v7.S            |   15 +-
- arch/arm/mm/proc-arm1020.S        |   45 +---
- arch/arm/mm/proc-arm1020e.S       |   52 +----
- arch/arm/mm/proc-arm1022.S        |   52 +----
- arch/arm/mm/proc-arm1026.S        |   53 +----
- arch/arm/mm/proc-arm6_7.S         |  166 +++----------
- arch/arm/mm/proc-arm720.S         |   85 ++-----
- arch/arm/mm/proc-arm740.S         |   42 +---
- arch/arm/mm/proc-arm7tdmi.S       |  216 +++--------------
- arch/arm/mm/proc-arm920.S         |   53 +----
- arch/arm/mm/proc-arm922.S         |   53 +----
- arch/arm/mm/proc-arm925.S         |   88 ++------
- arch/arm/mm/proc-arm926.S         |   51 +----
- arch/arm/mm/proc-arm940.S         |   51 +----
- arch/arm/mm/proc-arm946.S         |   53 +----
- arch/arm/mm/proc-arm9tdmi.S       |   78 ++-----
- arch/arm/mm/proc-fa526.S          |   38 +---
- arch/arm/mm/proc-feroceon.S       |  186 +++------------
- arch/arm/mm/proc-macros.S         |   76 ++++++
- arch/arm/mm/proc-mohawk.S         |   61 ++----
- arch/arm/mm/proc-sa110.S          |   39 +---
- arch/arm/mm/proc-sa1100.S         |   84 ++-----
- arch/arm/mm/proc-v6.S             |   39 +---
- arch/arm/mm/proc-v7.S             |  136 +++++------
- arch/arm/mm/proc-xsc3.S           |   90 ++------
- arch/arm/mm/proc-xscale.S         |  484 +++++--------------------------------
- arch/arm/mm/tlb-fa.S              |    8 +-
- arch/arm/mm/tlb-v3.S              |    8 +-
- arch/arm/mm/tlb-v4.S              |    8 +-
- arch/arm/mm/tlb-v4wb.S            |    8 +-
- arch/arm/mm/tlb-v4wbi.S           |    8 +-
- arch/arm/mm/tlb-v6.S              |    8 +-
- arch/arm/mm/tlb-v7.S              |    9 +-
- arch/arm/vfp/vfpmodule.c          |    6 +-
- 46 files changed, 889 insertions(+), 2051 deletions(-)
+Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+Cc: Paul Walmsley <paul@pwsan.com>
+Cc: Todd Poynor <toddpoynor@google.com>
+[paul at pwsan.com: move cpu_is_*() tests to the top of _wait_target_disable();
+ incorporate some feedback from Todd]
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+---
+ arch/arm/mach-omap2/cminst44xx.c |   27 +++++++++++++++++++++++++
+ arch/arm/mach-omap2/cminst44xx.h |    1 +
+ arch/arm/mach-omap2/omap_hwmod.c |   40 ++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 68 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/cminst44xx.c b/arch/arm/mach-omap2/cminst44xx.c
+index 3f65ce0..61e4382 100644
+--- a/arch/arm/mach-omap2/cminst44xx.c
++++ b/arch/arm/mach-omap2/cminst44xx.c
+@@ -33,6 +33,8 @@
+ #include "prm44xx.h"
+ #include "prcm_mpu44xx.h"
+ 
++#define CLKCTRL_IDLEST_DISABLED			0x3
++
+ static u32 _cm_bases[OMAP4_MAX_PRCM_PARTITIONS] = {
+ 	[OMAP4430_INVALID_PRCM_PARTITION]	= 0,
+ 	[OMAP4430_PRM_PARTITION]		= OMAP4430_PRM_BASE,
+@@ -244,3 +246,28 @@ int omap4_cminst_wait_module_ready(u8 part, u16 inst, s16 cdoffs, u16 clkctrl_of
+ 	return (i < MAX_MODULE_READY_TIME) ? 0 : -EBUSY;
+ }
+ 
++/**
++ * omap4_cminst_wait_module_idle - wait for a module to be in 'disabled'
++ * state
++ * @part: PRCM partition ID that the CM_CLKCTRL register exists in
++ * @inst: CM instance register offset (*_INST macro)
++ * @cdoffs: Clockdomain register offset (*_CDOFFS macro)
++ * @clkctrl_offs: Module clock control register offset (*_CLKCTRL macro)
++ *
++ * Wait for the module IDLEST to be disabled. Some PRCM transition,
++ * like reset assertion or parent clock de-activation must wait the
++ * module to be fully disabled.
++ */
++int omap4_cminst_wait_module_idle(u8 part, u16 inst, s16 cdoffs, u16 clkctrl_offs)
++{
++	int i = 0;
++
++	if (!clkctrl_offs)
++		return 0;
++
++	omap_test_timeout((_clkctrl_idlest(part, inst, cdoffs, clkctrl_offs) ==
++			   CLKCTRL_IDLEST_DISABLED),
++			  MAX_MODULE_READY_TIME, i);
++
++	return (i < MAX_MODULE_READY_TIME) ? 0 : -EBUSY;
++}
+diff --git a/arch/arm/mach-omap2/cminst44xx.h b/arch/arm/mach-omap2/cminst44xx.h
+index 8eba2ae..a985400 100644
+--- a/arch/arm/mach-omap2/cminst44xx.h
++++ b/arch/arm/mach-omap2/cminst44xx.h
+@@ -18,6 +18,7 @@ extern void omap4_cminst_clkdm_force_sleep(u8 part, s16 inst, u16 cdoffs);
+ extern void omap4_cminst_clkdm_force_wakeup(u8 part, s16 inst, u16 cdoffs);
+ 
+ extern int omap4_cminst_wait_module_ready(u8 part, u16 inst, s16 cdoffs, u16 clkctrl_offs);
++extern int omap4_cminst_wait_module_idle(u8 part, u16 inst, s16 cdoffs, u16 clkctrl_offs);
+ 
+ /*
+  * In an ideal world, we would not export these low-level functions,
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index 39c8831..fee80a8 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -1013,6 +1013,36 @@ static int _wait_target_ready(struct omap_hwmod *oh)
+ }
+ 
+ /**
++ * _wait_target_disable - wait for a module to be disabled
++ * @oh: struct omap_hwmod *
++ *
++ * Wait for a module @oh to enter slave idle.  Returns 0 if the module
++ * does not have an IDLEST bit or if the module successfully enters
++ * slave idle; otherwise, pass along the return value of the
++ * appropriate *_cm*_wait_module_idle() function.
++ */
++static int _wait_target_disable(struct omap_hwmod *oh)
++{
++	/* TODO: For now just handle OMAP4+ */
++	if (cpu_is_omap24xx() || cpu_is_omap34xx())
++		return 0;
++
++	if (!oh)
++		return -EINVAL;
++
++	if (oh->_int_flags & _HWMOD_NO_MPU_PORT)
++		return 0;
++
++	if (oh->flags & HWMOD_NO_IDLEST)
++		return 0;
++
++	return omap4_cminst_wait_module_idle(oh->clkdm->prcm_partition,
++					     oh->clkdm->cm_inst,
++					     oh->clkdm->clkdm_offs,
++					     oh->prcm.omap4.clkctrl_offs);
++}
++
++/**
+  * _lookup_hardreset - fill register bit info for this hwmod/reset line
+  * @oh: struct omap_hwmod *
+  * @name: name of the reset line in the context of this hwmod
+@@ -1319,6 +1349,8 @@ static int _enable(struct omap_hwmod *oh)
+  */
+ static int _idle(struct omap_hwmod *oh)
+ {
++	int ret;
++
+ 	if (oh->_state != _HWMOD_STATE_ENABLED) {
+ 		WARN(1, "omap_hwmod: %s: idle state can only be entered from "
+ 		     "enabled state\n", oh->name);
+@@ -1331,6 +1363,10 @@ static int _idle(struct omap_hwmod *oh)
+ 		_idle_sysc(oh);
+ 	_del_initiator_dep(oh, mpu_oh);
+ 	_disable_clocks(oh);
++	ret = _wait_target_disable(oh);
++	if (ret)
++		pr_warn("omap_hwmod: %s: _wait_target_disable failed\n",
++			oh->name);
+ 
+ 	/* Mux pins for device idle if populated */
+ 	if (oh->mux && oh->mux->pads_dynamic)
+@@ -1427,6 +1463,10 @@ static int _shutdown(struct omap_hwmod *oh)
+ 		_del_initiator_dep(oh, mpu_oh);
+ 		/* XXX what about the other system initiators here? dma, dsp */
+ 		_disable_clocks(oh);
++		ret = _wait_target_disable(oh);
++		if (ret)
++			pr_warn("omap_hwmod: %s: _wait_target_disable failed\n",
++				oh->name);
+ 	}
+ 	/* XXX Should this code also force-disable the optional clocks? */
+ 
+-- 
+1.7.5.4
