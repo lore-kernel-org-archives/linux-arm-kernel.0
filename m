@@ -1,24 +1,38 @@
-From: heechul@illinois.edu (heechul Yun)
-Date: Wed, 6 Jul 2011 19:53:23 -0700
-Subject: A few other cache related optimizations for Cortex-A9.
-In-Reply-To: <20110706193055.GO8286@n2100.arm.linux.org.uk>
-References: <CAN_5kQBszi=hV1RVjyKO6gOhOuymGjsMwLk6ORaWpkaL-4USxA@mail.gmail.com>
-	<20110706085656.GA32020@e102109-lin.cambridge.arm.com>
-	<20110706193055.GO8286@n2100.arm.linux.org.uk>
-Message-ID: <CAN_5kQB_s8aTKrvDc9n2vC4eGUbArUvWD2z-isNHa-SQ2U-pzg@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 6 Jul 2011 22:59:39 -0400 (EDT)
+Subject: [PATCH 02/10] ARM: add dma_zone_size to the machine_desc structure
+In-Reply-To: <20110706231034.GB8286@n2100.arm.linux.org.uk>
+References: <1309919442-20451-1-git-send-email-nicolas.pitre@linaro.org>
+	<1309919442-20451-2-git-send-email-nicolas.pitre@linaro.org>
+	<20110706231034.GB8286@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1107062252460.14596@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->
-> We don't need this flush anymore, so let's simply kill it outright.
->
-> Heechul (sorry, is that the correct way of addressing you?) could
-> you please submit a patch removing the __cpuc_flush_dcache_area()
-> from v6_copy_user_highpage_nonaliasing() entirely please?
->
+On Thu, 7 Jul 2011, Russell King - ARM Linux wrote:
 
-I sent the patch
+> On Tue, Jul 05, 2011 at 10:30:34PM -0400, Nicolas Pitre wrote:
+> > Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+> > ---
+> >  arch/arm/include/asm/mach/arch.h |    4 ++++
+> >  arch/arm/kernel/setup.c          |    6 ++++++
+> >  2 files changed, 10 insertions(+), 0 deletions(-)
+> > 
+> > diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
+> > index 946f4d7..7b79a00 100644
+> > --- a/arch/arm/include/asm/mach/arch.h
+> > +++ b/arch/arm/include/asm/mach/arch.h
+> > @@ -23,6 +23,10 @@ struct machine_desc {
+> >  
+> >  	unsigned int		nr_irqs;	/* number of IRQs */
+> >  
+> > +#ifdef CONFIG_ZONE_DMA
+> > +	unsigned long dma_zone_size;		/* size of DMA-able area */
+> 
+> Please try to keep the formatting the same.
 
-Thanks
+Oops, sure.  That's what might happens when your "screen" is effectively 
+a unidimensional 40x1 character display. Fixed.
 
-Heechul
+
+Nicolas
