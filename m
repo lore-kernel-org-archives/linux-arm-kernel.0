@@ -1,228 +1,261 @@
 From: haojian.zhuang@marvell.com (Haojian Zhuang)
-Date: Fri,  8 Jul 2011 18:20:23 +0800
-Subject: [PATCH] i2c: pxa: create dynamic platform device from device tree
-In-Reply-To: <1310120428-22700-6-git-send-email-haojian.zhuang@marvell.com>
+Date: Fri,  8 Jul 2011 18:20:24 +0800
+Subject: [PATCH] of: add devicetree API for regulator
+In-Reply-To: <1310120428-22700-7-git-send-email-haojian.zhuang@marvell.com>
 References: <1310120428-22700-1-git-send-email-haojian.zhuang@marvell.com>
 	<1310120428-22700-2-git-send-email-haojian.zhuang@marvell.com>
 	<1310120428-22700-3-git-send-email-haojian.zhuang@marvell.com>
 	<1310120428-22700-4-git-send-email-haojian.zhuang@marvell.com>
 	<1310120428-22700-5-git-send-email-haojian.zhuang@marvell.com>
 	<1310120428-22700-6-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <1310120428-22700-7-git-send-email-haojian.zhuang@marvell.com>
+	<1310120428-22700-7-git-send-email-haojian.zhuang@marvell.com>
+Message-ID: <1310120428-22700-8-git-send-email-haojian.zhuang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Create two probe function to support both current platform device and created
-dynamic platform device from device tree. After moving to device tree,
-original implementation of platform device will be removed.
-
-Use property to present polling mode and frequency mode.
-
 Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
 ---
- drivers/i2c/busses/i2c-pxa.c |  163 ++++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 163 insertions(+), 0 deletions(-)
+ drivers/of/Kconfig           |    4 +
+ drivers/of/Makefile          |    1 +
+ drivers/of/of_regulator.c    |  166 ++++++++++++++++++++++++++++++++++++++++++
+ include/linux/of_regulator.h |   34 +++++++++
+ 4 files changed, 205 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/of/of_regulator.c
+ create mode 100644 include/linux/of_regulator.h
 
-diff --git a/drivers/i2c/busses/i2c-pxa.c b/drivers/i2c/busses/i2c-pxa.c
-index d603646..7a6d774 100644
---- a/drivers/i2c/busses/i2c-pxa.c
-+++ b/drivers/i2c/busses/i2c-pxa.c
-@@ -29,6 +29,7 @@
- #include <linux/errno.h>
- #include <linux/interrupt.h>
- #include <linux/i2c-pxa.h>
-+#include <linux/of_device.h>
- #include <linux/of_i2c.h>
- #include <linux/platform_device.h>
- #include <linux/err.h>
-@@ -1044,6 +1045,162 @@ static const struct i2c_algorithm i2c_pxa_pio_algorithm = {
- 	.functionality	= i2c_pxa_functionality,
- };
+diff --git a/drivers/of/Kconfig b/drivers/of/Kconfig
+index d06a637..edb6601 100644
+--- a/drivers/of/Kconfig
++++ b/drivers/of/Kconfig
+@@ -75,4 +75,8 @@ config OF_PCI
+ 	help
+ 	  OpenFirmware PCI bus accessors
  
-+static const struct of_device_id pxa_i2c_of_match[] = {
-+	{ .compatible = "pxa2xx-i2c",	.data = (void *)REGS_PXA2XX, },
-+	{ .compatible = "pxa3xx-pwri2c", .data = (void *)REGS_PXA3XX, },
-+	{ .compatible = "ce4100-i2c",	.data = (void *)REGS_CE4100, },
-+	{},
-+};
++config OF_REGULATOR
++	def_tristate REGULATOR
++	depends on REGULATOR
 +
-+#ifdef CONFIG_OF
-+static int i2c_pxa_of_probe(struct platform_device *of_dev)
+ endmenu # OF
+diff --git a/drivers/of/Makefile b/drivers/of/Makefile
+index f7861ed..83ca06f 100644
+--- a/drivers/of/Makefile
++++ b/drivers/of/Makefile
+@@ -10,3 +10,4 @@ obj-$(CONFIG_OF_NET)	+= of_net.o
+ obj-$(CONFIG_OF_SPI)	+= of_spi.o
+ obj-$(CONFIG_OF_MDIO)	+= of_mdio.o
+ obj-$(CONFIG_OF_PCI)	+= of_pci.o
++obj-$(CONFIG_OF_REGULATOR)	+= of_regulator.o
+diff --git a/drivers/of/of_regulator.c b/drivers/of/of_regulator.c
+new file mode 100644
+index 0000000..d523302
+--- /dev/null
++++ b/drivers/of/of_regulator.c
+@@ -0,0 +1,166 @@
++/*
++ * OF helpers for the Regulator API
++ *
++ * Copyright (c) 2011 Haojian Zhuang <haojian.zhuang@marvell.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++#include <linux/kernel.h>
++#include <linux/of.h>
++#include <linux/regulator/machine.h>
++#include <linux/slab.h>
++#include <linux/string.h>
++#include <linux/suspend.h>
++
++static int of_regulator_init_constraints(struct device_node *of_dev,
++				struct regulation_constraints *constraints)
 +{
-+	struct device_node *np = of_dev->dev.of_node;
-+	const struct of_device_id *match;
-+	struct i2c_pxa_platform_data *plat = NULL;
-+	struct pxa_i2c *i2c;
-+	struct resource *res;
 +	const __be32 *p;
-+	int i2c_type, irq, data, ret;
-+	int id = 0, poll = 0, fast = 0;
++	const char *cp;
++	const char *ops[] = {"voltage", "current", "mode", "status",
++				"drms"};
++	int i, size, len = 0, tmp = 0;
 +
-+	match = of_match_device(pxa_i2c_of_match, &of_dev->dev);
-+	if (match == NULL)
-+		return -ENODEV;
-+	i2c_type = (int)match->data;
++	memset(constraints, 0, sizeof(struct regulation_constraints));
 +
-+	p = of_get_property(np, "cell-index", &data);
++	p = of_get_property(of_dev, "voltages", &size);
++	if (p && size / sizeof(int) == 2) {
++		constraints->min_uV = be32_to_cpu(*p++);
++		constraints->max_uV = be32_to_cpu(*p);
++	}
++	p = of_get_property(of_dev, "currents", &size);
++	if (p && size / sizeof(int) == 2) {
++		constraints->min_uA = be32_to_cpu(*p++);
++		constraints->max_uA = be32_to_cpu(*p);
++	}
++	p = of_get_property(of_dev, "modes-mask", NULL);
 +	if (p)
-+		id = be32_to_cpu(*p);
-+
-+	p = of_get_property(np, "i2c-polling", &data);
++		constraints->valid_modes_mask = be32_to_cpu(*p);
++	cp = of_get_property(of_dev, "ops-mask", &size);
++	tmp = 0;
++	if (cp && size > 0) {
++		i = 0;
++		do {
++			len = strlen(ops[i]);
++			if (!strncmp(cp, ops[i], len)) {
++				constraints->valid_ops_mask |= 1 << i;
++				/* need to handle '\0' */
++				cp += len + 1;
++				size = size - len - 1;
++				i = 0;
++			} else
++				i++;
++		} while (i < ARRAY_SIZE(ops));
++		if (size > 0)
++			printk(KERN_WARNING "Invalid string:%s\n", cp);
++	}
++	p = of_get_property(of_dev, "input-uV", NULL);
 +	if (p)
-+		poll = be32_to_cpu(*p);
-+
-+	p = of_get_property(np, "i2c-frequency", &data);
-+	if (p && !strncmp((char *)p, "fast", data))
-+		fast = 1;
-+
-+	res = platform_get_resource(of_dev, IORESOURCE_MEM, 0);
-+	irq = platform_get_irq(of_dev, 0);
-+	if (res == NULL || irq < 0)
-+		return -ENODEV;
-+
-+	if (!request_mem_region(res->start, resource_size(res), res->name))
-+		return -ENOMEM;
-+
-+	i2c = kzalloc(sizeof(struct pxa_i2c), GFP_KERNEL);
-+	if (!i2c) {
-+		ret = -ENOMEM;
-+		goto emalloc;
++		constraints->input_uV = be32_to_cpu(*p);
++	p = of_get_property(of_dev, "state-pm-disk", &size);
++	if (p && size / sizeof(int) == 3) {
++		constraints->state_disk.uV = be32_to_cpu(*p++);
++		constraints->state_disk.mode = be32_to_cpu(*p++);
++		tmp = be32_to_cpu(*p);
++		constraints->state_disk.enabled = (tmp) ? 1 : 0;
++		constraints->state_disk.disabled = (tmp) ? 0 : 1;
 +	}
-+
-+	i2c->adap.owner   = THIS_MODULE;
-+	i2c->adap.retries = 5;
-+
-+	spin_lock_init(&i2c->lock);
-+	init_waitqueue_head(&i2c->wait);
-+
-+	/*
-+	 * adap.nr comes from cell-index in dts file
-+	 */
-+	i2c->adap.nr = id;
-+	snprintf(i2c->adap.name, sizeof(i2c->adap.name), "pxa2xx-i2c.%u",
-+		 i2c->adap.nr);
-+
-+	i2c->clk = clk_get_sys(i2c->adap.name, NULL);
-+	if (IS_ERR(i2c->clk)) {
-+		ret = PTR_ERR(i2c->clk);
-+		goto eclk;
++	p = of_get_property(of_dev, "state-pm-mem", &size);
++	if (p && size / sizeof(int) == 3) {
++		constraints->state_mem.uV = be32_to_cpu(*p++);
++		constraints->state_mem.mode = be32_to_cpu(*p++);
++		tmp = be32_to_cpu(*p);
++		constraints->state_mem.enabled = (tmp) ? 1 : 0;
++		constraints->state_mem.disabled = (tmp) ? 0 : 1;
 +	}
-+
-+	i2c->reg_base = ioremap(res->start, resource_size(res));
-+	if (!i2c->reg_base) {
-+		ret = -EIO;
-+		goto eremap;
++	p = of_get_property(of_dev, "state-pm-standby", &size);
++	if (p && size / sizeof(int) == 3) {
++		constraints->state_standby.uV = be32_to_cpu(*p++);
++		constraints->state_standby.mode = be32_to_cpu(*p++);
++		tmp = be32_to_cpu(*p);
++		constraints->state_standby.enabled = (tmp) ? 1 : 0;
++		constraints->state_standby.disabled = (tmp) ? 0 : 1;
 +	}
-+
-+	i2c->reg_ibmr = i2c->reg_base + pxa_reg_layout[i2c_type].ibmr;
-+	i2c->reg_idbr = i2c->reg_base + pxa_reg_layout[i2c_type].idbr;
-+	i2c->reg_icr = i2c->reg_base + pxa_reg_layout[i2c_type].icr;
-+	i2c->reg_isr = i2c->reg_base + pxa_reg_layout[i2c_type].isr;
-+	if (i2c_type != REGS_CE4100)
-+		i2c->reg_isar = i2c->reg_base + pxa_reg_layout[i2c_type].isar;
-+
-+	i2c->iobase = res->start;
-+	i2c->iosize = resource_size(res);
-+
-+	i2c->irq = irq;
-+	i2c->use_pio = poll;
-+	i2c->fast_mode = fast;
-+
-+	i2c->slave_addr = I2C_PXA_SLAVE_ADDR;
-+
-+#ifdef CONFIG_I2C_PXA_SLAVE
-+	if (plat) {
-+		i2c->slave_addr = plat->slave_addr;
-+		i2c->slave = plat->slave;
++	cp = of_get_property(of_dev, "initial-state", &size);
++	if (cp) {
++		if (!strncmp(cp, "pm-suspend-on", size))
++			constraints->initial_state = PM_SUSPEND_ON;
++		if (!strncmp(cp, "pm-suspend-mem", size))
++			constraints->initial_state = PM_SUSPEND_MEM;
++		if (!strncmp(cp, "pm-suspend-standby", size))
++			constraints->initial_state = PM_SUSPEND_STANDBY;
 +	}
-+#endif
-+
-+	clk_enable(i2c->clk);
-+
-+	if (plat)
-+		i2c->adap.class = plat->class;
-+
-+	if (i2c->use_pio) {
-+		i2c->adap.algo = &i2c_pxa_pio_algorithm;
-+	} else {
-+		i2c->adap.algo = &i2c_pxa_algorithm;
-+		ret = request_irq(irq, i2c_pxa_handler, IRQF_SHARED,
-+				  i2c->adap.name, i2c);
-+		if (ret)
-+			goto ereqirq;
-+	}
-+
-+	i2c_pxa_reset(i2c);
-+
-+	i2c->adap.algo_data = i2c;
-+	i2c->adap.dev.parent = &of_dev->dev;
-+	i2c->adap.dev.of_node = of_dev->dev.of_node;
-+
-+	if (i2c_type == REGS_CE4100)
-+		ret = i2c_add_adapter(&i2c->adap);
-+	else
-+		ret = i2c_add_numbered_adapter(&i2c->adap);
-+	if (ret < 0) {
-+		printk(KERN_INFO "I2C: Failed to add bus\n");
-+		goto eadapt;
-+	}
-+	of_i2c_register_devices(&i2c->adap);
-+
-+	platform_set_drvdata(of_dev, i2c);
-+
-+#ifdef CONFIG_I2C_PXA_SLAVE
-+	printk(KERN_INFO "I2C: %s: PXA I2C adapter, slave address %d\n",
-+	       dev_name(&i2c->adap.dev), i2c->slave_addr);
-+#else
-+	printk(KERN_INFO "I2C: %s: PXA I2C adapter\n",
-+	       dev_name(&i2c->adap.dev));
-+#endif
++	p = of_get_property(of_dev, "initial_mode", NULL);
++	if (p)
++		constraints->initial_mode = be32_to_cpu(*p);
++	p = of_get_property(of_dev, "always-on", NULL);
++	if (p)
++		constraints->always_on = 1;
++	p = of_get_property(of_dev, "boot-on", NULL);
++	if (p)
++		constraints->boot_on = 1;
++	p = of_get_property(of_dev, "apply-uV", NULL);
++	if (p)
++		constraints->apply_uV = 1;
 +	return 0;
-+
-+eadapt:
-+	if (!i2c->use_pio)
-+		free_irq(irq, i2c);
-+ereqirq:
-+	clk_disable(i2c->clk);
-+	iounmap(i2c->reg_base);
-+eremap:
-+	clk_put(i2c->clk);
-+eclk:
-+	kfree(i2c);
-+emalloc:
-+	release_mem_region(res->start, resource_size(res));
-+	return ret;
 +}
-+#else
 +
- static int i2c_pxa_probe(struct platform_device *dev)
- {
- 	struct pxa_i2c *i2c;
-@@ -1174,6 +1331,7 @@ emalloc:
- 	release_mem_region(res->start, resource_size(res));
- 	return ret;
- }
-+#endif
- 
- static int __exit i2c_pxa_remove(struct platform_device *dev)
- {
-@@ -1228,12 +1386,17 @@ static const struct dev_pm_ops i2c_pxa_dev_pm_ops = {
- #endif
- 
- static struct platform_driver i2c_pxa_driver = {
-+#ifdef CONFIG_OF
-+	.probe		= i2c_pxa_of_probe,
++int of_regulator_init_data(struct device_node *of_dev,
++			struct regulator_init_data *data)
++{
++	struct regulator_consumer_supply *supply;
++	const char *p, *str;
++	int ret, i, size, calc_size, len, count = 0;
++
++	if (of_dev == NULL || data == NULL)
++		return -EINVAL;
++
++	p = of_get_property(of_dev, "device_type", &size);
++	if (p == NULL || strncmp(p, "regulator", size))
++		return -EINVAL;
++
++	ret = of_regulator_init_constraints(of_dev, &data->constraints);
++	if (ret)
++		return ret;
++	p = of_get_property(of_dev, "supply-name", &size);
++	str = p;
++	calc_size = size;
++	while (str && calc_size > 0) {
++		len = strlen(str);
++		if (len == 0)
++			break;
++		calc_size = calc_size - len - 1;
++		str += len + 1;
++		count++;
++	}
++	if (count == 0)
++		return -EINVAL;
++
++	supply = kzalloc(sizeof(struct regulator_consumer_supply) * count,
++		GFP_KERNEL);
++	if (supply == NULL)
++		return -EINVAL;
++	str = p;
++	calc_size = size;
++	i = 0;
++	while (str && calc_size > 0 && i < count) {
++		len = strlen(str);
++		if (len == 0)
++			break;
++		supply[i++].supply = str;
++		calc_size = calc_size - len - 1;
++		str += len + 1;
++	}
++	data->consumer_supplies = supply;
++	data->num_consumer_supplies = count;
++	return 0;
++}
++
++void of_regulator_deinit_data(struct regulator_init_data *data)
++{
++	if (data && data->consumer_supplies)
++		kfree(data->consumer_supplies);
++}
+diff --git a/include/linux/of_regulator.h b/include/linux/of_regulator.h
+new file mode 100644
+index 0000000..0155bd8
+--- /dev/null
++++ b/include/linux/of_regulator.h
+@@ -0,0 +1,34 @@
++/*
++ * Generic Regulator API implementation
++ *
++ * Copyright (c) 2011 Haojian Zhuang <haojian.zhuang@marvell.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++
++#ifndef __LINUX_OF_REGULATOR_H
++#define __LINUX_OF_REGULATOR_H
++
++#if defined(CONFIG_OF_REGULATOR) || defined(CONFIG_OF_REGULATOR_MODULE)
++#include <linux/regulator/machine.h>
++
++extern int of_regulator_init_data(struct device_node *of_node,
++				struct regulator_init_data *data);
++extern void of_regulator_deinit_data(struct regulator_init_data *data);
++
 +#else
- 	.probe		= i2c_pxa_probe,
-+#endif
- 	.remove		= __exit_p(i2c_pxa_remove),
- 	.driver		= {
- 		.name	= "pxa2xx-i2c",
- 		.owner	= THIS_MODULE,
- 		.pm	= I2C_PXA_DEV_PM_OPS,
-+		.of_match_table	= pxa_i2c_of_match,
- 	},
- 	.id_table	= i2c_pxa_id_table,
- };
++static inline int of_regulator_init_data(struct device_node *of_node,
++				struct regulator_init_data *data)
++{
++	return 0;
++}
++
++static inline void of_regulator_deinit_data(struct regulator_init_data *data)
++{
++}
++#endif	/* CONFIG_OF_REGULATOR */
++
++#endif	/* __LINUX_OF_REGULATOR_H */
 -- 
 1.5.6.5
