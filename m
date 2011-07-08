@@ -1,60 +1,52 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 7 Jul 2011 19:28:36 -0400 (EDT)
-Subject: [PATCH] ARM: get rid of a few StrongARM cache-related build time
-	constants
-In-Reply-To: <20110707205304.GF20403@n2100.arm.linux.org.uk>
-References: <1309919636-20546-1-git-send-email-nicolas.pitre@linaro.org>
-	<20110706075542.GK8286@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1107060912490.14596@xanadu.home>
-	<20110707170631.GB20403@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1107071438200.14596@xanadu.home>
-	<20110707205304.GF20403@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1107071926220.14596@xanadu.home>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Fri, 8 Jul 2011 08:06:39 +0800
+Subject: [PATCH] net/fec: gasket needs to be enabled for some i.mx
+In-Reply-To: <20110707184409.GH2824@ponder.secretlab.ca>
+References: <20110630161935.GA7977@S2100-06.ap.freescale.net>
+	<1309515082-7386-1-git-send-email-shawn.guo@linaro.org>
+	<20110707.041257.670268148869400054.davem@davemloft.net>
+	<20110707134157.GA12722@S2100-06.ap.freescale.net>
+	<20110707184409.GH2824@ponder.secretlab.ca>
+Message-ID: <20110708000638.GC12722@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 7 Jul 2011, Russell King - ARM Linux wrote:
-
-> On Thu, Jul 07, 2011 at 02:43:15PM -0400, Nicolas Pitre wrote:
-> > On Thu, 7 Jul 2011, Russell King - ARM Linux wrote:
-> > 
-> > > On Wed, Jul 06, 2011 at 09:21:33AM -0400, Nicolas Pitre wrote:
-> > > > Could you test this patch as well?  You're the only one I know who might 
-> > > > still have access to the affected hardware.
+On Thu, Jul 07, 2011 at 12:44:09PM -0600, Grant Likely wrote:
+> On Thu, Jul 07, 2011 at 09:41:58PM +0800, Shawn Guo wrote:
+> > On Thu, Jul 07, 2011 at 04:12:57AM -0700, David Miller wrote:
+> > > From: Shawn Guo <shawn.guo@linaro.org>
+> > > Date: Fri,  1 Jul 2011 18:11:22 +0800
 > > > 
-> > > Tested on Assabet, and unfortunately, this doesn't work on its own because
-> > > we don't permit iotable_init() to create pages with MT_CACHECLEAN and
-> > > MT_MINICLEAN.
+> > > > On the recent i.mx (mx25/50/53), there is a gasket inside fec
+> > > > controller which needs to be enabled no matter phy works in MII
+> > > > or RMII mode.
+> > > > 
+> > > > The current code enables the gasket only when phy interface is RMII.
+> > > > It's broken when the driver works with a MII phy.  The patch uses
+> > > > platform_device_id to distinguish the SoCs that have the gasket and
+> > > > enables it on these SoCs for both MII and RMII mode.
+> > > > 
+> > > > Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
+> > > > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 > > > 
-> > > <4>BUG: map for 0xe0000000 at 0xfffe0000 can not be mapped using pages, ignoring.
-> > > <4>BUG: map for 0xe0004000 at 0xfffe4000 can not be mapped using pages, ignoring.
-> > > <4>BUG: map for 0xe0008000 at 0xfffe8000 can not be mapped using pages, ignoring.
-> > > <4>BUG: map for 0xe000c000 at 0xfffec000 can not be mapped using pages, ignoring.
-> > > 
-> > > The fix is below (probably with offsets):
+> > > Acked-by: David S. Miller <davem@davemloft.net>
+> > > --
 > > 
-> > Great. Are you providing an ACK or tested-by with this patch folded in?
+> > Thanks, David.  I will try to get it through Sascha's tree after
+> > the rebase again dt series.
 > > 
-> > > @@ -506,16 +488,8 @@ static void __init build_mem_type_table(void)
-> > >  	mem_types[MT_MEMORY].prot_pte |= kern_pgprot;
-> > >  	mem_types[MT_MEMORY_NONCACHED].prot_sect |= ecc_mask;
-> > >  	mem_types[MT_ROM].prot_sect |= cp->pmd;
-> > > +	mem_types[MT_CACHECLEAN].prot_pte |= kern_pgprot;
-> > >  
-> > Doesn't MT_MINICLEAN require kern_pgprot as well?
+> > Hi Sascha,
+> > 
+> > How should we proceed?  It seems Grant will take the fec-dt series
+> > on his tree.  Would you then merge that tree into yours, so that I
+> > can rebase this patch on your tree and get it go through there?
 > 
-> Only if you think the result of orring:
+> I should probably just take the lot.
 > 
-> #define L_PTE_MT_WRITEBACK      (_AT(pteval_t, 0x03) << 2)      /* 0011 */
-> #define L_PTE_MT_MINICACHE      (_AT(pteval_t, 0x06) << 2)      /* 0110 (sa1100, xscale) */
-> 
-> together would make sense... it'd make it:
-> 
-> #define L_PTE_MT_WRITEALLOC     (_AT(pteval_t, 0x07) << 2)      /* 0111 */
-> 
-> though, so I don't think so.
+Thanks, Grant.  That makes people's life easier.  Please let me know
+once you apply the dt series, so that I can start rebase the patch on
+your tree.
 
-Agreed.
-
-
-Nicolas
+-- 
+Regards,
+Shawn
