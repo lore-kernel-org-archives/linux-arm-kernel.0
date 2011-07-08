@@ -1,30 +1,49 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 8 Jul 2011 11:04:10 +0100
-Subject: [RFC] dmaengine: Moving TI SDMA driver to dmaengine - design plan
-In-Reply-To: <E0D41E29EB0DAC4E9F3FF173962E9E94030259CD17@dbde02.ent.ti.com>
-References: <E0D41E29EB0DAC4E9F3FF173962E9E94030259CD17@dbde02.ent.ti.com>
-Message-ID: <20110708100410.GA4957@n2100.arm.linux.org.uk>
+From: j.weitzel@phytec.de (Jan Weitzel)
+Date: Fri, 8 Jul 2011 12:04:22 +0200
+Subject: [PATCH 1/3] ARM: OMAP4: Add pcm049 to Kconfig/Makefile
+In-Reply-To: <1310119464-3514-1-git-send-email-j.weitzel@phytec.de>
+References: <1310119464-3514-1-git-send-email-j.weitzel@phytec.de>
+Message-ID: <1310119464-3514-2-git-send-email-j.weitzel@phytec.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 08, 2011 at 01:52:17PM +0530, Raju, Sundaram wrote:
-> I am planning to move TI SDMA driver in OMAP tree
-> into the dmaengine framework.
-> 
-> The first immediate issue of concern I noticed is the
-> huge number of client drivers that use the existing SDMA driver.
-> More than 15 client drivers are using the current SDMA driver.
-> 
-> Moving the SDMA driver along with all of these client drivers at a
-> single stretch seems a humungous task. 
-> I noticed a model in the existing DMA drivers in dmaengine
-> framework that will over come this issue. 
 
-It _is_ sane to build a dmaengine driver on top of the existing SoC
-private API, then convert the drivers to DMA engine, and then cleanup
-the resulting DMA engine driver.
+Signed-off-by: Jan Weitzel <j.weitzel@phytec.de>
+---
+ arch/arm/mach-omap2/Kconfig  |    5 +++++
+ arch/arm/mach-omap2/Makefile |    4 ++++
+ 2 files changed, 9 insertions(+), 0 deletions(-)
 
-What we must make sure though is that the DMA engine slave API (which
-isn't well documented) is correctly implemented before drivers are
-converted over to use the DMA engine support code, otherwise we may
-end up with lots of drivers that require re-fixing several times over.
+diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+index 19d5891..c6a2d43 100644
+--- a/arch/arm/mach-omap2/Kconfig
++++ b/arch/arm/mach-omap2/Kconfig
+@@ -323,6 +323,11 @@ config MACH_OMAP4_PANDA
+ 	select OMAP_PACKAGE_CBS
+ 	select REGULATOR_FIXED_VOLTAGE
+ 
++config MACH_PCM049
++	bool "OMAP4 based phyCORE OMAP4"
++	depends on ARCH_OMAP4
++	select OMAP_PACKAGE_CBS
++
+ config OMAP3_EMU
+ 	bool "OMAP3 debugging peripherals"
+ 	depends on ARCH_OMAP3
+diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+index b148077..e81b594 100644
+--- a/arch/arm/mach-omap2/Makefile
++++ b/arch/arm/mach-omap2/Makefile
+@@ -238,6 +238,10 @@ obj-$(CONFIG_MACH_OMAP4_PANDA)		+= board-omap4panda.o \
+ 					   hsmmc.o \
+ 					   omap_phy_internal.o
+ 
++obj-$(CONFIG_MACH_PCM049)		+= board-omap4pcm049.o \
++					   hsmmc.o \
++					   omap_phy_internal.o
++
+ obj-$(CONFIG_MACH_OMAP3517EVM)		+= board-am3517evm.o \
+ 					   omap_phy_internal.o \
+ 
+-- 
+1.7.0.4
