@@ -1,35 +1,29 @@
-From: kaloz@openwrt.org (Imre Kaloz)
-Date: Fri, 08 Jul 2011 23:21:19 +0200
-Subject: [PATCH] ARM: support XZ compressed kernels
-In-Reply-To: <20110708210407.GY4812@n2100.arm.linux.org.uk>
-References: <1310033999-25617-1-git-send-email-kaloz@openwrt.org>
-	<20110708203832.GV4812@n2100.arm.linux.org.uk> <op.vybi03ze2s3iss@ecaz>
-	<20110708210407.GY4812@n2100.arm.linux.org.uk>
-Message-ID: <op.vybj9tox2s3iss@ecaz>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 8 Jul 2011 23:37:15 +0200
+Subject: [PATCH 1/3] ARM: CSR: Adding CSR SiRFprimaII board support
+In-Reply-To: <alpine.LFD.2.00.1107081327190.14596@xanadu.home>
+References: <1309945678-18813-1-git-send-email-bs14@csr.com>
+	<20110708162718.GI4812@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1107081327190.14596@xanadu.home>
+Message-ID: <201107082337.15584.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 08 Jul 2011 23:04:07 +0200, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+On Friday 08 July 2011 20:09:29 Nicolas Pitre wrote:
+> Indeed.  The VMALLOC_END case is possibly different as we were trying to 
+> find a way to adjust it automatically at run time which would be one 
+> thing less for platforms to care about.  Having a globally fixed value 
+> for it would also solve the multiple definition problem.  But some 
+> machines have a large set of IO mappings while some others have a 
+> small one, so having a one size fits all solution here might be 
+> suboptimal.
 
-> On Fri, Jul 08, 2011 at 10:54:29PM +0200, Imre Kaloz wrote:
->> On Fri, 08 Jul 2011 22:38:32 +0200, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
->>
->>> On Thu, Jul 07, 2011 at 12:19:59PM +0200, Imre Kaloz wrote:
->>>>  # Make sure files are removed during clean
->>>> -extra-y       += piggy.gzip piggy.lzo piggy.lzma lib1funcs.S
->>>> +extra-y       += piggy.gzip piggy.lzo piggy.lzma piggy.xzkern lib1funcs.S ashldi3.S
->>>
->>> Is there a reason the suffix is xzkern rather than just xz ?
->>
->> We do "$(call if_changed,$(suffix_y))" and scripts/Makefile.lib
->> uses cmd_xzkern. I think keeping the changes minimal worth more
->> then having the proper suffix for a temporary file.
->
-> Hmm, that's unfortunate.  It seems that it may be a non-standard format
-> so I guess that's reasonable.  No further comments then.
->
+Is everything between VMALLOC_END and 0xfeffffff guaranteed to come
+from iotable_init? If so, we could perhaps turn it into a variable
+that gets initialized to 0xfeffffff and decreased by iotable_init
+to be just below the lowest address that has actually been mapped.
 
-Indeed. After the .gitignore modification, should I resend it here or it can go into the patch system?
+Obviously, anything that derives values from VMALLOC_END at compile
+time would need to change, too.
 
-
-Imre
+	Arnd
