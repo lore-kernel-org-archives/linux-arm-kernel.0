@@ -1,30 +1,36 @@
-From: gregkh@suse.de (Greg KH)
-Date: Fri, 8 Jul 2011 07:57:25 -0700
-Subject: [Qualcomm PM8921 MFD 4/6] mfd: pm8xxx-mpp: Add pm8xxx MPP driver
-In-Reply-To: <1299104001-5240-5-git-send-email-adharmap@codeaurora.org>
-References: <1299104001-5240-1-git-send-email-adharmap@codeaurora.org>
-	<1299104001-5240-5-git-send-email-adharmap@codeaurora.org>
-Message-ID: <20110708145725.GA2395@suse.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 08 Jul 2011 16:13:23 +0100
+Subject: [RFC PATCH v2 0/4] Core device subsystem
+In-Reply-To: <4E170134.1020306@arm.com>
+References: <1310115250-3859-1-git-send-email-marc.zyngier@arm.com>	<CAHXqBFJiovYq5x_JDAxikvFs-t1To6yC-1uajBJFRX_jwjvejA@mail.gmail.com>
+	<4E170134.1020306@arm.com>
+Message-ID: <4E171E93.8020608@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 02, 2011 at 02:13:19PM -0800, adharmap at codeaurora.org wrote:
-> From: David Collins <collinsd@codeaurora.org>
+On 08/07/11 14:08, Marc Zyngier wrote:
+> So you're basically folding of_core_device_populate() and
+> core_driver_init_class() into one call, and generating the
+> of_device_ids on the fly. If you're going down that road,
+> it would be even simpler to directly use of_device_ids
+> instead of core_device_ids and skip the generation altogether.
 > 
-> Add support for multi-purpose pins (MPPs) on Qualcomm PM8xxx
-> PMIC chips.
+> That would also remove the static declaration of devices to be
+> probed in the architecture support code...
 > 
-> PM8xxx MPPs can be configured as digital or analog inputs or
-> outputs, current sinks, or buffers.
-> 
-> Change-Id: Iab39b2f7c2ba3f35ef6ac74d37ee7add8c70681f
+> Let me think of it and prototype that.
 
-What is this line for?  It makes no sense for a patch that is being
-submitted to the kernel tree, please remove it.
+See the attached patch against branch dt_gic_twd from
+git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git
 
-> Signed-off-by: David Collins <collinsd@codeaurora.org>
+It boots fine on my PB11MP.
 
-Why have you sent this patch from a different email address than this
-one?
+What do you think?
 
-greg k-h
+	M.
+-- 
+Jazz is not dead. It just smells funny...
+-------------- next part --------------
+An embedded and charset-unspecified text was scrubbed...
+Name: code_dev.patch.txt
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110708/ff104de1/attachment.txt>
