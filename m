@@ -1,34 +1,34 @@
-From: bs14@csr.com (Barry Song)
-Date: Thu, 7 Jul 2011 19:54:29 -0700
-Subject: [PATCH 3/3] ARM: NUC93X: add UL suffix to VMALLOC_END to ensure it is
-	properly typed
-In-Reply-To: <1310093669-4681-1-git-send-email-bs14@csr.com>
-References: <1310093669-4681-1-git-send-email-bs14@csr.com>
-Message-ID: <1310093669-4681-4-git-send-email-bs14@csr.com>
+From: bryan.wu@canonical.com (Bryan Wu)
+Date: Fri, 8 Jul 2011 11:00:25 +0800
+Subject: [PATCH 16/17] mach-sa1100: retire custom LED code
+In-Reply-To: <4E15DD7F.3050702@scram.de>
+References: <1309955687-19365-1-git-send-email-bryan.wu@canonical.com>
+	<1309955687-19365-17-git-send-email-bryan.wu@canonical.com>
+	<4E146B7C.7060607@scram.de>
+	<CAK5ve-JQhJxWOL=UiX9SUxa5Rw8VrANyd05nuRJbytoZRR+EzA@mail.gmail.com>
+	<4E15DD7F.3050702@scram.de>
+Message-ID: <CAK5ve-JDHECKs8sPVxLP_K6kYyM+-wL2bXJ-w=R7qoZJdRbmNg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Barry Song <baohua.song@csr.com>
----
- arch/arm/mach-nuc93x/include/mach/vmalloc.h |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+On Fri, Jul 8, 2011 at 12:23 AM, Jochen Friedrich <jochen@scram.de> wrote:
+> Hi Bryan,
+>
+>> This looks good and it's the right way to do that. We need gpiolib
+>> supporting firstly. How's status of your patchset, I guess you're
+>> trying to update it.
+>
+> I've resubmitted it yesterday for another review. In parallel, I'll retest
+> this on top of 3.0-rc5 on real hardware and ask Russell if it's OK to submit
+> to his patch tracker.
+>
 
-diff --git a/arch/arm/mach-nuc93x/include/mach/vmalloc.h b/arch/arm/mach-nuc93x/include/mach/vmalloc.h
-index 98a21b8..7d11a5f 100644
---- a/arch/arm/mach-nuc93x/include/mach/vmalloc.h
-+++ b/arch/arm/mach-nuc93x/include/mach/vmalloc.h
-@@ -18,6 +18,6 @@
- #ifndef __ASM_ARCH_VMALLOC_H
- #define __ASM_ARCH_VMALLOC_H
- 
--#define VMALLOC_END	  (0xE0000000)
-+#define VMALLOC_END	  0xE0000000UL
- 
- #endif /* __ASM_ARCH_VMALLOC_H */
+Great, I will remove my modification of simpad code in my patchset.
+
+Thanks,
 -- 
-1.7.1
-
-
-
-Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
-More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
+Bryan Wu <bryan.wu@canonical.com>
+Kernel Developer ? ?+86.138-1617-6545 Mobile
+Ubuntu Kernel Team
+Canonical Ltd. ? ? ?www.canonical.com
+Ubuntu - Linux for human beings | www.ubuntu.com
