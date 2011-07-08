@@ -1,98 +1,49 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Fri, 8 Jul 2011 17:27:11 +0800
-Subject: [PATCH v5 1/3] ARM: mxs: add GPMI-NFC support for imx23/imx28
-In-Reply-To: <20110708090903.GQ29624@pengutronix.de>
-References: <1309406028-2924-1-git-send-email-b32955@freescale.com>
-	<1309406028-2924-2-git-send-email-b32955@freescale.com>
-	<201106301555.19440.arnd@arndb.de>
-	<20110708073119.GP29624@pengutronix.de>
-	<4E16B47E.8090909@freescale.com>
-	<20110708090903.GQ29624@pengutronix.de>
-Message-ID: <4E16CD6F.9050304@freescale.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 08 Jul 2011 18:25:12 +0900
+Subject: [PATCH 4/4] arm: mach-s3c2440: mini2440: fix section mismatch
+In-Reply-To: <20110708091218.GD2414@n2100.arm.linux.org.uk>
+References: <1310033919-4245-1-git-send-email-w.sang@pengutronix.de>
+	<1310033919-4245-5-git-send-email-w.sang@pengutronix.de>
+	<001c01cc3d35$2aa7e8f0$7ff7bad0$%kim@samsung.com>
+	<20110708091218.GD2414@n2100.arm.linux.org.uk>
+Message-ID: <001001cc3d50$f3b47630$db1d6290$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2011?07?08? 17:09, Uwe Kleine-K?nig ??:
-> Hello,
->
-> On Fri, Jul 08, 2011 at 03:40:46PM +0800, Huang Shijie wrote:
->> ? 2011?07?08? 15:31, Uwe Kleine-K?nig ??:
->>> Hello,
->>>
->>> On Thu, Jun 30, 2011 at 03:55:19PM +0200, Arnd Bergmann wrote:
->>>> On Thursday 30 June 2011, Huang Shijie wrote:
->>>>> add GPMI-NFC support for imx23 and imx28.
->>>>>
->>>>> Signed-off-by: Huang Shijie<b32955@freescale.com>
->>>>> +/**
->>>>> + * struct gpmi_nfc_platform_data - GPMI NFC driver platform data.
->>>>> + *
->>>>> + * This structure communicates platform-specific information to the GPMI NFC
->>>>> + * driver that can't be expressed as resources.
->>>>> + *
->>>>> + * @platform_init:           A pointer to a function the driver will call to
->>>>> + *                           initialize the platform (e.g., set up the pin mux).
->>>>> + * @platform_exit:           A pointer to a function the driver will call to
->>>>> + *                           exit the platform (e.g., free pins).
->>>>> + * @min_prop_delay_in_ns:    Minimum propagation delay of GPMI signals to and
->>>>> + *                           from the NAND Flash device, in nanoseconds.
->>>>> + * @max_prop_delay_in_ns:    Maximum propagation delay of GPMI signals to and
->>>>> + *                           from the NAND Flash device, in nanoseconds.
->>>>> + * @max_chip_count:          The maximum number of chips for which the driver
->>>>> + *                           should configure the hardware. This value most
->>>>> + *                           likely reflects the number of pins that are
->>>>> + *                           connected to a NAND Flash device. If this is
->>>>> + *                           greater than the SoC hardware can support, the
->>>>> + *                           driver will print a message and fail to initialize.
->>>>> + * @partitions:              An optional pointer to an array of partition
->>>>> + *                           descriptions.
->>>>> + * @partition_count:         The number of elements in the partitions array.
->>>>> + */
->>>>> +struct gpmi_nfc_platform_data {
->>>>> +	/* SoC hardware information. */
->>>>> +	int		(*platform_init)(void);
->>>>> +	void		(*platform_exit)(void);
->>>>> +
->>>>> +	/* NAND Flash information. */
->>>>> +	unsigned int	min_prop_delay_in_ns;
->>>>> +	unsigned int	max_prop_delay_in_ns;
->>>>> +	unsigned int	max_chip_count;
->>>>> +
->>>>> +	/* Medium information. */
->>>>> +	struct mtd_partition *partitions;
->>>>> +	unsigned	partition_count;
->>>>> +};
->>>> When adding new infrastructure, always keep in mind how you want it to look
->>>> after the device tree conversion. The partitions and min/max_* are easily covered
->>>> with that, but the init/exit function pointers are somewhat problematic.
->>>>
->>>> Fortunately, you don't really require these functions for this driver. The _exit
->>>> function is completely unused, so just get rid of it.
->>>>
->>>> The init function is used only to set up iomux, so the logical replacement is
->>>> a pointer to the iomux data, and calling mxs_iomux_setup_multiple_pads
->>>> directly from the driver.
->>> Why not put the iomux stuff into the per-machine table and get rid of
->>> the init callback, too?
->> The mmc (ssp) has pin conflict with gpmi on both mx23evk and mx28evk.
->> So, it's better to initialize the pin when the driver(GPMI or MMC)
->> is enabled.
-> What do you do to prevent userspace from trying to use both devices?
-The board can not support the two devices at the same time.
-So the user can only use one device with the board.
+Russell King - ARM Linux wrote:
+> 
+> On Fri, Jul 08, 2011 at 03:06:17PM +0900, Kukjin Kim wrote:
+> > Wolfram Sang wrote:
+> > >
+> > > If mini2440_init() is in __init, mini2440_parse_features() should also
+> > > be in __init. Fixes:
+> > >
+> > > (.text+0x9adc): Section mismatch in reference from the function
+> > > mini2440_parse_features.clone.0() to the (unknown reference)
+> > .init.data:(unknown)
+> > > The function mini2440_parse_features.clone.0() references the (unknown
+> > reference)
+> > > __initdata (unknown).
+> >
+> > But I couldn't find above "Section mismatch" in my building with
+> > CONFIG_DEBUG_SECTION_MISMATCH=y.
+> 
+> Your compiler may have inlined the function, so defeating the check.
+> 
+> static struct s3c2410fb_display mini2440_lcd_cfg[] __initdata = {
+> 
+> and mini2440_parse_features() references this variable.  Therefore
+> either mini2440_parse_features() needs to be marked __init (it's
+> only caller is from __init, so that seems sensible) or the
+> __initdata markers on the referenced data need to be removed.
+> 
+> Adding __init looks like the right thing.
 
-> I guess you need to configure the hardware somehow to switch between the
-> two using a jumper? Isn't it possible to detect the hardware setting and
-> setup the muxer accordingly?
->
-> IMHO an per-device init-callback is the wrong approach to solve a pin
-> conflict.
-Do you have any good solution about this?
+OK, applied this into -fix.
+Thanks.
 
-
-Best Regards
-Huang Shijie
-
-> Best regards
-> Uwe
->
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
