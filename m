@@ -1,46 +1,55 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Fri, 08 Jul 2011 00:09:12 -0700
-Subject: [PATCH v2 4/6] OMAP4: clocks: Update the clock tree with 4460
-	clock nodes
-In-Reply-To: <alpine.DEB.2.00.1107080044270.24181@utopia.booyaka.com>
-References: <1309573826-10615-1-git-send-email-rnayak@ti.com>
-	<1309573826-10615-2-git-send-email-rnayak@ti.com>
-	<1309573826-10615-3-git-send-email-rnayak@ti.com>
-	<1309573826-10615-4-git-send-email-rnayak@ti.com>
-	<1309573826-10615-5-git-send-email-rnayak@ti.com>
-	<alpine.DEB.2.00.1107080044270.24181@utopia.booyaka.com>
-Message-ID: <4E16AD18.7040402@ti.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 8 Jul 2011 01:11:43 -0600 (MDT)
+Subject: [PATCH v2 00/18] OMAP4: PM data big spring cleanup and fixes
+In-Reply-To: <E9AF1FACCF71F448B55E58D9AED1B0F40E626BEE34@staex7mb2.telecom.sna.samsung.com>
+References: <1309552901-8944-1-git-send-email-b-cousson@ti.com>
+	<alpine.DEB.2.00.1107060017480.4217@utopia.booyaka.com>
+	<4E14B820.6070202@ti.com> <20110707055549.GC15815@atomide.com>
+	<E9AF1FACCF71F448B55E58D9AED1B0F40E626BEE32@staex7mb2.telecom.sna.samsung.com>,
+	<20110707121040.GF15815@atomide.com>
+	<E9AF1FACCF71F448B55E58D9AED1B0F40E626BEE34@staex7mb2.telecom.sna.samsung.com>
+Message-ID: <alpine.DEB.2.00.1107080053100.24181@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/7/2011 11:49 PM, Paul Walmsley wrote:
-> On Sat, 2 Jul 2011, Rajendra Nayak wrote:
->
->> Add the new clock nodes (bandgap_ts_fclk, div_ts_ck) for omap4460.
->> Handle these nodes using the clock flags (CK_*).
->>
->> Signed-off-by: Rajendra Nayak<rnayak@ti.com>
->> Signed-off-by: Nishanth Menon<nm@ti.com>
->> Signed-off-by: Benoit Cousson<b-cousson@ti.com>
->> Reviewed-by: Kevin Hilman<khilman@ti.com>
->
-> Is this data coming from autogenerator scripts that have been checked into
-> that repository, or have these been hand-edited?
+On Thu, 7 Jul 2011, Martin Fouts wrote:
 
-They have been hand edited to create a diff from the 4430 autogen output
-and 4460 autogen output.
+> From: Tony Lindgren [tony at atomide.com]
+> 
+> > The second problem we have here is "why does adding 4460 support depend
+> > on a cosmetic clean-up patch". That dependency should not exist at all
+> > as it seems the 4460 patches should work even without this patch.
+> 
+> I agree. Had the original submitter had the foresight to realize that 
+> the code should work for all 44xx family processors, we would have no 
+> issue at all. 
 
->
-> Also, this isn't the complete set of clock changes needed for full 4460
-> support, right?  I'm thinking of the duty cycle correction changes
-> described in TRM 3.6.3.7.2 "Tactical Clocking Adjustment".
-> Are those planned to go into a future patch?
+Uhhh...
 
-Yes, this series was targeted at providing basic boot support. I was
-planning to add the DCC changes as part of the next series.
+The original 4430 data, which is mostly what we're talking about here, was 
+added in 2009.  Maybe a few people inside TI knew what was going to change 
+and what was going to be the same for future OMAP4 parts.  But even if 
+someone did know, the decision of what to call a chip often isn't up to 
+engineers, it's up to marketing, which picks whatever name they like.  
+You know, like Linux 2.6.40^H^H^H^H^H^H3.0.
 
-regards,
-Rajendra
->
->
-> - Paul
+So back in 2009, the submitter and maintainers were faced with a choice:
+
+Option 1. Submit patches with facts.  "OMAP4430".  Don't speculate what 
+future, as-yet-nonexistent products will be numbered, and what their 
+feature set will be.  Plan to generalize later once it is known exactly 
+what needs to be generalized.
+
+Option 2. Try to predict what marketing will call the next chip, and what 
+features will still be present, then put that into the codebase.  
+"OMAP44XX".  Hope you guess right so you don't have to change them all if 
+marketing or engineering comes up with something different. 
+
+So, what's the right answer?
+
+I probably can't tell you that, but I can tell you that in 2009, option 1 
+seemed more technically conservative.  So that's what we did.  Maybe that 
+isn't the right answer, though.
+
+
+- Paul
