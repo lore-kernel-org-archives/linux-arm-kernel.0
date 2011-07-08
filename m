@@ -1,15 +1,405 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 8 Jul 2011 21:38:32 +0100
-Subject: [PATCH] ARM: support XZ compressed kernels
-In-Reply-To: <1310033999-25617-1-git-send-email-kaloz@openwrt.org>
-References: <1310033999-25617-1-git-send-email-kaloz@openwrt.org>
-Message-ID: <20110708203832.GV4812@n2100.arm.linux.org.uk>
+From: alexdeucher@gmail.com (Alex Deucher)
+Date: Fri, 8 Jul 2011 16:42:34 -0400
+Subject: [PATCH 4/5] DRM: Add support for the sii902x HDMI/DVI encoder
+In-Reply-To: <1307443550-25549-5-git-send-email-s.hauer@pengutronix.de>
+References: <1307443550-25549-1-git-send-email-s.hauer@pengutronix.de>
+	<1307443550-25549-5-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <CADnq5_NYNH3nEEKBpZazcfsPMutL_9zMHx_Ek1UU3VKkjwsevg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 07, 2011 at 12:19:59PM +0200, Imre Kaloz wrote:
->  # Make sure files are removed during clean
-> -extra-y       += piggy.gzip piggy.lzo piggy.lzma lib1funcs.S
-> +extra-y       += piggy.gzip piggy.lzo piggy.lzma piggy.xzkern lib1funcs.S ashldi3.S
+On Tue, Jun 7, 2011 at 6:45 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+> ?drivers/gpu/drm/Kconfig ? ? ? | ? ?6 +
+> ?drivers/gpu/drm/i2c/Makefile ?| ? ?3 +
+> ?drivers/gpu/drm/i2c/sii902x.c | ?334 +++++++++++++++++++++++++++++++++++++++++
+> ?3 files changed, 343 insertions(+), 0 deletions(-)
+> ?create mode 100644 drivers/gpu/drm/i2c/sii902x.c
+>
+> diff --git a/drivers/gpu/drm/Kconfig b/drivers/gpu/drm/Kconfig
+> index bcd9a27..01d5444 100644
+> --- a/drivers/gpu/drm/Kconfig
+> +++ b/drivers/gpu/drm/Kconfig
+> @@ -166,6 +166,12 @@ config DRM_SAVAGE
+> ? ? ? ? ?Choose this option if you have a Savage3D/4/SuperSavage/Pro/Twister
+> ? ? ? ? ?chipset. If M is selected the module will be called savage.
+>
+> +config DRM_I2C_SII902X
+> + ? ? ? tristate "sii902x"
+> + ? ? ? depends on DRM && I2C
+> + ? ? ? help
+> + ? ? ? ? Support for sii902x DVI/HDMI encoder chips
+> +
+> ?config DRM_IMX_IPUV3
+> ? ? ? ?tristate "i.MX IPUv3"
+> ? ? ? ?depends on DRM && ARCH_MXC
+> diff --git a/drivers/gpu/drm/i2c/Makefile b/drivers/gpu/drm/i2c/Makefile
+> index 9286256..a7a8d40 100644
+> --- a/drivers/gpu/drm/i2c/Makefile
+> +++ b/drivers/gpu/drm/i2c/Makefile
+> @@ -5,3 +5,6 @@ obj-$(CONFIG_DRM_I2C_CH7006) += ch7006.o
+>
+> ?sil164-y := sil164_drv.o
+> ?obj-$(CONFIG_DRM_I2C_SIL164) += sil164.o
+> +
+> +sii902x := sii902x_drv.o
+> +obj-$(CONFIG_DRM_I2C_SII902X) += sii902x.o
+> diff --git a/drivers/gpu/drm/i2c/sii902x.c b/drivers/gpu/drm/i2c/sii902x.c
+> new file mode 100644
+> index 0000000..7928533
+> --- /dev/null
+> +++ b/drivers/gpu/drm/i2c/sii902x.c
+> @@ -0,0 +1,334 @@
+> +/*
+> + * Copyright (C) 2010 Francisco Jerez.
 
-Is there a reason the suffix is xzkern rather than just xz ?
+Update the copyright?
+
+Alex
+
+> + * All Rights Reserved.
+> + *
+> + * Permission is hereby granted, free of charge, to any person obtaining
+> + * a copy of this software and associated documentation files (the
+> + * "Software"), to deal in the Software without restriction, including
+> + * without limitation the rights to use, copy, modify, merge, publish,
+> + * distribute, sublicense, and/or sell copies of the Software, and to
+> + * permit persons to whom the Software is furnished to do so, subject to
+> + * the following conditions:
+> + *
+> + * The above copyright notice and this permission notice (including the
+> + * next paragraph) shall be included in all copies or substantial
+> + * portions of the Software.
+> + *
+> + * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+> + * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+> + * IN NO EVENT SHALL THE COPYRIGHT OWNER(S) AND/OR ITS SUPPLIERS BE
+> + * LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+> + * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+> + * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+> + *
+> + */
+> +
+> +#include <drm/drmP.h>
+> +#include <drm/drm_crtc_helper.h>
+> +#include <drm/drm_encoder_slave.h>
+> +#include <drm/drm_encon.h>
+> +
+> +struct sii902x_encoder_params {
+> +};
+> +
+> +struct sii902x_priv {
+> + ? ? ? struct sii902x_encoder_params config;
+> + ? ? ? struct i2c_client *client;
+> + ? ? ? struct drm_encoder_connector encon;
+> +};
+> +
+> +#define to_sii902x(x) container_of(x, struct sii902x_priv, encon)
+> +
+> +static int sii902x_write(struct i2c_client *client, uint8_t addr, uint8_t val)
+> +{
+> + ? ? ? int ret;
+> +
+> + ? ? ? ret = i2c_smbus_write_byte_data(client, addr, val);
+> + ? ? ? if (ret) {
+> + ? ? ? ? ? ? ? dev_dbg(&client->dev, "%s failed with %d\n", __func__, ret);
+> + ? ? ? }
+> + ? ? ? return ret;
+> +}
+> +
+> +static uint8_t sii902x_read(struct i2c_client *client, uint8_t addr)
+> +{
+> + ? ? ? int dat;
+> +
+> + ? ? ? dat = i2c_smbus_read_byte_data(client, addr);
+> +
+> + ? ? ? return dat;
+> +}
+> +
+> +static int hdmi_cap = 0; /* FIXME */
+> +
+> +static void sii902x_poweron(struct sii902x_priv *priv)
+> +{
+> + ? ? ? struct i2c_client *client = priv->client;
+> +
+> + ? ? ? /* Turn on DVI or HDMI */
+> + ? ? ? if (hdmi_cap)
+> + ? ? ? ? ? ? ? sii902x_write(client, 0x1A, 0x01 | 4);
+> + ? ? ? else
+> + ? ? ? ? ? ? ? sii902x_write(client, 0x1A, 0x00);
+> +
+> + ? ? ? return;
+> +}
+> +
+> +static void sii902x_poweroff(struct sii902x_priv *priv)
+> +{
+> + ? ? ? struct i2c_client *client = priv->client;
+> +
+> + ? ? ? /* disable tmds before changing resolution */
+> + ? ? ? if (hdmi_cap)
+> + ? ? ? ? ? ? ? sii902x_write(client, 0x1A, 0x11);
+> + ? ? ? else
+> + ? ? ? ? ? ? ? sii902x_write(client, 0x1A, 0x10);
+> +
+> + ? ? ? return;
+> +}
+> +
+> +static int sii902x_get_modes(struct drm_encoder_connector *encon)
+> +{
+> + ? ? ? struct sii902x_priv *priv = to_sii902x(encon);
+> + ? ? ? struct i2c_client *client = priv->client;
+> + ? ? ? struct i2c_adapter *adap = client->adapter;
+> + ? ? ? struct drm_connector *connector = &encon->connector;
+> + ? ? ? struct edid *edid;
+> + ? ? ? int ret;
+> + ? ? ? int old, dat, cnt = 100;
+> +
+> + ? ? ? old = sii902x_read(client, 0x1A);
+> +
+> + ? ? ? sii902x_write(client, 0x1A, old | 0x4);
+> + ? ? ? do {
+> + ? ? ? ? ? ? ? cnt--;
+> + ? ? ? ? ? ? ? msleep(10);
+> + ? ? ? ? ? ? ? dat = sii902x_read(client, 0x1A);
+> + ? ? ? } while ((!(dat & 0x2)) && cnt);
+> +
+> + ? ? ? if (!cnt)
+> + ? ? ? ? ? ? ? return -ETIMEDOUT;
+> +
+> + ? ? ? sii902x_write(client, 0x1A, old | 0x06);
+> +
+> + ? ? ? edid = drm_get_edid(connector, adap);
+> + ? ? ? if (edid) {
+> + ? ? ? ? ? ? ? drm_mode_connector_update_edid_property(connector, edid);
+> + ? ? ? ? ? ? ? ret = drm_add_edid_modes(connector, edid);
+> + ? ? ? ? ? ? ? connector->display_info.raw_edid = NULL;
+> + ? ? ? ? ? ? ? kfree(edid);
+> + ? ? ? }
+> +
+> + ? ? ? cnt = 100;
+> + ? ? ? do {
+> + ? ? ? ? ? ? ? cnt--;
+> + ? ? ? ? ? ? ? sii902x_write(client, 0x1A, old & ~0x6);
+> + ? ? ? ? ? ? ? msleep(10);
+> + ? ? ? ? ? ? ? dat = sii902x_read(client, 0x1A);
+> + ? ? ? } while ((dat & 0x6) && cnt);
+> +
+> + ? ? ? if (!cnt)
+> + ? ? ? ? ? ? ? ret = -1;
+> +
+> + ? ? ? sii902x_write(client, 0x1A, old);
+> +
+> + ? ? ? return 0;
+> +}
+> +
+> +static irqreturn_t sii902x_detect_handler(int irq, void *data)
+> +{
+> + ? ? ? struct sii902x_priv *priv = data;
+> + ? ? ? struct i2c_client *client = priv->client;
+> + ? ? ? int dat;
+> +
+> + ? ? ? dat = sii902x_read(client, 0x3D);
+> + ? ? ? if (dat & 0x1) {
+> + ? ? ? ? ? ? ? /* cable connection changes */
+> + ? ? ? ? ? ? ? if (dat & 0x4) {
+> + ? ? ? ? ? ? ? ? ? ? ? printk("plugin\n");
+> + ? ? ? ? ? ? ? } else {
+> + ? ? ? ? ? ? ? ? ? ? ? printk("plugout\n");
+> + ? ? ? ? ? ? ? }
+> + ? ? ? }
+> + ? ? ? sii902x_write(client, 0x3D, dat);
+> +
+> + ? ? ? return IRQ_HANDLED;
+> +}
+> +
+> +
+> +static int sii902x_mode_valid(struct drm_encoder_connector *encon,
+> + ? ? ? ? ? ? ? ? ? ? ? ? struct drm_display_mode *mode)
+> +{
+> + ? ? ? return MODE_OK;
+> +}
+> +
+> +static void sii902x_mode_set(struct drm_encoder_connector *encon,
+> + ? ? ? ? ? ? ? ? ? ? ? ?struct drm_display_mode *mode,
+> + ? ? ? ? ? ? ? ? ? ? ? ?struct drm_display_mode *adjusted_mode)
+> +{
+> + ? ? ? struct sii902x_priv *priv = to_sii902x(encon);
+> + ? ? ? struct i2c_client *client = priv->client;
+> + ? ? ? u16 data[4];
+> + ? ? ? u32 refresh;
+> + ? ? ? u8 *tmp;
+> + ? ? ? int i;
+> +
+> + ? ? ? /* Power up */
+> + ? ? ? sii902x_write(client, 0x1E, 0x00);
+> +
+> + ? ? ? dev_dbg(&client->dev, "%s: %dx%d, pixclk %d\n", __func__,
+> + ? ? ? ? ? ? ? ? ? ? ? mode->hdisplay, mode->vdisplay,
+> + ? ? ? ? ? ? ? ? ? ? ? mode->clock * 1000);
+> +
+> + ? ? ? /* set TPI video mode */
+> + ? ? ? data[0] = mode->clock / 10;
+> + ? ? ? data[2] = mode->htotal;
+> + ? ? ? data[3] = mode->vtotal;
+> + ? ? ? refresh = data[2] * data[3];
+> + ? ? ? refresh = (mode->clock * 1000) / refresh;
+> + ? ? ? data[1] = refresh * 100;
+> + ? ? ? tmp = (u8 *)data;
+> + ? ? ? for (i = 0; i < 8; i++)
+> + ? ? ? ? ? ? ? sii902x_write(client, i, tmp[i]);
+> +
+> + ? ? ? /* input bus/pixel: full pixel wide (24bit), rising edge */
+> + ? ? ? sii902x_write(client, 0x08, 0x70);
+> + ? ? ? /* Set input format to RGB */
+> + ? ? ? sii902x_write(client, 0x09, 0x00);
+> + ? ? ? /* set output format to RGB */
+> + ? ? ? sii902x_write(client, 0x0A, 0x00);
+> + ? ? ? /* audio setup */
+> + ? ? ? sii902x_write(client, 0x25, 0x00);
+> + ? ? ? sii902x_write(client, 0x26, 0x40);
+> + ? ? ? sii902x_write(client, 0x27, 0x00);
+> +}
+> +
+> +static void sii902x_dpms(struct drm_encoder_connector *encon, int mode)
+> +{
+> + ? ? ? struct sii902x_priv *priv = to_sii902x(encon);
+> +
+> + ? ? ? if (mode)
+> + ? ? ? ? ? ? ? sii902x_poweroff(priv);
+> + ? ? ? else
+> + ? ? ? ? ? ? ? sii902x_poweron(priv);
+> +}
+> +
+> +static void sii902x_prepare(struct drm_encoder_connector *encon)
+> +{
+> + ? ? ? struct sii902x_priv *priv = to_sii902x(encon);
+> +
+> + ? ? ? sii902x_poweroff(priv);
+> +}
+> +
+> +static void sii902x_commit(struct drm_encoder_connector *encon)
+> +{
+> + ? ? ? struct sii902x_priv *priv = to_sii902x(encon);
+> +
+> + ? ? ? sii902x_poweron(priv);
+> +}
+> +
+> +struct drm_encoder_connector_funcs sii902x_funcs = {
+> + ? ? ? .dpms = sii902x_dpms,
+> + ? ? ? .prepare = sii902x_prepare,
+> + ? ? ? .commit = sii902x_commit,
+> + ? ? ? .get_modes = sii902x_get_modes,
+> + ? ? ? .mode_valid = sii902x_mode_valid,
+> + ? ? ? .mode_set = sii902x_mode_set,
+> +};
+> +
+> +/* I2C driver functions */
+> +
+> +static int
+> +sii902x_probe(struct i2c_client *client, const struct i2c_device_id *id)
+> +{
+> + ? ? ? int dat, ret;
+> + ? ? ? struct sii902x_priv *priv;
+> + ? ? ? const char *drm_name = "imx-drm.0"; /* FIXME: pass from pdata */
+> + ? ? ? int encon_id = 0; /* FIXME: pass from pdata */
+> +
+> + ? ? ? priv = kzalloc(sizeof(*priv), GFP_KERNEL);
+> + ? ? ? if (!priv)
+> + ? ? ? ? ? ? ? return -ENOMEM;
+> +
+> + ? ? ? priv->client = client;
+> +
+> + ? ? ? /* Set 902x in hardware TPI mode on and jump out of D3 state */
+> + ? ? ? if (sii902x_write(client, 0xc7, 0x00) < 0) {
+> + ? ? ? ? ? ? ? dev_err(&client->dev, "SII902x: cound not find device\n");
+> + ? ? ? ? ? ? ? return -ENODEV;
+> + ? ? ? }
+> +
+> + ? ? ? /* read device ID */
+> + ? ? ? dat = sii902x_read(client, 0x1b);
+> + ? ? ? if (dat != 0xb0) {
+> + ? ? ? ? ? ? ? dev_err(&client->dev, "not found. id is 0x%02x instead of 0xb0\n",
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? dat);
+> + ? ? ? ? ? ? ? return -ENODEV;
+> + ? ? ? }
+> +
+> + ? ? ? if (client->irq) {
+> + ? ? ? ? ? ? ? ret = request_threaded_irq(client->irq, NULL, sii902x_detect_handler,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? IRQF_TRIGGER_FALLING,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "SII902x_det", priv);
+> + ? ? ? ? ? ? ? sii902x_write(client, 0x3c, 0x01);
+> + ? ? ? }
+> +
+> + ? ? ? priv->encon.funcs = &sii902x_funcs;
+> +
+> + ? ? ? i2c_set_clientdata(client, priv);
+> +
+> + ? ? ? drm_encon_register(drm_name, encon_id, &priv->encon);
+> +
+> + ? ? ? dev_info(&client->dev, "initialized\n");
+> +
+> + ? ? ? return 0;
+> +}
+> +
+> +static int sii902x_remove(struct i2c_client *client)
+> +{
+> + ? ? ? struct sii902x_priv *priv;
+> + ? ? ? int ret;
+> +
+> + ? ? ? priv = i2c_get_clientdata(client);
+> +
+> + ? ? ? ret = drm_encon_unregister(&priv->encon);
+> + ? ? ? if (ret)
+> + ? ? ? ? ? ? ? return ret;
+> +
+> + ? ? ? kfree(priv);
+> +
+> + ? ? ? return 0;
+> +}
+> +
+> +static struct i2c_device_id sii902x_ids[] = {
+> + ? ? ? { "sii9022", 0 },
+> + ? ? ? { }
+> +};
+> +MODULE_DEVICE_TABLE(i2c, sii902x_ids);
+> +
+> +static struct i2c_driver sii902x_i2c_driver = {
+> + ? ? ? .probe = sii902x_probe,
+> + ? ? ? .remove = sii902x_remove,
+> + ? ? ? .driver = {
+> + ? ? ? ? ? ? ? .name = "sii902x",
+> + ? ? ? },
+> + ? ? ? .id_table = sii902x_ids,
+> +};
+> +
+> +static int __init sii902x_init(void)
+> +{
+> + ? ? ? return i2c_add_driver(&sii902x_i2c_driver);
+> +}
+> +
+> +static void __exit sii902x_exit(void)
+> +{
+> + ? ? ? i2c_del_driver(&sii902x_i2c_driver);
+> +}
+> +
+> +MODULE_AUTHOR("Sascha Hauer <s.hauer@pengutronix.de>");
+> +MODULE_DESCRIPTION("Silicon Image sii902x HDMI transmitter driver");
+> +MODULE_LICENSE("GPL");
+> +
+> +module_init(sii902x_init);
+> +module_exit(sii902x_exit);
+> --
+> 1.7.5.3
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> http://lists.freedesktop.org/mailman/listinfo/dri-devel
+>
