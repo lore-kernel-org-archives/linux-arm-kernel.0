@@ -1,82 +1,146 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 8 Jul 2011 06:01:02 -0700
-Subject: [GIT PULL] omap twl cleanup for v3.1 merge window
-Message-ID: <20110708130102.GB5783@atomide.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 08 Jul 2011 14:08:04 +0100
+Subject: [RFC PATCH v2 0/4] Core device subsystem
+In-Reply-To: <CAHXqBFJiovYq5x_JDAxikvFs-t1To6yC-1uajBJFRX_jwjvejA@mail.gmail.com>
+References: <1310115250-3859-1-git-send-email-marc.zyngier@arm.com>
+	<CAHXqBFJiovYq5x_JDAxikvFs-t1To6yC-1uajBJFRX_jwjvejA@mail.gmail.com>
+Message-ID: <4E170134.1020306@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On 08/07/11 12:37, Micha? Miros?aw wrote:
+> 2011/7/8 Marc Zyngier <marc.zyngier@arm.com>:
+>> There is a small number of devices that the core kernel needs very
+>> early in the boot process, namely an interrupt controller and a timer,
+>> long before the driver model is up and running.
+>>
+>> Most architectures implement this requirement by hardcoding the
+>> initialisation of a "well known" piece of hardware which is standard
+>> enough to work on any platform.
+>>
+>> This is very different on the ARM architecture, where platforms have a
+>> variety of interrupt controllers and timers. While the same hardcoding
+>> is possible (and is actually used), it makes it almost impossible to
+>> support several platforms in the same kernel.
+>>
+>> Though the device tree is helping greatly to solve this problem, some
+>> platform won't ever be converted to DT, hence the need to have a
+>> mechanism supporting a variety of information source. Early platform
+>> devices having been deemed unsuitable (complexity, abuse of various
+>> subsystems), this subsystem has been designed to provide the very
+>> minimal level of functionality.
+>>
+>> The "core device subsystem" offers a class based device/driver
+>> matching model, doesn't rely on any other subsystem, is very (too?)
+>> simple, and support getting information both from DT as well as from
+>> static data provided by the platform. It also gives the opportunity to
+>> define the probing order by offering a sorting hook at run-time.
+> [...]
+> 
+> I gave it some thought and it looks like your idea can be modified to
+> make it even less demanding on machine setup code.
+> 
+> For the DT case, all this can work without adding a single
+> board-specific code (even machine_desc->init_irq() is not needed).
 
-Please pull TWL cleanup from:
+machine_desc->init_irq() is only here for legacy purpose.
+And this call is already outside of the platform code.
 
-git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git cleanup-part-2
+> of_init_core_device_class(class)
+> {
+>   int ids_count = 0;
+>   struct of_device_id *ids, *p;
+> 
+>   for_each_core_device_driver(drv, class)
+>     for_each_core_device_id(id, drv)
+>       ++ids_count;
+> 
+>   p = ids = kzalloc(...);
+> 
+>   for_each_core_device_driver(drv, class)
+>     for_each_core_device_id(id, drv) {
+>       p->compatible = id->name;
+>       p->data = drv;
+>     }
+> 
+>   // generate matching device list from devicetree
+> 
+>   if (class == CORE_DEV_CLASS_IRQ)
+>     // sort the list (for intc class)
+> 
+>   core_driver_init_class(class);
+>   // call above could use matched ids' data field for finding
+>   // driver struct instead of traversing the driver list again
+> }
 
-This can be pulled into your omap/cleanup. It will cause a minor
-merge conflict with omap/board.
+So you're basically folding of_core_device_populate() and
+core_driver_init_class() into one call, and generating the
+of_device_ids on the fly. If you're going down that road,
+it would be even simpler to directly use of_device_ids
+instead of core_device_ids and skip the generation altogether.
 
-I've attached a conflict resolution patch too, it's trivial execpt
-note that .vdac needs to be removed in board-rx51-peripherals.c.
+That would also remove the static declaration of devices to be
+probed in the architecture support code...
 
-If this conflict causes problems for you, I can also base this series
-on omap/board.
+Let me think of it and prototype that.
 
-Regards,
+> For non-DT case, the board code would need to provide the devices with
+> core_device_register() in init_irq() or wherever is apropriate.
 
-Tony
+That's the way it is supposed to work already
+(from my local pb11mp board file):
+
+[...]
+#ifndef CONFIG_OF
+static struct resource realview_pb11mp_primary_gic_resources[] __initdata = {
+[...]
+};
+
+static struct core_device realview_pb11mp_primary_gic __initdata = {
+	.name		= "arm_gic",
+	.resource	= realview_pb11mp_primary_gic_resources,
+	.num_resources	= ARRAY_SIZE(realview_pb11mp_primary_gic_resources),
+};
+
+static struct resource realview_pb11mp_secondary_gic_resources[] __initdata = {
+[...]
+};
+
+static struct core_device realview_pb11mp_secondary_gic __initdata = {
+	.name		= "arm_gic",
+	.resource	= realview_pb11mp_secondary_gic_resources,
+	.num_resources	= ARRAY_SIZE(realview_pb11mp_secondary_gic_resources),
+};
+#endif
+
+static void __init gic_init_irq(void)
+{
+	unsigned int pldctrl;
+
+	/* new irq mode with no DCC */
+	writel(0x0000a05f, __io_address(REALVIEW_SYS_LOCK));
+	pldctrl = readl(__io_address(REALVIEW_SYS_BASE)	+ REALVIEW_PB11MP_SYS_PLD_CTRL1);
+	pldctrl |= 2 << 22;
+	writel(pldctrl, __io_address(REALVIEW_SYS_BASE) + REALVIEW_PB11MP_SYS_PLD_CTRL1);
+	writel(0x00000000, __io_address(REALVIEW_SYS_LOCK));
+#ifndef CONFIG_OF
+	core_device_register(CORE_DEV_CLASS_IRQ, &realview_pb11mp_primary_gic);
+	core_device_register(CORE_DEV_CLASS_IRQ, &realview_pb11mp_secondary_gic);
+#endif
+}
 
 
-The following changes since commit 48cb1258e8b0f8c81cfb699b42326c5b2147b3f8:
-  Tony Lindgren (1):
-        Merge branch 'for_3.1/pm-misc' of git://git.kernel.org/.../khilman/linux-omap-pm into devel-cleanup
+> For simplicity I thing mixing static and DT initialization should not
+> be allowed (for a single machine) - then static/DT initialization
+> order won't matter.
 
-are available in the git repository at:
+I don't think I ever thought of supporting such a setup, at least not
+within a single class (different classes are definitely supported).
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git cleanup-part-2
+> I hope this is useful for you. :)
 
-Jarkko Nikula (2):
-      omap: mcbsp: Remove rx_/tx_word_length variables
-      omap: mcbsp: Remove port number enums
+It is. Thanks for the comments!
 
-Peter Ujfalusi (4):
-      OMAP: New twl-common for common TWL configuration
-      OMAP4: Move common twl6030 configuration to twl-common
-      OMAP3: Move common twl configuration to twl-common
-      OMAP3: Move common regulator configuration to twl-common
-
-Tony Lindgren (1):
-      Merge branch 'peter/topic/for-tony_mach-cleanup' of git://gitorious.org/omap-audio/linux-audio into cleanup-part-2
-
- arch/arm/mach-omap1/mcbsp.c                  |    4 +-
- arch/arm/mach-omap2/Makefile                 |    2 +-
- arch/arm/mach-omap2/board-3430sdp.c          |   89 +-------
- arch/arm/mach-omap2/board-4430sdp.c          |  141 +-----------
- arch/arm/mach-omap2/board-cm-t35.c           |   51 +----
- arch/arm/mach-omap2/board-devkit8000.c       |   38 +---
- arch/arm/mach-omap2/board-igep0020.c         |   44 +---
- arch/arm/mach-omap2/board-ldp.c              |   15 +-
- arch/arm/mach-omap2/board-omap3beagle.c      |   62 +-----
- arch/arm/mach-omap2/board-omap3evm.c         |   70 +------
- arch/arm/mach-omap2/board-omap3pandora.c     |   62 +-----
- arch/arm/mach-omap2/board-omap3stalker.c     |   72 +------
- arch/arm/mach-omap2/board-omap3touchbook.c   |   61 +----
- arch/arm/mach-omap2/board-omap4panda.c       |  146 +-----------
- arch/arm/mach-omap2/board-overo.c            |   61 +-----
- arch/arm/mach-omap2/board-rm680.c            |    8 +-
- arch/arm/mach-omap2/board-rx51-peripherals.c |   40 +---
- arch/arm/mach-omap2/board-zoom-peripherals.c |   89 +-------
- arch/arm/mach-omap2/common-board-devices.c   |   21 --
- arch/arm/mach-omap2/common-board-devices.h   |   26 +--
- arch/arm/mach-omap2/twl-common.c             |  304 ++++++++++++++++++++++++++
- arch/arm/mach-omap2/twl-common.h             |   59 +++++
- arch/arm/plat-omap/include/plat/mcbsp.h      |   12 +-
- arch/arm/plat-omap/mcbsp.c                   |    3 -
- 24 files changed, 492 insertions(+), 988 deletions(-)
- create mode 100644 arch/arm/mach-omap2/twl-common.c
- create mode 100644 arch/arm/mach-omap2/twl-common.h
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: resolve.patch
-Type: text/x-diff
-Size: 2584 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110708/a96bac57/attachment.bin>
+	M.
+-- 
+Jazz is not dead. It just smells funny...
