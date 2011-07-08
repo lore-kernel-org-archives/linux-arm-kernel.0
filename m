@@ -1,36 +1,57 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 08 Jul 2011 16:13:23 +0100
-Subject: [RFC PATCH v2 0/4] Core device subsystem
-In-Reply-To: <4E170134.1020306@arm.com>
-References: <1310115250-3859-1-git-send-email-marc.zyngier@arm.com>	<CAHXqBFJiovYq5x_JDAxikvFs-t1To6yC-1uajBJFRX_jwjvejA@mail.gmail.com>
-	<4E170134.1020306@arm.com>
-Message-ID: <4E171E93.8020608@arm.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri, 08 Jul 2011 08:14:31 -0700
+Subject: [PATCH v4 00/18] I2C: OMAP: I2C fixes,
+	removal of cpu_is... from driver
+In-Reply-To: <20110707230122.GM15795@trinity.fluff.org> (Ben Dooks's message
+	of "Fri, 8 Jul 2011 00:01:22 +0100")
+References: <1306973984-15165-1-git-send-email-khilman@ti.com>
+	<20110615213637.GH15795@trinity.fluff.org> <87k4cm1xgj.fsf@ti.com>
+	<1309212726.6231.14.camel@vence> <1309212918.6231.16.camel@vence>
+	<1309892457.3077.8.camel@vence>
+	<20110707230122.GM15795@trinity.fluff.org>
+Message-ID: <87box4by94.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/07/11 14:08, Marc Zyngier wrote:
-> So you're basically folding of_core_device_populate() and
-> core_driver_init_class() into one call, and generating the
-> of_device_ids on the fly. If you're going down that road,
-> it would be even simpler to directly use of_device_ids
-> instead of core_device_ids and skip the generation altogether.
-> 
-> That would also remove the static declaration of devices to be
-> probed in the architecture support code...
-> 
-> Let me think of it and prototype that.
+Ben Dooks <ben-i2c@fluff.org> writes:
 
-See the attached patch against branch dt_gic_twd from
-git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git
+> On Tue, Jul 05, 2011 at 12:00:56PM -0700, Kevin Hilman wrote:
+>> Hi Ben,
+>> 
+>> On Mon, 2011-06-27 at 15:15 -0700, Kevin Hilman wrote:
+>> > On Mon, 2011-06-27 at 15:12 -0700, Kevin Hilman wrote:
+>> > 
+>> > > Ping.  I don't see this in linux-next yet.
+>> > > 
+>> > > Are you planning to queue this for v3.1?
+>> > > 
+>> > 
+>> > Oops, pushed send too soon on this...
+>> > 
+>> > As this series touches various data files in arch/arm/mach-omap2/* and
+>> > we have a handful of other changes to that data for this merge window, I
+>> > think it would be better for conflict avoidance if this series is merged
+>> > via Tony's linux-omap tree.
+>> > 
+>> > With your Ack, we'll merge it via OMAP.
+>> 
+>> I see that the same day I sent this, you merged it into your next-i2c
+>> branch.  Guess I was too late with my request.
+>> 
+>> As I mentioned above, we will have several conflicts with the
+>> arch/arm/mach-omap2 changes in this series, so we would prefer to merge
+>> them via the OMAP tree if at all possible so we can properly handle the
+>> conflicts.
+>> 
+>> Do you mind dropping it from your next-i2c so we can merge it via
+>> linux-omap (with your Ack.)
+>
+> Yes, and if you could indicate all the other omap i2c patches and I'll
+> add my ack to yours.
+>
+> Acked-by: Ben Dooks <ben-linux@fluff.org>
 
-It boots fine on my PB11MP.
+Thanks, I will refresh/repost any remaining OMAP I2C patches today and
+let you know.
 
-What do you think?
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
--------------- next part --------------
-An embedded and charset-unspecified text was scrubbed...
-Name: code_dev.patch.txt
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110708/ff104de1/attachment.txt>
+Kevin
