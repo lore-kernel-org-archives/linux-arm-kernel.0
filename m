@@ -1,82 +1,37 @@
 From: b29396@freescale.com (Dong Aisheng)
-Date: Fri, 8 Jul 2011 23:59:44 +0800
-Subject: [PATCH 04/10] ASoc: mxs: add asoc configuration files
+Date: Fri, 8 Jul 2011 23:59:49 +0800
+Subject: [PATCH 09/10] ARM: mxs: correct the using of frac div for saif
 In-Reply-To: <1310140790-2132-1-git-send-email-b29396@freescale.com>
 References: <1310140790-2132-1-git-send-email-b29396@freescale.com>
-Message-ID: <1310140790-2132-5-git-send-email-b29396@freescale.com>
+Message-ID: <1310140790-2132-10-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+According to spec, set to 1 is the enable of fractional devide
+or the clock can not be generated properly.
+
 Signed-off-by: Dong Aisheng <b29396@freescale.com>
 ---
- sound/soc/Kconfig      |    1 +
- sound/soc/Makefile     |    1 +
- sound/soc/mxs/Kconfig  |   20 ++++++++++++++++++++
- sound/soc/mxs/Makefile |   10 ++++++++++
- 4 files changed, 32 insertions(+), 0 deletions(-)
+ arch/arm/mach-mxs/clock-mx28.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/sound/soc/Kconfig b/sound/soc/Kconfig
-index 8224db5..aff2592 100644
---- a/sound/soc/Kconfig
-+++ b/sound/soc/Kconfig
-@@ -57,6 +57,7 @@ source "sound/soc/s6000/Kconfig"
- source "sound/soc/sh/Kconfig"
- source "sound/soc/tegra/Kconfig"
- source "sound/soc/txx9/Kconfig"
-+source "sound/soc/mxs/Kconfig"
+diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
+index 7b3657b..7954013 100644
+--- a/arch/arm/mach-mxs/clock-mx28.c
++++ b/arch/arm/mach-mxs/clock-mx28.c
+@@ -710,11 +710,11 @@ static int clk_misc_init(void)
  
- # Supported codecs
- source "sound/soc/codecs/Kconfig"
-diff --git a/sound/soc/Makefile b/sound/soc/Makefile
-index 1ed61c5..2023771 100644
---- a/sound/soc/Makefile
-+++ b/sound/soc/Makefile
-@@ -20,3 +20,4 @@ obj-$(CONFIG_SND_SOC)	+= s6000/
- obj-$(CONFIG_SND_SOC)	+= sh/
- obj-$(CONFIG_SND_SOC)	+= tegra/
- obj-$(CONFIG_SND_SOC)	+= txx9/
-+obj-$(CONFIG_SND_SOC)	+= mxs/
-diff --git a/sound/soc/mxs/Kconfig b/sound/soc/mxs/Kconfig
-new file mode 100644
-index 0000000..675e27c
---- /dev/null
-+++ b/sound/soc/mxs/Kconfig
-@@ -0,0 +1,20 @@
-+menuconfig SND_MXS_SOC
-+	tristate "SoC Audio for Freescale MXS CPUs"
-+	depends on ARCH_MXS
-+	select SND_PCM
-+	help
-+	  Say Y or M if you want to add support for codecs attached to
-+	  the MXS SAIF interface.
-+
-+
-+if SND_MXS_SOC
-+
-+config SND_SOC_MXS_SGTL5000
-+	tristate "SoC Audio support for i.MX boards with sgtl5000"
-+#	depends on MACH_MX28
-+	select SND_SOC_SGTL5000
-+	help
-+	  Say Y if you want to add support for SoC audio on an MXS board with
-+	  a sgtl5000 codec.
-+
-+endif	# SND_MXS_SOC
-diff --git a/sound/soc/mxs/Makefile b/sound/soc/mxs/Makefile
-new file mode 100644
-index 0000000..565b5b5
---- /dev/null
-+++ b/sound/soc/mxs/Makefile
-@@ -0,0 +1,10 @@
-+# MXS Platform Support
-+snd-soc-mxs-objs := mxs-saif.o
-+snd-soc-mxs-pcm-objs := mxs-pcm.o
-+
-+obj-$(CONFIG_SND_MXS_SOC) += snd-soc-mxs.o snd-soc-mxs-pcm.o
-+
-+# i.MX Machine Support
-+snd-soc-mxs-sgtl5000-objs := mxs-sgtl5000.o
-+
-+obj-$(CONFIG_SND_SOC_MXS_SGTL5000) += snd-soc-mxs-sgtl5000.o
+ 	/* SAIF has to use frac div for functional operation */
+ 	reg = __raw_readl(CLKCTRL_BASE_ADDR + HW_CLKCTRL_SAIF0);
+-	reg &= ~BM_CLKCTRL_SAIF0_DIV_FRAC_EN;
++	reg |= BM_CLKCTRL_SAIF0_DIV_FRAC_EN;
+ 	__raw_writel(reg, CLKCTRL_BASE_ADDR + HW_CLKCTRL_SAIF0);
+ 
+ 	reg = __raw_readl(CLKCTRL_BASE_ADDR + HW_CLKCTRL_SAIF1);
+-	reg &= ~BM_CLKCTRL_SAIF1_DIV_FRAC_EN;
++	reg |= BM_CLKCTRL_SAIF1_DIV_FRAC_EN;
+ 	__raw_writel(reg, CLKCTRL_BASE_ADDR + HW_CLKCTRL_SAIF1);
+ 
+ 	/*
 -- 
 1.7.0.4
