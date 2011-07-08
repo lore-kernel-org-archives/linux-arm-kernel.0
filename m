@@ -1,56 +1,50 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Fri, 8 Jul 2011 22:21:52 +0530
-Subject: [RFC PATCH v4] Consolidate SRAM support
-In-Reply-To: <1306371777-20431-1-git-send-email-plagnioj@jcrosoft.com>
-References: <20110512174546.GB8633@n2100.arm.linux.org.uk>
-	<1306371777-20431-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024D9B5940@dbde02.ent.ti.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 08 Jul 2011 09:56:09 -0700
+Subject: [PATCH 0/7] Re-organize linker layouts
+In-Reply-To: <20110708160329.GF4812@n2100.arm.linux.org.uk>
+References: <20110706102245.GO8286@n2100.arm.linux.org.uk>
+	<4E15ECB6.40100@codeaurora.org>
+	<20110707223620.GG20403@n2100.arm.linux.org.uk>
+	<4E165597.90002@codeaurora.org>
+	<20110708090721.GC2414@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1107080941090.14596@xanadu.home>
+	<20110708160329.GF4812@n2100.arm.linux.org.uk>
+Message-ID: <4E1736A9.9040102@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean-Christophe,
+On 7/8/2011 9:03 AM, Russell King - ARM Linux wrote:
+> On Fri, Jul 08, 2011 at 09:46:42AM -0400, Nicolas Pitre wrote:
+>> On Fri, 8 Jul 2011, Russell King - ARM Linux wrote:
+>>
+>>> There's also platforms where the zImage is loaded at some predetermined
+>>> offset into RAM to give the decompressor room to directly place the
+>>> kernel in its final location too, which will be buggered by
+>>> AUTO_ZRELADDR.
+>>
+>> How so?  Loading that zImage at the same predetermined offset will still 
+>> have the same desired effect.  As long as the offset is within 128MB of 
+>> the start of RAM.
+>
+> You just said it...
+>
+> Given that it's 128MB, Stephen shouldn't have a problem with loading the
+> zImage at 0xN0208000, but he said it doesn't work.  I think there's some
+> work to be done there to figure out if Stephen really has a problem, and
+> what that problem is.
 
-On Thu, May 26, 2011 at 06:32:57, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> From: Russell King - ARM Linux <linux@arm.linux.org.uk>
-> 
-> We have two SoCs using SRAM, both with their own allocation systems,
-> and both with their own ways of copying functions into the SRAM.
-> 
-> Let's unify this before we have additional SoCs re-implementing this
-> obviously common functionality themselves.
-> 
-> For this use the generic allocator and the newly introduce
-> gen_pool_add_virt and gen_pool_virt_to_phys
-> 
-> Uio_pruss should probably take the SRAM pool pointer via
-> platform data so that it doesn't have to include Davinci specific
-> includes.
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Cc: Sekhar Nori <nsekhar@ti.com>
-> Cc: Kevin Hilman <khilman@ti.com>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
+My problem is due to how the zreladdr is calculated. Our ram starts at
+0xN0200000 and loading the zImage at 0xN0208000 works fine, but then
+when zreladdr is calculated it essentially aligns PC to 128MB and then
+my kernel is loaded at 0xN0008000. I've lost the 2. It looks like other
+machines are in a similar situation (or their zImage is loaded somewhere
+beyond 128MB and it never works).
 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index f4b7dfa..5ec5e5f 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -848,6 +848,7 @@ config ARCH_DAVINCI
->  	bool "TI DaVinci"
->  	select GENERIC_CLOCKEVENTS
->  	select ARCH_REQUIRE_GPIOLIB
-> +	select GENERIC_ALLOCATOR
->  	select ZONE_DMA
->  	select HAVE_IDE
->  	select CLKDEV_LOOKUP
+Why can't this work via atags (or DT for that matter)? atags have always
+said where ram starts and we should be able to write some code that
+parses the atags/DT and figures out the final resting place of the
+decompressed image.
 
-GENERIC_ALLOCATOR is already selected for
-DaVinci (below the "select CLKDEV_LOOKUP"
-line).
-
-Please drop this hunk.
-
-Thanks,
-Sekhar
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
