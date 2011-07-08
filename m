@@ -1,1438 +1,885 @@
-From: mnalajal@codeaurora.org (Murali Nalajala)
-Date: Fri, 08 Jul 2011 17:39:18 -0000
-Subject: [PATCH 1/1] mtd: msm_nand: Add initial msm nand driver support.
-Message-ID: <1293785680-19850-1-git-send-email-mnalajal@codeaurora.org>
+From: vimal.newwork@gmail.com (Vimal Singh)
+Date: Fri, 08 Jul 2011 17:43:34 -0000
+Subject: [PATCH] omap3: nand: bch ecc support added
+In-Reply-To: <1295518680-8737-1-git-send-email-s-ghorai@ti.com>
+References: <1295518680-8737-1-git-send-email-s-ghorai@ti.com>
+Message-ID: <AANLkTin3pRkqLkQ_J1iTtqr0M+iz5V25S9ZwJc9+T0VW@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arve Hj?nnev?g <arve@android.com>
+Hi Ghorai,
 
-Add initial msm nand driver support for Qualcomm MSM and QSD platforms.
-This driver is currently capable of handling 2K page nand devices.
+I am the initial author of this patch. And I guess this patch still
+uses most of my work.
 
-This driver is originally
-developed by Google and its source is available at
-http://android.git.kernel.org/?p=kernel/experimental.git
 
-CC: Brian Swetland <swetland@google.com>
-Signed-off-by: Arve Hj?nnev?g <arve@android.com>
-Signed-off-by: Murali Nalajala <mnalajal@codeaurora.org>
----
- drivers/mtd/devices/Kconfig    |   10 +
- drivers/mtd/devices/Makefile   |    1 +
- drivers/mtd/devices/msm_nand.c | 1281 ++++++++++++++++++++++++++++++++++++++++
- drivers/mtd/devices/msm_nand.h |   75 +++
- 4 files changed, 1367 insertions(+), 0 deletions(-)
- create mode 100644 drivers/mtd/devices/msm_nand.c
- create mode 100644 drivers/mtd/devices/msm_nand.h
+Thanks and Regards,
+Vimal
 
-diff --git a/drivers/mtd/devices/Kconfig b/drivers/mtd/devices/Kconfig
-index 35081ce..bcf851f 100644
---- a/drivers/mtd/devices/Kconfig
-+++ b/drivers/mtd/devices/Kconfig
-@@ -49,6 +49,16 @@ config MTD_MS02NV
- 	  say M here and read <file:Documentation/kbuild/modules.txt>.
- 	  The module will be called ms02-nv.
- 
-+config MTD_MSM_NAND
-+	tristate "MSM on-chip NAND Flash Controller driver"
-+	depends on MTD && ARCH_MSM
-+	help
-+	  This enables the on-chip NAND flash controller driver on Qualcomm's
-+	  MSM and QSD platforms.
-+
-+	  MSM NAND controller is capable of interface to all leading nand
-+	  flash vendor devices ie Samsung, Micron, Hynix etc.
-+
- config MTD_DATAFLASH
- 	tristate "Support for AT45xxx DataFlash"
- 	depends on SPI_MASTER && EXPERIMENTAL
-diff --git a/drivers/mtd/devices/Makefile b/drivers/mtd/devices/Makefile
-index f3226b1..fe959e8 100644
---- a/drivers/mtd/devices/Makefile
-+++ b/drivers/mtd/devices/Makefile
-@@ -11,6 +11,7 @@ obj-$(CONFIG_MTD_SLRAM)		+= slram.o
- obj-$(CONFIG_MTD_PHRAM)		+= phram.o
- obj-$(CONFIG_MTD_PMC551)	+= pmc551.o
- obj-$(CONFIG_MTD_MS02NV)	+= ms02-nv.o
-+obj-$(CONFIG_MTD_MSM_NAND)	+= msm_nand.o
- obj-$(CONFIG_MTD_MTDRAM)	+= mtdram.o
- obj-$(CONFIG_MTD_LART)		+= lart.o
- obj-$(CONFIG_MTD_BLOCK2MTD)	+= block2mtd.o
-diff --git a/drivers/mtd/devices/msm_nand.c b/drivers/mtd/devices/msm_nand.c
-new file mode 100644
-index 0000000..89b7e03
---- /dev/null
-+++ b/drivers/mtd/devices/msm_nand.c
-@@ -0,0 +1,1281 @@
-+/*
-+ * Copyright (C) 2007 Google, Inc.
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ */
-+
-+#define pr_fmt(fmt) "%s:" fmt, __func__
-+
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/mtd/mtd.h>
-+#include <linux/mtd/partitions.h>
-+#include <linux/platform_device.h>
-+#include <linux/sched.h>
-+#include <linux/slab.h>
-+#include <linux/dma-mapping.h>
-+#include <asm/mach/flash.h>
-+#include <mach/dma.h>
-+
-+#include "msm_nand.h"
-+
-+unsigned long msm_nand_phys;
-+
-+#define CFG1_WIDE_FLASH (1U << 1)
-+#define MSM_NAND_DMA_BUFFER_SIZE SZ_4K
-+#define MSM_NAND_DMA_BUFFER_SLOTS \
-+	(MSM_NAND_DMA_BUFFER_SIZE / (sizeof(((atomic_t *)0)->counter) * 8))
-+
-+#define SRC_CRCI_NAND_CMD  CMD_SRC_CRCI(DMOV_NAND_CRCI_CMD)
-+#define DST_CRCI_NAND_CMD  CMD_DST_CRCI(DMOV_NAND_CRCI_CMD)
-+#define SRC_CRCI_NAND_DATA CMD_SRC_CRCI(DMOV_NAND_CRCI_DATA)
-+#define DST_CRCI_NAND_DATA CMD_DST_CRCI(DMOV_NAND_CRCI_DATA)
-+
-+#define msm_virt_to_dma(chip, vaddr) \
-+		 ((chip)->dma_addr + \
-+		 ((uint8_t *)(vaddr) - (chip)->dma_buffer))
-+
-+/**
-+ * struct msm_nand_chip - Describe the msm nand chip and dma properties
-+ * @dev:                Holds the device structure pointer
-+ * @wait_queue:         Wait queue for handling DMA buffer requests
-+ * @dma_buffer_busy:    Check DMA buffer status
-+ * @dma_channel:        DMA channel number
-+ * @dma_buffer:         Allocated dma buffer address
-+ * @dma_addr:           Bus-specific DMA address
-+ * @cfg0:               Nand controller configuration0 register value
-+ * @cfg1:               Nand controller configuration1 register value
-+ * @ecc_buf_cfg:        Stores ECC buffer configuration
-+ *
-+ * This structure is used to store the DMA and nand controller information
-+ */
-+struct msm_nand_chip {
-+	struct device *dev;
-+	wait_queue_head_t wait_queue;
-+	atomic_t dma_buffer_busy;
-+	unsigned dma_channel;
-+	uint8_t *dma_buffer;
-+	dma_addr_t dma_addr;
-+	unsigned cfg0, cfg1;
-+	uint32_t ecc_buf_cfg;
-+};
-+
-+/**
-+ * struct msm_nand_info - Stores the mtd and nand device information
-+ * @mtd:         MTD device structure
-+ * @parts:       Pointer to the MTD partitions
-+ * @msm_nand:    Holds the nand device information
-+ *
-+ * It stores the mtd properties associted to the nand device and also
-+ * mtd partition details.
-+ */
-+struct msm_nand_info {
-+	struct mtd_info         mtd;
-+	struct mtd_partition    *parts;
-+	struct msm_nand_chip    msm_nand;
-+};
-+
-+/**
-+ * msm_nand_oob_64 - oob info for large (2KB) page
-+ */
-+static struct nand_ecclayout msm_nand_oob_64 = {
-+	.eccbytes	= 40,
-+	.eccpos		= {
-+		0,  1,  2,  3,  4,  5,  6,  7,  8,  9,
-+		10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
-+		20, 21, 22, 23, 24, 25, 26, 27, 28, 29,
-+		46, 47, 48, 49, 50, 51, 52, 53, 54, 55,
-+		},
-+	.oobavail	= 16,
-+	.oobfree	= {
-+		{30, 16},
-+	}
-+};
-+
-+static void *msm_nand_get_dma_buffer(struct msm_nand_chip *chip, size_t size)
-+{
-+	unsigned int bitmask, free_bitmask, old_bitmask;
-+	unsigned int need_mask, current_need_mask;
-+	int free_index;
-+
-+	need_mask = (1UL << DIV_ROUND_UP(size, MSM_NAND_DMA_BUFFER_SLOTS)) - 1;
-+	bitmask = atomic_read(&chip->dma_buffer_busy);
-+	free_bitmask = ~bitmask;
-+	do {
-+		free_index = __ffs(free_bitmask);
-+		current_need_mask = need_mask << free_index;
-+		if ((bitmask & current_need_mask) == 0) {
-+			old_bitmask =
-+				atomic_cmpxchg(&chip->dma_buffer_busy,
-+					       bitmask,
-+					       bitmask | current_need_mask);
-+			if (old_bitmask == bitmask)
-+				return chip->dma_buffer +
-+					free_index * MSM_NAND_DMA_BUFFER_SLOTS;
-+			free_bitmask = 0; /* force return */
-+		}
-+		/* current free range was too small, clear all free bits */
-+		/* below the top busy bit within current_need_mask */
-+		free_bitmask &=
-+			~(~0U >> (32 - fls(bitmask & current_need_mask)));
-+	} while (free_bitmask);
-+
-+	return NULL;
-+}
-+
-+static void msm_nand_release_dma_buffer(struct msm_nand_chip *chip,
-+					void *buffer, size_t size)
-+{
-+	int index;
-+	unsigned int used_mask;
-+
-+	used_mask = (1UL << DIV_ROUND_UP(size, MSM_NAND_DMA_BUFFER_SLOTS)) - 1;
-+	index = ((uint8_t *)buffer - chip->dma_buffer) /
-+		MSM_NAND_DMA_BUFFER_SLOTS;
-+	atomic_sub(used_mask << index, &chip->dma_buffer_busy);
-+
-+	wake_up(&chip->wait_queue);
-+}
-+
-+static uint32_t flash_read_id(struct msm_nand_chip *chip)
-+{
-+	struct {
-+		dmov_s cmd[5];
-+		unsigned cmdptr;
-+		unsigned data[5];
-+	} *dma_buffer;
-+	uint32_t rv;
-+
-+	wait_event(chip->wait_queue,
-+		   (dma_buffer = msm_nand_get_dma_buffer(
-+			    chip, sizeof(*dma_buffer))));
-+
-+	dma_buffer->data[0] = NAND_DEV_SEL_CS0 | DM_ENABLE;
-+	dma_buffer->data[1] = NAND_CMD_FETCH_ID;
-+	dma_buffer->data[2] = 1;
-+	dma_buffer->data[3] = MSM_NAND_STATS_INIT;
-+	dma_buffer->data[4] = MSM_NAND_STATS_INIT;
-+	/* verify the array size statically to avoid array overflow access */
-+	BUILD_BUG_ON(4 != ARRAY_SIZE(dma_buffer->data) - 1);
-+
-+	dma_buffer->cmd[0].cmd = 0 | CMD_OCB;
-+	dma_buffer->cmd[0].src = msm_virt_to_dma(chip, &dma_buffer->data[0]);
-+	dma_buffer->cmd[0].dst = NAND_FLASH_CHIP_SELECT;
-+	dma_buffer->cmd[0].len = 4;
-+
-+	dma_buffer->cmd[1].cmd = DST_CRCI_NAND_CMD;
-+	dma_buffer->cmd[1].src = msm_virt_to_dma(chip, &dma_buffer->data[1]);
-+	dma_buffer->cmd[1].dst = NAND_FLASH_CMD;
-+	dma_buffer->cmd[1].len = 4;
-+
-+	dma_buffer->cmd[2].cmd = 0;
-+	dma_buffer->cmd[2].src = msm_virt_to_dma(chip, &dma_buffer->data[2]);
-+	dma_buffer->cmd[2].dst = NAND_EXEC_CMD;
-+	dma_buffer->cmd[2].len = 4;
-+
-+	dma_buffer->cmd[3].cmd = SRC_CRCI_NAND_DATA;
-+	dma_buffer->cmd[3].src = NAND_FLASH_STATUS;
-+	dma_buffer->cmd[3].dst = msm_virt_to_dma(chip, &dma_buffer->data[3]);
-+	dma_buffer->cmd[3].len = 4;
-+
-+	dma_buffer->cmd[4].cmd = CMD_OCU | CMD_LC;
-+	dma_buffer->cmd[4].src = NAND_READ_ID;
-+	dma_buffer->cmd[4].dst = msm_virt_to_dma(chip, &dma_buffer->data[4]);
-+	dma_buffer->cmd[4].len = 4;
-+	/* verify the array size statically to avoid array overflow access */
-+	BUILD_BUG_ON(4 != ARRAY_SIZE(dma_buffer->cmd) - 1);
-+
-+	dma_buffer->cmdptr =
-+		(msm_virt_to_dma(chip, dma_buffer->cmd) >> 3) | CMD_PTR_LP;
-+
-+	msm_dmov_exec_cmd(
-+		chip->dma_channel, DMOV_CMD_PTR_LIST |
-+		DMOV_CMD_ADDR(msm_virt_to_dma(chip, &dma_buffer->cmdptr)));
-+
-+	pr_debug("status: %x\n", dma_buffer->data[3]);
-+	pr_debug("nandid: %x maker %02x device %02x\n",
-+		dma_buffer->data[4], dma_buffer->data[4] & 0xff,
-+		(dma_buffer->data[4] >> 8) & 0xff);
-+	rv = dma_buffer->data[4];
-+	msm_nand_release_dma_buffer(chip, dma_buffer, sizeof(*dma_buffer));
-+	return rv;
-+}
-+
-+static int flash_read_config(struct msm_nand_chip *chip)
-+{
-+	struct {
-+		dmov_s cmd[2];
-+		unsigned cmdptr;
-+		unsigned cfg0;
-+		unsigned cfg1;
-+	} *dma_buffer;
-+
-+	wait_event(chip->wait_queue,
-+		   (dma_buffer = msm_nand_get_dma_buffer(
-+			    chip, sizeof(*dma_buffer))));
-+	dma_buffer->cfg0 = 0;
-+	dma_buffer->cfg1 = 0;
-+
-+	dma_buffer->cmd[0].cmd = CMD_OCB;
-+	dma_buffer->cmd[0].src = NAND_DEV0_CFG0;
-+	dma_buffer->cmd[0].dst = msm_virt_to_dma(chip, &dma_buffer->cfg0);
-+	dma_buffer->cmd[0].len = 4;
-+
-+	dma_buffer->cmd[1].cmd = CMD_OCU | CMD_LC;
-+	dma_buffer->cmd[1].src = NAND_DEV0_CFG1;
-+	dma_buffer->cmd[1].dst = msm_virt_to_dma(chip, &dma_buffer->cfg1);
-+	dma_buffer->cmd[1].len = 4;
-+	/* verify the array size statically to avoid array overflow access */
-+	BUILD_BUG_ON(1 != ARRAY_SIZE(dma_buffer->cmd) - 1);
-+
-+	dma_buffer->cmdptr =
-+		(msm_virt_to_dma(chip, dma_buffer->cmd) >> 3) | CMD_PTR_LP;
-+
-+	msm_dmov_exec_cmd(
-+		chip->dma_channel, DMOV_CMD_PTR_LIST |
-+		DMOV_CMD_ADDR(msm_virt_to_dma(chip, &dma_buffer->cmdptr)));
-+
-+	chip->cfg0 = dma_buffer->cfg0;
-+	chip->cfg1 = dma_buffer->cfg1;
-+
-+	pr_info("read cfg0 = %x, cfg1 = %x\n", chip->cfg0, chip->cfg1);
-+	msm_nand_release_dma_buffer(chip, dma_buffer, sizeof(*dma_buffer));
-+
-+	if ((chip->cfg0 == 0) || (chip->cfg1 == 0))
-+		return -ENODEV;
-+
-+	chip->cfg0 = (3 <<  6)  /* 4 codeword per page for 2k nand */
-+		|  (516 <<  9)  /* 516 user data bytes */
-+		|   (10 << 19)  /* 10 parity bytes */
-+		|    (5 << 27)  /* 5 address cycles */
-+		|    (1 << 30)  /* Read status before data */
-+		|    (1 << 31)  /* Send read cmd */
-+		/* 0 spare bytes for 16 bit nand or 1 spare bytes for 8 bit */
-+		| ((chip->cfg1 & CFG1_WIDE_FLASH) ? (0 << 23) : (1 << 23));
-+	chip->cfg1 = (0 <<  0)  /* Enable ecc */
-+		|    (7 <<  2)  /* 8 recovery cycles */
-+		|    (0 <<  5)  /* Allow CS deassertion */
-+		|  (465 <<  6)  /* Bad block marker location */
-+		|    (0 << 16)  /* Bad block in user data area */
-+		|    (2 << 17)  /* 6 cycle tWB/tRB */
-+		| (chip->cfg1 & CFG1_WIDE_FLASH); /* preserve wide flag */
-+
-+	return 0;
-+}
-+
-+static unsigned flash_rd_reg(struct msm_nand_chip *chip, unsigned addr)
-+{
-+	struct {
-+		dmov_s cmd;
-+		unsigned cmdptr;
-+		unsigned data;
-+	} *dma_buffer;
-+	unsigned rv;
-+
-+	wait_event(chip->wait_queue,
-+		   (dma_buffer = msm_nand_get_dma_buffer(
-+			    chip, sizeof(*dma_buffer))));
-+
-+	dma_buffer->cmd.cmd = CMD_LC;
-+	dma_buffer->cmd.src = addr;
-+	dma_buffer->cmd.dst = msm_virt_to_dma(chip, &dma_buffer->data);
-+	dma_buffer->cmd.len = 4;
-+
-+	dma_buffer->cmdptr =
-+		(msm_virt_to_dma(chip, &dma_buffer->cmd) >> 3) | CMD_PTR_LP;
-+	dma_buffer->data = MSM_NAND_STATS_INIT;
-+
-+	msm_dmov_exec_cmd(
-+		chip->dma_channel, DMOV_CMD_PTR_LIST |
-+		DMOV_CMD_ADDR(msm_virt_to_dma(chip, &dma_buffer->cmdptr)));
-+	rv = dma_buffer->data;
-+
-+	msm_nand_release_dma_buffer(chip, dma_buffer, sizeof(*dma_buffer));
-+
-+	return rv;
-+}
-+
-+static void flash_wr_reg(struct msm_nand_chip *chip, unsigned addr,
-+			 unsigned val)
-+{
-+	struct {
-+		dmov_s cmd;
-+		unsigned cmdptr;
-+		unsigned data;
-+	} *dma_buffer;
-+
-+	wait_event(chip->wait_queue,
-+		   (dma_buffer = msm_nand_get_dma_buffer(
-+			    chip, sizeof(*dma_buffer))));
-+
-+	dma_buffer->cmd.cmd = CMD_LC;
-+	dma_buffer->cmd.src = msm_virt_to_dma(chip, &dma_buffer->data);
-+	dma_buffer->cmd.dst = addr;
-+	dma_buffer->cmd.len = 4;
-+
-+	dma_buffer->cmdptr =
-+		(msm_virt_to_dma(chip, &dma_buffer->cmd) >> 3) | CMD_PTR_LP;
-+	dma_buffer->data = val;
-+
-+	msm_dmov_exec_cmd(
-+		chip->dma_channel, DMOV_CMD_PTR_LIST |
-+		DMOV_CMD_ADDR(msm_virt_to_dma(chip, &dma_buffer->cmdptr)));
-+
-+	msm_nand_release_dma_buffer(chip, dma_buffer, sizeof(*dma_buffer));
-+}
-+
-+static int msm_nand_read_oob(struct mtd_info *mtd, loff_t from,
-+			     struct mtd_oob_ops *ops)
-+{
-+	struct msm_nand_chip *chip = mtd->priv;
-+
-+	struct {
-+		dmov_s cmd[4 * 5 + 3];
-+		unsigned cmdptr;
-+		struct {
-+			uint32_t cmd;
-+			uint32_t addr0;
-+			uint32_t addr1;
-+			uint32_t chipsel;
-+			uint32_t cfg0;
-+			uint32_t cfg1;
-+			uint32_t exec;
-+			uint32_t ecccfg;
-+			struct {
-+				uint32_t flash_status;
-+				uint32_t buffer_status;
-+			} result[4];
-+		} data;
-+	} *dma_buffer;
-+	dmov_s *cmd;
-+	unsigned n;
-+	unsigned page = from / NAND_PAGE_SIZE;
-+	uint32_t oob_len = ops->ooblen;
-+	uint32_t sectordatasize;
-+	uint32_t sectoroobsize;
-+	int err, pageerr, rawerr;
-+	dma_addr_t data_dma_addr = 0;
-+	dma_addr_t oob_dma_addr = 0;
-+	dma_addr_t data_dma_addr_curr = 0;
-+	dma_addr_t oob_dma_addr_curr = 0;
-+	uint32_t oob_col = 0;
-+	unsigned page_count;
-+	unsigned pages_read = 0;
-+	unsigned start_sector = 0;
-+	uint32_t ecc_errors;
-+	uint32_t total_ecc_errors = 0;
-+
-+	if (from & (mtd->writesize - 1)) {
-+		pr_err("unsupported from, 0x%llx\n", from);
-+		return -EINVAL;
-+	}
-+	if (ops->datbuf != NULL && (ops->len % mtd->writesize) != 0) {
-+		/* when ops->datbuf is NULL, ops->len may refer to ooblen */
-+		pr_err("unsupported ops->len, %d\n", ops->len);
-+		return -EINVAL;
-+	}
-+	if (ops->ooblen != 0 && ops->ooboffs != 0) {
-+		pr_err("unsupported ops->ooboffs, %d\n", ops->ooboffs);
-+		return -EINVAL;
-+	}
-+
-+	if (ops->oobbuf && !ops->datbuf && ops->mode == MTD_OOB_AUTO)
-+		start_sector = 3;
-+
-+	if (ops->oobbuf && !ops->datbuf)
-+		page_count = ops->ooblen / ((ops->mode == MTD_OOB_AUTO) ?
-+			mtd->oobavail : mtd->oobsize);
-+	else
-+		page_count = ops->len / mtd->writesize;
-+
-+	pr_debug("%llx %p %x %p %x\n",
-+		from, ops->datbuf, ops->len, ops->oobbuf, ops->ooblen);
-+
-+	if (ops->datbuf) {
-+		data_dma_addr_curr = data_dma_addr =
-+			dma_map_single(chip->dev, ops->datbuf, ops->len,
-+				       DMA_FROM_DEVICE);
-+		if (dma_mapping_error(chip->dev, data_dma_addr)) {
-+			pr_err("msm_nand_read_oob: failed to get dma addr "
-+			       "for %p\n", ops->datbuf);
-+			return -EIO;
-+		}
-+	}
-+	if (ops->oobbuf) {
-+		memset(ops->oobbuf, 0xff, ops->ooblen);
-+		oob_dma_addr_curr = oob_dma_addr =
-+			dma_map_single(chip->dev, ops->oobbuf,
-+				       ops->ooblen, DMA_BIDIRECTIONAL);
-+		if (dma_mapping_error(chip->dev, oob_dma_addr)) {
-+			pr_err("msm_nand_read_oob: failed to get dma addr "
-+			       "for %p\n", ops->oobbuf);
-+			err = -EIO;
-+			goto err_dma_map_oobbuf_failed;
-+		}
-+	}
-+
-+	wait_event(chip->wait_queue,
-+		   (dma_buffer = msm_nand_get_dma_buffer(
-+			    chip, sizeof(*dma_buffer))));
-+
-+	oob_col = start_sector * 0x210;
-+	if (chip->cfg1 & CFG1_WIDE_FLASH)
-+		oob_col >>= 1;
-+
-+	err = 0;
-+	while (page_count-- > 0) {
-+		cmd = dma_buffer->cmd;
-+
-+		/* CMD / ADDR0 / ADDR1 / CHIPSEL program values */
-+		dma_buffer->data.cmd = NAND_CMD_PAGE_READ_ECC;
-+		dma_buffer->data.addr0 = (page << 16) | oob_col;
-+		dma_buffer->data.addr1 = (page >> 16) & 0xff;
-+		/* flash0 + undoc bit */
-+		dma_buffer->data.chipsel = NAND_DEV_SEL_CS0 | DM_ENABLE;
-+
-+
-+		dma_buffer->data.cfg0 =
-+			(chip->cfg0 & ~(7U << 6)) | ((3U - start_sector) << 6);
-+		dma_buffer->data.cfg1 = chip->cfg1;
-+
-+		/* GO bit for the EXEC register */
-+		dma_buffer->data.exec = 1;
-+
-+		/* verify the array size statically to avoid array
-+		 * overflow access
-+		 */
-+		BUILD_BUG_ON(4 != ARRAY_SIZE(dma_buffer->data.result));
-+
-+		for (n = start_sector; n < 4; n++) {
-+			/* flash + buffer status return words */
-+			dma_buffer->data.result[n].flash_status =
-+							 MSM_NAND_STATS_INIT;
-+			dma_buffer->data.result[n].buffer_status =
-+							 MSM_NAND_STATS_INIT;
-+
-+			/* block on cmd ready, then
-+			 * write CMD / ADDR0 / ADDR1 / CHIPSEL
-+			 * regs in a burst
-+			 */
-+			cmd->cmd = DST_CRCI_NAND_CMD;
-+			cmd->src = msm_virt_to_dma(chip, &dma_buffer->data.cmd);
-+			cmd->dst = NAND_FLASH_CMD;
-+			if (n == start_sector)
-+				cmd->len = 16;
-+			else
-+				cmd->len = 4;
-+			cmd++;
-+
-+			if (n == start_sector) {
-+				cmd->cmd = 0;
-+				cmd->src = msm_virt_to_dma(chip,
-+							&dma_buffer->data.cfg0);
-+				cmd->dst = NAND_DEV0_CFG0;
-+				cmd->len = 8;
-+				cmd++;
-+			}
-+
-+			/* kick the execute register */
-+			cmd->cmd = 0;
-+			cmd->src =
-+				msm_virt_to_dma(chip, &dma_buffer->data.exec);
-+			cmd->dst = NAND_EXEC_CMD;
-+			cmd->len = 4;
-+			cmd++;
-+
-+			/* block on data ready, then
-+			 * read the status register
-+			 */
-+			cmd->cmd = SRC_CRCI_NAND_DATA;
-+			cmd->src = NAND_FLASH_STATUS;
-+			cmd->dst = msm_virt_to_dma(chip,
-+						   &dma_buffer->data.result[n]);
-+			/* NAND_FLASH_STATUS + NAND_BUFFER_STATUS */
-+			cmd->len = 8;
-+			cmd++;
-+
-+			/* read data block
-+			 * (only valid if status says success)
-+			 */
-+			if (ops->datbuf) {
-+				sectordatasize = (n < 3) ? 516 : 500;
-+				cmd->cmd = 0;
-+				cmd->src = NAND_FLASH_BUFFER;
-+				cmd->dst = data_dma_addr_curr;
-+				data_dma_addr_curr += sectordatasize;
-+				cmd->len = sectordatasize;
-+				cmd++;
-+			}
-+
-+			if (ops->oobbuf &&
-+			    (n == 3 || ops->mode != MTD_OOB_AUTO)) {
-+				cmd->cmd = 0;
-+				if (n == 3) {
-+					cmd->src = NAND_FLASH_BUFFER + 500;
-+					sectoroobsize = 16;
-+					if (ops->mode != MTD_OOB_AUTO)
-+						sectoroobsize += 10;
-+				} else {
-+					cmd->src = NAND_FLASH_BUFFER + 516;
-+					sectoroobsize = 10;
-+				}
-+
-+				cmd->dst = oob_dma_addr_curr;
-+				if (sectoroobsize < oob_len)
-+					cmd->len = sectoroobsize;
-+				else
-+					cmd->len = oob_len;
-+				oob_dma_addr_curr += cmd->len;
-+				oob_len -= cmd->len;
-+				if (cmd->len > 0)
-+					cmd++;
-+			}
-+		}
-+
-+		/* verify the array size statically to avoid array
-+		 * overflow access
-+		 */
-+		BUILD_BUG_ON(4 * 5 + 3 != ARRAY_SIZE(dma_buffer->cmd));
-+		BUG_ON(cmd - dma_buffer->cmd > ARRAY_SIZE(dma_buffer->cmd));
-+		dma_buffer->cmd[0].cmd |= CMD_OCB;
-+		cmd[-1].cmd |= CMD_OCU | CMD_LC;
-+
-+		dma_buffer->cmdptr =
-+			(msm_virt_to_dma(chip, dma_buffer->cmd) >> 3)
-+			| CMD_PTR_LP;
-+
-+		msm_dmov_exec_cmd(
-+			chip->dma_channel, DMOV_CMD_PTR_LIST | DMOV_CMD_ADDR(
-+				msm_virt_to_dma(chip, &dma_buffer->cmdptr)));
-+
-+		/* if any of the writes failed (0x10), or there
-+		 * was a protection violation (0x100), we lose
-+		 */
-+		pageerr = rawerr = 0;
-+		for (n = start_sector; n < 4; n++) {
-+			if (dma_buffer->data.result[n].flash_status & 0x110) {
-+				rawerr = -EIO;
-+				break;
-+			}
-+		}
-+		if (rawerr) {
-+			if (ops->datbuf) {
-+				uint8_t *datbuf =
-+				ops->datbuf + pages_read * mtd->writesize;
-+				for (n = 0; n < mtd->writesize; n++) {
-+					/* empty blocks read 0x54 at
-+					 * these offsets
-+					 */
-+					if (n % 516 == 3 && datbuf[n] == 0x54)
-+						datbuf[n] = 0xff;
-+					if (datbuf[n] != 0xff) {
-+						pageerr = rawerr;
-+						break;
-+					}
-+				}
-+			}
-+			if (ops->oobbuf) {
-+				for (n = 0; n < ops->ooblen; n++) {
-+					if (ops->oobbuf[n] != 0xff) {
-+						pageerr = rawerr;
-+						break;
-+					}
-+				}
-+			}
-+		}
-+		if (pageerr) {
-+			for (n = start_sector; n < 4; n++) {
-+				if (dma_buffer->data.result[n].buffer_status
-+						& 0x8) {
-+					/* not thread safe */
-+					mtd->ecc_stats.failed++;
-+					pageerr = -EBADMSG;
-+					break;
-+				}
-+			}
-+		}
-+		if (!rawerr) { /* check for corretable errors */
-+			for (n = start_sector; n < 4; n++) {
-+				ecc_errors = dma_buffer->data.
-+					result[n].buffer_status & 0x7;
-+				if (ecc_errors) {
-+					total_ecc_errors += ecc_errors;
-+					/* not thread safe */
-+					mtd->ecc_stats.corrected += ecc_errors;
-+					if (ecc_errors > 1)
-+						pageerr = -EUCLEAN;
-+				}
-+			}
-+		}
-+		if (pageerr && (pageerr != -EUCLEAN || err == 0))
-+			err = pageerr;
-+
-+		if (rawerr && !pageerr) {
-+			pr_err("msm_nand_read_oob %llx %x %x empty page\n",
-+			       (loff_t)page * mtd->writesize, ops->len,
-+			       ops->ooblen);
-+		} else {
-+			pr_debug("status: %x %x %x %x %x %x %x %x\n",
-+				dma_buffer->data.result[0].flash_status,
-+				dma_buffer->data.result[0].buffer_status,
-+				dma_buffer->data.result[1].flash_status,
-+				dma_buffer->data.result[1].buffer_status,
-+				dma_buffer->data.result[2].flash_status,
-+				dma_buffer->data.result[2].buffer_status,
-+				dma_buffer->data.result[3].flash_status,
-+				dma_buffer->data.result[3].buffer_status);
-+		}
-+
-+		if (err && err != -EUCLEAN && err != -EBADMSG)
-+			break;
-+		pages_read++;
-+		page++;
-+	}
-+	msm_nand_release_dma_buffer(chip, dma_buffer, sizeof(*dma_buffer));
-+
-+	if (ops->oobbuf) {
-+		dma_unmap_single(chip->dev, oob_dma_addr,
-+				 ops->ooblen, DMA_FROM_DEVICE);
-+	}
-+err_dma_map_oobbuf_failed:
-+	if (ops->datbuf) {
-+		dma_unmap_single(chip->dev, data_dma_addr,
-+				 ops->len, DMA_FROM_DEVICE);
-+	}
-+
-+	ops->retlen = mtd->writesize * pages_read;
-+	ops->oobretlen = ops->ooblen - oob_len;
-+	if (err)
-+		pr_err("msm_nand_read_oob %llx %x %x failed %d, corrected %d\n",
-+		       from, ops->datbuf ? ops->len : 0, ops->ooblen, err,
-+		       total_ecc_errors);
-+	return err;
-+}
-+
-+static int
-+msm_nand_read(struct mtd_info *mtd, loff_t from, size_t len,
-+	      size_t *retlen, u_char *buf)
-+{
-+	int ret;
-+	struct mtd_oob_ops ops;
-+
-+
-+	ops.mode = MTD_OOB_PLACE;
-+	ops.len = len;
-+	ops.retlen = 0;
-+	ops.ooblen = 0;
-+	ops.datbuf = buf;
-+	ops.oobbuf = NULL;
-+	ret =  msm_nand_read_oob(mtd, from, &ops);
-+	*retlen = ops.retlen;
-+	return ret;
-+}
-+
-+static int
-+msm_nand_write_oob(struct mtd_info *mtd, loff_t to, struct mtd_oob_ops *ops)
-+{
-+	struct msm_nand_chip *chip = mtd->priv;
-+	struct {
-+		dmov_s cmd[4 * 5 + 3];
-+		unsigned cmdptr;
-+		struct {
-+			uint32_t cmd;
-+			uint32_t addr0;
-+			uint32_t addr1;
-+			uint32_t chipsel;
-+			uint32_t cfg0;
-+			uint32_t cfg1;
-+			uint32_t exec;
-+			uint32_t ecccfg;
-+			uint32_t flash_status[4];
-+		} data;
-+	} *dma_buffer;
-+	dmov_s *cmd;
-+	unsigned n;
-+	unsigned page = to / NAND_PAGE_SIZE;
-+	uint32_t oob_len = ops->ooblen;
-+	uint32_t sectordatawritesize;
-+	int err;
-+	dma_addr_t data_dma_addr = 0;
-+	dma_addr_t oob_dma_addr = 0;
-+	dma_addr_t data_dma_addr_curr = 0;
-+	dma_addr_t oob_dma_addr_curr = 0;
-+	unsigned page_count;
-+	unsigned pages_written = 0;
-+
-+	if (to & (mtd->writesize - 1)) {
-+		pr_err("unsupported to, 0x%llx\n", to);
-+		return -EINVAL;
-+	}
-+	if (ops->ooblen != 0 && ops->mode != MTD_OOB_AUTO) {
-+		pr_err("unsupported ops->mode, %d\n", ops->mode);
-+		return -EINVAL;
-+	}
-+
-+	if (ops->datbuf == NULL) {
-+		pr_err("unsupported ops->datbuf == NULL\n");
-+		return -EINVAL;
-+	}
-+	if ((ops->len % mtd->writesize) != 0) {
-+		pr_err("unsupported ops->len, %d\n", ops->len);
-+		return -EINVAL;
-+	}
-+
-+	if (ops->ooblen != 0 && ops->ooboffs != 0) {
-+		pr_err("unsupported ops->ooboffs, %d\n", ops->ooboffs);
-+		return -EINVAL;
-+	}
-+
-+	if (ops->datbuf) {
-+		data_dma_addr_curr = data_dma_addr =
-+			dma_map_single(chip->dev, ops->datbuf,
-+				       ops->len, DMA_TO_DEVICE);
-+		if (dma_mapping_error(chip->dev, data_dma_addr)) {
-+			pr_err("msm_nand_write_oob: failed to get dma addr "
-+			       "for %p\n", ops->datbuf);
-+			return -EIO;
-+		}
-+	}
-+	if (ops->oobbuf) {
-+		oob_dma_addr_curr = oob_dma_addr =
-+			dma_map_single(chip->dev, ops->oobbuf,
-+				       ops->ooblen, DMA_TO_DEVICE);
-+		if (dma_mapping_error(chip->dev, oob_dma_addr)) {
-+			pr_err("msm_nand_write_oob: failed to get dma addr "
-+			       "for %p\n", ops->oobbuf);
-+			err = -EIO;
-+			goto err_dma_map_oobbuf_failed;
-+		}
-+	}
-+
-+	page_count = ops->len / mtd->writesize;
-+
-+	wait_event(chip->wait_queue, (dma_buffer =
-+			msm_nand_get_dma_buffer(chip, sizeof(*dma_buffer))));
-+
-+	while (page_count-- > 0) {
-+		cmd = dma_buffer->cmd;
-+
-+		/* CMD / ADDR0 / ADDR1 / CHIPSEL program values */
-+		dma_buffer->data.cmd = NAND_CMD_PRG_PAGE;
-+		dma_buffer->data.addr0 = page << 16;
-+		dma_buffer->data.addr1 = (page >> 16) & 0xff;
-+		dma_buffer->data.chipsel = NAND_DEV_SEL_CS0 | DM_ENABLE;
-+
-+		dma_buffer->data.cfg0 = chip->cfg0;
-+		dma_buffer->data.cfg1 = chip->cfg1;
-+
-+		/* GO bit for the EXEC register */
-+		dma_buffer->data.exec = 1;
-+
-+		/* verify the array size statically to avoid array
-+		 * overflow access
-+		 */
-+		BUILD_BUG_ON(4 != ARRAY_SIZE(dma_buffer->data.flash_status));
-+
-+		for (n = 0; n < 4; n++) {
-+			/* status return words */
-+			dma_buffer->data.flash_status[n] = MSM_NAND_STATS_INIT;
-+			/* block on cmd ready, then
-+			 * write CMD / ADDR0 / ADDR1 / CHIPSEL regs in a burst
-+			 */
-+			cmd->cmd = DST_CRCI_NAND_CMD;
-+			cmd->src =
-+				msm_virt_to_dma(chip, &dma_buffer->data.cmd);
-+			cmd->dst = NAND_FLASH_CMD;
-+			if (n == 0)
-+				cmd->len = 16;
-+			else
-+				cmd->len = 4;
-+			cmd++;
-+
-+			if (n == 0) {
-+				cmd->cmd = 0;
-+				cmd->src = msm_virt_to_dma(chip,
-+							&dma_buffer->data.cfg0);
-+				cmd->dst = NAND_DEV0_CFG0;
-+				cmd->len = 8;
-+				cmd++;
-+			}
-+
-+				/* write data block */
-+			sectordatawritesize = (n < 3) ? 516 : 500;
-+			cmd->cmd = 0;
-+			cmd->src = data_dma_addr_curr;
-+			data_dma_addr_curr += sectordatawritesize;
-+			cmd->dst = NAND_FLASH_BUFFER;
-+			cmd->len = sectordatawritesize;
-+			cmd++;
-+
-+			if (ops->oobbuf) {
-+				if (n == 3) {
-+					cmd->cmd = 0;
-+					cmd->src = oob_dma_addr_curr;
-+					cmd->dst = NAND_FLASH_BUFFER + 500;
-+					if (16 < oob_len)
-+						cmd->len = 16;
-+					else
-+						cmd->len = oob_len;
-+					oob_dma_addr_curr += cmd->len;
-+					oob_len -= cmd->len;
-+					if (cmd->len > 0)
-+						cmd++;
-+				}
-+				if (ops->mode != MTD_OOB_AUTO) {
-+					/* skip ecc bytes in oobbuf */
-+					if (oob_len < 10) {
-+						oob_dma_addr_curr += 10;
-+						oob_len -= 10;
-+					} else {
-+						oob_dma_addr_curr += oob_len;
-+						oob_len = 0;
-+					}
-+				}
-+			}
-+
-+			/* kick the execute register */
-+			cmd->cmd = 0;
-+			cmd->src =
-+				msm_virt_to_dma(chip, &dma_buffer->data.exec);
-+			cmd->dst = NAND_EXEC_CMD;
-+			cmd->len = 4;
-+			cmd++;
-+
-+			/* block on data ready, then
-+			 * read the status register
-+			 */
-+			cmd->cmd = SRC_CRCI_NAND_DATA;
-+			cmd->src = NAND_FLASH_STATUS;
-+			cmd->dst = msm_virt_to_dma(chip,
-+					     &dma_buffer->data.flash_status[n]);
-+			cmd->len = 4;
-+			cmd++;
-+		}
-+
-+		dma_buffer->cmd[0].cmd |= CMD_OCB;
-+		cmd[-1].cmd |= CMD_OCU | CMD_LC;
-+		/* verify the array size statically to avoid array
-+		 * overflow access
-+		 */
-+		BUILD_BUG_ON(4 * 5 + 3 != ARRAY_SIZE(dma_buffer->cmd));
-+		BUG_ON(cmd - dma_buffer->cmd > ARRAY_SIZE(dma_buffer->cmd));
-+		dma_buffer->cmdptr =
-+			(msm_virt_to_dma(chip, dma_buffer->cmd) >> 3) |
-+			CMD_PTR_LP;
-+
-+		msm_dmov_exec_cmd(chip->dma_channel,
-+			DMOV_CMD_PTR_LIST | DMOV_CMD_ADDR(
-+				msm_virt_to_dma(chip, &dma_buffer->cmdptr)));
-+
-+		/* if any of the writes failed (0x10), or there was a
-+		 * protection violation (0x100), or the program success
-+		 * bit (0x80) is unset, we lose
-+		 */
-+		err = 0;
-+		for (n = 0; n < 4; n++) {
-+			if (dma_buffer->data.flash_status[n] & 0x110) {
-+				err = -EIO;
-+				break;
-+			}
-+			if (!(dma_buffer->data.flash_status[n] & 0x80)) {
-+				err = -EIO;
-+				break;
-+			}
-+		}
-+
-+		pr_debug("write page %d: status: %x %x %x %x\n", page,
-+			dma_buffer->data.flash_status[0],
-+			dma_buffer->data.flash_status[1],
-+			dma_buffer->data.flash_status[2],
-+			dma_buffer->data.flash_status[3]);
-+
-+		if (err)
-+			break;
-+		pages_written++;
-+		page++;
-+	}
-+	ops->retlen = mtd->writesize * pages_written;
-+	ops->oobretlen = ops->ooblen - oob_len;
-+
-+	msm_nand_release_dma_buffer(chip, dma_buffer, sizeof(*dma_buffer));
-+
-+	if (ops->oobbuf)
-+		dma_unmap_single(chip->dev, oob_dma_addr,
-+				 ops->ooblen, DMA_TO_DEVICE);
-+err_dma_map_oobbuf_failed:
-+	if (ops->datbuf)
-+		dma_unmap_single(chip->dev, data_dma_addr,
-+				 mtd->writesize, DMA_TO_DEVICE);
-+	if (err)
-+		pr_err("msm_nand_write_oob %llx %x %x failed %d\n",
-+		       to, ops->len, ops->ooblen, err);
-+	return err;
-+}
-+
-+static int msm_nand_write(struct mtd_info *mtd, loff_t to, size_t len,
-+			  size_t *retlen, const u_char *buf)
-+{
-+	int ret;
-+	struct mtd_oob_ops ops;
-+
-+	ops.mode = MTD_OOB_PLACE;
-+	ops.len = len;
-+	ops.retlen = 0;
-+	ops.ooblen = 0;
-+	ops.datbuf = (uint8_t *)buf;
-+	ops.oobbuf = NULL;
-+	ret =  msm_nand_write_oob(mtd, to, &ops);
-+	*retlen = ops.retlen;
-+	return ret;
-+}
-+
-+static int
-+msm_nand_erase(struct mtd_info *mtd, struct erase_info *instr)
-+{
-+	int err;
-+	struct msm_nand_chip *chip = mtd->priv;
-+	struct {
-+		dmov_s cmd[4];
-+		unsigned cmdptr;
-+		unsigned data[8];
-+	} *dma_buffer;
-+	unsigned page = instr->addr / NAND_PAGE_SIZE;
-+
-+	if (instr->addr & (mtd->erasesize - 1)) {
-+		pr_err("unsupported erase address, 0x%llx\n",
-+		       instr->addr);
-+		return -EINVAL;
-+	}
-+	if (instr->len != mtd->erasesize) {
-+		pr_err("unsupported erase len, %lld\n",
-+		       instr->len);
-+		return -EINVAL;
-+	}
-+
-+	wait_event(chip->wait_queue,
-+		   (dma_buffer = msm_nand_get_dma_buffer(
-+			    chip, sizeof(*dma_buffer))));
-+
-+	dma_buffer->data[0] = NAND_CMD_BLOCK_ERASE;
-+	dma_buffer->data[1] = page;
-+	dma_buffer->data[2] = 0;
-+	dma_buffer->data[3] = NAND_DEV_SEL_CS0 | DM_ENABLE;
-+	dma_buffer->data[4] = 1;
-+	dma_buffer->data[5] = MSM_NAND_STATS_INIT;
-+	dma_buffer->data[6] = chip->cfg0 & (~(7 << 6));  /* CW_PER_PAGE = 0 */
-+	dma_buffer->data[7] = chip->cfg1;
-+	/* verify the array size statically to avoid array overflow access */
-+	BUILD_BUG_ON(7 != ARRAY_SIZE(dma_buffer->data) - 1);
-+
-+	dma_buffer->cmd[0].cmd = DST_CRCI_NAND_CMD | CMD_OCB;
-+	dma_buffer->cmd[0].src = msm_virt_to_dma(chip, &dma_buffer->data[0]);
-+	dma_buffer->cmd[0].dst = NAND_FLASH_CMD;
-+	dma_buffer->cmd[0].len = 16;
-+
-+	dma_buffer->cmd[1].cmd = 0;
-+	dma_buffer->cmd[1].src = msm_virt_to_dma(chip, &dma_buffer->data[6]);
-+	dma_buffer->cmd[1].dst = NAND_DEV0_CFG0;
-+	dma_buffer->cmd[1].len = 8;
-+
-+	dma_buffer->cmd[2].cmd = 0;
-+	dma_buffer->cmd[2].src = msm_virt_to_dma(chip, &dma_buffer->data[4]);
-+	dma_buffer->cmd[2].dst = NAND_EXEC_CMD;
-+	dma_buffer->cmd[2].len = 4;
-+
-+	dma_buffer->cmd[3].cmd = SRC_CRCI_NAND_DATA | CMD_OCU | CMD_LC;;
-+	dma_buffer->cmd[3].src = NAND_FLASH_STATUS;
-+	dma_buffer->cmd[3].dst = msm_virt_to_dma(chip, &dma_buffer->data[5]);
-+	dma_buffer->cmd[3].len = 4;
-+
-+	/* verify the array size statically to avoid array overflow access */
-+	BUILD_BUG_ON(3 != ARRAY_SIZE(dma_buffer->cmd) - 1);
-+
-+	dma_buffer->cmdptr =
-+		(msm_virt_to_dma(chip, dma_buffer->cmd) >> 3) | CMD_PTR_LP;
-+
-+	msm_dmov_exec_cmd(
-+		chip->dma_channel, DMOV_CMD_PTR_LIST |
-+		DMOV_CMD_ADDR(msm_virt_to_dma(chip, &dma_buffer->cmdptr)));
-+
-+	/* we fail if there was an operation error, a mpu error, or the
-+	 * erase success bit was not set.
-+	 */
-+
-+	if (dma_buffer->data[5] & 0x110 || !(dma_buffer->data[5] & 0x80))
-+		err = -EIO;
-+	else
-+		err = 0;
-+
-+	msm_nand_release_dma_buffer(chip, dma_buffer, sizeof(*dma_buffer));
-+	if (err) {
-+		pr_err("erase failed, 0x%llx\n", instr->addr);
-+		instr->fail_addr = instr->addr;
-+		instr->state = MTD_ERASE_FAILED;
-+	} else {
-+		instr->state = MTD_ERASE_DONE;
-+		instr->fail_addr = 0xffffffff;
-+		mtd_erase_callback(instr);
-+	}
-+	return err;
-+}
-+
-+static int
-+msm_nand_block_isbad(struct mtd_info *mtd, loff_t ofs)
-+{
-+	/* Check for invalid offset */
-+	if (ofs > mtd->size)
-+		return -EINVAL;
-+
-+	return 0;
-+}
-+
-+
-+static int
-+msm_nand_block_markbad(struct mtd_info *mtd, loff_t ofs)
-+{
-+	int ret;
-+
-+	ret = msm_nand_block_isbad(mtd, ofs);
-+	if (ret) {
-+		/* If it was bad already, return success and do nothing */
-+		if (ret > 0)
-+			return 0;
-+		return ret;
-+	}
-+
-+	return -EIO;
-+}
-+
-+/**
-+ * msm_nand_scan - [msm_nand Interface] Scan for the msm_nand device
-+ * @mtd:        MTD device structure
-+ * @maxchips:   Number of chips to scan for
-+ *
-+ * This fills out all the not initialized function pointers
-+ * with the defaults.
-+ * The flash ID is read and the mtd/chip structures are
-+ * filled with the appropriate values.
-+ */
-+static int msm_nand_scan(struct mtd_info *mtd, int maxchips)
-+{
-+	unsigned n;
-+	struct msm_nand_chip *chip = mtd->priv;
-+	uint32_t flash_id;
-+
-+
-+	if (flash_read_config(chip)) {
-+		pr_err("ERROR: could not save cfg0 & cfg1 state\n");
-+		return -ENODEV;
-+	}
-+	pr_info("cfg0 = %x, cfg1 = %x\n", chip->cfg0, chip->cfg1);
-+	pr_info("cfg0: cw/page=%d ud_sz=%d ecc_sz=%d spare_sz=%d "
-+		"num_addr_cycles=%d\n", (chip->cfg0 >> 6) & 7,
-+		(chip->cfg0 >> 9) & 0x3ff, (chip->cfg0 >> 19) & 15,
-+		(chip->cfg0 >> 23) & 15, (chip->cfg0 >> 27) & 7);
-+
-+	pr_info("NAND_READ_ID = %x\n", flash_rd_reg(chip, NAND_READ_ID));
-+	flash_wr_reg(chip, NAND_READ_ID, 0x12345678);
-+
-+	flash_id = flash_read_id(chip);
-+
-+	n = flash_rd_reg(chip, NAND_DEV0_CFG0);
-+	pr_info("cfg0: cw/page=%d ud_sz=%d ecc_sz=%d spare_sz=%d\n",
-+		(n >> 6) & 7, (n >> 9) & 0x3ff, (n >> 19) & 15,
-+		(n >> 23) & 15);
-+
-+	n = flash_rd_reg(chip, NAND_DEV_CMD1);
-+	pr_info("DEV_CMD1: %x\n", n);
-+
-+	n = flash_rd_reg(chip, NAND_EBI2_ECC_BUF_CFG);
-+	pr_info("NAND_EBI2_ECC_BUF_CFG: %x\n", n);
-+
-+	chip->ecc_buf_cfg = 0x203;
-+
-+	if ((flash_id & 0xffff) == 0xaaec) /* 2Gbit Samsung chip */
-+		mtd->size = 256 << 20; /* * num_chips */
-+	else if (flash_id == 0x5580baad) /* 2Gbit Hynix chip */
-+		mtd->size = 256 << 20; /* * num_chips */
-+	else if (flash_id == 0x5510baad) /* 2Gbit Hynix chip */
-+		mtd->size = 256 << 20; /* * num_chips */
-+	pr_info("flash_id: %x size %llx\n", flash_id, mtd->size);
-+
-+	mtd->writesize = 2048;
-+	mtd->oobsize = msm_nand_oob_64.eccbytes + msm_nand_oob_64.oobavail;
-+	mtd->oobavail = msm_nand_oob_64.oobavail;
-+	mtd->erasesize = mtd->writesize << 6;
-+	mtd->ecclayout = &msm_nand_oob_64;
-+
-+	/* Fill in remaining MTD driver data */
-+	mtd->type = MTD_NANDFLASH;
-+	mtd->flags = MTD_CAP_NANDFLASH;
-+	mtd->erase = msm_nand_erase;
-+	mtd->point = NULL;
-+	mtd->unpoint = NULL;
-+	mtd->read = msm_nand_read;
-+	mtd->write = msm_nand_write;
-+	mtd->read_oob = msm_nand_read_oob;
-+	mtd->write_oob = msm_nand_write_oob;
-+	mtd->lock = NULL;
-+	mtd->suspend = NULL;
-+	mtd->resume = NULL;
-+	mtd->block_isbad = msm_nand_block_isbad;
-+	mtd->block_markbad = msm_nand_block_markbad;
-+	mtd->owner = THIS_MODULE;
-+
-+	return 0;
-+}
-+
-+/**
-+ * msm_nand_release - [msm_nand Interface] Free resources held by the msm_nand device
-+ * @mtd:    MTD device structure
-+ */
-+static void msm_nand_release(struct mtd_info *mtd)
-+{
-+
-+#ifdef CONFIG_MTD_PARTITIONS
-+	/* Deregister partitions */
-+	del_mtd_partitions(mtd);
-+#endif
-+	/* Deregister the device */
-+	del_mtd_device(mtd);
-+}
-+
-+#ifdef CONFIG_MTD_PARTITIONS
-+static const char const *part_probes[] = { "cmdlinepart", NULL,  };
-+#endif
-+
-+static int __devinit msm_nand_probe(struct platform_device *pdev)
-+{
-+	struct msm_nand_info *info;
-+	struct resource *res;
-+	struct flash_platform_data const *pdata = pdev->dev.platform_data;
-+	int err;
-+
-+	res = platform_get_resource_byname(pdev,
-+					IORESOURCE_MEM, "msm_nand_phys");
-+	if (!res || !res->start) {
-+		pr_err("msm_nand_phys resource invalid/absent\n");
-+		return -EINVAL;
-+	}
-+	msm_nand_phys = res->start;
-+	pr_debug("phys addr 0x%lx\n", msm_nand_phys);
-+
-+	res = platform_get_resource_byname(pdev,
-+					IORESOURCE_DMA, "msm_nand_dmac");
-+	if (!res || !res->start) {
-+		pr_err("Invalid msm_nand_dmac resource\n");
-+		return -EINVAL;
-+	}
-+
-+	info = kzalloc(sizeof(struct msm_nand_info), GFP_KERNEL);
-+	if (!info) {
-+		pr_err("No memory for msm_nand_info\n");
-+		return -ENOMEM;
-+	}
-+
-+	info->msm_nand.dev = &pdev->dev;
-+
-+	init_waitqueue_head(&info->msm_nand.wait_queue);
-+
-+	info->msm_nand.dma_channel = res->start;
-+	pr_debug("dma channel 0x%x\n", info->msm_nand.dma_channel);
-+	info->msm_nand.dma_buffer =
-+		dma_alloc_coherent(NULL, MSM_NAND_DMA_BUFFER_SIZE,
-+				   &info->msm_nand.dma_addr, GFP_KERNEL);
-+	if (info->msm_nand.dma_buffer == NULL) {
-+		err = -ENOMEM;
-+		goto out_free_info;
-+	}
-+
-+	pr_debug("allocated dma buffer at %p, dma_addr %x\n",
-+		info->msm_nand.dma_buffer, info->msm_nand.dma_addr);
-+
-+	info->mtd.name = dev_name(&pdev->dev);
-+	info->mtd.priv = &info->msm_nand;
-+	info->mtd.owner = THIS_MODULE;
-+
-+	if (msm_nand_scan(&info->mtd, 1)) {
-+		err = -ENXIO;
-+		goto out_free_dma_buffer;
-+	}
-+
-+#ifdef CONFIG_MTD_PARTITIONS
-+	err = parse_mtd_partitions(&info->mtd, part_probes, &info->parts, 0);
-+	if (err > 0)
-+		err = add_mtd_partitions(&info->mtd, info->parts, err);
-+	else if (err <= 0 && pdata && pdata->parts)
-+		err = add_mtd_partitions(&info->mtd, pdata->parts,
-+					 pdata->nr_parts);
-+	else
-+#endif
-+		err = add_mtd_device(&info->mtd);
-+
-+	if (err != 0)
-+		goto out_free_dma_buffer;
-+
-+	platform_set_drvdata(pdev, info);
-+
-+	return 0;
-+
-+out_free_dma_buffer:
-+	dma_free_coherent(NULL, MSM_NAND_DMA_BUFFER_SIZE,
-+			  info->msm_nand.dma_buffer, info->msm_nand.dma_addr);
-+out_free_info:
-+	kfree(info);
-+
-+	return err;
-+}
-+
-+static int __devexit msm_nand_remove(struct platform_device *pdev)
-+{
-+	struct msm_nand_info *info = platform_get_drvdata(pdev);
-+
-+	platform_set_drvdata(pdev, NULL);
-+
-+#ifdef CONFIG_MTD_PARTITIONS
-+	if (info->parts)
-+		del_mtd_partitions(&info->mtd);
-+	else
-+#endif
-+		del_mtd_device(&info->mtd);
-+
-+	msm_nand_release(&info->mtd);
-+	dma_free_coherent(NULL, MSM_NAND_DMA_BUFFER_SIZE,
-+			  info->msm_nand.dma_buffer, info->msm_nand.dma_addr);
-+	kfree(info);
-+
-+	return 0;
-+}
-+
-+static struct platform_driver msm_nand_driver = {
-+	.probe		= msm_nand_probe,
-+	.remove		= __devexit_p(msm_nand_remove),
-+	.driver = {
-+		.name	= "msm_nand",
-+		.owner	= THIS_MODULE,
-+	}
-+};
-+
-+static int __init msm_nand_init(void)
-+{
-+	return platform_driver_register(&msm_nand_driver);
-+}
-+module_init(msm_nand_init);
-+
-+static void __exit msm_nand_exit(void)
-+{
-+	platform_driver_unregister(&msm_nand_driver);
-+}
-+module_exit(msm_nand_exit);
-+
-+MODULE_LICENSE("GPL");
-+MODULE_DESCRIPTION("msm_nand flash driver code");
-+MODULE_ALIAS("platform:msm_nand");
-diff --git a/drivers/mtd/devices/msm_nand.h b/drivers/mtd/devices/msm_nand.h
-new file mode 100644
-index 0000000..c57d297
---- /dev/null
-+++ b/drivers/mtd/devices/msm_nand.h
-@@ -0,0 +1,75 @@
-+/*
-+ * Copyright (C) 2007 Google, Inc.
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ */
-+
-+#ifndef __DRIVERS_MTD_DEVICES_MSM_NAND_H
-+#define __DRIVERS_MTD_DEVICES_MSM_NAND_H
-+
-+extern unsigned long msm_nand_phys;
-+#define NAND_REG(off) (msm_nand_phys + (off))
-+
-+#define NAND_FLASH_CMD            NAND_REG(0x0000)
-+#define NAND_ADDR0                NAND_REG(0x0004)
-+#define NAND_ADDR1                NAND_REG(0x0008)
-+#define NAND_FLASH_CHIP_SELECT    NAND_REG(0x000C)
-+#define NAND_EXEC_CMD             NAND_REG(0x0010)
-+#define NAND_FLASH_STATUS         NAND_REG(0x0014)
-+#define NAND_BUFFER_STATUS        NAND_REG(0x0018)
-+#define NAND_DEV0_CFG0            NAND_REG(0x0020)
-+#define NAND_DEV0_CFG1            NAND_REG(0x0024)
-+#define NAND_DEV1_CFG0            NAND_REG(0x0030)
-+#define NAND_DEV1_CFG1            NAND_REG(0x0034)
-+#define NAND_READ_ID              NAND_REG(0x0040)
-+#define NAND_READ_STATUS          NAND_REG(0x0044)
-+#define NAND_CONFIG_DATA          NAND_REG(0x0050)
-+#define NAND_CONFIG               NAND_REG(0x0054)
-+#define NAND_CONFIG_MODE          NAND_REG(0x0058)
-+#define NAND_CONFIG_STATUS        NAND_REG(0x0060)
-+#define NAND_MACRO1_REG           NAND_REG(0x0064)
-+#define NAND_XFR_STEP1            NAND_REG(0x0070)
-+#define NAND_XFR_STEP2            NAND_REG(0x0074)
-+#define NAND_XFR_STEP3            NAND_REG(0x0078)
-+#define NAND_XFR_STEP4            NAND_REG(0x007C)
-+#define NAND_XFR_STEP5            NAND_REG(0x0080)
-+#define NAND_XFR_STEP6            NAND_REG(0x0084)
-+#define NAND_XFR_STEP7            NAND_REG(0x0088)
-+#define NAND_DEV_CMD0             NAND_REG(0x00A0)
-+#define NAND_DEV_CMD1             NAND_REG(0x00A4)
-+#define NAND_DEV_CMD2             NAND_REG(0x00A8)
-+#define NAND_DEV_CMD_VLD          NAND_REG(0x00AC)
-+#define NAND_EBI2_MISR_SIG_REG    NAND_REG(0x00B0)
-+#define NAND_EBI2_ECC_BUF_CFG     NAND_REG(0x00F0)
-+#define NAND_FLASH_BUFFER         NAND_REG(0x0100)
-+
-+/* device commands */
-+
-+#define NAND_CMD_SOFT_RESET         0x01
-+#define NAND_CMD_PAGE_READ          0x32
-+#define NAND_CMD_PAGE_READ_ECC      0x33
-+#define NAND_CMD_PAGE_READ_ALL      0x34
-+#define NAND_CMD_SEQ_PAGE_READ      0x15
-+#define NAND_CMD_PRG_PAGE           0x36
-+#define NAND_CMD_PRG_PAGE_ECC       0x37
-+#define NAND_CMD_PRG_PAGE_ALL       0x39
-+#define NAND_CMD_BLOCK_ERASE        0x3A
-+#define NAND_CMD_FETCH_ID           0x0B
-+#define NAND_CMD_STATUS             0x0C
-+#define NAND_CMD_RESET              0x0D
-+
-+#define MSM_NAND_STATS_INIT	    0xeeeeeeee
-+#define DM_ENABLE		    (1 << 2)
-+#define NAND_DEV_SEL_CS0	    (0 << 0)
-+
-+#define NAND_PAGE_SIZE		    2048
-+
-+#endif
---
-1.7.3.4
+On Thu, Jan 20, 2011 at 3:48 PM, Sukumar Ghorai <s-ghorai@ti.com> wrote:
+> bch error correction (t=4 and t=8) for 512 bytes support added.
+> Tested in omap-3630 es-1.1 silicon.
+>
+> Need to select the bch-ecc from board file. E.g.
+> arch/arm/mach-omap2/board-flash.c: board_nand_init()
+> board_nand_data.ecc_opt = OMAP_ECC_BCH4_CODE_HW
+>
+> This patch has dependency on -
+> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg42658.html
+>
+> Signed-off-by: Sukumar Ghorai <s-ghorai@ti.com>
+> ---
+> ?arch/arm/mach-omap2/gpmc.c ? ? ? ? ? ? | ?126 ++++++++---
+> ?arch/arm/plat-omap/include/plat/gpmc.h | ? ?6 +-
+> ?drivers/mtd/nand/Makefile ? ? ? ? ? ? ?| ? ?1 +
+> ?drivers/mtd/nand/omap2.c ? ? ? ? ? ? ? | ?119 ++++++++--
+> ?drivers/mtd/nand/omap_bch_decoder.c ? ?| ?393 ++++++++++++++++++++++++++++++++
+> ?5 files changed, 583 insertions(+), 62 deletions(-)
+> ?create mode 100644 drivers/mtd/nand/omap_bch_decoder.c
+>
+> diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
+> index 29c9732..91cfdca 100644
+> --- a/arch/arm/mach-omap2/gpmc.c
+> +++ b/arch/arm/mach-omap2/gpmc.c
+> @@ -48,6 +48,7 @@
+> ?#define GPMC_ECC_CONTROL ? ? ? 0x1f8
+> ?#define GPMC_ECC_SIZE_CONFIG ? 0x1fc
+> ?#define GPMC_ECC1_RESULT ? ? ? ?0x200
+> +#define GPMC_ECC_BCH_RESULT_0 ?0x240
+>
+> ?#define GPMC_CS0_OFFSET ? ? ? ? ? ? ? ?0x60
+> ?#define GPMC_CS_SIZE ? ? ? ? ? 0x30
+> @@ -94,7 +95,6 @@ static struct resource ? ? ? ?gpmc_mem_root;
+> ?static struct resource gpmc_cs_mem[GPMC_CS_NUM];
+> ?static DEFINE_SPINLOCK(gpmc_mem_lock);
+> ?static unsigned int gpmc_cs_map; ? ? ? /* flag for cs which are initialized */
+> -static int gpmc_ecc_used = -EINVAL; ? ?/* cs using ecc engine */
+>
+> ?static void __iomem *gpmc_base;
+>
+> @@ -832,52 +832,77 @@ void omap3_gpmc_restore_context(void)
+>
+> ?/**
+> ?* gpmc_enable_hwecc - enable hardware ecc functionality
+> + * @ecc_type: ecc type e.g. Hamming, BCH
+> ?* @cs: chip select number
+> ?* @mode: read/write mode
+> ?* @dev_width: device bus width(1 for x16, 0 for x8)
+> ?* @ecc_size: bytes for which ECC will be generated
+> ?*/
+> -int gpmc_enable_hwecc(int cs, int mode, int dev_width, int ecc_size)
+> +int gpmc_enable_hwecc(int ecc_type, int cs, int mode,
+> + ? ? ? ? ? ? ? ? ? ? ? int dev_width, int ecc_size)
+> ?{
+> - ? ? ? unsigned int val;
+> -
+> - ? ? ? /* check if ecc module is in used */
+> - ? ? ? if (gpmc_ecc_used != -EINVAL)
+> - ? ? ? ? ? ? ? return -EINVAL;
+> -
+> - ? ? ? gpmc_ecc_used = cs;
+> -
+> - ? ? ? /* clear ecc and enable bits */
+> - ? ? ? val = ((0x00000001<<8) | 0x00000001);
+> - ? ? ? gpmc_write_reg(GPMC_ECC_CONTROL, val);
+> -
+> - ? ? ? /* program ecc and result sizes */
+> - ? ? ? val = ((((ecc_size >> 1) - 1) << 22) | (0x0000000F));
+> - ? ? ? gpmc_write_reg(GPMC_ECC_SIZE_CONFIG, val);
+> + ? ? ? unsigned int bch_mod = 0, bch_wrapmode = 0, eccsize1 = 0, eccsize0 = 0;
+> + ? ? ? unsigned int ecc_conf_val = 0, ecc_size_conf_val = 0;
+>
+> ? ? ? ?switch (mode) {
+> ? ? ? ?case GPMC_ECC_READ:
+> - ? ? ? ? ? ? ? gpmc_write_reg(GPMC_ECC_CONTROL, 0x101);
+> + ? ? ? ? ? ? ? if (ecc_type == OMAP_ECC_BCH4_CODE_HW) {
+> + ? ? ? ? ? ? ? ? ? ? ? eccsize1 = 0xD; eccsize0 = 0x48;
+> + ? ? ? ? ? ? ? ? ? ? ? bch_mod = 0;
+> + ? ? ? ? ? ? ? ? ? ? ? bch_wrapmode = 0x09;
+> + ? ? ? ? ? ? ? } else if (ecc_type == OMAP_ECC_BCH8_CODE_HW) {
+> + ? ? ? ? ? ? ? ? ? ? ? eccsize1 = 0x1A; eccsize0 = 0x18;
+> + ? ? ? ? ? ? ? ? ? ? ? bch_mod = 1;
+> + ? ? ? ? ? ? ? ? ? ? ? bch_wrapmode = 0x04;
+> + ? ? ? ? ? ? ? } else
+> + ? ? ? ? ? ? ? ? ? ? ? eccsize1 = ((ecc_size >> 1) - 1) << 22;
+> ? ? ? ? ? ? ? ?break;
+> +
+> ? ? ? ?case GPMC_ECC_READSYN:
+> - ? ? ? ? ? ? ? ?gpmc_write_reg(GPMC_ECC_CONTROL, 0x100);
+> ? ? ? ? ? ? ? ?break;
+> +
+> ? ? ? ?case GPMC_ECC_WRITE:
+> - ? ? ? ? ? ? ? gpmc_write_reg(GPMC_ECC_CONTROL, 0x101);
+> + ? ? ? ? ? ? ? if (ecc_type == OMAP_ECC_BCH4_CODE_HW) {
+> + ? ? ? ? ? ? ? ? ? ? ? eccsize1 = 0x20; eccsize0 = 0x00;
+> + ? ? ? ? ? ? ? ? ? ? ? bch_mod = 0;
+> + ? ? ? ? ? ? ? ? ? ? ? bch_wrapmode = 0x06;
+> + ? ? ? ? ? ? ? } else if (ecc_type == OMAP_ECC_BCH8_CODE_HW) {
+> + ? ? ? ? ? ? ? ? ? ? ? eccsize1 = 0x20; eccsize0 = 0x00;
+> + ? ? ? ? ? ? ? ? ? ? ? bch_mod = 1;
+> + ? ? ? ? ? ? ? ? ? ? ? bch_wrapmode = 0x06;
+> + ? ? ? ? ? ? ? } else
+> + ? ? ? ? ? ? ? ? ? ? ? eccsize1 = ((ecc_size >> 1) - 1) << 22;
+> ? ? ? ? ? ? ? ?break;
+> +
+> ? ? ? ?default:
+> ? ? ? ? ? ? ? ?printk(KERN_INFO "Error: Unrecognized Mode[%d]!\n", mode);
+> ? ? ? ? ? ? ? ?break;
+> ? ? ? ?}
+>
+> - ? ? ? /* (ECC 16 or 8 bit col) | ( CS ?) ?| ECC Enable */
+> - ? ? ? val = (dev_width << 7) | (cs << 1) | (0x1);
+> - ? ? ? gpmc_write_reg(GPMC_ECC_CONFIG, val);
+> + ? ? ? /* clear ecc and enable bits */
+> + ? ? ? if ((ecc_type == OMAP_ECC_BCH4_CODE_HW) ||
+> + ? ? ? ? ? ? ? (ecc_type == OMAP_ECC_BCH8_CODE_HW)) {
+> + ? ? ? ? ? ? ? gpmc_write_reg(GPMC_ECC_CONTROL, 0x00000001);
+> + ? ? ? ? ? ? ? ecc_size_conf_val = (eccsize1 << 22) | (eccsize0 << 12);
+> + ? ? ? ? ? ? ? ecc_conf_val = ((0x01 << 16) | (bch_mod << 12)
+> + ? ? ? ? ? ? ? ? ? ? ? | (bch_wrapmode << 8) | (dev_width << 7)
+> + ? ? ? ? ? ? ? ? ? ? ? | (0x03 << 4) | (cs << 1) | (0x1));
+> + ? ? ? } else {
+> + ? ? ? ? ? ? ? gpmc_write_reg(GPMC_ECC_CONTROL, 0x00000101);
+> + ? ? ? ? ? ? ? ecc_size_conf_val = (eccsize1 << 22) | 0x0000000F;
+> + ? ? ? ? ? ? ? ecc_conf_val = (dev_width << 7) | (cs << 1) | (0x1);
+> + ? ? ? }
+> +
+> + ? ? ? gpmc_write_reg(GPMC_ECC_SIZE_CONFIG, ecc_size_conf_val);
+> + ? ? ? gpmc_write_reg(GPMC_ECC_CONFIG, ecc_conf_val);
+> + ? ? ? gpmc_write_reg(GPMC_ECC_CONTROL, 0x00000101);
+> +
+> ? ? ? ?return 0;
+> ?}
+>
+> ?/**
+> ?* gpmc_calculate_ecc - generate non-inverted ecc bytes
+> + * @ecc_type: ecc type e.g. Hamming, BCH
+> ?* @cs: chip select number
+> ?* @dat: data pointer over which ecc is computed
+> ?* @ecc_code: ecc code buffer
+> @@ -888,20 +913,51 @@ int gpmc_enable_hwecc(int cs, int mode, int dev_width, int ecc_size)
+> ?* an erased page will produce an ECC mismatch between generated and read
+> ?* ECC bytes that has to be dealt with separately.
+> ?*/
+> -int gpmc_calculate_ecc(int cs, const u_char *dat, u_char *ecc_code)
+> +int gpmc_calculate_ecc(int ecc_type, int cs,
+> + ? ? ? ? ? ? ? ? ? ? ? const u_char *dat, u_char *ecc_code)
+> ?{
+> - ? ? ? unsigned int val = 0x0;
+> -
+> - ? ? ? if (gpmc_ecc_used != cs)
+> - ? ? ? ? ? ? ? return -EINVAL;
+> + ? ? ? unsigned int reg;
+> + ? ? ? unsigned int val1 = 0x0, val2 = 0x0;
+> + ? ? ? unsigned int val3 = 0x0, val4 = 0x0;
+> + ? ? ? int i;
+>
+> - ? ? ? /* read ecc result */
+> - ? ? ? val = gpmc_read_reg(GPMC_ECC1_RESULT);
+> - ? ? ? *ecc_code++ = val; ? ? ? ? ?/* P128e, ..., P1e */
+> - ? ? ? *ecc_code++ = val >> 16; ? ?/* P128o, ..., P1o */
+> - ? ? ? /* P2048o, P1024o, P512o, P256o, P2048e, P1024e, P512e, P256e */
+> - ? ? ? *ecc_code++ = ((val >> 8) & 0x0f) | ((val >> 20) & 0xf0);
+> + ? ? ? if ((ecc_type == OMAP_ECC_BCH4_CODE_HW) ||
+> + ? ? ? ? ? ? ? (ecc_type == OMAP_ECC_BCH8_CODE_HW)) {
+> + ? ? ? ? ? ? ? for (i = 0; i < 4; i++) {
+> + ? ? ? ? ? ? ? ? ? ? ? /*
+> + ? ? ? ? ? ? ? ? ? ? ? ?* Reading HW ECC_BCH_Results
+> + ? ? ? ? ? ? ? ? ? ? ? ?* 0x240-0x24C, 0x250-0x25C, 0x260-0x26C, 0x270-0x27C
+> + ? ? ? ? ? ? ? ? ? ? ? ?*/
+> + ? ? ? ? ? ? ? ? ? ? ? reg = ?GPMC_ECC_BCH_RESULT_0 + (0x10 * i);
+> + ? ? ? ? ? ? ? ? ? ? ? val1 = gpmc_read_reg(reg);
+> + ? ? ? ? ? ? ? ? ? ? ? val2 = gpmc_read_reg(reg + 4);
+> + ? ? ? ? ? ? ? ? ? ? ? if (ecc_type == OMAP_ECC_BCH8_CODE_HW) {
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? val3 = gpmc_read_reg(reg + 8);
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? val4 = gpmc_read_reg(reg + 12);
+> +
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? *ecc_code++ = (val4 & 0xFF);
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? *ecc_code++ = ((val3 >> 24) & 0xFF);
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? *ecc_code++ = ((val3 >> 16) & 0xFF);
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? *ecc_code++ = ((val3 >> 8) & 0xFF);
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? *ecc_code++ = (val3 & 0xFF);
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? *ecc_code++ = ((val2 >> 24) & 0xFF);
+> + ? ? ? ? ? ? ? ? ? ? ? }
+> + ? ? ? ? ? ? ? ? ? ? ? *ecc_code++ = ((val2 >> 16) & 0xFF);
+> + ? ? ? ? ? ? ? ? ? ? ? *ecc_code++ = ((val2 >> 8) & 0xFF);
+> + ? ? ? ? ? ? ? ? ? ? ? *ecc_code++ = (val2 & 0xFF);
+> + ? ? ? ? ? ? ? ? ? ? ? *ecc_code++ = ((val1 >> 24) & 0xFF);
+> + ? ? ? ? ? ? ? ? ? ? ? *ecc_code++ = ((val1 >> 16) & 0xFF);
+> + ? ? ? ? ? ? ? ? ? ? ? *ecc_code++ = ((val1 >> 8) & 0xFF);
+> + ? ? ? ? ? ? ? ? ? ? ? *ecc_code++ = (val1 & 0xFF);
+> + ? ? ? ? ? ? ? }
+> + ? ? ? } else {
+> + ? ? ? ? ? ? ? /* read ecc result */
+> + ? ? ? ? ? ? ? val1 = gpmc_read_reg(GPMC_ECC1_RESULT);
+> + ? ? ? ? ? ? ? *ecc_code++ = val1; ? ? ? ? ?/* P128e, ..., P1e */
+> + ? ? ? ? ? ? ? *ecc_code++ = val1 >> 16; ? ?/* P128o, ..., P1o */
+> + ? ? ? ? ? ? ? /* P2048o, P1024o, P512o, P256o, P2048e, P1024e, P512e, P256e */
+> + ? ? ? ? ? ? ? *ecc_code++ = ((val1 >> 8) & 0x0f) | ((val1 >> 20) & 0xf0);
+> + ? ? ? }
+>
+> - ? ? ? gpmc_ecc_used = -EINVAL;
+> ? ? ? ?return 0;
+> ?}
+> diff --git a/arch/arm/plat-omap/include/plat/gpmc.h b/arch/arm/plat-omap/include/plat/gpmc.h
+> index 49aea09..838c185 100644
+> --- a/arch/arm/plat-omap/include/plat/gpmc.h
+> +++ b/arch/arm/plat-omap/include/plat/gpmc.h
+> @@ -92,6 +92,8 @@ enum omap_ecc {
+> ? ? ? ?OMAP_ECC_HAMMING_CODE_HW, /* gpmc to detect the error */
+> ? ? ? ? ? ? ? ?/* 1-bit ecc: stored at begining of spare area as romcode */
+> ? ? ? ?OMAP_ECC_HAMMING_CODE_HW_ROMCODE, /* gpmc method & romcode layout */
+> + ? ? ? OMAP_ECC_BCH4_CODE_HW, /* gpmc bch detection & s/w method correction */
+> + ? ? ? OMAP_ECC_BCH8_CODE_HW, /* gpmc bch detection & s/w method correction */
+> ?};
+>
+> ?/*
+> @@ -156,6 +158,6 @@ extern int gpmc_cs_configure(int cs, int cmd, int wval);
+> ?extern int gpmc_nand_read(int cs, int cmd);
+> ?extern int gpmc_nand_write(int cs, int cmd, int wval);
+>
+> -int gpmc_enable_hwecc(int cs, int mode, int dev_width, int ecc_size);
+> -int gpmc_calculate_ecc(int cs, const u_char *dat, u_char *ecc_code);
+> +int gpmc_enable_hwecc(int ecc, int cs, int mode, int dev_width, int ecc_size);
+> +int gpmc_calculate_ecc(int ecc, int cs, const u_char *dat, u_char *ecc_code);
+> ?#endif
+> diff --git a/drivers/mtd/nand/Makefile b/drivers/mtd/nand/Makefile
+> index 8ad6fae..ae02711 100644
+> --- a/drivers/mtd/nand/Makefile
+> +++ b/drivers/mtd/nand/Makefile
+> @@ -29,6 +29,7 @@ obj-$(CONFIG_MTD_NAND_NDFC) ? ? ? ? ? += ndfc.o
+> ?obj-$(CONFIG_MTD_NAND_ATMEL) ? ? ? ? ? += atmel_nand.o
+> ?obj-$(CONFIG_MTD_NAND_GPIO) ? ? ? ? ? ?+= gpio.o
+> ?obj-$(CONFIG_MTD_NAND_OMAP2) ? ? ? ? ? += omap2.o
+> +obj-$(CONFIG_MTD_NAND_OMAP2) ? ? ? ? ? += omap_bch_decoder.o
+> ?obj-$(CONFIG_MTD_NAND_CM_X270) ? ? ? ? += cmx270_nand.o
+> ?obj-$(CONFIG_MTD_NAND_PXA3xx) ? ? ? ? ?+= pxa3xx_nand.o
+> ?obj-$(CONFIG_MTD_NAND_TMIO) ? ? ? ? ? ?+= tmio_nand.o
+> diff --git a/drivers/mtd/nand/omap2.c b/drivers/mtd/nand/omap2.c
+> index 4e33972..14c7dfe 100644
+> --- a/drivers/mtd/nand/omap2.c
+> +++ b/drivers/mtd/nand/omap2.c
+> @@ -98,6 +98,8 @@
+> ?static const char *part_probes[] = { "cmdlinepart", NULL };
+> ?#endif
+>
+> +int decode_bch(int select_4_8, unsigned char *ecc, unsigned int *err_loc);
+> +
+> ?/* oob info generated runtime depending on ecc algorithm and layout selected */
+> ?static struct nand_ecclayout omap_oobinfo;
+> ?/* Define some generic bad / good block scan pattern which are used
+> @@ -130,7 +132,8 @@ struct omap_nand_info {
+> ? ? ? ? ? ? ? ?OMAP_NAND_IO_WRITE, ? ? /* write */
+> ? ? ? ?} iomode;
+> ? ? ? ?u_char ? ? ? ? ? ? ? ? ? ? ? ? ?*buf;
+> - ? ? ? int ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? buf_len;
+> + ? ? ? int ? ? ? ? ? ? ? ? ? ? ? ? ? ? buf_len;
+> + ? ? ? int ? ? ? ? ? ? ? ? ? ? ? ? ? ? ecc_opt;
+> ?};
+>
+> ?/**
+> @@ -529,7 +532,6 @@ static void omap_read_buf_irq_pref(struct mtd_info *mtd, u_char *buf, int len)
+> ? ? ? ?struct omap_nand_info *info = container_of(mtd,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct omap_nand_info, mtd);
+> ? ? ? ?int ret = 0;
+> -
+> ? ? ? ?if (len <= mtd->oobsize) {
+> ? ? ? ? ? ? ? ?omap_read_buf_pref(mtd, buf, len);
+> ? ? ? ? ? ? ? ?return;
+> @@ -803,6 +805,8 @@ static int omap_correct_data(struct mtd_info *mtd, u_char *dat,
+> ? ? ? ?struct omap_nand_info *info = container_of(mtd, struct omap_nand_info,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?mtd);
+> ? ? ? ?int blockCnt = 0, i = 0, ret = 0;
+> + ? ? ? int j, eccsize, eccflag, count;
+> + ? ? ? unsigned int err_loc[8];
+>
+> ? ? ? ?/* Ex NAND_ECC_HW12_2048 */
+> ? ? ? ?if ((info->nand.ecc.mode == NAND_ECC_HW) &&
+> @@ -811,16 +815,57 @@ static int omap_correct_data(struct mtd_info *mtd, u_char *dat,
+> ? ? ? ?else
+> ? ? ? ? ? ? ? ?blockCnt = 1;
+>
+> - ? ? ? for (i = 0; i < blockCnt; i++) {
+> - ? ? ? ? ? ? ? if (memcmp(read_ecc, calc_ecc, 3) != 0) {
+> - ? ? ? ? ? ? ? ? ? ? ? ret = omap_compare_ecc(read_ecc, calc_ecc, dat);
+> - ? ? ? ? ? ? ? ? ? ? ? if (ret < 0)
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? return ret;
+> + ? ? ? switch (info->ecc_opt) {
+> + ? ? ? case OMAP_ECC_HAMMING_CODE_HW:
+> + ? ? ? case OMAP_ECC_HAMMING_CODE_HW_ROMCODE:
+> + ? ? ? ? ? ? ? for (i = 0; i < blockCnt; i++) {
+> + ? ? ? ? ? ? ? ? ? ? ? if (memcmp(read_ecc, calc_ecc, 3) != 0) {
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ret = omap_compare_ecc(read_ecc, calc_ecc, dat);
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? if (ret < 0)
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? return ret;
+> + ? ? ? ? ? ? ? ? ? ? ? }
+> + ? ? ? ? ? ? ? ? ? ? ? read_ecc += 3;
+> + ? ? ? ? ? ? ? ? ? ? ? calc_ecc += 3;
+> + ? ? ? ? ? ? ? ? ? ? ? dat ? ? ?+= 512;
+> ? ? ? ? ? ? ? ?}
+> - ? ? ? ? ? ? ? read_ecc += 3;
+> - ? ? ? ? ? ? ? calc_ecc += 3;
+> - ? ? ? ? ? ? ? dat ? ? ?+= 512;
+> + ? ? ? ? ? ? ? break;
+> +
+> + ? ? ? case OMAP_ECC_BCH4_CODE_HW:
+> + ? ? ? ? ? ? ? eccsize = 7;
+> + ? ? ? ? ? ? ? gpmc_calculate_ecc(info->ecc_opt, info->gpmc_cs, dat, calc_ecc);
+> + ? ? ? ? ? ? ? for (i = 0; i < blockCnt; i++) {
+> + ? ? ? ? ? ? ? ? ? ? ? /* check if any ecc error */
+> + ? ? ? ? ? ? ? ? ? ? ? eccflag = 0;
+> + ? ? ? ? ? ? ? ? ? ? ? for (j = 0; (j < eccsize) && (eccflag == 0); j++)
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? if (calc_ecc[j] != 0)
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? eccflag = 1;
+> +
+> + ? ? ? ? ? ? ? ? ? ? ? if (eccflag == 1) {
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? eccflag = 0;
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? for (j = 0; (j < eccsize) &&
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? (eccflag == 0); j++)
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? if (read_ecc[j] != 0xFF)
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? eccflag = 1;
+> + ? ? ? ? ? ? ? ? ? ? ? }
+> +
+> + ? ? ? ? ? ? ? ? ? ? ? count = 0;
+> + ? ? ? ? ? ? ? ? ? ? ? if (eccflag == 1)
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? count = decode_bch(0, calc_ecc, err_loc);
+> +
+> + ? ? ? ? ? ? ? ? ? ? ? for (j = 0; j < count; j++) {
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? if (err_loc[j] < 4096)
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? dat[err_loc[j] >> 3] ^=
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 1 << (err_loc[j] & 7);
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? /* else, not interested to correct ecc */
+> + ? ? ? ? ? ? ? ? ? ? ? }
+> +
+> + ? ? ? ? ? ? ? ? ? ? ? calc_ecc = calc_ecc + eccsize;
+> + ? ? ? ? ? ? ? ? ? ? ? read_ecc = read_ecc + eccsize;
+> + ? ? ? ? ? ? ? ? ? ? ? dat += 512;
+> + ? ? ? ? ? ? ? }
+> + ? ? ? ? ? ? ? break;
+> ? ? ? ?}
+> +
+> ? ? ? ?return 0;
+> ?}
+>
+> @@ -841,7 +886,7 @@ static int omap_calculate_ecc(struct mtd_info *mtd, const u_char *dat,
+> ?{
+> ? ? ? ?struct omap_nand_info *info = container_of(mtd, struct omap_nand_info,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?mtd);
+> - ? ? ? return gpmc_calculate_ecc(info->gpmc_cs, dat, ecc_code);
+> + ? ? ? return gpmc_calculate_ecc(info->ecc_opt, info->gpmc_cs, dat, ecc_code);
+> ?}
+>
+> ?/**
+> @@ -856,7 +901,8 @@ static void omap_enable_hwecc(struct mtd_info *mtd, int mode)
+> ? ? ? ?struct nand_chip *chip = mtd->priv;
+> ? ? ? ?unsigned int dev_width = (chip->options & NAND_BUSWIDTH_16) ? 1 : 0;
+>
+> - ? ? ? gpmc_enable_hwecc(info->gpmc_cs, mode, dev_width, info->nand.ecc.size);
+> + ? ? ? gpmc_enable_hwecc(info->ecc_opt, info->gpmc_cs, mode,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? dev_width, info->nand.ecc.size);
+> ?}
+>
+> ?/**
+> @@ -953,6 +999,7 @@ static int __devinit omap_nand_probe(struct platform_device *pdev)
+> ? ? ? ?info->mtd.priv ? ? ? ? ?= &info->nand;
+> ? ? ? ?info->mtd.name ? ? ? ? ?= dev_name(&pdev->dev);
+> ? ? ? ?info->mtd.owner ? ? ? ? = THIS_MODULE;
+> + ? ? ? info->ecc_opt ? ? ? ? ? = pdata->ecc_opt;
+>
+> ? ? ? ?info->nand.options ? ? ?= pdata->devsize;
+> ? ? ? ?info->nand.options ? ? ?|= NAND_SKIP_BBTSCAN;
+> @@ -991,7 +1038,6 @@ static int __devinit omap_nand_probe(struct platform_device *pdev)
+> ? ? ? ? ? ? ? ?info->nand.waitfunc = omap_wait;
+> ? ? ? ? ? ? ? ?info->nand.chip_delay = 50;
+> ? ? ? ?}
+> -
+> ? ? ? ?switch (pdata->xfer_type) {
+> ? ? ? ?case NAND_OMAP_PREFETCH_POLLED:
+> ? ? ? ? ? ? ? ?info->nand.read_buf ? = omap_read_buf_pref;
+> @@ -1052,10 +1098,17 @@ static int __devinit omap_nand_probe(struct platform_device *pdev)
+> ? ? ? ?/* selsect the ecc type */
+> ? ? ? ?if (pdata->ecc_opt == OMAP_ECC_HAMMING_CODE_DEFAULT)
+> ? ? ? ? ? ? ? ?info->nand.ecc.mode = NAND_ECC_SOFT;
+> - ? ? ? else if ((pdata->ecc_opt == OMAP_ECC_HAMMING_CODE_HW) ||
+> - ? ? ? ? ? ? ? (pdata->ecc_opt == OMAP_ECC_HAMMING_CODE_HW_ROMCODE)) {
+> - ? ? ? ? ? ? ? info->nand.ecc.bytes ? ? ? ? ? ?= 3;
+> - ? ? ? ? ? ? ? info->nand.ecc.size ? ? ? ? ? ? = 512;
+> + ? ? ? else {
+> + ? ? ? ? ? ? ? if (pdata->ecc_opt == OMAP_ECC_BCH4_CODE_HW) {
+> + ? ? ? ? ? ? ? ? ? ? ? info->nand.ecc.bytes ? ?= 4*7;
+> + ? ? ? ? ? ? ? ? ? ? ? info->nand.ecc.size ? ? = 4*512;
+> + ? ? ? ? ? ? ? } else if (pdata->ecc_opt == OMAP_ECC_BCH8_CODE_HW) {
+> + ? ? ? ? ? ? ? ? ? ? ? info->nand.ecc.bytes ? ?= 13;
+> + ? ? ? ? ? ? ? ? ? ? ? info->nand.ecc.size ? ? = 4*512;
+> + ? ? ? ? ? ? ? } else {
+> + ? ? ? ? ? ? ? ? ? ? ? info->nand.ecc.bytes ? ?= 3;
+> + ? ? ? ? ? ? ? ? ? ? ? info->nand.ecc.size ? ? = 512;
+> + ? ? ? ? ? ? ? }
+> ? ? ? ? ? ? ? ?info->nand.ecc.calculate ? ? ? ?= omap_calculate_ecc;
+> ? ? ? ? ? ? ? ?info->nand.ecc.hwctl ? ? ? ? ? ?= omap_enable_hwecc;
+> ? ? ? ? ? ? ? ?info->nand.ecc.correct ? ? ? ? ?= omap_correct_data;
+> @@ -1073,8 +1126,8 @@ static int __devinit omap_nand_probe(struct platform_device *pdev)
+> ? ? ? ? ? ? ? ?}
+> ? ? ? ?}
+>
+> - ? ? ? /* rom code layout */
+> - ? ? ? if (pdata->ecc_opt == OMAP_ECC_HAMMING_CODE_HW_ROMCODE) {
+> + ? ? ? /* select ecc lyout */
+> + ? ? ? if (info->nand.ecc.mode != NAND_ECC_SOFT) {
+>
+> ? ? ? ? ? ? ? ?if (info->nand.options & NAND_BUSWIDTH_16)
+> ? ? ? ? ? ? ? ? ? ? ? ?offset = 2;
+> @@ -1082,15 +1135,31 @@ static int __devinit omap_nand_probe(struct platform_device *pdev)
+> ? ? ? ? ? ? ? ? ? ? ? ?offset = 1;
+> ? ? ? ? ? ? ? ? ? ? ? ?info->nand.badblock_pattern = &bb_descrip_flashbased;
+> ? ? ? ? ? ? ? ?}
+> - ? ? ? ? ? ? ? omap_oobinfo.eccbytes = 3 * (info->mtd.oobsize/16);
+> - ? ? ? ? ? ? ? for (i = 0; i < omap_oobinfo.eccbytes; i++)
+> - ? ? ? ? ? ? ? ? ? ? ? omap_oobinfo.eccpos[i] = i+offset;
+>
+> - ? ? ? ? ? ? ? omap_oobinfo.oobfree->offset = offset + omap_oobinfo.eccbytes;
+> - ? ? ? ? ? ? ? omap_oobinfo.oobfree->length = info->mtd.oobsize -
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? (offset + omap_oobinfo.eccbytes);
+> + ? ? ? ? ? ? ? if (info->mtd.oobsize == 64)
+> + ? ? ? ? ? ? ? ? ? ? ? omap_oobinfo.eccbytes = info->nand.ecc.bytes *
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 2048/info->nand.ecc.size;
+> + ? ? ? ? ? ? ? else
+> + ? ? ? ? ? ? ? ? ? ? ? omap_oobinfo.eccbytes = info->nand.ecc.bytes;
+> +
+> + ? ? ? ? ? ? ? if (pdata->ecc_opt == OMAP_ECC_HAMMING_CODE_HW_ROMCODE) {
+> + ? ? ? ? ? ? ? ? ? ? ? for (i = 0; i < omap_oobinfo.eccbytes; i++)
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? omap_oobinfo.eccpos[i] = i + offset;
+> + ? ? ? ? ? ? ? ? ? ? ? omap_oobinfo.oobfree->offset =
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? offset + omap_oobinfo.eccbytes;
+> + ? ? ? ? ? ? ? ? ? ? ? omap_oobinfo.oobfree->length = info->mtd.oobsize -
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? offset - omap_oobinfo.eccbytes;
+> + ? ? ? ? ? ? ? } else {
+>
+> + ? ? ? ? ? ? ? ? ? ? ? omap_oobinfo.oobfree->offset = offset;
+> + ? ? ? ? ? ? ? ? ? ? ? omap_oobinfo.oobfree->length = info->mtd.oobsize -
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? offset - omap_oobinfo.eccbytes;
+> + ? ? ? ? ? ? ? ? ? ? ? offset = info->mtd.oobsize - omap_oobinfo.eccbytes;
+> + ? ? ? ? ? ? ? ? ? ? ? for (i = 0; i < omap_oobinfo.eccbytes; i++)
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? omap_oobinfo.eccpos[i] = i + offset;
+> + ? ? ? ? ? ? ? }
+> ? ? ? ? ? ? ? ?info->nand.ecc.layout = &omap_oobinfo;
+> +
+> ? ? ? ?}
+>
+> ?#ifdef CONFIG_MTD_PARTITIONS
+> diff --git a/drivers/mtd/nand/omap_bch_decoder.c b/drivers/mtd/nand/omap_bch_decoder.c
+> new file mode 100644
+> index 0000000..da42bda
+> --- /dev/null
+> +++ b/drivers/mtd/nand/omap_bch_decoder.c
+> @@ -0,0 +1,393 @@
+> +/*
+> + * drivers/mtd/nand/omap_omap_bch_decoder.c
+> + *
+> + * Whole BCH ECC Decoder (Post hardware generated syndrome decoding)
+> + *
+> + * Copyright (c) 2007 Texas Instruments
+> + *
+> + * Author: Sukumar Ghorai <s-ghorai@ti.com
+> + * ? ? ? ? ? ? ? ?Michael Fillinger <m-fillinger@ti.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +#undef DEBUG
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +
+> +#define mm ? ? ? ? ? ? 13
+> +#define kk_shorten ? ? 4096
+> +#define nn ? ? ? ? ? ? 8191 ? ?/* Length of codeword, n = 2**mm - 1 */
+> +
+> +#define PPP ? ?0x201B ?/* Primary Polynomial : x^13 + x^4 + x^3 + x + 1 */
+> +#define P ? ? ?0x001B ?/* With omitted x^13 */
+> +#define POLY ? 12 ? ? ?/* degree of the primary Polynomial less one */
+> +
+> +/**
+> + * mpy_mod_gf - GALOIS field multiplier
+> + * Input ?: A(x), B(x)
+> + * Output : A(x)*B(x) mod P(x)
+> + */
+> +static unsigned int mpy_mod_gf(unsigned int a, unsigned int b)
+> +{
+> + ? ? ? unsigned int R = 0;
+> + ? ? ? unsigned int R1 = 0;
+> + ? ? ? unsigned int k = 0;
+> +
+> + ? ? ? for (k = 0; k < mm; k++) {
+> +
+> + ? ? ? ? ? ? ? R = (R << 1) & 0x1FFE;
+> + ? ? ? ? ? ? ? if (R1 == 1)
+> + ? ? ? ? ? ? ? ? ? ? ? R ^= P;
+> +
+> + ? ? ? ? ? ? ? if (((a >> (POLY - k)) & 1) == 1)
+> + ? ? ? ? ? ? ? ? ? ? ? R ^= b;
+> +
+> + ? ? ? ? ? ? ? if (k < POLY)
+> + ? ? ? ? ? ? ? ? ? ? ? R1 = (R >> POLY) & 1;
+> + ? ? ? }
+> + ? ? ? return R;
+> +}
+> +
+> +/**
+> + * chien - CHIEN search
+> + *
+> + * @location - Error location vector pointer
+> + *
+> + * Inputs ?: ELP(z)
+> + * ? ? ? ? ?No. of found errors
+> + * ? ? ? ? ?Size of input codeword
+> + * Outputs : Up to 8 locations
+> + * ? ? ? ? ?No. of errors
+> + */
+> +static int chien(unsigned int select_4_8, int err_nums,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? unsigned int err[], unsigned int *location)
+> +{
+> + ? ? ? int i, count; /* Number of dectected errors */
+> + ? ? ? /* Contains accumulation of evaluation at x^i (i:1->8) */
+> + ? ? ? unsigned int gammas[8] = {0};
+> + ? ? ? unsigned int alpha;
+> + ? ? ? unsigned int bit, ecc_bits;
+> + ? ? ? unsigned int elp_sum;
+> +
+> + ? ? ? ecc_bits = (select_4_8 == 0) ? 52 : 104;
+> +
+> + ? ? ? /* Start evaluation at Alpha**8192 and decreasing */
+> + ? ? ? for (i = 0; i < 8; i++)
+> + ? ? ? ? ? ? ? gammas[i] = err[i];
+> +
+> + ? ? ? count = 0;
+> + ? ? ? for (i = 1; (i <= nn) && (count < err_nums); i++) {
+> +
+> + ? ? ? ? ? ? ? /* Result of evaluation at root */
+> + ? ? ? ? ? ? ? elp_sum = 1 ^ gammas[0] ^ gammas[1] ^
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? gammas[2] ^ gammas[3] ^
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? gammas[4] ^ gammas[5] ^
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? gammas[6] ^ gammas[7];
+> +
+> + ? ? ? ? ? ? ? alpha = PPP >> 1;
+> + ? ? ? ? ? ? ? gammas[0] = mpy_mod_gf(gammas[0], alpha);
+> + ? ? ? ? ? ? ? alpha = mpy_mod_gf(alpha, (PPP >> 1)); ?/* x alphha^-2 */
+> + ? ? ? ? ? ? ? gammas[1] = mpy_mod_gf(gammas[1], alpha);
+> + ? ? ? ? ? ? ? alpha = mpy_mod_gf(alpha, (PPP >> 1)); ?/* x alphha^-2 */
+> + ? ? ? ? ? ? ? gammas[2] = mpy_mod_gf(gammas[2], alpha);
+> + ? ? ? ? ? ? ? alpha = mpy_mod_gf(alpha, (PPP >> 1)); ?/* x alphha^-3 */
+> + ? ? ? ? ? ? ? gammas[3] = mpy_mod_gf(gammas[3], alpha);
+> + ? ? ? ? ? ? ? alpha = mpy_mod_gf(alpha, (PPP >> 1)); ?/* x alphha^-4 */
+> + ? ? ? ? ? ? ? gammas[4] = mpy_mod_gf(gammas[4], alpha);
+> + ? ? ? ? ? ? ? alpha = mpy_mod_gf(alpha, (PPP >> 1)); ?/* x alphha^-5 */
+> + ? ? ? ? ? ? ? gammas[5] = mpy_mod_gf(gammas[5], alpha);
+> + ? ? ? ? ? ? ? alpha = mpy_mod_gf(alpha, (PPP >> 1)); ?/* x alphha^-6 */
+> + ? ? ? ? ? ? ? gammas[6] = mpy_mod_gf(gammas[6], alpha);
+> + ? ? ? ? ? ? ? alpha = mpy_mod_gf(alpha, (PPP >> 1)); ?/* x alphha^-7 */
+> + ? ? ? ? ? ? ? gammas[7] = mpy_mod_gf(gammas[7], alpha);
+> +
+> + ? ? ? ? ? ? ? if (elp_sum == 0) {
+> + ? ? ? ? ? ? ? ? ? ? ? /* calculate bit position in main data area */
+> + ? ? ? ? ? ? ? ? ? ? ? bit = ((i-1) & ~7)|(7-((i-1) & 7));
+> + ? ? ? ? ? ? ? ? ? ? ? if (i >= 2 * ecc_bits)
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? location[count++] =
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? kk_shorten - (bit - 2 * ecc_bits) - 1;
+> + ? ? ? ? ? ? ? }
+> + ? ? ? }
+> +
+> + ? ? ? /* Failure: No. of detected errors != No. or corrected errors */
+> + ? ? ? if (count != err_nums) {
+> + ? ? ? ? ? ? ? count = -1;
+> + ? ? ? ? ? ? ? printk(KERN_ERR "BCH decoding failed\n");
+> + ? ? ? }
+> + ? ? ? for (i = 0; i < count; i++)
+> + ? ? ? ? ? ? ? pr_debug("%d ", location[i]);
+> +
+> + ? ? ? return count;
+> +}
+> +
+> +/* synd : 16 Syndromes
+> + * return: gamaas - Coefficients to the error polynomial
+> + * return: : Number of detected errors
+> +*/
+> +static unsigned int berlekamp(unsigned int select_4_8,
+> + ? ? ? ? ? ? ? ? ? ? ? unsigned int synd[], unsigned int err[])
+> +{
+> + ? ? ? int loop, iteration;
+> + ? ? ? unsigned int LL = 0; ? ? ? ? ? ?/* Detected errors */
+> + ? ? ? unsigned int d = 0; ? ? /* Distance between Syndromes and ELP[n](z) */
+> + ? ? ? unsigned int invd = 0; ? ? ? ? ?/* Inverse of d */
+> + ? ? ? /* Intermediate ELP[n](z).
+> + ? ? ? ?* Final ELP[n](z) is Error Location Polynomial
+> + ? ? ? ?*/
+> + ? ? ? unsigned int gammas[16] = {0};
+> + ? ? ? /* Intermediate normalized ELP[n](z) : D[n](z) */
+> + ? ? ? unsigned int D[16] = {0};
+> + ? ? ? /* Temporary value that holds an ELP[n](z) coefficient */
+> + ? ? ? unsigned int next_gamma = 0;
+> +
+> + ? ? ? int e = 0;
+> + ? ? ? unsigned int sign = 0;
+> + ? ? ? unsigned int u = 0;
+> + ? ? ? unsigned int v = 0;
+> + ? ? ? unsigned int C1 = 0, C2 = 0;
+> + ? ? ? unsigned int ss = 0;
+> + ? ? ? unsigned int tmp_v = 0, tmp_s = 0;
+> + ? ? ? unsigned int tmp_poly;
+> +
+> + ? ? ? /*-------------- Step 0 ------------------*/
+> + ? ? ? for (loop = 0; loop < 16; loop++)
+> + ? ? ? ? ? ? ? gammas[loop] = 0;
+> + ? ? ? gammas[0] = 1;
+> + ? ? ? D[1] = 1;
+> +
+> + ? ? ? iteration = 0;
+> + ? ? ? LL = 0;
+> + ? ? ? while ((iteration < ((select_4_8+1)*2*4)) &&
+> + ? ? ? ? ? ? ? ? ? ? ? (LL <= ((select_4_8+1)*4))) {
+> +
+> + ? ? ? ? ? ? ? pr_debug("\nIteration.............%d\n", iteration);
+> + ? ? ? ? ? ? ? d = 0;
+> + ? ? ? ? ? ? ? /* Step: 0 */
+> + ? ? ? ? ? ? ? for (loop = 0; loop <= LL; loop++) {
+> + ? ? ? ? ? ? ? ? ? ? ? tmp_poly = mpy_mod_gf(
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? gammas[loop], synd[iteration - loop]);
+> + ? ? ? ? ? ? ? ? ? ? ? d ^= tmp_poly;
+> + ? ? ? ? ? ? ? ? ? ? ? pr_debug("%02d. s=0 LL=%x poly %x\n",
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? loop, LL, tmp_poly);
+> + ? ? ? ? ? ? ? }
+> +
+> + ? ? ? ? ? ? ? /* Step 1: 1 cycle only to perform inversion */
+> + ? ? ? ? ? ? ? v = d << 1;
+> + ? ? ? ? ? ? ? e = -1;
+> + ? ? ? ? ? ? ? sign = 1;
+> + ? ? ? ? ? ? ? ss = 0x2000;
+> + ? ? ? ? ? ? ? invd = 0;
+> + ? ? ? ? ? ? ? u = PPP;
+> + ? ? ? ? ? ? ? for (loop = 0; (d != 0) && (loop <= (2 * POLY)); loop++) {
+> + ? ? ? ? ? ? ? ? ? ? ? pr_debug("%02d. s=1 LL=%x poly NULL\n",
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? loop, LL);
+> + ? ? ? ? ? ? ? ? ? ? ? C1 = (v >> 13) & 1;
+> + ? ? ? ? ? ? ? ? ? ? ? C2 = C1 & sign;
+> +
+> + ? ? ? ? ? ? ? ? ? ? ? sign ^= C2 ^ (e == 0);
+> +
+> + ? ? ? ? ? ? ? ? ? ? ? tmp_v = v;
+> + ? ? ? ? ? ? ? ? ? ? ? tmp_s = ss;
+> +
+> + ? ? ? ? ? ? ? ? ? ? ? if (C1 == 1) {
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? v ^= u;
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ss ^= invd;
+> + ? ? ? ? ? ? ? ? ? ? ? }
+> + ? ? ? ? ? ? ? ? ? ? ? v = (v << 1) & 0x3FFF;
+> + ? ? ? ? ? ? ? ? ? ? ? if (C2 == 1) {
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? u = tmp_v;
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? invd = tmp_s;
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? e = -e;
+> + ? ? ? ? ? ? ? ? ? ? ? }
+> + ? ? ? ? ? ? ? ? ? ? ? invd >>= 1;
+> + ? ? ? ? ? ? ? ? ? ? ? e--;
+> + ? ? ? ? ? ? ? }
+> +
+> + ? ? ? ? ? ? ? for (loop = 0; (d != 0) && (loop <= (iteration + 1)); loop++) {
+> + ? ? ? ? ? ? ? ? ? ? ? /* Step 2
+> + ? ? ? ? ? ? ? ? ? ? ? ?* Interleaved with Step 3, if L<(n-k)
+> + ? ? ? ? ? ? ? ? ? ? ? ?* invd: Update of ELP[n](z) = ELP[n-1](z) - d.D[n-1](z)
+> + ? ? ? ? ? ? ? ? ? ? ? ?*/
+> +
+> + ? ? ? ? ? ? ? ? ? ? ? /* Holds value of ELP coefficient until precedent
+> + ? ? ? ? ? ? ? ? ? ? ? ?* value does not have to be used anymore
+> + ? ? ? ? ? ? ? ? ? ? ? ?*/
+> + ? ? ? ? ? ? ? ? ? ? ? tmp_poly = mpy_mod_gf(d, D[loop]);
+> + ? ? ? ? ? ? ? ? ? ? ? pr_debug("%02d. s=2 LL=%x poly %x\n",
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? loop, LL, tmp_poly);
+> +
+> + ? ? ? ? ? ? ? ? ? ? ? next_gamma = gammas[loop] ^ tmp_poly;
+> + ? ? ? ? ? ? ? ? ? ? ? if ((2 * LL) < (iteration + 1)) {
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? /* Interleaving with Step 3
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?* for parallelized update of ELP(z) and D(z)
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?*/
+> + ? ? ? ? ? ? ? ? ? ? ? } else {
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? /* Update of ELP(z) only -> stay in Step 2 */
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? gammas[loop] = next_gamma;
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? if (loop == (iteration + 1)) {
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? /* to step 4 */
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? break;
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? }
+> + ? ? ? ? ? ? ? ? ? ? ? }
+> +
+> + ? ? ? ? ? ? ? ? ? ? ? /* Step 3
+> + ? ? ? ? ? ? ? ? ? ? ? ?* Always interleaved with Step 2 (case when L<(n-k))
+> + ? ? ? ? ? ? ? ? ? ? ? ?* Update of D[n-1](z) = ELP[n-1](z)/d
+> + ? ? ? ? ? ? ? ? ? ? ? ?*/
+> + ? ? ? ? ? ? ? ? ? ? ? D[loop] = mpy_mod_gf(gammas[loop], invd);
+> + ? ? ? ? ? ? ? ? ? ? ? pr_debug("%02d. s=3 LL=%x poly %x\n",
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? loop, LL, D[loop]);
+> +
+> + ? ? ? ? ? ? ? ? ? ? ? /* Can safely update ELP[n](z) */
+> + ? ? ? ? ? ? ? ? ? ? ? gammas[loop] = next_gamma;
+> +
+> + ? ? ? ? ? ? ? ? ? ? ? if (loop == (iteration + 1)) {
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? /* If update finished */
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? LL = iteration - LL + 1;
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? /* to step 4 */
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? break;
+> + ? ? ? ? ? ? ? ? ? ? ? }
+> + ? ? ? ? ? ? ? ? ? ? ? /* Else, interleaving to step 2*/
+> + ? ? ? ? ? ? ? }
+> +
+> + ? ? ? ? ? ? ? /* Step 4: Update D(z): i:0->L */
+> + ? ? ? ? ? ? ? /* Final update of D[n](z) = D[n](z).z*/
+> + ? ? ? ? ? ? ? for (loop = 0; loop < 15; loop++) /* Left Shift */
+> + ? ? ? ? ? ? ? ? ? ? ? D[15 - loop] = D[14 - loop];
+> +
+> + ? ? ? ? ? ? ? D[0] = 0;
+> +
+> + ? ? ? ? ? ? ? iteration++;
+> + ? ? ? } /* while */
+> +
+> + ? ? ? /* Processing finished, copy ELP to final registers : 0->2t-1*/
+> + ? ? ? for (loop = 0; loop < 8; loop++)
+> + ? ? ? ? ? ? ? err[loop] = gammas[loop+1];
+> +
+> + ? ? ? pr_debug("\n Err poly:");
+> + ? ? ? for (loop = 0; loop < 8; loop++)
+> + ? ? ? ? ? ? ? pr_debug("0x%x ", err[loop]);
+> +
+> + ? ? ? return LL;
+> +}
+> +
+> +/*
+> + * syndrome - Generate syndrome components from hw generate syndrome
+> + * r(x) = c(x) + e(x)
+> + * s(x) = c(x) mod g(x) + e(x) mod g(x) = ?e(x) mod g(x)
+> + * so receiver checks if the syndrome s(x) = r(x) mod g(x) is equal to zero.
+> + * unsigned int s[16]; - Syndromes
+> + */
+> +static void syndrome(unsigned int select_4_8,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? unsigned char *ecc, unsigned int syn[])
+> +{
+> + ? ? ? unsigned int k, l, t;
+> + ? ? ? unsigned int alpha_bit, R_bit;
+> + ? ? ? int ecc_pos, ecc_min;
+> +
+> + ? ? ? /* 2t-1 = 15 (for t=8) minimal polynomials of the first 15 powers of a
+> + ? ? ? ?* primitive elemmants of GF(m); Even powers minimal polynomials are
+> + ? ? ? ?* duplicate of odd powers' minimal polynomials.
+> + ? ? ? ?* Odd powers of alpha (1 to 15)
+> + ? ? ? ?*/
+> + ? ? ? unsigned int pow_alpha[8] = {0x0002, 0x0008, 0x0020, 0x0080,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?0x0200, 0x0800, 0x001B, 0x006C};
+> +
+> + ? ? ? pr_debug("\n ECC[0..n]: ");
+> + ? ? ? for (k = 0; k < 13; k++)
+> + ? ? ? ? ? ? ? pr_debug("0x%x ", ecc[k]);
+> +
+> + ? ? ? if (select_4_8 == 0) {
+> + ? ? ? ? ? ? ? t = 4;
+> + ? ? ? ? ? ? ? ecc_pos = 55; /* bits(52-bits): 55->4 */
+> + ? ? ? ? ? ? ? ecc_min = 4;
+> + ? ? ? } else {
+> + ? ? ? ? ? ? ? t = 8;
+> + ? ? ? ? ? ? ? ecc_pos = 103; /* bits: 103->0 */
+> + ? ? ? ? ? ? ? ecc_min = 0;
+> + ? ? ? }
+> +
+> + ? ? ? /* total numbber of syndrom to be used is 2t */
+> + ? ? ? /* Step1: calculate the odd syndrome(s) */
+> + ? ? ? R_bit = ((ecc[ecc_pos/8] >> (7 - ecc_pos%8)) & 1);
+> + ? ? ? ecc_pos--;
+> + ? ? ? for (k = 0; k < t; k++)
+> + ? ? ? ? ? ? ? syn[2 * k] = R_bit;
+> +
+> + ? ? ? while (ecc_pos >= ecc_min) {
+> + ? ? ? ? ? ? ? R_bit = ((ecc[ecc_pos/8] >> (7 - ecc_pos%8)) & 1);
+> + ? ? ? ? ? ? ? ecc_pos--;
+> +
+> + ? ? ? ? ? ? ? for (k = 0; k < t; k++) {
+> + ? ? ? ? ? ? ? ? ? ? ? /* Accumulate value of x^i at alpha^(2k+1) */
+> + ? ? ? ? ? ? ? ? ? ? ? if (R_bit == 1)
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? syn[2*k] ^= pow_alpha[k];
+> +
+> + ? ? ? ? ? ? ? ? ? ? ? /* Compute a**(2k+1), using LSFR */
+> + ? ? ? ? ? ? ? ? ? ? ? for (l = 0; l < (2 * k + 1); l++) {
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? alpha_bit = (pow_alpha[k] >> POLY) & 1;
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? pow_alpha[k] = (pow_alpha[k] << 1) & 0x1FFF;
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? if (alpha_bit == 1)
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? pow_alpha[k] ^= P;
+> + ? ? ? ? ? ? ? ? ? ? ? }
+> + ? ? ? ? ? ? ? }
+> + ? ? ? }
+> +
+> + ? ? ? /* Step2: calculate the even syndrome(s)
+> + ? ? ? ?* Compute S(a), where a is an even power of alpha
+> + ? ? ? ?* Evenry even power of primitive element has the same minimal
+> + ? ? ? ?* polynomial as some odd power of elemets.
+> + ? ? ? ?* And based on S(a^2) = S^2(a)
+> + ? ? ? ?*/
+> + ? ? ? for (k = 0; k < t; k++)
+> + ? ? ? ? ? ? ? syn[2*k+1] = mpy_mod_gf(syn[k], syn[k]);
+> +
+> + ? ? ? pr_debug("\n Syndromes: ");
+> + ? ? ? for (k = 0; k < 16; k++)
+> + ? ? ? ? ? ? ? pr_debug("0x%x ", syn[k]);
+> +}
+> +
+> +/**
+> + * decode_bch - BCH decoder for 4- and 8-bit error correction
+> + *
+> + * @ecc - ECC syndrome generated by hw BCH engine
+> + * @err_loc - pointer to error location array
+> + *
+> + * This function does post sydrome generation (hw generated) decoding
+> + * for:-
+> + * Dimension of Galoise Field: m = 13
+> + * Length of codeword: n = 2**m - 1
+> + * Number of errors that can be corrected: 4- or 8-bits
+> + * Length of information bit: kk = nn - rr
+> + */
+> +int decode_bch(int select_4_8, unsigned char *ecc, unsigned int *err_loc)
+> +{
+> + ? ? ? int no_of_err;
+> + ? ? ? unsigned int syn[16] = {0,}; ? ?/* 16 Syndromes */
+> + ? ? ? unsigned int err_poly[8] = {0,};
+> + ? ? ? /* Coefficients to the error polynomial
+> + ? ? ? ?* ELP(x) = 1 + err0.x + err1.x^2 + ... + err7.x^8
+> + ? ? ? ?*/
+> +
+> + ? ? ? /* Decoting involes three steps
+> + ? ? ? ?* 1. Compute the syndrom from teh received codeword,
+> + ? ? ? ?* 2. Find the error location polynomial from a set of equations
+> + ? ? ? ?* ? ? derived from the syndrome,
+> + ? ? ? ?* 3. Use the error location polynomial to identify errants bits,
+> + ? ? ? ?*
+> + ? ? ? ?* And correcttion done by bit flips using error locaiton and expected
+> + ? ? ? ?* to be outseide of this implementation.
+> + ? ? ? ?*/
+> + ? ? ? syndrome(select_4_8, ecc, syn);
+> + ? ? ? no_of_err = berlekamp(select_4_8, syn, err_poly);
+> + ? ? ? if (no_of_err <= (4 << select_4_8))
+> + ? ? ? ? ? ? ? no_of_err = chien(select_4_8, no_of_err, err_poly, err_loc);
+> +
+> + ? ? ? return no_of_err;
+> +}
+> +EXPORT_SYMBOL(decode_bch);
+> +
+> --
+> 1.7.0.4
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>
 
---
-Sent by a consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+
+
+-- 
+Regards,
+Vimal Singh
 
 ______________________________________________________
 Linux MTD discussion mailing list
