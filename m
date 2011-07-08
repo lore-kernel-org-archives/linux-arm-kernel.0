@@ -1,48 +1,30 @@
 From: b29396@freescale.com (Dong Aisheng)
-Date: Fri, 8 Jul 2011 23:59:50 +0800
-Subject: [PATCH 10/10] ARM: mxs-dma: include <linux/dmaengine.h>
+Date: Fri, 8 Jul 2011 23:59:48 +0800
+Subject: [PATCH 08/10] ARM: mxs: add mxs-sgtl5000 device
 In-Reply-To: <1310140790-2132-1-git-send-email-b29396@freescale.com>
 References: <1310140790-2132-1-git-send-email-b29396@freescale.com>
-Message-ID: <1310140790-2132-11-git-send-email-b29396@freescale.com>
+Message-ID: <1310140790-2132-9-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Other files using dma.h may fail to compile as follows:
-In file included from sound/soc/mxs/mxs-pcm.h:22,
-                 from sound/soc/mxs/mxs-saif.h:112,
-                 from sound/soc/mxs/mxs-sgtl5000.c:34:
-arch/arm/mach-mxs/include/mach/dma.h:16: warning: 'struct dma_chan' declared inside parameter list
-arch/arm/mach-mxs/include/mach/dma.h:16: warning: its scope is only this definition or declaration, which is probably not what you want
-arch/arm/mach-mxs/include/mach/dma.h: In function 'mxs_dma_is_apbh':
-arch/arm/mach-mxs/include/mach/dma.h:18: error: dereferencing pointer to incomplete type
-arch/arm/mach-mxs/include/mach/dma.h: At top level:
-arch/arm/mach-mxs/include/mach/dma.h:21: warning: 'struct dma_chan' declared inside parameter list
-arch/arm/mach-mxs/include/mach/dma.h: In function 'mxs_dma_is_apbx':
-arch/arm/mach-mxs/include/mach/dma.h:23: error: dereferencing pointer to incomplete type
-make[3]: *** [sound/soc/mxs/mxs-sgtl5000.o] Error 1
-make[2]: *** [sound/soc/mxs] Error 2
-make[1]: *** [sound/soc] Error 2
-make: *** [sound] Error 2
-
-It seems it's better for dma.h to include dmaengine.h himself.
-
 Signed-off-by: Dong Aisheng <b29396@freescale.com>
 ---
- arch/arm/mach-mxs/include/mach/dma.h |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+ arch/arm/mach-mxs/mach-mx28evk.c |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-mxs/include/mach/dma.h b/arch/arm/mach-mxs/include/mach/dma.h
-index 7f4aeea..203d7c4 100644
---- a/arch/arm/mach-mxs/include/mach/dma.h
-+++ b/arch/arm/mach-mxs/include/mach/dma.h
-@@ -9,6 +9,8 @@
- #ifndef __MACH_MXS_DMA_H__
- #define __MACH_MXS_DMA_H__
+diff --git a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
+index c8b154a..03f75fe 100644
+--- a/arch/arm/mach-mxs/mach-mx28evk.c
++++ b/arch/arm/mach-mxs/mach-mx28evk.c
+@@ -425,6 +425,9 @@ static void __init mx28evk_init(void)
+ 	i2c_register_board_info(0, mxs_i2c0_board_info,
+ 				ARRAY_SIZE(mxs_i2c0_board_info));
  
-+#include <linux/dmaengine.h>
++	mxs_add_platform_device("mxs-sgtl5000", 0, NULL, 0,
++			NULL, 0);
 +
- struct mxs_dma_data {
- 	int chan_irq;
- };
+ 	/*set the saif clk mux, both saif0/saif1 use saif0 clk*/
+ 	__raw_writel(0x2 << 10, DIGCTRL_BASE_ADDR);
+ 
 -- 
 1.7.0.4
