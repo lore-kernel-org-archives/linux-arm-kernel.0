@@ -1,112 +1,46 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 07 Jul 2011 18:14:58 -0700
-Subject: [PATCH 02/17] ARM: Add cpu power management notifiers
-In-Reply-To: <1310053830-23779-3-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1310053830-23779-1-git-send-email-lorenzo.pieralisi@arm.com>
-	<1310053830-23779-3-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <4E165A12.5080600@ti.com>
+From: david@lang.hm (david at lang.hm)
+Date: Thu, 7 Jul 2011 18:32:17 -0700 (PDT)
+Subject: [PATCH 00/10] mm: Linux VM Infrastructure to support Memory
+	Power Management
+In-Reply-To: <alpine.DEB.2.00.1107072058390.5978@tiger>
+References: <1306499498-14263-1-git-send-email-ankita@in.ibm.com>
+	<20110629130038.GA7909@in.ibm.com>
+	<CAOJsxLHQP=-srK_uYYBsPb7+rUBnPZG7bzwtCd-rRaQa4ikUFg@mail.gmail.com>
+	<alpine.DEB.2.02.1107061318190.2535@asgard.lang.hm>
+	<alpine.DEB.2.00.1107072058390.5978@tiger>
+Message-ID: <alpine.DEB.2.02.1107071831250.8081@asgard.lang.hm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/7/2011 8:50 AM, Lorenzo Pieralisi wrote:
-> From: Colin Cross<ccross@android.com>
->
-> During some CPU power modes entered during idle, hotplug and
-> suspend, peripherals located in the CPU power domain, such as
-> the GIC and VFP, may be powered down.  Add a notifier chain
-> that allows drivers for those peripherals to be notified
-> before and after they may be reset.
->
-> Signed-off-by: Colin Cross<ccross@android.com>
-> Tested-by: Kevin Hilman<khilman@ti.com>
-> ---
->   arch/arm/Kconfig              |    7 ++
->   arch/arm/include/asm/cpu_pm.h |   54 ++++++++++++
->   arch/arm/kernel/Makefile      |    1 +
->   arch/arm/kernel/cpu_pm.c      |  181 +++++++++++++++++++++++++++++++++++++++++
->   4 files changed, 243 insertions(+), 0 deletions(-)
->   create mode 100644 arch/arm/include/asm/cpu_pm.h
->   create mode 100644 arch/arm/kernel/cpu_pm.c
->
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 9adc278..356f266 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -183,6 +183,13 @@ config FIQ
->   config ARCH_MTD_XIP
->   	bool
->
-> +config ARCH_USES_CPU_PM
-> +       bool
-> +
-> +config CPU_PM
-> +       def_bool y
-> +       depends on ARCH_USES_CPU_PM&&  (PM || CPU_IDLE)
-> +
->   config VECTORS_BASE
->   	hex
->   	default 0xffff0000 if MMU || CPU_HIGH_VECTOR
-> diff --git a/arch/arm/include/asm/cpu_pm.h b/arch/arm/include/asm/cpu_pm.h
-> new file mode 100644
-> index 0000000..b4bb715
-> --- /dev/null
-> +++ b/arch/arm/include/asm/cpu_pm.h
-> @@ -0,0 +1,54 @@
-> +/*
-> + * Copyright (C) 2011 Google, Inc.
-> + *
-> + * Author:
-> + *	Colin Cross<ccross@android.com>
-> + *
-> + * This software is licensed under the terms of the GNU General Public
-> + * License version 2, as published by the Free Software Foundation, and
-> + * may be copied, distributed, and modified under those terms.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + */
-> +
-> +#ifndef _ASMARM_CPU_PM_H
-> +#define _ASMARM_CPU_PM_H
-> +
-> +#include<linux/kernel.h>
-> +#include<linux/notifier.h>
-> +
-> +/* Event codes passed as unsigned long val to notifier calls */
-> +enum cpu_pm_event {
-> +	/* A single cpu is entering a low power state */
-> +	CPU_PM_ENTER,
-> +
-> +	/* A single cpu failed to enter a low power state */
-> +	CPU_PM_ENTER_FAILED,
-> +
-> +	/* A single cpu is exiting a low power state */
-> +	CPU_PM_EXIT,
-> +
-> +	/* A cpu power domain is entering a low power state */
-> +	CPU_COMPLEX_PM_ENTER,
-> +
-> +	/* A cpu power domain failed to enter a low power state */
-> +	CPU_COMPLEX_PM_ENTER_FAILED,
-> +
-> +	/* A cpu power domain is exiting a low power state */
-> +	CPU_COMPLEX_PM_EXIT,
-> +};
-> +
-> +int cpu_pm_register_notifier(struct notifier_block *nb);
-> +int cpu_pm_unregister_notifier(struct notifier_block *nb);
-> +
-> +int cpu_pm_enter(void);
-> +int cpu_pm_exit(void);
-> +
-> +int cpu_complex_pm_enter(void);
-> +int cpu_complex_pm_exit(void);
-> +
-Can "cpu_complex_pm*" renamed to "cpu_cluster_pm*" as discussed
-earlier on the list.
+On Thu, 7 Jul 2011, Pekka Enberg wrote:
 
-Regards
-Santosh
+> On Wed, 6 Jul 2011, Pekka Enberg wrote:
+>>> Why does the allocator need to know about address boundaries? Why
+>>> isn't it enough to make the page allocator and reclaim policies favor 
+>>> using
+>>> memory from lower addresses as aggressively as possible? That'd mean
+>>> we'd favor the first memory banks and could keep the remaining ones
+>>> powered off as much as possible.
+>>> 
+>>> IOW, why do we need to support scenarios such as this:
+>>>
+>>>   bank 0     bank 1   bank 2    bank3
+>>> | online  | offline | online  | offline |
+>> 
+> On Wed, 6 Jul 2011, david at lang.hm wrote:
+>> I believe that there are memory allocations that cannot be moved after they 
+>> are made (think about regions allocated to DMA from hardware where the 
+>> hardware has already been given the address space to DMA into)
+>> 
+>> As a result, you may not be able to take bank 2 offline, so your option is 
+>> to either leave banks 0-2 all online, or support emptying bank 1 and taking 
+>> it offline.
+>
+> But drivers allocate DMA memory for hardware during module load and stay 
+> pinned there until the driver is unloaded, no? So in practice DMA buffers are 
+> going to be in banks 0-1?
+
+that depends on when the device was initialized. it is common for them to 
+be in the beginning, but with hotplug, who knows.
+
+David Lang
