@@ -1,48 +1,46 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 08 Jul 2011 16:08:58 +0900
-Subject: [PATCH 03/17] ARM: gic: Use cpu pm notifiers to save gic state
-In-Reply-To: <4E16664D.7010206@ti.com>
-References: <1310053830-23779-1-git-send-email-lorenzo.pieralisi@arm.com>
-	<1310053830-23779-4-git-send-email-lorenzo.pieralisi@arm.com>
-	<4E165ECD.9070905@ti.com>
-	<CAMbhsRT-Z4AmYmen9B9+mJ+c5YWyVbcsx0mykrn7L_JxgOLVDg@mail.gmail.com>
-	<4E16664D.7010206@ti.com>
-Message-ID: <002801cc3d3d$edd60f70$c9822e50$%kim@samsung.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Fri, 08 Jul 2011 00:09:12 -0700
+Subject: [PATCH v2 4/6] OMAP4: clocks: Update the clock tree with 4460
+	clock nodes
+In-Reply-To: <alpine.DEB.2.00.1107080044270.24181@utopia.booyaka.com>
+References: <1309573826-10615-1-git-send-email-rnayak@ti.com>
+	<1309573826-10615-2-git-send-email-rnayak@ti.com>
+	<1309573826-10615-3-git-send-email-rnayak@ti.com>
+	<1309573826-10615-4-git-send-email-rnayak@ti.com>
+	<1309573826-10615-5-git-send-email-rnayak@ti.com>
+	<alpine.DEB.2.00.1107080044270.24181@utopia.booyaka.com>
+Message-ID: <4E16AD18.7040402@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Santosh Shilimkar wrote:
-> 
-> On 7/7/2011 6:41 PM, Colin Cross wrote:
+On 7/7/2011 11:49 PM, Paul Walmsley wrote:
+> On Sat, 2 Jul 2011, Rajendra Nayak wrote:
+>
+>> Add the new clock nodes (bandgap_ts_fclk, div_ts_ck) for omap4460.
+>> Handle these nodes using the clock flags (CK_*).
+>>
+>> Signed-off-by: Rajendra Nayak<rnayak@ti.com>
+>> Signed-off-by: Nishanth Menon<nm@ti.com>
+>> Signed-off-by: Benoit Cousson<b-cousson@ti.com>
+>> Reviewed-by: Kevin Hilman<khilman@ti.com>
+>
+> Is this data coming from autogenerator scripts that have been checked into
+> that repository, or have these been hand-edited?
 
-Hi all,
+They have been hand edited to create a diff from the 4430 autogen output
+and 4460 autogen output.
 
-Now Samsung prepares updating PM on EXYNOS4210 and save/restore GIC is
-needed for that.
-Actually, it works fine on EXYNOS4210 with this.
+>
+> Also, this isn't the complete set of clock changes needed for full 4460
+> support, right?  I'm thinking of the duty cycle correction changes
+> described in TRM 3.6.3.7.2 "Tactical Clocking Adjustment".
+> Are those planned to go into a future patch?
 
-But we have some concern about following.
+Yes, this series was targeted at providing basic boot support. I was
+planning to add the DCC changes as part of the next series.
 
-> +/*
-> + * Saves the GIC distributor registers during suspend or idle.  Must be
-called
-> + * with interrupts disabled but before powering down the GIC.  After
-calling
-> + * this function, no interrupts will be delivered by the GIC, and another
-> + * platform-specific wakeup source must be enabled.
-> + */
-
-PMU needs to detect interrupt which can be a wakeup source via GIC before
-calling WFI.
-Seems there is no problem but I think that can be a hole during very short
-time...
-
-So is it needed to disable GIC after saving context?
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+regards,
+Rajendra
+>
+>
+> - Paul
