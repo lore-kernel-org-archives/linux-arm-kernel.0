@@ -1,54 +1,56 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 07 Jul 2011 17:55:51 -0700
-Subject: [PATCH 0/7] Re-organize linker layouts
-In-Reply-To: <20110707223620.GG20403@n2100.arm.linux.org.uk>
-References: <20110706102245.GO8286@n2100.arm.linux.org.uk>
-	<4E15ECB6.40100@codeaurora.org>
-	<20110707223620.GG20403@n2100.arm.linux.org.uk>
-Message-ID: <4E165597.90002@codeaurora.org>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 07 Jul 2011 18:12:13 -0700
+Subject: [PATCH 01/17] ARM: proc: add definition of cpu_reset for ARMv6
+	and ARMv7 cores
+In-Reply-To: <1310053830-23779-2-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1310053830-23779-1-git-send-email-lorenzo.pieralisi@arm.com>
+	<1310053830-23779-2-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <4E16596D.9060103@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/07/2011 03:36 PM, Russell King - ARM Linux wrote:
-> On Thu, Jul 07, 2011 at 10:28:22AM -0700, Stephen Boyd wrote:
->> On 07/06/2011 03:22 AM, Russell King - ARM Linux wrote:
->>> The following series of patches are targetted at two issues:
->>>
->>> 1. Fixing large initramfs causing PC24 relocations to become out of
->>>    range.  This fixes both modules and link-time errors.
->>>
->>> 2. Making the vmlinux easier to pinpoint the various section-built
->>>    data structures and inspect them later.
->>>
->>> For the main kernel, this allows the size of various sections to be
->>> determined via objdump -h.  This also aids objdump -d and -s usage
->>> when asking it to target a particular section.
->>>
->>> For the decompressor, it means that it is now trivially possible to copy
->>> out the compressed kernel vmlinux image by:
->>>
->>>   arm-linux-objcopy -O binary -j .piggydata arch/arm/boot/compressed/vmlinux \
->>> 	piggy.gz
->>>
->>> and thereby obtain the binary kernel image (the Image file) which was
->>> originally used.
->>
->> I gave this series a test with my poison initmem patch and all looks well
->>
->> Tested-by: Stephen Boyd <sboyd@codeaurora.org>
->>
->> except for patch 2 as I didn't use a zImage.
+Minor nit,
+
+On 7/7/2011 8:50 AM, Lorenzo Pieralisi wrote:
+> From: Will Deacon<will.deacon@arm.com>
 >
-> Oh, what did you use instead?  I thought no one used the Image files
-> anymore...
+> This patch adds simple definitions of cpu_reset for ARMv6 and ARMv7
+> cores, which disable the MMU via the SCTLR.
+>
+> Signed-off-by: Will Deacon<will.deacon@arm.com>
+> ---
+>   arch/arm/mm/proc-v6.S |    5 +++++
+>   arch/arm/mm/proc-v7.S |    7 +++++++
+>   2 files changed, 12 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mm/proc-v6.S b/arch/arm/mm/proc-v6.S
+> index 1d2b845..f3b5232 100644
+> --- a/arch/arm/mm/proc-v6.S
+> +++ b/arch/arm/mm/proc-v6.S
+> @@ -56,6 +56,11 @@ ENTRY(cpu_v6_proc_fin)
+>    */
+>   	.align	5
+>   ENTRY(cpu_v6_reset)
+> +	mrc	p15, 0, r1, c1, c0, 0		@ ctrl register
+> +	bic	r1, r1, #0x1			@ ...............m
+> +	mcr	p15, 0, r1, c1, c0, 0		@ disable MMU
+> +	mov	r1, #0
+> +	mcr	p15, 0, r1, c7, c5, 4		@ ISB
+>   	mov	pc, r0
+>
+>   /*
+> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+> index 089c0b5..15d6191 100644
+> --- a/arch/arm/mm/proc-v7.S
+> +++ b/arch/arm/mm/proc-v7.S
+> @@ -58,9 +58,16 @@ ENDPROC(cpu_v7_proc_fin)
+>    *	to what would be the reset vector.
+>    *
+>    *	- loc   - location to jump to for soft reset
+> + *
+> + *	This code must be executed using a flat identity mapping with
+> + *      caches disabled.
+Align the text body.
 
-I used an Image. Android bootloaders are perfectly fine booting those.
-Plus, the zreladdr for every MSM post 7x00a isn't upstream.
-
-Which reminds me, the zreladdr for every MSM besides 7x00a and 8x50 is
-0xX0208000 which doesn't play nicely with AUTO_ZRELADDR. I wish we could
-fix that.
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Regards
+Santosh
