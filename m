@@ -1,52 +1,54 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 8 Jul 2011 08:06:39 +0800
-Subject: [PATCH] net/fec: gasket needs to be enabled for some i.mx
-In-Reply-To: <20110707184409.GH2824@ponder.secretlab.ca>
-References: <20110630161935.GA7977@S2100-06.ap.freescale.net>
-	<1309515082-7386-1-git-send-email-shawn.guo@linaro.org>
-	<20110707.041257.670268148869400054.davem@davemloft.net>
-	<20110707134157.GA12722@S2100-06.ap.freescale.net>
-	<20110707184409.GH2824@ponder.secretlab.ca>
-Message-ID: <20110708000638.GC12722@S2100-06.ap.freescale.net>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 07 Jul 2011 17:55:51 -0700
+Subject: [PATCH 0/7] Re-organize linker layouts
+In-Reply-To: <20110707223620.GG20403@n2100.arm.linux.org.uk>
+References: <20110706102245.GO8286@n2100.arm.linux.org.uk>
+	<4E15ECB6.40100@codeaurora.org>
+	<20110707223620.GG20403@n2100.arm.linux.org.uk>
+Message-ID: <4E165597.90002@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 07, 2011 at 12:44:09PM -0600, Grant Likely wrote:
-> On Thu, Jul 07, 2011 at 09:41:58PM +0800, Shawn Guo wrote:
-> > On Thu, Jul 07, 2011 at 04:12:57AM -0700, David Miller wrote:
-> > > From: Shawn Guo <shawn.guo@linaro.org>
-> > > Date: Fri,  1 Jul 2011 18:11:22 +0800
-> > > 
-> > > > On the recent i.mx (mx25/50/53), there is a gasket inside fec
-> > > > controller which needs to be enabled no matter phy works in MII
-> > > > or RMII mode.
-> > > > 
-> > > > The current code enables the gasket only when phy interface is RMII.
-> > > > It's broken when the driver works with a MII phy.  The patch uses
-> > > > platform_device_id to distinguish the SoCs that have the gasket and
-> > > > enables it on these SoCs for both MII and RMII mode.
-> > > > 
-> > > > Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
-> > > > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > > 
-> > > Acked-by: David S. Miller <davem@davemloft.net>
-> > > --
-> > 
-> > Thanks, David.  I will try to get it through Sascha's tree after
-> > the rebase again dt series.
-> > 
-> > Hi Sascha,
-> > 
-> > How should we proceed?  It seems Grant will take the fec-dt series
-> > on his tree.  Would you then merge that tree into yours, so that I
-> > can rebase this patch on your tree and get it go through there?
-> 
-> I should probably just take the lot.
-> 
-Thanks, Grant.  That makes people's life easier.  Please let me know
-once you apply the dt series, so that I can start rebase the patch on
-your tree.
+On 07/07/2011 03:36 PM, Russell King - ARM Linux wrote:
+> On Thu, Jul 07, 2011 at 10:28:22AM -0700, Stephen Boyd wrote:
+>> On 07/06/2011 03:22 AM, Russell King - ARM Linux wrote:
+>>> The following series of patches are targetted at two issues:
+>>>
+>>> 1. Fixing large initramfs causing PC24 relocations to become out of
+>>>    range.  This fixes both modules and link-time errors.
+>>>
+>>> 2. Making the vmlinux easier to pinpoint the various section-built
+>>>    data structures and inspect them later.
+>>>
+>>> For the main kernel, this allows the size of various sections to be
+>>> determined via objdump -h.  This also aids objdump -d and -s usage
+>>> when asking it to target a particular section.
+>>>
+>>> For the decompressor, it means that it is now trivially possible to copy
+>>> out the compressed kernel vmlinux image by:
+>>>
+>>>   arm-linux-objcopy -O binary -j .piggydata arch/arm/boot/compressed/vmlinux \
+>>> 	piggy.gz
+>>>
+>>> and thereby obtain the binary kernel image (the Image file) which was
+>>> originally used.
+>>
+>> I gave this series a test with my poison initmem patch and all looks well
+>>
+>> Tested-by: Stephen Boyd <sboyd@codeaurora.org>
+>>
+>> except for patch 2 as I didn't use a zImage.
+>
+> Oh, what did you use instead?  I thought no one used the Image files
+> anymore...
+
+I used an Image. Android bootloaders are perfectly fine booting those.
+Plus, the zreladdr for every MSM post 7x00a isn't upstream.
+
+Which reminds me, the zreladdr for every MSM besides 7x00a and 8x50 is
+0xX0208000 which doesn't play nicely with AUTO_ZRELADDR. I wish we could
+fix that.
 
 -- 
-Regards,
-Shawn
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
