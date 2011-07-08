@@ -1,65 +1,270 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 8 Jul 2011 18:25:41 +0100
-Subject: [PATCH 6/8] drivers: add Contiguous Memory Allocator
-In-Reply-To: <201107051558.39344.arnd@arndb.de>
-References: <1309851710-3828-1-git-send-email-m.szyprowski@samsung.com>
-	<201107051427.44899.arnd@arndb.de>
-	<20110705123035.GD8286@n2100.arm.linux.org.uk>
-	<201107051558.39344.arnd@arndb.de>
-Message-ID: <20110708172541.GM4812@n2100.arm.linux.org.uk>
+From: hong.xu@atmel.com (Hong Xu)
+Date: Fri, 08 Jul 2011 17:32:40 -0000
+Subject: [PATCH] MTD: atmel_nand: Add DMA support to access Nandflash
+In-Reply-To: <hong.xu@atmel.com>
+References: <hong.xu@atmel.com>
+Message-ID: <1295319406-5027-2-git-send-email-hong.xu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 05, 2011 at 03:58:39PM +0200, Arnd Bergmann wrote:
-> Ah, sorry I missed that patch on the mailing list, found it now in
-> your for-next branch.
+Some SAM9 chips have the ability to perform DMA between CPU and SMC controller.
+This patch adds DMA support for SAM9RL, SAM9G45, SSAM9G46,AM9M10, SAM9M11.
 
-I've been searching for this email to reply to for the last day or
-so...
+Signed-off-by: Hong Xu <hong.xu@atmel.com>
+---
+ drivers/mtd/nand/atmel_nand.c |  166 ++++++++++++++++++++++++++++++++++++++--
+ 1 files changed, 157 insertions(+), 9 deletions(-)
 
-> If I'm reading your "ARM: DMA: steal memory for DMA coherent mappings"
-> correctly, the idea is to have a per-platform compile-time amount
-> of memory that is reserved purely for coherent allocations and
-> taking out of the buddy allocator, right?
+diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
+index ccce0f0..02ad055 100644
+--- a/drivers/mtd/nand/atmel_nand.c
++++ b/drivers/mtd/nand/atmel_nand.c
+@@ -48,6 +48,9 @@
+ #define no_ecc		0
+ #endif
+ 
++static int use_dma = 1;
++module_param(use_dma, int, 0);
++
+ static int on_flash_bbt = 0;
+ module_param(on_flash_bbt, int, 0);
+ 
+@@ -89,11 +92,20 @@ struct atmel_nand_host {
+ 	struct nand_chip	nand_chip;
+ 	struct mtd_info		mtd;
+ 	void __iomem		*io_base;
++	dma_addr_t		io_phys;
+ 	struct atmel_nand_data	*board;
+ 	struct device		*dev;
+ 	void __iomem		*ecc;
++
++	struct completion comp;
++	struct dma_chan *dma_chan;
+ };
+ 
++static int cpu_has_dma(void)
++{
++	return cpu_is_at91sam9rl() || cpu_is_at91sam9g45();
++}
++
+ /*
+  * Enable NAND.
+  */
+@@ -150,7 +162,7 @@ static int atmel_nand_device_ready(struct mtd_info *mtd)
+ /*
+  * Minimal-overhead PIO for data access.
+  */
+-static void atmel_read_buf(struct mtd_info *mtd, u8 *buf, int len)
++static void atmel_read_buf8(struct mtd_info *mtd, u8 *buf, int len)
+ {
+ 	struct nand_chip	*nand_chip = mtd->priv;
+ 
+@@ -164,7 +176,7 @@ static void atmel_read_buf16(struct mtd_info *mtd, u8 *buf, int len)
+ 	__raw_readsw(nand_chip->IO_ADDR_R, buf, len / 2);
+ }
+ 
+-static void atmel_write_buf(struct mtd_info *mtd, const u8 *buf, int len)
++static void atmel_write_buf8(struct mtd_info *mtd, const u8 *buf, int len)
+ {
+ 	struct nand_chip	*nand_chip = mtd->priv;
+ 
+@@ -178,6 +190,121 @@ static void atmel_write_buf16(struct mtd_info *mtd, const u8 *buf, int len)
+ 	__raw_writesw(nand_chip->IO_ADDR_W, buf, len / 2);
+ }
+ 
++static void dma_complete_func(void *completion)
++{
++	complete(completion);
++}
++
++static int atmel_nand_dma_op(struct mtd_info *mtd, void *buf, int len,
++			       int is_read)
++{
++	struct dma_device *dma_dev;
++	enum dma_ctrl_flags flags;
++	dma_addr_t dma_src_addr, dma_dst_addr, phys_addr;
++	struct dma_async_tx_descriptor *tx = NULL;
++	dma_cookie_t cookie;
++	struct nand_chip *chip = mtd->priv;
++	struct atmel_nand_host *host = chip->priv;
++	void *p = buf;
++	enum dma_data_direction dir = is_read? DMA_FROM_DEVICE : DMA_TO_DEVICE;
++
++	if (buf >= high_memory) {
++		struct page *pg;
++
++		if (((size_t)buf & PAGE_MASK) !=
++		    ((size_t)(buf + len - 1) & PAGE_MASK)) {
++			dev_warn(host->dev, "Buffer doesn't fit in one page:");
++			goto err_dma;
++		}
++
++		pg = vmalloc_to_page(buf);
++		if (pg == 0) {
++			dev_err(host->dev, "Failed to vmalloc_to_page:");
++			goto err_dma;
++		}
++		p = page_address(pg) + ((size_t)buf & ~PAGE_MASK);
++	}
++
++	dma_dev = host->dma_chan->device;
++
++	flags = DMA_CTRL_ACK | DMA_COMPL_SKIP_DEST_UNMAP | DMA_PREP_INTERRUPT |
++			DMA_COMPL_SKIP_SRC_UNMAP;
++
++	phys_addr = dma_map_single(dma_dev->dev, p, len, dir);
++
++	if (dma_mapping_error(dma_dev->dev, phys_addr)) {
++		dev_err(host->dev, "Failed to dma_map_single:");
++		goto err_dma;
++	}
++
++	if (is_read) {
++		dma_src_addr = host->io_phys;
++		dma_dst_addr = phys_addr;
++	} else {
++		dma_src_addr = phys_addr;
++		dma_dst_addr = host->io_phys;
++	}
++
++	tx = dma_dev->device_prep_dma_memcpy(host->dma_chan, dma_dst_addr,
++					     dma_src_addr, len, flags);
++	if (!tx) {
++		dev_err(host->dev, "Failed to prepare DMA memcpy\n");
++		goto err;
++	}
++
++	init_completion(&host->comp);
++	tx->callback = dma_complete_func;
++	tx->callback_param = &host->comp;
++
++	cookie = tx->tx_submit(tx);
++	if (dma_submit_error(cookie)) {
++		dev_err(host->dev, "Failed to do DMA tx_submit\n");
++		goto err;
++	}
++
++	dma_async_issue_pending(host->dma_chan);
++
++	wait_for_completion(&host->comp);
++
++	return 0;
++
++err:
++	dma_unmap_single(dma_dev->dev, phys_addr, len, dir);
++err_dma:
++	dev_warn(host->dev, " Fall back to CPU I/O\n");
++	return -EIO;
++}
++
++static void atmel_read_buf(struct mtd_info *mtd, u8 *buf, int len)
++{
++	struct nand_chip *chip = mtd->priv;
++	struct atmel_nand_host *host = chip->priv;
++
++	if (use_dma && len >= mtd->oobsize)
++		if (atmel_nand_dma_op(mtd, buf, len, 1) == 0)
++			return;
++
++	if (host->board->bus_width_16)
++		atmel_read_buf16(mtd, buf, len);
++	else
++		atmel_read_buf8(mtd, buf, len);
++}
++
++static void atmel_write_buf(struct mtd_info *mtd, const u8 *buf, int len)
++{
++	struct nand_chip *chip = mtd->priv;
++	struct atmel_nand_host *host = chip->priv;
++
++	if (use_dma && len >= mtd->oobsize)
++		if (atmel_nand_dma_op(mtd, (void *)buf, len, 0) == 0)
++			return;
++
++	if (host->board->bus_width_16)
++		atmel_write_buf16(mtd, buf, len);
++	else
++		atmel_write_buf8(mtd, buf, len);
++}
++
+ /*
+  * Calculate HW ECC
+  *
+@@ -398,6 +525,8 @@ static int __init atmel_nand_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
+ 	}
+ 
++	host->io_phys = (dma_addr_t)mem->start;
++
+ 	host->io_base = ioremap(mem->start, mem->end - mem->start + 1);
+ 	if (host->io_base == NULL) {
+ 		printk(KERN_ERR "atmel_nand: ioremap failed\n");
+@@ -448,14 +577,11 @@ static int __init atmel_nand_probe(struct platform_device *pdev)
+ 
+ 	nand_chip->chip_delay = 20;		/* 20us command delay time */
+ 
+-	if (host->board->bus_width_16) {	/* 16-bit bus width */
++	if (host->board->bus_width_16)	/* 16-bit bus width */
+ 		nand_chip->options |= NAND_BUSWIDTH_16;
+-		nand_chip->read_buf = atmel_read_buf16;
+-		nand_chip->write_buf = atmel_write_buf16;
+-	} else {
+-		nand_chip->read_buf = atmel_read_buf;
+-		nand_chip->write_buf = atmel_write_buf;
+-	}
++		
++	nand_chip->read_buf = atmel_read_buf;
++	nand_chip->write_buf = atmel_write_buf;
+ 
+ 	platform_set_drvdata(pdev, host);
+ 	atmel_nand_enable(host);
+@@ -473,6 +599,22 @@ static int __init atmel_nand_probe(struct platform_device *pdev)
+ 		nand_chip->options |= NAND_USE_FLASH_BBT;
+ 	}
+ 
++	if (cpu_has_dma() && use_dma) {
++		dma_cap_mask_t mask;
++
++		dma_cap_zero(mask);
++		dma_cap_set(DMA_MEMCPY, mask);
++		host->dma_chan = dma_request_channel(mask, 0, NULL);
++		if (!host->dma_chan) {
++			dev_err(host->dev, "Failed to request DMA channel\n");
++			use_dma = 0;
++		}
++	}
++	if (use_dma)
++		dev_info(host->dev, "Using DMA for NAND access.\n");
++	else
++		dev_info(host->dev, "No DMA support for NAND access.\n");
++
+ 	/* first scan to find the device and get the page size */
+ 	if (nand_scan_ident(mtd, 1, NULL)) {
+ 		res = -ENXIO;
+@@ -555,6 +697,8 @@ err_scan_ident:
+ err_no_card:
+ 	atmel_nand_disable(host);
+ 	platform_set_drvdata(pdev, NULL);
++	if (host->dma_chan)
++		dma_release_channel(host->dma_chan);
+ 	if (host->ecc)
+ 		iounmap(host->ecc);
+ err_ecc_ioremap:
+@@ -578,6 +722,10 @@ static int __exit atmel_nand_remove(struct platform_device *pdev)
+ 
+ 	if (host->ecc)
+ 		iounmap(host->ecc);
++
++	if (host->dma_chan)
++		dma_release_channel(host->dma_chan);
++
+ 	iounmap(host->io_base);
+ 	kfree(host);
+ 
+-- 
+1.7.3.3
 
-Yes, because every time I've looked at taking out memory mappings in
-the first level page tables, it's always been a major issue.
 
-We have a method where we can remove first level mappings on
-uniprocessor systems in the ioremap code just fine - we use that so
-that systems can setup section and supersection mappings.  They can
-tear them down as well - and we update other tasks L1 page tables
-when they get switched in.
-
-This, however, doesn't work on SMP, because if you have a DMA allocation
-(which is permitted from IRQ context) you must have some way of removing
-the L1 page table entries from all CPUs TLBs and the page tables currently
-in use and any future page tables which those CPUs may switch to.
-
-The easy bit is "future page tables" - that can be done in the same way
-as the ioremap() code does with a generation number, checked when a new
-page table is switched in.  The problem is the current CPUs, and as we
-know trying to call smp_call_function() with IRQs disabled is not
-permitted due to deadlock.
-
-So, in a SMP system, there is no safe way to remove L1 page table entries
-from IRQ context.  That means if memory is mapped for the buddy allocators
-using L1 page table entries, then it is fixed for that application on a
-SMP system.
-
-However, that's not really what I wanted to find this email for.  That
-is I'm dropping the "ARM: DMA: steal memory for DMA coherent mappings"
-patch for this merge window because - as I found out yesterday - it
-prevents the Assabet platform booting, and so would be a regression.
-
-Plus, I have a report of a regression with the streaming DMA API
-speculative prefetch fixes causing the IOP ADMA raid5 async offload
-stuff to explode - which may result in the streaming DMA API fixes
-being reverted (which will leave ARMv6+ vulnerable to data corruption.)
-As I have no time to work through the RAID5 code, async_tx code, and
-IOP ADMA code to get to the bottom of it (because of this flood of
-patches) I think a revert is looking likely - either that or I'll have
-to tell the bug reporter to go away, which really isn't on.  It's on
-LKML if anyone's interested in trying to diagnose it, the
-"PROBLEM: ARM-dma-mapping-fix-for-speculative-prefetching cause OOPS"
-thread.
+______________________________________________________
+Linux MTD discussion mailing list
+http://lists.infradead.org/mailman/listinfo/linux-mtd/
