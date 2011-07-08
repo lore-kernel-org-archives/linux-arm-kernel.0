@@ -1,60 +1,64 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Fri, 8 Jul 2011 12:24:22 +0200
-Subject: [PATCH v5 1/3] ARM: mxs: add GPMI-NFC support for imx23/imx28
-In-Reply-To: <20110708101625.GR29624@pengutronix.de>
-References: <1309406028-2924-1-git-send-email-b32955@freescale.com>
-	<1309406028-2924-2-git-send-email-b32955@freescale.com>
-	<201106301555.19440.arnd@arndb.de>
-	<20110708073119.GP29624@pengutronix.de>
-	<4E16B47E.8090909@freescale.com>
-	<20110708090903.GQ29624@pengutronix.de>
-	<4E16CD6F.9050304@freescale.com>
-	<20110708101625.GR29624@pengutronix.de>
-Message-ID: <19990.56022.592145.982784@ipc1.ka-ro>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 8 Jul 2011 03:25:21 -0700
+Subject: [GIT PULL] omap board updates for v3.1 merge window
+In-Reply-To: <201107081054.01295.arnd@arndb.de>
+References: <20110707162911.GL5783@atomide.com>
+	<201107072240.58987.arnd@arndb.de>
+	<20110708083042.GQ5783@atomide.com>
+	<201107081054.01295.arnd@arndb.de>
+Message-ID: <20110708102521.GS5783@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Uwe Kleine-K?nig writes:
-> Hello Huang,
-> 
-> On Fri, Jul 08, 2011 at 05:27:11PM +0800, Huang Shijie wrote:
-> > >>>>The init function is used only to set up iomux, so the logical replacement is
-> > >>>>a pointer to the iomux data, and calling mxs_iomux_setup_multiple_pads
-> > >>>>directly from the driver.
-> > >>>Why not put the iomux stuff into the per-machine table and get rid of
-> > >>>the init callback, too?
-> > >>The mmc (ssp) has pin conflict with gpmi on both mx23evk and mx28evk.
-> > >>So, it's better to initialize the pin when the driver(GPMI or MMC)
-> > >>is enabled.
-> > >What do you do to prevent userspace from trying to use both devices?
-> > The board can not support the two devices at the same time.
-> > So the user can only use one device with the board.
+* Arnd Bergmann <arnd@arndb.de> [110708 01:49]:
+> On Friday 08 July 2011 10:30:42 Tony Lindgren wrote:
 > > 
-> > >I guess you need to configure the hardware somehow to switch between the
-> > >two using a jumper? Isn't it possible to detect the hardware setting and
-> > >setup the muxer accordingly?
-> > >
-> > >IMHO an per-device init-callback is the wrong approach to solve a pin
-> > >conflict.
-> > Do you have any good solution about this?
-> Put the pinmux corresponding to the one device that currently works in
-> the pinmux list!?
+> > * Arnd Bergmann <arnd@arndb.de> [110707 13:36]:
+> > > On Thursday 07 July 2011 18:29:11 Tony Lindgren wrote:
+> > > > Please pull omap board updates from:
+> > > > 
+> > > > git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git devel-board
+> > > > 
+> > > > These are currently on top of the fixes you pulled earlier but
+> > > > could be also rebased on the earlier cleanup if you prefer that.
+> > > 
+> > > I would generally prefer them to be independent, even if that causes
+> > > minor conflicts. If some branches are built on top of others, that
+> > > mainly means I have to remember the order in which to send them
+> > > upstream, and my memory for these things is limited.
+> > 
+> > Sure. So let's wait on this one a bit. I'll send you some more cleanup
+> > first as I just noticed that the TWL cleanup series will conflict with
+> > these patches.
 > 
-#define 'that currently works'
+> Sorry for being unclear, I forgot to say that I did in fact pull your tree
+> already.
 
-For a dedicated system that may not be a problem. But for development
-kits and modular systems that allow peripheral modules to be plugged
-in there is no 'one device that currently works'.
+OK no problem that's fine with me.
 
+BTW, looks like your tree is no longer showing up on kernel.org?
+ 
+> > I need to base these board files on all the cleanup though, otherwise
+> > things will get messy with merge and build conflicts.
+> > 
+> > Unfortunately there will be dependencies between branches until we
+> > have the driver probe and bus (hwmod) code initializing things
+> > using device tree data..
+> 
+> I already need to stage things out a bit, because the omap fixes
+> depend on the omap cleanups, while the imx cleanups depend on the
+> pxa fixes. So it's likely going to be something like
+> 
+> * fixes
+> * cleanup
+> * more fixes
+> * more cleanup
+> * new subarchitectures
+> * new boards
+> * wait for devicetree to get pulled in
+> * more cleanups based on device tree
+> * other new features
 
-Lothar Wa?mann
--- 
-___________________________________________________________
+It's getting messy :)
 
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Tony
