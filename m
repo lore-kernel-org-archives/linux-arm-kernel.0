@@ -1,47 +1,155 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 8 Jul 2011 03:27:51 -0700
-Subject: [RFC] dmaengine: Moving TI SDMA driver to dmaengine - design plan
-In-Reply-To: <E0D41E29EB0DAC4E9F3FF173962E9E94030259CDC4@dbde02.ent.ti.com>
-References: <E0D41E29EB0DAC4E9F3FF173962E9E94030259CD17@dbde02.ent.ti.com>
-	<20110708100410.GA4957@n2100.arm.linux.org.uk>
-	<E0D41E29EB0DAC4E9F3FF173962E9E94030259CDC4@dbde02.ent.ti.com>
-Message-ID: <20110708102751.GT5783@atomide.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 08 Jul 2011 11:33:30 +0100
+Subject: [RFC PATCH v2 2/4] Core device subsystem implementation
+In-Reply-To: <CAHXqBFJcO8-7v+SZ88jx6XjDQBFUybTjOU=LWdsc3ChD4bU_=g@mail.gmail.com>
+References: <1310115250-3859-1-git-send-email-marc.zyngier@arm.com>	<1310115250-3859-3-git-send-email-marc.zyngier@arm.com>
+	<CAHXqBFJcO8-7v+SZ88jx6XjDQBFUybTjOU=LWdsc3ChD4bU_=g@mail.gmail.com>
+Message-ID: <4E16DCFA.5050903@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Raju, Sundaram <sundaram@ti.com> [110708 03:09]:
-> > -----Original Message-----
-> > From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
-> > Sent: Friday, July 08, 2011 3:34 PM
-> > To: Raju, Sundaram
-> > Cc: linux-arm-kernel at lists.infradead.org; linux-omap at vger.kernel.org; Dan;
-> > Shilimkar, Santosh; linux-kernel at vger.kernel.org
-> > Subject: Re: [RFC] dmaengine: Moving TI SDMA driver to dmaengine - design
-> > plan
-> > 
-> > On Fri, Jul 08, 2011 at 01:52:17PM +0530, Raju, Sundaram wrote:
-> > > I am planning to move TI SDMA driver in OMAP tree
-> > > into the dmaengine framework.
-> > >
-> > > The first immediate issue of concern I noticed is the
-> > > huge number of client drivers that use the existing SDMA driver.
-> > > More than 15 client drivers are using the current SDMA driver.
-> > >
-> > > Moving the SDMA driver along with all of these client drivers at a
-> > > single stretch seems a humungous task.
-> > > I noticed a model in the existing DMA drivers in dmaengine
-> > > framework that will over come this issue.
-> > 
-> > It _is_ sane to build a dmaengine driver on top of the existing SoC
-> > private API, then convert the drivers to DMA engine, and then cleanup
-> > the resulting DMA engine driver.
+On 08/07/11 11:18, Micha? Miros?aw wrote:
+> 2011/7/8 Marc Zyngier <marc.zyngier@arm.com>:
+>> There is a small number of devices that the core kernel needs very
+>> early in the boot process, namely an interrupt controller and a timer,
+>> long before the device model is up and running.
+>>
+>> The "core device subsystem" offers a class based device/driver
+>> matching model, doesn't rely on any other subsystem, is very (too?)
+>> simple, and support getting information both from DT as well as from
+>> static data provided by the platform. It also gives the opportunity to
+>> define the probing order by offering a sorting hook at runtime.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> [...]
+>> --- /dev/null
+>> +++ b/drivers/base/core_device.c
+>> @@ -0,0 +1,108 @@
+> [...]
+>> +static int __init core_device_match(struct core_device *dev,
+>> +                                   struct core_device_id *ids)
+>> +{
+>> +       int i;
+>> +#ifdef CONFIG_OF
+>> +       if (dev->of_node)
+>> +               for (i = 0; ids[i].name != NULL; i++)
+>> +                       if (of_device_is_compatible(dev->of_node,
+>> +                                                   ids[i].name))
+>> +                               return 1;
 > 
-> Yes, that is what I thought. Thanks.
+> Add an else here? I assume DT devices shouldn't be matched by name.
 
-Yes that's what we did with the gpiolib changes. That allows then
-converting the drivers over to the DMA engine API one function at
-a time (or one driver at a time).
+Good point. I'll update that.
 
-Regards,
+>> +#endif
+>> +       for (i = 0; ids[i].name != NULL; i++)
+>> +               if (!strcmp(dev->name, ids[i].name))
+>> +                       return 1;
+>> +
+>> +       return 0;
+>> +}
+>> +
+> [...]
+>> --- /dev/null
+>> +++ b/include/linux/core_device.h
+>> @@ -0,0 +1,69 @@
+>> +/*
+>> + * Copyright (C) 2011 ARM Ltd
+>> + * Written by Marc Zyngier <marc.zyngier@arm.com>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + *
+>> + * Core device init support
+>> + */
+>> +
+>> +#ifndef _CORE_DEVICE_H
+>> +#define _CORE_DEVICE_H
+>> +
+>> +#include <linux/list.h>
+>> +#include <linux/ioport.h>
+>> +#include <linux/of.h>
+>> +
+>> +struct core_device_id {
+>> +       const char              *name;
+>> +};
+>> +
+>> +enum core_device_class {
+>> +       CORE_DEV_CLASS_IRQ,
+>> +       CORE_DEV_CLASS_TIMER,
+>> +       CORE_DEV_CLASS_MAX              /* Do not use as a class */
+>> +};
+> 
+> CORE_DEV_CLASS_MAX -> CORE_DEV_CLASS_COUNT
+> 
+> _MAX suggests that this is the largest value, but in this case it is a count.
 
-Tony
+_MAX seem to be the established usage in the kernel (I just grep-ed for
+"_MAX," in include/linux, and found a number of similar uses, while only
+ACPI seem to be using _COUNT).
+
+>> +
+>> +struct core_device {
+>> +       const char              *name;
+>> +       u32                     num_resources;
+>> +       struct resource         *resource;
+>> +#ifdef CONFIG_OF
+>> +       struct device_node      *of_node;
+>> +#endif
+>> +       struct list_head        entry;
+>> +};
+>> +
+>> +struct core_driver {
+>> +       int                     (*init)(struct core_device *);
+>> +       struct core_device_id   *ids;
+>> +};
+>> +
+>> +void core_device_register(enum core_device_class class,
+>> +                         struct core_device *dev);
+>> +void core_driver_init_class(enum core_device_class class,
+>> +                           void (*sort)(struct list_head *));
+>> +#ifdef CONFIG_OF
+>> +void of_core_device_populate(enum core_device_class class,
+>> +                            struct of_device_id *matches);
+>> +#else
+>> +static inline void of_core_device_populate(enum core_device_class class,
+>> +                                          struct of_device_id *matches)
+>> +{
+>> +}
+>> +#endif
+>> +
+>> +struct core_driver_setup_block {
+>> +       enum core_device_class  class;
+>> +       struct core_driver      *drv;
+>> +};
+>> +
+>> +#define core_driver_register(cls, drv)                                 \
+>> +static struct core_driver_setup_block __core_driver_block_##cls##_##drv        \
+>> +       __used __section(.init.core_driver)                             \
+>> +       __attribute__((aligned((sizeof(long)))))                        \
+>> +       = { cls, &drv }
+>> +
+>> +#endif
+> 
+> Since core_driver_register() is not a function it shouldn't look like
+> one. Something like DEFINE_CORE_DRIVER_ENTRY() would be better. I
+> would make cls to be only the last word of CORE_DEV_CLASS_* values so
+> its less typing in the board files (unless you don't like CPP string
+> concatenation).
+> 
+> +#define DEFINE_CORE_DRIVER_ENTRY(cls, drv)                               \
+> +static struct core_driver_setup_block __core_driver_block_##cls##_##drv  \
+> +       __used __section(.init.core_driver)                               \
+> +       = { CORE_DEV_CLASS_##cls, &drv }
+
+I fully agree with the "not a function" approach. I'm more cautious with
+the "CORE_DEV_CLASS_##cls" bit.  I feel like it's hiding a bit too much
+of what's going on, but it's only my own feeling, and I'd be happy to
+change it if that's what people prefer.
+
+Thanks for reviewing,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
