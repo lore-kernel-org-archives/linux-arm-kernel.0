@@ -1,7 +1,7 @@
 From: haojian.zhuang@marvell.com (Haojian Zhuang)
-Date: Fri,  8 Jul 2011 18:20:27 +0800
-Subject: [PATCH] mfd: convert devicetree to platform on 88pm860x
-In-Reply-To: <1310120428-22700-10-git-send-email-haojian.zhuang@marvell.com>
+Date: Fri,  8 Jul 2011 18:20:28 +0800
+Subject: [PATCH] ARM: mmp: add DTS file
+In-Reply-To: <1310120428-22700-11-git-send-email-haojian.zhuang@marvell.com>
 References: <1310120428-22700-1-git-send-email-haojian.zhuang@marvell.com>
 	<1310120428-22700-2-git-send-email-haojian.zhuang@marvell.com>
 	<1310120428-22700-3-git-send-email-haojian.zhuang@marvell.com>
@@ -12,233 +12,687 @@ References: <1310120428-22700-1-git-send-email-haojian.zhuang@marvell.com>
 	<1310120428-22700-8-git-send-email-haojian.zhuang@marvell.com>
 	<1310120428-22700-9-git-send-email-haojian.zhuang@marvell.com>
 	<1310120428-22700-10-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <1310120428-22700-11-git-send-email-haojian.zhuang@marvell.com>
+	<1310120428-22700-11-git-send-email-haojian.zhuang@marvell.com>
+Message-ID: <1310120428-22700-12-git-send-email-haojian.zhuang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make 88pm860x to support both platform data and device tree. So a translation
-between device tree and platform data is added.
+Add DTS file to support brownstone & ttc-dkb.
 
 Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
 ---
- drivers/mfd/88pm860x-i2c.c |  191 +++++++++++++++++++++++++++++++++++++++++++-
- 1 files changed, 189 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/mmp2-brownstone.dts |  319 +++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/ttc-dkb.dts         |  176 ++++++++++++++++++
+ arch/arm/mach-mmp/brownstone.c        |   66 ++-----
+ arch/arm/mach-mmp/ttc_dkb.c           |   21 ++-
+ 4 files changed, 530 insertions(+), 52 deletions(-)
+ create mode 100644 arch/arm/boot/dts/mmp2-brownstone.dts
+ create mode 100644 arch/arm/boot/dts/ttc-dkb.dts
 
-diff --git a/drivers/mfd/88pm860x-i2c.c b/drivers/mfd/88pm860x-i2c.c
-index e017dc8..b017e4a 100644
---- a/drivers/mfd/88pm860x-i2c.c
-+++ b/drivers/mfd/88pm860x-i2c.c
-@@ -10,6 +10,8 @@
-  */
+diff --git a/arch/arm/boot/dts/mmp2-brownstone.dts b/arch/arm/boot/dts/mmp2-brownstone.dts
+new file mode 100644
+index 0000000..5fdabc3
+--- /dev/null
++++ b/arch/arm/boot/dts/mmp2-brownstone.dts
+@@ -0,0 +1,319 @@
++/dts-v1/;
++
++/include/ "skeleton.dtsi"
++
++/ {
++	model = "Marvell MMP2 Brownstone";
++	compatible = "mrvl,mmp2-brownstone", "mrvl,armada610-brownstone";
++	interrupt-parent = <&mmp_intc>;
++
++	memory {
++		reg = <0x00000000 0x20000000>;
++	};
++
++	chosen {
++		bootargs = "console=ttyS2,38400 root=/dev/nfs nfsroot=192.168.1.100:192.168.1.101::255.255.255.0::eth0:on";
++		linux,stdout-path = &uart2;
++	};
++
++	soc at d4000000 {
++		compatible = "mrvl,mmp2", "mrvl,armada610", "simple-bus";
++		device_type = "soc";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++
++		mmp_intc: interrupt-controller at d4282000 {
++			compatible = "mrvl,mmp-intc";
++			/*device_type = "intc";*/
++			interrupt-controller;
++			#interrupt-cells = <1>;
++			/*
++			 * interrupts: irq index of parent's irq domain
++			 */
++			interrupts = <0>;
++			interrupt-parent = <&mmp_intc>;
++			sub-interrupts = <64>;
++
++			/* enable bits in conf register */
++			enable_mask = <0x20>;
++
++			/* reg: <offset & size> */
++			reg = <0xd4282000 0x400>;
++		};
++
++		mux_intc4: interrupt-controller at d4282150 {
++			compatible = "mrvl,mux-intc";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			#interrupt-cells = <1>;
++			interrupt-controller;
++			interrupts = <4>;
++			interrupt-parent = <&mmp_intc>;
++			sub-interrupts = <2>;
++			reg = <0xd4282150 0>;
++			status-mask = <0x150 0x168>;
++			/* mfp register & interrupt index */
++			mfp-edge-interrupt = <0xd401e2c4 1>;
++		};
++
++		mux_intc5: interrupt-controller at d4282154 {
++			compatible = "mrvl,mux-intc";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			#interrupt-cells = <1>;
++			interrupt-controller;
++			interrupts = <5>;
++			sub-interrupts = <2>;
++			interrupt-parent = <&mmp_intc>;
++			reg = <0xd4282154 0>;
++			status-mask = <0x154 0x16c>;
++		};
++
++		mux_intc9: interrupt-controller at d4282180 {
++			compatible = "mrvl,mux-intc";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			#interrupt-cells = <1>;
++			interrupt-controller;
++			interrupts = <9>;
++			interrupt-parent = <&mmp_intc>;
++			sub-interrupts = <3>;
++			reg = <0xd4282180 0>;
++			status-mask = <0x180 0x17c>;
++		};
++
++		mux_intc17: interrupt-controller at d4282158 {
++			compatible = "mrvl,mux-intc";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			#interrupt-cells = <1>;
++			interrupt-controller;
++			interrupts = <17>;
++			interrupt-parent = <&mmp_intc>;
++			sub-interrupts = <5>;
++			reg = <0xd4282158 0>;
++			status-mask = <0x158 0x170>;
++		};
++
++		mux_intc35: interrupt-controller at d428215c {
++			compatible = "mrvl,mux-intc";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			#interrupt-cells = <1>;
++			interrupt-controller;
++			interrupts = <35>;
++			interrupt-parent = <&mmp_intc>;
++			sub-interrupts = <15>;
++			reg = <0xd428215c 0>;
++			status-mask = <0x15c 0x174>;
++		};
++
++		mux_intc51: interrupt-controller at d4282160 {
++			compatible = "mrvl,mux-intc";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			#interrupt-cells = <1>;
++			interrupt-controller;
++			interrupts = <51>;
++			interrupt-parent = <&mmp_intc>;
++			sub-interrupts = <2>;
++			reg = <0xd4282160 0>;
++			status-mask = <0x160 0x178>;
++		};
++
++		mux_intc55: interrupt-controller at d4282188 {
++			compatible = "mrvl,mux-intc";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			#interrupt-cells = <1>;
++			interrupt-controller;
++			interrupts = <55>;
++			interrupt-parent = <&mmp_intc>;
++			sub-interrupts = <2>;
++			reg = <0xd4282188 0>;
++			status-mask = <0x188 0x184>;
++		};
++
++		gpio: gpio-controller {
++			compatible = "pxa,gpio";
++			gpio-controller;
++			reg = <
++				0xd4019000 0xb0
++				0xd4019004 0xb0
++				0xd4019008 0xb0
++				0xd4019100 0xb0
++				0xd4019104 0xb0
++				0xd4019108 0xb0>;
++
++			/* gpio-clk-value: <offset & value> */
++			gpio-clk-value = <0xd4015038 0x3>;
++
++			/* gpio-mask: <offset & value> */
++			gpio-mask = <
++				0xd401909c 0xffffffff
++				0xd40190a0 0xffffffff
++				0xd40190a4 0xffffffff
++				0xd401919c 0xffffffff
++				0xd40191a0 0xffffffff
++				0xd40191a4 0xffffffff>;
++			gpio-pins = <0 192>;
++			#interrupt-cells = <1>;
++			interrupt-controller;
++			interrupts = <49>;
++			interrupt-parent = <&mmp_intc>;
++			sub-interrupts = <192>;
++		};
++
++		i2c0: i2c at d4011000 {
++			compatible = "pxa2xx-i2c";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0xd4011000 0x60>;
++			cell-index = <0>;
++			i2c-polling = <0>;
++			i2c-frequency = "fast";
++			interrupts = <7>;
++			interrupt-parent = <&mmp_intc>;
++
++			max8649: pmic at 60 {
++				compatible = "maxim,max8649";
++				reg = <0x60>;
++				max8649-mode = <2>;	/* VID1 = 1, VID0 = 0 */
++				/* <Ramp Timing, Active Ramp-Down Control > */
++				max8649-ramp = <0 0>;	/* 32mV/us, Deactive */
++
++				device_type = "regulator";
++				voltages = <750000 1380000>;
++				boot-on;
++				always-on;
++				ops-mask = "voltage", "status";
++				supply-name = "vcore";
++			};
++
++			max8925: pmic at 3c {
++				compatible = "maxim,max8925";
++				#address-cells = <1>;
++				#size-cells = <0>;
++				interrupt-controller;
++				interrupts = <1>;
++				interrupt-parent = <&mux_intc4>;
++				sub-interrupts = <32>;
++				reg = <0x3c>;
++
++				bk: backlight at 0 {
++					compatible = "backlight";
++					reg = <0>;
++				};
++
++				v_mipi: regulator at ldo3 {
++					compatible = "LDO3";
++					device_type = "regulator";
++					voltages = <1000000 1500000>;
++					boot-on;
++					always-on;
++					ops-mask = "voltage", "status";
++					supply-name = "mipi_1.2v";
++					reg = <0>;
++				};
++
++				touch: touch at 0 {
++					compatible = "touch";
++					interrupts = <101>;
++					interrupt-parent = <&gpio>;
++					reg = <0>;
++				};
++			};
++		};
++
++		i2c1: i2c at d4031000 {
++			compatible = "pxa2xx-i2c";
++			reg = <0xd4031000 0x60>;
++			cell-index = <1>;
++			i2c-polling = <0>;
++			i2c-frequency = "fast";
++			interrupts = <0>;
++			interrupt-parent = <&mux_intc17>;
++		};
++
++		i2c2: i2c at d4032000 {
++			compatible = "pxa2xx-i2c";
++			reg = <0xd4032000 0x60>;
++			cell-index = <2>;
++			i2c-polling = <0>;
++			i2c-frequency = "fast";
++			interrupts = <1>;
++			interrupt-parent = <&mux_intc17>;
++		};
++
++		i2c3: i2c at d4033000 {
++			compatible = "pxa2xx-i2c";
++			reg = <0xd4033000 0x60>;
++			cell-index = <3>;
++			i2c-polling = <0>;
++			i2c-frequency = "fast";
++			interrupts = <2>;
++			interrupt-parent = <&mux_intc17>;
++		};
++
++		i2c4: i2c at d4033800 {
++			compatible = "pxa2xx-i2c";
++			reg = <0xd4033800 0x60>;
++			cell-index = <4>;
++			i2c-polling = <0>;
++			i2c-frequency = "fast";
++			interrupts = <3>;
++			interrupt-parent = <&mux_intc17>;
++		};
++
++		i2c5: i2c at d4034000 {
++			compatible = "pxa2xx-i2c";
++			reg = <0xd4034000 0x60>;
++			cell-index = <5>;
++			i2c-polling = <0>;
++			i2c-frequency = "fast";
++			interrupts = <4>;
++			interrupt-parent = <&mux_intc17>;
++		};
++
++		uart0: uart at d4030000 {
++			compatible = "pxa,serial";
++			reg = <0xd4030000 0x1000>;
++			reg-shift = <2>;
++			interrupts = <27>;
++			interrupt-parent = <&mmp_intc>;
++			clock-frequency = <26000000>;
++			current-speed = <115200>;
++		};
++
++		uart1: uart at d4017000 {
++			compatible = "pxa,serial";
++			reg = <0xd4017000 0x1000>;
++			reg-shift = <2>;
++			interrupts = <28>;
++			interrupt-parent = <&mmp_intc>;
++			clock-frequency = <26000000>;
++			current-speed = <115200>;
++		};
++
++		uart2: uart at d4018000 {
++			compatible = "pxa,serial";
++			reg = <0xd4018000 0x1000>;
++			reg-shift = <2>;
++			interrupts = <24>;
++			interrupt-parent = <&mmp_intc>;
++			clock-frequency = <26000000>;
++			current-speed = <38400>;
++		};
++
++		uart3: uart at d4016000 {
++			compatible = "pxa,serial";
++			reg = <0xd4016000 0x1000>;
++			reg-shift = <2>;
++			interrupts = <46>;
++			interrupt-parent = <&mmp_intc>;
++			clock-frequency = <26000000>;
++			current-speed = <115200>;
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/ttc-dkb.dts b/arch/arm/boot/dts/ttc-dkb.dts
+new file mode 100644
+index 0000000..9d50d12
+--- /dev/null
++++ b/arch/arm/boot/dts/ttc-dkb.dts
+@@ -0,0 +1,176 @@
++/dts-v1/;
++
++/include/ "skeleton.dtsi"
++
++/ {
++	model = "Marvell TTC DKB";
++	compatible = "mrvl,ttc-dkb", "mrvl,pxa910-dkb";
++	interrupt-parent = <&mmp_intc>;
++
++	memory {
++		reg = <0x00000000 0x20000000>;
++	};
++
++	chosen {
++		bootargs = "console=ttyS0,115200 root=/dev/nfs nfsroot=192.168.1.100:192.168.1.101::255.255.255.0::eth0:on";
++		linux,stdout-path = &uart0;
++	};
++
++	soc at d4000000 {
++		compatible = "mrvl,pxa910", "simple-bus";
++		device_type = "soc";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0xd4000000 0xd4000000 0x00200000	/* APB */
++			0xd4200000 0xd4200000 0x00200000>;	/* AXI */
++
++		mmp_intc: interrupt-controller at d4282000 {
++			compatible = "mrvl,mmp-intc";
++			interrupt-controller;
++			#interrupt-cells = <1>;
++			interrupts = <0>;
++			interrupt-parent = <&mmp_intc>;
++			sub-interrupts = <64>;
++
++			/* enable bits in conf register */
++			enable_mask = <0x51>;
++
++			/* reg: <offset & size> */
++			reg = <0xd4282000 0x400>;
++		};
++
++		gpio: gpio-controller {
++			compatible = "pxa,gpio";
++			gpio-controller;
++			reg = <
++				0xd4019000 0xb0
++				0xd4019004 0xb0
++				0xd4019008 0xb0
++				0xd4019100 0xb0>;
++
++			/* gpio-clk-value: <offset & value> */
++			gpio-clk-value = <0xd4015008 0x3>;
++
++			/* gpio-mask: <offset & value> */
++			gpio-mask = <
++				0xd401909c 0xffffffff
++				0xd40190a0 0xffffffff
++				0xd40190a4 0xffffffff
++				0xd401919c 0xffffffff>;
++			gpio-pins = <0 128>;
++			interrupt-controller;
++			#interrupt-cells = <1>;
++			interrupts = <49>;
++			interrupt-parent = <&mmp_intc>;
++			sub-interrupts = <128>;
++		};
++
++		i2c0: i2c at d4011000 {
++			compatible = "pxa2xx-i2c";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0xd4011000 0x60>;
++			cell-index = <0>;
++			i2c-polling = <0>;
++			i2c-frequency = "fast";
++			interrupts = <7>;
++			interrupt-parent = <&mmp_intc>;
++
++			pm860x: pmic at 34 {
++				compatible = "88PM860x";
++				#address-cells = <1>;
++				#size-cells = <0>;
++				interrupt-controller;
++				interrupts = <4>;
++				interrupt-parent = <&mmp_intc>;
++				sub-interrupts = <24>;
++				reg = <0x34>;
++				i2c-port = <0>;
++				irq-mode = <0>;
++				companion-addr = <0x11>;
++
++				bk: backlight at 0 {
++					compatible = "backlight";
++					cell-index = <0>;
++					iset = <8>;
++					reg = <0>;
++				};
++
++				led0: led at 0 {
++					compatible = "led";
++					cell-index = <0>;
++					iset = <8>;
++					reg = <0>;
++				};
++
++				led1: led at 1 {
++					compatible = "led";
++					cell-index = <1>;
++					iset = <8>;
++					reg = <0>;
++				};
++
++				led2: led at 2 {
++					compatible = "led";
++					cell-index = <2>;
++					iset = <8>;
++					reg = <0>;
++				};
++
++				touch: touch at 0 {
++					compatible = "touch";
++					interrupts = <15>;
++					interrupt-parent = <&pm860x>;
++					/* prebias: gpadc & ti & pen */
++					prebias = <1 6 16>;
++					slot-cycle = <1>;
++					pen-prechg = <2>;
++					resistor-xplate = <300>;
++					reg = <0>;
++				};
++
++				v_core: regulator at buck1 {
++					compatible = "BUCK1";
++					device_type = "regulator";
++					voltages = <900000 1400000>;
++					boot-on;
++					always-on;
++					ops-mask = "voltage";
++					constraint-name = "BUCK1";
++					supply-name = "vcc_core";
++					reg = <0>;
++				};
++			};
++		};
++
++		i2c1: i2c at d4037000 {
++			compatible = "pxa2xx-i2c";
++			reg = <0xd4037000 0x60>;
++			cell-index = <1>;
++			i2c-polling = <0>;
++			i2c-frequency = "fast";
++			interrupts = <54>;
++			interrupt-parent = <&mmp_intc>;
++		};
++
++		uart0: uart at d4017000 {
++			compatible = "pxa,serial";
++			reg = <0xd4017000 0x1000>;
++			reg-shift = <2>;
++			interrupts = <27>;
++			interrupt-parent = <&mmp_intc>;
++			clock-frequency = <14745600>;
++			current-speed = <115200>;
++		};
++
++		uart1: uart at d4018000 {
++			compatible = "pxa,serial";
++			reg = <0xd4018000 0x1000>;
++			reg-shift = <2>;
++			interrupts = <28>;
++			interrupt-parent = <&mmp_intc>;
++			clock-frequency = <14745600>;
++			current-speed = <115200>;
++		};
++	};
++};
+diff --git a/arch/arm/mach-mmp/brownstone.c b/arch/arm/mach-mmp/brownstone.c
+index 7bb78fd..c9848ad 100644
+--- a/arch/arm/mach-mmp/brownstone.c
++++ b/arch/arm/mach-mmp/brownstone.c
+@@ -12,6 +12,9 @@
+ 
+ #include <linux/init.h>
  #include <linux/kernel.h>
- #include <linux/module.h>
-+#include <linux/of_irq.h>
-+#include <linux/of_regulator.h>
++#include <linux/of.h>
++#include <linux/of_fdt.h>
++#include <linux/of_platform.h>
  #include <linux/platform_device.h>
- #include <linux/i2c.h>
- #include <linux/mfd/88pm860x.h>
-@@ -236,6 +238,187 @@ static const struct i2c_device_id pm860x_id_table[] = {
+ #include <linux/io.h>
+ #include <linux/gpio.h>
+@@ -105,30 +108,6 @@ static unsigned long brownstone_pin_config[] __initdata = {
+ 	GPIO89_GPIO,
  };
- MODULE_DEVICE_TABLE(i2c, pm860x_id_table);
  
-+#ifdef CONFIG_OF
-+static int __devinit pm860x_parse_irq(struct i2c_client *i2c,
-+				      struct pm860x_platform_data *pdata)
-+{
-+	struct device_node *of_node = i2c->dev.of_node;
+-static struct regulator_consumer_supply max8649_supply[] = {
+-	REGULATOR_SUPPLY("vcc_core", NULL),
+-};
+-
+-static struct regulator_init_data max8649_init_data = {
+-	.constraints	= {
+-		.name		= "vcc_core range",
+-		.min_uV		= 1150000,
+-		.max_uV		= 1280000,
+-		.always_on	= 1,
+-		.boot_on	= 1,
+-		.valid_ops_mask	= REGULATOR_CHANGE_VOLTAGE,
+-	},
+-	.num_consumer_supplies	= 1,
+-	.consumer_supplies	= &max8649_supply[0],
+-};
+-
+-static struct max8649_platform_data brownstone_max8649_info = {
+-	.mode		= 2,	/* VID1 = 1, VID0 = 0 */
+-	.extclk		= 0,
+-	.ramp_timing	= MAX8649_RAMP_32MV,
+-	.regulator	= &max8649_init_data,
+-};
+-
+ static struct regulator_consumer_supply brownstone_v_5vp_supplies[] = {
+ 	REGULATOR_SUPPLY("v_5vp", NULL),
+ };
+@@ -158,47 +137,38 @@ static struct platform_device brownstone_v_5vp_device = {
+ 	},
+ };
+ 
+-static struct max8925_platform_data brownstone_max8925_info = {
+-	.irq_base		= IRQ_BOARD_START,
+-};
+-
+-static struct i2c_board_info brownstone_twsi1_info[] = {
+-	[0] = {
+-		.type		= "max8649",
+-		.addr		= 0x60,
+-		.platform_data	= &brownstone_max8649_info,
+-	},
+-	[1] = {
+-		.type		= "max8925",
+-		.addr		= 0x3c,
+-		.irq		= IRQ_MMP2_PMIC,
+-		.platform_data	= &brownstone_max8925_info,
+-	},
+-};
+-
+ static struct sdhci_pxa_platdata mmp2_sdh_platdata_mmc0 = {
+ 	.max_speed	= 25000000,
+ };
+ 
++static __initdata struct of_device_id of_bus_ids[] = {
++	{ .compatible = "simple-bus", },
++	{},
++};
 +
-+	pdata->irq_base = irq_alloc_descs(-1, 0, 24, 0);
-+	irq_domain_add_simple(of_node, pdata->irq_base);
-+	return 0;
-+}
-+
-+static void __devinit pm860x_parse_backlight(struct device_node *np,
-+					struct pm860x_platform_data *pdata)
-+{
-+	const __be32 *idx, *iset, *pwm;
-+	int i;
-+
-+	idx = of_get_property(np, "cell-index", NULL);
-+	if (idx == NULL)
-+		return;
-+	iset = of_get_property(np, "iset", NULL);
-+	if (iset == NULL)
-+		return;
-+	pwm = of_get_property(np, "pwm", NULL);
-+
-+	i = be32_to_cpu(*idx);
-+	pdata->backlight[i].iset = be32_to_cpu(*iset);
-+	pdata->backlight[i].flags = i;
-+	if (pwm)
-+		pdata->backlight[i].pwm = be32_to_cpu(*pwm);
-+	pdata->num_backlights++;
-+}
-+
-+static void __devinit pm860x_parse_led(struct device_node *np,
-+					struct pm860x_platform_data *pdata)
-+{
-+	const __be32 *idx, *iset;
-+	int i;
-+
-+	idx = of_get_property(np, "cell-index", NULL);
-+	if (idx == NULL)
-+		return;
-+	iset = of_get_property(np, "iset", NULL);
-+	if (iset == NULL)
-+		return;
-+
-+	i = be32_to_cpu(*idx);
-+	pdata->led[i].iset = be32_to_cpu(*iset);
-+	pdata->led[i].flags = i;
-+	pdata->num_leds++;
-+}
-+
-+static void __devinit pm860x_parse_touch(struct device_node *np,
-+					struct pm860x_platform_data *pdata)
-+{
-+	struct pm860x_touch_pdata *touch;
-+	const __be32 *prebias, *slot, *res, *prechg;
-+
-+	prebias = of_get_property(np, "prebias", NULL);
-+	if (prebias == NULL)
-+		return;
-+	slot = of_get_property(np, "slot-cycle", NULL);
-+	if (slot == NULL)
-+		return;
-+	res = of_get_property(np, "resistor-xplate", NULL);
-+	if (res == NULL)
-+		return;
-+	prechg = of_get_property(np, "pen-prechg", NULL);
-+	if (prechg == NULL)
-+		return;
-+	touch = kzalloc(sizeof(struct pm860x_touch_pdata), GFP_KERNEL);
-+	if (touch == NULL)
-+		return;
-+	touch->gpadc_prebias = be32_to_cpu(*prebias++);
-+	touch->tsi_prebias = be32_to_cpu(*prebias++);
-+	touch->pen_prebias = be32_to_cpu(*prebias);
-+	touch->slot_cycle = be32_to_cpu(*slot);
-+	touch->pen_prechg = be32_to_cpu(*prechg);
-+	pdata->touch = touch;
-+}
-+
-+static int data[PM8607_ID_RG_MAX];
-+
-+static void __devinit pm860x_parse_regulator(struct device_node *np,
-+					struct pm860x_platform_data *pdata)
-+{
-+	const char *name[PM8607_ID_RG_MAX] = {
-+		"BUCK1", "BUCK2", "BUCK3", "LDO1", "LDO2", "LDO3", "LOD4",
-+		"LDO5", "LDO6", "LDO7", "LDO8", "LDO9", "LDO10", "LDO11",
-+		"LDO12", "LDO13", "LDO14", "LDO15"};
-+	const char *cp;
-+	int i;
-+
-+	cp = of_get_property(np, "compatible", NULL);
-+	if (cp == NULL)
-+		return;
-+	for (i = 0; i < PM8607_ID_RG_MAX; i++) {
-+		if (strncmp(cp, name[i], strlen(name[i])))
-+			continue;
-+		of_regulator_init_data(np, &pdata->regulator[i]);
-+		data[i] = i;
-+		pdata->regulator[i].driver_data = &data[i];
-+		pdata->num_regulators++;
-+		break;
-+	}
-+}
-+
-+static struct pm860x_platform_data __devinit
-+*pm860x_get_alt_pdata(struct i2c_client *i2c)
-+{
-+	struct pm860x_platform_data *pdata;
-+	struct device_node *of_node = i2c->dev.of_node;
-+	struct device_node *np, *pp = NULL;
-+	const char *cp;
-+	const __be32 *p;
-+	int ret;
-+
-+	pdata = kzalloc(sizeof(struct pm860x_platform_data), GFP_KERNEL);
-+	if (pdata == NULL)
-+		return NULL;
-+	pdata->regulator = kzalloc(sizeof(struct regulator_init_data)
-+				* PM8607_ID_RG_MAX, GFP_KERNEL);
-+	if (pdata->regulator == NULL)
-+		goto out_reg;
-+	pdata->led = kzalloc(sizeof(struct pm860x_led_pdata) * 3,
-+				GFP_KERNEL);
-+	if (pdata->led == NULL)
-+		goto out_led;
-+	pdata->backlight = kzalloc(sizeof(struct pm860x_backlight_pdata)
-+					* 3, GFP_KERNEL);
-+	if (pdata->backlight == NULL)
-+		goto out_backlight;
-+	p = of_get_property(of_node, "i2c-port", NULL);
-+	if (p)
-+		pdata->i2c_port = be32_to_cpu(*p);
-+	p = of_get_property(of_node, "companion-addr", NULL);
-+	if (p)
-+		pdata->companion_addr = be32_to_cpu(*p);
-+	p = of_get_property(of_node, "irq-mode", NULL);
-+	if (p)
-+		pdata->irq_mode = be32_to_cpu(*p);
-+
-+	ret = pm860x_parse_irq(i2c, pdata);
-+	if (ret < 0)
-+		goto out;
-+
-+	for (; (np = of_get_next_child(of_node, pp)) != NULL; pp = np) {
-+		cp = of_get_property(np, "compatible", NULL);
-+		if (cp == NULL)
-+			continue;
-+		if (!strncmp(cp, "backlight", strlen("backlight")))
-+			pm860x_parse_backlight(np, pdata);
-+		if (!strncmp(cp, "led", strlen("led")))
-+			pm860x_parse_led(np, pdata);
-+		if (!strncmp(cp, "touch", strlen("touch")))
-+			pm860x_parse_touch(np, pdata);
-+		cp = of_get_property(np, "device_type", NULL);
-+		if (cp == NULL)
-+			continue;
-+		if (!strncmp(cp, "regulator", strlen("regulator")))
-+			pm860x_parse_regulator(np, pdata);
-+	}
-+	return pdata;
-+out:
-+	kfree(pdata->backlight);
-+out_backlight:
-+	kfree(pdata->led);
-+out_led:
-+	kfree(pdata->regulator);
-+out_reg:
-+	kfree(pdata);
-+	return NULL;
-+}
-+#else
-+static struct pm860x_platform_data __devinit
-+*pm860x_get_alt_pdata(struct i2c_client *i2c)
-+{
-+	return NULL;
-+}
-+#endif
-+
- static int verify_addr(struct i2c_client *i2c)
+ static void __init brownstone_init(void)
  {
- 	unsigned short addr_8607[] = {0x30, 0x34};
-@@ -264,8 +447,12 @@ static int __devinit pm860x_probe(struct i2c_client *client,
- 	struct pm860x_chip *chip;
+ 	mfp_config(ARRAY_AND_SIZE(brownstone_pin_config));
  
- 	if (!pdata) {
--		pr_info("No platform data in %s!\n", __func__);
--		return -EINVAL;
-+		pdata = pm860x_get_alt_pdata(client);
-+		if (!pdata) {
-+			pr_info("No platform data in %s!\n", __func__);
-+			return -EINVAL;
-+		}
-+		client->dev.platform_data = pdata;
- 	}
+-	/* on-chip devices */
+-	mmp2_add_uart(1);
+-	mmp2_add_uart(3);
+-	mmp2_add_twsi(1, NULL, ARRAY_AND_SIZE(brownstone_twsi1_info));
++	if (of_platform_bus_probe(NULL, of_bus_ids, NULL) < 0)
++		BUG();
++
+ 	mmp2_add_sdhost(0, &mmp2_sdh_platdata_mmc0); /* SD/MMC */
  
- 	chip = kzalloc(sizeof(struct pm860x_chip), GFP_KERNEL);
+ 	/* enable 5v regulator */
+ 	platform_device_register(&brownstone_v_5vp_device);
+ }
+ 
++static const char *brownstone_dt_match[] __initdata = {
++	"mrvl,mmp2-brownstone",
++	NULL,
++};
++
+ MACHINE_START(BROWNSTONE, "Brownstone Development Platform")
+ 	/* Maintainer: Haojian Zhuang <haojian.zhuang@marvell.com> */
+ 	.map_io		= mmp_map_io,
+-	.nr_irqs	= BROWNSTONE_NR_IRQS,
+-	.init_irq	= mmp2_init_irq,
++	.init_irq	= mmp_init_intc,
+ 	.timer		= &mmp2_timer,
+ 	.init_machine	= brownstone_init,
++	.dt_compat	= brownstone_dt_match,
+ MACHINE_END
+diff --git a/arch/arm/mach-mmp/ttc_dkb.c b/arch/arm/mach-mmp/ttc_dkb.c
+index e411039..c19b4dc 100644
+--- a/arch/arm/mach-mmp/ttc_dkb.c
++++ b/arch/arm/mach-mmp/ttc_dkb.c
+@@ -10,6 +10,9 @@
+ 
+ #include <linux/init.h>
+ #include <linux/kernel.h>
++#include <linux/of.h>
++#include <linux/of_fdt.h>
++#include <linux/of_platform.h>
+ #include <linux/platform_device.h>
+ #include <linux/mtd/mtd.h>
+ #include <linux/mtd/partitions.h>
+@@ -113,21 +116,31 @@ static struct platform_device *ttc_dkb_devices[] = {
+ 	&ttc_dkb_device_onenand,
+ };
+ 
++static __initdata struct of_device_id of_bus_ids[] = {
++	{ .compatible = "simple-bus", },
++	{},
++};
++
+ static void __init ttc_dkb_init(void)
+ {
+ 	mfp_config(ARRAY_AND_SIZE(ttc_dkb_pin_config));
+ 
+-	/* on-chip devices */
+-	pxa910_add_uart(1);
++	if (of_platform_bus_probe(NULL, of_bus_ids, NULL) < 0)
++		BUG();
+ 
+ 	/* off-chip devices */
+ 	platform_add_devices(ARRAY_AND_SIZE(ttc_dkb_devices));
+ }
+ 
++static const char *ttc_dkb_dt_match[] __initdata = {
++	"mrvl,ttc-dkb",
++	NULL,
++};
++
+ MACHINE_START(TTC_DKB, "PXA910-based TTC_DKB Development Platform")
+ 	.map_io		= mmp_map_io,
+-	.nr_irqs	= TTCDKB_NR_IRQS,
+-	.init_irq       = pxa910_init_irq,
++	.init_irq       = mmp_init_intc,
+ 	.timer          = &pxa910_timer,
+ 	.init_machine   = ttc_dkb_init,
++	.dt_compat	= ttc_dkb_dt_match,
+ MACHINE_END
 -- 
 1.5.6.5
