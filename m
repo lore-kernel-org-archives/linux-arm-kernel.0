@@ -1,33 +1,59 @@
-From: tommy.lin.1101@gmail.com (Tommy Lin)
-Date: Fri,  8 Jul 2011 14:00:06 +0800
-Subject: [PATCH 2/2] arch: arm: CNS3xxx select the correct CPU type CPU_V6K
-Message-ID: <1310104806-12984-1-git-send-email-tommy.lin@caviumnetworks.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 08 Jul 2011 15:06:17 +0900
+Subject: [PATCH 4/4] arm: mach-s3c2440: mini2440: fix section mismatch
+In-Reply-To: <1310033919-4245-5-git-send-email-w.sang@pengutronix.de>
+References: <1310033919-4245-1-git-send-email-w.sang@pengutronix.de>
+	<1310033919-4245-5-git-send-email-w.sang@pengutronix.de>
+Message-ID: <001c01cc3d35$2aa7e8f0$7ff7bad0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM11        -> CPU_V6
-ARM11 MPCore -> CPU_V6K
-CNS3xxx has ARM11 MPCore CPUs (dual core), but initially select the same single
-core CPU type. To select MPCore watchdog support, this patch correts the CPU
-type from CPU_V6 to CPU_V6K.
+Wolfram Sang wrote:
+> 
+> If mini2440_init() is in __init, mini2440_parse_features() should also
+> be in __init. Fixes:
+> 
+> (.text+0x9adc): Section mismatch in reference from the function
+> mini2440_parse_features.clone.0() to the (unknown reference)
+.init.data:(unknown)
+> The function mini2440_parse_features.clone.0() references the (unknown
+reference)
+> __initdata (unknown).
 
-Signed-off-by: Tommy Lin <tommy.lin@caviumnetworks.com>
----
- arch/arm/Kconfig |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+But I couldn't find above "Section mismatch" in my building with
+CONFIG_DEBUG_SECTION_MISMATCH=y.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index c148326..89eaab7 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -321,7 +321,7 @@ config ARCH_CLPS711X
- 
- config ARCH_CNS3XXX
- 	bool "Cavium Networks CNS3XXX family"
--	select CPU_V6
-+	select CPU_V6K
- 	select GENERIC_CLOCKEVENTS
- 	select ARM_GIC
- 	select MIGHT_HAVE_PCI
--- 
-1.7.6
+Hmm...
+
+> 
+> Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
+> Cc: Michel Pollet <buserror@gmail.com>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> ---
+>  arch/arm/mach-s3c2440/mach-mini2440.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-s3c2440/mach-mini2440.c b/arch/arm/mach-
+> s3c2440/mach-mini2440.c
+> index dd3120d..fc2dc0b 100644
+> --- a/arch/arm/mach-s3c2440/mach-mini2440.c
+> +++ b/arch/arm/mach-s3c2440/mach-mini2440.c
+> @@ -552,7 +552,7 @@ struct mini2440_features_t {
+>  	struct platform_device *optional[8];
+>  };
+> 
+> -static void mini2440_parse_features(
+> +static void __init mini2440_parse_features(
+>  		struct mini2440_features_t * features,
+>  		const char * features_str )
+>  {
+> --
+> 1.7.5.4
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
