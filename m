@@ -1,46 +1,85 @@
-From: david@lang.hm (david at lang.hm)
-Date: Thu, 7 Jul 2011 18:32:17 -0700 (PDT)
-Subject: [PATCH 00/10] mm: Linux VM Infrastructure to support Memory
-	Power Management
-In-Reply-To: <alpine.DEB.2.00.1107072058390.5978@tiger>
-References: <1306499498-14263-1-git-send-email-ankita@in.ibm.com>
-	<20110629130038.GA7909@in.ibm.com>
-	<CAOJsxLHQP=-srK_uYYBsPb7+rUBnPZG7bzwtCd-rRaQa4ikUFg@mail.gmail.com>
-	<alpine.DEB.2.02.1107061318190.2535@asgard.lang.hm>
-	<alpine.DEB.2.00.1107072058390.5978@tiger>
-Message-ID: <alpine.DEB.2.02.1107071831250.8081@asgard.lang.hm>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 07 Jul 2011 18:35:09 -0700
+Subject: [PATCH 03/17] ARM: gic: Use cpu pm notifiers to save gic state
+In-Reply-To: <1310053830-23779-4-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1310053830-23779-1-git-send-email-lorenzo.pieralisi@arm.com>
+	<1310053830-23779-4-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <4E165ECD.9070905@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 7 Jul 2011, Pekka Enberg wrote:
-
-> On Wed, 6 Jul 2011, Pekka Enberg wrote:
->>> Why does the allocator need to know about address boundaries? Why
->>> isn't it enough to make the page allocator and reclaim policies favor 
->>> using
->>> memory from lower addresses as aggressively as possible? That'd mean
->>> we'd favor the first memory banks and could keep the remaining ones
->>> powered off as much as possible.
->>> 
->>> IOW, why do we need to support scenarios such as this:
->>>
->>>   bank 0     bank 1   bank 2    bank3
->>> | online  | offline | online  | offline |
->> 
-> On Wed, 6 Jul 2011, david at lang.hm wrote:
->> I believe that there are memory allocations that cannot be moved after they 
->> are made (think about regions allocated to DMA from hardware where the 
->> hardware has already been given the address space to DMA into)
->> 
->> As a result, you may not be able to take bank 2 offline, so your option is 
->> to either leave banks 0-2 all online, or support emptying bank 1 and taking 
->> it offline.
+On 7/7/2011 8:50 AM, Lorenzo Pieralisi wrote:
+> From: Colin Cross<ccross@android.com>
 >
-> But drivers allocate DMA memory for hardware during module load and stay 
-> pinned there until the driver is unloaded, no? So in practice DMA buffers are 
-> going to be in banks 0-1?
+> When the cpu is powered down in a low power mode, the gic cpu
+> interface may be reset, and when the cpu complex is powered
+> down, the gic distributor may also be reset.
+>
+> This patch uses CPU_PM_ENTER and CPU_PM_EXIT notifiers to save
+> and restore the gic cpu interface registers, and the
+> CPU_COMPLEX_PM_ENTER and CPU_COMPLEX_PM_EXIT notifiers to save
+> and restore the gic distributor registers.
+>
+> Signed-off-by: Colin Cross<ccross@android.com>
+> ---
+>   arch/arm/common/gic.c |  212 +++++++++++++++++++++++++++++++++++++++++++++++++
+>   1 files changed, 212 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+> index 4ddd0a6..8d62e07 100644
+> --- a/arch/arm/common/gic.c
+> +++ b/arch/arm/common/gic.c
 
-that depends on when the device was initialized. it is common for them to 
-be in the beginning, but with hotplug, who knows.
+[...]
 
-David Lang
+> +
+> +static int gic_notifier(struct notifier_block *self, unsigned long cmd,	void *v)
+> +{
+> +	int i;
+> +
+> +	for (i = 0; i<  MAX_GIC_NR; i++) {
+> +		switch (cmd) {
+> +		case CPU_PM_ENTER:
+> +			gic_cpu_save(i);
+> +			break;
+> +		case CPU_PM_ENTER_FAILED:
+> +		case CPU_PM_EXIT:
+> +			gic_cpu_restore(i);
+> +			break;
+> +		case CPU_COMPLEX_PM_ENTER:
+> +			gic_dist_save(i);
+> +			break;
+> +		case CPU_COMPLEX_PM_ENTER_FAILED:
+> +		case CPU_COMPLEX_PM_EXIT:
+> +			gic_dist_restore(i);
+> +			break;
+> +		}
+> +	}
+> +
+> +	return NOTIFY_OK;
+> +}
+
+Just to put forth OMAP requirements for GIC and see how much
+we can leverage these for OMAP.
+
+OMAP support GP(general) and HS(secure) devices and implements
+the trustzone on these devices. on Secure devices the GIC save
+and restore is completely done by secure ROM code. There are
+API's for save and restore is automatic on CPU reset based
+on the last CPU cluster state.
+
+On GP devices too, very few GIC registers needs to be saved
+in a pre-defined memory/register layout and restore is again
+done by boot-ROM code.
+
+OMAP need to enable/disable distributor and CPU interfaces
+based on CPU power states and that is something can be useful.
+Would be good if there is a provision to over-write the gic
+save/restore function using function pointers so that OMAP
+PM code can use the notifiers.
+
+Any more thoughts how we can handle this? We would like to
+use common ARM code as much as possible.
+
+Regards
+Santosh
