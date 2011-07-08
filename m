@@ -1,33 +1,45 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 8 Jul 2011 01:33:32 -0600 (MDT)
-Subject: [PATCH v2 00/18] OMAP4: PM data big spring cleanup and fixes
-In-Reply-To: <20110707154834.GP15815@atomide.com>
-References: <1309552901-8944-1-git-send-email-b-cousson@ti.com>
-	<alpine.DEB.2.00.1107060017480.4217@utopia.booyaka.com>
-	<4E14B820.6070202@ti.com> <20110707055549.GC15815@atomide.com>
-	<E9AF1FACCF71F448B55E58D9AED1B0F40E626BEE32@staex7mb2.telecom.sna.samsung.com>
-	<20110707121040.GF15815@atomide.com>
-	<E9AF1FACCF71F448B55E58D9AED1B0F40E626BEE34@staex7mb2.telecom.sna.samsung.com>
-	<20110707154834.GP15815@atomide.com>
-Message-ID: <alpine.DEB.2.00.1107080124480.24181@utopia.booyaka.com>
+Date: Fri, 8 Jul 2011 01:34:37 -0600 (MDT)
+Subject: [PATCH v2 3/6] OMAP4: PRCM: OMAP4460 specific PRM and CM register
+	bitshifts
+In-Reply-To: <4E16AB3C.7020007@ti.com>
+References: <1309573826-10615-1-git-send-email-rnayak@ti.com>
+	<1309573826-10615-2-git-send-email-rnayak@ti.com>
+	<1309573826-10615-3-git-send-email-rnayak@ti.com>
+	<1309573826-10615-4-git-send-email-rnayak@ti.com>
+	<alpine.DEB.2.00.1107080029550.24181@utopia.booyaka.com>
+	<4E16AB3C.7020007@ti.com>
+Message-ID: <alpine.DEB.2.00.1107080133470.24181@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 7 Jul 2011, Tony Lindgren wrote:
+On Fri, 8 Jul 2011, Rajendra Nayak wrote:
 
-> Well sounds like we might be able to get rid of CHIP_IS in the *_data.c 
-> files if we use SoC variant specific lists. Of course Paul might have 
-> some other ideas here.
+> Hi Paul,
+> 
+> On 7/7/2011 11:30 PM, Paul Walmsley wrote:
+> > Hi Rajendra
+> > 
+> > On Sat, 2 Jul 2011, Rajendra Nayak wrote:
+> > 
+> > > This patch adds additional register bitshifts for
+> > > registers added in OMAP4460 platform.
+> > > 
+> > > Signed-off-by: Rajendra Nayak<rnayak@ti.com>
+> > > Signed-off-by: Nishanth Menon<nm@ti.com>
+> > > Signed-off-by: Benoit Cousson<b-cousson@ti.com>
+> > > Reviewed-by: Kevin Hilman<khilman@ti.com>
+> > 
+> > Does this data come from the autogenerator scripts?
+> 
+> Yes, it does. But the patch is created by manually
+> diffing the 4430 and 4460 autogen script outputs.
+> That's because the autogen scripts cannot generate
+> data for multiple SoC's at once.
 
-Sounds like a reasonable approach to me for the data files.  The 
-powerdomain, clockdomain, and hwmod data would be good places to start.  
-It will come at the cost of some extra memory and duplicated data - 
-consider mach-omap2/clockdomains2xxx_3xxx_data.c. But given the zeitgeist, 
-it's probably worth it to avoid patching that data when we need to 
-generalize.
+Okay.  So then, 
 
-Unfortunately, we'll still have the macro naming and file naming parts of 
-the problem.  Not sure if there's an easy fix for those, though.
+Acked-by: Paul Walmsley <paul@pwsan.com>
 
 
 - Paul
