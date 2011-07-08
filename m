@@ -1,31 +1,32 @@
-From: kaloz@openwrt.org (Imre Kaloz)
-Date: Fri, 08 Jul 2011 20:50:10 +0200
-Subject: [PATCH] ARM: support XZ compressed kernels
-In-Reply-To: <alpine.LFD.2.00.1107071513440.14596@xanadu.home>
-References: <1310033999-25617-1-git-send-email-kaloz@openwrt.org>
-	<alpine.LFD.2.00.1107071513440.14596@xanadu.home>
-Message-ID: <op.vybc9wzk2s3iss@ecaz>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Fri, 8 Jul 2011 13:01:42 -0600
+Subject: [PATCH 0/6] Add device tree support for imx spi driver
+In-Reply-To: <1310113654-25887-1-git-send-email-shawn.guo@linaro.org>
+References: <1310113654-25887-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20110708190142.GD9070@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 07 Jul 2011 21:14:58 +0200, Nicolas Pitre <nico@fluxnic.net> wrote:
+On Fri, Jul 08, 2011 at 04:27:28PM +0800, Shawn Guo wrote:
+> The patch set makes some cleanups on imx spi driver to get it ready
+> for adding device tree probe and then add the support.
+> 
+> Those two dt helper function related patches are carried here to
+> resolve the dependency.  They should be on the way to sit on Grant's
+> devicetree/next branch.
+> 
+> Rob Herring (1):
+>       dt: add helper function to read u32 arrays
+> 
+> Shawn Guo (5):
+>       ARM: mxc: remove unnecessary header file inclusion from gpio.h
+>       spi/imx: use soc name in spi device type naming scheme
+>       spi/imx: copy gpio number passed by platform data into driver private data
+>       dt: add empty of_property_read_u32[_array] for non-dt
+>       spi/imx: add device tree probe support
 
-> On Thu, 7 Jul 2011, Imre Kaloz wrote:
->
->> Wire up support for the XZ decompressor
->>
->> Signed-off-by: Imre Kaloz <kaloz@openwrt.org>
->> ---
->>  arch/arm/Kconfig                        |    1 +
->>  arch/arm/boot/compressed/Makefile       |   11 +++++++++--
->>  arch/arm/boot/compressed/decompress.c   |    4 ++++
->>  arch/arm/boot/compressed/piggy.xzkern.S |    6 ++++++
->>  lib/xz/xz_dec_stream.c                  |    1 +
->>  5 files changed, 21 insertions(+), 2 deletions(-)
->
-> Please don't forget to update arch/arm/boot/compressed/.gitignore
+Okay, I tried to apply this series, but the first patch that removes
+the includes caused a build failure, so I've dropped it.  What tree
+are these patches based on top of?
 
-Thanks, will do and resend if no other replies come in.
-
-
-Imre
+g.
