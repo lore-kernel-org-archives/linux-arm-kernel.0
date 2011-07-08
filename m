@@ -1,180 +1,163 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 8 Jul 2011 03:51:15 -0700
-Subject: [PATCH v2 3/6] OMAP4: PRCM: OMAP4460 specific PRM and CM
-	register bitshifts
-In-Reply-To: <alpine.DEB.2.00.1107080133470.24181@utopia.booyaka.com>
+Date: Fri, 8 Jul 2011 03:52:17 -0700
+Subject: [PATCH v2 4/6] OMAP4: clocks: Update the clock tree with 4460
+	clock nodes
+In-Reply-To: <alpine.DEB.2.00.1107080134430.24181@utopia.booyaka.com>
 References: <1309573826-10615-1-git-send-email-rnayak@ti.com>
 	<1309573826-10615-2-git-send-email-rnayak@ti.com>
 	<1309573826-10615-3-git-send-email-rnayak@ti.com>
 	<1309573826-10615-4-git-send-email-rnayak@ti.com>
-	<alpine.DEB.2.00.1107080029550.24181@utopia.booyaka.com>
-	<4E16AB3C.7020007@ti.com>
-	<alpine.DEB.2.00.1107080133470.24181@utopia.booyaka.com>
-Message-ID: <20110708105115.GV5783@atomide.com>
+	<1309573826-10615-5-git-send-email-rnayak@ti.com>
+	<alpine.DEB.2.00.1107080044270.24181@utopia.booyaka.com>
+	<4E16AD18.7040402@ti.com>
+	<alpine.DEB.2.00.1107080134430.24181@utopia.booyaka.com>
+Message-ID: <20110708105217.GW5783@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [110708 00:29]:
+* Paul Walmsley <paul@pwsan.com> [110708 00:30]:
 > On Fri, 8 Jul 2011, Rajendra Nayak wrote:
 > 
-> > Hi Paul,
-> > 
-> > On 7/7/2011 11:30 PM, Paul Walmsley wrote:
-> > > Hi Rajendra
-> > > 
+> > On 7/7/2011 11:49 PM, Paul Walmsley wrote:
 > > > On Sat, 2 Jul 2011, Rajendra Nayak wrote:
 > > > 
-> > > > This patch adds additional register bitshifts for
-> > > > registers added in OMAP4460 platform.
+> > > > Add the new clock nodes (bandgap_ts_fclk, div_ts_ck) for omap4460.
+> > > > Handle these nodes using the clock flags (CK_*).
 > > > > 
 > > > > Signed-off-by: Rajendra Nayak<rnayak@ti.com>
 > > > > Signed-off-by: Nishanth Menon<nm@ti.com>
 > > > > Signed-off-by: Benoit Cousson<b-cousson@ti.com>
 > > > > Reviewed-by: Kevin Hilman<khilman@ti.com>
 > > > 
-> > > Does this data come from the autogenerator scripts?
+> > > Is this data coming from autogenerator scripts that have been checked into
+> > > that repository, or have these been hand-edited?
 > > 
-> > Yes, it does. But the patch is created by manually
-> > diffing the 4430 and 4460 autogen script outputs.
-> > That's because the autogen scripts cannot generate
-> > data for multiple SoC's at once.
+> > They have been hand edited to create a diff from the 4430 autogen output
+> > and 4460 autogen output.
+> > 
+> > > 
+> > > Also, this isn't the complete set of clock changes needed for full 4460
+> > > support, right?  I'm thinking of the duty cycle correction changes
+> > > described in TRM 3.6.3.7.2 "Tactical Clocking Adjustment".
+> > > Are those planned to go into a future patch?
+> > 
+> > Yes, this series was targeted at providing basic boot support. I was
+> > planning to add the DCC changes as part of the next series.
 > 
-> Okay.  So then, 
+> Okay.
 > 
 > Acked-by: Paul Walmsley <paul@pwsan.com>
 
-Here's this one updated.
+Updated patch below.
 
 Tony
 
 
 From: Rajendra Nayak <rnayak@ti.com>
-Date: Sat, 2 Jul 2011 08:00:23 +0530
-Subject: [PATCH] OMAP4: PRCM: OMAP4460 specific PRM and CM register bitshifts
+Date: Sat, 2 Jul 2011 08:00:24 +0530
+Subject: [PATCH] OMAP4: clocks: Update the clock tree with 4460 clock nodes
 
-This patch adds additional register bitshifts for
-registers added in OMAP4460 platform.
+Add the new clock nodes (bandgap_ts_fclk, div_ts_ck) for omap4460.
+Handle these nodes using the clock flags (CK_*).
 
 Signed-off-by: Rajendra Nayak <rnayak@ti.com>
 Signed-off-by: Nishanth Menon <nm@ti.com>
 Signed-off-by: Benoit Cousson <b-cousson@ti.com>
 Reviewed-by: Kevin Hilman <khilman@ti.com>
 Acked-by: Paul Walmsley <paul@pwsan.com>
-[tony at atomide.com: updated to apply on cleanup patches]
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 
-diff --git a/arch/arm/mach-omap2/cm-regbits-44xx.h b/arch/arm/mach-omap2/cm-regbits-44xx.h
-index 9d47a05..28e20d3 100644
---- a/arch/arm/mach-omap2/cm-regbits-44xx.h
-+++ b/arch/arm/mach-omap2/cm-regbits-44xx.h
-@@ -106,6 +106,10 @@
- #define OMAP4430_CLKACTIVITY_CORE_DPLL_EMU_CLK_SHIFT		9
- #define OMAP4430_CLKACTIVITY_CORE_DPLL_EMU_CLK_MASK		(1 << 9)
+diff --git a/arch/arm/mach-omap2/clock44xx_data.c b/arch/arm/mach-omap2/clock44xx_data.c
+index 8c96567..639e00e 100644
+--- a/arch/arm/mach-omap2/clock44xx_data.c
++++ b/arch/arm/mach-omap2/clock44xx_data.c
+@@ -1486,6 +1486,40 @@ static struct clk dss_dss_clk = {
+ 	.recalc		= &followparent_recalc,
+ };
  
-+/* Used by CM_L4CFG_CLKSTCTRL */
-+#define OMAP4460_CLKACTIVITY_CORE_TS_GFCLK_SHIFT		9
-+#define OMAP4460_CLKACTIVITY_CORE_TS_GFCLK_MASK			(1 << 9)
++static const struct clksel_rate div3_8to32_rates[] = {
++	{ .div = 8, .val = 0, .flags = RATE_IN_44XX },
++	{ .div = 16, .val = 1, .flags = RATE_IN_44XX },
++	{ .div = 32, .val = 2, .flags = RATE_IN_44XX },
++	{ .div = 0 },
++};
 +
- /* Used by CM_CEFUSE_CLKSTCTRL */
- #define OMAP4430_CLKACTIVITY_CUST_EFUSE_SYS_CLK_SHIFT		9
- #define OMAP4430_CLKACTIVITY_CUST_EFUSE_SYS_CLK_MASK		(1 << 9)
-@@ -418,6 +422,10 @@
- #define OMAP4430_CLKACTIVITY_WKUP_32K_GFCLK_SHIFT		11
- #define OMAP4430_CLKACTIVITY_WKUP_32K_GFCLK_MASK		(1 << 11)
++static const struct clksel div_ts_div[] = {
++	{ .parent = &l4_wkup_clk_mux_ck, .rates = div3_8to32_rates },
++	{ .parent = NULL },
++};
++
++static struct clk div_ts_ck = {
++	.name		= "div_ts_ck",
++	.parent		= &l4_wkup_clk_mux_ck,
++	.clksel		= div_ts_div,
++	.clksel_reg	= OMAP4430_CM_WKUP_BANDGAP_CLKCTRL,
++	.clksel_mask	= OMAP4430_CLKSEL_24_25_MASK,
++	.ops		= &clkops_null,
++	.recalc		= &omap2_clksel_recalc,
++	.round_rate	= &omap2_clksel_round_rate,
++	.set_rate	= &omap2_clksel_set_rate,
++};
++
++static struct clk bandgap_ts_fclk = {
++	.name		= "bandgap_ts_fclk",
++	.ops		= &clkops_omap2_dflt,
++	.enable_reg	= OMAP4430_CM_WKUP_BANDGAP_CLKCTRL,
++	.enable_bit	= OMAP4460_OPTFCLKEN_TS_FCLK_SHIFT,
++	.clkdm_name	= "l4_wkup_clkdm",
++	.parent		= &div_ts_ck,
++	.recalc		= &followparent_recalc,
++};
++
+ static struct clk dss_48mhz_clk = {
+ 	.name		= "dss_48mhz_clk",
+ 	.ops		= &clkops_omap2_dflt,
+@@ -3110,7 +3144,9 @@ static struct omap_clk omap44xx_clks[] = {
+ 	CLK(NULL,	"aes2_fck",			&aes2_fck,	CK_443X),
+ 	CLK(NULL,	"aess_fck",			&aess_fck,	CK_443X),
+ 	CLK(NULL,	"bandgap_fclk",			&bandgap_fclk,	CK_443X),
++	CLK(NULL,	"bandgap_ts_fclk",		&bandgap_ts_fclk,	CK_446X),
+ 	CLK(NULL,	"des3des_fck",			&des3des_fck,	CK_443X),
++	CLK(NULL,	"div_ts_ck",			&div_ts_ck,	CK_446X),
+ 	CLK(NULL,	"dmic_sync_mux_ck",		&dmic_sync_mux_ck,	CK_443X),
+ 	CLK(NULL,	"dmic_fck",			&dmic_fck,	CK_443X),
+ 	CLK(NULL,	"dsp_fck",			&dsp_fck,	CK_443X),
+@@ -3293,6 +3329,9 @@ int __init omap4xxx_clk_init(void)
+ 	if (cpu_is_omap44xx()) {
+ 		cpu_mask = RATE_IN_4430;
+ 		cpu_clkflg = CK_443X;
++	} else if (cpu_is_omap446x()) {
++		cpu_mask = RATE_IN_4460;
++		cpu_clkflg = CK_446X;
+ 	}
  
-+/* Used by CM_WKUP_CLKSTCTRL */
-+#define OMAP4460_CLKACTIVITY_WKUP_TS_GFCLK_SHIFT		13
-+#define OMAP4460_CLKACTIVITY_WKUP_TS_GFCLK_MASK			(1 << 13)
-+
- /*
-  * Used by CM1_ABE_TIMER5_CLKCTRL, CM1_ABE_TIMER6_CLKCTRL,
-  * CM1_ABE_TIMER7_CLKCTRL, CM1_ABE_TIMER8_CLKCTRL, CM_L3INIT_MMC1_CLKCTRL,
-@@ -449,6 +457,10 @@
- #define OMAP4430_CLKSEL_60M_SHIFT				24
- #define OMAP4430_CLKSEL_60M_MASK				(1 << 24)
+ 	clk_init(&omap2_clk_functions);
+diff --git a/arch/arm/plat-omap/include/plat/clkdev_omap.h b/arch/arm/plat-omap/include/plat/clkdev_omap.h
+index f1899a3..387a963 100644
+--- a/arch/arm/plat-omap/include/plat/clkdev_omap.h
++++ b/arch/arm/plat-omap/include/plat/clkdev_omap.h
+@@ -39,6 +39,7 @@ struct omap_clk {
+ #define CK_36XX		(1 << 10)	/* 36xx/37xx-specific clocks */
+ #define CK_443X		(1 << 11)
+ #define CK_TI816X	(1 << 12)
++#define CK_446X		(1 << 13)
  
-+/* Used by CM_MPU_MPU_CLKCTRL */
-+#define OMAP4460_CLKSEL_ABE_DIV_MODE_SHIFT			25
-+#define OMAP4460_CLKSEL_ABE_DIV_MODE_MASK			(1 << 25)
-+
- /* Used by CM1_ABE_AESS_CLKCTRL */
- #define OMAP4430_CLKSEL_AESS_FCLK_SHIFT				24
- #define OMAP4430_CLKSEL_AESS_FCLK_MASK				(1 << 24)
-@@ -468,6 +480,10 @@
- #define OMAP4430_CLKSEL_DIV_SHIFT				24
- #define OMAP4430_CLKSEL_DIV_MASK				(1 << 24)
  
-+/* Used by CM_MPU_MPU_CLKCTRL */
-+#define OMAP4460_CLKSEL_EMIF_DIV_MODE_SHIFT			24
-+#define OMAP4460_CLKSEL_EMIF_DIV_MODE_MASK			(1 << 24)
-+
- /* Used by CM_CAM_FDIF_CLKCTRL */
- #define OMAP4430_CLKSEL_FCLK_SHIFT				24
- #define OMAP4430_CLKSEL_FCLK_MASK				(0x3 << 24)
-@@ -572,6 +588,14 @@
- #define OMAP4430_D2D_STATDEP_SHIFT				18
- #define OMAP4430_D2D_STATDEP_MASK				(1 << 18)
+ #define CK_34XX		(CK_3430ES1 | CK_3430ES2PLUS)
+diff --git a/arch/arm/plat-omap/include/plat/clock.h b/arch/arm/plat-omap/include/plat/clock.h
+index 006e599..21b1beb 100644
+--- a/arch/arm/plat-omap/include/plat/clock.h
++++ b/arch/arm/plat-omap/include/plat/clock.h
+@@ -58,10 +58,12 @@ struct clkops {
+ #define RATE_IN_36XX		(1 << 4)
+ #define RATE_IN_4430		(1 << 5)
+ #define RATE_IN_TI816X		(1 << 6)
++#define RATE_IN_4460		(1 << 7)
  
-+/* Used by CM_CLKSEL_DPLL_MPU */
-+#define OMAP4460_DCC_COUNT_MAX_SHIFT				24
-+#define OMAP4460_DCC_COUNT_MAX_MASK				(0xff << 24)
-+
-+/* Used by CM_CLKSEL_DPLL_MPU */
-+#define OMAP4460_DCC_EN_SHIFT					22
-+#define OMAP4460_DCC_EN_MASK					(1 << 22)
-+
- /*
-  * Used by CM_SSC_DELTAMSTEP_DPLL_ABE, CM_SSC_DELTAMSTEP_DPLL_CORE,
-  * CM_SSC_DELTAMSTEP_DPLL_CORE_RESTORE, CM_SSC_DELTAMSTEP_DPLL_DDRPHY,
-@@ -582,6 +606,10 @@
- #define OMAP4430_DELTAMSTEP_SHIFT				0
- #define OMAP4430_DELTAMSTEP_MASK				(0xfffff << 0)
+ #define RATE_IN_24XX		(RATE_IN_242X | RATE_IN_243X)
+ #define RATE_IN_34XX		(RATE_IN_3430ES1 | RATE_IN_3430ES2PLUS)
+ #define RATE_IN_3XXX		(RATE_IN_34XX | RATE_IN_36XX)
++#define RATE_IN_44XX		(RATE_IN_4430 | RATE_IN_4460)
  
-+/* Renamed from DELTAMSTEP Used by CM_SSC_DELTAMSTEP_DPLL_USB */
-+#define OMAP4460_DELTAMSTEP_0_20_SHIFT				0
-+#define OMAP4460_DELTAMSTEP_0_20_MASK				(0x1fffff << 0)
-+
- /* Used by CM_SHADOW_FREQ_CONFIG1, CM_SHADOW_FREQ_CONFIG1_RESTORE */
- #define OMAP4430_DLL_OVERRIDE_SHIFT				2
- #define OMAP4430_DLL_OVERRIDE_MASK				(1 << 2)
-@@ -1204,6 +1232,10 @@
- #define OMAP4430_MODULEMODE_SHIFT				0
- #define OMAP4430_MODULEMODE_MASK				(0x3 << 0)
- 
-+/* Used by CM_L4CFG_DYNAMICDEP */
-+#define OMAP4460_MPU_DYNDEP_SHIFT				19
-+#define OMAP4460_MPU_DYNDEP_MASK				(1 << 19)
-+
- /* Used by CM_DSS_DSS_CLKCTRL */
- #define OMAP4430_OPTFCLKEN_48MHZ_CLK_SHIFT			9
- #define OMAP4430_OPTFCLKEN_48MHZ_CLK_MASK			(1 << 9)
-@@ -1298,6 +1330,10 @@
- #define OMAP4430_OPTFCLKEN_SYS_CLK_SHIFT			10
- #define OMAP4430_OPTFCLKEN_SYS_CLK_MASK				(1 << 10)
- 
-+/* Used by CM_WKUP_BANDGAP_CLKCTRL */
-+#define OMAP4460_OPTFCLKEN_TS_FCLK_SHIFT			8
-+#define OMAP4460_OPTFCLKEN_TS_FCLK_MASK				(1 << 8)
-+
- /* Used by CM_DSS_DSS_CLKCTRL */
- #define OMAP4430_OPTFCLKEN_TV_CLK_SHIFT				11
- #define OMAP4430_OPTFCLKEN_TV_CLK_MASK				(1 << 11)
-diff --git a/arch/arm/mach-omap2/prm-regbits-44xx.h b/arch/arm/mach-omap2/prm-regbits-44xx.h
-index 6d2776f..3cb247b 100644
---- a/arch/arm/mach-omap2/prm-regbits-44xx.h
-+++ b/arch/arm/mach-omap2/prm-regbits-44xx.h
-@@ -283,6 +283,14 @@
- #define OMAP4430_DUCATI_UNICACHE_STATEST_SHIFT				10
- #define OMAP4430_DUCATI_UNICACHE_STATEST_MASK				(0x3 << 10)
- 
-+/* Used by PRM_DEVICE_OFF_CTRL */
-+#define OMAP4460_EMIF1_OFFWKUP_DISABLE_SHIFT				8
-+#define OMAP4460_EMIF1_OFFWKUP_DISABLE_MASK				(1 << 8)
-+
-+/* Used by PRM_DEVICE_OFF_CTRL */
-+#define OMAP4460_EMIF2_OFFWKUP_DISABLE_SHIFT				9
-+#define OMAP4460_EMIF2_OFFWKUP_DISABLE_MASK				(1 << 9)
-+
- /* Used by RM_MPU_RSTST */
- #define OMAP4430_EMULATION_RST_SHIFT					0
- #define OMAP4430_EMULATION_RST_MASK					(1 << 0)
+ /* RATE_IN_3430ES2PLUS_36XX includes 34xx/35xx with ES >=2, and all 36xx/37xx */
+ #define RATE_IN_3430ES2PLUS_36XX	(RATE_IN_3430ES2PLUS | RATE_IN_36XX)
