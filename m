@@ -1,40 +1,34 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 08 Jul 2011 16:57:27 +0900
-Subject: [PATCH 2/7] DMA: PL330: Update PL330 DMA API driver
-In-Reply-To: <20110705073629.GM8286@n2100.arm.linux.org.uk>
-References: <1309781915-31549-1-git-send-email-kgene.kim@samsung.com>
-	<1309781915-31549-3-git-send-email-kgene.kim@samsung.com>
-	<20110705073629.GM8286@n2100.arm.linux.org.uk>
-Message-ID: <003301cc3d44$b0fccdd0$12f66970$%kim@samsung.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri,  8 Jul 2011 16:27:28 +0800
+Subject: [PATCH 0/6] Add device tree support for imx spi driver
+Message-ID: <1310113654-25887-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
-> 
-> On Mon, Jul 04, 2011 at 09:18:30PM +0900, Kukjin Kim wrote:
-> > diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
-> > index 25cf327..9b7f15a 100644
-> > --- a/drivers/dma/Kconfig
-> > +++ b/drivers/dma/Kconfig
-> > @@ -193,7 +193,8 @@ config ARCH_HAS_ASYNC_TX_FIND_CHANNEL
-> >  config PL330_DMA
-> >  	tristate "DMA API Driver for PL330"
-> >  	select DMA_ENGINE
-> > -	depends on PL330
-> > +	select ARM_AMBA
-> 
-> This is the wrong way around.  If your SoC supports Primecells, then you
-are
-> supposed to select ARM_AMBA from the SoC to allow the Primecell drivers to
-be
-> enabled.  Primecell drivers should then depend on ARM_AMBA.
+The patch set makes some cleanups on imx spi driver to get it ready
+for adding device tree probe and then add the support.
 
-OK, will address comments.
+Those two dt helper function related patches are carried here to
+resolve the dependency.  They should be on the way to sit on Grant's
+devicetree/next branch.
 
-Thanks.
+Rob Herring (1):
+      dt: add helper function to read u32 arrays
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Shawn Guo (5):
+      ARM: mxc: remove unnecessary header file inclusion from gpio.h
+      spi/imx: use soc name in spi device type naming scheme
+      spi/imx: copy gpio number passed by platform data into driver private data
+      dt: add empty of_property_read_u32[_array] for non-dt
+      spi/imx: add device tree probe support
+
+ .../devicetree/bindings/spi/fsl-imx-cspi.txt       |   22 +
+ arch/arm/mach-imx/clock-imx25.c                    |    7 +-
+ arch/arm/mach-mx5/clock-mx51-mx53.c                |   11 +-
+ arch/arm/plat-mxc/devices/platform-spi_imx.c       |   12 +-
+ arch/arm/plat-mxc/include/mach/gpio.h              |    2 -
+ drivers/of/base.c                                  |   19 +-
+ drivers/spi/Kconfig                                |   15 -
+ drivers/spi/spi-imx.c                              |  468 ++++++++++----------
+ include/linux/of.h                                 |   29 ++-
+ 9 files changed, 317 insertions(+), 268 deletions(-)
