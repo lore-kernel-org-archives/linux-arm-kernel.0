@@ -1,353 +1,1438 @@
-From: s-ghorai@ti.com (Sukumar Ghorai)
-Date: Fri, 08 Jul 2011 17:38:14 -0000
-Subject: [PATCH RESEND v8 4/7] omap3: nand: prefetch in irq mode support
-In-Reply-To: <1295443503-14515-1-git-send-email-s-ghorai@ti.com>
-References: <1295443503-14515-1-git-send-email-s-ghorai@ti.com>
-Message-ID: <1295443503-14515-5-git-send-email-s-ghorai@ti.com>
+From: mnalajal@codeaurora.org (Murali Nalajala)
+Date: Fri, 08 Jul 2011 17:39:18 -0000
+Subject: [PATCH 1/1] mtd: msm_nand: Add initial msm nand driver support.
+Message-ID: <1293785680-19850-1-git-send-email-mnalajal@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enable prefetch-irq mode for nand transfer(read, write)
+From: Arve Hj?nnev?g <arve@android.com>
 
-Signed-off-by: Vimal Singh <vimalsingh@ti.com>
-Signed-off-by: Sukumar Ghorai <s-ghorai@ti.com>
+Add initial msm nand driver support for Qualcomm MSM and QSD platforms.
+This driver is currently capable of handling 2K page nand devices.
+
+This driver is originally
+developed by Google and its source is available at
+http://android.git.kernel.org/?p=kernel/experimental.git
+
+CC: Brian Swetland <swetland@google.com>
+Signed-off-by: Arve Hj?nnev?g <arve@android.com>
+Signed-off-by: Murali Nalajala <mnalajal@codeaurora.org>
 ---
- arch/arm/mach-omap2/board-flash.c      |    2 +
- arch/arm/plat-omap/include/plat/nand.h |    4 +-
- drivers/mtd/nand/omap2.c               |  198 ++++++++++++++++++++++++++++++--
- 3 files changed, 194 insertions(+), 10 deletions(-)
+ drivers/mtd/devices/Kconfig    |   10 +
+ drivers/mtd/devices/Makefile   |    1 +
+ drivers/mtd/devices/msm_nand.c | 1281 ++++++++++++++++++++++++++++++++++++++++
+ drivers/mtd/devices/msm_nand.h |   75 +++
+ 4 files changed, 1367 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/mtd/devices/msm_nand.c
+ create mode 100644 drivers/mtd/devices/msm_nand.h
 
-diff --git a/arch/arm/mach-omap2/board-flash.c b/arch/arm/mach-omap2/board-flash.c
-index f6b7253..1964509 100644
---- a/arch/arm/mach-omap2/board-flash.c
-+++ b/arch/arm/mach-omap2/board-flash.c
-@@ -16,6 +16,7 @@
- #include <linux/platform_device.h>
- #include <linux/mtd/physmap.h>
- #include <linux/io.h>
-+#include <plat/irqs.h>
+diff --git a/drivers/mtd/devices/Kconfig b/drivers/mtd/devices/Kconfig
+index 35081ce..bcf851f 100644
+--- a/drivers/mtd/devices/Kconfig
++++ b/drivers/mtd/devices/Kconfig
+@@ -49,6 +49,16 @@ config MTD_MS02NV
+ 	  say M here and read <file:Documentation/kbuild/modules.txt>.
+ 	  The module will be called ms02-nv.
  
- #include <plat/gpmc.h>
- #include <plat/nand.h>
-@@ -147,6 +148,7 @@ __init board_nand_init(struct mtd_partition *nand_parts,
- 	board_nand_data.nr_parts	= nr_parts;
- 	board_nand_data.devsize		= nand_type;
- 
-+	board_nand_data.gpmc_irq = OMAP_GPMC_IRQ_BASE + cs;
- 	gpmc_nand_init(&board_nand_data);
- }
- #else
-diff --git a/arch/arm/plat-omap/include/plat/nand.h b/arch/arm/plat-omap/include/plat/nand.h
-index 78c0bdb..ae5e053 100644
---- a/arch/arm/plat-omap/include/plat/nand.h
-+++ b/arch/arm/plat-omap/include/plat/nand.h
-@@ -13,7 +13,8 @@
- enum nand_io {
- 	NAND_OMAP_PREFETCH_POLLED = 0,	/* prefetch polled mode, default */
- 	NAND_OMAP_POLLED,		/* polled mode, without prefetch */
--	NAND_OMAP_PREFETCH_DMA		/* prefetch enabled sDMA mode */
-+	NAND_OMAP_PREFETCH_DMA,		/* prefetch enabled sDMA mode */
-+	NAND_OMAP_PREFETCH_IRQ		/* prefetch enabled irq mode */
- };
- 
- struct omap_nand_platform_data {
-@@ -26,6 +27,7 @@ struct omap_nand_platform_data {
- 	int			(*nand_setup)(void);
- 	int			(*dev_ready)(struct omap_nand_platform_data *);
- 	int			dma_channel;
-+	int			gpmc_irq;
- 	enum nand_io		xfer_type;
- 	unsigned long		phys_base;
- 	int			devsize;
-diff --git a/drivers/mtd/nand/omap2.c b/drivers/mtd/nand/omap2.c
-index 60bac8e..fbe8414 100644
---- a/drivers/mtd/nand/omap2.c
-+++ b/drivers/mtd/nand/omap2.c
-@@ -11,6 +11,7 @@
- #include <linux/platform_device.h>
- #include <linux/dma-mapping.h>
- #include <linux/delay.h>
-+#include <linux/interrupt.h>
- #include <linux/jiffies.h>
- #include <linux/sched.h>
- #include <linux/mtd/mtd.h>
-@@ -24,6 +25,7 @@
- #include <plat/nand.h>
- 
- #define	DRIVER_NAME	"omap2-nand"
-+#define	OMAP_NAND_TIMEOUT_MS	5000
- 
- #define NAND_Ecc_P1e		(1 << 0)
- #define NAND_Ecc_P2e		(1 << 1)
-@@ -108,6 +110,13 @@ struct omap_nand_info {
- 	unsigned long			phys_base;
- 	struct completion		comp;
- 	int				dma_ch;
-+	int				gpmc_irq;
-+	enum {
-+		OMAP_NAND_IO_READ = 0,	/* read */
-+		OMAP_NAND_IO_WRITE,	/* write */
-+	} iomode;
-+	u_char				*buf;
-+	int					buf_len;
- };
- 
- /**
-@@ -267,9 +276,10 @@ static void omap_write_buf_pref(struct mtd_info *mtd,
- {
- 	struct omap_nand_info *info = container_of(mtd,
- 						struct omap_nand_info, mtd);
--	uint32_t pref_count = 0, w_count = 0;
-+	uint32_t w_count = 0;
- 	int i = 0, ret = 0;
- 	u16 *p;
-+	unsigned long tim, limit;
- 
- 	/* take care of subpage writes */
- 	if (len % 2 != 0) {
-@@ -295,9 +305,12 @@ static void omap_write_buf_pref(struct mtd_info *mtd,
- 				iowrite16(*p++, info->nand.IO_ADDR_W);
- 		}
- 		/* wait for data to flushed-out before reset the prefetch */
--		do {
--			pref_count = gpmc_read_status(GPMC_PREFETCH_COUNT);
--		} while (pref_count);
-+		tim = 0;
-+		limit = (loops_per_jiffy *
-+					msecs_to_jiffies(OMAP_NAND_TIMEOUT_MS));
-+		while (gpmc_read_status(GPMC_PREFETCH_COUNT) && (tim++ < limit))
-+			cpu_relax();
++config MTD_MSM_NAND
++	tristate "MSM on-chip NAND Flash Controller driver"
++	depends on MTD && ARCH_MSM
++	help
++	  This enables the on-chip NAND flash controller driver on Qualcomm's
++	  MSM and QSD platforms.
 +
- 		/* disable and stop the PFPW engine */
- 		gpmc_prefetch_reset(info->gpmc_cs);
- 	}
-@@ -326,11 +339,11 @@ static inline int omap_nand_dma_transfer(struct mtd_info *mtd, void *addr,
- {
- 	struct omap_nand_info *info = container_of(mtd,
- 					struct omap_nand_info, mtd);
--	uint32_t prefetch_status = 0;
- 	enum dma_data_direction dir = is_write ? DMA_TO_DEVICE :
- 							DMA_FROM_DEVICE;
- 	dma_addr_t dma_addr;
- 	int ret;
-+	unsigned long tim, limit;
- 
- 	/* The fifo depth is 64 bytes. We have a sync at each frame and frame
- 	 * length is 64 bytes.
-@@ -376,7 +389,7 @@ static inline int omap_nand_dma_transfer(struct mtd_info *mtd, void *addr,
- 	/*  configure and start prefetch transfer */
- 	ret = gpmc_prefetch_enable(info->gpmc_cs, 0x1, len, is_write);
- 	if (ret)
--		/* PFPW engine is busy, use cpu copy methode */
-+		/* PFPW engine is busy, use cpu copy method */
- 		goto out_copy;
- 
- 	init_completion(&info->comp);
-@@ -385,10 +398,11 @@ static inline int omap_nand_dma_transfer(struct mtd_info *mtd, void *addr,
- 
- 	/* setup and start DMA using dma_addr */
- 	wait_for_completion(&info->comp);
-+	tim = 0;
-+	limit = (loops_per_jiffy * msecs_to_jiffies(OMAP_NAND_TIMEOUT_MS));
-+	while (gpmc_read_status(GPMC_PREFETCH_COUNT) && (tim++ < limit))
-+		cpu_relax();
- 
--	do {
--		prefetch_status = gpmc_read_status(GPMC_PREFETCH_COUNT);
--	} while (prefetch_status);
- 	/* disable and stop the PFPW engine */
- 	gpmc_prefetch_reset(info->gpmc_cs);
- 
-@@ -436,6 +450,155 @@ static void omap_write_buf_dma_pref(struct mtd_info *mtd,
- 		omap_nand_dma_transfer(mtd, (u_char *) buf, len, 0x1);
- }
- 
++	  MSM NAND controller is capable of interface to all leading nand
++	  flash vendor devices ie Samsung, Micron, Hynix etc.
++
+ config MTD_DATAFLASH
+ 	tristate "Support for AT45xxx DataFlash"
+ 	depends on SPI_MASTER && EXPERIMENTAL
+diff --git a/drivers/mtd/devices/Makefile b/drivers/mtd/devices/Makefile
+index f3226b1..fe959e8 100644
+--- a/drivers/mtd/devices/Makefile
++++ b/drivers/mtd/devices/Makefile
+@@ -11,6 +11,7 @@ obj-$(CONFIG_MTD_SLRAM)		+= slram.o
+ obj-$(CONFIG_MTD_PHRAM)		+= phram.o
+ obj-$(CONFIG_MTD_PMC551)	+= pmc551.o
+ obj-$(CONFIG_MTD_MS02NV)	+= ms02-nv.o
++obj-$(CONFIG_MTD_MSM_NAND)	+= msm_nand.o
+ obj-$(CONFIG_MTD_MTDRAM)	+= mtdram.o
+ obj-$(CONFIG_MTD_LART)		+= lart.o
+ obj-$(CONFIG_MTD_BLOCK2MTD)	+= block2mtd.o
+diff --git a/drivers/mtd/devices/msm_nand.c b/drivers/mtd/devices/msm_nand.c
+new file mode 100644
+index 0000000..89b7e03
+--- /dev/null
++++ b/drivers/mtd/devices/msm_nand.c
+@@ -0,0 +1,1281 @@
 +/*
-+ * omap_nand_irq - GMPC irq handler
-+ * @this_irq: gpmc irq number
-+ * @dev: omap_nand_info structure pointer is passed here
++ * Copyright (C) 2007 Google, Inc.
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
 + */
-+static irqreturn_t omap_nand_irq(int this_irq, void *dev)
-+{
-+	struct omap_nand_info *info = (struct omap_nand_info *) dev;
-+	u32 bytes;
-+	u32 irq_stat;
 +
-+	irq_stat = gpmc_read_status(GPMC_GET_IRQ_STATUS);
-+	bytes = gpmc_read_status(GPMC_PREFETCH_FIFO_CNT);
-+	bytes = bytes  & 0xFFFC; /* io in multiple of 4 bytes */
-+	if (info->iomode == OMAP_NAND_IO_WRITE) { /* checks for write io */
-+		if (irq_stat & 0x2)
-+			goto done;
++#define pr_fmt(fmt) "%s:" fmt, __func__
 +
-+		if (info->buf_len && (info->buf_len < bytes))
-+			bytes = info->buf_len;
-+		else if (!info->buf_len)
-+			bytes = 0;
-+		iowrite32_rep(info->nand.IO_ADDR_W,
-+						(u32 *)info->buf, bytes >> 2);
-+		info->buf = info->buf + bytes;
-+		info->buf_len -= bytes;
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/mtd/mtd.h>
++#include <linux/mtd/partitions.h>
++#include <linux/platform_device.h>
++#include <linux/sched.h>
++#include <linux/slab.h>
++#include <linux/dma-mapping.h>
++#include <asm/mach/flash.h>
++#include <mach/dma.h>
 +
-+	} else {
-+		ioread32_rep(info->nand.IO_ADDR_R,
-+						(u32 *)info->buf, bytes >> 2);
-+		info->buf = info->buf + bytes;
++#include "msm_nand.h"
 +
-+		if (irq_stat & 0x2)
-+			goto done;
-+	}
-+	gpmc_cs_configure(info->gpmc_cs, GPMC_SET_IRQ_STATUS, irq_stat);
++unsigned long msm_nand_phys;
 +
-+	return IRQ_HANDLED;
++#define CFG1_WIDE_FLASH (1U << 1)
++#define MSM_NAND_DMA_BUFFER_SIZE SZ_4K
++#define MSM_NAND_DMA_BUFFER_SLOTS \
++	(MSM_NAND_DMA_BUFFER_SIZE / (sizeof(((atomic_t *)0)->counter) * 8))
 +
-+done:
-+	complete(&info->comp);
-+	/* disable irq */
-+	gpmc_cs_configure(info->gpmc_cs, GPMC_ENABLE_IRQ, 0);
++#define SRC_CRCI_NAND_CMD  CMD_SRC_CRCI(DMOV_NAND_CRCI_CMD)
++#define DST_CRCI_NAND_CMD  CMD_DST_CRCI(DMOV_NAND_CRCI_CMD)
++#define SRC_CRCI_NAND_DATA CMD_SRC_CRCI(DMOV_NAND_CRCI_DATA)
++#define DST_CRCI_NAND_DATA CMD_DST_CRCI(DMOV_NAND_CRCI_DATA)
 +
-+	/* clear status */
-+	gpmc_cs_configure(info->gpmc_cs, GPMC_SET_IRQ_STATUS, irq_stat);
++#define msm_virt_to_dma(chip, vaddr) \
++		 ((chip)->dma_addr + \
++		 ((uint8_t *)(vaddr) - (chip)->dma_buffer))
 +
-+	return IRQ_HANDLED;
-+}
-+
-+/*
-+ * omap_read_buf_irq_pref - read data from NAND controller into buffer
-+ * @mtd: MTD device structure
-+ * @buf: buffer to store date
-+ * @len: number of bytes to read
++/**
++ * struct msm_nand_chip - Describe the msm nand chip and dma properties
++ * @dev:                Holds the device structure pointer
++ * @wait_queue:         Wait queue for handling DMA buffer requests
++ * @dma_buffer_busy:    Check DMA buffer status
++ * @dma_channel:        DMA channel number
++ * @dma_buffer:         Allocated dma buffer address
++ * @dma_addr:           Bus-specific DMA address
++ * @cfg0:               Nand controller configuration0 register value
++ * @cfg1:               Nand controller configuration1 register value
++ * @ecc_buf_cfg:        Stores ECC buffer configuration
++ *
++ * This structure is used to store the DMA and nand controller information
 + */
-+static void omap_read_buf_irq_pref(struct mtd_info *mtd, u_char *buf, int len)
-+{
-+	struct omap_nand_info *info = container_of(mtd,
-+						struct omap_nand_info, mtd);
-+	int ret = 0;
++struct msm_nand_chip {
++	struct device *dev;
++	wait_queue_head_t wait_queue;
++	atomic_t dma_buffer_busy;
++	unsigned dma_channel;
++	uint8_t *dma_buffer;
++	dma_addr_t dma_addr;
++	unsigned cfg0, cfg1;
++	uint32_t ecc_buf_cfg;
++};
 +
-+	if (len <= mtd->oobsize) {
-+		omap_read_buf_pref(mtd, buf, len);
-+		return;
-+	}
-+
-+	info->iomode = OMAP_NAND_IO_READ;
-+	info->buf = buf;
-+	init_completion(&info->comp);
-+
-+	/*  configure and start prefetch transfer */
-+	ret = gpmc_prefetch_enable(info->gpmc_cs, 0x0, len, 0x0);
-+	if (ret)
-+		/* PFPW engine is busy, use cpu copy method */
-+		goto out_copy;
-+
-+	info->buf_len = len;
-+	/* enable irq */
-+	gpmc_cs_configure(info->gpmc_cs, GPMC_ENABLE_IRQ,
-+		(GPMC_IRQ_FIFOEVENTENABLE | GPMC_IRQ_COUNT_EVENT));
-+
-+	/* waiting for read to complete */
-+	wait_for_completion(&info->comp);
-+
-+	/* disable and stop the PFPW engine */
-+	gpmc_prefetch_reset(info->gpmc_cs);
-+	return;
-+
-+out_copy:
-+	if (info->nand.options & NAND_BUSWIDTH_16)
-+		omap_read_buf16(mtd, buf, len);
-+	else
-+		omap_read_buf8(mtd, buf, len);
-+}
-+
-+/*
-+ * omap_write_buf_irq_pref - write buffer to NAND controller
-+ * @mtd: MTD device structure
-+ * @buf: data buffer
-+ * @len: number of bytes to write
++/**
++ * struct msm_nand_info - Stores the mtd and nand device information
++ * @mtd:         MTD device structure
++ * @parts:       Pointer to the MTD partitions
++ * @msm_nand:    Holds the nand device information
++ *
++ * It stores the mtd properties associted to the nand device and also
++ * mtd partition details.
 + */
-+static void omap_write_buf_irq_pref(struct mtd_info *mtd,
-+					const u_char *buf, int len)
-+{
-+	struct omap_nand_info *info = container_of(mtd,
-+						struct omap_nand_info, mtd);
-+	int ret = 0;
-+	unsigned long tim, limit;
++struct msm_nand_info {
++	struct mtd_info         mtd;
++	struct mtd_partition    *parts;
++	struct msm_nand_chip    msm_nand;
++};
 +
-+	if (len <= mtd->oobsize) {
-+		omap_write_buf_pref(mtd, buf, len);
-+		return;
++/**
++ * msm_nand_oob_64 - oob info for large (2KB) page
++ */
++static struct nand_ecclayout msm_nand_oob_64 = {
++	.eccbytes	= 40,
++	.eccpos		= {
++		0,  1,  2,  3,  4,  5,  6,  7,  8,  9,
++		10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
++		20, 21, 22, 23, 24, 25, 26, 27, 28, 29,
++		46, 47, 48, 49, 50, 51, 52, 53, 54, 55,
++		},
++	.oobavail	= 16,
++	.oobfree	= {
++		{30, 16},
 +	}
++};
 +
-+	info->iomode = OMAP_NAND_IO_WRITE;
-+	info->buf = (u_char *) buf;
-+	init_completion(&info->comp);
++static void *msm_nand_get_dma_buffer(struct msm_nand_chip *chip, size_t size)
++{
++	unsigned int bitmask, free_bitmask, old_bitmask;
++	unsigned int need_mask, current_need_mask;
++	int free_index;
 +
-+	/*  configure and start prefetch transfer */
-+	ret = gpmc_prefetch_enable(info->gpmc_cs, 0x0, len, 0x1);
-+	if (ret)
-+		/* PFPW engine is busy, use cpu copy method */
-+		goto out_copy;
-+
-+	info->buf_len = len;
-+	/* enable irq */
-+	gpmc_cs_configure(info->gpmc_cs, GPMC_ENABLE_IRQ,
-+			(GPMC_IRQ_FIFOEVENTENABLE | GPMC_IRQ_COUNT_EVENT));
-+
-+	/* waiting for write to complete */
-+	wait_for_completion(&info->comp);
-+	/* wait for data to flushed-out before reset the prefetch */
-+	tim = 0;
-+	limit = (loops_per_jiffy *  msecs_to_jiffies(OMAP_NAND_TIMEOUT_MS));
-+	while (gpmc_read_status(GPMC_PREFETCH_COUNT) && (tim++ < limit))
-+		cpu_relax();
-+
-+	/* disable and stop the PFPW engine */
-+	gpmc_prefetch_reset(info->gpmc_cs);
-+	return;
-+
-+out_copy:
-+	if (info->nand.options & NAND_BUSWIDTH_16)
-+		omap_write_buf16(mtd, buf, len);
-+	else
-+		omap_write_buf8(mtd, buf, len);
-+}
-+
- /**
-  * omap_verify_buf - Verify chip data against buffer
-  * @mtd: MTD device structure
-@@ -846,6 +1009,20 @@ static int __devinit omap_nand_probe(struct platform_device *pdev)
- 		}
- 		break;
- 
-+	case NAND_OMAP_PREFETCH_IRQ:
-+		err = request_irq(pdata->gpmc_irq,
-+				omap_nand_irq, IRQF_SHARED, "gpmc-nand", info);
-+		if (err) {
-+			dev_err(&pdev->dev, "requesting irq(%d) error:%d",
-+							pdata->gpmc_irq, err);
-+			goto out_release_mem_region;
-+		} else {
-+			info->gpmc_irq	     = pdata->gpmc_irq;
-+			info->nand.read_buf  = omap_read_buf_irq_pref;
-+			info->nand.write_buf = omap_write_buf_irq_pref;
++	need_mask = (1UL << DIV_ROUND_UP(size, MSM_NAND_DMA_BUFFER_SLOTS)) - 1;
++	bitmask = atomic_read(&chip->dma_buffer_busy);
++	free_bitmask = ~bitmask;
++	do {
++		free_index = __ffs(free_bitmask);
++		current_need_mask = need_mask << free_index;
++		if ((bitmask & current_need_mask) == 0) {
++			old_bitmask =
++				atomic_cmpxchg(&chip->dma_buffer_busy,
++					       bitmask,
++					       bitmask | current_need_mask);
++			if (old_bitmask == bitmask)
++				return chip->dma_buffer +
++					free_index * MSM_NAND_DMA_BUFFER_SLOTS;
++			free_bitmask = 0; /* force return */
 +		}
-+		break;
++		/* current free range was too small, clear all free bits */
++		/* below the top busy bit within current_need_mask */
++		free_bitmask &=
++			~(~0U >> (32 - fls(bitmask & current_need_mask)));
++	} while (free_bitmask);
 +
- 	default:
- 		dev_err(&pdev->dev,
- 			"xfer_type(%d) not supported!\n", pdata->xfer_type);
-@@ -911,6 +1088,9 @@ static int omap_nand_remove(struct platform_device *pdev)
- 	if (info->dma_ch != -1)
- 		omap_free_dma(info->dma_ch);
- 
-+	if (info->gpmc_irq)
-+		free_irq(info->gpmc_irq, info);
++	return NULL;
++}
 +
- 	/* Release NAND device, its internal structures and partitions */
- 	nand_release(&info->mtd);
- 	iounmap(info->nand.IO_ADDR_R);
--- 
-1.7.0.4
++static void msm_nand_release_dma_buffer(struct msm_nand_chip *chip,
++					void *buffer, size_t size)
++{
++	int index;
++	unsigned int used_mask;
++
++	used_mask = (1UL << DIV_ROUND_UP(size, MSM_NAND_DMA_BUFFER_SLOTS)) - 1;
++	index = ((uint8_t *)buffer - chip->dma_buffer) /
++		MSM_NAND_DMA_BUFFER_SLOTS;
++	atomic_sub(used_mask << index, &chip->dma_buffer_busy);
++
++	wake_up(&chip->wait_queue);
++}
++
++static uint32_t flash_read_id(struct msm_nand_chip *chip)
++{
++	struct {
++		dmov_s cmd[5];
++		unsigned cmdptr;
++		unsigned data[5];
++	} *dma_buffer;
++	uint32_t rv;
++
++	wait_event(chip->wait_queue,
++		   (dma_buffer = msm_nand_get_dma_buffer(
++			    chip, sizeof(*dma_buffer))));
++
++	dma_buffer->data[0] = NAND_DEV_SEL_CS0 | DM_ENABLE;
++	dma_buffer->data[1] = NAND_CMD_FETCH_ID;
++	dma_buffer->data[2] = 1;
++	dma_buffer->data[3] = MSM_NAND_STATS_INIT;
++	dma_buffer->data[4] = MSM_NAND_STATS_INIT;
++	/* verify the array size statically to avoid array overflow access */
++	BUILD_BUG_ON(4 != ARRAY_SIZE(dma_buffer->data) - 1);
++
++	dma_buffer->cmd[0].cmd = 0 | CMD_OCB;
++	dma_buffer->cmd[0].src = msm_virt_to_dma(chip, &dma_buffer->data[0]);
++	dma_buffer->cmd[0].dst = NAND_FLASH_CHIP_SELECT;
++	dma_buffer->cmd[0].len = 4;
++
++	dma_buffer->cmd[1].cmd = DST_CRCI_NAND_CMD;
++	dma_buffer->cmd[1].src = msm_virt_to_dma(chip, &dma_buffer->data[1]);
++	dma_buffer->cmd[1].dst = NAND_FLASH_CMD;
++	dma_buffer->cmd[1].len = 4;
++
++	dma_buffer->cmd[2].cmd = 0;
++	dma_buffer->cmd[2].src = msm_virt_to_dma(chip, &dma_buffer->data[2]);
++	dma_buffer->cmd[2].dst = NAND_EXEC_CMD;
++	dma_buffer->cmd[2].len = 4;
++
++	dma_buffer->cmd[3].cmd = SRC_CRCI_NAND_DATA;
++	dma_buffer->cmd[3].src = NAND_FLASH_STATUS;
++	dma_buffer->cmd[3].dst = msm_virt_to_dma(chip, &dma_buffer->data[3]);
++	dma_buffer->cmd[3].len = 4;
++
++	dma_buffer->cmd[4].cmd = CMD_OCU | CMD_LC;
++	dma_buffer->cmd[4].src = NAND_READ_ID;
++	dma_buffer->cmd[4].dst = msm_virt_to_dma(chip, &dma_buffer->data[4]);
++	dma_buffer->cmd[4].len = 4;
++	/* verify the array size statically to avoid array overflow access */
++	BUILD_BUG_ON(4 != ARRAY_SIZE(dma_buffer->cmd) - 1);
++
++	dma_buffer->cmdptr =
++		(msm_virt_to_dma(chip, dma_buffer->cmd) >> 3) | CMD_PTR_LP;
++
++	msm_dmov_exec_cmd(
++		chip->dma_channel, DMOV_CMD_PTR_LIST |
++		DMOV_CMD_ADDR(msm_virt_to_dma(chip, &dma_buffer->cmdptr)));
++
++	pr_debug("status: %x\n", dma_buffer->data[3]);
++	pr_debug("nandid: %x maker %02x device %02x\n",
++		dma_buffer->data[4], dma_buffer->data[4] & 0xff,
++		(dma_buffer->data[4] >> 8) & 0xff);
++	rv = dma_buffer->data[4];
++	msm_nand_release_dma_buffer(chip, dma_buffer, sizeof(*dma_buffer));
++	return rv;
++}
++
++static int flash_read_config(struct msm_nand_chip *chip)
++{
++	struct {
++		dmov_s cmd[2];
++		unsigned cmdptr;
++		unsigned cfg0;
++		unsigned cfg1;
++	} *dma_buffer;
++
++	wait_event(chip->wait_queue,
++		   (dma_buffer = msm_nand_get_dma_buffer(
++			    chip, sizeof(*dma_buffer))));
++	dma_buffer->cfg0 = 0;
++	dma_buffer->cfg1 = 0;
++
++	dma_buffer->cmd[0].cmd = CMD_OCB;
++	dma_buffer->cmd[0].src = NAND_DEV0_CFG0;
++	dma_buffer->cmd[0].dst = msm_virt_to_dma(chip, &dma_buffer->cfg0);
++	dma_buffer->cmd[0].len = 4;
++
++	dma_buffer->cmd[1].cmd = CMD_OCU | CMD_LC;
++	dma_buffer->cmd[1].src = NAND_DEV0_CFG1;
++	dma_buffer->cmd[1].dst = msm_virt_to_dma(chip, &dma_buffer->cfg1);
++	dma_buffer->cmd[1].len = 4;
++	/* verify the array size statically to avoid array overflow access */
++	BUILD_BUG_ON(1 != ARRAY_SIZE(dma_buffer->cmd) - 1);
++
++	dma_buffer->cmdptr =
++		(msm_virt_to_dma(chip, dma_buffer->cmd) >> 3) | CMD_PTR_LP;
++
++	msm_dmov_exec_cmd(
++		chip->dma_channel, DMOV_CMD_PTR_LIST |
++		DMOV_CMD_ADDR(msm_virt_to_dma(chip, &dma_buffer->cmdptr)));
++
++	chip->cfg0 = dma_buffer->cfg0;
++	chip->cfg1 = dma_buffer->cfg1;
++
++	pr_info("read cfg0 = %x, cfg1 = %x\n", chip->cfg0, chip->cfg1);
++	msm_nand_release_dma_buffer(chip, dma_buffer, sizeof(*dma_buffer));
++
++	if ((chip->cfg0 == 0) || (chip->cfg1 == 0))
++		return -ENODEV;
++
++	chip->cfg0 = (3 <<  6)  /* 4 codeword per page for 2k nand */
++		|  (516 <<  9)  /* 516 user data bytes */
++		|   (10 << 19)  /* 10 parity bytes */
++		|    (5 << 27)  /* 5 address cycles */
++		|    (1 << 30)  /* Read status before data */
++		|    (1 << 31)  /* Send read cmd */
++		/* 0 spare bytes for 16 bit nand or 1 spare bytes for 8 bit */
++		| ((chip->cfg1 & CFG1_WIDE_FLASH) ? (0 << 23) : (1 << 23));
++	chip->cfg1 = (0 <<  0)  /* Enable ecc */
++		|    (7 <<  2)  /* 8 recovery cycles */
++		|    (0 <<  5)  /* Allow CS deassertion */
++		|  (465 <<  6)  /* Bad block marker location */
++		|    (0 << 16)  /* Bad block in user data area */
++		|    (2 << 17)  /* 6 cycle tWB/tRB */
++		| (chip->cfg1 & CFG1_WIDE_FLASH); /* preserve wide flag */
++
++	return 0;
++}
++
++static unsigned flash_rd_reg(struct msm_nand_chip *chip, unsigned addr)
++{
++	struct {
++		dmov_s cmd;
++		unsigned cmdptr;
++		unsigned data;
++	} *dma_buffer;
++	unsigned rv;
++
++	wait_event(chip->wait_queue,
++		   (dma_buffer = msm_nand_get_dma_buffer(
++			    chip, sizeof(*dma_buffer))));
++
++	dma_buffer->cmd.cmd = CMD_LC;
++	dma_buffer->cmd.src = addr;
++	dma_buffer->cmd.dst = msm_virt_to_dma(chip, &dma_buffer->data);
++	dma_buffer->cmd.len = 4;
++
++	dma_buffer->cmdptr =
++		(msm_virt_to_dma(chip, &dma_buffer->cmd) >> 3) | CMD_PTR_LP;
++	dma_buffer->data = MSM_NAND_STATS_INIT;
++
++	msm_dmov_exec_cmd(
++		chip->dma_channel, DMOV_CMD_PTR_LIST |
++		DMOV_CMD_ADDR(msm_virt_to_dma(chip, &dma_buffer->cmdptr)));
++	rv = dma_buffer->data;
++
++	msm_nand_release_dma_buffer(chip, dma_buffer, sizeof(*dma_buffer));
++
++	return rv;
++}
++
++static void flash_wr_reg(struct msm_nand_chip *chip, unsigned addr,
++			 unsigned val)
++{
++	struct {
++		dmov_s cmd;
++		unsigned cmdptr;
++		unsigned data;
++	} *dma_buffer;
++
++	wait_event(chip->wait_queue,
++		   (dma_buffer = msm_nand_get_dma_buffer(
++			    chip, sizeof(*dma_buffer))));
++
++	dma_buffer->cmd.cmd = CMD_LC;
++	dma_buffer->cmd.src = msm_virt_to_dma(chip, &dma_buffer->data);
++	dma_buffer->cmd.dst = addr;
++	dma_buffer->cmd.len = 4;
++
++	dma_buffer->cmdptr =
++		(msm_virt_to_dma(chip, &dma_buffer->cmd) >> 3) | CMD_PTR_LP;
++	dma_buffer->data = val;
++
++	msm_dmov_exec_cmd(
++		chip->dma_channel, DMOV_CMD_PTR_LIST |
++		DMOV_CMD_ADDR(msm_virt_to_dma(chip, &dma_buffer->cmdptr)));
++
++	msm_nand_release_dma_buffer(chip, dma_buffer, sizeof(*dma_buffer));
++}
++
++static int msm_nand_read_oob(struct mtd_info *mtd, loff_t from,
++			     struct mtd_oob_ops *ops)
++{
++	struct msm_nand_chip *chip = mtd->priv;
++
++	struct {
++		dmov_s cmd[4 * 5 + 3];
++		unsigned cmdptr;
++		struct {
++			uint32_t cmd;
++			uint32_t addr0;
++			uint32_t addr1;
++			uint32_t chipsel;
++			uint32_t cfg0;
++			uint32_t cfg1;
++			uint32_t exec;
++			uint32_t ecccfg;
++			struct {
++				uint32_t flash_status;
++				uint32_t buffer_status;
++			} result[4];
++		} data;
++	} *dma_buffer;
++	dmov_s *cmd;
++	unsigned n;
++	unsigned page = from / NAND_PAGE_SIZE;
++	uint32_t oob_len = ops->ooblen;
++	uint32_t sectordatasize;
++	uint32_t sectoroobsize;
++	int err, pageerr, rawerr;
++	dma_addr_t data_dma_addr = 0;
++	dma_addr_t oob_dma_addr = 0;
++	dma_addr_t data_dma_addr_curr = 0;
++	dma_addr_t oob_dma_addr_curr = 0;
++	uint32_t oob_col = 0;
++	unsigned page_count;
++	unsigned pages_read = 0;
++	unsigned start_sector = 0;
++	uint32_t ecc_errors;
++	uint32_t total_ecc_errors = 0;
++
++	if (from & (mtd->writesize - 1)) {
++		pr_err("unsupported from, 0x%llx\n", from);
++		return -EINVAL;
++	}
++	if (ops->datbuf != NULL && (ops->len % mtd->writesize) != 0) {
++		/* when ops->datbuf is NULL, ops->len may refer to ooblen */
++		pr_err("unsupported ops->len, %d\n", ops->len);
++		return -EINVAL;
++	}
++	if (ops->ooblen != 0 && ops->ooboffs != 0) {
++		pr_err("unsupported ops->ooboffs, %d\n", ops->ooboffs);
++		return -EINVAL;
++	}
++
++	if (ops->oobbuf && !ops->datbuf && ops->mode == MTD_OOB_AUTO)
++		start_sector = 3;
++
++	if (ops->oobbuf && !ops->datbuf)
++		page_count = ops->ooblen / ((ops->mode == MTD_OOB_AUTO) ?
++			mtd->oobavail : mtd->oobsize);
++	else
++		page_count = ops->len / mtd->writesize;
++
++	pr_debug("%llx %p %x %p %x\n",
++		from, ops->datbuf, ops->len, ops->oobbuf, ops->ooblen);
++
++	if (ops->datbuf) {
++		data_dma_addr_curr = data_dma_addr =
++			dma_map_single(chip->dev, ops->datbuf, ops->len,
++				       DMA_FROM_DEVICE);
++		if (dma_mapping_error(chip->dev, data_dma_addr)) {
++			pr_err("msm_nand_read_oob: failed to get dma addr "
++			       "for %p\n", ops->datbuf);
++			return -EIO;
++		}
++	}
++	if (ops->oobbuf) {
++		memset(ops->oobbuf, 0xff, ops->ooblen);
++		oob_dma_addr_curr = oob_dma_addr =
++			dma_map_single(chip->dev, ops->oobbuf,
++				       ops->ooblen, DMA_BIDIRECTIONAL);
++		if (dma_mapping_error(chip->dev, oob_dma_addr)) {
++			pr_err("msm_nand_read_oob: failed to get dma addr "
++			       "for %p\n", ops->oobbuf);
++			err = -EIO;
++			goto err_dma_map_oobbuf_failed;
++		}
++	}
++
++	wait_event(chip->wait_queue,
++		   (dma_buffer = msm_nand_get_dma_buffer(
++			    chip, sizeof(*dma_buffer))));
++
++	oob_col = start_sector * 0x210;
++	if (chip->cfg1 & CFG1_WIDE_FLASH)
++		oob_col >>= 1;
++
++	err = 0;
++	while (page_count-- > 0) {
++		cmd = dma_buffer->cmd;
++
++		/* CMD / ADDR0 / ADDR1 / CHIPSEL program values */
++		dma_buffer->data.cmd = NAND_CMD_PAGE_READ_ECC;
++		dma_buffer->data.addr0 = (page << 16) | oob_col;
++		dma_buffer->data.addr1 = (page >> 16) & 0xff;
++		/* flash0 + undoc bit */
++		dma_buffer->data.chipsel = NAND_DEV_SEL_CS0 | DM_ENABLE;
++
++
++		dma_buffer->data.cfg0 =
++			(chip->cfg0 & ~(7U << 6)) | ((3U - start_sector) << 6);
++		dma_buffer->data.cfg1 = chip->cfg1;
++
++		/* GO bit for the EXEC register */
++		dma_buffer->data.exec = 1;
++
++		/* verify the array size statically to avoid array
++		 * overflow access
++		 */
++		BUILD_BUG_ON(4 != ARRAY_SIZE(dma_buffer->data.result));
++
++		for (n = start_sector; n < 4; n++) {
++			/* flash + buffer status return words */
++			dma_buffer->data.result[n].flash_status =
++							 MSM_NAND_STATS_INIT;
++			dma_buffer->data.result[n].buffer_status =
++							 MSM_NAND_STATS_INIT;
++
++			/* block on cmd ready, then
++			 * write CMD / ADDR0 / ADDR1 / CHIPSEL
++			 * regs in a burst
++			 */
++			cmd->cmd = DST_CRCI_NAND_CMD;
++			cmd->src = msm_virt_to_dma(chip, &dma_buffer->data.cmd);
++			cmd->dst = NAND_FLASH_CMD;
++			if (n == start_sector)
++				cmd->len = 16;
++			else
++				cmd->len = 4;
++			cmd++;
++
++			if (n == start_sector) {
++				cmd->cmd = 0;
++				cmd->src = msm_virt_to_dma(chip,
++							&dma_buffer->data.cfg0);
++				cmd->dst = NAND_DEV0_CFG0;
++				cmd->len = 8;
++				cmd++;
++			}
++
++			/* kick the execute register */
++			cmd->cmd = 0;
++			cmd->src =
++				msm_virt_to_dma(chip, &dma_buffer->data.exec);
++			cmd->dst = NAND_EXEC_CMD;
++			cmd->len = 4;
++			cmd++;
++
++			/* block on data ready, then
++			 * read the status register
++			 */
++			cmd->cmd = SRC_CRCI_NAND_DATA;
++			cmd->src = NAND_FLASH_STATUS;
++			cmd->dst = msm_virt_to_dma(chip,
++						   &dma_buffer->data.result[n]);
++			/* NAND_FLASH_STATUS + NAND_BUFFER_STATUS */
++			cmd->len = 8;
++			cmd++;
++
++			/* read data block
++			 * (only valid if status says success)
++			 */
++			if (ops->datbuf) {
++				sectordatasize = (n < 3) ? 516 : 500;
++				cmd->cmd = 0;
++				cmd->src = NAND_FLASH_BUFFER;
++				cmd->dst = data_dma_addr_curr;
++				data_dma_addr_curr += sectordatasize;
++				cmd->len = sectordatasize;
++				cmd++;
++			}
++
++			if (ops->oobbuf &&
++			    (n == 3 || ops->mode != MTD_OOB_AUTO)) {
++				cmd->cmd = 0;
++				if (n == 3) {
++					cmd->src = NAND_FLASH_BUFFER + 500;
++					sectoroobsize = 16;
++					if (ops->mode != MTD_OOB_AUTO)
++						sectoroobsize += 10;
++				} else {
++					cmd->src = NAND_FLASH_BUFFER + 516;
++					sectoroobsize = 10;
++				}
++
++				cmd->dst = oob_dma_addr_curr;
++				if (sectoroobsize < oob_len)
++					cmd->len = sectoroobsize;
++				else
++					cmd->len = oob_len;
++				oob_dma_addr_curr += cmd->len;
++				oob_len -= cmd->len;
++				if (cmd->len > 0)
++					cmd++;
++			}
++		}
++
++		/* verify the array size statically to avoid array
++		 * overflow access
++		 */
++		BUILD_BUG_ON(4 * 5 + 3 != ARRAY_SIZE(dma_buffer->cmd));
++		BUG_ON(cmd - dma_buffer->cmd > ARRAY_SIZE(dma_buffer->cmd));
++		dma_buffer->cmd[0].cmd |= CMD_OCB;
++		cmd[-1].cmd |= CMD_OCU | CMD_LC;
++
++		dma_buffer->cmdptr =
++			(msm_virt_to_dma(chip, dma_buffer->cmd) >> 3)
++			| CMD_PTR_LP;
++
++		msm_dmov_exec_cmd(
++			chip->dma_channel, DMOV_CMD_PTR_LIST | DMOV_CMD_ADDR(
++				msm_virt_to_dma(chip, &dma_buffer->cmdptr)));
++
++		/* if any of the writes failed (0x10), or there
++		 * was a protection violation (0x100), we lose
++		 */
++		pageerr = rawerr = 0;
++		for (n = start_sector; n < 4; n++) {
++			if (dma_buffer->data.result[n].flash_status & 0x110) {
++				rawerr = -EIO;
++				break;
++			}
++		}
++		if (rawerr) {
++			if (ops->datbuf) {
++				uint8_t *datbuf =
++				ops->datbuf + pages_read * mtd->writesize;
++				for (n = 0; n < mtd->writesize; n++) {
++					/* empty blocks read 0x54 at
++					 * these offsets
++					 */
++					if (n % 516 == 3 && datbuf[n] == 0x54)
++						datbuf[n] = 0xff;
++					if (datbuf[n] != 0xff) {
++						pageerr = rawerr;
++						break;
++					}
++				}
++			}
++			if (ops->oobbuf) {
++				for (n = 0; n < ops->ooblen; n++) {
++					if (ops->oobbuf[n] != 0xff) {
++						pageerr = rawerr;
++						break;
++					}
++				}
++			}
++		}
++		if (pageerr) {
++			for (n = start_sector; n < 4; n++) {
++				if (dma_buffer->data.result[n].buffer_status
++						& 0x8) {
++					/* not thread safe */
++					mtd->ecc_stats.failed++;
++					pageerr = -EBADMSG;
++					break;
++				}
++			}
++		}
++		if (!rawerr) { /* check for corretable errors */
++			for (n = start_sector; n < 4; n++) {
++				ecc_errors = dma_buffer->data.
++					result[n].buffer_status & 0x7;
++				if (ecc_errors) {
++					total_ecc_errors += ecc_errors;
++					/* not thread safe */
++					mtd->ecc_stats.corrected += ecc_errors;
++					if (ecc_errors > 1)
++						pageerr = -EUCLEAN;
++				}
++			}
++		}
++		if (pageerr && (pageerr != -EUCLEAN || err == 0))
++			err = pageerr;
++
++		if (rawerr && !pageerr) {
++			pr_err("msm_nand_read_oob %llx %x %x empty page\n",
++			       (loff_t)page * mtd->writesize, ops->len,
++			       ops->ooblen);
++		} else {
++			pr_debug("status: %x %x %x %x %x %x %x %x\n",
++				dma_buffer->data.result[0].flash_status,
++				dma_buffer->data.result[0].buffer_status,
++				dma_buffer->data.result[1].flash_status,
++				dma_buffer->data.result[1].buffer_status,
++				dma_buffer->data.result[2].flash_status,
++				dma_buffer->data.result[2].buffer_status,
++				dma_buffer->data.result[3].flash_status,
++				dma_buffer->data.result[3].buffer_status);
++		}
++
++		if (err && err != -EUCLEAN && err != -EBADMSG)
++			break;
++		pages_read++;
++		page++;
++	}
++	msm_nand_release_dma_buffer(chip, dma_buffer, sizeof(*dma_buffer));
++
++	if (ops->oobbuf) {
++		dma_unmap_single(chip->dev, oob_dma_addr,
++				 ops->ooblen, DMA_FROM_DEVICE);
++	}
++err_dma_map_oobbuf_failed:
++	if (ops->datbuf) {
++		dma_unmap_single(chip->dev, data_dma_addr,
++				 ops->len, DMA_FROM_DEVICE);
++	}
++
++	ops->retlen = mtd->writesize * pages_read;
++	ops->oobretlen = ops->ooblen - oob_len;
++	if (err)
++		pr_err("msm_nand_read_oob %llx %x %x failed %d, corrected %d\n",
++		       from, ops->datbuf ? ops->len : 0, ops->ooblen, err,
++		       total_ecc_errors);
++	return err;
++}
++
++static int
++msm_nand_read(struct mtd_info *mtd, loff_t from, size_t len,
++	      size_t *retlen, u_char *buf)
++{
++	int ret;
++	struct mtd_oob_ops ops;
++
++
++	ops.mode = MTD_OOB_PLACE;
++	ops.len = len;
++	ops.retlen = 0;
++	ops.ooblen = 0;
++	ops.datbuf = buf;
++	ops.oobbuf = NULL;
++	ret =  msm_nand_read_oob(mtd, from, &ops);
++	*retlen = ops.retlen;
++	return ret;
++}
++
++static int
++msm_nand_write_oob(struct mtd_info *mtd, loff_t to, struct mtd_oob_ops *ops)
++{
++	struct msm_nand_chip *chip = mtd->priv;
++	struct {
++		dmov_s cmd[4 * 5 + 3];
++		unsigned cmdptr;
++		struct {
++			uint32_t cmd;
++			uint32_t addr0;
++			uint32_t addr1;
++			uint32_t chipsel;
++			uint32_t cfg0;
++			uint32_t cfg1;
++			uint32_t exec;
++			uint32_t ecccfg;
++			uint32_t flash_status[4];
++		} data;
++	} *dma_buffer;
++	dmov_s *cmd;
++	unsigned n;
++	unsigned page = to / NAND_PAGE_SIZE;
++	uint32_t oob_len = ops->ooblen;
++	uint32_t sectordatawritesize;
++	int err;
++	dma_addr_t data_dma_addr = 0;
++	dma_addr_t oob_dma_addr = 0;
++	dma_addr_t data_dma_addr_curr = 0;
++	dma_addr_t oob_dma_addr_curr = 0;
++	unsigned page_count;
++	unsigned pages_written = 0;
++
++	if (to & (mtd->writesize - 1)) {
++		pr_err("unsupported to, 0x%llx\n", to);
++		return -EINVAL;
++	}
++	if (ops->ooblen != 0 && ops->mode != MTD_OOB_AUTO) {
++		pr_err("unsupported ops->mode, %d\n", ops->mode);
++		return -EINVAL;
++	}
++
++	if (ops->datbuf == NULL) {
++		pr_err("unsupported ops->datbuf == NULL\n");
++		return -EINVAL;
++	}
++	if ((ops->len % mtd->writesize) != 0) {
++		pr_err("unsupported ops->len, %d\n", ops->len);
++		return -EINVAL;
++	}
++
++	if (ops->ooblen != 0 && ops->ooboffs != 0) {
++		pr_err("unsupported ops->ooboffs, %d\n", ops->ooboffs);
++		return -EINVAL;
++	}
++
++	if (ops->datbuf) {
++		data_dma_addr_curr = data_dma_addr =
++			dma_map_single(chip->dev, ops->datbuf,
++				       ops->len, DMA_TO_DEVICE);
++		if (dma_mapping_error(chip->dev, data_dma_addr)) {
++			pr_err("msm_nand_write_oob: failed to get dma addr "
++			       "for %p\n", ops->datbuf);
++			return -EIO;
++		}
++	}
++	if (ops->oobbuf) {
++		oob_dma_addr_curr = oob_dma_addr =
++			dma_map_single(chip->dev, ops->oobbuf,
++				       ops->ooblen, DMA_TO_DEVICE);
++		if (dma_mapping_error(chip->dev, oob_dma_addr)) {
++			pr_err("msm_nand_write_oob: failed to get dma addr "
++			       "for %p\n", ops->oobbuf);
++			err = -EIO;
++			goto err_dma_map_oobbuf_failed;
++		}
++	}
++
++	page_count = ops->len / mtd->writesize;
++
++	wait_event(chip->wait_queue, (dma_buffer =
++			msm_nand_get_dma_buffer(chip, sizeof(*dma_buffer))));
++
++	while (page_count-- > 0) {
++		cmd = dma_buffer->cmd;
++
++		/* CMD / ADDR0 / ADDR1 / CHIPSEL program values */
++		dma_buffer->data.cmd = NAND_CMD_PRG_PAGE;
++		dma_buffer->data.addr0 = page << 16;
++		dma_buffer->data.addr1 = (page >> 16) & 0xff;
++		dma_buffer->data.chipsel = NAND_DEV_SEL_CS0 | DM_ENABLE;
++
++		dma_buffer->data.cfg0 = chip->cfg0;
++		dma_buffer->data.cfg1 = chip->cfg1;
++
++		/* GO bit for the EXEC register */
++		dma_buffer->data.exec = 1;
++
++		/* verify the array size statically to avoid array
++		 * overflow access
++		 */
++		BUILD_BUG_ON(4 != ARRAY_SIZE(dma_buffer->data.flash_status));
++
++		for (n = 0; n < 4; n++) {
++			/* status return words */
++			dma_buffer->data.flash_status[n] = MSM_NAND_STATS_INIT;
++			/* block on cmd ready, then
++			 * write CMD / ADDR0 / ADDR1 / CHIPSEL regs in a burst
++			 */
++			cmd->cmd = DST_CRCI_NAND_CMD;
++			cmd->src =
++				msm_virt_to_dma(chip, &dma_buffer->data.cmd);
++			cmd->dst = NAND_FLASH_CMD;
++			if (n == 0)
++				cmd->len = 16;
++			else
++				cmd->len = 4;
++			cmd++;
++
++			if (n == 0) {
++				cmd->cmd = 0;
++				cmd->src = msm_virt_to_dma(chip,
++							&dma_buffer->data.cfg0);
++				cmd->dst = NAND_DEV0_CFG0;
++				cmd->len = 8;
++				cmd++;
++			}
++
++				/* write data block */
++			sectordatawritesize = (n < 3) ? 516 : 500;
++			cmd->cmd = 0;
++			cmd->src = data_dma_addr_curr;
++			data_dma_addr_curr += sectordatawritesize;
++			cmd->dst = NAND_FLASH_BUFFER;
++			cmd->len = sectordatawritesize;
++			cmd++;
++
++			if (ops->oobbuf) {
++				if (n == 3) {
++					cmd->cmd = 0;
++					cmd->src = oob_dma_addr_curr;
++					cmd->dst = NAND_FLASH_BUFFER + 500;
++					if (16 < oob_len)
++						cmd->len = 16;
++					else
++						cmd->len = oob_len;
++					oob_dma_addr_curr += cmd->len;
++					oob_len -= cmd->len;
++					if (cmd->len > 0)
++						cmd++;
++				}
++				if (ops->mode != MTD_OOB_AUTO) {
++					/* skip ecc bytes in oobbuf */
++					if (oob_len < 10) {
++						oob_dma_addr_curr += 10;
++						oob_len -= 10;
++					} else {
++						oob_dma_addr_curr += oob_len;
++						oob_len = 0;
++					}
++				}
++			}
++
++			/* kick the execute register */
++			cmd->cmd = 0;
++			cmd->src =
++				msm_virt_to_dma(chip, &dma_buffer->data.exec);
++			cmd->dst = NAND_EXEC_CMD;
++			cmd->len = 4;
++			cmd++;
++
++			/* block on data ready, then
++			 * read the status register
++			 */
++			cmd->cmd = SRC_CRCI_NAND_DATA;
++			cmd->src = NAND_FLASH_STATUS;
++			cmd->dst = msm_virt_to_dma(chip,
++					     &dma_buffer->data.flash_status[n]);
++			cmd->len = 4;
++			cmd++;
++		}
++
++		dma_buffer->cmd[0].cmd |= CMD_OCB;
++		cmd[-1].cmd |= CMD_OCU | CMD_LC;
++		/* verify the array size statically to avoid array
++		 * overflow access
++		 */
++		BUILD_BUG_ON(4 * 5 + 3 != ARRAY_SIZE(dma_buffer->cmd));
++		BUG_ON(cmd - dma_buffer->cmd > ARRAY_SIZE(dma_buffer->cmd));
++		dma_buffer->cmdptr =
++			(msm_virt_to_dma(chip, dma_buffer->cmd) >> 3) |
++			CMD_PTR_LP;
++
++		msm_dmov_exec_cmd(chip->dma_channel,
++			DMOV_CMD_PTR_LIST | DMOV_CMD_ADDR(
++				msm_virt_to_dma(chip, &dma_buffer->cmdptr)));
++
++		/* if any of the writes failed (0x10), or there was a
++		 * protection violation (0x100), or the program success
++		 * bit (0x80) is unset, we lose
++		 */
++		err = 0;
++		for (n = 0; n < 4; n++) {
++			if (dma_buffer->data.flash_status[n] & 0x110) {
++				err = -EIO;
++				break;
++			}
++			if (!(dma_buffer->data.flash_status[n] & 0x80)) {
++				err = -EIO;
++				break;
++			}
++		}
++
++		pr_debug("write page %d: status: %x %x %x %x\n", page,
++			dma_buffer->data.flash_status[0],
++			dma_buffer->data.flash_status[1],
++			dma_buffer->data.flash_status[2],
++			dma_buffer->data.flash_status[3]);
++
++		if (err)
++			break;
++		pages_written++;
++		page++;
++	}
++	ops->retlen = mtd->writesize * pages_written;
++	ops->oobretlen = ops->ooblen - oob_len;
++
++	msm_nand_release_dma_buffer(chip, dma_buffer, sizeof(*dma_buffer));
++
++	if (ops->oobbuf)
++		dma_unmap_single(chip->dev, oob_dma_addr,
++				 ops->ooblen, DMA_TO_DEVICE);
++err_dma_map_oobbuf_failed:
++	if (ops->datbuf)
++		dma_unmap_single(chip->dev, data_dma_addr,
++				 mtd->writesize, DMA_TO_DEVICE);
++	if (err)
++		pr_err("msm_nand_write_oob %llx %x %x failed %d\n",
++		       to, ops->len, ops->ooblen, err);
++	return err;
++}
++
++static int msm_nand_write(struct mtd_info *mtd, loff_t to, size_t len,
++			  size_t *retlen, const u_char *buf)
++{
++	int ret;
++	struct mtd_oob_ops ops;
++
++	ops.mode = MTD_OOB_PLACE;
++	ops.len = len;
++	ops.retlen = 0;
++	ops.ooblen = 0;
++	ops.datbuf = (uint8_t *)buf;
++	ops.oobbuf = NULL;
++	ret =  msm_nand_write_oob(mtd, to, &ops);
++	*retlen = ops.retlen;
++	return ret;
++}
++
++static int
++msm_nand_erase(struct mtd_info *mtd, struct erase_info *instr)
++{
++	int err;
++	struct msm_nand_chip *chip = mtd->priv;
++	struct {
++		dmov_s cmd[4];
++		unsigned cmdptr;
++		unsigned data[8];
++	} *dma_buffer;
++	unsigned page = instr->addr / NAND_PAGE_SIZE;
++
++	if (instr->addr & (mtd->erasesize - 1)) {
++		pr_err("unsupported erase address, 0x%llx\n",
++		       instr->addr);
++		return -EINVAL;
++	}
++	if (instr->len != mtd->erasesize) {
++		pr_err("unsupported erase len, %lld\n",
++		       instr->len);
++		return -EINVAL;
++	}
++
++	wait_event(chip->wait_queue,
++		   (dma_buffer = msm_nand_get_dma_buffer(
++			    chip, sizeof(*dma_buffer))));
++
++	dma_buffer->data[0] = NAND_CMD_BLOCK_ERASE;
++	dma_buffer->data[1] = page;
++	dma_buffer->data[2] = 0;
++	dma_buffer->data[3] = NAND_DEV_SEL_CS0 | DM_ENABLE;
++	dma_buffer->data[4] = 1;
++	dma_buffer->data[5] = MSM_NAND_STATS_INIT;
++	dma_buffer->data[6] = chip->cfg0 & (~(7 << 6));  /* CW_PER_PAGE = 0 */
++	dma_buffer->data[7] = chip->cfg1;
++	/* verify the array size statically to avoid array overflow access */
++	BUILD_BUG_ON(7 != ARRAY_SIZE(dma_buffer->data) - 1);
++
++	dma_buffer->cmd[0].cmd = DST_CRCI_NAND_CMD | CMD_OCB;
++	dma_buffer->cmd[0].src = msm_virt_to_dma(chip, &dma_buffer->data[0]);
++	dma_buffer->cmd[0].dst = NAND_FLASH_CMD;
++	dma_buffer->cmd[0].len = 16;
++
++	dma_buffer->cmd[1].cmd = 0;
++	dma_buffer->cmd[1].src = msm_virt_to_dma(chip, &dma_buffer->data[6]);
++	dma_buffer->cmd[1].dst = NAND_DEV0_CFG0;
++	dma_buffer->cmd[1].len = 8;
++
++	dma_buffer->cmd[2].cmd = 0;
++	dma_buffer->cmd[2].src = msm_virt_to_dma(chip, &dma_buffer->data[4]);
++	dma_buffer->cmd[2].dst = NAND_EXEC_CMD;
++	dma_buffer->cmd[2].len = 4;
++
++	dma_buffer->cmd[3].cmd = SRC_CRCI_NAND_DATA | CMD_OCU | CMD_LC;;
++	dma_buffer->cmd[3].src = NAND_FLASH_STATUS;
++	dma_buffer->cmd[3].dst = msm_virt_to_dma(chip, &dma_buffer->data[5]);
++	dma_buffer->cmd[3].len = 4;
++
++	/* verify the array size statically to avoid array overflow access */
++	BUILD_BUG_ON(3 != ARRAY_SIZE(dma_buffer->cmd) - 1);
++
++	dma_buffer->cmdptr =
++		(msm_virt_to_dma(chip, dma_buffer->cmd) >> 3) | CMD_PTR_LP;
++
++	msm_dmov_exec_cmd(
++		chip->dma_channel, DMOV_CMD_PTR_LIST |
++		DMOV_CMD_ADDR(msm_virt_to_dma(chip, &dma_buffer->cmdptr)));
++
++	/* we fail if there was an operation error, a mpu error, or the
++	 * erase success bit was not set.
++	 */
++
++	if (dma_buffer->data[5] & 0x110 || !(dma_buffer->data[5] & 0x80))
++		err = -EIO;
++	else
++		err = 0;
++
++	msm_nand_release_dma_buffer(chip, dma_buffer, sizeof(*dma_buffer));
++	if (err) {
++		pr_err("erase failed, 0x%llx\n", instr->addr);
++		instr->fail_addr = instr->addr;
++		instr->state = MTD_ERASE_FAILED;
++	} else {
++		instr->state = MTD_ERASE_DONE;
++		instr->fail_addr = 0xffffffff;
++		mtd_erase_callback(instr);
++	}
++	return err;
++}
++
++static int
++msm_nand_block_isbad(struct mtd_info *mtd, loff_t ofs)
++{
++	/* Check for invalid offset */
++	if (ofs > mtd->size)
++		return -EINVAL;
++
++	return 0;
++}
++
++
++static int
++msm_nand_block_markbad(struct mtd_info *mtd, loff_t ofs)
++{
++	int ret;
++
++	ret = msm_nand_block_isbad(mtd, ofs);
++	if (ret) {
++		/* If it was bad already, return success and do nothing */
++		if (ret > 0)
++			return 0;
++		return ret;
++	}
++
++	return -EIO;
++}
++
++/**
++ * msm_nand_scan - [msm_nand Interface] Scan for the msm_nand device
++ * @mtd:        MTD device structure
++ * @maxchips:   Number of chips to scan for
++ *
++ * This fills out all the not initialized function pointers
++ * with the defaults.
++ * The flash ID is read and the mtd/chip structures are
++ * filled with the appropriate values.
++ */
++static int msm_nand_scan(struct mtd_info *mtd, int maxchips)
++{
++	unsigned n;
++	struct msm_nand_chip *chip = mtd->priv;
++	uint32_t flash_id;
++
++
++	if (flash_read_config(chip)) {
++		pr_err("ERROR: could not save cfg0 & cfg1 state\n");
++		return -ENODEV;
++	}
++	pr_info("cfg0 = %x, cfg1 = %x\n", chip->cfg0, chip->cfg1);
++	pr_info("cfg0: cw/page=%d ud_sz=%d ecc_sz=%d spare_sz=%d "
++		"num_addr_cycles=%d\n", (chip->cfg0 >> 6) & 7,
++		(chip->cfg0 >> 9) & 0x3ff, (chip->cfg0 >> 19) & 15,
++		(chip->cfg0 >> 23) & 15, (chip->cfg0 >> 27) & 7);
++
++	pr_info("NAND_READ_ID = %x\n", flash_rd_reg(chip, NAND_READ_ID));
++	flash_wr_reg(chip, NAND_READ_ID, 0x12345678);
++
++	flash_id = flash_read_id(chip);
++
++	n = flash_rd_reg(chip, NAND_DEV0_CFG0);
++	pr_info("cfg0: cw/page=%d ud_sz=%d ecc_sz=%d spare_sz=%d\n",
++		(n >> 6) & 7, (n >> 9) & 0x3ff, (n >> 19) & 15,
++		(n >> 23) & 15);
++
++	n = flash_rd_reg(chip, NAND_DEV_CMD1);
++	pr_info("DEV_CMD1: %x\n", n);
++
++	n = flash_rd_reg(chip, NAND_EBI2_ECC_BUF_CFG);
++	pr_info("NAND_EBI2_ECC_BUF_CFG: %x\n", n);
++
++	chip->ecc_buf_cfg = 0x203;
++
++	if ((flash_id & 0xffff) == 0xaaec) /* 2Gbit Samsung chip */
++		mtd->size = 256 << 20; /* * num_chips */
++	else if (flash_id == 0x5580baad) /* 2Gbit Hynix chip */
++		mtd->size = 256 << 20; /* * num_chips */
++	else if (flash_id == 0x5510baad) /* 2Gbit Hynix chip */
++		mtd->size = 256 << 20; /* * num_chips */
++	pr_info("flash_id: %x size %llx\n", flash_id, mtd->size);
++
++	mtd->writesize = 2048;
++	mtd->oobsize = msm_nand_oob_64.eccbytes + msm_nand_oob_64.oobavail;
++	mtd->oobavail = msm_nand_oob_64.oobavail;
++	mtd->erasesize = mtd->writesize << 6;
++	mtd->ecclayout = &msm_nand_oob_64;
++
++	/* Fill in remaining MTD driver data */
++	mtd->type = MTD_NANDFLASH;
++	mtd->flags = MTD_CAP_NANDFLASH;
++	mtd->erase = msm_nand_erase;
++	mtd->point = NULL;
++	mtd->unpoint = NULL;
++	mtd->read = msm_nand_read;
++	mtd->write = msm_nand_write;
++	mtd->read_oob = msm_nand_read_oob;
++	mtd->write_oob = msm_nand_write_oob;
++	mtd->lock = NULL;
++	mtd->suspend = NULL;
++	mtd->resume = NULL;
++	mtd->block_isbad = msm_nand_block_isbad;
++	mtd->block_markbad = msm_nand_block_markbad;
++	mtd->owner = THIS_MODULE;
++
++	return 0;
++}
++
++/**
++ * msm_nand_release - [msm_nand Interface] Free resources held by the msm_nand device
++ * @mtd:    MTD device structure
++ */
++static void msm_nand_release(struct mtd_info *mtd)
++{
++
++#ifdef CONFIG_MTD_PARTITIONS
++	/* Deregister partitions */
++	del_mtd_partitions(mtd);
++#endif
++	/* Deregister the device */
++	del_mtd_device(mtd);
++}
++
++#ifdef CONFIG_MTD_PARTITIONS
++static const char const *part_probes[] = { "cmdlinepart", NULL,  };
++#endif
++
++static int __devinit msm_nand_probe(struct platform_device *pdev)
++{
++	struct msm_nand_info *info;
++	struct resource *res;
++	struct flash_platform_data const *pdata = pdev->dev.platform_data;
++	int err;
++
++	res = platform_get_resource_byname(pdev,
++					IORESOURCE_MEM, "msm_nand_phys");
++	if (!res || !res->start) {
++		pr_err("msm_nand_phys resource invalid/absent\n");
++		return -EINVAL;
++	}
++	msm_nand_phys = res->start;
++	pr_debug("phys addr 0x%lx\n", msm_nand_phys);
++
++	res = platform_get_resource_byname(pdev,
++					IORESOURCE_DMA, "msm_nand_dmac");
++	if (!res || !res->start) {
++		pr_err("Invalid msm_nand_dmac resource\n");
++		return -EINVAL;
++	}
++
++	info = kzalloc(sizeof(struct msm_nand_info), GFP_KERNEL);
++	if (!info) {
++		pr_err("No memory for msm_nand_info\n");
++		return -ENOMEM;
++	}
++
++	info->msm_nand.dev = &pdev->dev;
++
++	init_waitqueue_head(&info->msm_nand.wait_queue);
++
++	info->msm_nand.dma_channel = res->start;
++	pr_debug("dma channel 0x%x\n", info->msm_nand.dma_channel);
++	info->msm_nand.dma_buffer =
++		dma_alloc_coherent(NULL, MSM_NAND_DMA_BUFFER_SIZE,
++				   &info->msm_nand.dma_addr, GFP_KERNEL);
++	if (info->msm_nand.dma_buffer == NULL) {
++		err = -ENOMEM;
++		goto out_free_info;
++	}
++
++	pr_debug("allocated dma buffer at %p, dma_addr %x\n",
++		info->msm_nand.dma_buffer, info->msm_nand.dma_addr);
++
++	info->mtd.name = dev_name(&pdev->dev);
++	info->mtd.priv = &info->msm_nand;
++	info->mtd.owner = THIS_MODULE;
++
++	if (msm_nand_scan(&info->mtd, 1)) {
++		err = -ENXIO;
++		goto out_free_dma_buffer;
++	}
++
++#ifdef CONFIG_MTD_PARTITIONS
++	err = parse_mtd_partitions(&info->mtd, part_probes, &info->parts, 0);
++	if (err > 0)
++		err = add_mtd_partitions(&info->mtd, info->parts, err);
++	else if (err <= 0 && pdata && pdata->parts)
++		err = add_mtd_partitions(&info->mtd, pdata->parts,
++					 pdata->nr_parts);
++	else
++#endif
++		err = add_mtd_device(&info->mtd);
++
++	if (err != 0)
++		goto out_free_dma_buffer;
++
++	platform_set_drvdata(pdev, info);
++
++	return 0;
++
++out_free_dma_buffer:
++	dma_free_coherent(NULL, MSM_NAND_DMA_BUFFER_SIZE,
++			  info->msm_nand.dma_buffer, info->msm_nand.dma_addr);
++out_free_info:
++	kfree(info);
++
++	return err;
++}
++
++static int __devexit msm_nand_remove(struct platform_device *pdev)
++{
++	struct msm_nand_info *info = platform_get_drvdata(pdev);
++
++	platform_set_drvdata(pdev, NULL);
++
++#ifdef CONFIG_MTD_PARTITIONS
++	if (info->parts)
++		del_mtd_partitions(&info->mtd);
++	else
++#endif
++		del_mtd_device(&info->mtd);
++
++	msm_nand_release(&info->mtd);
++	dma_free_coherent(NULL, MSM_NAND_DMA_BUFFER_SIZE,
++			  info->msm_nand.dma_buffer, info->msm_nand.dma_addr);
++	kfree(info);
++
++	return 0;
++}
++
++static struct platform_driver msm_nand_driver = {
++	.probe		= msm_nand_probe,
++	.remove		= __devexit_p(msm_nand_remove),
++	.driver = {
++		.name	= "msm_nand",
++		.owner	= THIS_MODULE,
++	}
++};
++
++static int __init msm_nand_init(void)
++{
++	return platform_driver_register(&msm_nand_driver);
++}
++module_init(msm_nand_init);
++
++static void __exit msm_nand_exit(void)
++{
++	platform_driver_unregister(&msm_nand_driver);
++}
++module_exit(msm_nand_exit);
++
++MODULE_LICENSE("GPL");
++MODULE_DESCRIPTION("msm_nand flash driver code");
++MODULE_ALIAS("platform:msm_nand");
+diff --git a/drivers/mtd/devices/msm_nand.h b/drivers/mtd/devices/msm_nand.h
+new file mode 100644
+index 0000000..c57d297
+--- /dev/null
++++ b/drivers/mtd/devices/msm_nand.h
+@@ -0,0 +1,75 @@
++/*
++ * Copyright (C) 2007 Google, Inc.
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++
++#ifndef __DRIVERS_MTD_DEVICES_MSM_NAND_H
++#define __DRIVERS_MTD_DEVICES_MSM_NAND_H
++
++extern unsigned long msm_nand_phys;
++#define NAND_REG(off) (msm_nand_phys + (off))
++
++#define NAND_FLASH_CMD            NAND_REG(0x0000)
++#define NAND_ADDR0                NAND_REG(0x0004)
++#define NAND_ADDR1                NAND_REG(0x0008)
++#define NAND_FLASH_CHIP_SELECT    NAND_REG(0x000C)
++#define NAND_EXEC_CMD             NAND_REG(0x0010)
++#define NAND_FLASH_STATUS         NAND_REG(0x0014)
++#define NAND_BUFFER_STATUS        NAND_REG(0x0018)
++#define NAND_DEV0_CFG0            NAND_REG(0x0020)
++#define NAND_DEV0_CFG1            NAND_REG(0x0024)
++#define NAND_DEV1_CFG0            NAND_REG(0x0030)
++#define NAND_DEV1_CFG1            NAND_REG(0x0034)
++#define NAND_READ_ID              NAND_REG(0x0040)
++#define NAND_READ_STATUS          NAND_REG(0x0044)
++#define NAND_CONFIG_DATA          NAND_REG(0x0050)
++#define NAND_CONFIG               NAND_REG(0x0054)
++#define NAND_CONFIG_MODE          NAND_REG(0x0058)
++#define NAND_CONFIG_STATUS        NAND_REG(0x0060)
++#define NAND_MACRO1_REG           NAND_REG(0x0064)
++#define NAND_XFR_STEP1            NAND_REG(0x0070)
++#define NAND_XFR_STEP2            NAND_REG(0x0074)
++#define NAND_XFR_STEP3            NAND_REG(0x0078)
++#define NAND_XFR_STEP4            NAND_REG(0x007C)
++#define NAND_XFR_STEP5            NAND_REG(0x0080)
++#define NAND_XFR_STEP6            NAND_REG(0x0084)
++#define NAND_XFR_STEP7            NAND_REG(0x0088)
++#define NAND_DEV_CMD0             NAND_REG(0x00A0)
++#define NAND_DEV_CMD1             NAND_REG(0x00A4)
++#define NAND_DEV_CMD2             NAND_REG(0x00A8)
++#define NAND_DEV_CMD_VLD          NAND_REG(0x00AC)
++#define NAND_EBI2_MISR_SIG_REG    NAND_REG(0x00B0)
++#define NAND_EBI2_ECC_BUF_CFG     NAND_REG(0x00F0)
++#define NAND_FLASH_BUFFER         NAND_REG(0x0100)
++
++/* device commands */
++
++#define NAND_CMD_SOFT_RESET         0x01
++#define NAND_CMD_PAGE_READ          0x32
++#define NAND_CMD_PAGE_READ_ECC      0x33
++#define NAND_CMD_PAGE_READ_ALL      0x34
++#define NAND_CMD_SEQ_PAGE_READ      0x15
++#define NAND_CMD_PRG_PAGE           0x36
++#define NAND_CMD_PRG_PAGE_ECC       0x37
++#define NAND_CMD_PRG_PAGE_ALL       0x39
++#define NAND_CMD_BLOCK_ERASE        0x3A
++#define NAND_CMD_FETCH_ID           0x0B
++#define NAND_CMD_STATUS             0x0C
++#define NAND_CMD_RESET              0x0D
++
++#define MSM_NAND_STATS_INIT	    0xeeeeeeee
++#define DM_ENABLE		    (1 << 2)
++#define NAND_DEV_SEL_CS0	    (0 << 0)
++
++#define NAND_PAGE_SIZE		    2048
++
++#endif
+--
+1.7.3.4
 
+--
+Sent by a consultant of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
 
 ______________________________________________________
 Linux MTD discussion mailing list
