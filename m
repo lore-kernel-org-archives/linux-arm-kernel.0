@@ -1,81 +1,112 @@
-From: mirqus@gmail.com (=?ISO-8859-2?Q?Micha=B3_Miros=B3aw?=)
-Date: Fri, 8 Jul 2011 13:37:27 +0200
-Subject: [RFC PATCH v2 0/4] Core device subsystem
-In-Reply-To: <1310115250-3859-1-git-send-email-marc.zyngier@arm.com>
-References: <1310115250-3859-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <CAHXqBFJiovYq5x_JDAxikvFs-t1To6yC-1uajBJFRX_jwjvejA@mail.gmail.com>
+From: rbairva@gmail.com (rd bairva)
+Date: Fri, 8 Jul 2011 17:08:38 +0530
+Subject: ARM cortex A9 performance issue
+In-Reply-To: <20110707152740.GG2486@arm.com>
+References: <CAE_nTV4VgcNB0gc64zEPEfHp-hnDBsw6QsM=GqEObXAwzMTzTA@mail.gmail.com>
+	<20110707152740.GG2486@arm.com>
+Message-ID: <CAE_nTV7PuEJx0WJKCtbGU-4HjEBzFxPRmPLue1toktS27Htbzg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/7/8 Marc Zyngier <marc.zyngier@arm.com>:
-> There is a small number of devices that the core kernel needs very
-> early in the boot process, namely an interrupt controller and a timer,
-> long before the driver model is up and running.
+Now i have modified a source a little bit. Now I am doing a pingpong
+using msgsnd and msgrcv. using this I am getting 40000req/sec and 55%
+CPU usage.
+In another version I have taken the same lock in both the processes to
+ensure same thread is unlocking the mutex. But CPU usage is 100%.
+Shouldn't be the behaviour 50%.
+
+algo
+msgsnd/msgrcv version.
+
+Process1
+shared memory counter++
+msgsnd1
+msgrcv 2
+
+Process2
+msgrcv 1
+shared memory counter--
+msgsnd2
+
+Mutex version:
+Process 1
+
+mutex1
+c++
+unlock_mutex1
+
+Process 2
+mutex1
+c++
+unlock_mutex1
+
+
+Regards,
+Ramdayal
+
+
+On Thu, Jul 7, 2011 at 8:57 PM, Dave Martin <dave.martin@linaro.org> wrote:
+> On Thu, Jul 07, 2011 at 02:48:05PM +0530, rd bairva wrote:
+>> Hi,
+>>
+>> We are trying to benchmark ARM cortex A9 dual core behavior with
+>> respect to single core
+>> performance and also measuring it with respect to x86 dual core/single core.
+>> Please find attached with the mail is c app which we are using for benchmarking.
+>>
+>> Simple overview of C application:
+>> - It creates a shared memory area using shm_open().
+>> ? in this shm area, it declares 2 Process shared pthread mutex, lets say L1, L2.
+>> - then it forks to create a server_task and client task.
+>> - server_task takes L1 lock, touches a shm area, unlock L2, in a loop.
+>> - client_task takes L2 lock, touches a shm area, unlock L1, in a loop.
+>> - This loop runs for N number of times that we measure.
 >
-> Most architectures implement this requirement by hardcoding the
-> initialisation of a "well known" piece of hardware which is standard
-> enough to work on any platform.
+> The behaviour of pthread_mutex_unlock is unspecified if an attempt is made
+> to ulock a mutex from a thread which doesn't currently own that mutex.
+> You probably need to re-code your test to avoid this incorrect use of
+> the ABI before an interpretation can be placed on the results.
 >
-> This is very different on the ARM architecture, where platforms have a
-> variety of interrupt controllers and timers. While the same hardcoding
-> is possible (and is actually used), it makes it almost impossible to
-> support several platforms in the same kernel.
+> See pthread_mutexattr_init(3) for details.
 >
-> Though the device tree is helping greatly to solve this problem, some
-> platform won't ever be converted to DT, hence the need to have a
-> mechanism supporting a variety of information source. Early platform
-> devices having been deemed unsuitable (complexity, abuse of various
-> subsystems), this subsystem has been designed to provide the very
-> minimal level of functionality.
 >
-> The "core device subsystem" offers a class based device/driver
-> matching model, doesn't rely on any other subsystem, is very (too?)
-> simple, and support getting information both from DT as well as from
-> static data provided by the platform. It also gives the opportunity to
-> define the probing order by offering a sorting hook at run-time.
-[...]
-
-I gave it some thought and it looks like your idea can be modified to
-make it even less demanding on machine setup code.
-
-For the DT case, all this can work without adding a single
-board-specific code (even machine_desc->init_irq() is not needed).
-
-of_init_core_device_class(class)
-{
-  int ids_count = 0;
-  struct of_device_id *ids, *p;
-
-  for_each_core_device_driver(drv, class)
-    for_each_core_device_id(id, drv)
-      ++ids_count;
-
-  p = ids = kzalloc(...);
-
-  for_each_core_device_driver(drv, class)
-    for_each_core_device_id(id, drv) {
-      p->compatible = id->name;
-      p->data = drv;
-    }
-
-  // generate matching device list from devicetree
-
-  if (class == CORE_DEV_CLASS_IRQ)
-    // sort the list (for intc class)
-
-  core_driver_init_class(class);
-  // call above could use matched ids' data field for finding
-  // driver struct instead of traversing the driver list again
-}
-
-For non-DT case, the board code would need to provide the devices with
-core_device_register() in init_irq() or wherever is apropriate.
-
-For simplicity I thing mixing static and DT initialization should not
-be allowed (for a single machine) - then static/DT initialization
-order won't matter.
-
-I hope this is useful for you. :)
-
-Best Regards,
-Micha? Miros?aw
+>
+> Some people have been reported issues related to ?process shared mutexes
+> on ARM recently:
+>
+> https://bugs.launchpad.net/ubuntu/+source/apr/+bug/604753
+>
+> I'm not sure of the current status of that though, and I don't know
+> whether it would affect your test or not.
+>
+> Cheers
+> ---Dave
+>
+>>
+>> Here are the results for N/sec for different CPUs.
+>>
+>> Platform ? ? ? ? ? ? ?Up cores ? ? ? ? ? ? ?req/sec ? ? ? ? ? ? ? ?cpuload
+>> Cortexa9 ? ? ? ? ? ? ? ? ? ?2 ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?~44000
+>> ? ? ? ? ? ? 100%
+>> Cortexa9 ? ? ? ? ? ? ? ? ? ?1 ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?~18000
+>> ? ? ? ? ? ? 100%
+>> X86 ? ? ? ? ? ? ? ? ? ? ? ? ? ?2 ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?~64000
+>> ? ? ? ? ? ? ? ?35%
+>> X86 ? ? ? ? ? ? ? ? ? ? ? ? ? ?1 ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?~458886
+>> ? ? ? ? ? ? ?100% ? ? (1 cpu down by sysfs)
+>>
+>> we are not able to understand the results.
+>> - why for coretx A9 both dual/single core we are getting 100% cpu usage.
+>> - why in case of x86, N/sec is very high for single core than dual core.
+>> - why single core N/s is 1/3 in case of CortexA9.
+>>
+>> Thanks,
+>> Ramdayal
+>
+>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+>
