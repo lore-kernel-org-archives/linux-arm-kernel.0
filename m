@@ -1,36 +1,131 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Fri, 08 Jul 2011 14:41:08 +0400
-Subject: [GIT PULL] DaVinci features for v3.1
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024D9B56E8@dbde02.ent.ti.com>
-References: <B85A65D85D7EB246BE421B3FB0FBB593024D9B56E8@dbde02.ent.ti.com>
-Message-ID: <4E16DEC4.4070401@mvista.com>
+From: j.weitzel@phytec.de (Jan Weitzel)
+Date: Fri, 8 Jul 2011 12:47:14 +0200
+Subject: [PATCH] ARM: OMAP2+ Add Primview dispalys to panel-generic
+Message-ID: <1310122034-6561-1-git-send-email-j.weitzel@phytec.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Add displays to panel-generic-dpi.c
+Prime View PD035VL1 (640 x 480)
+Prime View PD050VL1 (640 x 480)
+Prime View PD104SLF (800 x 600)
+Prime View PM070WL4 (800 x 480)
 
-On 08-07-2011 13:13, Nori, Sekhar wrote:
+Signed-off-by: Jan Weitzel <j.weitzel@phytec.de>
+---
+ drivers/video/omap2/displays/panel-generic-dpi.c |  100 ++++++++++++++++++++++
+ 1 files changed, 100 insertions(+), 0 deletions(-)
 
-> Please pull the following DaVinci features for v3.1.
-
-> This pull request depends on the patch "davinci: dm6467/T EVM: fix setting
-> up of reference clock rate" in clean-up pull request for successful build.
-
-> Pulling this after the earlier clean-up pull request generates this merge
-> conflict:
-
-> <<<<<<<  HEAD:arch/arm/mach-davinci/include/mach/psc.h
-> #define MDSTAT_STATE_MASK	0x1f
-> =======
-> #define MDSTAT_STATE_MASK 0x1f
-> #define MDCTL_FORCE		BIT(31)
->>>>>>>> 8bb2c4813c534d26eba3beb7888fbd3cbc931f62:arch/arm/mach-davinci/include/mach/psc.h
-
-> The resolution is:
-
-> #define MDSTAT_STATE_MASK	0x1f
-> #define MDCTL_FORCE		BIT(31)
-
-    BTW, I think I'll send a patch fixing MDSTAT_STATE_MASK to 0x3f today.
-
-WBR, Sergei
+diff --git a/drivers/video/omap2/displays/panel-generic-dpi.c b/drivers/video/omap2/displays/panel-generic-dpi.c
+index 9c90f75..87d9ba1 100644
+--- a/drivers/video/omap2/displays/panel-generic-dpi.c
++++ b/drivers/video/omap2/displays/panel-generic-dpi.c
+@@ -232,6 +232,106 @@ static struct panel_config generic_dpi_panels[] = {
+ 		.power_off_delay	= 0,
+ 		.name			= "powertip_ph480272t",
+ 	},
++
++	/* Prime-View PD035VL1 */
++	{
++		{
++			.x_res		= 640,
++			.y_res		= 480,
++
++			.pixel_clock	= 25000,
++
++			.hsw		= 96,
++			.hfp		= 18,
++			.hbp		= 46,
++
++			.vsw		= 2,
++			.vfp		= 10,
++			.vbp		= 33,
++		},
++		.acbi			= 0x0,
++		.acb			= 0x28,
++		.config			= OMAP_DSS_LCD_TFT | OMAP_DSS_LCD_IVS |
++					  OMAP_DSS_LCD_IHS | OMAP_DSS_LCD_IPC,
++		.power_on_delay		= 50,
++		.power_off_delay	= 100,
++		.name			= "pd035vl1",
++	},
++
++	/* Prime-View PD050VL1 */
++	{
++		{
++			.x_res		= 640,
++			.y_res		= 480,
++
++			.pixel_clock	= 25000,
++
++			.hsw		= 96,
++			.hfp		= 18,
++			.hbp		= 46,
++
++			.vsw		= 2,
++			.vfp		= 10,
++			.vbp		= 33,
++		},
++		.acbi			= 0x0,
++		.acb			= 0x28,
++		.config			= OMAP_DSS_LCD_TFT | OMAP_DSS_LCD_IVS |
++					  OMAP_DSS_LCD_IHS | OMAP_DSS_LCD_IPC,
++		.power_on_delay		= 50,
++		.power_off_delay	= 100,
++		.name			= "pd050vl1",
++	},
++
++	/* Prime-View PM070WL4 */
++	{
++		{
++			.x_res		= 800,
++			.y_res		= 480,
++
++			.pixel_clock	= 32000,
++
++			.hsw		= 128,
++			.hfp		= 42,
++			.hbp		= 86,
++
++			.vsw		= 2,
++			.vfp		= 10,
++			.vbp		= 33,
++		},
++		.acbi			= 0x0,
++		.acb			= 0x28,
++		.config			= OMAP_DSS_LCD_TFT | OMAP_DSS_LCD_IVS |
++					  OMAP_DSS_LCD_IHS | OMAP_DSS_LCD_IPC,
++		.power_on_delay		= 50,
++		.power_off_delay	= 100,
++		.name			= "pm070wl4",
++	},
++
++	/* Prime-View PD104SLF */
++	{
++		{
++			.x_res		= 800,
++			.y_res		= 600,
++
++			.pixel_clock	= 40000,
++
++			.hsw		= 128,
++			.hfp		= 42,
++			.hbp		= 86,
++
++			.vsw		= 4,
++			.vfp		= 1,
++			.vbp		= 23,
++		},
++		.acbi			= 0x0,
++		.acb			= 0x28,
++		.config			= OMAP_DSS_LCD_TFT | OMAP_DSS_LCD_IVS |
++					  OMAP_DSS_LCD_IHS | OMAP_DSS_LCD_IPC,
++		.power_on_delay		= 50,
++		.power_off_delay	= 100,
++		.name			= "pd104slf",
++	},
+ };
+ 
+ struct panel_drv_data {
+-- 
+1.7.0.4
