@@ -1,45 +1,43 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 07 Jul 2011 19:24:38 -0700
-Subject: [RFC PATCH 14/17] ARM: kernel: save/restore 1:1 page tables
-In-Reply-To: <1310053830-23779-15-git-send-email-lorenzo.pieralisi@arm.com>
+Date: Thu, 07 Jul 2011 19:29:10 -0700
+Subject: [RFC PATCH 17/17] ARM: kernel: save/restore build infrastructure
+In-Reply-To: <1310053830-23779-18-git-send-email-lorenzo.pieralisi@arm.com>
 References: <1310053830-23779-1-git-send-email-lorenzo.pieralisi@arm.com>
-	<1310053830-23779-15-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <4E166A66.3020001@ti.com>
+	<1310053830-23779-18-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <4E166B76.7090901@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 7/7/2011 8:50 AM, Lorenzo Pieralisi wrote:
-> This patch adds the code required to allocate and populate page tables
-> that are needed by save/restore code to deal with MMU off/on
-> transactions.
+> This patch adds the required Kconfig and Makefile entries to
+> enable and compile common idle code for ARM kernel.
 >
-> MMU is enabled early in the resume path which allows to call into
-> Linux subsystems with init_mm virtual mappings (cloned at boot).
->
-> Current thread page table pointer and context id is saved on power
-> down from active_mm and restored on warm boot.
-> Currently the translation tables contains 1:1 mappings of the Linux
-> kernel code and data, and 1:1 UNCACHED mapping of control code required when MMU
-> is turned off in the restore code path.
+> Common idle code depends on CPU_PM platform notifiers to trigger
+> save/restore of kernel subsystems like PMU, VFP, GIC.
 >
 > Signed-off-by: Lorenzo Pieralisi<lorenzo.pieralisi@arm.com>
 > ---
->   arch/arm/kernel/sr_mapping.c |   78 ++++++++++++++++++++++++++++++++++++++++++
->   1 files changed, 78 insertions(+), 0 deletions(-)
->   create mode 100644 arch/arm/kernel/sr_mapping.c
+>   arch/arm/Kconfig         |   11 +++++++++++
+>   arch/arm/kernel/Makefile |    4 ++++
+>   2 files changed, 15 insertions(+), 0 deletions(-)
 >
-> diff --git a/arch/arm/kernel/sr_mapping.c b/arch/arm/kernel/sr_mapping.c
-> new file mode 100644
-> index 0000000..32640dc
-> --- /dev/null
-> +++ b/arch/arm/kernel/sr_mapping.c
-> @@ -0,0 +1,78 @@
-> +/*
-> + * Copyright (C) 2008-2011 ARM Limited
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 356f266..5b670bd 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1992,6 +1992,17 @@ config VFP
+>
+>   	  Say N if your target does not have VFP hardware.
+>
+> +config CONTEXT_SR
 
-This is more of question so don't beat me if I am wrong here.
-Above file doesn't exist in k.org from 2008 right ?
-I noticed this in your other patches too.
+SR sounds cryptic. Also since it's PM related _PM_ would
+be good.
+
+> +	bool "Save/Restore code support for CPU/Cluster Power Management"
+> +	depends on CPU_V7&&  CPU_PM
+			^
+space needed.
 
 Regards
-santosh
+Santosh
