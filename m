@@ -1,50 +1,76 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 08 Jul 2011 09:56:09 -0700
-Subject: [PATCH 0/7] Re-organize linker layouts
-In-Reply-To: <20110708160329.GF4812@n2100.arm.linux.org.uk>
-References: <20110706102245.GO8286@n2100.arm.linux.org.uk>
-	<4E15ECB6.40100@codeaurora.org>
-	<20110707223620.GG20403@n2100.arm.linux.org.uk>
-	<4E165597.90002@codeaurora.org>
-	<20110708090721.GC2414@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1107080941090.14596@xanadu.home>
-	<20110708160329.GF4812@n2100.arm.linux.org.uk>
-Message-ID: <4E1736A9.9040102@codeaurora.org>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Fri, 08 Jul 2011 09:56:29 -0700
+Subject: [PATCH v2 00/18] OMAP4: PM data big spring cleanup and fixes
+In-Reply-To: <alpine.DEB.2.00.1107080031440.24181@utopia.booyaka.com>
+References: <1309552901-8944-1-git-send-email-b-cousson@ti.com>
+	<alpine.DEB.2.00.1107060017480.4217@utopia.booyaka.com>
+	<4E14B820.6070202@ti.com> <20110707055549.GC15815@atomide.com>
+	<alpine.DEB.2.00.1107080031440.24181@utopia.booyaka.com>
+Message-ID: <4E1736BD.5070301@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/8/2011 9:03 AM, Russell King - ARM Linux wrote:
-> On Fri, Jul 08, 2011 at 09:46:42AM -0400, Nicolas Pitre wrote:
->> On Fri, 8 Jul 2011, Russell King - ARM Linux wrote:
->>
->>> There's also platforms where the zImage is loaded at some predetermined
->>> offset into RAM to give the decompressor room to directly place the
->>> kernel in its final location too, which will be buggered by
->>> AUTO_ZRELADDR.
->>
->> How so?  Loading that zImage at the same predetermined offset will still 
->> have the same desired effect.  As long as the offset is within 128MB of 
->> the start of RAM.
+On 7/7/2011 11:39 PM, Paul Walmsley wrote:
+> On Thu, 7 Jul 2011, Tony Lindgren wrote:
 >
-> You just said it...
+>> * Rajendra Nayak<rnayak@ti.com>  [110706 22:26]:
+>>> On 7/6/2011 12:19 AM, Paul Walmsley wrote:
+>>>>
+>>>> Patch 16, to me, belongs best with the 4460 support series and so I'll see
+>>>> if it makes sense to fit it in there somewhere.
+>>>
+>>> Paul,
+>>>
+>>> Do you want me to base the 4460 support series on one of your branches
+>>> and re-post including the above patch?
+>>
+>> Do we really need to do that patching right now to add base 4460 support?
+>>
+>> If we're just doing a bunch of renames all over the place to add support
+>> for a new processor variant, something is wrong. This is exactly the kind
+>> of "crazy churn" Linus was complaining about. In this case the crazy churn
+>> is "let's rename 4430 to 44XX all over the place".
+>>
+>> To me it's sane to assume that we can have most of 4430 features on 4460
+>> and don't need to rename 4430 to 44XX for that. Adding 4460 should be
+>> just add few new 4460 defines, then do an arch_initcall to fixup things
+>> between 4430 and 4460.
+>>
+>> It would be nice to get the base 4460 support merged as the patches look
+>> ready to go otherwise. Rajendra, I suggest you take a quick look and see
+>> if you can leave out the dependency to the 4430 to 44XX rename patch to
+>> add minimal 4460 support. Then we can patch in the missing features later
+>> on, most likely we don't even need the arch_initcall fixup initially either.
+>>
+>> This would also leave out the dependency between the various patch
+>> series which will always lead into issues with merging code. Changes to
+>> the infrastructure issues like this should have been patched away early.
+>> The merge window is about to start and we're still waiting for the
+>> dependencies to get sorted out.
 >
-> Given that it's 128MB, Stephen shouldn't have a problem with loading the
-> zImage at 0xN0208000, but he said it doesn't work.  I think there's some
-> work to be done there to figure out if Stephen really has a problem, and
-> what that problem is.
+> Rajendra's patch series doesn't require the 4430 ->  44XX changes in the
+> PRM/CM macros (Beno?t's patch 16).  That patch can be put in a separate
+> series, if you like.
 
-My problem is due to how the zreladdr is calculated. Our ram starts at
-0xN0200000 and loading the zImage at 0xN0208000 works fine, but then
-when zreladdr is calculated it essentially aligns PC to 128MB and then
-my kernel is loaded at 0xN0008000. I've lost the 2. It looks like other
-machines are in a similar situation (or their zImage is loaded somewhere
-beyond 128MB and it never works).
+Paul, I could not find any 4430 ->  44XX changes in any PRM/CM macros
+in Benoit's patch 16. Instead, I see he is updating the CHIP_IS_* macros
+similar to what I did in my series for Powerdomain/Clockdomain.
 
-Why can't this work via atags (or DT for that matter)? atags have always
-said where ram starts and we should be able to write some code that
-parses the atags/DT and figures out the final resting place of the
-decompressed image.
+>
+> It does require changing CHIP_IS_OMAP4430 to CHIP_IS_OMAP44XX in the
+> powerdomains, clockdomains, etc.
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+And in hwmod, which is what Benoit's patch 16 does I guess.
+If we drop all these, the only alternative is to change the way the
+different SoC variant's are handled in these different frameworks
+the way Tony suggested, by having SoC specific lists.
+
+> To me, that seems reasonable since the
+> 4460 isn't simply a die shrink, it has some other changes on it; but I
+> guess you have a different view on that.
+>
+> I will add acks/reviewed-by:s on the 4460 patches, and maybe you can
+> decide which ones you'd like to merge, if any.
+>
+>
+> - Paul
