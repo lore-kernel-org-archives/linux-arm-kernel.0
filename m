@@ -1,34 +1,37 @@
-From: cbouatmailru@gmail.com (Anton Vorontsov)
-Date: Fri, 8 Jul 2011 13:10:14 +0400
-Subject: [PATCH 1/2] arch: arm: Correct the dependency of HAVE_ARM_TWD
-In-Reply-To: <1310104763-12948-1-git-send-email-tommy.lin@caviumnetworks.com>
-References: <1310104763-12948-1-git-send-email-tommy.lin@caviumnetworks.com>
-Message-ID: <20110708091014.GA15142@oksana.dev.rtsoft.ru>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 8 Jul 2011 10:12:18 +0100
+Subject: [PATCH 4/4] arm: mach-s3c2440: mini2440: fix section mismatch
+In-Reply-To: <001c01cc3d35$2aa7e8f0$7ff7bad0$%kim@samsung.com>
+References: <1310033919-4245-1-git-send-email-w.sang@pengutronix.de>
+	<1310033919-4245-5-git-send-email-w.sang@pengutronix.de>
+	<001c01cc3d35$2aa7e8f0$7ff7bad0$%kim@samsung.com>
+Message-ID: <20110708091218.GD2414@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 08, 2011 at 01:59:23PM +0800, Tommy Lin wrote:
-> Original mpcore_wdt config dependency is as follow:
-> MPCORE_WATCHDOG -> HAVE_ARM_TWD -> SMP -> (CPU_V6K || CPU_V7)
-> This patch will remove SMP and made the dependency as follow:
-> MPCORE_WATCHDOG -> HAVE_ARM_TWD -> (CPU_V6K || CPU_V7)
+On Fri, Jul 08, 2011 at 03:06:17PM +0900, Kukjin Kim wrote:
+> Wolfram Sang wrote:
+> > 
+> > If mini2440_init() is in __init, mini2440_parse_features() should also
+> > be in __init. Fixes:
+> > 
+> > (.text+0x9adc): Section mismatch in reference from the function
+> > mini2440_parse_features.clone.0() to the (unknown reference)
+> .init.data:(unknown)
+> > The function mini2440_parse_features.clone.0() references the (unknown
+> reference)
+> > __initdata (unknown).
 > 
-> The MPCore watchdog (and timer) can be found at ARM11 MPCore (CPU_V6K) and
-> Cortex A9 MPCore (CPU_V7). The dependency between MPCORE_WATCHDOG and
-> (CPU_V6K || CPUV7) is necessary, but the dependency of SMP is redundant.
-> The MPCore watchdog should function normally even SMP is not turned on with
-> ARM11 or Cortex A9 CPU.
-> 
-> Signed-off-by: Tommy Lin <tommy.lin@caviumnetworks.com>
-> ---
+> But I couldn't find above "Section mismatch" in my building with
+> CONFIG_DEBUG_SECTION_MISMATCH=y.
 
-Russell,
+Your compiler may have inlined the function, so defeating the check.
 
-As the patch is needed for CNS3xxx Watchdog support, I'd like to take
-it via CNS3xxx tree, if you're OK with that.
+static struct s3c2410fb_display mini2440_lcd_cfg[] __initdata = {
 
-Thanks!
+and mini2440_parse_features() references this variable.  Therefore
+either mini2440_parse_features() needs to be marked __init (it's
+only caller is from __init, so that seems sensible) or the
+__initdata markers on the referenced data need to be removed.
 
--- 
-Anton Vorontsov
-Email: cbouatmailru at gmail.com
+Adding __init looks like the right thing.
