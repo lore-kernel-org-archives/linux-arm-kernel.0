@@ -1,27 +1,30 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 8 Jul 2011 17:47:32 +0200
-Subject: [RFC PATCH] ASoC: codecs: add codec driver for MFD mc13783
-In-Reply-To: <1310131198-493-1-git-send-email-J.Lambrecht@televic.com>
-References: <1310131198-493-1-git-send-email-J.Lambrecht@televic.com>
-Message-ID: <20110708154732.GH6069@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 8 Jul 2011 17:54:21 +0200
+Subject: [PATCH 0/3] *** add lost UL suffix to VMALLOC_END ***
+In-Reply-To: <20110708091415.GE2414@n2100.arm.linux.org.uk>
+References: <1310093669-4681-1-git-send-email-bs14@csr.com>
+	<20110708091415.GE2414@n2100.arm.linux.org.uk>
+Message-ID: <201107081754.22072.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 08, 2011 at 03:19:58PM +0200, J?rgen Lambrecht wrote:
-> Sascha Hauer's driver from Pengutronix' imx-sound branch.
-> Added some code found in a linux 2.6.33.
-> Needs further work and cleanup.
+On Friday 08 July 2011, Russell King - ARM Linux wrote:
+> On Thu, Jul 07, 2011 at 07:54:26PM -0700, Barry Song wrote:
+> > After grepping, several platforms lost the UL suffix for VMALLOC_END.
+> > 
+> > Barry Song (3):
+> >   ARM: CNS3XXX: add UL suffix to VMALLOC_END to ensure it is properly
+> >     typed
+> >   ARM: LPC32XXX: add UL suffix to VMALLOC_END to ensure it is properly
+> >     typed
+> >   ARM: NUC93X: add UL suffix to VMALLOC_END to ensure it is properly
+> >     typed
+> 
+> All looks fine to me, thanks.  Arnd - are you going to pick these up?
+> If so...
+> 
+> Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-Ahem, yes, that's right. We already have a cleaned up version (which
-probably still needs some work). If anybody is willing to continue the
-work on it, drop me a note, Otherwise I'll send it when I find the time
-for it.
+Applied to arm-soc/next/fixes, thanks!
 
-Sascha
-
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+	Arnd
