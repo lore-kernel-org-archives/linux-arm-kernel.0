@@ -1,50 +1,46 @@
-From: sundaram@ti.com (Raju, Sundaram)
-Date: Fri, 8 Jul 2011 15:44:02 +0530
-Subject: [RFC] dmaengine: Moving TI SDMA driver to dmaengine - design plan
-In-Reply-To: <20110708100410.GA4957@n2100.arm.linux.org.uk>
-References: <E0D41E29EB0DAC4E9F3FF173962E9E94030259CD17@dbde02.ent.ti.com>
-	<20110708100410.GA4957@n2100.arm.linux.org.uk>
-Message-ID: <E0D41E29EB0DAC4E9F3FF173962E9E94030259CDC4@dbde02.ent.ti.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 8 Jul 2011 12:16:25 +0200
+Subject: [PATCH v5 1/3] ARM: mxs: add GPMI-NFC support for imx23/imx28
+In-Reply-To: <4E16CD6F.9050304@freescale.com>
+References: <1309406028-2924-1-git-send-email-b32955@freescale.com>
+	<1309406028-2924-2-git-send-email-b32955@freescale.com>
+	<201106301555.19440.arnd@arndb.de>
+	<20110708073119.GP29624@pengutronix.de>
+	<4E16B47E.8090909@freescale.com>
+	<20110708090903.GQ29624@pengutronix.de>
+	<4E16CD6F.9050304@freescale.com>
+Message-ID: <20110708101625.GR29624@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
-> Sent: Friday, July 08, 2011 3:34 PM
-> To: Raju, Sundaram
-> Cc: linux-arm-kernel at lists.infradead.org; linux-omap at vger.kernel.org; Dan;
-> Shilimkar, Santosh; linux-kernel at vger.kernel.org
-> Subject: Re: [RFC] dmaengine: Moving TI SDMA driver to dmaengine - design
-> plan
+Hello Huang,
+
+On Fri, Jul 08, 2011 at 05:27:11PM +0800, Huang Shijie wrote:
+> >>>>The init function is used only to set up iomux, so the logical replacement is
+> >>>>a pointer to the iomux data, and calling mxs_iomux_setup_multiple_pads
+> >>>>directly from the driver.
+> >>>Why not put the iomux stuff into the per-machine table and get rid of
+> >>>the init callback, too?
+> >>The mmc (ssp) has pin conflict with gpmi on both mx23evk and mx28evk.
+> >>So, it's better to initialize the pin when the driver(GPMI or MMC)
+> >>is enabled.
+> >What do you do to prevent userspace from trying to use both devices?
+> The board can not support the two devices at the same time.
+> So the user can only use one device with the board.
 > 
-> On Fri, Jul 08, 2011 at 01:52:17PM +0530, Raju, Sundaram wrote:
-> > I am planning to move TI SDMA driver in OMAP tree
-> > into the dmaengine framework.
+> >I guess you need to configure the hardware somehow to switch between the
+> >two using a jumper? Isn't it possible to detect the hardware setting and
+> >setup the muxer accordingly?
 > >
-> > The first immediate issue of concern I noticed is the
-> > huge number of client drivers that use the existing SDMA driver.
-> > More than 15 client drivers are using the current SDMA driver.
-> >
-> > Moving the SDMA driver along with all of these client drivers at a
-> > single stretch seems a humungous task.
-> > I noticed a model in the existing DMA drivers in dmaengine
-> > framework that will over come this issue.
-> 
-> It _is_ sane to build a dmaengine driver on top of the existing SoC
-> private API, then convert the drivers to DMA engine, and then cleanup
-> the resulting DMA engine driver.
+> >IMHO an per-device init-callback is the wrong approach to solve a pin
+> >conflict.
+> Do you have any good solution about this?
+Put the pinmux corresponding to the one device that currently works in
+the pinmux list!?
 
-Yes, that is what I thought. Thanks.
+Best regards
+Uwe
 
-> 
-> What we must make sure though is that the DMA engine slave API (which
-> isn't well documented) is correctly implemented before drivers are
-> converted over to use the DMA engine support code, otherwise we may
-> end up with lots of drivers that require re-fixing several times over.
->
-
-Very true! Agreed!
-I will send over the patches for review once I am done with testing.
-
-Regards,
-Sundaram
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
