@@ -1,39 +1,38 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Fri, 08 Jul 2011 15:49:35 +0400
-Subject: [PATCH 1/3] ARM: OMAP4: Add pcm049 to Kconfig/Makefile
-In-Reply-To: <1310119464-3514-2-git-send-email-j.weitzel@phytec.de>
-References: <1310119464-3514-1-git-send-email-j.weitzel@phytec.de>
-	<1310119464-3514-2-git-send-email-j.weitzel@phytec.de>
-Message-ID: <4E16EECF.7030102@mvista.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 8 Jul 2011 04:52:49 -0700
+Subject: [GIT PULL] omap fix for v3.0
+Message-ID: <20110708115249.GZ5783@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Hi Linus,
 
-On 08-07-2011 14:04, Jan Weitzel wrote:
+Please pull one fix from:
 
-> Signed-off-by: Jan Weitzel<j.weitzel@phytec.de>
-> ---
->   arch/arm/mach-omap2/Kconfig  |    5 +++++
->   arch/arm/mach-omap2/Makefile |    4 ++++
->   2 files changed, 9 insertions(+), 0 deletions(-)
+git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
 
-> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-> index 19d5891..c6a2d43 100644
-> --- a/arch/arm/mach-omap2/Kconfig
-> +++ b/arch/arm/mach-omap2/Kconfig
-[...]
-> diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-> index b148077..e81b594 100644
-> --- a/arch/arm/mach-omap2/Makefile
-> +++ b/arch/arm/mach-omap2/Makefile
-> @@ -238,6 +238,10 @@ obj-$(CONFIG_MACH_OMAP4_PANDA)		+= board-omap4panda.o \
->   					   hsmmc.o \
->   					   omap_phy_internal.o
->
-> +obj-$(CONFIG_MACH_PCM049)		+= board-omap4pcm049.o \
+This fixes an embarassing segfault by dropping __initdata from data that
+should not be marked __initdata.
 
-    You need to first add board-omap4pcm049.c, and only then wire it to the 
-Makefile. You could do both in onme patch though...
+Regards,
 
-WBR, Sergei
+Tony
+
+
+The following changes since commit fe0d42203cb5616eeff68b14576a0f7e2dd56625:
+  Linus Torvalds (1):
+        Linux 3.0-rc6
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
+
+Janusz Krzysztofik (1):
+      omap: drop __initdata tags from static struct platform_device declarations
+
+ arch/arm/mach-omap1/board-ams-delta.c        |    8 ++++----
+ arch/arm/mach-omap1/gpio15xx.c               |    4 ++--
+ arch/arm/mach-omap1/gpio16xx.c               |   10 +++++-----
+ arch/arm/mach-omap1/gpio7xx.c                |   14 +++++++-------
+ arch/arm/mach-omap2/board-rx51-peripherals.c |    2 +-
+ 5 files changed, 19 insertions(+), 19 deletions(-)
