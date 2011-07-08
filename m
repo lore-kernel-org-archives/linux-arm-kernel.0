@@ -1,66 +1,38 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 08 Jul 2011 14:38:26 +0900
-Subject: [PATCH 1/4] arm: plat-s3c24xx: dma: don't use uninitialized
-	variable
-In-Reply-To: <1310033919-4245-2-git-send-email-w.sang@pengutronix.de>
-References: <1310033919-4245-1-git-send-email-w.sang@pengutronix.de>
-	<1310033919-4245-2-git-send-email-w.sang@pengutronix.de>
-Message-ID: <001501cc3d31$44ca4420$ce5ecc60$%kim@samsung.com>
+From: tommy.lin.1101@gmail.com (Tommy Lin)
+Date: Fri,  8 Jul 2011 13:59:23 +0800
+Subject: [PATCH 1/2] arch: arm: Correct the dependency of HAVE_ARM_TWD
+Message-ID: <1310104763-12948-1-git-send-email-tommy.lin@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Wolfram Sang wrote:
-> 
-> Commit 8970ef47 (S3C24XX: Remove hardware specific registers from DMA
-> calls) removed the parameter dcon in s3c2410_dma_config() and calculates
-> it on its own. So the debug-output for the old parameter can go, too.
-> Fixes:
-> 
-> arch/arm/plat-s3c24xx/dma.c: In function 's3c2410_dma_config':
-> arch/arm/plat-s3c24xx/dma.c:1030:2: warning: 'dcon' is used uninitialized
-in this
-> function
-> 
-> Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
-> Cc: Ben Dooks <ben-linux@fluff.org>
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> ---
->  arch/arm/plat-s3c24xx/dma.c |    8 ++------
->  1 files changed, 2 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm/plat-s3c24xx/dma.c b/arch/arm/plat-s3c24xx/dma.c
-> index 2abf966..a5b3684 100644
-> --- a/arch/arm/plat-s3c24xx/dma.c
-> +++ b/arch/arm/plat-s3c24xx/dma.c
-> @@ -1027,17 +1027,13 @@ int s3c2410_dma_config(unsigned int channel,
->  	struct s3c2410_dma_chan *chan = s3c_dma_lookup_channel(channel);
->  	unsigned int dcon;
-> 
-> -	pr_debug("%s: chan=%d, xfer_unit=%d, dcon=%08x\n",
-> -		 __func__, channel, xferunit, dcon);
-> +	pr_debug("%s: chan=%d, xfer_unit=%d\n", __func__, channel,
-xferunit);
-> 
->  	if (chan == NULL)
->  		return -EINVAL;
-> 
-> -	pr_debug("%s: Initial dcon is %08x\n", __func__, dcon);
-> -
->  	dcon = chan->dcon & dma_sel.dcon_mask;
-> -
-> -	pr_debug("%s: New dcon is %08x\n", __func__, dcon);
-> +	pr_debug("%s: dcon is %08x\n", __func__, dcon);
-> 
->  	switch (chan->req_ch) {
->  	case DMACH_I2S_IN:
-> --
-> 1.7.5.4
+Original mpcore_wdt config dependency is as follow:
+MPCORE_WATCHDOG -> HAVE_ARM_TWD -> SMP -> (CPU_V6K || CPU_V7)
+This patch will remove SMP and made the dependency as follow:
+MPCORE_WATCHDOG -> HAVE_ARM_TWD -> (CPU_V6K || CPU_V7)
 
-OK, will apply.
-Thanks.
+The MPCore watchdog (and timer) can be found at ARM11 MPCore (CPU_V6K) and
+Cortex A9 MPCore (CPU_V7). The dependency between MPCORE_WATCHDOG and
+(CPU_V6K || CPUV7) is necessary, but the dependency of SMP is redundant.
+The MPCore watchdog should function normally even SMP is not turned on with
+ARM11 or Cortex A9 CPU.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Signed-off-by: Tommy Lin <tommy.lin@caviumnetworks.com>
+---
+ arch/arm/Kconfig |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 3262b15..c148326 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1353,7 +1353,7 @@ config HAVE_ARM_SCU
+ 
+ config HAVE_ARM_TWD
+ 	bool
+-	depends on SMP
++	depends on CPU_V6K || CPU_V7
+ 	select TICK_ONESHOT
+ 	help
+ 	  This options enables support for the ARM timer and watchdog unit
+-- 
+1.7.6
