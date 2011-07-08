@@ -1,26 +1,30 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 8 Jul 2011 10:14:15 +0100
-Subject: [PATCH 0/3] *** add lost UL suffix to VMALLOC_END ***
-In-Reply-To: <1310093669-4681-1-git-send-email-bs14@csr.com>
-References: <1310093669-4681-1-git-send-email-bs14@csr.com>
-Message-ID: <20110708091415.GE2414@n2100.arm.linux.org.uk>
+From: cbouatmailru@gmail.com (Anton Vorontsov)
+Date: Fri, 8 Jul 2011 13:14:35 +0400
+Subject: [PATCH 2/2] arch: arm: CNS3xxx select the correct CPU type CPU_V6K
+In-Reply-To: <1310104806-12984-1-git-send-email-tommy.lin@caviumnetworks.com>
+References: <1310104806-12984-1-git-send-email-tommy.lin@caviumnetworks.com>
+Message-ID: <20110708091435.GB15142@oksana.dev.rtsoft.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 07, 2011 at 07:54:26PM -0700, Barry Song wrote:
-> After grepping, several platforms lost the UL suffix for VMALLOC_END.
+On Fri, Jul 08, 2011 at 02:00:06PM +0800, Tommy Lin wrote:
+> ARM11        -> CPU_V6
+> ARM11 MPCore -> CPU_V6K
+> CNS3xxx has ARM11 MPCore CPUs (dual core), but initially select the same single
+> core CPU type. To select MPCore watchdog support, this patch correts the CPU
+> type from CPU_V6 to CPU_V6K.
 > 
-> Barry Song (3):
->   ARM: CNS3XXX: add UL suffix to VMALLOC_END to ensure it is properly
->     typed
->   ARM: LPC32XXX: add UL suffix to VMALLOC_END to ensure it is properly
->     typed
->   ARM: NUC93X: add UL suffix to VMALLOC_END to ensure it is properly
->     typed
+> Signed-off-by: Tommy Lin <tommy.lin@caviumnetworks.com>
+> ---
 
-All looks fine to me, thanks.  Arnd - are you going to pick these up?
-If so...
+Imre Kaloz sent a similar patch yesterday:
 
-Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+http://www.spinics.net/lists/arm-kernel/msg131933.html
 
-for all three.
+Which is now in the linux-cns3xxx.git tree.
+
+Thanks,
+
+-- 
+Anton Vorontsov
+Email: cbouatmailru at gmail.com
