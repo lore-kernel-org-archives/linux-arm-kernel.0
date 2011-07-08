@@ -1,190 +1,32 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 08 Jul 2011 09:03:32 -0700
-Subject: Please submit platform trees for inclusion in arm-soc.git v3.1
-In-Reply-To: <201107012018.14619.arnd@arndb.de> (Arnd Bergmann's message of
-	"Fri, 1 Jul 2011 20:18:14 +0200")
-References: <201107012018.14619.arnd@arndb.de>
-Message-ID: <87wrfsahez.fsf@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 8 Jul 2011 17:03:29 +0100
+Subject: [PATCH 0/7] Re-organize linker layouts
+In-Reply-To: <alpine.LFD.2.00.1107080941090.14596@xanadu.home>
+References: <20110706102245.GO8286@n2100.arm.linux.org.uk>
+	<4E15ECB6.40100@codeaurora.org>
+	<20110707223620.GG20403@n2100.arm.linux.org.uk>
+	<4E165597.90002@codeaurora.org>
+	<20110708090721.GC2414@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1107080941090.14596@xanadu.home>
+Message-ID: <20110708160329.GF4812@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Fri, Jul 08, 2011 at 09:46:42AM -0400, Nicolas Pitre wrote:
+> On Fri, 8 Jul 2011, Russell King - ARM Linux wrote:
+> 
+> > There's also platforms where the zImage is loaded at some predetermined
+> > offset into RAM to give the decompressor room to directly place the
+> > kernel in its final location too, which will be buggered by
+> > AUTO_ZRELADDR.
+> 
+> How so?  Loading that zImage at the same predetermined offset will still 
+> have the same desired effect.  As long as the offset is within 128MB of 
+> the start of RAM.
 
-Arnd Bergmann <arnd@arndb.de> writes:
+You just said it...
 
-> Time is running out for the current cycle, so any changes that you
-> want to see merged in linux-3.1 through the arm-soc tree should be
-> submitted in form of pull-requests very soon.
-
-[...]
-
-It looks like your "remove rmk/for-next" commit may not have been
-totally complete.
-
-Trying to merge your master branch and Russell's current for-next branch
-still results in conflicts in files that should only be touched in
-Russell's branch (specifically, these seem related to changes in
-Russell's 'suspend' branch that is included in his 'for-next' branch.)
-
-Kevin
-
-
-$ git checkout -b tmp/test v3.0-rc6
-Switched to a new branch 'tmp/test'
-
-$ git merge rmk/for-next
-Updating fe0d422..b4584ba
-Fast-forward
- Documentation/arm/SH-Mobile/zboot-rom-sdhi.txt    |   42 ++
- Documentation/arm/kernel_user_helpers.txt         |  267 +++++++++++
- Documentation/devicetree/bindings/arm/pmu.txt     |   21 +
- MAINTAINERS                                       |   10 +
- arch/arm/Kconfig                                  |   37 ++-
- arch/arm/boot/compressed/Makefile                 |   10 +-
- arch/arm/boot/compressed/head-shmobile.S          |   12 +-
- arch/arm/boot/compressed/mmcif-sh7372.c           |    2 +-
- arch/arm/boot/compressed/sdhi-sh7372.c            |   95 ++++
- arch/arm/boot/compressed/sdhi-shmobile.c          |  449 ++++++++++++++++++
- arch/arm/boot/compressed/sdhi-shmobile.h          |   11 +
- arch/arm/boot/compressed/vmlinux.lds.in           |   12 +-
- arch/arm/common/dmabounce.c                       |  193 ++++-----
- arch/arm/common/it8152.c                          |   16 +-
- arch/arm/common/sa1111.c                          |   60 ++--
- arch/arm/include/asm/dma-mapping.h                |   56 +--
- arch/arm/include/asm/entry-macro-multi.S          |   14 +-
- arch/arm/include/asm/mach/map.h                   |    2 +
- arch/arm/include/asm/memory.h                     |    7 +
- arch/arm/include/asm/pgalloc.h                    |    2 +-
- arch/arm/include/asm/pgtable.h                    |   23 +-
- arch/arm/include/asm/pmu.h                        |    2 +-
- arch/arm/include/asm/proc-fns.h                   |   14 +-
- arch/arm/include/asm/scatterlist.h                |    4 +
- arch/arm/include/asm/setup.h                      |    2 +-
- arch/arm/include/asm/suspend.h                    |   22 +
- arch/arm/include/asm/tcm.h                        |    2 +
- arch/arm/include/asm/tlb.h                        |    1 +
- arch/arm/kernel/entry-armv.S                      |  523 ++++++++-------------
- arch/arm/kernel/entry-header.S                    |   19 -
- arch/arm/kernel/hw_breakpoint.c                   |   12 +-
- arch/arm/kernel/perf_event.c                      |   10 +-
- arch/arm/kernel/pmu.c                             |   87 +++-
- arch/arm/kernel/setup.c                           |  101 ++--
- arch/arm/kernel/sleep.S                           |   84 ++--
- arch/arm/kernel/smp_scu.c                         |    2 +
- arch/arm/kernel/tcm.c                             |   68 +++-
- arch/arm/kernel/vmlinux.lds.S                     |  126 +++---
- arch/arm/mach-bcmring/include/mach/entry-macro.S  |    4 -
- arch/arm/mach-davinci/include/mach/entry-macro.S  |    3 -
- arch/arm/mach-ep93xx/core.c                       |    4 +-
- arch/arm/mach-exynos4/pm.c                        |    2 +-
- arch/arm/mach-exynos4/sleep.S                     |   22 -
- arch/arm/mach-h720x/include/mach/entry-macro.S    |    3 -
- arch/arm/mach-ixp4xx/common-pci.c                 |   12 +-
- arch/arm/mach-lpc32xx/include/mach/entry-macro.S  |    4 -
- arch/arm/mach-omap2/control.c                     |    7 +-
- arch/arm/mach-omap2/control.h                     |    6 +-
- arch/arm/mach-omap2/include/mach/entry-macro.S    |    3 -
- arch/arm/mach-omap2/pm.h                          |   22 +-
- arch/arm/mach-omap2/pm34xx.c                      |   86 ++--
- arch/arm/mach-omap2/sleep34xx.S                   |  518 ++++++++-------------
- arch/arm/mach-pnx4008/include/mach/entry-macro.S  |    5 -
- arch/arm/mach-pxa/include/mach/pm.h               |    4 +-
- arch/arm/mach-pxa/palmz72.c                       |    1 +
- arch/arm/mach-pxa/pm.c                            |    1 -
- arch/arm/mach-pxa/pxa25x.c                        |    3 +-
- arch/arm/mach-pxa/pxa27x.c                        |   11 +-
- arch/arm/mach-pxa/pxa3xx.c                        |   14 +-
- arch/arm/mach-pxa/sleep.S                         |   55 +--
- arch/arm/mach-pxa/zeus.c                          |    3 +-
- arch/arm/mach-realview/Kconfig                    |    1 +
- arch/arm/mach-s3c2412/pm.c                        |    6 +-
- arch/arm/mach-s3c2416/pm.c                        |    6 +-
- arch/arm/mach-s3c64xx/pm.c                        |    2 +-
- arch/arm/mach-s3c64xx/sleep.S                     |   23 -
- arch/arm/mach-s5pv210/pm.c                        |    2 +-
- arch/arm/mach-s5pv210/sleep.S                     |   21 -
- arch/arm/mach-sa1100/pm.c                         |    7 +-
- arch/arm/mach-sa1100/sleep.S                      |   19 +-
- arch/arm/mach-shark/include/mach/entry-macro.S    |   10 +-
- arch/arm/mach-shmobile/include/mach/sdhi-sh7372.h |   21 +
- arch/arm/mach-shmobile/include/mach/sdhi.h        |   16 +
- arch/arm/mach-vt8500/irq.c                        |   21 +-
- arch/arm/mm/abort-ev4.S                           |   17 +-
- arch/arm/mm/abort-ev4t.S                          |   17 +-
- arch/arm/mm/abort-ev5t.S                          |   19 +-
- arch/arm/mm/abort-ev5tj.S                         |   25 +-
- arch/arm/mm/abort-ev6.S                           |   25 +-
- arch/arm/mm/abort-ev7.S                           |   25 +-
- arch/arm/mm/abort-lv4t.S                          |  141 +++---
- arch/arm/mm/abort-macro.S                         |   34 +-
- arch/arm/mm/abort-nommu.S                         |   10 +-
- arch/arm/mm/alignment.c                           |    3 +
- arch/arm/mm/cache-l2x0.c                          |   19 +-
- arch/arm/mm/dma-mapping.c                         |  314 +++++++------
- arch/arm/mm/fault.c                               |    4 +
- arch/arm/mm/init.c                                |    8 +-
- arch/arm/mm/mm.h                                  |    2 +
- arch/arm/mm/mmu.c                                 |   29 +-
- arch/arm/mm/nommu.c                               |    4 +
- arch/arm/mm/pabort-legacy.S                       |   10 +-
- arch/arm/mm/pabort-v6.S                           |   10 +-
- arch/arm/mm/pabort-v7.S                           |   11 +-
- arch/arm/mm/proc-arm6_7.S                         |   90 ++--
- arch/arm/mm/proc-sa1100.S                         |    4 +-
- arch/arm/plat-mxc/include/mach/entry-macro.S      |    4 -
- arch/arm/plat-omap/sram.c                         |   15 +-
- arch/arm/plat-s3c24xx/sleep.S                     |   25 -
- arch/arm/plat-samsung/include/plat/pm.h           |    5 +-
- arch/arm/plat-samsung/pm.c                        |   11 +-
- drivers/mmc/host/mmci.c                           |    2 +
- drivers/mmc/host/mmci.h                           |    5 +-
- 103 files changed, 2458 insertions(+), 1798 deletions(-)
- create mode 100644 Documentation/arm/SH-Mobile/zboot-rom-sdhi.txt
- create mode 100644 Documentation/arm/kernel_user_helpers.txt
- create mode 100644 Documentation/devicetree/bindings/arm/pmu.txt
- create mode 100644 arch/arm/boot/compressed/sdhi-sh7372.c
- create mode 100644 arch/arm/boot/compressed/sdhi-shmobile.c
- create mode 100644 arch/arm/boot/compressed/sdhi-shmobile.h
- create mode 100644 arch/arm/include/asm/suspend.h
- create mode 100644 arch/arm/mach-shmobile/include/mach/sdhi-sh7372.h
- create mode 100644 arch/arm/mach-shmobile/include/mach/sdhi.h
-
-$ git merge arm-soc/master
-Auto-merging arch/arm/Kconfig
-Auto-merging arch/arm/include/asm/entry-macro-multi.S
-CONFLICT (delete/modify): arch/arm/include/asm/suspend.h deleted in arm-soc/master and modified in HEAD. Version HEAD of arch/arm/include/asm/suspend.h left in tree.
-Auto-merging arch/arm/kernel/setup.c
-Auto-merging arch/arm/kernel/sleep.S
-CONFLICT (content): Merge conflict in arch/arm/kernel/sleep.S
-Auto-merging arch/arm/mach-exynos4/pm.c
-CONFLICT (content): Merge conflict in arch/arm/mach-exynos4/pm.c
-Removing arch/arm/mach-mxs/gpio.h
-Auto-merging arch/arm/mach-omap2/pm.h
-Auto-merging arch/arm/mach-omap2/pm34xx.c
-CONFLICT (content): Merge conflict in arch/arm/mach-omap2/pm34xx.c
-Auto-merging arch/arm/mach-omap2/sleep34xx.S
-CONFLICT (content): Merge conflict in arch/arm/mach-omap2/sleep34xx.S
-Removing arch/arm/mach-omap2/timer-gp.c
-Removing arch/arm/mach-omap2/timer-gp.h
-Auto-merging arch/arm/mach-pxa/include/mach/pm.h
-CONFLICT (content): Merge conflict in arch/arm/mach-pxa/include/mach/pm.h
-Auto-merging arch/arm/mach-pxa/pxa3xx.c
-CONFLICT (content): Merge conflict in arch/arm/mach-pxa/pxa3xx.c
-Auto-merging arch/arm/mach-s3c2412/pm.c
-CONFLICT (content): Merge conflict in arch/arm/mach-s3c2412/pm.c
-Auto-merging arch/arm/mach-s3c2416/pm.c
-CONFLICT (content): Merge conflict in arch/arm/mach-s3c2416/pm.c
-Auto-merging arch/arm/mach-s3c64xx/pm.c
-CONFLICT (content): Merge conflict in arch/arm/mach-s3c64xx/pm.c
-Auto-merging arch/arm/mach-sa1100/pm.c
-CONFLICT (content): Merge conflict in arch/arm/mach-sa1100/pm.c
-Removing arch/arm/plat-mxc/include/mach/iomux.h
-Auto-merging arch/arm/plat-samsung/include/plat/pm.h
-CONFLICT (content): Merge conflict in arch/arm/plat-samsung/include/plat/pm.h
-Auto-merging arch/arm/plat-samsung/pm.c
-CONFLICT (content): Merge conflict in arch/arm/plat-samsung/pm.c
-Auto-merging drivers/gpio/gpio-mxc.c
-Auto-merging drivers/gpio/gpio-mxs.c
-warning: inexact rename detection was skipped due to too many files.
-warning: you may want to set your merge.renamelimit variable to at least 3185 and retry the command.
-Automatic merge failed; fix conflicts and then commit the result.
+Given that it's 128MB, Stephen shouldn't have a problem with loading the
+zImage at 0xN0208000, but he said it doesn't work.  I think there's some
+work to be done there to figure out if Stephen really has a problem, and
+what that problem is.
