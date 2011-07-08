@@ -1,155 +1,115 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 08 Jul 2011 11:33:30 +0100
-Subject: [RFC PATCH v2 2/4] Core device subsystem implementation
-In-Reply-To: <CAHXqBFJcO8-7v+SZ88jx6XjDQBFUybTjOU=LWdsc3ChD4bU_=g@mail.gmail.com>
-References: <1310115250-3859-1-git-send-email-marc.zyngier@arm.com>	<1310115250-3859-3-git-send-email-marc.zyngier@arm.com>
-	<CAHXqBFJcO8-7v+SZ88jx6XjDQBFUybTjOU=LWdsc3ChD4bU_=g@mail.gmail.com>
-Message-ID: <4E16DCFA.5050903@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 8 Jul 2011 11:33:39 +0100
+Subject: [RFC PATCH 06/17] ARM: kernel: save/restore generic infrastructure
+In-Reply-To: <4E16643B.5020305@ti.com>
+References: <1310053830-23779-1-git-send-email-lorenzo.pieralisi@arm.com>
+	<1310053830-23779-7-git-send-email-lorenzo.pieralisi@arm.com>
+	<4E16643B.5020305@ti.com>
+Message-ID: <20110708103334.GA32207@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/07/11 11:18, Micha? Miros?aw wrote:
-> 2011/7/8 Marc Zyngier <marc.zyngier@arm.com>:
->> There is a small number of devices that the core kernel needs very
->> early in the boot process, namely an interrupt controller and a timer,
->> long before the device model is up and running.
->>
->> The "core device subsystem" offers a class based device/driver
->> matching model, doesn't rely on any other subsystem, is very (too?)
->> simple, and support getting information both from DT as well as from
->> static data provided by the platform. It also gives the opportunity to
->> define the probing order by offering a sorting hook at runtime.
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+On Fri, Jul 08, 2011 at 02:58:19AM +0100, Santosh Shilimkar wrote:
+> On 7/7/2011 8:50 AM, Lorenzo Pieralisi wrote:
+> > This patch provides the code infrastructure needed to maintain
+> > a generic per-cpu architecture implementation of idle code.
+> >
+> > sr_platform.c :
+> > 	- code manages patchset initialization and memory management
+> >
+> > sr_context.c:
+> > 	- code initializes run-time context save/restore generic
+> > 	  support
+> >
+> > sr_power.c:
+> > 	- provides the generic infrastructure to enter exit low
+> > 	  power modes and communicate with Power Control Unit (PCU)
+> >
+> > v7 support hinges on the basic infrastructure to provide per-cpu
+> > arch implementation basically through standard function pointers
+> > signatures.
+> >
+> > Preprocessor defines include size of data needed to save/restore
+> > L2 state. This define value should be moved to the respective
+> > subsystem (PL310) once the patchset IF to that subsystem is settled.
+> >
+> > Signed-off-by: Lorenzo Pieralisi<lorenzo.pieralisi@arm.com>
+> > ---
+> 
 > [...]
->> --- /dev/null
->> +++ b/drivers/base/core_device.c
->> @@ -0,0 +1,108 @@
-> [...]
->> +static int __init core_device_match(struct core_device *dev,
->> +                                   struct core_device_id *ids)
->> +{
->> +       int i;
->> +#ifdef CONFIG_OF
->> +       if (dev->of_node)
->> +               for (i = 0; ids[i].name != NULL; i++)
->> +                       if (of_device_is_compatible(dev->of_node,
->> +                                                   ids[i].name))
->> +                               return 1;
 > 
-> Add an else here? I assume DT devices shouldn't be matched by name.
-
-Good point. I'll update that.
-
->> +#endif
->> +       for (i = 0; ids[i].name != NULL; i++)
->> +               if (!strcmp(dev->name, ids[i].name))
->> +                       return 1;
->> +
->> +       return 0;
->> +}
->> +
-> [...]
->> --- /dev/null
->> +++ b/include/linux/core_device.h
->> @@ -0,0 +1,69 @@
->> +/*
->> + * Copyright (C) 2011 ARM Ltd
->> + * Written by Marc Zyngier <marc.zyngier@arm.com>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + *
->> + * Core device init support
->> + */
->> +
->> +#ifndef _CORE_DEVICE_H
->> +#define _CORE_DEVICE_H
->> +
->> +#include <linux/list.h>
->> +#include <linux/ioport.h>
->> +#include <linux/of.h>
->> +
->> +struct core_device_id {
->> +       const char              *name;
->> +};
->> +
->> +enum core_device_class {
->> +       CORE_DEV_CLASS_IRQ,
->> +       CORE_DEV_CLASS_TIMER,
->> +       CORE_DEV_CLASS_MAX              /* Do not use as a class */
->> +};
+> > diff --git a/arch/arm/kernel/sr_helpers.h b/arch/arm/kernel/sr_helpers.h
+> > new file mode 100644
+> > index 0000000..1ae3a9a
+> > --- /dev/null
+> > +++ b/arch/arm/kernel/sr_helpers.h
+> > @@ -0,0 +1,56 @@
+> > +/*
+> > + * Copyright (C) 2008-2011 ARM Limited
+> > + * Author(s): Jon Callan, Lorenzo Pieralisi
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License version 2 as
+> > + * published by the Free Software Foundation.
+> > + *
+> > + */
+> > +
+> > +static inline int sr_platform_get_cpu_index(void)
+> > +{
+> > +	unsigned int cpu;
+> > +	__asm__ __volatile__(
+> > +			"mrc	p15, 0, %0, c0, c0, 5\n\t"
+> > +			: "=r" (cpu));
+> > +	return cpu&  0xf;
+> > +}
+> > +
+> > +/*
+> > + * Placeholder for further extensions
+> > + */
+> > +static inline int sr_platform_get_cluster_index(void)
+> > +{
+> > +	return 0;
+> > +}
+> > +
+> > +static inline void __iomem *sr_platform_cbar(void)
+> > +{
+> > +	void __iomem *base;
+> > +	__asm__ __volatile__(
+> > +			"mrc	p15, 4, %0, c15, c0, 0\n\t"
+> > +			: "=r" (base));
+> > +	return base;
+> > +}
+> > +
+> > +#ifdef CONFIG_SMP
+> > +static inline void exit_coherency(void)
+> > +{
+> > +	unsigned int v;
+> > +	asm volatile (
+> > +		"mrc	p15, 0, %0, c1, c0, 1\n"
+> > +		"bic	%0, %0, %1\n"
+> > +		"mcr	p15, 0, %0, c1, c0, 1\n"
+> You should have a isb here.
 > 
-> CORE_DEV_CLASS_MAX -> CORE_DEV_CLASS_COUNT
+
+Yes, I think it is safer.
+
+> > +		 : "=&r" (v)
+> > +		 : "Ir" (0x40)
+> > +		 : );
+> > +}
 > 
-> _MAX suggests that this is the largest value, but in this case it is a count.
-
-_MAX seem to be the established usage in the kernel (I just grep-ed for
-"_MAX," in include/linux, and found a number of similar uses, while only
-ACPI seem to be using _COUNT).
-
->> +
->> +struct core_device {
->> +       const char              *name;
->> +       u32                     num_resources;
->> +       struct resource         *resource;
->> +#ifdef CONFIG_OF
->> +       struct device_node      *of_node;
->> +#endif
->> +       struct list_head        entry;
->> +};
->> +
->> +struct core_driver {
->> +       int                     (*init)(struct core_device *);
->> +       struct core_device_id   *ids;
->> +};
->> +
->> +void core_device_register(enum core_device_class class,
->> +                         struct core_device *dev);
->> +void core_driver_init_class(enum core_device_class class,
->> +                           void (*sort)(struct list_head *));
->> +#ifdef CONFIG_OF
->> +void of_core_device_populate(enum core_device_class class,
->> +                            struct of_device_id *matches);
->> +#else
->> +static inline void of_core_device_populate(enum core_device_class class,
->> +                                          struct of_device_id *matches)
->> +{
->> +}
->> +#endif
->> +
->> +struct core_driver_setup_block {
->> +       enum core_device_class  class;
->> +       struct core_driver      *drv;
->> +};
->> +
->> +#define core_driver_register(cls, drv)                                 \
->> +static struct core_driver_setup_block __core_driver_block_##cls##_##drv        \
->> +       __used __section(.init.core_driver)                             \
->> +       __attribute__((aligned((sizeof(long)))))                        \
->> +       = { cls, &drv }
->> +
->> +#endif
+> To avoid aborts on platform which doesn't provide
+> access to SMP bit, NSACR bit 18 should be read.
+> Something like....
 > 
-> Since core_driver_register() is not a function it shouldn't look like
-> one. Something like DEFINE_CORE_DRIVER_ENTRY() would be better. I
-> would make cls to be only the last word of CORE_DEV_CLASS_* values so
-> its less typing in the board files (unless you don't like CPP string
-> concatenation).
+>    mrc     p15, 0, r0, c1, c1, 2
+>    tst     r0, #(1 << 18)
+>    mrcne   p15, 0, r0, c1, c0, 1
+>    bicne   r0, r0, #(1 << 6)
+>    mcrne   p15, 0, r0, c1, c0, 1
 > 
-> +#define DEFINE_CORE_DRIVER_ENTRY(cls, drv)                               \
-> +static struct core_driver_setup_block __core_driver_block_##cls##_##drv  \
-> +       __used __section(.init.core_driver)                               \
-> +       = { CORE_DEV_CLASS_##cls, &drv }
 
-I fully agree with the "not a function" approach. I'm more cautious with
-the "CORE_DEV_CLASS_##cls" bit.  I feel like it's hiding a bit too much
-of what's going on, but it's only my own feeling, and I'd be happy to
-change it if that's what people prefer.
+I will merge that code in for v2.
 
-Thanks for reviewing,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Thanks,
+Lorenzo
