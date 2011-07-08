@@ -1,140 +1,60 @@
-From: mirqus@gmail.com (=?ISO-8859-2?Q?Micha=B3_Miros=B3aw?=)
-Date: Fri, 8 Jul 2011 12:18:47 +0200
-Subject: [RFC PATCH v2 2/4] Core device subsystem implementation
-In-Reply-To: <1310115250-3859-3-git-send-email-marc.zyngier@arm.com>
-References: <1310115250-3859-1-git-send-email-marc.zyngier@arm.com>
-	<1310115250-3859-3-git-send-email-marc.zyngier@arm.com>
-Message-ID: <CAHXqBFJcO8-7v+SZ88jx6XjDQBFUybTjOU=LWdsc3ChD4bU_=g@mail.gmail.com>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Fri, 8 Jul 2011 12:24:22 +0200
+Subject: [PATCH v5 1/3] ARM: mxs: add GPMI-NFC support for imx23/imx28
+In-Reply-To: <20110708101625.GR29624@pengutronix.de>
+References: <1309406028-2924-1-git-send-email-b32955@freescale.com>
+	<1309406028-2924-2-git-send-email-b32955@freescale.com>
+	<201106301555.19440.arnd@arndb.de>
+	<20110708073119.GP29624@pengutronix.de>
+	<4E16B47E.8090909@freescale.com>
+	<20110708090903.GQ29624@pengutronix.de>
+	<4E16CD6F.9050304@freescale.com>
+	<20110708101625.GR29624@pengutronix.de>
+Message-ID: <19990.56022.592145.982784@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/7/8 Marc Zyngier <marc.zyngier@arm.com>:
-> There is a small number of devices that the core kernel needs very
-> early in the boot process, namely an interrupt controller and a timer,
-> long before the device model is up and running.
->
-> The "core device subsystem" offers a class based device/driver
-> matching model, doesn't rely on any other subsystem, is very (too?)
-> simple, and support getting information both from DT as well as from
-> static data provided by the platform. It also gives the opportunity to
-> define the probing order by offering a sorting hook at runtime.
->
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-[...]
-> --- /dev/null
-> +++ b/drivers/base/core_device.c
-> @@ -0,0 +1,108 @@
-[...]
-> +static int __init core_device_match(struct core_device *dev,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct core_device_id *ids)
-> +{
-> + ? ? ? int i;
-> +#ifdef CONFIG_OF
-> + ? ? ? if (dev->of_node)
-> + ? ? ? ? ? ? ? for (i = 0; ids[i].name != NULL; i++)
-> + ? ? ? ? ? ? ? ? ? ? ? if (of_device_is_compatible(dev->of_node,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ids[i].name))
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? return 1;
+Uwe Kleine-K?nig writes:
+> Hello Huang,
+> 
+> On Fri, Jul 08, 2011 at 05:27:11PM +0800, Huang Shijie wrote:
+> > >>>>The init function is used only to set up iomux, so the logical replacement is
+> > >>>>a pointer to the iomux data, and calling mxs_iomux_setup_multiple_pads
+> > >>>>directly from the driver.
+> > >>>Why not put the iomux stuff into the per-machine table and get rid of
+> > >>>the init callback, too?
+> > >>The mmc (ssp) has pin conflict with gpmi on both mx23evk and mx28evk.
+> > >>So, it's better to initialize the pin when the driver(GPMI or MMC)
+> > >>is enabled.
+> > >What do you do to prevent userspace from trying to use both devices?
+> > The board can not support the two devices at the same time.
+> > So the user can only use one device with the board.
+> > 
+> > >I guess you need to configure the hardware somehow to switch between the
+> > >two using a jumper? Isn't it possible to detect the hardware setting and
+> > >setup the muxer accordingly?
+> > >
+> > >IMHO an per-device init-callback is the wrong approach to solve a pin
+> > >conflict.
+> > Do you have any good solution about this?
+> Put the pinmux corresponding to the one device that currently works in
+> the pinmux list!?
+> 
+#define 'that currently works'
 
-Add an else here? I assume DT devices shouldn't be matched by name.
+For a dedicated system that may not be a problem. But for development
+kits and modular systems that allow peripheral modules to be plugged
+in there is no 'one device that currently works'.
 
-> +#endif
-> + ? ? ? for (i = 0; ids[i].name != NULL; i++)
-> + ? ? ? ? ? ? ? if (!strcmp(dev->name, ids[i].name))
-> + ? ? ? ? ? ? ? ? ? ? ? return 1;
-> +
-> + ? ? ? return 0;
-> +}
-> +
-[...]
-> --- /dev/null
-> +++ b/include/linux/core_device.h
-> @@ -0,0 +1,69 @@
-> +/*
-> + * Copyright (C) 2011 ARM Ltd
-> + * Written by Marc Zyngier <marc.zyngier@arm.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * Core device init support
-> + */
-> +
-> +#ifndef _CORE_DEVICE_H
-> +#define _CORE_DEVICE_H
-> +
-> +#include <linux/list.h>
-> +#include <linux/ioport.h>
-> +#include <linux/of.h>
-> +
-> +struct core_device_id {
-> + ? ? ? const char ? ? ? ? ? ? ?*name;
-> +};
-> +
-> +enum core_device_class {
-> + ? ? ? CORE_DEV_CLASS_IRQ,
-> + ? ? ? CORE_DEV_CLASS_TIMER,
-> + ? ? ? CORE_DEV_CLASS_MAX ? ? ? ? ? ? ?/* Do not use as a class */
-> +};
 
-CORE_DEV_CLASS_MAX -> CORE_DEV_CLASS_COUNT
+Lothar Wa?mann
+-- 
+___________________________________________________________
 
-_MAX suggests that this is the largest value, but in this case it is a count.
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
 
-> +
-> +struct core_device {
-> + ? ? ? const char ? ? ? ? ? ? ?*name;
-> + ? ? ? u32 ? ? ? ? ? ? ? ? ? ? num_resources;
-> + ? ? ? struct resource ? ? ? ? *resource;
-> +#ifdef CONFIG_OF
-> + ? ? ? struct device_node ? ? ?*of_node;
-> +#endif
-> + ? ? ? struct list_head ? ? ? ?entry;
-> +};
-> +
-> +struct core_driver {
-> + ? ? ? int ? ? ? ? ? ? ? ? ? ? (*init)(struct core_device *);
-> + ? ? ? struct core_device_id ? *ids;
-> +};
-> +
-> +void core_device_register(enum core_device_class class,
-> + ? ? ? ? ? ? ? ? ? ? ? ? struct core_device *dev);
-> +void core_driver_init_class(enum core_device_class class,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? void (*sort)(struct list_head *));
-> +#ifdef CONFIG_OF
-> +void of_core_device_populate(enum core_device_class class,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct of_device_id *matches);
-> +#else
-> +static inline void of_core_device_populate(enum core_device_class class,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct of_device_id *matches)
-> +{
-> +}
-> +#endif
-> +
-> +struct core_driver_setup_block {
-> + ? ? ? enum core_device_class ?class;
-> + ? ? ? struct core_driver ? ? ?*drv;
-> +};
-> +
-> +#define core_driver_register(cls, drv) ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
-> +static struct core_driver_setup_block __core_driver_block_##cls##_##drv ? ? ? ?\
-> + ? ? ? __used __section(.init.core_driver) ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
-> + ? ? ? __attribute__((aligned((sizeof(long))))) ? ? ? ? ? ? ? ? ? ? ? ?\
-> + ? ? ? = { cls, &drv }
-> +
-> +#endif
-
-Since core_driver_register() is not a function it shouldn't look like
-one. Something like DEFINE_CORE_DRIVER_ENTRY() would be better. I
-would make cls to be only the last word of CORE_DEV_CLASS_* values so
-its less typing in the board files (unless you don't like CPP string
-concatenation).
-
-+#define DEFINE_CORE_DRIVER_ENTRY(cls, drv)                               \
-+static struct core_driver_setup_block __core_driver_block_##cls##_##drv  \
-+       __used __section(.init.core_driver)                               \
-+       = { CORE_DEV_CLASS_##cls, &drv }
-
-Best Regards,
-Micha? Miros?aw
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
