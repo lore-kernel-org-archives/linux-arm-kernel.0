@@ -1,51 +1,33 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 8 Jul 2011 17:20:05 -0400 (EDT)
-Subject: [PATCH 01/52] ARM: introduce atag_offset to replace
- boot_params
-In-Reply-To: <20110708203634.GU4812@n2100.arm.linux.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 8 Jul 2011 22:20:55 +0100
+Subject: [PATCH 46/52] ARM: mach-u300: convert boot_params to atag_offset
+In-Reply-To: <CAKnu2MrM-_sw70se==z8LO-ZO0eUbwqk9MhY3Co1ZErV=hOYUw@mail.gmail.com>
 References: <1309920457-21913-1-git-send-email-nicolas.pitre@linaro.org>
-	<20110708203634.GU4812@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1107081714251.14596@xanadu.home>
+	<1309920457-21913-46-git-send-email-nicolas.pitre@linaro.org>
+	<CAKnu2MrM-_sw70se==z8LO-ZO0eUbwqk9MhY3Co1ZErV=hOYUw@mail.gmail.com>
+Message-ID: <20110708212055.GZ4812@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 8 Jul 2011, Russell King - ARM Linux wrote:
-
-> On Tue, Jul 05, 2011 at 10:46:46PM -0400, Nicolas Pitre wrote:
-> > The boot_params member of the mdesc structure is used to provide a
-> > default physical address for the ATAG list.  Since this value is fixed
-> > at compile time and often based on ARCH_PHYS_OFFSET, it gets in the way
-> > of runtime PHYS_OFFSET usage.
-> > 
-> > Let's introduce atag_offset which should contains only the relative
-> > offset from start of memory instead of an absolute value, in preparation
-> > to move all instance of boot_params over to it.
+On Fri, Jul 08, 2011 at 03:12:06PM +0200, Linus Walleij wrote:
+> 2011/7/6 Nicolas Pitre <nicolas.pitre@linaro.org>:
 > 
-> I don't like this.
+> > Someone was smoking good stuff with CONFIG_MACH_U300_2MB_ALIGNMENT_FIX here...
 > 
-> While I understand the issue (the oops when we try to dereference the
-> absolute address), the fact is that's how it is.
+> Haha, it is a consequence of the PHYS_OFFSET having to align on a 2MB
+> boundary, whereas the actual physical memory was at an odd MB address.
+> We didn't really like the idea of loosing one megabyte of memory just to
+> please PHYSOFFSET, so hence this fix.
 > 
-> Take a moment to think about this.  The ATAG list is normally setup at a
-> fixed physical address by the boot loader.  While there are some boot
-> loaders which allow you to load the kernel at different physical addresses,
-> they still place the ATAG list at that same physical address.
+> What we do is round memory upwards to closest 2MB boundary, then we
+> reserve the first MB. That's why we're having so much fun...
+> 
+> The reason why memory can be at an odd address is that we can
+> dynamically alter (at boot time) how many MB are reserved for the
+> accompanying modem CPU.
 
-Would they really load the kernel at a different address?
-
-> That means if you change this into an offset from the kernels idea of
-> PHYS_OFFSET, it's not going to find the ATAGs.
-
-Is this going to be a real issue in practice?
-
-> So we're probably better off checking whether the platform provided ATAG
-> pointer is below our idea of PHYS_OFFSET, and if it is to ignore that.
-
-The code already does that.
-
-Alternatively, I can make the boot_params values into numeric values 
-instead of PLAT_PHYS_OFFSET or any other symbolic define I'd like to get 
-rid of.  What do you think?
-
-
-Nicolas
+Can it be killed now that we have memblock with a proper reserve callback?
+You could locate the kernel higher in memory (eg, 4MB+32K or even 1MB+32K)
+keeping the real PHYS_OFFSET/PAGE_OFFSET, and arrange for the ->reserve
+callback to mark the first 1MB as reserved, optionally freeing it from
+memblock's idea of available memory if you don't want it mapped.
