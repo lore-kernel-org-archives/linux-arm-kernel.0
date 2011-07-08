@@ -1,43 +1,77 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Fri, 8 Jul 2011 15:30:36 +0800
-Subject: [PATCH v6 2/4] ARM: mxs: add new a pad control
-In-Reply-To: <20110708072359.GO29624@pengutronix.de>
-References: <1310102885-4102-1-git-send-email-b32955@freescale.com>
-	<1310102885-4102-3-git-send-email-b32955@freescale.com>
-	<20110708072359.GO29624@pengutronix.de>
-Message-ID: <4E16B21C.7030102@freescale.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 8 Jul 2011 09:31:19 +0200
+Subject: [PATCH v5 1/3] ARM: mxs: add GPMI-NFC support for imx23/imx28
+In-Reply-To: <201106301555.19440.arnd@arndb.de>
+References: <1309406028-2924-1-git-send-email-b32955@freescale.com>
+	<1309406028-2924-2-git-send-email-b32955@freescale.com>
+	<201106301555.19440.arnd@arndb.de>
+Message-ID: <20110708073119.GP29624@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2011?07?08? 15:23, Uwe Kleine-K?nig ??:
-> On Fri, Jul 08, 2011 at 01:28:03PM +0800, Huang Shijie wrote:
->> add a new pad control which is used in some rare cases,
->> such as gpmi-nand device.
->>
->> Signed-off-by: Huang Shijie<b32955@freescale.com>
->> ---
->>   arch/arm/mach-mxs/include/mach/iomux.h |    3 +++
->>   1 files changed, 3 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/mach-mxs/include/mach/iomux.h b/arch/arm/mach-mxs/include/mach/iomux.h
->> index 7abdf58..1f31762 100644
->> --- a/arch/arm/mach-mxs/include/mach/iomux.h
->> +++ b/arch/arm/mach-mxs/include/mach/iomux.h
->> @@ -94,6 +94,9 @@ typedef u32 iomux_cfg_t;
->>   /* generic pad control used in most cases */
->>   #define MXS_PAD_CTRL	(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL)
->>
->> +/* special pad control used in rare cases */
-> I'd not talk about "rare cases" in the comment. It applies to most pads,
-> that they are used rarely (at most once per machine :-)
-ok. I will remove this comment in next version. :)
+Hello,
 
->> +#define MXS_PAD_CTRL_12MA	(MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_NOPULL)
-> But other than that I fully support this definition.
-thanks.
+On Thu, Jun 30, 2011 at 03:55:19PM +0200, Arnd Bergmann wrote:
+> On Thursday 30 June 2011, Huang Shijie wrote:
+> > add GPMI-NFC support for imx23 and imx28.
+> > 
+> > Signed-off-by: Huang Shijie <b32955@freescale.com>
+> 
+> > +/**
+> > + * struct gpmi_nfc_platform_data - GPMI NFC driver platform data.
+> > + *
+> > + * This structure communicates platform-specific information to the GPMI NFC
+> > + * driver that can't be expressed as resources.
+> > + *
+> > + * @platform_init:           A pointer to a function the driver will call to
+> > + *                           initialize the platform (e.g., set up the pin mux).
+> > + * @platform_exit:           A pointer to a function the driver will call to
+> > + *                           exit the platform (e.g., free pins).
+> > + * @min_prop_delay_in_ns:    Minimum propagation delay of GPMI signals to and
+> > + *                           from the NAND Flash device, in nanoseconds.
+> > + * @max_prop_delay_in_ns:    Maximum propagation delay of GPMI signals to and
+> > + *                           from the NAND Flash device, in nanoseconds.
+> > + * @max_chip_count:          The maximum number of chips for which the driver
+> > + *                           should configure the hardware. This value most
+> > + *                           likely reflects the number of pins that are
+> > + *                           connected to a NAND Flash device. If this is
+> > + *                           greater than the SoC hardware can support, the
+> > + *                           driver will print a message and fail to initialize.
+> > + * @partitions:              An optional pointer to an array of partition
+> > + *                           descriptions.
+> > + * @partition_count:         The number of elements in the partitions array.
+> > + */
+> > +struct gpmi_nfc_platform_data {
+> > +	/* SoC hardware information. */
+> > +	int		(*platform_init)(void);
+> > +	void		(*platform_exit)(void);
+> > +
+> > +	/* NAND Flash information. */
+> > +	unsigned int	min_prop_delay_in_ns;
+> > +	unsigned int	max_prop_delay_in_ns;
+> > +	unsigned int	max_chip_count;
+> > +
+> > +	/* Medium information. */
+> > +	struct mtd_partition *partitions;
+> > +	unsigned	partition_count;
+> > +};
+> 
+> When adding new infrastructure, always keep in mind how you want it to look
+> after the device tree conversion. The partitions and min/max_* are easily covered
+> with that, but the init/exit function pointers are somewhat problematic.
+> 
+> Fortunately, you don't really require these functions for this driver. The _exit
+> function is completely unused, so just get rid of it.
+> 
+> The init function is used only to set up iomux, so the logical replacement is
+> a pointer to the iomux data, and calling mxs_iomux_setup_multiple_pads
+> directly from the driver.
+Why not put the iomux stuff into the per-machine table and get rid of
+the init callback, too?
 
-Best Regards
-Huang Shijie
-> Best regards
-> Uwe
->
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
