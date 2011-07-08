@@ -1,115 +1,76 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 8 Jul 2011 11:33:39 +0100
-Subject: [RFC PATCH 06/17] ARM: kernel: save/restore generic infrastructure
-In-Reply-To: <4E16643B.5020305@ti.com>
-References: <1310053830-23779-1-git-send-email-lorenzo.pieralisi@arm.com>
-	<1310053830-23779-7-git-send-email-lorenzo.pieralisi@arm.com>
-	<4E16643B.5020305@ti.com>
-Message-ID: <20110708103334.GA32207@e102568-lin.cambridge.arm.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 8 Jul 2011 12:36:22 +0200
+Subject: [PATCH v3 0/3] Add device tree probe for imx/mxc gpio
+In-Reply-To: <20110707192705.GL2824@ponder.secretlab.ca>
+References: <1309970263-13239-1-git-send-email-shawn.guo@linaro.org>
+	<20110707192705.GL2824@ponder.secretlab.ca>
+Message-ID: <20110708103622.GF26347@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 08, 2011 at 02:58:19AM +0100, Santosh Shilimkar wrote:
-> On 7/7/2011 8:50 AM, Lorenzo Pieralisi wrote:
-> > This patch provides the code infrastructure needed to maintain
-> > a generic per-cpu architecture implementation of idle code.
-> >
-> > sr_platform.c :
-> > 	- code manages patchset initialization and memory management
-> >
-> > sr_context.c:
-> > 	- code initializes run-time context save/restore generic
-> > 	  support
-> >
-> > sr_power.c:
-> > 	- provides the generic infrastructure to enter exit low
-> > 	  power modes and communicate with Power Control Unit (PCU)
-> >
-> > v7 support hinges on the basic infrastructure to provide per-cpu
-> > arch implementation basically through standard function pointers
-> > signatures.
-> >
-> > Preprocessor defines include size of data needed to save/restore
-> > L2 state. This define value should be moved to the respective
-> > subsystem (PL310) once the patchset IF to that subsystem is settled.
-> >
-> > Signed-off-by: Lorenzo Pieralisi<lorenzo.pieralisi@arm.com>
-> > ---
+On Thu, Jul 07, 2011 at 01:27:05PM -0600, Grant Likely wrote:
+> On Thu, Jul 07, 2011 at 12:37:40AM +0800, Shawn Guo wrote:
+> > The first patch removes the uses of cpu_is_mx(), the second one
+> > changes mxc gpio number macro, and the third one adds actual device
+> > tree probe support.
+> > 
+> > Changes since v2:
+> >  * Keep platform case gpio range code path unchanged, and get range
+> >    from gpio core only for dt case.
+> > 
+> > Changes since v1:
+> >  * Address review comments given by Grant and Sascha
+> >  * Add patch #1 to get gpio range/base from gpio core
+> > 
+> > Shawn Guo (3):
+> >       gpio/mxc: get rid of the uses of cpu_is_mx()
+> >       ARM: mxc: use ARCH_NR_GPIOS to define gpio number
+> >       gpio/mxc: add device tree probe support
 > 
-> [...]
+> Sascha; so are we good?  Should I merge this series?
+
+These patches neither fit onto your gpio tree nor on the i.MX tree. I
+suggest that we give these patches a rest until both trees are merged.
+
+That's the downside of moving core drivers to drivers/ and thus to
+different maintainers, but I think things will become better once
+the actual move is completed.
+
+Sascha
+
 > 
-> > diff --git a/arch/arm/kernel/sr_helpers.h b/arch/arm/kernel/sr_helpers.h
-> > new file mode 100644
-> > index 0000000..1ae3a9a
-> > --- /dev/null
-> > +++ b/arch/arm/kernel/sr_helpers.h
-> > @@ -0,0 +1,56 @@
-> > +/*
-> > + * Copyright (C) 2008-2011 ARM Limited
-> > + * Author(s): Jon Callan, Lorenzo Pieralisi
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > + *
-> > + */
-> > +
-> > +static inline int sr_platform_get_cpu_index(void)
-> > +{
-> > +	unsigned int cpu;
-> > +	__asm__ __volatile__(
-> > +			"mrc	p15, 0, %0, c0, c0, 5\n\t"
-> > +			: "=r" (cpu));
-> > +	return cpu&  0xf;
-> > +}
-> > +
-> > +/*
-> > + * Placeholder for further extensions
-> > + */
-> > +static inline int sr_platform_get_cluster_index(void)
-> > +{
-> > +	return 0;
-> > +}
-> > +
-> > +static inline void __iomem *sr_platform_cbar(void)
-> > +{
-> > +	void __iomem *base;
-> > +	__asm__ __volatile__(
-> > +			"mrc	p15, 4, %0, c15, c0, 0\n\t"
-> > +			: "=r" (base));
-> > +	return base;
-> > +}
-> > +
-> > +#ifdef CONFIG_SMP
-> > +static inline void exit_coherency(void)
-> > +{
-> > +	unsigned int v;
-> > +	asm volatile (
-> > +		"mrc	p15, 0, %0, c1, c0, 1\n"
-> > +		"bic	%0, %0, %1\n"
-> > +		"mcr	p15, 0, %0, c1, c0, 1\n"
-> You should have a isb here.
+> g.
+> 
+> > 
+> >  .../devicetree/bindings/gpio/fsl-imx-gpio.txt      |   22 +++
+> >  arch/arm/mach-imx/mm-imx1.c                        |    8 +-
+> >  arch/arm/mach-imx/mm-imx21.c                       |   12 +-
+> >  arch/arm/mach-imx/mm-imx25.c                       |    9 +-
+> >  arch/arm/mach-imx/mm-imx27.c                       |   13 +-
+> >  arch/arm/mach-imx/mm-imx31.c                       |    6 +-
+> >  arch/arm/mach-imx/mm-imx35.c                       |    7 +-
+> >  arch/arm/mach-mx5/mm-mx50.c                        |   13 +-
+> >  arch/arm/mach-mx5/mm.c                             |   24 ++--
+> >  arch/arm/plat-mxc/devices/platform-gpio-mxc.c      |    4 +-
+> >  arch/arm/plat-mxc/include/mach/common.h            |    2 +-
+> >  arch/arm/plat-mxc/include/mach/irqs.h              |   21 +---
+> >  drivers/gpio/gpio-mxc.c                            |  157 +++++++++++++++++---
+> >  13 files changed, 211 insertions(+), 87 deletions(-)
+> > 
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> > Please read the FAQ at  http://www.tux.org/lkml/
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 > 
 
-Yes, I think it is safer.
-
-> > +		 : "=&r" (v)
-> > +		 : "Ir" (0x40)
-> > +		 : );
-> > +}
-> 
-> To avoid aborts on platform which doesn't provide
-> access to SMP bit, NSACR bit 18 should be read.
-> Something like....
-> 
->    mrc     p15, 0, r0, c1, c1, 2
->    tst     r0, #(1 << 18)
->    mrcne   p15, 0, r0, c1, c0, 1
->    bicne   r0, r0, #(1 << 6)
->    mcrne   p15, 0, r0, c1, c0, 1
-> 
-
-I will merge that code in for v2.
-
-Thanks,
-Lorenzo
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
