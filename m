@@ -1,287 +1,341 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 8 Jul 2011 08:51:17 -0600
-Subject: [PATCH] of: add devicetree API for regulator
-In-Reply-To: <1310120428-22700-8-git-send-email-haojian.zhuang@marvell.com>
-References: <1310120428-22700-1-git-send-email-haojian.zhuang@marvell.com>
-	<1310120428-22700-2-git-send-email-haojian.zhuang@marvell.com>
-	<1310120428-22700-3-git-send-email-haojian.zhuang@marvell.com>
-	<1310120428-22700-4-git-send-email-haojian.zhuang@marvell.com>
-	<1310120428-22700-5-git-send-email-haojian.zhuang@marvell.com>
-	<1310120428-22700-6-git-send-email-haojian.zhuang@marvell.com>
-	<1310120428-22700-7-git-send-email-haojian.zhuang@marvell.com>
-	<1310120428-22700-8-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <CACxGe6teb+-xYGUXAcjwubxNhNQ-9395PjjE=fDnmZQHbgR0tw@mail.gmail.com>
+From: leiwen@marvell.com (Lei Wen)
+Date: Fri, 08 Jul 2011 14:54:57 -0000
+Subject: [PATCH V5 5/6] pxa3xx_nand: mtd scan id process could be defined by
+	driver itself
+In-Reply-To: <1298019428-7809-1-git-send-email-leiwen@marvell.com>
+References: <1298019428-7809-1-git-send-email-leiwen@marvell.com>
+Message-ID: <1298860335-18638-6-git-send-email-leiwen@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Haojian,
+Different NAND driver may require its unique detection. For pxa3xx_nand,
+it use its self id database to get the necessary info.
 
-On Fri, Jul 8, 2011 at 4:20 AM, Haojian Zhuang
-<haojian.zhuang@marvell.com> wrote:
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+Signed-off-by: Lei Wen <leiwen@marvell.com>
+Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+Cc: Eric Miao <eric.y.miao@gmail.com>
+Cc: David Woodhouse <dwmw2@infradead.org>
+Cc: Artem Bityutskiy <Artem.Bityutskiy@nokia.com>
+---
+ drivers/mtd/nand/pxa3xx_nand.c |  216 +++++++++++++++++++++++-----------------
+ 1 files changed, 123 insertions(+), 93 deletions(-)
 
-No commit description?
-
-> ---
-> ?drivers/of/Kconfig ? ? ? ? ? | ? ?4 +
-> ?drivers/of/Makefile ? ? ? ? ?| ? ?1 +
-> ?drivers/of/of_regulator.c ? ?| ?166 ++++++++++++++++++++++++++++++++++++++++++
-> ?include/linux/of_regulator.h | ? 34 +++++++++
-> ?4 files changed, 205 insertions(+), 0 deletions(-)
-> ?create mode 100644 drivers/of/of_regulator.c
-> ?create mode 100644 include/linux/of_regulator.h
->
-> diff --git a/drivers/of/Kconfig b/drivers/of/Kconfig
-> index d06a637..edb6601 100644
-> --- a/drivers/of/Kconfig
-> +++ b/drivers/of/Kconfig
-> @@ -75,4 +75,8 @@ config OF_PCI
-> ? ? ? ?help
-> ? ? ? ? ?OpenFirmware PCI bus accessors
->
-> +config OF_REGULATOR
-> + ? ? ? def_tristate REGULATOR
-> + ? ? ? depends on REGULATOR
-> +
-> ?endmenu # OF
-> diff --git a/drivers/of/Makefile b/drivers/of/Makefile
-> index f7861ed..83ca06f 100644
-> --- a/drivers/of/Makefile
-> +++ b/drivers/of/Makefile
-> @@ -10,3 +10,4 @@ obj-$(CONFIG_OF_NET) ?+= of_net.o
-> ?obj-$(CONFIG_OF_SPI) ? += of_spi.o
-> ?obj-$(CONFIG_OF_MDIO) ?+= of_mdio.o
-> ?obj-$(CONFIG_OF_PCI) ? += of_pci.o
-> +obj-$(CONFIG_OF_REGULATOR) ? ? += of_regulator.o
-> diff --git a/drivers/of/of_regulator.c b/drivers/of/of_regulator.c
-> new file mode 100644
-> index 0000000..d523302
-> --- /dev/null
-> +++ b/drivers/of/of_regulator.c
-> @@ -0,0 +1,166 @@
-> +/*
-> + * OF helpers for the Regulator API
-> + *
-> + * Copyright (c) 2011 Haojian Zhuang <haojian.zhuang@marvell.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + */
-> +#include <linux/kernel.h>
-> +#include <linux/of.h>
-> +#include <linux/regulator/machine.h>
-> +#include <linux/slab.h>
-> +#include <linux/string.h>
-> +#include <linux/suspend.h>
-> +
-> +static int of_regulator_init_constraints(struct device_node *of_dev,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct regulation_constraints *constraints)
-> +{
-> + ? ? ? const __be32 *p;
-> + ? ? ? const char *cp;
-> + ? ? ? const char *ops[] = {"voltage", "current", "mode", "status",
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "drms"};
-> + ? ? ? int i, size, len = 0, tmp = 0;
-> +
-> + ? ? ? memset(constraints, 0, sizeof(struct regulation_constraints));
-> +
-> + ? ? ? p = of_get_property(of_dev, "voltages", &size);
-> + ? ? ? if (p && size / sizeof(int) == 2) {
-> + ? ? ? ? ? ? ? constraints->min_uV = be32_to_cpu(*p++);
-> + ? ? ? ? ? ? ? constraints->max_uV = be32_to_cpu(*p);
-> + ? ? ? }
-
-You can probably simplify a lot of code by using
-of_property_read_u32_array(), which is currently in devicetree/next
-
-> + ? ? ? p = of_get_property(of_dev, "currents", &size);
-> + ? ? ? if (p && size / sizeof(int) == 2) {
-> + ? ? ? ? ? ? ? constraints->min_uA = be32_to_cpu(*p++);
-> + ? ? ? ? ? ? ? constraints->max_uA = be32_to_cpu(*p);
-> + ? ? ? }
-> + ? ? ? p = of_get_property(of_dev, "modes-mask", NULL);
-> + ? ? ? if (p)
-> + ? ? ? ? ? ? ? constraints->valid_modes_mask = be32_to_cpu(*p);
-> + ? ? ? cp = of_get_property(of_dev, "ops-mask", &size);
-> + ? ? ? tmp = 0;
-> + ? ? ? if (cp && size > 0) {
-> + ? ? ? ? ? ? ? i = 0;
-> + ? ? ? ? ? ? ? do {
-> + ? ? ? ? ? ? ? ? ? ? ? len = strlen(ops[i]);
-> + ? ? ? ? ? ? ? ? ? ? ? if (!strncmp(cp, ops[i], len)) {
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? constraints->valid_ops_mask |= 1 << i;
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? /* need to handle '\0' */
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? cp += len + 1;
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? size = size - len - 1;
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? i = 0;
-> + ? ? ? ? ? ? ? ? ? ? ? } else
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? i++;
-> + ? ? ? ? ? ? ? } while (i < ARRAY_SIZE(ops));
-> + ? ? ? ? ? ? ? if (size > 0)
-> + ? ? ? ? ? ? ? ? ? ? ? printk(KERN_WARNING "Invalid string:%s\n", cp);
-> + ? ? ? }
-> + ? ? ? p = of_get_property(of_dev, "input-uV", NULL);
-> + ? ? ? if (p)
-> + ? ? ? ? ? ? ? constraints->input_uV = be32_to_cpu(*p);
-> + ? ? ? p = of_get_property(of_dev, "state-pm-disk", &size);
-> + ? ? ? if (p && size / sizeof(int) == 3) {
-> + ? ? ? ? ? ? ? constraints->state_disk.uV = be32_to_cpu(*p++);
-> + ? ? ? ? ? ? ? constraints->state_disk.mode = be32_to_cpu(*p++);
-> + ? ? ? ? ? ? ? tmp = be32_to_cpu(*p);
-> + ? ? ? ? ? ? ? constraints->state_disk.enabled = (tmp) ? 1 : 0;
-> + ? ? ? ? ? ? ? constraints->state_disk.disabled = (tmp) ? 0 : 1;
-> + ? ? ? }
-> + ? ? ? p = of_get_property(of_dev, "state-pm-mem", &size);
-> + ? ? ? if (p && size / sizeof(int) == 3) {
-> + ? ? ? ? ? ? ? constraints->state_mem.uV = be32_to_cpu(*p++);
-> + ? ? ? ? ? ? ? constraints->state_mem.mode = be32_to_cpu(*p++);
-> + ? ? ? ? ? ? ? tmp = be32_to_cpu(*p);
-> + ? ? ? ? ? ? ? constraints->state_mem.enabled = (tmp) ? 1 : 0;
-> + ? ? ? ? ? ? ? constraints->state_mem.disabled = (tmp) ? 0 : 1;
-> + ? ? ? }
-> + ? ? ? p = of_get_property(of_dev, "state-pm-standby", &size);
-> + ? ? ? if (p && size / sizeof(int) == 3) {
-> + ? ? ? ? ? ? ? constraints->state_standby.uV = be32_to_cpu(*p++);
-> + ? ? ? ? ? ? ? constraints->state_standby.mode = be32_to_cpu(*p++);
-> + ? ? ? ? ? ? ? tmp = be32_to_cpu(*p);
-> + ? ? ? ? ? ? ? constraints->state_standby.enabled = (tmp) ? 1 : 0;
-> + ? ? ? ? ? ? ? constraints->state_standby.disabled = (tmp) ? 0 : 1;
-> + ? ? ? }
-> + ? ? ? cp = of_get_property(of_dev, "initial-state", &size);
-> + ? ? ? if (cp) {
-> + ? ? ? ? ? ? ? if (!strncmp(cp, "pm-suspend-on", size))
-> + ? ? ? ? ? ? ? ? ? ? ? constraints->initial_state = PM_SUSPEND_ON;
-> + ? ? ? ? ? ? ? if (!strncmp(cp, "pm-suspend-mem", size))
-> + ? ? ? ? ? ? ? ? ? ? ? constraints->initial_state = PM_SUSPEND_MEM;
-> + ? ? ? ? ? ? ? if (!strncmp(cp, "pm-suspend-standby", size))
-> + ? ? ? ? ? ? ? ? ? ? ? constraints->initial_state = PM_SUSPEND_STANDBY;
-> + ? ? ? }
-> + ? ? ? p = of_get_property(of_dev, "initial_mode", NULL);
-> + ? ? ? if (p)
-> + ? ? ? ? ? ? ? constraints->initial_mode = be32_to_cpu(*p);
-> + ? ? ? p = of_get_property(of_dev, "always-on", NULL);
-> + ? ? ? if (p)
-> + ? ? ? ? ? ? ? constraints->always_on = 1;
-> + ? ? ? p = of_get_property(of_dev, "boot-on", NULL);
-> + ? ? ? if (p)
-> + ? ? ? ? ? ? ? constraints->boot_on = 1;
-> + ? ? ? p = of_get_property(of_dev, "apply-uV", NULL);
-> + ? ? ? if (p)
-> + ? ? ? ? ? ? ? constraints->apply_uV = 1;
-> + ? ? ? return 0;
-> +}
-
-This code is implementing a new binding which needs to be documented
-in Documentation/devicetree/bindings.  It is hard to review the patch
-without some accompanying documentation about how you expect it to be
-used.
-
-> +
-> +int of_regulator_init_data(struct device_node *of_dev,
-> + ? ? ? ? ? ? ? ? ? ? ? struct regulator_init_data *data)
-> +{
-> + ? ? ? struct regulator_consumer_supply *supply;
-> + ? ? ? const char *p, *str;
-> + ? ? ? int ret, i, size, calc_size, len, count = 0;
-> +
-> + ? ? ? if (of_dev == NULL || data == NULL)
-> + ? ? ? ? ? ? ? return -EINVAL;
-> +
-> + ? ? ? p = of_get_property(of_dev, "device_type", &size);
-> + ? ? ? if (p == NULL || strncmp(p, "regulator", size))
-> + ? ? ? ? ? ? ? return -EINVAL;
-> +
-> + ? ? ? ret = of_regulator_init_constraints(of_dev, &data->constraints);
-> + ? ? ? if (ret)
-> + ? ? ? ? ? ? ? return ret;
-> + ? ? ? p = of_get_property(of_dev, "supply-name", &size);
-> + ? ? ? str = p;
-> + ? ? ? calc_size = size;
-> + ? ? ? while (str && calc_size > 0) {
-> + ? ? ? ? ? ? ? len = strlen(str);
-> + ? ? ? ? ? ? ? if (len == 0)
-> + ? ? ? ? ? ? ? ? ? ? ? break;
-> + ? ? ? ? ? ? ? calc_size = calc_size - len - 1;
-> + ? ? ? ? ? ? ? str += len + 1;
-> + ? ? ? ? ? ? ? count++;
-> + ? ? ? }
-> + ? ? ? if (count == 0)
-> + ? ? ? ? ? ? ? return -EINVAL;
-> +
-> + ? ? ? supply = kzalloc(sizeof(struct regulator_consumer_supply) * count,
-> + ? ? ? ? ? ? ? GFP_KERNEL);
-> + ? ? ? if (supply == NULL)
-> + ? ? ? ? ? ? ? return -EINVAL;
-> + ? ? ? str = p;
-> + ? ? ? calc_size = size;
-> + ? ? ? i = 0;
-> + ? ? ? while (str && calc_size > 0 && i < count) {
-> + ? ? ? ? ? ? ? len = strlen(str);
-> + ? ? ? ? ? ? ? if (len == 0)
-> + ? ? ? ? ? ? ? ? ? ? ? break;
-> + ? ? ? ? ? ? ? supply[i++].supply = str;
-> + ? ? ? ? ? ? ? calc_size = calc_size - len - 1;
-> + ? ? ? ? ? ? ? str += len + 1;
-> + ? ? ? }
-> + ? ? ? data->consumer_supplies = supply;
-> + ? ? ? data->num_consumer_supplies = count;
-> + ? ? ? return 0;
-> +}
-> +
-> +void of_regulator_deinit_data(struct regulator_init_data *data)
-> +{
-> + ? ? ? if (data && data->consumer_supplies)
-> + ? ? ? ? ? ? ? kfree(data->consumer_supplies);
-> +}
-> diff --git a/include/linux/of_regulator.h b/include/linux/of_regulator.h
-> new file mode 100644
-> index 0000000..0155bd8
-> --- /dev/null
-> +++ b/include/linux/of_regulator.h
-> @@ -0,0 +1,34 @@
-> +/*
-> + * Generic Regulator API implementation
-> + *
-> + * Copyright (c) 2011 Haojian Zhuang <haojian.zhuang@marvell.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + */
-> +
-> +#ifndef __LINUX_OF_REGULATOR_H
-> +#define __LINUX_OF_REGULATOR_H
-> +
-> +#if defined(CONFIG_OF_REGULATOR) || defined(CONFIG_OF_REGULATOR_MODULE)
-> +#include <linux/regulator/machine.h>
-> +
-> +extern int of_regulator_init_data(struct device_node *of_node,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct regulator_init_data *data);
-> +extern void of_regulator_deinit_data(struct regulator_init_data *data);
-> +
-> +#else
-> +static inline int of_regulator_init_data(struct device_node *of_node,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct regulator_init_data *data)
-> +{
-> + ? ? ? return 0;
-> +}
-> +
-> +static inline void of_regulator_deinit_data(struct regulator_init_data *data)
-> +{
-> +}
-> +#endif /* CONFIG_OF_REGULATOR */
-> +
-> +#endif /* __LINUX_OF_REGULATOR_H */
-> --
-> 1.5.6.5
->
->
-
-
-
+diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
+index de0a2a2..bb50cf2 100644
+--- a/drivers/mtd/nand/pxa3xx_nand.c
++++ b/drivers/mtd/nand/pxa3xx_nand.c
+@@ -123,6 +123,7 @@ enum {
+ struct pxa3xx_nand_info {
+ 	struct nand_chip	nand_chip;
+ 
++	struct nand_hw_control	controller;
+ 	struct platform_device	 *pdev;
+ 	struct pxa3xx_nand_cmdset *cmdset;
+ 
+@@ -157,6 +158,7 @@ struct pxa3xx_nand_info {
+ 
+ 	int			use_ecc;	/* use HW ECC ? */
+ 	int			use_dma;	/* use DMA ? */
++	int			is_ready;
+ 
+ 	unsigned int		page_size;	/* page size of attached chip */
+ 	unsigned int		data_size;	/* data size in FIFO */
+@@ -223,6 +225,8 @@ static struct pxa3xx_nand_flash builtin_flash_types[] = {
+ /* Define a default flash type setting serve as flash detecting only */
+ #define DEFAULT_FLASH_TYPE (&builtin_flash_types[0])
+ 
++const char *mtd_names[] = {"pxa3xx_nand-0", NULL};
++
+ #define NDTR0_tCH(c)	(min((c), 7) << 19)
+ #define NDTR0_tCS(c)	(min((c), 7) << 16)
+ #define NDTR0_tWH(c)	(min((c), 7) << 11)
+@@ -437,8 +441,10 @@ static irqreturn_t pxa3xx_nand_irq(int irq, void *devid)
+ 		info->state = STATE_CMD_DONE;
+ 		is_completed = 1;
+ 	}
+-	if (status & NDSR_FLASH_RDY)
++	if (status & NDSR_FLASH_RDY) {
++		info->is_ready = 1;
+ 		info->state = STATE_READY;
++	}
+ 
+ 	if (status & NDSR_WRCMDREQ) {
+ 		nand_writel(info, NDSR, NDSR_WRCMDREQ);
+@@ -483,10 +489,11 @@ static int prepare_command_pool(struct pxa3xx_nand_info *info, int command,
+ 	exec_cmd = 1;
+ 
+ 	/* reset data and oob column point to handle data */
+-	info->buf_start	= 0;
+-	info->buf_count	= 0;
++	info->buf_start		= 0;
++	info->buf_count		= 0;
+ 	info->oob_size		= 0;
+ 	info->use_ecc		= 0;
++	info->is_ready		= 0;
+ 	info->retcode		= ERR_NONE;
+ 
+ 	switch (command) {
+@@ -849,42 +856,6 @@ static int pxa3xx_nand_detect_config(struct pxa3xx_nand_info *info)
+ 	return 0;
+ }
+ 
+-static int pxa3xx_nand_detect_flash(struct pxa3xx_nand_info *info,
+-				    const struct pxa3xx_nand_platform_data *pdata)
+-{
+-	const struct pxa3xx_nand_flash *f;
+-	uint32_t id = -1;
+-	int i;
+-
+-	if (pdata->keep_config)
+-		if (pxa3xx_nand_detect_config(info) == 0)
+-			return 0;
+-
+-	/* we use default timing to detect id */
+-	f = DEFAULT_FLASH_TYPE;
+-	pxa3xx_nand_config_flash(info, f);
+-	pxa3xx_nand_cmdfunc(info->mtd, NAND_CMD_READID, 0, 0);
+-	id = *((uint16_t *)(info->data_buff));
+-
+-	for (i=0; i<ARRAY_SIZE(builtin_flash_types) + pdata->num_flash - 1; i++) {
+-		/* we first choose the flash definition from platfrom */
+-		if (i < pdata->num_flash)
+-			f = pdata->flash + i;
+-		else
+-			f = &builtin_flash_types[i - pdata->num_flash + 1];
+-		if (f->chip_id == id) {
+-			dev_info(&info->pdev->dev, "detect chip id: 0x%x\n", id);
+-			pxa3xx_nand_config_flash(info, f);
+-			return 0;
+-		}
+-	}
+-
+-	dev_warn(&info->pdev->dev,
+-		 "failed to detect configured nand flash; found %04x instead of\n",
+-		 id);
+-	return -ENODEV;
+-}
+-
+ /* the maximum possible buffer size for large page with OOB data
+  * is: 2048 + 64 = 2112 bytes, allocate a page here for both the
+  * data buffer and the DMA descriptor
+@@ -926,57 +897,110 @@ static int pxa3xx_nand_init_buff(struct pxa3xx_nand_info *info)
+ 	return 0;
+ }
+ 
+-static struct nand_ecclayout hw_smallpage_ecclayout = {
+-	.eccbytes = 6,
+-	.eccpos = {8, 9, 10, 11, 12, 13 },
+-	.oobfree = { {2, 6} }
+-};
++static int pxa3xx_nand_sensing(struct pxa3xx_nand_info *info)
++{
++	struct mtd_info *mtd = info->mtd;
++	struct nand_chip *chip = mtd->priv;
+ 
+-static struct nand_ecclayout hw_largepage_ecclayout = {
+-	.eccbytes = 24,
+-	.eccpos = {
+-		40, 41, 42, 43, 44, 45, 46, 47,
+-		48, 49, 50, 51, 52, 53, 54, 55,
+-		56, 57, 58, 59, 60, 61, 62, 63},
+-	.oobfree = { {2, 38} }
+-};
++	/* use the common timing to make a try */
++	pxa3xx_nand_config_flash(info, &builtin_flash_types[0]);
++	chip->cmdfunc(mtd, NAND_CMD_RESET, 0, 0);
++	if (info->is_ready)
++		return 1;
++	else
++		return 0;
++}
+ 
+-static void pxa3xx_nand_init_mtd(struct mtd_info *mtd,
+-				 struct pxa3xx_nand_info *info)
++static int pxa3xx_nand_scan(struct mtd_info *mtd)
+ {
+-	struct nand_chip *this = &info->nand_chip;
+-
+-	this->options = (info->reg_ndcr & NDCR_DWIDTH_C) ? NAND_BUSWIDTH_16: 0;
+-	this->options |= NAND_NO_AUTOINCR;
+-
+-	this->waitfunc		= pxa3xx_nand_waitfunc;
+-	this->select_chip	= pxa3xx_nand_select_chip;
+-	this->dev_ready		= pxa3xx_nand_dev_ready;
+-	this->cmdfunc		= pxa3xx_nand_cmdfunc;
+-	this->ecc.read_page	= pxa3xx_nand_read_page_hwecc;
+-	this->ecc.write_page	= pxa3xx_nand_write_page_hwecc;
+-	this->read_word		= pxa3xx_nand_read_word;
+-	this->read_byte		= pxa3xx_nand_read_byte;
+-	this->read_buf		= pxa3xx_nand_read_buf;
+-	this->write_buf		= pxa3xx_nand_write_buf;
+-	this->verify_buf	= pxa3xx_nand_verify_buf;
+-
+-	this->ecc.mode		= NAND_ECC_HW;
+-	this->ecc.size		= info->page_size;
+-
+-	if (info->page_size == 2048)
+-		this->ecc.layout = &hw_largepage_ecclayout;
+-	else
+-		this->ecc.layout = &hw_smallpage_ecclayout;
++	struct pxa3xx_nand_info *info = mtd->priv;
++	struct platform_device *pdev = info->pdev;
++	struct pxa3xx_nand_platform_data *pdata = pdev->dev.platform_data;
++	const struct pxa3xx_nand_flash *f = NULL;
++	struct nand_chip *chip = mtd->priv;
++	uint32_t id = -1;
++	int i, ret, num;
++
++	if (pdata->keep_config && !pxa3xx_nand_detect_config(info))
++		return 0;
++
++	ret = pxa3xx_nand_sensing(info);
++	if (!ret) {
++		kfree(mtd);
++		info->mtd = NULL;
++		printk(KERN_INFO "There is no nand chip on cs 0!\n");
++
++		return -EINVAL;
++	}
++
++	chip->cmdfunc(mtd, NAND_CMD_READID, 0, 0);
++	id = *((uint16_t *)(info->data_buff));
++	if (id != 0)
++		printk(KERN_INFO "Detect a flash id %x\n", id);
++	else {
++		kfree(mtd);
++		info->mtd = NULL;
++		printk(KERN_WARNING "Read out ID 0, potential timing set wrong!!\n");
++
++		return -EINVAL;
++	}
++
++	num = ARRAY_SIZE(builtin_flash_types) + pdata->num_flash - 1;
++	for (i = 0; i < num; i++) {
++		if (i < pdata->num_flash)
++			f = pdata->flash + i;
++		else
++			f = &builtin_flash_types[i - pdata->num_flash + 1];
++
++		/* find the chip in default list */
++		if (f->chip_id == id) {
++			pxa3xx_nand_config_flash(info, f);
++			mtd->writesize = f->page_size;
++			mtd->writesize_shift = ffs(mtd->writesize) - 1;
++			mtd->writesize_mask = (1 << mtd->writesize_shift) - 1;
++			mtd->oobsize = mtd->writesize / 32;
++			mtd->erasesize = f->page_size * f->page_per_block;
++			mtd->erasesize_shift = ffs(mtd->erasesize) - 1;
++			mtd->erasesize_mask = (1 << mtd->erasesize_shift) - 1;
++
++			mtd->name = mtd_names[0];
++			break;
++		}
++	}
++
++	if (i >= (ARRAY_SIZE(builtin_flash_types) + pdata->num_flash)) {
++		kfree(mtd);
++		info->mtd = NULL;
++		printk(KERN_ERR "ERROR!! flash not defined!!!\n");
++
++		return -EINVAL;
++	}
++
++	chip->ecc.mode = NAND_ECC_HW;
++	chip->ecc.size = f->page_size;
++	chip->chipsize = (uint64_t)f->num_blocks * f->page_per_block
++				    * f->page_size;
++	mtd->size = chip->chipsize;
++
++	/* Calculate the address shift from the page size */
++	chip->page_shift = ffs(mtd->writesize) - 1;
++	chip->pagemask = mtd_div_by_ws(chip->chipsize, mtd) - 1;
++	chip->numchips = 1;
++	chip->phys_erase_shift = ffs(mtd->erasesize) - 1;
++	chip->bbt_erase_shift = chip->phys_erase_shift;
++
++	chip->options = (f->flash_width == 16) ? NAND_BUSWIDTH_16 : 0;
++	chip->options |= NAND_NO_AUTOINCR;
++	chip->options |= NAND_NO_READRDY;
+ 
+-	this->chip_delay = 25;
++	return nand_scan_tail(mtd);
+ }
+ 
+ static
+ struct pxa3xx_nand_info *alloc_nand_resource(struct platform_device *pdev)
+ {
+-	struct pxa3xx_nand_platform_data *pdata = pdev->dev.platform_data;
+ 	struct pxa3xx_nand_info *info;
++	struct nand_chip *chip;
+ 	struct mtd_info *mtd;
+ 	struct resource *r;
+ 	int ret, irq;
+@@ -989,12 +1013,27 @@ struct pxa3xx_nand_info *alloc_nand_resource(struct platform_device *pdev)
+ 	}
+ 
+ 	info = (struct pxa3xx_nand_info *)(&mtd[1]);
++	chip = (struct nand_chip *)(&mtd[1]);
+ 	info->pdev = pdev;
+-
+-	mtd->priv = info;
+ 	info->mtd = mtd;
++	mtd->priv = info;
+ 	mtd->owner = THIS_MODULE;
+ 
++	chip->ecc.read_page	= pxa3xx_nand_read_page_hwecc;
++	chip->ecc.write_page	= pxa3xx_nand_write_page_hwecc;
++	chip->controller        = &info->controller;
++	chip->waitfunc		= pxa3xx_nand_waitfunc;
++	chip->select_chip	= pxa3xx_nand_select_chip;
++	chip->dev_ready		= pxa3xx_nand_dev_ready;
++	chip->cmdfunc		= pxa3xx_nand_cmdfunc;
++	chip->read_word		= pxa3xx_nand_read_word;
++	chip->read_byte		= pxa3xx_nand_read_byte;
++	chip->read_buf		= pxa3xx_nand_read_buf;
++	chip->write_buf		= pxa3xx_nand_write_buf;
++	chip->verify_buf	= pxa3xx_nand_verify_buf;
++
++	spin_lock_init(&chip->controller->lock);
++	init_waitqueue_head(&chip->controller->wq);
+ 	info->clk = clk_get(&pdev->dev, NULL);
+ 	if (IS_ERR(info->clk)) {
+ 		dev_err(&pdev->dev, "failed to get nand clock\n");
+@@ -1062,21 +1101,12 @@ struct pxa3xx_nand_info *alloc_nand_resource(struct platform_device *pdev)
+ 		goto fail_free_buf;
+ 	}
+ 
+-	ret = pxa3xx_nand_detect_flash(info, pdata);
+-	if (ret) {
+-		dev_err(&pdev->dev, "failed to detect flash\n");
+-		ret = -ENODEV;
+-		goto fail_free_irq;
+-	}
+-
+-	pxa3xx_nand_init_mtd(mtd, info);
+ 	platform_set_drvdata(pdev, info);
+ 
+ 	return info;
+ 
+-fail_free_irq:
+-	free_irq(irq, info);
+ fail_free_buf:
++	free_irq(irq, info);
+ 	if (use_dma) {
+ 		pxa_free_dma(info->data_dma_ch);
+ 		dma_free_coherent(&pdev->dev, info->data_buff_size,
+@@ -1146,7 +1176,7 @@ static int pxa3xx_nand_probe(struct platform_device *pdev)
+ 	if (info == NULL)
+ 		return -ENOMEM;
+ 
+-	if (nand_scan(info->mtd, 1)) {
++	if (pxa3xx_nand_scan(info->mtd)) {
+ 		dev_err(&pdev->dev, "failed to scan nand\n");
+ 		pxa3xx_nand_remove(pdev);
+ 		return -ENODEV;
 -- 
-Grant Likely, B.Sc., P.Eng.
-Secret Lab Technologies Ltd.
+1.7.0.4
+
+
+______________________________________________________
+Linux MTD discussion mailing list
+http://lists.infradead.org/mailman/listinfo/linux-mtd/
