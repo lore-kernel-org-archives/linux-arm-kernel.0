@@ -1,39 +1,29 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 8 Jul 2011 01:45:12 -0600 (MDT)
-Subject: [PATCH v2 0/4] OMAP4: Add modulemode support to hwmod framework
-	(part 2)
-In-Reply-To: <1309557267-27165-1-git-send-email-b-cousson@ti.com>
-References: <1309557267-27165-1-git-send-email-b-cousson@ti.com>
-Message-ID: <alpine.DEB.2.00.1107080142090.24181@utopia.booyaka.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 8 Jul 2011 08:56:58 +0100
+Subject: [RFC PATCH 00/17] ARM: common idle infrastructure
+In-Reply-To: <20110707171530.GC20403@n2100.arm.linux.org.uk>
+References: <1310053830-23779-1-git-send-email-lorenzo.pieralisi@arm.com>
+	<20110707171530.GC20403@n2100.arm.linux.org.uk>
+Message-ID: <20110708075658.GA31273@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
-
-On Fri, 1 Jul 2011, Benoit Cousson wrote:
-
-> Here is the second part of the modulemode series. 
-> The goal here is to do the cleanup on the clock nodes and PRCM macros
-> that are not needed anymore by the hwmod data.
-> Some macros are still needed because of clock data. It should be removed
-> once the clock data will be cleaned.
+On Thu, Jul 07, 2011 at 06:15:30PM +0100, Russell King - ARM Linux wrote:
+> On Thu, Jul 07, 2011 at 04:50:13PM +0100, Lorenzo Pieralisi wrote:
+> > This patchset is a first attempt at providing a consolidation of idle
+> > code for the ARM processor architecture and a request for comment on
+> > the provided methodology.
+> > It relies and it is based on kernel features such as suspend/resume,
+> > pm notifiers and common code for cpu_reset().
 > 
-> Since the MMC pm_runtime is done, we can drop the TEMP hacks.
+> Please delay this for the next merge window - there's too much going on
+> at the moment to even start looking at this patch set.
 > 
-> The series is based on for_3.1/6_hwmod_clkdm_fixes and tested
-> on OMAP4430 ES2.1 + SDP. It should not affect OMAP2 & 3, but some testing
-> are definitively needed.
-> 
-> The patches are available here:
-> git://gitorious.org/omap-pm/linux.git for_3.1/7_hwmod_modulemode
+> Thanks.
 
-At this point, these don't seem like 3.1 material, mostly because this 
-series removes main_clk entries.  This is going to cause problems 
-retrieving the main_clk clockdomain, since the patch to retrieve it from 
-the hwmod clkdm was dropped due to OMAP2/3 breakage.  Also, we should 
-probably discuss whether there are additional implications to removing a 
-module's main_clk, as opposed to setting it to a clock tree node closer to 
-the root.
+Ok Russell, I understand. Please have a look whenever you can I need 
+feedback on many details.
 
+Thank you very much.
 
-- Paul
+Lorenzo
