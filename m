@@ -1,274 +1,677 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Fri, 08 Jul 2011 15:36:35 -0000
-Subject: [PATCH] MTD: atmel_nand: Add DMA support to access Nandflash
-In-Reply-To: <1295332565-25610-2-git-send-email-hong.xu@atmel.com>
-References: <hong.xu@atmel.com>
-	<1295332565-25610-2-git-send-email-hong.xu@atmel.com>
-Message-ID: <4D3557F8.4000008@bluewatersys.com>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Fri, 8 Jul 2011 23:59:42 +0800
+Subject: [PATCH 02/10] ASoc: mxs: add mxs-saif driver
+In-Reply-To: <1310140790-2132-1-git-send-email-b29396@freescale.com>
+References: <1310140790-2132-1-git-send-email-b29396@freescale.com>
+Message-ID: <1310140790-2132-3-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/01/11 19:36, Hong Xu wrote:
-> Some SAM9 chips have the ability to perform DMA between CPU and SMC controller.
-> This patch adds DMA support for SAM9RL, SAM9G45, SSAM9G46,AM9M10, SAM9M11.
->
-> Signed-off-by: Hong Xu<hong.xu@atmel.com>
+Signed-off-by: Dong Aisheng <b29396@freescale.com>
+---
+ sound/soc/mxs/mxs-saif.c |  524 ++++++++++++++++++++++++++++++++++++++++++++++
+ sound/soc/mxs/mxs-saif.h |  124 +++++++++++
+ 2 files changed, 648 insertions(+), 0 deletions(-)
 
-Tested-by: Ryan Mallon <ryan@bluewatersys.com>
-Acked-by: Ryan Mallon <ryan@bluewatersys.com>
-
-> ---
->   drivers/mtd/nand/atmel_nand.c |  166 ++++++++++++++++++++++++++++++++++++++--
->   1 files changed, 157 insertions(+), 9 deletions(-)
->
-> diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
-> index ccce0f0..6fae04b 100644
-> --- a/drivers/mtd/nand/atmel_nand.c
-> +++ b/drivers/mtd/nand/atmel_nand.c
-> @@ -48,6 +48,9 @@
->   #define no_ecc		0
->   #endif
->
-> +static int use_dma = 1;
-> +module_param(use_dma, int, 0);
-> +
->   static int on_flash_bbt = 0;
->   module_param(on_flash_bbt, int, 0);
->
-> @@ -89,11 +92,20 @@ struct atmel_nand_host {
->   	struct nand_chip	nand_chip;
->   	struct mtd_info		mtd;
->   	void __iomem		*io_base;
-> +	dma_addr_t		io_phys;
->   	struct atmel_nand_data	*board;
->   	struct device		*dev;
->   	void __iomem		*ecc;
-> +
-> +	struct completion	comp;
-> +	struct dma_chan		*dma_chan;
->   };
->
-> +static int cpu_has_dma(void)
-> +{
-> +	return cpu_is_at91sam9rl() || cpu_is_at91sam9g45();
-> +}
-> +
->   /*
->    * Enable NAND.
->    */
-> @@ -150,7 +162,7 @@ static int atmel_nand_device_ready(struct mtd_info *mtd)
->   /*
->    * Minimal-overhead PIO for data access.
->    */
-> -static void atmel_read_buf(struct mtd_info *mtd, u8 *buf, int len)
-> +static void atmel_read_buf8(struct mtd_info *mtd, u8 *buf, int len)
->   {
->   	struct nand_chip	*nand_chip = mtd->priv;
->
-> @@ -164,7 +176,7 @@ static void atmel_read_buf16(struct mtd_info *mtd, u8 *buf, int len)
->   	__raw_readsw(nand_chip->IO_ADDR_R, buf, len / 2);
->   }
->
-> -static void atmel_write_buf(struct mtd_info *mtd, const u8 *buf, int len)
-> +static void atmel_write_buf8(struct mtd_info *mtd, const u8 *buf, int len)
->   {
->   	struct nand_chip	*nand_chip = mtd->priv;
->
-> @@ -178,6 +190,121 @@ static void atmel_write_buf16(struct mtd_info *mtd, const u8 *buf, int len)
->   	__raw_writesw(nand_chip->IO_ADDR_W, buf, len / 2);
->   }
->
-> +static void dma_complete_func(void *completion)
-> +{
-> +	complete(completion);
-> +}
-> +
-> +static int atmel_nand_dma_op(struct mtd_info *mtd, void *buf, int len,
-> +			       int is_read)
-> +{
-> +	struct dma_device *dma_dev;
-> +	enum dma_ctrl_flags flags;
-> +	dma_addr_t dma_src_addr, dma_dst_addr, phys_addr;
-> +	struct dma_async_tx_descriptor *tx = NULL;
-> +	dma_cookie_t cookie;
-> +	struct nand_chip *chip = mtd->priv;
-> +	struct atmel_nand_host *host = chip->priv;
-> +	void *p = buf;
-> +	int err = -EIO;
-> +	enum dma_data_direction dir = is_read ? DMA_FROM_DEVICE : DMA_TO_DEVICE;
-> +
-> +	if (buf>= high_memory) {
-> +		struct page *pg;
-> +
-> +		if (((size_t)buf&  PAGE_MASK) !=
-> +		    ((size_t)(buf + len - 1)&  PAGE_MASK)) {
-> +			dev_warn(host->dev, "Buffer not fit in one page\n");
-> +			goto err_buf;
-> +		}
-> +
-> +		pg = vmalloc_to_page(buf);
-> +		if (pg == 0) {
-> +			dev_err(host->dev, "Failed to vmalloc_to_page\n");
-> +			goto err_buf;
-> +		}
-> +		p = page_address(pg) + ((size_t)buf&  ~PAGE_MASK);
-> +	}
-> +
-> +	dma_dev = host->dma_chan->device;
-> +
-> +	flags = DMA_CTRL_ACK | DMA_PREP_INTERRUPT | DMA_COMPL_SKIP_SRC_UNMAP |
-> +		DMA_COMPL_SKIP_DEST_UNMAP;
-> +
-> +	phys_addr = dma_map_single(dma_dev->dev, p, len, dir);
-> +	if (dma_mapping_error(dma_dev->dev, phys_addr)) {
-> +		dev_err(host->dev, "Failed to dma_map_single\n");
-> +		goto err_buf;
-> +	}
-> +
-> +	if (is_read) {
-> +		dma_src_addr = host->io_phys;
-> +		dma_dst_addr = phys_addr;
-> +	} else {
-> +		dma_src_addr = phys_addr;
-> +		dma_dst_addr = host->io_phys;
-> +	}
-> +
-> +	tx = dma_dev->device_prep_dma_memcpy(host->dma_chan, dma_dst_addr,
-> +					     dma_src_addr, len, flags);
-> +	if (!tx) {
-> +		dev_err(host->dev, "Failed to prepare DMA memcpy\n");
-> +		goto err_dma;
-> +	}
-> +
-> +	init_completion(&host->comp);
-> +	tx->callback = dma_complete_func;
-> +	tx->callback_param =&host->comp;
-> +
-> +	cookie = tx->tx_submit(tx);
-> +	if (dma_submit_error(cookie)) {
-> +		dev_err(host->dev, "Failed to do DMA tx_submit\n");
-> +		goto err_dma;
-> +	}
-> +
-> +	dma_async_issue_pending(host->dma_chan);
-> +	wait_for_completion(&host->comp);
-> +
-> +	err = 0;
-> +
-> +err_dma:
-> +	dma_unmap_single(dma_dev->dev, phys_addr, len, dir);
-> +err_buf:
-> +	if (err != 0)
-> +		dev_warn(host->dev, "Fall back to CPU I/O\n");
-> +	return err;
-> +}
-> +
-> +static void atmel_read_buf(struct mtd_info *mtd, u8 *buf, int len)
-> +{
-> +	struct nand_chip *chip = mtd->priv;
-> +	struct atmel_nand_host *host = chip->priv;
-> +
-> +	if (use_dma&&  len>= mtd->oobsize)
-> +		if (atmel_nand_dma_op(mtd, buf, len, 1) == 0)
-> +			return;
-> +
-> +	if (host->board->bus_width_16)
-> +		atmel_read_buf16(mtd, buf, len);
-> +	else
-> +		atmel_read_buf8(mtd, buf, len);
-> +}
-> +
-> +static void atmel_write_buf(struct mtd_info *mtd, const u8 *buf, int len)
-> +{
-> +	struct nand_chip *chip = mtd->priv;
-> +	struct atmel_nand_host *host = chip->priv;
-> +
-> +	if (use_dma&&  len>= mtd->oobsize)
-> +		if (atmel_nand_dma_op(mtd, (void *)buf, len, 0) == 0)
-> +			return;
-> +
-> +	if (host->board->bus_width_16)
-> +		atmel_write_buf16(mtd, buf, len);
-> +	else
-> +		atmel_write_buf8(mtd, buf, len);
-> +}
-> +
->   /*
->    * Calculate HW ECC
->    *
-> @@ -398,6 +525,8 @@ static int __init atmel_nand_probe(struct platform_device *pdev)
->   		return -ENOMEM;
->   	}
->
-> +	host->io_phys = (dma_addr_t)mem->start;
-> +
->   	host->io_base = ioremap(mem->start, mem->end - mem->start + 1);
->   	if (host->io_base == NULL) {
->   		printk(KERN_ERR "atmel_nand: ioremap failed\n");
-> @@ -448,14 +577,11 @@ static int __init atmel_nand_probe(struct platform_device *pdev)
->
->   	nand_chip->chip_delay = 20;		/* 20us command delay time */
->
-> -	if (host->board->bus_width_16) {	/* 16-bit bus width */
-> +	if (host->board->bus_width_16)	/* 16-bit bus width */
->   		nand_chip->options |= NAND_BUSWIDTH_16;
-> -		nand_chip->read_buf = atmel_read_buf16;
-> -		nand_chip->write_buf = atmel_write_buf16;
-> -	} else {
-> -		nand_chip->read_buf = atmel_read_buf;
-> -		nand_chip->write_buf = atmel_write_buf;
-> -	}
-> +
-> +	nand_chip->read_buf = atmel_read_buf;
-> +	nand_chip->write_buf = atmel_write_buf;
->
->   	platform_set_drvdata(pdev, host);
->   	atmel_nand_enable(host);
-> @@ -473,6 +599,22 @@ static int __init atmel_nand_probe(struct platform_device *pdev)
->   		nand_chip->options |= NAND_USE_FLASH_BBT;
->   	}
->
-> +	if (cpu_has_dma()&&  use_dma) {
-> +		dma_cap_mask_t mask;
-> +
-> +		dma_cap_zero(mask);
-> +		dma_cap_set(DMA_MEMCPY, mask);
-> +		host->dma_chan = dma_request_channel(mask, 0, NULL);
-> +		if (!host->dma_chan) {
-> +			dev_err(host->dev, "Failed to request DMA channel\n");
-> +			use_dma = 0;
-> +		}
-> +	}
-> +	if (use_dma)
-> +		dev_info(host->dev, "Using DMA for NAND access.\n");
-> +	else
-> +		dev_info(host->dev, "No DMA support for NAND access.\n");
-> +
->   	/* first scan to find the device and get the page size */
->   	if (nand_scan_ident(mtd, 1, NULL)) {
->   		res = -ENXIO;
-> @@ -555,6 +697,8 @@ err_scan_ident:
->   err_no_card:
->   	atmel_nand_disable(host);
->   	platform_set_drvdata(pdev, NULL);
-> +	if (host->dma_chan)
-> +		dma_release_channel(host->dma_chan);
->   	if (host->ecc)
->   		iounmap(host->ecc);
->   err_ecc_ioremap:
-> @@ -578,6 +722,10 @@ static int __exit atmel_nand_remove(struct platform_device *pdev)
->
->   	if (host->ecc)
->   		iounmap(host->ecc);
-> +
-> +	if (host->dma_chan)
-> +		dma_release_channel(host->dma_chan);
-> +
->   	iounmap(host->io_base);
->   	kfree(host);
->
-
-
-______________________________________________________
-Linux MTD discussion mailing list
-http://lists.infradead.org/mailman/listinfo/linux-mtd/
+diff --git a/sound/soc/mxs/mxs-saif.c b/sound/soc/mxs/mxs-saif.c
+new file mode 100644
+index 0000000..afc6e57
+--- /dev/null
++++ b/sound/soc/mxs/mxs-saif.c
+@@ -0,0 +1,524 @@
++/*
++ * Copyright 2011 Freescale Semiconductor, Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License along
++ * with this program; if not, write to the Free Software Foundation, Inc.,
++ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
++ */
++
++#include <linux/module.h>
++#include <linux/init.h>
++#include <linux/platform_device.h>
++#include <linux/slab.h>
++#include <linux/dma-mapping.h>
++#include <linux/clk.h>
++#include <linux/delay.h>
++#include <sound/core.h>
++#include <sound/pcm.h>
++#include <sound/pcm_params.h>
++#include <sound/soc.h>
++#include <mach/dma.h>
++#include <asm/mach-types.h>
++#include <mach/hardware.h>
++#include <mach/mx28.h>
++
++#include "mxs-saif.h"
++
++/*
++* SAIF system clock configuration.
++* Should only be called when port is inactive.
++*/
++static int mxs_saif_set_dai_sysclk(struct snd_soc_dai *cpu_dai,
++			int clk_id, unsigned int freq, int dir)
++{
++	struct mxs_saif *saif = snd_soc_dai_get_drvdata(cpu_dai);
++
++	switch (clk_id) {
++	case MXS_SAIF_SYS_CLK:
++		clk_set_rate(saif->clk, freq);
++		clk_enable(saif->clk);
++		break;
++	default:
++		return -EINVAL;
++	}
++	return 0;
++}
++
++/*
++ * SAIF Clock dividers
++ * Should only be called when port is inactive.
++ */
++static int mxs_saif_set_dai_clkdiv(struct snd_soc_dai *cpu_dai,
++				  int div_id, int div)
++{
++	u32 scr;
++	struct mxs_saif *saif = snd_soc_dai_get_drvdata(cpu_dai);
++
++	scr = __raw_readl(saif->base + SAIF_CTRL);
++	scr &= ~BM_SAIF_CTRL_BITCLK_MULT_RATE;
++	scr &= ~BM_SAIF_CTRL_BITCLK_BASE_RATE;
++
++	switch (div_id) {
++	case MXS_SAIF_MCLK:
++		switch (div) {
++		case 32:
++			scr |= BF_SAIF_CTRL_BITCLK_MULT_RATE(4);
++			scr &= ~BM_SAIF_CTRL_BITCLK_BASE_RATE;
++			break;
++		case 64:
++			scr |= BF_SAIF_CTRL_BITCLK_MULT_RATE(3);
++			scr &= ~BM_SAIF_CTRL_BITCLK_BASE_RATE;
++			break;
++		case 128:
++			scr |= BF_SAIF_CTRL_BITCLK_MULT_RATE(2);
++			scr &= ~BM_SAIF_CTRL_BITCLK_BASE_RATE;
++			break;
++		case 256:
++			scr |= BF_SAIF_CTRL_BITCLK_MULT_RATE(1);
++			scr &= ~BM_SAIF_CTRL_BITCLK_BASE_RATE;
++			break;
++		case 512:
++			scr |= BF_SAIF_CTRL_BITCLK_MULT_RATE(0);
++			scr &= ~BM_SAIF_CTRL_BITCLK_BASE_RATE;
++			break;
++		case 48:
++			scr |= BF_SAIF_CTRL_BITCLK_MULT_RATE(3);
++			scr |= BM_SAIF_CTRL_BITCLK_BASE_RATE;
++			break;
++		case 96:
++			scr |= BF_SAIF_CTRL_BITCLK_MULT_RATE(2);
++			scr |= BM_SAIF_CTRL_BITCLK_BASE_RATE;
++			break;
++		case 192:
++			scr |= BF_SAIF_CTRL_BITCLK_MULT_RATE(1);
++			scr |= BM_SAIF_CTRL_BITCLK_BASE_RATE;
++			break;
++		case 384:
++			scr |= BF_SAIF_CTRL_BITCLK_MULT_RATE(0);
++			scr |= BM_SAIF_CTRL_BITCLK_BASE_RATE;
++			break;
++		default:
++			return -EINVAL;
++		}
++		break;
++	default:
++		return -EINVAL;
++	}
++
++	__raw_writel(scr, saif->base + SAIF_CTRL);
++
++	return 0;
++}
++
++/*
++ * SAIF DAI format configuration.
++ * Should only be called when port is inactive.
++ * Note: We don't use the I2S modes but instead manually configure the
++ * SAIF for I2S.
++ */
++static int mxs_saif_set_dai_fmt(struct snd_soc_dai *cpu_dai, unsigned int fmt)
++{
++	u32 scr, stat;
++	u32 scr0;
++	struct mxs_saif *saif = snd_soc_dai_get_drvdata(cpu_dai);
++
++	stat = __raw_readl(saif->base + SAIF_STAT);
++	if (stat & BM_SAIF_STAT_BUSY)
++		return 0;
++
++	scr0 = __raw_readl(saif->base + SAIF_CTRL);
++	scr0 = scr0 & ~BM_SAIF_CTRL_BITCLK_EDGE & ~BM_SAIF_CTRL_LRCLK_POLARITY \
++		& ~BM_SAIF_CTRL_JUSTIFY & ~BM_SAIF_CTRL_DELAY;
++	scr = 0;
++
++	/* DAI mode */
++	switch (fmt & SND_SOC_DAIFMT_FORMAT_MASK) {
++	case SND_SOC_DAIFMT_I2S:
++		/* data frame low 1clk before data */
++		scr |= BM_SAIF_CTRL_DELAY;
++		scr &= ~BM_SAIF_CTRL_LRCLK_POLARITY;
++		break;
++	case SND_SOC_DAIFMT_LEFT_J:
++		/* data frame high with data */
++		scr &= ~BM_SAIF_CTRL_DELAY;
++		scr &= ~BM_SAIF_CTRL_LRCLK_POLARITY;
++		scr &= ~BM_SAIF_CTRL_JUSTIFY;
++		break;
++	}
++
++	/* DAI clock inversion */
++	switch (fmt & SND_SOC_DAIFMT_INV_MASK) {
++	case SND_SOC_DAIFMT_IB_IF:
++		scr |= BM_SAIF_CTRL_BITCLK_EDGE;
++		scr |= BM_SAIF_CTRL_LRCLK_POLARITY;
++		break;
++	case SND_SOC_DAIFMT_IB_NF:
++		scr |= BM_SAIF_CTRL_BITCLK_EDGE;
++		scr &= ~BM_SAIF_CTRL_LRCLK_POLARITY;
++		break;
++	case SND_SOC_DAIFMT_NB_IF:
++		scr &= ~BM_SAIF_CTRL_BITCLK_EDGE;
++		scr |= BM_SAIF_CTRL_LRCLK_POLARITY;
++		break;
++	case SND_SOC_DAIFMT_NB_NF:
++		scr &= ~BM_SAIF_CTRL_BITCLK_EDGE;
++		scr &= ~BM_SAIF_CTRL_LRCLK_POLARITY;
++		break;
++	}
++
++	/*
++	 * Note: We simply just support master mode since SAIF TX only supports
++	 * master mode.
++	 */
++	switch (fmt & SND_SOC_DAIFMT_MASTER_MASK) {
++	case SND_SOC_DAIFMT_CBS_CFS:
++		scr &= ~BM_SAIF_CTRL_SLAVE_MODE;
++		__raw_writel(scr | scr0, saif->base + SAIF_CTRL);
++		break;
++	case SND_SOC_DAIFMT_CBM_CFS:
++		break;
++	case SND_SOC_DAIFMT_CBS_CFM:
++		break;
++	case SND_SOC_DAIFMT_CBM_CFM:
++		return -EINVAL;
++		break;
++	}
++
++	return 0;
++}
++
++static int mxs_saif_startup(struct snd_pcm_substream *substream,
++			   struct snd_soc_dai *cpu_dai)
++{
++	struct mxs_saif *saif = snd_soc_dai_get_drvdata(cpu_dai);
++	snd_soc_dai_set_dma_data(cpu_dai, substream, &saif->dma_param);
++
++	return 0;
++}
++
++/*
++ * Should only be called when port is inactive.
++ * although can be called multiple times by upper layers.
++ */
++static int mxs_saif_hw_params(struct snd_pcm_substream *substream,
++			     struct snd_pcm_hw_params *params,
++			     struct snd_soc_dai *cpu_dai)
++{
++	struct mxs_saif *saif = snd_soc_dai_get_drvdata(cpu_dai);
++	u32 scr;
++
++	scr = __raw_readl(saif->base + SAIF_CTRL);
++
++	/* cant change any parameters when SAIF is running */
++	/* DAI data (word) size */
++	scr &= ~BM_SAIF_CTRL_WORD_LENGTH;
++	scr &= ~BM_SAIF_CTRL_BITCLK_48XFS_ENABLE;
++	switch (params_format(params)) {
++	case SNDRV_PCM_FORMAT_S16_LE:
++		scr |= BF_SAIF_CTRL_WORD_LENGTH(0);
++		break;
++	case SNDRV_PCM_FORMAT_S20_3LE:
++		scr |= BF_SAIF_CTRL_WORD_LENGTH(4);
++		scr |= BM_SAIF_CTRL_BITCLK_48XFS_ENABLE;
++		break;
++	case SNDRV_PCM_FORMAT_S24_LE:
++		scr |= BF_SAIF_CTRL_WORD_LENGTH(8);
++		scr |= BM_SAIF_CTRL_BITCLK_48XFS_ENABLE;
++		break;
++	}
++
++	/* Tx/Rx config */
++	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
++		/* enable TX mode */
++		scr &= ~BM_SAIF_CTRL_READ_MODE;
++	} else {
++		/* enable RX mode */
++		scr |= BM_SAIF_CTRL_READ_MODE;
++	}
++
++	__raw_writel(scr, saif->base + SAIF_CTRL);
++	return 0;
++}
++
++static int mxs_saif_prepare(struct snd_pcm_substream *substream,
++			   struct snd_soc_dai *cpu_dai)
++{
++	struct mxs_saif *saif = snd_soc_dai_get_drvdata(cpu_dai);
++	__raw_writel(BM_SAIF_CTRL_CLKGATE,
++		saif->base + SAIF_CTRL + MXS_CLR_ADDR);
++
++	return 0;
++}
++
++static int mxs_saif_trigger(struct snd_pcm_substream *substream, int cmd,
++				struct snd_soc_dai *cpu_dai)
++{
++	struct mxs_saif *saif = snd_soc_dai_get_drvdata(cpu_dai);
++
++	switch (cmd) {
++	case SNDRV_PCM_TRIGGER_START:
++	case SNDRV_PCM_TRIGGER_RESUME:
++	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
++		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
++			/*write a data to saif data register to trigger
++				the transfer*/
++			__raw_writel(0, saif->base + SAIF_DATA);
++		else
++			/*read a data from saif data register to trigger
++				the receive*/
++			__raw_readl(saif->base + SAIF_DATA);
++		break;
++	case SNDRV_PCM_TRIGGER_SUSPEND:
++	case SNDRV_PCM_TRIGGER_STOP:
++	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
++		break;
++	default:
++		return -EINVAL;
++	}
++
++	return 0;
++}
++
++#define MXS_SAIF_RATES		SNDRV_PCM_RATE_8000_192000
++#define MXS_SAIF_FORMATS \
++	(SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S20_3LE | \
++	SNDRV_PCM_FMTBIT_S24_LE)
++
++static struct snd_soc_dai_ops mxs_saif_dai_ops = {
++	.startup = mxs_saif_startup,
++	.trigger = mxs_saif_trigger,
++	.prepare = mxs_saif_prepare,
++	.hw_params = mxs_saif_hw_params,
++	.set_sysclk = mxs_saif_set_dai_sysclk,
++	.set_clkdiv = mxs_saif_set_dai_clkdiv,
++	.set_fmt = mxs_saif_set_dai_fmt,
++};
++
++static int mxs_saif_dai_probe(struct snd_soc_dai *dai)
++{
++	struct mxs_saif *saif = dev_get_drvdata(dai->dev);
++
++	snd_soc_dai_set_drvdata(dai, saif);
++
++	/* Reset */
++	__raw_writel(BM_SAIF_CTRL_SFTRST,
++		saif->base + SAIF_CTRL + MXS_CLR_ADDR);
++
++	/* enable MCLK output early since codec may need it */
++	__raw_writel(BM_SAIF_CTRL_CLKGATE,
++		saif->base + SAIF_CTRL + MXS_CLR_ADDR);
++	__raw_writel(BM_SAIF_CTRL_RUN,
++		saif->base + SAIF_CTRL + MXS_SET_ADDR);
++
++	return 0;
++}
++
++static struct snd_soc_dai_driver mxs_saif_dai = {
++	.name = "mxs-saif",
++	.probe = mxs_saif_dai_probe,
++	.playback = {
++		.channels_min = 2,
++		.channels_max = 2,
++		.rates = MXS_SAIF_RATES,
++		.formats = MXS_SAIF_FORMATS,
++	},
++	.capture = {
++		.channels_min = 2,
++		.channels_max = 2,
++		.rates = MXS_SAIF_RATES,
++		.formats = MXS_SAIF_FORMATS,
++	},
++	.ops = &mxs_saif_dai_ops,
++};
++
++static irqreturn_t mxs_saif_irq(int irq, void *dev_id)
++{
++	struct mxs_saif *saif = dev_id;
++
++	if (saif->fifo_err_counter++ % 100 == 0)
++		printk(KERN_ERR "saif_irq SAIF_STAT %x SAIF_CTRL %x \
++			fifo_errs=%d \n",
++		       __raw_readl(saif->base + SAIF_STAT),
++		       __raw_readl(saif->base + SAIF_CTRL),
++		       saif->fifo_err_counter);
++	__raw_writel(BM_SAIF_STAT_FIFO_UNDERFLOW_IRQ |
++			BM_SAIF_STAT_FIFO_OVERFLOW_IRQ,
++			saif->base + SAIF_STAT + MXS_CLR_ADDR);
++
++	return IRQ_HANDLED;
++}
++
++static int mxs_saif_probe(struct platform_device *pdev)
++{
++	struct resource *res;
++	struct mxs_saif *saif;
++	int ret = 0;
++
++	saif = kzalloc(sizeof(*saif), GFP_KERNEL);
++	if (!saif)
++		return -ENOMEM;
++
++	saif->irq = platform_get_irq(pdev, 0);
++	if (saif->irq < 0) {
++		ret = saif->irq;
++		dev_err(&pdev->dev, "failed to get irq resource: %d\n",
++			ret);
++		goto failed_get_irq1;
++	}
++
++	saif->fifo_err_counter = 0;
++	ret = request_irq(saif->irq, mxs_saif_irq, 0, "mxs-saif", saif);
++	if (ret) {
++		dev_err(&pdev->dev, "failed to request irq\n");
++		goto failed_req_irq;
++	}
++
++	saif->dma_param.chan_irq = platform_get_irq(pdev, 1);
++	if (saif->dma_param.chan_irq < 0) {
++		ret = saif->dma_param.chan_irq;
++		dev_err(&pdev->dev, "failed to get dma irq resource: %d\n",
++			ret);
++		goto failed_get_irq2;
++	}
++
++	saif->clk = clk_get(&pdev->dev, NULL);
++	if (IS_ERR(saif->clk)) {
++		ret = PTR_ERR(saif->clk);
++		dev_err(&pdev->dev, "Cannot get the clock: %d\n",
++			ret);
++		goto failed_clk;
++	}
++	clk_set_rate(saif->clk, 12000000);
++	clk_enable(saif->clk);
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!res) {
++		ret = -ENODEV;
++		dev_err(&pdev->dev, "failed to get io resource: %d\n",
++			ret);
++		goto failed_get_resource;
++	}
++
++	if (!request_mem_region(res->start, resource_size(res), "mxs-saif")) {
++		dev_err(&pdev->dev, "request_mem_region failed\n");
++		ret = -EBUSY;
++		goto failed_get_resource;
++	}
++
++	saif->base = ioremap(res->start, resource_size(res));
++	if (!saif->base) {
++		dev_err(&pdev->dev, "ioremap failed\n");
++		ret = -ENODEV;
++		goto failed_ioremap;
++	}
++
++	res = platform_get_resource(pdev, IORESOURCE_DMA, 0);
++	if (!res) {
++		ret = -ENODEV;
++		dev_err(&pdev->dev, "failed to get dma resource: %d\n",
++			ret);
++		goto failed_get_resource;
++	}
++	saif->dma_param.chan_num = res->start;
++
++	platform_set_drvdata(pdev, saif);
++
++	ret = snd_soc_register_dai(&pdev->dev, &mxs_saif_dai);
++	if (ret) {
++		dev_err(&pdev->dev, "register DAI failed\n");
++		goto failed_register;
++	}
++
++	saif->soc_platform_pdev = platform_device_alloc(
++					"mxs-pcm-audio", pdev->id);
++	if (!saif->soc_platform_pdev) {
++		ret = -ENOMEM;
++		goto failed_pdev_alloc;
++	}
++
++	platform_set_drvdata(saif->soc_platform_pdev, saif);
++	ret = platform_device_add(saif->soc_platform_pdev);
++	if (ret) {
++		dev_err(&pdev->dev, "failed to add soc platform device\n");
++		goto failed_pdev_add;
++	}
++
++	return 0;
++
++failed_pdev_add:
++	platform_device_put(saif->soc_platform_pdev);
++failed_pdev_alloc:
++	snd_soc_unregister_dai(&pdev->dev);
++failed_register:
++	iounmap(saif->base);
++failed_ioremap:
++	release_mem_region(res->start, resource_size(res));
++failed_get_resource:
++	clk_disable(saif->clk);
++	clk_put(saif->clk);
++failed_clk:
++failed_get_irq2:
++	free_irq(saif->irq, saif);
++failed_req_irq:
++failed_get_irq1:
++	kfree(saif);
++
++	return ret;
++}
++
++static int __devexit mxs_saif_remove(struct platform_device *pdev)
++{
++	struct resource *res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	struct mxs_saif *saif = platform_get_drvdata(pdev);
++
++	platform_device_unregister(saif->soc_platform_pdev);
++
++	snd_soc_unregister_dai(&pdev->dev);
++
++	iounmap(saif->base);
++	release_mem_region(res->start, resource_size(res));
++	free_irq(saif->irq, saif);
++
++	clk_disable(saif->clk);
++	clk_put(saif->clk);
++
++	kfree(saif);
++
++	return 0;
++}
++
++static struct platform_driver mxs_saif_driver = {
++	.probe = mxs_saif_probe,
++	.remove = __devexit_p(mxs_saif_remove),
++
++	.driver = {
++		.name = "mxs-saif",
++		.owner = THIS_MODULE,
++	},
++};
++
++static int __init mxs_saif_init(void)
++{
++	return platform_driver_register(&mxs_saif_driver);
++}
++
++static void __exit mxs_saif_exit(void)
++{
++	platform_driver_unregister(&mxs_saif_driver);
++}
++
++module_init(mxs_saif_init);
++module_exit(mxs_saif_exit);
++MODULE_AUTHOR("Freescale Semiconductor, Inc.");
++MODULE_DESCRIPTION("MXS ASoC SAIF driver");
++MODULE_LICENSE("GPL");
+diff --git a/sound/soc/mxs/mxs-saif.h b/sound/soc/mxs/mxs-saif.h
+new file mode 100644
+index 0000000..dd26b37
+--- /dev/null
++++ b/sound/soc/mxs/mxs-saif.h
+@@ -0,0 +1,124 @@
++/*
++ * Copyright (C) 2011 Freescale Semiconductor, Inc. All Rights Reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License along
++ * with this program; if not, write to the Free Software Foundation, Inc.,
++ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
++ */
++
++
++#ifndef _MXS_SAIF_H
++#define _MXS_SAIF_H
++
++#define SAIF_CTRL	0x0
++#define SAIF_STAT	0x10
++#define SAIF_DATA	0x20
++#define SAIF_VERSION	0X30
++
++/* SAIF_CTRL */
++#define BM_SAIF_CTRL_SFTRST		0x80000000
++#define BM_SAIF_CTRL_CLKGATE		0x40000000
++#define BP_SAIF_CTRL_BITCLK_MULT_RATE	27
++#define BM_SAIF_CTRL_BITCLK_MULT_RATE	0x38000000
++#define BF_SAIF_CTRL_BITCLK_MULT_RATE(v) \
++		(((v) << 27) & BM_SAIF_CTRL_BITCLK_MULT_RATE)
++#define BM_SAIF_CTRL_BITCLK_BASE_RATE	0x04000000
++#define BM_SAIF_CTRL_FIFO_ERROR_IRQ_EN	0x02000000
++#define BM_SAIF_CTRL_FIFO_SERVICE_IRQ_EN	0x01000000
++#define BP_SAIF_CTRL_RSRVD2		21
++#define BM_SAIF_CTRL_RSRVD2		0x00E00000
++
++#define BP_SAIF_CTRL_DMAWAIT_COUNT	16
++#define BM_SAIF_CTRL_DMAWAIT_COUNT	0x001F0000
++#define BF_SAIF_CTRL_DMAWAIT_COUNT(v) \
++		(((v) << 16) & BM_SAIF_CTRL_DMAWAIT_COUNT)
++#define BP_SAIF_CTRL_CHANNEL_NUM_SELECT 14
++#define BM_SAIF_CTRL_CHANNEL_NUM_SELECT 0x0000C000
++#define BF_SAIF_CTRL_CHANNEL_NUM_SELECT(v) \
++		(((v) << 14) & BM_SAIF_CTRL_CHANNEL_NUM_SELECT)
++#define BM_SAIF_CTRL_LRCLK_PULSE	0x00002000
++#define BM_SAIF_CTRL_BIT_ORDER		0x00001000
++#define BM_SAIF_CTRL_DELAY		0x00000800
++#define BM_SAIF_CTRL_JUSTIFY		0x00000400
++#define BM_SAIF_CTRL_LRCLK_POLARITY	0x00000200
++#define BM_SAIF_CTRL_BITCLK_EDGE	0x00000100
++#define BP_SAIF_CTRL_WORD_LENGTH	4
++#define BM_SAIF_CTRL_WORD_LENGTH	0x000000F0
++#define BF_SAIF_CTRL_WORD_LENGTH(v) \
++		(((v) << 4) & BM_SAIF_CTRL_WORD_LENGTH)
++#define BM_SAIF_CTRL_BITCLK_48XFS_ENABLE	0x00000008
++#define BM_SAIF_CTRL_SLAVE_MODE		0x00000004
++#define BM_SAIF_CTRL_READ_MODE		0x00000002
++#define BM_SAIF_CTRL_RUN		0x00000001
++
++/* SAIF_STAT */
++#define BM_SAIF_STAT_PRESENT		0x80000000
++#define BP_SAIF_STAT_RSRVD2		17
++#define BM_SAIF_STAT_RSRVD2		0x7FFE0000
++#define BF_SAIF_STAT_RSRVD2(v) \
++		(((v) << 17) & BM_SAIF_STAT_RSRVD2)
++#define BM_SAIF_STAT_DMA_PREQ		0x00010000
++#define BP_SAIF_STAT_RSRVD1		7
++#define BM_SAIF_STAT_RSRVD1		0x0000FF80
++#define BF_SAIF_STAT_RSRVD1(v) \
++		(((v) << 7) & BM_SAIF_STAT_RSRVD1)
++
++#define BM_SAIF_STAT_FIFO_UNDERFLOW_IRQ 0x00000040
++#define BM_SAIF_STAT_FIFO_OVERFLOW_IRQ	0x00000020
++#define BM_SAIF_STAT_FIFO_SERVICE_IRQ	0x00000010
++#define BP_SAIF_STAT_RSRVD0		1
++#define BM_SAIF_STAT_RSRVD0		0x0000000E
++#define BF_SAIF_STAT_RSRVD0(v) \
++		(((v) << 1) & BM_SAIF_STAT_RSRVD0)
++#define BM_SAIF_STAT_BUSY		0x00000001
++
++/* SAFI_DATA */
++#define BP_SAIF_DATA_PCM_RIGHT		16
++#define BM_SAIF_DATA_PCM_RIGHT		0xFFFF0000
++#define BF_SAIF_DATA_PCM_RIGHT(v) \
++		(((v) << 16) & BM_SAIF_DATA_PCM_RIGHT)
++#define BP_SAIF_DATA_PCM_LEFT		0
++#define BM_SAIF_DATA_PCM_LEFT		0x0000FFFF
++#define BF_SAIF_DATA_PCM_LEFT(v)	\
++		(((v) << 0) & BM_SAIF_DATA_PCM_LEFT)
++
++/* SAIF_VERSION */
++#define BP_SAIF_VERSION_MAJOR		24
++#define BM_SAIF_VERSION_MAJOR		0xFF000000
++#define BF_SAIF_VERSION_MAJOR(v) \
++		(((v) << 24) & BM_SAIF_VERSION_MAJOR)
++#define BP_SAIF_VERSION_MINOR		16
++#define BM_SAIF_VERSION_MINOR		0x00FF0000
++#define BF_SAIF_VERSION_MINOR(v) \
++		(((v) << 16) & BM_SAIF_VERSION_MINOR)
++#define BP_SAIF_VERSION_STEP		0
++#define BM_SAIF_VERSION_STEP		0x0000FFFF
++#define BF_SAIF_VERSION_STEP(v) \
++		(((v) << 0) & BM_SAIF_VERSION_STEP)
++
++#define MXS_SAIF_SYS_CLK	0
++#define MXS_SAIF_MCLK		1
++
++#include "mxs-pcm.h"
++
++struct mxs_saif {
++	struct clk *clk;
++	void __iomem *base;
++	int irq;
++	struct mxs_pcm_dma_params dma_param;
++
++	struct platform_device *soc_platform_pdev;
++	u32 fifo_err_counter;
++};
++
++#endif
+-- 
+1.7.0.4
