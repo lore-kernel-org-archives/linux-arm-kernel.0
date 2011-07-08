@@ -1,36 +1,62 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 08 Jul 2011 14:37:23 +0900
-Subject: [PATCH 2/4] arm: plat-s3c24xx: dma: drop return codes in void
-	function
-In-Reply-To: <201107072151.20618.rjw@sisk.pl>
+Date: Fri, 08 Jul 2011 14:38:26 +0900
+Subject: [PATCH 1/4] arm: plat-s3c24xx: dma: don't use uninitialized
+	variable
+In-Reply-To: <1310033919-4245-2-git-send-email-w.sang@pengutronix.de>
 References: <1310033919-4245-1-git-send-email-w.sang@pengutronix.de>
-	<1310033919-4245-3-git-send-email-w.sang@pengutronix.de>
-	<201107072151.20618.rjw@sisk.pl>
-Message-ID: <001401cc3d31$217be000$6473a000$%kim@samsung.com>
+	<1310033919-4245-2-git-send-email-w.sang@pengutronix.de>
+Message-ID: <001501cc3d31$44ca4420$ce5ecc60$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rafael J. Wysocki wrote:
+Wolfram Sang wrote:
 > 
-> On Thursday, July 07, 2011, Wolfram Sang wrote:
-> > Commit bb072c3c (ARM / Samsung: Use struct syscore_ops for "core" power
-> > management) turned s3c2410_dma_resume_chan() from int to void. So, drop
-> > the actual return values, too. Fixes:
-> >
-> > arch/arm/plat-s3c24xx/dma.c: In function 's3c2410_dma_resume_chan':
-> > arch/arm/plat-s3c24xx/dma.c:1238:3: warning: 'return' with a value, in
-function
-> returning void
-> > arch/arm/plat-s3c24xx/dma.c:1250:2: warning: 'return' with a value, in
-function
-> returning void
-> >
-> > Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
+> Commit 8970ef47 (S3C24XX: Remove hardware specific registers from DMA
+> calls) removed the parameter dcon in s3c2410_dma_config() and calculates
+> it on its own. So the debug-output for the old parameter can go, too.
+> Fixes:
 > 
-> Acked-by: Rafael J. Wysocki <rjw@sisk.pl>
+> arch/arm/plat-s3c24xx/dma.c: In function 's3c2410_dma_config':
+> arch/arm/plat-s3c24xx/dma.c:1030:2: warning: 'dcon' is used uninitialized
+in this
+> function
 > 
+> Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
+> Cc: Ben Dooks <ben-linux@fluff.org>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> ---
+>  arch/arm/plat-s3c24xx/dma.c |    8 ++------
+>  1 files changed, 2 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm/plat-s3c24xx/dma.c b/arch/arm/plat-s3c24xx/dma.c
+> index 2abf966..a5b3684 100644
+> --- a/arch/arm/plat-s3c24xx/dma.c
+> +++ b/arch/arm/plat-s3c24xx/dma.c
+> @@ -1027,17 +1027,13 @@ int s3c2410_dma_config(unsigned int channel,
+>  	struct s3c2410_dma_chan *chan = s3c_dma_lookup_channel(channel);
+>  	unsigned int dcon;
+> 
+> -	pr_debug("%s: chan=%d, xfer_unit=%d, dcon=%08x\n",
+> -		 __func__, channel, xferunit, dcon);
+> +	pr_debug("%s: chan=%d, xfer_unit=%d\n", __func__, channel,
+xferunit);
+> 
+>  	if (chan == NULL)
+>  		return -EINVAL;
+> 
+> -	pr_debug("%s: Initial dcon is %08x\n", __func__, dcon);
+> -
+>  	dcon = chan->dcon & dma_sel.dcon_mask;
+> -
+> -	pr_debug("%s: New dcon is %08x\n", __func__, dcon);
+> +	pr_debug("%s: dcon is %08x\n", __func__, dcon);
+> 
+>  	switch (chan->req_ch) {
+>  	case DMACH_I2S_IN:
+> --
+> 1.7.5.4
 
-Will apply this into -fix tree for 3.0.
+OK, will apply.
 Thanks.
 
 Best regards,
@@ -38,35 +64,3 @@ Kgene.
 --
 Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
 SW Solution Development Team, Samsung Electronics Co., Ltd.
-
-
-> > Cc: Kukjin Kim <kgene.kim@samsung.com>
-> > ---
-> >  arch/arm/plat-s3c24xx/dma.c |    4 +---
-> >  1 files changed, 1 insertions(+), 3 deletions(-)
-> >
-> > diff --git a/arch/arm/plat-s3c24xx/dma.c b/arch/arm/plat-s3c24xx/dma.c
-> > index a5b3684..a79a8cc 100644
-> > --- a/arch/arm/plat-s3c24xx/dma.c
-> > +++ b/arch/arm/plat-s3c24xx/dma.c
-> > @@ -1231,7 +1231,7 @@ static void s3c2410_dma_resume_chan(struct
-> s3c2410_dma_chan *cp)
-> >  	/* restore channel's hardware configuration */
-> >
-> >  	if (!cp->in_use)
-> > -		return 0;
-> > +		return;
-> >
-> >  	printk(KERN_INFO "dma%d: restoring configuration\n", cp->number);
-> >
-> > @@ -1242,8 +1242,6 @@ static void s3c2410_dma_resume_chan(struct
-> s3c2410_dma_chan *cp)
-> >
-> >  	if (cp->map != NULL)
-> >  		dma_sel.select(cp, cp->map);
-> > -
-> > -	return 0;
-> >  }
-> >
-> >  static void s3c2410_dma_resume(void)
-> >
