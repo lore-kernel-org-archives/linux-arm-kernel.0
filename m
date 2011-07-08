@@ -1,33 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 8 Jul 2011 22:20:55 +0100
-Subject: [PATCH 46/52] ARM: mach-u300: convert boot_params to atag_offset
-In-Reply-To: <CAKnu2MrM-_sw70se==z8LO-ZO0eUbwqk9MhY3Co1ZErV=hOYUw@mail.gmail.com>
-References: <1309920457-21913-1-git-send-email-nicolas.pitre@linaro.org>
-	<1309920457-21913-46-git-send-email-nicolas.pitre@linaro.org>
-	<CAKnu2MrM-_sw70se==z8LO-ZO0eUbwqk9MhY3Co1ZErV=hOYUw@mail.gmail.com>
-Message-ID: <20110708212055.GZ4812@n2100.arm.linux.org.uk>
+From: kaloz@openwrt.org (Imre Kaloz)
+Date: Fri, 08 Jul 2011 23:21:19 +0200
+Subject: [PATCH] ARM: support XZ compressed kernels
+In-Reply-To: <20110708210407.GY4812@n2100.arm.linux.org.uk>
+References: <1310033999-25617-1-git-send-email-kaloz@openwrt.org>
+	<20110708203832.GV4812@n2100.arm.linux.org.uk> <op.vybi03ze2s3iss@ecaz>
+	<20110708210407.GY4812@n2100.arm.linux.org.uk>
+Message-ID: <op.vybj9tox2s3iss@ecaz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 08, 2011 at 03:12:06PM +0200, Linus Walleij wrote:
-> 2011/7/6 Nicolas Pitre <nicolas.pitre@linaro.org>:
-> 
-> > Someone was smoking good stuff with CONFIG_MACH_U300_2MB_ALIGNMENT_FIX here...
-> 
-> Haha, it is a consequence of the PHYS_OFFSET having to align on a 2MB
-> boundary, whereas the actual physical memory was at an odd MB address.
-> We didn't really like the idea of loosing one megabyte of memory just to
-> please PHYSOFFSET, so hence this fix.
-> 
-> What we do is round memory upwards to closest 2MB boundary, then we
-> reserve the first MB. That's why we're having so much fun...
-> 
-> The reason why memory can be at an odd address is that we can
-> dynamically alter (at boot time) how many MB are reserved for the
-> accompanying modem CPU.
+On Fri, 08 Jul 2011 23:04:07 +0200, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
 
-Can it be killed now that we have memblock with a proper reserve callback?
-You could locate the kernel higher in memory (eg, 4MB+32K or even 1MB+32K)
-keeping the real PHYS_OFFSET/PAGE_OFFSET, and arrange for the ->reserve
-callback to mark the first 1MB as reserved, optionally freeing it from
-memblock's idea of available memory if you don't want it mapped.
+> On Fri, Jul 08, 2011 at 10:54:29PM +0200, Imre Kaloz wrote:
+>> On Fri, 08 Jul 2011 22:38:32 +0200, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+>>
+>>> On Thu, Jul 07, 2011 at 12:19:59PM +0200, Imre Kaloz wrote:
+>>>>  # Make sure files are removed during clean
+>>>> -extra-y       += piggy.gzip piggy.lzo piggy.lzma lib1funcs.S
+>>>> +extra-y       += piggy.gzip piggy.lzo piggy.lzma piggy.xzkern lib1funcs.S ashldi3.S
+>>>
+>>> Is there a reason the suffix is xzkern rather than just xz ?
+>>
+>> We do "$(call if_changed,$(suffix_y))" and scripts/Makefile.lib
+>> uses cmd_xzkern. I think keeping the changes minimal worth more
+>> then having the proper suffix for a temporary file.
+>
+> Hmm, that's unfortunate.  It seems that it may be a non-standard format
+> so I guess that's reasonable.  No further comments then.
+>
+
+Indeed. After the .gitignore modification, should I resend it here or it can go into the patch system?
+
+
+Imre
