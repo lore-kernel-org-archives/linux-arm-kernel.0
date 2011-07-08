@@ -1,39 +1,45 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 08 Jul 2011 07:19:56 -0700
-Subject: [PATCH v4 4/7] OMAP2+: PM: idle clkdms only if already in idle
-In-Reply-To: <alpine.DEB.2.00.1107071636540.2647@utopia.booyaka.com> (Paul
-	Walmsley's message of "Thu, 7 Jul 2011 16:37:26 -0600 (MDT)")
-References: <1309555626-22608-1-git-send-email-b-cousson@ti.com>
-	<1309555626-22608-5-git-send-email-b-cousson@ti.com>
-	<alpine.DEB.2.00.1107071636540.2647@utopia.booyaka.com>
-Message-ID: <87sjqgc0s3.fsf@ti.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 08 Jul 2011 09:30:15 -0500
+Subject: [RFC PATCH 09/11] arm/dt: Add dt machine definition
+In-Reply-To: <20110616044248.29371.69457.stgit@ponder>
+References: <20110616042653.29371.2052.stgit@ponder>
+	<20110616044248.29371.69457.stgit@ponder>
+Message-ID: <4E171477.8060303@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paul Walmsley <paul@pwsan.com> writes:
+Grant,
 
-> cc'ing Kevin, since this touches mach-omap2/pm.c - an ack would be great  
-> if you have the chance
->
-> On Fri, 1 Jul 2011, Benoit Cousson wrote:
->
->> From: Rajendra Nayak <rnayak@ti.com>
->> 
->> The omap_set_pwrdm_state function forces clockdomains
->> to idle, without checking the existing idle state
->> programmed, instead based solely on the HW capability
->> of the clockdomain to support idle.
->> This is wrong and the clockdomains should be idled
->> post a state_switch *only* if idle transitions on the
->> clockdomain were already enabled.
->> 
->> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
->> Cc: Paul Walmsley <paul@pwsan.com>
+On 06/15/2011 11:42 PM, Grant Likely wrote:
+> This patch adds a DT_MACHINE_START macro to use instead of
+> MACHINE_START when creating a machine_desc that supports using the
+> device tree.
+> 
+> Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
+> ---
+>  arch/arm/include/asm/mach/arch.h |    9 +++++++++
+>  1 files changed, 9 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
+> index 946f4d7..858d269 100644
+> --- a/arch/arm/include/asm/mach/arch.h
+> +++ b/arch/arm/include/asm/mach/arch.h
+> @@ -70,4 +70,13 @@ static const struct machine_desc __mach_desc_##_type	\
+>  #define MACHINE_END				\
+>  };
+>  
+> +#define MACH_TYPE_DT	0xffffffff
+> +
+> +#define DT_MACHINE_START(_name, _namestr)		\
+> +static const struct machine_desc __mach_desc_##_name	\
+> + __used							\
+> + __attribute__((__section__(".arch.info.init"))) = {	\
+> +	.nr		= MACH_TYPE_DT,			\
+> +	.name		= _namestr,
+> +
+>  #endif
+> 
 
-Acked-by: Kevin Hilman <khilman@ti.com>
+Do you plan to submit this for 3.1 as new platforms need this or a mach id?
 
-> Thanks, this patch has been queued for 3.1 at 
-> git://git.pwsan.com/linux-2.6 in the 'powerdomain_fixes_3.1' branch.
->
->
-> - Paul
+Rob
