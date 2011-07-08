@@ -1,89 +1,97 @@
 From: bs14@csr.com (Barry Song)
-Date: Fri, 8 Jul 2011 02:40:13 -0700
-Subject: [PATCH v5 2/3] ARM: CSR: mapping early DEBUG_LL uart
+Date: Fri, 8 Jul 2011 02:40:14 -0700
+Subject: [PATCH v5 3/3] ARM: CSR: initializing L2 cache
 In-Reply-To: <1310118014-24509-1-git-send-email-bs14@csr.com>
 References: <1310118014-24509-1-git-send-email-bs14@csr.com>
-Message-ID: <1310118014-24509-3-git-send-email-bs14@csr.com>
+Message-ID: <1310118014-24509-4-git-send-email-bs14@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Rongjun Ying <rongjun.ying@csr.com>
+
+Signed-off-by: Rongjun Ying <rongjun.ying@csr.com>
 Signed-off-by: Barry Song <baohua.song@csr.com>
 Reviewed-by: Arnd Bergmann <arnd@arndb.de>
 ---
  arch/arm/mach-prima2/Makefile |    1 +
- arch/arm/mach-prima2/common.h |    6 ++++++
- arch/arm/mach-prima2/lluart.c |   25 +++++++++++++++++++++++++
- arch/arm/mach-prima2/prima2.c |    1 +
- 4 files changed, 33 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-prima2/lluart.c
+ arch/arm/mach-prima2/l2x0.c   |   59 +++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 60 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-prima2/l2x0.c
 
 diff --git a/arch/arm/mach-prima2/Makefile b/arch/arm/mach-prima2/Makefile
-index d44f7ae..f2fba66 100644
+index f2fba66..7af7fc0 100644
 --- a/arch/arm/mach-prima2/Makefile
 +++ b/arch/arm/mach-prima2/Makefile
-@@ -3,3 +3,4 @@ obj-y += irq.o
- obj-y += clock.o
+@@ -4,3 +4,4 @@ obj-y += clock.o
  obj-y += rstc.o
  obj-y += prima2.o
-+obj-$(CONFIG_DEBUG_LL) += lluart.o
-diff --git a/arch/arm/mach-prima2/common.h b/arch/arm/mach-prima2/common.h
-index fa4a3b5..83e5d21 100644
---- a/arch/arm/mach-prima2/common.h
-+++ b/arch/arm/mach-prima2/common.h
-@@ -17,4 +17,10 @@ extern struct sys_timer sirfsoc_timer;
- extern void __init sirfsoc_of_irq_init(void);
- extern void __init sirfsoc_of_clk_init(void);
- 
-+#ifndef CONFIG_DEBUG_LL
-+static inline void sirfsoc_map_lluart(void)  {}
-+#else
-+extern void __init sirfsoc_map_lluart(void);
-+#endif
-+
- #endif
-diff --git a/arch/arm/mach-prima2/lluart.c b/arch/arm/mach-prima2/lluart.c
+ obj-$(CONFIG_DEBUG_LL) += lluart.o
++obj-$(CONFIG_CACHE_L2X0) += l2x0.o
+diff --git a/arch/arm/mach-prima2/l2x0.c b/arch/arm/mach-prima2/l2x0.c
 new file mode 100644
-index 0000000..a89f9b3
+index 0000000..9cda205
 --- /dev/null
-+++ b/arch/arm/mach-prima2/lluart.c
-@@ -0,0 +1,25 @@
++++ b/arch/arm/mach-prima2/l2x0.c
+@@ -0,0 +1,59 @@
 +/*
-+ * Static memory mapping for DEBUG_LL
++ * l2 cache initialization for CSR SiRFprimaII
 + *
 + * Copyright (c) 2011 Cambridge Silicon Radio Limited, a CSR plc group company.
 + *
 + * Licensed under GPLv2 or later.
 + */
 +
++#include <linux/init.h>
 +#include <linux/kernel.h>
-+#include <asm/page.h>
-+#include <asm/mach/map.h>
-+#include <mach/map.h>
-+#include <mach/uart.h>
++#include <linux/io.h>
++#include <linux/errno.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <asm/hardware/cache-l2x0.h>
++#include <mach/memory.h>
 +
-+void __init sirfsoc_map_lluart(void)
++#define L2X0_ADDR_FILTERING_START       0xC00
++#define L2X0_ADDR_FILTERING_END         0xC04
++
++static struct of_device_id l2x_ids[]  = {
++	{ .compatible = "arm,pl310-cache" },
++};
++
++static int __init sirfsoc_of_l2x_init(void)
 +{
-+	struct map_desc sirfsoc_lluart_map = {
-+		.virtual        = SIRFSOC_UART1_VA_BASE,
-+		.pfn            = __phys_to_pfn(SIRFSOC_UART1_PA_BASE),
-+		.length         = SIRFSOC_UART1_SIZE,
-+		.type           = MT_DEVICE,
-+	};
++	struct device_node *np;
++	void __iomem *sirfsoc_l2x_base;
 +
-+	iotable_init(&sirfsoc_lluart_map, 1);
++	np = of_find_matching_node(NULL, l2x_ids);
++	if (!np)
++		panic("unable to find compatible l2x node in dtb\n");
++
++	sirfsoc_l2x_base = of_iomap(np, 0);
++	if (!sirfsoc_l2x_base)
++		panic("unable to map l2x cpu registers\n");
++
++	of_node_put(np);
++
++	if (!(readl_relaxed(sirfsoc_l2x_base + L2X0_CTRL) & 1)) {
++		/*
++		 * set the physical memory windows L2 cache will cover
++		 */
++		writel_relaxed(PLAT_PHYS_OFFSET + 1024 * 1024 * 1024,
++			sirfsoc_l2x_base + L2X0_ADDR_FILTERING_END);
++		writel_relaxed(PLAT_PHYS_OFFSET | 0x1,
++			sirfsoc_l2x_base + L2X0_ADDR_FILTERING_START);
++
++		writel_relaxed(0,
++			sirfsoc_l2x_base + L2X0_TAG_LATENCY_CTRL);
++		writel_relaxed(0,
++			sirfsoc_l2x_base + L2X0_DATA_LATENCY_CTRL);
++	}
++	l2x0_init((void __iomem *)sirfsoc_l2x_base, 0x00040000,
++		0x00000000);
++
++	return 0;
 +}
-diff --git a/arch/arm/mach-prima2/prima2.c b/arch/arm/mach-prima2/prima2.c
-index c26947d..f57124b 100644
---- a/arch/arm/mach-prima2/prima2.c
-+++ b/arch/arm/mach-prima2/prima2.c
-@@ -33,6 +33,7 @@ MACHINE_START(PRIMA2_EVB, "prima2cb")
- 	/* Maintainer: Barry Song <baohua.song@csr.com> */
- 	.boot_params	= 0x00000100,
- 	.init_early     = sirfsoc_of_clk_init,
-+	.map_io         = sirfsoc_map_lluart,
- 	.init_irq	= sirfsoc_of_irq_init,
- 	.timer		= &sirfsoc_timer,
- 	.init_machine	= sirfsoc_mach_init,
++early_initcall(sirfsoc_of_l2x_init);
 -- 
 1.7.1
 
