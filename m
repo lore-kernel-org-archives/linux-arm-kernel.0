@@ -1,57 +1,50 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 08 Jul 2011 08:14:31 -0700
-Subject: [PATCH v4 00/18] I2C: OMAP: I2C fixes,
-	removal of cpu_is... from driver
-In-Reply-To: <20110707230122.GM15795@trinity.fluff.org> (Ben Dooks's message
-	of "Fri, 8 Jul 2011 00:01:22 +0100")
-References: <1306973984-15165-1-git-send-email-khilman@ti.com>
-	<20110615213637.GH15795@trinity.fluff.org> <87k4cm1xgj.fsf@ti.com>
-	<1309212726.6231.14.camel@vence> <1309212918.6231.16.camel@vence>
-	<1309892457.3077.8.camel@vence>
-	<20110707230122.GM15795@trinity.fluff.org>
-Message-ID: <87box4by94.fsf@ti.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 8 Jul 2011 16:14:49 +0100
+Subject: [RFC PATCH 17/17] ARM: kernel: save/restore build infrastructure
+In-Reply-To: <4E166B76.7090901@ti.com>
+References: <1310053830-23779-1-git-send-email-lorenzo.pieralisi@arm.com>
+	<1310053830-23779-18-git-send-email-lorenzo.pieralisi@arm.com>
+	<4E166B76.7090901@ti.com>
+Message-ID: <20110708151449.GA8071@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ben Dooks <ben-i2c@fluff.org> writes:
+On Fri, Jul 08, 2011 at 03:29:10AM +0100, Santosh Shilimkar wrote:
+> On 7/7/2011 8:50 AM, Lorenzo Pieralisi wrote:
+> > This patch adds the required Kconfig and Makefile entries to
+> > enable and compile common idle code for ARM kernel.
+> >
+> > Common idle code depends on CPU_PM platform notifiers to trigger
+> > save/restore of kernel subsystems like PMU, VFP, GIC.
+> >
+> > Signed-off-by: Lorenzo Pieralisi<lorenzo.pieralisi@arm.com>
+> > ---
+> >   arch/arm/Kconfig         |   11 +++++++++++
+> >   arch/arm/kernel/Makefile |    4 ++++
+> >   2 files changed, 15 insertions(+), 0 deletions(-)
+> >
+> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> > index 356f266..5b670bd 100644
+> > --- a/arch/arm/Kconfig
+> > +++ b/arch/arm/Kconfig
+> > @@ -1992,6 +1992,17 @@ config VFP
+> >
+> >   	  Say N if your target does not have VFP hardware.
+> >
+> > +config CONTEXT_SR
+> 
+> SR sounds cryptic. Also since it's PM related _PM_ would
+> be good.
+> 
 
-> On Tue, Jul 05, 2011 at 12:00:56PM -0700, Kevin Hilman wrote:
->> Hi Ben,
->> 
->> On Mon, 2011-06-27 at 15:15 -0700, Kevin Hilman wrote:
->> > On Mon, 2011-06-27 at 15:12 -0700, Kevin Hilman wrote:
->> > 
->> > > Ping.  I don't see this in linux-next yet.
->> > > 
->> > > Are you planning to queue this for v3.1?
->> > > 
->> > 
->> > Oops, pushed send too soon on this...
->> > 
->> > As this series touches various data files in arch/arm/mach-omap2/* and
->> > we have a handful of other changes to that data for this merge window, I
->> > think it would be better for conflict avoidance if this series is merged
->> > via Tony's linux-omap tree.
->> > 
->> > With your Ack, we'll merge it via OMAP.
->> 
->> I see that the same day I sent this, you merged it into your next-i2c
->> branch.  Guess I was too late with my request.
->> 
->> As I mentioned above, we will have several conflicts with the
->> arch/arm/mach-omap2 changes in this series, so we would prefer to merge
->> them via the OMAP tree if at all possible so we can properly handle the
->> conflicts.
->> 
->> Do you mind dropping it from your next-i2c so we can merge it via
->> linux-omap (with your Ack.)
->
-> Yes, and if you could indicate all the other omap i2c patches and I'll
-> add my ack to yours.
->
-> Acked-by: Ben Dooks <ben-linux@fluff.org>
+Yes, it is cryptic. I did not give it the thought it deserves, I will come
+up with something possibly nicer.
 
-Thanks, I will refresh/repost any remaining OMAP I2C patches today and
-let you know.
+> > +	bool "Save/Restore code support for CPU/Cluster Power Management"
+> > +	depends on CPU_V7&&  CPU_PM
+> 			^
+> space needed.
 
-Kevin
+It was there, did it get munged ? I will look into that.
+
+Lorenzo
