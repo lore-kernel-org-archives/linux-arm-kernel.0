@@ -1,168 +1,48 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Fri, 08 Jul 2011 00:01:16 -0700
-Subject: [PATCH v2 3/6] OMAP4: PRCM: OMAP4460 specific PRM and CM register
-	bitshifts
-In-Reply-To: <alpine.DEB.2.00.1107080029550.24181@utopia.booyaka.com>
-References: <1309573826-10615-1-git-send-email-rnayak@ti.com>
-	<1309573826-10615-2-git-send-email-rnayak@ti.com>
-	<1309573826-10615-3-git-send-email-rnayak@ti.com>
-	<1309573826-10615-4-git-send-email-rnayak@ti.com>
-	<alpine.DEB.2.00.1107080029550.24181@utopia.booyaka.com>
-Message-ID: <4E16AB3C.7020007@ti.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 08 Jul 2011 16:08:58 +0900
+Subject: [PATCH 03/17] ARM: gic: Use cpu pm notifiers to save gic state
+In-Reply-To: <4E16664D.7010206@ti.com>
+References: <1310053830-23779-1-git-send-email-lorenzo.pieralisi@arm.com>
+	<1310053830-23779-4-git-send-email-lorenzo.pieralisi@arm.com>
+	<4E165ECD.9070905@ti.com>
+	<CAMbhsRT-Z4AmYmen9B9+mJ+c5YWyVbcsx0mykrn7L_JxgOLVDg@mail.gmail.com>
+	<4E16664D.7010206@ti.com>
+Message-ID: <002801cc3d3d$edd60f70$c9822e50$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+Santosh Shilimkar wrote:
+> 
+> On 7/7/2011 6:41 PM, Colin Cross wrote:
 
-On 7/7/2011 11:30 PM, Paul Walmsley wrote:
-> Hi Rajendra
->
-> On Sat, 2 Jul 2011, Rajendra Nayak wrote:
->
->> This patch adds additional register bitshifts for
->> registers added in OMAP4460 platform.
->>
->> Signed-off-by: Rajendra Nayak<rnayak@ti.com>
->> Signed-off-by: Nishanth Menon<nm@ti.com>
->> Signed-off-by: Benoit Cousson<b-cousson@ti.com>
->> Reviewed-by: Kevin Hilman<khilman@ti.com>
->
-> Does this data come from the autogenerator scripts?
+Hi all,
 
-Yes, it does. But the patch is created by manually
-diffing the 4430 and 4460 autogen script outputs.
-That's because the autogen scripts cannot generate
-data for multiple SoC's at once.
+Now Samsung prepares updating PM on EXYNOS4210 and save/restore GIC is
+needed for that.
+Actually, it works fine on EXYNOS4210 with this.
 
-regards,
-Rajendra
->
->
-> - Paul
->
->> ---
->>   arch/arm/mach-omap2/cm-regbits-44xx.h  |   36 ++++++++++++++++++++++++++++++++
->>   arch/arm/mach-omap2/prm-regbits-44xx.h |    8 +++++++
->>   2 files changed, 44 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/cm-regbits-44xx.h b/arch/arm/mach-omap2/cm-regbits-44xx.h
->> index 5e96e7b..43a7c0f 100644
->> --- a/arch/arm/mach-omap2/cm-regbits-44xx.h
->> +++ b/arch/arm/mach-omap2/cm-regbits-44xx.h
->> @@ -101,6 +101,10 @@
->>   #define OMAP4430_CLKACTIVITY_CORE_DPLL_EMU_CLK_SHIFT		9
->>   #define OMAP4430_CLKACTIVITY_CORE_DPLL_EMU_CLK_MASK		(1<<  9)
->>
->> +/* Used by CM_L4CFG_CLKSTCTRL */
->> +#define OMAP4460_CLKACTIVITY_CORE_TS_GFCLK_SHIFT		9
->> +#define OMAP4460_CLKACTIVITY_CORE_TS_GFCLK_MASK			(1<<  9)
->> +
->>   /* Used by CM_CEFUSE_CLKSTCTRL */
->>   #define OMAP4430_CLKACTIVITY_CUST_EFUSE_SYS_CLK_SHIFT		9
->>   #define OMAP4430_CLKACTIVITY_CUST_EFUSE_SYS_CLK_MASK		(1<<  9)
->> @@ -401,6 +405,10 @@
->>   #define OMAP4430_CLKACTIVITY_WKUP_32K_GFCLK_SHIFT		11
->>   #define OMAP4430_CLKACTIVITY_WKUP_32K_GFCLK_MASK		(1<<  11)
->>
->> +/* Used by CM_WKUP_CLKSTCTRL */
->> +#define OMAP4460_CLKACTIVITY_WKUP_TS_GFCLK_SHIFT		13
->> +#define OMAP4460_CLKACTIVITY_WKUP_TS_GFCLK_MASK			(1<<  13)
->> +
->>   /*
->>    * Used by CM1_ABE_TIMER5_CLKCTRL, CM1_ABE_TIMER6_CLKCTRL,
->>    * CM1_ABE_TIMER7_CLKCTRL, CM1_ABE_TIMER8_CLKCTRL, CM_L3INIT_MMC1_CLKCTRL,
->> @@ -431,6 +439,10 @@
->>   #define OMAP4430_CLKSEL_60M_SHIFT				24
->>   #define OMAP4430_CLKSEL_60M_MASK				(1<<  24)
->>
->> +/* Used by CM_MPU_MPU_CLKCTRL */
->> +#define OMAP4460_CLKSEL_ABE_DIV_MODE_SHIFT			25
->> +#define OMAP4460_CLKSEL_ABE_DIV_MODE_MASK			(1<<  25)
->> +
->>   /* Used by CM1_ABE_AESS_CLKCTRL */
->>   #define OMAP4430_CLKSEL_AESS_FCLK_SHIFT				24
->>   #define OMAP4430_CLKSEL_AESS_FCLK_MASK				(1<<  24)
->> @@ -447,6 +459,10 @@
->>   #define OMAP4430_CLKSEL_DIV_SHIFT				24
->>   #define OMAP4430_CLKSEL_DIV_MASK				(1<<  24)
->>
->> +/* Used by CM_MPU_MPU_CLKCTRL */
->> +#define OMAP4460_CLKSEL_EMIF_DIV_MODE_SHIFT			24
->> +#define OMAP4460_CLKSEL_EMIF_DIV_MODE_MASK			(1<<  24)
->> +
->>   /* Used by CM_CAM_FDIF_CLKCTRL */
->>   #define OMAP4430_CLKSEL_FCLK_SHIFT				24
->>   #define OMAP4430_CLKSEL_FCLK_MASK				(0x3<<  24)
->> @@ -542,6 +558,14 @@
->>   #define OMAP4430_D2D_STATDEP_SHIFT				18
->>   #define OMAP4430_D2D_STATDEP_MASK				(1<<  18)
->>
->> +/* Used by CM_CLKSEL_DPLL_MPU */
->> +#define OMAP4460_DCC_COUNT_MAX_SHIFT				24
->> +#define OMAP4460_DCC_COUNT_MAX_MASK				(0xff<<  24)
->> +
->> +/* Used by CM_CLKSEL_DPLL_MPU */
->> +#define OMAP4460_DCC_EN_SHIFT					22
->> +#define OMAP4460_DCC_EN_MASK					(1<<  22)
->> +
->>   /*
->>    * Used by CM_SSC_DELTAMSTEP_DPLL_ABE, CM_SSC_DELTAMSTEP_DPLL_CORE,
->>    * CM_SSC_DELTAMSTEP_DPLL_DDRPHY, CM_SSC_DELTAMSTEP_DPLL_IVA,
->> @@ -551,6 +575,10 @@
->>   #define OMAP4430_DELTAMSTEP_SHIFT				0
->>   #define OMAP4430_DELTAMSTEP_MASK				(0xfffff<<  0)
->>
->> +/* Renamed from DELTAMSTEP Used by CM_SSC_DELTAMSTEP_DPLL_USB */
->> +#define OMAP4460_DELTAMSTEP_0_20_SHIFT				0
->> +#define OMAP4460_DELTAMSTEP_0_20_MASK				(0x1fffff<<  0)
->> +
->>   /* Used by CM_DLL_CTRL */
->>   #define OMAP4430_DLL_OVERRIDE_SHIFT				0
->>   #define OMAP4430_DLL_OVERRIDE_MASK				(1<<  0)
->> @@ -1079,6 +1107,10 @@
->>   #define OMAP4430_MODULEMODE_SHIFT				0
->>   #define OMAP4430_MODULEMODE_MASK				(0x3<<  0)
->>
->> +/* Used by CM_L4CFG_DYNAMICDEP */
->> +#define OMAP4460_MPU_DYNDEP_SHIFT				19
->> +#define OMAP4460_MPU_DYNDEP_MASK				(1<<  19)
->> +
->>   /* Used by CM_DSS_DSS_CLKCTRL */
->>   #define OMAP4430_OPTFCLKEN_48MHZ_CLK_SHIFT			9
->>   #define OMAP4430_OPTFCLKEN_48MHZ_CLK_MASK			(1<<  9)
->> @@ -1171,6 +1203,10 @@
->>   #define OMAP4430_OPTFCLKEN_SYS_CLK_SHIFT			10
->>   #define OMAP4430_OPTFCLKEN_SYS_CLK_MASK				(1<<  10)
->>
->> +/* Used by CM_WKUP_BANDGAP_CLKCTRL */
->> +#define OMAP4460_OPTFCLKEN_TS_FCLK_SHIFT			8
->> +#define OMAP4460_OPTFCLKEN_TS_FCLK_MASK				(1<<  8)
->> +
->>   /* Used by CM_DSS_DSS_CLKCTRL */
->>   #define OMAP4430_OPTFCLKEN_TV_CLK_SHIFT				11
->>   #define OMAP4430_OPTFCLKEN_TV_CLK_MASK				(1<<  11)
->> diff --git a/arch/arm/mach-omap2/prm-regbits-44xx.h b/arch/arm/mach-omap2/prm-regbits-44xx.h
->> index 9fd91d6..0b750cf 100644
->> --- a/arch/arm/mach-omap2/prm-regbits-44xx.h
->> +++ b/arch/arm/mach-omap2/prm-regbits-44xx.h
->> @@ -282,6 +282,14 @@
->>   #define OMAP4430_DUCATI_UNICACHE_STATEST_SHIFT				10
->>   #define OMAP4430_DUCATI_UNICACHE_STATEST_MASK				(0x3<<  10)
->>
->> +/* Used by PRM_DEVICE_OFF_CTRL */
->> +#define OMAP4460_EMIF1_OFFWKUP_DISABLE_SHIFT				8
->> +#define OMAP4460_EMIF1_OFFWKUP_DISABLE_MASK				(1<<  8)
->> +
->> +/* Used by PRM_DEVICE_OFF_CTRL */
->> +#define OMAP4460_EMIF2_OFFWKUP_DISABLE_SHIFT				9
->> +#define OMAP4460_EMIF2_OFFWKUP_DISABLE_MASK				(1<<  9)
->> +
->>   /* Used by RM_MPU_RSTST */
->>   #define OMAP4430_EMULATION_RST_SHIFT					0
->>   #define OMAP4430_EMULATION_RST_MASK					(1<<  0)
->> --
->> 1.7.4.1
->>
->
->
-> - Paul
+But we have some concern about following.
+
+> +/*
+> + * Saves the GIC distributor registers during suspend or idle.  Must be
+called
+> + * with interrupts disabled but before powering down the GIC.  After
+calling
+> + * this function, no interrupts will be delivered by the GIC, and another
+> + * platform-specific wakeup source must be enabled.
+> + */
+
+PMU needs to detect interrupt which can be a wakeup source via GIC before
+calling WFI.
+Seems there is no problem but I think that can be a hole during very short
+time...
+
+So is it needed to disable GIC after saving context?
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
