@@ -1,20 +1,15 @@
 From: tommy.lin.1101@gmail.com (Tommy Lin)
-Date: Fri,  8 Jul 2011 13:59:23 +0800
-Subject: [PATCH 1/2] arch: arm: Correct the dependency of HAVE_ARM_TWD
-Message-ID: <1310104763-12948-1-git-send-email-tommy.lin@caviumnetworks.com>
+Date: Fri,  8 Jul 2011 14:00:06 +0800
+Subject: [PATCH 2/2] arch: arm: CNS3xxx select the correct CPU type CPU_V6K
+Message-ID: <1310104806-12984-1-git-send-email-tommy.lin@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Original mpcore_wdt config dependency is as follow:
-MPCORE_WATCHDOG -> HAVE_ARM_TWD -> SMP -> (CPU_V6K || CPU_V7)
-This patch will remove SMP and made the dependency as follow:
-MPCORE_WATCHDOG -> HAVE_ARM_TWD -> (CPU_V6K || CPU_V7)
-
-The MPCore watchdog (and timer) can be found at ARM11 MPCore (CPU_V6K) and
-Cortex A9 MPCore (CPU_V7). The dependency between MPCORE_WATCHDOG and
-(CPU_V6K || CPUV7) is necessary, but the dependency of SMP is redundant.
-The MPCore watchdog should function normally even SMP is not turned on with
-ARM11 or Cortex A9 CPU.
+ARM11        -> CPU_V6
+ARM11 MPCore -> CPU_V6K
+CNS3xxx has ARM11 MPCore CPUs (dual core), but initially select the same single
+core CPU type. To select MPCore watchdog support, this patch correts the CPU
+type from CPU_V6 to CPU_V6K.
 
 Signed-off-by: Tommy Lin <tommy.lin@caviumnetworks.com>
 ---
@@ -22,17 +17,17 @@ Signed-off-by: Tommy Lin <tommy.lin@caviumnetworks.com>
  1 files changed, 1 insertions(+), 1 deletions(-)
 
 diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 3262b15..c148326 100644
+index c148326..89eaab7 100644
 --- a/arch/arm/Kconfig
 +++ b/arch/arm/Kconfig
-@@ -1353,7 +1353,7 @@ config HAVE_ARM_SCU
+@@ -321,7 +321,7 @@ config ARCH_CLPS711X
  
- config HAVE_ARM_TWD
- 	bool
--	depends on SMP
-+	depends on CPU_V6K || CPU_V7
- 	select TICK_ONESHOT
- 	help
- 	  This options enables support for the ARM timer and watchdog unit
+ config ARCH_CNS3XXX
+ 	bool "Cavium Networks CNS3XXX family"
+-	select CPU_V6
++	select CPU_V6K
+ 	select GENERIC_CLOCKEVENTS
+ 	select ARM_GIC
+ 	select MIGHT_HAVE_PCI
 -- 
 1.7.6
