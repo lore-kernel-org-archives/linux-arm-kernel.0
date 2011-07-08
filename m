@@ -1,45 +1,38 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 08 Jul 2011 18:25:12 +0900
-Subject: [PATCH 4/4] arm: mach-s3c2440: mini2440: fix section mismatch
-In-Reply-To: <20110708091218.GD2414@n2100.arm.linux.org.uk>
-References: <1310033919-4245-1-git-send-email-w.sang@pengutronix.de>
-	<1310033919-4245-5-git-send-email-w.sang@pengutronix.de>
-	<001c01cc3d35$2aa7e8f0$7ff7bad0$%kim@samsung.com>
-	<20110708091218.GD2414@n2100.arm.linux.org.uk>
-Message-ID: <001001cc3d50$f3b47630$db1d6290$%kim@samsung.com>
+Date: Fri, 08 Jul 2011 18:26:45 +0900
+Subject: [PATCH 6/7] spi/s3c64xx: Add support DMA engine API
+In-Reply-To: <CABb+yY3UqrbBNS1J1X1gCxPLp8Kv8JSe92Pnb7JpE9x9kqTPiA@mail.gmail.com>
+References: <1309781915-31549-1-git-send-email-kgene.kim@samsung.com>
+	<201107041859.11548.heiko@sntech.de>
+	<20110704170217.GH28042@ponder.secretlab.ca>
+	<201107042151.44075.heiko@sntech.de>
+	<20110704232758.GB12824@ponder.secretlab.ca>
+	<00bd01cc3ae1$f1dbfac0$d593f040$%kim@samsung.com>
+	<CABb+yY3UqrbBNS1J1X1gCxPLp8Kv8JSe92Pnb7JpE9x9kqTPiA@mail.gmail.com>
+Message-ID: <001101cc3d51$29b40250$7d1c06f0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
+Jassi Brar wrote:
 > 
-> On Fri, Jul 08, 2011 at 03:06:17PM +0900, Kukjin Kim wrote:
-> > Wolfram Sang wrote:
-> > >
-> > > If mini2440_init() is in __init, mini2440_parse_features() should also
-> > > be in __init. Fixes:
-> > >
-> > > (.text+0x9adc): Section mismatch in reference from the function
-> > > mini2440_parse_features.clone.0() to the (unknown reference)
-> > .init.data:(unknown)
-> > > The function mini2440_parse_features.clone.0() references the (unknown
-> > reference)
-> > > __initdata (unknown).
-> >
-> > But I couldn't find above "Section mismatch" in my building with
-> > CONFIG_DEBUG_SECTION_MISMATCH=y.
-> 
-> Your compiler may have inlined the function, so defeating the check.
-> 
-> static struct s3c2410fb_display mini2440_lcd_cfg[] __initdata = {
-> 
-> and mini2440_parse_features() references this variable.  Therefore
-> either mini2440_parse_features() needs to be marked __init (it's
-> only caller is from __init, so that seems sensible) or the
-> __initdata markers on the referenced data need to be removed.
-> 
-> Adding __init looks like the right thing.
+> > As you saw, the S3C_DMA_API is still used for PL080 DMA for compatibilities
+> > with this patches in each driver, e.g., spi and audio. As a note, S3C24XX
+> > and S3C64XX include PL080 DMAC not PL330.
+> Not exactly.
+> S3C24XX  use 2-3 different versions of Samsung's DMA implementations.
+> S3C6400/10  use PL080
+> S5P and later series use PL330
 
-OK, applied this into -fix.
+Your information is correct, I was confused.
+
+> > Of course, if we can remove every S3C_DMA_API, that can be the best solution
+> > but it needs more time. I'd like to go to our goal step by step.
+> >
+> Ideally, like PL330 for S5Pxxxx, drivers/dma/pl080 should be enabled for s3c64xx
+> And new generic dma api drivers written for S3C24xx in drivers/dma/
+> 
+We're thinking about this :)
+
 Thanks.
 
 Best regards,
