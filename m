@@ -1,295 +1,279 @@
 From: haojian.zhuang@marvell.com (Haojian Zhuang)
-Date: Fri,  8 Jul 2011 18:20:19 +0800
-Subject: [PATCH] ARM: mmp: parse irq from DT
-In-Reply-To: <1310120428-22700-2-git-send-email-haojian.zhuang@marvell.com>
+Date: Fri,  8 Jul 2011 18:20:21 +0800
+Subject: [PATCH] tty: serial: support device tree in pxa
+In-Reply-To: <1310120428-22700-4-git-send-email-haojian.zhuang@marvell.com>
 References: <1310120428-22700-1-git-send-email-haojian.zhuang@marvell.com>
 	<1310120428-22700-2-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <1310120428-22700-3-git-send-email-haojian.zhuang@marvell.com>
+	<1310120428-22700-3-git-send-email-haojian.zhuang@marvell.com>
+	<1310120428-22700-4-git-send-email-haojian.zhuang@marvell.com>
+Message-ID: <1310120428-22700-5-git-send-email-haojian.zhuang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Parse irq sepcifier from DT and translate it to Linux irq number.
+Support both normal platform driver and device tree driver in serial pxa.
 
 Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
 ---
- arch/arm/mach-mmp/Makefile |    2 +
- arch/arm/mach-mmp/common.h |    1 +
- arch/arm/mach-mmp/intc.c   |  245 ++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 248 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-mmp/intc.c
+ drivers/tty/serial/Kconfig     |    4 +-
+ drivers/tty/serial/of_serial.c |   12 +++++
+ drivers/tty/serial/pxa.c       |   91 ++++++++++++++++++++++++++++++++++------
+ include/linux/serial_pxa.h     |   17 +++++++
+ 4 files changed, 110 insertions(+), 14 deletions(-)
+ create mode 100644 include/linux/serial_pxa.h
 
-diff --git a/arch/arm/mach-mmp/Makefile b/arch/arm/mach-mmp/Makefile
-index 5c68382..e7862ea 100644
---- a/arch/arm/mach-mmp/Makefile
-+++ b/arch/arm/mach-mmp/Makefile
-@@ -4,6 +4,8 @@
- 
- obj-y				+= common.o clock.o devices.o time.o
- 
-+obj-$(CONFIG_OF_IRQ)		+= intc.o
-+
- # SoC support
- obj-$(CONFIG_CPU_PXA168)	+= pxa168.o irq-pxa168.o
- obj-$(CONFIG_CPU_PXA910)	+= pxa910.o irq-pxa168.o
-diff --git a/arch/arm/mach-mmp/common.h b/arch/arm/mach-mmp/common.h
-index ec8d65d..1c563c2 100644
---- a/arch/arm/mach-mmp/common.h
-+++ b/arch/arm/mach-mmp/common.h
-@@ -6,3 +6,4 @@ extern void timer_init(int irq);
- 
- extern void __init icu_init_irq(void);
- extern void __init mmp_map_io(void);
-+extern void __init mmp_init_intc(void);
-diff --git a/arch/arm/mach-mmp/intc.c b/arch/arm/mach-mmp/intc.c
-new file mode 100644
-index 0000000..48ad84b
---- /dev/null
-+++ b/arch/arm/mach-mmp/intc.c
-@@ -0,0 +1,245 @@
-+/*
-+ *  linux/arch/arm/mach-mmp/intc.c
-+ *
-+ *  Generic IRQ handling
-+ *
-+ *  Author:	Haojian Zhuang <haojian.zhuang@marvell.com>
-+ *  Copyright:	Marvell International Ltd. 2011
-+ *
-+ *  This program is free software; you can redistribute it and/or modify
-+ *  it under the terms of the GNU General Public License version 2 as
-+ *  published by the Free Software Foundation.
-+ */
-+
-+#include <linux/errno.h>
-+#include <linux/io.h>
-+#include <linux/kernel.h>
+diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
+index 636144c..3f75e0d 100644
+--- a/drivers/tty/serial/Kconfig
++++ b/drivers/tty/serial/Kconfig
+@@ -663,6 +663,8 @@ config SERIAL_MPSC_CONSOLE
+ config SERIAL_PXA
+ 	bool "PXA serial port support"
+ 	depends on ARCH_PXA || ARCH_MMP
++	select SERIAL_OF_PLATFORM
++	select SERIAL_CORE_CONSOLE
+ 	select SERIAL_CORE
+ 	help
+ 	  If you have a machine based on an Intel XScale PXA2xx CPU you
+@@ -1340,7 +1342,7 @@ config SERIAL_NETX_CONSOLE
+ config SERIAL_OF_PLATFORM
+ 	tristate "Serial port on Open Firmware platform bus"
+ 	depends on OF
+-	depends on SERIAL_8250 || SERIAL_OF_PLATFORM_NWPSERIAL
++	depends on SERIAL_8250 || SERIAL_OF_PLATFORM_NWPSERIAL || SERIAL_PXA
+ 	help
+ 	  If you have a PowerPC based system that has serial ports
+ 	  on a platform specific bus, you should enable this option.
+diff --git a/drivers/tty/serial/of_serial.c b/drivers/tty/serial/of_serial.c
+index e65f1e8..383bff3 100644
+--- a/drivers/tty/serial/of_serial.c
++++ b/drivers/tty/serial/of_serial.c
+@@ -14,6 +14,7 @@
+ #include <linux/slab.h>
+ #include <linux/serial_core.h>
+ #include <linux/serial_8250.h>
++#include <linux/serial_pxa.h>
+ #include <linux/of_address.h>
+ #include <linux/of_irq.h>
+ #include <linux/of_platform.h>
+@@ -126,6 +127,11 @@ static int __devinit of_platform_serial_probe(struct platform_device *ofdev)
+ 		ret = nwpserial_register_port(&port);
+ 		break;
+ #endif
++#ifdef CONFIG_SERIAL_PXA
++	case PORT_PXA:
++		ret = serial_pxa_register_port(&port);
++		break;
++#endif
+ 	default:
+ 		/* need to add code for these */
+ 	case PORT_UNKNOWN:
+@@ -163,6 +169,11 @@ static int of_platform_serial_remove(struct platform_device *ofdev)
+ 		nwpserial_unregister_port(info->line);
+ 		break;
+ #endif
++#ifdef CONFIG_SERIAL_PXA
++	case PORT_PXA:
++		serial_pxa_unregister_port(info->line);
++		break;
++#endif
+ 	default:
+ 		/* need to add code for these */
+ 		break;
+@@ -186,6 +197,7 @@ static struct of_device_id __devinitdata of_platform_serial_table[] = {
+ 	{ .compatible = "ibm,qpace-nwp-serial",
+ 		.data = (void *)PORT_NWPSERIAL, },
+ #endif
++	{ .compatible = "pxa,serial", .data = (void *)PORT_PXA, },
+ 	{ .type = "serial",         .data = (void *)PORT_UNKNOWN, },
+ 	{ /* end of list */ },
+ };
+diff --git a/drivers/tty/serial/pxa.c b/drivers/tty/serial/pxa.c
+index 4302e6e..fb80fb3 100644
+--- a/drivers/tty/serial/pxa.c
++++ b/drivers/tty/serial/pxa.c
+@@ -36,10 +36,12 @@
+ #include <linux/circ_buf.h>
+ #include <linux/delay.h>
+ #include <linux/interrupt.h>
 +#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
-+#include <linux/slab.h>
+ #include <linux/platform_device.h>
+ #include <linux/tty.h>
+ #include <linux/tty_flip.h>
+ #include <linux/serial_core.h>
++#include <linux/serial_pxa.h>
+ #include <linux/clk.h>
+ #include <linux/io.h>
+ #include <linux/slab.h>
+@@ -51,9 +53,14 @@ struct uart_pxa_port {
+ 	unsigned char           mcr;
+ 	unsigned int            lsr_break_flag;
+ 	struct clk		*clk;
+-	char			*name;
++	char			name[32];
++	int			id;
+ };
+ 
++#define PXA_SERIAL_NR		4
 +
-+struct mmp_intc_info {
-+	unsigned int		mask;
-+	unsigned int		phy_base;
-+	void __iomem		*virt_base;
-+	void __iomem		*mux_status;
-+	void __iomem		*mux_mask;
-+	void __iomem		*mfp_edge;
-+	unsigned int		mfp_edge_index;	/* index in irq domain */
-+	unsigned int		irq_base;
-+};
++static DEFINE_MUTEX(serial_pxa_mutex);
 +
-+static void mux_irq_unmask(struct irq_data *d)
+ static inline unsigned int serial_in(struct uart_pxa_port *up, int offset)
+ {
+ 	offset <<= 2;
+@@ -346,8 +353,6 @@ static int serial_pxa_startup(struct uart_port *port)
+ 	else
+ 		up->mcr = 0;
+ 
+-	up->port.uartclk = clk_get_rate(up->clk);
+-
+ 	/*
+ 	 * Allocate the IRQ
+ 	 */
+@@ -593,7 +598,7 @@ serial_pxa_type(struct uart_port *port)
+ 	return up->name;
+ }
+ 
+-static struct uart_pxa_port *serial_pxa_ports[4];
++static struct uart_pxa_port serial_pxa_ports[PXA_SERIAL_NR];
+ static struct uart_driver serial_pxa_reg;
+ 
+ #ifdef CONFIG_SERIAL_PXA_CONSOLE
+@@ -645,7 +650,7 @@ static void serial_pxa_console_putchar(struct uart_port *port, int ch)
+ static void
+ serial_pxa_console_write(struct console *co, const char *s, unsigned int count)
+ {
+-	struct uart_pxa_port *up = serial_pxa_ports[co->index];
++	struct uart_pxa_port *up = &serial_pxa_ports[co->index];
+ 	unsigned int ier;
+ 
+ 	clk_enable(up->clk);
+@@ -679,7 +684,7 @@ serial_pxa_console_setup(struct console *co, char *options)
+ 
+ 	if (co->index == -1 || co->index >= serial_pxa_reg.nr)
+ 		co->index = 0;
+-	up = serial_pxa_ports[co->index];
++	up = &serial_pxa_ports[co->index];
+ 	if (!up)
+ 		return -ENODEV;
+ 
+@@ -761,6 +766,68 @@ static const struct dev_pm_ops serial_pxa_pm_ops = {
+ };
+ #endif
+ 
++static int serial_pxa_port_size(struct uart_pxa_port *sport)
 +{
-+	struct mmp_intc_info *info = irq_data_get_irq_chip_data(d);
-+	unsigned int data, irq_offs;
-+
-+	irq_offs = d->irq - info->irq_base;
-+	if (info->mfp_edge && (info->mfp_edge_index == irq_offs)) {
-+		data = __raw_readl(info->mfp_edge);
-+		__raw_writel(data | (1 << 6), info->mfp_edge);
-+		__raw_writel(data, info->mfp_edge);
-+	}
-+	data = __raw_readl(info->mux_mask) & ~(1 << (d->irq - info->irq_base));
-+	__raw_writel(data, info->mux_mask);
++	return 8 << sport->port.regshift;
 +}
 +
-+static void mux_irq_mask(struct irq_data *d)
++int serial_pxa_register_port(struct uart_port *port)
 +{
-+	struct mmp_intc_info *info = irq_data_get_irq_chip_data(d);
-+	unsigned int data;
++	struct uart_pxa_port *sport = NULL;
++	char name[32];
++	int i, ret;
 +
-+	data = __raw_readl(info->mux_mask) | (1 << (d->irq - info->irq_base));
-+	__raw_writel(data, info->mux_mask);
-+}
-+
-+static struct irq_chip mux_irq_chip = {
-+	.name		= "mmp mux intc",
-+	.irq_unmask	= mux_irq_unmask,
-+	.irq_mask	= mux_irq_mask,
-+	.irq_ack	= mux_irq_mask,
-+};
-+
-+static void mmp_irq_demux_handler(unsigned int irq, struct irq_desc *desc)
-+{
-+	struct mmp_intc_info *info = irq_get_handler_data(irq);
-+	unsigned long status, mask, n;
-+
-+	mask = __raw_readl(info->mux_mask);
-+	while (1) {
-+		status = __raw_readl(info->mux_status) & ~mask;
-+		if (status == 0)
++	mutex_lock(&serial_pxa_mutex);
++	for (i = 0; i < PXA_SERIAL_NR; i++) {
++		if (serial_pxa_ports[i].id == 0) {
++			sport = &serial_pxa_ports[i];
++			sprintf(sport->name, "UART%d", i);
++			sport->id = i + 1;
 +			break;
-+		n = find_first_bit(&status, BITS_PER_LONG);
-+		while (n < BITS_PER_LONG) {
-+			generic_handle_irq(info->irq_base + n);
-+			n = find_next_bit(&status, BITS_PER_LONG, n + 1);
 +		}
 +	}
-+}
-+
-+static void mux_init_intc(struct mmp_intc_info *mmp_info)
-+{
-+	struct device_node *np;
-+	struct mmp_intc_info *mux_info;
-+	const __be32 *nr, *status, *edge;
-+	unsigned int addr = 0, offs = 0;
-+	int cascade, irq_nr, i;
-+
-+	if (mmp_info->virt_base == NULL)
++	sprintf(name, "pxa2xx-uart.%d", i);
++	sport->clk = clk_get_sys(name, NULL);
++	if (IS_ERR(sport->clk)) {
++		ret = PTR_ERR(sport->clk);
 +		goto out;
-+
-+	for (np = NULL; (np = of_find_all_nodes(np)) != NULL;) {
-+		if (!of_device_is_compatible(np, "mrvl,mux-intc"))
-+			continue;
-+		if (of_get_property(np, "interrupt-controller", NULL) == NULL)
-+			continue;
-+		nr = of_get_property(np, "sub-interrupts", NULL);
-+		if (nr == NULL) {
-+			printk(KERN_WARNING "sub-interrupts property "
-+				"is missed\n");
-+			continue;
-+		}
-+		irq_nr = be32_to_cpu(*nr);
-+		status = of_get_property(np, "status-mask", NULL);
-+		if (status == NULL) {
-+			printk(KERN_WARNING "status-mask property is missed\n");
-+			continue;
-+		}
-+		edge = of_get_property(np, "mfp-edge-interrupt", NULL);
-+
-+		mux_info = kzalloc(sizeof(struct mmp_intc_info), GFP_KERNEL);
-+		if (mux_info == NULL)
-+			goto out;
-+		mux_info->virt_base = mmp_info->virt_base;
-+		mux_info->mux_status = be32_to_cpu(*status++)
-+					+ mux_info->virt_base;
-+		mux_info->mux_mask = be32_to_cpu(*status)
-+					+ mux_info->virt_base;
-+		if (edge) {
-+			addr = be32_to_cpu(*edge) & PAGE_MASK;
-+			offs = be32_to_cpu(*edge) - addr;
-+			mux_info->mfp_edge = ioremap(addr, PAGE_SIZE) + offs;
-+			mux_info->mfp_edge_index = be32_to_cpu(*++edge);
-+		}
-+
-+		/* allocate new irq */
-+		cascade = irq_of_parse_and_map(np, 0);
-+		mux_info->irq_base = irq_alloc_descs(-1, 0, irq_nr, 0);
-+		irq_domain_add_simple(np, mux_info->irq_base);
-+
-+		i = mux_info->irq_base;
-+		for (; i < mux_info->irq_base + irq_nr; i++) {
-+			irq_set_chip_data(i, mux_info);
-+			mux_irq_mask(irq_get_irq_data(i));
-+			irq_set_chip_and_handler(i, &mux_irq_chip,
-+					handle_level_irq);
-+			set_irq_flags(i, IRQF_VALID);
-+		}
-+
-+		irq_set_handler_data(cascade, mux_info);
-+		irq_set_chained_handler(cascade, mmp_irq_demux_handler);
 +	}
++	memcpy(&sport->port, port, sizeof(struct uart_port));
++	sport->port.line = i;
++	sport->port.fifosize = 64;
++	sport->port.ops = &serial_pxa_pops;
++
++	sport->port.membase = ioremap(sport->port.mapbase,
++				serial_pxa_port_size(sport));
++	if (!sport->port.membase) {
++		ret = -ENOMEM;
++		goto out_membase;
++	}
++
++	uart_add_one_port(&serial_pxa_reg, &sport->port);
++	mutex_unlock(&serial_pxa_mutex);
++
++	return sport->port.line;
++
++out_membase:
++	clk_put(sport->clk);
 +out:
-+	return;
++	mutex_unlock(&serial_pxa_mutex);
++	return ret;
 +}
++EXPORT_SYMBOL(serial_pxa_register_port);
 +
-+static void mmp_irq_unmask(struct irq_data *d)
++void serial_pxa_unregister_port(int line)
 +{
-+	struct mmp_intc_info *info = irq_data_get_irq_chip_data(d);
++	struct uart_pxa_port *sport = &serial_pxa_ports[line];
 +
-+	/* ICU_INT_CONF */
-+	__raw_writel(info->mask, info->virt_base + (d->irq << 2));
++	mutex_lock(&serial_pxa_mutex);
++	uart_remove_one_port(&serial_pxa_reg, &sport->port);
++	sport->port.type = PORT_UNKNOWN;
++	clk_put(sport->clk);
++	mutex_unlock(&serial_pxa_mutex);
 +}
 +
-+static void mmp_irq_mask(struct irq_data *d)
-+{
-+	struct mmp_intc_info *info = irq_data_get_irq_chip_data(d);
+ static int serial_pxa_probe(struct platform_device *dev)
+ {
+ 	struct uart_pxa_port *sport;
+@@ -794,12 +861,12 @@ static int serial_pxa_probe(struct platform_device *dev)
+ 	sport->port.uartclk = clk_get_rate(sport->clk);
+ 
+ 	switch (dev->id) {
+-	case 0: sport->name = "FFUART"; break;
+-	case 1: sport->name = "BTUART"; break;
+-	case 2: sport->name = "STUART"; break;
+-	case 3: sport->name = "HWUART"; break;
++	case 0: strcpy(sport->name, "FFUART"); break;
++	case 1: strcpy(sport->name, "BTUART"); break;
++	case 2: strcpy(sport->name, "STUART"); break;
++	case 3: strcpy(sport->name, "HWUART"); break;
+ 	default:
+-		sport->name = "???";
++		strcpy(sport->name, "???");
+ 		break;
+ 	}
+ 
+@@ -809,8 +876,6 @@ static int serial_pxa_probe(struct platform_device *dev)
+ 		goto err_clk;
+ 	}
+ 
+-	serial_pxa_ports[dev->id] = sport;
+-
+ 	uart_add_one_port(&serial_pxa_reg, &sport->port);
+ 	platform_set_drvdata(dev, sport);
+ 
+diff --git a/include/linux/serial_pxa.h b/include/linux/serial_pxa.h
+new file mode 100644
+index 0000000..565e510
+--- /dev/null
++++ b/include/linux/serial_pxa.h
+@@ -0,0 +1,17 @@
++/*
++ *  linux/include/linux/serial_8250.h
++ *
++ *  Marvell Semiconductor Inc.
++ *  Copyright (C) 2011
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++#ifndef _LINUX_SERIAL_PXA_H
++#define _LINUX_SERIAL_PXA_H
 +
-+	__raw_writel(0, info->virt_base + (d->irq << 2));
-+}
-+
-+static struct irq_chip mmp_irq_chip = {
-+	.name		= "mmp-intc",
-+	.irq_unmask	= mmp_irq_unmask,
-+	.irq_mask	= mmp_irq_mask,
-+	.irq_ack	= mmp_irq_mask,
-+};
-+
-+void __init mmp_init_intc(void)
-+{
-+	struct mmp_intc_info *info;
-+	struct device_node *np;
-+	const __be32 *enable_mask, *base, *cell, *nr;
-+	int i, irq_nr, phy_base;
-+
-+	np = of_find_compatible_node(NULL, NULL, "mrvl,mmp-intc");
-+
-+	BUG_ON(!np);
-+
-+	of_node_get(np);
-+	if (of_get_property(np, "interrupt-controller", NULL) == NULL)
-+		goto out;
-+	cell = of_get_property(np, "#interrupt-cells", NULL);
-+	if (cell == NULL) {
-+		printk(KERN_ERR "mmp-intc: Device node %s missing "
-+			"interrupt-cells property\n", np->full_name);
-+		goto out;
-+	}
-+	if (be32_to_cpu(*cell) != 1) {
-+		printk(KERN_ERR "mmp-intc: interrupt-cells property is "
-+			"incorrect:%d\n", be32_to_cpu(*cell));
-+		goto out;
-+	}
-+
-+	nr = of_get_property(np, "sub-interrupts", NULL);
-+	if (nr == NULL) {
-+		printk(KERN_ERR "mmp-intc: interrupts property is missed\n");
-+		goto out;
-+	}
-+	irq_nr = be32_to_cpu(*nr);
-+
-+	base = of_get_property(np, "reg", NULL);
-+	if (base == NULL) {
-+		printk(KERN_ERR "intc: Device node %s missing reg property\n",
-+			np->full_name);
-+		goto out;
-+	}
-+	phy_base = of_translate_address(np, base);
-+
-+	info = kzalloc(sizeof(struct mmp_intc_info), GFP_KERNEL);
-+	if (info == NULL)
-+		goto out;
-+
-+	enable_mask = of_get_property(np, "enable_mask", NULL);
-+	if (enable_mask == NULL) {
-+		printk(KERN_ERR "interrupt controller: Device node %s "
-+			"missing interrupt property\n", np->full_name);
-+		goto out_mem;
-+	}
-+	info->mask = be32_to_cpu(*enable_mask);
-+
-+	/* phy_base: 0, phy_size:64 */
-+	info->phy_base = phy_base;
-+	info->virt_base = ioremap(info->phy_base, PAGE_SIZE);
-+
-+	/* allocate new irq */
-+	info->irq_base = irq_alloc_descs(-1, 0, irq_nr, 0);
-+	irq_domain_add_simple(np, 0);
-+
-+	for (i = info->irq_base; i < info->irq_base + irq_nr; i++) {
-+		irq_set_chip_data(i, info);
-+		mmp_irq_mask(irq_get_irq_data(i));
-+		irq_set_chip_and_handler(i, &mmp_irq_chip, handle_level_irq);
-+		set_irq_flags(i, IRQF_VALID);
-+	}
-+	mux_init_intc(info);
-+	of_node_put(np);
-+	return;
-+out_mem:
-+	kfree(info);
-+out:
-+	of_node_put(np);
-+	return;
-+}
++extern int serial_pxa_register_port(struct uart_port *);
++extern void serial_pxa_unregister_port(int);
++#endif
 -- 
 1.5.6.5
