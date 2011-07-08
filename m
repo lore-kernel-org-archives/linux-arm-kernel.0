@@ -1,609 +1,984 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Fri, 08 Jul 2011 17:33:12 -0000
-Subject: [PATCH] ATMEL, AVR32: inline nand partition table access
-Message-ID: <1306676962-22308-1-git-send-email-dbaryshkov@gmail.com>
+From: s-ghorai@ti.com (Ghorai, Sukumar)
+Date: Fri, 08 Jul 2011 17:35:59 -0000
+Subject: [PATCH] omap3: nand: bch ecc support added
+In-Reply-To: <AANLkTin3pRkqLkQ_J1iTtqr0M+iz5V25S9ZwJc9+T0VW@mail.gmail.com>
+References: <1295518680-8737-1-git-send-email-s-ghorai@ti.com>
+	<AANLkTin3pRkqLkQ_J1iTtqr0M+iz5V25S9ZwJc9+T0VW@mail.gmail.com>
+Message-ID: <2A3DCF3DA181AD40BDE86A3150B27B6B036A8DAF6C@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently atmel_nand driver used by AT91 and AVR32 calls a special callback
-which return nand partition table and number of partitions. However in all
-boards this callback returns just static data. So drop this callback and
-make atmel_nand use partition table provided statically via platform_data.
 
-Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
----
- arch/arm/mach-at91/board-afeb-9260v1.c      |    9 ++-------
- arch/arm/mach-at91/board-cam60.c            |    9 ++-------
- arch/arm/mach-at91/board-cap9adk.c          |    9 ++-------
- arch/arm/mach-at91/board-kb9202.c           |    9 ++-------
- arch/arm/mach-at91/board-neocore926.c       |    9 ++-------
- arch/arm/mach-at91/board-qil-a9260.c        |    9 ++-------
- arch/arm/mach-at91/board-rm9200dk.c         |    9 ++-------
- arch/arm/mach-at91/board-sam9-l9260.c       |    9 ++-------
- arch/arm/mach-at91/board-sam9260ek.c        |    9 ++-------
- arch/arm/mach-at91/board-sam9261ek.c        |    9 ++-------
- arch/arm/mach-at91/board-sam9263ek.c        |    9 ++-------
- arch/arm/mach-at91/board-sam9g20ek.c        |    9 ++-------
- arch/arm/mach-at91/board-sam9m10g45ek.c     |    9 ++-------
- arch/arm/mach-at91/board-sam9rlek.c         |    9 ++-------
- arch/arm/mach-at91/board-snapper9260.c      |   10 ++--------
- arch/arm/mach-at91/board-usb-a9260.c        |    9 ++-------
- arch/arm/mach-at91/board-usb-a9263.c        |    9 ++-------
- arch/arm/mach-at91/board-yl-9200.c          |    9 ++-------
- arch/arm/mach-at91/include/mach/board.h     |    3 ++-
- arch/avr32/boards/atngw100/setup.c          |    8 ++------
- arch/avr32/boards/atstk1000/atstk1002.c     |    9 ++-------
- arch/avr32/mach-at32ap/include/mach/board.h |    3 ++-
- drivers/mtd/nand/atmel_nand.c               |    7 ++++---
- 23 files changed, 48 insertions(+), 145 deletions(-)
 
-diff --git a/arch/arm/mach-at91/board-afeb-9260v1.c b/arch/arm/mach-at91/board-afeb-9260v1.c
-index a4924de..78c77fc 100644
---- a/arch/arm/mach-at91/board-afeb-9260v1.c
-+++ b/arch/arm/mach-at91/board-afeb-9260v1.c
-@@ -136,19 +136,14 @@ static struct mtd_partition __initdata afeb9260_nand_partition[] = {
- 	},
- };
- 
--static struct mtd_partition * __init nand_partitions(int size, int *num_partitions)
--{
--	*num_partitions = ARRAY_SIZE(afeb9260_nand_partition);
--	return afeb9260_nand_partition;
--}
--
- static struct atmel_nand_data __initdata afeb9260_nand_data = {
- 	.ale		= 21,
- 	.cle		= 22,
- 	.rdy_pin	= AT91_PIN_PC13,
- 	.enable_pin	= AT91_PIN_PC14,
--	.partition_info	= nand_partitions,
- 	.bus_width_16	= 0,
-+	.parts		= afeb9260_nand_partition,
-+	.num_parts	= ARRAY_SIZE(afeb9260_nand_partition),
- };
- 
- 
-diff --git a/arch/arm/mach-at91/board-cam60.c b/arch/arm/mach-at91/board-cam60.c
-index 148fccb..eefae5b 100644
---- a/arch/arm/mach-at91/board-cam60.c
-+++ b/arch/arm/mach-at91/board-cam60.c
-@@ -138,19 +138,14 @@ static struct mtd_partition __initdata cam60_nand_partition[] = {
- 	},
- };
- 
--static struct mtd_partition * __init nand_partitions(int size, int *num_partitions)
--{
--	*num_partitions = ARRAY_SIZE(cam60_nand_partition);
--	return cam60_nand_partition;
--}
--
- static struct atmel_nand_data __initdata cam60_nand_data = {
- 	.ale		= 21,
- 	.cle		= 22,
- 	// .det_pin	= ... not there
- 	.rdy_pin	= AT91_PIN_PA9,
- 	.enable_pin	= AT91_PIN_PA7,
--	.partition_info	= nand_partitions,
-+	.parts		= cam60_nand_partition,
-+	.num_parts	= ARRAY_SIZE(cam60_nand_partition),
- };
- 
- static struct sam9_smc_config __initdata cam60_nand_smc_config = {
-diff --git a/arch/arm/mach-at91/board-cap9adk.c b/arch/arm/mach-at91/board-cap9adk.c
-index 1904fdf..8aaa6e6 100644
---- a/arch/arm/mach-at91/board-cap9adk.c
-+++ b/arch/arm/mach-at91/board-cap9adk.c
-@@ -175,19 +175,14 @@ static struct mtd_partition __initdata cap9adk_nand_partitions[] = {
- 	},
- };
- 
--static struct mtd_partition * __init nand_partitions(int size, int *num_partitions)
--{
--	*num_partitions = ARRAY_SIZE(cap9adk_nand_partitions);
--	return cap9adk_nand_partitions;
--}
--
- static struct atmel_nand_data __initdata cap9adk_nand_data = {
- 	.ale		= 21,
- 	.cle		= 22,
- //	.det_pin	= ... not connected
- //	.rdy_pin	= ... not connected
- 	.enable_pin	= AT91_PIN_PD15,
--	.partition_info	= nand_partitions,
-+	.parts		= cap9adk_nand_partitions,
-+	.num_parts	= ARRAY_SIZE(cap9adk_nand_partitions),
- };
- 
- static struct sam9_smc_config __initdata cap9adk_nand_smc_config = {
-diff --git a/arch/arm/mach-at91/board-kb9202.c b/arch/arm/mach-at91/board-kb9202.c
-index a813a74..0cac9d3 100644
---- a/arch/arm/mach-at91/board-kb9202.c
-+++ b/arch/arm/mach-at91/board-kb9202.c
-@@ -102,19 +102,14 @@ static struct mtd_partition __initdata kb9202_nand_partition[] = {
- 	},
- };
- 
--static struct mtd_partition * __init nand_partitions(int size, int *num_partitions)
--{
--	*num_partitions = ARRAY_SIZE(kb9202_nand_partition);
--	return kb9202_nand_partition;
--}
--
- static struct atmel_nand_data __initdata kb9202_nand_data = {
- 	.ale		= 22,
- 	.cle		= 21,
- 	// .det_pin	= ... not there
- 	.rdy_pin	= AT91_PIN_PC29,
- 	.enable_pin	= AT91_PIN_PC28,
--	.partition_info	= nand_partitions,
-+	.parts		= kb9202_nand_partition,
-+	.num_parts	= ARRAY_SIZE(kb9202_nand_partition),
- };
- 
- static void __init kb9202_board_init(void)
-diff --git a/arch/arm/mach-at91/board-neocore926.c b/arch/arm/mach-at91/board-neocore926.c
-index 961e805..a63a4c9 100644
---- a/arch/arm/mach-at91/board-neocore926.c
-+++ b/arch/arm/mach-at91/board-neocore926.c
-@@ -188,19 +188,14 @@ static struct mtd_partition __initdata neocore926_nand_partition[] = {
- 	},
- };
- 
--static struct mtd_partition * __init nand_partitions(int size, int *num_partitions)
--{
--	*num_partitions = ARRAY_SIZE(neocore926_nand_partition);
--	return neocore926_nand_partition;
--}
--
- static struct atmel_nand_data __initdata neocore926_nand_data = {
- 	.ale			= 21,
- 	.cle			= 22,
- 	.rdy_pin		= AT91_PIN_PB19,
- 	.rdy_pin_active_low	= 1,
- 	.enable_pin		= AT91_PIN_PD15,
--	.partition_info		= nand_partitions,
-+	.parts			= neocore926_nand_partition,
-+	.num_parts		= ARRAY_SIZE(neocore926_nand_partition),
- };
- 
- static struct sam9_smc_config __initdata neocore926_nand_smc_config = {
-diff --git a/arch/arm/mach-at91/board-qil-a9260.c b/arch/arm/mach-at91/board-qil-a9260.c
-index d1a6001..86c163f 100644
---- a/arch/arm/mach-at91/board-qil-a9260.c
-+++ b/arch/arm/mach-at91/board-qil-a9260.c
-@@ -136,19 +136,14 @@ static struct mtd_partition __initdata ek_nand_partition[] = {
- 	},
- };
- 
--static struct mtd_partition * __init nand_partitions(int size, int *num_partitions)
--{
--	*num_partitions = ARRAY_SIZE(ek_nand_partition);
--	return ek_nand_partition;
--}
--
- static struct atmel_nand_data __initdata ek_nand_data = {
- 	.ale		= 21,
- 	.cle		= 22,
- //	.det_pin	= ... not connected
- 	.rdy_pin	= AT91_PIN_PC13,
- 	.enable_pin	= AT91_PIN_PC14,
--	.partition_info	= nand_partitions,
-+	.parts		= ek_nand_partition,
-+	.num_parts	= ARRAY_SIZE(ek_nand_partition),
- };
- 
- static struct sam9_smc_config __initdata ek_nand_smc_config = {
-diff --git a/arch/arm/mach-at91/board-rm9200dk.c b/arch/arm/mach-at91/board-rm9200dk.c
-index aef9627..7c9af30 100644
---- a/arch/arm/mach-at91/board-rm9200dk.c
-+++ b/arch/arm/mach-at91/board-rm9200dk.c
-@@ -143,19 +143,14 @@ static struct mtd_partition __initdata dk_nand_partition[] = {
- 	},
- };
- 
--static struct mtd_partition * __init nand_partitions(int size, int *num_partitions)
--{
--	*num_partitions = ARRAY_SIZE(dk_nand_partition);
--	return dk_nand_partition;
--}
--
- static struct atmel_nand_data __initdata dk_nand_data = {
- 	.ale		= 22,
- 	.cle		= 21,
- 	.det_pin	= AT91_PIN_PB1,
- 	.rdy_pin	= AT91_PIN_PC2,
- 	// .enable_pin	= ... not there
--	.partition_info	= nand_partitions,
-+	.parts		= dk_nand_partition,
-+	.num_parts	= ARRAY_SIZE(dk_nand_partition),
- };
- 
- #define DK_FLASH_BASE	AT91_CHIPSELECT_0
-diff --git a/arch/arm/mach-at91/board-sam9-l9260.c b/arch/arm/mach-at91/board-sam9-l9260.c
-index aaf1bf0..3646c2b 100644
---- a/arch/arm/mach-at91/board-sam9-l9260.c
-+++ b/arch/arm/mach-at91/board-sam9-l9260.c
-@@ -137,19 +137,14 @@ static struct mtd_partition __initdata ek_nand_partition[] = {
- 	},
- };
- 
--static struct mtd_partition * __init nand_partitions(int size, int *num_partitions)
--{
--	*num_partitions = ARRAY_SIZE(ek_nand_partition);
--	return ek_nand_partition;
--}
--
- static struct atmel_nand_data __initdata ek_nand_data = {
- 	.ale		= 21,
- 	.cle		= 22,
- //	.det_pin	= ... not connected
- 	.rdy_pin	= AT91_PIN_PC13,
- 	.enable_pin	= AT91_PIN_PC14,
--	.partition_info	= nand_partitions,
-+	.parts		= ek_nand_partition,
-+	.num_parts	= ARRAY_SIZE(ek_nand_partition),
- };
- 
- static struct sam9_smc_config __initdata ek_nand_smc_config = {
-diff --git a/arch/arm/mach-at91/board-sam9260ek.c b/arch/arm/mach-at91/board-sam9260ek.c
-index d600dc1..d6d9b21 100644
---- a/arch/arm/mach-at91/board-sam9260ek.c
-+++ b/arch/arm/mach-at91/board-sam9260ek.c
-@@ -179,19 +179,14 @@ static struct mtd_partition __initdata ek_nand_partition[] = {
- 	},
- };
- 
--static struct mtd_partition * __init nand_partitions(int size, int *num_partitions)
--{
--	*num_partitions = ARRAY_SIZE(ek_nand_partition);
--	return ek_nand_partition;
--}
--
- static struct atmel_nand_data __initdata ek_nand_data = {
- 	.ale		= 21,
- 	.cle		= 22,
- //	.det_pin	= ... not connected
- 	.rdy_pin	= AT91_PIN_PC13,
- 	.enable_pin	= AT91_PIN_PC14,
--	.partition_info	= nand_partitions,
-+	.parts		= ek_nand_partition,
-+	.num_parts	= ARRAY_SIZE(ek_nand_partition),
- };
- 
- static struct sam9_smc_config __initdata ek_nand_smc_config = {
-diff --git a/arch/arm/mach-at91/board-sam9261ek.c b/arch/arm/mach-at91/board-sam9261ek.c
-index f897f84..b4a3e18 100644
---- a/arch/arm/mach-at91/board-sam9261ek.c
-+++ b/arch/arm/mach-at91/board-sam9261ek.c
-@@ -185,19 +185,14 @@ static struct mtd_partition __initdata ek_nand_partition[] = {
- 	},
- };
- 
--static struct mtd_partition * __init nand_partitions(int size, int *num_partitions)
--{
--	*num_partitions = ARRAY_SIZE(ek_nand_partition);
--	return ek_nand_partition;
--}
--
- static struct atmel_nand_data __initdata ek_nand_data = {
- 	.ale		= 22,
- 	.cle		= 21,
- //	.det_pin	= ... not connected
- 	.rdy_pin	= AT91_PIN_PC15,
- 	.enable_pin	= AT91_PIN_PC14,
--	.partition_info	= nand_partitions,
-+	.parts		= ek_nand_partition,
-+	.num_parts	= ARRAY_SIZE(ek_nand_partition),
- };
- 
- static struct sam9_smc_config __initdata ek_nand_smc_config = {
-diff --git a/arch/arm/mach-at91/board-sam9263ek.c b/arch/arm/mach-at91/board-sam9263ek.c
-index 605b26f..4e6d586 100644
---- a/arch/arm/mach-at91/board-sam9263ek.c
-+++ b/arch/arm/mach-at91/board-sam9263ek.c
-@@ -186,19 +186,14 @@ static struct mtd_partition __initdata ek_nand_partition[] = {
- 	},
- };
- 
--static struct mtd_partition * __init nand_partitions(int size, int *num_partitions)
--{
--	*num_partitions = ARRAY_SIZE(ek_nand_partition);
--	return ek_nand_partition;
--}
--
- static struct atmel_nand_data __initdata ek_nand_data = {
- 	.ale		= 21,
- 	.cle		= 22,
- //	.det_pin	= ... not connected
- 	.rdy_pin	= AT91_PIN_PA22,
- 	.enable_pin	= AT91_PIN_PD15,
--	.partition_info	= nand_partitions,
-+	.parts		= ek_nand_partition,
-+	.num_parts	= ARRAY_SIZE(ek_nand_partition),
- };
- 
- static struct sam9_smc_config __initdata ek_nand_smc_config = {
-diff --git a/arch/arm/mach-at91/board-sam9g20ek.c b/arch/arm/mach-at91/board-sam9g20ek.c
-index 7624cf0..b0488b1 100644
---- a/arch/arm/mach-at91/board-sam9g20ek.c
-+++ b/arch/arm/mach-at91/board-sam9g20ek.c
-@@ -163,19 +163,14 @@ static struct mtd_partition __initdata ek_nand_partition[] = {
- 	},
- };
- 
--static struct mtd_partition * __init nand_partitions(int size, int *num_partitions)
--{
--	*num_partitions = ARRAY_SIZE(ek_nand_partition);
--	return ek_nand_partition;
--}
--
- /* det_pin is not connected */
- static struct atmel_nand_data __initdata ek_nand_data = {
- 	.ale		= 21,
- 	.cle		= 22,
- 	.rdy_pin	= AT91_PIN_PC13,
- 	.enable_pin	= AT91_PIN_PC14,
--	.partition_info	= nand_partitions,
-+	.parts		= ek_nand_partition,
-+	.num_parts	= ARRAY_SIZE(ek_nand_partition),
- };
- 
- static struct sam9_smc_config __initdata ek_nand_smc_config = {
-diff --git a/arch/arm/mach-at91/board-sam9m10g45ek.c b/arch/arm/mach-at91/board-sam9m10g45ek.c
-index 063c95d..0bb3468 100644
---- a/arch/arm/mach-at91/board-sam9m10g45ek.c
-+++ b/arch/arm/mach-at91/board-sam9m10g45ek.c
-@@ -143,19 +143,14 @@ static struct mtd_partition __initdata ek_nand_partition[] = {
- 	},
- };
- 
--static struct mtd_partition * __init nand_partitions(int size, int *num_partitions)
--{
--	*num_partitions = ARRAY_SIZE(ek_nand_partition);
--	return ek_nand_partition;
--}
--
- /* det_pin is not connected */
- static struct atmel_nand_data __initdata ek_nand_data = {
- 	.ale		= 21,
- 	.cle		= 22,
- 	.rdy_pin	= AT91_PIN_PC8,
- 	.enable_pin	= AT91_PIN_PC14,
--	.partition_info	= nand_partitions,
-+	.parts		= ek_nand_partition,
-+	.num_parts	= ARRAY_SIZE(ek_nand_partition),
- };
- 
- static struct sam9_smc_config __initdata ek_nand_smc_config = {
-diff --git a/arch/arm/mach-at91/board-sam9rlek.c b/arch/arm/mach-at91/board-sam9rlek.c
-index effb399..7aee8ab 100644
---- a/arch/arm/mach-at91/board-sam9rlek.c
-+++ b/arch/arm/mach-at91/board-sam9rlek.c
-@@ -94,19 +94,14 @@ static struct mtd_partition __initdata ek_nand_partition[] = {
- 	},
- };
- 
--static struct mtd_partition * __init nand_partitions(int size, int *num_partitions)
--{
--	*num_partitions = ARRAY_SIZE(ek_nand_partition);
--	return ek_nand_partition;
--}
--
- static struct atmel_nand_data __initdata ek_nand_data = {
- 	.ale		= 21,
- 	.cle		= 22,
- //	.det_pin	= ... not connected
- 	.rdy_pin	= AT91_PIN_PD17,
- 	.enable_pin	= AT91_PIN_PB6,
--	.partition_info	= nand_partitions,
-+	.parts		= ek_nand_partition,
-+	.num_parts	= ARRAY_SIZE(ek_nand_partition),
- };
- 
- static struct sam9_smc_config __initdata ek_nand_smc_config = {
-diff --git a/arch/arm/mach-at91/board-snapper9260.c b/arch/arm/mach-at91/board-snapper9260.c
-index 3eb0a11..a481451 100644
---- a/arch/arm/mach-at91/board-snapper9260.c
-+++ b/arch/arm/mach-at91/board-snapper9260.c
-@@ -102,18 +102,12 @@ static struct mtd_partition __initdata snapper9260_nand_partitions[] = {
- 	},
- };
- 
--static struct mtd_partition * __init
--snapper9260_nand_partition_info(int size, int *num_partitions)
--{
--	*num_partitions = ARRAY_SIZE(snapper9260_nand_partitions);
--	return snapper9260_nand_partitions;
--}
--
- static struct atmel_nand_data __initdata snapper9260_nand_data = {
- 	.ale		= 21,
- 	.cle		= 22,
- 	.rdy_pin	= AT91_PIN_PC13,
--	.partition_info	= snapper9260_nand_partition_info,
-+	.parts		= snapper9260_nand_partitions,
-+	.num_parts	= ARRAY_SIZE(snapper9260_nand_partitions),
- 	.bus_width_16	= 0,
- };
- 
-diff --git a/arch/arm/mach-at91/board-usb-a9260.c b/arch/arm/mach-at91/board-usb-a9260.c
-index 0e784e6..43f40ef 100644
---- a/arch/arm/mach-at91/board-usb-a9260.c
-+++ b/arch/arm/mach-at91/board-usb-a9260.c
-@@ -110,19 +110,14 @@ static struct mtd_partition __initdata ek_nand_partition[] = {
- 	}
- };
- 
--static struct mtd_partition * __init nand_partitions(int size, int *num_partitions)
--{
--	*num_partitions = ARRAY_SIZE(ek_nand_partition);
--	return ek_nand_partition;
--}
--
- static struct atmel_nand_data __initdata ek_nand_data = {
- 	.ale		= 21,
- 	.cle		= 22,
- //	.det_pin	= ... not connected
- 	.rdy_pin	= AT91_PIN_PC13,
- 	.enable_pin	= AT91_PIN_PC14,
--	.partition_info	= nand_partitions,
-+	.parts		= ek_nand_partition,
-+	.num_parts	= ARRAY_SIZE(ek_nand_partition),
- };
- 
- static struct sam9_smc_config __initdata ek_nand_smc_config = {
-diff --git a/arch/arm/mach-at91/board-usb-a9263.c b/arch/arm/mach-at91/board-usb-a9263.c
-index cf626dd..288d764 100644
---- a/arch/arm/mach-at91/board-usb-a9263.c
-+++ b/arch/arm/mach-at91/board-usb-a9263.c
-@@ -123,19 +123,14 @@ static struct mtd_partition __initdata ek_nand_partition[] = {
- 	}
- };
- 
--static struct mtd_partition * __init nand_partitions(int size, int *num_partitions)
--{
--	*num_partitions = ARRAY_SIZE(ek_nand_partition);
--	return ek_nand_partition;
--}
--
- static struct atmel_nand_data __initdata ek_nand_data = {
- 	.ale		= 21,
- 	.cle		= 22,
- //	.det_pin	= ... not connected
- 	.rdy_pin	= AT91_PIN_PA22,
- 	.enable_pin	= AT91_PIN_PD15,
--	.partition_info	= nand_partitions,
-+	.parts		= ek_nand_partition,
-+	.num_parts	= ARRAY_SIZE(ek_nand_partition),
- };
- 
- static struct sam9_smc_config __initdata ek_nand_smc_config = {
-diff --git a/arch/arm/mach-at91/board-yl-9200.c b/arch/arm/mach-at91/board-yl-9200.c
-index c208cc3..9ebc1ed 100644
---- a/arch/arm/mach-at91/board-yl-9200.c
-+++ b/arch/arm/mach-at91/board-yl-9200.c
-@@ -178,19 +178,14 @@ static struct mtd_partition __initdata yl9200_nand_partition[] = {
- 	}
- };
- 
--static struct mtd_partition * __init nand_partitions(int size, int *num_partitions)
--{
--	*num_partitions = ARRAY_SIZE(yl9200_nand_partition);
--	return yl9200_nand_partition;
--}
--
- static struct atmel_nand_data __initdata yl9200_nand_data = {
- 	.ale		= 6,
- 	.cle		= 7,
- 	// .det_pin	= ... not connected
- 	.rdy_pin	= AT91_PIN_PC14,	/* R/!B (Sheet10) */
- 	.enable_pin	= AT91_PIN_PC15,	/* !CE  (Sheet10) */
--	.partition_info	= nand_partitions,
-+	.parts		= yl9200_nand_partition,
-+	.num_parts	= ARRAY_SIZE(yl9200_nand_partition),
- };
- 
- /*
-diff --git a/arch/arm/mach-at91/include/mach/board.h b/arch/arm/mach-at91/include/mach/board.h
-index ed544a0..6643531 100644
---- a/arch/arm/mach-at91/include/mach/board.h
-+++ b/arch/arm/mach-at91/include/mach/board.h
-@@ -112,7 +112,8 @@ struct atmel_nand_data {
- 	u8		ale;		/* address line number connected to ALE */
- 	u8		cle;		/* address line number connected to CLE */
- 	u8		bus_width_16;	/* buswidth is 16 bit */
--	struct mtd_partition* (*partition_info)(int, int*);
-+	struct mtd_partition *parts;
-+	unsigned int	num_parts;
- };
- extern void __init at91_add_device_nand(struct atmel_nand_data *data);
- 
-diff --git a/arch/avr32/boards/atngw100/setup.c b/arch/avr32/boards/atngw100/setup.c
-index fafed4c..1f17bde 100644
---- a/arch/avr32/boards/atngw100/setup.c
-+++ b/arch/avr32/boards/atngw100/setup.c
-@@ -90,11 +90,6 @@ static struct mtd_partition nand_partitions[] = {
- 	},
- };
- 
--static struct mtd_partition *nand_part_info(int size, int *num_partitions)
--{
--	*num_partitions = ARRAY_SIZE(nand_partitions);
--	return nand_partitions;
--}
- 
- static struct atmel_nand_data atngw100mkii_nand_data __initdata = {
- 	.cle		= 21,
-@@ -102,7 +97,8 @@ static struct atmel_nand_data atngw100mkii_nand_data __initdata = {
- 	.rdy_pin	= GPIO_PIN_PB(28),
- 	.enable_pin	= GPIO_PIN_PE(23),
- 	.bus_width_16	= true,
--	.partition_info	= nand_part_info,
-+	.parts		= nand_partitions,
-+	.num_parts	= ARRAY_SIZE(nand_partitions),
- };
- #endif
- 
-diff --git a/arch/avr32/boards/atstk1000/atstk1002.c b/arch/avr32/boards/atstk1000/atstk1002.c
-index 6ce30fb..4643ff5 100644
---- a/arch/avr32/boards/atstk1000/atstk1002.c
-+++ b/arch/avr32/boards/atstk1000/atstk1002.c
-@@ -90,18 +90,13 @@ static struct mtd_partition nand_partitions[] = {
- 	},
- };
- 
--static struct mtd_partition *nand_part_info(int size, int *num_partitions)
--{
--	*num_partitions = ARRAY_SIZE(nand_partitions);
--	return nand_partitions;
--}
--
- static struct atmel_nand_data atstk1006_nand_data __initdata = {
- 	.cle		= 21,
- 	.ale		= 22,
- 	.rdy_pin	= GPIO_PIN_PB(30),
- 	.enable_pin	= GPIO_PIN_PB(29),
--	.partition_info	= nand_part_info,
-+	.parts		= nand_partitions,
-+	.num_parts	= ARRAY_SIZE(num_partitions),
- };
- #endif
- 
-diff --git a/arch/avr32/mach-at32ap/include/mach/board.h b/arch/avr32/mach-at32ap/include/mach/board.h
-index 679458d..5d7ffca 100644
---- a/arch/avr32/mach-at32ap/include/mach/board.h
-+++ b/arch/avr32/mach-at32ap/include/mach/board.h
-@@ -128,7 +128,8 @@ struct atmel_nand_data {
- 	u8	ale;		/* address line number connected to ALE */
- 	u8	cle;		/* address line number connected to CLE */
- 	u8	bus_width_16;	/* buswidth is 16 bit */
--	struct mtd_partition *(*partition_info)(int size, int *num_partitions);
-+	struct mtd_partition *parts;
-+	unsigned int	num_parts;
- };
- struct platform_device *
- at32_add_device_nand(unsigned int id, struct atmel_nand_data *data);
-diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
-index b300705..10605ed 100644
---- a/drivers/mtd/nand/atmel_nand.c
-+++ b/drivers/mtd/nand/atmel_nand.c
-@@ -659,9 +659,10 @@ static int __init atmel_nand_probe(struct platform_device *pdev)
- 	num_partitions = parse_mtd_partitions(mtd, part_probes,
- 					      &partitions, 0);
- #endif
--	if (num_partitions <= 0 && host->board->partition_info)
--		partitions = host->board->partition_info(mtd->size,
--							 &num_partitions);
-+	if (num_partitions <= 0 && host->board->parts) {
-+		partitions = host->board->parts;
-+		num_partitions = host->board->num_parts;
-+	}
- 
- 	if ((!partitions) || (num_partitions == 0)) {
- 		printk(KERN_ERR "atmel_nand: No partitions defined, or unsupported device.\n");
--- 
-1.7.4.4
+> -----Original Message-----
+> From: Vimal Singh [mailto:vimal.newwork at gmail.com]
+> Sent: Thursday, January 20, 2011 8:47 PM
+> To: Ghorai, Sukumar
+> Cc: linux-omap at vger.kernel.org; linux-mtd at lists.infradead.org; linux-arm-
+> kernel at lists.infradead.org; Kamat, Nishant
+> Subject: Re: [PATCH] omap3: nand: bch ecc support added
+>
+> Hi Ghorai,
+>
+> I am the initial author of this patch. And I guess this patch still
+> uses most of my work.
+[Ghorai] I know you are working on it,
 
+But I think your code was in a shape for -
+1. not for up-streamble shape
+2. non functional,
+So can you check this version matching with your original code?
+In that case I can add your Signed-off.
+
+>
+>
+> Thanks and Regards,
+> Vimal
+>
+> On Thu, Jan 20, 2011 at 3:48 PM, Sukumar Ghorai <s-ghorai@ti.com> wrote:
+> > bch error correction (t=4 and t=8) for 512 bytes support added.
+> > Tested in omap-3630 es-1.1 silicon.
+> >
+> > Need to select the bch-ecc from board file. E.g.
+> > arch/arm/mach-omap2/board-flash.c: board_nand_init()
+> > board_nand_data.ecc_opt = OMAP_ECC_BCH4_CODE_HW
+> >
+> > This patch has dependency on -
+> > http://www.mail-archive.com/linux-omap at vger.kernel.org/msg42658.html
+> >
+> > Signed-off-by: Sukumar Ghorai <s-ghorai@ti.com>
+> > ---
+> >  arch/arm/mach-omap2/gpmc.c             |  126 ++++++++---
+> >  arch/arm/plat-omap/include/plat/gpmc.h |    6 +-
+> >  drivers/mtd/nand/Makefile              |    1 +
+> >  drivers/mtd/nand/omap2.c               |  119 ++++++++--
+> >  drivers/mtd/nand/omap_bch_decoder.c    |  393
+> ++++++++++++++++++++++++++++++++
+> >  5 files changed, 583 insertions(+), 62 deletions(-)
+> >  create mode 100644 drivers/mtd/nand/omap_bch_decoder.c
+> >
+> > diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
+> > index 29c9732..91cfdca 100644
+> > --- a/arch/arm/mach-omap2/gpmc.c
+> > +++ b/arch/arm/mach-omap2/gpmc.c
+> > @@ -48,6 +48,7 @@
+> >  #define GPMC_ECC_CONTROL       0x1f8
+> >  #define GPMC_ECC_SIZE_CONFIG   0x1fc
+> >  #define GPMC_ECC1_RESULT        0x200
+> > +#define GPMC_ECC_BCH_RESULT_0  0x240
+> >
+> >  #define GPMC_CS0_OFFSET                0x60
+> >  #define GPMC_CS_SIZE           0x30
+> > @@ -94,7 +95,6 @@ static struct resource        gpmc_mem_root;
+> >  static struct resource gpmc_cs_mem[GPMC_CS_NUM];
+> >  static DEFINE_SPINLOCK(gpmc_mem_lock);
+> >  static unsigned int gpmc_cs_map;       /* flag for cs which are
+> initialized */
+> > -static int gpmc_ecc_used = -EINVAL;    /* cs using ecc engine */
+> >
+> >  static void __iomem *gpmc_base;
+> >
+> > @@ -832,52 +832,77 @@ void omap3_gpmc_restore_context(void)
+> >
+> >  /**
+> >  * gpmc_enable_hwecc - enable hardware ecc functionality
+> > + * @ecc_type: ecc type e.g. Hamming, BCH
+> >  * @cs: chip select number
+> >  * @mode: read/write mode
+> >  * @dev_width: device bus width(1 for x16, 0 for x8)
+> >  * @ecc_size: bytes for which ECC will be generated
+> >  */
+> > -int gpmc_enable_hwecc(int cs, int mode, int dev_width, int ecc_size)
+> > +int gpmc_enable_hwecc(int ecc_type, int cs, int mode,
+> > +                       int dev_width, int ecc_size)
+> >  {
+> > -       unsigned int val;
+> > -
+> > -       /* check if ecc module is in used */
+> > -       if (gpmc_ecc_used != -EINVAL)
+> > -               return -EINVAL;
+> > -
+> > -       gpmc_ecc_used = cs;
+> > -
+> > -       /* clear ecc and enable bits */
+> > -       val = ((0x00000001<<8) | 0x00000001);
+> > -       gpmc_write_reg(GPMC_ECC_CONTROL, val);
+> > -
+> > -       /* program ecc and result sizes */
+> > -       val = ((((ecc_size >> 1) - 1) << 22) | (0x0000000F));
+> > -       gpmc_write_reg(GPMC_ECC_SIZE_CONFIG, val);
+> > +       unsigned int bch_mod = 0, bch_wrapmode = 0, eccsize1 = 0,
+> eccsize0 = 0;
+> > +       unsigned int ecc_conf_val = 0, ecc_size_conf_val = 0;
+> >
+> >        switch (mode) {
+> >        case GPMC_ECC_READ:
+> > -               gpmc_write_reg(GPMC_ECC_CONTROL, 0x101);
+> > +               if (ecc_type == OMAP_ECC_BCH4_CODE_HW) {
+> > +                       eccsize1 = 0xD; eccsize0 = 0x48;
+> > +                       bch_mod = 0;
+> > +                       bch_wrapmode = 0x09;
+> > +               } else if (ecc_type == OMAP_ECC_BCH8_CODE_HW) {
+> > +                       eccsize1 = 0x1A; eccsize0 = 0x18;
+> > +                       bch_mod = 1;
+> > +                       bch_wrapmode = 0x04;
+> > +               } else
+> > +                       eccsize1 = ((ecc_size >> 1) - 1) << 22;
+> >                break;
+> > +
+> >        case GPMC_ECC_READSYN:
+> > -                gpmc_write_reg(GPMC_ECC_CONTROL, 0x100);
+> >                break;
+> > +
+> >        case GPMC_ECC_WRITE:
+> > -               gpmc_write_reg(GPMC_ECC_CONTROL, 0x101);
+> > +               if (ecc_type == OMAP_ECC_BCH4_CODE_HW) {
+> > +                       eccsize1 = 0x20; eccsize0 = 0x00;
+> > +                       bch_mod = 0;
+> > +                       bch_wrapmode = 0x06;
+> > +               } else if (ecc_type == OMAP_ECC_BCH8_CODE_HW) {
+> > +                       eccsize1 = 0x20; eccsize0 = 0x00;
+> > +                       bch_mod = 1;
+> > +                       bch_wrapmode = 0x06;
+> > +               } else
+> > +                       eccsize1 = ((ecc_size >> 1) - 1) << 22;
+> >                break;
+> > +
+> >        default:
+> >                printk(KERN_INFO "Error: Unrecognized Mode[%d]!\n",
+> mode);
+> >                break;
+> >        }
+> >
+> > -       /* (ECC 16 or 8 bit col) | ( CS  )  | ECC Enable */
+> > -       val = (dev_width << 7) | (cs << 1) | (0x1);
+> > -       gpmc_write_reg(GPMC_ECC_CONFIG, val);
+> > +       /* clear ecc and enable bits */
+> > +       if ((ecc_type == OMAP_ECC_BCH4_CODE_HW) ||
+> > +               (ecc_type == OMAP_ECC_BCH8_CODE_HW)) {
+> > +               gpmc_write_reg(GPMC_ECC_CONTROL, 0x00000001);
+> > +               ecc_size_conf_val = (eccsize1 << 22) | (eccsize0 << 12);
+> > +               ecc_conf_val = ((0x01 << 16) | (bch_mod << 12)
+> > +                       | (bch_wrapmode << 8) | (dev_width << 7)
+> > +                       | (0x03 << 4) | (cs << 1) | (0x1));
+> > +       } else {
+> > +               gpmc_write_reg(GPMC_ECC_CONTROL, 0x00000101);
+> > +               ecc_size_conf_val = (eccsize1 << 22) | 0x0000000F;
+> > +               ecc_conf_val = (dev_width << 7) | (cs << 1) | (0x1);
+> > +       }
+> > +
+> > +       gpmc_write_reg(GPMC_ECC_SIZE_CONFIG, ecc_size_conf_val);
+> > +       gpmc_write_reg(GPMC_ECC_CONFIG, ecc_conf_val);
+> > +       gpmc_write_reg(GPMC_ECC_CONTROL, 0x00000101);
+> > +
+> >        return 0;
+> >  }
+> >
+> >  /**
+> >  * gpmc_calculate_ecc - generate non-inverted ecc bytes
+> > + * @ecc_type: ecc type e.g. Hamming, BCH
+> >  * @cs: chip select number
+> >  * @dat: data pointer over which ecc is computed
+> >  * @ecc_code: ecc code buffer
+> > @@ -888,20 +913,51 @@ int gpmc_enable_hwecc(int cs, int mode, int
+> dev_width, int ecc_size)
+> >  * an erased page will produce an ECC mismatch between generated and
+> read
+> >  * ECC bytes that has to be dealt with separately.
+> >  */
+> > -int gpmc_calculate_ecc(int cs, const u_char *dat, u_char *ecc_code)
+> > +int gpmc_calculate_ecc(int ecc_type, int cs,
+> > +                       const u_char *dat, u_char *ecc_code)
+> >  {
+> > -       unsigned int val = 0x0;
+> > -
+> > -       if (gpmc_ecc_used != cs)
+> > -               return -EINVAL;
+> > +       unsigned int reg;
+> > +       unsigned int val1 = 0x0, val2 = 0x0;
+> > +       unsigned int val3 = 0x0, val4 = 0x0;
+> > +       int i;
+> >
+> > -       /* read ecc result */
+> > -       val = gpmc_read_reg(GPMC_ECC1_RESULT);
+> > -       *ecc_code++ = val;          /* P128e, ..., P1e */
+> > -       *ecc_code++ = val >> 16;    /* P128o, ..., P1o */
+> > -       /* P2048o, P1024o, P512o, P256o, P2048e, P1024e, P512e, P256e */
+> > -       *ecc_code++ = ((val >> 8) & 0x0f) | ((val >> 20) & 0xf0);
+> > +       if ((ecc_type == OMAP_ECC_BCH4_CODE_HW) ||
+> > +               (ecc_type == OMAP_ECC_BCH8_CODE_HW)) {
+> > +               for (i = 0; i < 4; i++) {
+> > +                       /*
+> > +                        * Reading HW ECC_BCH_Results
+> > +                        * 0x240-0x24C, 0x250-0x25C, 0x260-0x26C, 0x270-
+> 0x27C
+> > +                        */
+> > +                       reg =  GPMC_ECC_BCH_RESULT_0 + (0x10 * i);
+> > +                       val1 = gpmc_read_reg(reg);
+> > +                       val2 = gpmc_read_reg(reg + 4);
+> > +                       if (ecc_type == OMAP_ECC_BCH8_CODE_HW) {
+> > +                               val3 = gpmc_read_reg(reg + 8);
+> > +                               val4 = gpmc_read_reg(reg + 12);
+> > +
+> > +                               *ecc_code++ = (val4 & 0xFF);
+> > +                               *ecc_code++ = ((val3 >> 24) & 0xFF);
+> > +                               *ecc_code++ = ((val3 >> 16) & 0xFF);
+> > +                               *ecc_code++ = ((val3 >> 8) & 0xFF);
+> > +                               *ecc_code++ = (val3 & 0xFF);
+> > +                               *ecc_code++ = ((val2 >> 24) & 0xFF);
+> > +                       }
+> > +                       *ecc_code++ = ((val2 >> 16) & 0xFF);
+> > +                       *ecc_code++ = ((val2 >> 8) & 0xFF);
+> > +                       *ecc_code++ = (val2 & 0xFF);
+> > +                       *ecc_code++ = ((val1 >> 24) & 0xFF);
+> > +                       *ecc_code++ = ((val1 >> 16) & 0xFF);
+> > +                       *ecc_code++ = ((val1 >> 8) & 0xFF);
+> > +                       *ecc_code++ = (val1 & 0xFF);
+> > +               }
+> > +       } else {
+> > +               /* read ecc result */
+> > +               val1 = gpmc_read_reg(GPMC_ECC1_RESULT);
+> > +               *ecc_code++ = val1;          /* P128e, ..., P1e */
+> > +               *ecc_code++ = val1 >> 16;    /* P128o, ..., P1o */
+> > +               /* P2048o, P1024o, P512o, P256o, P2048e, P1024e, P512e,
+> P256e */
+> > +               *ecc_code++ = ((val1 >> 8) & 0x0f) | ((val1 >> 20) &
+> 0xf0);
+> > +       }
+> >
+> > -       gpmc_ecc_used = -EINVAL;
+> >        return 0;
+> >  }
+> > diff --git a/arch/arm/plat-omap/include/plat/gpmc.h b/arch/arm/plat-
+> omap/include/plat/gpmc.h
+> > index 49aea09..838c185 100644
+> > --- a/arch/arm/plat-omap/include/plat/gpmc.h
+> > +++ b/arch/arm/plat-omap/include/plat/gpmc.h
+> > @@ -92,6 +92,8 @@ enum omap_ecc {
+> >        OMAP_ECC_HAMMING_CODE_HW, /* gpmc to detect the error */
+> >                /* 1-bit ecc: stored at begining of spare area as romcode
+> */
+> >        OMAP_ECC_HAMMING_CODE_HW_ROMCODE, /* gpmc method & romcode layout
+> */
+> > +       OMAP_ECC_BCH4_CODE_HW, /* gpmc bch detection & s/w method
+> correction */
+> > +       OMAP_ECC_BCH8_CODE_HW, /* gpmc bch detection & s/w method
+> correction */
+> >  };
+> >
+> >  /*
+> > @@ -156,6 +158,6 @@ extern int gpmc_cs_configure(int cs, int cmd, int
+> wval);
+> >  extern int gpmc_nand_read(int cs, int cmd);
+> >  extern int gpmc_nand_write(int cs, int cmd, int wval);
+> >
+> > -int gpmc_enable_hwecc(int cs, int mode, int dev_width, int ecc_size);
+> > -int gpmc_calculate_ecc(int cs, const u_char *dat, u_char *ecc_code);
+> > +int gpmc_enable_hwecc(int ecc, int cs, int mode, int dev_width, int
+> ecc_size);
+> > +int gpmc_calculate_ecc(int ecc, int cs, const u_char *dat, u_char
+> *ecc_code);
+> >  #endif
+> > diff --git a/drivers/mtd/nand/Makefile b/drivers/mtd/nand/Makefile
+> > index 8ad6fae..ae02711 100644
+> > --- a/drivers/mtd/nand/Makefile
+> > +++ b/drivers/mtd/nand/Makefile
+> > @@ -29,6 +29,7 @@ obj-$(CONFIG_MTD_NAND_NDFC)           += ndfc.o
+> >  obj-$(CONFIG_MTD_NAND_ATMEL)           += atmel_nand.o
+> >  obj-$(CONFIG_MTD_NAND_GPIO)            += gpio.o
+> >  obj-$(CONFIG_MTD_NAND_OMAP2)           += omap2.o
+> > +obj-$(CONFIG_MTD_NAND_OMAP2)           += omap_bch_decoder.o
+> >  obj-$(CONFIG_MTD_NAND_CM_X270)         += cmx270_nand.o
+> >  obj-$(CONFIG_MTD_NAND_PXA3xx)          += pxa3xx_nand.o
+> >  obj-$(CONFIG_MTD_NAND_TMIO)            += tmio_nand.o
+> > diff --git a/drivers/mtd/nand/omap2.c b/drivers/mtd/nand/omap2.c
+> > index 4e33972..14c7dfe 100644
+> > --- a/drivers/mtd/nand/omap2.c
+> > +++ b/drivers/mtd/nand/omap2.c
+> > @@ -98,6 +98,8 @@
+> >  static const char *part_probes[] = { "cmdlinepart", NULL };
+> >  #endif
+> >
+> > +int decode_bch(int select_4_8, unsigned char *ecc, unsigned int
+> *err_loc);
+> > +
+> >  /* oob info generated runtime depending on ecc algorithm and layout
+> selected */
+> >  static struct nand_ecclayout omap_oobinfo;
+> >  /* Define some generic bad / good block scan pattern which are used
+> > @@ -130,7 +132,8 @@ struct omap_nand_info {
+> >                OMAP_NAND_IO_WRITE,     /* write */
+> >        } iomode;
+> >        u_char                          *buf;
+> > -       int                                     buf_len;
+> > +       int                             buf_len;
+> > +       int                             ecc_opt;
+> >  };
+> >
+> >  /**
+> > @@ -529,7 +532,6 @@ static void omap_read_buf_irq_pref(struct mtd_info
+> *mtd, u_char *buf, int len)
+> >        struct omap_nand_info *info = container_of(mtd,
+> >                                                struct omap_nand_info,
+> mtd);
+> >        int ret = 0;
+> > -
+> >        if (len <= mtd->oobsize) {
+> >                omap_read_buf_pref(mtd, buf, len);
+> >                return;
+> > @@ -803,6 +805,8 @@ static int omap_correct_data(struct mtd_info *mtd,
+> u_char *dat,
+> >        struct omap_nand_info *info = container_of(mtd, struct
+> omap_nand_info,
+> >                                                        mtd);
+> >        int blockCnt = 0, i = 0, ret = 0;
+> > +       int j, eccsize, eccflag, count;
+> > +       unsigned int err_loc[8];
+> >
+> >        /* Ex NAND_ECC_HW12_2048 */
+> >        if ((info->nand.ecc.mode == NAND_ECC_HW) &&
+> > @@ -811,16 +815,57 @@ static int omap_correct_data(struct mtd_info *mtd,
+> u_char *dat,
+> >        else
+> >                blockCnt = 1;
+> >
+> > -       for (i = 0; i < blockCnt; i++) {
+> > -               if (memcmp(read_ecc, calc_ecc, 3) != 0) {
+> > -                       ret = omap_compare_ecc(read_ecc, calc_ecc, dat);
+> > -                       if (ret < 0)
+> > -                               return ret;
+> > +       switch (info->ecc_opt) {
+> > +       case OMAP_ECC_HAMMING_CODE_HW:
+> > +       case OMAP_ECC_HAMMING_CODE_HW_ROMCODE:
+> > +               for (i = 0; i < blockCnt; i++) {
+> > +                       if (memcmp(read_ecc, calc_ecc, 3) != 0) {
+> > +                               ret = omap_compare_ecc(read_ecc,
+> calc_ecc, dat);
+> > +                               if (ret < 0)
+> > +                                       return ret;
+> > +                       }
+> > +                       read_ecc += 3;
+> > +                       calc_ecc += 3;
+> > +                       dat      += 512;
+> >                }
+> > -               read_ecc += 3;
+> > -               calc_ecc += 3;
+> > -               dat      += 512;
+> > +               break;
+> > +
+> > +       case OMAP_ECC_BCH4_CODE_HW:
+> > +               eccsize = 7;
+> > +               gpmc_calculate_ecc(info->ecc_opt, info->gpmc_cs, dat,
+> calc_ecc);
+> > +               for (i = 0; i < blockCnt; i++) {
+> > +                       /* check if any ecc error */
+> > +                       eccflag = 0;
+> > +                       for (j = 0; (j < eccsize) && (eccflag == 0);
+> j++)
+> > +                               if (calc_ecc[j] != 0)
+> > +                                       eccflag = 1;
+> > +
+> > +                       if (eccflag == 1) {
+> > +                               eccflag = 0;
+> > +                               for (j = 0; (j < eccsize) &&
+> > +                                               (eccflag == 0); j++)
+> > +                                       if (read_ecc[j] != 0xFF)
+> > +                                               eccflag = 1;
+> > +                       }
+> > +
+> > +                       count = 0;
+> > +                       if (eccflag == 1)
+> > +                               count = decode_bch(0, calc_ecc,
+> err_loc);
+> > +
+> > +                       for (j = 0; j < count; j++) {
+> > +                               if (err_loc[j] < 4096)
+> > +                                       dat[err_loc[j] >> 3] ^=
+> > +                                                       1 << (err_loc[j]
+> & 7);
+> > +                               /* else, not interested to correct ecc
+> */
+> > +                       }
+> > +
+> > +                       calc_ecc = calc_ecc + eccsize;
+> > +                       read_ecc = read_ecc + eccsize;
+> > +                       dat += 512;
+> > +               }
+> > +               break;
+> >        }
+> > +
+> >        return 0;
+> >  }
+> >
+> > @@ -841,7 +886,7 @@ static int omap_calculate_ecc(struct mtd_info *mtd,
+> const u_char *dat,
+> >  {
+> >        struct omap_nand_info *info = container_of(mtd, struct
+> omap_nand_info,
+> >                                                        mtd);
+> > -       return gpmc_calculate_ecc(info->gpmc_cs, dat, ecc_code);
+> > +       return gpmc_calculate_ecc(info->ecc_opt, info->gpmc_cs, dat,
+> ecc_code);
+> >  }
+> >
+> >  /**
+> > @@ -856,7 +901,8 @@ static void omap_enable_hwecc(struct mtd_info *mtd,
+> int mode)
+> >        struct nand_chip *chip = mtd->priv;
+> >        unsigned int dev_width = (chip->options & NAND_BUSWIDTH_16) ? 1 :
+> 0;
+> >
+> > -       gpmc_enable_hwecc(info->gpmc_cs, mode, dev_width, info-
+> >nand.ecc.size);
+> > +       gpmc_enable_hwecc(info->ecc_opt, info->gpmc_cs, mode,
+> > +                               dev_width, info->nand.ecc.size);
+> >  }
+> >
+> >  /**
+> > @@ -953,6 +999,7 @@ static int __devinit omap_nand_probe(struct
+> platform_device *pdev)
+> >        info->mtd.priv          = &info->nand;
+> >        info->mtd.name          = dev_name(&pdev->dev);
+> >        info->mtd.owner         = THIS_MODULE;
+> > +       info->ecc_opt           = pdata->ecc_opt;
+> >
+> >        info->nand.options      = pdata->devsize;
+> >        info->nand.options      |= NAND_SKIP_BBTSCAN;
+> > @@ -991,7 +1038,6 @@ static int __devinit omap_nand_probe(struct
+> platform_device *pdev)
+> >                info->nand.waitfunc = omap_wait;
+> >                info->nand.chip_delay = 50;
+> >        }
+> > -
+> >        switch (pdata->xfer_type) {
+> >        case NAND_OMAP_PREFETCH_POLLED:
+> >                info->nand.read_buf   = omap_read_buf_pref;
+> > @@ -1052,10 +1098,17 @@ static int __devinit omap_nand_probe(struct
+> platform_device *pdev)
+> >        /* selsect the ecc type */
+> >        if (pdata->ecc_opt == OMAP_ECC_HAMMING_CODE_DEFAULT)
+> >                info->nand.ecc.mode = NAND_ECC_SOFT;
+> > -       else if ((pdata->ecc_opt == OMAP_ECC_HAMMING_CODE_HW) ||
+> > -               (pdata->ecc_opt == OMAP_ECC_HAMMING_CODE_HW_ROMCODE)) {
+> > -               info->nand.ecc.bytes            = 3;
+> > -               info->nand.ecc.size             = 512;
+> > +       else {
+> > +               if (pdata->ecc_opt == OMAP_ECC_BCH4_CODE_HW) {
+> > +                       info->nand.ecc.bytes    = 4*7;
+> > +                       info->nand.ecc.size     = 4*512;
+> > +               } else if (pdata->ecc_opt == OMAP_ECC_BCH8_CODE_HW) {
+> > +                       info->nand.ecc.bytes    = 13;
+> > +                       info->nand.ecc.size     = 4*512;
+> > +               } else {
+> > +                       info->nand.ecc.bytes    = 3;
+> > +                       info->nand.ecc.size     = 512;
+> > +               }
+> >                info->nand.ecc.calculate        = omap_calculate_ecc;
+> >                info->nand.ecc.hwctl            = omap_enable_hwecc;
+> >                info->nand.ecc.correct          = omap_correct_data;
+> > @@ -1073,8 +1126,8 @@ static int __devinit omap_nand_probe(struct
+> platform_device *pdev)
+> >                }
+> >        }
+> >
+> > -       /* rom code layout */
+> > -       if (pdata->ecc_opt == OMAP_ECC_HAMMING_CODE_HW_ROMCODE) {
+> > +       /* select ecc lyout */
+> > +       if (info->nand.ecc.mode != NAND_ECC_SOFT) {
+> >
+> >                if (info->nand.options & NAND_BUSWIDTH_16)
+> >                        offset = 2;
+> > @@ -1082,15 +1135,31 @@ static int __devinit omap_nand_probe(struct
+> platform_device *pdev)
+> >                        offset = 1;
+> >                        info->nand.badblock_pattern =
+> &bb_descrip_flashbased;
+> >                }
+> > -               omap_oobinfo.eccbytes = 3 * (info->mtd.oobsize/16);
+> > -               for (i = 0; i < omap_oobinfo.eccbytes; i++)
+> > -                       omap_oobinfo.eccpos[i] = i+offset;
+> >
+> > -               omap_oobinfo.oobfree->offset = offset +
+> omap_oobinfo.eccbytes;
+> > -               omap_oobinfo.oobfree->length = info->mtd.oobsize -
+> > -                                       (offset +
+> omap_oobinfo.eccbytes);
+> > +               if (info->mtd.oobsize == 64)
+> > +                       omap_oobinfo.eccbytes = info->nand.ecc.bytes *
+> > +                                               2048/info-
+> >nand.ecc.size;
+> > +               else
+> > +                       omap_oobinfo.eccbytes = info->nand.ecc.bytes;
+> > +
+> > +               if (pdata->ecc_opt == OMAP_ECC_HAMMING_CODE_HW_ROMCODE)
+> {
+> > +                       for (i = 0; i < omap_oobinfo.eccbytes; i++)
+> > +                               omap_oobinfo.eccpos[i] = i + offset;
+> > +                       omap_oobinfo.oobfree->offset =
+> > +                                               offset +
+> omap_oobinfo.eccbytes;
+> > +                       omap_oobinfo.oobfree->length = info->mtd.oobsize
+> -
+> > +                                               offset -
+> omap_oobinfo.eccbytes;
+> > +               } else {
+> >
+> > +                       omap_oobinfo.oobfree->offset = offset;
+> > +                       omap_oobinfo.oobfree->length = info->mtd.oobsize
+> -
+> > +                                               offset -
+> omap_oobinfo.eccbytes;
+> > +                       offset = info->mtd.oobsize -
+> omap_oobinfo.eccbytes;
+> > +                       for (i = 0; i < omap_oobinfo.eccbytes; i++)
+> > +                               omap_oobinfo.eccpos[i] = i + offset;
+> > +               }
+> >                info->nand.ecc.layout = &omap_oobinfo;
+> > +
+> >        }
+> >
+> >  #ifdef CONFIG_MTD_PARTITIONS
+> > diff --git a/drivers/mtd/nand/omap_bch_decoder.c
+> b/drivers/mtd/nand/omap_bch_decoder.c
+> > new file mode 100644
+> > index 0000000..da42bda
+> > --- /dev/null
+> > +++ b/drivers/mtd/nand/omap_bch_decoder.c
+> > @@ -0,0 +1,393 @@
+> > +/*
+> > + * drivers/mtd/nand/omap_omap_bch_decoder.c
+> > + *
+> > + * Whole BCH ECC Decoder (Post hardware generated syndrome decoding)
+> > + *
+> > + * Copyright (c) 2007 Texas Instruments
+> > + *
+> > + * Author: Sukumar Ghorai <s-ghorai@ti.com
+> > + *                Michael Fillinger <m-fillinger@ti.com>
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License version 2 as
+> > + * published by the Free Software Foundation.
+> > + */
+> > +#undef DEBUG
+> > +
+> > +#include <linux/kernel.h>
+> > +#include <linux/module.h>
+> > +
+> > +#define mm             13
+> > +#define kk_shorten     4096
+> > +#define nn             8191    /* Length of codeword, n = 2**mm - 1 */
+> > +
+> > +#define PPP    0x201B  /* Primary Polynomial : x^13 + x^4 + x^3 + x + 1
+> */
+> > +#define P      0x001B  /* With omitted x^13 */
+> > +#define POLY   12      /* degree of the primary Polynomial less one */
+> > +
+> > +/**
+> > + * mpy_mod_gf - GALOIS field multiplier
+> > + * Input  : A(x), B(x)
+> > + * Output : A(x)*B(x) mod P(x)
+> > + */
+> > +static unsigned int mpy_mod_gf(unsigned int a, unsigned int b)
+> > +{
+> > +       unsigned int R = 0;
+> > +       unsigned int R1 = 0;
+> > +       unsigned int k = 0;
+> > +
+> > +       for (k = 0; k < mm; k++) {
+> > +
+> > +               R = (R << 1) & 0x1FFE;
+> > +               if (R1 == 1)
+> > +                       R ^= P;
+> > +
+> > +               if (((a >> (POLY - k)) & 1) == 1)
+> > +                       R ^= b;
+> > +
+> > +               if (k < POLY)
+> > +                       R1 = (R >> POLY) & 1;
+> > +       }
+> > +       return R;
+> > +}
+> > +
+> > +/**
+> > + * chien - CHIEN search
+> > + *
+> > + * @location - Error location vector pointer
+> > + *
+> > + * Inputs  : ELP(z)
+> > + *          No. of found errors
+> > + *          Size of input codeword
+> > + * Outputs : Up to 8 locations
+> > + *          No. of errors
+> > + */
+> > +static int chien(unsigned int select_4_8, int err_nums,
+> > +                               unsigned int err[], unsigned int
+> *location)
+> > +{
+> > +       int i, count; /* Number of dectected errors */
+> > +       /* Contains accumulation of evaluation at x^i (i:1->8) */
+> > +       unsigned int gammas[8] = {0};
+> > +       unsigned int alpha;
+> > +       unsigned int bit, ecc_bits;
+> > +       unsigned int elp_sum;
+> > +
+> > +       ecc_bits = (select_4_8 == 0) ? 52 : 104;
+> > +
+> > +       /* Start evaluation at Alpha**8192 and decreasing */
+> > +       for (i = 0; i < 8; i++)
+> > +               gammas[i] = err[i];
+> > +
+> > +       count = 0;
+> > +       for (i = 1; (i <= nn) && (count < err_nums); i++) {
+> > +
+> > +               /* Result of evaluation at root */
+> > +               elp_sum = 1 ^ gammas[0] ^ gammas[1] ^
+> > +                               gammas[2] ^ gammas[3] ^
+> > +                               gammas[4] ^ gammas[5] ^
+> > +                               gammas[6] ^ gammas[7];
+> > +
+> > +               alpha = PPP >> 1;
+> > +               gammas[0] = mpy_mod_gf(gammas[0], alpha);
+> > +               alpha = mpy_mod_gf(alpha, (PPP >> 1));  /* x alphha^-2
+> */
+> > +               gammas[1] = mpy_mod_gf(gammas[1], alpha);
+> > +               alpha = mpy_mod_gf(alpha, (PPP >> 1));  /* x alphha^-2
+> */
+> > +               gammas[2] = mpy_mod_gf(gammas[2], alpha);
+> > +               alpha = mpy_mod_gf(alpha, (PPP >> 1));  /* x alphha^-3
+> */
+> > +               gammas[3] = mpy_mod_gf(gammas[3], alpha);
+> > +               alpha = mpy_mod_gf(alpha, (PPP >> 1));  /* x alphha^-4
+> */
+> > +               gammas[4] = mpy_mod_gf(gammas[4], alpha);
+> > +               alpha = mpy_mod_gf(alpha, (PPP >> 1));  /* x alphha^-5
+> */
+> > +               gammas[5] = mpy_mod_gf(gammas[5], alpha);
+> > +               alpha = mpy_mod_gf(alpha, (PPP >> 1));  /* x alphha^-6
+> */
+> > +               gammas[6] = mpy_mod_gf(gammas[6], alpha);
+> > +               alpha = mpy_mod_gf(alpha, (PPP >> 1));  /* x alphha^-7
+> */
+> > +               gammas[7] = mpy_mod_gf(gammas[7], alpha);
+> > +
+> > +               if (elp_sum == 0) {
+> > +                       /* calculate bit position in main data area */
+> > +                       bit = ((i-1) & ~7)|(7-((i-1) & 7));
+> > +                       if (i >= 2 * ecc_bits)
+> > +                               location[count++] =
+> > +                                       kk_shorten - (bit - 2 *
+> ecc_bits) - 1;
+> > +               }
+> > +       }
+> > +
+> > +       /* Failure: No. of detected errors != No. or corrected errors */
+> > +       if (count != err_nums) {
+> > +               count = -1;
+> > +               printk(KERN_ERR "BCH decoding failed\n");
+> > +       }
+> > +       for (i = 0; i < count; i++)
+> > +               pr_debug("%d ", location[i]);
+> > +
+> > +       return count;
+> > +}
+> > +
+> > +/* synd : 16 Syndromes
+> > + * return: gamaas - Coefficients to the error polynomial
+> > + * return: : Number of detected errors
+> > +*/
+> > +static unsigned int berlekamp(unsigned int select_4_8,
+> > +                       unsigned int synd[], unsigned int err[])
+> > +{
+> > +       int loop, iteration;
+> > +       unsigned int LL = 0;            /* Detected errors */
+> > +       unsigned int d = 0;     /* Distance between Syndromes and
+> ELP[n](z) */
+> > +       unsigned int invd = 0;          /* Inverse of d */
+> > +       /* Intermediate ELP[n](z).
+> > +        * Final ELP[n](z) is Error Location Polynomial
+> > +        */
+> > +       unsigned int gammas[16] = {0};
+> > +       /* Intermediate normalized ELP[n](z) : D[n](z) */
+> > +       unsigned int D[16] = {0};
+> > +       /* Temporary value that holds an ELP[n](z) coefficient */
+> > +       unsigned int next_gamma = 0;
+> > +
+> > +       int e = 0;
+> > +       unsigned int sign = 0;
+> > +       unsigned int u = 0;
+> > +       unsigned int v = 0;
+> > +       unsigned int C1 = 0, C2 = 0;
+> > +       unsigned int ss = 0;
+> > +       unsigned int tmp_v = 0, tmp_s = 0;
+> > +       unsigned int tmp_poly;
+> > +
+> > +       /*-------------- Step 0 ------------------*/
+> > +       for (loop = 0; loop < 16; loop++)
+> > +               gammas[loop] = 0;
+> > +       gammas[0] = 1;
+> > +       D[1] = 1;
+> > +
+> > +       iteration = 0;
+> > +       LL = 0;
+> > +       while ((iteration < ((select_4_8+1)*2*4)) &&
+> > +                       (LL <= ((select_4_8+1)*4))) {
+> > +
+> > +               pr_debug("\nIteration.............%d\n", iteration);
+> > +               d = 0;
+> > +               /* Step: 0 */
+> > +               for (loop = 0; loop <= LL; loop++) {
+> > +                       tmp_poly = mpy_mod_gf(
+> > +                                       gammas[loop], synd[iteration -
+> loop]);
+> > +                       d ^= tmp_poly;
+> > +                       pr_debug("%02d. s=0 LL=%x poly %x\n",
+> > +                                       loop, LL, tmp_poly);
+> > +               }
+> > +
+> > +               /* Step 1: 1 cycle only to perform inversion */
+> > +               v = d << 1;
+> > +               e = -1;
+> > +               sign = 1;
+> > +               ss = 0x2000;
+> > +               invd = 0;
+> > +               u = PPP;
+> > +               for (loop = 0; (d != 0) && (loop <= (2 * POLY)); loop++)
+> {
+> > +                       pr_debug("%02d. s=1 LL=%x poly NULL\n",
+> > +                                               loop, LL);
+> > +                       C1 = (v >> 13) & 1;
+> > +                       C2 = C1 & sign;
+> > +
+> > +                       sign ^= C2 ^ (e == 0);
+> > +
+> > +                       tmp_v = v;
+> > +                       tmp_s = ss;
+> > +
+> > +                       if (C1 == 1) {
+> > +                               v ^= u;
+> > +                               ss ^= invd;
+> > +                       }
+> > +                       v = (v << 1) & 0x3FFF;
+> > +                       if (C2 == 1) {
+> > +                               u = tmp_v;
+> > +                               invd = tmp_s;
+> > +                               e = -e;
+> > +                       }
+> > +                       invd >>= 1;
+> > +                       e--;
+> > +               }
+> > +
+> > +               for (loop = 0; (d != 0) && (loop <= (iteration + 1));
+> loop++) {
+> > +                       /* Step 2
+> > +                        * Interleaved with Step 3, if L<(n-k)
+> > +                        * invd: Update of ELP[n](z) = ELP[n-1](z) -
+> d.D[n-1](z)
+> > +                        */
+> > +
+> > +                       /* Holds value of ELP coefficient until
+> precedent
+> > +                        * value does not have to be used anymore
+> > +                        */
+> > +                       tmp_poly = mpy_mod_gf(d, D[loop]);
+> > +                       pr_debug("%02d. s=2 LL=%x poly %x\n",
+> > +                                               loop, LL, tmp_poly);
+> > +
+> > +                       next_gamma = gammas[loop] ^ tmp_poly;
+> > +                       if ((2 * LL) < (iteration + 1)) {
+> > +                               /* Interleaving with Step 3
+> > +                                * for parallelized update of ELP(z) and
+> D(z)
+> > +                                */
+> > +                       } else {
+> > +                               /* Update of ELP(z) only -> stay in Step
+> 2 */
+> > +                               gammas[loop] = next_gamma;
+> > +                               if (loop == (iteration + 1)) {
+> > +                                       /* to step 4 */
+> > +                                       break;
+> > +                               }
+> > +                       }
+> > +
+> > +                       /* Step 3
+> > +                        * Always interleaved with Step 2 (case when
+> L<(n-k))
+> > +                        * Update of D[n-1](z) = ELP[n-1](z)/d
+> > +                        */
+> > +                       D[loop] = mpy_mod_gf(gammas[loop], invd);
+> > +                       pr_debug("%02d. s=3 LL=%x poly %x\n",
+> > +                                       loop, LL, D[loop]);
+> > +
+> > +                       /* Can safely update ELP[n](z) */
+> > +                       gammas[loop] = next_gamma;
+> > +
+> > +                       if (loop == (iteration + 1)) {
+> > +                               /* If update finished */
+> > +                               LL = iteration - LL + 1;
+> > +                               /* to step 4 */
+> > +                               break;
+> > +                       }
+> > +                       /* Else, interleaving to step 2*/
+> > +               }
+> > +
+> > +               /* Step 4: Update D(z): i:0->L */
+> > +               /* Final update of D[n](z) = D[n](z).z*/
+> > +               for (loop = 0; loop < 15; loop++) /* Left Shift */
+> > +                       D[15 - loop] = D[14 - loop];
+> > +
+> > +               D[0] = 0;
+> > +
+> > +               iteration++;
+> > +       } /* while */
+> > +
+> > +       /* Processing finished, copy ELP to final registers : 0->2t-1*/
+> > +       for (loop = 0; loop < 8; loop++)
+> > +               err[loop] = gammas[loop+1];
+> > +
+> > +       pr_debug("\n Err poly:");
+> > +       for (loop = 0; loop < 8; loop++)
+> > +               pr_debug("0x%x ", err[loop]);
+> > +
+> > +       return LL;
+> > +}
+> > +
+> > +/*
+> > + * syndrome - Generate syndrome components from hw generate syndrome
+> > + * r(x) = c(x) + e(x)
+> > + * s(x) = c(x) mod g(x) + e(x) mod g(x) =  e(x) mod g(x)
+> > + * so receiver checks if the syndrome s(x) = r(x) mod g(x) is equal to
+> zero.
+> > + * unsigned int s[16]; - Syndromes
+> > + */
+> > +static void syndrome(unsigned int select_4_8,
+> > +                                       unsigned char *ecc, unsigned int
+> syn[])
+> > +{
+> > +       unsigned int k, l, t;
+> > +       unsigned int alpha_bit, R_bit;
+> > +       int ecc_pos, ecc_min;
+> > +
+> > +       /* 2t-1 = 15 (for t=8) minimal polynomials of the first 15
+> powers of a
+> > +        * primitive elemmants of GF(m); Even powers minimal polynomials
+> are
+> > +        * duplicate of odd powers' minimal polynomials.
+> > +        * Odd powers of alpha (1 to 15)
+> > +        */
+> > +       unsigned int pow_alpha[8] = {0x0002, 0x0008, 0x0020, 0x0080,
+> > +                                0x0200, 0x0800, 0x001B, 0x006C};
+> > +
+> > +       pr_debug("\n ECC[0..n]: ");
+> > +       for (k = 0; k < 13; k++)
+> > +               pr_debug("0x%x ", ecc[k]);
+> > +
+> > +       if (select_4_8 == 0) {
+> > +               t = 4;
+> > +               ecc_pos = 55; /* bits(52-bits): 55->4 */
+> > +               ecc_min = 4;
+> > +       } else {
+> > +               t = 8;
+> > +               ecc_pos = 103; /* bits: 103->0 */
+> > +               ecc_min = 0;
+> > +       }
+> > +
+> > +       /* total numbber of syndrom to be used is 2t */
+> > +       /* Step1: calculate the odd syndrome(s) */
+> > +       R_bit = ((ecc[ecc_pos/8] >> (7 - ecc_pos%8)) & 1);
+> > +       ecc_pos--;
+> > +       for (k = 0; k < t; k++)
+> > +               syn[2 * k] = R_bit;
+> > +
+> > +       while (ecc_pos >= ecc_min) {
+> > +               R_bit = ((ecc[ecc_pos/8] >> (7 - ecc_pos%8)) & 1);
+> > +               ecc_pos--;
+> > +
+> > +               for (k = 0; k < t; k++) {
+> > +                       /* Accumulate value of x^i at alpha^(2k+1) */
+> > +                       if (R_bit == 1)
+> > +                               syn[2*k] ^= pow_alpha[k];
+> > +
+> > +                       /* Compute a**(2k+1), using LSFR */
+> > +                       for (l = 0; l < (2 * k + 1); l++) {
+> > +                               alpha_bit = (pow_alpha[k] >> POLY) & 1;
+> > +                               pow_alpha[k] = (pow_alpha[k] << 1) &
+> 0x1FFF;
+> > +                               if (alpha_bit == 1)
+> > +                                       pow_alpha[k] ^= P;
+> > +                       }
+> > +               }
+> > +       }
+> > +
+> > +       /* Step2: calculate the even syndrome(s)
+> > +        * Compute S(a), where a is an even power of alpha
+> > +        * Evenry even power of primitive element has the same minimal
+> > +        * polynomial as some odd power of elemets.
+> > +        * And based on S(a^2) = S^2(a)
+> > +        */
+> > +       for (k = 0; k < t; k++)
+> > +               syn[2*k+1] = mpy_mod_gf(syn[k], syn[k]);
+> > +
+> > +       pr_debug("\n Syndromes: ");
+> > +       for (k = 0; k < 16; k++)
+> > +               pr_debug("0x%x ", syn[k]);
+> > +}
+> > +
+> > +/**
+> > + * decode_bch - BCH decoder for 4- and 8-bit error correction
+> > + *
+> > + * @ecc - ECC syndrome generated by hw BCH engine
+> > + * @err_loc - pointer to error location array
+> > + *
+> > + * This function does post sydrome generation (hw generated) decoding
+> > + * for:-
+> > + * Dimension of Galoise Field: m = 13
+> > + * Length of codeword: n = 2**m - 1
+> > + * Number of errors that can be corrected: 4- or 8-bits
+> > + * Length of information bit: kk = nn - rr
+> > + */
+> > +int decode_bch(int select_4_8, unsigned char *ecc, unsigned int
+> *err_loc)
+> > +{
+> > +       int no_of_err;
+> > +       unsigned int syn[16] = {0,};    /* 16 Syndromes */
+> > +       unsigned int err_poly[8] = {0,};
+> > +       /* Coefficients to the error polynomial
+> > +        * ELP(x) = 1 + err0.x + err1.x^2 + ... + err7.x^8
+> > +        */
+> > +
+> > +       /* Decoting involes three steps
+> > +        * 1. Compute the syndrom from teh received codeword,
+> > +        * 2. Find the error location polynomial from a set of equations
+> > +        *     derived from the syndrome,
+> > +        * 3. Use the error location polynomial to identify errants bits,
+> > +        *
+> > +        * And correcttion done by bit flips using error locaiton and
+> expected
+> > +        * to be outseide of this implementation.
+> > +        */
+> > +       syndrome(select_4_8, ecc, syn);
+> > +       no_of_err = berlekamp(select_4_8, syn, err_poly);
+> > +       if (no_of_err <= (4 << select_4_8))
+> > +               no_of_err = chien(select_4_8, no_of_err, err_poly,
+> err_loc);
+> > +
+> > +       return no_of_err;
+> > +}
+> > +EXPORT_SYMBOL(decode_bch);
+> > +
+> > --
+> > 1.7.0.4
+> >
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> >
+>
+>
+>
+> --
+> Regards,
+> Vimal Singh
 
 ______________________________________________________
 Linux MTD discussion mailing list
