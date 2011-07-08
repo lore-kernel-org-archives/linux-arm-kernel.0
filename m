@@ -1,168 +1,297 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Fri, 08 Jul 2011 16:35:56 -0000
-Subject: [PATCH 1/8] mtd: nand: remove NAND_BBT_SCANBYTE1AND6 option
-In-Reply-To: <1306884687-1824-1-git-send-email-computersforpeace@gmail.com>
-References: <1306884687-1824-1-git-send-email-computersforpeace@gmail.com>
-Message-ID: <1306884687-1824-2-git-send-email-computersforpeace@gmail.com>
+From: justinmattock@gmail.com (Justin P. Mattock)
+Date: Fri, 08 Jul 2011 16:40:40 -0000
+Subject: [RFC 1/6]Fix typo "recieve" in various parts of the kernel.
+Message-ID: <1302192567-842-1-git-send-email-justinmattock@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch reverts most of:
-    commit 58373ff0afff4cc8ac40608872995f4d87eb72ec
-    mtd: nand: more BB Detection refactoring and dynamic scan options
+The patch below fixes some typos "recieve" in various parts of the kernel.
+Note: these below are in actual code rather than comments(excpet for r852.c which
+has a code fix, and comment).
+compile tested as best as I can...
 
-According to the discussion at:
-    http://lists.infradead.org/pipermail/linux-mtd/2011-May/035696.html
-the NAND_BBT_SCANBYTE1AND6 flag, although technically valid, can break
-some existing ECC layouts that use the 6th byte in the OOB for ECC data.
-Furthermore, we apparently do not need to scan both bytes 1 and 6 in
-the OOB region of the devices under consideration; instead, we only need
-to scan one or the other.
-
-Thus, the NAND_BBT_SCANBYTE1AND6 flag is at best unnecessary and at
-worst a regression.
-
-Signed-off-by: Brian Norris <computersforpeace@gmail.com>
+Signed-off-by: Justin P. Mattock <justinmattock@gmail.com>
+CC: linux-input at vger.kernel.org
+CC: linux-arm-kernel at lists.infradead.org 
+CC: linux-mtd at lists.infradead.org
+CC: netdev at vger.kernel.org
+CC: socketcan-core at lists.berlios.de
+CC: linux-scsi at vger.kernel.org 
+CC: linux-usb at vger.kernel.org
 ---
- drivers/mtd/nand/nand_base.c |   29 +++++------------------------
- drivers/mtd/nand/nand_bbt.c  |   32 +-------------------------------
- include/linux/mtd/bbm.h      |    2 --
- 3 files changed, 6 insertions(+), 57 deletions(-)
+ drivers/input/misc/keyspan_remote.c |    2 +-
+ drivers/mfd/ab8500-gpadc.c          |    2 +-
+ drivers/mtd/nand/r852.c             |    6 +++---
+ drivers/net/bnx2x/bnx2x_link.c      |    8 ++++----
+ drivers/net/can/janz-ican3.c        |    4 ++--
+ drivers/scsi/scsi_netlink.c         |    2 +-
+ drivers/usb/misc/ftdi-elan.c        |   28 ++++++++++++++--------------
+ drivers/uwb/reset.c                 |    2 +-
+ 8 files changed, 27 insertions(+), 27 deletions(-)
 
-diff --git a/drivers/mtd/nand/nand_base.c b/drivers/mtd/nand/nand_base.c
-index a46e9bb..456fb34 100644
---- a/drivers/mtd/nand/nand_base.c
-+++ b/drivers/mtd/nand/nand_base.c
-@@ -410,10 +410,11 @@ static int nand_default_block_markbad(struct mtd_info *mtd, loff_t ofs)
- 	else {
- 		nand_get_device(chip, mtd, FL_WRITING);
+diff --git a/drivers/input/misc/keyspan_remote.c b/drivers/input/misc/keyspan_remote.c
+index a93c525..fc62256 100644
+--- a/drivers/input/misc/keyspan_remote.c
++++ b/drivers/input/misc/keyspan_remote.c
+@@ -312,7 +312,7 @@ static void keyspan_check_data(struct usb_keyspan *remote)
+ 			remote->data.tester = remote->data.tester >> 5;
+ 			remote->data.bits_left -= 5;
+ 		} else {
+-			err("Bad message recieved, no stop bit found.\n");
++			err("Bad message received, no stop bit found.\n");
+ 		}
  
--		/* Write to first two pages and to byte 1 and 6 if necessary.
--		 * If we write to more than one location, the first error
--		 * encountered quits the procedure. We write two bytes per
--		 * location, so we dont have to mess with 16 bit access.
-+		/*
-+		 * Write to first two pages if necessary. If we write to more
-+		 * than one location, the first error encountered quits the
-+		 * procedure. We write two bytes per location, so we dont have
-+		 * to mess with 16 bit access.
- 		 */
- 		do {
- 			chip->ops.len = chip->ops.ooblen = 2;
-@@ -423,11 +424,6 @@ static int nand_default_block_markbad(struct mtd_info *mtd, loff_t ofs)
- 
- 			ret = nand_do_write_oob(mtd, ofs, &chip->ops);
- 
--			if (!ret && (chip->options & NAND_BBT_SCANBYTE1AND6)) {
--				chip->ops.ooboffs = NAND_SMALL_BADBLOCK_POS
--					& ~0x01;
--				ret = nand_do_write_oob(mtd, ofs, &chip->ops);
--			}
- 			i++;
- 			ofs += mtd->writesize;
- 		} while (!ret && (chip->options & NAND_BBT_SCAN2NDPAGE) &&
-@@ -3131,16 +3127,6 @@ ident_done:
- 			 *maf_id == NAND_MFR_MICRON))
- 		chip->options |= NAND_BBT_SCAN2NDPAGE;
- 
--	/*
--	 * Numonyx/ST 2K pages, x8 bus use BOTH byte 1 and 6
--	 */
--	if (!(busw & NAND_BUSWIDTH_16) &&
--			*maf_id == NAND_MFR_STMICRO &&
--			mtd->writesize == 2048) {
--		chip->options |= NAND_BBT_SCANBYTE1AND6;
--		chip->badblockpos = 0;
--	}
--
- 	/* Check for AND chips with 4 page planes */
- 	if (chip->options & NAND_4PAGE_ARRAY)
- 		chip->erase_cmd = multi_erase_cmd;
-@@ -3538,11 +3524,6 @@ void nand_release(struct mtd_info *mtd)
- 	kfree(chip->bbt);
- 	if (!(chip->options & NAND_OWN_BUFFERS))
- 		kfree(chip->buffers);
--
--	/* Free bad block descriptor memory */
--	if (chip->badblock_pattern && chip->badblock_pattern->options
--			& NAND_BBT_DYNAMICSTRUCT)
--		kfree(chip->badblock_pattern);
- }
- EXPORT_SYMBOL_GPL(nand_release);
- 
-diff --git a/drivers/mtd/nand/nand_bbt.c b/drivers/mtd/nand/nand_bbt.c
-index ccbeaa1..5ffb9a4 100644
---- a/drivers/mtd/nand/nand_bbt.c
-+++ b/drivers/mtd/nand/nand_bbt.c
-@@ -114,28 +114,6 @@ static int check_pattern(uint8_t *buf, int len, int paglen, struct nand_bbt_desc
- 			return -1;
+ 		dev_dbg(&remote->udev->dev,
+diff --git a/drivers/mfd/ab8500-gpadc.c b/drivers/mfd/ab8500-gpadc.c
+index bc93b2e..ea91ef1 100644
+--- a/drivers/mfd/ab8500-gpadc.c
++++ b/drivers/mfd/ab8500-gpadc.c
+@@ -314,7 +314,7 @@ int ab8500_gpadc_convert(struct ab8500_gpadc *gpadc, u8 input)
+ 	/* wait for completion of conversion */
+ 	if (!wait_for_completion_timeout(&gpadc->ab8500_gpadc_complete, 2*HZ)) {
+ 		dev_err(gpadc->dev,
+-			"timeout: didnt recieve GPADC conversion interrupt\n");
++			"timeout: didnt receive GPADC conversion interrupt\n");
+ 		ret = -EINVAL;
+ 		goto out;
  	}
+diff --git a/drivers/mtd/nand/r852.c b/drivers/mtd/nand/r852.c
+index 6322d1f..45a3f60 100644
+--- a/drivers/mtd/nand/r852.c
++++ b/drivers/mtd/nand/r852.c
+@@ -766,7 +766,7 @@ static irqreturn_t r852_irq(int irq, void *data)
+ 		ret = IRQ_HANDLED;
+ 		dev->card_detected = !!(card_status & R852_CARD_IRQ_INSERT);
  
--	/* Check both positions 1 and 6 for pattern? */
--	if (td->options & NAND_BBT_SCANBYTE1AND6) {
--		if (td->options & NAND_BBT_SCANEMPTY) {
--			p += td->len;
--			end += NAND_SMALL_BADBLOCK_POS - td->offs;
--			/* Check region between positions 1 and 6 */
--			for (i = 0; i < NAND_SMALL_BADBLOCK_POS - td->offs - td->len;
--					i++) {
--				if (*p++ != 0xff)
--					return -1;
--			}
--		}
--		else {
--			p += NAND_SMALL_BADBLOCK_POS - td->offs;
--		}
--		/* Compare the pattern */
--		for (i = 0; i < td->len; i++) {
--			if (p[i] != td->pattern[i])
--				return -1;
--		}
--	}
--
- 	if (td->options & NAND_BBT_SCANEMPTY) {
- 		p += td->len;
- 		end += td->len;
-@@ -167,13 +145,6 @@ static int check_short_pattern(uint8_t *buf, struct nand_bbt_descr *td)
- 		if (p[td->offs + i] != td->pattern[i])
- 			return -1;
+-		/* we shouldn't recieve any interrupts if we wait for card
++		/* we shouldn't receive any interrupts if we wait for card
+ 			to settle */
+ 		WARN_ON(dev->card_unstable);
+ 
+@@ -794,13 +794,13 @@ static irqreturn_t r852_irq(int irq, void *data)
+ 		ret = IRQ_HANDLED;
+ 
+ 		if (dma_status & R852_DMA_IRQ_ERROR) {
+-			dbg("recieved dma error IRQ");
++			dbg("received dma error IRQ");
+ 			r852_dma_done(dev, -EIO);
+ 			complete(&dev->dma_done);
+ 			goto out;
+ 		}
+ 
+-		/* recieved DMA interrupt out of nowhere? */
++		/* received DMA interrupt out of nowhere? */
+ 		WARN_ON_ONCE(dev->dma_stage == 0);
+ 
+ 		if (dev->dma_stage == 0)
+diff --git a/drivers/net/bnx2x/bnx2x_link.c b/drivers/net/bnx2x/bnx2x_link.c
+index f2f367d..d25491b 100644
+--- a/drivers/net/bnx2x/bnx2x_link.c
++++ b/drivers/net/bnx2x/bnx2x_link.c
+@@ -2385,7 +2385,7 @@ static void bnx2x_check_fallback_to_cl37(struct bnx2x_phy *phy,
+ 					 struct link_params *params)
+ {
+ 	struct bnx2x *bp = params->bp;
+-	u16 rx_status, ustat_val, cl37_fsm_recieved;
++	u16 rx_status, ustat_val, cl37_fsm_received;
+ 	DP(NETIF_MSG_LINK, "bnx2x_check_fallback_to_cl37\n");
+ 	/* Step 1: Make sure signal is detected */
+ 	CL22_RD_OVER_CL45(bp, phy,
+@@ -2423,15 +2423,15 @@ static void bnx2x_check_fallback_to_cl37(struct bnx2x_phy *phy,
+ 	CL22_RD_OVER_CL45(bp, phy,
+ 			  MDIO_REG_BANK_REMOTE_PHY,
+ 			  MDIO_REMOTE_PHY_MISC_RX_STATUS,
+-			  &cl37_fsm_recieved);
+-	if ((cl37_fsm_recieved &
++			  &cl37_fsm_received);
++	if ((cl37_fsm_received &
+ 	     (MDIO_REMOTE_PHY_MISC_RX_STATUS_CL37_FSM_RECEIVED_OVER1G_MSG |
+ 	     MDIO_REMOTE_PHY_MISC_RX_STATUS_CL37_FSM_RECEIVED_BRCM_OUI_MSG)) !=
+ 	    (MDIO_REMOTE_PHY_MISC_RX_STATUS_CL37_FSM_RECEIVED_OVER1G_MSG |
+ 	      MDIO_REMOTE_PHY_MISC_RX_STATUS_CL37_FSM_RECEIVED_BRCM_OUI_MSG)) {
+ 		DP(NETIF_MSG_LINK, "No CL37 FSM were received. "
+ 			     "misc_rx_status(0x8330) = 0x%x\n",
+-			 cl37_fsm_recieved);
++			 cl37_fsm_received);
+ 		return;
  	}
--	/* Need to check location 1 AND 6? */
--	if (td->options & NAND_BBT_SCANBYTE1AND6) {
--		for (i = 0; i < td->len; i++) {
--			if (p[NAND_SMALL_BADBLOCK_POS + i] != td->pattern[i])
--				return -1;
--		}
--	}
- 	return 0;
+ 	/*
+diff --git a/drivers/net/can/janz-ican3.c b/drivers/net/can/janz-ican3.c
+index 102b16c..98667f9 100644
+--- a/drivers/net/can/janz-ican3.c
++++ b/drivers/net/can/janz-ican3.c
+@@ -1050,7 +1050,7 @@ static void ican3_handle_inquiry(struct ican3_dev *mod, struct ican3_msg *msg)
+ 		complete(&mod->termination_comp);
+ 		break;
+ 	default:
+-		dev_err(mod->dev, "recieved an unknown inquiry response\n");
++		dev_err(mod->dev, "received an unknown inquiry response\n");
+ 		break;
+ 	}
+ }
+@@ -1058,7 +1058,7 @@ static void ican3_handle_inquiry(struct ican3_dev *mod, struct ican3_msg *msg)
+ static void ican3_handle_unknown_message(struct ican3_dev *mod,
+ 					struct ican3_msg *msg)
+ {
+-	dev_warn(mod->dev, "recieved unknown message: spec 0x%.2x length %d\n",
++	dev_warn(mod->dev, "received unknown message: spec 0x%.2x length %d\n",
+ 			   msg->spec, le16_to_cpu(msg->len));
  }
  
-@@ -1330,8 +1301,7 @@ static struct nand_bbt_descr bbt_mirror_no_bbt_descr = {
- 	.pattern = mirror_pattern
+diff --git a/drivers/scsi/scsi_netlink.c b/drivers/scsi/scsi_netlink.c
+index a2ed201..26a8a45 100644
+--- a/drivers/scsi/scsi_netlink.c
++++ b/drivers/scsi/scsi_netlink.c
+@@ -499,7 +499,7 @@ scsi_netlink_init(void)
+ 				SCSI_NL_GRP_CNT, scsi_nl_rcv_msg, NULL,
+ 				THIS_MODULE);
+ 	if (!scsi_nl_sock) {
+-		printk(KERN_ERR "%s: register of recieve handler failed\n",
++		printk(KERN_ERR "%s: register of receive handler failed\n",
+ 				__func__);
+ 		netlink_unregister_notifier(&scsi_netlink_notifier);
+ 		return;
+diff --git a/drivers/usb/misc/ftdi-elan.c b/drivers/usb/misc/ftdi-elan.c
+index 7839c98..1871a30 100644
+--- a/drivers/usb/misc/ftdi-elan.c
++++ b/drivers/usb/misc/ftdi-elan.c
+@@ -187,7 +187,7 @@ struct usb_ftdi {
+         u32 controlreg;
+         u8 response[4 + 1024];
+         int expected;
+-        int recieved;
++        int received;
+         int ed_found;
+ };
+ #define kref_to_usb_ftdi(d) container_of(d, struct usb_ftdi, kref)
+@@ -353,7 +353,7 @@ static void ftdi_elan_abandon_targets(struct usb_ftdi *ftdi)
+                         mutex_lock(&ftdi->u132_lock);
+                 }
+         }
+-        ftdi->recieved = 0;
++        ftdi->received = 0;
+         ftdi->expected = 4;
+         ftdi->ed_found = 0;
+         mutex_unlock(&ftdi->u132_lock);
+@@ -411,7 +411,7 @@ static void ftdi_elan_flush_targets(struct usb_ftdi *ftdi)
+                         }
+                 }
+         }
+-        ftdi->recieved = 0;
++        ftdi->received = 0;
+         ftdi->expected = 4;
+         ftdi->ed_found = 0;
+         mutex_unlock(&ftdi->u132_lock);
+@@ -447,7 +447,7 @@ static void ftdi_elan_cancel_targets(struct usb_ftdi *ftdi)
+                         }
+                 }
+         }
+-        ftdi->recieved = 0;
++        ftdi->received = 0;
+         ftdi->expected = 4;
+         ftdi->ed_found = 0;
+         mutex_unlock(&ftdi->u132_lock);
+@@ -874,7 +874,7 @@ static char *have_ed_set_response(struct usb_ftdi *ftdi,
+                         mutex_unlock(&ftdi->u132_lock);
+                         ftdi_elan_do_callback(ftdi, target, 4 + ftdi->response,
+                                 payload);
+-                        ftdi->recieved = 0;
++                        ftdi->received = 0;
+                         ftdi->expected = 4;
+                         ftdi->ed_found = 0;
+                         return ftdi->response;
+@@ -890,7 +890,7 @@ static char *have_ed_set_response(struct usb_ftdi *ftdi,
+                         mutex_unlock(&ftdi->u132_lock);
+                         ftdi_elan_do_callback(ftdi, target, 4 + ftdi->response,
+                                 payload);
+-                        ftdi->recieved = 0;
++                        ftdi->received = 0;
+                         ftdi->expected = 4;
+                         ftdi->ed_found = 0;
+                         return ftdi->response;
+@@ -905,7 +905,7 @@ static char *have_ed_set_response(struct usb_ftdi *ftdi,
+                 mutex_unlock(&ftdi->u132_lock);
+                 ftdi_elan_do_callback(ftdi, target, 4 + ftdi->response,
+                         payload);
+-                ftdi->recieved = 0;
++                ftdi->received = 0;
+                 ftdi->expected = 4;
+                 ftdi->ed_found = 0;
+                 return ftdi->response;
+@@ -914,7 +914,7 @@ static char *have_ed_set_response(struct usb_ftdi *ftdi,
+                 mutex_unlock(&ftdi->u132_lock);
+                 ftdi_elan_do_callback(ftdi, target, 4 + ftdi->response,
+                         payload);
+-                ftdi->recieved = 0;
++                ftdi->received = 0;
+                 ftdi->expected = 4;
+                 ftdi->ed_found = 0;
+                 return ftdi->response;
+@@ -934,7 +934,7 @@ static char *have_ed_get_response(struct usb_ftdi *ftdi,
+         if (target->active)
+                 ftdi_elan_do_callback(ftdi, target, NULL, 0);
+         target->abandoning = 0;
+-        ftdi->recieved = 0;
++        ftdi->received = 0;
+         ftdi->expected = 4;
+         ftdi->ed_found = 0;
+         return ftdi->response;
+@@ -951,7 +951,7 @@ static char *have_ed_get_response(struct usb_ftdi *ftdi,
+ */
+ static int ftdi_elan_respond_engine(struct usb_ftdi *ftdi)
+ {
+-        u8 *b = ftdi->response + ftdi->recieved;
++        u8 *b = ftdi->response + ftdi->received;
+         int bytes_read = 0;
+         int retry_on_empty = 1;
+         int retry_on_timeout = 3;
+@@ -1043,11 +1043,11 @@ static int ftdi_elan_respond_engine(struct usb_ftdi *ftdi)
+                 u8 c = ftdi->bulk_in_buffer[++ftdi->bulk_in_last];
+                 bytes_read += 1;
+                 ftdi->bulk_in_left -= 1;
+-                if (ftdi->recieved == 0 && c == 0xFF) {
++                if (ftdi->received == 0 && c == 0xFF) {
+                         goto have;
+                 } else
+                         *b++ = c;
+-                if (++ftdi->recieved < ftdi->expected) {
++                if (++ftdi->received < ftdi->expected) {
+                         goto have;
+                 } else if (ftdi->ed_found) {
+                         int ed_number = (ftdi->response[0] >> 5) & 0x03;
+@@ -1069,7 +1069,7 @@ static int ftdi_elan_respond_engine(struct usb_ftdi *ftdi)
+                         }
+                         ftdi_elan_do_callback(ftdi, target, 4 + ftdi->response,
+                                 payload);
+-                        ftdi->recieved = 0;
++                        ftdi->received = 0;
+                         ftdi->expected = 4;
+                         ftdi->ed_found = 0;
+                         b = ftdi->response;
+@@ -1089,7 +1089,7 @@ static int ftdi_elan_respond_engine(struct usb_ftdi *ftdi)
+                         *respond->value = data;
+                         *respond->result = 0;
+                         complete(&respond->wait_completion);
+-                        ftdi->recieved = 0;
++                        ftdi->received = 0;
+                         ftdi->expected = 4;
+                         ftdi->ed_found = 0;
+                         b = ftdi->response;
+diff --git a/drivers/uwb/reset.c b/drivers/uwb/reset.c
+index 2784929..3de630b 100644
+--- a/drivers/uwb/reset.c
++++ b/drivers/uwb/reset.c
+@@ -52,7 +52,7 @@ const char *__strerror[] = {
+ 	"cancelled",
+ 	"invalid state",
+ 	"invalid size",
+-	"ack not recieved",
++	"ack not received",
+ 	"no more asie notification",
  };
  
--#define BBT_SCAN_OPTIONS (NAND_BBT_SCANLASTPAGE | NAND_BBT_SCAN2NDPAGE | \
--		NAND_BBT_SCANBYTE1AND6)
-+#define BBT_SCAN_OPTIONS (NAND_BBT_SCANLASTPAGE | NAND_BBT_SCAN2NDPAGE)
- /**
-  * nand_create_default_bbt_descr - [Internal] Creates a BBT descriptor structure
-  * @this:	NAND chip to create descriptor for
-diff --git a/include/linux/mtd/bbm.h b/include/linux/mtd/bbm.h
-index 57cc0e6..08ffa21 100644
---- a/include/linux/mtd/bbm.h
-+++ b/include/linux/mtd/bbm.h
-@@ -98,8 +98,6 @@ struct nand_bbt_descr {
- #define NAND_BBT_SCAN2NDPAGE	0x00004000
- /* Search good / bad pattern on the last page of the eraseblock */
- #define NAND_BBT_SCANLASTPAGE	0x00008000
--/* Chip stores bad block marker on BOTH 1st and 6th bytes of OOB */
--#define NAND_BBT_SCANBYTE1AND6 0x00100000
- /* The nand_bbt_descr was created dynamicaly and must be freed */
- #define NAND_BBT_DYNAMICSTRUCT 0x00200000
- /* The bad block table does not OOB for marker */
 -- 
-1.7.0.4
-
+1.7.4.2
 
 
 ______________________________________________________
