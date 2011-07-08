@@ -1,24 +1,30 @@
 From: bs14@csr.com (Barry Song)
-Date: Thu, 7 Jul 2011 19:54:26 -0700
-Subject: [PATCH 0/3] *** add lost UL suffix to VMALLOC_END ***
-Message-ID: <1310093669-4681-1-git-send-email-bs14@csr.com>
+Date: Thu, 7 Jul 2011 19:54:27 -0700
+Subject: [PATCH 1/3] ARM: CNS3XXX: add UL suffix to VMALLOC_END to ensure it
+	is properly typed
+In-Reply-To: <1310093669-4681-1-git-send-email-bs14@csr.com>
+References: <1310093669-4681-1-git-send-email-bs14@csr.com>
+Message-ID: <1310093669-4681-2-git-send-email-bs14@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After grepping, several platforms lost the UL suffix for VMALLOC_END.
-
-Barry Song (3):
-  ARM: CNS3XXX: add UL suffix to VMALLOC_END to ensure it is properly
-    typed
-  ARM: LPC32XXX: add UL suffix to VMALLOC_END to ensure it is properly
-    typed
-  ARM: NUC93X: add UL suffix to VMALLOC_END to ensure it is properly
-    typed
-
+Signed-off-by: Barry Song <baohua.song@csr.com>
+---
  arch/arm/mach-cns3xxx/include/mach/vmalloc.h |    2 +-
- arch/arm/mach-lpc32xx/include/mach/vmalloc.h |    2 +-
- arch/arm/mach-nuc93x/include/mach/vmalloc.h  |    2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-cns3xxx/include/mach/vmalloc.h b/arch/arm/mach-cns3xxx/include/mach/vmalloc.h
+index 4d381ec..1dd231d 100644
+--- a/arch/arm/mach-cns3xxx/include/mach/vmalloc.h
++++ b/arch/arm/mach-cns3xxx/include/mach/vmalloc.h
+@@ -8,4 +8,4 @@
+  * published by the Free Software Foundation.
+  */
+ 
+-#define VMALLOC_END		0xd8000000
++#define VMALLOC_END		0xd8000000UL
+-- 
+1.7.1
 
 
 
