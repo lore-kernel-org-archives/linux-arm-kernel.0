@@ -1,28 +1,30 @@
 From: bs14@csr.com (Barry Song)
-Date: Thu, 7 Jul 2011 19:54:27 -0700
-Subject: [PATCH 1/3] ARM: CNS3XXX: add UL suffix to VMALLOC_END to ensure it
-	is properly typed
+Date: Thu, 7 Jul 2011 19:54:29 -0700
+Subject: [PATCH 3/3] ARM: NUC93X: add UL suffix to VMALLOC_END to ensure it is
+	properly typed
 In-Reply-To: <1310093669-4681-1-git-send-email-bs14@csr.com>
 References: <1310093669-4681-1-git-send-email-bs14@csr.com>
-Message-ID: <1310093669-4681-2-git-send-email-bs14@csr.com>
+Message-ID: <1310093669-4681-4-git-send-email-bs14@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Barry Song <baohua.song@csr.com>
 ---
- arch/arm/mach-cns3xxx/include/mach/vmalloc.h |    2 +-
+ arch/arm/mach-nuc93x/include/mach/vmalloc.h |    2 +-
  1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-cns3xxx/include/mach/vmalloc.h b/arch/arm/mach-cns3xxx/include/mach/vmalloc.h
-index 4d381ec..1dd231d 100644
---- a/arch/arm/mach-cns3xxx/include/mach/vmalloc.h
-+++ b/arch/arm/mach-cns3xxx/include/mach/vmalloc.h
-@@ -8,4 +8,4 @@
-  * published by the Free Software Foundation.
-  */
+diff --git a/arch/arm/mach-nuc93x/include/mach/vmalloc.h b/arch/arm/mach-nuc93x/include/mach/vmalloc.h
+index 98a21b8..7d11a5f 100644
+--- a/arch/arm/mach-nuc93x/include/mach/vmalloc.h
++++ b/arch/arm/mach-nuc93x/include/mach/vmalloc.h
+@@ -18,6 +18,6 @@
+ #ifndef __ASM_ARCH_VMALLOC_H
+ #define __ASM_ARCH_VMALLOC_H
  
--#define VMALLOC_END		0xd8000000
-+#define VMALLOC_END		0xd8000000UL
+-#define VMALLOC_END	  (0xE0000000)
++#define VMALLOC_END	  0xE0000000UL
+ 
+ #endif /* __ASM_ARCH_VMALLOC_H */
 -- 
 1.7.1
 
