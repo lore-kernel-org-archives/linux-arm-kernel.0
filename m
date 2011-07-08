@@ -1,57 +1,51 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Sat, 9 Jul 2011 00:15:30 +0300
-Subject: Ooops with 2.6.39.2 on pxa270
-In-Reply-To: <20110705101918.GU8286@n2100.arm.linux.org.uk>
-References: <201107042158.05767.anarsoul@gmail.com>
-	<20110705101918.GU8286@n2100.arm.linux.org.uk>
-Message-ID: <201107090015.30583.anarsoul@gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 8 Jul 2011 17:20:05 -0400 (EDT)
+Subject: [PATCH 01/52] ARM: introduce atag_offset to replace
+ boot_params
+In-Reply-To: <20110708203634.GU4812@n2100.arm.linux.org.uk>
+References: <1309920457-21913-1-git-send-email-nicolas.pitre@linaro.org>
+	<20110708203634.GU4812@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1107081714251.14596@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 05 July 2011 13:19:18 Russell King - ARM Linux wrote:
-> On Mon, Jul 04, 2011 at 09:58:05PM +0300, Vasily Khoruzhick wrote:
-> > Hi there, I'm getting following oops on my device (Zipit Z2 with PXA270)
-> > with 2.6.39.2. And I have no idea what can be wrong :( Ooops is not 100%
-> > reproducible, it happens in 50% of cases.
-> 
-> Short answer is I can't say for certain.  My compiler produces the
-> following for get_task_pid:
-> 
-> 00000248 <get_task_pid>:
->  248:   e1a0c00d        mov     ip, sp
->  24c:   e92dd800        push    {fp, ip, lr, pc}
->  250:   e24cb004        sub     fp, ip, #4      ; 0x4
->  254:   e3510000        cmp     r1, #0  ; 0x0
->  258:   159000e8        ldrne   r0, [r0, #232]
->  25c:   e3a0300c        mov     r3, #12 ; 0xc
->  260:   e0230391        mla     r3, r1, r3, r0
->  264:   e5930104        ldr     r0, [r3, #260]
->  268:   e3500000        cmp     r0, #0  ; 0x0
-> 
->  26c:   0a000006        beq     28c <get_task_pid+0x44>
->  270:   e10f2000        mrs     r2, CPSR
->  274:   e3823080        orr     r3, r2, #128    ; 0x80
->  278:   e121f003        msr     CPSR_c, r3
->  27c:   e5903000        ldr     r3, [r0]		 <== faulting insn
-> 
->  280:   e2833001        add     r3, r3, #1      ; 0x1
->  284:   e5803000        str     r3, [r0]
->  288:   e121f002        msr     CPSR_c, r2
->  28c:   e89da800        ldm     sp, {fp, sp, pc}
-> 
-> which is close enough to your code line (except my r3 is your r1).
-> 
-> We know that the passed r1 value was PIDTYPE_PID, wihch means the ldrne
-> wasn't executed.
-> 
-> My first guess is that something has overwritten task->pids - either
-> memory corruption, memory wrap-around due to the kernel thinking it has
-> more memory than physically fitted, or a buggy driver stamping over
-> memory it shouldn't.
+On Fri, 8 Jul 2011, Russell King - ARM Linux wrote:
 
-Thanks for hint. Looks like problem is libertas + pxa2xx_spi, pxa2xx_spi 
-corrupts memory when it uses DMA for 'null' transfers (libertas calls it 
-'dummy writes'). Everything is OK with PIO, still investigating problem...
+> On Tue, Jul 05, 2011 at 10:46:46PM -0400, Nicolas Pitre wrote:
+> > The boot_params member of the mdesc structure is used to provide a
+> > default physical address for the ATAG list.  Since this value is fixed
+> > at compile time and often based on ARCH_PHYS_OFFSET, it gets in the way
+> > of runtime PHYS_OFFSET usage.
+> > 
+> > Let's introduce atag_offset which should contains only the relative
+> > offset from start of memory instead of an absolute value, in preparation
+> > to move all instance of boot_params over to it.
+> 
+> I don't like this.
+> 
+> While I understand the issue (the oops when we try to dereference the
+> absolute address), the fact is that's how it is.
+> 
+> Take a moment to think about this.  The ATAG list is normally setup at a
+> fixed physical address by the boot loader.  While there are some boot
+> loaders which allow you to load the kernel at different physical addresses,
+> they still place the ATAG list at that same physical address.
 
-Regards
-Vasily
+Would they really load the kernel at a different address?
+
+> That means if you change this into an offset from the kernels idea of
+> PHYS_OFFSET, it's not going to find the ATAGs.
+
+Is this going to be a real issue in practice?
+
+> So we're probably better off checking whether the platform provided ATAG
+> pointer is below our idea of PHYS_OFFSET, and if it is to ignore that.
+
+The code already does that.
+
+Alternatively, I can make the boot_params values into numeric values 
+instead of PLAT_PHYS_OFFSET or any other symbolic define I'd like to get 
+rid of.  What do you think?
+
+
+Nicolas
