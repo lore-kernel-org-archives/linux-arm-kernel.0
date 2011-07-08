@@ -1,46 +1,172 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 8 Jul 2011 11:48:12 +0100
-Subject: [RFC PATCH 14/17] ARM: kernel: save/restore 1:1 page tables
-In-Reply-To: <4E166A66.3020001@ti.com>
-References: <1310053830-23779-1-git-send-email-lorenzo.pieralisi@arm.com>
-	<1310053830-23779-15-git-send-email-lorenzo.pieralisi@arm.com>
-	<4E166A66.3020001@ti.com>
-Message-ID: <20110708104812.GB32592@e102568-lin.cambridge.arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 8 Jul 2011 03:49:42 -0700
+Subject: [PATCH v2 1/6] OMAP: ID: introduce chip detection for OMAP4460
+In-Reply-To: <alpine.DEB.2.00.1107080039330.24181@utopia.booyaka.com>
+References: <1309573826-10615-1-git-send-email-rnayak@ti.com>
+	<1309573826-10615-2-git-send-email-rnayak@ti.com>
+	<alpine.DEB.2.00.1107080039330.24181@utopia.booyaka.com>
+Message-ID: <20110708104942.GU5783@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 08, 2011 at 03:24:38AM +0100, Santosh Shilimkar wrote:
-> On 7/7/2011 8:50 AM, Lorenzo Pieralisi wrote:
-> > This patch adds the code required to allocate and populate page tables
-> > that are needed by save/restore code to deal with MMU off/on
-> > transactions.
-> >
-> > MMU is enabled early in the resume path which allows to call into
-> > Linux subsystems with init_mm virtual mappings (cloned at boot).
-> >
-> > Current thread page table pointer and context id is saved on power
-> > down from active_mm and restored on warm boot.
-> > Currently the translation tables contains 1:1 mappings of the Linux
-> > kernel code and data, and 1:1 UNCACHED mapping of control code required when MMU
-> > is turned off in the restore code path.
-> >
-> > Signed-off-by: Lorenzo Pieralisi<lorenzo.pieralisi@arm.com>
-> > ---
-> >   arch/arm/kernel/sr_mapping.c |   78 ++++++++++++++++++++++++++++++++++++++++++
-> >   1 files changed, 78 insertions(+), 0 deletions(-)
-> >   create mode 100644 arch/arm/kernel/sr_mapping.c
-> >
-> > diff --git a/arch/arm/kernel/sr_mapping.c b/arch/arm/kernel/sr_mapping.c
-> > new file mode 100644
-> > index 0000000..32640dc
-> > --- /dev/null
-> > +++ b/arch/arm/kernel/sr_mapping.c
-> > @@ -0,0 +1,78 @@
-> > +/*
-> > + * Copyright (C) 2008-2011 ARM Limited
+* Paul Walmsley <paul@pwsan.com> [110707 23:34]:
+> On Sat, 2 Jul 2011, Rajendra Nayak wrote:
 > 
-> This is more of question so don't beat me if I am wrong here.
-> Above file doesn't exist in k.org from 2008 right ?
-> I noticed this in your other patches too.
+> > From: Aneesh V <aneesh@ti.com>
+> > 
+> > Add support for detecting the latest in the OMAP4 family: OMAP4460
+> > Among other changes, the new chip also can support 1.5GHz A9s,
+> > 1080p stereoscopic 3D and 12 MP stereo (dual camera). In addition,
+> > we have changes to OPPs supported, clock tree etc, hence having a
+> > chip detection is required.
+> > 
+> > For more details on OMAP4460, see
+> > Highlights:
+> > http://focus.ti.com/general/docs/wtbu/wtbuproductcontent.tsp?contentId=53243&navigationId=12843&templateId=6123
+> > Public TRM is available here as usual:
+> > http://focus.ti.com/general/docs/wtbu/wtbudocumentcenter.tsp?templateId=6123&navigationId=12667
+> > 
+> > [nm at ti.com: cleanups and introduction of ramp system]
+> > Signed-off-by: Nishanth Menon <nm@ti.com>
+> > Signed-off-by: Aneesh V <aneesh@ti.com>
+> > Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> > Reviewed-by: Kevin Hilman <khilman@ti.com>
+> 
+> Reviewed-by: Paul Walmsley <paul@pwsan.com>
 
-Yes you are right, I will updated the whole set.
+I've applied the first for patches of this series slightly
+modified on top of devel-cleanup branch.
+
+I've left out the CHIP_IS_44XX dependency as we're running
+out of time here, and that leaves out three out of the eight
+orignal patches. That can be sorted out in a separate series.
+
+Updated patch below.
+
+Tony
+
+
+From: Aneesh V <aneesh@ti.com>
+Date: Sat, 2 Jul 2011 08:00:21 +0530
+Subject: [PATCH] OMAP: ID: introduce chip detection for OMAP4460
+
+Add support for detecting the latest in the OMAP4 family: OMAP4460
+Among other changes, the new chip also can support 1.5GHz A9s,
+1080p stereoscopic 3D and 12 MP stereo (dual camera). In addition,
+we have changes to OPPs supported, clock tree etc, hence having a
+chip detection is required.
+
+For more details on OMAP4460, see Highlights:
+http://focus.ti.com/general/docs/wtbu/wtbuproductcontent.tsp?contentId=53243&navigationId=12843&templateId=6123
+
+Public TRM is available here as usual:
+http://focus.ti.com/general/docs/wtbu/wtbudocumentcenter.tsp?templateId=6123&navigationId=12667
+
+[nm at ti.com: cleanups and introduction of ramp system]
+Signed-off-by: Nishanth Menon <nm@ti.com>
+Signed-off-by: Aneesh V <aneesh@ti.com>
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+Reviewed-by: Kevin Hilman <khilman@ti.com>
+Reviewed-by: Paul Walmsley <paul@pwsan.com>
+[tony at atomide.com: updated to not use CHIP_IS_OMAP44XX]
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
+index 2537090..743889a 100644
+--- a/arch/arm/mach-omap2/id.c
++++ b/arch/arm/mach-omap2/id.c
+@@ -344,10 +344,10 @@ static void __init omap4_check_revision(void)
+ 	rev = (idcode >> 28) & 0xf;
+ 
+ 	/*
+-	 * Few initial ES2.0 samples IDCODE is same as ES1.0
++	 * Few initial 4430 ES2.0 samples IDCODE is same as ES1.0
+ 	 * Use ARM register to detect the correct ES version
+ 	 */
+-	if (!rev) {
++	if (!rev && (hawkeye != 0xb94e)) {
+ 		idcode = read_cpuid(CPUID_ID);
+ 		rev = (idcode & 0xf) - 1;
+ 	}
+@@ -377,6 +377,15 @@ static void __init omap4_check_revision(void)
+ 			omap_chip.oc |= CHIP_IS_OMAP4430ES2_2;
+ 		}
+ 		break;
++	case 0xb94e:
++		switch (rev) {
++		case 0:
++		default:
++			omap_revision = OMAP4460_REV_ES1_0;
++			omap_chip.oc |= CHIP_IS_OMAP4460ES1_0;
++			break;
++		}
++		break;
+ 	default:
+ 		/* Unknown default to latest silicon rev as default */
+ 		omap_revision = OMAP4430_REV_ES2_2;
+diff --git a/arch/arm/plat-omap/include/plat/cpu.h b/arch/arm/plat-omap/include/plat/cpu.h
+index 8198bb6..a2cec99 100644
+--- a/arch/arm/plat-omap/include/plat/cpu.h
++++ b/arch/arm/plat-omap/include/plat/cpu.h
+@@ -88,6 +88,7 @@ unsigned int omap_rev(void);
+  * cpu_is_omap243x():	True for OMAP2430
+  * cpu_is_omap343x():	True for OMAP3430
+  * cpu_is_omap443x():	True for OMAP4430
++ * cpu_is_omap446x():	True for OMAP4460
+  */
+ #define GET_OMAP_CLASS	(omap_rev() & 0xff)
+ 
+@@ -123,6 +124,7 @@ IS_OMAP_SUBCLASS(243x, 0x243)
+ IS_OMAP_SUBCLASS(343x, 0x343)
+ IS_OMAP_SUBCLASS(363x, 0x363)
+ IS_OMAP_SUBCLASS(443x, 0x443)
++IS_OMAP_SUBCLASS(446x, 0x446)
+ 
+ IS_TI_SUBCLASS(816x, 0x816)
+ 
+@@ -137,6 +139,7 @@ IS_TI_SUBCLASS(816x, 0x816)
+ #define cpu_is_ti816x()			0
+ #define cpu_is_omap44xx()		0
+ #define cpu_is_omap443x()		0
++#define cpu_is_omap446x()		0
+ 
+ #if defined(MULTI_OMAP1)
+ # if defined(CONFIG_ARCH_OMAP730)
+@@ -361,8 +364,10 @@ IS_OMAP_TYPE(3517, 0x3517)
+ # if defined(CONFIG_ARCH_OMAP4)
+ # undef cpu_is_omap44xx
+ # undef cpu_is_omap443x
++# undef cpu_is_omap446x
+ # define cpu_is_omap44xx()		is_omap44xx()
+ # define cpu_is_omap443x()		is_omap443x()
++# define cpu_is_omap446x()		is_omap446x()
+ # endif
+ 
+ /* Macros to detect if we have OMAP1 or OMAP2 */
+@@ -410,6 +415,9 @@ IS_OMAP_TYPE(3517, 0x3517)
+ #define OMAP4430_REV_ES2_1	(OMAP443X_CLASS | (0x21 << 8))
+ #define OMAP4430_REV_ES2_2	(OMAP443X_CLASS | (0x22 << 8))
+ 
++#define OMAP446X_CLASS		0x44600044
++#define OMAP4460_REV_ES1_0	(OMAP446X_CLASS | (0x10 << 8))
++
+ /*
+  * omap_chip bits
+  *
+@@ -439,13 +447,15 @@ IS_OMAP_TYPE(3517, 0x3517)
+ #define CHIP_IS_OMAP4430ES2_1		(1 << 12)
+ #define CHIP_IS_OMAP4430ES2_2		(1 << 13)
+ #define CHIP_IS_TI816X			(1 << 14)
++#define CHIP_IS_OMAP4460ES1_0		(1 << 15)
+ 
+ #define CHIP_IS_OMAP24XX		(CHIP_IS_OMAP2420 | CHIP_IS_OMAP2430)
+ 
+ #define CHIP_IS_OMAP4430		(CHIP_IS_OMAP4430ES1 |		\
+ 					 CHIP_IS_OMAP4430ES2 |		\
+ 					 CHIP_IS_OMAP4430ES2_1 |	\
+-					 CHIP_IS_OMAP4430ES2_2)
++					 CHIP_IS_OMAP4430ES2_2 |	\
++					 CHIP_IS_OMAP4460ES1_0)
+ 
+ /*
+  * "GE" here represents "greater than or equal to" in terms of ES
