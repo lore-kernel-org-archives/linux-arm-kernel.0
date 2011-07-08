@@ -1,42 +1,16 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Sat, 9 Jul 2011 00:54:43 +0300
-Subject: [PATCH 07/15] pxa25x_udc: drop support for udc_command
-In-Reply-To: <20110708213428.GA31866@kroah.com>
-References: <1309871321-11305-1-git-send-email-dbaryshkov@gmail.com>
-	<1309871321-11305-8-git-send-email-dbaryshkov@gmail.com>
-	<20110705134615.GJ2820@legolas.emea.dhcp.ti.com>
-	<20110708213428.GA31866@kroah.com>
-Message-ID: <20110708215442.GG31978@legolas.emea.dhcp.ti.com>
+From: johnlinn@comcast.net (johnlinn at comcast.net)
+Date: Fri, 8 Jul 2011 21:56:57 +0000 (UTC)
+Subject: PL330 alignment requirement questions
+In-Reply-To: <1866031594.379248.1310161913147.JavaMail.root@sz0140a.emeryville.ca.mail.comcast.net>
+Message-ID: <2034464824.379455.1310162217325.JavaMail.root@sz0140a.emeryville.ca.mail.comcast.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 08, 2011 at 02:34:28PM -0700, Greg KH wrote:
-> On Tue, Jul 05, 2011 at 04:46:16PM +0300, Felipe Balbi wrote:
-> > Hi,
-> > 
-> > On Tue, Jul 05, 2011 at 05:08:33PM +0400, Dmitry Eremin-Solenikov wrote:
-> > > None of pxa25x devices use udc_command() for UDC functionality.
-> > > Stop calling this callback from pxa25x_udc code.
-> > 
-> > looks good to me, Greg since this is a big re-work which depends on
-> > parts out of the Gadget Framework, can you take all the patches
-> > straight ? Here's my Acked-by:
-> > 
-> > Acked-by: Felipe Balbi <balbi@ti.com>
-> 
-> I can't take these, they should go through the gpio subsystem maintainer
-> instead.
+I'm testing our PL330 with the driver/dma/pl330 driver and see some strangeness that's probably my own setup issue.
 
-But why ? They only touch drivers/usb/gadget/pxa*.c
+I'm also using drivers/dmatest to test it with memory to memory copies. I'm seeing that the copy alignment (copy_align) is not setup (it's 0) such that I see errors on some transfers at the end of the transfer.
 
-Would it be enough if Grant would Ack them ?
+If I setup the copy_align to be 3 or larger then I don't see these errors. This number doesn't make much sense to me and I'm digging into the details (seems like 4 would make sense).  I just wanted to see if anyone had tested with dmatest and seen anything similar.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 490 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110709/c10b73d3/attachment-0001.sig>
+Thanks,
+John
