@@ -1,22 +1,21 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 8 Jul 2011 10:03:02 +0100
-Subject: [PATCH 1/3] ARM: CSR: Adding CSR SiRFprimaII board support
-In-Reply-To: <CAGsJ_4wsc=Jx6+thKriX+x5KdX2m8O9HfrnC_MGYAXTUe-DoRg@mail.gmail.com>
-References: <1309945678-18813-1-git-send-email-bs14@csr.com>
-	<201107071343.03591.arnd@arndb.de>
-	<20110707123707.GN8286@n2100.arm.linux.org.uk>
-	<201107071521.07070.arnd@arndb.de>
-	<20110707141254.GR8286@n2100.arm.linux.org.uk>
-	<CAGsJ_4wsc=Jx6+thKriX+x5KdX2m8O9HfrnC_MGYAXTUe-DoRg@mail.gmail.com>
-Message-ID: <20110708090302.GB2414@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 8 Jul 2011 11:02:37 +0200
+Subject: [PATCH v5 1/3] ARM: mxs: add GPMI-NFC support for imx23/imx28
+In-Reply-To: <20110708073119.GP29624@pengutronix.de>
+References: <1309406028-2924-1-git-send-email-b32955@freescale.com>
+	<201106301555.19440.arnd@arndb.de>
+	<20110708073119.GP29624@pengutronix.de>
+Message-ID: <201107081102.38179.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 08, 2011 at 10:18:57AM +0800, Barry Song wrote:
-> simply adding a UL suffix will make compiling fail since
-> arch/arm/kernel/debug.S will refer to the macro calculating virtual
-> address of SIRFSOC_UART1_VA_BASE and UL is not legal in asm.
+On Friday 08 July 2011 09:31:19 Uwe Kleine-K?nig wrote:
+> > The init function is used only to set up iomux, so the logical replacement is
+> > a pointer to the iomux data, and calling mxs_iomux_setup_multiple_pads
+> > directly from the driver.
+> Why not put the iomux stuff into the per-machine table and get rid of
+> the init callback, too?
 
-A solution for VMALLOC_END would be to include linux/const.h and use
-_AC(value, UL).  I think you're the only one who bases their IO
-addressing off VMALLOC_END.
+Sounds good to me.
+
+	Arnd
