@@ -1,45 +1,36 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Fri, 8 Jul 2011 22:28:33 +0530
-Subject: [RFC PATCH v4] Consolidate SRAM support
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024D9B5940@dbde02.ent.ti.com>
-References: <20110512174546.GB8633@n2100.arm.linux.org.uk>
-	<1306371777-20431-1-git-send-email-plagnioj@jcrosoft.com>
-	<B85A65D85D7EB246BE421B3FB0FBB593024D9B5940@dbde02.ent.ti.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024D9B5949@dbde02.ent.ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 8 Jul 2011 18:07:06 +0100
+Subject: [PATCH 16/17] mach-sa1100: retire custom LED code
+In-Reply-To: <4E172BE2.7040705@scram.de>
+References: <1309955687-19365-1-git-send-email-bryan.wu@canonical.com>
+	<1309955687-19365-17-git-send-email-bryan.wu@canonical.com>
+	<4E146B7C.7060607@scram.de>
+	<CAK5ve-JQhJxWOL=UiX9SUxa5Rw8VrANyd05nuRJbytoZRR+EzA@mail.gmail.com>
+	<4E15DD7F.3050702@scram.de>
+	<CAK5ve-JDHECKs8sPVxLP_K6kYyM+-wL2bXJ-w=R7qoZJdRbmNg@mail.gmail.com>
+	<4E172BE2.7040705@scram.de>
+Message-ID: <20110708170706.GL4812@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 08, 2011 at 22:21:52, Nori, Sekhar wrote:
-> Hi Jean-Christophe,
-> 
-> On Thu, May 26, 2011 at 06:32:57, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > From: Russell King - ARM Linux <linux@arm.linux.org.uk>
+On Fri, Jul 08, 2011 at 06:10:10PM +0200, Jochen Friedrich wrote:
+> @Russell: is it OK to submit this to the patch tracking system?
 
-> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> > index f4b7dfa..5ec5e5f 100644
-> > --- a/arch/arm/Kconfig
-> > +++ b/arch/arm/Kconfig
-> > @@ -848,6 +848,7 @@ config ARCH_DAVINCI
-> >  	bool "TI DaVinci"
-> >  	select GENERIC_CLOCKEVENTS
-> >  	select ARCH_REQUIRE_GPIOLIB
-> > +	select GENERIC_ALLOCATOR
-> >  	select ZONE_DMA
-> >  	select HAVE_IDE
-> >  	select CLKDEV_LOOKUP
-> 
-> GENERIC_ALLOCATOR is already selected for
-> DaVinci (below the "select CLKDEV_LOOKUP"
-> line).
-> 
-> Please drop this hunk.
+I can't say at the moment as I'm swamped with email.  I was already
+swamped this morning, but since then some nice person at develtech.com
+has misconfigured their M$ Exchange server which has been dumping emails
+from the last six months back in my mailbox.  The problem is that I've
+been out this afternoon and so wasn't around to notice.
 
-This mail popped up at the top of my inbox
-as an unread message and I replied to it
-without looking at the sent date assuming
-it is a patch resend.
+I've had to firewall their ISPs mail servers from my system to stop
+the deluge, which I think may have also cut at least Wim Van Sebroeck
+off.
 
-Sorry about the noise.
+Nevertheless, the result isn't pretty at this end (so far spent an
+hour on it sorting out the mess), and its only luck that I happened
+to spot your message.
 
-Thanks,
-Sekhar
+This is one of the times when I wish M$ didn't make stuff "easy to
+use" - the person running that system probably doesn't even realize
+what they've done.  Computers are dangerous tools in the hands of
+people who don't really understand what they're doing.
