@@ -1,35 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 8 Jul 2011 12:13:09 +0100
-Subject: [PATCH 0/3] Add generic idle notifiers
-In-Reply-To: <20110707201748.GB32199@google.com>
-References: <1309229190-25006-1-git-send-email-toddpoynor@google.com>
-	<87ei22dnsp.fsf@ti.com> <20110707201748.GB32199@google.com>
-Message-ID: <20110708111309.GB4812@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 8 Jul 2011 04:33:51 -0700
+Subject: [GIT PULL] omap board updates for v3.1 merge window
+In-Reply-To: <201107081311.15280.arnd@arndb.de>
+References: <20110707162911.GL5783@atomide.com>
+	<201107081054.01295.arnd@arndb.de>
+	<20110708102521.GS5783@atomide.com>
+	<201107081311.15280.arnd@arndb.de>
+Message-ID: <20110708113351.GY5783@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 07, 2011 at 01:17:48PM -0700, Todd Poynor wrote:
-> This is intended to coexist with the CPU PM notifiers.  The idle
-> notifiers proposed here are notifying of a change in kernel scheduler
-> state: the scheduler has no task to run and is entering its "idle
-> loop", or now has something to run and is exiting idle state.
-> Things that can use this include power management hints such as the
-> existing drivers/idle/i7300_idle.c usage, the ARM LEDs idle triggers,
-> and there's probably other existing potential uses in other arch'es that
-> I should go track down.
+* Arnd Bergmann <arnd@arndb.de> [110708 04:06]:
+> On Friday 08 July 2011, Tony Lindgren wrote:
+> > * Arnd Bergmann <arnd@arndb.de> [110708 01:49]:
+> > > On Friday 08 July 2011 10:30:42 Tony Lindgren wrote:
+> > > 
+> > > Sorry for being unclear, I forgot to say that I did in fact pull your tree
+> > > already.
+> > 
+> > OK no problem that's fine with me.
+> > 
+> > BTW, looks like your tree is no longer showing up on kernel.org?
+> >  
+> 
+> The URL has changed (from linux-2.6-arm-soc.git), it's now
+> git://git.kernel.org/pub/scm/linux/kernel/git/arm/linux-arm-soc.git
+> 
+> We figured that there would never be a 2.6 release in there, so the
+> original name was a bit silly. It won't change again, and if you
+> just change the URL in your remotes list, it should still fast-forward.
 
-Isn't drivers/idle yet another cpuidle like implementation, but done
-differently?  Is there any reason why the drivers/idle stuff can't
-hook in like cpuidle or vice versa?
+OK thanks seems to work now.
 
-Isn't it possible for cpuidle to gain the same information via the idle
-callback which these notifiers are providing drivers/idle with?
-
-One of the problems I see with these notifiers is that it's not really
-possible to keep an eye on the number of things hooked into them - and
-in this path adding latency to the idle stuff could affect responsiveness.
-
-Also bear in mind that at the point where idle starts, the decision about
-what power state to idle in hasn't been decided, so nothing actually knows
-whether it will be powered down, so all in all, I'm not sure what you'd
-use these notifiers for.
+Tony
