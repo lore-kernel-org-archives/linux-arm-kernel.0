@@ -1,34 +1,56 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri,  8 Jul 2011 16:27:28 +0800
-Subject: [PATCH 0/6] Add device tree support for imx spi driver
-Message-ID: <1310113654-25887-1-git-send-email-shawn.guo@linaro.org>
+Date: Fri,  8 Jul 2011 16:27:29 +0800
+Subject: [PATCH 1/6] ARM: mxc: remove unnecessary header file inclusion from
+	gpio.h
+In-Reply-To: <1310113654-25887-1-git-send-email-shawn.guo@linaro.org>
+References: <1310113654-25887-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1310113654-25887-2-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch set makes some cleanups on imx spi driver to get it ready
-for adding device tree probe and then add the support.
+The mach/gpio.h is included by asm/gpio.h, and in turn it gets
+included all over the place.  Including unnecessary headers there
+brings indirect inclusion trouble.
 
-Those two dt helper function related patches are carried here to
-resolve the dependency.  They should be on the way to sit on Grant's
-devicetree/next branch.
+As an example, spi-imx calls cpu_is_mx21() but never explicitly
+includes mach/hardware.h.  However it works because the header is
+included in mach/gpio.h.
 
-Rob Herring (1):
-      dt: add helper function to read u32 arrays
+The patch cleans the unnecessary header file from mach/gpio.h,
+and includes headers explicitly where needed.
 
-Shawn Guo (5):
-      ARM: mxc: remove unnecessary header file inclusion from gpio.h
-      spi/imx: use soc name in spi device type naming scheme
-      spi/imx: copy gpio number passed by platform data into driver private data
-      dt: add empty of_property_read_u32[_array] for non-dt
-      spi/imx: add device tree probe support
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Cc: Grant Likely <grant.likely@secretlab.ca>
+Cc: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ arch/arm/plat-mxc/include/mach/gpio.h |    2 --
+ drivers/spi/spi-imx.c                 |    1 +
+ 2 files changed, 1 insertions(+), 2 deletions(-)
 
- .../devicetree/bindings/spi/fsl-imx-cspi.txt       |   22 +
- arch/arm/mach-imx/clock-imx25.c                    |    7 +-
- arch/arm/mach-mx5/clock-mx51-mx53.c                |   11 +-
- arch/arm/plat-mxc/devices/platform-spi_imx.c       |   12 +-
- arch/arm/plat-mxc/include/mach/gpio.h              |    2 -
- drivers/of/base.c                                  |   19 +-
- drivers/spi/Kconfig                                |   15 -
- drivers/spi/spi-imx.c                              |  468 ++++++++++----------
- include/linux/of.h                                 |   29 ++-
- 9 files changed, 317 insertions(+), 268 deletions(-)
+diff --git a/arch/arm/plat-mxc/include/mach/gpio.h b/arch/arm/plat-mxc/include/mach/gpio.h
+index 31c820c..5bb02af 100644
+--- a/arch/arm/plat-mxc/include/mach/gpio.h
++++ b/arch/arm/plat-mxc/include/mach/gpio.h
+@@ -19,8 +19,6 @@
+ #ifndef __ASM_ARCH_MXC_GPIO_H__
+ #define __ASM_ARCH_MXC_GPIO_H__
+ 
+-#include <linux/spinlock.h>
+-#include <mach/hardware.h>
+ #include <asm-generic/gpio.h>
+ 
+ 
+diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
+index 69d6dba..7097d43 100644
+--- a/drivers/spi/spi-imx.c
++++ b/drivers/spi/spi-imx.c
+@@ -36,6 +36,7 @@
+ #include <linux/types.h>
+ 
+ #include <mach/spi.h>
++#include <mach/hardware.h>
+ 
+ #define DRIVER_NAME "spi_imx"
+ 
+-- 
+1.7.4.1
