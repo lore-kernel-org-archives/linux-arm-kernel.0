@@ -1,56 +1,112 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 07 Jul 2011 18:12:13 -0700
-Subject: [PATCH 01/17] ARM: proc: add definition of cpu_reset for ARMv6
-	and ARMv7 cores
-In-Reply-To: <1310053830-23779-2-git-send-email-lorenzo.pieralisi@arm.com>
+Date: Thu, 07 Jul 2011 18:14:58 -0700
+Subject: [PATCH 02/17] ARM: Add cpu power management notifiers
+In-Reply-To: <1310053830-23779-3-git-send-email-lorenzo.pieralisi@arm.com>
 References: <1310053830-23779-1-git-send-email-lorenzo.pieralisi@arm.com>
-	<1310053830-23779-2-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <4E16596D.9060103@ti.com>
+	<1310053830-23779-3-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <4E165A12.5080600@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Minor nit,
-
 On 7/7/2011 8:50 AM, Lorenzo Pieralisi wrote:
-> From: Will Deacon<will.deacon@arm.com>
+> From: Colin Cross<ccross@android.com>
 >
-> This patch adds simple definitions of cpu_reset for ARMv6 and ARMv7
-> cores, which disable the MMU via the SCTLR.
+> During some CPU power modes entered during idle, hotplug and
+> suspend, peripherals located in the CPU power domain, such as
+> the GIC and VFP, may be powered down.  Add a notifier chain
+> that allows drivers for those peripherals to be notified
+> before and after they may be reset.
 >
-> Signed-off-by: Will Deacon<will.deacon@arm.com>
+> Signed-off-by: Colin Cross<ccross@android.com>
+> Tested-by: Kevin Hilman<khilman@ti.com>
 > ---
->   arch/arm/mm/proc-v6.S |    5 +++++
->   arch/arm/mm/proc-v7.S |    7 +++++++
->   2 files changed, 12 insertions(+), 0 deletions(-)
+>   arch/arm/Kconfig              |    7 ++
+>   arch/arm/include/asm/cpu_pm.h |   54 ++++++++++++
+>   arch/arm/kernel/Makefile      |    1 +
+>   arch/arm/kernel/cpu_pm.c      |  181 +++++++++++++++++++++++++++++++++++++++++
+>   4 files changed, 243 insertions(+), 0 deletions(-)
+>   create mode 100644 arch/arm/include/asm/cpu_pm.h
+>   create mode 100644 arch/arm/kernel/cpu_pm.c
 >
-> diff --git a/arch/arm/mm/proc-v6.S b/arch/arm/mm/proc-v6.S
-> index 1d2b845..f3b5232 100644
-> --- a/arch/arm/mm/proc-v6.S
-> +++ b/arch/arm/mm/proc-v6.S
-> @@ -56,6 +56,11 @@ ENTRY(cpu_v6_proc_fin)
->    */
->   	.align	5
->   ENTRY(cpu_v6_reset)
-> +	mrc	p15, 0, r1, c1, c0, 0		@ ctrl register
-> +	bic	r1, r1, #0x1			@ ...............m
-> +	mcr	p15, 0, r1, c1, c0, 0		@ disable MMU
-> +	mov	r1, #0
-> +	mcr	p15, 0, r1, c7, c5, 4		@ ISB
->   	mov	pc, r0
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 9adc278..356f266 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -183,6 +183,13 @@ config FIQ
+>   config ARCH_MTD_XIP
+>   	bool
 >
->   /*
-> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-> index 089c0b5..15d6191 100644
-> --- a/arch/arm/mm/proc-v7.S
-> +++ b/arch/arm/mm/proc-v7.S
-> @@ -58,9 +58,16 @@ ENDPROC(cpu_v7_proc_fin)
->    *	to what would be the reset vector.
->    *
->    *	- loc   - location to jump to for soft reset
+> +config ARCH_USES_CPU_PM
+> +       bool
+> +
+> +config CPU_PM
+> +       def_bool y
+> +       depends on ARCH_USES_CPU_PM&&  (PM || CPU_IDLE)
+> +
+>   config VECTORS_BASE
+>   	hex
+>   	default 0xffff0000 if MMU || CPU_HIGH_VECTOR
+> diff --git a/arch/arm/include/asm/cpu_pm.h b/arch/arm/include/asm/cpu_pm.h
+> new file mode 100644
+> index 0000000..b4bb715
+> --- /dev/null
+> +++ b/arch/arm/include/asm/cpu_pm.h
+> @@ -0,0 +1,54 @@
+> +/*
+> + * Copyright (C) 2011 Google, Inc.
 > + *
-> + *	This code must be executed using a flat identity mapping with
-> + *      caches disabled.
-Align the text body.
+> + * Author:
+> + *	Colin Cross<ccross@android.com>
+> + *
+> + * This software is licensed under the terms of the GNU General Public
+> + * License version 2, as published by the Free Software Foundation, and
+> + * may be copied, distributed, and modified under those terms.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + */
+> +
+> +#ifndef _ASMARM_CPU_PM_H
+> +#define _ASMARM_CPU_PM_H
+> +
+> +#include<linux/kernel.h>
+> +#include<linux/notifier.h>
+> +
+> +/* Event codes passed as unsigned long val to notifier calls */
+> +enum cpu_pm_event {
+> +	/* A single cpu is entering a low power state */
+> +	CPU_PM_ENTER,
+> +
+> +	/* A single cpu failed to enter a low power state */
+> +	CPU_PM_ENTER_FAILED,
+> +
+> +	/* A single cpu is exiting a low power state */
+> +	CPU_PM_EXIT,
+> +
+> +	/* A cpu power domain is entering a low power state */
+> +	CPU_COMPLEX_PM_ENTER,
+> +
+> +	/* A cpu power domain failed to enter a low power state */
+> +	CPU_COMPLEX_PM_ENTER_FAILED,
+> +
+> +	/* A cpu power domain is exiting a low power state */
+> +	CPU_COMPLEX_PM_EXIT,
+> +};
+> +
+> +int cpu_pm_register_notifier(struct notifier_block *nb);
+> +int cpu_pm_unregister_notifier(struct notifier_block *nb);
+> +
+> +int cpu_pm_enter(void);
+> +int cpu_pm_exit(void);
+> +
+> +int cpu_complex_pm_enter(void);
+> +int cpu_complex_pm_exit(void);
+> +
+Can "cpu_complex_pm*" renamed to "cpu_cluster_pm*" as discussed
+earlier on the list.
 
 Regards
 Santosh
