@@ -1,131 +1,46 @@
-From: j.weitzel@phytec.de (Jan Weitzel)
-Date: Fri, 8 Jul 2011 12:47:14 +0200
-Subject: [PATCH] ARM: OMAP2+ Add Primview dispalys to panel-generic
-Message-ID: <1310122034-6561-1-git-send-email-j.weitzel@phytec.de>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 8 Jul 2011 11:48:12 +0100
+Subject: [RFC PATCH 14/17] ARM: kernel: save/restore 1:1 page tables
+In-Reply-To: <4E166A66.3020001@ti.com>
+References: <1310053830-23779-1-git-send-email-lorenzo.pieralisi@arm.com>
+	<1310053830-23779-15-git-send-email-lorenzo.pieralisi@arm.com>
+	<4E166A66.3020001@ti.com>
+Message-ID: <20110708104812.GB32592@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add displays to panel-generic-dpi.c
-Prime View PD035VL1 (640 x 480)
-Prime View PD050VL1 (640 x 480)
-Prime View PD104SLF (800 x 600)
-Prime View PM070WL4 (800 x 480)
+On Fri, Jul 08, 2011 at 03:24:38AM +0100, Santosh Shilimkar wrote:
+> On 7/7/2011 8:50 AM, Lorenzo Pieralisi wrote:
+> > This patch adds the code required to allocate and populate page tables
+> > that are needed by save/restore code to deal with MMU off/on
+> > transactions.
+> >
+> > MMU is enabled early in the resume path which allows to call into
+> > Linux subsystems with init_mm virtual mappings (cloned at boot).
+> >
+> > Current thread page table pointer and context id is saved on power
+> > down from active_mm and restored on warm boot.
+> > Currently the translation tables contains 1:1 mappings of the Linux
+> > kernel code and data, and 1:1 UNCACHED mapping of control code required when MMU
+> > is turned off in the restore code path.
+> >
+> > Signed-off-by: Lorenzo Pieralisi<lorenzo.pieralisi@arm.com>
+> > ---
+> >   arch/arm/kernel/sr_mapping.c |   78 ++++++++++++++++++++++++++++++++++++++++++
+> >   1 files changed, 78 insertions(+), 0 deletions(-)
+> >   create mode 100644 arch/arm/kernel/sr_mapping.c
+> >
+> > diff --git a/arch/arm/kernel/sr_mapping.c b/arch/arm/kernel/sr_mapping.c
+> > new file mode 100644
+> > index 0000000..32640dc
+> > --- /dev/null
+> > +++ b/arch/arm/kernel/sr_mapping.c
+> > @@ -0,0 +1,78 @@
+> > +/*
+> > + * Copyright (C) 2008-2011 ARM Limited
+> 
+> This is more of question so don't beat me if I am wrong here.
+> Above file doesn't exist in k.org from 2008 right ?
+> I noticed this in your other patches too.
 
-Signed-off-by: Jan Weitzel <j.weitzel@phytec.de>
----
- drivers/video/omap2/displays/panel-generic-dpi.c |  100 ++++++++++++++++++++++
- 1 files changed, 100 insertions(+), 0 deletions(-)
-
-diff --git a/drivers/video/omap2/displays/panel-generic-dpi.c b/drivers/video/omap2/displays/panel-generic-dpi.c
-index 9c90f75..87d9ba1 100644
---- a/drivers/video/omap2/displays/panel-generic-dpi.c
-+++ b/drivers/video/omap2/displays/panel-generic-dpi.c
-@@ -232,6 +232,106 @@ static struct panel_config generic_dpi_panels[] = {
- 		.power_off_delay	= 0,
- 		.name			= "powertip_ph480272t",
- 	},
-+
-+	/* Prime-View PD035VL1 */
-+	{
-+		{
-+			.x_res		= 640,
-+			.y_res		= 480,
-+
-+			.pixel_clock	= 25000,
-+
-+			.hsw		= 96,
-+			.hfp		= 18,
-+			.hbp		= 46,
-+
-+			.vsw		= 2,
-+			.vfp		= 10,
-+			.vbp		= 33,
-+		},
-+		.acbi			= 0x0,
-+		.acb			= 0x28,
-+		.config			= OMAP_DSS_LCD_TFT | OMAP_DSS_LCD_IVS |
-+					  OMAP_DSS_LCD_IHS | OMAP_DSS_LCD_IPC,
-+		.power_on_delay		= 50,
-+		.power_off_delay	= 100,
-+		.name			= "pd035vl1",
-+	},
-+
-+	/* Prime-View PD050VL1 */
-+	{
-+		{
-+			.x_res		= 640,
-+			.y_res		= 480,
-+
-+			.pixel_clock	= 25000,
-+
-+			.hsw		= 96,
-+			.hfp		= 18,
-+			.hbp		= 46,
-+
-+			.vsw		= 2,
-+			.vfp		= 10,
-+			.vbp		= 33,
-+		},
-+		.acbi			= 0x0,
-+		.acb			= 0x28,
-+		.config			= OMAP_DSS_LCD_TFT | OMAP_DSS_LCD_IVS |
-+					  OMAP_DSS_LCD_IHS | OMAP_DSS_LCD_IPC,
-+		.power_on_delay		= 50,
-+		.power_off_delay	= 100,
-+		.name			= "pd050vl1",
-+	},
-+
-+	/* Prime-View PM070WL4 */
-+	{
-+		{
-+			.x_res		= 800,
-+			.y_res		= 480,
-+
-+			.pixel_clock	= 32000,
-+
-+			.hsw		= 128,
-+			.hfp		= 42,
-+			.hbp		= 86,
-+
-+			.vsw		= 2,
-+			.vfp		= 10,
-+			.vbp		= 33,
-+		},
-+		.acbi			= 0x0,
-+		.acb			= 0x28,
-+		.config			= OMAP_DSS_LCD_TFT | OMAP_DSS_LCD_IVS |
-+					  OMAP_DSS_LCD_IHS | OMAP_DSS_LCD_IPC,
-+		.power_on_delay		= 50,
-+		.power_off_delay	= 100,
-+		.name			= "pm070wl4",
-+	},
-+
-+	/* Prime-View PD104SLF */
-+	{
-+		{
-+			.x_res		= 800,
-+			.y_res		= 600,
-+
-+			.pixel_clock	= 40000,
-+
-+			.hsw		= 128,
-+			.hfp		= 42,
-+			.hbp		= 86,
-+
-+			.vsw		= 4,
-+			.vfp		= 1,
-+			.vbp		= 23,
-+		},
-+		.acbi			= 0x0,
-+		.acb			= 0x28,
-+		.config			= OMAP_DSS_LCD_TFT | OMAP_DSS_LCD_IVS |
-+					  OMAP_DSS_LCD_IHS | OMAP_DSS_LCD_IPC,
-+		.power_on_delay		= 50,
-+		.power_off_delay	= 100,
-+		.name			= "pd104slf",
-+	},
- };
- 
- struct panel_drv_data {
--- 
-1.7.0.4
+Yes you are right, I will updated the whole set.
