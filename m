@@ -1,57 +1,109 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Fri, 8 Jul 2011 23:59:47 +0800
-Subject: [PATCH 07/10] ARM: mxs: add sgtl5000 i2c device
-In-Reply-To: <1310140790-2132-1-git-send-email-b29396@freescale.com>
-References: <1310140790-2132-1-git-send-email-b29396@freescale.com>
-Message-ID: <1310140790-2132-8-git-send-email-b29396@freescale.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 8 Jul 2011 17:41:23 +0200
+Subject: [GIT PULL] omap twl cleanup for v3.1 merge window
+In-Reply-To: <20110708130102.GB5783@atomide.com>
+References: <20110708130102.GB5783@atomide.com>
+Message-ID: <201107081741.23425.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Dong Aisheng <b29396@freescale.com>
----
- arch/arm/mach-mxs/mach-mx28evk.c |   16 ++++++++++++++++
- 1 files changed, 16 insertions(+), 0 deletions(-)
+On Friday 08 July 2011, Tony Lindgren wrote:
+>
+>I've attached a conflict resolution patch too, it's trivial execpt
+>note that .vdac needs to be removed in board-rx51-peripherals.c.
+>
+>If this conflict causes problems for you, I can also base this series
+>on omap/board.
 
-diff --git a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
-index 7837a87..c8b154a 100644
---- a/arch/arm/mach-mxs/mach-mx28evk.c
-+++ b/arch/arm/mach-mxs/mach-mx28evk.c
-@@ -186,6 +186,12 @@ static const iomux_cfg_t mx28evk_pads[] __initconst = {
- 	/* led */
- 	MX28_PAD_AUART1_TX__GPIO_3_5 | MXS_PAD_CTRL,
- 
-+	/* I2C */
-+	MX28_PAD_I2C0_SCL__I2C0_SCL |
-+		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
-+	MX28_PAD_I2C0_SDA__I2C0_SDA |
-+		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
-+
- 	/* saif0 & saif1 */
- 	MX28_PAD_SAIF0_MCLK__SAIF0_MCLK |
- 		(MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
-@@ -366,6 +372,12 @@ static struct mxs_mmc_platform_data mx28evk_mmc_pdata[] __initdata = {
- 	},
- };
- 
-+static struct i2c_board_info mxs_i2c0_board_info[] __initdata = {
-+	{
-+		I2C_BOARD_INFO("sgtl5000", 0x0a),
-+	},
-+};
-+
- static void __init mx28evk_init(void)
- {
- 	int ret;
-@@ -409,6 +421,10 @@ static void __init mx28evk_init(void)
- 	mx28_add_saif(0);
- 	mx28_add_saif(1);
- 
-+	mx28_add_mxs_i2c(0);
-+	i2c_register_board_info(0, mxs_i2c0_board_info,
-+				ARRAY_SIZE(mxs_i2c0_board_info));
-+
- 	/*set the saif clk mux, both saif0/saif1 use saif0 clk*/
- 	__raw_writel(0x2 << 10, DIGCTRL_BASE_ADDR);
- 
--- 
-1.7.0.4
+The conflict resolution you suggested doesn't build here:
+
+> --- a/arch/arm/mach-omap2/board-4430sdp.c
+> +++ b/arch/arm/mach-omap2/board-4430sdp.c
+> @@@ -572,75 -395,10 +509,62 @@@ static struct regulator_init_data sdp44
+>         },
+>   };
+>   
+>  +static struct regulator_init_data sdp4430_vana = {
+>  +      .constraints = {
+>  +              .min_uV                 = 2100000,
+>  +              .max_uV                 = 2100000,
+>  +              .valid_modes_mask       = REGULATOR_MODE_NORMAL
+>  +                                      | REGULATOR_MODE_STANDBY,
+>  +              .valid_ops_mask  = REGULATOR_CHANGE_MODE
+>  +                                      | REGULATOR_CHANGE_STATUS,
+>  +      },
+>  +};
+>  +
+>  +static struct regulator_init_data sdp4430_vcxio = {
+>  +      .constraints = {
+>  +              .min_uV                 = 1800000,
+>  +              .max_uV                 = 1800000,
+>  +              .valid_modes_mask       = REGULATOR_MODE_NORMAL
+>  +                                      | REGULATOR_MODE_STANDBY,
+>  +              .valid_ops_mask  = REGULATOR_CHANGE_MODE
+>  +                                      | REGULATOR_CHANGE_STATUS,
+>  +      },
+>  +};
+>  +
+>  +static struct regulator_init_data sdp4430_vdac = {
+>  +      .constraints = {
+>  +              .min_uV                 = 1800000,
+>  +              .max_uV                 = 1800000,
+>  +              .valid_modes_mask       = REGULATOR_MODE_NORMAL
+>  +                                      | REGULATOR_MODE_STANDBY,
+>  +              .valid_ops_mask  = REGULATOR_CHANGE_MODE
+>  +                                      | REGULATOR_CHANGE_STATUS,
+>  +      },
+>  +};
+>  +
+>  +static struct regulator_init_data sdp4430_vusb = {
+>  +      .constraints = {
+>  +              .min_uV                 = 3300000,
+>  +              .max_uV                 = 3300000,
+>  +              .apply_uV               = true,
+>  +              .valid_modes_mask       = REGULATOR_MODE_NORMAL
+>  +                                      | REGULATOR_MODE_STANDBY,
+>  +              .valid_ops_mask  =      REGULATOR_CHANGE_MODE
+>  +                                      | REGULATOR_CHANGE_STATUS,
+>  +      },
+>  +};
+>  +
+>  +static struct regulator_init_data sdp4430_clk32kg = {
+>  +      .constraints = {
+>  +              .valid_ops_mask         = REGULATOR_CHANGE_STATUS,
+>  +              .always_on              = true,
+>  +      },
+>  +};
+
+These are removed in the cleanup series, but changed in the fixes branch,
+now the removal is undone
+
+>   static struct twl4030_platform_data sdp4430_twldata = {
+> -       .irq_base       = TWL6030_IRQ_BASE,
+> -       .irq_end        = TWL6030_IRQ_END,
+> - 
+>         /* Regulators */
+> -       .vmmc           = &sdp4430_vmmc,
+> -       .vpp            = &sdp4430_vpp,
+>         .vusim          = &sdp4430_vusim,
+> -       .vana           = &sdp4430_vana,
+> -       .vcxio          = &sdp4430_vcxio,
+> -       .vdac           = &sdp4430_vdac,
+> -       .vusb           = &sdp4430_vusb,
+>         .vaux1          = &sdp4430_vaux1,
+> -       .vaux2          = &sdp4430_vaux2,
+> -       .vaux3          = &sdp4430_vaux3,
+> -       .clk32kg        = &sdp4430_clk32kg,
+> -       .usb            = &omap4_usbphy_data
+>   };
+>   
+
+but the references remain.
+
+I tried a different path, but then got
+
+arch/arm/mach-omap2/board-4430sdp.c:406:41: warning: 'sdp4430_vmmc_supply' defined but not used [-Wunused-variable]
+
+Should that variable be removed or kept referenced?
+
+	Arnd
