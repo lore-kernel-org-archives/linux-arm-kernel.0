@@ -1,7 +1,7 @@
 From: haojian.zhuang@marvell.com (Haojian Zhuang)
-Date: Fri,  8 Jul 2011 18:20:24 +0800
-Subject: [PATCH] of: add devicetree API for regulator
-In-Reply-To: <1310120428-22700-7-git-send-email-haojian.zhuang@marvell.com>
+Date: Fri,  8 Jul 2011 18:20:25 +0800
+Subject: [PATCH] regulator: convert devicetree to platform data on max8649
+In-Reply-To: <1310120428-22700-8-git-send-email-haojian.zhuang@marvell.com>
 References: <1310120428-22700-1-git-send-email-haojian.zhuang@marvell.com>
 	<1310120428-22700-2-git-send-email-haojian.zhuang@marvell.com>
 	<1310120428-22700-3-git-send-email-haojian.zhuang@marvell.com>
@@ -9,253 +9,110 @@ References: <1310120428-22700-1-git-send-email-haojian.zhuang@marvell.com>
 	<1310120428-22700-5-git-send-email-haojian.zhuang@marvell.com>
 	<1310120428-22700-6-git-send-email-haojian.zhuang@marvell.com>
 	<1310120428-22700-7-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <1310120428-22700-8-git-send-email-haojian.zhuang@marvell.com>
+	<1310120428-22700-8-git-send-email-haojian.zhuang@marvell.com>
+Message-ID: <1310120428-22700-9-git-send-email-haojian.zhuang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
 ---
- drivers/of/Kconfig           |    4 +
- drivers/of/Makefile          |    1 +
- drivers/of/of_regulator.c    |  166 ++++++++++++++++++++++++++++++++++++++++++
- include/linux/of_regulator.h |   34 +++++++++
- 4 files changed, 205 insertions(+), 0 deletions(-)
- create mode 100644 drivers/of/of_regulator.c
- create mode 100644 include/linux/of_regulator.h
+ drivers/regulator/max8649.c |   70 +++++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 70 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/of/Kconfig b/drivers/of/Kconfig
-index d06a637..edb6601 100644
---- a/drivers/of/Kconfig
-+++ b/drivers/of/Kconfig
-@@ -75,4 +75,8 @@ config OF_PCI
- 	help
- 	  OpenFirmware PCI bus accessors
+diff --git a/drivers/regulator/max8649.c b/drivers/regulator/max8649.c
+index 30eb9e5..4316a37 100644
+--- a/drivers/regulator/max8649.c
++++ b/drivers/regulator/max8649.c
+@@ -15,6 +15,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/regulator/driver.h>
+ #include <linux/slab.h>
++#include <linux/of_regulator.h>
+ #include <linux/regulator/max8649.h>
  
-+config OF_REGULATOR
-+	def_tristate REGULATOR
-+	depends on REGULATOR
-+
- endmenu # OF
-diff --git a/drivers/of/Makefile b/drivers/of/Makefile
-index f7861ed..83ca06f 100644
---- a/drivers/of/Makefile
-+++ b/drivers/of/Makefile
-@@ -10,3 +10,4 @@ obj-$(CONFIG_OF_NET)	+= of_net.o
- obj-$(CONFIG_OF_SPI)	+= of_spi.o
- obj-$(CONFIG_OF_MDIO)	+= of_mdio.o
- obj-$(CONFIG_OF_PCI)	+= of_pci.o
-+obj-$(CONFIG_OF_REGULATOR)	+= of_regulator.o
-diff --git a/drivers/of/of_regulator.c b/drivers/of/of_regulator.c
-new file mode 100644
-index 0000000..d523302
---- /dev/null
-+++ b/drivers/of/of_regulator.c
-@@ -0,0 +1,166 @@
-+/*
-+ * OF helpers for the Regulator API
-+ *
-+ * Copyright (c) 2011 Haojian Zhuang <haojian.zhuang@marvell.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ */
-+#include <linux/kernel.h>
-+#include <linux/of.h>
-+#include <linux/regulator/machine.h>
-+#include <linux/slab.h>
-+#include <linux/string.h>
-+#include <linux/suspend.h>
-+
-+static int of_regulator_init_constraints(struct device_node *of_dev,
-+				struct regulation_constraints *constraints)
+ #define MAX8649_DCDC_VMIN	750000		/* uV */
+@@ -275,6 +276,69 @@ static struct regulator_desc dcdc_desc = {
+ 	.owner		= THIS_MODULE,
+ };
+ 
++#ifdef CONFIG_OF_REGULATOR
++static struct max8649_platform_data __devinit
++*max8649_get_alt_pdata(struct i2c_client *client)
 +{
-+	const __be32 *p;
-+	const char *cp;
-+	const char *ops[] = {"voltage", "current", "mode", "status",
-+				"drms"};
-+	int i, size, len = 0, tmp = 0;
++	struct device_node *np = client->dev.of_node;
++	struct max8649_platform_data *pdata;
++	const __be32 *mode, *extclk, *ramp;
++	int ret = 0;
 +
-+	memset(constraints, 0, sizeof(struct regulation_constraints));
++	if (np == NULL)
++		goto out;
 +
-+	p = of_get_property(of_dev, "voltages", &size);
-+	if (p && size / sizeof(int) == 2) {
-+		constraints->min_uV = be32_to_cpu(*p++);
-+		constraints->max_uV = be32_to_cpu(*p);
++	mode = of_get_property(np, "max8649-mode", NULL);
++	if (mode == NULL) {
++		dev_err(&client->dev, "mode property is missed\n");
++		goto out;
 +	}
-+	p = of_get_property(of_dev, "currents", &size);
-+	if (p && size / sizeof(int) == 2) {
-+		constraints->min_uA = be32_to_cpu(*p++);
-+		constraints->max_uA = be32_to_cpu(*p);
++	extclk = of_get_property(np, "ext-clock-frequency", NULL);
++	if (extclk == NULL)
++		dev_dbg(&client->dev, "ext-clock-frequency is not set\n");
++	ramp = of_get_property(np, "max8649-ramp", NULL);
++	if (ramp == NULL) {
++		dev_err(&client->dev, "ramp is missed\n");
++		goto out;
 +	}
-+	p = of_get_property(of_dev, "modes-mask", NULL);
-+	if (p)
-+		constraints->valid_modes_mask = be32_to_cpu(*p);
-+	cp = of_get_property(of_dev, "ops-mask", &size);
-+	tmp = 0;
-+	if (cp && size > 0) {
-+		i = 0;
-+		do {
-+			len = strlen(ops[i]);
-+			if (!strncmp(cp, ops[i], len)) {
-+				constraints->valid_ops_mask |= 1 << i;
-+				/* need to handle '\0' */
-+				cp += len + 1;
-+				size = size - len - 1;
-+				i = 0;
-+			} else
-+				i++;
-+		} while (i < ARRAY_SIZE(ops));
-+		if (size > 0)
-+			printk(KERN_WARNING "Invalid string:%s\n", cp);
++
++	pdata = kzalloc(sizeof(struct max8649_platform_data), GFP_KERNEL);
++	if (pdata == NULL)
++		goto out;
++	pdata->mode = be32_to_cpu(*mode);
++	if (extclk) {
++		pdata->extclk = 1;
++		pdata->extclk_freq = be32_to_cpu(*extclk);
 +	}
-+	p = of_get_property(of_dev, "input-uV", NULL);
-+	if (p)
-+		constraints->input_uV = be32_to_cpu(*p);
-+	p = of_get_property(of_dev, "state-pm-disk", &size);
-+	if (p && size / sizeof(int) == 3) {
-+		constraints->state_disk.uV = be32_to_cpu(*p++);
-+		constraints->state_disk.mode = be32_to_cpu(*p++);
-+		tmp = be32_to_cpu(*p);
-+		constraints->state_disk.enabled = (tmp) ? 1 : 0;
-+		constraints->state_disk.disabled = (tmp) ? 0 : 1;
++	if (ramp) {
++		pdata->ramp_timing = be32_to_cpu(*ramp++);
++		pdata->ramp_down = be32_to_cpu(*ramp);
 +	}
-+	p = of_get_property(of_dev, "state-pm-mem", &size);
-+	if (p && size / sizeof(int) == 3) {
-+		constraints->state_mem.uV = be32_to_cpu(*p++);
-+		constraints->state_mem.mode = be32_to_cpu(*p++);
-+		tmp = be32_to_cpu(*p);
-+		constraints->state_mem.enabled = (tmp) ? 1 : 0;
-+		constraints->state_mem.disabled = (tmp) ? 0 : 1;
-+	}
-+	p = of_get_property(of_dev, "state-pm-standby", &size);
-+	if (p && size / sizeof(int) == 3) {
-+		constraints->state_standby.uV = be32_to_cpu(*p++);
-+		constraints->state_standby.mode = be32_to_cpu(*p++);
-+		tmp = be32_to_cpu(*p);
-+		constraints->state_standby.enabled = (tmp) ? 1 : 0;
-+		constraints->state_standby.disabled = (tmp) ? 0 : 1;
-+	}
-+	cp = of_get_property(of_dev, "initial-state", &size);
-+	if (cp) {
-+		if (!strncmp(cp, "pm-suspend-on", size))
-+			constraints->initial_state = PM_SUSPEND_ON;
-+		if (!strncmp(cp, "pm-suspend-mem", size))
-+			constraints->initial_state = PM_SUSPEND_MEM;
-+		if (!strncmp(cp, "pm-suspend-standby", size))
-+			constraints->initial_state = PM_SUSPEND_STANDBY;
-+	}
-+	p = of_get_property(of_dev, "initial_mode", NULL);
-+	if (p)
-+		constraints->initial_mode = be32_to_cpu(*p);
-+	p = of_get_property(of_dev, "always-on", NULL);
-+	if (p)
-+		constraints->always_on = 1;
-+	p = of_get_property(of_dev, "boot-on", NULL);
-+	if (p)
-+		constraints->boot_on = 1;
-+	p = of_get_property(of_dev, "apply-uV", NULL);
-+	if (p)
-+		constraints->apply_uV = 1;
-+	return 0;
++
++	pdata->regulator = kzalloc(sizeof(struct regulator_init_data),
++				GFP_KERNEL);
++	if (pdata->regulator == NULL)
++		goto out_pdata;
++	ret = of_regulator_init_data(np, pdata->regulator);
++	if (ret < 0)
++		goto out_regulator;
++	return pdata;
++
++out_regulator:
++	kfree(pdata->regulator);
++out_pdata:
++	kfree(pdata);
++out:
++	return NULL;
 +}
-+
-+int of_regulator_init_data(struct device_node *of_dev,
-+			struct regulator_init_data *data)
-+{
-+	struct regulator_consumer_supply *supply;
-+	const char *p, *str;
-+	int ret, i, size, calc_size, len, count = 0;
-+
-+	if (of_dev == NULL || data == NULL)
-+		return -EINVAL;
-+
-+	p = of_get_property(of_dev, "device_type", &size);
-+	if (p == NULL || strncmp(p, "regulator", size))
-+		return -EINVAL;
-+
-+	ret = of_regulator_init_constraints(of_dev, &data->constraints);
-+	if (ret)
-+		return ret;
-+	p = of_get_property(of_dev, "supply-name", &size);
-+	str = p;
-+	calc_size = size;
-+	while (str && calc_size > 0) {
-+		len = strlen(str);
-+		if (len == 0)
-+			break;
-+		calc_size = calc_size - len - 1;
-+		str += len + 1;
-+		count++;
-+	}
-+	if (count == 0)
-+		return -EINVAL;
-+
-+	supply = kzalloc(sizeof(struct regulator_consumer_supply) * count,
-+		GFP_KERNEL);
-+	if (supply == NULL)
-+		return -EINVAL;
-+	str = p;
-+	calc_size = size;
-+	i = 0;
-+	while (str && calc_size > 0 && i < count) {
-+		len = strlen(str);
-+		if (len == 0)
-+			break;
-+		supply[i++].supply = str;
-+		calc_size = calc_size - len - 1;
-+		str += len + 1;
-+	}
-+	data->consumer_supplies = supply;
-+	data->num_consumer_supplies = count;
-+	return 0;
-+}
-+
-+void of_regulator_deinit_data(struct regulator_init_data *data)
-+{
-+	if (data && data->consumer_supplies)
-+		kfree(data->consumer_supplies);
-+}
-diff --git a/include/linux/of_regulator.h b/include/linux/of_regulator.h
-new file mode 100644
-index 0000000..0155bd8
---- /dev/null
-+++ b/include/linux/of_regulator.h
-@@ -0,0 +1,34 @@
-+/*
-+ * Generic Regulator API implementation
-+ *
-+ * Copyright (c) 2011 Haojian Zhuang <haojian.zhuang@marvell.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ */
-+
-+#ifndef __LINUX_OF_REGULATOR_H
-+#define __LINUX_OF_REGULATOR_H
-+
-+#if defined(CONFIG_OF_REGULATOR) || defined(CONFIG_OF_REGULATOR_MODULE)
-+#include <linux/regulator/machine.h>
-+
-+extern int of_regulator_init_data(struct device_node *of_node,
-+				struct regulator_init_data *data);
-+extern void of_regulator_deinit_data(struct regulator_init_data *data);
-+
 +#else
-+static inline int of_regulator_init_data(struct device_node *of_node,
-+				struct regulator_init_data *data)
++static struct max8649_platform_data __devinit
++*max8649_get_alt_pdata(struct i2c_client *client)
 +{
 +	return 0;
 +}
++#endif
 +
-+static inline void of_regulator_deinit_data(struct regulator_init_data *data)
-+{
-+}
-+#endif	/* CONFIG_OF_REGULATOR */
+ static int __devinit max8649_regulator_probe(struct i2c_client *client,
+ 					     const struct i2c_device_id *id)
+ {
+@@ -294,6 +358,12 @@ static int __devinit max8649_regulator_probe(struct i2c_client *client,
+ 	mutex_init(&info->io_lock);
+ 	i2c_set_clientdata(client, info);
+ 
++	if (pdata == NULL) {
++		pdata = max8649_get_alt_pdata(client);
++		if (pdata == NULL)
++			return -ENODEV;
++	}
 +
-+#endif	/* __LINUX_OF_REGULATOR_H */
+ 	info->mode = pdata->mode;
+ 	switch (info->mode) {
+ 	case 0:
 -- 
 1.5.6.5
