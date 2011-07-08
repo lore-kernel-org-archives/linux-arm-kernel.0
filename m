@@ -1,40 +1,32 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Fri, 8 Jul 2011 14:36:03 +0530
-Subject: [GIT PULL] DaVinci cleanups for v3.1
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024D9B56D3@dbde02.ent.ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 8 Jul 2011 10:07:21 +0100
+Subject: [PATCH 0/7] Re-organize linker layouts
+In-Reply-To: <4E165597.90002@codeaurora.org>
+References: <20110706102245.GO8286@n2100.arm.linux.org.uk>
+	<4E15ECB6.40100@codeaurora.org>
+	<20110707223620.GG20403@n2100.arm.linux.org.uk>
+	<4E165597.90002@codeaurora.org>
+Message-ID: <20110708090721.GC2414@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Thu, Jul 07, 2011 at 05:55:51PM -0700, Stephen Boyd wrote:
+> On 07/07/2011 03:36 PM, Russell King - ARM Linux wrote:
+> > Oh, what did you use instead?  I thought no one used the Image files
+> > anymore...
+> 
+> I used an Image. Android bootloaders are perfectly fine booting those.
+> Plus, the zreladdr for every MSM post 7x00a isn't upstream.
 
-Please pull the following DaVinci clean-ups for the v3.1 merge window.
-The patch "davinci: dm6467/T EVM: fix setting up of reference clock rate"
-ends up adding extra code, but should make adding new boards with
-different reference clock rate very simple.
+Ah, ok.  Thanks for letting me know and thanks for the tested-by.
 
-There are further clean-ups pending merge of SRAM consolidation patch
-by Russell. If I see that getting merged, I can send a follow-up pull
-request. There is also another patch for which I am awaiting Mauro's ack.
+> Which reminds me, the zreladdr for every MSM besides 7x00a and 8x50 is
+> 0xX0208000 which doesn't play nicely with AUTO_ZRELADDR. I wish we could
+> fix that.
 
-Thanks,
-Sekhar
+And there's probably platforms which need it the existing way...
 
-The following changes since commit fe0d42203cb5616eeff68b14576a0f7e2dd56625:
-  Linus Torvalds (1):
-        Linux 3.0-rc6
-
-are available in the git repository at:
-
-  git://gitorious.org/linux-davinci/linux-davinci.git cleanup
-
-Sekhar Nori (2):
-      davinci: psc.h: clean up indentation done using spaces
-      davinci: dm6467/T EVM: fix setting up of reference clock rate
-
- arch/arm/mach-davinci/board-dm646x-evm.c    |   17 +--
- arch/arm/mach-davinci/clock.c               |   38 +++++++
- arch/arm/mach-davinci/clock.h               |    2 +
- arch/arm/mach-davinci/dm646x.c              |    4 +-
- arch/arm/mach-davinci/include/mach/dm646x.h |    2 -
- arch/arm/mach-davinci/include/mach/psc.h    |  148 +++++++++++++-------------
- 6 files changed, 123 insertions(+), 88 deletions(-)
+There's also platforms where the zImage is loaded at some predetermined
+offset into RAM to give the decompressor room to directly place the
+kernel in its final location too, which will be buggered by
+AUTO_ZRELADDR.
