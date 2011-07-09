@@ -1,33 +1,39 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Sat, 9 Jul 2011 16:34:59 -0600 (MDT)
-Subject: [RFC/PATCH] OMAP PM: remove OMAP_PM_NONE config option
-In-Reply-To: <BANLkTik=0=SFfEfcjE_be6Z+0D0onNQ4Gg@mail.gmail.com>
-References: <1304673087-24643-1-git-send-email-j-pihet@ti.com>
-	<alpine.DEB.2.00.1105061016070.30136@utopia.booyaka.com>
-	<BANLkTimgrpKq_SrD=U9rzXspKv8eOcsv0w@mail.gmail.com>
-	<alpine.DEB.2.00.1105061407140.30136@utopia.booyaka.com>
-	<BANLkTik=0=SFfEfcjE_be6Z+0D0onNQ4Gg@mail.gmail.com>
-Message-ID: <alpine.DEB.2.00.1107091634150.15984@utopia.booyaka.com>
+From: philippe.retornaz@epfl.ch (=?utf-8?q?Philippe=20R=C3=A9tornaz?=)
+Date: Sun, 10 Jul 2011 01:06:33 +0200
+Subject: [PATCH v3 0/3] mc13783: add pwr button support
+Message-ID: <1310252796-10596-1-git-send-email-philippe.retornaz@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean
+Hello
 
-On Mon, 20 Jun 2011, Jean Pihet wrote:
+This add button handling for the MC13783 PMIC.
+The first patch modify the mc13783 MFD driver to add a button
+subdevice and also adds the mc13783-pwrbutton driver using a misc
+input device.
 
-> > On Fri, 6 May 2011, Jean Pihet wrote:
-> >
-> >> I checked the patch against the master branch of both Tony's and
-> >> Linus's trees, it applies and compiles OK.
-> >> Is that OK to you?
-> >
-> > If it applies cleanly against Linus's current tree, then yes, that's fine.
-> Do you know what happened to this patch? Is it scheduled for merging
-> into mainline?
+The second patch adds the power on button support to the mx31moboard boards.
 
-This patch has been queued for 3.1 at git://git.pwsan.com/linux-2.6 in the 
-'omap_pm_cleanup_3.1' branch.
+The third patch is optional and modify the mc13xxx driver to use the platform 
+data to check if the leds and buttons subdevices should be enabled.
 
-thanks,
+We need to keep the regulator flags as the regulator platform data can be NULL
+on mc13892.
 
-- Paul
+v2: first patch modified according to comments by Dmitry Torokhov
+v3: Implement review by Uwe
+
+Philippe R?tornaz (3):
+  mc13783: add power button support
+  mx31moboard: Add MC13783 power button support
+  mc13xxx: implicitly enable leds and buttons
+
+ arch/arm/mach-imx/mach-mx31moboard.c   |   10 +-
+ drivers/input/misc/Kconfig             |   10 +
+ drivers/input/misc/Makefile            |    1 +
+ drivers/input/misc/mc13783-pwrbutton.c |  288 ++++++++++++++++++++++++++++++++
+ drivers/mfd/mc13xxx-core.c             |    6 +-
+ include/linux/mfd/mc13783.h            |    2 +-
+ include/linux/mfd/mc13xxx.h            |   18 ++-
+ 7 files changed, 331 insertions(+), 4 deletions(-)
+ create mode 100644 drivers/input/misc/mc13783-pwrbutton.c
