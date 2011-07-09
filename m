@@ -1,256 +1,295 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Sun, 10 Jul 2011 16:20:27 +0900
-Subject: [PATCH] mfd: convert devicetree to platform data on max8925
-In-Reply-To: <1310120428-22700-10-git-send-email-haojian.zhuang@marvell.com>
-References: <1310120428-22700-1-git-send-email-haojian.zhuang@marvell.com>
-	<1310120428-22700-2-git-send-email-haojian.zhuang@marvell.com>
-	<1310120428-22700-3-git-send-email-haojian.zhuang@marvell.com>
-	<1310120428-22700-4-git-send-email-haojian.zhuang@marvell.com>
-	<1310120428-22700-5-git-send-email-haojian.zhuang@marvell.com>
-	<1310120428-22700-6-git-send-email-haojian.zhuang@marvell.com>
-	<1310120428-22700-7-git-send-email-haojian.zhuang@marvell.com>
-	<1310120428-22700-8-git-send-email-haojian.zhuang@marvell.com>
-	<1310120428-22700-9-git-send-email-haojian.zhuang@marvell.com>
-	<1310120428-22700-10-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <20110710072027.GE10912@ponder.secretlab.ca>
+Date: Sun, 10 Jul 2011 06:29:24 +0900
+Subject: [RFC PATCH v2 4/4] Core devices: documentation
+In-Reply-To: <1310115250-3859-5-git-send-email-marc.zyngier@arm.com>
+References: <1310115250-3859-1-git-send-email-marc.zyngier@arm.com>
+	<1310115250-3859-5-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20110709212924.GD2805@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 08, 2011 at 06:20:26PM +0800, Haojian Zhuang wrote:
-> Make max8925 to support both platform data and device tree. So a translation
-> between device tree and platform data is added.
+On Fri, Jul 08, 2011 at 09:54:10AM +0100, Marc Zyngier wrote:
+> Add the documentation file for core devices.
 > 
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > ---
->  drivers/mfd/max8925-i2c.c |  159 ++++++++++++++++++++++++++++++++++++++++++++-
->  1 files changed, 157 insertions(+), 2 deletions(-)
+>  Documentation/core_devices.txt |  247 ++++++++++++++++++++++++++++++++++++++++
+>  1 files changed, 247 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/core_devices.txt
 > 
-> diff --git a/drivers/mfd/max8925-i2c.c b/drivers/mfd/max8925-i2c.c
-> index 0219115..fb74554 100644
-> --- a/drivers/mfd/max8925-i2c.c
-> +++ b/drivers/mfd/max8925-i2c.c
-> @@ -10,6 +10,9 @@
->   */
->  #include <linux/kernel.h>
->  #include <linux/module.h>
-> +#include <linux/irq.h>
-> +#include <linux/of_irq.h>
-> +#include <linux/of_regulator.h>
->  #include <linux/platform_device.h>
->  #include <linux/i2c.h>
->  #include <linux/mfd/max8925.h>
-> @@ -135,6 +138,154 @@ static const struct i2c_device_id max8925_id_table[] = {
->  };
->  MODULE_DEVICE_TABLE(i2c, max8925_id_table);
->  
-> +#ifdef CONFIG_OF
-> +static int __devinit max8925_parse_irq(struct i2c_client *i2c,
-> +					struct max8925_platform_data *pdata)
-> +{
-> +	struct device_node *of_node = i2c->dev.of_node;
+> diff --git a/Documentation/core_devices.txt b/Documentation/core_devices.txt
+> new file mode 100644
+> index 0000000..5d1581f
+> --- /dev/null
+> +++ b/Documentation/core_devices.txt
+> @@ -0,0 +1,247 @@
+> +Core Device Subsystem:
+> +=====================
 > +
-> +	pdata->irq_base = irq_alloc_descs(-1, 0, MAX8925_NR_IRQS, 0);
-> +	irq_domain_add_simple(of_node, pdata->irq_base);
-
-of_node is only used once.  This could simply be:
-
-	irq_domain_add_simple(i2c->dev.of_node, pdata->irq_base);
-
-> +	return 0;
-> +}
+> +There is a small number of devices that the core kernel needs very
+> +early in the boot process, namely an interrupt controller and a timer,
+> +long before the driver model is up and running.
 > +
-> +static void __devinit max8925_parse_backlight(struct device_node *np,
-> +					struct max8925_platform_data *pdata)
-> +{
-> +	struct max8925_backlight_pdata *bk;
-> +	const __be32 *p;
+> +Most architectures implement this requirement by hardcoding the
+> +initialisation of a "well known" piece of hardware which is standard
+> +enough to work on any platform.
 > +
-> +	bk = kzalloc(sizeof(struct max8925_backlight_pdata), GFP_KERNEL);
-> +	if (bk == NULL)
-> +		return;
-> +	pdata->backlight = bk;
-> +	p = of_get_property(np, "lxw-scl", NULL);
-> +	if (p)
-> +		bk->lxw_scl = be32_to_cpu(*p);
-> +	p = of_get_property(np, "lxw-freq", NULL);
-> +	if (p)
-> +		bk->lxw_freq = be32_to_cpu(*p);
-> +	p = of_get_property(np, "dual-string", NULL);
-> +	if (p)
-> +		bk->dual_string = be32_to_cpu(*p);
-
-of_property_read_u32() and of_property_read_string() would help you here.
-
-This implements a new binding.  Needs to be documented.
-
-> +}
+> +This is very different on the ARM architecture, where platforms have a
+> +variety of interrupt controllers and timers. While the same hardcoding
+> +is possible (and is actually used), it makes it almost impossible to
+> +support several platforms in the same kernel.
 > +
-> +static void __devinit max8925_parse_touch(struct device_node *np,
-> +					struct max8925_platform_data *pdata)
-> +{
-> +	struct max8925_touch_pdata *touch;
-> +	const __be32 *p;
+> +Though the device tree is helping greatly to solve this problem, some
+> +platform won't ever be converted to DT, hence the need to have a
+> +mechanism supporting a variety of information source. Early platform
+> +devices having been deemed unsuitable (complexity, abuse of various
+> +subsystems), this subsystem has been designed to provide the very
+> +minimal level of functionality.
 > +
-> +	touch = kzalloc(sizeof(struct max8925_touch_pdata), GFP_KERNEL);
-> +	if (touch == NULL)
-> +		return;
-> +	pdata->touch = touch;
-> +	p = of_get_property(np, "flags", NULL);
-> +	if (p)
-> +		touch->flags = be32_to_cpu(*p);
-> +	p = of_get_property(np, "interrupts", NULL);
-> +	if (p)
-> +		pdata->tsc_irq = irq_of_parse_and_map(np, 0);
-
-irq_of_parse_and_map() can be called directly.  It will return NO_IRQ
-if the irq cannot be parsed.
-
-> +}
+> +The "core device subsystem" offers a class based device/driver
+> +matching model, doesn't rely on any other subsystem, is very (too?)
+> +simple, and support getting information both from DT as well as from
+> +static data provided by the platform. It also gives the opportunity to
+> +define the probing order by offering a sorting hook at run-time.
 > +
-> +static void __devinit max8925_parse_power(struct device_node *np,
-> +					struct max8925_platform_data *pdata)
-> +{
-> +	struct max8925_power_pdata *power;
-> +	const __be32 *p;
+> +As for the Linux driver model, the core device subsystem deals mainly
+> +with device and driver objects. It also has the notion of "class" to
+> +designate a group of devices implementing the same functionality, and
+> +a group of drivers to be matched against the above devices
+> +(CORE_DEV_CLASS_TIMER for example).
 > +
-> +	power = kzalloc(sizeof(struct max8925_power_pdata), GFP_KERNEL);
-> +	if (power == NULL)
-> +		return;
-> +	pdata->power = power;
-> +	p = of_get_property(np, "battery-detect", NULL);
-> +	if (p)
-> +		power->batt_detect = be32_to_cpu(*p) ? 1 : 0;
-> +	p = of_get_property(np, "topoff-threshold", NULL);
-> +	if (p)
-> +		power->topoff_threshold = be32_to_cpu(*p) & 0x3;
-> +	p = of_get_property(np, "fast-charge", NULL);
-> +	if (p)
-> +		power->fast_charge = be32_to_cpu(*p) & 0x7;
-
-Needs to be documented.
-
-> +}
+> +One of the features is that the whole subsystem is discarded once the
+> +kernel has booted. No structures can or should be retained after the
+> +device has been probed. Of course, no support for module or other
+> +evolved features. Another design feature is that it is *NOT* thread
+> +safe. If you need any kind of mutual exclusion, you're probably using
+> +core devices for something they are not designed for.
 > +
-> +static void __devinit max8925_parse_regulator(struct device_node *np,
-> +					struct max8925_platform_data *pdata)
-> +{
-> +	const char *name[MAX8925_MAX_REGULATOR] = {
-> +			"SD1", "SD2", "SD3", "LDO1", "LDO2", "LDO3", "LDO4",
-> +			"LDO5", "LDO6", "LDO7", "LDO8", "LDO9", "LDO10",
-> +			"LDO11", "LDO12", "LDO13", "LDO14", "LDO15", "LDO16",
-> +			"LDO17", "LDO18", "LDO19", "LDO20"};
-> +	const char *cp;
-> +	int i;
+> +* Core Device:
+> +  ===========
 > +
-> +	cp = of_get_property(np, "compatible", NULL);
-> +	if (cp == NULL)
-> +		return;
-> +	for (i = 0; i < MAX8925_MAX_REGULATOR; i++) {
-> +		if (strncmp(cp, name[i], strlen(name[i])))
-> +			continue;
-> +		of_regulator_init_data(np, pdata->regulator[i]);
-> +		break;
-
-You don't need to open-code the parsing of compatible values.  Use
-of_match_node() instead with an of_device_id table.
-
-> +	}
-> +}
+> +The struct core_device is fairly similar to a platform_device.
+> +From "include/linux/core_device.h":
 > +
-> +static struct max8925_platform_data __devinit
-> +*max8925_get_alt_pdata(struct i2c_client *client)
-> +{
-> +	struct max8925_platform_data *pdata;
-> +	struct device_node *of_node = client->dev.of_node;
-> +	struct device_node *np, *pp = NULL;
-> +	const char *cp;
-> +	int ret, i;
+> +struct core_device {
+> +	const char		*name;
+> +	u32			num_resources;
+> +	struct resource		*resource;
+> +	struct device_node	*of_node;
+> +	struct list_head	entry;
+> +};
 > +
-> +	pdata = kzalloc(sizeof(struct max8925_platform_data), GFP_KERNEL);
+> +- name: friendly name for the device, will be used to match the driver
+> +- num_resources: number of resources associated with the device
+> +- resource: address of the resource array
+> +- of_node: pointer to the DT node if the device has been populated by
+> +  parsing the device tree. This is managed internally by the subsystem.
+> +- entry: internal management list (not to be initialised).
 
-sizeof(*pdata)
+Ignoring the question of "which devices are actually core devices" for
+the moment, (which is a question that does need to be answered
+regardless), I don't think the 'struct core_device' abstraction, or at
+least the "core_device_register()" abstraction is what is needed.
+When doing early setup for an SoC family, I better already have a
+pretty darn good idea about what devices are "core devices".  We *do*
+need a way to hook in setup code for a lot of different hardware in
+abstract ways, but something like a device model I think goes to far.
 
-> +	if (pdata == NULL)
-> +		return NULL;
-> +	pdata->regulator[0] = kzalloc(sizeof(struct regulator_init_data)
-> +			* MAX8925_MAX_REGULATOR, GFP_KERNEL);
-
-ditto.
-
-Is it appropriate to allocated the entire table of regulators?  From
-the parse_regulator function above, it looks like only one of the
-regulators will actually get registered (I've not dug deeply into what
-the driver needs here though).
-
-> +	if (pdata->regulator[0] == NULL) {
-> +		kfree(pdata);
-> +		return NULL;
-> +	}
-> +	for (i = 1; i < MAX8925_MAX_REGULATOR; i++)
-> +		pdata->regulator[i] = pdata->regulator[i - 1] + 1;
-> +
-> +	ret = max8925_parse_irq(client, pdata);
-> +	if (ret < 0)
-> +		goto out;
-> +
-> +	for (; (np = of_get_next_child(of_node, pp)) != NULL; pp = np) {
-> +		cp = of_get_property(np, "compatible", NULL);
-> +		if (cp == NULL)
-> +			continue;
-> +		if (!strncmp(cp, "backlight", strlen("backlight")))
-> +			max8925_parse_backlight(np, pdata);
-> +		if (!strncmp(cp, "power", strlen("power")))
-> +			max8925_parse_power(np, pdata);
-> +		if (!strncmp(cp, "touch", strlen("touch")))
-> +			max8925_parse_touch(np, pdata);
-> +		cp = of_get_property(np, "device_type", NULL);
-> +		if (cp == NULL)
-> +			continue;
-> +		if (!strncmp(cp, "regulator", strlen("regulator")))
-> +			max8925_parse_regulator(np, pdata);
-> +	}
-> +	return pdata;
-> +out:
-> +	kfree(pdata->regulator[0]);
-> +	kfree(pdata);
-> +	return NULL;
-> +}
-> +#else
-> +static struct max8925_platform_data __devinit
-> +*max8925_get_alt_pdata(struct i2c_client *client)
-> +{
-> +	return NULL;
-> +}
-> +#endif
-> +
->  static int __devinit max8925_probe(struct i2c_client *client,
->  				   const struct i2c_device_id *id)
->  {
-> @@ -142,8 +293,12 @@ static int __devinit max8925_probe(struct i2c_client *client,
->  	static struct max8925_chip *chip;
->  
->  	if (!pdata) {
-> -		pr_info("%s: platform data is missing\n", __func__);
-> -		return -EINVAL;
-> +		pdata = max8925_get_alt_pdata(client);
-> +		if (!pdata) {
-> +			pr_info("%s: platform data is missing\n", __func__);
-> +			return -EINVAL;
-> +		}
-> +		client->dev.platform_data = pdata;
-
-Don't write to dev.platform_data.  Device drivers must treat
-platform_data as immutable, and it is illegal to modify it.  If
-platform_data is used outside of the probe function, then the driver
-needs to be refactored to copy the data out of pdata and into the
-driver's private data structure so that the data can be sourced from
-either pdata or DT.
+It should be sufficient to have either implicitly or explicitly
+registered setup functions and a helper function (lets call it an
+early setup agent) that knows how to call them (which is pretty much
+what you've got implemented), but instead of a separate
+core_device_register() step, SoC code can pass a list of core devices
+to the setup agent directly.  Or in the DT case, a match table.
 
 g.
 
->  	}
->  
->  	chip = kzalloc(sizeof(struct max8925_chip), GFP_KERNEL);
+> +
+> +The device is registered with the core device subsystem with:
+> +void core_device_register(enum core_device_class class,
+> +			  struct core_device *dev);
+> +
+> +where:
+> +- class is one of CORE_DEV_CLASS_IRQ or CORE_DEV_CLASS_TIMER
+> +- dev is the core device to be registered.
+> +
+> +A typical use is the following:
+> +static struct resources twd_resources[] __initdata = {
+> +	{
+> +		.start	= 0x1f000600,
+> +		.end	= 0x1f0006ff,
+> +		.flags	= IORESOURCE_MEM,
+> +	},
+> +	{
+> +		.start	= IRQ_LOCALTIMER,
+> +		.end	= IRQ_LOCALTIMER,
+> +		.flags	= IORESOURCE_IRQ,
+> +	},
+> +};
+> +
+> +static struct core_device twd_device _initdata = {
+> +	.name		= "arm_smp_twd",
+> +	.resource	= twd_resources,
+> +	.num_resources	= ARRAY_SIZE(twd_resources),
+> +};
+> +
+> +static void __init timer_init(void)
+> +{
+> +	core_device_register(CORE_DEV_CLASS_TIMER, &twd_device);
+> +}
+> +
+> +Note that all structures are marked as __inidata, as none of them is
+> +expected to be used after the kernel has booted.
+> +
+> +The devices can also be automatically allocated and registered by
+> +parsing the device tree (if available) with the following function:
+> +
+> +void of_core_device_populate(enum core_device_class class,
+> +			     struct of_device_id *matches);
+> +
+> +The allocated core_device structures will have their of_node member
+> +pointing to the corresponding DT node. Resources will be allocated and
+> +populated according to attributes found in the device tree.
+> +
+> +
+> +
+> +* Core driver:
+> +  ===========
+> +
+> +The struct core_driver is the pendant to the core_device.
+> +
+> +struct core_driver {
+> +	int			(*init)(struct core_device *);
+> +	struct core_device_id	*ids;
+> +};
+> +
+> +- init: initialisation function. Returns 0 on success, error code on
+> +  failure.
+> +- ids: a null-terminated array of struct core_device_id against which
+> +  the device is matched.
+> +
+> +struct core_device_id {
+> +	const char		*name;
+> +};
+> +
+> +- name: string against which the device is matched
+> +
+> +core_driver_register(class, driver);
+> +
+> +Note that core_driver_register() is *not* a function, but expands to a
+> +static data structure stored in a discardable section.
+> +
+> +A typical use is the following:
+> +
+> +static int __init twd_core_init(struct core_device *dev)
+> +{
+> +	[...]
+> +	return 0;
+> +}
+> +static struct core_device_id twd_core_ids[] __initdata = {
+> +	{ .name = "arm,smp-twd", },
+> +	{ .name	= "arm_smp_twd", },
+> +	{},
+> +};
+> +
+> +static struct core_driver twd_core_driver __initdata = {
+> +	.init		= twd_core_init,
+> +	.ids		= twd_core_ids,
+> +};
+> +
+> +core_driver_register(CORE_DEV_CLASS_TIMER, twd_core_driver);
+> +
+> +As for the core_device, all structures should be marked __initdata,
+> +and the init function should be marked __init. The driver code must
+> +*not* hold any reference to the core_device, as it can be freed just
+> +after the init function has returned.
+> +
+> +
+> +
+> +* Device/Driver matching:
+> +  ======================
+> +
+> +The core kernel code directly controls when devices and drivers are
+> +matched (no matching-at-register-time) by calling:
+> +
+> +void core_driver_init_class(enum core_device_class class,
+> +			    void (*sort)(struct list_head *));
+> +
+> +Where:
+> +- class is one of CORE_DEV_CLASS_IRQ or CORE_DEV_CLASS_TIMER,
+> +- sort is a pointer to a function sorting the device list before they
+> +  are matched (NULL if unused).
+> +
+> +When this function is called:
+> +
+> +- All devices registered in "class" are probed with the matching
+> +  registered drivers
+> +- Once the devices in the class have been tried against the compiled
+> +  in drivers, they are removed from the list (whether they have
+> +  actually been probed or not).
+> +- If core devices have been dynamically allocated (by
+> +  of_core_device_populate()), they are freed.
+> +
+> +For example:
+> +
+> +/* List of supported timers */
+> +static struct of_device_id timer_ids[] __initdata = {
+> +	{ .compatible = "arm,smp-twd", },
+> +	{},
+> +};
+> +
+> +static void __init __arm_late_time_init(void)
+> +{
+> +	if (arm_late_time_init)
+> +		arm_late_time_init();
+> +
+> +	/* Fetch the supported timers from the device tree */
+> +	of_core_device_populate(CORE_DEV_CLASS_TIMER, timer_ids);
+> +	/* Init the devices (both DT based and static), no preliminary sort */
+> +	core_driver_init_class(CORE_DEV_CLASS_TIMER, NULL);
+> +}
+> +
+> +
+> +
+> +* Sorting functions
+> +  =================
+> +
+> +This may well fall into the hack category, and is probably only useful
+> +when used with the device tree.
+> +
+> +Imagine you have a bunch of interrupt controllers to initialise. There
+> +is probably one controller directly attached to the CPUs, and all the
+> +others cascading (in)directly into the first one. There is a strong
+> +requirement that these controllers are initialised in the right order
+> +(closest to the CPU first).
+> +
+> +This is easy enough to achieve when static core devices are registered
+> +(the registration order is preserved when probing), but is very
+> +unlikely to occur when devices are imported from the device tree.
+> +
+> +The "sort" function that can be passed to core_driver_init_class() is
+> +used to solve such a problem. It is called just before the devices are
+> +matched against the drivers, and is allowed to reorganise the list
+> +completely. It must not drop elements from the list though.
+> +
+> +One such sorting function is core_device_irq_sort(), which is designed
+> +to solve the above problem, and is used like this:
+> +
+> +static struct of_device_id of_irq_controller_ids[] __initdata = {
+> +	{ .compatible   = "arm,gic-spi", },
+> +	{},
+> +};
+> +
+> +void __init init_IRQ(void)
+> +{
+> +	machine_desc->init_irq();
+> +	of_core_device_populate(CORE_DEV_CLASS_IRQ, of_irq_controller_ids);
+> +	core_driver_init_class(CORE_DEV_CLASS_IRQ, core_device_irq_sort);
+> +}
+> +
+> +In this snippet, all the "arm,gic-spi" devices are registered, and
+> +then sorted at initialisation time by core_device_irq_sort().
 > -- 
-> 1.5.6.5
+> 1.7.0.4
+> 
 > 
