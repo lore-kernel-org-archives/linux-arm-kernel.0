@@ -1,239 +1,140 @@
 From: tixy@yxit.co.uk (Tixy)
-Date: Sat,  9 Jul 2011 11:56:59 +0100
-Subject: [PATCH 12/51] ARM: kprobes: Add Thumb breakpoint support
+Date: Sat,  9 Jul 2011 11:57:04 +0100
+Subject: [PATCH 17/51] ARM: kprobes: Add hooks to override singlestep()
 In-Reply-To: <1310209058-20980-1-git-send-email-tixy@yxit.co.uk>
 References: <1310209058-20980-1-git-send-email-tixy@yxit.co.uk>
-Message-ID: <1310209058-20980-13-git-send-email-tixy@yxit.co.uk>
+Message-ID: <1310209058-20980-18-git-send-email-tixy@yxit.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jon Medhurst <tixy@yxit.co.uk>
 
-Extend the breakpoint insertion and catching functions to support Thumb
-code.
+When a probe fires we must single-step the instruction which was
+replaced by a breakpoint. As the steps to do this vary between ARM and
+Thumb instructions we need a way to customise single-stepping.
 
-As breakpoints are no longer of a fixed size, the flush_insns macro
-is modified to take a size argument instead of an instruction count.
+This is done by adding a new hook called insn_singlestep to
+arch_specific_insn which is initialised by the instruction decoding
+functions.
 
-Note, we need both 16- and 32-bit Thumb breakpoints, because if we
-were to use a 16-bit breakpoint to replace a 32-bit instruction which
-was in an IT block, and the condition check failed, then the breakpoint
-may not fire (it's unpredictable behaviour) and the CPU could then try
-and execute the second half of the 32-bit Thumb instruction.
+These single-step hooks must update PC and call the instruction handler.
+For Thumb instructions an additional step of updating ITSTATE is needed.
+We do this after calling the handler because some handlers will need to
+test if they are running in an IT block.
 
 Signed-off-by: Jon Medhurst <tixy@yxit.co.uk>
 ---
- arch/arm/kernel/kprobes.h |    7 ++-
- arch/arm/kernel/kprobes.c |  122 ++++++++++++++++++++++++++++++++++++++++-----
- 2 files changed, 115 insertions(+), 14 deletions(-)
+ arch/arm/include/asm/kprobes.h  |    9 +++++----
+ arch/arm/kernel/kprobes-arm.c   |    7 +++++++
+ arch/arm/kernel/kprobes-thumb.c |   16 ++++++++++++++++
+ arch/arm/kernel/kprobes.c       |    8 +++-----
+ 4 files changed, 31 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/kernel/kprobes.h b/arch/arm/kernel/kprobes.h
-index 86abfab..a84b14d 100644
---- a/arch/arm/kernel/kprobes.h
-+++ b/arch/arm/kernel/kprobes.h
-@@ -18,10 +18,13 @@
- #define _ARM_KERNEL_KPROBES_H
+diff --git a/arch/arm/include/asm/kprobes.h b/arch/arm/include/asm/kprobes.h
+index 57d37d5..1e9ff56 100644
+--- a/arch/arm/include/asm/kprobes.h
++++ b/arch/arm/include/asm/kprobes.h
+@@ -32,14 +32,15 @@ typedef u32 kprobe_opcode_t;
  
- /*
-- * This undefined instruction must be unique and
-+ * These undefined instructions must be unique and
-  * reserved solely for kprobes' use.
-  */
--#define KPROBE_BREAKPOINT_INSTRUCTION	0xe7f001f8
-+#define KPROBE_ARM_BREAKPOINT_INSTRUCTION	0xe7f001f8
-+#define KPROBE_THUMB16_BREAKPOINT_INSTRUCTION	0xde18
-+#define KPROBE_THUMB32_BREAKPOINT_INSTRUCTION	0xf7f0a018
-+
+ struct kprobe;
+ typedef void (kprobe_insn_handler_t)(struct kprobe *, struct pt_regs *);
+-
+ typedef unsigned long (kprobe_check_cc)(unsigned long);
++typedef void (kprobe_insn_singlestep_t)(struct kprobe *, struct pt_regs *);
  
- enum kprobe_insn {
- 	INSN_REJECTED,
-diff --git a/arch/arm/kernel/kprobes.c b/arch/arm/kernel/kprobes.c
-index 0df2d6d..b8f5b3b 100644
---- a/arch/arm/kernel/kprobes.c
-+++ b/arch/arm/kernel/kprobes.c
-@@ -34,10 +34,10 @@
- 	min((unsigned long)MAX_STACK_SIZE,		\
- 	    (unsigned long)current_thread_info() + THREAD_START_SP - (addr))
- 
--#define flush_insns(addr, cnt) 				\
-+#define flush_insns(addr, size)				\
- 	flush_icache_range((unsigned long)(addr),	\
- 			   (unsigned long)(addr) +	\
--			   sizeof(kprobe_opcode_t) * (cnt))
-+			   (size))
- 
- /* Used as a marker in ARM_pc to note when we're in a jprobe. */
- #define JPROBE_MAGIC_ADDR		0xffffffff
-@@ -86,7 +86,8 @@ int __kprobes arch_prepare_kprobe(struct kprobe *p)
- 			return -ENOMEM;
- 		for (is = 0; is < MAX_INSN_SIZE; ++is)
- 			p->ainsn.insn[is] = tmp_insn[is];
--		flush_insns(p->ainsn.insn, MAX_INSN_SIZE);
-+		flush_insns(p->ainsn.insn,
-+				sizeof(p->ainsn.insn[0]) * MAX_INSN_SIZE);
- 		break;
- 
- 	case INSN_GOOD_NO_SLOT:	/* instruction doesn't need insn slot */
-@@ -97,24 +98,82 @@ int __kprobes arch_prepare_kprobe(struct kprobe *p)
- 	return 0;
- }
- 
-+#ifdef CONFIG_THUMB2_KERNEL
-+
-+/*
-+ * For a 32-bit Thumb breakpoint spanning two memory words we need to take
-+ * special precautions to insert the breakpoint atomically, especially on SMP
-+ * systems. This is achieved by calling this arming function using stop_machine.
-+ */
-+int __kprobes set_t32_breakpoint(void *addr)
-+{
-+	((u16 *)addr)[0] = KPROBE_THUMB32_BREAKPOINT_INSTRUCTION >> 16;
-+	((u16 *)addr)[1] = KPROBE_THUMB32_BREAKPOINT_INSTRUCTION & 0xffff;
-+	flush_insns(addr, 2*sizeof(u16));
-+	return 0;
-+}
-+
- void __kprobes arch_arm_kprobe(struct kprobe *p)
- {
--	*p->addr = KPROBE_BREAKPOINT_INSTRUCTION;
--	flush_insns(p->addr, 1);
-+	uintptr_t addr = (uintptr_t)p->addr & ~1; /* Remove any Thumb flag */
-+
-+	if (!is_wide_instruction(p->opcode)) {
-+		*(u16 *)addr = KPROBE_THUMB16_BREAKPOINT_INSTRUCTION;
-+		flush_insns(addr, sizeof(u16));
-+	} else if (addr & 2) {
-+		/* A 32-bit instruction spanning two words needs special care */
-+		stop_machine(set_t32_breakpoint, (void *)addr, &cpu_online_map);
-+	} else {
-+		/* Word aligned 32-bit instruction can be written atomically */
-+		u32 bkp = KPROBE_THUMB32_BREAKPOINT_INSTRUCTION;
-+#ifndef __ARMEB__ /* Swap halfwords for little-endian */
-+		bkp = (bkp >> 16) | (bkp << 16);
-+#endif
-+		*(u32 *)addr = bkp;
-+		flush_insns(addr, sizeof(u32));
-+	}
- }
- 
-+#else /* !CONFIG_THUMB2_KERNEL */
-+
-+void __kprobes arch_arm_kprobe(struct kprobe *p)
-+{
-+	*p->addr = KPROBE_ARM_BREAKPOINT_INSTRUCTION;
-+	flush_insns(p->addr, sizeof(p->addr[0]));
-+}
-+
-+#endif /* !CONFIG_THUMB2_KERNEL */
-+
- /*
-  * The actual disarming is done here on each CPU and synchronized using
-  * stop_machine. This synchronization is necessary on SMP to avoid removing
-  * a probe between the moment the 'Undefined Instruction' exception is raised
-  * and the moment the exception handler reads the faulting instruction from
-- * memory.
-+ * memory. It is also needed to atomically set the two half-words of a 32-bit
-+ * Thumb breakpoint.
-  */
- int __kprobes __arch_disarm_kprobe(void *p)
- {
- 	struct kprobe *kp = p;
-+#ifdef CONFIG_THUMB2_KERNEL
-+	u16 *addr = (u16 *)((uintptr_t)kp->addr & ~1);
-+	kprobe_opcode_t insn = kp->opcode;
-+	unsigned int len;
-+
-+	if (is_wide_instruction(insn)) {
-+		((u16 *)addr)[0] = insn>>16;
-+		((u16 *)addr)[1] = insn;
-+		len = 2*sizeof(u16);
-+	} else {
-+		((u16 *)addr)[0] = insn;
-+		len = sizeof(u16);
-+	}
-+	flush_insns(addr, len);
-+
-+#else /* !CONFIG_THUMB2_KERNEL */
- 	*kp->addr = kp->opcode;
--	flush_insns(kp->addr, 1);
-+	flush_insns(kp->addr, sizeof(kp->addr[0]));
-+#endif
- 	return 0;
- }
- 
-@@ -167,11 +226,23 @@ void __kprobes kprobe_handler(struct pt_regs *regs)
- {
- 	struct kprobe *p, *cur;
- 	struct kprobe_ctlblk *kcb;
--	kprobe_opcode_t	*addr = (kprobe_opcode_t *)regs->ARM_pc;
- 
- 	kcb = get_kprobe_ctlblk();
- 	cur = kprobe_running();
--	p = get_kprobe(addr);
-+
-+#ifdef CONFIG_THUMB2_KERNEL
-+	/*
-+	 * First look for a probe which was registered using an address with
-+	 * bit 0 set, this is the usual situation for pointers to Thumb code.
-+	 * If not found, fallback to looking for one with bit 0 clear.
-+	 */
-+	p = get_kprobe((kprobe_opcode_t *)(regs->ARM_pc | 1));
-+	if (!p)
-+		p = get_kprobe((kprobe_opcode_t *)regs->ARM_pc);
-+
-+#else /* ! CONFIG_THUMB2_KERNEL */
-+	p = get_kprobe((kprobe_opcode_t *)regs->ARM_pc);
-+#endif
- 
- 	if (p) {
- 		if (cur) {
-@@ -511,17 +582,44 @@ int __kprobes arch_trampoline_kprobe(struct kprobe *p)
- 	return 0;
- }
- 
--static struct undef_hook kprobes_break_hook = {
-+#ifdef CONFIG_THUMB2_KERNEL
-+
-+static struct undef_hook kprobes_thumb16_break_hook = {
-+	.instr_mask	= 0xffff,
-+	.instr_val	= KPROBE_THUMB16_BREAKPOINT_INSTRUCTION,
-+	.cpsr_mask	= MODE_MASK,
-+	.cpsr_val	= SVC_MODE,
-+	.fn		= kprobe_trap_handler,
-+};
-+
-+static struct undef_hook kprobes_thumb32_break_hook = {
-+	.instr_mask	= 0xffffffff,
-+	.instr_val	= KPROBE_THUMB32_BREAKPOINT_INSTRUCTION,
-+	.cpsr_mask	= MODE_MASK,
-+	.cpsr_val	= SVC_MODE,
-+	.fn		= kprobe_trap_handler,
-+};
-+
-+#else  /* !CONFIG_THUMB2_KERNEL */
-+
-+static struct undef_hook kprobes_arm_break_hook = {
- 	.instr_mask	= 0xffffffff,
--	.instr_val	= KPROBE_BREAKPOINT_INSTRUCTION,
-+	.instr_val	= KPROBE_ARM_BREAKPOINT_INSTRUCTION,
- 	.cpsr_mask	= MODE_MASK,
- 	.cpsr_val	= SVC_MODE,
- 	.fn		= kprobe_trap_handler,
+ /* Architecture specific copy of original instruction. */
+ struct arch_specific_insn {
+-	kprobe_opcode_t		*insn;
+-	kprobe_insn_handler_t	*insn_handler;
+-	kprobe_check_cc		*insn_check_cc;
++	kprobe_opcode_t			*insn;
++	kprobe_insn_handler_t		*insn_handler;
++	kprobe_check_cc			*insn_check_cc;
++	kprobe_insn_singlestep_t	*insn_singlestep;
  };
  
-+#endif /* !CONFIG_THUMB2_KERNEL */
-+
- int __init arch_init_kprobes()
- {
- 	arm_kprobe_decode_init();
--	register_undef_hook(&kprobes_break_hook);
-+#ifdef CONFIG_THUMB2_KERNEL
-+	register_undef_hook(&kprobes_thumb16_break_hook);
-+	register_undef_hook(&kprobes_thumb32_break_hook);
-+#else
-+	register_undef_hook(&kprobes_arm_break_hook);
-+#endif
- 	return 0;
+ struct prev_kprobe {
+diff --git a/arch/arm/kernel/kprobes-arm.c b/arch/arm/kernel/kprobes-arm.c
+index 0262b29..a1143e8 100644
+--- a/arch/arm/kernel/kprobes-arm.c
++++ b/arch/arm/kernel/kprobes-arm.c
+@@ -1494,6 +1494,12 @@ space_cccc_11xx(kprobe_opcode_t insn, struct arch_specific_insn *asi)
+ 	return INSN_REJECTED;
  }
+ 
++static void __kprobes arm_singlestep(struct kprobe *p, struct pt_regs *regs)
++{
++	regs->ARM_pc += 4;
++	p->ainsn.insn_handler(p, regs);
++}
++
+ /* Return:
+  *   INSN_REJECTED     If instruction is one not allowed to kprobe,
+  *   INSN_GOOD         If instruction is supported and uses instruction slot,
+@@ -1509,6 +1515,7 @@ space_cccc_11xx(kprobe_opcode_t insn, struct arch_specific_insn *asi)
+ enum kprobe_insn __kprobes
+ arm_kprobe_decode_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi)
+ {
++	asi->insn_singlestep = arm_singlestep;
+ 	asi->insn_check_cc = kprobe_condition_checks[insn>>28];
+ 	asi->insn[1] = KPROBE_RETURN_INSTRUCTION;
+ 
+diff --git a/arch/arm/kernel/kprobes-thumb.c b/arch/arm/kernel/kprobes-thumb.c
+index 24a188b..973c3eb 100644
+--- a/arch/arm/kernel/kprobes-thumb.c
++++ b/arch/arm/kernel/kprobes-thumb.c
+@@ -33,9 +33,24 @@ static unsigned long __kprobes thumb_check_cc(unsigned long cpsr)
+ 	return true;
+ }
+ 
++static void __kprobes thumb16_singlestep(struct kprobe *p, struct pt_regs *regs)
++{
++	regs->ARM_pc += 2;
++	p->ainsn.insn_handler(p, regs);
++	regs->ARM_cpsr = it_advance(regs->ARM_cpsr);
++}
++
++static void __kprobes thumb32_singlestep(struct kprobe *p, struct pt_regs *regs)
++{
++	regs->ARM_pc += 4;
++	p->ainsn.insn_handler(p, regs);
++	regs->ARM_cpsr = it_advance(regs->ARM_cpsr);
++}
++
+ enum kprobe_insn __kprobes
+ thumb16_kprobe_decode_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi)
+ {
++	asi->insn_singlestep = thumb16_singlestep;
+ 	asi->insn_check_cc = thumb_check_cc;
+ 	return INSN_REJECTED;
+ }
+@@ -43,6 +58,7 @@ thumb16_kprobe_decode_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi)
+ enum kprobe_insn __kprobes
+ thumb32_kprobe_decode_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi)
+ {
++	asi->insn_singlestep = thumb32_singlestep;
+ 	asi->insn_check_cc = thumb_check_cc;
+ 	return INSN_REJECTED;
+ }
+diff --git a/arch/arm/kernel/kprobes.c b/arch/arm/kernel/kprobes.c
+index 9104b03..3c5ed77 100644
+--- a/arch/arm/kernel/kprobes.c
++++ b/arch/arm/kernel/kprobes.c
+@@ -227,12 +227,10 @@ singlestep_skip(struct kprobe *p, struct pt_regs *regs)
+ #endif
+ }
+ 
+-static void __kprobes singlestep(struct kprobe *p, struct pt_regs *regs,
+-				 struct kprobe_ctlblk *kcb)
++static inline void __kprobes
++singlestep(struct kprobe *p, struct pt_regs *regs, struct kprobe_ctlblk *kcb)
+ {
+-	regs->ARM_pc += 4;
+-	if (p->ainsn.insn_check_cc(regs->ARM_cpsr))
+-		p->ainsn.insn_handler(p, regs);
++	p->ainsn.insn_singlestep(p, regs);
+ }
+ 
+ /*
 -- 
 1.7.2.5
