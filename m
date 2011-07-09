@@ -1,145 +1,125 @@
 From: tixy@yxit.co.uk (Tixy)
-Date: Sat,  9 Jul 2011 11:57:36 +0100
-Subject: [PATCH 49/51] ARM: kprobes: Decode 32-bit Thumb data-processing
-	(register) instructions
+Date: Sat,  9 Jul 2011 11:57:24 +0100
+Subject: [PATCH 37/51] ARM: kprobes: Optimise emulation of LDM and STM
 In-Reply-To: <1310209058-20980-1-git-send-email-tixy@yxit.co.uk>
 References: <1310209058-20980-1-git-send-email-tixy@yxit.co.uk>
-Message-ID: <1310209058-20980-50-git-send-email-tixy@yxit.co.uk>
+Message-ID: <1310209058-20980-38-git-send-email-tixy@yxit.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jon Medhurst <tixy@yxit.co.uk>
 
+This patch improves the performance of LDM and STM instruction
+emulation. This is desirable because.
+
+- jprobes and kretprobes probe the first instruction in a function and,
+  when the frame pointer is omitted, this instruction is often a STM
+  used to push registers onto the stack.
+
+- The STM and LDM instructions are common in the body and tail of
+  functions.
+
+- At the same time as being a common instruction form, they also have
+  one of the slowest and most complicated simulation routines.
+
+The approach taken to optimisation is to use simulation rather than
+emulation, that is, a modified form of the instruction is run with
+an appropriate register context.
+
+Benchmarking on an OMAP3530 shows the optimised emulation is between 2
+and 3 times faster than the simulation routines. On a Kirkwood based
+device the relative performance was very significantly better than this.
+
 Signed-off-by: Jon Medhurst <tixy@yxit.co.uk>
 ---
- arch/arm/kernel/kprobes-thumb.c |  108 +++++++++++++++++++++++++++++++++++++++
- 1 files changed, 108 insertions(+), 0 deletions(-)
+ arch/arm/kernel/kprobes-common.c |   68 ++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 68 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/kernel/kprobes-thumb.c b/arch/arm/kernel/kprobes-thumb.c
-index 9be8bea..7c32e5b 100644
---- a/arch/arm/kernel/kprobes-thumb.c
-+++ b/arch/arm/kernel/kprobes-thumb.c
-@@ -661,6 +661,108 @@ static const union decode_item t32_table_1111_100x[] = {
- 	DECODE_END
- };
+diff --git a/arch/arm/kernel/kprobes-common.c b/arch/arm/kernel/kprobes-common.c
+index 9ac1427..765c682 100644
+--- a/arch/arm/kernel/kprobes-common.c
++++ b/arch/arm/kernel/kprobes-common.c
+@@ -220,13 +220,81 @@ static void __kprobes simulate_ldm1_pc(struct kprobe *p, struct pt_regs *regs)
+ 	load_write_pc(regs->ARM_pc, regs);
+ }
  
-+static const union decode_item t32_table_1111_1010___1111[] = {
-+	/* Data-processing (register)					*/
++static void __kprobes
++emulate_generic_r0_12_noflags(struct kprobe *p, struct pt_regs *regs)
++{
++	register void *rregs asm("r1") = regs;
++	register void *rfn asm("lr") = p->ainsn.insn_fn;
 +
-+	/* ???			1111 1010 011x xxxx 1111 xxxx 1xxx xxxx */
-+	DECODE_REJECT	(0xffe0f080, 0xfa60f080),
++	__asm__ __volatile__ (
++		"stmdb	sp!, {%[regs], r11}	\n\t"
++		"ldmia	%[regs], {r0-r12}	\n\t"
++#if __LINUX_ARM_ARCH__ >= 6
++		"blx	%[fn]			\n\t"
++#else
++		"str	%[fn], [sp, #-4]!	\n\t"
++		"adr	lr, 1f			\n\t"
++		"ldr	pc, [sp], #4		\n\t"
++		"1:				\n\t"
++#endif
++		"ldr	lr, [sp], #4		\n\t" /* lr = regs */
++		"stmia	lr, {r0-r12}		\n\t"
++		"ldr	r11, [sp], #4		\n\t"
++		: [regs] "=r" (rregs), [fn] "=r" (rfn)
++		: "0" (rregs), "1" (rfn)
++		: "r0", "r2", "r3", "r4", "r5", "r6", "r7",
++		  "r8", "r9", "r10", "r12", "memory", "cc"
++		);
++}
 +
-+	/* SXTH			1111 1010 0000 1111 1111 xxxx 1xxx xxxx */
-+	/* UXTH			1111 1010 0001 1111 1111 xxxx 1xxx xxxx */
-+	/* SXTB16		1111 1010 0010 1111 1111 xxxx 1xxx xxxx */
-+	/* UXTB16		1111 1010 0011 1111 1111 xxxx 1xxx xxxx */
-+	/* SXTB			1111 1010 0100 1111 1111 xxxx 1xxx xxxx */
-+	/* UXTB			1111 1010 0101 1111 1111 xxxx 1xxx xxxx */
-+	DECODE_EMULATEX	(0xff8ff080, 0xfa0ff080, t32_emulate_rd8rn16rm0_rwflags,
-+						 REGS(0, 0, NOSPPC, 0, NOSPPC)),
++static void __kprobes
++emulate_generic_r2_14_noflags(struct kprobe *p, struct pt_regs *regs)
++{
++	emulate_generic_r0_12_noflags(p, (struct pt_regs *)(regs->uregs+2));
++}
 +
++static void __kprobes
++emulate_ldm_r3_15(struct kprobe *p, struct pt_regs *regs)
++{
++	emulate_generic_r0_12_noflags(p, (struct pt_regs *)(regs->uregs+3));
++	load_write_pc(regs->ARM_pc, regs);
++}
 +
-+	/* ???			1111 1010 1xxx xxxx 1111 xxxx 0x11 xxxx */
-+	DECODE_REJECT	(0xff80f0b0, 0xfa80f030),
-+	/* ???			1111 1010 1x11 xxxx 1111 xxxx 0xxx xxxx */
-+	DECODE_REJECT	(0xffb0f080, 0xfab0f000),
+ enum kprobe_insn __kprobes
+ kprobe_decode_ldmstm(kprobe_opcode_t insn, struct arch_specific_insn *asi)
+ {
+ 	kprobe_insn_handler_t *handler = 0;
+ 	unsigned reglist = insn & 0xffff;
+ 	int is_ldm = insn & 0x100000;
++	int rn = (insn >> 16) & 0xf;
 +
-+	/* SADD16		1111 1010 1001 xxxx 1111 xxxx 0000 xxxx */
-+	/* SASX			1111 1010 1010 xxxx 1111 xxxx 0000 xxxx */
-+	/* SSAX			1111 1010 1110 xxxx 1111 xxxx 0000 xxxx */
-+	/* SSUB16		1111 1010 1101 xxxx 1111 xxxx 0000 xxxx */
-+	/* SADD8		1111 1010 1000 xxxx 1111 xxxx 0000 xxxx */
-+	/* SSUB8		1111 1010 1100 xxxx 1111 xxxx 0000 xxxx */
++	if (rn <= 12 && (reglist & 0xe000) == 0) {
++		/* Instruction only uses registers in the range R0..R12 */
++		handler = emulate_generic_r0_12_noflags;
 +
-+	/* QADD16		1111 1010 1001 xxxx 1111 xxxx 0001 xxxx */
-+	/* QASX			1111 1010 1010 xxxx 1111 xxxx 0001 xxxx */
-+	/* QSAX			1111 1010 1110 xxxx 1111 xxxx 0001 xxxx */
-+	/* QSUB16		1111 1010 1101 xxxx 1111 xxxx 0001 xxxx */
-+	/* QADD8		1111 1010 1000 xxxx 1111 xxxx 0001 xxxx */
-+	/* QSUB8		1111 1010 1100 xxxx 1111 xxxx 0001 xxxx */
++	} else if (rn >= 2 && (reglist & 0x8003) == 0) {
++		/* Instruction only uses registers in the range R2..R14 */
++		rn -= 2;
++		reglist >>= 2;
++		handler = emulate_generic_r2_14_noflags;
 +
-+	/* SHADD16		1111 1010 1001 xxxx 1111 xxxx 0010 xxxx */
-+	/* SHASX		1111 1010 1010 xxxx 1111 xxxx 0010 xxxx */
-+	/* SHSAX		1111 1010 1110 xxxx 1111 xxxx 0010 xxxx */
-+	/* SHSUB16		1111 1010 1101 xxxx 1111 xxxx 0010 xxxx */
-+	/* SHADD8		1111 1010 1000 xxxx 1111 xxxx 0010 xxxx */
-+	/* SHSUB8		1111 1010 1100 xxxx 1111 xxxx 0010 xxxx */
++	} else if (rn >= 3 && (reglist & 0x0007) == 0) {
++		/* Instruction only uses registers in the range R3..R15 */
++		if (is_ldm && (reglist & 0x8000)) {
++			rn -= 3;
++			reglist >>= 3;
++			handler = emulate_ldm_r3_15;
++		}
++	}
 +
-+	/* UADD16		1111 1010 1001 xxxx 1111 xxxx 0100 xxxx */
-+	/* UASX			1111 1010 1010 xxxx 1111 xxxx 0100 xxxx */
-+	/* USAX			1111 1010 1110 xxxx 1111 xxxx 0100 xxxx */
-+	/* USUB16		1111 1010 1101 xxxx 1111 xxxx 0100 xxxx */
-+	/* UADD8		1111 1010 1000 xxxx 1111 xxxx 0100 xxxx */
-+	/* USUB8		1111 1010 1100 xxxx 1111 xxxx 0100 xxxx */
-+
-+	/* UQADD16		1111 1010 1001 xxxx 1111 xxxx 0101 xxxx */
-+	/* UQASX		1111 1010 1010 xxxx 1111 xxxx 0101 xxxx */
-+	/* UQSAX		1111 1010 1110 xxxx 1111 xxxx 0101 xxxx */
-+	/* UQSUB16		1111 1010 1101 xxxx 1111 xxxx 0101 xxxx */
-+	/* UQADD8		1111 1010 1000 xxxx 1111 xxxx 0101 xxxx */
-+	/* UQSUB8		1111 1010 1100 xxxx 1111 xxxx 0101 xxxx */
-+
-+	/* UHADD16		1111 1010 1001 xxxx 1111 xxxx 0110 xxxx */
-+	/* UHASX		1111 1010 1010 xxxx 1111 xxxx 0110 xxxx */
-+	/* UHSAX		1111 1010 1110 xxxx 1111 xxxx 0110 xxxx */
-+	/* UHSUB16		1111 1010 1101 xxxx 1111 xxxx 0110 xxxx */
-+	/* UHADD8		1111 1010 1000 xxxx 1111 xxxx 0110 xxxx */
-+	/* UHSUB8		1111 1010 1100 xxxx 1111 xxxx 0110 xxxx */
-+	DECODE_OR	(0xff80f080, 0xfa80f000),
-+
-+	/* SXTAH		1111 1010 0000 xxxx 1111 xxxx 1xxx xxxx */
-+	/* UXTAH		1111 1010 0001 xxxx 1111 xxxx 1xxx xxxx */
-+	/* SXTAB16		1111 1010 0010 xxxx 1111 xxxx 1xxx xxxx */
-+	/* UXTAB16		1111 1010 0011 xxxx 1111 xxxx 1xxx xxxx */
-+	/* SXTAB		1111 1010 0100 xxxx 1111 xxxx 1xxx xxxx */
-+	/* UXTAB		1111 1010 0101 xxxx 1111 xxxx 1xxx xxxx */
-+	DECODE_OR	(0xff80f080, 0xfa00f080),
-+
-+	/* QADD			1111 1010 1000 xxxx 1111 xxxx 1000 xxxx */
-+	/* QDADD		1111 1010 1000 xxxx 1111 xxxx 1001 xxxx */
-+	/* QSUB			1111 1010 1000 xxxx 1111 xxxx 1010 xxxx */
-+	/* QDSUB		1111 1010 1000 xxxx 1111 xxxx 1011 xxxx */
-+	DECODE_OR	(0xfff0f0c0, 0xfa80f080),
-+
-+	/* SEL			1111 1010 1010 xxxx 1111 xxxx 1000 xxxx */
-+	DECODE_OR	(0xfff0f0f0, 0xfaa0f080),
-+
-+	/* LSL			1111 1010 000x xxxx 1111 xxxx 0000 xxxx */
-+	/* LSR			1111 1010 001x xxxx 1111 xxxx 0000 xxxx */
-+	/* ASR			1111 1010 010x xxxx 1111 xxxx 0000 xxxx */
-+	/* ROR			1111 1010 011x xxxx 1111 xxxx 0000 xxxx */
-+	DECODE_EMULATEX	(0xff80f0f0, 0xfa00f000, t32_emulate_rd8rn16rm0_rwflags,
-+						 REGS(NOSPPC, 0, NOSPPC, 0, NOSPPC)),
-+
-+	/* CLZ			1111 1010 1010 xxxx 1111 xxxx 1000 xxxx */
-+	DECODE_OR	(0xfff0f0f0, 0xfab0f080),
-+
-+	/* REV			1111 1010 1001 xxxx 1111 xxxx 1000 xxxx */
-+	/* REV16		1111 1010 1001 xxxx 1111 xxxx 1001 xxxx */
-+	/* RBIT			1111 1010 1001 xxxx 1111 xxxx 1010 xxxx */
-+	/* REVSH		1111 1010 1001 xxxx 1111 xxxx 1011 xxxx */
-+	DECODE_EMULATEX	(0xfff0f0c0, 0xfa90f080, t32_emulate_rd8rn16_noflags,
-+						 REGS(NOSPPC, 0, NOSPPC, 0, SAMEAS16)),
-+
-+	/* Other unallocated instructions...				*/
-+	DECODE_END
-+};
-+
- const union decode_item kprobe_decode_thumb32_table[] = {
++	if (handler) {
++		/* We can emulate the instruction in (possibly) modified form */
++		asi->insn[0] = (insn & 0xfff00000) | (rn << 16) | reglist;
++		asi->insn_handler = handler;
++		return INSN_GOOD;
++	}
  
- 	/*
-@@ -726,6 +828,12 @@ const union decode_item kprobe_decode_thumb32_table[] = {
- 	DECODE_TABLE	(0xfe000000, 0xf8000000, t32_table_1111_100x),
- 
- 	/*
-+	 * Data-processing (register)
-+	 *			1111 1010 xxxx xxxx 1111 xxxx xxxx xxxx
-+	 */
-+	DECODE_TABLE	(0xff00f000, 0xfa00f000, t32_table_1111_1010___1111),
-+
-+	/*
- 	 * Coprocessor instructions
- 	 *			1111 11xx xxxx xxxx xxxx xxxx xxxx xxxx
- 	 */
++	/* Fallback to slower simulation... */
+ 	if (reglist & 0x8000)
+ 		handler = is_ldm ? simulate_ldm1_pc : simulate_stm1_pc;
+ 	else
 -- 
 1.7.2.5
