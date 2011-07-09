@@ -1,10 +1,10 @@
 From: tixy@yxit.co.uk (Tixy)
-Date: Sat,  9 Jul 2011 11:57:28 +0100
-Subject: [PATCH 41/51] ARM: kprobes: Decode 32-bit Thumb data-processing
-	(shifted register) instructions
+Date: Sat,  9 Jul 2011 11:57:36 +0100
+Subject: [PATCH 49/51] ARM: kprobes: Decode 32-bit Thumb data-processing
+	(register) instructions
 In-Reply-To: <1310209058-20980-1-git-send-email-tixy@yxit.co.uk>
 References: <1310209058-20980-1-git-send-email-tixy@yxit.co.uk>
-Message-ID: <1310209058-20980-42-git-send-email-tixy@yxit.co.uk>
+Message-ID: <1310209058-20980-50-git-send-email-tixy@yxit.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,126 +12,134 @@ From: Jon Medhurst <tixy@yxit.co.uk>
 
 Signed-off-by: Jon Medhurst <tixy@yxit.co.uk>
 ---
- arch/arm/kernel/kprobes-thumb.c |   93 +++++++++++++++++++++++++++++++++++++++
- 1 files changed, 93 insertions(+), 0 deletions(-)
+ arch/arm/kernel/kprobes-thumb.c |  108 +++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 108 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/kernel/kprobes-thumb.c b/arch/arm/kernel/kprobes-thumb.c
-index dfaea25..eac945c 100644
+index 9be8bea..7c32e5b 100644
 --- a/arch/arm/kernel/kprobes-thumb.c
 +++ b/arch/arm/kernel/kprobes-thumb.c
-@@ -97,6 +97,33 @@ t32_emulate_ldrdstrd(struct kprobe *p, struct pt_regs *regs)
- 	regs->uregs[rt2] = rt2v;
- }
- 
-+static void __kprobes
-+t32_emulate_rd8rn16rm0_rwflags(struct kprobe *p, struct pt_regs *regs)
-+{
-+	kprobe_opcode_t insn = p->opcode;
-+	int rd = (insn >> 8) & 0xf;
-+	int rn = (insn >> 16) & 0xf;
-+	int rm = insn & 0xf;
-+
-+	register unsigned long rdv asm("r1") = regs->uregs[rd];
-+	register unsigned long rnv asm("r2") = regs->uregs[rn];
-+	register unsigned long rmv asm("r3") = regs->uregs[rm];
-+	unsigned long cpsr = regs->ARM_cpsr;
-+
-+	__asm__ __volatile__ (
-+		"msr	cpsr_fs, %[cpsr]	\n\t"
-+		"blx    %[fn]			\n\t"
-+		"mrs	%[cpsr], cpsr		\n\t"
-+		: "=r" (rdv), [cpsr] "=r" (cpsr)
-+		: "0" (rdv), "r" (rnv), "r" (rmv),
-+		  "1" (cpsr), [fn] "r" (p->ainsn.insn_fn)
-+		: "lr", "memory", "cc"
-+	);
-+
-+	regs->uregs[rd] = rdv;
-+	regs->ARM_cpsr = (regs->ARM_cpsr & ~APSR_MASK) | (cpsr & APSR_MASK);
-+}
-+
- static const union decode_item t32_table_1110_100x_x0xx[] = {
- 	/* Load/store multiple instructions */
- 
-@@ -154,6 +181,66 @@ static const union decode_item t32_table_1110_100x_x1xx[] = {
+@@ -661,6 +661,108 @@ static const union decode_item t32_table_1111_100x[] = {
  	DECODE_END
  };
  
-+static const union decode_item t32_table_1110_101x[] = {
-+	/* Data-processing (shifted register)				*/
++static const union decode_item t32_table_1111_1010___1111[] = {
++	/* Data-processing (register)					*/
 +
-+	/* TST			1110 1010 0001 xxxx xxxx 1111 xxxx xxxx */
-+	/* TEQ			1110 1010 1001 xxxx xxxx 1111 xxxx xxxx */
-+	DECODE_EMULATEX	(0xff700f00, 0xea100f00, t32_emulate_rd8rn16rm0_rwflags,
-+						 REGS(NOSPPC, 0, 0, 0, NOSPPC)),
++	/* ???			1111 1010 011x xxxx 1111 xxxx 1xxx xxxx */
++	DECODE_REJECT	(0xffe0f080, 0xfa60f080),
 +
-+	/* CMN			1110 1011 0001 xxxx xxxx 1111 xxxx xxxx */
-+	DECODE_OR	(0xfff00f00, 0xeb100f00),
-+	/* CMP			1110 1011 1011 xxxx xxxx 1111 xxxx xxxx */
-+	DECODE_EMULATEX	(0xfff00f00, 0xebb00f00, t32_emulate_rd8rn16rm0_rwflags,
-+						 REGS(NOPC, 0, 0, 0, NOSPPC)),
-+
-+	/* MOV			1110 1010 010x 1111 xxxx xxxx xxxx xxxx */
-+	/* MVN			1110 1010 011x 1111 xxxx xxxx xxxx xxxx */
-+	DECODE_EMULATEX	(0xffcf0000, 0xea4f0000, t32_emulate_rd8rn16rm0_rwflags,
++	/* SXTH			1111 1010 0000 1111 1111 xxxx 1xxx xxxx */
++	/* UXTH			1111 1010 0001 1111 1111 xxxx 1xxx xxxx */
++	/* SXTB16		1111 1010 0010 1111 1111 xxxx 1xxx xxxx */
++	/* UXTB16		1111 1010 0011 1111 1111 xxxx 1xxx xxxx */
++	/* SXTB			1111 1010 0100 1111 1111 xxxx 1xxx xxxx */
++	/* UXTB			1111 1010 0101 1111 1111 xxxx 1xxx xxxx */
++	DECODE_EMULATEX	(0xff8ff080, 0xfa0ff080, t32_emulate_rd8rn16rm0_rwflags,
 +						 REGS(0, 0, NOSPPC, 0, NOSPPC)),
 +
-+	/* ???			1110 1010 101x xxxx xxxx xxxx xxxx xxxx */
-+	/* ???			1110 1010 111x xxxx xxxx xxxx xxxx xxxx */
-+	DECODE_REJECT	(0xffa00000, 0xeaa00000),
-+	/* ???			1110 1011 001x xxxx xxxx xxxx xxxx xxxx */
-+	DECODE_REJECT	(0xffe00000, 0xeb200000),
-+	/* ???			1110 1011 100x xxxx xxxx xxxx xxxx xxxx */
-+	DECODE_REJECT	(0xffe00000, 0xeb800000),
-+	/* ???			1110 1011 111x xxxx xxxx xxxx xxxx xxxx */
-+	DECODE_REJECT	(0xffe00000, 0xebe00000),
 +
-+	/* ADD/SUB SP, SP, Rm, LSL #0..3				*/
-+	/*			1110 1011 x0xx 1101 x000 1101 xx00 xxxx */
-+	DECODE_EMULATEX	(0xff4f7f30, 0xeb0d0d00, t32_emulate_rd8rn16rm0_rwflags,
-+						 REGS(SP, 0, SP, 0, NOSPPC)),
++	/* ???			1111 1010 1xxx xxxx 1111 xxxx 0x11 xxxx */
++	DECODE_REJECT	(0xff80f0b0, 0xfa80f030),
++	/* ???			1111 1010 1x11 xxxx 1111 xxxx 0xxx xxxx */
++	DECODE_REJECT	(0xffb0f080, 0xfab0f000),
 +
-+	/* ADD/SUB SP, SP, Rm, shift					*/
-+	/*			1110 1011 x0xx 1101 xxxx 1101 xxxx xxxx */
-+	DECODE_REJECT	(0xff4f0f00, 0xeb0d0d00),
++	/* SADD16		1111 1010 1001 xxxx 1111 xxxx 0000 xxxx */
++	/* SASX			1111 1010 1010 xxxx 1111 xxxx 0000 xxxx */
++	/* SSAX			1111 1010 1110 xxxx 1111 xxxx 0000 xxxx */
++	/* SSUB16		1111 1010 1101 xxxx 1111 xxxx 0000 xxxx */
++	/* SADD8		1111 1010 1000 xxxx 1111 xxxx 0000 xxxx */
++	/* SSUB8		1111 1010 1100 xxxx 1111 xxxx 0000 xxxx */
 +
-+	/* ADD/SUB Rd, SP, Rm, shift					*/
-+	/*			1110 1011 x0xx 1101 xxxx xxxx xxxx xxxx */
-+	DECODE_EMULATEX	(0xff4f0000, 0xeb0d0000, t32_emulate_rd8rn16rm0_rwflags,
-+						 REGS(SP, 0, NOPC, 0, NOSPPC)),
++	/* QADD16		1111 1010 1001 xxxx 1111 xxxx 0001 xxxx */
++	/* QASX			1111 1010 1010 xxxx 1111 xxxx 0001 xxxx */
++	/* QSAX			1111 1010 1110 xxxx 1111 xxxx 0001 xxxx */
++	/* QSUB16		1111 1010 1101 xxxx 1111 xxxx 0001 xxxx */
++	/* QADD8		1111 1010 1000 xxxx 1111 xxxx 0001 xxxx */
++	/* QSUB8		1111 1010 1100 xxxx 1111 xxxx 0001 xxxx */
 +
-+	/* AND			1110 1010 000x xxxx xxxx xxxx xxxx xxxx */
-+	/* BIC			1110 1010 001x xxxx xxxx xxxx xxxx xxxx */
-+	/* ORR			1110 1010 010x xxxx xxxx xxxx xxxx xxxx */
-+	/* ORN			1110 1010 011x xxxx xxxx xxxx xxxx xxxx */
-+	/* EOR			1110 1010 100x xxxx xxxx xxxx xxxx xxxx */
-+	/* PKH			1110 1010 110x xxxx xxxx xxxx xxxx xxxx */
-+	/* ADD			1110 1011 000x xxxx xxxx xxxx xxxx xxxx */
-+	/* ADC			1110 1011 010x xxxx xxxx xxxx xxxx xxxx */
-+	/* SBC			1110 1011 011x xxxx xxxx xxxx xxxx xxxx */
-+	/* SUB			1110 1011 101x xxxx xxxx xxxx xxxx xxxx */
-+	/* RSB			1110 1011 110x xxxx xxxx xxxx xxxx xxxx */
-+	DECODE_EMULATEX	(0xfe000000, 0xea000000, t32_emulate_rd8rn16rm0_rwflags,
++	/* SHADD16		1111 1010 1001 xxxx 1111 xxxx 0010 xxxx */
++	/* SHASX		1111 1010 1010 xxxx 1111 xxxx 0010 xxxx */
++	/* SHSAX		1111 1010 1110 xxxx 1111 xxxx 0010 xxxx */
++	/* SHSUB16		1111 1010 1101 xxxx 1111 xxxx 0010 xxxx */
++	/* SHADD8		1111 1010 1000 xxxx 1111 xxxx 0010 xxxx */
++	/* SHSUB8		1111 1010 1100 xxxx 1111 xxxx 0010 xxxx */
++
++	/* UADD16		1111 1010 1001 xxxx 1111 xxxx 0100 xxxx */
++	/* UASX			1111 1010 1010 xxxx 1111 xxxx 0100 xxxx */
++	/* USAX			1111 1010 1110 xxxx 1111 xxxx 0100 xxxx */
++	/* USUB16		1111 1010 1101 xxxx 1111 xxxx 0100 xxxx */
++	/* UADD8		1111 1010 1000 xxxx 1111 xxxx 0100 xxxx */
++	/* USUB8		1111 1010 1100 xxxx 1111 xxxx 0100 xxxx */
++
++	/* UQADD16		1111 1010 1001 xxxx 1111 xxxx 0101 xxxx */
++	/* UQASX		1111 1010 1010 xxxx 1111 xxxx 0101 xxxx */
++	/* UQSAX		1111 1010 1110 xxxx 1111 xxxx 0101 xxxx */
++	/* UQSUB16		1111 1010 1101 xxxx 1111 xxxx 0101 xxxx */
++	/* UQADD8		1111 1010 1000 xxxx 1111 xxxx 0101 xxxx */
++	/* UQSUB8		1111 1010 1100 xxxx 1111 xxxx 0101 xxxx */
++
++	/* UHADD16		1111 1010 1001 xxxx 1111 xxxx 0110 xxxx */
++	/* UHASX		1111 1010 1010 xxxx 1111 xxxx 0110 xxxx */
++	/* UHSAX		1111 1010 1110 xxxx 1111 xxxx 0110 xxxx */
++	/* UHSUB16		1111 1010 1101 xxxx 1111 xxxx 0110 xxxx */
++	/* UHADD8		1111 1010 1000 xxxx 1111 xxxx 0110 xxxx */
++	/* UHSUB8		1111 1010 1100 xxxx 1111 xxxx 0110 xxxx */
++	DECODE_OR	(0xff80f080, 0xfa80f000),
++
++	/* SXTAH		1111 1010 0000 xxxx 1111 xxxx 1xxx xxxx */
++	/* UXTAH		1111 1010 0001 xxxx 1111 xxxx 1xxx xxxx */
++	/* SXTAB16		1111 1010 0010 xxxx 1111 xxxx 1xxx xxxx */
++	/* UXTAB16		1111 1010 0011 xxxx 1111 xxxx 1xxx xxxx */
++	/* SXTAB		1111 1010 0100 xxxx 1111 xxxx 1xxx xxxx */
++	/* UXTAB		1111 1010 0101 xxxx 1111 xxxx 1xxx xxxx */
++	DECODE_OR	(0xff80f080, 0xfa00f080),
++
++	/* QADD			1111 1010 1000 xxxx 1111 xxxx 1000 xxxx */
++	/* QDADD		1111 1010 1000 xxxx 1111 xxxx 1001 xxxx */
++	/* QSUB			1111 1010 1000 xxxx 1111 xxxx 1010 xxxx */
++	/* QDSUB		1111 1010 1000 xxxx 1111 xxxx 1011 xxxx */
++	DECODE_OR	(0xfff0f0c0, 0xfa80f080),
++
++	/* SEL			1111 1010 1010 xxxx 1111 xxxx 1000 xxxx */
++	DECODE_OR	(0xfff0f0f0, 0xfaa0f080),
++
++	/* LSL			1111 1010 000x xxxx 1111 xxxx 0000 xxxx */
++	/* LSR			1111 1010 001x xxxx 1111 xxxx 0000 xxxx */
++	/* ASR			1111 1010 010x xxxx 1111 xxxx 0000 xxxx */
++	/* ROR			1111 1010 011x xxxx 1111 xxxx 0000 xxxx */
++	DECODE_EMULATEX	(0xff80f0f0, 0xfa00f000, t32_emulate_rd8rn16rm0_rwflags,
 +						 REGS(NOSPPC, 0, NOSPPC, 0, NOSPPC)),
 +
++	/* CLZ			1111 1010 1010 xxxx 1111 xxxx 1000 xxxx */
++	DECODE_OR	(0xfff0f0f0, 0xfab0f080),
++
++	/* REV			1111 1010 1001 xxxx 1111 xxxx 1000 xxxx */
++	/* REV16		1111 1010 1001 xxxx 1111 xxxx 1001 xxxx */
++	/* RBIT			1111 1010 1001 xxxx 1111 xxxx 1010 xxxx */
++	/* REVSH		1111 1010 1001 xxxx 1111 xxxx 1011 xxxx */
++	DECODE_EMULATEX	(0xfff0f0c0, 0xfa90f080, t32_emulate_rd8rn16_noflags,
++						 REGS(NOSPPC, 0, NOSPPC, 0, SAMEAS16)),
++
++	/* Other unallocated instructions...				*/
 +	DECODE_END
 +};
 +
- static const union decode_item t32_table_1111_0xxx___1[] = {
- 	/* Branches and miscellaneous control				*/
- 
-@@ -184,6 +271,12 @@ const union decode_item kprobe_decode_thumb32_table[] = {
- 	DECODE_TABLE	(0xfe400000, 0xe8400000, t32_table_1110_100x_x1xx),
+ const union decode_item kprobe_decode_thumb32_table[] = {
  
  	/*
-+	 * Data-processing (shifted register)
-+	 *			1110 101x xxxx xxxx xxxx xxxx xxxx xxxx
+@@ -726,6 +828,12 @@ const union decode_item kprobe_decode_thumb32_table[] = {
+ 	DECODE_TABLE	(0xfe000000, 0xf8000000, t32_table_1111_100x),
+ 
+ 	/*
++	 * Data-processing (register)
++	 *			1111 1010 xxxx xxxx 1111 xxxx xxxx xxxx
 +	 */
-+	DECODE_TABLE	(0xfe000000, 0xea000000, t32_table_1110_101x),
++	DECODE_TABLE	(0xff00f000, 0xfa00f000, t32_table_1111_1010___1111),
 +
 +	/*
- 	 * Branches and miscellaneous control
- 	 *			1111 0xxx xxxx xxxx 1xxx xxxx xxxx xxxx
+ 	 * Coprocessor instructions
+ 	 *			1111 11xx xxxx xxxx xxxx xxxx xxxx xxxx
  	 */
 -- 
 1.7.2.5
