@@ -1,74 +1,83 @@
-From: tixy@yxit.co.uk (Tixy)
-Date: Sat,  9 Jul 2011 11:57:17 +0100
-Subject: [PATCH 30/51] ARM: kprobes: Decode 16-bit Thumb IT instruction
-In-Reply-To: <1310209058-20980-1-git-send-email-tixy@yxit.co.uk>
-References: <1310209058-20980-1-git-send-email-tixy@yxit.co.uk>
-Message-ID: <1310209058-20980-31-git-send-email-tixy@yxit.co.uk>
+From: robherring2@gmail.com (Rob Herring)
+Date: Sat, 09 Jul 2011 09:33:06 -0500
+Subject: [PATCH 2/6] ARM: move ARCH_HAS_DMA_SET_COHERENT_MASK into memory.h
+In-Reply-To: <1309366019-24379-3-git-send-email-robherring2@gmail.com>
+References: <1309366019-24379-1-git-send-email-robherring2@gmail.com>
+	<1309366019-24379-3-git-send-email-robherring2@gmail.com>
+Message-ID: <4E1866A2.9040407@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jon Medhurst <tixy@yxit.co.uk>
+Nicolas,
 
-The normal Thumb singlestepping routine updates the IT state after
-calling the instruction handler. We don't what this to happen after the
-IT instruction simulation sets the IT state, therefore we need to
-provide a custom singlestep routine.
+On 06/29/2011 11:46 AM, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
+> 
+> On ixp4xx and pxa, ARCH_HAS_DMA_SET_COHERENT_MASK resides in hardware.h
+> which does not get directly included by dma-mapping.h. Move it into
+> mach/memory.h which is explicitly included.
+> 
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> ---
+>  arch/arm/mach-ixp4xx/include/mach/hardware.h |    2 --
+>  arch/arm/mach-ixp4xx/include/mach/memory.h   |    1 +
+>  arch/arm/mach-pxa/include/mach/hardware.h    |    1 -
+>  arch/arm/mach-pxa/include/mach/memory.h      |    1 +
+>  4 files changed, 2 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/mach-ixp4xx/include/mach/hardware.h b/arch/arm/mach-ixp4xx/include/mach/hardware.h
+> index 8138371..f91ca6d 100644
+> --- a/arch/arm/mach-ixp4xx/include/mach/hardware.h
+> +++ b/arch/arm/mach-ixp4xx/include/mach/hardware.h
+> @@ -26,8 +26,6 @@
+>  #define PCIBIOS_MAX_MEM		0x4BFFFFFF
+>  #endif
+>  
+> -#define ARCH_HAS_DMA_SET_COHERENT_MASK
+> -
+>  #define pcibios_assign_all_busses()	1
+>  
+>  /* Register locations and bits */
+> diff --git a/arch/arm/mach-ixp4xx/include/mach/memory.h b/arch/arm/mach-ixp4xx/include/mach/memory.h
+> index 34e7940..d671f5c 100644
+> --- a/arch/arm/mach-ixp4xx/include/mach/memory.h
+> +++ b/arch/arm/mach-ixp4xx/include/mach/memory.h
+> @@ -16,6 +16,7 @@
+>  
+>  #ifdef CONFIG_PCI
+>  #define ARM_DMA_ZONE_SIZE	SZ_64M
+> +#define ARCH_HAS_DMA_SET_COHERENT_MASK
+>  #endif
+>  
+>  #endif
+> diff --git a/arch/arm/mach-pxa/include/mach/hardware.h b/arch/arm/mach-pxa/include/mach/hardware.h
+> index 6957ba5..313051c 100644
+> --- a/arch/arm/mach-pxa/include/mach/hardware.h
+> +++ b/arch/arm/mach-pxa/include/mach/hardware.h
+> @@ -340,7 +340,6 @@ extern unsigned long get_clock_tick_rate(void);
+>  #define PCIBIOS_MIN_IO		0
+>  #define PCIBIOS_MIN_MEM		0
+>  #define pcibios_assign_all_busses()	1
+> -#define ARCH_HAS_DMA_SET_COHERENT_MASK
+>  #endif
+>  
+>  #endif  /* _ASM_ARCH_HARDWARE_H */
+> diff --git a/arch/arm/mach-pxa/include/mach/memory.h b/arch/arm/mach-pxa/include/mach/memory.h
+> index 07734f3..e697578 100644
+> --- a/arch/arm/mach-pxa/include/mach/memory.h
+> +++ b/arch/arm/mach-pxa/include/mach/memory.h
+> @@ -19,6 +19,7 @@
+>  
+>  #if defined(CONFIG_MACH_ARMCORE) && defined(CONFIG_PCI)
+>  #define ARM_DMA_ZONE_SIZE	SZ_64M
+> +#define ARCH_HAS_DMA_SET_COHERENT_MASK
+>  #endif
+>  
+>  #endif
 
-Signed-off-by: Jon Medhurst <tixy@yxit.co.uk>
----
- arch/arm/kernel/kprobes-thumb.c |   33 +++++++++++++++++++++++++++++++++
- 1 files changed, 33 insertions(+), 0 deletions(-)
+I noticed this is going to have conflicts with your ARM_DMA_ZONE_SIZE
+series. Can you add this into your series? This still presents another
+issue to solve for single kernel binary, but hopefully the dma mapping
+work will help.
 
-diff --git a/arch/arm/kernel/kprobes-thumb.c b/arch/arm/kernel/kprobes-thumb.c
-index e028949..e496948 100644
---- a/arch/arm/kernel/kprobes-thumb.c
-+++ b/arch/arm/kernel/kprobes-thumb.c
-@@ -110,6 +110,37 @@ t16_simulate_cbz(struct kprobe *p, struct pt_regs *regs)
- 	}
- }
- 
-+static void __kprobes
-+t16_simulate_it(struct kprobe *p, struct pt_regs *regs)
-+{
-+	/*
-+	 * The 8 IT state bits are split into two parts in CPSR:
-+	 *	ITSTATE<1:0> are in CPSR<26:25>
-+	 *	ITSTATE<7:2> are in CPSR<15:10>
-+	 * The new IT state is in the lower byte of insn.
-+	 */
-+	kprobe_opcode_t insn = p->opcode;
-+	unsigned long cpsr = regs->ARM_cpsr;
-+	cpsr &= ~PSR_IT_MASK;
-+	cpsr |= (insn & 0xfc) << 8;
-+	cpsr |= (insn & 0x03) << 25;
-+	regs->ARM_cpsr = cpsr;
-+}
-+
-+static void __kprobes
-+t16_singlestep_it(struct kprobe *p, struct pt_regs *regs)
-+{
-+	regs->ARM_pc += 2;
-+	t16_simulate_it(p, regs);
-+}
-+
-+static enum kprobe_insn __kprobes
-+t16_decode_it(kprobe_opcode_t insn, struct arch_specific_insn *asi)
-+{
-+	asi->insn_singlestep = t16_singlestep_it;
-+	return INSN_GOOD_NO_SLOT;
-+}
-+
- static unsigned long __kprobes
- t16_emulate_loregs(struct kprobe *p, struct pt_regs *regs)
- {
-@@ -310,6 +341,8 @@ static const union decode_item t16_table_1011[] = {
- 	DECODE_SIMULATE	(0xffcf, 0xbf00, kprobe_simulate_nop),
- 	/* Unassigned hints		1011 1111 xxxx 0000 */
- 	DECODE_REJECT	(0xff0f, 0xbf00),
-+	/* IT				1011 1111 xxxx xxxx */
-+	DECODE_CUSTOM	(0xff00, 0xbf00, t16_decode_it),
- 
- 	DECODE_END
- };
--- 
-1.7.2.5
+Rob
