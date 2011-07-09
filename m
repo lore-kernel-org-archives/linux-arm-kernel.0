@@ -1,73 +1,93 @@
 From: tixy@yxit.co.uk (Tixy)
-Date: Sat,  9 Jul 2011 11:57:34 +0100
-Subject: [PATCH 47/51] ARM: kprobes: Decode 32-bit Thumb memory hint
-	instructions
+Date: Sat,  9 Jul 2011 11:57:38 +0100
+Subject: [PATCH 51/51] ARM: kprobes: Decode 32-bit Thumb multiply and absolute
+	difference instructions
 In-Reply-To: <1310209058-20980-1-git-send-email-tixy@yxit.co.uk>
 References: <1310209058-20980-1-git-send-email-tixy@yxit.co.uk>
-Message-ID: <1310209058-20980-48-git-send-email-tixy@yxit.co.uk>
+Message-ID: <1310209058-20980-52-git-send-email-tixy@yxit.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jon Medhurst <tixy@yxit.co.uk>
 
-We'll treat the preload instructions as nops as they are just
-performance hints.
-
 Signed-off-by: Jon Medhurst <tixy@yxit.co.uk>
 ---
- arch/arm/kernel/kprobes-thumb.c |   33 +++++++++++++++++++++++++++++++++
- 1 files changed, 33 insertions(+), 0 deletions(-)
+ arch/arm/kernel/kprobes-thumb.c |   49 +++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 49 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/kernel/kprobes-thumb.c b/arch/arm/kernel/kprobes-thumb.c
-index 6cc51b4..bf1113c 100644
+index 4ef12d1..902ca59 100644
 --- a/arch/arm/kernel/kprobes-thumb.c
 +++ b/arch/arm/kernel/kprobes-thumb.c
-@@ -489,6 +489,33 @@ static const union decode_item t32_table_1111_0xxx___1[] = {
+@@ -315,6 +315,10 @@ t32_emulate_rdlo12rdhi8rn16rm0_noflags(struct kprobe *p, struct pt_regs *regs)
+ 	regs->uregs[rdhi] = rdhiv;
+ }
+ 
++/* These emulation encodings are functionally equivalent... */
++#define t32_emulate_rd8rn16rm0ra12_noflags \
++		t32_emulate_rdlo12rdhi8rn16rm0_noflags
++
+ static const union decode_item t32_table_1110_100x_x0xx[] = {
+ 	/* Load/store multiple instructions */
+ 
+@@ -789,6 +793,45 @@ static const union decode_item t32_table_1111_1010___1111[] = {
  	DECODE_END
  };
  
-+static const union decode_item t32_table_1111_100x_x0x1__1111[] = {
-+	/* Memory hints							*/
++static const union decode_item t32_table_1111_1011_0[] = {
++	/* Multiply, multiply accumulate, and absolute difference	*/
 +
-+	/* PLD (literal)	1111 1000 x001 1111 1111 xxxx xxxx xxxx */
-+	/* PLI (literal)	1111 1001 x001 1111 1111 xxxx xxxx xxxx */
-+	DECODE_SIMULATE	(0xfe7ff000, 0xf81ff000, kprobe_simulate_nop),
++	/* ???			1111 1011 0000 xxxx 1111 xxxx 0001 xxxx */
++	DECODE_REJECT	(0xfff0f0f0, 0xfb00f010),
++	/* ???			1111 1011 0111 xxxx 1111 xxxx 0001 xxxx */
++	DECODE_REJECT	(0xfff0f0f0, 0xfb70f010),
 +
-+	/* PLD{W} (immediate)	1111 1000 10x1 xxxx 1111 xxxx xxxx xxxx */
-+	DECODE_OR	(0xffd0f000, 0xf890f000),
-+	/* PLD{W} (immediate)	1111 1000 00x1 xxxx 1111 1100 xxxx xxxx */
-+	DECODE_OR	(0xffd0ff00, 0xf810fc00),
-+	/* PLI (immediate)	1111 1001 1001 xxxx 1111 xxxx xxxx xxxx */
-+	DECODE_OR	(0xfff0f000, 0xf990f000),
-+	/* PLI (immediate)	1111 1001 0001 xxxx 1111 1100 xxxx xxxx */
-+	DECODE_SIMULATEX(0xfff0ff00, 0xf910fc00, kprobe_simulate_nop,
-+						 REGS(NOPCX, 0, 0, 0, 0)),
++	/* SMULxy		1111 1011 0001 xxxx 1111 xxxx 00xx xxxx */
++	DECODE_OR	(0xfff0f0c0, 0xfb10f000),
++	/* MUL			1111 1011 0000 xxxx 1111 xxxx 0000 xxxx */
++	/* SMUAD{X}		1111 1011 0010 xxxx 1111 xxxx 000x xxxx */
++	/* SMULWy		1111 1011 0011 xxxx 1111 xxxx 000x xxxx */
++	/* SMUSD{X}		1111 1011 0100 xxxx 1111 xxxx 000x xxxx */
++	/* SMMUL{R}		1111 1011 0101 xxxx 1111 xxxx 000x xxxx */
++	/* USAD8		1111 1011 0111 xxxx 1111 xxxx 0000 xxxx */
++	DECODE_EMULATEX	(0xff80f0e0, 0xfb00f000, t32_emulate_rd8rn16rm0_rwflags,
++						 REGS(NOSPPC, 0, NOSPPC, 0, NOSPPC)),
 +
-+	/* PLD{W} (register)	1111 1000 00x1 xxxx 1111 0000 00xx xxxx */
-+	DECODE_OR	(0xffd0ffc0, 0xf810f000),
-+	/* PLI (register)	1111 1001 0001 xxxx 1111 0000 00xx xxxx */
-+	DECODE_SIMULATEX(0xfff0ffc0, 0xf910f000, kprobe_simulate_nop,
-+						 REGS(NOPCX, 0, 0, 0, NOSPPC)),
++	/* ???			1111 1011 0111 xxxx xxxx xxxx 0001 xxxx */
++	DECODE_REJECT	(0xfff000f0, 0xfb700010),
++
++	/* SMLAxy		1111 1011 0001 xxxx xxxx xxxx 00xx xxxx */
++	DECODE_OR	(0xfff000c0, 0xfb100000),
++	/* MLA			1111 1011 0000 xxxx xxxx xxxx 0000 xxxx */
++	/* MLS			1111 1011 0000 xxxx xxxx xxxx 0001 xxxx */
++	/* SMLAD{X}		1111 1011 0010 xxxx xxxx xxxx 000x xxxx */
++	/* SMLAWy		1111 1011 0011 xxxx xxxx xxxx 000x xxxx */
++	/* SMLSD{X}		1111 1011 0100 xxxx xxxx xxxx 000x xxxx */
++	/* SMMLA{R}		1111 1011 0101 xxxx xxxx xxxx 000x xxxx */
++	/* SMMLS{R}		1111 1011 0110 xxxx xxxx xxxx 000x xxxx */
++	/* USADA8		1111 1011 0111 xxxx xxxx xxxx 0000 xxxx */
++	DECODE_EMULATEX	(0xff8000c0, 0xfb000000, t32_emulate_rd8rn16rm0ra12_noflags,
++						 REGS(NOSPPC, NOSPPCX, NOSPPC, 0, NOSPPC)),
 +
 +	/* Other unallocated instructions...				*/
 +	DECODE_END
 +};
 +
- const union decode_item kprobe_decode_thumb32_table[] = {
+ static const union decode_item t32_table_1111_1011_1[] = {
+ 	/* Long multiply, long multiply accumulate, and divide		*/
+ 
+@@ -883,6 +926,12 @@ const union decode_item kprobe_decode_thumb32_table[] = {
+ 	DECODE_TABLE	(0xff00f000, 0xfa00f000, t32_table_1111_1010___1111),
  
  	/*
-@@ -540,6 +567,12 @@ const union decode_item kprobe_decode_thumb32_table[] = {
- 	DECODE_REJECT	(0xff100000, 0xf9000000),
- 
- 	/*
-+	 * Memory hints
-+	 *			1111 100x x0x1 xxxx 1111 xxxx xxxx xxxx
++	 * Multiply, multiply accumulate, and absolute difference
++	 *			1111 1011 0xxx xxxx xxxx xxxx xxxx xxxx
 +	 */
-+	DECODE_TABLE	(0xfe50f000, 0xf810f000, t32_table_1111_100x_x0x1__1111),
++	DECODE_TABLE	(0xff800000, 0xfb000000, t32_table_1111_1011_0),
 +
 +	/*
- 	 * Coprocessor instructions
- 	 *			1111 11xx xxxx xxxx xxxx xxxx xxxx xxxx
+ 	 * Long multiply, long multiply accumulate, and divide
+ 	 *			1111 1011 1xxx xxxx xxxx xxxx xxxx xxxx
  	 */
 -- 
 1.7.2.5
