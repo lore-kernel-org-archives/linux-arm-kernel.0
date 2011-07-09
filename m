@@ -1,42 +1,28 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Sat, 9 Jul 2011 15:52:51 -0600 (MDT)
-Subject: [PATCH] MAINTAINERS: add Kevin Hilman as the omap_device
- maintainer
-Message-ID: <alpine.DEB.2.00.1107091551350.15984@utopia.booyaka.com>
+From: cjb@laptop.org (Chris Ball)
+Date: Sat, 09 Jul 2011 18:09:45 -0400
+Subject: [PATCH v9 00/12] use nonblock mmc requests to minimize latency
+In-Reply-To: <1309539333-2606-1-git-send-email-per.forlin@linaro.org> (Per
+	Forlin's message of "Fri, 1 Jul 2011 18:55:21 +0200")
+References: <1309539333-2606-1-git-send-email-per.forlin@linaro.org>
+Message-ID: <m2y607jec6.fsf@bob.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Per,
 
-Currently, plat-omap/omap_device.c is used as the interface between
-the core Linux PM code (such as the system suspend and PM runtime
-code) and the internal OMAP power management infrastructure (such as
-the hwmod code, clockdomains, powerdomains, clocks, etc.)
+On Fri, Jul 01 2011, Per Forlin wrote:
+> How significant is the cache maintenance over head?
+> It depends, the eMMC are much faster now
+> compared to a few years ago and cache maintenance cost more due to
+> multiple cache levels and speculative cache pre-fetch. In relation the
+> cost for handling the caches have increased and is now a bottle neck
+> dealing with fast eMMC together with DMA.
 
-Kevin's doing most of the interaction with the core Linux PM people on
-this, so it makes sense for him to be the maintainer.
+Thanks very much, I've pushed v9 of the patchset to mmc-next for 3.1
+(after fixing some merge conflicts against Adrian Hunter's recent patches
+and rewording some of the commit message texts).
 
-Later, if we add some omap_bus code and convert omap_device into a proper 
-Linux device, I suggest that maintainership of this piece should return to 
-Tony.
-
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Kevin Hilman <khilman@ti.com>
----
- MAINTAINERS |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index ae563fa..4b5a5dc 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -4534,6 +4534,7 @@ M:	Kevin Hilman <khilman@ti.com>
- L:	linux-omap at vger.kernel.org
- S:	Maintained
- F:	arch/arm/*omap*/*pm*
-+F:	arch/arm/plat-omap/omap_device.c
- 
- OMAP POWERDOMAIN/CLOCKDOMAIN SOC ADAPTATION LAYER SUPPORT
- M:	Rajendra Nayak <rnayak@ti.com>
+- Chris.
 -- 
-1.7.5.4
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
