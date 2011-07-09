@@ -1,124 +1,95 @@
 From: tixy@yxit.co.uk (Tixy)
-Date: Sat,  9 Jul 2011 11:56:49 +0100
-Subject: [PATCH 02/51] ARM: Thumb-2: Support Thumb-2 in undefined instruction
-	handler
+Date: Sat,  9 Jul 2011 11:57:29 +0100
+Subject: [PATCH 42/51] ARM: kprobes: Decode 32-bit Thumb data-processing
+	(modified immediate) instructions
 In-Reply-To: <1310209058-20980-1-git-send-email-tixy@yxit.co.uk>
 References: <1310209058-20980-1-git-send-email-tixy@yxit.co.uk>
-Message-ID: <1310209058-20980-3-git-send-email-tixy@yxit.co.uk>
+Message-ID: <1310209058-20980-43-git-send-email-tixy@yxit.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jon Medhurst <tixy@yxit.co.uk>
 
-This patch allows undef_hook's to be specified for 32-bit Thumb
-instructions and also to be used for thumb kernel-side code.
-
-32-bit Thumb instructions are specified in the form:
-	((first_half << 16 ) | second_half)
-which matches the layout used by the ARM ARM.
-
-ptrace was handling 32-bit Thumb instructions by hooking the first
-halfword and manually checking the second half. This method would be
-broken by this patch so it is migrated to make use of the new Thumb-2
-support.
-
 Signed-off-by: Jon Medhurst <tixy@yxit.co.uk>
 ---
- arch/arm/include/asm/ptrace.h |    8 ++++++++
- arch/arm/kernel/ptrace.c      |   28 +++-------------------------
- arch/arm/kernel/traps.c       |   17 ++++++++++++++++-
- 3 files changed, 27 insertions(+), 26 deletions(-)
+ arch/arm/kernel/kprobes-thumb.c |   58 +++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 58 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/include/asm/ptrace.h b/arch/arm/include/asm/ptrace.h
-index 312d108..d484871 100644
---- a/arch/arm/include/asm/ptrace.h
-+++ b/arch/arm/include/asm/ptrace.h
-@@ -200,6 +200,14 @@ extern unsigned long profile_pc(struct pt_regs *regs);
- #define PREDICATE_ALWAYS	0xe0000000
+diff --git a/arch/arm/kernel/kprobes-thumb.c b/arch/arm/kernel/kprobes-thumb.c
+index eac945c..cf83448 100644
+--- a/arch/arm/kernel/kprobes-thumb.c
++++ b/arch/arm/kernel/kprobes-thumb.c
+@@ -241,6 +241,58 @@ static const union decode_item t32_table_1110_101x[] = {
+ 	DECODE_END
+ };
  
- /*
-+ * True if instr is a 32-bit thumb instruction. This works if instr
-+ * is the first or only half-word of a thumb instruction. It also works
-+ * when instr holds all 32-bits of a wide thumb instruction if stored
-+ * in the form (first_half<<16)|(second_half)
-+ */
-+#define is_wide_instruction(instr)	((unsigned)(instr) >= 0xe800)
++static const union decode_item t32_table_1111_0x0x___0[] = {
++	/* Data-processing (modified immediate)				*/
 +
-+/*
-  * kprobe-based event tracer support
-  */
- #include <linux/stddef.h>
-diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
-index 9726006..897ade0 100644
---- a/arch/arm/kernel/ptrace.c
-+++ b/arch/arm/kernel/ptrace.c
-@@ -228,34 +228,12 @@ static struct undef_hook thumb_break_hook = {
- 	.fn		= break_trap,
- };
++	/* TST			1111 0x00 0001 xxxx 0xxx 1111 xxxx xxxx */
++	/* TEQ			1111 0x00 1001 xxxx 0xxx 1111 xxxx xxxx */
++	DECODE_EMULATEX	(0xfb708f00, 0xf0100f00, t32_emulate_rd8rn16rm0_rwflags,
++						 REGS(NOSPPC, 0, 0, 0, 0)),
++
++	/* CMN			1111 0x01 0001 xxxx 0xxx 1111 xxxx xxxx */
++	DECODE_OR	(0xfbf08f00, 0xf1100f00),
++	/* CMP			1111 0x01 1011 xxxx 0xxx 1111 xxxx xxxx */
++	DECODE_EMULATEX	(0xfbf08f00, 0xf1b00f00, t32_emulate_rd8rn16rm0_rwflags,
++						 REGS(NOPC, 0, 0, 0, 0)),
++
++	/* MOV			1111 0x00 010x 1111 0xxx xxxx xxxx xxxx */
++	/* MVN			1111 0x00 011x 1111 0xxx xxxx xxxx xxxx */
++	DECODE_EMULATEX	(0xfbcf8000, 0xf04f0000, t32_emulate_rd8rn16rm0_rwflags,
++						 REGS(0, 0, NOSPPC, 0, 0)),
++
++	/* ???			1111 0x00 101x xxxx 0xxx xxxx xxxx xxxx */
++	DECODE_REJECT	(0xfbe08000, 0xf0a00000),
++	/* ???			1111 0x00 110x xxxx 0xxx xxxx xxxx xxxx */
++	/* ???			1111 0x00 111x xxxx 0xxx xxxx xxxx xxxx */
++	DECODE_REJECT	(0xfbc08000, 0xf0c00000),
++	/* ???			1111 0x01 001x xxxx 0xxx xxxx xxxx xxxx */
++	DECODE_REJECT	(0xfbe08000, 0xf1200000),
++	/* ???			1111 0x01 100x xxxx 0xxx xxxx xxxx xxxx */
++	DECODE_REJECT	(0xfbe08000, 0xf1800000),
++	/* ???			1111 0x01 111x xxxx 0xxx xxxx xxxx xxxx */
++	DECODE_REJECT	(0xfbe08000, 0xf1e00000),
++
++	/* ADD Rd, SP, #imm	1111 0x01 000x 1101 0xxx xxxx xxxx xxxx */
++	/* SUB Rd, SP, #imm	1111 0x01 101x 1101 0xxx xxxx xxxx xxxx */
++	DECODE_EMULATEX	(0xfb4f8000, 0xf10d0000, t32_emulate_rd8rn16rm0_rwflags,
++						 REGS(SP, 0, NOPC, 0, 0)),
++
++	/* AND			1111 0x00 000x xxxx 0xxx xxxx xxxx xxxx */
++	/* BIC			1111 0x00 001x xxxx 0xxx xxxx xxxx xxxx */
++	/* ORR			1111 0x00 010x xxxx 0xxx xxxx xxxx xxxx */
++	/* ORN			1111 0x00 011x xxxx 0xxx xxxx xxxx xxxx */
++	/* EOR			1111 0x00 100x xxxx 0xxx xxxx xxxx xxxx */
++	/* ADD			1111 0x01 000x xxxx 0xxx xxxx xxxx xxxx */
++	/* ADC			1111 0x01 010x xxxx 0xxx xxxx xxxx xxxx */
++	/* SBC			1111 0x01 011x xxxx 0xxx xxxx xxxx xxxx */
++	/* SUB			1111 0x01 101x xxxx 0xxx xxxx xxxx xxxx */
++	/* RSB			1111 0x01 110x xxxx 0xxx xxxx xxxx xxxx */
++	DECODE_EMULATEX	(0xfa008000, 0xf0000000, t32_emulate_rd8rn16rm0_rwflags,
++						 REGS(NOSPPC, 0, NOSPPC, 0, 0)),
++
++	DECODE_END
++};
++
+ static const union decode_item t32_table_1111_0xxx___1[] = {
+ 	/* Branches and miscellaneous control				*/
  
--static int thumb2_break_trap(struct pt_regs *regs, unsigned int instr)
--{
--	unsigned int instr2;
--	void __user *pc;
--
--	/* Check the second half of the instruction.  */
--	pc = (void __user *)(instruction_pointer(regs) + 2);
--
--	if (processor_mode(regs) == SVC_MODE) {
--		instr2 = *(u16 *) pc;
--	} else {
--		get_user(instr2, (u16 __user *)pc);
--	}
--
--	if (instr2 == 0xa000) {
--		ptrace_break(current, regs);
--		return 0;
--	} else {
--		return 1;
--	}
--}
--
- static struct undef_hook thumb2_break_hook = {
--	.instr_mask	= 0xffff,
--	.instr_val	= 0xf7f0,
-+	.instr_mask	= 0xffffffff,
-+	.instr_val	= 0xf7f0a000,
- 	.cpsr_mask	= PSR_T_BIT,
- 	.cpsr_val	= PSR_T_BIT,
--	.fn		= thumb2_break_trap,
-+	.fn		= break_trap,
- };
+@@ -277,6 +329,12 @@ const union decode_item kprobe_decode_thumb32_table[] = {
+ 	DECODE_TABLE	(0xfe000000, 0xea000000, t32_table_1110_101x),
  
- static int __init ptrace_break_init(void)
-diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-index 6807cb1..2d3436e 100644
---- a/arch/arm/kernel/traps.c
-+++ b/arch/arm/kernel/traps.c
-@@ -355,9 +355,24 @@ asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
- 	pc = (void __user *)instruction_pointer(regs);
- 
- 	if (processor_mode(regs) == SVC_MODE) {
--		instr = *(u32 *) pc;
-+#ifdef CONFIG_THUMB2_KERNEL
-+		if (thumb_mode(regs)) {
-+			instr = ((u16 *)pc)[0];
-+			if (is_wide_instruction(instr)) {
-+				instr <<= 16;
-+				instr |= ((u16 *)pc)[1];
-+			}
-+		} else
-+#endif
-+			instr = *(u32 *) pc;
- 	} else if (thumb_mode(regs)) {
- 		get_user(instr, (u16 __user *)pc);
-+		if (is_wide_instruction(instr)) {
-+			unsigned int instr2;
-+			get_user(instr2, (u16 __user *)pc+1);
-+			instr <<= 16;
-+			instr |= instr2;
-+		}
- 	} else {
- 		get_user(instr, (u32 __user *)pc);
- 	}
+ 	/*
++	 * Data-processing (modified immediate)
++	 *			1111 0x0x xxxx xxxx 0xxx xxxx xxxx xxxx
++	 */
++	DECODE_TABLE	(0xfa008000, 0xf0000000, t32_table_1111_0x0x___0),
++
++	/*
+ 	 * Branches and miscellaneous control
+ 	 *			1111 0xxx xxxx xxxx 1xxx xxxx xxxx xxxx
+ 	 */
 -- 
 1.7.2.5
