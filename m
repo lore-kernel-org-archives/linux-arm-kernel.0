@@ -1,46 +1,37 @@
-From: ccross@android.com (Colin Cross)
-Date: Sat, 9 Jul 2011 16:01:19 -0700
-Subject: [PATCH 03/17] ARM: gic: Use cpu pm notifiers to save gic state
-In-Reply-To: <20110709223315.GO4812@n2100.arm.linux.org.uk>
-References: <1310053830-23779-1-git-send-email-lorenzo.pieralisi@arm.com>
-	<1310053830-23779-4-git-send-email-lorenzo.pieralisi@arm.com>
-	<20110709102100.GJ4812@n2100.arm.linux.org.uk>
-	<CAMbhsRTFfv1q0po5CDtRfRBN5pABaKm3C0OR4U9yHmRJiFUOtw@mail.gmail.com>
-	<20110709223315.GO4812@n2100.arm.linux.org.uk>
-Message-ID: <CAMbhsRR0XCJ3-6DznCAmEk1AywpFhr70-1mH=cy9YBpZa978pw@mail.gmail.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Sun, 10 Jul 2011 01:05:48 +0200
+Subject: [PATCH] pxa2xx_spi: fix memory corruption
+In-Reply-To: <1310246098-21208-1-git-send-email-anarsoul@gmail.com>
+References: <1310246098-21208-1-git-send-email-anarsoul@gmail.com>
+Message-ID: <201107100105.48168.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 9, 2011 at 3:33 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Sat, Jul 09, 2011 at 03:10:56PM -0700, Colin Cross wrote:
->> This is necessary for cpuidle states that lose the GIC registers, not
->> just suspend, because the GIC is in the cpu's power domain. ?We could
->> avoid saving and restoring all the GIC registers in suspend and idle
->> by reusing the initialization functions, and then having the core irq
->> code call the unmask, set_type, and set_affinity functions on each irq
->> to reconfigure it, but that will be very inefficient - it will convert
->> each register write in the restore functions to a read-modify-write
->> per interrupt in that register. ?Santosh is already complaining that
->> this commong GIC restore code will be slower than the automatic DMA to
->> restore the GIC registers that OMAP4 supports.
->
-> Well, we need to come up with something sensible - a way of doing this
-> which doesn't require every interrupt controller driver (of which we as
-> an architecture have many) to have lots of support added.
->
-> If the current way is inefficient and is noticably so, then let's talk
-> to Thomas about finding a way around that - maybe having the generic
-> code make one suspend/resume callback per irq gc chip rather than doing
-> it per-IRQ. ?We can then reuse the same paths for suspend/resume as for
-> idle state saving.
->
+On Saturday, July 09, 2011 11:14:58 PM Vasily Khoruzhick wrote:
+> pxa2xx_spi_probe allocates struct driver_data and null_dma_buf
+> at same time via spi_alloc_master(), but then calculates
+> null_dma_buf pointer incorrectly, and it causes memory corruption
+> later if DMA usage is enabled.
+> 
+> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+> ---
+>  drivers/spi/pxa2xx_spi.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/spi/pxa2xx_spi.c b/drivers/spi/pxa2xx_spi.c
+> index dc25bee..ef38fbf 100644
+> --- a/drivers/spi/pxa2xx_spi.c
+> +++ b/drivers/spi/pxa2xx_spi.c
+> @@ -1569,7 +1569,7 @@ static int __devinit pxa2xx_spi_probe(struct
+> platform_device *pdev) master->transfer = transfer;
+> 
+>  	drv_data->ssp_type = ssp->type;
+> -	drv_data->null_dma_buf = (u32 *)ALIGN((u32)(drv_data +
+> +	drv_data->null_dma_buf = (u32 *)ALIGN(((u32)drv_data +
+>  						sizeof(struct driver_data)), 8);
 
-Are you referring to moving the gic driver to be gc chip?  Otherwise,
-I don't understand your suggestion - how is callback per chip any
-different than what this patch implements?  It just gets it's
-notification through a cpu_pm notifier, which works in idle and
-suspend, instead of a syscore op like the gc driver does.
-
-This patch does save and restore some registers that are never
-modified after init, so they don't need to be saved.
+This thing looks a bit disturbing in itself. Like, where the heck is that thing 
+pointing in the end ? Since some data are written to address in "null_dma_buf" 
+... isn't this just changing the corruption impact ?
+> 
+>  	drv_data->ioaddr = ssp->mmio_base;
