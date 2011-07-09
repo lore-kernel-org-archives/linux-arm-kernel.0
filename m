@@ -1,26 +1,38 @@
 From: cjb@laptop.org (Chris Ball)
-Date: Sat, 09 Jul 2011 18:09:45 -0400
-Subject: [PATCH v9 00/12] use nonblock mmc requests to minimize latency
-In-Reply-To: <1309539333-2606-1-git-send-email-per.forlin@linaro.org> (Per
-	Forlin's message of "Fri, 1 Jul 2011 18:55:21 +0200")
-References: <1309539333-2606-1-git-send-email-per.forlin@linaro.org>
-Message-ID: <m2y607jec6.fsf@bob.laptop.org>
+Date: Sat, 09 Jul 2011 18:14:43 -0400
+Subject: [PATCH v3 0/4] Add device tree probe for sdhci-esdhc-imx
+In-Reply-To: <1309970870-13336-1-git-send-email-shawn.guo@linaro.org> (Shawn
+	Guo's message of "Thu, 7 Jul 2011 00:47:46 +0800")
+References: <1309970870-13336-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <m2pqljje3w.fsf@bob.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Per,
+Hi Shawn,
 
-On Fri, Jul 01 2011, Per Forlin wrote:
-> How significant is the cache maintenance over head?
-> It depends, the eMMC are much faster now
-> compared to a few years ago and cache maintenance cost more due to
-> multiple cache levels and speculative cache pre-fetch. In relation the
-> cost for handling the caches have increased and is now a bottle neck
-> dealing with fast eMMC together with DMA.
+On Wed, Jul 06 2011, Shawn Guo wrote:
+> The first patch copies platform data into driver private data, and
+> do not reference platform data after probe.  The second one removes
+> the uses of cpu_is_mx().  The third one makes a dt related fix on
+> sdhci-pltfm.c, and the last one adds actual device tree probe for
+> sdhci-esdhc-imx driver.
+>
+> Changes since v2:
+>  * Add patch #1
+>  * Do not use Linux details of cd-type and wp-type for binding
+>
+> Changes since v1:
+>  * Address review comments given by Grant
+>
+> Shawn Guo (4):
+>       mmc: sdhci-esdhc-imx: do not reference platform data after probe
+>       mmc: sdhci-esdhc-imx: get rid of the uses of cpu_is_mx()
+>       mmc: sdhci-pltfm: dt device does not pass parent to sdhci_alloc_host
+>       mmc: sdhci-esdhc-imx: add device tree probe support
 
-Thanks very much, I've pushed v9 of the patchset to mmc-next for 3.1
-(after fixing some merge conflicts against Adrian Hunter's recent patches
-and rewording some of the commit message texts).
+These don't apply against mmc-next -- what is your tree based on?
+
+Thanks,
 
 - Chris.
 -- 
