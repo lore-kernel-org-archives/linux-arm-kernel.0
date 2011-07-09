@@ -1,81 +1,21 @@
-From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
-Date: Sat, 9 Jul 2011 16:57:07 +0200
-Subject: [Linaro-mm-sig] [PATCH 6/8] drivers: add Contiguous Memory
-	Allocator
-In-Reply-To: <201107061659.45253.arnd@arndb.de>
-References: <1309851710-3828-1-git-send-email-m.szyprowski@samsung.com>
-	<alpine.LFD.2.00.1107061034200.14596@xanadu.home>
-	<201107061659.45253.arnd@arndb.de>
-Message-ID: <201107091657.07925.jkrzyszt@tis.icnet.pl>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 9 Jul 2011 17:32:07 +0100
+Subject: [PATCH 0/3] Fix VFP thread handling
+Message-ID: <20110709163207.GN4812@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 6 Jul 2011 at 16:59:45 Arnd Bergmann wrote:
-> On Wednesday 06 July 2011, Nicolas Pitre wrote:
-> > On Wed, 6 Jul 2011, Russell King - ARM Linux wrote:
-> > > Another issue is that when a platform has restricted DMA regions,
-> > > they typically don't fall into the highmem zone.  As the
-> > > dmabounce code allocates from the DMA coherent allocator to
-> > > provide it with guaranteed DMA-able memory, that would be rather
-> > > inconvenient.
-> > 
-> > Do we encounter this in practice i.e. do those platforms requiring
-> > large contiguous allocations motivating this work have such DMA
-> > restrictions?
-> 
-> You can probably find one or two of those, but we don't have to
-> optimize for that case. I would at least expect the maximum size of
-> the allocation to be smaller than the DMA limit for these, and
-> consequently mandate that they define a sufficiently large
-> CONSISTENT_DMA_SIZE for the crazy devices, or possibly add a hack to
-> unmap some low memory and call
-> dma_declare_coherent_memory() for the device.
+There are three holes in the current VFP thread handling:
 
-Once found that Russell has dropped his "ARM: DMA: steal memory for DMA 
-coherent mappings" for now, let me get back to this idea of a hack that 
-would allow for safely calling dma_declare_coherent_memory() in order to 
-assign a device with a block of contiguous memory for exclusive use. 
-Assuming there should be no problem with successfully allocating a large 
-continuous block of coherent memory at boot time with 
-dma_alloc_coherent(), this block could be reserved for the device. The 
-only problem is with the dma_declare_coherent_memory() calling 
-ioremap(), which was designed with a device's dedicated physical memory 
-in mind, but shouldn't be called on a memory already mapped.
+1. Migration of a thread between CPUs, and then calling vfp_sync_state()
+   on the old CPU.
 
-There were three approaches proposed, two of them in August 2010:
-http://www.spinics.net/lists/linux-media/msg22179.html,
-http://www.spinics.net/lists/arm-kernel/msg96318.html,
-and a third one in January 2011:
-http://www.spinics.net/lists/linux-arch/msg12637.html.
+2. When a thread is copied, we weren't ensuring that a reload happened.
 
-As far as I can understand the reason why both of the first two were 
-NAKed, it was suggested that videobuf-dma-contig shouldn't use coherent 
-if all it requires is a contiguous memory, and a new API should be 
-invented, or dma_pool API extended, for providing contiguous memory. The 
-CMA was pointed out as a new work in progress contiguous memory API. Now 
-it turns out it's not, it's only a helper to ensure that 
-dma_alloc_coherent() always succeeds, and videobuf2-dma-contig is still 
-going to allocate buffers from coherent memory.
+3. When a thread is flushed, we weren't ensuring that a reload happened.
 
-(CCing both authors, Marin Mitov and Guennadi Liakhovetski, and their 
-main opponent, FUJITA Tomonori)
+These are described in detail in the commit message for patch 3.
 
-The third solution was not discussed much after it was pointed out as 
-being not very different from those two in terms of the above mentioned 
-rationale.
-
-All three solutions was different from now suggested method of unmapping 
-some low memory and then calling dma_declare_coherent_memory() which 
-ioremaps it in that those tried to reserve some boot time allocated 
-coherent memory, already mapped correctly, without (io)remapping it.
-
-If there are still problems with the CMA on one hand, and a need for a 
-hack to handle "crazy devices" is still seen, regardless of CMA 
-available and working or not, on the other, maybe we should get back to 
-the idea of adopting coherent API to new requirements, review those 
-three proposals again and select one which seems most acceptable to 
-everyone? Being a submitter of the third, I'll be happy to refresh it if 
-selected.
-
-Thanks,
-Janusz
+These are not targetted at this -rc because it's too risky to put them
+in this close to -final.  Once they have been reviewed and tested, they
+can be applied to stable trees.
