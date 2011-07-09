@@ -1,273 +1,137 @@
 From: tixy@yxit.co.uk (Tixy)
-Date: Sat,  9 Jul 2011 11:56:52 +0100
-Subject: [PATCH 05/51] ARM: kprobes: Add kprobes-common.c
+Date: Sat,  9 Jul 2011 11:57:16 +0100
+Subject: [PATCH 29/51] ARM: kprobes: Decode 16-bit Thumb PUSH and POP
+	instructions
 In-Reply-To: <1310209058-20980-1-git-send-email-tixy@yxit.co.uk>
 References: <1310209058-20980-1-git-send-email-tixy@yxit.co.uk>
-Message-ID: <1310209058-20980-6-git-send-email-tixy@yxit.co.uk>
+Message-ID: <1310209058-20980-30-git-send-email-tixy@yxit.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jon Medhurst <tixy@yxit.co.uk>
 
-This file will contain the instruction decoding and emulation code
-which is common to both ARM and Thumb instruction sets.
+These instructions are equivalent to
 
-For now, we will just move over condition_checks from kprobes-arm.c
-This table is also renamed to kprobe_condition_checks to avoid polluting
-the public namespace with a too generic name.
+	stmdb sp!,{r0-r7,lr}
+	ldmdb sp!,{r0-r7,pc}
+
+and we emulate them by transforming them into the 32-bit Thumb
+instructions
+
+	stmdb r9!,{r0-r7,r8}
+	ldmdb r9!,{r0-r7,r8}
+
+This is simpler, and almost certainly executes faster, than writing
+simulation functions.
 
 Signed-off-by: Jon Medhurst <tixy@yxit.co.uk>
 ---
- arch/arm/kernel/Makefile         |    2 +-
- arch/arm/kernel/kprobes.h        |    2 +
- arch/arm/kernel/kprobes-arm.c    |   92 +---------------------------------
- arch/arm/kernel/kprobes-common.c |  105 ++++++++++++++++++++++++++++++++++++++
- 4 files changed, 109 insertions(+), 92 deletions(-)
+ arch/arm/kernel/kprobes-thumb.c |   86 +++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 86 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-index 914c7a6..a22b8f1 100644
---- a/arch/arm/kernel/Makefile
-+++ b/arch/arm/kernel/Makefile
-@@ -37,7 +37,7 @@ obj-$(CONFIG_HAVE_ARM_TWD)	+= smp_twd.o
- obj-$(CONFIG_DYNAMIC_FTRACE)	+= ftrace.o
- obj-$(CONFIG_FUNCTION_GRAPH_TRACER)	+= ftrace.o
- obj-$(CONFIG_KEXEC)		+= machine_kexec.o relocate_kernel.o
--obj-$(CONFIG_KPROBES)		+= kprobes.o
-+obj-$(CONFIG_KPROBES)		+= kprobes.o kprobes-common.o
- obj-$(CONFIG_KPROBES)		+= kprobes-arm.o
- obj-$(CONFIG_ATAGS_PROC)	+= atags.o
- obj-$(CONFIG_OABI_COMPAT)	+= sys_oabi-compat.o
-diff --git a/arch/arm/kernel/kprobes.h b/arch/arm/kernel/kprobes.h
-index 87a5241..792f231 100644
---- a/arch/arm/kernel/kprobes.h
-+++ b/arch/arm/kernel/kprobes.h
-@@ -34,4 +34,6 @@ enum kprobe_insn arm_kprobe_decode_insn(kprobe_opcode_t,
- 
- void __init arm_kprobe_decode_init(void);
- 
-+extern kprobe_check_cc * const kprobe_condition_checks[16];
-+
- #endif /* _ARM_KERNEL_KPROBES_H */
-diff --git a/arch/arm/kernel/kprobes-arm.c b/arch/arm/kernel/kprobes-arm.c
-index 976ce14..8d4464f 100644
---- a/arch/arm/kernel/kprobes-arm.c
-+++ b/arch/arm/kernel/kprobes-arm.c
-@@ -1523,96 +1523,6 @@ space_cccc_11xx(kprobe_opcode_t insn, struct arch_specific_insn *asi)
- 	return INSN_REJECTED;
+diff --git a/arch/arm/kernel/kprobes-thumb.c b/arch/arm/kernel/kprobes-thumb.c
+index a5bdb2d..e028949 100644
+--- a/arch/arm/kernel/kprobes-thumb.c
++++ b/arch/arm/kernel/kprobes-thumb.c
+@@ -187,6 +187,87 @@ t16_decode_hiregs(kprobe_opcode_t insn, struct arch_specific_insn *asi)
+ 	return INSN_GOOD;
  }
  
--static unsigned long __kprobes __check_eq(unsigned long cpsr)
--{
--	return cpsr & PSR_Z_BIT;
--}
--
--static unsigned long __kprobes __check_ne(unsigned long cpsr)
--{
--	return (~cpsr) & PSR_Z_BIT;
--}
--
--static unsigned long __kprobes __check_cs(unsigned long cpsr)
--{
--	return cpsr & PSR_C_BIT;
--}
--
--static unsigned long __kprobes __check_cc(unsigned long cpsr)
--{
--	return (~cpsr) & PSR_C_BIT;
--}
--
--static unsigned long __kprobes __check_mi(unsigned long cpsr)
--{
--	return cpsr & PSR_N_BIT;
--}
--
--static unsigned long __kprobes __check_pl(unsigned long cpsr)
--{
--	return (~cpsr) & PSR_N_BIT;
--}
--
--static unsigned long __kprobes __check_vs(unsigned long cpsr)
--{
--	return cpsr & PSR_V_BIT;
--}
--
--static unsigned long __kprobes __check_vc(unsigned long cpsr)
--{
--	return (~cpsr) & PSR_V_BIT;
--}
--
--static unsigned long __kprobes __check_hi(unsigned long cpsr)
--{
--	cpsr &= ~(cpsr >> 1); /* PSR_C_BIT &= ~PSR_Z_BIT */
--	return cpsr & PSR_C_BIT;
--}
--
--static unsigned long __kprobes __check_ls(unsigned long cpsr)
--{
--	cpsr &= ~(cpsr >> 1); /* PSR_C_BIT &= ~PSR_Z_BIT */
--	return (~cpsr) & PSR_C_BIT;
--}
--
--static unsigned long __kprobes __check_ge(unsigned long cpsr)
--{
--	cpsr ^= (cpsr << 3); /* PSR_N_BIT ^= PSR_V_BIT */
--	return (~cpsr) & PSR_N_BIT;
--}
--
--static unsigned long __kprobes __check_lt(unsigned long cpsr)
--{
--	cpsr ^= (cpsr << 3); /* PSR_N_BIT ^= PSR_V_BIT */
--	return cpsr & PSR_N_BIT;
--}
--
--static unsigned long __kprobes __check_gt(unsigned long cpsr)
--{
--	unsigned long temp = cpsr ^ (cpsr << 3); /* PSR_N_BIT ^= PSR_V_BIT */
--	temp |= (cpsr << 1);			 /* PSR_N_BIT |= PSR_Z_BIT */
--	return (~temp) & PSR_N_BIT;
--}
--
--static unsigned long __kprobes __check_le(unsigned long cpsr)
--{
--	unsigned long temp = cpsr ^ (cpsr << 3); /* PSR_N_BIT ^= PSR_V_BIT */
--	temp |= (cpsr << 1);			 /* PSR_N_BIT |= PSR_Z_BIT */
--	return temp & PSR_N_BIT;
--}
--
--static unsigned long __kprobes __check_al(unsigned long cpsr)
--{
--	return true;
--}
--
--static kprobe_check_cc * const condition_checks[16] = {
--	&__check_eq, &__check_ne, &__check_cs, &__check_cc,
--	&__check_mi, &__check_pl, &__check_vs, &__check_vc,
--	&__check_hi, &__check_ls, &__check_ge, &__check_lt,
--	&__check_gt, &__check_le, &__check_al, &__check_al
--};
--
- /* Return:
-  *   INSN_REJECTED     If instruction is one not allowed to kprobe,
-  *   INSN_GOOD         If instruction is supported and uses instruction slot,
-@@ -1628,7 +1538,7 @@ static kprobe_check_cc * const condition_checks[16] = {
- enum kprobe_insn __kprobes
- arm_kprobe_decode_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi)
- {
--	asi->insn_check_cc = condition_checks[insn>>28];
-+	asi->insn_check_cc = kprobe_condition_checks[insn>>28];
- 	asi->insn[1] = KPROBE_RETURN_INSTRUCTION;
++static void __kprobes
++t16_emulate_push(struct kprobe *p, struct pt_regs *regs)
++{
++	__asm__ __volatile__ (
++		"ldr	r9, [%[regs], #13*4]	\n\t"
++		"ldr	r8, [%[regs], #14*4]	\n\t"
++		"ldmia	%[regs], {r0-r7}	\n\t"
++		"blx	%[fn]			\n\t"
++		"str	r9, [%[regs], #13*4]	\n\t"
++		:
++		: [regs] "r" (regs), [fn] "r" (p->ainsn.insn_fn)
++		: "r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7", "r8", "r9",
++		  "lr", "memory", "cc"
++		);
++}
++
++static enum kprobe_insn __kprobes
++t16_decode_push(kprobe_opcode_t insn, struct arch_specific_insn *asi)
++{
++	/*
++	 * To simulate a PUSH we use a Thumb-2 "STMDB R9!, {registers}"
++	 * and call it with R9=SP and LR in the register list represented
++	 * by R8.
++	 */
++	((u16 *)asi->insn)[0] = 0xe929;		/* 1st half STMDB R9!,{} */
++	((u16 *)asi->insn)[1] = insn & 0x1ff;	/* 2nd half (register list) */
++	asi->insn_handler = t16_emulate_push;
++	return INSN_GOOD;
++}
++
++static void __kprobes
++t16_emulate_pop_nopc(struct kprobe *p, struct pt_regs *regs)
++{
++	__asm__ __volatile__ (
++		"ldr	r9, [%[regs], #13*4]	\n\t"
++		"ldmia	%[regs], {r0-r7}	\n\t"
++		"blx	%[fn]			\n\t"
++		"stmia	%[regs], {r0-r7}	\n\t"
++		"str	r9, [%[regs], #13*4]	\n\t"
++		:
++		: [regs] "r" (regs), [fn] "r" (p->ainsn.insn_fn)
++		: "r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7", "r9",
++		  "lr", "memory", "cc"
++		);
++}
++
++static void __kprobes
++t16_emulate_pop_pc(struct kprobe *p, struct pt_regs *regs)
++{
++	register unsigned long pc asm("r8");
++
++	__asm__ __volatile__ (
++		"ldr	r9, [%[regs], #13*4]	\n\t"
++		"ldmia	%[regs], {r0-r7}	\n\t"
++		"blx	%[fn]			\n\t"
++		"stmia	%[regs], {r0-r7}	\n\t"
++		"str	r9, [%[regs], #13*4]	\n\t"
++		: "=r" (pc)
++		: [regs] "r" (regs), [fn] "r" (p->ainsn.insn_fn)
++		: "r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7", "r9",
++		  "lr", "memory", "cc"
++		);
++
++	bx_write_pc(pc, regs);
++}
++
++static enum kprobe_insn __kprobes
++t16_decode_pop(kprobe_opcode_t insn, struct arch_specific_insn *asi)
++{
++	/*
++	 * To simulate a POP we use a Thumb-2 "LDMDB R9!, {registers}"
++	 * and call it with R9=SP and PC in the register list represented
++	 * by R8.
++	 */
++	((u16 *)asi->insn)[0] = 0xe8b9;		/* 1st half LDMIA R9!,{} */
++	((u16 *)asi->insn)[1] = insn & 0x1ff;	/* 2nd half (register list) */
++	asi->insn_handler = insn & 0x100 ? t16_emulate_pop_pc
++					 : t16_emulate_pop_nopc;
++	return INSN_GOOD;
++}
++
+ static const union decode_item t16_table_1011[] = {
+ 	/* Miscellaneous 16-bit instructions		    */
  
- 	if ((insn & 0xf0000000) == 0xf0000000)
-diff --git a/arch/arm/kernel/kprobes-common.c b/arch/arm/kernel/kprobes-common.c
-new file mode 100644
-index 0000000..794827e
---- /dev/null
-+++ b/arch/arm/kernel/kprobes-common.c
-@@ -0,0 +1,105 @@
-+/*
-+ * arch/arm/kernel/kprobes-common.c
-+ *
-+ * Copyright (C) 2011 Jon Medhurst <tixy@yxit.co.uk>.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
+@@ -209,6 +290,11 @@ static const union decode_item t16_table_1011[] = {
+ 	DECODE_REJECT	(0xffc0, 0xba80),
+ 	DECODE_EMULATE	(0xf500, 0xb000, t16_emulate_loregs_rwflags),
+ 
++	/* PUSH				1011 010x xxxx xxxx */
++	DECODE_CUSTOM	(0xfe00, 0xb400, t16_decode_push),
++	/* POP				1011 110x xxxx xxxx */
++	DECODE_CUSTOM	(0xfe00, 0xbc00, t16_decode_pop),
 +
-+#include <linux/kernel.h>
-+#include <linux/kprobes.h>
-+
-+#include "kprobes.h"
-+
-+
-+static unsigned long __kprobes __check_eq(unsigned long cpsr)
-+{
-+	return cpsr & PSR_Z_BIT;
-+}
-+
-+static unsigned long __kprobes __check_ne(unsigned long cpsr)
-+{
-+	return (~cpsr) & PSR_Z_BIT;
-+}
-+
-+static unsigned long __kprobes __check_cs(unsigned long cpsr)
-+{
-+	return cpsr & PSR_C_BIT;
-+}
-+
-+static unsigned long __kprobes __check_cc(unsigned long cpsr)
-+{
-+	return (~cpsr) & PSR_C_BIT;
-+}
-+
-+static unsigned long __kprobes __check_mi(unsigned long cpsr)
-+{
-+	return cpsr & PSR_N_BIT;
-+}
-+
-+static unsigned long __kprobes __check_pl(unsigned long cpsr)
-+{
-+	return (~cpsr) & PSR_N_BIT;
-+}
-+
-+static unsigned long __kprobes __check_vs(unsigned long cpsr)
-+{
-+	return cpsr & PSR_V_BIT;
-+}
-+
-+static unsigned long __kprobes __check_vc(unsigned long cpsr)
-+{
-+	return (~cpsr) & PSR_V_BIT;
-+}
-+
-+static unsigned long __kprobes __check_hi(unsigned long cpsr)
-+{
-+	cpsr &= ~(cpsr >> 1); /* PSR_C_BIT &= ~PSR_Z_BIT */
-+	return cpsr & PSR_C_BIT;
-+}
-+
-+static unsigned long __kprobes __check_ls(unsigned long cpsr)
-+{
-+	cpsr &= ~(cpsr >> 1); /* PSR_C_BIT &= ~PSR_Z_BIT */
-+	return (~cpsr) & PSR_C_BIT;
-+}
-+
-+static unsigned long __kprobes __check_ge(unsigned long cpsr)
-+{
-+	cpsr ^= (cpsr << 3); /* PSR_N_BIT ^= PSR_V_BIT */
-+	return (~cpsr) & PSR_N_BIT;
-+}
-+
-+static unsigned long __kprobes __check_lt(unsigned long cpsr)
-+{
-+	cpsr ^= (cpsr << 3); /* PSR_N_BIT ^= PSR_V_BIT */
-+	return cpsr & PSR_N_BIT;
-+}
-+
-+static unsigned long __kprobes __check_gt(unsigned long cpsr)
-+{
-+	unsigned long temp = cpsr ^ (cpsr << 3); /* PSR_N_BIT ^= PSR_V_BIT */
-+	temp |= (cpsr << 1);			 /* PSR_N_BIT |= PSR_Z_BIT */
-+	return (~temp) & PSR_N_BIT;
-+}
-+
-+static unsigned long __kprobes __check_le(unsigned long cpsr)
-+{
-+	unsigned long temp = cpsr ^ (cpsr << 3); /* PSR_N_BIT ^= PSR_V_BIT */
-+	temp |= (cpsr << 1);			 /* PSR_N_BIT |= PSR_Z_BIT */
-+	return temp & PSR_N_BIT;
-+}
-+
-+static unsigned long __kprobes __check_al(unsigned long cpsr)
-+{
-+	return true;
-+}
-+
-+kprobe_check_cc * const kprobe_condition_checks[16] = {
-+	&__check_eq, &__check_ne, &__check_cs, &__check_cc,
-+	&__check_mi, &__check_pl, &__check_vs, &__check_vc,
-+	&__check_hi, &__check_ls, &__check_ge, &__check_lt,
-+	&__check_gt, &__check_le, &__check_al, &__check_al
-+};
+ 	/*
+ 	 * If-Then, and hints
+ 	 *				1011 1111 xxxx xxxx
 -- 
 1.7.2.5
