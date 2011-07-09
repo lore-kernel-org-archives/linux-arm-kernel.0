@@ -1,66 +1,57 @@
-From: greg@kroah.com (Greg KH)
-Date: Fri, 8 Jul 2011 22:43:10 -0700
-Subject: [RFC PATCH v2 0/4] Core device subsystem
-In-Reply-To: <1310115250-3859-1-git-send-email-marc.zyngier@arm.com>
-References: <1310115250-3859-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20110709054310.GB14519@kroah.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Sat, 9 Jul 2011 14:30:22 +0800
+Subject: [PATCH v3 0/3] Add device tree probe for imx/mxc gpio
+In-Reply-To: <20110708183832.GB9070@ponder.secretlab.ca>
+References: <1309970263-13239-1-git-send-email-shawn.guo@linaro.org>
+	<20110707192705.GL2824@ponder.secretlab.ca>
+	<20110708103622.GF26347@pengutronix.de>
+	<20110708183832.GB9070@ponder.secretlab.ca>
+Message-ID: <20110709063021.GC13962@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 08, 2011 at 09:54:06AM +0100, Marc Zyngier wrote:
-> There is a small number of devices that the core kernel needs very
-> early in the boot process, namely an interrupt controller and a timer,
-> long before the driver model is up and running.
-
-What in the "driver model" needs to be up and running early for you to
-use it?
-
-Why not just start it up sooner if it's so needed?
-
-Are you really just needing your bus to start up sooner?  Or your
-"platform" bus?
-
-> Most architectures implement this requirement by hardcoding the
-> initialisation of a "well known" piece of hardware which is standard
-> enough to work on any platform.
+On Fri, Jul 08, 2011 at 12:38:32PM -0600, Grant Likely wrote:
+> On Fri, Jul 08, 2011 at 12:36:22PM +0200, Sascha Hauer wrote:
+> > On Thu, Jul 07, 2011 at 01:27:05PM -0600, Grant Likely wrote:
+> > > On Thu, Jul 07, 2011 at 12:37:40AM +0800, Shawn Guo wrote:
+> > > > The first patch removes the uses of cpu_is_mx(), the second one
+> > > > changes mxc gpio number macro, and the third one adds actual device
+> > > > tree probe support.
+> > > > 
+> > > > Changes since v2:
+> > > >  * Keep platform case gpio range code path unchanged, and get range
+> > > >    from gpio core only for dt case.
+> > > > 
+> > > > Changes since v1:
+> > > >  * Address review comments given by Grant and Sascha
+> > > >  * Add patch #1 to get gpio range/base from gpio core
+> > > > 
+> > > > Shawn Guo (3):
+> > > >       gpio/mxc: get rid of the uses of cpu_is_mx()
+> > > >       ARM: mxc: use ARCH_NR_GPIOS to define gpio number
+> > > >       gpio/mxc: add device tree probe support
+> > > 
+> > > Sascha; so are we good?  Should I merge this series?
+> > 
+> > These patches neither fit onto your gpio tree nor on the i.MX tree. I
+> > suggest that we give these patches a rest until both trees are merged.
+> > 
+> > That's the downside of moving core drivers to drivers/ and thus to
+> > different maintainers, but I think things will become better once
+> > the actual move is completed.
 > 
-> This is very different on the ARM architecture, where platforms have a
-> variety of interrupt controllers and timers. While the same hardcoding
-> is possible (and is actually used), it makes it almost impossible to
-> support several platforms in the same kernel.
+> It's a trivial conflict though.  I've gone ahead and picked up this
+
+There is conflict because I based the series off linux-next.  I
+checked the code and I think the conflict was resolved correctly.
+
+> series and pushed it out to gpio/next.  Shawn, please test the
+> gpio/next branch and make sure there aren't any regressions.  I've
+> only done a bit of build testing.
 > 
-> Though the device tree is helping greatly to solve this problem, some
-> platform won't ever be converted to DT, hence the need to have a
-> mechanism supporting a variety of information source.
 
-So because you are not willing to convert to DT, we must support
-yet-another-one-off type of thing instead?  That's a pretty poor reason.
+There is no problem was seen with my testing.
 
-Why can't you just move the platform to DT instead, which would solve
-this for you?  That seems much easier than adding this core code.
-
-> Early platform
-> devices having been deemed unsuitable (complexity, abuse of various
-> subsystems), this subsystem has been designed to provide the very
-> minimal level of functionality.
-> 
-> The "core device subsystem" offers a class based device/driver
-> matching model, doesn't rely on any other subsystem, is very (too?)
-> simple, and support getting information both from DT as well as from
-> static data provided by the platform. It also gives the opportunity to
-> define the probing order by offering a sorting hook at run-time.
-
-Again, just use DT and all would be fine, right?
-
-> As for the Linux driver model, the core device subsystem deals mainly
-> with device and driver objects. It also has the notion of "class" to
-> designate a group of devices implementing the same functionality, and
-> a group of drivers to be matched against the above devices
-> (CORE_DEV_CLASS_TIMER for example).
-
-Classes are going away, never create a new one, so please don't create
-new code that emulates it.
-
-I'm still not sold as to why this is needed.
-
-greg k-h
+-- 
+Regards,
+Shawn
