@@ -1,103 +1,55 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Sat, 9 Jul 2011 03:25:01 +0100
-Subject: [RFC PATCH] ARM ASoC: add sound driver for imx27pdk using
-	mc13783 codec
-In-Reply-To: <1310131491-625-1-git-send-email-J.Lambrecht@televic.com>
-References: <1310131491-625-1-git-send-email-J.Lambrecht@televic.com>
-Message-ID: <20110709022501.GA26900@sirena.org.uk>
+Date: Sat, 9 Jul 2011 03:33:58 +0100
+Subject: [PATCH 01/10] ASoc: mxs: add mxs-pcm driver
+In-Reply-To: <1310140790-2132-2-git-send-email-b29396@freescale.com>
+References: <1310140790-2132-1-git-send-email-b29396@freescale.com>
+	<1310140790-2132-2-git-send-email-b29396@freescale.com>
+Message-ID: <20110709023358.GB26900@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 08, 2011 at 03:24:51PM +0200, J??rgen Lambrecht wrote:
+On Fri, Jul 08, 2011 at 11:59:41PM +0800, Dong Aisheng wrote:
+> Signed-off-by: Dong Aisheng <b29396@freescale.com>
 
-Please read and try to follow the guidelines in SubmittingPatches:
-- Provide a sensible changelog for your patch
-- Send copies to the relevant maintainers
-- Word wrap within 80 columns
-- Follow the kernel coding style.
+*Always* CC maintainers on patches.
 
->  
->  if SND_IMX_SOC
->  
-> -config SND_MXC_SOC_SSI
-> -	tristate
-> -
+> + * Copyright (C) 2011 Freescale Semiconductor, Inc. All Rights Reserved.
+> + *
+> + * Refer to sound/soc/imx/imx-pcm-dma-mx2.c
 
-This appeears to be unrelated to adding new machine support and should
-be a separate patch.
+Why?
 
-> +config SND_SOC_IMX_MC13783
-> +	tristate
-> +
+> +	iprtd->buf = (unsigned int *)substream->dma_buffer.area;
 
-Err...  what is this for?
+This cast looks incredibly suspicious...
 
->  config SND_MXC_SOC_WM1133_EV1
->  	tristate "Audio on the the i.MX31ADS with WM1133-EV1 fitted"
->  	depends on MACH_MX31ADS_WM1133_EV1 && EXPERIMENTAL
->  	select SND_SOC_WM8350
-> -	select SND_MXC_SOC_SSI
->  	select SND_MXC_SOC_FIQ
->  	help
-
-Again, this and all the other similar hunks are totally unrelated to
-adding a machine.
-
-> +config SND_SOC_IMX27_MC13783
-> +	tristate "SoC Audio support for i.MX27 platforms with a MC13783 codec"
-> +	depends on MACH_MX27_3DS
-
-The dependency and the text disagree with each other...
-
-> +	/* set codec and cpu DAI configuration */
-> +	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
-> +		ret = snd_soc_dai_set_fmt(codec_dai, FMT_PLAYBACK);
-> +		if (ret) {
-> +			pr_err("%s: failed set codec dai format\n", __func__);
-> +			return ret;
-> +		}
-> +		ret = snd_soc_dai_set_fmt(cpu_dai, FMT_PLAYBACK);
-> +		if (ret) {
-> +			pr_err("%s: failed set cpu dai format\n", __func__);
-> +			return ret;
-
-Can we have some blank lines for legibility please?
-
-> +		ret = snd_soc_dai_set_tdm_slot(codec_dai, 0, 0, 4, 32); /* args are not used in mc13783 */
-> +		if (ret)
-> +			return ret;
-> +	}
-
-If the arguments are not used why are you supplying them, or even
-calling this function?
-
-> +//ok: checked; we use clia input pin; last arg is not used
-> +	ret = snd_soc_dai_set_sysclk(codec_dai, MC13783_CLK_CLIA, 26000000, SND_SOC_CLOCK_OUT);
-> +	if (ret) {
-> +		pr_err("%s: failed setting codec sysclk\n", __func__);
-> +		return ret;
-> +	}
-
-Coding style here and elsewhere.  You're also rather inconsistent about
-error reporting.
-
-> +static int imx_mc13783_audio_hifi_hw_free(struct snd_pcm_substream *substream)
+> +static int snd_mxs_pcm_prepare(struct snd_pcm_substream *substream)
 > +{
 > +	return 0;
 > +}
-
-Omit empty functions.
-
-> +static int __init imx_mc13783_audio_init(void)
-> +{
-> +	int ret;
 > +
-> +	pr_info("IMX MC13783 Sound Card\n");
 
-This is needlessly chatty.
+Remove empty functions.
 
-> +	imx_mc13783_snd_device = platform_device_alloc("soc-audio", -1);
-> +	if (!imx_mc13783_snd_device)
-> +		return -ENOMEM;
+> +static int snd_mxs_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
+> +{
+> +	struct snd_pcm_runtime *runtime = substream->runtime;
+> +	struct mxs_pcm_runtime_data *iprtd = runtime->private_data;
+> +
+> +	switch (cmd) {
+> +	case SNDRV_PCM_TRIGGER_START:
+> +	case SNDRV_PCM_TRIGGER_RESUME:
+> +	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
+> +		dmaengine_submit(iprtd->desc);
+> +
+> +		break;
+> +
 
-Don't use soc-audio, use snd_soc_register_card().
+Why the random blank line?
+
+> +static struct platform_driver mxs_pcm_driver = {
+> +	.driver = {
+> +			.name = "mxs-pcm-audio",
+> +			.owner = THIS_MODULE,
+
+Indentation here is very odd...
