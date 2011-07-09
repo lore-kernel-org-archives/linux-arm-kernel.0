@@ -1,85 +1,87 @@
 From: tixy@yxit.co.uk (Tixy)
-Date: Sat,  9 Jul 2011 11:57:19 +0100
-Subject: [PATCH 32/51] ARM: kprobes: Decode 16-bit Thumb branch instructions
+Date: Sat,  9 Jul 2011 11:57:22 +0100
+Subject: [PATCH 35/51] ARM: kprobes: Add load_write_pc()
 In-Reply-To: <1310209058-20980-1-git-send-email-tixy@yxit.co.uk>
 References: <1310209058-20980-1-git-send-email-tixy@yxit.co.uk>
-Message-ID: <1310209058-20980-33-git-send-email-tixy@yxit.co.uk>
+Message-ID: <1310209058-20980-36-git-send-email-tixy@yxit.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jon Medhurst <tixy@yxit.co.uk>
 
-We previously changed the behaviour of probes so that conditional
-instructions don't fire when the condition isn't met. For ARM branches,
-and Thumb branches in IT blocks, this means they don't fire if the
-branch isn't taken.
-
-For consistency, we implement the same for Thumb conditional branch
-instructions. This involves setting up insn_check_cc to point to the
-relevant condition checking function. As the emulation routine is only
-called when this condition passes, it doesn't need to check again and
-can unconditionally update PC.
+This writes a value to PC which was obtained as the result of a
+LDR or LDM instruction. For ARMv5T and later this must perform
+interworking.
 
 Signed-off-by: Jon Medhurst <tixy@yxit.co.uk>
 ---
- arch/arm/kernel/kprobes-thumb.c |   38 ++++++++++++++++++++++++++++++++++++++
- 1 files changed, 38 insertions(+), 0 deletions(-)
+ arch/arm/kernel/kprobes.h        |   24 ++++++++++++++++++++++++
+ arch/arm/kernel/kprobes-common.c |   15 +++++++++++++++
+ 2 files changed, 39 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/kernel/kprobes-thumb.c b/arch/arm/kernel/kprobes-thumb.c
-index 997fc6d..d3133fd 100644
---- a/arch/arm/kernel/kprobes-thumb.c
-+++ b/arch/arm/kernel/kprobes-thumb.c
-@@ -141,6 +141,35 @@ t16_decode_it(kprobe_opcode_t insn, struct arch_specific_insn *asi)
- 	return INSN_GOOD_NO_SLOT;
+diff --git a/arch/arm/kernel/kprobes.h b/arch/arm/kernel/kprobes.h
+index 12627a3..5d6bf0d 100644
+--- a/arch/arm/kernel/kprobes.h
++++ b/arch/arm/kernel/kprobes.h
+@@ -109,6 +109,30 @@ static inline void __kprobes bx_write_pc(long pcv, struct pt_regs *regs)
+ 	regs->ARM_pc = pcv;
  }
  
-+static void __kprobes
-+t16_simulate_cond_branch(struct kprobe *p, struct pt_regs *regs)
++
++#if __LINUX_ARM_ARCH__ >= 6
++
++/* Kernels built for >= ARMv6 should never run on <= ARMv5 hardware, so... */
++#define load_write_pc_interworks true
++#define test_load_write_pc_interworking()
++
++#else /* __LINUX_ARM_ARCH__ < 6 */
++
++/* We need run-time testing to determine if load_write_pc() should interwork. */
++extern bool load_write_pc_interworks;
++void __init test_load_write_pc_interworking(void);
++
++#endif
++
++static inline void __kprobes load_write_pc(long pcv, struct pt_regs *regs)
 +{
-+	kprobe_opcode_t insn = p->opcode;
-+	unsigned long pc = thumb_probe_pc(p);
-+	long offset = insn & 0x7f;
-+	offset -= insn & 0x80; /* Apply sign bit */
-+	regs->ARM_pc = pc + (offset * 2);
++	if (load_write_pc_interworks)
++		bx_write_pc(pcv, regs);
++	else
++		regs->ARM_pc = pcv;
 +}
 +
-+static enum kprobe_insn __kprobes
-+t16_decode_cond_branch(kprobe_opcode_t insn, struct arch_specific_insn *asi)
-+{
-+	int cc = (insn >> 8) & 0xf;
-+	asi->insn_check_cc = kprobe_condition_checks[cc];
-+	asi->insn_handler = t16_simulate_cond_branch;
-+	return INSN_GOOD_NO_SLOT;
-+}
 +
-+static void __kprobes
-+t16_simulate_branch(struct kprobe *p, struct pt_regs *regs)
-+{
-+	kprobe_opcode_t insn = p->opcode;
-+	unsigned long pc = thumb_probe_pc(p);
-+	long offset = insn & 0x3ff;
-+	offset -= insn & 0x400; /* Apply sign bit */
-+	regs->ARM_pc = pc + (offset * 2);
-+}
-+
- static unsigned long __kprobes
- t16_emulate_loregs(struct kprobe *p, struct pt_regs *regs)
- {
-@@ -472,6 +501,15 @@ const union decode_item kprobe_decode_thumb16_table[] = {
- 	/* SVC				1101 1111 xxxx xxxx */
- 	DECODE_REJECT	(0xfe00, 0xde00),
+ void __kprobes kprobe_simulate_nop(struct kprobe *p, struct pt_regs *regs);
+ void __kprobes kprobe_emulate_none(struct kprobe *p, struct pt_regs *regs);
  
-+	/* Conditional branch		1101 xxxx xxxx xxxx */
-+	DECODE_CUSTOM	(0xf000, 0xd000, t16_decode_cond_branch),
+diff --git a/arch/arm/kernel/kprobes-common.c b/arch/arm/kernel/kprobes-common.c
+index 84c0c74..41e8218 100644
+--- a/arch/arm/kernel/kprobes-common.c
++++ b/arch/arm/kernel/kprobes-common.c
+@@ -45,9 +45,24 @@ void __init find_str_pc_offset(void)
+ #endif /* !find_str_pc_offset */
+ 
+ 
++#ifndef test_load_write_pc_interworking
 +
-+	/*
-+	 * Unconditional branch
-+	 * B				1110 0xxx xxxx xxxx
-+	 */
-+	DECODE_SIMULATE	(0xf800, 0xe000, t16_simulate_branch),
++bool load_write_pc_interworks;
 +
- 	DECODE_END
- };
++void __init test_load_write_pc_interworking(void)
++{
++	int arch = cpu_architecture();
++	BUG_ON(arch == CPU_ARCH_UNKNOWN);
++	load_write_pc_interworks = arch >= CPU_ARCH_ARMv5T;
++}
++
++#endif /* !test_load_write_pc_interworking */
++
++
+ void __init arm_kprobe_decode_init(void)
+ {
+ 	find_str_pc_offset();
++	test_load_write_pc_interworking();
+ }
+ 
  
 -- 
 1.7.2.5
