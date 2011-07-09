@@ -1,33 +1,42 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Sat, 9 Jul 2011 16:40:18 -0600 (MDT)
-Subject: [PATCH] OMAP: omap_device: replace _find_by_pdev() with
-	to_omap_device()
-In-Reply-To: <1309980377-5964-1-git-send-email-khilman@ti.com>
-References: <1309980377-5964-1-git-send-email-khilman@ti.com>
-Message-ID: <alpine.DEB.2.00.1107091639290.15984@utopia.booyaka.com>
+From: troy.kisky@boundarydevices.com (Troy Kisky)
+Date: Sat,  9 Jul 2011 15:51:53 -0700
+Subject: [PATCH 1/1] ARM: i.MX50/53: debug-macro: fix UART_PADDR
+Message-ID: <1310251913-9877-1-git-send-email-troy.kisky@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 6 Jul 2011, Kevin Hilman wrote:
+The i.MX51 UART_PADDR value does not work for MX50/53.
 
-> The omap_device layer currently has two ways of getting an omap_device
-> pointer from a platform_device pointer.
-> 
-> Replace current usage of _find_by_pdev() with to_omap_device() since
-> to_omap_device() is more familiar to the existing to_platform_device()
-> used when getting a platform_device pointer from a struct device pointer.
-> 
-> Cc: Felipe Balbi <balbi@ti.com>
-> Signed-off-by: Kevin Hilman <khilman@ti.com>
-> ---
-> Paul, please consider this minor cleanup for the v3.1 merge window.
-> Applies to v3.0-c6.
-> 
->  arch/arm/plat-omap/omap_device.c |   15 +++++----------
->  1 files changed, 5 insertions(+), 10 deletions(-)
+Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
+---
+ arch/arm/plat-mxc/include/mach/debug-macro.S |    9 ++++++++-
+ 1 files changed, 8 insertions(+), 1 deletions(-)
 
-Thanks, queued for 3.1 with Felipe's Reviewed-by at 
-git://git.pwsan.com/linux-2.6 in 'omap_device_cleanup_3.1'.
-
-
-- Paul
+diff --git a/arch/arm/plat-mxc/include/mach/debug-macro.S b/arch/arm/plat-mxc/include/mach/debug-macro.S
+index 8e8d175..3919ad4 100644
+--- a/arch/arm/plat-mxc/include/mach/debug-macro.S
++++ b/arch/arm/plat-mxc/include/mach/debug-macro.S
+@@ -37,13 +37,20 @@
+ #define UART_PADDR	MX3x_UART1_BASE_ADDR
+ #endif
+ 
+-#ifdef CONFIG_ARCH_MX5
++#ifdef CONFIG_ARCH_MX51
+ #ifdef UART_PADDR
+ #error "CONFIG_DEBUG_LL is incompatible with multiple archs"
+ #endif
+ #define UART_PADDR	MX51_UART1_BASE_ADDR
+ #endif
+ 
++#if defined(CONFIG_ARCH_MX50) || defined(CONFIG_ARCH_MX53)
++#ifdef UART_PADDR
++#error "CONFIG_DEBUG_LL is incompatible with multiple archs"
++#endif
++#define UART_PADDR	MX53_UART1_BASE_ADDR
++#endif
++
+ #define UART_VADDR	IMX_IO_ADDRESS(UART_PADDR)
+ 
+ 		.macro	addruart, rp, rv
+-- 
+1.7.0.4
