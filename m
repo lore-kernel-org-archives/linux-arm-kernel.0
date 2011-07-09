@@ -1,9 +1,10 @@
 From: tixy@yxit.co.uk (Tixy)
-Date: Sat,  9 Jul 2011 11:56:58 +0100
-Subject: [PATCH 11/51] ARM: Kconfig: Allow kprobes on Thumb-2 kernels
+Date: Sat,  9 Jul 2011 11:57:00 +0100
+Subject: [PATCH 13/51] ARM: kprobes: Add condition code checking to Thumb
+	emulation
 In-Reply-To: <1310209058-20980-1-git-send-email-tixy@yxit.co.uk>
 References: <1310209058-20980-1-git-send-email-tixy@yxit.co.uk>
-Message-ID: <1310209058-20980-12-git-send-email-tixy@yxit.co.uk>
+Message-ID: <1310209058-20980-14-git-send-email-tixy@yxit.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,21 +12,49 @@ From: Jon Medhurst <tixy@yxit.co.uk>
 
 Signed-off-by: Jon Medhurst <tixy@yxit.co.uk>
 ---
- arch/arm/Kconfig |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/kernel/kprobes-thumb.c |   22 ++++++++++++++++++++++
+ 1 files changed, 22 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 9adc278..b4177c5 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -10,7 +10,7 @@ config ARM
- 	select GENERIC_ATOMIC64 if (CPU_V6 || !CPU_32v6K || !AEABI)
- 	select HAVE_OPROFILE if (HAVE_PERF_EVENTS)
- 	select HAVE_ARCH_KGDB
--	select HAVE_KPROBES if (!XIP_KERNEL && !THUMB2_KERNEL)
-+	select HAVE_KPROBES if (!XIP_KERNEL)
- 	select HAVE_KRETPROBES if (HAVE_KPROBES)
- 	select HAVE_FUNCTION_TRACER if (!XIP_KERNEL)
- 	select HAVE_FTRACE_MCOUNT_RECORD if (!XIP_KERNEL)
+diff --git a/arch/arm/kernel/kprobes-thumb.c b/arch/arm/kernel/kprobes-thumb.c
+index ac6b2d1..24a188b 100644
+--- a/arch/arm/kernel/kprobes-thumb.c
++++ b/arch/arm/kernel/kprobes-thumb.c
+@@ -13,14 +13,36 @@
+ 
+ #include "kprobes.h"
+ 
++
++/*
++ * True if current instruction is in an IT block.
++ */
++#define in_it_block(cpsr)	((cpsr & 0x06000c00) != 0x00000000)
++
++/*
++ * Return the condition code to check for the currently executing instruction.
++ * This is in ITSTATE<7:4> which is in CPSR<15:12> but is only valid if
++ * in_it_block returns true.
++ */
++#define current_cond(cpsr)	((cpsr >> 12) & 0xf)
++
++static unsigned long __kprobes thumb_check_cc(unsigned long cpsr)
++{
++	if (unlikely(in_it_block(cpsr)))
++		return kprobe_condition_checks[current_cond(cpsr)](cpsr);
++	return true;
++}
++
+ enum kprobe_insn __kprobes
+ thumb16_kprobe_decode_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi)
+ {
++	asi->insn_check_cc = thumb_check_cc;
+ 	return INSN_REJECTED;
+ }
+ 
+ enum kprobe_insn __kprobes
+ thumb32_kprobe_decode_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi)
+ {
++	asi->insn_check_cc = thumb_check_cc;
+ 	return INSN_REJECTED;
+ }
 -- 
 1.7.2.5
