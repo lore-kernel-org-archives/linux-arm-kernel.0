@@ -1,104 +1,103 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Sat, 9 Jul 2011 11:03:25 +0900
-Subject: [PATCH] of: add devicetree API for regulator
-In-Reply-To: <1310120428-22700-8-git-send-email-haojian.zhuang@marvell.com>
-References: <1310120428-22700-1-git-send-email-haojian.zhuang@marvell.com>
-	<1310120428-22700-2-git-send-email-haojian.zhuang@marvell.com>
-	<1310120428-22700-3-git-send-email-haojian.zhuang@marvell.com>
-	<1310120428-22700-4-git-send-email-haojian.zhuang@marvell.com>
-	<1310120428-22700-5-git-send-email-haojian.zhuang@marvell.com>
-	<1310120428-22700-6-git-send-email-haojian.zhuang@marvell.com>
-	<1310120428-22700-7-git-send-email-haojian.zhuang@marvell.com>
-	<1310120428-22700-8-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <20110709020323.GH18860@opensource.wolfsonmicro.com>
+Date: Sat, 9 Jul 2011 03:25:01 +0100
+Subject: [RFC PATCH] ARM ASoC: add sound driver for imx27pdk using
+	mc13783 codec
+In-Reply-To: <1310131491-625-1-git-send-email-J.Lambrecht@televic.com>
+References: <1310131491-625-1-git-send-email-J.Lambrecht@televic.com>
+Message-ID: <20110709022501.GA26900@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 08, 2011 at 06:20:24PM +0800, Haojian Zhuang wrote:
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+On Fri, Jul 08, 2011 at 03:24:51PM +0200, J??rgen Lambrecht wrote:
 
-Overall this looks like a reasonable start but I'm having a hard time
-seeing how this would actually be used and there's a *lot* of Linux
-specifics in here which aren't going to be acceptable for device tree as
-device tree is supposed to be platform neutral.
+Please read and try to follow the guidelines in SubmittingPatches:
+- Provide a sensible changelog for your patch
+- Send copies to the relevant maintainers
+- Word wrap within 80 columns
+- Follow the kernel coding style.
 
-As a general comment blank lines would *really* improve the legibility
-of the code.
+>  
+>  if SND_IMX_SOC
+>  
+> -config SND_MXC_SOC_SSI
+> -	tristate
+> -
 
-> ---
->  drivers/of/Kconfig           |    4 +
->  drivers/of/Makefile          |    1 +
->  drivers/of/of_regulator.c    |  166 ++++++++++++++++++++++++++++++++++++++++++
+This appeears to be unrelated to adding new machine support and should
+be a separate patch.
 
-Why is this in drivers/of?
+> +config SND_SOC_IMX_MC13783
+> +	tristate
+> +
 
-> +	p = of_get_property(of_dev, "voltages", &size);
+Err...  what is this for?
 
-voltage_range would probably be better.
+>  config SND_MXC_SOC_WM1133_EV1
+>  	tristate "Audio on the the i.MX31ADS with WM1133-EV1 fitted"
+>  	depends on MACH_MX31ADS_WM1133_EV1 && EXPERIMENTAL
+>  	select SND_SOC_WM8350
+> -	select SND_MXC_SOC_SSI
+>  	select SND_MXC_SOC_FIQ
+>  	help
 
-> +	if (p && size / sizeof(int) == 2) {
-> +		constraints->min_uV = be32_to_cpu(*p++);
-> +		constraints->max_uV = be32_to_cpu(*p);
+Again, this and all the other similar hunks are totally unrelated to
+adding a machine.
+
+> +config SND_SOC_IMX27_MC13783
+> +	tristate "SoC Audio support for i.MX27 platforms with a MC13783 codec"
+> +	depends on MACH_MX27_3DS
+
+The dependency and the text disagree with each other...
+
+> +	/* set codec and cpu DAI configuration */
+> +	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
+> +		ret = snd_soc_dai_set_fmt(codec_dai, FMT_PLAYBACK);
+> +		if (ret) {
+> +			pr_err("%s: failed set codec dai format\n", __func__);
+> +			return ret;
+> +		}
+> +		ret = snd_soc_dai_set_fmt(cpu_dai, FMT_PLAYBACK);
+> +		if (ret) {
+> +			pr_err("%s: failed set cpu dai format\n", __func__);
+> +			return ret;
+
+Can we have some blank lines for legibility please?
+
+> +		ret = snd_soc_dai_set_tdm_slot(codec_dai, 0, 0, 4, 32); /* args are not used in mc13783 */
+> +		if (ret)
+> +			return ret;
 > +	}
 
-This and pretty much all of the rest of the code doesn't look like it's
-going to complain about parse problems.  That seems wrong, we'll just
-silently ignore things we think we should understand.
+If the arguments are not used why are you supplying them, or even
+calling this function?
 
-> +	p = of_get_property(of_dev, "modes-mask", NULL);
-> +	if (p)
-> +		constraints->valid_modes_mask = be32_to_cpu(*p);
-
-This probably shouldn't be in the OF bindings at all, the modes are a
-Linux specific property.  We probably shouldn't be putting random
-bitmasks directly in OF, and certainly not Linux defined ones.  This
-applies to an awful lot of the rest of the code too.
-
-> +	cp = of_get_property(of_dev, "ops-mask", &size);
-> +	tmp = 0;
-> +	if (cp && size > 0) {
-> +		i = 0;
-> +		do {
-> +			len = strlen(ops[i]);
-> +			if (!strncmp(cp, ops[i], len)) {
-> +				constraints->valid_ops_mask |= 1 << i;
-> +				/* need to handle '\0' */
-> +				cp += len + 1;
-> +				size = size - len - 1;
-> +				i = 0;
-> +			} else
-> +				i++;
-> +		} while (i < ARRAY_SIZE(ops));
-> +		if (size > 0)
-> +			printk(KERN_WARNING "Invalid string:%s\n", cp);
+> +//ok: checked; we use clia input pin; last arg is not used
+> +	ret = snd_soc_dai_set_sysclk(codec_dai, MC13783_CLK_CLIA, 26000000, SND_SOC_CLOCK_OUT);
+> +	if (ret) {
+> +		pr_err("%s: failed setting codec sysclk\n", __func__);
+> +		return ret;
 > +	}
 
-If there isn't a helper function for this there should be one.
+Coding style here and elsewhere.  You're also rather inconsistent about
+error reporting.
 
-> +	supply = kzalloc(sizeof(struct regulator_consumer_supply) * count,
-> +		GFP_KERNEL);
-> +	if (supply == NULL)
-> +		return -EINVAL;
-> +	str = p;
-> +	calc_size = size;
-> +	i = 0;
-> +	while (str && calc_size > 0 && i < count) {
-> +		len = strlen(str);
-> +		if (len == 0)
-> +			break;
-> +		supply[i++].supply = str;
-> +		calc_size = calc_size - len - 1;
-> +		str += len + 1;
-> +	}
-> +	data->consumer_supplies = supply;
-> +	data->num_consumer_supplies = count;
+> +static int imx_mc13783_audio_hifi_hw_free(struct snd_pcm_substream *substream)
+> +{
+> +	return 0;
+> +}
 
-This isn't going to fly, the consumer devices need to be referenced in
-the OF tree rather than via their Linux device names.
+Omit empty functions.
 
-> +extern int of_regulator_init_data(struct device_node *of_node,
-> +				struct regulator_init_data *data);
-> +extern void of_regulator_deinit_data(struct regulator_init_data *data);
+> +static int __init imx_mc13783_audio_init(void)
+> +{
+> +	int ret;
+> +
+> +	pr_info("IMX MC13783 Sound Card\n");
 
-How exactly is this supposed to be used?  I'd really expect the
-regulator core to be doing this transparently for the drivers.
+This is needlessly chatty.
+
+> +	imx_mc13783_snd_device = platform_device_alloc("soc-audio", -1);
+> +	if (!imx_mc13783_snd_device)
+> +		return -ENOMEM;
+
+Don't use soc-audio, use snd_soc_register_card().
