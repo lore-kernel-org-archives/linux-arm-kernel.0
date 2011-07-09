@@ -1,43 +1,123 @@
-From: jj@chaosbits.net (Jesper Juhl)
-Date: Sat, 9 Jul 2011 23:11:14 +0200 (CEST)
-Subject: [PATCH 1/7] ARM: static should be at beginning of declaration
-In-Reply-To: <alpine.LNX.2.00.1107092304160.25516@swampdragon.chaosbits.net>
-References: <alpine.LNX.2.00.1107092304160.25516@swampdragon.chaosbits.net>
-Message-ID: <alpine.LNX.2.00.1107092309500.25516@swampdragon.chaosbits.net>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Sat, 9 Jul 2011 15:26:00 -0600 (MDT)
+Subject: [PATCH] OMAP2+: clock: allow per-SoC clock init code to prevent
+	clockdomain calls from clock code
+Message-ID: <alpine.DEB.2.00.1107091524390.15984@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make sure that the 'static' keywork is at the beginning of declaration
-for arch/arm/mach-shmobile/board-ap4evb.c
 
-This gets rid of warnings like
-  warning: ?static? is not at beginning of declaration
-when building with -Wold-style-declaration (and/or -Wextra which also
-enables it).
+The OMAP2/3 clock code was written to notify the clockdomain code when
+the first clock in a clockdomain is enabled and when the last enabled
+clock in a clockdomain is disabled.  OMAP4 requires a different
+approach: the hwmod code needs to signal the clockdomain code when to
+force-enable and auto-idle a clockdomain during the IP block enable
+process.  The current conjecture is that once that hwmod sequence is
+implemented, it will no longer be necessary for the clock code to call
+into the clockdomain code for "optional clocks" on OMAP4.
 
-Signed-off-by: Jesper Juhl <jj@chaosbits.net>
+Add a static flag to the OMAP2+ clock code, clkdm_control, that by
+default preserves the OMAP2/3 behavior.  Also add a function,
+omap2_clk_disable_clkdm_control(), intended to be called from OMAP4
+and beyond clock initcalls, that disables the old behavior.
+
+Part of this patch was originally based on a patch by Rajendra Nayak
+<rnayak@ti.com>.
+
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Cc: Beno?t Cousson <b-cousson@ti.com>
+Cc: Rajendra Nayak <rnayak@ti.com>
 ---
- arch/arm/mach-shmobile/board-ap4evb.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/mach-omap2/clock.c |   27 ++++++++++++++++++++++++---
+ arch/arm/mach-omap2/clock.h |    3 +++
+ 2 files changed, 27 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/board-ap4evb.c b/arch/arm/mach-shmobile/board-ap4evb.c
-index 803bc6e..bb4e084 100644
---- a/arch/arm/mach-shmobile/board-ap4evb.c
-+++ b/arch/arm/mach-shmobile/board-ap4evb.c
-@@ -443,7 +443,7 @@ static struct platform_device usb1_host_device = {
- 	.resource	= usb1_host_resources,
- };
+diff --git a/arch/arm/mach-omap2/clock.c b/arch/arm/mach-omap2/clock.c
+index 180299e..fc84576 100644
+--- a/arch/arm/mach-omap2/clock.c
++++ b/arch/arm/mach-omap2/clock.c
+@@ -38,6 +38,14 @@
+ u8 cpu_mask;
  
--const static struct fb_videomode ap4evb_lcdc_modes[] = {
-+static const struct fb_videomode ap4evb_lcdc_modes[] = {
- 	{
- #ifdef CONFIG_AP4EVB_QHD
- 		.name		= "R63302(QHD)",
+ /*
++ * clkdm_control: if true, then when a clock is enabled in the
++ * hardware, its clockdomain will first be enabled; and when a clock
++ * is disabled in the hardware, its clockdomain will be disabled
++ * afterwards.
++ */
++static bool clkdm_control = true;
++
++/*
+  * OMAP2+ specific clock functions
+  */
+ 
+@@ -100,6 +108,19 @@ void omap2_init_clk_clkdm(struct clk *clk)
+ }
+ 
+ /**
++ * omap2_clk_disable_clkdm_control - disable clkdm control on clk enable/disable
++ *
++ * Prevent the OMAP clock code from calling into the clockdomain code
++ * when a hardware clock in that clockdomain is enabled or disabled.
++ * Intended to be called at init time from omap*_clk_init().  No
++ * return value.
++ */
++void __init omap2_clk_disable_clkdm_control(void)
++{
++	clkdm_control = false;
++}
++
++/**
+  * omap2_clk_dflt_find_companion - find companion clock to @clk
+  * @clk: struct clk * to find the companion clock of
+  * @other_reg: void __iomem ** to return the companion clock CM_*CLKEN va in
+@@ -268,7 +289,7 @@ void omap2_clk_disable(struct clk *clk)
+ 		clk->ops->disable(clk);
+ 	}
+ 
+-	if (clk->clkdm)
++	if (clkdm_control && clk->clkdm)
+ 		clkdm_clk_disable(clk->clkdm, clk);
+ 
+ 	if (clk->parent)
+@@ -308,7 +329,7 @@ int omap2_clk_enable(struct clk *clk)
+ 		}
+ 	}
+ 
+-	if (clk->clkdm) {
++	if (clkdm_control && clk->clkdm) {
+ 		ret = clkdm_clk_enable(clk->clkdm, clk);
+ 		if (ret) {
+ 			WARN(1, "clock: %s: could not enable clockdomain %s: "
+@@ -330,7 +351,7 @@ int omap2_clk_enable(struct clk *clk)
+ 	return 0;
+ 
+ oce_err3:
+-	if (clk->clkdm)
++	if (clkdm_control && clk->clkdm)
+ 		clkdm_clk_disable(clk->clkdm, clk);
+ oce_err2:
+ 	if (clk->parent)
+diff --git a/arch/arm/mach-omap2/clock.h b/arch/arm/mach-omap2/clock.h
+index e10ff2b..48ac568 100644
+--- a/arch/arm/mach-omap2/clock.h
++++ b/arch/arm/mach-omap2/clock.h
+@@ -16,6 +16,8 @@
+ #ifndef __ARCH_ARM_MACH_OMAP2_CLOCK_H
+ #define __ARCH_ARM_MACH_OMAP2_CLOCK_H
+ 
++#include <linux/kernel.h>
++
+ #include <plat/clock.h>
+ 
+ /* CM_CLKSEL2_PLL.CORE_CLK_SRC bits (2XXX) */
+@@ -72,6 +74,7 @@ void omap2_clk_disable_unused(struct clk *clk);
+ #endif
+ 
+ void omap2_init_clk_clkdm(struct clk *clk);
++void __init omap2_clk_disable_clkdm_control(void);
+ 
+ /* clkt_clksel.c public functions */
+ u32 omap2_clksel_round_rate_div(struct clk *clk, unsigned long target_rate,
 -- 
-1.7.6
-
-
--- 
-Jesper Juhl <jj@chaosbits.net>       http://www.chaosbits.net/
-Don't top-post http://www.catb.org/jargon/html/T/top-post.html
-Plain text mails only, please.
+1.7.5.4
