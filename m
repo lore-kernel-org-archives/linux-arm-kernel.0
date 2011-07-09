@@ -1,56 +1,57 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 10 Jul 2011 00:05:44 +0100
-Subject: [PATCH 03/17] ARM: gic: Use cpu pm notifiers to save gic state
-In-Reply-To: <CAMbhsRR0XCJ3-6DznCAmEk1AywpFhr70-1mH=cy9YBpZa978pw@mail.gmail.com>
-References: <1310053830-23779-1-git-send-email-lorenzo.pieralisi@arm.com>
-	<1310053830-23779-4-git-send-email-lorenzo.pieralisi@arm.com>
-	<20110709102100.GJ4812@n2100.arm.linux.org.uk>
-	<CAMbhsRTFfv1q0po5CDtRfRBN5pABaKm3C0OR4U9yHmRJiFUOtw@mail.gmail.com>
-	<20110709223315.GO4812@n2100.arm.linux.org.uk>
-	<CAMbhsRR0XCJ3-6DznCAmEk1AywpFhr70-1mH=cy9YBpZa978pw@mail.gmail.com>
-Message-ID: <20110709230544.GP4812@n2100.arm.linux.org.uk>
+Date: Sun, 10 Jul 2011 00:11:09 +0100
+Subject: [PATCH] pxa2xx_spi: fix memory corruption
+In-Reply-To: <201107100105.48168.marek.vasut@gmail.com>
+References: <1310246098-21208-1-git-send-email-anarsoul@gmail.com>
+	<201107100105.48168.marek.vasut@gmail.com>
+Message-ID: <20110709231108.GQ4812@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 09, 2011 at 04:01:19PM -0700, Colin Cross wrote:
-> On Sat, Jul 9, 2011 at 3:33 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Sat, Jul 09, 2011 at 03:10:56PM -0700, Colin Cross wrote:
-> >> This is necessary for cpuidle states that lose the GIC registers, not
-> >> just suspend, because the GIC is in the cpu's power domain. ?We could
-> >> avoid saving and restoring all the GIC registers in suspend and idle
-> >> by reusing the initialization functions, and then having the core irq
-> >> code call the unmask, set_type, and set_affinity functions on each irq
-> >> to reconfigure it, but that will be very inefficient - it will convert
-> >> each register write in the restore functions to a read-modify-write
-> >> per interrupt in that register. ?Santosh is already complaining that
-> >> this commong GIC restore code will be slower than the automatic DMA to
-> >> restore the GIC registers that OMAP4 supports.
-> >
-> > Well, we need to come up with something sensible - a way of doing this
-> > which doesn't require every interrupt controller driver (of which we as
-> > an architecture have many) to have lots of support added.
-> >
-> > If the current way is inefficient and is noticably so, then let's talk
-> > to Thomas about finding a way around that - maybe having the generic
-> > code make one suspend/resume callback per irq gc chip rather than doing
-> > it per-IRQ. ?We can then reuse the same paths for suspend/resume as for
-> > idle state saving.
-> >
+On Sun, Jul 10, 2011 at 01:05:48AM +0200, Marek Vasut wrote:
+> On Saturday, July 09, 2011 11:14:58 PM Vasily Khoruzhick wrote:
+> > pxa2xx_spi_probe allocates struct driver_data and null_dma_buf
+> > at same time via spi_alloc_master(), but then calculates
+> > null_dma_buf pointer incorrectly, and it causes memory corruption
+> > later if DMA usage is enabled.
+> > 
+> > Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+> > ---
+> >  drivers/spi/pxa2xx_spi.c |    2 +-
+> >  1 files changed, 1 insertions(+), 1 deletions(-)
+> > 
+> > diff --git a/drivers/spi/pxa2xx_spi.c b/drivers/spi/pxa2xx_spi.c
+> > index dc25bee..ef38fbf 100644
+> > --- a/drivers/spi/pxa2xx_spi.c
+> > +++ b/drivers/spi/pxa2xx_spi.c
+> > @@ -1569,7 +1569,7 @@ static int __devinit pxa2xx_spi_probe(struct
+> > platform_device *pdev) master->transfer = transfer;
+> > 
+> >  	drv_data->ssp_type = ssp->type;
+> > -	drv_data->null_dma_buf = (u32 *)ALIGN((u32)(drv_data +
+> > +	drv_data->null_dma_buf = (u32 *)ALIGN(((u32)drv_data +
+> >  						sizeof(struct driver_data)), 8);
 > 
-> Are you referring to moving the gic driver to be gc chip?  Otherwise,
-> I don't understand your suggestion - how is callback per chip any
-> different than what this patch implements?  It just gets it's
-> notification through a cpu_pm notifier, which works in idle and
-> suspend, instead of a syscore op like the gc driver does.
-> 
-> This patch does save and restore some registers that are never
-> modified after init, so they don't need to be saved.
+> This thing looks a bit disturbing in itself. Like, where the heck is that thing 
+> pointing in the end ? Since some data are written to address in "null_dma_buf" 
+> ... isn't this just changing the corruption impact ?
 
-The point is that we should aim to get to the point where, if an
-interrupt controller supports PM, then it supports _all_ PM out the
-box and doesn't require additional code for cpu idle PM vs system
-suspend PM.
+        /* Allocate master with space for drv_data and null dma buffer */
+        master = spi_alloc_master(dev, sizeof(struct driver_data) + 16);
 
-In other words, all we should need to do is provide genirq with a
-couple of functions for 'save state' and 'restore state'.
+So there's 16 bytes at the end of driver_data.
+
+However:
+
+	(u32)(drv_data + sizeof(struct driver_data))
+
+is pointer arithmetic.  drv_data points at an object of sizeof(struct
+driver_data).  Adding one to this increments the pointer by
+sizeof(struct driver_data) bytes.  So the above expression increments
+the pointer by sizeof(struct driver_data)*sizeof(struct driver_data)
+bytes, which is obviously complete rubbish.
+
+	((u32)drv_data + sizeof(struct driver_data))
+
+casts drv_data to a u32 first, then adds the sizeof(struct driver_data)
+which moves us into the 16 bytes allocated off the end of the struct.
