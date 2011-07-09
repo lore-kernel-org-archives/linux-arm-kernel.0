@@ -1,131 +1,139 @@
 From: tixy@yxit.co.uk (Tixy)
-Date: Sat,  9 Jul 2011 11:56:54 +0100
-Subject: [PATCH 07/51] ARM: kprobes: Move find_str_pc_offset into
-	kprobes-common.c
+Date: Sat,  9 Jul 2011 11:57:30 +0100
+Subject: [PATCH 43/51] ARM: kprobes: Decode 32-bit Thumb data-processing
+	(plain binary immediate) instructions
 In-Reply-To: <1310209058-20980-1-git-send-email-tixy@yxit.co.uk>
 References: <1310209058-20980-1-git-send-email-tixy@yxit.co.uk>
-Message-ID: <1310209058-20980-8-git-send-email-tixy@yxit.co.uk>
+Message-ID: <1310209058-20980-44-git-send-email-tixy@yxit.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jon Medhurst <tixy@yxit.co.uk>
 
-Move str_pc_offset into kprobes-common.c as it will be needed by common
-code later.
-
 Signed-off-by: Jon Medhurst <tixy@yxit.co.uk>
 ---
- arch/arm/kernel/kprobes.h        |    2 ++
- arch/arm/kernel/kprobes-arm.c    |   28 ----------------------------
- arch/arm/kernel/kprobes-common.c |   33 +++++++++++++++++++++++++++++++++
- 3 files changed, 35 insertions(+), 28 deletions(-)
+ arch/arm/kernel/kprobes-thumb.c |   95 +++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 95 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/kernel/kprobes.h b/arch/arm/kernel/kprobes.h
-index 4de2f37..43f630d 100644
---- a/arch/arm/kernel/kprobes.h
-+++ b/arch/arm/kernel/kprobes.h
-@@ -36,6 +36,8 @@ void __init arm_kprobe_decode_init(void);
+diff --git a/arch/arm/kernel/kprobes-thumb.c b/arch/arm/kernel/kprobes-thumb.c
+index cf83448..1fbeba8 100644
+--- a/arch/arm/kernel/kprobes-thumb.c
++++ b/arch/arm/kernel/kprobes-thumb.c
+@@ -124,6 +124,46 @@ t32_emulate_rd8rn16rm0_rwflags(struct kprobe *p, struct pt_regs *regs)
+ 	regs->ARM_cpsr = (regs->ARM_cpsr & ~APSR_MASK) | (cpsr & APSR_MASK);
+ }
  
- extern kprobe_check_cc * const kprobe_condition_checks[16];
- 
-+extern int str_pc_offset;
++static void __kprobes
++t32_emulate_rd8pc16_noflags(struct kprobe *p, struct pt_regs *regs)
++{
++	kprobe_opcode_t insn = p->opcode;
++	unsigned long pc = thumb_probe_pc(p);
++	int rd = (insn >> 8) & 0xf;
 +
- /*
-  * Test if load/store instructions writeback the address register.
-  * if P (bit 24) == 0 or W (bit 21) == 1
-diff --git a/arch/arm/kernel/kprobes-arm.c b/arch/arm/kernel/kprobes-arm.c
-index 3c4678e..0262b29 100644
---- a/arch/arm/kernel/kprobes-arm.c
-+++ b/arch/arm/kernel/kprobes-arm.c
-@@ -92,29 +92,6 @@ union reg_pair {
++	register unsigned long rdv asm("r1") = regs->uregs[rd];
++	register unsigned long rnv asm("r2") = pc & ~3;
++
++	__asm__ __volatile__ (
++		"blx    %[fn]"
++		: "=r" (rdv)
++		: "0" (rdv), "r" (rnv), [fn] "r" (p->ainsn.insn_fn)
++		: "lr", "memory", "cc"
++	);
++
++	regs->uregs[rd] = rdv;
++}
++
++static void __kprobes
++t32_emulate_rd8rn16_noflags(struct kprobe *p, struct pt_regs *regs)
++{
++	kprobe_opcode_t insn = p->opcode;
++	int rd = (insn >> 8) & 0xf;
++	int rn = (insn >> 16) & 0xf;
++
++	register unsigned long rdv asm("r1") = regs->uregs[rd];
++	register unsigned long rnv asm("r2") = regs->uregs[rn];
++
++	__asm__ __volatile__ (
++		"blx    %[fn]"
++		: "=r" (rdv)
++		: "0" (rdv), "r" (rnv), [fn] "r" (p->ainsn.insn_fn)
++		: "lr", "memory", "cc"
++	);
++
++	regs->uregs[rd] = rdv;
++}
++
+ static const union decode_item t32_table_1110_100x_x0xx[] = {
+ 	/* Load/store multiple instructions */
+ 
+@@ -293,6 +333,55 @@ static const union decode_item t32_table_1111_0x0x___0[] = {
+ 	DECODE_END
  };
  
- /*
-- * For STR and STM instructions, an ARM core may choose to use either
-- * a +8 or a +12 displacement from the current instruction's address.
-- * Whichever value is chosen for a given core, it must be the same for
-- * both instructions and may not change.  This function measures it.
-- */
--
--static int str_pc_offset;
--
--static void __init find_str_pc_offset(void)
--{
--	int addr, scratch, ret;
--
--	__asm__ (
--		"sub	%[ret], pc, #4		\n\t"
--		"str	pc, %[addr]		\n\t"
--		"ldr	%[scr], %[addr]		\n\t"
--		"sub	%[ret], %[scr], %[ret]	\n\t"
--		: [ret] "=r" (ret), [scr] "=r" (scratch), [addr] "+m" (addr));
--
--	str_pc_offset = ret;
--}
--
--/*
-  * The insnslot_?arg_r[w]flags() functions below are to keep the
-  * msr -> *fn -> mrs instruction sequences indivisible so that
-  * the state of the CPSR flags aren't inadvertently modified
-@@ -1569,8 +1546,3 @@ arm_kprobe_decode_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi)
++static const union decode_item t32_table_1111_0x1x___0[] = {
++	/* Data-processing (plain binary immediate)			*/
++
++	/* ADDW Rd, PC, #imm	1111 0x10 0000 1111 0xxx xxxx xxxx xxxx */
++	DECODE_OR	(0xfbff8000, 0xf20f0000),
++	/* SUBW	Rd, PC, #imm	1111 0x10 1010 1111 0xxx xxxx xxxx xxxx */
++	DECODE_EMULATEX	(0xfbff8000, 0xf2af0000, t32_emulate_rd8pc16_noflags,
++						 REGS(PC, 0, NOSPPC, 0, 0)),
++
++	/* ADDW SP, SP, #imm	1111 0x10 0000 1101 0xxx 1101 xxxx xxxx */
++	DECODE_OR	(0xfbff8f00, 0xf20d0d00),
++	/* SUBW	SP, SP, #imm	1111 0x10 1010 1101 0xxx 1101 xxxx xxxx */
++	DECODE_EMULATEX	(0xfbff8f00, 0xf2ad0d00, t32_emulate_rd8rn16_noflags,
++						 REGS(SP, 0, SP, 0, 0)),
++
++	/* ADDW			1111 0x10 0000 xxxx 0xxx xxxx xxxx xxxx */
++	DECODE_OR	(0xfbf08000, 0xf2000000),
++	/* SUBW			1111 0x10 1010 xxxx 0xxx xxxx xxxx xxxx */
++	DECODE_EMULATEX	(0xfbf08000, 0xf2a00000, t32_emulate_rd8rn16_noflags,
++						 REGS(NOPCX, 0, NOSPPC, 0, 0)),
++
++	/* MOVW			1111 0x10 0100 xxxx 0xxx xxxx xxxx xxxx */
++	/* MOVT			1111 0x10 1100 xxxx 0xxx xxxx xxxx xxxx */
++	DECODE_EMULATEX	(0xfb708000, 0xf2400000, t32_emulate_rd8rn16_noflags,
++						 REGS(0, 0, NOSPPC, 0, 0)),
++
++	/* SSAT16		1111 0x11 0010 xxxx 0000 xxxx 00xx xxxx */
++	/* SSAT			1111 0x11 00x0 xxxx 0xxx xxxx xxxx xxxx */
++	/* USAT16		1111 0x11 1010 xxxx 0000 xxxx 00xx xxxx */
++	/* USAT			1111 0x11 10x0 xxxx 0xxx xxxx xxxx xxxx */
++	DECODE_EMULATEX	(0xfb508000, 0xf3000000, t32_emulate_rd8rn16rm0_rwflags,
++						 REGS(NOSPPC, 0, NOSPPC, 0, 0)),
++
++	/* SFBX			1111 0x11 0100 xxxx 0xxx xxxx xxxx xxxx */
++	/* UFBX			1111 0x11 1100 xxxx 0xxx xxxx xxxx xxxx */
++	DECODE_EMULATEX	(0xfb708000, 0xf3400000, t32_emulate_rd8rn16_noflags,
++						 REGS(NOSPPC, 0, NOSPPC, 0, 0)),
++
++	/* BFC			1111 0x11 0110 1111 0xxx xxxx xxxx xxxx */
++	DECODE_EMULATEX	(0xfbff8000, 0xf36f0000, t32_emulate_rd8rn16_noflags,
++						 REGS(0, 0, NOSPPC, 0, 0)),
++
++	/* BFI			1111 0x11 0110 xxxx 0xxx xxxx xxxx xxxx */
++	DECODE_EMULATEX	(0xfbf08000, 0xf3600000, t32_emulate_rd8rn16_noflags,
++						 REGS(NOSPPCX, 0, NOSPPC, 0, 0)),
++
++	DECODE_END
++};
++
+ static const union decode_item t32_table_1111_0xxx___1[] = {
+ 	/* Branches and miscellaneous control				*/
  
- 	return space_cccc_11xx(insn, asi);
- }
--
--void __init arm_kprobe_decode_init(void)
--{
--	find_str_pc_offset();
--}
-diff --git a/arch/arm/kernel/kprobes-common.c b/arch/arm/kernel/kprobes-common.c
-index 794827e..e18576c 100644
---- a/arch/arm/kernel/kprobes-common.c
-+++ b/arch/arm/kernel/kprobes-common.c
-@@ -3,6 +3,9 @@
-  *
-  * Copyright (C) 2011 Jon Medhurst <tixy@yxit.co.uk>.
-  *
-+ * Some contents moved here from arch/arm/include/asm/kprobes-arm.c which is
-+ * Copyright (C) 2006, 2007 Motorola Inc.
-+ *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 as
-  * published by the Free Software Foundation.
-@@ -14,6 +17,36 @@
- #include "kprobes.h"
+@@ -335,6 +424,12 @@ const union decode_item kprobe_decode_thumb32_table[] = {
+ 	DECODE_TABLE	(0xfa008000, 0xf0000000, t32_table_1111_0x0x___0),
  
- 
-+/*
-+ * For STR and STM instructions, an ARM core may choose to use either
-+ * a +8 or a +12 displacement from the current instruction's address.
-+ * Whichever value is chosen for a given core, it must be the same for
-+ * both instructions and may not change.  This function measures it.
-+ */
+ 	/*
++	 * Data-processing (plain binary immediate)
++	 *			1111 0x1x xxxx xxxx 0xxx xxxx xxxx xxxx
++	 */
++	DECODE_TABLE	(0xfa008000, 0xf2000000, t32_table_1111_0x1x___0),
 +
-+int str_pc_offset;
-+
-+void __init find_str_pc_offset(void)
-+{
-+	int addr, scratch, ret;
-+
-+	__asm__ (
-+		"sub	%[ret], pc, #4		\n\t"
-+		"str	pc, %[addr]		\n\t"
-+		"ldr	%[scr], %[addr]		\n\t"
-+		"sub	%[ret], %[scr], %[ret]	\n\t"
-+		: [ret] "=r" (ret), [scr] "=r" (scratch), [addr] "+m" (addr));
-+
-+	str_pc_offset = ret;
-+}
-+
-+
-+void __init arm_kprobe_decode_init(void)
-+{
-+	find_str_pc_offset();
-+}
-+
-+
- static unsigned long __kprobes __check_eq(unsigned long cpsr)
- {
- 	return cpsr & PSR_Z_BIT;
++	/*
+ 	 * Branches and miscellaneous control
+ 	 *			1111 0xxx xxxx xxxx 1xxx xxxx xxxx xxxx
+ 	 */
 -- 
 1.7.2.5
