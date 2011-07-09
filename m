@@ -1,39 +1,49 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Sat, 9 Jul 2011 14:44:41 +0800
-Subject: [PATCH 0/6] Add device tree support for imx spi driver
-In-Reply-To: <20110708190142.GD9070@ponder.secretlab.ca>
+Date: Sat, 9 Jul 2011 15:00:02 +0800
+Subject: [PATCH 2/6] spi/imx: use soc name in spi device type naming scheme
+In-Reply-To: <20110708105851.GF6069@pengutronix.de>
 References: <1310113654-25887-1-git-send-email-shawn.guo@linaro.org>
-	<20110708190142.GD9070@ponder.secretlab.ca>
-Message-ID: <20110709064440.GD13962@S2100-06.ap.freescale.net>
+	<1310113654-25887-3-git-send-email-shawn.guo@linaro.org>
+	<20110708105851.GF6069@pengutronix.de>
+Message-ID: <20110709070001.GE13962@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 08, 2011 at 01:01:42PM -0600, Grant Likely wrote:
-> On Fri, Jul 08, 2011 at 04:27:28PM +0800, Shawn Guo wrote:
-> > The patch set makes some cleanups on imx spi driver to get it ready
-> > for adding device tree probe and then add the support.
+On Fri, Jul 08, 2011 at 12:58:51PM +0200, Sascha Hauer wrote:
+> On Fri, Jul 08, 2011 at 04:27:30PM +0800, Shawn Guo wrote:
+> > Software defined version number is not stable enough to be used
+> > in device type naming scheme.  The patch changes it to use implicit
+> > soc name for spi device type definition.  In this way, we can easily
+> > align the naming scheme with device tree binding, which comes later.
 > > 
-> > Those two dt helper function related patches are carried here to
-> > resolve the dependency.  They should be on the way to sit on Grant's
-> > devicetree/next branch.
-> > 
-> > Rob Herring (1):
-> >       dt: add helper function to read u32 arrays
-> > 
-> > Shawn Guo (5):
-> >       ARM: mxc: remove unnecessary header file inclusion from gpio.h
-> >       spi/imx: use soc name in spi device type naming scheme
-> >       spi/imx: copy gpio number passed by platform data into driver private data
-> >       dt: add empty of_property_read_u32[_array] for non-dt
-> >       spi/imx: add device tree probe support
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> > Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> > Cc: Grant Likely <grant.likely@secretlab.ca>
+> > ---
+> >  arch/arm/mach-imx/clock-imx25.c              |    7 +-
+> >  arch/arm/mach-mx5/clock-mx51-mx53.c          |   11 +-
+> >  arch/arm/plat-mxc/devices/platform-spi_imx.c |   12 +-
+> >  drivers/spi/Kconfig                          |   15 -
+> >  drivers/spi/spi-imx.c                        |  423 ++++++++++++--------------
+> >  5 files changed, 219 insertions(+), 249 deletions(-)
 > 
-> Okay, I tried to apply this series, but the first patch that removes
-> the includes caused a build failure, so I've dropped it.  What tree
-> are these patches based on top of?
+> Generally this patch is too big for me to get the warm feeling that
+> everything will just work. Renaming from spi_ver_xy to imx_xy is fine,
+> but should be done in smaller steps and where possible not across
+> subsystems.
 > 
-I based the series off linux-next.  Since it will go through your
-spi/next tree, I will repost the series against it, with splitting
-patch #2 into small pieces to address Sascha's comment.
+Okay, I will split the patch into small pieces to win your warm
+feeling :)
+
+> I increasingly see patches touching arch/ and drivers/ and I think
+> there's a high risk of merge conflicts upstream. This will not help
+> making Linus happy.
+> 
+Yes, I increasingly run into the situation touching arch/ and drivers/
+when working on dt migration because of the device renaming.  May I
+have to your suggestion on how to separate drivers/ patch from arch/
+one in orthogonal way, while keeping both trees working/bisectable?
 
 -- 
 Regards,
