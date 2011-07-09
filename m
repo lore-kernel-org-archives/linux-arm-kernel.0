@@ -1,30 +1,52 @@
-From: ccross@android.com (Colin Cross)
-Date: Sat, 9 Jul 2011 14:32:37 -0700
-Subject: [PATCH 02/17] ARM: Add cpu power management notifiers
-In-Reply-To: <20110709101528.GI4812@n2100.arm.linux.org.uk>
-References: <1310053830-23779-1-git-send-email-lorenzo.pieralisi@arm.com>
-	<1310053830-23779-3-git-send-email-lorenzo.pieralisi@arm.com>
-	<20110709101528.GI4812@n2100.arm.linux.org.uk>
-Message-ID: <CAMbhsRQndQJA9H9Q7F-DgDFDzmt60xZSSkNSm-C2-Odv5x2W4w@mail.gmail.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Sat,  9 Jul 2011 14:37:21 -0700
+Subject: [PATCH] OMAP3+: SR: ensure pm-runtime callbacks can be invoked with
+	IRQ disabled
+Message-ID: <1310247441-2709-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 9, 2011 at 3:15 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Thu, Jul 07, 2011 at 04:50:15PM +0100, Lorenzo Pieralisi wrote:
->> During some CPU power modes entered during idle, hotplug and
->> suspend, peripherals located in the CPU power domain, such as
->> the GIC and VFP, may be powered down. ?Add a notifier chain
->> that allows drivers for those peripherals to be notified
->> before and after they may be reset.
->
-> I defer comment on this until I see what the CPU_COMPLEX_* stuff is used
-> for.
->
+SmartReflex should be disabled while entering low power mode due to
+a) SmartReflex values are not defined for retention voltageFurther
+b) with SmartReflex enabled, if CPU enters lower c-states, FSM will try
+to bump the voltage to current OPP's voltage for which it has entered c-state;
+hence SmartReflex needs to be disabled for MPU, CORE and IVA voltage
+domains in idle path before enabling auto retention voltage achievement
+on the device.
 
-Per previous discussions on this patch, CPU_COMPLEX_* will be renamed
-CPU_CLUSTER_*, and will refer to all the gunk around the CPU that may
-be shared by another CPU.  In this series, it is only used to save and
-restore the GIC distributor registers, but it could be used for L2 as
-well, if any platforms can agree on what needs to happen to the L2,
-and when.
+However, since the current pm_runtime setup for SmartReflex devices are
+setup to allow callbacks to be invoked with interrupts enabled, calling
+SmartReflex enable/disable from other contexts such as idle paths
+where preemption is disabled causes warnings such as the following
+indicating of a potential race.
+[   82.023895] [<c04d079c>] (__irq_svc+0x3c/0x120) from [<c04d0484>] (_raw_spin_unlock_irq+0x28/0x2c)
+[   82.023895] [<c04d0484>] (_raw_spin_unlock_irq+0x28/0x2c) from [<c0323234>] (rpm_callback+0x4c/0x68)
+[   82.023956] [<c0323234>] (rpm_callback+0x4c/0x68) from [<c0323f7c>] (rpm_resume+0x338/0x53c)
+[   82.023956] [<c0323f7c>] (rpm_resume+0x338/0x53c) from [<c03243f4>] (__pm_runtime_resume+0x48/0x60)
+[   82.023986] [<c03243f4>] (__pm_runtime_resume+0x48/0x60) from [<c008aee0>] (sr_enable+0xa8/0x19c)
+[   82.023986] [<c008aee0>] (sr_enable+0xa8/0x19c) from [<c008b2fc>] (omap_sr_enable+0x50/0x90)
+[   82.024017] [<c008b2fc>] (omap_sr_enable+0x50/0x90) from [<c00888c0>] (omap4_enter_sleep+0x138/0x168)
+
+Instead, we use pm_runtime_irq_safe to tell the PM core that callbacks can be
+invoked in interrupt disabled contexts.
+
+Acked-by: Rajendra Nayak <rnayak@ti.com>
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
+ arch/arm/mach-omap2/smartreflex.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
+index f8c6305..444c5b2 100644
+--- a/arch/arm/mach-omap2/smartreflex.c
++++ b/arch/arm/mach-omap2/smartreflex.c
+@@ -862,6 +862,7 @@ static int __init omap_sr_probe(struct platform_device *pdev)
+ 	irq = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+ 
+ 	pm_runtime_enable(&pdev->dev);
++	pm_runtime_irq_safe(&pdev->dev);
+ 
+ 	sr_info->pdev = pdev;
+ 	sr_info->srid = pdev->id;
+-- 
+1.7.1
