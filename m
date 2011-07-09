@@ -1,68 +1,89 @@
 From: tixy@yxit.co.uk (Tixy)
-Date: Sat,  9 Jul 2011 11:57:31 +0100
-Subject: [PATCH 44/51] ARM: kprobes: Decode 32-bit miscellaneous control
-	instructions
+Date: Sat,  9 Jul 2011 11:57:02 +0100
+Subject: [PATCH 15/51] ARM: kprobes: Don't trigger probes on conditional
+	instructions when condition is false
 In-Reply-To: <1310209058-20980-1-git-send-email-tixy@yxit.co.uk>
 References: <1310209058-20980-1-git-send-email-tixy@yxit.co.uk>
-Message-ID: <1310209058-20980-45-git-send-email-tixy@yxit.co.uk>
+Message-ID: <1310209058-20980-16-git-send-email-tixy@yxit.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jon Medhurst <tixy@yxit.co.uk>
 
+This patch changes the behavior of kprobes on ARM so that:
+
+    Kprobes on conditional instructions don't trigger when the
+    condition is false. For conditional branches, this means that
+    they don't trigger in the branch not taken case.
+
+Rationale:
+
+When probes are placed onto conditionally executed instructions in a
+Thumb IT block, they may not fire if the condition is not met. This
+is because we use invalid instructions for breakpoints and "it is
+IMPLEMENTATION DEFINED whether the instruction executes as a NOP or
+causes an Undefined Instruction exception". Therefore, for consistency,
+we will ignore all probes on any conditional instructions when the
+condition is false. Alternative solutions seem to be too complex to
+implement or inconsistent.
+
+This issue was discussed on linux.arm.kernel in the thread titled
+"[RFC] kprobes with thumb2 conditional code" See
+http://comments.gmane.org/gmane.linux.linaro.devel/2985
+
 Signed-off-by: Jon Medhurst <tixy@yxit.co.uk>
 ---
- arch/arm/kernel/kprobes-thumb.c |   31 +++++++++++++++++++++++++++++++
- 1 files changed, 31 insertions(+), 0 deletions(-)
+ arch/arm/kernel/kprobes.c |   24 +++++++++++++++++++++++-
+ 1 files changed, 23 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/kernel/kprobes-thumb.c b/arch/arm/kernel/kprobes-thumb.c
-index 1fbeba8..c07c247 100644
---- a/arch/arm/kernel/kprobes-thumb.c
-+++ b/arch/arm/kernel/kprobes-thumb.c
-@@ -57,6 +57,15 @@ t32_simulate_table_branch(struct kprobe *p, struct pt_regs *regs)
- 	regs->ARM_pc = pc + 2 * halfwords;
+diff --git a/arch/arm/kernel/kprobes.c b/arch/arm/kernel/kprobes.c
+index b8f5b3b..7a9be60 100644
+--- a/arch/arm/kernel/kprobes.c
++++ b/arch/arm/kernel/kprobes.c
+@@ -207,6 +207,20 @@ static void __kprobes set_current_kprobe(struct kprobe *p)
+ 	__get_cpu_var(current_kprobe) = p;
  }
  
 +static void __kprobes
-+t32_simulate_mrs(struct kprobe *p, struct pt_regs *regs)
++singlestep_skip(struct kprobe *p, struct pt_regs *regs)
 +{
-+	kprobe_opcode_t insn = p->opcode;
-+	int rd = (insn >> 8) & 0xf;
-+	unsigned long mask = 0xf8ff03df; /* Mask out execution state */
-+	regs->uregs[rd] = regs->ARM_cpsr & mask;
++#ifdef CONFIG_THUMB2_KERNEL
++	regs->ARM_cpsr = it_advance(regs->ARM_cpsr);
++	if (is_wide_instruction(p->opcode))
++		regs->ARM_pc += 4;
++	else
++		regs->ARM_pc += 2;
++#else
++	regs->ARM_pc += 4;
++#endif
 +}
 +
- static enum kprobe_insn __kprobes
- t32_decode_ldmstm(kprobe_opcode_t insn, struct arch_specific_insn *asi)
+ static void __kprobes singlestep(struct kprobe *p, struct pt_regs *regs,
+ 				 struct kprobe_ctlblk *kcb)
  {
-@@ -394,6 +403,28 @@ static const union decode_item t32_table_1111_0xxx___1[] = {
- 	/* WFI			1111 0011 1010 xxxx 10x0 x000 0000 0011 */
- 	DECODE_SIMULATE	(0xfff0d7fc, 0xf3a08000, kprobe_simulate_nop),
+@@ -262,7 +276,8 @@ void __kprobes kprobe_handler(struct pt_regs *regs)
+ 				/* impossible cases */
+ 				BUG();
+ 			}
+-		} else {
++		} else if (p->ainsn.insn_check_cc(regs->ARM_cpsr)) {
++			/* Probe hit and conditional execution check ok. */
+ 			set_current_kprobe(p);
+ 			kcb->kprobe_status = KPROBE_HIT_ACTIVE;
  
-+	/* MRS Rd, CPSR		1111 0011 1110 xxxx 10x0 xxxx xxxx xxxx */
-+	DECODE_SIMULATEX(0xfff0d000, 0xf3e08000, t32_simulate_mrs,
-+						 REGS(0, 0, NOSPPC, 0, 0)),
-+
-+	/*
-+	 * Unsupported instructions
-+	 *			1111 0x11 1xxx xxxx 10x0 xxxx xxxx xxxx
-+	 *
-+	 * MSR			1111 0011 100x xxxx 10x0 xxxx xxxx xxxx
-+	 * DBG hint		1111 0011 1010 xxxx 10x0 x000 1111 xxxx
-+	 * Unallocated hints	1111 0011 1010 xxxx 10x0 x000 xxxx xxxx
-+	 * CPS			1111 0011 1010 xxxx 10x0 xxxx xxxx xxxx
-+	 * CLREX/DSB/DMB/ISB	1111 0011 1011 xxxx 10x0 xxxx xxxx xxxx
-+	 * BXJ			1111 0011 1100 xxxx 10x0 xxxx xxxx xxxx
-+	 * SUBS PC,LR,#<imm8>	1111 0011 1101 xxxx 10x0 xxxx xxxx xxxx
-+	 * MRS Rd, SPSR		1111 0011 1111 xxxx 10x0 xxxx xxxx xxxx
-+	 * SMC			1111 0111 1111 xxxx 1000 xxxx xxxx xxxx
-+	 * UNDEFINED		1111 0111 1111 xxxx 1010 xxxx xxxx xxxx
-+	 * ???			1111 0111 1xxx xxxx 1010 xxxx xxxx xxxx
-+	 */
-+	DECODE_REJECT	(0xfb80d000, 0xf3808000),
-+
- 	DECODE_END
- };
- 
+@@ -282,6 +297,13 @@ void __kprobes kprobe_handler(struct pt_regs *regs)
+ 				}
+ 				reset_current_kprobe();
+ 			}
++		} else {
++			/*
++			 * Probe hit but conditional execution check failed,
++			 * so just skip the instruction and continue as if
++			 * nothing had happened.
++			 */
++			singlestep_skip(p, regs);
+ 		}
+ 	} else if (cur) {
+ 		/* We probably hit a jprobe.  Call its break handler. */
 -- 
 1.7.2.5
