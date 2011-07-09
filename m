@@ -1,32 +1,43 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Sun, 10 Jul 2011 00:14:58 +0300
-Subject: [PATCH] pxa2xx_spi: fix memory corruption
-Message-ID: <1310246098-21208-1-git-send-email-anarsoul@gmail.com>
+From: jj@chaosbits.net (Jesper Juhl)
+Date: Sat, 9 Jul 2011 23:11:14 +0200 (CEST)
+Subject: [PATCH 1/7] ARM: static should be at beginning of declaration
+In-Reply-To: <alpine.LNX.2.00.1107092304160.25516@swampdragon.chaosbits.net>
+References: <alpine.LNX.2.00.1107092304160.25516@swampdragon.chaosbits.net>
+Message-ID: <alpine.LNX.2.00.1107092309500.25516@swampdragon.chaosbits.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pxa2xx_spi_probe allocates struct driver_data and null_dma_buf
-at same time via spi_alloc_master(), but then calculates
-null_dma_buf pointer incorrectly, and it causes memory corruption
-later if DMA usage is enabled.
+Make sure that the 'static' keywork is at the beginning of declaration
+for arch/arm/mach-shmobile/board-ap4evb.c
 
-Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+This gets rid of warnings like
+  warning: ?static? is not at beginning of declaration
+when building with -Wold-style-declaration (and/or -Wextra which also
+enables it).
+
+Signed-off-by: Jesper Juhl <jj@chaosbits.net>
 ---
- drivers/spi/pxa2xx_spi.c |    2 +-
+ arch/arm/mach-shmobile/board-ap4evb.c |    2 +-
  1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/drivers/spi/pxa2xx_spi.c b/drivers/spi/pxa2xx_spi.c
-index dc25bee..ef38fbf 100644
---- a/drivers/spi/pxa2xx_spi.c
-+++ b/drivers/spi/pxa2xx_spi.c
-@@ -1569,7 +1569,7 @@ static int __devinit pxa2xx_spi_probe(struct platform_device *pdev)
- 	master->transfer = transfer;
+diff --git a/arch/arm/mach-shmobile/board-ap4evb.c b/arch/arm/mach-shmobile/board-ap4evb.c
+index 803bc6e..bb4e084 100644
+--- a/arch/arm/mach-shmobile/board-ap4evb.c
++++ b/arch/arm/mach-shmobile/board-ap4evb.c
+@@ -443,7 +443,7 @@ static struct platform_device usb1_host_device = {
+ 	.resource	= usb1_host_resources,
+ };
  
- 	drv_data->ssp_type = ssp->type;
--	drv_data->null_dma_buf = (u32 *)ALIGN((u32)(drv_data +
-+	drv_data->null_dma_buf = (u32 *)ALIGN(((u32)drv_data +
- 						sizeof(struct driver_data)), 8);
- 
- 	drv_data->ioaddr = ssp->mmio_base;
+-const static struct fb_videomode ap4evb_lcdc_modes[] = {
++static const struct fb_videomode ap4evb_lcdc_modes[] = {
+ 	{
+ #ifdef CONFIG_AP4EVB_QHD
+ 		.name		= "R63302(QHD)",
 -- 
-1.7.5.rc3
+1.7.6
+
+
+-- 
+Jesper Juhl <jj@chaosbits.net>       http://www.chaosbits.net/
+Don't top-post http://www.catb.org/jargon/html/T/top-post.html
+Plain text mails only, please.
