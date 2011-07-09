@@ -1,66 +1,32 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 09 Jul 2011 17:44:46 +0100
-Subject: [PATCH 4/3] ARM: vfp: ensure that thread flushing works if preempted
-In-Reply-To: <20110709163207.GN4812@n2100.arm.linux.org.uk>
-References: <20110709163207.GN4812@n2100.arm.linux.org.uk>
-Message-ID: <E1Qfae6-0006RC-2M@rmk-PC.arm.linux.org.uk>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sun, 10 Jul 2011 01:16:34 +0800
+Subject: [PATCH v2 0/7] Add device tree support for imx spi driver
+Message-ID: <1310231801-18761-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Prevent a preemption event causing the initialized VFP state being
-overwritten by ensuring that the VFP hardware access is disabled
-prior to starting initialization.  We can then do this in safety
-while still allowing preemption to occur.
+The patch set makes some cleanups on imx spi driver to get it ready
+for adding device tree probe and then add the support.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
-And one last hole plugged to stop the beer barrel from emptying
-prematurely.
+Changes since v1:
+ * Split the big patch into small ones per Sascha's comment
+ * Drop the patch cleaning mxc/mach/gpio.h from the series.  Will
+   post it separately later.
+ * Drop dt helper patches, as they are on Grant's tree
 
- arch/arm/vfp/vfpmodule.c |   23 +++++++++++++----------
- 1 files changed, 13 insertions(+), 10 deletions(-)
+Shawn Guo (7):
+      spi/imx: do not make copy of spi_imx_devtype_data
+      spi/imx: use mx21 to name SPI_IMX_VER_0_0 function and macro
+      spi/imx: do not use spi_imx2_3 to name SPI_IMX_VER_2_3 function and macro
+      spi/imx: merge type SPI_IMX_VER_0_7 into SPI_IMX_VER_0_4
+      spi/imx: use soc name in spi device type naming scheme
+      spi/imx: copy gpio number passed by platform data into driver private data
+      spi/imx: add device tree probe support
 
-diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
-index 08ff93f..0a96f71 100644
---- a/arch/arm/vfp/vfpmodule.c
-+++ b/arch/arm/vfp/vfpmodule.c
-@@ -89,24 +89,27 @@ static void vfp_thread_flush(struct thread_info *thread)
- 	union vfp_state *vfp = &thread->vfpstate;
- 	unsigned int cpu;
- 
--	memset(vfp, 0, sizeof(union vfp_state));
--
--	vfp->hard.fpexc = FPEXC_EN;
--	vfp->hard.fpscr = FPSCR_ROUND_NEAREST;
--#ifdef CONFIG_SMP
--	vfp->hard.cpu = NR_CPUS;
--#endif
--
- 	/*
- 	 * Disable VFP to ensure we initialize it first.  We must ensure
--	 * that the modification of vfp_current_hw_state[] and hardware disable
--	 * are done for the same CPU and without preemption.
-+	 * that the modification of vfp_current_hw_state[] and hardware
-+	 * disable are done for the same CPU and without preemption.
-+	 *
-+	 * Do this first to ensure that preemption won't overwrite our
-+	 * state saving should access to the VFP be enabled at this point.
- 	 */
- 	cpu = get_cpu();
- 	if (vfp_current_hw_state[cpu] == vfp)
- 		vfp_current_hw_state[cpu] = NULL;
- 	fmxr(FPEXC, fmrx(FPEXC) & ~FPEXC_EN);
- 	put_cpu();
-+
-+	memset(vfp, 0, sizeof(union vfp_state));
-+
-+	vfp->hard.fpexc = FPEXC_EN;
-+	vfp->hard.fpscr = FPSCR_ROUND_NEAREST;
-+#ifdef CONFIG_SMP
-+	vfp->hard.cpu = NR_CPUS;
-+#endif
- }
- 
- static void vfp_thread_exit(struct thread_info *thread)
--- 
-1.7.4.4
+ .../devicetree/bindings/spi/fsl-imx-cspi.txt       |   22 +
+ arch/arm/mach-imx/clock-imx25.c                    |    7 +-
+ arch/arm/mach-mx5/clock-mx51-mx53.c                |   11 +-
+ arch/arm/plat-mxc/devices/platform-spi_imx.c       |   12 +-
+ drivers/spi/Kconfig                                |   15 -
+ drivers/spi/spi-imx.c                              |  468 ++++++++++----------
+ 6 files changed, 277 insertions(+), 258 deletions(-)
