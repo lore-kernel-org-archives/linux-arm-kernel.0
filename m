@@ -1,42 +1,46 @@
-From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Sat,  9 Jul 2011 15:51:53 -0700
-Subject: [PATCH 1/1] ARM: i.MX50/53: debug-macro: fix UART_PADDR
-Message-ID: <1310251913-9877-1-git-send-email-troy.kisky@boundarydevices.com>
+From: ccross@android.com (Colin Cross)
+Date: Sat, 9 Jul 2011 16:01:19 -0700
+Subject: [PATCH 03/17] ARM: gic: Use cpu pm notifiers to save gic state
+In-Reply-To: <20110709223315.GO4812@n2100.arm.linux.org.uk>
+References: <1310053830-23779-1-git-send-email-lorenzo.pieralisi@arm.com>
+	<1310053830-23779-4-git-send-email-lorenzo.pieralisi@arm.com>
+	<20110709102100.GJ4812@n2100.arm.linux.org.uk>
+	<CAMbhsRTFfv1q0po5CDtRfRBN5pABaKm3C0OR4U9yHmRJiFUOtw@mail.gmail.com>
+	<20110709223315.GO4812@n2100.arm.linux.org.uk>
+Message-ID: <CAMbhsRR0XCJ3-6DznCAmEk1AywpFhr70-1mH=cy9YBpZa978pw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The i.MX51 UART_PADDR value does not work for MX50/53.
+On Sat, Jul 9, 2011 at 3:33 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Sat, Jul 09, 2011 at 03:10:56PM -0700, Colin Cross wrote:
+>> This is necessary for cpuidle states that lose the GIC registers, not
+>> just suspend, because the GIC is in the cpu's power domain. ?We could
+>> avoid saving and restoring all the GIC registers in suspend and idle
+>> by reusing the initialization functions, and then having the core irq
+>> code call the unmask, set_type, and set_affinity functions on each irq
+>> to reconfigure it, but that will be very inefficient - it will convert
+>> each register write in the restore functions to a read-modify-write
+>> per interrupt in that register. ?Santosh is already complaining that
+>> this commong GIC restore code will be slower than the automatic DMA to
+>> restore the GIC registers that OMAP4 supports.
+>
+> Well, we need to come up with something sensible - a way of doing this
+> which doesn't require every interrupt controller driver (of which we as
+> an architecture have many) to have lots of support added.
+>
+> If the current way is inefficient and is noticably so, then let's talk
+> to Thomas about finding a way around that - maybe having the generic
+> code make one suspend/resume callback per irq gc chip rather than doing
+> it per-IRQ. ?We can then reuse the same paths for suspend/resume as for
+> idle state saving.
+>
 
-Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
----
- arch/arm/plat-mxc/include/mach/debug-macro.S |    9 ++++++++-
- 1 files changed, 8 insertions(+), 1 deletions(-)
+Are you referring to moving the gic driver to be gc chip?  Otherwise,
+I don't understand your suggestion - how is callback per chip any
+different than what this patch implements?  It just gets it's
+notification through a cpu_pm notifier, which works in idle and
+suspend, instead of a syscore op like the gc driver does.
 
-diff --git a/arch/arm/plat-mxc/include/mach/debug-macro.S b/arch/arm/plat-mxc/include/mach/debug-macro.S
-index 8e8d175..3919ad4 100644
---- a/arch/arm/plat-mxc/include/mach/debug-macro.S
-+++ b/arch/arm/plat-mxc/include/mach/debug-macro.S
-@@ -37,13 +37,20 @@
- #define UART_PADDR	MX3x_UART1_BASE_ADDR
- #endif
- 
--#ifdef CONFIG_ARCH_MX5
-+#ifdef CONFIG_ARCH_MX51
- #ifdef UART_PADDR
- #error "CONFIG_DEBUG_LL is incompatible with multiple archs"
- #endif
- #define UART_PADDR	MX51_UART1_BASE_ADDR
- #endif
- 
-+#if defined(CONFIG_ARCH_MX50) || defined(CONFIG_ARCH_MX53)
-+#ifdef UART_PADDR
-+#error "CONFIG_DEBUG_LL is incompatible with multiple archs"
-+#endif
-+#define UART_PADDR	MX53_UART1_BASE_ADDR
-+#endif
-+
- #define UART_VADDR	IMX_IO_ADDRESS(UART_PADDR)
- 
- 		.macro	addruart, rp, rv
--- 
-1.7.0.4
+This patch does save and restore some registers that are never
+modified after init, so they don't need to be saved.
