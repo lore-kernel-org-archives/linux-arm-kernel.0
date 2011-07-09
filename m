@@ -1,33 +1,33 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 9 Jul 2011 23:33:15 +0100
-Subject: [PATCH 03/17] ARM: gic: Use cpu pm notifiers to save gic state
-In-Reply-To: <CAMbhsRTFfv1q0po5CDtRfRBN5pABaKm3C0OR4U9yHmRJiFUOtw@mail.gmail.com>
-References: <1310053830-23779-1-git-send-email-lorenzo.pieralisi@arm.com>
-	<1310053830-23779-4-git-send-email-lorenzo.pieralisi@arm.com>
-	<20110709102100.GJ4812@n2100.arm.linux.org.uk>
-	<CAMbhsRTFfv1q0po5CDtRfRBN5pABaKm3C0OR4U9yHmRJiFUOtw@mail.gmail.com>
-Message-ID: <20110709223315.GO4812@n2100.arm.linux.org.uk>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Sat, 9 Jul 2011 16:34:59 -0600 (MDT)
+Subject: [RFC/PATCH] OMAP PM: remove OMAP_PM_NONE config option
+In-Reply-To: <BANLkTik=0=SFfEfcjE_be6Z+0D0onNQ4Gg@mail.gmail.com>
+References: <1304673087-24643-1-git-send-email-j-pihet@ti.com>
+	<alpine.DEB.2.00.1105061016070.30136@utopia.booyaka.com>
+	<BANLkTimgrpKq_SrD=U9rzXspKv8eOcsv0w@mail.gmail.com>
+	<alpine.DEB.2.00.1105061407140.30136@utopia.booyaka.com>
+	<BANLkTik=0=SFfEfcjE_be6Z+0D0onNQ4Gg@mail.gmail.com>
+Message-ID: <alpine.DEB.2.00.1107091634150.15984@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 09, 2011 at 03:10:56PM -0700, Colin Cross wrote:
-> This is necessary for cpuidle states that lose the GIC registers, not
-> just suspend, because the GIC is in the cpu's power domain.  We could
-> avoid saving and restoring all the GIC registers in suspend and idle
-> by reusing the initialization functions, and then having the core irq
-> code call the unmask, set_type, and set_affinity functions on each irq
-> to reconfigure it, but that will be very inefficient - it will convert
-> each register write in the restore functions to a read-modify-write
-> per interrupt in that register.  Santosh is already complaining that
-> this commong GIC restore code will be slower than the automatic DMA to
-> restore the GIC registers that OMAP4 supports.
+Hi Jean
 
-Well, we need to come up with something sensible - a way of doing this
-which doesn't require every interrupt controller driver (of which we as
-an architecture have many) to have lots of support added.
+On Mon, 20 Jun 2011, Jean Pihet wrote:
 
-If the current way is inefficient and is noticably so, then let's talk
-to Thomas about finding a way around that - maybe having the generic
-code make one suspend/resume callback per irq gc chip rather than doing
-it per-IRQ.  We can then reuse the same paths for suspend/resume as for
-idle state saving.
+> > On Fri, 6 May 2011, Jean Pihet wrote:
+> >
+> >> I checked the patch against the master branch of both Tony's and
+> >> Linus's trees, it applies and compiles OK.
+> >> Is that OK to you?
+> >
+> > If it applies cleanly against Linus's current tree, then yes, that's fine.
+> Do you know what happened to this patch? Is it scheduled for merging
+> into mainline?
+
+This patch has been queued for 3.1 at git://git.pwsan.com/linux-2.6 in the 
+'omap_pm_cleanup_3.1' branch.
+
+thanks,
+
+- Paul
