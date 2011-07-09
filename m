@@ -1,215 +1,204 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 9 Jul 2011 09:13:15 +0100
-Subject: [PATCH 01/10] ARM: change ARM_DMA_ZONE_SIZE into a variable
-In-Reply-To: <20110708203045.GT4812@n2100.arm.linux.org.uk>
-References: <1309919442-20451-1-git-send-email-nicolas.pitre@linaro.org>
-	<20110706230455.GZ8286@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1107062043180.14596@xanadu.home>
-	<20110708121441.GD4812@n2100.arm.linux.org.uk>
-	<20110708203045.GT4812@n2100.arm.linux.org.uk>
-Message-ID: <20110709081315.GB30368@n2100.arm.linux.org.uk>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Sat, 9 Jul 2011 02:15:33 -0600 (MDT)
+Subject: [PATCH v4 7/7] OMAP2+: hwmod: Follow the recommended PRCM module
+	enable sequence
+In-Reply-To: <1309555626-22608-8-git-send-email-b-cousson@ti.com>
+References: <1309555626-22608-1-git-send-email-b-cousson@ti.com>
+	<1309555626-22608-8-git-send-email-b-cousson@ti.com>
+Message-ID: <alpine.DEB.2.00.1107090150040.15984@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 08, 2011 at 09:30:45PM +0100, Russell King - ARM Linux wrote:
-> On Fri, Jul 08, 2011 at 01:14:41PM +0100, Russell King - ARM Linux wrote:
-> > It looks like ISA_DMA_THRESHOLD has become unused by most of the kernel,
-> > so yes, renaming it to "dma_zone_limit" would be more descriptive.  We
-> > should probably make dma_supported() be out-of-line anyway (which then
-> > means that dma_zone_limit doesn't have to be exported to drivers) - and
-> > I think the DMA bounce stuff needs cleaning up in dma_set_mask().
+On Fri, 1 Jul 2011, Benoit Cousson wrote:
+
+> From: Rajendra Nayak <rnayak@ti.com>
 > 
-> ... and I now have a patch which does this, pending testing.  Once
-> I've tested it I'll send it out.
+> On OMAP4, the PRCM recommended sequence for enabling
+> a module after power-on-reset is:
+> -1- Force clkdm to SW_WKUP
+> -2- Enabling the clocks
+> -3- Configure desired module mode to "enable" or "auto"
+> -4- Wait for the desired module idle status to be FUNC
+> -5- Program clkdm in HW_AUTO(if supported)
+> 
+> This sequence applies to all older OMAPs' as well,
+> however since they use autodeps, it makes sure that
+> no clkdm is in IDLE, and hence not requiring a force
+> SW_WKUP when a module is being enabled.
+> 
+> OMAP4 does not need to support autodeps, because
+> of the dyanamic dependency feature, wherein
+> the HW takes care of waking up a clockdomain from
+> idle and hence the module, whenever an interconnect
+> access happens to the given module.
+> 
+> Implementing the sequence for OMAP4 requires
+> the clockdomain handling that is currently done in
+> clock framework to be done as part of hwmod framework
+> since the step -4- above to "Wait for the desired
+> module idle status to be FUNC" is done as part of
+> hwmod framework.
+> 
+> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> [b-cousson at ti.com: Adapt it to the new clkdm hwmod attribute and API]
+> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+> Cc: Paul Walmsley <paul@pwsan.com>
 
-8<--------
-From: Russell King - ARM Linux <linux@arm.linux.org.uk>
-ARM: dma: replace ISA_DMA_THRESHOLD with a variable
+This patch breaks OMAP2/3.  It appears this version wasn't tested on 
+either of those.  I'm not even sure it's 100% right for OMAP4 either, 
+since we know that some of the "optional" clocks do factor into whether a 
+clockdomain can go idle or not.  The current example we've been using is 
+the GPIO debounce clock, but there are probably others too.  The 
+impression I get from talking with people working on OMAP4, however, is 
+that this approach to handling clockdomains fixes some big problems on 
+OMAP4.  
 
-ISA_DMA_THRESHOLD has been unused by non-arch code, so lets now get
-rid of it from ARM by replacing it with arm_dma_zone_mask.  Move
-dma_supported() and dma_set_mask() out of line, and have
-dma_supported() check this new variable instead.
+So the clock framework part of this patch has been reimplemented as a 
+separate patch.  The default is to preserve the OMAP2/3 behavior. The 
+OMAP4 clock init code will be able to disable this during init.  This 
+patch will be posted separately.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Then the remaining hwmod changes in this patch also need to be made 
+conditional on whether oh->clkdm is non-null, otherwise the kernel won't 
+work on OMAP2/3.  The updated patch is below.
+
+Although I've chosen to clean up this patch this time to try to deal with 
+some of the recent uncertainty, in the future, I'm not going to spend 
+any time fixing series with patches that break OMAP2/3 boards.
+
+
+- Paul
+
+
+From: Rajendra Nayak <rnayak@ti.com>
+Date: Fri, 1 Jul 2011 23:27:06 +0200
+Subject: [PATCH] OMAP2+: hwmod: Follow the recommended PRCM module enable
+ sequence
+
+On OMAP4, the PRCM recommended sequence for enabling
+a module after power-on-reset is:
+-1- Force clkdm to SW_WKUP
+-2- Enabling the clocks
+-3- Configure desired module mode to "enable" or "auto"
+-4- Wait for the desired module idle status to be FUNC
+-5- Program clkdm in HW_AUTO(if supported)
+
+This sequence applies to all older OMAPs' as well,
+however since they use autodeps, it makes sure that
+no clkdm is in IDLE, and hence not requiring a force
+SW_WKUP when a module is being enabled.
+
+OMAP4 does not need to support autodeps, because
+of the dyanamic dependency feature, wherein
+the HW takes care of waking up a clockdomain from
+idle and hence the module, whenever an interconnect
+access happens to the given module.
+
+Implementing the sequence for OMAP4 requires
+the clockdomain handling that is currently done in
+clock framework to be done as part of hwmod framework
+since the step -4- above to "Wait for the desired
+module idle status to be FUNC" is done as part of
+hwmod framework.
+
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+[b-cousson at ti.com: Adapt it to the new clkdm hwmod attribute and API]
+Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+Cc: Paul Walmsley <paul@pwsan.com>
+[paul at pwsan.com: dropped mach-omap2/clock.c changes; modified to only
+ call the clockdomain code if oh->clkdm is set; disable clock->clockdomain
+ interaction on OMAP4]
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
 ---
- arch/arm/include/asm/dma-mapping.h |   29 ++---------------------------
- arch/arm/include/asm/memory.h      |   12 ------------
- arch/arm/mm/dma-mapping.c          |   35 ++++++++++++++++++++++++++++++++---
- arch/arm/mm/init.c                 |   10 ++++++++++
- arch/arm/mm/mm.h                   |    6 ++++++
- 5 files changed, 50 insertions(+), 42 deletions(-)
+ arch/arm/mach-omap2/clock44xx_data.c |    1 +
+ arch/arm/mach-omap2/omap_hwmod.c     |   31 +++++++++++++++++++++++++++++++
+ 2 files changed, 32 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
-index 94662f4..7a21d0b 100644
---- a/arch/arm/include/asm/dma-mapping.h
-+++ b/arch/arm/include/asm/dma-mapping.h
-@@ -115,33 +115,8 @@ static inline void __dma_page_dev_to_cpu(struct page *page, unsigned long off,
- 		___dma_page_dev_to_cpu(page, off, size, dir);
- }
- 
--/*
-- * Return whether the given device DMA address mask can be supported
-- * properly.  For example, if your device can only drive the low 24-bits
-- * during bus mastering, then you would pass 0x00ffffff as the mask
-- * to this function.
-- *
-- * FIXME: This should really be a platform specific issue - we should
-- * return false if GFP_DMA allocations may not satisfy the supplied 'mask'.
-- */
--static inline int dma_supported(struct device *dev, u64 mask)
--{
--	if (mask < ISA_DMA_THRESHOLD)
--		return 0;
--	return 1;
--}
--
--static inline int dma_set_mask(struct device *dev, u64 dma_mask)
--{
--	if (!dev->dma_mask || !dma_supported(dev, dma_mask))
--		return -EIO;
--
--#ifndef CONFIG_DMABOUNCE
--	*dev->dma_mask = dma_mask;
--#endif
--
--	return 0;
--}
-+extern int dma_supported(struct device *, u64);
-+extern int dma_set_mask(struct device *, u64);
- 
- /*
-  * DMA errors are defined by all-bits-set in the DMA address.
-diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-index af44a8f..b8de516 100644
---- a/arch/arm/include/asm/memory.h
-+++ b/arch/arm/include/asm/memory.h
-@@ -204,18 +204,6 @@ static inline unsigned long __phys_to_virt(unsigned long x)
- #endif
- 
- /*
-- * The DMA mask corresponding to the maximum bus address allocatable
-- * using GFP_DMA.  The default here places no restriction on DMA
-- * allocations.  This must be the smallest DMA mask in the system,
-- * so a successful GFP_DMA allocation will always satisfy this.
-- */
--#ifndef ARM_DMA_ZONE_SIZE
--#define ISA_DMA_THRESHOLD	(0xffffffffULL)
--#else
--#define ISA_DMA_THRESHOLD	(PHYS_OFFSET + ARM_DMA_ZONE_SIZE - 1)
--#endif
--
--/*
-  * PFNs are used to describe any physical page; this means
-  * PFN 0 == physical address 0.
-  *
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index 82a093c..0a0a1e7 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -25,9 +25,11 @@
- #include <asm/tlbflush.h>
- #include <asm/sizes.h>
- 
-+#include "mm.h"
-+
- static u64 get_coherent_dma_mask(struct device *dev)
- {
--	u64 mask = ISA_DMA_THRESHOLD;
-+	u64 mask = (u64)arm_dma_limit;
- 
- 	if (dev) {
- 		mask = dev->coherent_dma_mask;
-@@ -41,10 +43,10 @@ static u64 get_coherent_dma_mask(struct device *dev)
- 			return 0;
- 		}
- 
--		if ((~mask) & ISA_DMA_THRESHOLD) {
-+		if ((~mask) & (u64)arm_dma_limit) {
- 			dev_warn(dev, "coherent DMA mask %#llx is smaller "
- 				 "than system GFP_DMA mask %#llx\n",
--				 mask, (unsigned long long)ISA_DMA_THRESHOLD);
-+				 mask, (u64)arm_dma_limit);
- 			return 0;
- 		}
+diff --git a/arch/arm/mach-omap2/clock44xx_data.c b/arch/arm/mach-omap2/clock44xx_data.c
+index 8c96567..28b5de1 100644
+--- a/arch/arm/mach-omap2/clock44xx_data.c
++++ b/arch/arm/mach-omap2/clock44xx_data.c
+@@ -3296,6 +3296,7 @@ int __init omap4xxx_clk_init(void)
  	}
-@@ -657,6 +659,33 @@ void dma_sync_sg_for_device(struct device *dev, struct scatterlist *sg,
- }
- EXPORT_SYMBOL(dma_sync_sg_for_device);
  
-+/*
-+ * Return whether the given device DMA address mask can be supported
-+ * properly.  For example, if your device can only drive the low 24-bits
-+ * during bus mastering, then you would pass 0x00ffffff as the mask
-+ * to this function.
-+ */
-+int dma_supported(struct device *dev, u64 mask)
-+{
-+	if (mask < (u64)arm_dma_limit)
-+		return 0;
-+	return 1;
-+}
-+EXPORT_SYMBOL(dma_supported);
-+
-+int dma_set_mask(struct device *dev, u64 dma_mask)
-+{
-+	if (!dev->dma_mask || !dma_supported(dev, dma_mask))
-+		return -EIO;
-+
-+#ifndef CONFIG_DMABOUNCE
-+	*dev->dma_mask = dma_mask;
-+#endif
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL(dma_set_mask);
-+
- #define PREALLOC_DMA_DEBUG_ENTRIES	4096
+ 	clk_init(&omap2_clk_functions);
++	omap2_clk_disable_clkdm_control();
  
- static int __init dma_debug_do_init(void)
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index c19571c..b9efa18 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -212,6 +212,14 @@ static void __init arm_bootmem_init(unsigned long start_pfn,
- }
- 
- #ifdef CONFIG_ZONE_DMA
-+/*
-+ * The DMA mask corresponding to the maximum bus address allocatable
-+ * using GFP_DMA.  The default here places no restriction on DMA
-+ * allocations.  This must be the smallest DMA mask in the system,
-+ * so a successful GFP_DMA allocation will always satisfy this.
-+ */
-+u32 arm_dma_zone_size;
-+
- static void __init arm_adjust_dma_zone(unsigned long *size, unsigned long *hole,
- 	unsigned long dma_size)
+ 	for (c = omap44xx_clks; c < omap44xx_clks + ARRAY_SIZE(omap44xx_clks);
+ 									  c++)
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index 293fa6c..e74b9c7 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -1223,6 +1223,7 @@ static int _reset(struct omap_hwmod *oh)
+ static int _enable(struct omap_hwmod *oh)
  {
-@@ -278,6 +286,8 @@ static void __init arm_bootmem_free(unsigned long min, unsigned long max_low,
- 	 */
- 	arm_adjust_dma_zone(zone_size, zhole_size,
- 		ARM_DMA_ZONE_SIZE >> PAGE_SHIFT);
+ 	int r;
++	int hwsup = 0;
+ 
+ 	if (oh->_state != _HWMOD_STATE_INITIALIZED &&
+ 	    oh->_state != _HWMOD_STATE_IDLE &&
+@@ -1250,10 +1251,33 @@ static int _enable(struct omap_hwmod *oh)
+ 		omap_hwmod_mux(oh->mux, _HWMOD_STATE_ENABLED);
+ 
+ 	_add_initiator_dep(oh, mpu_oh);
 +
-+	arm_dma_limit = PHYS_OFFSET + ARM_DMA_ZONE_SIZE - 1;
- #endif
- 
- 	free_area_init_node(0, zone_size, min, zhole_size);
-diff --git a/arch/arm/mm/mm.h b/arch/arm/mm/mm.h
-index 5b3d7d5..0105667 100644
---- a/arch/arm/mm/mm.h
-+++ b/arch/arm/mm/mm.h
-@@ -23,5 +23,11 @@ extern void __flush_dcache_page(struct address_space *mapping, struct page *page
- 
- #endif
- 
-+#ifdef CONFIG_ZONE_DMA
-+extern u32 arm_dma_limit;
-+#else
-+#define arm_dma_limit ((u32)~0)
-+#endif
++	if (oh->clkdm) {
++		/*
++		 * A clockdomain must be in SW_SUP before enabling
++		 * completely the module. The clockdomain can be set
++		 * in HW_AUTO only when the module become ready.
++		 */
++		hwsup = clkdm_in_hwsup(oh->clkdm);
++		r = clkdm_hwmod_enable(oh->clkdm, oh);
++		if (r) {
++			WARN(1, "omap_hwmod: %s: could not enable clockdomain %s: %d\n",
++			     oh->name, oh->clkdm->name, r);
++			return r;
++		}
++	}
 +
- void __init bootmem_init(void);
- void arm_mm_memblock_reserve(void);
+ 	_enable_clocks(oh);
+ 
+ 	r = _wait_target_ready(oh);
+ 	if (!r) {
++		/*
++		 * Set the clockdomain to HW_AUTO only if the target is ready,
++		 * assuming that the previous state was HW_AUTO
++		 */
++		if (oh->clkdm && hwsup)
++			clkdm_allow_idle(oh->clkdm);
++
+ 		oh->_state = _HWMOD_STATE_ENABLED;
+ 
+ 		/* Access the sysconfig only if the target is ready */
+@@ -1266,6 +1290,9 @@ static int _enable(struct omap_hwmod *oh)
+ 		_disable_clocks(oh);
+ 		pr_debug("omap_hwmod: %s: _wait_target_ready: %d\n",
+ 			 oh->name, r);
++
++		if (oh->clkdm)
++			clkdm_hwmod_disable(oh->clkdm, oh);
+ 	}
+ 
+ 	return r;
+@@ -1293,6 +1320,8 @@ static int _idle(struct omap_hwmod *oh)
+ 		_idle_sysc(oh);
+ 	_del_initiator_dep(oh, mpu_oh);
+ 	_disable_clocks(oh);
++	if (oh->clkdm)
++		clkdm_hwmod_disable(oh->clkdm, oh);
+ 
+ 	/* Mux pins for device idle if populated */
+ 	if (oh->mux && oh->mux->pads_dynamic)
+@@ -1389,6 +1418,8 @@ static int _shutdown(struct omap_hwmod *oh)
+ 		_del_initiator_dep(oh, mpu_oh);
+ 		/* XXX what about the other system initiators here? dma, dsp */
+ 		_disable_clocks(oh);
++		if (oh->clkdm)
++			clkdm_hwmod_disable(oh->clkdm, oh);
+ 	}
+ 	/* XXX Should this code also force-disable the optional clocks? */
+ 
 -- 
-1.7.4.4
+1.7.5.4
