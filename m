@@ -1,76 +1,142 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 09 Jul 2011 11:50:52 +0900
-Subject: [GIT PULL] Samsung fixes for 3.0-rc7
-Message-ID: <007801cc3de3$06c33a30$1449ae90$%kim@samsung.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Sat, 9 Jul 2011 03:52:52 +0100
+Subject: [PATCH 02/10] ASoc: mxs: add mxs-saif driver
+In-Reply-To: <1310140790-2132-3-git-send-email-b29396@freescale.com>
+References: <1310140790-2132-1-git-send-email-b29396@freescale.com>
+	<1310140790-2132-3-git-send-email-b29396@freescale.com>
+Message-ID: <20110709025252.GC26900@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Fri, Jul 08, 2011 at 11:59:42PM +0800, Dong Aisheng wrote:
+> Signed-off-by: Dong Aisheng <b29396@freescale.com>
 
-Please pull Samsung fixes from:
+Again, *always* CC maintainers on patches.
 
-git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-s5p-fixes-for-linus
+> +static int mxs_saif_set_dai_sysclk(struct snd_soc_dai *cpu_dai,
+> +			int clk_id, unsigned int freq, int dir)
+> +{
+> +	struct mxs_saif *saif = snd_soc_dai_get_drvdata(cpu_dai);
+> +
+> +	switch (clk_id) {
+> +	case MXS_SAIF_SYS_CLK:
+> +		clk_set_rate(saif->clk, freq);
+> +		clk_enable(saif->clk);
 
-These things are for bug fix. If any problems, please let me know.
+How would one turn this clock off?
 
-Thanks.
+> + * SAIF Clock dividers
+> + * Should only be called when port is inactive.
+> + */
+> +static int mxs_saif_set_dai_clkdiv(struct snd_soc_dai *cpu_dai,
+> +				  int div_id, int div)
+> +{
+> +	u32 scr;
+> +	struct mxs_saif *saif = snd_soc_dai_get_drvdata(cpu_dai);
+> +
+> +	scr = __raw_readl(saif->base + SAIF_CTRL);
+> +	scr &= ~BM_SAIF_CTRL_BITCLK_MULT_RATE;
+> +	scr &= ~BM_SAIF_CTRL_BITCLK_BASE_RATE;
+> +
+> +	switch (div_id) {
+> +	case MXS_SAIF_MCLK:
+> +		switch (div) {
+> +		case 32:
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+No, this stuff should all be figured out automatically by the driver -
+the user shouldn't have to manually set the ratio, especially if they've
+already set the master clock.
 
-The following changes since commit fe0d42203cb5616eeff68b14576a0f7e2dd56625:
+> +	switch (fmt & SND_SOC_DAIFMT_FORMAT_MASK) {
+> +	case SND_SOC_DAIFMT_I2S:
+> +		/* data frame low 1clk before data */
+> +		scr |= BM_SAIF_CTRL_DELAY;
+> +		scr &= ~BM_SAIF_CTRL_LRCLK_POLARITY;
+> +		break;
+> +	case SND_SOC_DAIFMT_LEFT_J:
+> +		/* data frame high with data */
+> +		scr &= ~BM_SAIF_CTRL_DELAY;
+> +		scr &= ~BM_SAIF_CTRL_LRCLK_POLARITY;
+> +		scr &= ~BM_SAIF_CTRL_JUSTIFY;
+> +		break;
+> +	}
 
-  Linux 3.0-rc6 (2011-07-04 15:56:24 -0700)
+This should return an error if the parameters are invalid.  The rest of
+the code has many other instances of this missing check.
 
-are available in the git repository at:
-   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-s5p-fixes-for-linus
+> +	/*
+> +	 * Note: We simply just support master mode since SAIF TX only supports
+> +	 * master mode.
+> +	 */
+> +	switch (fmt & SND_SOC_DAIFMT_MASTER_MASK) {
+> +	case SND_SOC_DAIFMT_CBS_CFS:
+> +		scr &= ~BM_SAIF_CTRL_SLAVE_MODE;
+> +		__raw_writel(scr | scr0, saif->base + SAIF_CTRL);
+> +		break;
+> +	case SND_SOC_DAIFMT_CBM_CFS:
+> +		break;
+> +	case SND_SOC_DAIFMT_CBS_CFM:
+> +		break;
 
-Kukjin Kim (1):
-      Merge branch 'for-spi' into s5p-fixes-for-linus
+This is clearly wrong, you're doing exactly the same thing for two
+different inputs.
 
-MyungJoo Ham (2):
-      ARM: SAMSUNG: header file revised to prevent declaring duplicated
-      ARM: EXYNOS4: Address a section mismatch w/ suspend issue.
+> +static int mxs_saif_startup(struct snd_pcm_substream *substream,
+> +			   struct snd_soc_dai *cpu_dai)
+> +{
+> +	struct mxs_saif *saif = snd_soc_dai_get_drvdata(cpu_dai);
+> +	snd_soc_dai_set_dma_data(cpu_dai, substream, &saif->dma_param);
+> +
+> +	return 0;
+> +}
 
-Naveen Krishna Chatradhi (1):
-      ARM: EXYNOS4: fix improper gpio configuration
+Remove empty functions.
 
-Padmavathi Venna (3):
-      ARM: SAMSUNG: Add tx_st_done variable
-      spi/s3c64xx: Bug fix for SPI with different FIFO level
-      ARM: S5PC100: Fix for compilation error
+> +/*
+> + * Should only be called when port is inactive.
+> + * although can be called multiple times by upper layers.
+> + */
+> +static int mxs_saif_hw_params(struct snd_pcm_substream *substream,
+> +			     struct snd_pcm_hw_params *params,
+> +			     struct snd_soc_dai *cpu_dai)
 
-Sangbeom Kim (1):
-      ARM: S5P: Fix bug on init of PWMTimers for HRTimer
+The requirement for the port to be inactive is totally unreasonable,
+especially given that the params are configured by applications and you
+support simultaneous playback and record.
 
-Sylwester Nawrocki (1):
-      ARM: EXYNOS4: Set appropriate I2C device variant
+> +static irqreturn_t mxs_saif_irq(int irq, void *dev_id)
+> +{
+> +	struct mxs_saif *saif = dev_id;
+> +
+> +	if (saif->fifo_err_counter++ % 100 == 0)
 
-Thomas Abraham (1):
-      ARM: EXYNOS4: Fix card detection for sdhci 0 and 2
+The rate limit looks awfully suspicious...
 
-Wolfram Sang (3):
-      ARM: S3C24XX: don't use uninitialized variable in dma.c
-      ARM: S3C24XX: drop return codes in void function of dma.c
-      ARM: S3C2440: fix section mismatch on mini2440
+> +		printk(KERN_ERR "saif_irq SAIF_STAT %x SAIF_CTRL %x \
+> +			fifo_errs=%d \n",
+> +		       __raw_readl(saif->base + SAIF_STAT),
+> +		       __raw_readl(saif->base + SAIF_CTRL),
+> +		       saif->fifo_err_counter);
 
- arch/arm/mach-exynos4/cpu.c                      |    6 ++++++
- arch/arm/mach-exynos4/dev-audio.c                |    2 +-
- arch/arm/mach-exynos4/headsmp.S                  |    2 +-
- arch/arm/mach-exynos4/mach-smdkv310.c            |    8 ++------
- arch/arm/mach-s3c2440/mach-mini2440.c            |    2 +-
- arch/arm/mach-s3c64xx/dev-spi.c                  |    2 ++
- arch/arm/mach-s5p64x0/dev-spi.c                  |    4 ++++
- arch/arm/mach-s5pc100/dev-spi.c                  |    4 ++++
- arch/arm/mach-s5pv210/dev-spi.c                  |    2 ++
- arch/arm/plat-s3c24xx/dma.c                      |   12 +++---------
- arch/arm/plat-s5p/s5p-time.c                     |    4 ++--
- arch/arm/plat-samsung/include/plat/devs.h        |    6 ++++++
- arch/arm/plat-samsung/include/plat/s3c64xx-spi.h |    2 ++
- drivers/spi/spi_s3c64xx.c                        |    4 +---
- 14 files changed, 37 insertions(+), 23 deletions(-)
+dev_err()
+
+> +	__raw_writel(BM_SAIF_STAT_FIFO_UNDERFLOW_IRQ |
+> +			BM_SAIF_STAT_FIFO_OVERFLOW_IRQ,
+> +			saif->base + SAIF_STAT + MXS_CLR_ADDR);
+> +
+> +	return IRQ_HANDLED;
+
+You're not actually checking that the relevant interrupt fired...
+
+> +	saif->clk = clk_get(&pdev->dev, NULL);
+> +	if (IS_ERR(saif->clk)) {
+> +		ret = PTR_ERR(saif->clk);
+> +		dev_err(&pdev->dev, "Cannot get the clock: %d\n",
+> +			ret);
+> +		goto failed_clk;
+> +	}
+> +	clk_set_rate(saif->clk, 12000000);
+> +	clk_enable(saif->clk);
+
+How did you pick this clock rate and why does it need to be set?  It's
+not an obvious audio rate...
