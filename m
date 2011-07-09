@@ -1,137 +1,204 @@
 From: tixy@yxit.co.uk (Tixy)
-Date: Sat,  9 Jul 2011 11:56:51 +0100
-Subject: [PATCH 04/51] ARM: kprobes: Split out internal parts of kprobes.h
+Date: Sat,  9 Jul 2011 11:57:23 +0100
+Subject: [PATCH 36/51] ARM: kprobes: Add common decoding function for LDM and
+	STM
 In-Reply-To: <1310209058-20980-1-git-send-email-tixy@yxit.co.uk>
 References: <1310209058-20980-1-git-send-email-tixy@yxit.co.uk>
-Message-ID: <1310209058-20980-5-git-send-email-tixy@yxit.co.uk>
+Message-ID: <1310209058-20980-37-git-send-email-tixy@yxit.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jon Medhurst <tixy@yxit.co.uk>
 
-Later, we will be adding a considerable amount of internal
-implementation definitions to kprobe header files and it would be good
-to have these in local header file along side the source code, rather
-than pollute the existing header which is include by all users of
-kprobes.
+The encoding of these instructions is substantially the same for both
+ARM and Thumb, so we can have common decoding and simulation functions.
 
-To this end, we add arch/arm/kernel/kprobes.h and move into this the
-existing internal defintions from arch/arm/include/asm/kprobes.h
+This patch moves the simulation functions from kprobes-arm.c to
+kprobes-common.c. It also adds a new simulation function
+(simulate_ldm1_pc) for the case where we load into PC because this may
+need to interwork.
+
+The instruction decoding is done by a custom function
+(kprobe_decode_ldmstm) rather than just relying on decoding table
+entries because we will later be adding optimisation code.
 
 Signed-off-by: Jon Medhurst <tixy@yxit.co.uk>
 ---
- arch/arm/include/asm/kprobes.h |   17 -----------------
- arch/arm/kernel/kprobes.h      |   37 +++++++++++++++++++++++++++++++++++++
- arch/arm/kernel/kprobes-arm.c  |    2 ++
- arch/arm/kernel/kprobes.c      |    2 ++
- 4 files changed, 41 insertions(+), 17 deletions(-)
+ arch/arm/kernel/kprobes.h        |    3 ++
+ arch/arm/kernel/kprobes-arm.c    |   58 ++++---------------------------
+ arch/arm/kernel/kprobes-common.c |   70 ++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 80 insertions(+), 51 deletions(-)
 
-diff --git a/arch/arm/include/asm/kprobes.h b/arch/arm/include/asm/kprobes.h
-index e46bdd0..57d37d5 100644
---- a/arch/arm/include/asm/kprobes.h
-+++ b/arch/arm/include/asm/kprobes.h
-@@ -24,12 +24,6 @@
- #define MAX_INSN_SIZE			2
- #define MAX_STACK_SIZE			64	/* 32 would probably be OK */
- 
--/*
-- * This undefined instruction must be unique and
-- * reserved solely for kprobes' use.
-- */
--#define KPROBE_BREAKPOINT_INSTRUCTION	0xe7f001f8
--
- #define regs_return_value(regs)		((regs)->ARM_r0)
- #define flush_insn_slot(p)		do { } while (0)
- #define kretprobe_blacklist_size	0
-@@ -62,20 +56,9 @@ struct kprobe_ctlblk {
- };
- 
- void arch_remove_kprobe(struct kprobe *);
--void kretprobe_trampoline(void);
--
- int kprobe_fault_handler(struct pt_regs *regs, unsigned int fsr);
- int kprobe_exceptions_notify(struct notifier_block *self,
- 			     unsigned long val, void *data);
- 
--enum kprobe_insn {
--	INSN_REJECTED,
--	INSN_GOOD,
--	INSN_GOOD_NO_SLOT
--};
--
--enum kprobe_insn arm_kprobe_decode_insn(kprobe_opcode_t,
--					struct arch_specific_insn *);
--void __init arm_kprobe_decode_init(void);
- 
- #endif /* _ARM_KPROBES_H */
 diff --git a/arch/arm/kernel/kprobes.h b/arch/arm/kernel/kprobes.h
-new file mode 100644
-index 0000000..87a5241
---- /dev/null
+index 5d6bf0d..c442852 100644
+--- a/arch/arm/kernel/kprobes.h
 +++ b/arch/arm/kernel/kprobes.h
-@@ -0,0 +1,37 @@
-+/*
-+ * arch/arm/kernel/kprobes.h
-+ *
-+ * Contents moved from arch/arm/include/asm/kprobes.h which is
-+ * Copyright (C) 2006, 2007 Motorola Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-+ * General Public License for more details.
-+ */
+@@ -136,6 +136,9 @@ static inline void __kprobes load_write_pc(long pcv, struct pt_regs *regs)
+ void __kprobes kprobe_simulate_nop(struct kprobe *p, struct pt_regs *regs);
+ void __kprobes kprobe_emulate_none(struct kprobe *p, struct pt_regs *regs);
+ 
++enum kprobe_insn __kprobes
++kprobe_decode_ldmstm(kprobe_opcode_t insn, struct arch_specific_insn *asi);
 +
-+#ifndef _ARM_KERNEL_KPROBES_H
-+#define _ARM_KERNEL_KPROBES_H
-+
-+/*
-+ * This undefined instruction must be unique and
-+ * reserved solely for kprobes' use.
-+ */
-+#define KPROBE_BREAKPOINT_INSTRUCTION	0xe7f001f8
-+
-+enum kprobe_insn {
-+	INSN_REJECTED,
-+	INSN_GOOD,
-+	INSN_GOOD_NO_SLOT
-+};
-+
-+enum kprobe_insn arm_kprobe_decode_insn(kprobe_opcode_t,
-+					struct arch_specific_insn *);
-+
-+void __init arm_kprobe_decode_init(void);
-+
-+#endif /* _ARM_KERNEL_KPROBES_H */
+ /*
+  * Test if load/store instructions writeback the address register.
+  * if P (bit 24) == 0 or W (bit 21) == 1
 diff --git a/arch/arm/kernel/kprobes-arm.c b/arch/arm/kernel/kprobes-arm.c
-index 15eeff6..976ce14 100644
+index a1143e8..c6f2c69 100644
 --- a/arch/arm/kernel/kprobes-arm.c
 +++ b/arch/arm/kernel/kprobes-arm.c
-@@ -61,6 +61,8 @@
- #include <linux/kernel.h>
- #include <linux/kprobes.h>
+@@ -437,54 +437,6 @@ static void __kprobes simulate_mrs(struct kprobe *p, struct pt_regs *regs)
+ 	regs->uregs[rd] = regs->ARM_cpsr & mask;
+ }
  
-+#include "kprobes.h"
+-static void __kprobes simulate_ldm1stm1(struct kprobe *p, struct pt_regs *regs)
+-{
+-	kprobe_opcode_t insn = p->opcode;
+-	int rn = (insn >> 16) & 0xf;
+-	int lbit = insn & (1 << 20);
+-	int wbit = insn & (1 << 21);
+-	int ubit = insn & (1 << 23);
+-	int pbit = insn & (1 << 24);
+-	long *addr = (long *)regs->uregs[rn];
+-	int reg_bit_vector;
+-	int reg_count;
+-
+-	reg_count = 0;
+-	reg_bit_vector = insn & 0xffff;
+-	while (reg_bit_vector) {
+-		reg_bit_vector &= (reg_bit_vector - 1);
+-		++reg_count;
+-	}
+-
+-	if (!ubit)
+-		addr -= reg_count;
+-	addr += (!pbit == !ubit);
+-
+-	reg_bit_vector = insn & 0xffff;
+-	while (reg_bit_vector) {
+-		int reg = __ffs(reg_bit_vector);
+-		reg_bit_vector &= (reg_bit_vector - 1);
+-		if (lbit)
+-			regs->uregs[reg] = *addr++;
+-		else
+-			*addr++ = regs->uregs[reg];
+-	}
+-
+-	if (wbit) {
+-		if (!ubit)
+-			addr -= reg_count;
+-		addr -= (!pbit == !ubit);
+-		regs->uregs[rn] = (long)addr;
+-	}
+-}
+-
+-static void __kprobes simulate_stm1_pc(struct kprobe *p, struct pt_regs *regs)
+-{
+-	regs->ARM_pc = (long)p->addr + str_pc_offset;
+-	simulate_ldm1stm1(p, regs);
+-	regs->ARM_pc = (long)p->addr + 4;
+-}
+-
+ static void __kprobes simulate_mov_ipsp(struct kprobe *p, struct pt_regs *regs)
+ {
+ 	regs->uregs[12] = regs->uregs[13];
+@@ -1463,9 +1415,13 @@ space_cccc_100x(kprobe_opcode_t insn, struct arch_specific_insn *asi)
+ 
+ 	/* LDM(1) : cccc 100x x0x1 xxxx xxxx xxxx xxxx xxxx */
+ 	/* STM(1) : cccc 100x x0x0 xxxx xxxx xxxx xxxx xxxx */
+-	asi->insn_handler = ((insn & 0x108000) == 0x008000) ? /* STM & R15 */
+-				simulate_stm1_pc : simulate_ldm1stm1;
+-	return INSN_GOOD_NO_SLOT;
 +
- #define sign_extend(x, signbit) ((x) | (0 - ((x) & (1 << (signbit)))))
++	/*
++	 * Make the instruction unconditional because the new emulation
++	 * functions don't bother to setup the PSR context.
++	 */
++	insn = (insn | 0xe0000000) & ~0x10000000;
++	return kprobe_decode_ldmstm(insn, asi);
+ }
  
- #define branch_displacement(insn) sign_extend(((insn) & 0xffffff) << 2, 25)
-diff --git a/arch/arm/kernel/kprobes.c b/arch/arm/kernel/kprobes.c
-index 1656c87..3ba5f8d 100644
---- a/arch/arm/kernel/kprobes.c
-+++ b/arch/arm/kernel/kprobes.c
-@@ -28,6 +28,8 @@
- #include <asm/traps.h>
- #include <asm/cacheflush.h>
+ static enum kprobe_insn __kprobes
+diff --git a/arch/arm/kernel/kprobes-common.c b/arch/arm/kernel/kprobes-common.c
+index 41e8218..9ac1427 100644
+--- a/arch/arm/kernel/kprobes-common.c
++++ b/arch/arm/kernel/kprobes-common.c
+@@ -166,6 +166,76 @@ void __kprobes kprobe_emulate_none(struct kprobe *p, struct pt_regs *regs)
+ 	p->ainsn.insn_fn();
+ }
  
-+#include "kprobes.h"
++static void __kprobes simulate_ldm1stm1(struct kprobe *p, struct pt_regs *regs)
++{
++	kprobe_opcode_t insn = p->opcode;
++	int rn = (insn >> 16) & 0xf;
++	int lbit = insn & (1 << 20);
++	int wbit = insn & (1 << 21);
++	int ubit = insn & (1 << 23);
++	int pbit = insn & (1 << 24);
++	long *addr = (long *)regs->uregs[rn];
++	int reg_bit_vector;
++	int reg_count;
 +
- #define MIN_STACK_SIZE(addr) 				\
- 	min((unsigned long)MAX_STACK_SIZE,		\
- 	    (unsigned long)current_thread_info() + THREAD_START_SP - (addr))
++	reg_count = 0;
++	reg_bit_vector = insn & 0xffff;
++	while (reg_bit_vector) {
++		reg_bit_vector &= (reg_bit_vector - 1);
++		++reg_count;
++	}
++
++	if (!ubit)
++		addr -= reg_count;
++	addr += (!pbit == !ubit);
++
++	reg_bit_vector = insn & 0xffff;
++	while (reg_bit_vector) {
++		int reg = __ffs(reg_bit_vector);
++		reg_bit_vector &= (reg_bit_vector - 1);
++		if (lbit)
++			regs->uregs[reg] = *addr++;
++		else
++			*addr++ = regs->uregs[reg];
++	}
++
++	if (wbit) {
++		if (!ubit)
++			addr -= reg_count;
++		addr -= (!pbit == !ubit);
++		regs->uregs[rn] = (long)addr;
++	}
++}
++
++static void __kprobes simulate_stm1_pc(struct kprobe *p, struct pt_regs *regs)
++{
++	regs->ARM_pc = (long)p->addr + str_pc_offset;
++	simulate_ldm1stm1(p, regs);
++	regs->ARM_pc = (long)p->addr + 4;
++}
++
++static void __kprobes simulate_ldm1_pc(struct kprobe *p, struct pt_regs *regs)
++{
++	simulate_ldm1stm1(p, regs);
++	load_write_pc(regs->ARM_pc, regs);
++}
++
++enum kprobe_insn __kprobes
++kprobe_decode_ldmstm(kprobe_opcode_t insn, struct arch_specific_insn *asi)
++{
++	kprobe_insn_handler_t *handler = 0;
++	unsigned reglist = insn & 0xffff;
++	int is_ldm = insn & 0x100000;
++
++	if (reglist & 0x8000)
++		handler = is_ldm ? simulate_ldm1_pc : simulate_stm1_pc;
++	else
++		handler = simulate_ldm1stm1;
++	asi->insn_handler = handler;
++	return INSN_GOOD_NO_SLOT;
++}
++
++
+ /*
+  * Prepare an instruction slot to receive an instruction for emulating.
+  * This is done by placing a subroutine return after the location where the
 -- 
 1.7.2.5
