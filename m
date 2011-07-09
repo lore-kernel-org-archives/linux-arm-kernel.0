@@ -1,249 +1,193 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Sun, 10 Jul 2011 14:26:21 +0900
-Subject: [PATCH] i2c: pxa: create dynamic platform device from device tree
-In-Reply-To: <1310120428-22700-7-git-send-email-haojian.zhuang@marvell.com>
-References: <1310120428-22700-1-git-send-email-haojian.zhuang@marvell.com>
-	<1310120428-22700-2-git-send-email-haojian.zhuang@marvell.com>
-	<1310120428-22700-3-git-send-email-haojian.zhuang@marvell.com>
-	<1310120428-22700-4-git-send-email-haojian.zhuang@marvell.com>
-	<1310120428-22700-5-git-send-email-haojian.zhuang@marvell.com>
-	<1310120428-22700-6-git-send-email-haojian.zhuang@marvell.com>
-	<1310120428-22700-7-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <20110710052621.GD10912@ponder.secretlab.ca>
+Date: Sat, 9 Jul 2011 15:14:19 -0600
+Subject: [RFC PATCH v2 3/4] Core devices: add OF interrupt controller
+	sorting method
+In-Reply-To: <1310115250-3859-4-git-send-email-marc.zyngier@arm.com>
+References: <1310115250-3859-1-git-send-email-marc.zyngier@arm.com>
+	<1310115250-3859-4-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20110709211419.GC2805@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 08, 2011 at 06:20:23PM +0800, Haojian Zhuang wrote:
-> Create two probe function to support both current platform device and created
-> dynamic platform device from device tree. After moving to device tree,
-> original implementation of platform device will be removed.
+On Fri, Jul 08, 2011 at 09:54:09AM +0100, Marc Zyngier wrote:
+> When several interrupt controllers are initialized, it is
+> necessary to probe them in the order described by their
+> cascading interrupts (or interrupt-parent in OF parlance).
 > 
-> Use property to present polling mode and frequency mode.
+> This patch introduces a method that can be passed to
+> core_driver_init_class() at runtime and that will
+> reorder the device list according to the OF properties.
 > 
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > ---
->  drivers/i2c/busses/i2c-pxa.c |  163 ++++++++++++++++++++++++++++++++++++++++++
->  1 files changed, 163 insertions(+), 0 deletions(-)
+>  drivers/base/core_device.c  |  109 +++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/core_device.h |    2 +
+>  2 files changed, 111 insertions(+), 0 deletions(-)
 > 
-> diff --git a/drivers/i2c/busses/i2c-pxa.c b/drivers/i2c/busses/i2c-pxa.c
-> index d603646..7a6d774 100644
-> --- a/drivers/i2c/busses/i2c-pxa.c
-> +++ b/drivers/i2c/busses/i2c-pxa.c
-> @@ -29,6 +29,7 @@
->  #include <linux/errno.h>
->  #include <linux/interrupt.h>
->  #include <linux/i2c-pxa.h>
-> +#include <linux/of_device.h>
->  #include <linux/of_i2c.h>
->  #include <linux/platform_device.h>
->  #include <linux/err.h>
-> @@ -1044,6 +1045,162 @@ static const struct i2c_algorithm i2c_pxa_pio_algorithm = {
->  	.functionality	= i2c_pxa_functionality,
->  };
+> diff --git a/drivers/base/core_device.c b/drivers/base/core_device.c
+> index 9262145..a8df59d 100644
+> --- a/drivers/base/core_device.c
+> +++ b/drivers/base/core_device.c
+> @@ -10,7 +10,9 @@
+>   */
+>  #include <linux/core_device.h>
+>  #include <linux/of_platform.h>
+> +#include <linux/of_irq.h>
+>  #include <linux/slab.h>
+> +#include <linux/sort.h>
 >  
-> +static const struct of_device_id pxa_i2c_of_match[] = {
-> +	{ .compatible = "pxa2xx-i2c",	.data = (void *)REGS_PXA2XX, },
-> +	{ .compatible = "pxa3xx-pwri2c", .data = (void *)REGS_PXA3XX, },
-> +	{ .compatible = "ce4100-i2c",	.data = (void *)REGS_CE4100, },
-
-New compatible values need to be written up in
-Documentation/devicetree/bindings, and strings should be in the form
-"<vendor>,<soc>-i2c".  They should also be specific to the soc instead
-of trying to be generic (ie. use "marvell,pxa255-i2c" instead of
-"marvell,pxa2xx-i2c".
-
-> +	{},
+>  static struct list_head anchors[CORE_DEV_CLASS_MAX] __initdata = {
+>  	[CORE_DEV_CLASS_IRQ]   = LIST_HEAD_INIT(anchors[CORE_DEV_CLASS_IRQ]),
+> @@ -105,4 +107,111 @@ void __init of_core_device_populate(enum core_device_class class,
+>  		core_device_register(class, dev);
+>  	}
+>  }
+> +
+> +struct intc_desc {
+> +	struct core_device	*dev;
+> +	struct intc_desc	*parent;
+> +	int			order;
 > +};
 > +
-> +#ifdef CONFIG_OF
-> +static int i2c_pxa_of_probe(struct platform_device *of_dev)
+> +static struct intc_desc * __init irq_find_parent(struct core_device *dev,
+> +						 struct intc_desc *intcs,
+> +						 int nr)
 > +{
-
-CONFIG_OF should not be an either/or option.  Turning on CONFIG_OF
-must not disable non-DT users.
-
-> +	struct device_node *np = of_dev->dev.of_node;
-> +	const struct of_device_id *match;
-> +	struct i2c_pxa_platform_data *plat = NULL;
-> +	struct pxa_i2c *i2c;
-> +	struct resource *res;
-> +	const __be32 *p;
-> +	int i2c_type, irq, data, ret;
-> +	int id = 0, poll = 0, fast = 0;
+> +	struct device_node *np;
+> +	int i;
 > +
-> +	match = of_match_device(pxa_i2c_of_match, &of_dev->dev);
-> +	if (match == NULL)
-> +		return -ENODEV;
-> +	i2c_type = (int)match->data;
+> +	if (!dev->of_node)
+> +		return NULL;
 > +
-> +	p = of_get_property(np, "cell-index", &data);
-> +	if (p)
-> +		id = be32_to_cpu(*p);
-
-When using the device tree, the bus id should be dynamically
-assigned.  Don't use a cell-index property.
-
-> +
-> +	p = of_get_property(np, "i2c-polling", &data);
-> +	if (p)
-> +		poll = be32_to_cpu(*p);
-> +
-> +	p = of_get_property(np, "i2c-frequency", &data);
-> +	if (p && !strncmp((char *)p, "fast", data))
-> +		fast = 1;
-> +
-> +	res = platform_get_resource(of_dev, IORESOURCE_MEM, 0);
-> +	irq = platform_get_irq(of_dev, 0);
-> +	if (res == NULL || irq < 0)
-> +		return -ENODEV;
-> +
-> +	if (!request_mem_region(res->start, resource_size(res), res->name))
-> +		return -ENOMEM;
-> +
-> +	i2c = kzalloc(sizeof(struct pxa_i2c), GFP_KERNEL);
-
-kzalloc(sizeof(*i2c), GFP_KERNEL)
-
-> +	if (!i2c) {
-> +		ret = -ENOMEM;
-> +		goto emalloc;
+> +	np = of_irq_find_parent(dev->of_node);
+> +	if (!np || dev->of_node == np) {
+> +		pr_debug("%s has no interrupt-parent\n",
+> +			dev->of_node->full_name);
+> +		return NULL;
 > +	}
 > +
-> +	i2c->adap.owner   = THIS_MODULE;
-> +	i2c->adap.retries = 5;
+> +	of_node_put(np);
+> +	for (i = 0; i < nr; i++)
+> +		if (intcs[i].dev->of_node == np) {
+> +			pr_debug("%s interrupt-parent %s found in probe list\n",
+> +				 dev->of_node->full_name, np->full_name);
+> +			return &intcs[i];
+> +		}
 > +
-> +	spin_lock_init(&i2c->lock);
-> +	init_waitqueue_head(&i2c->wait);
-> +
-> +	/*
-> +	 * adap.nr comes from cell-index in dts file
-> +	 */
-> +	i2c->adap.nr = id;
-> +	snprintf(i2c->adap.name, sizeof(i2c->adap.name), "pxa2xx-i2c.%u",
-> +		 i2c->adap.nr);
-> +
-> +	i2c->clk = clk_get_sys(i2c->adap.name, NULL);
-> +	if (IS_ERR(i2c->clk)) {
-> +		ret = PTR_ERR(i2c->clk);
-> +		goto eclk;
-> +	}
-> +
-> +	i2c->reg_base = ioremap(res->start, resource_size(res));
-> +	if (!i2c->reg_base) {
-> +		ret = -EIO;
-> +		goto eremap;
-> +	}
-> +
-> +	i2c->reg_ibmr = i2c->reg_base + pxa_reg_layout[i2c_type].ibmr;
-> +	i2c->reg_idbr = i2c->reg_base + pxa_reg_layout[i2c_type].idbr;
-> +	i2c->reg_icr = i2c->reg_base + pxa_reg_layout[i2c_type].icr;
-> +	i2c->reg_isr = i2c->reg_base + pxa_reg_layout[i2c_type].isr;
-> +	if (i2c_type != REGS_CE4100)
-> +		i2c->reg_isar = i2c->reg_base + pxa_reg_layout[i2c_type].isar;
-> +
-> +	i2c->iobase = res->start;
-> +	i2c->iosize = resource_size(res);
-> +
-> +	i2c->irq = irq;
-> +	i2c->use_pio = poll;
-> +	i2c->fast_mode = fast;
-> +
-> +	i2c->slave_addr = I2C_PXA_SLAVE_ADDR;
-> +
-> +#ifdef CONFIG_I2C_PXA_SLAVE
-> +	if (plat) {
-> +		i2c->slave_addr = plat->slave_addr;
-> +		i2c->slave = plat->slave;
-> +	}
-> +#endif
-> +
-> +	clk_enable(i2c->clk);
-> +
-> +	if (plat)
-> +		i2c->adap.class = plat->class;
-> +
-> +	if (i2c->use_pio) {
-> +		i2c->adap.algo = &i2c_pxa_pio_algorithm;
-> +	} else {
-> +		i2c->adap.algo = &i2c_pxa_algorithm;
-> +		ret = request_irq(irq, i2c_pxa_handler, IRQF_SHARED,
-> +				  i2c->adap.name, i2c);
-> +		if (ret)
-> +			goto ereqirq;
-> +	}
-> +
-> +	i2c_pxa_reset(i2c);
-> +
-> +	i2c->adap.algo_data = i2c;
-> +	i2c->adap.dev.parent = &of_dev->dev;
-> +	i2c->adap.dev.of_node = of_dev->dev.of_node;
-> +
-> +	if (i2c_type == REGS_CE4100)
-> +		ret = i2c_add_adapter(&i2c->adap);
-> +	else
-> +		ret = i2c_add_numbered_adapter(&i2c->adap);
-> +	if (ret < 0) {
-> +		printk(KERN_INFO "I2C: Failed to add bus\n");
-> +		goto eadapt;
-> +	}
-> +	of_i2c_register_devices(&i2c->adap);
-> +
-> +	platform_set_drvdata(of_dev, i2c);
-> +
-> +#ifdef CONFIG_I2C_PXA_SLAVE
-> +	printk(KERN_INFO "I2C: %s: PXA I2C adapter, slave address %d\n",
-> +	       dev_name(&i2c->adap.dev), i2c->slave_addr);
-> +#else
-> +	printk(KERN_INFO "I2C: %s: PXA I2C adapter\n",
-> +	       dev_name(&i2c->adap.dev));
-> +#endif
-> +	return 0;
-> +
-> +eadapt:
-> +	if (!i2c->use_pio)
-> +		free_irq(irq, i2c);
-> +ereqirq:
-> +	clk_disable(i2c->clk);
-> +	iounmap(i2c->reg_base);
-> +eremap:
-> +	clk_put(i2c->clk);
-> +eclk:
-> +	kfree(i2c);
-> +emalloc:
-> +	release_mem_region(res->start, resource_size(res));
-> +	return ret;
+> +	pr_warning("%s interrupt-parent %s not in probe list\n",
+> +		   dev->of_node->full_name, np->full_name);
+> +	return NULL;
 > +}
-> +#else
 > +
->  static int i2c_pxa_probe(struct platform_device *dev)
+> +static int __init irq_cmp_intc_desc(const void *x1, const void *x2)
+> +{
+> +	const struct intc_desc *d1 = x1, *d2 = x2;
+> +	return d1->order - d2->order;
+> +}
+> +
+> +void __init core_device_irq_sort(struct list_head *head)
+> +{
+> +	struct intc_desc *intcs;
+> +	struct core_device *dev, *tmp;
+> +	int count = 0, i = 0, inc, max_order = 0;
+> +
+> +	if (list_empty(head))
+> +		return;
+> +
+> +	/* Count the number of interrupt controllers */
+> +	list_for_each_entry(dev, head, entry)
+> +		count++;
+> +
+> +	if (count == 1)
+> +		return;
+
+If you change this to 'if (count <= 1)', then I think the list_empty() test above becomes redundant.
+
+> +
+> +	/* Allocate a big enough array */
+> +	intcs = kmalloc(sizeof(*intcs) * count, GFP_KERNEL);
+
+kzalloc()
+
+> +	if (!intcs) {
+> +		pr_err("irq_core_device_sort: allocation failed");
+> +		return;
+> +	}
+> +
+> +	/* Populate the array */
+> +	i = 0;
+> +	list_for_each_entry(dev, head, entry) {
+> +		intcs[i].dev = dev;
+> +		intcs[i].parent = NULL;
+> +		intcs[i].order = 0;
+
+Clearing parent and order become redundant when using kzalloc().
+
+> +		i++;
+> +	}
+> +
+> +	/* Find out the interrupt-parents */
+> +	for (i = 0; i < count; i++)
+> +		intcs[i].parent = irq_find_parent(intcs[i].dev, intcs, count);
+> +
+> +	/* Compute the orders */
+> +	do {
+> +		inc = 0;
+> +		for (i = 0; i < count; i++)
+> +			if (intcs[i].parent &&
+> +			    intcs[i].order <= intcs[i].parent->order) {
+> +				intcs[i].order =  intcs[i].parent->order + 1;
+> +				if (max_order < intcs[i].order)
+> +					max_order = intcs[i].order;
+> +				inc = 1;
+> +			}
+> +	} while (inc);
+
+Can't this look be rolled into the list_for_each_entry() loop?
+
+This is a good start (and is probably pragmatically what should be
+done immediately), but there is an added complexity that an irq
+controller can actually have multiple parents if it is attached to an
+interrupt nexus.
+
+That said, it might just be best to punt that use-case out to a 'real'
+device driver than can defer probing until its dependencies are met
+(assuming deferred probe gets merged).  Not all interrupt controllers
+need to be probed early.
+
+As for the implementation, I think we can do better with fewer loops:
+
+	for (i = 0; i < count; i++) {
+		parent = irq_find_parent(intcs[i].dev, intcs, count);
+		if (parent) {
+			list_add(&intcs[i].list, &parent->child_list);
+		} else {
+			WARN_ON(root_parent);
+			root_parent = &intcs[i];
+		}
+	}
+
+And then simply walk each intcs' child_list starting at the root_parent.
+
+> diff --git a/include/linux/core_device.h b/include/linux/core_device.h
+> index ca67e5e..e632868 100644
+> --- a/include/linux/core_device.h
+> +++ b/include/linux/core_device.h
+> @@ -48,11 +48,13 @@ void core_driver_init_class(enum core_device_class class,
+>  #ifdef CONFIG_OF
+>  void of_core_device_populate(enum core_device_class class,
+>  			     struct of_device_id *matches);
+> +void core_device_irq_sort(struct list_head *head);
+>  #else
+>  static inline void of_core_device_populate(enum core_device_class class,
+>  					   struct of_device_id *matches)
 >  {
->  	struct pxa_i2c *i2c;
-> @@ -1174,6 +1331,7 @@ emalloc:
->  	release_mem_region(res->start, resource_size(res));
->  	return ret;
 >  }
-> +#endif
->  
->  static int __exit i2c_pxa_remove(struct platform_device *dev)
->  {
-> @@ -1228,12 +1386,17 @@ static const struct dev_pm_ops i2c_pxa_dev_pm_ops = {
+> +#define core_device_irq_sort	NULL
 >  #endif
 >  
->  static struct platform_driver i2c_pxa_driver = {
-> +#ifdef CONFIG_OF
-> +	.probe		= i2c_pxa_of_probe,
-> +#else
->  	.probe		= i2c_pxa_probe,
-> +#endif
->  	.remove		= __exit_p(i2c_pxa_remove),
->  	.driver		= {
->  		.name	= "pxa2xx-i2c",
->  		.owner	= THIS_MODULE,
->  		.pm	= I2C_PXA_DEV_PM_OPS,
-> +		.of_match_table	= pxa_i2c_of_match,
->  	},
->  	.id_table	= i2c_pxa_id_table,
->  };
+>  struct core_driver_setup_block {
 > -- 
-> 1.5.6.5
+> 1.7.0.4
+> 
 > 
