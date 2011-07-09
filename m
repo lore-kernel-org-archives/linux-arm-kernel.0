@@ -1,55 +1,33 @@
-From: ccross@android.com (Colin Cross)
-Date: Sat, 9 Jul 2011 15:10:56 -0700
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 9 Jul 2011 23:33:15 +0100
 Subject: [PATCH 03/17] ARM: gic: Use cpu pm notifiers to save gic state
-In-Reply-To: <20110709102100.GJ4812@n2100.arm.linux.org.uk>
+In-Reply-To: <CAMbhsRTFfv1q0po5CDtRfRBN5pABaKm3C0OR4U9yHmRJiFUOtw@mail.gmail.com>
 References: <1310053830-23779-1-git-send-email-lorenzo.pieralisi@arm.com>
 	<1310053830-23779-4-git-send-email-lorenzo.pieralisi@arm.com>
 	<20110709102100.GJ4812@n2100.arm.linux.org.uk>
-Message-ID: <CAMbhsRTFfv1q0po5CDtRfRBN5pABaKm3C0OR4U9yHmRJiFUOtw@mail.gmail.com>
+	<CAMbhsRTFfv1q0po5CDtRfRBN5pABaKm3C0OR4U9yHmRJiFUOtw@mail.gmail.com>
+Message-ID: <20110709223315.GO4812@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 9, 2011 at 3:21 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Thu, Jul 07, 2011 at 04:50:16PM +0100, Lorenzo Pieralisi wrote:
->> From: Colin Cross <ccross@android.com>
->>
->> When the cpu is powered down in a low power mode, the gic cpu
->> interface may be reset, and when the cpu complex is powered
->> down, the gic distributor may also be reset.
->>
->> This patch uses CPU_PM_ENTER and CPU_PM_EXIT notifiers to save
->> and restore the gic cpu interface registers, and the
->> CPU_COMPLEX_PM_ENTER and CPU_COMPLEX_PM_EXIT notifiers to save
->> and restore the gic distributor registers.
->>
->> Signed-off-by: Colin Cross <ccross@android.com>
->
-> Lost attributations and original author. ?This is based in part on code
-> from Gary King, according to patch 6646/1 in the patch system.
+On Sat, Jul 09, 2011 at 03:10:56PM -0700, Colin Cross wrote:
+> This is necessary for cpuidle states that lose the GIC registers, not
+> just suspend, because the GIC is in the cpu's power domain.  We could
+> avoid saving and restoring all the GIC registers in suspend and idle
+> by reusing the initialization functions, and then having the core irq
+> code call the unmask, set_type, and set_affinity functions on each irq
+> to reconfigure it, but that will be very inefficient - it will convert
+> each register write in the restore functions to a read-modify-write
+> per interrupt in that register.  Santosh is already complaining that
+> this commong GIC restore code will be slower than the automatic DMA to
+> restore the GIC registers that OMAP4 supports.
 
-You're right, I'll make sure the attribution goes back in.
+Well, we need to come up with something sensible - a way of doing this
+which doesn't require every interrupt controller driver (of which we as
+an architecture have many) to have lots of support added.
 
-> Moreover, how now that we have genirq dealing with the suspend/restore
-> issues, how much of this is actually required. ?And should this be
-> GIC specific or should there be a way of asking genirq to take care of
-> some of this for us?
->
-> We need to _reduce_ the amount of code needed to support this stuff, and
-> if core code almost-but-not-quite does what we need then we need to talk
-> to the maintainers of that code to see whether it can be changed.
->
-> Because adding 212 lines to save and restore the state of every interrupt
-> controller that we may have just isn't on. ?We need this properly
-> abstracted and dealt with in a generic way.
-
-This is necessary for cpuidle states that lose the GIC registers, not
-just suspend, because the GIC is in the cpu's power domain.  We could
-avoid saving and restoring all the GIC registers in suspend and idle
-by reusing the initialization functions, and then having the core irq
-code call the unmask, set_type, and set_affinity functions on each irq
-to reconfigure it, but that will be very inefficient - it will convert
-each register write in the restore functions to a read-modify-write
-per interrupt in that register.  Santosh is already complaining that
-this commong GIC restore code will be slower than the automatic DMA to
-restore the GIC registers that OMAP4 supports.
+If the current way is inefficient and is noticably so, then let's talk
+to Thomas about finding a way around that - maybe having the generic
+code make one suspend/resume callback per irq gc chip rather than doing
+it per-IRQ.  We can then reuse the same paths for suspend/resume as for
+idle state saving.
