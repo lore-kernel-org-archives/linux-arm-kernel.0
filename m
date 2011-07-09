@@ -1,50 +1,64 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Sat, 9 Jul 2011 15:00:02 +0800
-Subject: [PATCH 2/6] spi/imx: use soc name in spi device type naming scheme
-In-Reply-To: <20110708105851.GF6069@pengutronix.de>
-References: <1310113654-25887-1-git-send-email-shawn.guo@linaro.org>
-	<1310113654-25887-3-git-send-email-shawn.guo@linaro.org>
-	<20110708105851.GF6069@pengutronix.de>
-Message-ID: <20110709070001.GE13962@S2100-06.ap.freescale.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 9 Jul 2011 09:12:23 +0100
+Subject: [PATCH 01/10] ARM: change ARM_DMA_ZONE_SIZE into a variable
+In-Reply-To: <20110708203045.GT4812@n2100.arm.linux.org.uk>
+References: <1309919442-20451-1-git-send-email-nicolas.pitre@linaro.org>
+	<20110706230455.GZ8286@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1107062043180.14596@xanadu.home>
+	<20110708121441.GD4812@n2100.arm.linux.org.uk>
+	<20110708203045.GT4812@n2100.arm.linux.org.uk>
+Message-ID: <20110709081223.GA30368@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 08, 2011 at 12:58:51PM +0200, Sascha Hauer wrote:
-> On Fri, Jul 08, 2011 at 04:27:30PM +0800, Shawn Guo wrote:
-> > Software defined version number is not stable enough to be used
-> > in device type naming scheme.  The patch changes it to use implicit
-> > soc name for spi device type definition.  In this way, we can easily
-> > align the naming scheme with device tree binding, which comes later.
-> > 
-> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> > Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> > Cc: Grant Likely <grant.likely@secretlab.ca>
-> > ---
-> >  arch/arm/mach-imx/clock-imx25.c              |    7 +-
-> >  arch/arm/mach-mx5/clock-mx51-mx53.c          |   11 +-
-> >  arch/arm/plat-mxc/devices/platform-spi_imx.c |   12 +-
-> >  drivers/spi/Kconfig                          |   15 -
-> >  drivers/spi/spi-imx.c                        |  423 ++++++++++++--------------
-> >  5 files changed, 219 insertions(+), 249 deletions(-)
+On Fri, Jul 08, 2011 at 09:30:45PM +0100, Russell King - ARM Linux wrote:
+> On Fri, Jul 08, 2011 at 01:14:41PM +0100, Russell King - ARM Linux wrote:
+> > It looks like ISA_DMA_THRESHOLD has become unused by most of the kernel,
+> > so yes, renaming it to "dma_zone_limit" would be more descriptive.  We
+> > should probably make dma_supported() be out-of-line anyway (which then
+> > means that dma_zone_limit doesn't have to be exported to drivers) - and
+> > I think the DMA bounce stuff needs cleaning up in dma_set_mask().
 > 
-> Generally this patch is too big for me to get the warm feeling that
-> everything will just work. Renaming from spi_ver_xy to imx_xy is fine,
-> but should be done in smaller steps and where possible not across
-> subsystems.
-> 
-Okay, I will split the patch into small pieces to win your warm
-feeling :)
+> ... and I now have a patch which does this, pending testing.  Once
+> I've tested it I'll send it out.
 
-> I increasingly see patches touching arch/ and drivers/ and I think
-> there's a high risk of merge conflicts upstream. This will not help
-> making Linus happy.
-> 
-Yes, I increasingly run into the situation touching arch/ and drivers/
-when working on dt migration because of the device renaming.  May I
-have to your suggestion on how to separate drivers/ patch from arch/
-one in orthogonal way, while keeping both trees working/bisectable?
+8<-----
+From: Russell King <rmk+kernel@arm.linux.org.uk>
+ARM: dmabounce: simplify dma_set_mask()
 
+Simplify the dmabounce specific code in dma_set_mask().  We can just
+omit setting the dma mask if dmabounce is enabled (we will have already
+set dma mask via callbacks when the device is created in that case.)
+
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/include/asm/dma-mapping.h |   10 ++--------
+ 1 files changed, 2 insertions(+), 8 deletions(-)
+
+diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
+index 4ad2533..94662f4 100644
+--- a/arch/arm/include/asm/dma-mapping.h
++++ b/arch/arm/include/asm/dma-mapping.h
+@@ -133,18 +133,12 @@ static inline int dma_supported(struct device *dev, u64 mask)
+ 
+ static inline int dma_set_mask(struct device *dev, u64 dma_mask)
+ {
+-#ifdef CONFIG_DMABOUNCE
+-	if (dev->archdata.dmabounce) {
+-		if (dma_mask >= ISA_DMA_THRESHOLD)
+-			return 0;
+-		else
+-			return -EIO;
+-	}
+-#endif
+ 	if (!dev->dma_mask || !dma_supported(dev, dma_mask))
+ 		return -EIO;
+ 
++#ifndef CONFIG_DMABOUNCE
+ 	*dev->dma_mask = dma_mask;
++#endif
+ 
+ 	return 0;
+ }
 -- 
-Regards,
-Shawn
+1.7.4.4
