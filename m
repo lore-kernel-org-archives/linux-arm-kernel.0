@@ -1,54 +1,33 @@
-From: philippe.retornaz@epfl.ch (=?utf-8?q?Philippe=20R=C3=A9tornaz?=)
-Date: Sun, 10 Jul 2011 01:06:35 +0200
-Subject: [PATCH 2/3] mx31moboard: Add MC13783 power button support
-In-Reply-To: <1310252796-10596-2-git-send-email-philippe.retornaz@epfl.ch>
-References: <1310252796-10596-1-git-send-email-philippe.retornaz@epfl.ch>
-	<1310252796-10596-2-git-send-email-philippe.retornaz@epfl.ch>
-Message-ID: <1310252796-10596-3-git-send-email-philippe.retornaz@epfl.ch>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Sat, 9 Jul 2011 16:40:18 -0600 (MDT)
+Subject: [PATCH] OMAP: omap_device: replace _find_by_pdev() with
+	to_omap_device()
+In-Reply-To: <1309980377-5964-1-git-send-email-khilman@ti.com>
+References: <1309980377-5964-1-git-send-email-khilman@ti.com>
+Message-ID: <alpine.DEB.2.00.1107091639290.15984@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the power-on button on mx31moboard using MC13783 PMIC.
+On Wed, 6 Jul 2011, Kevin Hilman wrote:
 
-Signed-off-by: Philippe R?tornaz <philippe.retornaz@epfl.ch>
----
- arch/arm/mach-imx/mach-mx31moboard.c |   10 +++++++++-
- 1 files changed, 9 insertions(+), 1 deletions(-)
+> The omap_device layer currently has two ways of getting an omap_device
+> pointer from a platform_device pointer.
+> 
+> Replace current usage of _find_by_pdev() with to_omap_device() since
+> to_omap_device() is more familiar to the existing to_platform_device()
+> used when getting a platform_device pointer from a struct device pointer.
+> 
+> Cc: Felipe Balbi <balbi@ti.com>
+> Signed-off-by: Kevin Hilman <khilman@ti.com>
+> ---
+> Paul, please consider this minor cleanup for the v3.1 merge window.
+> Applies to v3.0-c6.
+> 
+>  arch/arm/plat-omap/omap_device.c |   15 +++++----------
+>  1 files changed, 5 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/mach-imx/mach-mx31moboard.c b/arch/arm/mach-imx/mach-mx31moboard.c
-index 12ee755..447143b 100644
---- a/arch/arm/mach-imx/mach-mx31moboard.c
-+++ b/arch/arm/mach-imx/mach-mx31moboard.c
-@@ -28,6 +28,7 @@
- #include <linux/spi/spi.h>
- #include <linux/types.h>
- #include <linux/memblock.h>
-+#include <linux/input.h>
- 
- #include <linux/usb/otg.h>
- #include <linux/usb/ulpi.h>
-@@ -264,14 +265,21 @@ static struct mc13783_leds_platform_data moboard_leds = {
- 	.tc2_period = MC13783_LED_PERIOD_10MS,
- };
- 
-+static struct mc13783_buttons_platform_data moboard_buttons = {
-+	.b1on_flags = MC13783_BUTTON_DBNC_750MS | MC13783_BUTTON_ENABLE |
-+			MC13783_BUTTON_POL_INVERT,
-+	.b1on_key = KEY_POWER,
-+};
-+
- static struct mc13xxx_platform_data moboard_pmic = {
- 	.regulators = {
- 		.regulators = moboard_regulators,
- 		.num_regulators = ARRAY_SIZE(moboard_regulators),
- 	},
- 	.leds = &moboard_leds,
-+	.buttons = &moboard_buttons,
- 	.flags = MC13XXX_USE_REGULATOR | MC13XXX_USE_RTC |
--		MC13XXX_USE_ADC | MC13XXX_USE_LED,
-+		MC13XXX_USE_ADC | MC13XXX_USE_LED | MC13XXX_USE_BUTTON,
- };
- 
- static struct spi_board_info moboard_spi_board_info[] __initdata = {
--- 
-1.6.3.3
+Thanks, queued for 3.1 with Felipe's Reviewed-by at 
+git://git.pwsan.com/linux-2.6 in 'omap_device_cleanup_3.1'.
+
+
+- Paul
