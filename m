@@ -1,54 +1,37 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 9 Jul 2011 09:45:08 +0100
-Subject: [RFC PATCH 05/17] ARM: kernel: save/restore kernel IF
-In-Reply-To: <20110709083815.GE4812@n2100.arm.linux.org.uk>
-References: <1310053830-23779-1-git-send-email-lorenzo.pieralisi@arm.com>
-	<1310053830-23779-6-git-send-email-lorenzo.pieralisi@arm.com>
-	<20110709083815.GE4812@n2100.arm.linux.org.uk>
-Message-ID: <20110709084508.GF4812@n2100.arm.linux.org.uk>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Sat, 9 Jul 2011 12:50:48 +0400
+Subject: [PATCH 07/15] pxa25x_udc: drop support for udc_command
+In-Reply-To: <20110708213428.GA31866@kroah.com>
+References: <1309871321-11305-1-git-send-email-dbaryshkov@gmail.com>
+	<1309871321-11305-8-git-send-email-dbaryshkov@gmail.com>
+	<20110705134615.GJ2820@legolas.emea.dhcp.ti.com>
+	<20110708213428.GA31866@kroah.com>
+Message-ID: <CALT56yNC0D8Pjc4-XiJjEY8w6vjvHbRFPQzpw6mKVYsEM=D9=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 09, 2011 at 09:38:15AM +0100, Russell King - ARM Linux wrote:
-> On Thu, Jul 07, 2011 at 04:50:18PM +0100, Lorenzo Pieralisi wrote:
-> > +static int late_init(void)
-> > +{
-> > +	int rc;
-> > +	struct sr_cluster *cluster;
-> > +	int cluster_index, cpu_index = sr_platform_get_cpu_index();
-> 
-> Stop this madness, and use the standard linux APIs like smp_processor_id
-> here.  It might actually help you find bugs, like the fact that you're
-> in a preemptible context here, and so could be rescheduled onto any other
-> CPU in the system _after_ you've read the MPIDR register.
-> 
-> > +
-> > +	cluster_index = sr_platform_get_cluster_index();
-> > +	cluster = main_table.cluster_table + cluster_index;
-> > +	main_table.os_mmu_context[cluster_index][cpu_index] =
-> > +				current->active_mm->pgd;
-> > +	cpu_switch_mm(main_table.fw_mmu_context, current->active_mm);
-> > +	rc = sr_platform_init();
-> > +	cpu_switch_mm(main_table.os_mmu_context[cluster_index][cpu_index],
-> > +				current->active_mm);
-> 
-> CPU numbers are unique in the system, why do you need a 'cluster_index'
-> to save this?  In fact why do you even need to save it in a structure
-> at all?
-> 
-> Plus, "cluster" is not used, please get rid of it.
+Hi,
 
-Oh, that's another thing.  This thread is about introducing idle support
-not cluster support.  Cluster support is surely something different (esp.
-as it seems from the above code that you're trying to support several
-clusters of MPCore CPUs, each with physical 0-N CPU numbers.)
+On 7/9/11, Greg KH <greg@kroah.com> wrote:
+> On Tue, Jul 05, 2011 at 04:46:16PM +0300, Felipe Balbi wrote:
+>> Hi,
+>>
+>> On Tue, Jul 05, 2011 at 05:08:33PM +0400, Dmitry Eremin-Solenikov wrote:
+>> > None of pxa25x devices use udc_command() for UDC functionality.
+>> > Stop calling this callback from pxa25x_udc code.
+>>
+>> looks good to me, Greg since this is a big re-work which depends on
+>> parts out of the Gadget Framework, can you take all the patches
+>> straight ? Here's my Acked-by:
+>>
+>> Acked-by: Felipe Balbi <balbi@ti.com>
+>
+> I can't take these, they should go through the gpio subsystem maintainer
+> instead.
 
-Cluster support should be an entirely separate patch series.
+Why? I can understand if you'd say that it should go through the ARM/PXA
+trees, but why GPIO?
 
-If that is not what this cluster stuff in this patch is about, then it's
-just written badly and reinforces the need for it to be rewritten - in
-that case there's no need for a 2D array.
-
-In any case, smp_processor_id() will be (and must be) unique in any given
-running kernel across all CPUs, even if you have clusters of N CPUs all
-physically numbered 0-N.
+-- 
+With best wishes
+Dmitry
