@@ -1,66 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 9 Jul 2011 09:20:59 +0100
-Subject: [PATCH v2 3/5] ARM: ep93xx: increase NR_BANKS to 16 for
-	support of 128MB RAM
-In-Reply-To: <20110709082007.GA17990@ibawizard.net>
-References: <1307891100-31123-1-git-send-email-ynezz@true.cz>
-	<1307891100-31123-4-git-send-email-ynezz@true.cz>
-	<ADE657CA350FB648AAC2C43247A983F001F3821F5A0A@AUSP01VMBX24.collaborationhost.net>
-	<20110617103249.GB4416@ibawizard.net>
-	<20110709082007.GA17990@ibawizard.net>
-Message-ID: <20110709082059.GD4812@n2100.arm.linux.org.uk>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Sat, 9 Jul 2011 02:24:38 -0600 (MDT)
+Subject: [PATCH v2 17/18] OMAP4: hwmod data: Modify DSS opt clocks
+In-Reply-To: <1309598037.1846.3.camel@deskari>
+References: <1309552901-8944-1-git-send-email-b-cousson@ti.com>
+	<1309552901-8944-18-git-send-email-b-cousson@ti.com>
+	<1309598037.1846.3.camel@deskari>
+Message-ID: <alpine.DEB.2.00.1107090224100.15984@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 09, 2011 at 10:20:08AM +0200, Petr ?tetiar wrote:
-> Petr ?tetiar <ynezz@true.cz> [2011-06-17 12:32:49]:
-> 
-> > H Hartley Sweeten <hartleys@visionengravers.com> [2011-06-13 12:43:25]:
-> > 
-> > > On Sunday, June 12, 2011 8:05 AM, Petr ?tetiar wrote:
-> > > >
-> > > > I've got hands on one ts-7300 board, which is equiped with 128MB RAM in two
-> > > > 64MB memory chips, so it's 16 banks/8MB each. Without this patch, the bootmem
-> > > > init code complains about small NR_BANKS number and only lower 64MB is
-> > > > accessible.
-> > > >
-> > > > Cc: Russell King <linux@arm.linux.org.uk>
-> > > > Cc: Hartley Sweeten <hsweeten@visionengravers.com>
-> > > > Cc: Ryan Mallon <ryan@bluewatersys.com>
-> > > > Signed-off-by: Petr ?tetiar <ynezz@true.cz>
-> > > > ---
-> > > >  arch/arm/include/asm/setup.h |    6 +++++-
-> > > >  1 files changed, 5 insertions(+), 1 deletions(-)
-> > > > 
-> > > > diff --git a/arch/arm/include/asm/setup.h b/arch/arm/include/asm/setup.h
-> > > > index ee2ad8a..b13720d 100644
-> > > > --- a/arch/arm/include/asm/setup.h
-> > > > +++ b/arch/arm/include/asm/setup.h
-> > > > @@ -192,7 +192,11 @@ static struct tagtable __tagtable_##fn __tag = { tag, fn }
-> > > >  /*
-> > > >   * Memory map description
-> > > >   */
-> > > > -#define NR_BANKS 8
-> > > > +#ifdef CONFIG_ARCH_EP93XX
-> > > > +# define NR_BANKS 16
-> > > > +#else
-> > > > +# define NR_BANKS 8
-> > > > +#endif
-> > > >  
-> > > >  struct membank {
-> > > >  	phys_addr_t start;
-> > > 
-> > > I would like Russell's opinion on this patch before it's accepted into his
-> > > Patch Tracker.
-> > > 
-> > > But, as far as the ep93xx support goes...
-> > > 
-> > > Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-> > 
-> > Hello Russell,
-> > 
-> > could I kindly ask you about your opinnion on this patch? Thanks a lot.
-> 
-> Ping. Thanks a lot.
+Hi,
 
-It's fine.
+On Sat, 2 Jul 2011, Tomi Valkeinen wrote:
+
+> This patch adds "fck" opt-clocks for DSS. After your patch set
+> for_3.1/5_auto_fck_clkdev, in which you create "fck" automatically, I
+> see:
+> 
+> [    0.218231] omap_device: omapdss_dss: fck already exist
+> [    0.218261] omap_device: omapdss_dss: fck already exist
+> [    0.218261] omap_device: omapdss_dss: sys_clk already exist
+> [    0.218261] omap_device: omapdss_dss: tv_clk already exist
+> [    0.218322] omap_device: omapdss_dss: video_clk already exist
+> [    0.218627] omap_device: omapdss_dispc: fck already exist
+> [    0.219329] omap_device: omapdss_venc: fck already exist
+> [    0.219635] omap_device: omapdss_dsi1: fck already exist
+> [    0.219970] omap_device: omapdss_dsi2: fck already exist
+> [    0.220336] omap_device: omapdss_hdmi: fck already exist
+> 
+> So I think the "fck" clocks in this patch should be removed. I only
+> added them for compatibility, as I didn't have the automatic "fck"
+> creation patch in my tree.
+
+Thanks Tomi, I've gone ahead and removed these.
+
+
+- Paul
