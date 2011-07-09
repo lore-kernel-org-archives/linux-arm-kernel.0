@@ -1,138 +1,77 @@
 From: tixy@yxit.co.uk (Tixy)
-Date: Sat,  9 Jul 2011 11:56:57 +0100
-Subject: [PATCH 10/51] ARM: kprobes: Add Thumb instruction decoding stubs
+Date: Sat,  9 Jul 2011 11:57:14 +0100
+Subject: [PATCH 27/51] ARM: kprobes: Decode 16-bit Thumb PC- and SP-relative
+	address instructions
 In-Reply-To: <1310209058-20980-1-git-send-email-tixy@yxit.co.uk>
 References: <1310209058-20980-1-git-send-email-tixy@yxit.co.uk>
-Message-ID: <1310209058-20980-11-git-send-email-tixy@yxit.co.uk>
+Message-ID: <1310209058-20980-28-git-send-email-tixy@yxit.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jon Medhurst <tixy@yxit.co.uk>
 
-Extend arch_prepare_kprobe to support probing of Thumb code. For
-the actual decoding of Thumb instructions, stub functions are
-added which currently just reject the probe.
-
 Signed-off-by: Jon Medhurst <tixy@yxit.co.uk>
 ---
- arch/arm/kernel/Makefile        |    4 ++++
- arch/arm/kernel/kprobes.h       |   13 +++++++++++++
- arch/arm/kernel/kprobes-thumb.c |   26 ++++++++++++++++++++++++++
- arch/arm/kernel/kprobes.c       |   20 ++++++++++++++++++--
- 4 files changed, 61 insertions(+), 2 deletions(-)
+ arch/arm/kernel/kprobes-thumb.c |   33 +++++++++++++++++++++++++++++++++
+ 1 files changed, 33 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-index a22b8f1..f7887dc 100644
---- a/arch/arm/kernel/Makefile
-+++ b/arch/arm/kernel/Makefile
-@@ -38,7 +38,11 @@ obj-$(CONFIG_DYNAMIC_FTRACE)	+= ftrace.o
- obj-$(CONFIG_FUNCTION_GRAPH_TRACER)	+= ftrace.o
- obj-$(CONFIG_KEXEC)		+= machine_kexec.o relocate_kernel.o
- obj-$(CONFIG_KPROBES)		+= kprobes.o kprobes-common.o
-+ifdef CONFIG_THUMB2_KERNEL
-+obj-$(CONFIG_KPROBES)		+= kprobes-thumb.o
-+else
- obj-$(CONFIG_KPROBES)		+= kprobes-arm.o
-+endif
- obj-$(CONFIG_ATAGS_PROC)	+= atags.o
- obj-$(CONFIG_OABI_COMPAT)	+= sys_oabi-compat.o
- obj-$(CONFIG_ARM_THUMBEE)	+= thumbee.o
-diff --git a/arch/arm/kernel/kprobes.h b/arch/arm/kernel/kprobes.h
-index 406bb2d..86abfab 100644
---- a/arch/arm/kernel/kprobes.h
-+++ b/arch/arm/kernel/kprobes.h
-@@ -29,8 +29,21 @@ enum kprobe_insn {
- 	INSN_GOOD_NO_SLOT
- };
- 
-+typedef enum kprobe_insn (kprobe_decode_insn_t)(kprobe_opcode_t,
-+						struct arch_specific_insn *);
-+
-+#ifdef CONFIG_THUMB2_KERNEL
-+
-+enum kprobe_insn thumb16_kprobe_decode_insn(kprobe_opcode_t,
-+						struct arch_specific_insn *);
-+enum kprobe_insn thumb32_kprobe_decode_insn(kprobe_opcode_t,
-+						struct arch_specific_insn *);
-+
-+#else /* !CONFIG_THUMB2_KERNEL */
-+
- enum kprobe_insn arm_kprobe_decode_insn(kprobe_opcode_t,
- 					struct arch_specific_insn *);
-+#endif
- 
- void __init arm_kprobe_decode_init(void);
- 
 diff --git a/arch/arm/kernel/kprobes-thumb.c b/arch/arm/kernel/kprobes-thumb.c
-new file mode 100644
-index 0000000..ac6b2d1
---- /dev/null
+index 632a5e8..2b30828 100644
+--- a/arch/arm/kernel/kprobes-thumb.c
 +++ b/arch/arm/kernel/kprobes-thumb.c
-@@ -0,0 +1,26 @@
-+/*
-+ * arch/arm/kernel/kprobes-thumb.c
-+ *
-+ * Copyright (C) 2011 Jon Medhurst <tixy@yxit.co.uk>.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/kprobes.h>
-+
-+#include "kprobes.h"
-+
-+enum kprobe_insn __kprobes
-+thumb16_kprobe_decode_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi)
+@@ -74,6 +74,28 @@ t16_simulate_ldrstr_sp_relative(struct kprobe *p, struct pt_regs *regs)
+ 		base[index] = regs->uregs[rt];
+ }
+ 
++static void __kprobes
++t16_simulate_reladr(struct kprobe *p, struct pt_regs *regs)
 +{
-+	return INSN_REJECTED;
++	kprobe_opcode_t insn = p->opcode;
++	unsigned long base = (insn & 0x800) ? regs->ARM_sp
++					    : (thumb_probe_pc(p) & ~3);
++	long offset = insn & 0xff;
++	int rt = (insn >> 8) & 0x7;
++	regs->uregs[rt] = base + offset * 4;
 +}
 +
-+enum kprobe_insn __kprobes
-+thumb32_kprobe_decode_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi)
++static void __kprobes
++t16_simulate_add_sp_imm(struct kprobe *p, struct pt_regs *regs)
 +{
-+	return INSN_REJECTED;
++	kprobe_opcode_t insn = p->opcode;
++	long imm = insn & 0x7f;
++	if (insn & 0x80) /* SUB */
++		regs->ARM_sp -= imm * 4;
++	else /* ADD */
++		regs->ARM_sp += imm * 4;
 +}
-diff --git a/arch/arm/kernel/kprobes.c b/arch/arm/kernel/kprobes.c
-index 0e47d3d..0df2d6d 100644
---- a/arch/arm/kernel/kprobes.c
-+++ b/arch/arm/kernel/kprobes.c
-@@ -51,16 +51,32 @@ int __kprobes arch_prepare_kprobe(struct kprobe *p)
- 	kprobe_opcode_t insn;
- 	kprobe_opcode_t tmp_insn[MAX_INSN_SIZE];
- 	unsigned long addr = (unsigned long)p->addr;
-+	kprobe_decode_insn_t *decode_insn;
- 	int is;
- 
--	if (addr & 0x3 || in_exception_text(addr))
-+	if (in_exception_text(addr))
- 		return -EINVAL;
- 
-+#ifdef CONFIG_THUMB2_KERNEL
-+	addr &= ~1; /* Bit 0 would normally be set to indicate Thumb code */
-+	insn = ((u16 *)addr)[0];
-+	if (is_wide_instruction(insn)) {
-+		insn <<= 16;
-+		insn |= ((u16 *)addr)[1];
-+		decode_insn = thumb32_kprobe_decode_insn;
-+	} else
-+		decode_insn = thumb16_kprobe_decode_insn;
-+#else /* !CONFIG_THUMB2_KERNEL */
-+	if (addr & 0x3)
-+		return -EINVAL;
- 	insn = *p->addr;
-+	decode_insn = arm_kprobe_decode_insn;
-+#endif
 +
- 	p->opcode = insn;
- 	p->ainsn.insn = tmp_insn;
+ static unsigned long __kprobes
+ t16_emulate_loregs(struct kprobe *p, struct pt_regs *regs)
+ {
+@@ -154,6 +176,10 @@ t16_decode_hiregs(kprobe_opcode_t insn, struct arch_specific_insn *asi)
+ static const union decode_item t16_table_1011[] = {
+ 	/* Miscellaneous 16-bit instructions		    */
  
--	switch (arm_kprobe_decode_insn(insn, &p->ainsn)) {
-+	switch ((*decode_insn)(insn, &p->ainsn)) {
- 	case INSN_REJECTED:	/* not supported */
- 		return -EINVAL;
++	/* ADD (SP plus immediate)	1011 0000 0xxx xxxx */
++	/* SUB (SP minus immediate)	1011 0000 1xxx xxxx */
++	DECODE_SIMULATE	(0xff00, 0xb000, t16_simulate_add_sp_imm),
++
+ 	/*
+ 	 * If-Then, and hints
+ 	 *				1011 1111 xxxx xxxx
+@@ -274,6 +300,13 @@ const union decode_item kprobe_decode_thumb16_table[] = {
+ 	DECODE_SIMULATE	(0xf000, 0x9000, t16_simulate_ldrstr_sp_relative),
  
+ 	/*
++	 * Generate PC-/SP-relative address
++	 * ADR (literal)		1010 0xxx xxxx xxxx
++	 * ADD (SP plus immediate)	1010 1xxx xxxx xxxx
++	 */
++	DECODE_SIMULATE	(0xf000, 0xa000, t16_simulate_reladr),
++
++	/*
+ 	 * Miscellaneous 16-bit instructions
+ 	 *				1011 xxxx xxxx xxxx
+ 	 */
 -- 
 1.7.2.5
