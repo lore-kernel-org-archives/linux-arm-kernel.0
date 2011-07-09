@@ -1,29 +1,32 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Sat, 09 Jul 2011 16:58:48 -0400
-Subject: [PATCH V3] MMC: PM: add suspend/resume in atmel-mci
-In-Reply-To: <1309779505-25509-1-git-send-email-nicolas.ferre@atmel.com>
-	(Nicolas Ferre's message of "Mon, 4 Jul 2011 13:38:25 +0200")
-References: <1309530754.4373.3.camel@hcegtvedt.norway.atmel.com>
-	<1309779505-25509-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <m2iprbkw6v.fsf@bob.laptop.org>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Sun, 10 Jul 2011 00:14:58 +0300
+Subject: [PATCH] pxa2xx_spi: fix memory corruption
+Message-ID: <1310246098-21208-1-git-send-email-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+pxa2xx_spi_probe allocates struct driver_data and null_dma_buf
+at same time via spi_alloc_master(), but then calculates
+null_dma_buf pointer incorrectly, and it causes memory corruption
+later if DMA usage is enabled.
 
-On Mon, Jul 04 2011, Nicolas Ferre wrote:
-> Take care of slots while going to suspend state.
->
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> ---
-> V3: take care of each slot SUSPENDED state
->     (adding a status bit in the slot "flags")
-> V2: move to pm_ops
+Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+---
+ drivers/spi/pxa2xx_spi.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Thanks, I've merged v3 of this patch for mmc-next/3.1 with Felipe's
-Reviewed-by, and your [2/2] kconfig change.
-
-- Chris.
+diff --git a/drivers/spi/pxa2xx_spi.c b/drivers/spi/pxa2xx_spi.c
+index dc25bee..ef38fbf 100644
+--- a/drivers/spi/pxa2xx_spi.c
++++ b/drivers/spi/pxa2xx_spi.c
+@@ -1569,7 +1569,7 @@ static int __devinit pxa2xx_spi_probe(struct platform_device *pdev)
+ 	master->transfer = transfer;
+ 
+ 	drv_data->ssp_type = ssp->type;
+-	drv_data->null_dma_buf = (u32 *)ALIGN((u32)(drv_data +
++	drv_data->null_dma_buf = (u32 *)ALIGN(((u32)drv_data +
+ 						sizeof(struct driver_data)), 8);
+ 
+ 	drv_data->ioaddr = ssp->mmio_base;
 -- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+1.7.5.rc3
