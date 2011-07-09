@@ -1,125 +1,109 @@
 From: tixy@yxit.co.uk (Tixy)
-Date: Sat,  9 Jul 2011 11:57:24 +0100
-Subject: [PATCH 37/51] ARM: kprobes: Optimise emulation of LDM and STM
+Date: Sat,  9 Jul 2011 11:57:32 +0100
+Subject: [PATCH 45/51] ARM: kprobes: Decode 32-bit Thumb branch instructions
 In-Reply-To: <1310209058-20980-1-git-send-email-tixy@yxit.co.uk>
 References: <1310209058-20980-1-git-send-email-tixy@yxit.co.uk>
-Message-ID: <1310209058-20980-38-git-send-email-tixy@yxit.co.uk>
+Message-ID: <1310209058-20980-46-git-send-email-tixy@yxit.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jon Medhurst <tixy@yxit.co.uk>
 
-This patch improves the performance of LDM and STM instruction
-emulation. This is desirable because.
-
-- jprobes and kretprobes probe the first instruction in a function and,
-  when the frame pointer is omitted, this instruction is often a STM
-  used to push registers onto the stack.
-
-- The STM and LDM instructions are common in the body and tail of
-  functions.
-
-- At the same time as being a common instruction form, they also have
-  one of the slowest and most complicated simulation routines.
-
-The approach taken to optimisation is to use simulation rather than
-emulation, that is, a modified form of the instruction is run with
-an appropriate register context.
-
-Benchmarking on an OMAP3530 shows the optimised emulation is between 2
-and 3 times faster than the simulation routines. On a Kirkwood based
-device the relative performance was very significantly better than this.
-
 Signed-off-by: Jon Medhurst <tixy@yxit.co.uk>
 ---
- arch/arm/kernel/kprobes-common.c |   68 ++++++++++++++++++++++++++++++++++++++
- 1 files changed, 68 insertions(+), 0 deletions(-)
+ arch/arm/kernel/kprobes-thumb.c |   65 +++++++++++++++++++++++++++++++++++++-
+ 1 files changed, 63 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/kernel/kprobes-common.c b/arch/arm/kernel/kprobes-common.c
-index 9ac1427..765c682 100644
---- a/arch/arm/kernel/kprobes-common.c
-+++ b/arch/arm/kernel/kprobes-common.c
-@@ -220,13 +220,81 @@ static void __kprobes simulate_ldm1_pc(struct kprobe *p, struct pt_regs *regs)
- 	load_write_pc(regs->ARM_pc, regs);
+diff --git a/arch/arm/kernel/kprobes-thumb.c b/arch/arm/kernel/kprobes-thumb.c
+index c07c247..1677234 100644
+--- a/arch/arm/kernel/kprobes-thumb.c
++++ b/arch/arm/kernel/kprobes-thumb.c
+@@ -49,9 +49,9 @@ t32_simulate_table_branch(struct kprobe *p, struct pt_regs *regs)
+ 	unsigned long rmv = regs->uregs[rm];
+ 	unsigned int halfwords;
+ 
+-	if (insn & 0x10)
++	if (insn & 0x10) /* TBH */
+ 		halfwords = ((u16 *)rnv)[rmv];
+-	else
++	else /* TBB */
+ 		halfwords = ((u8 *)rnv)[rmv];
+ 
+ 	regs->ARM_pc = pc + 2 * halfwords;
+@@ -66,6 +66,58 @@ t32_simulate_mrs(struct kprobe *p, struct pt_regs *regs)
+ 	regs->uregs[rd] = regs->ARM_cpsr & mask;
  }
  
 +static void __kprobes
-+emulate_generic_r0_12_noflags(struct kprobe *p, struct pt_regs *regs)
++t32_simulate_cond_branch(struct kprobe *p, struct pt_regs *regs)
 +{
-+	register void *rregs asm("r1") = regs;
-+	register void *rfn asm("lr") = p->ainsn.insn_fn;
++	kprobe_opcode_t insn = p->opcode;
++	unsigned long pc = thumb_probe_pc(p);
 +
-+	__asm__ __volatile__ (
-+		"stmdb	sp!, {%[regs], r11}	\n\t"
-+		"ldmia	%[regs], {r0-r12}	\n\t"
-+#if __LINUX_ARM_ARCH__ >= 6
-+		"blx	%[fn]			\n\t"
-+#else
-+		"str	%[fn], [sp, #-4]!	\n\t"
-+		"adr	lr, 1f			\n\t"
-+		"ldr	pc, [sp], #4		\n\t"
-+		"1:				\n\t"
-+#endif
-+		"ldr	lr, [sp], #4		\n\t" /* lr = regs */
-+		"stmia	lr, {r0-r12}		\n\t"
-+		"ldr	r11, [sp], #4		\n\t"
-+		: [regs] "=r" (rregs), [fn] "=r" (rfn)
-+		: "0" (rregs), "1" (rfn)
-+		: "r0", "r2", "r3", "r4", "r5", "r6", "r7",
-+		  "r8", "r9", "r10", "r12", "memory", "cc"
-+		);
++	long offset = insn & 0x7ff;		/* imm11 */
++	offset += (insn & 0x003f0000) >> 5;	/* imm6 */
++	offset += (insn & 0x00002000) << 4;	/* J1 */
++	offset += (insn & 0x00000800) << 7;	/* J2 */
++	offset -= (insn & 0x04000000) >> 7;	/* Apply sign bit */
++
++	regs->ARM_pc = pc + (offset * 2);
++}
++
++static enum kprobe_insn __kprobes
++t32_decode_cond_branch(kprobe_opcode_t insn, struct arch_specific_insn *asi)
++{
++	int cc = (insn >> 22) & 0xf;
++	asi->insn_check_cc = kprobe_condition_checks[cc];
++	asi->insn_handler = t32_simulate_cond_branch;
++	return INSN_GOOD_NO_SLOT;
 +}
 +
 +static void __kprobes
-+emulate_generic_r2_14_noflags(struct kprobe *p, struct pt_regs *regs)
++t32_simulate_branch(struct kprobe *p, struct pt_regs *regs)
 +{
-+	emulate_generic_r0_12_noflags(p, (struct pt_regs *)(regs->uregs+2));
-+}
++	kprobe_opcode_t insn = p->opcode;
++	unsigned long pc = thumb_probe_pc(p);
 +
-+static void __kprobes
-+emulate_ldm_r3_15(struct kprobe *p, struct pt_regs *regs)
-+{
-+	emulate_generic_r0_12_noflags(p, (struct pt_regs *)(regs->uregs+3));
-+	load_write_pc(regs->ARM_pc, regs);
-+}
++	long offset = insn & 0x7ff;		/* imm11 */
++	offset += (insn & 0x03ff0000) >> 5;	/* imm10 */
++	offset += (insn & 0x00002000) << 9;	/* J1 */
++	offset += (insn & 0x00000800) << 10;	/* J2 */
++	if (insn & 0x04000000)
++		offset -= 0x00800000; /* Apply sign bit */
++	else
++		offset ^= 0x00600000; /* Invert J1 and J2 */
 +
- enum kprobe_insn __kprobes
- kprobe_decode_ldmstm(kprobe_opcode_t insn, struct arch_specific_insn *asi)
- {
- 	kprobe_insn_handler_t *handler = 0;
- 	unsigned reglist = insn & 0xffff;
- 	int is_ldm = insn & 0x100000;
-+	int rn = (insn >> 16) & 0xf;
-+
-+	if (rn <= 12 && (reglist & 0xe000) == 0) {
-+		/* Instruction only uses registers in the range R0..R12 */
-+		handler = emulate_generic_r0_12_noflags;
-+
-+	} else if (rn >= 2 && (reglist & 0x8003) == 0) {
-+		/* Instruction only uses registers in the range R2..R14 */
-+		rn -= 2;
-+		reglist >>= 2;
-+		handler = emulate_generic_r2_14_noflags;
-+
-+	} else if (rn >= 3 && (reglist & 0x0007) == 0) {
-+		/* Instruction only uses registers in the range R3..R15 */
-+		if (is_ldm && (reglist & 0x8000)) {
-+			rn -= 3;
-+			reglist >>= 3;
-+			handler = emulate_ldm_r3_15;
++	if (insn & (1 << 14)) {
++		/* BL or BLX */
++		regs->ARM_lr = (unsigned long)p->addr + 4;
++		if (!(insn & (1 << 12))) {
++			/* BLX so switch to ARM mode */
++			regs->ARM_cpsr &= ~PSR_T_BIT;
++			pc &= ~3;
 +		}
 +	}
 +
-+	if (handler) {
-+		/* We can emulate the instruction in (possibly) modified form */
-+		asi->insn[0] = (insn & 0xfff00000) | (rn << 16) | reglist;
-+		asi->insn_handler = handler;
-+		return INSN_GOOD;
-+	}
++	regs->ARM_pc = pc + (offset * 2);
++}
++
+ static enum kprobe_insn __kprobes
+ t32_decode_ldmstm(kprobe_opcode_t insn, struct arch_specific_insn *asi)
+ {
+@@ -425,6 +477,15 @@ static const union decode_item t32_table_1111_0xxx___1[] = {
+ 	 */
+ 	DECODE_REJECT	(0xfb80d000, 0xf3808000),
  
-+	/* Fallback to slower simulation... */
- 	if (reglist & 0x8000)
- 		handler = is_ldm ? simulate_ldm1_pc : simulate_stm1_pc;
- 	else
++	/* Bcc			1111 0xxx xxxx xxxx 10x0 xxxx xxxx xxxx */
++	DECODE_CUSTOM	(0xf800d000, 0xf0008000, t32_decode_cond_branch),
++
++	/* BLX			1111 0xxx xxxx xxxx 11x0 xxxx xxxx xxx0 */
++	DECODE_OR	(0xf800d001, 0xf000c000),
++	/* B			1111 0xxx xxxx xxxx 10x1 xxxx xxxx xxxx */
++	/* BL			1111 0xxx xxxx xxxx 11x1 xxxx xxxx xxxx */
++	DECODE_SIMULATE	(0xf8009000, 0xf0009000, t32_simulate_branch),
++
+ 	DECODE_END
+ };
+ 
 -- 
 1.7.2.5
