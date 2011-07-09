@@ -1,34 +1,30 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Sat, 9 Jul 2011 13:45:26 +0800
-Subject: [PATCH] net/fec: gasket needs to be enabled for some i.mx
-In-Reply-To: <4E174E91.2090609@boundarydevices.com>
-References: <20110630161935.GA7977@S2100-06.ap.freescale.net>
-	<1309515082-7386-1-git-send-email-shawn.guo@linaro.org>
-	<20110708101810.GE6069@pengutronix.de>
-	<4E174E91.2090609@boundarydevices.com>
-Message-ID: <20110709054526.GB13962@S2100-06.ap.freescale.net>
+From: greg@kroah.com (Greg KH)
+Date: Fri, 8 Jul 2011 22:38:18 -0700
+Subject: [RFC PATCH v2 2/4] Core device subsystem implementation
+In-Reply-To: <1310115250-3859-3-git-send-email-marc.zyngier@arm.com>
+References: <1310115250-3859-1-git-send-email-marc.zyngier@arm.com>
+	<1310115250-3859-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20110709053818.GA14519@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 08, 2011 at 11:38:09AM -0700, Troy Kisky wrote:
-> On 7/8/2011 3:18 AM, Sascha Hauer wrote:
-> > On Fri, Jul 01, 2011 at 06:11:22PM +0800, Shawn Guo wrote:
-> >> On the recent i.mx (mx25/50/53), there is a gasket inside fec
-> >> controller which needs to be enabled no matter phy works in MII
-> >> or RMII mode.
-> >>
-> >> The current code enables the gasket only when phy interface is RMII.
-> >> It's broken when the driver works with a MII phy.  The patch uses
-> >> platform_device_id to distinguish the SoCs that have the gasket and
-> >> enables it on these SoCs for both MII and RMII mode.
-> >>
-> >> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
+On Fri, Jul 08, 2011 at 09:54:08AM +0100, Marc Zyngier wrote:
+> There is a small number of devices that the core kernel needs very
+> early in the boot process, namely an interrupt controller and a timer,
+> long before the device model is up and running.
 > 
-> While you're making changes, you can change this to
-> Reported-by: Troy Kisky
+> The "core device subsystem" offers a class based device/driver
+> matching model, doesn't rely on any other subsystem, is very (too?)
+> simple, and support getting information both from DT as well as from
+> static data provided by the platform. It also gives the opportunity to
+> define the probing order by offering a sorting hook at runtime.
 > 
-Ok.
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
 
--- 
-Regards,
-Shawn
+Any reason why you didn't use scripts/get_maintainer.pl to at least
+figure out who to send something like this to for review?
+
+Please do so in the future, otherwise it will get overlooked...
+
+greg k-h
