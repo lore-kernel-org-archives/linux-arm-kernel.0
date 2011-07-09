@@ -1,204 +1,99 @@
 From: tixy@yxit.co.uk (Tixy)
-Date: Sat,  9 Jul 2011 11:57:23 +0100
-Subject: [PATCH 36/51] ARM: kprobes: Add common decoding function for LDM and
-	STM
+Date: Sat,  9 Jul 2011 11:57:37 +0100
+Subject: [PATCH 50/51] ARM: kprobes: Decode 32-bit Thumb long multiply and
+	divide instructions
 In-Reply-To: <1310209058-20980-1-git-send-email-tixy@yxit.co.uk>
 References: <1310209058-20980-1-git-send-email-tixy@yxit.co.uk>
-Message-ID: <1310209058-20980-37-git-send-email-tixy@yxit.co.uk>
+Message-ID: <1310209058-20980-51-git-send-email-tixy@yxit.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jon Medhurst <tixy@yxit.co.uk>
 
-The encoding of these instructions is substantially the same for both
-ARM and Thumb, so we can have common decoding and simulation functions.
-
-This patch moves the simulation functions from kprobes-arm.c to
-kprobes-common.c. It also adds a new simulation function
-(simulate_ldm1_pc) for the case where we load into PC because this may
-need to interwork.
-
-The instruction decoding is done by a custom function
-(kprobe_decode_ldmstm) rather than just relying on decoding table
-entries because we will later be adding optimisation code.
-
 Signed-off-by: Jon Medhurst <tixy@yxit.co.uk>
 ---
- arch/arm/kernel/kprobes.h        |    3 ++
- arch/arm/kernel/kprobes-arm.c    |   58 ++++---------------------------
- arch/arm/kernel/kprobes-common.c |   70 ++++++++++++++++++++++++++++++++++++++
- 3 files changed, 80 insertions(+), 51 deletions(-)
+ arch/arm/kernel/kprobes-thumb.c |   55 +++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 55 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/kernel/kprobes.h b/arch/arm/kernel/kprobes.h
-index 5d6bf0d..c442852 100644
---- a/arch/arm/kernel/kprobes.h
-+++ b/arch/arm/kernel/kprobes.h
-@@ -136,6 +136,9 @@ static inline void __kprobes load_write_pc(long pcv, struct pt_regs *regs)
- void __kprobes kprobe_simulate_nop(struct kprobe *p, struct pt_regs *regs);
- void __kprobes kprobe_emulate_none(struct kprobe *p, struct pt_regs *regs);
- 
-+enum kprobe_insn __kprobes
-+kprobe_decode_ldmstm(kprobe_opcode_t insn, struct arch_specific_insn *asi);
-+
- /*
-  * Test if load/store instructions writeback the address register.
-  * if P (bit 24) == 0 or W (bit 21) == 1
-diff --git a/arch/arm/kernel/kprobes-arm.c b/arch/arm/kernel/kprobes-arm.c
-index a1143e8..c6f2c69 100644
---- a/arch/arm/kernel/kprobes-arm.c
-+++ b/arch/arm/kernel/kprobes-arm.c
-@@ -437,54 +437,6 @@ static void __kprobes simulate_mrs(struct kprobe *p, struct pt_regs *regs)
- 	regs->uregs[rd] = regs->ARM_cpsr & mask;
+diff --git a/arch/arm/kernel/kprobes-thumb.c b/arch/arm/kernel/kprobes-thumb.c
+index 7c32e5b..4ef12d1 100644
+--- a/arch/arm/kernel/kprobes-thumb.c
++++ b/arch/arm/kernel/kprobes-thumb.c
+@@ -289,6 +289,32 @@ t32_emulate_rd8rn16_noflags(struct kprobe *p, struct pt_regs *regs)
+ 	regs->uregs[rd] = rdv;
  }
  
--static void __kprobes simulate_ldm1stm1(struct kprobe *p, struct pt_regs *regs)
--{
--	kprobe_opcode_t insn = p->opcode;
--	int rn = (insn >> 16) & 0xf;
--	int lbit = insn & (1 << 20);
--	int wbit = insn & (1 << 21);
--	int ubit = insn & (1 << 23);
--	int pbit = insn & (1 << 24);
--	long *addr = (long *)regs->uregs[rn];
--	int reg_bit_vector;
--	int reg_count;
--
--	reg_count = 0;
--	reg_bit_vector = insn & 0xffff;
--	while (reg_bit_vector) {
--		reg_bit_vector &= (reg_bit_vector - 1);
--		++reg_count;
--	}
--
--	if (!ubit)
--		addr -= reg_count;
--	addr += (!pbit == !ubit);
--
--	reg_bit_vector = insn & 0xffff;
--	while (reg_bit_vector) {
--		int reg = __ffs(reg_bit_vector);
--		reg_bit_vector &= (reg_bit_vector - 1);
--		if (lbit)
--			regs->uregs[reg] = *addr++;
--		else
--			*addr++ = regs->uregs[reg];
--	}
--
--	if (wbit) {
--		if (!ubit)
--			addr -= reg_count;
--		addr -= (!pbit == !ubit);
--		regs->uregs[rn] = (long)addr;
--	}
--}
--
--static void __kprobes simulate_stm1_pc(struct kprobe *p, struct pt_regs *regs)
--{
--	regs->ARM_pc = (long)p->addr + str_pc_offset;
--	simulate_ldm1stm1(p, regs);
--	regs->ARM_pc = (long)p->addr + 4;
--}
--
- static void __kprobes simulate_mov_ipsp(struct kprobe *p, struct pt_regs *regs)
- {
- 	regs->uregs[12] = regs->uregs[13];
-@@ -1463,9 +1415,13 @@ space_cccc_100x(kprobe_opcode_t insn, struct arch_specific_insn *asi)
- 
- 	/* LDM(1) : cccc 100x x0x1 xxxx xxxx xxxx xxxx xxxx */
- 	/* STM(1) : cccc 100x x0x0 xxxx xxxx xxxx xxxx xxxx */
--	asi->insn_handler = ((insn & 0x108000) == 0x008000) ? /* STM & R15 */
--				simulate_stm1_pc : simulate_ldm1stm1;
--	return INSN_GOOD_NO_SLOT;
-+
-+	/*
-+	 * Make the instruction unconditional because the new emulation
-+	 * functions don't bother to setup the PSR context.
-+	 */
-+	insn = (insn | 0xe0000000) & ~0x10000000;
-+	return kprobe_decode_ldmstm(insn, asi);
- }
- 
- static enum kprobe_insn __kprobes
-diff --git a/arch/arm/kernel/kprobes-common.c b/arch/arm/kernel/kprobes-common.c
-index 41e8218..9ac1427 100644
---- a/arch/arm/kernel/kprobes-common.c
-+++ b/arch/arm/kernel/kprobes-common.c
-@@ -166,6 +166,76 @@ void __kprobes kprobe_emulate_none(struct kprobe *p, struct pt_regs *regs)
- 	p->ainsn.insn_fn();
- }
- 
-+static void __kprobes simulate_ldm1stm1(struct kprobe *p, struct pt_regs *regs)
++static void __kprobes
++t32_emulate_rdlo12rdhi8rn16rm0_noflags(struct kprobe *p, struct pt_regs *regs)
 +{
 +	kprobe_opcode_t insn = p->opcode;
++	int rdlo = (insn >> 12) & 0xf;
++	int rdhi = (insn >> 8) & 0xf;
 +	int rn = (insn >> 16) & 0xf;
-+	int lbit = insn & (1 << 20);
-+	int wbit = insn & (1 << 21);
-+	int ubit = insn & (1 << 23);
-+	int pbit = insn & (1 << 24);
-+	long *addr = (long *)regs->uregs[rn];
-+	int reg_bit_vector;
-+	int reg_count;
++	int rm = insn & 0xf;
 +
-+	reg_count = 0;
-+	reg_bit_vector = insn & 0xffff;
-+	while (reg_bit_vector) {
-+		reg_bit_vector &= (reg_bit_vector - 1);
-+		++reg_count;
-+	}
++	register unsigned long rdlov asm("r0") = regs->uregs[rdlo];
++	register unsigned long rdhiv asm("r1") = regs->uregs[rdhi];
++	register unsigned long rnv asm("r2") = regs->uregs[rn];
++	register unsigned long rmv asm("r3") = regs->uregs[rm];
 +
-+	if (!ubit)
-+		addr -= reg_count;
-+	addr += (!pbit == !ubit);
++	__asm__ __volatile__ (
++		"blx    %[fn]"
++		: "=r" (rdlov), "=r" (rdhiv)
++		: "0" (rdlov), "1" (rdhiv), "r" (rnv), "r" (rmv),
++		  [fn] "r" (p->ainsn.insn_fn)
++		: "lr", "memory", "cc"
++	);
 +
-+	reg_bit_vector = insn & 0xffff;
-+	while (reg_bit_vector) {
-+		int reg = __ffs(reg_bit_vector);
-+		reg_bit_vector &= (reg_bit_vector - 1);
-+		if (lbit)
-+			regs->uregs[reg] = *addr++;
-+		else
-+			*addr++ = regs->uregs[reg];
-+	}
-+
-+	if (wbit) {
-+		if (!ubit)
-+			addr -= reg_count;
-+		addr -= (!pbit == !ubit);
-+		regs->uregs[rn] = (long)addr;
-+	}
++	regs->uregs[rdlo] = rdlov;
++	regs->uregs[rdhi] = rdhiv;
 +}
 +
-+static void __kprobes simulate_stm1_pc(struct kprobe *p, struct pt_regs *regs)
-+{
-+	regs->ARM_pc = (long)p->addr + str_pc_offset;
-+	simulate_ldm1stm1(p, regs);
-+	regs->ARM_pc = (long)p->addr + 4;
-+}
+ static const union decode_item t32_table_1110_100x_x0xx[] = {
+ 	/* Load/store multiple instructions */
+ 
+@@ -763,6 +789,29 @@ static const union decode_item t32_table_1111_1010___1111[] = {
+ 	DECODE_END
+ };
+ 
++static const union decode_item t32_table_1111_1011_1[] = {
++	/* Long multiply, long multiply accumulate, and divide		*/
 +
-+static void __kprobes simulate_ldm1_pc(struct kprobe *p, struct pt_regs *regs)
-+{
-+	simulate_ldm1stm1(p, regs);
-+	load_write_pc(regs->ARM_pc, regs);
-+}
++	/* UMAAL		1111 1011 1110 xxxx xxxx xxxx 0110 xxxx */
++	DECODE_OR	(0xfff000f0, 0xfbe00060),
++	/* SMLALxy		1111 1011 1100 xxxx xxxx xxxx 10xx xxxx */
++	DECODE_OR	(0xfff000c0, 0xfbc00080),
++	/* SMLALD{X}		1111 1011 1100 xxxx xxxx xxxx 110x xxxx */
++	/* SMLSLD{X}		1111 1011 1101 xxxx xxxx xxxx 110x xxxx */
++	DECODE_OR	(0xffe000e0, 0xfbc000c0),
++	/* SMULL		1111 1011 1000 xxxx xxxx xxxx 0000 xxxx */
++	/* UMULL		1111 1011 1010 xxxx xxxx xxxx 0000 xxxx */
++	/* SMLAL		1111 1011 1100 xxxx xxxx xxxx 0000 xxxx */
++	/* UMLAL		1111 1011 1110 xxxx xxxx xxxx 0000 xxxx */
++	DECODE_EMULATEX	(0xff9000f0, 0xfb800000, t32_emulate_rdlo12rdhi8rn16rm0_noflags,
++						 REGS(NOSPPC, NOSPPC, NOSPPC, 0, NOSPPC)),
 +
-+enum kprobe_insn __kprobes
-+kprobe_decode_ldmstm(kprobe_opcode_t insn, struct arch_specific_insn *asi)
-+{
-+	kprobe_insn_handler_t *handler = 0;
-+	unsigned reglist = insn & 0xffff;
-+	int is_ldm = insn & 0x100000;
++	/* SDIV			1111 1011 1001 xxxx xxxx xxxx 1111 xxxx */
++	/* UDIV			1111 1011 1011 xxxx xxxx xxxx 1111 xxxx */
++	/* Other unallocated instructions...				*/
++	DECODE_END
++};
 +
-+	if (reglist & 0x8000)
-+		handler = is_ldm ? simulate_ldm1_pc : simulate_stm1_pc;
-+	else
-+		handler = simulate_ldm1stm1;
-+	asi->insn_handler = handler;
-+	return INSN_GOOD_NO_SLOT;
-+}
+ const union decode_item kprobe_decode_thumb32_table[] = {
+ 
+ 	/*
+@@ -834,6 +883,12 @@ const union decode_item kprobe_decode_thumb32_table[] = {
+ 	DECODE_TABLE	(0xff00f000, 0xfa00f000, t32_table_1111_1010___1111),
+ 
+ 	/*
++	 * Long multiply, long multiply accumulate, and divide
++	 *			1111 1011 1xxx xxxx xxxx xxxx xxxx xxxx
++	 */
++	DECODE_TABLE	(0xff800000, 0xfb800000, t32_table_1111_1011_1),
 +
-+
- /*
-  * Prepare an instruction slot to receive an instruction for emulating.
-  * This is done by placing a subroutine return after the location where the
++	/*
+ 	 * Coprocessor instructions
+ 	 *			1111 11xx xxxx xxxx xxxx xxxx xxxx xxxx
+ 	 */
 -- 
 1.7.2.5
