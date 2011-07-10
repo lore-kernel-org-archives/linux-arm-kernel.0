@@ -1,326 +1,256 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Sat, 9 Jul 2011 12:08:53 -0600
-Subject: [RFC PATCH v2 2/4] Core device subsystem implementation
-In-Reply-To: <1310115250-3859-3-git-send-email-marc.zyngier@arm.com>
-References: <1310115250-3859-1-git-send-email-marc.zyngier@arm.com>
-	<1310115250-3859-3-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20110709180853.GB2805@ponder.secretlab.ca>
+Date: Sun, 10 Jul 2011 16:20:27 +0900
+Subject: [PATCH] mfd: convert devicetree to platform data on max8925
+In-Reply-To: <1310120428-22700-10-git-send-email-haojian.zhuang@marvell.com>
+References: <1310120428-22700-1-git-send-email-haojian.zhuang@marvell.com>
+	<1310120428-22700-2-git-send-email-haojian.zhuang@marvell.com>
+	<1310120428-22700-3-git-send-email-haojian.zhuang@marvell.com>
+	<1310120428-22700-4-git-send-email-haojian.zhuang@marvell.com>
+	<1310120428-22700-5-git-send-email-haojian.zhuang@marvell.com>
+	<1310120428-22700-6-git-send-email-haojian.zhuang@marvell.com>
+	<1310120428-22700-7-git-send-email-haojian.zhuang@marvell.com>
+	<1310120428-22700-8-git-send-email-haojian.zhuang@marvell.com>
+	<1310120428-22700-9-git-send-email-haojian.zhuang@marvell.com>
+	<1310120428-22700-10-git-send-email-haojian.zhuang@marvell.com>
+Message-ID: <20110710072027.GE10912@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 08, 2011 at 09:54:08AM +0100, Marc Zyngier wrote:
-> There is a small number of devices that the core kernel needs very
-> early in the boot process, namely an interrupt controller and a timer,
-> long before the device model is up and running.
+On Fri, Jul 08, 2011 at 06:20:26PM +0800, Haojian Zhuang wrote:
+> Make max8925 to support both platform data and device tree. So a translation
+> between device tree and platform data is added.
 > 
-> The "core device subsystem" offers a class based device/driver
-> matching model, doesn't rely on any other subsystem, is very (too?)
-> simple, and support getting information both from DT as well as from
-> static data provided by the platform. It also gives the opportunity to
-> define the probing order by offering a sorting hook at runtime.
-
-I know you're trying to support platforms that probably won't be
-converted to DT, but is that really worth the effort?  Those platforms
-are already supported by the kernel, and so are not dependant on this
-infrastructure.  New ARM platform support AFAIK now is required to use
-DT.
-
-For the DT case, I'm not convinced this is the right direction to go.
-My (admittedly limited) understanding of this patch series is that it
-purposefully stratifies different kinds of devices into an explicit
-init order, while I think we need *less* stratification of device
-initialization, and provide device drivers with the ability to sort
-themselves.
-
-That said, I do understand the issues your trying to solve to get a
-core timer and the core irq controllers set up really early, without a
-lot of code duplication.  I've been thinking about the same problem.
-It is a very small set of devices that need to be set up this early.
-I've been looking at it from the perspective of what can be done to
-get things bootstrapped, but then hand off to real devices in the real
-device model without an artificial separation between the two.
-
-Regardless, I'll go through this patch set and give you my feedback,
-and I'll try to keep my own biases in check as I do so....
-
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
 > ---
->  arch/arm/kernel/vmlinux.lds.S     |    1 +
->  drivers/base/Makefile             |    3 +-
->  drivers/base/core_device.c        |  108 +++++++++++++++++++++++++++++++++++++
->  include/asm-generic/vmlinux.lds.h |    6 ++
->  include/linux/core_device.h       |   69 +++++++++++++++++++++++
->  5 files changed, 186 insertions(+), 1 deletions(-)
->  create mode 100644 drivers/base/core_device.c
->  create mode 100644 include/linux/core_device.h
+>  drivers/mfd/max8925-i2c.c |  159 ++++++++++++++++++++++++++++++++++++++++++++-
+>  1 files changed, 157 insertions(+), 2 deletions(-)
 > 
-> diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-> index e5287f2..ae33310 100644
-> --- a/arch/arm/kernel/vmlinux.lds.S
-> +++ b/arch/arm/kernel/vmlinux.lds.S
-> @@ -70,6 +70,7 @@ SECTIONS
+> diff --git a/drivers/mfd/max8925-i2c.c b/drivers/mfd/max8925-i2c.c
+> index 0219115..fb74554 100644
+> --- a/drivers/mfd/max8925-i2c.c
+> +++ b/drivers/mfd/max8925-i2c.c
+> @@ -10,6 +10,9 @@
+>   */
+>  #include <linux/kernel.h>
+>  #include <linux/module.h>
+> +#include <linux/irq.h>
+> +#include <linux/of_irq.h>
+> +#include <linux/of_regulator.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/i2c.h>
+>  #include <linux/mfd/max8925.h>
+> @@ -135,6 +138,154 @@ static const struct i2c_device_id max8925_id_table[] = {
+>  };
+>  MODULE_DEVICE_TABLE(i2c, max8925_id_table);
 >  
->  		INIT_SETUP(16)
->  
-> +		INIT_CORE_DRV
->  		INIT_CALLS
->  		CON_INITCALL
->  		SECURITY_INITCALL
-> diff --git a/drivers/base/Makefile b/drivers/base/Makefile
-> index 4c5701c..79476f0 100644
-> --- a/drivers/base/Makefile
-> +++ b/drivers/base/Makefile
-> @@ -3,7 +3,8 @@
->  obj-y			:= core.o sys.o bus.o dd.o syscore.o \
->  			   driver.o class.o platform.o \
->  			   cpu.o firmware.o init.o map.o devres.o \
-> -			   attribute_container.o transport_class.o
-> +			   attribute_container.o transport_class.o \
-> +			   core_device.o
-
-Should this really be hard-enabled?  If a majority of platforms are
-not using this, then it should be CONFIG'ed out.
-
->  obj-$(CONFIG_DEVTMPFS)	+= devtmpfs.o
->  obj-y			+= power/
->  obj-$(CONFIG_HAS_DMA)	+= dma-mapping.o
-> diff --git a/drivers/base/core_device.c b/drivers/base/core_device.c
-> new file mode 100644
-> index 0000000..9262145
-> --- /dev/null
-> +++ b/drivers/base/core_device.c
-> @@ -0,0 +1,108 @@
-> +/*
-> + * Copyright (C) 2011 ARM Ltd
-> + * Written by Marc Zyngier <marc.zyngier@arm.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * Core device init support
-> + */
-> +#include <linux/core_device.h>
-> +#include <linux/of_platform.h>
-> +#include <linux/slab.h>
-> +
-> +static struct list_head anchors[CORE_DEV_CLASS_MAX] __initdata = {
-> +	[CORE_DEV_CLASS_IRQ]   = LIST_HEAD_INIT(anchors[CORE_DEV_CLASS_IRQ]),
-> +	[CORE_DEV_CLASS_TIMER] = LIST_HEAD_INIT(anchors[CORE_DEV_CLASS_TIMER]),
-> +};
-> +
-> +static int __init core_device_match(struct core_device *dev,
-> +				    struct core_device_id *ids)
-> +{
-> +	int i;
 > +#ifdef CONFIG_OF
-> +	if (dev->of_node)
-> +		for (i = 0; ids[i].name != NULL; i++)
-> +			if (of_device_is_compatible(dev->of_node,
-> +						    ids[i].name))
-> +				return 1;
-> +#endif
-> +	for (i = 0; ids[i].name != NULL; i++)
-> +		if (!strcmp(dev->name, ids[i].name))
-> +			return 1;
+> +static int __devinit max8925_parse_irq(struct i2c_client *i2c,
+> +					struct max8925_platform_data *pdata)
+> +{
+> +	struct device_node *of_node = i2c->dev.of_node;
 > +
+> +	pdata->irq_base = irq_alloc_descs(-1, 0, MAX8925_NR_IRQS, 0);
+> +	irq_domain_add_simple(of_node, pdata->irq_base);
+
+of_node is only used once.  This could simply be:
+
+	irq_domain_add_simple(i2c->dev.of_node, pdata->irq_base);
+
 > +	return 0;
 > +}
 > +
-> +void __init core_device_register(enum core_device_class class,
-> +			  struct core_device *dev)
+> +static void __devinit max8925_parse_backlight(struct device_node *np,
+> +					struct max8925_platform_data *pdata)
 > +{
-> +	list_add_tail(&dev->entry, &anchors[class]);
+> +	struct max8925_backlight_pdata *bk;
+> +	const __be32 *p;
+> +
+> +	bk = kzalloc(sizeof(struct max8925_backlight_pdata), GFP_KERNEL);
+> +	if (bk == NULL)
+> +		return;
+> +	pdata->backlight = bk;
+> +	p = of_get_property(np, "lxw-scl", NULL);
+> +	if (p)
+> +		bk->lxw_scl = be32_to_cpu(*p);
+> +	p = of_get_property(np, "lxw-freq", NULL);
+> +	if (p)
+> +		bk->lxw_freq = be32_to_cpu(*p);
+> +	p = of_get_property(np, "dual-string", NULL);
+> +	if (p)
+> +		bk->dual_string = be32_to_cpu(*p);
+
+of_property_read_u32() and of_property_read_string() would help you here.
+
+This implements a new binding.  Needs to be documented.
+
 > +}
 > +
-> +extern const struct core_driver_setup_block __core_driver_block_start[],
-> +					    __core_driver_block_end[];
-> +
-> +void __init core_driver_init_class(enum core_device_class class,
-> +				   void (*sort)(struct list_head *))
+> +static void __devinit max8925_parse_touch(struct device_node *np,
+> +					struct max8925_platform_data *pdata)
 > +{
-> +	const struct core_driver_setup_block *b;
-> +	struct core_device *dev, *tmp;
-> +	int err;
+> +	struct max8925_touch_pdata *touch;
+> +	const __be32 *p;
 > +
-> +	if (sort)
-> +		sort(&anchors[class]);
+> +	touch = kzalloc(sizeof(struct max8925_touch_pdata), GFP_KERNEL);
+> +	if (touch == NULL)
+> +		return;
+> +	pdata->touch = touch;
+> +	p = of_get_property(np, "flags", NULL);
+> +	if (p)
+> +		touch->flags = be32_to_cpu(*p);
+> +	p = of_get_property(np, "interrupts", NULL);
+> +	if (p)
+> +		pdata->tsc_irq = irq_of_parse_and_map(np, 0);
+
+irq_of_parse_and_map() can be called directly.  It will return NO_IRQ
+if the irq cannot be parsed.
+
+> +}
 > +
-> +	list_for_each_entry_safe(dev, tmp, &anchors[class], entry) {
-> +		pr_debug("core: matching device %s(%d)\n", dev->name, class);
-> +		for (b = __core_driver_block_start;
-> +		     b < __core_driver_block_end;
-> +		     b++) {
-> +			if (b->class != class ||
-> +			    !core_device_match(dev, b->drv->ids))
-> +				continue;
-> +			
-> +			pr_debug("core: matched device %s\n", dev->name);
-> +			err = b->drv->init(dev);
-> +			if (err)
-> +				pr_warning("core: %s init failed\n", dev->name);
-> +		}
+> +static void __devinit max8925_parse_power(struct device_node *np,
+> +					struct max8925_platform_data *pdata)
+> +{
+> +	struct max8925_power_pdata *power;
+> +	const __be32 *p;
 > +
-> +		list_del(&dev->entry);
-> +#ifdef CONFIG_OF
-> +		if (dev->of_node) { /* These are dynamically allocated */
-> +			kfree(dev->resource);
-> +			kfree(dev);
-> +		}
-> +#endif
+> +	power = kzalloc(sizeof(struct max8925_power_pdata), GFP_KERNEL);
+> +	if (power == NULL)
+> +		return;
+> +	pdata->power = power;
+> +	p = of_get_property(np, "battery-detect", NULL);
+> +	if (p)
+> +		power->batt_detect = be32_to_cpu(*p) ? 1 : 0;
+> +	p = of_get_property(np, "topoff-threshold", NULL);
+> +	if (p)
+> +		power->topoff_threshold = be32_to_cpu(*p) & 0x3;
+> +	p = of_get_property(np, "fast-charge", NULL);
+> +	if (p)
+> +		power->fast_charge = be32_to_cpu(*p) & 0x7;
+
+Needs to be documented.
+
+> +}
+> +
+> +static void __devinit max8925_parse_regulator(struct device_node *np,
+> +					struct max8925_platform_data *pdata)
+> +{
+> +	const char *name[MAX8925_MAX_REGULATOR] = {
+> +			"SD1", "SD2", "SD3", "LDO1", "LDO2", "LDO3", "LDO4",
+> +			"LDO5", "LDO6", "LDO7", "LDO8", "LDO9", "LDO10",
+> +			"LDO11", "LDO12", "LDO13", "LDO14", "LDO15", "LDO16",
+> +			"LDO17", "LDO18", "LDO19", "LDO20"};
+> +	const char *cp;
+> +	int i;
+> +
+> +	cp = of_get_property(np, "compatible", NULL);
+> +	if (cp == NULL)
+> +		return;
+> +	for (i = 0; i < MAX8925_MAX_REGULATOR; i++) {
+> +		if (strncmp(cp, name[i], strlen(name[i])))
+> +			continue;
+> +		of_regulator_init_data(np, pdata->regulator[i]);
+> +		break;
+
+You don't need to open-code the parsing of compatible values.  Use
+of_match_node() instead with an of_device_id table.
+
 > +	}
 > +}
-
-I think Greg commented on this, but I'll say the same thing.  I don't
-think it is a good idea to try and classify core devices.  If it is
-needed, there should be only one level of core devices, and they
-should have the ability to sort themselves into the correct init
-order.
-
 > +
-> +#ifdef CONFIG_OF
-> +void __init of_core_device_populate(enum core_device_class class,
-> +			     struct of_device_id *matches)
+> +static struct max8925_platform_data __devinit
+> +*max8925_get_alt_pdata(struct i2c_client *client)
 > +{
-> +	struct device_node *np;
-> +	struct core_device *dev;
-> +	int num_res;
+> +	struct max8925_platform_data *pdata;
+> +	struct device_node *of_node = client->dev.of_node;
+> +	struct device_node *np, *pp = NULL;
+> +	const char *cp;
+> +	int ret, i;
 > +
-> +	for_each_matching_node(np, matches) {
-> +		pr_debug("core: registering OF device %s\n", np->full_name);
-> +		dev = kzalloc(sizeof(*dev), GFP_KERNEL);
-> +		if (!dev)
-> +			return;
-> +		dev->name = np->name;
-> +		dev->of_node = np;
-> +
-> +		dev->resource = of_device_alloc_resources(np, &num_res);
-> +		if (num_res < 0) {
-> +			kfree(dev);
-> +			return;
-> +		}
-> +		dev->num_resources = num_res;
-> +
-> +		core_device_register(class, dev);
+> +	pdata = kzalloc(sizeof(struct max8925_platform_data), GFP_KERNEL);
+
+sizeof(*pdata)
+
+> +	if (pdata == NULL)
+> +		return NULL;
+> +	pdata->regulator[0] = kzalloc(sizeof(struct regulator_init_data)
+> +			* MAX8925_MAX_REGULATOR, GFP_KERNEL);
+
+ditto.
+
+Is it appropriate to allocated the entire table of regulators?  From
+the parse_regulator function above, it looks like only one of the
+regulators will actually get registered (I've not dug deeply into what
+the driver needs here though).
+
+> +	if (pdata->regulator[0] == NULL) {
+> +		kfree(pdata);
+> +		return NULL;
 > +	}
+> +	for (i = 1; i < MAX8925_MAX_REGULATOR; i++)
+> +		pdata->regulator[i] = pdata->regulator[i - 1] + 1;
+> +
+> +	ret = max8925_parse_irq(client, pdata);
+> +	if (ret < 0)
+> +		goto out;
+> +
+> +	for (; (np = of_get_next_child(of_node, pp)) != NULL; pp = np) {
+> +		cp = of_get_property(np, "compatible", NULL);
+> +		if (cp == NULL)
+> +			continue;
+> +		if (!strncmp(cp, "backlight", strlen("backlight")))
+> +			max8925_parse_backlight(np, pdata);
+> +		if (!strncmp(cp, "power", strlen("power")))
+> +			max8925_parse_power(np, pdata);
+> +		if (!strncmp(cp, "touch", strlen("touch")))
+> +			max8925_parse_touch(np, pdata);
+> +		cp = of_get_property(np, "device_type", NULL);
+> +		if (cp == NULL)
+> +			continue;
+> +		if (!strncmp(cp, "regulator", strlen("regulator")))
+> +			max8925_parse_regulator(np, pdata);
+> +	}
+> +	return pdata;
+> +out:
+> +	kfree(pdata->regulator[0]);
+> +	kfree(pdata);
+> +	return NULL;
+> +}
+> +#else
+> +static struct max8925_platform_data __devinit
+> +*max8925_get_alt_pdata(struct i2c_client *client)
+> +{
+> +	return NULL;
 > +}
 > +#endif
+> +
+>  static int __devinit max8925_probe(struct i2c_client *client,
+>  				   const struct i2c_device_id *id)
+>  {
+> @@ -142,8 +293,12 @@ static int __devinit max8925_probe(struct i2c_client *client,
+>  	static struct max8925_chip *chip;
+>  
+>  	if (!pdata) {
+> -		pr_info("%s: platform data is missing\n", __func__);
+> -		return -EINVAL;
+> +		pdata = max8925_get_alt_pdata(client);
+> +		if (!pdata) {
+> +			pr_info("%s: platform data is missing\n", __func__);
+> +			return -EINVAL;
+> +		}
+> +		client->dev.platform_data = pdata;
 
-I'm concerned here about how a platform decides which devices are
-'core' and which are not.  It doesn't make sense to have a
-"core-device" compatible value or similar because it doesn't actually
-describe the hardware requirements.  It only describes how the current
-Linux kernel wants to initialize the world, and that is something very
-much subject to change.
-
-Also, for any device nodes picked up by this function, the driver
-model would also need to inhibit those same nodes from being picked up
-by of_platform_populate(), otherwise it could end up with two drivers
-bound to the same device.  How are you thinking about handling it?
+Don't write to dev.platform_data.  Device drivers must treat
+platform_data as immutable, and it is illegal to modify it.  If
+platform_data is used outside of the probe function, then the driver
+needs to be refactored to copy the data out of pdata and into the
+driver's private data structure so that the data can be sourced from
+either pdata or DT.
 
 g.
 
-> diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
-> index db22d13..2b1590a 100644
-> --- a/include/asm-generic/vmlinux.lds.h
-> +++ b/include/asm-generic/vmlinux.lds.h
-> @@ -616,6 +616,11 @@
->  		*(.init.setup)						\
->  		VMLINUX_SYMBOL(__setup_end) = .;
+>  	}
 >  
-> +#define INIT_CORE_DRV							\
-> +		VMLINUX_SYMBOL(__core_driver_block_start) = .;		\
-> +		*(.init.core_driver)					\
-> +		VMLINUX_SYMBOL(__core_driver_block_end) = .;
-> +
->  #define INITCALLS							\
->  	*(.initcallearly.init)						\
->  	VMLINUX_SYMBOL(__early_initcall_end) = .;			\
-> @@ -797,6 +802,7 @@
->  	.init.data : AT(ADDR(.init.data) - LOAD_OFFSET) {		\
->  		INIT_DATA						\
->  		INIT_SETUP(initsetup_align)				\
-> +		INIT_CORE_DRV						\
->  		INIT_CALLS						\
->  		CON_INITCALL						\
->  		SECURITY_INITCALL					\
-> diff --git a/include/linux/core_device.h b/include/linux/core_device.h
-> new file mode 100644
-> index 0000000..ca67e5e
-> --- /dev/null
-> +++ b/include/linux/core_device.h
-> @@ -0,0 +1,69 @@
-> +/*
-> + * Copyright (C) 2011 ARM Ltd
-> + * Written by Marc Zyngier <marc.zyngier@arm.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * Core device init support
-> + */
-> +
-> +#ifndef _CORE_DEVICE_H
-> +#define _CORE_DEVICE_H
-> +
-> +#include <linux/list.h>
-> +#include <linux/ioport.h>
-> +#include <linux/of.h>
-> +
-> +struct core_device_id {
-> +	const char		*name;
-> +};
-> +
-> +enum core_device_class {
-> +	CORE_DEV_CLASS_IRQ,
-> +	CORE_DEV_CLASS_TIMER,
-> +	CORE_DEV_CLASS_MAX		/* Do not use as a class */
-> +};
-> +
-> +struct core_device {
-> +	const char		*name;
-> +	u32			num_resources;
-> +	struct resource		*resource;
-> +#ifdef CONFIG_OF
-> +	struct device_node	*of_node;
-> +#endif
-> +	struct list_head	entry;
-> +};
-> +
-> +struct core_driver {
-> +	int			(*init)(struct core_device *);
-> +	struct core_device_id	*ids;
-> +};
-> +
-> +void core_device_register(enum core_device_class class,
-> +			  struct core_device *dev);
-> +void core_driver_init_class(enum core_device_class class,
-> +			    void (*sort)(struct list_head *));
-> +#ifdef CONFIG_OF
-> +void of_core_device_populate(enum core_device_class class,
-> +			     struct of_device_id *matches);
-> +#else
-> +static inline void of_core_device_populate(enum core_device_class class,
-> +					   struct of_device_id *matches)
-> +{
-> +}
-> +#endif
-> +
-> +struct core_driver_setup_block {
-> +	enum core_device_class	class;
-> +	struct core_driver	*drv;
-> +};
-> +
-> +#define core_driver_register(cls, drv)					\
-> +static struct core_driver_setup_block __core_driver_block_##cls##_##drv	\
-> +	__used __section(.init.core_driver)				\
-> +	__attribute__((aligned((sizeof(long)))))			\
-> +	= { cls, &drv }
-> +
-> +#endif
+>  	chip = kzalloc(sizeof(struct max8925_chip), GFP_KERNEL);
 > -- 
-> 1.7.0.4
-> 
+> 1.5.6.5
 > 
