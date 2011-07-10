@@ -1,70 +1,63 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sun, 10 Jul 2011 15:35:13 +0800
-Subject: [PATCH] mtd: dataflash: add device tree probe support
-Message-ID: <1310283313-32087-1-git-send-email-shawn.guo@linaro.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Sun, 10 Jul 2011 01:34:19 -0600 (MDT)
+Subject: [GIT PULL] OMAP: SoC data/core: fixes for 3.1 
+Message-ID: <alpine.DEB.2.00.1107100132470.15984@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It adds device tree probe support for mtd_dataflash driver.
+Hi Tony,
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Cc: David Woodhouse <dwmw2@infradead.org>
-Cc: Artem Bityutskiy <Artem.Bityutskiy@nokia.com>
----
- drivers/mtd/devices/mtd_dataflash.c |   12 +++++++++++-
- 1 files changed, 11 insertions(+), 1 deletions(-)
+The following changes since commit c402c0d9dfa8d4fb54dd98fc12525f39d0f29bfe:
 
-diff --git a/drivers/mtd/devices/mtd_dataflash.c b/drivers/mtd/devices/mtd_dataflash.c
-index 8f6b02c..64d7242 100644
---- a/drivers/mtd/devices/mtd_dataflash.c
-+++ b/drivers/mtd/devices/mtd_dataflash.c
-@@ -24,6 +24,8 @@
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/partitions.h>
- 
-+#include <linux/of.h>
-+#include <linux/of_device.h>
- 
- /*
-  * DataFlash is a kind of SPI flash.  Most AT45 chips have two buffers in
-@@ -98,6 +100,11 @@ struct dataflash {
- 	struct mtd_info		mtd;
- };
- 
-+static const struct of_device_id dataflash_dt_ids[] = {
-+	{ .compatible = "atmel,dataflash", },
-+	{ /* sentinel */ }
-+};
-+
- /* ......................................................................... */
- 
- /*
-@@ -634,6 +641,7 @@ add_dataflash_otp(struct spi_device *spi, char *name,
- {
- 	struct dataflash		*priv;
- 	struct mtd_info			*device;
-+	struct mtd_part_parser_data	ppdata;
- 	struct flash_platform_data	*pdata = spi->dev.platform_data;
- 	char				*otp_tag = "";
- 	int				err = 0;
-@@ -675,7 +683,8 @@ add_dataflash_otp(struct spi_device *spi, char *name,
- 			pagesize, otp_tag);
- 	dev_set_drvdata(&spi->dev, priv);
- 
--	err = mtd_device_parse_register(device, NULL, 0,
-+	ppdata.of_node = spi->dev.of_node;
-+	err = mtd_device_parse_register(device, NULL, &ppdata,
- 			pdata ? pdata->parts : NULL,
- 			pdata ? pdata->nr_parts : 0);
- 
-@@ -926,6 +935,7 @@ static struct spi_driver dataflash_driver = {
- 		.name		= "mtd_dataflash",
- 		.bus		= &spi_bus_type,
- 		.owner		= THIS_MODULE,
-+		.of_match_table = dataflash_dt_ids,
- 	},
- 
- 	.probe		= dataflash_probe,
--- 
-1.7.4.1
+  Merge branches 'dmtimer_precleanup_3.1', 'hwmod_core_cleanup_a_3.1', 'combine_common_hwmod_3.1', 'omap4_hwmod_data_cleanup_a_3.1', 'clock_cleanup_a_3.1', 'prcm_cleanup_a_3.1', 'omap_pm_cleanup_3.1' and 'omap_device_cleanup_3.1' into prcm-cleanup-3.1 (2011-07-09 20:24:07 -0600)
+
+are available in the git repository at:
+
+  git://git.pwsan.com/linux-2.6 prcm-fixes-3.1
+
+Andy Green (6):
+      I2C: OMAP2+: Set hwmod flags to only allow 16-bit accesses to i2c
+      I2C: OMAP2+: increase omap_i2c_dev_attr flags from u8 to u32
+      I2C: OMAP2+:  Introduce I2C IP versioning constants
+      I2C: OMAP1/OMAP2+: create omap I2C functionality flags for each cpu_... test
+      I2C: OMAP2+: Tag all OMAP2+ hwmod defintions with I2C IP revision
+      I2C: OMAP2+: add correct functionality flags to all omap2plus i2c dev_attr
+
+Avinash.H.M (1):
+      OMAP: hwmod: fix the i2c-reset timeout during bootup
+
+Benoit Cousson (1):
+      OMAP4: powerdomain data: Fix core mem states and missing cefuse flag
+
+Paul Walmsley (1):
+      Merge branches 'powerdomain_fixes_3.1', 'hardware_workarounds_3.1', 'hwmod_dss_fix_3.1' and 'i2c_fixes_3.1' into prcm-fixes-3.1
+
+Rajendra Nayak (1):
+      OMAP2+: PM: Initialise sleep_switch to a non-valid value
+
+Santosh Shilimkar (2):
+      OMAP4: clock data: Keep GPMC clocks always enabled and hardware managed
+      OMAP4: powerdomain data: Remove unsupported MPU powerdomain state
+
+Tomi Valkeinen (2):
+      OMAP4: hwmod data: Modify DSS opt clocks
+      OMAP4: hwmod data: Change DSS main_clk scheme
+
+ arch/arm/mach-omap2/clock44xx_data.c         |    9 ++-
+ arch/arm/mach-omap2/i2c.c                    |   68 +++++++++++++++++++++
+ arch/arm/mach-omap2/omap_hwmod.c             |   27 +++++++++
+ arch/arm/mach-omap2/omap_hwmod_2420_data.c   |    9 +++-
+ arch/arm/mach-omap2/omap_hwmod_2430_data.c   |    7 ++
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c   |   18 +++++-
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c   |   81 ++++++++++++++++++++------
+ arch/arm/mach-omap2/pm.c                     |    2 +-
+ arch/arm/mach-omap2/powerdomains44xx_data.c  |    9 ++-
+ arch/arm/plat-omap/include/plat/i2c.h        |    6 ++-
+ arch/arm/plat-omap/include/plat/omap_hwmod.h |    1 +
+ include/linux/i2c-omap.h                     |   27 +++++++++
+ 12 files changed, 233 insertions(+), 31 deletions(-)
+
+omap2plus_defconfig
+   text    data     bss     dec     hex filename
+6353285  528944 5591048 12473277         be53bd vmlinux.orig
+6352073	 529392	5591048	12472513	 be50c1	vmlinux.patched
