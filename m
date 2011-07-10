@@ -1,32 +1,25 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 10 Jul 2011 15:15:37 +0100
-Subject: [PATCH] Use MMIO clocksource for 32kHz counter
-In-Reply-To: <20110627191102.GV23145@atomide.com>
-References: <20110627123315.GB1777@n2100.arm.linux.org.uk>
-	<20110627123754.GQ23145@atomide.com>
-	<20110627191102.GV23145@atomide.com>
-Message-ID: <20110710141537.GB4957@n2100.arm.linux.org.uk>
+Date: Sun, 10 Jul 2011 15:19:35 +0100
+Subject: [PATCHv2 0/3] clocksource: add db8500 PRCMU timer
+In-Reply-To: <20110602094622.GS3660@n2100.arm.linux.org.uk>
+References: <1307007271-1004-1-git-send-email-mattias.wallin@stericsson.com>
+	<20110602094622.GS3660@n2100.arm.linux.org.uk>
+Message-ID: <20110710141935.GA21414@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 27, 2011 at 12:11:02PM -0700, Tony Lindgren wrote:
-> * Tony Lindgren <tony@atomide.com> [110627 05:33]:
-> > * Russell King - ARM Linux <linux@arm.linux.org.uk> [110627 05:28]:
-> > > --- a/arch/arm/plat-omap/counter_32k.c
-> > > +++ b/arch/arm/plat-omap/counter_32k.c
-> > > +#ifdef CONFIG_ARCH_OMAP16XX
-> > > +		else if (cpu_is_omap16xx())
-> > > +			base = OMAP2_L4_IO_ADDRESS(OMAP16XX_TIMER_32K_SYNCHRONIZED);
+On Thu, Jun 02, 2011 at 10:46:22AM +0100, Russell King - ARM Linux wrote:
+> On Thu, Jun 02, 2011 at 11:34:31AM +0200, Mattias Wallin wrote:
+> > The Multi Timer Unit (MTU) is currently used as clocksource and sched_clk
+> > for the u8500 machine. The MTU block loose power during cpuidle sleep states
+> > so an alternate clocksource is needed and these patches adds the db8500 PRCMU
+> > timer.
 > 
-> BTW, the above should have been OMAP1_IO_ADDRESS instead..
->   
-> > You should be able to replace the above with just ioremap as we now
-> > have the static mappings.
+> Why don't we just find a way of fixing sched_clock so that the value
+> doesn't reset over a suspend/resume cycle?  IOW, lets fix the problem
+> for _everyone_ rather than only fixing it for one platform at a time.
 > 
-> ..here's a patch to use ioremap with comment added about the static
-> mapping requirements.
-> 
-> Thanks for getting rid of hopefully the last remaining omap_readl
-> for omap2+ BTW :)
+> Could you try this patch to check whether sched_clock() behaves better
+> across a suspend/resume cycle please?
 
-What're we doing with this patch and your follow-up patch?
+So do I merge this patch?
