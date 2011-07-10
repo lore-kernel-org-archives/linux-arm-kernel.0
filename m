@@ -1,42 +1,65 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sat, 9 Jul 2011 23:56:27 -0700
-Subject: [GIT PULL] minimal omap4460 support for v3.1 merge window
-Message-ID: <20110710065627.GE5783@atomide.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Sun, 10 Jul 2011 09:14:45 +0200
+Subject: [PATCH] pxa2xx_spi: fix memory corruption
+In-Reply-To: <20110709231108.GQ4812@n2100.arm.linux.org.uk>
+References: <1310246098-21208-1-git-send-email-anarsoul@gmail.com>
+	<201107100105.48168.marek.vasut@gmail.com>
+	<20110709231108.GQ4812@n2100.arm.linux.org.uk>
+Message-ID: <201107100914.45452.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Sunday, July 10, 2011 01:11:09 AM Russell King - ARM Linux wrote:
+> On Sun, Jul 10, 2011 at 01:05:48AM +0200, Marek Vasut wrote:
+> > On Saturday, July 09, 2011 11:14:58 PM Vasily Khoruzhick wrote:
+> > > pxa2xx_spi_probe allocates struct driver_data and null_dma_buf
+> > > at same time via spi_alloc_master(), but then calculates
+> > > null_dma_buf pointer incorrectly, and it causes memory corruption
+> > > later if DMA usage is enabled.
+> > > 
+> > > Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+> > > ---
+> > > 
+> > >  drivers/spi/pxa2xx_spi.c |    2 +-
+> > >  1 files changed, 1 insertions(+), 1 deletions(-)
+> > > 
+> > > diff --git a/drivers/spi/pxa2xx_spi.c b/drivers/spi/pxa2xx_spi.c
+> > > index dc25bee..ef38fbf 100644
+> > > --- a/drivers/spi/pxa2xx_spi.c
+> > > +++ b/drivers/spi/pxa2xx_spi.c
+> > > @@ -1569,7 +1569,7 @@ static int __devinit pxa2xx_spi_probe(struct
+> > > platform_device *pdev) master->transfer = transfer;
+> > > 
+> > >  	drv_data->ssp_type = ssp->type;
+> > > 
+> > > -	drv_data->null_dma_buf = (u32 *)ALIGN((u32)(drv_data +
+> > > +	drv_data->null_dma_buf = (u32 *)ALIGN(((u32)drv_data +
+> > > 
+> > >  						sizeof(struct driver_data)), 8);
+> > 
+> > This thing looks a bit disturbing in itself. Like, where the heck is that
+> > thing pointing in the end ? Since some data are written to address in
+> > "null_dma_buf" ... isn't this just changing the corruption impact ?
+> 
+>         /* Allocate master with space for drv_data and null dma buffer */
+>         master = spi_alloc_master(dev, sizeof(struct driver_data) + 16);
+> 
+> So there's 16 bytes at the end of driver_data.
+> 
+> However:
+> 
+> 	(u32)(drv_data + sizeof(struct driver_data))
+> 
+> is pointer arithmetic.  drv_data points at an object of sizeof(struct
+> driver_data).  Adding one to this increments the pointer by
+> sizeof(struct driver_data) bytes.  So the above expression increments
+> the pointer by sizeof(struct driver_data)*sizeof(struct driver_data)
+> bytes, which is obviously complete rubbish.
+> 
+> 	((u32)drv_data + sizeof(struct driver_data))
+> 
+> casts drv_data to a u32 first, then adds the sizeof(struct driver_data)
+> which moves us into the 16 bytes allocated off the end of the struct.
 
-Please pull minimal omap4460 support from:
-
-git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git 4460
-
-Regards,
-
-Tony
-
-
-The following changes since commit 48cb1258e8b0f8c81cfb699b42326c5b2147b3f8:
-  Tony Lindgren (1):
-        Merge branch 'for_3.1/pm-misc' of git://git.kernel.org/.../khilman/linux-omap-pm into devel-cleanup
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git 4460
-
-Aneesh V (2):
-      OMAP: ID: introduce chip detection for OMAP4460
-      OMAP4: ID: add omap_has_feature for max freq supported
-
-Rajendra Nayak (2):
-      OMAP4: PRCM: OMAP4460 specific PRM and CM register bitshifts
-      OMAP4: clocks: Update the clock tree with 4460 clock nodes
-
- arch/arm/mach-omap2/clock44xx_data.c          |   39 ++++++++++++++++++
- arch/arm/mach-omap2/cm-regbits-44xx.h         |   36 +++++++++++++++++
- arch/arm/mach-omap2/id.c                      |   53 ++++++++++++++++++++----
- arch/arm/mach-omap2/prm-regbits-44xx.h        |    8 ++++
- arch/arm/plat-omap/include/plat/clkdev_omap.h |    1 +
- arch/arm/plat-omap/include/plat/clock.h       |    2 +
- arch/arm/plat-omap/include/plat/cpu.h         |   35 +++++++++++++++-
- 7 files changed, 162 insertions(+), 12 deletions(-)
+The ptr arritmetic is clear, it was the 16 bytes after the structure I was 
+missing ... if it's allocated there, it's fine. Thanks for clearing this.
