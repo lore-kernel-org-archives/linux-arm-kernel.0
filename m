@@ -1,29 +1,49 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Sun, 10 Jul 2011 17:40:27 +0900
-Subject: [PATCH 03/10] ASoc: mxs: add mxs-sgtl5000 machine driver
-In-Reply-To: <CAA+hA=TirfTs9WB19snuH2HhmJvaxApEg2H1oT2BwQwPkTOuUA@mail.gmail.com>
-References: <1310140790-2132-1-git-send-email-b29396@freescale.com>
-	<1310140790-2132-4-git-send-email-b29396@freescale.com>
-	<20110709030008.GD26900@sirena.org.uk>
-	<CAA+hA=TirfTs9WB19snuH2HhmJvaxApEg2H1oT2BwQwPkTOuUA@mail.gmail.com>
-Message-ID: <20110710084021.GE23199@opensource.wolfsonmicro.com>
+From: rabin@rab.in (Rabin Vincent)
+Date: Sun, 10 Jul 2011 14:20:27 +0530
+Subject: function tracer on i.mx35 (pcm043)
+In-Reply-To: <201107041909.27354.tim.sander@hbm.com>
+References: <201107041909.27354.tim.sander@hbm.com>
+Message-ID: <CAH+eYFCwVacjbmG+08y6+NO2dYkRd-9YRgaGoUnrJZwa8ki-WA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 10, 2011 at 04:36:44PM +0800, Dong Aisheng wrote:
-> 2011/7/9 Mark Brown <broonie@opensource.wolfsonmicro.com>:
-> > On Fri, Jul 08, 2011 at 11:59:43PM +0800, Dong Aisheng wrote:
+On Mon, Jul 4, 2011 at 22:39, Tim Sander <tim.sander@hbm.com> wrote:
+> Using vanilla 2.6.39 on arm i.mx35 (pcm043) with trace-cmd 1.0.5,
+> build with:
+> arm-1136jfs-linux-gnueabi-gcc (OSELAS.Toolchain-2011.03.0) 4.5.2.
+>
+> I am currently trying to find the reason why the irq on the i.mx35 is somtimes
+> up do 80?s delayed. I thought that the function tracer would help in solving
+> that problem but unfortunately it crashes when using the function trace plugin.
 
-> >> + ? ? int (*init) (void); ? ? /* board specific init */
-> >> + ? ? int (*finit) (void); ? ?/* board specific finit */
+I think your platform uses arch/arm/plat-mxc/time.c?  Oopses with the
+function graph tracer are usually caused by recursion due to a missing
+notrace annotation on sched_clock() or its called functions.
 
-> > Eh? ?Your machine driver is already entirely board specific...
+Could you please try the following change? (applies on 2.6.39)
 
-> Still not.
+diff --git a/arch/arm/plat-mxc/time.c b/arch/arm/plat-mxc/time.c
+index 2237ff8..9c7c6dc 100644
+--- a/arch/arm/plat-mxc/time.c
++++ b/arch/arm/plat-mxc/time.c
+@@ -106,17 +106,17 @@ static void gpt_irq_acknowledge(void)
+ 		__raw_writel(V2_TSTAT_OF1, timer_base + V2_TSTAT);
+ }
 
-> It's originally used for some board's codec that do not need SAIF to
-> provide mclk.
-> I will remove it if we still do not need it to make the things simply.
+-static cycle_t dummy_get_cycles(struct clocksource *cs)
++static cycle_t notrace dummy_get_cycles(struct clocksource *cs)
+ {
+ 	return 0;
+ }
 
-If you've got different CODECs you almost certainly want to have
-different machine drivers for the relevant boards.
+-static cycle_t mx1_2_get_cycles(struct clocksource *cs)
++static cycle_t notrace mx1_2_get_cycles(struct clocksource *cs)
+ {
+ 	return __raw_readl(timer_base + MX1_2_TCN);
+ }
+
+-static cycle_t v2_get_cycles(struct clocksource *cs)
++static cycle_t notrace v2_get_cycles(struct clocksource *cs)
+ {
+ 	return __raw_readl(timer_base + V2_TCN);
+ }
