@@ -1,41 +1,41 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Sun, 10 Jul 2011 09:29:49 -0500
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 10 Jul 2011 15:51:23 +0100
 Subject: [PATCH 2/6] ARM: move ARCH_HAS_DMA_SET_COHERENT_MASK into memory.h
-In-Reply-To: <20110709145856.GM4812@n2100.arm.linux.org.uk>
+In-Reply-To: <4E19B75D.2080109@gmail.com>
 References: <1309366019-24379-1-git-send-email-robherring2@gmail.com>
 	<1309366019-24379-3-git-send-email-robherring2@gmail.com>
 	<4E1866A2.9040407@gmail.com>
 	<20110709145856.GM4812@n2100.arm.linux.org.uk>
-Message-ID: <4E19B75D.2080109@gmail.com>
+	<4E19B75D.2080109@gmail.com>
+Message-ID: <20110710145123.GH4812@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/09/2011 09:58 AM, Russell King - ARM Linux wrote:
-> On Sat, Jul 09, 2011 at 09:33:06AM -0500, Rob Herring wrote:
->> I noticed this is going to have conflicts with your ARM_DMA_ZONE_SIZE
->> series. Can you add this into your series? This still presents another
->> issue to solve for single kernel binary, but hopefully the dma mapping
->> work will help.
-> 
-> That's a different problem - its about limiting the maximum DMA mask
-> which can be set, so that memory is sourced from the right place
-> even for drivers which use 32-bit masks.
+On Sun, Jul 10, 2011 at 09:29:49AM -0500, Rob Herring wrote:
+> asm/dma-mapping.h only includes asm/memory.h. We are getting lucky that
+> linux/dma-mapping.h is picking up ARCH_HAS_DMA_SET_COHERENT_MASK because
+> the include path looks like this for ixp4xx and pxa: linux/dma-mapping.h
+> -> linux/scatterlist.h -> asm/io.h -> mach/io.h -> mach/hardware.h.
 
-Yes, I know that they are different.
+That's probably because of the way the code has changed over the last
+year:
 
-> It's needed to ensure that dma_set_coherent_mask() can be overridden.
-> One solution to it would be to ensure that we always define
-> ARCH_HAS_DMA_SET_COHERENT_MASK, and handle the differences internally,
-> which is something I've been thinking about adding to my DMA bounce
-> series of patches.
+6fee48c dma-mapping: arm: use generic pci_set_dma_mask and pci_set_consistent_dma_mask
 
-asm/dma-mapping.h only includes asm/memory.h. We are getting lucky that
-linux/dma-mapping.h is picking up ARCH_HAS_DMA_SET_COHERENT_MASK because
-the include path looks like this for ixp4xx and pxa: linux/dma-mapping.h
--> linux/scatterlist.h -> asm/io.h -> mach/io.h -> mach/hardware.h.
+Removes HAVE_ARCH_PCI_SET_DMA_MASK from IXP4xx mach/hardware.h, thus
+breaking IXP4xx machines.
 
-I was previously thinking the define was getting picked up thru
-asm/pci.h somehow. So I can just drop this from my series. It does need
-to get fixed though or other header re-working could silently break this.
+5f3cd1e dma-mapping: pci: move pci_set_dma_mask and pci_set_consistent_dma_mask to pci-dma-compat.h
 
-Rob
+Removes HAVE_ARCH_PCI_SET_DMA_MASK support from drivers/pci/pci.c,
+which includes linux/pci.h -> asm/pci.h -> mach/hardware.h and thus
+the definition.
+
+710224fa arm: fix "arm: fix pci_set_consistent_dma_mask for dmabounce devices"
+
+Creates the current ARCH_HAS_DMA_SET_COHERENT_MASK stuff, placing it
+into ixp4xx's and PXA's mach/hardware.h to fix the regression caused
+by 6fee48c and 5f3cd1e.
+
+So this really could do with being made more robust first, because
+as you point out, the current solution is extremely fragile.
