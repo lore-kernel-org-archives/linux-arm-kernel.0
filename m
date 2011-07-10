@@ -1,58 +1,63 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Sun, 10 Jul 2011 15:09:22 +0300
-Subject: [PATCH v2] pxa2xx_spi: fix memory corruption
-In-Reply-To: <201107100957.06377.marek.vasut@gmail.com>
-References: <201107100957.06377.marek.vasut@gmail.com>
-Message-ID: <1310299762-20079-1-git-send-email-anarsoul@gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Sun, 10 Jul 2011 06:31:58 -0600 (MDT)
+Subject: [GIT PULL v2] OMAP: SoC data/core: fixes for 3.1
+Message-ID: <alpine.DEB.2.00.1107100629430.15984@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pxa2xx_spi_probe allocates struct driver_data and null_dma_buf
-at same time via spi_alloc_master(), but then calculates
-null_dma_buf pointer incorrectly, and it causes memory corruption
-later if DMA usage is enabled.
+Hi Tony,
 
-Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
----
-v2: - add u8 __null_dma_buf[16] to the end of driver_data structure
-    and use it as null_dma_buf after alignment.
-    - use PTR_ALIGN instead of ALIGN
- drivers/spi/pxa2xx_spi.c |    9 +++++----
- 1 files changed, 5 insertions(+), 4 deletions(-)
+The following changes since commit c402c0d9dfa8d4fb54dd98fc12525f39d0f29bfe:
 
-diff --git a/drivers/spi/pxa2xx_spi.c b/drivers/spi/pxa2xx_spi.c
-index dc25bee..25358cd 100644
---- a/drivers/spi/pxa2xx_spi.c
-+++ b/drivers/spi/pxa2xx_spi.c
-@@ -106,6 +106,7 @@ struct driver_data {
- 	int rx_channel;
- 	int tx_channel;
- 	u32 *null_dma_buf;
-+	u8 __null_dma_buf[16];
- 
- 	/* SSP register addresses */
- 	void __iomem *ioaddr;
-@@ -1543,8 +1544,8 @@ static int __devinit pxa2xx_spi_probe(struct platform_device *pdev)
- 		return -ENODEV;
- 	}
- 
--	/* Allocate master with space for drv_data and null dma buffer */
--	master = spi_alloc_master(dev, sizeof(struct driver_data) + 16);
-+	/* Allocate master with space for drv_data */
-+	master = spi_alloc_master(dev, sizeof(struct driver_data));
- 	if (!master) {
- 		dev_err(&pdev->dev, "cannot alloc spi_master\n");
- 		pxa_ssp_free(ssp);
-@@ -1569,8 +1570,8 @@ static int __devinit pxa2xx_spi_probe(struct platform_device *pdev)
- 	master->transfer = transfer;
- 
- 	drv_data->ssp_type = ssp->type;
--	drv_data->null_dma_buf = (u32 *)ALIGN((u32)(drv_data +
--						sizeof(struct driver_data)), 8);
-+	drv_data->null_dma_buf =
-+		(u32 *)PTR_ALIGN((u8 *)drv_data->__null_dma_buf, 8);
- 
- 	drv_data->ioaddr = ssp->mmio_base;
- 	drv_data->ssdr_physical = ssp->phys_base + SSDR;
--- 
-1.7.5.rc3
+  Merge branches 'dmtimer_precleanup_3.1', 'hwmod_core_cleanup_a_3.1', 'combine_common_hwmod_3.1', 'omap4_hwmod_data_cleanup_a_3.1', 'clock_cleanup_a_3.1', 'prcm_cleanup_a_3.1', 'omap_pm_cleanup_3.1' and 'omap_device_cleanup_3.1' into prcm-cleanup-3.1 (2011-07-09 20:24:07 -0600)
+
+are available in the git repository at:
+
+  git://git.pwsan.com/linux-2.6 prcm-fixes-3.1
+
+Andy Green (6):
+      I2C: OMAP2+: Set hwmod flags to only allow 16-bit accesses to i2c
+      I2C: OMAP2+: increase omap_i2c_dev_attr flags from u8 to u32
+      I2C: OMAP2+:  Introduce I2C IP versioning constants
+      I2C: OMAP1/OMAP2+: create omap I2C functionality flags for each cpu_... test
+      I2C: OMAP2+: Tag all OMAP2+ hwmod defintions with I2C IP revision
+      I2C: OMAP2+: add correct functionality flags to all omap2plus i2c dev_attr
+
+Avinash.H.M (1):
+      OMAP: hwmod: fix the i2c-reset timeout during bootup
+
+Benoit Cousson (1):
+      OMAP4: powerdomain data: Fix core mem states and missing cefuse flag
+
+Paul Walmsley (1):
+      Merge branches 'powerdomain_fixes_3.1', 'hardware_workarounds_3.1', 'hwmod_dss_fix_3.1' and 'i2c_fixes_3.1' into prcm-fixes-3.1
+
+Rajendra Nayak (1):
+      OMAP2+: PM: Initialise sleep_switch to a non-valid value
+
+Santosh Shilimkar (2):
+      OMAP4: clock data: Keep GPMC clocks always enabled and hardware managed
+      OMAP4: powerdomain data: Remove unsupported MPU powerdomain state
+
+Tomi Valkeinen (2):
+      OMAP4: hwmod data: Modify DSS opt clocks
+      OMAP4: hwmod data: Change DSS main_clk scheme
+
+ arch/arm/mach-omap2/clock44xx_data.c         |    9 ++-
+ arch/arm/mach-omap2/i2c.c                    |   68 +++++++++++++++++++++
+ arch/arm/mach-omap2/omap_hwmod.c             |   27 +++++++++
+ arch/arm/mach-omap2/omap_hwmod_2420_data.c   |    9 +++-
+ arch/arm/mach-omap2/omap_hwmod_2430_data.c   |    7 ++
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c   |   18 +++++-
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c   |   81 ++++++++++++++++++++------
+ arch/arm/mach-omap2/pm.c                     |    2 +-
+ arch/arm/mach-omap2/powerdomains44xx_data.c  |    9 ++-
+ arch/arm/plat-omap/include/plat/i2c.h        |    6 ++-
+ arch/arm/plat-omap/include/plat/omap_hwmod.h |    1 +
+ include/linux/i2c-omap.h                     |   27 +++++++++
+ 12 files changed, 233 insertions(+), 31 deletions(-)
+
+omap2plus_defconfig
+   text	   data	    bss	    dec	    hex	filename
+6351345  529296 5591048 12471689         be4d89 vmlinux.orig
+6349889	 529328	5591048	12470265	 be47f9	vmlinux.patched
