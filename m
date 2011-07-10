@@ -1,43 +1,61 @@
-From: philippe.retornaz@epfl.ch (Philippe =?iso-8859-1?q?R=E9tornaz?=)
-Date: Sun, 10 Jul 2011 13:33:09 +0200
-Subject: [PATCH 3/3] mc13xxx: implicitly enable leds and buttons
-In-Reply-To: <20110710080450.GW29624@pengutronix.de>
-References: <1310252796-10596-1-git-send-email-philippe.retornaz@epfl.ch>
-	<1310252796-10596-4-git-send-email-philippe.retornaz@epfl.ch>
-	<20110710080450.GW29624@pengutronix.de>
-Message-ID: <201107101333.10309.philippe.retornaz@epfl.ch>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 10 Jul 2011 12:52:06 +0100
+Subject: [PATCH 01/17] ARM: proc: add definition of cpu_reset for ARMv6
+	and ARMv7 cores
+In-Reply-To: <20110710110023.GA14312@e102144-lin.cambridge.arm.com>
+References: <1310053830-23779-1-git-send-email-lorenzo.pieralisi@arm.com>
+	<1310053830-23779-2-git-send-email-lorenzo.pieralisi@arm.com>
+	<20110709101445.GH4812@n2100.arm.linux.org.uk>
+	<20110710110023.GA14312@e102144-lin.cambridge.arm.com>
+Message-ID: <20110710115206.GF4812@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le dimanche 10 juillet 2011 10:04:50, Uwe Kleine-K?nig a ?crit :
-> Hello,
+On Sun, Jul 10, 2011 at 12:00:24PM +0100, Will Deacon wrote:
+> I've had a look at a bunch of the cpu_*_reset definitions and I can't see
+> any reason why they wouldn't be callable with the flat mapping in place. In
+> fact, there's a scary comment for xscale:
+
+However, that flat mapping doesn't save us, because this only covers
+space below PAGE_OFFSET virtual.  We're executing these generally from
+virtual space at addresses greater than this, which means when the MMU
+is turned off, the instruction stream disappears.
+
+> @ CAUTION: MMU turned off from this point. We count on the pipeline
+> @ already containing those two last instructions to survive.
 > 
-> On Sun, Jul 10, 2011 at 01:06:36AM +0200, Philippe R?tornaz wrote:
-> > The leds and buttons subdevices cannot be used without additional
-> > platform data.
-> > 
-> > Use the presence of the platform data to enable the device instead
-> > of an additional flag.
-> 
-> I guess you could make some people happy by splitting this patch into:
-> 
-> 	- mfd/mc13xxx: implicitly enable leds and buttons (and
-> 	  regulators?)
-> 	- drop MC13XXX_USE_... in arch code
+> which I think would disappear if the code was called via the ID map.
 
-But this mean that between the two commit the build will be broken or the 
-behavior will change.  Which will break bissections.
+Yes, and everything pre-ARMv6 fundamentally relies upon the instructions
+following the MCR to turn the MMU off already being in the CPUs pipeline.
+Pre-ARMv6 relies upon this kind of behaviour from the CPU:
 
-For the regulator stuff, I don't want to change the behavior of others board as 
-some (mx31lite) enable the regualtor without platform data. That's why I did 
-not changed it. 
-Moreover for the mc13892 chip (which share the same flag), the probe() does 
-modify some registers, so it's not just some cosmetic change, it will change 
-the behavior on some boards.
+	fetch	decode	execute
+	mcr
+	mov pc	mcr
+	nop	mov pc	mcr
+	nop	nop	mov pc
+	<inst0> <--- flushed --->
 
-BTW I will be on holydays next week so I won't be able to produce new patches 
-soon.
+where inst0 is the instruction at the target of the "mov pc" branch.
+May not be well documented in the architecture manual, but there have
+been documentation of this level against CPUs in the past.  Maybe
+back in ARMv3 times, but the trick has proven to work all the way up
+to ARMv5, and these are of course CPU specific files rather than
+architecture specific.
 
-Thanks,
+It's curious that with ARMs move to a more relaxed model, that turning
+the MMU off has visibly changed from a fairly weak operation to an
+effective strong instruction barrier.  These now have visibly this
+behaviour:
 
-Philippe
+	fetch	decode	execute
+	mcr
+	mov pc	mcr
+	<inst0>	mov pc	mcr
+	<------ flushed ------>
+	mov pc*
+* - attempt to reload this instruction fails because MMU is now off.
+
+I'm not saying there that the pipeline is flushed (it may be) - but this
+represents the _observed_ behaviour.
