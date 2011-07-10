@@ -1,84 +1,87 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Sun, 10 Jul 2011 16:09:30 +0300
-Subject: [PATCH v2] pxa2xx_spi: fix memory corruption
-In-Reply-To: <201107101443.42307.marek.vasut@gmail.com>
-References: <201107100957.06377.marek.vasut@gmail.com>
-	<1310299762-20079-1-git-send-email-anarsoul@gmail.com>
-	<201107101443.42307.marek.vasut@gmail.com>
-Message-ID: <201107101609.31405.anarsoul@gmail.com>
+From: ido@wizery.com (Ido Yariv)
+Date: Sun, 10 Jul 2011 16:14:34 +0300
+Subject: [PATCH v2 1/6] arm: davinci: Fix low level gpio irq handlers' argument
+In-Reply-To: <1310303679-17936-1-git-send-email-ido@wizery.com>
+References: <1310303679-17936-1-git-send-email-ido@wizery.com>
+Message-ID: <1310303679-17936-2-git-send-email-ido@wizery.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 10 July 2011 15:43:41 Marek Vasut wrote:
-> On Sunday, July 10, 2011 02:09:22 PM Vasily Khoruzhick wrote:
-> > pxa2xx_spi_probe allocates struct driver_data and null_dma_buf
-> > at same time via spi_alloc_master(), but then calculates
-> > null_dma_buf pointer incorrectly, and it causes memory corruption
-> > later if DMA usage is enabled.
-> > 
-> > Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
-> > ---
-> > v2: - add u8 __null_dma_buf[16] to the end of driver_data structure
-> > 
-> >     and use it as null_dma_buf after alignment.
-> >     - use PTR_ALIGN instead of ALIGN
-> >  
-> >  drivers/spi/pxa2xx_spi.c |    9 +++++----
-> >  1 files changed, 5 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/drivers/spi/pxa2xx_spi.c b/drivers/spi/pxa2xx_spi.c
-> > index dc25bee..25358cd 100644
-> > --- a/drivers/spi/pxa2xx_spi.c
-> > +++ b/drivers/spi/pxa2xx_spi.c
-> > @@ -106,6 +106,7 @@ struct driver_data {
-> > 
-> >  	int rx_channel;
-> >  	int tx_channel;
-> >  	u32 *null_dma_buf;
-> > 
-> > +	u8 __null_dma_buf[16];
-> 
-> Ah, please don't name it starting with two underscores.
+Commit 7416401 ("arm: davinci: Fix fallout from generic irq chip
+conversion") introduced a bug, causing low level interrupt handlers to
+get a bogus irq number as an argument. The gpio irq handler falsely
+assumes that the handler data is the irq base number and that is no
+longer true.
 
-Ok, what name do you suggest?
+Fix this by converting gpio_irq_handler's bank_irq argument to the
+corresponding irq base number.
 
-> >  	/* SSP register addresses */
-> >  	void __iomem *ioaddr;
-> > 
-> > @@ -1543,8 +1544,8 @@ static int __devinit pxa2xx_spi_probe(struct
-> > platform_device *pdev) return -ENODEV;
-> > 
-> >  	}
-> > 
-> > -	/* Allocate master with space for drv_data and null dma buffer */
-> > -	master = spi_alloc_master(dev, sizeof(struct driver_data) + 16);
-> > +	/* Allocate master with space for drv_data */
-> > +	master = spi_alloc_master(dev, sizeof(struct driver_data));
-> > 
-> >  	if (!master) {
-> >  	
-> >  		dev_err(&pdev->dev, "cannot alloc spi_master\n");
-> >  		pxa_ssp_free(ssp);
-> > 
-> > @@ -1569,8 +1570,8 @@ static int __devinit pxa2xx_spi_probe(struct
-> > platform_device *pdev) master->transfer = transfer;
-> > 
-> >  	drv_data->ssp_type = ssp->type;
-> > 
-> > -	drv_data->null_dma_buf = (u32 *)ALIGN((u32)(drv_data +
-> > -						sizeof(struct driver_data)), 8);
-> > +	drv_data->null_dma_buf =
-> > +		(u32 *)PTR_ALIGN((u8 *)drv_data->__null_dma_buf, 8);
-> 
-> Do you need that (u8 *) cast there ?
+Signed-off-by: Ido Yariv <ido@wizery.com>
+CC: Thomas Gleixner <tglx@linutronix.de>
+---
+ arch/arm/mach-davinci/gpio.c |   32 ++++++++++++++++++++++++++++----
+ 1 files changed, 28 insertions(+), 4 deletions(-)
 
-Yes, cast is necessary here, otherwise:
-
-drivers/spi/pxa2xx_spi.c:1574:10: error: cast specifies array type
-
-> #define PTR_ALIGN(p, a)         ((typeof(p))ALIGN((unsigned long)(p), (a)))
-> 
-> from linux/kernel.h line 42
-> 
-> >  	drv_data->ioaddr = ssp->mmio_base;
-> >  	drv_data->ssdr_physical = ssp->phys_base + SSDR;
+diff --git a/arch/arm/mach-davinci/gpio.c b/arch/arm/mach-davinci/gpio.c
+index e722139..ff43e2a 100644
+--- a/arch/arm/mach-davinci/gpio.c
++++ b/arch/arm/mach-davinci/gpio.c
+@@ -249,16 +249,40 @@ static struct irq_chip gpio_irqchip = {
+ 	.flags		= IRQCHIP_SET_TYPE_MASKED,
+ };
+ 
++static inline int bankirq_to_irqbase(unsigned int bank_irq)
++{
++	int gpio;
++	int index;
++
++	/* Each irq bank consists of up to 16 irqs */
++	gpio = 16 * (bank_irq - davinci_soc_info.gpio_irq);
++
++	/* Each controller controls 32 GPIOs */
++	index = gpio / 32;
++
++	if (unlikely(!davinci_soc_info.gpio_ctlrs))
++		return -EINVAL;
++
++	if (unlikely(index >= davinci_soc_info.gpio_ctlrs_num))
++		return -EINVAL;
++
++	return davinci_soc_info.gpio_ctlrs[index].irq_base;
++}
++
+ static void
+-gpio_irq_handler(unsigned irq, struct irq_desc *desc)
++gpio_irq_handler(unsigned bank_irq, struct irq_desc *desc)
+ {
+ 	struct davinci_gpio_regs __iomem *g;
+ 	u32 mask = 0xffff;
++	int irqbase = bankirq_to_irqbase(bank_irq);
++
++	if (unlikely(irqbase < 0))
++		return;
+ 
+ 	g = (__force struct davinci_gpio_regs __iomem *) irq_desc_get_handler_data(desc);
+ 
+ 	/* we only care about one bank */
+-	if (irq & 1)
++	if (bank_irq & 1)
+ 		mask <<= 16;
+ 
+ 	/* temporarily mask (level sensitive) parent IRQ */
+@@ -274,11 +298,11 @@ gpio_irq_handler(unsigned irq, struct irq_desc *desc)
+ 		if (!status)
+ 			break;
+ 		__raw_writel(status, &g->intstat);
+-		if (irq & 1)
++		if (bank_irq & 1)
+ 			status >>= 16;
+ 
+ 		/* now demux them to the right lowlevel handler */
+-		n = (int)irq_get_handler_data(irq);
++		n = irqbase;
+ 		while (status) {
+ 			res = ffs(status);
+ 			n += res;
+-- 
+1.7.4.1
