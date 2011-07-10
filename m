@@ -1,172 +1,24 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Sun, 10 Jul 2011 16:17:13 +0800
-Subject: [PATCH 02/10] ASoc: mxs: add mxs-saif driver
-In-Reply-To: <20110709025252.GC26900@sirena.org.uk>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Sun, 10 Jul 2011 17:21:48 +0900
+Subject: [PATCH 01/10] ASoc: mxs: add mxs-pcm driver
+In-Reply-To: <CAA+hA=ROnBkLFbZgvbP_XtmbqALKGBqLbZXquxe-HYOg-xhJqg@mail.gmail.com>
 References: <1310140790-2132-1-git-send-email-b29396@freescale.com>
-	<1310140790-2132-3-git-send-email-b29396@freescale.com>
-	<20110709025252.GC26900@sirena.org.uk>
-Message-ID: <CAA+hA=S0HTqNt+OxprdaqZMF8_9NF8G54UKJprcWc2DCbGf0xA@mail.gmail.com>
+	<1310140790-2132-2-git-send-email-b29396@freescale.com>
+	<20110709023358.GB26900@sirena.org.uk>
+	<CAA+hA=ROnBkLFbZgvbP_XtmbqALKGBqLbZXquxe-HYOg-xhJqg@mail.gmail.com>
+Message-ID: <20110710082146.GA23199@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/7/9 Mark Brown <broonie@opensource.wolfsonmicro.com>:
-> On Fri, Jul 08, 2011 at 11:59:42PM +0800, Dong Aisheng wrote:
->> Signed-off-by: Dong Aisheng <b29396@freescale.com>
->
-> Again, *always* CC maintainers on patches.
-Will add in the updated patch.
+On Sun, Jul 10, 2011 at 02:28:26PM +0800, Dong Aisheng wrote:
+> 2011/7/9 Mark Brown <broonie@opensource.wolfsonmicro.com>:
+> > On Fri, Jul 08, 2011 at 11:59:41PM +0800, Dong Aisheng wrote:
 
->> +static int mxs_saif_set_dai_sysclk(struct snd_soc_dai *cpu_dai,
->> + ? ? ? ? ? ? ? ? ? ? int clk_id, unsigned int freq, int dir)
->> +{
->> + ? ? struct mxs_saif *saif = snd_soc_dai_get_drvdata(cpu_dai);
->> +
->> + ? ? switch (clk_id) {
->> + ? ? case MXS_SAIF_SYS_CLK:
->> + ? ? ? ? ? ? clk_set_rate(saif->clk, freq);
->> + ? ? ? ? ? ? clk_enable(saif->clk);
->
-> How would one turn this clock off?
-Currenty simply enable clock always.
-The problem is that the codec may use the MCLK supplied by SAIF as its
-system clock for normal operations such as i2c r/w.
-If we disable it after playback or capture. The automatic dapm
-operations of codec may fail on i2c r/w. Will check if dapm has any
-machnism to avoid this.
-Can you share your experience ont this issue?
+> >> + * Refer to sound/soc/imx/imx-pcm-dma-mx2.c
 
->> + * SAIF Clock dividers
->> + * Should only be called when port is inactive.
->> + */
->> +static int mxs_saif_set_dai_clkdiv(struct snd_soc_dai *cpu_dai,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? int div_id, int div)
->> +{
->> + ? ? u32 scr;
->> + ? ? struct mxs_saif *saif = snd_soc_dai_get_drvdata(cpu_dai);
->> +
->> + ? ? scr = __raw_readl(saif->base + SAIF_CTRL);
->> + ? ? scr &= ~BM_SAIF_CTRL_BITCLK_MULT_RATE;
->> + ? ? scr &= ~BM_SAIF_CTRL_BITCLK_BASE_RATE;
->> +
->> + ? ? switch (div_id) {
->> + ? ? case MXS_SAIF_MCLK:
->> + ? ? ? ? ? ? switch (div) {
->> + ? ? ? ? ? ? case 32:
->
-> No, this stuff should all be figured out automatically by the driver -
-> the user shouldn't have to manually set the ratio, especially if they've
-> already set the master clock.
-Yes, that's a good point and i will try to do it in the updated patch.
+> > Why?
 
->> + ? ? switch (fmt & SND_SOC_DAIFMT_FORMAT_MASK) {
->> + ? ? case SND_SOC_DAIFMT_I2S:
->> + ? ? ? ? ? ? /* data frame low 1clk before data */
->> + ? ? ? ? ? ? scr |= BM_SAIF_CTRL_DELAY;
->> + ? ? ? ? ? ? scr &= ~BM_SAIF_CTRL_LRCLK_POLARITY;
->> + ? ? ? ? ? ? break;
->> + ? ? case SND_SOC_DAIFMT_LEFT_J:
->> + ? ? ? ? ? ? /* data frame high with data */
->> + ? ? ? ? ? ? scr &= ~BM_SAIF_CTRL_DELAY;
->> + ? ? ? ? ? ? scr &= ~BM_SAIF_CTRL_LRCLK_POLARITY;
->> + ? ? ? ? ? ? scr &= ~BM_SAIF_CTRL_JUSTIFY;
->> + ? ? ? ? ? ? break;
->> + ? ? }
->
-> This should return an error if the parameters are invalid. ?The rest of
-> the code has many other instances of this missing check.
-Will add them.
+> Just with the reference of  imx-pcm-dma-mx2.c code.
 
->> + ? ? /*
->> + ? ? ?* Note: We simply just support master mode since SAIF TX only supports
->> + ? ? ?* master mode.
->> + ? ? ?*/
->> + ? ? switch (fmt & SND_SOC_DAIFMT_MASTER_MASK) {
->> + ? ? case SND_SOC_DAIFMT_CBS_CFS:
->> + ? ? ? ? ? ? scr &= ~BM_SAIF_CTRL_SLAVE_MODE;
->> + ? ? ? ? ? ? __raw_writel(scr | scr0, saif->base + SAIF_CTRL);
->> + ? ? ? ? ? ? break;
->> + ? ? case SND_SOC_DAIFMT_CBM_CFS:
->> + ? ? ? ? ? ? break;
->> + ? ? case SND_SOC_DAIFMT_CBS_CFM:
->> + ? ? ? ? ? ? break;
->
-> This is clearly wrong, you're doing exactly the same thing for two
-> different inputs.
-Will fix in next patch.
-
->> +static int mxs_saif_startup(struct snd_pcm_substream *substream,
->> + ? ? ? ? ? ? ? ? ? ? ? ?struct snd_soc_dai *cpu_dai)
->> +{
->> + ? ? struct mxs_saif *saif = snd_soc_dai_get_drvdata(cpu_dai);
->> + ? ? snd_soc_dai_set_dma_data(cpu_dai, substream, &saif->dma_param);
->> +
->> + ? ? return 0;
->> +}
->
-> Remove empty functions.
-This is to set dma param.
-
->> +/*
->> + * Should only be called when port is inactive.
->> + * although can be called multiple times by upper layers.
->> + */
->> +static int mxs_saif_hw_params(struct snd_pcm_substream *substream,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ?struct snd_pcm_hw_params *params,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ?struct snd_soc_dai *cpu_dai)
->
-> The requirement for the port to be inactive is totally unreasonable,
-> especially given that the params are configured by applications and you
-> support simultaneous playback and record.
-Yes, i will remove it. Finally we will support simultaneous playback and record.
-
->> +static irqreturn_t mxs_saif_irq(int irq, void *dev_id)
->> +{
->> + ? ? struct mxs_saif *saif = dev_id;
->> +
->> + ? ? if (saif->fifo_err_counter++ % 100 == 0)
->
-> The rate limit looks awfully suspicious...
-Originally it's just for printing less error messages when the issue happens.
-I could remove the rate limit.
-
->> + ? ? ? ? ? ? printk(KERN_ERR "saif_irq SAIF_STAT %x SAIF_CTRL %x \
->> + ? ? ? ? ? ? ? ? ? ? fifo_errs=%d \n",
->> + ? ? ? ? ? ? ? ? ? ?__raw_readl(saif->base + SAIF_STAT),
->> + ? ? ? ? ? ? ? ? ? ?__raw_readl(saif->base + SAIF_CTRL),
->> + ? ? ? ? ? ? ? ? ? ?saif->fifo_err_counter);
->
-> dev_err()
-Will change.
-
->> + ? ? __raw_writel(BM_SAIF_STAT_FIFO_UNDERFLOW_IRQ |
->> + ? ? ? ? ? ? ? ? ? ? BM_SAIF_STAT_FIFO_OVERFLOW_IRQ,
->> + ? ? ? ? ? ? ? ? ? ? saif->base + SAIF_STAT + MXS_CLR_ADDR);
->> +
->> + ? ? return IRQ_HANDLED;
->
-> You're not actually checking that the relevant interrupt fired...
-I will add the checking for different errors.
-
->> + ? ? saif->clk = clk_get(&pdev->dev, NULL);
->> + ? ? if (IS_ERR(saif->clk)) {
->> + ? ? ? ? ? ? ret = PTR_ERR(saif->clk);
->> + ? ? ? ? ? ? dev_err(&pdev->dev, "Cannot get the clock: %d\n",
->> + ? ? ? ? ? ? ? ? ? ? ret);
->> + ? ? ? ? ? ? goto failed_clk;
->> + ? ? }
->> + ? ? clk_set_rate(saif->clk, 12000000);
->> + ? ? clk_enable(saif->clk);
->
-> How did you pick this clock rate and why does it need to be set? ?It's
-> not an obvious audio rate...
-It's initial clock rate for normal operations of codecs based on MCLK.
-We found the default MCLK ouput(only about 7.3Khz) can not work for codecs like
-sgtl5000 for its initialization since its clock range is 8Mhz~27Mhz.
-So we set a common working clock 12Mhz here.
-Maybe i should try to set it elsewhere or just set it via platform data.
-
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+What is the relevance of that specific code compared to other DMA
+drivers, though?
