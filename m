@@ -1,44 +1,56 @@
 From: ccross@android.com (Colin Cross)
-Date: Sun, 10 Jul 2011 15:11:56 -0700
-Subject: [GIT PULL v3 0/3] TrimSlice updates for 3.1
-In-Reply-To: <cover.1309955711.git.mike@compulab.co.il>
-References: <cover.1309955711.git.mike@compulab.co.il>
-Message-ID: <CAMbhsRQQf3VpxQ+oD_HJJ+2s+ciBQ+AgjHNYw1voPUMAYNaTJQ@mail.gmail.com>
+Date: Sun, 10 Jul 2011 15:14:33 -0700
+Subject: [PATCH 0/6 V2] ARM: tegra: paz00 patches for 2.6.40
+In-Reply-To: <1305806910-3903-1-git-send-email-marvin24@gmx.de>
+References: <1305806910-3903-1-git-send-email-marvin24@gmx.de>
+Message-ID: <CAMbhsRSH2iyv0_1seVtwSQ7AbHmPbz+VqSVkhfLgsNA8+dOwJA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 6, 2011 at 11:04 PM, Mike Rapoport <mike@compulab.co.il> wrote:
-> Hi Colin,
-> Please consider pulling TrimSlice updates for 3.1 merge window.
-> These patches add registration of i2c, audio and USB devices.
+On Thu, May 19, 2011 at 5:08 AM, Marc Dietrich <marvin24@gmx.de> wrote:
+> Hi Collin, Olof,
 >
-> v3 changes:
-> - rebased on top of current Linus tree
+> the following patches are intended for 2.6.40 merge. They are mostly similar
+> to the TrimSlice patches sent by Mike a few days ago.
 >
-> v2 changes:
-> - update CDEV1 pinmux as per Stephen suggestion
-> - use GPIO table for USB-related GPIOs
+> We are still stuggling with the sound codec (alc5632) and the nvec, so there
+> is nothing to connect to the i2c yet. On the other hand, I'm wondering what's
+> up with the atd7461 included in most (all?) boards. It's compatible with lm90,
+> but the driver will never register because of the wrong name.
 >
-> The following changes since commit a2fa83faf47b514ab947cea916d3691b66525073:
+> May I ask if there is some timeline for framebuffer integration? A netbook
+> without display is of not much use (ok, same holds for keyboard/mouse).
 >
-> ?Merge branch 'usb-linus' of git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/usb-2.6 (2011-07-05 20:57:45 -0700)
+> Thanks!
 >
-> are available in the git repository at:
+> Marc
 >
-> ?git://git.kernel.org/pub/scm/linux/kernel/git/rppt/linux-tegra.git trimslice/upstream
+> Changes in V2:
+> ? ?- add some more blurb to the commit messages
+> ? ?- change the machine to some neater name (patch 5)
+> ? ?- enable the wifi board during boot (patch 6)
 >
-> Mike Rapoport (3):
-> ? ? ?ARM: tegra: trimslice: register i2c busses and devices
-> ? ? ?ARM: tegra: trimslice: add audio devices and clocks
-> ? ? ?ARM: tegra: trimslice: enable USB ports
 >
-> ?arch/arm/mach-tegra/board-trimslice-pinmux.c | ? ?7 ++-
-> ?arch/arm/mach-tegra/board-trimslice.c ? ? ? ?| ? 92 ++++++++++++++++++++++++++
-> ?arch/arm/mach-tegra/board-trimslice.h ? ? ? ?| ? ?3 +
-> ?3 files changed, 100 insertions(+), 2 deletions(-)
+> Marc Dietrich (6):
+> ?ARM: tegra: paz00: whitespace cleanup
+> ?ARM: tegra: paz00: register i2c busses
+> ?ARM: tegra: paz00: enable usb ports
+> ?ARM: tegra: paz00: cleanup sdhci ports
+> ?ARM: tegra: paz00: change the machine name
+> ?ARM: tegra: paz00: enable wifi card
+>
+> ?arch/arm/mach-tegra/board-paz00-pinmux.c | ? 12 ++--
+> ?arch/arm/mach-tegra/board-paz00.c ? ? ? ?| ? 96 ++++++++++++++++++++++++++----
+> ?arch/arm/mach-tegra/board-paz00.h ? ? ? ?| ? 17 ++++--
+> ?3 files changed, 102 insertions(+), 23 deletions(-)
+>
+> --
+> 1.7.4.2
+>
 >
 
-I pushed this series to for-next.
+I pushed this series to for-next, except for patch 6 "ARM: tegra:
+paz00: enable wifi card".
 
 I have some cleanup patches that go on top to reduce some of the
 duplicate platform data added by trimslice and paz00, I'd appreciate a
