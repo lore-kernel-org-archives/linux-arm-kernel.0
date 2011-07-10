@@ -1,71 +1,87 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Sun, 10 Jul 2011 17:34:02 +0900
-Subject: [PATCH 02/10] ASoc: mxs: add mxs-saif driver
-In-Reply-To: <CAA+hA=S0HTqNt+OxprdaqZMF8_9NF8G54UKJprcWc2DCbGf0xA@mail.gmail.com>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Sun, 10 Jul 2011 16:36:44 +0800
+Subject: [PATCH 03/10] ASoc: mxs: add mxs-sgtl5000 machine driver
+In-Reply-To: <20110709030008.GD26900@sirena.org.uk>
 References: <1310140790-2132-1-git-send-email-b29396@freescale.com>
-	<1310140790-2132-3-git-send-email-b29396@freescale.com>
-	<20110709025252.GC26900@sirena.org.uk>
-	<CAA+hA=S0HTqNt+OxprdaqZMF8_9NF8G54UKJprcWc2DCbGf0xA@mail.gmail.com>
-Message-ID: <20110710083359.GB23199@opensource.wolfsonmicro.com>
+	<1310140790-2132-4-git-send-email-b29396@freescale.com>
+	<20110709030008.GD26900@sirena.org.uk>
+Message-ID: <CAA+hA=TirfTs9WB19snuH2HhmJvaxApEg2H1oT2BwQwPkTOuUA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 10, 2011 at 04:17:13PM +0800, Dong Aisheng wrote:
-> 2011/7/9 Mark Brown <broonie@opensource.wolfsonmicro.com>:
-> > On Fri, Jul 08, 2011 at 11:59:42PM +0800, Dong Aisheng wrote:
+2011/7/9 Mark Brown <broonie@opensource.wolfsonmicro.com>:
+> On Fri, Jul 08, 2011 at 11:59:43PM +0800, Dong Aisheng wrote:
+>> The driver only supports playback firstly.
+>
+> Once more, *always* CC maintainers.
+Got it.
 
-> >> + ? ? switch (clk_id) {
-> >> + ? ? case MXS_SAIF_SYS_CLK:
-> >> + ? ? ? ? ? ? clk_set_rate(saif->clk, freq);
-> >> + ? ? ? ? ? ? clk_enable(saif->clk);
+>> +struct mxs_audio_platform_data {
+>> + ? ? int sysclk;
+>> +
+>> + ? ? int (*init) (void); ? ? /* board specific init */
+>> + ? ? int (*finit) (void); ? ?/* board specific finit */
+>
+> Eh? ?Your machine driver is already entirely board specific...
+Still not.
+It's originally used for some board's codec that do not need SAIF to
+provide mclk.
+I will remove it if we still do not need it to make the things simply.
 
-> > How would one turn this clock off?
+>> + ? ? /* The SAIF clock should be either 512*fs or 384*fs */
+>> + ? ? card_priv.sysclk = 512 * rate;
+>> + ? ? ret = snd_soc_dai_set_sysclk(cpu_dai, MXS_SAIF_SYS_CLK,
+>> + ? ? ? ? ? ? ? ? ? ? card_priv.sysclk,
+>> + ? ? ? ? ? ? ? ? ? ? SND_SOC_CLOCK_OUT);
+>
+> Why are you storing the sysclk? ?You never reference it again and
+> you're using different sysclks for everything in the system.
+Yes, it may not really need to store it in this version of code.
+I will change this part of clock setting in the next patch.
 
-> Currenty simply enable clock always.
+>> + ? ? /* set SGTL5000_SYSCLK as 256*fs to support 96k sample rate */
+>> + ? ? snd_soc_dai_set_sysclk(codec_dai, SGTL5000_SYSCLK, 256 * rate, 0);
+>> +
+>> + ? ? /* The MCLK output rate is 256*fs */
+>> + ? ? snd_soc_dai_set_clkdiv(cpu_dai, MXS_SAIF_MCLK, 256);
+>
+> Why are you not checking errors on these?
+Will add it.
 
-If that's what you're doing you should enable the clock when the device
-is probed and disable it when the device is removed.  These repeated
-enables will mean that you're constantly leaking references.
+>> +static int mxs_sgtl5000_soc_init(struct snd_soc_pcm_runtime *rtd)
+>> +{
+>> + ? ? /* TBD: add dapm widgets */
+>> +
+>> + ? ? return 0;
+>> +}
+>
+> Remove empty functions.
+Will do that.
 
-> The problem is that the codec may use the MCLK supplied by SAIF as its
-> system clock for normal operations such as i2c r/w.
+>> +static int __devinit mxs_sgtl5000_probe(struct platform_device *pdev)
+>> +{
+>> + ? ? struct mxs_audio_platform_data *plat = pdev->dev.platform_data;
+>> + ? ? int ret;
+>> +
+>> + ? ? card_priv.pdev = pdev;
+>> +
+>> + ? ? ret = -EINVAL;
+>> + ? ? if (plat && plat->init && plat->init())
+>> + ? ? ? ? ? ? return ret;
+>
+> You're not calling snd_soc_register_card()...
+>
+>> + ? ? mxs_sgtl5000_snd_device = platform_device_alloc("soc-audio", -1);
+>> + ? ? if (!mxs_sgtl5000_snd_device)
+>> + ? ? ? ? ? ? return -ENOMEM;
+>
+> ...and you're using both a platform device and soc-audio to instantate
+> which is a bit confused. ?New code should not be using soc-audio.
+Thanks for reminder.
+I will change this part of code to following the new rule.
 
-That may be true for your particular system but it is not going to be
-true in general - most devices can handle having their MCLK removed.
-
-> If we disable it after playback or capture. The automatic dapm
-> operations of codec may fail on i2c r/w. Will check if dapm has any
-> machnism to avoid this.
-> Can you share your experience ont this issue?
-
-You should ideally let the machine driver or other system integration
-code control if the clock is constantly enabled, or at the very least
-control it from the probe and remove.
-
-> >> +static irqreturn_t mxs_saif_irq(int irq, void *dev_id)
-> >> +{
-> >> + ? ? struct mxs_saif *saif = dev_id;
-> >> +
-> >> + ? ? if (saif->fifo_err_counter++ % 100 == 0)
-> >
-> > The rate limit looks awfully suspicious...
-> Originally it's just for printing less error messages when the issue happens.
-> I could remove the rate limit.
-
-Please do so.
-
-> >> + ? ? clk_set_rate(saif->clk, 12000000);
-> >> + ? ? clk_enable(saif->clk);
-
-> > How did you pick this clock rate and why does it need to be set? ?It's
-> > not an obvious audio rate...
-
-> It's initial clock rate for normal operations of codecs based on MCLK.
-> We found the default MCLK ouput(only about 7.3Khz) can not work for codecs like
-> sgtl5000 for its initialization since its clock range is 8Mhz~27Mhz.
-> So we set a common working clock 12Mhz here.
-> Maybe i should try to set it elsewhere or just set it via platform data.
-
-This is the same issue as the above one with repeated enables?  You
-should delegate the rate selection and ideally also the enable control
-to the machine driver, it can set something in its probe() function.
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
