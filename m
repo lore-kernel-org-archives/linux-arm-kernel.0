@@ -1,57 +1,69 @@
 From: ido@wizery.com (Ido Yariv)
-Date: Sun, 10 Jul 2011 16:14:33 +0300
-Subject: [PATCH v2 0/6] arm: davinci: DA850: wl12xx expansion card
-Message-ID: <1310303679-17936-1-git-send-email-ido@wizery.com>
+Date: Sun, 10 Jul 2011 16:14:36 +0300
+Subject: [PATCH v2 3/6] arm: davinci: mmc: Add support for set_power callback
+In-Reply-To: <1310303679-17936-1-git-send-email-ido@wizery.com>
+References: <1310303679-17936-1-git-send-email-ido@wizery.com>
+Message-ID: <1310303679-17936-4-git-send-email-ido@wizery.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following series adds support for an optional wl12xx based expansion
-card for the AM18x EVM:
-http://processors.wiki.ti.com/index.php/AM18x_%2B_WL1271
+Some devices connected to the MMC bus are power controlled by external
+means. For instance, an SDIO device may be powered down/up by an
+external gpio line.
 
-The first couple of patches address issues which had to be fixed for this
-series to work. However, these should be fixed regardless of the wl12xx
-daughter board support.
+In order to avoid toggling power from within the MMC host driver, add a
+set_power callback function, which will be called by set_ios upon
+powering down/up.
 
-Only the Wi-Fi functionality of the expansion card is supported. Bluetooth
-functionality is not yet supported.
+Signed-off-by: Ido Yariv <ido@wizery.com>
+---
+ arch/arm/mach-davinci/include/mach/mmc.h |    3 +++
+ drivers/mmc/host/davinci_mmc.c           |   13 +++++++++++++
+ 2 files changed, 16 insertions(+), 0 deletions(-)
 
-The patches are based on v3.0-rc6.
-
-Changes from v1:
-* Explicitly set the default queue for all channel controllers on all
-  platforms. As it makes little sense to set DA850's default queue to an
-  invalid value and then fix it, merge the two patches
-* Move pinmux configurations to separate patches
-* Remove FREF Kconfig entry, use a default value of 38MHz instead
-* Use msleep for long delays, usleep_range for shorter ones
-* Minor cleanups
-
-Ido.
-
-
-Ido Yariv (6):
-  arm: davinci: Fix low level gpio irq handlers' argument
-  arm: davinci: Explicitly set channel controllers' default queues
-  arm: davinci: mmc: Add support for set_power callback
-  arm: davinci: DA850: Add MMC/SD1 pinmux configuration
-  arm: davinci: DA850: Add GPIO pinmux configuration for wl1271
-  arm: davinci: DA850: Add wl1271/wlan support
-
- arch/arm/mach-davinci/Kconfig             |   10 +++
- arch/arm/mach-davinci/board-da850-evm.c   |  127 +++++++++++++++++++++++++++++
- arch/arm/mach-davinci/da850.c             |    9 ++
- arch/arm/mach-davinci/devices-da8xx.c     |    3 +
- arch/arm/mach-davinci/devices-tnetv107x.c |    1 +
- arch/arm/mach-davinci/dm355.c             |    1 +
- arch/arm/mach-davinci/dm644x.c            |    1 +
- arch/arm/mach-davinci/dm646x.c            |    1 +
- arch/arm/mach-davinci/dma.c               |    2 -
- arch/arm/mach-davinci/gpio.c              |   32 +++++++-
- arch/arm/mach-davinci/include/mach/mmc.h  |    3 +
- arch/arm/mach-davinci/include/mach/mux.h  |   10 +++
- drivers/mmc/host/davinci_mmc.c            |   13 +++
- 13 files changed, 207 insertions(+), 6 deletions(-)
-
+diff --git a/arch/arm/mach-davinci/include/mach/mmc.h b/arch/arm/mach-davinci/include/mach/mmc.h
+index d4f1e96..5ba6b22 100644
+--- a/arch/arm/mach-davinci/include/mach/mmc.h
++++ b/arch/arm/mach-davinci/include/mach/mmc.h
+@@ -12,6 +12,9 @@ struct davinci_mmc_config {
+ 	/* get_cd()/get_wp() may sleep */
+ 	int	(*get_cd)(int module);
+ 	int	(*get_ro)(int module);
++
++	void	(*set_power)(int module, bool on);
++
+ 	/* wires == 0 is equivalent to wires == 4 (4-bit parallel) */
+ 	u8	wires;
+ 
+diff --git a/drivers/mmc/host/davinci_mmc.c b/drivers/mmc/host/davinci_mmc.c
+index 0076c74..64a8325 100644
+--- a/drivers/mmc/host/davinci_mmc.c
++++ b/drivers/mmc/host/davinci_mmc.c
+@@ -807,12 +807,25 @@ static void calculate_clk_divider(struct mmc_host *mmc, struct mmc_ios *ios)
+ static void mmc_davinci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ {
+ 	struct mmc_davinci_host *host = mmc_priv(mmc);
++	struct platform_device *pdev = to_platform_device(mmc->parent);
++	struct davinci_mmc_config *config = pdev->dev.platform_data;
+ 
+ 	dev_dbg(mmc_dev(host->mmc),
+ 		"clock %dHz busmode %d powermode %d Vdd %04x\n",
+ 		ios->clock, ios->bus_mode, ios->power_mode,
+ 		ios->vdd);
+ 
++	switch (ios->power_mode) {
++	case MMC_POWER_OFF:
++		if (config && config->set_power)
++			config->set_power(pdev->id, false);
++		break;
++	case MMC_POWER_UP:
++		if (config && config->set_power)
++			config->set_power(pdev->id, true);
++		break;
++	}
++
+ 	switch (ios->bus_width) {
+ 	case MMC_BUS_WIDTH_8:
+ 		dev_dbg(mmc_dev(host->mmc), "Enabling 8 bit mode\n");
 -- 
 1.7.4.1
