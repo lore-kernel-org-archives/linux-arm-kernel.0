@@ -1,69 +1,45 @@
 From: ccross@android.com (Colin Cross)
-Date: Sun, 10 Jul 2011 14:02:52 -0700
-Subject: [PATCH] ARM: tegra: remove mach/barriers.h
-Message-ID: <1310331772-13310-1-git-send-email-ccross@android.com>
+Date: Sun, 10 Jul 2011 15:11:56 -0700
+Subject: [GIT PULL v3 0/3] TrimSlice updates for 3.1
+In-Reply-To: <cover.1309955711.git.mike@compulab.co.il>
+References: <cover.1309955711.git.mike@compulab.co.il>
+Message-ID: <CAMbhsRQQf3VpxQ+oD_HJJ+2s+ciBQ+AgjHNYw1voPUMAYNaTJQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The barriers implemented in arch/arm/mach-tegra/mach/barriers.h
-are exactly the same as the default barriers implemented in
-arch/arm/include/asm/system.h.  Remove barriers.h from Tegra,
-and don't select ARCH_HAS_BARRIERS.
+On Wed, Jul 6, 2011 at 11:04 PM, Mike Rapoport <mike@compulab.co.il> wrote:
+> Hi Colin,
+> Please consider pulling TrimSlice updates for 3.1 merge window.
+> These patches add registration of i2c, audio and USB devices.
+>
+> v3 changes:
+> - rebased on top of current Linus tree
+>
+> v2 changes:
+> - update CDEV1 pinmux as per Stephen suggestion
+> - use GPIO table for USB-related GPIOs
+>
+> The following changes since commit a2fa83faf47b514ab947cea916d3691b66525073:
+>
+> ?Merge branch 'usb-linus' of git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/usb-2.6 (2011-07-05 20:57:45 -0700)
+>
+> are available in the git repository at:
+>
+> ?git://git.kernel.org/pub/scm/linux/kernel/git/rppt/linux-tegra.git trimslice/upstream
+>
+> Mike Rapoport (3):
+> ? ? ?ARM: tegra: trimslice: register i2c busses and devices
+> ? ? ?ARM: tegra: trimslice: add audio devices and clocks
+> ? ? ?ARM: tegra: trimslice: enable USB ports
+>
+> ?arch/arm/mach-tegra/board-trimslice-pinmux.c | ? ?7 ++-
+> ?arch/arm/mach-tegra/board-trimslice.c ? ? ? ?| ? 92 ++++++++++++++++++++++++++
+> ?arch/arm/mach-tegra/board-trimslice.h ? ? ? ?| ? ?3 +
+> ?3 files changed, 100 insertions(+), 2 deletions(-)
+>
 
-Signed-off-by: Colin Cross <ccross@android.com>
----
- arch/arm/Kconfig                            |    1 -
- arch/arm/mach-tegra/include/mach/barriers.h |   30 ---------------------------
- 2 files changed, 0 insertions(+), 31 deletions(-)
- delete mode 100644 arch/arm/mach-tegra/include/mach/barriers.h
+I pushed this series to for-next.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 9adc278..7e179f0 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -591,7 +591,6 @@ config ARCH_TEGRA
- 	select GENERIC_GPIO
- 	select HAVE_CLK
- 	select HAVE_SCHED_CLOCK
--	select ARCH_HAS_BARRIERS if CACHE_L2X0
- 	select ARCH_HAS_CPUFREQ
- 	help
- 	  This enables support for NVIDIA Tegra based systems (Tegra APX,
-diff --git a/arch/arm/mach-tegra/include/mach/barriers.h b/arch/arm/mach-tegra/include/mach/barriers.h
-deleted file mode 100644
-index 425b42e..0000000
---- a/arch/arm/mach-tegra/include/mach/barriers.h
-+++ /dev/null
-@@ -1,30 +0,0 @@
--/*
-- * arch/arm/mach-realview/include/mach/barriers.h
-- *
-- * Copyright (C) 2010 ARM Ltd.
-- * Written by Catalin Marinas <catalin.marinas@arm.com>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
-- */
--
--#ifndef __MACH_BARRIERS_H
--#define __MACH_BARRIERS_H
--
--#include <asm/outercache.h>
--
--#define rmb()		dsb()
--#define wmb()		do { dsb(); outer_sync(); } while (0)
--#define mb()		wmb()
--
--#endif	/* __MACH_BARRIERS_H */
--- 
-1.7.4.1
+I have some cleanup patches that go on top to reduce some of the
+duplicate platform data added by trimslice and paz00, I'd appreciate a
+tested-by once I post those.
