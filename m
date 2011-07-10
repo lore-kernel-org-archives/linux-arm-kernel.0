@@ -1,20 +1,36 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Sun, 10 Jul 2011 18:09:30 +0900
-Subject: [PATCH 0/4] Add a generic struct clk
-In-Reply-To: <1305876469.325655.313573683829.0.gpush@pororo>
-References: <1305876469.325655.313573683829.0.gpush@pororo>
-	<1305876469.325655.313573683829.0.gpush@pororo>
-Message-ID: <20110710090927.GA23445@opensource.wolfsonmicro.com>
+Date: Sun, 10 Jul 2011 18:17:31 +0900
+Subject: [PATCH] mfd: convert devicetree to platform data on max8925
+In-Reply-To: <20110710072027.GE10912@ponder.secretlab.ca>
+References: <1310120428-22700-2-git-send-email-haojian.zhuang@marvell.com>
+	<1310120428-22700-3-git-send-email-haojian.zhuang@marvell.com>
+	<1310120428-22700-4-git-send-email-haojian.zhuang@marvell.com>
+	<1310120428-22700-5-git-send-email-haojian.zhuang@marvell.com>
+	<1310120428-22700-6-git-send-email-haojian.zhuang@marvell.com>
+	<1310120428-22700-7-git-send-email-haojian.zhuang@marvell.com>
+	<1310120428-22700-8-git-send-email-haojian.zhuang@marvell.com>
+	<1310120428-22700-9-git-send-email-haojian.zhuang@marvell.com>
+	<1310120428-22700-10-git-send-email-haojian.zhuang@marvell.com>
+	<20110710072027.GE10912@ponder.secretlab.ca>
+Message-ID: <20110710091729.GA23521@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 20, 2011 at 03:27:49PM +0800, Jeremy Kerr wrote:
-> [This series was originally titled 'Add a common struct clk', but
-> the goals have changed since that first set of patches. We're now aiming
-> for a more complete generic clock infrastructure, rather than just
-> abstracting struct clk]
-> 
-> [This series still needs work, see the TODO section below]
+On Sun, Jul 10, 2011 at 04:20:27PM +0900, Grant Likely wrote:
+> On Fri, Jul 08, 2011 at 06:20:26PM +0800, Haojian Zhuang wrote:
 
-Is there a git tree with the current state of this code in it somewhere?
-It's not mentioned here and my google skills are failing me.
+> > +	if (pdata == NULL)
+> > +		return NULL;
+> > +	pdata->regulator[0] = kzalloc(sizeof(struct regulator_init_data)
+> > +			* MAX8925_MAX_REGULATOR, GFP_KERNEL);
+
+> ditto.
+
+> Is it appropriate to allocated the entire table of regulators?  From
+> the parse_regulator function above, it looks like only one of the
+> regulators will actually get registered (I've not dug deeply into what
+> the driver needs here though).
+
+If the code/binding doesn't allow the use of all the regulators on the
+device the code is probably wrong, it'd be very unusual to have hardware
+like that.
