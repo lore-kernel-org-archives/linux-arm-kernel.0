@@ -1,84 +1,66 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Sun, 10 Jul 2011 06:38:39 -0600 (MDT)
-Subject: [GIT PULL] OMAP: SoC data/core: new code for 3.1
-Message-ID: <alpine.DEB.2.00.1107100632040.15984@utopia.booyaka.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Sun, 10 Jul 2011 14:43:41 +0200
+Subject: [PATCH v2] pxa2xx_spi: fix memory corruption
+In-Reply-To: <1310299762-20079-1-git-send-email-anarsoul@gmail.com>
+References: <201107100957.06377.marek.vasut@gmail.com>
+	<1310299762-20079-1-git-send-email-anarsoul@gmail.com>
+Message-ID: <201107101443.42307.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sunday, July 10, 2011 02:09:22 PM Vasily Khoruzhick wrote:
+> pxa2xx_spi_probe allocates struct driver_data and null_dma_buf
+> at same time via spi_alloc_master(), but then calculates
+> null_dma_buf pointer incorrectly, and it causes memory corruption
+> later if DMA usage is enabled.
+> 
+> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+> ---
+> v2: - add u8 __null_dma_buf[16] to the end of driver_data structure
+>     and use it as null_dma_buf after alignment.
+>     - use PTR_ALIGN instead of ALIGN
+>  drivers/spi/pxa2xx_spi.c |    9 +++++----
+>  1 files changed, 5 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/spi/pxa2xx_spi.c b/drivers/spi/pxa2xx_spi.c
+> index dc25bee..25358cd 100644
+> --- a/drivers/spi/pxa2xx_spi.c
+> +++ b/drivers/spi/pxa2xx_spi.c
+> @@ -106,6 +106,7 @@ struct driver_data {
+>  	int rx_channel;
+>  	int tx_channel;
+>  	u32 *null_dma_buf;
+> +	u8 __null_dma_buf[16];
 
-Hi Tony,
+Ah, please don't name it starting with two underscores.
+> 
+>  	/* SSP register addresses */
+>  	void __iomem *ioaddr;
+> @@ -1543,8 +1544,8 @@ static int __devinit pxa2xx_spi_probe(struct
+> platform_device *pdev) return -ENODEV;
+>  	}
+> 
+> -	/* Allocate master with space for drv_data and null dma buffer */
+> -	master = spi_alloc_master(dev, sizeof(struct driver_data) + 16);
+> +	/* Allocate master with space for drv_data */
+> +	master = spi_alloc_master(dev, sizeof(struct driver_data));
+>  	if (!master) {
+>  		dev_err(&pdev->dev, "cannot alloc spi_master\n");
+>  		pxa_ssp_free(ssp);
+> @@ -1569,8 +1570,8 @@ static int __devinit pxa2xx_spi_probe(struct
+> platform_device *pdev) master->transfer = transfer;
+> 
+>  	drv_data->ssp_type = ssp->type;
+> -	drv_data->null_dma_buf = (u32 *)ALIGN((u32)(drv_data +
+> -						sizeof(struct driver_data)), 8);
+> +	drv_data->null_dma_buf =
+> +		(u32 *)PTR_ALIGN((u8 *)drv_data->__null_dma_buf, 8);
 
-The following changes since commit c84584139aaeef7631df152e13cbf319d8e55950:
+Do you need that (u8 *) cast there ?
 
-  Merge branches 'powerdomain_fixes_3.1', 'hardware_workarounds_3.1', 'hwmod_dss_fix_3.1' and 'i2c_fixes_3.1' into prcm-fixes-3.1 (2011-07-10 05:44:23 -0600)
+#define PTR_ALIGN(p, a)         ((typeof(p))ALIGN((unsigned long)(p), (a)))
 
-are available in the git repository at:
-
-  git://git.pwsan.com/linux-2.6 prcm-devel-3.1
-
-Note that to test this branch, you'll probably need Balaji's PM runtime 
-changes for HSMMC merged.  (Chris Ball has queued these for 3.1.)
-
-Benoit Cousson (13):
-      OMAP: omap_device: Create clkdev entry for hwmod main_clk
-      OMAP4: hwmod data: Add clock domain attribute
-      OMAP2+: hwmod: Init clkdm field at boot time
-      OMAP4: hwmod: Replace CLKCTRL absolute address with offset macros
-      OMAP: hwmod: Wait the idle status to be disabled
-      OMAP4: hwmod: Replace RSTCTRL absolute address with offset macros
-      OMAP4: prm: Replace warm reset API with the offset based version
-      OMAP4: prm: Remove deprecated functions
-      OMAP4: hwmod data: Add PRM context register offset
-      OMAP4: hwmod data: Add modulemode entry in omap_hwmod structure
-      OMAP4: cm: Add two new APIs for modulemode control
-      OMAP4: hwmod: Introduce the module control in hwmod control
-      OMAP2+: clockdomain: Add 2 APIs to control clockdomain from hwmod framework
-
-Jon Hunter (1):
-      OMAP: Add debugfs node to show the summary of all clocks
-
-Paul Walmsley (3):
-      OMAP2+: clockdomain: add clkdm_in_hwsup()
-      OMAP2+: clock: allow per-SoC clock init code to prevent clockdomain calls from clock code
-      Merge branches 'omap4_clockdomain_hwmod_3.1', 'clock_debugfs_a_3.1', 'omap4_clock_auxclk_3.1' and 'omap_device_a_3.1' into prcm-devel-3.1
-
-Rajendra Nayak (4):
-      OMAP4: clock data: Add missing divider selection for auxclks
-      OMAP2+: PM: idle clkdms only if already in idle
-      OMAP2+: clockdomain: Add per clkdm lock to prevent concurrent state programming
-      OMAP2+: hwmod: Follow the recommended PRCM module enable sequence
-
-Vaibhav Bedia (1):
-      OMAP: clockdomain: Remove redundant call to pwrdm_wait_transition()
-
- arch/arm/mach-omap2/clock.c                  |   27 ++-
- arch/arm/mach-omap2/clock.h                  |    3 +
- arch/arm/mach-omap2/clock2420_data.c         |   22 +-
- arch/arm/mach-omap2/clock2430_data.c         |   32 +-
- arch/arm/mach-omap2/clock3xxx_data.c         |   44 ++--
- arch/arm/mach-omap2/clock44xx_data.c         |  215 +++++++++++---
- arch/arm/mach-omap2/clockdomain.c            |  210 +++++++++++---
- arch/arm/mach-omap2/clockdomain.h            |   11 +
- arch/arm/mach-omap2/clockdomain2xxx_3xxx.c   |    6 +-
- arch/arm/mach-omap2/clockdomain44xx.c        |   13 +-
- arch/arm/mach-omap2/clockdomains44xx_data.c  |    2 +-
- arch/arm/mach-omap2/cm44xx.h                 |    8 +-
- arch/arm/mach-omap2/cminst44xx.c             |  150 +++++++++-
- arch/arm/mach-omap2/cminst44xx.h             |   10 +-
- arch/arm/mach-omap2/omap_hwmod.c             |  234 +++++++++++++--
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c   |  412 +++++++++++++++++++++-----
- arch/arm/mach-omap2/pm.c                     |    4 +-
- arch/arm/mach-omap2/prcm.c                   |    2 +-
- arch/arm/mach-omap2/prm44xx.c                |  145 +---------
- arch/arm/mach-omap2/prm44xx.h                |   10 -
- arch/arm/mach-omap2/prminst44xx.c            |  112 +++++++-
- arch/arm/mach-omap2/prminst44xx.h            |   12 +-
- arch/arm/plat-omap/clock.c                   |   39 +++
- arch/arm/plat-omap/include/plat/omap_hwmod.h |   14 +-
- arch/arm/plat-omap/omap_device.c             |   85 +++---
- 25 files changed, 1346 insertions(+), 476 deletions(-)
-
-omap2plus_defconfig
-   text	   data	    bss	    dec	    hex	filename
-6349889	 529328	5591048	12470265	 be47f9	vmlinux.orig
-6353065	 532816	5591048	12476929	 be6201	vmlinux.patched
+from linux/kernel.h line 42
+> 
+>  	drv_data->ioaddr = ssp->mmio_base;
+>  	drv_data->ssdr_physical = ssp->phys_base + SSDR;
