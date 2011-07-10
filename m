@@ -1,133 +1,115 @@
-From: per.forlin@linaro.org (Per Forlin)
-Date: Sun, 10 Jul 2011 21:21:59 +0200
-Subject: [PATCH v6] mmc: documentation of mmc non-blocking request usage and
-	design.
-Message-ID: <1310325719-2151-1-git-send-email-per.forlin@linaro.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Sun, 10 Jul 2011 12:50:25 -0700
+Subject: [GIT PULL] omap twl cleanup for v3.1 merge window
+In-Reply-To: <20110710101705.GF5783@atomide.com>
+References: <20110708130102.GB5783@atomide.com>
+	<201107081741.23425.arnd@arndb.de>
+	<20110710065537.GD5783@atomide.com>
+	<20110710101705.GF5783@atomide.com>
+Message-ID: <20110710195025.GI5783@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Documentation about the background and the design of mmc non-blocking.
-Host driver guidelines to minimize request preparation overhead.
+* Tony Lindgren <tony@atomide.com> [110710 03:12]:
+> * Tony Lindgren <tony@atomide.com> [110709 23:50]:
+> > * Arnd Bergmann <arnd@arndb.de> [110708 08:36]:
+> > > On Friday 08 July 2011, Tony Lindgren wrote:
+> > > >
+> > > >I've attached a conflict resolution patch too, it's trivial execpt
+> > > >note that .vdac needs to be removed in board-rx51-peripherals.c.
+> > > >
+> > > >If this conflict causes problems for you, I can also base this series
+> > > >on omap/board.
+> > > 
+> > > The conflict resolution you suggested doesn't build here:
+> > ...
+> > 
+> > > 
+> > > These are removed in the cleanup series, but changed in the fixes branch,
+> > > now the removal is undone
+> > 
+> > Hmm these are added in omap/board. Maybe the issue is caused by not
+> > merging omap/board also?
+> 
+> Looks like what got added in in omap/board should now work with the
+> TWL default values in twl-common.c. So most likely those can just be
+> dropped. Will check that today.
 
-Signed-off-by: Per Forlin <per.forlin@linaro.org>
-Acked-by: Randy Dunlap <rdunlap@xenotime.net>
----
-ChangeLog:
- v2: - Minor updates after proofreading comments from Chris
- v3: - Minor updates after more comments from Chris
- v4: - Minor updates after comments from Randy
- v5: - Fixed one more comment and Acked-by from Randy
- v6: - Write out full function names and use () for all functions,
-       feedback from James.
+Yes most of it can be dropped for 4430sdp, but the merge is a pain.
 
- Documentation/mmc/00-INDEX          |    2 +
- Documentation/mmc/mmc-async-req.txt |   88 +++++++++++++++++++++++++++++++++++
- 2 files changed, 90 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/mmc/mmc-async-req.txt
+I've merged cleanup-part-2 into my devel-board so if you pull that
+into your omap/board, and merge omap/board into your master
+branch things should be sorted out. The updated devel-board is at:
 
-diff --git a/Documentation/mmc/00-INDEX b/Documentation/mmc/00-INDEX
-index 93dd7a7..a9ba672 100644
---- a/Documentation/mmc/00-INDEX
-+++ b/Documentation/mmc/00-INDEX
-@@ -4,3 +4,5 @@ mmc-dev-attrs.txt
-         - info on SD and MMC device attributes
- mmc-dev-parts.txt
-         - info on SD and MMC device partitions
-+mmc-async-req.txt
-+        - info on mmc asynchronous requests
-diff --git a/Documentation/mmc/mmc-async-req.txt b/Documentation/mmc/mmc-async-req.txt
-new file mode 100644
-index 0000000..aac5634
---- /dev/null
-+++ b/Documentation/mmc/mmc-async-req.txt
-@@ -0,0 +1,88 @@
-+Rationale
-+=========
-+
-+How significant is the cache maintenance overhead?
-+It depends. Fast eMMC and multiple cache levels with speculative cache
-+pre-fetch makes the cache overhead relatively significant. If the DMA
-+preparations for the next request are done in parallel with the current
-+transfer, the DMA preparation overhead would not affect the MMC performance.
-+The intention of non-blocking (asynchronous) MMC requests is to minimize the
-+time between when an MMC request ends and another MMC request begins.
-+Using mmc_wait_for_req(), the MMC controller is idle while dma_map_sg and
-+dma_unmap_sg are processing. Using non-blocking MMC requests makes it
-+possible to prepare the caches for next job in parallel with an active
-+MMC request.
-+
-+MMC block driver
-+================
-+
-+The mmc_blk_issue_rw_rq() in the MMC block driver is made non-blocking.
-+The increase in throughput is proportional to the time it takes to
-+prepare (major part of preparations are dma_map_sg() and dma_unmap_sg())
-+a request and how fast the memory is. The faster the MMC/SD is
-+the more significant the prepare request time becomes. Roughly the expected
-+performance gain is 5% for large writes and 10% on large reads on a L2 cache
-+platform. In power save mode, when clocks run on a lower frequency, the DMA
-+preparation may cost even more. As long as these slower preparations are run
-+in parallel with the transfer performance won't be affected.
-+
-+Details on measurements from IOZone and mmc_test
-+================================================
-+
-+https://wiki.linaro.org/WorkingGroups/Kernel/Specs/StoragePerfMMC-async-req
-+
-+MMC core API extension
-+======================
-+
-+There is one new public function mmc_start_req().
-+It starts a new MMC command request for a host. The function isn't
-+truly non-blocking. If there is on ongoing async request it waits
-+for completion of that request and starts the new one and returns. It
-+doesn't wait for the new request to complete. If there is no ongoing
-+request it starts the new request and returns immediately.
-+
-+MMC host extensions
-+===================
-+
-+There are two optional members in the
-+mmc_host_ops -- pre_req() and post_req() -- that the host
-+driver may implement in order to move work to before and after the actual
-+mmc_host_ops.request() function is called. In the DMA case pre_req() may do
-+dma_map_sg() and prepare the DMA descriptor, and post_req() runs
-+the dma_unmap_sg().
-+
-+Optimize for the first request
-+==============================
-+
-+The first request in a series of requests can't be prepared in parallel with
-+the previous transfer, since there is no previous request.
-+The argument is_first_req in pre_req() indicates that there is no previous
-+request. The host driver may optimize for this scenario to minimize
-+the performance loss. A way to optimize for this is to split the current
-+request in two chunks, prepare the first chunk and start the request,
-+and finally prepare the second chunk and start the transfer.
-+
-+Pseudocode to handle is_first_req scenario with minimal prepare overhead:
-+
-+if (is_first_req && req->size > threshold)
-+   /* start MMC transfer for the complete transfer size */
-+   mmc_start_command(MMC_CMD_TRANSFER_FULL_SIZE);
-+
-+   /*
-+    * Begin to prepare DMA while cmd is being processed by MMC.
-+    * The first chunk of the request should take the same time
-+    * to prepare as the "MMC process command time".
-+    * If prepare time exceeds MMC cmd time
-+    * the transfer is delayed, guesstimate max 4k as first chunk size.
-+    */
-+    prepare_1st_chunk_for_dma(req);
-+    /* flush pending desc to the DMAC (dmaengine.h) */
-+    dma_issue_pending(req->dma_desc);
-+
-+    prepare_2nd_chunk_for_dma(req);
-+    /*
-+     * The second issue_pending should be called before MMC runs out
-+     * of the first chunk. If the MMC runs out of the first data chunk
-+     * before this call, the transfer is delayed.
-+     */
-+    dma_issue_pending(req->dma_desc);
--- 
-1.7.4.1
+git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git devel-board
+
+The new top commit at 1ad920556f32a5a127397ca461d1a1faaf22c4e0.
+
+As omap/board already depends on omap/cleanup, this does not cause
+new dependency issues. I've also added the resolve patch below.
+
+Regards,
+
+Tony
+
+
+--- a/arch/arm/mach-omap2/board-4430sdp.c
++++ b/arch/arm/mach-omap2/board-4430sdp.c
+@@@ -411,41 -324,6 +403,37 @@@ static struct regulator_consumer_suppl
+  	REGULATOR_SUPPLY("vmmc", "omap_hsmmc.1"),
+  };
+  
+- static struct regulator_consumer_supply sdp4430_vmmc_supply[] = {
+- 	REGULATOR_SUPPLY("vmmc", "omap_hsmmc.0"),
+- };
+- 
+ +static struct regulator_consumer_supply omap4_sdp4430_vmmc5_supply = {
+ +	.supply = "vmmc",
+ +	.dev_name = "omap_hsmmc.4",
+ +};
+ +
+ +static struct regulator_init_data sdp4430_vmmc5 = {
+ +	.constraints = {
+ +		.valid_ops_mask = REGULATOR_CHANGE_STATUS,
+ +	},
+ +	.num_consumer_supplies = 1,
+ +	.consumer_supplies = &omap4_sdp4430_vmmc5_supply,
+ +};
+ +
+ +static struct fixed_voltage_config sdp4430_vwlan = {
+ +	.supply_name		= "vwl1271",
+ +	.microvolts		= 1800000, /* 1.8V */
+ +	.gpio			= GPIO_WIFI_PMENA,
+ +	.startup_delay		= 70000, /* 70msec */
+ +	.enable_high		= 1,
+ +	.enabled_at_boot	= 0,
+ +	.init_data		= &sdp4430_vmmc5,
+ +};
+ +
+ +static struct platform_device omap_vwlan_device = {
+ +	.name		= "reg-fixed-voltage",
+ +	.id		= 1,
+ +	.dev = {
+ +		.platform_data = &sdp4430_vwlan,
+ +	},
+ +};
+ +
+  static int omap4_twl6030_hsmmc_late_init(struct device *dev)
+  {
+  	int ret = 0;
+--- a/arch/arm/mach-omap2/board-rx51-peripherals.c
++++ b/arch/arm/mach-omap2/board-rx51-peripherals.c
+@@@ -916,13 -761,7 +884,12 @@@ static struct twl4030_platform_data rx5
+  	.vaux2			= &rx51_vaux2,
+  	.vaux4			= &rx51_vaux4,
+  	.vmmc1			= &rx51_vmmc1,
+ +	.vpll1			= &rx51_vpll1,
+ +	.vpll2			= &rx51_vpll2,
+  	.vsim			= &rx51_vsim,
+- 	.vdac			= &rx51_vdac,
+ +	.vintana1		= &rx51_vintana1,
+ +	.vintana2		= &rx51_vintana2,
+ +	.vintdig		= &rx51_vintdig,
+  	.vio			= &rx51_vio,
+  };
+  
