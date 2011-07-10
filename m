@@ -1,44 +1,48 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Sun, 10 Jul 2011 19:40:32 +0900
-Subject: [PATCH] mfd: convert devicetree to platform data on max8925
-In-Reply-To: <20110710091729.GA23521@opensource.wolfsonmicro.com>
-References: <1310120428-22700-2-git-send-email-haojian.zhuang@marvell.com>
-	<1310120428-22700-3-git-send-email-haojian.zhuang@marvell.com>
-	<1310120428-22700-4-git-send-email-haojian.zhuang@marvell.com>
-	<1310120428-22700-5-git-send-email-haojian.zhuang@marvell.com>
-	<1310120428-22700-6-git-send-email-haojian.zhuang@marvell.com>
-	<1310120428-22700-7-git-send-email-haojian.zhuang@marvell.com>
-	<1310120428-22700-8-git-send-email-haojian.zhuang@marvell.com>
-	<1310120428-22700-9-git-send-email-haojian.zhuang@marvell.com>
-	<1310120428-22700-10-git-send-email-haojian.zhuang@marvell.com>
-	<20110710072027.GE10912@ponder.secretlab.ca>
-	<20110710091729.GA23521@opensource.wolfsonmicro.com>
-Message-ID: <CACxGe6sEkToYu01wQpj6ey+--JMkDkK8s4U5aqwxoppSGRb1OQ@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 10 Jul 2011 11:47:40 +0100
+Subject: [PATCH V3 1/4] ARM: smp_twd: Fix typo in 'twd_timer_rate' printing
+In-Reply-To: <4E15DCE1.8010201@mvista.com>
+References: <1310041339-2348-1-git-send-email-vkuzmichev@mvista.com>
+	<1310041396-2461-1-git-send-email-vkuzmichev@mvista.com>
+	<20110707123907.GP8286@n2100.arm.linux.org.uk>
+	<4E15DCE1.8010201@mvista.com>
+Message-ID: <20110710104740.GD4812@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 10, 2011 at 6:17 PM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Sun, Jul 10, 2011 at 04:20:27PM +0900, Grant Likely wrote:
->> On Fri, Jul 08, 2011 at 06:20:26PM +0800, Haojian Zhuang wrote:
->
->> > + ? if (pdata == NULL)
->> > + ? ? ? ? ? return NULL;
->> > + ? pdata->regulator[0] = kzalloc(sizeof(struct regulator_init_data)
->> > + ? ? ? ? ? ? ? ? ? * MAX8925_MAX_REGULATOR, GFP_KERNEL);
->
->> ditto.
->
->> Is it appropriate to allocated the entire table of regulators? ?From
->> the parse_regulator function above, it looks like only one of the
->> regulators will actually get registered (I've not dug deeply into what
->> the driver needs here though).
->
-> If the code/binding doesn't allow the use of all the regulators on the
-> device the code is probably wrong, it'd be very unusual to have hardware
-> like that.
+On Thu, Jul 07, 2011 at 08:20:49PM +0400, Vitaly Kuzmichev wrote:
+> Hi Russell,
+> 
+> On 07/07/2011 04:39 PM, Russell King - ARM Linux wrote:
+> > On Thu, Jul 07, 2011 at 04:23:13PM +0400, Vitaly Kuzmichev wrote:
+> >> To get hundredths of MHz the rate needs to be divided by 10'000.
+> >> Here is an example:
+> >>  twd_timer_rate = 123456789
+> >>  Before the patch:
+> >>     twd_timer_rate / 1000000 = 123
+> >>     (twd_timer_rate / 1000000) % 100 = 23
+> >>     Result: 123.23MHz.
+> >>  After being fixed:
+> >>     twd_timer_rate / 1000000 = 123
+> >>     (twd_timer_rate / 10000) % 100 = 45
+> >>     Result: 123.45MHz.
+> >>
+> >> Signed-off-by: Vitaly Kuzmichev <vkuzmichev@mvista.com>
+> > 
+> > -> patch system please.
+> 
+> Should I submit other patches into this system too?
 
-I was wondering about that.  I was just going by what I could
-understand of the code.
+No, the other patches I've yet to look at, and I think there's issues
+still to be resolved.
 
-g.
+Eg, ISTR a patch to make smp_twd.c selectable on non-SMP platforms so
+that the mpcore watchdog can be used on non-SMP platforms.  While that
+fixes the build issues, functionally its broken.  I don't think that
+the mpcore watchdog should be asking the smp_twd code in any case for
+the clock rate.
+
+If we get the issue with knowing the TWD clock rate on ARMs development
+platforms sorted out, then we can provide a struct clk for it, which
+means everyone can finally move to using the clk API to get the mpcore
+watchdog/twd clock rate.
