@@ -1,147 +1,32 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Sat, 9 Jul 2011 11:13:20 -0600
-Subject: [RFC PATCH v2 1/4] dt: expose device resource allocator
-In-Reply-To: <1310115250-3859-2-git-send-email-marc.zyngier@arm.com>
-References: <1310115250-3859-1-git-send-email-marc.zyngier@arm.com>
-	<1310115250-3859-2-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20110709171320.GA2805@ponder.secretlab.ca>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Sun, 10 Jul 2011 16:37:09 +0800
+Subject: [PATCH 04/10] ASoc: mxs: add asoc configuration files
+In-Reply-To: <20110709030132.GE26900@sirena.org.uk>
+References: <1310140790-2132-1-git-send-email-b29396@freescale.com>
+	<1310140790-2132-5-git-send-email-b29396@freescale.com>
+	<20110709030132.GE26900@sirena.org.uk>
+Message-ID: <CAA+hA=RB_G8gvJ=Lb2a8ged_=v7aA-LM+woQdjzQPsQWEFffpw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 08, 2011 at 09:54:07AM +0100, Marc Zyngier wrote:
-> of_device_alloc() takes care of allocating both a platform
-> device and its associated resource, as part of the runtime
-> device-tree to platform_device conversion.
-> 
-> The resource allocation itself is useful on its own, and
-> would be used by the core driver subsystem.  Create the
-> of_device_alloc_resources() function, and let of_device_alloc()
-> use it.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+2011/7/9 Mark Brown <broonie@opensource.wolfsonmicro.com>:
+> On Fri, Jul 08, 2011 at 11:59:44PM +0800, Dong Aisheng wrote:
+>> Signed-off-by: Dong Aisheng <b29396@freescale.com>
+>
+> *Always* CC maintainers on patches.
+>
+>> @@ -57,6 +57,7 @@ source "sound/soc/s6000/Kconfig"
+>> ?source "sound/soc/sh/Kconfig"
+>> ?source "sound/soc/tegra/Kconfig"
+>> ?source "sound/soc/txx9/Kconfig"
+>> +source "sound/soc/mxs/Kconfig"
+>
+> Keep all these files sorted.
+Thanks for reminder.
+Will fix in the updated v2 patch soon.
 
-Hi Marc,
-
-Comments below.
-
-> ---
->  drivers/of/platform.c       |   60 +++++++++++++++++++++++++++++-------------
->  include/linux/of_platform.h |    2 +
->  2 files changed, 43 insertions(+), 19 deletions(-)
-> 
-> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-> index e75af39..f839f79 100644
-> --- a/drivers/of/platform.c
-> +++ b/drivers/of/platform.c
-> @@ -122,22 +122,16 @@ void of_device_make_bus_id(struct device *dev)
->  }
->  
->  /**
-> - * of_device_alloc - Allocate and initialize an of_device
-> - * @np: device node to assign to device
-> - * @bus_id: Name to assign to the device.  May be null to use default name.
-> - * @parent: Parent device.
-> + * of_device_alloc_resources - Allocate and initialize resources for an
-> + *			       of_device
-> + * @np: device node to fetch resources from
-> + * @num_res: number of allocated resources
->   */
-> -struct platform_device *of_device_alloc(struct device_node *np,
-> -				  const char *bus_id,
-> -				  struct device *parent)
-> +struct resource *of_device_alloc_resources(struct device_node *np,
-> +					   int *num_res)
->  {
-> -	struct platform_device *dev;
->  	int rc, i, num_reg = 0, num_irq;
-> -	struct resource *res, temp_res;
-> -
-> -	dev = platform_device_alloc("", -1);
-> -	if (!dev)
-> -		return NULL;
-> +	struct resource *res = NULL, temp_res;
->  
->  	/* count the io and irq resources */
->  	while (of_address_to_resource(np, num_reg, &temp_res) == 0)
-> @@ -148,19 +142,47 @@ struct platform_device *of_device_alloc(struct device_node *np,
->  	if (num_irq || num_reg) {
->  		res = kzalloc(sizeof(*res) * (num_irq + num_reg), GFP_KERNEL);
->  		if (!res) {
-> -			platform_device_put(dev);
-> +			*num_res = -1;
-
-I would argue that it is not a good idea to modify num_res in the
-failure case.  Though I man not be fond of the pattern, the common
-convention in the kernel is to use ERR_PTR when a function needs to
-differentiate between a failure case and simply "no data".
-
->  			return NULL;
->  		}
->  
-> -		dev->num_resources = num_reg + num_irq;
-> -		dev->resource = res;
-> -		for (i = 0; i < num_reg; i++, res++) {
-> -			rc = of_address_to_resource(np, i, res);
-> +		for (i = 0; i < num_reg; i++) {
-> +			rc = of_address_to_resource(np, i, &res[i]);
-
-Nit: the patch would be less invasive if the 'res' pointer handling
-was left alone.  Just keep a copy of the starting position to use for
-returning.
-
->  			WARN_ON(rc);
->  		}
-> -		WARN_ON(of_irq_to_resource_table(np, res, num_irq) != num_irq);
-> +		WARN_ON(of_irq_to_resource_table(np, &res[i], num_irq) != num_irq);
-> +	}
-> +
-> +	*num_res = num_irq + num_reg;
-> +	return res;
-> +}
-> +
-> +/**
-> + * of_device_alloc - Allocate and initialize an of_device
-> + * @np: device node to assign to device
-> + * @bus_id: Name to assign to the device.  May be null to use default name.
-> + * @parent: Parent device.
-> + */
-> +struct platform_device *of_device_alloc(struct device_node *np,
-> +				  const char *bus_id,
-> +				  struct device *parent)
-> +{
-> +	struct platform_device *dev;
-> +	int num_res;
-> +	struct resource *res;
-> +
-> +	dev = platform_device_alloc("", -1);
-> +	if (!dev)
-> +		return NULL;
-> +
-> +	res = of_device_alloc_resources(np, &num_res);
-> +	if (num_res == -1) {
-> +		platform_device_put(dev);
-> +		return NULL;
->  	}
->  
-> +	dev->num_resources = num_res;
-> +	dev->resource = res;
->  	dev->dev.of_node = of_node_get(np);
->  #if defined(CONFIG_PPC) || defined(CONFIG_MICROBLAZE)
->  	dev->dev.dma_mask = &dev->archdata.dma_mask;
-> diff --git a/include/linux/of_platform.h b/include/linux/of_platform.h
-> index 5a6f458..773a880 100644
-> --- a/include/linux/of_platform.h
-> +++ b/include/linux/of_platform.h
-> @@ -77,6 +77,8 @@ struct of_platform_driver
->  extern const struct of_device_id of_default_bus_match_table[];
->  
->  /* Platform drivers register/unregister */
-> +extern struct resource *of_device_alloc_resources(struct device_node *np,
-> +						  int *num_res);
->  extern struct platform_device *of_device_alloc(struct device_node *np,
->  					 const char *bus_id,
->  					 struct device *parent);
-> -- 
-> 1.7.0.4
-> 
-> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
