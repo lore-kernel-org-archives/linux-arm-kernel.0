@@ -1,51 +1,69 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sun, 10 Jul 2011 12:52:16 -0700
-Subject: [GIT PULL] minimal omap4460 support for v3.1 merge window
-In-Reply-To: <20110710065627.GE5783@atomide.com>
-References: <20110710065627.GE5783@atomide.com>
-Message-ID: <20110710195215.GJ5783@atomide.com>
+From: ccross@android.com (Colin Cross)
+Date: Sun, 10 Jul 2011 14:02:52 -0700
+Subject: [PATCH] ARM: tegra: remove mach/barriers.h
+Message-ID: <1310331772-13310-1-git-send-email-ccross@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Correting the email address for Arnd.
+The barriers implemented in arch/arm/mach-tegra/mach/barriers.h
+are exactly the same as the default barriers implemented in
+arch/arm/include/asm/system.h.  Remove barriers.h from Tegra,
+and don't select ARCH_HAS_BARRIERS.
 
-* Tony Lindgren <tony@atomide.com> [110709 23:51]:
-> Hi Arnd,
-> 
-> Please pull minimal omap4460 support from:
-> 
-> git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git 4460
-> 
-> Regards,
-> 
-> Tony
-> 
-> 
-> The following changes since commit 48cb1258e8b0f8c81cfb699b42326c5b2147b3f8:
->   Tony Lindgren (1):
->         Merge branch 'for_3.1/pm-misc' of git://git.kernel.org/.../khilman/linux-omap-pm into devel-cleanup
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git 4460
-> 
-> Aneesh V (2):
->       OMAP: ID: introduce chip detection for OMAP4460
->       OMAP4: ID: add omap_has_feature for max freq supported
-> 
-> Rajendra Nayak (2):
->       OMAP4: PRCM: OMAP4460 specific PRM and CM register bitshifts
->       OMAP4: clocks: Update the clock tree with 4460 clock nodes
-> 
->  arch/arm/mach-omap2/clock44xx_data.c          |   39 ++++++++++++++++++
->  arch/arm/mach-omap2/cm-regbits-44xx.h         |   36 +++++++++++++++++
->  arch/arm/mach-omap2/id.c                      |   53 ++++++++++++++++++++----
->  arch/arm/mach-omap2/prm-regbits-44xx.h        |    8 ++++
->  arch/arm/plat-omap/include/plat/clkdev_omap.h |    1 +
->  arch/arm/plat-omap/include/plat/clock.h       |    2 +
->  arch/arm/plat-omap/include/plat/cpu.h         |   35 +++++++++++++++-
->  7 files changed, 162 insertions(+), 12 deletions(-)
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Signed-off-by: Colin Cross <ccross@android.com>
+---
+ arch/arm/Kconfig                            |    1 -
+ arch/arm/mach-tegra/include/mach/barriers.h |   30 ---------------------------
+ 2 files changed, 0 insertions(+), 31 deletions(-)
+ delete mode 100644 arch/arm/mach-tegra/include/mach/barriers.h
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 9adc278..7e179f0 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -591,7 +591,6 @@ config ARCH_TEGRA
+ 	select GENERIC_GPIO
+ 	select HAVE_CLK
+ 	select HAVE_SCHED_CLOCK
+-	select ARCH_HAS_BARRIERS if CACHE_L2X0
+ 	select ARCH_HAS_CPUFREQ
+ 	help
+ 	  This enables support for NVIDIA Tegra based systems (Tegra APX,
+diff --git a/arch/arm/mach-tegra/include/mach/barriers.h b/arch/arm/mach-tegra/include/mach/barriers.h
+deleted file mode 100644
+index 425b42e..0000000
+--- a/arch/arm/mach-tegra/include/mach/barriers.h
++++ /dev/null
+@@ -1,30 +0,0 @@
+-/*
+- * arch/arm/mach-realview/include/mach/barriers.h
+- *
+- * Copyright (C) 2010 ARM Ltd.
+- * Written by Catalin Marinas <catalin.marinas@arm.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+- */
+-
+-#ifndef __MACH_BARRIERS_H
+-#define __MACH_BARRIERS_H
+-
+-#include <asm/outercache.h>
+-
+-#define rmb()		dsb()
+-#define wmb()		do { dsb(); outer_sync(); } while (0)
+-#define mb()		wmb()
+-
+-#endif	/* __MACH_BARRIERS_H */
+-- 
+1.7.4.1
