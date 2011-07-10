@@ -1,204 +1,266 @@
 From: ccross@android.com (Colin Cross)
-Date: Sun, 10 Jul 2011 15:19:34 -0700
-Subject: [PATCH 2/2] ARM: tegra: remove copy-and-pasted usb platform data from
+Date: Sun, 10 Jul 2011 15:19:33 -0700
+Subject: [PATCH 1/2] ARM: tegra: remove copy-and-pasted i2c platform data in
 	boards
-In-Reply-To: <1310336374-31727-1-git-send-email-ccross@android.com>
-References: <1310336374-31727-1-git-send-email-ccross@android.com>
-Message-ID: <1310336374-31727-2-git-send-email-ccross@android.com>
+Message-ID: <1310336374-31727-1-git-send-email-ccross@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-trimslice and paz00 both have functionally identical platform
-data for the tegra-ehci driver.  Move the platform data into
-devices.c, and remove it from all the board files.
+Every board file includes the same platform data definition
+for the i2c-tegra driver's bus speed.  Move the platform data
+into devices.c, and remove it from all the board files.
 
 Signed-off-by: Colin Cross <ccross@android.com>
 ---
- arch/arm/mach-tegra/board-paz00.c     |   26 --------------------------
- arch/arm/mach-tegra/board-trimslice.c |   19 -------------------
- arch/arm/mach-tegra/devices.c         |   28 ++++++++++++++++++++++++++++
- 3 files changed, 28 insertions(+), 45 deletions(-)
+ arch/arm/mach-tegra/board-harmony.c   |   22 ----------------------
+ arch/arm/mach-tegra/board-paz00.c     |   17 -----------------
+ arch/arm/mach-tegra/board-seaboard.c  |   22 ----------------------
+ arch/arm/mach-tegra/board-trimslice.c |   17 -----------------
+ arch/arm/mach-tegra/devices.c         |   25 +++++++++++++++++++++----
+ 5 files changed, 21 insertions(+), 82 deletions(-)
 
+diff --git a/arch/arm/mach-tegra/board-harmony.c b/arch/arm/mach-tegra/board-harmony.c
+index 30e18bc..846cd7d 100644
+--- a/arch/arm/mach-tegra/board-harmony.c
++++ b/arch/arm/mach-tegra/board-harmony.c
+@@ -25,7 +25,6 @@
+ #include <linux/io.h>
+ #include <linux/gpio.h>
+ #include <linux/i2c.h>
+-#include <linux/i2c-tegra.h>
+ 
+ #include <sound/wm8903.h>
+ 
+@@ -83,22 +82,6 @@ static struct platform_device harmony_audio_device = {
+ 	},
+ };
+ 
+-static struct tegra_i2c_platform_data harmony_i2c1_platform_data = {
+-	.bus_clk_rate   = 400000,
+-};
+-
+-static struct tegra_i2c_platform_data harmony_i2c2_platform_data = {
+-	.bus_clk_rate   = 400000,
+-};
+-
+-static struct tegra_i2c_platform_data harmony_i2c3_platform_data = {
+-	.bus_clk_rate   = 400000,
+-};
+-
+-static struct tegra_i2c_platform_data harmony_dvc_platform_data = {
+-	.bus_clk_rate   = 400000,
+-};
+-
+ static struct wm8903_platform_data harmony_wm8903_pdata = {
+ 	.irq_active_low = 0,
+ 	.micdet_cfg = 0,
+@@ -121,11 +104,6 @@ static struct i2c_board_info __initdata wm8903_board_info = {
+ 
+ static void __init harmony_i2c_init(void)
+ {
+-	tegra_i2c_device1.dev.platform_data = &harmony_i2c1_platform_data;
+-	tegra_i2c_device2.dev.platform_data = &harmony_i2c2_platform_data;
+-	tegra_i2c_device3.dev.platform_data = &harmony_i2c3_platform_data;
+-	tegra_i2c_device4.dev.platform_data = &harmony_dvc_platform_data;
+-
+ 	platform_device_register(&tegra_i2c_device1);
+ 	platform_device_register(&tegra_i2c_device2);
+ 	platform_device_register(&tegra_i2c_device3);
 diff --git a/arch/arm/mach-tegra/board-paz00.c b/arch/arm/mach-tegra/board-paz00.c
-index 465768e..ea2f79c 100644
+index 1b076f6..465768e 100644
 --- a/arch/arm/mach-tegra/board-paz00.c
 +++ b/arch/arm/mach-tegra/board-paz00.c
 @@ -26,7 +26,6 @@
  #include <linux/pda_power.h>
  #include <linux/io.h>
  #include <linux/i2c.h>
--#include <linux/platform_data/tegra_usb.h>
+-#include <linux/i2c-tegra.h>
+ #include <linux/platform_data/tegra_usb.h>
  
  #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -36,7 +35,6 @@
- #include <mach/iomap.h>
- #include <mach/irqs.h>
- #include <mach/sdhci.h>
--#include <mach/usb_phy.h>
- #include <mach/gpio.h>
+@@ -74,24 +73,8 @@ static struct platform_device *paz00_devices[] __initdata = {
+ 	&tegra_sdhci_device4,
+ };
  
- #include "board.h"
-@@ -80,32 +78,8 @@ static void paz00_i2c_init(void)
- 	platform_device_register(&tegra_i2c_device4);
- }
- 
--static struct tegra_ulpi_config ulpi_phy_config = {
--		.reset_gpio = TEGRA_ULPI_RST,
--		.clk = "cdev2",
+-static struct tegra_i2c_platform_data paz00_i2c1_platform_data = {
+-	.bus_clk_rate   = 400000,
 -};
 -
--static struct tegra_ehci_platform_data tegra_ehci_pdata[] = {
--		[0] = {
--			.operating_mode = TEGRA_USB_OTG,
--			.power_down_on_bus_suspend = 1,
--		},
--		[1] = {
--			.phy_config = &ulpi_phy_config,
--			.operating_mode = TEGRA_USB_HOST,
--			.power_down_on_bus_suspend = 1,
--		},
--		[2] = {
--			.operating_mode = TEGRA_USB_HOST,
--			.power_down_on_bus_suspend = 1,
--		},
+-static struct tegra_i2c_platform_data paz00_i2c2_platform_data = {
+-	.bus_clk_rate   = 400000,
 -};
 -
- static void paz00_usb_init(void)
+-static struct tegra_i2c_platform_data paz00_dvc_platform_data = {
+-	.bus_clk_rate   = 400000,
+-};
+-
+ static void paz00_i2c_init(void)
  {
--	tegra_ehci2_device.dev.platform_data = &tegra_ehci_pdata[1];
--	tegra_ehci3_device.dev.platform_data = &tegra_ehci_pdata[2];
+-	tegra_i2c_device1.dev.platform_data = &paz00_i2c1_platform_data;
+-	tegra_i2c_device2.dev.platform_data = &paz00_i2c2_platform_data;
+-	tegra_i2c_device4.dev.platform_data = &paz00_dvc_platform_data;
 -
- 	platform_device_register(&tegra_ehci2_device);
- 	platform_device_register(&tegra_ehci3_device);
- }
+ 	platform_device_register(&tegra_i2c_device1);
+ 	platform_device_register(&tegra_i2c_device2);
+ 	platform_device_register(&tegra_i2c_device4);
+diff --git a/arch/arm/mach-tegra/board-seaboard.c b/arch/arm/mach-tegra/board-seaboard.c
+index 783de17..46d5df9 100644
+--- a/arch/arm/mach-tegra/board-seaboard.c
++++ b/arch/arm/mach-tegra/board-seaboard.c
+@@ -19,7 +19,6 @@
+ #include <linux/platform_device.h>
+ #include <linux/serial_8250.h>
+ #include <linux/i2c.h>
+-#include <linux/i2c-tegra.h>
+ #include <linux/delay.h>
+ #include <linux/input.h>
+ #include <linux/io.h>
+@@ -66,22 +65,6 @@ static __initdata struct tegra_clk_init_table seaboard_clk_init_table[] = {
+ 	{ NULL,		NULL,		0,		0},
+ };
+ 
+-static struct tegra_i2c_platform_data seaboard_i2c1_platform_data = {
+-	.bus_clk_rate	= 400000.
+-};
+-
+-static struct tegra_i2c_platform_data seaboard_i2c2_platform_data = {
+-	.bus_clk_rate	= 400000,
+-};
+-
+-static struct tegra_i2c_platform_data seaboard_i2c3_platform_data = {
+-	.bus_clk_rate	= 400000,
+-};
+-
+-static struct tegra_i2c_platform_data seaboard_dvc_platform_data = {
+-	.bus_clk_rate	= 400000,
+-};
+-
+ static struct gpio_keys_button seaboard_gpio_keys_buttons[] = {
+ 	{
+ 		.code		= SW_LID,
+@@ -161,11 +144,6 @@ static void __init seaboard_i2c_init(void)
+ 
+ 	i2c_register_board_info(4, &adt7461_device, 1);
+ 
+-	tegra_i2c_device1.dev.platform_data = &seaboard_i2c1_platform_data;
+-	tegra_i2c_device2.dev.platform_data = &seaboard_i2c2_platform_data;
+-	tegra_i2c_device3.dev.platform_data = &seaboard_i2c3_platform_data;
+-	tegra_i2c_device4.dev.platform_data = &seaboard_dvc_platform_data;
+-
+ 	platform_device_register(&tegra_i2c_device1);
+ 	platform_device_register(&tegra_i2c_device2);
+ 	platform_device_register(&tegra_i2c_device3);
 diff --git a/arch/arm/mach-tegra/board-trimslice.c b/arch/arm/mach-tegra/board-trimslice.c
-index e1d7e67..89a6d2a 100644
+index a8fff42..e1d7e67 100644
 --- a/arch/arm/mach-tegra/board-trimslice.c
 +++ b/arch/arm/mach-tegra/board-trimslice.c
 @@ -24,7 +24,6 @@
  #include <linux/serial_8250.h>
  #include <linux/io.h>
  #include <linux/i2c.h>
--#include <linux/platform_data/tegra_usb.h>
+-#include <linux/i2c-tegra.h>
+ #include <linux/platform_data/tegra_usb.h>
  #include <linux/gpio.h>
  
- #include <asm/mach-types.h>
-@@ -33,7 +32,6 @@
+@@ -92,18 +91,6 @@ static struct platform_device *trimslice_devices[] __initdata = {
+ 	&trimslice_audio_device,
+ };
  
- #include <mach/iomap.h>
- #include <mach/sdhci.h>
--#include <mach/usb_phy.h>
- #include <mach/gpio.h>
- 
- #include "board.h"
-@@ -110,28 +108,12 @@ static void trimslice_i2c_init(void)
- 				ARRAY_SIZE(trimslice_i2c3_board_info));
- }
- 
--struct tegra_ulpi_config ehci2_phy_config = {
--	.reset_gpio = TRIMSLICE_GPIO_USB2_RST,
--	.clk = "cdev2",
+-static struct tegra_i2c_platform_data trimslice_i2c1_platform_data = {
+-	.bus_clk_rate   = 400000,
 -};
 -
--static struct tegra_ehci_platform_data ehci_ulpi_data = {
--	.operating_mode = TEGRA_USB_HOST,
--	.phy_config = &ehci2_phy_config,
+-static struct tegra_i2c_platform_data trimslice_i2c2_platform_data = {
+-	.bus_clk_rate   = 400000,
 -};
 -
--static struct tegra_ehci_platform_data ehci_utmi_data = {
--	.operating_mode = TEGRA_USB_HOST,
+-static struct tegra_i2c_platform_data trimslice_i2c3_platform_data = {
+-	.bus_clk_rate   = 400000,
 -};
 -
- static void trimslice_usb_init(void)
+ static struct i2c_board_info trimslice_i2c3_board_info[] = {
+ 	{
+ 		I2C_BOARD_INFO("tlv320aic23", 0x1a),
+@@ -115,10 +102,6 @@ static struct i2c_board_info trimslice_i2c3_board_info[] = {
+ 
+ static void trimslice_i2c_init(void)
  {
- 	int err;
- 
--	tegra_ehci3_device.dev.platform_data = &ehci_utmi_data;
- 	platform_device_register(&tegra_ehci3_device);
- 
--	tegra_ehci2_device.dev.platform_data = &ehci_ulpi_data;
- 	platform_device_register(&tegra_ehci2_device);
- 
- 	err = gpio_request_one(TRIMSLICE_GPIO_USB1_MODE, GPIOF_OUT_INIT_HIGH,
-@@ -141,7 +123,6 @@ static void trimslice_usb_init(void)
- 		return;
- 	}
- 
--	tegra_ehci1_device.dev.platform_data = &ehci_utmi_data;
- 	platform_device_register(&tegra_ehci1_device);
- }
- 
+-	tegra_i2c_device1.dev.platform_data = &trimslice_i2c1_platform_data;
+-	tegra_i2c_device2.dev.platform_data = &trimslice_i2c2_platform_data;
+-	tegra_i2c_device3.dev.platform_data = &trimslice_i2c3_platform_data;
+-
+ 	platform_device_register(&tegra_i2c_device1);
+ 	platform_device_register(&tegra_i2c_device2);
+ 	platform_device_register(&tegra_i2c_device3);
 diff --git a/arch/arm/mach-tegra/devices.c b/arch/arm/mach-tegra/devices.c
-index 066eaf9..57e35d2 100644
+index 1528f9d..066eaf9 100644
 --- a/arch/arm/mach-tegra/devices.c
 +++ b/arch/arm/mach-tegra/devices.c
-@@ -23,10 +23,13 @@
+@@ -22,6 +22,7 @@
+ #include <linux/dma-mapping.h>
  #include <linux/fsl_devices.h>
  #include <linux/serial_8250.h>
- #include <linux/i2c-tegra.h>
-+#include <linux/platform_data/tegra_usb.h>
++#include <linux/i2c-tegra.h>
  #include <asm/pmu.h>
  #include <mach/irqs.h>
  #include <mach/iomap.h>
- #include <mach/dma.h>
-+#include <mach/usb_phy.h>
-+#include "gpio-names.h"
- 
- static struct resource i2c_resource1[] = {
- 	[0] = {
-@@ -351,6 +354,28 @@ static struct resource tegra_usb3_resources[] = {
+@@ -79,13 +80,29 @@ static struct resource i2c_resource4[] = {
  	},
  };
  
-+static struct tegra_ulpi_config tegra_ehci2_ulpi_phy_config = {
-+	/* All existing boards use GPIO PV0 for phy reset */
-+	.reset_gpio = TEGRA_GPIO_PV0,
-+	.clk = "cdev2",
++static struct tegra_i2c_platform_data tegra_i2c1_platform_data = {
++	.bus_clk_rate   = 400000,
 +};
 +
-+static struct tegra_ehci_platform_data tegra_ehci1_pdata = {
-+	.operating_mode = TEGRA_USB_OTG,
-+	.power_down_on_bus_suspend = 1,
++static struct tegra_i2c_platform_data tegra_i2c2_platform_data = {
++	.bus_clk_rate   = 400000,
 +};
 +
-+static struct tegra_ehci_platform_data tegra_ehci2_pdata = {
-+	.phy_config = &tegra_ehci2_ulpi_phy_config,
-+	.operating_mode = TEGRA_USB_HOST,
-+	.power_down_on_bus_suspend = 1,
++static struct tegra_i2c_platform_data tegra_i2c3_platform_data = {
++	.bus_clk_rate   = 400000,
 +};
 +
-+static struct tegra_ehci_platform_data tegra_ehci3_pdata = {
-+	.operating_mode = TEGRA_USB_HOST,
-+	.power_down_on_bus_suspend = 1,
++static struct tegra_i2c_platform_data tegra_dvc_platform_data = {
++	.bus_clk_rate   = 400000,
 +};
 +
- static u64 tegra_ehci_dmamask = DMA_BIT_MASK(32);
+ struct platform_device tegra_i2c_device1 = {
+ 	.name		= "tegra-i2c",
+ 	.id		= 0,
+ 	.resource	= i2c_resource1,
+ 	.num_resources	= ARRAY_SIZE(i2c_resource1),
+ 	.dev = {
+-		.platform_data = 0,
++		.platform_data = &tegra_i2c1_platform_data,
+ 	},
+ };
  
- struct platform_device tegra_ehci1_device = {
-@@ -359,6 +384,7 @@ struct platform_device tegra_ehci1_device = {
- 	.dev	= {
- 		.dma_mask	= &tegra_ehci_dmamask,
- 		.coherent_dma_mask = DMA_BIT_MASK(32),
-+		.platform_data = &tegra_ehci1_pdata,
+@@ -95,7 +112,7 @@ struct platform_device tegra_i2c_device2 = {
+ 	.resource	= i2c_resource2,
+ 	.num_resources	= ARRAY_SIZE(i2c_resource2),
+ 	.dev = {
+-		.platform_data = 0,
++		.platform_data = &tegra_i2c2_platform_data,
  	},
- 	.resource = tegra_usb1_resources,
- 	.num_resources = ARRAY_SIZE(tegra_usb1_resources),
-@@ -370,6 +396,7 @@ struct platform_device tegra_ehci2_device = {
- 	.dev	= {
- 		.dma_mask	= &tegra_ehci_dmamask,
- 		.coherent_dma_mask = DMA_BIT_MASK(32),
-+		.platform_data = &tegra_ehci2_pdata,
+ };
+ 
+@@ -105,7 +122,7 @@ struct platform_device tegra_i2c_device3 = {
+ 	.resource	= i2c_resource3,
+ 	.num_resources	= ARRAY_SIZE(i2c_resource3),
+ 	.dev = {
+-		.platform_data = 0,
++		.platform_data = &tegra_i2c3_platform_data,
  	},
- 	.resource = tegra_usb2_resources,
- 	.num_resources = ARRAY_SIZE(tegra_usb2_resources),
-@@ -381,6 +408,7 @@ struct platform_device tegra_ehci3_device = {
- 	.dev	= {
- 		.dma_mask	= &tegra_ehci_dmamask,
- 		.coherent_dma_mask = DMA_BIT_MASK(32),
-+		.platform_data = &tegra_ehci3_pdata,
+ };
+ 
+@@ -115,7 +132,7 @@ struct platform_device tegra_i2c_device4 = {
+ 	.resource	= i2c_resource4,
+ 	.num_resources	= ARRAY_SIZE(i2c_resource4),
+ 	.dev = {
+-		.platform_data = 0,
++		.platform_data = &tegra_dvc_platform_data,
  	},
- 	.resource = tegra_usb3_resources,
- 	.num_resources = ARRAY_SIZE(tegra_usb3_resources),
+ };
+ 
 -- 
 1.7.4.1
