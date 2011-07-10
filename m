@@ -1,47 +1,58 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Sun, 10 Jul 2011 21:06:36 +0900
-Subject: [PATCH 2/2] clk: Provide a dummy clk_unregister()
-In-Reply-To: <1310299596-26137-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-References: <1310299596-26137-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <1310299596-26137-2-git-send-email-broonie@opensource.wolfsonmicro.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Sun, 10 Jul 2011 15:09:22 +0300
+Subject: [PATCH v2] pxa2xx_spi: fix memory corruption
+In-Reply-To: <201107100957.06377.marek.vasut@gmail.com>
+References: <201107100957.06377.marek.vasut@gmail.com>
+Message-ID: <1310299762-20079-1-git-send-email-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Even though unregistration is not actually supported by the clk API it is
-still useful to provide a clk_unregister() so that drivers can implement
-their unregistration code. This saves having to go back later and update
-them once unregistration is possible.
+pxa2xx_spi_probe allocates struct driver_data and null_dma_buf
+at same time via spi_alloc_master(), but then calculates
+null_dma_buf pointer incorrectly, and it causes memory corruption
+later if DMA usage is enabled.
 
-Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
 ---
- include/linux/clk.h |   15 +++++++++++++++
- 1 files changed, 15 insertions(+), 0 deletions(-)
+v2: - add u8 __null_dma_buf[16] to the end of driver_data structure
+    and use it as null_dma_buf after alignment.
+    - use PTR_ALIGN instead of ALIGN
+ drivers/spi/pxa2xx_spi.c |    9 +++++----
+ 1 files changed, 5 insertions(+), 4 deletions(-)
 
-diff --git a/include/linux/clk.h b/include/linux/clk.h
-index 2ca4f66..df5c64f 100644
---- a/include/linux/clk.h
-+++ b/include/linux/clk.h
-@@ -149,6 +149,21 @@ extern struct clk_hw_ops clk_gate_ops;
- struct clk *clk_register(struct clk_hw_ops *ops, struct clk_hw *hw,
- 			 const char *name);
+diff --git a/drivers/spi/pxa2xx_spi.c b/drivers/spi/pxa2xx_spi.c
+index dc25bee..25358cd 100644
+--- a/drivers/spi/pxa2xx_spi.c
++++ b/drivers/spi/pxa2xx_spi.c
+@@ -106,6 +106,7 @@ struct driver_data {
+ 	int rx_channel;
+ 	int tx_channel;
+ 	u32 *null_dma_buf;
++	u8 __null_dma_buf[16];
  
-+/**
-+ * clk_unregister - remove a clock
-+ *
-+ * @clk: clock to unregister
-+ *
-+ * Remove a clock from the clk subsystem.  This is currently not
-+ * implemented but is provided to allow unregistration code to be
-+ * written in drivers ready for use when an implementation is
-+ * provided.
-+ */
-+static inline int clk_unregister(struct clk *clk)
-+{
-+	return -ENOTSUPP;
-+}
-+
- #else /* !CONFIG_GENERIC_CLK */
+ 	/* SSP register addresses */
+ 	void __iomem *ioaddr;
+@@ -1543,8 +1544,8 @@ static int __devinit pxa2xx_spi_probe(struct platform_device *pdev)
+ 		return -ENODEV;
+ 	}
  
- /*
+-	/* Allocate master with space for drv_data and null dma buffer */
+-	master = spi_alloc_master(dev, sizeof(struct driver_data) + 16);
++	/* Allocate master with space for drv_data */
++	master = spi_alloc_master(dev, sizeof(struct driver_data));
+ 	if (!master) {
+ 		dev_err(&pdev->dev, "cannot alloc spi_master\n");
+ 		pxa_ssp_free(ssp);
+@@ -1569,8 +1570,8 @@ static int __devinit pxa2xx_spi_probe(struct platform_device *pdev)
+ 	master->transfer = transfer;
+ 
+ 	drv_data->ssp_type = ssp->type;
+-	drv_data->null_dma_buf = (u32 *)ALIGN((u32)(drv_data +
+-						sizeof(struct driver_data)), 8);
++	drv_data->null_dma_buf =
++		(u32 *)PTR_ALIGN((u8 *)drv_data->__null_dma_buf, 8);
+ 
+ 	drv_data->ioaddr = ssp->mmio_base;
+ 	drv_data->ssdr_physical = ssp->phys_base + SSDR;
 -- 
-1.7.5.4
+1.7.5.rc3
