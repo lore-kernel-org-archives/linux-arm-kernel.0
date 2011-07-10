@@ -1,49 +1,40 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Sun, 10 Jul 2011 14:20:27 +0530
-Subject: function tracer on i.mx35 (pcm043)
-In-Reply-To: <201107041909.27354.tim.sander@hbm.com>
-References: <201107041909.27354.tim.sander@hbm.com>
-Message-ID: <CAH+eYFCwVacjbmG+08y6+NO2dYkRd-9YRgaGoUnrJZwa8ki-WA@mail.gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Sun, 10 Jul 2011 13:02:18 +0900
+Subject: [PATCH] ARM: mmp: remove builtin gpio driver support
+In-Reply-To: <1310120428-22700-2-git-send-email-haojian.zhuang@marvell.com>
+References: <1310120428-22700-1-git-send-email-haojian.zhuang@marvell.com>
+	<1310120428-22700-2-git-send-email-haojian.zhuang@marvell.com>
+Message-ID: <20110710040218.GA10912@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 4, 2011 at 22:39, Tim Sander <tim.sander@hbm.com> wrote:
-> Using vanilla 2.6.39 on arm i.mx35 (pcm043) with trace-cmd 1.0.5,
-> build with:
-> arm-1136jfs-linux-gnueabi-gcc (OSELAS.Toolchain-2011.03.0) 4.5.2.
->
-> I am currently trying to find the reason why the irq on the i.mx35 is somtimes
-> up do 80?s delayed. I thought that the function tracer would help in solving
-> that problem but unfortunately it crashes when using the function trace plugin.
+On Fri, Jul 08, 2011 at 06:20:18PM +0800, Haojian Zhuang wrote:
+> Remove builtin gpio driver support form mmp.
+> 
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
 
-I think your platform uses arch/arm/plat-mxc/time.c?  Oopses with the
-function graph tracer are usually caused by recursion due to a missing
-notrace annotation on sched_clock() or its called functions.
+Hi Haojian.
 
-Could you please try the following change? (applies on 2.6.39)
+I'm not clear what this patch is intending to do.  I understand that
+it removes the mmp-specific gpio support, but I looks like don't see the code
+that replaces it, which would mean that applying this patch breaks
+gpio on mmp platforms.
 
-diff --git a/arch/arm/plat-mxc/time.c b/arch/arm/plat-mxc/time.c
-index 2237ff8..9c7c6dc 100644
---- a/arch/arm/plat-mxc/time.c
-+++ b/arch/arm/plat-mxc/time.c
-@@ -106,17 +106,17 @@ static void gpt_irq_acknowledge(void)
- 		__raw_writel(V2_TSTAT_OF1, timer_base + V2_TSTAT);
- }
+Am I missing something?
 
--static cycle_t dummy_get_cycles(struct clocksource *cs)
-+static cycle_t notrace dummy_get_cycles(struct clocksource *cs)
- {
- 	return 0;
- }
+> diff --git a/arch/arm/plat-pxa/Makefile b/arch/arm/plat-pxa/Makefile
+> index 3aca5ba..8e432b1 100644
+> --- a/arch/arm/plat-pxa/Makefile
+> +++ b/arch/arm/plat-pxa/Makefile
+> @@ -4,7 +4,9 @@
+>  
+>  obj-y	:= dma.o
+>  
+> +ifeq ($(CONFIG_OF),)
+>  obj-$(CONFIG_GENERIC_GPIO)	+= gpio.o
+> +endif
 
--static cycle_t mx1_2_get_cycles(struct clocksource *cs)
-+static cycle_t notrace mx1_2_get_cycles(struct clocksource *cs)
- {
- 	return __raw_readl(timer_base + MX1_2_TCN);
- }
+Be careful about this.  Turning on device tree support must not
+disable booting on non-DT machines.
 
--static cycle_t v2_get_cycles(struct clocksource *cs)
-+static cycle_t notrace v2_get_cycles(struct clocksource *cs)
- {
- 	return __raw_readl(timer_base + V2_TCN);
- }
+g.
