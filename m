@@ -1,39 +1,47 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Sun, 10 Jul 2011 21:06:35 +0900
-Subject: [PATCH 1/2] clk: Prototype and document clk_register()
-Message-ID: <1310299596-26137-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Date: Sun, 10 Jul 2011 21:06:36 +0900
+Subject: [PATCH 2/2] clk: Provide a dummy clk_unregister()
+In-Reply-To: <1310299596-26137-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+References: <1310299596-26137-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <1310299596-26137-2-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This allows the compiler to ensure drivers are using the correct prototype.
+Even though unregistration is not actually supported by the clk API it is
+still useful to provide a clk_unregister() so that drivers can implement
+their unregistration code. This saves having to go back later and update
+them once unregistration is possible.
 
 Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 ---
- include/linux/clk.h |   12 ++++++++++++
- 1 files changed, 12 insertions(+), 0 deletions(-)
+ include/linux/clk.h |   15 +++++++++++++++
+ 1 files changed, 15 insertions(+), 0 deletions(-)
 
 diff --git a/include/linux/clk.h b/include/linux/clk.h
-index 7c26135..2ca4f66 100644
+index 2ca4f66..df5c64f 100644
 --- a/include/linux/clk.h
 +++ b/include/linux/clk.h
-@@ -136,6 +136,18 @@ extern struct clk_hw_ops clk_gate_ops;
- 
- #endif /* CONFIG_GENERIC_CLK_GATE */
+@@ -149,6 +149,21 @@ extern struct clk_hw_ops clk_gate_ops;
+ struct clk *clk_register(struct clk_hw_ops *ops, struct clk_hw *hw,
+ 			 const char *name);
  
 +/**
-+ * clk_register - register and initialize a new clock
++ * clk_unregister - remove a clock
 + *
-+ * @ops: ops for the new clock
-+ * @hw: struct clk_hw to be passed to the ops of the new clock
-+ * @name: name to use for the new clock
++ * @clk: clock to unregister
 + *
-+ * Register a new clock with the clk subsytem.  Returns either a
-+ * struct clk for the new clock or a NULL pointer.
++ * Remove a clock from the clk subsystem.  This is currently not
++ * implemented but is provided to allow unregistration code to be
++ * written in drivers ready for use when an implementation is
++ * provided.
 + */
-+struct clk *clk_register(struct clk_hw_ops *ops, struct clk_hw *hw,
-+			 const char *name);
- 
++static inline int clk_unregister(struct clk *clk)
++{
++	return -ENOTSUPP;
++}
++
  #else /* !CONFIG_GENERIC_CLK */
  
+ /*
 -- 
 1.7.5.4
