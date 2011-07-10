@@ -1,63 +1,70 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Sun, 10 Jul 2011 01:34:19 -0600 (MDT)
-Subject: [GIT PULL] OMAP: SoC data/core: fixes for 3.1 
-Message-ID: <alpine.DEB.2.00.1107100132470.15984@utopia.booyaka.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Sun, 10 Jul 2011 09:57:06 +0200
+Subject: [PATCH] pxa2xx_spi: fix memory corruption
+In-Reply-To: <201107100914.45452.marek.vasut@gmail.com>
+References: <1310246098-21208-1-git-send-email-anarsoul@gmail.com>
+	<20110709231108.GQ4812@n2100.arm.linux.org.uk>
+	<201107100914.45452.marek.vasut@gmail.com>
+Message-ID: <201107100957.06377.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+On Sunday, July 10, 2011 09:14:45 AM Marek Vasut wrote:
+> On Sunday, July 10, 2011 01:11:09 AM Russell King - ARM Linux wrote:
+> > On Sun, Jul 10, 2011 at 01:05:48AM +0200, Marek Vasut wrote:
+> > > On Saturday, July 09, 2011 11:14:58 PM Vasily Khoruzhick wrote:
+> > > > pxa2xx_spi_probe allocates struct driver_data and null_dma_buf
+> > > > at same time via spi_alloc_master(), but then calculates
+> > > > null_dma_buf pointer incorrectly, and it causes memory corruption
+> > > > later if DMA usage is enabled.
+> > > > 
+> > > > Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+> > > > ---
+> > > > 
+> > > >  drivers/spi/pxa2xx_spi.c |    2 +-
+> > > >  1 files changed, 1 insertions(+), 1 deletions(-)
+> > > > 
+> > > > diff --git a/drivers/spi/pxa2xx_spi.c b/drivers/spi/pxa2xx_spi.c
+> > > > index dc25bee..ef38fbf 100644
+> > > > --- a/drivers/spi/pxa2xx_spi.c
+> > > > +++ b/drivers/spi/pxa2xx_spi.c
+> > > > @@ -1569,7 +1569,7 @@ static int __devinit pxa2xx_spi_probe(struct
+> > > > platform_device *pdev) master->transfer = transfer;
+> > > > 
+> > > >  	drv_data->ssp_type = ssp->type;
+> > > > 
+> > > > -	drv_data->null_dma_buf = (u32 *)ALIGN((u32)(drv_data +
+> > > > +	drv_data->null_dma_buf = (u32 *)ALIGN(((u32)drv_data +
+> > > > 
+> > > >  						sizeof(struct driver_data)), 8);
+> > > 
+> > > This thing looks a bit disturbing in itself. Like, where the heck is
+> > > that thing pointing in the end ? Since some data are written to
+> > > address in "null_dma_buf" ... isn't this just changing the corruption
+> > > impact ?
+> > > 
+> >         /* Allocate master with space for drv_data and null dma buffer */
+> >         master = spi_alloc_master(dev, sizeof(struct driver_data) + 16);
+> > 
+> > So there's 16 bytes at the end of driver_data.
+> > 
+> > However:
+> > 	(u32)(drv_data + sizeof(struct driver_data))
+> > 
+> > is pointer arithmetic.  drv_data points at an object of sizeof(struct
+> > driver_data).  Adding one to this increments the pointer by
+> > sizeof(struct driver_data) bytes.  So the above expression increments
+> > the pointer by sizeof(struct driver_data)*sizeof(struct driver_data)
+> > bytes, which is obviously complete rubbish.
+> > 
+> > 	((u32)drv_data + sizeof(struct driver_data))
+> > 
+> > casts drv_data to a u32 first, then adds the sizeof(struct driver_data)
+> > which moves us into the 16 bytes allocated off the end of the struct.
+> 
+> The ptr arritmetic is clear, it was the 16 bytes after the structure I was
+> missing ... if it's allocated there, it's fine. Thanks for clearing this.
 
-The following changes since commit c402c0d9dfa8d4fb54dd98fc12525f39d0f29bfe:
-
-  Merge branches 'dmtimer_precleanup_3.1', 'hwmod_core_cleanup_a_3.1', 'combine_common_hwmod_3.1', 'omap4_hwmod_data_cleanup_a_3.1', 'clock_cleanup_a_3.1', 'prcm_cleanup_a_3.1', 'omap_pm_cleanup_3.1' and 'omap_device_cleanup_3.1' into prcm-cleanup-3.1 (2011-07-09 20:24:07 -0600)
-
-are available in the git repository at:
-
-  git://git.pwsan.com/linux-2.6 prcm-fixes-3.1
-
-Andy Green (6):
-      I2C: OMAP2+: Set hwmod flags to only allow 16-bit accesses to i2c
-      I2C: OMAP2+: increase omap_i2c_dev_attr flags from u8 to u32
-      I2C: OMAP2+:  Introduce I2C IP versioning constants
-      I2C: OMAP1/OMAP2+: create omap I2C functionality flags for each cpu_... test
-      I2C: OMAP2+: Tag all OMAP2+ hwmod defintions with I2C IP revision
-      I2C: OMAP2+: add correct functionality flags to all omap2plus i2c dev_attr
-
-Avinash.H.M (1):
-      OMAP: hwmod: fix the i2c-reset timeout during bootup
-
-Benoit Cousson (1):
-      OMAP4: powerdomain data: Fix core mem states and missing cefuse flag
-
-Paul Walmsley (1):
-      Merge branches 'powerdomain_fixes_3.1', 'hardware_workarounds_3.1', 'hwmod_dss_fix_3.1' and 'i2c_fixes_3.1' into prcm-fixes-3.1
-
-Rajendra Nayak (1):
-      OMAP2+: PM: Initialise sleep_switch to a non-valid value
-
-Santosh Shilimkar (2):
-      OMAP4: clock data: Keep GPMC clocks always enabled and hardware managed
-      OMAP4: powerdomain data: Remove unsupported MPU powerdomain state
-
-Tomi Valkeinen (2):
-      OMAP4: hwmod data: Modify DSS opt clocks
-      OMAP4: hwmod data: Change DSS main_clk scheme
-
- arch/arm/mach-omap2/clock44xx_data.c         |    9 ++-
- arch/arm/mach-omap2/i2c.c                    |   68 +++++++++++++++++++++
- arch/arm/mach-omap2/omap_hwmod.c             |   27 +++++++++
- arch/arm/mach-omap2/omap_hwmod_2420_data.c   |    9 +++-
- arch/arm/mach-omap2/omap_hwmod_2430_data.c   |    7 ++
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c   |   18 +++++-
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c   |   81 ++++++++++++++++++++------
- arch/arm/mach-omap2/pm.c                     |    2 +-
- arch/arm/mach-omap2/powerdomains44xx_data.c  |    9 ++-
- arch/arm/plat-omap/include/plat/i2c.h        |    6 ++-
- arch/arm/plat-omap/include/plat/omap_hwmod.h |    1 +
- include/linux/i2c-omap.h                     |   27 +++++++++
- 12 files changed, 233 insertions(+), 31 deletions(-)
-
-omap2plus_defconfig
-   text    data     bss     dec     hex filename
-6353285  528944 5591048 12473277         be53bd vmlinux.orig
-6352073	 529392	5591048	12472513	 be50c1	vmlinux.patched
+Actually ... why don't we just add char null_buf[16] at the end of the structure 
+instead of allocating +16 bytes and then doing this strange crap ? Or even 
+better ... kzalloc() the buffer in probe(), then kfree() it in remove()?
