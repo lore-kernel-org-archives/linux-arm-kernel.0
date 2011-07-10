@@ -1,323 +1,249 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Sun, 10 Jul 2011 13:34:06 +0900
-Subject: [PATCH] ARM: mmp: parse irq from DT
-In-Reply-To: <1310120428-22700-3-git-send-email-haojian.zhuang@marvell.com>
+Date: Sun, 10 Jul 2011 14:26:21 +0900
+Subject: [PATCH] i2c: pxa: create dynamic platform device from device tree
+In-Reply-To: <1310120428-22700-7-git-send-email-haojian.zhuang@marvell.com>
 References: <1310120428-22700-1-git-send-email-haojian.zhuang@marvell.com>
 	<1310120428-22700-2-git-send-email-haojian.zhuang@marvell.com>
 	<1310120428-22700-3-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <20110710043406.GB10912@ponder.secretlab.ca>
+	<1310120428-22700-4-git-send-email-haojian.zhuang@marvell.com>
+	<1310120428-22700-5-git-send-email-haojian.zhuang@marvell.com>
+	<1310120428-22700-6-git-send-email-haojian.zhuang@marvell.com>
+	<1310120428-22700-7-git-send-email-haojian.zhuang@marvell.com>
+Message-ID: <20110710052621.GD10912@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 08, 2011 at 06:20:19PM +0800, Haojian Zhuang wrote:
-> Parse irq sepcifier from DT and translate it to Linux irq number.
+On Fri, Jul 08, 2011 at 06:20:23PM +0800, Haojian Zhuang wrote:
+> Create two probe function to support both current platform device and created
+> dynamic platform device from device tree. After moving to device tree,
+> original implementation of platform device will be removed.
+> 
+> Use property to present polling mode and frequency mode.
 > 
 > Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
 > ---
->  arch/arm/mach-mmp/Makefile |    2 +
->  arch/arm/mach-mmp/common.h |    1 +
->  arch/arm/mach-mmp/intc.c   |  245 ++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 248 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/mach-mmp/intc.c
+>  drivers/i2c/busses/i2c-pxa.c |  163 ++++++++++++++++++++++++++++++++++++++++++
+>  1 files changed, 163 insertions(+), 0 deletions(-)
 > 
-> diff --git a/arch/arm/mach-mmp/Makefile b/arch/arm/mach-mmp/Makefile
-> index 5c68382..e7862ea 100644
-> --- a/arch/arm/mach-mmp/Makefile
-> +++ b/arch/arm/mach-mmp/Makefile
-> @@ -4,6 +4,8 @@
+> diff --git a/drivers/i2c/busses/i2c-pxa.c b/drivers/i2c/busses/i2c-pxa.c
+> index d603646..7a6d774 100644
+> --- a/drivers/i2c/busses/i2c-pxa.c
+> +++ b/drivers/i2c/busses/i2c-pxa.c
+> @@ -29,6 +29,7 @@
+>  #include <linux/errno.h>
+>  #include <linux/interrupt.h>
+>  #include <linux/i2c-pxa.h>
+> +#include <linux/of_device.h>
+>  #include <linux/of_i2c.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/err.h>
+> @@ -1044,6 +1045,162 @@ static const struct i2c_algorithm i2c_pxa_pio_algorithm = {
+>  	.functionality	= i2c_pxa_functionality,
+>  };
 >  
->  obj-y				+= common.o clock.o devices.o time.o
->  
-> +obj-$(CONFIG_OF_IRQ)		+= intc.o
-> +
->  # SoC support
->  obj-$(CONFIG_CPU_PXA168)	+= pxa168.o irq-pxa168.o
->  obj-$(CONFIG_CPU_PXA910)	+= pxa910.o irq-pxa168.o
-> diff --git a/arch/arm/mach-mmp/common.h b/arch/arm/mach-mmp/common.h
-> index ec8d65d..1c563c2 100644
-> --- a/arch/arm/mach-mmp/common.h
-> +++ b/arch/arm/mach-mmp/common.h
-> @@ -6,3 +6,4 @@ extern void timer_init(int irq);
->  
->  extern void __init icu_init_irq(void);
->  extern void __init mmp_map_io(void);
-> +extern void __init mmp_init_intc(void);
-> diff --git a/arch/arm/mach-mmp/intc.c b/arch/arm/mach-mmp/intc.c
-> new file mode 100644
-> index 0000000..48ad84b
-> --- /dev/null
-> +++ b/arch/arm/mach-mmp/intc.c
-> @@ -0,0 +1,245 @@
-> +/*
-> + *  linux/arch/arm/mach-mmp/intc.c
-> + *
-> + *  Generic IRQ handling
-> + *
-> + *  Author:	Haojian Zhuang <haojian.zhuang@marvell.com>
-> + *  Copyright:	Marvell International Ltd. 2011
-> + *
-> + *  This program is free software; you can redistribute it and/or modify
-> + *  it under the terms of the GNU General Public License version 2 as
-> + *  published by the Free Software Foundation.
-> + */
-> +
-> +#include <linux/errno.h>
-> +#include <linux/io.h>
-> +#include <linux/kernel.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_irq.h>
-> +#include <linux/slab.h>
-> +
-> +struct mmp_intc_info {
-> +	unsigned int		mask;
-> +	unsigned int		phy_base;
-> +	void __iomem		*virt_base;
-> +	void __iomem		*mux_status;
-> +	void __iomem		*mux_mask;
-> +	void __iomem		*mfp_edge;
-> +	unsigned int		mfp_edge_index;	/* index in irq domain */
-> +	unsigned int		irq_base;
+> +static const struct of_device_id pxa_i2c_of_match[] = {
+> +	{ .compatible = "pxa2xx-i2c",	.data = (void *)REGS_PXA2XX, },
+> +	{ .compatible = "pxa3xx-pwri2c", .data = (void *)REGS_PXA3XX, },
+> +	{ .compatible = "ce4100-i2c",	.data = (void *)REGS_CE4100, },
+
+New compatible values need to be written up in
+Documentation/devicetree/bindings, and strings should be in the form
+"<vendor>,<soc>-i2c".  They should also be specific to the soc instead
+of trying to be generic (ie. use "marvell,pxa255-i2c" instead of
+"marvell,pxa2xx-i2c".
+
+> +	{},
 > +};
 > +
-> +static void mux_irq_unmask(struct irq_data *d)
+> +#ifdef CONFIG_OF
+> +static int i2c_pxa_of_probe(struct platform_device *of_dev)
 > +{
-> +	struct mmp_intc_info *info = irq_data_get_irq_chip_data(d);
-> +	unsigned int data, irq_offs;
+
+CONFIG_OF should not be an either/or option.  Turning on CONFIG_OF
+must not disable non-DT users.
+
+> +	struct device_node *np = of_dev->dev.of_node;
+> +	const struct of_device_id *match;
+> +	struct i2c_pxa_platform_data *plat = NULL;
+> +	struct pxa_i2c *i2c;
+> +	struct resource *res;
+> +	const __be32 *p;
+> +	int i2c_type, irq, data, ret;
+> +	int id = 0, poll = 0, fast = 0;
 > +
-> +	irq_offs = d->irq - info->irq_base;
-> +	if (info->mfp_edge && (info->mfp_edge_index == irq_offs)) {
-> +		data = __raw_readl(info->mfp_edge);
-> +		__raw_writel(data | (1 << 6), info->mfp_edge);
-> +		__raw_writel(data, info->mfp_edge);
+> +	match = of_match_device(pxa_i2c_of_match, &of_dev->dev);
+> +	if (match == NULL)
+> +		return -ENODEV;
+> +	i2c_type = (int)match->data;
+> +
+> +	p = of_get_property(np, "cell-index", &data);
+> +	if (p)
+> +		id = be32_to_cpu(*p);
+
+When using the device tree, the bus id should be dynamically
+assigned.  Don't use a cell-index property.
+
+> +
+> +	p = of_get_property(np, "i2c-polling", &data);
+> +	if (p)
+> +		poll = be32_to_cpu(*p);
+> +
+> +	p = of_get_property(np, "i2c-frequency", &data);
+> +	if (p && !strncmp((char *)p, "fast", data))
+> +		fast = 1;
+> +
+> +	res = platform_get_resource(of_dev, IORESOURCE_MEM, 0);
+> +	irq = platform_get_irq(of_dev, 0);
+> +	if (res == NULL || irq < 0)
+> +		return -ENODEV;
+> +
+> +	if (!request_mem_region(res->start, resource_size(res), res->name))
+> +		return -ENOMEM;
+> +
+> +	i2c = kzalloc(sizeof(struct pxa_i2c), GFP_KERNEL);
+
+kzalloc(sizeof(*i2c), GFP_KERNEL)
+
+> +	if (!i2c) {
+> +		ret = -ENOMEM;
+> +		goto emalloc;
 > +	}
-> +	data = __raw_readl(info->mux_mask) & ~(1 << (d->irq - info->irq_base));
-> +	__raw_writel(data, info->mux_mask);
+> +
+> +	i2c->adap.owner   = THIS_MODULE;
+> +	i2c->adap.retries = 5;
+> +
+> +	spin_lock_init(&i2c->lock);
+> +	init_waitqueue_head(&i2c->wait);
+> +
+> +	/*
+> +	 * adap.nr comes from cell-index in dts file
+> +	 */
+> +	i2c->adap.nr = id;
+> +	snprintf(i2c->adap.name, sizeof(i2c->adap.name), "pxa2xx-i2c.%u",
+> +		 i2c->adap.nr);
+> +
+> +	i2c->clk = clk_get_sys(i2c->adap.name, NULL);
+> +	if (IS_ERR(i2c->clk)) {
+> +		ret = PTR_ERR(i2c->clk);
+> +		goto eclk;
+> +	}
+> +
+> +	i2c->reg_base = ioremap(res->start, resource_size(res));
+> +	if (!i2c->reg_base) {
+> +		ret = -EIO;
+> +		goto eremap;
+> +	}
+> +
+> +	i2c->reg_ibmr = i2c->reg_base + pxa_reg_layout[i2c_type].ibmr;
+> +	i2c->reg_idbr = i2c->reg_base + pxa_reg_layout[i2c_type].idbr;
+> +	i2c->reg_icr = i2c->reg_base + pxa_reg_layout[i2c_type].icr;
+> +	i2c->reg_isr = i2c->reg_base + pxa_reg_layout[i2c_type].isr;
+> +	if (i2c_type != REGS_CE4100)
+> +		i2c->reg_isar = i2c->reg_base + pxa_reg_layout[i2c_type].isar;
+> +
+> +	i2c->iobase = res->start;
+> +	i2c->iosize = resource_size(res);
+> +
+> +	i2c->irq = irq;
+> +	i2c->use_pio = poll;
+> +	i2c->fast_mode = fast;
+> +
+> +	i2c->slave_addr = I2C_PXA_SLAVE_ADDR;
+> +
+> +#ifdef CONFIG_I2C_PXA_SLAVE
+> +	if (plat) {
+> +		i2c->slave_addr = plat->slave_addr;
+> +		i2c->slave = plat->slave;
+> +	}
+> +#endif
+> +
+> +	clk_enable(i2c->clk);
+> +
+> +	if (plat)
+> +		i2c->adap.class = plat->class;
+> +
+> +	if (i2c->use_pio) {
+> +		i2c->adap.algo = &i2c_pxa_pio_algorithm;
+> +	} else {
+> +		i2c->adap.algo = &i2c_pxa_algorithm;
+> +		ret = request_irq(irq, i2c_pxa_handler, IRQF_SHARED,
+> +				  i2c->adap.name, i2c);
+> +		if (ret)
+> +			goto ereqirq;
+> +	}
+> +
+> +	i2c_pxa_reset(i2c);
+> +
+> +	i2c->adap.algo_data = i2c;
+> +	i2c->adap.dev.parent = &of_dev->dev;
+> +	i2c->adap.dev.of_node = of_dev->dev.of_node;
+> +
+> +	if (i2c_type == REGS_CE4100)
+> +		ret = i2c_add_adapter(&i2c->adap);
+> +	else
+> +		ret = i2c_add_numbered_adapter(&i2c->adap);
+> +	if (ret < 0) {
+> +		printk(KERN_INFO "I2C: Failed to add bus\n");
+> +		goto eadapt;
+> +	}
+> +	of_i2c_register_devices(&i2c->adap);
+> +
+> +	platform_set_drvdata(of_dev, i2c);
+> +
+> +#ifdef CONFIG_I2C_PXA_SLAVE
+> +	printk(KERN_INFO "I2C: %s: PXA I2C adapter, slave address %d\n",
+> +	       dev_name(&i2c->adap.dev), i2c->slave_addr);
+> +#else
+> +	printk(KERN_INFO "I2C: %s: PXA I2C adapter\n",
+> +	       dev_name(&i2c->adap.dev));
+> +#endif
+> +	return 0;
+> +
+> +eadapt:
+> +	if (!i2c->use_pio)
+> +		free_irq(irq, i2c);
+> +ereqirq:
+> +	clk_disable(i2c->clk);
+> +	iounmap(i2c->reg_base);
+> +eremap:
+> +	clk_put(i2c->clk);
+> +eclk:
+> +	kfree(i2c);
+> +emalloc:
+> +	release_mem_region(res->start, resource_size(res));
+> +	return ret;
 > +}
+> +#else
 > +
-> +static void mux_irq_mask(struct irq_data *d)
-> +{
-> +	struct mmp_intc_info *info = irq_data_get_irq_chip_data(d);
-> +	unsigned int data;
-> +
-> +	data = __raw_readl(info->mux_mask) | (1 << (d->irq - info->irq_base));
-> +	__raw_writel(data, info->mux_mask);
-> +}
-> +
-> +static struct irq_chip mux_irq_chip = {
-> +	.name		= "mmp mux intc",
-> +	.irq_unmask	= mux_irq_unmask,
-> +	.irq_mask	= mux_irq_mask,
-> +	.irq_ack	= mux_irq_mask,
-> +};
-> +
-> +static void mmp_irq_demux_handler(unsigned int irq, struct irq_desc *desc)
-> +{
-> +	struct mmp_intc_info *info = irq_get_handler_data(irq);
-> +	unsigned long status, mask, n;
-> +
-> +	mask = __raw_readl(info->mux_mask);
-> +	while (1) {
-> +		status = __raw_readl(info->mux_status) & ~mask;
-> +		if (status == 0)
-> +			break;
-> +		n = find_first_bit(&status, BITS_PER_LONG);
-> +		while (n < BITS_PER_LONG) {
-> +			generic_handle_irq(info->irq_base + n);
-> +			n = find_next_bit(&status, BITS_PER_LONG, n + 1);
-> +		}
-> +	}
-> +}
-> +
-> +static void mux_init_intc(struct mmp_intc_info *mmp_info)
-> +{
-> +	struct device_node *np;
-> +	struct mmp_intc_info *mux_info;
-> +	const __be32 *nr, *status, *edge;
-> +	unsigned int addr = 0, offs = 0;
-> +	int cascade, irq_nr, i;
-> +
-> +	if (mmp_info->virt_base == NULL)
-> +		goto out;
-> +
-> +	for (np = NULL; (np = of_find_all_nodes(np)) != NULL;) {
-> +		if (!of_device_is_compatible(np, "mrvl,mux-intc"))
-> +			continue;
-
-for_each_compatible_node()
-
-> +		if (of_get_property(np, "interrupt-controller", NULL) == NULL)
-> +			continue;
-> +		nr = of_get_property(np, "sub-interrupts", NULL);
-> +		if (nr == NULL) {
-> +			printk(KERN_WARNING "sub-interrupts property "
-> +				"is missed\n");
-> +			continue;
-> +		}
-> +		irq_nr = be32_to_cpu(*nr);
-
-There's a new function you can use here that makes reading single property
-values easier.  of_platform_read_u32() is queued up in linux-next.
-
-> +		status = of_get_property(np, "status-mask", NULL);
-> +		if (status == NULL) {
-> +			printk(KERN_WARNING "status-mask property is missed\n");
-> +			continue;
-> +		}
-> +		edge = of_get_property(np, "mfp-edge-interrupt", NULL);
-> +
-> +		mux_info = kzalloc(sizeof(struct mmp_intc_info), GFP_KERNEL);
-
-kzalloc(sizeof(*mux_info), GFP_KERNEL);
-
-> +		if (mux_info == NULL)
-> +			goto out;
-> +		mux_info->virt_base = mmp_info->virt_base;
-> +		mux_info->mux_status = be32_to_cpu(*status++)
-> +					+ mux_info->virt_base;
-> +		mux_info->mux_mask = be32_to_cpu(*status)
-> +					+ mux_info->virt_base;
-> +		if (edge) {
-> +			addr = be32_to_cpu(*edge) & PAGE_MASK;
-> +			offs = be32_to_cpu(*edge) - addr;
-> +			mux_info->mfp_edge = ioremap(addr, PAGE_SIZE) + offs;
-> +			mux_info->mfp_edge_index = be32_to_cpu(*++edge);
-> +		}
-> +
-> +		/* allocate new irq */
-> +		cascade = irq_of_parse_and_map(np, 0);
-> +		mux_info->irq_base = irq_alloc_descs(-1, 0, irq_nr, 0);
-> +		irq_domain_add_simple(np, mux_info->irq_base);
-> +
-> +		i = mux_info->irq_base;
-> +		for (; i < mux_info->irq_base + irq_nr; i++) {
-> +			irq_set_chip_data(i, mux_info);
-> +			mux_irq_mask(irq_get_irq_data(i));
-> +			irq_set_chip_and_handler(i, &mux_irq_chip,
-> +					handle_level_irq);
-> +			set_irq_flags(i, IRQF_VALID);
-> +		}
-> +
-> +		irq_set_handler_data(cascade, mux_info);
-> +		irq_set_chained_handler(cascade, mmp_irq_demux_handler);
-> +	}
-> +out:
-> +	return;
-> +}
-
-It looks like this function is parsing a new device tree binding.  Any
-new bindings needs to be documented in Documentation/devicetree/bindings.
-
-> +
-> +static void mmp_irq_unmask(struct irq_data *d)
-> +{
-> +	struct mmp_intc_info *info = irq_data_get_irq_chip_data(d);
-> +
-> +	/* ICU_INT_CONF */
-> +	__raw_writel(info->mask, info->virt_base + (d->irq << 2));
-> +}
-> +
-> +static void mmp_irq_mask(struct irq_data *d)
-> +{
-> +	struct mmp_intc_info *info = irq_data_get_irq_chip_data(d);
-> +
-> +	__raw_writel(0, info->virt_base + (d->irq << 2));
-> +}
-> +
-> +static struct irq_chip mmp_irq_chip = {
-> +	.name		= "mmp-intc",
-> +	.irq_unmask	= mmp_irq_unmask,
-> +	.irq_mask	= mmp_irq_mask,
-> +	.irq_ack	= mmp_irq_mask,
-> +};
-
-Can you use IRQ_GENERIC_CHIP?
-
-> +
-> +void __init mmp_init_intc(void)
-> +{
-> +	struct mmp_intc_info *info;
-> +	struct device_node *np;
-> +	const __be32 *enable_mask, *base, *cell, *nr;
-> +	int i, irq_nr, phy_base;
-> +
-> +	np = of_find_compatible_node(NULL, NULL, "mrvl,mmp-intc");
-> +
-> +	BUG_ON(!np);
-> +
-> +	of_node_get(np);
-> +	if (of_get_property(np, "interrupt-controller", NULL) == NULL)
-> +		goto out;
-> +	cell = of_get_property(np, "#interrupt-cells", NULL);
-> +	if (cell == NULL) {
-> +		printk(KERN_ERR "mmp-intc: Device node %s missing "
-> +			"interrupt-cells property\n", np->full_name);
-> +		goto out;
-> +	}
-> +	if (be32_to_cpu(*cell) != 1) {
-> +		printk(KERN_ERR "mmp-intc: interrupt-cells property is "
-> +			"incorrect:%d\n", be32_to_cpu(*cell));
-> +		goto out;
-> +	}
-> +
-> +	nr = of_get_property(np, "sub-interrupts", NULL);
-> +	if (nr == NULL) {
-> +		printk(KERN_ERR "mmp-intc: interrupts property is missed\n");
-> +		goto out;
-> +	}
-> +	irq_nr = be32_to_cpu(*nr);
-> +
-> +	base = of_get_property(np, "reg", NULL);
-> +	if (base == NULL) {
-> +		printk(KERN_ERR "intc: Device node %s missing reg property\n",
-> +			np->full_name);
-> +		goto out;
-> +	}
-> +	phy_base = of_translate_address(np, base);
-
-Use of_address_to_resource().
-
-> +
-> +	info = kzalloc(sizeof(struct mmp_intc_info), GFP_KERNEL);
-> +	if (info == NULL)
-> +		goto out;
-> +
-> +	enable_mask = of_get_property(np, "enable_mask", NULL);
-> +	if (enable_mask == NULL) {
-> +		printk(KERN_ERR "interrupt controller: Device node %s "
-> +			"missing interrupt property\n", np->full_name);
-> +		goto out_mem;
-> +	}
-> +	info->mask = be32_to_cpu(*enable_mask);
-> +
-> +	/* phy_base: 0, phy_size:64 */
-> +	info->phy_base = phy_base;
-> +	info->virt_base = ioremap(info->phy_base, PAGE_SIZE);
-> +
-> +	/* allocate new irq */
-> +	info->irq_base = irq_alloc_descs(-1, 0, irq_nr, 0);
-> +	irq_domain_add_simple(np, 0);
-
-Excellent! Good use of dynamic irqs.
-
-> +
-> +	for (i = info->irq_base; i < info->irq_base + irq_nr; i++) {
-> +		irq_set_chip_data(i, info);
-> +		mmp_irq_mask(irq_get_irq_data(i));
-> +		irq_set_chip_and_handler(i, &mmp_irq_chip, handle_level_irq);
-> +		set_irq_flags(i, IRQF_VALID);
-> +	}
-> +	mux_init_intc(info);
-> +	of_node_put(np);
-> +	return;
-> +out_mem:
-> +	kfree(info);
-> +out:
-> +	of_node_put(np);
-> +	return;
-> +}
-
-There's a lot of duplicate code here between the primary and cascaded
-irq controllers.  It can probably be consolidated.
-
-g.
+>  static int i2c_pxa_probe(struct platform_device *dev)
+>  {
+>  	struct pxa_i2c *i2c;
+> @@ -1174,6 +1331,7 @@ emalloc:
+>  	release_mem_region(res->start, resource_size(res));
+>  	return ret;
+>  }
+> +#endif
+>  
+>  static int __exit i2c_pxa_remove(struct platform_device *dev)
+>  {
+> @@ -1228,12 +1386,17 @@ static const struct dev_pm_ops i2c_pxa_dev_pm_ops = {
+>  #endif
+>  
+>  static struct platform_driver i2c_pxa_driver = {
+> +#ifdef CONFIG_OF
+> +	.probe		= i2c_pxa_of_probe,
+> +#else
+>  	.probe		= i2c_pxa_probe,
+> +#endif
+>  	.remove		= __exit_p(i2c_pxa_remove),
+>  	.driver		= {
+>  		.name	= "pxa2xx-i2c",
+>  		.owner	= THIS_MODULE,
+>  		.pm	= I2C_PXA_DEV_PM_OPS,
+> +		.of_match_table	= pxa_i2c_of_match,
+>  	},
+>  	.id_table	= i2c_pxa_id_table,
+>  };
+> -- 
+> 1.5.6.5
+> 
