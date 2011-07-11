@@ -1,134 +1,137 @@
-From: khilman@ti.com (Kevin Hilman)
+From: ccross@android.com (Colin Cross)
 Date: Mon, 11 Jul 2011 11:51:00 -0700
-Subject: [pm-wip/cpufreq] [PATCH] OMAP2+: CPUfreq: update lpj with
-	reference value to avoid progressive error.
-In-Reply-To: <1310406004-5060-1-git-send-email-santosh.shilimkar@ti.com>
-	(Santosh Shilimkar's message of "Mon, 11 Jul 2011 23:10:04 +0530")
-References: <1310406004-5060-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <87d3hgzm5n.fsf@ti.com>
+Subject: [RFC PATCH 05/17] ARM: kernel: save/restore kernel IF
+In-Reply-To: <20110711184010.GB8486@n2100.arm.linux.org.uk>
+References: <1310053830-23779-1-git-send-email-lorenzo.pieralisi@arm.com>
+	<1310053830-23779-6-git-send-email-lorenzo.pieralisi@arm.com>
+	<alpine.DEB.2.00.1107081641280.2609@localhost6.localdomain6>
+	<20110711140047.GA346@e102568-lin.cambridge.arm.com>
+	<20110711184010.GB8486@n2100.arm.linux.org.uk>
+Message-ID: <CAMbhsRRm4-8gzjxqqu8MAkyMg8Xx02wDhmjET0b9njVF5z=UVw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+On Mon, Jul 11, 2011 at 11:40 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Jul 11, 2011 at 03:00:47PM +0100, Lorenzo Pieralisi wrote:
+>> Well, short answer is no. On SMP we do need to save CPU registers
+>> but if just one single cpu is shutdown L2 is still on.
+>> cpu_suspend saves regs on the stack that has to be cleaned from
+>> L2 before shutting a CPU down which make things more complicated than
+>> they should.
+>
+> Hang on. ?Please explain something to me here. ?You've mentioned a few
+> times that cpu_suspend() can't be used because of the L2 cache. ?Why
+> is this the case?
+>
+> OMAP appears to have code in its sleep path - which has been converted
+> to cpu_suspend() support - to deal with the L2 issues.
 
-> From: Russell King <rmk+kernel@arm.linux.org.uk>
->
-> Adjust _both_ the per-cpu loops_per_jiffy and global lpj. Calibrate them
-> with with reference to the initial values to avoid a progressively
-> bigger and bigger error in the value over time.
->
-> While at this, re-use the notifiers for UP/SMP since on
-> UP machine or UP_ON_SMP policy->cpus mask would contain only
-> the boot CPU.
->
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> [santosh.shilimkar at ti.com: re-based against omap cpufreq
-> upstream branch and fixed notifiers]
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> Cc: Kevin Hilman <khilman@ti.com>
+OMAP is very different, because it doesn't use cpu_suspend.  It saves
+it's state to SAR ram, which is mapped uncached, which avoids L2
+problems.
 
-Thanks, applied to pm-wip/cpufreq branch.
-
-Kevin
-
-> ---
-> Patch is outcome of below discussion.
-> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg51559.html
+> However, lets recap. ?What we do in cpu_suspend() in order is:
 >
->  arch/arm/mach-omap2/omap2plus-cpufreq.c |   50 ++++++++++++++++--------------
->  1 files changed, 27 insertions(+), 23 deletions(-)
+> - Save the ABI registers onto the stack, and some private state
+> - Save the CPU specific state onto the stack
+> - Flush the L1 cache
+> - Call the platform specific suspend finisher
 >
-> diff --git a/arch/arm/mach-omap2/omap2plus-cpufreq.c b/arch/arm/mach-omap2/omap2plus-cpufreq.c
-> index 1f3b2e1..de82e87 100644
-> --- a/arch/arm/mach-omap2/omap2plus-cpufreq.c
-> +++ b/arch/arm/mach-omap2/omap2plus-cpufreq.c
-> @@ -38,6 +38,16 @@
->  
->  #include <mach/hardware.h>
->  
-> +#ifdef CONFIG_SMP
-> +struct lpj_info {
-> +	unsigned long	ref;
-> +	unsigned int	freq;
-> +};
-> +
-> +static DEFINE_PER_CPU(struct lpj_info, lpj_ref);
-> +static struct lpj_info global_lpj_ref;
-> +#endif
-> +
->  static struct cpufreq_frequency_table *freq_table;
->  static atomic_t freq_table_users = ATOMIC_INIT(0);
->  static struct clk *mpu_clk;
-> @@ -96,37 +106,18 @@ static int omap_target(struct cpufreq_policy *policy,
->  	if (freqs.old == freqs.new && policy->cur == freqs.new)
->  		return ret;
->  
-> -	if (!is_smp()) {
-> -		cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
-> -		goto set_freq;
-> -	}
-> -
->  	/* notifiers */
->  	for_each_cpu(i, policy->cpus) {
->  		freqs.cpu = i;
->  		cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
->  	}
->  
-> -set_freq:
->  #ifdef CONFIG_CPU_FREQ_DEBUG
->  	pr_info("cpufreq-omap: transition: %u --> %u\n", freqs.old, freqs.new);
->  #endif
->  
->  	ret = clk_set_rate(mpu_clk, freqs.new * 1000);
-> -
-> -	/*
-> -	 * Generic CPUFREQ driver jiffy update is under !SMP. So jiffies
-> -	 * won't get updated when UP machine cpufreq build with
-> -	 * CONFIG_SMP enabled. Below code is added only to manage that
-> -	 * scenario
-> -	 */
->  	freqs.new = omap_getspeed(policy->cpu);
-> -	if (!is_smp()) {
-> -		loops_per_jiffy =
-> -			 cpufreq_scale(loops_per_jiffy, freqs.old, freqs.new);
-> -		cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
-> -		goto skip_lpj;
-> -	}
->  
->  #ifdef CONFIG_SMP
->  	/*
-> @@ -134,10 +125,24 @@ set_freq:
->  	 * cpufreq driver. So, update the per-CPU loops_per_jiffy value
->  	 * on frequency transition. We need to update all dependent CPUs.
->  	 */
-> -	for_each_cpu(i, policy->cpus)
-> +	for_each_cpu(i, policy->cpus) {
-> +		struct lpj_info *lpj = &per_cpu(lpj_ref, i);
-> +		if (!lpj->freq) {
-> +			lpj->ref = per_cpu(cpu_data, i).loops_per_jiffy;
-> +			lpj->freq = freqs.old;
-> +		}
-> +
->  		per_cpu(cpu_data, i).loops_per_jiffy =
-> -			cpufreq_scale(per_cpu(cpu_data, i).loops_per_jiffy,
-> -					freqs.old, freqs.new);
-> +			cpufreq_scale(lpj->ref, lpj->freq, freqs.new);
-> +	}
-> +
-> +	/* And don't forget to adjust the global one */
-> +	if (!global_lpj_ref.freq) {
-> +		global_lpj_ref.ref = loops_per_jiffy;
-> +		global_lpj_ref.freq = freqs.old;
-> +	}
-> +	loops_per_jiffy = cpufreq_scale(global_lpj_ref.ref, global_lpj_ref.freq,
-> +					freqs.new);
->  #endif
->  
->  	/* notifiers */
-> @@ -146,7 +151,6 @@ set_freq:
->  		cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
->  	}
->  
-> -skip_lpj:
->  	return ret;
->  }
+> On resume, with the MMU and caches off:
+>
+> - Platform defined entry point is called, which _may_ be cpu_resume
+> ?directly.
+> - Platform initial code is executed to do whatever that requires
+> - cpu_resume will be called
+> - cpu_resume loads the previously saved private state
+> - The CPU specific state is restored
+> - Page table is modified to permit 1:1 mapping for MMU enable
+> - MMU is enabled with caches disabled
+> - Page table modification is undone
+> - Caches are enabled in the main control register
+> - CPU exception mode stacks are reinitialized
+> - CPU specific init function is called
+> - ABI registers are popped off and 'cpu_suspend' function returns
+>
+> So, as far as L2 goes, in the suspend finisher:
+>
+> - If L2 state is lost, the finisher needs to clean dirty data from L2
+> ?to ensure that it is preserved in RAM.
+> ?Note: There is no need to disable or even invalidate the L2 cache as
+> ?we should not be writing any data in the finisher function which we
+> ?later need after resume.
+>
+> - If L2 state is not lost, the finisher needs to clean the saved state
+> ?as a minimum, to sure that this is visible when the main control register
+> ?C bit is clear. ?The easiest way to do that is to find the top of stack
+> ?via current_thread_info() - we have a macro for that, and then add
+> ?THREAD_SIZE to find the top of stack. ?'sp' will be the current bottom
+> ?of stack.
+
+The sleep_save_sp location also needs to be cleaned.
+
+> In the resume initial code:
+>
+> - If L2 state was lost, the L2 configuration needs to be restored.
+> ?This generally needs to happen before cpu_resume is called:
+> ?- there are CPUs which need L2 setup before the MMU is enabled.
+> ?- OMAP3 currently does this in its assembly, which is convenient to
+> ? ?allow it to make the SMI calls to the secure world. ?The same will
+> ? ?be true of any CPU running in non-secure mode.
+>
+> - If L2 state was not lost, and the platform choses not to clean and
+> ?invalidate the ABI registers from the stack, and the platform restores
+> ?the L2 configuration before calling cpu_resume, then the ABI registers
+> ?will be read out of L2 on return if that's where they are - at that
+> ?point everything will be setup correctly.
+>
+> ?This will give the greatest performance, which is important for CPU
+> ?idle use of these code paths.
+>
+> Now, considering SMP, there's an issue here: do we know at the point
+> where one CPU goes down whether L2 state will be lost?
+
+CPU idle will need a voting mechanism between the two CPUs, and the
+second CPU to go down needs to determine the minimum state supported
+by both CPUs.  Any time a CPU goes down, we should know for sure that
+either the L2 will not be lost, or the L2 might be lost if the other
+CPU goes idle.
+
+In practice, I don't think many SoCs will support low power modes that
+lose the L2 during idle, only during suspend.  Tegra and OMAP4 both
+don't support the modes where the L2 is powered down in idle.
+
+> If the answer is that state will not be lost, we can do the minimum.
+> If all L2 state is lost, we need to do as above. ?If we don't know the
+> answer, then we have to assume that L2 state will be lost.
+>
+> But wait - L2 cache (or more accurately, the outer cache) is common
+> between CPUs in a SMP system. ?So, if we're _not_ the last CPU to go
+> down, then we assume that L2 state will not be lost. ?It is the last
+> CPUs responsibility to deal with L2 state when it goes into a PM mode
+> that results in L2 state being lost.
+>
+> Lastly, should generic code deal with flushing L2 and setting it back
+> up on resume? ?A couple of points there:
+>
+> 1. Will generic code know whether L2 state will be lost, or should it
+> ? assume that L2 state is always lost and do a full L2 flush. ?That
+> ? seems wasteful if we have another CPU still running (which would
+> ? also have to flush L2.)
+>
+> 2. L2 configuration registers are not accessible to CPUs operating in
+> ? non-secure mode like OMAPs. ?Generic code on these CPUs has _no_
+> ? way to restore and re-enable the L2 cache. ?It needs to make
+> ? implementation specific SMI calls to achieve that.
+>
+> So, I believe the answer to that is no. ?However, I think we can still
+> do a change to improve the situation:
+>
+> 1. Pass in r2 and r3 to the suspend finisher the bottom and top of the
+> ? stack which needs to be cleaned from L2. ?This covers the saved
+> ? state but not the ABI registers.
+>
+> 2. Mandate that L2 configuration is to be restored by platforms in their
+> ? pre-cpu_resume code so L2 is available when the C bit is set.
+>
