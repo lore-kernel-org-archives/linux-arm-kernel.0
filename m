@@ -1,27 +1,28 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 11 Jul 2011 22:09:50 +0100
-Subject: [PATCH 16/17] mach-sa1100: retire custom LED code
-In-Reply-To: <CAK5ve-+Pr8EDa8mfhZVbf8ADc2YDU0EyTPL3Fwwipj237tgKQg@mail.gmail.com>
-References: <1309955687-19365-1-git-send-email-bryan.wu@canonical.com>
-	<1309955687-19365-17-git-send-email-bryan.wu@canonical.com>
-	<20110710092426.GR4812@n2100.arm.linux.org.uk>
-	<CAK5ve-+Pr8EDa8mfhZVbf8ADc2YDU0EyTPL3Fwwipj237tgKQg@mail.gmail.com>
-Message-ID: <20110711210950.GE8486@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 11 Jul 2011 23:10:19 +0200
+Subject: [GIT PULL] CSR SiRFprimaII board support for v3.1
+In-Reply-To: <CAGsJ_4zojPGr52mc8Neko1bKmUWTcvA=NcomZA=P1SFTQMMxCA@mail.gmail.com>
+References: <CAGsJ_4zojPGr52mc8Neko1bKmUWTcvA=NcomZA=P1SFTQMMxCA@mail.gmail.com>
+Message-ID: <201107112310.19803.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 11, 2011 at 10:36:49PM +0800, Bryan Wu wrote:
-> Right, I got it. So if we are going to run a single binary for all the
-> sa1100 machines, how about we check the machine in each fs_initcall
+On Saturday 09 July 2011, Barry Song wrote:
+> git://gitorious.org/sirfprima2-kernel/sirfprima2-kernel.git for-arnd
 > 
-> static int __init assabet_leds_init(void)
-> {
->  ? ? int i;
-> 
->      if (!machine_is_assabet())
->           return -ENODEV,
-> 
->  ? ? for (i = 0; i < ARRAY_SIZE(assabet_leds); i++) {
->  ? ? ? ? ? ? struct assabet_led *led;
+> It is same with v5 patchset I sent in the linux-arm-kernel mail list.
+> For more comments ongoing/coming and new features, I will work on them
+> to figure out incremental patches. There are still large number of
+> work left in mach-prima2, for exmaple, PM, full clock tree, RTC-IOBG
+> APIs, gpio(now drivers/gpio), pinmux(now drivers/pinmux) and so on.
+> Those will be continued in the next merge window.
 
-Yes, that'll do, thanks.
+Pulled, thanks!
+ 
+> I'd like to say we really appreciate you very much for your great help
+> on the basic board support of CSR prima2.
+
+It was a pleasure working with you on this, looking forward to see
+more work like these patches.
+
+	Arnd
