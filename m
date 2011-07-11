@@ -1,39 +1,36 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 11 Jul 2011 10:54:24 +0100
-Subject: [PATCH V2 0/6] arm_smp_twd: mpcore_wdt: Fix MPCORE watchdog setup
-In-Reply-To: <20110711094343.GB11247@e102109-lin.cambridge.arm.com>
-References: <1286185540-19569-1-git-send-email-vkuzmichev@mvista.com>
-	<1309892440-3260-1-git-send-email-vkuzmichev@mvista.com>
-	<4E14337F.1050101@arm.com>
-	<20110706101456.GN8286@n2100.arm.linux.org.uk>
-	<20110706110548.GA31936@1n450.cable.virginmedia.net>
-	<20110706111603.GS8286@n2100.arm.linux.org.uk>
-	<20110711094343.GB11247@e102109-lin.cambridge.arm.com>
-Message-ID: <20110711095424.GD3239@n2100.arm.linux.org.uk>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Mon, 11 Jul 2011 12:00:04 +0200
+Subject: [PATCH 02/10] ASoc: mxs: add mxs-saif driver
+In-Reply-To: <20110710092623.GB23521@opensource.wolfsonmicro.com>
+References: <1310140790-2132-1-git-send-email-b29396@freescale.com>
+	<1310140790-2132-3-git-send-email-b29396@freescale.com>
+	<20110709025252.GC26900@sirena.org.uk>
+	<CAA+hA=S0HTqNt+OxprdaqZMF8_9NF8G54UKJprcWc2DCbGf0xA@mail.gmail.com>
+	<20110710083359.GB23199@opensource.wolfsonmicro.com>
+	<CAA+hA=SBP3Qv0x-9KQMR+iT9nT1E6_HamyM7zeNd1p8rfE6V0g@mail.gmail.com>
+	<20110710092623.GB23521@opensource.wolfsonmicro.com>
+Message-ID: <20110711100004.GA11153@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 11, 2011 at 10:43:43AM +0100, Catalin Marinas wrote:
-> On Wed, Jul 06, 2011 at 12:16:03PM +0100, Russell King - ARM Linux wrote:
-> > On Wed, Jul 06, 2011 at 12:05:48PM +0100, Catalin Marinas wrote:
-> > > On Wed, Jul 06, 2011 at 11:14:56AM +0100, Russell King - ARM Linux wrote:
-> > > > Do we know why the calibration was initially introduced?  FWIR, it came
-> > > > from the SMP group in ARM, so I guess they had a reason for it rather
-> > > > than copying x86.
-> > > 
-> > > I think it was introduced because the TWD frequency is half of the CPU
-> > > frequency but the latter may not be known - boot monitor configuration
-> > > could change it.
-> > 
-> > Okay, that implies we can't have a fixed frequency built into the kernel
-> > then.  For such platforms like the ARM dev boards (realview + vexpress),
-> > I expect we can read the CPU frequency from somewhere like one of the
-> > ICST PLLs.
->  
-> That's highly platform dependent and it's not just ARM dev boards. Any
-> board with ARM11MPCore, Cortex-A9 or Cortex-A5 would need to find a way
-> to retrieve such information. If anyone is prepared to go through each
-> board and figure out how to get the information, it's fine by me.
 
-So, these patches are blocked until we find some way to resolve the
-clocking issues on all platforms with TWD and the MPcore watchdog.
+> > Also i still do not have such type of codecs integrated on hand.
+> 
+> That's fine, audio hardware is so flexible that it's unreasonable to
+> expect that all possible systems have been tested.  So long as the code
+> looks sensible it should be fine and if there are problems people can
+> always come back and fix them.
+
+I will get a custom board with a different codec in about a month and
+will happily do tests.
+
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110711/ef0ed5d0/attachment.sig>
