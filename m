@@ -1,35 +1,73 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 11 Jul 2011 01:32:26 -0700
-Subject: [GIT PULL] OMAP: SoC data/core: cleanups for 3.1
-In-Reply-To: <alpine.DEB.2.00.1107092031400.15984@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1107092031400.15984@utopia.booyaka.com>
-Message-ID: <20110711083225.GO5783@atomide.com>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Mon, 11 Jul 2011 10:37:29 +0200
+Subject: [PATCH v5 1/3] ARM: mxs: add GPMI-NFC support for imx23/imx28
+In-Reply-To: <20110711080003.GE13840@pengutronix.de>
+References: <1309406028-2924-1-git-send-email-b32955@freescale.com>
+	<1309406028-2924-2-git-send-email-b32955@freescale.com>
+	<201106301555.19440.arnd@arndb.de>
+	<20110708073119.GP29624@pengutronix.de>
+	<4E16B47E.8090909@freescale.com>
+	<20110708090903.GQ29624@pengutronix.de>
+	<4E16CD6F.9050304@freescale.com>
+	<20110708101625.GR29624@pengutronix.de>
+	<19990.56022.592145.982784@ipc1.ka-ro>
+	<20110711080003.GE13840@pengutronix.de>
+Message-ID: <19994.46665.674302.352501@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [110709 19:32]:
-> Hello Tony,
-> 
-> The following changes since commit ecba3287b4121dcf3ca7607fe71c205913edec06:
-> 
->   Merge branch 'cleanup-part-2' of git+ssh://master.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6 into omap/cleanup (2011-07-08 15:01:45 +0000)
-> 
-> are available in the git repository at:
-> 
->   git://git.pwsan.com/linux-2.6 prcm-cleanup-3.1
+Uwe Kleine-K?nig writes:
+> On Fri, Jul 08, 2011 at 12:24:22PM +0200, Lothar Wa?mann wrote:
+> > Uwe Kleine-K?nig writes:
+> > > Hello Huang,
+> > > 
+> > > On Fri, Jul 08, 2011 at 05:27:11PM +0800, Huang Shijie wrote:
+> > > > >>>>The init function is used only to set up iomux, so the logical replacement is
+> > > > >>>>a pointer to the iomux data, and calling mxs_iomux_setup_multiple_pads
+> > > > >>>>directly from the driver.
+> > > > >>>Why not put the iomux stuff into the per-machine table and get rid of
+> > > > >>>the init callback, too?
+> > > > >>The mmc (ssp) has pin conflict with gpmi on both mx23evk and mx28evk.
+> > > > >>So, it's better to initialize the pin when the driver(GPMI or MMC)
+> > > > >>is enabled.
+> > > > >What do you do to prevent userspace from trying to use both devices?
+> > > > The board can not support the two devices at the same time.
+> > > > So the user can only use one device with the board.
+> > > > 
+> > > > >I guess you need to configure the hardware somehow to switch between the
+> > > > >two using a jumper? Isn't it possible to detect the hardware setting and
+> > > > >setup the muxer accordingly?
+> > > > >
+> > > > >IMHO an per-device init-callback is the wrong approach to solve a pin
+> > > > >conflict.
+> > > > Do you have any good solution about this?
+> > > Put the pinmux corresponding to the one device that currently works in
+> > > the pinmux list!?
+> > > 
+> > #define 'that currently works'
+> > 
+> > For a dedicated system that may not be a problem. But for development
+> > kits and modular systems that allow peripheral modules to be plugged
+> > in there is no 'one device that currently works'.
+> Yeah, I know that problem. Back when I worked for a company selling
+> development boards I solved it with clks. Not pretty but more convenient
+> than kernel parameters or #ifdefs.
+> The upside of doing it with clks is that if $customer tries to use both
+> conflicting devices you get an error message instead of breaking device1
+> when device2 is opened/probed.
+>
+This could be prevented by a reservation mechanism for the iomux like
+for GPIOs.
 
-I've merged this into linux-omap master for testing and
-also merged it into cleanup-part-3 along Russell's timer
-cleanup patch.
 
-Paul, please use the mainline tags or linux-omap static branches
-instead of the arm-soc branches. In this case there's only the extra
-merge commit there, so not a problem. Now it just makes it a bit
-harder for me to do pull requests and diffs to other branches.
+Lothar Wa?mann
+-- 
+___________________________________________________________
 
-In general, we want to keep the dependencies between branches and
-other trees to minimum.
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
 
-Regards,
-
-Tony
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
