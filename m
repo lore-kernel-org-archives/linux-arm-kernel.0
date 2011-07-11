@@ -1,28 +1,47 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 11 Jul 2011 20:43:06 +0900
-Subject: [PATCH 0/6] clk: Initial feedback for off-SoC slow bus clocks
-In-Reply-To: <20110711104625.GH26347@pengutronix.de>
-References: <20110711025344.GA27497@opensource.wolfsonmicro.com>
-	<20110711093124.GA3239@n2100.arm.linux.org.uk>
-	<20110711100759.GG26347@pengutronix.de>
-	<20110711102856.GG3239@n2100.arm.linux.org.uk>
-	<20110711104625.GH26347@pengutronix.de>
-Message-ID: <20110711114304.GJ5092@opensource.wolfsonmicro.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Mon, 11 Jul 2011 19:44:09 +0800
+Subject: [PATCH] ARM: mmp: remove builtin gpio driver support
+In-Reply-To: <1310360751.4621.6.camel@Lily>
+References: <1310120428-22700-1-git-send-email-haojian.zhuang@marvell.com>
+	<1310120428-22700-2-git-send-email-haojian.zhuang@marvell.com>
+	<20110710040218.GA10912@ponder.secretlab.ca>
+	<1310360751.4621.6.camel@Lily>
+Message-ID: <CAMPhdO_q=bzt4XVs=wmdqB=D=A9XrYXe96BqpQdnqMikG8ToQA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 11, 2011 at 12:46:25PM +0200, Sascha Hauer wrote:
-> On Mon, Jul 11, 2011 at 11:28:56AM +0100, Russell King - ARM Linux wrote:
+On Mon, Jul 11, 2011 at 1:05 PM, Haojian Zhuang
+<haojian.zhuang@marvell.com> wrote:
+> On Sat, 2011-07-09 at 21:02 -0700, Grant Likely wrote:
+>> On Fri, Jul 08, 2011 at 06:20:18PM +0800, Haojian Zhuang wrote:
+>> > Remove builtin gpio driver support form mmp.
+>> >
+>> > Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+>>
+>> Hi Haojian.
+>>
+>> I'm not clear what this patch is intending to do. ?I understand that
+>> it removes the mmp-specific gpio support, but I looks like don't see the code
+>> that replaces it, which would mean that applying this patch breaks
+>> gpio on mmp platforms.
+>>
+>> Am I missing something?
+>>
+> I'm sorry that I shouldn't loop this patch since my new gpio driver
+> isn't contained in this patch series.
+>
+> I'm willing to add one operation to select using original gpio driver or
+> the new one. Since the original gpio driver is shared between ARCH-PXA
+> and ARCH-mmp. I don't want patch breaking the implementation in
+> ARCH-PXA.
 
-> > If that's all its for, then can't some other solution for debugfs names
-> > (lets stop calling them clock names to avoid confusion) be found -
-> > such as
+The built-in version is used for those timing critical situations. In some
+best cases, it can be optimized to only one load/store instruction, which
+is extremely useful for those bit-banging operations like I2C/SPI emulation
+with GPIO.
 
-> > 	sprintf(debugfsname, "%s@%p", clk->debugfsprefix, clk);
-
-> Sounds good. During my tests on i.MX I found it very convenient to have
-> speaking debugfs names, so I vote for this suggestion instead the
-> following ones.
-
-FWIW that's pretty much exactly what I added except I used a - instead
-of @.
+>
+> Thanks
+> Haojian
+>
+>
