@@ -1,43 +1,45 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 11 Jul 2011 19:53:45 +0900
-Subject: [PATCH 5/6] clk: Support multiple instances of the same clock
-	provider
-In-Reply-To: <20110711093439.GB3239@n2100.arm.linux.org.uk>
-References: <20110711025344.GA27497@opensource.wolfsonmicro.com>
-	<1310352837-4277-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-	<1310352837-4277-5-git-send-email-broonie@opensource.wolfsonmicro.com>
-	<20110711093439.GB3239@n2100.arm.linux.org.uk>
-Message-ID: <20110711105342.GE5092@opensource.wolfsonmicro.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Mon, 11 Jul 2011 13:00:24 +0200
+Subject: [PATCH v7 0/4] add the GPMI-NAND support for imx23/imx28
+In-Reply-To: <1310371266-10704-1-git-send-email-b32955@freescale.com>
+References: <1310371266-10704-1-git-send-email-b32955@freescale.com>
+Message-ID: <20110711110024.GB11153@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 11, 2011 at 10:34:39AM +0100, Russell King - ARM Linux wrote:
-> On Mon, Jul 11, 2011 at 11:53:56AM +0900, Mark Brown wrote:
+Hi,
 
-> > +	/* Since we currently match clock providers on a purely string
-> > +	 * based method add a prefix based on the device name if a
-> > +	 * device is provided.  When we have support for device tree
+On Mon, Jul 11, 2011 at 04:01:02PM +0800, Huang Shijie wrote:
 
-> This "clk consolidation" is really idiotic.  The clk matching mechanism
-> should have _nothing_ to do with the rest of the clk API, especially the
-> consolidation effort.
+> The general-purpose media interface(GPMI) controller is a flexible interface
+> to up to several NAND flashs.
+> 
+> The Bose Ray-Choudhury Hocquenghem(BCH) module is a hardware ECC accelerator.
+> 
+> With the help of BCH, the GPMI controller can choose to do the hardware ECC or
+> not.
+> 
+> v6 --> v7:
+> 	[0] rename RES_SIZE to GPMI_NAND_RES_SIZE.
+> 	[1] move gpmi-nand.h to `include/linux/mtd/` directory.
+> 	[2] remove comment for new pad control.
+> 	[3] others
 
-It's not touching clkdev, the comment is somewhat misleading and is
-mostly based on me thinking about how we'd deploy off-SoC clocks.
-There's also the diagnostic issues Sacha mentioned, if we don't keep
-some source information handy it's hard to tell what clock logging is
-talking about.
+Could you also post a driver which is adapted to all these changes?
+The series looks good now; still I want to test it a little just to make
+sure...
 
-> It should not matter whether clkdev is used, or an alternative method
-> to specify this stuff via DT.  Keep the clk_get()/clk_put() _separate_
-> from the consolidation of the rest.
+Thanks,
 
-We do need some way to have some idea which clocks we're talking about,
-and for off-SoC stuff passing around struct clk pointers is rather
-painful.  At some point some bit of code is going to have to get hold of
-the actual struct clk and then map it onto the devices using it.
+   Wolfram
 
-For device tree we should be able to do that fairly painlessly with just
-the struct devices, without device tree you either have to have the
-structs handy or use names.  At the minute the infrastructure is
-somewhat lacking here.
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110711/2e3b0e8b/attachment.sig>
