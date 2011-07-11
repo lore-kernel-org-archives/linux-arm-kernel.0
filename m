@@ -1,89 +1,55 @@
-From: toddpoynor@google.com (Todd Poynor)
-Date: Mon, 11 Jul 2011 16:10:55 -0700
-Subject: [PATCH v14 05/12] OMAP: dmtimer: platform driver
-In-Reply-To: <1310383759-19059-6-git-send-email-tarun.kanti@ti.com>
-References: <1310383759-19059-1-git-send-email-tarun.kanti@ti.com>
-	<1310383759-19059-6-git-send-email-tarun.kanti@ti.com>
-Message-ID: <20110711231055.GA8312@google.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 11 Jul 2011 18:14:38 -0400 (EDT)
+Subject: [PATCH 0/7] Re-organize linker layouts
+In-Reply-To: <4E1B5A57.3010701@codeaurora.org>
+References: <20110706102245.GO8286@n2100.arm.linux.org.uk>
+	<4E15ECB6.40100@codeaurora.org>
+	<20110707223620.GG20403@n2100.arm.linux.org.uk>
+	<4E165597.90002@codeaurora.org>
+	<20110708090721.GC2414@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1107080941090.14596@xanadu.home>
+	<20110708160329.GF4812@n2100.arm.linux.org.uk>
+	<4E1736A9.9040102@codeaurora.org>
+	<alpine.LFD.2.00.1107081417080.14596@xanadu.home>
+	<4E1B5A57.3010701@codeaurora.org>
+Message-ID: <alpine.LFD.2.00.1107111803520.14596@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 11, 2011 at 04:59:12PM +0530, Tarun Kanti DebBarma wrote:
-> Add dmtimer platform driver functions which include:
-> (1) platform driver initialization
-> (2) driver probe function
-> (3) driver remove function
+On Mon, 11 Jul 2011, Stephen Boyd wrote:
+
+> On 7/8/2011 11:24 AM, Nicolas Pitre wrote:
+> > On Fri, 8 Jul 2011, Stephen Boyd wrote:
+> >> Why can't this work via atags (or DT for that matter)? atags have always
+> >> said where ram starts and we should be able to write some code that
+> >> parses the atags/DT and figures out the final resting place of the
+> >> decompressed image.
+> > Possibly.  But that would be an MSM special case.
+> >
 > 
-...
-> +	timer = kzalloc(sizeof(struct omap_dm_timer), GFP_KERNEL);
-> +	if (!timer) {
-> +		dev_err(&pdev->dev, "%s: no memory for omap_dm_timer.\n",
-> +			__func__);
-> +		ret = -ENOMEM;
-> +		goto err_release_ioregion;
-> +	}
-> +
-> +	timer->io_base = ioremap(mem->start, resource_size(mem));
-> +	if (!timer->io_base) {
-> +		dev_err(&pdev->dev, "%s: ioremap failed.\n", __func__);
-> +		ret = -ENOMEM;
-> +		goto err_free_mem;
-> +	}
-> +
-> +	if (pdata->timer_ip_type == OMAP_TIMER_IP_VERSION_2) {
-> +		timer->func_offset = VERSION2_TIMER_WAKEUP_EN_REG_OFFSET;
-> +		timer->intr_offset = VERSION2_TIMER_STAT_REG_OFFSET;
-> +	} else {
-> +		timer->func_offset = 0;
-> +		timer->intr_offset = 0;
+> Hmm. I thought ST-Erricson folks had something similar.
+> 
+> Anyway, maybe we've been going about this the wrong way. Couldn't we
+> just make TEXT_OFFSET be 0x00208000 and then make sure to remove the
+> first 2MB of memory in a machine->reserve() routine if we're MSM?
 
-Don't need to init kzalloc'ed fields to zero.
+I think that would certainly be a worthwhile thing to do.  This would 
+even make ARM_PATCH_PHYS_VIRT more efficient as you won't have to enable 
+ARM_PATCH_PHYS_VIRT_16BIT anymore.  And even without 
+ARM_PATCH_PHYS_VIRT, the compiled code for virt_to_phys() and 
+phys_to_virt() would be more efficient.
 
-> +	}
-> +
-> +	timer->id = pdev->id;
-> +	timer->irq = irq->start;
-> +	timer->pdev = pdev;
-> +	timer->reserved = 0;
+Whether or not we would like to still keep the ARM_PATCH_PHYS_VIRT_16BIT 
+code around is a separate question.
 
-And here.
+> Something like PHYS_OFFSET=0xN0000000 and TEXT_OFFSET=0x00208000 so that
+> our text ends up at the right place (0xN0208000) and AUTO_ZRELADDR will
+> be happy. This seems to work as long as I fixup the atags to say memory
+> starts at 0xN000000 instead of 0xN0200000.
 
-> +err_free_pdev:
-> +	kfree(pdata);
-
-pdata wasn't allocated here, shouldn't be freed here.
-
-> +	platform_device_unregister(pdev);
-
-The platform device wasn't registered here.
-
-...
-> +static int __devexit omap_dm_timer_remove(struct platform_device *pdev)
-> +{
-> +	struct omap_dm_timer *timer, *tmp;
-> +	unsigned long flags;
-> +	int ret = -EINVAL;
-> +
-> +	spin_lock_irqsave(&dm_timer_lock, flags);
-> +	list_for_each_entry_safe(timer, tmp, &omap_timer_list, node) {
+As long as you are fixing it up in the kernel not in the bootloader, 
+given that it is the kernel who is cheating.  The mdesc->fixup callback 
+is perfect for that.
 
 
-Don't need list_for_each_entry_safe, you have the lock protecting list
-modifications held and IRQs off.
-
-> +		if (timer->pdev->id == pdev->id) {
-> +			kfree(timer->pdev->dev.platform_data);
-
-
-Not allocated by this driver.
-
-> +			platform_device_del(timer->pdev);
-
-
-Not added by this driver.
-
-> +			list_del(&timer->node);
-> +			kfree(timer);
-
-
-Todd
+Nicolas
