@@ -1,99 +1,40 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 11 Jul 2011 17:02:46 +0100
-Subject: [RFC PATCH 05/17] ARM: kernel: save/restore kernel IF
-In-Reply-To: <alpine.DEB.2.00.1107111503100.2609@localhost6.localdomain6>
-References: <1310053830-23779-1-git-send-email-lorenzo.pieralisi@arm.com>
-	<1310053830-23779-6-git-send-email-lorenzo.pieralisi@arm.com>
-	<alpine.DEB.2.00.1107081641280.2609@localhost6.localdomain6>
-	<20110711140047.GA346@e102568-lin.cambridge.arm.com>
-	<alpine.DEB.2.00.1107111503100.2609@localhost6.localdomain6>
-Message-ID: <20110711160246.GA1161@e102568-lin.cambridge.arm.com>
+From: linnj@xilinx.com (John Linn)
+Date: Mon, 11 Jul 2011 09:58:56 -0600
+Subject: PL330 alignment requirement questions
+In-Reply-To: <CABb+yY2aMSsA6+R+1RhExoAUTz4OcHB8ucuyR8OK9Ahe=0XVCw@mail.gmail.com>
+References: <1866031594.379248.1310161913147.JavaMail.root@sz0140a.emeryville.ca.mail.comcast.net><2034464824.379455.1310162217325.JavaMail.root@sz0140a.emeryville.ca.mail.comcast.net>
+	<CABb+yY2aMSsA6+R+1RhExoAUTz4OcHB8ucuyR8OK9Ahe=0XVCw@mail.gmail.com>
+Message-ID: <7ebbc5f4-0478-424f-a7d6-4a88432d4918@VA3EHSMHS022.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 11, 2011 at 03:31:30PM +0100, Frank Hofmann wrote:
+> -----Original Message-----
+> From: Jassi Brar [mailto:jassisinghbrar at gmail.com]
+> Sent: Friday, July 08, 2011 7:57 PM
+> To: johnlinn at comcast.net
+> Cc: linux-arm-kernel at lists.infradead.org
+> Subject: Re: PL330 alignment requirement questions
 > 
-> 
-> On Mon, 11 Jul 2011, Lorenzo Pieralisi wrote:
-> 
-> > On Fri, Jul 08, 2011 at 05:12:22PM +0100, Frank Hofmann wrote:
-> >> Hi Lorenzo,
-> >>
-> >> only a few comments at this stage.
-> >>
-
-[...]
-
-> >> How much memory do all the pagedirs require that are being kept around ?
-> >> Why does each core need a separate one, what would happen to just use a
-> >> single "identity table" for all ?
-> >> I understand you can't use swapper_pg_dir for idle, so a separate one has
-> >> to be allocated, yet the question remains why per-cpu required ?
-> >>
-> >>
+> On Sat, Jul 9, 2011 at 3:26 AM,  <johnlinn@comcast.net> wrote:
+> > I'm testing our PL330 with the driver/dma/pl330 driver and see some
+> strangeness that's probably my own setup issue.
 > >
-> > I just allocate a 1:1 mapping once cloned from init_mm, reused for all CPUs,
-> > with an additional mapping.
-> 
-> Have started to wonder whether this facility (a 1:1-mapped pagedir for 
-> kernel text/data, or maybe even "non-user text/data") could/should be made 
-> available on a global scale; after all, both kexec, reset, hibernate, some 
-> forms of idle/suspend do require "some sort of that" to go through MMU 
-> reinitialization. I'm unfortunately not deep enough in the VM subsystem to 
-> say how exactly this best would have to look like.
-> 
-> Merely mentioning this because it looks while everyone creates 1:1 
-> mappings, there's ever so slight differences between how the 1:1 
-> mapping(s) are created; we've seen:
-> 
->  	* (re)using current->active_mm->pgd
->  	* (re)using swapper_pg_dir (different lengths for the 1:1 section)
->  	* using a separately-allocated/initialized pgdir
-> 
-> Such proliferation usually means there's a justified need to do that kind 
-> of thing. Just the gritty details haven't been sorted how everyone with 
-> that need could do _the same_ thing instead of reinventing various square 
-> wheels.
-> 
-> The main reason why I've used swapper_pg_dir in the hibernation patch is 
-> because it's the only static one in the system (the hibernation hooks are 
-> in irqs-off codepaths and pgd_alloc isn't a good idea then), and happens 
-> to have "clear" lower sections (in the user area) so that one's not 
-> actually substituting anything when creating 1:1 mappings (and getting rid 
-> of them restores the "pristine" state). But this assumption only holds as 
-> long as swapper_pg_dir's use isn't changed. So a little creepy feeling 
-> remains.
-> 
-> A generic "reset_mmu_pg_dir", wouldn't that be a good thing to have ?
->
-
-It is a fair point, and certainly worth discussing. I will give it
-some thought and get back to you.
-
-> > The array of pointers is there to save pgdir on idle entry, one per-cpu.
-> 
-> If you're going through cpu_{do_}suspend/resume, the TTBRs are 
-> saved/restored anyway, what do you need to keep the virtual addresses 
-> around for ?
-> 
-
-Because I switch mm before calling suspend, which is called
-with a cloned pgdir. I am not sure I can avoid that.
-
-> 
+> > I'm also using drivers/dmatest to test it with memory to memory
+> copies. I'm seeing that the copy alignment (copy_align) is not setup
+> (it's 0) such that I see errors on some transfers at the end of the
+> transfer.
 > >
-> >>
-> >> I'm currently transitioning between jobs; will re-subscribe to arm-kernel
-> >> under a different email address soon, this one is likely to stop working
-> >> in August. Sorry the inconvenience and high-latency responses till then :(
-> >>
-> >> FrankH.
+> > If I setup the copy_align to be 3 or larger then I don't see these
+> errors. This number doesn't make much sense to me and I'm digging into
+> the details (seems like 4 would make sense). ?I just wanted to see if
+> anyone had tested with dmatest and seen anything similar.
 > >
-> > May I thank you very much for the review in the interim,
-> 
-> You're welcome.
-> FrankH.
-> 
+> It might help if you dump length, src_addr and dst_addr of failed
+> transfers.
+> drivers/dma/pl330.c was not rigorously tested because Samsung drivers
+> use their own DMA API.
+> Btw, please remember to CC the author.
 
-Thank you,
-Lorenzo
+Thanks Jassi for the input, sounds good on CCing you :).
+
+This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
