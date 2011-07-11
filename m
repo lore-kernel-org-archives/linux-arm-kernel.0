@@ -1,66 +1,99 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 11 Jul 2011 16:36:15 +0100
+Date: Mon, 11 Jul 2011 17:02:46 +0100
 Subject: [RFC PATCH 05/17] ARM: kernel: save/restore kernel IF
-In-Reply-To: <20110709084508.GF4812@n2100.arm.linux.org.uk>
+In-Reply-To: <alpine.DEB.2.00.1107111503100.2609@localhost6.localdomain6>
 References: <1310053830-23779-1-git-send-email-lorenzo.pieralisi@arm.com>
 	<1310053830-23779-6-git-send-email-lorenzo.pieralisi@arm.com>
-	<20110709083815.GE4812@n2100.arm.linux.org.uk>
-	<20110709084508.GF4812@n2100.arm.linux.org.uk>
-Message-ID: <20110711153615.GA1103@e102568-lin.cambridge.arm.com>
+	<alpine.DEB.2.00.1107081641280.2609@localhost6.localdomain6>
+	<20110711140047.GA346@e102568-lin.cambridge.arm.com>
+	<alpine.DEB.2.00.1107111503100.2609@localhost6.localdomain6>
+Message-ID: <20110711160246.GA1161@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 09, 2011 at 09:45:08AM +0100, Russell King - ARM Linux wrote:
-> On Sat, Jul 09, 2011 at 09:38:15AM +0100, Russell King - ARM Linux wrote:
-> > On Thu, Jul 07, 2011 at 04:50:18PM +0100, Lorenzo Pieralisi wrote:
-> > > +static int late_init(void)
-> > > +{
-> > > +	int rc;
-> > > +	struct sr_cluster *cluster;
-> > > +	int cluster_index, cpu_index = sr_platform_get_cpu_index();
-> > 
-> > Stop this madness, and use the standard linux APIs like smp_processor_id
-> > here.  It might actually help you find bugs, like the fact that you're
-> > in a preemptible context here, and so could be rescheduled onto any other
-> > CPU in the system _after_ you've read the MPIDR register.
-> > 
-
-You are right, wanted to make all code uniform and rushed in a change
-which is bound to create issues.
-
-> > > +
-> > > +	cluster_index = sr_platform_get_cluster_index();
-> > > +	cluster = main_table.cluster_table + cluster_index;
-> > > +	main_table.os_mmu_context[cluster_index][cpu_index] =
-> > > +				current->active_mm->pgd;
-> > > +	cpu_switch_mm(main_table.fw_mmu_context, current->active_mm);
-> > > +	rc = sr_platform_init();
-> > > +	cpu_switch_mm(main_table.os_mmu_context[cluster_index][cpu_index],
-> > > +				current->active_mm);
-> > 
-> > CPU numbers are unique in the system, why do you need a 'cluster_index'
-> > to save this?  In fact why do you even need to save it in a structure
-> > at all?
-> > 
-> > Plus, "cluster" is not used, please get rid of it.
+On Mon, Jul 11, 2011 at 03:31:30PM +0100, Frank Hofmann wrote:
 > 
-> Oh, that's another thing.  This thread is about introducing idle support
-> not cluster support.  Cluster support is surely something different (esp.
-> as it seems from the above code that you're trying to support several
-> clusters of MPCore CPUs, each with physical 0-N CPU numbers.)
 > 
-> Cluster support should be an entirely separate patch series.
+> On Mon, 11 Jul 2011, Lorenzo Pieralisi wrote:
 > 
-
-Yes it is cluster support, within idle though, that has to be said;
-I will introduce it in a different patch as suggested and this patch 
-will have to rely on it.
+> > On Fri, Jul 08, 2011 at 05:12:22PM +0100, Frank Hofmann wrote:
+> >> Hi Lorenzo,
+> >>
+> >> only a few comments at this stage.
+> >>
 
 [...]
 
-> In any case, smp_processor_id() will be (and must be) unique in any given
-> running kernel across all CPUs, even if you have clusters of N CPUs all
-> physically numbered 0-N.
+> >> How much memory do all the pagedirs require that are being kept around ?
+> >> Why does each core need a separate one, what would happen to just use a
+> >> single "identity table" for all ?
+> >> I understand you can't use swapper_pg_dir for idle, so a separate one has
+> >> to be allocated, yet the question remains why per-cpu required ?
+> >>
+> >>
+> >
+> > I just allocate a 1:1 mapping once cloned from init_mm, reused for all CPUs,
+> > with an additional mapping.
+> 
+> Have started to wonder whether this facility (a 1:1-mapped pagedir for 
+> kernel text/data, or maybe even "non-user text/data") could/should be made 
+> available on a global scale; after all, both kexec, reset, hibernate, some 
+> forms of idle/suspend do require "some sort of that" to go through MMU 
+> reinitialization. I'm unfortunately not deep enough in the VM subsystem to 
+> say how exactly this best would have to look like.
+> 
+> Merely mentioning this because it looks while everyone creates 1:1 
+> mappings, there's ever so slight differences between how the 1:1 
+> mapping(s) are created; we've seen:
+> 
+>  	* (re)using current->active_mm->pgd
+>  	* (re)using swapper_pg_dir (different lengths for the 1:1 section)
+>  	* using a separately-allocated/initialized pgdir
+> 
+> Such proliferation usually means there's a justified need to do that kind 
+> of thing. Just the gritty details haven't been sorted how everyone with 
+> that need could do _the same_ thing instead of reinventing various square 
+> wheels.
+> 
+> The main reason why I've used swapper_pg_dir in the hibernation patch is 
+> because it's the only static one in the system (the hibernation hooks are 
+> in irqs-off codepaths and pgd_alloc isn't a good idea then), and happens 
+> to have "clear" lower sections (in the user area) so that one's not 
+> actually substituting anything when creating 1:1 mappings (and getting rid 
+> of them restores the "pristine" state). But this assumption only holds as 
+> long as swapper_pg_dir's use isn't changed. So a little creepy feeling 
+> remains.
+> 
+> A generic "reset_mmu_pg_dir", wouldn't that be a good thing to have ?
+>
+
+It is a fair point, and certainly worth discussing. I will give it
+some thought and get back to you.
+
+> > The array of pointers is there to save pgdir on idle entry, one per-cpu.
+> 
+> If you're going through cpu_{do_}suspend/resume, the TTBRs are 
+> saved/restored anyway, what do you need to keep the virtual addresses 
+> around for ?
 > 
 
-Indeed.
+Because I switch mm before calling suspend, which is called
+with a cloned pgdir. I am not sure I can avoid that.
+
+> 
+> >
+> >>
+> >> I'm currently transitioning between jobs; will re-subscribe to arm-kernel
+> >> under a different email address soon, this one is likely to stop working
+> >> in August. Sorry the inconvenience and high-latency responses till then :(
+> >>
+> >> FrankH.
+> >
+> > May I thank you very much for the review in the interim,
+> 
+> You're welcome.
+> FrankH.
+> 
+
+Thank you,
+Lorenzo
