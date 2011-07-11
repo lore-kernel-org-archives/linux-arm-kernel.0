@@ -1,42 +1,67 @@
-From: guenter.roeck@ericsson.com (Guenter Roeck)
-Date: Mon, 11 Jul 2011 14:03:13 -0700
-Subject: [PATCH v2] MAX1111: Fix Race condition causing NULL pointer
-	exception
-In-Reply-To: <1602583.Pi9fQvRk5m@bloomfield>
-References: <1310410051-13127-1-git-send-email-morpheus.ibis@gmail.com>
-	<20110711221148.3a76d55b@endymion.delvare>
-	<1602583.Pi9fQvRk5m@bloomfield>
-Message-ID: <1310418193.21224.14.camel@groeck-laptop>
+From: ido@wizery.com (Ido Yariv)
+Date: Tue, 12 Jul 2011 00:03:11 +0300
+Subject: [PATCH v3 1/6] arm: davinci: Fix low level gpio irq handlers' argument
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024DA7A9DD@dbde02.ent.ti.com>
+References: <B85A65D85D7EB246BE421B3FB0FBB593024DA7A9DD@dbde02.ent.ti.com>
+Message-ID: <1310418191-27009-1-git-send-email-ido@wizery.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2011-07-11 at 16:36 -0400, Pavel Herrmann wrote:
-> On Monday 11 of July 2011 22:11:48 Jean Delvare wrote:
-> > > spi_sync call uses its spi_message parameter to keep completion
-> > > information, having this structure static is not thread-safe,
-> > > potentially causing one thread having pointers to memory on or above
-> > > other threads stack. use mutex to prevent multiple access
-> > 
-> > This has nothing to do with static, as a matter of fact the structure
-> > is dynamically allocated. The bottom line is that the driver structure
-> > is such that calls to max1111_read() must be serialized.
-> 
-> the structure is dynamically allocated, but the pointer used to hold it is a 
-> static global var.
+Commit 7416401 ("arm: davinci: Fix fallout from generic irq chip
+conversion") introduced a bug, causing low level interrupt handlers to
+get a bogus irq number as an argument. The gpio irq handler falsely
+assumes that the handler data is the irq base number and that is no
+longer true.
 
-This is true only if CONFIG_SHARPSL_PM is defined, and it assumes that
-the driver is instantiated exactly once. That is pretty badly broken
-(the commit introducing it even admits that), and should be fixed. This
-does not happen CONFIG_SHARPSL_PM is not defined. If CONFIG_SHARPSL_PM
-_is_ defined in your environment, and you do have multiple instances of
-the driver (ie if you have multiple MAX1111 chips in your system), a
-severe problem is that max1111_read_channel() does not identify the
-driver instance. That can not be fixed with a mutex.
+Set the irq handler data to be a pointer to the corresponding gpio
+controller. The chained irq handler can then use it to extract both the
+irq base number and the gpio registers structure.
 
-> "static" in this context meant "shared by all threads"
-> 
-I think it would make sense to stick with common terminology. In your
-definition, almost all global variables of all programs out there would
-be defined as "static".
+Signed-off-by: Ido Yariv <ido@wizery.com>
+CC: Thomas Gleixner <tglx@linutronix.de>
+---
+ arch/arm/mach-davinci/gpio.c |   14 +++++++++++---
+ 1 files changed, 11 insertions(+), 3 deletions(-)
 
-Guenter
+diff --git a/arch/arm/mach-davinci/gpio.c b/arch/arm/mach-davinci/gpio.c
+index e722139..7d64a07 100644
+--- a/arch/arm/mach-davinci/gpio.c
++++ b/arch/arm/mach-davinci/gpio.c
+@@ -254,8 +254,10 @@ gpio_irq_handler(unsigned irq, struct irq_desc *desc)
+ {
+ 	struct davinci_gpio_regs __iomem *g;
+ 	u32 mask = 0xffff;
++	struct davinci_gpio_controller *ctl;
+ 
+-	g = (__force struct davinci_gpio_regs __iomem *) irq_desc_get_handler_data(desc);
++	ctl = (struct davinci_gpio_controller *)irq_desc_get_handler_data(desc);
++	g = (struct davinci_gpio_regs __iomem *)ctl->regs;
+ 
+ 	/* we only care about one bank */
+ 	if (irq & 1)
+@@ -278,7 +280,7 @@ gpio_irq_handler(unsigned irq, struct irq_desc *desc)
+ 			status >>= 16;
+ 
+ 		/* now demux them to the right lowlevel handler */
+-		n = (int)irq_get_handler_data(irq);
++		n = ctl->irq_base;
+ 		while (status) {
+ 			res = ffs(status);
+ 			n += res;
+@@ -424,7 +426,13 @@ static int __init davinci_gpio_irq_setup(void)
+ 
+ 		/* set up all irqs in this bank */
+ 		irq_set_chained_handler(bank_irq, gpio_irq_handler);
+-		irq_set_handler_data(bank_irq, (__force void *)g);
++
++		/*
++		 * Each chip handles 32 gpios, and each irq bank consists of 16
++		 * gpio irqs. Pass the irq bank's corresponding controller to
++		 * the chained irq handler.
++		 */
++		irq_set_handler_data(bank_irq, &chips[bank * 16 / 32]);
+ 
+ 		for (i = 0; i < 16 && gpio < ngpio; i++, irq++, gpio++) {
+ 			irq_set_chip(irq, &gpio_irqchip);
+-- 
+1.7.4.1
