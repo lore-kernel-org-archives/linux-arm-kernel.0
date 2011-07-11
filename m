@@ -1,60 +1,35 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Mon, 11 Jul 2011 16:31:04 +0800
-Subject: [GIT PULL] pxa: features for next
-In-Reply-To: <20110711075243.GM4812@n2100.arm.linux.org.uk>
-References: <CAMPhdO8uQR4km9szkuGDjuym-hViE9+zxtie6D2WGJmf1_9rUg@mail.gmail.com>
-	<20110711074113.GK4812@n2100.arm.linux.org.uk>
-	<CAMPhdO8pxGsEN1EeYwZRBnPvhkN29wOmEzWaaoCh9iqO+VkDrg@mail.gmail.com>
-	<20110711074600.GL4812@n2100.arm.linux.org.uk>
-	<CAMPhdO8=Gsiw_e6mFRi1PM99DSroaQi_SBiH298KAKqHb41rNw@mail.gmail.com>
-	<20110711075243.GM4812@n2100.arm.linux.org.uk>
-Message-ID: <CAMPhdO-zR_=i_01KSTx_TzRFEOgygHc=kkUB68bke62_nzO=8Q@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 11 Jul 2011 01:32:26 -0700
+Subject: [GIT PULL] OMAP: SoC data/core: cleanups for 3.1
+In-Reply-To: <alpine.DEB.2.00.1107092031400.15984@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1107092031400.15984@utopia.booyaka.com>
+Message-ID: <20110711083225.GO5783@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 11, 2011 at 3:52 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Jul 11, 2011 at 03:47:27PM +0800, Eric Miao wrote:
->> On Mon, Jul 11, 2011 at 3:46 PM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->> > On Mon, Jul 11, 2011 at 03:44:54PM +0800, Eric Miao wrote:
->> >> On Mon, Jul 11, 2011 at 3:41 PM, Russell King - ARM Linux
->> >> <linux@arm.linux.org.uk> wrote:
->> >> > On Mon, Jul 11, 2011 at 03:27:15PM +0800, Eric Miao wrote:
->> >> >> ? ? ? ARM: pxa: avoid accessing interrupt registers directly
->> >> >> ? ? ? ARM: pxa: introduce {icip,ichp}_handle_irq() to prepare MULTI_IRQ_HANDLER
->> >> >
->> >> > What happened about the __exception issue with asm_do_IRQ?
->> >> >
->> >>
->> >> I just removed the __exception from the C handler.
->> >
->> > From asm_do_IRQ ?
->> >
->>
->> No. From icip_handle_irq() and ichp_handle_irq(). Thought the ability to
->> unwind asm_do_IRQ() is more important.
->
-> Which means you didn't understand my objection when I reviewed your patch.
->
-> The __exception annotation on a function causes this to happen:
->
-> [<c002406c>] (asm_do_IRQ+0x6c/0x8c) from [<c0024b84>] (__irq_svc+0x44/0xcc)
-> Exception stack(0xc3897c78 to 0xc3897cc0)
-> 7c60: ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 4022d320 4022e000
-> 7c80: 08000075 00001000 c32273c0 c03ce1c0 c2b49b78 4022d000 c2b420b4 00000001
-> 7ca0: 00000000 c3897cfc 00000000 c3897cc0 c00afc54 c002edd8 00000013 ffffffff
->
-> Where that stack dump represents the pt_regs for the exception which
-> happened. ?Any function found in while unwinding will cause this to
-> be printed.
->
-> If you insert a C function between the IRQ assembly and asm_do_IRQ, the
-> dump you get from asm_do_IRQ will be the stack for your function, not
-> the pt_regs. ?That makes the feature useless.
->
+* Paul Walmsley <paul@pwsan.com> [110709 19:32]:
+> Hello Tony,
+> 
+> The following changes since commit ecba3287b4121dcf3ca7607fe71c205913edec06:
+> 
+>   Merge branch 'cleanup-part-2' of git+ssh://master.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6 into omap/cleanup (2011-07-08 15:01:45 +0000)
+> 
+> are available in the git repository at:
+> 
+>   git://git.pwsan.com/linux-2.6 prcm-cleanup-3.1
 
-Sorry for my stupidity, but I think I still don't get it quite correctly.
-When both functions are prefixed with __exception_irq_entry, if
-unwind works correctly, both stacks will be dumped, how would
-the asm_do_IRQ will be stack for the function inserted?
+I've merged this into linux-omap master for testing and
+also merged it into cleanup-part-3 along Russell's timer
+cleanup patch.
+
+Paul, please use the mainline tags or linux-omap static branches
+instead of the arm-soc branches. In this case there's only the extra
+merge commit there, so not a problem. Now it just makes it a bit
+harder for me to do pull requests and diffs to other branches.
+
+In general, we want to keep the dependencies between branches and
+other trees to minimum.
+
+Regards,
+
+Tony
