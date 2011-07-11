@@ -1,56 +1,28 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 11 Jul 2011 12:42:29 +0100
-Subject: [PATCH 11/51] ARM: Kconfig: Allow kprobes on Thumb-2 kernels
-In-Reply-To: <1310384021.2258.9.camel@computer2>
-References: <1310209058-20980-1-git-send-email-tixy@yxit.co.uk>
-	<1310209058-20980-12-git-send-email-tixy@yxit.co.uk>
-	<4E1AD7F2.9020205@ru.mvista.com>
-	<1310384021.2258.9.camel@computer2>
-Message-ID: <20110711114229.GJ3239@n2100.arm.linux.org.uk>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 11 Jul 2011 20:43:06 +0900
+Subject: [PATCH 0/6] clk: Initial feedback for off-SoC slow bus clocks
+In-Reply-To: <20110711104625.GH26347@pengutronix.de>
+References: <20110711025344.GA27497@opensource.wolfsonmicro.com>
+	<20110711093124.GA3239@n2100.arm.linux.org.uk>
+	<20110711100759.GG26347@pengutronix.de>
+	<20110711102856.GG3239@n2100.arm.linux.org.uk>
+	<20110711104625.GH26347@pengutronix.de>
+Message-ID: <20110711114304.GJ5092@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 11, 2011 at 12:33:41PM +0100, Tixy wrote:
-> On Mon, 2011-07-11 at 15:01 +0400, Sergei Shtylyov wrote: 
-> > Hello.
-> > 
-> > On 09-07-2011 14:56, Tixy wrote:
-> > 
-> > > From: Jon Medhurst<tixy@yxit.co.uk>
-> > 
-> > > Signed-off-by: Jon Medhurst<tixy@yxit.co.uk>
-> > > ---
-> > >   arch/arm/Kconfig |    2 +-
-> > >   1 files changed, 1 insertions(+), 1 deletions(-)
-> > 
-> > > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> > > index 9adc278..b4177c5 100644
-> > > --- a/arch/arm/Kconfig
-> > > +++ b/arch/arm/Kconfig
-> > > @@ -10,7 +10,7 @@ config ARM
-> > >   	select GENERIC_ATOMIC64 if (CPU_V6 || !CPU_32v6K || !AEABI)
-> > >   	select HAVE_OPROFILE if (HAVE_PERF_EVENTS)
-> > >   	select HAVE_ARCH_KGDB
-> > > -	select HAVE_KPROBES if (!XIP_KERNEL&&  !THUMB2_KERNEL)
-> > > +	select HAVE_KPROBES if (!XIP_KERNEL)
-> > 
-> >     Why not drop useless parens, while at it?
-> 
-> Every other 'if' clause in that file has these parenthesis so I thought
-> I would kept it consistent.
+On Mon, Jul 11, 2011 at 12:46:25PM +0200, Sascha Hauer wrote:
+> On Mon, Jul 11, 2011 at 11:28:56AM +0100, Russell King - ARM Linux wrote:
 
-There's plenty of examples where this isn't the case, eg:
+> > If that's all its for, then can't some other solution for debugfs names
+> > (lets stop calling them clock names to avoid confusion) be found -
+> > such as
 
-        default y if PXA27x || PXA3xx || PXA95x || ARCH_MMP
-...
-        default 200 if ARCH_EBSA110 || ARCH_S3C2410 || ARCH_S5P64X0 || \
-                ARCH_S5PV210 || ARCH_EXYNOS4
-        default OMAP_32K_TIMER_HZ if ARCH_OMAP && OMAP_32K_TIMER
-        default AT91_TIMER_HZ if ARCH_AT91
-        default SHMOBILE_TIMER_HZ if ARCH_SHMOBILE
-...
-        depends on !ARCH_S5P64X0 && !ARCH_S5PC100
-        depends on CPU_ARM920T || CPU_ARM926T || CPU_SA1100 || \
-                CPU_V6 || CPU_V6K || CPU_V7 || CPU_XSC3 || CPU_XSCALE
+> > 	sprintf(debugfsname, "%s@%p", clk->debugfsprefix, clk);
 
-We really need to stop useless additional parens for simple expressions.
+> Sounds good. During my tests on i.MX I found it very convenient to have
+> speaking debugfs names, so I vote for this suggestion instead the
+> following ones.
+
+FWIW that's pretty much exactly what I added except I used a - instead
+of @.
