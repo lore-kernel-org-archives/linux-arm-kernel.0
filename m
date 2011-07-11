@@ -1,45 +1,50 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Mon, 11 Jul 2011 13:00:24 +0200
-Subject: [PATCH v7 0/4] add the GPMI-NAND support for imx23/imx28
-In-Reply-To: <1310371266-10704-1-git-send-email-b32955@freescale.com>
-References: <1310371266-10704-1-git-send-email-b32955@freescale.com>
-Message-ID: <20110711110024.GB11153@pengutronix.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 11 Jul 2011 12:06:41 +0100
+Subject: [PATCH V2 0/6] arm_smp_twd: mpcore_wdt: Fix MPCORE watchdog setup
+In-Reply-To: <20110711095424.GD3239@n2100.arm.linux.org.uk>
+References: <1286185540-19569-1-git-send-email-vkuzmichev@mvista.com>
+	<1309892440-3260-1-git-send-email-vkuzmichev@mvista.com>
+	<4E14337F.1050101@arm.com>
+	<20110706101456.GN8286@n2100.arm.linux.org.uk>
+	<20110706110548.GA31936@1n450.cable.virginmedia.net>
+	<20110706111603.GS8286@n2100.arm.linux.org.uk>
+	<20110711094343.GB11247@e102109-lin.cambridge.arm.com>
+	<20110711095424.GD3239@n2100.arm.linux.org.uk>
+Message-ID: <20110711110641.GC11247@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, Jul 11, 2011 at 04:01:02PM +0800, Huang Shijie wrote:
-
-> The general-purpose media interface(GPMI) controller is a flexible interface
-> to up to several NAND flashs.
+On Mon, Jul 11, 2011 at 10:54:24AM +0100, Russell King - ARM Linux wrote:
+> On Mon, Jul 11, 2011 at 10:43:43AM +0100, Catalin Marinas wrote:
+> > On Wed, Jul 06, 2011 at 12:16:03PM +0100, Russell King - ARM Linux wrote:
+> > > On Wed, Jul 06, 2011 at 12:05:48PM +0100, Catalin Marinas wrote:
+> > > > On Wed, Jul 06, 2011 at 11:14:56AM +0100, Russell King - ARM Linux wrote:
+> > > > > Do we know why the calibration was initially introduced?  FWIR, it came
+> > > > > from the SMP group in ARM, so I guess they had a reason for it rather
+> > > > > than copying x86.
+> > > > 
+> > > > I think it was introduced because the TWD frequency is half of the CPU
+> > > > frequency but the latter may not be known - boot monitor configuration
+> > > > could change it.
+> > > 
+> > > Okay, that implies we can't have a fixed frequency built into the kernel
+> > > then.  For such platforms like the ARM dev boards (realview + vexpress),
+> > > I expect we can read the CPU frequency from somewhere like one of the
+> > > ICST PLLs.
+> >  
+> > That's highly platform dependent and it's not just ARM dev boards. Any
+> > board with ARM11MPCore, Cortex-A9 or Cortex-A5 would need to find a way
+> > to retrieve such information. If anyone is prepared to go through each
+> > board and figure out how to get the information, it's fine by me.
 > 
-> The Bose Ray-Choudhury Hocquenghem(BCH) module is a hardware ECC accelerator.
-> 
-> With the help of BCH, the GPMI controller can choose to do the hardware ECC or
-> not.
-> 
-> v6 --> v7:
-> 	[0] rename RES_SIZE to GPMI_NAND_RES_SIZE.
-> 	[1] move gpmi-nand.h to `include/linux/mtd/` directory.
-> 	[2] remove comment for new pad control.
-> 	[3] others
-
-Could you also post a driver which is adapted to all these changes?
-The series looks good now; still I want to test it a little just to make
-sure...
-
-Thanks,
-
-   Wolfram
+> So, these patches are blocked until we find some way to resolve the
+> clocking issues on all platforms with TWD and the MPcore watchdog.
+ 
+A way would be to mark TWD as broken on those platforms (you can still
+use the global timer, with its drawbacks) and push the platform
+maintainers to change their code. Once that's sorted and we know for
+sure that no platform requires the TWD calibration, you can merge these
+patches.
 
 -- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110711/2e3b0e8b/attachment.sig>
+Catalin
