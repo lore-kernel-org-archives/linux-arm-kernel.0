@@ -1,33 +1,29 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 11 Jul 2011 23:37:08 +0200
-Subject: Please submit platform trees for inclusion in arm-soc.git v3.1
-In-Reply-To: <87wrfsahez.fsf@ti.com>
-References: <201107012018.14619.arnd@arndb.de> <87wrfsahez.fsf@ti.com>
-Message-ID: <201107112337.08892.arnd@arndb.de>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Mon, 11 Jul 2011 14:39:17 -0700
+Subject: [PATCH] dmaengine: add dma_ctrl_cmd to pass buffer stride
+	configuration
+In-Reply-To: <CAKnu2MqzSm8BVK4z9E-ud8e_jUohDfSfYO9aW-oN3RFw4p7GrA@mail.gmail.com>
+References: <1310310203-12288-1-git-send-email-sundaram@ti.com>
+	<CAKnu2MqzSm8BVK4z9E-ud8e_jUohDfSfYO9aW-oN3RFw4p7GrA@mail.gmail.com>
+Message-ID: <CAA9_cmeWUjiTghKbjAvith5c6z9PDVdFSeK55RYWfyQKFSjA+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 08 July 2011, Kevin Hilman wrote:
-> > Time is running out for the current cycle, so any changes that you
-> > want to see merged in linux-3.1 through the arm-soc tree should be
-> > submitted in form of pull-requests very soon.
-> 
-> [...]
-> 
-> It looks like your "remove rmk/for-next" commit may not have been
-> totally complete.
-> 
-> Trying to merge your master branch and Russell's current for-next branch
-> still results in conflicts in files that should only be touched in
-> Russell's branch (specifically, these seem related to changes in
-> Russell's 'suspend' branch that is included in his 'for-next' branch.)
+On Mon, Jul 11, 2011 at 2:28 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> 2011/7/10 Sundaram Raju <sundaram@ti.com>:
+>
+>> Added new dma_ctrl_cmd TI_DMA_STRIDE_CONFIG to pass the TI DMA
+>> controller specific configurations on how a buffer must be walked
+>> through and how data is picked for transfer based on a specified
+>> pattern over the channel.
+>>
+>> The configuration passed is specific to the TI DMA controller used.
 
-Yes, that's my fault for not fixing this up correctly after initially
-doing the incorrect pull.
+...and I suspect the slave device drivers that use TI DMA are not
+expected to ever work with other dmaengines?  Likely the case, but
+just wondering out loud.
 
-I guess I'll throw away the current master branch and generate a new
-one. After discussing this with Russell, I think it's best to treat
-the master branch as temporary anyway unless Nicolas or Thomas come up
-with a good reason against doing this.
-
-	Arnd
+>> Signed-off-by: Sundaram Raju <sundaram@ti.com>
+>
+> This is exactly how I think we should do this.
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
