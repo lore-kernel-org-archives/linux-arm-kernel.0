@@ -1,27 +1,41 @@
 From: bryan.wu@canonical.com (Bryan Wu)
-Date: Mon, 11 Jul 2011 22:02:01 +0800
-Subject: [PATCH 04/17] mach-versatile: retire custom LED code
-In-Reply-To: <20110710092836.GT4812@n2100.arm.linux.org.uk>
+Date: Mon, 11 Jul 2011 22:13:29 +0800
+Subject: [PATCH 03/17] mach-realview: retire custom LED code
+In-Reply-To: <20110710092747.GS4812@n2100.arm.linux.org.uk>
 References: <1309955687-19365-1-git-send-email-bryan.wu@canonical.com>
-	<1309955687-19365-5-git-send-email-bryan.wu@canonical.com>
-	<20110710092836.GT4812@n2100.arm.linux.org.uk>
-Message-ID: <CAK5ve-KwL4rX65FqyWcZrvAcx0vFcGDpWQXgm67P8n2MDpNHWQ@mail.gmail.com>
+	<1309955687-19365-4-git-send-email-bryan.wu@canonical.com>
+	<20110710092747.GS4812@n2100.arm.linux.org.uk>
+Message-ID: <CAK5ve-+Zs=Q9sgfmCYJxOLvV+ATfrjOKrZEH_E49RHPk7WYJEQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 10, 2011 at 5:28 PM, Russell King - ARM Linux
+On Sun, Jul 10, 2011 at 5:27 PM, Russell King - ARM Linux
 <linux@arm.linux.org.uk> wrote:
-> On Wed, Jul 06, 2011 at 08:34:34PM +0800, Bryan Wu wrote:
->> From: Linus Walleij <linus.walleij@linaro.org>
+> On Wed, Jul 06, 2011 at 08:34:33PM +0800, Bryan Wu wrote:
+>> diff --git a/arch/arm/plat-versatile/Kconfig b/arch/arm/plat-versatile/Kconfig
+>> index 52353be..c600420 100644
+>> --- a/arch/arm/plat-versatile/Kconfig
+>> +++ b/arch/arm/plat-versatile/Kconfig
+>> @@ -7,8 +7,12 @@ config PLAT_VERSATILE_FPGA_IRQ
+>> ? ? ? bool
 >>
->> The CPU activity LED is now handled by the trigger in the leds
->> subsystem, retire this old CONFIG_LEDS-based code.
+>> ?config PLAT_VERSATILE_LEDS
+>> - ? ? def_bool y if LEDS_CLASS
+>> + ? ? def_bool y
+>> ? ? ? depends on ARCH_REALVIEW || ARCH_VERSATILE
+>> + ? ? select NEW_LEDS
+>> + ? ? select LEDS_CLASS
+>> + ? ? select LEDS_TRIGGERS
+>> + ? ? select LEDS_TRIGGER_CPU
 >
-> Shouldn't this be part of the previous patch? ?The previous patch changes
-> both Realview and Versatile by touching plat-versatile.
+> Can you explain the choice to force LED support to be enabled with no
+> choice for these?
 >
 
-I will fold them together, if Linus has no problem about it.
+I force to select this to default build-in LEDS stuff and don't wanna
+to modify the defconfig to build-in LEDS stuff as default.
+Now, I agree we can let users to select them when they wanna to enable
+LED via menuconfig.
 
 Thanks,
 -- 
