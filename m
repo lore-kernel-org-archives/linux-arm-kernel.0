@@ -1,138 +1,104 @@
 From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
-Date: Mon, 11 Jul 2011 16:59:16 +0530
-Subject: [PATCH v14 09/12] OMAP: dmtimer: use mutex instead of spinlock
+Date: Mon, 11 Jul 2011 16:59:14 +0530
+Subject: [PATCH v14 07/12] OMAP: dmtimer: pm_runtime support
 In-Reply-To: <1310383759-19059-1-git-send-email-tarun.kanti@ti.com>
 References: <1310383759-19059-1-git-send-email-tarun.kanti@ti.com>
-Message-ID: <1310383759-19059-10-git-send-email-tarun.kanti@ti.com>
+Message-ID: <1310383759-19059-8-git-send-email-tarun.kanti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the spinlock is not used in any interrupt context we can
-replace it with mutex instead.
+Add pm_runtime feature to dmtimer whereby _get_sync() is called within
+omap_dm_timer_enable(), _put_sync() is called in omap_dm_timer_disable().
 
 Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+[p-basak2 at ti.com: added pm_runtime logic in probe()]
+Signed-off-by: Partha Basak <p-basak2@ti.com>
+Reviewed-by: Varadarajan, Charulatha <charu@ti.com>
+Acked-by: Cousson, Benoit <b-cousson@ti.com>
 ---
- arch/arm/plat-omap/dmtimer.c |   27 +++++++++++----------------
- 1 files changed, 11 insertions(+), 16 deletions(-)
+ arch/arm/plat-omap/dmtimer.c              |   31 +++++++---------------------
+ arch/arm/plat-omap/include/plat/dmtimer.h |    1 -
+ 2 files changed, 8 insertions(+), 24 deletions(-)
 
 diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
-index f7ab92c..e7ceb5b 100644
+index d46efb4..f7ab92c 100644
 --- a/arch/arm/plat-omap/dmtimer.c
 +++ b/arch/arm/plat-omap/dmtimer.c
-@@ -43,7 +43,7 @@
+@@ -38,6 +38,7 @@
+ #include <linux/io.h>
+ #include <linux/slab.h>
+ #include <linux/err.h>
++#include <linux/pm_runtime.h>
+ 
  #include <plat/dmtimer.h>
  
- static LIST_HEAD(omap_timer_list);
--static DEFINE_SPINLOCK(dm_timer_lock);
-+static DEFINE_MUTEX(dm_timer_mutex);
+@@ -193,33 +194,13 @@ EXPORT_SYMBOL_GPL(omap_dm_timer_free);
  
- /**
-  * omap_dm_timer_read_reg - read timer registers in posted and non-posted mode
-@@ -136,9 +136,8 @@ void omap_dm_timer_prepare(struct omap_dm_timer *timer)
- struct omap_dm_timer *omap_dm_timer_request(void)
+ void omap_dm_timer_enable(struct omap_dm_timer *timer)
  {
- 	struct omap_dm_timer *timer = NULL, *t;
--	unsigned long flags;
- 
--	spin_lock_irqsave(&dm_timer_lock, flags);
-+	mutex_lock(&dm_timer_mutex);
- 	list_for_each_entry(t, &omap_timer_list, node) {
- 		if (t->reserved)
- 			continue;
-@@ -147,7 +146,7 @@ struct omap_dm_timer *omap_dm_timer_request(void)
- 		timer->reserved = 1;
- 		break;
- 	}
--	spin_unlock_irqrestore(&dm_timer_lock, flags);
-+	mutex_unlock(&dm_timer_mutex);
- 
- 	if (timer)
- 		omap_dm_timer_prepare(timer);
-@@ -161,9 +160,8 @@ EXPORT_SYMBOL_GPL(omap_dm_timer_request);
- struct omap_dm_timer *omap_dm_timer_request_specific(int id)
- {
- 	struct omap_dm_timer *timer = NULL, *t;
--	unsigned long flags;
- 
--	spin_lock_irqsave(&dm_timer_lock, flags);
-+	mutex_lock(&dm_timer_mutex);
- 	list_for_each_entry(t, &omap_timer_list, node) {
- 		if (t->pdev->id == id && !t->reserved) {
- 			timer = t;
-@@ -171,7 +169,7 @@ struct omap_dm_timer *omap_dm_timer_request_specific(int id)
- 			break;
- 		}
- 	}
--	spin_unlock_irqrestore(&dm_timer_lock, flags);
-+	mutex_unlock(&dm_timer_mutex);
- 
- 	if (timer)
- 		omap_dm_timer_prepare(timer);
-@@ -220,14 +218,13 @@ __u32 omap_dm_timer_modify_idlect_mask(__u32 inputmask)
- {
- 	int i = 0;
- 	struct omap_dm_timer *timer = NULL;
--	unsigned long flags;
- 
- 	/* If ARMXOR cannot be idled this function call is unnecessary */
- 	if (!(inputmask & (1 << 1)))
- 		return inputmask;
- 
- 	/* If any active timer is using ARMXOR return modified mask */
--	spin_lock_irqsave(&dm_timer_lock, flags);
-+	mutex_lock(&dm_timer_mutex);
- 	list_for_each_entry(timer, &omap_timer_list, node) {
- 		u32 l;
- 
-@@ -240,7 +237,7 @@ __u32 omap_dm_timer_modify_idlect_mask(__u32 inputmask)
- 		}
- 		i++;
- 	}
--	spin_unlock_irqrestore(&dm_timer_lock, flags);
-+	mutex_unlock(&dm_timer_mutex);
- 
- 	return inputmask;
+-	struct dmtimer_platform_data *pdata = timer->pdev->dev.platform_data;
+-
+-	if (timer->enabled)
+-		return;
+-
+-	if (!pdata->needs_manual_reset) {
+-		clk_enable(timer->fclk);
+-		clk_enable(timer->iclk);
+-	}
+-
+-	timer->enabled = 1;
++	pm_runtime_get_sync(&timer->pdev->dev);
  }
-@@ -464,7 +461,6 @@ EXPORT_SYMBOL_GPL(omap_dm_timers_active);
- static int __devinit omap_dm_timer_probe(struct platform_device *pdev)
+ EXPORT_SYMBOL_GPL(omap_dm_timer_enable);
+ 
+ void omap_dm_timer_disable(struct omap_dm_timer *timer)
  {
- 	int ret;
--	unsigned long flags;
+-	struct dmtimer_platform_data *pdata = timer->pdev->dev.platform_data;
+-
+-	if (!timer->enabled)
+-		return;
+-
+-	if (!pdata->needs_manual_reset) {
+-		clk_disable(timer->iclk);
+-		clk_disable(timer->fclk);
+-	}
+-
+-	timer->enabled = 0;
++	pm_runtime_put_sync(&timer->pdev->dev);
+ }
+ EXPORT_SYMBOL_GPL(omap_dm_timer_disable);
+ 
+@@ -461,7 +442,7 @@ int omap_dm_timers_active(void)
  	struct omap_dm_timer *timer;
- 	struct resource *mem, *irq, *ioarea;
- 	struct dmtimer_platform_data *pdata = pdev->dev.platform_data;
-@@ -529,9 +525,9 @@ static int __devinit omap_dm_timer_probe(struct platform_device *pdev)
- 		pm_runtime_enable(&pdev->dev);
  
+ 	list_for_each_entry(timer, &omap_timer_list, node) {
+-		if (!timer->enabled)
++		if (!timer->reserved)
+ 			continue;
+ 
+ 		if (omap_dm_timer_read_reg(timer, OMAP_TIMER_CTRL_REG) &
+@@ -543,6 +524,10 @@ static int __devinit omap_dm_timer_probe(struct platform_device *pdev)
+ 	timer->pdev = pdev;
+ 	timer->reserved = 0;
+ 
++	/* Skip pm_runtime_enable for OMAP1 */
++	if (!pdata->needs_manual_reset)
++		pm_runtime_enable(&pdev->dev);
++
  	/* add the timer element to the list */
--	spin_lock_irqsave(&dm_timer_lock, flags);
-+	mutex_lock(&dm_timer_mutex);
+ 	spin_lock_irqsave(&dm_timer_lock, flags);
  	list_add_tail(&timer->node, &omap_timer_list);
--	spin_unlock_irqrestore(&dm_timer_lock, flags);
-+	mutex_unlock(&dm_timer_mutex);
- 
- 	dev_dbg(&pdev->dev, "Device Probed.\n");
- 
-@@ -561,10 +557,9 @@ err_free_pdev:
- static int __devexit omap_dm_timer_remove(struct platform_device *pdev)
- {
- 	struct omap_dm_timer *timer, *tmp;
--	unsigned long flags;
- 	int ret = -EINVAL;
- 
--	spin_lock_irqsave(&dm_timer_lock, flags);
-+	mutex_lock(&dm_timer_mutex);
- 	list_for_each_entry_safe(timer, tmp, &omap_timer_list, node) {
- 		if (timer->pdev->id == pdev->id) {
- 			kfree(timer->pdev->dev.platform_data);
-@@ -575,7 +570,7 @@ static int __devexit omap_dm_timer_remove(struct platform_device *pdev)
- 			break;
- 		}
- 	}
--	spin_unlock_irqrestore(&dm_timer_lock, flags);
-+	mutex_unlock(&dm_timer_mutex);
- 
- 	return ret;
- }
+diff --git a/arch/arm/plat-omap/include/plat/dmtimer.h b/arch/arm/plat-omap/include/plat/dmtimer.h
+index 90a504a..53d5da6 100644
+--- a/arch/arm/plat-omap/include/plat/dmtimer.h
++++ b/arch/arm/plat-omap/include/plat/dmtimer.h
+@@ -238,7 +238,6 @@ struct omap_dm_timer {
+ 	void __iomem *io_base;
+ 	unsigned long rate;
+ 	unsigned reserved:1;
+-	unsigned enabled:1;
+ 	unsigned posted:1;
+ 	u8 func_offset;
+ 	u8 intr_offset;
 -- 
 1.6.0.4
