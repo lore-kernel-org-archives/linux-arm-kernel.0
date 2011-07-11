@@ -1,82 +1,59 @@
-From: rbairva@gmail.com (rd bairva)
-Date: Mon, 11 Jul 2011 13:56:35 +0530
-Subject: ARM cortex A9 performance issue
-In-Reply-To: <20110708133315.GB2115@arm.com>
-References: <CAE_nTV4VgcNB0gc64zEPEfHp-hnDBsw6QsM=GqEObXAwzMTzTA@mail.gmail.com>
-	<20110707152740.GG2486@arm.com>
-	<CAE_nTV7PuEJx0WJKCtbGU-4HjEBzFxPRmPLue1toktS27Htbzg@mail.gmail.com>
-	<20110708133315.GB2115@arm.com>
-Message-ID: <CAE_nTV4t64A7JGN117Pkg1dmqnEvPFkE1AqoyRbeVhN3dN1Q8g@mail.gmail.com>
+From: amit.kucheria@canonical.com (Amit Kucheria)
+Date: Mon, 11 Jul 2011 12:06:09 +0300
+Subject: [PATCH 1/1] ARM: i.MX50/53: debug-macro: fix UART_PADDR
+In-Reply-To: <1310251913-9877-1-git-send-email-troy.kisky@boundarydevices.com>
+References: <1310251913-9877-1-git-send-email-troy.kisky@boundarydevices.com>
+Message-ID: <20110711090609.GB2482@matterhorn1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Attaching the new code.
+On 11 Jul 09, Troy Kisky wrote:
+> The i.MX51 UART_PADDR value does not work for MX50/53.
+> 
+> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
 
-On Fri, Jul 8, 2011 at 7:03 PM, Dave Martin <dave.martin@linaro.org> wrote:
-> On Fri, Jul 08, 2011 at 05:08:38PM +0530, rd bairva wrote:
->> Now i have modified a source a little bit. Now I am doing a pingpong
->> using msgsnd and msgrcv. using this I am getting 40000req/sec and 55%
->> CPU usage.
->> In another version I have taken the same lock in both the processes to
->> ensure same thread is unlocking the mutex. But CPU usage is 100%.
->> Shouldn't be the behaviour 50%.
->
-> Possibly. ?Do you see that behaviour on all platforms, or just A9?
-On single processor it is always 100% on ARM as well as X86. but on
-X86, cpu is >50% free.
->
->>
->> algo
->> msgsnd/msgrcv version.
->>
->> Process1
->> shared memory counter++
->> msgsnd1
->> msgrcv 2
->>
->> Process2
->> msgrcv 1
->> shared memory counter--
->> msgsnd2
->>
->> Mutex version:
->> Process 1
->>
->> mutex1
->> c++
->> unlock_mutex1
->>
->> Process 2
->> mutex1
->> c++
->> unlock_mutex1
->
-> If there is some overhead outside the critical section, then the two threads
-> are likely to end up synchronised in such a way that this hides some or all of
-> the latency of acquiring the lock. ?So I'd expect a CPU load somewhere between
-> 50% and 100%, though I'd be a bit surprised if all the latency is hidden.
->
-> If you don't check or wait for the counter increment, the same thread may
-> repeatedly take the lock of course, without ever waiting. ?If that happens,
-> you would see 100% load. ?This probably can't happen with the msgsnd/msgrcv
-> version.
->
-> Your results from msgsnd/msgrcv also suggest that the hidden message
-> receive latency and other system overheads account for something like
-> of the total CPU load for that code, which sounds plausible.
->
-> Can you attach your new code?
->
-> Cheers
-> ---Dave
->
->
-Thanks and regards,
-Ramdayal
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: shmemtest.zip
-Type: application/zip
-Size: 3414 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110711/3367f4db/attachment.zip>
+Acked-by: Amit Kucheria <amit.kucheria@canonical.com>
+
+but I think we should switch to runtime detection of the machine (machine
+ID?) and then set the port address.
+
+See arch/arm/plat-omap/include/plat/uncompress.h for a possible scheme.
+
+> ---
+>  arch/arm/plat-mxc/include/mach/debug-macro.S |    9 ++++++++-
+>  1 files changed, 8 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/plat-mxc/include/mach/debug-macro.S b/arch/arm/plat-mxc/include/mach/debug-macro.S
+> index 8e8d175..3919ad4 100644
+> --- a/arch/arm/plat-mxc/include/mach/debug-macro.S
+> +++ b/arch/arm/plat-mxc/include/mach/debug-macro.S
+> @@ -37,13 +37,20 @@
+>  #define UART_PADDR	MX3x_UART1_BASE_ADDR
+>  #endif
+>  
+> -#ifdef CONFIG_ARCH_MX5
+> +#ifdef CONFIG_ARCH_MX51
+>  #ifdef UART_PADDR
+>  #error "CONFIG_DEBUG_LL is incompatible with multiple archs"
+>  #endif
+>  #define UART_PADDR	MX51_UART1_BASE_ADDR
+>  #endif
+>  
+> +#if defined(CONFIG_ARCH_MX50) || defined(CONFIG_ARCH_MX53)
+> +#ifdef UART_PADDR
+> +#error "CONFIG_DEBUG_LL is incompatible with multiple archs"
+> +#endif
+> +#define UART_PADDR	MX53_UART1_BASE_ADDR
+> +#endif
+> +
+>  #define UART_VADDR	IMX_IO_ADDRESS(UART_PADDR)
+>  
+>  		.macro	addruart, rp, rv
+> -- 
+> 1.7.0.4
+> 
+
+-- 
+----------------------------------------------------------------------
+Amit Kucheria, Kernel Engineer || amit.kucheria at canonical.com
+----------------------------------------------------------------------
