@@ -1,136 +1,208 @@
-From: frank.hofmann@tomtom.com (Frank Hofmann)
-Date: Mon, 11 Jul 2011 15:31:30 +0100 (BST)
-Subject: [RFC PATCH 05/17] ARM: kernel: save/restore kernel IF
-In-Reply-To: <20110711140047.GA346@e102568-lin.cambridge.arm.com>
-References: <1310053830-23779-1-git-send-email-lorenzo.pieralisi@arm.com>
-	<1310053830-23779-6-git-send-email-lorenzo.pieralisi@arm.com>
-	<alpine.DEB.2.00.1107081641280.2609@localhost6.localdomain6>
-	<20110711140047.GA346@e102568-lin.cambridge.arm.com>
-Message-ID: <alpine.DEB.2.00.1107111503100.2609@localhost6.localdomain6>
+From: bryan.wu@canonical.com (Bryan Wu)
+Date: Mon, 11 Jul 2011 22:36:49 +0800
+Subject: [PATCH 16/17] mach-sa1100: retire custom LED code
+In-Reply-To: <20110710092426.GR4812@n2100.arm.linux.org.uk>
+References: <1309955687-19365-1-git-send-email-bryan.wu@canonical.com>
+	<1309955687-19365-17-git-send-email-bryan.wu@canonical.com>
+	<20110710092426.GR4812@n2100.arm.linux.org.uk>
+Message-ID: <CAK5ve-+Pr8EDa8mfhZVbf8ADc2YDU0EyTPL3Fwwipj237tgKQg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On Mon, 11 Jul 2011, Lorenzo Pieralisi wrote:
-
-> On Fri, Jul 08, 2011 at 05:12:22PM +0100, Frank Hofmann wrote:
->> Hi Lorenzo,
+On Sun, Jul 10, 2011 at 5:24 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Jul 06, 2011 at 08:34:46PM +0800, Bryan Wu wrote:
+>> diff --git a/arch/arm/mach-sa1100/assabet.c b/arch/arm/mach-sa1100/assabet.c
+>> index 5778274..13e4e5d 100644
+>> --- a/arch/arm/mach-sa1100/assabet.c
+>> +++ b/arch/arm/mach-sa1100/assabet.c
+>> @@ -19,6 +19,8 @@
+>> ?#include <linux/mtd/partitions.h>
+>> ?#include <linux/delay.h>
+>> ?#include <linux/mm.h>
+>> +#include <linux/leds.h>
+>> +#include <linux/slab.h>
 >>
->> only a few comments at this stage.
+>> ?#include <mach/hardware.h>
+>> ?#include <asm/mach-types.h>
+>> @@ -445,6 +447,79 @@ static void __init assabet_map_io(void)
+>> ? ? ? sa1100_register_uart(2, 3);
+>> ?}
 >>
->> The sr_entry.S code is both exclusively .arm (using conditionals and
->> long-distance adr, i.e. not Thumb2-clean), and it uses post-armv5
->> instructions (like wfi). Same for the other *.S code in the patch series.
->> It's non-generic assembly within arch/arch/kernel/, wouldn't one better
->> place this into arch/arm/mm/...-v[67].S ?
+>> +/* LEDs */
+>> +struct assabet_led {
+>> + ? ? struct led_classdev cdev;
+>> + ? ? u32 mask;
+>> +};
+>> +
+>> +/*
+>> + * The triggers lines up below will only be used if the
+>> + * LED triggers are compiled in.
+>> + */
+>> +static const struct {
+>> + ? ? const char *name;
+>> + ? ? const char *trigger;
+>> +} assabet_leds[] = {
+>> + ? ? { "assabet:red", "cpu",},
+>> + ? ? { "assabet:green", "heartbeat", },
+>> +};
+>> +
+>> +static void assabet_led_set(struct led_classdev *cdev,
+>> + ? ? ? ? ? ? enum led_brightness b)
+>> +{
+>> + ? ? struct assabet_led *led = container_of(cdev,
+>> + ? ? ? ? ? ? ? ? ? ? struct assabet_led, cdev);
+>> +
+>> + ? ? if (b != LED_OFF)
+>> + ? ? ? ? ? ? ASSABET_BCR_clear(led->mask);
+>> + ? ? else
+>> + ? ? ? ? ? ? ASSABET_BCR_set(led->mask);
+>> +}
+>> +
+>> +static enum led_brightness assabet_led_get(struct led_classdev *cdev)
+>> +{
+>> + ? ? struct assabet_led *led = container_of(cdev,
+>> + ? ? ? ? ? ? ? ? ? ? struct assabet_led, cdev);
+>> +
+>> + ? ? return (ASSABET_BCR & led->mask) ? LED_OFF : LED_FULL;
+>> +}
+>> +
+>> +static int __init assabet_leds_init(void)
+>> +{
+>> + ? ? int i;
+>> +
+>> + ? ? for (i = 0; i < ARRAY_SIZE(assabet_leds); i++) {
+>> + ? ? ? ? ? ? struct assabet_led *led;
+>> +
+>> + ? ? ? ? ? ? led = kzalloc(sizeof(*led), GFP_KERNEL);
+>> + ? ? ? ? ? ? if (!led)
+>> + ? ? ? ? ? ? ? ? ? ? break;
+>> +
+>> + ? ? ? ? ? ? led->cdev.name = assabet_leds[i].name;
+>> + ? ? ? ? ? ? led->cdev.brightness_set = assabet_led_set;
+>> + ? ? ? ? ? ? led->cdev.brightness_get = assabet_led_get;
+>> + ? ? ? ? ? ? led->cdev.default_trigger = assabet_leds[i].trigger;
+>> +
+>> + ? ? ? ? ? ? if (!i)
+>> + ? ? ? ? ? ? ? ? ? ? led->mask = ASSABET_BCR_LED_RED;
+>> + ? ? ? ? ? ? else
+>> + ? ? ? ? ? ? ? ? ? ? led->mask = ASSABET_BCR_LED_GREEN;
+>> +
+>> + ? ? ? ? ? ? if (led_classdev_register(NULL, &led->cdev) < 0) {
+>> + ? ? ? ? ? ? ? ? ? ? kfree(led);
+>> + ? ? ? ? ? ? ? ? ? ? break;
+>> + ? ? ? ? ? ? }
+>> + ? ? }
+>> +
+>> + ? ? return 0;
+>> +}
+>> +
+>> +/*
+>> + * Since we may have triggers on any subsystem, defer registration
+>> + * until after subsystem_init.
+>> + */
+>> +fs_initcall(assabet_leds_init);
+>
+> This is buggy. ?init functions are called irrespective of what platform
+> we're running on, so this means if assabet is built in to the kernel,
+> then we'll register its LEDs and try to access the BCR register
+> irrespective of whether we are on assabet or not.
+>
+
+Right, I got it. So if we are going to run a single binary for all the
+sa1100 machines, how about we check the machine in each fs_initcall
+
+static int __init assabet_leds_init(void)
+{
+ ? ? int i;
+
+     if (!machine_is_assabet())
+          return -ENODEV,
+
+ ? ? for (i = 0; i < ARRAY_SIZE(assabet_leds); i++) {
+ ? ? ? ? ? ? struct assabet_led *led;
+
+Thanks,
+
+>> diff --git a/arch/arm/mach-sa1100/simpad.c b/arch/arm/mach-sa1100/simpad.c
+>> index cfb7607..6f87258 100644
+>> --- a/arch/arm/mach-sa1100/simpad.c
+>> +++ b/arch/arm/mach-sa1100/simpad.c
+>> @@ -13,6 +13,8 @@
+>> ?#include <linux/mtd/mtd.h>
+>> ?#include <linux/mtd/partitions.h>
+>> ?#include <linux/io.h>
+>> +#include <linux/leds.h>
+>> +#include <linux/slab.h>
 >>
->
-> Yes, it is certainly something I should improve to make it more generic.
->
+>> ?#include <asm/irq.h>
+>> ?#include <mach/hardware.h>
+>> @@ -205,7 +207,53 @@ static struct platform_device *devices[] __initdata = {
+>> ? ? ? &simpad_mq200fb
+>> ?};
 >>
->> Then, sr_suspend/sr_resume; these functions are "C-exported" and are
->> directly calling cpu_do_suspend/do_resume to pass a supplied buffer; I've
->> done that for one iteration of the hibernation patch, yes, but that was a
->> bit sneaky and Russell stated then the interface is cpu_suspend/cpu_resume
->> not the proc funcs directly. Unless _those_ have been changed they're also
->> unsafe to call from C funcs (clobber all regs). Couldn't you simply use
->> cpu_suspend/resume directly ?
+>> +/* LEDs */
+>> +#define LED_GREEN ? ?1
 >>
+>> +static void simpad_led_set(struct led_classdev *cdev,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? enum led_brightness b)
+>> +{
+>> + ? ? if (b != LED_OFF)
+>> + ? ? ? ? ? ? set_cs3_bit(LED_GREEN);
+>> + ? ? else
+>> + ? ? ? ? ? ? clear_cs3_bit(LED_GREEN);
+>> +}
+>> +
+>> +static enum led_brightness simpad_led_get(struct led_classdev *cdev)
+>> +{
+>> + ? ? u32 reg = *(CS3BUSTYPE *)(CS3_BASE);
+>> +
+>> + ? ? return (reg & LED_GREEN) ? LED_FULL : LED_OFF;
+>> +}
+>> +
+>> +static int __init simpad_leds_init(void)
+>> +{
+>> + ? ? struct led_classdev *simpad_led;
+>> + ? ? int ret;
+>> +
+>> + ? ? simpad_led = kzalloc(sizeof(*simpad_led), GFP_KERNEL);
+>> + ? ? if (!simpad_led)
+>> + ? ? ? ? ? ? return -ENOMEM;
+>> +
+>> + ? ? simpad_led->name = "simpad:green";
+>> + ? ? simpad_led->brightness_set = simpad_led_set;
+>> + ? ? simpad_led->brightness_get = simpad_led_get;
+>> + ? ? simpad_led->default_trigger = "heartbeat";
+>> +
+>> + ? ? ret = led_classdev_register(NULL, simpad_led);
+>> + ? ? if (ret < 0) {
+>> + ? ? ? ? ? ? kfree(simpad_led);
+>> + ? ? ? ? ? ? return ret;
+>> + ? ? }
+>> +
+>> + ? ? return 0;
+>> +}
+>> +
+>> +/*
+>> + * Since we may have triggers on any subsystem, defer registration
+>> + * until after subsystem_init.
+>> + */
+>> +fs_initcall(simpad_leds_init);
 >
-> Well, short answer is no. On SMP we do need to save CPU registers
-> but if just one single cpu is shutdown L2 is still on.
-> cpu_suspend saves regs on the stack that has to be cleaned from
-> L2 before shutting a CPU down which make things more complicated than
-> they should. That's why I use cpu_do_{suspend,resume}, so that I can choose
-> the memory used to save registers (uncached), but that's an abuse of
-> API.
-
-There's the option to use a switch_stack() as Will Deacon has provided via 
-his kexec series. Agreed not mainline yet but good for ideas. Will's diff 
-is here:
-
-http://www.spinics.net/lists/arm-kernel/msg127951.html
-
-and that one restores the original sp after the "stack switched" function 
-returns.
-
-If you use that to switch to a different (uncached) stack before doing 
-cpu_suspend (and the 'idle' finisher through that), wouldn't that solve 
-the problem ? When the suspend returns, the above would restore your 
-cached stackpointer.
-
-> I agree this is sneaky, but I wanted to avoid duplicating code that
-> just saves registers. Maybe moving to an uncached stack might solve this
-> problem if we want to reuse cpu_suspend from cpu idle, which is still an
-> open point.
-
-(me speedtyping above ...) As you say ;-)
-
+> Looks like simpad is similarly afflicted. ?I haven't gone through the
+> rest to check for similar issues.
 >
->> How much memory do all the pagedirs require that are being kept around ?
->> Why does each core need a separate one, what would happen to just use a
->> single "identity table" for all ?
->> I understand you can't use swapper_pg_dir for idle, so a separate one has
->> to be allocated, yet the question remains why per-cpu required ?
->>
->>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 >
-> I just allocate a 1:1 mapping once cloned from init_mm, reused for all CPUs,
-> with an additional mapping.
-
-Have started to wonder whether this facility (a 1:1-mapped pagedir for 
-kernel text/data, or maybe even "non-user text/data") could/should be made 
-available on a global scale; after all, both kexec, reset, hibernate, some 
-forms of idle/suspend do require "some sort of that" to go through MMU 
-reinitialization. I'm unfortunately not deep enough in the VM subsystem to 
-say how exactly this best would have to look like.
-
-Merely mentioning this because it looks while everyone creates 1:1 
-mappings, there's ever so slight differences between how the 1:1 
-mapping(s) are created; we've seen:
-
- 	* (re)using current->active_mm->pgd
- 	* (re)using swapper_pg_dir (different lengths for the 1:1 section)
- 	* using a separately-allocated/initialized pgdir
-
-Such proliferation usually means there's a justified need to do that kind 
-of thing. Just the gritty details haven't been sorted how everyone with 
-that need could do _the same_ thing instead of reinventing various square 
-wheels.
-
-The main reason why I've used swapper_pg_dir in the hibernation patch is 
-because it's the only static one in the system (the hibernation hooks are 
-in irqs-off codepaths and pgd_alloc isn't a good idea then), and happens 
-to have "clear" lower sections (in the user area) so that one's not 
-actually substituting anything when creating 1:1 mappings (and getting rid 
-of them restores the "pristine" state). But this assumption only holds as 
-long as swapper_pg_dir's use isn't changed. So a little creepy feeling 
-remains.
-
-A generic "reset_mmu_pg_dir", wouldn't that be a good thing to have ?
-
-> The array of pointers is there to save pgdir on idle entry, one per-cpu.
-
-If you're going through cpu_{do_}suspend/resume, the TTBRs are 
-saved/restored anyway, what do you need to keep the virtual addresses 
-around for ?
 
 
->
->>
->> I'm currently transitioning between jobs; will re-subscribe to arm-kernel
->> under a different email address soon, this one is likely to stop working
->> in August. Sorry the inconvenience and high-latency responses till then :(
->>
->> FrankH.
->
-> May I thank you very much for the review in the interim,
 
-You're welcome.
-FrankH.
-
->
-> Lorenzo
->
->
+-- 
+Bryan Wu <bryan.wu@canonical.com>
+Kernel Developer ? ?+86.138-1617-6545 Mobile
+Ubuntu Kernel Team
+Canonical Ltd. ? ? ?www.canonical.com
+Ubuntu - Linux for human beings | www.ubuntu.com
