@@ -1,77 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 11 Jul 2011 21:14:00 +0100
-Subject: [RFC PATCH 05/17] ARM: kernel: save/restore kernel IF
-In-Reply-To: <4E1B5780.6040307@ti.com>
-References: <1310053830-23779-1-git-send-email-lorenzo.pieralisi@arm.com>
-	<1310053830-23779-6-git-send-email-lorenzo.pieralisi@arm.com>
-	<alpine.DEB.2.00.1107081641280.2609@localhost6.localdomain6>
-	<20110711140047.GA346@e102568-lin.cambridge.arm.com>
-	<20110711184010.GB8486@n2100.arm.linux.org.uk>
-	<4E1B5780.6040307@ti.com>
-Message-ID: <20110711201400.GD8486@n2100.arm.linux.org.uk>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 11 Jul 2011 13:17:27 -0700
+Subject: [PATCH 0/7] Re-organize linker layouts
+In-Reply-To: <alpine.LFD.2.00.1107081417080.14596@xanadu.home>
+References: <20110706102245.GO8286@n2100.arm.linux.org.uk>
+	<4E15ECB6.40100@codeaurora.org>
+	<20110707223620.GG20403@n2100.arm.linux.org.uk>
+	<4E165597.90002@codeaurora.org>
+	<20110708090721.GC2414@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1107080941090.14596@xanadu.home>
+	<20110708160329.GF4812@n2100.arm.linux.org.uk>
+	<4E1736A9.9040102@codeaurora.org>
+	<alpine.LFD.2.00.1107081417080.14596@xanadu.home>
+Message-ID: <4E1B5A57.3010701@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 11, 2011 at 01:05:20PM -0700, Santosh Shilimkar wrote:
-> (Just to add few more points on top of what Colin already commented)
+On 7/8/2011 11:24 AM, Nicolas Pitre wrote:
+> On Fri, 8 Jul 2011, Stephen Boyd wrote:
+>> Why can't this work via atags (or DT for that matter)? atags have always
+>> said where ram starts and we should be able to write some code that
+>> parses the atags/DT and figures out the final resting place of the
+>> decompressed image.
+> Possibly.  But that would be an MSM special case.
 >
-> On 7/11/2011 11:40 AM, Russell King - ARM Linux wrote:
->> On Mon, Jul 11, 2011 at 03:00:47PM +0100, Lorenzo Pieralisi wrote:
->>> Well, short answer is no. On SMP we do need to save CPU registers
->>> but if just one single cpu is shutdown L2 is still on.
->>> cpu_suspend saves regs on the stack that has to be cleaned from
->>> L2 before shutting a CPU down which make things more complicated than
->>> they should.
->>
->> Hang on.  Please explain something to me here.  You've mentioned a few
->> times that cpu_suspend() can't be used because of the L2 cache.  Why
->> is this the case?
->>
->> OMAP appears to have code in its sleep path - which has been converted
->> to cpu_suspend() support - to deal with the L2 issues.
->>
-> This part is not done yet Russell. Infact the cpu_resume() function
-> need an update to work with L2 enable configuration.
 
-The code does deal with L2 cache enable in the resume path...
+Hmm. I thought ST-Erricson folks had something similar.
 
->> However, lets recap.  What we do in cpu_suspend() in order is:
->>
->> - Save the ABI registers onto the stack, and some private state
->> - Save the CPU specific state onto the stack
-> We need to disable C bit here to avoid any speculative artifacts
-> during further operations before WFI.
+Anyway, maybe we've been going about this the wrong way. Couldn't we
+just make TEXT_OFFSET be 0x00208000 and then make sure to remove the
+first 2MB of memory in a machine->reserve() routine if we're MSM?
 
-Which you are doing.
+Something like PHYS_OFFSET=0xN0000000 and TEXT_OFFSET=0x00208000 so that
+our text ends up at the right place (0xN0208000) and AUTO_ZRELADDR will
+be happy. This seems to work as long as I fixup the atags to say memory
+starts at 0xN000000 instead of 0xN0200000.
 
->> - Flush the L1 cache
->> - Call the platform specific suspend finisher
-> Also finisher function should issue the WFI and just in
-> case for some reason CPU doesn't hit the targeted low
-> power state, finisher function takes care of things
-> like enabling C bit, SMP bit etc.
-
-You're restoring the C bit in the non-off paths already which follow a
-failed WFI.  You're not touching the SMP bit there though - was it
-ever reset?  I don't think so.
-
->> On resume, with the MMU and caches off:
->>
->> - Platform defined entry point is called, which _may_ be cpu_resume
->>    directly.
->> - Platform initial code is executed to do whatever that requires
->> - cpu_resume will be called
->> - cpu_resume loads the previously saved private state
->> - The CPU specific state is restored
->> - Page table is modified to permit 1:1 mapping for MMU enable
-> 1:1 idmap used here should be mapped as non-cached to avoid L2 related
-> issues. I faced similar issue in OMAP sleep code earlier and later
-> thanks to Colin,  we got the fixed my making use of non-cached idmap.
-
-It is specified that if the main control register C bit is clear,
-accesses will be uncached.
-
-Whether you get cache hits or not is probably implementation dependent,
-and provided that the state information is cleaned from the L2 cache,
-it doesn't matter if we hit the L2 cached copy or the RAM copy.  It's
-the same data.
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
