@@ -1,85 +1,82 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 11 Jul 2011 04:47:37 -0700
-Subject: Remaining omap pull requests
-Message-ID: <20110711114736.GX5783@atomide.com>
+From: vkuzmichev@mvista.com (Vitaly Kuzmichev)
+Date: Mon, 11 Jul 2011 15:50:10 +0400
+Subject: [PATCH V3 1/4] ARM: smp_twd: Fix typo in 'twd_timer_rate' printing
+In-Reply-To: <20110710104740.GD4812@n2100.arm.linux.org.uk>
+References: <1310041339-2348-1-git-send-email-vkuzmichev@mvista.com>
+	<1310041396-2461-1-git-send-email-vkuzmichev@mvista.com>
+	<20110707123907.GP8286@n2100.arm.linux.org.uk>
+	<4E15DCE1.8010201@mvista.com>
+	<20110710104740.GD4812@n2100.arm.linux.org.uk>
+Message-ID: <4E1AE372.1000909@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hi Russell,
 
-Below is a summary of the pending omap pull requests as there are still
-few branches pending.
+On 07/10/2011 02:47 PM, Russell King - ARM Linux wrote:
+> On Thu, Jul 07, 2011 at 08:20:49PM +0400, Vitaly Kuzmichev wrote:
+>> Hi Russell,
+>>
+>> On 07/07/2011 04:39 PM, Russell King - ARM Linux wrote:
+>>> On Thu, Jul 07, 2011 at 04:23:13PM +0400, Vitaly Kuzmichev wrote:
+>>>> To get hundredths of MHz the rate needs to be divided by 10'000.
+>>>> Here is an example:
+>>>>  twd_timer_rate = 123456789
+>>>>  Before the patch:
+>>>>     twd_timer_rate / 1000000 = 123
+>>>>     (twd_timer_rate / 1000000) % 100 = 23
+>>>>     Result: 123.23MHz.
+>>>>  After being fixed:
+>>>>     twd_timer_rate / 1000000 = 123
+>>>>     (twd_timer_rate / 10000) % 100 = 45
+>>>>     Result: 123.45MHz.
+>>>>
+>>>> Signed-off-by: Vitaly Kuzmichev <vkuzmichev@mvista.com>
+>>>
+>>> -> patch system please.
+>>
+>> Should I submit other patches into this system too?
+> 
+> No, the other patches I've yet to look at, and I think there's issues
+> still to be resolved.
+> 
+> Eg, ISTR a patch to make smp_twd.c selectable on non-SMP platforms so
+> that the mpcore watchdog can be used on non-SMP platforms.  While that
+> fixes the build issues, functionally its broken.  I don't think that
+> the mpcore watchdog should be asking the smp_twd code in any case for
+> the clock rate.
 
-Can you please take a look and see what you can take of these for v3.1
-merge window?
+I'm guessing that you mean here both cases when non-SMP kernel runs on
+multi-core and on single-core (I'm not sure whether they really exist)
+MPCore CPUs, do you? I think in both these cases TWD timer(s) should
+always be presented in MPCore. So it is wrong to call this timer as
+SMP_TWD and make it dependent on CONFIG_SMP, isn't it?
 
-There's still quite a bit more code shrinkage, and the new code for 4460
-and PRCM related changes are badly needed.
+I just mean, probably the fact that mpcore_wdt depends on swp_twd is not
+a real issue, and my patch is correct, but does not fix everything. In
+this case it's better than nothing, better than watchdog that does not
+work properly either on SMP, or on non-SMP platforms.
+Note that my patch does not introduce new dependencies, it just relies
+on the one that already exists.
 
-Here's what's still pending:
+As regarding to new clocksource/arm_smp_twd driver, if it can be
+compiled for non-SMP kernel/platform the mpcore_wdt will also be able to
+do the same (even with only my patch). But in the case of clk interface
+mpcore_wdt will be dependent on TWD's clk structure anyway. So I can
+think only of one case when it can be fully independent from TWD: having
+own calibration loop.
 
-1. Branches to pull into omap/cleanup
+> If we get the issue with knowing the TWD clock rate on ARMs development
+> platforms sorted out, then we can provide a struct clk for it, which
+> means everyone can finally move to using the clk API to get the mpcore
+> watchdog/twd clock rate.
 
-   I will reply to this mail with a pull request for cleanup-part-3
-   that contains Russell's timer cleanup patch and Paul's PRCM cleanup
-   series.
+I really like this. And I will be happy if this happens before than I'm
+expecting :)
+Ok, lets assume that this happened. Can you guarantee that the one who
+will fix the mpcore_wdt to use clk interface also will not reuse the
+formula that was there before? :)
 
-2. Branches to pull into omap/fixes
 
-   I will reply to this mail with a pull request for fixes-part-2 that
-   contains Paul's PRCM fixes, and one McBSP fix also from Paul.
-
-   This branch depends on cleanup-part-3 in #1 above for the PRCM fixes.
-
-3. Branches to pull into omap/board
-
-   This one needs one merge commit to clear the merge conflict that
-   I posted on Sunday at:
-
-   http://marc.info/?l=linux-omap&m=131032743717583&w=2
-
-4. New code for minimal omap4460 support
-
-   This I've posted here:
-
-   http://marc.info/?l=linux-omap&m=131032754417673&w=2
-
-   It has some a trivial merge conflict with the cleanup-part-3 in
-   #1 above that you should be able to handle.
-
-5. New code for ASoC and MFD changes
-
-   Because of the TWL cleanup, it was agreed that the TWL related
-   MFD/ASoC changes should be merged by us also. I will reply to
-   this mail with a pull request for this email.
-
-   Note that this could also be merged by the ASoC or MFD people
-   if they pull in your omap/cleanup-part-2.
-
-6. New code for PRCM changes
-
-   This you might as well pull from Paul directly as posted here:
-
-   http://marc.info/?l=linux-omap&m=131030152129307&w=2
-
-   It depends on the PRCM fixes in #2 above. I've already pulled
-   this into linux-omap master branch for testing.
-
-The following order should be kept for these branches:
-
-omap/cleanup
-omap/fixes
-omap/board
-
-And after that these can be merged in whatever order:
-
-new code for minimal 4460 support
-new code for ASoC/MFD
-new code for PRCM changes
-
-Then there are two new boards remaining, but they both are waiting
-on the machine_id patch.
-
-Regards,
-
-Tony
+Thanks,
+Vitaly.
