@@ -1,36 +1,40 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Mon, 11 Jul 2011 12:00:04 +0200
-Subject: [PATCH 02/10] ASoc: mxs: add mxs-saif driver
-In-Reply-To: <20110710092623.GB23521@opensource.wolfsonmicro.com>
-References: <1310140790-2132-1-git-send-email-b29396@freescale.com>
-	<1310140790-2132-3-git-send-email-b29396@freescale.com>
-	<20110709025252.GC26900@sirena.org.uk>
-	<CAA+hA=S0HTqNt+OxprdaqZMF8_9NF8G54UKJprcWc2DCbGf0xA@mail.gmail.com>
-	<20110710083359.GB23199@opensource.wolfsonmicro.com>
-	<CAA+hA=SBP3Qv0x-9KQMR+iT9nT1E6_HamyM7zeNd1p8rfE6V0g@mail.gmail.com>
-	<20110710092623.GB23521@opensource.wolfsonmicro.com>
-Message-ID: <20110711100004.GA11153@pengutronix.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 11 Jul 2011 12:07:59 +0200
+Subject: [PATCH 0/6] clk: Initial feedback for off-SoC slow bus clocks
+In-Reply-To: <20110711093124.GA3239@n2100.arm.linux.org.uk>
+References: <20110711025344.GA27497@opensource.wolfsonmicro.com>
+	<20110711093124.GA3239@n2100.arm.linux.org.uk>
+Message-ID: <20110711100759.GG26347@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> > Also i still do not have such type of codecs integrated on hand.
+On Mon, Jul 11, 2011 at 10:31:24AM +0100, Russell King - ARM Linux wrote:
+> On Mon, Jul 11, 2011 at 11:53:44AM +0900, Mark Brown wrote:
+> > The biggest issue I ran into was that as the clocks are all registered
+> > by name with the API if you've got two instances of the same off-SoC
+> > device in the system you'll not be able to disambiguate between the
+> > clocks it provides.
 > 
-> That's fine, audio hardware is so flexible that it's unreasonable to
-> expect that all possible systems have been tested.  So long as the code
-> looks sensible it should be fine and if there are problems people can
-> always come back and fix them.
+> Sigh.  That sounds like yet more trash.  Obviously whoever thought
+> up that doesn't actually understand clks.
 
-I will get a custom board with a different codec in about a month and
-will happily do tests.
+Nope. In the patches Jeremy posted clocks have a name, but this name
+is not meant to be used with clk_get. clk_get is still implemented
+in clkdev, so the matching between clocks and devices is independent
+of the clock name.
+
+In earlier versions of Jeremys patches the clock name was only present
+when debugfs was compiled in and I think it can be changed back to this.
+
+That said the debugfs support (which is not present in Jeremys latest
+series) would break if two clocks with the same name have the same
+parent, because the clock core would try to create to debugfs entries
+with the same name.
+
+Sascha
 
 -- 
-Pengutronix e.K.                           | Wolfram Sang                |
+Pengutronix e.K.                           |                             |
 Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110711/ef0ed5d0/attachment.sig>
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
