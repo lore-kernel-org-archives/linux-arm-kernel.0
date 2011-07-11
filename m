@@ -1,47 +1,85 @@
-From: tixy@yxit.co.uk (Tixy)
-Date: Mon, 11 Jul 2011 12:47:02 +0100
-Subject: [PATCH 11/51] ARM: Kconfig: Allow kprobes on Thumb-2 kernels
-In-Reply-To: <20110711114229.GJ3239@n2100.arm.linux.org.uk>
-References: <1310209058-20980-1-git-send-email-tixy@yxit.co.uk>
-	<1310209058-20980-12-git-send-email-tixy@yxit.co.uk>
-	<4E1AD7F2.9020205@ru.mvista.com> <1310384021.2258.9.camel@computer2>
-	<20110711114229.GJ3239@n2100.arm.linux.org.uk>
-Message-ID: <1310384822.2258.11.camel@computer2>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 11 Jul 2011 04:47:37 -0700
+Subject: Remaining omap pull requests
+Message-ID: <20110711114736.GX5783@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2011-07-11 at 12:42 +0100, Russell King - ARM Linux wrote:
-> On Mon, Jul 11, 2011 at 12:33:41PM +0100, Tixy wrote:
-> > On Mon, 2011-07-11 at 15:01 +0400, Sergei Shtylyov wrote: 
-> > > Hello.
-> > > 
-> > > On 09-07-2011 14:56, Tixy wrote:
-> > > 
-> > > > From: Jon Medhurst<tixy@yxit.co.uk>
-> > > 
-> > > > Signed-off-by: Jon Medhurst<tixy@yxit.co.uk>
-> > > > ---
-> > > >   arch/arm/Kconfig |    2 +-
-> > > >   1 files changed, 1 insertions(+), 1 deletions(-)
-> > > 
-> > > > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> > > > index 9adc278..b4177c5 100644
-> > > > --- a/arch/arm/Kconfig
-> > > > +++ b/arch/arm/Kconfig
-> > > > @@ -10,7 +10,7 @@ config ARM
-> > > >   	select GENERIC_ATOMIC64 if (CPU_V6 || !CPU_32v6K || !AEABI)
-> > > >   	select HAVE_OPROFILE if (HAVE_PERF_EVENTS)
-> > > >   	select HAVE_ARCH_KGDB
-> > > > -	select HAVE_KPROBES if (!XIP_KERNEL&&  !THUMB2_KERNEL)
-> > > > +	select HAVE_KPROBES if (!XIP_KERNEL)
-> > > 
-> > >     Why not drop useless parens, while at it?
-> > 
-> > Every other 'if' clause in that file has these parenthesis so I thought
-> > I would kept it consistent.
-> 
-> There's plenty of examples where this isn't the case, 
-[...]
-> We really need to stop useless additional parens for simple expressions.
+Hi Arnd,
 
-OK, fair enough.
+Below is a summary of the pending omap pull requests as there are still
+few branches pending.
+
+Can you please take a look and see what you can take of these for v3.1
+merge window?
+
+There's still quite a bit more code shrinkage, and the new code for 4460
+and PRCM related changes are badly needed.
+
+Here's what's still pending:
+
+1. Branches to pull into omap/cleanup
+
+   I will reply to this mail with a pull request for cleanup-part-3
+   that contains Russell's timer cleanup patch and Paul's PRCM cleanup
+   series.
+
+2. Branches to pull into omap/fixes
+
+   I will reply to this mail with a pull request for fixes-part-2 that
+   contains Paul's PRCM fixes, and one McBSP fix also from Paul.
+
+   This branch depends on cleanup-part-3 in #1 above for the PRCM fixes.
+
+3. Branches to pull into omap/board
+
+   This one needs one merge commit to clear the merge conflict that
+   I posted on Sunday at:
+
+   http://marc.info/?l=linux-omap&m=131032743717583&w=2
+
+4. New code for minimal omap4460 support
+
+   This I've posted here:
+
+   http://marc.info/?l=linux-omap&m=131032754417673&w=2
+
+   It has some a trivial merge conflict with the cleanup-part-3 in
+   #1 above that you should be able to handle.
+
+5. New code for ASoC and MFD changes
+
+   Because of the TWL cleanup, it was agreed that the TWL related
+   MFD/ASoC changes should be merged by us also. I will reply to
+   this mail with a pull request for this email.
+
+   Note that this could also be merged by the ASoC or MFD people
+   if they pull in your omap/cleanup-part-2.
+
+6. New code for PRCM changes
+
+   This you might as well pull from Paul directly as posted here:
+
+   http://marc.info/?l=linux-omap&m=131030152129307&w=2
+
+   It depends on the PRCM fixes in #2 above. I've already pulled
+   this into linux-omap master branch for testing.
+
+The following order should be kept for these branches:
+
+omap/cleanup
+omap/fixes
+omap/board
+
+And after that these can be merged in whatever order:
+
+new code for minimal 4460 support
+new code for ASoC/MFD
+new code for PRCM changes
+
+Then there are two new boards remaining, but they both are waiting
+on the machine_id patch.
+
+Regards,
+
+Tony
