@@ -1,48 +1,32 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 11 Jul 2011 16:29:29 -0700
-Subject: [PATCH 4/4] OMAP: PM: disable idle on suspend for GPIO and UART
-In-Reply-To: <1310426969-30306-1-git-send-email-khilman@ti.com>
-References: <1310426969-30306-1-git-send-email-khilman@ti.com>
-Message-ID: <1310426969-30306-5-git-send-email-khilman@ti.com>
+From: khilman@ti.com (Hilman, Kevin)
+Date: Mon, 11 Jul 2011 16:38:33 -0700
+Subject: [PATCH] OMAP2+: PM: fix watchdog boot when runtime PM is disabled
+In-Reply-To: <1310426484-30083-1-git-send-email-khilman@ti.com>
+References: <1310426484-30083-1-git-send-email-khilman@ti.com>
+Message-ID: <CALyTGOCsfYJifYmrDP=Z3=uN_FhdEkV0Mku70rc_xx8GKOk9-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Until these drivers are runtime PM converted, their device power
-states are managed by calling custom driver hooks late in the
-idle/suspend path.  Therefore, do not let the suspend/resume core code
-automatically idle these devices since they will be managed manually
-by the OMAP PM core very late in the idle/suspend path.
+On Mon, Jul 11, 2011 at 4:21 PM, Kevin Hilman <khilman@ti.com> wrote:
+> Fix boot crash in watchdog driver when runtime PM is disabled.
+>
+> When runtime PM is disabled, devices should be left enabled so that
+> all device accesses in drivers will succeed even though the runtime PM
+> get/put calls are noops.
+>
+> This is already the case for all devices, but the WDT init has its
+> own hwmod postsetup which was not taking this into account.
+>
+> This fixes a boot crash where the first device access in the WDT probe
+> function would crash a booting kernel.
+>
+> Cc: Paul Walmsley <paul@pwsan.com>
+> Signed-off-by: Kevin Hilman <khilman@ti.com>
+> ---
+> Tony, as this is a boot crash, it should probably be queued for v3.0.
+> However, since OMAP2PLUS_TYPICAL always enables runtime PM, this is
+> unlikely to be seen unless specifically testing with runtime PM disabled.
 
-Signed-off-by: Kevin Hilman <khilman@ti.com>
----
- arch/arm/mach-omap2/gpio.c   |    2 ++
- arch/arm/mach-omap2/serial.c |    1 +
- 2 files changed, 3 insertions(+), 0 deletions(-)
+I forgot to mention that I added this fix to my for_3.0/pm-fixes-3 branch.
 
-diff --git a/arch/arm/mach-omap2/gpio.c b/arch/arm/mach-omap2/gpio.c
-index 9529842..48e5ece 100644
---- a/arch/arm/mach-omap2/gpio.c
-+++ b/arch/arm/mach-omap2/gpio.c
-@@ -87,6 +87,8 @@ static int omap2_gpio_dev_init(struct omap_hwmod *oh, void *unused)
- 		return PTR_ERR(od);
- 	}
- 
-+	omap_device_disable_idle_on_suspend(od);
-+
- 	gpio_bank_count++;
- 	return 0;
- }
-diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
-index 1ac361b..466fc722 100644
---- a/arch/arm/mach-omap2/serial.c
-+++ b/arch/arm/mach-omap2/serial.c
-@@ -805,6 +805,7 @@ void __init omap_serial_init_port(struct omap_board_data *bdata)
- 	WARN(IS_ERR(od), "Could not build omap_device for %s: %s.\n",
- 	     name, oh->name);
- 
-+	omap_device_disable_idle_on_suspend(od);
- 	oh->mux = omap_hwmod_mux_init(bdata->pads, bdata->pads_cnt);
- 
- 	uart->irq = oh->mpu_irqs[0].irq;
--- 
-1.7.6
+Kevin
