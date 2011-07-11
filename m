@@ -1,97 +1,37 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 11 Jul 2011 10:42:36 +0100
-Subject: [PATCH] mach-integrator: delete bits.h include file
-In-Reply-To: <1310377091-18103-1-git-send-email-linus.walleij@linaro.org>
-References: <1310377091-18103-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20110711094236.GC3239@n2100.arm.linux.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 11 Jul 2011 10:43:43 +0100
+Subject: [PATCH V2 0/6] arm_smp_twd: mpcore_wdt: Fix MPCORE watchdog setup
+In-Reply-To: <20110706111603.GS8286@n2100.arm.linux.org.uk>
+References: <1286185540-19569-1-git-send-email-vkuzmichev@mvista.com>
+	<1309892440-3260-1-git-send-email-vkuzmichev@mvista.com>
+	<4E14337F.1050101@arm.com>
+	<20110706101456.GN8286@n2100.arm.linux.org.uk>
+	<20110706110548.GA31936@1n450.cable.virginmedia.net>
+	<20110706111603.GS8286@n2100.arm.linux.org.uk>
+Message-ID: <20110711094343.GB11247@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 11, 2011 at 11:38:11AM +0200, Linus Walleij wrote:
-> Not only does this file duplicate <linux/bitops.h> and implement a
-> well-known antipattern, it is also not used by anything.
+On Wed, Jul 06, 2011 at 12:16:03PM +0100, Russell King - ARM Linux wrote:
+> On Wed, Jul 06, 2011 at 12:05:48PM +0100, Catalin Marinas wrote:
+> > On Wed, Jul 06, 2011 at 11:14:56AM +0100, Russell King - ARM Linux wrote:
+> > > Do we know why the calibration was initially introduced?  FWIR, it came
+> > > from the SMP group in ARM, so I guess they had a reason for it rather
+> > > than copying x86.
+> > 
+> > I think it was introduced because the TWD frequency is half of the CPU
+> > frequency but the latter may not be known - boot monitor configuration
+> > could change it.
 > 
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> Okay, that implies we can't have a fixed frequency built into the kernel
+> then.  For such platforms like the ARM dev boards (realview + vexpress),
+> I expect we can read the CPU frequency from somewhere like one of the
+> ICST PLLs.
+ 
+That's highly platform dependent and it's not just ARM dev boards. Any
+board with ARM11MPCore, Cortex-A9 or Cortex-A5 would need to find a way
+to retrieve such information. If anyone is prepared to go through each
+board and figure out how to get the information, it's fine by me.
 
-> ---
->  arch/arm/mach-integrator/include/mach/bits.h |   61 --------------------------
->  1 files changed, 0 insertions(+), 61 deletions(-)
->  delete mode 100644 arch/arm/mach-integrator/include/mach/bits.h
-> 
-> diff --git a/arch/arm/mach-integrator/include/mach/bits.h b/arch/arm/mach-integrator/include/mach/bits.h
-> deleted file mode 100644
-> index 09b024e..0000000
-> --- a/arch/arm/mach-integrator/include/mach/bits.h
-> +++ /dev/null
-> @@ -1,61 +0,0 @@
-> -/*
-> - * This program is free software; you can redistribute it and/or modify
-> - * it under the terms of the GNU General Public License as published by
-> - * the Free Software Foundation; either version 2 of the License, or
-> - * (at your option) any later version.
-> - *
-> - * This program is distributed in the hope that it will be useful,
-> - * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> - * GNU General Public License for more details.
-> - *
-> - * You should have received a copy of the GNU General Public License
-> - * along with this program; if not, write to the Free Software
-> - * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-> - */
-> -/* DO NOT EDIT!! - this file automatically generated
-> - *                 from .s file by awk -f s2h.awk
-> - */
-> -/*  Bit field definitions
-> - *  Copyright (C) ARM Limited 1998. All rights reserved.
-> - */
-> -
-> -#ifndef __bits_h
-> -#define __bits_h                        1
-> -
-> -#define BIT0                            0x00000001
-> -#define BIT1                            0x00000002
-> -#define BIT2                            0x00000004
-> -#define BIT3                            0x00000008
-> -#define BIT4                            0x00000010
-> -#define BIT5                            0x00000020
-> -#define BIT6                            0x00000040
-> -#define BIT7                            0x00000080
-> -#define BIT8                            0x00000100
-> -#define BIT9                            0x00000200
-> -#define BIT10                           0x00000400
-> -#define BIT11                           0x00000800
-> -#define BIT12                           0x00001000
-> -#define BIT13                           0x00002000
-> -#define BIT14                           0x00004000
-> -#define BIT15                           0x00008000
-> -#define BIT16                           0x00010000
-> -#define BIT17                           0x00020000
-> -#define BIT18                           0x00040000
-> -#define BIT19                           0x00080000
-> -#define BIT20                           0x00100000
-> -#define BIT21                           0x00200000
-> -#define BIT22                           0x00400000
-> -#define BIT23                           0x00800000
-> -#define BIT24                           0x01000000
-> -#define BIT25                           0x02000000
-> -#define BIT26                           0x04000000
-> -#define BIT27                           0x08000000
-> -#define BIT28                           0x10000000
-> -#define BIT29                           0x20000000
-> -#define BIT30                           0x40000000
-> -#define BIT31                           0x80000000
-> -
-> -#endif
-> -
-> -/*         END */
-> -- 
-> 1.7.6
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+Catalin
