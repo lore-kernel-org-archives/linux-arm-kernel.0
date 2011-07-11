@@ -1,55 +1,60 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Mon, 11 Jul 2011 23:13:30 +0800
-Subject: zaurus patches -- arm/pxa -- is Eric alive
-In-Reply-To: <20110711140303.GA32532@atrey.karlin.mff.cuni.cz>
-References: <20110711134150.GA15506@localhost.ucw.cz>
-	<CALT56yM+fNs_2QorWK0=gr2um1H3vDX+HXPCi9bmKDdOdSvptA@mail.gmail.com>
-	<20110711140303.GA32532@atrey.karlin.mff.cuni.cz>
-Message-ID: <CAMPhdO-UjxqyL47VsihX-fBD9VtAKkQqEQGj2u1YG0c90EHfqA@mail.gmail.com>
+From: shijie8@gmail.com (Huang Shijie)
+Date: Mon, 11 Jul 2011 11:19:11 -0400
+Subject: [PATCH v7 0/4] add the GPMI-NAND support for imx23/imx28
+In-Reply-To: <20110711110024.GB11153@pengutronix.de>
+References: <1310371266-10704-1-git-send-email-b32955@freescale.com>
+	<20110711110024.GB11153@pengutronix.de>
+Message-ID: <CAMiH66G4T3y=JydxFCaDwBZwHBvayy1i+Ys5Hd2+f-_u7bPoGQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 11, 2011 at 10:03 PM, Cyril Hrubis <metan@ucw.cz> wrote:
-> Hi!
->> > There are some rather critical patches for zaurus C-3000 (spitz)
->> > available... with no response. What is going on?
+Hi:
+
+On Mon, Jul 11, 2011 at 7:00 AM, Wolfram Sang <w.sang@pengutronix.de> wrote:
+> Hi,
+>
+> On Mon, Jul 11, 2011 at 04:01:02PM +0800, Huang Shijie wrote:
+>
+>> The general-purpose media interface(GPMI) controller is a flexible interface
+>> to up to several NAND flashs.
 >>
->> Eric seems alive. At least he've sent pull requests few days ago.
->> Maybe you can point to those patches, that you mention as critical?
+>> The Bose Ray-Choudhury Hocquenghem(BCH) module is a hardware ECC accelerator.
+>>
+>> With the help of BCH, the GPMI controller can choose to do the hardware ECC or
+>> not.
+>>
+>> v6 --> v7:
+>> ? ? ? [0] rename RES_SIZE to GPMI_NAND_RES_SIZE.
+>> ? ? ? [1] move gpmi-nand.h to `include/linux/mtd/` directory.
+>> ? ? ? [2] remove comment for new pad control.
+>> ? ? ? [3] others
 >
-> Perhaps the most critical one is:
->
-> [PATCH] MAX1111: Fix race condition causing NULL pointer exception
->
-> http://ns1.yosemitephotos.net/lists/arm-kernel/msg125356.html
->
-> Which fixes memory corruption that caused random oops.
->
-> And then there is a bunch of fixes for charging and power management from
-> Pavel Machek:
+> Could you also post a driver which is adapted to all these changes?
+> The series looks good now; still I want to test it a little just to make
+> sure...
+ok.
 
-Guys, I'm still alive, at least still breathing. Just too many mails
-and I was lost.
+I will sent out the GPMI driver as soon as possible.
 
->
-> Disable CF during suspend
->
-> https://lkml.org/lkml/2011/5/21/46
 
-The fix is trivial, think I can take it. A better approach will be to have a
-generic CF power control function and invoke it in pcmcia driver when
-suspending.
+Best Regards
+Huang Shijie
 
 >
-> and spitz pm
+> Thanks,
 >
-> https://lkml.org/lkml/2011/5/21/72
-> https://lkml.org/lkml/2011/5/21/73
-> https://lkml.org/lkml/2011/5/21/76
-
-Looks good to me, yet I need the last one Acked by power supply people.
-
+> ? Wolfram
 >
 > --
-> metan
+> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | Wolfram Sang ? ? ? ? ? ? ? ?|
+> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
+>
+> -----BEGIN PGP SIGNATURE-----
+> Version: GnuPG v1.4.10 (GNU/Linux)
+>
+> iEYEARECAAYFAk4a18gACgkQD27XaX1/VRsCUQCfeXzR64/uz3n97nbdrTGxH86+
+> 3lUAmweRWjZlouL+9cdGiuu8gz4CzNhH
+> =CQJw
+> -----END PGP SIGNATURE-----
+>
 >
