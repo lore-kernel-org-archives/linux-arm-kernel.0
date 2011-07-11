@@ -1,48 +1,49 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 11 Jul 2011 11:53:53 +0900
-Subject: [PATCH 2/6] clk: Provide a dummy clk_unregister()
+Date: Mon, 11 Jul 2011 11:53:55 +0900
+Subject: [PATCH 4/6] clk: Add Kconfig option to build all generic clk drivers
 In-Reply-To: <1310352837-4277-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 References: <20110711025344.GA27497@opensource.wolfsonmicro.com>
 	<1310352837-4277-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <1310352837-4277-2-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <1310352837-4277-4-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Even though unregistration is not actually supported by the clk API it is
-still useful to provide a clk_unregister() so that drivers can implement
-their unregistration code. This saves having to go back later and update
-them once unregistration is possible.
+Currently drivers for the generic clk subsystem must be selected by
+platforms using them in order to enable build. When doing development on
+the API or generic build time testing it is useful to be able to build
+unused drivers in order to improve coverage so supply a Kconfig option
+which allows this.
 
 Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 ---
- include/linux/clk.h |   15 +++++++++++++++
- 1 files changed, 15 insertions(+), 0 deletions(-)
+ drivers/clk/Kconfig |   11 ++++++++++-
+ 1 files changed, 10 insertions(+), 1 deletions(-)
 
-diff --git a/include/linux/clk.h b/include/linux/clk.h
-index 2ca4f66..df5c64f 100644
---- a/include/linux/clk.h
-+++ b/include/linux/clk.h
-@@ -149,6 +149,21 @@ extern struct clk_hw_ops clk_gate_ops;
- struct clk *clk_register(struct clk_hw_ops *ops, struct clk_hw *hw,
- 			 const char *name);
+diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+index 75d2902..1fd0070 100644
+--- a/drivers/clk/Kconfig
++++ b/drivers/clk/Kconfig
+@@ -1,4 +1,3 @@
+-
+ config CLKDEV_LOOKUP
+ 	bool
+ 	select HAVE_CLK
+@@ -6,6 +5,16 @@ config CLKDEV_LOOKUP
+ config GENERIC_CLK
+ 	bool
  
-+/**
-+ * clk_unregister - remove a clock
-+ *
-+ * @clk: clock to unregister
-+ *
-+ * Remove a clock from the clk subsystem.  This is currently not
-+ * implemented but is provided to allow unregistration code to be
-+ * written in drivers ready for use when an implementation is
-+ * provided.
-+ */
-+static inline int clk_unregister(struct clk *clk)
-+{
-+	return -ENOTSUPP;
-+}
++config GENERIC_CLK_BUILD_TEST
++	bool "Build all generic clock drivers"
++	depends on EXPERIMENTAL && GENERIC_CLK
++	select GENERIC_CLK_FIXED
++	select GENERIC_CLK_GATE
++	help
++	   Enable all possible generic clock drivers.  This is only
++	   useful for improving build coverage, it is not useful for
++	   production kernel builds.
 +
- #else /* !CONFIG_GENERIC_CLK */
- 
- /*
+ config GENERIC_CLK_FIXED
+ 	bool
+ 	depends on GENERIC_CLK
 -- 
 1.7.5.4
