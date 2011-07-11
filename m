@@ -1,80 +1,134 @@
-From: morpheus.ibis@gmail.com (Pavel Herrmann)
-Date: Mon, 11 Jul 2011 20:47:31 +0200
-Subject: [PATCH v2] MAX1111: Fix Race condition causing NULL pointer exception
-Message-ID: <1310410051-13127-1-git-send-email-morpheus.ibis@gmail.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Mon, 11 Jul 2011 11:51:00 -0700
+Subject: [pm-wip/cpufreq] [PATCH] OMAP2+: CPUfreq: update lpj with
+	reference value to avoid progressive error.
+In-Reply-To: <1310406004-5060-1-git-send-email-santosh.shilimkar@ti.com>
+	(Santosh Shilimkar's message of "Mon, 11 Jul 2011 23:10:04 +0530")
+References: <1310406004-5060-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <87d3hgzm5n.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-spi_sync call uses its spi_message parameter to keep completion information,
-having this structure static is not thread-safe, potentially causing one
-thread having pointers to memory on or above other threads stack. use mutex
-to prevent multiple access
+Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
 
-Signed-off-by: Pavel Herrmann <morpheus.ibis@gmail.com>
-Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
-Acked-by: Pavel Machek <pavel@ucw.cz>
-Acked-by: Marek Vasut <marek.vasut@gmail.com>
-Acked-by: Cyril Hrubis <metan@ucw.cz>
----
- drivers/hwmon/max1111.c |   12 ++++++++++++
- 1 files changed, 12 insertions(+), 0 deletions(-)
+> From: Russell King <rmk+kernel@arm.linux.org.uk>
+>
+> Adjust _both_ the per-cpu loops_per_jiffy and global lpj. Calibrate them
+> with with reference to the initial values to avoid a progressively
+> bigger and bigger error in the value over time.
+>
+> While at this, re-use the notifiers for UP/SMP since on
+> UP machine or UP_ON_SMP policy->cpus mask would contain only
+> the boot CPU.
+>
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> [santosh.shilimkar at ti.com: re-based against omap cpufreq
+> upstream branch and fixed notifiers]
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> Cc: Kevin Hilman <khilman@ti.com>
 
-diff --git a/drivers/hwmon/max1111.c b/drivers/hwmon/max1111.c
-index 12a54aa..d872f57 100644
---- a/drivers/hwmon/max1111.c
-+++ b/drivers/hwmon/max1111.c
-@@ -40,6 +40,7 @@ struct max1111_data {
- 	struct spi_transfer	xfer[2];
- 	uint8_t *tx_buf;
- 	uint8_t *rx_buf;
-+	struct mutex		msg_lock_mutex;
- };
- 
- static int max1111_read(struct device *dev, int channel)
-@@ -48,6 +49,11 @@ static int max1111_read(struct device *dev, int channel)
- 	uint8_t v1, v2;
- 	int err;
- 
-+	/* spi_sync requires data not to be freed before function returns
-+	 * for static data, any access is dangerous, use locks
-+	 */
-+	mutex_lock(&data->msg_lock_mutex);
-+
- 	data->tx_buf[0] = (channel << MAX1111_CTRL_SEL_SH) |
- 		MAX1111_CTRL_PD0 | MAX1111_CTRL_PD1 |
- 		MAX1111_CTRL_SGL | MAX1111_CTRL_UNI | MAX1111_CTRL_STR;
-@@ -55,12 +61,15 @@ static int max1111_read(struct device *dev, int channel)
- 	err = spi_sync(data->spi, &data->msg);
- 	if (err < 0) {
- 		dev_err(dev, "spi_sync failed with %d\n", err);
-+		mutex_unlock(&data->msg_lock_mutex);
- 		return err;
- 	}
- 
- 	v1 = data->rx_buf[0];
- 	v2 = data->rx_buf[1];
- 
-+	mutex_unlock(&data->msg_lock_mutex);
-+
- 	if ((v1 & 0xc0) || (v2 & 0x3f))
- 		return -EINVAL;
- 
-@@ -176,6 +185,8 @@ static int __devinit max1111_probe(struct spi_device *spi)
- 	if (err)
- 		goto err_free_data;
- 
-+	mutex_init(&data->msg_lock_mutex);
-+
- 	data->spi = spi;
- 	spi_set_drvdata(spi, data);
- 
-@@ -213,6 +224,7 @@ static int __devexit max1111_remove(struct spi_device *spi)
- 
- 	hwmon_device_unregister(data->hwmon_dev);
- 	sysfs_remove_group(&spi->dev.kobj, &max1111_attr_group);
-+	mutex_destroy(data->msg_lock_mutex);
- 	kfree(data->rx_buf);
- 	kfree(data->tx_buf);
- 	kfree(data);
--- 
-1.7.5.rc3
+Thanks, applied to pm-wip/cpufreq branch.
+
+Kevin
+
+> ---
+> Patch is outcome of below discussion.
+> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg51559.html
+>
+>  arch/arm/mach-omap2/omap2plus-cpufreq.c |   50 ++++++++++++++++--------------
+>  1 files changed, 27 insertions(+), 23 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/omap2plus-cpufreq.c b/arch/arm/mach-omap2/omap2plus-cpufreq.c
+> index 1f3b2e1..de82e87 100644
+> --- a/arch/arm/mach-omap2/omap2plus-cpufreq.c
+> +++ b/arch/arm/mach-omap2/omap2plus-cpufreq.c
+> @@ -38,6 +38,16 @@
+>  
+>  #include <mach/hardware.h>
+>  
+> +#ifdef CONFIG_SMP
+> +struct lpj_info {
+> +	unsigned long	ref;
+> +	unsigned int	freq;
+> +};
+> +
+> +static DEFINE_PER_CPU(struct lpj_info, lpj_ref);
+> +static struct lpj_info global_lpj_ref;
+> +#endif
+> +
+>  static struct cpufreq_frequency_table *freq_table;
+>  static atomic_t freq_table_users = ATOMIC_INIT(0);
+>  static struct clk *mpu_clk;
+> @@ -96,37 +106,18 @@ static int omap_target(struct cpufreq_policy *policy,
+>  	if (freqs.old == freqs.new && policy->cur == freqs.new)
+>  		return ret;
+>  
+> -	if (!is_smp()) {
+> -		cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
+> -		goto set_freq;
+> -	}
+> -
+>  	/* notifiers */
+>  	for_each_cpu(i, policy->cpus) {
+>  		freqs.cpu = i;
+>  		cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
+>  	}
+>  
+> -set_freq:
+>  #ifdef CONFIG_CPU_FREQ_DEBUG
+>  	pr_info("cpufreq-omap: transition: %u --> %u\n", freqs.old, freqs.new);
+>  #endif
+>  
+>  	ret = clk_set_rate(mpu_clk, freqs.new * 1000);
+> -
+> -	/*
+> -	 * Generic CPUFREQ driver jiffy update is under !SMP. So jiffies
+> -	 * won't get updated when UP machine cpufreq build with
+> -	 * CONFIG_SMP enabled. Below code is added only to manage that
+> -	 * scenario
+> -	 */
+>  	freqs.new = omap_getspeed(policy->cpu);
+> -	if (!is_smp()) {
+> -		loops_per_jiffy =
+> -			 cpufreq_scale(loops_per_jiffy, freqs.old, freqs.new);
+> -		cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
+> -		goto skip_lpj;
+> -	}
+>  
+>  #ifdef CONFIG_SMP
+>  	/*
+> @@ -134,10 +125,24 @@ set_freq:
+>  	 * cpufreq driver. So, update the per-CPU loops_per_jiffy value
+>  	 * on frequency transition. We need to update all dependent CPUs.
+>  	 */
+> -	for_each_cpu(i, policy->cpus)
+> +	for_each_cpu(i, policy->cpus) {
+> +		struct lpj_info *lpj = &per_cpu(lpj_ref, i);
+> +		if (!lpj->freq) {
+> +			lpj->ref = per_cpu(cpu_data, i).loops_per_jiffy;
+> +			lpj->freq = freqs.old;
+> +		}
+> +
+>  		per_cpu(cpu_data, i).loops_per_jiffy =
+> -			cpufreq_scale(per_cpu(cpu_data, i).loops_per_jiffy,
+> -					freqs.old, freqs.new);
+> +			cpufreq_scale(lpj->ref, lpj->freq, freqs.new);
+> +	}
+> +
+> +	/* And don't forget to adjust the global one */
+> +	if (!global_lpj_ref.freq) {
+> +		global_lpj_ref.ref = loops_per_jiffy;
+> +		global_lpj_ref.freq = freqs.old;
+> +	}
+> +	loops_per_jiffy = cpufreq_scale(global_lpj_ref.ref, global_lpj_ref.freq,
+> +					freqs.new);
+>  #endif
+>  
+>  	/* notifiers */
+> @@ -146,7 +151,6 @@ set_freq:
+>  		cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
+>  	}
+>  
+> -skip_lpj:
+>  	return ret;
+>  }
