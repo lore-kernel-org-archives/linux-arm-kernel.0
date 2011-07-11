@@ -1,45 +1,115 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 11 Jul 2011 13:09:45 -0700
-Subject: [RFC PATCH 05/17] ARM: kernel: save/restore kernel IF
-In-Reply-To: <20110711191952.GC8486@n2100.arm.linux.org.uk>
-References: <1310053830-23779-1-git-send-email-lorenzo.pieralisi@arm.com>
-	<1310053830-23779-6-git-send-email-lorenzo.pieralisi@arm.com>
-	<alpine.DEB.2.00.1107081641280.2609@localhost6.localdomain6>
-	<20110711140047.GA346@e102568-lin.cambridge.arm.com>
-	<20110711184010.GB8486@n2100.arm.linux.org.uk>
-	<CAMbhsRRm4-8gzjxqqu8MAkyMg8Xx02wDhmjET0b9njVF5z=UVw@mail.gmail.com>
-	<20110711191952.GC8486@n2100.arm.linux.org.uk>
-Message-ID: <4E1B5889.4050700@ti.com>
+From: khali@linux-fr.org (Jean Delvare)
+Date: Mon, 11 Jul 2011 22:11:48 +0200
+Subject: [PATCH v2] MAX1111: Fix Race condition causing NULL pointer
+	exception
+In-Reply-To: <1310410051-13127-1-git-send-email-morpheus.ibis@gmail.com>
+References: <1310410051-13127-1-git-send-email-morpheus.ibis@gmail.com>
+Message-ID: <20110711221148.3a76d55b@endymion.delvare>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/11/2011 12:19 PM, Russell King - ARM Linux wrote:
-> On Mon, Jul 11, 2011 at 11:51:00AM -0700, Colin Cross wrote:
->> On Mon, Jul 11, 2011 at 11:40 AM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk>  wrote:
->>> On Mon, Jul 11, 2011 at 03:00:47PM +0100, Lorenzo Pieralisi wrote:
->>>> Well, short answer is no. On SMP we do need to save CPU registers
->>>> but if just one single cpu is shutdown L2 is still on.
->>>> cpu_suspend saves regs on the stack that has to be cleaned from
->>>> L2 before shutting a CPU down which make things more complicated than
->>>> they should.
->>>
->>> Hang on.  Please explain something to me here.  You've mentioned a few
->>> times that cpu_suspend() can't be used because of the L2 cache.  Why
->>> is this the case?
->>>
->>> OMAP appears to have code in its sleep path - which has been converted
->>> to cpu_suspend() support - to deal with the L2 issues.
->>
->> OMAP is very different, because it doesn't use cpu_suspend.  It saves
->> it's state to SAR ram, which is mapped uncached, which avoids L2
->> problems.
->
-> I'm afraid your information is out of date.  See:
->
-I think the confusion is OMAP3 and OMAP4. Colin was talking about OMAP4
-which isn't merged in mainline yet where as you were referring OMAP3
-clean-ups happened recently.
+Hi Pavel,
 
-Regards
-Santosh
+On Mon, 11 Jul 2011 20:47:31 +0200, Pavel Herrmann wrote:
+> spi_sync call uses its spi_message parameter to keep completion information,
+> having this structure static is not thread-safe, potentially causing one
+> thread having pointers to memory on or above other threads stack. use mutex
+> to prevent multiple access
+
+This has nothing to do with static, as a matter of fact the structure
+is dynamically allocated. The bottom line is that the driver structure
+is such that calls to max1111_read() must be serialized.
+> 
+> Signed-off-by: Pavel Herrmann <morpheus.ibis@gmail.com>
+> Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> Acked-by: Pavel Machek <pavel@ucw.cz>
+> Acked-by: Marek Vasut <marek.vasut@gmail.com>
+> Acked-by: Cyril Hrubis <metan@ucw.cz>
+> ---
+>  drivers/hwmon/max1111.c |   12 ++++++++++++
+>  1 files changed, 12 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/hwmon/max1111.c b/drivers/hwmon/max1111.c
+> index 12a54aa..d872f57 100644
+> --- a/drivers/hwmon/max1111.c
+> +++ b/drivers/hwmon/max1111.c
+> @@ -40,6 +40,7 @@ struct max1111_data {
+>  	struct spi_transfer	xfer[2];
+>  	uint8_t *tx_buf;
+>  	uint8_t *rx_buf;
+> +	struct mutex		msg_lock_mutex;
+
+"lock" and "mutex" being kind of synonyms, this is a rather bad name.
+And you should add a comment explaining what is protected. As I
+understand it, it's more than just msg, it's also protecting xfer,
+tx_buf and rx_buf.
+
+>  };
+>  
+>  static int max1111_read(struct device *dev, int channel)
+> @@ -48,6 +49,11 @@ static int max1111_read(struct device *dev, int channel)
+>  	uint8_t v1, v2;
+>  	int err;
+>  
+> +	/* spi_sync requires data not to be freed before function returns
+> +	 * for static data, any access is dangerous, use locks
+> +	 */
+
+This has nothing to do with "freeing data". max1111_read() doesn't free
+anything. It is making use of a data structure, the access to which
+must be serialized. Easy as that. And no, access isn't dangerous ;)
+
+> +	mutex_lock(&data->msg_lock_mutex);
+> +
+>  	data->tx_buf[0] = (channel << MAX1111_CTRL_SEL_SH) |
+>  		MAX1111_CTRL_PD0 | MAX1111_CTRL_PD1 |
+>  		MAX1111_CTRL_SGL | MAX1111_CTRL_UNI | MAX1111_CTRL_STR;
+> @@ -55,12 +61,15 @@ static int max1111_read(struct device *dev, int channel)
+>  	err = spi_sync(data->spi, &data->msg);
+>  	if (err < 0) {
+>  		dev_err(dev, "spi_sync failed with %d\n", err);
+> +		mutex_unlock(&data->msg_lock_mutex);
+>  		return err;
+>  	}
+>  
+>  	v1 = data->rx_buf[0];
+>  	v2 = data->rx_buf[1];
+>  
+> +	mutex_unlock(&data->msg_lock_mutex);
+> +
+>  	if ((v1 & 0xc0) || (v2 & 0x3f))
+>  		return -EINVAL;
+>  
+> @@ -176,6 +185,8 @@ static int __devinit max1111_probe(struct spi_device *spi)
+>  	if (err)
+>  		goto err_free_data;
+>  
+> +	mutex_init(&data->msg_lock_mutex);
+> +
+>  	data->spi = spi;
+>  	spi_set_drvdata(spi, data);
+>  
+> @@ -213,6 +224,7 @@ static int __devexit max1111_remove(struct spi_device *spi)
+>  
+>  	hwmon_device_unregister(data->hwmon_dev);
+>  	sysfs_remove_group(&spi->dev.kobj, &max1111_attr_group);
+> +	mutex_destroy(data->msg_lock_mutex);
+
+I didn't know about this function, interesting. No other hwmon driver
+calls it, not sure if it makes sense when the underlying memory is
+going to be freed immediately afterwards anyway. But of course it can't
+hurt.
+
+>  	kfree(data->rx_buf);
+>  	kfree(data->tx_buf);
+>  	kfree(data);
+
+Unrelated to your patch, but these 3 separate allocs are really insane,
+memory usage in this driver could be much improved IMHO.
+
+Please respin your patch with a better struct member name and improved
+description and comments, and I'll be happy to apply it.
+
+Thanks,
+-- 
+Jean Delvare
