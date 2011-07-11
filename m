@@ -1,83 +1,64 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Mon, 11 Jul 2011 16:49:12 +0200
-Subject: [PATCH 3/4] MTD: pxa3xx_nand: enable multiple chip select support
-In-Reply-To: <4E1411BB.4010000@compulab.co.il>
-References: <1309319494-17951-1-git-send-email-leiwen@marvell.com>
-	<1309771536-10597-4-git-send-email-leiwen@marvell.com>
-	<4E1411BB.4010000@compulab.co.il>
-Message-ID: <CACTFLAOmRMDH_6qo_WkndoWX-HPw9RTqbtsURDfw22sWEFS2wg@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 11 Jul 2011 10:59:05 -0400 (EDT)
+Subject: [PATCH 01/52] ARM: introduce atag_offset to replace
+ boot_params
+In-Reply-To: <alpine.LFD.2.00.1107081714251.14596@xanadu.home>
+References: <1309920457-21913-1-git-send-email-nicolas.pitre@linaro.org>
+	<20110708203634.GU4812@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1107081714251.14596@xanadu.home>
+Message-ID: <alpine.LFD.2.00.1107111046350.14596@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 6, 2011 at 9:41 AM, Igor Grinberg <grinberg@compulab.co.il> wrote:
-> Daniel,
->
-> have you tested the suspend/resume with this patch?
-> (and keep_config on?)
+On Fri, 8 Jul 2011, Nicolas Pitre wrote:
 
-We did now test this with keep_config=1 and it seems that we indeed
-have a problem with suspend/resume after this patch. Affected machines
-show the following after wake up:
+> On Fri, 8 Jul 2011, Russell King - ARM Linux wrote:
+> 
+> > On Tue, Jul 05, 2011 at 10:46:46PM -0400, Nicolas Pitre wrote:
+> > > The boot_params member of the mdesc structure is used to provide a
+> > > default physical address for the ATAG list.  Since this value is fixed
+> > > at compile time and often based on ARCH_PHYS_OFFSET, it gets in the way
+> > > of runtime PHYS_OFFSET usage.
+> > > 
+> > > Let's introduce atag_offset which should contains only the relative
+> > > offset from start of memory instead of an absolute value, in preparation
+> > > to move all instance of boot_params over to it.
+> > 
+> > I don't like this.
+> > 
+> > While I understand the issue (the oops when we try to dereference the
+> > absolute address), the fact is that's how it is.
+> > 
+> > Take a moment to think about this.  The ATAG list is normally setup at a
+> > fixed physical address by the boot loader.  While there are some boot
+> > loaders which allow you to load the kernel at different physical addresses,
+> > they still place the ATAG list at that same physical address.
+> 
+> Would they really load the kernel at a different address?
+> 
+> > That means if you change this into an offset from the kernels idea of
+> > PHYS_OFFSET, it's not going to find the ATAGs.
+> 
+> Is this going to be a real issue in practice?
+> 
+> > So we're probably better off checking whether the platform provided ATAG
+> > pointer is below our idea of PHYS_OFFSET, and if it is to ignore that.
+> 
+> The code already does that.
+> 
+> Alternatively, I can make the boot_params values into numeric values 
+> instead of PLAT_PHYS_OFFSET or any other symbolic define I'd like to get 
+> rid of.  What do you think?
 
+After looking at it some more, this can't work either as on ep93xx the 
+RAM offset is currently selected a kernel config time and we do want to 
+get rid of that.
 
-[ 1295.458958] PM: resume of devices complete after 296.228 msecs
-[ 1295.717773] Restarting tasks ...
-[ 1295.729639] UBI error: ubi_io_write: error -5 while writing 2048
-bytes to PEB 19:59392, written 0 bytes
-[ 1295.761672] done.
-[ 1295.772706] UBI warning: ubi_eba_write_leb: failed to write data to PEB 19
-[ 1295.782492] UBI: recover PEB 19, move data to PEB 405
-[ 1295.849084] mmc0: new SDIO card at address 0001
-[ 1295.978045] pxa3xx-nand pxa3xx-nand: Wait time out!!!
-[ 1295.983153] UBI warning: ubi_io_read_vid_hdr: no VID header found
-at PEB 19, only 0xFF bytes
-[ 1296.015382] UBI: run torture test for PEB 405
-[ 1296.024375] UBI warning: ubi_ro_mode: switch to read-only mode
-[ 1296.032321] UBI error: do_sync_erase: read-only mode
-[ 1296.037296] UBI error: erase_worker: failed to erase PEB 405, error -30
-[ 1296.058363] UBIFS error (pid 1303): ubifs_wbuf_write_nolock: cannot
-write 424 bytes to LEB 317:55296, error -5
-[ 1296.080917] UBIFS error (pid 1092): ubifs_wbuf_write_nolock: cannot
-write 416 bytes to LEB 317:55296, error -30
-[ 1296.094470] UBIFS warning (pid 1303): ubifs_ro_mode: switched to
-read-only mode, error -5
-[ 1296.106183] UBIFS error (pid 1092): ubifs_create: cannot create
-regular file, error -30
-[ 1296.118007] UBI error: do_work: work failed with error code -30
-[ 1296.123915] UBI error: ubi_thread: ubi_bgt0d: work failed with error code -30
-[ 1296.742934] libertas_sdio mmc0:0001:1: (unregistered net_device):
-00:19:88:11:db:67, fw 9.70.7p0, cap 0x00000303
-[ 1296.779845] libertas_sdio mmc0:0001:1: wlan0: Marvell WLAN 802.11 adapter
-[ 1296.847141] ADDRCONF(NETDEV_UP): wlan0: link is not ready
-[ 1298.041988] ADDRCONF(NETDEV_CHANGE): wlan0: link becomes ready
-[ 1300.957951] pxa3xx-nand pxa3xx-nand: Wait time out!!!
-[ 1301.157810] pxa3xx-nand pxa3xx-nand: Wait time out!!!
-[ 1301.357874] pxa3xx-nand pxa3xx-nand: Wait time out!!!
-[ 1301.557924] pxa3xx-nand pxa3xx-nand: Wait time out!!!
-[ 1301.563064] UBIFS error (pid 1260): ubifs_read_node: bad node type
-(255 but expected 1)
-[ 1301.573526] UBIFS error (pid 1260): ubifs_read_node: bad node at
-LEB 112:18808, LEB mapping status 1
-[ 1301.583586] UBIFS error (pid 1260): do_readpage: cannot read page 3
-of inode 10295, error -22
-[ 1301.787877] pxa3xx-nand pxa3xx-nand: Wait time out!!!
-[ 1301.987891] pxa3xx-nand pxa3xx-nand: Wait time out!!!
-[ 1302.187878] pxa3xx-nand pxa3xx-nand: Wait time out!!!
-[ 1302.387878] pxa3xx-nand pxa3xx-nand: Wait time out!!!
-[ 1302.393866] UBIFS error (pid 1260): ubifs_read_node: bad node type
-(255 but expected 1)
-[ 1302.403452] UBIFS error (pid 1260): ubifs_read_node: bad node at
-LEB 112:18808, LEB mapping status 1
-[ 1302.413507] UBIFS error (pid 1260): do_readpage: cannot read page 3
-of inode 10295, error -22
+Furthermore, the code in setup_machine_tags() always validates the atags 
+pointer with ATAG_CORE and assigns it the address of init_tags 
+otherwise.  Given that the atag offset is always within the first 
+megabyte which is always mapped, the kernel won't crash even if the 
+ATAGs are not there.
 
 
-The UBIFS is very likely toast after this.
-
-Lei, any ideas, can you reproduce this? To avoid further regressions
-of this driver, you really should have a system on which you can test
-suspend and resume after each commit.
-
-
-Thanks,
-Daniel
+Nicolas
