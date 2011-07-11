@@ -1,32 +1,44 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 11 Jul 2011 09:31:36 +0200
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Mon, 11 Jul 2011 09:32:32 +0200
 Subject: [PATCH v2 1/7] spi/imx: do not make copy of spi_imx_devtype_data
-In-Reply-To: <19994.41750.920408.162356@ipc1.ka-ro>
+In-Reply-To: <20110711073523.GA19105@S2100-06.ap.freescale.net>
 References: <1310231801-18761-1-git-send-email-shawn.guo@linaro.org>
 	<1310231801-18761-2-git-send-email-shawn.guo@linaro.org>
 	<19994.41750.920408.162356@ipc1.ka-ro>
-Message-ID: <20110711073136.GA13840@pengutronix.de>
+	<20110711073523.GA19105@S2100-06.ap.freescale.net>
+Message-ID: <19994.42768.316833.688381@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 11, 2011 at 09:15:34AM +0200, Lothar Wa?mann wrote:
-> Hi,
-> 
-> Shawn Guo writes:
-> > spi_imx_devtype_data has already been driver private data.  There is
-> > really no need to make a copy in spi_imx_data.  Instead, a reference
-> > pointer works perfectly fine.
+Hi,
+
+Shawn Guo writes:
+> On Mon, Jul 11, 2011 at 09:15:34AM +0200, Lothar Wa?mann wrote:
+> > Hi,
 > > 
-> You obviously overlooked, that the copy is done on purpose to keep
-> only the data that is actually needed and discard everything else
-> after initialisation.
-though you could argue that __devinitdata isn't discarded on modern
-systems anyhow (and Shawn's patch takes care of removing that
-annotation).
+> > Shawn Guo writes:
+> > > spi_imx_devtype_data has already been driver private data.  There is
+> > > really no need to make a copy in spi_imx_data.  Instead, a reference
+> > > pointer works perfectly fine.
+> > > 
+> > You obviously overlooked, that the copy is done on purpose to keep
+> > only the data that is actually needed and discard everything else
+> > after initialisation.
+> > 
+> I did not overlook that, as I removed __devinitdata there.
+> 
+But now you keep the whole array of which only one entry is being
+used instead of only the used entry.
 
-Best regards
-Uwe
 
+Lothar Wa?mann
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
