@@ -1,122 +1,37 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 11 Jul 2011 15:47:32 +0200
-Subject: [Linaro-mm-sig] [PATCH 6/8] drivers: add Contiguous Memory
-	Allocator
-In-Reply-To: <201107091657.07925.jkrzyszt@tis.icnet.pl>
-References: <1309851710-3828-1-git-send-email-m.szyprowski@samsung.com>
-	<alpine.LFD.2.00.1107061034200.14596@xanadu.home>
-	<201107061659.45253.arnd@arndb.de>
-	<201107091657.07925.jkrzyszt@tis.icnet.pl>
-Message-ID: <001e01cc3fd1$159f7bf0$40de73d0$%szyprowski@samsung.com>
+From: bryan.wu@canonical.com (Bryan Wu)
+Date: Mon, 11 Jul 2011 21:48:38 +0800
+Subject: [PATCH 05/17] mach-ks8695: remove leds driver, since nobody use it
+In-Reply-To: <4E1ADA59.40409@ru.mvista.com>
+References: <1309955687-19365-1-git-send-email-bryan.wu@canonical.com>
+	<1309955687-19365-6-git-send-email-bryan.wu@canonical.com>
+	<CAFumwP1abk+-R-mht9BmKhU9opfVNUjD1PTBha--O6Ts5SCuQg@mail.gmail.com>
+	<4E1ADA59.40409@ru.mvista.com>
+Message-ID: <CAK5ve-JujN6t5PanWdc89Wgn-6G+K214TkUxoUq1NkS8v6eMEw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Mon, Jul 11, 2011 at 7:11 PM, Sergei Shtylyov <sshtylyov@mvista.com> wrote:
+> Hello.
+>
+> On 09-07-2011 0:23, Andrew Victor wrote:
+>
+>>> Signed-off-by: Bryan Wu<bryan.wu@canonical.com>
+>
+>> As the original author of this code.
+>
+>> Acked-by: Andrew Victor <linux@maxim.org.za>
+>
+> ? If you're the original author, shouldn't there be:
+>
+> From: Andrew Victor <linux@maxim.org.za>
+>
 
-On Saturday, July 09, 2011 4:57 PM Janusz Krzysztofik	wrote:
+No problem, I will change that.
 
-> On Wed, 6 Jul 2011 at 16:59:45 Arnd Bergmann wrote:
-> > On Wednesday 06 July 2011, Nicolas Pitre wrote:
-> > > On Wed, 6 Jul 2011, Russell King - ARM Linux wrote:
-> > > > Another issue is that when a platform has restricted DMA regions,
-> > > > they typically don't fall into the highmem zone.  As the
-> > > > dmabounce code allocates from the DMA coherent allocator to
-> > > > provide it with guaranteed DMA-able memory, that would be rather
-> > > > inconvenient.
-> > >
-> > > Do we encounter this in practice i.e. do those platforms requiring
-> > > large contiguous allocations motivating this work have such DMA
-> > > restrictions?
-> >
-> > You can probably find one or two of those, but we don't have to
-> > optimize for that case. I would at least expect the maximum size of
-> > the allocation to be smaller than the DMA limit for these, and
-> > consequently mandate that they define a sufficiently large
-> > CONSISTENT_DMA_SIZE for the crazy devices, or possibly add a hack to
-> > unmap some low memory and call
-> > dma_declare_coherent_memory() for the device.
-> 
-> Once found that Russell has dropped his "ARM: DMA: steal memory for DMA
-> coherent mappings" for now, let me get back to this idea of a hack that
-> would allow for safely calling dma_declare_coherent_memory() in order to
-> assign a device with a block of contiguous memory for exclusive use.
-
-We tested such approach and finally with 3.0-rc1 it works fine. You can find
-an example for dma_declare_coherent() together with required memblock_remove()
-calls in the following patch series:
-http://www.spinics.net/lists/linux-samsung-soc/msg05026.html 
-"[PATCH 0/3 v2] ARM: S5P: Add support for MFC device on S5PV210 and EXYNOS4"
-
-> Assuming there should be no problem with successfully allocating a large
-> continuous block of coherent memory at boot time with
-> dma_alloc_coherent(), this block could be reserved for the device. The
-> only problem is with the dma_declare_coherent_memory() calling
-> ioremap(), which was designed with a device's dedicated physical memory
-> in mind, but shouldn't be called on a memory already mapped.
-
-All these issues with ioremap has been finally resolved in 3.0-rc1. Like
-Russell pointed me in http://www.spinics.net/lists/arm-kernel/msg127644.html,
-ioremap can be fixed to work on early reserved memory areas by selecting
-ARCH_HAS_HOLES_MEMORYMODEL Kconfig option.
-
-> There were three approaches proposed, two of them in August 2010:
-> http://www.spinics.net/lists/linux-media/msg22179.html,
-> http://www.spinics.net/lists/arm-kernel/msg96318.html,
-> and a third one in January 2011:
-> http://www.spinics.net/lists/linux-arch/msg12637.html.
-> 
-> As far as I can understand the reason why both of the first two were
-> NAKed, it was suggested that videobuf-dma-contig shouldn't use coherent
-> if all it requires is a contiguous memory, and a new API should be
-> invented, or dma_pool API extended, for providing contiguous memory.
-
-This is another story. DMA-mapping framework definitely needs some 
-extensions to allow more detailed specification of the allocated memory
-(currently we have only coherent and nearly ARM-specific writecombine).
-During Linaro Memory Management summit we agreed that the 
-dma_alloc_attrs() function might be needed to clean-up the API and
-provide a nice way of adding new memory parameters. Having a possibility
-to allocate contiguous cached buffers might be one of the new DMA
-attributes. Here are some details of my proposal:
-http://www.spinics.net/lists/linux-mm/msg21235.html
-
-> The
-> CMA was pointed out as a new work in progress contiguous memory API.
-
-That was probably the biggest mistake at the beginning. We definitely 
-should have learned dma-mapping framework and its internals.
-
-> Now
-> it turns out it's not, it's only a helper to ensure that
-> dma_alloc_coherent() always succeeds, and videobuf2-dma-contig is still
-> going to allocate buffers from coherent memory.
-
-I hope that once the dma_alloc_attrs() API will be accepted, I will add
-support for memory attributes to videobuf2-dma-contig allocator. 
- 
-> (CCing both authors, Marin Mitov and Guennadi Liakhovetski, and their
-> main opponent, FUJITA Tomonori)
-> 
-> The third solution was not discussed much after it was pointed out as
-> being not very different from those two in terms of the above mentioned
-> rationale.
-> 
-> All three solutions was different from now suggested method of unmapping
-> some low memory and then calling dma_declare_coherent_memory() which
-> ioremaps it in that those tried to reserve some boot time allocated
-> coherent memory, already mapped correctly, without (io)remapping it.
-> 
-> If there are still problems with the CMA on one hand, and a need for a
-> hack to handle "crazy devices" is still seen, regardless of CMA
-> available and working or not, on the other, maybe we should get back to
-> the idea of adopting coherent API to new requirements, review those
-> three proposals again and select one which seems most acceptable to
-> everyone? Being a submitter of the third, I'll be happy to refresh it if
-> selected.
-
-I'm open to discussion.
-
-Best regards
+Thanks,
 -- 
-Marek Szyprowski
-Samsung Poland R&D Center
+Bryan Wu <bryan.wu@canonical.com>
+Kernel Developer ? ?+86.138-1617-6545 Mobile
+Ubuntu Kernel Team
+Canonical Ltd. ? ? ?www.canonical.com
+Ubuntu - Linux for human beings | www.ubuntu.com
