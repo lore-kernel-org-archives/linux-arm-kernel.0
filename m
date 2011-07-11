@@ -1,49 +1,27 @@
 From: bryan.wu@canonical.com (Bryan Wu)
-Date: Mon, 11 Jul 2011 22:07:46 +0800
-Subject: [PATCH 05/17] mach-ks8695: remove leds driver, since nobody use it
-In-Reply-To: <alpine.LFD.2.00.1107110956280.14596@xanadu.home>
+Date: Mon, 11 Jul 2011 22:02:01 +0800
+Subject: [PATCH 04/17] mach-versatile: retire custom LED code
+In-Reply-To: <20110710092836.GT4812@n2100.arm.linux.org.uk>
 References: <1309955687-19365-1-git-send-email-bryan.wu@canonical.com>
-	<1309955687-19365-6-git-send-email-bryan.wu@canonical.com>
-	<CAFumwP1abk+-R-mht9BmKhU9opfVNUjD1PTBha--O6Ts5SCuQg@mail.gmail.com>
-	<4E1ADA59.40409@ru.mvista.com>
-	<CAK5ve-JujN6t5PanWdc89Wgn-6G+K214TkUxoUq1NkS8v6eMEw@mail.gmail.com>
-	<alpine.LFD.2.00.1107110956280.14596@xanadu.home>
-Message-ID: <CAK5ve-+eFT6SGQTrKfQOoqqOYBe19r4EjtJnVrfuU92au4A5zw@mail.gmail.com>
+	<1309955687-19365-5-git-send-email-bryan.wu@canonical.com>
+	<20110710092836.GT4812@n2100.arm.linux.org.uk>
+Message-ID: <CAK5ve-KwL4rX65FqyWcZrvAcx0vFcGDpWQXgm67P8n2MDpNHWQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 11, 2011 at 10:00 PM, Nicolas Pitre
-<nicolas.pitre@linaro.org> wrote:
-> On Mon, 11 Jul 2011, Bryan Wu wrote:
->
->> On Mon, Jul 11, 2011 at 7:11 PM, Sergei Shtylyov <sshtylyov@mvista.com> wrote:
->> > Hello.
->> >
->> > On 09-07-2011 0:23, Andrew Victor wrote:
->> >
->> >>> Signed-off-by: Bryan Wu<bryan.wu@canonical.com>
->> >
->> >> As the original author of this code.
->> >
->> >> Acked-by: Andrew Victor <linux@maxim.org.za>
->> >
->> > ? If you're the original author, shouldn't there be:
->> >
->> > From: Andrew Victor <linux@maxim.org.za>
->> >
+On Sun, Jul 10, 2011 at 5:28 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Jul 06, 2011 at 08:34:34PM +0800, Bryan Wu wrote:
+>> From: Linus Walleij <linus.walleij@linaro.org>
 >>
->> No problem, I will change that.
+>> The CPU activity LED is now handled by the trigger in the leds
+>> subsystem, retire this old CONFIG_LEDS-based code.
 >
-> Beware. ?Is Andrew Victor the original author of the code being removed
-> here and in this case he's indicating his agreement to the removal of
-> his code, or he is the one actually responsible for the removal? ?If the
-> former then it is wrong to put a "From" with his name and the
-> "Acked-by:" is the right thing to do.
+> Shouldn't this be part of the previous patch? ?The previous patch changes
+> both Realview and Versatile by touching plat-versatile.
 >
 
-Right, I was confused by the email. I prepared the removing patch and
-Andrew said "Acked-by".
-Andrew, is that what you want?
+I will fold them together, if Linus has no problem about it.
 
 Thanks,
 -- 
