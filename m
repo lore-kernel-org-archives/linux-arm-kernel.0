@@ -1,85 +1,31 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Mon, 11 Jul 2011 16:01:06 +0800
-Subject: [PATCH v7 4/4] ARM: mxs/mx28evk: add GPMI-NAND device
-In-Reply-To: <1310371266-10704-1-git-send-email-b32955@freescale.com>
-References: <1310371266-10704-1-git-send-email-b32955@freescale.com>
-Message-ID: <1310371266-10704-5-git-send-email-b32955@freescale.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 11 Jul 2011 09:38:44 +0200
+Subject: [PATCH v2 4/7] spi/imx: merge type SPI_IMX_VER_0_7 into
+	SPI_IMX_VER_0_4
+In-Reply-To: <1310231801-18761-5-git-send-email-shawn.guo@linaro.org>
+References: <1310231801-18761-1-git-send-email-shawn.guo@linaro.org>
+	<1310231801-18761-5-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20110711073844.GC13840@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add GPMI-NAND device for mx28evk board.
+On Sun, Jul 10, 2011 at 01:16:38AM +0800, Shawn Guo wrote:
+> The only difference between SPI_IMX_VER_0_7 and SPI_IMX_VER_0_4 is
+> .config function.  The patch uses cpu_is_mx35 (to be removed) as the
+> temporary solution to consolidate functions spi_imx0_4_config and
+> spi_imx0_7_config into mx31_config.  As a result, type SPI_IMX_VER_0_7
+> can be merged into SPI_IMX_VER_0_4.
+> 
+> It also renames function spi_imx0_4_reset to mx31_reset to keep
+> consistency with other function naming.
+> 
+> A couple of redundant macros, MX3_CSPISTAT and MX3_CSPISTAT_RR,
+> together with the useless type SPI_IMX_VER_0_5 also get cleaned up.
+s/useless/unused/?
 
-Signed-off-by: Huang Shijie <b32955@freescale.com>
----
- arch/arm/mach-mxs/Kconfig        |    1 +
- arch/arm/mach-mxs/mach-mx28evk.c |   36 ++++++++++++++++++++++++++++++++++++
- 2 files changed, 37 insertions(+), 0 deletions(-)
+Best regards
+Uwe
 
-diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
-index ec337d0..f13e9c1 100644
---- a/arch/arm/mach-mxs/Kconfig
-+++ b/arch/arm/mach-mxs/Kconfig
-@@ -47,6 +47,7 @@ config MACH_MX28EVK
- 	select MXS_HAVE_PLATFORM_AUART
- 	select MXS_HAVE_PLATFORM_FEC
- 	select MXS_HAVE_PLATFORM_FLEXCAN
-+	select MXS_HAVE_PLATFORM_GPMI_NAND
- 	select MXS_HAVE_PLATFORM_MXS_MMC
- 	select MXS_HAVE_PLATFORM_MXSFB
- 	select MXS_OCOTP
-diff --git a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
-index eaaf6ff..d26bc22 100644
---- a/arch/arm/mach-mxs/mach-mx28evk.c
-+++ b/arch/arm/mach-mxs/mach-mx28evk.c
-@@ -314,6 +314,41 @@ static const struct flexcan_platform_data
- 	}
- };
- 
-+/* gpmi-nand */
-+static iomux_cfg_t mx28evk_gpmi_nand_pads[] = {
-+	MX28_PAD_GPMI_D00__GPMI_D0 | MXS_PAD_CTRL,
-+	MX28_PAD_GPMI_D01__GPMI_D1 | MXS_PAD_CTRL,
-+	MX28_PAD_GPMI_D02__GPMI_D2 | MXS_PAD_CTRL,
-+	MX28_PAD_GPMI_D03__GPMI_D3 | MXS_PAD_CTRL,
-+	MX28_PAD_GPMI_D04__GPMI_D4 | MXS_PAD_CTRL,
-+	MX28_PAD_GPMI_D05__GPMI_D5 | MXS_PAD_CTRL,
-+	MX28_PAD_GPMI_D06__GPMI_D6 | MXS_PAD_CTRL,
-+	MX28_PAD_GPMI_D07__GPMI_D7 | MXS_PAD_CTRL,
-+	MX28_PAD_GPMI_ALE__GPMI_ALE | MXS_PAD_CTRL,
-+	MX28_PAD_GPMI_CLE__GPMI_CLE | MXS_PAD_CTRL,
-+	MX28_PAD_GPMI_CE0N__GPMI_CE0N | MXS_PAD_CTRL,
-+	MX28_PAD_GPMI_CE1N__GPMI_CE1N | MXS_PAD_CTRL,
-+	MX28_PAD_GPMI_RDY0__GPMI_READY0 | MXS_PAD_CTRL,
-+	MX28_PAD_GPMI_RDY1__GPMI_READY1 | MXS_PAD_CTRL,
-+	MX28_PAD_GPMI_RDN__GPMI_RDN | MXS_PAD_CTRL_12MA,
-+	MX28_PAD_GPMI_WRN__GPMI_WRN | MXS_PAD_CTRL_12MA,
-+	MX28_PAD_GPMI_RESETN__GPMI_RESETN | MXS_PAD_CTRL_12MA,
-+};
-+
-+static int mx28evk_gpmi_nand_platform_init(void)
-+{
-+	return mxs_iomux_setup_multiple_pads(mx28evk_gpmi_nand_pads,
-+				ARRAY_SIZE(mx28evk_gpmi_nand_pads));
-+}
-+
-+static const struct gpmi_nand_platform_data
-+mx28evk_gpmi_nand_data __initconst = {
-+	.platform_init		= mx28evk_gpmi_nand_platform_init,
-+	.min_prop_delay_in_ns	= 5,
-+	.max_prop_delay_in_ns	= 9,
-+	.max_chip_count		= 1,
-+};
-+
- /* mxsfb (lcdif) */
- static struct fb_videomode mx28evk_video_modes[] = {
- 	{
-@@ -390,6 +425,7 @@ static void __init mx28evk_init(void)
- 	else
- 		gpio_set_value(MX28EVK_BL_ENABLE, 1);
- 
-+	mx28_add_gpmi_nand(&mx28evk_gpmi_nand_data);
- 	mx28_add_mxsfb(&mx28evk_mxsfb_pdata);
- 
- 	/* power on mmc slot by writing 0 to the gpio */
 -- 
-1.7.0.4
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
