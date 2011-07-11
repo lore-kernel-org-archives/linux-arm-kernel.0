@@ -1,127 +1,49 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 11 Jul 2011 23:10:04 +0530
-Subject: [pm-wip/cpufreq] [PATCH] OMAP2+: CPUfreq: update lpj with reference
-	value to avoid progressive error.
-Message-ID: <1310406004-5060-1-git-send-email-santosh.shilimkar@ti.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 11 Jul 2011 19:05:47 +0100
+Subject: [RFC PATCH 05/17] ARM: kernel: save/restore kernel IF
+In-Reply-To: <alpine.DEB.2.00.1107111746480.2609@localhost6.localdomain6>
+References: <1310053830-23779-1-git-send-email-lorenzo.pieralisi@arm.com>
+	<1310053830-23779-6-git-send-email-lorenzo.pieralisi@arm.com>
+	<alpine.DEB.2.00.1107081641280.2609@localhost6.localdomain6>
+	<20110711140047.GA346@e102568-lin.cambridge.arm.com>
+	<alpine.DEB.2.00.1107111503100.2609@localhost6.localdomain6>
+	<20110711160246.GA1161@e102568-lin.cambridge.arm.com>
+	<alpine.DEB.2.00.1107111746480.2609@localhost6.localdomain6>
+Message-ID: <20110711180545.GA3451@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Russell King <rmk+kernel@arm.linux.org.uk>
+On Mon, Jul 11, 2011 at 05:57:29PM +0100, Frank Hofmann wrote:
+> On Mon, 11 Jul 2011, Lorenzo Pieralisi wrote:
+> 
+> [ ... ]
+> >>> The array of pointers is there to save pgdir on idle entry, one per-cpu.
+> >>
+> >> If you're going through cpu_{do_}suspend/resume, the TTBRs are
+> >> saved/restored anyway, what do you need to keep the virtual addresses
+> >> around for ?
+> >>
+> >
+> > Because I switch mm before calling suspend, which is called
+> > with a cloned pgdir. I am not sure I can avoid that.
+> 
+> On resume, you'll be restoring the same thread as was previously running, 
+> right ? If so, all you do there is copying current->active_mm->pgd to some 
+> other place ?
 
-Adjust _both_ the per-cpu loops_per_jiffy and global lpj. Calibrate them
-with with reference to the initial values to avoid a progressively
-bigger and bigger error in the value over time.
+You are right, I will remove that code unless I can use the saved value
+on resume and I cannot rely on current to be retrieved at that point.
 
-While at this, re-use the notifiers for UP/SMP since on
-UP machine or UP_ON_SMP policy->cpus mask would contain only
-the boot CPU.
+> 
+> Also, if you'd be using cpu_suspend(), would there still be a need for 
+> cpu_switch_mm() before ? It'd rather be a case of possibly calling that 
+> before the MMU-off sequence / cpu_resume() ?
+> 
+> Or is it that you use the new pgdir to make a memory region uncacheable ?
 
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-[santosh.shilimkar at ti.com: re-based against omap cpufreq
-upstream branch and fixed notifiers]
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-Cc: Kevin Hilman <khilman@ti.com>
----
-Patch is outcome of below discussion.
-http://www.mail-archive.com/linux-omap at vger.kernel.org/msg51559.html
+Yes, that's the reason why I switch mm (eg uncacheable memory used to
+save registers through cpu_do_suspend and mapped in the cloned pgdir at boot +
+some control variables used when MMU is off).
 
- arch/arm/mach-omap2/omap2plus-cpufreq.c |   50 ++++++++++++++++--------------
- 1 files changed, 27 insertions(+), 23 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/omap2plus-cpufreq.c b/arch/arm/mach-omap2/omap2plus-cpufreq.c
-index 1f3b2e1..de82e87 100644
---- a/arch/arm/mach-omap2/omap2plus-cpufreq.c
-+++ b/arch/arm/mach-omap2/omap2plus-cpufreq.c
-@@ -38,6 +38,16 @@
- 
- #include <mach/hardware.h>
- 
-+#ifdef CONFIG_SMP
-+struct lpj_info {
-+	unsigned long	ref;
-+	unsigned int	freq;
-+};
-+
-+static DEFINE_PER_CPU(struct lpj_info, lpj_ref);
-+static struct lpj_info global_lpj_ref;
-+#endif
-+
- static struct cpufreq_frequency_table *freq_table;
- static atomic_t freq_table_users = ATOMIC_INIT(0);
- static struct clk *mpu_clk;
-@@ -96,37 +106,18 @@ static int omap_target(struct cpufreq_policy *policy,
- 	if (freqs.old == freqs.new && policy->cur == freqs.new)
- 		return ret;
- 
--	if (!is_smp()) {
--		cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
--		goto set_freq;
--	}
--
- 	/* notifiers */
- 	for_each_cpu(i, policy->cpus) {
- 		freqs.cpu = i;
- 		cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
- 	}
- 
--set_freq:
- #ifdef CONFIG_CPU_FREQ_DEBUG
- 	pr_info("cpufreq-omap: transition: %u --> %u\n", freqs.old, freqs.new);
- #endif
- 
- 	ret = clk_set_rate(mpu_clk, freqs.new * 1000);
--
--	/*
--	 * Generic CPUFREQ driver jiffy update is under !SMP. So jiffies
--	 * won't get updated when UP machine cpufreq build with
--	 * CONFIG_SMP enabled. Below code is added only to manage that
--	 * scenario
--	 */
- 	freqs.new = omap_getspeed(policy->cpu);
--	if (!is_smp()) {
--		loops_per_jiffy =
--			 cpufreq_scale(loops_per_jiffy, freqs.old, freqs.new);
--		cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
--		goto skip_lpj;
--	}
- 
- #ifdef CONFIG_SMP
- 	/*
-@@ -134,10 +125,24 @@ set_freq:
- 	 * cpufreq driver. So, update the per-CPU loops_per_jiffy value
- 	 * on frequency transition. We need to update all dependent CPUs.
- 	 */
--	for_each_cpu(i, policy->cpus)
-+	for_each_cpu(i, policy->cpus) {
-+		struct lpj_info *lpj = &per_cpu(lpj_ref, i);
-+		if (!lpj->freq) {
-+			lpj->ref = per_cpu(cpu_data, i).loops_per_jiffy;
-+			lpj->freq = freqs.old;
-+		}
-+
- 		per_cpu(cpu_data, i).loops_per_jiffy =
--			cpufreq_scale(per_cpu(cpu_data, i).loops_per_jiffy,
--					freqs.old, freqs.new);
-+			cpufreq_scale(lpj->ref, lpj->freq, freqs.new);
-+	}
-+
-+	/* And don't forget to adjust the global one */
-+	if (!global_lpj_ref.freq) {
-+		global_lpj_ref.ref = loops_per_jiffy;
-+		global_lpj_ref.freq = freqs.old;
-+	}
-+	loops_per_jiffy = cpufreq_scale(global_lpj_ref.ref, global_lpj_ref.freq,
-+					freqs.new);
- #endif
- 
- 	/* notifiers */
-@@ -146,7 +151,6 @@ set_freq:
- 		cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
- 	}
- 
--skip_lpj:
- 	return ret;
- }
- 
--- 
-1.6.0.4
+Thanks,
+Lorenzo
