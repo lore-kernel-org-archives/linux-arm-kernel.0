@@ -1,38 +1,28 @@
-From: metan@ucw.cz (Cyril Hrubis)
-Date: Mon, 11 Jul 2011 16:22:10 +0200
-Subject: zaurus patches -- arm/pxa -- is Eric alive
-In-Reply-To: <20110711141712.GD11153@pengutronix.de>
-References: <20110711134150.GA15506@localhost.ucw.cz>
-	<CALT56yM+fNs_2QorWK0=gr2um1H3vDX+HXPCi9bmKDdOdSvptA@mail.gmail.com>
-	<20110711140303.GA32532@atrey.karlin.mff.cuni.cz>
-	<20110711141712.GD11153@pengutronix.de>
-Message-ID: <20110711142210.GB32532@atrey.karlin.mff.cuni.cz>
+From: bryan.wu@canonical.com (Bryan Wu)
+Date: Mon, 11 Jul 2011 22:25:50 +0800
+Subject: [PATCH 11/17] mach-footbridge: retire custom LED code
+In-Reply-To: <20110710093740.GX4812@n2100.arm.linux.org.uk>
+References: <1309955687-19365-1-git-send-email-bryan.wu@canonical.com>
+	<1309955687-19365-12-git-send-email-bryan.wu@canonical.com>
+	<20110710093740.GX4812@n2100.arm.linux.org.uk>
+Message-ID: <CAK5ve-LNe+n8=7=6i_bgAw4wP4Qw8ADJ=T5wH0rGKuAb18uecA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-> > > > There are some rather critical patches for zaurus C-3000 (spitz)
-> > > > available... with no response. What is going on?
-> > > 
-> > > Eric seems alive. At least he've sent pull requests few days ago.
-> > > Maybe you can point to those patches, that you mention as critical?
-> > 
-> > Perhaps the most critical one is:
-> > 
-> > [PATCH] MAX1111: Fix race condition causing NULL pointer exception
-> > 
-> > http://ns1.yosemitephotos.net/lists/arm-kernel/msg125356.html
-> 
-> Ahem, this one was opposed to. The right one seems to be:
-> 
-> http://ns1.yosemitephotos.net/lists/arm-kernel/msg125592.html
-> 
-> Note that it is a hwmon-driver and neither the apropriate list nor
-> maintainers have been CCed. Eric cannot take this patch. Check
-> MAINTAINERAS (or use scripts/get_maintainer.pl) to find the right people
-> and this will increase chances to get your patch upstream a lot.
+On Sun, Jul 10, 2011 at 5:37 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Jul 06, 2011 at 08:34:41PM +0800, Bryan Wu wrote:
+>> Signed-off-by: Bryan Wu <bryan.wu@canonical.com>
+>
+> Same comments again.
+>
 
-Right, CCing patch author.
+OK, removed.
 
+Thanks,
 -- 
-metan
+Bryan Wu <bryan.wu@canonical.com>
+Kernel Developer ? ?+86.138-1617-6545 Mobile
+Ubuntu Kernel Team
+Canonical Ltd. ? ? ?www.canonical.com
+Ubuntu - Linux for human beings | www.ubuntu.com
