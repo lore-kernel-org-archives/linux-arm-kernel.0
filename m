@@ -1,40 +1,80 @@
 From: morpheus.ibis@gmail.com (Pavel Herrmann)
-Date: Mon, 11 Jul 2011 23:49:10 +0200
-Subject: [PATCH v2] MAX1111: Fix Race condition causing NULL pointer
-	exception
-In-Reply-To: <1310418193.21224.14.camel@groeck-laptop>
-References: <1310410051-13127-1-git-send-email-morpheus.ibis@gmail.com>
-	<1602583.Pi9fQvRk5m@bloomfield>
-	<1310418193.21224.14.camel@groeck-laptop>
-Message-ID: <3737907.jTEM1bACya@bloomfield>
+Date: Mon, 11 Jul 2011 23:50:38 +0200
+Subject: [PATCH v3] MAX1111: Fix Race condition causing NULL pointer exception
+Message-ID: <1310421038-14823-1-git-send-email-morpheus.ibis@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 11 of July 2011 14:03:13 Guenter Roeck wrote:
-> On Mon, 2011-07-11 at 16:36 -0400, Pavel Herrmann wrote:
-> > the structure is dynamically allocated, but the pointer used to hold it
-> > is a static global var.
-> 
-> This is true only if CONFIG_SHARPSL_PM is defined, and it assumes that
-> the driver is instantiated exactly once. That is pretty badly broken
-> (the commit introducing it even admits that), and should be fixed. This
-> does not happen CONFIG_SHARPSL_PM is not defined. If CONFIG_SHARPSL_PM
-> _is_ defined in your environment, and you do have multiple instances of
-> the driver (ie if you have multiple MAX1111 chips in your system), a
-> severe problem is that max1111_read_channel() does not identify the
-> driver instance. That can not be fixed with a mutex.
+spi_sync call uses its spi_message parameter to keep completion information,
+using a drvdata structure is not thread-safe, potentially causing one thread
+having pointers to memory on or above other threads stack. use mutex to
+prevent multiple access
 
-if you don't have CONFIG_SHARPSL_PM then there is nothing calling 
-max1111_read, and thus any of the discussed doesn't matter
-AFAIK max1111 is only used in sharpsl devices (according to kernel drivers 
-anyways), and only one a piece.
-this patch is meant to fix a crash, not make the driver code pretty just in 
-case someone else decides to use it. this patch also doesn't present any more 
-challenges for solving the multiple devices issue and would be necessary 
-either way, as drvdata is not thread-safe anyways (or I am badly mistaken)
+Signed-off-by: Pavel Herrmann <morpheus.ibis@gmail.com>
+Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Acked-by: Pavel Machek <pavel@ucw.cz>
+Acked-by: Marek Vasut <marek.vasut@gmail.com>
+Acked-by: Cyril Hrubis <metan@ucw.cz>
+Tested-by: Stanislav Brabec <utx@penguin.cz>
+---
+ drivers/hwmon/max1111.c |   11 +++++++++++
+ 1 files changed, 11 insertions(+), 0 deletions(-)
 
-> I think it would make sense to stick with common terminology. In your
-> definition, almost all global variables of all programs out there would
-> be defined as "static".
-
-yeah, sorry for that
+diff --git a/drivers/hwmon/max1111.c b/drivers/hwmon/max1111.c
+index 12a54aa..5c9e54c 100644
+--- a/drivers/hwmon/max1111.c
++++ b/drivers/hwmon/max1111.c
+@@ -40,6 +40,8 @@ struct max1111_data {
+ 	struct spi_transfer	xfer[2];
+ 	uint8_t *tx_buf;
+ 	uint8_t *rx_buf;
++	struct mutex		drvdata_lock;
++	/* protect msg, xfer and buffers from multiple access */
+ };
+ 
+ static int max1111_read(struct device *dev, int channel)
+@@ -48,6 +50,9 @@ static int max1111_read(struct device *dev, int channel)
+ 	uint8_t v1, v2;
+ 	int err;
+ 
++	/* writing to drvdata struct is not thread safe, wait on mutex */
++	mutex_lock(&data->drvdata_lock);
++
+ 	data->tx_buf[0] = (channel << MAX1111_CTRL_SEL_SH) |
+ 		MAX1111_CTRL_PD0 | MAX1111_CTRL_PD1 |
+ 		MAX1111_CTRL_SGL | MAX1111_CTRL_UNI | MAX1111_CTRL_STR;
+@@ -55,12 +60,15 @@ static int max1111_read(struct device *dev, int channel)
+ 	err = spi_sync(data->spi, &data->msg);
+ 	if (err < 0) {
+ 		dev_err(dev, "spi_sync failed with %d\n", err);
++		mutex_unlock(&data->drvdata_lock);
+ 		return err;
+ 	}
+ 
+ 	v1 = data->rx_buf[0];
+ 	v2 = data->rx_buf[1];
+ 
++	mutex_unlock(&data->drvdata_lock);
++
+ 	if ((v1 & 0xc0) || (v2 & 0x3f))
+ 		return -EINVAL;
+ 
+@@ -176,6 +184,8 @@ static int __devinit max1111_probe(struct spi_device *spi)
+ 	if (err)
+ 		goto err_free_data;
+ 
++	mutex_init(&data->drvdata_lock);
++
+ 	data->spi = spi;
+ 	spi_set_drvdata(spi, data);
+ 
+@@ -213,6 +223,7 @@ static int __devexit max1111_remove(struct spi_device *spi)
+ 
+ 	hwmon_device_unregister(data->hwmon_dev);
+ 	sysfs_remove_group(&spi->dev.kobj, &max1111_attr_group);
++	mutex_destroy(data->drvdata_lock);
+ 	kfree(data->rx_buf);
+ 	kfree(data->tx_buf);
+ 	kfree(data);
+-- 
+1.7.5.rc3
