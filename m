@@ -1,82 +1,91 @@
-From: vkuzmichev@mvista.com (Vitaly Kuzmichev)
-Date: Mon, 11 Jul 2011 15:50:10 +0400
-Subject: [PATCH V3 1/4] ARM: smp_twd: Fix typo in 'twd_timer_rate' printing
-In-Reply-To: <20110710104740.GD4812@n2100.arm.linux.org.uk>
-References: <1310041339-2348-1-git-send-email-vkuzmichev@mvista.com>
-	<1310041396-2461-1-git-send-email-vkuzmichev@mvista.com>
-	<20110707123907.GP8286@n2100.arm.linux.org.uk>
-	<4E15DCE1.8010201@mvista.com>
-	<20110710104740.GD4812@n2100.arm.linux.org.uk>
-Message-ID: <4E1AE372.1000909@mvista.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 11 Jul 2011 04:53:09 -0700
+Subject: [GIT PULL] omap related MFD and ASoC patches for v3.1 merge window
+In-Reply-To: <20110711114736.GX5783@atomide.com>
+References: <20110711114736.GX5783@atomide.com>
+Message-ID: <20110711115309.GA5783@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+The following changes since commit 727e18b429e3badda12d1de74f492bfa363a2e94:
+  Tony Lindgren (1):
+        Merge branch 'peter/topic/for-tony_mach-cleanup' of git://gitorious.org/omap-audio/linux-audio into cleanup-part-2
 
-On 07/10/2011 02:47 PM, Russell King - ARM Linux wrote:
-> On Thu, Jul 07, 2011 at 08:20:49PM +0400, Vitaly Kuzmichev wrote:
->> Hi Russell,
->>
->> On 07/07/2011 04:39 PM, Russell King - ARM Linux wrote:
->>> On Thu, Jul 07, 2011 at 04:23:13PM +0400, Vitaly Kuzmichev wrote:
->>>> To get hundredths of MHz the rate needs to be divided by 10'000.
->>>> Here is an example:
->>>>  twd_timer_rate = 123456789
->>>>  Before the patch:
->>>>     twd_timer_rate / 1000000 = 123
->>>>     (twd_timer_rate / 1000000) % 100 = 23
->>>>     Result: 123.23MHz.
->>>>  After being fixed:
->>>>     twd_timer_rate / 1000000 = 123
->>>>     (twd_timer_rate / 10000) % 100 = 45
->>>>     Result: 123.45MHz.
->>>>
->>>> Signed-off-by: Vitaly Kuzmichev <vkuzmichev@mvista.com>
->>>
->>> -> patch system please.
->>
->> Should I submit other patches into this system too?
-> 
-> No, the other patches I've yet to look at, and I think there's issues
-> still to be resolved.
-> 
-> Eg, ISTR a patch to make smp_twd.c selectable on non-SMP platforms so
-> that the mpcore watchdog can be used on non-SMP platforms.  While that
-> fixes the build issues, functionally its broken.  I don't think that
-> the mpcore watchdog should be asking the smp_twd code in any case for
-> the clock rate.
+are available in the git repository at:
 
-I'm guessing that you mean here both cases when non-SMP kernel runs on
-multi-core and on single-core (I'm not sure whether they really exist)
-MPCore CPUs, do you? I think in both these cases TWD timer(s) should
-always be presented in MPCore. So it is wrong to call this timer as
-SMP_TWD and make it dependent on CONFIG_SMP, isn't it?
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git twl-asoc
 
-I just mean, probably the fact that mpcore_wdt depends on swp_twd is not
-a real issue, and my patch is correct, but does not fix everything. In
-this case it's better than nothing, better than watchdog that does not
-work properly either on SMP, or on non-SMP platforms.
-Note that my patch does not introduce new dependencies, it just relies
-on the one that already exists.
+These depend on the cleanup-part-2 branch, so it was agreed with the MFD and ASoC
+maintainers that they should get merged along with the other omap patches.
 
-As regarding to new clocksource/arm_smp_twd driver, if it can be
-compiled for non-SMP kernel/platform the mpcore_wdt will also be able to
-do the same (even with only my patch). But in the case of clk interface
-mpcore_wdt will be dependent on TWD's clk structure anyway. So I can
-think only of one case when it can be fully independent from TWD: having
-own calibration loop.
+Axel Castaneda Gonzalez (1):
+      ASoC: twl6040: Configure ramp step based on platform
 
-> If we get the issue with knowing the TWD clock rate on ARMs development
-> platforms sorted out, then we can provide a struct clk for it, which
-> means everyone can finally move to using the clk API to get the mpcore
-> watchdog/twd clock rate.
+Liam Girdwood (3):
+      ASoC: twl6040: add all ABE DAIs
+      ASoC: twl6040: Support other sample rates in constraints.
+      ASoC: twl6040: set default constraints.
 
-I really like this. And I will be happy if this happens before than I'm
-expecting :)
-Ok, lets assume that this happened. Can you guarantee that the one who
-will fix the mpcore_wdt to use clk interface also will not reuse the
-formula that was there before? :)
+Misael Lopez Cruz (5):
+      mfd: twl6040: Add initial support
+      ASoC: twl6040: Convert into TWL6040 MFD child
+      input: Add initial support for TWL6040 vibrator
+      ASoC: twl6040: Remove pll and headset mode dependency
+      OMAP4: SDP4430: Add twl6040 codec platform support
 
+Peter Ujfalusi (17):
+      MFD: twl4030-codec: Rename internals from codec to audio
+      MFD: twl4030-codec -> twl4030-audio: Rename the driver
+      MFD: twl4030-audio: Rename platform data
+      MFD: twl6040: Change platform data for soc codec driver
+      OMAP4: SDP4430: Add twl6040 vibrator platform support
+      MFD: twl6040: Use resource to provide irq number for slaves
+      input: twl6040-vibra: Do not use wrapper for irq request
+      ASoC: twl6040: Do not use wrapper for irq request
+      MFD: twl6040: Demand valid interrupt configuration
+      MFD: twl6040: Remove wrapper for threaded irq request
+      ASoC: twl6040: Use neutral name for power mode text/enum
+      ASoC: twl6040: Move PLL selection to codec driver
+      ASoC: twl6040: Simplify sample rate constraint handling
+      ASoC: twl6040: Configure PLL only once
+      MFD: twl6040: Remove enum for PLL tracking
+      ASoC: twl6040: No need to convert the PLL ID
+      ASoC: twl6040: Add back support for legacy mode
 
-Thanks,
-Vitaly.
+Tony Lindgren (1):
+      Merge branch 'peter/topic/for-tony' of git://gitorious.org/omap-audio/linux-audio into twl-asoc
+
+ arch/arm/mach-omap2/board-4430sdp.c                |   56 ++
+ arch/arm/mach-omap2/board-rx51-peripherals.c       |    6 +-
+ arch/arm/mach-omap2/board-zoom-peripherals.c       |   10 +-
+ arch/arm/mach-omap2/twl-common.c                   |   10 +-
+ arch/arm/plat-omap/include/plat/irqs.h             |   12 +-
+ drivers/input/misc/Kconfig                         |   13 +-
+ drivers/input/misc/Makefile                        |    1 +
+ drivers/input/misc/twl4030-vibra.c                 |   12 +-
+ drivers/input/misc/twl6040-vibra.c                 |  423 +++++++++++
+ drivers/mfd/Kconfig                                |    8 +-
+ drivers/mfd/Makefile                               |    3 +-
+ drivers/mfd/twl-core.c                             |   13 +-
+ drivers/mfd/twl4030-audio.c                        |  277 ++++++++
+ drivers/mfd/twl4030-codec.c                        |  277 --------
+ drivers/mfd/twl6040-core.c                         |  620 +++++++++++++++++
+ drivers/mfd/twl6040-irq.c                          |  191 +++++
+ include/linux/i2c/twl.h                            |   25 +-
+ .../linux/mfd/{twl4030-codec.h => twl4030-audio.h} |   16 +-
+ include/linux/mfd/twl6040.h                        |  228 ++++++
+ sound/soc/codecs/Kconfig                           |    3 +-
+ sound/soc/codecs/twl4030.c                         |   22 +-
+ sound/soc/codecs/twl6040.c                         |  733 +++++++++-----------
+ sound/soc/codecs/twl6040.h                         |  119 +----
+ sound/soc/omap/sdp3430.c                           |    2 +-
+ sound/soc/omap/sdp4430.c                           |   52 +--
+ sound/soc/omap/zoom2.c                             |    2 +-
+ 26 files changed, 2230 insertions(+), 904 deletions(-)
+ create mode 100644 drivers/input/misc/twl6040-vibra.c
+ create mode 100644 drivers/mfd/twl4030-audio.c
+ delete mode 100644 drivers/mfd/twl4030-codec.c
+ create mode 100644 drivers/mfd/twl6040-core.c
+ create mode 100644 drivers/mfd/twl6040-irq.c
+ rename include/linux/mfd/{twl4030-codec.h => twl4030-audio.h} (96%)
+ create mode 100644 include/linux/mfd/twl6040.h
