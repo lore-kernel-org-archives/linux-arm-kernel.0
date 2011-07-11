@@ -1,67 +1,167 @@
-From: amit.kucheria@canonical.com (Amit Kucheria)
-Date: Mon, 11 Jul 2011 13:08:38 +0300
-Subject: [PATCH 1/1] ARM: i.MX50/53: debug-macro: fix UART_PADDR
-In-Reply-To: <20110711093055.GJ13840@pengutronix.de>
-References: <1310251913-9877-1-git-send-email-troy.kisky@boundarydevices.com>
-	<20110711090609.GB2482@matterhorn1>
-	<20110711093055.GJ13840@pengutronix.de>
-Message-ID: <20110711100838.GD2482@matterhorn1>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Mon, 11 Jul 2011 18:17:25 +0800
+Subject: [GIT PULL] pxa: features for next
+In-Reply-To: <CAMPhdO84i1v1ibzBnJ4BPkF67cRpQ74o+=Es_rW2t8PStN-jbg@mail.gmail.com>
+References: <CAMPhdO8uQR4km9szkuGDjuym-hViE9+zxtie6D2WGJmf1_9rUg@mail.gmail.com>
+	<20110711074113.GK4812@n2100.arm.linux.org.uk>
+	<CAMPhdO8pxGsEN1EeYwZRBnPvhkN29wOmEzWaaoCh9iqO+VkDrg@mail.gmail.com>
+	<20110711074600.GL4812@n2100.arm.linux.org.uk>
+	<CAMPhdO8=Gsiw_e6mFRi1PM99DSroaQi_SBiH298KAKqHb41rNw@mail.gmail.com>
+	<20110711075243.GM4812@n2100.arm.linux.org.uk>
+	<CAMPhdO-zR_=i_01KSTx_TzRFEOgygHc=kkUB68bke62_nzO=8Q@mail.gmail.com>
+	<20110711084026.GN4812@n2100.arm.linux.org.uk>
+	<CAMPhdO84i1v1ibzBnJ4BPkF67cRpQ74o+=Es_rW2t8PStN-jbg@mail.gmail.com>
+Message-ID: <CAMPhdO8SZjzE3f=rk1o8QSjaHGaySSHi6Ac9j4Mbm2s=0+A1pg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 Jul 11, Uwe Kleine-K?nig wrote:
-> On Mon, Jul 11, 2011 at 12:06:09PM +0300, Amit Kucheria wrote:
-> > On 11 Jul 09, Troy Kisky wrote:
-> > > The i.MX51 UART_PADDR value does not work for MX50/53.
-> > > 
-> > > Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
-> > 
-> > Acked-by: Amit Kucheria <amit.kucheria@canonical.com>
-> > 
-> > but I think we should switch to runtime detection of the machine (machine
-> > ID?) and then set the port address.
-> > 
-> > See arch/arm/plat-omap/include/plat/uncompress.h for a possible scheme.
-> mach/debug-macro.S and mach/uncompress.h are two different things. And
-> the uncompress stuff is dynamic for mxc AFAIK.
- 
-Indeed they're different. But it seems to me that
-arch/arm/mach-omap2/include/mach/debug-macro.S and arch/arm/plat-omap/include/plat/uncompress.h
-show clearly how we can deal with the serial port addresses (for DEBUG_LL)
-dynamically. No?
+On Mon, Jul 11, 2011 at 6:07 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
+> On Mon, Jul 11, 2011 at 4:40 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+>> On Mon, Jul 11, 2011 at 04:31:04PM +0800, Eric Miao wrote:
+>>> On Mon, Jul 11, 2011 at 3:52 PM, Russell King - ARM Linux
+>>> <linux@arm.linux.org.uk> wrote:
+>>> > On Mon, Jul 11, 2011 at 03:47:27PM +0800, Eric Miao wrote:
+>>> >> On Mon, Jul 11, 2011 at 3:46 PM, Russell King - ARM Linux
+>>> >> <linux@arm.linux.org.uk> wrote:
+>>> >> > On Mon, Jul 11, 2011 at 03:44:54PM +0800, Eric Miao wrote:
+>>> >> >> On Mon, Jul 11, 2011 at 3:41 PM, Russell King - ARM Linux
+>>> >> >> <linux@arm.linux.org.uk> wrote:
+>>> >> >> > On Mon, Jul 11, 2011 at 03:27:15PM +0800, Eric Miao wrote:
+>>> >> >> >> ? ? ? ARM: pxa: avoid accessing interrupt registers directly
+>>> >> >> >> ? ? ? ARM: pxa: introduce {icip,ichp}_handle_irq() to prepare MULTI_IRQ_HANDLER
+>>> >> >> >
+>>> >> >> > What happened about the __exception issue with asm_do_IRQ?
+>>> >> >> >
+>>> >> >>
+>>> >> >> I just removed the __exception from the C handler.
+>>> >> >
+>>> >> > From asm_do_IRQ ?
+>>> >> >
+>>> >>
+>>> >> No. From icip_handle_irq() and ichp_handle_irq(). Thought the ability to
+>>> >> unwind asm_do_IRQ() is more important.
+>>> >
+>>> > Which means you didn't understand my objection when I reviewed your patch.
+>>> >
+>>> > The __exception annotation on a function causes this to happen:
+>>> >
+>>> > [<c002406c>] (asm_do_IRQ+0x6c/0x8c) from [<c0024b84>] (__irq_svc+0x44/0xcc)
+>>> > Exception stack(0xc3897c78 to 0xc3897cc0)
+>>> > 7c60: ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 4022d320 4022e000
+>>> > 7c80: 08000075 00001000 c32273c0 c03ce1c0 c2b49b78 4022d000 c2b420b4 00000001
+>>> > 7ca0: 00000000 c3897cfc 00000000 c3897cc0 c00afc54 c002edd8 00000013 ffffffff
+>>> >
+>>> > Where that stack dump represents the pt_regs for the exception which
+>>> > happened. ?Any function found in while unwinding will cause this to
+>>> > be printed.
+>>> >
+>>> > If you insert a C function between the IRQ assembly and asm_do_IRQ, the
+>>> > dump you get from asm_do_IRQ will be the stack for your function, not
+>>> > the pt_regs. ?That makes the feature useless.
+>>> >
+>>>
+>>> Sorry for my stupidity, but I think I still don't get it quite correctly.
+>>> When both functions are prefixed with __exception_irq_entry, if
+>>> unwind works correctly, both stacks will be dumped, how would
+>>> the asm_do_IRQ will be stack for the function inserted?
+>>
+>> When __irq_svc - or any of the other exception handling assembly code -
+>> calls the C code, the stack pointer will be pointing at the pt_regs
+>> structure.
+>>
+>> All the entry points into C code from the exception handling code are
+>> marked with __exception or __exception_irq_enter to indicate that they
+>> are one of the functions which has pt_regs above them.
+>>
+>> Normally, when you've entered asm_do_IRQ() you will have this stack
+>> layout (higher address towards top):
+>>
+>> ? ? ? ?pt_regs
+>> ? ? ? ?asm_do_IRQ frame
+>>
+>> If you insert a C function between the exception assembly code and
+>> asm_do_IRQ, you end up with this stack layout instead:
+>>
+>> ? ? ? ?pt_regs
+>> ? ? ? ?your function frame
+>> ? ? ? ?asm_do_IRQ frame
+>>
+>> This means when we unwind, we'll get to asm_do_IRQ, and rather than
+>> dumping out the pt_regs, we'll dump out your functions stack frame
+>> instead, because that's what is above the asm_do_IRQ stack frame
+>> rather than the expected pt_regs structure.
+>>
+>
+> Ah now I see the problem. So it's actually in dump_backtrace_entry(),
+> where the if (in_exception_text(where)) dump_mem(...) has this
+> assumption.
+>
+> One way to solve this from my humble opinion is to mandate
+> __exception for the C function (stack version) of handle_arch_irq,
+> and when MULTI_IRQ defined, remove __exception from asm_do_IRQ(),
+> so the assumption in dump_backtrace_entry() still holds true.
+>
+> Or do we have a gcc extension to tell the compiler a simple function
+> doesn't need to use the stack?
+>
 
-> > > ---
-> > >  arch/arm/plat-mxc/include/mach/debug-macro.S |    9 ++++++++-
-> > >  1 files changed, 8 insertions(+), 1 deletions(-)
-> > > 
-> > > diff --git a/arch/arm/plat-mxc/include/mach/debug-macro.S b/arch/arm/plat-mxc/include/mach/debug-macro.S
-> > > index 8e8d175..3919ad4 100644
-> > > --- a/arch/arm/plat-mxc/include/mach/debug-macro.S
-> > > +++ b/arch/arm/plat-mxc/include/mach/debug-macro.S
-> > > @@ -37,13 +37,20 @@
-> > >  #define UART_PADDR	MX3x_UART1_BASE_ADDR
-> > >  #endif
-> > >  
-> > > -#ifdef CONFIG_ARCH_MX5
-> > > +#ifdef CONFIG_ARCH_MX51
-> > >  #ifdef UART_PADDR
-> > >  #error "CONFIG_DEBUG_LL is incompatible with multiple archs"
-> > >  #endif
-> > >  #define UART_PADDR	MX51_UART1_BASE_ADDR
-> > >  #endif
-> > >  
-> > > +#if defined(CONFIG_ARCH_MX50) || defined(CONFIG_ARCH_MX53)
-> > > +#ifdef UART_PADDR
-> > > +#error "CONFIG_DEBUG_LL is incompatible with multiple archs"
-> > > +#endif
-> > > +#define UART_PADDR	MX53_UART1_BASE_ADDR
-> > > +#endif
-> > > +
-> Hm, even though it's obvious, maybe add a comment that
-> MX50_UART1_BASE_ADDR is identical to MX53_UART1_BASE_ADDR?
-> 
+Hi Russell,
 
--- 
-----------------------------------------------------------------------
-Amit Kucheria, Kernel Engineer || amit.kucheria at canonical.com
-----------------------------------------------------------------------
+How about something like below, it's not clever at all though:
+
+diff --git a/arch/arm/include/asm/mach/irq.h b/arch/arm/include/asm/mach/irq.h
+index febe495..09a4856 100644
+--- a/arch/arm/include/asm/mach/irq.h
++++ b/arch/arm/include/asm/mach/irq.h
+@@ -25,6 +25,16 @@ extern void (*handle_arch_irq)(struct pt_regs *);
+ #endif
+
+ /*
++ * do not dump exception stack when MULTI_IRQ_HANDLER is defined, as
++ * the stack will be dumped for function (*handle_arch_irq)().
++ */
++#ifdef CONFIG_MULTI_IRQ_HANDLER
++#define __multi_irq_entry
++#else
++#define __multi_irq_entry	__exception_irq_entry
++#endif
++
++/*
+  * This is for easy migration, but should be changed in the source
+  */
+ #define do_bad_IRQ(irq,desc)				\
+diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
+index 83bbad0..7d32fd5 100644
+--- a/arch/arm/kernel/irq.c
++++ b/arch/arm/kernel/irq.c
+@@ -71,7 +71,7 @@ int arch_show_interrupts(struct seq_file *p, int prec)
+  * come via this function.  Instead, they should provide their
+  * own 'handler'
+  */
+-asmlinkage void __exception_irq_entry
++asmlinkage void __multi_irq_entry
+ asm_do_IRQ(unsigned int irq, struct pt_regs *regs)
+ {
+ 	struct pt_regs *old_regs = set_irq_regs(regs);
+diff --git a/arch/arm/mach-pxa/irq.c b/arch/arm/mach-pxa/irq.c
+index 2d079f4..d9cab3b 100644
+--- a/arch/arm/mach-pxa/irq.c
++++ b/arch/arm/mach-pxa/irq.c
+@@ -129,7 +129,7 @@ static struct irq_chip pxa_low_gpio_chip = {
+ 	.irq_set_type	= pxa_set_low_gpio_type,
+ };
+
+-asmlinkage void icip_handle_irq(struct pt_regs *regs)
++asmlinkage void __exception_irq_entry icip_handle_irq(struct pt_regs *regs)
+ {
+ 	uint32_t icip, icmr, mask;
+
+@@ -145,7 +145,7 @@ asmlinkage void icip_handle_irq(struct pt_regs *regs)
+ 	} while (1);
+ }
+
+-asmlinkage void ichp_handle_irq(struct pt_regs *regs)
++asmlinkage void __exception_irq_entry ichp_handle_irq(struct pt_regs *regs)
+ {
+ 	uint32_t ichp;
