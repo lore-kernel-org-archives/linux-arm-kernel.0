@@ -1,86 +1,98 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 11 Jul 2011 11:38:11 +0200
-Subject: [PATCH] mach-integrator: delete bits.h include file
-Message-ID: <1310377091-18103-1-git-send-email-linus.walleij@linaro.org>
+From: sudhakar.raj@ti.com (Rajashekhara, Sudhakar)
+Date: Mon, 11 Jul 2011 14:58:21 +0530
+Subject: [PATCH v3] davinci: da850 EVM: read mac address from SPI flash
+Message-ID: <1310376501-14189-1-git-send-email-sudhakar.raj@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Not only does this file duplicate <linux/bitops.h> and implement a
-well-known antipattern, it is also not used by anything.
+DA850/OMAP-L138 EMAC driver uses random mac address instead of
+a fixed one because the mac address is not stuffed into EMAC
+platform data.
 
-Cc: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+This patch provides a function which reads the mac address
+stored in SPI flash (registered as MTD device) and populates the
+EMAC platform data. The function which reads the mac address is
+registered as a callback which gets called upon addition of MTD
+device.
+
+NOTE: In case the MAC address stored in SPI flash is erased, follow
+the instructions at [1] to restore it.
+
+[1] http://processors.wiki.ti.com/index.php/GSG:_OMAP-L138_DVEVM_Additional_Procedures#Restoring_MAC_address_on_SPI_Flash
+
+Modifications in v2:
+Guarded registering the mtd_notifier only when MTD is enabled.
+Earlier this was handled using mtd_has_partitions() call, but
+this has been removed in Linux v3.0.
+
+Modifications in v3:
+a. Guarded da850_evm_m25p80_notify_add() function and
+   da850evm_spi_notifier structure with CONFIG_MTD macros.
+b. Renamed da850_evm_register_mtd_user() function to
+   da850_evm_setup_mac_addr() and removed the struct mtd_notifier
+   argument to this function.
+c. Passed the da850evm_spi_notifier structure to register_mtd_user()
+   function.
+
+Signed-off-by: Rajashekhara, Sudhakar <sudhakar.raj@ti.com>
 ---
- arch/arm/mach-integrator/include/mach/bits.h |   61 --------------------------
- 1 files changed, 0 insertions(+), 61 deletions(-)
- delete mode 100644 arch/arm/mach-integrator/include/mach/bits.h
+ arch/arm/mach-davinci/board-da850-evm.c |   30 ++++++++++++++++++++++++++++++
+ 1 files changed, 30 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-integrator/include/mach/bits.h b/arch/arm/mach-integrator/include/mach/bits.h
-deleted file mode 100644
-index 09b024e..0000000
---- a/arch/arm/mach-integrator/include/mach/bits.h
-+++ /dev/null
-@@ -1,61 +0,0 @@
--/*
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-- */
--/* DO NOT EDIT!! - this file automatically generated
-- *                 from .s file by awk -f s2h.awk
-- */
--/*  Bit field definitions
-- *  Copyright (C) ARM Limited 1998. All rights reserved.
-- */
--
--#ifndef __bits_h
--#define __bits_h                        1
--
--#define BIT0                            0x00000001
--#define BIT1                            0x00000002
--#define BIT2                            0x00000004
--#define BIT3                            0x00000008
--#define BIT4                            0x00000010
--#define BIT5                            0x00000020
--#define BIT6                            0x00000040
--#define BIT7                            0x00000080
--#define BIT8                            0x00000100
--#define BIT9                            0x00000200
--#define BIT10                           0x00000400
--#define BIT11                           0x00000800
--#define BIT12                           0x00001000
--#define BIT13                           0x00002000
--#define BIT14                           0x00004000
--#define BIT15                           0x00008000
--#define BIT16                           0x00010000
--#define BIT17                           0x00020000
--#define BIT18                           0x00040000
--#define BIT19                           0x00080000
--#define BIT20                           0x00100000
--#define BIT21                           0x00200000
--#define BIT22                           0x00400000
--#define BIT23                           0x00800000
--#define BIT24                           0x01000000
--#define BIT25                           0x02000000
--#define BIT26                           0x04000000
--#define BIT27                           0x08000000
--#define BIT28                           0x10000000
--#define BIT29                           0x20000000
--#define BIT30                           0x40000000
--#define BIT31                           0x80000000
--
--#endif
--
--/*         END */
+diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
+index a7b41bf..5bb6556 100644
+--- a/arch/arm/mach-davinci/board-da850-evm.c
++++ b/arch/arm/mach-davinci/board-da850-evm.c
+@@ -115,6 +115,25 @@ static struct spi_board_info da850evm_spi_info[] = {
+ 	},
+ };
+ 
++#ifdef CONFIG_MTD
++static void da850_evm_m25p80_notify_add(struct mtd_info *mtd)
++{
++	char *mac_addr = davinci_soc_info.emac_pdata->mac_addr;
++	size_t retlen;
++
++	if (!strcmp(mtd->name, "MAC-Address")) {
++		mtd->read(mtd, 0, ETH_ALEN, &retlen, mac_addr);
++		if (retlen == ETH_ALEN)
++			pr_info("Read MAC addr from SPI Flash: %pM\n",
++				mac_addr);
++	}
++}
++
++static struct mtd_notifier da850evm_spi_notifier = {
++	.add	= da850_evm_m25p80_notify_add,
++};
++#endif
++
+ static struct mtd_partition da850_evm_norflash_partition[] = {
+ 	{
+ 		.name           = "bootloaders + env",
+@@ -1117,6 +1136,15 @@ static __init int da850_evm_init_cpufreq(void)
+ static __init int da850_evm_init_cpufreq(void) { return 0; }
+ #endif
+ 
++#ifdef CONFIG_MTD
++static void da850_evm_setup_mac_addr(void)
++{
++	register_mtd_user(&da850evm_spi_notifier);
++}
++#else
++static void da850_evm_setup_mac_addr(void) { }
++#endif
++
+ static __init void da850_evm_init(void)
+ {
+ 	int ret;
+@@ -1237,6 +1265,8 @@ static __init void da850_evm_init(void)
+ 	if (ret)
+ 		pr_warning("da850_evm_init: spi 1 registration failed: %d\n",
+ 				ret);
++
++	da850_evm_setup_mac_addr();
+ }
+ 
+ #ifdef CONFIG_SERIAL_8250_CONSOLE
 -- 
-1.7.6
+1.7.1
