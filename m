@@ -1,54 +1,15 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 11 Jul 2011 15:24:08 +0200
-Subject: [PATCHv11 0/8] Contiguous Memory Allocator
-In-Reply-To: <20110706151112.5c619431.akpm@linux-foundation.org>
-References: <1309851710-3828-1-git-send-email-m.szyprowski@samsung.com>
-	<201107051407.17249.arnd@arndb.de>
-	<20110706151112.5c619431.akpm@linux-foundation.org>
-Message-ID: <001d01cc3fcd$d082a450$7187ecf0$%szyprowski@samsung.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 11 Jul 2011 13:41:51 +0000
+Subject: zaurus patches -- arm/pxa -- is Eric alive
+Message-ID: <20110711134150.GA15506@localhost.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi!
 
-On Thursday, July 07, 2011 12:11 AM Andrew Morton wrote:
-
-> On Tue, 5 Jul 2011 14:07:17 +0200
-> Arnd Bergmann <arnd@arndb.de> wrote:
-> 
-> > On Tuesday 05 July 2011, Marek Szyprowski wrote:
-> > > This is yet another round of Contiguous Memory Allocator patches. I
-> hope
-> > > that I've managed to resolve all the items discussed during the Memory
-> > > Management summit at Linaro Meeting in Budapest and pointed later on
-> > > mailing lists. The goal is to integrate it as tight as possible with
-> > > other kernel subsystems (like memory management and dma-mapping) and
-> > > finally merge to mainline.
-> >
-> > You have certainly addressed all of my concerns, this looks really good
-> now!
-> >
-> > Andrew, can you add this to your -mm tree? What's your opinion on the
-> > current state, do you think this is ready for merging in 3.1 or would
-> > you want to have more reviews from core memory management people?
-> >
-> > My reviews were mostly on the driver and platform API side, and I think
-> > we're fine there now, but I don't really understand the impacts this has
-> > in mm.
-> 
-> I could review it and put it in there on a preliminary basis for some
-> runtime testing.  But the question in my mind is how different will the
-> code be after the problems which rmk has identified have been fixed?
-> 
-> If "not very different" then that effort and testing will have been
-> worthwhile.
-
-The issue reported by Russell is very ARM specific and can be solved mostly
-in arch/arm/mm/dma-mapping.c, maybe with some minor changes/helpers in
-drivers/base/dma-contiguous.c The core part in linux/mm probably won't be
-affected by these changes at all.
-
-Best regards
+There are some rather critical patches for zaurus C-3000 (spitz)
+available... with no response. What is going on?
+								Pavel
 -- 
-Marek Szyprowski
-Samsung Poland R&D Center
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
