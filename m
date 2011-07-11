@@ -1,91 +1,22 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 11 Jul 2011 09:45:29 +0200
-Subject: [PATCH v2 6/7] spi/imx: copy gpio number passed by platform data
-	into driver private data
-In-Reply-To: <1310231801-18761-7-git-send-email-shawn.guo@linaro.org>
-References: <1310231801-18761-1-git-send-email-shawn.guo@linaro.org>
-	<1310231801-18761-7-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20110711074529.GD13840@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 11 Jul 2011 08:46:00 +0100
+Subject: [GIT PULL] pxa: features for next
+In-Reply-To: <CAMPhdO8pxGsEN1EeYwZRBnPvhkN29wOmEzWaaoCh9iqO+VkDrg@mail.gmail.com>
+References: <CAMPhdO8uQR4km9szkuGDjuym-hViE9+zxtie6D2WGJmf1_9rUg@mail.gmail.com>
+	<20110711074113.GK4812@n2100.arm.linux.org.uk>
+	<CAMPhdO8pxGsEN1EeYwZRBnPvhkN29wOmEzWaaoCh9iqO+VkDrg@mail.gmail.com>
+Message-ID: <20110711074600.GL4812@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 10, 2011 at 01:16:40AM +0800, Shawn Guo wrote:
-> It copies gpio number passed via platform data embedded pointer into
-> driver private data, so that we do not need to refer to this embedded
-> pointer passed by platform data after probe function exits.
+On Mon, Jul 11, 2011 at 03:44:54PM +0800, Eric Miao wrote:
+> On Mon, Jul 11, 2011 at 3:41 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Mon, Jul 11, 2011 at 03:27:15PM +0800, Eric Miao wrote:
+> >> ? ? ? ARM: pxa: avoid accessing interrupt registers directly
+> >> ? ? ? ARM: pxa: introduce {icip,ichp}_handle_irq() to prepare MULTI_IRQ_HANDLER
+> >
+> > What happened about the __exception issue with asm_do_IRQ?
+> >
 > 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> ---
->  drivers/spi/spi-imx.c |   12 +++++++-----
->  1 files changed, 7 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
-> index 2ed9c32..ad61828 100644
-> --- a/drivers/spi/spi-imx.c
-> +++ b/drivers/spi/spi-imx.c
-> @@ -84,7 +84,6 @@ struct spi_imx_data {
->  	int irq;
->  	struct clk *clk;
->  	unsigned long spi_clk;
-> -	int *chipselect;
->  
->  	unsigned int count;
->  	void (*tx)(struct spi_imx_data *);
-> @@ -94,6 +93,7 @@ struct spi_imx_data {
->  	unsigned int txfifo; /* number of words pushed in tx FIFO */
->  
->  	struct spi_imx_devtype_data *devtype_data;
-> +	int chipselect[0];
-It's not needed to use a zero-length array here (which is a gcc
-extension). A (C99) flexible array member should be fine.
-Long words short: s/0//
-
->  };
->  
->  static inline int is_imx27_cspi(struct spi_imx_data *d)
-> @@ -743,7 +743,7 @@ static int __devinit spi_imx_probe(struct platform_device *pdev)
->  	struct spi_master *master;
->  	struct spi_imx_data *spi_imx;
->  	struct resource *res;
-> -	int i, ret;
-> +	int i, ret, num_cs;
->  
->  	mxc_platform_info = dev_get_platdata(&pdev->dev);
->  	if (!mxc_platform_info) {
-> @@ -751,20 +751,22 @@ static int __devinit spi_imx_probe(struct platform_device *pdev)
->  		return -EINVAL;
->  	}
->  
-> -	master = spi_alloc_master(&pdev->dev, sizeof(struct spi_imx_data));
-> +	num_cs = mxc_platform_info->num_chipselect;
-> +	master = spi_alloc_master(&pdev->dev,
-> +			sizeof(struct spi_imx_data) + sizeof(int) * num_cs);
->  	if (!master)
->  		return -ENOMEM;
->  
->  	platform_set_drvdata(pdev, master);
->  
->  	master->bus_num = pdev->id;
-> -	master->num_chipselect = mxc_platform_info->num_chipselect;
-> +	master->num_chipselect = num_cs;
->  
->  	spi_imx = spi_master_get_devdata(master);
->  	spi_imx->bitbang.master = spi_master_get(master);
-> -	spi_imx->chipselect = mxc_platform_info->chipselect;
->  
->  	for (i = 0; i < master->num_chipselect; i++) {
-> +		spi_imx->chipselect[i] = mxc_platform_info->chipselect[i];
->  		if (spi_imx->chipselect[i] < 0)
->  			continue;
->  		ret = gpio_request(spi_imx->chipselect[i], DRIVER_NAME);
-> -- 
-> 1.7.4.1
-> 
-> 
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> I just removed the __exception from the C handler.
