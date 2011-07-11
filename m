@@ -1,88 +1,82 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 11 Jul 2011 09:40:26 +0100
-Subject: [GIT PULL] pxa: features for next
-In-Reply-To: <CAMPhdO-zR_=i_01KSTx_TzRFEOgygHc=kkUB68bke62_nzO=8Q@mail.gmail.com>
-References: <CAMPhdO8uQR4km9szkuGDjuym-hViE9+zxtie6D2WGJmf1_9rUg@mail.gmail.com>
-	<20110711074113.GK4812@n2100.arm.linux.org.uk>
-	<CAMPhdO8pxGsEN1EeYwZRBnPvhkN29wOmEzWaaoCh9iqO+VkDrg@mail.gmail.com>
-	<20110711074600.GL4812@n2100.arm.linux.org.uk>
-	<CAMPhdO8=Gsiw_e6mFRi1PM99DSroaQi_SBiH298KAKqHb41rNw@mail.gmail.com>
-	<20110711075243.GM4812@n2100.arm.linux.org.uk>
-	<CAMPhdO-zR_=i_01KSTx_TzRFEOgygHc=kkUB68bke62_nzO=8Q@mail.gmail.com>
-Message-ID: <20110711084026.GN4812@n2100.arm.linux.org.uk>
+From: rbairva@gmail.com (rd bairva)
+Date: Mon, 11 Jul 2011 13:56:35 +0530
+Subject: ARM cortex A9 performance issue
+In-Reply-To: <20110708133315.GB2115@arm.com>
+References: <CAE_nTV4VgcNB0gc64zEPEfHp-hnDBsw6QsM=GqEObXAwzMTzTA@mail.gmail.com>
+	<20110707152740.GG2486@arm.com>
+	<CAE_nTV7PuEJx0WJKCtbGU-4HjEBzFxPRmPLue1toktS27Htbzg@mail.gmail.com>
+	<20110708133315.GB2115@arm.com>
+Message-ID: <CAE_nTV4t64A7JGN117Pkg1dmqnEvPFkE1AqoyRbeVhN3dN1Q8g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 11, 2011 at 04:31:04PM +0800, Eric Miao wrote:
-> On Mon, Jul 11, 2011 at 3:52 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Mon, Jul 11, 2011 at 03:47:27PM +0800, Eric Miao wrote:
-> >> On Mon, Jul 11, 2011 at 3:46 PM, Russell King - ARM Linux
-> >> <linux@arm.linux.org.uk> wrote:
-> >> > On Mon, Jul 11, 2011 at 03:44:54PM +0800, Eric Miao wrote:
-> >> >> On Mon, Jul 11, 2011 at 3:41 PM, Russell King - ARM Linux
-> >> >> <linux@arm.linux.org.uk> wrote:
-> >> >> > On Mon, Jul 11, 2011 at 03:27:15PM +0800, Eric Miao wrote:
-> >> >> >> ? ? ? ARM: pxa: avoid accessing interrupt registers directly
-> >> >> >> ? ? ? ARM: pxa: introduce {icip,ichp}_handle_irq() to prepare MULTI_IRQ_HANDLER
-> >> >> >
-> >> >> > What happened about the __exception issue with asm_do_IRQ?
-> >> >> >
-> >> >>
-> >> >> I just removed the __exception from the C handler.
-> >> >
-> >> > From asm_do_IRQ ?
-> >> >
-> >>
-> >> No. From icip_handle_irq() and ichp_handle_irq(). Thought the ability to
-> >> unwind asm_do_IRQ() is more important.
-> >
-> > Which means you didn't understand my objection when I reviewed your patch.
-> >
-> > The __exception annotation on a function causes this to happen:
-> >
-> > [<c002406c>] (asm_do_IRQ+0x6c/0x8c) from [<c0024b84>] (__irq_svc+0x44/0xcc)
-> > Exception stack(0xc3897c78 to 0xc3897cc0)
-> > 7c60: ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 4022d320 4022e000
-> > 7c80: 08000075 00001000 c32273c0 c03ce1c0 c2b49b78 4022d000 c2b420b4 00000001
-> > 7ca0: 00000000 c3897cfc 00000000 c3897cc0 c00afc54 c002edd8 00000013 ffffffff
-> >
-> > Where that stack dump represents the pt_regs for the exception which
-> > happened. ?Any function found in while unwinding will cause this to
-> > be printed.
-> >
-> > If you insert a C function between the IRQ assembly and asm_do_IRQ, the
-> > dump you get from asm_do_IRQ will be the stack for your function, not
-> > the pt_regs. ?That makes the feature useless.
-> >
-> 
-> Sorry for my stupidity, but I think I still don't get it quite correctly.
-> When both functions are prefixed with __exception_irq_entry, if
-> unwind works correctly, both stacks will be dumped, how would
-> the asm_do_IRQ will be stack for the function inserted?
+Attaching the new code.
 
-When __irq_svc - or any of the other exception handling assembly code -
-calls the C code, the stack pointer will be pointing at the pt_regs
-structure.
-
-All the entry points into C code from the exception handling code are
-marked with __exception or __exception_irq_enter to indicate that they
-are one of the functions which has pt_regs above them.
-
-Normally, when you've entered asm_do_IRQ() you will have this stack
-layout (higher address towards top):
-
-	pt_regs
-	asm_do_IRQ frame
-
-If you insert a C function between the exception assembly code and
-asm_do_IRQ, you end up with this stack layout instead:
-
-	pt_regs
-	your function frame
-	asm_do_IRQ frame
-
-This means when we unwind, we'll get to asm_do_IRQ, and rather than
-dumping out the pt_regs, we'll dump out your functions stack frame
-instead, because that's what is above the asm_do_IRQ stack frame
-rather than the expected pt_regs structure.
+On Fri, Jul 8, 2011 at 7:03 PM, Dave Martin <dave.martin@linaro.org> wrote:
+> On Fri, Jul 08, 2011 at 05:08:38PM +0530, rd bairva wrote:
+>> Now i have modified a source a little bit. Now I am doing a pingpong
+>> using msgsnd and msgrcv. using this I am getting 40000req/sec and 55%
+>> CPU usage.
+>> In another version I have taken the same lock in both the processes to
+>> ensure same thread is unlocking the mutex. But CPU usage is 100%.
+>> Shouldn't be the behaviour 50%.
+>
+> Possibly. ?Do you see that behaviour on all platforms, or just A9?
+On single processor it is always 100% on ARM as well as X86. but on
+X86, cpu is >50% free.
+>
+>>
+>> algo
+>> msgsnd/msgrcv version.
+>>
+>> Process1
+>> shared memory counter++
+>> msgsnd1
+>> msgrcv 2
+>>
+>> Process2
+>> msgrcv 1
+>> shared memory counter--
+>> msgsnd2
+>>
+>> Mutex version:
+>> Process 1
+>>
+>> mutex1
+>> c++
+>> unlock_mutex1
+>>
+>> Process 2
+>> mutex1
+>> c++
+>> unlock_mutex1
+>
+> If there is some overhead outside the critical section, then the two threads
+> are likely to end up synchronised in such a way that this hides some or all of
+> the latency of acquiring the lock. ?So I'd expect a CPU load somewhere between
+> 50% and 100%, though I'd be a bit surprised if all the latency is hidden.
+>
+> If you don't check or wait for the counter increment, the same thread may
+> repeatedly take the lock of course, without ever waiting. ?If that happens,
+> you would see 100% load. ?This probably can't happen with the msgsnd/msgrcv
+> version.
+>
+> Your results from msgsnd/msgrcv also suggest that the hidden message
+> receive latency and other system overheads account for something like
+> of the total CPU load for that code, which sounds plausible.
+>
+> Can you attach your new code?
+>
+> Cheers
+> ---Dave
+>
+>
+Thanks and regards,
+Ramdayal
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: shmemtest.zip
+Type: application/zip
+Size: 3414 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110711/3367f4db/attachment.zip>
