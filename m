@@ -1,31 +1,46 @@
-From: eric.miao@linaro.org (Eric Miao)
-Date: Mon, 11 Jul 2011 15:25:30 +0800
-Subject: [GIT PULL] pxa: fixes for v3.0-rc6 (2nd bunch)
-Message-ID: <CAMPhdO_NxvJmZqK23USQ3HVn2eXhuNpvM=EeWq3nwpt3WOUbzw@mail.gmail.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Mon, 11 Jul 2011 15:26:24 +0800
+Subject: [GIT PULL] pxa: cleanup for next
+Message-ID: <CAMPhdO-BQjNxYauY9KEfszY11JmTqBWnbNnT1p1+RF=ZtyvNPw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 6662498e132dfa758925a160fd5ef80a083651c3:
+The following changes since commit fe0d42203cb5616eeff68b14576a0f7e2dd56625:
 
-  ARM: pxa168: correct nand pmu setting (2011-07-06 23:51:36 +0800)
+  Linux 3.0-rc6 (2011-07-04 15:56:24 -0700)
 
 are available in the git repository at:
-  git://git.kernel.org/pub/scm/linux/kernel/git/ycmiao/pxa-linux-2.6.git fix
+  git://git.kernel.org/pub/scm/linux/kernel/git/ycmiao/pxa-linux-2.6.git cleanup
 
-Daniel Mack (1):
-      ARM: pxa/raumfeld: fix device name for codec ak4104
+Dmitry Eremin-Solenikov (1):
+      ARM: scoop: drop pcmcia_init callback
+
+Eric Miao (1):
+      ARM: pxa/saarb: make use of pxa3xx_map_io()
+
+Igor Grinberg (4):
+      ARM: pxa/cm-x300: fix V3020 RTC functionality
+      ARM: pxa/cm-x300: GPIO cleanup
+      ARM: pxa/cm-x300: minor style cleanup
+      ARM: pxa/cm-x300: update cm_x300_defconfig
 
 Jonathan Cameron (1):
-      pcmcia: pxa2xx/vpac270: free gpios on exist rather than requesting
+      pcmcia: pxa2xx/trizeps4: remove unnecessary ifdefs
 
-Linus Walleij (1):
-      ARM: pxa: fix gpio_to_chip() clash with gpiolib namespace
+Philipp Zabel (4):
+      ARM: pxa/magician: fix MAGICIAN_EGPIO_BASE, align with NR_BUILTIN_GPIO
+      ARM: pxa/magician: use gpio arrays for backlight and global gpios
+      ARM: pxa/hx4700: use gpio arrays for global gpios
+      ARM: pxa/mioa701: use gpio arrays for global and gsm gpios
 
-Sven Neumann (2):
-      ARM: pxa/raumfeld: adapt to upcoming hardware change
-      ARM: pxa/raumfeld: display initialisation fixes
-
- arch/arm/mach-pxa/raumfeld.c    |   36 +++++++++++++++++++-----------------
- arch/arm/plat-pxa/gpio.c        |   10 +++++-----
- drivers/pcmcia/pxa2xx_vpac270.c |    4 ++--
- 3 files changed, 26 insertions(+), 24 deletions(-)
+ arch/arm/configs/cm_x300_defconfig        |   18 ++------
+ arch/arm/include/asm/hardware/scoop.h     |    1 -
+ arch/arm/mach-pxa/cm-x300.c               |   58 +++++++++++-------------
+ arch/arm/mach-pxa/hx4700.c                |   70 ++++++++---------------------
+ arch/arm/mach-pxa/include/mach/magician.h |    3 +-
+ arch/arm/mach-pxa/magician.c              |   57 +++++++++--------------
+ arch/arm/mach-pxa/mioa701.c               |   70 ++++++----------------------
+ arch/arm/mach-pxa/saarb.c                 |    2 +-
+ drivers/pcmcia/pxa2xx_sharpsl.c           |    3 -
+ drivers/pcmcia/pxa2xx_trizeps4.c          |    4 --
+ 10 files changed, 91 insertions(+), 195 deletions(-)
