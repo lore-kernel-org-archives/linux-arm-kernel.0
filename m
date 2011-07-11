@@ -1,29 +1,40 @@
-From: dan.j.williams@intel.com (Dan Williams)
-Date: Mon, 11 Jul 2011 14:39:17 -0700
-Subject: [PATCH] dmaengine: add dma_ctrl_cmd to pass buffer stride
-	configuration
-In-Reply-To: <CAKnu2MqzSm8BVK4z9E-ud8e_jUohDfSfYO9aW-oN3RFw4p7GrA@mail.gmail.com>
-References: <1310310203-12288-1-git-send-email-sundaram@ti.com>
-	<CAKnu2MqzSm8BVK4z9E-ud8e_jUohDfSfYO9aW-oN3RFw4p7GrA@mail.gmail.com>
-Message-ID: <CAA9_cmeWUjiTghKbjAvith5c6z9PDVdFSeK55RYWfyQKFSjA+Q@mail.gmail.com>
+From: morpheus.ibis@gmail.com (Pavel Herrmann)
+Date: Mon, 11 Jul 2011 23:49:10 +0200
+Subject: [PATCH v2] MAX1111: Fix Race condition causing NULL pointer
+	exception
+In-Reply-To: <1310418193.21224.14.camel@groeck-laptop>
+References: <1310410051-13127-1-git-send-email-morpheus.ibis@gmail.com>
+	<1602583.Pi9fQvRk5m@bloomfield>
+	<1310418193.21224.14.camel@groeck-laptop>
+Message-ID: <3737907.jTEM1bACya@bloomfield>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 11, 2011 at 2:28 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> 2011/7/10 Sundaram Raju <sundaram@ti.com>:
->
->> Added new dma_ctrl_cmd TI_DMA_STRIDE_CONFIG to pass the TI DMA
->> controller specific configurations on how a buffer must be walked
->> through and how data is picked for transfer based on a specified
->> pattern over the channel.
->>
->> The configuration passed is specific to the TI DMA controller used.
+On Monday 11 of July 2011 14:03:13 Guenter Roeck wrote:
+> On Mon, 2011-07-11 at 16:36 -0400, Pavel Herrmann wrote:
+> > the structure is dynamically allocated, but the pointer used to hold it
+> > is a static global var.
+> 
+> This is true only if CONFIG_SHARPSL_PM is defined, and it assumes that
+> the driver is instantiated exactly once. That is pretty badly broken
+> (the commit introducing it even admits that), and should be fixed. This
+> does not happen CONFIG_SHARPSL_PM is not defined. If CONFIG_SHARPSL_PM
+> _is_ defined in your environment, and you do have multiple instances of
+> the driver (ie if you have multiple MAX1111 chips in your system), a
+> severe problem is that max1111_read_channel() does not identify the
+> driver instance. That can not be fixed with a mutex.
 
-...and I suspect the slave device drivers that use TI DMA are not
-expected to ever work with other dmaengines?  Likely the case, but
-just wondering out loud.
+if you don't have CONFIG_SHARPSL_PM then there is nothing calling 
+max1111_read, and thus any of the discussed doesn't matter
+AFAIK max1111 is only used in sharpsl devices (according to kernel drivers 
+anyways), and only one a piece.
+this patch is meant to fix a crash, not make the driver code pretty just in 
+case someone else decides to use it. this patch also doesn't present any more 
+challenges for solving the multiple devices issue and would be necessary 
+either way, as drvdata is not thread-safe anyways (or I am badly mistaken)
 
->> Signed-off-by: Sundaram Raju <sundaram@ti.com>
->
-> This is exactly how I think we should do this.
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> I think it would make sense to stick with common terminology. In your
+> definition, almost all global variables of all programs out there would
+> be defined as "static".
+
+yeah, sorry for that
