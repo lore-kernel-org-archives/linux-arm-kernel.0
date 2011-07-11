@@ -1,80 +1,59 @@
-From: morpheus.ibis@gmail.com (Pavel Herrmann)
-Date: Mon, 11 Jul 2011 23:50:38 +0200
-Subject: [PATCH v3] MAX1111: Fix Race condition causing NULL pointer exception
-Message-ID: <1310421038-14823-1-git-send-email-morpheus.ibis@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 11 Jul 2011 23:52:40 +0200
+Subject: [PATCH 16/17] mach-sa1100: retire custom LED code
+In-Reply-To: <20110711210950.GE8486@n2100.arm.linux.org.uk>
+References: <1309955687-19365-1-git-send-email-bryan.wu@canonical.com>
+	<CAK5ve-+Pr8EDa8mfhZVbf8ADc2YDU0EyTPL3Fwwipj237tgKQg@mail.gmail.com>
+	<20110711210950.GE8486@n2100.arm.linux.org.uk>
+Message-ID: <201107112352.40424.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-spi_sync call uses its spi_message parameter to keep completion information,
-using a drvdata structure is not thread-safe, potentially causing one thread
-having pointers to memory on or above other threads stack. use mutex to
-prevent multiple access
+On Monday 11 July 2011, Russell King - ARM Linux wrote:
+> On Mon, Jul 11, 2011 at 10:36:49PM +0800, Bryan Wu wrote:
+> > Right, I got it. So if we are going to run a single binary for all the
+> > sa1100 machines, how about we check the machine in each fs_initcall
+> > 
+> > static int __init assabet_leds_init(void)
+> > {
+> >      int i;
+> > 
+> >      if (!machine_is_assabet())
+> >           return -ENODEV,
+> > 
+> >      for (i = 0; i < ARRAY_SIZE(assabet_leds); i++) {
+> >              struct assabet_led *led;
+> 
+> Yes, that'll do, thanks.
+> 
 
-Signed-off-by: Pavel Herrmann <morpheus.ibis@gmail.com>
-Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
-Acked-by: Pavel Machek <pavel@ucw.cz>
-Acked-by: Marek Vasut <marek.vasut@gmail.com>
-Acked-by: Cyril Hrubis <metan@ucw.cz>
-Tested-by: Stanislav Brabec <utx@penguin.cz>
----
- drivers/hwmon/max1111.c |   11 +++++++++++
- 1 files changed, 11 insertions(+), 0 deletions(-)
+Do you think it's worth copying the logic from powerpc for this?
 
-diff --git a/drivers/hwmon/max1111.c b/drivers/hwmon/max1111.c
-index 12a54aa..5c9e54c 100644
---- a/drivers/hwmon/max1111.c
-+++ b/drivers/hwmon/max1111.c
-@@ -40,6 +40,8 @@ struct max1111_data {
- 	struct spi_transfer	xfer[2];
- 	uint8_t *tx_buf;
- 	uint8_t *rx_buf;
-+	struct mutex		drvdata_lock;
-+	/* protect msg, xfer and buffers from multiple access */
- };
- 
- static int max1111_read(struct device *dev, int channel)
-@@ -48,6 +50,9 @@ static int max1111_read(struct device *dev, int channel)
- 	uint8_t v1, v2;
- 	int err;
- 
-+	/* writing to drvdata struct is not thread safe, wait on mutex */
-+	mutex_lock(&data->drvdata_lock);
-+
- 	data->tx_buf[0] = (channel << MAX1111_CTRL_SEL_SH) |
- 		MAX1111_CTRL_PD0 | MAX1111_CTRL_PD1 |
- 		MAX1111_CTRL_SGL | MAX1111_CTRL_UNI | MAX1111_CTRL_STR;
-@@ -55,12 +60,15 @@ static int max1111_read(struct device *dev, int channel)
- 	err = spi_sync(data->spi, &data->msg);
- 	if (err < 0) {
- 		dev_err(dev, "spi_sync failed with %d\n", err);
-+		mutex_unlock(&data->drvdata_lock);
- 		return err;
- 	}
- 
- 	v1 = data->rx_buf[0];
- 	v2 = data->rx_buf[1];
- 
-+	mutex_unlock(&data->drvdata_lock);
-+
- 	if ((v1 & 0xc0) || (v2 & 0x3f))
- 		return -EINVAL;
- 
-@@ -176,6 +184,8 @@ static int __devinit max1111_probe(struct spi_device *spi)
- 	if (err)
- 		goto err_free_data;
- 
-+	mutex_init(&data->drvdata_lock);
-+
- 	data->spi = spi;
- 	spi_set_drvdata(spi, data);
- 
-@@ -213,6 +223,7 @@ static int __devexit max1111_remove(struct spi_device *spi)
- 
- 	hwmon_device_unregister(data->hwmon_dev);
- 	sysfs_remove_group(&spi->dev.kobj, &max1111_attr_group);
-+	mutex_destroy(data->drvdata_lock);
- 	kfree(data->rx_buf);
- 	kfree(data->tx_buf);
- 	kfree(data);
--- 
-1.7.5.rc3
+
+arch/powerpc/include/asm/machdep.h:
+#define __define_machine_initcall(mach,level,fn,id) \
+        static int __init __machine_initcall_##mach##_##fn(void) { \
+                if (machine_is(mach)) return fn(); \
+                return 0; \
+        } \
+        __define_initcall(level,__machine_initcall_##mach##_##fn,id);
+#define machine_core_initcall(mach,fn)          __define_machine_initcall(mach,"1",fn,1)
+#define machine_core_initcall_sync(mach,fn)     __define_machine_initcall(mach,"1s",fn,1s)
+#define machine_postcore_initcall(mach,fn)      __define_machine_initcall(mach,"2",fn,2)
+#define machine_postcore_initcall_sync(mach,fn) __define_machine_initcall(mach,"2s",fn,2s)
+#define machine_arch_initcall(mach,fn)          __define_machine_initcall(mach,"3",fn,3)
+#define machine_arch_initcall_sync(mach,fn)     __define_machine_initcall(mach,"3s",fn,3s)
+#define machine_subsys_initcall(mach,fn)        __define_machine_initcall(mach,"4",fn,4)
+#define machine_subsys_initcall_sync(mach,fn)   __define_machine_initcall(mach,"4s",fn,4s)
+#define machine_fs_initcall(mach,fn)            __define_machine_initcall(mach,"5",fn,5)
+#define machine_fs_initcall_sync(mach,fn)       __define_machine_initcall(mach,"5s",fn,5s)
+#define machine_rootfs_initcall(mach,fn)        __define_machine_initcall(mach,"rootfs",fn,rootfs)
+#define machine_device_initcall(mach,fn)        __define_machine_initcall(mach,"6",fn,6)
+#define machine_device_initcall_sync(mach,fn)   __define_machine_initcall(mach,"6s",fn,6s)
+#define machine_late_initcall(mach,fn)          __define_machine_initcall(mach,"7",fn,7)
+#define machine_late_initcall_sync(mach,fn)     __define_machine_initcall(mach,"7s",fn,7s)
+
+I don't really like the magic macros, but my feeling is that it's easier
+to do the conversion without introducing subtle bugs this way.
+
+	Arnd
