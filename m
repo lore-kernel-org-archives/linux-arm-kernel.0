@@ -1,46 +1,48 @@
-From: bryan.wu@canonical.com (Bryan Wu)
-Date: Mon, 11 Jul 2011 22:13:29 +0800
-Subject: [PATCH 03/17] mach-realview: retire custom LED code
-In-Reply-To: <20110710092747.GS4812@n2100.arm.linux.org.uk>
-References: <1309955687-19365-1-git-send-email-bryan.wu@canonical.com>
-	<1309955687-19365-4-git-send-email-bryan.wu@canonical.com>
-	<20110710092747.GS4812@n2100.arm.linux.org.uk>
-Message-ID: <CAK5ve-+Zs=Q9sgfmCYJxOLvV+ATfrjOKrZEH_E49RHPk7WYJEQ@mail.gmail.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Mon, 11 Jul 2011 16:17:12 +0200
+Subject: zaurus patches -- arm/pxa -- is Eric alive
+In-Reply-To: <20110711140303.GA32532@atrey.karlin.mff.cuni.cz>
+References: <20110711134150.GA15506@localhost.ucw.cz>
+	<CALT56yM+fNs_2QorWK0=gr2um1H3vDX+HXPCi9bmKDdOdSvptA@mail.gmail.com>
+	<20110711140303.GA32532@atrey.karlin.mff.cuni.cz>
+Message-ID: <20110711141712.GD11153@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 10, 2011 at 5:27 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, Jul 06, 2011 at 08:34:33PM +0800, Bryan Wu wrote:
->> diff --git a/arch/arm/plat-versatile/Kconfig b/arch/arm/plat-versatile/Kconfig
->> index 52353be..c600420 100644
->> --- a/arch/arm/plat-versatile/Kconfig
->> +++ b/arch/arm/plat-versatile/Kconfig
->> @@ -7,8 +7,12 @@ config PLAT_VERSATILE_FPGA_IRQ
->> ? ? ? bool
->>
->> ?config PLAT_VERSATILE_LEDS
->> - ? ? def_bool y if LEDS_CLASS
->> + ? ? def_bool y
->> ? ? ? depends on ARCH_REALVIEW || ARCH_VERSATILE
->> + ? ? select NEW_LEDS
->> + ? ? select LEDS_CLASS
->> + ? ? select LEDS_TRIGGERS
->> + ? ? select LEDS_TRIGGER_CPU
->
-> Can you explain the choice to force LED support to be enabled with no
-> choice for these?
->
+On Mon, Jul 11, 2011 at 04:03:03PM +0200, Cyril Hrubis wrote:
+> Hi!
+> > > There are some rather critical patches for zaurus C-3000 (spitz)
+> > > available... with no response. What is going on?
+> > 
+> > Eric seems alive. At least he've sent pull requests few days ago.
+> > Maybe you can point to those patches, that you mention as critical?
+> 
+> Perhaps the most critical one is:
+> 
+> [PATCH] MAX1111: Fix race condition causing NULL pointer exception
+> 
+> http://ns1.yosemitephotos.net/lists/arm-kernel/msg125356.html
 
-I force to select this to default build-in LEDS stuff and don't wanna
-to modify the defconfig to build-in LEDS stuff as default.
-Now, I agree we can let users to select them when they wanna to enable
-LED via menuconfig.
+Ahem, this one was opposed to. The right one seems to be:
 
-Thanks,
+http://ns1.yosemitephotos.net/lists/arm-kernel/msg125592.html
+
+Note that it is a hwmon-driver and neither the apropriate list nor
+maintainers have been CCed. Eric cannot take this patch. Check
+MAINTAINERAS (or use scripts/get_maintainer.pl) to find the right people
+and this will increase chances to get your patch upstream a lot.
+
+Regards,
+
+   Wolfram
+
 -- 
-Bryan Wu <bryan.wu@canonical.com>
-Kernel Developer ? ?+86.138-1617-6545 Mobile
-Ubuntu Kernel Team
-Canonical Ltd. ? ? ?www.canonical.com
-Ubuntu - Linux for human beings | www.ubuntu.com
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110711/36212a6c/attachment.sig>
