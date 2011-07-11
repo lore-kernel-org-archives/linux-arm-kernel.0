@@ -1,33 +1,53 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 11 Jul 2011 11:22:18 +0100
-Subject: [GIT PULL] pxa: features for next
-In-Reply-To: <CAMPhdO84i1v1ibzBnJ4BPkF67cRpQ74o+=Es_rW2t8PStN-jbg@mail.gmail.com>
-References: <CAMPhdO8uQR4km9szkuGDjuym-hViE9+zxtie6D2WGJmf1_9rUg@mail.gmail.com>
-	<20110711074113.GK4812@n2100.arm.linux.org.uk>
-	<CAMPhdO8pxGsEN1EeYwZRBnPvhkN29wOmEzWaaoCh9iqO+VkDrg@mail.gmail.com>
-	<20110711074600.GL4812@n2100.arm.linux.org.uk>
-	<CAMPhdO8=Gsiw_e6mFRi1PM99DSroaQi_SBiH298KAKqHb41rNw@mail.gmail.com>
-	<20110711075243.GM4812@n2100.arm.linux.org.uk>
-	<CAMPhdO-zR_=i_01KSTx_TzRFEOgygHc=kkUB68bke62_nzO=8Q@mail.gmail.com>
-	<20110711084026.GN4812@n2100.arm.linux.org.uk>
-	<CAMPhdO84i1v1ibzBnJ4BPkF67cRpQ74o+=Es_rW2t8PStN-jbg@mail.gmail.com>
-Message-ID: <20110711102218.GF3239@n2100.arm.linux.org.uk>
+Date: Mon, 11 Jul 2011 11:28:56 +0100
+Subject: [PATCH 0/6] clk: Initial feedback for off-SoC slow bus clocks
+In-Reply-To: <20110711100759.GG26347@pengutronix.de>
+References: <20110711025344.GA27497@opensource.wolfsonmicro.com>
+	<20110711093124.GA3239@n2100.arm.linux.org.uk>
+	<20110711100759.GG26347@pengutronix.de>
+Message-ID: <20110711102856.GG3239@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 11, 2011 at 06:07:56PM +0800, Eric Miao wrote:
-> Ah now I see the problem. So it's actually in dump_backtrace_entry(),
-> where the if (in_exception_text(where)) dump_mem(...) has this
-> assumption.
+On Mon, Jul 11, 2011 at 12:07:59PM +0200, Sascha Hauer wrote:
+> On Mon, Jul 11, 2011 at 10:31:24AM +0100, Russell King - ARM Linux wrote:
+> > On Mon, Jul 11, 2011 at 11:53:44AM +0900, Mark Brown wrote:
+> > > The biggest issue I ran into was that as the clocks are all registered
+> > > by name with the API if you've got two instances of the same off-SoC
+> > > device in the system you'll not be able to disambiguate between the
+> > > clocks it provides.
+> > 
+> > Sigh.  That sounds like yet more trash.  Obviously whoever thought
+> > up that doesn't actually understand clks.
 > 
-> One way to solve this from my humble opinion is to mandate
-> __exception for the C function (stack version) of handle_arch_irq,
-> and when MULTI_IRQ defined, remove __exception from asm_do_IRQ(),
-> so the assumption in dump_backtrace_entry() still holds true.
+> Nope. In the patches Jeremy posted clocks have a name, but this name
+> is not meant to be used with clk_get. clk_get is still implemented
+> in clkdev, so the matching between clocks and devices is independent
+> of the clock name.
 > 
-> Or do we have a gcc extension to tell the compiler a simple function
-> doesn't need to use the stack?
+> In earlier versions of Jeremys patches the clock name was only present
+> when debugfs was compiled in and I think it can be changed back to this.
+> 
+> That said the debugfs support (which is not present in Jeremys latest
+> series) would break if two clocks with the same name have the same
+> parent, because the clock core would try to create to debugfs entries
+> with the same name.
 
-Or we could rename asm_do_IRQ() to handle_arch_irq() without the
-__exception tag, and recreate asm_do_IRQ() with the tag, which just calls
-handle_arch_irq().
+If that's all its for, then can't some other solution for debugfs names
+(lets stop calling them clock names to avoid confusion) be found -
+such as
+
+	sprintf(debugfsname, "%s@%p", clk->debugfsprefix, clk);
+
+Or how about using something like this:
+
+$debugfs/clkdev/device/connection -> ../../clk/<name-of-clk>
+$debugfs/clk/<name-of-clk>
+
+where <name-of-clk> could just be the address of the struct clk (which
+eliminates the need to pass any names in) or some prefix plus an
+incrementing identifier, or just an incrementing number.
+
+I did think about introducing such a scheme along with clkdev (and did
+have some code but that's long gone), but without the $debugfs/clk/ bit
+being standardized, it wouldn't have worked.
