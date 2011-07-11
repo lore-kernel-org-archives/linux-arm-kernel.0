@@ -1,31 +1,85 @@
 From: b32955@freescale.com (Huang Shijie)
-Date: Mon, 11 Jul 2011 16:01:04 +0800
-Subject: [PATCH v7 2/4] ARM: mxs: add new a pad control
+Date: Mon, 11 Jul 2011 16:01:05 +0800
+Subject: [PATCH v7 3/4] ARM: mxs/mx23evk: add GPMI-NAND device
 In-Reply-To: <1310371266-10704-1-git-send-email-b32955@freescale.com>
 References: <1310371266-10704-1-git-send-email-b32955@freescale.com>
-Message-ID: <1310371266-10704-3-git-send-email-b32955@freescale.com>
+Message-ID: <1310371266-10704-4-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add a new pad control which is used in some rare cases,
-such as gpmi-nand device.
+add the GPMI-NAND device for mx23evk board.
 
 Signed-off-by: Huang Shijie <b32955@freescale.com>
 ---
- arch/arm/mach-mxs/include/mach/iomux.h |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ arch/arm/mach-mxs/Kconfig        |    1 +
+ arch/arm/mach-mxs/mach-mx23evk.c |   36 ++++++++++++++++++++++++++++++++++++
+ 2 files changed, 37 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-mxs/include/mach/iomux.h b/arch/arm/mach-mxs/include/mach/iomux.h
-index 7abdf58..1b6f55a 100644
---- a/arch/arm/mach-mxs/include/mach/iomux.h
-+++ b/arch/arm/mach-mxs/include/mach/iomux.h
-@@ -93,6 +93,7 @@ typedef u32 iomux_cfg_t;
+diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
+index 1d3985f..ec337d0 100644
+--- a/arch/arm/mach-mxs/Kconfig
++++ b/arch/arm/mach-mxs/Kconfig
+@@ -32,6 +32,7 @@ config MACH_MX23EVK
+ 	select SOC_IMX23
+ 	select MXS_HAVE_AMBA_DUART
+ 	select MXS_HAVE_PLATFORM_AUART
++	select MXS_HAVE_PLATFORM_GPMI_NAND
+ 	select MXS_HAVE_PLATFORM_MXS_MMC
+ 	select MXS_HAVE_PLATFORM_MXSFB
+ 	help
+diff --git a/arch/arm/mach-mxs/mach-mx23evk.c b/arch/arm/mach-mxs/mach-mx23evk.c
+index 3c2de33..d55ee6f 100644
+--- a/arch/arm/mach-mxs/mach-mx23evk.c
++++ b/arch/arm/mach-mxs/mach-mx23evk.c
+@@ -107,6 +107,41 @@ static const iomux_cfg_t mx23evk_pads[] __initconst = {
+ 		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+ };
  
- /* generic pad control used in most cases */
- #define MXS_PAD_CTRL	(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL)
-+#define MXS_PAD_CTRL_12MA	(MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_NOPULL)
++/* gpmi-nand */
++static iomux_cfg_t mx23evk_gpmi_nand_pads[] = {
++	MX23_PAD_GPMI_D00__GPMI_D00 | MXS_PAD_CTRL,
++	MX23_PAD_GPMI_D01__GPMI_D01 | MXS_PAD_CTRL,
++	MX23_PAD_GPMI_D02__GPMI_D02 | MXS_PAD_CTRL,
++	MX23_PAD_GPMI_D03__GPMI_D03 | MXS_PAD_CTRL,
++	MX23_PAD_GPMI_D04__GPMI_D04 | MXS_PAD_CTRL,
++	MX23_PAD_GPMI_D05__GPMI_D05 | MXS_PAD_CTRL,
++	MX23_PAD_GPMI_D06__GPMI_D06 | MXS_PAD_CTRL,
++	MX23_PAD_GPMI_D07__GPMI_D07 | MXS_PAD_CTRL,
++	MX23_PAD_GPMI_CLE__GPMI_CLE | MXS_PAD_CTRL,
++	MX23_PAD_GPMI_ALE__GPMI_ALE | MXS_PAD_CTRL,
++	MX23_PAD_GPMI_WPN__GPMI_WPN | MXS_PAD_CTRL_12MA,
++	MX23_PAD_GPMI_WRN__GPMI_WRN | MXS_PAD_CTRL_12MA,
++	MX23_PAD_GPMI_RDN__GPMI_RDN | MXS_PAD_CTRL_12MA,
++	MX23_PAD_GPMI_RDY0__GPMI_RDY0 | MXS_PAD_CTRL,
++	MX23_PAD_GPMI_RDY1__GPMI_RDY1 | MXS_PAD_CTRL,
++	MX23_PAD_GPMI_CE0N__GPMI_CE0N | MXS_PAD_CTRL,
++	MX23_PAD_GPMI_CE1N__GPMI_CE1N | MXS_PAD_CTRL,
++};
++
++static int mx23evk_gpmi_nand_platform_init(void)
++{
++	return mxs_iomux_setup_multiple_pads(mx23evk_gpmi_nand_pads,
++				ARRAY_SIZE(mx23evk_gpmi_nand_pads));
++}
++
++static const
++struct gpmi_nand_platform_data mx23evk_gpmi_nand_data __initconst = {
++	.platform_init		= mx23evk_gpmi_nand_platform_init,
++	.min_prop_delay_in_ns	= 5,
++	.max_prop_delay_in_ns	= 9,
++	.max_chip_count		= 1,
++};
++
+ /* mxsfb (lcdif) */
+ static struct fb_videomode mx23evk_video_modes[] = {
+ 	{
+@@ -166,6 +201,7 @@ static void __init mx23evk_init(void)
+ 	else
+ 		gpio_set_value(MX23EVK_BL_ENABLE, 1);
  
- #define MXS_IOMUX_PAD(_bank, _pin, _muxsel, _ma, _vol, _pull)		\
- 		(((iomux_cfg_t)(_bank) << MXS_PAD_BANK_SHIFT) |		\
++	mx23_add_gpmi_nand(&mx23evk_gpmi_nand_data);
+ 	mx23_add_mxsfb(&mx23evk_mxsfb_pdata);
+ }
+ 
 -- 
 1.7.0.4
