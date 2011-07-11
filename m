@@ -1,73 +1,88 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Mon, 11 Jul 2011 10:37:29 +0200
-Subject: [PATCH v5 1/3] ARM: mxs: add GPMI-NFC support for imx23/imx28
-In-Reply-To: <20110711080003.GE13840@pengutronix.de>
-References: <1309406028-2924-1-git-send-email-b32955@freescale.com>
-	<1309406028-2924-2-git-send-email-b32955@freescale.com>
-	<201106301555.19440.arnd@arndb.de>
-	<20110708073119.GP29624@pengutronix.de>
-	<4E16B47E.8090909@freescale.com>
-	<20110708090903.GQ29624@pengutronix.de>
-	<4E16CD6F.9050304@freescale.com>
-	<20110708101625.GR29624@pengutronix.de>
-	<19990.56022.592145.982784@ipc1.ka-ro>
-	<20110711080003.GE13840@pengutronix.de>
-Message-ID: <19994.46665.674302.352501@ipc1.ka-ro>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 11 Jul 2011 09:40:26 +0100
+Subject: [GIT PULL] pxa: features for next
+In-Reply-To: <CAMPhdO-zR_=i_01KSTx_TzRFEOgygHc=kkUB68bke62_nzO=8Q@mail.gmail.com>
+References: <CAMPhdO8uQR4km9szkuGDjuym-hViE9+zxtie6D2WGJmf1_9rUg@mail.gmail.com>
+	<20110711074113.GK4812@n2100.arm.linux.org.uk>
+	<CAMPhdO8pxGsEN1EeYwZRBnPvhkN29wOmEzWaaoCh9iqO+VkDrg@mail.gmail.com>
+	<20110711074600.GL4812@n2100.arm.linux.org.uk>
+	<CAMPhdO8=Gsiw_e6mFRi1PM99DSroaQi_SBiH298KAKqHb41rNw@mail.gmail.com>
+	<20110711075243.GM4812@n2100.arm.linux.org.uk>
+	<CAMPhdO-zR_=i_01KSTx_TzRFEOgygHc=kkUB68bke62_nzO=8Q@mail.gmail.com>
+Message-ID: <20110711084026.GN4812@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Uwe Kleine-K?nig writes:
-> On Fri, Jul 08, 2011 at 12:24:22PM +0200, Lothar Wa?mann wrote:
-> > Uwe Kleine-K?nig writes:
-> > > Hello Huang,
-> > > 
-> > > On Fri, Jul 08, 2011 at 05:27:11PM +0800, Huang Shijie wrote:
-> > > > >>>>The init function is used only to set up iomux, so the logical replacement is
-> > > > >>>>a pointer to the iomux data, and calling mxs_iomux_setup_multiple_pads
-> > > > >>>>directly from the driver.
-> > > > >>>Why not put the iomux stuff into the per-machine table and get rid of
-> > > > >>>the init callback, too?
-> > > > >>The mmc (ssp) has pin conflict with gpmi on both mx23evk and mx28evk.
-> > > > >>So, it's better to initialize the pin when the driver(GPMI or MMC)
-> > > > >>is enabled.
-> > > > >What do you do to prevent userspace from trying to use both devices?
-> > > > The board can not support the two devices at the same time.
-> > > > So the user can only use one device with the board.
-> > > > 
-> > > > >I guess you need to configure the hardware somehow to switch between the
-> > > > >two using a jumper? Isn't it possible to detect the hardware setting and
-> > > > >setup the muxer accordingly?
-> > > > >
-> > > > >IMHO an per-device init-callback is the wrong approach to solve a pin
-> > > > >conflict.
-> > > > Do you have any good solution about this?
-> > > Put the pinmux corresponding to the one device that currently works in
-> > > the pinmux list!?
-> > > 
-> > #define 'that currently works'
-> > 
-> > For a dedicated system that may not be a problem. But for development
-> > kits and modular systems that allow peripheral modules to be plugged
-> > in there is no 'one device that currently works'.
-> Yeah, I know that problem. Back when I worked for a company selling
-> development boards I solved it with clks. Not pretty but more convenient
-> than kernel parameters or #ifdefs.
-> The upside of doing it with clks is that if $customer tries to use both
-> conflicting devices you get an error message instead of breaking device1
-> when device2 is opened/probed.
->
-This could be prevented by a reservation mechanism for the iomux like
-for GPIOs.
+On Mon, Jul 11, 2011 at 04:31:04PM +0800, Eric Miao wrote:
+> On Mon, Jul 11, 2011 at 3:52 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Mon, Jul 11, 2011 at 03:47:27PM +0800, Eric Miao wrote:
+> >> On Mon, Jul 11, 2011 at 3:46 PM, Russell King - ARM Linux
+> >> <linux@arm.linux.org.uk> wrote:
+> >> > On Mon, Jul 11, 2011 at 03:44:54PM +0800, Eric Miao wrote:
+> >> >> On Mon, Jul 11, 2011 at 3:41 PM, Russell King - ARM Linux
+> >> >> <linux@arm.linux.org.uk> wrote:
+> >> >> > On Mon, Jul 11, 2011 at 03:27:15PM +0800, Eric Miao wrote:
+> >> >> >> ? ? ? ARM: pxa: avoid accessing interrupt registers directly
+> >> >> >> ? ? ? ARM: pxa: introduce {icip,ichp}_handle_irq() to prepare MULTI_IRQ_HANDLER
+> >> >> >
+> >> >> > What happened about the __exception issue with asm_do_IRQ?
+> >> >> >
+> >> >>
+> >> >> I just removed the __exception from the C handler.
+> >> >
+> >> > From asm_do_IRQ ?
+> >> >
+> >>
+> >> No. From icip_handle_irq() and ichp_handle_irq(). Thought the ability to
+> >> unwind asm_do_IRQ() is more important.
+> >
+> > Which means you didn't understand my objection when I reviewed your patch.
+> >
+> > The __exception annotation on a function causes this to happen:
+> >
+> > [<c002406c>] (asm_do_IRQ+0x6c/0x8c) from [<c0024b84>] (__irq_svc+0x44/0xcc)
+> > Exception stack(0xc3897c78 to 0xc3897cc0)
+> > 7c60: ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 4022d320 4022e000
+> > 7c80: 08000075 00001000 c32273c0 c03ce1c0 c2b49b78 4022d000 c2b420b4 00000001
+> > 7ca0: 00000000 c3897cfc 00000000 c3897cc0 c00afc54 c002edd8 00000013 ffffffff
+> >
+> > Where that stack dump represents the pt_regs for the exception which
+> > happened. ?Any function found in while unwinding will cause this to
+> > be printed.
+> >
+> > If you insert a C function between the IRQ assembly and asm_do_IRQ, the
+> > dump you get from asm_do_IRQ will be the stack for your function, not
+> > the pt_regs. ?That makes the feature useless.
+> >
+> 
+> Sorry for my stupidity, but I think I still don't get it quite correctly.
+> When both functions are prefixed with __exception_irq_entry, if
+> unwind works correctly, both stacks will be dumped, how would
+> the asm_do_IRQ will be stack for the function inserted?
 
+When __irq_svc - or any of the other exception handling assembly code -
+calls the C code, the stack pointer will be pointing at the pt_regs
+structure.
 
-Lothar Wa?mann
--- 
-___________________________________________________________
+All the entry points into C code from the exception handling code are
+marked with __exception or __exception_irq_enter to indicate that they
+are one of the functions which has pt_regs above them.
 
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+Normally, when you've entered asm_do_IRQ() you will have this stack
+layout (higher address towards top):
 
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+	pt_regs
+	asm_do_IRQ frame
+
+If you insert a C function between the exception assembly code and
+asm_do_IRQ, you end up with this stack layout instead:
+
+	pt_regs
+	your function frame
+	asm_do_IRQ frame
+
+This means when we unwind, we'll get to asm_do_IRQ, and rather than
+dumping out the pt_regs, we'll dump out your functions stack frame
+instead, because that's what is above the asm_do_IRQ stack frame
+rather than the expected pt_regs structure.
