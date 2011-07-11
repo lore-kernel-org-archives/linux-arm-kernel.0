@@ -1,47 +1,22 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Mon, 11 Jul 2011 19:44:09 +0800
-Subject: [PATCH] ARM: mmp: remove builtin gpio driver support
-In-Reply-To: <1310360751.4621.6.camel@Lily>
-References: <1310120428-22700-1-git-send-email-haojian.zhuang@marvell.com>
-	<1310120428-22700-2-git-send-email-haojian.zhuang@marvell.com>
-	<20110710040218.GA10912@ponder.secretlab.ca>
-	<1310360751.4621.6.camel@Lily>
-Message-ID: <CAMPhdO_q=bzt4XVs=wmdqB=D=A9XrYXe96BqpQdnqMikG8ToQA@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 11 Jul 2011 20:44:56 +0900
+Subject: [RFC PATCH] ARM ASoC: add sound driver for imx27pdk using
+	mc13783 codec
+In-Reply-To: <4E1AD0DC.7020201@televic.com>
+References: <1310131491-625-1-git-send-email-J.Lambrecht@televic.com>
+	<20110709022501.GA26900@sirena.org.uk>
+	<4E1AD0DC.7020201@televic.com>
+Message-ID: <20110711114452.GK5092@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 11, 2011 at 1:05 PM, Haojian Zhuang
-<haojian.zhuang@marvell.com> wrote:
-> On Sat, 2011-07-09 at 21:02 -0700, Grant Likely wrote:
->> On Fri, Jul 08, 2011 at 06:20:18PM +0800, Haojian Zhuang wrote:
->> > Remove builtin gpio driver support form mmp.
->> >
->> > Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
->>
->> Hi Haojian.
->>
->> I'm not clear what this patch is intending to do. ?I understand that
->> it removes the mmp-specific gpio support, but I looks like don't see the code
->> that replaces it, which would mean that applying this patch breaks
->> gpio on mmp platforms.
->>
->> Am I missing something?
->>
-> I'm sorry that I shouldn't loop this patch since my new gpio driver
-> isn't contained in this patch series.
->
-> I'm willing to add one operation to select using original gpio driver or
-> the new one. Since the original gpio driver is shared between ARCH-PXA
-> and ARCH-mmp. I don't want patch breaking the implementation in
-> ARCH-PXA.
+On Mon, Jul 11, 2011 at 12:30:52PM +0200, Lambrecht J?rgen wrote:
 
-The built-in version is used for those timing critical situations. In some
-best cases, it can be optimized to only one load/store instruction, which
-is extremely useful for those bit-banging operations like I2C/SPI emulation
-with GPIO.
+> But actually, I have my doubts. Is it possible to reuse such a platform 
+> driver?
+> I don't know the other platforms, maybe they differ a little bit?
 
->
-> Thanks
-> Haojian
->
->
+Yes, of course.  Use platform data or key off something like
+machine_is_() to handle small differences between systems in the same
+way as for any other driver.  There's a few examples of this in the
+tree.
