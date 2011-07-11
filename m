@@ -1,9 +1,9 @@
 From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
-Date: Mon, 11 Jul 2011 16:59:10 +0530
+Date: Mon, 11 Jul 2011 16:51:27 +0530
 Subject: [PATCH v14 03/12] OMAP1: dmtimer: conversion to platform devices
-In-Reply-To: <1310383759-19059-1-git-send-email-tarun.kanti@ti.com>
-References: <1310383759-19059-1-git-send-email-tarun.kanti@ti.com>
-Message-ID: <1310383759-19059-4-git-send-email-tarun.kanti@ti.com>
+In-Reply-To: <1310383296-18956-1-git-send-email-tarun.kanti@ti.com>
+References: <1310383296-18956-1-git-send-email-tarun.kanti@ti.com>
+Message-ID: <1310383296-18956-4-git-send-email-tarun.kanti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
