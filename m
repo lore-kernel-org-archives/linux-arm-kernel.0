@@ -1,59 +1,58 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 11 Jul 2011 18:01:41 +0100
-Subject: Unnecessary cache-line flush on page table updates ?
-In-Reply-To: <20110711164919.GB18871@e102109-lin.cambridge.arm.com>
-References: <20110704094531.GB19117@e102109-lin.cambridge.arm.com>
-	<20110704100221.GB8286@n2100.arm.linux.org.uk>
-	<20110704104329.GD19117@e102109-lin.cambridge.arm.com>
-	<20110704111338.GD8286@n2100.arm.linux.org.uk>
-	<20110704155835.GA30189@e102109-lin.cambridge.arm.com>
-	<20110704195819.GG8286@n2100.arm.linux.org.uk>
-	<20110704232019.GK8286@n2100.arm.linux.org.uk>
-	<20110706160551.GH32020@e102109-lin.cambridge.arm.com>
-	<20110706180814.GL8286@n2100.arm.linux.org.uk>
-	<20110711164919.GB18871@e102109-lin.cambridge.arm.com>
-Message-ID: <20110711170141.GA8486@n2100.arm.linux.org.uk>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Mon, 11 Jul 2011 12:17:25 -0500
+Subject: [PATCH 01/52] ARM: introduce atag_offset to replace boot_params
+In-Reply-To: <alpine.LFD.2.00.1107111046350.14596@xanadu.home>
+References: <1309920457-21913-1-git-send-email-nicolas.pitre@linaro.org>
+	<20110708203634.GU4812@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1107081714251.14596@xanadu.home>
+	<alpine.LFD.2.00.1107111046350.14596@xanadu.home>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F001F383D6D6F7@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 11, 2011 at 05:49:20PM +0100, Catalin Marinas wrote:
-> On Wed, Jul 06, 2011 at 07:08:14PM +0100, Russell King - ARM Linux wrote:
-> > Okay, so I can say with confidence then that how things stand in my tree,
-> > which limits BTC invalidation to:
-> > 
-> > 1. For kernel mappings, flush_icache_range() which must be called prior
-> >    to code placed in them being executed.
-> > 
-> > 2. For user mappings, __sync_icache_dcache's icache flush, which is
-> >    called before a non-zero user PTE is inserted.
-> 
-> What about:
-> 
-> flush_cache_user_range()
-> flush_ptrace_access()
-> 
-> They are fine as long as you haven't removed the BTC invalidation from
-> __cpuc_coherent_(kern|user)_range.
+On Monday, July 11, 2011 7:59 AM, Nicolas Pitre wrote:
+> After looking at it some more, this can't work either as on ep93xx the 
+> RAM offset is currently selected a kernel config time and we do want to 
+> get rid of that.
 
-That's the basis of flush_icache_range(), so that still has the BTC
-invalidate.
+The ep93xx actually uses the same relative offset for the boot_params (+0x100)
+for all memory configurations.  The issue is the base physical address of the
+system memory.
 
-> > The area which needs more to focus some further work is
-> > __sync_icache_dcache(), which is fairly over-zealous about all the
-> > flushing.
-> 
-> Another thing that could be optimised is not to clean and invalidate the
-> D-cache but only clean to the PoU. The only problem is that
-> (flush|invalidate)_kernel_vmap_area, functions that seem to used only in
-> a single place. The semantics in cachetlb.txt claim to be used for I/O,
-> which means that they are already broken since we don't handle the L2
-> cache.
+There are four sdram chip selects available on the ep93xx.  These, along with
+the ASDO boot option pin, define the base address for the sdram.
 
-Those are newly introduced to cope with XFS wanting DMA to vmap'd areas
-to work.  They're there to handle the vmalloc-space alias of the pages.
-The DMA API sorts out the kernel direct-mapped plus L2 for non-virtually
-tagged L2 caches.
+nSDCS3, ASDO=1	0x00000000
+nSDCS3, ASDO=0	0xf0000000
+nSDCS2, ASDO=x	0xe0000000
+nSDCS1, ASDO=x	0xd0000000
+nSDCS0, ASDO=x	0xc0000000
 
-So they're just an additional pre-flush and post-invalidate calls around
-the DMA API to cope with vmalloc space aliases.  So I don't think they're
-broken.
+Unfortunately, all the ep93xx boards I have are designed with the sdram using
+nSDCS0 so I can't test the other boot configurations.
+
+Regardless, with these patches, and having ARM_PATCH_PHYS_VIRT enabled, I am
+able to boot all of my boards successfully.
+
+The EDB9315 dev board can be jumper selected so that the sdram is connected
+to either nSDSC0 or nSDCS3 (default).
+
+The EDB9312 dev board can be jumper selected to use any of the chip selects
+for the sdram.
+
+If anyone has access to either of these boards and could test these patches
+it would be a great help.
+
+Before the ARM_PATCH_PHYS_VIRT patch the Kconfig options to select the
+"EP93xx first SDRAM bank selection" was needed to limit the board selections
+so that only board which shared an SDRAM chip select configuration could be
+selected.  With ARM_PATCH_PHYS_VIRT I don't think this is needed any longer.
+
+But, if the boot_params are still going to be used, the bank selection is still
+needed so that the physical address of the boot_params is correct.  Changing it
+to an atag_offset makes it work on the ep93xx.
+
+Just my 2 cents....
+
+Regards,
+Hartley
