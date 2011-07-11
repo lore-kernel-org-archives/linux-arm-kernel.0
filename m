@@ -1,59 +1,127 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Mon, 11 Jul 2011 18:00:46 +0100
-Subject: ARM cortex A9 performance issue
-In-Reply-To: <CAE_nTV4t64A7JGN117Pkg1dmqnEvPFkE1AqoyRbeVhN3dN1Q8g@mail.gmail.com>
-References: <CAE_nTV4VgcNB0gc64zEPEfHp-hnDBsw6QsM=GqEObXAwzMTzTA@mail.gmail.com>
-	<20110707152740.GG2486@arm.com>
-	<CAE_nTV7PuEJx0WJKCtbGU-4HjEBzFxPRmPLue1toktS27Htbzg@mail.gmail.com>
-	<20110708133315.GB2115@arm.com>
-	<CAE_nTV4t64A7JGN117Pkg1dmqnEvPFkE1AqoyRbeVhN3dN1Q8g@mail.gmail.com>
-Message-ID: <20110711170032.GA3137@arm.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 11 Jul 2011 23:10:04 +0530
+Subject: [pm-wip/cpufreq] [PATCH] OMAP2+: CPUfreq: update lpj with reference
+	value to avoid progressive error.
+Message-ID: <1310406004-5060-1-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 11, 2011 at 01:56:35PM +0530, rd bairva wrote:
-> Attaching the new code.
-> 
-> On Fri, Jul 8, 2011 at 7:03 PM, Dave Martin <dave.martin@linaro.org> wrote:
-> > On Fri, Jul 08, 2011 at 05:08:38PM +0530, rd bairva wrote:
-> >> Now i have modified a source a little bit. Now I am doing a pingpong
-> >> using msgsnd and msgrcv. using this I am getting 40000req/sec and 55%
-> >> CPU usage.
-> >> In another version I have taken the same lock in both the processes to
-> >> ensure same thread is unlocking the mutex. But CPU usage is 100%.
-> >> Shouldn't be the behaviour 50%.
-> >
-> > Possibly. ?Do you see that behaviour on all platforms, or just A9?
-> On single processor it is always 100% on ARM as well as X86. but on
-> X86, cpu is >50% free.
+From: Russell King <rmk+kernel@arm.linux.org.uk>
 
-For me, on x86:
+Adjust _both_ the per-cpu loops_per_jiffy and global lpj. Calibrate them
+with with reference to the initial values to avoid a progressively
+bigger and bigger error in the value over time.
 
-With WITH_MSG, the test consumes about 56-57% on two CPUs.
-Without WITH_MSG, the test consumes about 59-60% on two CPUs.
+While at this, re-use the notifiers for UP/SMP since on
+UP machine or UP_ON_SMP policy->cpus mask would contain only
+the boot CPU.
 
-(as reported by running top during the test)
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+[santosh.shilimkar at ti.com: re-based against omap cpufreq
+upstream branch and fixed notifiers]
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Cc: Kevin Hilman <khilman@ti.com>
+---
+Patch is outcome of below discussion.
+http://www.mail-archive.com/linux-omap at vger.kernel.org/msg51559.html
 
-For me, this is as expected: there is some latency involved in signalling
-between CPUs, so there should be a bit less than 50% of useful work per
-CPU.  However, there is overhead in both process, and this can parallelise
-against the signalling latency, giving an overall load of a bit more than
-50% per CPU.  The total is about the same on each CPU, since both processes
-are doing essentially the same thing.
+ arch/arm/mach-omap2/omap2plus-cpufreq.c |   50 ++++++++++++++++--------------
+ 1 files changed, 27 insertions(+), 23 deletions(-)
 
-I quickly hacked up a completely different implementation using pthreads
-condition variables to signal between threads and got similar results (though
-with a bit more CPU load).
-
-Someone borrowed by pandaboard, but I'll try on there when I get a chance...
-
-Cheers
----Dave
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: pingpong.c
-Type: text/x-csrc
-Size: 3602 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110711/18ac98eb/attachment.bin>
+diff --git a/arch/arm/mach-omap2/omap2plus-cpufreq.c b/arch/arm/mach-omap2/omap2plus-cpufreq.c
+index 1f3b2e1..de82e87 100644
+--- a/arch/arm/mach-omap2/omap2plus-cpufreq.c
++++ b/arch/arm/mach-omap2/omap2plus-cpufreq.c
+@@ -38,6 +38,16 @@
+ 
+ #include <mach/hardware.h>
+ 
++#ifdef CONFIG_SMP
++struct lpj_info {
++	unsigned long	ref;
++	unsigned int	freq;
++};
++
++static DEFINE_PER_CPU(struct lpj_info, lpj_ref);
++static struct lpj_info global_lpj_ref;
++#endif
++
+ static struct cpufreq_frequency_table *freq_table;
+ static atomic_t freq_table_users = ATOMIC_INIT(0);
+ static struct clk *mpu_clk;
+@@ -96,37 +106,18 @@ static int omap_target(struct cpufreq_policy *policy,
+ 	if (freqs.old == freqs.new && policy->cur == freqs.new)
+ 		return ret;
+ 
+-	if (!is_smp()) {
+-		cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
+-		goto set_freq;
+-	}
+-
+ 	/* notifiers */
+ 	for_each_cpu(i, policy->cpus) {
+ 		freqs.cpu = i;
+ 		cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
+ 	}
+ 
+-set_freq:
+ #ifdef CONFIG_CPU_FREQ_DEBUG
+ 	pr_info("cpufreq-omap: transition: %u --> %u\n", freqs.old, freqs.new);
+ #endif
+ 
+ 	ret = clk_set_rate(mpu_clk, freqs.new * 1000);
+-
+-	/*
+-	 * Generic CPUFREQ driver jiffy update is under !SMP. So jiffies
+-	 * won't get updated when UP machine cpufreq build with
+-	 * CONFIG_SMP enabled. Below code is added only to manage that
+-	 * scenario
+-	 */
+ 	freqs.new = omap_getspeed(policy->cpu);
+-	if (!is_smp()) {
+-		loops_per_jiffy =
+-			 cpufreq_scale(loops_per_jiffy, freqs.old, freqs.new);
+-		cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
+-		goto skip_lpj;
+-	}
+ 
+ #ifdef CONFIG_SMP
+ 	/*
+@@ -134,10 +125,24 @@ set_freq:
+ 	 * cpufreq driver. So, update the per-CPU loops_per_jiffy value
+ 	 * on frequency transition. We need to update all dependent CPUs.
+ 	 */
+-	for_each_cpu(i, policy->cpus)
++	for_each_cpu(i, policy->cpus) {
++		struct lpj_info *lpj = &per_cpu(lpj_ref, i);
++		if (!lpj->freq) {
++			lpj->ref = per_cpu(cpu_data, i).loops_per_jiffy;
++			lpj->freq = freqs.old;
++		}
++
+ 		per_cpu(cpu_data, i).loops_per_jiffy =
+-			cpufreq_scale(per_cpu(cpu_data, i).loops_per_jiffy,
+-					freqs.old, freqs.new);
++			cpufreq_scale(lpj->ref, lpj->freq, freqs.new);
++	}
++
++	/* And don't forget to adjust the global one */
++	if (!global_lpj_ref.freq) {
++		global_lpj_ref.ref = loops_per_jiffy;
++		global_lpj_ref.freq = freqs.old;
++	}
++	loops_per_jiffy = cpufreq_scale(global_lpj_ref.ref, global_lpj_ref.freq,
++					freqs.new);
+ #endif
+ 
+ 	/* notifiers */
+@@ -146,7 +151,6 @@ set_freq:
+ 		cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
+ 	}
+ 
+-skip_lpj:
+ 	return ret;
+ }
+ 
+-- 
+1.6.0.4
