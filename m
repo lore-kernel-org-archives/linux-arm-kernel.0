@@ -1,71 +1,23 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Mon, 11 Jul 2011 16:30:34 +0800
-Subject: [PATCH v5 1/3] ARM: mxs: add GPMI-NFC support for imx23/imx28
-In-Reply-To: <20110711080003.GE13840@pengutronix.de>
-References: <1309406028-2924-1-git-send-email-b32955@freescale.com>
-	<1309406028-2924-2-git-send-email-b32955@freescale.com>
-	<201106301555.19440.arnd@arndb.de>
-	<20110708073119.GP29624@pengutronix.de>
-	<4E16B47E.8090909@freescale.com>
-	<20110708090903.GQ29624@pengutronix.de>
-	<4E16CD6F.9050304@freescale.com>
-	<20110708101625.GR29624@pengutronix.de>
-	<19990.56022.592145.982784@ipc1.ka-ro>
-	<20110711080003.GE13840@pengutronix.de>
-Message-ID: <4E1AB4AA.7020702@freescale.com>
+From: jochen@scram.de (Jochen Friedrich)
+Date: Mon, 11 Jul 2011 10:28:54 +0200
+Subject: [PATCH 16/17] mach-sa1100: retire custom LED code
+In-Reply-To: <20110710092426.GR4812@n2100.arm.linux.org.uk>
+References: <1309955687-19365-1-git-send-email-bryan.wu@canonical.com>	<1309955687-19365-17-git-send-email-bryan.wu@canonical.com>
+	<20110710092426.GR4812@n2100.arm.linux.org.uk>
+Message-ID: <4E1AB446.4000903@scram.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe:
-> On Fri, Jul 08, 2011 at 12:24:22PM +0200, Lothar Wa?mann wrote:
->> Uwe Kleine-K?nig writes:
->>> Hello Huang,
->>>
->>> On Fri, Jul 08, 2011 at 05:27:11PM +0800, Huang Shijie wrote:
->>>>>>>> The init function is used only to set up iomux, so the logical replacement is
->>>>>>>> a pointer to the iomux data, and calling mxs_iomux_setup_multiple_pads
->>>>>>>> directly from the driver.
->>>>>>> Why not put the iomux stuff into the per-machine table and get rid of
->>>>>>> the init callback, too?
->>>>>> The mmc (ssp) has pin conflict with gpmi on both mx23evk and mx28evk.
->>>>>> So, it's better to initialize the pin when the driver(GPMI or MMC)
->>>>>> is enabled.
->>>>> What do you do to prevent userspace from trying to use both devices?
->>>> The board can not support the two devices at the same time.
->>>> So the user can only use one device with the board.
->>>>
->>>>> I guess you need to configure the hardware somehow to switch between the
->>>>> two using a jumper? Isn't it possible to detect the hardware setting and
->>>>> setup the muxer accordingly?
->>>>>
->>>>> IMHO an per-device init-callback is the wrong approach to solve a pin
->>>>> conflict.
->>>> Do you have any good solution about this?
->>> Put the pinmux corresponding to the one device that currently works in
->>> the pinmux list!?
->>>
->> #define 'that currently works'
->>
->> For a dedicated system that may not be a problem. But for development
->> kits and modular systems that allow peripheral modules to be plugged
->> in there is no 'one device that currently works'.
-> Yeah, I know that problem. Back when I worked for a company selling
-> development boards I solved it with clks. Not pretty but more convenient
-Could you give me some more details about how did you solve it with clks?
+Hi Russell,
 
-I am confused about it.
-
-thanks
-
-Best Regards
-Huang Shijie
-> than kernel parameters or #ifdefs.
-> The upside of doing it with clks is that if $customer tries to use both
-> conflicting devices you get an error message instead of breaking device1
-> when device2 is opened/probed.
-> IMHO this last scenario must not happen, so I strongly object to setup
-> the pinmuxing in an .init callback.
+>> +fs_initcall(simpad_leds_init);
 >
-> Best regards
-> Uwe
->
+> Looks like simpad is similarly afflicted.  I haven't gone through the
+> rest to check for similar issues.
+
+simpad is buggy in other means, as well (wrong bit, read of write-only 
+register, missing locking). That's why I want to push my CS3 cleanup 
+patch first, converting a custom IO to standard GPIO ;-)
+
+Thanks,
+Jochen
