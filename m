@@ -1,28 +1,34 @@
-From: bryan.wu@canonical.com (Bryan Wu)
-Date: Mon, 11 Jul 2011 22:28:34 +0800
-Subject: [PATCH 12/17] mach-pxa: retire custom LED code
-In-Reply-To: <20110710093756.GY4812@n2100.arm.linux.org.uk>
+From: avictor.za@gmail.com (Andrew Victor)
+Date: Mon, 11 Jul 2011 16:30:29 +0200
+Subject: [PATCH 05/17] mach-ks8695: remove leds driver, since nobody use it
+In-Reply-To: <CAK5ve-+eFT6SGQTrKfQOoqqOYBe19r4EjtJnVrfuU92au4A5zw@mail.gmail.com>
 References: <1309955687-19365-1-git-send-email-bryan.wu@canonical.com>
-	<1309955687-19365-13-git-send-email-bryan.wu@canonical.com>
-	<20110710093756.GY4812@n2100.arm.linux.org.uk>
-Message-ID: <CAK5ve-JJo5s5XsOKDbOakvMDzUG_0cXWyfHtMOVOQHSo4MK27Q@mail.gmail.com>
+	<1309955687-19365-6-git-send-email-bryan.wu@canonical.com>
+	<CAFumwP1abk+-R-mht9BmKhU9opfVNUjD1PTBha--O6Ts5SCuQg@mail.gmail.com>
+	<4E1ADA59.40409@ru.mvista.com>
+	<CAK5ve-JujN6t5PanWdc89Wgn-6G+K214TkUxoUq1NkS8v6eMEw@mail.gmail.com>
+	<alpine.LFD.2.00.1107110956280.14596@xanadu.home>
+	<CAK5ve-+eFT6SGQTrKfQOoqqOYBe19r4EjtJnVrfuU92au4A5zw@mail.gmail.com>
+Message-ID: <CAFumwP3UtMiPt65540Ncd+XPanqbnPa7psU-y7CqnsvRxCsoiA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 10, 2011 at 5:37 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, Jul 06, 2011 at 08:34:42PM +0800, Bryan Wu wrote:
->> Signed-off-by: Bryan Wu <bryan.wu@canonical.com>
->
-> Same comments.
->
+hi,
 
-Removed,
+>> Beware. ?Is Andrew Victor the original author of the code being removed
+>> here and in this case he's indicating his agreement to the removal of
+>> his code, or he is the one actually responsible for the removal? ?If the
+>> former then it is wrong to put a "From" with his name and the
+>> "Acked-by:" is the right thing to do.
+>>
+>
+> Right, I was confused by the email. I prepared the removing patch and
+> Andrew said "Acked-by".
+> Andrew, is that what you want?
 
-Thanks,
--- 
-Bryan Wu <bryan.wu@canonical.com>
-Kernel Developer ? ?+86.138-1617-6545 Mobile
-Ubuntu Kernel Team
-Canonical Ltd. ? ? ?www.canonical.com
-Ubuntu - Linux for human beings | www.ubuntu.com
+Yes, I'm acknowledging the removal of my code.
+So, Acked-by.
+
+
+Regards,
+  Andrew
