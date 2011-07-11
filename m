@@ -1,104 +1,122 @@
 From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
-Date: Mon, 11 Jul 2011 16:51:31 +0530
-Subject: [PATCH v14 07/12] OMAP: dmtimer: pm_runtime support
-In-Reply-To: <1310383296-18956-1-git-send-email-tarun.kanti@ti.com>
-References: <1310383296-18956-1-git-send-email-tarun.kanti@ti.com>
-Message-ID: <1310383296-18956-8-git-send-email-tarun.kanti@ti.com>
+Date: Mon, 11 Jul 2011 16:59:18 +0530
+Subject: [PATCH v14 11/12] OMAP: dmtimer: add context save/restore routines
+In-Reply-To: <1310383759-19059-1-git-send-email-tarun.kanti@ti.com>
+References: <1310383759-19059-1-git-send-email-tarun.kanti@ti.com>
+Message-ID: <1310383759-19059-12-git-send-email-tarun.kanti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add pm_runtime feature to dmtimer whereby _get_sync() is called within
-omap_dm_timer_enable(), _put_sync() is called in omap_dm_timer_disable().
+Define context register structure and make it member of struct omap_dm_timer.
+Also define two routines to save and restore dmtimer context to be used
+subsequently.
 
 Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
-[p-basak2 at ti.com: added pm_runtime logic in probe()]
-Signed-off-by: Partha Basak <p-basak2@ti.com>
-Reviewed-by: Varadarajan, Charulatha <charu@ti.com>
-Acked-by: Cousson, Benoit <b-cousson@ti.com>
 ---
- arch/arm/plat-omap/dmtimer.c              |   31 +++++++---------------------
- arch/arm/plat-omap/include/plat/dmtimer.h |    1 -
- 2 files changed, 8 insertions(+), 24 deletions(-)
+ arch/arm/plat-omap/dmtimer.c              |   48 +++++++++++++++++++++++++++++
+ arch/arm/plat-omap/include/plat/dmtimer.h |   24 ++++++++++++++
+ 2 files changed, 72 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
-index d46efb4..f7ab92c 100644
+index c0e5bab..2405637 100644
 --- a/arch/arm/plat-omap/dmtimer.c
 +++ b/arch/arm/plat-omap/dmtimer.c
-@@ -38,6 +38,7 @@
- #include <linux/io.h>
- #include <linux/slab.h>
- #include <linux/err.h>
-+#include <linux/pm_runtime.h>
- 
- #include <plat/dmtimer.h>
- 
-@@ -193,33 +194,13 @@ EXPORT_SYMBOL_GPL(omap_dm_timer_free);
- 
- void omap_dm_timer_enable(struct omap_dm_timer *timer)
- {
--	struct dmtimer_platform_data *pdata = timer->pdev->dev.platform_data;
--
--	if (timer->enabled)
--		return;
--
--	if (!pdata->needs_manual_reset) {
--		clk_enable(timer->fclk);
--		clk_enable(timer->iclk);
--	}
--
--	timer->enabled = 1;
-+	pm_runtime_get_sync(&timer->pdev->dev);
+@@ -87,6 +87,54 @@ static void omap_dm_timer_write_reg(struct omap_dm_timer *timer, u32 reg,
+ 				timer->func_offset);
  }
- EXPORT_SYMBOL_GPL(omap_dm_timer_enable);
  
- void omap_dm_timer_disable(struct omap_dm_timer *timer)
- {
--	struct dmtimer_platform_data *pdata = timer->pdev->dev.platform_data;
--
--	if (!timer->enabled)
--		return;
--
--	if (!pdata->needs_manual_reset) {
--		clk_disable(timer->iclk);
--		clk_disable(timer->fclk);
--	}
--
--	timer->enabled = 0;
-+	pm_runtime_put_sync(&timer->pdev->dev);
- }
- EXPORT_SYMBOL_GPL(omap_dm_timer_disable);
- 
-@@ -461,7 +442,7 @@ int omap_dm_timers_active(void)
- 	struct omap_dm_timer *timer;
- 
- 	list_for_each_entry(timer, &omap_timer_list, node) {
--		if (!timer->enabled)
-+		if (!timer->reserved)
- 			continue;
- 
- 		if (omap_dm_timer_read_reg(timer, OMAP_TIMER_CTRL_REG) &
-@@ -543,6 +524,10 @@ static int __devinit omap_dm_timer_probe(struct platform_device *pdev)
- 	timer->pdev = pdev;
- 	timer->reserved = 0;
- 
-+	/* Skip pm_runtime_enable for OMAP1 */
-+	if (!pdata->needs_manual_reset)
-+		pm_runtime_enable(&pdev->dev);
++static void omap_timer_save_context(struct omap_dm_timer *timer)
++{
++	timer->context.tiocp_cfg =
++		omap_dm_timer_read_reg(timer, OMAP_TIMER_OCP_CFG_REG);
++	timer->context.tistat =
++		omap_dm_timer_read_reg(timer, OMAP_TIMER_SYS_STAT_REG);
++	timer->context.tisr =
++		omap_dm_timer_read_reg(timer, OMAP_TIMER_STAT_REG);
++	timer->context.tier =
++		omap_dm_timer_read_reg(timer, OMAP_TIMER_INT_EN_REG);
++	timer->context.twer =
++		omap_dm_timer_read_reg(timer, OMAP_TIMER_WAKEUP_EN_REG);
++	timer->context.tclr =
++		omap_dm_timer_read_reg(timer, OMAP_TIMER_CTRL_REG);
++	timer->context.tcrr =
++		omap_dm_timer_read_reg(timer, OMAP_TIMER_COUNTER_REG);
++	timer->context.tldr =
++		omap_dm_timer_read_reg(timer, OMAP_TIMER_LOAD_REG);
++	timer->context.tmar =
++		omap_dm_timer_read_reg(timer, OMAP_TIMER_MATCH_REG);
++	timer->context.tsicr =
++		omap_dm_timer_read_reg(timer, OMAP_TIMER_IF_CTRL_REG);
++}
 +
- 	/* add the timer element to the list */
- 	spin_lock_irqsave(&dm_timer_lock, flags);
- 	list_add_tail(&timer->node, &omap_timer_list);
++static void omap_timer_restore_context(struct omap_dm_timer *timer)
++{
++	omap_dm_timer_write_reg(timer, OMAP_TIMER_OCP_CFG_REG,
++				timer->context.tiocp_cfg);
++	omap_dm_timer_write_reg(timer, OMAP_TIMER_SYS_STAT_REG,
++				timer->context.tistat);
++	omap_dm_timer_write_reg(timer, OMAP_TIMER_STAT_REG,
++				timer->context.tisr);
++	omap_dm_timer_write_reg(timer, OMAP_TIMER_INT_EN_REG,
++				timer->context.tier);
++	omap_dm_timer_write_reg(timer, OMAP_TIMER_WAKEUP_EN_REG,
++				timer->context.twer);
++	omap_dm_timer_write_reg(timer, OMAP_TIMER_CTRL_REG,
++				timer->context.tclr);
++	omap_dm_timer_write_reg(timer, OMAP_TIMER_COUNTER_REG,
++				timer->context.tcrr);
++	omap_dm_timer_write_reg(timer, OMAP_TIMER_LOAD_REG,
++				timer->context.tldr);
++	omap_dm_timer_write_reg(timer, OMAP_TIMER_MATCH_REG,
++				timer->context.tmar);
++	omap_dm_timer_write_reg(timer, OMAP_TIMER_IF_CTRL_REG,
++				timer->context.tsicr);
++}
++
+ static void omap_dm_timer_wait_for_reset(struct omap_dm_timer *timer)
+ {
+ 	int c;
 diff --git a/arch/arm/plat-omap/include/plat/dmtimer.h b/arch/arm/plat-omap/include/plat/dmtimer.h
-index 90a504a..53d5da6 100644
+index 6e34094..9a2d7e3 100644
 --- a/arch/arm/plat-omap/include/plat/dmtimer.h
 +++ b/arch/arm/plat-omap/include/plat/dmtimer.h
-@@ -238,7 +238,6 @@ struct omap_dm_timer {
- 	void __iomem *io_base;
- 	unsigned long rate;
- 	unsigned reserved:1;
--	unsigned enabled:1;
+@@ -234,6 +234,29 @@ int omap_dm_timers_active(void);
+ 
+ #define MAX_WRITE_PEND_WAIT            10000 /* 10ms timeout delay */
+ 
++struct timer_regs {
++	u32 tidr;
++	u32 tiocp_cfg;
++	u32 tistat;
++	u32 tisr;
++	u32 tier;
++	u32 twer;
++	u32 tclr;
++	u32 tcrr;
++	u32 tldr;
++	u32 ttrg;
++	u32 twps;
++	u32 tmar;
++	u32 tcar1;
++	u32 tsicr;
++	u32 tcar2;
++	u32 tpir;
++	u32 tnir;
++	u32 tcvr;
++	u32 tocr;
++	u32 towr;
++};
++
+ struct omap_dm_timer {
+ 	unsigned long phys_base;
+ 	int id;
+@@ -245,6 +268,7 @@ struct omap_dm_timer {
  	unsigned posted:1;
  	u8 func_offset;
  	u8 intr_offset;
++	struct timer_regs context;
+ 	struct platform_device *pdev;
+ 	struct list_head node;
+ };
 -- 
 1.6.0.4
