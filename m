@@ -1,63 +1,106 @@
 From: nsekhar@ti.com (Nori, Sekhar)
-Date: Mon, 11 Jul 2011 18:02:55 +0530
-Subject: [PATCH v3] davinci: da850 EVM: read mac address from SPI flash
-In-Reply-To: <1310376501-14189-1-git-send-email-sudhakar.raj@ti.com>
-References: <1310376501-14189-1-git-send-email-sudhakar.raj@ti.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024DA7AA0C@dbde02.ent.ti.com>
+Date: Mon, 11 Jul 2011 17:28:44 +0530
+Subject: [PATCH v2 1/6] arm: davinci: Fix low level gpio irq handlers'
+	argument
+In-Reply-To: <1310303679-17936-2-git-send-email-ido@wizery.com>
+References: <1310303679-17936-1-git-send-email-ido@wizery.com>
+	<1310303679-17936-2-git-send-email-ido@wizery.com>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024DA7A9DD@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sudhakar,
+Hi Ido,
 
-On Mon, Jul 11, 2011 at 14:58:21, Rajashekhara, Sudhakar wrote:
-
-> diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
-> index a7b41bf..5bb6556 100644
-> --- a/arch/arm/mach-davinci/board-da850-evm.c
-> +++ b/arch/arm/mach-davinci/board-da850-evm.c
-> @@ -115,6 +115,25 @@ static struct spi_board_info da850evm_spi_info[] = {
->  	},
+On Sun, Jul 10, 2011 at 18:44:34, Ido Yariv wrote:
+> Commit 7416401 ("arm: davinci: Fix fallout from generic irq chip
+> conversion") introduced a bug, causing low level interrupt handlers to
+> get a bogus irq number as an argument. The gpio irq handler falsely
+> assumes that the handler data is the irq base number and that is no
+> longer true.
+> 
+> Fix this by converting gpio_irq_handler's bank_irq argument to the
+> corresponding irq base number.
+> 
+> Signed-off-by: Ido Yariv <ido@wizery.com>
+> CC: Thomas Gleixner <tglx@linutronix.de>
+> ---
+>  arch/arm/mach-davinci/gpio.c |   32 ++++++++++++++++++++++++++++----
+>  1 files changed, 28 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/mach-davinci/gpio.c b/arch/arm/mach-davinci/gpio.c
+> index e722139..ff43e2a 100644
+> --- a/arch/arm/mach-davinci/gpio.c
+> +++ b/arch/arm/mach-davinci/gpio.c
+> @@ -249,16 +249,40 @@ static struct irq_chip gpio_irqchip = {
+>  	.flags		= IRQCHIP_SET_TYPE_MASKED,
 >  };
 >  
-> +#ifdef CONFIG_MTD
-> +static void da850_evm_m25p80_notify_add(struct mtd_info *mtd)
+> +static inline int bankirq_to_irqbase(unsigned int bank_irq)
 > +{
-> +	char *mac_addr = davinci_soc_info.emac_pdata->mac_addr;
-> +	size_t retlen;
+> +	int gpio;
+> +	int index;
 > +
-> +	if (!strcmp(mtd->name, "MAC-Address")) {
-> +		mtd->read(mtd, 0, ETH_ALEN, &retlen, mac_addr);
-> +		if (retlen == ETH_ALEN)
-> +			pr_info("Read MAC addr from SPI Flash: %pM\n",
-> +				mac_addr);
-> +	}
+> +	/* Each irq bank consists of up to 16 irqs */
+> +	gpio = 16 * (bank_irq - davinci_soc_info.gpio_irq);
+> +
+> +	/* Each controller controls 32 GPIOs */
+> +	index = gpio / 32;
+> +
+> +	if (unlikely(!davinci_soc_info.gpio_ctlrs))
+> +		return -EINVAL;
+> +
+> +	if (unlikely(index >= davinci_soc_info.gpio_ctlrs_num))
+> +		return -EINVAL;
+> +
+> +	return davinci_soc_info.gpio_ctlrs[index].irq_base;
 > +}
 > +
-> +static struct mtd_notifier da850evm_spi_notifier = {
-> +	.add	= da850_evm_m25p80_notify_add,
-> +};
-> +#endif
+>  static void
+> -gpio_irq_handler(unsigned irq, struct irq_desc *desc)
+> +gpio_irq_handler(unsigned bank_irq, struct irq_desc *desc)
+>  {
+>  	struct davinci_gpio_regs __iomem *g;
+>  	u32 mask = 0xffff;
+> +	int irqbase = bankirq_to_irqbase(bank_irq);
 > +
->  static struct mtd_partition da850_evm_norflash_partition[] = {
->  	{
->  		.name           = "bootloaders + env",
-> @@ -1117,6 +1136,15 @@ static __init int da850_evm_init_cpufreq(void)
->  static __init int da850_evm_init_cpufreq(void) { return 0; }
->  #endif
+> +	if (unlikely(irqbase < 0))
+> +		return;
 >  
-> +#ifdef CONFIG_MTD
-> +static void da850_evm_setup_mac_addr(void)
-> +{
-> +	register_mtd_user(&da850evm_spi_notifier);
-> +}
-> +#else
-> +static void da850_evm_setup_mac_addr(void) { }
-> +#endif
+>  	g = (__force struct davinci_gpio_regs __iomem *) irq_desc_get_handler_data(desc);
+>  
+>  	/* we only care about one bank */
+> -	if (irq & 1)
+> +	if (bank_irq & 1)
+>  		mask <<= 16;
+>  
+>  	/* temporarily mask (level sensitive) parent IRQ */
+> @@ -274,11 +298,11 @@ gpio_irq_handler(unsigned irq, struct irq_desc *desc)
+>  		if (!status)
+>  			break;
+>  		__raw_writel(status, &g->intstat);
+> -		if (irq & 1)
+> +		if (bank_irq & 1)
+>  			status >>= 16;
+>  
+>  		/* now demux them to the right lowlevel handler */
+> -		n = (int)irq_get_handler_data(irq);
+> +		n = irqbase;
+>  		while (status) {
+>  			res = ffs(status);
+>  			n += res;
 
-Why not combine this ifdef construct with
-earlier one?
+Thanks for the bug fix.
 
-Rest of it looks good to me.
+How about setting the handler data for bank IRQ in
+davinci_gpio_irq_setup() to &chips[bank]?
+
+chips[bank].regs should give you the register base address
+(g) and chips[bank].irq_base should give you 'n'.
+
+Also please drop the rename of irq to bank_irq as it is not
+central to the bug fix.
+
+If you spin in soon enough, we may make it to v3.0
 
 Thanks,
 Sekhar
