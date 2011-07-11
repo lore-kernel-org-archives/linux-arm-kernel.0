@@ -1,106 +1,54 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Mon, 11 Jul 2011 17:28:44 +0530
-Subject: [PATCH v2 1/6] arm: davinci: Fix low level gpio irq handlers'
-	argument
-In-Reply-To: <1310303679-17936-2-git-send-email-ido@wizery.com>
-References: <1310303679-17936-1-git-send-email-ido@wizery.com>
-	<1310303679-17936-2-git-send-email-ido@wizery.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024DA7A9DD@dbde02.ent.ti.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 11 Jul 2011 15:24:08 +0200
+Subject: [PATCHv11 0/8] Contiguous Memory Allocator
+In-Reply-To: <20110706151112.5c619431.akpm@linux-foundation.org>
+References: <1309851710-3828-1-git-send-email-m.szyprowski@samsung.com>
+	<201107051407.17249.arnd@arndb.de>
+	<20110706151112.5c619431.akpm@linux-foundation.org>
+Message-ID: <001d01cc3fcd$d082a450$7187ecf0$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ido,
+Hello,
 
-On Sun, Jul 10, 2011 at 18:44:34, Ido Yariv wrote:
-> Commit 7416401 ("arm: davinci: Fix fallout from generic irq chip
-> conversion") introduced a bug, causing low level interrupt handlers to
-> get a bogus irq number as an argument. The gpio irq handler falsely
-> assumes that the handler data is the irq base number and that is no
-> longer true.
+On Thursday, July 07, 2011 12:11 AM Andrew Morton wrote:
+
+> On Tue, 5 Jul 2011 14:07:17 +0200
+> Arnd Bergmann <arnd@arndb.de> wrote:
 > 
-> Fix this by converting gpio_irq_handler's bank_irq argument to the
-> corresponding irq base number.
+> > On Tuesday 05 July 2011, Marek Szyprowski wrote:
+> > > This is yet another round of Contiguous Memory Allocator patches. I
+> hope
+> > > that I've managed to resolve all the items discussed during the Memory
+> > > Management summit at Linaro Meeting in Budapest and pointed later on
+> > > mailing lists. The goal is to integrate it as tight as possible with
+> > > other kernel subsystems (like memory management and dma-mapping) and
+> > > finally merge to mainline.
+> >
+> > You have certainly addressed all of my concerns, this looks really good
+> now!
+> >
+> > Andrew, can you add this to your -mm tree? What's your opinion on the
+> > current state, do you think this is ready for merging in 3.1 or would
+> > you want to have more reviews from core memory management people?
+> >
+> > My reviews were mostly on the driver and platform API side, and I think
+> > we're fine there now, but I don't really understand the impacts this has
+> > in mm.
 > 
-> Signed-off-by: Ido Yariv <ido@wizery.com>
-> CC: Thomas Gleixner <tglx@linutronix.de>
-> ---
->  arch/arm/mach-davinci/gpio.c |   32 ++++++++++++++++++++++++++++----
->  1 files changed, 28 insertions(+), 4 deletions(-)
+> I could review it and put it in there on a preliminary basis for some
+> runtime testing.  But the question in my mind is how different will the
+> code be after the problems which rmk has identified have been fixed?
 > 
-> diff --git a/arch/arm/mach-davinci/gpio.c b/arch/arm/mach-davinci/gpio.c
-> index e722139..ff43e2a 100644
-> --- a/arch/arm/mach-davinci/gpio.c
-> +++ b/arch/arm/mach-davinci/gpio.c
-> @@ -249,16 +249,40 @@ static struct irq_chip gpio_irqchip = {
->  	.flags		= IRQCHIP_SET_TYPE_MASKED,
->  };
->  
-> +static inline int bankirq_to_irqbase(unsigned int bank_irq)
-> +{
-> +	int gpio;
-> +	int index;
-> +
-> +	/* Each irq bank consists of up to 16 irqs */
-> +	gpio = 16 * (bank_irq - davinci_soc_info.gpio_irq);
-> +
-> +	/* Each controller controls 32 GPIOs */
-> +	index = gpio / 32;
-> +
-> +	if (unlikely(!davinci_soc_info.gpio_ctlrs))
-> +		return -EINVAL;
-> +
-> +	if (unlikely(index >= davinci_soc_info.gpio_ctlrs_num))
-> +		return -EINVAL;
-> +
-> +	return davinci_soc_info.gpio_ctlrs[index].irq_base;
-> +}
-> +
->  static void
-> -gpio_irq_handler(unsigned irq, struct irq_desc *desc)
-> +gpio_irq_handler(unsigned bank_irq, struct irq_desc *desc)
->  {
->  	struct davinci_gpio_regs __iomem *g;
->  	u32 mask = 0xffff;
-> +	int irqbase = bankirq_to_irqbase(bank_irq);
-> +
-> +	if (unlikely(irqbase < 0))
-> +		return;
->  
->  	g = (__force struct davinci_gpio_regs __iomem *) irq_desc_get_handler_data(desc);
->  
->  	/* we only care about one bank */
-> -	if (irq & 1)
-> +	if (bank_irq & 1)
->  		mask <<= 16;
->  
->  	/* temporarily mask (level sensitive) parent IRQ */
-> @@ -274,11 +298,11 @@ gpio_irq_handler(unsigned irq, struct irq_desc *desc)
->  		if (!status)
->  			break;
->  		__raw_writel(status, &g->intstat);
-> -		if (irq & 1)
-> +		if (bank_irq & 1)
->  			status >>= 16;
->  
->  		/* now demux them to the right lowlevel handler */
-> -		n = (int)irq_get_handler_data(irq);
-> +		n = irqbase;
->  		while (status) {
->  			res = ffs(status);
->  			n += res;
+> If "not very different" then that effort and testing will have been
+> worthwhile.
 
-Thanks for the bug fix.
+The issue reported by Russell is very ARM specific and can be solved mostly
+in arch/arm/mm/dma-mapping.c, maybe with some minor changes/helpers in
+drivers/base/dma-contiguous.c The core part in linux/mm probably won't be
+affected by these changes at all.
 
-How about setting the handler data for bank IRQ in
-davinci_gpio_irq_setup() to &chips[bank]?
-
-chips[bank].regs should give you the register base address
-(g) and chips[bank].irq_base should give you 'n'.
-
-Also please drop the rename of irq to bank_irq as it is not
-central to the bug fix.
-
-If you spin in soon enough, we may make it to v3.0
-
-Thanks,
-Sekhar
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
