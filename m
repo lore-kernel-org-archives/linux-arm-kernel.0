@@ -1,156 +1,59 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 11 Jul 2011 09:35:23 +0200
-Subject: [PATCH v2 2/7] spi/imx: use mx21 to name SPI_IMX_VER_0_0
-	function and macro
-In-Reply-To: <1310231801-18761-3-git-send-email-shawn.guo@linaro.org>
-References: <1310231801-18761-1-git-send-email-shawn.guo@linaro.org>
-	<1310231801-18761-3-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20110711073523.GB13840@pengutronix.de>
+From: b32955@freescale.com (Huang Shijie)
+Date: Mon, 11 Jul 2011 16:01:02 +0800
+Subject: [PATCH v7 0/4] add the GPMI-NAND support for imx23/imx28
+Message-ID: <1310371266-10704-1-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 10, 2011 at 01:16:36AM +0800, Shawn Guo wrote:
-> SPI_IMX_VER_0_0 covers i.mx21 and i.mx27.  It makes more sense to
-> use mx21 rather than mx27 to name SPI_IMX_VER_0_0 function and
-> macro, since i.mx21 comes out ealier than i.mx27.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> ---
->  drivers/spi/spi-imx.c |   67 +++++++++++++++++++++++++------------------------
->  1 files changed, 34 insertions(+), 33 deletions(-)
-> 
-> diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
-> index 1c55dc9..ad928b1 100644
-> --- a/drivers/spi/spi-imx.c
-> +++ b/drivers/spi/spi-imx.c
-> @@ -406,70 +406,71 @@ static void __maybe_unused spi_imx0_4_reset(struct spi_imx_data *spi_imx)
->  		readl(spi_imx->base + MXC_CSPIRXDATA);
->  }
->  
-> -#define MX27_INTREG_RR		(1 << 4)
-> -#define MX27_INTREG_TEEN	(1 << 9)
-> -#define MX27_INTREG_RREN	(1 << 13)
-> -
-> -#define MX27_CSPICTRL_POL	(1 << 5)
-> -#define MX27_CSPICTRL_PHA	(1 << 6)
-> -#define MX27_CSPICTRL_SSPOL	(1 << 8)
-> -#define MX27_CSPICTRL_XCH	(1 << 9)
-> -#define MX27_CSPICTRL_ENABLE	(1 << 10)
-> -#define MX27_CSPICTRL_MASTER	(1 << 11)
-> -#define MX27_CSPICTRL_DR_SHIFT	14
-> -#define MX27_CSPICTRL_CS_SHIFT	19
-> -
-> -static void __maybe_unused mx27_intctrl(struct spi_imx_data *spi_imx, int enable)
-> +#define MX21_INTREG_RR		(1 << 4)
-> +#define MX21_INTREG_TEEN	(1 << 9)
-> +#define MX21_INTREG_RREN	(1 << 13)
-> +
-> +#define MX21_CSPICTRL_POL	(1 << 5)
-> +#define MX21_CSPICTRL_PHA	(1 << 6)
-> +#define MX21_CSPICTRL_SSPOL	(1 << 8)
-> +#define MX21_CSPICTRL_XCH	(1 << 9)
-> +#define MX21_CSPICTRL_ENABLE	(1 << 10)
-> +#define MX21_CSPICTRL_MASTER	(1 << 11)
-> +#define MX21_CSPICTRL_DR_SHIFT	14
-> +#define MX21_CSPICTRL_CS_SHIFT	19
-> +
-> +static void __maybe_unused
-> +mx21_intctrl(struct spi_imx_data *spi_imx, int enable)
-this needs to be intended. I usually use 2 tabs (and I'm quite annoyed
-that vim doesn't do that for me).
+The patch is based on branch "imx-for-3.1" of tree :
+      git://git.pengutronix.de/git/imx/linux-2.6.git
 
->  {
->  	unsigned int val = 0;
->  
->  	if (enable & MXC_INT_TE)
-> -		val |= MX27_INTREG_TEEN;
-> +		val |= MX21_INTREG_TEEN;
->  	if (enable & MXC_INT_RR)
-> -		val |= MX27_INTREG_RREN;
-> +		val |= MX21_INTREG_RREN;
->  
->  	writel(val, spi_imx->base + MXC_CSPIINT);
->  }
->  
-> -static void __maybe_unused mx27_trigger(struct spi_imx_data *spi_imx)
-> +static void __maybe_unused mx21_trigger(struct spi_imx_data *spi_imx)
->  {
->  	unsigned int reg;
->  
->  	reg = readl(spi_imx->base + MXC_CSPICTRL);
-> -	reg |= MX27_CSPICTRL_XCH;
-> +	reg |= MX21_CSPICTRL_XCH;
->  	writel(reg, spi_imx->base + MXC_CSPICTRL);
->  }
->  
-> -static int __maybe_unused mx27_config(struct spi_imx_data *spi_imx,
-> +static int __maybe_unused mx21_config(struct spi_imx_data *spi_imx,
->  		struct spi_imx_config *config)
->  {
-> -	unsigned int reg = MX27_CSPICTRL_ENABLE | MX27_CSPICTRL_MASTER;
-> +	unsigned int reg = MX21_CSPICTRL_ENABLE | MX21_CSPICTRL_MASTER;
->  	int cs = spi_imx->chipselect[config->cs];
->  
->  	reg |= spi_imx_clkdiv_1(spi_imx->spi_clk, config->speed_hz) <<
-> -		MX27_CSPICTRL_DR_SHIFT;
-> +		MX21_CSPICTRL_DR_SHIFT;
->  	reg |= config->bpw - 1;
->  
->  	if (config->mode & SPI_CPHA)
-> -		reg |= MX27_CSPICTRL_PHA;
-> +		reg |= MX21_CSPICTRL_PHA;
->  	if (config->mode & SPI_CPOL)
-> -		reg |= MX27_CSPICTRL_POL;
-> +		reg |= MX21_CSPICTRL_POL;
->  	if (config->mode & SPI_CS_HIGH)
-> -		reg |= MX27_CSPICTRL_SSPOL;
-> +		reg |= MX21_CSPICTRL_SSPOL;
->  	if (cs < 0)
-> -		reg |= (cs + 32) << MX27_CSPICTRL_CS_SHIFT;
-> +		reg |= (cs + 32) << MX21_CSPICTRL_CS_SHIFT;
->  
->  	writel(reg, spi_imx->base + MXC_CSPICTRL);
->  
->  	return 0;
->  }
->  
-> -static int __maybe_unused mx27_rx_available(struct spi_imx_data *spi_imx)
-> +static int __maybe_unused mx21_rx_available(struct spi_imx_data *spi_imx)
->  {
-> -	return readl(spi_imx->base + MXC_CSPIINT) & MX27_INTREG_RR;
-> +	return readl(spi_imx->base + MXC_CSPIINT) & MX21_INTREG_RR;
->  }
->  
-> -static void __maybe_unused spi_imx0_0_reset(struct spi_imx_data *spi_imx)
-> +static void __maybe_unused mx21_reset(struct spi_imx_data *spi_imx)
->  {
->  	writel(1, spi_imx->base + MXC_RESET);
->  }
-> @@ -552,11 +553,11 @@ static struct spi_imx_devtype_data spi_imx_devtype_data[] = {
->  #endif
->  #ifdef CONFIG_SPI_IMX_VER_0_0
->  	[SPI_IMX_VER_0_0] = {
-> -		.intctrl = mx27_intctrl,
-> -		.config = mx27_config,
-> -		.trigger = mx27_trigger,
-> -		.rx_available = mx27_rx_available,
-> -		.reset = spi_imx0_0_reset,
-> +		.intctrl = mx21_intctrl,
-> +		.config = mx21_config,
-> +		.trigger = mx21_trigger,
-> +		.rx_available = mx21_rx_available,
-> +		.reset = mx21_reset,
->  		.fifosize = 8,
->  	},
->  #endif
-> -- 
-> 1.7.4.1
-> 
-> 
+The general-purpose media interface(GPMI) controller is a flexible interface
+to up to several NAND flashs.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+The Bose Ray-Choudhury Hocquenghem(BCH) module is a hardware ECC accelerator.
+
+With the help of BCH, the GPMI controller can choose to do the hardware ECC or
+not.
+
+v6 --> v7:
+	[0] rename RES_SIZE to GPMI_NAND_RES_SIZE.
+	[1] move gpmi-nand.h to `include/linux/mtd/` directory.
+	[2] remove comment for new pad control.
+	[3] others
+
+v5 --> v6:
+	[0] rename `gpmi-nfc` to `gpmi-nand`.
+	[1] remove ->exit() in structure gpmi_nand_platform_data{}.
+	[2] drop the macros for the resource's definition of gpmi-nand.
+	[3] add a new pad control `MXS_PAD_CTRL_12MA`. 
+	[4] others.
+
+v4 --> v5:
+	[0] split out the mach code and the machine code.
+
+v3 --> v4:
+	merge the GPMI-NFC device code to the new branch.
+
+Huang Shijie (4):
+  ARM: mxs: add GPMI-NAND support for imx23/imx28
+  ARM: mxs: add new a pad control
+  ARM: mxs/mx23evk: add GPMI-NAND device
+  ARM: mxs/mx28evk: add GPMI-NAND device
+
+ arch/arm/mach-mxs/Kconfig                       |    2 +
+ arch/arm/mach-mxs/clock-mx23.c                  |    1 +
+ arch/arm/mach-mxs/clock-mx28.c                  |    1 +
+ arch/arm/mach-mxs/devices-mx23.h                |    4 +
+ arch/arm/mach-mxs/devices-mx28.h                |    4 +
+ arch/arm/mach-mxs/devices/Kconfig               |    3 +
+ arch/arm/mach-mxs/devices/Makefile              |    1 +
+ arch/arm/mach-mxs/devices/platform-gpmi-nand.c  |  108 +++++++++++++++++++++++
+ arch/arm/mach-mxs/include/mach/devices-common.h |   10 ++
+ arch/arm/mach-mxs/include/mach/iomux.h          |    1 +
+ arch/arm/mach-mxs/mach-mx23evk.c                |   36 ++++++++
+ arch/arm/mach-mxs/mach-mx28evk.c                |   36 ++++++++
+ include/linux/mtd/gpmi-nand.h                   |   68 ++++++++++++++
+ 13 files changed, 275 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-mxs/devices/platform-gpmi-nand.c
+ create mode 100644 include/linux/mtd/gpmi-nand.h
