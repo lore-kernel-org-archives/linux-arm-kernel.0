@@ -1,167 +1,76 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Mon, 11 Jul 2011 18:17:25 +0800
-Subject: [GIT PULL] pxa: features for next
-In-Reply-To: <CAMPhdO84i1v1ibzBnJ4BPkF67cRpQ74o+=Es_rW2t8PStN-jbg@mail.gmail.com>
-References: <CAMPhdO8uQR4km9szkuGDjuym-hViE9+zxtie6D2WGJmf1_9rUg@mail.gmail.com>
-	<20110711074113.GK4812@n2100.arm.linux.org.uk>
-	<CAMPhdO8pxGsEN1EeYwZRBnPvhkN29wOmEzWaaoCh9iqO+VkDrg@mail.gmail.com>
-	<20110711074600.GL4812@n2100.arm.linux.org.uk>
-	<CAMPhdO8=Gsiw_e6mFRi1PM99DSroaQi_SBiH298KAKqHb41rNw@mail.gmail.com>
-	<20110711075243.GM4812@n2100.arm.linux.org.uk>
-	<CAMPhdO-zR_=i_01KSTx_TzRFEOgygHc=kkUB68bke62_nzO=8Q@mail.gmail.com>
-	<20110711084026.GN4812@n2100.arm.linux.org.uk>
-	<CAMPhdO84i1v1ibzBnJ4BPkF67cRpQ74o+=Es_rW2t8PStN-jbg@mail.gmail.com>
-Message-ID: <CAMPhdO8SZjzE3f=rk1o8QSjaHGaySSHi6Ac9j4Mbm2s=0+A1pg@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 11 Jul 2011 11:17:50 +0100
+Subject: [PATCH v8 14/14] ARM: gic: add gic_ppi_map_on_cpu()
+In-Reply-To: <4E1AC7C5.9020909@arm.com>
+References: <1309855755-6261-1-git-send-email-marc.zyngier@arm.com>
+	<1309855755-6261-15-git-send-email-marc.zyngier@arm.com>
+	<20110708195708.GR4812@n2100.arm.linux.org.uk>
+	<20110710161038.46770f08@taxman.wild-wind.fr.eu.org>
+	<20110710153759.GI4812@n2100.arm.linux.org.uk>
+	<20110710183039.GJ4812@n2100.arm.linux.org.uk>
+	<4E1AC7C5.9020909@arm.com>
+Message-ID: <20110711101750.GE3239@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 11, 2011 at 6:07 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
-> On Mon, Jul 11, 2011 at 4:40 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
->> On Mon, Jul 11, 2011 at 04:31:04PM +0800, Eric Miao wrote:
->>> On Mon, Jul 11, 2011 at 3:52 PM, Russell King - ARM Linux
->>> <linux@arm.linux.org.uk> wrote:
->>> > On Mon, Jul 11, 2011 at 03:47:27PM +0800, Eric Miao wrote:
->>> >> On Mon, Jul 11, 2011 at 3:46 PM, Russell King - ARM Linux
->>> >> <linux@arm.linux.org.uk> wrote:
->>> >> > On Mon, Jul 11, 2011 at 03:44:54PM +0800, Eric Miao wrote:
->>> >> >> On Mon, Jul 11, 2011 at 3:41 PM, Russell King - ARM Linux
->>> >> >> <linux@arm.linux.org.uk> wrote:
->>> >> >> > On Mon, Jul 11, 2011 at 03:27:15PM +0800, Eric Miao wrote:
->>> >> >> >> ? ? ? ARM: pxa: avoid accessing interrupt registers directly
->>> >> >> >> ? ? ? ARM: pxa: introduce {icip,ichp}_handle_irq() to prepare MULTI_IRQ_HANDLER
->>> >> >> >
->>> >> >> > What happened about the __exception issue with asm_do_IRQ?
->>> >> >> >
->>> >> >>
->>> >> >> I just removed the __exception from the C handler.
->>> >> >
->>> >> > From asm_do_IRQ ?
->>> >> >
->>> >>
->>> >> No. From icip_handle_irq() and ichp_handle_irq(). Thought the ability to
->>> >> unwind asm_do_IRQ() is more important.
->>> >
->>> > Which means you didn't understand my objection when I reviewed your patch.
->>> >
->>> > The __exception annotation on a function causes this to happen:
->>> >
->>> > [<c002406c>] (asm_do_IRQ+0x6c/0x8c) from [<c0024b84>] (__irq_svc+0x44/0xcc)
->>> > Exception stack(0xc3897c78 to 0xc3897cc0)
->>> > 7c60: ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 4022d320 4022e000
->>> > 7c80: 08000075 00001000 c32273c0 c03ce1c0 c2b49b78 4022d000 c2b420b4 00000001
->>> > 7ca0: 00000000 c3897cfc 00000000 c3897cc0 c00afc54 c002edd8 00000013 ffffffff
->>> >
->>> > Where that stack dump represents the pt_regs for the exception which
->>> > happened. ?Any function found in while unwinding will cause this to
->>> > be printed.
->>> >
->>> > If you insert a C function between the IRQ assembly and asm_do_IRQ, the
->>> > dump you get from asm_do_IRQ will be the stack for your function, not
->>> > the pt_regs. ?That makes the feature useless.
->>> >
->>>
->>> Sorry for my stupidity, but I think I still don't get it quite correctly.
->>> When both functions are prefixed with __exception_irq_entry, if
->>> unwind works correctly, both stacks will be dumped, how would
->>> the asm_do_IRQ will be stack for the function inserted?
->>
->> When __irq_svc - or any of the other exception handling assembly code -
->> calls the C code, the stack pointer will be pointing at the pt_regs
->> structure.
->>
->> All the entry points into C code from the exception handling code are
->> marked with __exception or __exception_irq_enter to indicate that they
->> are one of the functions which has pt_regs above them.
->>
->> Normally, when you've entered asm_do_IRQ() you will have this stack
->> layout (higher address towards top):
->>
->> ? ? ? ?pt_regs
->> ? ? ? ?asm_do_IRQ frame
->>
->> If you insert a C function between the exception assembly code and
->> asm_do_IRQ, you end up with this stack layout instead:
->>
->> ? ? ? ?pt_regs
->> ? ? ? ?your function frame
->> ? ? ? ?asm_do_IRQ frame
->>
->> This means when we unwind, we'll get to asm_do_IRQ, and rather than
->> dumping out the pt_regs, we'll dump out your functions stack frame
->> instead, because that's what is above the asm_do_IRQ stack frame
->> rather than the expected pt_regs structure.
->>
->
-> Ah now I see the problem. So it's actually in dump_backtrace_entry(),
-> where the if (in_exception_text(where)) dump_mem(...) has this
-> assumption.
->
-> One way to solve this from my humble opinion is to mandate
-> __exception for the C function (stack version) of handle_arch_irq,
-> and when MULTI_IRQ defined, remove __exception from asm_do_IRQ(),
-> so the assumption in dump_backtrace_entry() still holds true.
->
-> Or do we have a gcc extension to tell the compiler a simple function
-> doesn't need to use the stack?
->
+On Mon, Jul 11, 2011 at 10:52:05AM +0100, Marc Zyngier wrote:
+> You won't be surprised if I say that I prefer your first version. The
+> second one, while much simpler, keeps the additional low level entry
+> point (gic_call_ppi), and has to do its own accounting.
+> 
+> But more than that. MSM timers are implemented using the same code on
+> both UP and SMP, with or without GIC. which means we have to request the
+> interrupt using the same API. Your first version would work in that case
+> (gic_ppi_map() on a non-PPI should return the same number).
 
-Hi Russell,
+Who says gic_request_ppi() will exist on systems without GIC?  Or
+even gic_ppi_map()?
 
-How about something like below, it's not clever at all though:
+Let me make the point plain: no driver must EVER use gic_ppi_map().
+No driver must EVER call request_irq() any other genirq function for
+a PPI interrupt directly.  They must all be wrapped in suitable
+containers to bind the current thread to the current CPU.  Not doing
+so will lead to failures due to the wrong CPUs registers being hit.
 
-diff --git a/arch/arm/include/asm/mach/irq.h b/arch/arm/include/asm/mach/irq.h
-index febe495..09a4856 100644
---- a/arch/arm/include/asm/mach/irq.h
-+++ b/arch/arm/include/asm/mach/irq.h
-@@ -25,6 +25,16 @@ extern void (*handle_arch_irq)(struct pt_regs *);
- #endif
+> > There's also the question about whether we should pass in the desired CPU
+> > number to these too, in case we have a requirement to ensure that we get
+> > the PPI on a specific CPU, or whether we only care about the _current_
+> > CPU we happen to be running on.
+> 
+> As long as we tie mapping and interrupt request together, there is no
+> reason to offer that functionality. But DT may need to resolve the
+> mappings independently (while creating the platform devices), and the
+> driver would then request the mapped PPI. In that case, we need to
+> ensure we're running on the right CPU.
 
- /*
-+ * do not dump exception stack when MULTI_IRQ_HANDLER is defined, as
-+ * the stack will be dumped for function (*handle_arch_irq)().
-+ */
-+#ifdef CONFIG_MULTI_IRQ_HANDLER
-+#define __multi_irq_entry
-+#else
-+#define __multi_irq_entry	__exception_irq_entry
-+#endif
-+
-+/*
-  * This is for easy migration, but should be changed in the source
-  */
- #define do_bad_IRQ(irq,desc)				\
-diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
-index 83bbad0..7d32fd5 100644
---- a/arch/arm/kernel/irq.c
-+++ b/arch/arm/kernel/irq.c
-@@ -71,7 +71,7 @@ int arch_show_interrupts(struct seq_file *p, int prec)
-  * come via this function.  Instead, they should provide their
-  * own 'handler'
-  */
--asmlinkage void __exception_irq_entry
-+asmlinkage void __multi_irq_entry
- asm_do_IRQ(unsigned int irq, struct pt_regs *regs)
- {
- 	struct pt_regs *old_regs = set_irq_regs(regs);
-diff --git a/arch/arm/mach-pxa/irq.c b/arch/arm/mach-pxa/irq.c
-index 2d079f4..d9cab3b 100644
---- a/arch/arm/mach-pxa/irq.c
-+++ b/arch/arm/mach-pxa/irq.c
-@@ -129,7 +129,7 @@ static struct irq_chip pxa_low_gpio_chip = {
- 	.irq_set_type	= pxa_set_low_gpio_type,
- };
+You still don't get the issue.  Really you don't.  And you don't seem
+to get DT either.
 
--asmlinkage void icip_handle_irq(struct pt_regs *regs)
-+asmlinkage void __exception_irq_entry icip_handle_irq(struct pt_regs *regs)
- {
- 	uint32_t icip, icmr, mask;
+DT has precisely nothing to do with this, and should never have anything
+to do with this kind of mapping.  Mapping a PPI + CPU to a _Linux_ IRQ
+number is a _Linux_ specific operation.  It's not something that will
+be acceptable to be represented in DT.  What DT describes is the
+_hardware_.  So, if DT wants to describe a PPI, then DT should describe
+PPI N on CPU N.
 
-@@ -145,7 +145,7 @@ asmlinkage void icip_handle_irq(struct pt_regs *regs)
- 	} while (1);
- }
+However, the basis of my argument is that this has got precisely nothing
+to do with the mapping of PPIs to IRQ numbers.  It's about the using
+unique IRQ numbers to describe an IRQ which can _only_ be accessed on one
+particular CPU.
 
--asmlinkage void ichp_handle_irq(struct pt_regs *regs)
-+asmlinkage void __exception_irq_entry ichp_handle_irq(struct pt_regs *regs)
- {
- 	uint32_t ichp;
+The PPIs are really not standard interrupts.  Trying to treat them as such
+means that all the standard genirq interfaces will need to be _wrapped_ to
+ensure that they're bound to the particular CPU that you're interested in.
+
+The reason for that is to ensure that you hit the right hardware registers
+for the IRQ number you're passing in.  Using my previous example, it's no
+good if you pass in IRQ9 (PPI2 CPU1) but end up hitting IRQ11's (PPI2 CPU3)
+registers instead.
+
+Plus, someone will have to audit drivers even more carefully to ensure that
+they're not trying to use the standard request_irq() (or any other of the
+genirq interfaces) with PPI interrupt numbers.  Who's going to do that?
+
+So, I believe your patches are fundamentally misdesigned on a technical
+level, are fragile, and therefore are not suitable for integration into
+mainline.
