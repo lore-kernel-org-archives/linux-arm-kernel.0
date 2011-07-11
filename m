@@ -1,53 +1,26 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 11 Jul 2011 11:53:54 +0900
-Subject: [PATCH 3/6] clk: Constify struct clk_hw_ops
-In-Reply-To: <1310352837-4277-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-References: <20110711025344.GA27497@opensource.wolfsonmicro.com>
-	<1310352837-4277-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <1310352837-4277-3-git-send-email-broonie@opensource.wolfsonmicro.com>
+Date: Mon, 11 Jul 2011 12:57:41 +0900
+Subject: [PATCH 0/4] Add a generic struct clk
+In-Reply-To: <1310352588.3591.197.camel@pororo>
+References: <1305876469.325655.313573683829.0.gpush@pororo>
+	<1305876469.325655.313573683829.0.gpush@pororo>
+	<20110710090927.GA23445@opensource.wolfsonmicro.com>
+	<1310352588.3591.197.camel@pororo>
+Message-ID: <20110711035739.GB4532@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
----
- drivers/clk/clk.c   |    4 ++--
- include/linux/clk.h |    2 +-
- 2 files changed, 3 insertions(+), 3 deletions(-)
+On Mon, Jul 11, 2011 at 10:49:48AM +0800, Jeremy Kerr wrote:
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 3a4d70e..1df6e23 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -16,7 +16,7 @@
- 
- struct clk {
- 	const char		*name;
--	struct clk_hw_ops	*ops;
-+	const struct clk_hw_ops	*ops;
- 	struct clk_hw		*hw;
- 	unsigned int		enable_count;
- 	unsigned int		prepare_count;
-@@ -252,7 +252,7 @@ int clk_set_parent(struct clk *clk, struct clk *parent)
- }
- EXPORT_SYMBOL_GPL(clk_set_parent);
- 
--struct clk *clk_register(struct clk_hw_ops *ops, struct clk_hw *hw,
-+struct clk *clk_register(const struct clk_hw_ops *ops, struct clk_hw *hw,
- 		const char *name)
- {
- 	struct clk *clk;
-diff --git a/include/linux/clk.h b/include/linux/clk.h
-index df5c64f..fb5e435 100644
---- a/include/linux/clk.h
-+++ b/include/linux/clk.h
-@@ -146,7 +146,7 @@ extern struct clk_hw_ops clk_gate_ops;
-  * Register a new clock with the clk subsytem.  Returns either a
-  * struct clk for the new clock or a NULL pointer.
-  */
--struct clk *clk_register(struct clk_hw_ops *ops, struct clk_hw *hw,
-+struct clk *clk_register(const struct clk_hw_ops *ops, struct clk_hw *hw,
- 			 const char *name);
- 
- /**
--- 
-1.7.5.4
+> On a related note, I've not had sufficient time to dedicate to the clk
+> work recently, so Linus Walleij will be taking over the clk patches, and
+> he'll be able to spend the necessary time to get things into shape :)
+
+Oh, that's bad timing given that I just sent you a small stack of
+patches :/
+
+> He's on vacation at the moment, but will start at the upcoming Linaro
+> event in Cambridge, I believe.
+
+No idea when that is, and given that I'm not involved in Linaro I'm
+unlikely to attend.
