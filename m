@@ -1,28 +1,20 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 11 Jul 2011 23:10:19 +0200
-Subject: [GIT PULL] CSR SiRFprimaII board support for v3.1
-In-Reply-To: <CAGsJ_4zojPGr52mc8Neko1bKmUWTcvA=NcomZA=P1SFTQMMxCA@mail.gmail.com>
-References: <CAGsJ_4zojPGr52mc8Neko1bKmUWTcvA=NcomZA=P1SFTQMMxCA@mail.gmail.com>
-Message-ID: <201107112310.19803.arnd@arndb.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 11 Jul 2011 22:10:58 +0100
+Subject: [PATCH] ARM: get rid of a few StrongARM cache-related build
+	time constants
+In-Reply-To: <alpine.LFD.2.00.1107111021020.14596@xanadu.home>
+References: <1309919636-20546-1-git-send-email-nicolas.pitre@linaro.org>
+	<20110706075542.GK8286@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1107060912490.14596@xanadu.home>
+	<20110707170631.GB20403@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1107111021020.14596@xanadu.home>
+Message-ID: <20110711211058.GF8486@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 09 July 2011, Barry Song wrote:
-> git://gitorious.org/sirfprima2-kernel/sirfprima2-kernel.git for-arnd
-> 
-> It is same with v5 patchset I sent in the linux-arm-kernel mail list.
-> For more comments ongoing/coming and new features, I will work on them
-> to figure out incremental patches. There are still large number of
-> work left in mach-prima2, for exmaple, PM, full clock tree, RTC-IOBG
-> APIs, gpio(now drivers/gpio), pinmux(now drivers/pinmux) and so on.
-> Those will be continued in the next merge window.
+On Mon, Jul 11, 2011 at 10:38:54AM -0400, Nicolas Pitre wrote:
+> So here is this patch again with all fixes folded in:
 
-Pulled, thanks!
- 
-> I'd like to say we really appreciate you very much for your great help
-> on the basic board support of CSR prima2.
-
-It was a pleasure working with you on this, looking forward to see
-more work like these patches.
-
-	Arnd
+Thanks.  I didn't get a chance to test the original on anything but
+Assabet yet.  I'll try to make some time for the other platforms this
+week.
