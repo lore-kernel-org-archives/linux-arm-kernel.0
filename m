@@ -1,57 +1,27 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 11 Jul 2011 23:09:39 +0200
-Subject: zaurus patches -- arm/pxa -- is Eric alive
-In-Reply-To: <CAMPhdO-UjxqyL47VsihX-fBD9VtAKkQqEQGj2u1YG0c90EHfqA@mail.gmail.com>
-References: <20110711134150.GA15506@localhost.ucw.cz>
-	<CALT56yM+fNs_2QorWK0=gr2um1H3vDX+HXPCi9bmKDdOdSvptA@mail.gmail.com>
-	<20110711140303.GA32532@atrey.karlin.mff.cuni.cz>
-	<CAMPhdO-UjxqyL47VsihX-fBD9VtAKkQqEQGj2u1YG0c90EHfqA@mail.gmail.com>
-Message-ID: <20110711210939.GA5682@elf.ucw.cz>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 11 Jul 2011 22:09:50 +0100
+Subject: [PATCH 16/17] mach-sa1100: retire custom LED code
+In-Reply-To: <CAK5ve-+Pr8EDa8mfhZVbf8ADc2YDU0EyTPL3Fwwipj237tgKQg@mail.gmail.com>
+References: <1309955687-19365-1-git-send-email-bryan.wu@canonical.com>
+	<1309955687-19365-17-git-send-email-bryan.wu@canonical.com>
+	<20110710092426.GR4812@n2100.arm.linux.org.uk>
+	<CAK5ve-+Pr8EDa8mfhZVbf8ADc2YDU0EyTPL3Fwwipj237tgKQg@mail.gmail.com>
+Message-ID: <20110711210950.GE8486@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-> > Perhaps the most critical one is:
-> >
-> > [PATCH] MAX1111: Fix race condition causing NULL pointer exception
-> >
-> > http://ns1.yosemitephotos.net/lists/arm-kernel/msg125356.html
-
-Yep, that one (or equivalent) is most critical.
-
-> > Which fixes memory corruption that caused random oops.
-> >
-> > And then there is a bunch of fixes for charging and power management from
-> > Pavel Machek:
+On Mon, Jul 11, 2011 at 10:36:49PM +0800, Bryan Wu wrote:
+> Right, I got it. So if we are going to run a single binary for all the
+> sa1100 machines, how about we check the machine in each fs_initcall
 > 
-> Guys, I'm still alive, at least still breathing. Just too many mails
-> and I was lost.
-
-Good :-).
-
-> > Disable CF during suspend
-> >
-> > https://lkml.org/lkml/2011/5/21/46
+> static int __init assabet_leds_init(void)
+> {
+>  ? ? int i;
 > 
-> The fix is trivial, think I can take it. A better approach will be to have a
-> generic CF power control function and invoke it in pcmcia driver when
-> suspending.
-
-Please take it. It is also regression from 2.6.15-or-so.
-
-> > and spitz pm
-> >
-> > https://lkml.org/lkml/2011/5/21/72
-> > https://lkml.org/lkml/2011/5/21/73
-> > https://lkml.org/lkml/2011/5/21/76
+>      if (!machine_is_assabet())
+>           return -ENODEV,
 > 
-> Looks good to me, yet I need the last one Acked by power supply people.
+>  ? ? for (i = 0; i < ARRAY_SIZE(assabet_leds); i++) {
+>  ? ? ? ? ? ? struct assabet_led *led;
 
-Can you take the first two? They are trivial preparations... And I'll
-get the ACKs...
-								Pavel
-
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Yes, that'll do, thanks.
