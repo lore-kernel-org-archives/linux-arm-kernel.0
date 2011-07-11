@@ -1,91 +1,45 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 11 Jul 2011 04:53:09 -0700
-Subject: [GIT PULL] omap related MFD and ASoC patches for v3.1 merge window
-In-Reply-To: <20110711114736.GX5783@atomide.com>
-References: <20110711114736.GX5783@atomide.com>
-Message-ID: <20110711115309.GA5783@atomide.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 11 Jul 2011 13:36:27 +0100
+Subject: [PATCH v8 14/14] ARM: gic: add gic_ppi_map_on_cpu()
+In-Reply-To: <20110711113818.GI3239@n2100.arm.linux.org.uk>
+References: <1309855755-6261-1-git-send-email-marc.zyngier@arm.com>
+	<1309855755-6261-15-git-send-email-marc.zyngier@arm.com>
+	<20110708195708.GR4812@n2100.arm.linux.org.uk>
+	<20110710161038.46770f08@taxman.wild-wind.fr.eu.org>
+	<20110710153759.GI4812@n2100.arm.linux.org.uk>
+	<20110710183039.GJ4812@n2100.arm.linux.org.uk>
+	<4E1AC7C5.9020909@arm.com>
+	<20110711101750.GE3239@n2100.arm.linux.org.uk>
+	<4E1ADB1C.80504@arm.com>
+	<20110711113818.GI3239@n2100.arm.linux.org.uk>
+Message-ID: <4E1AEE4B.3090904@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 727e18b429e3badda12d1de74f492bfa363a2e94:
-  Tony Lindgren (1):
-        Merge branch 'peter/topic/for-tony_mach-cleanup' of git://gitorious.org/omap-audio/linux-audio into cleanup-part-2
+On 11/07/11 12:38, Russell King - ARM Linux wrote:
+> On Mon, Jul 11, 2011 at 12:14:36PM +0100, Marc Zyngier wrote:
+>> And that's exactly what it does:
+>> http://www.mail-archive.com/devicetree-discuss at lists.ozlabs.org/msg05026.html
+>>
+>> What I was trying to explain (and obviously failed to) is that the
+>> _Linux_ DT _code_ will try to resolve the PPI number and convert it to a
+>> _Linux_ IRQ number. Unless of course you don't encode it as an interrupt
+>> at all, which seems to be what you're aiming for.
+> 
+> I'm not aiming for anything.  I'm trying to get you to fully understand
+> the issue I've raised with your patches.  So, let's try a new scenario
+> based on your statement above.
+> 
+> You have a device which happens to use a PPI.  You obtain its IRQ number
+> from DT, which tells you IRQ 9, because the DT information said PPI 2
+> CPU 1.  So you pass IRQ 9 into the IRQ request function, but as you're
+> running on CPU 3, you have no access to the hardware for IRQ 9.
+> 
+> Please describe in detail how, with your patches, PPI 2 CPU 1 gets enabled
+> rather than PPI 2 CPU 3 when IRQ 9 is requested.
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git twl-asoc
-
-These depend on the cleanup-part-2 branch, so it was agreed with the MFD and ASoC
-maintainers that they should get merged along with the other omap patches.
-
-Axel Castaneda Gonzalez (1):
-      ASoC: twl6040: Configure ramp step based on platform
-
-Liam Girdwood (3):
-      ASoC: twl6040: add all ABE DAIs
-      ASoC: twl6040: Support other sample rates in constraints.
-      ASoC: twl6040: set default constraints.
-
-Misael Lopez Cruz (5):
-      mfd: twl6040: Add initial support
-      ASoC: twl6040: Convert into TWL6040 MFD child
-      input: Add initial support for TWL6040 vibrator
-      ASoC: twl6040: Remove pll and headset mode dependency
-      OMAP4: SDP4430: Add twl6040 codec platform support
-
-Peter Ujfalusi (17):
-      MFD: twl4030-codec: Rename internals from codec to audio
-      MFD: twl4030-codec -> twl4030-audio: Rename the driver
-      MFD: twl4030-audio: Rename platform data
-      MFD: twl6040: Change platform data for soc codec driver
-      OMAP4: SDP4430: Add twl6040 vibrator platform support
-      MFD: twl6040: Use resource to provide irq number for slaves
-      input: twl6040-vibra: Do not use wrapper for irq request
-      ASoC: twl6040: Do not use wrapper for irq request
-      MFD: twl6040: Demand valid interrupt configuration
-      MFD: twl6040: Remove wrapper for threaded irq request
-      ASoC: twl6040: Use neutral name for power mode text/enum
-      ASoC: twl6040: Move PLL selection to codec driver
-      ASoC: twl6040: Simplify sample rate constraint handling
-      ASoC: twl6040: Configure PLL only once
-      MFD: twl6040: Remove enum for PLL tracking
-      ASoC: twl6040: No need to convert the PLL ID
-      ASoC: twl6040: Add back support for legacy mode
-
-Tony Lindgren (1):
-      Merge branch 'peter/topic/for-tony' of git://gitorious.org/omap-audio/linux-audio into twl-asoc
-
- arch/arm/mach-omap2/board-4430sdp.c                |   56 ++
- arch/arm/mach-omap2/board-rx51-peripherals.c       |    6 +-
- arch/arm/mach-omap2/board-zoom-peripherals.c       |   10 +-
- arch/arm/mach-omap2/twl-common.c                   |   10 +-
- arch/arm/plat-omap/include/plat/irqs.h             |   12 +-
- drivers/input/misc/Kconfig                         |   13 +-
- drivers/input/misc/Makefile                        |    1 +
- drivers/input/misc/twl4030-vibra.c                 |   12 +-
- drivers/input/misc/twl6040-vibra.c                 |  423 +++++++++++
- drivers/mfd/Kconfig                                |    8 +-
- drivers/mfd/Makefile                               |    3 +-
- drivers/mfd/twl-core.c                             |   13 +-
- drivers/mfd/twl4030-audio.c                        |  277 ++++++++
- drivers/mfd/twl4030-codec.c                        |  277 --------
- drivers/mfd/twl6040-core.c                         |  620 +++++++++++++++++
- drivers/mfd/twl6040-irq.c                          |  191 +++++
- include/linux/i2c/twl.h                            |   25 +-
- .../linux/mfd/{twl4030-codec.h => twl4030-audio.h} |   16 +-
- include/linux/mfd/twl6040.h                        |  228 ++++++
- sound/soc/codecs/Kconfig                           |    3 +-
- sound/soc/codecs/twl4030.c                         |   22 +-
- sound/soc/codecs/twl6040.c                         |  733 +++++++++-----------
- sound/soc/codecs/twl6040.h                         |  119 +----
- sound/soc/omap/sdp3430.c                           |    2 +-
- sound/soc/omap/sdp4430.c                           |   52 +--
- sound/soc/omap/zoom2.c                             |    2 +-
- 26 files changed, 2230 insertions(+), 904 deletions(-)
- create mode 100644 drivers/input/misc/twl6040-vibra.c
- create mode 100644 drivers/mfd/twl4030-audio.c
- delete mode 100644 drivers/mfd/twl4030-codec.c
- create mode 100644 drivers/mfd/twl6040-core.c
- create mode 100644 drivers/mfd/twl6040-irq.c
- rename include/linux/mfd/{twl4030-codec.h => twl4030-audio.h} (96%)
- create mode 100644 include/linux/mfd/twl6040.h
+You simply do not do that. You store the mapping for later use on the
+right CPU. My code is buggy as I didn't think of the requesting thread
+being preempted, but I never intended to do this sort of cross-CPU request.
+-- 
+Jazz is not dead. It just smells funny...
