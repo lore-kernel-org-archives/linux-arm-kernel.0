@@ -1,49 +1,63 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 11 Jul 2011 19:05:47 +0100
-Subject: [RFC PATCH 05/17] ARM: kernel: save/restore kernel IF
-In-Reply-To: <alpine.DEB.2.00.1107111746480.2609@localhost6.localdomain6>
-References: <1310053830-23779-1-git-send-email-lorenzo.pieralisi@arm.com>
-	<1310053830-23779-6-git-send-email-lorenzo.pieralisi@arm.com>
-	<alpine.DEB.2.00.1107081641280.2609@localhost6.localdomain6>
-	<20110711140047.GA346@e102568-lin.cambridge.arm.com>
-	<alpine.DEB.2.00.1107111503100.2609@localhost6.localdomain6>
-	<20110711160246.GA1161@e102568-lin.cambridge.arm.com>
-	<alpine.DEB.2.00.1107111746480.2609@localhost6.localdomain6>
-Message-ID: <20110711180545.GA3451@e102568-lin.cambridge.arm.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 11 Jul 2011 14:07:05 -0400 (EDT)
+Subject: [PATCH 01/51] ARM: Thumb-2: Fix exception return sequence to
+	restore stack correctly
+In-Reply-To: <1310209058-20980-2-git-send-email-tixy@yxit.co.uk>
+References: <1310209058-20980-1-git-send-email-tixy@yxit.co.uk>
+	<1310209058-20980-2-git-send-email-tixy@yxit.co.uk>
+Message-ID: <alpine.LFD.2.00.1107111406240.14596@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 11, 2011 at 05:57:29PM +0100, Frank Hofmann wrote:
-> On Mon, 11 Jul 2011, Lorenzo Pieralisi wrote:
-> 
-> [ ... ]
-> >>> The array of pointers is there to save pgdir on idle entry, one per-cpu.
-> >>
-> >> If you're going through cpu_{do_}suspend/resume, the TTBRs are
-> >> saved/restored anyway, what do you need to keep the virtual addresses
-> >> around for ?
-> >>
-> >
-> > Because I switch mm before calling suspend, which is called
-> > with a cloned pgdir. I am not sure I can avoid that.
-> 
-> On resume, you'll be restoring the same thread as was previously running, 
-> right ? If so, all you do there is copying current->active_mm->pgd to some 
-> other place ?
+On Sat, 9 Jul 2011, Tixy wrote:
 
-You are right, I will remove that code unless I can use the saved value
-on resume and I cannot rely on current to be retrieved at that point.
-
+> From: Jon Medhurst <tixy@yxit.co.uk>
 > 
-> Also, if you'd be using cpu_suspend(), would there still be a need for 
-> cpu_switch_mm() before ? It'd rather be a case of possibly calling that 
-> before the MMU-off sequence / cpu_resume() ?
+> The implementation of svc_exit didn't take into account any stack hole
+> created by svc_entry; as happens with the undef handler when kprobes are
+> configured. The fix is to read the saved value of SP rather than trying
+> to calculate it.
 > 
-> Or is it that you use the new pgdir to make a memory region uncacheable ?
+> Signed-off-by: Jon Medhurst <tixy@yxit.co.uk>
 
-Yes, that's the reason why I switch mm (eg uncacheable memory used to
-save registers through cpu_do_suspend and mapped in the cloned pgdir at boot +
-some control variables used when MMU is off).
+Reviewed-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 
-Thanks,
-Lorenzo
+
+> ---
+>  arch/arm/kernel/entry-header.S |   12 +++++-------
+>  1 files changed, 5 insertions(+), 7 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/entry-header.S b/arch/arm/kernel/entry-header.S
+> index 051166c..83e29ad 100644
+> --- a/arch/arm/kernel/entry-header.S
+> +++ b/arch/arm/kernel/entry-header.S
+> @@ -121,15 +121,13 @@
+>  	.endm
+>  #else	/* CONFIG_THUMB2_KERNEL */
+>  	.macro	svc_exit, rpsr
+> +	ldr	lr, [sp, #S_SP]			@ top of the stack
+> +	ldrd	r0, r1, [sp, #S_LR]		@ calling lr and pc
+>  	clrex					@ clear the exclusive monitor
+> -	ldr	r0, [sp, #S_SP]			@ top of the stack
+> -	ldr	r1, [sp, #S_PC]			@ return address
+> -	tst	r0, #4				@ orig stack 8-byte aligned?
+> -	stmdb	r0, {r1, \rpsr}			@ rfe context
+> +	stmdb	lr!, {r0, r1, \rpsr}		@ calling lr and rfe context
+>  	ldmia	sp, {r0 - r12}
+> -	ldr	lr, [sp, #S_LR]
+> -	addeq	sp, sp, #S_FRAME_SIZE - 8	@ aligned
+> -	addne	sp, sp, #S_FRAME_SIZE - 4	@ not aligned
+> +	mov	sp, lr
+> +	ldr	lr, [sp], #4
+>  	rfeia	sp!
+>  	.endm
+>  
+> -- 
+> 1.7.2.5
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
