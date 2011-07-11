@@ -1,115 +1,77 @@
-From: khali@linux-fr.org (Jean Delvare)
-Date: Mon, 11 Jul 2011 22:11:48 +0200
-Subject: [PATCH v2] MAX1111: Fix Race condition causing NULL pointer
-	exception
-In-Reply-To: <1310410051-13127-1-git-send-email-morpheus.ibis@gmail.com>
-References: <1310410051-13127-1-git-send-email-morpheus.ibis@gmail.com>
-Message-ID: <20110711221148.3a76d55b@endymion.delvare>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 11 Jul 2011 21:14:00 +0100
+Subject: [RFC PATCH 05/17] ARM: kernel: save/restore kernel IF
+In-Reply-To: <4E1B5780.6040307@ti.com>
+References: <1310053830-23779-1-git-send-email-lorenzo.pieralisi@arm.com>
+	<1310053830-23779-6-git-send-email-lorenzo.pieralisi@arm.com>
+	<alpine.DEB.2.00.1107081641280.2609@localhost6.localdomain6>
+	<20110711140047.GA346@e102568-lin.cambridge.arm.com>
+	<20110711184010.GB8486@n2100.arm.linux.org.uk>
+	<4E1B5780.6040307@ti.com>
+Message-ID: <20110711201400.GD8486@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pavel,
+On Mon, Jul 11, 2011 at 01:05:20PM -0700, Santosh Shilimkar wrote:
+> (Just to add few more points on top of what Colin already commented)
+>
+> On 7/11/2011 11:40 AM, Russell King - ARM Linux wrote:
+>> On Mon, Jul 11, 2011 at 03:00:47PM +0100, Lorenzo Pieralisi wrote:
+>>> Well, short answer is no. On SMP we do need to save CPU registers
+>>> but if just one single cpu is shutdown L2 is still on.
+>>> cpu_suspend saves regs on the stack that has to be cleaned from
+>>> L2 before shutting a CPU down which make things more complicated than
+>>> they should.
+>>
+>> Hang on.  Please explain something to me here.  You've mentioned a few
+>> times that cpu_suspend() can't be used because of the L2 cache.  Why
+>> is this the case?
+>>
+>> OMAP appears to have code in its sleep path - which has been converted
+>> to cpu_suspend() support - to deal with the L2 issues.
+>>
+> This part is not done yet Russell. Infact the cpu_resume() function
+> need an update to work with L2 enable configuration.
 
-On Mon, 11 Jul 2011 20:47:31 +0200, Pavel Herrmann wrote:
-> spi_sync call uses its spi_message parameter to keep completion information,
-> having this structure static is not thread-safe, potentially causing one
-> thread having pointers to memory on or above other threads stack. use mutex
-> to prevent multiple access
+The code does deal with L2 cache enable in the resume path...
 
-This has nothing to do with static, as a matter of fact the structure
-is dynamically allocated. The bottom line is that the driver structure
-is such that calls to max1111_read() must be serialized.
-> 
-> Signed-off-by: Pavel Herrmann <morpheus.ibis@gmail.com>
-> Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> Acked-by: Pavel Machek <pavel@ucw.cz>
-> Acked-by: Marek Vasut <marek.vasut@gmail.com>
-> Acked-by: Cyril Hrubis <metan@ucw.cz>
-> ---
->  drivers/hwmon/max1111.c |   12 ++++++++++++
->  1 files changed, 12 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/hwmon/max1111.c b/drivers/hwmon/max1111.c
-> index 12a54aa..d872f57 100644
-> --- a/drivers/hwmon/max1111.c
-> +++ b/drivers/hwmon/max1111.c
-> @@ -40,6 +40,7 @@ struct max1111_data {
->  	struct spi_transfer	xfer[2];
->  	uint8_t *tx_buf;
->  	uint8_t *rx_buf;
-> +	struct mutex		msg_lock_mutex;
+>> However, lets recap.  What we do in cpu_suspend() in order is:
+>>
+>> - Save the ABI registers onto the stack, and some private state
+>> - Save the CPU specific state onto the stack
+> We need to disable C bit here to avoid any speculative artifacts
+> during further operations before WFI.
 
-"lock" and "mutex" being kind of synonyms, this is a rather bad name.
-And you should add a comment explaining what is protected. As I
-understand it, it's more than just msg, it's also protecting xfer,
-tx_buf and rx_buf.
+Which you are doing.
 
->  };
->  
->  static int max1111_read(struct device *dev, int channel)
-> @@ -48,6 +49,11 @@ static int max1111_read(struct device *dev, int channel)
->  	uint8_t v1, v2;
->  	int err;
->  
-> +	/* spi_sync requires data not to be freed before function returns
-> +	 * for static data, any access is dangerous, use locks
-> +	 */
+>> - Flush the L1 cache
+>> - Call the platform specific suspend finisher
+> Also finisher function should issue the WFI and just in
+> case for some reason CPU doesn't hit the targeted low
+> power state, finisher function takes care of things
+> like enabling C bit, SMP bit etc.
 
-This has nothing to do with "freeing data". max1111_read() doesn't free
-anything. It is making use of a data structure, the access to which
-must be serialized. Easy as that. And no, access isn't dangerous ;)
+You're restoring the C bit in the non-off paths already which follow a
+failed WFI.  You're not touching the SMP bit there though - was it
+ever reset?  I don't think so.
 
-> +	mutex_lock(&data->msg_lock_mutex);
-> +
->  	data->tx_buf[0] = (channel << MAX1111_CTRL_SEL_SH) |
->  		MAX1111_CTRL_PD0 | MAX1111_CTRL_PD1 |
->  		MAX1111_CTRL_SGL | MAX1111_CTRL_UNI | MAX1111_CTRL_STR;
-> @@ -55,12 +61,15 @@ static int max1111_read(struct device *dev, int channel)
->  	err = spi_sync(data->spi, &data->msg);
->  	if (err < 0) {
->  		dev_err(dev, "spi_sync failed with %d\n", err);
-> +		mutex_unlock(&data->msg_lock_mutex);
->  		return err;
->  	}
->  
->  	v1 = data->rx_buf[0];
->  	v2 = data->rx_buf[1];
->  
-> +	mutex_unlock(&data->msg_lock_mutex);
-> +
->  	if ((v1 & 0xc0) || (v2 & 0x3f))
->  		return -EINVAL;
->  
-> @@ -176,6 +185,8 @@ static int __devinit max1111_probe(struct spi_device *spi)
->  	if (err)
->  		goto err_free_data;
->  
-> +	mutex_init(&data->msg_lock_mutex);
-> +
->  	data->spi = spi;
->  	spi_set_drvdata(spi, data);
->  
-> @@ -213,6 +224,7 @@ static int __devexit max1111_remove(struct spi_device *spi)
->  
->  	hwmon_device_unregister(data->hwmon_dev);
->  	sysfs_remove_group(&spi->dev.kobj, &max1111_attr_group);
-> +	mutex_destroy(data->msg_lock_mutex);
+>> On resume, with the MMU and caches off:
+>>
+>> - Platform defined entry point is called, which _may_ be cpu_resume
+>>    directly.
+>> - Platform initial code is executed to do whatever that requires
+>> - cpu_resume will be called
+>> - cpu_resume loads the previously saved private state
+>> - The CPU specific state is restored
+>> - Page table is modified to permit 1:1 mapping for MMU enable
+> 1:1 idmap used here should be mapped as non-cached to avoid L2 related
+> issues. I faced similar issue in OMAP sleep code earlier and later
+> thanks to Colin,  we got the fixed my making use of non-cached idmap.
 
-I didn't know about this function, interesting. No other hwmon driver
-calls it, not sure if it makes sense when the underlying memory is
-going to be freed immediately afterwards anyway. But of course it can't
-hurt.
+It is specified that if the main control register C bit is clear,
+accesses will be uncached.
 
->  	kfree(data->rx_buf);
->  	kfree(data->tx_buf);
->  	kfree(data);
-
-Unrelated to your patch, but these 3 separate allocs are really insane,
-memory usage in this driver could be much improved IMHO.
-
-Please respin your patch with a better struct member name and improved
-description and comments, and I'll be happy to apply it.
-
-Thanks,
--- 
-Jean Delvare
+Whether you get cache hits or not is probably implementation dependent,
+and provided that the state information is cleaned from the L2 cache,
+it doesn't matter if we hit the L2 cached copy or the RAM copy.  It's
+the same data.
