@@ -1,32 +1,43 @@
-From: ido@wizery.com (Ido Yariv)
-Date: Mon, 11 Jul 2011 23:33:56 +0300
-Subject: [PATCH v2 1/6] arm: davinci: Fix low level gpio irq handlers'
-	argument
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024DA7A9DD@dbde02.ent.ti.com>
-References: <1310303679-17936-1-git-send-email-ido@wizery.com>
-	<1310303679-17936-2-git-send-email-ido@wizery.com>
-	<B85A65D85D7EB246BE421B3FB0FBB593024DA7A9DD@dbde02.ent.ti.com>
-Message-ID: <20110711203356.GA5633@WorkStation>
+From: morpheus.ibis@gmail.com (Pavel Herrmann)
+Date: Mon, 11 Jul 2011 22:36:31 +0200
+Subject: [PATCH v2] MAX1111: Fix Race condition causing NULL pointer
+	exception
+In-Reply-To: <20110711221148.3a76d55b@endymion.delvare>
+References: <1310410051-13127-1-git-send-email-morpheus.ibis@gmail.com>
+	<20110711221148.3a76d55b@endymion.delvare>
+Message-ID: <1602583.Pi9fQvRk5m@bloomfield>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sekhar,
+On Monday 11 of July 2011 22:11:48 Jean Delvare wrote:
+> > spi_sync call uses its spi_message parameter to keep completion
+> > information, having this structure static is not thread-safe,
+> > potentially causing one thread having pointers to memory on or above
+> > other threads stack. use mutex to prevent multiple access
+> 
+> This has nothing to do with static, as a matter of fact the structure
+> is dynamically allocated. The bottom line is that the driver structure
+> is such that calls to max1111_read() must be serialized.
 
-On Mon, Jul 11, 2011 at 05:28:44PM +0530, Nori, Sekhar wrote:
-> Thanks for the bug fix.
-> 
-> How about setting the handler data for bank IRQ in
-> davinci_gpio_irq_setup() to &chips[bank]?
-> 
-> chips[bank].regs should give you the register base address
-> (g) and chips[bank].irq_base should give you 'n'.
-> 
-> Also please drop the rename of irq to bank_irq as it is not
-> central to the bug fix.
-> 
-> If you spin in soon enough, we may make it to v3.0
+the structure is dynamically allocated, but the pointer used to hold it is a 
+static global var.
+"static" in this context meant "shared by all threads"
 
-Sure, I'll send a v3 in a few.
+> > +	/* spi_sync requires data not to be freed before function returns
+> > +	 * for static data, any access is dangerous, use locks
+> > +	 */
+> 
+> This has nothing to do with "freeing data". max1111_read() doesn't free
+> anything. It is making use of a data structure, the access to which
+> must be serialized. Easy as that. And no, access isn't dangerous ;)
 
-Thanks for the review,
-Ido.
+as spi_message contains a pointer to completion (created and waited on by 
+spi_sync()), witch gets rewritten and causes the NULL exception, writing to it 
+while the call is in progress is bad idea. also changing the message sent 
+half-way would not be very nice.
+reading would be fine, though
+
+> Please respin your patch with a better struct member name and improved
+> description and comments, and I'll be happy to apply it.
+
+on it
