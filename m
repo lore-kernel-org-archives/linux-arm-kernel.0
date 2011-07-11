@@ -1,58 +1,59 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Mon, 11 Jul 2011 12:17:25 -0500
-Subject: [PATCH 01/52] ARM: introduce atag_offset to replace boot_params
-In-Reply-To: <alpine.LFD.2.00.1107111046350.14596@xanadu.home>
-References: <1309920457-21913-1-git-send-email-nicolas.pitre@linaro.org>
-	<20110708203634.GU4812@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1107081714251.14596@xanadu.home>
-	<alpine.LFD.2.00.1107111046350.14596@xanadu.home>
-Message-ID: <ADE657CA350FB648AAC2C43247A983F001F383D6D6F7@AUSP01VMBX24.collaborationhost.net>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Mon, 11 Jul 2011 18:00:46 +0100
+Subject: ARM cortex A9 performance issue
+In-Reply-To: <CAE_nTV4t64A7JGN117Pkg1dmqnEvPFkE1AqoyRbeVhN3dN1Q8g@mail.gmail.com>
+References: <CAE_nTV4VgcNB0gc64zEPEfHp-hnDBsw6QsM=GqEObXAwzMTzTA@mail.gmail.com>
+	<20110707152740.GG2486@arm.com>
+	<CAE_nTV7PuEJx0WJKCtbGU-4HjEBzFxPRmPLue1toktS27Htbzg@mail.gmail.com>
+	<20110708133315.GB2115@arm.com>
+	<CAE_nTV4t64A7JGN117Pkg1dmqnEvPFkE1AqoyRbeVhN3dN1Q8g@mail.gmail.com>
+Message-ID: <20110711170032.GA3137@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, July 11, 2011 7:59 AM, Nicolas Pitre wrote:
-> After looking at it some more, this can't work either as on ep93xx the 
-> RAM offset is currently selected a kernel config time and we do want to 
-> get rid of that.
+On Mon, Jul 11, 2011 at 01:56:35PM +0530, rd bairva wrote:
+> Attaching the new code.
+> 
+> On Fri, Jul 8, 2011 at 7:03 PM, Dave Martin <dave.martin@linaro.org> wrote:
+> > On Fri, Jul 08, 2011 at 05:08:38PM +0530, rd bairva wrote:
+> >> Now i have modified a source a little bit. Now I am doing a pingpong
+> >> using msgsnd and msgrcv. using this I am getting 40000req/sec and 55%
+> >> CPU usage.
+> >> In another version I have taken the same lock in both the processes to
+> >> ensure same thread is unlocking the mutex. But CPU usage is 100%.
+> >> Shouldn't be the behaviour 50%.
+> >
+> > Possibly. ?Do you see that behaviour on all platforms, or just A9?
+> On single processor it is always 100% on ARM as well as X86. but on
+> X86, cpu is >50% free.
 
-The ep93xx actually uses the same relative offset for the boot_params (+0x100)
-for all memory configurations.  The issue is the base physical address of the
-system memory.
+For me, on x86:
 
-There are four sdram chip selects available on the ep93xx.  These, along with
-the ASDO boot option pin, define the base address for the sdram.
+With WITH_MSG, the test consumes about 56-57% on two CPUs.
+Without WITH_MSG, the test consumes about 59-60% on two CPUs.
 
-nSDCS3, ASDO=1	0x00000000
-nSDCS3, ASDO=0	0xf0000000
-nSDCS2, ASDO=x	0xe0000000
-nSDCS1, ASDO=x	0xd0000000
-nSDCS0, ASDO=x	0xc0000000
+(as reported by running top during the test)
 
-Unfortunately, all the ep93xx boards I have are designed with the sdram using
-nSDCS0 so I can't test the other boot configurations.
+For me, this is as expected: there is some latency involved in signalling
+between CPUs, so there should be a bit less than 50% of useful work per
+CPU.  However, there is overhead in both process, and this can parallelise
+against the signalling latency, giving an overall load of a bit more than
+50% per CPU.  The total is about the same on each CPU, since both processes
+are doing essentially the same thing.
 
-Regardless, with these patches, and having ARM_PATCH_PHYS_VIRT enabled, I am
-able to boot all of my boards successfully.
+I quickly hacked up a completely different implementation using pthreads
+condition variables to signal between threads and got similar results (though
+with a bit more CPU load).
 
-The EDB9315 dev board can be jumper selected so that the sdram is connected
-to either nSDSC0 or nSDCS3 (default).
+Someone borrowed by pandaboard, but I'll try on there when I get a chance...
 
-The EDB9312 dev board can be jumper selected to use any of the chip selects
-for the sdram.
+Cheers
+---Dave
 
-If anyone has access to either of these boards and could test these patches
-it would be a great help.
-
-Before the ARM_PATCH_PHYS_VIRT patch the Kconfig options to select the
-"EP93xx first SDRAM bank selection" was needed to limit the board selections
-so that only board which shared an SDRAM chip select configuration could be
-selected.  With ARM_PATCH_PHYS_VIRT I don't think this is needed any longer.
-
-But, if the boot_params are still going to be used, the bank selection is still
-needed so that the physical address of the boot_params is correct.  Changing it
-to an atag_offset makes it work on the ep93xx.
-
-Just my 2 cents....
-
-Regards,
-Hartley
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: pingpong.c
+Type: text/x-csrc
+Size: 3602 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110711/18ac98eb/attachment.bin>
