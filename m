@@ -1,34 +1,87 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 11 Jul 2011 21:02:44 -0400 (EDT)
-Subject: ARM: kprobes: Add support for Thumb-2
-In-Reply-To: <1310209058-20980-1-git-send-email-tixy@yxit.co.uk>
-References: <1310209058-20980-1-git-send-email-tixy@yxit.co.uk>
-Message-ID: <alpine.LFD.2.00.1107112046490.14596@xanadu.home>
+From: troy.kisky@boundarydevices.com (Troy Kisky)
+Date: Mon, 11 Jul 2011 19:40:44 -0700
+Subject: [PATCH 1/1] ARM: i.MX50/53: debug-macro: fix UART_PADDR
+Message-ID: <1310438444-4237-1-git-send-email-troy.kisky@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 9 Jul 2011, Tixy wrote:
+The i.MX51 UART_PADDR value does not work for MX50/53.
 
-> This patch series adds support for kprobes on Thumb-2 kernels.
-> This requires making the framework handle Thumb breakpoints and adding
-> simulation and emulation routines for the Thumb instruction set.
-> 
-> Note, this series also modifies the existing behaviour in the case when
-> probes are placed on conditionally executed instructions (see patch 15).
+Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
+---
+ arch/arm/plat-mxc/include/mach/debug-macro.S |   42 +++++++++++++++++++++-----
+ 1 files changed, 34 insertions(+), 8 deletions(-)
 
-Pretty nice and well organized patch series.  This is excellent work !
-
-Although I didn't reply to all the patches, I've read them all and you 
-can add "Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>" to all of 
-them after the already posted comments are addressed.
-
-I know that you also developed a comprehensive test suite in parallel to 
-validate all this code.  I'm therefore pretty confident it'll work as 
-well if not better than the existing code we had in the tree for quite a 
-while before you started working on it.
-
-I think this is ready to be merged with Russell whenever you are done 
-with those small fixes.
-
-
-Nicolas
+diff --git a/arch/arm/plat-mxc/include/mach/debug-macro.S b/arch/arm/plat-mxc/include/mach/debug-macro.S
+index 8e8d175..6b696cd 100644
+--- a/arch/arm/plat-mxc/include/mach/debug-macro.S
++++ b/arch/arm/plat-mxc/include/mach/debug-macro.S
+@@ -17,32 +17,58 @@
+ #endif
+ 
+ #ifdef CONFIG_ARCH_MX25
+-#ifdef UART_PADDR
++#ifndef UART_PADDR
++#define UART_PADDR	MX25_UART1_BASE_ADDR
++#endif
++#if UART_PADDR != MX25_UART1_BASE_ADDR
+ #error "CONFIG_DEBUG_LL is incompatible with multiple archs"
+ #endif
+-#define UART_PADDR	MX25_UART1_BASE_ADDR
+ #endif
+ 
+ #ifdef CONFIG_ARCH_MX2
+-#ifdef UART_PADDR
++#ifndef UART_PADDR
++#define UART_PADDR	MX2x_UART1_BASE_ADDR
++#endif
++#if UART_PADDR != MX2x_UART1_BASE_ADDR
+ #error "CONFIG_DEBUG_LL is incompatible with multiple archs"
+ #endif
+-#define UART_PADDR	MX2x_UART1_BASE_ADDR
+ #endif
+ 
+ #ifdef CONFIG_ARCH_MX3
+-#ifdef UART_PADDR
++#ifndef UART_PADDR
++#define UART_PADDR	MX3x_UART1_BASE_ADDR
++#endif
++#if UART_PADDR != MX3x_UART1_BASE_ADDR
+ #error "CONFIG_DEBUG_LL is incompatible with multiple archs"
+ #endif
+-#define UART_PADDR	MX3x_UART1_BASE_ADDR
+ #endif
+ 
+-#ifdef CONFIG_ARCH_MX5
+-#ifdef UART_PADDR
++#ifdef CONFIG_ARCH_MX50
++#ifndef UART_PADDR
++#define UART_PADDR	MX50_UART1_BASE_ADDR
++#endif
++#if UART_PADDR != MX50_UART1_BASE_ADDR
+ #error "CONFIG_DEBUG_LL is incompatible with multiple archs"
+ #endif
++#endif
++
++#ifdef CONFIG_ARCH_MX51
++#ifndef UART_PADDR
+ #define UART_PADDR	MX51_UART1_BASE_ADDR
+ #endif
++#if UART_PADDR != MX51_UART1_BASE_ADDR
++#error "CONFIG_DEBUG_LL is incompatible with multiple archs"
++#endif
++#endif
++
++#ifdef CONFIG_ARCH_MX53
++#ifndef UART_PADDR
++#define UART_PADDR	MX53_UART1_BASE_ADDR
++#endif
++#if UART_PADDR != MX53_UART1_BASE_ADDR
++#error "CONFIG_DEBUG_LL is incompatible with multiple archs"
++#endif
++#endif
+ 
+ #define UART_VADDR	IMX_IO_ADDRESS(UART_PADDR)
+ 
+-- 
+1.7.0.4
