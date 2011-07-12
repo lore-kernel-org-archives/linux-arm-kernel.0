@@ -1,31 +1,17 @@
-From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Tue, 12 Jul 2011 22:02:09 +0530
-Subject: [PATCH] OMAP4: 4430SDP: Keypad: Make keypad_data initdata
-Message-ID: <1310488329-16139-1-git-send-email-shubhrajyoti@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 12 Jul 2011 18:35:31 +0200
+Subject: [PATCH] MAINTAINERS: add maintainer of CSR SiRFprimaII machine
+In-Reply-To: <1310478250-2210-1-git-send-email-21cnbao@gmail.com>
+References: <1310478250-2210-1-git-send-email-21cnbao@gmail.com>
+Message-ID: <201107121835.31193.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The keypad data is accessed only at init so making it initdata.
-This removes the section mismatch warning.
+On Tuesday 12 July 2011, Barry Song wrote:
+> Signed-off-by: Barry Song <baohua.song@csr.com>
 
-Reported-by: Kevin Hilman <khilman@ti.com>
-Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
----
- arch/arm/mach-omap2/board-4430sdp.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+Thanks!
 
-diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
-index 47e6ab9..2b28c7e 100644
---- a/arch/arm/mach-omap2/board-4430sdp.c
-+++ b/arch/arm/mach-omap2/board-4430sdp.c
-@@ -195,7 +195,7 @@ static struct omap4_keypad_platform_data sdp4430_keypad_data = {
- 	.cols			= 8,
- };
- 
--static struct omap_board_data keypad_data = {
-+static struct omap_board_data keypad_data __initdata = {
- 	.id	    = 1,
- 	.pads	 = keypad_pads,
- 	.pads_cnt       = ARRAY_SIZE(keypad_pads),
--- 
-1.7.1
+I've simply applied it on top of the git branch you have provided.
+
+	Arnd
