@@ -1,28 +1,25 @@
-From: heechul@illinois.edu (heechul Yun)
-Date: Tue, 12 Jul 2011 00:34:59 -0700
-Subject: [RFC] Improving scalability of smp_mb__[before|after]_clear_bit
-Message-ID: <CAN_5kQAniGQgLix4nAsLpJZ3r=LR_NDjuvaXokJ=NiwLfp=7zw@mail.gmail.com>
+From: khali@linux-fr.org (Jean Delvare)
+Date: Tue, 12 Jul 2011 09:36:06 +0200
+Subject: [PATCH v3] MAX1111: Fix Race condition causing NULL pointer
+	exception
+In-Reply-To: <1310421038-14823-1-git-send-email-morpheus.ibis@gmail.com>
+References: <1310421038-14823-1-git-send-email-morpheus.ibis@gmail.com>
+Message-ID: <20110712093606.5db834cb@endymion.delvare>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I think L2 cache sync operation, called by mb(), is not necessary for bitops.
-This patch improves lat_pagefault of lmbench by up to 11% on a A9 SMP.
-Higher proceesor
-counts can benefit more.
+On Mon, 11 Jul 2011 23:50:38 +0200, Pavel Herrmann wrote:
+> spi_sync call uses its spi_message parameter to keep completion information,
+> using a drvdata structure is not thread-safe, potentially causing one thread
+> having pointers to memory on or above other threads stack. use mutex to
+> prevent multiple access
 
----
-diff --git a/arch/arm/include/asm/bitops.h b/arch/arm/include/asm/bitops.h
-index b4892a0..f428059 100644
---- a/arch/arm/include/asm/bitops.h
-+++ b/arch/arm/include/asm/bitops.h
-@@ -26,8 +26,8 @@
- #include <linux/compiler.h>
- #include <asm/system.h>
+Honestly, I have no idea what "causing one thread having pointers to
+memory on or above other threads stack" means (nor why this would be
+bad.)
 
--#define smp_mb__before_clear_bit()     mb()
--#define smp_mb__after_clear_bit()      mb()
-+#define smp_mb__before_clear_bit()     smp_mb()
-+#define smp_mb__after_clear_bit()      smp_mb()
+Patch applied nevertheless, as it fixes an actual bug which should be
+fixed ASAP. Thanks for your contribution.
 
- /*
-  * These functions are the basis of our bit ops.
+-- 
+Jean Delvare
