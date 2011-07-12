@@ -1,23 +1,61 @@
-From: arnd.bergmann@linaro.org (Arnd Bergmann)
-Date: Tue, 12 Jul 2011 17:23:27 +0200
-Subject: [GIT PULL] pxa: features for next
-In-Reply-To: <CAMPhdO9ibczzuyoyyQBi=MntkWaAfAGRtfvORDYw0En7MWLwhQ@mail.gmail.com>
-References: <CAMPhdO8uQR4km9szkuGDjuym-hViE9+zxtie6D2WGJmf1_9rUg@mail.gmail.com>
-	<201107112319.38768.arnd.bergmann@linaro.org>
-	<CAMPhdO9ibczzuyoyyQBi=MntkWaAfAGRtfvORDYw0En7MWLwhQ@mail.gmail.com>
-Message-ID: <201107121723.27151.arnd.bergmann@linaro.org>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Tue, 12 Jul 2011 18:49:03 +0300
+Subject: [PATCH 3/4] MTD: pxa3xx_nand: enable multiple chip select support
+In-Reply-To: <CACTFLAPpy8v1O+_eDLiLLCD++7mFk0CKbjsFDB3VopjWd99OTg@mail.gmail.com>
+References: <1309319494-17951-1-git-send-email-leiwen@marvell.com>	<1309771536-10597-4-git-send-email-leiwen@marvell.com>	<4E1411BB.4010000@compulab.co.il>	<CACTFLAOmRMDH_6qo_WkndoWX-HPw9RTqbtsURDfw22sWEFS2wg@mail.gmail.com>	<4E1B3ECC.5080308@compulab.co.il>	<CACTFLAPMh+XMpOPPqkDTaEZppSkWxVxFMH3RALTmqOCNk8WAvw@mail.gmail.com>	<4E1B4E21.1090507@compulab.co.il>
+	<CACTFLAPpy8v1O+_eDLiLLCD++7mFk0CKbjsFDB3VopjWd99OTg@mail.gmail.com>
+Message-ID: <4E1C6CEF.9030307@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 12 July 2011, Eric Miao wrote:
-> And Russell kindly provided a better fix, and I've merged and rebased
-> the whole series. Please consider re-pull (just pushed, sync to git.k.o
-> is in still in progress I guess).
-> 
-> I posted the patch as below, with the name changed to handle_IRQ for
-> non-exception stack dump use (as the original handle_irq_event conflicts
-> with the one in kernel/irq/).
+On 07/12/11 15:48, Daniel Mack wrote:
 
-Ok, pulled. Thanks,
+> On Mon, Jul 11, 2011 at 9:25 PM, Igor Grinberg <grinberg@compulab.co.il> wrote:
+>> On 07/11/11 21:53, Daniel Mack wrote:
+>>> At least not in our case. The first level bootloader is entered on
+>>> resume just as it is on a POR event, with the exception that the D3S
+>>> bit in the ASCR register is set in this case.
+>> You say "first level boot loader is entered"... who is loading it and where from?
+>> Indeed, it should happen as in POR case, but again, it resides on some non-volatile
+>> storage, isn't it? What storage does it reside on?
+> That is true. I was assuming that the first-stage loader remains in
+> SRAM and is re-used later, but I think you're right, and it is loaded
+> from NAND again after resume.
+>
+>>> We unconditionally
+>>> initialize the static and dynamic memory controllers and then either
+>>> jump to the routine that initializes the NAND controller, read the 2nd
+>>> level loader and pass control to it. Or (in the resume case) we just
+>>> jump to the address stored at the RAM address 0x80000000 (which has
+>>> been set to cpu_resume previously) and thus enter the kernel again. No
+>>> NAND operations in the game in this case, and this has always worked
+>>> fine.
+>> Except those to read the first stage boot loader... (if it resides on NAND).
+>> Well, our case is working similarly and both the first stage bootloader (OBM)
+>> and the second stage bootloader (U-Boot) reside on the NAND flash,
+>> therefore BootROM has to reconfigure the NAND flash, so it can boot (resume).
+> Well, the load of the first NAND page (where the OBM resides)
 
-	Arnd
+You mean block, page is too small for the OBM to fit...
+
+>  is out
+> of control for our software, as the code in PXA's internal ROM mask
+> takes care for this.
+
+Exactly... the BootROM is configuring the NAND controller
+and (I think) that is one of the reasons we have the keep_config in first place...
+
+> We do not, however, re-initialize the NAND
+> controller in the resume case, just as we don't restore any other
+> pheripheral's registers.
+
+Yes, the NAND initialization is done by the BootROM, so you don't need to reinitialize it.
+Just the DRAM controller (may be SRAM also), so you will be able to jump back to Linux.
+
+> And this has worked fine all the time, and it
+> still does if Lei's latest patch set is not applied.
+
+
+-- 
+Regards,
+Igor.
