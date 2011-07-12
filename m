@@ -1,271 +1,143 @@
-From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Mon, 11 Jul 2011 17:02:08 -0700
-Subject: [PATCH 6/6] ARM: i.MX53: change MX53_..._UARTn_TXD_MUX to UARTn_TXD
-In-Reply-To: <1310428928-2637-1-git-send-email-troy.kisky@boundarydevices.com>
-References: <1310428928-2637-1-git-send-email-troy.kisky@boundarydevices.com>
-Message-ID: <1310428928-2637-6-git-send-email-troy.kisky@boundarydevices.com>
+From: james_p_freyensee@linux.intel.com (J Freyensee)
+Date: Mon, 11 Jul 2011 17:22:39 -0700
+Subject: [PATCH v6] mmc: documentation of mmc non-blocking request usage
+	and design.
+In-Reply-To: <1310325719-2151-1-git-send-email-per.forlin@linaro.org>
+References: <1310325719-2151-1-git-send-email-per.forlin@linaro.org>
+Message-ID: <4E1B93CF.60700@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The _MUX suffix added nothing meaningful, and was
-an unnecessary difference with the MX51.
+On 07/10/2011 12:21 PM, Per Forlin wrote:
+> Documentation about the background and the design of mmc non-blocking.
+> Host driver guidelines to minimize request preparation overhead.
+>
+> Signed-off-by: Per Forlin<per.forlin@linaro.org>
+> Acked-by: Randy Dunlap<rdunlap@xenotime.net>
+> ---
+> ChangeLog:
+>   v2: - Minor updates after proofreading comments from Chris
+>   v3: - Minor updates after more comments from Chris
+>   v4: - Minor updates after comments from Randy
+>   v5: - Fixed one more comment and Acked-by from Randy
+>   v6: - Write out full function names and use () for all functions,
+>         feedback from James.
+>
+>   Documentation/mmc/00-INDEX          |    2 +
+>   Documentation/mmc/mmc-async-req.txt |   88 +++++++++++++++++++++++++++++++++++
+>   2 files changed, 90 insertions(+), 0 deletions(-)
+>   create mode 100644 Documentation/mmc/mmc-async-req.txt
+>
+> diff --git a/Documentation/mmc/00-INDEX b/Documentation/mmc/00-INDEX
+> index 93dd7a7..a9ba672 100644
+> --- a/Documentation/mmc/00-INDEX
+> +++ b/Documentation/mmc/00-INDEX
+> @@ -4,3 +4,5 @@ mmc-dev-attrs.txt
+>           - info on SD and MMC device attributes
+>   mmc-dev-parts.txt
+>           - info on SD and MMC device partitions
+> +mmc-async-req.txt
+> +        - info on mmc asynchronous requests
+> diff --git a/Documentation/mmc/mmc-async-req.txt b/Documentation/mmc/mmc-async-req.txt
+> new file mode 100644
+> index 0000000..aac5634
+> --- /dev/null
+> +++ b/Documentation/mmc/mmc-async-req.txt
+> @@ -0,0 +1,88 @@
+> +Rationale
+> +=========
+> +
+> +How significant is the cache maintenance overhead?
+> +It depends. Fast eMMC and multiple cache levels with speculative cache
+> +pre-fetch makes the cache overhead relatively significant. If the DMA
+> +preparations for the next request are done in parallel with the current
+> +transfer, the DMA preparation overhead would not affect the MMC performance.
+> +The intention of non-blocking (asynchronous) MMC requests is to minimize the
+> +time between when an MMC request ends and another MMC request begins.
+> +Using mmc_wait_for_req(), the MMC controller is idle while dma_map_sg and
+> +dma_unmap_sg are processing. Using non-blocking MMC requests makes it
+> +possible to prepare the caches for next job in parallel with an active
+> +MMC request.
+> +
+> +MMC block driver
+> +================
+> +
+> +The mmc_blk_issue_rw_rq() in the MMC block driver is made non-blocking.
+> +The increase in throughput is proportional to the time it takes to
+> +prepare (major part of preparations are dma_map_sg() and dma_unmap_sg())
+> +a request and how fast the memory is. The faster the MMC/SD is
+> +the more significant the prepare request time becomes. Roughly the expected
+> +performance gain is 5% for large writes and 10% on large reads on a L2 cache
+> +platform. In power save mode, when clocks run on a lower frequency, the DMA
+> +preparation may cost even more. As long as these slower preparations are run
+> +in parallel with the transfer performance won't be affected.
+> +
+> +Details on measurements from IOZone and mmc_test
+> +================================================
+> +
+> +https://wiki.linaro.org/WorkingGroups/Kernel/Specs/StoragePerfMMC-async-req
+> +
+> +MMC core API extension
+> +======================
+> +
+> +There is one new public function mmc_start_req().
+> +It starts a new MMC command request for a host. The function isn't
+> +truly non-blocking. If there is on ongoing async request it waits
+> +for completion of that request and starts the new one and returns. It
+> +doesn't wait for the new request to complete. If there is no ongoing
+> +request it starts the new request and returns immediately.
+> +
+> +MMC host extensions
+> +===================
+> +
+> +There are two optional members in the
+> +mmc_host_ops -- pre_req() and post_req() -- that the host
+> +driver may implement in order to move work to before and after the actual
+> +mmc_host_ops.request() function is called. In the DMA case pre_req() may do
+> +dma_map_sg() and prepare the DMA descriptor, and post_req() runs
+> +the dma_unmap_sg().
+> +
 
-Also, change .._RXD_MUX to _RXD
+One question: Is the 'Optimize for the first request' below an example 
+of how to use the 'MMC host extensions' above?  So just using 
+'mmc_start_req()' in an MMC client driver would not be beneficial if the 
+MMC host was not also using the MMC host extensions, right?
 
-Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
----
- arch/arm/mach-mx5/board-mx53_evk.c          |   12 ++++----
- arch/arm/mach-mx5/board-mx53_loco.c         |    4 +-
- arch/arm/mach-mx5/board-mx53_smd.c          |   12 ++++----
- arch/arm/plat-mxc/include/mach/iomux-mx53.h |   44 +++++++++++++-------------
- 4 files changed, 36 insertions(+), 36 deletions(-)
+Thanks,
+Jay
 
-diff --git a/arch/arm/mach-mx5/board-mx53_evk.c b/arch/arm/mach-mx5/board-mx53_evk.c
-index f87d571..2a23b48 100644
---- a/arch/arm/mach-mx5/board-mx53_evk.c
-+++ b/arch/arm/mach-mx5/board-mx53_evk.c
-@@ -40,16 +40,16 @@
- #include "devices-imx53.h"
- 
- static iomux_v3_cfg_t mx53_evk_pads[] = {
--	MX53_PAD_CSI0_DAT10__UART1_TXD_MUX,
--	MX53_PAD_CSI0_DAT11__UART1_RXD_MUX,
-+	MX53_PAD_CSI0_DAT10__UART1_TXD,
-+	MX53_PAD_CSI0_DAT11__UART1_RXD,
- 
--	MX53_PAD_PATA_BUFFER_EN__UART2_RXD_MUX,
--	MX53_PAD_PATA_DMARQ__UART2_TXD_MUX,
-+	MX53_PAD_PATA_BUFFER_EN__UART2_RXD,
-+	MX53_PAD_PATA_DMARQ__UART2_TXD,
- 	MX53_PAD_PATA_DIOR__UART2_RTS,
- 	MX53_PAD_PATA_INTRQ__UART2_CTS,
- 
--	MX53_PAD_PATA_CS_0__UART3_TXD_MUX,
--	MX53_PAD_PATA_CS_1__UART3_RXD_MUX,
-+	MX53_PAD_PATA_CS_0__UART3_TXD,
-+	MX53_PAD_PATA_CS_1__UART3_RXD,
- 
- 	MX53_PAD_EIM_D16__ECSPI1_SCLK,
- 	MX53_PAD_EIM_D17__ECSPI1_MISO,
-diff --git a/arch/arm/mach-mx5/board-mx53_loco.c b/arch/arm/mach-mx5/board-mx53_loco.c
-index 1b947e8..c1eac9e 100644
---- a/arch/arm/mach-mx5/board-mx53_loco.c
-+++ b/arch/arm/mach-mx5/board-mx53_loco.c
-@@ -112,8 +112,8 @@ static iomux_v3_cfg_t mx53_loco_pads[] = {
- 	MX53_PAD_CSI0_DAT8__I2C1_SDA,
- 	MX53_PAD_CSI0_DAT9__I2C1_SCL,
- 	/* UART1 */
--	MX53_PAD_CSI0_DAT10__UART1_TXD_MUX,
--	MX53_PAD_CSI0_DAT11__UART1_RXD_MUX,
-+	MX53_PAD_CSI0_DAT10__UART1_TXD,
-+	MX53_PAD_CSI0_DAT11__UART1_RXD,
- 	/* CSI0 */
- 	MX53_PAD_CSI0_DAT12__IPU_CSI0_D_12,
- 	MX53_PAD_CSI0_DAT13__IPU_CSI0_D_13,
-diff --git a/arch/arm/mach-mx5/board-mx53_smd.c b/arch/arm/mach-mx5/board-mx53_smd.c
-index 817c089..ecafcb4 100644
---- a/arch/arm/mach-mx5/board-mx53_smd.c
-+++ b/arch/arm/mach-mx5/board-mx53_smd.c
-@@ -37,14 +37,14 @@
- #define SMD_FEC_PHY_RST		IMX_GPIO_NR(7, 6)
- 
- static iomux_v3_cfg_t mx53_smd_pads[] = {
--	MX53_PAD_CSI0_DAT10__UART1_TXD_MUX,
--	MX53_PAD_CSI0_DAT11__UART1_RXD_MUX,
-+	MX53_PAD_CSI0_DAT10__UART1_TXD,
-+	MX53_PAD_CSI0_DAT11__UART1_RXD,
- 
--	MX53_PAD_PATA_BUFFER_EN__UART2_RXD_MUX,
--	MX53_PAD_PATA_DMARQ__UART2_TXD_MUX,
-+	MX53_PAD_PATA_BUFFER_EN__UART2_RXD,
-+	MX53_PAD_PATA_DMARQ__UART2_TXD,
- 
--	MX53_PAD_PATA_CS_0__UART3_TXD_MUX,
--	MX53_PAD_PATA_CS_1__UART3_RXD_MUX,
-+	MX53_PAD_PATA_CS_0__UART3_TXD,
-+	MX53_PAD_PATA_CS_1__UART3_RXD,
- 	MX53_PAD_PATA_DA_1__UART3_CTS,
- 	MX53_PAD_PATA_DA_2__UART3_RTS,
- 	/* I2C1 */
-diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx53.h b/arch/arm/plat-mxc/include/mach/iomux-mx53.h
-index 04dbbb6..93f3ffb 100644
---- a/arch/arm/plat-mxc/include/mach/iomux-mx53.h
-+++ b/arch/arm/plat-mxc/include/mach/iomux-mx53.h
-@@ -43,27 +43,27 @@
- #define MX53_PAD_KEY_COL0__KPP_COL_0			IOMUX_PAD(0x34C, 0x024, 0, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_KEY_COL0__GPIO4_6			IOMUX_PAD(0x34C, 0x024, 1, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_KEY_COL0__AUDMUX_AUD5_TXC		IOMUX_PAD(0x34C, 0x024, 2, 0x758, 0, NO_PAD_CTRL)
--#define MX53_PAD_KEY_COL0__UART4_TXD_MUX		IOMUX_PAD(0x34C, 0x024, 4, __NA_, 0, MX53_UART_PAD_CTRL)
-+#define MX53_PAD_KEY_COL0__UART4_TXD			IOMUX_PAD(0x34C, 0x024, 4, __NA_, 0, MX53_UART_PAD_CTRL)
- #define MX53_PAD_KEY_COL0__ECSPI1_SCLK			IOMUX_PAD(0x34C, 0x024, 5, 0x79C, 0, NO_PAD_CTRL)
- #define MX53_PAD_KEY_COL0__FEC_RDATA_3			IOMUX_PAD(0x34C, 0x024, 6, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_KEY_COL0__SRC_ANY_PU_RST		IOMUX_PAD(0x34C, 0x024, 7, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_KEY_ROW0__KPP_ROW_0			IOMUX_PAD(0x350, 0x028, 0, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_KEY_ROW0__GPIO4_7			IOMUX_PAD(0x350, 0x028, 1, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_KEY_ROW0__AUDMUX_AUD5_TXD		IOMUX_PAD(0x350, 0x028, 2, 0x74C, 0, NO_PAD_CTRL)
--#define MX53_PAD_KEY_ROW0__UART4_RXD_MUX		IOMUX_PAD(0x350, 0x028, 4, 0x890, 1, MX53_UART_PAD_CTRL)
-+#define MX53_PAD_KEY_ROW0__UART4_RXD			IOMUX_PAD(0x350, 0x028, 4, 0x890, 1, MX53_UART_PAD_CTRL)
- #define MX53_PAD_KEY_ROW0__ECSPI1_MOSI			IOMUX_PAD(0x350, 0x028, 5, 0x7A4, 0, NO_PAD_CTRL)
- #define MX53_PAD_KEY_ROW0__FEC_TX_ER			IOMUX_PAD(0x350, 0x028, 6, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_KEY_COL1__KPP_COL_1			IOMUX_PAD(0x354, 0x02C, 0, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_KEY_COL1__GPIO4_8			IOMUX_PAD(0x354, 0x02C, 1, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_KEY_COL1__AUDMUX_AUD5_TXFS		IOMUX_PAD(0x354, 0x02C, 2, 0x75C, 0, NO_PAD_CTRL)
--#define MX53_PAD_KEY_COL1__UART5_TXD_MUX		IOMUX_PAD(0x354, 0x02C, 4, __NA_, 0, MX53_UART_PAD_CTRL)
-+#define MX53_PAD_KEY_COL1__UART5_TXD			IOMUX_PAD(0x354, 0x02C, 4, __NA_, 0, MX53_UART_PAD_CTRL)
- #define MX53_PAD_KEY_COL1__ECSPI1_MISO			IOMUX_PAD(0x354, 0x02C, 5, 0x7A0, 0, NO_PAD_CTRL)
- #define MX53_PAD_KEY_COL1__FEC_RX_CLK			IOMUX_PAD(0x354, 0x02C, 6, 0x808, 0, NO_PAD_CTRL)
- #define MX53_PAD_KEY_COL1__USBPHY1_TXREADY		IOMUX_PAD(0x354, 0x02C, 7, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_KEY_ROW1__KPP_ROW_1			IOMUX_PAD(0x358, 0x030, 0, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_KEY_ROW1__GPIO4_9			IOMUX_PAD(0x358, 0x030, 1, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_KEY_ROW1__AUDMUX_AUD5_RXD		IOMUX_PAD(0x358, 0x030, 2, 0x748, 0, NO_PAD_CTRL)
--#define MX53_PAD_KEY_ROW1__UART5_RXD_MUX		IOMUX_PAD(0x358, 0x030, 4, 0x898, 1, MX53_UART_PAD_CTRL)
-+#define MX53_PAD_KEY_ROW1__UART5_RXD			IOMUX_PAD(0x358, 0x030, 4, 0x898, 1, MX53_UART_PAD_CTRL)
- #define MX53_PAD_KEY_ROW1__ECSPI1_SS0			IOMUX_PAD(0x358, 0x030, 5, 0x7A8, 0, NO_PAD_CTRL)
- #define MX53_PAD_KEY_ROW1__FEC_COL			IOMUX_PAD(0x358, 0x030, 6, 0x800, 0, NO_PAD_CTRL)
- #define MX53_PAD_KEY_ROW1__USBPHY1_RXVALID		IOMUX_PAD(0x358, 0x030, 7, __NA_, 0, NO_PAD_CTRL)
-@@ -390,7 +390,7 @@
- #define MX53_PAD_CSI0_DAT9__TPIU_TRACE_6		IOMUX_PAD(0x410, 0x0E4, 7, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_CSI0_DAT10__IPU_CSI0_D_10		IOMUX_PAD(0x414, 0x0E8, 0, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_CSI0_DAT10__GPIO5_28			IOMUX_PAD(0x414, 0x0E8, 1, __NA_, 0, NO_PAD_CTRL)
--#define MX53_PAD_CSI0_DAT10__UART1_TXD_MUX		IOMUX_PAD(0x414, 0x0E8, 2, __NA_, 0, MX53_UART_PAD_CTRL)
-+#define MX53_PAD_CSI0_DAT10__UART1_TXD			IOMUX_PAD(0x414, 0x0E8, 2, __NA_, 0, MX53_UART_PAD_CTRL)
- #define MX53_PAD_CSI0_DAT10__ECSPI2_MISO		IOMUX_PAD(0x414, 0x0E8, 3, 0x7BC, 1, NO_PAD_CTRL)
- #define MX53_PAD_CSI0_DAT10__AUDMUX_AUD3_RXC		IOMUX_PAD(0x414, 0x0E8, 4, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_CSI0_DAT10__SDMA_DEBUG_PC_4		IOMUX_PAD(0x414, 0x0E8, 5, __NA_, 0, NO_PAD_CTRL)
-@@ -398,7 +398,7 @@
- #define MX53_PAD_CSI0_DAT10__TPIU_TRACE_7		IOMUX_PAD(0x414, 0x0E8, 7, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_CSI0_DAT11__IPU_CSI0_D_11		IOMUX_PAD(0x418, 0x0EC, 0, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_CSI0_DAT11__GPIO5_29			IOMUX_PAD(0x418, 0x0EC, 1, __NA_, 0, NO_PAD_CTRL)
--#define MX53_PAD_CSI0_DAT11__UART1_RXD_MUX		IOMUX_PAD(0x418, 0x0EC, 2, 0x878, 1, MX53_UART_PAD_CTRL)
-+#define MX53_PAD_CSI0_DAT11__UART1_RXD			IOMUX_PAD(0x418, 0x0EC, 2, 0x878, 1, MX53_UART_PAD_CTRL)
- #define MX53_PAD_CSI0_DAT11__ECSPI2_SS0			IOMUX_PAD(0x418, 0x0EC, 3, 0x7C4, 1, NO_PAD_CTRL)
- #define MX53_PAD_CSI0_DAT11__AUDMUX_AUD3_RXFS		IOMUX_PAD(0x418, 0x0EC, 4, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_CSI0_DAT11__SDMA_DEBUG_PC_5		IOMUX_PAD(0x418, 0x0EC, 5, __NA_, 0, NO_PAD_CTRL)
-@@ -406,28 +406,28 @@
- #define MX53_PAD_CSI0_DAT11__TPIU_TRACE_8		IOMUX_PAD(0x418, 0x0EC, 7, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_CSI0_DAT12__IPU_CSI0_D_12		IOMUX_PAD(0x41C, 0x0F0, 0, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_CSI0_DAT12__GPIO5_30			IOMUX_PAD(0x41C, 0x0F0, 1, __NA_, 0, NO_PAD_CTRL)
--#define MX53_PAD_CSI0_DAT12__UART4_TXD_MUX		IOMUX_PAD(0x41C, 0x0F0, 2, __NA_, 0, MX53_UART_PAD_CTRL)
-+#define MX53_PAD_CSI0_DAT12__UART4_TXD			IOMUX_PAD(0x41C, 0x0F0, 2, __NA_, 0, MX53_UART_PAD_CTRL)
- #define MX53_PAD_CSI0_DAT12__USBOH3_USBH3_DATA_0	IOMUX_PAD(0x41C, 0x0F0, 4, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_CSI0_DAT12__SDMA_DEBUG_PC_6		IOMUX_PAD(0x41C, 0x0F0, 5, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_CSI0_DAT12__EMI_EMI_DEBUG_41		IOMUX_PAD(0x41C, 0x0F0, 6, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_CSI0_DAT12__TPIU_TRACE_9		IOMUX_PAD(0x41C, 0x0F0, 7, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_CSI0_DAT13__IPU_CSI0_D_13		IOMUX_PAD(0x420, 0x0F4, 0, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_CSI0_DAT13__GPIO5_31			IOMUX_PAD(0x420, 0x0F4, 1, __NA_, 0, NO_PAD_CTRL)
--#define MX53_PAD_CSI0_DAT13__UART4_RXD_MUX		IOMUX_PAD(0x420, 0x0F4, 2, 0x890, 3, MX53_UART_PAD_CTRL)
-+#define MX53_PAD_CSI0_DAT13__UART4_RXD			IOMUX_PAD(0x420, 0x0F4, 2, 0x890, 3, MX53_UART_PAD_CTRL)
- #define MX53_PAD_CSI0_DAT13__USBOH3_USBH3_DATA_1	IOMUX_PAD(0x420, 0x0F4, 4, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_CSI0_DAT13__SDMA_DEBUG_PC_7		IOMUX_PAD(0x420, 0x0F4, 5, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_CSI0_DAT13__EMI_EMI_DEBUG_42		IOMUX_PAD(0x420, 0x0F4, 6, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_CSI0_DAT13__TPIU_TRACE_10		IOMUX_PAD(0x420, 0x0F4, 7, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_CSI0_DAT14__IPU_CSI0_D_14		IOMUX_PAD(0x424, 0x0F8, 0, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_CSI0_DAT14__GPIO6_0			IOMUX_PAD(0x424, 0x0F8, 1, __NA_, 0, NO_PAD_CTRL)
--#define MX53_PAD_CSI0_DAT14__UART5_TXD_MUX		IOMUX_PAD(0x424, 0x0F8, 2, __NA_, 0, MX53_UART_PAD_CTRL)
-+#define MX53_PAD_CSI0_DAT14__UART5_TXD			IOMUX_PAD(0x424, 0x0F8, 2, __NA_, 0, MX53_UART_PAD_CTRL)
- #define MX53_PAD_CSI0_DAT14__USBOH3_USBH3_DATA_2	IOMUX_PAD(0x424, 0x0F8, 4, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_CSI0_DAT14__SDMA_DEBUG_PC_8		IOMUX_PAD(0x424, 0x0F8, 5, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_CSI0_DAT14__EMI_EMI_DEBUG_43		IOMUX_PAD(0x424, 0x0F8, 6, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_CSI0_DAT14__TPIU_TRACE_11		IOMUX_PAD(0x424, 0x0F8, 7, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_CSI0_DAT15__IPU_CSI0_D_15		IOMUX_PAD(0x428, 0x0FC, 0, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_CSI0_DAT15__GPIO6_1			IOMUX_PAD(0x428, 0x0FC, 1, __NA_, 0, NO_PAD_CTRL)
--#define MX53_PAD_CSI0_DAT15__UART5_RXD_MUX		IOMUX_PAD(0x428, 0x0FC, 2, 0x898, 3, MX53_UART_PAD_CTRL)
-+#define MX53_PAD_CSI0_DAT15__UART5_RXD			IOMUX_PAD(0x428, 0x0FC, 2, 0x898, 3, MX53_UART_PAD_CTRL)
- #define MX53_PAD_CSI0_DAT15__USBOH3_USBH3_DATA_3	IOMUX_PAD(0x428, 0x0FC, 4, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_CSI0_DAT15__SDMA_DEBUG_PC_9		IOMUX_PAD(0x428, 0x0FC, 5, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_CSI0_DAT15__EMI_EMI_DEBUG_44		IOMUX_PAD(0x428, 0x0FC, 6, __NA_, 0, NO_PAD_CTRL)
-@@ -538,7 +538,7 @@
- #define MX53_PAD_EIM_EB3__IPU_DI1_PIN16			IOMUX_PAD(0x480, 0x138, 7, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_EIM_D24__EMI_WEIM_D_24			IOMUX_PAD(0x484, 0x13C, 0, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_EIM_D24__GPIO3_24			IOMUX_PAD(0x484, 0x13C, 1, __NA_, 0, NO_PAD_CTRL)
--#define MX53_PAD_EIM_D24__UART3_TXD_MUX			IOMUX_PAD(0x484, 0x13C, 2, __NA_, 0, MX53_UART_PAD_CTRL)
-+#define MX53_PAD_EIM_D24__UART3_TXD			IOMUX_PAD(0x484, 0x13C, 2, __NA_, 0, MX53_UART_PAD_CTRL)
- #define MX53_PAD_EIM_D24__ECSPI1_SS2			IOMUX_PAD(0x484, 0x13C, 3, 0x7B0, 1, NO_PAD_CTRL)
- #define MX53_PAD_EIM_D24__CSPI_SS2			IOMUX_PAD(0x484, 0x13C, 4, 0x794, 1, NO_PAD_CTRL)
- #define MX53_PAD_EIM_D24__AUDMUX_AUD5_RXFS		IOMUX_PAD(0x484, 0x13C, 5, 0x754, 1, NO_PAD_CTRL)
-@@ -546,7 +546,7 @@
- #define MX53_PAD_EIM_D24__UART1_DTR			IOMUX_PAD(0x484, 0x13C, 7, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_EIM_D25__EMI_WEIM_D_25			IOMUX_PAD(0x488, 0x140, 0, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_EIM_D25__GPIO3_25			IOMUX_PAD(0x488, 0x140, 1, __NA_, 0, NO_PAD_CTRL)
--#define MX53_PAD_EIM_D25__UART3_RXD_MUX			IOMUX_PAD(0x488, 0x140, 2, 0x888, 1, MX53_UART_PAD_CTRL)
-+#define MX53_PAD_EIM_D25__UART3_RXD			IOMUX_PAD(0x488, 0x140, 2, 0x888, 1, MX53_UART_PAD_CTRL)
- #define MX53_PAD_EIM_D25__ECSPI1_SS3			IOMUX_PAD(0x488, 0x140, 3, 0x7B4, 1, NO_PAD_CTRL)
- #define MX53_PAD_EIM_D25__CSPI_SS3			IOMUX_PAD(0x488, 0x140, 4, 0x798, 1, NO_PAD_CTRL)
- #define MX53_PAD_EIM_D25__AUDMUX_AUD5_RXC		IOMUX_PAD(0x488, 0x140, 5, 0x750, 1, NO_PAD_CTRL)
-@@ -554,7 +554,7 @@
- #define MX53_PAD_EIM_D25__UART1_DSR			IOMUX_PAD(0x488, 0x140, 7, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_EIM_D26__EMI_WEIM_D_26			IOMUX_PAD(0x48C, 0x144, 0, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_EIM_D26__GPIO3_26			IOMUX_PAD(0x48C, 0x144, 1, __NA_, 0, NO_PAD_CTRL)
--#define MX53_PAD_EIM_D26__UART2_TXD_MUX			IOMUX_PAD(0x48C, 0x144, 2, __NA_, 0, MX53_UART_PAD_CTRL)
-+#define MX53_PAD_EIM_D26__UART2_TXD			IOMUX_PAD(0x48C, 0x144, 2, __NA_, 0, MX53_UART_PAD_CTRL)
- #define MX53_PAD_EIM_D26__FIRI_RXD			IOMUX_PAD(0x48C, 0x144, 3, 0x80C, 0, NO_PAD_CTRL)
- #define MX53_PAD_EIM_D26__IPU_CSI0_D_1			IOMUX_PAD(0x48C, 0x144, 4, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_EIM_D26__IPU_DI1_PIN11			IOMUX_PAD(0x48C, 0x144, 5, __NA_, 0, NO_PAD_CTRL)
-@@ -562,7 +562,7 @@
- #define MX53_PAD_EIM_D26__IPU_DISP1_DAT_22		IOMUX_PAD(0x48C, 0x144, 7, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_EIM_D27__EMI_WEIM_D_27			IOMUX_PAD(0x490, 0x148, 0, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_EIM_D27__GPIO3_27			IOMUX_PAD(0x490, 0x148, 1, __NA_, 0, NO_PAD_CTRL)
--#define MX53_PAD_EIM_D27__UART2_RXD_MUX			IOMUX_PAD(0x490, 0x148, 2, 0x880, 1, MX53_UART_PAD_CTRL)
-+#define MX53_PAD_EIM_D27__UART2_RXD			IOMUX_PAD(0x490, 0x148, 2, 0x880, 1, MX53_UART_PAD_CTRL)
- #define MX53_PAD_EIM_D27__FIRI_TXD			IOMUX_PAD(0x490, 0x148, 3, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_EIM_D27__IPU_CSI0_D_0			IOMUX_PAD(0x490, 0x148, 4, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_EIM_D27__IPU_DI1_PIN13			IOMUX_PAD(0x490, 0x148, 5, __NA_, 0, NO_PAD_CTRL)
-@@ -872,20 +872,20 @@
- #define MX53_PAD_FEC_MDC__USBPHY2_DATAOUT_1		IOMUX_PAD(0x5E8, 0x26C, 7, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_PATA_DIOW__PATA_DIOW			IOMUX_PAD(0x5F0, 0x270, 0, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_PATA_DIOW__GPIO6_17			IOMUX_PAD(0x5F0, 0x270, 1, __NA_, 0, NO_PAD_CTRL)
--#define MX53_PAD_PATA_DIOW__UART1_TXD_MUX		IOMUX_PAD(0x5F0, 0x270, 3, __NA_, 0, MX53_UART_PAD_CTRL)
-+#define MX53_PAD_PATA_DIOW__UART1_TXD			IOMUX_PAD(0x5F0, 0x270, 3, __NA_, 0, MX53_UART_PAD_CTRL)
- #define MX53_PAD_PATA_DIOW__USBPHY2_DATAOUT_2		IOMUX_PAD(0x5F0, 0x270, 7, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_PATA_DMACK__PATA_DMACK			IOMUX_PAD(0x5F4, 0x274, 0, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_PATA_DMACK__GPIO6_18			IOMUX_PAD(0x5F4, 0x274, 1, __NA_, 0, NO_PAD_CTRL)
--#define MX53_PAD_PATA_DMACK__UART1_RXD_MUX		IOMUX_PAD(0x5F4, 0x274, 3, 0x878, 3, MX53_UART_PAD_CTRL)
-+#define MX53_PAD_PATA_DMACK__UART1_RXD			IOMUX_PAD(0x5F4, 0x274, 3, 0x878, 3, MX53_UART_PAD_CTRL)
- #define MX53_PAD_PATA_DMACK__USBPHY2_DATAOUT_3		IOMUX_PAD(0x5F4, 0x274, 7, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_PATA_DMARQ__PATA_DMARQ			IOMUX_PAD(0x5F8, 0x278, 0, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_PATA_DMARQ__GPIO7_0			IOMUX_PAD(0x5F8, 0x278, 1, __NA_, 0, NO_PAD_CTRL)
--#define MX53_PAD_PATA_DMARQ__UART2_TXD_MUX		IOMUX_PAD(0x5F8, 0x278, 3, __NA_, 0, MX53_UART_PAD_CTRL)
-+#define MX53_PAD_PATA_DMARQ__UART2_TXD			IOMUX_PAD(0x5F8, 0x278, 3, __NA_, 0, MX53_UART_PAD_CTRL)
- #define MX53_PAD_PATA_DMARQ__CCM_CCM_OUT_0		IOMUX_PAD(0x5F8, 0x278, 5, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_PATA_DMARQ__USBPHY2_DATAOUT_4		IOMUX_PAD(0x5F8, 0x278, 7, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_PATA_BUFFER_EN__PATA_BUFFER_EN		IOMUX_PAD(0x5FC, 0x27C, 0, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_PATA_BUFFER_EN__GPIO7_1		IOMUX_PAD(0x5FC, 0x27C, 1, __NA_, 0, NO_PAD_CTRL)
--#define MX53_PAD_PATA_BUFFER_EN__UART2_RXD_MUX		IOMUX_PAD(0x5FC, 0x27C, 3, 0x880, 3, MX53_UART_PAD_CTRL)
-+#define MX53_PAD_PATA_BUFFER_EN__UART2_RXD		IOMUX_PAD(0x5FC, 0x27C, 3, 0x880, 3, MX53_UART_PAD_CTRL)
- #define MX53_PAD_PATA_BUFFER_EN__CCM_CCM_OUT_1		IOMUX_PAD(0x5FC, 0x27C, 5, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_PATA_BUFFER_EN__USBPHY2_DATAOUT_5	IOMUX_PAD(0x5FC, 0x27C, 7, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_PATA_INTRQ__PATA_INTRQ			IOMUX_PAD(0x600, 0x280, 0, __NA_, 0, NO_PAD_CTRL)
-@@ -928,11 +928,11 @@
- #define MX53_PAD_PATA_DA_2__USBPHY1_DATAOUT_4		IOMUX_PAD(0x618, 0x298, 7, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_PATA_CS_0__PATA_CS_0			IOMUX_PAD(0x61C, 0x29C, 0, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_PATA_CS_0__GPIO7_9			IOMUX_PAD(0x61C, 0x29C, 1, __NA_, 0, NO_PAD_CTRL)
--#define MX53_PAD_PATA_CS_0__UART3_TXD_MUX		IOMUX_PAD(0x61C, 0x29C, 4, __NA_, 0, MX53_UART_PAD_CTRL)
-+#define MX53_PAD_PATA_CS_0__UART3_TXD			IOMUX_PAD(0x61C, 0x29C, 4, __NA_, 0, MX53_UART_PAD_CTRL)
- #define MX53_PAD_PATA_CS_0__USBPHY1_DATAOUT_5		IOMUX_PAD(0x61C, 0x29C, 7, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_PATA_CS_1__PATA_CS_1			IOMUX_PAD(0x620, 0x2A0, 0, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_PATA_CS_1__GPIO7_10			IOMUX_PAD(0x620, 0x2A0, 1, __NA_, 0, NO_PAD_CTRL)
--#define MX53_PAD_PATA_CS_1__UART3_RXD_MUX		IOMUX_PAD(0x620, 0x2A0, 4, 0x888, 3, MX53_UART_PAD_CTRL)
-+#define MX53_PAD_PATA_CS_1__UART3_RXD			IOMUX_PAD(0x620, 0x2A0, 4, 0x888, 3, MX53_UART_PAD_CTRL)
- #define MX53_PAD_PATA_CS_1__USBPHY1_DATAOUT_6		IOMUX_PAD(0x620, 0x2A0, 7, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_PATA_DATA0__PATA_DATA_0		IOMUX_PAD(0x628, 0x2A4, 0, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_PATA_DATA0__GPIO2_0			IOMUX_PAD(0x628, 0x2A4, 1, __NA_, 0, NO_PAD_CTRL)
-@@ -1180,7 +1180,7 @@
- #define MX53_PAD_GPIO_7__GPIO1_7			IOMUX_PAD(0x6C4, 0x334, 1, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_GPIO_7__EPIT1_EPITO			IOMUX_PAD(0x6C4, 0x334, 2, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_GPIO_7__CAN1_TXCAN			IOMUX_PAD(0x6C4, 0x334, 3, __NA_, 0, NO_PAD_CTRL)
--#define MX53_PAD_GPIO_7__UART2_TXD_MUX			IOMUX_PAD(0x6C4, 0x334, 4, __NA_, 0, MX53_UART_PAD_CTRL)
-+#define MX53_PAD_GPIO_7__UART2_TXD			IOMUX_PAD(0x6C4, 0x334, 4, __NA_, 0, MX53_UART_PAD_CTRL)
- #define MX53_PAD_GPIO_7__FIRI_RXD			IOMUX_PAD(0x6C4, 0x334, 5, 0x80C, 1, NO_PAD_CTRL)
- #define MX53_PAD_GPIO_7__SPDIF_PLOCK			IOMUX_PAD(0x6C4, 0x334, 6, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_GPIO_7__CCM_PLL2_BYP			IOMUX_PAD(0x6C4, 0x334, 7, 0x774, 1, NO_PAD_CTRL)
-@@ -1188,7 +1188,7 @@
- #define MX53_PAD_GPIO_8__GPIO1_8			IOMUX_PAD(0x6C8, 0x338, 1, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_GPIO_8__EPIT2_EPITO			IOMUX_PAD(0x6C8, 0x338, 2, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_GPIO_8__CAN1_RXCAN			IOMUX_PAD(0x6C8, 0x338, 3, 0x760, 3, NO_PAD_CTRL)
--#define MX53_PAD_GPIO_8__UART2_RXD_MUX			IOMUX_PAD(0x6C8, 0x338, 4, 0x880, 5, MX53_UART_PAD_CTRL)
-+#define MX53_PAD_GPIO_8__UART2_RXD			IOMUX_PAD(0x6C8, 0x338, 4, 0x880, 5, MX53_UART_PAD_CTRL)
- #define MX53_PAD_GPIO_8__FIRI_TXD			IOMUX_PAD(0x6C8, 0x338, 5, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_GPIO_8__SPDIF_SRCLK			IOMUX_PAD(0x6C8, 0x338, 6, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_GPIO_8__CCM_PLL3_BYP			IOMUX_PAD(0x6C8, 0x338, 7, 0x778, 1, NO_PAD_CTRL)
--- 
-1.7.0.4
+> +Optimize for the first request
+> +==============================
+> +
+> +The first request in a series of requests can't be prepared in parallel with
+> +the previous transfer, since there is no previous request.
+> +The argument is_first_req in pre_req() indicates that there is no previous
+> +request. The host driver may optimize for this scenario to minimize
+> +the performance loss. A way to optimize for this is to split the current
+> +request in two chunks, prepare the first chunk and start the request,
+> +and finally prepare the second chunk and start the transfer.
+> +
+> +Pseudocode to handle is_first_req scenario with minimal prepare overhead:
+> +
+> +if (is_first_req&&  req->size>  threshold)
+> +   /* start MMC transfer for the complete transfer size */
+> +   mmc_start_command(MMC_CMD_TRANSFER_FULL_SIZE);
+> +
+> +   /*
+> +    * Begin to prepare DMA while cmd is being processed by MMC.
+> +    * The first chunk of the request should take the same time
+> +    * to prepare as the "MMC process command time".
+> +    * If prepare time exceeds MMC cmd time
+> +    * the transfer is delayed, guesstimate max 4k as first chunk size.
+> +    */
+> +    prepare_1st_chunk_for_dma(req);
+> +    /* flush pending desc to the DMAC (dmaengine.h) */
+> +    dma_issue_pending(req->dma_desc);
+> +
+> +    prepare_2nd_chunk_for_dma(req);
+> +    /*
+> +     * The second issue_pending should be called before MMC runs out
+> +     * of the first chunk. If the MMC runs out of the first data chunk
+> +     * before this call, the transfer is delayed.
+> +     */
+> +    dma_issue_pending(req->dma_desc);
