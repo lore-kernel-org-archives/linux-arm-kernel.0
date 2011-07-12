@@ -1,38 +1,60 @@
-From: ccross@android.com (Colin Cross)
-Date: Mon, 11 Jul 2011 21:02:41 -0700
-Subject: [PATCH 1/2] ARM: tegra: remove copy-and-pasted i2c platform data
-	in boards
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF049E834150@HQMAIL01.nvidia.com>
-References: <1310336374-31727-1-git-send-email-ccross@android.com>
-	<74CDBE0F657A3D45AFBB94109FB122FF049E834150@HQMAIL01.nvidia.com>
-Message-ID: <CAMbhsRQqv23cWBOCxhtA+U=tYxnGka_zNHHGLJbg3766ZYnD+A@mail.gmail.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Tue, 12 Jul 2011 09:47:19 +0530
+Subject: [PATCH] dmaengine: add dma_ctrl_cmd to pass buffer stride
+	configuration
+In-Reply-To: <1310310203-12288-1-git-send-email-sundaram@ti.com>
+References: <1310310203-12288-1-git-send-email-sundaram@ti.com>
+Message-ID: <CABb+yY1HJOR+QzmM4-ju4cs+8keoyUbMv+SpVoM6BW=DCMzmQQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 11, 2011 at 8:02 AM, Stephen Warren <swarren@nvidia.com> wrote:
-> Colin Cross wrote at Sunday, July 10, 2011 4:20 PM:
->> Every board file includes the same platform data definition
->> for the i2c-tegra driver's bus speed. ?Move the platform data
->> into devices.c, and remove it from all the board files.
+On Sun, Jul 10, 2011 at 8:33 PM, Sundaram Raju <sundaram@ti.com> wrote:
+> Added new dma_ctrl_cmd TI_DMA_STRIDE_CONFIG to pass the TI DMA
+> controller specific configurations on how a buffer must be walked
+> through and how data is picked for transfer based on a specified
+> pattern over the channel.
 >
-> For both these patches, it seems like pure luck that all current board
-> happen to share the same platform data.
-
-Partially luck, partially that every board here is based on nVidia's
-reference designs.
-
-> Given that they do, the change seems conceptually fine, but I wouldn't
-> necessarily expect any future boards to be able to share the data, and
-> so this change would make any differing future boards work differently
-> to all the existing boards...
+> The configuration passed is specific to the TI DMA controller used.
 >
-> I guess the idea is that by the time any new boards come along, Device
-> Tree will be fleshed out enough that we wouldn't need to add code for
-> the new boards, but just a Device Tree file, so my point isn't an issue?
+> Signed-off-by: Sundaram Raju <sundaram@ti.com>
+> ---
+> ?include/linux/dmaengine.h | ? ?5 +++++
+> ?1 files changed, 5 insertions(+), 0 deletions(-)
+>
+> diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
+> index eee7add..51dadc4 100644
+> --- a/include/linux/dmaengine.h
+> +++ b/include/linux/dmaengine.h
+> @@ -123,6 +123,10 @@ enum dma_ctrl_flags {
+> ?* command.
+> ?* @FSLDMA_EXTERNAL_START: this command will put the Freescale DMA controller
+> ?* into external start mode.
+> + * @TI_DMA_STRIDE_CONFIG: this command is only implemented by TI DMA
+> + * controllers that need to pass special configuration on how to walk through
+> + * the buffer to pick up data in a specified pattern to be transferred in
+> + * the channel.
+> ?*/
+> ?enum dma_ctrl_cmd {
+> ? ? ? ?DMA_TERMINATE_ALL,
+> @@ -130,6 +134,7 @@ enum dma_ctrl_cmd {
+> ? ? ? ?DMA_RESUME,
+> ? ? ? ?DMA_SLAVE_CONFIG,
+> ? ? ? ?FSLDMA_EXTERNAL_START,
+> + ? ? ? TI_DMA_STRIDE_CONFIG,
+> ?};
+IMHO this isn't very correct.
 
-Either device tree will solve all the world's problems, or I'll add a
-function to initialize the device that takes whatever data needs to be
-customized.  That can be solved if it ever becomes necessary.
+1) Striding, in one form or other, is supported by other DMACs as well.
+   The number will only increase in future.
+   Are we to add  <VENDOR>_DMA_STRIDE_CONFIG for each case ?
 
-Any other comments or testers?  Otherwise, I'll try to get this in the
-arm-soc tree.
+2) As Dan noted, client drivers are going to have ifdef hackery in
+order to be common
+ to other SoCs.
+
+3) TI may not have just one DMAC IP used in all the SoCs. So if you want
+  vendor specific defines anyway, please atleast also add DMAC version to it.
+  Something like
+>        DMA_SLAVE_CONFIG,
+>        FSLDMA_EXTERNAL_START,
+> +       TI_DMA_v1_STRIDE_CONFIG,
