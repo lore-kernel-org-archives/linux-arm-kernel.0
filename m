@@ -1,26 +1,29 @@
-From: axel.lin@gmail.com (Axel Lin)
-Date: Tue, 12 Jul 2011 19:05:29 +0800
-Subject: [PATCH] USB: s3c2410_udc: fix unterminated platform_device_id table
-Message-ID: <1310468729.6590.3.camel@phoenix>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 12 Jul 2011 13:12:45 +0200
+Subject: [PATCH 04/17] mach-versatile: retire custom LED code
+In-Reply-To: <CAK5ve-KwL4rX65FqyWcZrvAcx0vFcGDpWQXgm67P8n2MDpNHWQ@mail.gmail.com>
+References: <1309955687-19365-1-git-send-email-bryan.wu@canonical.com>
+	<1309955687-19365-5-git-send-email-bryan.wu@canonical.com>
+	<20110710092836.GT4812@n2100.arm.linux.org.uk>
+	<CAK5ve-KwL4rX65FqyWcZrvAcx0vFcGDpWQXgm67P8n2MDpNHWQ@mail.gmail.com>
+Message-ID: <CACRpkdZ-PKLW--5KAXM9paWoFpcmWrOfq6ax8pyZWU7QA=z+pg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Axel Lin <axel.lin@gmail.com>
----
- drivers/usb/gadget/s3c2410_udc.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+On Mon, Jul 11, 2011 at 4:02 PM, Bryan Wu <bryan.wu@canonical.com> wrote:
+> On Sun, Jul 10, 2011 at 5:28 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+>>
+>> Shouldn't this be part of the previous patch? ?The previous patch changes
+>> both Realview and Versatile by touching plat-versatile.
+>>
+>
+> I will fold them together, if Linus has no problem about it.
 
-diff --git a/drivers/usb/gadget/s3c2410_udc.c b/drivers/usb/gadget/s3c2410_udc.c
-index 85c1b0d..8d31848 100644
---- a/drivers/usb/gadget/s3c2410_udc.c
-+++ b/drivers/usb/gadget/s3c2410_udc.c
-@@ -2060,6 +2060,7 @@ static int s3c2410_udc_resume(struct platform_device *pdev)
- static const struct platform_device_id s3c_udc_ids[] = {
- 	{ "s3c2410-usbgadget", },
- 	{ "s3c2440-usbgadget", },
-+	{ }
- };
- MODULE_DEVICE_TABLE(platform, s3c_udc_ids);
- 
--- 
-1.7.4.1
+I have no problems with anything, and I'm not one bit picky about
+SoB:s and Author: tags, I'm more concerned about the LED code
+getting cleaned up. Just do whatever it takes to make good patches
+out of this!
+
+Thanks,
+Linus Walleij
