@@ -1,122 +1,29 @@
-From: kaloz@openwrt.org (Imre Kaloz)
-Date: Tue, 12 Jul 2011 14:56:09 +0200
-Subject: [PATCH v2] ARM: support XZ compressed kernels
-Message-ID: <1310475369-3000-1-git-send-email-kaloz@openwrt.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 12 Jul 2011 15:02:41 +0200
+Subject: [PATCH v2 0/6] ARM: make mach/hardware.h optional
+In-Reply-To: <4E1B176E.3030503@gmail.com>
+References: <1309366019-24379-1-git-send-email-robherring2@gmail.com>
+	<201107021124.46953.arnd@arndb.de> <4E1B176E.3030503@gmail.com>
+Message-ID: <201107121502.41570.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Wire up support for the XZ decompressor
+On Monday 11 July 2011, Rob Herring wrote:
+> > 
+> > This is very good work, I really like it. I've mentioned one idea for
+> > an improvement in patch 5, which you can still integrate, but otherwise
+> > 
+> > Reviewed-by: Arnd Bergmann <arnd@arndb.de>
+> > 
+> > for the whole series.
+> > 
+> 
+> I have an updated version ready to send out. Will you take this in your
+> tree including the 1st patch for pci flags functions? Also, what about
+> the powerpc conversion to generic pci flags?
 
-Signed-off-by: Imre Kaloz <kaloz@openwrt.org>
----
-Change since v1: added missing .gitignore modification
+I can take it all in the arm-soc tree, yes. However for anything outside
+of arch/arm/{mach,plat}-*, please get an Ack from the respective maintainer
+(Russell, Michal, BenH, ...).
 
- arch/arm/Kconfig                        |    1 +
- arch/arm/boot/compressed/.gitignore     |    1 +
- arch/arm/boot/compressed/Makefile       |   11 +++++++++--
- arch/arm/boot/compressed/decompress.c   |    4 ++++
- arch/arm/boot/compressed/piggy.xzkern.S |    6 ++++++
- lib/xz/xz_dec_stream.c                  |    1 +
- 6 files changed, 22 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm/boot/compressed/piggy.xzkern.S
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 9adc278..286873e 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -20,6 +20,7 @@ config ARM
- 	select HAVE_KERNEL_GZIP
- 	select HAVE_KERNEL_LZO
- 	select HAVE_KERNEL_LZMA
-+	select HAVE_KERNEL_XZ
- 	select HAVE_IRQ_WORK
- 	select HAVE_PERF_EVENTS
- 	select PERF_USE_VMALLOC
-diff --git a/arch/arm/boot/compressed/.gitignore b/arch/arm/boot/compressed/.gitignore
-index c602896..593a712 100644
---- a/arch/arm/boot/compressed/.gitignore
-+++ b/arch/arm/boot/compressed/.gitignore
-@@ -3,5 +3,6 @@ lib1funcs.S
- piggy.gzip
- piggy.lzo
- piggy.lzma
-+piggy.xzkern
- vmlinux
- vmlinux.lds
-diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
-index 23aad07..e5db34e 100644
---- a/arch/arm/boot/compressed/Makefile
-+++ b/arch/arm/boot/compressed/Makefile
-@@ -82,13 +82,14 @@ SEDFLAGS	= s/TEXT_START/$(ZTEXTADDR)/;s/BSS_START/$(ZBSSADDR)/
- suffix_$(CONFIG_KERNEL_GZIP) = gzip
- suffix_$(CONFIG_KERNEL_LZO)  = lzo
- suffix_$(CONFIG_KERNEL_LZMA) = lzma
-+suffix_$(CONFIG_KERNEL_XZ)   = xzkern
- 
- targets       := vmlinux vmlinux.lds \
- 		 piggy.$(suffix_y) piggy.$(suffix_y).o \
- 		 font.o font.c head.o misc.o $(OBJS)
- 
- # Make sure files are removed during clean
--extra-y       += piggy.gzip piggy.lzo piggy.lzma lib1funcs.S
-+extra-y       += piggy.gzip piggy.lzo piggy.lzma piggy.xzkern lib1funcs.S ashldi3.S
- 
- ifeq ($(CONFIG_FUNCTION_TRACER),y)
- ORIG_CFLAGS := $(KBUILD_CFLAGS)
-@@ -133,8 +134,14 @@ bad_syms=$$($(CROSS_COMPILE)nm $@ | sed -n 's/^.\{8\} [bc] \(.*\)/\1/p') && \
-   ( echo "following symbols must have non local/private scope:" >&2; \
-     echo "$$bad_syms" >&2; rm -f $@; false )
- 
-+# For __aeabi_llsl
-+ashldi3 = $(obj)/ashldi3.o
-+
-+$(obj)/ashldi3.S: $(srctree)/arch/$(SRCARCH)/lib/ashldi3.S FORCE
-+	$(call cmd,shipped)
-+
- $(obj)/vmlinux: $(obj)/vmlinux.lds $(obj)/$(HEAD) $(obj)/piggy.$(suffix_y).o \
--	 	$(addprefix $(obj)/, $(OBJS)) $(lib1funcs) FORCE
-+	 	$(addprefix $(obj)/, $(OBJS)) $(lib1funcs) $(ashldi3) FORCE
- 	$(call if_changed,ld)
- 	@$(check_for_bad_syms)
- 
-diff --git a/arch/arm/boot/compressed/decompress.c b/arch/arm/boot/compressed/decompress.c
-index 07be5a2..0ecd8b4 100644
---- a/arch/arm/boot/compressed/decompress.c
-+++ b/arch/arm/boot/compressed/decompress.c
-@@ -44,6 +44,10 @@ extern void error(char *);
- #include "../../../../lib/decompress_unlzma.c"
- #endif
- 
-+#ifdef CONFIG_KERNEL_XZ
-+#include "../../../../lib/decompress_unxz.c"
-+#endif
-+
- int do_decompress(u8 *input, int len, u8 *output, void (*error)(char *x))
- {
- 	return decompress(input, len, NULL, NULL, output, NULL, error);
-diff --git a/arch/arm/boot/compressed/piggy.xzkern.S b/arch/arm/boot/compressed/piggy.xzkern.S
-new file mode 100644
-index 0000000..5703f30
---- /dev/null
-+++ b/arch/arm/boot/compressed/piggy.xzkern.S
-@@ -0,0 +1,6 @@
-+	.section .piggydata,#alloc
-+	.globl	input_data
-+input_data:
-+	.incbin	"arch/arm/boot/compressed/piggy.xzkern"
-+	.globl	input_data_end
-+input_data_end:
-diff --git a/lib/xz/xz_dec_stream.c b/lib/xz/xz_dec_stream.c
-index ac809b1..9a60cc2 100644
---- a/lib/xz/xz_dec_stream.c
-+++ b/lib/xz/xz_dec_stream.c
-@@ -9,6 +9,7 @@
- 
- #include "xz_private.h"
- #include "xz_stream.h"
-+#include <linux/kernel.h>
- 
- /* Hash used to validate the Index field */
- struct xz_dec_hash {
--- 
-1.7.1
+	Arnd
