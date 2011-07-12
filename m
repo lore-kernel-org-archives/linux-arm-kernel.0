@@ -1,65 +1,31 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Tue, 12 Jul 2011 11:57:36 +0200
-Subject: Pull request for LPC32xx
-Message-ID: <20110712095735.GC1953@pengutronix.de>
+From: zonque@gmail.com (Daniel Mack)
+Date: Tue, 12 Jul 2011 11:57:53 +0200
+Subject: [PATCH 3/4] MTD: pxa3xx_nand: enable multiple chip select support
+In-Reply-To: <CALZhoSRPYtMtsDqY5rPKfx4ux72iCDPQm=3wmTMMt2_P3zWtKA@mail.gmail.com>
+References: <1309319494-17951-1-git-send-email-leiwen@marvell.com>
+	<1309771536-10597-4-git-send-email-leiwen@marvell.com>
+	<4E1411BB.4010000@compulab.co.il>
+	<CACTFLAOmRMDH_6qo_WkndoWX-HPw9RTqbtsURDfw22sWEFS2wg@mail.gmail.com>
+	<4E1B3ECC.5080308@compulab.co.il>
+	<CACTFLAPMh+XMpOPPqkDTaEZppSkWxVxFMH3RALTmqOCNk8WAvw@mail.gmail.com>
+	<4E1B4E21.1090507@compulab.co.il>
+	<CALZhoSRPYtMtsDqY5rPKfx4ux72iCDPQm=3wmTMMt2_P3zWtKA@mail.gmail.com>
+Message-ID: <CACTFLAOe_iL8W_+dAPrJEA=_npN9gmH38Xhz__nvy73BYCYBHw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Tue, Jul 12, 2011 at 11:40 AM, Lei Wen <adrian.wenl@gmail.com> wrote:
+> I retest with suspend&resume on my board, each time that board would
+> reset the timing in the
+> begining of pxa3xx_cmdfunc as expected. So this should be ok as it is
+> the same behavior
+> with original code.
 
-I hope it is okay that I send these pull-requests, but Kevin seems to be busy.
-He has tested the patches before, though. They are quite trivial, I think, yet
-this is the third try to get them included. It is mainly adding devices for
-which the drivers have been accepted meanwhile.
+Ok, just to be sure - as there have been quite some iterations fot
+this now - can you send me a link to your most current version of this
+patch again, please? Just to avoid confusion which version we're
+talking about.
+
 
 Thanks,
-
-   Wolfram
-
-The features:
-=============
-
-The following changes since commit 620917de59eeb934b9f8cf35cc2d95c1ac8ed0fc:
-
-  Linux 3.0-rc7 (2011-07-11 16:51:52 -0700)
-
-are available in the git repository at:
-  git://git.pengutronix.de/git/wsa/linux-2.6.git lpc32xx-for-3.1-features
-
-Wolfram Sang (2):
-      arm: lpc32xx: add tsc-device
-      arm: lpc32xx: add rtc-device
-
- arch/arm/mach-lpc32xx/clock.c  |    2 +-
- arch/arm/mach-lpc32xx/common.c |   42 ++++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-lpc32xx/common.h |    2 +
- 3 files changed, 45 insertions(+), 1 deletions(-)
-
-
-
-The bugfix:
-===========
-
-The following changes since commit 620917de59eeb934b9f8cf35cc2d95c1ac8ed0fc:
-
-  Linux 3.0-rc7 (2011-07-11 16:51:52 -0700)
-
-are available in the git repository at:
-  git://git.pengutronix.de/git/wsa/linux-2.6.git lpc32xx-for-3.1-bugfixes
-
-Wolfram Sang (1):
-      arm: lpc32xx: clock: use bool logic instead of binary
-
- arch/arm/mach-lpc32xx/clock.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110712/30776079/attachment.sig>
+Daniel
