@@ -1,52 +1,23 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 12 Jul 2011 07:55:00 -0700
-Subject: [PATCH] OMAP2+: PM: fix watchdog boot when runtime PM is disabled
-In-Reply-To: <4E1B8B47.3020904@ti.com> (Santosh Shilimkar's message of "Mon,
-	11 Jul 2011 16:46:15 -0700")
-References: <1310426484-30083-1-git-send-email-khilman@ti.com>
-	<4E1B8B47.3020904@ti.com>
-Message-ID: <878vs3v9a3.fsf@ti.com>
+From: arnd.bergmann@linaro.org (Arnd Bergmann)
+Date: Tue, 12 Jul 2011 17:23:27 +0200
+Subject: [GIT PULL] pxa: features for next
+In-Reply-To: <CAMPhdO9ibczzuyoyyQBi=MntkWaAfAGRtfvORDYw0En7MWLwhQ@mail.gmail.com>
+References: <CAMPhdO8uQR4km9szkuGDjuym-hViE9+zxtie6D2WGJmf1_9rUg@mail.gmail.com>
+	<201107112319.38768.arnd.bergmann@linaro.org>
+	<CAMPhdO9ibczzuyoyyQBi=MntkWaAfAGRtfvORDYw0En7MWLwhQ@mail.gmail.com>
+Message-ID: <201107121723.27151.arnd.bergmann@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+On Tuesday 12 July 2011, Eric Miao wrote:
+> And Russell kindly provided a better fix, and I've merged and rebased
+> the whole series. Please consider re-pull (just pushed, sync to git.k.o
+> is in still in progress I guess).
+> 
+> I posted the patch as below, with the name changed to handle_IRQ for
+> non-exception stack dump use (as the original handle_irq_event conflicts
+> with the one in kernel/irq/).
 
-> On 7/11/2011 4:21 PM, Kevin Hilman wrote:
->> Fix boot crash in watchdog driver when runtime PM is disabled.
->>
->> When runtime PM is disabled, devices should be left enabled so that
->> all device accesses in drivers will succeed even though the runtime PM
->> get/put calls are noops.
->>
->> This is already the case for all devices, but the WDT init has its
->> own hwmod postsetup which was not taking this into account.
->>
->> This fixes a boot crash where the first device access in the WDT probe
->> function would crash a booting kernel.
->>
->> Cc: Paul Walmsley<paul@pwsan.com>
->> Signed-off-by: Kevin Hilman<khilman@ti.com>
->> ---
->> Tony, as this is a boot crash, it should probably be queued for v3.0.
->> However, since OMAP2PLUS_TYPICAL always enables runtime PM, this is
->> unlikely to be seen unless specifically testing with runtime PM disabled.
->>
-> This patch is exactly same as the one I submitted on Jan 5, 2011 for
-> the same issue. Here is the patchwork link for the same.
->
-> https://patchwork.kernel.org/patch/453481/
->
-> Paul had a valid concern about the boot-loader leaving the watchdog
-> enabled. More on this in below thread.
->
-> http://www.spinics.net/lists/arm-kernel/msg110937.html
->
+Ok, pulled. Thanks,
 
-Paul's concern is valid, and could be addressed by making that init code
-actually check if the WDT is currently active (as suggested by the
-comment there.)
-
-In the mean time, this simple fix should be applied to prevent a boot
-crash, IMO.
-
-Kevin
+	Arnd
