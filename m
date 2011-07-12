@@ -1,23 +1,23 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 12 Jul 2011 18:47:46 +0200
-Subject: [PATCH 2/3] mach-ux500: export System-on-Chip information via
-	sysfs
-In-Reply-To: <1310476090-9807-2-git-send-email-lee.jones@linaro.org>
-References: <1310476090-9807-1-git-send-email-lee.jones@linaro.org>
-	<1310476090-9807-2-git-send-email-lee.jones@linaro.org>
-Message-ID: <201107121847.46144.arnd@arndb.de>
+From: troy.kisky@boundarydevices.com (Troy Kisky)
+Date: Tue, 12 Jul 2011 09:48:36 -0700
+Subject: [PATCH 1/1] ARM: i.MX50/53: debug-macro: fix UART_PADDR
+In-Reply-To: <20110712133443.GR6069@pengutronix.de>
+References: <1310438444-4237-1-git-send-email-troy.kisky@boundarydevices.com>
+	<20110712133443.GR6069@pengutronix.de>
+Message-ID: <4E1C7AE4.5030303@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 12 July 2011, Lee Jones wrote:
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+On 7/12/2011 6:34 AM, Sascha Hauer wrote:
+> On Mon, Jul 11, 2011 at 07:40:44PM -0700, Troy Kisky wrote:
+>> The i.MX51 UART_PADDR value does not work for MX50/53.
+>>
+>> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
+> 
+> Your first patch looked better...
+> 
+> Sascha
 
-Just like last time:
+I agree, I was trying to address Uwe's complaint.
 
-   NAK
-
-You still have all the SoC devices as top-level platform devices.
-Make them children of the SoC device you create here, and we can
-apply this patch.
-
-	Arnd
+Troy
