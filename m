@@ -1,129 +1,71 @@
-From: tixy@yxit.co.uk (Tixy)
-Date: Tue, 12 Jul 2011 13:40:02 +0100
-Subject: [PATCH] [RFC PATCH] ARM: kprobes: Make breakpoint setting/clearing
-	SMP safe
-Message-ID: <1310474402-5398-1-git-send-email-tixy@yxit.co.uk>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Tue, 12 Jul 2011 18:15:22 +0530
+Subject: [PATCH] dmaengine: add dma_ctrl_cmd to pass buffer stride
+	configuration
+In-Reply-To: <E0D41E29EB0DAC4E9F3FF173962E9E94030259DBBE@dbde02.ent.ti.com>
+References: <1310310203-12288-1-git-send-email-sundaram@ti.com>
+	<CABb+yY1HJOR+QzmM4-ju4cs+8keoyUbMv+SpVoM6BW=DCMzmQQ@mail.gmail.com>
+	<CACRpkdbLg0+_2kpi4NizFj0fDWb6QPtkcKirKgoH+83vGD0O0A@mail.gmail.com>
+	<CABb+yY1RqHJ6jsMB2RqPNnBLff-bzhwaXG1U-hCD8CpME+a3aA@mail.gmail.com>
+	<E0D41E29EB0DAC4E9F3FF173962E9E94030259DBBE@dbde02.ent.ti.com>
+Message-ID: <CABb+yY1_vuM7NGxV4o103YmYfte09XKpaXnYARcn3jjnChiBsQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jon Medhurst <tixy@yxit.co.uk>
+On Tue, Jul 12, 2011 at 5:01 PM, Raju, Sundaram <sundaram@ti.com> wrote:
+>> -----Original Message-----
+>> From: Jassi Brar [mailto:jassisinghbrar at gmail.com]
+>> Sent: Tuesday, July 12, 2011 4:51 PM
+>> To: Linus Walleij
+>> Cc: Raju, Sundaram; linux-arm-kernel at lists.infradead.org; linux-
+>> kernel at vger.kernel.org; davinci-linux-open-source at linux.davincidsp.com;
+>> linux at arm.linux.org.uk; dan.j.williams at intel.com; linux-omap at vger.kernel.org
+>> Subject: Re: [PATCH] dmaengine: add dma_ctrl_cmd to pass buffer stride
+>> configuration
+>>
+>> On Tue, Jul 12, 2011 at 3:33 PM, Linus Walleij <linus.walleij@linaro.org>
+>> wrote:
+>> > On Tue, Jul 12, 2011 at 6:17 AM, Jassi Brar <jassisinghbrar@gmail.com>
+>> wrote:
+>> >
+>> >> 1) Striding, in one form or other, is supported by other DMACs as well.
+>> >> ? The number will only increase in future.
+>> >> ? Are we to add ?<VENDOR>_DMA_STRIDE_CONFIG for each case ?
+>> >
+>> > If we are sure about this and striding will work in a similar way on all
+>> > then let's have the enum named DMA_STRIDE_CONFIG and move the
+>> > passed-in struct to <linux/dmaengine.h) then?
+>> >
+>> > Would that be:
+>> >
+>> > struct dma_stride_config {
+>> > ? ?u32 read_bytes;
+>> > ? ?u32 skip_bytes;
+>> > };
+>> >
+>> > Or something more complex?
+>> Well, I am not sure if striding needs any special treatment at all.
+>> Why not have client drivers prepare and submit sg-list.
+>> Let the DMAC drivers interpret/parse the sg-list and program it
+>> as strides if the h/w supports it.
+>> If anything, we should make preparation and submission of sg-list
+>> as efficient as possible.
+> Jassi,
+>
+> sg_lists describe only a bunch of disjoint buffers. But what if the
+> DMAC can skip and read the bytes within each of the buffers in
+> the sg_list? (like TI EDMAC and TI SDMAC)
+> How can that information be passed to the offload
+> engine driver from the client?
+>
+OK, I overlooked.
+We do need something new to handle these ultra-fine-grained sg-lists.
+But still we shouldn't add SoC specific API to the common sub-systems.
 
-On SMP systems, kprobes has two different issues when manipulating
-breakpoints.
-
-When disarming probes, with two CPUs (A and B) we can get:
-
-- A takes undef exception due to hitting a probe breakpoint.
-- B disarms probe, replacing the breakpoint with original instruction.
-- A's undef handler reads instruction at PC, doesn't see kprobe
-  breakpoint, therefore doesn't call kprobe_handler and the process
-  takes a fatal exception.
-
-The second issue occurs when both arming and disarming probes on a
-32-bit Thumb instruction which straddles two memory words. In this case
-it's possible that another CPU will read 16 bits from the new
-instruction and 16 from the old.
-
-Both these issues are known and the kprobe implementation uses
-stop_machine() to avoid them, however, this is not sufficient.
-stop_machine() does not perform any kind on synchronisation between CPUs
-so it it still possible for one CPU to call the breakpoint changing
-function before another CPU has been interrupted to do likewise.
-
-To fix this problem, this patch creates a new function
-sync_stop_machine() which ensures that all online CPUs execute the
-specified function at the same time.
-
-I am looking for feedback:
-- Have I got my understanding of stop_machine() right?
-- Are there other APIs to do what we need?
-- Is my patch robust.
-- Do I have the correct barriers?
-
-Signed-off-by: Jon Medhurst <tixy@yxit.co.uk>
----
- arch/arm/kernel/kprobes.c |   55 +++++++++++++++++++++++++++++++++++++++++++-
- 1 files changed, 53 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/kernel/kprobes.c b/arch/arm/kernel/kprobes.c
-index 129c116..c6b7f2a 100644
---- a/arch/arm/kernel/kprobes.c
-+++ b/arch/arm/kernel/kprobes.c
-@@ -103,6 +103,57 @@ int __kprobes arch_prepare_kprobe(struct kprobe *p)
- 	return 0;
- }
- 
-+struct sync_stop_machine_data {
-+	atomic_t begin;
-+	atomic_t end;
-+	int	 (*fn)(void *);
-+	void	 *data;
-+};
-+
-+static int __kprobes __sync_stop_machine(void *data)
-+{
-+	struct sync_stop_machine_data *ssmd;
-+	int ret;
-+
-+	ssmd = (struct sync_stop_machine_data *)data;
-+
-+	/* Wait until all CPUs are ready before calling the function */
-+	atomic_dec(&ssmd->begin);
-+	smp_mb__after_atomic_dec();
-+	while (atomic_read(&ssmd->begin)) {}
-+
-+	ret = ssmd->fn(ssmd->data);
-+
-+	/* Wait for all CPUs to finish 'fn' before returning */
-+	smp_mb__before_atomic_dec();
-+	atomic_dec(&ssmd->end);
-+	while (atomic_read(&ssmd->end)) {}
-+
-+	return ret;
-+}
-+
-+static int __kprobes sync_stop_machine(int (*fn)(void *), void *data)
-+{
-+	struct sync_stop_machine_data ssmd = {
-+		.fn	= fn,
-+		.data	= data
-+	};
-+	int num_cpus;
-+	int ret;
-+
-+	get_online_cpus(); /* So number of CPUs can't change */
-+
-+	num_cpus = num_online_cpus();
-+	atomic_set(&ssmd.begin, num_cpus);
-+	atomic_set(&ssmd.end, num_cpus);
-+	smp_wmb();
-+
-+	ret = stop_machine(__sync_stop_machine, &ssmd, &cpu_online_map);
-+
-+	put_online_cpus();
-+	return ret;
-+}
-+
- #ifdef CONFIG_THUMB2_KERNEL
- 
- /*
-@@ -127,7 +178,7 @@ void __kprobes arch_arm_kprobe(struct kprobe *p)
- 		flush_insns(addr, sizeof(u16));
- 	} else if (addr & 2) {
- 		/* A 32-bit instruction spanning two words needs special care */
--		stop_machine(set_t32_breakpoint, (void *)addr, &cpu_online_map);
-+		sync_stop_machine(set_t32_breakpoint, (void *)addr);
- 	} else {
- 		/* Word aligned 32-bit instruction can be written atomically */
- 		u32 bkp = KPROBE_THUMB32_BREAKPOINT_INSTRUCTION;
-@@ -190,7 +241,7 @@ int __kprobes __arch_disarm_kprobe(void *p)
- 
- void __kprobes arch_disarm_kprobe(struct kprobe *p)
- {
--	stop_machine(__arch_disarm_kprobe, p, &cpu_online_map);
-+	sync_stop_machine(__arch_disarm_kprobe, p);
- }
- 
- void __kprobes arch_remove_kprobe(struct kprobe *p)
--- 
-1.7.2.5
+Maybe a new api to pass fixed-format variable-length encoded message
+to the DMAC drivers?
+Which could be interpreted by DMAC drivers to extract all the needed xfer
+parameters from the 'header' section and instructions to program the xfers
+in the DMAC from the variable length body of the 'message' buffer.
+It might sound complicated but we can have helpers to make the job easy.
+Btw, the regular single/sg-list xfers could also be expressed by this method.
