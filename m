@@ -1,68 +1,50 @@
-From: sundaram@ti.com (Raju, Sundaram)
-Date: Tue, 12 Jul 2011 15:45:47 +0530
-Subject: [PATCH] dmaengine: add dma_ctrl_cmd to pass buffer stride
-	configuration
-In-Reply-To: <CACRpkdbj-xucUN+jxMsBnfXfcmy3ohuhd=66x_AqcCykMsNwPQ@mail.gmail.com>
-References: <1310310203-12288-1-git-send-email-sundaram@ti.com>
-	<CAKnu2MqzSm8BVK4z9E-ud8e_jUohDfSfYO9aW-oN3RFw4p7GrA@mail.gmail.com>
-	<CAA9_cmeWUjiTghKbjAvith5c6z9PDVdFSeK55RYWfyQKFSjA+Q@mail.gmail.com>
-	<CACRpkdbj-xucUN+jxMsBnfXfcmy3ohuhd=66x_AqcCykMsNwPQ@mail.gmail.com>
-Message-ID: <E0D41E29EB0DAC4E9F3FF173962E9E94030259DAFE@dbde02.ent.ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 12 Jul 2011 11:19:48 +0100
+Subject: [RFC PATCH 05/17] ARM: kernel: save/restore kernel IF
+In-Reply-To: <20110712101252.GA9604@e102568-lin.cambridge.arm.com>
+References: <1310053830-23779-1-git-send-email-lorenzo.pieralisi@arm.com>
+	<1310053830-23779-6-git-send-email-lorenzo.pieralisi@arm.com>
+	<alpine.DEB.2.00.1107081641280.2609@localhost6.localdomain6>
+	<20110711140047.GA346@e102568-lin.cambridge.arm.com>
+	<20110711184010.GB8486@n2100.arm.linux.org.uk>
+	<20110712101252.GA9604@e102568-lin.cambridge.arm.com>
+Message-ID: <20110712101948.GD23270@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Linus Walleij [mailto:linus.walleij at linaro.org]
-> Sent: Tuesday, July 12, 2011 3:28 PM
-> To: Dan Williams
-> Cc: Raju, Sundaram; linux-arm-kernel at lists.infradead.org; linux-
-> kernel at vger.kernel.org; davinci-linux-open-source at linux.davincidsp.com;
-> linux at arm.linux.org.uk; linux-omap at vger.kernel.org
-> Subject: Re: [PATCH] dmaengine: add dma_ctrl_cmd to pass buffer stride
-> configuration
+On Tue, Jul 12, 2011 at 11:12:57AM +0100, Lorenzo Pieralisi wrote:
+> Thank you very much Russell for this recap.
 > 
-> On Mon, Jul 11, 2011 at 11:39 PM, Dan Williams <dan.j.williams@intel.com>
-> wrote:
-> > On Mon, Jul 11, 2011 at 2:28 AM, Linus Walleij <linus.walleij@linaro.org>
-> wrote:
+> On Mon, Jul 11, 2011 at 07:40:10PM +0100, Russell King - ARM Linux wrote:
+> > On Mon, Jul 11, 2011 at 03:00:47PM +0100, Lorenzo Pieralisi wrote:
+> > > Well, short answer is no. On SMP we do need to save CPU registers 
+> > > but if just one single cpu is shutdown L2 is still on. 
+> > > cpu_suspend saves regs on the stack that has to be cleaned from
+> > > L2 before shutting a CPU down which make things more complicated than
+> > > they should.
+> > 
+> > Hang on.  Please explain something to me here.  You've mentioned a few
+> > times that cpu_suspend() can't be used because of the L2 cache.  Why
+> > is this the case?
+> > 
+> > OMAP appears to have code in its sleep path - which has been converted
+> > to cpu_suspend() support - to deal with the L2 issues.
+> > 
 > 
-> > ...and I suspect the slave device drivers that use TI DMA are not
-> > expected to ever work with other dmaengines? ?Likely the case, but
-> > just wondering out loud.
-> 
-> Typically the OMAP/TI drivers are one-to-one with this specific DMA
-> controller, but they *can* support controllers without stride options, and
-> notice that striding will only be used for the display driver IIRC,
-> pseudo-code:
-> 
-> ret = dmaengine_device_control(chan, TI_DMA_STRIDE_CONFIG,
->                         (unsigned long) &my_stride_config);
-> if (ret) {
->    /*
->     * OK no striding on this DMA engine, fall back to something else,
->     * such as creating an SGlist which emulates the striding with one
->     * sglist element per stride.
->     */
-> }
-> 
-> By injecting an error in the stride config path this can even be
-> properly tested. So it will become an optional acceleration.
+> OMAP4, it is SMP configs I am talking about.
 
-Yes, this is exactly what I also wanted to say. :)
+Seriously, that's not something which really concerns me at present
+because suspend/resume in any form is not supported there in any form
+in mainline.
 
-But if the client driver does not implement a fallback like this then that
-driver will work only with TI DMA and not any other dmaengines.
-(Mentioning this because, there are client drivers which are tightly 
-coupled to this special configuration)
+All my comments are based on the mainline kernel.  That's what I work
+with.  Everything elsewhere is not my concern.
 
-Keeping this in mind, I had started the original discussion with
-the suggestion of modifying the existing prepare API and adding
-an extra argument to it, which can be used to pass special configuration.
-And I also wanted to generalize that configuration passed.
+So, let me say again.  OMAP suspend/resume support _in_ _mainline_ will
+be converted at the next merge window.  As that's only OMAP3 _in_
+_mainline_ which has the need for saving state etc, that's the only
+OMAP code I have access to, and therefore that's the only thing which
+I've been able to fix.
 
-Anyways that design also will come down to this same path, and instead
-of modifying the existing API signatures, I think this is the best way
-we can go.
-
-Regards,
-Sundaram
+OMAP4 suspend/resume support doesn't exist in mainline and therefore
+doesn't exist for me.
