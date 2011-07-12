@@ -1,88 +1,65 @@
-From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
-Date: Tue, 12 Jul 2011 11:53:26 +0200
-Subject: [RESEND] [PATCH 1/2] OMAP1: allow reserving memory for camera
-In-Reply-To: <20110608221330.GA13246@n2100.arm.linux.org.uk>
-References: <201012051929.07220.jkrzyszt@tis.icnet.pl>
-	<201106082354.10985.jkrzyszt@tis.icnet.pl>
-	<20110608221330.GA13246@n2100.arm.linux.org.uk>
-Message-ID: <201107121153.27115.jkrzyszt@tis.icnet.pl>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Tue, 12 Jul 2011 11:57:36 +0200
+Subject: Pull request for LPC32xx
+Message-ID: <20110712095735.GC1953@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 9 Jun 2011 at 00:13:30 Russell King - ARM Linux wrote:
-> On Wed, Jun 08, 2011 at 11:53:49PM +0200, Janusz Krzysztofik wrote:
-> > On Fri 10 Dec 2010 at 22:03:52 Janusz Krzysztofik wrote:
-> > > Friday 10 December 2010 18:03:56 Russell King - ARM Linux napisa?(a):
-> > > > On Fri, Dec 10, 2010 at 12:03:07PM +0100, Janusz Krzysztofik wrote:
-> > > > >  void __init omap1_camera_init(void *info)
-> > > > >  {
-> > > > >  
-> > > > >  	struct platform_device *dev = &omap1_camera_device;
-> > > > > 
-> > > > > +	dma_addr_t paddr = omap1_camera_phys_mempool_base;
-> > > > > +	dma_addr_t size = omap1_camera_phys_mempool_size;
-> > > > > 
-> > > > >  	int ret;
-> > > > >  	
-> > > > >  	dev->dev.platform_data = info;
-> > > > > 
-> > > > > +	if (paddr) {
-> > > > > +		if (dma_declare_coherent_memory(&dev->dev, paddr, paddr, size,
-> > > > > +				DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE))
-> > > > 
-> > > > Although this works, you're ending up with SDRAM being mapped
-> > > > via ioremap, which uses MT_DEVICE - so what is SDRAM ends up
-> > > > being mapped as if it were a device.
-> > > > 
-> > > > For OMAP1, which is ARMv5 or lower, device memory becomes
-> > > > 'uncacheable, unbufferable' which is luckily what is used for
-> > > > the DMA coherent memory on those platforms - so no technical
-> > > > problem here.
-> > > > 
-> > > > However, on ARMv6 and later, ioremapped memory is device
-> > > > memory, which has different ordering wrt normal memory
-> > > > mappings, and may appear on different busses on the CPU's
-> > > > interface.  So, this is something I don't encourage as it's
-> > > > unclear that the hardware will work.
-> > > > 
-> > > > Essentially, dma_declare_coherent_memory() on ARM with main
-> > > > SDRAM should be viewed as a 'it might work, it might not, and
-> > > > it might stop working in the future' kind of interface.  In
-> > > > other words, there is no guarantee that this kind of thing
-> > > > will be supported in the future.
-> > 
-> > Russell, Tony,
-> > 
-> > Sorry for getting back to this old thread, but since my previous
-> > attempts to provide[1] or support[2] a possibly better solution to
-> > the problem all failed on one hand, and I can see patches not very
-> > different from mine[3] being accepted for arch/arm/mach-{mx3,imx}
-> > during this and previous merge windows[4][5][6] on the other, is
-> > there any chance for the 'dma_declare_coherent_memory() over a
-> > memblock_alloc()->free()->remove() obtained area' based solution
-> > being accepted for omap1_camera as well if I resend it refreshed?
-> 
-> I stand by my answer to your patches quoted above from a technical
-> point of view; we should not be mapping SDRAM using device mappings.
+Hi Arnd,
 
-Russell,
-Would it change anything here if we define ARCH_HAS_HOLES_MEMORYMODEL, 
-as suggested by Marek Szyprowski recently[*], when configuring for 
-ARCH_OMAP1 with VIDEO_OMAP1 (camera) selected?
-
-[*] http://lists.infradead.org/pipermail/linux-arm-kernel/2011-July/057447.html
-
-> Certainly the memblock_alloc()+free()+remove() is the right way to
-> reserve the memory, but as it stands dma_declare_coherent_memory()
-> should not be used on ARMv6 or higher CPUs to pass that memory to the
-> device driver.
-
-Tony,
-With full respect to all Russell's reservations about incorrectness of 
-ioremapping SDRAM in general, would you be willing to accept this 
-solution in the OMAP1 camera case, taking into account that, quoting 
-Russell, "there is no technical problem here", and similiar solutions 
-had been accepted recently with other ARM platforms?
+I hope it is okay that I send these pull-requests, but Kevin seems to be busy.
+He has tested the patches before, though. They are quite trivial, I think, yet
+this is the third try to get them included. It is mainly adding devices for
+which the drivers have been accepted meanwhile.
 
 Thanks,
-Janusz
+
+   Wolfram
+
+The features:
+=============
+
+The following changes since commit 620917de59eeb934b9f8cf35cc2d95c1ac8ed0fc:
+
+  Linux 3.0-rc7 (2011-07-11 16:51:52 -0700)
+
+are available in the git repository at:
+  git://git.pengutronix.de/git/wsa/linux-2.6.git lpc32xx-for-3.1-features
+
+Wolfram Sang (2):
+      arm: lpc32xx: add tsc-device
+      arm: lpc32xx: add rtc-device
+
+ arch/arm/mach-lpc32xx/clock.c  |    2 +-
+ arch/arm/mach-lpc32xx/common.c |   42 ++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-lpc32xx/common.h |    2 +
+ 3 files changed, 45 insertions(+), 1 deletions(-)
+
+
+
+The bugfix:
+===========
+
+The following changes since commit 620917de59eeb934b9f8cf35cc2d95c1ac8ed0fc:
+
+  Linux 3.0-rc7 (2011-07-11 16:51:52 -0700)
+
+are available in the git repository at:
+  git://git.pengutronix.de/git/wsa/linux-2.6.git lpc32xx-for-3.1-bugfixes
+
+Wolfram Sang (1):
+      arm: lpc32xx: clock: use bool logic instead of binary
+
+ arch/arm/mach-lpc32xx/clock.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110712/30776079/attachment.sig>
