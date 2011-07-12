@@ -1,39 +1,52 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 12 Jul 2011 11:58:04 +0200
+Date: Tue, 12 Jul 2011 12:03:22 +0200
 Subject: [PATCH] dmaengine: add dma_ctrl_cmd to pass buffer stride
 	configuration
-In-Reply-To: <CAA9_cmeWUjiTghKbjAvith5c6z9PDVdFSeK55RYWfyQKFSjA+Q@mail.gmail.com>
+In-Reply-To: <CABb+yY1HJOR+QzmM4-ju4cs+8keoyUbMv+SpVoM6BW=DCMzmQQ@mail.gmail.com>
 References: <1310310203-12288-1-git-send-email-sundaram@ti.com>
-	<CAKnu2MqzSm8BVK4z9E-ud8e_jUohDfSfYO9aW-oN3RFw4p7GrA@mail.gmail.com>
-	<CAA9_cmeWUjiTghKbjAvith5c6z9PDVdFSeK55RYWfyQKFSjA+Q@mail.gmail.com>
-Message-ID: <CACRpkdbj-xucUN+jxMsBnfXfcmy3ohuhd=66x_AqcCykMsNwPQ@mail.gmail.com>
+	<CABb+yY1HJOR+QzmM4-ju4cs+8keoyUbMv+SpVoM6BW=DCMzmQQ@mail.gmail.com>
+Message-ID: <CACRpkdbLg0+_2kpi4NizFj0fDWb6QPtkcKirKgoH+83vGD0O0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 11, 2011 at 11:39 PM, Dan Williams <dan.j.williams@intel.com> wrote:
-> On Mon, Jul 11, 2011 at 2:28 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+On Tue, Jul 12, 2011 at 6:17 AM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
 
-> ...and I suspect the slave device drivers that use TI DMA are not
-> expected to ever work with other dmaengines? ?Likely the case, but
-> just wondering out loud.
+> 1) Striding, in one form or other, is supported by other DMACs as well.
+> ? The number will only increase in future.
+> ? Are we to add ?<VENDOR>_DMA_STRIDE_CONFIG for each case ?
 
-Typically the OMAP/TI drivers are one-to-one with this specific DMA
-controller, but they *can* support controllers without stride options, and
-notice that striding will only be used for the display driver IIRC,
-pseudo-code:
+If we are sure about this and striding will work in a similar way on all
+then let's have the enum named DMA_STRIDE_CONFIG and move the
+passed-in struct to <linux/dmaengine.h) then?
 
-ret = dmaengine_device_control(chan, TI_DMA_STRIDE_CONFIG,
-                        (unsigned long) &my_stride_config);
-if (ret) {
-   /*
-    * OK no striding on this DMA engine, fall back to something else,
-    * such as creating an SGlist which emulates the striding with one
-    * sglist element per stride.
-    */
-}
+Would that be:
 
-By injecting an error in the stride config path this can even be
-properly tested. So it will become an optional acceleration.
+struct dma_stride_config {
+    u32 read_bytes;
+    u32 skip_bytes;
+};
 
-Thanks,
+Or something more complex?
+
+> 2) As Dan noted, client drivers are going to have ifdef hackery in
+> order to be common
+> ?to other SoCs.
+
+Don't think so, why? This is a runtime config entirely, and I just illustrated
+in mail to Dan how that can be handled by falling back to a sglist I believe?
+
+We can *maybe* even put the fallback code into dmaengine, so that an
+emulated sglist in place for the DMAengine is done automatically of the
+DMA controller does not support striding.
+
+> 3) TI may not have just one DMAC IP used in all the SoCs. So if you want
+> ?vendor specific defines anyway, please atleast also add DMAC version to it.
+> ?Something like
+>> ? ? ? ?DMA_SLAVE_CONFIG,
+>> ? ? ? ?FSLDMA_EXTERNAL_START,
+>> + ? ? ? TI_DMA_v1_STRIDE_CONFIG,
+
+Yep unless we make it generic DMA_STRIDE_CONFIG simply, this makes
+a lot of sense.
+
 Linus Walleij
