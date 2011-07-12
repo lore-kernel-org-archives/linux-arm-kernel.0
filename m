@@ -1,25 +1,34 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 12 Jul 2011 12:43:24 -0700
-Subject: [PATCH 1/2] ARM: tegra: remove copy-and-pasted i2c platform data
-	in boards
-In-Reply-To: <1310336374-31727-1-git-send-email-ccross@android.com>
-References: <1310336374-31727-1-git-send-email-ccross@android.com>
-Message-ID: <CAOesGMjzSJ5S8gzhqnnQyzVrV5QKjYXQDRz_Twnc+1M8Ja9V-w@mail.gmail.com>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Tue, 12 Jul 2011 22:42:13 +0200
+Subject: [PATCH 0/4] OMAP: PM: omap_device: update PM domain support for
+	v3.1
+In-Reply-To: <1310426969-30306-1-git-send-email-khilman@ti.com>
+References: <1310426969-30306-1-git-send-email-khilman@ti.com>
+Message-ID: <201107122242.13837.rjw@sisk.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 10, 2011 at 3:19 PM, Colin Cross <ccross@android.com> wrote:
-> Every board file includes the same platform data definition
-> for the i2c-tegra driver's bus speed. ?Move the platform data
-> into devices.c, and remove it from all the board files.
->
-> Signed-off-by: Colin Cross <ccross@android.com>
+Hi,
 
-Acked-by: Olof Johansson <olof@lixom.net>
+On Tuesday, July 12, 2011, Kevin Hilman wrote:
+> For v3.1, the PM core has some changes that impact various assumptions
+> made (by me) during the design and implementation of the PM domain
+> support in the omap_device layer.
+> 
+> This series is needed to update our PM domain layer to behave properly
+> under the new rules of the PM core code which are planned to be merged
+> for v3.1 (see recent linux-pm discussions for the gory details.)
+> 
+> This series is based on the pm-domains branch of Rafael Wysocki's
+> suspend-2.6 tree, and also depends on the patch which adds
+> pm_runtime_status_suspended() helper function[1].
+> 
+> Rafael, because of the dependencies on your pm-domains branch (due to
+> the pwr_domain -> pm_domain rename), it might be easiest to merge
+> these via your tree.   Let me know if that's OK with you.
 
+Yes, it is.  I'm going to apply them to my pm-runtime branch that is based
+on pm-domains.
 
-As mentioned, hopefully board-specific overrides can be done via
-device tree as things go in.
-
-
--Olof
+Thanks,
+Rafael
