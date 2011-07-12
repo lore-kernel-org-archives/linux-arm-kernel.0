@@ -1,28 +1,45 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 12 Jul 2011 09:22:17 +0100
-Subject: [lm-sensors] [PATCH v3] MAX1111: Fix Race condition causing
-	NULL pointer exception
-In-Reply-To: <1628512.b7CSRB10BJ@bloomfield>
-References: <1310421038-14823-1-git-send-email-morpheus.ibis@gmail.com>
-	<20110712093606.5db834cb@endymion.delvare>
-	<1628512.b7CSRB10BJ@bloomfield>
-Message-ID: <20110712082217.GA16141@sirena.org.uk>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Tue, 12 Jul 2011 14:02:30 +0530
+Subject: [PATCH 3/7] DMA: PL330: Add DMA capabilities
+In-Reply-To: <CAPTzV15Y7JFDKsec8x-M0C1AFLOMp39QvHpRCsO=E001P_tH9A@mail.gmail.com>
+References: <1309781915-31549-1-git-send-email-kgene.kim@samsung.com>
+	<1309781915-31549-4-git-send-email-kgene.kim@samsung.com>
+	<CAPTzV15Y7JFDKsec8x-M0C1AFLOMp39QvHpRCsO=E001P_tH9A@mail.gmail.com>
+Message-ID: <CABb+yY0M659Ob0u+wOBW5i6v_VfpayRkY29-TUNpsp1oVLn-SQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 12, 2011 at 10:04:55AM +0200, Pavel Herrmann wrote:
-> On Tuesday 12 of July 2011 09:36:06 Jean Delvare wrote:
-
-> > Honestly, I have no idea what "causing one thread having pointers to
-> > memory on or above other threads stack" means (nor why this would be
-> > bad.)
-
-> the long-winded story is that thread A writes a pointer onto its stack into 
-> the drvdata as part of spi_sync call, then thread B comes in and puts a 
-> pointer onto its stack into the drvdata, at the end of spi_sync thread A uses 
-> this pointer (assuming it is unchanged), which is pointing either onto valid 
-> stack of thread B or somewhere above it (if thread B already returned)
-
-That's just a use after free bug, the fact that the variables are on the
-stacks of other threads isn't the issue, the issue is that the two
-threads that are sharing state arne't properly synchronized.
+On Tue, Jul 5, 2011 at 12:03 PM, Chanho Park <parkch98@gmail.com> wrote:
+> Kukjin Kim <kgene.kim <at> samsung.com> writes:
+>
+> (snip)
+>
+>> + ? ? ? ? ? ? if (slave_config->direction == DMA_TO_DEVICE) {
+>> + ? ? ? ? ? ? ? ? ? ? if (slave_config->dst_addr)
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? peri->fifo_addr = slave_config->dst_addr;
+>> + ? ? ? ? ? ? ? ? ? ? if (slave_config->dst_addr_width) {
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? i = 0;
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? while (slave_config->dst_addr_width != (1 <<
+> i))
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? i++;
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? peri->burst_sz = i;
+>> + ? ? ? ? ? ? ? ? ? ? }
+>> + ? ? ? ? ? ? } else if (slave_config->direction == DMA_FROM_DEVICE) {
+>> + ? ? ? ? ? ? ? ? ? ? if (slave_config->src_addr)
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? peri->fifo_addr = slave_config->src_addr;
+>> + ? ? ? ? ? ? ? ? ? ? if (slave_config->src_addr_width) {
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? i = 0;
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? while (slave_config->src_addr_width != (1 <<
+> i))
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? i++;
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? peri->burst_sz = i;
+>
+> Re-send including cc and mailing lists
+> --
+> pl330 dmac only supports 1/2/4/8/16 bytes burst size.
+> If some bad D/D doesn't use powers of 2 width,
+> dmaengine is going to infinite loop.
+> You'd better check it instead of running loop.
+>
+It might be even better to start with max possible width and
+keep decreasing 'i' in the loop.
