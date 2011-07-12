@@ -1,69 +1,52 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 12 Jul 2011 15:37:58 +0200
-Subject: [PATCH 4/6] ARM: i.MX53: clean up iomux-mx53.h
-In-Reply-To: <1310428928-2637-4-git-send-email-troy.kisky@boundarydevices.com>
-References: <1310428928-2637-1-git-send-email-troy.kisky@boundarydevices.com>
-	<1310428928-2637-4-git-send-email-troy.kisky@boundarydevices.com>
-Message-ID: <20110712133758.GS6069@pengutronix.de>
+From: monstr@monstr.eu (Michal Simek)
+Date: Tue, 12 Jul 2011 15:38:56 +0200
+Subject: [PATCH v2 0/6] ARM: make mach/hardware.h optional
+In-Reply-To: <201107121502.41570.arnd@arndb.de>
+References: <1309366019-24379-1-git-send-email-robherring2@gmail.com>
+	<201107021124.46953.arnd@arndb.de> <4E1B176E.3030503@gmail.com>
+	<201107121502.41570.arnd@arndb.de>
+Message-ID: <4E1C4E70.8030302@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 11, 2011 at 05:02:06PM -0700, Troy Kisky wrote:
-> Delete about 1,000 symbols used only once
+Arnd Bergmann wrote:
+> On Monday 11 July 2011, Rob Herring wrote:
+>>> This is very good work, I really like it. I've mentioned one idea for
+>>> an improvement in patch 5, which you can still integrate, but otherwise
+>>>
+>>> Reviewed-by: Arnd Bergmann <arnd@arndb.de>
+>>>
+>>> for the whole series.
+>>>
+>> I have an updated version ready to send out. Will you take this in your
+>> tree including the 1st patch for pci flags functions? Also, what about
+>> the powerpc conversion to generic pci flags?
 > 
-> I used the following script to clean up the file.
-> cp iomux-mx53.h iomux-mx53.h.cpy
-> 
-> grep "define _MX5" iomux-mx53.h.cpy | \
-> sed -e 's/#define[ \x09]\+\(_MX5[0-9a-zA-Z_]*\)[ \x09]\+\(.\+\)/s@\1@\2 at g/' >t.tmp
-> 
-> grep -v "define _MX5" iomux-mx53.h.cpy | \
-> sed -f t.tmp | \
-> sed -e 's/,[ \x09]*\([^,]\+\)/, \1/g' \
-> -e 's/, 0)[ \x09]*|[ \x09]*MUX_PAD_CTRL(/, /' \
-> -e 's/(IOMUX_PAD(\(.*\)))/IOMUX_PAD(\1)/' \
-> -e 's/0x\([0-9a-fA-F]\{2\}\)[ \x09]*,/0x0\1,/' \
-> -e 's/NON_PAD_I/__NA_/' \
-> -e 's/0x0,/__NA_,/' \
-> -e 's/#define[ \x09]\+\(MX5[0-9a-zA-Z_]*\)[ \x09]\+\(IOMUX_PAD.\+\)/#define \1\x09\2/' \
-> -e 's/\(#define MX5[^\x09]\{5,12\}\)\x09\(IOMUX_PAD.\+\)/\1\x09\x09\x09\x09\x09\2/' \
-> -e 's/\(#define MX5[^\x09]\{13,20\}\)\x09\(IOMUX_PAD.\+\)/\1\x09\x09\x09\x09\2/' \
-> -e 's/\(#define MX5[^\x09]\{21,28\}\)\x09\(IOMUX_PAD.\+\)/\1\x09\x09\x09\2/' \
-> -e 's/\(#define MX5[^\x09]\{29,36\}\)\x09\(IOMUX_PAD.\+\)/\1\x09\x09\2/' \
-> -e 's/\(#define MX5[^\x09]\{45,\}\)\x09\(IOMUX_PAD.\+\)/\1\x09\\\n\x09\x09\x09\x09\x09\x09\x09\2/' \
-> -e 's/, IOMUX_CONFIG_SION,/, 0 | IOMUX_CONFIG_SION,/' >iomux-mx53.h
-> 
-> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
-> ---
->  arch/arm/plat-mxc/include/mach/iomux-mx53.h | 3527 +++++++++------------------
->  1 files changed, 1184 insertions(+), 2343 deletions(-)
-> 
-> diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx53.h b/arch/arm/plat-mxc/include/mach/iomux-mx53.h
-> index 235d7ea..04dbbb6 100644
-> --- a/arch/arm/plat-mxc/include/mach/iomux-mx53.h
-> +++ b/arch/arm/plat-mxc/include/mach/iomux-mx53.h
-> @@ -23,7 +23,7 @@
->  
->  /* These 2 defines are for pins that may not have a mux register, but could
->   * have a pad setting register, and vice-versa. */
-> -#define NON_PAD_I	0x00
-> +#define __NA_	0x00
->  
->  #define MX53_UART_PAD_CTRL		(PAD_CTL_PKE | PAD_CTL_PUE |	\
->  		PAD_CTL_DSE_HIGH | PAD_CTL_SRE_FAST | PAD_CTL_HYS)
-> @@ -31,2348 +31,1189 @@
->  				PAD_CTL_PUS_47K_UP | PAD_CTL_DSE_HIGH | \
->  				PAD_CTL_SRE_FAST)
->  
-> -#define _MX53_PAD_GPIO_19__KPP_COL_5		IOMUX_PAD(0x348, 0x20, 0, 0x840, 0, 0)
+> I can take it all in the arm-soc tree, yes. However for anything outside
+> of arch/arm/{mach,plat}-*, please get an Ack from the respective maintainer
+> (Russell, Michal, BenH, ...).
 
-The underscore versions are for the case when somebody wants a
-nonstandard pad control setting and shouldn't be removed.
+Definitely not ACK for [PATH 1/6] because it breaks Microblaze PCI compilation.
+Rob removed some parts from microblaze pci-bridge.h and didn't move them to 
+generic location or keep them in it. Also didn't remove PCI 
+bits(PCI_REASSIGN..., etc) from microblaze header. I have attached changed patch 
+with Microblaze part.
 
-Sascha
+I would also prefer to add to this patch fixes for PPC too. Microblaze pci code 
+comes from PPC that's why will be the best to fix PPC in the same patch.
+There should be one more patch for ppc which rename ppc_pci_flags to pci_flags + 
+functions and bits
+
+ From my point of view make sense do these patches.
+1. (s/ppc_pci_flags/pci_flags/g) + (s/ppc_pci_/pci_/g) + (s/PPC_PCI_/PCI_/g)
+2. introduce new asm-generic/pci-bridge.h with changes for microblaze and ppc
+3. all others patches
+
+Thanks,
+Michal
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Michal Simek, Ing. (M.Eng)
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel 2.6 Microblaze Linux - http://www.monstr.eu/fdt/
+Microblaze U-BOOT custodian
