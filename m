@@ -1,34 +1,66 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Tue, 12 Jul 2011 20:22:33 +0200
-Subject: [PATCH V2 00/10]
-In-Reply-To: <1310483085-31442-1-git-send-email-b29396@freescale.com>
-References: <1310483085-31442-1-git-send-email-b29396@freescale.com>
-Message-ID: <20110712182233.GA16638@pengutronix.de>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Tue, 12 Jul 2011 20:31:15 +0200
+Subject: [PATCH v2] new helper to define common struct resource constructs
+In-Reply-To: <ADE657CA350FB648AAC2C43247A983F001F383D6DAD4@AUSP01VMBX24.collaborationhost.net>
+References: <ADE657CA350FB648AAC2C43247A983F001F383D6DAD4@AUSP01VMBX24.collaborationhost.net>
+Message-ID: <1310495475-22469-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 12, 2011 at 11:04:35PM +0800, Dong Aisheng wrote:
+resource definitions that just define start, end and flags =
+IORESOURCE_MEM or IORESOURCE_IRQ (with start=end) are quite common. So
+introduce a shortcut for them. For completeness add macros for
+IORESOURCE_DMA and IORESOURCE_IO, too and also make available a set of
+macros to specify named resources of all types.
 
-> This patch series is to add audio support based on saif for mxs platform.
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+changes since v1:
+- also add _IO and _DMA variants
 
-Seems like only 6 out of 10 patches made it to the lists? Pity, I was looking
-forward to all of them :)
+ include/linux/ioport.h |   30 ++++++++++++++++++++++++++++++
+ 1 files changed, 30 insertions(+), 0 deletions(-)
 
-Isn't there someone at Freescale or Linaro who can give you developers access
-to a git server? I think it would speed up development if reviewers/testers
-could simply pull your branches.
-
-Regards,
-
-   Wolfram
-
+diff --git a/include/linux/ioport.h b/include/linux/ioport.h
+index 63eb429..f98124f 100644
+--- a/include/linux/ioport.h
++++ b/include/linux/ioport.h
+@@ -109,6 +109,36 @@ struct resource_list {
+ /* PCI control bits.  Shares IORESOURCE_BITS with above PCI ROM.  */
+ #define IORESOURCE_PCI_FIXED		(1<<4)	/* Do not move resource */
+ 
++
++/* helpers to define resources */
++#define DEFINE_RES_NAMED(_start, _size, _name, _flags)			\
++	{								\
++		.start = _start,					\
++		.end = _start + _size - 1,				\
++		.name = _name,						\
++		.flags = _flags,					\
++	}
++
++#define DEFINE_RES_IO_NAMED(_start, _size, _name)			\
++	DEFINE_RES_NAMED(_start, _size, _name, IORESOURCE_IO)
++#define DEFINE_RES_IO(_start, _size)					\
++	DEFINE_RES_IO_NAMED(_start, _size, NULL)
++
++#define DEFINE_RES_MEM_NAMED(_start, _size, _name)			\
++	DEFINE_RES_NAMED(_start, _size, _name, IORESOURCE_MEM)
++#define DEFINE_RES_MEM(_start, _size)					\
++	DEFINE_RES_MEM_NAMED(_start, _size, NULL)
++
++#define DEFINE_RES_IRQ_NAMED(_irq, _name)				\
++	DEFINE_RES_NAMED(_irq, 1, _name, IORESOURCE_IRQ)
++#define DEFINE_RES_IRQ(_irq)						\
++	DEFINE_RES_IRQ_NAMED(_irq, NULL)
++
++#define DEFINE_RES_DMA_NAMED(_dma, _name)				\
++	DEFINE_RES_NAMED(_dma, 1, _name, IORESOURCE_DMA)
++#define DEFINE_RES_DMA(_dma)						\
++	DEFINE_RES_DMA_NAMED(_dma, NULL)
++
+ /* PC/ISA/whatever - the normal PC address spaces: IO and memory */
+ extern struct resource ioport_resource;
+ extern struct resource iomem_resource;
 -- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110712/a5ef3530/attachment.sig>
+1.7.5.4
