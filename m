@@ -1,120 +1,182 @@
-From: richard.zhu@linaro.org (Richard Zhu)
-Date: Tue, 12 Jul 2011 18:13:29 +0800
-Subject: [PATCH V3] mmc: Enable the ADMA2 on esdhc imx driver
-Message-ID: <1310465609-4516-1-git-send-email-richard.zhu@linaro.org>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 12 Jul 2011 11:12:57 +0100
+Subject: [RFC PATCH 05/17] ARM: kernel: save/restore kernel IF
+In-Reply-To: <20110711184010.GB8486@n2100.arm.linux.org.uk>
+References: <1310053830-23779-1-git-send-email-lorenzo.pieralisi@arm.com>
+	<1310053830-23779-6-git-send-email-lorenzo.pieralisi@arm.com>
+	<alpine.DEB.2.00.1107081641280.2609@localhost6.localdomain6>
+	<20110711140047.GA346@e102568-lin.cambridge.arm.com>
+	<20110711184010.GB8486@n2100.arm.linux.org.uk>
+Message-ID: <20110712101252.GA9604@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Eanble the ADMA2 mode on freescale esdhc imx driver,
-tested on MX25, MX51 and MX53.
+Thank you very much Russell for this recap.
 
-Only ADMA2 mode is enabled, MX25/35 can't support the ADMA2 mode.
-So this patch is only used to enable the ADMA2 for MX51/53 platforms.
+On Mon, Jul 11, 2011 at 07:40:10PM +0100, Russell King - ARM Linux wrote:
+> On Mon, Jul 11, 2011 at 03:00:47PM +0100, Lorenzo Pieralisi wrote:
+> > Well, short answer is no. On SMP we do need to save CPU registers 
+> > but if just one single cpu is shutdown L2 is still on. 
+> > cpu_suspend saves regs on the stack that has to be cleaned from
+> > L2 before shutting a CPU down which make things more complicated than
+> > they should.
+> 
+> Hang on.  Please explain something to me here.  You've mentioned a few
+> times that cpu_suspend() can't be used because of the L2 cache.  Why
+> is this the case?
+> 
+> OMAP appears to have code in its sleep path - which has been converted
+> to cpu_suspend() support - to deal with the L2 issues.
+> 
 
-The ADMA2 mode supported or not can be distinguished by the
-bit20 of Capability Register(offset 0x40) and bit9-8 of
-HOST PROTOCOL Register(offset 0x28) in FSL eSDHC module.
+OMAP4, it is SMP configs I am talking about.
 
-BTW:Here are the definition of the Bit9~8 DMAS of HOST PROTOCOL
-Reg(offset 0x28). The bit9 couldn't be set to 1 when the SOC can't
-support ADMA2. This bit is used to make a double check that the ADMA2
-is supported or not in this patch, since the bit20 of Capability Reg
-is broken on SOCs.
-DMAS definitions:
-00: No DMA or Simple DMA is selected
-01: ADMA1 is selected
-10: ADMA2 is selected
-11: reserved
+> However, lets recap.  What we do in cpu_suspend() in order is:
+> 
+> - Save the ABI registers onto the stack, and some private state
+> - Save the CPU specific state onto the stack
 
-Signed-off-by: Richard Zhu <richard.zhu@linaro.org>
----
- drivers/mmc/host/sdhci-esdhc-imx.c |   45 ++++++++++++++++++++++++++++++++++-
- 1 files changed, 43 insertions(+), 2 deletions(-)
+As Santosh said, L1 should be cleaned with C bit cleared. We are still
+in coherency and if L1 D$ keeps allocating we might run into issues here
+when for instance a single CPU is going down. It is the stack, as usual.
+The finisher should be written in assembly (I think that's the case) and 
+should not use the stack
+(eg thread_info). If I am not mistaken thread_info might be written by
+other CPUs and DDI might pull in it as a dirty line.
+We must avoid having dirty lines in L1 D$ when we pull the power.
 
-diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-index a19967d..46092c7 100644
---- a/drivers/mmc/host/sdhci-esdhc-imx.c
-+++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-@@ -31,6 +31,14 @@
- #define SDHCI_VENDOR_SPEC		0xC0
- #define  SDHCI_VENDOR_SPEC_SDIO_QUIRK	0x00000002
- 
-+/*
-+ * There is INT DMA ERR mis-match between eSDHC and STD SDHC SPEC
-+ * Bit25 is used in STD SPEC, and is reserved in fsl eSDHC design,
-+ * but bit28 is used as the INT DMA ERR in fsl eSDHC design.
-+ * Define this macro DMA error INT for fsl eSDHC
-+ */
-+#define  SDHCI_INT_VENDOR_SPEC_DMA_ERR	0x10000000
-+
- #define ESDHC_FLAG_GPIO_FOR_CD_WP	(1 << 0)
- /*
-  * The CMDTYPE of the CMD register (offset 0xE) should be set to
-@@ -62,6 +70,7 @@ static u32 esdhc_readl_le(struct sdhci_host *host, int reg)
- {
- 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
- 	struct pltfm_imx_data *imx_data = pltfm_host->priv;
-+	u32 dma_mode;
- 
- 	/* fake CARD_PRESENT flag on mx25/35 */
- 	u32 val = readl(host->ioaddr + reg);
-@@ -80,6 +89,30 @@ static u32 esdhc_readl_le(struct sdhci_host *host, int reg)
- 			val |= SDHCI_CARD_PRESENT;
- 	}
- 
-+	if (unlikely(reg == SDHCI_CAPABILITIES)) {
-+		/* In FSL esdhc IC module, only bit20 is used to indicate the
-+		 * ADMA2 capability of esdhc, but this bit is messed up on some
-+		 * SOCs (e.x MX25, this bit is set, but it can't support the
-+		 * ADMA2 actually). So readout HOST_CONTROl register to make a
-+		 * double check that the ADMA2 is supported or not.
-+		 */
-+		dma_mode = readl(host->ioaddr + SDHCI_HOST_CONTROL) >> 5;
-+		dma_mode &= SDHCI_CTRL_DMA_MASK;
-+
-+		if ((val & SDHCI_CAN_DO_ADMA1)
-+				&& (dma_mode > SDHCI_CTRL_ADMA1)) {
-+			val &= ~SDHCI_CAN_DO_ADMA1;
-+			val |= SDHCI_CAN_DO_ADMA2;
-+		}
-+	}
-+
-+	if (unlikely(reg == SDHCI_INT_STATUS)) {
-+		if (val & SDHCI_INT_VENDOR_SPEC_DMA_ERR) {
-+			val &= ~SDHCI_INT_VENDOR_SPEC_DMA_ERR;
-+			val |= SDHCI_INT_ADMA_ERROR;
-+		}
-+	}
-+
- 	return val;
- }
- 
-@@ -105,6 +138,13 @@ static void esdhc_writel_le(struct sdhci_host *host, u32 val, int reg)
- 			writel(v, host->ioaddr + SDHCI_VENDOR_SPEC);
- 	}
- 
-+	if (unlikely((reg == SDHCI_INT_ENABLE)
-+				|| (reg == SDHCI_SIGNAL_ENABLE))) {
-+		if (val & SDHCI_INT_ADMA_ERROR) {
-+			val &= ~SDHCI_INT_ADMA_ERROR;
-+			val |= SDHCI_INT_VENDOR_SPEC_DMA_ERR;
-+		}
-+	}
- 	writel(val, host->ioaddr + reg);
- }
- 
-@@ -322,9 +362,10 @@ static void esdhc_pltfm_exit(struct sdhci_host *host)
- }
- 
- struct sdhci_pltfm_data sdhci_esdhc_imx_pdata = {
--	.quirks = ESDHC_DEFAULT_QUIRKS | SDHCI_QUIRK_BROKEN_ADMA
-+	.quirks = ESDHC_DEFAULT_QUIRKS | SDHCI_QUIRK_NO_HISPD_BIT
-+			| SDHCI_QUIRK_NO_ENDATTR_IN_NOPDESC
-+			| SDHCI_QUIRK_BROKEN_ADMA_ZEROLEN_DESC
- 			| SDHCI_QUIRK_BROKEN_CARD_DETECTION,
--	/* ADMA has issues. Might be fixable */
- 	.ops = &sdhci_esdhc_ops,
- 	.init = esdhc_pltfm_init,
- 	.exit = esdhc_pltfm_exit,
--- 
-1.7.1
+On top of that, if the C bit is cleared I think we need to clean the
+L2 cache in assembly in the finisher, and avoid using spinlocks because 
+this does not work when C bit is cleared. 
+This means that this code will become racy by definition or I am missing
+something.
+
+> - Flush the L1 cache
+> - Call the platform specific suspend finisher
+> 
+> On resume, with the MMU and caches off:
+> 
+> - Platform defined entry point is called, which _may_ be cpu_resume
+>   directly.
+> - Platform initial code is executed to do whatever that requires
+> - cpu_resume will be called
+> - cpu_resume loads the previously saved private state
+> - The CPU specific state is restored
+> - Page table is modified to permit 1:1 mapping for MMU enable
+> - MMU is enabled with caches disabled
+> - Page table modification is undone
+> - Caches are enabled in the main control register
+> - CPU exception mode stacks are reinitialized
+> - CPU specific init function is called
+> - ABI registers are popped off and 'cpu_suspend' function returns
+> 
+> So, as far as L2 goes, in the suspend finisher:
+> 
+> - If L2 state is lost, the finisher needs to clean dirty data from L2
+>   to ensure that it is preserved in RAM.
+>   Note: There is no need to disable or even invalidate the L2 cache as
+>   we should not be writing any data in the finisher function which we
+>   later need after resume.
+
+I agree that "not writing" should be sufficient but want to raise a
+point anyway.
+If L2 is shutdown or put in L2 RAM retention on idle (I read the reply 
+from Colin about idle support for L2 shutdown but I think
+we have to cater for it anyway) it has to be disabled before issuing wfi
+(we have to be in control of L2 to make sure it is not fetching lines
+behind our back).
+It is about avoiding transactions on the AXI bus when the power is
+yanked from L2. Also L2 prefetch bits should be cleared, I am checking
+with HW guys how and when this might create issues.
+
+> 
+> - If L2 state is not lost, the finisher needs to clean the saved state
+>   as a minimum, to sure that this is visible when the main control register
+>   C bit is clear.  The easiest way to do that is to find the top of stack
+>   via current_thread_info() - we have a macro for that, and then add
+>   THREAD_SIZE to find the top of stack.  'sp' will be the current bottom
+>   of stack.
+> 
+
+Spot-on.
+
+> In the resume initial code:
+> 
+> - If L2 state was lost, the L2 configuration needs to be restored.
+>   This generally needs to happen before cpu_resume is called:
+>   - there are CPUs which need L2 setup before the MMU is enabled.
+>   - OMAP3 currently does this in its assembly, which is convenient to
+>     allow it to make the SMI calls to the secure world.  The same will
+>     be true of any CPU running in non-secure mode.
+> 
+> - If L2 state was not lost, and the platform choses not to clean and
+>   invalidate the ABI registers from the stack, and the platform restores
+>   the L2 configuration before calling cpu_resume, then the ABI registers
+>   will be read out of L2 on return if that's where they are - at that
+>   point everything will be setup correctly.
+> 
+>   This will give the greatest performance, which is important for CPU
+>   idle use of these code paths.
+> 
+> Now, considering SMP, there's an issue here: do we know at the point
+> where one CPU goes down whether L2 state will be lost?
+> 
+
+That is what I am tracking in the patch, meaning that we have to know
+when the executing CPU is the last running. If we mandate control
+within CPU idle to control that for all platforms I think we are all
+set.
+
+> If the answer is that state will not be lost, we can do the minimum.
+> If all L2 state is lost, we need to do as above.  If we don't know the
+> answer, then we have to assume that L2 state will be lost.
+> 
+
+I know I am a pain in the neck, but please consider L2 RAM retention in
+this picture where logic is lost but RAM is retained, so it should not
+be cleaned.
+
+> But wait - L2 cache (or more accurately, the outer cache) is common
+> between CPUs in a SMP system.  So, if we're _not_ the last CPU to go
+> down, then we assume that L2 state will not be lost.  It is the last
+> CPUs responsibility to deal with L2 state when it goes into a PM mode
+> that results in L2 state being lost.
+> 
+
+That's correct.
+
+> Lastly, should generic code deal with flushing L2 and setting it back
+> up on resume?  A couple of points there:
+> 
+> 1. Will generic code know whether L2 state will be lost, or should it
+>    assume that L2 state is always lost and do a full L2 flush.  That
+>    seems wasteful if we have another CPU still running (which would
+>    also have to flush L2.)
+
+on SMP, single CPU shutdown, as you stated, only the minimum should
+be cleaned from L2. The same goes for system shutdown (all CPUs down)
+L2 RAM retention.
+
+> 
+> 2. L2 configuration registers are not accessible to CPUs operating in
+>    non-secure mode like OMAPs.  Generic code on these CPUs has _no_
+>    way to restore and re-enable the L2 cache.  It needs to make
+>    implementation specific SMI calls to achieve that.
+> 
+> So, I believe the answer to that is no.  However, I think we can still
+> do a change to improve the situation:
+> 
+> 1. Pass in r2 and r3 to the suspend finisher the bottom and top of the
+>    stack which needs to be cleaned from L2.  This covers the saved
+>    state but not the ABI registers.
+> 
+> 2. Mandate that L2 configuration is to be restored by platforms in their
+>    pre-cpu_resume code so L2 is available when the C bit is set.
+> 
+
+On top of that, if we can also define and mandate a warm-boot protocol 
+(eg CPU0 is always the one coming up from complete system shutdown) and 
+the other(s) are put into wfi or a platform specific procedure that would 
+be grand. 
+
+Lorenzo
