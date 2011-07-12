@@ -1,25 +1,43 @@
-From: khali@linux-fr.org (Jean Delvare)
-Date: Tue, 12 Jul 2011 09:36:06 +0200
-Subject: [PATCH v3] MAX1111: Fix Race condition causing NULL pointer
-	exception
-In-Reply-To: <1310421038-14823-1-git-send-email-morpheus.ibis@gmail.com>
-References: <1310421038-14823-1-git-send-email-morpheus.ibis@gmail.com>
-Message-ID: <20110712093606.5db834cb@endymion.delvare>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 12 Jul 2011 09:44:06 +0200
+Subject: [PATCH 1/1] ARM: i.MX50/53: debug-macro: fix UART_PADDR
+In-Reply-To: <1310438444-4237-1-git-send-email-troy.kisky@boundarydevices.com>
+References: <1310438444-4237-1-git-send-email-troy.kisky@boundarydevices.com>
+Message-ID: <20110712074405.GF7751@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 11 Jul 2011 23:50:38 +0200, Pavel Herrmann wrote:
-> spi_sync call uses its spi_message parameter to keep completion information,
-> using a drvdata structure is not thread-safe, potentially causing one thread
-> having pointers to memory on or above other threads stack. use mutex to
-> prevent multiple access
+On Mon, Jul 11, 2011 at 07:40:44PM -0700, Troy Kisky wrote:
+> The i.MX51 UART_PADDR value does not work for MX50/53.
+> 
+> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
+> ---
+>  arch/arm/plat-mxc/include/mach/debug-macro.S |   42 +++++++++++++++++++++-----
+>  1 files changed, 34 insertions(+), 8 deletions(-)
+> 
+> diff --git a/arch/arm/plat-mxc/include/mach/debug-macro.S b/arch/arm/plat-mxc/include/mach/debug-macro.S
+> index 8e8d175..6b696cd 100644
+> --- a/arch/arm/plat-mxc/include/mach/debug-macro.S
+> +++ b/arch/arm/plat-mxc/include/mach/debug-macro.S
+> @@ -17,32 +17,58 @@
+>  #endif
+>  
+>  #ifdef CONFIG_ARCH_MX25
+> -#ifdef UART_PADDR
+> +#ifndef UART_PADDR
+> +#define UART_PADDR	MX25_UART1_BASE_ADDR
+> +#endif
+> +#if UART_PADDR != MX25_UART1_BASE_ADDR
+>  #error "CONFIG_DEBUG_LL is incompatible with multiple archs"
+>  #endif
+> -#define UART_PADDR	MX25_UART1_BASE_ADDR
+>  #endif
+I'm not sure it's worth the effort to do this. Still you should at least
+note it in the change log or better move it to a separate patch.
 
-Honestly, I have no idea what "causing one thread having pointers to
-memory on or above other threads stack" means (nor why this would be
-bad.)
-
-Patch applied nevertheless, as it fixes an actual bug which should be
-fixed ASAP. Thanks for your contribution.
+Best regards
+Uwe
 
 -- 
-Jean Delvare
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
