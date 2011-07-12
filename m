@@ -1,54 +1,96 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 12 Jul 2011 15:32:31 +0200
+Date: Tue, 12 Jul 2011 15:34:43 +0200
 Subject: [PATCH 1/1] ARM: i.MX50/53: debug-macro: fix UART_PADDR
-In-Reply-To: <1310251913-9877-1-git-send-email-troy.kisky@boundarydevices.com>
-References: <1310251913-9877-1-git-send-email-troy.kisky@boundarydevices.com>
-Message-ID: <20110712133231.GQ6069@pengutronix.de>
+In-Reply-To: <1310438444-4237-1-git-send-email-troy.kisky@boundarydevices.com>
+References: <1310438444-4237-1-git-send-email-troy.kisky@boundarydevices.com>
+Message-ID: <20110712133443.GR6069@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Troy,
-
-On Sat, Jul 09, 2011 at 03:51:53PM -0700, Troy Kisky wrote:
+On Mon, Jul 11, 2011 at 07:40:44PM -0700, Troy Kisky wrote:
 > The i.MX51 UART_PADDR value does not work for MX50/53.
 > 
 > Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
 
-Please rebase the patch on my for-next branch and use CONFIG_SOC_IMX*
-instead of CONFIG_ARCH_*.
+Your first patch looked better...
 
 Sascha
 
 > ---
->  arch/arm/plat-mxc/include/mach/debug-macro.S |    9 ++++++++-
->  1 files changed, 8 insertions(+), 1 deletions(-)
+>  arch/arm/plat-mxc/include/mach/debug-macro.S |   42 +++++++++++++++++++++-----
+>  1 files changed, 34 insertions(+), 8 deletions(-)
 > 
 > diff --git a/arch/arm/plat-mxc/include/mach/debug-macro.S b/arch/arm/plat-mxc/include/mach/debug-macro.S
-> index 8e8d175..3919ad4 100644
+> index 8e8d175..6b696cd 100644
 > --- a/arch/arm/plat-mxc/include/mach/debug-macro.S
 > +++ b/arch/arm/plat-mxc/include/mach/debug-macro.S
-> @@ -37,13 +37,20 @@
->  #define UART_PADDR	MX3x_UART1_BASE_ADDR
+> @@ -17,32 +17,58 @@
+>  #endif
+>  
+>  #ifdef CONFIG_ARCH_MX25
+> -#ifdef UART_PADDR
+> +#ifndef UART_PADDR
+> +#define UART_PADDR	MX25_UART1_BASE_ADDR
+> +#endif
+> +#if UART_PADDR != MX25_UART1_BASE_ADDR
+>  #error "CONFIG_DEBUG_LL is incompatible with multiple archs"
+>  #endif
+> -#define UART_PADDR	MX25_UART1_BASE_ADDR
+>  #endif
+>  
+>  #ifdef CONFIG_ARCH_MX2
+> -#ifdef UART_PADDR
+> +#ifndef UART_PADDR
+> +#define UART_PADDR	MX2x_UART1_BASE_ADDR
+> +#endif
+> +#if UART_PADDR != MX2x_UART1_BASE_ADDR
+>  #error "CONFIG_DEBUG_LL is incompatible with multiple archs"
+>  #endif
+> -#define UART_PADDR	MX2x_UART1_BASE_ADDR
+>  #endif
+>  
+>  #ifdef CONFIG_ARCH_MX3
+> -#ifdef UART_PADDR
+> +#ifndef UART_PADDR
+> +#define UART_PADDR	MX3x_UART1_BASE_ADDR
+> +#endif
+> +#if UART_PADDR != MX3x_UART1_BASE_ADDR
+>  #error "CONFIG_DEBUG_LL is incompatible with multiple archs"
+>  #endif
+> -#define UART_PADDR	MX3x_UART1_BASE_ADDR
 >  #endif
 >  
 > -#ifdef CONFIG_ARCH_MX5
-> +#ifdef CONFIG_ARCH_MX51
->  #ifdef UART_PADDR
+> -#ifdef UART_PADDR
+> +#ifdef CONFIG_ARCH_MX50
+> +#ifndef UART_PADDR
+> +#define UART_PADDR	MX50_UART1_BASE_ADDR
+> +#endif
+> +#if UART_PADDR != MX50_UART1_BASE_ADDR
 >  #error "CONFIG_DEBUG_LL is incompatible with multiple archs"
 >  #endif
->  #define UART_PADDR	MX51_UART1_BASE_ADDR
->  #endif
->  
-> +#if defined(CONFIG_ARCH_MX50) || defined(CONFIG_ARCH_MX53)
-> +#ifdef UART_PADDR
-> +#error "CONFIG_DEBUG_LL is incompatible with multiple archs"
-> +#endif
-> +#define UART_PADDR	MX53_UART1_BASE_ADDR
 > +#endif
 > +
+> +#ifdef CONFIG_ARCH_MX51
+> +#ifndef UART_PADDR
+>  #define UART_PADDR	MX51_UART1_BASE_ADDR
+>  #endif
+> +#if UART_PADDR != MX51_UART1_BASE_ADDR
+> +#error "CONFIG_DEBUG_LL is incompatible with multiple archs"
+> +#endif
+> +#endif
+> +
+> +#ifdef CONFIG_ARCH_MX53
+> +#ifndef UART_PADDR
+> +#define UART_PADDR	MX53_UART1_BASE_ADDR
+> +#endif
+> +#if UART_PADDR != MX53_UART1_BASE_ADDR
+> +#error "CONFIG_DEBUG_LL is incompatible with multiple archs"
+> +#endif
+> +#endif
+>  
 >  #define UART_VADDR	IMX_IO_ADDRESS(UART_PADDR)
 >  
->  		.macro	addruart, rp, rv
 > -- 
 > 1.7.0.4
 > 
