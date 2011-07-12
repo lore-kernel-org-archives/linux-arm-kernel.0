@@ -1,51 +1,134 @@
-From: sjg@chromium.org (Simon Glass)
-Date: Mon, 11 Jul 2011 17:01:22 -0700
-Subject: [PATCH v4] ARM: Use generic BUG() handler
-In-Reply-To: <20110707092802.GA2486@arm.com>
-References: <1302822031-6752-1-git-send-email-sjg@chromium.org>
-	<4DA7A914.5020804@codeaurora.org>
-	<BANLkTikcY-xzjd0W77UfWWoO8ibjKNXQGg@mail.gmail.com>
-	<BANLkTin_TpzdQS96SPKUNye6vb2b55Qc4A@mail.gmail.com>
-	<143ea9b1bb96e613d534caa7cb3a1e2d.squirrel@www.codeaurora.org>
-	<20110426014741.GB28721@quad.lixom.net>
-	<BANLkTikHT2E=76jMLbzmQm_CiUw8rA3cCA@mail.gmail.com>
-	<20110706200607.GS8286@n2100.arm.linux.org.uk>
-	<20110707092802.GA2486@arm.com>
-Message-ID: <CAPnjgZ1-wPW1WyR0nC1R5BkLSwc54evb5gV0dpSEOM4duS4omg@mail.gmail.com>
+From: troy.kisky@boundarydevices.com (Troy Kisky)
+Date: Mon, 11 Jul 2011 17:02:03 -0700
+Subject: [PATCH 1/6] ARM: i.MX53: UARTn_TXD pin should not change RXD input
+	select
+Message-ID: <1310428928-2637-1-git-send-email-troy.kisky@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Resent, without html, sorry]
+If both the RXD pad and TXD pad definitions setup
+IOMUXC_UARTn_IPP_UART_RXD_MUX_SELECT_INPUT, then
+the order of setup will matter. We don't want that.
 
-Hi Russell & Dave,
+Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
 
-On Thu, Jul 7, 2011 at 2:28 AM, Dave Martin <dave.martin@linaro.org> wrote:
-> On Wed, Jul 06, 2011 at 09:06:07PM +0100, Russell King - ARM Linux wrote:
->>
->> Sorry, I've finally got back to looking at this.
->>
->> + ? ? ? ? ? ? ? ".pushsection .rodata.str, \"aMS\", 1\n" ? ? ? ?\
->>
->> According to my gas manual:
->>
->> | 7.88 `.pushsection NAME [, SUBSECTION] [, "FLAGS"[, @TYPE[,ARGUMENTS]]]'
->> | ...
-[snip]
->> It appears that the TYPE argument is missing. ?As the GAS manual says
->> its required, then I think it really ought to be there. ?Any comment?
->
-> I guess type should be %progbits. ?That's what the compiler generates for
-> the assembler input in similar situations.
->
-> Interestingly, gas does not require this argument and seems to default to
-> progbits anyway ... but it seems best to do what the manual says.
->
+---
+You might think that selecting the TXD pad in the
+xxx_RXD_MUX_SELECT_INPUT would swap the RXD and TXD
+pins. That does not seem to be the case. Transmits still
+happen on the TXD pin. This appears to be a local loopback mode.
+---
+Sascha,
 
-Thanks for this. I will update the patch and resend to the list.
+This series is based on your fixes branch
 
-Regards,
-Simon
 
-> Cheers
-> ---Dave
->
+
+ arch/arm/plat-mxc/include/mach/iomux-mx53.h |   22 +++++++++++-----------
+ 1 files changed, 11 insertions(+), 11 deletions(-)
+
+diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx53.h b/arch/arm/plat-mxc/include/mach/iomux-mx53.h
+index e11dd5f..29ce1e6 100644
+--- a/arch/arm/plat-mxc/include/mach/iomux-mx53.h
++++ b/arch/arm/plat-mxc/include/mach/iomux-mx53.h
+@@ -42,7 +42,7 @@
+ #define _MX53_PAD_KEY_COL0__KPP_COL_0	IOMUX_PAD(0x34C, 0x24, 0, 0x0, 0, 0)
+ #define _MX53_PAD_KEY_COL0__GPIO4_6		IOMUX_PAD(0x34C, 0x24, 1, 0x0, 0, 0)
+ #define _MX53_PAD_KEY_COL0__AUDMUX_AUD5_TXC	IOMUX_PAD(0x34C, 0x24, 2, 0x758, 0, 0)
+-#define _MX53_PAD_KEY_COL0__UART4_TXD_MUX	IOMUX_PAD(0x34C, 0x24, 4, 0x890, 0, 0)
++#define _MX53_PAD_KEY_COL0__UART4_TXD_MUX	IOMUX_PAD(0x34C, 0x24, 4, 0x0, 0, 0)
+ #define _MX53_PAD_KEY_COL0__ECSPI1_SCLK	IOMUX_PAD(0x34C, 0x24, 5, 0x79C, 0, 0)
+ #define _MX53_PAD_KEY_COL0__FEC_RDATA_3	IOMUX_PAD(0x34C, 0x24, 6, 0x0, 0, 0)
+ #define _MX53_PAD_KEY_COL0__SRC_ANY_PU_RST	IOMUX_PAD(0x34C, 0x24, 7, 0x0, 0, 0)
+@@ -55,7 +55,7 @@
+ #define _MX53_PAD_KEY_COL1__KPP_COL_1	IOMUX_PAD(0x354, 0x2C, 0, 0x0, 0, 0)
+ #define _MX53_PAD_KEY_COL1__GPIO4_8		IOMUX_PAD(0x354, 0x2C, 1, 0x0, 0, 0)
+ #define _MX53_PAD_KEY_COL1__AUDMUX_AUD5_TXFS	IOMUX_PAD(0x354, 0x2C, 2, 0x75C, 0, 0)
+-#define _MX53_PAD_KEY_COL1__UART5_TXD_MUX	IOMUX_PAD(0x354, 0x2C, 4, 0x898, 0, 0)
++#define _MX53_PAD_KEY_COL1__UART5_TXD_MUX	IOMUX_PAD(0x354, 0x2C, 4, 0x0, 0, 0)
+ #define _MX53_PAD_KEY_COL1__ECSPI1_MISO	IOMUX_PAD(0x354, 0x2C, 5, 0x7A0, 0, 0)
+ #define _MX53_PAD_KEY_COL1__FEC_RX_CLK	IOMUX_PAD(0x354, 0x2C, 6, 0x808, 0, 0)
+ #define _MX53_PAD_KEY_COL1__USBPHY1_TXREADY	IOMUX_PAD(0x354, 0x2C, 7, 0x0, 0, 0)
+@@ -377,7 +377,7 @@
+ #define _MX53_PAD_CSI0_DAT9__TPIU_TRACE_6		IOMUX_PAD(0x410, 0xE4, 7, 0x0, 0, 0)
+ #define _MX53_PAD_CSI0_DAT10__IPU_CSI0_D_10		IOMUX_PAD(0x414, 0xE8, 0, 0x0, 0, 0)
+ #define _MX53_PAD_CSI0_DAT10__GPIO5_28		IOMUX_PAD(0x414, 0xE8, 1, 0x0, 0, 0)
+-#define _MX53_PAD_CSI0_DAT10__UART1_TXD_MUX	IOMUX_PAD(0x414, 0xE8, 2, 0x878, 0, 0)
++#define _MX53_PAD_CSI0_DAT10__UART1_TXD_MUX	IOMUX_PAD(0x414, 0xE8, 2, 0x0, 0, 0)
+ #define _MX53_PAD_CSI0_DAT10__ECSPI2_MISO		IOMUX_PAD(0x414, 0xE8, 3, 0x7BC, 1, 0)
+ #define _MX53_PAD_CSI0_DAT10__AUDMUX_AUD3_RXC	IOMUX_PAD(0x414, 0xE8, 4, 0x0, 0, 0)
+ #define _MX53_PAD_CSI0_DAT10__SDMA_DEBUG_PC_4	IOMUX_PAD(0x414, 0xE8, 5, 0x0, 0, 0)
+@@ -393,7 +393,7 @@
+ #define _MX53_PAD_CSI0_DAT11__TPIU_TRACE_8		IOMUX_PAD(0x418, 0xEC, 7, 0x0, 0, 0)
+ #define _MX53_PAD_CSI0_DAT12__IPU_CSI0_D_12		IOMUX_PAD(0x41C, 0xF0, 0, 0x0, 0, 0)
+ #define _MX53_PAD_CSI0_DAT12__GPIO5_30		IOMUX_PAD(0x41C, 0xF0, 1, 0x0, 0, 0)
+-#define _MX53_PAD_CSI0_DAT12__UART4_TXD_MUX	IOMUX_PAD(0x41C, 0xF0, 2, 0x890, 2, 0)
++#define _MX53_PAD_CSI0_DAT12__UART4_TXD_MUX	IOMUX_PAD(0x41C, 0xF0, 2, 0x0, 0, 0)
+ #define _MX53_PAD_CSI0_DAT12__USBOH3_USBH3_DATA_0	IOMUX_PAD(0x41C, 0xF0, 4, 0x0, 0, 0)
+ #define _MX53_PAD_CSI0_DAT12__SDMA_DEBUG_PC_6	IOMUX_PAD(0x41C, 0xF0, 5, 0x0, 0, 0)
+ #define _MX53_PAD_CSI0_DAT12__EMI_EMI_DEBUG_41	IOMUX_PAD(0x41C, 0xF0, 6, 0x0, 0, 0)
+@@ -407,7 +407,7 @@
+ #define _MX53_PAD_CSI0_DAT13__TPIU_TRACE_10		IOMUX_PAD(0x420, 0xF4, 7, 0x0, 0, 0)
+ #define _MX53_PAD_CSI0_DAT14__IPU_CSI0_D_14		IOMUX_PAD(0x424, 0xF8, 0, 0x0, 0, 0)
+ #define _MX53_PAD_CSI0_DAT14__GPIO6_0		IOMUX_PAD(0x424, 0xF8, 1, 0x0, 0, 0)
+-#define _MX53_PAD_CSI0_DAT14__UART5_TXD_MUX	IOMUX_PAD(0x424, 0xF8, 2, 0x898, 2, 0)
++#define _MX53_PAD_CSI0_DAT14__UART5_TXD_MUX	IOMUX_PAD(0x424, 0xF8, 2, 0x0, 0, 0)
+ #define _MX53_PAD_CSI0_DAT14__USBOH3_USBH3_DATA_2	IOMUX_PAD(0x424, 0xF8, 4, 0x0, 0, 0)
+ #define _MX53_PAD_CSI0_DAT14__SDMA_DEBUG_PC_8	IOMUX_PAD(0x424, 0xF8, 5, 0x0, 0, 0)
+ #define _MX53_PAD_CSI0_DAT14__EMI_EMI_DEBUG_43	IOMUX_PAD(0x424, 0xF8, 6, 0x0, 0, 0)
+@@ -525,7 +525,7 @@
+ #define _MX53_PAD_EIM_EB3__IPU_DI1_PIN16		IOMUX_PAD(0x480, 0x138, 7, 0x0, 0, 0)
+ #define _MX53_PAD_EIM_D24__EMI_WEIM_D_24		IOMUX_PAD(0x484, 0x13C, 0, 0x0, 0, 0)
+ #define _MX53_PAD_EIM_D24__GPIO3_24			IOMUX_PAD(0x484, 0x13C, 1, 0x0, 0, 0)
+-#define _MX53_PAD_EIM_D24__UART3_TXD_MUX		IOMUX_PAD(0x484, 0x13C, 2, 0x888, 0, 0)
++#define _MX53_PAD_EIM_D24__UART3_TXD_MUX		IOMUX_PAD(0x484, 0x13C, 2, 0x0, 0, 0)
+ #define _MX53_PAD_EIM_D24__ECSPI1_SS2		IOMUX_PAD(0x484, 0x13C, 3, 0x7B0, 1, 0)
+ #define _MX53_PAD_EIM_D24__CSPI_SS2			IOMUX_PAD(0x484, 0x13C, 4, 0x794, 1, 0)
+ #define _MX53_PAD_EIM_D24__AUDMUX_AUD5_RXFS	IOMUX_PAD(0x484, 0x13C, 5, 0x754, 1, 0)
+@@ -541,7 +541,7 @@
+ #define _MX53_PAD_EIM_D25__UART1_DSR		IOMUX_PAD(0x488, 0x140, 7, 0x0, 0, 0)
+ #define _MX53_PAD_EIM_D26__EMI_WEIM_D_26		IOMUX_PAD(0x48C, 0x144, 0, 0x0, 0, 0)
+ #define _MX53_PAD_EIM_D26__GPIO3_26			IOMUX_PAD(0x48C, 0x144, 1, 0x0, 0, 0)
+-#define _MX53_PAD_EIM_D26__UART2_TXD_MUX		IOMUX_PAD(0x48C, 0x144, 2, 0x880, 0, 0)
++#define _MX53_PAD_EIM_D26__UART2_TXD_MUX		IOMUX_PAD(0x48C, 0x144, 2, 0x0, 0, 0)
+ #define _MX53_PAD_EIM_D26__FIRI_RXD			IOMUX_PAD(0x48C, 0x144, 3, 0x80C, 0, 0)
+ #define _MX53_PAD_EIM_D26__IPU_CSI0_D_1		IOMUX_PAD(0x48C, 0x144, 4, 0x0, 0, 0)
+ #define _MX53_PAD_EIM_D26__IPU_DI1_PIN11		IOMUX_PAD(0x48C, 0x144, 5, 0x0, 0, 0)
+@@ -859,7 +859,7 @@
+ #define _MX53_PAD_FEC_MDC__USBPHY2_DATAOUT_1	IOMUX_PAD(0x5E8, 0x26C, 7, 0x0, 0, 0)
+ #define _MX53_PAD_PATA_DIOW__PATA_DIOW		IOMUX_PAD(0x5F0, 0x270, 0, 0x0, 0, 0)
+ #define _MX53_PAD_PATA_DIOW__GPIO6_17		IOMUX_PAD(0x5F0, 0x270, 1, 0x0, 0, 0)
+-#define _MX53_PAD_PATA_DIOW__UART1_TXD_MUX	IOMUX_PAD(0x5F0, 0x270, 3, 0x878, 2, 0)
++#define _MX53_PAD_PATA_DIOW__UART1_TXD_MUX	IOMUX_PAD(0x5F0, 0x270, 3, 0x0, 0, 0)
+ #define _MX53_PAD_PATA_DIOW__USBPHY2_DATAOUT_2	IOMUX_PAD(0x5F0, 0x270, 7, 0x0, 0, 0)
+ #define _MX53_PAD_PATA_DMACK__PATA_DMACK		IOMUX_PAD(0x5F4, 0x274, 0, 0x0, 0, 0)
+ #define _MX53_PAD_PATA_DMACK__GPIO6_18		IOMUX_PAD(0x5F4, 0x274, 1, 0x0, 0, 0)
+@@ -867,7 +867,7 @@
+ #define _MX53_PAD_PATA_DMACK__USBPHY2_DATAOUT_3	IOMUX_PAD(0x5F4, 0x274, 7, 0x0, 0, 0)
+ #define _MX53_PAD_PATA_DMARQ__PATA_DMARQ		IOMUX_PAD(0x5F8, 0x278, 0, 0x0, 0, 0)
+ #define _MX53_PAD_PATA_DMARQ__GPIO7_0		IOMUX_PAD(0x5F8, 0x278, 1, 0x0, 0, 0)
+-#define _MX53_PAD_PATA_DMARQ__UART2_TXD_MUX	IOMUX_PAD(0x5F8, 0x278, 3, 0x880, 2, 0)
++#define _MX53_PAD_PATA_DMARQ__UART2_TXD_MUX	IOMUX_PAD(0x5F8, 0x278, 3, 0x0, 0, 0)
+ #define _MX53_PAD_PATA_DMARQ__CCM_CCM_OUT_0	IOMUX_PAD(0x5F8, 0x278, 5, 0x0, 0, 0)
+ #define _MX53_PAD_PATA_DMARQ__USBPHY2_DATAOUT_4	IOMUX_PAD(0x5F8, 0x278, 7, 0x0, 0, 0)
+ #define _MX53_PAD_PATA_BUFFER_EN__PATA_BUFFER_EN	IOMUX_PAD(0x5FC, 0x27C, 0, 0x0, 0, 0)
+@@ -915,7 +915,7 @@
+ #define _MX53_PAD_PATA_DA_2__USBPHY1_DATAOUT_4	IOMUX_PAD(0x618, 0x298, 7, 0x0, 0, 0)
+ #define _MX53_PAD_PATA_CS_0__PATA_CS_0		IOMUX_PAD(0x61C, 0x29C, 0, 0x0, 0, 0)
+ #define _MX53_PAD_PATA_CS_0__GPIO7_9			IOMUX_PAD(0x61C, 0x29C, 1, 0x0, 0, 0)
+-#define _MX53_PAD_PATA_CS_0__UART3_TXD_MUX		IOMUX_PAD(0x61C, 0x29C, 4, 0x888, 2, 0)
++#define _MX53_PAD_PATA_CS_0__UART3_TXD_MUX		IOMUX_PAD(0x61C, 0x29C, 4, 0x0, 0, 0)
+ #define _MX53_PAD_PATA_CS_0__USBPHY1_DATAOUT_5	IOMUX_PAD(0x61C, 0x29C, 7, 0x0, 0, 0)
+ #define _MX53_PAD_PATA_CS_1__PATA_CS_1		IOMUX_PAD(0x620, 0x2A0, 0, 0x0, 0, 0)
+ #define _MX53_PAD_PATA_CS_1__GPIO7_10		IOMUX_PAD(0x620, 0x2A0, 1, 0x0, 0, 0)
+@@ -1167,7 +1167,7 @@
+ #define _MX53_PAD_GPIO_7__GPIO1_7		IOMUX_PAD(0x6C4, 0x334, 1, 0x0, 0, 0)
+ #define _MX53_PAD_GPIO_7__EPIT1_EPITO	IOMUX_PAD(0x6C4, 0x334, 2, 0x0, 0, 0)
+ #define _MX53_PAD_GPIO_7__CAN1_TXCAN	IOMUX_PAD(0x6C4, 0x334, 3, 0x0, 0, 0)
+-#define _MX53_PAD_GPIO_7__UART2_TXD_MUX	IOMUX_PAD(0x6C4, 0x334, 4, 0x880, 4, 0)
++#define _MX53_PAD_GPIO_7__UART2_TXD_MUX	IOMUX_PAD(0x6C4, 0x334, 4, 0x0, 0, 0)
+ #define _MX53_PAD_GPIO_7__FIRI_RXD		IOMUX_PAD(0x6C4, 0x334, 5, 0x80C, 1, 0)
+ #define _MX53_PAD_GPIO_7__SPDIF_PLOCK	IOMUX_PAD(0x6C4, 0x334, 6, 0x0, 0, 0)
+ #define _MX53_PAD_GPIO_7__CCM_PLL2_BYP	IOMUX_PAD(0x6C4, 0x334, 7, 0x774, 1, 0)
+-- 
+1.7.0.4
