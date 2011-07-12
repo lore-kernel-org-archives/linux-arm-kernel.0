@@ -1,62 +1,32 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Tue, 12 Jul 2011 10:05:13 +0200
-Subject: [PATCH] ARM: fix regression in IXP4xx clocksource
-In-Reply-To: <m3liwb15t2.fsf@intrepid.localdomain>
-References: <m3liwb15t2.fsf@intrepid.localdomain>
-Message-ID: <20110712080513.GA2937@riccoc20.at.omicron.at>
+From: morpheus.ibis@gmail.com (Pavel Herrmann)
+Date: Tue, 12 Jul 2011 10:04:55 +0200
+Subject: [PATCH v3] MAX1111: Fix Race condition causing NULL pointer
+	exception
+In-Reply-To: <20110712093606.5db834cb@endymion.delvare>
+References: <1310421038-14823-1-git-send-email-morpheus.ibis@gmail.com>
+	<20110712093606.5db834cb@endymion.delvare>
+Message-ID: <1628512.b7CSRB10BJ@bloomfield>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 06, 2011 at 11:02:17PM +0200, Krzysztof Halasa wrote:
-> From: Richard Cochran <richardcochran@gmail.com>
+On Tuesday 12 of July 2011 09:36:06 Jean Delvare wrote:
+> On Mon, 11 Jul 2011 23:50:38 +0200, Pavel Herrmann wrote:
+> > spi_sync call uses its spi_message parameter to keep completion
+> > information, using a drvdata structure is not thread-safe, potentially
+> > causing one thread having pointers to memory on or above other threads
+> > stack. use mutex to prevent multiple access
 > 
-> Commit 234b6ceddb4fc2a4bc5b9a7670f070f6e69e0868
-> 
->    clocksource: convert ARM 32-bit up counting clocksources
-> 
-> broke the build for ixp4xx and made big endian operation impossible.
-> This commit restores the original behaviour.
+> Honestly, I have no idea what "causing one thread having pointers to
+> memory on or above other threads stack" means (nor why this would be
+> bad.)
 
-I know I nag, but can we *please* have this patch in 3.0?
-Big endian IXP really, really does not work without it.
+the long-winded story is that thread A writes a pointer onto its stack into 
+the drvdata as part of spi_sync call, then thread B comes in and puts a 
+pointer onto its stack into the drvdata, at the end of spi_sync thread A uses 
+this pointer (assuming it is unchanged), which is pointing either onto valid 
+stack of thread B or somewhere above it (if thread B already returned)
 
-Thanks,
+> Patch applied nevertheless, as it fixes an actual bug which should be
+> fixed ASAP. Thanks for your contribution.
 
-Richard
-
-> 
-> Signed-off-by: Richard Cochran <richard.cochran@omicron.at>
-> Signed-off-by: Krzysztof Ha?asa <khc@pm.waw.pl>
-> 
-> diff --git a/arch/arm/mach-ixp4xx/common.c b/arch/arm/mach-ixp4xx/common.c
-> index 74ed81a..0777257 100644
-> --- a/arch/arm/mach-ixp4xx/common.c
-> +++ b/arch/arm/mach-ixp4xx/common.c
-> @@ -419,14 +419,20 @@ static void notrace ixp4xx_update_sched_clock(void)
->  /*
->   * clocksource
->   */
-> +
-> +static cycle_t ixp4xx_clocksource_read(struct clocksource *c)
-> +{
-> +	return *IXP4XX_OSTS;
-> +}
-> +
->  unsigned long ixp4xx_timer_freq = IXP4XX_TIMER_FREQ;
->  EXPORT_SYMBOL(ixp4xx_timer_freq);
->  static void __init ixp4xx_clocksource_init(void)
->  {
->  	init_sched_clock(&cd, ixp4xx_update_sched_clock, 32, ixp4xx_timer_freq);
->  
-> -	clocksource_mmio_init(&IXP4XX_OSTS, "OSTS", ixp4xx_timer_freq, 200, 32,
-> -			clocksource_mmio_readl_up);
-> +	clocksource_mmio_init(NULL, "OSTS", ixp4xx_timer_freq, 200, 32,
-> +			ixp4xx_clocksource_read);
->  }
->  
->  /*
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+thanks
