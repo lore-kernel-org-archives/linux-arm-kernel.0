@@ -1,60 +1,86 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Tue, 12 Jul 2011 09:47:19 +0530
-Subject: [PATCH] dmaengine: add dma_ctrl_cmd to pass buffer stride
-	configuration
-In-Reply-To: <1310310203-12288-1-git-send-email-sundaram@ti.com>
-References: <1310310203-12288-1-git-send-email-sundaram@ti.com>
-Message-ID: <CABb+yY1HJOR+QzmM4-ju4cs+8keoyUbMv+SpVoM6BW=DCMzmQQ@mail.gmail.com>
+From: amit.kachhap@linaro.org (amit kachhap)
+Date: Tue, 12 Jul 2011 11:01:53 +0530
+Subject: [PATCH 00/10] mm: Linux VM Infrastructure to support Memory Power
+	Management
+In-Reply-To: <20110528005640.9076c0b1.akpm@linux-foundation.org>
+References: <1306499498-14263-1-git-send-email-ankita@in.ibm.com>
+	<20110528005640.9076c0b1.akpm@linux-foundation.org>
+Message-ID: <CADGdYn7VCKemAgdbNw76vj7E9swxtK=z8+9uv=omG89QNE0uxg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 10, 2011 at 8:33 PM, Sundaram Raju <sundaram@ti.com> wrote:
-> Added new dma_ctrl_cmd TI_DMA_STRIDE_CONFIG to pass the TI DMA
-> controller specific configurations on how a buffer must be walked
-> through and how data is picked for transfer based on a specified
-> pattern over the channel.
->
-> The configuration passed is specific to the TI DMA controller used.
->
-> Signed-off-by: Sundaram Raju <sundaram@ti.com>
-> ---
-> ?include/linux/dmaengine.h | ? ?5 +++++
-> ?1 files changed, 5 insertions(+), 0 deletions(-)
->
-> diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
-> index eee7add..51dadc4 100644
-> --- a/include/linux/dmaengine.h
-> +++ b/include/linux/dmaengine.h
-> @@ -123,6 +123,10 @@ enum dma_ctrl_flags {
-> ?* command.
-> ?* @FSLDMA_EXTERNAL_START: this command will put the Freescale DMA controller
-> ?* into external start mode.
-> + * @TI_DMA_STRIDE_CONFIG: this command is only implemented by TI DMA
-> + * controllers that need to pass special configuration on how to walk through
-> + * the buffer to pick up data in a specified pattern to be transferred in
-> + * the channel.
-> ?*/
-> ?enum dma_ctrl_cmd {
-> ? ? ? ?DMA_TERMINATE_ALL,
-> @@ -130,6 +134,7 @@ enum dma_ctrl_cmd {
-> ? ? ? ?DMA_RESUME,
-> ? ? ? ?DMA_SLAVE_CONFIG,
-> ? ? ? ?FSLDMA_EXTERNAL_START,
-> + ? ? ? TI_DMA_STRIDE_CONFIG,
-> ?};
-IMHO this isn't very correct.
+Hi All,
 
-1) Striding, in one form or other, is supported by other DMACs as well.
-   The number will only increase in future.
-   Are we to add  <VENDOR>_DMA_STRIDE_CONFIG for each case ?
+In response to the discussion about power savings with memory regions
+features following measurements are done.
 
-2) As Dan noted, client drivers are going to have ifdef hackery in
-order to be common
- to other SoCs.
+Title:
+On a system with 2GB memory , 1GB is static and the other 1GB in
+various power states.
 
-3) TI may not have just one DMAC IP used in all the SoCs. So if you want
-  vendor specific defines anyway, please atleast also add DMAC version to it.
-  Something like
->        DMA_SLAVE_CONFIG,
->        FSLDMA_EXTERNAL_START,
-> +       TI_DMA_v1_STRIDE_CONFIG,
+Brief environment description:
+Samsung smdk-exynos board is used for this work and full board level
+power consumption is measured that comprises of cpu and other
+components. It has 2 DMC's(Dynamic memory controller) with each
+supporting 1 GB DDR3 memory. Power characteristics of DMC0 controlled
+memory remain same but memory controlled by DMC1 is changed to 4
+different power states. The following numbers describe the maximum
+power savings measured after executing the software from DMC0
+controlled memory which changes the power states of DMC1 controlled
+memory. Here the actual numbers are not mentioned but the percentage
+power savings is shown in reference to the change in overall power
+consumption. The memory region patches are expected to facilitate
+transition of memory into into one of the following low power states.
+
+1) Percentage power savings when DMC1(1GB) moved to self refresh mode
+from idle/unaccess mode= 2.69%
+2) Percentage power savings when DMC1(1GB) moved to precharge mode
+from idle/unaccess mode= 3.23%
+3) Percentage power savings when DMC1(1GB) clock is gated  = 6.32%
+
+The above power savings is indicative of the benefits that memory
+regions could provide in this platform.
+
+Thanks & Regards,
+Amit Daniel Kachhap
+Samsung India s/w operations, Bangalore
+
+On Sat, May 28, 2011 at 1:26 PM, Andrew Morton
+<akpm@linux-foundation.org> wrote:
+> On Fri, 27 May 2011 18:01:28 +0530 Ankita Garg <ankita@in.ibm.com> wrote:
+>
+>> This patchset proposes a generic memory regions infrastructure that can be
+>> used to tag boundaries of memory blocks which belongs to a specific memory
+>> power management domain and further enable exploitation of platform memory
+>> power management capabilities.
+>
+> A couple of quick thoughts...
+>
+> I'm seeing no estimate of how much energy we might save when this work
+> is completed. ?But saving energy is the entire point of the entire
+> patchset! ?So please spend some time thinking about that and update and
+> maintain the [patch 0/n] description so others can get some idea of the
+> benefit we might get from all of this. ?That estimate should include an
+> estimate of what proportion of machines are likely to have hardware
+> which can use this feature and in what timeframe.
+>
+> IOW, if it saves one microwatt on 0.001% of machines, not interested ;)
+>
+>
+> Also, all this code appears to be enabled on all machines? ?So machines
+> which don't have the requisite hardware still carry any additional
+> overhead which is added here. ?I can see that ifdeffing a feature like
+> this would be ghastly but please also have a think about the
+> implications of this and add that discussion also.
+>
+> If possible, it would be good to think up some microbenchmarks which
+> probe the worst-case performance impact and describe those and present
+> the results. ?So others can gain an understanding of the runtime costs.
+>
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
