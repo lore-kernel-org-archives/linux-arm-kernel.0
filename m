@@ -1,32 +1,22 @@
-From: toddpoynor@google.com (Todd Poynor)
-Date: Tue, 12 Jul 2011 15:42:05 -0700
-Subject: [PATCH 4/4] ARM: OMAP2+: Check NULL return from irq_alloc_generic_chip
-Message-ID: <1310510525-4786-1-git-send-email-toddpoynor@google.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 13 Jul 2011 08:27:21 +0900
+Subject: [PATCH V2 01/10] ASoc: mxs: add mxs-pcm driver
+In-Reply-To: <1310483085-31442-2-git-send-email-b29396@freescale.com>
+References: <1310483085-31442-1-git-send-email-b29396@freescale.com>
+	<1310483085-31442-2-git-send-email-b29396@freescale.com>
+Message-ID: <20110712232719.GB17710@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Todd Poynor <toddpoynor@google.com>
----
- arch/arm/mach-omap2/irq.c |    7 +++++++
- 1 files changed, 7 insertions(+), 0 deletions(-)
+On Tue, Jul 12, 2011 at 11:04:36PM +0800, Dong Aisheng wrote:
 
-diff --git a/arch/arm/mach-omap2/irq.c b/arch/arm/mach-omap2/irq.c
-index 3af2b7a..acbb05c 100644
---- a/arch/arm/mach-omap2/irq.c
-+++ b/arch/arm/mach-omap2/irq.c
-@@ -129,6 +129,13 @@ omap_alloc_gc(void __iomem *base, unsigned int irq_start, unsigned int num)
- 
- 	gc = irq_alloc_generic_chip("INTC", 1, irq_start, base,
- 					handle_level_irq);
-+
-+	if (!gc) {
-+		pr_err("%s: irq_alloc_generic_chip for IRQ %u failed\n",
-+		       __func__, irq_start);
-+		return;
-+	}
-+
- 	ct = gc->chip_types;
- 	ct->chip.irq_ack = omap_mask_ack_irq;
- 	ct->chip.irq_mask = irq_gc_mask_disable_reg;
--- 
-1.7.3.1
+> +	if (dai->driver->capture.channels_min) {
+> +		ret = mxs_pcm_preallocate_dma_buffer(pcm,
+> +			SNDRV_PCM_STREAM_CAPTURE);
+> +		if (ret)
+> +			goto out;
+> +	}
+
+For robustness replace the channels_min check with a check for the
+relevant substream being present (see pxa2xx-pcm.c for a recent
+example).
