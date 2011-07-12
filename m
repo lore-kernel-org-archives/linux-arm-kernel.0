@@ -1,55 +1,84 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Tue, 12 Jul 2011 13:39:59 +0200
-Subject: [PATCH V6 4/4] MTD: pxa3xx_nand: enhance suspend and resume
-	routine
-In-Reply-To: <1310466535-15287-5-git-send-email-leiwen@marvell.com>
-References: <1310096084-14646-1-git-send-email-leiwen@marvell.com>
-	<1310466535-15287-5-git-send-email-leiwen@marvell.com>
-Message-ID: <CACTFLANDZN6gAorV1MYEFD3FnAnomPqLgx44pPUeUaxKjApG_Q@mail.gmail.com>
+From: govindraj.ti@gmail.com (Govindraj)
+Date: Tue, 12 Jul 2011 17:14:11 +0530
+Subject: RFC: Issues using runtime API's with console uart
+Message-ID: <CAAL8m4yeT9Qm0WFP-7rVH6dMuLd0YHB9zGS4NiHL8thOY4QWFg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 12, 2011 at 12:28 PM, Lei Wen <leiwen@marvell.com> wrote:
-> This patch add protection on the suspend&resume path to prevent
-> some unexpected behavior, like interrupt occur at the very second
-> of resume back and it don't follow normal command path, which lead
-> to bug.
->
-> Signed-off-by: Lei Wen <leiwen@marvell.com>
-> ---
-> ?drivers/mtd/nand/pxa3xx_nand.c | ? 28 ++++++++++++++++++++++++++++
-> ?1 files changed, 28 insertions(+), 0 deletions(-)
->
+Hi All,
 
-[...]
+With recent uart runtime conversion I am facing some issues with runtime
+API usage with console.
 
-> @@ -1267,6 +1283,18 @@ static int pxa3xx_nand_resume(struct platform_device *pdev)
-> ? ? ? ?info->cs = 0xff;
-> ? ? ? ?clk_enable(info->clk);
->
-> + ? ? ? /*
-> + ? ? ? ?* As the spec, the NDSR would be updated to 0x1800 when
-> + ? ? ? ?* do the nand_clk disable/enable.
-> + ? ? ? ?* To prevent it damage state machine of the driver, clear
-> + ? ? ? ?* all status before resume
-> + ? ? ? ?*/
-> + ? ? ? nand_writel(nand, NDSR, NDSR_MASK);
+With runtime adaptation the clock cutting is done aggressively with get and put.
 
-This doesn't build:
+as below with console_write API in uart code.
 
-  CC      drivers/mtd/nand/pxa3xx_nand.o
-drivers/mtd/nand/pxa3xx_nand.c: In function 'pxa3xx_nand_resume':
-drivers/mtd/nand/pxa3xx_nand.c:1292: error: 'nand' undeclared (first
-use in this function)
-drivers/mtd/nand/pxa3xx_nand.c:1292: error: (Each undeclared
-identifier is reported only once
-drivers/mtd/nand/pxa3xx_nand.c:1292: error: for each function it appears in.)
-drivers/mtd/nand/pxa3xx_nand.c:1294: error: 'mtd' undeclared (first
-use in this function)
-make[3]: *** [drivers/mtd/nand/pxa3xx_nand.o] Error 1
+serial_omap_console_write(.....)
+{
+      get_sync();
+      .
+      .
+      .
+      put();
+}
 
-I guess this was not even compile tested? Anyway, I did a trivial
-fix-up and will test.
+serial_omap_set_mctrl(..)
+{
+     get_sync();
+      .
+      .
+      .
+      put()
+}
+
+Now if debug messages(pr_debug) from hwmod and omap_device are enabled
+then get_sync and put will internally have prints which get redirected to
+console_write and will call get_sync.
+
+so from a runtime API context I call another runtime API which leads
+to power lock contention, since every runtime API entrant tries to get
+a power lock.
+
+To elaborate further from above code snippets consider set_mctrl
+calling get_sync and printk from omap_hwmod calling console_write
+which calls get_sync.
+
+-> leads to get_sync calling get_sync.
+
+similarly with put_sync having prints calling console driver calling get_sync
+leading to power_lock contention.
+
+As of today I don't see any clean approaches to be available.
+
+Some of the approaches I am considering is
+
+1.) let the clock gating for uart be handled with idle path as done today with
+     prepare and resume calls.
+
+2.) Aggressively binding all get and put with console lock to suppress
+     prints from get/put and to printed during console_unlock.
+
+    uart_port_enb(..)
+    {
+          if (console_trylock()) {
+              get_sync();
+              console_unlock();
+          }
+    }
+
+    Even this approach doesn't seem fool proof, Similarly if I have port_disable
+    console unlock(has not yet released the console lock)
+    will have a print stating uart clock is disabled will call console_write
+    which will call port_enb since above trylock fails and eventually
+    might oops out trying
+    to print the message as put has already disabled the uart clocks.
 
 
-Daniel
+I don't see any clean method rather using approach[1] as of today.
+
+So any suggestions on any other approach will be helpful.
+
+---
+Thanks,
+Govindraj.R
