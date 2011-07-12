@@ -1,38 +1,66 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Tue, 12 Jul 2011 16:39:47 -0500
-Subject: [PATCH 01/52] ARM: introduce atag_offset to replace boot_params
-In-Reply-To: <20110712204814.GD15997@ibawizard.net>
-References: <1309920457-21913-1-git-send-email-nicolas.pitre@linaro.org>
-	<20110708203634.GU4812@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1107081714251.14596@xanadu.home>
-	<alpine.LFD.2.00.1107111046350.14596@xanadu.home>
-	<ADE657CA350FB648AAC2C43247A983F001F383D6D6F7@AUSP01VMBX24.collaborationhost.net>
-	<20110712204814.GD15997@ibawizard.net>
-Message-ID: <ADE657CA350FB648AAC2C43247A983F001F383E054DE@AUSP01VMBX24.collaborationhost.net>
+From: ido@wizery.com (Ido Yariv)
+Date: Wed, 13 Jul 2011 01:19:15 +0300
+Subject: [PATCH v3 1/6] arm: davinci: Fix low level gpio irq handlers'
+	argument
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024DA7AEF2@dbde02.ent.ti.com>
+References: <B85A65D85D7EB246BE421B3FB0FBB593024DA7A9DD@dbde02.ent.ti.com>
+	<1310418191-27009-1-git-send-email-ido@wizery.com>
+	<B85A65D85D7EB246BE421B3FB0FBB593024DA7AEF2@dbde02.ent.ti.com>
+Message-ID: <20110712221915.GD5633@WorkStation>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, July 12, 2011 1:48 PM, Petr ?tetiar wrote:
-> H Hartley Sweeten <hartleys@visionengravers.com> [2011-07-11 12:17:25]:
->
->> Unfortunately, all the ep93xx boards I have are designed with the sdram using
->> nSDCS0 so I can't test the other boot configurations.
->
-> I've tested that actual patchset from nico/redux git branch[1,2] on
-> ts-7250/32M and ts-7300/128M (both nSDCS3) and it boots, so you can add my
-> tested-by if you like:
+Hi Sekhar,
+
+On Tue, Jul 12, 2011 at 02:52:17PM +0530, Nori, Sekhar wrote:
+> > -	g = (__force struct davinci_gpio_regs __iomem *) irq_desc_get_handler_data(desc);
+> > +	ctl = (struct davinci_gpio_controller *)irq_desc_get_handler_data(desc);
+> > +	g = (struct davinci_gpio_regs __iomem *)ctl->regs;
+> >  
+> >  	/* we only care about one bank */
+> >  	if (irq & 1)
+> > @@ -278,7 +280,7 @@ gpio_irq_handler(unsigned irq, struct irq_desc *desc)
+> >  			status >>= 16;
+> >  
+> >  		/* now demux them to the right lowlevel handler */
+> > -		n = (int)irq_get_handler_data(irq);
+> > +		n = ctl->irq_base;
 > 
-> Tested-by: Petr ?tetiar <ynezz@true.cz>
+> I realized that this breaks for odd banks as the status is
+> right shifted by 16. The GPIO you are using must have been
+> in even bank?
+
+You're absolutely right, I missed that. And yes, I have been using an
+even bank GPIO.
+
+> >  		while (status) {
+> >  			res = ffs(status);
+> >  			n += res;
+> > @@ -424,7 +426,13 @@ static int __init davinci_gpio_irq_setup(void)
+> >  
+> >  		/* set up all irqs in this bank */
+> >  		irq_set_chained_handler(bank_irq, gpio_irq_handler);
+> > -		irq_set_handler_data(bank_irq, (__force void *)g);
+> > +
+> > +		/*
+> > +		 * Each chip handles 32 gpios, and each irq bank consists of 16
+> > +		 * gpio irqs. Pass the irq bank's corresponding controller to
+> > +		 * the chained irq handler.
+> > +		 */
+> > +		irq_set_handler_data(bank_irq, &chips[bank * 16 / 32]);
 > 
-> 1. git://git.linaro.org/people/nico/linux.git redux
-> 2. git hash bc869e434e411ee7f3fcfed7594ee64b1d56b3c9
+> This can simply be:
+> 
+> 		irq_set_handler_data(bank_irq, &chips[gpio / 32]);
+> 
+> In the interest of time, I did these fixes and pushed the
+> patch to "fixes" branch of git://gitorious.org/linux-davinci/linux-davinci.git
+> 
+> Can you please test it out and let me know if it works.
 
-So, I guess the big test would be to see if a kernel that boots on your boards
-using nSDCS3 will also boot on mine using nSDCS0.
+This patch seems to work just fine. I'm afraid I can't test an odd bank
+GPIO here to verify that this indeed fixed the issue you raised, but it
+looks correct.
 
-Could you rebuild your kernel with MACH_EDB9307A also selected in your
-config?  After verifying that it still boots please either send me the zImage
-or place it somewhere I can grab it and I will make sure it boots on mine.
-
-Regards,
-Hartley
+Thanks,
+Ido.
