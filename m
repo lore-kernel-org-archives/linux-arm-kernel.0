@@ -1,29 +1,37 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 12 Jul 2011 13:12:45 +0200
-Subject: [PATCH 04/17] mach-versatile: retire custom LED code
-In-Reply-To: <CAK5ve-KwL4rX65FqyWcZrvAcx0vFcGDpWQXgm67P8n2MDpNHWQ@mail.gmail.com>
-References: <1309955687-19365-1-git-send-email-bryan.wu@canonical.com>
-	<1309955687-19365-5-git-send-email-bryan.wu@canonical.com>
-	<20110710092836.GT4812@n2100.arm.linux.org.uk>
-	<CAK5ve-KwL4rX65FqyWcZrvAcx0vFcGDpWQXgm67P8n2MDpNHWQ@mail.gmail.com>
-Message-ID: <CACRpkdZ-PKLW--5KAXM9paWoFpcmWrOfq6ax8pyZWU7QA=z+pg@mail.gmail.com>
+Date: Tue, 12 Jul 2011 13:09:31 +0200
+Subject: [PATCH] dmaengine: add dma_ctrl_cmd to pass buffer stride
+	configuration
+In-Reply-To: <E0D41E29EB0DAC4E9F3FF173962E9E94030259DB5B@dbde02.ent.ti.com>
+References: <1310310203-12288-1-git-send-email-sundaram@ti.com>
+	<CABb+yY1HJOR+QzmM4-ju4cs+8keoyUbMv+SpVoM6BW=DCMzmQQ@mail.gmail.com>
+	<CACRpkdbLg0+_2kpi4NizFj0fDWb6QPtkcKirKgoH+83vGD0O0A@mail.gmail.com>
+	<E0D41E29EB0DAC4E9F3FF173962E9E94030259DB5B@dbde02.ent.ti.com>
+Message-ID: <CACRpkdYk65dmgvy325EA0rFEL3sZXMzNBvPBLGxctjQsfZhCBg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 11, 2011 at 4:02 PM, Bryan Wu <bryan.wu@canonical.com> wrote:
-> On Sun, Jul 10, 2011 at 5:28 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
+On Tue, Jul 12, 2011 at 12:56 PM, Raju, Sundaram <sundaram@ti.com> wrote:
+> [Me]
+>> [Jassi]
+>> > 3) TI may not have just one DMAC IP used in all the SoCs. So if you want
+>> > ?vendor specific defines anyway, please atleast also add DMAC version to it.
+>> > ?Something like
+>> >> ? ? ? ?DMA_SLAVE_CONFIG,
+>> >> ? ? ? ?FSLDMA_EXTERNAL_START,
+>> >> + ? ? ? TI_DMA_v1_STRIDE_CONFIG,
 >>
->> Shouldn't this be part of the previous patch? ?The previous patch changes
->> both Realview and Versatile by touching plat-versatile.
->>
+>> Yep unless we make it generic DMA_STRIDE_CONFIG simply, this makes
+>> a lot of sense.
 >
-> I will fold them together, if Linus has no problem about it.
+> Okay, I can add one cmd for the EDMAC in DaVinci series of SoCs and
+> one for SDMAC in OMAP series of SoCs.
 
-I have no problems with anything, and I'm not one bit picky about
-SoB:s and Author: tags, I'm more concerned about the LED code
-getting cleaned up. Just do whatever it takes to make good patches
-out of this!
+Wait, that's two different silicon blocks right? Then you already have proof
+that this spans more than one DMAC and then you can just go for a generic
+DMA_STRIDE_CONFIG from day one.
 
-Thanks,
+That both are TI does not matter, if they are totally unrelated implementations.
+
+Yours,
 Linus Walleij
