@@ -1,45 +1,30 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Tue, 12 Jul 2011 14:02:30 +0530
-Subject: [PATCH 3/7] DMA: PL330: Add DMA capabilities
-In-Reply-To: <CAPTzV15Y7JFDKsec8x-M0C1AFLOMp39QvHpRCsO=E001P_tH9A@mail.gmail.com>
-References: <1309781915-31549-1-git-send-email-kgene.kim@samsung.com>
-	<1309781915-31549-4-git-send-email-kgene.kim@samsung.com>
-	<CAPTzV15Y7JFDKsec8x-M0C1AFLOMp39QvHpRCsO=E001P_tH9A@mail.gmail.com>
-Message-ID: <CABb+yY0M659Ob0u+wOBW5i6v_VfpayRkY29-TUNpsp1oVLn-SQ@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 12 Jul 2011 09:32:52 +0100
+Subject: [PATCH] ARM: fix regression in IXP4xx clocksource
+In-Reply-To: <20110712080513.GA2937@riccoc20.at.omicron.at>
+References: <m3liwb15t2.fsf@intrepid.localdomain>
+	<20110712080513.GA2937@riccoc20.at.omicron.at>
+Message-ID: <20110712083252.GC23270@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 5, 2011 at 12:03 PM, Chanho Park <parkch98@gmail.com> wrote:
-> Kukjin Kim <kgene.kim <at> samsung.com> writes:
->
-> (snip)
->
->> + ? ? ? ? ? ? if (slave_config->direction == DMA_TO_DEVICE) {
->> + ? ? ? ? ? ? ? ? ? ? if (slave_config->dst_addr)
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? peri->fifo_addr = slave_config->dst_addr;
->> + ? ? ? ? ? ? ? ? ? ? if (slave_config->dst_addr_width) {
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? i = 0;
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? while (slave_config->dst_addr_width != (1 <<
-> i))
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? i++;
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? peri->burst_sz = i;
->> + ? ? ? ? ? ? ? ? ? ? }
->> + ? ? ? ? ? ? } else if (slave_config->direction == DMA_FROM_DEVICE) {
->> + ? ? ? ? ? ? ? ? ? ? if (slave_config->src_addr)
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? peri->fifo_addr = slave_config->src_addr;
->> + ? ? ? ? ? ? ? ? ? ? if (slave_config->src_addr_width) {
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? i = 0;
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? while (slave_config->src_addr_width != (1 <<
-> i))
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? i++;
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? peri->burst_sz = i;
->
-> Re-send including cc and mailing lists
-> --
-> pl330 dmac only supports 1/2/4/8/16 bytes burst size.
-> If some bad D/D doesn't use powers of 2 width,
-> dmaengine is going to infinite loop.
-> You'd better check it instead of running loop.
->
-It might be even better to start with max possible width and
-keep decreasing 'i' in the loop.
+On Tue, Jul 12, 2011 at 10:05:13AM +0200, Richard Cochran wrote:
+> On Wed, Jul 06, 2011 at 11:02:17PM +0200, Krzysztof Halasa wrote:
+> > From: Richard Cochran <richardcochran@gmail.com>
+> > 
+> > Commit 234b6ceddb4fc2a4bc5b9a7670f070f6e69e0868
+> > 
+> >    clocksource: convert ARM 32-bit up counting clocksources
+> > 
+> > broke the build for ixp4xx and made big endian operation impossible.
+> > This commit restores the original behaviour.
+> 
+> I know I nag, but can we *please* have this patch in 3.0?
+> Big endian IXP really, really does not work without it.
+
+Thomas Glexnier said:
+> Thinking more about it we should add BE accessor functions to the mmio
+> clocksource as this might be useful for other architectures as well.
+
+It seems that I can't rely on others, so I'm going to have to fit
+this into my busy schedule at some point.
