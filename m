@@ -1,70 +1,34 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Tue, 12 Jul 2011 19:35:30 +0200
-Subject: [PATCH V6 4/4] MTD: pxa3xx_nand: enhance suspend and resume
-	routine
-In-Reply-To: <4E1C6EB7.80506@compulab.co.il>
-References: <1310096084-14646-1-git-send-email-leiwen@marvell.com>
-	<1310466535-15287-5-git-send-email-leiwen@marvell.com>
-	<CACTFLANDZN6gAorV1MYEFD3FnAnomPqLgx44pPUeUaxKjApG_Q@mail.gmail.com>
-	<CACTFLAPB0JE9FJc8jdbaoME_qmPbN1N-HyPVN7Kb5-op6Pa1EA@mail.gmail.com>
-	<4E1C6EB7.80506@compulab.co.il>
-Message-ID: <CACTFLAPgttSapjqmsnBvTtE-RwfcyYk8h1gz2sP-WGAp_uue-g@mail.gmail.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Tue, 12 Jul 2011 20:22:33 +0200
+Subject: [PATCH V2 00/10]
+In-Reply-To: <1310483085-31442-1-git-send-email-b29396@freescale.com>
+References: <1310483085-31442-1-git-send-email-b29396@freescale.com>
+Message-ID: <20110712182233.GA16638@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 12, 2011 at 5:56 PM, Igor Grinberg <grinberg@compulab.co.il> wrote:
-> On 07/12/11 15:02, Daniel Mack wrote:
->
->> On Tue, Jul 12, 2011 at 1:39 PM, Daniel Mack <zonque@gmail.com> wrote:
->>> On Tue, Jul 12, 2011 at 12:28 PM, Lei Wen <leiwen@marvell.com> wrote:
->>>> This patch add protection on the suspend&resume path to prevent
->>>> some unexpected behavior, like interrupt occur at the very second
->>>> of resume back and it don't follow normal command path, which lead
->>>> to bug.
->>>>
->>>> Signed-off-by: Lei Wen <leiwen@marvell.com>
->>>> ---
->>>> ?drivers/mtd/nand/pxa3xx_nand.c | ? 28 ++++++++++++++++++++++++++++
->>>> ?1 files changed, 28 insertions(+), 0 deletions(-)
->>>>
->>> [...]
->>>
->>>> @@ -1267,6 +1283,18 @@ static int pxa3xx_nand_resume(struct platform_device *pdev)
->>>> ? ? ? ?info->cs = 0xff;
->>>> ? ? ? ?clk_enable(info->clk);
->>>>
->>>> + ? ? ? /*
->>>> + ? ? ? ?* As the spec, the NDSR would be updated to 0x1800 when
->>>> + ? ? ? ?* do the nand_clk disable/enable.
->>>> + ? ? ? ?* To prevent it damage state machine of the driver, clear
->>>> + ? ? ? ?* all status before resume
->>>> + ? ? ? ?*/
->>>> + ? ? ? nand_writel(nand, NDSR, NDSR_MASK);
->>> This doesn't build:
->>>
->>> ?CC ? ? ?drivers/mtd/nand/pxa3xx_nand.o
->>> drivers/mtd/nand/pxa3xx_nand.c: In function 'pxa3xx_nand_resume':
->>> drivers/mtd/nand/pxa3xx_nand.c:1292: error: 'nand' undeclared (first
->>> use in this function)
->>> drivers/mtd/nand/pxa3xx_nand.c:1292: error: (Each undeclared
->>> identifier is reported only once
->>> drivers/mtd/nand/pxa3xx_nand.c:1292: error: for each function it appears in.)
->>> drivers/mtd/nand/pxa3xx_nand.c:1294: error: 'mtd' undeclared (first
->>> use in this function)
->>> make[3]: *** [drivers/mtd/nand/pxa3xx_nand.o] Error 1
->>>
->>> I guess this was not even compile tested? Anyway, I did a trivial
->>> fix-up and will test.
->> Also, with this (fixed) patch applied, the system doesn't resume at
->> all. No messages, it simply doesn't come back.
->
-> I was skeptic about the clock being disabled in Lei's patch,
-> as I observed system hangs if that clock was disabled back then in 2.6.31,
-> but wanted to give it a try, because things has changed since then.
->
-> Now I see, that Lei already sent v7 without clock toggling...
+On Tue, Jul 12, 2011 at 11:04:35PM +0800, Dong Aisheng wrote:
 
-Yes, we debugged this quickly via Jabber, and without the clock
-disable, things work fine for me again.
+> This patch series is to add audio support based on saif for mxs platform.
 
-Daniel
+Seems like only 6 out of 10 patches made it to the lists? Pity, I was looking
+forward to all of them :)
+
+Isn't there someone at Freescale or Linaro who can give you developers access
+to a git server? I think it would speed up development if reviewers/testers
+could simply pull your branches.
+
+Regards,
+
+   Wolfram
+
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110712/a5ef3530/attachment.sig>
