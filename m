@@ -1,66 +1,227 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Tue, 12 Jul 2011 20:31:15 +0200
-Subject: [PATCH v2] new helper to define common struct resource constructs
-In-Reply-To: <ADE657CA350FB648AAC2C43247A983F001F383D6DAD4@AUSP01VMBX24.collaborationhost.net>
-References: <ADE657CA350FB648AAC2C43247A983F001F383D6DAD4@AUSP01VMBX24.collaborationhost.net>
-Message-ID: <1310495475-22469-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: mike.rapoport@gmail.com (Mike Rapoport)
+Date: Tue, 12 Jul 2011 22:28:04 +0300
+Subject: [PATCH 2/2] ARM: tegra: remove copy-and-pasted usb platform data
+	from boards
+In-Reply-To: <1310336374-31727-2-git-send-email-ccross@android.com>
+References: <1310336374-31727-1-git-send-email-ccross@android.com>
+	<1310336374-31727-2-git-send-email-ccross@android.com>
+Message-ID: <CABpLfoi5z3wiWGf2bKBdx7xncYxij2wvFVuw2sPNac6Fi7qpbw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-resource definitions that just define start, end and flags =
-IORESOURCE_MEM or IORESOURCE_IRQ (with start=end) are quite common. So
-introduce a shortcut for them. For completeness add macros for
-IORESOURCE_DMA and IORESOURCE_IO, too and also make available a set of
-macros to specify named resources of all types.
+Hi Colin,
+Sorry for the delay, I don't have the hardware at the moment, so I
+asked Konstantin to do the testing.
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
-changes since v1:
-- also add _IO and _DMA variants
+On Mon, Jul 11, 2011 at 1:19 AM, Colin Cross <ccross@android.com> wrote:
+> trimslice and paz00 both have functionally identical platform
+> data for the tegra-ehci driver. ?Move the platform data into
+> devices.c, and remove it from all the board files.
+>
+> Signed-off-by: Colin Cross <ccross@android.com>
 
- include/linux/ioport.h |   30 ++++++++++++++++++++++++++++++
- 1 files changed, 30 insertions(+), 0 deletions(-)
+For the TrimSlice part:
 
-diff --git a/include/linux/ioport.h b/include/linux/ioport.h
-index 63eb429..f98124f 100644
---- a/include/linux/ioport.h
-+++ b/include/linux/ioport.h
-@@ -109,6 +109,36 @@ struct resource_list {
- /* PCI control bits.  Shares IORESOURCE_BITS with above PCI ROM.  */
- #define IORESOURCE_PCI_FIXED		(1<<4)	/* Do not move resource */
- 
-+
-+/* helpers to define resources */
-+#define DEFINE_RES_NAMED(_start, _size, _name, _flags)			\
-+	{								\
-+		.start = _start,					\
-+		.end = _start + _size - 1,				\
-+		.name = _name,						\
-+		.flags = _flags,					\
-+	}
-+
-+#define DEFINE_RES_IO_NAMED(_start, _size, _name)			\
-+	DEFINE_RES_NAMED(_start, _size, _name, IORESOURCE_IO)
-+#define DEFINE_RES_IO(_start, _size)					\
-+	DEFINE_RES_IO_NAMED(_start, _size, NULL)
-+
-+#define DEFINE_RES_MEM_NAMED(_start, _size, _name)			\
-+	DEFINE_RES_NAMED(_start, _size, _name, IORESOURCE_MEM)
-+#define DEFINE_RES_MEM(_start, _size)					\
-+	DEFINE_RES_MEM_NAMED(_start, _size, NULL)
-+
-+#define DEFINE_RES_IRQ_NAMED(_irq, _name)				\
-+	DEFINE_RES_NAMED(_irq, 1, _name, IORESOURCE_IRQ)
-+#define DEFINE_RES_IRQ(_irq)						\
-+	DEFINE_RES_IRQ_NAMED(_irq, NULL)
-+
-+#define DEFINE_RES_DMA_NAMED(_dma, _name)				\
-+	DEFINE_RES_NAMED(_dma, 1, _name, IORESOURCE_DMA)
-+#define DEFINE_RES_DMA(_dma)						\
-+	DEFINE_RES_DMA_NAMED(_dma, NULL)
-+
- /* PC/ISA/whatever - the normal PC address spaces: IO and memory */
- extern struct resource ioport_resource;
- extern struct resource iomem_resource;
+Tested-by: Konstantin Sinyuk <kostyas@compulab.co.il>
+
+> ---
+> ?arch/arm/mach-tegra/board-paz00.c ? ? | ? 26 --------------------------
+> ?arch/arm/mach-tegra/board-trimslice.c | ? 19 -------------------
+> ?arch/arm/mach-tegra/devices.c ? ? ? ? | ? 28 ++++++++++++++++++++++++++++
+> ?3 files changed, 28 insertions(+), 45 deletions(-)
+>
+> diff --git a/arch/arm/mach-tegra/board-paz00.c b/arch/arm/mach-tegra/board-paz00.c
+> index 465768e..ea2f79c 100644
+> --- a/arch/arm/mach-tegra/board-paz00.c
+> +++ b/arch/arm/mach-tegra/board-paz00.c
+> @@ -26,7 +26,6 @@
+> ?#include <linux/pda_power.h>
+> ?#include <linux/io.h>
+> ?#include <linux/i2c.h>
+> -#include <linux/platform_data/tegra_usb.h>
+>
+> ?#include <asm/mach-types.h>
+> ?#include <asm/mach/arch.h>
+> @@ -36,7 +35,6 @@
+> ?#include <mach/iomap.h>
+> ?#include <mach/irqs.h>
+> ?#include <mach/sdhci.h>
+> -#include <mach/usb_phy.h>
+> ?#include <mach/gpio.h>
+>
+> ?#include "board.h"
+> @@ -80,32 +78,8 @@ static void paz00_i2c_init(void)
+> ? ? ? ?platform_device_register(&tegra_i2c_device4);
+> ?}
+>
+> -static struct tegra_ulpi_config ulpi_phy_config = {
+> - ? ? ? ? ? ? ? .reset_gpio = TEGRA_ULPI_RST,
+> - ? ? ? ? ? ? ? .clk = "cdev2",
+> -};
+> -
+> -static struct tegra_ehci_platform_data tegra_ehci_pdata[] = {
+> - ? ? ? ? ? ? ? [0] = {
+> - ? ? ? ? ? ? ? ? ? ? ? .operating_mode = TEGRA_USB_OTG,
+> - ? ? ? ? ? ? ? ? ? ? ? .power_down_on_bus_suspend = 1,
+> - ? ? ? ? ? ? ? },
+> - ? ? ? ? ? ? ? [1] = {
+> - ? ? ? ? ? ? ? ? ? ? ? .phy_config = &ulpi_phy_config,
+> - ? ? ? ? ? ? ? ? ? ? ? .operating_mode = TEGRA_USB_HOST,
+> - ? ? ? ? ? ? ? ? ? ? ? .power_down_on_bus_suspend = 1,
+> - ? ? ? ? ? ? ? },
+> - ? ? ? ? ? ? ? [2] = {
+> - ? ? ? ? ? ? ? ? ? ? ? .operating_mode = TEGRA_USB_HOST,
+> - ? ? ? ? ? ? ? ? ? ? ? .power_down_on_bus_suspend = 1,
+> - ? ? ? ? ? ? ? },
+> -};
+> -
+> ?static void paz00_usb_init(void)
+> ?{
+> - ? ? ? tegra_ehci2_device.dev.platform_data = &tegra_ehci_pdata[1];
+> - ? ? ? tegra_ehci3_device.dev.platform_data = &tegra_ehci_pdata[2];
+> -
+> ? ? ? ?platform_device_register(&tegra_ehci2_device);
+> ? ? ? ?platform_device_register(&tegra_ehci3_device);
+> ?}
+> diff --git a/arch/arm/mach-tegra/board-trimslice.c b/arch/arm/mach-tegra/board-trimslice.c
+> index e1d7e67..89a6d2a 100644
+> --- a/arch/arm/mach-tegra/board-trimslice.c
+> +++ b/arch/arm/mach-tegra/board-trimslice.c
+> @@ -24,7 +24,6 @@
+> ?#include <linux/serial_8250.h>
+> ?#include <linux/io.h>
+> ?#include <linux/i2c.h>
+> -#include <linux/platform_data/tegra_usb.h>
+> ?#include <linux/gpio.h>
+>
+> ?#include <asm/mach-types.h>
+> @@ -33,7 +32,6 @@
+>
+> ?#include <mach/iomap.h>
+> ?#include <mach/sdhci.h>
+> -#include <mach/usb_phy.h>
+> ?#include <mach/gpio.h>
+>
+> ?#include "board.h"
+> @@ -110,28 +108,12 @@ static void trimslice_i2c_init(void)
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?ARRAY_SIZE(trimslice_i2c3_board_info));
+> ?}
+>
+> -struct tegra_ulpi_config ehci2_phy_config = {
+> - ? ? ? .reset_gpio = TRIMSLICE_GPIO_USB2_RST,
+> - ? ? ? .clk = "cdev2",
+> -};
+> -
+> -static struct tegra_ehci_platform_data ehci_ulpi_data = {
+> - ? ? ? .operating_mode = TEGRA_USB_HOST,
+> - ? ? ? .phy_config = &ehci2_phy_config,
+> -};
+> -
+> -static struct tegra_ehci_platform_data ehci_utmi_data = {
+> - ? ? ? .operating_mode = TEGRA_USB_HOST,
+> -};
+> -
+> ?static void trimslice_usb_init(void)
+> ?{
+> ? ? ? ?int err;
+>
+> - ? ? ? tegra_ehci3_device.dev.platform_data = &ehci_utmi_data;
+> ? ? ? ?platform_device_register(&tegra_ehci3_device);
+>
+> - ? ? ? tegra_ehci2_device.dev.platform_data = &ehci_ulpi_data;
+> ? ? ? ?platform_device_register(&tegra_ehci2_device);
+>
+> ? ? ? ?err = gpio_request_one(TRIMSLICE_GPIO_USB1_MODE, GPIOF_OUT_INIT_HIGH,
+> @@ -141,7 +123,6 @@ static void trimslice_usb_init(void)
+> ? ? ? ? ? ? ? ?return;
+> ? ? ? ?}
+>
+> - ? ? ? tegra_ehci1_device.dev.platform_data = &ehci_utmi_data;
+> ? ? ? ?platform_device_register(&tegra_ehci1_device);
+> ?}
+>
+> diff --git a/arch/arm/mach-tegra/devices.c b/arch/arm/mach-tegra/devices.c
+> index 066eaf9..57e35d2 100644
+> --- a/arch/arm/mach-tegra/devices.c
+> +++ b/arch/arm/mach-tegra/devices.c
+> @@ -23,10 +23,13 @@
+> ?#include <linux/fsl_devices.h>
+> ?#include <linux/serial_8250.h>
+> ?#include <linux/i2c-tegra.h>
+> +#include <linux/platform_data/tegra_usb.h>
+> ?#include <asm/pmu.h>
+> ?#include <mach/irqs.h>
+> ?#include <mach/iomap.h>
+> ?#include <mach/dma.h>
+> +#include <mach/usb_phy.h>
+> +#include "gpio-names.h"
+>
+> ?static struct resource i2c_resource1[] = {
+> ? ? ? ?[0] = {
+> @@ -351,6 +354,28 @@ static struct resource tegra_usb3_resources[] = {
+> ? ? ? ?},
+> ?};
+>
+> +static struct tegra_ulpi_config tegra_ehci2_ulpi_phy_config = {
+> + ? ? ? /* All existing boards use GPIO PV0 for phy reset */
+> + ? ? ? .reset_gpio = TEGRA_GPIO_PV0,
+> + ? ? ? .clk = "cdev2",
+> +};
+> +
+> +static struct tegra_ehci_platform_data tegra_ehci1_pdata = {
+> + ? ? ? .operating_mode = TEGRA_USB_OTG,
+> + ? ? ? .power_down_on_bus_suspend = 1,
+> +};
+> +
+> +static struct tegra_ehci_platform_data tegra_ehci2_pdata = {
+> + ? ? ? .phy_config = &tegra_ehci2_ulpi_phy_config,
+> + ? ? ? .operating_mode = TEGRA_USB_HOST,
+> + ? ? ? .power_down_on_bus_suspend = 1,
+> +};
+> +
+> +static struct tegra_ehci_platform_data tegra_ehci3_pdata = {
+> + ? ? ? .operating_mode = TEGRA_USB_HOST,
+> + ? ? ? .power_down_on_bus_suspend = 1,
+> +};
+> +
+> ?static u64 tegra_ehci_dmamask = DMA_BIT_MASK(32);
+>
+> ?struct platform_device tegra_ehci1_device = {
+> @@ -359,6 +384,7 @@ struct platform_device tegra_ehci1_device = {
+> ? ? ? ?.dev ? ?= {
+> ? ? ? ? ? ? ? ?.dma_mask ? ? ? = &tegra_ehci_dmamask,
+> ? ? ? ? ? ? ? ?.coherent_dma_mask = DMA_BIT_MASK(32),
+> + ? ? ? ? ? ? ? .platform_data = &tegra_ehci1_pdata,
+> ? ? ? ?},
+> ? ? ? ?.resource = tegra_usb1_resources,
+> ? ? ? ?.num_resources = ARRAY_SIZE(tegra_usb1_resources),
+> @@ -370,6 +396,7 @@ struct platform_device tegra_ehci2_device = {
+> ? ? ? ?.dev ? ?= {
+> ? ? ? ? ? ? ? ?.dma_mask ? ? ? = &tegra_ehci_dmamask,
+> ? ? ? ? ? ? ? ?.coherent_dma_mask = DMA_BIT_MASK(32),
+> + ? ? ? ? ? ? ? .platform_data = &tegra_ehci2_pdata,
+> ? ? ? ?},
+> ? ? ? ?.resource = tegra_usb2_resources,
+> ? ? ? ?.num_resources = ARRAY_SIZE(tegra_usb2_resources),
+> @@ -381,6 +408,7 @@ struct platform_device tegra_ehci3_device = {
+> ? ? ? ?.dev ? ?= {
+> ? ? ? ? ? ? ? ?.dma_mask ? ? ? = &tegra_ehci_dmamask,
+> ? ? ? ? ? ? ? ?.coherent_dma_mask = DMA_BIT_MASK(32),
+> + ? ? ? ? ? ? ? .platform_data = &tegra_ehci3_pdata,
+> ? ? ? ?},
+> ? ? ? ?.resource = tegra_usb3_resources,
+> ? ? ? ?.num_resources = ARRAY_SIZE(tegra_usb3_resources),
+> --
+> 1.7.4.1
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>
+
+
+
 -- 
-1.7.5.4
+Sincerely Yours,
+Mike.
