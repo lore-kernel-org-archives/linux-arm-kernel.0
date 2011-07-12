@@ -1,93 +1,41 @@
-From: sudhakar.raj@ti.com (Rajashekhara, Sudhakar)
-Date: Tue, 12 Jul 2011 15:58:53 +0530
-Subject: [PATCH v4] davinci: da850 EVM: read mac address from SPI flash
-Message-ID: <1310466533-24474-1-git-send-email-sudhakar.raj@ti.com>
+From: marvin24@gmx.de (Marc Dietrich)
+Date: Tue, 12 Jul 2011 12:47:22 +0200
+Subject: [PATCH 0/6 V2] ARM: tegra: paz00 patches for 2.6.40
+In-Reply-To: <CAMbhsRSH2iyv0_1seVtwSQ7AbHmPbz+VqSVkhfLgsNA8+dOwJA@mail.gmail.com>
+References: <1305806910-3903-1-git-send-email-marvin24@gmx.de>
+	<CAMbhsRSH2iyv0_1seVtwSQ7AbHmPbz+VqSVkhfLgsNA8+dOwJA@mail.gmail.com>
+Message-ID: <20110712124722.2b0454f9@ac100.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DA850/OMAP-L138 EMAC driver uses random mac address instead of
-a fixed one because the mac address is not stuffed into EMAC
-platform data.
+Collin,
 
-This patch provides a function which reads the mac address
-stored in SPI flash (registered as MTD device) and populates the
-EMAC platform data. The function which reads the mac address is
-registered as a callback which gets called upon addition of MTD
-device.
+Am Sun, 10 Jul 2011 15:14:33 -0700
+schrieb Colin Cross <ccross@android.com>:
 
-NOTE: In case the MAC address stored in SPI flash is erased, follow
-the instructions at [1] to restore it.
+> On Thu, May 19, 2011 at 5:08 AM, Marc Dietrich <marvin24@gmx.de>
+> wrote:
+> > Hi Collin, Olof,
+> >
+> > the following patches are intended for 2.6.40 merge. They are
+> > mostly similar to the TrimSlice patches sent by Mike a few days ago.
+> >
+> > ...
+> 
+> I pushed this series to for-next, except for patch 6 "ARM: tegra:
+> paz00: enable wifi card".
+> 
+> I have some cleanup patches that go on top to reduce some of the
+> duplicate platform data added by trimslice and paz00, I'd appreciate a
+> tested-by once I post those.
 
-[1] http://processors.wiki.ti.com/index.php/GSG:_OMAP-L138_DVEVM_Additional_Procedures#Restoring_MAC_address_on_SPI_Flash
+thanks for taking care of this. I'm currently in busy holidays and can't
+read my mail frequently. Anyway, I'll try my best to test the cleanup
+patches or ask another person from the AC100 team to check.
 
-Modifications in v2:
-Guarded registering the mtd_notifier only when MTD is enabled.
-Earlier this was handled using mtd_has_partitions() call, but
-this has been removed in Linux v3.0.
+I also have a replacement for the wifi patch in work which I'll send out
+as soon as possible.
 
-Modifications in v3:
-a. Guarded da850_evm_m25p80_notify_add() function and
-   da850evm_spi_notifier structure with CONFIG_MTD macros.
-b. Renamed da850_evm_register_mtd_user() function to
-   da850_evm_setup_mac_addr() and removed the struct mtd_notifier
-   argument to this function.
-c. Passed the da850evm_spi_notifier structure to register_mtd_user()
-   function.
+Thanks
 
-Modifications in v4:
-Moved the da850_evm_setup_mac_addr() function within the first
-CONFIG_MTD ifdef construct.
-
-Signed-off-by: Rajashekhara, Sudhakar <sudhakar.raj@ti.com>
----
- arch/arm/mach-davinci/board-da850-evm.c |   28 ++++++++++++++++++++++++++++
- 1 files changed, 28 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
-index a7b41bf..e83cc86 100644
---- a/arch/arm/mach-davinci/board-da850-evm.c
-+++ b/arch/arm/mach-davinci/board-da850-evm.c
-@@ -115,6 +115,32 @@ static struct spi_board_info da850evm_spi_info[] = {
- 	},
- };
- 
-+#ifdef CONFIG_MTD
-+static void da850_evm_m25p80_notify_add(struct mtd_info *mtd)
-+{
-+	char *mac_addr = davinci_soc_info.emac_pdata->mac_addr;
-+	size_t retlen;
-+
-+	if (!strcmp(mtd->name, "MAC-Address")) {
-+		mtd->read(mtd, 0, ETH_ALEN, &retlen, mac_addr);
-+		if (retlen == ETH_ALEN)
-+			pr_info("Read MAC addr from SPI Flash: %pM\n",
-+				mac_addr);
-+	}
-+}
-+
-+static struct mtd_notifier da850evm_spi_notifier = {
-+	.add	= da850_evm_m25p80_notify_add,
-+};
-+
-+static void da850_evm_setup_mac_addr(void)
-+{
-+	register_mtd_user(&da850evm_spi_notifier);
-+}
-+#else
-+static void da850_evm_setup_mac_addr(void) { }
-+#endif
-+
- static struct mtd_partition da850_evm_norflash_partition[] = {
- 	{
- 		.name           = "bootloaders + env",
-@@ -1237,6 +1263,8 @@ static __init void da850_evm_init(void)
- 	if (ret)
- 		pr_warning("da850_evm_init: spi 1 registration failed: %d\n",
- 				ret);
-+
-+	da850_evm_setup_mac_addr();
- }
- 
- #ifdef CONFIG_SERIAL_8250_CONSOLE
--- 
-1.7.1
+Marc
