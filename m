@@ -1,215 +1,37 @@
-From: jochen@scram.de (Jochen Friedrich)
-Date: Tue, 12 Jul 2011 08:46:26 +0200
-Subject: [PATCH 3.1 4/4] ARM: simpad: replace ARM specific LED code
-In-Reply-To: <1310453186-22518-1-git-send-email-jochen@scram.de>
-References: <1310453186-22518-1-git-send-email-jochen@scram.de>
-Message-ID: <1310453186-22518-5-git-send-email-jochen@scram.de>
+From: tommy.lin.1101@gmail.com (=?Big5?B?qkynu6Tl?=)
+Date: Tue, 12 Jul 2011 14:57:38 +0800
+Subject: [PATCH 1/2] arch: arm: Correct the dependency of HAVE_ARM_TWD
+In-Reply-To: <20110708091713.GF2414@n2100.arm.linux.org.uk>
+References: <1310104763-12948-1-git-send-email-tommy.lin@caviumnetworks.com>
+	<20110708091014.GA15142@oksana.dev.rtsoft.ru>
+	<20110708091713.GF2414@n2100.arm.linux.org.uk>
+Message-ID: <CAB8eogcYUSYPBS9UAv29MqnTLdUrbYt+y=yLmzG0r92kz-PUXA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the legacy ARM LED code for simpad devices and
-register a stadard LED platform device using GPIO line
-instead.
+2011/7/8 Russell King - ARM Linux <linux@arm.linux.org.uk>
+>
+> On Fri, Jul 08, 2011 at 01:10:14PM +0400, Anton Vorontsov wrote:
+> > On Fri, Jul 08, 2011 at 01:59:23PM +0800, Tommy Lin wrote:
+> > Russell,
+> >
+> > As the patch is needed for CNS3xxx Watchdog support, I'd like to take
+> > it via CNS3xxx tree, if you're OK with that.
+>
+> No.
+>
+> TWD is only useful if SMP is enabled, otherwise the contained code
+> won't be called.  Without SMP you'll find that the timer rate will
+> be zero.
+>
+> So actually your problems are bigger than just this dependency.
+I think LOCAL_TIMERS is the one that useful if SMP is enabled. The zero
+timer rate issue still able to limited by LOCAL_TIMERS.
+MPCore watchdog is rely on HAVE_ARM_TWD, but not related to SMP
+at least in the current source. I have test the watchdog part without enable
+SMP and watchdog works well except wrong reload value that can be fixed
+by another patch.
 
-Signed-off-by: Jochen Friedrich <jochen@scram.de>
----
- arch/arm/mach-sa1100/Makefile      |    1 -
- arch/arm/mach-sa1100/leds-simpad.c |   97 ------------------------------------
- arch/arm/mach-sa1100/leds.c        |    2 -
- arch/arm/mach-sa1100/leds.h        |    1 -
- arch/arm/mach-sa1100/simpad.c      |   28 ++++++++++
- 5 files changed, 28 insertions(+), 101 deletions(-)
- delete mode 100644 arch/arm/mach-sa1100/leds-simpad.c
-
-diff --git a/arch/arm/mach-sa1100/Makefile b/arch/arm/mach-sa1100/Makefile
-index 41252d2..0063178 100644
---- a/arch/arm/mach-sa1100/Makefile
-+++ b/arch/arm/mach-sa1100/Makefile
-@@ -45,7 +45,6 @@ obj-$(CONFIG_SA1100_PLEB)		+= pleb.o
- obj-$(CONFIG_SA1100_SHANNON)		+= shannon.o
- 
- obj-$(CONFIG_SA1100_SIMPAD)		+= simpad.o
--led-$(CONFIG_SA1100_SIMPAD)		+= leds-simpad.o
- 
- # LEDs support
- obj-$(CONFIG_LEDS) += $(led-y)
-diff --git a/arch/arm/mach-sa1100/leds-simpad.c b/arch/arm/mach-sa1100/leds-simpad.c
-deleted file mode 100644
-index d25784c..0000000
---- a/arch/arm/mach-sa1100/leds-simpad.c
-+++ /dev/null
-@@ -1,97 +0,0 @@
--/*
-- * linux/arch/arm/mach-sa1100/leds-simpad.c
-- *
-- * Author: Juergen Messerer <juergen.messerer@siemens.ch>
-- */
--#include <linux/init.h>
--
--#include <mach/hardware.h>
--#include <asm/leds.h>
--#include <asm/system.h>
--#include <mach/simpad.h>
--
--#include "leds.h"
--
--
--#define LED_STATE_ENABLED	1
--#define LED_STATE_CLAIMED	2
--
--static unsigned int led_state;
--static unsigned int hw_led_state;
--
--#define	LED_GREEN	(1)
--#define	LED_MASK	(1)
--
--void simpad_leds_event(led_event_t evt)
--{
--	switch (evt)
--	{
--	case led_start:
--	        hw_led_state = LED_GREEN;
--		led_state = LED_STATE_ENABLED;
--		break;
--
--	case led_stop:
--		led_state &= ~LED_STATE_ENABLED;
--		break;
--
--	case led_claim:
--		led_state |= LED_STATE_CLAIMED;
--		hw_led_state = LED_GREEN;
--		break;
--
--	case led_release:
--		led_state &= ~LED_STATE_CLAIMED;
--		hw_led_state = LED_GREEN;
--		break;
--
--#ifdef CONFIG_LEDS_TIMER
--	case led_timer:
--		if (!(led_state & LED_STATE_CLAIMED))
--			hw_led_state ^= LED_GREEN;
--		break;
--#endif
--
--#ifdef CONFIG_LEDS_CPU
--	case led_idle_start:
--		break;
--
--	case led_idle_end:
--		break;
--#endif
--
--	case led_halted:
--		break;
--
--	case led_green_on:
--		if (led_state & LED_STATE_CLAIMED)
--			hw_led_state |= LED_GREEN;
--		break;
--
--	case led_green_off:
--		if (led_state & LED_STATE_CLAIMED)
--			hw_led_state &= ~LED_GREEN;
--		break;
--
--	case led_amber_on:
--		break;
--
--	case led_amber_off:
--		break;
--
--	case led_red_on:
--		break;
--
--	case led_red_off:
--		break;
--
--	default:
--		break;
--	}
--
--	if  (led_state & LED_STATE_ENABLED)
--		simpad_set_cs3_bit(LED2_ON);
--	else 
--		simpad_clear_cs3_bit(LED2_ON);
--}
--
-diff --git a/arch/arm/mach-sa1100/leds.c b/arch/arm/mach-sa1100/leds.c
-index bbfe197..5fe71a0 100644
---- a/arch/arm/mach-sa1100/leds.c
-+++ b/arch/arm/mach-sa1100/leds.c
-@@ -42,8 +42,6 @@ sa1100_leds_init(void)
- 		leds_event = adsbitsy_leds_event;
- 	if (machine_is_pt_system3())
- 		leds_event = system3_leds_event;
--	if (machine_is_simpad())
--		leds_event = simpad_leds_event; /* what about machine registry? including led, apm... -zecke */
- 
- 	leds_event(led_start);
- 	return 0;
-diff --git a/arch/arm/mach-sa1100/leds.h b/arch/arm/mach-sa1100/leds.h
-index 68cc9f7..776b602 100644
---- a/arch/arm/mach-sa1100/leds.h
-+++ b/arch/arm/mach-sa1100/leds.h
-@@ -11,4 +11,3 @@ extern void pfs168_leds_event(led_event_t evt);
- extern void graphicsmaster_leds_event(led_event_t evt);
- extern void adsbitsy_leds_event(led_event_t evt);
- extern void system3_leds_event(led_event_t evt);
--extern void simpad_leds_event(led_event_t evt);
-diff --git a/arch/arm/mach-sa1100/simpad.c b/arch/arm/mach-sa1100/simpad.c
-index d1a13bb..b9c8e39 100644
---- a/arch/arm/mach-sa1100/simpad.c
-+++ b/arch/arm/mach-sa1100/simpad.c
-@@ -31,6 +31,7 @@
- #include <linux/ioport.h>
- #include <linux/input.h>
- #include <linux/gpio_keys.h>
-+#include <linux/leds.h>
- #include <linux/i2c-gpio.h>
- 
- #include "generic.h"
-@@ -295,6 +296,32 @@ static struct platform_device simpad_polled_keys = {
- };
- 
- /*
-+ * GPIO LEDs
-+ */
-+
-+static struct gpio_led simpad_leds[] = {
-+	{
-+		.name = "power",
-+		.gpio = SIMPAD_CS3_LED2_ON,
-+		.active_low = 0,
-+		.default_trigger = "default-on",
-+	},
-+};
-+
-+static struct gpio_led_platform_data simpad_led_data = {
-+	.num_leds = 1,
-+	.leds = simpad_leds,
-+};
-+
-+static struct platform_device simpad_gpio_leds = {
-+	.name = "leds-gpio",
-+	.id = 0,
-+	.dev = {
-+		.platform_data = &simpad_led_data,
-+	},
-+};
-+
-+/*
-  * i2c
-  */
- static struct i2c_gpio_platform_data simpad_i2c_data = {
-@@ -324,6 +351,7 @@ static struct platform_device *devices[] __initdata = {
- 	&simpad_keys,
- 	&simpad_polled_keys,
- 	&simpad_mq200fb,
-+	&simpad_gpio_leds,
- 	&simpad_i2c,
- };
- 
--- 
-1.7.5.4
+--
+Best Regards,
+Tommy Lin
