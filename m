@@ -1,39 +1,18 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 12 Jul 2011 14:08:10 +0100
-Subject: [PATCH 3/3] Add documenation for new sysfs devices/soc functionallity
-In-Reply-To: <1310476090-9807-1-git-send-email-lee.jones@linaro.org>
-References: <1310476090-9807-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1310476090-9807-3-git-send-email-lee.jones@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 12 Jul 2011 15:09:42 +0200
+Subject: Pull request for LPC32xx
+In-Reply-To: <20110712095735.GC1953@pengutronix.de>
+References: <20110712095735.GC1953@pengutronix.de>
+Message-ID: <201107121509.42888.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- Documentation/ABI/testing/sysfs-devices-soc |   16 ++++++++++++++++
- 1 files changed, 16 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/ABI/testing/sysfs-devices-soc
+On Tuesday 12 July 2011, Wolfram Sang wrote:
+> I hope it is okay that I send these pull-requests, but Kevin seems to be busy.
+> He has tested the patches before, though. They are quite trivial, I think, yet
+> this is the third try to get them included. It is mainly adding devices for
+> which the drivers have been accepted meanwhile.
 
-diff --git a/Documentation/ABI/testing/sysfs-devices-soc b/Documentation/ABI/testing/sysfs-devices-soc
-new file mode 100644
-index 0000000..fcf7f07
---- /dev/null
-+++ b/Documentation/ABI/testing/sysfs-devices-soc
-@@ -0,0 +1,16 @@
-+What:		/sys/devices/soc
-+Date:		April 2011
-+contact:	Lee Jones <lee.jones@linaro.org>
-+Description:
-+		The /sys/devices/soc directory contains a sub-directory for each
-+		System-on-Chip (SoC) device on a running platform. Information
-+		regarding each SoC can be obtained by reading sysfs files. This
-+		functionallity is only available if implemented by the platform.
-+		This directory contains two kinds of attributes:
-+			- Common attributes:
-+				* machine: the name of the machine (e.g. Ux500).
-+				* family: the family name of the SoC (e.g. DB8500).
-+			- SoC-specific attributes:
-+			  	* SoC vendor declared, such as serial and rev numbers.
-+Users:
-+		Any platform dependent user-space applications or profiling tools.
--- 
-1.7.4.1
+Yes, no problem. Of course if Kevin has any objections, I'll just revert them.
+
+	Arnd
