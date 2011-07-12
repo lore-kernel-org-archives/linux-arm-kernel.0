@@ -1,37 +1,31 @@
-From: tommy.lin.1101@gmail.com (=?Big5?B?qkynu6Tl?=)
-Date: Tue, 12 Jul 2011 14:57:38 +0800
-Subject: [PATCH 1/2] arch: arm: Correct the dependency of HAVE_ARM_TWD
-In-Reply-To: <20110708091713.GF2414@n2100.arm.linux.org.uk>
-References: <1310104763-12948-1-git-send-email-tommy.lin@caviumnetworks.com>
-	<20110708091014.GA15142@oksana.dev.rtsoft.ru>
-	<20110708091713.GF2414@n2100.arm.linux.org.uk>
-Message-ID: <CAB8eogcYUSYPBS9UAv29MqnTLdUrbYt+y=yLmzG0r92kz-PUXA@mail.gmail.com>
+From: tixy@yxit.co.uk (Tixy)
+Date: Tue, 12 Jul 2011 08:14:01 +0100
+Subject: [PATCH 19/51] ARM: kprobes: Infrastructure for table driven
+	decoding of CPU instructions
+In-Reply-To: <alpine.LFD.2.00.1107111552140.14596@xanadu.home>
+References: <1310209058-20980-1-git-send-email-tixy@yxit.co.uk>
+	<1310209058-20980-20-git-send-email-tixy@yxit.co.uk>
+	<alpine.LFD.2.00.1107111552140.14596@xanadu.home>
+Message-ID: <1310454841.2258.3.camel@computer2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/7/8 Russell King - ARM Linux <linux@arm.linux.org.uk>
->
-> On Fri, Jul 08, 2011 at 01:10:14PM +0400, Anton Vorontsov wrote:
-> > On Fri, Jul 08, 2011 at 01:59:23PM +0800, Tommy Lin wrote:
-> > Russell,
-> >
-> > As the patch is needed for CNS3xxx Watchdog support, I'd like to take
-> > it via CNS3xxx tree, if you're OK with that.
->
-> No.
->
-> TWD is only useful if SMP is enabled, otherwise the contained code
-> won't be called.  Without SMP you'll find that the timer rate will
-> be zero.
->
-> So actually your problems are bigger than just this dependency.
-I think LOCAL_TIMERS is the one that useful if SMP is enabled. The zero
-timer rate issue still able to limited by LOCAL_TIMERS.
-MPCore watchdog is rely on HAVE_ARM_TWD, but not related to SMP
-at least in the current source. I have test the watchdog part without enable
-SMP and watchdog works well except wrong reload value that can be fixed
-by another patch.
+On Mon, 2011-07-11 at 16:05 -0400, Nicolas Pitre wrote:
+> On Sat, 9 Jul 2011, Tixy wrote:
+> 
+> > +static kprobe_opcode_t __kprobes
+> > +prepare_emulated_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi,
+> > +								bool thumb)
+> > +{
+> > +#ifdef CONFIG_THUMB2_KERNEL
+> > +	if (thumb) {
+> > +		u16* thumb_insn = (u16 *)asi->insn;
+> 
+> Ninor style nit: we usually put the * against the variable rather than 
+> the type.
 
---
-Best Regards,
-Tommy Lin
+checkpatch doesn't catch that one. I'll try and come up with a
+simplified test case for a bug report.
+
+-- 
+Tixy
