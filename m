@@ -1,22 +1,23 @@
-From: tixy@yxit.co.uk (Tixy)
-Date: Tue, 12 Jul 2011 08:20:59 +0100
-Subject: [PATCH 37/51] ARM: kprobes: Optimise emulation of LDM and STM
-In-Reply-To: <alpine.LFD.2.00.1107112037190.14596@xanadu.home>
-References: <1310209058-20980-1-git-send-email-tixy@yxit.co.uk>
-	<1310209058-20980-38-git-send-email-tixy@yxit.co.uk>
-	<alpine.LFD.2.00.1107112037190.14596@xanadu.home>
-Message-ID: <1310455259.2258.10.camel@computer2>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 12 Jul 2011 08:30:37 +0100
+Subject: [PATCH 16/17] mach-sa1100: retire custom LED code
+In-Reply-To: <CAK5ve-LNDCN0P6L_5-L4PT11n1Tiv0qz=8=rgmv-v7WsEDotBQ@mail.gmail.com>
+References: <1309955687-19365-1-git-send-email-bryan.wu@canonical.com>
+	<CAK5ve-+Pr8EDa8mfhZVbf8ADc2YDU0EyTPL3Fwwipj237tgKQg@mail.gmail.com>
+	<20110711210950.GE8486@n2100.arm.linux.org.uk>
+	<201107112352.40424.arnd@arndb.de>
+	<CAK5ve-LNDCN0P6L_5-L4PT11n1Tiv0qz=8=rgmv-v7WsEDotBQ@mail.gmail.com>
+Message-ID: <20110712073037.GA23270@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2011-07-11 at 20:45 -0400, Nicolas Pitre wrote: 
-> On Sat, 9 Jul 2011, Tixy wrote:
-> > The approach taken to optimisation is to use simulation rather than
-> > emulation,
-> 
-> Isn't it the other way around i.e. emulation rather than simulation?
+On Tue, Jul 12, 2011 at 08:31:28AM +0800, Bryan Wu wrote:
+> I think this is a great idea. what about moving it to include/asm-generic/
 
-It is.
+Except, instead of:
 
--- 
-Tixy 
+		if (machine_is(mach)) return fn(); \
+
+we'd need:
+
+		if (machine_is_##mach()) return fn(); \
