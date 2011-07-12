@@ -1,117 +1,129 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Tue, 12 Jul 2011 14:16:25 +0200
-Subject: [PATCH 1/2] arm: mach-mxs: add device for rtc
-Message-ID: <1310472986-31493-1-git-send-email-w.sang@pengutronix.de>
+From: tixy@yxit.co.uk (Tixy)
+Date: Tue, 12 Jul 2011 13:40:02 +0100
+Subject: [PATCH] [RFC PATCH] ARM: kprobes: Make breakpoint setting/clearing
+	SMP safe
+Message-ID: <1310474402-5398-1-git-send-email-tixy@yxit.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
-Tested-by: Shawn Guo <shawn.guo@freescale.com>
----
- arch/arm/mach-mxs/devices-mx23.h                  |    2 +
- arch/arm/mach-mxs/devices-mx28.h                  |    2 +
- arch/arm/mach-mxs/devices/Kconfig                 |    3 +
- arch/arm/mach-mxs/devices/Makefile                |    1 +
- arch/arm/mach-mxs/devices/platform-rtc-stmp3xxx.c |   51 +++++++++++++++++++++
- 5 files changed, 59 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-mxs/devices/platform-rtc-stmp3xxx.c
+From: Jon Medhurst <tixy@yxit.co.uk>
 
-diff --git a/arch/arm/mach-mxs/devices-mx23.h b/arch/arm/mach-mxs/devices-mx23.h
-index c6f345f..3fa651d 100644
---- a/arch/arm/mach-mxs/devices-mx23.h
-+++ b/arch/arm/mach-mxs/devices-mx23.h
-@@ -29,3 +29,5 @@ extern const struct mxs_mxs_mmc_data mx23_mxs_mmc_data[] __initconst;
+On SMP systems, kprobes has two different issues when manipulating
+breakpoints.
+
+When disarming probes, with two CPUs (A and B) we can get:
+
+- A takes undef exception due to hitting a probe breakpoint.
+- B disarms probe, replacing the breakpoint with original instruction.
+- A's undef handler reads instruction at PC, doesn't see kprobe
+  breakpoint, therefore doesn't call kprobe_handler and the process
+  takes a fatal exception.
+
+The second issue occurs when both arming and disarming probes on a
+32-bit Thumb instruction which straddles two memory words. In this case
+it's possible that another CPU will read 16 bits from the new
+instruction and 16 from the old.
+
+Both these issues are known and the kprobe implementation uses
+stop_machine() to avoid them, however, this is not sufficient.
+stop_machine() does not perform any kind on synchronisation between CPUs
+so it it still possible for one CPU to call the breakpoint changing
+function before another CPU has been interrupted to do likewise.
+
+To fix this problem, this patch creates a new function
+sync_stop_machine() which ensures that all online CPUs execute the
+specified function at the same time.
+
+I am looking for feedback:
+- Have I got my understanding of stop_machine() right?
+- Are there other APIs to do what we need?
+- Is my patch robust.
+- Do I have the correct barriers?
+
+Signed-off-by: Jon Medhurst <tixy@yxit.co.uk>
+---
+ arch/arm/kernel/kprobes.c |   55 +++++++++++++++++++++++++++++++++++++++++++-
+ 1 files changed, 53 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/kernel/kprobes.c b/arch/arm/kernel/kprobes.c
+index 129c116..c6b7f2a 100644
+--- a/arch/arm/kernel/kprobes.c
++++ b/arch/arm/kernel/kprobes.c
+@@ -103,6 +103,57 @@ int __kprobes arch_prepare_kprobe(struct kprobe *p)
+ 	return 0;
+ }
  
- struct platform_device *__init mx23_add_mxsfb(
- 		const struct mxsfb_platform_data *pdata);
++struct sync_stop_machine_data {
++	atomic_t begin;
++	atomic_t end;
++	int	 (*fn)(void *);
++	void	 *data;
++};
 +
-+struct platform_device *__init mx23_add_rtc_stmp3xxx(void);
-diff --git a/arch/arm/mach-mxs/devices-mx28.h b/arch/arm/mach-mxs/devices-mx28.h
-index 79b9452..a252c68 100644
---- a/arch/arm/mach-mxs/devices-mx28.h
-+++ b/arch/arm/mach-mxs/devices-mx28.h
-@@ -45,3 +45,5 @@ extern const struct mxs_mxs_mmc_data mx28_mxs_mmc_data[] __initconst;
- 
- struct platform_device *__init mx28_add_mxsfb(
- 		const struct mxsfb_platform_data *pdata);
-+
-+struct platform_device *__init mx28_add_rtc_stmp3xxx(void);
-diff --git a/arch/arm/mach-mxs/devices/Kconfig b/arch/arm/mach-mxs/devices/Kconfig
-index acf9eea..9d8d239 100644
---- a/arch/arm/mach-mxs/devices/Kconfig
-+++ b/arch/arm/mach-mxs/devices/Kconfig
-@@ -23,3 +23,6 @@ config MXS_HAVE_PLATFORM_MXS_PWM
- 
- config MXS_HAVE_PLATFORM_MXSFB
- 	bool
-+
-+config MXS_HAVE_PLATFORM_RTC_STMP3XXX
-+	bool
-diff --git a/arch/arm/mach-mxs/devices/Makefile b/arch/arm/mach-mxs/devices/Makefile
-index 351915c..31e0a0b 100644
---- a/arch/arm/mach-mxs/devices/Makefile
-+++ b/arch/arm/mach-mxs/devices/Makefile
-@@ -8,3 +8,4 @@ obj-$(CONFIG_MXS_HAVE_PLATFORM_MXS_MMC) += platform-mxs-mmc.o
- obj-$(CONFIG_MXS_HAVE_PLATFORM_MXS_PWM) += platform-mxs-pwm.o
- obj-y += platform-gpio-mxs.o
- obj-$(CONFIG_MXS_HAVE_PLATFORM_MXSFB) += platform-mxsfb.o
-+obj-$(CONFIG_MXS_HAVE_PLATFORM_RTC_STMP3XXX) += platform-rtc-stmp3xxx.o
-diff --git a/arch/arm/mach-mxs/devices/platform-rtc-stmp3xxx.c b/arch/arm/mach-mxs/devices/platform-rtc-stmp3xxx.c
-new file mode 100644
-index 0000000..639eaee
---- /dev/null
-+++ b/arch/arm/mach-mxs/devices/platform-rtc-stmp3xxx.c
-@@ -0,0 +1,51 @@
-+/*
-+ * Copyright (C) 2011 Pengutronix, Wolfram Sang <w.sang@pengutronix.de>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it under
-+ * the terms of the GNU General Public License version 2 as published by the
-+ * Free Software Foundation.
-+ */
-+#include <asm/sizes.h>
-+#include <mach/mx23.h>
-+#include <mach/mx28.h>
-+#include <mach/devices-common.h>
-+
-+#ifdef CONFIG_SOC_IMX23
-+struct platform_device *__init mx23_add_rtc_stmp3xxx(void)
++static int __kprobes __sync_stop_machine(void *data)
 +{
-+	struct resource res[] = {
-+		{
-+			.start = MX23_RTC_BASE_ADDR,
-+			.end = MX23_RTC_BASE_ADDR + SZ_8K - 1,
-+			.flags = IORESOURCE_MEM,
-+		}, {
-+			.start = MX23_INT_RTC_ALARM,
-+			.end = MX23_INT_RTC_ALARM,
-+			.flags = IORESOURCE_IRQ,
-+		},
-+	};
++	struct sync_stop_machine_data *ssmd;
++	int ret;
 +
-+	return mxs_add_platform_device("stmp3xxx-rtc", 0, res, ARRAY_SIZE(res),
-+					NULL, 0);
++	ssmd = (struct sync_stop_machine_data *)data;
++
++	/* Wait until all CPUs are ready before calling the function */
++	atomic_dec(&ssmd->begin);
++	smp_mb__after_atomic_dec();
++	while (atomic_read(&ssmd->begin)) {}
++
++	ret = ssmd->fn(ssmd->data);
++
++	/* Wait for all CPUs to finish 'fn' before returning */
++	smp_mb__before_atomic_dec();
++	atomic_dec(&ssmd->end);
++	while (atomic_read(&ssmd->end)) {}
++
++	return ret;
 +}
-+#endif /* CONFIG_SOC_IMX23 */
 +
-+#ifdef CONFIG_SOC_IMX28
-+struct platform_device *__init mx28_add_rtc_stmp3xxx(void)
++static int __kprobes sync_stop_machine(int (*fn)(void *), void *data)
 +{
-+	struct resource res[] = {
-+		{
-+			.start = MX28_RTC_BASE_ADDR,
-+			.end = MX28_RTC_BASE_ADDR + SZ_8K - 1,
-+			.flags = IORESOURCE_MEM,
-+		}, {
-+			.start = MX28_INT_RTC_ALARM,
-+			.end = MX28_INT_RTC_ALARM,
-+			.flags = IORESOURCE_IRQ,
-+		},
++	struct sync_stop_machine_data ssmd = {
++		.fn	= fn,
++		.data	= data
 +	};
++	int num_cpus;
++	int ret;
 +
-+	return mxs_add_platform_device("stmp3xxx-rtc", 0, res, ARRAY_SIZE(res),
-+					NULL, 0);
++	get_online_cpus(); /* So number of CPUs can't change */
++
++	num_cpus = num_online_cpus();
++	atomic_set(&ssmd.begin, num_cpus);
++	atomic_set(&ssmd.end, num_cpus);
++	smp_wmb();
++
++	ret = stop_machine(__sync_stop_machine, &ssmd, &cpu_online_map);
++
++	put_online_cpus();
++	return ret;
 +}
-+#endif /* CONFIG_SOC_IMX28 */
++
+ #ifdef CONFIG_THUMB2_KERNEL
+ 
+ /*
+@@ -127,7 +178,7 @@ void __kprobes arch_arm_kprobe(struct kprobe *p)
+ 		flush_insns(addr, sizeof(u16));
+ 	} else if (addr & 2) {
+ 		/* A 32-bit instruction spanning two words needs special care */
+-		stop_machine(set_t32_breakpoint, (void *)addr, &cpu_online_map);
++		sync_stop_machine(set_t32_breakpoint, (void *)addr);
+ 	} else {
+ 		/* Word aligned 32-bit instruction can be written atomically */
+ 		u32 bkp = KPROBE_THUMB32_BREAKPOINT_INSTRUCTION;
+@@ -190,7 +241,7 @@ int __kprobes __arch_disarm_kprobe(void *p)
+ 
+ void __kprobes arch_disarm_kprobe(struct kprobe *p)
+ {
+-	stop_machine(__arch_disarm_kprobe, p, &cpu_online_map);
++	sync_stop_machine(__arch_disarm_kprobe, p);
+ }
+ 
+ void __kprobes arch_remove_kprobe(struct kprobe *p)
 -- 
-1.7.5.4
+1.7.2.5
