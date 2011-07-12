@@ -1,48 +1,58 @@
-From: khali@linux-fr.org (Jean Delvare)
-Date: Tue, 12 Jul 2011 08:48:04 +0200
-Subject: [PATCH v2] MAX1111: Fix Race condition causing NULL pointer
-	exception
-In-Reply-To: <3737907.jTEM1bACya@bloomfield>
-References: <1310410051-13127-1-git-send-email-morpheus.ibis@gmail.com>
-	<1602583.Pi9fQvRk5m@bloomfield>
-	<1310418193.21224.14.camel@groeck-laptop>
-	<3737907.jTEM1bACya@bloomfield>
-Message-ID: <20110712084804.0235de42@endymion.delvare>
+From: jochen@scram.de (Jochen Friedrich)
+Date: Tue, 12 Jul 2011 08:46:23 +0200
+Subject: [PATCH 3.1 1/4] ARM:simpad: Add ucb1x00 GPIO definitions and register
+	GPIO
+In-Reply-To: <1310453186-22518-1-git-send-email-jochen@scram.de>
+References: <1310453186-22518-1-git-send-email-jochen@scram.de>
+Message-ID: <1310453186-22518-2-git-send-email-jochen@scram.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 11 Jul 2011 23:49:10 +0200, Pavel Herrmann wrote:
-> On Monday 11 of July 2011 14:03:13 Guenter Roeck wrote:
-> > On Mon, 2011-07-11 at 16:36 -0400, Pavel Herrmann wrote:
-> > > the structure is dynamically allocated, but the pointer used to hold it
-> > > is a static global var.
-> > 
-> > This is true only if CONFIG_SHARPSL_PM is defined, and it assumes that
-> > the driver is instantiated exactly once. That is pretty badly broken
-> > (the commit introducing it even admits that), and should be fixed. This
-> > does not happen CONFIG_SHARPSL_PM is not defined. If CONFIG_SHARPSL_PM
-> > _is_ defined in your environment, and you do have multiple instances of
-> > the driver (ie if you have multiple MAX1111 chips in your system), a
-> > severe problem is that max1111_read_channel() does not identify the
-> > driver instance. That can not be fixed with a mutex.
-> 
-> if you don't have CONFIG_SHARPSL_PM then there is nothing calling 
-> max1111_read, and thus any of the discussed doesn't matter
+Add ucb1x00 GPIO definitions to simpad.h and add gpio_base
+to ucb1x00 platform device so the pins are available using
+the GPIO API.
 
-This assumption of yours is incorrect. Even with CONFIG_SHARPSL_PM
-disabled, the max1111 driver creates sysfs attributes which, when read,
-call max1111_read(). What CONFIG_SHARPSL_PM adds is the in-kernel
-access.
+Signed-off-by: Jochen Friedrich <jochen@scram.de>
+---
+ arch/arm/mach-sa1100/include/mach/simpad.h |   13 +++++++++++++
+ arch/arm/mach-sa1100/simpad.c              |    1 +
+ 2 files changed, 14 insertions(+), 0 deletions(-)
 
-> AFAIK max1111 is only used in sharpsl devices (according to kernel drivers 
-> anyways), and only one a piece.
-> this patch is meant to fix a crash, not make the driver code pretty just in 
-> case someone else decides to use it. this patch also doesn't present any more 
-> challenges for solving the multiple devices issue and would be necessary 
-> either way, as drvdata is not thread-safe anyways (or I am badly mistaken)
-
-You are right, drvdata is not thread-safe, and this is the most obvious
-reason why your patch is needed.
-
+diff --git a/arch/arm/mach-sa1100/include/mach/simpad.h b/arch/arm/mach-sa1100/include/mach/simpad.h
+index 9296c45..231550d 100644
+--- a/arch/arm/mach-sa1100/include/mach/simpad.h
++++ b/arch/arm/mach-sa1100/include/mach/simpad.h
+@@ -48,6 +48,19 @@
+ #define GPIO_SMART_CARD		GPIO_GPIO10
+ #define IRQ_GPIO_SMARD_CARD	IRQ_GPIO10
+ 
++/*--- ucb1x00 GPIO ---*/
++#define SIMPAD_UCB1X00_GPIO_BASE	(GPIO_MAX + 1)
++#define SIMPAD_UCB1X00_GPIO_PROG1	(SIMPAD_UCB1X00_GPIO_BASE)
++#define SIMPAD_UCB1X00_GPIO_PROG2	(SIMPAD_UCB1X00_GPIO_BASE + 1)
++#define SIMPAD_UCB1X00_GPIO_UP		(SIMPAD_UCB1X00_GPIO_BASE + 2)
++#define SIMPAD_UCB1X00_GPIO_DOWN	(SIMPAD_UCB1X00_GPIO_BASE + 3)
++#define SIMPAD_UCB1X00_GPIO_LEFT	(SIMPAD_UCB1X00_GPIO_BASE + 4)
++#define SIMPAD_UCB1X00_GPIO_RIGHT	(SIMPAD_UCB1X00_GPIO_BASE + 5)
++#define SIMPAD_UCB1X00_GPIO_6		(SIMPAD_UCB1X00_GPIO_BASE + 6)
++#define SIMPAD_UCB1X00_GPIO_7		(SIMPAD_UCB1X00_GPIO_BASE + 7)
++#define SIMPAD_UCB1X00_GPIO_HEADSET	(SIMPAD_UCB1X00_GPIO_BASE + 8)
++#define SIMPAD_UCB1X00_GPIO_SPEAKER	(SIMPAD_UCB1X00_GPIO_BASE + 9)
++
+ // CS3 Latch is write only, a shadow is necessary
+ 
+ #define CS3BUSTYPE unsigned volatile long
+diff --git a/arch/arm/mach-sa1100/simpad.c b/arch/arm/mach-sa1100/simpad.c
+index cfb7607..718b802 100644
+--- a/arch/arm/mach-sa1100/simpad.c
++++ b/arch/arm/mach-sa1100/simpad.c
+@@ -132,6 +132,7 @@ static struct resource simpad_flash_resources [] = {
+ static struct mcp_plat_data simpad_mcp_data = {
+ 	.mccr0		= MCCR0_ADM,
+ 	.sclk_rate	= 11981000,
++	.gpio_base	= SIMPAD_UCB1X00_GPIO_BASE,
+ };
+ 
+ 
 -- 
-Jean Delvare
+1.7.5.4
