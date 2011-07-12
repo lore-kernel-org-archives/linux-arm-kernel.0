@@ -1,46 +1,122 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 12 Jul 2011 14:55:53 +0200
-Subject: Please submit platform trees for inclusion in arm-soc.git v3.1
-In-Reply-To: <alpine.LFD.2.00.1107111815340.14596@xanadu.home>
-References: <201107012018.14619.arnd@arndb.de>
-	<201107112337.08892.arnd@arndb.de>
-	<alpine.LFD.2.00.1107111815340.14596@xanadu.home>
-Message-ID: <201107121455.53717.arnd@arndb.de>
+From: kaloz@openwrt.org (Imre Kaloz)
+Date: Tue, 12 Jul 2011 14:56:09 +0200
+Subject: [PATCH v2] ARM: support XZ compressed kernels
+Message-ID: <1310475369-3000-1-git-send-email-kaloz@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 12 July 2011, Nicolas Pitre wrote:
-> On Mon, 11 Jul 2011, Arnd Bergmann wrote:
-> 
-> > On Friday 08 July 2011, Kevin Hilman wrote:
-> > > > Time is running out for the current cycle, so any changes that you
-> > > > want to see merged in linux-3.1 through the arm-soc tree should be
-> > > > submitted in form of pull-requests very soon.
-> > > 
-> > > [...]
-> > > 
-> > > It looks like your "remove rmk/for-next" commit may not have been
-> > > totally complete.
-> > > 
-> > > Trying to merge your master branch and Russell's current for-next branch
-> > > still results in conflicts in files that should only be touched in
-> > > Russell's branch (specifically, these seem related to changes in
-> > > Russell's 'suspend' branch that is included in his 'for-next' branch.)
-> > 
-> > Yes, that's my fault for not fixing this up correctly after initially
-> > doing the incorrect pull.
-> > 
-> > I guess I'll throw away the current master branch and generate a new
-> > one. After discussing this with Russell, I think it's best to treat
-> > the master branch as temporary anyway unless Nicolas or Thomas come up
-> > with a good reason against doing this.
-> 
-> No objections.  However, to avoid confusion, I'd suggest getting rid of 
-> the branch called "master" entirely and call it something else.
+Wire up support for the XZ decompressor
 
-Yes, makes sense.
+Signed-off-by: Imre Kaloz <kaloz@openwrt.org>
+---
+Change since v1: added missing .gitignore modification
 
-I'll call it 'for-next' then, following the same scheme that Russell uses.
-Hopefully people will take it as a hint that it's getting rebased.
+ arch/arm/Kconfig                        |    1 +
+ arch/arm/boot/compressed/.gitignore     |    1 +
+ arch/arm/boot/compressed/Makefile       |   11 +++++++++--
+ arch/arm/boot/compressed/decompress.c   |    4 ++++
+ arch/arm/boot/compressed/piggy.xzkern.S |    6 ++++++
+ lib/xz/xz_dec_stream.c                  |    1 +
+ 6 files changed, 22 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm/boot/compressed/piggy.xzkern.S
 
-	Arnd
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 9adc278..286873e 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -20,6 +20,7 @@ config ARM
+ 	select HAVE_KERNEL_GZIP
+ 	select HAVE_KERNEL_LZO
+ 	select HAVE_KERNEL_LZMA
++	select HAVE_KERNEL_XZ
+ 	select HAVE_IRQ_WORK
+ 	select HAVE_PERF_EVENTS
+ 	select PERF_USE_VMALLOC
+diff --git a/arch/arm/boot/compressed/.gitignore b/arch/arm/boot/compressed/.gitignore
+index c602896..593a712 100644
+--- a/arch/arm/boot/compressed/.gitignore
++++ b/arch/arm/boot/compressed/.gitignore
+@@ -3,5 +3,6 @@ lib1funcs.S
+ piggy.gzip
+ piggy.lzo
+ piggy.lzma
++piggy.xzkern
+ vmlinux
+ vmlinux.lds
+diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
+index 23aad07..e5db34e 100644
+--- a/arch/arm/boot/compressed/Makefile
++++ b/arch/arm/boot/compressed/Makefile
+@@ -82,13 +82,14 @@ SEDFLAGS	= s/TEXT_START/$(ZTEXTADDR)/;s/BSS_START/$(ZBSSADDR)/
+ suffix_$(CONFIG_KERNEL_GZIP) = gzip
+ suffix_$(CONFIG_KERNEL_LZO)  = lzo
+ suffix_$(CONFIG_KERNEL_LZMA) = lzma
++suffix_$(CONFIG_KERNEL_XZ)   = xzkern
+ 
+ targets       := vmlinux vmlinux.lds \
+ 		 piggy.$(suffix_y) piggy.$(suffix_y).o \
+ 		 font.o font.c head.o misc.o $(OBJS)
+ 
+ # Make sure files are removed during clean
+-extra-y       += piggy.gzip piggy.lzo piggy.lzma lib1funcs.S
++extra-y       += piggy.gzip piggy.lzo piggy.lzma piggy.xzkern lib1funcs.S ashldi3.S
+ 
+ ifeq ($(CONFIG_FUNCTION_TRACER),y)
+ ORIG_CFLAGS := $(KBUILD_CFLAGS)
+@@ -133,8 +134,14 @@ bad_syms=$$($(CROSS_COMPILE)nm $@ | sed -n 's/^.\{8\} [bc] \(.*\)/\1/p') && \
+   ( echo "following symbols must have non local/private scope:" >&2; \
+     echo "$$bad_syms" >&2; rm -f $@; false )
+ 
++# For __aeabi_llsl
++ashldi3 = $(obj)/ashldi3.o
++
++$(obj)/ashldi3.S: $(srctree)/arch/$(SRCARCH)/lib/ashldi3.S FORCE
++	$(call cmd,shipped)
++
+ $(obj)/vmlinux: $(obj)/vmlinux.lds $(obj)/$(HEAD) $(obj)/piggy.$(suffix_y).o \
+-	 	$(addprefix $(obj)/, $(OBJS)) $(lib1funcs) FORCE
++	 	$(addprefix $(obj)/, $(OBJS)) $(lib1funcs) $(ashldi3) FORCE
+ 	$(call if_changed,ld)
+ 	@$(check_for_bad_syms)
+ 
+diff --git a/arch/arm/boot/compressed/decompress.c b/arch/arm/boot/compressed/decompress.c
+index 07be5a2..0ecd8b4 100644
+--- a/arch/arm/boot/compressed/decompress.c
++++ b/arch/arm/boot/compressed/decompress.c
+@@ -44,6 +44,10 @@ extern void error(char *);
+ #include "../../../../lib/decompress_unlzma.c"
+ #endif
+ 
++#ifdef CONFIG_KERNEL_XZ
++#include "../../../../lib/decompress_unxz.c"
++#endif
++
+ int do_decompress(u8 *input, int len, u8 *output, void (*error)(char *x))
+ {
+ 	return decompress(input, len, NULL, NULL, output, NULL, error);
+diff --git a/arch/arm/boot/compressed/piggy.xzkern.S b/arch/arm/boot/compressed/piggy.xzkern.S
+new file mode 100644
+index 0000000..5703f30
+--- /dev/null
++++ b/arch/arm/boot/compressed/piggy.xzkern.S
+@@ -0,0 +1,6 @@
++	.section .piggydata,#alloc
++	.globl	input_data
++input_data:
++	.incbin	"arch/arm/boot/compressed/piggy.xzkern"
++	.globl	input_data_end
++input_data_end:
+diff --git a/lib/xz/xz_dec_stream.c b/lib/xz/xz_dec_stream.c
+index ac809b1..9a60cc2 100644
+--- a/lib/xz/xz_dec_stream.c
++++ b/lib/xz/xz_dec_stream.c
+@@ -9,6 +9,7 @@
+ 
+ #include "xz_private.h"
+ #include "xz_stream.h"
++#include <linux/kernel.h>
+ 
+ /* Hash used to validate the Index field */
+ struct xz_dec_hash {
+-- 
+1.7.1
