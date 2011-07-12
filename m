@@ -1,52 +1,34 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 12 Jul 2011 12:03:22 +0200
-Subject: [PATCH] dmaengine: add dma_ctrl_cmd to pass buffer stride
-	configuration
-In-Reply-To: <CABb+yY1HJOR+QzmM4-ju4cs+8keoyUbMv+SpVoM6BW=DCMzmQQ@mail.gmail.com>
-References: <1310310203-12288-1-git-send-email-sundaram@ti.com>
-	<CABb+yY1HJOR+QzmM4-ju4cs+8keoyUbMv+SpVoM6BW=DCMzmQQ@mail.gmail.com>
-Message-ID: <CACRpkdbLg0+_2kpi4NizFj0fDWb6QPtkcKirKgoH+83vGD0O0A@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 12 Jul 2011 11:07:04 +0100
+Subject: [RFC] Improving scalability of smp_mb__[before|after]_clear_bit
+In-Reply-To: <CAN_5kQAniGQgLix4nAsLpJZ3r=LR_NDjuvaXokJ=NiwLfp=7zw@mail.gmail.com>
+References: <CAN_5kQAniGQgLix4nAsLpJZ3r=LR_NDjuvaXokJ=NiwLfp=7zw@mail.gmail.com>
+Message-ID: <20110712100704.GC13235@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 12, 2011 at 6:17 AM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+On Tue, Jul 12, 2011 at 08:34:59AM +0100, heechul Yun wrote:
+> I think L2 cache sync operation, called by mb(), is not necessary for
+> bitops.  This patch improves lat_pagefault of lmbench by up to 11% on
+> a A9 SMP.  Higher proceesor counts can benefit more.
+> 
+> ---
+> diff --git a/arch/arm/include/asm/bitops.h b/arch/arm/include/asm/bitops.h
+> index b4892a0..f428059 100644
+> --- a/arch/arm/include/asm/bitops.h
+> +++ b/arch/arm/include/asm/bitops.h
+> @@ -26,8 +26,8 @@
+>  #include <linux/compiler.h>
+>  #include <asm/system.h>
+> 
+> -#define smp_mb__before_clear_bit()     mb()
+> -#define smp_mb__after_clear_bit()      mb()
+> +#define smp_mb__before_clear_bit()     smp_mb()
+> +#define smp_mb__after_clear_bit()      smp_mb()
+> 
+>  /*
+>   * These functions are the basis of our bit ops.
+ 
+It looks fine to me.
 
-> 1) Striding, in one form or other, is supported by other DMACs as well.
-> ? The number will only increase in future.
-> ? Are we to add ?<VENDOR>_DMA_STRIDE_CONFIG for each case ?
-
-If we are sure about this and striding will work in a similar way on all
-then let's have the enum named DMA_STRIDE_CONFIG and move the
-passed-in struct to <linux/dmaengine.h) then?
-
-Would that be:
-
-struct dma_stride_config {
-    u32 read_bytes;
-    u32 skip_bytes;
-};
-
-Or something more complex?
-
-> 2) As Dan noted, client drivers are going to have ifdef hackery in
-> order to be common
-> ?to other SoCs.
-
-Don't think so, why? This is a runtime config entirely, and I just illustrated
-in mail to Dan how that can be handled by falling back to a sglist I believe?
-
-We can *maybe* even put the fallback code into dmaengine, so that an
-emulated sglist in place for the DMAengine is done automatically of the
-DMA controller does not support striding.
-
-> 3) TI may not have just one DMAC IP used in all the SoCs. So if you want
-> ?vendor specific defines anyway, please atleast also add DMAC version to it.
-> ?Something like
->> ? ? ? ?DMA_SLAVE_CONFIG,
->> ? ? ? ?FSLDMA_EXTERNAL_START,
->> + ? ? ? TI_DMA_v1_STRIDE_CONFIG,
-
-Yep unless we make it generic DMA_STRIDE_CONFIG simply, this makes
-a lot of sense.
-
-Linus Walleij
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
