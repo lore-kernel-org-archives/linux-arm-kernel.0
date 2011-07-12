@@ -1,162 +1,85 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Tue, 12 Jul 2011 14:52:17 +0530
-Subject: [PATCH v3 1/6] arm: davinci: Fix low level gpio irq handlers'
-	argument
-In-Reply-To: <1310418191-27009-1-git-send-email-ido@wizery.com>
-References: <B85A65D85D7EB246BE421B3FB0FBB593024DA7A9DD@dbde02.ent.ti.com>
-	<1310418191-27009-1-git-send-email-ido@wizery.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024DA7AEF2@dbde02.ent.ti.com>
+From: adrian.wenl@gmail.com (Lei Wen)
+Date: Tue, 12 Jul 2011 17:40:33 +0800
+Subject: [PATCH 3/4] MTD: pxa3xx_nand: enable multiple chip select support
+In-Reply-To: <4E1B4E21.1090507@compulab.co.il>
+References: <1309319494-17951-1-git-send-email-leiwen@marvell.com>
+	<1309771536-10597-4-git-send-email-leiwen@marvell.com>
+	<4E1411BB.4010000@compulab.co.il>
+	<CACTFLAOmRMDH_6qo_WkndoWX-HPw9RTqbtsURDfw22sWEFS2wg@mail.gmail.com>
+	<4E1B3ECC.5080308@compulab.co.il>
+	<CACTFLAPMh+XMpOPPqkDTaEZppSkWxVxFMH3RALTmqOCNk8WAvw@mail.gmail.com>
+	<4E1B4E21.1090507@compulab.co.il>
+Message-ID: <CALZhoSRPYtMtsDqY5rPKfx4ux72iCDPQm=3wmTMMt2_P3zWtKA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ido,
+On Tue, Jul 12, 2011 at 3:25 AM, Igor Grinberg <grinberg@compulab.co.il> wrote:
+>
+>
+> On 07/11/11 21:53, Daniel Mack wrote:
+>
+>> On Mon, Jul 11, 2011 at 8:19 PM, Igor Grinberg <grinberg@compulab.co.il> wrote:
+>>> On 07/11/11 17:49, Daniel Mack wrote:
+>>>> Lei, any ideas, can you reproduce this? To avoid further regressions
+>>>> of this driver, you really should have a system on which you can test
+>>>> suspend and resume after each commit.
+>>> I think the problem is that on PXA3xx resume from S2/S3 involves bootloader.
+>>> If I remember correctly, the BootROM reads the bootloader from the boot device
+>>> regardless of the reset cause (S2/S3 resume is kind a reset for PXA3xx).
+>> At least not in our case. The first level bootloader is entered on
+>> resume just as it is on a POR event, with the exception that the D3S
+>> bit in the ASCR register is set in this case.
+>
+> You say "first level boot loader is entered"... who is loading it and where from?
+> Indeed, it should happen as in POR case, but again, it resides on some non-volatile
+> storage, isn't it? What storage does it reside on?
+>
+>> We unconditionally
+>> initialize the static and dynamic memory controllers and then either
+>> jump to the routine that initializes the NAND controller, read the 2nd
+>> level loader and pass control to it. Or (in the resume case) we just
+>> jump to the address stored at the RAM address 0x80000000 (which has
+>> been set to cpu_resume previously) and thus enter the kernel again. No
+>> NAND operations in the game in this case, and this has always worked
+>> fine.
+>
+> Except those to read the first stage boot loader... (if it resides on NAND).
+> Well, our case is working similarly and both the first stage bootloader (OBM)
+> and the second stage bootloader (U-Boot) reside on the NAND flash,
+> therefore BootROM has to reconfigure the NAND flash, so it can boot (resume).
+>
+>
+>>> Then the bootloader must decide what should be done according to the reset cause.
+>>> This means, that the BootROM already configures the NAND flash
+>>> (if it is the boot device) and pxa3xx_nand driver should just get on with it
+>>> and don't try to reconfigure?
+>> I think the problem is just the opposite. The driver expects the setup
+>> registers to retain their state over suspend, and doesn't write them
+>> again, and this causes operations to fail after resume.
+>
+> Well, according to Lei, the driver writes back the configuration that is stored prior
+> to suspend and that's why I agreed that it should work...
+>
+> http://www.spinics.net/lists/arm-kernel/msg131942.html
+>
+>
+Daniel,
 
-On Tue, Jul 12, 2011 at 02:33:11, Ido Yariv wrote:
-> Commit 7416401 ("arm: davinci: Fix fallout from generic irq chip
-> conversion") introduced a bug, causing low level interrupt handlers to
-> get a bogus irq number as an argument. The gpio irq handler falsely
-> assumes that the handler data is the irq base number and that is no
-> longer true.
-> 
-> Set the irq handler data to be a pointer to the corresponding gpio
-> controller. The chained irq handler can then use it to extract both the
-> irq base number and the gpio registers structure.
-> 
-> Signed-off-by: Ido Yariv <ido@wizery.com>
-> CC: Thomas Gleixner <tglx@linutronix.de>
-> ---
->  arch/arm/mach-davinci/gpio.c |   14 +++++++++++---
->  1 files changed, 11 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/mach-davinci/gpio.c b/arch/arm/mach-davinci/gpio.c
-> index e722139..7d64a07 100644
-> --- a/arch/arm/mach-davinci/gpio.c
-> +++ b/arch/arm/mach-davinci/gpio.c
-> @@ -254,8 +254,10 @@ gpio_irq_handler(unsigned irq, struct irq_desc *desc)
->  {
->  	struct davinci_gpio_regs __iomem *g;
->  	u32 mask = 0xffff;
-> +	struct davinci_gpio_controller *ctl;
+I retest with suspend&resume on my board, each time that board would
+reset the timing in the
+begining of pxa3xx_cmdfunc as expected. So this should be ok as it is
+the same behavior
+with original code.
 
-Lets call the variable "d" to be consistent with the rest of the file.
+However, it certainly has some potential risk in the suspend&resume process.
+That is in pxa3xx_nand_suspend and pxa3xx_nand_resume, it should call
+mtd->suspend and mtd->resume
+respectively.
 
->  
-> -	g = (__force struct davinci_gpio_regs __iomem *) irq_desc_get_handler_data(desc);
-> +	ctl = (struct davinci_gpio_controller *)irq_desc_get_handler_data(desc);
-> +	g = (struct davinci_gpio_regs __iomem *)ctl->regs;
->  
->  	/* we only care about one bank */
->  	if (irq & 1)
-> @@ -278,7 +280,7 @@ gpio_irq_handler(unsigned irq, struct irq_desc *desc)
->  			status >>= 16;
->  
->  		/* now demux them to the right lowlevel handler */
-> -		n = (int)irq_get_handler_data(irq);
-> +		n = ctl->irq_base;
-
-I realized that this breaks for odd banks as the status is
-right shifted by 16. The GPIO you are using must have been
-in even bank?
-
->  		while (status) {
->  			res = ffs(status);
->  			n += res;
-> @@ -424,7 +426,13 @@ static int __init davinci_gpio_irq_setup(void)
->  
->  		/* set up all irqs in this bank */
->  		irq_set_chained_handler(bank_irq, gpio_irq_handler);
-> -		irq_set_handler_data(bank_irq, (__force void *)g);
-> +
-> +		/*
-> +		 * Each chip handles 32 gpios, and each irq bank consists of 16
-> +		 * gpio irqs. Pass the irq bank's corresponding controller to
-> +		 * the chained irq handler.
-> +		 */
-> +		irq_set_handler_data(bank_irq, &chips[bank * 16 / 32]);
-
-This can simply be:
-
-		irq_set_handler_data(bank_irq, &chips[gpio / 32]);
-
-In the interest of time, I did these fixes and pushed the
-patch to "fixes" branch of git://gitorious.org/linux-davinci/linux-davinci.git
-
-Can you please test it out and let me know if it works.
-
-Updated patch also attached.
+This implement has already existed in our code release for years, but
+have get into the mainline yet.
+So I tend to merged into the third patch, and you could have test
+again whether could fix your issue.
 
 Thanks,
-Sekhar
-
-8<---------------------
-From: Ido Yariv <ido@wizery.com>
-Subject: arm: davinci: Fix low level gpio irq handlers' argument
-
-Commit 7416401 ("arm: davinci: Fix fallout from generic irq chip
-conversion") introduced a bug, causing low level interrupt handlers to
-get a bogus irq number as an argument. The gpio irq handler falsely
-assumes that the handler data is the irq base number and that is no
-longer true.
-
-Set the irq handler data to be a pointer to the corresponding gpio
-controller. The chained irq handler can then use it to extract both the
-irq base number and the gpio registers structure.
-
-Signed-off-by: Ido Yariv <ido@wizery.com>
-CC: Thomas Gleixner <tglx@linutronix.de>
-[nsekhar at ti.com: renamed "ctl" to "d", simplified indexing logic for chips and
-took care of odd bank handling in irq handler]
-Signed-off-by: Sekhar Nori <nsekhar@ti.com>
----
- arch/arm/mach-davinci/gpio.c |   21 ++++++++++++++++-----
- 1 files changed, 16 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm/mach-davinci/gpio.c b/arch/arm/mach-davinci/gpio.c
-index e722139..cafbe13 100644
---- a/arch/arm/mach-davinci/gpio.c
-+++ b/arch/arm/mach-davinci/gpio.c
-@@ -254,8 +254,10 @@ gpio_irq_handler(unsigned irq, struct irq_desc *desc)
- {
- 	struct davinci_gpio_regs __iomem *g;
- 	u32 mask = 0xffff;
-+	struct davinci_gpio_controller *d;
- 
--	g = (__force struct davinci_gpio_regs __iomem *) irq_desc_get_handler_data(desc);
-+	d = (struct davinci_gpio_controller *)irq_desc_get_handler_data(desc);
-+	g = (struct davinci_gpio_regs __iomem *)d->regs;
- 
- 	/* we only care about one bank */
- 	if (irq & 1)
-@@ -274,11 +276,14 @@ gpio_irq_handler(unsigned irq, struct irq_desc *desc)
- 		if (!status)
- 			break;
- 		__raw_writel(status, &g->intstat);
--		if (irq & 1)
--			status >>= 16;
- 
- 		/* now demux them to the right lowlevel handler */
--		n = (int)irq_get_handler_data(irq);
-+		n = d->irq_base;
-+		if (irq & 1) {
-+			n += 16;
-+			status >>= 16;
-+		}
-+
- 		while (status) {
- 			res = ffs(status);
- 			n += res;
-@@ -424,7 +429,13 @@ static int __init davinci_gpio_irq_setup(void)
- 
- 		/* set up all irqs in this bank */
- 		irq_set_chained_handler(bank_irq, gpio_irq_handler);
--		irq_set_handler_data(bank_irq, (__force void *)g);
-+
-+		/*
-+		 * Each chip handles 32 gpios, and each irq bank consists of 16
-+		 * gpio irqs. Pass the irq bank's corresponding controller to
-+		 * the chained irq handler.
-+		 */
-+		irq_set_handler_data(bank_irq, &chips[gpio / 32]);
- 
- 		for (i = 0; i < 16 && gpio < ngpio; i++, irq++, gpio++) {
- 			irq_set_chip(irq, &gpio_irqchip);
+Lei
