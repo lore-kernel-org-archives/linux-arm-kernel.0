@@ -1,33 +1,82 @@
-From: gregkh@suse.de (Greg KH)
-Date: Tue, 12 Jul 2011 18:08:57 +0200
-Subject: [PATCH 1/3] Framework for exporting System-on-Chip information
-	via sysfs
-In-Reply-To: <20110712141339.GB24957@sapphire.tkos.co.il>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Tue, 12 Jul 2011 09:29:04 -0700
+Subject: [PATCH 2/3] mach-ux500: export System-on-Chip information via
+	sysfs
+In-Reply-To: <1310476090-9807-2-git-send-email-lee.jones@linaro.org>
 References: <1310476090-9807-1-git-send-email-lee.jones@linaro.org>
-	<20110712141339.GB24957@sapphire.tkos.co.il>
-Message-ID: <20110712160857.GA7059@suse.de>
+	<1310476090-9807-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <4E1C7650.6010700@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 12, 2011 at 05:13:39PM +0300, Baruch Siach wrote:
-> Hi Lee,
-> 
-> On Tue, Jul 12, 2011 at 02:08:08PM +0100, Lee Jones wrote:
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > ---
-> >  drivers/base/Kconfig    |   10 +++++
-> >  drivers/base/Makefile   |    1 +
-> >  drivers/base/soc.c      |   98 +++++++++++++++++++++++++++++++++++++++++++++++
-> >  include/linux/sys_soc.h |   45 +++++++++++++++++++++
-> >  4 files changed, 154 insertions(+), 0 deletions(-)
-> >  create mode 100644 drivers/base/soc.c
-> >  create mode 100644 include/linux/sys_soc.h
-> 
-> I guess you should Cc Greg Kroah-Hartman <gregkh@suse.de> on this series.
+On 07/12/2011 06:08 AM, Lee Jones wrote:
+> Signed-off-by: Lee Jones<lee.jones@linaro.org>
+> ---
+>   arch/arm/mach-ux500/Kconfig |    1 +
+>   arch/arm/mach-ux500/id.c    |  115 +++++++++++++++++++++++++++++++++++++++++++
+>   2 files changed, 116 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mach-ux500/Kconfig b/arch/arm/mach-ux500/Kconfig
+> index 4210cb4..4d2f2c2 100644
 
-Only if the submitter wants it applied, obviously, they don't :)
+<snip>
 
-Why do we have things like the MAINTAINERS file and
-scripts/get_maintainer.pl if no one uses them...
+> +
+> +struct soc_callback_functions soc_callbacks = {
+> +	.get_machine_fn  = ux500_get_machine,
+> +	.get_family_fn   = ux500_get_family,
+> +	.get_soc_id_fn   = ux500_get_soc_id,
+> +	.get_revision_fn = ux500_get_revision,
+> +};
+> +
+> +struct device_attribute ux500_soc_attrs[] = {
+> +	__ATTR(process,  S_IRUGO, ux500_get_process,  NULL),
+> +	__ATTR_NULL,
+> +};
+> +
+> +static int __init ux500_soc_sysfs_init(void)
+> +{
+> +	int ret;
+> +	int i = 0;
+> +	ret = soc_device_register(&soc_parent,
+> +				&soc_callbacks);
+> +	if (ret>= 0) {
+> +		while (ux500_soc_attrs[i].attr.name != NULL) {
+> +			ret = device_create_file(&soc_parent,
+> +						&ux500_soc_attrs[i++]);
+> +			if (ret)
+> +				goto out;
+> +		}
+> +	}
 
-greg k-h
+Can you please make this code as part of soc_device_register? Otherwise, 
+every SoC that wants to add its own set of attributes will have to 
+repeat this code.
+
+> + out:
+> +	return ret;
+> +}
+> +module_init(ux500_soc_sysfs_init);
+> +
+> +static void __exit ux500_soc_sysfs_exit(void)
+> +{
+> +	int i = 0;
+> +
+> +	while (ux500_soc_attrs[i].attr.name != NULL)
+> +		device_remove_file(&soc_parent,&ux500_soc_attrs[i++]);
+
+That would also pull this in and make sure the ordering is always correct.
+
+> +
+> +	soc_device_unregister(&soc_parent);
+> +}
+> +module_exit(ux500_soc_sysfs_exit);
+> +
+> +#endif
+
+Thanks,
+Saravana
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
