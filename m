@@ -1,34 +1,28 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Tue, 12 Jul 2011 22:42:13 +0200
-Subject: [PATCH 0/4] OMAP: PM: omap_device: update PM domain support for
-	v3.1
-In-Reply-To: <1310426969-30306-1-git-send-email-khilman@ti.com>
-References: <1310426969-30306-1-git-send-email-khilman@ti.com>
-Message-ID: <201107122242.13837.rjw@sisk.pl>
+From: ynezz@true.cz (Petr =?iso-8859-2?Q?=A9tetiar?=)
+Date: Tue, 12 Jul 2011 22:48:14 +0200
+Subject: [PATCH 01/52] ARM: introduce atag_offset to replace boot_params
+In-Reply-To: <ADE657CA350FB648AAC2C43247A983F001F383D6D6F7@AUSP01VMBX24.collaborationhost.net>
+References: <1309920457-21913-1-git-send-email-nicolas.pitre@linaro.org>
+	<20110708203634.GU4812@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1107081714251.14596@xanadu.home>
+	<alpine.LFD.2.00.1107111046350.14596@xanadu.home>
+	<ADE657CA350FB648AAC2C43247A983F001F383D6D6F7@AUSP01VMBX24.collaborationhost.net>
+Message-ID: <20110712204814.GD15997@ibawizard.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+H Hartley Sweeten <hartleys@visionengravers.com> [2011-07-11 12:17:25]:
 
-On Tuesday, July 12, 2011, Kevin Hilman wrote:
-> For v3.1, the PM core has some changes that impact various assumptions
-> made (by me) during the design and implementation of the PM domain
-> support in the omap_device layer.
-> 
-> This series is needed to update our PM domain layer to behave properly
-> under the new rules of the PM core code which are planned to be merged
-> for v3.1 (see recent linux-pm discussions for the gory details.)
-> 
-> This series is based on the pm-domains branch of Rafael Wysocki's
-> suspend-2.6 tree, and also depends on the patch which adds
-> pm_runtime_status_suspended() helper function[1].
-> 
-> Rafael, because of the dependencies on your pm-domains branch (due to
-> the pwr_domain -> pm_domain rename), it might be easiest to merge
-> these via your tree.   Let me know if that's OK with you.
+> Unfortunately, all the ep93xx boards I have are designed with the sdram using
+> nSDCS0 so I can't test the other boot configurations.
 
-Yes, it is.  I'm going to apply them to my pm-runtime branch that is based
-on pm-domains.
+I've tested that actual patchset from nico/redux git branch[1,2] on
+ts-7250/32M and ts-7300/128M (both nSDCS3) and it boots, so you can add my
+tested-by if you like:
 
-Thanks,
-Rafael
+Tested-by: Petr ?tetiar <ynezz@true.cz>
+
+1. git://git.linaro.org/people/nico/linux.git redux
+2. git hash bc869e434e411ee7f3fcfed7594ee64b1d56b3c9
+
+-- ynezz
