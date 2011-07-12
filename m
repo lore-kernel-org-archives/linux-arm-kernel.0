@@ -1,143 +1,70 @@
-From: james_p_freyensee@linux.intel.com (J Freyensee)
-Date: Mon, 11 Jul 2011 17:22:39 -0700
-Subject: [PATCH v6] mmc: documentation of mmc non-blocking request usage
-	and design.
-In-Reply-To: <1310325719-2151-1-git-send-email-per.forlin@linaro.org>
-References: <1310325719-2151-1-git-send-email-per.forlin@linaro.org>
-Message-ID: <4E1B93CF.60700@linux.intel.com>
+From: bryan.wu@canonical.com (Bryan Wu)
+Date: Tue, 12 Jul 2011 08:31:28 +0800
+Subject: [PATCH 16/17] mach-sa1100: retire custom LED code
+In-Reply-To: <201107112352.40424.arnd@arndb.de>
+References: <1309955687-19365-1-git-send-email-bryan.wu@canonical.com>
+	<CAK5ve-+Pr8EDa8mfhZVbf8ADc2YDU0EyTPL3Fwwipj237tgKQg@mail.gmail.com>
+	<20110711210950.GE8486@n2100.arm.linux.org.uk>
+	<201107112352.40424.arnd@arndb.de>
+Message-ID: <CAK5ve-LNDCN0P6L_5-L4PT11n1Tiv0qz=8=rgmv-v7WsEDotBQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/10/2011 12:21 PM, Per Forlin wrote:
-> Documentation about the background and the design of mmc non-blocking.
-> Host driver guidelines to minimize request preparation overhead.
+On Tue, Jul 12, 2011 at 5:52 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Monday 11 July 2011, Russell King - ARM Linux wrote:
+>> On Mon, Jul 11, 2011 at 10:36:49PM +0800, Bryan Wu wrote:
+>> > Right, I got it. So if we are going to run a single binary for all the
+>> > sa1100 machines, how about we check the machine in each fs_initcall
+>> >
+>> > static int __init assabet_leds_init(void)
+>> > {
+>> > ? ? ?int i;
+>> >
+>> > ? ? ?if (!machine_is_assabet())
+>> > ? ? ? ? ? return -ENODEV,
+>> >
+>> > ? ? ?for (i = 0; i < ARRAY_SIZE(assabet_leds); i++) {
+>> > ? ? ? ? ? ? ?struct assabet_led *led;
+>>
+>> Yes, that'll do, thanks.
+>>
 >
-> Signed-off-by: Per Forlin<per.forlin@linaro.org>
-> Acked-by: Randy Dunlap<rdunlap@xenotime.net>
-> ---
-> ChangeLog:
->   v2: - Minor updates after proofreading comments from Chris
->   v3: - Minor updates after more comments from Chris
->   v4: - Minor updates after comments from Randy
->   v5: - Fixed one more comment and Acked-by from Randy
->   v6: - Write out full function names and use () for all functions,
->         feedback from James.
+> Do you think it's worth copying the logic from powerpc for this?
 >
->   Documentation/mmc/00-INDEX          |    2 +
->   Documentation/mmc/mmc-async-req.txt |   88 +++++++++++++++++++++++++++++++++++
->   2 files changed, 90 insertions(+), 0 deletions(-)
->   create mode 100644 Documentation/mmc/mmc-async-req.txt
 >
-> diff --git a/Documentation/mmc/00-INDEX b/Documentation/mmc/00-INDEX
-> index 93dd7a7..a9ba672 100644
-> --- a/Documentation/mmc/00-INDEX
-> +++ b/Documentation/mmc/00-INDEX
-> @@ -4,3 +4,5 @@ mmc-dev-attrs.txt
->           - info on SD and MMC device attributes
->   mmc-dev-parts.txt
->           - info on SD and MMC device partitions
-> +mmc-async-req.txt
-> +        - info on mmc asynchronous requests
-> diff --git a/Documentation/mmc/mmc-async-req.txt b/Documentation/mmc/mmc-async-req.txt
-> new file mode 100644
-> index 0000000..aac5634
-> --- /dev/null
-> +++ b/Documentation/mmc/mmc-async-req.txt
-> @@ -0,0 +1,88 @@
-> +Rationale
-> +=========
-> +
-> +How significant is the cache maintenance overhead?
-> +It depends. Fast eMMC and multiple cache levels with speculative cache
-> +pre-fetch makes the cache overhead relatively significant. If the DMA
-> +preparations for the next request are done in parallel with the current
-> +transfer, the DMA preparation overhead would not affect the MMC performance.
-> +The intention of non-blocking (asynchronous) MMC requests is to minimize the
-> +time between when an MMC request ends and another MMC request begins.
-> +Using mmc_wait_for_req(), the MMC controller is idle while dma_map_sg and
-> +dma_unmap_sg are processing. Using non-blocking MMC requests makes it
-> +possible to prepare the caches for next job in parallel with an active
-> +MMC request.
-> +
-> +MMC block driver
-> +================
-> +
-> +The mmc_blk_issue_rw_rq() in the MMC block driver is made non-blocking.
-> +The increase in throughput is proportional to the time it takes to
-> +prepare (major part of preparations are dma_map_sg() and dma_unmap_sg())
-> +a request and how fast the memory is. The faster the MMC/SD is
-> +the more significant the prepare request time becomes. Roughly the expected
-> +performance gain is 5% for large writes and 10% on large reads on a L2 cache
-> +platform. In power save mode, when clocks run on a lower frequency, the DMA
-> +preparation may cost even more. As long as these slower preparations are run
-> +in parallel with the transfer performance won't be affected.
-> +
-> +Details on measurements from IOZone and mmc_test
-> +================================================
-> +
-> +https://wiki.linaro.org/WorkingGroups/Kernel/Specs/StoragePerfMMC-async-req
-> +
-> +MMC core API extension
-> +======================
-> +
-> +There is one new public function mmc_start_req().
-> +It starts a new MMC command request for a host. The function isn't
-> +truly non-blocking. If there is on ongoing async request it waits
-> +for completion of that request and starts the new one and returns. It
-> +doesn't wait for the new request to complete. If there is no ongoing
-> +request it starts the new request and returns immediately.
-> +
-> +MMC host extensions
-> +===================
-> +
-> +There are two optional members in the
-> +mmc_host_ops -- pre_req() and post_req() -- that the host
-> +driver may implement in order to move work to before and after the actual
-> +mmc_host_ops.request() function is called. In the DMA case pre_req() may do
-> +dma_map_sg() and prepare the DMA descriptor, and post_req() runs
-> +the dma_unmap_sg().
-> +
+> arch/powerpc/include/asm/machdep.h:
+> #define __define_machine_initcall(mach,level,fn,id) \
+> ? ? ? ?static int __init __machine_initcall_##mach##_##fn(void) { \
+> ? ? ? ? ? ? ? ?if (machine_is(mach)) return fn(); \
+> ? ? ? ? ? ? ? ?return 0; \
+> ? ? ? ?} \
+> ? ? ? ?__define_initcall(level,__machine_initcall_##mach##_##fn,id);
+> #define machine_core_initcall(mach,fn) ? ? ? ? ?__define_machine_initcall(mach,"1",fn,1)
+> #define machine_core_initcall_sync(mach,fn) ? ? __define_machine_initcall(mach,"1s",fn,1s)
+> #define machine_postcore_initcall(mach,fn) ? ? ?__define_machine_initcall(mach,"2",fn,2)
+> #define machine_postcore_initcall_sync(mach,fn) __define_machine_initcall(mach,"2s",fn,2s)
+> #define machine_arch_initcall(mach,fn) ? ? ? ? ?__define_machine_initcall(mach,"3",fn,3)
+> #define machine_arch_initcall_sync(mach,fn) ? ? __define_machine_initcall(mach,"3s",fn,3s)
+> #define machine_subsys_initcall(mach,fn) ? ? ? ?__define_machine_initcall(mach,"4",fn,4)
+> #define machine_subsys_initcall_sync(mach,fn) ? __define_machine_initcall(mach,"4s",fn,4s)
+> #define machine_fs_initcall(mach,fn) ? ? ? ? ? ?__define_machine_initcall(mach,"5",fn,5)
+> #define machine_fs_initcall_sync(mach,fn) ? ? ? __define_machine_initcall(mach,"5s",fn,5s)
+> #define machine_rootfs_initcall(mach,fn) ? ? ? ?__define_machine_initcall(mach,"rootfs",fn,rootfs)
+> #define machine_device_initcall(mach,fn) ? ? ? ?__define_machine_initcall(mach,"6",fn,6)
+> #define machine_device_initcall_sync(mach,fn) ? __define_machine_initcall(mach,"6s",fn,6s)
+> #define machine_late_initcall(mach,fn) ? ? ? ? ?__define_machine_initcall(mach,"7",fn,7)
+> #define machine_late_initcall_sync(mach,fn) ? ? __define_machine_initcall(mach,"7s",fn,7s)
+>
+> I don't really like the magic macros, but my feeling is that it's easier
+> to do the conversion without introducing subtle bugs this way.
+>
 
-One question: Is the 'Optimize for the first request' below an example 
-of how to use the 'MMC host extensions' above?  So just using 
-'mmc_start_req()' in an MMC client driver would not be beneficial if the 
-MMC host was not also using the MMC host extensions, right?
+I think this is a great idea. what about moving it to include/asm-generic/
 
 Thanks,
-Jay
-
-> +Optimize for the first request
-> +==============================
-> +
-> +The first request in a series of requests can't be prepared in parallel with
-> +the previous transfer, since there is no previous request.
-> +The argument is_first_req in pre_req() indicates that there is no previous
-> +request. The host driver may optimize for this scenario to minimize
-> +the performance loss. A way to optimize for this is to split the current
-> +request in two chunks, prepare the first chunk and start the request,
-> +and finally prepare the second chunk and start the transfer.
-> +
-> +Pseudocode to handle is_first_req scenario with minimal prepare overhead:
-> +
-> +if (is_first_req&&  req->size>  threshold)
-> +   /* start MMC transfer for the complete transfer size */
-> +   mmc_start_command(MMC_CMD_TRANSFER_FULL_SIZE);
-> +
-> +   /*
-> +    * Begin to prepare DMA while cmd is being processed by MMC.
-> +    * The first chunk of the request should take the same time
-> +    * to prepare as the "MMC process command time".
-> +    * If prepare time exceeds MMC cmd time
-> +    * the transfer is delayed, guesstimate max 4k as first chunk size.
-> +    */
-> +    prepare_1st_chunk_for_dma(req);
-> +    /* flush pending desc to the DMAC (dmaengine.h) */
-> +    dma_issue_pending(req->dma_desc);
-> +
-> +    prepare_2nd_chunk_for_dma(req);
-> +    /*
-> +     * The second issue_pending should be called before MMC runs out
-> +     * of the first chunk. If the MMC runs out of the first data chunk
-> +     * before this call, the transfer is delayed.
-> +     */
-> +    dma_issue_pending(req->dma_desc);
+-- 
+Bryan Wu <bryan.wu@canonical.com>
+Kernel Developer ? ?+86.138-1617-6545 Mobile
+Ubuntu Kernel Team
+Canonical Ltd. ? ? ?www.canonical.com
+Ubuntu - Linux for human beings | www.ubuntu.com
