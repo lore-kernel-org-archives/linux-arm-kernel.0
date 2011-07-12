@@ -1,25 +1,40 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 12 Jul 2011 06:07:55 +0000
-Subject: [PATCH] OMAP3: run the ASM sleep code from DDR
-In-Reply-To: <1309365623-14704-1-git-send-email-j-pihet@ti.com>
-References: <1309365623-14704-1-git-send-email-j-pihet@ti.com>
-Message-ID: <20110712060755.GA18622@localhost.ucw.cz>
+From: tushar.behera@linaro.org (Tushar Behera)
+Date: Tue, 12 Jul 2011 11:54:37 +0530
+Subject: [PATCH] ARM:SAMSUNG: DMA Cleanup as per sparse [re-submit]
+In-Reply-To: <1310401398-21104-1-git-send-email-sangwook.lee@linaro.org>
+References: <1310401398-21104-1-git-send-email-sangwook.lee@linaro.org>
+Message-ID: <4E1BE8A5.1010304@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 2011-06-29 18:40:23, jean.pihet at newoldbits.com wrote:
-> From: Jean Pihet <j-pihet@ti.com>
-> 
-> Most of the ASM sleep code (in arch/arm/mach-omap2/sleep34xx.S)
-> is copied to internal SRAM at boot and after wake-up from CORE OFF mode.
-> However only a small part of the code really needs to run from internal SRAM.
-> 
-> This fix lets most of the ASM idle code run from the DDR
-> in order to minimize the SRAM usage and the overhead in the code copy.
+On Monday 11 July 2011 09:53 PM, Sangwook Lee wrote:
+> Function declaration differs between file: dma.c and file:dma.h
+> and SPARSE (Documentation/sparse.txt) gives error messages
+>
+> All dma channels are members of 'enum dma_ch' and not 'unsigned int'
+> Please have a look at channel definitions in:
+> arch/arm/mach-s3c64xx/include/mach/dma.h
+> arch/arm/plat-samsung/include/plat/s3c-dma-pl330.h
+> arch/arm/mach-s3c2410/include/mach/dma.h
+> So all arguments should be of type 'enum dma_ch'
+>
+> Signed-off-by: Sangwook Lee<sangwook.lee@linaro.org>
+> ---
+>   arch/arm/mach-s3c64xx/dma.c              |   14 +++++++-------
+>   arch/arm/plat-s3c24xx/dma.c              |   12 ++++++------
+>   arch/arm/plat-samsung/dma.c              |    6 +++---
+>   arch/arm/plat-samsung/include/plat/dma.h |   21 +++++++++++----------
+>   4 files changed, 27 insertions(+), 26 deletions(-)
+>
 
-So... what do you plan to use sram for? Because I don't think the
-speedup is worth the complexity...
+Compilation is ok for following default configs.
+
+s3c2410_defconfig
+s3c6400_defconfig
+s5p64x0_defconfig
+s5pc100_defconfig
+s5pv210_defconfig
+exynos4_defconfig
 
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Tushar Behera
