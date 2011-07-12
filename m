@@ -1,77 +1,31 @@
-From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Tue, 12 Jul 2011 09:31:15 -0700
-Subject: [PATCH 4/6] ARM: i.MX53: clean up iomux-mx53.h
-In-Reply-To: <20110712133758.GS6069@pengutronix.de>
-References: <1310428928-2637-1-git-send-email-troy.kisky@boundarydevices.com>	<1310428928-2637-4-git-send-email-troy.kisky@boundarydevices.com>
-	<20110712133758.GS6069@pengutronix.de>
-Message-ID: <4E1C76D3.8070006@boundarydevices.com>
+From: shubhrajyoti@ti.com (Shubhrajyoti D)
+Date: Tue, 12 Jul 2011 22:02:09 +0530
+Subject: [PATCH] OMAP4: 4430SDP: Keypad: Make keypad_data initdata
+Message-ID: <1310488329-16139-1-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/12/2011 6:37 AM, Sascha Hauer wrote:
-> On Mon, Jul 11, 2011 at 05:02:06PM -0700, Troy Kisky wrote:
->> Delete about 1,000 symbols used only once
->>
->> I used the following script to clean up the file.
->> cp iomux-mx53.h iomux-mx53.h.cpy
->>
->> grep "define _MX5" iomux-mx53.h.cpy | \
->> sed -e 's/#define[ \x09]\+\(_MX5[0-9a-zA-Z_]*\)[ \x09]\+\(.\+\)/s@\1@\2 at g/' >t.tmp
->>
->> grep -v "define _MX5" iomux-mx53.h.cpy | \
->> sed -f t.tmp | \
->> sed -e 's/,[ \x09]*\([^,]\+\)/, \1/g' \
->> -e 's/, 0)[ \x09]*|[ \x09]*MUX_PAD_CTRL(/, /' \
->> -e 's/(IOMUX_PAD(\(.*\)))/IOMUX_PAD(\1)/' \
->> -e 's/0x\([0-9a-fA-F]\{2\}\)[ \x09]*,/0x0\1,/' \
->> -e 's/NON_PAD_I/__NA_/' \
->> -e 's/0x0,/__NA_,/' \
->> -e 's/#define[ \x09]\+\(MX5[0-9a-zA-Z_]*\)[ \x09]\+\(IOMUX_PAD.\+\)/#define \1\x09\2/' \
->> -e 's/\(#define MX5[^\x09]\{5,12\}\)\x09\(IOMUX_PAD.\+\)/\1\x09\x09\x09\x09\x09\2/' \
->> -e 's/\(#define MX5[^\x09]\{13,20\}\)\x09\(IOMUX_PAD.\+\)/\1\x09\x09\x09\x09\2/' \
->> -e 's/\(#define MX5[^\x09]\{21,28\}\)\x09\(IOMUX_PAD.\+\)/\1\x09\x09\x09\2/' \
->> -e 's/\(#define MX5[^\x09]\{29,36\}\)\x09\(IOMUX_PAD.\+\)/\1\x09\x09\2/' \
->> -e 's/\(#define MX5[^\x09]\{45,\}\)\x09\(IOMUX_PAD.\+\)/\1\x09\\\n\x09\x09\x09\x09\x09\x09\x09\2/' \
->> -e 's/, IOMUX_CONFIG_SION,/, 0 | IOMUX_CONFIG_SION,/' >iomux-mx53.h
->>
->> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
->> ---
->>  arch/arm/plat-mxc/include/mach/iomux-mx53.h | 3527 +++++++++------------------
->>  1 files changed, 1184 insertions(+), 2343 deletions(-)
->>
->> diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx53.h b/arch/arm/plat-mxc/include/mach/iomux-mx53.h
->> index 235d7ea..04dbbb6 100644
->> --- a/arch/arm/plat-mxc/include/mach/iomux-mx53.h
->> +++ b/arch/arm/plat-mxc/include/mach/iomux-mx53.h
->> @@ -23,7 +23,7 @@
->>  
->>  /* These 2 defines are for pins that may not have a mux register, but could
->>   * have a pad setting register, and vice-versa. */
->> -#define NON_PAD_I	0x00
->> +#define __NA_	0x00
->>  
->>  #define MX53_UART_PAD_CTRL		(PAD_CTL_PKE | PAD_CTL_PUE |	\
->>  		PAD_CTL_DSE_HIGH | PAD_CTL_SRE_FAST | PAD_CTL_HYS)
->> @@ -31,2348 +31,1189 @@
->>  				PAD_CTL_PUS_47K_UP | PAD_CTL_DSE_HIGH | \
->>  				PAD_CTL_SRE_FAST)
->>  
->> -#define _MX53_PAD_GPIO_19__KPP_COL_5		IOMUX_PAD(0x348, 0x20, 0, 0x840, 0, 0)
-> 
-> The underscore versions are for the case when somebody wants a
-> nonstandard pad control setting and shouldn't be removed.
-> 
-> Sascha
-> 
+The keypad data is accessed only at init so making it initdata.
+This removes the section mismatch warning.
 
-I handled that case.
+Reported-by: Kevin Hilman <khilman@ti.com>
+Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+---
+ arch/arm/mach-omap2/board-4430sdp.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-
-+#define NEW_PAD_CTRL(cfg, pad)	((cfg & ~MUX_PAD_CTRL_MASK) |
-MUX_PAD_CTRL(pad))
-
-
-
-Look at patch 4/6
-
-Troy
+diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
+index 47e6ab9..2b28c7e 100644
+--- a/arch/arm/mach-omap2/board-4430sdp.c
++++ b/arch/arm/mach-omap2/board-4430sdp.c
+@@ -195,7 +195,7 @@ static struct omap4_keypad_platform_data sdp4430_keypad_data = {
+ 	.cols			= 8,
+ };
+ 
+-static struct omap_board_data keypad_data = {
++static struct omap_board_data keypad_data __initdata = {
+ 	.id	    = 1,
+ 	.pads	 = keypad_pads,
+ 	.pads_cnt       = ARRAY_SIZE(keypad_pads),
+-- 
+1.7.1
