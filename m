@@ -1,85 +1,88 @@
-From: adrian.wenl@gmail.com (Lei Wen)
-Date: Tue, 12 Jul 2011 17:40:33 +0800
-Subject: [PATCH 3/4] MTD: pxa3xx_nand: enable multiple chip select support
-In-Reply-To: <4E1B4E21.1090507@compulab.co.il>
-References: <1309319494-17951-1-git-send-email-leiwen@marvell.com>
-	<1309771536-10597-4-git-send-email-leiwen@marvell.com>
-	<4E1411BB.4010000@compulab.co.il>
-	<CACTFLAOmRMDH_6qo_WkndoWX-HPw9RTqbtsURDfw22sWEFS2wg@mail.gmail.com>
-	<4E1B3ECC.5080308@compulab.co.il>
-	<CACTFLAPMh+XMpOPPqkDTaEZppSkWxVxFMH3RALTmqOCNk8WAvw@mail.gmail.com>
-	<4E1B4E21.1090507@compulab.co.il>
-Message-ID: <CALZhoSRPYtMtsDqY5rPKfx4ux72iCDPQm=3wmTMMt2_P3zWtKA@mail.gmail.com>
+From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
+Date: Tue, 12 Jul 2011 11:53:26 +0200
+Subject: [RESEND] [PATCH 1/2] OMAP1: allow reserving memory for camera
+In-Reply-To: <20110608221330.GA13246@n2100.arm.linux.org.uk>
+References: <201012051929.07220.jkrzyszt@tis.icnet.pl>
+	<201106082354.10985.jkrzyszt@tis.icnet.pl>
+	<20110608221330.GA13246@n2100.arm.linux.org.uk>
+Message-ID: <201107121153.27115.jkrzyszt@tis.icnet.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 12, 2011 at 3:25 AM, Igor Grinberg <grinberg@compulab.co.il> wrote:
->
->
-> On 07/11/11 21:53, Daniel Mack wrote:
->
->> On Mon, Jul 11, 2011 at 8:19 PM, Igor Grinberg <grinberg@compulab.co.il> wrote:
->>> On 07/11/11 17:49, Daniel Mack wrote:
->>>> Lei, any ideas, can you reproduce this? To avoid further regressions
->>>> of this driver, you really should have a system on which you can test
->>>> suspend and resume after each commit.
->>> I think the problem is that on PXA3xx resume from S2/S3 involves bootloader.
->>> If I remember correctly, the BootROM reads the bootloader from the boot device
->>> regardless of the reset cause (S2/S3 resume is kind a reset for PXA3xx).
->> At least not in our case. The first level bootloader is entered on
->> resume just as it is on a POR event, with the exception that the D3S
->> bit in the ASCR register is set in this case.
->
-> You say "first level boot loader is entered"... who is loading it and where from?
-> Indeed, it should happen as in POR case, but again, it resides on some non-volatile
-> storage, isn't it? What storage does it reside on?
->
->> We unconditionally
->> initialize the static and dynamic memory controllers and then either
->> jump to the routine that initializes the NAND controller, read the 2nd
->> level loader and pass control to it. Or (in the resume case) we just
->> jump to the address stored at the RAM address 0x80000000 (which has
->> been set to cpu_resume previously) and thus enter the kernel again. No
->> NAND operations in the game in this case, and this has always worked
->> fine.
->
-> Except those to read the first stage boot loader... (if it resides on NAND).
-> Well, our case is working similarly and both the first stage bootloader (OBM)
-> and the second stage bootloader (U-Boot) reside on the NAND flash,
-> therefore BootROM has to reconfigure the NAND flash, so it can boot (resume).
->
->
->>> Then the bootloader must decide what should be done according to the reset cause.
->>> This means, that the BootROM already configures the NAND flash
->>> (if it is the boot device) and pxa3xx_nand driver should just get on with it
->>> and don't try to reconfigure?
->> I think the problem is just the opposite. The driver expects the setup
->> registers to retain their state over suspend, and doesn't write them
->> again, and this causes operations to fail after resume.
->
-> Well, according to Lei, the driver writes back the configuration that is stored prior
-> to suspend and that's why I agreed that it should work...
->
-> http://www.spinics.net/lists/arm-kernel/msg131942.html
->
->
-Daniel,
+On Thu, 9 Jun 2011 at 00:13:30 Russell King - ARM Linux wrote:
+> On Wed, Jun 08, 2011 at 11:53:49PM +0200, Janusz Krzysztofik wrote:
+> > On Fri 10 Dec 2010 at 22:03:52 Janusz Krzysztofik wrote:
+> > > Friday 10 December 2010 18:03:56 Russell King - ARM Linux napisa?(a):
+> > > > On Fri, Dec 10, 2010 at 12:03:07PM +0100, Janusz Krzysztofik wrote:
+> > > > >  void __init omap1_camera_init(void *info)
+> > > > >  {
+> > > > >  
+> > > > >  	struct platform_device *dev = &omap1_camera_device;
+> > > > > 
+> > > > > +	dma_addr_t paddr = omap1_camera_phys_mempool_base;
+> > > > > +	dma_addr_t size = omap1_camera_phys_mempool_size;
+> > > > > 
+> > > > >  	int ret;
+> > > > >  	
+> > > > >  	dev->dev.platform_data = info;
+> > > > > 
+> > > > > +	if (paddr) {
+> > > > > +		if (dma_declare_coherent_memory(&dev->dev, paddr, paddr, size,
+> > > > > +				DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE))
+> > > > 
+> > > > Although this works, you're ending up with SDRAM being mapped
+> > > > via ioremap, which uses MT_DEVICE - so what is SDRAM ends up
+> > > > being mapped as if it were a device.
+> > > > 
+> > > > For OMAP1, which is ARMv5 or lower, device memory becomes
+> > > > 'uncacheable, unbufferable' which is luckily what is used for
+> > > > the DMA coherent memory on those platforms - so no technical
+> > > > problem here.
+> > > > 
+> > > > However, on ARMv6 and later, ioremapped memory is device
+> > > > memory, which has different ordering wrt normal memory
+> > > > mappings, and may appear on different busses on the CPU's
+> > > > interface.  So, this is something I don't encourage as it's
+> > > > unclear that the hardware will work.
+> > > > 
+> > > > Essentially, dma_declare_coherent_memory() on ARM with main
+> > > > SDRAM should be viewed as a 'it might work, it might not, and
+> > > > it might stop working in the future' kind of interface.  In
+> > > > other words, there is no guarantee that this kind of thing
+> > > > will be supported in the future.
+> > 
+> > Russell, Tony,
+> > 
+> > Sorry for getting back to this old thread, but since my previous
+> > attempts to provide[1] or support[2] a possibly better solution to
+> > the problem all failed on one hand, and I can see patches not very
+> > different from mine[3] being accepted for arch/arm/mach-{mx3,imx}
+> > during this and previous merge windows[4][5][6] on the other, is
+> > there any chance for the 'dma_declare_coherent_memory() over a
+> > memblock_alloc()->free()->remove() obtained area' based solution
+> > being accepted for omap1_camera as well if I resend it refreshed?
+> 
+> I stand by my answer to your patches quoted above from a technical
+> point of view; we should not be mapping SDRAM using device mappings.
 
-I retest with suspend&resume on my board, each time that board would
-reset the timing in the
-begining of pxa3xx_cmdfunc as expected. So this should be ok as it is
-the same behavior
-with original code.
+Russell,
+Would it change anything here if we define ARCH_HAS_HOLES_MEMORYMODEL, 
+as suggested by Marek Szyprowski recently[*], when configuring for 
+ARCH_OMAP1 with VIDEO_OMAP1 (camera) selected?
 
-However, it certainly has some potential risk in the suspend&resume process.
-That is in pxa3xx_nand_suspend and pxa3xx_nand_resume, it should call
-mtd->suspend and mtd->resume
-respectively.
+[*] http://lists.infradead.org/pipermail/linux-arm-kernel/2011-July/057447.html
 
-This implement has already existed in our code release for years, but
-have get into the mainline yet.
-So I tend to merged into the third patch, and you could have test
-again whether could fix your issue.
+> Certainly the memblock_alloc()+free()+remove() is the right way to
+> reserve the memory, but as it stands dma_declare_coherent_memory()
+> should not be used on ARMv6 or higher CPUs to pass that memory to the
+> device driver.
+
+Tony,
+With full respect to all Russell's reservations about incorrectness of 
+ioremapping SDRAM in general, would you be willing to accept this 
+solution in the OMAP1 camera case, taking into account that, quoting 
+Russell, "there is no technical problem here", and similiar solutions 
+had been accepted recently with other ARM platforms?
 
 Thanks,
-Lei
+Janusz
