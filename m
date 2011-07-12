@@ -1,52 +1,51 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Tue, 12 Jul 2011 15:38:56 +0200
-Subject: [PATCH v2 0/6] ARM: make mach/hardware.h optional
-In-Reply-To: <201107121502.41570.arnd@arndb.de>
-References: <1309366019-24379-1-git-send-email-robherring2@gmail.com>
-	<201107021124.46953.arnd@arndb.de> <4E1B176E.3030503@gmail.com>
-	<201107121502.41570.arnd@arndb.de>
-Message-ID: <4E1C4E70.8030302@monstr.eu>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 12 Jul 2011 15:39:31 +0200
+Subject: [PATCH 6/8] drivers: add Contiguous Memory Allocator
+In-Reply-To: <20110708172541.GM4812@n2100.arm.linux.org.uk>
+References: <1309851710-3828-1-git-send-email-m.szyprowski@samsung.com>
+	<201107051558.39344.arnd@arndb.de>
+	<20110708172541.GM4812@n2100.arm.linux.org.uk>
+Message-ID: <201107121539.31548.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann wrote:
-> On Monday 11 July 2011, Rob Herring wrote:
->>> This is very good work, I really like it. I've mentioned one idea for
->>> an improvement in patch 5, which you can still integrate, but otherwise
->>>
->>> Reviewed-by: Arnd Bergmann <arnd@arndb.de>
->>>
->>> for the whole series.
->>>
->> I have an updated version ready to send out. Will you take this in your
->> tree including the 1st patch for pci flags functions? Also, what about
->> the powerpc conversion to generic pci flags?
+On Friday 08 July 2011, Russell King - ARM Linux wrote:
+> On Tue, Jul 05, 2011 at 03:58:39PM +0200, Arnd Bergmann wrote:
 > 
-> I can take it all in the arm-soc tree, yes. However for anything outside
-> of arch/arm/{mach,plat}-*, please get an Ack from the respective maintainer
-> (Russell, Michal, BenH, ...).
+> > If I'm reading your "ARM: DMA: steal memory for DMA coherent mappings"
+> > correctly, the idea is to have a per-platform compile-time amount
+> > of memory that is reserved purely for coherent allocations and
+> > taking out of the buddy allocator, right?
+> 
+> Yes, because every time I've looked at taking out memory mappings in
+> the first level page tables, it's always been a major issue.
+> 
+> We have a method where we can remove first level mappings on
+> uniprocessor systems in the ioremap code just fine - we use that so
+> that systems can setup section and supersection mappings.  They can
+> tear them down as well - and we update other tasks L1 page tables
+> when they get switched in.
+> 
+> This, however, doesn't work on SMP, because if you have a DMA allocation
+> (which is permitted from IRQ context) you must have some way of removing
+> the L1 page table entries from all CPUs TLBs and the page tables currently
+> in use and any future page tables which those CPUs may switch to.
 
-Definitely not ACK for [PATH 1/6] because it breaks Microblaze PCI compilation.
-Rob removed some parts from microblaze pci-bridge.h and didn't move them to 
-generic location or keep them in it. Also didn't remove PCI 
-bits(PCI_REASSIGN..., etc) from microblaze header. I have attached changed patch 
-with Microblaze part.
+Ah, interesting. So there is no tlb flush broadcast operation and it
+always goes through IPI?
 
-I would also prefer to add to this patch fixes for PPC too. Microblaze pci code 
-comes from PPC that's why will be the best to fix PPC in the same patch.
-There should be one more patch for ppc which rename ppc_pci_flags to pci_flags + 
-functions and bits
+> So, in a SMP system, there is no safe way to remove L1 page table entries
+> from IRQ context.  That means if memory is mapped for the buddy allocators
+> using L1 page table entries, then it is fixed for that application on a
+> SMP system.
 
- From my point of view make sense do these patches.
-1. (s/ppc_pci_flags/pci_flags/g) + (s/ppc_pci_/pci_/g) + (s/PPC_PCI_/PCI_/g)
-2. introduce new asm-generic/pci-bridge.h with changes for microblaze and ppc
-3. all others patches
+Ok. Can we limit GFP_ATOMIC to memory that doesn't need to be remapped then?
+I guess we can assume that there is no regression if we just skip
+the dma_alloc_contiguous step in dma_alloc_coherent for any atomic
+callers and immediately fall back to the regular allocator.
 
-Thanks,
-Michal
+Unfortunately, this still means we have to keep both methods. I was
+hoping that with CMA doing dynamic remapping there would be no need for
+keeping a significant number of pages reserved for this.
 
--- 
-Michal Simek, Ing. (M.Eng)
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel 2.6 Microblaze Linux - http://www.monstr.eu/fdt/
-Microblaze U-BOOT custodian
+	Arnd
