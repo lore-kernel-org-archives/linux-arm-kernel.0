@@ -1,38 +1,52 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 12 Jul 2011 14:52:14 +0200
-Subject: [PATCH 16/17] mach-sa1100: retire custom LED code
-In-Reply-To: <20110712073037.GA23270@n2100.arm.linux.org.uk>
-References: <1309955687-19365-1-git-send-email-bryan.wu@canonical.com>
-	<CAK5ve-LNDCN0P6L_5-L4PT11n1Tiv0qz=8=rgmv-v7WsEDotBQ@mail.gmail.com>
-	<20110712073037.GA23270@n2100.arm.linux.org.uk>
-Message-ID: <201107121452.14705.arnd@arndb.de>
+From: zonque@gmail.com (Daniel Mack)
+Date: Tue, 12 Jul 2011 14:48:24 +0200
+Subject: [PATCH 3/4] MTD: pxa3xx_nand: enable multiple chip select support
+In-Reply-To: <4E1B4E21.1090507@compulab.co.il>
+References: <1309319494-17951-1-git-send-email-leiwen@marvell.com>
+	<1309771536-10597-4-git-send-email-leiwen@marvell.com>
+	<4E1411BB.4010000@compulab.co.il>
+	<CACTFLAOmRMDH_6qo_WkndoWX-HPw9RTqbtsURDfw22sWEFS2wg@mail.gmail.com>
+	<4E1B3ECC.5080308@compulab.co.il>
+	<CACTFLAPMh+XMpOPPqkDTaEZppSkWxVxFMH3RALTmqOCNk8WAvw@mail.gmail.com>
+	<4E1B4E21.1090507@compulab.co.il>
+Message-ID: <CACTFLAPpy8v1O+_eDLiLLCD++7mFk0CKbjsFDB3VopjWd99OTg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 12 July 2011, Russell King - ARM Linux wrote:
-> On Tue, Jul 12, 2011 at 08:31:28AM +0800, Bryan Wu wrote:
-> > I think this is a great idea. what about moving it to include/asm-generic/
+On Mon, Jul 11, 2011 at 9:25 PM, Igor Grinberg <grinberg@compulab.co.il> wrote:
+> On 07/11/11 21:53, Daniel Mack wrote:
+>> At least not in our case. The first level bootloader is entered on
+>> resume just as it is on a POR event, with the exception that the D3S
+>> bit in the ASCR register is set in this case.
+>
+> You say "first level boot loader is entered"... who is loading it and where from?
+> Indeed, it should happen as in POR case, but again, it resides on some non-volatile
+> storage, isn't it? What storage does it reside on?
 
-I wouldn't want to encourage new architectures to actually use this method
-until they grow to need it. For most simple architectures, it's probably
-better to have a different method of doing machine specific work.
+That is true. I was assuming that the first-stage loader remains in
+SRAM and is re-used later, but I think you're right, and it is loaded
+from NAND again after resume.
 
-> Except, instead of:
-> 
-> 		if (machine_is(mach)) return fn(); \
-> 
-> we'd need:
-> 
-> 		if (machine_is_##mach()) return fn(); \
+>> We unconditionally
+>> initialize the static and dynamic memory controllers and then either
+>> jump to the routine that initializes the NAND controller, read the 2nd
+>> level loader and pass control to it. Or (in the resume case) we just
+>> jump to the address stored at the RAM address 0x80000000 (which has
+>> been set to cpu_resume previously) and thus enter the kernel again. No
+>> NAND operations in the game in this case, and this has always worked
+>> fine.
+>
+> Except those to read the first stage boot loader... (if it resides on NAND).
+> Well, our case is working similarly and both the first stage bootloader (OBM)
+> and the second stage bootloader (U-Boot) reside on the NAND flash,
+> therefore BootROM has to reconfigure the NAND flash, so it can boot (resume).
 
-Right. Maybe we can start simple and just do a single definition at fs_initcall level:
-
-#define machine_initcall(mach,level,fn) \
-        static int __init __machine_initcall_##mach##_##fn(void) { \
-                if (machine_is ## mach()) return fn(); \
-                return 0; \
-        } \
-        fs_initcall(,__machine_initcall_##mach##_##fn);
+Well, the load of the first NAND page (where the OBM resides) is out
+of control for our software, as the code in PXA's internal ROM mask
+takes care for this. We do not, however, re-initialize the NAND
+controller in the resume case, just as we don't restore any other
+pheripheral's registers. And this has worked fine all the time, and it
+still does if Lei's latest patch set is not applied.
 
 
-	Arnd
+Daniel
