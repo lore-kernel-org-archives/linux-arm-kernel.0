@@ -1,165 +1,119 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 12 Jul 2011 14:08:09 +0100
-Subject: [PATCH 2/3] mach-ux500: export System-on-Chip information via sysfs
-In-Reply-To: <1310476090-9807-1-git-send-email-lee.jones@linaro.org>
-References: <1310476090-9807-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1310476090-9807-2-git-send-email-lee.jones@linaro.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 12 Jul 2011 15:21:07 +0200
+Subject: [PATCH 4/5] DRM: Add support for the sii902x HDMI/DVI encoder
+In-Reply-To: <CAHXqBFJX01ZFeYMi=weK3LWhhFTkJ-_R6WPO_d2FDJ9cbBxSLQ@mail.gmail.com>
+References: <1307443550-25549-1-git-send-email-s.hauer@pengutronix.de>
+	<1307443550-25549-5-git-send-email-s.hauer@pengutronix.de>
+	<CAHXqBFJX01ZFeYMi=weK3LWhhFTkJ-_R6WPO_d2FDJ9cbBxSLQ@mail.gmail.com>
+Message-ID: <20110712132107.GO6069@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- arch/arm/mach-ux500/Kconfig |    1 +
- arch/arm/mach-ux500/id.c    |  115 +++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 116 insertions(+), 0 deletions(-)
+On Fri, Jul 08, 2011 at 11:01:18PM +0200, Micha?? Miros??aw wrote:
+> 2011/6/7 Sascha Hauer <s.hauer@pengutronix.de>:
+> [...]
+> > --- /dev/null
+> > +++ b/drivers/gpu/drm/i2c/sii902x.c
+> > @@ -0,0 +1,334 @@
+> [...]
+> > +static int sii902x_write(struct i2c_client *client, uint8_t addr, uint8_t val)
+> > +{
+> > + ? ? ? int ret;
+> > +
+> > + ? ? ? ret = i2c_smbus_write_byte_data(client, addr, val);
+> > + ? ? ? if (ret) {
+> > + ? ? ? ? ? ? ? dev_dbg(&client->dev, "%s failed with %d\n", __func__, ret);
+> > + ? ? ? }
+> > + ? ? ? return ret;
+> > +}
+> 
+> Return value is never tested.
 
-diff --git a/arch/arm/mach-ux500/Kconfig b/arch/arm/mach-ux500/Kconfig
-index 4210cb4..4d2f2c2 100644
---- a/arch/arm/mach-ux500/Kconfig
-+++ b/arch/arm/mach-ux500/Kconfig
-@@ -26,6 +26,7 @@ config MACH_U8500
- 	bool "U8500 Development platform"
- 	depends on UX500_SOC_DB8500
- 	select TPS6105X
-+	select SYS_SOC
- 	help
- 	  Include support for the mop500 development platform.
- 
-diff --git a/arch/arm/mach-ux500/id.c b/arch/arm/mach-ux500/id.c
-index d35122e..5156438 100644
---- a/arch/arm/mach-ux500/id.c
-+++ b/arch/arm/mach-ux500/id.c
-@@ -2,12 +2,16 @@
-  * Copyright (C) ST-Ericsson SA 2010
-  *
-  * Author: Rabin Vincent <rabin.vincent@stericsson.com> for ST-Ericsson
-+ * Author: Lee Jones <lee.jones@linaro.org> for ST-Ericsson
-  * License terms: GNU General Public License (GPL) version 2
-  */
- 
- #include <linux/kernel.h>
- #include <linux/init.h>
- #include <linux/io.h>
-+#include <linux/sys_soc.h>
-+#include <linux/slab.h>
-+#include <linux/stat.h>
- 
- #include <asm/cputype.h>
- #include <asm/tlbflush.h>
-@@ -105,3 +109,114 @@ void __init ux500_map_io(void)
- 
- 	ux500_print_soc_info(asicid);
- }
-+
-+#ifdef CONFIG_SYS_SOC
-+#define U8500_BB_UID_BASE (U8500_BACKUPRAM1_BASE + 0xFC0)
-+#define U8500_BB_UID_LENGTH 5
-+
-+static struct device soc_parent;
-+
-+static ssize_t ux500_get_family(struct device *dev,
-+				struct device_attribute *attr,
-+				char *buf)
-+{
-+	return sprintf(buf, "Ux500\n");
-+}
-+
-+static ssize_t ux500_get_machine(struct device *dev,
-+				struct device_attribute *attr,
-+				char *buf)
-+{
-+	return sprintf(buf, "DB%4x\n", dbx500_partnumber());
-+}
-+
-+static ssize_t ux500_get_soc_id(struct device *dev,
-+				struct device_attribute *attr,
-+				char *buf)
-+{
-+	void __iomem *uid_base;
-+	int i;
-+	ssize_t sz = 0;
-+
-+	if (dbx500_partnumber() == 0x8500) {
-+		uid_base = __io_address(U8500_BB_UID_BASE);
-+		for (i = 0; i < U8500_BB_UID_LENGTH; i++)
-+			sz += sprintf(buf + sz, "%08x",
-+				readl(uid_base + i * sizeof(u32)));
-+		sz += sprintf(buf + sz, "\n");
-+	} else {
-+		/* Don't know where it is located for U5500 */
-+		sz = sprintf(buf, "N/A\n");
-+	}
-+
-+	return sz;
-+}
-+
-+static ssize_t ux500_get_revision(struct device *dev,
-+				struct device_attribute *attr,
-+				char *buf)
-+{
-+	unsigned int rev = dbx500_revision();
-+
-+	if (rev == 0x01)
-+		return sprintf(buf, "%s\n", "ED");
-+	else if (rev >= 0xA0)
-+		return sprintf(buf, "%d.%d\n" ,
-+			(rev >> 4) - 0xA + 1, rev & 0xf);
-+
-+	return sprintf(buf, "%s", "Unknown\n");
-+}
-+
-+static ssize_t ux500_get_process(struct device *dev,
-+				struct device_attribute *attr,
-+				char *buf)
-+{
-+	if (dbx500_id.process == 0x00)
-+		return sprintf(buf, "Standard\n");
-+
-+	return sprintf(buf, "%02xnm\n", dbx500_id.process);
-+}
-+
-+struct soc_callback_functions soc_callbacks = {
-+	.get_machine_fn  = ux500_get_machine,
-+	.get_family_fn   = ux500_get_family,
-+	.get_soc_id_fn   = ux500_get_soc_id,
-+	.get_revision_fn = ux500_get_revision,
-+};
-+
-+struct device_attribute ux500_soc_attrs[] = {
-+	__ATTR(process,  S_IRUGO, ux500_get_process,  NULL),
-+	__ATTR_NULL,
-+};
-+
-+static int __init ux500_soc_sysfs_init(void)
-+{
-+	int ret;
-+	int i = 0;
-+	ret = soc_device_register(&soc_parent,
-+				  &soc_callbacks);
-+	if (ret >= 0) {
-+		while (ux500_soc_attrs[i].attr.name != NULL) {
-+			ret = device_create_file(&soc_parent,
-+						&ux500_soc_attrs[i++]);
-+			if (ret)
-+				goto out;
-+		}
-+	}
-+ out:
-+	return ret;
-+}
-+module_init(ux500_soc_sysfs_init);
-+
-+static void __exit ux500_soc_sysfs_exit(void)
-+{
-+	int i = 0;
-+
-+	while (ux500_soc_attrs[i].attr.name != NULL)
-+		device_remove_file(&soc_parent, &ux500_soc_attrs[i++]);
-+
-+	soc_device_unregister(&soc_parent);
-+}
-+module_exit(ux500_soc_sysfs_exit);
-+
-+#endif
+Yes, but there is not much I can do about it. This function is called
+from void functions most of the time, so I can't even forward the error.
+
+> 
+> > +static irqreturn_t sii902x_detect_handler(int irq, void *data)
+> > +{
+> > + ? ? ? struct sii902x_priv *priv = data;
+> > + ? ? ? struct i2c_client *client = priv->client;
+> > + ? ? ? int dat;
+> > +
+> > + ? ? ? dat = sii902x_read(client, 0x3D);
+> > + ? ? ? if (dat & 0x1) {
+> > + ? ? ? ? ? ? ? /* cable connection changes */
+> > + ? ? ? ? ? ? ? if (dat & 0x4) {
+> > + ? ? ? ? ? ? ? ? ? ? ? printk("plugin\n");
+> > + ? ? ? ? ? ? ? } else {
+> > + ? ? ? ? ? ? ? ? ? ? ? printk("plugout\n");
+> > + ? ? ? ? ? ? ? }
+> 
+> Missing code?
+
+Yes. I will either remove interrupt support or put the missing code in.
+
+> 
+> > + ? ? ? }
+> > + ? ? ? sii902x_write(client, 0x3D, dat);
+> > +
+> > + ? ? ? return IRQ_HANDLED;
+> > +}
+> [...]
+> > +/* I2C driver functions */
+> > +
+> > +static int
+> > +sii902x_probe(struct i2c_client *client, const struct i2c_device_id *id)
+> > +{
+> > + ? ? ? int dat, ret;
+> > + ? ? ? struct sii902x_priv *priv;
+> > + ? ? ? const char *drm_name = "imx-drm.0"; /* FIXME: pass from pdata */
+> > + ? ? ? int encon_id = 0; /* FIXME: pass from pdata */
+> > +
+> > + ? ? ? priv = kzalloc(sizeof(*priv), GFP_KERNEL);
+> > + ? ? ? if (!priv)
+> > + ? ? ? ? ? ? ? return -ENOMEM;
+> > +
+> > + ? ? ? priv->client = client;
+> > +
+> > + ? ? ? /* Set 902x in hardware TPI mode on and jump out of D3 state */
+> > + ? ? ? if (sii902x_write(client, 0xc7, 0x00) < 0) {
+> > + ? ? ? ? ? ? ? dev_err(&client->dev, "SII902x: cound not find device\n");
+> > + ? ? ? ? ? ? ? return -ENODEV;
+> 
+> Leaks priv. Same on other error paths.
+
+Jup, thanks for noting. There are some other bugs in the probe function,
+like not checking the return value of drm_encon_register().
+
+Will fix
+
+> 
+> > + ? ? ? }
+> [...]
+> 
+> > +
+> > +
+> > +static int sii902x_remove(struct i2c_client *client)
+> > +{
+> > + ? ? ? struct sii902x_priv *priv;
+> > + ? ? ? int ret;
+> > +
+> > + ? ? ? priv = i2c_get_clientdata(client);
+> > +
+> > + ? ? ? ret = drm_encon_unregister(&priv->encon);
+> > + ? ? ? if (ret)
+> > + ? ? ? ? ? ? ? return ret;
+> 
+> Leaks priv on error.
+
+and forgets to free_irq()
+
+Thanks
+ Sascha
+
+
 -- 
-1.7.4.1
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
