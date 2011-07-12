@@ -1,249 +1,382 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 12 Jul 2011 11:53:28 -0500
-Subject: [PATCH 2/6] pci: move microblaze and powerpc pci flag functions into
-	asm-generic
+Date: Tue, 12 Jul 2011 11:53:30 -0500
+Subject: [PATCH 4/6] ARM: pci: make pcibios_assign_all_busses use pci_has_flag
 In-Reply-To: <1310489612-8625-1-git-send-email-robherring2@gmail.com>
 References: <1310489612-8625-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1310489612-8625-3-git-send-email-robherring2@gmail.com>
+Message-ID: <1310489612-8625-5-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-Move separate microblaze and powerpc pci flag functions pci_set_flags,
-pci_add_flags, and pci_has_flag into asm-generic/pci-bridge.h so other
-archs can use them.
+Convert pcibios_assign_all_busses from a define to inline so platforms can
+control this setting.
 
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-Acked-by: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-Cc: Jesse Barnes <jbarnes@virtuousgeek.org>
-Signed-off-by: Michal Simek <monstr@monstr.eu>
+Reviewed-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/microblaze/include/asm/pci-bridge.h |   67 ++++-------------------------
- arch/powerpc/include/asm/pci-bridge.h    |   50 +----------------------
- include/asm-generic/pci-bridge.h         |   62 +++++++++++++++++++++++++++
- 3 files changed, 73 insertions(+), 106 deletions(-)
- create mode 100644 include/asm-generic/pci-bridge.h
+ arch/arm/include/asm/pci.h                       |    6 ++++++
+ arch/arm/mach-bcmring/include/mach/hardware.h    |    2 --
+ arch/arm/mach-cns3xxx/include/mach/hardware.h    |    1 -
+ arch/arm/mach-dove/include/mach/hardware.h       |    2 --
+ arch/arm/mach-ep93xx/include/mach/hardware.h     |    2 --
+ arch/arm/mach-footbridge/include/mach/hardware.h |    2 --
+ arch/arm/mach-integrator/include/mach/hardware.h |    2 --
+ arch/arm/mach-iop13xx/include/mach/hardware.h    |    2 --
+ arch/arm/mach-iop32x/include/mach/hardware.h     |    1 -
+ arch/arm/mach-iop33x/include/mach/hardware.h     |    1 -
+ arch/arm/mach-ixp2000/include/mach/hardware.h    |    2 --
+ arch/arm/mach-ixp2000/pci.c                      |    2 ++
+ arch/arm/mach-ixp23xx/include/mach/hardware.h    |    2 --
+ arch/arm/mach-ixp23xx/pci.c                      |    2 ++
+ arch/arm/mach-ixp4xx/include/mach/hardware.h     |    2 --
+ arch/arm/mach-kirkwood/include/mach/hardware.h   |    3 ---
+ arch/arm/mach-ks8695/include/mach/hardware.h     |    2 --
+ arch/arm/mach-mv78xx0/include/mach/hardware.h    |    2 --
+ arch/arm/mach-orion5x/include/mach/hardware.h    |    2 --
+ arch/arm/mach-pxa/include/mach/hardware.h        |    1 -
+ arch/arm/mach-sa1100/include/mach/hardware.h     |    1 -
+ arch/arm/mach-shark/include/mach/hardware.h      |    2 --
+ arch/arm/mach-tegra/include/mach/hardware.h      |    1 -
+ arch/arm/mach-versatile/include/mach/hardware.h  |    2 --
+ arch/arm/mm/iomap.c                              |    4 ++++
+ 25 files changed, 14 insertions(+), 37 deletions(-)
 
-diff --git a/arch/microblaze/include/asm/pci-bridge.h b/arch/microblaze/include/asm/pci-bridge.h
-index 746df91..4cae1d5 100644
---- a/arch/microblaze/include/asm/pci-bridge.h
-+++ b/arch/microblaze/include/asm/pci-bridge.h
-@@ -10,31 +10,19 @@
- #include <linux/pci.h>
- #include <linux/list.h>
- #include <linux/ioport.h>
+diff --git a/arch/arm/include/asm/pci.h b/arch/arm/include/asm/pci.h
+index 92e2a83..cb77e66 100644
+--- a/arch/arm/include/asm/pci.h
++++ b/arch/arm/include/asm/pci.h
+@@ -3,10 +3,16 @@
+ 
+ #ifdef __KERNEL__
+ #include <asm-generic/pci-dma-compat.h>
 +#include <asm-generic/pci-bridge.h>
  
- struct device_node;
+ #include <asm/mach/pci.h> /* for pci_sys_data */
+ #include <mach/hardware.h> /* for PCIBIOS_MIN_* */
  
--enum {
--	/* Force re-assigning all resources (ignore firmware
--	 * setup completely)
--	 */
--	PCI_REASSIGN_ALL_RSRC	= 0x00000001,
--
--	/* Re-assign all bus numbers */
--	PCI_REASSIGN_ALL_BUS	= 0x00000002,
--
--	/* Do not try to assign, just use existing setup */
--	PCI_PROBE_ONLY		= 0x00000004,
--
--	/* Don't bother with ISA alignment unless the bridge has
--	 * ISA forwarding enabled
--	 */
--	PCI_CAN_SKIP_ISA_ALIGN	= 0x00000008,
--
--	/* Enable domain numbers in /proc */
--	PCI_ENABLE_PROC_DOMAINS	= 0x00000010,
--	/* ... except for domain 0 */
--	PCI_COMPAT_DOMAIN_0		= 0x00000020,
--};
-+#ifdef CONFIG_PCI
-+extern struct list_head hose_list;
-+extern int pcibios_vaddr_is_ioport(void __iomem *address);
-+#else
-+static inline int pcibios_vaddr_is_ioport(void __iomem *address)
++static inline int pcibios_assign_all_busses(void)
 +{
-+	return 0;
++	return pci_has_flag(PCI_REASSIGN_ALL_RSRC);
 +}
-+#endif
++
+ #ifdef CONFIG_PCI_DOMAINS
+ static inline int pci_domain_nr(struct pci_bus *bus)
+ {
+diff --git a/arch/arm/mach-bcmring/include/mach/hardware.h b/arch/arm/mach-bcmring/include/mach/hardware.h
+index 8bf3564..ed78aab 100644
+--- a/arch/arm/mach-bcmring/include/mach/hardware.h
++++ b/arch/arm/mach-bcmring/include/mach/hardware.h
+@@ -36,8 +36,6 @@
+ #define RAM_SIZE                (CFG_GLOBAL_RAM_SIZE-CFG_GLOBAL_RAM_SIZE_RESERVED)
+ #define RAM_BASE                PAGE_OFFSET
  
- /*
-  * Structure of a PCI controller (host bridge)
-@@ -164,40 +152,5 @@ extern struct pci_controller *pcibios_alloc_controller(struct device_node *dev);
- extern void pcibios_free_controller(struct pci_controller *phb);
- extern void pcibios_setup_phb_resources(struct pci_controller *hose);
+-#define pcibios_assign_all_busses()	1
+-
+ /* Macros to make managing spinlocks a bit more controlled in terms of naming. */
+ /* See reg_gpio.h, reg_irq.h, arch.c, gpio.c for example usage. */
+ #if defined(__KERNEL__)
+diff --git a/arch/arm/mach-cns3xxx/include/mach/hardware.h b/arch/arm/mach-cns3xxx/include/mach/hardware.h
+index 57e0983..82a0d4e 100644
+--- a/arch/arm/mach-cns3xxx/include/mach/hardware.h
++++ b/arch/arm/mach-cns3xxx/include/mach/hardware.h
+@@ -17,6 +17,5 @@
+ /* macro to get at IO space when running virtually */
+ #define PCIBIOS_MIN_IO		0x00000000
+ #define PCIBIOS_MIN_MEM		0x00000000
+-#define pcibios_assign_all_busses()	1
  
--#ifdef CONFIG_PCI
--extern unsigned int pci_flags;
--
--static inline void pci_set_flags(int flags)
--{
--	pci_flags = flags;
--}
--
--static inline void pci_add_flags(int flags)
--{
--	pci_flags |= flags;
--}
--
--static inline int pci_has_flag(int flag)
--{
--	return pci_flags & flag;
--}
--
--extern struct list_head hose_list;
--
--extern int pcibios_vaddr_is_ioport(void __iomem *address);
--#else
--static inline int pcibios_vaddr_is_ioport(void __iomem *address)
--{
--	return 0;
--}
--
--static inline void pci_set_flags(int flags) { }
--static inline void pci_add_flags(int flags) { }
--static inline int pci_has_flag(int flag)
--{
--	return 0;
--}
--#endif	/* CONFIG_PCI */
--
- #endif	/* __KERNEL__ */
- #endif	/* _ASM_MICROBLAZE_PCI_BRIDGE_H */
-diff --git a/arch/powerpc/include/asm/pci-bridge.h b/arch/powerpc/include/asm/pci-bridge.h
-index b3a40c3..8a9cb9f 100644
---- a/arch/powerpc/include/asm/pci-bridge.h
-+++ b/arch/powerpc/include/asm/pci-bridge.h
-@@ -10,58 +10,10 @@
- #include <linux/pci.h>
- #include <linux/list.h>
- #include <linux/ioport.h>
-+#include <asm-generic/pci-bridge.h>
+ #endif
+diff --git a/arch/arm/mach-dove/include/mach/hardware.h b/arch/arm/mach-dove/include/mach/hardware.h
+index 32b0826..f619fb9 100644
+--- a/arch/arm/mach-dove/include/mach/hardware.h
++++ b/arch/arm/mach-dove/include/mach/hardware.h
+@@ -11,8 +11,6 @@
  
- struct device_node;
+ #include "dove.h"
  
--enum {
--	/* Force re-assigning all resources (ignore firmware
--	 * setup completely)
--	 */
--	PCI_REASSIGN_ALL_RSRC	= 0x00000001,
+-#define pcibios_assign_all_busses()	1
 -
--	/* Re-assign all bus numbers */
--	PCI_REASSIGN_ALL_BUS	= 0x00000002,
--
--	/* Do not try to assign, just use existing setup */
--	PCI_PROBE_ONLY		= 0x00000004,
--
--	/* Don't bother with ISA alignment unless the bridge has
--	 * ISA forwarding enabled
--	 */
--	PCI_CAN_SKIP_ISA_ALIGN	= 0x00000008,
--
--	/* Enable domain numbers in /proc */
--	PCI_ENABLE_PROC_DOMAINS	= 0x00000010,
--	/* ... except for domain 0 */
--	PCI_COMPAT_DOMAIN_0		= 0x00000020,
--};
--#ifdef CONFIG_PCI
--extern unsigned int pci_flags;
--
--static inline void pci_set_flags(int flags)
--{
--	pci_flags = flags;
--}
--
--static inline void pci_add_flags(int flags)
--{
--	pci_flags |= flags;
--}
--
--static inline int pci_has_flag(int flag)
--{
--	return (pci_flags & flag);
--}
--#else
--static inline void pci_set_flags(int flags) { }
--static inline void pci_add_flags(int flags) { }
--static inline int pci_has_flag(int flag)
--{
--	return 0;
--}
--#endif
--
+ #define PCIBIOS_MIN_IO			0x1000
+ #define PCIBIOS_MIN_MEM			0x01000000
+ #define PCIMEM_BASE			DOVE_PCIE0_MEM_PHYS_BASE
+diff --git a/arch/arm/mach-ep93xx/include/mach/hardware.h b/arch/arm/mach-ep93xx/include/mach/hardware.h
+index 5a3ce02..4df8428 100644
+--- a/arch/arm/mach-ep93xx/include/mach/hardware.h
++++ b/arch/arm/mach-ep93xx/include/mach/hardware.h
+@@ -8,8 +8,6 @@
+ #include <mach/ep93xx-regs.h>
+ #include <mach/platform.h>
+ 
+-#define pcibios_assign_all_busses()	0
 -
  /*
-  * Structure of a PCI controller (host bridge)
+  * The EP93xx has two external crystal oscillators.  To generate the
+  * required high-frequency clocks, the processor uses two phase-locked-
+diff --git a/arch/arm/mach-footbridge/include/mach/hardware.h b/arch/arm/mach-footbridge/include/mach/hardware.h
+index b6fdf23..082e6ce 100644
+--- a/arch/arm/mach-footbridge/include/mach/hardware.h
++++ b/arch/arm/mach-footbridge/include/mach/hardware.h
+@@ -100,8 +100,6 @@ extern unsigned int nw_gpio_read(void);
+ extern void nw_cpld_modify(unsigned int mask, unsigned int set);
+ #endif
+ 
+-#define pcibios_assign_all_busses()	1
+-
+ #define PCIBIOS_MIN_IO		0x1000
+ #define PCIBIOS_MIN_MEM 	0x81000000
+ 
+diff --git a/arch/arm/mach-integrator/include/mach/hardware.h b/arch/arm/mach-integrator/include/mach/hardware.h
+index 57f51ba..37323ea 100644
+--- a/arch/arm/mach-integrator/include/mach/hardware.h
++++ b/arch/arm/mach-integrator/include/mach/hardware.h
+@@ -34,8 +34,6 @@
+ 
+ #define PCIMEM_BASE		PCI_MEMORY_VADDR
+ 
+-#define pcibios_assign_all_busses()	1
+-
+ #define PCIBIOS_MIN_IO		0x6000
+ #define PCIBIOS_MIN_MEM 	0x00100000
+ 
+diff --git a/arch/arm/mach-iop13xx/include/mach/hardware.h b/arch/arm/mach-iop13xx/include/mach/hardware.h
+index 8e1d562..ba81e50 100644
+--- a/arch/arm/mach-iop13xx/include/mach/hardware.h
++++ b/arch/arm/mach-iop13xx/include/mach/hardware.h
+@@ -2,8 +2,6 @@
+ #define __ASM_ARCH_HARDWARE_H
+ #include <asm/types.h>
+ 
+-#define pcibios_assign_all_busses() 1
+-
+ #ifndef __ASSEMBLY__
+ extern unsigned long iop13xx_pcibios_min_io;
+ extern unsigned long iop13xx_pcibios_min_mem;
+diff --git a/arch/arm/mach-iop32x/include/mach/hardware.h b/arch/arm/mach-iop32x/include/mach/hardware.h
+index d559c4e..e68bf97 100644
+--- a/arch/arm/mach-iop32x/include/mach/hardware.h
++++ b/arch/arm/mach-iop32x/include/mach/hardware.h
+@@ -18,7 +18,6 @@
+  * but when we read them, we convert them to virtual addresses. See
+  * arch/arm/plat-iop/pci.c.
   */
-diff --git a/include/asm-generic/pci-bridge.h b/include/asm-generic/pci-bridge.h
-new file mode 100644
-index 0000000..4a5aca2
---- /dev/null
-+++ b/include/asm-generic/pci-bridge.h
-@@ -0,0 +1,62 @@
-+/*
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version
-+ * 2 of the License, or (at your option) any later version.
-+ */
-+#ifndef _ASM_GENERIC_PCI_BRIDGE_H
-+#define _ASM_GENERIC_PCI_BRIDGE_H
+-#define pcibios_assign_all_busses() 1
+ #define PCIBIOS_MIN_IO		0x00000000
+ #define PCIBIOS_MIN_MEM		0x00000000
+ 
+diff --git a/arch/arm/mach-iop33x/include/mach/hardware.h b/arch/arm/mach-iop33x/include/mach/hardware.h
+index 8c10e43..215065b 100644
+--- a/arch/arm/mach-iop33x/include/mach/hardware.h
++++ b/arch/arm/mach-iop33x/include/mach/hardware.h
+@@ -18,7 +18,6 @@
+  * but when we read them, we convert them to virtual addresses.  See
+  * arch/arm/mach-iop3xx/iop3xx-pci.c
+  */
+-#define pcibios_assign_all_busses()	1
+ #define PCIBIOS_MIN_IO		0x00000000
+ #define PCIBIOS_MIN_MEM		0x00000000
+ 
+diff --git a/arch/arm/mach-ixp2000/include/mach/hardware.h b/arch/arm/mach-ixp2000/include/mach/hardware.h
+index f033de4..6c92008 100644
+--- a/arch/arm/mach-ixp2000/include/mach/hardware.h
++++ b/arch/arm/mach-ixp2000/include/mach/hardware.h
+@@ -27,8 +27,6 @@
+ 
+ #include "ixp2000-regs.h"	/* Chipset Registers */
+ 
+-#define pcibios_assign_all_busses() 0
+-
+ /*
+  * Platform helper functions
+  */
+diff --git a/arch/arm/mach-ixp2000/pci.c b/arch/arm/mach-ixp2000/pci.c
+index f797c5f..8888ed9 100644
+--- a/arch/arm/mach-ixp2000/pci.c
++++ b/arch/arm/mach-ixp2000/pci.c
+@@ -196,6 +196,8 @@ clear_master_aborts(void)
+ void __init
+ ixp2000_pci_preinit(void)
+ {
++	pci_set_flags(0);
 +
-+#ifdef __KERNEL__
+ #ifndef CONFIG_IXP2000_SUPPORT_BROKEN_PCI_IO
+ 	/*
+ 	 * Configure the PCI unit to properly byteswap I/O transactions,
+diff --git a/arch/arm/mach-ixp23xx/include/mach/hardware.h b/arch/arm/mach-ixp23xx/include/mach/hardware.h
+index 57b508b..b8bb781 100644
+--- a/arch/arm/mach-ixp23xx/include/mach/hardware.h
++++ b/arch/arm/mach-ixp23xx/include/mach/hardware.h
+@@ -20,8 +20,6 @@
+ 
+ #include "ixp23xx.h"
+ 
+-#define pcibios_assign_all_busses()	0
+-
+ /*
+  * Platform helper functions
+  */
+diff --git a/arch/arm/mach-ixp23xx/pci.c b/arch/arm/mach-ixp23xx/pci.c
+index 563819a..72d145a 100644
+--- a/arch/arm/mach-ixp23xx/pci.c
++++ b/arch/arm/mach-ixp23xx/pci.c
+@@ -227,6 +227,8 @@ static void __init ixp23xx_pci_common_init(void)
+ 
+ void __init ixp23xx_pci_preinit(void)
+ {
++	pci_set_flags(0);
 +
-+enum {
-+	/* Force re-assigning all resources (ignore firmware
-+	 * setup completely)
-+	 */
-+	PCI_REASSIGN_ALL_RSRC	= 0x00000001,
+ 	ixp23xx_pci_common_init();
+ 
+ 	hook_fault_code(16+6, ixp23xx_pci_abort_handler, SIGBUS, 0,
+diff --git a/arch/arm/mach-ixp4xx/include/mach/hardware.h b/arch/arm/mach-ixp4xx/include/mach/hardware.h
+index 8138371..163e506 100644
+--- a/arch/arm/mach-ixp4xx/include/mach/hardware.h
++++ b/arch/arm/mach-ixp4xx/include/mach/hardware.h
+@@ -28,8 +28,6 @@
+ 
+ #define ARCH_HAS_DMA_SET_COHERENT_MASK
+ 
+-#define pcibios_assign_all_busses()	1
+-
+ /* Register locations and bits */
+ #include "ixp4xx-regs.h"
+ 
+diff --git a/arch/arm/mach-kirkwood/include/mach/hardware.h b/arch/arm/mach-kirkwood/include/mach/hardware.h
+index cde8528..31b81fe 100644
+--- a/arch/arm/mach-kirkwood/include/mach/hardware.h
++++ b/arch/arm/mach-kirkwood/include/mach/hardware.h
+@@ -11,9 +11,6 @@
+ 
+ #include "kirkwood.h"
+ 
+-#define pcibios_assign_all_busses()	1
+-
+-#define PCIBIOS_MIN_IO			0x00001000
+ #define PCIBIOS_MIN_MEM			0x01000000
+ #define PCIMEM_BASE			KIRKWOOD_PCIE_MEM_PHYS_BASE /* mem base for VGA */
+ 
+diff --git a/arch/arm/mach-ks8695/include/mach/hardware.h b/arch/arm/mach-ks8695/include/mach/hardware.h
+index e0f911d..a46be88 100644
+--- a/arch/arm/mach-ks8695/include/mach/hardware.h
++++ b/arch/arm/mach-ks8695/include/mach/hardware.h
+@@ -46,8 +46,6 @@
+ /*
+  * PCI support
+  */
+-#define pcibios_assign_all_busses()	1
+-
+ #define PCIBIOS_MIN_IO		0
+ #define PCIBIOS_MIN_MEM		0
+ 
+diff --git a/arch/arm/mach-mv78xx0/include/mach/hardware.h b/arch/arm/mach-mv78xx0/include/mach/hardware.h
+index 5d88755..c76b93f 100644
+--- a/arch/arm/mach-mv78xx0/include/mach/hardware.h
++++ b/arch/arm/mach-mv78xx0/include/mach/hardware.h
+@@ -11,8 +11,6 @@
+ 
+ #include "mv78xx0.h"
+ 
+-#define pcibios_assign_all_busses()	1
+-
+ #define PCIBIOS_MIN_IO			0x00001000
+ #define PCIBIOS_MIN_MEM			0x01000000
+ #define PCIMEM_BASE			MV78XX0_PCIE_MEM_PHYS_BASE /* mem base for VGA */
+diff --git a/arch/arm/mach-orion5x/include/mach/hardware.h b/arch/arm/mach-orion5x/include/mach/hardware.h
+index e51aaf4..a42b743 100644
+--- a/arch/arm/mach-orion5x/include/mach/hardware.h
++++ b/arch/arm/mach-orion5x/include/mach/hardware.h
+@@ -11,8 +11,6 @@
+ 
+ #include "orion5x.h"
+ 
+-#define pcibios_assign_all_busses()	1
+-
+ #define PCIBIOS_MIN_IO		0x00001000
+ #define PCIBIOS_MIN_MEM		0x01000000
+ #define PCIMEM_BASE		ORION5X_PCIE_MEM_PHYS_BASE
+diff --git a/arch/arm/mach-pxa/include/mach/hardware.h b/arch/arm/mach-pxa/include/mach/hardware.h
+index 6957ba5..b4ea392 100644
+--- a/arch/arm/mach-pxa/include/mach/hardware.h
++++ b/arch/arm/mach-pxa/include/mach/hardware.h
+@@ -339,7 +339,6 @@ extern unsigned long get_clock_tick_rate(void);
+ #if defined(CONFIG_MACH_ARMCORE) && defined(CONFIG_PCI)
+ #define PCIBIOS_MIN_IO		0
+ #define PCIBIOS_MIN_MEM		0
+-#define pcibios_assign_all_busses()	1
+ #define ARCH_HAS_DMA_SET_COHERENT_MASK
+ #endif
+ 
+diff --git a/arch/arm/mach-sa1100/include/mach/hardware.h b/arch/arm/mach-sa1100/include/mach/hardware.h
+index 967ae76..5946af2 100644
+--- a/arch/arm/mach-sa1100/include/mach/hardware.h
++++ b/arch/arm/mach-sa1100/include/mach/hardware.h
+@@ -79,7 +79,6 @@ static inline unsigned long get_clock_tick_rate(void)
+ #if defined(CONFIG_ARCH_SA1100) && defined(CONFIG_PCI)
+ #define PCIBIOS_MIN_IO		0
+ #define PCIBIOS_MIN_MEM		0
+-#define pcibios_assign_all_busses()	1
+ #define HAVE_ARCH_PCI_SET_DMA_MASK	1
+ #endif
+ 
+diff --git a/arch/arm/mach-shark/include/mach/hardware.h b/arch/arm/mach-shark/include/mach/hardware.h
+index 94d84b2..24639ce 100644
+--- a/arch/arm/mach-shark/include/mach/hardware.h
++++ b/arch/arm/mach-shark/include/mach/hardware.h
+@@ -12,8 +12,6 @@
+ 
+ #define UNCACHEABLE_ADDR        0xdf010000
+ 
+-#define pcibios_assign_all_busses()     1
+-
+ #define PCIBIOS_MIN_IO          0x6000
+ #define PCIBIOS_MIN_MEM         0x50000000
+ #define PCIMEM_BASE		0xe8000000
+diff --git a/arch/arm/mach-tegra/include/mach/hardware.h b/arch/arm/mach-tegra/include/mach/hardware.h
+index 56e43b3..84c2658 100644
+--- a/arch/arm/mach-tegra/include/mach/hardware.h
++++ b/arch/arm/mach-tegra/include/mach/hardware.h
+@@ -23,6 +23,5 @@
+ 
+ #define PCIBIOS_MIN_IO			0x1000
+ #define PCIBIOS_MIN_MEM			0
+-#define pcibios_assign_all_busses()	1
+ 
+ #endif
+diff --git a/arch/arm/mach-versatile/include/mach/hardware.h b/arch/arm/mach-versatile/include/mach/hardware.h
+index 6911e1f..8f60e94 100644
+--- a/arch/arm/mach-versatile/include/mach/hardware.h
++++ b/arch/arm/mach-versatile/include/mach/hardware.h
+@@ -34,8 +34,6 @@
+ #define PCIBIOS_MIN_IO			0x44000000
+ #define PCIBIOS_MIN_MEM			0x50000000
+ 
+-#define pcibios_assign_all_busses()     1
+-
+ /* macro to get at IO space when running virtually */
+ #define IO_ADDRESS(x)		(((x) & 0x0fffffff) + (((x) >> 4) & 0x0f000000) + 0xf0000000)
+ 
+diff --git a/arch/arm/mm/iomap.c b/arch/arm/mm/iomap.c
+index ffad039..ad41414 100644
+--- a/arch/arm/mm/iomap.c
++++ b/arch/arm/mm/iomap.c
+@@ -8,6 +8,7 @@
+ #include <linux/pci.h>
+ #include <linux/ioport.h>
+ #include <linux/io.h>
++#include <asm/pci.h>
+ 
+ #ifdef __io
+ void __iomem *ioport_map(unsigned long port, unsigned int nr)
+@@ -23,6 +24,9 @@ EXPORT_SYMBOL(ioport_unmap);
+ #endif
+ 
+ #ifdef CONFIG_PCI
++unsigned int pci_flags = PCI_REASSIGN_ALL_RSRC;
++EXPORT_SYMBOL(pci_flags);
 +
-+	/* Re-assign all bus numbers */
-+	PCI_REASSIGN_ALL_BUS	= 0x00000002,
-+
-+	/* Do not try to assign, just use existing setup */
-+	PCI_PROBE_ONLY		= 0x00000004,
-+
-+	/* Don't bother with ISA alignment unless the bridge has
-+	 * ISA forwarding enabled
-+	 */
-+	PCI_CAN_SKIP_ISA_ALIGN	= 0x00000008,
-+
-+	/* Enable domain numbers in /proc */
-+	PCI_ENABLE_PROC_DOMAINS	= 0x00000010,
-+	/* ... except for domain 0 */
-+	PCI_COMPAT_DOMAIN_0	= 0x00000020,
-+};
-+
-+#ifdef CONFIG_PCI
-+extern unsigned int pci_flags;
-+
-+static inline void pci_set_flags(int flags)
-+{
-+	pci_flags = flags;
-+}
-+
-+static inline void pci_add_flags(int flags)
-+{
-+	pci_flags |= flags;
-+}
-+
-+static inline int pci_has_flag(int flag)
-+{
-+	return pci_flags & flag;
-+}
-+#else
-+static inline void pci_set_flags(int flags) { }
-+static inline void pci_add_flags(int flags) { }
-+static inline int pci_has_flag(int flag)
-+{
-+	return 0;
-+}
-+#endif	/* CONFIG_PCI */
-+
-+#endif	/* __KERNEL__ */
-+#endif	/* _ASM_GENERIC_PCI_BRIDGE_H */
+ void __iomem *pci_iomap(struct pci_dev *dev, int bar, unsigned long maxlen)
+ {
+ 	resource_size_t start = pci_resource_start(dev, bar);
 -- 
 1.7.4.1
