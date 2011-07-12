@@ -1,40 +1,48 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Tue, 12 Jul 2011 11:54:37 +0530
-Subject: [PATCH] ARM:SAMSUNG: DMA Cleanup as per sparse [re-submit]
-In-Reply-To: <1310401398-21104-1-git-send-email-sangwook.lee@linaro.org>
-References: <1310401398-21104-1-git-send-email-sangwook.lee@linaro.org>
-Message-ID: <4E1BE8A5.1010304@linaro.org>
+From: khali@linux-fr.org (Jean Delvare)
+Date: Tue, 12 Jul 2011 08:48:04 +0200
+Subject: [PATCH v2] MAX1111: Fix Race condition causing NULL pointer
+	exception
+In-Reply-To: <3737907.jTEM1bACya@bloomfield>
+References: <1310410051-13127-1-git-send-email-morpheus.ibis@gmail.com>
+	<1602583.Pi9fQvRk5m@bloomfield>
+	<1310418193.21224.14.camel@groeck-laptop>
+	<3737907.jTEM1bACya@bloomfield>
+Message-ID: <20110712084804.0235de42@endymion.delvare>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 11 July 2011 09:53 PM, Sangwook Lee wrote:
-> Function declaration differs between file: dma.c and file:dma.h
-> and SPARSE (Documentation/sparse.txt) gives error messages
->
-> All dma channels are members of 'enum dma_ch' and not 'unsigned int'
-> Please have a look at channel definitions in:
-> arch/arm/mach-s3c64xx/include/mach/dma.h
-> arch/arm/plat-samsung/include/plat/s3c-dma-pl330.h
-> arch/arm/mach-s3c2410/include/mach/dma.h
-> So all arguments should be of type 'enum dma_ch'
->
-> Signed-off-by: Sangwook Lee<sangwook.lee@linaro.org>
-> ---
->   arch/arm/mach-s3c64xx/dma.c              |   14 +++++++-------
->   arch/arm/plat-s3c24xx/dma.c              |   12 ++++++------
->   arch/arm/plat-samsung/dma.c              |    6 +++---
->   arch/arm/plat-samsung/include/plat/dma.h |   21 +++++++++++----------
->   4 files changed, 27 insertions(+), 26 deletions(-)
->
+On Mon, 11 Jul 2011 23:49:10 +0200, Pavel Herrmann wrote:
+> On Monday 11 of July 2011 14:03:13 Guenter Roeck wrote:
+> > On Mon, 2011-07-11 at 16:36 -0400, Pavel Herrmann wrote:
+> > > the structure is dynamically allocated, but the pointer used to hold it
+> > > is a static global var.
+> > 
+> > This is true only if CONFIG_SHARPSL_PM is defined, and it assumes that
+> > the driver is instantiated exactly once. That is pretty badly broken
+> > (the commit introducing it even admits that), and should be fixed. This
+> > does not happen CONFIG_SHARPSL_PM is not defined. If CONFIG_SHARPSL_PM
+> > _is_ defined in your environment, and you do have multiple instances of
+> > the driver (ie if you have multiple MAX1111 chips in your system), a
+> > severe problem is that max1111_read_channel() does not identify the
+> > driver instance. That can not be fixed with a mutex.
+> 
+> if you don't have CONFIG_SHARPSL_PM then there is nothing calling 
+> max1111_read, and thus any of the discussed doesn't matter
 
-Compilation is ok for following default configs.
+This assumption of yours is incorrect. Even with CONFIG_SHARPSL_PM
+disabled, the max1111 driver creates sysfs attributes which, when read,
+call max1111_read(). What CONFIG_SHARPSL_PM adds is the in-kernel
+access.
 
-s3c2410_defconfig
-s3c6400_defconfig
-s5p64x0_defconfig
-s5pc100_defconfig
-s5pv210_defconfig
-exynos4_defconfig
+> AFAIK max1111 is only used in sharpsl devices (according to kernel drivers 
+> anyways), and only one a piece.
+> this patch is meant to fix a crash, not make the driver code pretty just in 
+> case someone else decides to use it. this patch also doesn't present any more 
+> challenges for solving the multiple devices issue and would be necessary 
+> either way, as drvdata is not thread-safe anyways (or I am badly mistaken)
+
+You are right, drvdata is not thread-safe, and this is the most obvious
+reason why your patch is needed.
 
 -- 
-Tushar Behera
+Jean Delvare
