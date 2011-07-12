@@ -1,76 +1,25 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Tue, 12 Jul 2011 14:51:11 +0900
-Subject: [PATCH] clocksource: convert S5PV210 32-bit down counting clocksource
-Message-ID: <4E1BE0CF.7060207@samsung.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 12 Jul 2011 06:07:55 +0000
+Subject: [PATCH] OMAP3: run the ASM sleep code from DDR
+In-Reply-To: <1309365623-14704-1-git-send-email-j-pihet@ti.com>
+References: <1309365623-14704-1-git-send-email-j-pihet@ti.com>
+Message-ID: <20110712060755.GA18622@localhost.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert the S5PV210 32-bit down-counting clocksource to the generic
-mmio clocksource infrastructure
+On Wed 2011-06-29 18:40:23, jean.pihet at newoldbits.com wrote:
+> From: Jean Pihet <j-pihet@ti.com>
+> 
+> Most of the ASM sleep code (in arch/arm/mach-omap2/sleep34xx.S)
+> is copied to internal SRAM at boot and after wake-up from CORE OFF mode.
+> However only a small part of the code really needs to run from internal SRAM.
+> 
+> This fix lets most of the ASM idle code run from the DDR
+> in order to minimize the SRAM usage and the overhead in the code copy.
 
-Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- arch/arm/Kconfig             |    1 +
- arch/arm/plat-s5p/s5p-time.c |   20 +++-----------------
- 2 files changed, 4 insertions(+), 17 deletions(-)
+So... what do you plan to use sram for? Because I don't think the
+speedup is worth the complexity...
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 9adc278..d7cd6f9 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -749,6 +749,7 @@ config ARCH_S5PV210
- 	bool "Samsung S5PV210/S5PC110"
- 	select CPU_V7
- 	select ARCH_SPARSEMEM_ENABLE
-+	select CLKSRC_MMIO
- 	select GENERIC_GPIO
- 	select HAVE_CLK
- 	select ARM_L1_CACHE_SHIFT_6
-diff --git a/arch/arm/plat-s5p/s5p-time.c b/arch/arm/plat-s5p/s5p-time.c
-index 612934c..5666f55 100644
---- a/arch/arm/plat-s5p/s5p-time.c
-+++ b/arch/arm/plat-s5p/s5p-time.c
-@@ -314,13 +314,6 @@ static void __iomem *s5p_timer_reg(void)
- 	return S3C_TIMERREG(offset);
- }
- 
--static cycle_t s5p_timer_read(struct clocksource *cs)
--{
--	void __iomem *reg = s5p_timer_reg();
--
--	return (cycle_t) (reg ? ~__raw_readl(reg) : 0);
--}
--
- /*
-  * Override the global weak sched_clock symbol with this
-  * local implementation which uses the clocksource to get some
-@@ -350,14 +343,6 @@ static void notrace s5p_update_sched_clock(void)
- 	update_sched_clock(&cd, ~__raw_readl(reg), (u32)~0);
- }
- 
--struct clocksource time_clocksource = {
--	.name		= "s5p_clocksource_timer",
--	.rating		= 250,
--	.read		= s5p_timer_read,
--	.mask		= CLOCKSOURCE_MASK(32),
--	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
--};
--
- static void __init s5p_clocksource_init(void)
- {
- 	unsigned long pclk;
-@@ -375,8 +360,9 @@ static void __init s5p_clocksource_init(void)
- 
- 	init_sched_clock(&cd, s5p_update_sched_clock, 32, clock_rate);
- 
--	if (clocksource_register_hz(&time_clocksource, clock_rate))
--		panic("%s: can't register clocksource\n", time_clocksource.name);
-+	if (clocksource_mmio_init(s5p_timer_reg(), "s5p_clocksource_timer",
-+			clock_rate, 250, 32, clocksource_mmio_readl_down))
-+		panic("s5p_clocksource_timer: can't register clocksource\n");
- }
- 
- static void __init s5p_timer_resources(void)
 -- 
-1.7.0.4
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
