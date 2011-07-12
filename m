@@ -1,59 +1,55 @@
-From: sundaram@ti.com (Raju, Sundaram)
-Date: Tue, 12 Jul 2011 17:01:23 +0530
-Subject: [PATCH] dmaengine: add dma_ctrl_cmd to pass buffer stride
-	configuration
-In-Reply-To: <CABb+yY1RqHJ6jsMB2RqPNnBLff-bzhwaXG1U-hCD8CpME+a3aA@mail.gmail.com>
-References: <1310310203-12288-1-git-send-email-sundaram@ti.com>
-	<CABb+yY1HJOR+QzmM4-ju4cs+8keoyUbMv+SpVoM6BW=DCMzmQQ@mail.gmail.com>
-	<CACRpkdbLg0+_2kpi4NizFj0fDWb6QPtkcKirKgoH+83vGD0O0A@mail.gmail.com>
-	<CABb+yY1RqHJ6jsMB2RqPNnBLff-bzhwaXG1U-hCD8CpME+a3aA@mail.gmail.com>
-Message-ID: <E0D41E29EB0DAC4E9F3FF173962E9E94030259DBBE@dbde02.ent.ti.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Tue, 12 Jul 2011 13:39:59 +0200
+Subject: [PATCH V6 4/4] MTD: pxa3xx_nand: enhance suspend and resume
+	routine
+In-Reply-To: <1310466535-15287-5-git-send-email-leiwen@marvell.com>
+References: <1310096084-14646-1-git-send-email-leiwen@marvell.com>
+	<1310466535-15287-5-git-send-email-leiwen@marvell.com>
+Message-ID: <CACTFLANDZN6gAorV1MYEFD3FnAnomPqLgx44pPUeUaxKjApG_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Jassi Brar [mailto:jassisinghbrar at gmail.com]
-> Sent: Tuesday, July 12, 2011 4:51 PM
-> To: Linus Walleij
-> Cc: Raju, Sundaram; linux-arm-kernel at lists.infradead.org; linux-
-> kernel at vger.kernel.org; davinci-linux-open-source at linux.davincidsp.com;
-> linux at arm.linux.org.uk; dan.j.williams at intel.com; linux-omap at vger.kernel.org
-> Subject: Re: [PATCH] dmaengine: add dma_ctrl_cmd to pass buffer stride
-> configuration
-> 
-> On Tue, Jul 12, 2011 at 3:33 PM, Linus Walleij <linus.walleij@linaro.org>
-> wrote:
-> > On Tue, Jul 12, 2011 at 6:17 AM, Jassi Brar <jassisinghbrar@gmail.com>
-> wrote:
-> >
-> >> 1) Striding, in one form or other, is supported by other DMACs as well.
-> >> ? The number will only increase in future.
-> >> ? Are we to add ?<VENDOR>_DMA_STRIDE_CONFIG for each case ?
-> >
-> > If we are sure about this and striding will work in a similar way on all
-> > then let's have the enum named DMA_STRIDE_CONFIG and move the
-> > passed-in struct to <linux/dmaengine.h) then?
-> >
-> > Would that be:
-> >
-> > struct dma_stride_config {
-> > ? ?u32 read_bytes;
-> > ? ?u32 skip_bytes;
-> > };
-> >
-> > Or something more complex?
-> Well, I am not sure if striding needs any special treatment at all.
-> Why not have client drivers prepare and submit sg-list.
-> Let the DMAC drivers interpret/parse the sg-list and program it
-> as strides if the h/w supports it.
-> If anything, we should make preparation and submission of sg-list
-> as efficient as possible.
-Jassi,
+On Tue, Jul 12, 2011 at 12:28 PM, Lei Wen <leiwen@marvell.com> wrote:
+> This patch add protection on the suspend&resume path to prevent
+> some unexpected behavior, like interrupt occur at the very second
+> of resume back and it don't follow normal command path, which lead
+> to bug.
+>
+> Signed-off-by: Lei Wen <leiwen@marvell.com>
+> ---
+> ?drivers/mtd/nand/pxa3xx_nand.c | ? 28 ++++++++++++++++++++++++++++
+> ?1 files changed, 28 insertions(+), 0 deletions(-)
+>
 
-sg_lists describe only a bunch of disjoint buffers. But what if the
-DMAC can skip and read the bytes within each of the buffers in
-the sg_list? (like TI EDMAC and TI SDMAC)
-How can that information be passed to the offload
-engine driver from the client?
+[...]
 
-~Sundaram
+> @@ -1267,6 +1283,18 @@ static int pxa3xx_nand_resume(struct platform_device *pdev)
+> ? ? ? ?info->cs = 0xff;
+> ? ? ? ?clk_enable(info->clk);
+>
+> + ? ? ? /*
+> + ? ? ? ?* As the spec, the NDSR would be updated to 0x1800 when
+> + ? ? ? ?* do the nand_clk disable/enable.
+> + ? ? ? ?* To prevent it damage state machine of the driver, clear
+> + ? ? ? ?* all status before resume
+> + ? ? ? ?*/
+> + ? ? ? nand_writel(nand, NDSR, NDSR_MASK);
+
+This doesn't build:
+
+  CC      drivers/mtd/nand/pxa3xx_nand.o
+drivers/mtd/nand/pxa3xx_nand.c: In function 'pxa3xx_nand_resume':
+drivers/mtd/nand/pxa3xx_nand.c:1292: error: 'nand' undeclared (first
+use in this function)
+drivers/mtd/nand/pxa3xx_nand.c:1292: error: (Each undeclared
+identifier is reported only once
+drivers/mtd/nand/pxa3xx_nand.c:1292: error: for each function it appears in.)
+drivers/mtd/nand/pxa3xx_nand.c:1294: error: 'mtd' undeclared (first
+use in this function)
+make[3]: *** [drivers/mtd/nand/pxa3xx_nand.o] Error 1
+
+I guess this was not even compile tested? Anyway, I did a trivial
+fix-up and will test.
+
+
+Daniel
