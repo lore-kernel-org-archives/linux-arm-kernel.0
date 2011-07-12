@@ -1,113 +1,30 @@
 From: jochen@scram.de (Jochen Friedrich)
-Date: Tue, 12 Jul 2011 08:46:25 +0200
-Subject: [PATCH 3.1 3/4] ARM:simpad: add GPIO based device definitions.
-In-Reply-To: <1310453186-22518-1-git-send-email-jochen@scram.de>
-References: <1310453186-22518-1-git-send-email-jochen@scram.de>
-Message-ID: <1310453186-22518-4-git-send-email-jochen@scram.de>
+Date: Tue, 12 Jul 2011 08:46:22 +0200
+Subject: [PATCH 3.1 0/4] ARM: simpad: Add support for GPIO attached hardware
+Message-ID: <1310453186-22518-1-git-send-email-jochen@scram.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Register keyboard, polled keyboard and I2C platform
-devices based on GPIOs.
+Resend as this might got lost in the develtech.com disaster.
+Bryan Wu <bryan.wu@canonical.com> intends to base his patch set to
+get rid of the custom LED code on this series.
 
-V3: Split LED changes into seperate patch.
+This series enables GPIO API on UCB1x00 and implements the GPIO
+API on the CS3 latch. The third patch finally registers platform
+devices for the GPIO attached LED, buttons and I2C bus.
 
-Signed-off-by: Jochen Friedrich <jochen@scram.de>
----
- arch/arm/mach-sa1100/simpad.c |   67 ++++++++++++++++++++++++++++++++++++++++-
- 1 files changed, 66 insertions(+), 1 deletions(-)
+ARM: simpad: Add ucb1x00 GPIO definitions and register GPIO
+ARM: simpad: Cleanup CS3 accessors and add GPIO API
+ARM: simpad: add GPIO based device definitions
+ARM: simpad: replace ARM specific LED code
 
-diff --git a/arch/arm/mach-sa1100/simpad.c b/arch/arm/mach-sa1100/simpad.c
-index 4d60c28..d1a13bb 100644
---- a/arch/arm/mach-sa1100/simpad.c
-+++ b/arch/arm/mach-sa1100/simpad.c
-@@ -29,6 +29,9 @@
- 
- #include <linux/serial_core.h>
- #include <linux/ioport.h>
-+#include <linux/input.h>
-+#include <linux/gpio_keys.h>
-+#include <linux/i2c-gpio.h>
- 
- #include "generic.h"
- 
-@@ -249,6 +252,65 @@ static void simpad_power_off(void)
- 
- }
- 
-+/*
-+ * gpio_keys
-+*/
-+
-+static struct gpio_keys_button simpad_button_table[] = {
-+	{ KEY_POWER, IRQ_GPIO_POWER_BUTTON, 1, "power button" },
-+};
-+
-+static struct gpio_keys_platform_data simpad_keys_data = {
-+	.buttons = simpad_button_table,
-+	.nbuttons = ARRAY_SIZE(simpad_button_table),
-+};
-+
-+static struct platform_device simpad_keys = {
-+	.name = "gpio-keys",
-+	.dev = {
-+		.platform_data = &simpad_keys_data,
-+	},
-+};
-+
-+static struct gpio_keys_button simpad_polled_button_table[] = {
-+	{ KEY_PROG1, SIMPAD_UCB1X00_GPIO_PROG1, 1, "prog1 button" },
-+	{ KEY_PROG2, SIMPAD_UCB1X00_GPIO_PROG2, 1, "prog2 button" },
-+	{ KEY_UP,    SIMPAD_UCB1X00_GPIO_UP,    1, "up button" },
-+	{ KEY_DOWN,  SIMPAD_UCB1X00_GPIO_DOWN,  1, "down button" },
-+	{ KEY_LEFT,  SIMPAD_UCB1X00_GPIO_LEFT,  1, "left button" },
-+	{ KEY_RIGHT, SIMPAD_UCB1X00_GPIO_RIGHT, 1, "right button" },
-+};
-+
-+static struct gpio_keys_platform_data simpad_polled_keys_data = {
-+	.buttons = simpad_polled_button_table,
-+	.nbuttons = ARRAY_SIZE(simpad_polled_button_table),
-+	.poll_interval = 50,
-+};
-+
-+static struct platform_device simpad_polled_keys = {
-+	.name = "gpio-keys-polled",
-+	.dev = {
-+		.platform_data = &simpad_polled_keys_data,
-+	},
-+};
-+
-+/*
-+ * i2c
-+ */
-+static struct i2c_gpio_platform_data simpad_i2c_data = {
-+	.sda_pin = GPIO_GPIO21,
-+	.scl_pin = GPIO_GPIO25,
-+	.udelay = 10,
-+	.timeout = HZ,
-+};
-+
-+static struct platform_device simpad_i2c = {
-+	.name = "i2c-gpio",
-+	.id = 0,
-+	.dev = {
-+		.platform_data = &simpad_i2c_data,
-+	},
-+};
- 
- /*
-  * MediaQ Video Device
-@@ -259,7 +321,10 @@ static struct platform_device simpad_mq200fb = {
- };
- 
- static struct platform_device *devices[] __initdata = {
--	&simpad_mq200fb
-+	&simpad_keys,
-+	&simpad_polled_keys,
-+	&simpad_mq200fb,
-+	&simpad_i2c,
- };
- 
- 
--- 
-1.7.5.4
+Overall diffstat:
+
+ arch/arm/mach-sa1100/Makefile              |    1 -
+ arch/arm/mach-sa1100/include/mach/simpad.h |   94 ++++++++++---
+ arch/arm/mach-sa1100/leds-simpad.c         |  100 -------------
+ arch/arm/mach-sa1100/leds.c                |    2 -
+ arch/arm/mach-sa1100/leds.h                |    1 -
+ arch/arm/mach-sa1100/simpad.c              |  211 ++++++++++++++++++++++++---
+ drivers/pcmcia/sa1100_simpad.c             |   35 ++---
+ 7 files changed, 274 insertions(+), 170 deletions(-)
