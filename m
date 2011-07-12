@@ -1,38 +1,48 @@
-From: cbouatmailru@gmail.com (Anton Vorontsov)
-Date: Tue, 12 Jul 2011 18:18:43 +0400
-Subject: [PATCH V3] mmc: Enable the ADMA2 on esdhc imx driver
-In-Reply-To: <20110712134602.GT6069@pengutronix.de>
-References: <1310465609-4516-1-git-send-email-richard.zhu@linaro.org>
-	<20110712134602.GT6069@pengutronix.de>
-Message-ID: <20110712141843.GA27358@oksana.dev.rtsoft.ru>
+From: leiwen@marvell.com (Lei Wen)
+Date: Tue, 12 Jul 2011 07:35:32 -0700
+Subject: [PATCH V7 0/4] pxa3xx_nand: add two chip select support
+In-Reply-To: <1310466535-15287-1-git-send-email-leiwen@marvell.com>
+References: <1310466535-15287-1-git-send-email-leiwen@marvell.com>
+Message-ID: <1310481336-13230-1-git-send-email-leiwen@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 12, 2011 at 03:46:02PM +0200, Sascha Hauer wrote:
-[...]
-> Honestly, putting all kinds of driver logic into the register access
-> functions will lead to a catastrophe sooner or later. There are too
-> many quirks in it already, we should not add more of them.
+V2:
+Choose to at most keep original pxa3xx_nand_info structure to reduce
+patch size
 
-There aren't many options. You may pollute generic driver with
-quirks (which is not an option :-), or you can introduce more
-ops for things like sdhci_send_command(), but in that case
-you will duplicate the logic just to compensate minor register
-differences.
+V3:
+Seperate original one patch into a patch set
 
-In some cases, e.g. capabilities register, it seems that introducing
-get_caps() op would be a logical step, but then you just move the code
-under 'if (reg == SDHCI_CAPABILITIES) { ' into a dedicated function.
-No big difference.
+V4:
+Further seperate patch into small pieces:
+Mainly change make in two patch, which seperate do
+the new structure definition and two chip select support add.
 
-As for me, I don't see any catastrophe coming because of the register
-access fixups. Quite the contrary: from the maintenance stand point,
-you just need to know how the generic SDHCI works, and then you can
-look into platform drivers to see their differences, which are mostly
-minor.
+V5:
+Merge platform change patch and two chip feature into one patch.
+Clean some format issue.
 
-Thanks,
+V6:
+Add suspend and resume enhancement as a part of this patch set.
 
--- 
-Anton Vorontsov
-Email: cbouatmailru at gmail.com
+V7:
+Fix build bug
+Fix zylonite machine cannot resume back
+
+Lei Wen (4):
+  MTD: pxa3xx_nand: enhance suspend and resume routine
+  MTD: pxa3xx_nand: convert all printk into dev_*
+  MTD: pxa3xx_nand: sperate each chip individual info
+  MTD: pxa3xx_nand: enable multiple chip select support
+
+ arch/arm/mach-mmp/aspenite.c                 |    5 +-
+ arch/arm/mach-pxa/cm-x300.c                  |    5 +-
+ arch/arm/mach-pxa/colibri-pxa3xx.c           |    5 +-
+ arch/arm/mach-pxa/littleton.c                |    5 +-
+ arch/arm/mach-pxa/mxm8x10.c                  |    9 +-
+ arch/arm/mach-pxa/raumfeld.c                 |    5 +-
+ arch/arm/mach-pxa/zylonite.c                 |    5 +-
+ arch/arm/plat-pxa/include/plat/pxa3xx_nand.h |   20 +-
+ drivers/mtd/nand/pxa3xx_nand.c               |  453 ++++++++++++++++----------
+ 9 files changed, 327 insertions(+), 185 deletions(-)
