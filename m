@@ -1,59 +1,65 @@
 From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Tue, 12 Jul 2011 18:49:03 +0300
-Subject: [PATCH 3/4] MTD: pxa3xx_nand: enable multiple chip select support
-In-Reply-To: <CACTFLAPpy8v1O+_eDLiLLCD++7mFk0CKbjsFDB3VopjWd99OTg@mail.gmail.com>
-References: <1309319494-17951-1-git-send-email-leiwen@marvell.com>	<1309771536-10597-4-git-send-email-leiwen@marvell.com>	<4E1411BB.4010000@compulab.co.il>	<CACTFLAOmRMDH_6qo_WkndoWX-HPw9RTqbtsURDfw22sWEFS2wg@mail.gmail.com>	<4E1B3ECC.5080308@compulab.co.il>	<CACTFLAPMh+XMpOPPqkDTaEZppSkWxVxFMH3RALTmqOCNk8WAvw@mail.gmail.com>	<4E1B4E21.1090507@compulab.co.il>
-	<CACTFLAPpy8v1O+_eDLiLLCD++7mFk0CKbjsFDB3VopjWd99OTg@mail.gmail.com>
-Message-ID: <4E1C6CEF.9030307@compulab.co.il>
+Date: Tue, 12 Jul 2011 18:56:39 +0300
+Subject: [PATCH V6 4/4] MTD: pxa3xx_nand: enhance suspend and resume
+	routine
+In-Reply-To: <CACTFLAPB0JE9FJc8jdbaoME_qmPbN1N-HyPVN7Kb5-op6Pa1EA@mail.gmail.com>
+References: <1310096084-14646-1-git-send-email-leiwen@marvell.com>	<1310466535-15287-5-git-send-email-leiwen@marvell.com>	<CACTFLANDZN6gAorV1MYEFD3FnAnomPqLgx44pPUeUaxKjApG_Q@mail.gmail.com>
+	<CACTFLAPB0JE9FJc8jdbaoME_qmPbN1N-HyPVN7Kb5-op6Pa1EA@mail.gmail.com>
+Message-ID: <4E1C6EB7.80506@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/12/11 15:48, Daniel Mack wrote:
+On 07/12/11 15:02, Daniel Mack wrote:
 
-> On Mon, Jul 11, 2011 at 9:25 PM, Igor Grinberg <grinberg@compulab.co.il> wrote:
->> On 07/11/11 21:53, Daniel Mack wrote:
->>> At least not in our case. The first level bootloader is entered on
->>> resume just as it is on a POR event, with the exception that the D3S
->>> bit in the ASCR register is set in this case.
->> You say "first level boot loader is entered"... who is loading it and where from?
->> Indeed, it should happen as in POR case, but again, it resides on some non-volatile
->> storage, isn't it? What storage does it reside on?
-> That is true. I was assuming that the first-stage loader remains in
-> SRAM and is re-used later, but I think you're right, and it is loaded
-> from NAND again after resume.
->
->>> We unconditionally
->>> initialize the static and dynamic memory controllers and then either
->>> jump to the routine that initializes the NAND controller, read the 2nd
->>> level loader and pass control to it. Or (in the resume case) we just
->>> jump to the address stored at the RAM address 0x80000000 (which has
->>> been set to cpu_resume previously) and thus enter the kernel again. No
->>> NAND operations in the game in this case, and this has always worked
->>> fine.
->> Except those to read the first stage boot loader... (if it resides on NAND).
->> Well, our case is working similarly and both the first stage bootloader (OBM)
->> and the second stage bootloader (U-Boot) reside on the NAND flash,
->> therefore BootROM has to reconfigure the NAND flash, so it can boot (resume).
-> Well, the load of the first NAND page (where the OBM resides)
+> On Tue, Jul 12, 2011 at 1:39 PM, Daniel Mack <zonque@gmail.com> wrote:
+>> On Tue, Jul 12, 2011 at 12:28 PM, Lei Wen <leiwen@marvell.com> wrote:
+>>> This patch add protection on the suspend&resume path to prevent
+>>> some unexpected behavior, like interrupt occur at the very second
+>>> of resume back and it don't follow normal command path, which lead
+>>> to bug.
+>>>
+>>> Signed-off-by: Lei Wen <leiwen@marvell.com>
+>>> ---
+>>>  drivers/mtd/nand/pxa3xx_nand.c |   28 ++++++++++++++++++++++++++++
+>>>  1 files changed, 28 insertions(+), 0 deletions(-)
+>>>
+>> [...]
+>>
+>>> @@ -1267,6 +1283,18 @@ static int pxa3xx_nand_resume(struct platform_device *pdev)
+>>>        info->cs = 0xff;
+>>>        clk_enable(info->clk);
+>>>
+>>> +       /*
+>>> +        * As the spec, the NDSR would be updated to 0x1800 when
+>>> +        * do the nand_clk disable/enable.
+>>> +        * To prevent it damage state machine of the driver, clear
+>>> +        * all status before resume
+>>> +        */
+>>> +       nand_writel(nand, NDSR, NDSR_MASK);
+>> This doesn't build:
+>>
+>>  CC      drivers/mtd/nand/pxa3xx_nand.o
+>> drivers/mtd/nand/pxa3xx_nand.c: In function 'pxa3xx_nand_resume':
+>> drivers/mtd/nand/pxa3xx_nand.c:1292: error: 'nand' undeclared (first
+>> use in this function)
+>> drivers/mtd/nand/pxa3xx_nand.c:1292: error: (Each undeclared
+>> identifier is reported only once
+>> drivers/mtd/nand/pxa3xx_nand.c:1292: error: for each function it appears in.)
+>> drivers/mtd/nand/pxa3xx_nand.c:1294: error: 'mtd' undeclared (first
+>> use in this function)
+>> make[3]: *** [drivers/mtd/nand/pxa3xx_nand.o] Error 1
+>>
+>> I guess this was not even compile tested? Anyway, I did a trivial
+>> fix-up and will test.
+> Also, with this (fixed) patch applied, the system doesn't resume at
+> all. No messages, it simply doesn't come back.
 
-You mean block, page is too small for the OBM to fit...
+I was skeptic about the clock being disabled in Lei's patch,
+as I observed system hangs if that clock was disabled back then in 2.6.31,
+but wanted to give it a try, because things has changed since then.
 
->  is out
-> of control for our software, as the code in PXA's internal ROM mask
-> takes care for this.
+Now I see, that Lei already sent v7 without clock toggling...
 
-Exactly... the BootROM is configuring the NAND controller
-and (I think) that is one of the reasons we have the keep_config in first place...
-
-> We do not, however, re-initialize the NAND
-> controller in the resume case, just as we don't restore any other
-> pheripheral's registers.
-
-Yes, the NAND initialization is done by the BootROM, so you don't need to reinitialize it.
-Just the DRAM controller (may be SRAM also), so you will be able to jump back to Linux.
-
-> And this has worked fine all the time, and it
-> still does if Lei's latest patch set is not applied.
 
 
 -- 
