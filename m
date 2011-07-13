@@ -1,75 +1,35 @@
 From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
-Date: Wed, 13 Jul 2011 19:24:08 +0530
-Subject: [PATCH v4 09/20] gpio/omap: cleanup omap1 related macros
+Date: Wed, 13 Jul 2011 19:24:16 +0530
+Subject: [PATCH v4 17/20] gpio/omap: fix bankwidth for OMAP7xx MPUIO
 In-Reply-To: <1310565259-31267-1-git-send-email-tarun.kanti@ti.com>
 References: <1310565259-31267-1-git-send-email-tarun.kanti@ti.com>
-Message-ID: <1310565259-31267-10-git-send-email-tarun.kanti@ti.com>
+Message-ID: <1310565259-31267-18-git-send-email-tarun.kanti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Charulatha V <charu@ti.com>
 
-mpuio_init() function is defined under #ifdefs. It is required only in case
-of MPUIO bank type and only when PM operations are supported by it.
-This is applicable only in case of OMAP16xx SoC's MPUIO GPIO bank type.
-For all the other cases it is a dummy function. Hence clean up the same
-and remove all the OMAP SoC specific #ifdefs.
-
-bank_is_mpuio() is defined as a check to identify if the bank type is MPUIO.
-It is not required to define it separately as zero for OMAP2PLUS. Remove this.
+In all OMAP1 SoCs, the MPUIO bank width is 16 bits. But, in OMAP7xx,
+it is wrongly initialised to 32. Fix this.
 
 Signed-off-by: Charulatha V <charu@ti.com>
 ---
- drivers/gpio/gpio-omap.c |   19 -------------------
- 1 files changed, 0 insertions(+), 19 deletions(-)
+ arch/arm/mach-omap1/gpio7xx.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-index c9d12c5..fe02e7a 100644
---- a/drivers/gpio/gpio-omap.c
-+++ b/drivers/gpio/gpio-omap.c
-@@ -777,14 +777,8 @@ static struct irq_chip gpio_irq_chip = {
+diff --git a/arch/arm/mach-omap1/gpio7xx.c b/arch/arm/mach-omap1/gpio7xx.c
+index 91a7691..65949c8 100644
+--- a/arch/arm/mach-omap1/gpio7xx.c
++++ b/arch/arm/mach-omap1/gpio7xx.c
+@@ -52,8 +52,8 @@ static struct omap_gpio_reg_offs omap7xx_mpuio_regs = {
  
- /*---------------------------------------------------------------------*/
- 
--#ifdef CONFIG_ARCH_OMAP1
--
- #define bank_is_mpuio(bank)	((bank)->method == METHOD_MPUIO)
- 
--#ifdef CONFIG_ARCH_OMAP16XX
--
--#include <linux/platform_device.h>
--
- static int omap_mpuio_suspend_noirq(struct device *dev)
- {
- 	struct platform_device *pdev = to_platform_device(dev);
-@@ -846,17 +840,6 @@ static inline void mpuio_init(struct gpio_bank *bank)
- 		(void) platform_device_register(&omap_mpuio_device);
- }
- 
--#else
--static inline void mpuio_init(struct gpio_bank *bank) {}
--#endif	/* 16xx */
--
--#else
--
--#define bank_is_mpuio(bank)	0
--static inline void mpuio_init(struct gpio_bank *bank) {}
--
--#endif
--
- /*---------------------------------------------------------------------*/
- 
- /* REVISIT these are stupid implementations!  replace by ones that
-@@ -1077,10 +1060,8 @@ static void __devinit omap_gpio_chip_init(struct gpio_bank *bank)
- 	bank->chip.to_irq = gpio_2irq;
- 	if (bank_is_mpuio(bank)) {
- 		bank->chip.label = "mpuio";
--#ifdef CONFIG_ARCH_OMAP16XX
- 		if (bank->regs->wkup_status)
- 			bank->chip.dev = &omap_mpuio_device.dev;
--#endif
- 		bank->chip.base = OMAP_MPUIO(0);
- 	} else {
- 		bank->chip.label = "gpio";
+ static struct __initdata omap_gpio_platform_data omap7xx_mpu_gpio_config = {
+ 	.virtual_irq_start	= IH_MPUIO_BASE,
+-	.bank_width		= 32,
+ 	.is_mpuio		= true,
++	.bank_width		= 16,
+ 	.bank_stride		= 2,
+ 	.regs                   = &omap7xx_mpuio_regs,
+ };
 -- 
 1.6.0.4
