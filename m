@@ -1,38 +1,18 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Wed, 13 Jul 2011 16:40:58 +0400
-Subject: [PATCH 3.1 3/4] ARM:simpad: add GPIO based device definitions.
-In-Reply-To: <4E1D91CB.6090405@scram.de>
-References: <1310453186-22518-1-git-send-email-jochen@scram.de>	<1310453186-22518-4-git-send-email-jochen@scram.de>
-	<ivgta2$vvj$1@dough.gmane.org> <4E1D91CB.6090405@scram.de>
-Message-ID: <4E1D925A.9050601@gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 13 Jul 2011 21:46:52 +0900
+Subject: [PATCH V2 03/10] ASoc: mxs: add mxs-sgtl5000 machine driver
+In-Reply-To: <20110713115711.GG1928@pengutronix.de>
+References: <1310483085-31442-1-git-send-email-b29396@freescale.com>
+	<1310483085-31442-4-git-send-email-b29396@freescale.com>
+	<20110713115711.GG1928@pengutronix.de>
+Message-ID: <20110713124648.GA6640@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Wed, Jul 13, 2011 at 01:57:11PM +0200, Wolfram Sang wrote:
 
-On 13.07.2011 16:38, Jochen Friedrich wrote:
-> Hi Dmitry,
->
->>> @@ -259,7 +321,10 @@ static struct platform_device simpad_mq200fb = {
->>> };
->>>
->>> static struct platform_device *devices[] __initdata = {
->>> - &simpad_mq200fb
->>
->> Are you sure this is correct?
->>
->>> + &simpad_keys,
->>> + &simpad_polled_keys,
->>> + &simpad_mq200fb,
->>> + &simpad_i2c,
->>> };
->
-> Sorry, I don't see your point here. Could you clarify? Did I miss
-> something obvious?
+> Proper regulator support for mxs is not in mainline yet. Is that
+> planned? How do you do it?
 
-Oh, I'm sorry now. I saw the removal of mq200fb device, but missed the 
-re-addition of it. So please ignore my comment.
-
--- 
-With best wishes
-Dmitry
+Regulator support is not a feature of the platform, it's a generic Linux
+feature.
