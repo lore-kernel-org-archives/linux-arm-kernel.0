@@ -1,428 +1,448 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 13 Jul 2011 17:47:30 +0900
-Subject: [PATCH V2 05/12] ARM: SAMSUNG: Add common DMA operations
+Date: Wed, 13 Jul 2011 17:47:31 +0900
+Subject: [PATCH V2 06/12] ARM: EXYNOS4: Use generic DMA PL330 driver
 In-Reply-To: <1310546857-6304-1-git-send-email-kgene.kim@samsung.com>
 References: <1310546857-6304-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <1310546857-6304-6-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1310546857-6304-7-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Boojin Kim <boojin.kim@samsung.com>
 
-This patch adds common DMA operations which are used for Samsung DMA
-drivers. Currently there are two types of DMA driver for Samsung SoCs.
-The one is S3C-DMA for S3C SoCs and the other is PL330-DMA for S5P SoCs.
-This patch provides funcion pointers for common DMA operations to DMA
-client driver like SPI and Audio. It makes DMA client drivers support
-multi-platform.
-In addition, this common DMA operations implement the shared actions
-that are needed for DMA client driver. For example shared actions are
-filter() function for dma_request_channel() and parameter passing for
-device_prep_slave_sg().
+This patch makes Samsung EXYNOS4 to use DMA PL330 driver
+on DMADEVICE. The EXYNOS4 uses DMA generic APIs instead of
+SAMSUNG specific S3C-PL330 APIs.
 
 Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/mach-s3c2410/include/mach/dma.h       |    3 +-
- arch/arm/plat-samsung/Makefile                 |    6 +-
- arch/arm/plat-samsung/dma-ops.c                |  131 +++++++++++++++++++++++
- arch/arm/plat-samsung/include/plat/dma-ops.h   |   47 +++++++++
- arch/arm/plat-samsung/include/plat/dma-pl330.h |    3 +
- arch/arm/plat-samsung/include/plat/dma.h       |    2 +-
- arch/arm/plat-samsung/s3c-dma-ops.c            |  132 ++++++++++++++++++++++++
- 7 files changed, 320 insertions(+), 4 deletions(-)
- create mode 100644 arch/arm/plat-samsung/dma-ops.c
- create mode 100644 arch/arm/plat-samsung/include/plat/dma-ops.h
- create mode 100644 arch/arm/plat-samsung/s3c-dma-ops.c
+ arch/arm/mach-exynos4/Kconfig |    2 +-
+ arch/arm/mach-exynos4/clock.c |   16 +-
+ arch/arm/mach-exynos4/dma.c   |  323 +++++++++++++++++++++++++++--------------
+ 3 files changed, 221 insertions(+), 120 deletions(-)
 
-diff --git a/arch/arm/mach-s3c2410/include/mach/dma.h b/arch/arm/mach-s3c2410/include/mach/dma.h
-index b2b2a5b..71a662d 100644
---- a/arch/arm/mach-s3c2410/include/mach/dma.h
-+++ b/arch/arm/mach-s3c2410/include/mach/dma.h
-@@ -13,7 +13,6 @@
- #ifndef __ASM_ARCH_DMA_H
- #define __ASM_ARCH_DMA_H __FILE__
+diff --git a/arch/arm/mach-exynos4/Kconfig b/arch/arm/mach-exynos4/Kconfig
+index 1435fc3..5cc9b7a 100644
+--- a/arch/arm/mach-exynos4/Kconfig
++++ b/arch/arm/mach-exynos4/Kconfig
+@@ -11,7 +11,7 @@ if ARCH_EXYNOS4
  
--#include <plat/dma.h>
- #include <linux/sysdev.h>
+ config CPU_EXYNOS4210
+ 	bool
+-	select S3C_PL330_DMA
++	select DMADEV_PL330
+ 	help
+ 	  Enable EXYNOS4210 CPU support
  
- #define MAX_DMA_TRANSFER_SIZE   0x100000 /* Data Unit is half word  */
-@@ -51,6 +50,8 @@ enum dma_ch {
- 	DMACH_MAX,		/* the end entry */
+diff --git a/arch/arm/mach-exynos4/clock.c b/arch/arm/mach-exynos4/clock.c
+index 871f9d5..1b2e78c 100644
+--- a/arch/arm/mach-exynos4/clock.c
++++ b/arch/arm/mach-exynos4/clock.c
+@@ -47,6 +47,11 @@ static struct clk clk_sclk_usbphy1 = {
+ 	.id		= -1,
  };
  
-+#include <plat/dma.h>
++static struct clk dummy_apb_pclk = {
++	.name		= "apb_pclk",
++	.id		= -1,
++};
 +
- #define DMACH_LOW_LEVEL	(1<<28)	/* use this to specifiy hardware ch no */
+ static int exynos4_clksrc_mask_top_ctrl(struct clk *clk, int enable)
+ {
+ 	return s5p_gatectrl(S5P_CLKSRC_MASK_TOP, clk, enable);
+@@ -485,16 +490,11 @@ static struct clk init_clocks_off[] = {
+ 		.enable		= exynos4_clk_ip_fsys_ctrl,
+ 		.ctrlbit	= (1 << 10),
+ 	}, {
+-		.name		= "pdma",
+-		.id		= 0,
++		.name		= "dma",
++		.id		= -1,
+ 		.enable		= exynos4_clk_ip_fsys_ctrl,
+ 		.ctrlbit	= (1 << 0),
+ 	}, {
+-		.name		= "pdma",
+-		.id		= 1,
+-		.enable		= exynos4_clk_ip_fsys_ctrl,
+-		.ctrlbit	= (1 << 1),
+-	}, {
+ 		.name		= "adc",
+ 		.id		= -1,
+ 		.enable		= exynos4_clk_ip_peril_ctrl,
+@@ -1212,5 +1212,7 @@ void __init exynos4_register_clocks(void)
+ 	s3c_register_clocks(init_clocks_off, ARRAY_SIZE(init_clocks_off));
+ 	s3c_disable_clocks(init_clocks_off, ARRAY_SIZE(init_clocks_off));
  
- /* we have 4 dma channels */
-diff --git a/arch/arm/plat-samsung/Makefile b/arch/arm/plat-samsung/Makefile
-index 53eb15b..9ecf2aa 100644
---- a/arch/arm/plat-samsung/Makefile
-+++ b/arch/arm/plat-samsung/Makefile
-@@ -62,9 +62,11 @@ obj-$(CONFIG_SAMSUNG_DEV_PWM)	+= dev-pwm.o
- 
- # DMA support
- 
--obj-$(CONFIG_S3C_DMA)		+= dma.o
-+obj-$(CONFIG_S3C_DMA)		+= dma.o s3c-dma-ops.o
- 
--obj-$(CONFIG_S3C_PL330_DMA)	+= s3c-pl330.o
-+obj-$(CONFIG_DMADEV_PL330)	+= dma-ops.o
++	s3c24xx_register_clock(&dummy_apb_pclk);
 +
-+obj-$(CONFIG_S3C_PL330_DMA)	+= s3c-pl330.o s3c-dma-ops.o
+ 	s3c_pwmclk_init();
+ }
+diff --git a/arch/arm/mach-exynos4/dma.c b/arch/arm/mach-exynos4/dma.c
+index 564bb53..e1c00cf 100644
+--- a/arch/arm/mach-exynos4/dma.c
++++ b/arch/arm/mach-exynos4/dma.c
+@@ -21,151 +21,250 @@
+  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+  */
  
- # PM support
- 
-diff --git a/arch/arm/plat-samsung/dma-ops.c b/arch/arm/plat-samsung/dma-ops.c
-new file mode 100644
-index 0000000..94a9d33
---- /dev/null
-+++ b/arch/arm/plat-samsung/dma-ops.c
-@@ -0,0 +1,131 @@
-+/* linux/arch/arm/plat-samsung/dma-ops.c
-+ *
-+ * Copyright (c) 2011 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com
-+ *
-+ * Samsung DMA Operations
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
-+
-+#include <linux/kernel.h>
-+#include <linux/errno.h>
-+#include <linux/dmaengine.h>
+-#include <linux/platform_device.h>
+ #include <linux/dma-mapping.h>
++#include <linux/amba/bus.h>
 +#include <linux/amba/pl330.h>
-+
-+#include <mach/dma.h>
-+
-+static bool filter(struct dma_chan *chan, void *param)
-+{
-+	struct dma_pl330_peri *peri = (struct dma_pl330_peri *)chan->private;
-+	unsigned dma_ch = (unsigned)param;
-+
-+	if (peri->peri_id != dma_ch)
-+		return false;
-+
-+	return true;
-+}
-+
-+static unsigned dma_request(enum dma_ch dma_ch, struct samsung_dma_info *info)
-+{
-+	struct dma_chan *chan;
-+	dma_cap_mask_t mask;
-+	struct dma_slave_config slave_config;
-+
-+	dma_cap_zero(mask);
-+	dma_cap_set(info->cap, mask);
-+
-+	chan = dma_request_channel(mask, filter, (void *)dma_ch);
-+
-+	if (info->direction == DMA_FROM_DEVICE) {
-+		memset(&slave_config, 0, sizeof(struct dma_slave_config));
-+		slave_config.direction = info->direction;
-+		slave_config.src_addr = info->fifo;
-+		slave_config.src_addr_width = info->width;
-+		dmaengine_slave_config(chan, &slave_config);
-+	} else if (info->direction == DMA_TO_DEVICE) {
-+		memset(&slave_config, 0, sizeof(struct dma_slave_config));
-+		slave_config.direction = info->direction;
-+		slave_config.dst_addr = info->fifo;
-+		slave_config.dst_addr_width = info->width;
-+		dmaengine_slave_config(chan, &slave_config);
-+	}
-+
-+	return (unsigned)chan;
-+}
-+
-+static int dma_release(unsigned ch, struct s3c2410_dma_client *client)
-+{
-+	dma_release_channel((struct dma_chan *)ch);
-+
-+	return 0;
-+}
-+
-+static int dma_prepare(unsigned ch, struct samsung_dma_prep_info *info)
-+{
-+	struct scatterlist sg;
-+	struct dma_chan *chan = (struct dma_chan *)ch;
-+	struct dma_async_tx_descriptor *desc;
-+
-+	switch (info->cap) {
-+	case DMA_SLAVE:
-+		sg_init_table(&sg, 1);
-+		sg_dma_len(&sg) = info->len;
-+		sg_set_page(&sg, pfn_to_page(PFN_DOWN(info->buf)),
-+			    info->len, offset_in_page(info->buf));
-+		sg_dma_address(&sg) = info->buf;
-+
-+		desc = chan->device->device_prep_slave_sg(chan,
-+			&sg, 1, info->direction, DMA_PREP_INTERRUPT);
-+		break;
-+	case DMA_CYCLIC:
-+		desc = chan->device->device_prep_dma_cyclic(chan,
-+			info->buf, info->len, info->period, info->direction);
-+		break;
-+	default:
-+		dev_err(&chan->dev->device, "unsupported format\n");
-+		return -EFAULT;
-+	}
-+
-+	if (!desc) {
-+		dev_err(&chan->dev->device, "cannot prepare cyclic dma\n");
-+		return -EFAULT;
-+	}
-+
-+	desc->callback = info->fp;
-+	desc->callback_param = info->fp_param;
-+
-+	dmaengine_submit((struct dma_async_tx_descriptor *)desc);
-+
-+	return 0;
-+}
-+
-+static inline int dma_trigger(unsigned ch)
-+{
-+	dma_async_issue_pending((struct dma_chan *)ch);
-+
-+	return 0;
-+}
-+
-+static inline int dma_flush(unsigned ch)
-+{
-+	return dmaengine_terminate_all((struct dma_chan *)ch);
-+}
-+
-+static struct samsung_dma_ops dmaeng_ops = {
-+	.request	= dma_request,
-+	.release	= dma_release,
-+	.prepare	= dma_prepare,
-+	.trigger	= dma_trigger,
-+	.started	= NULL,
-+	.flush		= dma_flush,
-+	.stop		= dma_flush,
-+};
-+
-+void *samsung_dma_get_ops(void)
-+{
-+	return (void *)&dmaeng_ops;
-+}
-+EXPORT_SYMBOL(samsung_dma_get_ops);
-diff --git a/arch/arm/plat-samsung/include/plat/dma-ops.h b/arch/arm/plat-samsung/include/plat/dma-ops.h
-new file mode 100644
-index 0000000..eea4130
---- /dev/null
-+++ b/arch/arm/plat-samsung/include/plat/dma-ops.h
-@@ -0,0 +1,47 @@
-+/* arch/arm/plat-samsung/include/plat/dma-ops.h
-+ *
-+ * Copyright (c) 2011 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com
-+ *
-+ * Samsung DMA support
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
-+
-+#include <linux/dmaengine.h>
-+
-+struct samsung_dma_prep_info {
-+	enum dma_transaction_type cap;
-+	enum dma_data_direction direction;
-+	unsigned buf;
-+	unsigned long period;
-+	unsigned long len;
-+	void (*fp)(void *data);
-+	void *fp_param;
-+};
-+
-+struct samsung_dma_info {
-+	enum dma_transaction_type cap;
-+	enum dma_data_direction direction;
-+	enum dma_slave_buswidth width;
-+	unsigned fifo;
-+	struct s3c2410_dma_client *client;
-+};
-+
-+struct samsung_dma_ops {
-+	unsigned (*request)(enum dma_ch ch, struct samsung_dma_info *info);
-+	int (*release)(unsigned ch, struct s3c2410_dma_client *client);
-+	int (*prepare)(unsigned ch, struct samsung_dma_prep_info *info);
-+	int (*trigger)(unsigned ch);
-+	int (*started)(unsigned ch);
-+	int (*flush)(unsigned ch);
-+	int (*stop)(unsigned ch);
-+};
-+
-+/*
-+ * samsung_dma_get_ops
-+ * get the set of dma operations
-+ */
-+extern void *samsung_dma_get_ops(void);
-diff --git a/arch/arm/plat-samsung/include/plat/dma-pl330.h b/arch/arm/plat-samsung/include/plat/dma-pl330.h
-index c402719..be84bec 100644
---- a/arch/arm/plat-samsung/include/plat/dma-pl330.h
-+++ b/arch/arm/plat-samsung/include/plat/dma-pl330.h
-@@ -1,4 +1,7 @@
- /*
-+ * Copyright (c) 2011 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com
-+ *
-  * Copyright (C) 2010 Samsung Electronics Co. Ltd.
-  *	Jaswinder Singh <jassi.brar@samsung.com>
-  *
-diff --git a/arch/arm/plat-samsung/include/plat/dma.h b/arch/arm/plat-samsung/include/plat/dma.h
-index 2e8f8c6..90da162 100644
---- a/arch/arm/plat-samsung/include/plat/dma.h
-+++ b/arch/arm/plat-samsung/include/plat/dma.h
-@@ -124,4 +124,4 @@ extern int s3c2410_dma_getposition(unsigned int channel,
- extern int s3c2410_dma_set_opfn(unsigned int, s3c2410_dma_opfn_t rtn);
- extern int s3c2410_dma_set_buffdone_fn(unsigned int, s3c2410_dma_cbfn_t rtn);
  
++#include <asm/irq.h>
+ #include <plat/devs.h>
+ #include <plat/irqs.h>
+ 
+ #include <mach/map.h>
+ #include <mach/irqs.h>
 -
-+#include <plat/dma-ops.h>
-diff --git a/arch/arm/plat-samsung/s3c-dma-ops.c b/arch/arm/plat-samsung/s3c-dma-ops.c
-new file mode 100644
-index 0000000..17b1be0
---- /dev/null
-+++ b/arch/arm/plat-samsung/s3c-dma-ops.c
-@@ -0,0 +1,132 @@
-+/* linux/arch/arm/plat-samsung/s3c-dma-ops.c
-+ *
-+ * Copyright (c) 2011 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com
-+ *
-+ * Samsung S3C-DMA Operations
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
-+
-+#include <linux/kernel.h>
-+#include <linux/errno.h>
-+#include <linux/slab.h>
-+#include <linux/types.h>
-+
+-#include <plat/s3c-pl330-pdata.h>
 +#include <mach/dma.h>
-+
-+struct cb_data {
-+	void (*fp) (void *);
-+	void *fp_param;
-+	unsigned ch;
-+	struct list_head node;
-+};
-+
-+static LIST_HEAD(dma_list);
-+
-+static void dma_cb(struct s3c2410_dma_chan *channel,
-+		   void *param, int size, enum s3c2410_dma_buffresult res)
-+{
-+	struct cb_data *data = (struct cb_data *)param;
-+
-+	data->fp(data->fp_param);
-+}
-+
-+static unsigned dma_request(enum dma_ch dma_ch, struct samsung_dma_info *info)
-+{
-+	struct cb_data *data;
-+
-+	if (s3c2410_dma_request(dma_ch, info->client, NULL) < 0) {
-+		s3c2410_dma_free(dma_ch, info->client);
-+		return 0;
-+	}
-+
-+	data = kmalloc(sizeof(struct cb_data), GFP_KERNEL);
-+	data->fp = NULL;
-+	data->ch = (unsigned)dma_ch;
-+	list_add_tail(&data->node, &dma_list);
-+
-+	if (info->direction == DMA_FROM_DEVICE)
-+		s3c2410_dma_devconfig(dma_ch, S3C2410_DMASRC_HW, info->fifo);
-+	else
-+		s3c2410_dma_devconfig(dma_ch, S3C2410_DMASRC_MEM, info->fifo);
-+
-+	if (info->cap == DMA_CYCLIC)
-+		s3c2410_dma_setflags(dma_ch, S3C2410_DMAF_CIRCULAR);
-+
-+	s3c2410_dma_config(dma_ch, info->width);
-+
-+	return (unsigned)dma_ch;
-+}
-+
-+static int dma_release(unsigned ch, struct s3c2410_dma_client *client)
-+{
-+	struct cb_data *data;
-+
-+	list_for_each_entry(data, &dma_list, node)
-+	    if (data->ch == ch)
-+		break;
-+	list_del(&data->node);
-+
-+	s3c2410_dma_free((enum dma_ch)ch, client);
-+	kfree(data);
-+
-+	return 0;
-+}
-+
-+static int dma_prepare(unsigned ch, struct samsung_dma_prep_info *info)
-+{
-+	struct cb_data *data;
-+
-+	list_for_each_entry(data, &dma_list, node)
-+	    if (data->ch == ch)
-+		break;
-+
-+	if (!data->fp) {
-+		s3c2410_dma_set_buffdone_fn((enum dma_ch)ch, dma_cb);
-+		data->fp = info->fp;
-+		data->fp_param = info->fp_param;
-+	}
-+	s3c2410_dma_enqueue((enum dma_ch)ch, (void *)data, info->buf,
-+			    info->period);
-+
-+	return 0;
-+}
-+
-+static inline int dma_trigger(unsigned ch)
-+{
-+	return s3c2410_dma_ctrl(ch, S3C2410_DMAOP_START);
-+}
-+
-+static inline int dma_started(unsigned ch)
-+{
-+	return s3c2410_dma_ctrl(ch, S3C2410_DMAOP_STARTED);
-+}
-+
-+static inline int dma_flush(unsigned ch)
-+{
-+	return s3c2410_dma_ctrl(ch, S3C2410_DMAOP_FLUSH);
-+}
-+
-+static inline int dma_stop(unsigned ch)
-+{
-+	return s3c2410_dma_ctrl(ch, S3C2410_DMAOP_STOP);
-+}
-+
-+static struct samsung_dma_ops s3c_dma_ops = {
-+	.request	= dma_request,
-+	.release	= dma_release,
-+	.prepare	= dma_prepare,
-+	.trigger	= dma_trigger,
-+	.started	= dma_started,
-+	.flush		= dma_flush,
-+	.stop		= dma_stop,
-+};
-+
-+void *samsung_dma_get_ops(void)
-+{
-+	return (void *)&s3c_dma_ops;
-+}
-+EXPORT_SYMBOL(samsung_dma_get_ops);
+ 
+ static u64 dma_dmamask = DMA_BIT_MASK(32);
+ 
+-static struct resource exynos4_pdma0_resource[] = {
+-	[0] = {
+-		.start	= EXYNOS4_PA_PDMA0,
+-		.end	= EXYNOS4_PA_PDMA0 + SZ_4K,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	[1] = {
+-		.start	= IRQ_PDMA0,
+-		.end	= IRQ_PDMA0,
+-		.flags	= IORESOURCE_IRQ,
++struct dma_pl330_peri pdma0_peri[32] = {
++	{
++		.peri_id = (u8)DMACH_PCM0_RX,
++		.rqtype = DEVTOMEM,
++	}, {
++		.peri_id = (u8)DMACH_PCM0_TX,
++		.rqtype = MEMTODEV,
++	}, {
++		.peri_id = (u8)DMACH_PCM2_RX,
++		.rqtype = DEVTOMEM,
++	}, {
++		.peri_id = (u8)DMACH_PCM2_TX,
++		.rqtype = MEMTODEV,
++		.burst_sz = 4,
++	}, {
++		.peri_id = (u8)DMACH_MSM_REQ0,
++	}, {
++		.peri_id = (u8)DMACH_MSM_REQ2,
++	}, {
++		.peri_id = (u8)DMACH_SPI0_RX,
++		.rqtype = DEVTOMEM,
++		.burst_sz = 1,
++	}, {
++		.peri_id = (u8)DMACH_SPI0_TX,
++		.rqtype = MEMTODEV,
++		.burst_sz = 1,
++	}, {
++		.peri_id = (u8)DMACH_SPI2_RX,
++		.rqtype = DEVTOMEM,
++		.burst_sz = 1,
++	}, {
++		.peri_id = (u8)DMACH_SPI2_TX,
++		.rqtype = MEMTODEV,
++		.burst_sz = 1,
++	}, {
++		.peri_id = (u8)DMACH_I2S0S_TX,
++		.rqtype = MEMTODEV,
++	}, {
++		.peri_id = (u8)DMACH_I2S0_RX,
++		.rqtype = DEVTOMEM,
++	}, {
++		.peri_id = (u8)DMACH_I2S0_TX,
++		.rqtype = MEMTODEV,
++	}, {
++		.peri_id = (u8)DMACH_UART0_RX,
++		.rqtype = DEVTOMEM,
++		.burst_sz = 4,
++	}, {
++		.peri_id = (u8)DMACH_UART0_TX,
++		.rqtype = MEMTODEV,
++		.burst_sz = 4,
++	}, {
++		.peri_id = (u8)DMACH_UART2_RX,
++		.rqtype = DEVTOMEM,
++		.burst_sz = 4,
++	}, {
++		.peri_id = (u8)DMACH_UART2_TX,
++		.rqtype = MEMTODEV,
++		.burst_sz = 4,
++	}, {
++		.peri_id = (u8)DMACH_UART4_RX,
++		.rqtype = DEVTOMEM,
++		.burst_sz = 4,
++	}, {
++		.peri_id = (u8)DMACH_UART4_TX,
++		.rqtype = MEMTODEV,
++		.burst_sz = 4,
++	}, {
++		.peri_id = (u8)DMACH_SLIMBUS0_RX,
++		.rqtype = DEVTOMEM,
++	}, {
++		.peri_id = (u8)DMACH_SLIMBUS0_TX,
++		.rqtype = MEMTODEV,
++	}, {
++		.peri_id = (u8)DMACH_SLIMBUS2_RX,
++		.rqtype = DEVTOMEM,
++	}, {
++		.peri_id = (u8)DMACH_SLIMBUS2_TX,
++		.rqtype = MEMTODEV,
++	}, {
++		.peri_id = (u8)DMACH_SLIMBUS4_RX,
++		.rqtype = DEVTOMEM,
++	}, {
++		.peri_id = (u8)DMACH_SLIMBUS4_TX,
++		.rqtype = MEMTODEV,
++	}, {
++		.peri_id = (u8)DMACH_AC97_MICIN,
++		.rqtype = DEVTOMEM,
++		.burst_sz = 4,
++	}, {
++		.peri_id = (u8)DMACH_AC97_PCMIN,
++		.rqtype = DEVTOMEM,
++		.burst_sz = 4,
++	}, {
++		.peri_id = (u8)DMACH_AC97_PCMOUT,
++		.rqtype = MEMTODEV,
++		.burst_sz = 4,
+ 	},
+ };
+ 
+-static struct s3c_pl330_platdata exynos4_pdma0_pdata = {
+-	.peri = {
+-		[0] = DMACH_PCM0_RX,
+-		[1] = DMACH_PCM0_TX,
+-		[2] = DMACH_PCM2_RX,
+-		[3] = DMACH_PCM2_TX,
+-		[4] = DMACH_MSM_REQ0,
+-		[5] = DMACH_MSM_REQ2,
+-		[6] = DMACH_SPI0_RX,
+-		[7] = DMACH_SPI0_TX,
+-		[8] = DMACH_SPI2_RX,
+-		[9] = DMACH_SPI2_TX,
+-		[10] = DMACH_I2S0S_TX,
+-		[11] = DMACH_I2S0_RX,
+-		[12] = DMACH_I2S0_TX,
+-		[13] = DMACH_I2S2_RX,
+-		[14] = DMACH_I2S2_TX,
+-		[15] = DMACH_UART0_RX,
+-		[16] = DMACH_UART0_TX,
+-		[17] = DMACH_UART2_RX,
+-		[18] = DMACH_UART2_TX,
+-		[19] = DMACH_UART4_RX,
+-		[20] = DMACH_UART4_TX,
+-		[21] = DMACH_SLIMBUS0_RX,
+-		[22] = DMACH_SLIMBUS0_TX,
+-		[23] = DMACH_SLIMBUS2_RX,
+-		[24] = DMACH_SLIMBUS2_TX,
+-		[25] = DMACH_SLIMBUS4_RX,
+-		[26] = DMACH_SLIMBUS4_TX,
+-		[27] = DMACH_AC97_MICIN,
+-		[28] = DMACH_AC97_PCMIN,
+-		[29] = DMACH_AC97_PCMOUT,
+-		[30] = DMACH_MAX,
+-		[31] = DMACH_MAX,
+-	},
++struct dma_pl330_platdata exynos4_pdma0_pdata = {
++	.nr_valid_peri = 32,
++	.peri = pdma0_peri,
+ };
+ 
+-static struct platform_device exynos4_device_pdma0 = {
+-	.name		= "s3c-pl330",
+-	.id		= 0,
+-	.num_resources	= ARRAY_SIZE(exynos4_pdma0_resource),
+-	.resource	= exynos4_pdma0_resource,
+-	.dev		= {
++struct amba_device exynos4_device_pdma0 = {
++	.dev = {
++		.init_name = "dma-pl330.0",
+ 		.dma_mask = &dma_dmamask,
+ 		.coherent_dma_mask = DMA_BIT_MASK(32),
+ 		.platform_data = &exynos4_pdma0_pdata,
+-	},
++		},
++	.res = {
++		.start = EXYNOS4_PA_PDMA0,
++		.end = EXYNOS4_PA_PDMA0 + SZ_4K,
++		.flags = IORESOURCE_MEM,
++		},
++	.irq = {IRQ_PDMA0, NO_IRQ},
++	.periphid = 0x00041330,
+ };
+ 
+-static struct resource exynos4_pdma1_resource[] = {
+-	[0] = {
+-		.start	= EXYNOS4_PA_PDMA1,
+-		.end	= EXYNOS4_PA_PDMA1 + SZ_4K,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	[1] = {
+-		.start	= IRQ_PDMA1,
+-		.end	= IRQ_PDMA1,
+-		.flags	= IORESOURCE_IRQ,
++struct dma_pl330_peri pdma1_peri[32] = {
++	{
++		.peri_id = (u8)DMACH_PCM0_RX,
++		.rqtype = DEVTOMEM,
++	}, {
++		.peri_id = (u8)DMACH_PCM0_TX,
++		.rqtype = MEMTODEV,
++	}, {
++		.peri_id = (u8)DMACH_PCM1_RX,
++		.rqtype = DEVTOMEM,
++	}, {
++		.peri_id = (u8)DMACH_PCM1_TX,
++		.rqtype = MEMTODEV,
++	}, {
++		.peri_id = (u8)DMACH_MSM_REQ1,
++	}, {
++		.peri_id = (u8)DMACH_MSM_REQ3,
++	}, {
++		.peri_id = (u8)DMACH_SPI1_RX,
++		.rqtype = DEVTOMEM,
++		.burst_sz = 1,
++	}, {
++		.peri_id = (u8)DMACH_SPI1_TX,
++		.rqtype = MEMTODEV,
++		.burst_sz = 1,
++	}, {
++		.peri_id = (u8)DMACH_I2S0S_TX,
++		.rqtype = MEMTODEV,
++	}, {
++		.peri_id = (u8)DMACH_I2S0_RX,
++		.rqtype = DEVTOMEM,
++	}, {
++		.peri_id = (u8)DMACH_I2S0_TX,
++		.rqtype = MEMTODEV,
++	}, {
++		.peri_id = (u8)DMACH_I2S1_RX,
++		.rqtype = DEVTOMEM,
++	}, {
++		.peri_id = (u8)DMACH_I2S1_TX,
++		.rqtype = MEMTODEV,
++	}, {
++		.peri_id = (u8)DMACH_UART0_RX,
++		.rqtype = DEVTOMEM,
++		.burst_sz = 4,
++	}, {
++		.peri_id = (u8)DMACH_UART0_TX,
++		.rqtype = MEMTODEV,
++		.burst_sz = 4,
++	}, {
++		.peri_id = (u8)DMACH_UART1_RX,
++		.rqtype = DEVTOMEM,
++		.burst_sz = 4,
++	}, {
++		.peri_id = (u8)DMACH_UART1_TX,
++		.rqtype = MEMTODEV,
++		.burst_sz = 4,
++	}, {
++		.peri_id = (u8)DMACH_UART3_RX,
++		.rqtype = DEVTOMEM,
++		.burst_sz = 4,
++	}, {
++		.peri_id = (u8)DMACH_UART3_TX,
++		.rqtype = MEMTODEV,
++		.burst_sz = 4,
++	}, {
++		.peri_id = (u8)DMACH_SLIMBUS1_RX,
++		.rqtype = DEVTOMEM,
++	}, {
++		.peri_id = (u8)DMACH_SLIMBUS1_TX,
++		.rqtype = MEMTODEV,
++	}, {
++		.peri_id = (u8)DMACH_SLIMBUS3_RX,
++		.rqtype = DEVTOMEM,
++	}, {
++		.peri_id = (u8)DMACH_SLIMBUS3_TX,
++		.rqtype = MEMTODEV,
++	}, {
++		.peri_id = (u8)DMACH_SLIMBUS5_RX,
++		.rqtype = DEVTOMEM,
++	}, {
++		.peri_id = (u8)DMACH_SLIMBUS5_TX,
++		.rqtype = MEMTODEV,
+ 	},
+ };
+ 
+-static struct s3c_pl330_platdata exynos4_pdma1_pdata = {
+-	.peri = {
+-		[0] = DMACH_PCM0_RX,
+-		[1] = DMACH_PCM0_TX,
+-		[2] = DMACH_PCM1_RX,
+-		[3] = DMACH_PCM1_TX,
+-		[4] = DMACH_MSM_REQ1,
+-		[5] = DMACH_MSM_REQ3,
+-		[6] = DMACH_SPI1_RX,
+-		[7] = DMACH_SPI1_TX,
+-		[8] = DMACH_I2S0S_TX,
+-		[9] = DMACH_I2S0_RX,
+-		[10] = DMACH_I2S0_TX,
+-		[11] = DMACH_I2S1_RX,
+-		[12] = DMACH_I2S1_TX,
+-		[13] = DMACH_UART0_RX,
+-		[14] = DMACH_UART0_TX,
+-		[15] = DMACH_UART1_RX,
+-		[16] = DMACH_UART1_TX,
+-		[17] = DMACH_UART3_RX,
+-		[18] = DMACH_UART3_TX,
+-		[19] = DMACH_SLIMBUS1_RX,
+-		[20] = DMACH_SLIMBUS1_TX,
+-		[21] = DMACH_SLIMBUS3_RX,
+-		[22] = DMACH_SLIMBUS3_TX,
+-		[23] = DMACH_SLIMBUS5_RX,
+-		[24] = DMACH_SLIMBUS5_TX,
+-		[25] = DMACH_SLIMBUS0AUX_RX,
+-		[26] = DMACH_SLIMBUS0AUX_TX,
+-		[27] = DMACH_SPDIF,
+-		[28] = DMACH_MAX,
+-		[29] = DMACH_MAX,
+-		[30] = DMACH_MAX,
+-		[31] = DMACH_MAX,
+-	},
++struct dma_pl330_platdata exynos4_pdma1_pdata = {
++	.nr_valid_peri = 32,
++	.peri = pdma1_peri,
+ };
+ 
+-static struct platform_device exynos4_device_pdma1 = {
+-	.name		= "s3c-pl330",
+-	.id		= 1,
+-	.num_resources	= ARRAY_SIZE(exynos4_pdma1_resource),
+-	.resource	= exynos4_pdma1_resource,
+-	.dev		= {
++struct amba_device exynos4_device_pdma1 = {
++	.dev = {
++		.init_name = "dma-pl330.1",
+ 		.dma_mask = &dma_dmamask,
+ 		.coherent_dma_mask = DMA_BIT_MASK(32),
+ 		.platform_data = &exynos4_pdma1_pdata,
+ 	},
+-};
+-
+-static struct platform_device *exynos4_dmacs[] __initdata = {
+-	&exynos4_device_pdma0,
+-	&exynos4_device_pdma1,
++	.res = {
++		.start = EXYNOS4_PA_PDMA1,
++		.end = EXYNOS4_PA_PDMA1 + SZ_4K,
++		.flags = IORESOURCE_MEM,
++	},
++	.irq = {IRQ_PDMA1, NO_IRQ},
++	.periphid = 0x00041330,
+ };
+ 
+ static int __init exynos4_dma_init(void)
+ {
+-	platform_add_devices(exynos4_dmacs, ARRAY_SIZE(exynos4_dmacs));
++	amba_device_register(&exynos4_device_pdma0, &iomem_resource);
+ 
+ 	return 0;
+ }
 -- 
 1.7.1
