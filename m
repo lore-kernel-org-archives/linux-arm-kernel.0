@@ -1,119 +1,255 @@
 From: tixy@yxit.co.uk (Tixy)
-Date: Wed, 13 Jul 2011 10:06:09 +0100
-Subject: [PATCH 20/24] ARM: kprobes: Add new versions of emulate_ldr() and
-	emulate_str()
+Date: Wed, 13 Jul 2011 10:06:00 +0100
+Subject: [PATCH 11/24] ARM: kprobes: Migrate ARM space_cccc_0110__1 to
+	decoding tables
 In-Reply-To: <1310547973-31784-1-git-send-email-tixy@yxit.co.uk>
 References: <1310547973-31784-1-git-send-email-tixy@yxit.co.uk>
-Message-ID: <1310547973-31784-21-git-send-email-tixy@yxit.co.uk>
+Message-ID: <1310547973-31784-12-git-send-email-tixy@yxit.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jon Medhurst <tixy@yxit.co.uk>
 
-These use the register calling conventions required by the new decoding
-table framework for calling simulated instructions.
-
-We rename the old versions of these functions to *_old for now.
-
 Signed-off-by: Jon Medhurst <tixy@yxit.co.uk>
 ---
- arch/arm/kernel/kprobes-arm.c |   63 +++++++++++++++++++++++++++++++++++++++--
- 1 files changed, 60 insertions(+), 3 deletions(-)
+ arch/arm/kernel/kprobes-arm.c |  217 +++++++++++++++++------------------------
+ 1 files changed, 91 insertions(+), 126 deletions(-)
 
 diff --git a/arch/arm/kernel/kprobes-arm.c b/arch/arm/kernel/kprobes-arm.c
-index bb38ae3..d252e78 100644
+index eb11a56..6203505 100644
 --- a/arch/arm/kernel/kprobes-arm.c
 +++ b/arch/arm/kernel/kprobes-arm.c
-@@ -502,7 +502,7 @@ static void __kprobes emulate_strd(struct kprobe *p, struct pt_regs *regs)
- 		regs->uregs[rn] = rnv_wb;
- }
+@@ -1281,132 +1281,97 @@ static const union decode_item arm_cccc_001x_table[] = {
+ 	DECODE_END
+ };
  
--static void __kprobes emulate_ldr(struct kprobe *p, struct pt_regs *regs)
-+static void __kprobes emulate_ldr_old(struct kprobe *p, struct pt_regs *regs)
- {
- 	insn_llret_3arg_fn_t *i_fn = (insn_llret_3arg_fn_t *)&p->ainsn.insn[0];
- 	kprobe_opcode_t insn = p->opcode;
-@@ -535,7 +535,7 @@ static void __kprobes emulate_ldr(struct kprobe *p, struct pt_regs *regs)
- 	regs->uregs[rd] = rdv;
- }
+-static enum kprobe_insn __kprobes
+-space_cccc_0110__1(kprobe_opcode_t insn, struct arch_specific_insn *asi)
+-{
+-	/* SEL : cccc 0110 1000 xxxx xxxx xxxx 1011 xxxx GE: !!! */
+-	if ((insn & 0x0ff000f0) == 0x068000b0) {
+-		if (is_r15(insn, 12))
+-			return INSN_REJECTED;	/* Rd is PC */
+-		insn &= 0xfff00ff0;	/* Rd = r0, Rn = r0 */
+-		insn |= 0x00000001;	/* Rm = r1 */
+-		asi->insn[0] = insn;
+-		asi->insn_handler = emulate_sel;
+-		return INSN_GOOD;
+-	}
+-
+-	/* SSAT   : cccc 0110 101x xxxx xxxx xxxx xx01 xxxx :Q */
+-	/* USAT   : cccc 0110 111x xxxx xxxx xxxx xx01 xxxx :Q */
+-	/* SSAT16 : cccc 0110 1010 xxxx xxxx xxxx 0011 xxxx :Q */
+-	/* USAT16 : cccc 0110 1110 xxxx xxxx xxxx 0011 xxxx :Q */
+-	if ((insn & 0x0fa00030) == 0x06a00010 ||
+-	    (insn & 0x0fb000f0) == 0x06a00030) {
+-		if (is_r15(insn, 12))
+-			return INSN_REJECTED;	/* Rd is PC */
+-		insn &= 0xffff0ff0;	/* Rd = r0, Rm = r0 */
+-		asi->insn[0] = insn;
+-		asi->insn_handler = emulate_sat;
+-		return INSN_GOOD;
+-	}
+-
+-	/* REV    : cccc 0110 1011 xxxx xxxx xxxx 0011 xxxx */
+-	/* REV16  : cccc 0110 1011 xxxx xxxx xxxx 1011 xxxx */
+-	/* RBIT   : cccc 0110 1111 xxxx xxxx xxxx 0011 xxxx */
+-	/* REVSH  : cccc 0110 1111 xxxx xxxx xxxx 1011 xxxx */
+-	if ((insn & 0x0ff00070) == 0x06b00030 ||
+-	    (insn & 0x0ff00070) == 0x06f00030)
+-		return prep_emulate_rd12rm0(insn, asi);
+-
+-	/* ???       : cccc 0110 0000 xxxx xxxx xxxx xxx1 xxxx :   */
+-	/* SADD16    : cccc 0110 0001 xxxx xxxx xxxx 0001 xxxx :GE */
+-	/* SADDSUBX  : cccc 0110 0001 xxxx xxxx xxxx 0011 xxxx :GE */
+-	/* SSUBADDX  : cccc 0110 0001 xxxx xxxx xxxx 0101 xxxx :GE */
+-	/* SSUB16    : cccc 0110 0001 xxxx xxxx xxxx 0111 xxxx :GE */
+-	/* SADD8     : cccc 0110 0001 xxxx xxxx xxxx 1001 xxxx :GE */
+-	/* ???       : cccc 0110 0001 xxxx xxxx xxxx 1011 xxxx :   */
+-	/* ???       : cccc 0110 0001 xxxx xxxx xxxx 1101 xxxx :   */
+-	/* SSUB8     : cccc 0110 0001 xxxx xxxx xxxx 1111 xxxx :GE */
+-	/* QADD16    : cccc 0110 0010 xxxx xxxx xxxx 0001 xxxx :   */
+-	/* QADDSUBX  : cccc 0110 0010 xxxx xxxx xxxx 0011 xxxx :   */
+-	/* QSUBADDX  : cccc 0110 0010 xxxx xxxx xxxx 0101 xxxx :   */
+-	/* QSUB16    : cccc 0110 0010 xxxx xxxx xxxx 0111 xxxx :   */
+-	/* QADD8     : cccc 0110 0010 xxxx xxxx xxxx 1001 xxxx :   */
+-	/* ???       : cccc 0110 0010 xxxx xxxx xxxx 1011 xxxx :   */
+-	/* ???       : cccc 0110 0010 xxxx xxxx xxxx 1101 xxxx :   */
+-	/* QSUB8     : cccc 0110 0010 xxxx xxxx xxxx 1111 xxxx :   */
+-	/* SHADD16   : cccc 0110 0011 xxxx xxxx xxxx 0001 xxxx :   */
+-	/* SHADDSUBX : cccc 0110 0011 xxxx xxxx xxxx 0011 xxxx :   */
+-	/* SHSUBADDX : cccc 0110 0011 xxxx xxxx xxxx 0101 xxxx :   */
+-	/* SHSUB16   : cccc 0110 0011 xxxx xxxx xxxx 0111 xxxx :   */
+-	/* SHADD8    : cccc 0110 0011 xxxx xxxx xxxx 1001 xxxx :   */
+-	/* ???       : cccc 0110 0011 xxxx xxxx xxxx 1011 xxxx :   */
+-	/* ???       : cccc 0110 0011 xxxx xxxx xxxx 1101 xxxx :   */
+-	/* SHSUB8    : cccc 0110 0011 xxxx xxxx xxxx 1111 xxxx :   */
+-	/* ???       : cccc 0110 0100 xxxx xxxx xxxx xxx1 xxxx :   */
+-	/* UADD16    : cccc 0110 0101 xxxx xxxx xxxx 0001 xxxx :GE */
+-	/* UADDSUBX  : cccc 0110 0101 xxxx xxxx xxxx 0011 xxxx :GE */
+-	/* USUBADDX  : cccc 0110 0101 xxxx xxxx xxxx 0101 xxxx :GE */
+-	/* USUB16    : cccc 0110 0101 xxxx xxxx xxxx 0111 xxxx :GE */
+-	/* UADD8     : cccc 0110 0101 xxxx xxxx xxxx 1001 xxxx :GE */
+-	/* ???       : cccc 0110 0101 xxxx xxxx xxxx 1011 xxxx :   */
+-	/* ???       : cccc 0110 0101 xxxx xxxx xxxx 1101 xxxx :   */
+-	/* USUB8     : cccc 0110 0101 xxxx xxxx xxxx 1111 xxxx :GE */
+-	/* UQADD16   : cccc 0110 0110 xxxx xxxx xxxx 0001 xxxx :   */
+-	/* UQADDSUBX : cccc 0110 0110 xxxx xxxx xxxx 0011 xxxx :   */
+-	/* UQSUBADDX : cccc 0110 0110 xxxx xxxx xxxx 0101 xxxx :   */
+-	/* UQSUB16   : cccc 0110 0110 xxxx xxxx xxxx 0111 xxxx :   */
+-	/* UQADD8    : cccc 0110 0110 xxxx xxxx xxxx 1001 xxxx :   */
+-	/* ???       : cccc 0110 0110 xxxx xxxx xxxx 1011 xxxx :   */
+-	/* ???       : cccc 0110 0110 xxxx xxxx xxxx 1101 xxxx :   */
+-	/* UQSUB8    : cccc 0110 0110 xxxx xxxx xxxx 1111 xxxx :   */
+-	/* UHADD16   : cccc 0110 0111 xxxx xxxx xxxx 0001 xxxx :   */
+-	/* UHADDSUBX : cccc 0110 0111 xxxx xxxx xxxx 0011 xxxx :   */
+-	/* UHSUBADDX : cccc 0110 0111 xxxx xxxx xxxx 0101 xxxx :   */
+-	/* UHSUB16   : cccc 0110 0111 xxxx xxxx xxxx 0111 xxxx :   */
+-	/* UHADD8    : cccc 0110 0111 xxxx xxxx xxxx 1001 xxxx :   */
+-	/* ???       : cccc 0110 0111 xxxx xxxx xxxx 1011 xxxx :   */
+-	/* ???       : cccc 0110 0111 xxxx xxxx xxxx 1101 xxxx :   */
+-	/* UHSUB8    : cccc 0110 0111 xxxx xxxx xxxx 1111 xxxx :   */
+-	if ((insn & 0x0f800010) == 0x06000010) {
+-		if ((insn & 0x00300000) == 0x00000000 ||
+-		    (insn & 0x000000e0) == 0x000000a0 ||
+-		    (insn & 0x000000e0) == 0x000000c0)
+-			return INSN_REJECTED;	/* Unallocated space */
+-		return prep_emulate_rd12rn16rm0_wflags(insn, asi);
+-	}
+-
+-	/* PKHBT     : cccc 0110 1000 xxxx xxxx xxxx x001 xxxx :   */
+-	/* PKHTB     : cccc 0110 1000 xxxx xxxx xxxx x101 xxxx :   */
+-	if ((insn & 0x0ff00030) == 0x06800010)
+-		return prep_emulate_rd12rn16rm0_wflags(insn, asi);
+-
+-	/* SXTAB16   : cccc 0110 1000 xxxx xxxx xxxx 0111 xxxx :   */
+-	/* SXTB16    : cccc 0110 1000 1111 xxxx xxxx 0111 xxxx :   */
+-	/* ???       : cccc 0110 1001 xxxx xxxx xxxx 0111 xxxx :   */
+-	/* SXTAB     : cccc 0110 1010 xxxx xxxx xxxx 0111 xxxx :   */
+-	/* SXTB      : cccc 0110 1010 1111 xxxx xxxx 0111 xxxx :   */
+-	/* SXTAH     : cccc 0110 1011 xxxx xxxx xxxx 0111 xxxx :   */
+-	/* SXTH      : cccc 0110 1011 1111 xxxx xxxx 0111 xxxx :   */
+-	/* UXTAB16   : cccc 0110 1100 xxxx xxxx xxxx 0111 xxxx :   */
+-	/* UXTB16    : cccc 0110 1100 1111 xxxx xxxx 0111 xxxx :   */
+-	/* ???       : cccc 0110 1101 xxxx xxxx xxxx 0111 xxxx :   */
+-	/* UXTAB     : cccc 0110 1110 xxxx xxxx xxxx 0111 xxxx :   */
+-	/* UXTB      : cccc 0110 1110 1111 xxxx xxxx 0111 xxxx :   */
+-	/* UXTAH     : cccc 0110 1111 xxxx xxxx xxxx 0111 xxxx :   */
+-	/* UXTH      : cccc 0110 1111 1111 xxxx xxxx 0111 xxxx :   */
+-	if ((insn & 0x0f8000f0) == 0x06800070) {
+-		if ((insn & 0x00300000) == 0x00100000)
+-			return INSN_REJECTED;	/* Unallocated space */
+-
+-		if ((insn & 0x000f0000) == 0x000f0000)
+-			return prep_emulate_rd12rm0(insn, asi);
+-		else
+-			return prep_emulate_rd12rn16rm0_wflags(insn, asi);
+-	}
++static const union decode_item arm_cccc_0110_____xxx1_table[] = {
++	/* Media instructions						*/
++
++	/* SEL			cccc 0110 1000 xxxx xxxx xxxx 1011 xxxx */
++	DECODE_EMULATEX	(0x0ff000f0, 0x068000b0, emulate_rd12rn16rm0_rwflags_nopc,
++						 REGS(NOPC, NOPC, 0, 0, NOPC)),
++
++	/* SSAT			cccc 0110 101x xxxx xxxx xxxx xx01 xxxx */
++	/* USAT			cccc 0110 111x xxxx xxxx xxxx xx01 xxxx */
++	DECODE_OR(0x0fa00030, 0x06a00010),
++	/* SSAT16		cccc 0110 1010 xxxx xxxx xxxx 0011 xxxx */
++	/* USAT16		cccc 0110 1110 xxxx xxxx xxxx 0011 xxxx */
++	DECODE_EMULATEX	(0x0fb000f0, 0x06a00030, emulate_rd12rn16rm0_rwflags_nopc,
++						 REGS(0, NOPC, 0, 0, NOPC)),
++
++	/* REV			cccc 0110 1011 xxxx xxxx xxxx 0011 xxxx */
++	/* REV16		cccc 0110 1011 xxxx xxxx xxxx 1011 xxxx */
++	/* RBIT			cccc 0110 1111 xxxx xxxx xxxx 0011 xxxx */
++	/* REVSH		cccc 0110 1111 xxxx xxxx xxxx 1011 xxxx */
++	DECODE_CUSTOM	(0x0fb00070, 0x06b00030, prep_emulate_rd12rm0),
++
++	/* ???			cccc 0110 0x00 xxxx xxxx xxxx xxx1 xxxx */
++	DECODE_REJECT	(0x0fb00010, 0x06000010),
++	/* ???			cccc 0110 0xxx xxxx xxxx xxxx 1011 xxxx */
++	DECODE_REJECT	(0x0f8000f0, 0x060000b0),
++	/* ???			cccc 0110 0xxx xxxx xxxx xxxx 1101 xxxx */
++	DECODE_REJECT	(0x0f8000f0, 0x060000d0),
++	/* SADD16		cccc 0110 0001 xxxx xxxx xxxx 0001 xxxx */
++	/* SADDSUBX		cccc 0110 0001 xxxx xxxx xxxx 0011 xxxx */
++	/* SSUBADDX		cccc 0110 0001 xxxx xxxx xxxx 0101 xxxx */
++	/* SSUB16		cccc 0110 0001 xxxx xxxx xxxx 0111 xxxx */
++	/* SADD8		cccc 0110 0001 xxxx xxxx xxxx 1001 xxxx */
++	/* SSUB8		cccc 0110 0001 xxxx xxxx xxxx 1111 xxxx */
++	/* QADD16		cccc 0110 0010 xxxx xxxx xxxx 0001 xxxx */
++	/* QADDSUBX		cccc 0110 0010 xxxx xxxx xxxx 0011 xxxx */
++	/* QSUBADDX		cccc 0110 0010 xxxx xxxx xxxx 0101 xxxx */
++	/* QSUB16		cccc 0110 0010 xxxx xxxx xxxx 0111 xxxx */
++	/* QADD8		cccc 0110 0010 xxxx xxxx xxxx 1001 xxxx */
++	/* QSUB8		cccc 0110 0010 xxxx xxxx xxxx 1111 xxxx */
++	/* SHADD16		cccc 0110 0011 xxxx xxxx xxxx 0001 xxxx */
++	/* SHADDSUBX		cccc 0110 0011 xxxx xxxx xxxx 0011 xxxx */
++	/* SHSUBADDX		cccc 0110 0011 xxxx xxxx xxxx 0101 xxxx */
++	/* SHSUB16		cccc 0110 0011 xxxx xxxx xxxx 0111 xxxx */
++	/* SHADD8		cccc 0110 0011 xxxx xxxx xxxx 1001 xxxx */
++	/* SHSUB8		cccc 0110 0011 xxxx xxxx xxxx 1111 xxxx */
++	/* UADD16		cccc 0110 0101 xxxx xxxx xxxx 0001 xxxx */
++	/* UADDSUBX		cccc 0110 0101 xxxx xxxx xxxx 0011 xxxx */
++	/* USUBADDX		cccc 0110 0101 xxxx xxxx xxxx 0101 xxxx */
++	/* USUB16		cccc 0110 0101 xxxx xxxx xxxx 0111 xxxx */
++	/* UADD8		cccc 0110 0101 xxxx xxxx xxxx 1001 xxxx */
++	/* USUB8		cccc 0110 0101 xxxx xxxx xxxx 1111 xxxx */
++	/* UQADD16		cccc 0110 0110 xxxx xxxx xxxx 0001 xxxx */
++	/* UQADDSUBX		cccc 0110 0110 xxxx xxxx xxxx 0011 xxxx */
++	/* UQSUBADDX		cccc 0110 0110 xxxx xxxx xxxx 0101 xxxx */
++	/* UQSUB16		cccc 0110 0110 xxxx xxxx xxxx 0111 xxxx */
++	/* UQADD8		cccc 0110 0110 xxxx xxxx xxxx 1001 xxxx */
++	/* UQSUB8		cccc 0110 0110 xxxx xxxx xxxx 1111 xxxx */
++	/* UHADD16		cccc 0110 0111 xxxx xxxx xxxx 0001 xxxx */
++	/* UHADDSUBX		cccc 0110 0111 xxxx xxxx xxxx 0011 xxxx */
++	/* UHSUBADDX		cccc 0110 0111 xxxx xxxx xxxx 0101 xxxx */
++	/* UHSUB16		cccc 0110 0111 xxxx xxxx xxxx 0111 xxxx */
++	/* UHADD8		cccc 0110 0111 xxxx xxxx xxxx 1001 xxxx */
++	/* UHSUB8		cccc 0110 0111 xxxx xxxx xxxx 1111 xxxx */
++	DECODE_CUSTOM	(0x0f800010, 0x06000010, prep_emulate_rd12rn16rm0_wflags),
++
++	/* PKHBT		cccc 0110 1000 xxxx xxxx xxxx x001 xxxx */
++	/* PKHTB		cccc 0110 1000 xxxx xxxx xxxx x101 xxxx */
++	DECODE_CUSTOM	(0x0ff00030, 0x06800010, prep_emulate_rd12rn16rm0_wflags),
++
++	/* ???			cccc 0110 1001 xxxx xxxx xxxx 0111 xxxx */
++	/* ???			cccc 0110 1101 xxxx xxxx xxxx 0111 xxxx */
++	DECODE_REJECT	(0x0fb000f0, 0x06900070),
++
++	/* SXTB16		cccc 0110 1000 1111 xxxx xxxx 0111 xxxx */
++	/* SXTB			cccc 0110 1010 1111 xxxx xxxx 0111 xxxx */
++	/* SXTH			cccc 0110 1011 1111 xxxx xxxx 0111 xxxx */
++	/* UXTB16		cccc 0110 1100 1111 xxxx xxxx 0111 xxxx */
++	/* UXTB			cccc 0110 1110 1111 xxxx xxxx 0111 xxxx */
++	/* UXTH			cccc 0110 1111 1111 xxxx xxxx 0111 xxxx */
++	DECODE_CUSTOM	(0x0f8f00f0, 0x068f0070, prep_emulate_rd12rm0),
++
++	/* SXTAB16		cccc 0110 1000 xxxx xxxx xxxx 0111 xxxx */
++	/* SXTAB		cccc 0110 1010 xxxx xxxx xxxx 0111 xxxx */
++	/* SXTAH		cccc 0110 1011 xxxx xxxx xxxx 0111 xxxx */
++	/* UXTAB16		cccc 0110 1100 xxxx xxxx xxxx 0111 xxxx */
++	/* UXTAB		cccc 0110 1110 xxxx xxxx xxxx 0111 xxxx */
++	/* UXTAH		cccc 0110 1111 xxxx xxxx xxxx 0111 xxxx */
++	DECODE_CUSTOM	(0x0f8000f0, 0x06800070, prep_emulate_rd12rn16rm0_wflags),
  
--static void __kprobes emulate_str(struct kprobe *p, struct pt_regs *regs)
-+static void __kprobes emulate_str_old(struct kprobe *p, struct pt_regs *regs)
- {
- 	insn_3arg_fn_t *i_fn = (insn_3arg_fn_t *)&p->ainsn.insn[0];
- 	kprobe_opcode_t insn = p->opcode;
-@@ -795,7 +795,7 @@ prep_emulate_ldr_str(kprobe_opcode_t insn, struct arch_specific_insn *asi)
- 		insn |= 2;	/* Rm = r2 */
- 	}
- 	asi->insn[0] = insn;
--	asi->insn_handler = (insn & (1 << 20)) ? emulate_ldr : emulate_str;
-+	asi->insn_handler = (insn & (1 << 20)) ? emulate_ldr_old : emulate_str_old;
- 	return INSN_GOOD;
- }
+-	/* Other instruction encodings aren't yet defined */
+-	return INSN_REJECTED;
+-}
++	DECODE_END
++};
  
-@@ -923,6 +923,63 @@ emulate_ldrdstrd(struct kprobe *p, struct pt_regs *regs)
- }
+ static enum kprobe_insn __kprobes
+ space_cccc_0111__1(kprobe_opcode_t insn, struct arch_specific_insn *asi)
+@@ -1563,7 +1528,7 @@ arm_kprobe_decode_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi)
  
- static void __kprobes
-+emulate_ldr(struct kprobe *p, struct pt_regs *regs)
-+{
-+	kprobe_opcode_t insn = p->opcode;
-+	unsigned long pc = (unsigned long)p->addr + 8;
-+	int rt = (insn >> 12) & 0xf;
-+	int rn = (insn >> 16) & 0xf;
-+	int rm = insn & 0xf;
-+
-+	register unsigned long rtv asm("r0");
-+	register unsigned long rnv asm("r2") = (rn == 15) ? pc
-+							  : regs->uregs[rn];
-+	register unsigned long rmv asm("r3") = regs->uregs[rm];
-+
-+	__asm__ __volatile__ (
-+		BLX("%[fn]")
-+		: "=r" (rtv), "=r" (rnv)
-+		: "1" (rnv), "r" (rmv), [fn] "r" (p->ainsn.insn_fn)
-+		: "lr", "memory", "cc"
-+	);
-+
-+	if (rt == 15)
-+		load_write_pc(rtv, regs);
-+	else
-+		regs->uregs[rt] = rtv;
-+
-+	if (is_writeback(insn))
-+		regs->uregs[rn] = rnv;
-+}
-+
-+static void __kprobes
-+emulate_str(struct kprobe *p, struct pt_regs *regs)
-+{
-+	kprobe_opcode_t insn = p->opcode;
-+	unsigned long rtpc = (unsigned long)p->addr + str_pc_offset;
-+	unsigned long rnpc = (unsigned long)p->addr + 8;
-+	int rt = (insn >> 12) & 0xf;
-+	int rn = (insn >> 16) & 0xf;
-+	int rm = insn & 0xf;
-+
-+	register unsigned long rtv asm("r0") = (rt == 15) ? rtpc
-+							  : regs->uregs[rt];
-+	register unsigned long rnv asm("r2") = (rn == 15) ? rnpc
-+							  : regs->uregs[rn];
-+	register unsigned long rmv asm("r3") = regs->uregs[rm];
-+
-+	__asm__ __volatile__ (
-+		BLX("%[fn]")
-+		: "=r" (rnv)
-+		: "r" (rtv), "0" (rnv), "r" (rmv), [fn] "r" (p->ainsn.insn_fn)
-+		: "lr", "memory", "cc"
-+	);
-+
-+	if (is_writeback(insn))
-+		regs->uregs[rn] = rnv;
-+}
-+
-+static void __kprobes
- emulate_rd12rn16rm0rs8_rwflags(struct kprobe *p, struct pt_regs *regs)
- {
- 	kprobe_opcode_t insn = p->opcode;
+ 	else if ((insn & 0x0f000010) == 0x06000010)
+ 
+-		return space_cccc_0110__1(insn, asi);
++		return kprobe_decode_insn(insn, asi, arm_cccc_0110_____xxx1_table, false);
+ 
+ 	else if ((insn & 0x0f000010) == 0x07000010)
+ 
 -- 
 1.7.2.5
