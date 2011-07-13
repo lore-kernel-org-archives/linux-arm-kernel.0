@@ -1,37 +1,39 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 12 Jul 2011 23:49:50 -0700
-Subject: [GIT PULL] OMAP: SoC data/core: cleanups for 3.1
-In-Reply-To: <alpine.DEB.2.00.1107130037140.30229@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1107092031400.15984@utopia.booyaka.com>
-	<20110711083225.GO5783@atomide.com>
-	<alpine.DEB.2.00.1107130037140.30229@utopia.booyaka.com>
-Message-ID: <20110713064949.GI5783@atomide.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 13 Jul 2011 08:16:05 +0100
+Subject: [PATCH 1/3] Framework for exporting System-on-Chip information
+	via sysfs
+In-Reply-To: <20110712160857.GA7059@suse.de>
+References: <1310476090-9807-1-git-send-email-lee.jones@linaro.org>
+	<20110712141339.GB24957@sapphire.tkos.co.il>
+	<20110712160857.GA7059@suse.de>
+Message-ID: <4E1D4635.4040107@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [110712 23:33]:
-> Hi Tony,
+On 12/07/11 17:08, Greg KH wrote:
+> On Tue, Jul 12, 2011 at 05:13:39PM +0300, Baruch Siach wrote:
+>> Hi Lee,
+>>
+>> On Tue, Jul 12, 2011 at 02:08:08PM +0100, Lee Jones wrote:
+>>> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+>>> ---
+>>>  drivers/base/Kconfig    |   10 +++++
+>>>  drivers/base/Makefile   |    1 +
+>>>  drivers/base/soc.c      |   98 +++++++++++++++++++++++++++++++++++++++++++++++
+>>>  include/linux/sys_soc.h |   45 +++++++++++++++++++++
+>>>  4 files changed, 154 insertions(+), 0 deletions(-)
+>>>  create mode 100644 drivers/base/soc.c
+>>>  create mode 100644 include/linux/sys_soc.h
+>>
+>> I guess you should Cc Greg Kroah-Hartman <gregkh@suse.de> on this series.
+
+Yes, of course. Thanks Baruch.
+
+> Only if the submitter wants it applied, obviously, they don't :)
 > 
-> On Mon, 11 Jul 2011, Tony Lindgren wrote:
-> 
-> > Paul, please use the mainline tags or linux-omap static branches
-> > instead of the arm-soc branches. In this case there's only the extra
-> > merge commit there, so not a problem. Now it just makes it a bit
-> > harder for me to do pull requests and diffs to other branches.
-> > 
-> > In general, we want to keep the dependencies between branches and
-> > other trees to minimum.
-> 
-> Sorry about that.  It was a misunderstanding on my part.
+> Why do we have things like the MAINTAINERS file and
+> scripts/get_maintainer.pl if no one uses them...
 
-No problem, we should probably document that in the wiki page..
- 
-> Would you like me to rebase the prcm-fixes-3.1 and prcm-devel-3.1 branches 
-> on a different branch/commit?
-
-No need to, they're already all pulled in and in arm-soc waiting
-for the merge window.
-
-Regards,
-
-Tony
+Doh! Sorry Greg. I'm playing around with my new send-patches.sh and I've
+neglected to add functionality to apply bespoke To, CC and BCC fields on
+sending. I'll make the amendments to the script for next time.
