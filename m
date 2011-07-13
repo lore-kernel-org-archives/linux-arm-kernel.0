@@ -1,27 +1,52 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Wed, 13 Jul 2011 12:31:23 -0700
-Subject: [PATCH 2/2] ARM: Tegra: Seaboard: Re-order sdhci device
-	registration
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF049E834796@HQMAIL01.nvidia.com>
-References: <1306876448-28147-1-git-send-email-swarren@nvidia.com>
-	<1306876448-28147-3-git-send-email-swarren@nvidia.com>
-	<74CDBE0F657A3D45AFBB94109FB122FF049E834796@HQMAIL01.nvidia.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF049E8347B9@HQMAIL01.nvidia.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Wed, 13 Jul 2011 22:26:00 +0200
+Subject: [RFC 0/6] watchdog drivers converted to the new framework
+Message-ID: <1310588766-16638-1-git-send-email-w.sang@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Stephen Warren wrote at Wednesday, July 13, 2011 12:56 PM:
-> Stephen Warren wrote at Tuesday, May 31, 2011 3:14 PM:
-> > Ensure the built-in eMMC is always named mmcblk0.
-> 
-> Colin, could you please consider this for 3.1?
+As promised, here is a RFC with two examples demonstrating how watchdog drivers
+can be converted to use the new watchdog framework (using the current version
+Wim posted two days ago). There is also conversion guide put to the
+documentation folder. Being RFC, all this is not final yet, but presentable, I
+hope.
 
-Never mind, I see this has already been applied; I must have missed the
-email saying so, and the local rebase of my branch didn't show it as
-already applied since the tegra next branch only got pushed out last
-night and isn't in linux-next yet.
+Although there are a few more consolidation options left, there is already a
+gain of ~100 lines per driver. Promising, but there are a few issues to be
+sorted out, too, yet nothing which can be dealt with.
 
-Sorry for the noise.
+I have two other drivers in the making (stmp3xxx and imx2), but they need some
+more preparation; the first one needs some internal cleanups (like a lot of
+watchdog drivers); the latter one needs an addition to the framework
+(installing a timer for non-stoppable devices). I will also prepare a new
+driver (mx1) to show how small new drivers can be now :) The aim for all these
+driver conversions is inclusion in Linux 3.2. I still hope we can get the basic
+framework into Linux 3.1.
+
+Many thanks to CELF/LF for supporting this work and to Wim and Alan for making
+the framework!
+
+Looking forward to comments,
+
+   Wolfram
+
+They are also available in the git repository at:
+  git://git.pengutronix.de/git/wsa/linux-2.6.git generic-watchdog-with-drivers
+
+Wolfram Sang (6):
+  Documentation: watchdog: add guide how to convert drivers to new framework
+  watchdog: s3c2410: convert to use the watchdog framework
+  watchdog: pnx4008: cleanup resource handling using managed devices
+  watchdog: pnx4008: don't use __raw_-accessors
+  watchdog: pnx4008: convert driver to use the watchdog framework
+  watchdog: pnx4008: WIP refactor disabling device
+
+ .../watchdog/convert_drivers_to_kernel_api.txt     |  195 ++++++++++++++++
+ drivers/watchdog/Kconfig                           |    2 +
+ drivers/watchdog/pnx4008_wdt.c                     |  246 +++++++-------------
+ drivers/watchdog/s3c2410_wdt.c                     |  176 +++-----------
+ 4 files changed, 313 insertions(+), 306 deletions(-)
+ create mode 100644 Documentation/watchdog/convert_drivers_to_kernel_api.txt
 
 -- 
-nvpublic
+1.7.2.5
