@@ -1,102 +1,793 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Wed, 13 Jul 2011 17:58:21 +0200
-Subject: [PATCH V2 03/10] ASoc: mxs: add mxs-sgtl5000 machine driver
-In-Reply-To: <1310483085-31442-4-git-send-email-b29396@freescale.com>
-References: <1310483085-31442-1-git-send-email-b29396@freescale.com>
-	<1310483085-31442-4-git-send-email-b29396@freescale.com>
-Message-ID: <20110713155821.GL1928@pengutronix.de>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 13 Jul 2011 12:04:12 -0400 (EDT)
+Subject: [PATCH 24/24] ARM: kprobes: Remove now unused code
+In-Reply-To: <1310547973-31784-25-git-send-email-tixy@yxit.co.uk>
+References: <1310547973-31784-1-git-send-email-tixy@yxit.co.uk>
+	<1310547973-31784-25-git-send-email-tixy@yxit.co.uk>
+Message-ID: <alpine.LFD.2.00.1107131202070.14596@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 12, 2011 at 11:04:38PM +0800, Dong Aisheng wrote:
-> The driver only supports playback firstly.
-> For recording, as we have to use two saif instances to implement full
-> duplex (playback & recording) due to hardware limitation, we need to
-> figure out a good design to fit in ASoC.
+On Wed, 13 Jul 2011, Tixy wrote:
+
+> From: Jon Medhurst <tixy@yxit.co.uk>
 > 
-> Signed-off-by: Dong Aisheng <b29396@freescale.com>
-> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> Cc: Liam Girdwood <lrg@ti.com>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> Signed-off-by: Jon Medhurst <tixy@yxit.co.uk>
 > ---
->  sound/soc/mxs/mxs-sgtl5000.c |  170 ++++++++++++++++++++++++++++++++++++++++++
->  1 files changed, 170 insertions(+), 0 deletions(-)
+>  arch/arm/kernel/kprobes-arm.c |  738 -----------------------------------------
+>  1 files changed, 0 insertions(+), 738 deletions(-)
+
+I certainly like this one.
+
+Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+
+This is also valid for the whole series.  Again, this is excellent work.
+
+
+
 > 
-> diff --git a/sound/soc/mxs/mxs-sgtl5000.c b/sound/soc/mxs/mxs-sgtl5000.c
-> new file mode 100644
-> index 0000000..be9b5d5
-> --- /dev/null
-> +++ b/sound/soc/mxs/mxs-sgtl5000.c
-> @@ -0,0 +1,170 @@
-> +/*
-> + * Copyright 2011 Freescale Semiconductor, Inc.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License along
-> + * with this program; if not, write to the Free Software Foundation, Inc.,
-> + * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-> + */
-> +
-> +#include <linux/module.h>
-> +#include <linux/moduleparam.h>
-
-No parameters here, drop it.
-
-> +#include <linux/device.h>
-> +#include <linux/i2c.h>
-> +#include <linux/fsl_devices.h>
-> +#include <linux/gpio.h>
-
-The last three, too.
-
-> +#include <sound/core.h>
-> +#include <sound/pcm.h>
-> +#include <sound/soc.h>
-> +#include <sound/jack.h>
-> +#include <sound/soc-dapm.h>
-> +#include <asm/mach-types.h>
-> +
-> +#include "../codecs/sgtl5000.h"
-> +#include "mxs-saif.h"
-> +
-> +static int mxs_sgtl5000_hw_params(struct snd_pcm_substream *substream,
-> +	struct snd_pcm_hw_params *params)
-> +{
-> +	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-> +	struct snd_soc_dai *codec_dai = rtd->codec_dai;
-> +	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
-> +	unsigned int rate = params_rate(params);
-
-Here you initialize 'rate'...
-
-> +	u32 dai_format, mclk;
-> +	int ret;
-> +
-> +	/* sgtl5000 does not support 512*rate when in 96000 fs */
-> +	rate = params_rate(params);
-
-...so this line can go.
-
-Thanks,
-
-   Wolfram
-
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110713/dcaca5af/attachment.sig>
+> diff --git a/arch/arm/kernel/kprobes-arm.c b/arch/arm/kernel/kprobes-arm.c
+> index 8a58c99..79203ee 100644
+> --- a/arch/arm/kernel/kprobes-arm.c
+> +++ b/arch/arm/kernel/kprobes-arm.c
+> @@ -74,300 +74,6 @@
+>  			"mov	pc, "reg"	\n\t"
+>  #endif
+>  
+> -#define is_r15(insn, bitpos) (((insn) & (0xf << bitpos)) == (0xf << bitpos))
+> -
+> -#define PSR_fs	(PSR_f|PSR_s)
+> -
+> -#define KPROBE_RETURN_INSTRUCTION	0xe1a0f00e	/* mov pc, lr */
+> -
+> -typedef long (insn_0arg_fn_t)(void);
+> -typedef long (insn_1arg_fn_t)(long);
+> -typedef long (insn_2arg_fn_t)(long, long);
+> -typedef long (insn_3arg_fn_t)(long, long, long);
+> -typedef long (insn_4arg_fn_t)(long, long, long, long);
+> -typedef long long (insn_llret_0arg_fn_t)(void);
+> -typedef long long (insn_llret_3arg_fn_t)(long, long, long);
+> -typedef long long (insn_llret_4arg_fn_t)(long, long, long, long);
+> -
+> -union reg_pair {
+> -	long long	dr;
+> -#ifdef __LITTLE_ENDIAN
+> -	struct { long	r0, r1; };
+> -#else
+> -	struct { long	r1, r0; };
+> -#endif
+> -};
+> -
+> -/*
+> - * The insnslot_?arg_r[w]flags() functions below are to keep the
+> - * msr -> *fn -> mrs instruction sequences indivisible so that
+> - * the state of the CPSR flags aren't inadvertently modified
+> - * just before or just after the call.
+> - */
+> -
+> -static inline long __kprobes
+> -insnslot_0arg_rflags(long cpsr, insn_0arg_fn_t *fn)
+> -{
+> -	register long ret asm("r0");
+> -
+> -	__asm__ __volatile__ (
+> -		"msr	cpsr_fs, %[cpsr]	\n\t"
+> -		"mov	lr, pc			\n\t"
+> -		"mov	pc, %[fn]		\n\t"
+> -		: "=r" (ret)
+> -		: [cpsr] "r" (cpsr), [fn] "r" (fn)
+> -		: "lr", "cc"
+> -	);
+> -	return ret;
+> -}
+> -
+> -static inline long long __kprobes
+> -insnslot_llret_0arg_rflags(long cpsr, insn_llret_0arg_fn_t *fn)
+> -{
+> -	register long ret0 asm("r0");
+> -	register long ret1 asm("r1");
+> -	union reg_pair fnr;
+> -
+> -	__asm__ __volatile__ (
+> -		"msr	cpsr_fs, %[cpsr]	\n\t"
+> -		"mov	lr, pc			\n\t"
+> -		"mov	pc, %[fn]		\n\t"
+> -		: "=r" (ret0), "=r" (ret1)
+> -		: [cpsr] "r" (cpsr), [fn] "r" (fn)
+> -		: "lr", "cc"
+> -	);
+> -	fnr.r0 = ret0;
+> -	fnr.r1 = ret1;
+> -	return fnr.dr;
+> -}
+> -
+> -static inline long __kprobes
+> -insnslot_1arg_rflags(long r0, long cpsr, insn_1arg_fn_t *fn)
+> -{
+> -	register long rr0 asm("r0") = r0;
+> -	register long ret asm("r0");
+> -
+> -	__asm__ __volatile__ (
+> -		"msr	cpsr_fs, %[cpsr]	\n\t"
+> -		"mov	lr, pc			\n\t"
+> -		"mov	pc, %[fn]		\n\t"
+> -		: "=r" (ret)
+> -		: "0" (rr0), [cpsr] "r" (cpsr), [fn] "r" (fn)
+> -		: "lr", "cc"
+> -	);
+> -	return ret;
+> -}
+> -
+> -static inline long __kprobes
+> -insnslot_2arg_rflags(long r0, long r1, long cpsr, insn_2arg_fn_t *fn)
+> -{
+> -	register long rr0 asm("r0") = r0;
+> -	register long rr1 asm("r1") = r1;
+> -	register long ret asm("r0");
+> -
+> -	__asm__ __volatile__ (
+> -		"msr	cpsr_fs, %[cpsr]	\n\t"
+> -		"mov	lr, pc			\n\t"
+> -		"mov	pc, %[fn]		\n\t"
+> -		: "=r" (ret)
+> -		: "0" (rr0), "r" (rr1),
+> -		  [cpsr] "r" (cpsr), [fn] "r" (fn)
+> -		: "lr", "cc"
+> -	);
+> -	return ret;
+> -}
+> -
+> -static inline long __kprobes
+> -insnslot_3arg_rflags(long r0, long r1, long r2, long cpsr, insn_3arg_fn_t *fn)
+> -{
+> -	register long rr0 asm("r0") = r0;
+> -	register long rr1 asm("r1") = r1;
+> -	register long rr2 asm("r2") = r2;
+> -	register long ret asm("r0");
+> -
+> -	__asm__ __volatile__ (
+> -		"msr	cpsr_fs, %[cpsr]	\n\t"
+> -		"mov	lr, pc			\n\t"
+> -		"mov	pc, %[fn]		\n\t"
+> -		: "=r" (ret)
+> -		: "0" (rr0), "r" (rr1), "r" (rr2),
+> -		  [cpsr] "r" (cpsr), [fn] "r" (fn)
+> -		: "lr", "cc"
+> -	);
+> -	return ret;
+> -}
+> -
+> -static inline long long __kprobes
+> -insnslot_llret_3arg_rflags(long r0, long r1, long r2, long cpsr,
+> -			   insn_llret_3arg_fn_t *fn)
+> -{
+> -	register long rr0 asm("r0") = r0;
+> -	register long rr1 asm("r1") = r1;
+> -	register long rr2 asm("r2") = r2;
+> -	register long ret0 asm("r0");
+> -	register long ret1 asm("r1");
+> -	union reg_pair fnr;
+> -
+> -	__asm__ __volatile__ (
+> -		"msr	cpsr_fs, %[cpsr]	\n\t"
+> -		"mov	lr, pc			\n\t"
+> -		"mov	pc, %[fn]		\n\t"
+> -		: "=r" (ret0), "=r" (ret1)
+> -		: "0" (rr0), "r" (rr1), "r" (rr2),
+> -		  [cpsr] "r" (cpsr), [fn] "r" (fn)
+> -		: "lr", "cc"
+> -	);
+> -	fnr.r0 = ret0;
+> -	fnr.r1 = ret1;
+> -	return fnr.dr;
+> -}
+> -
+> -static inline long __kprobes
+> -insnslot_4arg_rflags(long r0, long r1, long r2, long r3, long cpsr,
+> -		     insn_4arg_fn_t *fn)
+> -{
+> -	register long rr0 asm("r0") = r0;
+> -	register long rr1 asm("r1") = r1;
+> -	register long rr2 asm("r2") = r2;
+> -	register long rr3 asm("r3") = r3;
+> -	register long ret asm("r0");
+> -
+> -	__asm__ __volatile__ (
+> -		"msr	cpsr_fs, %[cpsr]	\n\t"
+> -		"mov	lr, pc			\n\t"
+> -		"mov	pc, %[fn]		\n\t"
+> -		: "=r" (ret)
+> -		: "0" (rr0), "r" (rr1), "r" (rr2), "r" (rr3),
+> -		  [cpsr] "r" (cpsr), [fn] "r" (fn)
+> -		: "lr", "cc"
+> -	);
+> -	return ret;
+> -}
+> -
+> -static inline long __kprobes
+> -insnslot_1arg_rwflags(long r0, long *cpsr, insn_1arg_fn_t *fn)
+> -{
+> -	register long rr0 asm("r0") = r0;
+> -	register long ret asm("r0");
+> -	long oldcpsr = *cpsr;
+> -	long newcpsr;
+> -
+> -	__asm__ __volatile__ (
+> -		"msr	cpsr_fs, %[oldcpsr]	\n\t"
+> -		"mov	lr, pc			\n\t"
+> -		"mov	pc, %[fn]		\n\t"
+> -		"mrs	%[newcpsr], cpsr	\n\t"
+> -		: "=r" (ret), [newcpsr] "=r" (newcpsr)
+> -		: "0" (rr0), [oldcpsr] "r" (oldcpsr), [fn] "r" (fn)
+> -		: "lr", "cc"
+> -	);
+> -	*cpsr = (oldcpsr & ~PSR_fs) | (newcpsr & PSR_fs);
+> -	return ret;
+> -}
+> -
+> -static inline long __kprobes
+> -insnslot_2arg_rwflags(long r0, long r1, long *cpsr, insn_2arg_fn_t *fn)
+> -{
+> -	register long rr0 asm("r0") = r0;
+> -	register long rr1 asm("r1") = r1;
+> -	register long ret asm("r0");
+> -	long oldcpsr = *cpsr;
+> -	long newcpsr;
+> -
+> -	__asm__ __volatile__ (
+> -		"msr	cpsr_fs, %[oldcpsr]	\n\t"
+> -		"mov	lr, pc			\n\t"
+> -		"mov	pc, %[fn]		\n\t"
+> -		"mrs	%[newcpsr], cpsr	\n\t"
+> -		: "=r" (ret), [newcpsr] "=r" (newcpsr)
+> -		: "0" (rr0), "r" (rr1), [oldcpsr] "r" (oldcpsr), [fn] "r" (fn)
+> -		: "lr", "cc"
+> -	);
+> -	*cpsr = (oldcpsr & ~PSR_fs) | (newcpsr & PSR_fs);
+> -	return ret;
+> -}
+> -
+> -static inline long __kprobes
+> -insnslot_3arg_rwflags(long r0, long r1, long r2, long *cpsr,
+> -		      insn_3arg_fn_t *fn)
+> -{
+> -	register long rr0 asm("r0") = r0;
+> -	register long rr1 asm("r1") = r1;
+> -	register long rr2 asm("r2") = r2;
+> -	register long ret asm("r0");
+> -	long oldcpsr = *cpsr;
+> -	long newcpsr;
+> -
+> -	__asm__ __volatile__ (
+> -		"msr	cpsr_fs, %[oldcpsr]	\n\t"
+> -		"mov	lr, pc			\n\t"
+> -		"mov	pc, %[fn]		\n\t"
+> -		"mrs	%[newcpsr], cpsr	\n\t"
+> -		: "=r" (ret), [newcpsr] "=r" (newcpsr)
+> -		: "0" (rr0), "r" (rr1), "r" (rr2),
+> -		  [oldcpsr] "r" (oldcpsr), [fn] "r" (fn)
+> -		: "lr", "cc"
+> -	);
+> -	*cpsr = (oldcpsr & ~PSR_fs) | (newcpsr & PSR_fs);
+> -	return ret;
+> -}
+> -
+> -static inline long __kprobes
+> -insnslot_4arg_rwflags(long r0, long r1, long r2, long r3, long *cpsr,
+> -		      insn_4arg_fn_t *fn)
+> -{
+> -	register long rr0 asm("r0") = r0;
+> -	register long rr1 asm("r1") = r1;
+> -	register long rr2 asm("r2") = r2;
+> -	register long rr3 asm("r3") = r3;
+> -	register long ret asm("r0");
+> -	long oldcpsr = *cpsr;
+> -	long newcpsr;
+> -
+> -	__asm__ __volatile__ (
+> -		"msr	cpsr_fs, %[oldcpsr]	\n\t"
+> -		"mov	lr, pc			\n\t"
+> -		"mov	pc, %[fn]		\n\t"
+> -		"mrs	%[newcpsr], cpsr	\n\t"
+> -		: "=r" (ret), [newcpsr] "=r" (newcpsr)
+> -		: "0" (rr0), "r" (rr1), "r" (rr2), "r" (rr3),
+> -		  [oldcpsr] "r" (oldcpsr), [fn] "r" (fn)
+> -		: "lr", "cc"
+> -	);
+> -	*cpsr = (oldcpsr & ~PSR_fs) | (newcpsr & PSR_fs);
+> -	return ret;
+> -}
+> -
+> -static inline long long __kprobes
+> -insnslot_llret_4arg_rwflags(long r0, long r1, long r2, long r3, long *cpsr,
+> -			    insn_llret_4arg_fn_t *fn)
+> -{
+> -	register long rr0 asm("r0") = r0;
+> -	register long rr1 asm("r1") = r1;
+> -	register long rr2 asm("r2") = r2;
+> -	register long rr3 asm("r3") = r3;
+> -	register long ret0 asm("r0");
+> -	register long ret1 asm("r1");
+> -	long oldcpsr = *cpsr;
+> -	long newcpsr;
+> -	union reg_pair fnr;
+> -
+> -	__asm__ __volatile__ (
+> -		"msr	cpsr_fs, %[oldcpsr]	\n\t"
+> -		"mov	lr, pc			\n\t"
+> -		"mov	pc, %[fn]		\n\t"
+> -		"mrs	%[newcpsr], cpsr	\n\t"
+> -		: "=r" (ret0), "=r" (ret1), [newcpsr] "=r" (newcpsr)
+> -		: "0" (rr0), "r" (rr1), "r" (rr2), "r" (rr3),
+> -		  [oldcpsr] "r" (oldcpsr), [fn] "r" (fn)
+> -		: "lr", "cc"
+> -	);
+> -	*cpsr = (oldcpsr & ~PSR_fs) | (newcpsr & PSR_fs);
+> -	fnr.r0 = ret0;
+> -	fnr.r1 = ret1;
+> -	return fnr.dr;
+> -}
+> -
+>  /*
+>   * To avoid the complications of mimicing single-stepping on a
+>   * processor without a Next-PC or a single-step mode, and to
+> @@ -449,450 +155,6 @@ static void __kprobes simulate_mov_ipsp(struct kprobe *p, struct pt_regs *regs)
+>  	regs->uregs[12] = regs->uregs[13];
+>  }
+>  
+> -static void __kprobes emulate_ldrd(struct kprobe *p, struct pt_regs *regs)
+> -{
+> -	insn_2arg_fn_t *i_fn = (insn_2arg_fn_t *)&p->ainsn.insn[0];
+> -	kprobe_opcode_t insn = p->opcode;
+> -	long ppc = (long)p->addr + 8;
+> -	int rd = (insn >> 12) & 0xf;
+> -	int rn = (insn >> 16) & 0xf;
+> -	int rm = insn & 0xf;  /* rm may be invalid, don't care. */
+> -	long rmv = (rm == 15) ? ppc : regs->uregs[rm];
+> -	long rnv = (rn == 15) ? ppc : regs->uregs[rn];
+> -
+> -	/* Not following the C calling convention here, so need asm(). */
+> -	__asm__ __volatile__ (
+> -		"ldr	r0, %[rn]	\n\t"
+> -		"ldr	r1, %[rm]	\n\t"
+> -		"msr	cpsr_fs, %[cpsr]\n\t"
+> -		"mov	lr, pc		\n\t"
+> -		"mov	pc, %[i_fn]	\n\t"
+> -		"str	r0, %[rn]	\n\t"	/* in case of writeback */
+> -		"str	r2, %[rd0]	\n\t"
+> -		"str	r3, %[rd1]	\n\t"
+> -		: [rn]  "+m" (rnv),
+> -		  [rd0] "=m" (regs->uregs[rd]),
+> -		  [rd1] "=m" (regs->uregs[rd+1])
+> -		: [rm]   "m" (rmv),
+> -		  [cpsr] "r" (regs->ARM_cpsr),
+> -		  [i_fn] "r" (i_fn)
+> -		: "r0", "r1", "r2", "r3", "lr", "cc"
+> -	);
+> -	if (is_writeback(insn))
+> -		regs->uregs[rn] = rnv;
+> -}
+> -
+> -static void __kprobes emulate_strd(struct kprobe *p, struct pt_regs *regs)
+> -{
+> -	insn_4arg_fn_t *i_fn = (insn_4arg_fn_t *)&p->ainsn.insn[0];
+> -	kprobe_opcode_t insn = p->opcode;
+> -	long ppc = (long)p->addr + 8;
+> -	int rd = (insn >> 12) & 0xf;
+> -	int rn = (insn >> 16) & 0xf;
+> -	int rm  = insn & 0xf;
+> -	long rnv = (rn == 15) ? ppc : regs->uregs[rn];
+> -	/* rm/rmv may be invalid, don't care. */
+> -	long rmv = (rm == 15) ? ppc : regs->uregs[rm];
+> -	long rnv_wb;
+> -
+> -	rnv_wb = insnslot_4arg_rflags(rnv, rmv, regs->uregs[rd],
+> -					       regs->uregs[rd+1],
+> -					       regs->ARM_cpsr, i_fn);
+> -	if (is_writeback(insn))
+> -		regs->uregs[rn] = rnv_wb;
+> -}
+> -
+> -static void __kprobes emulate_ldr_old(struct kprobe *p, struct pt_regs *regs)
+> -{
+> -	insn_llret_3arg_fn_t *i_fn = (insn_llret_3arg_fn_t *)&p->ainsn.insn[0];
+> -	kprobe_opcode_t insn = p->opcode;
+> -	long ppc = (long)p->addr + 8;
+> -	union reg_pair fnr;
+> -	int rd = (insn >> 12) & 0xf;
+> -	int rn = (insn >> 16) & 0xf;
+> -	int rm = insn & 0xf;
+> -	long rdv;
+> -	long rnv = (rn == 15) ? ppc : regs->uregs[rn];
+> -	long rmv = (rm == 15) ? ppc : regs->uregs[rm];
+> -	long cpsr = regs->ARM_cpsr;
+> -
+> -	fnr.dr = insnslot_llret_3arg_rflags(rnv, 0, rmv, cpsr, i_fn);
+> -	if (rn != 15)
+> -		regs->uregs[rn] = fnr.r0;  /* Save Rn in case of writeback. */
+> -	rdv = fnr.r1;
+> -
+> -	if (rd == 15) {
+> -#if __LINUX_ARM_ARCH__ >= 5
+> -		cpsr &= ~PSR_T_BIT;
+> -		if (rdv & 0x1)
+> -			cpsr |= PSR_T_BIT;
+> -		regs->ARM_cpsr = cpsr;
+> -		rdv &= ~0x1;
+> -#else
+> -		rdv &= ~0x2;
+> -#endif
+> -	}
+> -	regs->uregs[rd] = rdv;
+> -}
+> -
+> -static void __kprobes emulate_str_old(struct kprobe *p, struct pt_regs *regs)
+> -{
+> -	insn_3arg_fn_t *i_fn = (insn_3arg_fn_t *)&p->ainsn.insn[0];
+> -	kprobe_opcode_t insn = p->opcode;
+> -	long iaddr = (long)p->addr;
+> -	int rd = (insn >> 12) & 0xf;
+> -	int rn = (insn >> 16) & 0xf;
+> -	int rm = insn & 0xf;
+> -	long rdv = (rd == 15) ? iaddr + str_pc_offset : regs->uregs[rd];
+> -	long rnv = (rn == 15) ? iaddr +  8 : regs->uregs[rn];
+> -	long rmv = regs->uregs[rm];  /* rm/rmv may be invalid, don't care. */
+> -	long rnv_wb;
+> -
+> -	rnv_wb = insnslot_3arg_rflags(rnv, rdv, rmv, regs->ARM_cpsr, i_fn);
+> -	if (rn != 15)
+> -		regs->uregs[rn] = rnv_wb;  /* Save Rn in case of writeback. */
+> -}
+> -
+> -static void __kprobes emulate_sat(struct kprobe *p, struct pt_regs *regs)
+> -{
+> -	insn_1arg_fn_t *i_fn = (insn_1arg_fn_t *)&p->ainsn.insn[0];
+> -	kprobe_opcode_t insn = p->opcode;
+> -	int rd = (insn >> 12) & 0xf;
+> -	int rm = insn & 0xf;
+> -	long rmv = regs->uregs[rm];
+> -
+> -	/* Writes Q flag */
+> -	regs->uregs[rd] = insnslot_1arg_rwflags(rmv, &regs->ARM_cpsr, i_fn);
+> -}
+> -
+> -static void __kprobes emulate_sel(struct kprobe *p, struct pt_regs *regs)
+> -{
+> -	insn_2arg_fn_t *i_fn = (insn_2arg_fn_t *)&p->ainsn.insn[0];
+> -	kprobe_opcode_t insn = p->opcode;
+> -	int rd = (insn >> 12) & 0xf;
+> -	int rn = (insn >> 16) & 0xf;
+> -	int rm = insn & 0xf;
+> -	long rnv = regs->uregs[rn];
+> -	long rmv = regs->uregs[rm];
+> -
+> -	/* Reads GE bits */
+> -	regs->uregs[rd] = insnslot_2arg_rflags(rnv, rmv, regs->ARM_cpsr, i_fn);
+> -}
+> -
+> -static void __kprobes emulate_none(struct kprobe *p, struct pt_regs *regs)
+> -{
+> -	insn_0arg_fn_t *i_fn = (insn_0arg_fn_t *)&p->ainsn.insn[0];
+> -
+> -	insnslot_0arg_rflags(regs->ARM_cpsr, i_fn);
+> -}
+> -
+> -static void __kprobes emulate_nop(struct kprobe *p, struct pt_regs *regs)
+> -{
+> -}
+> -
+> -static void __kprobes
+> -emulate_rd12_modify(struct kprobe *p, struct pt_regs *regs)
+> -{
+> -	insn_1arg_fn_t *i_fn = (insn_1arg_fn_t *)&p->ainsn.insn[0];
+> -	kprobe_opcode_t insn = p->opcode;
+> -	int rd = (insn >> 12) & 0xf;
+> -	long rdv = regs->uregs[rd];
+> -
+> -	regs->uregs[rd] = insnslot_1arg_rflags(rdv, regs->ARM_cpsr, i_fn);
+> -}
+> -
+> -static void __kprobes
+> -emulate_rd12rn0_modify(struct kprobe *p, struct pt_regs *regs)
+> -{
+> -	insn_2arg_fn_t *i_fn = (insn_2arg_fn_t *)&p->ainsn.insn[0];
+> -	kprobe_opcode_t insn = p->opcode;
+> -	int rd = (insn >> 12) & 0xf;
+> -	int rn = insn & 0xf;
+> -	long rdv = regs->uregs[rd];
+> -	long rnv = regs->uregs[rn];
+> -
+> -	regs->uregs[rd] = insnslot_2arg_rflags(rdv, rnv, regs->ARM_cpsr, i_fn);
+> -}
+> -
+> -static void __kprobes emulate_rd12rm0(struct kprobe *p, struct pt_regs *regs)
+> -{
+> -	insn_1arg_fn_t *i_fn = (insn_1arg_fn_t *)&p->ainsn.insn[0];
+> -	kprobe_opcode_t insn = p->opcode;
+> -	int rd = (insn >> 12) & 0xf;
+> -	int rm = insn & 0xf;
+> -	long rmv = regs->uregs[rm];
+> -
+> -	regs->uregs[rd] = insnslot_1arg_rflags(rmv, regs->ARM_cpsr, i_fn);
+> -}
+> -
+> -static void __kprobes
+> -emulate_rd12rn16rm0_rwflags(struct kprobe *p, struct pt_regs *regs)
+> -{
+> -	insn_2arg_fn_t *i_fn = (insn_2arg_fn_t *)&p->ainsn.insn[0];
+> -	kprobe_opcode_t insn = p->opcode;
+> -	int rd = (insn >> 12) & 0xf;
+> -	int rn = (insn >> 16) & 0xf;
+> -	int rm = insn & 0xf;
+> -	long rnv = regs->uregs[rn];
+> -	long rmv = regs->uregs[rm];
+> -
+> -	regs->uregs[rd] =
+> -		insnslot_2arg_rwflags(rnv, rmv, &regs->ARM_cpsr, i_fn);
+> -}
+> -
+> -static void __kprobes
+> -emulate_rd16rn12rs8rm0_rwflags(struct kprobe *p, struct pt_regs *regs)
+> -{
+> -	insn_3arg_fn_t *i_fn = (insn_3arg_fn_t *)&p->ainsn.insn[0];
+> -	kprobe_opcode_t insn = p->opcode;
+> -	int rd = (insn >> 16) & 0xf;
+> -	int rn = (insn >> 12) & 0xf;
+> -	int rs = (insn >> 8) & 0xf;
+> -	int rm = insn & 0xf;
+> -	long rnv = regs->uregs[rn];
+> -	long rsv = regs->uregs[rs];
+> -	long rmv = regs->uregs[rm];
+> -
+> -	regs->uregs[rd] =
+> -		insnslot_3arg_rwflags(rnv, rsv, rmv, &regs->ARM_cpsr, i_fn);
+> -}
+> -
+> -static void __kprobes
+> -emulate_rd16rs8rm0_rwflags(struct kprobe *p, struct pt_regs *regs)
+> -{
+> -	insn_2arg_fn_t *i_fn = (insn_2arg_fn_t *)&p->ainsn.insn[0];
+> -	kprobe_opcode_t insn = p->opcode;
+> -	int rd = (insn >> 16) & 0xf;
+> -	int rs = (insn >> 8) & 0xf;
+> -	int rm = insn & 0xf;
+> -	long rsv = regs->uregs[rs];
+> -	long rmv = regs->uregs[rm];
+> -
+> -	regs->uregs[rd] =
+> -		insnslot_2arg_rwflags(rsv, rmv, &regs->ARM_cpsr, i_fn);
+> -}
+> -
+> -static void __kprobes
+> -emulate_rdhi16rdlo12rs8rm0_rwflags(struct kprobe *p, struct pt_regs *regs)
+> -{
+> -	insn_llret_4arg_fn_t *i_fn = (insn_llret_4arg_fn_t *)&p->ainsn.insn[0];
+> -	kprobe_opcode_t insn = p->opcode;
+> -	union reg_pair fnr;
+> -	int rdhi = (insn >> 16) & 0xf;
+> -	int rdlo = (insn >> 12) & 0xf;
+> -	int rs   = (insn >> 8) & 0xf;
+> -	int rm   = insn & 0xf;
+> -	long rsv = regs->uregs[rs];
+> -	long rmv = regs->uregs[rm];
+> -
+> -	fnr.dr = insnslot_llret_4arg_rwflags(regs->uregs[rdhi],
+> -					     regs->uregs[rdlo], rsv, rmv,
+> -					     &regs->ARM_cpsr, i_fn);
+> -	regs->uregs[rdhi] = fnr.r0;
+> -	regs->uregs[rdlo] = fnr.r1;
+> -}
+> -
+> -static void __kprobes
+> -emulate_alu_imm_rflags(struct kprobe *p, struct pt_regs *regs)
+> -{
+> -	insn_1arg_fn_t *i_fn = (insn_1arg_fn_t *)&p->ainsn.insn[0];
+> -	kprobe_opcode_t insn = p->opcode;
+> -	int rd = (insn >> 12) & 0xf;
+> -	int rn = (insn >> 16) & 0xf;
+> -	long rnv = (rn == 15) ? (long)p->addr + 8 : regs->uregs[rn];
+> -
+> -	regs->uregs[rd] = insnslot_1arg_rflags(rnv, regs->ARM_cpsr, i_fn);
+> -}
+> -
+> -static void __kprobes
+> -emulate_alu_imm_rwflags(struct kprobe *p, struct pt_regs *regs)
+> -{
+> -	insn_1arg_fn_t *i_fn = (insn_1arg_fn_t *)&p->ainsn.insn[0];
+> -	kprobe_opcode_t insn = p->opcode;
+> -	int rd = (insn >> 12) & 0xf;
+> -	int rn = (insn >> 16) & 0xf;
+> -	long rnv = (rn == 15) ? (long)p->addr + 8 : regs->uregs[rn];
+> -
+> -	regs->uregs[rd] = insnslot_1arg_rwflags(rnv, &regs->ARM_cpsr, i_fn);
+> -}
+> -
+> -static void __kprobes
+> -emulate_alu_tests_imm(struct kprobe *p, struct pt_regs *regs)
+> -{
+> -	insn_1arg_fn_t *i_fn = (insn_1arg_fn_t *)&p->ainsn.insn[0];
+> -	kprobe_opcode_t insn = p->opcode;
+> -	int rn = (insn >> 16) & 0xf;
+> -	long rnv = (rn == 15) ? (long)p->addr + 8 : regs->uregs[rn];
+> -
+> -	insnslot_1arg_rwflags(rnv, &regs->ARM_cpsr, i_fn);
+> -}
+> -
+> -static void __kprobes
+> -emulate_alu_rflags(struct kprobe *p, struct pt_regs *regs)
+> -{
+> -	insn_3arg_fn_t *i_fn = (insn_3arg_fn_t *)&p->ainsn.insn[0];
+> -	kprobe_opcode_t insn = p->opcode;
+> -	long ppc = (long)p->addr + 8;
+> -	int rd = (insn >> 12) & 0xf;
+> -	int rn = (insn >> 16) & 0xf;	/* rn/rnv/rs/rsv may be */
+> -	int rs = (insn >> 8) & 0xf;	/* invalid, don't care. */
+> -	int rm = insn & 0xf;
+> -	long rnv = (rn == 15) ? ppc : regs->uregs[rn];
+> -	long rmv = (rm == 15) ? ppc : regs->uregs[rm];
+> -	long rsv = regs->uregs[rs];
+> -
+> -	regs->uregs[rd] =
+> -		insnslot_3arg_rflags(rnv, rmv, rsv, regs->ARM_cpsr, i_fn);
+> -}
+> -
+> -static void __kprobes
+> -emulate_alu_rwflags(struct kprobe *p, struct pt_regs *regs)
+> -{
+> -	insn_3arg_fn_t *i_fn = (insn_3arg_fn_t *)&p->ainsn.insn[0];
+> -	kprobe_opcode_t insn = p->opcode;
+> -	long ppc = (long)p->addr + 8;
+> -	int rd = (insn >> 12) & 0xf;
+> -	int rn = (insn >> 16) & 0xf;	/* rn/rnv/rs/rsv may be */
+> -	int rs = (insn >> 8) & 0xf;	/* invalid, don't care. */
+> -	int rm = insn & 0xf;
+> -	long rnv = (rn == 15) ? ppc : regs->uregs[rn];
+> -	long rmv = (rm == 15) ? ppc : regs->uregs[rm];
+> -	long rsv = regs->uregs[rs];
+> -
+> -	regs->uregs[rd] =
+> -		insnslot_3arg_rwflags(rnv, rmv, rsv, &regs->ARM_cpsr, i_fn);
+> -}
+> -
+> -static void __kprobes
+> -emulate_alu_tests(struct kprobe *p, struct pt_regs *regs)
+> -{
+> -	insn_3arg_fn_t *i_fn = (insn_3arg_fn_t *)&p->ainsn.insn[0];
+> -	kprobe_opcode_t insn = p->opcode;
+> -	long ppc = (long)p->addr + 8;
+> -	int rn = (insn >> 16) & 0xf;
+> -	int rs = (insn >> 8) & 0xf;	/* rs/rsv may be invalid, don't care. */
+> -	int rm = insn & 0xf;
+> -	long rnv = (rn == 15) ? ppc : regs->uregs[rn];
+> -	long rmv = (rm == 15) ? ppc : regs->uregs[rm];
+> -	long rsv = regs->uregs[rs];
+> -
+> -	insnslot_3arg_rwflags(rnv, rmv, rsv, &regs->ARM_cpsr, i_fn);
+> -}
+> -
+> -static enum kprobe_insn __kprobes
+> -prep_emulate_ldr_str(kprobe_opcode_t insn, struct arch_specific_insn *asi)
+> -{
+> -	int not_imm = (insn & (1 << 26)) ? (insn & (1 << 25))
+> -					 : (~insn & (1 << 22));
+> -
+> -	if (is_writeback(insn) && is_r15(insn, 16))
+> -		return INSN_REJECTED;	/* Writeback to PC */
+> -
+> -	insn &= 0xfff00fff;
+> -	insn |= 0x00001000;	/* Rn = r0, Rd = r1 */
+> -	if (not_imm) {
+> -		insn &= ~0xf;
+> -		insn |= 2;	/* Rm = r2 */
+> -	}
+> -	asi->insn[0] = insn;
+> -	asi->insn_handler = (insn & (1 << 20)) ? emulate_ldr_old : emulate_str_old;
+> -	return INSN_GOOD;
+> -}
+> -
+> -static enum kprobe_insn __kprobes
+> -prep_emulate_rd12_modify(kprobe_opcode_t insn, struct arch_specific_insn *asi)
+> -{
+> -	if (is_r15(insn, 12))
+> -		return INSN_REJECTED;	/* Rd is PC */
+> -
+> -	insn &= 0xffff0fff;	/* Rd = r0 */
+> -	asi->insn[0] = insn;
+> -	asi->insn_handler = emulate_rd12_modify;
+> -	return INSN_GOOD;
+> -}
+> -
+> -static enum kprobe_insn __kprobes
+> -prep_emulate_rd12rn0_modify(kprobe_opcode_t insn,
+> -			    struct arch_specific_insn *asi)
+> -{
+> -	if (is_r15(insn, 12))
+> -		return INSN_REJECTED;	/* Rd is PC */
+> -
+> -	insn &= 0xffff0ff0;	/* Rd = r0 */
+> -	insn |= 0x00000001;	/* Rn = r1 */
+> -	asi->insn[0] = insn;
+> -	asi->insn_handler = emulate_rd12rn0_modify;
+> -	return INSN_GOOD;
+> -}
+> -
+> -static enum kprobe_insn __kprobes
+> -prep_emulate_rd12rm0(kprobe_opcode_t insn, struct arch_specific_insn *asi)
+> -{
+> -	if (is_r15(insn, 12))
+> -		return INSN_REJECTED;	/* Rd is PC */
+> -
+> -	insn &= 0xffff0ff0;	/* Rd = r0, Rm = r0 */
+> -	asi->insn[0] = insn;
+> -	asi->insn_handler = emulate_rd12rm0;
+> -	return INSN_GOOD;
+> -}
+> -
+> -static enum kprobe_insn __kprobes
+> -prep_emulate_rd12rn16rm0_wflags(kprobe_opcode_t insn,
+> -				struct arch_specific_insn *asi)
+> -{
+> -	if (is_r15(insn, 12))
+> -		return INSN_REJECTED;	/* Rd is PC */
+> -
+> -	insn &= 0xfff00ff0;	/* Rd = r0, Rn = r0 */
+> -	insn |= 0x00000001;	/* Rm = r1 */
+> -	asi->insn[0] = insn;
+> -	asi->insn_handler = emulate_rd12rn16rm0_rwflags;
+> -	return INSN_GOOD;
+> -}
+> -
+> -static enum kprobe_insn __kprobes
+> -prep_emulate_rd16rs8rm0_wflags(kprobe_opcode_t insn,
+> -			       struct arch_specific_insn *asi)
+> -{
+> -	if (is_r15(insn, 16))
+> -		return INSN_REJECTED;	/* Rd is PC */
+> -
+> -	insn &= 0xfff0f0f0;	/* Rd = r0, Rs = r0 */
+> -	insn |= 0x00000001;	/* Rm = r1          */
+> -	asi->insn[0] = insn;
+> -	asi->insn_handler = emulate_rd16rs8rm0_rwflags;
+> -	return INSN_GOOD;
+> -}
+> -
+> -static enum kprobe_insn __kprobes
+> -prep_emulate_rd16rn12rs8rm0_wflags(kprobe_opcode_t insn,
+> -				   struct arch_specific_insn *asi)
+> -{
+> -	if (is_r15(insn, 16))
+> -		return INSN_REJECTED;	/* Rd is PC */
+> -
+> -	insn &= 0xfff000f0;	/* Rd = r0, Rn = r0 */
+> -	insn |= 0x00000102;	/* Rs = r1, Rm = r2 */
+> -	asi->insn[0] = insn;
+> -	asi->insn_handler = emulate_rd16rn12rs8rm0_rwflags;
+> -	return INSN_GOOD;
+> -}
+> -
+> -static enum kprobe_insn __kprobes
+> -prep_emulate_rdhi16rdlo12rs8rm0_wflags(kprobe_opcode_t insn,
+> -				       struct arch_specific_insn *asi)
+> -{
+> -	if (is_r15(insn, 16) || is_r15(insn, 12))
+> -		return INSN_REJECTED;	/* RdHi or RdLo is PC */
+> -
+> -	insn &= 0xfff000f0;	/* RdHi = r0, RdLo = r1 */
+> -	insn |= 0x00001203;	/* Rs = r2, Rm = r3 */
+> -	asi->insn[0] = insn;
+> -	asi->insn_handler = emulate_rdhi16rdlo12rs8rm0_rwflags;
+> -	return INSN_GOOD;
+> -}
+> -
+>  static void __kprobes
+>  emulate_ldrdstrd(struct kprobe *p, struct pt_regs *regs)
+>  {
+> -- 
+> 1.7.2.5
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
