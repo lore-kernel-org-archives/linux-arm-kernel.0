@@ -1,164 +1,63 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 13 Jul 2011 10:14:03 +0100
-Subject: [PATCH V2 03/12] DMA: PL330: Add DMA capabilities
-In-Reply-To: <1310546857-6304-4-git-send-email-kgene.kim@samsung.com>
-References: <1310546857-6304-1-git-send-email-kgene.kim@samsung.com>
-	<1310546857-6304-4-git-send-email-kgene.kim@samsung.com>
-Message-ID: <20110713091403.GI23270@n2100.arm.linux.org.uk>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 13 Jul 2011 11:29:16 +0200
+Subject: [PATCH 1/3] ohci-at91: add vbus_pin_inverted platform attribute
+In-Reply-To: <1310549358-13330-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1310549358-13330-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1310549358-13330-2-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 13, 2011 at 05:47:28PM +0900, Kukjin Kim wrote:
-> +static void pl330_tasklet_cyclic(unsigned long data)
-> +{
-> +	struct dma_pl330_chan *pch = (struct dma_pl330_chan *)data;
-> +	struct dma_pl330_desc *desc, *_dt;
-> +	unsigned long flags;
-> +	LIST_HEAD(list);
-> +
-> +	spin_lock_irqsave(&pch->lock, flags);
-> +
-> +	/* Pick up ripe tomatoes */
-> +	list_for_each_entry_safe(desc, _dt, &pch->work_list, node)
-> +		if ((desc->status == DONE) && desc->cyclic) {
-> +			dma_async_tx_callback callback;
-> +
-> +			list_move_tail(&desc->node, &pch->work_list);
-> +			pch->completed = desc->txd.cookie;
-> +
-> +			desc->status = PREP;
-> +
-> +			/* Try to submit a req imm.
-> +			next to the last completed cookie */
-> +			fill_queue(pch);
-> +
-> +			/* Make sure the PL330 Channel thread is active */
-> +			pl330_chan_ctrl(pch->pl330_chid, PL330_OP_START);
-> +
-> +			callback = desc->txd.callback;
-> +			if (callback)
-> +				callback(desc->txd.callback_param);
+The existing OHCI AT91 driver made the assumption that the enable
+input of the USB power switch was active low. However, some USB power
+switches such as the Micrel MIC2026-1 [1] have an active high input to
+enable the power. A new vbus_pin_inverted attribute is added to the
+at91_usbh_data structure so that board files can tell the OHCI driver
+if the vbus pin logic is active low or active high.
 
-How does this work when callbacks are allowed to queue new requests?
-Aren't you going to deadlock on the spinlock?
+[1] http://www.micrel.com/page.do?page=product-info/products/mic2026.shtml
 
-I don't see 'list' being used in this function either.
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: Andrew Victor <linux@maxim.org.za>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+---
+ arch/arm/mach-at91/include/mach/board.h |    1 +
+ drivers/usb/host/ohci-at91.c            |    4 ++--
+ 2 files changed, 3 insertions(+), 2 deletions(-)
 
-> +
-> +		}
-> +
-> +	spin_unlock_irqrestore(&pch->lock, flags);
-> +}
-> +
-> +static void pl330_cyclic_free(struct dma_pl330_chan *pch)
-> +{
-> +	struct dma_pl330_dmac *pdmac = pch->dmac;
-> +	struct dma_pl330_desc *desc, *_dt;
-> +	unsigned long flags;
-> +	LIST_HEAD(list);
-> +
-> +	spin_lock_irqsave(&pdmac->pool_lock, flags);
-> +
-> +	list_for_each_entry_safe(desc, _dt, &pch->work_list, node)
-> +	if (desc->cyclic)
-> +		list_move_tail(&desc->node, &list);
-> +
-> +	list_splice_tail_init(&list, &pdmac->desc_pool);
-
-As you're not using 'list' after this point, would 'list_splice_tail'
-do here?
-
-> +
-> +	spin_unlock_irqrestore(&pdmac->pool_lock, flags);
-> +	pch->cyclic_task = NULL;
-> +}
-> +
->  static void pl330_tasklet(unsigned long data)
->  {
->  	struct dma_pl330_chan *pch = (struct dma_pl330_chan *)data;
-> @@ -227,6 +285,9 @@ static void dma_pl330_rqcb(void *token, enum pl330_op_err err)
->  
->  	spin_unlock_irqrestore(&pch->lock, flags);
->  
-> +	if (pch->cyclic_task)
-> +		tasklet_schedule(pch->cyclic_task);
-> +	else
->  	tasklet_schedule(&pch->task);
-
-This 'tasklet_schedule' wants to be indented.
-
->  }
->  
-> @@ -256,25 +317,58 @@ static int pl330_alloc_chan_resources(struct dma_chan *chan)
->  static int pl330_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd, unsigned long arg)
->  {
->  	struct dma_pl330_chan *pch = to_pchan(chan);
-> -	struct dma_pl330_desc *desc;
-> +	struct dma_pl330_desc *desc, *_dt;
->  	unsigned long flags;
-> +	struct dma_pl330_dmac *pdmac = pch->dmac;
-> +	struct dma_slave_config *slave_config;
-> +	struct dma_pl330_peri *peri;
-> +	int i;
-> +	LIST_HEAD(list);
->  
-> -	/* Only supports DMA_TERMINATE_ALL */
-> -	if (cmd != DMA_TERMINATE_ALL)
-> -		return -ENXIO;
-> -
-> -	spin_lock_irqsave(&pch->lock, flags);
-> -
-> -	/* FLUSH the PL330 Channel thread */
-> -	pl330_chan_ctrl(pch->pl330_chid, PL330_OP_FLUSH);
-> +	switch (cmd) {
-> +	case DMA_TERMINATE_ALL:
-> +		spin_lock_irqsave(&pch->lock, flags);
->  
-> -	/* Mark all desc done */
-> -	list_for_each_entry(desc, &pch->work_list, node)
-> -		desc->status = DONE;
-> +		/* FLUSH the PL330 Channel thread */
-> +		pl330_chan_ctrl(pch->pl330_chid, PL330_OP_FLUSH);
->  
-> -	spin_unlock_irqrestore(&pch->lock, flags);
-> +		/* Mark all desc done */
-> +		list_for_each_entry_safe(desc, _dt, &pch->work_list , node) {
-> +			desc->status = DONE;
-> +			pch->completed = desc->txd.cookie;
-> +			list_move_tail(&desc->node, &list);
-> +		}
->  
-> -	pl330_tasklet((unsigned long) pch);
-> +		list_splice_tail_init(&list, &pdmac->desc_pool);
-
-Again, would list_splice_tail() do here?
-
-> +		spin_unlock_irqrestore(&pch->lock, flags);
-> +		break;
-> +	case DMA_SLAVE_CONFIG:
-> +		slave_config = (struct dma_slave_config *)arg;
-> +		peri = pch->chan.private;
-> +
-> +		if (slave_config->direction == DMA_TO_DEVICE) {
-> +			if (slave_config->dst_addr)
-> +				peri->fifo_addr = slave_config->dst_addr;
-> +			if (slave_config->dst_addr_width) {
-> +				i = 0;
-> +				while (slave_config->dst_addr_width != (1 << i))
-> +					i++;
-> +				peri->burst_sz = i;
-> +			}
-> +		} else if (slave_config->direction == DMA_FROM_DEVICE) {
-> +			if (slave_config->src_addr)
-> +				peri->fifo_addr = slave_config->src_addr;
-> +			if (slave_config->src_addr_width) {
-> +				i = 0;
-> +				while (slave_config->src_addr_width != (1 << i))
-> +					i++;
-> +				peri->burst_sz = i;
-> +			}
-> +		}
-
-It would make more sense to store the M2P and P2M address/width/burst size
-separately, so you don't have to make DMA_SLAVE_CONFIG calls before every
-transfer.
+diff --git a/arch/arm/mach-at91/include/mach/board.h b/arch/arm/mach-at91/include/mach/board.h
+index ed544a0..61d52dc 100644
+--- a/arch/arm/mach-at91/include/mach/board.h
++++ b/arch/arm/mach-at91/include/mach/board.h
+@@ -98,6 +98,7 @@ extern void __init at91_add_device_eth(struct at91_eth_data *data);
+ struct at91_usbh_data {
+ 	u8		ports;		/* number of ports on root hub */
+ 	u8		vbus_pin[2];	/* port power-control pin */
++	u8              vbus_pin_inverted;
+ };
+ extern void __init at91_add_device_usbh(struct at91_usbh_data *data);
+ extern void __init at91_add_device_usbh_ohci(struct at91_usbh_data *data);
+diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
+index 944291e..3612ccd 100644
+--- a/drivers/usb/host/ohci-at91.c
++++ b/drivers/usb/host/ohci-at91.c
+@@ -284,7 +284,7 @@ static int ohci_hcd_at91_drv_probe(struct platform_device *pdev)
+ 			if (pdata->vbus_pin[i] <= 0)
+ 				continue;
+ 			gpio_request(pdata->vbus_pin[i], "ohci_vbus");
+-			gpio_direction_output(pdata->vbus_pin[i], 0);
++			gpio_direction_output(pdata->vbus_pin[i], pdata->vbus_pin_inverted);
+ 		}
+ 	}
+ 
+@@ -301,7 +301,7 @@ static int ohci_hcd_at91_drv_remove(struct platform_device *pdev)
+ 		for (i = 0; i < ARRAY_SIZE(pdata->vbus_pin); i++) {
+ 			if (pdata->vbus_pin[i] <= 0)
+ 				continue;
+-			gpio_direction_output(pdata->vbus_pin[i], 1);
++			gpio_direction_output(pdata->vbus_pin[i], !pdata->vbus_pin_inverted);
+ 			gpio_free(pdata->vbus_pin[i]);
+ 		}
+ 	}
+-- 
+1.7.4.1
