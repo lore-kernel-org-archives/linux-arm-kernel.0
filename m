@@ -1,55 +1,29 @@
-From: B29396@freescale.com (Dong Aisheng-B29396)
-Date: Wed, 13 Jul 2011 06:29:48 +0000
-Subject: [PATCH V2 01/10] ASoc: mxs: add mxs-pcm driver
-In-Reply-To: <20110712232719.GB17710@opensource.wolfsonmicro.com>
-References: <1310483085-31442-1-git-send-email-b29396@freescale.com>
-	<1310483085-31442-2-git-send-email-b29396@freescale.com>
-	<20110712232719.GB17710@opensource.wolfsonmicro.com>
-Message-ID: <65EE16ACC360FA4D99C96DC085B3F7721CD7EC@039-SN1MPN1-002.039d.mgd.msft.net>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 13 Jul 2011 00:38:37 -0600 (MDT)
+Subject: [GIT PULL] OMAP: SoC data/core: cleanups for 3.1
+In-Reply-To: <20110711083225.GO5783@atomide.com>
+References: <alpine.DEB.2.00.1107092031400.15984@utopia.booyaka.com>
+	<20110711083225.GO5783@atomide.com>
+Message-ID: <alpine.DEB.2.00.1107130037140.30229@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Mark Brown [mailto:broonie at opensource.wolfsonmicro.com]
-> Sent: Wednesday, July 13, 2011 7:27 AM
-> To: Dong Aisheng-B29396
-> Cc: alsa-devel at alsa-project.org; linux-arm-kernel at lists.infradead.org;
-> lrg at ti.com; s.hauer at pengutronix.de; u.kleine-koenig at pengutronix.de
-> Subject: Re: [PATCH V2 01/10] ASoc: mxs: add mxs-pcm driver
-> 
-> On Tue, Jul 12, 2011 at 11:04:36PM +0800, Dong Aisheng wrote:
-> 
-> > +	if (dai->driver->capture.channels_min) {
-> > +		ret = mxs_pcm_preallocate_dma_buffer(pcm,
-> > +			SNDRV_PCM_STREAM_CAPTURE);
-> > +		if (ret)
-> > +			goto out;
-> > +	}
-> 
-> For robustness replace the channels_min check with a check for the
-> relevant substream being present (see pxa2xx-pcm.c for a recent example).
-Is this change ok?
-diff --git a/sound/soc/mxs/mxs-pcm.c b/sound/soc/mxs/mxs-pcm.c
-index 3e3a8c8..a385ba9 100644
---- a/sound/soc/mxs/mxs-pcm.c
-+++ b/sound/soc/mxs/mxs-pcm.c
-@@ -288,14 +288,14 @@ static int mxs_pcm_new(struct snd_card *card, struct snd_soc_dai *dai,
-                card->dev->dma_mask = &mxs_pcm_dmamask;
-        if (!card->dev->coherent_dma_mask)
-                card->dev->coherent_dma_mask = DMA_BIT_MASK(32);
--       if (dai->driver->playback.channels_min) {
-+       if (pcm->streams[SNDRV_PCM_STREAM_PLAYBACK].substream) {
-                ret = mxs_pcm_preallocate_dma_buffer(pcm,
-                        SNDRV_PCM_STREAM_PLAYBACK);
-                if (ret)
-                        goto out;
-        }
+Hi Tony,
 
--       if (dai->driver->capture.channels_min) {
-+       if (pcm->streams[SNDRV_PCM_STREAM_CAPTURE].substream) {
-                ret = mxs_pcm_preallocate_dma_buffer(pcm,
-                        SNDRV_PCM_STREAM_CAPTURE);
-                if (ret)
+On Mon, 11 Jul 2011, Tony Lindgren wrote:
 
-Regards
-Dong Aisheng
+> Paul, please use the mainline tags or linux-omap static branches
+> instead of the arm-soc branches. In this case there's only the extra
+> merge commit there, so not a problem. Now it just makes it a bit
+> harder for me to do pull requests and diffs to other branches.
+> 
+> In general, we want to keep the dependencies between branches and
+> other trees to minimum.
+
+Sorry about that.  It was a misunderstanding on my part.
+
+Would you like me to rebase the prcm-fixes-3.1 and prcm-devel-3.1 branches 
+on a different branch/commit?
+
+
+- Paul
