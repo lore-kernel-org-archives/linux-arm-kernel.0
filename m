@@ -1,318 +1,235 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 13 Jul 2011 11:29:17 +0200
-Subject: [PATCH 2/3] at91-ohci: support overcurrent notification
-In-Reply-To: <1310549358-13330-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1310549358-13330-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1310549358-13330-3-git-send-email-thomas.petazzoni@free-electrons.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 13 Jul 2011 17:47:36 +0900
+Subject: [PATCH V2 11/12] spi/s3c64xx: Add support DMA engine API
+In-Reply-To: <1310546857-6304-1-git-send-email-kgene.kim@samsung.com>
+References: <1310546857-6304-1-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1310546857-6304-12-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Several USB power switches (AIC1526 or MIC2026) have a digital output
-that is used to notify that an overcurrent situation is taking
-place. This digital outputs are typically connected to GPIO inputs of
-the processor and can be used to be notified of those overcurrent
-situations.
+From: Boojin Kim <boojin.kim@samsung.com>
 
-Therefore, we add a new overcurrent_pin[] array in the at91_usbh_data
-structure so that boards can tell the AT91 OHCI driver which pins are
-used for the overcurrent notification, and an overcurrent_supported
-boolean to tell the driver whether overcurrent is supported or not.
+This patch adds to support DMA generic API to transfer raw
+SPI data. Basiclly the spi driver uses DMA generic API if
+architecture supports it. Otherwise, uses Samsung specific
+S3C-PL330 APIs.
 
-The code has been largely borrowed from ohci-da8xx.c and
-ohci-s3c2410.c.
-
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: Andrew Victor <linux@maxim.org.za>
-Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-Cc: Matthieu CASTET <matthieu.castet@parrot.com>
+Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
+Cc: Grant Likely <grant.likely@secretlab.ca>
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/mach-at91/include/mach/board.h |    4 +
- drivers/usb/host/ohci-at91.c            |  224 +++++++++++++++++++++++++++++--
- 2 files changed, 219 insertions(+), 9 deletions(-)
+ drivers/spi/spi_s3c64xx.c |  141 ++++++++++++++++++++++-----------------------
+ 1 files changed, 69 insertions(+), 72 deletions(-)
 
-diff --git a/arch/arm/mach-at91/include/mach/board.h b/arch/arm/mach-at91/include/mach/board.h
-index 61d52dc..d07767f 100644
---- a/arch/arm/mach-at91/include/mach/board.h
-+++ b/arch/arm/mach-at91/include/mach/board.h
-@@ -99,6 +99,10 @@ struct at91_usbh_data {
- 	u8		ports;		/* number of ports on root hub */
- 	u8		vbus_pin[2];	/* port power-control pin */
- 	u8              vbus_pin_inverted;
-+	u8              overcurrent_supported;
-+	u8              overcurrent_pin[2];
-+	u8              overcurrent_status[2];
-+	u8              overcurrent_changed[2];
+diff --git a/drivers/spi/spi_s3c64xx.c b/drivers/spi/spi_s3c64xx.c
+index 8945e20..a4cf76a 100644
+--- a/drivers/spi/spi_s3c64xx.c
++++ b/drivers/spi/spi_s3c64xx.c
+@@ -172,6 +172,9 @@ struct s3c64xx_spi_driver_data {
+ 	unsigned                        state;
+ 	unsigned                        cur_mode, cur_bpw;
+ 	unsigned                        cur_speed;
++	unsigned			rx_ch;
++	unsigned			tx_ch;
++	struct samsung_dma_ops		*ops;
  };
- extern void __init at91_add_device_usbh(struct at91_usbh_data *data);
- extern void __init at91_add_device_usbh_ohci(struct at91_usbh_data *data);
-diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
-index 3612ccd..331909f 100644
---- a/drivers/usb/host/ohci-at91.c
-+++ b/drivers/usb/host/ohci-at91.c
-@@ -223,6 +223,156 @@ ohci_at91_start (struct usb_hcd *hcd)
- 	return 0;
+ 
+ static struct s3c2410_dma_client s3c64xx_spi_dma_client = {
+@@ -227,6 +230,38 @@ static void flush_fifo(struct s3c64xx_spi_driver_data *sdd)
+ 	writel(val, regs + S3C64XX_SPI_CH_CFG);
  }
  
-+static void ohci_at91_usb_set_power(struct at91_usbh_data *pdata, int port, int enable)
++static void s3c64xx_spi_dma_rxcb(void *data)
 +{
-+	if (port < 0 || port >= 2)
-+		return;
++	struct s3c64xx_spi_driver_data *sdd
++		= (struct s3c64xx_spi_driver_data *)data;
++	unsigned long flags;
 +
-+	gpio_set_value(pdata->vbus_pin[port], !pdata->vbus_pin_inverted ^ enable);
++	spin_lock_irqsave(&sdd->lock, flags);
++
++	sdd->state &= ~RXBUSY;
++	/* If the other done */
++	if (!(sdd->state & TXBUSY))
++		complete(&sdd->xfer_completion);
++
++	spin_unlock_irqrestore(&sdd->lock, flags);
 +}
 +
-+static int ohci_at91_usb_get_power(struct at91_usbh_data *pdata, int port)
++static void s3c64xx_spi_dma_txcb(void *data)
 +{
-+	if (port < 0 || port >= 2)
-+		return -EINVAL;
++	struct s3c64xx_spi_driver_data *sdd
++		= (struct s3c64xx_spi_driver_data *)data;
++	unsigned long flags;
 +
-+	return gpio_get_value(pdata->vbus_pin[port]) ^ !pdata->vbus_pin_inverted;
++	spin_lock_irqsave(&sdd->lock, flags);
++
++	sdd->state &= ~TXBUSY;
++	/* If the other done */
++	if (!(sdd->state & RXBUSY))
++		complete(&sdd->xfer_completion);
++
++	spin_unlock_irqrestore(&sdd->lock, flags);
 +}
 +
-+/*
-+ * Update the status data from the hub with the over-current indicator change.
-+ */
-+static int ohci_at91_hub_status_data(struct usb_hcd *hcd, char *buf)
-+{
-+	struct at91_usbh_data *pdata = hcd->self.controller->platform_data;
-+	int length = ohci_hub_status_data(hcd, buf);
-+	int port;
-+
-+	for (port = 0; port < ARRAY_SIZE(pdata->overcurrent_pin); port++) {
-+		if (pdata->overcurrent_changed[port]) {
-+			if (! length)
-+				length = 1;
-+			buf[0] |= 1 << (port + 1);
-+		}
-+	}
-+
-+	return length;
-+}
-+
-+/*
-+ * Look@the control requests to the root hub and see if we need to override.
-+ */
-+static int ohci_at91_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
-+				 u16 wIndex, char *buf, u16 wLength)
-+{
-+	struct at91_usbh_data *pdata = hcd->self.controller->platform_data;
-+	struct usb_hub_descriptor *desc;
-+	int ret = -EINVAL;
-+	u32 *data = (u32 *)buf;
-+
-+	dev_dbg(hcd->self.controller,
-+		"ohci_at91_hub_control(%p,0x%04x,0x%04x,0x%04x,%p,%04x)\n",
-+		hcd, typeReq, wValue, wIndex, buf, wLength);
-+
-+	switch (typeReq) {
-+	case SetPortFeature:
-+		if (wValue == USB_PORT_FEAT_POWER) {
-+			dev_dbg(hcd->self.controller, "SetPortFeat: POWER\n");
-+			ohci_at91_usb_set_power(pdata, wIndex - 1, 1);
-+			goto out;
-+		}
-+		break;
-+
-+	case ClearPortFeature:
-+		switch (wValue) {
-+		case USB_PORT_FEAT_C_OVER_CURRENT:
-+			dev_dbg(hcd->self.controller,
-+				"ClearPortFeature: C_OVER_CURRENT\n");
-+
-+			if (wIndex == 1 || wIndex == 2) {
-+				pdata->overcurrent_changed[wIndex-1] = 0;
-+				pdata->overcurrent_status[wIndex-1] = 0;
-+			}
-+
-+			goto out;
-+
-+		case USB_PORT_FEAT_OVER_CURRENT:
-+			dev_dbg(hcd->self.controller,
-+				"ClearPortFeature: OVER_CURRENT\n");
-+
-+			if (wIndex == 1 || wIndex == 2) {
-+				pdata->overcurrent_status[wIndex-1] = 0;
-+			}
-+
-+			goto out;
-+
-+		case USB_PORT_FEAT_POWER:
-+			dev_dbg(hcd->self.controller,
-+				"ClearPortFeature: POWER\n");
-+
-+			if (wIndex == 1 || wIndex == 2) {
-+				ohci_at91_usb_set_power(pdata, wIndex - 1, 0);
-+				return 0;
-+			}
-+		}
-+		break;
-+	}
-+
-+	ret = ohci_hub_control(hcd, typeReq, wValue, wIndex, buf, wLength);
-+	if (ret)
-+		goto out;
-+
-+	switch (typeReq) {
-+	case GetHubDescriptor:
-+
-+		/* update the hub's descriptor */
-+
-+		desc = (struct usb_hub_descriptor *)buf;
-+
-+		dev_dbg(hcd->self.controller, "wHubCharacteristics 0x%04x\n",
-+			desc->wHubCharacteristics);
-+
-+		/* remove the old configurations for power-switching, and
-+		 * over-current protection, and insert our new configuration
-+		 */
-+
-+		desc->wHubCharacteristics &= ~cpu_to_le16(HUB_CHAR_LPSM);
-+		desc->wHubCharacteristics |= cpu_to_le16(0x0001);
-+
-+		if (pdata->overcurrent_supported) {
-+			desc->wHubCharacteristics &= ~cpu_to_le16(HUB_CHAR_OCPM);
-+			desc->wHubCharacteristics |=  cpu_to_le16(0x0008|0x0001);
-+		}
-+
-+		dev_dbg(hcd->self.controller, "wHubCharacteristics after 0x%04x\n",
-+			desc->wHubCharacteristics);
-+
-+		return ret;
-+
-+	case GetPortStatus:
-+		/* check port status */
-+
-+		dev_dbg(hcd->self.controller, "GetPortStatus(%d)\n", wIndex);
-+
-+		if (wIndex == 1 || wIndex == 2) {
-+			if (! ohci_at91_usb_get_power(pdata, wIndex-1)) {
-+				*data &= ~cpu_to_le32(RH_PS_PPS);
-+			}
-+
-+			if (pdata->overcurrent_changed[wIndex-1]) {
-+				*data |= cpu_to_le32(RH_PS_OCIC);
-+			}
-+
-+			if (pdata->overcurrent_status[wIndex-1]) {
-+				*data |= cpu_to_le32(RH_PS_POCI);
-+			}
-+		}
-+	}
-+
-+ out:
-+	return ret;
-+}
-+
- /*-------------------------------------------------------------------------*/
+ static void enable_datapath(struct s3c64xx_spi_driver_data *sdd,
+ 				struct spi_device *spi,
+ 				struct spi_transfer *xfer, int dma_mode)
+@@ -234,6 +269,7 @@ static void enable_datapath(struct s3c64xx_spi_driver_data *sdd,
+ 	struct s3c64xx_spi_info *sci = sdd->cntrlr_info;
+ 	void __iomem *regs = sdd->regs;
+ 	u32 modecfg, chcfg;
++	struct samsung_dma_prep_info info;
  
- static const struct hc_driver ohci_at91_hc_driver = {
-@@ -258,8 +408,8 @@ static const struct hc_driver ohci_at91_hc_driver = {
- 	/*
- 	 * root hub support
- 	 */
--	.hub_status_data =	ohci_hub_status_data,
--	.hub_control =		ohci_hub_control,
-+	.hub_status_data =	ohci_at91_hub_status_data,
-+	.hub_control =		ohci_at91_hub_control,
- #ifdef CONFIG_PM
- 	.bus_suspend =		ohci_bus_suspend,
- 	.bus_resume =		ohci_bus_resume,
-@@ -269,22 +419,71 @@ static const struct hc_driver ohci_at91_hc_driver = {
+ 	modecfg = readl(regs + S3C64XX_SPI_MODE_CFG);
+ 	modecfg &= ~(S3C64XX_SPI_MODE_TXDMA_ON | S3C64XX_SPI_MODE_RXDMA_ON);
+@@ -259,10 +295,14 @@ static void enable_datapath(struct s3c64xx_spi_driver_data *sdd,
+ 		chcfg |= S3C64XX_SPI_CH_TXCH_ON;
+ 		if (dma_mode) {
+ 			modecfg |= S3C64XX_SPI_MODE_TXDMA_ON;
+-			s3c2410_dma_config(sdd->tx_dmach, sdd->cur_bpw / 8);
+-			s3c2410_dma_enqueue(sdd->tx_dmach, (void *)sdd,
+-						xfer->tx_dma, xfer->len);
+-			s3c2410_dma_ctrl(sdd->tx_dmach, S3C2410_DMAOP_START);
++			info.cap = DMA_SLAVE;
++			info.direction = DMA_TO_DEVICE;
++			info.buf = xfer->tx_dma;
++			info.len = xfer->len;
++			info.fp = s3c64xx_spi_dma_txcb;
++			info.fp_param = sdd;
++			sdd->ops->prepare(sdd->tx_ch, &info);
++			sdd->ops->trigger(sdd->tx_ch);
+ 		} else {
+ 			switch (sdd->cur_bpw) {
+ 			case 32:
+@@ -294,10 +334,14 @@ static void enable_datapath(struct s3c64xx_spi_driver_data *sdd,
+ 			writel(((xfer->len * 8 / sdd->cur_bpw) & 0xffff)
+ 					| S3C64XX_SPI_PACKET_CNT_EN,
+ 					regs + S3C64XX_SPI_PACKET_CNT);
+-			s3c2410_dma_config(sdd->rx_dmach, sdd->cur_bpw / 8);
+-			s3c2410_dma_enqueue(sdd->rx_dmach, (void *)sdd,
+-						xfer->rx_dma, xfer->len);
+-			s3c2410_dma_ctrl(sdd->rx_dmach, S3C2410_DMAOP_START);
++			info.cap = DMA_SLAVE;
++			info.direction = DMA_FROM_DEVICE;
++			info.buf = xfer->rx_dma;
++			info.len = xfer->len;
++			info.fp = s3c64xx_spi_dma_rxcb;
++			info.fp_param = sdd;
++			sdd->ops->prepare(sdd->rx_ch, &info);
++			sdd->ops->trigger(sdd->rx_ch);
+ 		}
+ 	}
  
- /*-------------------------------------------------------------------------*/
+@@ -483,46 +527,6 @@ static void s3c64xx_spi_config(struct s3c64xx_spi_driver_data *sdd)
+ 	}
+ }
  
-+static irqreturn_t ohci_hcd_at91_overcurrent_irq(int irq, void *data)
-+{
-+	struct platform_device *pdev = data;
-+	struct at91_usbh_data *pdata = pdev->dev.platform_data;
-+	int val, gpio, port;
-+
-+	/* From the GPIO notifying the over-current situation, find
-+	 * out the corresponding port */
-+	gpio = irq_to_gpio(irq);
-+	for (port = 0; port < ARRAY_SIZE(pdata->overcurrent_pin); port++) {
-+		if (pdata->overcurrent_pin[port] == gpio)
-+			break;
-+	}
-+
-+	if (port == ARRAY_SIZE(pdata->overcurrent_pin)) {
-+		dev_err(& pdev->dev, "overcurrent interrupt from unknown GPIO\n");
-+		return IRQ_HANDLED;
-+	}
-+
-+	val = gpio_get_value(gpio);
-+
-+	/* When notified of an over-current situation, disable power
-+	   on the corresponding port, and mark this port in
-+	   over-current. */
-+	if (! val) {
-+		ohci_at91_usb_set_power(pdata, port, 0);
-+		pdata->overcurrent_status[port]  = 1;
-+		pdata->overcurrent_changed[port] = 1;
-+	}
-+
-+	dev_dbg(& pdev->dev, "overcurrent situation %s\n",
-+		val ? "exited" : "notified");
-+
-+	return IRQ_HANDLED;
-+}
-+
-+/*-------------------------------------------------------------------------*/
-+
- static int ohci_hcd_at91_drv_probe(struct platform_device *pdev)
+-static void s3c64xx_spi_dma_rxcb(struct s3c2410_dma_chan *chan, void *buf_id,
+-				 int size, enum s3c2410_dma_buffresult res)
+-{
+-	struct s3c64xx_spi_driver_data *sdd = buf_id;
+-	unsigned long flags;
+-
+-	spin_lock_irqsave(&sdd->lock, flags);
+-
+-	if (res == S3C2410_RES_OK)
+-		sdd->state &= ~RXBUSY;
+-	else
+-		dev_err(&sdd->pdev->dev, "DmaAbrtRx-%d\n", size);
+-
+-	/* If the other done */
+-	if (!(sdd->state & TXBUSY))
+-		complete(&sdd->xfer_completion);
+-
+-	spin_unlock_irqrestore(&sdd->lock, flags);
+-}
+-
+-static void s3c64xx_spi_dma_txcb(struct s3c2410_dma_chan *chan, void *buf_id,
+-				 int size, enum s3c2410_dma_buffresult res)
+-{
+-	struct s3c64xx_spi_driver_data *sdd = buf_id;
+-	unsigned long flags;
+-
+-	spin_lock_irqsave(&sdd->lock, flags);
+-
+-	if (res == S3C2410_RES_OK)
+-		sdd->state &= ~TXBUSY;
+-	else
+-		dev_err(&sdd->pdev->dev, "DmaAbrtTx-%d \n", size);
+-
+-	/* If the other done */
+-	if (!(sdd->state & RXBUSY))
+-		complete(&sdd->xfer_completion);
+-
+-	spin_unlock_irqrestore(&sdd->lock, flags);
+-}
+-
+ #define XFER_DMAADDR_INVALID DMA_BIT_MASK(32)
+ 
+ static int s3c64xx_spi_map_mssg(struct s3c64xx_spi_driver_data *sdd,
+@@ -697,12 +701,10 @@ static void handle_msg(struct s3c64xx_spi_driver_data *sdd,
+ 			if (use_dma) {
+ 				if (xfer->tx_buf != NULL
+ 						&& (sdd->state & TXBUSY))
+-					s3c2410_dma_ctrl(sdd->tx_dmach,
+-							S3C2410_DMAOP_FLUSH);
++					sdd->ops->stop(sdd->tx_ch);
+ 				if (xfer->rx_buf != NULL
+ 						&& (sdd->state & RXBUSY))
+-					s3c2410_dma_ctrl(sdd->rx_dmach,
+-							S3C2410_DMAOP_FLUSH);
++					sdd->ops->stop(sdd->rx_ch);
+ 			}
+ 
+ 			goto out;
+@@ -742,24 +744,19 @@ out:
+ 
+ static int acquire_dma(struct s3c64xx_spi_driver_data *sdd)
  {
- 	struct at91_usbh_data	*pdata = pdev->dev.platform_data;
- 	int			i;
+-	if (s3c2410_dma_request(sdd->rx_dmach,
+-					&s3c64xx_spi_dma_client, NULL) < 0) {
+-		dev_err(&sdd->pdev->dev, "cannot get RxDMA\n");
+-		return 0;
+-	}
+-	s3c2410_dma_set_buffdone_fn(sdd->rx_dmach, s3c64xx_spi_dma_rxcb);
+-	s3c2410_dma_devconfig(sdd->rx_dmach, S3C2410_DMASRC_HW,
+-					sdd->sfr_start + S3C64XX_SPI_RX_DATA);
+-
+-	if (s3c2410_dma_request(sdd->tx_dmach,
+-					&s3c64xx_spi_dma_client, NULL) < 0) {
+-		dev_err(&sdd->pdev->dev, "cannot get TxDMA\n");
+-		s3c2410_dma_free(sdd->rx_dmach, &s3c64xx_spi_dma_client);
+-		return 0;
+-	}
+-	s3c2410_dma_set_buffdone_fn(sdd->tx_dmach, s3c64xx_spi_dma_txcb);
+-	s3c2410_dma_devconfig(sdd->tx_dmach, S3C2410_DMASRC_MEM,
+-					sdd->sfr_start + S3C64XX_SPI_TX_DATA);
++
++	struct samsung_dma_info info;
++	sdd->ops = samsung_dma_get_ops();
++
++	info.cap = DMA_SLAVE;
++	info.client = &s3c64xx_spi_dma_client;
++	info.direction = DMA_FROM_DEVICE;
++	info.fifo = sdd->sfr_start + S3C64XX_SPI_RX_DATA;
++	info.width = sdd->cur_bpw / 8;
++	sdd->rx_ch = sdd->ops->request(sdd->rx_dmach, &info);
++	info.direction = DMA_TO_DEVICE;
++	info.fifo = sdd->sfr_start + S3C64XX_SPI_TX_DATA;
++	sdd->tx_ch = sdd->ops->request(sdd->tx_dmach, &info);
  
- 	if (pdata) {
--		/* REVISIT make the driver support per-port power switching,
--		 * and also overcurrent detection.  Here we assume the ports
--		 * are always powered while this driver is active, and use
--		 * active-low power switches.
--		 */
- 		for (i = 0; i < ARRAY_SIZE(pdata->vbus_pin); i++) {
- 			if (pdata->vbus_pin[i] <= 0)
- 				continue;
- 			gpio_request(pdata->vbus_pin[i], "ohci_vbus");
--			gpio_direction_output(pdata->vbus_pin[i], pdata->vbus_pin_inverted);
-+			ohci_at91_usb_set_power(pdata, i, 1);
-+		}
-+
-+		for (i = 0; i < ARRAY_SIZE(pdata->overcurrent_pin); i++) {
-+			int ret;
-+
-+			if (pdata->overcurrent_pin[i] <= 0)
-+				continue;
-+			gpio_request(pdata->overcurrent_pin[i], "ohci_overcurrent");
-+
-+			ret = request_irq(gpio_to_irq(pdata->overcurrent_pin[i]),
-+					  ohci_hcd_at91_overcurrent_irq,
-+					  IRQF_SHARED, "ohci_overcurrent", pdev);
-+			if (ret) {
-+				gpio_free(pdata->overcurrent_pin[i]);
-+				dev_warn(& pdev->dev, "cannot get GPIO IRQ for overcurrent\n");
-+			}
- 		}
- 	}
+ 	return 1;
+ }
+@@ -800,8 +797,8 @@ static void s3c64xx_spi_work(struct work_struct *work)
+ 	spin_unlock_irqrestore(&sdd->lock, flags);
  
-@@ -301,9 +500,16 @@ static int ohci_hcd_at91_drv_remove(struct platform_device *pdev)
- 		for (i = 0; i < ARRAY_SIZE(pdata->vbus_pin); i++) {
- 			if (pdata->vbus_pin[i] <= 0)
- 				continue;
--			gpio_direction_output(pdata->vbus_pin[i], !pdata->vbus_pin_inverted);
-+			ohci_at91_usb_set_power(pdata, i, 0);
- 			gpio_free(pdata->vbus_pin[i]);
- 		}
-+
-+		for (i = 0; i < ARRAY_SIZE(pdata->overcurrent_pin); i++) {
-+			if (pdata->overcurrent_pin[i] <= 0)
-+				continue;
-+			free_irq(gpio_to_irq(pdata->overcurrent_pin[i]), pdev);
-+			gpio_free(pdata->overcurrent_pin[i]);
-+		}
- 	}
+ 	/* Free DMA channels */
+-	s3c2410_dma_free(sdd->tx_dmach, &s3c64xx_spi_dma_client);
+-	s3c2410_dma_free(sdd->rx_dmach, &s3c64xx_spi_dma_client);
++	sdd->ops->release(sdd->rx_ch, &s3c64xx_spi_dma_client);
++	sdd->ops->release(sdd->tx_ch, &s3c64xx_spi_dma_client);
+ }
  
- 	device_init_wakeup(&pdev->dev, 0);
+ static int s3c64xx_spi_transfer(struct spi_device *spi,
 -- 
-1.7.4.1
+1.7.1
