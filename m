@@ -1,42 +1,44 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Wed, 13 Jul 2011 14:40:18 -0600
-Subject: [PATCH 2/2] ARM: Tegra: Harmony: Add USB device
-In-Reply-To: <1310589618-16080-1-git-send-email-swarren@nvidia.com>
-References: <1310589618-16080-1-git-send-email-swarren@nvidia.com>
-Message-ID: <1310589618-16080-2-git-send-email-swarren@nvidia.com>
+From: gregkh@suse.de (Greg KH)
+Date: Wed, 13 Jul 2011 22:32:26 +0200
+Subject: [PATCH 2/3] mach-ux500: export System-on-Chip information via
+	sysfs
+In-Reply-To: <4E1DCA83.7010204@codeaurora.org>
+References: <1310476090-9807-1-git-send-email-lee.jones@linaro.org>
+	<1310476090-9807-2-git-send-email-lee.jones@linaro.org>
+	<4E1C7650.6010700@codeaurora.org> <4E1D4F88.3070501@linaro.org>
+	<4E1DCA83.7010204@codeaurora.org>
+Message-ID: <20110713203226.GA23055@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Tegra USB port is attached an an SMSC9514; a combination USB hub
-and Ethernet controller.
+On Wed, Jul 13, 2011 at 09:40:35AM -0700, Saravana Kannan wrote:
+> On 07/13/2011 12:55 AM, Lee Jones wrote:
+> >On 12/07/11 17:29, Saravana Kannan wrote:
+> >>Can you please make this code as part of soc_device_register? Otherwise,
+> >>every SoC that wants to add its own set of attributes will have to
+> >>repeat this code.
+> >
+> >That's the idea.
+> >
+> >I initially had it all as part of soc_device_register, but Arnd told me
+> >to remove it in this patch-set.
+> >
+> >See here:
+> >
+> >On 17/04/11 19:36, Arnd Bergmann wrote:
+> >>For the nonstandard attributes, I would recommend having the individual
+> >>drivers call device_create_file, in order to discourage the use of
+> >>device specific attribute names.
+> 
+> Arnd,
+> 
+> I don't think forcing individual driver to call device_create_file()
+> is really going to be much of a discouragement.
 
-This change is extracted from a change in the ChromeOS 2.6.38 kernel.
+Yes it is as calling that is broken and wrong and userspace will race
+with the kernel and bad things will happen on the wrong phase of the
+moon.
 
-Signed-off-by: Olof Johansson <olofj@chromium.org>
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
- arch/arm/mach-tegra/board-harmony.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+But again, I never saw the original series to explain why...
 
-diff --git a/arch/arm/mach-tegra/board-harmony.c b/arch/arm/mach-tegra/board-harmony.c
-index e4548a5..ecad7cb 100644
---- a/arch/arm/mach-tegra/board-harmony.c
-+++ b/arch/arm/mach-tegra/board-harmony.c
-@@ -120,6 +120,7 @@ static struct platform_device *harmony_devices[] __initdata = {
- 	&tegra_sdhci_device1,
- 	&tegra_sdhci_device2,
- 	&tegra_sdhci_device4,
-+	&tegra_ehci3_device,
- 	&tegra_i2s_device1,
- 	&tegra_das_device,
- 	&tegra_pcm_device,
-@@ -143,6 +144,7 @@ static __initdata struct tegra_clk_init_table harmony_clk_init_table[] = {
- 	{ "pll_a_out0",	"pll_a",	11289600,	true },
- 	{ "cdev1",	NULL,		0,		true },
- 	{ "i2s1",	"pll_a_out0",	11289600,	false},
-+	{ "usb3",	"clk_m",	12000000,	true },
- 	{ NULL,		NULL,		0,		0},
- };
- 
--- 
-1.7.0.4
+greg k-h
