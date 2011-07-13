@@ -1,236 +1,119 @@
-From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
-Date: Wed, 13 Jul 2011 19:24:17 +0530
-Subject: [PATCH v4 18/20] gpio/omap: use pm-runtime framework
-In-Reply-To: <1310565259-31267-1-git-send-email-tarun.kanti@ti.com>
-References: <1310565259-31267-1-git-send-email-tarun.kanti@ti.com>
-Message-ID: <1310565259-31267-19-git-send-email-tarun.kanti@ti.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Wed, 13 Jul 2011 16:00:38 +0200
+Subject: [PATCH V2 03/10] ASoc: mxs: add mxs-sgtl5000 machine driver
+In-Reply-To: <65EE16ACC360FA4D99C96DC085B3F7721CDC7C@039-SN1MPN1-002.039d.mgd.msft.net>
+References: <1310483085-31442-1-git-send-email-b29396@freescale.com>
+	<1310483085-31442-4-git-send-email-b29396@freescale.com>
+	<20110713115711.GG1928@pengutronix.de>
+	<65EE16ACC360FA4D99C96DC085B3F7721CDBAA@039-SN1MPN1-002.039d.mgd.msft.net>
+	<65EE16ACC360FA4D99C96DC085B3F7721CDC7C@039-SN1MPN1-002.039d.mgd.msft.net>
+Message-ID: <20110713140038.GI1928@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Charulatha V <charu@ti.com>
 
-Call runtime pm APIs pm_runtime_get_sync() and pm_runtime_put_sync()
-for enabling/disabling clocks appropriately. Remove syscore_ops and
-instead use dev_pm_ops now.
+> For regulator issue, One method is that just add two regulator (VDDA&VDDIO)
+> needed by sgtl5000 in platform code to make sgtl5000 work first.
+> If that I could add it in my the following patches.
+> 
+> Or we do not add it (just leave sgtl5000 unwork), instead, we directly
+> implement the full regulator support for MX28 power management?
+> 
+> What's your suggestion?
 
-Signed-off-by: Charulatha V <charu@ti.com>
-Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
----
- drivers/gpio/gpio-omap.c |   99 ++++++++++++++++++++++++++++++++++++----------
- 1 files changed, 78 insertions(+), 21 deletions(-)
+Hmmm, as we started now with the audio patches, I'd think we should concentrate
+on getting them in shape first. So, my preference would be adding just the two
+regulators. Whenever the power management gets complete, they should be easy to
+include/adapt, if I didn't miss anything.
 
-diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-index 4191555..3f1b992 100644
---- a/drivers/gpio/gpio-omap.c
-+++ b/drivers/gpio/gpio-omap.c
-@@ -79,6 +79,8 @@ struct gpio_bank {
- 	struct omap_gpio_reg_offs *regs;
- };
- 
-+static void omap_gpio_mod_init(struct gpio_bank *bank);
-+
- #define GPIO_INDEX(bank, gpio) (gpio % bank->width)
- #define GPIO_BIT(bank, gpio) (1 << GPIO_INDEX(bank, gpio))
- #define GPIO_MOD_CTRL_BIT	BIT(0)
-@@ -479,6 +481,22 @@ static int omap_gpio_request(struct gpio_chip *chip, unsigned offset)
- 	struct gpio_bank *bank = container_of(chip, struct gpio_bank, chip);
- 	unsigned long flags;
- 
-+	/*
-+	 * If this is the first gpio_request for the bank,
-+	 * enable the bank module.
-+	 */
-+	if (!bank->mod_usage) {
-+		if (IS_ERR_VALUE(pm_runtime_get_sync(bank->dev) < 0)) {
-+			dev_err(bank->dev, "%s: GPIO bank %d "
-+					"pm_runtime_get_sync failed\n",
-+					__func__, bank->id);
-+			return -EINVAL;
-+		}
-+
-+		/* Initialize the gpio bank registers to init time value */
-+		omap_gpio_mod_init(bank);
-+	}
-+
- 	spin_lock_irqsave(&bank->lock, flags);
- 
- 	/* Set trigger to none. You need to enable the desired trigger with
-@@ -536,6 +554,18 @@ static void omap_gpio_free(struct gpio_chip *chip, unsigned offset)
- 
- 	_reset_gpio(bank, bank->chip.base + offset);
- 	spin_unlock_irqrestore(&bank->lock, flags);
-+
-+	/*
-+	 * If this is the last gpio to be freed in the bank,
-+	 * disable the bank module.
-+	 */
-+	if (!bank->mod_usage) {
-+		if (IS_ERR_VALUE(pm_runtime_put_sync(bank->dev) < 0)) {
-+			dev_err(bank->dev, "%s: GPIO bank %d "
-+					"pm_runtime_put_sync failed\n",
-+					__func__, bank->id);
-+		}
-+	}
- }
- 
- /*
-@@ -560,6 +590,9 @@ static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
- 	chained_irq_enter(chip, desc);
- 
- 	bank = irq_get_handler_data(irq);
-+
-+	pm_runtime_get_sync(bank->dev);
-+
- 	isr_reg = bank->base + bank->regs->irqstatus;
- 
- 	if (WARN_ON(!isr_reg))
-@@ -622,6 +655,8 @@ static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
- exit:
- 	if (!unmasked)
- 		chained_irq_exit(chip, desc);
-+
-+	pm_runtime_put_sync(bank->dev);
- }
- 
- static void gpio_irq_shutdown(struct irq_data *d)
-@@ -1028,12 +1063,25 @@ static int __devinit omap_gpio_probe(struct platform_device *pdev)
- 	}
- 
- 	pm_runtime_enable(bank->dev);
--	pm_runtime_get_sync(bank->dev);
-+	pm_runtime_irq_safe(bank->dev);
-+	if (IS_ERR_VALUE(pm_runtime_get_sync(bank->dev) < 0)) {
-+		dev_err(bank->dev, "%s: GPIO bank %d pm_runtime_get_sync "
-+				"failed\n", __func__, bank->id);
-+		iounmap(bank->base);
-+		return -EINVAL;
-+	}
- 
- 	omap_gpio_mod_init(bank);
- 	omap_gpio_chip_init(bank);
- 	omap_gpio_show_rev(bank);
- 
-+	if (IS_ERR_VALUE(pm_runtime_put_sync(bank->dev) < 0)) {
-+		dev_err(bank->dev, "%s: GPIO bank %d pm_runtime_put_sync "
-+				"failed\n", __func__, bank->id);
-+		iounmap(bank->base);
-+		return -EINVAL;
-+	}
-+
- 	list_add_tail(&bank->node, &omap_gpio_list);
- 
- 	return ret;
-@@ -1044,10 +1092,12 @@ err_exit:
- 	return ret;
- }
- 
--static int omap_gpio_suspend(void)
-+static int omap_gpio_suspend(struct device *dev)
- {
- 	struct gpio_bank *bank;
- 
-+	pm_runtime_get_sync(dev);
-+
- 	list_for_each_entry(bank, &omap_gpio_list, node) {
- 		void __iomem *base = bank->base;
- 		void __iomem *wake_status;
-@@ -1065,30 +1115,33 @@ static int omap_gpio_suspend(void)
- 		spin_unlock_irqrestore(&bank->lock, flags);
- 	}
- 
-+	pm_runtime_put_sync(dev);
-+
- 	return 0;
- }
- 
--static void omap_gpio_resume(void)
-+static int omap_gpio_resume(struct device *dev)
- {
- 	struct gpio_bank *bank;
- 
-+	pm_runtime_get_sync(dev);
-+
- 	list_for_each_entry(bank, &omap_gpio_list, node) {
- 		void __iomem *base = bank->base;
- 		unsigned long flags;
- 
- 		if (!bank->regs->wkup_status)
--			return;
-+			return 0;
- 
- 		spin_lock_irqsave(&bank->lock, flags);
- 		_gpio_rmw(base, bank->regs->wkup_status, bank->saved_wakeup, 1);
- 		spin_unlock_irqrestore(&bank->lock, flags);
- 	}
--}
- 
--static struct syscore_ops omap_gpio_syscore_ops = {
--	.suspend	= omap_gpio_suspend,
--	.resume		= omap_gpio_resume,
--};
-+	pm_runtime_put_sync(dev);
-+
-+	return 0;
-+}
- 
- #ifdef CONFIG_ARCH_OMAP2PLUS
- 
-@@ -1112,6 +1165,11 @@ void omap2_gpio_prepare_for_idle(int off_mode)
- 		if (!off_mode)
- 			continue;
- 
-+		if (IS_ERR_VALUE(pm_runtime_put_sync(bank->dev) < 0))
-+			dev_err(bank->dev, "%s: GPIO bank %d "
-+					"pm_runtime_put_sync failed\n",
-+					__func__, bank->id);
-+
- 		/* If going to OFF, remove triggering for all
- 		 * non-wakeup GPIOs.  Otherwise spurious IRQs will be
- 		 * generated.  See OMAP2420 Errata item 1.101. */
-@@ -1152,6 +1210,11 @@ void omap2_gpio_resume_after_idle(void)
- 		if (!bank->loses_context)
- 			continue;
- 
-+		if (IS_ERR_VALUE(pm_runtime_get_sync(bank->dev) < 0))
-+			dev_err(bank->dev, "%s: GPIO bank %d "
-+					"pm_runtime_get_sync failed\n",
-+					__func__, bank->id);
-+
- 		for (j = 0; j < hweight_long(bank->dbck_enable_mask); j++)
- 			clk_enable(bank->dbck);
- 
-@@ -1267,10 +1330,16 @@ static void omap_gpio_restore_context(struct gpio_bank *bank)
- }
- #endif
- 
-+static const struct dev_pm_ops gpio_pm_ops = {
-+	.suspend		= omap_gpio_suspend,
-+	.resume			= omap_gpio_resume,
-+};
-+
- static struct platform_driver omap_gpio_driver = {
- 	.probe		= omap_gpio_probe,
- 	.driver		= {
- 		.name	= "omap_gpio",
-+		.pm	= &gpio_pm_ops,
- 	},
- };
- 
-@@ -1285,15 +1354,3 @@ static int __init omap_gpio_drv_reg(void)
- }
- postcore_initcall(omap_gpio_drv_reg);
- 
--static int __init omap_gpio_sysinit(void)
--{
--
--#if defined(CONFIG_ARCH_OMAP16XX) || defined(CONFIG_ARCH_OMAP2PLUS)
--	if (cpu_is_omap16xx() || cpu_class_is_omap2())
--		register_syscore_ops(&omap_gpio_syscore_ops);
--#endif
--
--	return 0;
--}
--
--arch_initcall(omap_gpio_sysinit);
+With your sgtl-patch, I can set the alsa-controls like volume. Yet the
+WAV played via simple aplay has a massive hall (like a concert at the
+other end of the cathedral ;)). Interrupting aplay, and trying again
+gives me sometimes:
+
+Playing WAVE 'machinae supremacy - great gianna sisters.wav' : Signed 16 bit Little Endian, Rate 44100 Hz, Stereo
+[   15.940000] private_candidate: dma0chan0 busy
+[   15.950000] private_candidate: dma0chan1 busy
+[   15.950000] private_candidate: dma0chan2 filter said false
+[   15.960000] private_candidate: dma0chan3 filter said false
+[   15.960000] private_candidate: dma0chan4 filter said false
+[   15.970000] private_candidate: dma0chan5 filter said false
+[   15.970000] private_candidate: dma0chan6 filter said false
+[   15.980000] private_candidate: dma0chan7 filter said false
+[   15.980000] private_candidate: dma0chan8 filter said false
+[   15.990000] private_candidate: dma0chan9 filter said false
+[   15.990000] private_candidate: dma0chan10 filter said false
+[   16.000000] private_candidate: dma0chan11 filter said false
+[   16.010000] private_candidate: dma0chan12 filter said false
+[   16.010000] private_candidate: dma0chan13 filter said false
+[   16.020000] private_candidate: dma0chan14 filter said false
+[   16.020000] private_candidate: dma0chan15 filter said false
+[   16.030000] private_candidate: dma1chan0 filter said false
+[   16.030000] private_candidate: dma1chan1 filter said false
+[   16.040000] private_candidate: dma1chan2 filter said false
+[   16.050000] private_candidate: dma1chan3 filter said false
+[   16.050000] Division by zero in kernel.
+[   16.050000] [<c0025cac>] (unwind_backtrace+0x0/0xe4) from [<c012a1b4>] (Ldiv0+0x8/0x10)
+[   16.060000] [<c012a1b4>] (Ldiv0+0x8/0x10) from [<c012a184>] (__aeabi_uidivmod+0x8/0x18)
+[   16.070000] [<c012a184>] (__aeabi_uidivmod+0x8/0x18) from [<c01ad5c8>] (audio_dma_irq+0x28/0x38)
+[   16.080000] [<c01ad5c8>] (audio_dma_irq+0x28/0x38) from [<c013b200>] (mxs_dma_tasklet+0x18/0x1c)
+[   16.090000] [<c013b200>] (mxs_dma_tasklet+0x18/0x1c) from [<c0037430>] (tasklet_action+0x88/0xe0)
+[   16.100000] [<c0037430>] (tasklet_action+0x88/0xe0) from [<c0037918>] (__do_softirq+0x84/0x11c)
+[   16.110000] [<c0037918>] (__do_softirq+0x84/0x11c) from [<c0037d1c>] (irq_exit+0x40/0x90)
+[   16.110000] [<c0037d1c>] (irq_exit+0x40/0x90) from [<c0021064>] (asm_do_IRQ+0x64/0x84)
+[   16.120000] [<c0021064>] (asm_do_IRQ+0x64/0x84) from [<c0021b14>] (__irq_svc+0x34/0x60)
+[   16.130000] Exception stack(0xc7a13de0 to 0xc7a13e28)
+[   16.140000] 3de0: 00000000 00000000 00000000 00000000 c0316368 c7927b00 00000050 60000013
+[   16.140000] 3e00: 00000000 00000000 c0316390 c031f13c 00000000 c7a13e28 c0060fd0 c0060298
+[   16.150000] 3e20: 60000013 ffffffff
+[   16.160000] [<c0021b14>] (__irq_svc+0x34/0x60) from [<c0060298>] (__setup_irq+0x280/0x340)
+[   16.160000] [<c0060298>] (__setup_irq+0x280/0x340) from [<c0060424>] (request_threaded_irq+0xcc/0x11c)
+[   16.170000] [<c0060424>] (request_threaded_irq+0xcc/0x11c) from [<c013b684>] (mxs_dma_alloc_chan_resources+0x70/0xe8)
+[   16.180000] [<c013b684>] (mxs_dma_alloc_chan_resources+0x70/0xe8) from [<c013a3d0>] (dma_chan_get+0x88/0x110)
+[   16.190000] [<c013a3d0>] (dma_chan_get+0x88/0x110) from [<c013a4d0>] (__dma_request_channel+0x78/0x18c)
+[   16.200000] [<c013a4d0>] (__dma_request_channel+0x78/0x18c) from [<c01ad3e0>] (snd_mxs_pcm_hw_params+0x70/0x1d4)
+[   16.210000] [<c01ad3e0>] (snd_mxs_pcm_hw_params+0x70/0x1d4) from [<c01a3a0c>] (soc_pcm_hw_params+0x100/0x1ac)
+[   16.220000] [<c01a3a0c>] (soc_pcm_hw_params+0x100/0x1ac) from [<c019cd1c>] (snd_pcm_hw_params+0x98/0x33c)
+[   16.230000] [<c019cd1c>] (snd_pcm_hw_params+0x98/0x33c) from [<c019dc10>] (snd_pcm_common_ioctl1+0x1e4/0x4f8)
+[   16.240000] [<c019dc10>] (snd_pcm_common_ioctl1+0x1e4/0x4f8) from [<c019e374>] (snd_pcm_playback_ioctl1+0x200/0x220)
+[   16.250000] [<c019e374>] (snd_pcm_playback_ioctl1+0x200/0x220) from [<c0097b24>] (do_vfs_ioctl+0x258/0x288)
+[   16.260000] [<c0097b24>] (do_vfs_ioctl+0x258/0x288) from [<c0097b88>] (sys_ioctl+0x34/0x54)
+[   16.270000] [<c0097b88>] (sys_ioctl+0x34/0x54) from [<c0021ea0>] (ret_fast_syscall+0x0/0x2c)
+[   16.280000] __dma_request_channel: success (dma1chan4)
+[   16.290000] dma dma1chan4: cannot prepare slave dma
+[   16.290000] asoc: platform mxs-pcm-audio.0 hw params failed
+aplay: set_params:1053: Unable to install hw params:
+ACCESS:  RW_INTERLEAVED
+FORMAT:  S16_LE
+SUBFORMAT:  STD
+SAMPLE_BITS: 16
+FRAME_BITS: 32
+CHANNELS: 2
+RATE: 44100
+PERIOD_TIME: (46439 46440)
+PERIOD_SIZE: 2048
+PERIOD_BYTES: 8192
+PERIODS: 8
+BUFFER_TIME: (371519 371520)
+BUFFER_SIZE: 16384
+BUFFER_BYTES: 65536
+TICK_TIME: 0
+
+After that OOPS, playing works again (still with the hall). Didn't have the
+time to look at these issues yet, but since I was writing to you anyway, I
+thought I'd mention it...
+
+Regards,
+
+   Wolfram
+
 -- 
-1.6.0.4
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110713/099d9e6f/attachment.sig>
