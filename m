@@ -1,52 +1,37 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Wed, 13 Jul 2011 22:26:00 +0200
-Subject: [RFC 0/6] watchdog drivers converted to the new framework
-Message-ID: <1310588766-16638-1-git-send-email-w.sang@pengutronix.de>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Wed, 13 Jul 2011 14:40:17 -0600
+Subject: [PATCH 1/2] ARM: Tegra: Harmony: Register and configure WM8903 IRQ
+	GPIO
+Message-ID: <1310589618-16080-1-git-send-email-swarren@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As promised, here is a RFC with two examples demonstrating how watchdog drivers
-can be converted to use the new watchdog framework (using the current version
-Wim posted two days ago). There is also conversion guide put to the
-documentation folder. Being RFC, all this is not final yet, but presentable, I
-hope.
+Technically, we need to request and configure the GPIO used as the WM8903
+interrupt. This prevents conflicting registrations, and assures that the
+GPIO is correctly configured in all cases, e.g. if the bootloader left the
+GPIO in some unexpected state.
 
-Although there are a few more consolidation options left, there is already a
-gain of ~100 lines per driver. Promising, but there are a few issues to be
-sorted out, too, yet nothing which can be dealt with.
+In practice, the previous code works as-is, at least when using ChromeOS's
+U-Boot as the boot-loader.
 
-I have two other drivers in the making (stmp3xxx and imx2), but they need some
-more preparation; the first one needs some internal cleanups (like a lot of
-watchdog drivers); the latter one needs an addition to the framework
-(installing a timer for non-stoppable devices). I will also prepare a new
-driver (mx1) to show how small new drivers can be now :) The aim for all these
-driver conversions is inclusion in Linux 3.2. I still hope we can get the basic
-framework into Linux 3.1.
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+ arch/arm/mach-tegra/board-harmony.c |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
 
-Many thanks to CELF/LF for supporting this work and to Wim and Alan for making
-the framework!
-
-Looking forward to comments,
-
-   Wolfram
-
-They are also available in the git repository at:
-  git://git.pengutronix.de/git/wsa/linux-2.6.git generic-watchdog-with-drivers
-
-Wolfram Sang (6):
-  Documentation: watchdog: add guide how to convert drivers to new framework
-  watchdog: s3c2410: convert to use the watchdog framework
-  watchdog: pnx4008: cleanup resource handling using managed devices
-  watchdog: pnx4008: don't use __raw_-accessors
-  watchdog: pnx4008: convert driver to use the watchdog framework
-  watchdog: pnx4008: WIP refactor disabling device
-
- .../watchdog/convert_drivers_to_kernel_api.txt     |  195 ++++++++++++++++
- drivers/watchdog/Kconfig                           |    2 +
- drivers/watchdog/pnx4008_wdt.c                     |  246 +++++++-------------
- drivers/watchdog/s3c2410_wdt.c                     |  176 +++-----------
- 4 files changed, 313 insertions(+), 306 deletions(-)
- create mode 100644 Documentation/watchdog/convert_drivers_to_kernel_api.txt
-
+diff --git a/arch/arm/mach-tegra/board-harmony.c b/arch/arm/mach-tegra/board-harmony.c
+index 846cd7d..e4548a5 100644
+--- a/arch/arm/mach-tegra/board-harmony.c
++++ b/arch/arm/mach-tegra/board-harmony.c
+@@ -109,6 +109,9 @@ static void __init harmony_i2c_init(void)
+ 	platform_device_register(&tegra_i2c_device3);
+ 	platform_device_register(&tegra_i2c_device4);
+ 
++	gpio_request(TEGRA_GPIO_CDC_IRQ, "wm8903");
++	gpio_direction_input(TEGRA_GPIO_CDC_IRQ);
++
+ 	i2c_register_board_info(0, &wm8903_board_info, 1);
+ }
+ 
 -- 
-1.7.2.5
+1.7.0.4
