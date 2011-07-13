@@ -1,34 +1,27 @@
-From: paulo@nlink.com.br (Paulo Fragoso)
-Date: Wed, 13 Jul 2011 15:27:43 -0300
-Subject: AT91 SDIO WiFi no working
-Message-ID: <4E1DE39F.3030104@nlink.com.br>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Wed, 13 Jul 2011 11:51:41 -0700
+Subject: [PATCH] ARM: Tegra: Trimslice: Tri-state DAP2 pinmux
+In-Reply-To: <20110713180058.GB27828@avionic-0098.mockup.avionic-design.de>
+References: <1310579091-7424-1-git-send-email-swarren@nvidia.com>
+	<20110713180058.GB27828@avionic-0098.mockup.avionic-design.de>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF049E834793@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Thierry Reding wrote at Wednesday, July 13, 2011 12:01 PM:
+> Stephen Warren wrote:
+> > DAP2 is used for a bunch of GPIOs. Not tri-stating the pins means audio
+> > signals get sent out there, and this ends up resetting USB and breaking
+> > SDHCI too.
+...
+> > -	{TEGRA_PINGROUP_DAP3,  TEGRA_MUX_DAP3,          TEGRA_PUPD_NORMAL,      TEGRA_TRI_NORMAL},
+> > +	{TEGRA_PINGROUP_DAP3,  TEGRA_MUX_DAP3,          TEGRA_PUPD_NORMAL,      TEGRA_TRI_TRISTATE},
+> 
+> The patch subject and description say that DAP2 is tristated, not DAP3.
 
-We are trying to run SDIO WiFI with a board based on AT91sam9 and our 
-configuration and firmware files are apparently ok but now we have got 
-this erro:
+Oops. I've fixed that locally and will repost once Mike acks it.
 
-root at buildroot:~# modprobe libertas
-root at buildroot:~# modprobe libertas_sdio.ko 
-helper_name=/lib/firmware/sd8686_v8_
-helper.bin fw_name=/lib/firmware/sd8686_v8.bin
-libertas_sdio: Libertas SDIO driver
-libertas_sdio: Copyright Pierre Ossman
-libertas: can't load helper firmware
-libertas: failed to load helper firmware
-libertas_sdio: probe of mmc0:0001:1 failed with error -2
-
-udev is running too, what might be happening?
-
-Thanks,
-Paulo.
+Thanks!
 
 -- 
-Digium-Certified Asterisk Professional (dCAP: 1947)
-FreeBSD/UN*X Administrator
-Electronic Engineer
-+55 81 2121-6666 - www.nlink.com.br
-Cel:81 9727-6666 - Voip:   786-7161
+nvpublic
