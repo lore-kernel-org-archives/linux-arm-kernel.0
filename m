@@ -1,79 +1,27 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 13 Jul 2011 10:03:46 +0900
-Subject: [PATCH V2 02/10] ASoc: mxs: add mxs-saif driver
-In-Reply-To: <1310483085-31442-3-git-send-email-b29396@freescale.com>
-References: <1310483085-31442-1-git-send-email-b29396@freescale.com>
-	<1310483085-31442-3-git-send-email-b29396@freescale.com>
-Message-ID: <20110713010346.GA18959@opensource.wolfsonmicro.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 12 Jul 2011 23:25:30 -0700
+Subject: Remaining omap pull requests
+In-Reply-To: <1310460112.19324.3.camel@lws-weitzel>
+References: <20110711114736.GX5783@atomide.com>
+	<1310460112.19324.3.camel@lws-weitzel>
+Message-ID: <20110713062530.GH5783@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 12, 2011 at 11:04:37PM +0800, Dong Aisheng wrote:
+* Jan Weitzel <J.Weitzel@phytec.de> [110712 01:36]:
+> Am Montag, den 11.07.2011, 04:47 -0700 schrieb Tony Lindgren:
+> 
+> > Then there are two new boards remaining, but they both are waiting
+> > on the machine_id patch.
+> > 
+> 
+> If one of them is our pcm049 OMAP4 board, the machine_id is already in.
+> pcm049                  MACH_PCM049             PCM049                  3364
 
-Looks pretty good, a few small issues below.
+Yes, thanks for pointing that out. And now we also have an ack from Russell
+for the Nook mach-types changes. I'll take one more look at the machine
+patches and if no issues will apply them.
 
-> +	/* The SAIF clock should be either 384*fs or 512*fs */
-> +	if (saif->mclk_in_use) {
-> +		if (mclk % 32 == 0) {
-> +			scr &= ~BM_SAIF_CTRL_BITCLK_BASE_RATE;
-> +			ret = clk_set_rate(saif->clk, 512 * rate);
-> +		} else if (mclk % 48 == 0) {
-> +			scr |= BM_SAIF_CTRL_BITCLK_BASE_RATE;
-> +			ret = clk_set_rate(saif->clk, 384 * rate);
-> +		}
+Regards,
 
-What if MCLK is not set corectly for some reason?  We'll just silently
-do nothing.
-
-> +	if (ret)
-> +		return  -EINVAL;
-
-Should pass through any error codes we get.
-
-In hw_params()...
-> +	stat = __raw_readl(saif->base + SAIF_STAT);
-> +	if (stat & BM_SAIF_STAT_BUSY) {
-> +		dev_err(cpu_dai->dev, "error: busy\n");
-> +		return -EBUSY;
-> +	}
-
-Does this work for simultaneous playback and record?  Perhaps you need
-to set symmetric_rates in the DAI (if the hardware needs the same sample
-rate for playback and record) and have a check here to see if we're
-trying to apply the same configuration as we already have.
-
-> +	struct mxs_saif *saif = dev_id;
-> +	unsigned int stat;
-> +
-> +	stat = __raw_readl(saif->base + SAIF_STAT);
-> +	if (stat & BM_SAIF_STAT_FIFO_UNDERFLOW_IRQ)
-> +		dev_dbg(saif->dev, "underrun!!! %d\n", ++saif->fifo_underrun);
-> +
-> +	if (stat & BM_SAIF_STAT_FIFO_OVERFLOW_IRQ)
-> +		dev_dbg(saif->dev, "overrun!!! %d\n", ++saif->fifo_overrun);
-
-Probably dev_err()?
-
-> +	__raw_writel(BM_SAIF_STAT_FIFO_UNDERFLOW_IRQ |
-> +			BM_SAIF_STAT_FIFO_OVERFLOW_IRQ,
-> +			saif->base + SAIF_STAT + MXS_CLR_ADDR);
-> +
-> +	return IRQ_HANDLED;
-
-Should really check to see if underflow or overflow occurred and only
-report handled if they did - otherwise we might have trouble with new
-hardware blocks that have other interrupts.
-
-> +	if (pdev->id >= 2)
-> +		return -EINVAL;
-> +	mxs_saif[pdev->id] = saif;
-
-The id check should check for ARRAY_SIZE() mxs_saif[] to make updates
-easier if a new chip has more ports.
-
-> +	saif->dma_param.chan_irq = platform_get_irq(pdev, 1);
-> +	if (saif->dma_param.chan_irq < 0) {
-
-Does the IRQ requesting need to happen after you've set the base
-address?  Otherwise there's a potential race if for some reason the IRQ
-fires before we've got the data structures set up.
+Tony
