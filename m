@@ -1,33 +1,45 @@
-From: pma@sysgo.com (Pavel Machek)
-Date: Wed, 13 Jul 2011 08:15:31 +0200
-Subject: [PATCH V3] mmc: Enable the ADMA2 on esdhc imx driver
-In-Reply-To: <20110712141843.GA27358@oksana.dev.rtsoft.ru>
-References: <1310465609-4516-1-git-send-email-richard.zhu@linaro.org>
-	<20110712134602.GT6069@pengutronix.de>
-	<20110712141843.GA27358@oksana.dev.rtsoft.ru>
-Message-ID: <20110713061531.GA10700@pma.sysgo.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 12 Jul 2011 23:16:34 -0700
+Subject: Remaining omap pull requests
+In-Reply-To: <201107120016.12366.arnd@arndb.de>
+References: <20110711114736.GX5783@atomide.com>
+	<201107120016.12366.arnd@arndb.de>
+Message-ID: <20110713061634.GG5783@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 2011-07-12 18:18:43, Anton Vorontsov wrote:
-> On Tue, Jul 12, 2011 at 03:46:02PM +0200, Sascha Hauer wrote:
-> [...]
-> > Honestly, putting all kinds of driver logic into the register access
-> > functions will lead to a catastrophe sooner or later. There are too
-> > many quirks in it already, we should not add more of them.
+* Arnd Bergmann <arnd@arndb.de> [110711 15:11]:
+> On Monday 11 July 2011, Tony Lindgren wrote:
+> > Hi Arnd,
+> > 
+> > Below is a summary of the pending omap pull requests as there are still
+> > few branches pending.
+> > 
+> > Can you please take a look and see what you can take of these for v3.1
+> > merge window?
+> > 
+> > There's still quite a bit more code shrinkage, and the new code for 4460
+> > and PRCM related changes are badly needed.
 > 
-> There aren't many options. You may pollute generic driver with
-> quirks (which is not an option :-), or you can introduce more
-> ops for things like sdhci_send_command(), but in that case
-> you will duplicate the logic just to compensate minor register
-> differences.
-> 
-> In some cases, e.g. capabilities register, it seems that introducing
-> get_caps() op would be a logical step, but then you just move the code
-> under 'if (reg == SDHCI_CAPABILITIES) { ' into a dedicated function.
-> No big difference.
+> I've pulled everything now, please check if it looks ok to you.
 
-Actually, there is huge difference. Generic code does
-read-modify-write on the hw registers. And people only implement fixup
-in write, for example :-(.
-								Pavel
+Thanks looks good to me.
+ 
+> I haven't really looked at the patches much, I hope that I have time
+> to at least do some test builds and take a very rough look at the
+> contents tomorrow.
+
+OK thanks.
+ 
+> Thanks for the detailed descriptions, and for splitting it
+> into good-sized series.
+
+Looks like I forgot the i2c driver changes that also should be
+merged by us. Those are acked by Ben Dooks, Kevin's pull request
+for that is at:
+
+http://marc.info/?l=linux-omap&m=131014213007667&w=2
+
+Regards,
+
+Tony
