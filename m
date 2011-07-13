@@ -1,52 +1,86 @@
-From: j.weitzel@phytec.de (Jan Weitzel)
-Date: Wed, 13 Jul 2011 12:59:22 +0200
-Subject: [PATCH] ARM: OMAP4: PCM049: remove vusim regulator
-In-Reply-To: <1310554738.18446.12.camel@lws-weitzel>
-References: <1310554738.18446.12.camel@lws-weitzel>
-Message-ID: <1310554762-10743-1-git-send-email-j.weitzel@phytec.de>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Wed, 13 Jul 2011 14:53:17 +0400
+Subject: [PATCH V7 1/4] MTD: pxa3xx_nand: enhance suspend and resume
+	routine
+In-Reply-To: <1310481336-13230-2-git-send-email-leiwen@marvell.com>
+References: <1310466535-15287-1-git-send-email-leiwen@marvell.com>
+	<1310481336-13230-2-git-send-email-leiwen@marvell.com>
+Message-ID: <4E1D791D.2060801@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-vusim is not used.
+Hello.
 
-Signed-off-by: Jan Weitzel <j.weitzel@phytec.de>
----
- arch/arm/mach-omap2/board-omap4pcm049.c |   16 +---------------
- 1 files changed, 1 insertions(+), 15 deletions(-)
+On 12-07-2011 18:35, Lei Wen wrote:
 
-diff --git a/arch/arm/mach-omap2/board-omap4pcm049.c b/arch/arm/mach-omap2/board-omap4pcm049.c
-index ad8cb46..85193ec 100644
---- a/arch/arm/mach-omap2/board-omap4pcm049.c
-+++ b/arch/arm/mach-omap2/board-omap4pcm049.c
-@@ -227,18 +227,6 @@ static struct platform_device pcm049_vcc_3v3_device = {
- 	},
- };
- 
--static struct regulator_init_data pcm049_vusim = {
--	.constraints = {
--		.min_uV			= 1800000,
--		.max_uV			= 3300000,
--		.apply_uV		= true,
--		.valid_modes_mask	= REGULATOR_MODE_NORMAL
--					| REGULATOR_MODE_STANDBY,
--		.valid_ops_mask	 =	REGULATOR_CHANGE_MODE
--					| REGULATOR_CHANGE_STATUS,
--	},
--};
--
- static struct at24_platform_data board_eeprom = {
- 	.byte_len = 4096,
- 	.page_size = 32,
-@@ -318,9 +306,7 @@ static struct i2c_board_info __initdata pcm049_i2c_4_boardinfo[] = {
- 	}
- };
- 
--static struct twl4030_platform_data pcm049_twldata = {
--	.vusim		= &pcm049_vusim,
--};
-+static struct twl4030_platform_data pcm049_twldatai;
- 
- static int __init pcm049_i2c_init(void)
- {
--- 
-1.7.0.4
+> This patch add protection on the suspend&resume path to prevent
+> some unexpected behavior, like interrupt occur at the very second
+> of resume back and it don't follow normal command path, which lead
+> to bug.
+
+> Signed-off-by: Lei Wen<leiwen@marvell.com>
+> ---
+>   drivers/mtd/nand/pxa3xx_nand.c |   17 ++++++++++++++++-
+>   1 files changed, 16 insertions(+), 1 deletions(-)
+
+> diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
+> index b7db1b2..1efecf7 100644
+> --- a/drivers/mtd/nand/pxa3xx_nand.c
+> +++ b/drivers/mtd/nand/pxa3xx_nand.c
+> @@ -1158,23 +1158,38 @@ static int pxa3xx_nand_probe(struct platform_device *pdev)
+>   static int pxa3xx_nand_suspend(struct platform_device *pdev, pm_message_t state)
+>   {
+>   	struct pxa3xx_nand_info *info = platform_get_drvdata(pdev);
+> +	struct mtd_info *mtd;
+>
+>   	if (info->state) {
+>   		dev_err(&pdev->dev, "driver busy, state = %d\n", info->state);
+>   		return -EAGAIN;
+>   	}
+>
+> +	mtd = info->mtd;
+
+    Why not make this into an initializer?
+
+> +	mtd->suspend(mtd);
+>   	return 0;
+>   }
+>
+>   static int pxa3xx_nand_resume(struct platform_device *pdev)
+>   {
+>   	struct pxa3xx_nand_info *info = platform_get_drvdata(pdev);
+> +	struct mtd_info *mtd;
+> +
+> +	/* We don't want to handle interrupt without calling mtd routine */
+> +	disable_int(info, NDCR_INT_MASK);
+>
+>   	nand_writel(info, NDTR0CS0, info->ndtr0cs0);
+>   	nand_writel(info, NDTR1CS0, info->ndtr1cs0);
+> -	clk_enable(info->clk);
+>
+> +	/*
+> +	 * As the spec, the NDSR would be updated to 0x1800 when
+
+    As the spec says?
+
+> +	 * do the nand_clk disable/enable.
+
+    Doing.
+
+> +	 * To prevent it damage state machine of the driver, clear
+
+    From damaging?
+
+> +	 * all status before resume
+> +	 */
+> +	nand_writel(info, NDSR, NDSR_MASK);
+> +	mtd = info->mtd;
+
+    This one too could be an initializer...
+
+> +	mtd->resume(mtd);
+>   	return 0;
+>   }
+>   #else
+
+WBR, Sergei
