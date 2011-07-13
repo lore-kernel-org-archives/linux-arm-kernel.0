@@ -1,42 +1,33 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Wed, 13 Jul 2011 11:04:16 +0530
-Subject: [GIT PULL] DaVinci fix for v3.0
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024DA7B3D7@dbde02.ent.ti.com>
-References: <B85A65D85D7EB246BE421B3FB0FBB593024DA7B3D7@dbde02.ent.ti.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024DA7B3E0@dbde02.ent.ti.com>
+From: pma@sysgo.com (Pavel Machek)
+Date: Wed, 13 Jul 2011 08:15:31 +0200
+Subject: [PATCH V3] mmc: Enable the ADMA2 on esdhc imx driver
+In-Reply-To: <20110712141843.GA27358@oksana.dev.rtsoft.ru>
+References: <1310465609-4516-1-git-send-email-richard.zhu@linaro.org>
+	<20110712134602.GT6069@pengutronix.de>
+	<20110712141843.GA27358@oksana.dev.rtsoft.ru>
+Message-ID: <20110713061531.GA10700@pma.sysgo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 13, 2011 at 10:59:47, Nori, Sekhar wrote:
-> Hi Arnd,
+On Tue 2011-07-12 18:18:43, Anton Vorontsov wrote:
+> On Tue, Jul 12, 2011 at 03:46:02PM +0200, Sascha Hauer wrote:
+> [...]
+> > Honestly, putting all kinds of driver logic into the register access
+> > functions will lead to a catastrophe sooner or later. There are too
+> > many quirks in it already, we should not add more of them.
 > 
-> Can you please pull this late breaking DaVinci fix for v3.0?
-> This is fallout of generic irq chip migration and prevents GPIO
-> interrupts from functioning correctly.
+> There aren't many options. You may pollute generic driver with
+> quirks (which is not an option :-), or you can introduce more
+> ops for things like sdhci_send_command(), but in that case
+> you will duplicate the logic just to compensate minor register
+> differences.
+> 
+> In some cases, e.g. capabilities register, it seems that introducing
+> get_caps() op would be a logical step, but then you just move the code
+> under 'if (reg == SDHCI_CAPABILITIES) { ' into a dedicated function.
+> No big difference.
 
-Resent with fixed DaVinci Linux mailing list address.
-
-Thanks,
-Sekhar
-
-> 
-> The following changes since commit 620917de59eeb934b9f8cf35cc2d95c1ac8ed0fc:
->   Linus Torvalds (1):
->         Linux 3.0-rc7
-> 
-> are available in the git repository at:
-> 
->   git://gitorious.org/linux-davinci/linux-davinci.git fixes
-> 
-> Ido Yariv (1):
->       arm: davinci: Fix low level gpio irq handlers' argument
-> 
->  arch/arm/mach-davinci/gpio.c |   21 ++++++++++++++++-----
->  1 files changed, 16 insertions(+), 5 deletions(-)
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Actually, there is huge difference. Generic code does
+read-modify-write on the hw registers. And people only implement fixup
+in write, for example :-(.
+								Pavel
