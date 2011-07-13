@@ -1,10 +1,9 @@
 From: tixy@yxit.co.uk (Tixy)
-Date: Wed, 13 Jul 2011 10:05:57 +0100
-Subject: [PATCH 08/24] ARM: kprobes: Migrate ARM space_cccc_000x to decoding
-	tables
+Date: Wed, 13 Jul 2011 10:06:13 +0100
+Subject: [PATCH 24/24] ARM: kprobes: Remove now unused code
 In-Reply-To: <1310547973-31784-1-git-send-email-tixy@yxit.co.uk>
 References: <1310547973-31784-1-git-send-email-tixy@yxit.co.uk>
-Message-ID: <1310547973-31784-9-git-send-email-tixy@yxit.co.uk>
+Message-ID: <1310547973-31784-25-git-send-email-tixy@yxit.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,290 +11,764 @@ From: Jon Medhurst <tixy@yxit.co.uk>
 
 Signed-off-by: Jon Medhurst <tixy@yxit.co.uk>
 ---
- arch/arm/kernel/kprobes-arm.c |  254 +++++++++++++++++++----------------------
- 1 files changed, 117 insertions(+), 137 deletions(-)
+ arch/arm/kernel/kprobes-arm.c |  738 -----------------------------------------
+ 1 files changed, 0 insertions(+), 738 deletions(-)
 
 diff --git a/arch/arm/kernel/kprobes-arm.c b/arch/arm/kernel/kprobes-arm.c
-index e590ff6..ef350a5 100644
+index 8a58c99..79203ee 100644
 --- a/arch/arm/kernel/kprobes-arm.c
 +++ b/arch/arm/kernel/kprobes-arm.c
-@@ -997,7 +997,99 @@ static const union decode_item arm_1111_table[] = {
- 	DECODE_END
- };
+@@ -74,300 +74,6 @@
+ 			"mov	pc, "reg"	\n\t"
+ #endif
  
-+static const union decode_item arm_cccc_0001_0xx0____0xxx_table[] = {
-+	/* Miscellaneous instructions					*/
-+
-+	/* MRS cpsr		cccc 0001 0000 xxxx xxxx xxxx 0000 xxxx */
-+	DECODE_SIMULATEX(0x0ff000f0, 0x01000000, simulate_mrs,
-+						 REGS(0, NOPC, 0, 0, 0)),
-+
-+	/* BX			cccc 0001 0010 xxxx xxxx xxxx 0001 xxxx */
-+	DECODE_SIMULATE	(0x0ff000f0, 0x01200010, simulate_blx2bx),
-+
-+	/* BLX (register)	cccc 0001 0010 xxxx xxxx xxxx 0011 xxxx */
-+	DECODE_SIMULATEX(0x0ff000f0, 0x01200030, simulate_blx2bx,
-+						 REGS(0, 0, 0, 0, NOPC)),
-+
-+	/* CLZ			cccc 0001 0110 xxxx xxxx xxxx 0001 xxxx */
-+	DECODE_CUSTOM	(0x0ff000f0, 0x01600010, prep_emulate_rd12rm0),
-+
-+	/* QADD			cccc 0001 0000 xxxx xxxx xxxx 0101 xxxx */
-+	/* QSUB			cccc 0001 0010 xxxx xxxx xxxx 0101 xxxx */
-+	/* QDADD		cccc 0001 0100 xxxx xxxx xxxx 0101 xxxx */
-+	/* QDSUB		cccc 0001 0110 xxxx xxxx xxxx 0101 xxxx */
-+	DECODE_CUSTOM	(0x0f9000f0, 0x01000050, prep_emulate_rd12rn16rm0_wflags),
-+
-+	/* BXJ			cccc 0001 0010 xxxx xxxx xxxx 0010 xxxx */
-+	/* MSR			cccc 0001 0x10 xxxx xxxx xxxx 0000 xxxx */
-+	/* MRS spsr		cccc 0001 0100 xxxx xxxx xxxx 0000 xxxx */
-+	/* BKPT			1110 0001 0010 xxxx xxxx xxxx 0111 xxxx */
-+	/* SMC			cccc 0001 0110 xxxx xxxx xxxx 0111 xxxx */
-+	/* And unallocated instructions...				*/
-+	DECODE_END
-+};
-+
-+static const union decode_item arm_cccc_0001_0xx0____1xx0_table[] = {
-+	/* Halfword multiply and multiply-accumulate			*/
-+
-+	/* SMLALxy		cccc 0001 0100 xxxx xxxx xxxx 1xx0 xxxx */
-+	DECODE_CUSTOM	(0x0ff00090, 0x01400080, prep_emulate_rdhi16rdlo12rs8rm0_wflags),
-+
-+	/* SMULWy		cccc 0001 0010 xxxx xxxx xxxx 1x10 xxxx */
-+	DECODE_OR	(0x0ff000b0, 0x012000a0),
-+	/* SMULxy		cccc 0001 0110 xxxx xxxx xxxx 1xx0 xxxx */
-+	DECODE_CUSTOM	(0x0ff00090, 0x01600080, prep_emulate_rd16rs8rm0_wflags),
-+
-+	/* SMLAxy		cccc 0001 0000 xxxx xxxx xxxx 1xx0 xxxx */
-+	DECODE_OR	(0x0ff00090, 0x01000080),
-+	/* SMLAWy		cccc 0001 0010 xxxx xxxx xxxx 1x00 xxxx */
-+	DECODE_CUSTOM	(0x0ff000b0, 0x01200080, prep_emulate_rd16rn12rs8rm0_wflags),
-+
-+	DECODE_END
-+};
-+
-+static const union decode_item arm_cccc_0000_____1001_table[] = {
-+	/* Multiply and multiply-accumulate				*/
-+
-+	/* MUL			cccc 0000 0000 xxxx xxxx xxxx 1001 xxxx */
-+	/* MULS			cccc 0000 0001 xxxx xxxx xxxx 1001 xxxx */
-+	DECODE_CUSTOM	(0x0fe000f0, 0x00000090, prep_emulate_rd16rs8rm0_wflags),
-+
-+	/* MLA			cccc 0000 0010 xxxx xxxx xxxx 1001 xxxx */
-+	/* MLAS			cccc 0000 0011 xxxx xxxx xxxx 1001 xxxx */
-+	DECODE_OR	(0x0fe000f0, 0x00200090),
-+	/* MLS			cccc 0000 0110 xxxx xxxx xxxx 1001 xxxx */
-+	DECODE_CUSTOM	(0x0ff000f0, 0x00600090, prep_emulate_rd16rn12rs8rm0_wflags),
-+
-+	/* UMAAL		cccc 0000 0100 xxxx xxxx xxxx 1001 xxxx */
-+	DECODE_OR	(0x0ff000f0, 0x00400090),
-+	/* UMULL		cccc 0000 1000 xxxx xxxx xxxx 1001 xxxx */
-+	/* UMULLS		cccc 0000 1001 xxxx xxxx xxxx 1001 xxxx */
-+	/* UMLAL		cccc 0000 1010 xxxx xxxx xxxx 1001 xxxx */
-+	/* UMLALS		cccc 0000 1011 xxxx xxxx xxxx 1001 xxxx */
-+	/* SMULL		cccc 0000 1100 xxxx xxxx xxxx 1001 xxxx */
-+	/* SMULLS		cccc 0000 1101 xxxx xxxx xxxx 1001 xxxx */
-+	/* SMLAL		cccc 0000 1110 xxxx xxxx xxxx 1001 xxxx */
-+	/* SMLALS		cccc 0000 1111 xxxx xxxx xxxx 1001 xxxx */
-+	DECODE_CUSTOM	(0x0f8000f0, 0x00800090, prep_emulate_rdhi16rdlo12rs8rm0_wflags),
-+
-+	DECODE_END
-+};
-+
-+static const union decode_item arm_cccc_0001_____1001_table[] = {
-+	/* Synchronization primitives					*/
-+
-+	/* SMP/SWPB		cccc 0001 0x00 xxxx xxxx xxxx 1001 xxxx */
-+	DECODE_CUSTOM	(0x0fb000f0, 0x01000090, prep_emulate_rd12rn16rm0_wflags),
-+
-+	/* LDREX/STREX{,D,B,H}	cccc 0001 1xxx xxxx xxxx xxxx 1001 xxxx */
-+	/* And unallocated instructions...				*/
-+	DECODE_END
-+};
-+
- static const union decode_item arm_cccc_000x_____1xx1_table[] = {
-+	/* Extra load/store instructions				*/
-+
- 	/* LDRD/STRD lr,pc,{...	cccc 000x x0x0 xxxx 111x xxxx 1101 xxxx */
- 	DECODE_REJECT	(0x0e10e0d0, 0x0000e0d0),
- 
-@@ -1011,6 +1103,20 @@ static const union decode_item arm_cccc_000x_____1xx1_table[] = {
- 	DECODE_EMULATEX	(0x0e5000d0, 0x004000d0, emulate_ldrdstrd,
- 						 REGS(NOPCWB, NOPCX, 0, 0, 0)),
- 
-+	/* Reject Rd is PC */
-+	/* TODO: fold this into next entry when it is made a DECODE_EMULATE */
-+	DECODE_REJECT	(0x0000f000, 0x0000f000),
-+
-+	/* STRH (register)	cccc 000x x0x0 xxxx xxxx xxxx 1011 xxxx */
-+	/* LDRH (register)	cccc 000x x0x1 xxxx xxxx xxxx 1011 xxxx */
-+	/* LDRSB (register)	cccc 000x x0x1 xxxx xxxx xxxx 1101 xxxx */
-+	/* LDRSH (register)	cccc 000x x0x1 xxxx xxxx xxxx 1111 xxxx */
-+	/* STRH (immediate)	cccc 000x x1x0 xxxx xxxx xxxx 1011 xxxx */
-+	/* LDRH (immediate)	cccc 000x x1x1 xxxx xxxx xxxx 1011 xxxx */
-+	/* LDRSB (immediate)	cccc 000x x1x1 xxxx xxxx xxxx 1101 xxxx */
-+	/* LDRSH (immediate)	cccc 000x x1x1 xxxx xxxx xxxx 1111 xxxx */
-+	DECODE_CUSTOM	(0x0e000090, 0x00000090, prep_emulate_ldr_str),
-+
- 	DECODE_END
- };
- 
-@@ -1079,146 +1185,20 @@ static const union decode_item arm_cccc_000x_table[] = {
- static enum kprobe_insn __kprobes
- space_cccc_000x(kprobe_opcode_t insn, struct arch_specific_insn *asi)
- {
--	/* cccc 0001 0xx0 xxxx xxxx xxxx xxxx xxx0 xxxx */
--	if ((insn & 0x0f900010) == 0x01000000) {
+-#define is_r15(insn, bitpos) (((insn) & (0xf << bitpos)) == (0xf << bitpos))
 -
--		/* MRS cpsr : cccc 0001 0000 xxxx xxxx xxxx 0000 xxxx */
--		if ((insn & 0x0ff000f0) == 0x01000000) {
--			if (is_r15(insn, 12))
--				return INSN_REJECTED;	/* Rd is PC */
--			asi->insn_handler = simulate_mrs;
--			return INSN_GOOD_NO_SLOT;
--		}
+-#define PSR_fs	(PSR_f|PSR_s)
 -
--		/* SMLALxy : cccc 0001 0100 xxxx xxxx xxxx 1xx0 xxxx */
--		if ((insn & 0x0ff00090) == 0x01400080)
--			return prep_emulate_rdhi16rdlo12rs8rm0_wflags(insn,
--									asi);
+-#define KPROBE_RETURN_INSTRUCTION	0xe1a0f00e	/* mov pc, lr */
 -
--		/* SMULWy : cccc 0001 0010 xxxx xxxx xxxx 1x10 xxxx */
--		/* SMULxy : cccc 0001 0110 xxxx xxxx xxxx 1xx0 xxxx */
--		if ((insn & 0x0ff000b0) == 0x012000a0 ||
--		    (insn & 0x0ff00090) == 0x01600080)
--			return prep_emulate_rd16rs8rm0_wflags(insn, asi);
+-typedef long (insn_0arg_fn_t)(void);
+-typedef long (insn_1arg_fn_t)(long);
+-typedef long (insn_2arg_fn_t)(long, long);
+-typedef long (insn_3arg_fn_t)(long, long, long);
+-typedef long (insn_4arg_fn_t)(long, long, long, long);
+-typedef long long (insn_llret_0arg_fn_t)(void);
+-typedef long long (insn_llret_3arg_fn_t)(long, long, long);
+-typedef long long (insn_llret_4arg_fn_t)(long, long, long, long);
 -
--		/* SMLAxy : cccc 0001 0000 xxxx xxxx xxxx 1xx0 xxxx : Q */
--		/* SMLAWy : cccc 0001 0010 xxxx xxxx xxxx 1x00 xxxx : Q */
--		if ((insn & 0x0ff00090) == 0x01000080 ||
--		    (insn & 0x0ff000b0) == 0x01200080)
--			return prep_emulate_rd16rn12rs8rm0_wflags(insn, asi);
+-union reg_pair {
+-	long long	dr;
+-#ifdef __LITTLE_ENDIAN
+-	struct { long	r0, r1; };
+-#else
+-	struct { long	r1, r0; };
+-#endif
+-};
 -
--		/* BXJ      : cccc 0001 0010 xxxx xxxx xxxx 0010 xxxx */
--		/* MSR      : cccc 0001 0x10 xxxx xxxx xxxx 0000 xxxx */
--		/* MRS spsr : cccc 0001 0100 xxxx xxxx xxxx 0000 xxxx */
+-/*
+- * The insnslot_?arg_r[w]flags() functions below are to keep the
+- * msr -> *fn -> mrs instruction sequences indivisible so that
+- * the state of the CPSR flags aren't inadvertently modified
+- * just before or just after the call.
+- */
 -
--		/* Other instruction encodings aren't yet defined */
--		return INSN_REJECTED;
--	}
+-static inline long __kprobes
+-insnslot_0arg_rflags(long cpsr, insn_0arg_fn_t *fn)
+-{
+-	register long ret asm("r0");
 -
--	/* cccc 0001 0xx0 xxxx xxxx xxxx xxxx 0xx1 xxxx */
--	else if ((insn & 0x0f900090) == 0x01000010) {
+-	__asm__ __volatile__ (
+-		"msr	cpsr_fs, %[cpsr]	\n\t"
+-		"mov	lr, pc			\n\t"
+-		"mov	pc, %[fn]		\n\t"
+-		: "=r" (ret)
+-		: [cpsr] "r" (cpsr), [fn] "r" (fn)
+-		: "lr", "cc"
+-	);
+-	return ret;
+-}
 -
--		/* BLX(2) : cccc 0001 0010 xxxx xxxx xxxx 0011 xxxx */
--		/* BX     : cccc 0001 0010 xxxx xxxx xxxx 0001 xxxx */
--		if ((insn & 0x0ff000d0) == 0x01200010) {
--			if ((insn & 0x0ff000ff) == 0x0120003f)
--				return INSN_REJECTED; /* BLX pc */
--			asi->insn_handler = simulate_blx2bx;
--			return INSN_GOOD_NO_SLOT;
--		}
+-static inline long long __kprobes
+-insnslot_llret_0arg_rflags(long cpsr, insn_llret_0arg_fn_t *fn)
+-{
+-	register long ret0 asm("r0");
+-	register long ret1 asm("r1");
+-	union reg_pair fnr;
 -
--		/* CLZ : cccc 0001 0110 xxxx xxxx xxxx 0001 xxxx */
--		if ((insn & 0x0ff000f0) == 0x01600010)
--			return prep_emulate_rd12rm0(insn, asi);
-+	if ((insn & 0x0f900080) == 0x01000000)
-+		return kprobe_decode_insn(insn, asi, arm_cccc_0001_0xx0____0xxx_table, false);
- 
--		/* QADD    : cccc 0001 0000 xxxx xxxx xxxx 0101 xxxx :Q */
--		/* QSUB    : cccc 0001 0010 xxxx xxxx xxxx 0101 xxxx :Q */
--		/* QDADD   : cccc 0001 0100 xxxx xxxx xxxx 0101 xxxx :Q */
--		/* QDSUB   : cccc 0001 0110 xxxx xxxx xxxx 0101 xxxx :Q */
--		if ((insn & 0x0f9000f0) == 0x01000050)
--			return prep_emulate_rd12rn16rm0_wflags(insn, asi);
-+	if ((insn & 0x0f900090) == 0x01000080)
-+		return kprobe_decode_insn(insn, asi, arm_cccc_0001_0xx0____1xx0_table, false);
- 
--		/* BKPT : 1110 0001 0010 xxxx xxxx xxxx 0111 xxxx */
--		/* SMC  : cccc 0001 0110 xxxx xxxx xxxx 0111 xxxx */
-+	if ((insn & 0x0f0000f0) == 0x00000090)
-+		return kprobe_decode_insn(insn, asi, arm_cccc_0000_____1001_table, false);
- 
--		/* Other instruction encodings aren't yet defined */
--		return INSN_REJECTED;
--	}
-+	if ((insn & 0x0f0000f0) == 0x01000090)
-+		return kprobe_decode_insn(insn, asi, arm_cccc_0001_____1001_table, false);
- 
--	/* cccc 0000 xxxx xxxx xxxx xxxx xxxx 1001 xxxx */
--	else if ((insn & 0x0f0000f0) == 0x00000090) {
+-	__asm__ __volatile__ (
+-		"msr	cpsr_fs, %[cpsr]	\n\t"
+-		"mov	lr, pc			\n\t"
+-		"mov	pc, %[fn]		\n\t"
+-		: "=r" (ret0), "=r" (ret1)
+-		: [cpsr] "r" (cpsr), [fn] "r" (fn)
+-		: "lr", "cc"
+-	);
+-	fnr.r0 = ret0;
+-	fnr.r1 = ret1;
+-	return fnr.dr;
+-}
 -
--		/* MUL    : cccc 0000 0000 xxxx xxxx xxxx 1001 xxxx :   */
--		/* MULS   : cccc 0000 0001 xxxx xxxx xxxx 1001 xxxx :cc */
--		/* MLA    : cccc 0000 0010 xxxx xxxx xxxx 1001 xxxx :   */
--		/* MLAS   : cccc 0000 0011 xxxx xxxx xxxx 1001 xxxx :cc */
--		/* UMAAL  : cccc 0000 0100 xxxx xxxx xxxx 1001 xxxx :   */
--		/* undef  : cccc 0000 0101 xxxx xxxx xxxx 1001 xxxx :   */
--		/* MLS    : cccc 0000 0110 xxxx xxxx xxxx 1001 xxxx :   */
--		/* undef  : cccc 0000 0111 xxxx xxxx xxxx 1001 xxxx :   */
--		/* UMULL  : cccc 0000 1000 xxxx xxxx xxxx 1001 xxxx :   */
--		/* UMULLS : cccc 0000 1001 xxxx xxxx xxxx 1001 xxxx :cc */
--		/* UMLAL  : cccc 0000 1010 xxxx xxxx xxxx 1001 xxxx :   */
--		/* UMLALS : cccc 0000 1011 xxxx xxxx xxxx 1001 xxxx :cc */
--		/* SMULL  : cccc 0000 1100 xxxx xxxx xxxx 1001 xxxx :   */
--		/* SMULLS : cccc 0000 1101 xxxx xxxx xxxx 1001 xxxx :cc */
--		/* SMLAL  : cccc 0000 1110 xxxx xxxx xxxx 1001 xxxx :   */
--		/* SMLALS : cccc 0000 1111 xxxx xxxx xxxx 1001 xxxx :cc */
--		if ((insn & 0x00d00000) == 0x00500000)
--			return INSN_REJECTED;
--		else if ((insn & 0x00e00000) == 0x00000000)
--			return prep_emulate_rd16rs8rm0_wflags(insn, asi);
--		else if ((insn & 0x00a00000) == 0x00200000)
--			return prep_emulate_rd16rn12rs8rm0_wflags(insn, asi);
--		else
--			return prep_emulate_rdhi16rdlo12rs8rm0_wflags(insn,
--									asi);
--	}
+-static inline long __kprobes
+-insnslot_1arg_rflags(long r0, long cpsr, insn_1arg_fn_t *fn)
+-{
+-	register long rr0 asm("r0") = r0;
+-	register long ret asm("r0");
 -
--	/* cccc 000x xxxx xxxx xxxx xxxx xxxx 1xx1 xxxx */
--	else if ((insn & 0x0e000090) == 0x00000090) {
+-	__asm__ __volatile__ (
+-		"msr	cpsr_fs, %[cpsr]	\n\t"
+-		"mov	lr, pc			\n\t"
+-		"mov	pc, %[fn]		\n\t"
+-		: "=r" (ret)
+-		: "0" (rr0), [cpsr] "r" (cpsr), [fn] "r" (fn)
+-		: "lr", "cc"
+-	);
+-	return ret;
+-}
 -
--		/* SWP   : cccc 0001 0000 xxxx xxxx xxxx 1001 xxxx */
--		/* SWPB  : cccc 0001 0100 xxxx xxxx xxxx 1001 xxxx */
--		/* ???   : cccc 0001 0x01 xxxx xxxx xxxx 1001 xxxx */
--		/* ???   : cccc 0001 0x10 xxxx xxxx xxxx 1001 xxxx */
--		/* ???   : cccc 0001 0x11 xxxx xxxx xxxx 1001 xxxx */
--		/* STREX : cccc 0001 1000 xxxx xxxx xxxx 1001 xxxx */
--		/* LDREX : cccc 0001 1001 xxxx xxxx xxxx 1001 xxxx */
--		/* STREXD: cccc 0001 1010 xxxx xxxx xxxx 1001 xxxx */
--		/* LDREXD: cccc 0001 1011 xxxx xxxx xxxx 1001 xxxx */
--		/* STREXB: cccc 0001 1100 xxxx xxxx xxxx 1001 xxxx */
--		/* LDREXB: cccc 0001 1101 xxxx xxxx xxxx 1001 xxxx */
--		/* STREXH: cccc 0001 1110 xxxx xxxx xxxx 1001 xxxx */
--		/* LDREXH: cccc 0001 1111 xxxx xxxx xxxx 1001 xxxx */
+-static inline long __kprobes
+-insnslot_2arg_rflags(long r0, long r1, long cpsr, insn_2arg_fn_t *fn)
+-{
+-	register long rr0 asm("r0") = r0;
+-	register long rr1 asm("r1") = r1;
+-	register long ret asm("r0");
 -
--		/* LDRD  : cccc 000x xxx0 xxxx xxxx xxxx 1101 xxxx */
--		/* STRD  : cccc 000x xxx0 xxxx xxxx xxxx 1111 xxxx */
--		/* LDRH  : cccc 000x xxx1 xxxx xxxx xxxx 1011 xxxx */
--		/* STRH  : cccc 000x xxx0 xxxx xxxx xxxx 1011 xxxx */
--		/* LDRSB : cccc 000x xxx1 xxxx xxxx xxxx 1101 xxxx */
--		/* LDRSH : cccc 000x xxx1 xxxx xxxx xxxx 1111 xxxx */
--		if ((insn & 0x0f0000f0) == 0x01000090) {
--			if ((insn & 0x0fb000f0) == 0x01000090) {
--				/* SWP/SWPB */
--				return prep_emulate_rd12rn16rm0_wflags(insn,
--									asi);
--			} else {
--				/* STREX/LDREX variants and unallocaed space */
--				return INSN_REJECTED;
--			}
+-	__asm__ __volatile__ (
+-		"msr	cpsr_fs, %[cpsr]	\n\t"
+-		"mov	lr, pc			\n\t"
+-		"mov	pc, %[fn]		\n\t"
+-		: "=r" (ret)
+-		: "0" (rr0), "r" (rr1),
+-		  [cpsr] "r" (cpsr), [fn] "r" (fn)
+-		: "lr", "cc"
+-	);
+-	return ret;
+-}
 -
--		} else if ((insn & 0x0e1000d0) == 0x00000d0) {
+-static inline long __kprobes
+-insnslot_3arg_rflags(long r0, long r1, long r2, long cpsr, insn_3arg_fn_t *fn)
+-{
+-	register long rr0 asm("r0") = r0;
+-	register long rr1 asm("r1") = r1;
+-	register long rr2 asm("r2") = r2;
+-	register long ret asm("r0");
 -
--			return kprobe_decode_insn(insn, asi, arm_cccc_000x_____1xx1_table,
--									false);
--		}
+-	__asm__ __volatile__ (
+-		"msr	cpsr_fs, %[cpsr]	\n\t"
+-		"mov	lr, pc			\n\t"
+-		"mov	pc, %[fn]		\n\t"
+-		: "=r" (ret)
+-		: "0" (rr0), "r" (rr1), "r" (rr2),
+-		  [cpsr] "r" (cpsr), [fn] "r" (fn)
+-		: "lr", "cc"
+-	);
+-	return ret;
+-}
 -
--		/* LDRH/STRH/LDRSB/LDRSH */
--		if (is_r15(insn, 12))
--			return INSN_REJECTED;	/* Rd is PC */
--		return prep_emulate_ldr_str(insn, asi);
--	}
-+	if ((insn & 0x0e000090) == 0x00000090)
-+		return kprobe_decode_insn(insn, asi, arm_cccc_000x_____1xx1_table, false);
- 
- 	return kprobe_decode_insn(insn, asi, arm_cccc_000x_table, false);
+-static inline long long __kprobes
+-insnslot_llret_3arg_rflags(long r0, long r1, long r2, long cpsr,
+-			   insn_llret_3arg_fn_t *fn)
+-{
+-	register long rr0 asm("r0") = r0;
+-	register long rr1 asm("r1") = r1;
+-	register long rr2 asm("r2") = r2;
+-	register long ret0 asm("r0");
+-	register long ret1 asm("r1");
+-	union reg_pair fnr;
+-
+-	__asm__ __volatile__ (
+-		"msr	cpsr_fs, %[cpsr]	\n\t"
+-		"mov	lr, pc			\n\t"
+-		"mov	pc, %[fn]		\n\t"
+-		: "=r" (ret0), "=r" (ret1)
+-		: "0" (rr0), "r" (rr1), "r" (rr2),
+-		  [cpsr] "r" (cpsr), [fn] "r" (fn)
+-		: "lr", "cc"
+-	);
+-	fnr.r0 = ret0;
+-	fnr.r1 = ret1;
+-	return fnr.dr;
+-}
+-
+-static inline long __kprobes
+-insnslot_4arg_rflags(long r0, long r1, long r2, long r3, long cpsr,
+-		     insn_4arg_fn_t *fn)
+-{
+-	register long rr0 asm("r0") = r0;
+-	register long rr1 asm("r1") = r1;
+-	register long rr2 asm("r2") = r2;
+-	register long rr3 asm("r3") = r3;
+-	register long ret asm("r0");
+-
+-	__asm__ __volatile__ (
+-		"msr	cpsr_fs, %[cpsr]	\n\t"
+-		"mov	lr, pc			\n\t"
+-		"mov	pc, %[fn]		\n\t"
+-		: "=r" (ret)
+-		: "0" (rr0), "r" (rr1), "r" (rr2), "r" (rr3),
+-		  [cpsr] "r" (cpsr), [fn] "r" (fn)
+-		: "lr", "cc"
+-	);
+-	return ret;
+-}
+-
+-static inline long __kprobes
+-insnslot_1arg_rwflags(long r0, long *cpsr, insn_1arg_fn_t *fn)
+-{
+-	register long rr0 asm("r0") = r0;
+-	register long ret asm("r0");
+-	long oldcpsr = *cpsr;
+-	long newcpsr;
+-
+-	__asm__ __volatile__ (
+-		"msr	cpsr_fs, %[oldcpsr]	\n\t"
+-		"mov	lr, pc			\n\t"
+-		"mov	pc, %[fn]		\n\t"
+-		"mrs	%[newcpsr], cpsr	\n\t"
+-		: "=r" (ret), [newcpsr] "=r" (newcpsr)
+-		: "0" (rr0), [oldcpsr] "r" (oldcpsr), [fn] "r" (fn)
+-		: "lr", "cc"
+-	);
+-	*cpsr = (oldcpsr & ~PSR_fs) | (newcpsr & PSR_fs);
+-	return ret;
+-}
+-
+-static inline long __kprobes
+-insnslot_2arg_rwflags(long r0, long r1, long *cpsr, insn_2arg_fn_t *fn)
+-{
+-	register long rr0 asm("r0") = r0;
+-	register long rr1 asm("r1") = r1;
+-	register long ret asm("r0");
+-	long oldcpsr = *cpsr;
+-	long newcpsr;
+-
+-	__asm__ __volatile__ (
+-		"msr	cpsr_fs, %[oldcpsr]	\n\t"
+-		"mov	lr, pc			\n\t"
+-		"mov	pc, %[fn]		\n\t"
+-		"mrs	%[newcpsr], cpsr	\n\t"
+-		: "=r" (ret), [newcpsr] "=r" (newcpsr)
+-		: "0" (rr0), "r" (rr1), [oldcpsr] "r" (oldcpsr), [fn] "r" (fn)
+-		: "lr", "cc"
+-	);
+-	*cpsr = (oldcpsr & ~PSR_fs) | (newcpsr & PSR_fs);
+-	return ret;
+-}
+-
+-static inline long __kprobes
+-insnslot_3arg_rwflags(long r0, long r1, long r2, long *cpsr,
+-		      insn_3arg_fn_t *fn)
+-{
+-	register long rr0 asm("r0") = r0;
+-	register long rr1 asm("r1") = r1;
+-	register long rr2 asm("r2") = r2;
+-	register long ret asm("r0");
+-	long oldcpsr = *cpsr;
+-	long newcpsr;
+-
+-	__asm__ __volatile__ (
+-		"msr	cpsr_fs, %[oldcpsr]	\n\t"
+-		"mov	lr, pc			\n\t"
+-		"mov	pc, %[fn]		\n\t"
+-		"mrs	%[newcpsr], cpsr	\n\t"
+-		: "=r" (ret), [newcpsr] "=r" (newcpsr)
+-		: "0" (rr0), "r" (rr1), "r" (rr2),
+-		  [oldcpsr] "r" (oldcpsr), [fn] "r" (fn)
+-		: "lr", "cc"
+-	);
+-	*cpsr = (oldcpsr & ~PSR_fs) | (newcpsr & PSR_fs);
+-	return ret;
+-}
+-
+-static inline long __kprobes
+-insnslot_4arg_rwflags(long r0, long r1, long r2, long r3, long *cpsr,
+-		      insn_4arg_fn_t *fn)
+-{
+-	register long rr0 asm("r0") = r0;
+-	register long rr1 asm("r1") = r1;
+-	register long rr2 asm("r2") = r2;
+-	register long rr3 asm("r3") = r3;
+-	register long ret asm("r0");
+-	long oldcpsr = *cpsr;
+-	long newcpsr;
+-
+-	__asm__ __volatile__ (
+-		"msr	cpsr_fs, %[oldcpsr]	\n\t"
+-		"mov	lr, pc			\n\t"
+-		"mov	pc, %[fn]		\n\t"
+-		"mrs	%[newcpsr], cpsr	\n\t"
+-		: "=r" (ret), [newcpsr] "=r" (newcpsr)
+-		: "0" (rr0), "r" (rr1), "r" (rr2), "r" (rr3),
+-		  [oldcpsr] "r" (oldcpsr), [fn] "r" (fn)
+-		: "lr", "cc"
+-	);
+-	*cpsr = (oldcpsr & ~PSR_fs) | (newcpsr & PSR_fs);
+-	return ret;
+-}
+-
+-static inline long long __kprobes
+-insnslot_llret_4arg_rwflags(long r0, long r1, long r2, long r3, long *cpsr,
+-			    insn_llret_4arg_fn_t *fn)
+-{
+-	register long rr0 asm("r0") = r0;
+-	register long rr1 asm("r1") = r1;
+-	register long rr2 asm("r2") = r2;
+-	register long rr3 asm("r3") = r3;
+-	register long ret0 asm("r0");
+-	register long ret1 asm("r1");
+-	long oldcpsr = *cpsr;
+-	long newcpsr;
+-	union reg_pair fnr;
+-
+-	__asm__ __volatile__ (
+-		"msr	cpsr_fs, %[oldcpsr]	\n\t"
+-		"mov	lr, pc			\n\t"
+-		"mov	pc, %[fn]		\n\t"
+-		"mrs	%[newcpsr], cpsr	\n\t"
+-		: "=r" (ret0), "=r" (ret1), [newcpsr] "=r" (newcpsr)
+-		: "0" (rr0), "r" (rr1), "r" (rr2), "r" (rr3),
+-		  [oldcpsr] "r" (oldcpsr), [fn] "r" (fn)
+-		: "lr", "cc"
+-	);
+-	*cpsr = (oldcpsr & ~PSR_fs) | (newcpsr & PSR_fs);
+-	fnr.r0 = ret0;
+-	fnr.r1 = ret1;
+-	return fnr.dr;
+-}
+-
+ /*
+  * To avoid the complications of mimicing single-stepping on a
+  * processor without a Next-PC or a single-step mode, and to
+@@ -449,450 +155,6 @@ static void __kprobes simulate_mov_ipsp(struct kprobe *p, struct pt_regs *regs)
+ 	regs->uregs[12] = regs->uregs[13];
  }
+ 
+-static void __kprobes emulate_ldrd(struct kprobe *p, struct pt_regs *regs)
+-{
+-	insn_2arg_fn_t *i_fn = (insn_2arg_fn_t *)&p->ainsn.insn[0];
+-	kprobe_opcode_t insn = p->opcode;
+-	long ppc = (long)p->addr + 8;
+-	int rd = (insn >> 12) & 0xf;
+-	int rn = (insn >> 16) & 0xf;
+-	int rm = insn & 0xf;  /* rm may be invalid, don't care. */
+-	long rmv = (rm == 15) ? ppc : regs->uregs[rm];
+-	long rnv = (rn == 15) ? ppc : regs->uregs[rn];
+-
+-	/* Not following the C calling convention here, so need asm(). */
+-	__asm__ __volatile__ (
+-		"ldr	r0, %[rn]	\n\t"
+-		"ldr	r1, %[rm]	\n\t"
+-		"msr	cpsr_fs, %[cpsr]\n\t"
+-		"mov	lr, pc		\n\t"
+-		"mov	pc, %[i_fn]	\n\t"
+-		"str	r0, %[rn]	\n\t"	/* in case of writeback */
+-		"str	r2, %[rd0]	\n\t"
+-		"str	r3, %[rd1]	\n\t"
+-		: [rn]  "+m" (rnv),
+-		  [rd0] "=m" (regs->uregs[rd]),
+-		  [rd1] "=m" (regs->uregs[rd+1])
+-		: [rm]   "m" (rmv),
+-		  [cpsr] "r" (regs->ARM_cpsr),
+-		  [i_fn] "r" (i_fn)
+-		: "r0", "r1", "r2", "r3", "lr", "cc"
+-	);
+-	if (is_writeback(insn))
+-		regs->uregs[rn] = rnv;
+-}
+-
+-static void __kprobes emulate_strd(struct kprobe *p, struct pt_regs *regs)
+-{
+-	insn_4arg_fn_t *i_fn = (insn_4arg_fn_t *)&p->ainsn.insn[0];
+-	kprobe_opcode_t insn = p->opcode;
+-	long ppc = (long)p->addr + 8;
+-	int rd = (insn >> 12) & 0xf;
+-	int rn = (insn >> 16) & 0xf;
+-	int rm  = insn & 0xf;
+-	long rnv = (rn == 15) ? ppc : regs->uregs[rn];
+-	/* rm/rmv may be invalid, don't care. */
+-	long rmv = (rm == 15) ? ppc : regs->uregs[rm];
+-	long rnv_wb;
+-
+-	rnv_wb = insnslot_4arg_rflags(rnv, rmv, regs->uregs[rd],
+-					       regs->uregs[rd+1],
+-					       regs->ARM_cpsr, i_fn);
+-	if (is_writeback(insn))
+-		regs->uregs[rn] = rnv_wb;
+-}
+-
+-static void __kprobes emulate_ldr_old(struct kprobe *p, struct pt_regs *regs)
+-{
+-	insn_llret_3arg_fn_t *i_fn = (insn_llret_3arg_fn_t *)&p->ainsn.insn[0];
+-	kprobe_opcode_t insn = p->opcode;
+-	long ppc = (long)p->addr + 8;
+-	union reg_pair fnr;
+-	int rd = (insn >> 12) & 0xf;
+-	int rn = (insn >> 16) & 0xf;
+-	int rm = insn & 0xf;
+-	long rdv;
+-	long rnv = (rn == 15) ? ppc : regs->uregs[rn];
+-	long rmv = (rm == 15) ? ppc : regs->uregs[rm];
+-	long cpsr = regs->ARM_cpsr;
+-
+-	fnr.dr = insnslot_llret_3arg_rflags(rnv, 0, rmv, cpsr, i_fn);
+-	if (rn != 15)
+-		regs->uregs[rn] = fnr.r0;  /* Save Rn in case of writeback. */
+-	rdv = fnr.r1;
+-
+-	if (rd == 15) {
+-#if __LINUX_ARM_ARCH__ >= 5
+-		cpsr &= ~PSR_T_BIT;
+-		if (rdv & 0x1)
+-			cpsr |= PSR_T_BIT;
+-		regs->ARM_cpsr = cpsr;
+-		rdv &= ~0x1;
+-#else
+-		rdv &= ~0x2;
+-#endif
+-	}
+-	regs->uregs[rd] = rdv;
+-}
+-
+-static void __kprobes emulate_str_old(struct kprobe *p, struct pt_regs *regs)
+-{
+-	insn_3arg_fn_t *i_fn = (insn_3arg_fn_t *)&p->ainsn.insn[0];
+-	kprobe_opcode_t insn = p->opcode;
+-	long iaddr = (long)p->addr;
+-	int rd = (insn >> 12) & 0xf;
+-	int rn = (insn >> 16) & 0xf;
+-	int rm = insn & 0xf;
+-	long rdv = (rd == 15) ? iaddr + str_pc_offset : regs->uregs[rd];
+-	long rnv = (rn == 15) ? iaddr +  8 : regs->uregs[rn];
+-	long rmv = regs->uregs[rm];  /* rm/rmv may be invalid, don't care. */
+-	long rnv_wb;
+-
+-	rnv_wb = insnslot_3arg_rflags(rnv, rdv, rmv, regs->ARM_cpsr, i_fn);
+-	if (rn != 15)
+-		regs->uregs[rn] = rnv_wb;  /* Save Rn in case of writeback. */
+-}
+-
+-static void __kprobes emulate_sat(struct kprobe *p, struct pt_regs *regs)
+-{
+-	insn_1arg_fn_t *i_fn = (insn_1arg_fn_t *)&p->ainsn.insn[0];
+-	kprobe_opcode_t insn = p->opcode;
+-	int rd = (insn >> 12) & 0xf;
+-	int rm = insn & 0xf;
+-	long rmv = regs->uregs[rm];
+-
+-	/* Writes Q flag */
+-	regs->uregs[rd] = insnslot_1arg_rwflags(rmv, &regs->ARM_cpsr, i_fn);
+-}
+-
+-static void __kprobes emulate_sel(struct kprobe *p, struct pt_regs *regs)
+-{
+-	insn_2arg_fn_t *i_fn = (insn_2arg_fn_t *)&p->ainsn.insn[0];
+-	kprobe_opcode_t insn = p->opcode;
+-	int rd = (insn >> 12) & 0xf;
+-	int rn = (insn >> 16) & 0xf;
+-	int rm = insn & 0xf;
+-	long rnv = regs->uregs[rn];
+-	long rmv = regs->uregs[rm];
+-
+-	/* Reads GE bits */
+-	regs->uregs[rd] = insnslot_2arg_rflags(rnv, rmv, regs->ARM_cpsr, i_fn);
+-}
+-
+-static void __kprobes emulate_none(struct kprobe *p, struct pt_regs *regs)
+-{
+-	insn_0arg_fn_t *i_fn = (insn_0arg_fn_t *)&p->ainsn.insn[0];
+-
+-	insnslot_0arg_rflags(regs->ARM_cpsr, i_fn);
+-}
+-
+-static void __kprobes emulate_nop(struct kprobe *p, struct pt_regs *regs)
+-{
+-}
+-
+-static void __kprobes
+-emulate_rd12_modify(struct kprobe *p, struct pt_regs *regs)
+-{
+-	insn_1arg_fn_t *i_fn = (insn_1arg_fn_t *)&p->ainsn.insn[0];
+-	kprobe_opcode_t insn = p->opcode;
+-	int rd = (insn >> 12) & 0xf;
+-	long rdv = regs->uregs[rd];
+-
+-	regs->uregs[rd] = insnslot_1arg_rflags(rdv, regs->ARM_cpsr, i_fn);
+-}
+-
+-static void __kprobes
+-emulate_rd12rn0_modify(struct kprobe *p, struct pt_regs *regs)
+-{
+-	insn_2arg_fn_t *i_fn = (insn_2arg_fn_t *)&p->ainsn.insn[0];
+-	kprobe_opcode_t insn = p->opcode;
+-	int rd = (insn >> 12) & 0xf;
+-	int rn = insn & 0xf;
+-	long rdv = regs->uregs[rd];
+-	long rnv = regs->uregs[rn];
+-
+-	regs->uregs[rd] = insnslot_2arg_rflags(rdv, rnv, regs->ARM_cpsr, i_fn);
+-}
+-
+-static void __kprobes emulate_rd12rm0(struct kprobe *p, struct pt_regs *regs)
+-{
+-	insn_1arg_fn_t *i_fn = (insn_1arg_fn_t *)&p->ainsn.insn[0];
+-	kprobe_opcode_t insn = p->opcode;
+-	int rd = (insn >> 12) & 0xf;
+-	int rm = insn & 0xf;
+-	long rmv = regs->uregs[rm];
+-
+-	regs->uregs[rd] = insnslot_1arg_rflags(rmv, regs->ARM_cpsr, i_fn);
+-}
+-
+-static void __kprobes
+-emulate_rd12rn16rm0_rwflags(struct kprobe *p, struct pt_regs *regs)
+-{
+-	insn_2arg_fn_t *i_fn = (insn_2arg_fn_t *)&p->ainsn.insn[0];
+-	kprobe_opcode_t insn = p->opcode;
+-	int rd = (insn >> 12) & 0xf;
+-	int rn = (insn >> 16) & 0xf;
+-	int rm = insn & 0xf;
+-	long rnv = regs->uregs[rn];
+-	long rmv = regs->uregs[rm];
+-
+-	regs->uregs[rd] =
+-		insnslot_2arg_rwflags(rnv, rmv, &regs->ARM_cpsr, i_fn);
+-}
+-
+-static void __kprobes
+-emulate_rd16rn12rs8rm0_rwflags(struct kprobe *p, struct pt_regs *regs)
+-{
+-	insn_3arg_fn_t *i_fn = (insn_3arg_fn_t *)&p->ainsn.insn[0];
+-	kprobe_opcode_t insn = p->opcode;
+-	int rd = (insn >> 16) & 0xf;
+-	int rn = (insn >> 12) & 0xf;
+-	int rs = (insn >> 8) & 0xf;
+-	int rm = insn & 0xf;
+-	long rnv = regs->uregs[rn];
+-	long rsv = regs->uregs[rs];
+-	long rmv = regs->uregs[rm];
+-
+-	regs->uregs[rd] =
+-		insnslot_3arg_rwflags(rnv, rsv, rmv, &regs->ARM_cpsr, i_fn);
+-}
+-
+-static void __kprobes
+-emulate_rd16rs8rm0_rwflags(struct kprobe *p, struct pt_regs *regs)
+-{
+-	insn_2arg_fn_t *i_fn = (insn_2arg_fn_t *)&p->ainsn.insn[0];
+-	kprobe_opcode_t insn = p->opcode;
+-	int rd = (insn >> 16) & 0xf;
+-	int rs = (insn >> 8) & 0xf;
+-	int rm = insn & 0xf;
+-	long rsv = regs->uregs[rs];
+-	long rmv = regs->uregs[rm];
+-
+-	regs->uregs[rd] =
+-		insnslot_2arg_rwflags(rsv, rmv, &regs->ARM_cpsr, i_fn);
+-}
+-
+-static void __kprobes
+-emulate_rdhi16rdlo12rs8rm0_rwflags(struct kprobe *p, struct pt_regs *regs)
+-{
+-	insn_llret_4arg_fn_t *i_fn = (insn_llret_4arg_fn_t *)&p->ainsn.insn[0];
+-	kprobe_opcode_t insn = p->opcode;
+-	union reg_pair fnr;
+-	int rdhi = (insn >> 16) & 0xf;
+-	int rdlo = (insn >> 12) & 0xf;
+-	int rs   = (insn >> 8) & 0xf;
+-	int rm   = insn & 0xf;
+-	long rsv = regs->uregs[rs];
+-	long rmv = regs->uregs[rm];
+-
+-	fnr.dr = insnslot_llret_4arg_rwflags(regs->uregs[rdhi],
+-					     regs->uregs[rdlo], rsv, rmv,
+-					     &regs->ARM_cpsr, i_fn);
+-	regs->uregs[rdhi] = fnr.r0;
+-	regs->uregs[rdlo] = fnr.r1;
+-}
+-
+-static void __kprobes
+-emulate_alu_imm_rflags(struct kprobe *p, struct pt_regs *regs)
+-{
+-	insn_1arg_fn_t *i_fn = (insn_1arg_fn_t *)&p->ainsn.insn[0];
+-	kprobe_opcode_t insn = p->opcode;
+-	int rd = (insn >> 12) & 0xf;
+-	int rn = (insn >> 16) & 0xf;
+-	long rnv = (rn == 15) ? (long)p->addr + 8 : regs->uregs[rn];
+-
+-	regs->uregs[rd] = insnslot_1arg_rflags(rnv, regs->ARM_cpsr, i_fn);
+-}
+-
+-static void __kprobes
+-emulate_alu_imm_rwflags(struct kprobe *p, struct pt_regs *regs)
+-{
+-	insn_1arg_fn_t *i_fn = (insn_1arg_fn_t *)&p->ainsn.insn[0];
+-	kprobe_opcode_t insn = p->opcode;
+-	int rd = (insn >> 12) & 0xf;
+-	int rn = (insn >> 16) & 0xf;
+-	long rnv = (rn == 15) ? (long)p->addr + 8 : regs->uregs[rn];
+-
+-	regs->uregs[rd] = insnslot_1arg_rwflags(rnv, &regs->ARM_cpsr, i_fn);
+-}
+-
+-static void __kprobes
+-emulate_alu_tests_imm(struct kprobe *p, struct pt_regs *regs)
+-{
+-	insn_1arg_fn_t *i_fn = (insn_1arg_fn_t *)&p->ainsn.insn[0];
+-	kprobe_opcode_t insn = p->opcode;
+-	int rn = (insn >> 16) & 0xf;
+-	long rnv = (rn == 15) ? (long)p->addr + 8 : regs->uregs[rn];
+-
+-	insnslot_1arg_rwflags(rnv, &regs->ARM_cpsr, i_fn);
+-}
+-
+-static void __kprobes
+-emulate_alu_rflags(struct kprobe *p, struct pt_regs *regs)
+-{
+-	insn_3arg_fn_t *i_fn = (insn_3arg_fn_t *)&p->ainsn.insn[0];
+-	kprobe_opcode_t insn = p->opcode;
+-	long ppc = (long)p->addr + 8;
+-	int rd = (insn >> 12) & 0xf;
+-	int rn = (insn >> 16) & 0xf;	/* rn/rnv/rs/rsv may be */
+-	int rs = (insn >> 8) & 0xf;	/* invalid, don't care. */
+-	int rm = insn & 0xf;
+-	long rnv = (rn == 15) ? ppc : regs->uregs[rn];
+-	long rmv = (rm == 15) ? ppc : regs->uregs[rm];
+-	long rsv = regs->uregs[rs];
+-
+-	regs->uregs[rd] =
+-		insnslot_3arg_rflags(rnv, rmv, rsv, regs->ARM_cpsr, i_fn);
+-}
+-
+-static void __kprobes
+-emulate_alu_rwflags(struct kprobe *p, struct pt_regs *regs)
+-{
+-	insn_3arg_fn_t *i_fn = (insn_3arg_fn_t *)&p->ainsn.insn[0];
+-	kprobe_opcode_t insn = p->opcode;
+-	long ppc = (long)p->addr + 8;
+-	int rd = (insn >> 12) & 0xf;
+-	int rn = (insn >> 16) & 0xf;	/* rn/rnv/rs/rsv may be */
+-	int rs = (insn >> 8) & 0xf;	/* invalid, don't care. */
+-	int rm = insn & 0xf;
+-	long rnv = (rn == 15) ? ppc : regs->uregs[rn];
+-	long rmv = (rm == 15) ? ppc : regs->uregs[rm];
+-	long rsv = regs->uregs[rs];
+-
+-	regs->uregs[rd] =
+-		insnslot_3arg_rwflags(rnv, rmv, rsv, &regs->ARM_cpsr, i_fn);
+-}
+-
+-static void __kprobes
+-emulate_alu_tests(struct kprobe *p, struct pt_regs *regs)
+-{
+-	insn_3arg_fn_t *i_fn = (insn_3arg_fn_t *)&p->ainsn.insn[0];
+-	kprobe_opcode_t insn = p->opcode;
+-	long ppc = (long)p->addr + 8;
+-	int rn = (insn >> 16) & 0xf;
+-	int rs = (insn >> 8) & 0xf;	/* rs/rsv may be invalid, don't care. */
+-	int rm = insn & 0xf;
+-	long rnv = (rn == 15) ? ppc : regs->uregs[rn];
+-	long rmv = (rm == 15) ? ppc : regs->uregs[rm];
+-	long rsv = regs->uregs[rs];
+-
+-	insnslot_3arg_rwflags(rnv, rmv, rsv, &regs->ARM_cpsr, i_fn);
+-}
+-
+-static enum kprobe_insn __kprobes
+-prep_emulate_ldr_str(kprobe_opcode_t insn, struct arch_specific_insn *asi)
+-{
+-	int not_imm = (insn & (1 << 26)) ? (insn & (1 << 25))
+-					 : (~insn & (1 << 22));
+-
+-	if (is_writeback(insn) && is_r15(insn, 16))
+-		return INSN_REJECTED;	/* Writeback to PC */
+-
+-	insn &= 0xfff00fff;
+-	insn |= 0x00001000;	/* Rn = r0, Rd = r1 */
+-	if (not_imm) {
+-		insn &= ~0xf;
+-		insn |= 2;	/* Rm = r2 */
+-	}
+-	asi->insn[0] = insn;
+-	asi->insn_handler = (insn & (1 << 20)) ? emulate_ldr_old : emulate_str_old;
+-	return INSN_GOOD;
+-}
+-
+-static enum kprobe_insn __kprobes
+-prep_emulate_rd12_modify(kprobe_opcode_t insn, struct arch_specific_insn *asi)
+-{
+-	if (is_r15(insn, 12))
+-		return INSN_REJECTED;	/* Rd is PC */
+-
+-	insn &= 0xffff0fff;	/* Rd = r0 */
+-	asi->insn[0] = insn;
+-	asi->insn_handler = emulate_rd12_modify;
+-	return INSN_GOOD;
+-}
+-
+-static enum kprobe_insn __kprobes
+-prep_emulate_rd12rn0_modify(kprobe_opcode_t insn,
+-			    struct arch_specific_insn *asi)
+-{
+-	if (is_r15(insn, 12))
+-		return INSN_REJECTED;	/* Rd is PC */
+-
+-	insn &= 0xffff0ff0;	/* Rd = r0 */
+-	insn |= 0x00000001;	/* Rn = r1 */
+-	asi->insn[0] = insn;
+-	asi->insn_handler = emulate_rd12rn0_modify;
+-	return INSN_GOOD;
+-}
+-
+-static enum kprobe_insn __kprobes
+-prep_emulate_rd12rm0(kprobe_opcode_t insn, struct arch_specific_insn *asi)
+-{
+-	if (is_r15(insn, 12))
+-		return INSN_REJECTED;	/* Rd is PC */
+-
+-	insn &= 0xffff0ff0;	/* Rd = r0, Rm = r0 */
+-	asi->insn[0] = insn;
+-	asi->insn_handler = emulate_rd12rm0;
+-	return INSN_GOOD;
+-}
+-
+-static enum kprobe_insn __kprobes
+-prep_emulate_rd12rn16rm0_wflags(kprobe_opcode_t insn,
+-				struct arch_specific_insn *asi)
+-{
+-	if (is_r15(insn, 12))
+-		return INSN_REJECTED;	/* Rd is PC */
+-
+-	insn &= 0xfff00ff0;	/* Rd = r0, Rn = r0 */
+-	insn |= 0x00000001;	/* Rm = r1 */
+-	asi->insn[0] = insn;
+-	asi->insn_handler = emulate_rd12rn16rm0_rwflags;
+-	return INSN_GOOD;
+-}
+-
+-static enum kprobe_insn __kprobes
+-prep_emulate_rd16rs8rm0_wflags(kprobe_opcode_t insn,
+-			       struct arch_specific_insn *asi)
+-{
+-	if (is_r15(insn, 16))
+-		return INSN_REJECTED;	/* Rd is PC */
+-
+-	insn &= 0xfff0f0f0;	/* Rd = r0, Rs = r0 */
+-	insn |= 0x00000001;	/* Rm = r1          */
+-	asi->insn[0] = insn;
+-	asi->insn_handler = emulate_rd16rs8rm0_rwflags;
+-	return INSN_GOOD;
+-}
+-
+-static enum kprobe_insn __kprobes
+-prep_emulate_rd16rn12rs8rm0_wflags(kprobe_opcode_t insn,
+-				   struct arch_specific_insn *asi)
+-{
+-	if (is_r15(insn, 16))
+-		return INSN_REJECTED;	/* Rd is PC */
+-
+-	insn &= 0xfff000f0;	/* Rd = r0, Rn = r0 */
+-	insn |= 0x00000102;	/* Rs = r1, Rm = r2 */
+-	asi->insn[0] = insn;
+-	asi->insn_handler = emulate_rd16rn12rs8rm0_rwflags;
+-	return INSN_GOOD;
+-}
+-
+-static enum kprobe_insn __kprobes
+-prep_emulate_rdhi16rdlo12rs8rm0_wflags(kprobe_opcode_t insn,
+-				       struct arch_specific_insn *asi)
+-{
+-	if (is_r15(insn, 16) || is_r15(insn, 12))
+-		return INSN_REJECTED;	/* RdHi or RdLo is PC */
+-
+-	insn &= 0xfff000f0;	/* RdHi = r0, RdLo = r1 */
+-	insn |= 0x00001203;	/* Rs = r2, Rm = r3 */
+-	asi->insn[0] = insn;
+-	asi->insn_handler = emulate_rdhi16rdlo12rs8rm0_rwflags;
+-	return INSN_GOOD;
+-}
+-
+ static void __kprobes
+ emulate_ldrdstrd(struct kprobe *p, struct pt_regs *regs)
+ {
 -- 
 1.7.2.5
