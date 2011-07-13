@@ -1,45 +1,79 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 12 Jul 2011 23:16:34 -0700
-Subject: Remaining omap pull requests
-In-Reply-To: <201107120016.12366.arnd@arndb.de>
-References: <20110711114736.GX5783@atomide.com>
-	<201107120016.12366.arnd@arndb.de>
-Message-ID: <20110713061634.GG5783@atomide.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 13 Jul 2011 10:03:46 +0900
+Subject: [PATCH V2 02/10] ASoc: mxs: add mxs-saif driver
+In-Reply-To: <1310483085-31442-3-git-send-email-b29396@freescale.com>
+References: <1310483085-31442-1-git-send-email-b29396@freescale.com>
+	<1310483085-31442-3-git-send-email-b29396@freescale.com>
+Message-ID: <20110713010346.GA18959@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnd Bergmann <arnd@arndb.de> [110711 15:11]:
-> On Monday 11 July 2011, Tony Lindgren wrote:
-> > Hi Arnd,
-> > 
-> > Below is a summary of the pending omap pull requests as there are still
-> > few branches pending.
-> > 
-> > Can you please take a look and see what you can take of these for v3.1
-> > merge window?
-> > 
-> > There's still quite a bit more code shrinkage, and the new code for 4460
-> > and PRCM related changes are badly needed.
-> 
-> I've pulled everything now, please check if it looks ok to you.
+On Tue, Jul 12, 2011 at 11:04:37PM +0800, Dong Aisheng wrote:
 
-Thanks looks good to me.
- 
-> I haven't really looked at the patches much, I hope that I have time
-> to at least do some test builds and take a very rough look at the
-> contents tomorrow.
+Looks pretty good, a few small issues below.
 
-OK thanks.
- 
-> Thanks for the detailed descriptions, and for splitting it
-> into good-sized series.
+> +	/* The SAIF clock should be either 384*fs or 512*fs */
+> +	if (saif->mclk_in_use) {
+> +		if (mclk % 32 == 0) {
+> +			scr &= ~BM_SAIF_CTRL_BITCLK_BASE_RATE;
+> +			ret = clk_set_rate(saif->clk, 512 * rate);
+> +		} else if (mclk % 48 == 0) {
+> +			scr |= BM_SAIF_CTRL_BITCLK_BASE_RATE;
+> +			ret = clk_set_rate(saif->clk, 384 * rate);
+> +		}
 
-Looks like I forgot the i2c driver changes that also should be
-merged by us. Those are acked by Ben Dooks, Kevin's pull request
-for that is at:
+What if MCLK is not set corectly for some reason?  We'll just silently
+do nothing.
 
-http://marc.info/?l=linux-omap&m=131014213007667&w=2
+> +	if (ret)
+> +		return  -EINVAL;
 
-Regards,
+Should pass through any error codes we get.
 
-Tony
+In hw_params()...
+> +	stat = __raw_readl(saif->base + SAIF_STAT);
+> +	if (stat & BM_SAIF_STAT_BUSY) {
+> +		dev_err(cpu_dai->dev, "error: busy\n");
+> +		return -EBUSY;
+> +	}
+
+Does this work for simultaneous playback and record?  Perhaps you need
+to set symmetric_rates in the DAI (if the hardware needs the same sample
+rate for playback and record) and have a check here to see if we're
+trying to apply the same configuration as we already have.
+
+> +	struct mxs_saif *saif = dev_id;
+> +	unsigned int stat;
+> +
+> +	stat = __raw_readl(saif->base + SAIF_STAT);
+> +	if (stat & BM_SAIF_STAT_FIFO_UNDERFLOW_IRQ)
+> +		dev_dbg(saif->dev, "underrun!!! %d\n", ++saif->fifo_underrun);
+> +
+> +	if (stat & BM_SAIF_STAT_FIFO_OVERFLOW_IRQ)
+> +		dev_dbg(saif->dev, "overrun!!! %d\n", ++saif->fifo_overrun);
+
+Probably dev_err()?
+
+> +	__raw_writel(BM_SAIF_STAT_FIFO_UNDERFLOW_IRQ |
+> +			BM_SAIF_STAT_FIFO_OVERFLOW_IRQ,
+> +			saif->base + SAIF_STAT + MXS_CLR_ADDR);
+> +
+> +	return IRQ_HANDLED;
+
+Should really check to see if underflow or overflow occurred and only
+report handled if they did - otherwise we might have trouble with new
+hardware blocks that have other interrupts.
+
+> +	if (pdev->id >= 2)
+> +		return -EINVAL;
+> +	mxs_saif[pdev->id] = saif;
+
+The id check should check for ARRAY_SIZE() mxs_saif[] to make updates
+easier if a new chip has more ports.
+
+> +	saif->dma_param.chan_irq = platform_get_irq(pdev, 1);
+> +	if (saif->dma_param.chan_irq < 0) {
+
+Does the IRQ requesting need to happen after you've set the base
+address?  Otherwise there's a potential race if for some reason the IRQ
+fires before we've got the data structures set up.
