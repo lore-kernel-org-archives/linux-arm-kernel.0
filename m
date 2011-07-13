@@ -1,33 +1,21 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Wed, 13 Jul 2011 14:59:33 +0200
-Subject: [PATCH V2 03/10] ASoc: mxs: add mxs-sgtl5000 machine driver
-In-Reply-To: <20110713124648.GA6640@opensource.wolfsonmicro.com>
-References: <1310483085-31442-1-git-send-email-b29396@freescale.com>
-	<1310483085-31442-4-git-send-email-b29396@freescale.com>
-	<20110713115711.GG1928@pengutronix.de>
-	<20110713124648.GA6640@opensource.wolfsonmicro.com>
-Message-ID: <20110713125933.GH1928@pengutronix.de>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 13 Jul 2011 21:17:50 +0800
+Subject: mxs: usb support?
+In-Reply-To: <CAHMSPgO9urZj1-Ru-b7c-CKX_7oTCicHn2qJZFqtue0FFoQ8=A@mail.gmail.com>
+References: <CAHMSPgO9urZj1-Ru-b7c-CKX_7oTCicHn2qJZFqtue0FFoQ8=A@mail.gmail.com>
+Message-ID: <20110713131749.GA10401@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 13, 2011 at 09:46:52PM +0900, Mark Brown wrote:
-> On Wed, Jul 13, 2011 at 01:57:11PM +0200, Wolfram Sang wrote:
+On Wed, Jul 13, 2011 at 09:49:21AM +0200, Koen Beel wrote:
+> Hi,
 > 
-> > Proper regulator support for mxs is not in mainline yet. Is that
-> > planned? How do you do it?
+> Just wanted to ask if anyone is working on usb support for mxs
+> (Freescale i.MX23/28), or is planning to submit a patch to support
+> this?
 > 
-> Regulator support is not a feature of the platform, it's a generic Linux
-> feature.
-
-Yup, sorry, meant s/mxs/mx28evk/
+Yes, Freescale has the plan to mainline mxs usb.
 
 -- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110713/8e742c20/attachment.sig>
+Regards,
+Shawn
