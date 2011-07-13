@@ -1,30 +1,35 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Wed, 13 Jul 2011 23:16:40 +0800
-Subject: [PATCH V2 03/10] ASoc: mxs: add mxs-sgtl5000 machine driver
-In-Reply-To: <20110713150102.GK1928@pengutronix.de>
-References: <1310483085-31442-1-git-send-email-b29396@freescale.com>
-	<1310483085-31442-4-git-send-email-b29396@freescale.com>
-	<20110713115711.GG1928@pengutronix.de>
-	<65EE16ACC360FA4D99C96DC085B3F7721CDBAA@039-SN1MPN1-002.039d.mgd.msft.net>
-	<65EE16ACC360FA4D99C96DC085B3F7721CDC7C@039-SN1MPN1-002.039d.mgd.msft.net>
-	<20110713140038.GI1928@pengutronix.de>
-	<65EE16ACC360FA4D99C96DC085B3F7721CDD7B@039-SN1MPN1-002.039d.mgd.msft.net>
-	<20110713150102.GK1928@pengutronix.de>
-Message-ID: <CAA+hA=QmcSGoe7w2jMRUCa18auQLOXXjnGQ8QtLZrteD3Q1ysA@mail.gmail.com>
+From: cjb@laptop.org (Chris Ball)
+Date: Wed, 13 Jul 2011 11:36:26 -0400
+Subject: [PATCH V2 00/16] omap_hsmmc patches
+In-Reply-To: <CANOLnONWmYn4FpuF-UAKQR4rAA6LOgWdMfu2bMN46nna6rOxAw@mail.gmail.com>
+	(Grazvydas Ignotas's message of "Wed, 13 Jul 2011 13:48:08 +0300")
+References: <1304673255-31634-1-git-send-email-adrian.hunter@nokia.com>
+	<CANOLnONWmYn4FpuF-UAKQR4rAA6LOgWdMfu2bMN46nna6rOxAw@mail.gmail.com>
+Message-ID: <m2k4bm2nwl.fsf@bob.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/7/13 Wolfram Sang <w.sang@pengutronix.de>:
-> On Wed, Jul 13, 2011 at 02:22:42PM +0000, Dong Aisheng-B29396 wrote:
->>
->> You mean the sound is incorrect?
->
-> It was, but is fixed now. There was something wrong in our audio-path
-> electrically. Together with your DMA patch, music sounds fine now \o/
->
+Hi,
 
-It's good.
-Thanks for the test.
+On Wed, Jul 13 2011, Grazvydas Ignotas wrote:
+> it seems this series got lost in time, at least patches 01, 02, 03,
+> 04, 05, 06, 07, 08, 12 look like valid standalone fixes and
+> improvements to me, they don't touch other trees and still apply
+> cleanly, so would be good to have.
 
-Regards
-Dong Aisheng
+Yeah.  I didn't merge them because Tony still has unanswered comments on
+the OMAP side of the patches, and they're submitted as a single patchset.
+
+I've applied {2, 3, 5, 6, 7, 8, 12} to mmc-next for 3.1 now.  1 doesn't
+apply because the function doesn't exist anymore.  4 doesn't apply
+because iclk doesn't exist anymore.
+
+If someone wants to look at rebasing the rest of these against mmc-next
+and resubmitting, I think that'd be useful.
+
+Thanks,
+
+- Chris.
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
