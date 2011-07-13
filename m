@@ -1,70 +1,50 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 14 Jul 2011 08:33:38 +0900
-Subject: [PATCH] i2c: tegra: Use engineering names in DT compatible
-	property
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF049E834757@HQMAIL01.nvidia.com>
-References: <1309897306-22953-1-git-send-email-swarren@nvidia.com>
-	<20110706053941.GE9978@ponder.secretlab.ca>
-	<74CDBE0F657A3D45AFBB94109FB122FF049E834757@HQMAIL01.nvidia.com>
-Message-ID: <CACxGe6tojgLSmHTxzGn3hZZVqiR_z6xbWrazYekm0TwQoWK5eA@mail.gmail.com>
+From: vinod.koul@intel.com (Koul, Vinod)
+Date: Thu, 14 Jul 2011 04:35:28 +0530
+Subject: [PATCH 0/9] PL08x further cleanups
+In-Reply-To: <20110705131030.GE8286@n2100.arm.linux.org.uk>
+References: <20110705131030.GE8286@n2100.arm.linux.org.uk>
+Message-ID: <1310598328.1536.27.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 14, 2011 at 2:59 AM, Stephen Warren <swarren@nvidia.com> wrote:
-> Grant Likely wrote at Tuesday, July 05, 2011 11:40 PM:
->> On Tue, Jul 05, 2011 at 02:21:46PM -0600, Stephen Warren wrote:
->> > Engineering names are more stable than marketing names. Hence, use them
->> > for Device Tree compatible properties instead.
->> >
->> > Signed-off-by: Stephen Warren <swarren@nvidia.com>
->> > ---
->> > Grant, this is against devicetree/arm and also makes sense for
->> > devicetree/test.
->>
->> Acked-by: Grant Likely <grant.likely@secretlab.ca>
->>
->> Ben is the one to pick up this patch.
->
-> I don't believe anyone ever sent a patch to Ben to add tegra_i2c_of_match
-> to the driver; the OF support patch didn't include that part of the code.
-> As such, Ben can't yet apply this to his tree. (Although I note this patch
-> is in Grant's /arm and /test trees, which is probably good enough for now).
+On Tue, 2011-07-05 at 14:10 +0100, Russell King - ARM Linux wrote:
+> This patch series is the remainder of the PL08x work I did earlier
+> this year while trying to get the ARM platforms working with DMA.
+> 
+> Unfortunately, due to the state of the hardware, I was not able to
+> properly test these changes.  However, they do compile, and I think
+> if others are going to be looking at the PL08x DMA engine driver,
+> they're worth having.
+> 
+> Linus, can you check these out on your hardware please?
 
-Hmmm, I thought it had been done.  It certainly is ready to go in.  Do
-you want to put together a roll-up patch that includes all the
-required changes and post it again? (although double check linux-next
-first).
+Russell,
 
-g.
+The fail to build for me, on line 550 it refers to bd.llil_bus whereas
+the bd is a pointer. Further the WIDTH macros seem to be missing.
 
->
->> > ?drivers/i2c/busses/i2c-tegra.c | ? ?2 +-
->> > ?1 files changed, 1 insertions(+), 1 deletions(-)
->> >
->> > diff --git a/drivers/i2c/busses/i2c-tegra.c b/drivers/i2c/busses/i2c-tegra.c
->> > index 8914bd1..99b1b6d 100644
->> > --- a/drivers/i2c/busses/i2c-tegra.c
->> > +++ b/drivers/i2c/busses/i2c-tegra.c
->> > @@ -716,7 +716,7 @@ static int tegra_i2c_resume(struct platform_device *pdev)
->> > ?#if defined(CONFIG_OF)
->> > ?/* Match table for of_platform binding */
->> > ?static const struct of_device_id tegra_i2c_of_match[] __devinitconst = {
->> > - ? { .compatible = "nvidia,tegra250-i2c", },
->> > + ? { .compatible = "nvidia,tegra20-i2c", },
->> > ? ? {},
->> > ?};
->> > ?MODULE_DEVICE_TABLE(of, tegra_i2c_of_match);
->> > --
->> > 1.7.0.4
->> >
->
-> --
-> nvpublic
->
->
+While you are fixing this, you may want to fix the minor checkpatch
+warning as well.
 
+drivers/dma/amba-pl08x.c: In function 'pl08x_fill_lli_for_desc':
+drivers/dma/amba-pl08x.c:550: error: request for member 'lli_bus' in
+something not a structure or union
+drivers/dma/amba-pl08x.c: In function 'pl08x_width':
+drivers/dma/amba-pl08x.c:1121: error: 'PL08X_WIDTH_8BIT' undeclared
+(first use in this function)
+drivers/dma/amba-pl08x.c:1121: error: (Each undeclared identifier is
+reported only once
+drivers/dma/amba-pl08x.c:1121: error: for each function it appears in.)
+drivers/dma/amba-pl08x.c:1123: error: 'PL08X_WIDTH_16BIT' undeclared
+(first use in this function)
+drivers/dma/amba-pl08x.c:1125: error: 'PL08X_WIDTH_32BIT' undeclared
+(first use in this function)
+drivers/dma/amba-pl08x.c:1119: warning: enumeration value
+'DMA_SLAVE_BUSWIDTH_UNDEFINED' not handled in switch
+drivers/dma/amba-pl08x.c:1119: warning: enumeration value
+'DMA_SLAVE_BUSWIDTH_8_BYTES' not handled in switch
+make[1]: *** [drivers/dma/amba-pl08x.o] Error 1
 
 
 -- 
-Grant Likely, B.Sc., P.Eng.
-Secret Lab Technologies Ltd.
+~Vinod
