@@ -1,64 +1,124 @@
-From: toddpoynor@google.com (Todd Poynor)
-Date: Wed, 13 Jul 2011 15:53:07 -0700
-Subject: [PATCH 2/3] ARM: Call idle notifiers
-In-Reply-To: <20110711195000.GH4109@somewhere.redhat.com>
-References: <1309229190-25006-1-git-send-email-toddpoynor@google.com>
-	<1309229190-25006-3-git-send-email-toddpoynor@google.com>
-	<20110711195000.GH4109@somewhere.redhat.com>
-Message-ID: <20110713225307.GA17946@google.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 14 Jul 2011 07:57:16 +0900
+Subject: [PATCH 1/4] dt: omap3: add SoC file for handling i2c controllers
+In-Reply-To: <1310592975-25773-2-git-send-email-manjugk@ti.com>
+References: <1310592975-25773-1-git-send-email-manjugk@ti.com>
+	<1310592975-25773-2-git-send-email-manjugk@ti.com>
+Message-ID: <CACxGe6u3D=ZgK2TpLP7waCwH=MA_5UR+YBRSgVE9QBVyvkF32A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 11, 2011 at 09:50:04PM +0200, Frederic Weisbecker wrote:
-> On Mon, Jun 27, 2011 at 07:46:29PM -0700, Todd Poynor wrote:
-> > Change-Id: Id833e61c13baa1783705ac9e9046d1f0cc90c95e
-> > Signed-off-by: Todd Poynor <toddpoynor@google.com>
-> > ---
-> >  arch/arm/kernel/process.c |    2 ++
-> >  1 files changed, 2 insertions(+), 0 deletions(-)
-> > 
-> > diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-> > index 5e1e541..1b9101e 100644
-> > --- a/arch/arm/kernel/process.c
-> > +++ b/arch/arm/kernel/process.c
-> > @@ -184,6 +184,7 @@ void cpu_idle(void)
-> >  	while (1) {
-> >  		tick_nohz_stop_sched_tick(1);
-> >  		leds_event(led_idle_start);
-> > +		idle_notifier_call_chain(IDLE_START);
-> >  		while (!need_resched()) {
-> >  #ifdef CONFIG_HOTPLUG_CPU
-> >  			if (cpu_is_offline(smp_processor_id()))
-> > @@ -208,6 +209,7 @@ void cpu_idle(void)
-> >  			}
-> >  		}
-> >  		leds_event(led_idle_end);
-> > +		idle_notifier_call_chain(IDLE_END);
-> >  		tick_nohz_restart_sched_tick();
-> >  		preempt_enable_no_resched();
-> >  		schedule();
-> 
-> You seem to use this notifier with different semantics than x86.
-> x86 notifies idle state when it knows it goes to sleep and exit it any
-> time it gets interrupted. And it does that every time in the need_resched()
-> loop.
-> 
-> But here in ARM you enter idle only once before the loop (and you don't even
-> know if you will enter the loop). And you don't notify idle exit state on interrupts.
-> 
-> So if in the end this idle notifier is something that is really wanted, it needs
-> to have a consistant behaviour across archs.
+On Thu, Jul 14, 2011 at 7:06 AM, G, Manjunath Kondaiah <manjugk@ti.com> wrote:
+>
+> Add omap3 SoC file for handling omap3 SoC i2c controllers existing
+> on l4-core bus.
+>
+> Out of three i2c controllers, first i2c controller is interfaced with
+> PMIC on all the boards of OMAP3. The clock for i2c controllers are
+> controlled through omap hwmod framework hence first i2c controller
+> device registration through dt is disabled till hwmod dependencies
+> are resolved.
+>
+> Signed-off-by: G, Manjunath Kondaiah <manjugk@ti.com>
+> ---
+> ?arch/arm/boot/dts/omap3-soc.dtsi | ? 65 ++++++++++++++++++++++++++++++++++++++
+> ?1 files changed, 65 insertions(+), 0 deletions(-)
+> ?create mode 100644 arch/arm/boot/dts/omap3-soc.dtsi
+>
+> diff --git a/arch/arm/boot/dts/omap3-soc.dtsi b/arch/arm/boot/dts/omap3-soc.dtsi
+> new file mode 100644
+> index 0000000..f186a32
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/omap3-soc.dtsi
+> @@ -0,0 +1,65 @@
+> +/*
+> + * Device Tree Source for OMAP3 SoC
+> + *
+> + * Copyright (C) 2011 Texas Instruments Incorporated - http://www.ti.com/
+> + *
+> + * This file is licensed under the terms of the GNU General Public License
+> + * version 2. ?This program is licensed "as is" without any warranty of any
+> + * kind, whether express or implied.
+> + */
+> +
+> +/dts-v1/;
+> +/include/ "skeleton.dtsi"
+> +
+> +/ {
+> + ? ? ? #address-cells = <1>;
+> + ? ? ? #size-cells = <1>;
+> + ? ? ? model = "ti,omap3";
 
-Yes, I didn't want to change the behavior of the existing notifiers
-being converted in these patches, but eventually one would want
-cross-arch idle callbacks with consistent behavior, and the
-existing arch-specific notifications have different semantics.
-My goal is to notify when the OS scheduler enters and exits its idle
-loop, so the existing ARM semantics are what I'm aiming for; the x86_64
-behavior is probably further evidence that it is really a
-cpuidle-style operation being performed.  If the idle notifiers do
-find any traction then it sounds like moving the notification to the
-common schedule code would be the right thing to do.
+You can drop the model property here since this doesn't define a board.
+
+> + ? ? ? compatible = "ti,omap3";
+> +
+> + ? ? ? intc: interrupt-controller at 0x48200000 {
+> + ? ? ? ? ? ? ? compatible = "ti,omap3-intc", "arm,intc";
+
+Which arm intc controller?  For any new 'compatible' value you define,
+the patch needs to include documentation for it in
+Documentation/devicetree/bindings.
+
+> + ? ? ? ? ? ? ? interrupt-controller;
+> + ? ? ? ? ? ? ? #interrupt-cells = <1>;
+> + ? ? ? ? ? ? ? reg = <0x48200000 0x1000>;
+> + ? ? ? };
+> +
+> + ? ? ? l4-core {
+> + ? ? ? ? ? ? ? compatible = "ti,l4-core";
+
+Probably should be "ti,omap3-l4-core"?
+
+> + ? ? ? ? ? ? ? #address-cells = <1>;
+> + ? ? ? ? ? ? ? #size-cells = <1>;
+> + ? ? ? ? ? ? ? ranges = <0 0x48000000 0x1000000>;
+> +
+> + ? ? ? ? ? ? ? i2c at 1 {
+> + ? ? ? ? ? ? ? ? ? ? ? #address-cells = <1>;
+> + ? ? ? ? ? ? ? ? ? ? ? #size-cells = <0>;
+> + ? ? ? ? ? ? ? ? ? ? ? compatible = "ti,omap3-i2c";
+> + ? ? ? ? ? ? ? ? ? ? ? reg = <0x70000 0x100>;
+> + ? ? ? ? ? ? ? ? ? ? ? interrupts = < 88 >;
+> + ? ? ? ? ? ? ? ? ? ? ? status = "disabled";
+
+Drop the 'status' properties.  I know the current tegra code does
+this, but I'd prefer devices to be enabled by default and for boards
+to explicitly disable them instead of the other way around.
+
+> + ? ? ? ? ? ? ? };
+> +
+> + ? ? ? ? ? ? ? i2c at 2 {
+> + ? ? ? ? ? ? ? ? ? ? ? #address-cells = <1>;
+> + ? ? ? ? ? ? ? ? ? ? ? #size-cells = <0>;
+> + ? ? ? ? ? ? ? ? ? ? ? compatible = "ti,omap3-i2c";
+> + ? ? ? ? ? ? ? ? ? ? ? reg = <0x72000 0x100>;
+> + ? ? ? ? ? ? ? ? ? ? ? interrupts = < 89 >;
+> + ? ? ? ? ? ? ? };
+> +
+> + ? ? ? ? ? ? ? i2c at 3 {
+> + ? ? ? ? ? ? ? ? ? ? ? #address-cells = <1>;
+> + ? ? ? ? ? ? ? ? ? ? ? #size-cells = <0>;
+> + ? ? ? ? ? ? ? ? ? ? ? compatible = "ti,omap3-i2c";
+> + ? ? ? ? ? ? ? ? ? ? ? reg = <0x60000 0x100>;
+> + ? ? ? ? ? ? ? ? ? ? ? interrupts = < 93 >;
+> + ? ? ? ? ? ? ? };
+> + ? ? ? };
+> +
+> + ? ? ? l4-per {
+> + ? ? ? ? ? ? ? compatible = "ti,l4-per";
+> + ? ? ? ? ? ? ? #address-cells = <1>;
+> + ? ? ? ? ? ? ? #size-cells = <1>;
+> + ? ? ? ? ? ? ? ranges = <0 0x49000000 0x100000>;
+> + ? ? ? };
+> +};
+> --
+> 1.7.4.1
+>
+>
 
 
-Thanks -- Todd
+
+-- 
+Grant Likely, B.Sc., P.Eng.
+Secret Lab Technologies Ltd.
