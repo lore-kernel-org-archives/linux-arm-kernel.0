@@ -1,32 +1,54 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 12 Jul 2011 23:22:16 -0400 (EDT)
-Subject: [PATCH 01/52] ARM: introduce atag_offset to replace
- boot_params
-In-Reply-To: <20110712204814.GD15997@ibawizard.net>
-References: <1309920457-21913-1-git-send-email-nicolas.pitre@linaro.org>
-	<20110708203634.GU4812@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1107081714251.14596@xanadu.home>
-	<alpine.LFD.2.00.1107111046350.14596@xanadu.home>
-	<ADE657CA350FB648AAC2C43247A983F001F383D6D6F7@AUSP01VMBX24.collaborationhost.net>
-	<20110712204814.GD15997@ibawizard.net>
-Message-ID: <alpine.LFD.2.00.1107122321401.14596@xanadu.home>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 13 Jul 2011 08:56:27 +0530
+Subject: [PATCH] OMAP: powerdomains: Make all powerdomain target states as ON
+	at init
+Message-ID: <1310527588-13022-1-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 12 Jul 2011, Petr ?tetiar wrote:
+From: Rajendra Nayak <rnayak@ti.com>
 
-> H Hartley Sweeten <hartleys@visionengravers.com> [2011-07-11 12:17:25]:
-> 
-> > Unfortunately, all the ep93xx boards I have are designed with the sdram using
-> > nSDCS0 so I can't test the other boot configurations.
-> 
-> I've tested that actual patchset from nico/redux git branch[1,2] on
-> ts-7250/32M and ts-7300/128M (both nSDCS3) and it boots, so you can add my
-> tested-by if you like:
-> 
-> Tested-by: Petr ?tetiar <ynezz@true.cz>
+Program all powerdomain target state as ON; This is to
+prevent domains from hitting low power states (if bootloader
+has target states set to something other than ON) and potentially
+even losing context while PM is not fully initilized.
+The PM late init code can then program the desired target
+state for all the power domains.
 
-Thanks.
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+---
+ arch/arm/mach-omap2/powerdomain.c |   12 +++++++++++-
+ 1 files changed, 11 insertions(+), 1 deletions(-)
 
-
-Nicolas
+diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
+index e0490bc..e61866c 100644
+--- a/arch/arm/mach-omap2/powerdomain.c
++++ b/arch/arm/mach-omap2/powerdomain.c
+@@ -109,6 +109,16 @@ static int _pwrdm_register(struct powerdomain *pwrdm)
+ 
+ 	list_add(&pwrdm->node, &pwrdm_list);
+ 
++	/*
++	* Program all powerdomain target state as ON; This is to
++	* prevent domains from hitting low power states (if bootloader
++	* has target states set to something other than ON) and potentially
++	* even losing context while PM is not fully initilized.
++	* The PM late init code can then program the desired target
++	* state for all the power domains.
++	*/
++	pwrdm_set_next_pwrst(pwrdm, PWRDM_POWER_ON);
++
+ 	/* Initialize the powerdomain's state counter */
+ 	for (i = 0; i < PWRDM_MAX_PWRSTS; i++)
+ 		pwrdm->state_counter[i] = 0;
+@@ -218,7 +228,7 @@ static int _pwrdm_post_transition_cb(struct powerdomain *pwrdm, void *unused)
+ /**
+  * pwrdm_init - set up the powerdomain layer
+  * @pwrdm_list: array of struct powerdomain pointers to register
+- * @custom_funcs: func pointers for arch specific implementations
++ * @custom_funcs: func pointers for arch specfic implementations
+  *
+  * Loop through the array of powerdomains @pwrdm_list, registering all
+  * that are available on the current CPU. If pwrdm_list is supplied
+-- 
+1.7.4.1
