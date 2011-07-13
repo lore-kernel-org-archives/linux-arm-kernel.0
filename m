@@ -1,33 +1,130 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 13 Jul 2011 11:29:15 +0200
-Subject: [PATCH v2] AT91 OHCI active-high vbus and overcurrent handling
-Message-ID: <1310549358-13330-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Wed, 13 Jul 2011 11:29:18 +0200
+Subject: [PATCH 3/3] at91-ohci: configure overcurrent pins as input GPIOs
+In-Reply-To: <1310549358-13330-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1310549358-13330-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1310549358-13330-4-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+As a new overcurrent_pin[] array has been added to the at91_usbh_data
+structure, those pins must be muxed to work properly. This commit
+implements this muxing for all AT91 SoCs that support the AT91 OHCI.
 
-This series of patches adds two features to the AT91 OHCI driver :
- * Support for active-high vbus pin USB power switches (patch 1)
- * Support for over-current notification (patches 2 and 3)
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: Andrew Victor <linux@maxim.org.za>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+---
+ arch/arm/mach-at91/at91cap9_devices.c    |    6 ++++++
+ arch/arm/mach-at91/at91rm9200_devices.c  |    6 ++++++
+ arch/arm/mach-at91/at91sam9260_devices.c |    6 ++++++
+ arch/arm/mach-at91/at91sam9261_devices.c |    6 ++++++
+ arch/arm/mach-at91/at91sam9263_devices.c |    6 ++++++
+ arch/arm/mach-at91/at91sam9g45_devices.c |    6 ++++++
+ 6 files changed, 36 insertions(+), 0 deletions(-)
 
-Changes since v1 (posted July, 5th 2011) :
-
- * Simplify expressions in gpio_direction_output() when controlling
-   the VBUS pin, as suggested by Sergei Shtylyov
-   <sshtylyov@mvista.com>
-
- * Extend the overcurrent notification support by notifying the USB
-   stack and exposing the fact that per-port power switching and
-   overcurrent notification, based on ohci-da8xx.c and ohci-s3c2410.c,
-   as suggested by Matthieu CASTET <matthieu.castet@parrot.com>
-
-I haven't yet taken into account Jean-Christophe Plagniol-Villard
-comment on using the named ressources, because I don't see how a board
-file can define ressources with the current AT91 code structure (the
-ressources are only defined at the SoC level). Input from
-Jean-Christophe on this would be greatly appreciated.
-
-Regards,
-
-Thomas
+diff --git a/arch/arm/mach-at91/at91cap9_devices.c b/arch/arm/mach-at91/at91cap9_devices.c
+index dba0d8d..b46615a 100644
+--- a/arch/arm/mach-at91/at91cap9_devices.c
++++ b/arch/arm/mach-at91/at91cap9_devices.c
+@@ -80,6 +80,12 @@ void __init at91_add_device_usbh(struct at91_usbh_data *data)
+ 			at91_set_gpio_output(data->vbus_pin[i], 0);
+ 	}
+ 
++	/* Enable overcurrent notification */
++	for (i = 0; i < data->ports; i++) {
++		if (data->overcurrent_pin[i])
++			at91_set_gpio_input(data->overcurrent_pin[i], 1);
++	}
++
+ 	usbh_data = *data;
+ 	platform_device_register(&at91_usbh_device);
+ }
+diff --git a/arch/arm/mach-at91/at91rm9200_devices.c b/arch/arm/mach-at91/at91rm9200_devices.c
+index 7227755..b2202b6 100644
+--- a/arch/arm/mach-at91/at91rm9200_devices.c
++++ b/arch/arm/mach-at91/at91rm9200_devices.c
+@@ -63,6 +63,12 @@ void __init at91_add_device_usbh(struct at91_usbh_data *data)
+ 	if (!data)
+ 		return;
+ 
++	/* Enable overcurrent notification */
++	for (i = 0; i < data->ports; i++) {
++		if (data->overcurrent_pin[i])
++			at91_set_gpio_input(data->overcurrent_pin[i], 1);
++	}
++
+ 	usbh_data = *data;
+ 	platform_device_register(&at91rm9200_usbh_device);
+ }
+diff --git a/arch/arm/mach-at91/at91sam9260_devices.c b/arch/arm/mach-at91/at91sam9260_devices.c
+index 39f81f4..ad64fc3 100644
+--- a/arch/arm/mach-at91/at91sam9260_devices.c
++++ b/arch/arm/mach-at91/at91sam9260_devices.c
+@@ -64,6 +64,12 @@ void __init at91_add_device_usbh(struct at91_usbh_data *data)
+ 	if (!data)
+ 		return;
+ 
++	/* Enable overcurrent notification */
++	for (i = 0; i < data->ports; i++) {
++		if (data->overcurrent_pin[i])
++			at91_set_gpio_input(data->overcurrent_pin[i], 1);
++	}
++
+ 	usbh_data = *data;
+ 	platform_device_register(&at91_usbh_device);
+ }
+diff --git a/arch/arm/mach-at91/at91sam9261_devices.c b/arch/arm/mach-at91/at91sam9261_devices.c
+index 5004bf0..e394e86 100644
+--- a/arch/arm/mach-at91/at91sam9261_devices.c
++++ b/arch/arm/mach-at91/at91sam9261_devices.c
+@@ -67,6 +67,12 @@ void __init at91_add_device_usbh(struct at91_usbh_data *data)
+ 	if (!data)
+ 		return;
+ 
++	/* Enable overcurrent notification */
++	for (i = 0; i < data->ports; i++) {
++		if (data->overcurrent_pin[i])
++			at91_set_gpio_input(data->overcurrent_pin[i], 1);
++	}
++
+ 	usbh_data = *data;
+ 	platform_device_register(&at91sam9261_usbh_device);
+ }
+diff --git a/arch/arm/mach-at91/at91sam9263_devices.c b/arch/arm/mach-at91/at91sam9263_devices.c
+index a050f41..d4aef76 100644
+--- a/arch/arm/mach-at91/at91sam9263_devices.c
++++ b/arch/arm/mach-at91/at91sam9263_devices.c
+@@ -74,6 +74,12 @@ void __init at91_add_device_usbh(struct at91_usbh_data *data)
+ 			at91_set_gpio_output(data->vbus_pin[i], 0);
+ 	}
+ 
++	/* Enable overcurrent notification */
++	for (i = 0; i < data->ports; i++) {
++		if (data->overcurrent_pin[i])
++			at91_set_gpio_input(data->overcurrent_pin[i], 1);
++	}
++
+ 	usbh_data = *data;
+ 	platform_device_register(&at91_usbh_device);
+ }
+diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
+index 600bffb..e4a9857 100644
+--- a/arch/arm/mach-at91/at91sam9g45_devices.c
++++ b/arch/arm/mach-at91/at91sam9g45_devices.c
+@@ -124,6 +124,12 @@ void __init at91_add_device_usbh_ohci(struct at91_usbh_data *data)
+ 			at91_set_gpio_output(data->vbus_pin[i], 0);
+ 	}
+ 
++	/* Enable overcurrent notification */
++	for (i = 0; i < data->ports; i++) {
++		if (data->overcurrent_pin[i])
++			at91_set_gpio_input(data->overcurrent_pin[i], 1);
++	}
++
+ 	usbh_ohci_data = *data;
+ 	platform_device_register(&at91_usbh_ohci_device);
+ }
+-- 
+1.7.4.1
