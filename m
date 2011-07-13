@@ -1,36 +1,64 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Wed, 13 Jul 2011 16:42:47 -0600
-Subject: [PATCH v2] ARM: Tegra: Trimslice: Tri-state DAP3 pinmux
-Message-ID: <1310596967-19996-1-git-send-email-swarren@nvidia.com>
+From: toddpoynor@google.com (Todd Poynor)
+Date: Wed, 13 Jul 2011 15:53:07 -0700
+Subject: [PATCH 2/3] ARM: Call idle notifiers
+In-Reply-To: <20110711195000.GH4109@somewhere.redhat.com>
+References: <1309229190-25006-1-git-send-email-toddpoynor@google.com>
+	<1309229190-25006-3-git-send-email-toddpoynor@google.com>
+	<20110711195000.GH4109@somewhere.redhat.com>
+Message-ID: <20110713225307.GA17946@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DAP3 is used for a bunch of GPIOs. Not tri-stating the pins means audio
-signals get sent out there, and this ends up resetting USB and breaking
-SDHCI too.
+On Mon, Jul 11, 2011 at 09:50:04PM +0200, Frederic Weisbecker wrote:
+> On Mon, Jun 27, 2011 at 07:46:29PM -0700, Todd Poynor wrote:
+> > Change-Id: Id833e61c13baa1783705ac9e9046d1f0cc90c95e
+> > Signed-off-by: Todd Poynor <toddpoynor@google.com>
+> > ---
+> >  arch/arm/kernel/process.c |    2 ++
+> >  1 files changed, 2 insertions(+), 0 deletions(-)
+> > 
+> > diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+> > index 5e1e541..1b9101e 100644
+> > --- a/arch/arm/kernel/process.c
+> > +++ b/arch/arm/kernel/process.c
+> > @@ -184,6 +184,7 @@ void cpu_idle(void)
+> >  	while (1) {
+> >  		tick_nohz_stop_sched_tick(1);
+> >  		leds_event(led_idle_start);
+> > +		idle_notifier_call_chain(IDLE_START);
+> >  		while (!need_resched()) {
+> >  #ifdef CONFIG_HOTPLUG_CPU
+> >  			if (cpu_is_offline(smp_processor_id()))
+> > @@ -208,6 +209,7 @@ void cpu_idle(void)
+> >  			}
+> >  		}
+> >  		leds_event(led_idle_end);
+> > +		idle_notifier_call_chain(IDLE_END);
+> >  		tick_nohz_restart_sched_tick();
+> >  		preempt_enable_no_resched();
+> >  		schedule();
+> 
+> You seem to use this notifier with different semantics than x86.
+> x86 notifies idle state when it knows it goes to sleep and exit it any
+> time it gets interrupted. And it does that every time in the need_resched()
+> loop.
+> 
+> But here in ARM you enter idle only once before the loop (and you don't even
+> know if you will enter the loop). And you don't notify idle exit state on interrupts.
+> 
+> So if in the end this idle notifier is something that is really wanted, it needs
+> to have a consistant behaviour across archs.
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
-v2: s/DAP2/DAP3/ in patch subject/description.
+Yes, I didn't want to change the behavior of the existing notifiers
+being converted in these patches, but eventually one would want
+cross-arch idle callbacks with consistent behavior, and the
+existing arch-specific notifications have different semantics.
+My goal is to notify when the OS scheduler enters and exits its idle
+loop, so the existing ARM semantics are what I'm aiming for; the x86_64
+behavior is probably further evidence that it is really a
+cpuidle-style operation being performed.  If the idle notifiers do
+find any traction then it sounds like moving the notification to the
+common schedule code would be the right thing to do.
 
-I've not verified that this patch is both necessary and sufficient on
-TrimSlice hardware.
 
- arch/arm/mach-tegra/board-trimslice-pinmux.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-tegra/board-trimslice-pinmux.c b/arch/arm/mach-tegra/board-trimslice-pinmux.c
-index 82646a4..47c596c 100644
---- a/arch/arm/mach-tegra/board-trimslice-pinmux.c
-+++ b/arch/arm/mach-tegra/board-trimslice-pinmux.c
-@@ -35,7 +35,7 @@ static __initdata struct tegra_pingroup_config trimslice_pinmux[] = {
- 	{TEGRA_PINGROUP_CSUS,  TEGRA_MUX_VI_SENSOR_CLK, TEGRA_PUPD_PULL_DOWN,   TEGRA_TRI_TRISTATE},
- 	{TEGRA_PINGROUP_DAP1,  TEGRA_MUX_DAP1,          TEGRA_PUPD_NORMAL,      TEGRA_TRI_NORMAL},
- 	{TEGRA_PINGROUP_DAP2,  TEGRA_MUX_DAP2,          TEGRA_PUPD_NORMAL,      TEGRA_TRI_TRISTATE},
--	{TEGRA_PINGROUP_DAP3,  TEGRA_MUX_DAP3,          TEGRA_PUPD_NORMAL,      TEGRA_TRI_NORMAL},
-+	{TEGRA_PINGROUP_DAP3,  TEGRA_MUX_DAP3,          TEGRA_PUPD_NORMAL,      TEGRA_TRI_TRISTATE},
- 	{TEGRA_PINGROUP_DAP4,  TEGRA_MUX_DAP4,          TEGRA_PUPD_NORMAL,      TEGRA_TRI_TRISTATE},
- 	{TEGRA_PINGROUP_DDC,   TEGRA_MUX_I2C2,          TEGRA_PUPD_PULL_UP,     TEGRA_TRI_NORMAL},
- 	{TEGRA_PINGROUP_DTA,   TEGRA_MUX_VI,            TEGRA_PUPD_NORMAL,      TEGRA_TRI_TRISTATE},
--- 
-1.7.0.4
+Thanks -- Todd
