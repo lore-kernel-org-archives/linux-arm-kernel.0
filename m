@@ -1,52 +1,36 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Wed, 13 Jul 2011 10:59:53 -0700
-Subject: [PATCH] i2c: tegra: Use engineering names in DT compatible
-	property
-In-Reply-To: <20110706053941.GE9978@ponder.secretlab.ca>
-References: <1309897306-22953-1-git-send-email-swarren@nvidia.com>
-	<20110706053941.GE9978@ponder.secretlab.ca>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF049E834757@HQMAIL01.nvidia.com>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Wed, 13 Jul 2011 20:00:58 +0200
+Subject: [PATCH] ARM: Tegra: Trimslice: Tri-state DAP2 pinmux
+In-Reply-To: <1310579091-7424-1-git-send-email-swarren@nvidia.com>
+References: <1310579091-7424-1-git-send-email-swarren@nvidia.com>
+Message-ID: <20110713180058.GB27828@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Grant Likely wrote at Tuesday, July 05, 2011 11:40 PM:
-> On Tue, Jul 05, 2011 at 02:21:46PM -0600, Stephen Warren wrote:
-> > Engineering names are more stable than marketing names. Hence, use them
-> > for Device Tree compatible properties instead.
-> >
-> > Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> > ---
-> > Grant, this is against devicetree/arm and also makes sense for
-> > devicetree/test.
-> 
-> Acked-by: Grant Likely <grant.likely@secretlab.ca>
-> 
-> Ben is the one to pick up this patch.
+* Stephen Warren wrote:
+> DAP2 is used for a bunch of GPIOs. Not tri-stating the pins means audio
+> signals get sent out there, and this ends up resetting USB and breaking
+> SDHCI too.
+[...]
+> diff --git a/arch/arm/mach-tegra/board-trimslice-pinmux.c b/arch/arm/mach-tegra/board-trimslice-pinmux.c
+> index 82646a4..47c596c 100644
+> --- a/arch/arm/mach-tegra/board-trimslice-pinmux.c
+> +++ b/arch/arm/mach-tegra/board-trimslice-pinmux.c
+> @@ -35,7 +35,7 @@ static __initdata struct tegra_pingroup_config trimslice_pinmux[] = {
+>  	{TEGRA_PINGROUP_CSUS,  TEGRA_MUX_VI_SENSOR_CLK, TEGRA_PUPD_PULL_DOWN,   TEGRA_TRI_TRISTATE},
+>  	{TEGRA_PINGROUP_DAP1,  TEGRA_MUX_DAP1,          TEGRA_PUPD_NORMAL,      TEGRA_TRI_NORMAL},
+>  	{TEGRA_PINGROUP_DAP2,  TEGRA_MUX_DAP2,          TEGRA_PUPD_NORMAL,      TEGRA_TRI_TRISTATE},
+> -	{TEGRA_PINGROUP_DAP3,  TEGRA_MUX_DAP3,          TEGRA_PUPD_NORMAL,      TEGRA_TRI_NORMAL},
+> +	{TEGRA_PINGROUP_DAP3,  TEGRA_MUX_DAP3,          TEGRA_PUPD_NORMAL,      TEGRA_TRI_TRISTATE},
+                        ^^^^
 
-I don't believe anyone ever sent a patch to Ben to add tegra_i2c_of_match
-to the driver; the OF support patch didn't include that part of the code.
-As such, Ben can't yet apply this to his tree. (Although I note this patch
-is in Grant's /arm and /test trees, which is probably good enough for now).
+The patch subject and description say that DAP2 is tristated, not DAP3.
 
-> >  drivers/i2c/busses/i2c-tegra.c |    2 +-
-> >  1 files changed, 1 insertions(+), 1 deletions(-)
-> >
-> > diff --git a/drivers/i2c/busses/i2c-tegra.c b/drivers/i2c/busses/i2c-tegra.c
-> > index 8914bd1..99b1b6d 100644
-> > --- a/drivers/i2c/busses/i2c-tegra.c
-> > +++ b/drivers/i2c/busses/i2c-tegra.c
-> > @@ -716,7 +716,7 @@ static int tegra_i2c_resume(struct platform_device *pdev)
-> >  #if defined(CONFIG_OF)
-> >  /* Match table for of_platform binding */
-> >  static const struct of_device_id tegra_i2c_of_match[] __devinitconst = {
-> > -	{ .compatible = "nvidia,tegra250-i2c", },
-> > +	{ .compatible = "nvidia,tegra20-i2c", },
-> >  	{},
-> >  };
-> >  MODULE_DEVICE_TABLE(of, tegra_i2c_of_match);
-> > --
-> > 1.7.0.4
-> >
-
--- 
-nvpublic
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110713/61ff604d/attachment.sig>
