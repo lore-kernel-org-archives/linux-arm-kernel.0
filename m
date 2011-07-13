@@ -1,42 +1,72 @@
 From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Wed, 13 Jul 2011 14:46:24 +0400
-Subject: [PATCH 1/4] ARM: davinci: Check for NULL return from
-	irq_alloc_generic_chip
-In-Reply-To: <1310509910-4244-1-git-send-email-toddpoynor@google.com>
-References: <1310509910-4244-1-git-send-email-toddpoynor@google.com>
-Message-ID: <4E1D7780.9050505@mvista.com>
+Date: Wed, 13 Jul 2011 14:57:34 +0400
+Subject: [PATCH V7 2/4] MTD: pxa3xx_nand: convert all printk into dev_*
+In-Reply-To: <1310481336-13230-3-git-send-email-leiwen@marvell.com>
+References: <1310466535-15287-1-git-send-email-leiwen@marvell.com>
+	<1310481336-13230-3-git-send-email-leiwen@marvell.com>
+Message-ID: <4E1D7A1E.1020802@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello.
 
-On 13-07-2011 2:31, Todd Poynor wrote:
+On 12-07-2011 18:35, Lei Wen wrote:
 
-> Signed-off-by: Todd Poynor<toddpoynor@google.com>
+> Signed-off-by: Lei Wen<leiwen@marvell.com>
 > ---
->   arch/arm/mach-davinci/irq.c |    7 +++++++
->   1 files changed, 7 insertions(+), 0 deletions(-)
+>   drivers/mtd/nand/pxa3xx_nand.c |   27 ++++++++++++++++-----------
+>   1 files changed, 16 insertions(+), 11 deletions(-)
 
-> diff --git a/arch/arm/mach-davinci/irq.c b/arch/arm/mach-davinci/irq.c
-> index bfe68ec..ab7f688 100644
-> --- a/arch/arm/mach-davinci/irq.c
-> +++ b/arch/arm/mach-davinci/irq.c
-> @@ -52,6 +52,13 @@ davinci_alloc_gc(void __iomem *base, unsigned int irq_start, unsigned int num)
->   	struct irq_chip_type *ct;
+> diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
+> index 1efecf7..afe14bd 100644
+> --- a/drivers/mtd/nand/pxa3xx_nand.c
+> +++ b/drivers/mtd/nand/pxa3xx_nand.c
+[...]
+> @@ -774,11 +774,15 @@ static int pxa3xx_nand_config_flash(struct pxa3xx_nand_info *info,
+>   	struct pxa3xx_nand_platform_data *pdata = pdev->dev.platform_data;
+>   	uint32_t ndcr = 0x0; /* enable all interrupts */
 >
->   	gc = irq_alloc_generic_chip("AINTC", 1, irq_start, base, handle_edge_irq);
-> +
-
-    Remove this empty line please.
-
-> +	if (!gc) {
-> +		pr_err("%s: irq_alloc_generic_chip for IRQ %u failed\n",
-> +		       __func__, irq_start);
-> +		return;
+> -	if (f->page_size != 2048 && f->page_size != 512)
+> +	if (f->page_size != 2048 && f->page_size != 512) {
+> +		dev_err(&pdev->dev, "Current only support 2048 and 512 size\n");
+>   		return -EINVAL;
 > +	}
-> +
->   	ct = gc->chip_types;
->   	ct->chip.irq_ack = irq_gc_ack;
->   	ct->chip.irq_mask = irq_gc_mask_clr_bit;
+>
+> -	if (f->flash_width != 16 && f->flash_width != 8)
+> +	if (f->flash_width != 16 && f->flash_width != 8) {
+> +		dev_err(&pdev->dev, "Only support 8bit and 16 bit!\n");
+
+    So this patch not only converts printk() to dev_*() calls, it also adds 
+some dev_err() calls? This should have been mentioned in the change long at 
+least...
+
+>   		return -EINVAL;
+> +	}
+>
+>   	/* calculate flash information */
+>   	info->cmdset =&default_cmdset;
+> @@ -898,7 +902,7 @@ static int pxa3xx_nand_scan(struct mtd_info *mtd)
+>   	if (!ret) {
+>   		kfree(mtd);
+>   		info->mtd = NULL;
+> -		printk(KERN_INFO "There is no nand chip on cs 0!\n");
+> +		dev_info(&info->pdev->dev, "There is no nand chip on cs 0!\n");
+>
+>   		return -EINVAL;
+>   	}
+> @@ -906,11 +910,12 @@ static int pxa3xx_nand_scan(struct mtd_info *mtd)
+>   	chip->cmdfunc(mtd, NAND_CMD_READID, 0, 0);
+>   	id = *((uint16_t *)(info->data_buff));
+>   	if (id != 0)
+> -		printk(KERN_INFO "Detect a flash id %x\n", id);
+> +		dev_info(&info->pdev->dev, "Detect a flash id %x\n", id);
+>   	else {
+>   		kfree(mtd);
+>   		info->mtd = NULL;
+> -		printk(KERN_WARNING "Read out ID 0, potential timing set wrong!!\n");
+> +		dev_warn(&info->pdev->dev, "Read out ID 0, "
+> +				"potential timing set wrong!!\n");
+
+    Don't break the string -- this prevents grepping for it.
 
 WBR, Sergei
