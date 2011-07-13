@@ -1,94 +1,125 @@
 From: tixy@yxit.co.uk (Tixy)
-Date: Wed, 13 Jul 2011 10:06:08 +0100
-Subject: [PATCH 19/24] ARM: kprobes: Add
-	emulate_rdlo12rdhi16rn0rm8_rwflags_nopc()
+Date: Wed, 13 Jul 2011 10:06:01 +0100
+Subject: [PATCH 12/24] ARM: kprobes: Migrate ARM space_cccc_0111__1 to
+	decoding tables
 In-Reply-To: <1310547973-31784-1-git-send-email-tixy@yxit.co.uk>
 References: <1310547973-31784-1-git-send-email-tixy@yxit.co.uk>
-Message-ID: <1310547973-31784-20-git-send-email-tixy@yxit.co.uk>
+Message-ID: <1310547973-31784-13-git-send-email-tixy@yxit.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jon Medhurst <tixy@yxit.co.uk>
 
-This is the emulation function for the instruction format used by the
-ARM multiply long instructions. It replaces use of
-prep_emulate_rdhi16rdlo12rs8rm0_wflags().
-
 Signed-off-by: Jon Medhurst <tixy@yxit.co.uk>
 ---
- arch/arm/kernel/kprobes-arm.c |   39 ++++++++++++++++++++++++++++++++++++---
- 1 files changed, 36 insertions(+), 3 deletions(-)
+ arch/arm/kernel/kprobes-arm.c |   82 ++++++++++++++++++-----------------------
+ 1 files changed, 36 insertions(+), 46 deletions(-)
 
 diff --git a/arch/arm/kernel/kprobes-arm.c b/arch/arm/kernel/kprobes-arm.c
-index 688101f..bb38ae3 100644
+index 6203505..58faacc 100644
 --- a/arch/arm/kernel/kprobes-arm.c
 +++ b/arch/arm/kernel/kprobes-arm.c
-@@ -1033,6 +1033,36 @@ emulate_rd12rm0_noflags_nopc(struct kprobe *p, struct pt_regs *regs)
- 	regs->uregs[rd] = rdv;
- }
- 
-+static void __kprobes
-+emulate_rdlo12rdhi16rn0rm8_rwflags_nopc(struct kprobe *p, struct pt_regs *regs)
-+{
-+	kprobe_opcode_t insn = p->opcode;
-+	int rdlo = (insn >> 12) & 0xf;
-+	int rdhi = (insn >> 16) & 0xf;
-+	int rn = insn & 0xf;
-+	int rm = (insn >> 8) & 0xf;
-+
-+	register unsigned long rdlov asm("r0") = regs->uregs[rdlo];
-+	register unsigned long rdhiv asm("r2") = regs->uregs[rdhi];
-+	register unsigned long rnv asm("r3") = regs->uregs[rn];
-+	register unsigned long rmv asm("r1") = regs->uregs[rm];
-+	unsigned long cpsr = regs->ARM_cpsr;
-+
-+	__asm__ __volatile__ (
-+		"msr	cpsr_fs, %[cpsr]	\n\t"
-+		BLX("%[fn]")
-+		"mrs	%[cpsr], cpsr		\n\t"
-+		: "=r" (rdlov), "=r" (rdhiv), [cpsr] "=r" (cpsr)
-+		: "0" (rdlov), "1" (rdhiv), "r" (rnv), "r" (rmv),
-+		  "2" (cpsr), [fn] "r" (p->ainsn.insn_fn)
-+		: "lr", "memory", "cc"
-+	);
-+
-+	regs->uregs[rdlo] = rdlov;
-+	regs->uregs[rdhi] = rdhiv;
-+	regs->ARM_cpsr = (regs->ARM_cpsr & ~APSR_MASK) | (cpsr & APSR_MASK);
-+}
-+
- /*
-  * For the instruction masking and comparisons in all the "space_*"
-  * functions below, Do _not_ rearrange the order of tests unless
-@@ -1111,7 +1141,8 @@ static const union decode_item arm_cccc_0001_0xx0____1xx0_table[] = {
- 	/* Halfword multiply and multiply-accumulate			*/
- 
- 	/* SMLALxy		cccc 0001 0100 xxxx xxxx xxxx 1xx0 xxxx */
--	DECODE_CUSTOM	(0x0ff00090, 0x01400080, prep_emulate_rdhi16rdlo12rs8rm0_wflags),
-+	DECODE_EMULATEX	(0x0ff00090, 0x01400080, emulate_rdlo12rdhi16rn0rm8_rwflags_nopc,
-+						 REGS(NOPC, NOPC, NOPC, 0, NOPC)),
- 
- 	/* SMULWy		cccc 0001 0010 xxxx xxxx xxxx 1x10 xxxx */
- 	DECODE_OR	(0x0ff000b0, 0x012000a0),
-@@ -1153,7 +1184,8 @@ static const union decode_item arm_cccc_0000_____1001_table[] = {
- 	/* SMULLS		cccc 0000 1101 xxxx xxxx xxxx 1001 xxxx */
- 	/* SMLAL		cccc 0000 1110 xxxx xxxx xxxx 1001 xxxx */
- 	/* SMLALS		cccc 0000 1111 xxxx xxxx xxxx 1001 xxxx */
--	DECODE_CUSTOM	(0x0f8000f0, 0x00800090, prep_emulate_rdhi16rdlo12rs8rm0_wflags),
-+	DECODE_EMULATEX	(0x0f8000f0, 0x00800090, emulate_rdlo12rdhi16rn0rm8_rwflags_nopc,
-+						 REGS(NOPC, NOPC, NOPC, 0, NOPC)),
- 
+@@ -1373,57 +1373,47 @@ static const union decode_item arm_cccc_0110_____xxx1_table[] = {
  	DECODE_END
  };
-@@ -1422,7 +1454,8 @@ static const union decode_item arm_cccc_0111_____xxx1_table[] = {
  
- 	/* SMLALD		cccc 0111 0100 xxxx xxxx xxxx 00x1 xxxx */
- 	/* SMLSLD		cccc 0111 0100 xxxx xxxx xxxx 01x1 xxxx */
--	DECODE_CUSTOM	(0x0ff00090, 0x07400010, prep_emulate_rdhi16rdlo12rs8rm0_wflags),
-+	DECODE_EMULATEX	(0x0ff00090, 0x07400010, emulate_rdlo12rdhi16rn0rm8_rwflags_nopc,
-+						 REGS(NOPC, NOPC, NOPC, 0, NOPC)),
+-static enum kprobe_insn __kprobes
+-space_cccc_0111__1(kprobe_opcode_t insn, struct arch_specific_insn *asi)
+-{
+-	/* Undef : cccc 0111 1111 xxxx xxxx xxxx 1111 xxxx */
+-	if ((insn & 0x0ff000f0) == 0x03f000f0)
+-		return INSN_REJECTED;
++static const union decode_item arm_cccc_0111_____xxx1_table[] = {
++	/* Media instructions						*/
  
- 	/* SMUAD		cccc 0111 0000 xxxx 1111 xxxx 00x1 xxxx */
- 	/* SMUSD		cccc 0111 0000 xxxx 1111 xxxx 01x1 xxxx */
+-	/* SMLALD : cccc 0111 0100 xxxx xxxx xxxx 00x1 xxxx */
+-	/* SMLSLD : cccc 0111 0100 xxxx xxxx xxxx 01x1 xxxx */
+-	if ((insn & 0x0ff00090) == 0x07400010)
+-		return prep_emulate_rdhi16rdlo12rs8rm0_wflags(insn, asi);
+-
+-	/* SMLAD  : cccc 0111 0000 xxxx xxxx xxxx 00x1 xxxx :Q */
+-	/* SMUAD  : cccc 0111 0000 xxxx 1111 xxxx 00x1 xxxx :Q */
+-	/* SMLSD  : cccc 0111 0000 xxxx xxxx xxxx 01x1 xxxx :Q */
+-	/* SMUSD  : cccc 0111 0000 xxxx 1111 xxxx 01x1 xxxx :  */
+-	/* SMMLA  : cccc 0111 0101 xxxx xxxx xxxx 00x1 xxxx :  */
+-	/* SMMUL  : cccc 0111 0101 xxxx 1111 xxxx 00x1 xxxx :  */
+-	/* USADA8 : cccc 0111 1000 xxxx xxxx xxxx 0001 xxxx :  */
+-	/* USAD8  : cccc 0111 1000 xxxx 1111 xxxx 0001 xxxx :  */
+-	if ((insn & 0x0ff00090) == 0x07000010 ||
+-	    (insn & 0x0ff000d0) == 0x07500010 ||
+-	    (insn & 0x0ff000f0) == 0x07800010) {
+-
+-		if ((insn & 0x0000f000) == 0x0000f000)
+-			return prep_emulate_rd16rs8rm0_wflags(insn, asi);
+-		else
+-			return prep_emulate_rd16rn12rs8rm0_wflags(insn, asi);
+-	}
++	/* UNDEFINED		cccc 0111 1111 xxxx xxxx xxxx 1111 xxxx */
++	DECODE_REJECT	(0x0ff000f0, 0x07f000f0),
+ 
+-	/* SMMLS  : cccc 0111 0101 xxxx xxxx xxxx 11x1 xxxx :  */
+-	if ((insn & 0x0ff000d0) == 0x075000d0)
+-		return prep_emulate_rd16rn12rs8rm0_wflags(insn, asi);
++	/* SMLALD		cccc 0111 0100 xxxx xxxx xxxx 00x1 xxxx */
++	/* SMLSLD		cccc 0111 0100 xxxx xxxx xxxx 01x1 xxxx */
++	DECODE_CUSTOM	(0x0ff00090, 0x07400010, prep_emulate_rdhi16rdlo12rs8rm0_wflags),
+ 
+-	/* SBFX   : cccc 0111 101x xxxx xxxx xxxx x101 xxxx :  */
+-	/* UBFX   : cccc 0111 111x xxxx xxxx xxxx x101 xxxx :  */
+-	if ((insn & 0x0fa00070) == 0x07a00050)
+-		return prep_emulate_rd12rm0(insn, asi);
++	/* SMUAD		cccc 0111 0000 xxxx 1111 xxxx 00x1 xxxx */
++	/* SMUSD		cccc 0111 0000 xxxx 1111 xxxx 01x1 xxxx */
++	DECODE_OR	(0x0ff0f090, 0x0700f010),
++	/* SMMUL		cccc 0111 0101 xxxx 1111 xxxx 00x1 xxxx */
++	DECODE_OR	(0x0ff0f0d0, 0x0750f010),
++	/* USAD8		cccc 0111 1000 xxxx 1111 xxxx 0001 xxxx */
++	DECODE_CUSTOM	(0x0ff0f0f0, 0x0780f010, prep_emulate_rd16rs8rm0_wflags),
+ 
+-	/* BFI    : cccc 0111 110x xxxx xxxx xxxx x001 xxxx :  */
+-	/* BFC    : cccc 0111 110x xxxx xxxx xxxx x001 1111 :  */
+-	if ((insn & 0x0fe00070) == 0x07c00010) {
++	/* SMLAD		cccc 0111 0000 xxxx xxxx xxxx 00x1 xxxx */
++	/* SMLSD		cccc 0111 0000 xxxx xxxx xxxx 01x1 xxxx */
++	DECODE_OR	(0x0ff00090, 0x07000010),
++	/* SMMLA		cccc 0111 0101 xxxx xxxx xxxx 00x1 xxxx */
++	DECODE_OR	(0x0ff000d0, 0x07500010),
++	/* USADA8		cccc 0111 1000 xxxx xxxx xxxx 0001 xxxx */
++	DECODE_CUSTOM	(0x0ff000f0, 0x07800010, prep_emulate_rd16rn12rs8rm0_wflags),
+ 
+-		if ((insn & 0x0000000f) == 0x0000000f)
+-			return prep_emulate_rd12_modify(insn, asi);
+-		else
+-			return prep_emulate_rd12rn0_modify(insn, asi);
+-	}
++	/* SMMLS		cccc 0111 0101 xxxx xxxx xxxx 11x1 xxxx */
++	DECODE_CUSTOM	(0x0ff000d0, 0x075000d0, prep_emulate_rd16rn12rs8rm0_wflags),
+ 
+-	return INSN_REJECTED;
+-}
++	/* SBFX			cccc 0111 101x xxxx xxxx xxxx x101 xxxx */
++	/* UBFX			cccc 0111 111x xxxx xxxx xxxx x101 xxxx */
++	DECODE_CUSTOM	(0x0fa00070, 0x07a00050, prep_emulate_rd12rm0),
++
++	/* BFC			cccc 0111 110x xxxx xxxx xxxx x001 1111 */
++	DECODE_CUSTOM	(0x0fe0007f, 0x07c0001f, prep_emulate_rd12_modify),
++
++	/* BFI			cccc 0111 110x xxxx xxxx xxxx x001 xxxx */
++	DECODE_CUSTOM	(0x0fe00070, 0x07c00010, prep_emulate_rd12rn0_modify),
++
++	DECODE_END
++};
+ 
+ static enum kprobe_insn __kprobes
+ space_cccc_01xx(kprobe_opcode_t insn, struct arch_specific_insn *asi)
+@@ -1532,7 +1522,7 @@ arm_kprobe_decode_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi)
+ 
+ 	else if ((insn & 0x0f000010) == 0x07000010)
+ 
+-		return space_cccc_0111__1(insn, asi);
++		return kprobe_decode_insn(insn, asi, arm_cccc_0111_____xxx1_table, false);
+ 
+ 	else if ((insn & 0x0c000000) == 0x04000000)
+ 
 -- 
 1.7.2.5
