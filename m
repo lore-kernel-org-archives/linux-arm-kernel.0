@@ -1,38 +1,35 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Wed, 13 Jul 2011 11:40:23 +0800
-Subject: [PATCH V2 09/10] ARM: mxs: correct the using of frac div for saif
-In-Reply-To: <1310483085-31442-1-git-send-email-b29396@freescale.com>
+From: B29396@freescale.com (Dong Aisheng-B29396)
+Date: Wed, 13 Jul 2011 03:20:03 +0000
+Subject: [PATCH V2 01/10] ASoc: mxs: add mxs-pcm driver
+In-Reply-To: <20110712232719.GB17710@opensource.wolfsonmicro.com>
 References: <1310483085-31442-1-git-send-email-b29396@freescale.com>
-Message-ID: <1310528423-25143-1-git-send-email-b29396@freescale.com>
+	<1310483085-31442-2-git-send-email-b29396@freescale.com>
+	<20110712232719.GB17710@opensource.wolfsonmicro.com>
+Message-ID: <65EE16ACC360FA4D99C96DC085B3F7721CD59D@039-SN1MPN1-002.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to spec, set to 1 is the enable of fractional devide
-or the clock can not be generated properly.
+> -----Original Message-----
+> From: Mark Brown [mailto:broonie at opensource.wolfsonmicro.com]
+> Sent: Wednesday, July 13, 2011 7:27 AM
+> To: Dong Aisheng-B29396
+> Cc: alsa-devel at alsa-project.org; linux-arm-kernel at lists.infradead.org;
+> lrg at ti.com; s.hauer at pengutronix.de; u.kleine-koenig at pengutronix.de
+> Subject: Re: [PATCH V2 01/10] ASoc: mxs: add mxs-pcm driver
+> 
+> On Tue, Jul 12, 2011 at 11:04:36PM +0800, Dong Aisheng wrote:
+> 
+> > +	if (dai->driver->capture.channels_min) {
+> > +		ret = mxs_pcm_preallocate_dma_buffer(pcm,
+> > +			SNDRV_PCM_STREAM_CAPTURE);
+> > +		if (ret)
+> > +			goto out;
+> > +	}
+> 
+> For robustness replace the channels_min check with a check for the
+> relevant substream being present (see pxa2xx-pcm.c for a recent example).
+Thanks for the reminder.
+I will check it.
 
-Signed-off-by: Dong Aisheng <b29396@freescale.com>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
----
- arch/arm/mach-mxs/clock-mx28.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
-index 7b3657b..7954013 100644
---- a/arch/arm/mach-mxs/clock-mx28.c
-+++ b/arch/arm/mach-mxs/clock-mx28.c
-@@ -710,11 +710,11 @@ static int clk_misc_init(void)
- 
- 	/* SAIF has to use frac div for functional operation */
- 	reg = __raw_readl(CLKCTRL_BASE_ADDR + HW_CLKCTRL_SAIF0);
--	reg &= ~BM_CLKCTRL_SAIF0_DIV_FRAC_EN;
-+	reg |= BM_CLKCTRL_SAIF0_DIV_FRAC_EN;
- 	__raw_writel(reg, CLKCTRL_BASE_ADDR + HW_CLKCTRL_SAIF0);
- 
- 	reg = __raw_readl(CLKCTRL_BASE_ADDR + HW_CLKCTRL_SAIF1);
--	reg &= ~BM_CLKCTRL_SAIF1_DIV_FRAC_EN;
-+	reg |= BM_CLKCTRL_SAIF1_DIV_FRAC_EN;
- 	__raw_writel(reg, CLKCTRL_BASE_ADDR + HW_CLKCTRL_SAIF1);
- 
- 	/*
--- 
-1.7.0.4
+Regards
+Dong Aisheng
