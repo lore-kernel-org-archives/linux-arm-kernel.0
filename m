@@ -1,69 +1,75 @@
 From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
-Date: Wed, 13 Jul 2011 19:24:13 +0530
-Subject: [PATCH v4 14/20] gpio/omap: use pinctrl offset instead of macro
+Date: Wed, 13 Jul 2011 19:24:08 +0530
+Subject: [PATCH v4 09/20] gpio/omap: cleanup omap1 related macros
 In-Reply-To: <1310565259-31267-1-git-send-email-tarun.kanti@ti.com>
 References: <1310565259-31267-1-git-send-email-tarun.kanti@ti.com>
-Message-ID: <1310565259-31267-15-git-send-email-tarun.kanti@ti.com>
+Message-ID: <1310565259-31267-10-git-send-email-tarun.kanti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Charulatha V <charu@ti.com>
 
-Use regs->pinctrl field instead of using the macro OMAP1510_GPIO_PIN_CONTROL
+mpuio_init() function is defined under #ifdefs. It is required only in case
+of MPUIO bank type and only when PM operations are supported by it.
+This is applicable only in case of OMAP16xx SoC's MPUIO GPIO bank type.
+For all the other cases it is a dummy function. Hence clean up the same
+and remove all the OMAP SoC specific #ifdefs.
+
+bank_is_mpuio() is defined as a check to identify if the bank type is MPUIO.
+It is not required to define it separately as zero for OMAP2PLUS. Remove this.
 
 Signed-off-by: Charulatha V <charu@ti.com>
 ---
- arch/arm/mach-omap1/gpio15xx.c         |    1 +
- arch/arm/plat-omap/include/plat/gpio.h |    1 +
- drivers/gpio/gpio-omap.c               |    8 +++-----
- 3 files changed, 5 insertions(+), 5 deletions(-)
+ drivers/gpio/gpio-omap.c |   19 -------------------
+ 1 files changed, 0 insertions(+), 19 deletions(-)
 
-diff --git a/arch/arm/mach-omap1/gpio15xx.c b/arch/arm/mach-omap1/gpio15xx.c
-index fd2fe8f..020725f 100644
---- a/arch/arm/mach-omap1/gpio15xx.c
-+++ b/arch/arm/mach-omap1/gpio15xx.c
-@@ -85,6 +85,7 @@ static struct omap_gpio_reg_offs omap15xx_gpio_regs = {
- 	.irqenable	= OMAP1510_GPIO_INT_MASK,
- 	.irqenable_inv	= true,
- 	.irqctrl	= OMAP1510_GPIO_INT_CONTROL,
-+	.pinctrl	= OMAP1510_GPIO_PIN_CONTROL,
- };
- 
- static struct __initdata omap_gpio_platform_data omap15xx_gpio_config = {
-diff --git a/arch/arm/plat-omap/include/plat/gpio.h b/arch/arm/plat-omap/include/plat/gpio.h
-index 4f584de..3a05c58 100644
---- a/arch/arm/plat-omap/include/plat/gpio.h
-+++ b/arch/arm/plat-omap/include/plat/gpio.h
-@@ -198,6 +198,7 @@ struct omap_gpio_reg_offs {
- 	u16 irqctrl;
- 	u16 edgectrl1;
- 	u16 edgectrl2;
-+	u16 pinctrl;
- 
- 	bool irqenable_inv;
- };
 diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-index 0da78f3..742c310 100644
+index c9d12c5..fe02e7a 100644
 --- a/drivers/gpio/gpio-omap.c
 +++ b/drivers/gpio/gpio-omap.c
-@@ -486,15 +486,13 @@ static int omap_gpio_request(struct gpio_chip *chip, unsigned offset)
- 	 */
- 	_set_gpio_triggering(bank, offset, IRQ_TYPE_NONE);
+@@ -777,14 +777,8 @@ static struct irq_chip gpio_irq_chip = {
  
--#ifdef CONFIG_ARCH_OMAP15XX
--	if (bank->method == METHOD_GPIO_1510) {
--		void __iomem *reg;
-+	if (bank->regs->pinctrl) {
-+		void __iomem *reg = bank->base + bank->regs->pinctrl;
+ /*---------------------------------------------------------------------*/
  
- 		/* Claim the pin for MPU */
--		reg = bank->base + OMAP1510_GPIO_PIN_CONTROL;
- 		__raw_writel(__raw_readl(reg) | (1 << offset), reg);
- 	}
+-#ifdef CONFIG_ARCH_OMAP1
+-
+ #define bank_is_mpuio(bank)	((bank)->method == METHOD_MPUIO)
+ 
+-#ifdef CONFIG_ARCH_OMAP16XX
+-
+-#include <linux/platform_device.h>
+-
+ static int omap_mpuio_suspend_noirq(struct device *dev)
+ {
+ 	struct platform_device *pdev = to_platform_device(dev);
+@@ -846,17 +840,6 @@ static inline void mpuio_init(struct gpio_bank *bank)
+ 		(void) platform_device_register(&omap_mpuio_device);
+ }
+ 
+-#else
+-static inline void mpuio_init(struct gpio_bank *bank) {}
+-#endif	/* 16xx */
+-
+-#else
+-
+-#define bank_is_mpuio(bank)	0
+-static inline void mpuio_init(struct gpio_bank *bank) {}
+-
 -#endif
-+
- 	if (bank->regs->ctrl && !bank->mod_usage) {
- 		void __iomem *reg = bank->base + bank->regs->ctrl;
- 		u32 ctrl;
+-
+ /*---------------------------------------------------------------------*/
+ 
+ /* REVISIT these are stupid implementations!  replace by ones that
+@@ -1077,10 +1060,8 @@ static void __devinit omap_gpio_chip_init(struct gpio_bank *bank)
+ 	bank->chip.to_irq = gpio_2irq;
+ 	if (bank_is_mpuio(bank)) {
+ 		bank->chip.label = "mpuio";
+-#ifdef CONFIG_ARCH_OMAP16XX
+ 		if (bank->regs->wkup_status)
+ 			bank->chip.dev = &omap_mpuio_device.dev;
+-#endif
+ 		bank->chip.base = OMAP_MPUIO(0);
+ 	} else {
+ 		bank->chip.label = "gpio";
 -- 
 1.6.0.4
