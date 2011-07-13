@@ -1,130 +1,318 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 13 Jul 2011 11:29:18 +0200
-Subject: [PATCH 3/3] at91-ohci: configure overcurrent pins as input GPIOs
+Date: Wed, 13 Jul 2011 11:29:17 +0200
+Subject: [PATCH 2/3] at91-ohci: support overcurrent notification
 In-Reply-To: <1310549358-13330-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1310549358-13330-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1310549358-13330-4-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1310549358-13330-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As a new overcurrent_pin[] array has been added to the at91_usbh_data
-structure, those pins must be muxed to work properly. This commit
-implements this muxing for all AT91 SoCs that support the AT91 OHCI.
+Several USB power switches (AIC1526 or MIC2026) have a digital output
+that is used to notify that an overcurrent situation is taking
+place. This digital outputs are typically connected to GPIO inputs of
+the processor and can be used to be notified of those overcurrent
+situations.
+
+Therefore, we add a new overcurrent_pin[] array in the at91_usbh_data
+structure so that boards can tell the AT91 OHCI driver which pins are
+used for the overcurrent notification, and an overcurrent_supported
+boolean to tell the driver whether overcurrent is supported or not.
+
+The code has been largely borrowed from ohci-da8xx.c and
+ohci-s3c2410.c.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Cc: Andrew Victor <linux@maxim.org.za>
 Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
 Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+Cc: Matthieu CASTET <matthieu.castet@parrot.com>
 ---
- arch/arm/mach-at91/at91cap9_devices.c    |    6 ++++++
- arch/arm/mach-at91/at91rm9200_devices.c  |    6 ++++++
- arch/arm/mach-at91/at91sam9260_devices.c |    6 ++++++
- arch/arm/mach-at91/at91sam9261_devices.c |    6 ++++++
- arch/arm/mach-at91/at91sam9263_devices.c |    6 ++++++
- arch/arm/mach-at91/at91sam9g45_devices.c |    6 ++++++
- 6 files changed, 36 insertions(+), 0 deletions(-)
+ arch/arm/mach-at91/include/mach/board.h |    4 +
+ drivers/usb/host/ohci-at91.c            |  224 +++++++++++++++++++++++++++++--
+ 2 files changed, 219 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/mach-at91/at91cap9_devices.c b/arch/arm/mach-at91/at91cap9_devices.c
-index dba0d8d..b46615a 100644
---- a/arch/arm/mach-at91/at91cap9_devices.c
-+++ b/arch/arm/mach-at91/at91cap9_devices.c
-@@ -80,6 +80,12 @@ void __init at91_add_device_usbh(struct at91_usbh_data *data)
- 			at91_set_gpio_output(data->vbus_pin[i], 0);
+diff --git a/arch/arm/mach-at91/include/mach/board.h b/arch/arm/mach-at91/include/mach/board.h
+index 61d52dc..d07767f 100644
+--- a/arch/arm/mach-at91/include/mach/board.h
++++ b/arch/arm/mach-at91/include/mach/board.h
+@@ -99,6 +99,10 @@ struct at91_usbh_data {
+ 	u8		ports;		/* number of ports on root hub */
+ 	u8		vbus_pin[2];	/* port power-control pin */
+ 	u8              vbus_pin_inverted;
++	u8              overcurrent_supported;
++	u8              overcurrent_pin[2];
++	u8              overcurrent_status[2];
++	u8              overcurrent_changed[2];
+ };
+ extern void __init at91_add_device_usbh(struct at91_usbh_data *data);
+ extern void __init at91_add_device_usbh_ohci(struct at91_usbh_data *data);
+diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
+index 3612ccd..331909f 100644
+--- a/drivers/usb/host/ohci-at91.c
++++ b/drivers/usb/host/ohci-at91.c
+@@ -223,6 +223,156 @@ ohci_at91_start (struct usb_hcd *hcd)
+ 	return 0;
+ }
+ 
++static void ohci_at91_usb_set_power(struct at91_usbh_data *pdata, int port, int enable)
++{
++	if (port < 0 || port >= 2)
++		return;
++
++	gpio_set_value(pdata->vbus_pin[port], !pdata->vbus_pin_inverted ^ enable);
++}
++
++static int ohci_at91_usb_get_power(struct at91_usbh_data *pdata, int port)
++{
++	if (port < 0 || port >= 2)
++		return -EINVAL;
++
++	return gpio_get_value(pdata->vbus_pin[port]) ^ !pdata->vbus_pin_inverted;
++}
++
++/*
++ * Update the status data from the hub with the over-current indicator change.
++ */
++static int ohci_at91_hub_status_data(struct usb_hcd *hcd, char *buf)
++{
++	struct at91_usbh_data *pdata = hcd->self.controller->platform_data;
++	int length = ohci_hub_status_data(hcd, buf);
++	int port;
++
++	for (port = 0; port < ARRAY_SIZE(pdata->overcurrent_pin); port++) {
++		if (pdata->overcurrent_changed[port]) {
++			if (! length)
++				length = 1;
++			buf[0] |= 1 << (port + 1);
++		}
++	}
++
++	return length;
++}
++
++/*
++ * Look@the control requests to the root hub and see if we need to override.
++ */
++static int ohci_at91_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
++				 u16 wIndex, char *buf, u16 wLength)
++{
++	struct at91_usbh_data *pdata = hcd->self.controller->platform_data;
++	struct usb_hub_descriptor *desc;
++	int ret = -EINVAL;
++	u32 *data = (u32 *)buf;
++
++	dev_dbg(hcd->self.controller,
++		"ohci_at91_hub_control(%p,0x%04x,0x%04x,0x%04x,%p,%04x)\n",
++		hcd, typeReq, wValue, wIndex, buf, wLength);
++
++	switch (typeReq) {
++	case SetPortFeature:
++		if (wValue == USB_PORT_FEAT_POWER) {
++			dev_dbg(hcd->self.controller, "SetPortFeat: POWER\n");
++			ohci_at91_usb_set_power(pdata, wIndex - 1, 1);
++			goto out;
++		}
++		break;
++
++	case ClearPortFeature:
++		switch (wValue) {
++		case USB_PORT_FEAT_C_OVER_CURRENT:
++			dev_dbg(hcd->self.controller,
++				"ClearPortFeature: C_OVER_CURRENT\n");
++
++			if (wIndex == 1 || wIndex == 2) {
++				pdata->overcurrent_changed[wIndex-1] = 0;
++				pdata->overcurrent_status[wIndex-1] = 0;
++			}
++
++			goto out;
++
++		case USB_PORT_FEAT_OVER_CURRENT:
++			dev_dbg(hcd->self.controller,
++				"ClearPortFeature: OVER_CURRENT\n");
++
++			if (wIndex == 1 || wIndex == 2) {
++				pdata->overcurrent_status[wIndex-1] = 0;
++			}
++
++			goto out;
++
++		case USB_PORT_FEAT_POWER:
++			dev_dbg(hcd->self.controller,
++				"ClearPortFeature: POWER\n");
++
++			if (wIndex == 1 || wIndex == 2) {
++				ohci_at91_usb_set_power(pdata, wIndex - 1, 0);
++				return 0;
++			}
++		}
++		break;
++	}
++
++	ret = ohci_hub_control(hcd, typeReq, wValue, wIndex, buf, wLength);
++	if (ret)
++		goto out;
++
++	switch (typeReq) {
++	case GetHubDescriptor:
++
++		/* update the hub's descriptor */
++
++		desc = (struct usb_hub_descriptor *)buf;
++
++		dev_dbg(hcd->self.controller, "wHubCharacteristics 0x%04x\n",
++			desc->wHubCharacteristics);
++
++		/* remove the old configurations for power-switching, and
++		 * over-current protection, and insert our new configuration
++		 */
++
++		desc->wHubCharacteristics &= ~cpu_to_le16(HUB_CHAR_LPSM);
++		desc->wHubCharacteristics |= cpu_to_le16(0x0001);
++
++		if (pdata->overcurrent_supported) {
++			desc->wHubCharacteristics &= ~cpu_to_le16(HUB_CHAR_OCPM);
++			desc->wHubCharacteristics |=  cpu_to_le16(0x0008|0x0001);
++		}
++
++		dev_dbg(hcd->self.controller, "wHubCharacteristics after 0x%04x\n",
++			desc->wHubCharacteristics);
++
++		return ret;
++
++	case GetPortStatus:
++		/* check port status */
++
++		dev_dbg(hcd->self.controller, "GetPortStatus(%d)\n", wIndex);
++
++		if (wIndex == 1 || wIndex == 2) {
++			if (! ohci_at91_usb_get_power(pdata, wIndex-1)) {
++				*data &= ~cpu_to_le32(RH_PS_PPS);
++			}
++
++			if (pdata->overcurrent_changed[wIndex-1]) {
++				*data |= cpu_to_le32(RH_PS_OCIC);
++			}
++
++			if (pdata->overcurrent_status[wIndex-1]) {
++				*data |= cpu_to_le32(RH_PS_POCI);
++			}
++		}
++	}
++
++ out:
++	return ret;
++}
++
+ /*-------------------------------------------------------------------------*/
+ 
+ static const struct hc_driver ohci_at91_hc_driver = {
+@@ -258,8 +408,8 @@ static const struct hc_driver ohci_at91_hc_driver = {
+ 	/*
+ 	 * root hub support
+ 	 */
+-	.hub_status_data =	ohci_hub_status_data,
+-	.hub_control =		ohci_hub_control,
++	.hub_status_data =	ohci_at91_hub_status_data,
++	.hub_control =		ohci_at91_hub_control,
+ #ifdef CONFIG_PM
+ 	.bus_suspend =		ohci_bus_suspend,
+ 	.bus_resume =		ohci_bus_resume,
+@@ -269,22 +419,71 @@ static const struct hc_driver ohci_at91_hc_driver = {
+ 
+ /*-------------------------------------------------------------------------*/
+ 
++static irqreturn_t ohci_hcd_at91_overcurrent_irq(int irq, void *data)
++{
++	struct platform_device *pdev = data;
++	struct at91_usbh_data *pdata = pdev->dev.platform_data;
++	int val, gpio, port;
++
++	/* From the GPIO notifying the over-current situation, find
++	 * out the corresponding port */
++	gpio = irq_to_gpio(irq);
++	for (port = 0; port < ARRAY_SIZE(pdata->overcurrent_pin); port++) {
++		if (pdata->overcurrent_pin[port] == gpio)
++			break;
++	}
++
++	if (port == ARRAY_SIZE(pdata->overcurrent_pin)) {
++		dev_err(& pdev->dev, "overcurrent interrupt from unknown GPIO\n");
++		return IRQ_HANDLED;
++	}
++
++	val = gpio_get_value(gpio);
++
++	/* When notified of an over-current situation, disable power
++	   on the corresponding port, and mark this port in
++	   over-current. */
++	if (! val) {
++		ohci_at91_usb_set_power(pdata, port, 0);
++		pdata->overcurrent_status[port]  = 1;
++		pdata->overcurrent_changed[port] = 1;
++	}
++
++	dev_dbg(& pdev->dev, "overcurrent situation %s\n",
++		val ? "exited" : "notified");
++
++	return IRQ_HANDLED;
++}
++
++/*-------------------------------------------------------------------------*/
++
+ static int ohci_hcd_at91_drv_probe(struct platform_device *pdev)
+ {
+ 	struct at91_usbh_data	*pdata = pdev->dev.platform_data;
+ 	int			i;
+ 
+ 	if (pdata) {
+-		/* REVISIT make the driver support per-port power switching,
+-		 * and also overcurrent detection.  Here we assume the ports
+-		 * are always powered while this driver is active, and use
+-		 * active-low power switches.
+-		 */
+ 		for (i = 0; i < ARRAY_SIZE(pdata->vbus_pin); i++) {
+ 			if (pdata->vbus_pin[i] <= 0)
+ 				continue;
+ 			gpio_request(pdata->vbus_pin[i], "ohci_vbus");
+-			gpio_direction_output(pdata->vbus_pin[i], pdata->vbus_pin_inverted);
++			ohci_at91_usb_set_power(pdata, i, 1);
++		}
++
++		for (i = 0; i < ARRAY_SIZE(pdata->overcurrent_pin); i++) {
++			int ret;
++
++			if (pdata->overcurrent_pin[i] <= 0)
++				continue;
++			gpio_request(pdata->overcurrent_pin[i], "ohci_overcurrent");
++
++			ret = request_irq(gpio_to_irq(pdata->overcurrent_pin[i]),
++					  ohci_hcd_at91_overcurrent_irq,
++					  IRQF_SHARED, "ohci_overcurrent", pdev);
++			if (ret) {
++				gpio_free(pdata->overcurrent_pin[i]);
++				dev_warn(& pdev->dev, "cannot get GPIO IRQ for overcurrent\n");
++			}
+ 		}
  	}
  
-+	/* Enable overcurrent notification */
-+	for (i = 0; i < data->ports; i++) {
-+		if (data->overcurrent_pin[i])
-+			at91_set_gpio_input(data->overcurrent_pin[i], 1);
-+	}
+@@ -301,9 +500,16 @@ static int ohci_hcd_at91_drv_remove(struct platform_device *pdev)
+ 		for (i = 0; i < ARRAY_SIZE(pdata->vbus_pin); i++) {
+ 			if (pdata->vbus_pin[i] <= 0)
+ 				continue;
+-			gpio_direction_output(pdata->vbus_pin[i], !pdata->vbus_pin_inverted);
++			ohci_at91_usb_set_power(pdata, i, 0);
+ 			gpio_free(pdata->vbus_pin[i]);
+ 		}
 +
- 	usbh_data = *data;
- 	platform_device_register(&at91_usbh_device);
- }
-diff --git a/arch/arm/mach-at91/at91rm9200_devices.c b/arch/arm/mach-at91/at91rm9200_devices.c
-index 7227755..b2202b6 100644
---- a/arch/arm/mach-at91/at91rm9200_devices.c
-+++ b/arch/arm/mach-at91/at91rm9200_devices.c
-@@ -63,6 +63,12 @@ void __init at91_add_device_usbh(struct at91_usbh_data *data)
- 	if (!data)
- 		return;
- 
-+	/* Enable overcurrent notification */
-+	for (i = 0; i < data->ports; i++) {
-+		if (data->overcurrent_pin[i])
-+			at91_set_gpio_input(data->overcurrent_pin[i], 1);
-+	}
-+
- 	usbh_data = *data;
- 	platform_device_register(&at91rm9200_usbh_device);
- }
-diff --git a/arch/arm/mach-at91/at91sam9260_devices.c b/arch/arm/mach-at91/at91sam9260_devices.c
-index 39f81f4..ad64fc3 100644
---- a/arch/arm/mach-at91/at91sam9260_devices.c
-+++ b/arch/arm/mach-at91/at91sam9260_devices.c
-@@ -64,6 +64,12 @@ void __init at91_add_device_usbh(struct at91_usbh_data *data)
- 	if (!data)
- 		return;
- 
-+	/* Enable overcurrent notification */
-+	for (i = 0; i < data->ports; i++) {
-+		if (data->overcurrent_pin[i])
-+			at91_set_gpio_input(data->overcurrent_pin[i], 1);
-+	}
-+
- 	usbh_data = *data;
- 	platform_device_register(&at91_usbh_device);
- }
-diff --git a/arch/arm/mach-at91/at91sam9261_devices.c b/arch/arm/mach-at91/at91sam9261_devices.c
-index 5004bf0..e394e86 100644
---- a/arch/arm/mach-at91/at91sam9261_devices.c
-+++ b/arch/arm/mach-at91/at91sam9261_devices.c
-@@ -67,6 +67,12 @@ void __init at91_add_device_usbh(struct at91_usbh_data *data)
- 	if (!data)
- 		return;
- 
-+	/* Enable overcurrent notification */
-+	for (i = 0; i < data->ports; i++) {
-+		if (data->overcurrent_pin[i])
-+			at91_set_gpio_input(data->overcurrent_pin[i], 1);
-+	}
-+
- 	usbh_data = *data;
- 	platform_device_register(&at91sam9261_usbh_device);
- }
-diff --git a/arch/arm/mach-at91/at91sam9263_devices.c b/arch/arm/mach-at91/at91sam9263_devices.c
-index a050f41..d4aef76 100644
---- a/arch/arm/mach-at91/at91sam9263_devices.c
-+++ b/arch/arm/mach-at91/at91sam9263_devices.c
-@@ -74,6 +74,12 @@ void __init at91_add_device_usbh(struct at91_usbh_data *data)
- 			at91_set_gpio_output(data->vbus_pin[i], 0);
++		for (i = 0; i < ARRAY_SIZE(pdata->overcurrent_pin); i++) {
++			if (pdata->overcurrent_pin[i] <= 0)
++				continue;
++			free_irq(gpio_to_irq(pdata->overcurrent_pin[i]), pdev);
++			gpio_free(pdata->overcurrent_pin[i]);
++		}
  	}
  
-+	/* Enable overcurrent notification */
-+	for (i = 0; i < data->ports; i++) {
-+		if (data->overcurrent_pin[i])
-+			at91_set_gpio_input(data->overcurrent_pin[i], 1);
-+	}
-+
- 	usbh_data = *data;
- 	platform_device_register(&at91_usbh_device);
- }
-diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
-index 600bffb..e4a9857 100644
---- a/arch/arm/mach-at91/at91sam9g45_devices.c
-+++ b/arch/arm/mach-at91/at91sam9g45_devices.c
-@@ -124,6 +124,12 @@ void __init at91_add_device_usbh_ohci(struct at91_usbh_data *data)
- 			at91_set_gpio_output(data->vbus_pin[i], 0);
- 	}
- 
-+	/* Enable overcurrent notification */
-+	for (i = 0; i < data->ports; i++) {
-+		if (data->overcurrent_pin[i])
-+			at91_set_gpio_input(data->overcurrent_pin[i], 1);
-+	}
-+
- 	usbh_ohci_data = *data;
- 	platform_device_register(&at91_usbh_ohci_device);
- }
+ 	device_init_wakeup(&pdev->dev, 0);
 -- 
 1.7.4.1
