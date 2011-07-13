@@ -1,115 +1,94 @@
 From: tixy@yxit.co.uk (Tixy)
-Date: Wed, 13 Jul 2011 10:06:07 +0100
-Subject: [PATCH 18/24] ARM: kprobes: Add emulate_rd12rm0_noflags_nopc()
+Date: Wed, 13 Jul 2011 10:06:08 +0100
+Subject: [PATCH 19/24] ARM: kprobes: Add
+	emulate_rdlo12rdhi16rn0rm8_rwflags_nopc()
 In-Reply-To: <1310547973-31784-1-git-send-email-tixy@yxit.co.uk>
 References: <1310547973-31784-1-git-send-email-tixy@yxit.co.uk>
-Message-ID: <1310547973-31784-19-git-send-email-tixy@yxit.co.uk>
+Message-ID: <1310547973-31784-20-git-send-email-tixy@yxit.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jon Medhurst <tixy@yxit.co.uk>
 
 This is the emulation function for the instruction format used by the
-ARM bit-field manipulation instructions.
-
-Various other instruction forms can also make use of this and it is used
-to replace use of prep_emulate_rd12{rm0}{_modify}
+ARM multiply long instructions. It replaces use of
+prep_emulate_rdhi16rdlo12rs8rm0_wflags().
 
 Signed-off-by: Jon Medhurst <tixy@yxit.co.uk>
 ---
- arch/arm/kernel/kprobes-arm.c |   41 ++++++++++++++++++++++++++++++++++-------
- 1 files changed, 34 insertions(+), 7 deletions(-)
+ arch/arm/kernel/kprobes-arm.c |   39 ++++++++++++++++++++++++++++++++++++---
+ 1 files changed, 36 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm/kernel/kprobes-arm.c b/arch/arm/kernel/kprobes-arm.c
-index 2131506..688101f 100644
+index 688101f..bb38ae3 100644
 --- a/arch/arm/kernel/kprobes-arm.c
 +++ b/arch/arm/kernel/kprobes-arm.c
-@@ -1013,6 +1013,26 @@ emulate_rd16rn12rm0rs8_rwflags_nopc(struct kprobe *p, struct pt_regs *regs)
- 	regs->ARM_cpsr = (regs->ARM_cpsr & ~APSR_MASK) | (cpsr & APSR_MASK);
+@@ -1033,6 +1033,36 @@ emulate_rd12rm0_noflags_nopc(struct kprobe *p, struct pt_regs *regs)
+ 	regs->uregs[rd] = rdv;
  }
  
 +static void __kprobes
-+emulate_rd12rm0_noflags_nopc(struct kprobe *p, struct pt_regs *regs)
++emulate_rdlo12rdhi16rn0rm8_rwflags_nopc(struct kprobe *p, struct pt_regs *regs)
 +{
 +	kprobe_opcode_t insn = p->opcode;
-+	int rd = (insn >> 12) & 0xf;
-+	int rm = insn & 0xf;
++	int rdlo = (insn >> 12) & 0xf;
++	int rdhi = (insn >> 16) & 0xf;
++	int rn = insn & 0xf;
++	int rm = (insn >> 8) & 0xf;
 +
-+	register unsigned long rdv asm("r0") = regs->uregs[rd];
-+	register unsigned long rmv asm("r3") = regs->uregs[rm];
++	register unsigned long rdlov asm("r0") = regs->uregs[rdlo];
++	register unsigned long rdhiv asm("r2") = regs->uregs[rdhi];
++	register unsigned long rnv asm("r3") = regs->uregs[rn];
++	register unsigned long rmv asm("r1") = regs->uregs[rm];
++	unsigned long cpsr = regs->ARM_cpsr;
 +
 +	__asm__ __volatile__ (
++		"msr	cpsr_fs, %[cpsr]	\n\t"
 +		BLX("%[fn]")
-+		: "=r" (rdv)
-+		: "0" (rdv), "r" (rmv), [fn] "r" (p->ainsn.insn_fn)
++		"mrs	%[cpsr], cpsr		\n\t"
++		: "=r" (rdlov), "=r" (rdhiv), [cpsr] "=r" (cpsr)
++		: "0" (rdlov), "1" (rdhiv), "r" (rnv), "r" (rmv),
++		  "2" (cpsr), [fn] "r" (p->ainsn.insn_fn)
 +		: "lr", "memory", "cc"
 +	);
 +
-+	regs->uregs[rd] = rdv;
++	regs->uregs[rdlo] = rdlov;
++	regs->uregs[rdhi] = rdhiv;
++	regs->ARM_cpsr = (regs->ARM_cpsr & ~APSR_MASK) | (cpsr & APSR_MASK);
 +}
 +
  /*
   * For the instruction masking and comparisons in all the "space_*"
   * functions below, Do _not_ rearrange the order of tests unless
-@@ -1068,7 +1088,8 @@ static const union decode_item arm_cccc_0001_0xx0____0xxx_table[] = {
- 						 REGS(0, 0, 0, 0, NOPC)),
+@@ -1111,7 +1141,8 @@ static const union decode_item arm_cccc_0001_0xx0____1xx0_table[] = {
+ 	/* Halfword multiply and multiply-accumulate			*/
  
- 	/* CLZ			cccc 0001 0110 xxxx xxxx xxxx 0001 xxxx */
--	DECODE_CUSTOM	(0x0ff000f0, 0x01600010, prep_emulate_rd12rm0),
-+	DECODE_EMULATEX	(0x0ff000f0, 0x01600010, emulate_rd12rm0_noflags_nopc,
-+						 REGS(0, NOPC, 0, 0, NOPC)),
+ 	/* SMLALxy		cccc 0001 0100 xxxx xxxx xxxx 1xx0 xxxx */
+-	DECODE_CUSTOM	(0x0ff00090, 0x01400080, prep_emulate_rdhi16rdlo12rs8rm0_wflags),
++	DECODE_EMULATEX	(0x0ff00090, 0x01400080, emulate_rdlo12rdhi16rn0rm8_rwflags_nopc,
++						 REGS(NOPC, NOPC, NOPC, 0, NOPC)),
  
- 	/* QADD			cccc 0001 0000 xxxx xxxx xxxx 0101 xxxx */
- 	/* QSUB			cccc 0001 0010 xxxx xxxx xxxx 0101 xxxx */
-@@ -1249,7 +1270,8 @@ static const union decode_item arm_cccc_001x_table[] = {
- 
- 	/* MOVW			cccc 0011 0000 xxxx xxxx xxxx xxxx xxxx */
- 	/* MOVT			cccc 0011 0100 xxxx xxxx xxxx xxxx xxxx */
--	DECODE_CUSTOM	(0x0fb00000, 0x03000000, prep_emulate_rd12_modify),
-+	DECODE_EMULATEX	(0x0fb00000, 0x03000000, emulate_rd12rm0_noflags_nopc,
-+						 REGS(0, NOPC, 0, 0, 0)),
- 
- 	/* YIELD		cccc 0011 0010 0000 xxxx xxxx 0000 0001 */
- 	DECODE_OR	(0x0fff00ff, 0x03200001),
-@@ -1314,7 +1336,8 @@ static const union decode_item arm_cccc_0110_____xxx1_table[] = {
- 	/* REV16		cccc 0110 1011 xxxx xxxx xxxx 1011 xxxx */
- 	/* RBIT			cccc 0110 1111 xxxx xxxx xxxx 0011 xxxx */
- 	/* REVSH		cccc 0110 1111 xxxx xxxx xxxx 1011 xxxx */
--	DECODE_CUSTOM	(0x0fb00070, 0x06b00030, prep_emulate_rd12rm0),
-+	DECODE_EMULATEX	(0x0fb00070, 0x06b00030, emulate_rd12rm0_noflags_nopc,
-+						 REGS(0, NOPC, 0, 0, NOPC)),
- 
- 	/* ???			cccc 0110 0x00 xxxx xxxx xxxx xxx1 xxxx */
- 	DECODE_REJECT	(0x0fb00010, 0x06000010),
-@@ -1376,7 +1399,8 @@ static const union decode_item arm_cccc_0110_____xxx1_table[] = {
- 	/* UXTB16		cccc 0110 1100 1111 xxxx xxxx 0111 xxxx */
- 	/* UXTB			cccc 0110 1110 1111 xxxx xxxx 0111 xxxx */
- 	/* UXTH			cccc 0110 1111 1111 xxxx xxxx 0111 xxxx */
--	DECODE_CUSTOM	(0x0f8f00f0, 0x068f0070, prep_emulate_rd12rm0),
-+	DECODE_EMULATEX	(0x0f8f00f0, 0x068f0070, emulate_rd12rm0_noflags_nopc,
-+						 REGS(0, NOPC, 0, 0, NOPC)),
- 
- 	/* SXTAB16		cccc 0110 1000 xxxx xxxx xxxx 0111 xxxx */
- 	/* SXTAB		cccc 0110 1010 xxxx xxxx xxxx 0111 xxxx */
-@@ -1424,13 +1448,16 @@ static const union decode_item arm_cccc_0111_____xxx1_table[] = {
- 
- 	/* SBFX			cccc 0111 101x xxxx xxxx xxxx x101 xxxx */
- 	/* UBFX			cccc 0111 111x xxxx xxxx xxxx x101 xxxx */
--	DECODE_CUSTOM	(0x0fa00070, 0x07a00050, prep_emulate_rd12rm0),
-+	DECODE_EMULATEX	(0x0fa00070, 0x07a00050, emulate_rd12rm0_noflags_nopc,
-+						 REGS(0, NOPC, 0, 0, NOPC)),
- 
- 	/* BFC			cccc 0111 110x xxxx xxxx xxxx x001 1111 */
--	DECODE_CUSTOM	(0x0fe0007f, 0x07c0001f, prep_emulate_rd12_modify),
-+	DECODE_EMULATEX	(0x0fe0007f, 0x07c0001f, emulate_rd12rm0_noflags_nopc,
-+						 REGS(0, NOPC, 0, 0, 0)),
- 
- 	/* BFI			cccc 0111 110x xxxx xxxx xxxx x001 xxxx */
--	DECODE_CUSTOM	(0x0fe00070, 0x07c00010, prep_emulate_rd12rn0_modify),
-+	DECODE_EMULATEX	(0x0fe00070, 0x07c00010, emulate_rd12rm0_noflags_nopc,
-+						 REGS(0, NOPC, 0, 0, NOPCX)),
+ 	/* SMULWy		cccc 0001 0010 xxxx xxxx xxxx 1x10 xxxx */
+ 	DECODE_OR	(0x0ff000b0, 0x012000a0),
+@@ -1153,7 +1184,8 @@ static const union decode_item arm_cccc_0000_____1001_table[] = {
+ 	/* SMULLS		cccc 0000 1101 xxxx xxxx xxxx 1001 xxxx */
+ 	/* SMLAL		cccc 0000 1110 xxxx xxxx xxxx 1001 xxxx */
+ 	/* SMLALS		cccc 0000 1111 xxxx xxxx xxxx 1001 xxxx */
+-	DECODE_CUSTOM	(0x0f8000f0, 0x00800090, prep_emulate_rdhi16rdlo12rs8rm0_wflags),
++	DECODE_EMULATEX	(0x0f8000f0, 0x00800090, emulate_rdlo12rdhi16rn0rm8_rwflags_nopc,
++						 REGS(NOPC, NOPC, NOPC, 0, NOPC)),
  
  	DECODE_END
  };
+@@ -1422,7 +1454,8 @@ static const union decode_item arm_cccc_0111_____xxx1_table[] = {
+ 
+ 	/* SMLALD		cccc 0111 0100 xxxx xxxx xxxx 00x1 xxxx */
+ 	/* SMLSLD		cccc 0111 0100 xxxx xxxx xxxx 01x1 xxxx */
+-	DECODE_CUSTOM	(0x0ff00090, 0x07400010, prep_emulate_rdhi16rdlo12rs8rm0_wflags),
++	DECODE_EMULATEX	(0x0ff00090, 0x07400010, emulate_rdlo12rdhi16rn0rm8_rwflags_nopc,
++						 REGS(NOPC, NOPC, NOPC, 0, NOPC)),
+ 
+ 	/* SMUAD		cccc 0111 0000 xxxx 1111 xxxx 00x1 xxxx */
+ 	/* SMUSD		cccc 0111 0000 xxxx 1111 xxxx 01x1 xxxx */
 -- 
 1.7.2.5
