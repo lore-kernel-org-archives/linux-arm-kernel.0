@@ -1,44 +1,44 @@
-From: jic23@cam.ac.uk (Jonathan Cameron)
-Date: Wed, 13 Jul 2011 15:54:56 +0100
-Subject: [PATCH 1/3] drivers:pcmcia:soc_common: make socket_init and
-	socket_suspend optional
-In-Reply-To: <1310568898-9201-1-git-send-email-jic23@cam.ac.uk>
-References: <1310568898-9201-1-git-send-email-jic23@cam.ac.uk>
-Message-ID: <1310568898-9201-2-git-send-email-jic23@cam.ac.uk>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Wed, 13 Jul 2011 17:01:02 +0200
+Subject: [PATCH V2 03/10] ASoc: mxs: add mxs-sgtl5000 machine driver
+In-Reply-To: <65EE16ACC360FA4D99C96DC085B3F7721CDD7B@039-SN1MPN1-002.039d.mgd.msft.net>
+References: <1310483085-31442-1-git-send-email-b29396@freescale.com>
+	<1310483085-31442-4-git-send-email-b29396@freescale.com>
+	<20110713115711.GG1928@pengutronix.de>
+	<65EE16ACC360FA4D99C96DC085B3F7721CDBAA@039-SN1MPN1-002.039d.mgd.msft.net>
+	<65EE16ACC360FA4D99C96DC085B3F7721CDC7C@039-SN1MPN1-002.039d.mgd.msft.net>
+	<20110713140038.GI1928@pengutronix.de>
+	<65EE16ACC360FA4D99C96DC085B3F7721CDD7B@039-SN1MPN1-002.039d.mgd.msft.net>
+Message-ID: <20110713150102.GK1928@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-10 boards define these empty, probably indicating not everyone has a use for them.
+On Wed, Jul 13, 2011 at 02:22:42PM +0000, Dong Aisheng-B29396 wrote:
+> > -----Original Message-----
+> > From: Wolfram Sang [mailto:w.sang at pengutronix.de]
+> > Sent: Wednesday, July 13, 2011 10:01 PM
+> > To: Dong Aisheng-B29396
+> > Cc: alsa-devel at alsa-project.org; s.hauer at pengutronix.de;
+> > broonie at opensource.wolfsonmicro.com; u.kleine-koenig at pengutronix.de;
+> > lrg at ti.com; linux-arm-kernel at lists.infradead.org
+> > Subject: Re: [PATCH V2 03/10] ASoc: mxs: add mxs-sgtl5000 machine driver
+> > 
+> > With your sgtl-patch, I can set the alsa-controls like volume. Yet the
+> > WAV played via simple aplay has a massive hall (like a concert at the
+> > other end of the cathedral ;)). 
+> 
+> You mean the sound is incorrect?
 
-Signed-off-by: Jonathan Cameron <jic23@cam.ac.uk>
----
- drivers/pcmcia/soc_common.c |    7 ++++---
- 1 files changed, 4 insertions(+), 3 deletions(-)
+It was, but is fixed now. There was something wrong in our audio-path
+electrically. Together with your DMA patch, music sounds fine now \o/
 
-diff --git a/drivers/pcmcia/soc_common.c b/drivers/pcmcia/soc_common.c
-index 768f957..a0a9c2a 100644
---- a/drivers/pcmcia/soc_common.c
-+++ b/drivers/pcmcia/soc_common.c
-@@ -186,8 +186,8 @@ static int soc_common_pcmcia_sock_init(struct pcmcia_socket *sock)
- 	struct soc_pcmcia_socket *skt = to_soc_pcmcia_socket(sock);
- 
- 	debug(skt, 2, "initializing socket\n");
--
--	skt->ops->socket_init(skt);
-+	if (skt->ops->socket_init)
-+		skt->ops->socket_init(skt);
- 	return 0;
- }
- 
-@@ -207,7 +207,8 @@ static int soc_common_pcmcia_suspend(struct pcmcia_socket *sock)
- 
- 	debug(skt, 2, "suspending socket\n");
- 
--	skt->ops->socket_suspend(skt);
-+	if (skt->ops->socket_suspend)
-+		skt->ops->socket_suspend(skt);
- 
- 	return 0;
- }
 -- 
-1.7.3.4
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110713/0525987a/attachment.sig>
