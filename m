@@ -1,157 +1,37 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 12 Jul 2011 20:00:11 -0500
-Subject: [PATCH] dmaengine: pl330: make platform data optional
-Message-ID: <1310518811-379-1-git-send-email-robherring2@gmail.com>
+From: B29396@freescale.com (Dong Aisheng-B29396)
+Date: Wed, 13 Jul 2011 03:02:07 +0000
+Subject: [PATCH V2 00/10] ARM: mxs: add audio support
+In-Reply-To: <20110712182233.GA16638@pengutronix.de>
+References: <1310483085-31442-1-git-send-email-b29396@freescale.com>
+	<20110712182233.GA16638@pengutronix.de>
+Message-ID: <65EE16ACC360FA4D99C96DC085B3F7721CD535@039-SN1MPN1-002.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+> -----Original Message-----
+> From: Wolfram Sang [mailto:w.sang at pengutronix.de]
+> Sent: Wednesday, July 13, 2011 2:23 AM
+> To: Dong Aisheng-B29396
+> Cc: alsa-devel at alsa-project.org; s.hauer at pengutronix.de;
+> broonie at opensource.wolfsonmicro.com; lrg at ti.com; linux-arm-
+> kernel at lists.infradead.org; u.kleine-koenig at pengutronix.de
+> Subject: Re: [PATCH V2 00/10]
+> 
+> On Tue, Jul 12, 2011 at 11:04:35PM +0800, Dong Aisheng wrote:
+> 
+> > This patch series is to add audio support based on saif for mxs
+> platform.
+> 
+> Seems like only 6 out of 10 patches made it to the lists? Pity, I was
+> looking forward to all of them :)
+Sorry for missed patches (our mail server may get problems).
+I will send missed ones out.
 
-The pl330 needs platform data for describing peripheral connections, but
-some platforms may only support memory to memory dma channels. In this
-case, we can probe for how many channels there are and don't need the
-platform data.
+> Isn't there someone at Freescale or Linaro who can give you developers
+> access to a git server? I think it would speed up development if
+> reviewers/testers could simply pull your branches.
+Not yet for a public git server.
+We will check internally with IT to see if we can build one.
 
-As memcpy requests don't need channel private data to hold peripheral
-info, allow private data to be NULL in this case.
-
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-Cc: Jassi Brar <jassi.brar@samsung.com>
-Cc: Vinod Koul <vinod.koul@intel.com>
-Cc: Dan Williams <dan.j.williams@intel.com>
----
- drivers/dma/pl330.c |   64 ++++++++++++++++++++++++++++----------------------
- 1 files changed, 36 insertions(+), 28 deletions(-)
-
-diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-index 7181e43..76fd403 100644
---- a/drivers/dma/pl330.c
-+++ b/drivers/dma/pl330.c
-@@ -82,7 +82,7 @@ struct dma_pl330_dmac {
- 	spinlock_t pool_lock;
- 
- 	/* Peripheral channels connected to this DMAC */
--	struct dma_pl330_chan peripherals[0]; /* keep at end */
-+	struct dma_pl330_chan *peripherals; /* keep at end */
- };
- 
- struct dma_pl330_desc {
-@@ -451,8 +451,13 @@ static struct dma_pl330_desc *pl330_get_desc(struct dma_pl330_chan *pch)
- 	desc->txd.cookie = 0;
- 	async_tx_ack(&desc->txd);
- 
--	desc->req.rqtype = peri->rqtype;
--	desc->req.peri = peri->peri_id;
-+	if (peri) {
-+		desc->req.rqtype = peri->rqtype;
-+		desc->req.peri = peri->peri_id;
-+	} else {
-+		desc->req.rqtype = MEMTOMEM;
-+		desc->req.peri = 0;
-+	}
- 
- 	dma_async_tx_descriptor_init(&desc->txd, &pch->chan);
- 
-@@ -529,10 +534,10 @@ pl330_prep_dma_memcpy(struct dma_chan *chan, dma_addr_t dst,
- 	struct pl330_info *pi;
- 	int burst;
- 
--	if (unlikely(!pch || !len || !peri))
-+	if (unlikely(!pch || !len))
- 		return NULL;
- 
--	if (peri->rqtype != MEMTOMEM)
-+	if (peri && peri->rqtype != MEMTOMEM)
- 		return NULL;
- 
- 	pi = &pch->dmac->pif;
-@@ -577,7 +582,7 @@ pl330_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
- 	int i, burst_size;
- 	dma_addr_t addr;
- 
--	if (unlikely(!pch || !sgl || !sg_len))
-+	if (unlikely(!pch || !sgl || !sg_len || !peri))
- 		return NULL;
- 
- 	/* Make sure the direction is consistent */
-@@ -666,17 +671,12 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
- 	struct dma_device *pd;
- 	struct resource *res;
- 	int i, ret, irq;
-+	int num_chan;
- 
- 	pdat = adev->dev.platform_data;
- 
--	if (!pdat || !pdat->nr_valid_peri) {
--		dev_err(&adev->dev, "platform data missing\n");
--		return -ENODEV;
--	}
--
- 	/* Allocate a new DMAC and its Channels */
--	pdmac = kzalloc(pdat->nr_valid_peri * sizeof(*pch)
--				+ sizeof(*pdmac), GFP_KERNEL);
-+	pdmac = kzalloc(sizeof(*pdmac), GFP_KERNEL);
- 	if (!pdmac) {
- 		dev_err(&adev->dev, "unable to allocate mem\n");
- 		return -ENOMEM;
-@@ -685,7 +685,7 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
- 	pi = &pdmac->pif;
- 	pi->dev = &adev->dev;
- 	pi->pl330_data = NULL;
--	pi->mcbufsz = pdat->mcbuf_sz;
-+	pi->mcbufsz = pdat ? pdat->mcbuf_sz : 0;
- 
- 	res = &adev->res;
- 	request_mem_region(res->start, resource_size(res), "dma-pl330");
-@@ -717,27 +717,35 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
- 	INIT_LIST_HEAD(&pd->channels);
- 
- 	/* Initialize channel parameters */
--	for (i = 0; i < pdat->nr_valid_peri; i++) {
--		struct dma_pl330_peri *peri = &pdat->peri[i];
--		pch = &pdmac->peripherals[i];
-+	num_chan = max(pdat->nr_valid_peri, (u8)pi->pcfg.num_chan);
-+	pdmac->peripherals = kzalloc(num_chan * sizeof(*pch), GFP_KERNEL);
- 
--		switch (peri->rqtype) {
--		case MEMTOMEM:
-+	for (i = 0; i < num_chan; i++) {
-+		pch = &pdmac->peripherals[i];
-+		if (pdat) {
-+			struct dma_pl330_peri *peri = &pdat->peri[i];
-+
-+			switch (peri->rqtype) {
-+			case MEMTOMEM:
-+				dma_cap_set(DMA_MEMCPY, pd->cap_mask);
-+				break;
-+			case MEMTODEV:
-+			case DEVTOMEM:
-+				dma_cap_set(DMA_SLAVE, pd->cap_mask);
-+				break;
-+			default:
-+				dev_err(&adev->dev, "DEVTODEV Not Supported\n");
-+				continue;
-+			}
-+			pch->chan.private = peri;
-+		} else {
- 			dma_cap_set(DMA_MEMCPY, pd->cap_mask);
--			break;
--		case MEMTODEV:
--		case DEVTOMEM:
--			dma_cap_set(DMA_SLAVE, pd->cap_mask);
--			break;
--		default:
--			dev_err(&adev->dev, "DEVTODEV Not Supported\n");
--			continue;
-+			pch->chan.private = NULL;
- 		}
- 
- 		INIT_LIST_HEAD(&pch->work_list);
- 		spin_lock_init(&pch->lock);
- 		pch->pl330_chid = NULL;
--		pch->chan.private = peri;
- 		pch->chan.device = pd;
- 		pch->chan.chan_id = i;
- 		pch->dmac = pdmac;
--- 
-1.7.4.1
+Regards
+Dong Aisheng
