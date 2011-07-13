@@ -1,71 +1,53 @@
 From: tixy@yxit.co.uk (Tixy)
-Date: Wed, 13 Jul 2011 10:06:06 +0100
-Subject: [PATCH 17/24] ARM: kprobes: Replace use of
-	prep_emulate_rd12rn16rm0_wflags()
+Date: Wed, 13 Jul 2011 10:06:11 +0100
+Subject: [PATCH 22/24] ARM: kprobes: Reject probing of unprivileged load and
+	store instructions
 In-Reply-To: <1310547973-31784-1-git-send-email-tixy@yxit.co.uk>
 References: <1310547973-31784-1-git-send-email-tixy@yxit.co.uk>
-Message-ID: <1310547973-31784-18-git-send-email-tixy@yxit.co.uk>
+Message-ID: <1310547973-31784-23-git-send-email-tixy@yxit.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jon Medhurst <tixy@yxit.co.uk>
 
-These can now use emulate_rd12rn16rm0_rwflags_nopc().
+These occur extremely rarely in the kernel and writing test cases for
+them is difficult.
 
 Signed-off-by: Jon Medhurst <tixy@yxit.co.uk>
 ---
- arch/arm/kernel/kprobes-arm.c |   15 ++++++++++-----
- 1 files changed, 10 insertions(+), 5 deletions(-)
+ arch/arm/kernel/kprobes-arm.c |   13 +++++++++++++
+ 1 files changed, 13 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/kernel/kprobes-arm.c b/arch/arm/kernel/kprobes-arm.c
-index d3b0506..2131506 100644
+index 1ee38ad..70e540b 100644
 --- a/arch/arm/kernel/kprobes-arm.c
 +++ b/arch/arm/kernel/kprobes-arm.c
-@@ -1074,7 +1074,8 @@ static const union decode_item arm_cccc_0001_0xx0____0xxx_table[] = {
- 	/* QSUB			cccc 0001 0010 xxxx xxxx xxxx 0101 xxxx */
- 	/* QDADD		cccc 0001 0100 xxxx xxxx xxxx 0101 xxxx */
- 	/* QDSUB		cccc 0001 0110 xxxx xxxx xxxx 0101 xxxx */
--	DECODE_CUSTOM	(0x0f9000f0, 0x01000050, prep_emulate_rd12rn16rm0_wflags),
-+	DECODE_EMULATEX	(0x0f9000f0, 0x01000050, emulate_rd12rn16rm0_rwflags_nopc,
-+						 REGS(NOPC, NOPC, 0, 0, NOPC)),
+@@ -1262,6 +1262,13 @@ static const union decode_item arm_cccc_0001_____1001_table[] = {
+ static const union decode_item arm_cccc_000x_____1xx1_table[] = {
+ 	/* Extra load/store instructions				*/
  
- 	/* BXJ			cccc 0001 0010 xxxx xxxx xxxx 0010 xxxx */
- 	/* MSR			cccc 0001 0x10 xxxx xxxx xxxx 0000 xxxx */
-@@ -1140,7 +1141,8 @@ static const union decode_item arm_cccc_0001_____1001_table[] = {
- 	/* Synchronization primitives					*/
++	/* STRHT		cccc 0000 xx10 xxxx xxxx xxxx 1011 xxxx */
++	/* ???			cccc 0000 xx10 xxxx xxxx xxxx 11x1 xxxx */
++	/* LDRHT		cccc 0000 xx11 xxxx xxxx xxxx 1011 xxxx */
++	/* LDRSBT		cccc 0000 xx11 xxxx xxxx xxxx 1101 xxxx */
++	/* LDRSHT		cccc 0000 xx11 xxxx xxxx xxxx 1111 xxxx */
++	DECODE_REJECT	(0x0f200090, 0x00200090),
++
+ 	/* LDRD/STRD lr,pc,{...	cccc 000x x0x0 xxxx 111x xxxx 1101 xxxx */
+ 	DECODE_REJECT	(0x0e10e0d0, 0x0000e0d0),
  
- 	/* SMP/SWPB		cccc 0001 0x00 xxxx xxxx xxxx 1001 xxxx */
--	DECODE_CUSTOM	(0x0fb000f0, 0x01000090, prep_emulate_rd12rn16rm0_wflags),
-+	DECODE_EMULATEX	(0x0fb000f0, 0x01000090, emulate_rd12rn16rm0_rwflags_nopc,
-+						 REGS(NOPC, NOPC, 0, 0, NOPC)),
+@@ -1564,6 +1571,12 @@ static const union decode_item arm_cccc_01xx_table[] = {
+ 	/* LDRB/STRB pc,[...]	cccc 01xx x0xx xxxx xxxx xxxx xxxx xxxx */
+ 	DECODE_REJECT	(0x0c40f000, 0x0440f000),
  
- 	/* LDREX/STREX{,D,B,H}	cccc 0001 1xxx xxxx xxxx xxxx 1001 xxxx */
- 	/* And unallocated instructions...				*/
-@@ -1356,11 +1358,13 @@ static const union decode_item arm_cccc_0110_____xxx1_table[] = {
- 	/* UHSUB16		cccc 0110 0111 xxxx xxxx xxxx 0111 xxxx */
- 	/* UHADD8		cccc 0110 0111 xxxx xxxx xxxx 1001 xxxx */
- 	/* UHSUB8		cccc 0110 0111 xxxx xxxx xxxx 1111 xxxx */
--	DECODE_CUSTOM	(0x0f800010, 0x06000010, prep_emulate_rd12rn16rm0_wflags),
-+	DECODE_EMULATEX	(0x0f800010, 0x06000010, emulate_rd12rn16rm0_rwflags_nopc,
-+						 REGS(NOPC, NOPC, 0, 0, NOPC)),
- 
- 	/* PKHBT		cccc 0110 1000 xxxx xxxx xxxx x001 xxxx */
- 	/* PKHTB		cccc 0110 1000 xxxx xxxx xxxx x101 xxxx */
--	DECODE_CUSTOM	(0x0ff00030, 0x06800010, prep_emulate_rd12rn16rm0_wflags),
-+	DECODE_EMULATEX	(0x0ff00030, 0x06800010, emulate_rd12rn16rm0_rwflags_nopc,
-+						 REGS(NOPC, NOPC, 0, 0, NOPC)),
- 
- 	/* ???			cccc 0110 1001 xxxx xxxx xxxx 0111 xxxx */
- 	/* ???			cccc 0110 1101 xxxx xxxx xxxx 0111 xxxx */
-@@ -1380,7 +1384,8 @@ static const union decode_item arm_cccc_0110_____xxx1_table[] = {
- 	/* UXTAB16		cccc 0110 1100 xxxx xxxx xxxx 0111 xxxx */
- 	/* UXTAB		cccc 0110 1110 xxxx xxxx xxxx 0111 xxxx */
- 	/* UXTAH		cccc 0110 1111 xxxx xxxx xxxx 0111 xxxx */
--	DECODE_CUSTOM	(0x0f8000f0, 0x06800070, prep_emulate_rd12rn16rm0_wflags),
-+	DECODE_EMULATEX	(0x0f8000f0, 0x06800070, emulate_rd12rn16rm0_rwflags_nopc,
-+						 REGS(NOPCX, NOPC, 0, 0, NOPC)),
- 
- 	DECODE_END
- };
++	/* STRT			cccc 01x0 x010 xxxx xxxx xxxx xxxx xxxx */
++	/* LDRT			cccc 01x0 x011 xxxx xxxx xxxx xxxx xxxx */
++	/* STRBT		cccc 01x0 x110 xxxx xxxx xxxx xxxx xxxx */
++	/* LDRBT		cccc 01x0 x111 xxxx xxxx xxxx xxxx xxxx */
++	DECODE_REJECT	(0x0d200000, 0x04200000),
++
+ 	/* STR (immediate)	cccc 010x x0x0 xxxx xxxx xxxx xxxx xxxx */
+ 	/* STRB (immediate)	cccc 010x x1x0 xxxx xxxx xxxx xxxx xxxx */
+ 	DECODE_EMULATEX	(0x0e100000, 0x04000000, emulate_str,
 -- 
 1.7.2.5
