@@ -1,35 +1,70 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Wed, 13 Jul 2011 11:36:26 -0400
-Subject: [PATCH V2 00/16] omap_hsmmc patches
-In-Reply-To: <CANOLnONWmYn4FpuF-UAKQR4rAA6LOgWdMfu2bMN46nna6rOxAw@mail.gmail.com>
-	(Grazvydas Ignotas's message of "Wed, 13 Jul 2011 13:48:08 +0300")
-References: <1304673255-31634-1-git-send-email-adrian.hunter@nokia.com>
-	<CANOLnONWmYn4FpuF-UAKQR4rAA6LOgWdMfu2bMN46nna6rOxAw@mail.gmail.com>
-Message-ID: <m2k4bm2nwl.fsf@bob.laptop.org>
+From: cbouatmailru@gmail.com (Anton Vorontsov)
+Date: Wed, 13 Jul 2011 19:52:12 +0400
+Subject: [PATCH v3 4/4] mmc: sdhci-esdhc-imx: add device tree probe support
+In-Reply-To: <20110706210518.GD5371@ponder.secretlab.ca>
+References: <1309970870-13336-1-git-send-email-shawn.guo@linaro.org>
+	<1309970870-13336-5-git-send-email-shawn.guo@linaro.org>
+	<20110706210518.GD5371@ponder.secretlab.ca>
+Message-ID: <20110713155212.GB7875@oksana.dev.rtsoft.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Wed, Jul 13 2011, Grazvydas Ignotas wrote:
-> it seems this series got lost in time, at least patches 01, 02, 03,
-> 04, 05, 06, 07, 08, 12 look like valid standalone fixes and
-> improvements to me, they don't touch other trees and still apply
-> cleanly, so would be good to have.
+On Wed, Jul 06, 2011 at 03:05:18PM -0600, Grant Likely wrote:
+> On Thu, Jul 07, 2011 at 12:47:50AM +0800, Shawn Guo wrote:
+> > The patch adds device tree probe support for sdhci-esdhc-imx driver.
+> > 
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > Cc: Wolfram Sang <w.sang@pengutronix.de>
+> > Cc: Chris Ball <cjb@laptop.org>
+> > Cc: Grant Likely <grant.likely@secretlab.ca>
+> 
+> Acked-by: Grant Likely <grant.likely@secretlab.ca>
+[...]
+> > +Optional properties:
+> > +- fsl,card-wired : Indicate the card is wired to host permanently
+> > +- fsl,cd-internal : Indicate to use controller internal card detection
+> > +- fsl,wp-internal : Indicate to use controller internal write protection
+> > +- cd-gpios : Specify GPIOs for card detection
+> > +- wp-gpios : Specify GPIOs for write protection
+[...]
+> > +	cd-gpios = <&gpio0 6 0>; /* GPIO1_6 */
+> > +	wp-gpios = <&gpio0 5 0>; /* GPIO1_5 */
 
-Yeah.  I didn't merge them because Tony still has unanswered comments on
-the OMAP side of the patches, and they're submitted as a single patchset.
+Is there any particular reason why we started using named GPIOs
+in the device tree? To me, that's quite drastic change... should
+we start using named regs and interrupts as well? Personally, I
+don't think that the idea is great, as now you don't know where
+to expect memory resources, interrupt resources and, eventually
+GPIO resources.
 
-I've applied {2, 3, 5, 6, 7, 8, 12} to mmc-next for 3.1 now.  1 doesn't
-apply because the function doesn't exist anymore.  4 doesn't apply
-because iclk doesn't exist anymore.
+Just a few disadvantages off the top of my head:
 
-If someone wants to look at rebasing the rest of these against mmc-next
-and resubmitting, I think that'd be useful.
+- You can't statically validate your device tree for correctness.
+  Today dtc checks #{address,size}-cells sanity for 'regs' and
+  'ranges';
+- You can't automatically convert named resources into 'struct
+  resource *', as we do for platform devices now;
+- Any pros for using named resources in the device tree? I don't
+  see any.
 
-Thanks,
+So, I suggest to at least discuss this stuff a little bit more
+before polluting device trees with dubious ideas.
 
-- Chris.
+p.s.
+
+As for this particular patch, I really don't see why we should
+use named GPIOs. For consistency, I'd suggest to reuse bindings
+from Documentation/devicetree/bindings/mmc/mmc-spi-slot.txt.
+
+Plus, fsl,cd-internal and fsl,wp-internal is not needed: either
+you specify GPIOs or not. That already signals whether driver
+should use internal detection (i.e. 'present' register) or
+external (i.e. GPIO).
+
+And also, why {cd,wp}-gpioS (plural)?
+
 -- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+Anton Vorontsov
+Email: cbouatmailru at gmail.com
