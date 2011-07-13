@@ -1,56 +1,25 @@
-From: scottwood@freescale.com (Scott Wood)
-Date: Wed, 13 Jul 2011 11:09:40 -0500
-Subject: [PATCH v3 4/4] mmc: sdhci-esdhc-imx: add device tree probe support
-In-Reply-To: <20110713155212.GB7875@oksana.dev.rtsoft.ru>
-References: <1309970870-13336-1-git-send-email-shawn.guo@linaro.org>
-	<1309970870-13336-5-git-send-email-shawn.guo@linaro.org>
-	<20110706210518.GD5371@ponder.secretlab.ca>
-	<20110713155212.GB7875@oksana.dev.rtsoft.ru>
-Message-ID: <20110713110940.460a7966@schlenkerla.am.freescale.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 13 Jul 2011 18:20:41 +0200
+Subject: [PATCH 2/3] mach-ux500: export System-on-Chip information via
+	sysfs
+In-Reply-To: <4E1DAC3E.4030804@linaro.org>
+References: <1310476090-9807-1-git-send-email-lee.jones@linaro.org>
+	<201107131542.37432.arnd@arndb.de> <4E1DAC3E.4030804@linaro.org>
+Message-ID: <201107131820.41183.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 13 Jul 2011 19:52:12 +0400
-Anton Vorontsov <cbouatmailru@gmail.com> wrote:
+On Wednesday 13 July 2011, Lee Jones wrote:
+> Does this have to be coded and submitted with this patch-set? Is there
+> any way we can accept this one and I'll take this reorganisation of
+> platform drivers as an action to be completed when I have some more
+> spare cycles?
 
-> On Wed, Jul 06, 2011 at 03:05:18PM -0600, Grant Likely wrote:
-> > On Thu, Jul 07, 2011 at 12:47:50AM +0800, Shawn Guo wrote:
-> > > +- cd-gpios : Specify GPIOs for card detection
-> > > +- wp-gpios : Specify GPIOs for write protection
-> [...]
-> > > +	cd-gpios = <&gpio0 6 0>; /* GPIO1_6 */
-> > > +	wp-gpios = <&gpio0 5 0>; /* GPIO1_5 */
-> 
-> Is there any particular reason why we started using named GPIOs
-> in the device tree? To me, that's quite drastic change... should
-> we start using named regs and interrupts as well? Personally, I
-> don't think that the idea is great, as now you don't know where
-> to expect memory resources, interrupt resources and, eventually
-> GPIO resources.
+I prefer to remain strict on this one. I don't mind the first
+patch getting in now, but I wouldn't want to set a precedent
+on incorrect usage of the soc nodes. Note that doing this right
+will become a lot easier once the platform has been converted
+into device tree probing, because that implies a hierarchical
+view of the devices by nature.
 
-Just check the binding, and you'll know. :-)
-
-It makes it easier to deal with cases where some resources are optional,
-especially when dealing with a binding for a family of devices that grows
-over time, and helps avoid resources being mismatched since order no longer
-matters.
-
-> Just a few disadvantages off the top of my head:
-> 
-> - You can't statically validate your device tree for correctness.
->   Today dtc checks #{address,size}-cells sanity for 'regs' and
->   'ranges';
-
-The vast majority of stuff in the device tree already cannot be checked in
-this manner, without adding binding knowledge to dtc.
-
-Perhaps it could check things that end in "-gpios", "-regs", etc., if we
-avoid adding new properties that match those patterns that aren't what they
-appear to be, and let dtc know about any existing cases.
-
-> - You can't automatically convert named resources into 'struct
->   resource *', as we do for platform devices now;
-
-So add named resource support to platform devices. :-)
-
--Scott
+	Arnd
