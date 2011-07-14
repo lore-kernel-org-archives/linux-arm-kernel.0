@@ -1,63 +1,60 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Thu, 14 Jul 2011 20:30:45 +0200 (CEST)
-Subject: CMOS camera interface on ARM
-In-Reply-To: <loom.20110714T130539-468@post.gmane.org>
-References: <loom.20110714T130539-468@post.gmane.org>
-Message-ID: <Pine.LNX.4.64.1107142029380.10688@axis700.grange>
+From: omar.ramirez@ti.com (Ramirez Luna, Omar)
+Date: Thu, 14 Jul 2011 13:32:38 -0500
+Subject: [Linaro-mm-sig] [RFC 2/2] ARM: initial proof-of-concept IOMMU mapper
+	for DMA-mapping
+Message-ID: <CAB-zwWhRQmv8euqN6jeJP=tXTQgGQ3buRJEf=4aPtTOBsh+Z2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 14 Jul 2011, GIGIN JOSE wrote:
+Hi Marek,
 
-> Hi, 
-> 
-> I am working on ARM9 based linux embedded system. I need to 
-> interface a CMOS camera on the SoC. The processor I use is 
-> samsung s3c2416, which does not have a camera interface. 
-> The linux version I use is 2.6.21
+> Add initial proof of concept implementation of DMA-mapping API for
+> devices that have IOMMU support. Right now only dma_alloc_coherent,
+> dma_free_coherent and dma_mmap_coherent functions are supported.
+>
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+...
+> diff --git a/arch/arm/include/asm/dma-iommu.h b/arch/arm/include/asm/dma-iommu.h
+> new file mode 100644
+> index 0000000..c246ff3
+> --- /dev/null
+> +++ b/arch/arm/include/asm/dma-iommu.h
+...
+> +int __init arm_iommu_assign_device(struct device *dev, dma_addr_t base, dma_addr_t size);
 
-You need to use the latest kernel.
+__init causes a panic if the iommu is assigned after boot.
 
-> 
-> With the standard resolutions(640*480) and fps
->  (~25 fps) configured on the camera, I am getting the 
-> clock rates as below:
-> Master clock: 24 MHz
-> Pixel Clock : 8MHz
-> HSYNC       : 20KHz
-> VSYNC       : 25Hz
-> 
-> The Bit Resolution I use is 8bpp. 
-> 
-> Using the regular interrupt lines (external interrupts),
->  will I be able to read the 8 bit camera data coming 
-> with each pixel ? Can I do this with regular IRQ interrupt
->  or should I configure my interrupts to be FIQ ? 
-> Is there any generic driver available for this 
-> kind of interface in linux.
+In OMAP3 the iommu driver controls isp and dsp address spaces, it is
+loaded until any of those 2 drivers is needed.
 
-See drivers/media/video/s5p-fimc/ for an example, as well as other drivers 
-under drivers/media/video/
+> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> index f8c6972..b6397c1 100644
+> --- a/arch/arm/mm/dma-mapping.c
+> +++ b/arch/arm/mm/dma-mapping.c
+...
+> +static void *arm_iommu_alloc_attrs(struct device *dev, size_t size,
+> + ? ? ? ? ? dma_addr_t *handle, gfp_t gfp, struct dma_attrs *attrs)
+> +{
+> + ? ? ? struct dma_iommu_mapping *mapping = dev->archdata.mapping;
+> + ? ? ? struct page **pages;
+> + ? ? ? void *addr = NULL;
+> + ? ? ? pgprot_t prot;
+> +
+> + ? ? ? if (dma_get_attr(DMA_ATTR_WRITE_COMBINE, attrs))
+> + ? ? ? ? ? ? ? prot = pgprot_writecombine(pgprot_kernel);
+> + ? ? ? else
+> + ? ? ? ? ? ? ? prot = pgprot_dmacoherent(pgprot_kernel);
+> +
+> + ? ? ? arm_iommu_init(dev);
 
-Thanks
-Guennadi
+I found useful to call arm_iommu_init inside arm_iommu_assign_device
+instead. So, then gen_pool is created only once without the
+mapping->pool check, instead of relying on the call to ...alloc_attrs,
+which in my case I never use because I'm implementing
+iommu_map|unmap_sg functions to see how it goes with the dma mapping.
 
-> What is the interrupt
->  latency if I configure the external interrupts in FIQ mode 
-> and IRQ mode ? 
-> 
-> 
-> Thank You
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Regards,
 
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+Omar
