@@ -1,40 +1,29 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Thu, 14 Jul 2011 11:09:47 -0700
-Subject: [PATCH] i2c: tegra: Use engineering names in DT compatible
-	property
-In-Reply-To: <CACxGe6tojgLSmHTxzGn3hZZVqiR_z6xbWrazYekm0TwQoWK5eA@mail.gmail.com>
-References: <1309897306-22953-1-git-send-email-swarren@nvidia.com>
-	<20110706053941.GE9978@ponder.secretlab.ca>
-	<74CDBE0F657A3D45AFBB94109FB122FF049E834757@HQMAIL01.nvidia.com>
-	<CACxGe6tojgLSmHTxzGn3hZZVqiR_z6xbWrazYekm0TwQoWK5eA@mail.gmail.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF049E834A2E@HQMAIL01.nvidia.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Thu, 14 Jul 2011 20:24:16 +0200
+Subject: [PATCH 07/15] pxa25x_udc: drop support for udc_command
+In-Reply-To: <CAMPhdO8vBhod0eWw7dtNSrJHjruoBCZG5KKOHLvJHe+2Y3+TSg@mail.gmail.com>
+References: <1309871321-11305-1-git-send-email-dbaryshkov@gmail.com>	<1309871321-11305-8-git-send-email-dbaryshkov@gmail.com>	<20110705134615.GJ2820@legolas.emea.dhcp.ti.com>	<20110708213428.GA31866@kroah.com>	<20110708215442.GG31978@legolas.emea.dhcp.ti.com>	<20110708220258.GA29651@suse.de>	<CALT56yPuQxY13eAOd9mm7q4A8g6j2mP3F=h-sMv=xwzYzhRQxg@mail.gmail.com>
+	<CAMPhdO8vBhod0eWw7dtNSrJHjruoBCZG5KKOHLvJHe+2Y3+TSg@mail.gmail.com>
+Message-ID: <4E1F3450.3050603@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Grant Likely wrote at Wednesday, July 13, 2011 5:34 PM:
-> On Thu, Jul 14, 2011 at 2:59 AM, Stephen Warren <swarren@nvidia.com> wrote:
-...
-> > I don't believe anyone ever sent a patch to Ben to add tegra_i2c_of_match
-> > to the driver; the OF support patch didn't include that part of the code.
-> > As such, Ben can't yet apply this to his tree. (Although I note this patch
-> > is in Grant's /arm and /test trees, which is probably good enough for now).
-> 
-> Hmmm, I thought it had been done.  It certainly is ready to go in.  Do
-> you want to put together a roll-up patch that includes all the
-> required changes and post it again? (although double check linux-next
-> first).
+On 07/14/2011 04:52 AM, Eric Miao wrote:
+> Well, I agree with Dmitry the whole patchset is not related to the GPIO
+> subsystem at all. The major cleanup is actually to the PXA machines,
+> and touches part of the pxa25x_udc driver. If some one Acks the USB
+> part, I can help take the remaining patches.
 
-When John Bonesio posted the patch to add DT support to i2c-tegra.c, the first
-version of the patch was missing the match table chunk. A few days later, an
-updated version was posted that added the missing chunk; see:
+Ok, I tested the patches for the pxa27x_udc and mioa701 parts.
+Therefore, as it is working, for patches 2, 13, and 15 (reduced to 
+pxa27x_udc), I give my :
+Acked-by: Robert Jarzmik <robert.jarzmik@free>
 
-http://groups.google.com/group/linux.kernel/browse_thread/thread/d2596e8dee819b0f/c8aa04183ea2331e?show_docid=c8aa04183ea2331e
+That leaves you with the pxa25x_udc, I'm afraid, but I don't maintain 
+that one. Is there an identified maintainer now, or at least someone 
+able to test it ?
 
-It looks like the first version of the patch has actually been applied to Ben's
-next-i2c branch rather than the updated version.
+Cheers.
 
-I guess it's simplest if I just post a patch that adds the missing chunk based
-on the latest next-i2c tree. I'll go do that.
-
--- 
-nvpublic
+--
+Robert
