@@ -1,216 +1,40 @@
-From: tgih.jun@samsung.com (Seungwon Jeon)
-Date: Thu, 14 Jul 2011 10:30:47 +0900
-Subject: [PATCH] ARM: EXYNOS4: Add platform device for dwmci driver.
-In-Reply-To: <CAH9JG2VpLBACx2Ym3G65=oAPqUtJO3CXbXsuQGJTmKaqML8ANw@mail.gmail.com>
-References: <1310541479-32252-1-git-send-email-tgih.jun@samsung.com>
-	<CAH9JG2VpLBACx2Ym3G65=oAPqUtJO3CXbXsuQGJTmKaqML8ANw@mail.gmail.com>
-Message-ID: <001c01cc41c5$ab942fc0$02bc8f40$%jun@samsung.com>
+From: ccross@google.com (Colin Cross)
+Date: Wed, 13 Jul 2011 18:43:13 -0700
+Subject: IRQCHIP_MASK_ON_SUSPEND and the gic
+Message-ID: <CAMbhsRS=Pu-VoLFZR162DEjTVsx_f8X0S5zX09c8bDnfDq4=Xg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Quick background:
+The gic is an interrupt controller commonly found in SMP ARM devices.
+It has no power management capabilities, and is turned off when the
+cpu is powered down in suspend.  In order to wake the device out of
+suspend, a second interrupt controller is placed in series with the
+gic, passing each interrupt through along with a mask.  If an unmasked
+interrupt is received at the secondary controller, and the cpu is
+powered down, a wakeup is triggered.
 
-Kyungmin Park wrote:
-> On Wed, Jul 13, 2011 at 4:17 PM, Seungwon Jeon <tgih.jun@samsung.com>
-> wrote:
-> > This patch add platform devices for Synopsys DesignWare Multimedia Card
-> > Interface driver.
-> >
-> > Signed-off-by: Seungwon Jeon <tgih.jun@samsung.com>
-> > ---
-> >  arch/arm/mach-exynos4/Kconfig             |    5 ++
-> >  arch/arm/mach-exynos4/Makefile            |    1 +
-> >  arch/arm/mach-exynos4/dev-dwmci.c         |   86
-> +++++++++++++++++++++++++++++
-> >  arch/arm/mach-exynos4/include/mach/irqs.h |    1 +
-> >  arch/arm/mach-exynos4/include/mach/map.h  |    1 +
-> >  arch/arm/plat-samsung/include/plat/devs.h |    1 +
-> >  6 files changed, 95 insertions(+), 0 deletions(-)
-> >  create mode 100644 arch/arm/mach-exynos4/dev-dwmci.c
-> >
-> > diff --git a/arch/arm/mach-exynos4/Kconfig b/arch/arm/mach-
-> exynos4/Kconfig
-> > index 5115b90..c82674a 100644
-> > --- a/arch/arm/mach-exynos4/Kconfig
-> > +++ b/arch/arm/mach-exynos4/Kconfig
-> > @@ -35,6 +35,11 @@ config EXYNOS4_DEV_SYSMMU
-> >        help
-> >          Common setup code for SYSTEM MMU in EXYNOS4
-> >
-> > +config EXYNOS4_DEV_DWMCI
-> > +       bool
-> > +       help
-> > +         Compile in platform device definitions for DWMCI
-> > +
-> >  config EXYNOS4_SETUP_I2C1
-> >        bool
-> >        help
-> > diff --git a/arch/arm/mach-exynos4/Makefile b/arch/arm/mach-
-> exynos4/Makefile
-> > index 60fe5ec..eeeaada 100644
-> > --- a/arch/arm/mach-exynos4/Makefile
-> > +++ b/arch/arm/mach-exynos4/Makefile
-> > @@ -43,6 +43,7 @@ obj-y                                 += dev-audio.o
-> >  obj-$(CONFIG_EXYNOS4_DEV_AHCI)         += dev-ahci.o
-> >  obj-$(CONFIG_EXYNOS4_DEV_PD)           += dev-pd.o
-> >  obj-$(CONFIG_EXYNOS4_DEV_SYSMMU)       += dev-sysmmu.o
-> > +obj-$(CONFIG_EXYNOS4_DEV_DWMCI)        += dev-dwmci.o
-> >
-> >  obj-$(CONFIG_EXYNOS4_SETUP_FIMC)       += setup-fimc.o
-> >  obj-$(CONFIG_EXYNOS4_SETUP_I2C1)       += setup-i2c1.o
-> > diff --git a/arch/arm/mach-exynos4/dev-dwmci.c b/arch/arm/mach-
-> exynos4/dev-dwmci.c
-> > new file mode 100644
-> > index 0000000..6b69707
-> > --- /dev/null
-> > +++ b/arch/arm/mach-exynos4/dev-dwmci.c
-> > @@ -0,0 +1,86 @@
-> > +/*
-> > + * linuxarch/arm/mach-exynos4/dev-dwmci.c
-> > + *
-> > + * Copyright (c) 2011 Samsung Electronics Co., Ltd.
-> > + *             http://www.samsung.com
-> > + *
-> > + * Platform device for Synopsys DesignWare Mobile Storage IP
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License as published by
-> > + * the Free Software Foundation; either version 2 of the License, or
-> > + * (at your option) any later version.
-> > + */
-> > +
-> > +#include <linux/kernel.h>
-> > +#include <linux/dma-mapping.h>
-> > +#include <linux/platform_device.h>
-> > +#include <linux/interrupt.h>
-> > +#include <linux/mmc/dw_mmc.h>
-> > +#include <linux/mmc/host.h>
-> > +#include <linux/io.h>
-> > +
-> > +#include <mach/map.h>
-> > +#include <mach/gpio.h>
-> > +
-> > +#include <plat/devs.h>
-> > +#include <plat/cpu.h>
-> > +#include <plat/gpio-cfg.h>
-> > +
-> > +static int exynos4_dwmci_init(u32 slot_id, irq_handler_t handler, void
-> *data);
-> > +static int exynos4_dwmci_get_ocr(u32 slot_id);
-> > +static int exynos4_dwmci_get_bus_wd(u32 slot_id);
-> No need to declare it at here.
-> Just put the exynos4_dwci_pdata at last.
+In order to keep the cpu from waking on masked interrupts during
+cpuidle, the secondary controller masks must be updated at the same
+time as the gic masks.  This is handled through the gic_arch_extn
+irqchip pointer that is filled out by each architecture.
 
-I'll apply your comment next.
-Thank you.
+During suspend, the same registers used by mask/unmask need to be
+programmed to have all wakeup interrupts unmasked, and all non-wakeup
+interrupts masked.  I believe the unmasking is already taken care of:
+every interrupt starts as unmasked, and is lazily masked only when an
+interrupt arrives while it is disabled.  When check_wakeup_irqs is
+called in suspend, every interrupt is guaranteed to be either
+unmasked, or masked and marked pending.  Pending wakeup irqs will
+abort suspend, so every wakeup interrupt is guaranteed to be unmasked
+after check_wakeup_irqs.
 
-> > +
-> > +static struct resource exynos4_dwmci_resource[] = {
-> > +       [0] = {
-> > +               .start = EXYNOS4_PA_DWMCI,
-> > +               .end   = EXYNOS4_PA_DWMCI + SZ_4K - 1,
-> > +               .flags = IORESOURCE_MEM,
-> > +       },
-> > +       [1] = {
-> > +               .start = IRQ_DWMCI,
-> > +               .end   = IRQ_DWMCI,
-> > +               .flags = IORESOURCE_IRQ,
-> > +       }
-> > +};
-> > +
-> > +static struct dw_mci_board exynos4_dwci_pdata = {
-> > +       .num_slots                      = 1,
-> > +       .quirks                         = DW_MCI_QUIRK_BROKEN_CARD_DETECTION,
-> > +       .bus_hz                         = 80*1000*1000,
-> Does it correct value?
-> > +       .detect_delay_ms        = 200,
-> > +       .init                           = exynos4_dwmci_init,
-> > +       .get_ocr                        = exynos4_dwmci_get_ocr,
-> > +       .get_bus_wd                     = exynos4_dwmci_get_bus_wd,
-> > +       .select_slot            = NULL,
-> > +};
-> > +
-> > +static u64 exynos4_dwmci_dmamask = DMA_BIT_MASK(32);
-> > +
-> > +struct platform_device exynos4_device_dwmci = {
-> > +       .name           = "dw_mmc",
-> > +       .id             = -1,
-> > +       .num_resources  = ARRAY_SIZE(exynos4_dwmci_resource),
-> > +       .resource       = exynos4_dwmci_resource,
-> > +       .dev            = {
-> > +               .dma_mask               = &exynos4_dwmci_dmamask,
-> > +               .coherent_dma_mask      = DMA_BIT_MASK(32),
-> > +               .platform_data  = &exynos4_dwci_pdata,
-> > +       },
-> > +};
-> > +
-> > +static int exynos4_dwmci_get_ocr(u32 slot_id)
-> > +{
-> > +       return MMC_VDD_32_33 | MMC_VDD_33_34;
-> > +}
-> > +
-> > +static int exynos4_dwmci_get_bus_wd(u32 slot_id)
-> > +{
-> > +       return 4;
-> It's platform dependent value. Please give also platform helper
-> function to setup at each platform.
+That leaves masking, which can easily be handled by setting the
+IRQCHIP_MASK_ON_SUSPEND flag on the gic irqchip (propagated from the
+gic_arch_extn irqchip).
 
-I think it is related with board dependency rather than platform.
-So, I prefer to adding board configuration option for decision of width.
-
-> > +}
-> > +
-> > +static int exynos4_dwmci_init(u32 slot_id, irq_handler_t handler, void
-> *data)
-> > +{
-> > +       return 0;
-> > +}
-> > +
-> > diff --git a/arch/arm/mach-exynos4/include/mach/irqs.h b/arch/arm/mach-
-> exynos4/include/mach/irqs.h
-> > index 5d03730..b720246 100644
-> > --- a/arch/arm/mach-exynos4/include/mach/irqs.h
-> > +++ b/arch/arm/mach-exynos4/include/mach/irqs.h
-> > @@ -107,6 +107,7 @@
-> >  #define IRQ_HSMMC1             COMBINER_IRQ(29, 1)
-> >  #define IRQ_HSMMC2             COMBINER_IRQ(29, 2)
-> >  #define IRQ_HSMMC3             COMBINER_IRQ(29, 3)
-> > +#define IRQ_DWMCI              COMBINER_IRQ(29, 4)
-> >
-> >  #define IRQ_MIPI_CSIS0         COMBINER_IRQ(30, 0)
-> >  #define IRQ_MIPI_CSIS1         COMBINER_IRQ(30, 1)
-> > diff --git a/arch/arm/mach-exynos4/include/mach/map.h b/arch/arm/mach-
-> exynos4/include/mach/map.h
-> > index 0009e77..352e500 100644
-> > --- a/arch/arm/mach-exynos4/include/mach/map.h
-> > +++ b/arch/arm/mach-exynos4/include/mach/map.h
-> > @@ -94,6 +94,7 @@
-> >  #define EXYNOS4_PA_MIPI_CSIS1          0x11890000
-> >
-> >  #define EXYNOS4_PA_HSMMC(x)            (0x12510000 + ((x) * 0x10000))
-> > +#define EXYNOS4_PA_DWMCI               0x12550000
-> >
-> >  #define EXYNOS4_PA_SATA                        0x12560000
-> >  #define EXYNOS4_PA_SATAPHY             0x125D0000
-> > diff --git a/arch/arm/plat-samsung/include/plat/devs.h b/arch/arm/plat-
-> samsung/include/plat/devs.h
-> > index e3b31c2..29fa1cf 100644
-> > --- a/arch/arm/plat-samsung/include/plat/devs.h
-> > +++ b/arch/arm/plat-samsung/include/plat/devs.h
-> > @@ -112,6 +112,7 @@ extern struct platform_device exynos4_device_i2s2;
-> >  extern struct platform_device exynos4_device_spdif;
-> >  extern struct platform_device exynos4_device_pd[];
-> >  extern struct platform_device exynos4_device_ahci;
-> > +extern struct platform_device exynos4_device_dwmci;
-> >
-> >  extern struct platform_device s5p6440_device_pcm;
-> >  extern struct platform_device s5p6440_device_iis;
-> > --
-> > 1.7.2.3
-> >
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-samsung-
-> soc" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> >
+So, finally, my question: there is nothing for each secondary
+interrupt controller driver to do in a set_wake handler, but if its
+not implemented, enable_irq_wake will return an error.  Is there any
+way to avoid implementing an empty set_wake handler?  Should the
+missing handler not be an error if IRQCHIP_MASK_ON_SUSPEND is set?
