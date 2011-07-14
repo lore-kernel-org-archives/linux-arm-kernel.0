@@ -1,29 +1,63 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 14 Jul 2011 08:34:53 +0100
-Subject: [PATCH] ARM: move memory layout sanity checking before meminfo
-	initialization
-In-Reply-To: <CAMbhsRRQ9D+VXTZP3vB7egkROEtN9-FxssFa2EcxuqB3F-Uv6Q@mail.gmail.com>
-References: <20110705185758.GI8286@n2100.arm.linux.org.uk>
-	<CAMbhsRRQ9D+VXTZP3vB7egkROEtN9-FxssFa2EcxuqB3F-Uv6Q@mail.gmail.com>
-Message-ID: <20110714073453.GK23270@n2100.arm.linux.org.uk>
+From: ajaykumar.rs@samsung.com (Ajay Kumar)
+Date: Thu, 14 Jul 2011 09:27:10 -0400
+Subject: [PATCH 0/6] ARM: S5P64X0: Add Framebuffer support
+Message-ID: <1310650036-28836-1-git-send-email-ajaykumar.rs@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 13, 2011 at 11:52:21PM -0700, Colin Cross wrote:
-> On Tue, Jul 5, 2011 at 11:57 AM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > Ensure that the meminfo array is sanity checked before we pass the
-> > memory to memblock. ?This helps to ensure that memblock and meminfo
-> > agree on the dimensions of memory, especially when more memory is
-> > passed than the kernel can deal with.
-> >
-> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> 
-> This patch causes a regression in v3.0-rc7 when overlapping mem=
-> options are passed to the kernel.  On an OMAP4 board, I was
-> accidentally using "mem=512M mem=920M" on the command line, which
-> works fine in v3.0-rc6.
+	The patches are created against "for-next" branch of Kukjin Kim's tree at:
+	git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
 
-I don't regard that as a regression.  That's something which hasn't
-been supported before the move to memblock, and it's not something
-that was not intended to be supported.
+	Patch [1/6]
+	-- add "s5p64x0-fb" type driver_data(s3c_fb_driverdata).
+	-- Display controller in S5P64X0 supports 3 windows.
+
+	Patch [2/6]
+	-- Resource definitions(_MEM, _IRQ).
+
+	Patch [3/6]
+	-- Set s3c_device_fb name as "s5p64x0-fb"
+	   for S5P6440 and S5P6450.
+
+	Patch [4/6]
+	-- GPIO settings for LCD in S5P6440 and S5P6450.
+	-- Select LCD interface type (RGB/i80)
+
+	Patch [5/6]
+	-- Add support for LCD-LTE480 platform device in SMDK6440.
+	-- Platform data for FB and a basic window definition.
+	-- Enables FB support and platform-lcd support.
+	-- Add support for window 0 with 24 BPP.
+
+	Patch [6/6]
+	-- Add support for LCD-LTE480 platform device in SMDK6450.
+	-- Platform data for FB and a basic window definition.
+	-- Enables FB support and platform-lcd support.
+	-- Add support for window 0 with 24 BPP.
+
+ o To Paul Mundt, Jingoo Han
+   [Patch 1/6] video: s3c-fb: Add S5P64X0 specific s3c_fb_driverdata
+
+ o To Kukjin Kim
+   [Patch 2/6] ARM: S5P64X0: Add register base and IRQ for Framebuffer
+   [Patch 3/6] ARM: S5P64X0: Set s3c_device_fb name
+   [Patch 4/6] ARM: S5P64X0: Add GPIO and SPCON settings for LCD
+   [Patch 5/6] ARM: S5P6440: Add LCD-LTE480 and enable Framebuffer support
+   [Patch 6/6] ARM: S5P6450: Add LCD-LTE480 and enable Framebuffer support
+
+
+ arch/arm/mach-s5p64x0/Kconfig                  |   10 ++++
+ arch/arm/mach-s5p64x0/Makefile                 |    1 +
+ arch/arm/mach-s5p64x0/cpu.c                    |    3 +
+ arch/arm/mach-s5p64x0/include/mach/irqs.h      |    4 ++
+ arch/arm/mach-s5p64x0/include/mach/map.h       |    3 +
+ arch/arm/mach-s5p64x0/include/mach/regs-fb.h   |   19 +++++++
+ arch/arm/mach-s5p64x0/include/mach/regs-gpio.h |    4 ++
+ arch/arm/mach-s5p64x0/mach-smdk6440.c          |   63 +++++++++++++++++++++++
+ arch/arm/mach-s5p64x0/mach-smdk6450.c          |   63 +++++++++++++++++++++++
+ arch/arm/mach-s5p64x0/setup-fb.c               |   48 ++++++++++++++++++
+ arch/arm/plat-samsung/include/plat/fb.h        |   14 +++++
+ drivers/video/s3c-fb.c                         |   64 ++++++++++++++++++++++++
+ 12 files changed, 296 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-s5p64x0/include/mach/regs-fb.h
+ create mode 100644 arch/arm/mach-s5p64x0/setup-fb.c
