@@ -1,75 +1,44 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Thu, 14 Jul 2011 16:17:37 +0200
-Subject: [PATCH V2 10/10] ARM: mxs-dma: include <linux/dmaengine.h>
-In-Reply-To: <1310528454-25178-1-git-send-email-b29396@freescale.com>
-References: <1310483085-31442-1-git-send-email-b29396@freescale.com>
-	<1310528454-25178-1-git-send-email-b29396@freescale.com>
-Message-ID: <20110714141737.GE1904@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 14 Jul 2011 17:22:19 +0200
+Subject: [PATCH v3 0/6] ARM: make mach/hardware.h optional
+In-Reply-To: <1310489612-8625-1-git-send-email-robherring2@gmail.com>
+References: <1310489612-8625-1-git-send-email-robherring2@gmail.com>
+Message-ID: <201107141722.19407.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 13, 2011 at 11:40:54AM +0800, Dong Aisheng wrote:
-> Other files using dma.h may fail to compile as follows:
-> In file included from sound/soc/mxs/mxs-pcm.h:22,
->                  from sound/soc/mxs/mxs-saif.h:112,
->                  from sound/soc/mxs/mxs-sgtl5000.c:34:
-> arch/arm/mach-mxs/include/mach/dma.h:16: warning: 'struct dma_chan' declared inside parameter list
-> arch/arm/mach-mxs/include/mach/dma.h:16: warning: its scope is only this definition or declaration, which is probably not what you want
-> arch/arm/mach-mxs/include/mach/dma.h: In function 'mxs_dma_is_apbh':
-> arch/arm/mach-mxs/include/mach/dma.h:18: error: dereferencing pointer to incomplete type
-> arch/arm/mach-mxs/include/mach/dma.h: At top level:
-> arch/arm/mach-mxs/include/mach/dma.h:21: warning: 'struct dma_chan' declared inside parameter list
-> arch/arm/mach-mxs/include/mach/dma.h: In function 'mxs_dma_is_apbx':
-> arch/arm/mach-mxs/include/mach/dma.h:23: error: dereferencing pointer to incomplete type
-> make[3]: *** [sound/soc/mxs/mxs-sgtl5000.o] Error 1
-> make[2]: *** [sound/soc/mxs] Error 2
-> make[1]: *** [sound/soc] Error 2
-> make: *** [sound] Error 2
+On Tuesday 12 July 2011, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
 > 
-> It seems it's better for dma.h to include dmaengine.h himself.
+> Currently, all ARM platforms must have a mach/hardware.h include. This is
+> because it is ultimately included by linux/pci.h which is included in many
+> places even for !CONFIG_PCI.
 > 
-> Signed-off-by: Dong Aisheng <b29396@freescale.com>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
+> This could be fixed simply with an ifdef around the include of mach/hardware.h
+> in asm/pci.h. However, in the interest of fixing this for single kernel
+> binary builds, this series removes the include of mach/hardware.h outside of
+> mach-* and plat-*. What's used from hardware.h is a couple of PCI defines. 
+> Converting them to variables allows each platform to set the values as needed.
+> 
+> This does not address the inclusion of mach/hardware.h under drivers/*. This
+> appears to be mostly older platforms. There could also be some indirect
+> inclusions from other mach/* headers.
+> 
+> I've compile tested on most affected ARM platforms. 
+> 
+> Changes from v2:
+> - Incorporated compile fixes for microblaze from Michal Simek.
+> - Added conversion of powerpc to generic pci flag functions.
+> - Combined powerpc and microblaze conversion to use 
+>   asm-generic/pci-bridge.h into one commit. Renaming of powerpc pci
+>   flags functions is separate commit.
+> - Changed defaults for PCIBIOS_MIN_IO and PCIBIOS_MIN_MEM to 0x1000 and
+>   0x1000000, respectively.
+> - Dropped commit moving ARCH_HAS_DMA_SET_COHERENT_MASK defines into 
+>   memory.h. This conflicts with other clean-up work by Nicolas Pitre.
 
-Acked-by: Wolfram Sang <w.sang@pengutronix.de>
+Looks good to me, I'll apply it as soon as I hear back from Russell.
 
-Sascha, maybe we can pick this one up already?
+Russell, do you have an opinion on the changes to arch/arm/{include,lib} ?
 
-> ---
->  arch/arm/mach-mxs/include/mach/dma.h |    2 ++
->  1 files changed, 2 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mxs/include/mach/dma.h b/arch/arm/mach-mxs/include/mach/dma.h
-> index 7f4aeea..203d7c4 100644
-> --- a/arch/arm/mach-mxs/include/mach/dma.h
-> +++ b/arch/arm/mach-mxs/include/mach/dma.h
-> @@ -9,6 +9,8 @@
->  #ifndef __MACH_MXS_DMA_H__
->  #define __MACH_MXS_DMA_H__
->  
-> +#include <linux/dmaengine.h>
-> +
->  struct mxs_dma_data {
->  	int chan_irq;
->  };
-> -- 
-> 1.7.0.4
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110714/48758e02/attachment.sig>
+	Arnd
