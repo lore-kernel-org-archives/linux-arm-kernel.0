@@ -1,67 +1,37 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Thu, 14 Jul 2011 13:34:48 +0200
-Subject: [PATCH v3] new helper to define common struct resource constructs
-In-Reply-To: <1310631065-4271-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <20110713141849.b8cbf675.akpm@linux-foundation.org>
-	<1310631065-4271-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <19998.54360.684936.674009@ipc1.ka-ro>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 14 Jul 2011 12:36:25 +0100
+Subject: [PATCH 1/1 V2] Add Thread Support for the Context ID Register
+	of ARM v6 & v7 Architectures
+In-Reply-To: <4E1ECDD4.1020800@st.com>
+References: <cover.1310544641.git.wolfgang.betz@st.com>
+	<a4ef7565bd6013f56c5c10071bd36739c59768b7.1310544641.git.wolfgang.betz@st.com>
+	<20110714100254.GA20903@e102144-lin.cambridge.arm.com>
+	<4E1ECDD4.1020800@st.com>
+Message-ID: <20110714113625.GB20903@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Jul 14, 2011 at 12:07:00PM +0100, Wolfgang BETZ wrote:
+> Ciao Will,
 
-Uwe Kleine-K?nig writes:
-> resource definitions that just define start, end and flags =
-> IORESOURCE_MEM or IORESOURCE_IRQ (with start=end) are quite common. So
-> introduce a shortcut for them. For completeness add macros for
-> IORESOURCE_DMA and IORESOURCE_IO, too and also make available a set of
-> macros to specify named resources of all types which are less common.
-> 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> ---
-> changes since v2:
-> - add parentheses around macro parameter usages
-> 
-> changes since v1:                                                               
-> - also add _IO and _DMA variants                                                
-> 
->  include/linux/ioport.h |   30 ++++++++++++++++++++++++++++++
->  1 files changed, 30 insertions(+), 0 deletions(-)
-> 
-> diff --git a/include/linux/ioport.h b/include/linux/ioport.h
-> index 63eb429..9d57a71 100644
-> --- a/include/linux/ioport.h
-> +++ b/include/linux/ioport.h
-> @@ -109,6 +109,36 @@ struct resource_list {
->  /* PCI control bits.  Shares IORESOURCE_BITS with above PCI ROM.  */
->  #define IORESOURCE_PCI_FIXED		(1<<4)	/* Do not move resource */
->  
-> +
-> +/* helpers to define resources */
-> +#define DEFINE_RES_NAMED(_start, _size, _name, _flags)			\
-> +	{								\
-> +		.start = (_start),					\
-> +		.end = (_start) + (_size) - 1,				\
-> +		.name = (_name),					\
-> +		.flags = (_flags),					\
-> +	}
-> +
-> +#define DEFINE_RES_IO_NAMED(_start, _size, _name)			\
-> +	DEFINE_RES_NAMED((_start), (_size), (_name), IORESOURCE_IO)
->
-There is no need for parens around a macro argument when it is not
-part of an expression...
-This just looks silly.
+Hello,
 
+> maybe there is a basic misunderstanding: do we speak about the actual CONTEXTID
+> register or the data structures in the Linux kernel which represents this
+> register?
 
-Lothar Wa?mann
--- 
-___________________________________________________________
+Sorry, I didn't see that you'd changed the context ID writes so that they
+write the masked value. I also looked to see if there's a handy thread ID
+register you can use instead but there isn't (TPIDRRO is used for the TLS).
 
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+Looking again at the structure of your code (FrankH has already pointed out
+a lot of the implementation issues), perhaps this would be better off as a
+(configurable) thread notifier which reads the context ID, sets the upper
+bits (taking care to preserve the ASID) and writes it back.
 
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+This is far less invasive, is easy to enable/disable and is also easy to
+implement for future cores without requiring changes to older CPUs.
+
+Would that work?
+
+Will
