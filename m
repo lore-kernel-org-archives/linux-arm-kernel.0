@@ -1,36 +1,27 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 14 Jul 2011 00:27:08 -0700
-Subject: [PATCH 1/3] ARM: OMAP4: Add pcm049 to Kconfig/Makefile
-In-Reply-To: <20110708115842.GJ4820@legolas.emea.dhcp.ti.com>
-References: <1310119464-3514-1-git-send-email-j.weitzel@phytec.de>
-	<1310119464-3514-2-git-send-email-j.weitzel@phytec.de>
-	<4E16EECF.7030102@mvista.com> <20110708115521.GA5783@atomide.com>
-	<20110708115842.GJ4820@legolas.emea.dhcp.ti.com>
-Message-ID: <20110714072708.GK5783@atomide.com>
+Date: Thu, 14 Jul 2011 00:34:45 -0700
+Subject: [PATCH] ARM: OMAP4: PCM049: remove vusim regulator
+In-Reply-To: <1310561772.18446.14.camel@lws-weitzel>
+References: <1310554738.18446.12.camel@lws-weitzel>
+	<1310554762-10743-1-git-send-email-j.weitzel@phytec.de>
+	<4E1D8BCD.5060901@ru.mvista.com>
+	<1310561772.18446.14.camel@lws-weitzel>
+Message-ID: <20110714073445.GL5783@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Felipe Balbi <balbi@ti.com> [110708 04:53]:
+* Jan Weitzel <J.Weitzel@phytec.de> [110713 05:51]:
+> Am Mittwoch, den 13.07.2011, 16:13 +0400 schrieb Sergei Shtylyov:
 > 
-> Are you or are you not taking now board files ? We have one which was
-> left out due to a comment from Russell stating that no new board-files
-> would be accepted until the move to device tree was completed [1]
+> > 
+> >     Have you added that 'i' at the end intentionally?
+> > 
+> Thank you. It was a tribute to vim.
 
-Well looking at the cumulative diffstats, adding these board files
-with about total of 1000 lines of addition would push our diffstat to
-positive side. And that's not a good sign of code coalescing.
+:i)
 
-So I'll carry the board files in testing-board until we have device tree
-working and won't need those.
-
-Alternatively if somebody combines beagle variants to use board-beagle-common.c
-and board-panda-common.c then adding new boards would have minimal impact
-and would probably make device tree conversion of these boards easier
-too.
-
-Regards,
+I'll fold the fixed patch into your original patch. Will also
+keep the new board files in testing-board because of the code
+coalescing and device tree conversion effort.
 
 Tony
-
- 
-> [1] http://marc.info/?t=130199607500006&r=1&w=2
