@@ -1,73 +1,32 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Thu, 14 Jul 2011 10:25:42 -0700
-Subject: [PATCH 2/3] mach-ux500: export System-on-Chip information via
-	sysfs
-In-Reply-To: <201107132251.48606.arnd@arndb.de>
-References: <1310476090-9807-1-git-send-email-lee.jones@linaro.org>	<4E1DCA83.7010204@codeaurora.org>
-	<20110713203226.GA23055@suse.de> <201107132251.48606.arnd@arndb.de>
-Message-ID: <4E1F2696.3010608@codeaurora.org>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Thu, 14 Jul 2011 21:52:02 +0400
+Subject: [PATCH v2] mtd: dataflash: add device tree probe support
+In-Reply-To: <1310658757-17018-1-git-send-email-shawn.guo@linaro.org>
+References: <1310283313-32087-1-git-send-email-shawn.guo@linaro.org>
+	<1310658757-17018-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20110714175013.GA17845@belfalas.ww600.siemens.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/13/2011 01:51 PM, Arnd Bergmann wrote:
-> On Wednesday 13 July 2011 22:32:26 Greg KH wrote:
->> On Wed, Jul 13, 2011 at 09:40:35AM -0700, Saravana Kannan wrote:
->>> On 07/13/2011 12:55 AM, Lee Jones wrote:
->>>> On 12/07/11 17:29, Saravana Kannan wrote:
->>>> I initially had it all as part of soc_device_register, but Arnd told me
->>>> to remove it in this patch-set.
->>>>
->>>> See here:
->>>>
->>>> On 17/04/11 19:36, Arnd Bergmann wrote:
->>>>> For the nonstandard attributes, I would recommend having the individual
->>>>> drivers call device_create_file, in order to discourage the use of
->>>>> device specific attribute names.
->>>
->>> Arnd,
->>>
->>> I don't think forcing individual driver to call device_create_file()
->>> is really going to be much of a discouragement.
->>
->> Yes it is as calling that is broken and wrong and userspace will race
->> with the kernel and bad things will happen on the wrong phase of the
->> moon.
->>
->> But again, I never saw the original series to explain why...
+On Thu, Jul 14, 2011 at 11:52:37PM +0800, Shawn Guo wrote:
+> It adds device tree probe support for mtd_dataflash driver.
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Cc: David Woodhouse <dwmw2@infradead.org>
+> Cc: Artem Bityutskiy <Artem.Bityutskiy@nokia.com>
+> ---
+> Changes since v1:
+>  * Add "atmel,at45xxx" into the match table
+>  * Add binding document
 
-Greg,
+I?m sorry for being unclean on this. Device family is just at45,
+so I?d suggest the following compatibility list:
+"atmel,at45d789000", "atmel,at45"
 
-Your wording was a bit confusing for me (sorry), but it appears that you 
-are disagreeing with me. Assuming that to be the case, how will moving a 
-couple of lines of code (calls to device_create_file()) from a caller 
-function A into caller function B make any functional difference if the 
-order of the calls are maintained? The calls to device_create_file() 
-will still be done as part of the same call flow/execution flow. I'm 
-just asking for code refactoring to avoid repeating the code multiple times.
-
-Thanks,
-Saravana
-
-> This is about attributes to the main device that acts as a parent for all
-> devices on the SoC, so there is no user space at the time.
->
-> IIRC, the original patch was documenting a set of standard attributes and
-> letting the SoC specific driver pass a set of static attributes in the
-> hope that they do whatever is documented.
->
-> In one of my review comments, I asked this to be changed to pass a data
-> structure with the actual contents of those attributes and to make
-> the implementation common to the soc independent code, in order to
-> reduce the amount of code needed in each soc implementation, to enforce
-> consistent behavior, and to make it more obvious (and painful) when an
-> soc implementation adds a nonstandard attribute.
->
-> It seems the final outcome was to have a data structure of function
-> pointers to get the attribute contents, which is less nice but still
-> acceptable IMHO.
->
-> 	Arnd
+You might want to add "atmel,dataflash" or "mtd,dataflash", but I see
+no point in that.
 
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+With best wishes
+Dmitry
