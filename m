@@ -1,35 +1,69 @@
-From: ccross@google.com (Colin Cross)
-Date: Thu, 14 Jul 2011 00:58:41 -0700
-Subject: [PATCH] ARM: move memory layout sanity checking before meminfo
-	initialization
-In-Reply-To: <20110714073453.GK23270@n2100.arm.linux.org.uk>
-References: <20110705185758.GI8286@n2100.arm.linux.org.uk>
-	<CAMbhsRRQ9D+VXTZP3vB7egkROEtN9-FxssFa2EcxuqB3F-Uv6Q@mail.gmail.com>
-	<20110714073453.GK23270@n2100.arm.linux.org.uk>
-Message-ID: <CAMbhsRT=NNYUYyYZXpz2=PpBXoBGANQHPgOkCE1oZ8XzHKN4og@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Thu, 14 Jul 2011 10:11:05 +0200
+Subject: [PATCH v3] new helper to define common struct resource constructs
+In-Reply-To: <20110713141849.b8cbf675.akpm@linux-foundation.org>
+References: <20110713141849.b8cbf675.akpm@linux-foundation.org>
+Message-ID: <1310631065-4271-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 14, 2011 at 12:34 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, Jul 13, 2011 at 11:52:21PM -0700, Colin Cross wrote:
->> On Tue, Jul 5, 2011 at 11:57 AM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->> > Ensure that the meminfo array is sanity checked before we pass the
->> > memory to memblock. ?This helps to ensure that memblock and meminfo
->> > agree on the dimensions of memory, especially when more memory is
->> > passed than the kernel can deal with.
->> >
->> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
->>
->> This patch causes a regression in v3.0-rc7 when overlapping mem=
->> options are passed to the kernel. ?On an OMAP4 board, I was
->> accidentally using "mem=512M mem=920M" on the command line, which
->> works fine in v3.0-rc6.
->
-> I don't regard that as a regression. ?That's something which hasn't
-> been supported before the move to memblock, and it's not something
-> that was not intended to be supported.
->
+resource definitions that just define start, end and flags =
+IORESOURCE_MEM or IORESOURCE_IRQ (with start=end) are quite common. So
+introduce a shortcut for them. For completeness add macros for
+IORESOURCE_DMA and IORESOURCE_IO, too and also make available a set of
+macros to specify named resources of all types which are less common.
 
-Ok, works for me.
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+changes since v2:
+- add parentheses around macro parameter usages
+
+changes since v1:                                                               
+- also add _IO and _DMA variants                                                
+
+ include/linux/ioport.h |   30 ++++++++++++++++++++++++++++++
+ 1 files changed, 30 insertions(+), 0 deletions(-)
+
+diff --git a/include/linux/ioport.h b/include/linux/ioport.h
+index 63eb429..9d57a71 100644
+--- a/include/linux/ioport.h
++++ b/include/linux/ioport.h
+@@ -109,6 +109,36 @@ struct resource_list {
+ /* PCI control bits.  Shares IORESOURCE_BITS with above PCI ROM.  */
+ #define IORESOURCE_PCI_FIXED		(1<<4)	/* Do not move resource */
+ 
++
++/* helpers to define resources */
++#define DEFINE_RES_NAMED(_start, _size, _name, _flags)			\
++	{								\
++		.start = (_start),					\
++		.end = (_start) + (_size) - 1,				\
++		.name = (_name),					\
++		.flags = (_flags),					\
++	}
++
++#define DEFINE_RES_IO_NAMED(_start, _size, _name)			\
++	DEFINE_RES_NAMED((_start), (_size), (_name), IORESOURCE_IO)
++#define DEFINE_RES_IO(_start, _size)					\
++	DEFINE_RES_IO_NAMED((_start), (_size), NULL)
++
++#define DEFINE_RES_MEM_NAMED(_start, _size, _name)			\
++	DEFINE_RES_NAMED((_start), (_size), (_name), IORESOURCE_MEM)
++#define DEFINE_RES_MEM(_start, _size)					\
++	DEFINE_RES_MEM_NAMED((_start), (_size), NULL)
++
++#define DEFINE_RES_IRQ_NAMED(_irq, _name)				\
++	DEFINE_RES_NAMED((_irq), 1, (_name), IORESOURCE_IRQ)
++#define DEFINE_RES_IRQ(_irq)						\
++	DEFINE_RES_IRQ_NAMED((_irq), NULL)
++
++#define DEFINE_RES_DMA_NAMED(_dma, _name)				\
++	DEFINE_RES_NAMED((_dma), 1, (_name), IORESOURCE_DMA)
++#define DEFINE_RES_DMA(_dma)						\
++	DEFINE_RES_DMA_NAMED((_dma), NULL)
++
+ /* PC/ISA/whatever - the normal PC address spaces: IO and memory */
+ extern struct resource ioport_resource;
+ extern struct resource iomem_resource;
+-- 
+1.7.5.4
