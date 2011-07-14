@@ -1,40 +1,53 @@
-From: ccross@google.com (Colin Cross)
-Date: Wed, 13 Jul 2011 18:43:13 -0700
-Subject: IRQCHIP_MASK_ON_SUSPEND and the gic
-Message-ID: <CAMbhsRS=Pu-VoLFZR162DEjTVsx_f8X0S5zX09c8bDnfDq4=Xg@mail.gmail.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Thu, 14 Jul 2011 10:52:47 +0800
+Subject: [PATCH 07/15] pxa25x_udc: drop support for udc_command
+In-Reply-To: <CALT56yPuQxY13eAOd9mm7q4A8g6j2mP3F=h-sMv=xwzYzhRQxg@mail.gmail.com>
+References: <1309871321-11305-1-git-send-email-dbaryshkov@gmail.com>
+	<1309871321-11305-8-git-send-email-dbaryshkov@gmail.com>
+	<20110705134615.GJ2820@legolas.emea.dhcp.ti.com>
+	<20110708213428.GA31866@kroah.com>
+	<20110708215442.GG31978@legolas.emea.dhcp.ti.com>
+	<20110708220258.GA29651@suse.de>
+	<CALT56yPuQxY13eAOd9mm7q4A8g6j2mP3F=h-sMv=xwzYzhRQxg@mail.gmail.com>
+Message-ID: <CAMPhdO8vBhod0eWw7dtNSrJHjruoBCZG5KKOHLvJHe+2Y3+TSg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quick background:
-The gic is an interrupt controller commonly found in SMP ARM devices.
-It has no power management capabilities, and is turned off when the
-cpu is powered down in suspend.  In order to wake the device out of
-suspend, a second interrupt controller is placed in series with the
-gic, passing each interrupt through along with a mask.  If an unmasked
-interrupt is received at the secondary controller, and the cpu is
-powered down, a wakeup is triggered.
+On Tue, Jul 12, 2011 at 9:41 PM, Dmitry Eremin-Solenikov
+<dbaryshkov@gmail.com> wrote:
+> On 7/9/11, Greg KH <gregkh@suse.de> wrote:
+>> On Sat, Jul 09, 2011 at 12:54:43AM +0300, Felipe Balbi wrote:
+>>> On Fri, Jul 08, 2011 at 02:34:28PM -0700, Greg KH wrote:
+>>> > On Tue, Jul 05, 2011 at 04:46:16PM +0300, Felipe Balbi wrote:
+>>> > > Hi,
+>>> > >
+>>> > > On Tue, Jul 05, 2011 at 05:08:33PM +0400, Dmitry Eremin-Solenikov
+>>> > > wrote:
+>>> > > > None of pxa25x devices use udc_command() for UDC functionality.
+>>> > > > Stop calling this callback from pxa25x_udc code.
+>>> > >
+>>> > > looks good to me, Greg since this is a big re-work which depends on
+>>> > > parts out of the Gadget Framework, can you take all the patches
+>>> > > straight ? Here's my Acked-by:
+>>> > >
+>>> > > Acked-by: Felipe Balbi <balbi@ti.com>
+>>> >
+>>> > I can't take these, they should go through the gpio subsystem maintainer
+>>> > instead.
+>>>
+>>> But why ? They only touch drivers/usb/gadget/pxa*.c
+>>
+>> All 15 patches? ?No they don't they touch all sorts of things.
+>>
+>>> Would it be enough if Grant would Ack them ?
+>>
+>> Sure, but it would be easier if Grant took them all, right?
+>
+> Colleagues, can you please tell me the current status/future of this patches?
+> Are they going to 3.1? 3.2? Should they go via ARM/PXA, via usb? usb-gadget?
+> Via gpio(why?)?? Should I send them to somebody for merging?
 
-In order to keep the cpu from waking on masked interrupts during
-cpuidle, the secondary controller masks must be updated at the same
-time as the gic masks.  This is handled through the gic_arch_extn
-irqchip pointer that is filled out by each architecture.
-
-During suspend, the same registers used by mask/unmask need to be
-programmed to have all wakeup interrupts unmasked, and all non-wakeup
-interrupts masked.  I believe the unmasking is already taken care of:
-every interrupt starts as unmasked, and is lazily masked only when an
-interrupt arrives while it is disabled.  When check_wakeup_irqs is
-called in suspend, every interrupt is guaranteed to be either
-unmasked, or masked and marked pending.  Pending wakeup irqs will
-abort suspend, so every wakeup interrupt is guaranteed to be unmasked
-after check_wakeup_irqs.
-
-That leaves masking, which can easily be handled by setting the
-IRQCHIP_MASK_ON_SUSPEND flag on the gic irqchip (propagated from the
-gic_arch_extn irqchip).
-
-So, finally, my question: there is nothing for each secondary
-interrupt controller driver to do in a set_wake handler, but if its
-not implemented, enable_irq_wake will return an error.  Is there any
-way to avoid implementing an empty set_wake handler?  Should the
-missing handler not be an error if IRQCHIP_MASK_ON_SUSPEND is set?
+Well, I agree with Dmitry the whole patchset is not related to the GPIO
+subsystem at all. The major cleanup is actually to the PXA machines,
+and touches part of the pxa25x_udc driver. If some one Acks the USB
+part, I can help take the remaining patches.
