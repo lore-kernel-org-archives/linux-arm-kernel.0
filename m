@@ -1,85 +1,141 @@
-From: frank.hofmann@tomtom.com (Frank Hofmann)
-Date: Thu, 14 Jul 2011 11:24:04 +0100 (BST)
-Subject: [PATCH 1/1 V2] Add Thread Support for the Context ID Register
-	of ARM v6 & v7 Architectures
-In-Reply-To: <mailman.2928.1310636156.20023.linux-arm-kernel@lists.infradead.org>
-References: <mailman.2928.1310636156.20023.linux-arm-kernel@lists.infradead.org>
-Message-ID: <alpine.DEB.2.00.1107141054400.2609@localhost6.localdomain6>
+From: B29396@freescale.com (Dong Aisheng-B29396)
+Date: Thu, 14 Jul 2011 10:39:13 +0000
+Subject: [alsa-devel] [PATCH V2 02/10] ASoc: mxs: add mxs-saif driver
+In-Reply-To: <20110714030633.GA11559@opensource.wolfsonmicro.com>
+References: <1310483085-31442-1-git-send-email-b29396@freescale.com>
+	<1310483085-31442-3-git-send-email-b29396@freescale.com>
+	<20110713010346.GA18959@opensource.wolfsonmicro.com>
+	<65EE16ACC360FA4D99C96DC085B3F7721CD902@039-SN1MPN1-002.039d.mgd.msft.net>
+	<20110714030633.GA11559@opensource.wolfsonmicro.com>
+Message-ID: <65EE16ACC360FA4D99C96DC085B3F7721CE875@039-SN1MPN1-002.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Message: 6
-> Date: Thu, 14 Jul 2011 11:33:10 +0200
-> From: Wolfgang BETZ <wolfgang.betz@st.com>
-> To: "linux-arm-kernel at lists.infradead.org"
-> 	<linux-arm-kernel@lists.infradead.org>, 	"linux at arm.linux.org.uk"
-> 	<linux@arm.linux.org.uk>
-> Cc: "Rudolf.Dienstbeck at Lauterbach.com"
-> 	<Rudolf.Dienstbeck@Lauterbach.com>,	Wolfgang BETZ
-> 	<wolfgang.betz@st.com>,	Linus WALLEIJ <linus.walleij@stericsson.com>,
-> 	Srinidhi KASAGAR <srinidhi.kasagar@stericsson.com>,
-> 	"khaled.jmal at lauterbach.com" <khaled.jmal@lauterbach.com>,
-> 	"marco.ferrario at lauterbach.it" <marco.ferrario@lauterbach.it>,
-> 	"will.deacon at arm.com" <will.deacon@arm.com>,
-> 	"maurizio.menegotto at lauterbach.it" <maurizio.menegotto@lauterbach.it>,
-> 	David SIORPAES <david.siorpaes@st.com>,	Giuseppe DESOLI
-> 	<giuseppe.desoli@st.com>
-> Subject: [PATCH 1/1 V2] Add Thread Support for the Context ID Register
-> 	of	ARM v6 & v7 Architectures
-> Message-ID:
-> 	<a4ef7565bd6013f56c5c10071bd36739c59768b7.1310544641.git.wolfgang.betz@st.com>
->
-> Content-Type: text/plain; charset="iso-8859-1"
->
-> From: Wolfgang Betz <wolfgang.betz@st.com>
 
-Hi Wolfgang,
+> -----Original Message-----
+> From: Mark Brown [mailto:broonie at opensource.wolfsonmicro.com]
+> Sent: Thursday, July 14, 2011 11:07 AM
+> To: Dong Aisheng-B29396
+> Cc: alsa-devel at alsa-project.org; s.hauer at pengutronix.de; lrg at ti.com;
+> linux-arm-kernel at lists.infradead.org; u.kleine-koenig at pengutronix.de
+> Subject: Re: [alsa-devel] [PATCH V2 02/10] ASoc: mxs: add mxs-saif driver
+> 
+> On Wed, Jul 13, 2011 at 08:14:09AM +0000, Dong Aisheng-B29396 wrote:
+> 
+> > > What if MCLK is not set corectly for some reason?  We'll just
+> > > silently do nothing.
+> 
+> > We will just return an error if MCLK is not correct (not 32x or 48x).
+> >         /* SAIF MCLK should be either 32*fs or 48*fs */
+> >         if (saif->mclk_in_use && (mclk % 32 != 0) && (mclk % 48 != 0))
+> >                 return -EINVAL;
+> > Machine driver should guarantee to set a correct value since it's HW
+> limitation.
+> > Is that ok?
+> 
+> Please fix the code so you only check if the ratio is valid in one place,
+> the code currently is too hard to read.
 
-sorry for replying through the digest, but I have comments on this one.
+Hi Mark,
 
->
-> The aim of this patch is to enable thread support in the context ID register
-> (CONTEXTIDR) as it comes with ARM architectures v6 & v7.
-[ ... ]
-> +/*
-> + * Set context ID for task and mm
-> + */
-> +static inline
-> +void set_context_id(struct task_struct *tsk, struct mm_struct *mm)
-> +{
-> +	unsigned int ctxid = (unsigned int)calc_context_id(tsk, mm);
-> +
-> +	/* set the new ContextID */
-> +	asm("mcr	p15, 0, %0, c13, c0, 1\n" : : "r" (ctxid));
-> +	isb();
-> +}
+So far, thanks a lot for your kindly review.
+I removed the duplicated checking as you indicated and changed the clk setting
+flow a bit(also adding more comments) to try to make it more easy to read.
 
-While I'm not qualified to comment on the technical correctness of the 
-patch, I've got a few questions about the way this change is done:
+The code is as follows.
+Is it ok for you?
+Or you have any better suggestions?
 
-Specifically:
+/*
+ * Set SAIF clock and MCLK
+ */
+static int mxs_saif_set_clk(struct mxs_saif *saif,
+                                  unsigned int mclk,
+                                  unsigned int rate)
+{
+        u32 scr;
+        int ret;
 
-1. about the above, (unsigned int)calc_context_id(), the cast and/or
-    the data type isn't required, the asm doesn't care about types.
+        scr = __raw_readl(saif->base + SAIF_CTRL);
+        scr &= ~BM_SAIF_CTRL_BITCLK_MULT_RATE;
+        scr &= ~BM_SAIF_CTRL_BITCLK_BASE_RATE;
 
-Generally:
+        /*
+         * Set SAIF clock
+         *
+         * The SAIF clock should be either 384*fs or 512*fs.
+         * If MCLK is used, the SAIF clk ratio needs to match mclk ratio.
+         *  For 32x mclk, set saif clk as 512*fs.
+         *  For 48x mclk, set saif clk as 384*fs.
+         *
+         * If MCLK is not used, we just set saif clk to 512*fs.
+         */
+        if (saif->mclk_in_use) {
+                if (mclk % 32 == 0) {
+                        scr &= ~BM_SAIF_CTRL_BITCLK_BASE_RATE;
+                        ret = clk_set_rate(saif->clk, 512 * rate);
+                } else if (mclk % 48 == 0) {
+                        scr |= BM_SAIF_CTRL_BITCLK_BASE_RATE;
+                        ret = clk_set_rate(saif->clk, 384 * rate);
+                } else {
+                        /* SAIF MCLK should be either 32x or 48x */
+                        return -EINVAL;
+                }
+        } else {
+                ret = clk_set_rate(saif->clk, 512 * rate);
+                scr &= ~BM_SAIF_CTRL_BITCLK_BASE_RATE;
+        }
 
-2. the patch changes the signature of cpu_switch_mm() but not all the
-    callers (doesn't touch the kexec / reset / suspend paths), why ?
+        if (ret)
+                return ret;
 
-3. what does this patch do to non-v6/v7 architectures ? Are they all
-    _guaranteed_ never to use the second arg ?
+        if (!saif->mclk_in_use) {
+                __raw_writel(scr, saif->base + SAIF_CTRL);
+                return 0;
+        }
 
-    what about future architectures ? Is it a good idea to force the
-    2nd arg to an integer where right now it's a pointer to a data
-    structure, possibly far more flexible at passing "any info" ?
+        /*
+         * Program the over-sample rate for MCLK output if used
+         *
+         * The available MCLK range is 32x, 48x... 512x. The rate
+         * could be from 8kHz to 192kH.
+         */
+        switch (mclk / rate) {
+        case 32:
+                scr |= BF_SAIF_CTRL_BITCLK_MULT_RATE(4);
+                break;
+        case 64:
+                scr |= BF_SAIF_CTRL_BITCLK_MULT_RATE(3);
+                break;
+        case 128:
+                scr |= BF_SAIF_CTRL_BITCLK_MULT_RATE(2);
+                break;
+        case 256:
+                scr |= BF_SAIF_CTRL_BITCLK_MULT_RATE(1);
+                break;
+        case 512:
+                scr |= BF_SAIF_CTRL_BITCLK_MULT_RATE(0);
+                break;
+        case 48:
+                scr |= BF_SAIF_CTRL_BITCLK_MULT_RATE(3);
+                break;
+        case 96:
+                scr |= BF_SAIF_CTRL_BITCLK_MULT_RATE(2);
+                break;
+        case 192:
+                scr |= BF_SAIF_CTRL_BITCLK_MULT_RATE(1);
+                break;
+        case 384:
+                scr |= BF_SAIF_CTRL_BITCLK_MULT_RATE(0);
+                break;
+        default:
+                return -EINVAL;
+        }
 
-4. with that patch in, calling cpu_switch_mm() requires availability
-    of "current" because of the proxy-wrapping, call calc_context_id()
-    before which uses "current".
-    There are usecases (kexec, reset, hibernate) where code that wants
-    to cpu_switch_mm doesn't have "current" because of a stack switch;
-    how are these codepaths supposed to call it ? Is it ok to just
-    pass NULL / garbage ?
+        __raw_writel(scr, saif->base + SAIF_CTRL);
 
-FrankH.
+        return 0;
+}
+
+Regards
+Dong Aisheng
