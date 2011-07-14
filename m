@@ -1,195 +1,85 @@
-From: tgih.jun@samsung.com (Seungwon Jeon)
-Date: Thu, 14 Jul 2011 18:53:46 +0900
-Subject: [PATCH v2] ARM: EXYNOS4: Add platform device for dwmci driver.
-Message-ID: <1310637226-19478-1-git-send-email-tgih.jun@samsung.com>
+From: frank.hofmann@tomtom.com (Frank Hofmann)
+Date: Thu, 14 Jul 2011 11:24:04 +0100 (BST)
+Subject: [PATCH 1/1 V2] Add Thread Support for the Context ID Register
+	of ARM v6 & v7 Architectures
+In-Reply-To: <mailman.2928.1310636156.20023.linux-arm-kernel@lists.infradead.org>
+References: <mailman.2928.1310636156.20023.linux-arm-kernel@lists.infradead.org>
+Message-ID: <alpine.DEB.2.00.1107141054400.2609@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add platform devices for Synopsys DesignWare Multimedia Card
-Interface driver.
+> Message: 6
+> Date: Thu, 14 Jul 2011 11:33:10 +0200
+> From: Wolfgang BETZ <wolfgang.betz@st.com>
+> To: "linux-arm-kernel at lists.infradead.org"
+> 	<linux-arm-kernel@lists.infradead.org>, 	"linux at arm.linux.org.uk"
+> 	<linux@arm.linux.org.uk>
+> Cc: "Rudolf.Dienstbeck at Lauterbach.com"
+> 	<Rudolf.Dienstbeck@Lauterbach.com>,	Wolfgang BETZ
+> 	<wolfgang.betz@st.com>,	Linus WALLEIJ <linus.walleij@stericsson.com>,
+> 	Srinidhi KASAGAR <srinidhi.kasagar@stericsson.com>,
+> 	"khaled.jmal at lauterbach.com" <khaled.jmal@lauterbach.com>,
+> 	"marco.ferrario at lauterbach.it" <marco.ferrario@lauterbach.it>,
+> 	"will.deacon at arm.com" <will.deacon@arm.com>,
+> 	"maurizio.menegotto at lauterbach.it" <maurizio.menegotto@lauterbach.it>,
+> 	David SIORPAES <david.siorpaes@st.com>,	Giuseppe DESOLI
+> 	<giuseppe.desoli@st.com>
+> Subject: [PATCH 1/1 V2] Add Thread Support for the Context ID Register
+> 	of	ARM v6 & v7 Architectures
+> Message-ID:
+> 	<a4ef7565bd6013f56c5c10071bd36739c59768b7.1310544641.git.wolfgang.betz@st.com>
+>
+> Content-Type: text/plain; charset="iso-8859-1"
+>
+> From: Wolfgang Betz <wolfgang.betz@st.com>
 
-Signed-off-by: Seungwon Jeon <tgih.jun@samsung.com>
----
- arch/arm/mach-exynos4/Kconfig             |   12 ++++
- arch/arm/mach-exynos4/Makefile            |    1 +
- arch/arm/mach-exynos4/dev-dwmci.c         |   88 +++++++++++++++++++++++++++++
- arch/arm/mach-exynos4/include/mach/irqs.h |    1 +
- arch/arm/mach-exynos4/include/mach/map.h  |    1 +
- arch/arm/plat-samsung/include/plat/devs.h |    1 +
- 6 files changed, 104 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-exynos4/dev-dwmci.c
+Hi Wolfgang,
 
-diff --git a/arch/arm/mach-exynos4/Kconfig b/arch/arm/mach-exynos4/Kconfig
-index 5115b90..2ec5b96 100644
---- a/arch/arm/mach-exynos4/Kconfig
-+++ b/arch/arm/mach-exynos4/Kconfig
-@@ -35,6 +35,11 @@ config EXYNOS4_DEV_SYSMMU
- 	help
- 	  Common setup code for SYSTEM MMU in EXYNOS4
- 
-+config EXYNOS4_DEV_DWMCI
-+	bool
-+	help
-+	  Compile in platform device definitions for DWMCI
-+
- config EXYNOS4_SETUP_I2C1
- 	bool
- 	help
-@@ -200,6 +205,13 @@ comment "Configuration for HSMMC bus width"
- 
- menu "Use 8-bit bus width"
- 
-+config EXYNOS4_DWMCI_8BIT
-+	bool "DWMCI with 8-bit bus"
-+	depends on EXYNOS4_DEV_DWMCI
-+	help
-+	  Support DWMCI 8-bit bus.
-+	  If selected, Channel 1 is disabled.
-+
- config EXYNOS4_SDHCI_CH0_8BIT
- 	bool "Channel 0 with 8-bit bus"
- 	help
-diff --git a/arch/arm/mach-exynos4/Makefile b/arch/arm/mach-exynos4/Makefile
-index 60fe5ec..eeeaada 100644
---- a/arch/arm/mach-exynos4/Makefile
-+++ b/arch/arm/mach-exynos4/Makefile
-@@ -43,6 +43,7 @@ obj-y					+= dev-audio.o
- obj-$(CONFIG_EXYNOS4_DEV_AHCI)		+= dev-ahci.o
- obj-$(CONFIG_EXYNOS4_DEV_PD)		+= dev-pd.o
- obj-$(CONFIG_EXYNOS4_DEV_SYSMMU)	+= dev-sysmmu.o
-+obj-$(CONFIG_EXYNOS4_DEV_DWMCI)	+= dev-dwmci.o
- 
- obj-$(CONFIG_EXYNOS4_SETUP_FIMC)	+= setup-fimc.o
- obj-$(CONFIG_EXYNOS4_SETUP_I2C1)	+= setup-i2c1.o
-diff --git a/arch/arm/mach-exynos4/dev-dwmci.c b/arch/arm/mach-exynos4/dev-dwmci.c
-new file mode 100644
-index 0000000..a0defa4
---- /dev/null
-+++ b/arch/arm/mach-exynos4/dev-dwmci.c
-@@ -0,0 +1,88 @@
-+/*
-+ * linuxarch/arm/mach-exynos4/dev-dwmci.c
-+ *
-+ * Copyright (c) 2011 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com
-+ *
-+ * Platform device for Synopsys DesignWare Mobile Storage IP
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/dma-mapping.h>
-+#include <linux/platform_device.h>
-+#include <linux/interrupt.h>
-+#include <linux/mmc/dw_mmc.h>
-+#include <linux/mmc/host.h>
-+#include <linux/io.h>
-+#include <linux/gpio.h>
-+
-+#include <plat/devs.h>
-+#include <plat/cpu.h>
-+#include <plat/gpio-cfg.h>
-+
-+#include <mach/map.h>
-+
-+#ifdef EXYNOS4_DWMCI_8BIT
-+#define BUS_WIDTH 8
-+#else
-+#define BUS_WIDTH 4
-+#endif
-+
-+static int exynos4_dwmci_get_ocr(u32 slot_id)
-+{
-+	return MMC_VDD_32_33 | MMC_VDD_33_34;
-+}
-+
-+static int exynos4_dwmci_get_bus_wd(u32 slot_id)
-+{
-+	return BUS_WIDTH;
-+}
-+
-+static int exynos4_dwmci_init(u32 slot_id, irq_handler_t handler, void *data)
-+{
-+	return 0;
-+}
-+
-+static struct resource exynos4_dwmci_resource[] = {
-+	[0] = {
-+		.start = EXYNOS4_PA_DWMCI,
-+		.end   = EXYNOS4_PA_DWMCI + SZ_4K - 1,
-+		.flags = IORESOURCE_MEM,
-+	},
-+	[1] = {
-+		.start = IRQ_DWMCI,
-+		.end   = IRQ_DWMCI,
-+		.flags = IORESOURCE_IRQ,
-+	}
-+};
-+
-+static struct dw_mci_board exynos4_dwci_pdata = {
-+	.num_slots			= 1,
-+	.quirks				= DW_MCI_QUIRK_BROKEN_CARD_DETECTION,
-+	.bus_hz				= 80*1000*1000,
-+	.detect_delay_ms	= 200,
-+	.init				= exynos4_dwmci_init,
-+	.get_ocr			= exynos4_dwmci_get_ocr,
-+	.get_bus_wd			= exynos4_dwmci_get_bus_wd,
-+	.select_slot		= NULL,
-+};
-+
-+static u64 exynos4_dwmci_dmamask = DMA_BIT_MASK(32);
-+
-+struct platform_device exynos4_device_dwmci = {
-+	.name		= "dw_mmc",
-+	.id		= -1,
-+	.num_resources	= ARRAY_SIZE(exynos4_dwmci_resource),
-+	.resource	= exynos4_dwmci_resource,
-+	.dev		= {
-+		.dma_mask		= &exynos4_dwmci_dmamask,
-+		.coherent_dma_mask	= DMA_BIT_MASK(32),
-+		.platform_data	= &exynos4_dwci_pdata,
-+	},
-+};
-+
-diff --git a/arch/arm/mach-exynos4/include/mach/irqs.h b/arch/arm/mach-exynos4/include/mach/irqs.h
-index 5d03730..b720246 100644
---- a/arch/arm/mach-exynos4/include/mach/irqs.h
-+++ b/arch/arm/mach-exynos4/include/mach/irqs.h
-@@ -107,6 +107,7 @@
- #define IRQ_HSMMC1		COMBINER_IRQ(29, 1)
- #define IRQ_HSMMC2		COMBINER_IRQ(29, 2)
- #define IRQ_HSMMC3		COMBINER_IRQ(29, 3)
-+#define IRQ_DWMCI		COMBINER_IRQ(29, 4)
- 
- #define IRQ_MIPI_CSIS0		COMBINER_IRQ(30, 0)
- #define IRQ_MIPI_CSIS1		COMBINER_IRQ(30, 1)
-diff --git a/arch/arm/mach-exynos4/include/mach/map.h b/arch/arm/mach-exynos4/include/mach/map.h
-index 0009e77..352e500 100644
---- a/arch/arm/mach-exynos4/include/mach/map.h
-+++ b/arch/arm/mach-exynos4/include/mach/map.h
-@@ -94,6 +94,7 @@
- #define EXYNOS4_PA_MIPI_CSIS1		0x11890000
- 
- #define EXYNOS4_PA_HSMMC(x)		(0x12510000 + ((x) * 0x10000))
-+#define EXYNOS4_PA_DWMCI		0x12550000
- 
- #define EXYNOS4_PA_SATA			0x12560000
- #define EXYNOS4_PA_SATAPHY		0x125D0000
-diff --git a/arch/arm/plat-samsung/include/plat/devs.h b/arch/arm/plat-samsung/include/plat/devs.h
-index e3b31c2..29fa1cf 100644
---- a/arch/arm/plat-samsung/include/plat/devs.h
-+++ b/arch/arm/plat-samsung/include/plat/devs.h
-@@ -112,6 +112,7 @@ extern struct platform_device exynos4_device_i2s2;
- extern struct platform_device exynos4_device_spdif;
- extern struct platform_device exynos4_device_pd[];
- extern struct platform_device exynos4_device_ahci;
-+extern struct platform_device exynos4_device_dwmci;
- 
- extern struct platform_device s5p6440_device_pcm;
- extern struct platform_device s5p6440_device_iis;
--- 
-1.7.2.3
+sorry for replying through the digest, but I have comments on this one.
+
+>
+> The aim of this patch is to enable thread support in the context ID register
+> (CONTEXTIDR) as it comes with ARM architectures v6 & v7.
+[ ... ]
+> +/*
+> + * Set context ID for task and mm
+> + */
+> +static inline
+> +void set_context_id(struct task_struct *tsk, struct mm_struct *mm)
+> +{
+> +	unsigned int ctxid = (unsigned int)calc_context_id(tsk, mm);
+> +
+> +	/* set the new ContextID */
+> +	asm("mcr	p15, 0, %0, c13, c0, 1\n" : : "r" (ctxid));
+> +	isb();
+> +}
+
+While I'm not qualified to comment on the technical correctness of the 
+patch, I've got a few questions about the way this change is done:
+
+Specifically:
+
+1. about the above, (unsigned int)calc_context_id(), the cast and/or
+    the data type isn't required, the asm doesn't care about types.
+
+Generally:
+
+2. the patch changes the signature of cpu_switch_mm() but not all the
+    callers (doesn't touch the kexec / reset / suspend paths), why ?
+
+3. what does this patch do to non-v6/v7 architectures ? Are they all
+    _guaranteed_ never to use the second arg ?
+
+    what about future architectures ? Is it a good idea to force the
+    2nd arg to an integer where right now it's a pointer to a data
+    structure, possibly far more flexible at passing "any info" ?
+
+4. with that patch in, calling cpu_switch_mm() requires availability
+    of "current" because of the proxy-wrapping, call calc_context_id()
+    before which uses "current".
+    There are usecases (kexec, reset, hibernate) where code that wants
+    to cpu_switch_mm doesn't have "current" because of a stack switch;
+    how are these codepaths supposed to call it ? Is it ok to just
+    pass NULL / garbage ?
+
+FrankH.
