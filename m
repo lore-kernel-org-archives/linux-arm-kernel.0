@@ -1,60 +1,22 @@
-From: omar.ramirez@ti.com (Ramirez Luna, Omar)
-Date: Thu, 14 Jul 2011 13:32:38 -0500
-Subject: [Linaro-mm-sig] [RFC 2/2] ARM: initial proof-of-concept IOMMU mapper
-	for DMA-mapping
-Message-ID: <CAB-zwWhRQmv8euqN6jeJP=tXTQgGQ3buRJEf=4aPtTOBsh+Z2Q@mail.gmail.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Thu, 14 Jul 2011 13:42:02 -0500
+Subject: [RFC 0/6] watchdog drivers converted to the new framework
+In-Reply-To: <20110714182734.GA31082@pengutronix.de>
+References: <1310588766-16638-1-git-send-email-w.sang@pengutronix.de>
+	<ADE657CA350FB648AAC2C43247A983F001F383E05B65@AUSP01VMBX24.collaborationhost.net>
+	<20110714182734.GA31082@pengutronix.de>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F001F383E05BCD@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
-
-> Add initial proof of concept implementation of DMA-mapping API for
-> devices that have IOMMU support. Right now only dma_alloc_coherent,
-> dma_free_coherent and dma_mmap_coherent functions are supported.
+On Thursday, July 14, 2011 11:28 AM, Wolfram Sang wrote:
+>> I would also like to convert this driver into a proper platform_driver using
+>> ioremap'ed addresses instead of the static mappings.  Converting the driver
+>> to the new watchdog framework would make this a bit cleaner.
 >
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
-...
-> diff --git a/arch/arm/include/asm/dma-iommu.h b/arch/arm/include/asm/dma-iommu.h
-> new file mode 100644
-> index 0000000..c246ff3
-> --- /dev/null
-> +++ b/arch/arm/include/asm/dma-iommu.h
-...
-> +int __init arm_iommu_assign_device(struct device *dev, dma_addr_t base, dma_addr_t size);
+> Try managed devices (devm_* and friends) for an extra cleanup bonus.
 
-__init causes a panic if the iommu is assigned after boot.
-
-In OMAP3 the iommu driver controls isp and dsp address spaces, it is
-loaded until any of those 2 drivers is needed.
-
-> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> index f8c6972..b6397c1 100644
-> --- a/arch/arm/mm/dma-mapping.c
-> +++ b/arch/arm/mm/dma-mapping.c
-...
-> +static void *arm_iommu_alloc_attrs(struct device *dev, size_t size,
-> + ? ? ? ? ? dma_addr_t *handle, gfp_t gfp, struct dma_attrs *attrs)
-> +{
-> + ? ? ? struct dma_iommu_mapping *mapping = dev->archdata.mapping;
-> + ? ? ? struct page **pages;
-> + ? ? ? void *addr = NULL;
-> + ? ? ? pgprot_t prot;
-> +
-> + ? ? ? if (dma_get_attr(DMA_ATTR_WRITE_COMBINE, attrs))
-> + ? ? ? ? ? ? ? prot = pgprot_writecombine(pgprot_kernel);
-> + ? ? ? else
-> + ? ? ? ? ? ? ? prot = pgprot_dmacoherent(pgprot_kernel);
-> +
-> + ? ? ? arm_iommu_init(dev);
-
-I found useful to call arm_iommu_init inside arm_iommu_assign_device
-instead. So, then gen_pool is created only once without the
-mapping->pool check, instead of relying on the call to ...alloc_attrs,
-which in my case I never use because I'm implementing
-iommu_map|unmap_sg functions to see how it goes with the dma mapping.
+Already done, just waiting for the framework... ;-)
 
 Regards,
-
-Omar
+Hartley
