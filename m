@@ -1,32 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 14 Jul 2011 20:44:11 +0100
-Subject: ARM cortex A9 feature
-In-Reply-To: <CABi1daHh7cgyhJ4c3zo+jSUY4uzbFtihtgw0Q2Mcrndno_gcTA@mail.gmail.com>
-References: <CAJ8eaTzLmSTSMOY-0Xg0tE-DEbZ6RNA+uh70Dn3K5CbrjQsEiA@mail.gmail.com>
-	<CABi1daHh7cgyhJ4c3zo+jSUY4uzbFtihtgw0Q2Mcrndno_gcTA@mail.gmail.com>
-Message-ID: <20110714194411.GA8942@n2100.arm.linux.org.uk>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Thu, 14 Jul 2011 22:00:53 +0200
+Subject: [RFC 0/6] watchdog drivers converted to the new framework
+In-Reply-To: <ADE657CA350FB648AAC2C43247A983F001F383E05BCD@AUSP01VMBX24.collaborationhost.net>
+References: <1310588766-16638-1-git-send-email-w.sang@pengutronix.de>
+	<ADE657CA350FB648AAC2C43247A983F001F383E05B65@AUSP01VMBX24.collaborationhost.net>
+	<20110714182734.GA31082@pengutronix.de>
+	<ADE657CA350FB648AAC2C43247A983F001F383E05BCD@AUSP01VMBX24.collaborationhost.net>
+Message-ID: <20110714200053.GC31082@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 14, 2011 at 09:56:34AM -0700, Dave Hylands wrote:
-> Hi Naveen,
-> 
-> On Wed, Jul 13, 2011 at 11:26 PM, naveen yadav <yad.naveen@gmail.com> wrote:
-> > Hi All,
+On Thu, Jul 14, 2011 at 01:42:02PM -0500, H Hartley Sweeten wrote:
+> On Thursday, July 14, 2011 11:28 AM, Wolfram Sang wrote:
+> >> I would also like to convert this driver into a proper platform_driver using
+> >> ioremap'ed addresses instead of the static mappings.  Converting the driver
+> >> to the new watchdog framework would make this a bit cleaner.
 > >
-> > I am reading ARM cortex a9 manual and got few question in mind.
-> >
-> > 1. Where I need strong order type memory ? any sample example is very helpfull.
+> > Try managed devices (devm_* and friends) for an extra cleanup bonus.
 > 
-> Often when dealing with hardware, you need to ensure that when your code does:
-> 
-> reg1 = val1;
-> reg2 = val2;
-> 
-> that these writes actually occur in the order that the code issues
-> them. Using volatile pointers will get the compiler to not reorder the
-> instructions, but you still need the writes to hit the hardware in the
-> same order that they were issued. Using strongly ordered memory is one
-> way to achieve that.
+> Already done, just waiting for the framework... ;-)
 
-Note that device memory also gives that an ordering guarantee too.
+Nice :) Did you use my conversion-guide as a reference? Any comments if so?
+
+Regards,
+
+   Wolfram
+
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110714/55026e44/attachment.sig>
