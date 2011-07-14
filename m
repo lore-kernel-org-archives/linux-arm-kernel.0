@@ -1,57 +1,92 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Thu, 14 Jul 2011 09:23:17 +0530
-Subject: [PATCH 3/7] DMA: PL330: Add DMA capabilities
-In-Reply-To: <002201cc41c0$fdf79810$f9e6c830$%kim@samsung.com>
-References: <1309781915-31549-1-git-send-email-kgene.kim@samsung.com>
-	<1309781915-31549-4-git-send-email-kgene.kim@samsung.com>
-	<CAPTzV15Y7JFDKsec8x-M0C1AFLOMp39QvHpRCsO=E001P_tH9A@mail.gmail.com>
-	<CABb+yY0M659Ob0u+wOBW5i6v_VfpayRkY29-TUNpsp1oVLn-SQ@mail.gmail.com>
-	<002201cc41c0$fdf79810$f9e6c830$%kim@samsung.com>
-Message-ID: <CABb+yY198iVKYV765C_dokzciL9en3kkRyZgcgYpp5WphPNZmw@mail.gmail.com>
+From: B29396@freescale.com (Dong Aisheng-B29396)
+Date: Thu, 14 Jul 2011 04:34:29 +0000
+Subject: [alsa-devel] [PATCH V2 02/10] ASoc: mxs: add mxs-saif driver
+In-Reply-To: <20110714030633.GA11559@opensource.wolfsonmicro.com>
+References: <1310483085-31442-1-git-send-email-b29396@freescale.com>
+	<1310483085-31442-3-git-send-email-b29396@freescale.com>
+	<20110713010346.GA18959@opensource.wolfsonmicro.com>
+	<65EE16ACC360FA4D99C96DC085B3F7721CD902@039-SN1MPN1-002.039d.mgd.msft.net>
+	<20110714030633.GA11559@opensource.wolfsonmicro.com>
+Message-ID: <65EE16ACC360FA4D99C96DC085B3F7721CE4BB@039-SN1MPN1-002.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 14, 2011 at 6:27 AM, boojin <boojin.kim@samsung.com> wrote:
-> Jassi Brar wrote:
+> -----Original Message-----
+> From: Mark Brown [mailto:broonie at opensource.wolfsonmicro.com]
+> Sent: Thursday, July 14, 2011 11:07 AM
+> To: Dong Aisheng-B29396
+> Cc: alsa-devel at alsa-project.org; s.hauer at pengutronix.de; lrg at ti.com;
+> linux-arm-kernel at lists.infradead.org; u.kleine-koenig at pengutronix.de
+> Subject: Re: [alsa-devel] [PATCH V2 02/10] ASoc: mxs: add mxs-saif driver
 >
->> On Tue, Jul 5, 2011 at 12:03 PM, Chanho Park <parkch98@gmail.com> wrote:
->> > Kukjin Kim <kgene.kim <at> samsung.com> writes:
->> >
->> > (snip)
->> >
->> >> + ? ? ? ? ? ? if (slave_config->direction == DMA_TO_DEVICE) {
->> >> + ? ? ? ? ? ? ? ? ? ? if (slave_config->dst_addr)
->> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? peri->fifo_addr = slave_config->dst_addr;
->> >> + ? ? ? ? ? ? ? ? ? ? if (slave_config->dst_addr_width) {
->> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? i = 0;
->> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? while (slave_config->dst_addr_width != (1 <<
->> > i))
->> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? i++;
->> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? peri->burst_sz = i;
->> >> + ? ? ? ? ? ? ? ? ? ? }
->> >> + ? ? ? ? ? ? } else if (slave_config->direction == DMA_FROM_DEVICE) {
->> >> + ? ? ? ? ? ? ? ? ? ? if (slave_config->src_addr)
->> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? peri->fifo_addr = slave_config->src_addr;
->> >> + ? ? ? ? ? ? ? ? ? ? if (slave_config->src_addr_width) {
->> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? i = 0;
->> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? while (slave_config->src_addr_width != (1 <<
->> > i))
->> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? i++;
->> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? peri->burst_sz = i;
->> >
->> > Re-send including cc and mailing lists
->> > --
->> > pl330 dmac only supports 1/2/4/8/16 bytes burst size.
->> > If some bad D/D doesn't use powers of 2 width,
->> > dmaengine is going to infinite loop.
->> > You'd better check it instead of running loop.
->> >
->> It might be even better to start with max possible width and
->> keep decreasing 'i' in the loop.
-> I will addressed your comment on next release.
+> > We will just return an error if MCLK is not correct (not 32x or 48x).
+> >         /* SAIF MCLK should be either 32*fs or 48*fs */
+> >         if (saif->mclk_in_use && (mclk % 32 != 0) && (mclk % 48 != 0))
+> >                 return -EINVAL;
+> > Machine driver should guarantee to set a correct value since it's HW
+> limitation.
+> > Is that ok?
+> 
+> Please fix the code so you only check if the ratio is valid in one place,
+> the code currently is too hard to read.
+Sorry, here the comment is wrong:
+        /* SAIF MCLK should be either 32*fs or 48*fs */
+        if (saif->mclk_in_use && (mclk % 32 != 0) && (mclk % 48 != 0))
+                return -EINVAL;
+should be changed to:
+/* SAIF MCLK should be either 32x or 48x */
 
-Actually, best would be to simply do
-    peri->burst_sz =  __ffs(slave_config->src_addr_width);
+BTW, do you mean the duplicate ratio checking is the following line?
+        /* select the multiple of the base frequency rate of MCLK */
+        switch (mclk / rate) {
+.....
+This is used to calculate the real ratio for mclk.
+(The range is from 32x to 512x)
 
-And sorry I haven't yet reviewed the patches because I have been
-very busy lately. Will be more active in a few days.
+Yes, the code is a little confuse.
+Since the mxs_saif_set_clk sets both saif clk ratio and saif mclk ratio,
+I placed the mclk ratio checking in mxs_saif_set_clk rather than in
+mxs_saif_get_mclk to avoid duplication.
+And saif clk ratio needs to meet mclk ratio.
+Maybe I need to add more comments in code as follows.
+        /*
+         * The SAIF clock should be either 384*fs or 512*fs
+         *
+         * For 32x mclk, set saif clk as 512x.
+         * For 48x mclk, set saif clk as 384x.
+         */
+
+Do you have any suggestion to make it more easy to read?
+
+> > So it seems, as you said, we may need to set symmetric_rates in the DAI.
+> 
+> Not if there are two separate SAIFs used for each direction - this is
+> only relevant if one interface provides both playback and capture.
+OK. But how to treat our case that although there are two separate SAIFs used
+for each direction, they cannot work on different sample rate?
+Is there any parameter like symmetric_rates to tell ASoc core that 
+do not play a different rate stream While another SAIF is already working?
+
+> 
+> Because you return IRQ_HANDLED you're telling the IRQ infrastructure that
+> you handled the interrupt but you didn't.  If you didn't handle an
+> interrupt you should return IRQ_NONE instead.
+Ok, understand. Thanks.
+How about adding handle IRQ_NONE as follows:
+diff --git a/sound/soc/mxs/mxs-saif.c b/sound/soc/mxs/mxs-saif.c
+index bb32ee9..fefab24 100644
+--- a/sound/soc/mxs/mxs-saif.c
++++ b/sound/soc/mxs/mxs-saif.c
+@@ -475,6 +475,10 @@ static irqreturn_t mxs_saif_irq(int irq, void *dev_id)
+        unsigned int stat;
+
+        stat = __raw_readl(saif->base + SAIF_STAT);
++       if (stat & (BM_SAIF_STAT_FIFO_UNDERFLOW_IRQ |
++               BM_SAIF_STAT_FIFO_UNDERFLOW_IRQ))
++               return IRQ_NONE;
++
+        if (stat & BM_SAIF_STAT_FIFO_UNDERFLOW_IRQ)
+                dev_dbg(saif->dev, "underrun!!! %d\n", ++saif->fifo_underrun);
+
+Regards
+Dong Aisheng
