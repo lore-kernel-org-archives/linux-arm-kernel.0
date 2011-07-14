@@ -1,35 +1,67 @@
-From: gigin_jose@yahoo.co.in (GIGIN JOSE)
-Date: Thu, 14 Jul 2011 11:20:13 +0000 (UTC)
-Subject: CMOS camera interface on ARM
-Message-ID: <loom.20110714T130539-468@post.gmane.org>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Thu, 14 Jul 2011 13:34:48 +0200
+Subject: [PATCH v3] new helper to define common struct resource constructs
+In-Reply-To: <1310631065-4271-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <20110713141849.b8cbf675.akpm@linux-foundation.org>
+	<1310631065-4271-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <19998.54360.684936.674009@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, 
+Hi,
 
-I am working on ARM9 based linux embedded system. I need to 
-interface a CMOS camera on the SoC. The processor I use is 
-samsung s3c2416, which does not have a camera interface. 
-The linux version I use is 2.6.21
+Uwe Kleine-K?nig writes:
+> resource definitions that just define start, end and flags =
+> IORESOURCE_MEM or IORESOURCE_IRQ (with start=end) are quite common. So
+> introduce a shortcut for them. For completeness add macros for
+> IORESOURCE_DMA and IORESOURCE_IO, too and also make available a set of
+> macros to specify named resources of all types which are less common.
+> 
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> ---
+> changes since v2:
+> - add parentheses around macro parameter usages
+> 
+> changes since v1:                                                               
+> - also add _IO and _DMA variants                                                
+> 
+>  include/linux/ioport.h |   30 ++++++++++++++++++++++++++++++
+>  1 files changed, 30 insertions(+), 0 deletions(-)
+> 
+> diff --git a/include/linux/ioport.h b/include/linux/ioport.h
+> index 63eb429..9d57a71 100644
+> --- a/include/linux/ioport.h
+> +++ b/include/linux/ioport.h
+> @@ -109,6 +109,36 @@ struct resource_list {
+>  /* PCI control bits.  Shares IORESOURCE_BITS with above PCI ROM.  */
+>  #define IORESOURCE_PCI_FIXED		(1<<4)	/* Do not move resource */
+>  
+> +
+> +/* helpers to define resources */
+> +#define DEFINE_RES_NAMED(_start, _size, _name, _flags)			\
+> +	{								\
+> +		.start = (_start),					\
+> +		.end = (_start) + (_size) - 1,				\
+> +		.name = (_name),					\
+> +		.flags = (_flags),					\
+> +	}
+> +
+> +#define DEFINE_RES_IO_NAMED(_start, _size, _name)			\
+> +	DEFINE_RES_NAMED((_start), (_size), (_name), IORESOURCE_IO)
+>
+There is no need for parens around a macro argument when it is not
+part of an expression...
+This just looks silly.
 
-With the standard resolutions(640*480) and fps
- (~25 fps) configured on the camera, I am getting the 
-clock rates as below:
-Master clock: 24 MHz
-Pixel Clock : 8MHz
-HSYNC       : 20KHz
-VSYNC       : 25Hz
 
-The Bit Resolution I use is 8bpp. 
+Lothar Wa?mann
+-- 
+___________________________________________________________
 
-Using the regular interrupt lines (external interrupts),
- will I be able to read the 8 bit camera data coming 
-with each pixel ? Can I do this with regular IRQ interrupt
- or should I configure my interrupts to be FIQ ? 
-Is there any generic driver available for this 
-kind of interface in linux. What is the interrupt
- latency if I configure the external interrupts in FIQ mode 
-and IRQ mode ? 
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
 
-
-Thank You
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
