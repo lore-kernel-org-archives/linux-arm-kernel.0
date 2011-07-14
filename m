@@ -1,69 +1,16 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Thu, 14 Jul 2011 10:11:05 +0200
-Subject: [PATCH v3] new helper to define common struct resource constructs
-In-Reply-To: <20110713141849.b8cbf675.akpm@linux-foundation.org>
-References: <20110713141849.b8cbf675.akpm@linux-foundation.org>
-Message-ID: <1310631065-4271-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Thu, 14 Jul 2011 10:24:14 +0200
+Subject: [PATCH] USB: s3c2410_udc: fix unterminated platform_device_id
+	table
+In-Reply-To: <1310468729.6590.3.camel@phoenix>
+References: <1310468729.6590.3.camel@phoenix>
+Message-ID: <20110714082414.GC7149@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-resource definitions that just define start, end and flags =
-IORESOURCE_MEM or IORESOURCE_IRQ (with start=end) are quite common. So
-introduce a shortcut for them. For completeness add macros for
-IORESOURCE_DMA and IORESOURCE_IO, too and also make available a set of
-macros to specify named resources of all types which are less common.
+* Axel Lin | 2011-07-12 19:05:29 [+0800]:
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
-changes since v2:
-- add parentheses around macro parameter usages
+>Signed-off-by: Axel Lin <axel.lin@gmail.com>
+Acked-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 
-changes since v1:                                                               
-- also add _IO and _DMA variants                                                
-
- include/linux/ioport.h |   30 ++++++++++++++++++++++++++++++
- 1 files changed, 30 insertions(+), 0 deletions(-)
-
-diff --git a/include/linux/ioport.h b/include/linux/ioport.h
-index 63eb429..9d57a71 100644
---- a/include/linux/ioport.h
-+++ b/include/linux/ioport.h
-@@ -109,6 +109,36 @@ struct resource_list {
- /* PCI control bits.  Shares IORESOURCE_BITS with above PCI ROM.  */
- #define IORESOURCE_PCI_FIXED		(1<<4)	/* Do not move resource */
- 
-+
-+/* helpers to define resources */
-+#define DEFINE_RES_NAMED(_start, _size, _name, _flags)			\
-+	{								\
-+		.start = (_start),					\
-+		.end = (_start) + (_size) - 1,				\
-+		.name = (_name),					\
-+		.flags = (_flags),					\
-+	}
-+
-+#define DEFINE_RES_IO_NAMED(_start, _size, _name)			\
-+	DEFINE_RES_NAMED((_start), (_size), (_name), IORESOURCE_IO)
-+#define DEFINE_RES_IO(_start, _size)					\
-+	DEFINE_RES_IO_NAMED((_start), (_size), NULL)
-+
-+#define DEFINE_RES_MEM_NAMED(_start, _size, _name)			\
-+	DEFINE_RES_NAMED((_start), (_size), (_name), IORESOURCE_MEM)
-+#define DEFINE_RES_MEM(_start, _size)					\
-+	DEFINE_RES_MEM_NAMED((_start), (_size), NULL)
-+
-+#define DEFINE_RES_IRQ_NAMED(_irq, _name)				\
-+	DEFINE_RES_NAMED((_irq), 1, (_name), IORESOURCE_IRQ)
-+#define DEFINE_RES_IRQ(_irq)						\
-+	DEFINE_RES_IRQ_NAMED((_irq), NULL)
-+
-+#define DEFINE_RES_DMA_NAMED(_dma, _name)				\
-+	DEFINE_RES_NAMED((_dma), 1, (_name), IORESOURCE_DMA)
-+#define DEFINE_RES_DMA(_dma)						\
-+	DEFINE_RES_DMA_NAMED((_dma), NULL)
-+
- /* PC/ISA/whatever - the normal PC address spaces: IO and memory */
- extern struct resource ioport_resource;
- extern struct resource iomem_resource;
--- 
-1.7.5.4
+Sebastian
