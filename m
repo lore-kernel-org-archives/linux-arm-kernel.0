@@ -1,27 +1,35 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 14 Jul 2011 00:47:10 -0700
-Subject: [PATCH 1/3] ARM: OMAP4: Add pcm049 to Kconfig/Makefile
-In-Reply-To: <20110714072708.GK5783@atomide.com>
-References: <1310119464-3514-1-git-send-email-j.weitzel@phytec.de>
-	<1310119464-3514-2-git-send-email-j.weitzel@phytec.de>
-	<4E16EECF.7030102@mvista.com> <20110708115521.GA5783@atomide.com>
-	<20110708115842.GJ4820@legolas.emea.dhcp.ti.com>
-	<20110714072708.GK5783@atomide.com>
-Message-ID: <20110714074710.GM5783@atomide.com>
+From: ccross@google.com (Colin Cross)
+Date: Thu, 14 Jul 2011 00:58:41 -0700
+Subject: [PATCH] ARM: move memory layout sanity checking before meminfo
+	initialization
+In-Reply-To: <20110714073453.GK23270@n2100.arm.linux.org.uk>
+References: <20110705185758.GI8286@n2100.arm.linux.org.uk>
+	<CAMbhsRRQ9D+VXTZP3vB7egkROEtN9-FxssFa2EcxuqB3F-Uv6Q@mail.gmail.com>
+	<20110714073453.GK23270@n2100.arm.linux.org.uk>
+Message-ID: <CAMbhsRT=NNYUYyYZXpz2=PpBXoBGANQHPgOkCE1oZ8XzHKN4og@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [110714 00:22]:
-> * Felipe Balbi <balbi@ti.com> [110708 04:53]:
-> > 
-> > Are you or are you not taking now board files ? We have one which was
-> > left out due to a comment from Russell stating that no new board-files
-> > would be accepted until the move to device tree was completed [1]
+On Thu, Jul 14, 2011 at 12:34 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Jul 13, 2011 at 11:52:21PM -0700, Colin Cross wrote:
+>> On Tue, Jul 5, 2011 at 11:57 AM, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>> > Ensure that the meminfo array is sanity checked before we pass the
+>> > memory to memblock. ?This helps to ensure that memblock and meminfo
+>> > agree on the dimensions of memory, especially when more memory is
+>> > passed than the kernel can deal with.
+>> >
+>> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+>>
+>> This patch causes a regression in v3.0-rc7 when overlapping mem=
+>> options are passed to the kernel. ?On an OMAP4 board, I was
+>> accidentally using "mem=512M mem=920M" on the command line, which
+>> works fine in v3.0-rc6.
+>
+> I don't regard that as a regression. ?That's something which hasn't
+> been supported before the move to memblock, and it's not something
+> that was not intended to be supported.
+>
 
-For the mcop changes, that should be updated against current devel-board
-for the irq/timer/init_early changes. Then I can add that to testing-board
-too.
-
-Tony
- 
-> > [1] http://marc.info/?t=130199607500006&r=1&w=2
+Ok, works for me.
