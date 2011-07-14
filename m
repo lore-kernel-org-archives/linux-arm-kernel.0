@@ -1,142 +1,65 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 14 Jul 2011 01:53:29 -0700
-Subject: [PATCH] omap2+: Use Kconfig symbol in Makefile instead of obj-y
-In-Reply-To: <CACxGe6sELS=C==16TZ2pfrxJDDyqjS_qOwJUfwzwMO8hqo8Xag@mail.gmail.com>
-References: <1310592975-25773-1-git-send-email-manjugk@ti.com>
-	<1310592975-25773-4-git-send-email-manjugk@ti.com>
-	<CACxGe6sELS=C==16TZ2pfrxJDDyqjS_qOwJUfwzwMO8hqo8Xag@mail.gmail.com>
-Message-ID: <20110714085328.GN5783@atomide.com>
+From: boojin.kim@samsung.com (boojin)
+Date: Thu, 14 Jul 2011 18:04:26 +0900
+Subject: [PATCH 3/7] DMA: PL330: Add DMA capabilities
+In-Reply-To: <CABb+yY198iVKYV765C_dokzciL9en3kkRyZgcgYpp5WphPNZmw@mail.gmail.com>
+References: <1309781915-31549-1-git-send-email-kgene.kim@samsung.com>
+	<1309781915-31549-4-git-send-email-kgene.kim@samsung.com>
+	<CAPTzV15Y7JFDKsec8x-M0C1AFLOMp39QvHpRCsO=E001P_tH9A@mail.gmail.com>
+	<CABb+yY0M659Ob0u+wOBW5i6v_VfpayRkY29-TUNpsp1oVLn-SQ@mail.gmail.com>
+	<002201cc41c0$fdf79810$f9e6c830$%kim@samsung.com>
+	<CABb+yY198iVKYV765C_dokzciL9en3kkRyZgcgYpp5WphPNZmw@mail.gmail.com>
+Message-ID: <002801cc4205$08c91f90$1a5b5eb0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As noted by Grant Likely <grant.likely@secretlab.ca>, omap2+ Makefile unnecessarily
-repeats entries for common device init code instead of using Kconfig symbol.
-
-Remove references to hsmmc.o and board-flash.o. Also omap_phy_internal.o
-references can be removed once it has some Kconfig symbol to use.
-
-Signed-off-by: Tony Lindgren <tony at atomide.com
----
-* Grant Likely <grant.likely@secretlab.ca> [110713 16:10]:
+Jassi Brar Wrote:
+> On Thu, Jul 14, 2011 at 6:27 AM, boojin <boojin.kim@samsung.com> wrote:
+> > Jassi Brar wrote:
+> >
+> >> On Tue, Jul 5, 2011 at 12:03 PM, Chanho Park <parkch98@gmail.com> wrote:
+> >> > Kukjin Kim <kgene.kim <at> samsung.com> writes:
+> >> >
+> >> > (snip)
+> >> >
+> >> >> +             if (slave_config->direction == DMA_TO_DEVICE) {
+> >> >> +                     if (slave_config->dst_addr)
+> >> >> +                             peri->fifo_addr = slave_config->dst_addr;
+> >> >> +                     if (slave_config->dst_addr_width) {
+> >> >> +                             i = 0;
+> >> >> +                             while (slave_config->dst_addr_width != (1
+> <<
+> >> > i))
+> >> >> +                                     i++;
+> >> >> +                             peri->burst_sz = i;
+> >> >> +                     }
+> >> >> +             } else if (slave_config->direction == DMA_FROM_DEVICE)
+> {
+> >> >> +                     if (slave_config->src_addr)
+> >> >> +                             peri->fifo_addr = slave_config->src_addr;
+> >> >> +                     if (slave_config->src_addr_width) {
+> >> >> +                             i = 0;
+> >> >> +                             while (slave_config->src_addr_width != (1
+> <<
+> >> > i))
+> >> >> +                                     i++;
+> >> >> +                             peri->burst_sz = i;
+> >> >
+> >> > Re-send including cc and mailing lists
+> >> > --
+> >> > pl330 dmac only supports 1/2/4/8/16 bytes burst size.
+> >> > If some bad D/D doesn't use powers of 2 width,
+> >> > dmaengine is going to infinite loop.
+> >> > You'd better check it instead of running loop.
+> >> >
+> >> It might be even better to start with max possible width and
+> >> keep decreasing 'i' in the loop.
+> > I will addressed your comment on next release.
 > 
-> This is an odd construct.  Tony, why does each board add hsmmc to the
-> oby-y variable instead of it having its own kconfig symbol?
+> Actually, best would be to simply do
+>     peri->burst_sz =  __ffs(slave_config->src_addr_width);
+> 
+> And sorry I haven't yet reviewed the patches because I have been
+> very busy lately. Will be more active in a few days.
 
-Heh that's true. Something that got added for one board got cloned
-all over the Makefile. Here's a patch to simplify that.
-
-diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-index ff1466f..9c49a86 100644
---- a/arch/arm/mach-omap2/Makefile
-+++ b/arch/arm/mach-omap2/Makefile
-@@ -175,78 +175,66 @@ endif
- # Specific board support
- obj-$(CONFIG_MACH_OMAP_GENERIC)		+= board-generic.o
- obj-$(CONFIG_MACH_OMAP_H4)		+= board-h4.o
--obj-$(CONFIG_MACH_OMAP_2430SDP)		+= board-2430sdp.o \
--					   hsmmc.o
-+obj-$(CONFIG_MACH_OMAP_2430SDP)		+= board-2430sdp.o
- obj-$(CONFIG_MACH_OMAP_APOLLON)		+= board-apollon.o
--obj-$(CONFIG_MACH_OMAP3_BEAGLE)		+= board-omap3beagle.o \
--					   hsmmc.o
--obj-$(CONFIG_MACH_DEVKIT8000)     	+= board-devkit8000.o \
--                                           hsmmc.o
--obj-$(CONFIG_MACH_OMAP_LDP)		+= board-ldp.o \
--					   board-flash.o \
--					   hsmmc.o
--obj-$(CONFIG_MACH_OMAP3530_LV_SOM)      += board-omap3logic.o \
--					   hsmmc.o
--obj-$(CONFIG_MACH_OMAP3_TORPEDO)        += board-omap3logic.o \
--					   hsmmc.o
--obj-$(CONFIG_MACH_OVERO)		+= board-overo.o \
--					   hsmmc.o
--obj-$(CONFIG_MACH_OMAP3EVM)		+= board-omap3evm.o \
--					   hsmmc.o
--obj-$(CONFIG_MACH_OMAP3_PANDORA)	+= board-omap3pandora.o \
--					   hsmmc.o
--obj-$(CONFIG_MACH_OMAP_3430SDP)		+= board-3430sdp.o \
--					   hsmmc.o \
--					   board-flash.o
-+obj-$(CONFIG_MACH_OMAP3_BEAGLE)		+= board-omap3beagle.o
-+obj-$(CONFIG_MACH_DEVKIT8000)     	+= board-devkit8000.o
-+obj-$(CONFIG_MACH_OMAP_LDP)		+= board-ldp.o
-+obj-$(CONFIG_MACH_OMAP3530_LV_SOM)      += board-omap3logic.o
-+obj-$(CONFIG_MACH_OMAP3_TORPEDO)        += board-omap3logic.o
-+obj-$(CONFIG_MACH_ENCORE)		+= board-omap3encore.o
-+obj-$(CONFIG_MACH_OVERO)		+= board-overo.o
-+obj-$(CONFIG_MACH_OMAP3EVM)		+= board-omap3evm.o
-+obj-$(CONFIG_MACH_OMAP3_PANDORA)	+= board-omap3pandora.o
-+obj-$(CONFIG_MACH_OMAP_3430SDP)		+= board-3430sdp.o
- obj-$(CONFIG_MACH_NOKIA_N8X0)		+= board-n8x0.o
- obj-$(CONFIG_MACH_NOKIA_RM680)		+= board-rm680.o \
--					   sdram-nokia.o \
--					   hsmmc.o
-+					   sdram-nokia.o
- obj-$(CONFIG_MACH_NOKIA_RX51)		+= board-rx51.o \
- 					   sdram-nokia.o \
- 					   board-rx51-peripherals.o \
--					   board-rx51-video.o \
--					   hsmmc.o
-+					   board-rx51-video.o
- obj-$(CONFIG_MACH_OMAP_ZOOM2)		+= board-zoom.o \
- 					   board-zoom-peripherals.o \
- 					   board-zoom-display.o \
--					   board-flash.o \
--					   hsmmc.o \
- 					   board-zoom-debugboard.o
- obj-$(CONFIG_MACH_OMAP_ZOOM3)		+= board-zoom.o \
- 					   board-zoom-peripherals.o \
- 					   board-zoom-display.o \
--					   board-flash.o \
--					   hsmmc.o \
- 					   board-zoom-debugboard.o
- obj-$(CONFIG_MACH_OMAP_3630SDP)		+= board-3630sdp.o \
- 					   board-zoom-peripherals.o \
--					   board-zoom-display.o \
--					   board-flash.o \
--					   hsmmc.o
--obj-$(CONFIG_MACH_CM_T35)		+= board-cm-t35.o \
--					   hsmmc.o
-+					   board-zoom-display.o
-+obj-$(CONFIG_MACH_CM_T35)		+= board-cm-t35.o
- obj-$(CONFIG_MACH_CM_T3517)		+= board-cm-t3517.o
--obj-$(CONFIG_MACH_IGEP0020)		+= board-igep0020.o \
--					   hsmmc.o
--obj-$(CONFIG_MACH_OMAP3_TOUCHBOOK)	+= board-omap3touchbook.o \
--					   hsmmc.o
-+obj-$(CONFIG_MACH_IGEP0020)		+= board-igep0020.o
-+obj-$(CONFIG_MACH_OMAP3_TOUCHBOOK)	+= board-omap3touchbook.o
- obj-$(CONFIG_MACH_OMAP_4430SDP)		+= board-4430sdp.o \
--					   hsmmc.o \
- 					   omap_phy_internal.o
- obj-$(CONFIG_MACH_OMAP4_PANDA)		+= board-omap4panda.o \
--					   hsmmc.o \
-+					   omap_phy_internal.o
-+
-+obj-$(CONFIG_MACH_PCM049)		+= board-omap4pcm049.o \
- 					   omap_phy_internal.o
- 
- obj-$(CONFIG_MACH_OMAP3517EVM)		+= board-am3517evm.o \
--					   omap_phy_internal.o \
-+					   omap_phy_internal.o
- 
- obj-$(CONFIG_MACH_CRANEBOARD)		+= board-am3517crane.o
- 
--obj-$(CONFIG_MACH_SBC3530)		+= board-omap3stalker.o \
--					   hsmmc.o
-+obj-$(CONFIG_MACH_SBC3530)		+= board-omap3stalker.o
- obj-$(CONFIG_MACH_TI8168EVM)		+= board-ti8168evm.o
-+
- # Platform specific device init code
-+
-+omap-flash-$(CONFIG_MTD_NAND_OMAP2)	:= board-flash.o
-+omap-flash-$(CONFIG_MTD_ONENAND_OMAP2)	:= board-flash.o
-+obj-y					+= $(omap-flash-y) $(omap-flash-m)
-+
-+omap-hsmmc-$(CONFIG_MMC_OMAP_HS)	:= hsmmc.o
-+obj-y					+= $(omap-hsmmc-m) $(omap-hsmmc-y)
-+
-+
- usbfs-$(CONFIG_ARCH_OMAP_OTG)		:= usb-fs.o
- obj-y					+= $(usbfs-m) $(usbfs-y)
- obj-y					+= usb-musb.o
+Thanks for good information. Please give me your feedback.
+I will release next version after gathering and reflecting all comments.
