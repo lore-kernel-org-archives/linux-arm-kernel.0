@@ -1,27 +1,63 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Thu, 14 Jul 2011 20:27:34 +0200
-Subject: [RFC 0/6] watchdog drivers converted to the new framework
-In-Reply-To: <ADE657CA350FB648AAC2C43247A983F001F383E05B65@AUSP01VMBX24.collaborationhost.net>
-References: <1310588766-16638-1-git-send-email-w.sang@pengutronix.de>
-	<ADE657CA350FB648AAC2C43247A983F001F383E05B65@AUSP01VMBX24.collaborationhost.net>
-Message-ID: <20110714182734.GA31082@pengutronix.de>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Thu, 14 Jul 2011 20:30:45 +0200 (CEST)
+Subject: CMOS camera interface on ARM
+In-Reply-To: <loom.20110714T130539-468@post.gmane.org>
+References: <loom.20110714T130539-468@post.gmane.org>
+Message-ID: <Pine.LNX.4.64.1107142029380.10688@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, 14 Jul 2011, GIGIN JOSE wrote:
 
-> I would also like to convert this driver into a proper platform_driver using
-> ioremap'ed addresses instead of the static mappings.  Converting the driver
-> to the new watchdog framework would make this a bit cleaner.
+> Hi, 
+> 
+> I am working on ARM9 based linux embedded system. I need to 
+> interface a CMOS camera on the SoC. The processor I use is 
+> samsung s3c2416, which does not have a camera interface. 
+> The linux version I use is 2.6.21
 
-Try managed devices (devm_* and friends) for an extra cleanup bonus.
+You need to use the latest kernel.
 
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110714/b945e391/attachment.sig>
+> 
+> With the standard resolutions(640*480) and fps
+>  (~25 fps) configured on the camera, I am getting the 
+> clock rates as below:
+> Master clock: 24 MHz
+> Pixel Clock : 8MHz
+> HSYNC       : 20KHz
+> VSYNC       : 25Hz
+> 
+> The Bit Resolution I use is 8bpp. 
+> 
+> Using the regular interrupt lines (external interrupts),
+>  will I be able to read the 8 bit camera data coming 
+> with each pixel ? Can I do this with regular IRQ interrupt
+>  or should I configure my interrupts to be FIQ ? 
+> Is there any generic driver available for this 
+> kind of interface in linux.
+
+See drivers/media/video/s5p-fimc/ for an example, as well as other drivers 
+under drivers/media/video/
+
+Thanks
+Guennadi
+
+> What is the interrupt
+>  latency if I configure the external interrupts in FIQ mode 
+> and IRQ mode ? 
+> 
+> 
+> Thank You
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
