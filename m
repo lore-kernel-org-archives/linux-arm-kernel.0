@@ -1,44 +1,99 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 14 Jul 2011 17:22:19 +0200
-Subject: [PATCH v3 0/6] ARM: make mach/hardware.h optional
-In-Reply-To: <1310489612-8625-1-git-send-email-robherring2@gmail.com>
-References: <1310489612-8625-1-git-send-email-robherring2@gmail.com>
-Message-ID: <201107141722.19407.arnd@arndb.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 14 Jul 2011 23:52:37 +0800
+Subject: [PATCH v2] mtd: dataflash: add device tree probe support
+In-Reply-To: <1310283313-32087-1-git-send-email-shawn.guo@linaro.org>
+References: <1310283313-32087-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1310658757-17018-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 12 July 2011, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
-> 
-> Currently, all ARM platforms must have a mach/hardware.h include. This is
-> because it is ultimately included by linux/pci.h which is included in many
-> places even for !CONFIG_PCI.
-> 
-> This could be fixed simply with an ifdef around the include of mach/hardware.h
-> in asm/pci.h. However, in the interest of fixing this for single kernel
-> binary builds, this series removes the include of mach/hardware.h outside of
-> mach-* and plat-*. What's used from hardware.h is a couple of PCI defines. 
-> Converting them to variables allows each platform to set the values as needed.
-> 
-> This does not address the inclusion of mach/hardware.h under drivers/*. This
-> appears to be mostly older platforms. There could also be some indirect
-> inclusions from other mach/* headers.
-> 
-> I've compile tested on most affected ARM platforms. 
-> 
-> Changes from v2:
-> - Incorporated compile fixes for microblaze from Michal Simek.
-> - Added conversion of powerpc to generic pci flag functions.
-> - Combined powerpc and microblaze conversion to use 
->   asm-generic/pci-bridge.h into one commit. Renaming of powerpc pci
->   flags functions is separate commit.
-> - Changed defaults for PCIBIOS_MIN_IO and PCIBIOS_MIN_MEM to 0x1000 and
->   0x1000000, respectively.
-> - Dropped commit moving ARCH_HAS_DMA_SET_COHERENT_MASK defines into 
->   memory.h. This conflicts with other clean-up work by Nicolas Pitre.
+It adds device tree probe support for mtd_dataflash driver.
 
-Looks good to me, I'll apply it as soon as I hear back from Russell.
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Cc: Grant Likely <grant.likely@secretlab.ca>
+Cc: David Woodhouse <dwmw2@infradead.org>
+Cc: Artem Bityutskiy <Artem.Bityutskiy@nokia.com>
+---
+Changes since v1:
+ * Add "atmel,at45xxx" into the match table
+ * Add binding document
 
-Russell, do you have an opinion on the changes to arch/arm/{include,lib} ?
+ .../devicetree/bindings/mtd/atmel-dataflash.txt    |   14 ++++++++++++++
+ drivers/mtd/devices/mtd_dataflash.c                |   13 ++++++++++++-
+ 2 files changed, 26 insertions(+), 1 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mtd/atmel-dataflash.txt
 
-	Arnd
+diff --git a/Documentation/devicetree/bindings/mtd/atmel-dataflash.txt b/Documentation/devicetree/bindings/mtd/atmel-dataflash.txt
+new file mode 100644
+index 0000000..3783962
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mtd/atmel-dataflash.txt
+@@ -0,0 +1,14 @@
++* Atmel Data Flash
++
++Required properties:
++- compatible : "atmel,<model>", "atmel,<series>", "atmel,dataflash".
++
++Example:
++
++flash at 1 {
++	#address-cells = <1>;
++	#size-cells = <1>;
++	compatible = "atmel,at45db321d", "atmel,at45xxx", "atmel,dataflash";
++	spi-max-frequency = <25000000>;
++	reg = <1>;
++};
+diff --git a/drivers/mtd/devices/mtd_dataflash.c b/drivers/mtd/devices/mtd_dataflash.c
+index 8f6b02c..8e091b0 100644
+--- a/drivers/mtd/devices/mtd_dataflash.c
++++ b/drivers/mtd/devices/mtd_dataflash.c
+@@ -24,6 +24,8 @@
+ #include <linux/mtd/mtd.h>
+ #include <linux/mtd/partitions.h>
+ 
++#include <linux/of.h>
++#include <linux/of_device.h>
+ 
+ /*
+  * DataFlash is a kind of SPI flash.  Most AT45 chips have two buffers in
+@@ -98,6 +100,12 @@ struct dataflash {
+ 	struct mtd_info		mtd;
+ };
+ 
++static const struct of_device_id dataflash_dt_ids[] = {
++	{ .compatible = "atmel,at45xxx", },
++	{ .compatible = "atmel,dataflash", },
++	{ /* sentinel */ }
++};
++
+ /* ......................................................................... */
+ 
+ /*
+@@ -634,6 +642,7 @@ add_dataflash_otp(struct spi_device *spi, char *name,
+ {
+ 	struct dataflash		*priv;
+ 	struct mtd_info			*device;
++	struct mtd_part_parser_data	ppdata;
+ 	struct flash_platform_data	*pdata = spi->dev.platform_data;
+ 	char				*otp_tag = "";
+ 	int				err = 0;
+@@ -675,7 +684,8 @@ add_dataflash_otp(struct spi_device *spi, char *name,
+ 			pagesize, otp_tag);
+ 	dev_set_drvdata(&spi->dev, priv);
+ 
+-	err = mtd_device_parse_register(device, NULL, 0,
++	ppdata.of_node = spi->dev.of_node;
++	err = mtd_device_parse_register(device, NULL, &ppdata,
+ 			pdata ? pdata->parts : NULL,
+ 			pdata ? pdata->nr_parts : 0);
+ 
+@@ -926,6 +936,7 @@ static struct spi_driver dataflash_driver = {
+ 		.name		= "mtd_dataflash",
+ 		.bus		= &spi_bus_type,
+ 		.owner		= THIS_MODULE,
++		.of_match_table = dataflash_dt_ids,
+ 	},
+ 
+ 	.probe		= dataflash_probe,
+-- 
+1.7.4.1
