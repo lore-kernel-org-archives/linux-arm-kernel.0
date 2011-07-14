@@ -1,37 +1,50 @@
-From: dhylands@gmail.com (Dave Hylands)
-Date: Thu, 14 Jul 2011 09:56:34 -0700
-Subject: ARM cortex A9 feature
-In-Reply-To: <CAJ8eaTzLmSTSMOY-0Xg0tE-DEbZ6RNA+uh70Dn3K5CbrjQsEiA@mail.gmail.com>
-References: <CAJ8eaTzLmSTSMOY-0Xg0tE-DEbZ6RNA+uh70Dn3K5CbrjQsEiA@mail.gmail.com>
-Message-ID: <CABi1daHh7cgyhJ4c3zo+jSUY4uzbFtihtgw0Q2Mcrndno_gcTA@mail.gmail.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Thu, 14 Jul 2011 12:23:43 -0500
+Subject: [RFC 0/6] watchdog drivers converted to the new framework
+In-Reply-To: <1310588766-16638-1-git-send-email-w.sang@pengutronix.de>
+References: <1310588766-16638-1-git-send-email-w.sang@pengutronix.de>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F001F383E05B65@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Naveen,
+On Wednesday, July 13, 2011 1:26 PM, Wolfram Sang wrote:
+> As promised, here is a RFC with two examples demonstrating how watchdog drivers
+> can be converted to use the new watchdog framework (using the current version
+> Wim posted two days ago). There is also conversion guide put to the
+> documentation folder. Being RFC, all this is not final yet, but presentable, I
+> hope.
+> 
+> Although there are a few more consolidation options left, there is already a
+> gain of ~100 lines per driver. Promising, but there are a few issues to be
+> sorted out, too, yet nothing which can be dealt with.
+> 
+> I have two other drivers in the making (stmp3xxx and imx2), but they need some
+> more preparation; the first one needs some internal cleanups (like a lot of
+> watchdog drivers); the latter one needs an addition to the framework
+> (installing a timer for non-stoppable devices). I will also prepare a new
+> driver (mx1) to show how small new drivers can be now :) The aim for all these
+> driver conversions is inclusion in Linux 3.2. I still hope we can get the basic
+> framework into Linux 3.1.
+> 
+> Many thanks to CELF/LF for supporting this work and to Wim and Alan for making
+> the framework!
+> 
+> Looking forward to comments,
 
-On Wed, Jul 13, 2011 at 11:26 PM, naveen yadav <yad.naveen@gmail.com> wrote:
-> Hi All,
->
-> I am reading ARM cortex a9 manual and got few question in mind.
->
-> 1. Where I need strong order type memory ? any sample example is very helpfull.
+What's the status on Wim's watchdog framework patches?  It would be nice to have
+them re-posted and CC the linux-arm-kernel list.  Not everyone follows lkml
+regularly.
 
-Often when dealing with hardware, you need to ensure that when your code does:
+I found Wim's patches on lkml and converted the ep93xx watchdog driver and get:
 
-reg1 = val1;
-reg2 = val2;
+ drivers/watchdog/ep93xx_wdt.c |  174 +++++++++-------------------------------
+ 1 files changed, 39 insertions(+), 135 deletions(-)
 
-that these writes actually occur in the order that the code issues
-them. Using volatile pointers will get the compiler to not reorder the
-instructions, but you still need the writes to hit the hardware in the
-same order that they were issued. Using strongly ordered memory is one
-way to achieve that.
+Overall I like the results.  It also makes the driver a lot easier to follow.
 
-> 2. L2 cache, Cortex a9 support exclusive L2 cache feature, where we need it ?
+I would also like to convert this driver into a proper platform_driver using
+ioremap'ed addresses instead of the static mappings.  Converting the driver
+to the new watchdog framework would make this a bit cleaner.
 
-L2 cache can improve your performance.
-
--- 
-Dave Hylands
-Shuswap, BC, Canada
-http://www.davehylands.com
+Regards,
+Hartley
