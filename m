@@ -1,99 +1,47 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 14 Jul 2011 23:52:37 +0800
-Subject: [PATCH v2] mtd: dataflash: add device tree probe support
-In-Reply-To: <1310283313-32087-1-git-send-email-shawn.guo@linaro.org>
-References: <1310283313-32087-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1310658757-17018-1-git-send-email-shawn.guo@linaro.org>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Thu, 14 Jul 2011 08:49:28 -0700
+Subject: [PATCH 1/2] ARM: Tegra: Harmony: Register and configure WM8903
+	IRQ GPIO
+In-Reply-To: <20110714122520.GB14249@sirena.org.uk>
+References: <1310589618-16080-1-git-send-email-swarren@nvidia.com>
+	<20110714122520.GB14249@sirena.org.uk>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF049E834971@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It adds device tree probe support for mtd_dataflash driver.
+Mark Brown wrote at Thursday, July 14, 2011 6:25 AM:
+> On Wed, Jul 13, 2011 at 02:40:17PM -0600, Stephen Warren wrote:
+> 
+> > +	gpio_request(TEGRA_GPIO_CDC_IRQ, "wm8903");
+> > +	gpio_direction_input(TEGRA_GPIO_CDC_IRQ);
+> > +
+> >  	i2c_register_board_info(0, &wm8903_board_info, 1);
+> 
+> This seems silly - we should fix this in the core code rather than have
+> every single board that ahppens to use an interrupt which is also
+> available as a GPIO manually faff around with gpiolib.
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Cc: David Woodhouse <dwmw2@infradead.org>
-Cc: Artem Bityutskiy <Artem.Bityutskiy@nokia.com>
----
-Changes since v1:
- * Add "atmel,at45xxx" into the match table
- * Add binding document
+That seems a good goal.
 
- .../devicetree/bindings/mtd/atmel-dataflash.txt    |   14 ++++++++++++++
- drivers/mtd/devices/mtd_dataflash.c                |   13 ++++++++++++-
- 2 files changed, 26 insertions(+), 1 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/mtd/atmel-dataflash.txt
+However, how does the WM8903 driver know whether the interrupt number
+it's passed is a straight-up dedicated interrupt (hence the calls aren't
+required), or a GPIO (hence they are)?
 
-diff --git a/Documentation/devicetree/bindings/mtd/atmel-dataflash.txt b/Documentation/devicetree/bindings/mtd/atmel-dataflash.txt
-new file mode 100644
-index 0000000..3783962
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mtd/atmel-dataflash.txt
-@@ -0,0 +1,14 @@
-+* Atmel Data Flash
-+
-+Required properties:
-+- compatible : "atmel,<model>", "atmel,<series>", "atmel,dataflash".
-+
-+Example:
-+
-+flash at 1 {
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+	compatible = "atmel,at45db321d", "atmel,at45xxx", "atmel,dataflash";
-+	spi-max-frequency = <25000000>;
-+	reg = <1>;
-+};
-diff --git a/drivers/mtd/devices/mtd_dataflash.c b/drivers/mtd/devices/mtd_dataflash.c
-index 8f6b02c..8e091b0 100644
---- a/drivers/mtd/devices/mtd_dataflash.c
-+++ b/drivers/mtd/devices/mtd_dataflash.c
-@@ -24,6 +24,8 @@
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/partitions.h>
- 
-+#include <linux/of.h>
-+#include <linux/of_device.h>
- 
- /*
-  * DataFlash is a kind of SPI flash.  Most AT45 chips have two buffers in
-@@ -98,6 +100,12 @@ struct dataflash {
- 	struct mtd_info		mtd;
- };
- 
-+static const struct of_device_id dataflash_dt_ids[] = {
-+	{ .compatible = "atmel,at45xxx", },
-+	{ .compatible = "atmel,dataflash", },
-+	{ /* sentinel */ }
-+};
-+
- /* ......................................................................... */
- 
- /*
-@@ -634,6 +642,7 @@ add_dataflash_otp(struct spi_device *spi, char *name,
- {
- 	struct dataflash		*priv;
- 	struct mtd_info			*device;
-+	struct mtd_part_parser_data	ppdata;
- 	struct flash_platform_data	*pdata = spi->dev.platform_data;
- 	char				*otp_tag = "";
- 	int				err = 0;
-@@ -675,7 +684,8 @@ add_dataflash_otp(struct spi_device *spi, char *name,
- 			pagesize, otp_tag);
- 	dev_set_drvdata(&spi->dev, priv);
- 
--	err = mtd_device_parse_register(device, NULL, 0,
-+	ppdata.of_node = spi->dev.of_node;
-+	err = mtd_device_parse_register(device, NULL, &ppdata,
- 			pdata ? pdata->parts : NULL,
- 			pdata ? pdata->nr_parts : 0);
- 
-@@ -926,6 +936,7 @@ static struct spi_driver dataflash_driver = {
- 		.name		= "mtd_dataflash",
- 		.bus		= &spi_bus_type,
- 		.owner		= THIS_MODULE,
-+		.of_match_table = dataflash_dt_ids,
- 	},
- 
- 	.probe		= dataflash_probe,
+I guess the answer is that there should be an interrupt API to map from
+interrupt to GPIO number, returning <0 when there is no GPIO backing the
+IRQ, and an op in struct irq_chip to implement that? However, that's not
+there right now as far as I can tell.
+
+Finally, there are some pinmux interactions that need to be dealt with;
+on Tegra, the pinmux allows the tristate/drive status of pins to be set
+on a group basis (a group being a set of 1-n pins). However, gpio enable
+(which overrides the pinmux's setting of tristate/drive) can be set on
+a per-pin basis. At least on Seaboard, the WM8903 IRQ is an input pin
+in a group that otherwise needs to contain output pins, so we really
+want to enable the WM8903 IRQ GPIO pin as a GPIO, and set it to input,
+before setting up that pinmux group to drive the pins. Without this,
+there may be a brief period where both Tegra and the WM8903 are driving
+this IRQ signal, which can't be good for hardware.
+
 -- 
-1.7.4.1
+nvpublic
