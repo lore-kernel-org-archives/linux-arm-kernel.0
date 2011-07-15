@@ -1,68 +1,84 @@
 From: banajit.g@samsung.com (Banajit Goswami)
-Date: Fri, 15 Jul 2011 20:12:40 +0530
-Subject: [PATCH 0/8] ARM: SAMSUNG: Add common PWM Backlight support
-Message-ID: <1310740968-26722-1-git-send-email-banajit.g@samsung.com>
+Date: Fri, 15 Jul 2011 20:12:42 +0530
+Subject: [PATCH 2/8] ARM: EXYNOS4: Add PWM backlight support on Samsung
+	SMDKV310 board
+In-Reply-To: <1310740968-26722-1-git-send-email-banajit.g@samsung.com>
+References: <1310740968-26722-1-git-send-email-banajit.g@samsung.com>
+Message-ID: <1310740968-26722-3-git-send-email-banajit.g@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- The patches are created against "for-next" branch of Kukjin Kim's tree at:
- git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+This patch adds support for LCD backlight using PWM timer for
+Samsung SMDKV310 board.
 
- Patch [1/8]
-  -- add a common infrastructure to support PWM backlight for various 
-     Samsung boards.
+Signed-off-by: Banajit Goswami <banajit.g@samsung.com>
+---
+ arch/arm/mach-exynos4/Kconfig         |    2 ++
+ arch/arm/mach-exynos4/mach-smdkv310.c |   16 ++++++++++++++++
+ 2 files changed, 18 insertions(+), 0 deletions(-)
 
- Patch [2/8]
-  -- Add support for PWM backlight for SMDKV310 board.
-
- Patch [3/8]
-  -- Add support for PWM backlight for SMDKC210 board.
-
- Patch [4/8]
-  -- Add support for PWM backlight for SMDKV210 board.
-
- Patch [5/8]
-  -- Add support for PWM backlight for SMDKC100 board.
-
- Patch [6/8]
-  -- Add support for PWM backlight for SMDK6440 board.
-
-Patch [7/8]
-  -- Add support for PWM backlight for SMDK6450 board.
-
- Patch [8/8]
-  -- Add support for PWM backlight for SMDK6410 board.
-
- Patch 3 with PWM Backlight support for SMDKC210 is only compile tested.
-
-   [Patch 1/8] ARM: SAMSUNG: Create a common infrastructure for PWM backlight support
-   [Patch 2/8] ARM: EXYNOS4: Add PWM backlight support on Samsung SMDKV310 board
-   [Patch 3/8] ARM: EXYNOS4: Add PWM backlight support on Samsung SMDKC210 board
-   [Patch 4/8] ARM: S5PV210: Add PWM backlight support on Samsung SMDKV210 board
-   [Patch 5/8] ARM: S5PC100: Add PWM backlight support on Samsung SMDKC100 board
-   [Patch 6/8] ARM: S5P64X0: Add PWM backlight support on Samsung SMDK6440 board
-   [Patch 7/8] ARM: S5P64X0: Add PWM backlight support on Samsung SMDK6450 board
-   [Patch 8/8] ARM: S3C64XX: Add PWM backlight support on Samsung SMDK6410 board
-
- arch/arm/mach-exynos4/Kconfig                  |    4 +
- arch/arm/mach-exynos4/mach-smdkc210.c          |   16 +++
- arch/arm/mach-exynos4/mach-smdkv310.c          |   16 +++
- arch/arm/mach-s3c64xx/Kconfig                  |    1 +
- arch/arm/mach-s3c64xx/mach-smdk6410.c          |   15 ++-
- arch/arm/mach-s5p64x0/Kconfig                  |    2 +
- arch/arm/mach-s5p64x0/mach-smdk6440.c          |   54 ++-------
- arch/arm/mach-s5p64x0/mach-smdk6450.c          |   54 ++-------
- arch/arm/mach-s5pc100/Kconfig                  |    1 +
- arch/arm/mach-s5pc100/mach-smdkc100.c          |   55 ++-------
- arch/arm/mach-s5pv210/Kconfig                  |    1 +
- arch/arm/mach-s5pv210/mach-smdkv210.c          |   54 ++-------
- arch/arm/plat-samsung/Kconfig                  |    6 +
- arch/arm/plat-samsung/Makefile                 |    1 +
- arch/arm/plat-samsung/dev-backlight.c          |  151 ++++++++++++++++++++++++
- arch/arm/plat-samsung/include/plat/backlight.h |   26 ++++
- 16 files changed, 291 insertions(+), 166 deletions(-)
- create mode 100644 arch/arm/plat-samsung/dev-backlight.c
- create mode 100644 arch/arm/plat-samsung/include/plat/backlight.h
-
+diff --git a/arch/arm/mach-exynos4/Kconfig b/arch/arm/mach-exynos4/Kconfig
+index 5115b90..e27f044 100644
+--- a/arch/arm/mach-exynos4/Kconfig
++++ b/arch/arm/mach-exynos4/Kconfig
+@@ -128,8 +128,10 @@ config MACH_SMDKV310
+ 	select S3C_DEV_HSMMC2
+ 	select S3C_DEV_HSMMC3
+ 	select EXYNOS4_DEV_AHCI
++	select SAMSUNG_DEV_BACKLIGHT
+ 	select SAMSUNG_DEV_KEYPAD
+ 	select EXYNOS4_DEV_PD
++	select SAMSUNG_DEV_PWM
+ 	select EXYNOS4_DEV_SYSMMU
+ 	select EXYNOS4_SETUP_I2C1
+ 	select EXYNOS4_SETUP_KEYPAD
+diff --git a/arch/arm/mach-exynos4/mach-smdkv310.c b/arch/arm/mach-exynos4/mach-smdkv310.c
+index be16236..e85d646 100644
+--- a/arch/arm/mach-exynos4/mach-smdkv310.c
++++ b/arch/arm/mach-exynos4/mach-smdkv310.c
+@@ -16,6 +16,7 @@
+ #include <linux/io.h>
+ #include <linux/i2c.h>
+ #include <linux/input.h>
++#include <linux/pwm_backlight.h>
+ 
+ #include <asm/mach/arch.h>
+ #include <asm/mach-types.h>
+@@ -29,6 +30,8 @@
+ #include <plat/sdhci.h>
+ #include <plat/iic.h>
+ #include <plat/pd.h>
++#include <plat/gpio-cfg.h>
++#include <plat/backlight.h>
+ 
+ #include <mach/map.h>
+ 
+@@ -210,6 +213,17 @@ static void __init smdkv310_smsc911x_init(void)
+ 		     (0x1 << S5P_SROM_BCX__TACS__SHIFT), S5P_SROM_BC1);
+ }
+ 
++/* LCD Backlight data */
++static struct samsung_bl_gpio_info smdkv310_bl_gpio_info = {
++	.no = EXYNOS4_GPD0(1),
++	.func = S3C_GPIO_SFN(2),
++};
++
++static struct platform_pwm_backlight_data smdkv310_bl_data = {
++	.pwm_id = 1,
++	.pwm_period_ns  = 1000,
++};
++
+ static void __init smdkv310_map_io(void)
+ {
+ 	s5p_init_io(NULL, 0, S5P_VA_CHIPID);
+@@ -231,6 +245,8 @@ static void __init smdkv310_machine_init(void)
+ 
+ 	samsung_keypad_set_platdata(&smdkv310_keypad_data);
+ 
++	samsung_bl_set(&smdkv310_bl_gpio_info, &smdkv310_bl_data);
++
+ 	platform_add_devices(smdkv310_devices, ARRAY_SIZE(smdkv310_devices));
+ }
+ 
 -- 
 1.7.2.3
