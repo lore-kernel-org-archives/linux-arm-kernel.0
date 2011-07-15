@@ -1,74 +1,46 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 15 Jul 2011 13:34:29 +0100
-Subject: [PATCH] ARM: S5P64X0: External Interrupt Support
-In-Reply-To: <CAAgF-Bcke26iFsgf0DA3LB5CLv=TkS6UG0y+SBLR=F6TzGYU+A@mail.gmail.com>
-References: <1310712094-19831-1-git-send-email-padma.v@samsung.com>
-	<20110715090011.GN23270@n2100.arm.linux.org.uk>
-	<CAAgF-Bcke26iFsgf0DA3LB5CLv=TkS6UG0y+SBLR=F6TzGYU+A@mail.gmail.com>
-Message-ID: <20110715123429.GP23270@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 15 Jul 2011 15:06:29 +0200
+Subject: [GIT PULL] Tegra updates for v3.1
+In-Reply-To: <CAMbhsRQoZ7vJGchkXLUOrOH4rpKJzJe-iGvLjTfBmz4R=8HtVw@mail.gmail.com>
+References: <CAMbhsRQoZ7vJGchkXLUOrOH4rpKJzJe-iGvLjTfBmz4R=8HtVw@mail.gmail.com>
+Message-ID: <201107151506.29281.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 15, 2011 at 05:23:33PM +0530, padma venkat wrote:
-> Hi Russell,
+On Friday 15 July 2011, Colin Cross wrote:
+> Please pull Tegra updates from:
 > 
-> On Fri, Jul 15, 2011 at 2:30 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Fri, Jul 15, 2011 at 12:11:34PM +0530, Padmavathi Venna wrote:
-> >> +#define eint_offset(irq) ? ? ((irq) - IRQ_EINT(0))
-> >> +#define eint_irq_to_bit(irq) ((u32)(1 << eint_offset(irq)))
-> >> +
-> >> +static inline void s5p64x0_irq_eint_mask(struct irq_data *data)
-> >> +{
-> >> + ? ? u32 mask;
-> >> +
-> >> + ? ? mask = __raw_readl(S5P64X0_EINT0MASK);
-> >> + ? ? mask |= (u32)data->chip_data;
-> >> + ? ? __raw_writel(mask, S5P64X0_EINT0MASK);
-> >> +}
-> >> +
-> >> +static void s5p64x0_irq_eint_unmask(struct irq_data *data)
-> >> +{
-> >> + ? ? u32 mask;
-> >> +
-> >> + ? ? mask = __raw_readl(S5P64X0_EINT0MASK);
-> >> + ? ? mask &= ~((u32)data->chip_data);
-> >> + ? ? __raw_writel(mask, S5P64X0_EINT0MASK);
-> >> +}
-> >> +
-> >> +static inline void s5p64x0_irq_eint_ack(struct irq_data *data)
-> >> +{
-> >> + ? ? __raw_writel((u32)data->chip_data, S5P64X0_EINT0PEND);
-> >> +}
-> >> +
-> >> +static void s5p64x0_irq_eint_maskack(struct irq_data *data)
-> >> +{
-> >> + ? ? /* compiler should in-line these */
-> >> + ? ? s5p64x0_irq_eint_mask(data);
-> >> + ? ? s5p64x0_irq_eint_ack(data);
-> >> +}
-> >
-> > Won't genirqchip support deal with all of the above for you?
-> As per my understanding, to deal with low level interrupt hardware access
-> we need to use the accessor functions. Please suggest me if there is
-> any better way of doing this.
+> git://android.git.kernel.org/kernel/tegra.git for-next
+> 
+> Mostly peripheral support in existing boards, but also a few fixes and
+> code reduction.
+> 
 
-I'm not saying don't have these.  I'm saying use the _generic_ irqchip
-support which has the code implemented to set and clear bits in registers.
-Something like this:
+Hi Colin,
 
-	struct irq_chip_generic *gc;
+I've browsed over the patches, and I had the impression that there are
+still a number of issues that should be resolved before I pull this.
 
-	gc = irq_alloc_generic_chip(name, 1, first_irq, base_of_controller,
-			handler);
+Specifically, what I noticed is:
 
-	gc->chip_types->chip.irq_ack = irq_gc_ack;
-	gc->chip_types->chip.irq_mask = irq_gc_mask_set_bit;
-	gc->chip_types->chip.irq_unmask = irq_gc_mask_clr_bit;
+* The cpufreq driver should now live in drivers/cpufreq/
+* The DMA driver uses its own interface instead of the regular
+  dma-engine API. I don't want to merge any more drivers like this.
+* The legacy-irq code is essentially dead code, it's not being used
+  anywhere. My impression is that it would need to look differently
+  if you actually want to use it.
+* The pinmux code is getting largely replaced with new code, but
+  the new version does not use the new pinmux API from Linus Walleij.
+* The commit named "[ARM] tegra: clock: Add dvfs support, bug fixes,
+  and cleanups" puts a lot of stuff into a single patch that doesn't
+  even belong into the same pull request.
 
-	/* replace the two below with the _real_ offset, rather than these calculations */
-	gc->chip_types->reg.ack = S5P64X0_EINT0PEND - base_of_controller;
-	gc->chip_types->reg.mask = S5P64X0_EINT0MASK - base_of_controller;
+I would very much like to at least pull the cleanups and bug fixes,
+but it doesn't work like this, sorry.
 
-	irq_setup_generic_chip(gc, mask_of_irqs_to_setup,
-		IRQ_GC_INIT_MASK_CACHE, flags_to_clear, flags_to_set);
+Please remove the controversial patches and submit separate pull
+requests for the bug fixes and cleanups. It's probably a good idea
+to also  have the patches that add features reviewed on the mailing
+lists again and then decide how to proceed with each one..
+
+	Arnd
