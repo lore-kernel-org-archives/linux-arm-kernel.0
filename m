@@ -1,47 +1,81 @@
-From: dhylands@gmail.com (Dave Hylands)
-Date: Thu, 14 Jul 2011 23:03:17 -0700
-Subject: ARM cortex A9 feature
-In-Reply-To: <CAJ8eaTyqOBq2mbfvuTun=bVvhFSrMqJ5uVyd+cozF5PtVeSVaw@mail.gmail.com>
-References: <CAJ8eaTzLmSTSMOY-0Xg0tE-DEbZ6RNA+uh70Dn3K5CbrjQsEiA@mail.gmail.com>
-	<CABi1daHh7cgyhJ4c3zo+jSUY4uzbFtihtgw0Q2Mcrndno_gcTA@mail.gmail.com>
-	<CAJ8eaTyqOBq2mbfvuTun=bVvhFSrMqJ5uVyd+cozF5PtVeSVaw@mail.gmail.com>
-Message-ID: <CABi1daFp=mKw0kq=Vm_T9RKeHfnXsA-kssdRm56AhkaJ4FjCxA@mail.gmail.com>
+From: tushar.behera@linaro.org (Tushar Behera)
+Date: Fri, 15 Jul 2011 11:42:30 +0530
+Subject: [PATCH 0/6] ARM: S5P64X0: Add Framebuffer support
+In-Reply-To: <1310650036-28836-1-git-send-email-ajaykumar.rs@samsung.com>
+References: <1310650036-28836-1-git-send-email-ajaykumar.rs@samsung.com>
+Message-ID: <4E1FDA4E.9010800@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi naveen,
+On Thursday 14 July 2011 06:57 PM, Ajay Kumar wrote:
+> 	The patches are created against "for-next" branch of Kukjin Kim's tree at:
+> 	git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+>
+> 	Patch [1/6]
+> 	-- add "s5p64x0-fb" type driver_data(s3c_fb_driverdata).
+> 	-- Display controller in S5P64X0 supports 3 windows.
+>
+> 	Patch [2/6]
+> 	-- Resource definitions(_MEM, _IRQ).
+>
+> 	Patch [3/6]
+> 	-- Set s3c_device_fb name as "s5p64x0-fb"
+> 	   for S5P6440 and S5P6450.
+>
+> 	Patch [4/6]
+> 	-- GPIO settings for LCD in S5P6440 and S5P6450.
+> 	-- Select LCD interface type (RGB/i80)
+>
+> 	Patch [5/6]
+> 	-- Add support for LCD-LTE480 platform device in SMDK6440.
+> 	-- Platform data for FB and a basic window definition.
+> 	-- Enables FB support and platform-lcd support.
+> 	-- Add support for window 0 with 24 BPP.
+>
+> 	Patch [6/6]
+> 	-- Add support for LCD-LTE480 platform device in SMDK6450.
+> 	-- Platform data for FB and a basic window definition.
+> 	-- Enables FB support and platform-lcd support.
+> 	-- Add support for window 0 with 24 BPP.
+>
+Some of the patches have got some coding syntax (DOS LINE ending etc.). 
+Consider running scripts/checkpatch.pl on the patches before sending the 
+next version.
 
-On Thu, Jul 14, 2011 at 10:15 PM, naveen yadav <yad.naveen@gmail.com> wrote:
-> Hi dave,
->
-> Thanks for answering, but I think question 2, answer ?is still not clear to me .
->
-> my question is why exclusive L2.
->
-> 8.1.4 Exclusive L2 cache
-> The Cortex-A9 processor can be connected to an L2 cache that supports
-> an exclusive cache
-> mode. This mode must be activated both in the Cortex-A9 processor and
-> in the L2 cache
-> controller.
-> In this mode, the data cache of the Cortex-A9 processor and the L2
-> cache are exclusive. At any
-> time, a given address is cached in either L1 data caches or in the L2
-> cache, but not in both. This
-> has the effect of greatly increasing the usable space and efficiency
-> of an L2 cache connected to
-> the Cortex-A9 processor. When exclusive cache configuration is selected:
-> ? Data cache line replacement policy is modified so that the victim
-> line always gets evicted
-> to L2 memory, even if it is clean.
-> ? If a line is dirty in the L2 cache controller, a read request to this address
->
->
-> what is usecase for this . This is my question .
+scripts/cleanpatch can help you in fixing many of the style problems.
 
-Since I've never used one, I'm not sure. Maybe somebody else knows.
+>   o To Paul Mundt, Jingoo Han
+>     [Patch 1/6] video: s3c-fb: Add S5P64X0 specific s3c_fb_driverdata
+>
+>   o To Kukjin Kim
+>     [Patch 2/6] ARM: S5P64X0: Add register base and IRQ for Framebuffer
+>     [Patch 3/6] ARM: S5P64X0: Set s3c_device_fb name
+>     [Patch 4/6] ARM: S5P64X0: Add GPIO and SPCON settings for LCD
+>     [Patch 5/6] ARM: S5P6440: Add LCD-LTE480 and enable Framebuffer support
+>     [Patch 6/6] ARM: S5P6450: Add LCD-LTE480 and enable Framebuffer support
+>
+>
+>   arch/arm/mach-s5p64x0/Kconfig                  |   10 ++++
+>   arch/arm/mach-s5p64x0/Makefile                 |    1 +
+>   arch/arm/mach-s5p64x0/cpu.c                    |    3 +
+>   arch/arm/mach-s5p64x0/include/mach/irqs.h      |    4 ++
+>   arch/arm/mach-s5p64x0/include/mach/map.h       |    3 +
+>   arch/arm/mach-s5p64x0/include/mach/regs-fb.h   |   19 +++++++
+>   arch/arm/mach-s5p64x0/include/mach/regs-gpio.h |    4 ++
+>   arch/arm/mach-s5p64x0/mach-smdk6440.c          |   63 +++++++++++++++++++++++
+>   arch/arm/mach-s5p64x0/mach-smdk6450.c          |   63 +++++++++++++++++++++++
+>   arch/arm/mach-s5p64x0/setup-fb.c               |   48 ++++++++++++++++++
+>   arch/arm/plat-samsung/include/plat/fb.h        |   14 +++++
+>   drivers/video/s3c-fb.c                         |   64 ++++++++++++++++++++++++
+>   12 files changed, 296 insertions(+), 0 deletions(-)
+>   create mode 100644 arch/arm/mach-s5p64x0/include/mach/regs-fb.h
+>   create mode 100644 arch/arm/mach-s5p64x0/setup-fb.c
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
 
 -- 
-Dave Hylands
-Shuswap, BC, Canada
-http://www.davehylands.com
+Tushar Behera
