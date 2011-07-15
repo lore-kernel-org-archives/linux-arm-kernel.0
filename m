@@ -1,46 +1,75 @@
-From: J.Weitzel@phytec.de (Jan Weitzel)
-Date: Fri, 15 Jul 2011 11:47:54 +0200
-Subject: [PATCH] ARM: OMAP4: PCM049: remove vusim regulator
-In-Reply-To: <20110715075024.GO5783@atomide.com>
-References: <1310554738.18446.12.camel@lws-weitzel>
-	<1310554762-10743-1-git-send-email-j.weitzel@phytec.de>
-	<4E1D8BCD.5060901@ru.mvista.com>
-	<1310561772.18446.14.camel@lws-weitzel>
-	<20110714073445.GL5783@atomide.com>
-	<1310632792.4008.3.camel@lws-weitzel>
-	<20110715075024.GO5783@atomide.com>
-Message-ID: <1310723274.26087.38.camel@lws-weitzel>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Fri, 15 Jul 2011 11:55:56 +0200
+Subject: [PATCH 2/2] ARM: tegra: remove copy-and-pasted usb platform data
+	from boards
+In-Reply-To: <20110715111348.3ed0522a@ac100.localdomain>
+References: <1310336374-31727-1-git-send-email-ccross@android.com>
+	<1310336374-31727-2-git-send-email-ccross@android.com>
+	<20110715111348.3ed0522a@ac100.localdomain>
+Message-ID: <201107151155.56495.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, den 15.07.2011, 00:50 -0700 schrieb Tony Lindgren:
-> Well we can add it even before device tree support if it makes
-> sense from code coalescing point of view. In this case it would
-> mean creating board-panda-common.c or similar so the code can
-> be shared amongst the panda variants.
+Am Freitag, 15. Juli 2011, 11:13:48 schrieb Marc Dietrich:
+> see comment for PATCH 1/2
 > 
-> It seems that some GPIO pins are different and there are some
-> difference in devices connected, but big parts of the code can be
-> shared.
+> Am Sun, 10 Jul 2011 15:19:34 -0700
 > 
-> Adding the pending boards without combining code would be adding code
-> that will be going away for most part with the device tree support.
+> schrieb Colin Cross <ccross@android.com>:
+> > trimslice and paz00 both have functionally identical platform
+> > data for the tegra-ehci driver.  Move the platform data into
+> > devices.c, and remove it from all the board files.
+> > 
+> > Signed-off-by: Colin Cross <ccross@android.com>
 > 
-> And most likely the beagle and panda based boards will be the first
-> ones to work with device tree. So anything we can do to have common
-> board init code will also help with this effort.
+> Acked-By: Marc Dietrich <marvin24@gmx.de>
 > 
-> Regards,
-> 
-> Tony
-pcm049 and panda board have some more different devices.
-I am working on patches to add NAND support and using tlv320aic3x audio
-codec which need regulators in platformcode. I need a hack to controll
-usb otg by gpio (controlling a external power circuit). The patches are
-not mainline ready by now. 
-If using machine_is_xxxx() in board-omap4panda.c then also is good way,
-I could provide our board as patches on top of board-omap4panda.c.
-When will pandaboard use device tree to boot?
+> > ---
+> > 
+> >  arch/arm/mach-tegra/board-paz00.c     |   26
+> > 
 
-Kind Regards,
-Jan
+> > 
+> > -static struct tegra_ulpi_config ulpi_phy_config = {
+> > -		.reset_gpio = TEGRA_ULPI_RST,
+> > -		.clk = "cdev2",
+> > -};
+> > -
+> > -static struct tegra_ehci_platform_data tegra_ehci_pdata[] = {
+> > -		[0] = {
+> > -			.operating_mode = TEGRA_USB_OTG,
+> > -			.power_down_on_bus_suspend = 1,
+> > -		},
+> > -		[1] = {
+> > -			.phy_config = &ulpi_phy_config,
+> > -			.operating_mode = TEGRA_USB_HOST,
+> > -			.power_down_on_bus_suspend = 1,
+> > -		},
+> > -		[2] = {
+> > -			.operating_mode = TEGRA_USB_HOST,
+> > -			.power_down_on_bus_suspend = 1,
+> > -		},
+> > -};
+
+I'm not sure about this.
+
+For paz00 tegra_ehci3_device also leads to an external usb port. With 
+power_down_on_bus_suspend = 1 hotplugging usb devices doesn't work (as the bus 
+might be suspended at the time).
+
+>From the initial commit message of ehci-tegra on android.git.kernel.org:
+"For additional power saving, the driver supports powering down the
+phy on bus suspend when it is used, for example, to connect an internal
+device that use an out-of-band remote wakeup mechanism (e.g. a gpio)."
+
+So my guess was, that the correct handling of this was setting 
+power_down_on_bus_suspend to 0 - which did fix the problem.
+
+With this data moving to devices.c, setting this would also change the 
+trimslice behaviour which would be a problem.
+
+In the end I'm not sure if setting power_down_on_bus_suspend to 0 is the 
+correct solution to the hotplug problem or if a better solution exists.
+
+Thanks
+Heiko
