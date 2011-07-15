@@ -1,238 +1,113 @@
-From: padma.v@samsung.com (Padmavathi Venna)
-Date: Fri, 15 Jul 2011 12:11:34 +0530
-Subject: [PATCH] ARM: S5P64X0: External Interrupt Support
-Message-ID: <1310712094-19831-1-git-send-email-padma.v@samsung.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 15 Jul 2011 07:27:03 +0100
+Subject: [PATCH 2/3] mach-ux500: export System-on-Chip information via
+	sysfs
+In-Reply-To: <4E1F2696.3010608@codeaurora.org>
+References: <1310476090-9807-1-git-send-email-lee.jones@linaro.org>	<4E1DCA83.7010204@codeaurora.org>
+	<20110713203226.GA23055@suse.de> <201107132251.48606.arnd@arndb.de>
+	<4E1F2696.3010608@codeaurora.org>
+Message-ID: <4E1FDDB7.9070900@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add external interrupt support for S5P64X0. The external interrupts
-supported are 0 to 15.
+On 14/07/11 18:25, Saravana Kannan wrote:
+> On 07/13/2011 01:51 PM, Arnd Bergmann wrote:
+>> On Wednesday 13 July 2011 22:32:26 Greg KH wrote:
+>>> On Wed, Jul 13, 2011 at 09:40:35AM -0700, Saravana Kannan wrote:
+>>>> On 07/13/2011 12:55 AM, Lee Jones wrote:
+>>>>> On 12/07/11 17:29, Saravana Kannan wrote:
+>>>>> I initially had it all as part of soc_device_register, but Arnd
+>>>>> told me
+>>>>> to remove it in this patch-set.
+>>>>>
+>>>>> See here:
+>>>>>
+>>>>> On 17/04/11 19:36, Arnd Bergmann wrote:
+>>>>>> For the nonstandard attributes, I would recommend having the
+>>>>>> individual
+>>>>>> drivers call device_create_file, in order to discourage the use of
+>>>>>> device specific attribute names.
+>>>>
+>>>> Arnd,
+>>>>
+>>>> I don't think forcing individual driver to call device_create_file()
+>>>> is really going to be much of a discouragement.
+>>>
+>>> Yes it is as calling that is broken and wrong and userspace will race
+>>> with the kernel and bad things will happen on the wrong phase of the
+>>> moon.
+>>>
+>>> But again, I never saw the original series to explain why...
+> 
+> Greg,
+> 
+> Your wording was a bit confusing for me (sorry), but it appears that you
+> are disagreeing with me. Assuming that to be the case, how will moving a
+> couple of lines of code (calls to device_create_file()) from a caller
+> function A into caller function B make any functional difference if the
+> order of the calls are maintained? The calls to device_create_file()
+> will still be done as part of the same call flow/execution flow. I'm
+> just asking for code refactoring to avoid repeating the code multiple
+> times.
 
-Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
----
- arch/arm/mach-s5p64x0/Makefile                 |    1 +
- arch/arm/mach-s5p64x0/include/mach/regs-gpio.h |    6 +
- arch/arm/mach-s5p64x0/irq-eint.c               |  185 ++++++++++++++++++++++++
- 3 files changed, 192 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-s5p64x0/irq-eint.c
+I believe it is Arnd that's disagreeing with you. For his full
+description as to why he thought it was a bad idea to allow users to
+_easily_ add nodes, see my first attempts at this patch.
 
-diff --git a/arch/arm/mach-s5p64x0/Makefile b/arch/arm/mach-s5p64x0/Makefile
-index ae6bf6f..30f34f0 100644
---- a/arch/arm/mach-s5p64x0/Makefile
-+++ b/arch/arm/mach-s5p64x0/Makefile
-@@ -16,6 +16,7 @@ obj-$(CONFIG_ARCH_S5P64X0)	+= cpu.o init.o clock.o dma.o gpiolib.o
- obj-$(CONFIG_ARCH_S5P64X0)	+= setup-i2c0.o
- obj-$(CONFIG_CPU_S5P6440)	+= clock-s5p6440.o
- obj-$(CONFIG_CPU_S5P6450)	+= clock-s5p6450.o
-+obj-y				+= irq-eint.o
- 
- # machine support
- 
-diff --git a/arch/arm/mach-s5p64x0/include/mach/regs-gpio.h b/arch/arm/mach-s5p64x0/include/mach/regs-gpio.h
-index 0953ef6..de005ac 100644
---- a/arch/arm/mach-s5p64x0/include/mach/regs-gpio.h
-+++ b/arch/arm/mach-s5p64x0/include/mach/regs-gpio.h
-@@ -34,4 +34,10 @@
- #define S5P6450_GPQ_BASE		(S5P_VA_GPIO + 0x0180)
- #define S5P6450_GPS_BASE		(S5P_VA_GPIO + 0x0300)
- 
-+/* External interrupt control registers for group0 */
-+
-+#define S5P64X0_EINT0CON0		(S5P_VA_GPIO + 0x900)
-+#define S5P64X0_EINT0MASK		(S5P_VA_GPIO + 0x920)
-+#define S5P64X0_EINT0PEND		(S5P_VA_GPIO + 0x924)
-+
- #endif /* __ASM_ARCH_REGS_GPIO_H */
-diff --git a/arch/arm/mach-s5p64x0/irq-eint.c b/arch/arm/mach-s5p64x0/irq-eint.c
-new file mode 100644
-index 0000000..cfaf599
---- /dev/null
-+++ b/arch/arm/mach-s5p64x0/irq-eint.c
-@@ -0,0 +1,185 @@
-+/* arch/arm/mach-s5p64x0/irq-eint.c
-+ *
-+ * Copyright (c) 2011 Samsung Electronics Co., Ltd
-+ *		http://www.samsung.com/
-+ *
-+ * Based on linux/arch/arm/mach-s3c64xx/irq-eint.c
-+ *
-+ * S5P64X0 - Interrupt handling for External Interrupts.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/gpio.h>
-+#include <linux/irq.h>
-+#include <linux/io.h>
-+
-+#include <plat/regs-irqtype.h>
-+#include <plat/gpio-cfg.h>
-+
-+#include <mach/regs-gpio.h>
-+#include <mach/regs-clock.h>
-+
-+#define eint_offset(irq)	((irq) - IRQ_EINT(0))
-+#define eint_irq_to_bit(irq)	((u32)(1 << eint_offset(irq)))
-+
-+static inline void s5p64x0_irq_eint_mask(struct irq_data *data)
-+{
-+	u32 mask;
-+
-+	mask = __raw_readl(S5P64X0_EINT0MASK);
-+	mask |= (u32)data->chip_data;
-+	__raw_writel(mask, S5P64X0_EINT0MASK);
-+}
-+
-+static void s5p64x0_irq_eint_unmask(struct irq_data *data)
-+{
-+	u32 mask;
-+
-+	mask = __raw_readl(S5P64X0_EINT0MASK);
-+	mask &= ~((u32)data->chip_data);
-+	__raw_writel(mask, S5P64X0_EINT0MASK);
-+}
-+
-+static inline void s5p64x0_irq_eint_ack(struct irq_data *data)
-+{
-+	__raw_writel((u32)data->chip_data, S5P64X0_EINT0PEND);
-+}
-+
-+static void s5p64x0_irq_eint_maskack(struct irq_data *data)
-+{
-+	/* compiler should in-line these */
-+	s5p64x0_irq_eint_mask(data);
-+	s5p64x0_irq_eint_ack(data);
-+}
-+
-+static int s5p64x0_irq_eint_set_type(struct irq_data *data, unsigned int type)
-+{
-+	int offs = eint_offset(data->irq);
-+	int shift;
-+	u32 ctrl, mask;
-+	u32 newvalue = 0;
-+	unsigned int id;
-+
-+	if (offs > 15)
-+		return -EINVAL;
-+
-+	switch (type) {
-+	case IRQ_TYPE_NONE:
-+		printk(KERN_WARNING "No edge setting!\n");
-+		break;
-+
-+	case IRQ_TYPE_EDGE_RISING:
-+		newvalue = S3C2410_EXTINT_RISEEDGE;
-+		break;
-+
-+	case IRQ_TYPE_EDGE_FALLING:
-+		newvalue = S3C2410_EXTINT_FALLEDGE;
-+		break;
-+
-+	case IRQ_TYPE_EDGE_BOTH:
-+		newvalue = S3C2410_EXTINT_BOTHEDGE;
-+		break;
-+
-+	case IRQ_TYPE_LEVEL_LOW:
-+		newvalue = S3C2410_EXTINT_LOWLEV;
-+		break;
-+
-+	case IRQ_TYPE_LEVEL_HIGH:
-+		newvalue = S3C2410_EXTINT_HILEV;
-+		break;
-+
-+	default:
-+		printk(KERN_ERR "No such irq type %d", type);
-+		return -1;
-+	}
-+
-+	shift = (offs / 2) * 4;
-+	mask = 0x7 << shift;
-+
-+	ctrl = __raw_readl(S5P64X0_EINT0CON0) & ~mask;
-+	ctrl |= newvalue << shift;
-+	__raw_writel(ctrl, S5P64X0_EINT0CON0);
-+
-+	id = __raw_readl(S5P64X0_SYS_ID) & 0xFF000;
-+
-+	if (id == 0x50000)
-+		s3c_gpio_cfgpin(S5P6450_GPN(offs), S3C_GPIO_SFN(2));
-+	else
-+		s3c_gpio_cfgpin(S5P6440_GPN(offs), S3C_GPIO_SFN(2));
-+
-+	return 0;
-+}
-+
-+static struct irq_chip s5p64x0_irq_eint = {
-+	.name		= "s5p64x0-eint",
-+	.irq_mask	= s5p64x0_irq_eint_mask,
-+	.irq_unmask	= s5p64x0_irq_eint_unmask,
-+	.irq_mask_ack	= s5p64x0_irq_eint_maskack,
-+	.irq_ack	= s5p64x0_irq_eint_ack,
-+	.irq_set_type	= s5p64x0_irq_eint_set_type,
+I initially had this:
+
++struct device_attribute soc_one_attrs[] = {
++	__ATTR(machine,  S_IRUGO, ux500_get_machine,  NULL),
++	__ATTR(family,   S_IRUGO, ux500_get_family,   NULL),
++	__ATTR(soc_id,   S_IRUGO, ux500_get_soc_id,   NULL),
++	__ATTR(revision, S_IRUGO, ux500_get_revision, NULL),
++	__ATTR(process,  S_IRUGO, ux500_get_process,  NULL),
++	__ATTR_NULL,
 +};
 +
-+/*
-+ * s5p64x0_irq_demux_eint
-+ *
-+ * This function demuxes the IRQ from the group0 external interrupts,
-+ * from IRQ_EINT(0) to IRQ_EINT(15). It is designed to be inlined into
-+ * the specific handlers s5p64x0_irq_demux_eintX_Y.
-+ */
-+static inline void s5p64x0_irq_demux_eint(unsigned int start, unsigned int end)
++struct device_attribute *each_soc_attrs[] = {
++	soc_one_attrs,
++	NULL,
++};
++
++static int __init ux500_soc_sysfs_init(void)
 +{
-+	u32 status = __raw_readl(S5P64X0_EINT0PEND);
-+	u32 mask = __raw_readl(S5P64X0_EINT0MASK);
-+	unsigned int irq;
-+
-+	status &= ~mask;
-+	status >>= start;
-+	status &= (1 << (end - start + 1)) - 1;
-+
-+	for (irq = IRQ_EINT(start); irq <= IRQ_EINT(end); irq++) {
-+		if (status & 1)
-+			generic_handle_irq(irq);
-+
-+		status >>= 1;
-+	}
++	return soc_device_register(&parent_soc, each_soc_attrs
++                                  ARRAY_SIZE(each_soc_attrs));
 +}
-+
-+static void s5p64x0_irq_demux_eint0_3(unsigned int irq, struct irq_desc *desc)
-+{
-+	s5p64x0_irq_demux_eint(0, 3);
-+}
-+
-+static void s5p64x0_irq_demux_eint4_11(unsigned int irq, struct irq_desc *desc)
-+{
-+	s5p64x0_irq_demux_eint(4, 11);
-+}
-+
-+static void s5p64x0_irq_demux_eint12_15(unsigned int irq,
-+					struct irq_desc *desc)
-+{
-+	s5p64x0_irq_demux_eint(12, 15);
-+}
-+
-+static int __init s5p64x0_init_irq_eint(void)
-+{
-+	int irq;
-+
-+	for (irq = IRQ_EINT(0); irq <= IRQ_EINT(15); irq++) {
-+		irq_set_chip_and_handler(irq, &s5p64x0_irq_eint,
-+					 handle_level_irq);
-+		irq_set_chip_data(irq, (void *)eint_irq_to_bit(irq));
-+		set_irq_flags(irq, IRQF_VALID);
-+	}
-+
-+	irq_set_chained_handler(IRQ_EINT0_3, s5p64x0_irq_demux_eint0_3);
-+	irq_set_chained_handler(IRQ_EINT4_11, s5p64x0_irq_demux_eint4_11);
-+	irq_set_chained_handler(IRQ_EINT12_15, s5p64x0_irq_demux_eint12_15);
-+
-+	return 0;
-+}
-+
-+arch_initcall(s5p64x0_init_irq_eint);
+
+Which I loved. It was neat and easy to read. However, Arnd felt that it
+would be far too easy for SoC vendors/hackers to add nodes willy-nilly,
+which he wanted to prevent. Hence the request for change.
+
+Kind regards,
+Lee
+
+>> This is about attributes to the main device that acts as a parent for all
+>> devices on the SoC, so there is no user space at the time.
+>>
+>> IIRC, the original patch was documenting a set of standard attributes and
+>> letting the SoC specific driver pass a set of static attributes in the
+>> hope that they do whatever is documented.
+>>
+>> In one of my review comments, I asked this to be changed to pass a data
+>> structure with the actual contents of those attributes and to make
+>> the implementation common to the soc independent code, in order to
+>> reduce the amount of code needed in each soc implementation, to enforce
+>> consistent behavior, and to make it more obvious (and painful) when an
+>> soc implementation adds a nonstandard attribute.
+>>
+>> It seems the final outcome was to have a data structure of function
+>> pointers to get the attribute contents, which is less nice but still
+>> acceptable IMHO.
+>>
+>>     Arnd
+> 
+
+
 -- 
-1.7.4.4
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+M: +44 77 88 633 515
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
