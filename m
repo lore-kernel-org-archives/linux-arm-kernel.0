@@ -1,105 +1,73 @@
-From: ajaynumb@gmail.com (Ajay kumar)
-Date: Fri, 15 Jul 2011 11:57:37 +0530
-Subject: [PATCH 0/6] ARM: S5P64X0: Add Framebuffer support
-In-Reply-To: <4E1FDA4E.9010800@linaro.org>
-References: <1310650036-28836-1-git-send-email-ajaykumar.rs@samsung.com>
-	<4E1FDA4E.9010800@linaro.org>
-Message-ID: <CAEC9eQMonzbcTOfb+2=UBCDpOrk-Qh+snQjTDLetz=jftb3AeQ@mail.gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 15 Jul 2011 08:27:58 +0200
+Subject: [Linaro-mm-sig] [RFC 2/2] ARM: initial proof-of-concept IOMMU
+	mapper for DMA-mapping
+In-Reply-To: <CAB-zwWhRQmv8euqN6jeJP=tXTQgGQ3buRJEf=4aPtTOBsh+Z2Q@mail.gmail.com>
+References: <CAB-zwWhRQmv8euqN6jeJP=tXTQgGQ3buRJEf=4aPtTOBsh+Z2Q@mail.gmail.com>
+Message-ID: <000301cc42b8$569fca30$03df5e90$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tushar,
+Hello,
 
-On Fri, Jul 15, 2011 at 11:42 AM, Tushar Behera
-<tushar.behera@linaro.org> wrote:
-> On Thursday 14 July 2011 06:57 PM, Ajay Kumar wrote:
->>
->> ? ? ? ?The patches are created against "for-next" branch of Kukjin Kim's
->> tree at:
->>
->> ?git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
->>
->> ? ? ? ?Patch [1/6]
->> ? ? ? ?-- add "s5p64x0-fb" type driver_data(s3c_fb_driverdata).
->> ? ? ? ?-- Display controller in S5P64X0 supports 3 windows.
->>
->> ? ? ? ?Patch [2/6]
->> ? ? ? ?-- Resource definitions(_MEM, _IRQ).
->>
->> ? ? ? ?Patch [3/6]
->> ? ? ? ?-- Set s3c_device_fb name as "s5p64x0-fb"
->> ? ? ? ? ? for S5P6440 and S5P6450.
->>
->> ? ? ? ?Patch [4/6]
->> ? ? ? ?-- GPIO settings for LCD in S5P6440 and S5P6450.
->> ? ? ? ?-- Select LCD interface type (RGB/i80)
->>
->> ? ? ? ?Patch [5/6]
->> ? ? ? ?-- Add support for LCD-LTE480 platform device in SMDK6440.
->> ? ? ? ?-- Platform data for FB and a basic window definition.
->> ? ? ? ?-- Enables FB support and platform-lcd support.
->> ? ? ? ?-- Add support for window 0 with 24 BPP.
->>
->> ? ? ? ?Patch [6/6]
->> ? ? ? ?-- Add support for LCD-LTE480 platform device in SMDK6450.
->> ? ? ? ?-- Platform data for FB and a basic window definition.
->> ? ? ? ?-- Enables FB support and platform-lcd support.
->> ? ? ? ?-- Add support for window 0 with 24 BPP.
->>
-> Some of the patches have got some coding syntax (DOS LINE ending etc.).
-> Consider running scripts/checkpatch.pl on the patches before sending the
-> next version.
->
-> scripts/cleanpatch can help you in fixing many of the style problems.
->
+On Thursday, July 14, 2011 8:33 PM Ramirez Luna, Omar wrote:
 
-I have tried running checkpatch.pl on patches 1 to 6,
-and I did not encounter any error like DOS_LINE as you have mentioned.
-Can you please tell me which patch is showing that error when run with
-checkpatch.pl?
+> > Add initial proof of concept implementation of DMA-mapping API for
+> > devices that have IOMMU support. Right now only dma_alloc_coherent,
+> > dma_free_coherent and dma_mmap_coherent functions are supported.
+> >
+> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> > ---
+> ...
+> > diff --git a/arch/arm/include/asm/dma-iommu.h b/arch/arm/include/asm/dma-
+> iommu.h
+> > new file mode 100644
+> > index 0000000..c246ff3
+> > --- /dev/null
+> > +++ b/arch/arm/include/asm/dma-iommu.h
+> ...
+> > +int __init arm_iommu_assign_device(struct device *dev, dma_addr_t base,
+> dma_addr_t size);
+> 
+> __init causes a panic if the iommu is assigned after boot.
+> 
+> In OMAP3 the iommu driver controls isp and dsp address spaces, it is
+> loaded until any of those 2 drivers is needed.
 
->> ?o To Paul Mundt, Jingoo Han
->> ? ?[Patch 1/6] video: s3c-fb: Add S5P64X0 specific s3c_fb_driverdata
->>
->> ?o To Kukjin Kim
->> ? ?[Patch 2/6] ARM: S5P64X0: Add register base and IRQ for Framebuffer
->> ? ?[Patch 3/6] ARM: S5P64X0: Set s3c_device_fb name
->> ? ?[Patch 4/6] ARM: S5P64X0: Add GPIO and SPCON settings for LCD
->> ? ?[Patch 5/6] ARM: S5P6440: Add LCD-LTE480 and enable Framebuffer support
->> ? ?[Patch 6/6] ARM: S5P6450: Add LCD-LTE480 and enable Framebuffer support
->>
->>
->> ?arch/arm/mach-s5p64x0/Kconfig ? ? ? ? ? ? ? ? ?| ? 10 ++++
->> ?arch/arm/mach-s5p64x0/Makefile ? ? ? ? ? ? ? ? | ? ?1 +
->> ?arch/arm/mach-s5p64x0/cpu.c ? ? ? ? ? ? ? ? ? ?| ? ?3 +
->> ?arch/arm/mach-s5p64x0/include/mach/irqs.h ? ? ?| ? ?4 ++
->> ?arch/arm/mach-s5p64x0/include/mach/map.h ? ? ? | ? ?3 +
->> ?arch/arm/mach-s5p64x0/include/mach/regs-fb.h ? | ? 19 +++++++
->> ?arch/arm/mach-s5p64x0/include/mach/regs-gpio.h | ? ?4 ++
->> ?arch/arm/mach-s5p64x0/mach-smdk6440.c ? ? ? ? ?| ? 63
->> +++++++++++++++++++++++
->> ?arch/arm/mach-s5p64x0/mach-smdk6450.c ? ? ? ? ?| ? 63
->> +++++++++++++++++++++++
->> ?arch/arm/mach-s5p64x0/setup-fb.c ? ? ? ? ? ? ? | ? 48 ++++++++++++++++++
->> ?arch/arm/plat-samsung/include/plat/fb.h ? ? ? ?| ? 14 +++++
->> ?drivers/video/s3c-fb.c ? ? ? ? ? ? ? ? ? ? ? ? | ? 64
->> ++++++++++++++++++++++++
->> ?12 files changed, 296 insertions(+), 0 deletions(-)
->> ?create mode 100644 arch/arm/mach-s5p64x0/include/mach/regs-fb.h
->> ?create mode 100644 arch/arm/mach-s5p64x0/setup-fb.c
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe
->> linux-samsung-soc" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
->
-> --
-> Tushar Behera
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc"
-> in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+Well, ok. This was just a proof-of-concept/rfc patch, so it was designed only
+for our particular case.
+
+> > diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> > index f8c6972..b6397c1 100644
+> > --- a/arch/arm/mm/dma-mapping.c
+> > +++ b/arch/arm/mm/dma-mapping.c
+> ...
+> > +static void *arm_iommu_alloc_attrs(struct device *dev, size_t size,
+> > + ? ? ? ? ? dma_addr_t *handle, gfp_t gfp, struct dma_attrs *attrs)
+> > +{
+> > + ? ? ? struct dma_iommu_mapping *mapping = dev->archdata.mapping;
+> > + ? ? ? struct page **pages;
+> > + ? ? ? void *addr = NULL;
+> > + ? ? ? pgprot_t prot;
+> > +
+> > + ? ? ? if (dma_get_attr(DMA_ATTR_WRITE_COMBINE, attrs))
+> > + ? ? ? ? ? ? ? prot = pgprot_writecombine(pgprot_kernel);
+> > + ? ? ? else
+> > + ? ? ? ? ? ? ? prot = pgprot_dmacoherent(pgprot_kernel);
+> > +
+> > + ? ? ? arm_iommu_init(dev);
+> 
+> I found useful to call arm_iommu_init inside arm_iommu_assign_device
+> instead. So, then gen_pool is created only once without the
+> mapping->pool check, instead of relying on the call to ...alloc_attrs,
+> which in my case I never use because I'm implementing
+> iommu_map|unmap_sg functions to see how it goes with the dma mapping.
+
+Right, this is still on my todo list, but I wanted to focus on cleanup 
+of dma mapping framework and cma first.
+
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
