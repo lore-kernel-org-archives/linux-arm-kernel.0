@@ -1,123 +1,138 @@
 From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
-Date: Fri, 15 Jul 2011 17:35:00 +0530
-Subject: [PATCH v14 REPOST 11/12] OMAP: dmtimer: add context save/restore
-	routines
+Date: Fri, 15 Jul 2011 17:34:58 +0530
+Subject: [PATCH v14 REPOST 09/12] OMAP: dmtimer: use mutex instead of spinlock
 In-Reply-To: <1310731501-13078-1-git-send-email-tarun.kanti@ti.com>
 References: <1310731501-13078-1-git-send-email-tarun.kanti@ti.com>
-Message-ID: <1310731501-13078-12-git-send-email-tarun.kanti@ti.com>
+Message-ID: <1310731501-13078-10-git-send-email-tarun.kanti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define context register structure and make it member of struct omap_dm_timer.
-Also define two routines to save and restore dmtimer context to be used
-subsequently.
+Since the spinlock is not used in any interrupt context we can
+replace it with mutex instead.
 
 Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
 ---
- arch/arm/plat-omap/dmtimer.c              |   48 +++++++++++++++++++++++++++++
- arch/arm/plat-omap/include/plat/dmtimer.h |   24 ++++++++++++++
- 2 files changed, 72 insertions(+), 0 deletions(-)
+ arch/arm/plat-omap/dmtimer.c |   27 +++++++++++----------------
+ 1 files changed, 11 insertions(+), 16 deletions(-)
 
 diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
-index 8c8cb00..cdef48b 100644
+index 0560248..be55e42 100644
 --- a/arch/arm/plat-omap/dmtimer.c
 +++ b/arch/arm/plat-omap/dmtimer.c
-@@ -87,6 +87,54 @@ static void omap_dm_timer_write_reg(struct omap_dm_timer *timer, u32 reg,
- 				timer->func_offset);
- }
+@@ -43,7 +43,7 @@
+ #include <plat/dmtimer.h>
  
-+static void omap_timer_save_context(struct omap_dm_timer *timer)
-+{
-+	timer->context.tiocp_cfg =
-+		omap_dm_timer_read_reg(timer, OMAP_TIMER_OCP_CFG_REG);
-+	timer->context.tistat =
-+		omap_dm_timer_read_reg(timer, OMAP_TIMER_SYS_STAT_REG);
-+	timer->context.tisr =
-+		omap_dm_timer_read_reg(timer, OMAP_TIMER_STAT_REG);
-+	timer->context.tier =
-+		omap_dm_timer_read_reg(timer, OMAP_TIMER_INT_EN_REG);
-+	timer->context.twer =
-+		omap_dm_timer_read_reg(timer, OMAP_TIMER_WAKEUP_EN_REG);
-+	timer->context.tclr =
-+		omap_dm_timer_read_reg(timer, OMAP_TIMER_CTRL_REG);
-+	timer->context.tcrr =
-+		omap_dm_timer_read_reg(timer, OMAP_TIMER_COUNTER_REG);
-+	timer->context.tldr =
-+		omap_dm_timer_read_reg(timer, OMAP_TIMER_LOAD_REG);
-+	timer->context.tmar =
-+		omap_dm_timer_read_reg(timer, OMAP_TIMER_MATCH_REG);
-+	timer->context.tsicr =
-+		omap_dm_timer_read_reg(timer, OMAP_TIMER_IF_CTRL_REG);
-+}
-+
-+static void omap_timer_restore_context(struct omap_dm_timer *timer)
-+{
-+	omap_dm_timer_write_reg(timer, OMAP_TIMER_OCP_CFG_REG,
-+				timer->context.tiocp_cfg);
-+	omap_dm_timer_write_reg(timer, OMAP_TIMER_SYS_STAT_REG,
-+				timer->context.tistat);
-+	omap_dm_timer_write_reg(timer, OMAP_TIMER_STAT_REG,
-+				timer->context.tisr);
-+	omap_dm_timer_write_reg(timer, OMAP_TIMER_INT_EN_REG,
-+				timer->context.tier);
-+	omap_dm_timer_write_reg(timer, OMAP_TIMER_WAKEUP_EN_REG,
-+				timer->context.twer);
-+	omap_dm_timer_write_reg(timer, OMAP_TIMER_CTRL_REG,
-+				timer->context.tclr);
-+	omap_dm_timer_write_reg(timer, OMAP_TIMER_COUNTER_REG,
-+				timer->context.tcrr);
-+	omap_dm_timer_write_reg(timer, OMAP_TIMER_LOAD_REG,
-+				timer->context.tldr);
-+	omap_dm_timer_write_reg(timer, OMAP_TIMER_MATCH_REG,
-+				timer->context.tmar);
-+	omap_dm_timer_write_reg(timer, OMAP_TIMER_IF_CTRL_REG,
-+				timer->context.tsicr);
-+}
-+
- static void omap_dm_timer_wait_for_reset(struct omap_dm_timer *timer)
+ static LIST_HEAD(omap_timer_list);
+-static DEFINE_SPINLOCK(dm_timer_lock);
++static DEFINE_MUTEX(dm_timer_mutex);
+ 
+ /**
+  * omap_dm_timer_read_reg - read timer registers in posted and non-posted mode
+@@ -136,9 +136,8 @@ void omap_dm_timer_prepare(struct omap_dm_timer *timer)
+ struct omap_dm_timer *omap_dm_timer_request(void)
  {
- 	int c;
-diff --git a/arch/arm/plat-omap/include/plat/dmtimer.h b/arch/arm/plat-omap/include/plat/dmtimer.h
-index 6e34094..9a2d7e3 100644
---- a/arch/arm/plat-omap/include/plat/dmtimer.h
-+++ b/arch/arm/plat-omap/include/plat/dmtimer.h
-@@ -234,6 +234,29 @@ int omap_dm_timers_active(void);
+ 	struct omap_dm_timer *timer = NULL, *t;
+-	unsigned long flags;
  
- #define MAX_WRITE_PEND_WAIT            10000 /* 10ms timeout delay */
+-	spin_lock_irqsave(&dm_timer_lock, flags);
++	mutex_lock(&dm_timer_mutex);
+ 	list_for_each_entry(t, &omap_timer_list, node) {
+ 		if (t->reserved)
+ 			continue;
+@@ -147,7 +146,7 @@ struct omap_dm_timer *omap_dm_timer_request(void)
+ 		timer->reserved = 1;
+ 		break;
+ 	}
+-	spin_unlock_irqrestore(&dm_timer_lock, flags);
++	mutex_unlock(&dm_timer_mutex);
  
-+struct timer_regs {
-+	u32 tidr;
-+	u32 tiocp_cfg;
-+	u32 tistat;
-+	u32 tisr;
-+	u32 tier;
-+	u32 twer;
-+	u32 tclr;
-+	u32 tcrr;
-+	u32 tldr;
-+	u32 ttrg;
-+	u32 twps;
-+	u32 tmar;
-+	u32 tcar1;
-+	u32 tsicr;
-+	u32 tcar2;
-+	u32 tpir;
-+	u32 tnir;
-+	u32 tcvr;
-+	u32 tocr;
-+	u32 towr;
-+};
-+
- struct omap_dm_timer {
- 	unsigned long phys_base;
- 	int id;
-@@ -245,6 +268,7 @@ struct omap_dm_timer {
- 	unsigned posted:1;
- 	u8 func_offset;
- 	u8 intr_offset;
-+	struct timer_regs context;
- 	struct platform_device *pdev;
- 	struct list_head node;
- };
+ 	if (timer)
+ 		omap_dm_timer_prepare(timer);
+@@ -161,9 +160,8 @@ EXPORT_SYMBOL_GPL(omap_dm_timer_request);
+ struct omap_dm_timer *omap_dm_timer_request_specific(int id)
+ {
+ 	struct omap_dm_timer *timer = NULL, *t;
+-	unsigned long flags;
+ 
+-	spin_lock_irqsave(&dm_timer_lock, flags);
++	mutex_lock(&dm_timer_mutex);
+ 	list_for_each_entry(t, &omap_timer_list, node) {
+ 		if (t->pdev->id == id && !t->reserved) {
+ 			timer = t;
+@@ -171,7 +169,7 @@ struct omap_dm_timer *omap_dm_timer_request_specific(int id)
+ 			break;
+ 		}
+ 	}
+-	spin_unlock_irqrestore(&dm_timer_lock, flags);
++	mutex_unlock(&dm_timer_mutex);
+ 
+ 	if (timer)
+ 		omap_dm_timer_prepare(timer);
+@@ -220,14 +218,13 @@ __u32 omap_dm_timer_modify_idlect_mask(__u32 inputmask)
+ {
+ 	int i = 0;
+ 	struct omap_dm_timer *timer = NULL;
+-	unsigned long flags;
+ 
+ 	/* If ARMXOR cannot be idled this function call is unnecessary */
+ 	if (!(inputmask & (1 << 1)))
+ 		return inputmask;
+ 
+ 	/* If any active timer is using ARMXOR return modified mask */
+-	spin_lock_irqsave(&dm_timer_lock, flags);
++	mutex_lock(&dm_timer_mutex);
+ 	list_for_each_entry(timer, &omap_timer_list, node) {
+ 		u32 l;
+ 
+@@ -240,7 +237,7 @@ __u32 omap_dm_timer_modify_idlect_mask(__u32 inputmask)
+ 		}
+ 		i++;
+ 	}
+-	spin_unlock_irqrestore(&dm_timer_lock, flags);
++	mutex_unlock(&dm_timer_mutex);
+ 
+ 	return inputmask;
+ }
+@@ -464,7 +461,6 @@ EXPORT_SYMBOL_GPL(omap_dm_timers_active);
+ static int __devinit omap_dm_timer_probe(struct platform_device *pdev)
+ {
+ 	int ret;
+-	unsigned long flags;
+ 	struct omap_dm_timer *timer;
+ 	struct resource *mem, *irq, *ioarea;
+ 	struct dmtimer_platform_data *pdata = pdev->dev.platform_data;
+@@ -522,9 +518,9 @@ static int __devinit omap_dm_timer_probe(struct platform_device *pdev)
+ 		pm_runtime_enable(&pdev->dev);
+ 
+ 	/* add the timer element to the list */
+-	spin_lock_irqsave(&dm_timer_lock, flags);
++	mutex_lock(&dm_timer_mutex);
+ 	list_add_tail(&timer->node, &omap_timer_list);
+-	spin_unlock_irqrestore(&dm_timer_lock, flags);
++	mutex_unlock(&dm_timer_mutex);
+ 
+ 	dev_dbg(&pdev->dev, "Device Probed.\n");
+ 
+@@ -550,10 +546,9 @@ err_free_ioregion:
+ static int __devexit omap_dm_timer_remove(struct platform_device *pdev)
+ {
+ 	struct omap_dm_timer *timer;
+-	unsigned long flags;
+ 	int ret = -EINVAL;
+ 
+-	spin_lock_irqsave(&dm_timer_lock, flags);
++	mutex_lock(&dm_timer_mutex);
+ 	list_for_each_entry(timer, &omap_timer_list, node)
+ 		if (timer->pdev->id == pdev->id) {
+ 			list_del(&timer->node);
+@@ -561,7 +556,7 @@ static int __devexit omap_dm_timer_remove(struct platform_device *pdev)
+ 			ret = 0;
+ 			break;
+ 		}
+-	spin_unlock_irqrestore(&dm_timer_lock, flags);
++	mutex_unlock(&dm_timer_mutex);
+ 
+ 	return ret;
+ }
 -- 
 1.6.0.4
