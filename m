@@ -1,49 +1,90 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 15 Jul 2011 11:37:54 +0300
-Subject: [PATCH] OMAP: powerdomains: Make all powerdomain target states
-	as ON at init
-In-Reply-To: <alpine.DEB.2.00.1107150222400.16606@utopia.booyaka.com>
-References: <1310527588-13022-1-git-send-email-santosh.shilimkar@ti.com>
-	<20110715080315.GC2611@legolas.emea.dhcp.ti.com>
-	<alpine.DEB.2.00.1107150204510.16606@utopia.booyaka.com>
-	<20110715081725.GE2611@legolas.emea.dhcp.ti.com>
-	<alpine.DEB.2.00.1107150222400.16606@utopia.booyaka.com>
-Message-ID: <20110715083753.GG2611@legolas.emea.dhcp.ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 15 Jul 2011 10:00:11 +0100
+Subject: [PATCH] ARM: S5P64X0: External Interrupt Support
+In-Reply-To: <1310712094-19831-1-git-send-email-padma.v@samsung.com>
+References: <1310712094-19831-1-git-send-email-padma.v@samsung.com>
+Message-ID: <20110715090011.GN23270@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Jul 15, 2011 at 12:11:34PM +0530, Padmavathi Venna wrote:
+> +#define eint_offset(irq)	((irq) - IRQ_EINT(0))
+> +#define eint_irq_to_bit(irq)	((u32)(1 << eint_offset(irq)))
+> +
+> +static inline void s5p64x0_irq_eint_mask(struct irq_data *data)
+> +{
+> +	u32 mask;
+> +
+> +	mask = __raw_readl(S5P64X0_EINT0MASK);
+> +	mask |= (u32)data->chip_data;
+> +	__raw_writel(mask, S5P64X0_EINT0MASK);
+> +}
+> +
+> +static void s5p64x0_irq_eint_unmask(struct irq_data *data)
+> +{
+> +	u32 mask;
+> +
+> +	mask = __raw_readl(S5P64X0_EINT0MASK);
+> +	mask &= ~((u32)data->chip_data);
+> +	__raw_writel(mask, S5P64X0_EINT0MASK);
+> +}
+> +
+> +static inline void s5p64x0_irq_eint_ack(struct irq_data *data)
+> +{
+> +	__raw_writel((u32)data->chip_data, S5P64X0_EINT0PEND);
+> +}
+> +
+> +static void s5p64x0_irq_eint_maskack(struct irq_data *data)
+> +{
+> +	/* compiler should in-line these */
+> +	s5p64x0_irq_eint_mask(data);
+> +	s5p64x0_irq_eint_ack(data);
+> +}
 
-On Fri, Jul 15, 2011 at 02:23:16AM -0600, Paul Walmsley wrote:
-> Hi Felipe,
-> 
-> On Fri, 15 Jul 2011, Felipe Balbi wrote:
-> 
-> > I see... thanks for clarifying. The comment above the code wasn't really
-> > clear about it to me.
-> 
-> No worries.  If you propose a clarification, I'll stick that into the 
-> patch.
+Won't genirqchip support deal with all of the above for you?
 
-How about something like:
+> +
+> +static int s5p64x0_irq_eint_set_type(struct irq_data *data, unsigned int type)
+> +{
+> +	int offs = eint_offset(data->irq);
+> +	int shift;
+> +	u32 ctrl, mask;
+> +	u32 newvalue = 0;
+> +	unsigned int id;
+> +
+> +	if (offs > 15)
+> +		return -EINVAL;
+> +
+> +	switch (type) {
+> +	case IRQ_TYPE_NONE:
+> +		printk(KERN_WARNING "No edge setting!\n");
+> +		break;
+> +
+> +	case IRQ_TYPE_EDGE_RISING:
+> +		newvalue = S3C2410_EXTINT_RISEEDGE;
+> +		break;
+> +
+> +	case IRQ_TYPE_EDGE_FALLING:
+> +		newvalue = S3C2410_EXTINT_FALLEDGE;
+> +		break;
+> +
+> +	case IRQ_TYPE_EDGE_BOTH:
+> +		newvalue = S3C2410_EXTINT_BOTHEDGE;
+> +		break;
+> +
+> +	case IRQ_TYPE_LEVEL_LOW:
+> +		newvalue = S3C2410_EXTINT_LOWLEV;
+> +		break;
+> +
+> +	case IRQ_TYPE_LEVEL_HIGH:
+> +		newvalue = S3C2410_EXTINT_HILEV;
+> +		break;
+> +
+> +	default:
+> +		printk(KERN_ERR "No such irq type %d", type);
+> +		return -1;
 
-/*
- * Program target state of all power domains to ON. This is to prevent
- * power domains from hitting low power states during boot up and
- * potentially causing accesses to the address space of an IP while it
- * is disabled.
- *
- * PM late init code will make sure of disabling all unused IPs later.
- */
+NO!  Stop this right now and never do it again.  Please _always_ look
+up the right error code and use it.
 
-not sure if it's a lot better though.
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 490 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110715/9b5e456c/attachment.sig>
+'return -1' is almost never valid.
