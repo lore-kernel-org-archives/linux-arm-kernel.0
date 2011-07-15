@@ -1,39 +1,62 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Fri, 15 Jul 2011 22:39:01 +0200
-Subject: [PATCH v3 00/10] ARM: mxs: add audio support
-In-Reply-To: <1310731780-1645-1-git-send-email-b29396@freescale.com>
-References: <1310731780-1645-1-git-send-email-b29396@freescale.com>
-Message-ID: <20110715203901.GB24047@pengutronix.de>
+From: ccross@google.com (Colin Cross)
+Date: Fri, 15 Jul 2011 13:58:37 -0700
+Subject: [PATCH] ARM: move memory layout sanity checking before meminfo
+	initialization
+In-Reply-To: <20110715181309.GD24628@n2100.arm.linux.org.uk>
+References: <20110705185758.GI8286@n2100.arm.linux.org.uk>
+	<CAMbhsRRQ9D+VXTZP3vB7egkROEtN9-FxssFa2EcxuqB3F-Uv6Q@mail.gmail.com>
+	<20110714073453.GK23270@n2100.arm.linux.org.uk>
+	<CAMbhsRT=NNYUYyYZXpz2=PpBXoBGANQHPgOkCE1oZ8XzHKN4og@mail.gmail.com>
+	<CAMbhsRSgUcFPpdTFvEDTFfo_Wk0k7BQzwk6cRtXC6K7mpQ+YDg@mail.gmail.com>
+	<20110715080950.GL23270@n2100.arm.linux.org.uk>
+	<CAMbhsRRCV0ukwbzFc6w_ba6xdVxs=TFmJMGd06UKTiNQPEJqpw@mail.gmail.com>
+	<20110715161628.GA24628@n2100.arm.linux.org.uk>
+	<CAMbhsRSbXTLzhSzBbQ8ebJqAC227ESHGyY2bHS+J4cN+NgzXFg@mail.gmail.com>
+	<20110715181309.GD24628@n2100.arm.linux.org.uk>
+Message-ID: <CAMbhsRQRjwskzWB06g7rmSVgSdq5oVxA3yY+14qdtTxuQ=NeMQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 15, 2011 at 08:09:30PM +0800, Dong Aisheng wrote:
-> This patch series is to add audio support based on saif for mxs platform.
-> The driver only supports playback currently.
-> For capturing, due to hardware limitation that we have to use two saif
-> instances to implement full duplex (playback & recording), we need to
-> figure out a good design to fit in ASoC as the following work.
-> 
-> In addition, we simply just support master mode since saif tx can
-> only work as a master due to hw limitation(rx can work in both
-> master & slave mode).
-> 
-> Code is written based on the branch imx-for-3.1 in sascha's tree
-> http://git.pengutronix.de/git/imx/linux-2.6.git
+On Fri, Jul 15, 2011 at 11:13 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, Jul 15, 2011 at 10:35:14AM -0700, Colin Cross wrote:
+>> CMDLINE_EXTEND solves a real problem, and when it's not solved in the
+>> kernel, it ends up getting solved in every bootloader. ?Every
+>> kernel/board requires some command line options (like "console="), and
+>> every bootloader ends up passing some special options.
+>
+> And yet again, if you have a kernel with a built-in console= setting,
+> there is _no_ _way_ to disable that console via the kernel command
+> line.
+>
+> So what if some of your platforms need one console, others need a different
+> console, but must not use the first one...
+>
+> Do we need nomem= and noconsole= options too? ?Or do we just do the
+> sane thing and get rid of CMDLINE_EXTEND - or insist that stuff like
+> console= and mem= options are never built-in ?
+>
 
-Thanks! Branch can be found here:
+The source of the problem is that there are two kinds of options mixed
+together into one command line:
+1.  Options that are specific to the kernel and board (console, mem, etc.)
+2.  Options that tell the kernel information that only the bootloader
+knows (Tegra needs to know where the bootloader put signed resume code
+to be executed by a slave processor, some devices need to get a MAC
+address from the bootloader)
 
-git://git.pengutronix.de/git/wsa/linux-2.6.git mxs-audio-v3
+For kernels that are designed to run on a single board, the kernel
+options can go into the built-in command line, the bootloader options
+can be concatenated with CONFIG_CMDLINE_EXTEND, and everything works
+great (unless I forget to remove the mem= option from the bootloader
+options).  That doesn't work as well for multi-board kernels, where
+CMDLINE_EXTEND removes the ability for the bootloader to override the
+kernel, requiring the kernel built-in command line to only have the
+options that are guaranteed to work on all boards (or leave
+CMDLINE_EXTEND=n).
 
-Will test tomorrow!
-
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110715/eaac185c/attachment.sig>
+If there was a second way to pass options from the bootloader that
+didn't override the built-in kernel options, bootloader options could
+go there, while allowing the builtin command line to be replaced if
+necessary.  A new ATAG_CMDLINE_EXTEND?  Move all the bootloader
+options into ATAGs?
