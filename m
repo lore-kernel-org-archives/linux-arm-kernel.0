@@ -1,75 +1,83 @@
-From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Fri, 15 Jul 2011 11:55:56 +0200
-Subject: [PATCH 2/2] ARM: tegra: remove copy-and-pasted usb platform data
-	from boards
-In-Reply-To: <20110715111348.3ed0522a@ac100.localdomain>
-References: <1310336374-31727-1-git-send-email-ccross@android.com>
-	<1310336374-31727-2-git-send-email-ccross@android.com>
-	<20110715111348.3ed0522a@ac100.localdomain>
-Message-ID: <201107151155.56495.heiko@sntech.de>
+From: vishwanath.bs@ti.com (Vishwanath Sripathy)
+Date: Fri, 15 Jul 2011 15:34:08 +0530
+Subject: [GIT PULL] minimal omap4460 support for v3.1 merge window
+In-Reply-To: <20110710195215.GJ5783@atomide.com>
+References: <20110710065627.GE5783@atomide.com>
+	<20110710195215.GJ5783@atomide.com>
+Message-ID: <f4cffad16aa1de61a44edfae84e2249a@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 15. Juli 2011, 11:13:48 schrieb Marc Dietrich:
-> see comment for PATCH 1/2
-> 
-> Am Sun, 10 Jul 2011 15:19:34 -0700
-> 
-> schrieb Colin Cross <ccross@android.com>:
-> > trimslice and paz00 both have functionally identical platform
-> > data for the tegra-ehci driver.  Move the platform data into
-> > devices.c, and remove it from all the board files.
-> > 
-> > Signed-off-by: Colin Cross <ccross@android.com>
-> 
-> Acked-By: Marc Dietrich <marvin24@gmx.de>
-> 
-> > ---
-> > 
-> >  arch/arm/mach-tegra/board-paz00.c     |   26
-> > 
+Tony,
+I boot tested this pull request on 4460 Panda and it boots up fine.
 
-> > 
-> > -static struct tegra_ulpi_config ulpi_phy_config = {
-> > -		.reset_gpio = TEGRA_ULPI_RST,
-> > -		.clk = "cdev2",
-> > -};
-> > -
-> > -static struct tegra_ehci_platform_data tegra_ehci_pdata[] = {
-> > -		[0] = {
-> > -			.operating_mode = TEGRA_USB_OTG,
-> > -			.power_down_on_bus_suspend = 1,
-> > -		},
-> > -		[1] = {
-> > -			.phy_config = &ulpi_phy_config,
-> > -			.operating_mode = TEGRA_USB_HOST,
-> > -			.power_down_on_bus_suspend = 1,
-> > -		},
-> > -		[2] = {
-> > -			.operating_mode = TEGRA_USB_HOST,
-> > -			.power_down_on_bus_suspend = 1,
-> > -		},
-> > -};
+Regards
+Vishwa
 
-I'm not sure about this.
 
-For paz00 tegra_ehci3_device also leads to an external usb port. With 
-power_down_on_bus_suspend = 1 hotplugging usb devices doesn't work (as the bus 
-might be suspended at the time).
-
->From the initial commit message of ehci-tegra on android.git.kernel.org:
-"For additional power saving, the driver supports powering down the
-phy on bus suspend when it is used, for example, to connect an internal
-device that use an out-of-band remote wakeup mechanism (e.g. a gpio)."
-
-So my guess was, that the correct handling of this was setting 
-power_down_on_bus_suspend to 0 - which did fix the problem.
-
-With this data moving to devices.c, setting this would also change the 
-trimslice behaviour which would be a problem.
-
-In the end I'm not sure if setting power_down_on_bus_suspend to 0 is the 
-correct solution to the hotplug problem or if a better solution exists.
-
-Thanks
-Heiko
+> -----Original Message-----
+> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-
+> arm-kernel-bounces at lists.infradead.org] On Behalf Of Tony Lindgren
+> Sent: Monday, July 11, 2011 1:22 AM
+> To: Arnd Bergmann
+> Cc: Thomas Gleixner; linux-omap at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; Nicolas Pitre
+> Subject: Re: [GIT PULL] minimal omap4460 support for v3.1 merge
+> window
+>
+> Correting the email address for Arnd.
+>
+> * Tony Lindgren <tony@atomide.com> [110709 23:51]:
+> > Hi Arnd,
+> >
+> > Please pull minimal omap4460 support from:
+> >
+> > git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-
+> 2.6.git 4460
+> >
+> > Regards,
+> >
+> > Tony
+> >
+> >
+> > The following changes since commit
+> 48cb1258e8b0f8c81cfb699b42326c5b2147b3f8:
+> >   Tony Lindgren (1):
+> >         Merge branch 'for_3.1/pm-misc' of
+> git://git.kernel.org/.../khilman/linux-omap-pm into devel-cleanup
+> >
+> > are available in the git repository at:
+> >
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-
+> 2.6.git 4460
+> >
+> > Aneesh V (2):
+> >       OMAP: ID: introduce chip detection for OMAP4460
+> >       OMAP4: ID: add omap_has_feature for max freq supported
+> >
+> > Rajendra Nayak (2):
+> >       OMAP4: PRCM: OMAP4460 specific PRM and CM register bitshifts
+> >       OMAP4: clocks: Update the clock tree with 4460 clock nodes
+> >
+> >  arch/arm/mach-omap2/clock44xx_data.c          |   39
+> ++++++++++++++++++
+> >  arch/arm/mach-omap2/cm-regbits-44xx.h         |   36
+> +++++++++++++++++
+> >  arch/arm/mach-omap2/id.c                      |   53
+> ++++++++++++++++++++----
+> >  arch/arm/mach-omap2/prm-regbits-44xx.h        |    8 ++++
+> >  arch/arm/plat-omap/include/plat/clkdev_omap.h |    1 +
+> >  arch/arm/plat-omap/include/plat/clock.h       |    2 +
+> >  arch/arm/plat-omap/include/plat/cpu.h         |   35
+> +++++++++++++++-
+> >  7 files changed, 162 insertions(+), 12 deletions(-)
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-
+> omap" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
