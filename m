@@ -1,101 +1,74 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Fri, 15 Jul 2011 15:17:02 +0300
-Subject: [PATCH 2/3] ARM: tegra: paz00: export the WIFI rfkill gpio
-In-Reply-To: <1310725464-2524-3-git-send-email-marvin24@gmx.de>
-References: <1310725464-2524-1-git-send-email-marvin24@gmx.de>
-	<1310725464-2524-3-git-send-email-marvin24@gmx.de>
-Message-ID: <201107151517.03176.anarsoul@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 15 Jul 2011 13:34:29 +0100
+Subject: [PATCH] ARM: S5P64X0: External Interrupt Support
+In-Reply-To: <CAAgF-Bcke26iFsgf0DA3LB5CLv=TkS6UG0y+SBLR=F6TzGYU+A@mail.gmail.com>
+References: <1310712094-19831-1-git-send-email-padma.v@samsung.com>
+	<20110715090011.GN23270@n2100.arm.linux.org.uk>
+	<CAAgF-Bcke26iFsgf0DA3LB5CLv=TkS6UG0y+SBLR=F6TzGYU+A@mail.gmail.com>
+Message-ID: <20110715123429.GP23270@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 15 July 2011 13:24:22 Marc Dietrich wrote:
-> This makes the WIFI rfkill gpio available to userspace. On boot,
-> WIFI will be unblocked by default.
+On Fri, Jul 15, 2011 at 05:23:33PM +0530, padma venkat wrote:
+> Hi Russell,
+> 
+> On Fri, Jul 15, 2011 at 2:30 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Fri, Jul 15, 2011 at 12:11:34PM +0530, Padmavathi Venna wrote:
+> >> +#define eint_offset(irq) ? ? ((irq) - IRQ_EINT(0))
+> >> +#define eint_irq_to_bit(irq) ((u32)(1 << eint_offset(irq)))
+> >> +
+> >> +static inline void s5p64x0_irq_eint_mask(struct irq_data *data)
+> >> +{
+> >> + ? ? u32 mask;
+> >> +
+> >> + ? ? mask = __raw_readl(S5P64X0_EINT0MASK);
+> >> + ? ? mask |= (u32)data->chip_data;
+> >> + ? ? __raw_writel(mask, S5P64X0_EINT0MASK);
+> >> +}
+> >> +
+> >> +static void s5p64x0_irq_eint_unmask(struct irq_data *data)
+> >> +{
+> >> + ? ? u32 mask;
+> >> +
+> >> + ? ? mask = __raw_readl(S5P64X0_EINT0MASK);
+> >> + ? ? mask &= ~((u32)data->chip_data);
+> >> + ? ? __raw_writel(mask, S5P64X0_EINT0MASK);
+> >> +}
+> >> +
+> >> +static inline void s5p64x0_irq_eint_ack(struct irq_data *data)
+> >> +{
+> >> + ? ? __raw_writel((u32)data->chip_data, S5P64X0_EINT0PEND);
+> >> +}
+> >> +
+> >> +static void s5p64x0_irq_eint_maskack(struct irq_data *data)
+> >> +{
+> >> + ? ? /* compiler should in-line these */
+> >> + ? ? s5p64x0_irq_eint_mask(data);
+> >> + ? ? s5p64x0_irq_eint_ack(data);
+> >> +}
+> >
+> > Won't genirqchip support deal with all of the above for you?
+> As per my understanding, to deal with low level interrupt hardware access
+> we need to use the accessor functions. Please suggest me if there is
+> any better way of doing this.
 
-Take a look on rfkill-gpio driver.
+I'm not saying don't have these.  I'm saying use the _generic_ irqchip
+support which has the code implemented to set and clear bits in registers.
+Something like this:
 
-Regards
-Vasily
+	struct irq_chip_generic *gc;
 
-> Signed-off-by: Marc Dietrich <marvin24@gmx.de>
-> ---
->  arch/arm/mach-tegra/board-paz00-pinmux.c |    1 +
->  arch/arm/mach-tegra/board-paz00.c        |   16 ++++++++++++++++
->  arch/arm/mach-tegra/board-paz00.h        |    6 ++++++
->  3 files changed, 23 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-tegra/board-paz00-pinmux.c
-> b/arch/arm/mach-tegra/board-paz00-pinmux.c index bdd2627..c02a48f 100644
-> --- a/arch/arm/mach-tegra/board-paz00-pinmux.c
-> +++ b/arch/arm/mach-tegra/board-paz00-pinmux.c
-> @@ -145,6 +145,7 @@ static struct tegra_gpio_table gpio_table[] = {
->  	{ .gpio = TEGRA_GPIO_SD1_WP,	.enable = true },
->  	{ .gpio = TEGRA_GPIO_SD1_POWER,	.enable = true },
->  	{ .gpio = TEGRA_ULPI_RST,	.enable = true },
-> +	{ .gpio = TEGRA_WIFI_PWRN,	.enable = true },
->  };
-> 
->  void paz00_pinmux_init(void)
-> diff --git a/arch/arm/mach-tegra/board-paz00.c
-> b/arch/arm/mach-tegra/board-paz00.c index 931b06e..0bc652b 100644
-> --- a/arch/arm/mach-tegra/board-paz00.c
-> +++ b/arch/arm/mach-tegra/board-paz00.c
-> @@ -25,6 +25,7 @@
->  #include <linux/dma-mapping.h>
->  #include <linux/pda_power.h>
->  #include <linux/io.h>
-> +#include <linux/gpio.h>
->  #include <linux/i2c.h>
->  #include <linux/i2c-tegra.h>
->  #include <linux/platform_data/tegra_usb.h>
-> @@ -165,6 +166,20 @@ static struct tegra_sdhci_platform_data sdhci_pdata4 =
-> { .is_8bit	= 1,
->  };
-> 
-> +static void __init paz00_wifi_init(void)
-> +{
-> +	int ret;
-> +
-> +	/* unlock hw rfkill */
-> +	ret = gpio_request_one(TEGRA_WIFI_PWRN, GPIOF_OUT_INIT_HIGH,
-> +		"wifi pwrn");
-> +	if (ret) {
-> +		pr_warning("WIFI: could not requestrfkill gpio\n");
-> +		return;
-> +	}
-> +	gpio_export(TEGRA_WIFI_PWRN, 0);
-> +};
-> +
->  static void __init tegra_paz00_init(void)
->  {
->  	tegra_clk_init_from_table(paz00_clk_init_table);
-> @@ -178,6 +193,7 @@ static void __init tegra_paz00_init(void)
-> 
->  	paz00_i2c_init();
->  	paz00_usb_init();
-> +	paz00_wifi_init();
->  }
-> 
->  MACHINE_START(PAZ00, "Toshiba AC100 / Dynabook AZ")
-> diff --git a/arch/arm/mach-tegra/board-paz00.h
-> b/arch/arm/mach-tegra/board-paz00.h index d4ff39d..5d2849e 100644
-> --- a/arch/arm/mach-tegra/board-paz00.h
-> +++ b/arch/arm/mach-tegra/board-paz00.h
-> @@ -17,11 +17,17 @@
->  #ifndef _MACH_TEGRA_BOARD_PAZ00_H
->  #define _MACH_TEGRA_BOARD_PAZ00_H
-> 
-> +/* SDCARD */
->  #define TEGRA_GPIO_SD1_CD		TEGRA_GPIO_PV5
->  #define TEGRA_GPIO_SD1_WP		TEGRA_GPIO_PH1
->  #define TEGRA_GPIO_SD1_POWER		TEGRA_GPIO_PT3
-> +
-> +/* ULPI */
->  #define TEGRA_ULPI_RST			TEGRA_GPIO_PV0
-> 
-> +/* WIFI */
-> +#define TEGRA_WIFI_PWRN			TEGRA_GPIO_PK5
-> +
->  void paz00_pinmux_init(void);
-> 
->  #endif
+	gc = irq_alloc_generic_chip(name, 1, first_irq, base_of_controller,
+			handler);
+
+	gc->chip_types->chip.irq_ack = irq_gc_ack;
+	gc->chip_types->chip.irq_mask = irq_gc_mask_set_bit;
+	gc->chip_types->chip.irq_unmask = irq_gc_mask_clr_bit;
+
+	/* replace the two below with the _real_ offset, rather than these calculations */
+	gc->chip_types->reg.ack = S5P64X0_EINT0PEND - base_of_controller;
+	gc->chip_types->reg.mask = S5P64X0_EINT0MASK - base_of_controller;
+
+	irq_setup_generic_chip(gc, mask_of_irqs_to_setup,
+		IRQ_GC_INIT_MASK_CACHE, flags_to_clear, flags_to_set);
