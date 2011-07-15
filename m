@@ -1,46 +1,62 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Fri, 15 Jul 2011 15:32:41 +0200
-Subject: [PATCH V2 06/10] ARM: mxs: add saif device
-In-Reply-To: <1310483085-31442-7-git-send-email-b29396@freescale.com>
-References: <1310483085-31442-1-git-send-email-b29396@freescale.com>
-	<1310483085-31442-7-git-send-email-b29396@freescale.com>
-Message-ID: <20110715133241.GG2021@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 15 Jul 2011 16:00:40 +0200
+Subject: [GIT PULL] Tegra updates for v3.1
+In-Reply-To: <201107151506.29281.arnd@arndb.de>
+References: <CAMbhsRQoZ7vJGchkXLUOrOH4rpKJzJe-iGvLjTfBmz4R=8HtVw@mail.gmail.com>
+	<201107151506.29281.arnd@arndb.de>
+Message-ID: <201107151600.40794.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Friday 15 July 2011, Arnd Bergmann wrote:
+> On Friday 15 July 2011, Colin Cross wrote:
+> > Please pull Tegra updates from:
+> > 
+> > git://android.git.kernel.org/kernel/tegra.git for-next
+> > 
+> > Mostly peripheral support in existing boards, but also a few fixes and
+> > code reduction.
 
-just noticed this one...
+Hi Colin,
 
-> diff --git a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
-> index eaaf6ff..7837a87 100644
-> --- a/arch/arm/mach-mxs/mach-mx28evk.c
-> +++ b/arch/arm/mach-mxs/mach-mx28evk.c
-> @@ -40,6 +40,8 @@
->  #define MX28EVK_MMC0_SLOT_POWER		MXS_GPIO_NR(3, 28)
->  #define MX28EVK_MMC1_SLOT_POWER		MXS_GPIO_NR(3, 29)
->  
-> +#define DIGCTRL_BASE_ADDR      MX28_IO_ADDRESS(MX28_DIGCTL_BASE_ADDR)
-> +
+Sorry about the first message. I accidentally looked at the tegra/for-next
+branch, not at for-next, so the stuff I commented on is very historic and
+has been merged a few releases ago.
 
-Hmm, maybe define a function mx28_set_saif_clkmux(val)?
+The stuff you sent now does look very good. It would still be better
+to reorganize it into separate branches next time, but it's small
+enough overall that I'll just merge it as one for this release.
 
-> +	mx28_add_saif(0);
-> +	mx28_add_saif(1);
-> +
-> +	/*set the saif clk mux, both saif0/saif1 use saif0 clk*/
-> +	__raw_writel(0x2 << 10, DIGCTRL_BASE_ADDR);
+Again, sorry if my first message caused any trouble.
 
-You might overwrite previous settings here. The hardcoded numbers need
-defines, too.
+	Arnd
 
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110715/7a3994ba/attachment.sig>
+> Hi Colin,
+> 
+> I've browsed over the patches, and I had the impression that there are
+> still a number of issues that should be resolved before I pull this.
+> 
+> Specifically, what I noticed is:
+> 
+> * The cpufreq driver should now live in drivers/cpufreq/
+> * The DMA driver uses its own interface instead of the regular
+>   dma-engine API. I don't want to merge any more drivers like this.
+> * The legacy-irq code is essentially dead code, it's not being used
+>   anywhere. My impression is that it would need to look differently
+>   if you actually want to use it.
+> * The pinmux code is getting largely replaced with new code, but
+>   the new version does not use the new pinmux API from Linus Walleij.
+> * The commit named "[ARM] tegra: clock: Add dvfs support, bug fixes,
+>   and cleanups" puts a lot of stuff into a single patch that doesn't
+>   even belong into the same pull request.
+> 
+> I would very much like to at least pull the cleanups and bug fixes,
+> but it doesn't work like this, sorry.
+> 
+> Please remove the controversial patches and submit separate pull
+> requests for the bug fixes and cleanups. It's probably a good idea
+> to also  have the patches that add features reviewed on the mailing
+> lists again and then decide how to proceed with each one..
+> 
+> 	Arnd
+> 
