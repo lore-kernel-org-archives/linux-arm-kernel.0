@@ -1,63 +1,28 @@
-From: B29396@freescale.com (Dong Aisheng-B29396)
-Date: Fri, 15 Jul 2011 06:30:51 +0000
-Subject: [alsa-devel] [PATCH V2 01/10] ASoc: mxs: add mxs-pcm driver
-In-Reply-To: <CAA+hA=T7TDrUWnH1ami_1C2btzV_7GVbTU6D-ypSxjaSSFB_bw@mail.gmail.com>
-References: <1310483085-31442-1-git-send-email-b29396@freescale.com>
-	<1310483085-31442-2-git-send-email-b29396@freescale.com>
-	<20110714123106.GB1904@pengutronix.de>
-	<CAA+hA=T7TDrUWnH1ami_1C2btzV_7GVbTU6D-ypSxjaSSFB_bw@mail.gmail.com>
-Message-ID: <65EE16ACC360FA4D99C96DC085B3F7721CF10E@039-SN1MPN1-002.039d.mgd.msft.net>
+From: ynezz@true.cz (Petr =?iso-8859-2?Q?=A9tetiar?=)
+Date: Fri, 15 Jul 2011 08:48:54 +0200
+Subject: [PATCH 01/52] ARM: introduce atag_offset to replace boot_params
+In-Reply-To: <ADE657CA350FB648AAC2C43247A983F001F383E054DE@AUSP01VMBX24.collaborationhost.net>
+References: <1309920457-21913-1-git-send-email-nicolas.pitre@linaro.org>
+	<20110708203634.GU4812@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1107081714251.14596@xanadu.home>
+	<alpine.LFD.2.00.1107111046350.14596@xanadu.home>
+	<ADE657CA350FB648AAC2C43247A983F001F383D6D6F7@AUSP01VMBX24.collaborationhost.net>
+	<20110712204814.GD15997@ibawizard.net>
+	<ADE657CA350FB648AAC2C43247A983F001F383E054DE@AUSP01VMBX24.collaborationhost.net>
+Message-ID: <20110715064853.GE15997@ibawizard.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Dong Aisheng [mailto:dongas86 at gmail.com]
-> Sent: Friday, July 15, 2011 12:15 AM
-> To: Wolfram Sang
-> Cc: Dong Aisheng-B29396; alsa-devel at alsa-project.org;
-> s.hauer at pengutronix.de; broonie at opensource.wolfsonmicro.com; u.kleine-
-> koenig at pengutronix.de; lrg at ti.com; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [alsa-devel] [PATCH V2 01/10] ASoc: mxs: add mxs-pcm driver
-> 
-> 2011/7/14 Wolfram Sang <w.sang@pengutronix.de>:
-> >
-> >> +static struct snd_pcm_hardware snd_mxs_hardware = {
-> >> + ? ? .info ? ? ? ? ? ? ? ? ? = SNDRV_PCM_INFO_MMAP |
-> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? SNDRV_PCM_INFO_MMAP_VALID |
-> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? SNDRV_PCM_INFO_PAUSE |
-> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? SNDRV_PCM_INFO_RESUME |
-> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? SNDRV_PCM_INFO_INTERLEAVED,
-> >> + ? ? .formats ? ? ? ? ? ? ? ?= SNDRV_PCM_FMTBIT_S16_LE |
-> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? SNDRV_PCM_FMTBIT_S20_3LE |
-> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? SNDRV_PCM_FMTBIT_S24_LE |
-> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? SNDRV_PCM_FMTBIT_S32_LE,
-> >> + ? ? .channels_min ? ? ? ? ? = 2,
-> >> + ? ? .channels_max ? ? ? ? ? = 2,
-> >> + ? ? .period_bytes_min ? ? ? = 32,
-> >> + ? ? .period_bytes_max ? ? ? = 8192,
-> >> + ? ? .periods_min ? ? ? ? ? ?= 1,
-> >> + ? ? .periods_max ? ? ? ? ? ?= 255,
-> >
-> > When using madplay (for MP3) instead of aplay, I get
-> >
-> > [ 3310.010000] mxs-dma mxs-dma-apbx: maximum number of sg exceeded:
-> > 128 > 53 [ 3310.020000] dma dma1chan4: cannot prepare slave dma
-> >
-> > So, the mxs-dma limit should be taken into account here.
-> I also have tried a lot on mp3 playing with madplay, however still have
-> not met this issue.
-> Can you tell how can i get the same mp3 as you played?
-> Maybe it helps me to reproduce this issue.
-> I will check it tomorrow.
-> Thanks for the reminder.
-> 
+H Hartley Sweeten <hartleys@visionengravers.com> [2011-07-12 16:39:47]:
 
-Changed to 52 due for periods_max.
-        .periods_min            = 1,
--       .periods_max            = 255,
-+       .periods_max            = 52,
+> Could you rebuild your kernel with MACH_EDB9307A also selected in your
+> config?  After verifying that it still boots please either send me the zImage
+> or place it somewhere I can grab it and I will make sure it boots on mine.
 
-Thanks.
+Verified, kernel[1,2] boots. Source tree[3] used to build it (including config etc).
 
-Regards
-Dong Aisheng
+1. http://ynezz.true.cz/redux/zImage 
+2. http://ynezz.true.cz/redux/zImage.md5sum 
+3. https://github.com/ynezz/linux-2.6/commits/test-redux
+
+-- ynezz
