@@ -1,51 +1,38 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Fri, 15 Jul 2011 17:34:50 +0200
-Subject: [alsa-devel] [PATCH V2 06/10] ARM: mxs: add saif device
-In-Reply-To: <CAA+hA=TtBrDoAMfv0fqj30_heEJuZJFH=QjTUG8zTys0G+vgvA@mail.gmail.com>
-References: <1310483085-31442-1-git-send-email-b29396@freescale.com>
-	<1310483085-31442-7-git-send-email-b29396@freescale.com>
-	<20110715133241.GG2021@pengutronix.de>
-	<CAA+hA=TtBrDoAMfv0fqj30_heEJuZJFH=QjTUG8zTys0G+vgvA@mail.gmail.com>
-Message-ID: <20110715153450.GA31640@pengutronix.de>
+From: ccross@google.com (Colin Cross)
+Date: Fri, 15 Jul 2011 08:57:27 -0700
+Subject: [GIT PULL] Tegra updates for v3.1
+In-Reply-To: <201107151600.40794.arnd@arndb.de>
+References: <CAMbhsRQoZ7vJGchkXLUOrOH4rpKJzJe-iGvLjTfBmz4R=8HtVw@mail.gmail.com>
+	<201107151506.29281.arnd@arndb.de>
+	<201107151600.40794.arnd@arndb.de>
+Message-ID: <CAMbhsRQLaZss2uhLCaY-WjaH85WKLbYYnR2cfw4b+Qnz_rKXyw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 15, 2011 at 11:02:36PM +0800, Dong Aisheng wrote:
-> 2011/7/15 Wolfram Sang <w.sang@pengutronix.de>:
-> >> +#define DIGCTRL_BASE_ADDR ? ? ?MX28_IO_ADDRESS(MX28_DIGCTL_BASE_ADDR)
-> >> +
-> >
-> > Hmm, maybe define a function mx28_set_saif_clkmux(val)?
-> >
-> >> + ? ? mx28_add_saif(0);
-> >> + ? ? mx28_add_saif(1);
-> >> +
-> >> + ? ? /*set the saif clk mux, both saif0/saif1 use saif0 clk*/
-> >> + ? ? __raw_writel(0x2 << 10, DIGCTRL_BASE_ADDR);
-> >
-> > You might overwrite previous settings here. The hardcoded numbers need
-> > defines, too.
-> 
-> It's correct.
-> I'm originally going to do that when implement record because this
-> setting may affect both
-> machine driver and saif driver on recording.
-> Since currently we only implement playback, so i just hardcode it.
-> Do you think if that's ok?
-> Or i need to do it now?
+On Fri, Jul 15, 2011 at 7:00 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Friday 15 July 2011, Arnd Bergmann wrote:
+>> On Friday 15 July 2011, Colin Cross wrote:
+>> > Please pull Tegra updates from:
+>> >
+>> > git://android.git.kernel.org/kernel/tegra.git for-next
+>> >
+>> > Mostly peripheral support in existing boards, but also a few fixes and
+>> > code reduction.
+>
+> Hi Colin,
+>
+> Sorry about the first message. I accidentally looked at the tegra/for-next
+> branch, not at for-next, so the stuff I commented on is very historic and
+> has been merged a few releases ago.
+>
+> The stuff you sent now does look very good. It would still be better
+> to reorganize it into separate branches next time, but it's small
+> enough overall that I'll just merge it as one for this release.
+>
+> Again, sorry if my first message caused any trouble.
 
-If you just do playback, do you need to mux SAIF1-clk to SAIF0-clk ? If not
-(what I'd think), just leave changing DIGCTL out completely since the
-reset-default for that register should work. If you do need changing DIGCTL,
-some helper function like mentioned above would be better, I think.
+No problem, I'll delete the tegra/for-next branch, it was an old mis-push.
 
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110715/6fb7d837/attachment.sig>
+If I put it in separate branches in the future, do you want a single
+pull request for a merge of the branches, or a pull request for each
+branch?
