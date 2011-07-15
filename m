@@ -1,108 +1,82 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Fri, 15 Jul 2011 13:02:52 -0700
-Subject: [PATCH 1/2] ARM: Tegra: Harmony: Register and configure WM8903
-	IRQ GPIO
-In-Reply-To: <20110715000510.GD32716@opensource.wolfsonmicro.com>
-References: <1310589618-16080-1-git-send-email-swarren@nvidia.com>
-	<20110714122520.GB14249@sirena.org.uk>
-	<74CDBE0F657A3D45AFBB94109FB122FF049E834971@HQMAIL01.nvidia.com>
-	<20110715000510.GD32716@opensource.wolfsonmicro.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF049E834CCC@HQMAIL01.nvidia.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 15 Jul 2011 21:24:21 +0100
+Subject: [PATCH v3] pxa2xx_spi: fix memory corruption
+In-Reply-To: <20110715195003.GG2833@ponder.secretlab.ca>
+References: <201107101609.31405.anarsoul@gmail.com>
+	<1310311099-24638-1-git-send-email-anarsoul@gmail.com>
+	<20110715025331.GL2927@ponder.secretlab.ca>
+	<20110715081242.GM23270@n2100.arm.linux.org.uk>
+	<20110715195003.GG2833@ponder.secretlab.ca>
+Message-ID: <20110715202421.GE24628@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown wrote at Thursday, July 14, 2011 6:05 PM:
-> On Thu, Jul 14, 2011 at 08:49:28AM -0700, Stephen Warren wrote:
-> > Mark Brown wrote at Thursday, July 14, 2011 6:25 AM:
+On Fri, Jul 15, 2011 at 01:50:03PM -0600, Grant Likely wrote:
+> On Fri, Jul 15, 2011 at 09:12:42AM +0100, Russell King - ARM Linux wrote:
+> > On Thu, Jul 14, 2011 at 08:53:31PM -0600, Grant Likely wrote:
+> > > > +	u8 null_dma_buf_unaligned[16];
+> > > 
+> > > Don't dma buffers need to be cache-line aligned?  How large is the
+> > > actual transfer?  Using the __aligned() or __cacheline_aligned
+> > > attribute is the correct way to make sure you've got a data buffer
+> > > that can be used for DMA mixed with other stuff.  Then you don't need
+> > > to fool around with PTR_ALIGN or anything.
+> > 
+> > Err, did you not read the whole patch?
+> > 
+> > > > +	drv_data->null_dma_buf =
+> > > > +		(u32 *)PTR_ALIGN(&drv_data->null_dma_buf_unaligned, 8);
 > 
-> > > This seems silly - we should fix this in the core code rather than have
-> > > every single board that ahppens to use an interrupt which is also
-> > > available as a GPIO manually faff around with gpiolib.
-> 
-> > That seems a good goal.
-> 
-> > However, how does the WM8903 driver know whether the interrupt number
-> > it's passed is a straight-up dedicated interrupt (hence the calls aren't
-> > required), or a GPIO (hence they are)?
-> 
-> It shouldn't - I said "core code" for a reason :)
+> I read a lot of patches yesterday.  I may very well have missed
+> something.  I still don't see what you're referring to though.  If
+> the __aligned() was used inside the structure definition, then there
+> would be no need to have both the null_dma_buf pointer and the
+> null_dma_buf_unaligned buffer.  It would just be a correctly aligned
+> null_dma_buf.
 
-Ah, yes.
+That depends on the alignment guarantees from kmalloc, which may not be
+8 bytes - we have this:
 
-[Grant, Thomas, as GPIO/IRQ maintainers, do you agree that (a) below is
-something the core IRQ code should be doing?]
+#if defined(CONFIG_AEABI) && (__LINUX_ARM_ARCH__ >= 5)
+#define ARCH_SLAB_MINALIGN 8
+#endif
 
-There are two aspects to this:
+so presumably on !AEABI or arches < ARMv5, kmalloc _can_ return less than
+8 byte alignments.  Which makes using __aligned() in the definition useless.
 
-a) The generic gpio_request/gpio_direction_input. This could be handled
-by the core irq code if struct irq_chip grew a to_irq function, and a
-__irq_to_gpio/irq_to_gpio global function were created to mirror
-gpio_to_irq.
+> Plus, I was asking about whether it was valid to use the structure as
+> allocated in DMA operations since it may very well end up in the same
+> cache line as the allocated structure.  Firstly, that could mean DMA
+> and the cache referencing the same memory which could cause
+> corruption, and secondly on ARM isn't it a problem to have DMA buffers
+> in memory that is also cache mapped?
 
-b) On Tegra at least, we need to call tegra_gpio_enable to configure the
-pin to be a GPIO. This isn't performed by the Tegra GPIO driver during
-gpio_request, since such configuration is supposed to be outside the
-domain of the GPIO driver, but deferred to perhaps a pinmux driver. Should
-the same be true of request_irq; should it require the user to somehow
-call tegra_gpio_enable elsewhere? It'd be asymmetric to how gpio_request
-worked, but Tegra's irq_chip could easily call tegra_gpio_enable from
-within irq_chip.startup, thus simplifying any code that wants to use
-interrupt-that-are-GPIOs.
+For the second point, that depends on whether you're talking about the
+coherent stuff or the streaming stuff.
 
-The alternative is for the board files to have a list of GPIOs for which
-to call tegra_gpio_enable, and indeed, that's what we do have in Tegra
-e.g. in board-seaboard-pinmux.c.
+The coherent DMA API has entirely different semantics to streaming DMA API.
+The coherent DMA API allows for simultaneous access to the buffer by both
+the DMA device and the host CPU.
 
-I suppose with the new pinmux API, there will simply be a pinmux table in
-either the board file or Device Tree, and that will allow "GPIO" as a legal
-"special function" for each pin, and for pins which are really "GPIO
-interrupts", we'll just need to list "GPIO" in that pinmux table, so perhaps
-everything will just fall out cleanly that way. I suppose that a pinmux
-driver could even expose an "interrupt" special function for relevant pins
-just to clearly document the usage, even if this maps to the same thing as
-configuring a pin as a GPIO.
+The streaming DMA API only allows exclusive access by either the DMA device
+or the host CPU.
 
-> > I guess the answer is that there should be an interrupt API to map from
-> > interrupt to GPIO number, returning <0 when there is no GPIO backing the
-> > IRQ, and an op in struct irq_chip to implement that? However, that's not
-> > there right now as far as I can tell.
-> 
-> Yes, exactly - but it should not be complicated to add one and since
-> you're doing this anyway it'd make sense to do the core change rather
-> than faffing around the edges of the system.
+Therefore, with the streaming DMA API, the only thing that's required is
+to ensure that data is visible in some manner to the DMA device.  If the
+DMA device can read from the CPU cache, then probably nothing's required.
+If not, then the data must be evicted from as many levels of cache that
+are necessary to make it visible.  Conversely, for DMA writes, what
+matters is the visibility of the data to the host CPU.
 
-Sure, it doesn't look too hard.
+That approach does not work with the coherent DMA API.  Take a network
+driver TX ring.  Consider the effect of the following series of actions
+to see why it won't work:
 
-A complication is that ARM doesn't define gpio_to_irq in a single central
-header, but rather one per subarchitecture, I suppose since not all 
-subarchitectures implement/require gpiolib. Still, I think this mostly
-just means cut/pasting "#define irq_to_gpio __irq_to_gpio" into each
-mach-foo's gpio.h for now, so /probably/ not a big deal...
+- host CPU reads a word from the DMA buffer.  This brings in a whole
+  cache line.
+- network device writes to the previous descriptor (which overlaps the
+  just read cache line) to change its status
+- host CPU updates the next descriptor and writes the cache line back
+  XXX overwriting the network device's write to the previous descriptor.
 
-> > Finally, there are some pinmux interactions that need to be dealt with;
-> > on Tegra, the pinmux allows the tristate/drive status of pins to be set
-> > on a group basis (a group being a set of 1-n pins). However, gpio enable
-> > (which overrides the pinmux's setting of tristate/drive) can be set on
-> > a per-pin basis. At least on Seaboard, the WM8903 IRQ is an input pin
-> > in a group that otherwise needs to contain output pins, so we really
-> > want to enable the WM8903 IRQ GPIO pin as a GPIO, and set it to input,
-> > before setting up that pinmux group to drive the pins. Without this,
-> > there may be a brief period where both Tegra and the WM8903 are driving
-> > this IRQ signal, which can't be good for hardware.
-> 
-> If the pinmux stuff can't work this out then it needs to be worked on
-> until it can, this is pretty basic stuff.  I had thought that the plan
-> was to support a big block configuration done by the board which set
-> everything up en masse and would presumably cope with stuff like this?
-
-Maybe the solution for Tegra, once we have the new pinmux API in place,
-is for the pinmux driver initialization to program all pins in HW as
-input GPIOs, and hence tri-stated. That way, there can never be any
-conflict with external HW. If/once a pin/group is requested as a
-particular special function, the tri-state can be removed, since then
-we'll know the board-specific direction. Some though may have to be
-given to not tri-stating any pins required for basic SDRAM or UART
-access during the boot process, but this is probably workable.
-
--- 
-nvpublic
+So, coherent DMA is special because there's no exclusiveness there.
