@@ -1,52 +1,49 @@
-From: ccross@google.com (Colin Cross)
-Date: Fri, 15 Jul 2011 15:13:57 -0700
-Subject: [PATCH] ARM: move memory layout sanity checking before meminfo
-	initialization
-In-Reply-To: <20110715215819.GG24628@n2100.arm.linux.org.uk>
-References: <CAMbhsRT=NNYUYyYZXpz2=PpBXoBGANQHPgOkCE1oZ8XzHKN4og@mail.gmail.com>
-	<CAMbhsRSgUcFPpdTFvEDTFfo_Wk0k7BQzwk6cRtXC6K7mpQ+YDg@mail.gmail.com>
-	<20110715080950.GL23270@n2100.arm.linux.org.uk>
-	<CAMbhsRRCV0ukwbzFc6w_ba6xdVxs=TFmJMGd06UKTiNQPEJqpw@mail.gmail.com>
-	<20110715161628.GA24628@n2100.arm.linux.org.uk>
-	<CAMbhsRSbXTLzhSzBbQ8ebJqAC227ESHGyY2bHS+J4cN+NgzXFg@mail.gmail.com>
-	<20110715181309.GD24628@n2100.arm.linux.org.uk>
-	<CAMbhsRQRjwskzWB06g7rmSVgSdq5oVxA3yY+14qdtTxuQ=NeMQ@mail.gmail.com>
-	<20110715210720.GF24628@n2100.arm.linux.org.uk>
-	<CAMbhsRR=EVhKPkNUnzQ_2Ai9edWpmvHM_9TXwhh-xaa9Dk1Mcw@mail.gmail.com>
-	<20110715215819.GG24628@n2100.arm.linux.org.uk>
-Message-ID: <CAMbhsRSQpThghsO0X=i8g3MmyZC+cDJaOJ1+MYZV3hvw-8=GXw@mail.gmail.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Fri, 15 Jul 2011 17:40:47 -0500
+Subject: [PATCH 01/52] ARM: introduce atag_offset to replace boot_params
+In-Reply-To: <20110715064853.GE15997@ibawizard.net>
+References: <1309920457-21913-1-git-send-email-nicolas.pitre@linaro.org>
+	<20110708203634.GU4812@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1107081714251.14596@xanadu.home>
+	<alpine.LFD.2.00.1107111046350.14596@xanadu.home>
+	<ADE657CA350FB648AAC2C43247A983F001F383D6D6F7@AUSP01VMBX24.collaborationhost.net>
+	<20110712204814.GD15997@ibawizard.net>
+	<ADE657CA350FB648AAC2C43247A983F001F383E054DE@AUSP01VMBX24.collaborationhost.net>
+	<20110715064853.GE15997@ibawizard.net>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F001F383E0601F@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 15, 2011 at 2:58 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Fri, Jul 15, 2011 at 02:18:59PM -0700, Colin Cross wrote:
->> The thread has devolved into a generic command line problem - how to
->> pass completely unrelated options from the bootloader to the kernel
->> without also having to pass in every other option that the kernel
->> requires to boot. ?I have a solution that works for my case
->> (CMDLINE_EXTEND), I was trying to offer a solution that would work for
->> me while also working for multi-board kernels, but I'm happy to drop
->> it.
+On Thursday, July 14, 2011 11:49 PM, Petr ?tetiar wrote:
+> H Hartley Sweeten <hartleys@visionengravers.com> [2011-07-12 16:39:47]:
 >
-> You miss the point.
-<snip>
+>> Could you rebuild your kernel with MACH_EDB9307A also selected in your
+>> config?  After verifying that it still boots please either send me the zImage
+>> or place it somewhere I can grab it and I will make sure it boots on mine.
+>
+> Verified, kernel[1,2] boots. Source tree[3] used to build it (including config etc).
+>
+> 1. http://ynezz.true.cz/redux/zImage 
+> 2. http://ynezz.true.cz/redux/zImage.md5sum 
+> 3. https://github.com/ynezz/linux-2.6/commits/test-redux
 
-You cut out the relevant part of my email where I didn't miss your point:
->> My initial offer was a patch that makes an incorrect overlapping mem=
->> command line print a warning and ignore it, instead of doing something
->> that is guaranteed to crash the kernel in an obscure way.  I'll post a
->> patch.
+Well... Partial success...
 
-I don't care about making overlapping mem= work, I'm just trying to
-make it easier to debug when someone screws up and passes conflicting
-mem= arguments, by printing a big warning.  When the warning is
-printed, the kernel might as well take a stab at picking which of the
-two mem= arguments might let it boot far enough to get the console up
-- taking the smaller of any two overlapping regions seems most likely
-to work.  If not, DEBUG_LL will show the warning.
+The kernel does boot, but then panic's when trying to mount the root fs.
 
-The multiple command lines issue is irrelevant - I happened to hit
-this using CMDLINE_EXTEND, I could just as well have put both mem=
-options in ATAG_CMDLINE, and the problem would have been just as hard
-to debug.
+All my development boards are setup to pull the rootfs from a tftp server
+and then use root=/dev/ram as the rootfs.  This kernel must be missing something
+for that to work.
+
+Regardless, the kernel _does_ boot so the phys offset is correctly being
+worked out at run-time and the memory configuration looks correct so the
+atags offset must be working.
+
+So, as far as the ep39xx goes, for this patchset you can have either of these:
+
+Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+
+Tested-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+
+Regards,
+Hartley
