@@ -1,67 +1,58 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 15 Jul 2011 17:16:28 +0100
-Subject: [PATCH] ARM: move memory layout sanity checking before meminfo
-	initialization
-In-Reply-To: <CAMbhsRRCV0ukwbzFc6w_ba6xdVxs=TFmJMGd06UKTiNQPEJqpw@mail.gmail.com>
-References: <20110705185758.GI8286@n2100.arm.linux.org.uk>
-	<CAMbhsRRQ9D+VXTZP3vB7egkROEtN9-FxssFa2EcxuqB3F-Uv6Q@mail.gmail.com>
-	<20110714073453.GK23270@n2100.arm.linux.org.uk>
-	<CAMbhsRT=NNYUYyYZXpz2=PpBXoBGANQHPgOkCE1oZ8XzHKN4og@mail.gmail.com>
-	<CAMbhsRSgUcFPpdTFvEDTFfo_Wk0k7BQzwk6cRtXC6K7mpQ+YDg@mail.gmail.com>
-	<20110715080950.GL23270@n2100.arm.linux.org.uk>
-	<CAMbhsRRCV0ukwbzFc6w_ba6xdVxs=TFmJMGd06UKTiNQPEJqpw@mail.gmail.com>
-Message-ID: <20110715161628.GA24628@n2100.arm.linux.org.uk>
+Date: Fri, 15 Jul 2011 17:24:42 +0100
+Subject: Unnecessary cache-line flush on page table updates ?
+In-Reply-To: <20110712130907.GE13235@e102109-lin.cambridge.arm.com>
+References: <20110704104329.GD19117@e102109-lin.cambridge.arm.com>
+	<20110704111338.GD8286@n2100.arm.linux.org.uk>
+	<20110704155835.GA30189@e102109-lin.cambridge.arm.com>
+	<20110704195819.GG8286@n2100.arm.linux.org.uk>
+	<20110704232019.GK8286@n2100.arm.linux.org.uk>
+	<20110706160551.GH32020@e102109-lin.cambridge.arm.com>
+	<20110706180814.GL8286@n2100.arm.linux.org.uk>
+	<20110711164919.GB18871@e102109-lin.cambridge.arm.com>
+	<20110711170141.GA8486@n2100.arm.linux.org.uk>
+	<20110712130907.GE13235@e102109-lin.cambridge.arm.com>
+Message-ID: <20110715162442.GB24628@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 15, 2011 at 09:06:08AM -0700, Colin Cross wrote:
-> On Fri, Jul 15, 2011 at 1:09 AM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Thu, Jul 14, 2011 at 03:10:51PM -0700, Colin Cross wrote:
-> >> With CONFIG_CMDLINE_EXTEND, accidentally using two mem= options is
-> >> going to become more common (that's how I did it). ?Would you accept a
-> >> patch for 3.1/3.2 that would make incorrect mem= handling more robust?
-> >
-> > The issue here is that mem= parameters are not supposed to overlap.
-> > While there can be multiple mem= parameters, there is no sure way to
-> > tell when one should override previous parameters.
-> >
-> >> Investigating a little more, the problem happens in free_unused_memmap
-> >> when two banks ordered by bank_start have reverse order bank_end.
-> >> prev_bank_end gets set too low, and the area between bank_end of the
-> >> previous two banks gets freed when a third bank is processed.
-> >>
-> >> I can either drop extra mem= options if they overlap with a previous
-> >> one, try to copy the memblock data back into meminit after memblock
-> >> has handled the overlapping case, or fix up free_unused_memblock to
-> >> only increase prev_bank_end.
-> >
-> > You can't do that. ?We keep the original meminfo data because memblock
-> > coalesces the information and that breaks the sparse bank stuff (we need
-> > to know where the boundaries are even when banks are fully populated.)
+On Tue, Jul 12, 2011 at 02:09:07PM +0100, Catalin Marinas wrote:
+> On Mon, Jul 11, 2011 at 06:01:41PM +0100, Russell King - ARM Linux wrote:
+> > On Mon, Jul 11, 2011 at 05:49:20PM +0100, Catalin Marinas wrote:
+> > > On Wed, Jul 06, 2011 at 07:08:14PM +0100, Russell King - ARM Linux wrote:
+> > > > The area which needs more to focus some further work is
+> > > > __sync_icache_dcache(), which is fairly over-zealous about all the
+> > > > flushing.
+> > > 
+> > > Another thing that could be optimised is not to clean and invalidate the
+> > > D-cache but only clean to the PoU. The only problem is that
+> > > (flush|invalidate)_kernel_vmap_area, functions that seem to used only in
+> > > a single place. The semantics in cachetlb.txt claim to be used for I/O,
+> > > which means that they are already broken since we don't handle the L2
+> > > cache.
+> > 
+> > Those are newly introduced to cope with XFS wanting DMA to vmap'd areas
+> > to work.  They're there to handle the vmalloc-space alias of the pages.
+> > The DMA API sorts out the kernel direct-mapped plus L2 for non-virtually
+> > tagged L2 caches.
+> > 
+> > So they're just an additional pre-flush and post-invalidate calls around
+> > the DMA API to cope with vmalloc space aliases.  So I don't think they're
+> > broken.
 > 
-> OK, so no copying the memblock data back.  What about the other option:
-> Check the incoming banks in arm_add_memory, dropping anything that
-> overlaps (or taking the bigger/smaller one?), and printing a big
-> warning?
+> OK, so in this case these functions need to go to the point of
+> coherency. We could also optimise them to do pre-cleaning and
+> post-invalidation rather than always clean&invalidate.
 > 
-> I also have a patch that removes the requirement that the meminfo
-> banks be sorted by their end addresses in free_unused_memmap, which
-> fixes the crash that I am seeing, but there could be other problems
-> with overlapping banks with config options I am not testing.
+> Can we not use dmac_flush_range() (or dma_clean_range and dma_inv_range
+> via dmac_(map|unmap)_area) instead of __cpuc_flush_dcache_area?
 
-No.  It's insane.  The more I think about this silly CMDLINE_EXTEND option
-the more I don't like it, and the closer I am to ripping out these silly
-CONFIG_CMDLINE_blah options.  It's stupid if you think about the mem=
-parameter.
+We got rid of the clean and invalidate interfaces because they weren't
+suitable for cross-CPU cache handling (they were defined by implementation
+rather than purpose.)
 
-For example, if you have built-in parameters with mem= values, then you
-can't remove previously added memory sizes.  You're effectively stuck
-with needing to have the minimum amount of memory which the kernel was
-built for.  Even if you happen to have a good boot loader which does
-pass the right memory geometry to the kernel via ATAGs or DT.  mem=
-trumps all that.
-
-So, I'm sorry but I feel that this whole CMDLINE crap is becoming just
-that, and it really needs to die if people are going to try to use it
-in this way.
+We don't have enough information here to be able to call the map/unmap
+functions (the DMA direction would be a nonsense) so I think these
+should be new callbacks into the CPU cache code, and we do whatever
+is necessary in the low level stuff, rather than trying to overload
+existing functions.
