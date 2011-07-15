@@ -1,71 +1,132 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 14 Jul 2011 20:53:31 -0600
-Subject: [PATCH v3] pxa2xx_spi: fix memory corruption
-In-Reply-To: <1310311099-24638-1-git-send-email-anarsoul@gmail.com>
-References: <201107101609.31405.anarsoul@gmail.com>
-	<1310311099-24638-1-git-send-email-anarsoul@gmail.com>
-Message-ID: <20110715025331.GL2927@ponder.secretlab.ca>
+Date: Thu, 14 Jul 2011 20:53:40 -0600
+Subject: [PATCH v2 1/7] spi/imx: do not make copy of spi_imx_devtype_data
+In-Reply-To: <1310231801-18761-2-git-send-email-shawn.guo@linaro.org>
+References: <1310231801-18761-1-git-send-email-shawn.guo@linaro.org>
+	<1310231801-18761-2-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20110715025340.GP2927@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 10, 2011 at 06:18:19PM +0300, Vasily Khoruzhick wrote:
-> pxa2xx_spi_probe allocates struct driver_data and null_dma_buf
-> at same time via spi_alloc_master(), but then calculates
-> null_dma_buf pointer incorrectly, and it causes memory corruption
-> later if DMA usage is enabled.
+On Sun, Jul 10, 2011 at 01:16:35AM +0800, Shawn Guo wrote:
+> spi_imx_devtype_data has already been driver private data.  There is
+> really no need to make a copy in spi_imx_data.  Instead, a reference
+> pointer works perfectly fine.
 > 
-> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
-> ---
-> v2: - add u8 __null_dma_buf[16] to the end of driver_data structure
->     and use it as null_dma_buf after alignment.
->     - use PTR_ALIGN instead of ALIGN
-> v3: - drop (u8 *) cast, use & operator instead, change array name
->  drivers/spi/pxa2xx_spi.c |    9 +++++----
->  1 files changed, 5 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/spi/pxa2xx_spi.c b/drivers/spi/pxa2xx_spi.c
-> index dc25bee..b25fe27 100644
-> --- a/drivers/spi/pxa2xx_spi.c
-> +++ b/drivers/spi/pxa2xx_spi.c
-> @@ -106,6 +106,7 @@ struct driver_data {
->  	int rx_channel;
->  	int tx_channel;
->  	u32 *null_dma_buf;
-> +	u8 null_dma_buf_unaligned[16];
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
 
-Don't dma buffers need to be cache-line aligned?  How large is the
-actual transfer?  Using the __aligned() or __cacheline_aligned
-attribute is the correct way to make sure you've got a data buffer
-that can be used for DMA mixed with other stuff.  Then you don't need
-to fool around with PTR_ALIGN or anything.
+Applied, thanks.
 
 g.
 
+> ---
+>  drivers/spi/spi-imx.c |   24 ++++++++++++------------
+>  1 files changed, 12 insertions(+), 12 deletions(-)
+> 
+> diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
+> index 69d6dba..1c55dc9 100644
+> --- a/drivers/spi/spi-imx.c
+> +++ b/drivers/spi/spi-imx.c
+> @@ -96,7 +96,7 @@ struct spi_imx_data {
+>  	const void *tx_buf;
+>  	unsigned int txfifo; /* number of words pushed in tx FIFO */
 >  
->  	/* SSP register addresses */
->  	void __iomem *ioaddr;
-> @@ -1543,8 +1544,8 @@ static int __devinit pxa2xx_spi_probe(struct platform_device *pdev)
->  		return -ENODEV;
+> -	struct spi_imx_devtype_data devtype_data;
+> +	struct spi_imx_devtype_data *devtype_data;
+>  };
+>  
+>  #define MXC_SPI_BUF_RX(type)						\
+> @@ -539,7 +539,7 @@ static void __maybe_unused mx1_reset(struct spi_imx_data *spi_imx)
+>   * These version numbers are taken from the Freescale driver.  Unfortunately it
+>   * doesn't support i.MX1, so this entry doesn't match the scheme. :-(
+>   */
+> -static struct spi_imx_devtype_data spi_imx_devtype_data[] __devinitdata = {
+> +static struct spi_imx_devtype_data spi_imx_devtype_data[] = {
+>  #ifdef CONFIG_SPI_IMX_VER_IMX1
+>  	[SPI_IMX_VER_IMX1] = {
+>  		.intctrl = mx1_intctrl,
+> @@ -607,21 +607,21 @@ static void spi_imx_chipselect(struct spi_device *spi, int is_active)
+>  
+>  static void spi_imx_push(struct spi_imx_data *spi_imx)
+>  {
+> -	while (spi_imx->txfifo < spi_imx->devtype_data.fifosize) {
+> +	while (spi_imx->txfifo < spi_imx->devtype_data->fifosize) {
+>  		if (!spi_imx->count)
+>  			break;
+>  		spi_imx->tx(spi_imx);
+>  		spi_imx->txfifo++;
 >  	}
 >  
-> -	/* Allocate master with space for drv_data and null dma buffer */
-> -	master = spi_alloc_master(dev, sizeof(struct driver_data) + 16);
-> +	/* Allocate master with space for drv_data */
-> +	master = spi_alloc_master(dev, sizeof(struct driver_data));
->  	if (!master) {
->  		dev_err(&pdev->dev, "cannot alloc spi_master\n");
->  		pxa_ssp_free(ssp);
-> @@ -1569,8 +1570,8 @@ static int __devinit pxa2xx_spi_probe(struct platform_device *pdev)
->  	master->transfer = transfer;
+> -	spi_imx->devtype_data.trigger(spi_imx);
+> +	spi_imx->devtype_data->trigger(spi_imx);
+>  }
 >  
->  	drv_data->ssp_type = ssp->type;
-> -	drv_data->null_dma_buf = (u32 *)ALIGN((u32)(drv_data +
-> -						sizeof(struct driver_data)), 8);
-> +	drv_data->null_dma_buf =
-> +		(u32 *)PTR_ALIGN(&drv_data->null_dma_buf_unaligned, 8);
+>  static irqreturn_t spi_imx_isr(int irq, void *dev_id)
+>  {
+>  	struct spi_imx_data *spi_imx = dev_id;
 >  
->  	drv_data->ioaddr = ssp->mmio_base;
->  	drv_data->ssdr_physical = ssp->phys_base + SSDR;
+> -	while (spi_imx->devtype_data.rx_available(spi_imx)) {
+> +	while (spi_imx->devtype_data->rx_available(spi_imx)) {
+>  		spi_imx->rx(spi_imx);
+>  		spi_imx->txfifo--;
+>  	}
+> @@ -635,12 +635,12 @@ static irqreturn_t spi_imx_isr(int irq, void *dev_id)
+>  		/* No data left to push, but still waiting for rx data,
+>  		 * enable receive data available interrupt.
+>  		 */
+> -		spi_imx->devtype_data.intctrl(
+> +		spi_imx->devtype_data->intctrl(
+>  				spi_imx, MXC_INT_RR);
+>  		return IRQ_HANDLED;
+>  	}
+>  
+> -	spi_imx->devtype_data.intctrl(spi_imx, 0);
+> +	spi_imx->devtype_data->intctrl(spi_imx, 0);
+>  	complete(&spi_imx->xfer_done);
+>  
+>  	return IRQ_HANDLED;
+> @@ -677,7 +677,7 @@ static int spi_imx_setupxfer(struct spi_device *spi,
+>  	} else
+>  		BUG();
+>  
+> -	spi_imx->devtype_data.config(spi_imx, &config);
+> +	spi_imx->devtype_data->config(spi_imx, &config);
+>  
+>  	return 0;
+>  }
+> @@ -696,7 +696,7 @@ static int spi_imx_transfer(struct spi_device *spi,
+>  
+>  	spi_imx_push(spi_imx);
+>  
+> -	spi_imx->devtype_data.intctrl(spi_imx, MXC_INT_TE);
+> +	spi_imx->devtype_data->intctrl(spi_imx, MXC_INT_TE);
+>  
+>  	wait_for_completion(&spi_imx->xfer_done);
+>  
+> @@ -811,7 +811,7 @@ static int __devinit spi_imx_probe(struct platform_device *pdev)
+>  	init_completion(&spi_imx->xfer_done);
+>  
+>  	spi_imx->devtype_data =
+> -		spi_imx_devtype_data[pdev->id_entry->driver_data];
+> +		&spi_imx_devtype_data[pdev->id_entry->driver_data];
+>  
+>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>  	if (!res) {
+> @@ -854,9 +854,9 @@ static int __devinit spi_imx_probe(struct platform_device *pdev)
+>  	clk_enable(spi_imx->clk);
+>  	spi_imx->spi_clk = clk_get_rate(spi_imx->clk);
+>  
+> -	spi_imx->devtype_data.reset(spi_imx);
+> +	spi_imx->devtype_data->reset(spi_imx);
+>  
+> -	spi_imx->devtype_data.intctrl(spi_imx, 0);
+> +	spi_imx->devtype_data->intctrl(spi_imx, 0);
+>  
+>  	ret = spi_bitbang_start(&spi_imx->bitbang);
+>  	if (ret) {
 > -- 
-> 1.7.5.rc3
+> 1.7.4.1
 > 
