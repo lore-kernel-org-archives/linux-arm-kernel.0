@@ -1,83 +1,116 @@
-From: vishwanath.bs@ti.com (Vishwanath Sripathy)
-Date: Fri, 15 Jul 2011 15:34:08 +0530
-Subject: [GIT PULL] minimal omap4460 support for v3.1 merge window
-In-Reply-To: <20110710195215.GJ5783@atomide.com>
-References: <20110710065627.GE5783@atomide.com>
-	<20110710195215.GJ5783@atomide.com>
-Message-ID: <f4cffad16aa1de61a44edfae84e2249a@mail.gmail.com>
+From: tushar.behera@linaro.org (Tushar Behera)
+Date: Fri, 15 Jul 2011 15:35:49 +0530
+Subject: [PATCH 0/6] ARM: S5P64X0: Add Framebuffer support
+In-Reply-To: <CAEC9eQMonzbcTOfb+2=UBCDpOrk-Qh+snQjTDLetz=jftb3AeQ@mail.gmail.com>
+References: <1310650036-28836-1-git-send-email-ajaykumar.rs@samsung.com>	<4E1FDA4E.9010800@linaro.org>
+	<CAEC9eQMonzbcTOfb+2=UBCDpOrk-Qh+snQjTDLetz=jftb3AeQ@mail.gmail.com>
+Message-ID: <4E2010FD.2020409@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony,
-I boot tested this pull request on 4460 Panda and it boots up fine.
-
-Regards
-Vishwa
-
-
-> -----Original Message-----
-> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-
-> arm-kernel-bounces at lists.infradead.org] On Behalf Of Tony Lindgren
-> Sent: Monday, July 11, 2011 1:22 AM
-> To: Arnd Bergmann
-> Cc: Thomas Gleixner; linux-omap at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; Nicolas Pitre
-> Subject: Re: [GIT PULL] minimal omap4460 support for v3.1 merge
-> window
+On Friday 15 July 2011 11:57 AM, Ajay kumar wrote:
+> Hi Tushar,
 >
-> Correting the email address for Arnd.
+> On Fri, Jul 15, 2011 at 11:42 AM, Tushar Behera
+> <tushar.behera@linaro.org>  wrote:
+>> On Thursday 14 July 2011 06:57 PM, Ajay Kumar wrote:
+>>>
+>>>         The patches are created against "for-next" branch of Kukjin Kim's
+>>> tree at:
+>>>
+>>>   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+>>>
+>>>         Patch [1/6]
+>>>         -- add "s5p64x0-fb" type driver_data(s3c_fb_driverdata).
+>>>         -- Display controller in S5P64X0 supports 3 windows.
+>>>
+>>>         Patch [2/6]
+>>>         -- Resource definitions(_MEM, _IRQ).
+>>>
+>>>         Patch [3/6]
+>>>         -- Set s3c_device_fb name as "s5p64x0-fb"
+>>>            for S5P6440 and S5P6450.
+>>>
+>>>         Patch [4/6]
+>>>         -- GPIO settings for LCD in S5P6440 and S5P6450.
+>>>         -- Select LCD interface type (RGB/i80)
+>>>
+>>>         Patch [5/6]
+>>>         -- Add support for LCD-LTE480 platform device in SMDK6440.
+>>>         -- Platform data for FB and a basic window definition.
+>>>         -- Enables FB support and platform-lcd support.
+>>>         -- Add support for window 0 with 24 BPP.
+>>>
+>>>         Patch [6/6]
+>>>         -- Add support for LCD-LTE480 platform device in SMDK6450.
+>>>         -- Platform data for FB and a basic window definition.
+>>>         -- Enables FB support and platform-lcd support.
+>>>         -- Add support for window 0 with 24 BPP.
+>>>
+>> Some of the patches have got some coding syntax (DOS LINE ending etc.).
+>> Consider running scripts/checkpatch.pl on the patches before sending the
+>> next version.
+>>
+>> scripts/cleanpatch can help you in fixing many of the style problems.
+>>
 >
-> * Tony Lindgren <tony@atomide.com> [110709 23:51]:
-> > Hi Arnd,
-> >
-> > Please pull minimal omap4460 support from:
-> >
-> > git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-
-> 2.6.git 4460
-> >
-> > Regards,
-> >
-> > Tony
-> >
-> >
-> > The following changes since commit
-> 48cb1258e8b0f8c81cfb699b42326c5b2147b3f8:
-> >   Tony Lindgren (1):
-> >         Merge branch 'for_3.1/pm-misc' of
-> git://git.kernel.org/.../khilman/linux-omap-pm into devel-cleanup
-> >
-> > are available in the git repository at:
-> >
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-
-> 2.6.git 4460
-> >
-> > Aneesh V (2):
-> >       OMAP: ID: introduce chip detection for OMAP4460
-> >       OMAP4: ID: add omap_has_feature for max freq supported
-> >
-> > Rajendra Nayak (2):
-> >       OMAP4: PRCM: OMAP4460 specific PRM and CM register bitshifts
-> >       OMAP4: clocks: Update the clock tree with 4460 clock nodes
-> >
-> >  arch/arm/mach-omap2/clock44xx_data.c          |   39
-> ++++++++++++++++++
-> >  arch/arm/mach-omap2/cm-regbits-44xx.h         |   36
-> +++++++++++++++++
-> >  arch/arm/mach-omap2/id.c                      |   53
-> ++++++++++++++++++++----
-> >  arch/arm/mach-omap2/prm-regbits-44xx.h        |    8 ++++
-> >  arch/arm/plat-omap/include/plat/clkdev_omap.h |    1 +
-> >  arch/arm/plat-omap/include/plat/clock.h       |    2 +
-> >  arch/arm/plat-omap/include/plat/cpu.h         |   35
-> +++++++++++++++-
-> >  7 files changed, 162 insertions(+), 12 deletions(-)
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-
-> omap" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> I have tried running checkpatch.pl on patches 1 to 6,
+> and I did not encounter any error like DOS_LINE as you have mentioned.
+> Can you please tell me which patch is showing that error when run with
+> checkpatch.pl?
 >
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+Yes you are right.
+
+I used Thunderbird mail client to download the patches and some thing is 
+wrong with its settings.
+
+>>>   o To Paul Mundt, Jingoo Han
+>>>     [Patch 1/6] video: s3c-fb: Add S5P64X0 specific s3c_fb_driverdata
+>>>
+>>>   o To Kukjin Kim
+>>>     [Patch 2/6] ARM: S5P64X0: Add register base and IRQ for Framebuffer
+>>>     [Patch 3/6] ARM: S5P64X0: Set s3c_device_fb name
+>>>     [Patch 4/6] ARM: S5P64X0: Add GPIO and SPCON settings for LCD
+>>>     [Patch 5/6] ARM: S5P6440: Add LCD-LTE480 and enable Framebuffer support
+>>>     [Patch 6/6] ARM: S5P6450: Add LCD-LTE480 and enable Framebuffer support
+>>>
+>>>
+>>>   arch/arm/mach-s5p64x0/Kconfig                  |   10 ++++
+>>>   arch/arm/mach-s5p64x0/Makefile                 |    1 +
+>>>   arch/arm/mach-s5p64x0/cpu.c                    |    3 +
+>>>   arch/arm/mach-s5p64x0/include/mach/irqs.h      |    4 ++
+>>>   arch/arm/mach-s5p64x0/include/mach/map.h       |    3 +
+>>>   arch/arm/mach-s5p64x0/include/mach/regs-fb.h   |   19 +++++++
+>>>   arch/arm/mach-s5p64x0/include/mach/regs-gpio.h |    4 ++
+>>>   arch/arm/mach-s5p64x0/mach-smdk6440.c          |   63
+>>> +++++++++++++++++++++++
+>>>   arch/arm/mach-s5p64x0/mach-smdk6450.c          |   63
+>>> +++++++++++++++++++++++
+>>>   arch/arm/mach-s5p64x0/setup-fb.c               |   48 ++++++++++++++++++
+>>>   arch/arm/plat-samsung/include/plat/fb.h        |   14 +++++
+>>>   drivers/video/s3c-fb.c                         |   64
+>>> ++++++++++++++++++++++++
+>>>   12 files changed, 296 insertions(+), 0 deletions(-)
+>>>   create mode 100644 arch/arm/mach-s5p64x0/include/mach/regs-fb.h
+>>>   create mode 100644 arch/arm/mach-s5p64x0/setup-fb.c
+>>>
+>>> --
+>>> To unsubscribe from this list: send the line "unsubscribe
+>>> linux-samsung-soc" in
+>>> the body of a message to majordomo at vger.kernel.org
+>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>
+>>
+>> --
+>> Tushar Behera
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc"
+>> in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>
+
+
+-- 
+Tushar Behera
