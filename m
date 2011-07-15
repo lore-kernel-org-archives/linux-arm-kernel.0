@@ -1,115 +1,121 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 15 Jul 2011 16:38:56 +0800
-Subject: [PATCH v3] mtd: dataflash: add device tree probe support
-In-Reply-To: <1310283313-32087-1-git-send-email-shawn.guo@linaro.org>
-References: <1310283313-32087-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1310719136-21565-1-git-send-email-shawn.guo@linaro.org>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 15 Jul 2011 11:31:04 +0300
+Subject: [PATCH] ARM: OMAP4: PCM049: remove vusim regulator
+In-Reply-To: <20110715082012.GR5783@atomide.com>
+References: <1310554738.18446.12.camel@lws-weitzel>
+	<1310554762-10743-1-git-send-email-j.weitzel@phytec.de>
+	<4E1D8BCD.5060901@ru.mvista.com>
+	<1310561772.18446.14.camel@lws-weitzel>
+	<20110714073445.GL5783@atomide.com>
+	<1310632792.4008.3.camel@lws-weitzel>
+	<20110715075024.GO5783@atomide.com>
+	<20110715075825.GB2611@legolas.emea.dhcp.ti.com>
+	<20110715082012.GR5783@atomide.com>
+Message-ID: <20110715083103.GF2611@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It adds device tree probe support for mtd_dataflash driver.
+Hi,
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Cc: David Woodhouse <dwmw2@infradead.org>
-Cc: Artem Bityutskiy <Artem.Bityutskiy@nokia.com>
----
-Changes since v2:
- * Change compatible string to "at45" from "at45xxx"
- * Add "#ifdef CONFIG_OF" for dataflash_dt_ids
+On Fri, Jul 15, 2011 at 01:20:12AM -0700, Tony Lindgren wrote:
+> * Felipe Balbi <balbi@ti.com> [110715 00:53]:
+> > Hi,
+> > 
+> > On Fri, Jul 15, 2011 at 12:50:24AM -0700, Tony Lindgren wrote:
+> > > * Jan Weitzel <J.Weitzel@phytec.de> [110714 01:34]:
+> > > > Am Donnerstag, den 14.07.2011, 00:34 -0700 schrieb Tony Lindgren:
+> > > > > * Jan Weitzel <J.Weitzel@phytec.de> [110713 05:51]:
+> > > > > > Am Mittwoch, den 13.07.2011, 16:13 +0400 schrieb Sergei Shtylyov:
+> > > > > > 
+> > > > > > > 
+> > > > > > >     Have you added that 'i' at the end intentionally?
+> > > > > > > 
+> > > > > > Thank you. It was a tribute to vim.
+> > > > > 
+> > > > > :i)
+> > > > > 
+> > > > > I'll fold the fixed patch into your original patch. Will also
+> > > > > keep the new board files in testing-board because of the code
+> > > > > coalescing and device tree conversion effort.
+> > > > 
+> > > > So there is no way to get the board mainline yet?
+> > > 
+> > > Well we can add it even before device tree support if it makes
+> > > sense from code coalescing point of view. In this case it would
+> > > mean creating board-panda-common.c or similar so the code can
+> > > be shared amongst the panda variants.
+> > > 
+> > > It seems that some GPIO pins are different and there are some
+> > > difference in devices connected, but big parts of the code can be
+> > > shared.
+> > 
+> > isn't it easier than to just add a few if (machine_is_xxxx()) checks and
+> > another MACHINE_START() to board-omap4panda.c rather than creating a new
+> > file, shuffling code around and then adding a new board file ??
+> 
+> That works too if the init_machine does not get too complicated.
 
-Changes since v1:
- * Add "atmel,at45xxx" into the match table
- * Add binding document
+possibly something like this (still missing MACHINE_START a few more
+things):
 
- .../devicetree/bindings/mtd/atmel-dataflash.txt    |   14 ++++++++++++++
- drivers/mtd/devices/mtd_dataflash.c                |   18 ++++++++++++++++--
- 2 files changed, 30 insertions(+), 2 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/mtd/atmel-dataflash.txt
-
-diff --git a/Documentation/devicetree/bindings/mtd/atmel-dataflash.txt b/Documentation/devicetree/bindings/mtd/atmel-dataflash.txt
-new file mode 100644
-index 0000000..ef66ddd
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mtd/atmel-dataflash.txt
-@@ -0,0 +1,14 @@
-+* Atmel Data Flash
-+
-+Required properties:
-+- compatible : "atmel,<model>", "atmel,<series>", "atmel,dataflash".
-+
-+Example:
-+
-+flash at 1 {
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+	compatible = "atmel,at45db321d", "atmel,at45", "atmel,dataflash";
-+	spi-max-frequency = <25000000>;
-+	reg = <1>;
+diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
+index 0cfe200..dff174c 100644
+--- a/arch/arm/mach-omap2/board-omap4panda.c
++++ b/arch/arm/mach-omap2/board-omap4panda.c
+@@ -681,20 +681,44 @@ void omap4_panda_display_init(void)
+        omap_display_init(&omap4_panda_dss_data);
+ }
+ 
++static struct omap_smsc911x_platform_data board_smsc911x_data __initdata = {
++       .cs             = OMAP4_SMSC911X_ETH_CS,
++       .gpio_irq       = OMAP4_SMSC911X_ETH_GPIO_IRQ,
++       .gpio_reset     = -EINVAL,
++       .flags          = SMSC911X_USE_16BIT,
 +};
-diff --git a/drivers/mtd/devices/mtd_dataflash.c b/drivers/mtd/devices/mtd_dataflash.c
-index 8f6b02c..c86fa57 100644
---- a/drivers/mtd/devices/mtd_dataflash.c
-+++ b/drivers/mtd/devices/mtd_dataflash.c
-@@ -17,6 +17,8 @@
- #include <linux/mutex.h>
- #include <linux/err.h>
- #include <linux/math64.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
- 
- #include <linux/spi/spi.h>
- #include <linux/spi/flash.h>
-@@ -24,7 +26,6 @@
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/partitions.h>
- 
--
- /*
-  * DataFlash is a kind of SPI flash.  Most AT45 chips have two buffers in
-  * each chip, which may be used for double buffered I/O; but this driver
-@@ -98,6 +99,16 @@ struct dataflash {
- 	struct mtd_info		mtd;
- };
- 
-+#ifdef CONFIG_OF
-+static const struct of_device_id dataflash_dt_ids[] = {
-+	{ .compatible = "atmel,at45", },
-+	{ .compatible = "atmel,dataflash", },
-+	{ /* sentinel */ }
-+};
-+#else
-+#define dataflash_dt_ids NULL
-+#endif
 +
- /* ......................................................................... */
- 
- /*
-@@ -634,6 +645,7 @@ add_dataflash_otp(struct spi_device *spi, char *name,
++static void __init omap4_panda_smsc91xx_init(void)
++{
++       if (!machine_is_pcm049())
++               return;
++
++       omap_mux_init_gpio(OMAP4_PCM049_ETH_GPIO_IRQ, OMAP_PIN_INPUT);
++       gpmc_smsc911x_init(&board_smsc911x_data);
++}
++
+ static void __init omap4_panda_init(void)
  {
- 	struct dataflash		*priv;
- 	struct mtd_info			*device;
-+	struct mtd_part_parser_data	ppdata;
- 	struct flash_platform_data	*pdata = spi->dev.platform_data;
- 	char				*otp_tag = "";
- 	int				err = 0;
-@@ -675,7 +687,8 @@ add_dataflash_otp(struct spi_device *spi, char *name,
- 			pagesize, otp_tag);
- 	dev_set_drvdata(&spi->dev, priv);
+        int package = OMAP_PACKAGE_CBS;
  
--	err = mtd_device_parse_register(device, NULL, 0,
-+	ppdata.of_node = spi->dev.of_node;
-+	err = mtd_device_parse_register(device, NULL, &ppdata,
- 			pdata ? pdata->parts : NULL,
- 			pdata ? pdata->nr_parts : 0);
+        if (omap_rev() == OMAP4430_REV_ES1_0)
+                package = OMAP_PACKAGE_CBL;
++
+        omap4_mux_init(board_mux, NULL, package);
  
-@@ -926,6 +939,7 @@ static struct spi_driver dataflash_driver = {
- 		.name		= "mtd_dataflash",
- 		.bus		= &spi_bus_type,
- 		.owner		= THIS_MODULE,
-+		.of_match_table = dataflash_dt_ids,
- 	},
+-       if (wl12xx_set_platform_data(&omap_panda_wlan_data))
+-               pr_err("error setting wl12xx data\n");
++       if (machine_is_omap4panda()) {
++               int             ret;
++
++               ret = wl12xx_set_platform_data(&omap_panda_wlan_data);
++               if (ret)
++                       pr_err("error setting wl12xx data\n");
++
++               platform_device_register(&omap_vwlan_device);
++       }
  
- 	.probe		= dataflash_probe,
++       omap4_panda_smsc91xx_init();
+        omap4_panda_i2c_init();
+        platform_add_devices(panda_devices, ARRAY_SIZE(panda_devices));
+-       platform_device_register(&omap_vwlan_device);
+        board_serial_init();
+        omap4_twl6030_hsmmc_init(mmc);
+
 -- 
-1.7.4.1
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 490 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110715/d0fbe0d4/attachment.sig>
