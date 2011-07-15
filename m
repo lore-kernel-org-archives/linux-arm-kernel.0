@@ -1,63 +1,77 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 15 Jul 2011 11:03:16 +0300
-Subject: [PATCH] OMAP: powerdomains: Make all powerdomain target states
-	as ON at init
-In-Reply-To: <1310527588-13022-1-git-send-email-santosh.shilimkar@ti.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 15 Jul 2011 02:03:26 -0600 (MDT)
+Subject: [PATCH] OMAP: clockdomain: Wait for powerdomain to be ON when
+	using clockdomain force wakeup
+In-Reply-To: <1310527588-13022-2-git-send-email-santosh.shilimkar@ti.com>
 References: <1310527588-13022-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <20110715080315.GC2611@legolas.emea.dhcp.ti.com>
+	<1310527588-13022-2-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <alpine.DEB.2.00.1107150159580.16606@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+cc'ing Patrick
 
-On Wed, Jul 13, 2011 at 08:56:27AM +0530, Santosh Shilimkar wrote:
-> From: Rajendra Nayak <rnayak@ti.com>
+Hi Rajendra, Santosh,
+
+some comments here:
+
+On Wed, 13 Jul 2011, Santosh Shilimkar wrote:
+
+> While using clockdomain force wakeup method, not waiting for powerdomain
+> to be effectively ON may end up locking the clockdomain FSM until a
+> next wakeup event occurs.
 > 
-> Program all powerdomain target state as ON; This is to
-> prevent domains from hitting low power states (if bootloader
-> has target states set to something other than ON) and potentially
-> even losing context while PM is not fully initilized.
-> The PM late init code can then program the desired target
-> state for all the power domains.
+> One such issue was seen on OMAP4430, where L4_PER was periodically
+> getting stuck in in-transition state when transitioning from from OSWR to ON.
 > 
+> This issue was reported and investigated by Patrick Titiano <p-titiano@ti.com>
+> 
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 > Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> Reported-by: Patrick Titiano <p-titiano@ti.com>
+> Cc: Kevin Hilman <khilman@ti.com>
+> Cc: Benoit Cousson <b-cousson@ti.com>
+> Cc: Paul Walmsley <paul@pwsan.com>
 > ---
->  arch/arm/mach-omap2/powerdomain.c |   12 +++++++++++-
->  1 files changed, 11 insertions(+), 1 deletions(-)
+>  arch/arm/mach-omap2/clockdomain.c |    7 ++++++-
+>  1 files changed, 6 insertions(+), 1 deletions(-)
 > 
-> diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
-> index e0490bc..e61866c 100644
-> --- a/arch/arm/mach-omap2/powerdomain.c
-> +++ b/arch/arm/mach-omap2/powerdomain.c
-> @@ -109,6 +109,16 @@ static int _pwrdm_register(struct powerdomain *pwrdm)
+> diff --git a/arch/arm/mach-omap2/clockdomain.c b/arch/arm/mach-omap2/clockdomain.c
+> index b98a972..583cc3d 100644
+> --- a/arch/arm/mach-omap2/clockdomain.c
+> +++ b/arch/arm/mach-omap2/clockdomain.c
+> @@ -718,6 +718,8 @@ int clkdm_sleep(struct clockdomain *clkdm)
+>   */
+>  int clkdm_wakeup(struct clockdomain *clkdm)
+>  {
+> +	int ret;
+> +
+>  	if (!clkdm)
+>  		return -EINVAL;
 >  
->  	list_add(&pwrdm->node, &pwrdm_list);
+> @@ -732,7 +734,10 @@ int clkdm_wakeup(struct clockdomain *clkdm)
 >  
-> +	/*
-> +	* Program all powerdomain target state as ON; This is to
-> +	* prevent domains from hitting low power states (if bootloader
-> +	* has target states set to something other than ON) and potentially
-> +	* even losing context while PM is not fully initilized.
-> +	* The PM late init code can then program the desired target
-> +	* state for all the power domains.
-> +	*/
-> +	pwrdm_set_next_pwrst(pwrdm, PWRDM_POWER_ON);
+>  	pr_debug("clockdomain: forcing wakeup on %s\n", clkdm->name);
+>  
+> -	return arch_clkdm->clkdm_wakeup(clkdm);
+> +	ret = arch_clkdm->clkdm_wakeup(clkdm);
+> +	ret |= pwrdm_wait_transition(clkdm->pwrdm.ptr);
 
-Just out of curiosity, I was wondering if it really makes sense to power
-up all power domains during boot just to avoid loosing context. Doesn't
-hwmod/omap_device soft-reset all IPs during initialization ? If that's
-really the case, shouldn't we then choose which powerdomains are
-strictly necessary for boot and only power those up ?
+Seems like this should just call pwrdm_state_switch() or 
+pwrdm_clkdm_state_switch()?  (This second function looks superfluous, we 
+should probably get rid of it.)
 
-Sorry if this is a non-sensical question, but I was curious about it
-;-)
+Shouldn't this be added to all of 
+clkdm_{wakeup,sleep,allow_idle,deny_idle}() if it isn't there already?
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 490 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110715/e9cd6215/attachment.sig>
+> +
+> +	return ret;
+>  }
+>  
+>  /**
+> -- 
+> 1.7.4.1
+> 
+
+
+- Paul
