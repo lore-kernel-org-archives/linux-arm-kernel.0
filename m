@@ -1,35 +1,63 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 15 Jul 2011 10:01:32 +0200
-Subject: [PATCH 1/2] dmaengine: imx-sdma: use platform_device_id to
-	identify sdma version
-In-Reply-To: <1310660057-17953-2-git-send-email-shawn.guo@linaro.org>
-References: <1310660057-17953-1-git-send-email-shawn.guo@linaro.org>
-	<1310660057-17953-2-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20110715080132.GI6069@pengutronix.de>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 15 Jul 2011 11:03:16 +0300
+Subject: [PATCH] OMAP: powerdomains: Make all powerdomain target states
+	as ON at init
+In-Reply-To: <1310527588-13022-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1310527588-13022-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <20110715080315.GC2611@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 15, 2011 at 12:14:16AM +0800, Shawn Guo wrote:
-> It might be not good to use software defined version to identify sdma
-> device type, when hardware does not define such version.  Instead,
-> soc name is stable enough to define the device type.
+Hi,
+
+On Wed, Jul 13, 2011 at 08:56:27AM +0530, Santosh Shilimkar wrote:
+> From: Rajendra Nayak <rnayak@ti.com>
 > 
-> The patch uses platform_device_id rather than version number passed
-> by platform data to identify sdma device type/version.
+> Program all powerdomain target state as ON; This is to
+> prevent domains from hitting low power states (if bootloader
+> has target states set to something other than ON) and potentially
+> even losing context while PM is not fully initilized.
+> The PM late init code can then program the desired target
+> state for all the power domains.
 > 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> ---
+>  arch/arm/mach-omap2/powerdomain.c |   12 +++++++++++-
+>  1 files changed, 11 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
+> index e0490bc..e61866c 100644
+> --- a/arch/arm/mach-omap2/powerdomain.c
+> +++ b/arch/arm/mach-omap2/powerdomain.c
+> @@ -109,6 +109,16 @@ static int _pwrdm_register(struct powerdomain *pwrdm)
+>  
+>  	list_add(&pwrdm->node, &pwrdm_list);
+>  
+> +	/*
+> +	* Program all powerdomain target state as ON; This is to
+> +	* prevent domains from hitting low power states (if bootloader
+> +	* has target states set to something other than ON) and potentially
+> +	* even losing context while PM is not fully initilized.
+> +	* The PM late init code can then program the desired target
+> +	* state for all the power domains.
+> +	*/
+> +	pwrdm_set_next_pwrst(pwrdm, PWRDM_POWER_ON);
 
-Generally Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+Just out of curiosity, I was wondering if it really makes sense to power
+up all power domains during boot just to avoid loosing context. Doesn't
+hwmod/omap_device soft-reset all IPs during initialization ? If that's
+really the case, shouldn't we then choose which powerdomains are
+strictly necessary for boot and only power those up ?
 
-However, I find no branch to apply this on. This patch *mostly* applied
-after I merged Grants gpio-next branch into mine and resolved the
-resulting merge conflicts.
-
-Sascha
-
+Sorry if this is a non-sensical question, but I was curious about it
+;-)
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 490 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110715/e9cd6215/attachment.sig>
