@@ -1,77 +1,51 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 15 Jul 2011 02:03:26 -0600 (MDT)
-Subject: [PATCH] OMAP: clockdomain: Wait for powerdomain to be ON when
-	using clockdomain force wakeup
-In-Reply-To: <1310527588-13022-2-git-send-email-santosh.shilimkar@ti.com>
-References: <1310527588-13022-1-git-send-email-santosh.shilimkar@ti.com>
-	<1310527588-13022-2-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <alpine.DEB.2.00.1107150159580.16606@utopia.booyaka.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 15 Jul 2011 00:50:24 -0700
+Subject: [PATCH] ARM: OMAP4: PCM049: remove vusim regulator
+In-Reply-To: <1310632792.4008.3.camel@lws-weitzel>
+References: <1310554738.18446.12.camel@lws-weitzel>
+	<1310554762-10743-1-git-send-email-j.weitzel@phytec.de>
+	<4E1D8BCD.5060901@ru.mvista.com>
+	<1310561772.18446.14.camel@lws-weitzel>
+	<20110714073445.GL5783@atomide.com>
+	<1310632792.4008.3.camel@lws-weitzel>
+Message-ID: <20110715075024.GO5783@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-cc'ing Patrick
-
-Hi Rajendra, Santosh,
-
-some comments here:
-
-On Wed, 13 Jul 2011, Santosh Shilimkar wrote:
-
-> While using clockdomain force wakeup method, not waiting for powerdomain
-> to be effectively ON may end up locking the clockdomain FSM until a
-> next wakeup event occurs.
+* Jan Weitzel <J.Weitzel@phytec.de> [110714 01:34]:
+> Am Donnerstag, den 14.07.2011, 00:34 -0700 schrieb Tony Lindgren:
+> > * Jan Weitzel <J.Weitzel@phytec.de> [110713 05:51]:
+> > > Am Mittwoch, den 13.07.2011, 16:13 +0400 schrieb Sergei Shtylyov:
+> > > 
+> > > > 
+> > > >     Have you added that 'i' at the end intentionally?
+> > > > 
+> > > Thank you. It was a tribute to vim.
+> > 
+> > :i)
+> > 
+> > I'll fold the fixed patch into your original patch. Will also
+> > keep the new board files in testing-board because of the code
+> > coalescing and device tree conversion effort.
 > 
-> One such issue was seen on OMAP4430, where L4_PER was periodically
-> getting stuck in in-transition state when transitioning from from OSWR to ON.
-> 
-> This issue was reported and investigated by Patrick Titiano <p-titiano@ti.com>
-> 
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-> Reported-by: Patrick Titiano <p-titiano@ti.com>
-> Cc: Kevin Hilman <khilman@ti.com>
-> Cc: Benoit Cousson <b-cousson@ti.com>
-> Cc: Paul Walmsley <paul@pwsan.com>
-> ---
->  arch/arm/mach-omap2/clockdomain.c |    7 ++++++-
->  1 files changed, 6 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/clockdomain.c b/arch/arm/mach-omap2/clockdomain.c
-> index b98a972..583cc3d 100644
-> --- a/arch/arm/mach-omap2/clockdomain.c
-> +++ b/arch/arm/mach-omap2/clockdomain.c
-> @@ -718,6 +718,8 @@ int clkdm_sleep(struct clockdomain *clkdm)
->   */
->  int clkdm_wakeup(struct clockdomain *clkdm)
->  {
-> +	int ret;
-> +
->  	if (!clkdm)
->  		return -EINVAL;
->  
-> @@ -732,7 +734,10 @@ int clkdm_wakeup(struct clockdomain *clkdm)
->  
->  	pr_debug("clockdomain: forcing wakeup on %s\n", clkdm->name);
->  
-> -	return arch_clkdm->clkdm_wakeup(clkdm);
-> +	ret = arch_clkdm->clkdm_wakeup(clkdm);
-> +	ret |= pwrdm_wait_transition(clkdm->pwrdm.ptr);
+> So there is no way to get the board mainline yet?
 
-Seems like this should just call pwrdm_state_switch() or 
-pwrdm_clkdm_state_switch()?  (This second function looks superfluous, we 
-should probably get rid of it.)
+Well we can add it even before device tree support if it makes
+sense from code coalescing point of view. In this case it would
+mean creating board-panda-common.c or similar so the code can
+be shared amongst the panda variants.
 
-Shouldn't this be added to all of 
-clkdm_{wakeup,sleep,allow_idle,deny_idle}() if it isn't there already?
+It seems that some GPIO pins are different and there are some
+difference in devices connected, but big parts of the code can be
+shared.
 
-> +
-> +	return ret;
->  }
->  
->  /**
-> -- 
-> 1.7.4.1
-> 
+Adding the pending boards without combining code would be adding code
+that will be going away for most part with the device tree support.
 
+And most likely the beagle and panda based boards will be the first
+ones to work with device tree. So anything we can do to have common
+board init code will also help with this effort.
 
-- Paul
+Regards,
+
+Tony
