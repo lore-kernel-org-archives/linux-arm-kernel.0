@@ -1,26 +1,42 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Sat, 16 Jul 2011 01:22:16 +0800
-Subject: [alsa-devel] [PATCH V2 06/10] ARM: mxs: add saif device
-In-Reply-To: <20110715153450.GA31640@pengutronix.de>
-References: <1310483085-31442-1-git-send-email-b29396@freescale.com>
-	<1310483085-31442-7-git-send-email-b29396@freescale.com>
-	<20110715133241.GG2021@pengutronix.de>
-	<CAA+hA=TtBrDoAMfv0fqj30_heEJuZJFH=QjTUG8zTys0G+vgvA@mail.gmail.com>
-	<20110715153450.GA31640@pengutronix.de>
-Message-ID: <CAA+hA=RSXQJ1QhSMrdkxhpDvAwib-HDxO7wOQ6-XOOVgBq9hyA@mail.gmail.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Fri, 15 Jul 2011 10:30:42 -0700
+Subject: [PATCH 2/3] ARM: tegra: paz00: export the WIFI rfkill gpio
+In-Reply-To: <4E2077EC.1070902@ru.mvista.com>
+References: <1310725464-2524-1-git-send-email-marvin24@gmx.de>
+	<1310725464-2524-3-git-send-email-marvin24@gmx.de>
+	<74CDBE0F657A3D45AFBB94109FB122FF049E834C2F@HQMAIL01.nvidia.com>
+	<4E2077EC.1070902@ru.mvista.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF049E834C57@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/7/15 Wolfram Sang <w.sang@pengutronix.de>:
-> If you just do playback, do you need to mux SAIF1-clk to SAIF0-clk ? If not
-> (what I'd think), just leave changing DIGCTL out completely since the
-> reset-default for that register should work. If you do need changing DIGCTL,
-> some helper function like mentioned above would be better, I think.
+Sergei Shtylyov wrote at Friday, July 15, 2011 11:25 AM:
+> Stephen Warren wrote:
+> 
+> >> This makes the WIFI rfkill gpio available to userspace. On boot,
+> >> WIFI will be unblocked by default.
+> > ...
+> >> +static void __init paz00_wifi_init(void)
+> >> +{
+> >> +	int ret;
+> >> +
+> >> +	/* unlock hw rfkill */
+> >> +	ret = gpio_request_one(TEGRA_WIFI_PWRN, GPIOF_OUT_INIT_HIGH,
+> >> +		"wifi pwrn");
+> >> +	if (ret) {
+> >> +		pr_warning("WIFI: could not requestrfkill gpio\n");
+> >> +		return;
+> >> +	}
+> >> +	gpio_export(TEGRA_WIFI_PWRN, 0);
+> >> +};
+> >
+> > Wouldn't you want to skip the gpio_export() call if the gpio_request()
+> > call failed?
+> 
+>     I think that's what he does -- there's a *return* statement.
 
-You're right.
-I will remove that line of code firstly before doing record and we will provide
-that helper funtion later.
-Thanks for your suggestions.
+D'oh. There is indeed. For some reason I only noticed the warning call.
+I guess I suck at reviews:-(
 
-Regards
-Dong Aisheng
+-- 
+nvpublic
