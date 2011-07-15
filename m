@@ -1,39 +1,55 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 15 Jul 2011 09:09:51 +0100
-Subject: [PATCH] ARM: move memory layout sanity checking before meminfo
-	initialization
-In-Reply-To: <CAMbhsRSgUcFPpdTFvEDTFfo_Wk0k7BQzwk6cRtXC6K7mpQ+YDg@mail.gmail.com>
-References: <20110705185758.GI8286@n2100.arm.linux.org.uk>
-	<CAMbhsRRQ9D+VXTZP3vB7egkROEtN9-FxssFa2EcxuqB3F-Uv6Q@mail.gmail.com>
-	<20110714073453.GK23270@n2100.arm.linux.org.uk>
-	<CAMbhsRT=NNYUYyYZXpz2=PpBXoBGANQHPgOkCE1oZ8XzHKN4og@mail.gmail.com>
-	<CAMbhsRSgUcFPpdTFvEDTFfo_Wk0k7BQzwk6cRtXC6K7mpQ+YDg@mail.gmail.com>
-Message-ID: <20110715080950.GL23270@n2100.arm.linux.org.uk>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 15 Jul 2011 02:10:46 -0600 (MDT)
+Subject: [PATCH] OMAP: powerdomains: Make all powerdomain target states
+	as ON at init
+In-Reply-To: <20110715080315.GC2611@legolas.emea.dhcp.ti.com>
+References: <1310527588-13022-1-git-send-email-santosh.shilimkar@ti.com>
+	<20110715080315.GC2611@legolas.emea.dhcp.ti.com>
+Message-ID: <alpine.DEB.2.00.1107150204510.16606@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 14, 2011 at 03:10:51PM -0700, Colin Cross wrote:
-> With CONFIG_CMDLINE_EXTEND, accidentally using two mem= options is
-> going to become more common (that's how I did it).  Would you accept a
-> patch for 3.1/3.2 that would make incorrect mem= handling more robust?
+Hi,
 
-The issue here is that mem= parameters are not supposed to overlap.
-While there can be multiple mem= parameters, there is no sure way to
-tell when one should override previous parameters.
+On Fri, 15 Jul 2011, Felipe Balbi wrote:
 
-> Investigating a little more, the problem happens in free_unused_memmap
-> when two banks ordered by bank_start have reverse order bank_end.
-> prev_bank_end gets set too low, and the area between bank_end of the
-> previous two banks gets freed when a third bank is processed.
+> > diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
+> > index e0490bc..e61866c 100644
+> > --- a/arch/arm/mach-omap2/powerdomain.c
+> > +++ b/arch/arm/mach-omap2/powerdomain.c
+> > @@ -109,6 +109,16 @@ static int _pwrdm_register(struct powerdomain *pwrdm)
+> >  
+> >  	list_add(&pwrdm->node, &pwrdm_list);
+> >  
+> > +	/*
+> > +	* Program all powerdomain target state as ON; This is to
+> > +	* prevent domains from hitting low power states (if bootloader
+> > +	* has target states set to something other than ON) and potentially
+> > +	* even losing context while PM is not fully initilized.
+> > +	* The PM late init code can then program the desired target
+> > +	* state for all the power domains.
+> > +	*/
+> > +	pwrdm_set_next_pwrst(pwrdm, PWRDM_POWER_ON);
 > 
-> I can either drop extra mem= options if they overlap with a previous
-> one, try to copy the memblock data back into meminit after memblock
-> has handled the overlapping case, or fix up free_unused_memblock to
-> only increase prev_bank_end.
+> Just out of curiosity, I was wondering if it really makes sense to power
+> up all power domains during boot just to avoid loosing context. Doesn't
+> hwmod/omap_device soft-reset all IPs during initialization ? If that's
+> really the case, shouldn't we then choose which powerdomains are
+> strictly necessary for boot and only power those up ?
+> 
+> Sorry if this is a non-sensical question, but I was curious about it
+> ;-)
 
-You can't do that.  We keep the original meminfo data because memblock
-coalesces the information and that breaks the sparse bank stuff (we need
-to know where the boundaries are even when banks are fully populated.)
+This patch only sets the powerdomain's next power state to ON.  It doesn't 
+affect the current power state of the powerdomain.
 
-I think probably the best solution is to get rid of CMDLINE_EXTEND to
-stop people walking blindly into this trap.
+Let's say that the bootloader, previous OS (in the kexec case), or ROM 
+code programs the next power state of some powerdomains to OFF.  Let's 
+also say that the kernel that is booted has PM disabled.  The moment a 
+powerdomain's clockdomains go inactive, the powerdomain will then switch 
+off and all devices in that powerdomain will lose context.  On a 
+non-PM-enabled kernel, that will be unexpected and will probably cause the 
+system to crash.  This patch prevents that from happening.
+
+
+- Paul
