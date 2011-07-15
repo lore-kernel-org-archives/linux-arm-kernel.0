@@ -1,51 +1,33 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Fri, 15 Jul 2011 20:09:40 +0800
-Subject: [PATCH v3 10/10] ARM: mxs-dma: include <linux/dmaengine.h>
-In-Reply-To: <1310731780-1645-1-git-send-email-b29396@freescale.com>
-References: <1310731780-1645-1-git-send-email-b29396@freescale.com>
-Message-ID: <1310731780-1645-11-git-send-email-b29396@freescale.com>
+From: dv@vollmann.ch (Detlef Vollmann)
+Date: Fri, 15 Jul 2011 13:47:45 +0200
+Subject: [PATCH 4/7] at91: remove non used at91_spi.h
+In-Reply-To: <1310687525-22486-4-git-send-email-plagnioj@jcrosoft.com>
+References: <1310687525-22486-1-git-send-email-plagnioj@jcrosoft.com>
+	<1310687525-22486-4-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <4E2028E1.1060603@vollmann.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Other files using dma.h may fail to compile as follows:
-In file included from sound/soc/mxs/mxs-pcm.h:22,
-                 from sound/soc/mxs/mxs-saif.h:112,
-                 from sound/soc/mxs/mxs-sgtl5000.c:34:
-arch/arm/mach-mxs/include/mach/dma.h:16: warning: 'struct dma_chan' declared inside parameter list
-arch/arm/mach-mxs/include/mach/dma.h:16: warning: its scope is only this definition or declaration, which is probably not what you want
-arch/arm/mach-mxs/include/mach/dma.h: In function 'mxs_dma_is_apbh':
-arch/arm/mach-mxs/include/mach/dma.h:18: error: dereferencing pointer to incomplete type
-arch/arm/mach-mxs/include/mach/dma.h: At top level:
-arch/arm/mach-mxs/include/mach/dma.h:21: warning: 'struct dma_chan' declared inside parameter list
-arch/arm/mach-mxs/include/mach/dma.h: In function 'mxs_dma_is_apbx':
-arch/arm/mach-mxs/include/mach/dma.h:23: error: dereferencing pointer to incomplete type
-make[3]: *** [sound/soc/mxs/mxs-sgtl5000.o] Error 1
-make[2]: *** [sound/soc/mxs] Error 2
-make[1]: *** [sound/soc] Error 2
-make: *** [sound] Error 2
+Sorry, I couldn't find a summary message for this patch series,
+so I picked this one to reply, because this one hurts me most.
 
-It seems it's better for dma.h to include dmaengine.h himself.
+On 07/15/11 01:52, Jean-Christophe PLAGNIOL-VILLARD wrote:
+ > Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD<plagnioj@jcrosoft.com>
+ > Cc: Nicolas Ferre<nicolas.ferre@atmel.com>
+ > ---
+ >   arch/arm/mach-at91/include/mach/at91_spi.h |   81 
+----------------------------
+ >   1 files changed, 0 insertions(+), 81 deletions(-)
+ >   delete mode 100644 arch/arm/mach-at91/include/mach/at91_spi.h
+[...]
 
-Signed-off-by: Dong Aisheng <b29396@freescale.com>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Acked-by: Wolfram Sang <w.sang@pengutronix.de>
----
- arch/arm/mach-mxs/include/mach/dma.h |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+First, I'm actually using mach/at91_spi.h in an SPI slave driver.
+And I'm using arch/arm/mach-at91/include/mach/at91_spi.h instead of
+drivers/spi/atmel_spi.h (which still exists in the kernel version
+we use here), because arch/arm/mach-at91/include/mach/at91_spi.h
+is accessible from an out-of-tree driver w/o extra effort.
 
-diff --git a/arch/arm/mach-mxs/include/mach/dma.h b/arch/arm/mach-mxs/include/mach/dma.h
-index 7f4aeea..203d7c4 100644
---- a/arch/arm/mach-mxs/include/mach/dma.h
-+++ b/arch/arm/mach-mxs/include/mach/dma.h
-@@ -9,6 +9,8 @@
- #ifndef __MACH_MXS_DMA_H__
- #define __MACH_MXS_DMA_H__
- 
-+#include <linux/dmaengine.h>
-+
- struct mxs_dma_data {
- 	int chan_irq;
- };
--- 
-1.7.0.4
+And this applies to all all of those header files, so I'm
+really against all patches in this series.
+
+   Detlef
