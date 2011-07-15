@@ -1,37 +1,56 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 15 Jul 2011 16:22:05 +0800
-Subject: [PATCH 1/2] dmaengine: imx-sdma: use platform_device_id to
-	identify sdma version
-In-Reply-To: <20110715080132.GI6069@pengutronix.de>
-References: <1310660057-17953-1-git-send-email-shawn.guo@linaro.org>
-	<1310660057-17953-2-git-send-email-shawn.guo@linaro.org>
-	<20110715080132.GI6069@pengutronix.de>
-Message-ID: <20110715082204.GD1840@S2100-06.ap.freescale.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 15 Jul 2011 01:20:12 -0700
+Subject: [PATCH] ARM: OMAP4: PCM049: remove vusim regulator
+In-Reply-To: <20110715075825.GB2611@legolas.emea.dhcp.ti.com>
+References: <1310554738.18446.12.camel@lws-weitzel>
+	<1310554762-10743-1-git-send-email-j.weitzel@phytec.de>
+	<4E1D8BCD.5060901@ru.mvista.com>
+	<1310561772.18446.14.camel@lws-weitzel>
+	<20110714073445.GL5783@atomide.com>
+	<1310632792.4008.3.camel@lws-weitzel>
+	<20110715075024.GO5783@atomide.com>
+	<20110715075825.GB2611@legolas.emea.dhcp.ti.com>
+Message-ID: <20110715082012.GR5783@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
-
-On Fri, Jul 15, 2011 at 10:01:32AM +0200, Sascha Hauer wrote:
-> On Fri, Jul 15, 2011 at 12:14:16AM +0800, Shawn Guo wrote:
-> > It might be not good to use software defined version to identify sdma
-> > device type, when hardware does not define such version.  Instead,
-> > soc name is stable enough to define the device type.
+* Felipe Balbi <balbi@ti.com> [110715 00:53]:
+> Hi,
+> 
+> On Fri, Jul 15, 2011 at 12:50:24AM -0700, Tony Lindgren wrote:
+> > * Jan Weitzel <J.Weitzel@phytec.de> [110714 01:34]:
+> > > Am Donnerstag, den 14.07.2011, 00:34 -0700 schrieb Tony Lindgren:
+> > > > * Jan Weitzel <J.Weitzel@phytec.de> [110713 05:51]:
+> > > > > Am Mittwoch, den 13.07.2011, 16:13 +0400 schrieb Sergei Shtylyov:
+> > > > > 
+> > > > > > 
+> > > > > >     Have you added that 'i' at the end intentionally?
+> > > > > > 
+> > > > > Thank you. It was a tribute to vim.
+> > > > 
+> > > > :i)
+> > > > 
+> > > > I'll fold the fixed patch into your original patch. Will also
+> > > > keep the new board files in testing-board because of the code
+> > > > coalescing and device tree conversion effort.
+> > > 
+> > > So there is no way to get the board mainline yet?
 > > 
-> > The patch uses platform_device_id rather than version number passed
-> > by platform data to identify sdma device type/version.
+> > Well we can add it even before device tree support if it makes
+> > sense from code coalescing point of view. In this case it would
+> > mean creating board-panda-common.c or similar so the code can
+> > be shared amongst the panda variants.
 > > 
-> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > It seems that some GPIO pins are different and there are some
+> > difference in devices connected, but big parts of the code can be
+> > shared.
 > 
-> Generally Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
-> 
-> However, I find no branch to apply this on. This patch *mostly* applied
-> after I merged Grants gpio-next branch into mine and resolved the
-> resulting merge conflicts.
-> 
-I appreciate it, if you can do that.  Otherwise, maybe we can let it
-rest for a while until all trees get merged in coming -rc window.
+> isn't it easier than to just add a few if (machine_is_xxxx()) checks and
+> another MACHINE_START() to board-omap4panda.c rather than creating a new
+> file, shuffling code around and then adding a new board file ??
 
--- 
+That works too if the init_machine does not get too complicated.
+
 Regards,
-Shawn
+
+Tony
