@@ -1,36 +1,37 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 15 Jul 2011 10:27:17 +0100
-Subject: [PATCH 3/8] ARM: dma-mapping: use asm-generic/dma-mapping-common.h
-In-Reply-To: <20110715001021.GM951@wantstofly.org>
-References: <1308556213-24970-1-git-send-email-m.szyprowski@samsung.com>
-	<201106241736.43576.arnd@arndb.de>
-	<000601cc34c4$430f91f0$c92eb5d0$%szyprowski@samsung.com>
-	<201106271519.43581.arnd@arndb.de>
-	<20110707120918.GF7810@wantstofly.org>
-	<20110707123825.GO8286@n2100.arm.linux.org.uk>
-	<20110715001021.GM951@wantstofly.org>
-Message-ID: <20110715092717.GO23270@n2100.arm.linux.org.uk>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 15 Jul 2011 17:44:23 +0800
+Subject: [PATCH v2 0/3] Add device tree probe for imx-sdma driver
+Message-ID: <1310723066-567-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 15, 2011 at 02:10:21AM +0200, Lennert Buytenhek wrote:
-> On Thu, Jul 07, 2011 at 01:38:25PM +0100, Russell King - ARM Linux wrote:
-> 
-> > > > > > I suppose for the majority of the cases, the overhead of the indirect
-> > > > > > function call is near-zero, compared to the overhead of the cache
-> > > > > > management operation, so it would only make a difference for coherent
-> > > > > > systems without an IOMMU. Do we care about micro-optimizing those?
-> > > 
-> > > FWIW, when I was hacking on ARM access point routing performance some
-> > > time ago, turning the L1/L2 cache maintenance operations into inline
-> > > functions (inlined into the ethernet driver) gave me a significant and
-> > > measurable performance boost.
-> > 
-> > On what architecture?  Can you show what you did to gain that?
-> 
-> Patch is attached below.  It's an ugly product-specific hack, not
-> suitable for upstreaming in this form, etc etc, but IIRC it gave me
-> a ~5% improvement on packet routing.
+The first patch remove the use of software defined sdma version, and
+instead uses platform_device_id to handle the sdma differences from
+one soc to another.  The second one makes a small cleanup on function
+sdma_get_firmware(), and the third patch adds the actual device tree
+probe support.
 
-Do you know how much is contributed from each change - L1, L2, moving
-dma_cache_maint() inline, removing the virt_addr_valid() etc?
+Changes since v1:
+ * Do not encode ROM script address in device tree
+ * Add one more small cleanup on function sdma_get_firmware()
+
+ShawnsGuo (3):
+      dmaengine: imx-sdma: use platform_device_id to identify sdma version
+      dmaengine: imx-sdma: sdma_get_firmware does not need to copy fw_name
+      dmaengine: imx-sdma: add device tree probe support
+
+ .../devicetree/bindings/dma/fsl-imx-sdma.txt       |   17 ++++
+ arch/arm/mach-imx/clock-imx25.c                    |    3 +-
+ arch/arm/mach-imx/clock-imx31.c                    |    2 +-
+ arch/arm/mach-imx/clock-imx35.c                    |    2 +-
+ arch/arm/mach-imx/mm-imx25.c                       |    4 +-
+ arch/arm/mach-imx/mm-imx31.c                       |    3 +-
+ arch/arm/mach-imx/mm-imx35.c                       |    3 +-
+ arch/arm/mach-mx5/clock-mx51-mx53.c                |    6 +-
+ arch/arm/mach-mx5/mm.c                             |    8 +-
+ arch/arm/plat-mxc/devices/platform-imx-dma.c       |    4 +-
+ arch/arm/plat-mxc/include/mach/devices-common.h    |    2 +-
+ arch/arm/plat-mxc/include/mach/dma.h               |    3 +-
+ arch/arm/plat-mxc/include/mach/sdma.h              |    2 -
+ drivers/dma/imx-sdma.c                             |   92 +++++++++++++++-----
+ 14 files changed, 107 insertions(+), 44 deletions(-)
