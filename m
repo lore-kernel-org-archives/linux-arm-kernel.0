@@ -1,189 +1,241 @@
-From: ajaynumb@gmail.com (Ajay kumar)
-Date: Fri, 15 Jul 2011 12:25:33 +0530
-Subject: [PATCH 6/6] ARM: S5P6450: Add LCD-LTE480 and enable Framebuffer
-	support
-In-Reply-To: <18967554.25641310709947612.JavaMail.weblogic@epv6ml06>
-References: <18967554.25641310709947612.JavaMail.weblogic@epv6ml06>
-Message-ID: <CAEC9eQMuUxHxmVkViRv2Vit6HtQmoOSmLRhN6-ngMsgV=VPD2g@mail.gmail.com>
+From: tgih.jun@samsung.com (Seungwon Jeon)
+Date: Fri, 15 Jul 2011 15:58:45 +0900
+Subject: [PATCH v2] ARM: EXYNOS4: Add platform device for dwmci driver.
+In-Reply-To: <CAH9JG2Vy9OJcrATeKV60X7SjdAR7Z+LDMzgMaps5NKu+M2zxAA@mail.gmail.com>
+References: <1310637226-19478-1-git-send-email-tgih.jun@samsung.com>
+	<CAH9JG2Vy9OJcrATeKV60X7SjdAR7Z+LDMzgMaps5NKu+M2zxAA@mail.gmail.com>
+Message-ID: <003201cc42bc$a43e4150$ecbac3f0$%jun@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jingoo,
+Hi,
 
-2011/7/15 JinGoo Han <jg1.han@samsung.com>:
-> Hi, Ajay Kumar.
-> Please read my comments.
->> -----Original Message-----
->> From: Ajay Kumar [mailto:ajaykumar.rs at samsung.com]
->> Sent: Thursday, July 14, 2011 10:27 PM
->> To: kgene.kim at samsung.com; linux-samsung-soc at vger.kernel.org; linux-arm-
->> kernel at lists.infradead.org; lethal at linux-sh.org; jg1.han at samsung.com
->> Subject: [PATCH 6/6] ARM: S5P6450: Add LCD-LTE480 and enable Framebuffer
->> support
->>
->> This patch:
->> o Adds platform device support for LCD-LTE480.
->> o Adds platform data for FB with win_mode and default_bpp.
->> o Enables FB device support and platform-lcd support.
->>
->> Signed-off-by: Ajay Kumar <ajaykumar.rs@samsung.com>
->> ---
->> ?arch/arm/mach-s5p64x0/Kconfig ? ? ? ? | ? ?2 +
->> ?arch/arm/mach-s5p64x0/mach-smdk6450.c | ? 63
->> +++++++++++++++++++++++++++++++++
->> ?2 files changed, 65 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/mach-s5p64x0/Kconfig b/arch/arm/mach-s5p64x0/Kconfig
->> index c69a32d..b9f3aca 100644
->> --- a/arch/arm/mach-s5p64x0/Kconfig
->> +++ b/arch/arm/mach-s5p64x0/Kconfig
->> @@ -53,6 +53,7 @@ config MACH_SMDK6440
->> ?config MACH_SMDK6450
->> ? ? ? bool "SMDK6450"
->> ? ? ? select CPU_S5P6450
->> + ? ? select S3C_DEV_FB
->> ? ? ? select S3C_DEV_I2C1
->> ? ? ? select S3C_DEV_RTC
->> ? ? ? select S3C_DEV_WDT
->> @@ -60,6 +61,7 @@ config MACH_SMDK6450
->> ? ? ? select SAMSUNG_DEV_ADC
->> ? ? ? select SAMSUNG_DEV_PWM
->> ? ? ? select SAMSUNG_DEV_TS
->> + ? ? select S5P64X0_SETUP_FB
->> ? ? ? select S5P64X0_SETUP_I2C1
->> ? ? ? help
->> ? ? ? ? Machine support for the Samsung SMDK6450
->> diff --git a/arch/arm/mach-s5p64x0/mach-smdk6450.c b/arch/arm/mach-
->> s5p64x0/mach-smdk6450.c
->> index d19c469..7568f38 100644
->> --- a/arch/arm/mach-s5p64x0/mach-smdk6450.c
->> +++ b/arch/arm/mach-s5p64x0/mach-smdk6450.c
->> @@ -23,6 +23,7 @@
->> ?#include <linux/clk.h>
->> ?#include <linux/gpio.h>
->> ?#include <linux/pwm_backlight.h>
->> +#include <linux/fb.h>
->>
->> ?#include <asm/mach/arch.h>
->> ?#include <asm/mach/map.h>
->> @@ -34,6 +35,7 @@
->> ?#include <mach/regs-clock.h>
->> ?#include <mach/i2c.h>
->> ?#include <mach/regs-gpio.h>
->> +#include <mach/regs-fb.h>
->>
->> ?#include <plat/regs-serial.h>
->> ?#include <plat/gpio-cfg.h>
->> @@ -46,6 +48,9 @@
->> ?#include <plat/adc.h>
->> ?#include <plat/ts.h>
->> ?#include <plat/s5p-time.h>
->> +#include <plat/fb.h>
->> +
->> +#include <video/platform_lcd.h>
->>
->> ?#define SMDK6450_UCON_DEFAULT ? ? ? ?(S3C2410_UCON_TXILEVEL | ? ? ? ?\
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? S3C2410_UCON_RXILEVEL | ? ? ? ? \
->> @@ -148,6 +153,59 @@ static struct platform_device
->> smdk6450_backlight_device = {
->> ? ? ? },
->> ?};
->>
->> +/* Frame Buffer */
->> +static struct s3c_fb_pd_win s5p6450_fb_win0 = {
-> This information also depends on LCD panel on the board.
-> So, s5p6450_fb_win0 should be changed to smdk6450_fb_win0.
->> +/* this is to ensure we use win0 */
->> + ? ? .win_mode ? ? ? = {
->> + ? ? ? ? ? ? .left_margin ? ?= 8,
->> + ? ? ? ? ? ? .right_margin ? = 13,
->> + ? ? ? ? ? ? .upper_margin ? = 7,
->> + ? ? ? ? ? ? .lower_margin ? = 5,
->> + ? ? ? ? ? ? .hsync_len ? ? ?= 3,
->> + ? ? ? ? ? ? .vsync_len ? ? ?= 1,
->> + ? ? ? ? ? ? .xres ? ? ? ? ? = 800,
->> + ? ? ? ? ? ? .yres ? ? ? ? ? = 480,
->> + ? ? ? ? ? ? .refresh ? ? ? ?= 80,
-> Why do you use 80Hz as frame rate?
-> Please don't add this, if there is no problem when using 60Hz.
->> + ? ? },
->> + ? ? .max_bpp ? ? ? ?= 24,
-> max_bpp can be 32bpp. FIMD of S5P6440 and S5P6450 can support ARGB 8888.
-> Please use 32 as max_bpp.
-> + ? ? ? .max_bpp ? ? ? ?= 32,
->> + ? ? .default_bpp ? ?= 24,
->> + ? ? };
-> Don't useless tab space.
-> It should be as follows.
-> +};
->> +
->> +static struct s3c_fb_platdata s5p6450_lcd_pdata __initdata = {
->> + ? ? .win[0] ? ? ? ? = &s5p6450_fb_win0,
-> s5p6450_fb_win0 should be changed to smdk6450_fb_win0.
->> + ? ? .vidcon0 ? ? ? ?= VIDCON0_VIDOUT_RGB | VIDCON0_PNRMODE_RGB,
->> + ? ? .vidcon1 ? ? ? ?= VIDCON1_INV_HSYNC | VIDCON1_INV_VSYNC,
->> + ? ? .setup_gpio ? ? = s5p64x0_fb_gpio_setup_24bpp,
->> +};
->> +
->> +/* LCD power controller */
->> +static void s5p6450_lte480_reset_power(struct plat_lcd_data *pd,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? unsigned int power)
->> +{
->> + ? ? int err;
->> +
->> + ? ? if (power) {
->> + ? ? ? ? ? ? err = gpio_request(S5P6450_GPN(5), "GPN");
->> + ? ? ? ? ? ? if (err)
->> + ? ? ? ? ? ? ? ? ? ? printk(KERN_ERR "failed to request GPN for lcd
->> reset\n");
->> +
->> + ? ? ? ? ? ? gpio_direction_output(S5P6450_GPN(5), 1);
->> + ? ? ? ? ? ? gpio_set_value(S5P6450_GPN(5), 0);
->> + ? ? ? ? ? ? gpio_set_value(S5P6450_GPN(5), 1);
->> + ? ? ? ? ? ? gpio_free(S5P6450_GPN(5));
->> + ? ? }
->> +}
->> +
->> +static struct plat_lcd_data s5p6450_lcd_power_data = {
->> + ? ? .set_power ? ? ?= s5p6450_lte480_reset_power,
->> +};
->> +
->> +static struct platform_device smdk6450_lcd_lte480wv = {
->> + ? ? .name ? ? ? ? ? ? ? ? ? = "platform-lcd",
->> + ? ? .dev.parent ? ? ? ? ? ? = &s3c_device_fb.dev,
->> + ? ? .dev.platform_data ? ? ?= &s5p6450_lcd_power_data,
->> +};
->> +
-> Please change s5p6450_ lte480 to smdk6450_ lte480.
-> LCD reset GPIO pin can be changed according to the board.
->> ?static struct platform_device *smdk6450_devices[] __initdata = {
->> ? ? ? &s3c_device_adc,
->> ? ? ? &s3c_device_rtc,
->> @@ -159,6 +217,9 @@ static struct platform_device *smdk6450_devices[]
->> __initdata = {
->> ? ? ? &s5p6450_device_iis0,
->> ? ? ? &s3c_device_timer[1],
->> ? ? ? &smdk6450_backlight_device,
->> + ? ? &s3c_device_fb,
->> + ? ? &smdk6450_lcd_lte480wv,
->> +
->> ? ? ? /* s5p6450_device_spi0 will be added */
->> ?};
->>
->> @@ -212,6 +273,8 @@ static void __init smdk6450_machine_init(void)
->> ? ? ? ? ? ? ? ? ? ? ? ARRAY_SIZE(smdk6450_i2c_devs0));
->> ? ? ? i2c_register_board_info(1, smdk6450_i2c_devs1,
->> ? ? ? ? ? ? ? ? ? ? ? ARRAY_SIZE(smdk6450_i2c_devs1));
->> + ? ? s3c_fb_set_platdata(&s5p6450_lcd_pdata);
->> + ? ? s5p64x0_fb_init(S5P64X0_SPCON0_LCD_SEL_RGB);
->>
->> ? ? ? platform_add_devices(smdk6450_devices,
->> ARRAY_SIZE(smdk6450_devices));
->> ?}
->> --
->> 1.7.1
->
+Kyungmin Park wrote:
+> On Thu, Jul 14, 2011 at 6:53 PM, Seungwon Jeon <tgih.jun@samsung.com>
+> wrote:
+> > This patch add platform devices for Synopsys DesignWare Multimedia Card
+> > Interface driver.
+> >
+> > Signed-off-by: Seungwon Jeon <tgih.jun@samsung.com>
+> > ---
+> >  arch/arm/mach-exynos4/Kconfig             |   12 ++++
+> >  arch/arm/mach-exynos4/Makefile            |    1 +
+> >  arch/arm/mach-exynos4/dev-dwmci.c         |   88
+> +++++++++++++++++++++++++++++
+> >  arch/arm/mach-exynos4/include/mach/irqs.h |    1 +
+> >  arch/arm/mach-exynos4/include/mach/map.h  |    1 +
+> >  arch/arm/plat-samsung/include/plat/devs.h |    1 +
+> >  6 files changed, 104 insertions(+), 0 deletions(-)
+> >  create mode 100644 arch/arm/mach-exynos4/dev-dwmci.c
+> >
+> > diff --git a/arch/arm/mach-exynos4/Kconfig b/arch/arm/mach-
+> exynos4/Kconfig
+> > index 5115b90..2ec5b96 100644
+> > --- a/arch/arm/mach-exynos4/Kconfig
+> > +++ b/arch/arm/mach-exynos4/Kconfig
+> > @@ -35,6 +35,11 @@ config EXYNOS4_DEV_SYSMMU
+> >        help
+> >          Common setup code for SYSTEM MMU in EXYNOS4
+> >
+> > +config EXYNOS4_DEV_DWMCI
+> > +       bool
+> > +       help
+> > +         Compile in platform device definitions for DWMCI
+> > +
+> >  config EXYNOS4_SETUP_I2C1
+> >        bool
+> >        help
+> > @@ -200,6 +205,13 @@ comment "Configuration for HSMMC bus width"
+> >
+> >  menu "Use 8-bit bus width"
+> >
+> > +config EXYNOS4_DWMCI_8BIT
+> > +       bool "DWMCI with 8-bit bus"
+> > +       depends on EXYNOS4_DEV_DWMCI
+> > +       help
+> > +         Support DWMCI 8-bit bus.
+> > +         If selected, Channel 1 is disabled.
+> 
+> No it should be determined at runtime instead of compile time.
 
-Thanks for your comments.
-Right now I am looking forward for more comments.
-I will fix the same and send a V2 patch-set next week.
+Sorry for that I don't understand your meaning.
+Perhaps, you want to decide the width according to the board type at runtime?
+I expect the reason and description about your comment.
+Bus width is board-specific information related with capability
+which is not determined in runtime.
+So we should decide and choice bus width considering the board target
+before compiling.
+
+Best regards,
+Seungwon Jeon.
+
+> 
+> > +
+> >  config EXYNOS4_SDHCI_CH0_8BIT
+> >        bool "Channel 0 with 8-bit bus"
+> >        help
+> > diff --git a/arch/arm/mach-exynos4/Makefile b/arch/arm/mach-
+> exynos4/Makefile
+> > index 60fe5ec..eeeaada 100644
+> > --- a/arch/arm/mach-exynos4/Makefile
+> > +++ b/arch/arm/mach-exynos4/Makefile
+> > @@ -43,6 +43,7 @@ obj-y                                 += dev-audio.o
+> >  obj-$(CONFIG_EXYNOS4_DEV_AHCI)         += dev-ahci.o
+> >  obj-$(CONFIG_EXYNOS4_DEV_PD)           += dev-pd.o
+> >  obj-$(CONFIG_EXYNOS4_DEV_SYSMMU)       += dev-sysmmu.o
+> > +obj-$(CONFIG_EXYNOS4_DEV_DWMCI)        += dev-dwmci.o
+> >
+> >  obj-$(CONFIG_EXYNOS4_SETUP_FIMC)       += setup-fimc.o
+> >  obj-$(CONFIG_EXYNOS4_SETUP_I2C1)       += setup-i2c1.o
+> > diff --git a/arch/arm/mach-exynos4/dev-dwmci.c b/arch/arm/mach-
+> exynos4/dev-dwmci.c
+> > new file mode 100644
+> > index 0000000..a0defa4
+> > --- /dev/null
+> > +++ b/arch/arm/mach-exynos4/dev-dwmci.c
+> > @@ -0,0 +1,88 @@
+> > +/*
+> > + * linuxarch/arm/mach-exynos4/dev-dwmci.c
+> > + *
+> > + * Copyright (c) 2011 Samsung Electronics Co., Ltd.
+> > + *             http://www.samsung.com
+> > + *
+> > + * Platform device for Synopsys DesignWare Mobile Storage IP
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License as published by
+> > + * the Free Software Foundation; either version 2 of the License, or
+> > + * (at your option) any later version.
+> > + */
+> > +
+> > +#include <linux/kernel.h>
+> > +#include <linux/dma-mapping.h>
+> > +#include <linux/platform_device.h>
+> > +#include <linux/interrupt.h>
+> > +#include <linux/mmc/dw_mmc.h>
+> > +#include <linux/mmc/host.h>
+> > +#include <linux/io.h>
+> > +#include <linux/gpio.h>
+> > +
+> > +#include <plat/devs.h>
+> > +#include <plat/cpu.h>
+> > +#include <plat/gpio-cfg.h>
+> > +
+> > +#include <mach/map.h>
+> > +
+> > +#ifdef EXYNOS4_DWMCI_8BIT
+> > +#define BUS_WIDTH 8
+> > +#else
+> > +#define BUS_WIDTH 4
+> > +#endif
+> 
+> Right, each board can modify the bus width. so it needs the helper
+> function to setup.
+> > +
+> > +static int exynos4_dwmci_get_ocr(u32 slot_id)
+> > +{
+> > +       return MMC_VDD_32_33 | MMC_VDD_33_34;
+> > +}
+> > +
+> > +static int exynos4_dwmci_get_bus_wd(u32 slot_id)
+> > +{
+> > +       return BUS_WIDTH;
+> > +}
+> > +
+> > +static int exynos4_dwmci_init(u32 slot_id, irq_handler_t handler, void
+> *data)
+> > +{
+> > +       return 0;
+> > +}
+> > +
+> > +static struct resource exynos4_dwmci_resource[] = {
+> > +       [0] = {
+> > +               .start = EXYNOS4_PA_DWMCI,
+> > +               .end   = EXYNOS4_PA_DWMCI + SZ_4K - 1,
+> > +               .flags = IORESOURCE_MEM,
+> > +       },
+> > +       [1] = {
+> > +               .start = IRQ_DWMCI,
+> > +               .end   = IRQ_DWMCI,
+> > +               .flags = IORESOURCE_IRQ,
+> > +       }
+> > +};
+> > +
+> > +static struct dw_mci_board exynos4_dwci_pdata = {
+> > +       .num_slots                      = 1,
+> > +       .quirks                         = DW_MCI_QUIRK_BROKEN_CARD_DETECTION,
+> > +       .bus_hz                         = 80*1000*1000,
+> > +       .detect_delay_ms        = 200,
+> > +       .init                           = exynos4_dwmci_init,
+> > +       .get_ocr                        = exynos4_dwmci_get_ocr,
+> > +       .get_bus_wd                     = exynos4_dwmci_get_bus_wd,
+> > +       .select_slot            = NULL,
+> > +};
+> > +
+> > +static u64 exynos4_dwmci_dmamask = DMA_BIT_MASK(32);
+> > +
+> > +struct platform_device exynos4_device_dwmci = {
+> > +       .name           = "dw_mmc",
+> > +       .id             = -1,
+> > +       .num_resources  = ARRAY_SIZE(exynos4_dwmci_resource),
+> > +       .resource       = exynos4_dwmci_resource,
+> > +       .dev            = {
+> > +               .dma_mask               = &exynos4_dwmci_dmamask,
+> > +               .coherent_dma_mask      = DMA_BIT_MASK(32),
+> > +               .platform_data  = &exynos4_dwci_pdata,
+> > +       },
+> > +};
+> > +
+> > diff --git a/arch/arm/mach-exynos4/include/mach/irqs.h b/arch/arm/mach-
+> exynos4/include/mach/irqs.h
+> > index 5d03730..b720246 100644
+> > --- a/arch/arm/mach-exynos4/include/mach/irqs.h
+> > +++ b/arch/arm/mach-exynos4/include/mach/irqs.h
+> > @@ -107,6 +107,7 @@
+> >  #define IRQ_HSMMC1             COMBINER_IRQ(29, 1)
+> >  #define IRQ_HSMMC2             COMBINER_IRQ(29, 2)
+> >  #define IRQ_HSMMC3             COMBINER_IRQ(29, 3)
+> > +#define IRQ_DWMCI              COMBINER_IRQ(29, 4)
+> >
+> >  #define IRQ_MIPI_CSIS0         COMBINER_IRQ(30, 0)
+> >  #define IRQ_MIPI_CSIS1         COMBINER_IRQ(30, 1)
+> > diff --git a/arch/arm/mach-exynos4/include/mach/map.h b/arch/arm/mach-
+> exynos4/include/mach/map.h
+> > index 0009e77..352e500 100644
+> > --- a/arch/arm/mach-exynos4/include/mach/map.h
+> > +++ b/arch/arm/mach-exynos4/include/mach/map.h
+> > @@ -94,6 +94,7 @@
+> >  #define EXYNOS4_PA_MIPI_CSIS1          0x11890000
+> >
+> >  #define EXYNOS4_PA_HSMMC(x)            (0x12510000 + ((x) * 0x10000))
+> > +#define EXYNOS4_PA_DWMCI               0x12550000
+> >
+> >  #define EXYNOS4_PA_SATA                        0x12560000
+> >  #define EXYNOS4_PA_SATAPHY             0x125D0000
+> > diff --git a/arch/arm/plat-samsung/include/plat/devs.h b/arch/arm/plat-
+> samsung/include/plat/devs.h
+> > index e3b31c2..29fa1cf 100644
+> > --- a/arch/arm/plat-samsung/include/plat/devs.h
+> > +++ b/arch/arm/plat-samsung/include/plat/devs.h
+> > @@ -112,6 +112,7 @@ extern struct platform_device exynos4_device_i2s2;
+> >  extern struct platform_device exynos4_device_spdif;
+> >  extern struct platform_device exynos4_device_pd[];
+> >  extern struct platform_device exynos4_device_ahci;
+> > +extern struct platform_device exynos4_device_dwmci;
+> >
+> >  extern struct platform_device s5p6440_device_pcm;
+> >  extern struct platform_device s5p6440_device_iis;
+> > --
+> > 1.7.2.3
+> >
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-samsung-
+> soc" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> >
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-
+> soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
