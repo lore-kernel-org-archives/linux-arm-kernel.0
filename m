@@ -1,30 +1,26 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Fri, 15 Jul 2011 10:10:28 -0700
-Subject: [PATCH 3/3] ARM: tegra: paz00: enable wifi led
-In-Reply-To: <1310725464-2524-4-git-send-email-marvin24@gmx.de>
-References: <1310725464-2524-1-git-send-email-marvin24@gmx.de>
-	<1310725464-2524-4-git-send-email-marvin24@gmx.de>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF049E834C43@HQMAIL01.nvidia.com>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Sat, 16 Jul 2011 01:22:16 +0800
+Subject: [alsa-devel] [PATCH V2 06/10] ARM: mxs: add saif device
+In-Reply-To: <20110715153450.GA31640@pengutronix.de>
+References: <1310483085-31442-1-git-send-email-b29396@freescale.com>
+	<1310483085-31442-7-git-send-email-b29396@freescale.com>
+	<20110715133241.GG2021@pengutronix.de>
+	<CAA+hA=TtBrDoAMfv0fqj30_heEJuZJFH=QjTUG8zTys0G+vgvA@mail.gmail.com>
+	<20110715153450.GA31640@pengutronix.de>
+Message-ID: <CAA+hA=RSXQJ1QhSMrdkxhpDvAwib-HDxO7wOQ6-XOOVgBq9hyA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc Dietrich wrote at Friday, July 15, 2011 4:24 AM:
-> This adds support for the wifi led. It is automaticly triggered by
-> the rfkill0 event.
-...
-> +static struct gpio_led gpio_leds[] = {
-> +	{
-> +		.name                   = "wifi-led",
-> +		.default_trigger        = "rfkill0",
-> +		.gpio                   = TEGRA_WIFI_LED,
-> +	},
-> +};
+2011/7/15 Wolfram Sang <w.sang@pengutronix.de>:
+> If you just do playback, do you need to mux SAIF1-clk to SAIF0-clk ? If not
+> (what I'd think), just leave changing DIGCTL out completely since the
+> reset-default for that register should work. If you do need changing DIGCTL,
+> some helper function like mentioned above would be better, I think.
 
-How does this work given that the previous patch simply exports the actual
-GPIO to user-space, rather than registering it through an rfkill driver;
-Does the WiFi driver itself register directly with the rfkill system? 
+You're right.
+I will remove that line of code firstly before doing record and we will provide
+that helper funtion later.
+Thanks for your suggestions.
 
-(what model of device is the AC100's WiFi? I assume it's on USB.)
-
--- 
-nvpublic
+Regards
+Dong Aisheng
