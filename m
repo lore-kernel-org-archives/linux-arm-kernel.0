@@ -1,49 +1,42 @@
-From: nbowler@elliptictech.com (Nick Bowler)
-Date: Fri, 15 Jul 2011 11:04:02 -0400
-Subject: [PATCH 3/3] watchdog: sp805: Flush posted writes in enable/disable.
-In-Reply-To: <1310742242-14647-1-git-send-email-nbowler@elliptictech.com>
-References: <1310742242-14647-1-git-send-email-nbowler@elliptictech.com>
-Message-ID: <1310742242-14647-4-git-send-email-nbowler@elliptictech.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Sat, 16 Jul 2011 00:17:13 +0900
+Subject: [PATCH V2 03/10] ASoc: mxs: add mxs-sgtl5000 machine driver
+In-Reply-To: <20110715151104.GE1840@S2100-06.ap.freescale.net>
+References: <1310483085-31442-1-git-send-email-b29396@freescale.com>
+	<1310483085-31442-4-git-send-email-b29396@freescale.com>
+	<20110715151104.GE1840@S2100-06.ap.freescale.net>
+Message-ID: <20110715151706.GD11154@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are no reads in these functions, so if MMIO writes are posted,
-the writes in enable/disable may not have completed by the time these
-functions return.  If the functions run from different CPUs, it's
-in theory possible for the writes to be interleaved, which would be
-disastrous for this driver.
+On Fri, Jul 15, 2011 at 11:11:06PM +0800, Shawn Guo wrote:
 
-At the very least, we need an mmiowb() before releasing the lock, but
-since it seems desirable for the watchdog timer to be actually stopped
-or reset when these functions return, read the lock register to force
-the writes out.
+> Currently, soc-core requires machine driver register snd_soc_dai_link
+> with proper codec, cpu_dai and platform device name coded, so that it
+> can match/bind dai link.  It works for existing non-dt devices probe,
+> because they can have static device id assigned by platform code to
+> map the actual hardware instance.
 
-Signed-off-by: Nick Bowler <nbowler@elliptictech.com>
----
- drivers/watchdog/sp805_wdt.c |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+There's existing device tree code for PowerPC which seems to figure this
+out by doing a DT lookup in the machine driver which appears to be sane
+enough.  If we can't look up a struct device via the device tree we'd
+seem to have a fairly serious problem as struct devices are how we talk
+about devices at runtime in general.
 
-diff --git a/drivers/watchdog/sp805_wdt.c b/drivers/watchdog/sp805_wdt.c
-index c1e099a..cc2cfbe 100644
---- a/drivers/watchdog/sp805_wdt.c
-+++ b/drivers/watchdog/sp805_wdt.c
-@@ -134,6 +134,8 @@ static void wdt_enable(void)
- 	writel(INT_ENABLE | RESET_ENABLE, wdt->base + WDTCONTROL);
- 	writel(LOCK, wdt->base + WDTLOCK);
- 
-+	/* Flush posted writes. */
-+	readl(wdt->base + WDTLOCK);
- 	spin_unlock(&wdt->lock);
- }
- 
-@@ -146,6 +148,8 @@ static void wdt_disable(void)
- 	writel(0, wdt->base + WDTCONTROL);
- 	writel(LOCK, wdt->base + WDTLOCK);
- 
-+	/* Flush posted writes. */
-+	readl(wdt->base + WDTLOCK);
- 	spin_unlock(&wdt->lock);
- }
- 
--- 
-1.7.3.4
+To be honest I've not paid too much attention to the device tree code
+people are currently using since discussion around it has always
+involved repeatedly going over all the reasons why we actually need
+machine drivers and that gets tedious after a while.
+
+> Actually, I found matching cpu_dai using name does not scale in imx-ssi
+> case even for non-dt probe.  imx provides some flexibility on the
+> connection between codec and ssi.  With proper audmux configuration,
+> codec can be connected to either ssi.0 or ssi.1 for given board design.
+> That said even for given board, .cpu_dai_name can be dynamic.  This is
+> something the current soc-core matching/binding approach hates to see.
+
+This isn't a scalability thing and it's not related to binding, it's
+because the AUXMUX isn't properly represented as a driver.  It probably
+wants to be moved over to use the soc-dsp stuff Liam's doing at the
+minute.  Currently we don't tell the core about the AUDMUX at all so
+it's unreasonable to expect it to do anything except a static route.
