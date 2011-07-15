@@ -1,158 +1,396 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 14 Jul 2011 20:53:46 -0600
-Subject: [PATCH v2 7/7] spi/imx: add device tree probe support
-In-Reply-To: <1310231801-18761-8-git-send-email-shawn.guo@linaro.org>
-References: <1310231801-18761-1-git-send-email-shawn.guo@linaro.org>
-	<1310231801-18761-8-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20110715025346.GT2927@ponder.secretlab.ca>
+Date: Thu, 14 Jul 2011 20:53:47 -0600
+Subject: [PATCH V2 05/12] ARM: SAMSUNG: Add common DMA operations
+In-Reply-To: <1310546857-6304-6-git-send-email-kgene.kim@samsung.com>
+References: <1310546857-6304-1-git-send-email-kgene.kim@samsung.com>
+	<1310546857-6304-6-git-send-email-kgene.kim@samsung.com>
+Message-ID: <20110715025347.GU2927@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 10, 2011 at 01:16:41AM +0800, Shawn Guo wrote:
-> It adds device tree probe support for spi-imx driver.
+On Wed, Jul 13, 2011 at 05:47:30PM +0900, Kukjin Kim wrote:
+> From: Boojin Kim <boojin.kim@samsung.com>
 > 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-
-Applied, thanks.
-
-g.
-
+> This patch adds common DMA operations which are used for Samsung DMA
+> drivers. Currently there are two types of DMA driver for Samsung SoCs.
+> The one is S3C-DMA for S3C SoCs and the other is PL330-DMA for S5P SoCs.
+> This patch provides funcion pointers for common DMA operations to DMA
+> client driver like SPI and Audio. It makes DMA client drivers support
+> multi-platform.
+> In addition, this common DMA operations implement the shared actions
+> that are needed for DMA client driver. For example shared actions are
+> filter() function for dma_request_channel() and parameter passing for
+> device_prep_slave_sg().
+> 
+> Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 > ---
->  .../devicetree/bindings/spi/fsl-imx-cspi.txt       |   22 +++++++++++
->  drivers/spi/spi-imx.c                              |   38 ++++++++++++++++----
->  2 files changed, 53 insertions(+), 7 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/spi/fsl-imx-cspi.txt
+>  arch/arm/mach-s3c2410/include/mach/dma.h       |    3 +-
+>  arch/arm/plat-samsung/Makefile                 |    6 +-
+>  arch/arm/plat-samsung/dma-ops.c                |  131 +++++++++++++++++++++++
+>  arch/arm/plat-samsung/include/plat/dma-ops.h   |   47 +++++++++
+>  arch/arm/plat-samsung/include/plat/dma-pl330.h |    3 +
+>  arch/arm/plat-samsung/include/plat/dma.h       |    2 +-
+>  arch/arm/plat-samsung/s3c-dma-ops.c            |  132 ++++++++++++++++++++++++
+>  7 files changed, 320 insertions(+), 4 deletions(-)
+>  create mode 100644 arch/arm/plat-samsung/dma-ops.c
+>  create mode 100644 arch/arm/plat-samsung/include/plat/dma-ops.h
+>  create mode 100644 arch/arm/plat-samsung/s3c-dma-ops.c
 > 
-> diff --git a/Documentation/devicetree/bindings/spi/fsl-imx-cspi.txt b/Documentation/devicetree/bindings/spi/fsl-imx-cspi.txt
-> new file mode 100644
-> index 0000000..9841057
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/spi/fsl-imx-cspi.txt
-> @@ -0,0 +1,22 @@
-> +* Freescale (Enhanced) Configurable Serial Peripheral Interface
-> +  (CSPI/eCSPI) for i.MX
-> +
-> +Required properties:
-> +- compatible : Should be "fsl,<soc>-cspi" or "fsl,<soc>-ecspi"
-> +- reg : Offset and length of the register set for the device
-> +- interrupts : Should contain CSPI/eCSPI interrupt
-> +- fsl,spi-num-chipselects : Contains the number of the chipselect
-> +- cs-gpios : Specifies the gpio pins to be used for chipselects.
-> +
-> +Example:
-> +
-> +ecspi at 70010000 {
-> +	#address-cells = <1>;
-> +	#size-cells = <0>;
-> +	compatible = "fsl,imx51-ecspi";
-> +	reg = <0x70010000 0x4000>;
-> +	interrupts = <36>;
-> +	fsl,spi-num-chipselects = <2>;
-> +	cs-gpios = <&gpio3 24 0>, /* GPIO4_24 */
-> +		   <&gpio3 25 0>; /* GPIO4_25 */
-> +};
-> diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
-> index ad61828..5456bcc 100644
-> --- a/drivers/spi/spi-imx.c
-> +++ b/drivers/spi/spi-imx.c
-> @@ -34,6 +34,9 @@
->  #include <linux/spi/spi.h>
->  #include <linux/spi/spi_bitbang.h>
->  #include <linux/types.h>
-> +#include <linux/of.h>
-> +#include <linux/of_device.h>
-> +#include <linux/of_gpio.h>
+> diff --git a/arch/arm/mach-s3c2410/include/mach/dma.h b/arch/arm/mach-s3c2410/include/mach/dma.h
+> index b2b2a5b..71a662d 100644
+> --- a/arch/arm/mach-s3c2410/include/mach/dma.h
+> +++ b/arch/arm/mach-s3c2410/include/mach/dma.h
+> @@ -13,7 +13,6 @@
+>  #ifndef __ASM_ARCH_DMA_H
+>  #define __ASM_ARCH_DMA_H __FILE__
 >  
->  #include <mach/spi.h>
+> -#include <plat/dma.h>
+>  #include <linux/sysdev.h>
 >  
-> @@ -606,6 +609,16 @@ static struct platform_device_id spi_imx_devtype[] = {
->  	}
+>  #define MAX_DMA_TRANSFER_SIZE   0x100000 /* Data Unit is half word  */
+> @@ -51,6 +50,8 @@ enum dma_ch {
+>  	DMACH_MAX,		/* the end entry */
 >  };
 >  
-> +static const struct of_device_id spi_imx_dt_ids[] = {
-> +	{ .compatible = "fsl,imx1-cspi", .data = &imx1_cspi_devtype_data, },
-> +	{ .compatible = "fsl,imx21-cspi", .data = &imx21_cspi_devtype_data, },
-> +	{ .compatible = "fsl,imx27-cspi", .data = &imx27_cspi_devtype_data, },
-> +	{ .compatible = "fsl,imx31-cspi", .data = &imx31_cspi_devtype_data, },
-> +	{ .compatible = "fsl,imx35-cspi", .data = &imx35_cspi_devtype_data, },
-> +	{ .compatible = "fsl,imx51-ecspi", .data = &imx51_ecspi_devtype_data, },
-> +	{ /* sentinel */ }
+> +#include <plat/dma.h>
+> +
+>  #define DMACH_LOW_LEVEL	(1<<28)	/* use this to specifiy hardware ch no */
+>  
+>  /* we have 4 dma channels */
+> diff --git a/arch/arm/plat-samsung/Makefile b/arch/arm/plat-samsung/Makefile
+> index 53eb15b..9ecf2aa 100644
+> --- a/arch/arm/plat-samsung/Makefile
+> +++ b/arch/arm/plat-samsung/Makefile
+> @@ -62,9 +62,11 @@ obj-$(CONFIG_SAMSUNG_DEV_PWM)	+= dev-pwm.o
+>  
+>  # DMA support
+>  
+> -obj-$(CONFIG_S3C_DMA)		+= dma.o
+> +obj-$(CONFIG_S3C_DMA)		+= dma.o s3c-dma-ops.o
+>  
+> -obj-$(CONFIG_S3C_PL330_DMA)	+= s3c-pl330.o
+> +obj-$(CONFIG_DMADEV_PL330)	+= dma-ops.o
+> +
+> +obj-$(CONFIG_S3C_PL330_DMA)	+= s3c-pl330.o s3c-dma-ops.o
+>  
+>  # PM support
+>  
+> diff --git a/arch/arm/plat-samsung/dma-ops.c b/arch/arm/plat-samsung/dma-ops.c
+> new file mode 100644
+> index 0000000..94a9d33
+> --- /dev/null
+> +++ b/arch/arm/plat-samsung/dma-ops.c
+> @@ -0,0 +1,131 @@
+> +/* linux/arch/arm/plat-samsung/dma-ops.c
+> + *
+> + * Copyright (c) 2011 Samsung Electronics Co., Ltd.
+> + *		http://www.samsung.com
+> + *
+> + * Samsung DMA Operations
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> +*/
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/errno.h>
+> +#include <linux/dmaengine.h>
+> +#include <linux/amba/pl330.h>
+> +
+> +#include <mach/dma.h>
+> +
+> +static bool filter(struct dma_chan *chan, void *param)
+> +{
+> +	struct dma_pl330_peri *peri = (struct dma_pl330_peri *)chan->private;
+
+Is this code pl330 specific?  If so, 'pl330' should probably be
+referenced in the function name.
+
+> +	unsigned dma_ch = (unsigned)param;
+> +
+> +	if (peri->peri_id != dma_ch)
+> +		return false;
+> +
+> +	return true;
+> +}
+> +
+> +static unsigned dma_request(enum dma_ch dma_ch, struct samsung_dma_info *info)
+> +{
+> +	struct dma_chan *chan;
+> +	dma_cap_mask_t mask;
+> +	struct dma_slave_config slave_config;
+> +
+> +	dma_cap_zero(mask);
+> +	dma_cap_set(info->cap, mask);
+> +
+> +	chan = dma_request_channel(mask, filter, (void *)dma_ch);
+> +
+> +	if (info->direction == DMA_FROM_DEVICE) {
+> +		memset(&slave_config, 0, sizeof(struct dma_slave_config));
+> +		slave_config.direction = info->direction;
+> +		slave_config.src_addr = info->fifo;
+> +		slave_config.src_addr_width = info->width;
+> +		dmaengine_slave_config(chan, &slave_config);
+> +	} else if (info->direction == DMA_TO_DEVICE) {
+> +		memset(&slave_config, 0, sizeof(struct dma_slave_config));
+> +		slave_config.direction = info->direction;
+> +		slave_config.dst_addr = info->fifo;
+> +		slave_config.dst_addr_width = info->width;
+> +		dmaengine_slave_config(chan, &slave_config);
+> +	}
+> +
+> +	return (unsigned)chan;
+> +}
+> +
+> +static int dma_release(unsigned ch, struct s3c2410_dma_client *client)
+> +{
+> +	dma_release_channel((struct dma_chan *)ch);
+> +
+> +	return 0;
+> +}
+> +
+> +static int dma_prepare(unsigned ch, struct samsung_dma_prep_info *info)
+> +{
+> +	struct scatterlist sg;
+> +	struct dma_chan *chan = (struct dma_chan *)ch;
+> +	struct dma_async_tx_descriptor *desc;
+> +
+> +	switch (info->cap) {
+> +	case DMA_SLAVE:
+> +		sg_init_table(&sg, 1);
+> +		sg_dma_len(&sg) = info->len;
+> +		sg_set_page(&sg, pfn_to_page(PFN_DOWN(info->buf)),
+> +			    info->len, offset_in_page(info->buf));
+> +		sg_dma_address(&sg) = info->buf;
+> +
+> +		desc = chan->device->device_prep_slave_sg(chan,
+> +			&sg, 1, info->direction, DMA_PREP_INTERRUPT);
+> +		break;
+> +	case DMA_CYCLIC:
+> +		desc = chan->device->device_prep_dma_cyclic(chan,
+> +			info->buf, info->len, info->period, info->direction);
+> +		break;
+> +	default:
+> +		dev_err(&chan->dev->device, "unsupported format\n");
+> +		return -EFAULT;
+> +	}
+> +
+> +	if (!desc) {
+> +		dev_err(&chan->dev->device, "cannot prepare cyclic dma\n");
+> +		return -EFAULT;
+> +	}
+> +
+> +	desc->callback = info->fp;
+> +	desc->callback_param = info->fp_param;
+> +
+> +	dmaengine_submit((struct dma_async_tx_descriptor *)desc);
+> +
+> +	return 0;
+> +}
+> +
+> +static inline int dma_trigger(unsigned ch)
+> +{
+> +	dma_async_issue_pending((struct dma_chan *)ch);
+> +
+> +	return 0;
+> +}
+> +
+> +static inline int dma_flush(unsigned ch)
+> +{
+> +	return dmaengine_terminate_all((struct dma_chan *)ch);
+> +}
+> +
+> +static struct samsung_dma_ops dmaeng_ops = {
+> +	.request	= dma_request,
+> +	.release	= dma_release,
+> +	.prepare	= dma_prepare,
+> +	.trigger	= dma_trigger,
+> +	.started	= NULL,
+> +	.flush		= dma_flush,
+> +	.stop		= dma_flush,
+> +};
+
+Even though these function are all local statics, you should use a
+samsung prefix to avoid namespace collisions.  So, they should be
+named something like: samsung_dmaeng_ops, samsung_dmaeng_request(),
+samsung_dmaeng_release(), etc.  The ops structure and the functions
+should have the same prefix.
+
+> +
+> +void *samsung_dma_get_ops(void)
+> +{
+> +	return (void *)&dmaeng_ops;
+> +}
+> +EXPORT_SYMBOL(samsung_dma_get_ops);
+
+If all that is needed is a reference to the dma ops, then you could
+simply export samsung_dmaeng_ops() without a separate function.
+
+> diff --git a/arch/arm/plat-samsung/include/plat/dma-ops.h b/arch/arm/plat-samsung/include/plat/dma-ops.h
+> new file mode 100644
+> index 0000000..eea4130
+> --- /dev/null
+> +++ b/arch/arm/plat-samsung/include/plat/dma-ops.h
+> @@ -0,0 +1,47 @@
+> +/* arch/arm/plat-samsung/include/plat/dma-ops.h
+> + *
+> + * Copyright (c) 2011 Samsung Electronics Co., Ltd.
+> + *		http://www.samsung.com
+> + *
+> + * Samsung DMA support
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> +*/
+> +
+> +#include <linux/dmaengine.h>
+> +
+> +struct samsung_dma_prep_info {
+> +	enum dma_transaction_type cap;
+> +	enum dma_data_direction direction;
+> +	unsigned buf;
+> +	unsigned long period;
+> +	unsigned long len;
+> +	void (*fp)(void *data);
+> +	void *fp_param;
 > +};
 > +
->  static void spi_imx_chipselect(struct spi_device *spi, int is_active)
->  {
->  	struct spi_imx_data *spi_imx = spi_master_get_devdata(spi->master);
-> @@ -739,19 +752,25 @@ static void spi_imx_cleanup(struct spi_device *spi)
->  
->  static int __devinit spi_imx_probe(struct platform_device *pdev)
->  {
-> -	struct spi_imx_master *mxc_platform_info;
-> +	struct device_node *np = pdev->dev.of_node;
-> +	const struct of_device_id *of_id =
-> +			of_match_device(spi_imx_dt_ids, &pdev->dev);
-> +	struct spi_imx_master *mxc_platform_info =
-> +			dev_get_platdata(&pdev->dev);
->  	struct spi_master *master;
->  	struct spi_imx_data *spi_imx;
->  	struct resource *res;
->  	int i, ret, num_cs;
->  
-> -	mxc_platform_info = dev_get_platdata(&pdev->dev);
-> -	if (!mxc_platform_info) {
-> +	if (!np && !mxc_platform_info) {
->  		dev_err(&pdev->dev, "can't get the platform data\n");
->  		return -EINVAL;
->  	}
->  
-> -	num_cs = mxc_platform_info->num_chipselect;
-> +	ret = of_property_read_u32(np, "fsl,spi-num-chipselects", &num_cs);
-> +	if (ret < 0)
-> +		num_cs = mxc_platform_info->num_chipselect;
+> +struct samsung_dma_info {
+> +	enum dma_transaction_type cap;
+> +	enum dma_data_direction direction;
+> +	enum dma_slave_buswidth width;
+> +	unsigned fifo;
+> +	struct s3c2410_dma_client *client;
+> +};
 > +
->  	master = spi_alloc_master(&pdev->dev,
->  			sizeof(struct spi_imx_data) + sizeof(int) * num_cs);
->  	if (!master)
-> @@ -766,9 +785,12 @@ static int __devinit spi_imx_probe(struct platform_device *pdev)
->  	spi_imx->bitbang.master = spi_master_get(master);
+> +struct samsung_dma_ops {
+> +	unsigned (*request)(enum dma_ch ch, struct samsung_dma_info *info);
+> +	int (*release)(unsigned ch, struct s3c2410_dma_client *client);
+> +	int (*prepare)(unsigned ch, struct samsung_dma_prep_info *info);
+> +	int (*trigger)(unsigned ch);
+> +	int (*started)(unsigned ch);
+> +	int (*flush)(unsigned ch);
+> +	int (*stop)(unsigned ch);
+> +};
+> +
+> +/*
+> + * samsung_dma_get_ops
+> + * get the set of dma operations
+> + */
+> +extern void *samsung_dma_get_ops(void);
+> diff --git a/arch/arm/plat-samsung/include/plat/dma-pl330.h b/arch/arm/plat-samsung/include/plat/dma-pl330.h
+> index c402719..be84bec 100644
+> --- a/arch/arm/plat-samsung/include/plat/dma-pl330.h
+> +++ b/arch/arm/plat-samsung/include/plat/dma-pl330.h
+> @@ -1,4 +1,7 @@
+>  /*
+> + * Copyright (c) 2011 Samsung Electronics Co., Ltd.
+> + *		http://www.samsung.com
+> + *
+>   * Copyright (C) 2010 Samsung Electronics Co. Ltd.
+>   *	Jaswinder Singh <jassi.brar@samsung.com>
+>   *
+
+
+Heh, this patch doesn't make any changes to this file, and samsung
+already has a copyright notice on it anyway.  You should probably drop
+this hunk.
+
+> diff --git a/arch/arm/plat-samsung/include/plat/dma.h b/arch/arm/plat-samsung/include/plat/dma.h
+> index 2e8f8c6..90da162 100644
+> --- a/arch/arm/plat-samsung/include/plat/dma.h
+> +++ b/arch/arm/plat-samsung/include/plat/dma.h
+> @@ -124,4 +124,4 @@ extern int s3c2410_dma_getposition(unsigned int channel,
+>  extern int s3c2410_dma_set_opfn(unsigned int, s3c2410_dma_opfn_t rtn);
+>  extern int s3c2410_dma_set_buffdone_fn(unsigned int, s3c2410_dma_cbfn_t rtn);
 >  
->  	for (i = 0; i < master->num_chipselect; i++) {
-> -		spi_imx->chipselect[i] = mxc_platform_info->chipselect[i];
-> -		if (spi_imx->chipselect[i] < 0)
-> +		int cs_gpio = of_get_named_gpio(np, "cs-gpios", i);
-> +		if (cs_gpio < 0)
-> +			cs_gpio = mxc_platform_info->chipselect[i];
-> +		if (cs_gpio < 0)
->  			continue;
-> +		spi_imx->chipselect[i] = cs_gpio;
->  		ret = gpio_request(spi_imx->chipselect[i], DRIVER_NAME);
->  		if (ret) {
->  			while (i > 0) {
-> @@ -790,7 +812,7 @@ static int __devinit spi_imx_probe(struct platform_device *pdev)
->  
->  	init_completion(&spi_imx->xfer_done);
->  
-> -	spi_imx->devtype_data =
-> +	spi_imx->devtype_data = of_id ? of_id->data :
->  		(struct spi_imx_devtype_data *) pdev->id_entry->driver_data;
->  
->  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> @@ -838,6 +860,7 @@ static int __devinit spi_imx_probe(struct platform_device *pdev)
->  
->  	spi_imx->devtype_data->intctrl(spi_imx, 0);
->  
-> +	master->dev.of_node = pdev->dev.of_node;
->  	ret = spi_bitbang_start(&spi_imx->bitbang);
->  	if (ret) {
->  		dev_err(&pdev->dev, "bitbang start failed with %d\n", ret);
-> @@ -900,6 +923,7 @@ static struct platform_driver spi_imx_driver = {
->  	.driver = {
->  		   .name = DRIVER_NAME,
->  		   .owner = THIS_MODULE,
-> +		   .of_match_table = spi_imx_dt_ids,
->  		   },
->  	.id_table = spi_imx_devtype,
->  	.probe = spi_imx_probe,
-> -- 
-> 1.7.4.1
-> 
+> -
+
+nitpick: Unrelated whitespace change.  One blank line of whitespace is
+sufficient anyway.
+
+> +#include <plat/dma-ops.h>
+> diff --git a/arch/arm/plat-samsung/s3c-dma-ops.c b/arch/arm/plat-samsung/s3c-dma-ops.c
+> new file mode 100644
+> index 0000000..17b1be0
+> --- /dev/null
+> +++ b/arch/arm/plat-samsung/s3c-dma-ops.c
+> @@ -0,0 +1,132 @@
+> +/* linux/arch/arm/plat-samsung/s3c-dma-ops.c
+> + *
+> + * Copyright (c) 2011 Samsung Electronics Co., Ltd.
+> + *		http://www.samsung.com
+> + *
+> + * Samsung S3C-DMA Operations
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> +*/
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/errno.h>
+> +#include <linux/slab.h>
+> +#include <linux/types.h>
+> +
+> +#include <mach/dma.h>
+> +
+> +struct cb_data {
+
+struct s3c2410_cb_data {
+
+> +	void (*fp) (void *);
+> +	void *fp_param;
+> +	unsigned ch;
+> +	struct list_head node;
+> +};
+> +
+> +static LIST_HEAD(dma_list);
+> +
+> +static void dma_cb(struct s3c2410_dma_chan *channel,
+> +		   void *param, int size, enum s3c2410_dma_buffresult res)
+> +{
+> +	struct cb_data *data = (struct cb_data *)param;
+
+param is a void*.  The (struct cb_data*) cast is not needed.
+
+> +
+> +	data->fp(data->fp_param);
+> +}
+> +
+> +static unsigned dma_request(enum dma_ch dma_ch, struct samsung_dma_info *info)
+
+These functions should *definitely* be named differently from the
+dma_* ops in the other file so that you can differentiate between
+them, and to make them grep-friendly.  This goes for *all* file-scope
+symbols.
+
+> +{
+> +	struct cb_data *data;
+> +
+> +	if (s3c2410_dma_request(dma_ch, info->client, NULL) < 0) {
+> +		s3c2410_dma_free(dma_ch, info->client);
+> +		return 0;
+> +	}
+> +
+> +	data = kmalloc(sizeof(struct cb_data), GFP_KERNEL);
+
+kzalloc()
+
+> +	data->fp = NULL;
+
+Drop this line after converting to kzalloc()
+
+> +	data->ch = (unsigned)dma_ch;
+
+Is the cast necessary?
+
+> +	list_add_tail(&data->node, &dma_list);
+> +
+> +	if (info->direction == DMA_FROM_DEVICE)
+> +		s3c2410_dma_devconfig(dma_ch, S3C2410_DMASRC_HW, info->fifo);
+> +	else
+> +		s3c2410_dma_devconfig(dma_ch, S3C2410_DMASRC_MEM, info->fifo);
