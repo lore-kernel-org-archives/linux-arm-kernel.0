@@ -1,511 +1,215 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 14 Jul 2011 20:53:39 -0600
-Subject: [PATCH 6/6] clk: Add initial WM831x clock driver
-In-Reply-To: <1310352837-4277-6-git-send-email-broonie@opensource.wolfsonmicro.com>
-References: <20110711025344.GA27497@opensource.wolfsonmicro.com>
-	<1310352837-4277-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-	<1310352837-4277-6-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <20110715025339.GO2927@ponder.secretlab.ca>
+Date: Thu, 14 Jul 2011 20:53:45 -0600
+Subject: [PATCH v2 3/7] spi/imx: do not use spi_imx2_3 to name
+	SPI_IMX_VER_2_3 function and macro
+In-Reply-To: <1310231801-18761-4-git-send-email-shawn.guo@linaro.org>
+References: <1310231801-18761-1-git-send-email-shawn.guo@linaro.org>
+	<1310231801-18761-4-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20110715025345.GS2927@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 11, 2011 at 11:53:57AM +0900, Mark Brown wrote:
-> The WM831x and WM832x series of PMICs contain a flexible clocking
-> subsystem intended to provide always on and system core clocks.  It
-> features:
+On Sun, Jul 10, 2011 at 01:16:37AM +0800, Shawn Guo wrote:
+> It's confusing to use spi_imx2_3 to name SPI_IMX_VER_2_3 function
+> and macro, as it easily make people think of imx2 and imx3.  It's
+> better to use specific soc name just like what other SPI_IMX_VER
+> do.  For SPI_IMX_VER_2_3 case, it will be mx51.  To distinguish it
+> from CSPI on mx51, mx51_ecspi might be a good choice.
 > 
-> - A 32.768kHz crystal oscillator which can optionally be used to pass
->   through an externally generated clock.
-> - A FLL which can be clocked from either the 32.768kHz oscillator or
->   the CLKIN pin.
-> - A CLKOUT pin which can bring out either the oscillator or the FLL
->   output.
-> - The 32.768kHz clock can also optionally be brought out on the GPIO
->   pins of the device.
-> 
-> This driver fully supports the 32.768kHz oscillator and CLKOUT.  The FLL
-> is supported only in AUTO mode, the full flexibility of the FLL cannot
-> currently be used.  The use of clock references other than the internal
-> oscillator is not currently supported, and since clk_set_parent() is not
-> implemented in the generic clock API the clock tree configuration cannot
-> be changed at runtime.
-> 
-> Due to a lack of access to systems where the core SoC has been converted
-> to use the generic clock API this driver has been compile tested only.
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
 
-Generally seems okay.  Minor comments below.
+Applied, thanks.
 
 g.
 
-> 
-> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 > ---
->  MAINTAINERS              |    1 +
->  drivers/clk/Kconfig      |    5 +
->  drivers/clk/Makefile     |    1 +
->  drivers/clk/clk-wm831x.c |  389 ++++++++++++++++++++++++++++++++++++++++++++++
->  4 files changed, 396 insertions(+), 0 deletions(-)
->  create mode 100644 drivers/clk/clk-wm831x.c
+>  drivers/spi/spi-imx.c |  107 +++++++++++++++++++++++++------------------------
+>  1 files changed, 54 insertions(+), 53 deletions(-)
 > 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index ae563fa..c234756 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -6969,6 +6969,7 @@ T:	git git://opensource.wolfsonmicro.com/linux-2.6-audioplus
->  W:	http://opensource.wolfsonmicro.com/content/linux-drivers-wolfson-devices
->  S:	Supported
->  F:	Documentation/hwmon/wm83??
-> +F:	drivers/clk/clk-wm83*.c
->  F:	drivers/leds/leds-wm83*.c
->  F:	drivers/mfd/wm8*.c
->  F:	drivers/power/wm83*.c
-> diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
-> index 1fd0070..7f6eec2 100644
-> --- a/drivers/clk/Kconfig
-> +++ b/drivers/clk/Kconfig
-> @@ -10,6 +10,7 @@ config GENERIC_CLK_BUILD_TEST
->  	depends on EXPERIMENTAL && GENERIC_CLK
->  	select GENERIC_CLK_FIXED
->  	select GENERIC_CLK_GATE
-> +	select GENERIC_CLK_WM831X if MFD_WM831X=y
-
-Hmmm, this could get unwieldy in a hurry.
-
->  	help
->  	   Enable all possible generic clock drivers.  This is only
->  	   useful for improving build coverage, it is not useful for
-> @@ -22,3 +23,7 @@ config GENERIC_CLK_FIXED
->  config GENERIC_CLK_GATE
->  	bool
->  	depends on GENERIC_CLK
-> +
-> +config GENERIC_CLK_WM831X
-> +	tristate
-> +	depends on GENERIC_CLK && MFD_WM831X
-> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-> index d186446..6628ad5 100644
-> --- a/drivers/clk/Makefile
-> +++ b/drivers/clk/Makefile
-> @@ -3,3 +3,4 @@ obj-$(CONFIG_CLKDEV_LOOKUP)	+= clkdev.o
->  obj-$(CONFIG_GENERIC_CLK)	+= clk.o
->  obj-$(CONFIG_GENERIC_CLK_FIXED)	+= clk-fixed.o
->  obj-$(CONFIG_GENERIC_CLK_GATE)	+= clk-gate.o
-> +obj-$(CONFIG_GENERIC_CLK_WM831X) += clk-wm831x.o
-> diff --git a/drivers/clk/clk-wm831x.c b/drivers/clk/clk-wm831x.c
-> new file mode 100644
-> index 0000000..82782f1
-> --- /dev/null
-> +++ b/drivers/clk/clk-wm831x.c
-> @@ -0,0 +1,389 @@
-> +/*
-> + * WM831x clock control
-> + *
-> + * Copyright 2011 Wolfson Microelectronics PLC.
-> + *
-> + * Author: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> + *
-> + *  This program is free software; you can redistribute  it and/or modify it
-> + *  under  the terms of  the GNU General  Public License as published by the
-> + *  Free Software Foundation;  either version 2 of the  License, or (at your
-> + *  option) any later version.
-> + *
-> + */
-> +
-> +#include <linux/clk.h>
-> +#include <linux/module.h>
-> +#include <linux/slab.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/mfd/wm831x/core.h>
-> +
-> +struct wm831x_clk {
-> +	struct wm831x *wm831x;
-> +	struct clk_hw xtal_hw;
-> +	struct clk_hw fll_hw;
-> +	struct clk_hw clkout_hw;
-> +	bool xtal_ena;
-> +};
-> +
-> +static int wm831x_xtal_enable(struct clk_hw *hw)
-> +{
-> +	struct wm831x_clk *clkdata = container_of(hw, struct wm831x_clk,
-> +						  xtal_hw);
-
-This container of is used 10 times.  A static inline would be
-reasonable.
-
-> +
-> +	if (clkdata->xtal_ena)
-> +		return 0;
-> +	else
-> +		return -EPERM;
-> +}
-
-Nit: return clkdata->xtal_ena ? 0 : -EPERM;
-
-Just makes for more concise code.
-
-> +
-> +static unsigned long wm831x_xtal_recalc_rate(struct clk_hw *hw)
-> +{
-> +	struct wm831x_clk *clkdata = container_of(hw, struct wm831x_clk,
-> +						  xtal_hw);
-> +
-> +	if (clkdata->xtal_ena)
-> +		return 32768;
-> +	else
-> +		return 0;
-> +}
-> +
-> +static long wm831x_xtal_round_rate(struct clk_hw *hw, unsigned long rate)
-> +{
-> +	return wm831x_xtal_recalc_rate(hw);
-> +}
-> +
-> +static const struct clk_hw_ops wm831x_xtal_ops = {
-> +	.enable = wm831x_xtal_enable,
-> +	.recalc_rate = wm831x_xtal_recalc_rate,
-> +	.round_rate = wm831x_xtal_round_rate,
-> +};
-> +
-> +static const unsigned long wm831x_fll_auto_rates[] = {
-> +	 2048000,
-> +	11289600,
-> +	12000000,
-> +	12288000,
-> +	19200000,
-> +	22579600,
-> +	24000000,
-> +	24576000,
-> +};
-> +
-> +static bool wm831x_fll_enabled(struct wm831x *wm831x)
-> +{
-> +	int ret;
-> +
-> +	ret = wm831x_reg_read(wm831x, WM831X_FLL_CONTROL_1);
-> +	if (ret < 0) {
-> +		dev_err(wm831x->dev, "Unable to read FLL_CONTROL_1: %d\n",
-> +			ret);
-> +		return true;
-> +	}
-> +
-> +	if (ret & WM831X_FLL_ENA)
-> +		return true;
-> +	else
-> +		return false;
-
-similarly, return (ret & WM831X_FLL_ENA) != 0;
-
-> +}
-> +
-> +static int wm831x_fll_prepare(struct clk_hw *hw)
-> +{
-> +	struct wm831x_clk *clkdata = container_of(hw, struct wm831x_clk,
-> +						  fll_hw);
-> +	struct wm831x *wm831x = clkdata->wm831x;
-> +	int ret;
-> +
-> +	ret = wm831x_set_bits(wm831x, WM831X_FLL_CONTROL_2,
-> +			      WM831X_FLL_ENA, WM831X_FLL_ENA);
-> +	if (ret != 0)
-> +		dev_crit(wm831x->dev, "Failed to enable FLL: %d\n", ret);
-> +
-> +	return ret;
-> +}
-> +
-> +static void wm831x_fll_unprepare(struct clk_hw *hw)
-> +{
-> +	struct wm831x_clk *clkdata = container_of(hw, struct wm831x_clk,
-> +						  fll_hw);
-> +	struct wm831x *wm831x = clkdata->wm831x;
-> +	int ret;
-> +
-> +	ret = wm831x_set_bits(wm831x, WM831X_FLL_CONTROL_2, WM831X_FLL_ENA, 0);
-> +	if (ret != 0)
-> +		dev_crit(wm831x->dev, "Failed to disaable FLL: %d\n", ret);
-> +}
-> +
-> +static unsigned long wm831x_fll_recalc_rate(struct clk_hw *hw)
-> +{
-> +	struct wm831x_clk *clkdata = container_of(hw, struct wm831x_clk,
-> +						  fll_hw);
-> +	struct wm831x *wm831x = clkdata->wm831x;
-> +	int ret;
-> +
-> +	ret = wm831x_reg_read(wm831x, WM831X_CLOCK_CONTROL_2);
-> +	if (ret < 0) {
-> +		dev_err(wm831x->dev, "Unable to read CLOCK_CONTROL_2: %d\n",
-> +			ret);
-> +		return 0;
-> +	}
-> +
-> +	if (ret & WM831X_FLL_AUTO)
-> +		return wm831x_fll_auto_rates[ret & WM831X_FLL_AUTO_FREQ_MASK];
-> +
-> +	dev_err(wm831x->dev, "FLL only supported in AUTO mode\n");
-> +	return 0;
-> +}
-> +
-> +static int wm831x_fll_set_rate(struct clk_hw *hw, unsigned long rate,
-> +			       unsigned long *parent_rate)
-> +{
-> +	struct wm831x_clk *clkdata = container_of(hw, struct wm831x_clk,
-> +						  fll_hw);
-> +	struct wm831x *wm831x = clkdata->wm831x;
-> +	int i;
-> +
-> +	for (i = 0; i < ARRAY_SIZE(wm831x_fll_auto_rates); i++)
-> +		if (wm831x_fll_auto_rates[i] == rate)
-> +			break;
-> +	if (i == ARRAY_SIZE(wm831x_fll_auto_rates))
-> +		return -EINVAL;
-> +
-> +	if (wm831x_fll_enabled(wm831x))
-> +		return -EPERM;
-> +
-> +	return wm831x_set_bits(wm831x, WM831X_CLOCK_CONTROL_2,
-> +			       WM831X_FLL_AUTO_FREQ_MASK, i);
-> +}
-> +
-> +static struct clk *wm831x_fll_get_parent(struct clk_hw *hw)
-> +{
-> +	struct wm831x_clk *clkdata = container_of(hw, struct wm831x_clk,
-> +						  fll_hw);
-> +	struct wm831x *wm831x = clkdata->wm831x;
-> +	int ret;
-> +
-> +	/* AUTO mode is always clocked from the crystal */
-> +	ret = wm831x_reg_read(wm831x, WM831X_CLOCK_CONTROL_2);
-> +	if (ret < 0) {
-> +		dev_err(wm831x->dev, "Unable to read CLOCK_CONTROL_2: %d\n",
-> +			ret);
-> +		return NULL;
-> +	}
-> +
-> +	if (ret & WM831X_FLL_AUTO)
-> +		return clkdata->xtal_hw.clk;
-> +
-> +	ret = wm831x_reg_read(wm831x, WM831X_FLL_CONTROL_5);
-> +	if (ret < 0) {
-> +		dev_err(wm831x->dev, "Unable to read FLL_CONTROL_5: %d\n",
-> +			ret);
-> +		return NULL;
-> +	}
-> +
-> +	switch (ret & WM831X_FLL_CLK_SRC_MASK) {
-> +	case 0:
-> +		return clkdata->xtal_hw.clk;
-> +	case 1:
-> +		dev_warn(wm831x->dev,
-> +			 "FLL clocked from CLKIN not yet supported\n");
-> +		return NULL;
-> +	default:
-> +		dev_err(wm831x->dev, "Unsupported FLL clock source %d\n",
-> +			ret & WM831X_FLL_CLK_SRC_MASK);
-> +		return NULL;
-> +	}
-> +}
-> +
-> +static const struct clk_hw_ops wm831x_fll_ops = {
-> +	.prepare = wm831x_fll_prepare,
-> +	.unprepare = wm831x_fll_unprepare,
-> +	.recalc_rate = wm831x_fll_recalc_rate,
-> +	.set_rate = wm831x_fll_set_rate,
-> +	.get_parent = wm831x_fll_get_parent,
-> +};
-> +
-> +static int wm831x_clkout_prepare(struct clk_hw *hw)
-> +{
-> +	struct wm831x_clk *clkdata = container_of(hw, struct wm831x_clk,
-> +						  clkout_hw);
-> +	struct wm831x *wm831x = clkdata->wm831x;
-> +	int ret;
-> +
-> +	ret = wm831x_reg_unlock(wm831x);
-> +	if (ret != 0) {
-> +		dev_crit(wm831x->dev, "Failed to lock registers: %d\n", ret);
-> +		return ret;
-> +	}
-> +
-> +	ret = wm831x_set_bits(wm831x, WM831X_CLOCK_CONTROL_1,
-> +			      WM831X_CLKOUT_ENA, WM831X_CLKOUT_ENA);
-> +	if (ret != 0)
-> +		dev_crit(wm831x->dev, "Failed to enable CLKOUT: %d\n", ret);
-> +
-> +	wm831x_reg_lock(wm831x);
-> +
-> +	return ret;
-> +}
-> +
-> +static void wm831x_clkout_unprepare(struct clk_hw *hw)
-> +{
-> +	struct wm831x_clk *clkdata = container_of(hw, struct wm831x_clk,
-> +						  clkout_hw);
-> +	struct wm831x *wm831x = clkdata->wm831x;
-> +	int ret;
-> +
-> +	ret = wm831x_reg_unlock(wm831x);
-> +	if (ret != 0) {
-> +		dev_crit(wm831x->dev, "Failed to lock registers: %d\n", ret);
-> +		return;
-> +	}
-> +
-> +	ret = wm831x_set_bits(wm831x, WM831X_CLOCK_CONTROL_1,
-> +			      WM831X_CLKOUT_ENA, 0);
-> +	if (ret != 0)
-> +		dev_crit(wm831x->dev, "Failed to disable CLKOUT: %d\n", ret);
-> +
-> +	wm831x_reg_lock(wm831x);
-> +}
-> +
-> +static unsigned long wm831x_clkout_recalc_rate(struct clk_hw *hw)
-> +{
-> +	return clk_get_rate(clk_get_parent(hw->clk));
-> +}
-> +
-> +static long wm831x_clkout_round_rate(struct clk_hw *hw, unsigned long rate)
-> +{
-> +	return clk_round_rate(clk_get_parent(hw->clk), rate);
-> +}
-> +
-> +static int wm831x_clkout_set_rate(struct clk_hw *hw, unsigned long rate,
-> +				  unsigned long *parent_rate)
-> +{
-> +	*parent_rate = rate;
-> +	return CLK_SET_RATE_PROPAGATE;
-> +}
-> +
-> +static struct clk *wm831x_clkout_get_parent(struct clk_hw *hw)
-> +{
-> +	struct wm831x_clk *clkdata = container_of(hw, struct wm831x_clk,
-> +						  clkout_hw);
-> +	struct wm831x *wm831x = clkdata->wm831x;
-> +	int ret;
-> +
-> +	ret = wm831x_reg_read(wm831x, WM831X_CLOCK_CONTROL_1);
-> +	if (ret < 0) {
-> +		dev_err(wm831x->dev, "Unable to read CLOCK_CONTROL_1: %d\n",
-> +			ret);
-> +		return NULL;
-> +	}
-> +
-> +	if (ret & WM831X_CLKOUT_SRC)
-> +		return clkdata->xtal_hw.clk;
-> +	else
-> +		return clkdata->fll_hw.clk;
-> +}
-> +
-> +static const struct clk_hw_ops wm831x_clkout_ops = {
-> +	.prepare = wm831x_clkout_prepare,
-> +	.unprepare = wm831x_clkout_unprepare,
-> +	.recalc_rate = wm831x_clkout_recalc_rate,
-> +	.round_rate = wm831x_clkout_round_rate,
-> +	.set_rate = wm831x_clkout_set_rate,
-> +	.get_parent = wm831x_clkout_get_parent,
-> +};
-> +
-> +static __devinit int wm831x_clk_probe(struct platform_device *pdev)
-> +{
-> +	struct wm831x *wm831x = dev_get_drvdata(pdev->dev.parent);
-> +	struct wm831x_clk *clkdata;
-> +	int ret;
-> +
-> +	clkdata = kzalloc(sizeof(*clkdata), GFP_KERNEL);
-> +	if (!clkdata)
-> +		return -ENOMEM;
-> +
-> +	/* XTAL_ENA can only be set via OTP/InstantConfig so just read once */
-> +	ret = wm831x_reg_read(wm831x, WM831X_CLOCK_CONTROL_2);
-> +	if (ret < 0) {
-> +		dev_err(wm831x->dev, "Unable to read CLOCK_CONTROL_2: %d\n",
-> +			ret);
-> +		goto err_alloc;
-> +	}
-> +	clkdata->xtal_ena = ret & WM831X_XTAL_ENA;
-> +
-> +	if (!clk_register(wm831x->dev, &wm831x_xtal_ops, &clkdata->xtal_hw,
-> +			  "xtal")) {
-> +		ret = -EINVAL;
-> +		goto err_alloc;
-> +	}
-> +
-> +	if (!clk_register(wm831x->dev, &wm831x_fll_ops, &clkdata->fll_hw,
-> +			  "fll")) {
-> +		ret = -EINVAL;
-> +		goto err_xtal;
-> +	}
-> +
-> +	if (!clk_register(wm831x->dev, &wm831x_clkout_ops, &clkdata->clkout_hw,
-> +			  "clkout")) {
-> +		ret = -EINVAL;
-> +		goto err_fll;
-> +	}
-
-How common will this pattern be?  Is there need for a
-clk_register_many() variant?
-
-> +
-> +	dev_set_drvdata(&pdev->dev, clkdata);
-> +
-> +	return 0;
-> +
-> +err_fll:
-> +	clk_unregister(clkdata->fll_hw.clk);
-> +err_xtal:
-> +	clk_unregister(clkdata->xtal_hw.clk);
-> +err_alloc:
-> +	kfree(clkdata);
-> +	return ret;
-> +}
-> +
-> +static __devexit int wm831x_clk_remove(struct platform_device *pdev)
-> +{
-> +	struct wm831x_clk *clkdata = dev_get_drvdata(&pdev->dev);
-> +
-> +	clk_unregister(clkdata->clkout_hw.clk);
-> +	clk_unregister(clkdata->fll_hw.clk);
-> +	clk_unregister(clkdata->xtal_hw.clk);
-> +	kfree(clkdata);
-> +
-> +	return 0;
-> +}
-> +
-> +static struct platform_driver wm831x_clk_driver = {
-> +	.probe = wm831x_clk_probe,
-> +	.remove = __devexit_p(wm831x_clk_remove),
-> +	.driver		= {
-> +		.name	= "wm831x-clk",
-> +		.owner	= THIS_MODULE,
-> +	},
-> +};
-> +
-> +static int __init wm831x_clk_init(void)
-> +{
-> +	int ret;
-> +
-> +	ret = platform_driver_register(&wm831x_clk_driver);
-> +	if (ret != 0)
-> +		pr_err("Failed to register WM831x clock driver: %d\n", ret);
-> +
-> +	return ret;
-> +}
-
-Driver registration is very well implemented and debugged.  Just do
-"return platform_driver_register();"
-
-> +module_init(wm831x_clk_init);
-> +
-> +static void __exit wm831x_clk_exit(void)
-> +{
-> +	platform_driver_unregister(&wm831x_clk_driver);
-> +}
-> +module_exit(wm831x_clk_exit);
-> +
-> +/* Module information */
-> +MODULE_AUTHOR("Mark Brown <broonie@opensource.wolfsonmicro.com>");
-> +MODULE_DESCRIPTION("WM831x clock driver");
-> +MODULE_LICENSE("GPL");
-> +MODULE_ALIAS("platform:wm831x-clk");
+> diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
+> index ad928b1..052959df 100644
+> --- a/drivers/spi/spi-imx.c
+> +++ b/drivers/spi/spi-imx.c
+> @@ -171,30 +171,30 @@ static unsigned int spi_imx_clkdiv_2(unsigned int fin,
+>  	return 7;
+>  }
+>  
+> -#define SPI_IMX2_3_CTRL		0x08
+> -#define SPI_IMX2_3_CTRL_ENABLE		(1 <<  0)
+> -#define SPI_IMX2_3_CTRL_XCH		(1 <<  2)
+> -#define SPI_IMX2_3_CTRL_MODE_MASK	(0xf << 4)
+> -#define SPI_IMX2_3_CTRL_POSTDIV_OFFSET	8
+> -#define SPI_IMX2_3_CTRL_PREDIV_OFFSET	12
+> -#define SPI_IMX2_3_CTRL_CS(cs)		((cs) << 18)
+> -#define SPI_IMX2_3_CTRL_BL_OFFSET	20
+> -
+> -#define SPI_IMX2_3_CONFIG	0x0c
+> -#define SPI_IMX2_3_CONFIG_SCLKPHA(cs)	(1 << ((cs) +  0))
+> -#define SPI_IMX2_3_CONFIG_SCLKPOL(cs)	(1 << ((cs) +  4))
+> -#define SPI_IMX2_3_CONFIG_SBBCTRL(cs)	(1 << ((cs) +  8))
+> -#define SPI_IMX2_3_CONFIG_SSBPOL(cs)	(1 << ((cs) + 12))
+> -
+> -#define SPI_IMX2_3_INT		0x10
+> -#define SPI_IMX2_3_INT_TEEN		(1 <<  0)
+> -#define SPI_IMX2_3_INT_RREN		(1 <<  3)
+> -
+> -#define SPI_IMX2_3_STAT		0x18
+> -#define SPI_IMX2_3_STAT_RR		(1 <<  3)
+> +#define MX51_ECSPI_CTRL		0x08
+> +#define MX51_ECSPI_CTRL_ENABLE		(1 <<  0)
+> +#define MX51_ECSPI_CTRL_XCH		(1 <<  2)
+> +#define MX51_ECSPI_CTRL_MODE_MASK	(0xf << 4)
+> +#define MX51_ECSPI_CTRL_POSTDIV_OFFSET	8
+> +#define MX51_ECSPI_CTRL_PREDIV_OFFSET	12
+> +#define MX51_ECSPI_CTRL_CS(cs)		((cs) << 18)
+> +#define MX51_ECSPI_CTRL_BL_OFFSET	20
+> +
+> +#define MX51_ECSPI_CONFIG	0x0c
+> +#define MX51_ECSPI_CONFIG_SCLKPHA(cs)	(1 << ((cs) +  0))
+> +#define MX51_ECSPI_CONFIG_SCLKPOL(cs)	(1 << ((cs) +  4))
+> +#define MX51_ECSPI_CONFIG_SBBCTRL(cs)	(1 << ((cs) +  8))
+> +#define MX51_ECSPI_CONFIG_SSBPOL(cs)	(1 << ((cs) + 12))
+> +
+> +#define MX51_ECSPI_INT		0x10
+> +#define MX51_ECSPI_INT_TEEN		(1 <<  0)
+> +#define MX51_ECSPI_INT_RREN		(1 <<  3)
+> +
+> +#define MX51_ECSPI_STAT		0x18
+> +#define MX51_ECSPI_STAT_RR		(1 <<  3)
+>  
+>  /* MX51 eCSPI */
+> -static unsigned int spi_imx2_3_clkdiv(unsigned int fin, unsigned int fspi)
+> +static unsigned int mx51_ecspi_clkdiv(unsigned int fin, unsigned int fspi)
+>  {
+>  	/*
+>  	 * there are two 4-bit dividers, the pre-divider divides by
+> @@ -222,36 +222,37 @@ static unsigned int spi_imx2_3_clkdiv(unsigned int fin, unsigned int fspi)
+>  
+>  	pr_debug("%s: fin: %u, fspi: %u, post: %u, pre: %u\n",
+>  			__func__, fin, fspi, post, pre);
+> -	return (pre << SPI_IMX2_3_CTRL_PREDIV_OFFSET) |
+> -		(post << SPI_IMX2_3_CTRL_POSTDIV_OFFSET);
+> +	return (pre << MX51_ECSPI_CTRL_PREDIV_OFFSET) |
+> +		(post << MX51_ECSPI_CTRL_POSTDIV_OFFSET);
+>  }
+>  
+> -static void __maybe_unused spi_imx2_3_intctrl(struct spi_imx_data *spi_imx, int enable)
+> +static void __maybe_unused
+> +mx51_ecspi_intctrl(struct spi_imx_data *spi_imx, int enable)
+>  {
+>  	unsigned val = 0;
+>  
+>  	if (enable & MXC_INT_TE)
+> -		val |= SPI_IMX2_3_INT_TEEN;
+> +		val |= MX51_ECSPI_INT_TEEN;
+>  
+>  	if (enable & MXC_INT_RR)
+> -		val |= SPI_IMX2_3_INT_RREN;
+> +		val |= MX51_ECSPI_INT_RREN;
+>  
+> -	writel(val, spi_imx->base + SPI_IMX2_3_INT);
+> +	writel(val, spi_imx->base + MX51_ECSPI_INT);
+>  }
+>  
+> -static void __maybe_unused spi_imx2_3_trigger(struct spi_imx_data *spi_imx)
+> +static void __maybe_unused mx51_ecspi_trigger(struct spi_imx_data *spi_imx)
+>  {
+>  	u32 reg;
+>  
+> -	reg = readl(spi_imx->base + SPI_IMX2_3_CTRL);
+> -	reg |= SPI_IMX2_3_CTRL_XCH;
+> -	writel(reg, spi_imx->base + SPI_IMX2_3_CTRL);
+> +	reg = readl(spi_imx->base + MX51_ECSPI_CTRL);
+> +	reg |= MX51_ECSPI_CTRL_XCH;
+> +	writel(reg, spi_imx->base + MX51_ECSPI_CTRL);
+>  }
+>  
+> -static int __maybe_unused spi_imx2_3_config(struct spi_imx_data *spi_imx,
+> +static int __maybe_unused mx51_ecspi_config(struct spi_imx_data *spi_imx,
+>  		struct spi_imx_config *config)
+>  {
+> -	u32 ctrl = SPI_IMX2_3_CTRL_ENABLE, cfg = 0;
+> +	u32 ctrl = MX51_ECSPI_CTRL_ENABLE, cfg = 0;
+>  
+>  	/*
+>  	 * The hardware seems to have a race condition when changing modes. The
+> @@ -260,42 +261,42 @@ static int __maybe_unused spi_imx2_3_config(struct spi_imx_data *spi_imx,
+>  	 * the same time.
+>  	 * So set master mode for all channels as we do not support slave mode.
+>  	 */
+> -	ctrl |= SPI_IMX2_3_CTRL_MODE_MASK;
+> +	ctrl |= MX51_ECSPI_CTRL_MODE_MASK;
+>  
+>  	/* set clock speed */
+> -	ctrl |= spi_imx2_3_clkdiv(spi_imx->spi_clk, config->speed_hz);
+> +	ctrl |= mx51_ecspi_clkdiv(spi_imx->spi_clk, config->speed_hz);
+>  
+>  	/* set chip select to use */
+> -	ctrl |= SPI_IMX2_3_CTRL_CS(config->cs);
+> +	ctrl |= MX51_ECSPI_CTRL_CS(config->cs);
+>  
+> -	ctrl |= (config->bpw - 1) << SPI_IMX2_3_CTRL_BL_OFFSET;
+> +	ctrl |= (config->bpw - 1) << MX51_ECSPI_CTRL_BL_OFFSET;
+>  
+> -	cfg |= SPI_IMX2_3_CONFIG_SBBCTRL(config->cs);
+> +	cfg |= MX51_ECSPI_CONFIG_SBBCTRL(config->cs);
+>  
+>  	if (config->mode & SPI_CPHA)
+> -		cfg |= SPI_IMX2_3_CONFIG_SCLKPHA(config->cs);
+> +		cfg |= MX51_ECSPI_CONFIG_SCLKPHA(config->cs);
+>  
+>  	if (config->mode & SPI_CPOL)
+> -		cfg |= SPI_IMX2_3_CONFIG_SCLKPOL(config->cs);
+> +		cfg |= MX51_ECSPI_CONFIG_SCLKPOL(config->cs);
+>  
+>  	if (config->mode & SPI_CS_HIGH)
+> -		cfg |= SPI_IMX2_3_CONFIG_SSBPOL(config->cs);
+> +		cfg |= MX51_ECSPI_CONFIG_SSBPOL(config->cs);
+>  
+> -	writel(ctrl, spi_imx->base + SPI_IMX2_3_CTRL);
+> -	writel(cfg, spi_imx->base + SPI_IMX2_3_CONFIG);
+> +	writel(ctrl, spi_imx->base + MX51_ECSPI_CTRL);
+> +	writel(cfg, spi_imx->base + MX51_ECSPI_CONFIG);
+>  
+>  	return 0;
+>  }
+>  
+> -static int __maybe_unused spi_imx2_3_rx_available(struct spi_imx_data *spi_imx)
+> +static int __maybe_unused mx51_ecspi_rx_available(struct spi_imx_data *spi_imx)
+>  {
+> -	return readl(spi_imx->base + SPI_IMX2_3_STAT) & SPI_IMX2_3_STAT_RR;
+> +	return readl(spi_imx->base + MX51_ECSPI_STAT) & MX51_ECSPI_STAT_RR;
+>  }
+>  
+> -static void __maybe_unused spi_imx2_3_reset(struct spi_imx_data *spi_imx)
+> +static void __maybe_unused mx51_ecspi_reset(struct spi_imx_data *spi_imx)
+>  {
+>  	/* drain receive buffer */
+> -	while (spi_imx2_3_rx_available(spi_imx))
+> +	while (mx51_ecspi_rx_available(spi_imx))
+>  		readl(spi_imx->base + MXC_CSPIRXDATA);
+>  }
+>  
+> @@ -583,11 +584,11 @@ static struct spi_imx_devtype_data spi_imx_devtype_data[] = {
+>  #endif
+>  #ifdef CONFIG_SPI_IMX_VER_2_3
+>  	[SPI_IMX_VER_2_3] = {
+> -		.intctrl = spi_imx2_3_intctrl,
+> -		.config = spi_imx2_3_config,
+> -		.trigger = spi_imx2_3_trigger,
+> -		.rx_available = spi_imx2_3_rx_available,
+> -		.reset = spi_imx2_3_reset,
+> +		.intctrl = mx51_ecspi_intctrl,
+> +		.config = mx51_ecspi_config,
+> +		.trigger = mx51_ecspi_trigger,
+> +		.rx_available = mx51_ecspi_rx_available,
+> +		.reset = mx51_ecspi_reset,
+>  		.fifosize = 64,
+>  	},
+>  #endif
 > -- 
-> 1.7.5.4
+> 1.7.4.1
 > 
