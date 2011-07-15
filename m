@@ -1,24 +1,68 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 15 Jul 2011 16:32:06 +0200
-Subject: [GIT PULL] ARM: Cavium CNS3xxx updates for 3.1
-In-Reply-To: <20110714171053.GA8580@oksana.dev.rtsoft.ru>
-References: <20110714171053.GA8580@oksana.dev.rtsoft.ru>
-Message-ID: <201107151632.06548.arnd@arndb.de>
+From: banajit.g@samsung.com (Banajit Goswami)
+Date: Fri, 15 Jul 2011 20:12:40 +0530
+Subject: [PATCH 0/8] ARM: SAMSUNG: Add common PWM Backlight support
+Message-ID: <1310740968-26722-1-git-send-email-banajit.g@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 14 July 2011, Anton Vorontsov wrote:
-> Please pull linux-cns3xxx.git tree to receive updates for CNS3xxx.
-> There are just two patches: the first patch corrects CPU type, and
-> the second adds L2 cache controller support, which doubles the
-> performance.
-> 
-> For the second patch, I fixed all the comments, plus added some
-> notes regarding why we don't want to select CACHE_PL310 for CNS3xxx.
-> 
-> For convenience' sake I inline the patches here, they're pretty
-> small.
+ The patches are created against "for-next" branch of Kukjin Kim's tree at:
+ git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
 
-Pulled, thanks!
+ Patch [1/8]
+  -- add a common infrastructure to support PWM backlight for various 
+     Samsung boards.
 
-	Arnd
+ Patch [2/8]
+  -- Add support for PWM backlight for SMDKV310 board.
+
+ Patch [3/8]
+  -- Add support for PWM backlight for SMDKC210 board.
+
+ Patch [4/8]
+  -- Add support for PWM backlight for SMDKV210 board.
+
+ Patch [5/8]
+  -- Add support for PWM backlight for SMDKC100 board.
+
+ Patch [6/8]
+  -- Add support for PWM backlight for SMDK6440 board.
+
+Patch [7/8]
+  -- Add support for PWM backlight for SMDK6450 board.
+
+ Patch [8/8]
+  -- Add support for PWM backlight for SMDK6410 board.
+
+ Patch 3 with PWM Backlight support for SMDKC210 is only compile tested.
+
+   [Patch 1/8] ARM: SAMSUNG: Create a common infrastructure for PWM backlight support
+   [Patch 2/8] ARM: EXYNOS4: Add PWM backlight support on Samsung SMDKV310 board
+   [Patch 3/8] ARM: EXYNOS4: Add PWM backlight support on Samsung SMDKC210 board
+   [Patch 4/8] ARM: S5PV210: Add PWM backlight support on Samsung SMDKV210 board
+   [Patch 5/8] ARM: S5PC100: Add PWM backlight support on Samsung SMDKC100 board
+   [Patch 6/8] ARM: S5P64X0: Add PWM backlight support on Samsung SMDK6440 board
+   [Patch 7/8] ARM: S5P64X0: Add PWM backlight support on Samsung SMDK6450 board
+   [Patch 8/8] ARM: S3C64XX: Add PWM backlight support on Samsung SMDK6410 board
+
+ arch/arm/mach-exynos4/Kconfig                  |    4 +
+ arch/arm/mach-exynos4/mach-smdkc210.c          |   16 +++
+ arch/arm/mach-exynos4/mach-smdkv310.c          |   16 +++
+ arch/arm/mach-s3c64xx/Kconfig                  |    1 +
+ arch/arm/mach-s3c64xx/mach-smdk6410.c          |   15 ++-
+ arch/arm/mach-s5p64x0/Kconfig                  |    2 +
+ arch/arm/mach-s5p64x0/mach-smdk6440.c          |   54 ++-------
+ arch/arm/mach-s5p64x0/mach-smdk6450.c          |   54 ++-------
+ arch/arm/mach-s5pc100/Kconfig                  |    1 +
+ arch/arm/mach-s5pc100/mach-smdkc100.c          |   55 ++-------
+ arch/arm/mach-s5pv210/Kconfig                  |    1 +
+ arch/arm/mach-s5pv210/mach-smdkv210.c          |   54 ++-------
+ arch/arm/plat-samsung/Kconfig                  |    6 +
+ arch/arm/plat-samsung/Makefile                 |    1 +
+ arch/arm/plat-samsung/dev-backlight.c          |  151 ++++++++++++++++++++++++
+ arch/arm/plat-samsung/include/plat/backlight.h |   26 ++++
+ 16 files changed, 291 insertions(+), 166 deletions(-)
+ create mode 100644 arch/arm/plat-samsung/dev-backlight.c
+ create mode 100644 arch/arm/plat-samsung/include/plat/backlight.h
+
+-- 
+1.7.2.3
