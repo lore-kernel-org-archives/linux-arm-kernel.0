@@ -1,80 +1,36 @@
-From: banajit.g@samsung.com (Banajit Goswami)
-Date: Fri, 15 Jul 2011 20:12:48 +0530
-Subject: [PATCH 8/8] ARM: S3C64XX: Add PWM backlight support on Samsung
-	SMDK6410 board
-In-Reply-To: <1310740968-26722-1-git-send-email-banajit.g@samsung.com>
-References: <1310740968-26722-1-git-send-email-banajit.g@samsung.com>
-Message-ID: <1310740968-26722-9-git-send-email-banajit.g@samsung.com>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Fri, 15 Jul 2011 23:02:36 +0800
+Subject: [alsa-devel] [PATCH V2 06/10] ARM: mxs: add saif device
+In-Reply-To: <20110715133241.GG2021@pengutronix.de>
+References: <1310483085-31442-1-git-send-email-b29396@freescale.com>
+	<1310483085-31442-7-git-send-email-b29396@freescale.com>
+	<20110715133241.GG2021@pengutronix.de>
+Message-ID: <CAA+hA=TtBrDoAMfv0fqj30_heEJuZJFH=QjTUG8zTys0G+vgvA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for LCD backlight using PWM timer for
-Samsung SMDK6410 board.
+2011/7/15 Wolfram Sang <w.sang@pengutronix.de>:
+>> +#define DIGCTRL_BASE_ADDR ? ? ?MX28_IO_ADDRESS(MX28_DIGCTL_BASE_ADDR)
+>> +
+>
+> Hmm, maybe define a function mx28_set_saif_clkmux(val)?
+>
+>> + ? ? mx28_add_saif(0);
+>> + ? ? mx28_add_saif(1);
+>> +
+>> + ? ? /*set the saif clk mux, both saif0/saif1 use saif0 clk*/
+>> + ? ? __raw_writel(0x2 << 10, DIGCTRL_BASE_ADDR);
+>
+> You might overwrite previous settings here. The hardcoded numbers need
+> defines, too.
 
-Signed-off-by: Banajit Goswami <banajit.g@samsung.com>
----
- arch/arm/mach-s3c64xx/Kconfig         |    1 +
- arch/arm/mach-s3c64xx/mach-smdk6410.c |   15 +++++++++++++--
- 2 files changed, 14 insertions(+), 2 deletions(-)
+It's correct.
+I'm originally going to do that when implement record because this
+setting may affect both
+machine driver and saif driver on recording.
+Since currently we only implement playback, so i just hardcode it.
+Do you think if that's ok?
+Or i need to do it now?
 
-diff --git a/arch/arm/mach-s3c64xx/Kconfig b/arch/arm/mach-s3c64xx/Kconfig
-index 4e2c371..f057b6a 100644
---- a/arch/arm/mach-s3c64xx/Kconfig
-+++ b/arch/arm/mach-s3c64xx/Kconfig
-@@ -142,6 +142,7 @@ config MACH_SMDK6410
- 	select S3C_DEV_USB_HOST
- 	select S3C_DEV_USB_HSOTG
- 	select S3C_DEV_WDT
-+	select SAMSUNG_DEV_BACKLIGHT
- 	select SAMSUNG_DEV_KEYPAD
- 	select SAMSUNG_DEV_PWM
- 	select HAVE_S3C2410_WATCHDOG if WATCHDOG
-diff --git a/arch/arm/mach-s3c64xx/mach-smdk6410.c b/arch/arm/mach-s3c64xx/mach-smdk6410.c
-index e0521e0..2aa28a2 100644
---- a/arch/arm/mach-s3c64xx/mach-smdk6410.c
-+++ b/arch/arm/mach-s3c64xx/mach-smdk6410.c
-@@ -71,6 +71,7 @@
- #include <plat/adc.h>
- #include <plat/ts.h>
- #include <plat/keypad.h>
-+#include <plat/backlight.h>
- 
- #define UCON S3C2410_UCON_DEFAULT | S3C2410_UCON_UCLK
- #define ULCON S3C2410_LCON_CS8 | S3C2410_LCON_PNONE | S3C2410_LCON_STOPB
-@@ -329,8 +330,6 @@ static struct platform_device *smdk6410_devices[] __initdata = {
- 	&s3c_device_rtc,
- 	&s3c_device_ts,
- 	&s3c_device_wdt,
--	&s3c_device_timer[1],
--	&smdk6410_backlight_device,
- };
- 
- #ifdef CONFIG_REGULATOR
-@@ -665,6 +664,16 @@ static struct s3c2410_ts_mach_info s3c_ts_platform __initdata = {
- 	.oversampling_shift	= 2,
- };
- 
-+/* LCD Backlight data */
-+static struct samsung_bl_gpio_info smdk6410_bl_gpio_info = {
-+	.no = S3C64XX_GPF(15),
-+	.func = S3C_GPIO_SFN(2),
-+};
-+
-+static struct platform_pwm_backlight_data smdk6410_bl_data = {
-+	.pwm_id = 1,
-+};
-+
- static void __init smdk6410_map_io(void)
- {
- 	u32 tmp;
-@@ -726,6 +735,8 @@ static void __init smdk6410_machine_init(void)
- 
- 	s3c_ide_set_platdata(&smdk6410_ide_pdata);
- 
-+	samsung_bl_set(&smdk6410_bl_gpio_info, &smdk6410_bl_data);
-+
- 	platform_add_devices(smdk6410_devices, ARRAY_SIZE(smdk6410_devices));
- }
- 
--- 
-1.7.2.3
+Regards
+Dong Aisheng
