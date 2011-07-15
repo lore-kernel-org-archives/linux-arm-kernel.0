@@ -1,43 +1,62 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Fri, 15 Jul 2011 18:40:54 +0800
-Subject: [PATCH 07/15] pxa25x_udc: drop support for udc_command
-In-Reply-To: <4E1F3450.3050603@free.fr>
-References: <1309871321-11305-1-git-send-email-dbaryshkov@gmail.com>
-	<1309871321-11305-8-git-send-email-dbaryshkov@gmail.com>
-	<20110705134615.GJ2820@legolas.emea.dhcp.ti.com>
-	<20110708213428.GA31866@kroah.com>
-	<20110708215442.GG31978@legolas.emea.dhcp.ti.com>
-	<20110708220258.GA29651@suse.de>
-	<CALT56yPuQxY13eAOd9mm7q4A8g6j2mP3F=h-sMv=xwzYzhRQxg@mail.gmail.com>
-	<CAMPhdO8vBhod0eWw7dtNSrJHjruoBCZG5KKOHLvJHe+2Y3+TSg@mail.gmail.com>
-	<4E1F3450.3050603@free.fr>
-Message-ID: <CAMPhdO_f=Mxw9-WgMojLeE8LCbW2tTg7HGcm4NiVJwhseEgjGw@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 15 Jul 2011 03:55:58 -0700
+Subject: [PATCH] ARM: OMAP4: PCM049: remove vusim regulator
+In-Reply-To: <1310723274.26087.38.camel@lws-weitzel>
+References: <1310554738.18446.12.camel@lws-weitzel>
+	<1310554762-10743-1-git-send-email-j.weitzel@phytec.de>
+	<4E1D8BCD.5060901@ru.mvista.com>
+	<1310561772.18446.14.camel@lws-weitzel>
+	<20110714073445.GL5783@atomide.com>
+	<1310632792.4008.3.camel@lws-weitzel>
+	<20110715075024.GO5783@atomide.com>
+	<1310723274.26087.38.camel@lws-weitzel>
+Message-ID: <20110715105558.GT5783@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Not sure if zaurus people can help test it. Pavel?
+* Jan Weitzel <J.Weitzel@phytec.de> [110715 02:42]:
+> Am Freitag, den 15.07.2011, 00:50 -0700 schrieb Tony Lindgren:
+> > Well we can add it even before device tree support if it makes
+> > sense from code coalescing point of view. In this case it would
+> > mean creating board-panda-common.c or similar so the code can
+> > be shared amongst the panda variants.
+> > 
+> > It seems that some GPIO pins are different and there are some
+> > difference in devices connected, but big parts of the code can be
+> > shared.
+> > 
+> > Adding the pending boards without combining code would be adding code
+> > that will be going away for most part with the device tree support.
+> > 
+> > And most likely the beagle and panda based boards will be the first
+> > ones to work with device tree. So anything we can do to have common
+> > board init code will also help with this effort.
+> > 
+> > Regards,
+> > 
+> > Tony
+> pcm049 and panda board have some more different devices.
+> I am working on patches to add NAND support and using tlv320aic3x audio
+> codec which need regulators in platformcode. I need a hack to controll
+> usb otg by gpio (controlling a external power circuit). The patches are
+> not mainline ready by now. 
 
-- eric
+OK, let's figure out how we can add the basic support first then.
 
-On Fri, Jul 15, 2011 at 2:24 AM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
-> On 07/14/2011 04:52 AM, Eric Miao wrote:
->>
->> Well, I agree with Dmitry the whole patchset is not related to the GPIO
->> subsystem at all. The major cleanup is actually to the PXA machines,
->> and touches part of the pxa25x_udc driver. If some one Acks the USB
->> part, I can help take the remaining patches.
->
-> Ok, I tested the patches for the pxa27x_udc and mioa701 parts.
-> Therefore, as it is working, for patches 2, 13, and 15 (reduced to
-> pxa27x_udc), I give my :
-> Acked-by: Robert Jarzmik <robert.jarzmik@free>
->
-> That leaves you with the pxa25x_udc, I'm afraid, but I don't maintain that
-> one. Is there an identified maintainer now, or at least someone able to test
-> it ?
->
-> Cheers.
->
-> --
-> Robert
->
+> If using machine_is_xxxx() in board-omap4panda.c then also is good way,
+> I could provide our board as patches on top of board-omap4panda.c.
+> When will pandaboard use device tree to boot?
+
+Yes, but it would better just to use separate .init_machine entries to
+initialize thing. Gpio entries can be initialized along the lines of the
+recent beagle commit 5fe8b4c19dc24e3bb873daf9e96a2439a83bbd79 that adds
+support for beagl xm board. Except you already have a separate machine_id,
+so no runtime detection is needed.
+
+That avoids adding the machine_is entries all over the place that tend
+to cause problems when some other panda variant is added as it requires
+patching in multiple places.
+
+Regards,
+
+Tony
