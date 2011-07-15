@@ -1,104 +1,68 @@
-From: padma.kvr@gmail.com (padma venkat)
-Date: Fri, 15 Jul 2011 17:23:33 +0530
-Subject: [PATCH] ARM: S5P64X0: External Interrupt Support
-In-Reply-To: <20110715090011.GN23270@n2100.arm.linux.org.uk>
-References: <1310712094-19831-1-git-send-email-padma.v@samsung.com>
-	<20110715090011.GN23270@n2100.arm.linux.org.uk>
-Message-ID: <CAAgF-Bcke26iFsgf0DA3LB5CLv=TkS6UG0y+SBLR=F6TzGYU+A@mail.gmail.com>
+From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
+Date: Fri, 15 Jul 2011 17:34:51 +0530
+Subject: [PATCH v14 REPOST 02/12] OMAP4: hwmod data: add dmtimer version
+	information
+In-Reply-To: <1310731501-13078-1-git-send-email-tarun.kanti@ti.com>
+References: <1310731501-13078-1-git-send-email-tarun.kanti@ti.com>
+Message-ID: <1310731501-13078-3-git-send-email-tarun.kanti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+OMAP4 has two groups of timers: version 1 timers are 1, 2, 10,
+while the rest of the timers, 3-9, 11 are version 2 timers.
+The version information is required by the driver so that they
+could be handled correctly by it.
 
-On Fri, Jul 15, 2011 at 2:30 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Fri, Jul 15, 2011 at 12:11:34PM +0530, Padmavathi Venna wrote:
->> +#define eint_offset(irq) ? ? ((irq) - IRQ_EINT(0))
->> +#define eint_irq_to_bit(irq) ((u32)(1 << eint_offset(irq)))
->> +
->> +static inline void s5p64x0_irq_eint_mask(struct irq_data *data)
->> +{
->> + ? ? u32 mask;
->> +
->> + ? ? mask = __raw_readl(S5P64X0_EINT0MASK);
->> + ? ? mask |= (u32)data->chip_data;
->> + ? ? __raw_writel(mask, S5P64X0_EINT0MASK);
->> +}
->> +
->> +static void s5p64x0_irq_eint_unmask(struct irq_data *data)
->> +{
->> + ? ? u32 mask;
->> +
->> + ? ? mask = __raw_readl(S5P64X0_EINT0MASK);
->> + ? ? mask &= ~((u32)data->chip_data);
->> + ? ? __raw_writel(mask, S5P64X0_EINT0MASK);
->> +}
->> +
->> +static inline void s5p64x0_irq_eint_ack(struct irq_data *data)
->> +{
->> + ? ? __raw_writel((u32)data->chip_data, S5P64X0_EINT0PEND);
->> +}
->> +
->> +static void s5p64x0_irq_eint_maskack(struct irq_data *data)
->> +{
->> + ? ? /* compiler should in-line these */
->> + ? ? s5p64x0_irq_eint_mask(data);
->> + ? ? s5p64x0_irq_eint_ack(data);
->> +}
->
-> Won't genirqchip support deal with all of the above for you?
-As per my understanding, to deal with low level interrupt hardware access
-we need to use the accessor functions. Please suggest me if there is
-any better way of doing this.
->
->> +
->> +static int s5p64x0_irq_eint_set_type(struct irq_data *data, unsigned int type)
->> +{
->> + ? ? int offs = eint_offset(data->irq);
->> + ? ? int shift;
->> + ? ? u32 ctrl, mask;
->> + ? ? u32 newvalue = 0;
->> + ? ? unsigned int id;
->> +
->> + ? ? if (offs > 15)
->> + ? ? ? ? ? ? return -EINVAL;
->> +
->> + ? ? switch (type) {
->> + ? ? case IRQ_TYPE_NONE:
->> + ? ? ? ? ? ? printk(KERN_WARNING "No edge setting!\n");
->> + ? ? ? ? ? ? break;
->> +
->> + ? ? case IRQ_TYPE_EDGE_RISING:
->> + ? ? ? ? ? ? newvalue = S3C2410_EXTINT_RISEEDGE;
->> + ? ? ? ? ? ? break;
->> +
->> + ? ? case IRQ_TYPE_EDGE_FALLING:
->> + ? ? ? ? ? ? newvalue = S3C2410_EXTINT_FALLEDGE;
->> + ? ? ? ? ? ? break;
->> +
->> + ? ? case IRQ_TYPE_EDGE_BOTH:
->> + ? ? ? ? ? ? newvalue = S3C2410_EXTINT_BOTHEDGE;
->> + ? ? ? ? ? ? break;
->> +
->> + ? ? case IRQ_TYPE_LEVEL_LOW:
->> + ? ? ? ? ? ? newvalue = S3C2410_EXTINT_LOWLEV;
->> + ? ? ? ? ? ? break;
->> +
->> + ? ? case IRQ_TYPE_LEVEL_HIGH:
->> + ? ? ? ? ? ? newvalue = S3C2410_EXTINT_HILEV;
->> + ? ? ? ? ? ? break;
->> +
->> + ? ? default:
->> + ? ? ? ? ? ? printk(KERN_ERR "No such irq type %d", type);
->> + ? ? ? ? ? ? return -1;
->
-> NO! ?Stop this right now and never do it again. ?Please _always_ look
-> up the right error code and use it.
->
-> 'return -1' is almost never valid.
-I will correct this.
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+Acked-by: Cousson, Benoit <b-cousson@ti.com>
+Cc: Cousson, Benoit <b-cousson@ti.com>
+---
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    3 +++
+ arch/arm/plat-omap/include/plat/dmtimer.h  |    4 +++-
+ 2 files changed, 6 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+index e1c69ff..be8ef2c 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+@@ -27,6 +27,7 @@
+ #include <plat/mcspi.h>
+ #include <plat/mcbsp.h>
+ #include <plat/mmc.h>
++#include <plat/dmtimer.h>
+ 
+ #include "omap_hwmod_common_data.h"
+ 
+@@ -3994,6 +3995,7 @@ static struct omap_hwmod_class_sysconfig omap44xx_timer_1ms_sysc = {
+ static struct omap_hwmod_class omap44xx_timer_1ms_hwmod_class = {
+ 	.name	= "timer",
+ 	.sysc	= &omap44xx_timer_1ms_sysc,
++	.rev    = OMAP_TIMER_IP_VERSION_1,
+ };
+ 
+ static struct omap_hwmod_class_sysconfig omap44xx_timer_sysc = {
+@@ -4009,6 +4011,7 @@ static struct omap_hwmod_class_sysconfig omap44xx_timer_sysc = {
+ static struct omap_hwmod_class omap44xx_timer_hwmod_class = {
+ 	.name	= "timer",
+ 	.sysc	= &omap44xx_timer_sysc,
++	.rev    = OMAP_TIMER_IP_VERSION_2,
+ };
+ 
+ /* timer1 */
+diff --git a/arch/arm/plat-omap/include/plat/dmtimer.h b/arch/arm/plat-omap/include/plat/dmtimer.h
+index d0f3a2d..1892abf 100644
+--- a/arch/arm/plat-omap/include/plat/dmtimer.h
++++ b/arch/arm/plat-omap/include/plat/dmtimer.h
+@@ -57,7 +57,9 @@
+  * IP revision identifier so that Highlander IP
+  * in OMAP4 can be distinguished.
+  */
+-#define OMAP_TIMER_IP_VERSION_1                        0x1
++#define OMAP_TIMER_IP_VERSION_1			0x1
++#define OMAP_TIMER_IP_VERSION_2			0x2
++
+ struct omap_dm_timer;
+ struct clk;
+ 
+-- 
+1.6.0.4
