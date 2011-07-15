@@ -1,109 +1,113 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 14 Jul 2011 20:54:07 -0600
-Subject: [PATCH v2] mtd: dataflash: add device tree probe support
-In-Reply-To: <1310658757-17018-1-git-send-email-shawn.guo@linaro.org>
-References: <1310283313-32087-1-git-send-email-shawn.guo@linaro.org>
-	<1310658757-17018-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20110715025407.GF2927@ponder.secretlab.ca>
+Date: Thu, 14 Jul 2011 20:54:08 -0600
+Subject: [PATCH 1/2] i2c/imx: remove init/exit hooks from platform data
+In-Reply-To: <1310659425-17499-2-git-send-email-shawn.guo@linaro.org>
+References: <1310659425-17499-1-git-send-email-shawn.guo@linaro.org>
+	<1310659425-17499-2-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20110715025408.GG2927@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 14, 2011 at 11:52:37PM +0800, Shawn Guo wrote:
-> It adds device tree probe support for mtd_dataflash driver.
+On Fri, Jul 15, 2011 at 12:03:44AM +0800, Shawn Guo wrote:
+> The init/exit hooks in platform data are being used nowhere, so can
+> be removed.
 > 
 > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Cc: David Woodhouse <dwmw2@infradead.org>
-> Cc: Artem Bityutskiy <Artem.Bityutskiy@nokia.com>
-> ---
-> Changes since v1:
->  * Add "atmel,at45xxx" into the match table
->  * Add binding document
-> 
->  .../devicetree/bindings/mtd/atmel-dataflash.txt    |   14 ++++++++++++++
->  drivers/mtd/devices/mtd_dataflash.c                |   13 ++++++++++++-
->  2 files changed, 26 insertions(+), 1 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/mtd/atmel-dataflash.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/mtd/atmel-dataflash.txt b/Documentation/devicetree/bindings/mtd/atmel-dataflash.txt
-> new file mode 100644
-> index 0000000..3783962
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mtd/atmel-dataflash.txt
-> @@ -0,0 +1,14 @@
-> +* Atmel Data Flash
-> +
-> +Required properties:
-> +- compatible : "atmel,<model>", "atmel,<series>", "atmel,dataflash".
-> +
-> +Example:
-> +
-> +flash at 1 {
-> +	#address-cells = <1>;
-> +	#size-cells = <1>;
-> +	compatible = "atmel,at45db321d", "atmel,at45xxx", "atmel,dataflash";
-> +	spi-max-frequency = <25000000>;
-> +	reg = <1>;
-> +};
-> diff --git a/drivers/mtd/devices/mtd_dataflash.c b/drivers/mtd/devices/mtd_dataflash.c
-> index 8f6b02c..8e091b0 100644
-> --- a/drivers/mtd/devices/mtd_dataflash.c
-> +++ b/drivers/mtd/devices/mtd_dataflash.c
-> @@ -24,6 +24,8 @@
->  #include <linux/mtd/mtd.h>
->  #include <linux/mtd/partitions.h>
->  
-> +#include <linux/of.h>
-> +#include <linux/of_device.h>
+> Cc: Darius Augulis <augulis.darius@gmail.com>
+> Cc: Ben Dooks <ben-linux@fluff.org>
 
-This shouldn't be separate from the regular block of #include
-statements above it.
+Acked-by: Grant Likely <grant.likely@secretlab.ca>
+
+Yes, I think this is the think to do.  Notifiers provide a generic
+mechanism.  There is no need for each driver to open code this
+functionality.
+
+g.
+
+> ---
+>  arch/arm/plat-mxc/include/mach/i2c.h |    4 ----
+>  drivers/i2c/busses/i2c-imx.c         |   21 +++------------------
+>  2 files changed, 3 insertions(+), 22 deletions(-)
+> 
+> diff --git a/arch/arm/plat-mxc/include/mach/i2c.h b/arch/arm/plat-mxc/include/mach/i2c.h
+> index 4a5dc5c..375cdd0 100644
+> --- a/arch/arm/plat-mxc/include/mach/i2c.h
+> +++ b/arch/arm/plat-mxc/include/mach/i2c.h
+> @@ -11,14 +11,10 @@
 >  
->  /*
->   * DataFlash is a kind of SPI flash.  Most AT45 chips have two buffers in
-> @@ -98,6 +100,12 @@ struct dataflash {
->  	struct mtd_info		mtd;
+>  /**
+>   * struct imxi2c_platform_data - structure of platform data for MXC I2C driver
+> - * @init:	Initialise gpio's and other board specific things
+> - * @exit:	Free everything initialised by @init
+>   * @bitrate:	Bus speed measured in Hz
+>   *
+>   **/
+>  struct imxi2c_platform_data {
+> -	int (*init)(struct device *dev);
+> -	void (*exit)(struct device *dev);
+>  	int bitrate;
 >  };
 >  
-> +static const struct of_device_id dataflash_dt_ids[] = {
-> +	{ .compatible = "atmel,at45xxx", },
-> +	{ .compatible = "atmel,dataflash", },
-> +	{ /* sentinel */ }
-> +};
-> +
-
-This should be protected with a #ifdef CONFIG_OF/#else/#endif, and
-there should be a MODULE_DEVICE_TABLE().
-
->  /* ......................................................................... */
->  
->  /*
-> @@ -634,6 +642,7 @@ add_dataflash_otp(struct spi_device *spi, char *name,
+> diff --git a/drivers/i2c/busses/i2c-imx.c b/drivers/i2c/busses/i2c-imx.c
+> index 4c2a62b..54d809e 100644
+> --- a/drivers/i2c/busses/i2c-imx.c
+> +++ b/drivers/i2c/busses/i2c-imx.c
+> @@ -466,7 +466,7 @@ static int __init i2c_imx_probe(struct platform_device *pdev)
 >  {
->  	struct dataflash		*priv;
->  	struct mtd_info			*device;
-> +	struct mtd_part_parser_data	ppdata;
->  	struct flash_platform_data	*pdata = spi->dev.platform_data;
->  	char				*otp_tag = "";
->  	int				err = 0;
-> @@ -675,7 +684,8 @@ add_dataflash_otp(struct spi_device *spi, char *name,
->  			pagesize, otp_tag);
->  	dev_set_drvdata(&spi->dev, priv);
+>  	struct imx_i2c_struct *i2c_imx;
+>  	struct resource *res;
+> -	struct imxi2c_platform_data *pdata;
+> +	struct imxi2c_platform_data *pdata = pdev->dev.platform_data;
+>  	void __iomem *base;
+>  	resource_size_t res_size;
+>  	int irq;
+> @@ -485,19 +485,11 @@ static int __init i2c_imx_probe(struct platform_device *pdev)
+>  		return -ENOENT;
+>  	}
 >  
-> -	err = mtd_device_parse_register(device, NULL, 0,
-> +	ppdata.of_node = spi->dev.of_node;
-> +	err = mtd_device_parse_register(device, NULL, &ppdata,
->  			pdata ? pdata->parts : NULL,
->  			pdata ? pdata->nr_parts : 0);
+> -	pdata = pdev->dev.platform_data;
+> -
+> -	if (pdata && pdata->init) {
+> -		ret = pdata->init(&pdev->dev);
+> -		if (ret)
+> -			return ret;
+> -	}
+> -
+>  	res_size = resource_size(res);
 >  
-> @@ -926,6 +936,7 @@ static struct spi_driver dataflash_driver = {
->  		.name		= "mtd_dataflash",
->  		.bus		= &spi_bus_type,
->  		.owner		= THIS_MODULE,
-> +		.of_match_table = dataflash_dt_ids,
->  	},
+>  	if (!request_mem_region(res->start, res_size, DRIVER_NAME)) {
+> -		ret = -EBUSY;
+> -		goto fail0;
+> +		dev_err(&pdev->dev, "request_mem_region failed\n");
+> +		return -EBUSY;
+>  	}
 >  
->  	.probe		= dataflash_probe,
+>  	base = ioremap(res->start, res_size);
+> @@ -586,9 +578,6 @@ fail2:
+>  	iounmap(base);
+>  fail1:
+>  	release_mem_region(res->start, resource_size(res));
+> -fail0:
+> -	if (pdata && pdata->exit)
+> -		pdata->exit(&pdev->dev);
+>  	return ret; /* Return error number */
+>  }
+>  
+> @@ -611,10 +600,6 @@ static int __exit i2c_imx_remove(struct platform_device *pdev)
+>  	writeb(0, i2c_imx->base + IMX_I2C_I2CR);
+>  	writeb(0, i2c_imx->base + IMX_I2C_I2SR);
+>  
+> -	/* Shut down hardware */
+> -	if (pdata && pdata->exit)
+> -		pdata->exit(&pdev->dev);
+> -
+>  	clk_put(i2c_imx->clk);
+>  
+>  	iounmap(i2c_imx->base);
 > -- 
 > 1.7.4.1
 > 
+> _______________________________________________
+> devicetree-discuss mailing list
+> devicetree-discuss at lists.ozlabs.org
+> https://lists.ozlabs.org/listinfo/devicetree-discuss
