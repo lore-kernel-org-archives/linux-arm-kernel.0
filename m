@@ -1,52 +1,51 @@
-From: ccross@google.com (Colin Cross)
-Date: Thu, 14 Jul 2011 15:10:51 -0700
-Subject: [PATCH] ARM: move memory layout sanity checking before meminfo
-	initialization
-In-Reply-To: <CAMbhsRT=NNYUYyYZXpz2=PpBXoBGANQHPgOkCE1oZ8XzHKN4og@mail.gmail.com>
-References: <20110705185758.GI8286@n2100.arm.linux.org.uk>
-	<CAMbhsRRQ9D+VXTZP3vB7egkROEtN9-FxssFa2EcxuqB3F-Uv6Q@mail.gmail.com>
-	<20110714073453.GK23270@n2100.arm.linux.org.uk>
-	<CAMbhsRT=NNYUYyYZXpz2=PpBXoBGANQHPgOkCE1oZ8XzHKN4og@mail.gmail.com>
-Message-ID: <CAMbhsRSgUcFPpdTFvEDTFfo_Wk0k7BQzwk6cRtXC6K7mpQ+YDg@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 15 Jul 2011 09:05:12 +0900
+Subject: [PATCH 1/2] ARM: Tegra: Harmony: Register and configure WM8903
+	IRQ GPIO
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF049E834971@HQMAIL01.nvidia.com>
+References: <1310589618-16080-1-git-send-email-swarren@nvidia.com>
+	<20110714122520.GB14249@sirena.org.uk>
+	<74CDBE0F657A3D45AFBB94109FB122FF049E834971@HQMAIL01.nvidia.com>
+Message-ID: <20110715000510.GD32716@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 14, 2011 at 12:58 AM, Colin Cross <ccross@google.com> wrote:
-> On Thu, Jul 14, 2011 at 12:34 AM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
->> On Wed, Jul 13, 2011 at 11:52:21PM -0700, Colin Cross wrote:
->>> On Tue, Jul 5, 2011 at 11:57 AM, Russell King - ARM Linux
->>> <linux@arm.linux.org.uk> wrote:
->>> > Ensure that the meminfo array is sanity checked before we pass the
->>> > memory to memblock. ?This helps to ensure that memblock and meminfo
->>> > agree on the dimensions of memory, especially when more memory is
->>> > passed than the kernel can deal with.
->>> >
->>> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
->>>
->>> This patch causes a regression in v3.0-rc7 when overlapping mem=
->>> options are passed to the kernel. ?On an OMAP4 board, I was
->>> accidentally using "mem=512M mem=920M" on the command line, which
->>> works fine in v3.0-rc6.
->>
->> I don't regard that as a regression. ?That's something which hasn't
->> been supported before the move to memblock, and it's not something
->> that was not intended to be supported.
->>
->
-> Ok, works for me.
->
+On Thu, Jul 14, 2011 at 08:49:28AM -0700, Stephen Warren wrote:
+> Mark Brown wrote at Thursday, July 14, 2011 6:25 AM:
 
-With CONFIG_CMDLINE_EXTEND, accidentally using two mem= options is
-going to become more common (that's how I did it).  Would you accept a
-patch for 3.1/3.2 that would make incorrect mem= handling more robust?
+> > This seems silly - we should fix this in the core code rather than have
+> > every single board that ahppens to use an interrupt which is also
+> > available as a GPIO manually faff around with gpiolib.
 
-Investigating a little more, the problem happens in free_unused_memmap
-when two banks ordered by bank_start have reverse order bank_end.
-prev_bank_end gets set too low, and the area between bank_end of the
-previous two banks gets freed when a third bank is processed.
+> That seems a good goal.
 
-I can either drop extra mem= options if they overlap with a previous
-one, try to copy the memblock data back into meminit after memblock
-has handled the overlapping case, or fix up free_unused_memblock to
-only increase prev_bank_end.
+> However, how does the WM8903 driver know whether the interrupt number
+> it's passed is a straight-up dedicated interrupt (hence the calls aren't
+> required), or a GPIO (hence they are)?
+
+It shouldn't - I said "core code" for a reason :)
+
+> I guess the answer is that there should be an interrupt API to map from
+> interrupt to GPIO number, returning <0 when there is no GPIO backing the
+> IRQ, and an op in struct irq_chip to implement that? However, that's not
+> there right now as far as I can tell.
+
+Yes, exactly - but it should not be complicated to add one and since
+you're doing this anyway it'd make sense to do the core change rather
+than faffing around the edges of the system.
+
+> Finally, there are some pinmux interactions that need to be dealt with;
+> on Tegra, the pinmux allows the tristate/drive status of pins to be set
+> on a group basis (a group being a set of 1-n pins). However, gpio enable
+> (which overrides the pinmux's setting of tristate/drive) can be set on
+> a per-pin basis. At least on Seaboard, the WM8903 IRQ is an input pin
+> in a group that otherwise needs to contain output pins, so we really
+> want to enable the WM8903 IRQ GPIO pin as a GPIO, and set it to input,
+> before setting up that pinmux group to drive the pins. Without this,
+> there may be a brief period where both Tegra and the WM8903 are driving
+> this IRQ signal, which can't be good for hardware.
+
+If the pinmux stuff can't work this out then it needs to be worked on
+until it can, this is pretty basic stuff.  I had thought that the plan
+was to support a big block configuration done by the board which set
+everything up en masse and would presumably cope with stuff like this?
