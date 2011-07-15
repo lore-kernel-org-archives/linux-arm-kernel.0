@@ -1,64 +1,70 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 15 Jul 2011 14:05:05 +0900
-Subject: [PATCH 6/6] clk: Add initial WM831x clock driver
-In-Reply-To: <20110715025339.GO2927@ponder.secretlab.ca>
-References: <20110711025344.GA27497@opensource.wolfsonmicro.com>
-	<1310352837-4277-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-	<1310352837-4277-6-git-send-email-broonie@opensource.wolfsonmicro.com>
-	<20110715025339.GO2927@ponder.secretlab.ca>
-Message-ID: <20110715050503.GL32716@opensource.wolfsonmicro.com>
+From: yad.naveen@gmail.com (naveen yadav)
+Date: Fri, 15 Jul 2011 10:45:52 +0530
+Subject: ARM cortex A9 feature
+In-Reply-To: <CABi1daHh7cgyhJ4c3zo+jSUY4uzbFtihtgw0Q2Mcrndno_gcTA@mail.gmail.com>
+References: <CAJ8eaTzLmSTSMOY-0Xg0tE-DEbZ6RNA+uh70Dn3K5CbrjQsEiA@mail.gmail.com>
+	<CABi1daHh7cgyhJ4c3zo+jSUY4uzbFtihtgw0Q2Mcrndno_gcTA@mail.gmail.com>
+Message-ID: <CAJ8eaTyqOBq2mbfvuTun=bVvhFSrMqJ5uVyd+cozF5PtVeSVaw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 14, 2011 at 08:53:39PM -0600, Grant Likely wrote:
-> On Mon, Jul 11, 2011 at 11:53:57AM +0900, Mark Brown wrote:
+Hi dave,
 
-> > @@ -10,6 +10,7 @@ config GENERIC_CLK_BUILD_TEST
-> >  	depends on EXPERIMENTAL && GENERIC_CLK
-> >  	select GENERIC_CLK_FIXED
-> >  	select GENERIC_CLK_GATE
-> > +	select GENERIC_CLK_WM831X if MFD_WM831X=y
+Thanks for answering, but I think question 2, answer  is still not clear to me .
 
-> Hmmm, this could get unwieldy in a hurry.
+my question is why exclusive L2.
 
-It's not really any hassle, we've got a one of these in ASoC.  The list
-gets long but if you keep it sorted it's not an issue for merges and
-otherwise it's just long not complicated.  The ability to get build
-coverage is *really* useful.
+8.1.4 Exclusive L2 cache
+The Cortex-A9 processor can be connected to an L2 cache that supports
+an exclusive cache
+mode. This mode must be activated both in the Cortex-A9 processor and
+in the L2 cache
+controller.
+In this mode, the data cache of the Cortex-A9 processor and the L2
+cache are exclusive. At any
+time, a given address is cached in either L1 data caches or in the L2
+cache, but not in both. This
+has the effect of greatly increasing the usable space and efficiency
+of an L2 cache connected to
+the Cortex-A9 processor. When exclusive cache configuration is selected:
+? Data cache line replacement policy is modified so that the victim
+line always gets evicted
+to L2 memory, even if it is clean.
+? If a line is dirty in the L2 cache controller, a read request to this address
 
-> > +static int wm831x_xtal_enable(struct clk_hw *hw)
-> > +{
-> > +	struct wm831x_clk *clkdata = container_of(hw, struct wm831x_clk,
-> > +						  xtal_hw);
 
-> This container of is used 10 times.  A static inline would be
-> reasonable.
+what is usecase for this . This is my question .
 
-Not quite - it's used in three different variants (one for each of the
-clocks).
+Thanks
 
-> > +	if (clkdata->xtal_ena)
-> > +		return 0;
-> > +	else
-> > +		return -EPERM;
-> > +}
 
-> Nit: return clkdata->xtal_ena ? 0 : -EPERM;
-
-> Just makes for more concise code.
-
-I have an extremely strong dislike of the ternery operator, I find it
-does nothing for legibility.
-
-> > +	if (!clk_register(wm831x->dev, &wm831x_clkout_ops, &clkdata->clkout_hw,
-> > +			  "clkout")) {
-> > +		ret = -EINVAL;
-> > +		goto err_fll;
-> > +	}
-
-> How common will this pattern be?  Is there need for a
-> clk_register_many() variant?
-
-I dunno, I think a lot of the SoCs may be doing one clk per device.  But
-equally well it's not like it'd be hard if someone starts working on the
-API again.
+On Thu, Jul 14, 2011 at 10:26 PM, Dave Hylands <dhylands@gmail.com> wrote:
+> Hi Naveen,
+>
+> On Wed, Jul 13, 2011 at 11:26 PM, naveen yadav <yad.naveen@gmail.com> wrote:
+>> Hi All,
+>>
+>> I am reading ARM cortex a9 manual and got few question in mind.
+>>
+>> 1. Where I need strong order type memory ? any sample example is very helpfull.
+>
+> Often when dealing with hardware, you need to ensure that when your code does:
+>
+> reg1 = val1;
+> reg2 = val2;
+>
+> that these writes actually occur in the order that the code issues
+> them. Using volatile pointers will get the compiler to not reorder the
+> instructions, but you still need the writes to hit the hardware in the
+> same order that they were issued. Using strongly ordered memory is one
+> way to achieve that.
+>
+>> 2. L2 cache, Cortex a9 support exclusive L2 cache feature, where we need it ?
+>
+> L2 cache can improve your performance.
+>
+> --
+> Dave Hylands
+> Shuswap, BC, Canada
+> http://www.davehylands.com
+>
