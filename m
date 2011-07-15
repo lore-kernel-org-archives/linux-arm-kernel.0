@@ -1,29 +1,67 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 15 Jul 2011 18:09:04 +0200
-Subject: [GIT PULL] Tegra updates for v3.1
-In-Reply-To: <CAMbhsRQLaZss2uhLCaY-WjaH85WKLbYYnR2cfw4b+Qnz_rKXyw@mail.gmail.com>
-References: <CAMbhsRQoZ7vJGchkXLUOrOH4rpKJzJe-iGvLjTfBmz4R=8HtVw@mail.gmail.com>
-	<201107151600.40794.arnd@arndb.de>
-	<CAMbhsRQLaZss2uhLCaY-WjaH85WKLbYYnR2cfw4b+Qnz_rKXyw@mail.gmail.com>
-Message-ID: <201107151809.04667.arnd@arndb.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 15 Jul 2011 17:16:28 +0100
+Subject: [PATCH] ARM: move memory layout sanity checking before meminfo
+	initialization
+In-Reply-To: <CAMbhsRRCV0ukwbzFc6w_ba6xdVxs=TFmJMGd06UKTiNQPEJqpw@mail.gmail.com>
+References: <20110705185758.GI8286@n2100.arm.linux.org.uk>
+	<CAMbhsRRQ9D+VXTZP3vB7egkROEtN9-FxssFa2EcxuqB3F-Uv6Q@mail.gmail.com>
+	<20110714073453.GK23270@n2100.arm.linux.org.uk>
+	<CAMbhsRT=NNYUYyYZXpz2=PpBXoBGANQHPgOkCE1oZ8XzHKN4og@mail.gmail.com>
+	<CAMbhsRSgUcFPpdTFvEDTFfo_Wk0k7BQzwk6cRtXC6K7mpQ+YDg@mail.gmail.com>
+	<20110715080950.GL23270@n2100.arm.linux.org.uk>
+	<CAMbhsRRCV0ukwbzFc6w_ba6xdVxs=TFmJMGd06UKTiNQPEJqpw@mail.gmail.com>
+Message-ID: <20110715161628.GA24628@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 15 July 2011, Colin Cross wrote:
-> If I put it in separate branches in the future, do you want a single
-> pull request for a merge of the branches, or a pull request for each
-> branch?
+On Fri, Jul 15, 2011 at 09:06:08AM -0700, Colin Cross wrote:
+> On Fri, Jul 15, 2011 at 1:09 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Thu, Jul 14, 2011 at 03:10:51PM -0700, Colin Cross wrote:
+> >> With CONFIG_CMDLINE_EXTEND, accidentally using two mem= options is
+> >> going to become more common (that's how I did it). ?Would you accept a
+> >> patch for 3.1/3.2 that would make incorrect mem= handling more robust?
+> >
+> > The issue here is that mem= parameters are not supposed to overlap.
+> > While there can be multiple mem= parameters, there is no sure way to
+> > tell when one should override previous parameters.
+> >
+> >> Investigating a little more, the problem happens in free_unused_memmap
+> >> when two banks ordered by bank_start have reverse order bank_end.
+> >> prev_bank_end gets set too low, and the area between bank_end of the
+> >> previous two banks gets freed when a third bank is processed.
+> >>
+> >> I can either drop extra mem= options if they overlap with a previous
+> >> one, try to copy the memblock data back into meminit after memblock
+> >> has handled the overlapping case, or fix up free_unused_memblock to
+> >> only increase prev_bank_end.
+> >
+> > You can't do that. ?We keep the original meminfo data because memblock
+> > coalesces the information and that breaks the sparse bank stuff (we need
+> > to know where the boundaries are even when banks are fully populated.)
+> 
+> OK, so no copying the memblock data back.  What about the other option:
+> Check the incoming banks in arm_add_memory, dropping anything that
+> overlaps (or taking the bigger/smaller one?), and printing a big
+> warning?
+> 
+> I also have a patch that removes the requirement that the meminfo
+> banks be sorted by their end addresses in free_unused_memmap, which
+> fixes the crash that I am seeing, but there could be other problems
+> with overlapping banks with config options I am not testing.
 
-Separate requests. The idea is that I can group them together with
-similar branches from other platforms and then send a single
-pull request to Linus for e.g. all fixes, or a specific feature
-getting added to multiple platforms.
+No.  It's insane.  The more I think about this silly CMDLINE_EXTEND option
+the more I don't like it, and the closer I am to ripping out these silly
+CONFIG_CMDLINE_blah options.  It's stupid if you think about the mem=
+parameter.
 
-The branches that I commonly have for other platforms are 'fixes',
-'cleanup', 'devel' and 'board'. If you have a lot of patches, like
-omap typically has, you can also do more specific feature branches.
+For example, if you have built-in parameters with mem= values, then you
+can't remove previously added memory sizes.  You're effectively stuck
+with needing to have the minimum amount of memory which the kernel was
+built for.  Even if you happen to have a good boot loader which does
+pass the right memory geometry to the kernel via ATAGs or DT.  mem=
+trumps all that.
 
-In the future, I hope to see a lot more device tree work, which should
-also have its own branch.
-
-	Arnd
+So, I'm sorry but I feel that this whole CMDLINE crap is becoming just
+that, and it really needs to die if people are going to try to use it
+in this way.
