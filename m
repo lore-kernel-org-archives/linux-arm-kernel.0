@@ -1,67 +1,85 @@
-From: abhilash.kv@ti.com (Abhilash K V)
-Date: Fri, 15 Jul 2011 17:14:10 +0530
-Subject: [PATCH v2] OMAP3: powerdomains: Match silicon revision to select the
-	correct "core_pwrdm" definition
-Message-ID: <1310730250-10920-1-git-send-email-abhilash.kv@ti.com>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Fri, 15 Jul 2011 20:09:30 +0800
+Subject: [PATCH v3 00/10] ARM: mxs: add audio support
+Message-ID: <1310731780-1645-1-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-powerdomains3xxx_data.c defines core_3xxx_pre_es3_1_pwrdm and
-core_3xxx_es3_1_pwrdm to take care of differences in "core_pwrdm"
-implementations across revisions.
-However,_pwrdm_lookup("core_pwrdm") always matches the first definition for
-3630 ES 1.1 and 1.2 which is incorrect. This patch fixes this issue by adding
-code to match silicon revision as well while looking up "core_pwrdm" in
-_pwrdm_lookup().
-core_3xxx_es3_1_pwrdm is different from core_3xxx_pre_es3_1_pwrdm in
-that the former adds hardware save-restore support for USBTLL for 3430
-ES3.1 and for 3630 ES1.1 and ES1.2.
+This patch series is to add audio support based on saif for mxs platform.
+The driver only supports playback currently.
+For capturing, due to hardware limitation that we have to use two saif
+instances to implement full duplex (playback & recording), we need to
+figure out a good design to fit in ASoC as the following work.
 
-Signed-off-by: Abhilash K V <abhilash.kv@ti.com>
----
-v2:
-* now tested on 3630 (ES1.2 and ES1.0) and 3530 (ES3.0 and ES3.1)
-* fixed checkpatch errors/warnings.
+In addition, we simply just support master mode since saif tx can
+only work as a master due to hw limitation(rx can work in both
+master & slave mode).
 
- arch/arm/mach-omap2/powerdomain.c |   19 +++++++++++++++++++
- 1 files changed, 19 insertions(+), 0 deletions(-)
+Code is written based on the branch imx-for-3.1 in sascha's tree
+http://git.pengutronix.de/git/imx/linux-2.6.git
 
-diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
-index 9af0847..82a2e30 100644
---- a/arch/arm/mach-omap2/powerdomain.c
-+++ b/arch/arm/mach-omap2/powerdomain.c
-@@ -32,6 +32,7 @@
- #include "powerdomain.h"
- #include "clockdomain.h"
- #include <plat/prcm.h>
-+#include <plat/cpu.h>
- 
- #include "pm.h"
- 
-@@ -58,6 +59,24 @@ static struct powerdomain *_pwrdm_lookup(const char *name)
- 
- 	list_for_each_entry(temp_pwrdm, &pwrdm_list, node) {
- 		if (!strcmp(name, temp_pwrdm->name)) {
-+			if (!strcmp(name, "core_pwrdm") && cpu_is_omap3630()) {
-+				if (omap_rev() > OMAP3630_REV_ES1_0) {
-+					/*
-+					 * match omap_chip info for OMAP3630
-+					 * Rev ES1.1, ES1.2 or higher
-+					 */
-+					if (!(temp_pwrdm->omap_chip.oc
-+						& CHIP_GE_OMAP3630ES1_1))
-+						continue;
-+				} else {
-+					/* match omap_chip info for OMAP3630
-+					 * Rev ES1.0
-+					 */
-+					if (!(temp_pwrdm->omap_chip.oc
-+						 & CHIP_IS_OMAP3630ES1))
-+						continue;
-+				}
-+			}
- 			pwrdm = temp_pwrdm;
- 			break;
- 		}
--- 
-1.7.1
+Tested on MX28EVK.
+
+changes since v2:
+ * mxs-pcm
+    - fix wrong periods_max.
+    - For robustness replace the channels_min check with a check
+      for the relevant substream being present
+ * mxs-saif
+    - Add IRQ_NONE handle
+    - improve mxs_saif_set_clk to make it more easy to read
+    - correct return value
+    - request_irq sequence changed to after ioremap
+ * mxs-sgtl5000
+    - clean up a few unused code
+ * Kconfig&Makefile
+    - SND_SOC_MXS_SGTL5000 should depend on I2C in Kconfig
+ * mxs
+    - Select MXS_I2C in kconfig for mxs-sgtl5000
+
+changes since v1:
+ * export saif mclk control interface to machine driver.
+   Machine driver can decide whether it needs to use mclk supplied by
+   saif according to its requirement.
+ * error checking improvement
+ * remove a few unneccesary code
+
+Dong Aisheng (10):
+  ASoc: mxs: add mxs-pcm driver
+  ASoc: mxs: add mxs-saif driver
+  ASoc: mxs: add mxs-sgtl5000 machine driver
+  ASoc: mxs: add asoc configuration files
+  ARM: mxs: add saif clock
+  ARM: mxs: add saif device
+  ARM: mxs: add sgtl5000 i2c device
+  ARM: mxs: add mxs-sgtl5000 device
+  ARM: mxs: correct the using of frac div for saif
+  ARM: mxs-dma: include <linux/dmaengine.h>
+
+ arch/arm/mach-mxs/Kconfig                       |    2 +
+ arch/arm/mach-mxs/clock-mx28.c                  |    8 +-
+ arch/arm/mach-mxs/devices-mx28.h                |    3 +
+ arch/arm/mach-mxs/devices/Kconfig               |    3 +
+ arch/arm/mach-mxs/devices/Makefile              |    1 +
+ arch/arm/mach-mxs/devices/platform-mxs-saif.c   |   60 ++
+ arch/arm/mach-mxs/include/mach/devices-common.h |   12 +
+ arch/arm/mach-mxs/include/mach/dma.h            |    2 +
+ arch/arm/mach-mxs/mach-mx28evk.c                |   40 ++
+ sound/soc/Kconfig                               |    1 +
+ sound/soc/Makefile                              |    1 +
+ sound/soc/mxs/Kconfig                           |   20 +
+ sound/soc/mxs/Makefile                          |   10 +
+ sound/soc/mxs/mxs-pcm.c                         |  359 ++++++++++++
+ sound/soc/mxs/mxs-pcm.h                         |   43 ++
+ sound/soc/mxs/mxs-saif.c                        |  677 +++++++++++++++++++++++
+ sound/soc/mxs/mxs-saif.h                        |  130 +++++
+ sound/soc/mxs/mxs-sgtl5000.c                    |  165 ++++++
+ 18 files changed, 1535 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm/mach-mxs/devices/platform-mxs-saif.c
+ create mode 100644 sound/soc/mxs/Kconfig
+ create mode 100644 sound/soc/mxs/Makefile
+ create mode 100644 sound/soc/mxs/mxs-pcm.c
+ create mode 100644 sound/soc/mxs/mxs-pcm.h
+ create mode 100644 sound/soc/mxs/mxs-saif.c
+ create mode 100644 sound/soc/mxs/mxs-saif.h
+ create mode 100644 sound/soc/mxs/mxs-sgtl5000.c
