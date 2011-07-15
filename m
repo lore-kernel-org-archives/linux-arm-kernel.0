@@ -1,32 +1,50 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 15 Jul 2011 11:30:18 -0700
-Subject: [PATCH 2/2] ARM: tegra: remove copy-and-pasted usb platform data
-	from boards
-In-Reply-To: <CAMbhsRTxAwKJ7qiK=_BAMc3Y1x_WHF7WHrm_54o-sYLBb1zzng@mail.gmail.com>
-References: <1310336374-31727-1-git-send-email-ccross@android.com>
-	<1310336374-31727-2-git-send-email-ccross@android.com>
-	<20110715111348.3ed0522a@ac100.localdomain>
-	<201107151155.56495.heiko@sntech.de>
-	<CAMbhsRTxAwKJ7qiK=_BAMc3Y1x_WHF7WHrm_54o-sYLBb1zzng@mail.gmail.com>
-Message-ID: <20110715183018.GA3083@quad.lixom.net>
+From: khc@pm.waw.pl (Krzysztof Halasa)
+Date: Fri, 15 Jul 2011 21:33:12 +0200
+Subject: [PATCH REPOST] ARM: fix regression in IXP4xx clocksource
+Message-ID: <m3zkkfpcef.fsf@intrepid.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 15, 2011 at 09:45:53AM -0700, Colin Cross wrote:
-> Can you or someone else test if power_down_on_bus_suspend is causing a
-> problem?  If it is, I'll change the default in devices.c to
-> power_down_on_bus_suspend=0, and devices that want
-> power_down_on_bus_suspend=1 will have to set it.
+From: Richard Cochran <richardcochran@gmail.com>
 
-Seaboard and derivatives have power_down_on_bus_suspend set, and does OK with
-that. I suggest that paz00 overrides the value before device registration if
-it has to. If the number of boards down the road that need it off exceeds
-number of boards that need it on, it can always be flipped. This should come
-from the device tree later anyway.
+Commit 234b6ceddb4fc2a4bc5b9a7670f070f6e69e0868
 
-(Note: I'll post a patch in a bit that keeps the IP clocked even if phy is
-powered down on bus suspend, since otherwise we don't get hotplug events for
-hub-less systems).
+   clocksource: convert ARM 32-bit up counting clocksources
+
+broke the build for ixp4xx and made big endian operation impossible.
+This commit restores the original behaviour.
+
+Signed-off-by: Richard Cochran <richard.cochran@omicron.at>
+Signed-off-by: Krzysztof Ha?asa <khc@pm.waw.pl>
+
+diff --git a/arch/arm/mach-ixp4xx/common.c b/arch/arm/mach-ixp4xx/common.c
+index 74ed81a..0777257 100644
+--- a/arch/arm/mach-ixp4xx/common.c
++++ b/arch/arm/mach-ixp4xx/common.c
+@@ -419,14 +419,20 @@ static void notrace ixp4xx_update_sched_clock(void)
+ /*
+  * clocksource
+  */
++
++static cycle_t ixp4xx_clocksource_read(struct clocksource *c)
++{
++	return *IXP4XX_OSTS;
++}
++
+ unsigned long ixp4xx_timer_freq = IXP4XX_TIMER_FREQ;
+ EXPORT_SYMBOL(ixp4xx_timer_freq);
+ static void __init ixp4xx_clocksource_init(void)
+ {
+ 	init_sched_clock(&cd, ixp4xx_update_sched_clock, 32, ixp4xx_timer_freq);
+ 
+-	clocksource_mmio_init(&IXP4XX_OSTS, "OSTS", ixp4xx_timer_freq, 200, 32,
+-			clocksource_mmio_readl_up);
++	clocksource_mmio_init(NULL, "OSTS", ixp4xx_timer_freq, 200, 32,
++			ixp4xx_clocksource_read);
+ }
+ 
+ /*
 
 
--Olof
+-- 
+Krzysztof Halasa
