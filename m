@@ -1,144 +1,310 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 15 Jul 2011 12:49:20 +0800
-Subject: [PATCH v2] mtd: dataflash: add device tree probe support
-In-Reply-To: <20110715025407.GF2927@ponder.secretlab.ca>
-References: <1310283313-32087-1-git-send-email-shawn.guo@linaro.org>
-	<1310658757-17018-1-git-send-email-shawn.guo@linaro.org>
-	<20110715025407.GF2927@ponder.secretlab.ca>
-Message-ID: <20110715044919.GB1840@S2100-06.ap.freescale.net>
+From: parkch98@gmail.com (Chanho Park)
+Date: Fri, 15 Jul 2011 13:45:44 +0900
+Subject: [PATCH V2 03/12] DMA: PL330: Add DMA capabilities
+In-Reply-To: <1310546857-6304-4-git-send-email-kgene.kim@samsung.com>
+References: <1310546857-6304-1-git-send-email-kgene.kim@samsung.com>
+	<1310546857-6304-4-git-send-email-kgene.kim@samsung.com>
+Message-ID: <CAPTzV17kaSCP8bnQQKSwL_-97r3dQVBY5L-r+u4Sv9TXH2nwew@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 14, 2011 at 08:54:07PM -0600, Grant Likely wrote:
-> On Thu, Jul 14, 2011 at 11:52:37PM +0800, Shawn Guo wrote:
-> > It adds device tree probe support for mtd_dataflash driver.
-> > 
-> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > Cc: Grant Likely <grant.likely@secretlab.ca>
-> > Cc: David Woodhouse <dwmw2@infradead.org>
-> > Cc: Artem Bityutskiy <Artem.Bityutskiy@nokia.com>
-> > ---
-> > Changes since v1:
-> >  * Add "atmel,at45xxx" into the match table
-> >  * Add binding document
-> > 
-> >  .../devicetree/bindings/mtd/atmel-dataflash.txt    |   14 ++++++++++++++
-> >  drivers/mtd/devices/mtd_dataflash.c                |   13 ++++++++++++-
-> >  2 files changed, 26 insertions(+), 1 deletions(-)
-> >  create mode 100644 Documentation/devicetree/bindings/mtd/atmel-dataflash.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/mtd/atmel-dataflash.txt b/Documentation/devicetree/bindings/mtd/atmel-dataflash.txt
-> > new file mode 100644
-> > index 0000000..3783962
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/mtd/atmel-dataflash.txt
-> > @@ -0,0 +1,14 @@
-> > +* Atmel Data Flash
-> > +
-> > +Required properties:
-> > +- compatible : "atmel,<model>", "atmel,<series>", "atmel,dataflash".
-> > +
-> > +Example:
-> > +
-> > +flash at 1 {
-> > +	#address-cells = <1>;
-> > +	#size-cells = <1>;
-> > +	compatible = "atmel,at45db321d", "atmel,at45xxx", "atmel,dataflash";
-> > +	spi-max-frequency = <25000000>;
-> > +	reg = <1>;
-> > +};
-> > diff --git a/drivers/mtd/devices/mtd_dataflash.c b/drivers/mtd/devices/mtd_dataflash.c
-> > index 8f6b02c..8e091b0 100644
-> > --- a/drivers/mtd/devices/mtd_dataflash.c
-> > +++ b/drivers/mtd/devices/mtd_dataflash.c
-> > @@ -24,6 +24,8 @@
-> >  #include <linux/mtd/mtd.h>
-> >  #include <linux/mtd/partitions.h>
-> >  
-> > +#include <linux/of.h>
-> > +#include <linux/of_device.h>
-> 
-> This shouldn't be separate from the regular block of #include
-> statements above it.
+Hello,
 
-The patch does not show the context.  Here is the existing code.  I
-just followed the pattern.
+2011/7/13 Kukjin Kim <kgene.kim@samsung.com>:
+> From: Boojin Kim <boojin.kim@samsung.com>
+>
+> This patch adds DMA_CYCLIC capability that is used for audio driver
+> and SLAVE_CONFIG capability for transmit between device and memory.
+>
+> Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
+> Cc: Vinod Koul <vinod.koul@intel.com>
+> Cc: Dan Williams <dan.j.williams@intel.com>
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> ---
+> ?drivers/dma/pl330.c | ?187 +++++++++++++++++++++++++++++++++++++++++++++++----
+> ?1 files changed, 173 insertions(+), 14 deletions(-)
+>
+> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+> index 9bdda7b..2162ac5 100644
+> --- a/drivers/dma/pl330.c
+> +++ b/drivers/dma/pl330.c
+> @@ -69,6 +69,9 @@ struct dma_pl330_chan {
+> ? ? ? ? * NULL if the channel is available to be acquired.
+> ? ? ? ? */
+> ? ? ? ?void *pl330_chid;
+> +
+> + ? ? ? /* taks for cyclic capability */
+> + ? ? ? struct tasklet_struct *cyclic_task;
+> ?};
+>
+> ?struct dma_pl330_dmac {
+> @@ -105,6 +108,7 @@ struct dma_pl330_desc {
+>
+> ? ? ? ?/* The channel which currently holds this desc */
+> ? ? ? ?struct dma_pl330_chan *pchan;
+> + ? ? ? bool cyclic;
+> ?};
+>
+> ?static inline struct dma_pl330_chan *
+> @@ -184,6 +188,60 @@ static inline void fill_queue(struct dma_pl330_chan *pch)
+> ? ? ? ?}
+> ?}
+>
+> +static void pl330_tasklet_cyclic(unsigned long data)
+> +{
+> + ? ? ? struct dma_pl330_chan *pch = (struct dma_pl330_chan *)data;
+> + ? ? ? struct dma_pl330_desc *desc, *_dt;
+> + ? ? ? unsigned long flags;
+> + ? ? ? LIST_HEAD(list);
+> +
+> + ? ? ? spin_lock_irqsave(&pch->lock, flags);
+> +
+> + ? ? ? /* Pick up ripe tomatoes */
+> + ? ? ? list_for_each_entry_safe(desc, _dt, &pch->work_list, node)
+> + ? ? ? ? ? ? ? if ((desc->status == DONE) && desc->cyclic) {
+> + ? ? ? ? ? ? ? ? ? ? ? dma_async_tx_callback callback;
+> +
+> + ? ? ? ? ? ? ? ? ? ? ? list_move_tail(&desc->node, &pch->work_list);
+> + ? ? ? ? ? ? ? ? ? ? ? pch->completed = desc->txd.cookie;
+> +
+> + ? ? ? ? ? ? ? ? ? ? ? desc->status = PREP;
+> +
+> + ? ? ? ? ? ? ? ? ? ? ? /* Try to submit a req imm.
+> + ? ? ? ? ? ? ? ? ? ? ? next to the last completed cookie */
+> + ? ? ? ? ? ? ? ? ? ? ? fill_queue(pch);
+> +
+> + ? ? ? ? ? ? ? ? ? ? ? /* Make sure the PL330 Channel thread is active */
+> + ? ? ? ? ? ? ? ? ? ? ? pl330_chan_ctrl(pch->pl330_chid, PL330_OP_START);
+> +
+> + ? ? ? ? ? ? ? ? ? ? ? callback = desc->txd.callback;
+> + ? ? ? ? ? ? ? ? ? ? ? if (callback)
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? callback(desc->txd.callback_param);
+> +
+> + ? ? ? ? ? ? ? }
+> +
+> + ? ? ? spin_unlock_irqrestore(&pch->lock, flags);
+> +}
+> +
+> +static void pl330_cyclic_free(struct dma_pl330_chan *pch)
+> +{
+> + ? ? ? struct dma_pl330_dmac *pdmac = pch->dmac;
+> + ? ? ? struct dma_pl330_desc *desc, *_dt;
+> + ? ? ? unsigned long flags;
+> + ? ? ? LIST_HEAD(list);
+> +
+> + ? ? ? spin_lock_irqsave(&pdmac->pool_lock, flags);
+> +
+> + ? ? ? list_for_each_entry_safe(desc, _dt, &pch->work_list, node)
+> + ? ? ? if (desc->cyclic)
+> + ? ? ? ? ? ? ? list_move_tail(&desc->node, &list);
 
-#include <linux/module.h>
-#include <linux/init.h>
-#include <linux/slab.h>
-#include <linux/delay.h>
-#include <linux/device.h>
-#include <linux/mutex.h>
-#include <linux/err.h>
-#include <linux/math64.h>
+nitpick: indentation will be required after for_each
 
-#include <linux/spi/spi.h>
-#include <linux/spi/flash.h>
+> +
+> + ? ? ? list_splice_tail_init(&list, &pdmac->desc_pool);
+> +
+> + ? ? ? spin_unlock_irqrestore(&pdmac->pool_lock, flags);
+> + ? ? ? pch->cyclic_task = NULL;
+> +}
+> +
+> ?static void pl330_tasklet(unsigned long data)
+> ?{
+> ? ? ? ?struct dma_pl330_chan *pch = (struct dma_pl330_chan *)data;
+> @@ -227,6 +285,9 @@ static void dma_pl330_rqcb(void *token, enum pl330_op_err err)
+>
+> ? ? ? ?spin_unlock_irqrestore(&pch->lock, flags);
+>
+> + ? ? ? if (pch->cyclic_task)
+> + ? ? ? ? ? ? ? tasklet_schedule(pch->cyclic_task);
+> + ? ? ? else
+> ? ? ? ?tasklet_schedule(&pch->task);
+> ?}
+>
+> @@ -256,25 +317,58 @@ static int pl330_alloc_chan_resources(struct dma_chan *chan)
+> ?static int pl330_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd, unsigned long arg)
+> ?{
+> ? ? ? ?struct dma_pl330_chan *pch = to_pchan(chan);
+> - ? ? ? struct dma_pl330_desc *desc;
+> + ? ? ? struct dma_pl330_desc *desc, *_dt;
+> ? ? ? ?unsigned long flags;
+> + ? ? ? struct dma_pl330_dmac *pdmac = pch->dmac;
+> + ? ? ? struct dma_slave_config *slave_config;
+> + ? ? ? struct dma_pl330_peri *peri;
+> + ? ? ? int i;
+> + ? ? ? LIST_HEAD(list);
+>
+> - ? ? ? /* Only supports DMA_TERMINATE_ALL */
+> - ? ? ? if (cmd != DMA_TERMINATE_ALL)
+> - ? ? ? ? ? ? ? return -ENXIO;
+> -
+> - ? ? ? spin_lock_irqsave(&pch->lock, flags);
+> -
+> - ? ? ? /* FLUSH the PL330 Channel thread */
+> - ? ? ? pl330_chan_ctrl(pch->pl330_chid, PL330_OP_FLUSH);
+> + ? ? ? switch (cmd) {
+> + ? ? ? case DMA_TERMINATE_ALL:
+> + ? ? ? ? ? ? ? spin_lock_irqsave(&pch->lock, flags);
+>
+> - ? ? ? /* Mark all desc done */
+> - ? ? ? list_for_each_entry(desc, &pch->work_list, node)
+> - ? ? ? ? ? ? ? desc->status = DONE;
+> + ? ? ? ? ? ? ? /* FLUSH the PL330 Channel thread */
+> + ? ? ? ? ? ? ? pl330_chan_ctrl(pch->pl330_chid, PL330_OP_FLUSH);
+>
+> - ? ? ? spin_unlock_irqrestore(&pch->lock, flags);
+> + ? ? ? ? ? ? ? /* Mark all desc done */
+> + ? ? ? ? ? ? ? list_for_each_entry_safe(desc, _dt, &pch->work_list , node) {
+> + ? ? ? ? ? ? ? ? ? ? ? desc->status = DONE;
+> + ? ? ? ? ? ? ? ? ? ? ? pch->completed = desc->txd.cookie;
+> + ? ? ? ? ? ? ? ? ? ? ? list_move_tail(&desc->node, &list);
+> + ? ? ? ? ? ? ? }
+>
+> - ? ? ? pl330_tasklet((unsigned long) pch);
+> + ? ? ? ? ? ? ? list_splice_tail_init(&list, &pdmac->desc_pool);
+> + ? ? ? ? ? ? ? spin_unlock_irqrestore(&pch->lock, flags);
+> + ? ? ? ? ? ? ? break;
+> + ? ? ? case DMA_SLAVE_CONFIG:
+> + ? ? ? ? ? ? ? slave_config = (struct dma_slave_config *)arg;
+> + ? ? ? ? ? ? ? peri = pch->chan.private;
+> +
+> + ? ? ? ? ? ? ? if (slave_config->direction == DMA_TO_DEVICE) {
+> + ? ? ? ? ? ? ? ? ? ? ? if (slave_config->dst_addr)
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? peri->fifo_addr = slave_config->dst_addr;
+> + ? ? ? ? ? ? ? ? ? ? ? if (slave_config->dst_addr_width) {
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? i = 0;
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? while (slave_config->dst_addr_width != (1 << i))
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? i++;
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? peri->burst_sz = i;
+> + ? ? ? ? ? ? ? ? ? ? ? }
+> + ? ? ? ? ? ? ? } else if (slave_config->direction == DMA_FROM_DEVICE) {
+> + ? ? ? ? ? ? ? ? ? ? ? if (slave_config->src_addr)
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? peri->fifo_addr = slave_config->src_addr;
+> + ? ? ? ? ? ? ? ? ? ? ? if (slave_config->src_addr_width) {
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? i = 0;
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? while (slave_config->src_addr_width != (1 << i))
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? i++;
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? peri->burst_sz = i;
+> + ? ? ? ? ? ? ? ? ? ? ? }
+> + ? ? ? ? ? ? ? }
+> + ? ? ? ? ? ? ? break;
+> + ? ? ? default:
+> + ? ? ? ? ? ? ? return -ENXIO;
 
-#include <linux/mtd/mtd.h>
-#include <linux/mtd/partitions.h>
+To print error message in the default case will be better.
 
-But okay, I will add the OF headers right behind math64.h to not make
-it any worse.
+> + ? ? ? }
+>
+> ? ? ? ?return 0;
+> ?}
+> @@ -291,6 +385,9 @@ static void pl330_free_chan_resources(struct dma_chan *chan)
+> ? ? ? ?pl330_release_channel(pch->pl330_chid);
+> ? ? ? ?pch->pl330_chid = NULL;
+>
+> + ? ? ? if (pch->cyclic_task)
+> + ? ? ? ? ? ? ? pl330_cyclic_free(pch);
+> +
+> ? ? ? ?spin_unlock_irqrestore(&pch->lock, flags);
+> ?}
+>
+> @@ -522,6 +619,66 @@ static inline int get_burst_len(struct dma_pl330_desc *desc, size_t len)
+> ? ? ? ?return burst_len;
+> ?}
+>
+> +static struct dma_async_tx_descriptor *pl330_prep_dma_cyclic(
+> + ? ? ? ? ? ? ? struct dma_chan *chan, dma_addr_t dma_addr, size_t len,
+> + ? ? ? ? ? ? ? size_t period_len, enum dma_data_direction direction)
+> +{
+> + ? ? ? struct dma_pl330_desc *desc;
+> + ? ? ? struct dma_pl330_chan *pch = to_pchan(chan);
+> + ? ? ? struct dma_pl330_peri *peri = chan->private;
+> + ? ? ? dma_addr_t dst;
+> + ? ? ? dma_addr_t src;
+> +
+> + ? ? ? pch = to_pchan(chan);
+> + ? ? ? if (!pch) {
+> + ? ? ? ? ? ? ? dev_err(pch->dmac->pif.dev, "%s:%d Unable to fetch desc\n",
+> + ? ? ? ? ? ? ? ? ? ? ? __func__, __LINE__);
+> + ? ? ? ? ? ? ? return NULL;
+> + ? ? ? }
 
-> >  
-> >  /*
-> >   * DataFlash is a kind of SPI flash.  Most AT45 chips have two buffers in
-> > @@ -98,6 +100,12 @@ struct dataflash {
-> >  	struct mtd_info		mtd;
-> >  };
-> >  
-> > +static const struct of_device_id dataflash_dt_ids[] = {
-> > +	{ .compatible = "atmel,at45xxx", },
-> > +	{ .compatible = "atmel,dataflash", },
-> > +	{ /* sentinel */ }
-> > +};
-> > +
-> 
-> This should be protected with a #ifdef CONFIG_OF/#else/#endif, and
-> there should be a MODULE_DEVICE_TABLE().
-> 
-I personally hate #ifdef stuff.  But okay, I can do it since there
-are people being concerned by this little waste of space.
+'pch' is already acquired when defined. It's duplicated.
+dev_err has a incorrect parameter because pch is NULL.
+Accessing pch->dmac will be failed.
 
-Regards,
-Shawn
+> +
+> + ? ? ? desc = pl330_get_desc(pch);
+> + ? ? ? if (!desc) {
+> + ? ? ? ? ? ? ? dev_err(pch->dmac->pif.dev, "%s:%d Unable to fetch desc\n",
+> + ? ? ? ? ? ? ? ? ? ? ? __func__, __LINE__);
+> + ? ? ? ? ? ? ? return NULL;
+> + ? ? ? }
+> +
+> + ? ? ? switch (direction) {
+> + ? ? ? case DMA_TO_DEVICE:
+> + ? ? ? ? ? ? ? desc->rqcfg.src_inc = 1;
+> + ? ? ? ? ? ? ? desc->rqcfg.dst_inc = 0;
+> + ? ? ? ? ? ? ? src = dma_addr;
+> + ? ? ? ? ? ? ? dst = peri->fifo_addr;
+> + ? ? ? ? ? ? ? break;
+> + ? ? ? case DMA_FROM_DEVICE:
+> + ? ? ? ? ? ? ? desc->rqcfg.src_inc = 0;
+> + ? ? ? ? ? ? ? desc->rqcfg.dst_inc = 1;
+> + ? ? ? ? ? ? ? src = peri->fifo_addr;
+> + ? ? ? ? ? ? ? dst = dma_addr;
+> + ? ? ? ? ? ? ? break;
+> + ? ? ? default:
+> + ? ? ? ? ? ? ? dev_err(pch->dmac->pif.dev, "%s:%d Invalid dma direction\n",
+> + ? ? ? ? ? ? ? __func__, __LINE__);
+> + ? ? ? ? ? ? ? return NULL;
+> + ? ? ? }
+> +
+> + ? ? ? desc->rqcfg.brst_size = peri->burst_sz;
+> + ? ? ? desc->rqcfg.brst_len = 1;
+> +
+> + ? ? ? if (!pch->cyclic_task) {
+> + ? ? ? ? ? ? ? pch->cyclic_task =
+> + ? ? ? ? ? ? ? ? ? ? ? kmalloc(sizeof(struct tasklet_struct), GFP_KERNEL);
+> + ? ? ? ? ? ? ? tasklet_init(pch->cyclic_task,
+> + ? ? ? ? ? ? ? ? ? ? ? pl330_tasklet_cyclic, (unsigned int)pch);
+> + ? ? ? }
+> +
+> + ? ? ? desc->cyclic = true;
+> +
+> + ? ? ? fill_px(&desc->px, dst, src, period_len);
+> +
+> + ? ? ? return &desc->txd;
+> +}
+> +
+> ?static struct dma_async_tx_descriptor *
+> ?pl330_prep_dma_memcpy(struct dma_chan *chan, dma_addr_t dst,
+> ? ? ? ? ? ? ? ?dma_addr_t src, size_t len, unsigned long flags)
+> @@ -756,6 +913,7 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
+> ? ? ? ? ? ? ? ? ? ? ? ?case MEMTODEV:
+> ? ? ? ? ? ? ? ? ? ? ? ?case DEVTOMEM:
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?dma_cap_set(DMA_SLAVE, pd->cap_mask);
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? dma_cap_set(DMA_CYCLIC, pd->cap_mask);
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?break;
+> ? ? ? ? ? ? ? ? ? ? ? ?default:
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?dev_err(&adev->dev, "DEVTODEV Not Supported\n");
+> @@ -781,6 +939,7 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
+> ? ? ? ?pd->device_alloc_chan_resources = pl330_alloc_chan_resources;
+> ? ? ? ?pd->device_free_chan_resources = pl330_free_chan_resources;
+> ? ? ? ?pd->device_prep_dma_memcpy = pl330_prep_dma_memcpy;
+> + ? ? ? pd->device_prep_dma_cyclic = pl330_prep_dma_cyclic;
+> ? ? ? ?pd->device_tx_status = pl330_tx_status;
+> ? ? ? ?pd->device_prep_slave_sg = pl330_prep_slave_sg;
+> ? ? ? ?pd->device_control = pl330_control;
+> --
+> 1.7.1
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>
 
-> >  /* ......................................................................... */
-> >  
-> >  /*
-> > @@ -634,6 +642,7 @@ add_dataflash_otp(struct spi_device *spi, char *name,
-> >  {
-> >  	struct dataflash		*priv;
-> >  	struct mtd_info			*device;
-> > +	struct mtd_part_parser_data	ppdata;
-> >  	struct flash_platform_data	*pdata = spi->dev.platform_data;
-> >  	char				*otp_tag = "";
-> >  	int				err = 0;
-> > @@ -675,7 +684,8 @@ add_dataflash_otp(struct spi_device *spi, char *name,
-> >  			pagesize, otp_tag);
-> >  	dev_set_drvdata(&spi->dev, priv);
-> >  
-> > -	err = mtd_device_parse_register(device, NULL, 0,
-> > +	ppdata.of_node = spi->dev.of_node;
-> > +	err = mtd_device_parse_register(device, NULL, &ppdata,
-> >  			pdata ? pdata->parts : NULL,
-> >  			pdata ? pdata->nr_parts : 0);
-> >  
-> > @@ -926,6 +936,7 @@ static struct spi_driver dataflash_driver = {
-> >  		.name		= "mtd_dataflash",
-> >  		.bus		= &spi_bus_type,
-> >  		.owner		= THIS_MODULE,
-> > +		.of_match_table = dataflash_dt_ids,
-> >  	},
-> >  
-> >  	.probe		= dataflash_probe,
-> > -- 
-> > 1.7.4.1
-> > 
-> _______________________________________________
-> devicetree-discuss mailing list
-> devicetree-discuss at lists.ozlabs.org
-> https://lists.ozlabs.org/listinfo/devicetree-discuss
-> 
+
+
+-- 
+Best Regards,
+Chanho Park
