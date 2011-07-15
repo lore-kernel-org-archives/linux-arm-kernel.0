@@ -1,94 +1,45 @@
-From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Fri, 15 Jul 2011 21:40:41 +0200
-Subject: [PATCH 2/2] ARM: tegra: remove copy-and-pasted usb platform data
-	from boards
-In-Reply-To: <CAMbhsRTxAwKJ7qiK=_BAMc3Y1x_WHF7WHrm_54o-sYLBb1zzng@mail.gmail.com>
-References: <1310336374-31727-1-git-send-email-ccross@android.com>
-	<201107151155.56495.heiko@sntech.de>
-	<CAMbhsRTxAwKJ7qiK=_BAMc3Y1x_WHF7WHrm_54o-sYLBb1zzng@mail.gmail.com>
-Message-ID: <201107152140.42122.heiko@sntech.de>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Fri, 15 Jul 2011 13:50:03 -0600
+Subject: [PATCH v3] pxa2xx_spi: fix memory corruption
+In-Reply-To: <20110715081242.GM23270@n2100.arm.linux.org.uk>
+References: <201107101609.31405.anarsoul@gmail.com>
+	<1310311099-24638-1-git-send-email-anarsoul@gmail.com>
+	<20110715025331.GL2927@ponder.secretlab.ca>
+	<20110715081242.GM23270@n2100.arm.linux.org.uk>
+Message-ID: <20110715195003.GG2833@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag 15 Juli 2011, 18:45:53 schrieb Colin Cross:
-> On Fri, Jul 15, 2011 at 2:55 AM, Heiko St?bner <heiko@sntech.de> wrote:
-> > Am Freitag, 15. Juli 2011, 11:13:48 schrieb Marc Dietrich:
-> >> see comment for PATCH 1/2
-> >> 
-> >> Am Sun, 10 Jul 2011 15:19:34 -0700
-> >> 
-> >> schrieb Colin Cross <ccross@android.com>:
-> >> > trimslice and paz00 both have functionally identical platform
-> >> > data for the tegra-ehci driver.  Move the platform data into
-> >> > devices.c, and remove it from all the board files.
-> >> > 
-> >> > Signed-off-by: Colin Cross <ccross@android.com>
-> >> 
-> >> Acked-By: Marc Dietrich <marvin24@gmx.de>
-> >> 
-> >> > ---
-> >> > 
-> >> >  arch/arm/mach-tegra/board-paz00.c     |   26
-> >> > 
-> >> > 
-> >> > 
-> >> > -static struct tegra_ulpi_config ulpi_phy_config = {
-> >> > -           .reset_gpio = TEGRA_ULPI_RST,
-> >> > -           .clk = "cdev2",
-> >> > -};
-> >> > -
-> >> > -static struct tegra_ehci_platform_data tegra_ehci_pdata[] = {
-> >> > -           [0] = {
-> >> > -                   .operating_mode = TEGRA_USB_OTG,
-> >> > -                   .power_down_on_bus_suspend = 1,
-> >> > -           },
-> >> > -           [1] = {
-> >> > -                   .phy_config = &ulpi_phy_config,
-> >> > -                   .operating_mode = TEGRA_USB_HOST,
-> >> > -                   .power_down_on_bus_suspend = 1,
-> >> > -           },
-> >> > -           [2] = {
-> >> > -                   .operating_mode = TEGRA_USB_HOST,
-> >> > -                   .power_down_on_bus_suspend = 1,
-> >> > -           },
-> >> > -};
+On Fri, Jul 15, 2011 at 09:12:42AM +0100, Russell King - ARM Linux wrote:
+> On Thu, Jul 14, 2011 at 08:53:31PM -0600, Grant Likely wrote:
+> > > +	u8 null_dma_buf_unaligned[16];
 > > 
-> > I'm not sure about this.
-> > 
-> > For paz00 tegra_ehci3_device also leads to an external usb port. With
-> > power_down_on_bus_suspend = 1 hotplugging usb devices doesn't work (as
-> > the bus might be suspended at the time).
-> > 
-> > From the initial commit message of ehci-tegra on android.git.kernel.org:
-> > "For additional power saving, the driver supports powering down the
-> > phy on bus suspend when it is used, for example, to connect an internal
-> > device that use an out-of-band remote wakeup mechanism (e.g. a gpio)."
-> > 
-> > So my guess was, that the correct handling of this was setting
-> > power_down_on_bus_suspend to 0 - which did fix the problem.
-> > 
-> > With this data moving to devices.c, setting this would also change the
-> > trimslice behaviour which would be a problem.
-> > 
-> > In the end I'm not sure if setting power_down_on_bus_suspend to 0 is the
-> > correct solution to the hotplug problem or if a better solution exists.
-> > 
-> > Thanks
-> > Heiko
+> > Don't dma buffers need to be cache-line aligned?  How large is the
+> > actual transfer?  Using the __aligned() or __cacheline_aligned
+> > attribute is the correct way to make sure you've got a data buffer
+> > that can be used for DMA mixed with other stuff.  Then you don't need
+> > to fool around with PTR_ALIGN or anything.
 > 
-> Can you or someone else test if power_down_on_bus_suspend is causing a
-> problem?  If it is, I'll change the default in devices.c to
-> power_down_on_bus_suspend=0, and devices that want
-> power_down_on_bus_suspend=1 will have to set it.
+> Err, did you not read the whole patch?
+> 
+> > > +	drv_data->null_dma_buf =
+> > > +		(u32 *)PTR_ALIGN(&drv_data->null_dma_buf_unaligned, 8);
 
-With power_down_on_bus_suspend = 1, paz00 fails to recognize newly attached 
-devices, i.e. only devices connected during boot are accessible.
-But it doesn't cause problems with the devices themselfs.
+I read a lot of patches yesterday.  I may very well have missed
+something.  I still don't see what you're referring to though.  If
+the __aligned() was used inside the structure definition, then there
+would be no need to have both the null_dma_buf pointer and the
+null_dma_buf_unaligned buffer.  It would just be a correctly aligned
+null_dma_buf.
 
-Am Freitag 15 Juli 2011, 20:30:18 schrieb Olof Johansson:
-> (Note: I'll post a patch in a bit that keeps the IP clocked even if phy is
-> powered down on bus suspend, since otherwise we don't get hotplug events
-> for hub-less systems).
-This might also fix the hotplug problem on paz00 *fingers crossed*.
+Plus, I was asking about whether it was valid to use the structure as
+allocated in DMA operations since it may very well end up in the same
+cache line as the allocated structure.  Firstly, that could mean DMA
+and the cache referencing the same memory which could cause
+corruption, and secondly on ARM isn't it a problem to have DMA buffers
+in memory that is also cache mapped?
 
-Heiko
+That said, I've not read the entire driver, so I haven't checked
+null_dma_buffer is used in a real dma operation.
+
+g.
