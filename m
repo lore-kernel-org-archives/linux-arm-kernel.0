@@ -1,95 +1,81 @@
-From: ccross@google.com (Colin Cross)
-Date: Fri, 15 Jul 2011 14:18:59 -0700
-Subject: [PATCH] ARM: move memory layout sanity checking before meminfo
-	initialization
-In-Reply-To: <20110715210720.GF24628@n2100.arm.linux.org.uk>
-References: <CAMbhsRRQ9D+VXTZP3vB7egkROEtN9-FxssFa2EcxuqB3F-Uv6Q@mail.gmail.com>
-	<20110714073453.GK23270@n2100.arm.linux.org.uk>
-	<CAMbhsRT=NNYUYyYZXpz2=PpBXoBGANQHPgOkCE1oZ8XzHKN4og@mail.gmail.com>
-	<CAMbhsRSgUcFPpdTFvEDTFfo_Wk0k7BQzwk6cRtXC6K7mpQ+YDg@mail.gmail.com>
-	<20110715080950.GL23270@n2100.arm.linux.org.uk>
-	<CAMbhsRRCV0ukwbzFc6w_ba6xdVxs=TFmJMGd06UKTiNQPEJqpw@mail.gmail.com>
-	<20110715161628.GA24628@n2100.arm.linux.org.uk>
-	<CAMbhsRSbXTLzhSzBbQ8ebJqAC227ESHGyY2bHS+J4cN+NgzXFg@mail.gmail.com>
-	<20110715181309.GD24628@n2100.arm.linux.org.uk>
-	<CAMbhsRQRjwskzWB06g7rmSVgSdq5oVxA3yY+14qdtTxuQ=NeMQ@mail.gmail.com>
-	<20110715210720.GF24628@n2100.arm.linux.org.uk>
-Message-ID: <CAMbhsRR=EVhKPkNUnzQ_2Ai9edWpmvHM_9TXwhh-xaa9Dk1Mcw@mail.gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Fri, 15 Jul 2011 15:31:06 -0600
+Subject: [PATCH v3] pxa2xx_spi: fix memory corruption
+In-Reply-To: <20110715202421.GE24628@n2100.arm.linux.org.uk>
+References: <201107101609.31405.anarsoul@gmail.com>
+	<1310311099-24638-1-git-send-email-anarsoul@gmail.com>
+	<20110715025331.GL2927@ponder.secretlab.ca>
+	<20110715081242.GM23270@n2100.arm.linux.org.uk>
+	<20110715195003.GG2833@ponder.secretlab.ca>
+	<20110715202421.GE24628@n2100.arm.linux.org.uk>
+Message-ID: <20110715213106.GM2833@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 15, 2011 at 2:07 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Fri, Jul 15, 2011 at 01:58:37PM -0700, Colin Cross wrote:
->> On Fri, Jul 15, 2011 at 11:13 AM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->> > On Fri, Jul 15, 2011 at 10:35:14AM -0700, Colin Cross wrote:
->> >> CMDLINE_EXTEND solves a real problem, and when it's not solved in the
->> >> kernel, it ends up getting solved in every bootloader. ?Every
->> >> kernel/board requires some command line options (like "console="), and
->> >> every bootloader ends up passing some special options.
->> >
->> > And yet again, if you have a kernel with a built-in console= setting,
->> > there is _no_ _way_ to disable that console via the kernel command
->> > line.
->> >
->> > So what if some of your platforms need one console, others need a different
->> > console, but must not use the first one...
->> >
->> > Do we need nomem= and noconsole= options too? ?Or do we just do the
->> > sane thing and get rid of CMDLINE_EXTEND - or insist that stuff like
->> > console= and mem= options are never built-in ?
->> >
->>
->> The source of the problem is that there are two kinds of options mixed
->> together into one command line:
->> 1. ?Options that are specific to the kernel and board (console, mem, etc.)
->> 2. ?Options that tell the kernel information that only the bootloader
->> knows (Tegra needs to know where the bootloader put signed resume code
->> to be executed by a slave processor, some devices need to get a MAC
->> address from the bootloader)
->>
->> For kernels that are designed to run on a single board, the kernel
->> options can go into the built-in command line, the bootloader options
->> can be concatenated with CONFIG_CMDLINE_EXTEND, and everything works
->> great (unless I forget to remove the mem= option from the bootloader
->> options).
->
-> I'm sorry at this point I'm having a hard time taking this seriously.
-> Really.
->
-> Your boot loader doesn't know how much memory is there? ?Or if it does
-> you've chosen not to use ATAG_MEM to pass that information to the kernel,
-> but instead provide it via the command line. ?And then you complain that
-> two overlapping mem= arguments cause the kernel to explode.
+On Fri, Jul 15, 2011 at 09:24:21PM +0100, Russell King - ARM Linux wrote:
+> On Fri, Jul 15, 2011 at 01:50:03PM -0600, Grant Likely wrote:
+> > On Fri, Jul 15, 2011 at 09:12:42AM +0100, Russell King - ARM Linux wrote:
+> > > On Thu, Jul 14, 2011 at 08:53:31PM -0600, Grant Likely wrote:
+> > > > > +	u8 null_dma_buf_unaligned[16];
+> > > > 
+> > > > Don't dma buffers need to be cache-line aligned?  How large is the
+> > > > actual transfer?  Using the __aligned() or __cacheline_aligned
+> > > > attribute is the correct way to make sure you've got a data buffer
+> > > > that can be used for DMA mixed with other stuff.  Then you don't need
+> > > > to fool around with PTR_ALIGN or anything.
+> > > 
+> > > Err, did you not read the whole patch?
+> > > 
+> > > > > +	drv_data->null_dma_buf =
+> > > > > +		(u32 *)PTR_ALIGN(&drv_data->null_dma_buf_unaligned, 8);
+> > 
+> > I read a lot of patches yesterday.  I may very well have missed
+> > something.  I still don't see what you're referring to though.  If
+> > the __aligned() was used inside the structure definition, then there
+> > would be no need to have both the null_dma_buf pointer and the
+> > null_dma_buf_unaligned buffer.  It would just be a correctly aligned
+> > null_dma_buf.
+> 
+> That depends on the alignment guarantees from kmalloc, which may not be
+> 8 bytes - we have this:
+> 
+> #if defined(CONFIG_AEABI) && (__LINUX_ARM_ARCH__ >= 5)
+> #define ARCH_SLAB_MINALIGN 8
+> #endif
+> 
+> so presumably on !AEABI or arches < ARMv5, kmalloc _can_ return less than
+> 8 byte alignments.  Which makes using __aligned() in the definition useless.
+> 
+> > Plus, I was asking about whether it was valid to use the structure as
+> > allocated in DMA operations since it may very well end up in the same
+> > cache line as the allocated structure.  Firstly, that could mean DMA
+> > and the cache referencing the same memory which could cause
+> > corruption, and secondly on ARM isn't it a problem to have DMA buffers
+> > in memory that is also cache mapped?
+> 
+> For the second point, that depends on whether you're talking about the
+> coherent stuff or the streaming stuff.
+> 
+> The coherent DMA API has entirely different semantics to streaming DMA API.
+> The coherent DMA API allows for simultaneous access to the buffer by both
+> the DMA device and the host CPU.
+> 
+> The streaming DMA API only allows exclusive access by either the DMA device
+> or the host CPU.
+> 
+> Therefore, with the streaming DMA API, the only thing that's required is
+> to ensure that data is visible in some manner to the DMA device.  If the
+> DMA device can read from the CPU cache, then probably nothing's required.
+> If not, then the data must be evicted from as many levels of cache that
+> are necessary to make it visible.  Conversely, for DMA writes, what
+> matters is the visibility of the data to the host CPU.
 
-Obviously, this is wrong.  I said it was a mistake to pass overlapping
-mem=, I fixed where I was passing it in twice, the bootloader is
-passing the correct ATAG_MEM, and the only remaining mem= will go away
-as soon as all the drivers use memblock_remove to get their memory out
-of the kernel mapping.  But for now, I have a reduced mem= in the
-kernel built-in command line, because the problem is a kernel problem
-- drivers needing contiguous memory removed from the mapping.
+... plus care must be taken not to accidentally reload the line into
+cache after it has been pushed out for DMA, which is a risk on
+structures with embedded DMA buffers if other non-DMA elements end up
+in the same cache line.  This is the situation I was wondering about.
 
-> Sorry, I can't take you seriously if that's what you're doing.
->
-> ATAG_MEM is there for the boot loader to pass the memory information to
-> the kernel. ?mem= is there to allow overriding that information.
->
-> We don't need yet another way to override memory information. ?We need
-> people sanely using what's there already.
->
-> NO FIX.
+Of course, as you mention, if the DMA hw is cache-coherent, this isn't
+a problem.
 
-My initial offer was a patch that makes an incorrect overlapping mem=
-command line print a warning and ignore it, instead of doing something
-that is guaranteed to crash the kernel in an obscure way.  I'll post a
-patch.
-
-The thread has devolved into a generic command line problem - how to
-pass completely unrelated options from the bootloader to the kernel
-without also having to pass in every other option that the kernel
-requires to boot.  I have a solution that works for my case
-(CMDLINE_EXTEND), I was trying to offer a solution that would work for
-me while also working for multi-board kernels, but I'm happy to drop
-it.
+g.
