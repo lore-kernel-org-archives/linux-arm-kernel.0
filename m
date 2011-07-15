@@ -1,27 +1,58 @@
-From: khali@linux-fr.org (Jean Delvare)
-Date: Fri, 15 Jul 2011 09:23:14 +0200
-Subject: [PATCH 2/7] at91/i2c: move register header to drivers
-In-Reply-To: <1310687525-22486-2-git-send-email-plagnioj@jcrosoft.com>
-References: <1310687525-22486-1-git-send-email-plagnioj@jcrosoft.com>
-	<1310687525-22486-2-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <20110715092314.215043d5@endymion.delvare>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 15 Jul 2011 10:58:26 +0300
+Subject: [PATCH] ARM: OMAP4: PCM049: remove vusim regulator
+In-Reply-To: <20110715075024.GO5783@atomide.com>
+References: <1310554738.18446.12.camel@lws-weitzel>
+	<1310554762-10743-1-git-send-email-j.weitzel@phytec.de>
+	<4E1D8BCD.5060901@ru.mvista.com>
+	<1310561772.18446.14.camel@lws-weitzel>
+	<20110714073445.GL5783@atomide.com>
+	<1310632792.4008.3.camel@lws-weitzel>
+	<20110715075024.GO5783@atomide.com>
+Message-ID: <20110715075825.GB2611@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean-Christophe,
+Hi,
 
-On Fri, 15 Jul 2011 01:52:00 +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Cc: linux-i2c at vger.kernel.org
-> ---
->  drivers/i2c/busses/i2c-at91.c                      |    3 ++-
->  .../at91_twi.h => drivers/i2c/busses/i2c-at91.h    |    7 +++----
->  2 files changed, 5 insertions(+), 5 deletions(-)
->  rename arch/arm/mach-at91/include/mach/at91_twi.h => drivers/i2c/busses/i2c-at91.h (97%)
+On Fri, Jul 15, 2011 at 12:50:24AM -0700, Tony Lindgren wrote:
+> * Jan Weitzel <J.Weitzel@phytec.de> [110714 01:34]:
+> > Am Donnerstag, den 14.07.2011, 00:34 -0700 schrieb Tony Lindgren:
+> > > * Jan Weitzel <J.Weitzel@phytec.de> [110713 05:51]:
+> > > > Am Mittwoch, den 13.07.2011, 16:13 +0400 schrieb Sergei Shtylyov:
+> > > > 
+> > > > > 
+> > > > >     Have you added that 'i' at the end intentionally?
+> > > > > 
+> > > > Thank you. It was a tribute to vim.
+> > > 
+> > > :i)
+> > > 
+> > > I'll fold the fixed patch into your original patch. Will also
+> > > keep the new board files in testing-board because of the code
+> > > coalescing and device tree conversion effort.
+> > 
+> > So there is no way to get the board mainline yet?
+> 
+> Well we can add it even before device tree support if it makes
+> sense from code coalescing point of view. In this case it would
+> mean creating board-panda-common.c or similar so the code can
+> be shared amongst the panda variants.
+> 
+> It seems that some GPIO pins are different and there are some
+> difference in devices connected, but big parts of the code can be
+> shared.
 
-Why don't you just merge i2c-at91.h into i2c-at91.c then, if it's the
-only user?
+isn't it easier than to just add a few if (machine_is_xxxx()) checks and
+another MACHINE_START() to board-omap4panda.c rather than creating a new
+file, shuffling code around and then adding a new board file ??
 
 -- 
-Jean Delvare
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 490 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110715/125881cc/attachment-0001.sig>
