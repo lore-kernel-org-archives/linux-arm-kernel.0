@@ -1,142 +1,45 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 15 Jul 2011 17:44:26 +0800
-Subject: [PATCH v2 3/3] dmaengine: imx-sdma: add device tree probe support
-In-Reply-To: <1310723066-567-1-git-send-email-shawn.guo@linaro.org>
-References: <1310723066-567-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1310723066-567-4-git-send-email-shawn.guo@linaro.org>
+From: notasas@gmail.com (Grazvydas Ignotas)
+Date: Fri, 15 Jul 2011 12:32:56 +0300
+Subject: [PATCH V2 00/16] omap_hsmmc patches
+In-Reply-To: <m2k4bm2nwl.fsf@bob.laptop.org>
+References: <1304673255-31634-1-git-send-email-adrian.hunter@nokia.com>
+	<CANOLnONWmYn4FpuF-UAKQR4rAA6LOgWdMfu2bMN46nna6rOxAw@mail.gmail.com>
+	<m2k4bm2nwl.fsf@bob.laptop.org>
+Message-ID: <CANOLnOPGay+jQaeBAVD5-B3WQaWMSiPFirvhrPkeS0_ZgmX-BQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It adds device tree probe support for imx-sdma driver.
+On Wed, Jul 13, 2011 at 6:36 PM, Chris Ball <cjb@laptop.org> wrote:
+> Hi,
+>
+> On Wed, Jul 13 2011, Grazvydas Ignotas wrote:
+>> it seems this series got lost in time, at least patches 01, 02, 03,
+>> 04, 05, 06, 07, 08, 12 look like valid standalone fixes and
+>> improvements to me, they don't touch other trees and still apply
+>> cleanly, so would be good to have.
+>
+> Yeah. ?I didn't merge them because Tony still has unanswered comments on
+> the OMAP side of the patches, and they're submitted as a single patchset.
+>
+> I've applied {2, 3, 5, 6, 7, 8, 12} to mmc-next for 3.1 now. ?1 doesn't
+> apply because the function doesn't exist anymore. ?4 doesn't apply
+> because iclk doesn't exist anymore.
+>
+> If someone wants to look at rebasing the rest of these against mmc-next
+> and resubmitting, I think that'd be useful.
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Cc: Vinod Koul <vinod.koul@intel.com>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
----
- .../devicetree/bindings/dma/fsl-imx-sdma.txt       |   17 ++++++++
- drivers/dma/imx-sdma.c                             |   41 ++++++++++++++++++-
- 2 files changed, 55 insertions(+), 3 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/dma/fsl-imx-sdma.txt
+Thanks! 1 and 4 seem to be unneeded any more (I was trying them on
+linux-next, not noticing it was not updated for a while), and others
+have comments pending, so it's all done.
 
-diff --git a/Documentation/devicetree/bindings/dma/fsl-imx-sdma.txt b/Documentation/devicetree/bindings/dma/fsl-imx-sdma.txt
-new file mode 100644
-index 0000000..d1e3f44
---- /dev/null
-+++ b/Documentation/devicetree/bindings/dma/fsl-imx-sdma.txt
-@@ -0,0 +1,17 @@
-+* Freescale Smart Direct Memory Access (SDMA) Controller for i.MX
-+
-+Required properties:
-+- compatible : Should be "fsl,<chip>-sdma"
-+- reg : Should contain SDMA registers location and length
-+- interrupts : Should contain SDMA interrupt
-+- fsl,sdma-ram-script-name : Should contain the full path of SDMA RAM
-+  scripts firmware
-+
-+Examples:
-+
-+sdma at 83fb0000 {
-+	compatible = "fsl,imx51-sdma", "fsl,imx35-sdma";
-+	reg = <0x83fb0000 0x4000>;
-+	interrupts = <6>;
-+	fsl,sdma-ram-script-name = "sdma-imx51.bin";
-+};
-diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
-index 6b839a2..20504f0 100644
---- a/drivers/dma/imx-sdma.c
-+++ b/drivers/dma/imx-sdma.c
-@@ -32,6 +32,8 @@
- #include <linux/slab.h>
- #include <linux/platform_device.h>
- #include <linux/dmaengine.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
- 
- #include <asm/irq.h>
- #include <mach/sdma.h>
-@@ -331,6 +333,12 @@ static struct platform_device_id sdma_devtypes[] = {
- 	}
- };
- 
-+static const struct of_device_id sdma_dt_ids[] = {
-+	{ .compatible = "fsl,imx31-sdma", .data = &sdma_devtypes[IMX31_SDMA], },
-+	{ .compatible = "fsl,imx35-sdma", .data = &sdma_devtypes[IMX35_SDMA], },
-+	{ /* sentinel */ }
-+};
-+
- #define SDMA_H_CONFIG_DSPDMA	(1 << 12) /* indicates if the DSPDMA is used */
- #define SDMA_H_CONFIG_RTD_PINS	(1 << 11) /* indicates if Real-Time Debug pins are enabled */
- #define SDMA_H_CONFIG_ACR	(1 << 4)  /* indicates if AHB freq /core freq = 2 or 1 */
-@@ -1249,6 +1257,10 @@ err_dma_alloc:
- 
- static int __init sdma_probe(struct platform_device *pdev)
- {
-+	const struct of_device_id *of_id =
-+			of_match_device(sdma_dt_ids, &pdev->dev);
-+	struct device_node *np = pdev->dev.of_node;
-+	const char *fw_name;
- 	int ret;
- 	int irq;
- 	struct resource *iores;
-@@ -1264,7 +1276,7 @@ static int __init sdma_probe(struct platform_device *pdev)
- 
- 	iores = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	irq = platform_get_irq(pdev, 0);
--	if (!iores || irq < 0 || !pdata) {
-+	if (!iores || irq < 0) {
- 		ret = -EINVAL;
- 		goto err_irq;
- 	}
-@@ -1294,6 +1306,8 @@ static int __init sdma_probe(struct platform_device *pdev)
- 	if (!sdma->script_addrs)
- 		goto err_alloc;
- 
-+	if (of_id)
-+		pdev->id_entry = of_id->data;
- 	sdma->devtype = pdev->id_entry->driver_data;
- 
- 	dma_cap_set(DMA_SLAVE, sdma->dma_device.cap_mask);
-@@ -1324,10 +1338,30 @@ static int __init sdma_probe(struct platform_device *pdev)
- 	if (ret)
- 		goto err_init;
- 
--	if (pdata->script_addrs)
-+	if (pdata && pdata->script_addrs)
- 		sdma_add_scripts(sdma, pdata->script_addrs);
- 
--	sdma_get_firmware(sdma, pdata->fw_name);
-+	if (pdata) {
-+		sdma_get_firmware(sdma, pdata->fw_name);
-+	} else {
-+		/*
-+		 * Because that device tree does not encode ROM script address,
-+		 * the RAM script in firmware is mandatory for device tree
-+		 * probe, otherwise it fails.
-+		 */
-+		ret = of_property_read_string(np, "fsl,sdma-ram-script-name",
-+					      &fw_name);
-+		if (ret) {
-+			dev_err(&pdev->dev, "failed to get firmware name\n");
-+			goto err_init;
-+		}
-+
-+		ret = sdma_get_firmware(sdma, fw_name);
-+		if (ret) {
-+			dev_err(&pdev->dev, "failed to get firmware\n");
-+			goto err_init;
-+		}
-+	}
- 
- 	sdma->dma_device.dev = &pdev->dev;
- 
-@@ -1375,6 +1409,7 @@ static int __exit sdma_remove(struct platform_device *pdev)
- static struct platform_driver sdma_driver = {
- 	.driver		= {
- 		.name	= "imx-sdma",
-+		.of_match_table = sdma_dt_ids,
- 	},
- 	.id_table	= sdma_devtypes,
- 	.remove		= __exit_p(sdma_remove),
+>
+> Thanks,
+>
+> - Chris.
+> --
+> Chris Ball ? <cjb@laptop.org> ? <http://printf.net/>
+> One Laptop Per Child
+>
+
 -- 
-1.7.4.1
+Gra?vydas
