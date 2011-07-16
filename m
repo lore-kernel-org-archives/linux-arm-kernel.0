@@ -1,69 +1,36 @@
 From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
-Date: Sat, 16 Jul 2011 13:45:46 +0530
-Subject: [PATCH v4 REPOST 14/20] gpio/omap: use pinctrl offset instead of macro
+Date: Sat, 16 Jul 2011 13:45:47 +0530
+Subject: [PATCH v4 REPOST 15/20] gpio/omap: use readl in irq_handler for all
+	access
 In-Reply-To: <1310804152-9243-1-git-send-email-tarun.kanti@ti.com>
 References: <1310804152-9243-1-git-send-email-tarun.kanti@ti.com>
-Message-ID: <1310804152-9243-15-git-send-email-tarun.kanti@ti.com>
+Message-ID: <1310804152-9243-16-git-send-email-tarun.kanti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Charulatha V <charu@ti.com>
 
-Use regs->pinctrl field instead of using the macro OMAP1510_GPIO_PIN_CONTROL
+Even when bank->width is 16, all the OMAP1 registers are 4-byte aligned, so just
+use a 4-byte read.  The 'enabled' mask is already taking care to mask for bank width.
 
 Signed-off-by: Charulatha V <charu@ti.com>
+Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
 ---
- arch/arm/mach-omap1/gpio15xx.c         |    1 +
- arch/arm/plat-omap/include/plat/gpio.h |    1 +
- drivers/gpio/gpio-omap.c               |    8 +++-----
- 3 files changed, 5 insertions(+), 5 deletions(-)
+ drivers/gpio/gpio-omap.c |    2 --
+ 1 files changed, 0 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap1/gpio15xx.c b/arch/arm/mach-omap1/gpio15xx.c
-index fd2fe8f..020725f 100644
---- a/arch/arm/mach-omap1/gpio15xx.c
-+++ b/arch/arm/mach-omap1/gpio15xx.c
-@@ -85,6 +85,7 @@ static struct omap_gpio_reg_offs omap15xx_gpio_regs = {
- 	.irqenable	= OMAP1510_GPIO_INT_MASK,
- 	.irqenable_inv	= true,
- 	.irqctrl	= OMAP1510_GPIO_INT_CONTROL,
-+	.pinctrl	= OMAP1510_GPIO_PIN_CONTROL,
- };
- 
- static struct __initdata omap_gpio_platform_data omap15xx_gpio_config = {
-diff --git a/arch/arm/plat-omap/include/plat/gpio.h b/arch/arm/plat-omap/include/plat/gpio.h
-index 4f584de..3a05c58 100644
---- a/arch/arm/plat-omap/include/plat/gpio.h
-+++ b/arch/arm/plat-omap/include/plat/gpio.h
-@@ -198,6 +198,7 @@ struct omap_gpio_reg_offs {
- 	u16 irqctrl;
- 	u16 edgectrl1;
- 	u16 edgectrl2;
-+	u16 pinctrl;
- 
- 	bool irqenable_inv;
- };
 diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-index 0da78f3..742c310 100644
+index 742c310..ef2ad76 100644
 --- a/drivers/gpio/gpio-omap.c
 +++ b/drivers/gpio/gpio-omap.c
-@@ -486,15 +486,13 @@ static int omap_gpio_request(struct gpio_chip *chip, unsigned offset)
- 	 */
- 	_set_gpio_triggering(bank, offset, IRQ_TYPE_NONE);
+@@ -572,8 +572,6 @@ static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
+ 		enabled = _get_gpio_irqbank_mask(bank);
+ 		isr_saved = isr = __raw_readl(isr_reg) & enabled;
  
--#ifdef CONFIG_ARCH_OMAP15XX
--	if (bank->method == METHOD_GPIO_1510) {
--		void __iomem *reg;
-+	if (bank->regs->pinctrl) {
-+		void __iomem *reg = bank->base + bank->regs->pinctrl;
+-		if (cpu_is_omap15xx() && (bank->method == METHOD_MPUIO))
+-			isr &= 0x0000ffff;
  
- 		/* Claim the pin for MPU */
--		reg = bank->base + OMAP1510_GPIO_PIN_CONTROL;
- 		__raw_writel(__raw_readl(reg) | (1 << offset), reg);
- 	}
--#endif
-+
- 	if (bank->regs->ctrl && !bank->mod_usage) {
- 		void __iomem *reg = bank->base + bank->regs->ctrl;
- 		u32 ctrl;
+ 		if (bank->level_mask)
+ 			level_mask = bank->level_mask & enabled;
 -- 
 1.6.0.4
