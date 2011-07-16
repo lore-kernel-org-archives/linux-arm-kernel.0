@@ -1,235 +1,378 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 16 Jul 2011 15:44:24 +0900
-Subject: [PATCH V3 11/13] spi/s3c64xx: Add support DMA engine API
+Date: Sat, 16 Jul 2011 15:44:25 +0900
+Subject: [PATCH V3 12/13] ASoC: Samsung: Update DMA interface
 In-Reply-To: <1310798666-7659-1-git-send-email-kgene.kim@samsung.com>
 References: <1310798666-7659-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <1310798666-7659-12-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1310798666-7659-13-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Boojin Kim <boojin.kim@samsung.com>
 
-This patch adds to support DMA generic API to transfer raw
-SPI data. Basiclly the spi driver uses DMA generic API if
-architecture supports it. Otherwise, uses Samsung specific
-S3C-PL330 APIs.
+This patch adds to support the DMA PL330 driver that uses
+DMA generic API. Samsung sound driver uses DMA generic API
+if architecture supports it. Otherwise, use samsung specific
+S3C-PL330 API driver to transfer PCM data.
 
 Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
-Cc: Grant Likely <grant.likely@secretlab.ca>
+Cc: Jassi Brar <jassisinghbrar@gmail.com>
+Cc: Liam Girdwood <lrg@ti.com>
+Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- drivers/spi/spi_s3c64xx.c |  141 ++++++++++++++++++++++-----------------------
- 1 files changed, 69 insertions(+), 72 deletions(-)
+ arch/arm/mach-s3c2410/include/mach/dma.h       |   10 +-
+ arch/arm/mach-s3c64xx/include/mach/dma.h       |    2 +-
+ arch/arm/plat-samsung/include/plat/dma-pl330.h |    2 +-
+ sound/soc/samsung/ac97.c                       |   10 ++-
+ sound/soc/samsung/dma.c                        |  144 ++++++++++--------------
+ sound/soc/samsung/dma.h                        |    4 +-
+ 6 files changed, 78 insertions(+), 94 deletions(-)
 
-diff --git a/drivers/spi/spi_s3c64xx.c b/drivers/spi/spi_s3c64xx.c
-index 8945e20..a4cf76a 100644
---- a/drivers/spi/spi_s3c64xx.c
-+++ b/drivers/spi/spi_s3c64xx.c
-@@ -172,6 +172,9 @@ struct s3c64xx_spi_driver_data {
- 	unsigned                        state;
- 	unsigned                        cur_mode, cur_bpw;
- 	unsigned                        cur_speed;
-+	unsigned			rx_ch;
-+	unsigned			tx_ch;
-+	struct samsung_dma_ops		*ops;
+diff --git a/arch/arm/mach-s3c2410/include/mach/dma.h b/arch/arm/mach-s3c2410/include/mach/dma.h
+index e61a91f..4e485ba 100644
+--- a/arch/arm/mach-s3c2410/include/mach/dma.h
++++ b/arch/arm/mach-s3c2410/include/mach/dma.h
+@@ -50,6 +50,11 @@ enum dma_ch {
+ 	DMACH_MAX,		/* the end entry */
  };
  
- static struct s3c2410_dma_client s3c64xx_spi_dma_client = {
-@@ -227,6 +230,38 @@ static void flush_fifo(struct s3c64xx_spi_driver_data *sdd)
- 	writel(val, regs + S3C64XX_SPI_CH_CFG);
- }
- 
-+static void s3c64xx_spi_dma_rxcb(void *data)
++static inline bool samsung_dma_has_circular(void)
 +{
-+	struct s3c64xx_spi_driver_data *sdd
-+		= (struct s3c64xx_spi_driver_data *)data;
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&sdd->lock, flags);
-+
-+	sdd->state &= ~RXBUSY;
-+	/* If the other done */
-+	if (!(sdd->state & TXBUSY))
-+		complete(&sdd->xfer_completion);
-+
-+	spin_unlock_irqrestore(&sdd->lock, flags);
++	return false;
 +}
 +
-+static void s3c64xx_spi_dma_txcb(void *data)
-+{
-+	struct s3c64xx_spi_driver_data *sdd
-+		= (struct s3c64xx_spi_driver_data *)data;
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&sdd->lock, flags);
-+
-+	sdd->state &= ~TXBUSY;
-+	/* If the other done */
-+	if (!(sdd->state & RXBUSY))
-+		complete(&sdd->xfer_completion);
-+
-+	spin_unlock_irqrestore(&sdd->lock, flags);
-+}
-+
- static void enable_datapath(struct s3c64xx_spi_driver_data *sdd,
- 				struct spi_device *spi,
- 				struct spi_transfer *xfer, int dma_mode)
-@@ -234,6 +269,7 @@ static void enable_datapath(struct s3c64xx_spi_driver_data *sdd,
- 	struct s3c64xx_spi_info *sci = sdd->cntrlr_info;
- 	void __iomem *regs = sdd->regs;
- 	u32 modecfg, chcfg;
-+	struct samsung_dma_prep_info info;
- 
- 	modecfg = readl(regs + S3C64XX_SPI_MODE_CFG);
- 	modecfg &= ~(S3C64XX_SPI_MODE_TXDMA_ON | S3C64XX_SPI_MODE_RXDMA_ON);
-@@ -259,10 +295,14 @@ static void enable_datapath(struct s3c64xx_spi_driver_data *sdd,
- 		chcfg |= S3C64XX_SPI_CH_TXCH_ON;
- 		if (dma_mode) {
- 			modecfg |= S3C64XX_SPI_MODE_TXDMA_ON;
--			s3c2410_dma_config(sdd->tx_dmach, sdd->cur_bpw / 8);
--			s3c2410_dma_enqueue(sdd->tx_dmach, (void *)sdd,
--						xfer->tx_dma, xfer->len);
--			s3c2410_dma_ctrl(sdd->tx_dmach, S3C2410_DMAOP_START);
-+			info.cap = DMA_SLAVE;
-+			info.direction = DMA_TO_DEVICE;
-+			info.buf = xfer->tx_dma;
-+			info.len = xfer->len;
-+			info.fp = s3c64xx_spi_dma_txcb;
-+			info.fp_param = sdd;
-+			sdd->ops->prepare(sdd->tx_ch, &info);
-+			sdd->ops->trigger(sdd->tx_ch);
- 		} else {
- 			switch (sdd->cur_bpw) {
- 			case 32:
-@@ -294,10 +334,14 @@ static void enable_datapath(struct s3c64xx_spi_driver_data *sdd,
- 			writel(((xfer->len * 8 / sdd->cur_bpw) & 0xffff)
- 					| S3C64XX_SPI_PACKET_CNT_EN,
- 					regs + S3C64XX_SPI_PACKET_CNT);
--			s3c2410_dma_config(sdd->rx_dmach, sdd->cur_bpw / 8);
--			s3c2410_dma_enqueue(sdd->rx_dmach, (void *)sdd,
--						xfer->rx_dma, xfer->len);
--			s3c2410_dma_ctrl(sdd->rx_dmach, S3C2410_DMAOP_START);
-+			info.cap = DMA_SLAVE;
-+			info.direction = DMA_FROM_DEVICE;
-+			info.buf = xfer->rx_dma;
-+			info.len = xfer->len;
-+			info.fp = s3c64xx_spi_dma_rxcb;
-+			info.fp_param = sdd;
-+			sdd->ops->prepare(sdd->rx_ch, &info);
-+			sdd->ops->trigger(sdd->rx_ch);
- 		}
- 	}
- 
-@@ -483,46 +527,6 @@ static void s3c64xx_spi_config(struct s3c64xx_spi_driver_data *sdd)
- 	}
- }
- 
--static void s3c64xx_spi_dma_rxcb(struct s3c2410_dma_chan *chan, void *buf_id,
--				 int size, enum s3c2410_dma_buffresult res)
--{
--	struct s3c64xx_spi_driver_data *sdd = buf_id;
--	unsigned long flags;
--
--	spin_lock_irqsave(&sdd->lock, flags);
--
--	if (res == S3C2410_RES_OK)
--		sdd->state &= ~RXBUSY;
--	else
--		dev_err(&sdd->pdev->dev, "DmaAbrtRx-%d\n", size);
--
--	/* If the other done */
--	if (!(sdd->state & TXBUSY))
--		complete(&sdd->xfer_completion);
--
--	spin_unlock_irqrestore(&sdd->lock, flags);
--}
--
--static void s3c64xx_spi_dma_txcb(struct s3c2410_dma_chan *chan, void *buf_id,
--				 int size, enum s3c2410_dma_buffresult res)
--{
--	struct s3c64xx_spi_driver_data *sdd = buf_id;
--	unsigned long flags;
--
--	spin_lock_irqsave(&sdd->lock, flags);
--
--	if (res == S3C2410_RES_OK)
--		sdd->state &= ~TXBUSY;
--	else
--		dev_err(&sdd->pdev->dev, "DmaAbrtTx-%d \n", size);
--
--	/* If the other done */
--	if (!(sdd->state & RXBUSY))
--		complete(&sdd->xfer_completion);
--
--	spin_unlock_irqrestore(&sdd->lock, flags);
--}
--
- #define XFER_DMAADDR_INVALID DMA_BIT_MASK(32)
- 
- static int s3c64xx_spi_map_mssg(struct s3c64xx_spi_driver_data *sdd,
-@@ -697,12 +701,10 @@ static void handle_msg(struct s3c64xx_spi_driver_data *sdd,
- 			if (use_dma) {
- 				if (xfer->tx_buf != NULL
- 						&& (sdd->state & TXBUSY))
--					s3c2410_dma_ctrl(sdd->tx_dmach,
--							S3C2410_DMAOP_FLUSH);
-+					sdd->ops->stop(sdd->tx_ch);
- 				if (xfer->rx_buf != NULL
- 						&& (sdd->state & RXBUSY))
--					s3c2410_dma_ctrl(sdd->rx_dmach,
--							S3C2410_DMAOP_FLUSH);
-+					sdd->ops->stop(sdd->rx_ch);
- 			}
- 
- 			goto out;
-@@ -742,24 +744,19 @@ out:
- 
- static int acquire_dma(struct s3c64xx_spi_driver_data *sdd)
+ static inline bool samsung_dma_is_dmadev(void)
  {
--	if (s3c2410_dma_request(sdd->rx_dmach,
--					&s3c64xx_spi_dma_client, NULL) < 0) {
--		dev_err(&sdd->pdev->dev, "cannot get RxDMA\n");
--		return 0;
--	}
--	s3c2410_dma_set_buffdone_fn(sdd->rx_dmach, s3c64xx_spi_dma_rxcb);
--	s3c2410_dma_devconfig(sdd->rx_dmach, S3C2410_DMASRC_HW,
--					sdd->sfr_start + S3C64XX_SPI_RX_DATA);
+ 	return false;
+@@ -202,9 +207,4 @@ struct s3c2410_dma_chan {
+ 
+ typedef unsigned long dma_device_t;
+ 
+-static inline bool s3c_dma_has_circular(void)
+-{
+-	return false;
+-}
 -
--	if (s3c2410_dma_request(sdd->tx_dmach,
--					&s3c64xx_spi_dma_client, NULL) < 0) {
--		dev_err(&sdd->pdev->dev, "cannot get TxDMA\n");
--		s3c2410_dma_free(sdd->rx_dmach, &s3c64xx_spi_dma_client);
--		return 0;
+ #endif /* __ASM_ARCH_DMA_H */
+diff --git a/arch/arm/mach-s3c64xx/include/mach/dma.h b/arch/arm/mach-s3c64xx/include/mach/dma.h
+index 49c3a53..74fdf25 100644
+--- a/arch/arm/mach-s3c64xx/include/mach/dma.h
++++ b/arch/arm/mach-s3c64xx/include/mach/dma.h
+@@ -58,7 +58,7 @@ enum dma_ch {
+ 	DMACH_MAX		/* the end */
+ };
+ 
+-static __inline__ bool s3c_dma_has_circular(void)
++static inline bool samsung_dma_has_circular(void)
+ {
+ 	return true;
+ }
+diff --git a/arch/arm/plat-samsung/include/plat/dma-pl330.h b/arch/arm/plat-samsung/include/plat/dma-pl330.h
+index e7565c0..4b8b81d 100644
+--- a/arch/arm/plat-samsung/include/plat/dma-pl330.h
++++ b/arch/arm/plat-samsung/include/plat/dma-pl330.h
+@@ -100,7 +100,7 @@ struct s3c2410_dma_client {
+ 	char	*name;
+ };
+ 
+-static inline bool s3c_dma_has_circular(void)
++static inline bool samsung_dma_has_circular(void)
+ {
+ 	return true;
+ }
+diff --git a/sound/soc/samsung/ac97.c b/sound/soc/samsung/ac97.c
+index f97110e..b4f9b00 100644
+--- a/sound/soc/samsung/ac97.c
++++ b/sound/soc/samsung/ac97.c
+@@ -271,7 +271,10 @@ static int s3c_ac97_trigger(struct snd_pcm_substream *substream, int cmd,
+ 
+ 	writel(ac_glbctrl, s3c_ac97.regs + S3C_AC97_GLBCTRL);
+ 
+-	s3c2410_dma_ctrl(dma_data->channel, S3C2410_DMAOP_STARTED);
++	if (!dma_data->ops)
++		dma_data->ops = samsung_dma_get_ops();
++
++	dma_data->ops->started(dma_data->channel);
+ 
+ 	return 0;
+ }
+@@ -317,7 +320,10 @@ static int s3c_ac97_mic_trigger(struct snd_pcm_substream *substream,
+ 
+ 	writel(ac_glbctrl, s3c_ac97.regs + S3C_AC97_GLBCTRL);
+ 
+-	s3c2410_dma_ctrl(dma_data->channel, S3C2410_DMAOP_STARTED);
++	if (!dma_data->ops)
++		dma_data->ops = samsung_dma_get_ops();
++
++	dma_data->ops->started(dma_data->channel);
+ 
+ 	return 0;
+ }
+diff --git a/sound/soc/samsung/dma.c b/sound/soc/samsung/dma.c
+index 5cb3b88..ceca331 100644
+--- a/sound/soc/samsung/dma.c
++++ b/sound/soc/samsung/dma.c
+@@ -62,77 +62,79 @@ struct runtime_data {
+ 	struct s3c_dma_params *params;
+ };
+ 
++static void audio_buffdone(void *data);
++
+ /* dma_enqueue
+  *
+  * place a dma buffer onto the queue for the dma system
+  * to handle.
+-*/
++ */
+ static void dma_enqueue(struct snd_pcm_substream *substream)
+ {
+ 	struct runtime_data *prtd = substream->runtime->private_data;
+ 	dma_addr_t pos = prtd->dma_pos;
+ 	unsigned int limit;
+-	int ret;
++	struct samsung_dma_prep_info dma_info;
+ 
+ 	pr_debug("Entered %s\n", __func__);
+ 
+-	if (s3c_dma_has_circular())
+-		limit = (prtd->dma_end - prtd->dma_start) / prtd->dma_period;
+-	else
+-		limit = prtd->dma_limit;
++	limit = (prtd->dma_end - prtd->dma_start) / prtd->dma_period;
+ 
+ 	pr_debug("%s: loaded %d, limit %d\n",
+ 				__func__, prtd->dma_loaded, limit);
+ 
+-	while (prtd->dma_loaded < limit) {
+-		unsigned long len = prtd->dma_period;
++	dma_info.cap = (samsung_dma_has_circular() ? DMA_CYCLIC : DMA_SLAVE);
++	dma_info.direction =
++		(substream->stream == SNDRV_PCM_STREAM_PLAYBACK
++		? DMA_TO_DEVICE : DMA_FROM_DEVICE);
++	dma_info.fp = audio_buffdone;
++	dma_info.fp_param = substream;
++	dma_info.period = prtd->dma_period;
++	dma_info.len = prtd->dma_period*limit;
+ 
++	while (prtd->dma_loaded < limit) {
+ 		pr_debug("dma_loaded: %d\n", prtd->dma_loaded);
+ 
+-		if ((pos + len) > prtd->dma_end) {
+-			len  = prtd->dma_end - pos;
+-			pr_debug("%s: corrected dma len %ld\n", __func__, len);
++		if ((pos + dma_info.period) > prtd->dma_end) {
++			dma_info.period  = prtd->dma_end - pos;
++			pr_debug("%s: corrected dma len %ld\n",
++					__func__, dma_info.period);
+ 		}
+ 
+-		ret = s3c2410_dma_enqueue(prtd->params->channel,
+-			substream, pos, len);
++		dma_info.buf = pos;
++		prtd->params->ops->prepare(prtd->params->ch, &dma_info);
+ 
+-		if (ret == 0) {
+-			prtd->dma_loaded++;
+-			pos += prtd->dma_period;
+-			if (pos >= prtd->dma_end)
+-				pos = prtd->dma_start;
+-		} else
+-			break;
++		prtd->dma_loaded++;
++		pos += prtd->dma_period;
++		if (pos >= prtd->dma_end)
++			pos = prtd->dma_start;
+ 	}
+ 
+ 	prtd->dma_pos = pos;
+ }
+ 
+-static void audio_buffdone(struct s3c2410_dma_chan *channel,
+-				void *dev_id, int size,
+-				enum s3c2410_dma_buffresult result)
++static void audio_buffdone(void *data)
+ {
+-	struct snd_pcm_substream *substream = dev_id;
+-	struct runtime_data *prtd;
++	struct snd_pcm_substream *substream = data;
++	struct runtime_data *prtd = substream->runtime->private_data;
+ 
+ 	pr_debug("Entered %s\n", __func__);
+ 
+-	if (result == S3C2410_RES_ABORT || result == S3C2410_RES_ERR)
+-		return;
+-
+-	prtd = substream->runtime->private_data;
++	if (prtd->state & ST_RUNNING) {
++		prtd->dma_pos += prtd->dma_period;
++		if (prtd->dma_pos >= prtd->dma_end)
++			prtd->dma_pos = prtd->dma_start;
+ 
+-	if (substream)
+-		snd_pcm_period_elapsed(substream);
++		if (substream)
++			snd_pcm_period_elapsed(substream);
+ 
+-	spin_lock(&prtd->lock);
+-	if (prtd->state & ST_RUNNING && !s3c_dma_has_circular()) {
+-		prtd->dma_loaded--;
+-		dma_enqueue(substream);
++		spin_lock(&prtd->lock);
++		if (!samsung_dma_has_circular()) {
++			prtd->dma_loaded--;
++			dma_enqueue(substream);
++		}
++		spin_unlock(&prtd->lock);
+ 	}
+-
+-	spin_unlock(&prtd->lock);
+ }
+ 
+ static int dma_hw_params(struct snd_pcm_substream *substream,
+@@ -144,8 +146,7 @@ static int dma_hw_params(struct snd_pcm_substream *substream,
+ 	unsigned long totbytes = params_buffer_bytes(params);
+ 	struct s3c_dma_params *dma =
+ 		snd_soc_dai_get_dma_data(rtd->cpu_dai, substream);
+-	int ret = 0;
+-
++	struct samsung_dma_info dma_info;
+ 
+ 	pr_debug("Entered %s\n", __func__);
+ 
+@@ -163,23 +164,20 @@ static int dma_hw_params(struct snd_pcm_substream *substream,
+ 		pr_debug("params %p, client %p, channel %d\n", prtd->params,
+ 			prtd->params->client, prtd->params->channel);
+ 
+-		ret = s3c2410_dma_request(prtd->params->channel,
+-					  prtd->params->client, NULL);
+-
+-		if (ret < 0) {
+-			printk(KERN_ERR "failed to get dma channel\n");
+-			return ret;
+-		}
+-
+-		/* use the circular buffering if we have it available. */
+-		if (s3c_dma_has_circular())
+-			s3c2410_dma_setflags(prtd->params->channel,
+-					     S3C2410_DMAF_CIRCULAR);
++		prtd->params->ops = samsung_dma_get_ops();
++
++		dma_info.cap = (samsung_dma_has_circular() ?
++			DMA_CYCLIC : DMA_SLAVE);
++		dma_info.client = prtd->params->client;
++		dma_info.direction =
++			(substream->stream == SNDRV_PCM_STREAM_PLAYBACK
++			? DMA_TO_DEVICE : DMA_FROM_DEVICE);
++		dma_info.width = prtd->params->dma_size;
++		dma_info.fifo = prtd->params->dma_addr;
++		prtd->params->ch = prtd->params->ops->request(
++				prtd->params->channel, &dma_info);
+ 	}
+ 
+-	s3c2410_dma_set_buffdone_fn(prtd->params->channel,
+-				    audio_buffdone);
+-
+ 	snd_pcm_set_runtime_buffer(substream, &substream->dma_buffer);
+ 
+ 	runtime->dma_bytes = totbytes;
+@@ -206,7 +204,8 @@ static int dma_hw_free(struct snd_pcm_substream *substream)
+ 	snd_pcm_set_runtime_buffer(substream, NULL);
+ 
+ 	if (prtd->params) {
+-		s3c2410_dma_free(prtd->params->channel, prtd->params->client);
++		prtd->params->ops->release(prtd->params->ch,
++					prtd->params->client);
+ 		prtd->params = NULL;
+ 	}
+ 
+@@ -225,23 +224,9 @@ static int dma_prepare(struct snd_pcm_substream *substream)
+ 	if (!prtd->params)
+ 		return 0;
+ 
+-	/* channel needs configuring for mem=>device, increment memory addr,
+-	 * sync to pclk, half-word transfers to the IIS-FIFO. */
+-	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
+-		s3c2410_dma_devconfig(prtd->params->channel,
+-				      S3C2410_DMASRC_MEM,
+-				      prtd->params->dma_addr);
+-	} else {
+-		s3c2410_dma_devconfig(prtd->params->channel,
+-				      S3C2410_DMASRC_HW,
+-				      prtd->params->dma_addr);
 -	}
--	s3c2410_dma_set_buffdone_fn(sdd->tx_dmach, s3c64xx_spi_dma_txcb);
--	s3c2410_dma_devconfig(sdd->tx_dmach, S3C2410_DMASRC_MEM,
--					sdd->sfr_start + S3C64XX_SPI_TX_DATA);
+-
+-	s3c2410_dma_config(prtd->params->channel,
+-			   prtd->params->dma_size);
+-
+ 	/* flush the DMA channel */
+-	s3c2410_dma_ctrl(prtd->params->channel, S3C2410_DMAOP_FLUSH);
++	prtd->params->ops->flush(prtd->params->ch);
 +
-+	struct samsung_dma_info info;
-+	sdd->ops = samsung_dma_get_ops();
-+
-+	info.cap = DMA_SLAVE;
-+	info.client = &s3c64xx_spi_dma_client;
-+	info.direction = DMA_FROM_DEVICE;
-+	info.fifo = sdd->sfr_start + S3C64XX_SPI_RX_DATA;
-+	info.width = sdd->cur_bpw / 8;
-+	sdd->rx_ch = sdd->ops->request(sdd->rx_dmach, &info);
-+	info.direction = DMA_TO_DEVICE;
-+	info.fifo = sdd->sfr_start + S3C64XX_SPI_TX_DATA;
-+	sdd->tx_ch = sdd->ops->request(sdd->tx_dmach, &info);
+ 	prtd->dma_loaded = 0;
+ 	prtd->dma_pos = prtd->dma_start;
  
- 	return 1;
- }
-@@ -800,8 +797,8 @@ static void s3c64xx_spi_work(struct work_struct *work)
- 	spin_unlock_irqrestore(&sdd->lock, flags);
+@@ -265,14 +250,14 @@ static int dma_trigger(struct snd_pcm_substream *substream, int cmd)
+ 	case SNDRV_PCM_TRIGGER_RESUME:
+ 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
+ 		prtd->state |= ST_RUNNING;
+-		s3c2410_dma_ctrl(prtd->params->channel, S3C2410_DMAOP_START);
++		prtd->params->ops->trigger(prtd->params->ch);
+ 		break;
  
- 	/* Free DMA channels */
--	s3c2410_dma_free(sdd->tx_dmach, &s3c64xx_spi_dma_client);
--	s3c2410_dma_free(sdd->rx_dmach, &s3c64xx_spi_dma_client);
-+	sdd->ops->release(sdd->rx_ch, &s3c64xx_spi_dma_client);
-+	sdd->ops->release(sdd->tx_ch, &s3c64xx_spi_dma_client);
- }
+ 	case SNDRV_PCM_TRIGGER_STOP:
+ 	case SNDRV_PCM_TRIGGER_SUSPEND:
+ 	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
+ 		prtd->state &= ~ST_RUNNING;
+-		s3c2410_dma_ctrl(prtd->params->channel, S3C2410_DMAOP_STOP);
++		prtd->params->ops->stop(prtd->params->ch);
+ 		break;
  
- static int s3c64xx_spi_transfer(struct spi_device *spi,
+ 	default:
+@@ -291,21 +276,12 @@ dma_pointer(struct snd_pcm_substream *substream)
+ 	struct snd_pcm_runtime *runtime = substream->runtime;
+ 	struct runtime_data *prtd = runtime->private_data;
+ 	unsigned long res;
+-	dma_addr_t src, dst;
+ 
+ 	pr_debug("Entered %s\n", __func__);
+ 
+-	spin_lock(&prtd->lock);
+-	s3c2410_dma_getposition(prtd->params->channel, &src, &dst);
+-
+-	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
+-		res = dst - prtd->dma_start;
+-	else
+-		res = src - prtd->dma_start;
+-
+-	spin_unlock(&prtd->lock);
++	res = prtd->dma_pos - prtd->dma_start;
+ 
+-	pr_debug("Pointer %x %x\n", src, dst);
++	pr_debug("Pointer offset: %lu\n", res);
+ 
+ 	/* we seem to be getting the odd error from the pcm library due
+ 	 * to out-of-bounds pointers. this is maybe due to the dma engine
+diff --git a/sound/soc/samsung/dma.h b/sound/soc/samsung/dma.h
+index c506592..7d1ead7 100644
+--- a/sound/soc/samsung/dma.h
++++ b/sound/soc/samsung/dma.h
+@@ -6,7 +6,7 @@
+  *  Free Software Foundation;  either version 2 of the  License, or (at your
+  *  option) any later version.
+  *
+- *  ALSA PCM interface for the Samsung S3C24xx CPU
++ *  ALSA PCM interface for the Samsung SoC
+  */
+ 
+ #ifndef _S3C_AUDIO_H
+@@ -17,6 +17,8 @@ struct s3c_dma_params {
+ 	int channel;				/* Channel ID */
+ 	dma_addr_t dma_addr;
+ 	int dma_size;			/* Size of the DMA transfer */
++	unsigned ch;
++	struct samsung_dma_ops *ops;
+ };
+ 
+ #endif
 -- 
 1.7.1
