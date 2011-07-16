@@ -1,71 +1,89 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 16 Jul 2011 11:58:37 +0900
-Subject: [PATCH 3/4] ARM: samsung: Check NULL return from
-	irq_alloc_generic_chip
-In-Reply-To: <1310510305-4540-1-git-send-email-toddpoynor@google.com>
-References: <1310510305-4540-1-git-send-email-toddpoynor@google.com>
-Message-ID: <034e01cc4364$44048800$cc0d9800$%kim@samsung.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Sat, 16 Jul 2011 12:26:41 +0900
+Subject: [PATCH] clocksource: convert S5PV210 32-bit down counting
+	clocksource
+In-Reply-To: <034d01cc4364$3f5075d0$bdf16170$%kim@samsung.com>
+References: <4E1BE0CF.7060207@samsung.com>
+	<034d01cc4364$3f5075d0$bdf16170$%kim@samsung.com>
+Message-ID: <4E2104F1.9050104@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Todd Poynor wrote:
+Kukjin Kim wrote:
+> Chanwoo Choi wrote:
+>> Convert the S5PV210 32-bit down-counting clocksource to the generic
+>> mmio clocksource infrastructure
+>>
+>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+>> ---
+>>  arch/arm/Kconfig             |    1 +
+>>  arch/arm/plat-s5p/s5p-time.c |   20 +++-----------------
+>>  2 files changed, 4 insertions(+), 17 deletions(-)
+>>
+>> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+>> index 9adc278..d7cd6f9 100644
+>> --- a/arch/arm/Kconfig
+>> +++ b/arch/arm/Kconfig
+>> @@ -749,6 +749,7 @@ config ARCH_S5PV210
+>>  	bool "Samsung S5PV210/S5PC110"
+>>  	select CPU_V7
+>>  	select ARCH_SPARSEMEM_ENABLE
+>> +	select CLKSRC_MMIO
+>>  	select GENERIC_GPIO
+>>  	select HAVE_CLK
+>>  	select ARM_L1_CACHE_SHIFT_6
+>> diff --git a/arch/arm/plat-s5p/s5p-time.c b/arch/arm/plat-s5p/s5p-time.c
+>> index 612934c..5666f55 100644
+>> --- a/arch/arm/plat-s5p/s5p-time.c
+>> +++ b/arch/arm/plat-s5p/s5p-time.c
+>> @@ -314,13 +314,6 @@ static void __iomem *s5p_timer_reg(void)
+>>  	return S3C_TIMERREG(offset);
+>>  }
+>>
+>> -static cycle_t s5p_timer_read(struct clocksource *cs)
+>> -{
+>> -	void __iomem *reg = s5p_timer_reg();
+>> -
+>> -	return (cycle_t) (reg ? ~__raw_readl(reg) : 0);
+>> -}
+>> -
+>>  /*
+>>   * Override the global weak sched_clock symbol with this
+>>   * local implementation which uses the clocksource to get some
+>> @@ -350,14 +343,6 @@ static void notrace s5p_update_sched_clock(void)
+>>  	update_sched_clock(&cd, ~__raw_readl(reg), (u32)~0);
+>>  }
+>>
+>> -struct clocksource time_clocksource = {
+>> -	.name		= "s5p_clocksource_timer",
+>> -	.rating		= 250,
+>> -	.read		= s5p_timer_read,
+>> -	.mask		= CLOCKSOURCE_MASK(32),
+>> -	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
+>> -};
+>> -
+>>  static void __init s5p_clocksource_init(void)
+>>  {
+>>  	unsigned long pclk;
+>> @@ -375,8 +360,9 @@ static void __init s5p_clocksource_init(void)
+>>
+>>  	init_sched_clock(&cd, s5p_update_sched_clock, 32, clock_rate);
+>>
+>> -	if (clocksource_register_hz(&time_clocksource, clock_rate))
+>> -		panic("%s: can't register clocksource\n", time_clocksource.name);
+>> +	if (clocksource_mmio_init(s5p_timer_reg(), "s5p_clocksource_timer",
+>> +			clock_rate, 250, 32, clocksource_mmio_readl_down))
+>> +		panic("s5p_clocksource_timer: can't register clocksource\n");
+>>  }
+>>
+>>  static void __init s5p_timer_resources(void)
+>> --
+>> 1.7.0.4
 > 
-> Signed-off-by: Todd Poynor <toddpoynor@google.com>
-> ---
->  arch/arm/plat-samsung/irq-uart.c      |    7 +++++++
->  arch/arm/plat-samsung/irq-vic-timer.c |    7 +++++++
->  2 files changed, 14 insertions(+), 0 deletions(-)
+> The s5p-time is also used on S5P64X0, so CLKSRC_MMIO should be add in that.
 > 
-> diff --git a/arch/arm/plat-samsung/irq-uart.c
-b/arch/arm/plat-samsung/irq-uart.c
-> index 32582c0..38c5364 100644
-> --- a/arch/arm/plat-samsung/irq-uart.c
-> +++ b/arch/arm/plat-samsung/irq-uart.c
-> @@ -54,6 +54,13 @@ static void __init s3c_init_uart_irq(struct
-s3c_uart_irq *uirq)
-> 
->  	gc = irq_alloc_generic_chip("s3c-uart", 1, uirq->base_irq, reg_base,
->  				    handle_level_irq);
-> +
-> +	if (!gc) {
-> +		pr_err("%s: irq_alloc_generic_chip for IRQ %u failed\n",
-> +		       __func__, uirq->base_irq);
-> +		return;
-> +	}
-> +
->  	ct = gc->chip_types;
->  	ct->chip.irq_ack = irq_gc_ack;
->  	ct->chip.irq_mask = irq_gc_mask_set_bit;
-> diff --git a/arch/arm/plat-samsung/irq-vic-timer.c
-b/arch/arm/plat-samsung/irq-vic-
-> timer.c
-> index a607546..f714d06 100644
-> --- a/arch/arm/plat-samsung/irq-vic-timer.c
-> +++ b/arch/arm/plat-samsung/irq-vic-timer.c
-> @@ -54,6 +54,13 @@ void __init s3c_init_vic_timer_irq(unsigned int num,
-> unsigned int timer_irq)
-> 
->  	s3c_tgc = irq_alloc_generic_chip("s3c-timer", 1, timer_irq,
->  					 S3C64XX_TINT_CSTAT,
-> handle_level_irq);
-> +
-> +	if (!s3c_tgc) {
-> +		pr_err("%s: irq_alloc_generic_chip for IRQ %d failed\n",
-> +		       __func__, timer_irq);
-> +		return;
-> +	}
-> +
->  	ct = s3c_tgc->chip_types;
->  	ct->chip.irq_mask = irq_gc_mask_clr_bit;
->  	ct->chip.irq_unmask = irq_gc_mask_set_bit;
-> --
-> 1.7.3.1
+OK, I will repost the modified patch.
 
-Looks good to me, will apply.
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Thanks & Regards,
+Chanwoo Choi
