@@ -1,153 +1,69 @@
 From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
-Date: Sat, 16 Jul 2011 13:45:45 +0530
-Subject: [PATCH v4 REPOST 13/20] gpio/omap: cleanup omap_gpio_mod_init function
+Date: Sat, 16 Jul 2011 13:45:46 +0530
+Subject: [PATCH v4 REPOST 14/20] gpio/omap: use pinctrl offset instead of macro
 In-Reply-To: <1310804152-9243-1-git-send-email-tarun.kanti@ti.com>
 References: <1310804152-9243-1-git-send-email-tarun.kanti@ti.com>
-Message-ID: <1310804152-9243-14-git-send-email-tarun.kanti@ti.com>
+Message-ID: <1310804152-9243-15-git-send-email-tarun.kanti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With register offsets now defined for respective OMAP versions we can get rid
-of cpu_class_* checks. This function now has common initialization code for
-all OMAP versions. Initialization specific to OMAP16xx has been moved within
-omap16xx_gpio_init().
+From: Charulatha V <charu@ti.com>
 
-Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+Use regs->pinctrl field instead of using the macro OMAP1510_GPIO_PIN_CONTROL
+
 Signed-off-by: Charulatha V <charu@ti.com>
 ---
- arch/arm/mach-omap1/gpio16xx.c |   31 +++++++++++++++++-
- drivers/gpio/gpio-omap.c       |   68 +++++++++------------------------------
- 2 files changed, 46 insertions(+), 53 deletions(-)
+ arch/arm/mach-omap1/gpio15xx.c         |    1 +
+ arch/arm/plat-omap/include/plat/gpio.h |    1 +
+ drivers/gpio/gpio-omap.c               |    8 +++-----
+ 3 files changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-omap1/gpio16xx.c b/arch/arm/mach-omap1/gpio16xx.c
-index 08dda3c..bd9c49e 100644
---- a/arch/arm/mach-omap1/gpio16xx.c
-+++ b/arch/arm/mach-omap1/gpio16xx.c
-@@ -218,12 +218,41 @@ static struct __initdata platform_device * omap16xx_gpio_dev[] = {
- static int __init omap16xx_gpio_init(void)
- {
- 	int i;
-+	void __iomem *base;
-+	struct resource *res;
-+	struct platform_device *pdev;
-+	struct omap_gpio_platform_data *pdata;
+diff --git a/arch/arm/mach-omap1/gpio15xx.c b/arch/arm/mach-omap1/gpio15xx.c
+index fd2fe8f..020725f 100644
+--- a/arch/arm/mach-omap1/gpio15xx.c
++++ b/arch/arm/mach-omap1/gpio15xx.c
+@@ -85,6 +85,7 @@ static struct omap_gpio_reg_offs omap15xx_gpio_regs = {
+ 	.irqenable	= OMAP1510_GPIO_INT_MASK,
+ 	.irqenable_inv	= true,
+ 	.irqctrl	= OMAP1510_GPIO_INT_CONTROL,
++	.pinctrl	= OMAP1510_GPIO_PIN_CONTROL,
+ };
  
- 	if (!cpu_is_omap16xx())
- 		return -EINVAL;
+ static struct __initdata omap_gpio_platform_data omap15xx_gpio_config = {
+diff --git a/arch/arm/plat-omap/include/plat/gpio.h b/arch/arm/plat-omap/include/plat/gpio.h
+index 4f584de..3a05c58 100644
+--- a/arch/arm/plat-omap/include/plat/gpio.h
++++ b/arch/arm/plat-omap/include/plat/gpio.h
+@@ -198,6 +198,7 @@ struct omap_gpio_reg_offs {
+ 	u16 irqctrl;
+ 	u16 edgectrl1;
+ 	u16 edgectrl2;
++	u16 pinctrl;
  
--	for (i = 0; i < ARRAY_SIZE(omap16xx_gpio_dev); i++)
-+	for (i = 0; i < ARRAY_SIZE(omap16xx_gpio_dev); i++) {
-+		pdev = omap16xx_gpio_dev[i];
-+		pdata = pdev->dev.platform_data;
-+
-+		res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+		if (unlikely(!res)) {
-+			dev_err(&pdev->dev, "Invalid mem resource.\n");
-+			return -ENODEV;
-+		}
-+
-+		base = ioremap(res->start, resource_size(res));
-+		if (unlikely(!base)) {
-+			dev_err(&pdev->dev, "ioremap failed.\n");
-+			return -ENOMEM;
-+		}
-+
-+		__raw_writel(0x0014, base + OMAP1610_GPIO_SYSCONFIG);
-+
-+		/*
-+		 * Enable system clock for GPIO module.
-+		 * The CAM_CLK_CTRL *is* really the right place.
-+		 */
-+		omap_writel(omap_readl(ULPD_CAM_CLK_CTRL) | 0x04,
-+					ULPD_CAM_CLK_CTRL);
-+
- 		platform_device_register(omap16xx_gpio_dev[i]);
-+	}
- 
- 	return 0;
- }
+ 	bool irqenable_inv;
+ };
 diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-index 5b32bbf..0da78f3 100644
+index 0da78f3..742c310 100644
 --- a/drivers/gpio/gpio-omap.c
 +++ b/drivers/gpio/gpio-omap.c
-@@ -875,62 +875,26 @@ static void __init omap_gpio_show_rev(struct gpio_bank *bank)
-  */
- static struct lock_class_key gpio_lock_class;
+@@ -486,15 +486,13 @@ static int omap_gpio_request(struct gpio_chip *chip, unsigned offset)
+ 	 */
+ 	_set_gpio_triggering(bank, offset, IRQ_TYPE_NONE);
  
--/* TODO: Cleanup cpu_is_* checks */
- static void omap_gpio_mod_init(struct gpio_bank *bank)
- {
--	if (cpu_class_is_omap2()) {
--		if (cpu_is_omap44xx()) {
--			__raw_writel(0xffffffff, bank->base +
--					OMAP4_GPIO_IRQSTATUSCLR0);
--			__raw_writel(0x00000000, bank->base +
--					 OMAP4_GPIO_DEBOUNCENABLE);
--			/* Initialize interface clk ungated, module enabled */
--			__raw_writel(0, bank->base + OMAP4_GPIO_CTRL);
--		} else if (cpu_is_omap34xx()) {
--			__raw_writel(0x00000000, bank->base +
--					OMAP24XX_GPIO_IRQENABLE1);
--			__raw_writel(0xffffffff, bank->base +
--					OMAP24XX_GPIO_IRQSTATUS1);
--			__raw_writel(0x00000000, bank->base +
--					OMAP24XX_GPIO_DEBOUNCE_EN);
--
--			/* Initialize interface clk ungated, module enabled */
--			__raw_writel(0, bank->base + OMAP24XX_GPIO_CTRL);
--		}
--	} else if (cpu_class_is_omap1()) {
--		if (bank_is_mpuio(bank)) {
--			__raw_writew(0xffff, bank->base +
--				OMAP_MPUIO_GPIO_MASKIT / bank->stride);
--			mpuio_init(bank);
--		}
--		if (cpu_is_omap15xx() && bank->method == METHOD_GPIO_1510) {
--			__raw_writew(0xffff, bank->base
--						+ OMAP1510_GPIO_INT_MASK);
--			__raw_writew(0x0000, bank->base
--						+ OMAP1510_GPIO_INT_STATUS);
--		}
--		if (cpu_is_omap16xx() && bank->method == METHOD_GPIO_1610) {
--			__raw_writew(0x0000, bank->base
--						+ OMAP1610_GPIO_IRQENABLE1);
--			__raw_writew(0xffff, bank->base
--						+ OMAP1610_GPIO_IRQSTATUS1);
--			__raw_writew(0x0014, bank->base
--						+ OMAP1610_GPIO_SYSCONFIG);
-+	void __iomem *base = bank->base;
-+	u32 l = 0xffffffff;
+-#ifdef CONFIG_ARCH_OMAP15XX
+-	if (bank->method == METHOD_GPIO_1510) {
+-		void __iomem *reg;
++	if (bank->regs->pinctrl) {
++		void __iomem *reg = bank->base + bank->regs->pinctrl;
  
--			/*
--			 * Enable system clock for GPIO module.
--			 * The CAM_CLK_CTRL *is* really the right place.
--			 */
--			omap_writel(omap_readl(ULPD_CAM_CLK_CTRL) | 0x04,
--						ULPD_CAM_CLK_CTRL);
--		}
--		if (cpu_is_omap7xx() && bank->method == METHOD_GPIO_7XX) {
--			__raw_writel(0xffffffff, bank->base
--						+ OMAP7XX_GPIO_INT_MASK);
--			__raw_writel(0x00000000, bank->base
--						+ OMAP7XX_GPIO_INT_STATUS);
--		}
-+	if (bank_is_mpuio(bank)) {
-+		__raw_writel(0xffff, bank->base + bank->regs->irqenable);
-+		if (bank->regs->wkup_status)
-+			mpuio_init(bank);
-+		return;
+ 		/* Claim the pin for MPU */
+-		reg = bank->base + OMAP1510_GPIO_PIN_CONTROL;
+ 		__raw_writel(__raw_readl(reg) | (1 << offset), reg);
  	}
+-#endif
 +
-+	if (bank->width == 16)
-+		l = 0xffff;
-+
-+	_gpio_rmw(base, bank->regs->irqenable, l, bank->regs->irqenable_inv);
-+	_gpio_rmw(base, bank->regs->irqstatus, l,
-+					bank->regs->irqenable_inv == false);
-+	_gpio_rmw(base, bank->regs->irqenable, l, bank->regs->debounce_en != 0);
-+	_gpio_rmw(base, bank->regs->irqenable, l, bank->regs->ctrl != 0);
- }
- 
- static __init void
+ 	if (bank->regs->ctrl && !bank->mod_usage) {
+ 		void __iomem *reg = bank->base + bank->regs->ctrl;
+ 		u32 ctrl;
 -- 
 1.6.0.4
