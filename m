@@ -1,46 +1,19 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 16 Jul 2011 16:15:16 +0900
-Subject: [PATCH v3 0/6] ARM: EXYNOS4: NURI Board Configuration Update
-In-Reply-To: <1309421729-11172-1-git-send-email-myungjoo.ham@samsung.com>
-References: <1309421729-11172-1-git-send-email-myungjoo.ham@samsung.com>
-Message-ID: <037b01cc4388$1f1b7c50$5d5274f0$%kim@samsung.com>
+Date: Sat, 16 Jul 2011 16:21:37 +0900
+Subject: [GIT PULL] Samsung fixes for 3.0
+Message-ID: <037c01cc4389$02934c10$07b9e430$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MyungJoo Ham wrote:
-> 
-> 1/6: Increase NR_IRQS for MAX8997
-> 2/6: Add MAX8997 PMIC
-> 3/6: Add MAX17042 Fuel Gauge
-> 4/6: Add ADC
-> 5/6: Add MAX8903 Secondary Charger
-> 6/6: Add RTC-S3C
-> 
-> ps. Tushar, I didn't seperated MAX8997 support code out of mach-nuri.c,
-yet
-> because I still have no idea about how similar the Origen board is with
-NURI board.
-> 
-> MyungJoo Ham (6):
->   ARM: EXYNOS4: Increase NR_IRQS for devices with more IRQs
->   Exynos4 NURI: configure regulators and PMIC (MAX8997)
->   Exynos4 NURI: configure MAX17042 fuel gauge
->   Exynos4 NURI: configure ADC.
->   Exynos4 NURI: configure MAX8903 secondary charger
->   Exynos4 NURI: configure rtc-s3c.
-> 
->  arch/arm/mach-exynos4/include/mach/irqs.h |    2 +-
->  arch/arm/mach-exynos4/mach-nuri.c         |  739
-> ++++++++++++++++++++++++++++-
->  2 files changed, 739 insertions(+), 2 deletions(-)
-> 
-> --
-> 1.7.4.1
+Hi Linus,
 
-Hi MyungJoo Ham,
+This is last pull request for v3.0 :)
 
-Sorry for late response.
-I will be back on this next Monday.
+Please pull Samsung fixes from:
+git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+s5p-fixes-for-linus
+
+If any problems, please let me know.
 
 Thanks.
 
@@ -49,3 +22,25 @@ Kgene.
 --
 Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
 SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+The following changes since commit 620917de59eeb934b9f8cf35cc2d95c1ac8ed0fc:
+
+  Linux 3.0-rc7 (2011-07-11 16:51:52 -0700)
+
+are available in the git repository at:
+   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+s5p-fixes-for-linus
+
+Sangwook Lee (1):
+      ARM: SAMSUNG: DMA Cleanup as per sparse
+
+Todd Poynor (1):
+      ARM: SAMSUNG: Check NULL return from irq_alloc_generic_chip
+
+ arch/arm/mach-s3c64xx/dma.c              |   14 +++++++-------
+ arch/arm/plat-s3c24xx/dma.c              |   12 ++++++------
+ arch/arm/plat-samsung/dma.c              |    6 +++---
+ arch/arm/plat-samsung/include/plat/dma.h |   21 +++++++++++----------
+ arch/arm/plat-samsung/irq-uart.c         |    7 +++++++
+ arch/arm/plat-samsung/irq-vic-timer.c    |    7 +++++++
+ 6 files changed, 41 insertions(+), 26 deletions(-)
