@@ -1,246 +1,102 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 16 Jul 2011 15:44:26 +0900
-Subject: [PATCH V3 13/13] ARM: SAMSUNG: Remove Samsung specific enum type for
-	dma direction
-In-Reply-To: <1310798666-7659-1-git-send-email-kgene.kim@samsung.com>
-References: <1310798666-7659-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <1310798666-7659-14-git-send-email-kgene.kim@samsung.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Sat, 16 Jul 2011 00:48:55 -0700
+Subject: [PATCH] OMAP: clockdomain: Wait for powerdomain to be ON when
+	using clockdomain force wakeup
+In-Reply-To: <alpine.DEB.2.00.1107150159580.16606@utopia.booyaka.com>
+References: <1310527588-13022-1-git-send-email-santosh.shilimkar@ti.com>
+	<1310527588-13022-2-git-send-email-santosh.shilimkar@ti.com>
+	<alpine.DEB.2.00.1107150159580.16606@utopia.booyaka.com>
+Message-ID: <4E214267.2090700@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Boojin Kim <boojin.kim@samsung.com>
+Hi Paul,
 
-This patch removes the samsung specific enum type 's3c2410_dmasrc'
-and uses 'dma_data_direction' instead.
+On 7/15/2011 1:03 AM, Paul Walmsley wrote:
+> cc'ing Patrick
+>
+> Hi Rajendra, Santosh,
+>
+> some comments here:
+>
+> On Wed, 13 Jul 2011, Santosh Shilimkar wrote:
+>
+>> While using clockdomain force wakeup method, not waiting for powerdomain
+>> to be effectively ON may end up locking the clockdomain FSM until a
+>> next wakeup event occurs.
+>>
+>> One such issue was seen on OMAP4430, where L4_PER was periodically
+>> getting stuck in in-transition state when transitioning from from OSWR to ON.
+>>
+>> This issue was reported and investigated by Patrick Titiano<p-titiano@ti.com>
+>>
+>> Signed-off-by: Santosh Shilimkar<santosh.shilimkar@ti.com>
+>> Signed-off-by: Rajendra Nayak<rnayak@ti.com>
+>> Reported-by: Patrick Titiano<p-titiano@ti.com>
+>> Cc: Kevin Hilman<khilman@ti.com>
+>> Cc: Benoit Cousson<b-cousson@ti.com>
+>> Cc: Paul Walmsley<paul@pwsan.com>
+>> ---
+>>   arch/arm/mach-omap2/clockdomain.c |    7 ++++++-
+>>   1 files changed, 6 insertions(+), 1 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/clockdomain.c b/arch/arm/mach-omap2/clockdomain.c
+>> index b98a972..583cc3d 100644
+>> --- a/arch/arm/mach-omap2/clockdomain.c
+>> +++ b/arch/arm/mach-omap2/clockdomain.c
+>> @@ -718,6 +718,8 @@ int clkdm_sleep(struct clockdomain *clkdm)
+>>    */
+>>   int clkdm_wakeup(struct clockdomain *clkdm)
+>>   {
+>> +	int ret;
+>> +
+>>   	if (!clkdm)
+>>   		return -EINVAL;
+>>
+>> @@ -732,7 +734,10 @@ int clkdm_wakeup(struct clockdomain *clkdm)
+>>
+>>   	pr_debug("clockdomain: forcing wakeup on %s\n", clkdm->name);
+>>
+>> -	return arch_clkdm->clkdm_wakeup(clkdm);
+>> +	ret = arch_clkdm->clkdm_wakeup(clkdm);
+>> +	ret |= pwrdm_wait_transition(clkdm->pwrdm.ptr);
+>
+> Seems like this should just call pwrdm_state_switch() or
+> pwrdm_clkdm_state_switch()?  (This second function looks superfluous, we
+> should probably get rid of it.)
+>
+This comment was expected since initially we thought of using
+pwrdm_clkdm_state_switch
 
-Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
-Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
----
- arch/arm/mach-s3c2410/include/mach/dma.h         |    2 +-
- arch/arm/mach-s3c2412/dma.c                      |    4 ++--
- arch/arm/mach-s3c64xx/dma.c                      |   10 +++++-----
- arch/arm/mach-s3c64xx/include/mach/dma.h         |    2 +-
- arch/arm/plat-s3c24xx/dma.c                      |   10 +++++-----
- arch/arm/plat-samsung/include/plat/dma-s3c24xx.h |    2 +-
- arch/arm/plat-samsung/include/plat/dma.h         |    9 +++------
- arch/arm/plat-samsung/s3c-dma-ops.c              |    5 +----
- drivers/mmc/host/s3cmci.c                        |    6 +++---
- 9 files changed, 22 insertions(+), 28 deletions(-)
+pwrdm_clkdm_state_switch()
+	|--> pwrdm_wait_transition()
+	|--> pwrdm_state_switch()
 
-diff --git a/arch/arm/mach-s3c2410/include/mach/dma.h b/arch/arm/mach-s3c2410/include/mach/dma.h
-index 4e485ba..ae8e482 100644
---- a/arch/arm/mach-s3c2410/include/mach/dma.h
-+++ b/arch/arm/mach-s3c2410/include/mach/dma.h
-@@ -174,7 +174,7 @@ struct s3c2410_dma_chan {
- 	struct s3c2410_dma_client *client;
- 
- 	/* channel configuration */
--	enum s3c2410_dmasrc	 source;
-+	enum dma_data_direction	 source;
- 	enum dma_ch		 req_ch;
- 	unsigned long		 dev_addr;
- 	unsigned long		 load_timeout;
-diff --git a/arch/arm/mach-s3c2412/dma.c b/arch/arm/mach-s3c2412/dma.c
-index 7abecfc..1c42972 100644
---- a/arch/arm/mach-s3c2412/dma.c
-+++ b/arch/arm/mach-s3c2412/dma.c
-@@ -148,11 +148,11 @@ static struct s3c24xx_dma_map __initdata s3c2412_dma_mappings[] = {
- 
- static void s3c2412_dma_direction(struct s3c2410_dma_chan *chan,
- 				  struct s3c24xx_dma_map *map,
--				  enum s3c2410_dmasrc dir)
-+				  enum dma_data_direction dir)
- {
- 	unsigned long chsel;
- 
--	if (dir == S3C2410_DMASRC_HW)
-+	if (dir == DMA_FROM_DEVICE)
- 		chsel = map->channels_rx[0];
- 	else
- 		chsel = map->channels[0];
-diff --git a/arch/arm/mach-s3c64xx/dma.c b/arch/arm/mach-s3c64xx/dma.c
-index b197171..d96ed4c 100644
---- a/arch/arm/mach-s3c64xx/dma.c
-+++ b/arch/arm/mach-s3c64xx/dma.c
-@@ -147,14 +147,14 @@ static void s3c64xx_dma_fill_lli(struct s3c2410_dma_chan *chan,
- 	u32 control0, control1;
- 
- 	switch (chan->source) {
--	case S3C2410_DMASRC_HW:
-+	case DMA_FROM_DEVICE:
- 		src = chan->dev_addr;
- 		dst = data;
- 		control0 = PL080_CONTROL_SRC_AHB2;
- 		control0 |= PL080_CONTROL_DST_INCR;
- 		break;
- 
--	case S3C2410_DMASRC_MEM:
-+	case DMA_TO_DEVICE:
- 		src = data;
- 		dst = chan->dev_addr;
- 		control0 = PL080_CONTROL_DST_AHB2;
-@@ -416,7 +416,7 @@ EXPORT_SYMBOL(s3c2410_dma_enqueue);
- 
- 
- int s3c2410_dma_devconfig(unsigned int channel,
--			  enum s3c2410_dmasrc source,
-+			  enum dma_data_direction source,
- 			  unsigned long devaddr)
- {
- 	struct s3c2410_dma_chan *chan = s3c_dma_lookup_channel(channel);
-@@ -437,11 +437,11 @@ int s3c2410_dma_devconfig(unsigned int channel,
- 	pr_debug("%s: peripheral %d\n", __func__, peripheral);
- 
- 	switch (source) {
--	case S3C2410_DMASRC_HW:
-+	case DMA_FROM_DEVICE:
- 		config = 2 << PL080_CONFIG_FLOW_CONTROL_SHIFT;
- 		config |= peripheral << PL080_CONFIG_SRC_SEL_SHIFT;
- 		break;
--	case S3C2410_DMASRC_MEM:
-+	case DMA_TO_DEVICE:
- 		config = 1 << PL080_CONFIG_FLOW_CONTROL_SHIFT;
- 		config |= peripheral << PL080_CONFIG_DST_SEL_SHIFT;
- 		break;
-diff --git a/arch/arm/mach-s3c64xx/include/mach/dma.h b/arch/arm/mach-s3c64xx/include/mach/dma.h
-index 74fdf25..fe1a98c 100644
---- a/arch/arm/mach-s3c64xx/include/mach/dma.h
-+++ b/arch/arm/mach-s3c64xx/include/mach/dma.h
-@@ -99,7 +99,7 @@ struct s3c2410_dma_chan {
- 	unsigned char		 peripheral;
- 
- 	unsigned int		 flags;
--	enum s3c2410_dmasrc	 source;
-+	enum dma_data_direction	 source;
- 
- 
- 	dma_addr_t		dev_addr;
-diff --git a/arch/arm/plat-s3c24xx/dma.c b/arch/arm/plat-s3c24xx/dma.c
-index a79a8cc..036ff81 100644
---- a/arch/arm/plat-s3c24xx/dma.c
-+++ b/arch/arm/plat-s3c24xx/dma.c
-@@ -1094,14 +1094,14 @@ EXPORT_SYMBOL(s3c2410_dma_config);
-  *
-  * configure the dma source/destination hardware type and address
-  *
-- * source:    S3C2410_DMASRC_HW: source is hardware
-- *            S3C2410_DMASRC_MEM: source is memory
-+ * source:    DMA_FROM_DEVICE: source is hardware
-+ *            DMA_TO_DEVICE: source is memory
-  *
-  * devaddr:   physical address of the source
- */
- 
- int s3c2410_dma_devconfig(unsigned int channel,
--			  enum s3c2410_dmasrc source,
-+			  enum dma_data_direction source,
- 			  unsigned long devaddr)
- {
- 	struct s3c2410_dma_chan *chan = s3c_dma_lookup_channel(channel);
-@@ -1131,7 +1131,7 @@ int s3c2410_dma_devconfig(unsigned int channel,
- 	 hwcfg |= S3C2410_DISRCC_INC;
- 
- 	switch (source) {
--	case S3C2410_DMASRC_HW:
-+	case DMA_FROME_DEVICE:
- 		/* source is hardware */
- 		pr_debug("%s: hw source, devaddr=%08lx, hwcfg=%d\n",
- 			 __func__, devaddr, hwcfg);
-@@ -1142,7 +1142,7 @@ int s3c2410_dma_devconfig(unsigned int channel,
- 		chan->addr_reg = dma_regaddr(chan, S3C2410_DMA_DIDST);
- 		break;
- 
--	case S3C2410_DMASRC_MEM:
-+	case DMA_TO_DEVICE:
- 		/* source is memory */
- 		pr_debug("%s: mem source, devaddr=%08lx, hwcfg=%d\n",
- 			 __func__, devaddr, hwcfg);
-diff --git a/arch/arm/plat-samsung/include/plat/dma-s3c24xx.h b/arch/arm/plat-samsung/include/plat/dma-s3c24xx.h
-index 336d5ac..1982829 100644
---- a/arch/arm/plat-samsung/include/plat/dma-s3c24xx.h
-+++ b/arch/arm/plat-samsung/include/plat/dma-s3c24xx.h
-@@ -47,7 +47,7 @@ struct s3c24xx_dma_selection {
- 
- 	void	(*direction)(struct s3c2410_dma_chan *chan,
- 			     struct s3c24xx_dma_map *map,
--			     enum s3c2410_dmasrc dir);
-+			     enum dma_data_direction dir);
- };
- 
- extern int s3c24xx_dma_init_map(struct s3c24xx_dma_selection *sel);
-diff --git a/arch/arm/plat-samsung/include/plat/dma.h b/arch/arm/plat-samsung/include/plat/dma.h
-index e87c6be..b395398 100644
---- a/arch/arm/plat-samsung/include/plat/dma.h
-+++ b/arch/arm/plat-samsung/include/plat/dma.h
-@@ -10,17 +10,14 @@
-  * published by the Free Software Foundation.
- */
- 
-+#include <linux/dma-mapping.h>
-+
- enum s3c2410_dma_buffresult {
- 	S3C2410_RES_OK,
- 	S3C2410_RES_ERR,
- 	S3C2410_RES_ABORT
- };
- 
--enum s3c2410_dmasrc {
--	S3C2410_DMASRC_HW,		/* source is memory */
--	S3C2410_DMASRC_MEM		/* source is hardware */
--};
--
- /* enum s3c2410_chan_op
-  *
-  * operation codes passed to the DMA code by the user, and also used
-@@ -111,7 +108,7 @@ extern int s3c2410_dma_config(unsigned int channel, int xferunit);
- */
- 
- extern int s3c2410_dma_devconfig(unsigned int channel,
--		enum s3c2410_dmasrc source, unsigned long devaddr);
-+		enum dma_data_direction source, unsigned long devaddr);
- 
- /* s3c2410_dma_getposition
-  *
-diff --git a/arch/arm/plat-samsung/s3c-dma-ops.c b/arch/arm/plat-samsung/s3c-dma-ops.c
-index b534663..76fe202 100644
---- a/arch/arm/plat-samsung/s3c-dma-ops.c
-+++ b/arch/arm/plat-samsung/s3c-dma-ops.c
-@@ -47,10 +47,7 @@ static unsigned s3c_dma_request(enum dma_ch dma_ch, struct samsung_dma_info *inf
- 	data->ch = dma_ch;
- 	list_add_tail(&data->node, &dma_list);
- 
--	if (info->direction == DMA_FROM_DEVICE)
--		s3c2410_dma_devconfig(dma_ch, S3C2410_DMASRC_HW, info->fifo);
--	else
--		s3c2410_dma_devconfig(dma_ch, S3C2410_DMASRC_MEM, info->fifo);
-+	s3c2410_dma_devconfig(dma_ch, info->direction, info->fifo);
- 
- 	if (info->cap == DMA_CYCLIC)
- 		s3c2410_dma_setflags(dma_ch, S3C2410_DMAF_CIRCULAR);
-diff --git a/drivers/mmc/host/s3cmci.c b/drivers/mmc/host/s3cmci.c
-index a04f87d..03cfdab 100644
---- a/drivers/mmc/host/s3cmci.c
-+++ b/drivers/mmc/host/s3cmci.c
-@@ -913,9 +913,9 @@ request_done:
- }
- 
- static void s3cmci_dma_setup(struct s3cmci_host *host,
--			     enum s3c2410_dmasrc source)
-+			     enum dma_data_direction source)
- {
--	static enum s3c2410_dmasrc last_source = -1;
-+	static enum dma_data_direction last_source = -1;
- 	static int setup_ok;
- 
- 	if (last_source == source)
-@@ -1087,7 +1087,7 @@ static int s3cmci_prepare_dma(struct s3cmci_host *host, struct mmc_data *data)
- 
- 	BUG_ON((data->flags & BOTH_DIR) == BOTH_DIR);
- 
--	s3cmci_dma_setup(host, rw ? S3C2410_DMASRC_MEM : S3C2410_DMASRC_HW);
-+	s3cmci_dma_setup(host, rw ? DMA_TO_DEVICE : DMA_FROM_DEVICE);
- 	s3c2410_dma_ctrl(host->dma, S3C2410_DMAOP_FLUSH);
- 
- 	dma_len = dma_map_sg(mmc_dev(host->mmc), data->sg, data->sg_len,
--- 
-1.7.1
+What we need is only first function to ensure that we don't
+proceed when PD is in middle of transition.
+
+The second function is actually just doing those debug counter
+updates and we wanted to avoid that since it's a live path.
+Rajendra observed some huge latencies while doing the
+profiling and the suspect was "pwrdm_state_switch()" which
+actually keeps adding overhead because of those counter
+updates.
+
+> Shouldn't this be added to all of
+> clkdm_{wakeup,sleep,allow_idle,deny_idle}() if it isn't there already?
+>
+clkdm_allow_idle() already has the power-domain wait.
+This patch adds it for clkdm_wakeup() function.
+clkdm_sleep(), this shouldn't be applicable since power
+domain sleep transition is depdent on other clockdomains
+in the PD and it's a lazy operation.
+That leaves clkdm_deny_idle() and I guess we should
+address this API as well.
+
+If you agree with above, I can update the patch to address
+remaining clkdm_deny_idle() function.
+
+Regards
+Santosh
+Regards
+Santosh
