@@ -1,305 +1,71 @@
-From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
-Date: Sat, 16 Jul 2011 13:45:52 +0530
-Subject: [PATCH v4 REPOST 20/20] gpio/omap: cleanup prepare_for_idle and
-	resume_after_idle
-In-Reply-To: <1310804152-9243-1-git-send-email-tarun.kanti@ti.com>
-References: <1310804152-9243-1-git-send-email-tarun.kanti@ti.com>
-Message-ID: <1310804152-9243-21-git-send-email-tarun.kanti@ti.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Sat, 16 Jul 2011 12:57:52 +0200
+Subject: [PATCH 4/7] at91: remove non used at91_spi.h
+In-Reply-To: <4E206E7D.2070708@vollmann.ch>
+References: <1310687525-22486-1-git-send-email-plagnioj@jcrosoft.com>
+	<1310687525-22486-4-git-send-email-plagnioj@jcrosoft.com>
+	<4E2028E1.1060603@vollmann.ch>
+	<20110715154636.GA20678@game.jcrosoft.org>
+	<4E206E7D.2070708@vollmann.ch>
+Message-ID: <20110716105752.GD20678@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Simplify  omap2_gpio_prepare_for_idle() and omap2_gpio_resume_after_idle()
-by moving most of the stuff to *_pm_runtime_suspend() and *_pm_runtime_resume().
-Also, omap_gpio_suspend() and omap_gpio_resume() optimized to operate per
-GPIO bank instead of operating on entire list every time.
+On 18:44 Fri 15 Jul     , Detlef Vollmann wrote:
+> On 07/15/11 17:46, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> >On 13:47 Fri 15 Jul     , Detlef Vollmann wrote:
+> >>Sorry, I couldn't find a summary message for this patch series,
+> >>so I picked this one to reply, because this one hurts me most.
+> >>
+> >>On 07/15/11 01:52, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> >>>Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD<plagnioj@jcrosoft.com>
+> >>>Cc: Nicolas Ferre<nicolas.ferre@atmel.com>
+> >>>---
+> >>>   arch/arm/mach-at91/include/mach/at91_spi.h |   81
+> >>----------------------------
+> >>>   1 files changed, 0 insertions(+), 81 deletions(-)
+> >>>   delete mode 100644 arch/arm/mach-at91/include/mach/at91_spi.h
+> >>[...]
+> >>
+> >>First, I'm actually using mach/at91_spi.h in an SPI slave driver.
+> >>And I'm using arch/arm/mach-at91/include/mach/at91_spi.h instead of
+> >>drivers/spi/atmel_spi.h (which still exists in the kernel version
+> >>we use here), because arch/arm/mach-at91/include/mach/at91_spi.h
+> >>is accessible from an out-of-tree driver w/o extra effort.
+> >>
+> >>And this applies to all all of those header files, so I'm
+> >>really against all patches in this series.
+> >You need the use SPI framework for this
+> I think you reply here to the wrong part of my message.
+> This part here is about the whole patch series, as I didn't
+> get a summary message for the patch series.
+> 
+> About the SPI driver:
+> From Documentation/spi/spi-summary:
+> "At this writing, Linux has no slave side programming interface."
+> So there's no SPI framwork that covers the slave side.
+This what I mean use the SPI framework and add the SPI Slave support there
+> 
+> >Out of tree driver is not enough good reason to keep it
+> As there's currently no slave support in-tree, any Linux device
+> that's an SPI slave needs an out-of-tree driver.
+> 
+> And again, there's no rationale given for moving all the other
+> headers from an genarally accessible place to a generally
+> inaccessible place, so I'm still against the whole patch series.
+those information are driver and IP related keep them in the
+arch/arm/mach-at91 make those driver difficult to share cross arch
 
-Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
-Signed-off-by: Charulatha V <charu@ti.com>
----
- drivers/gpio/gpio-omap.c |  234 ++++++++++++++++++++++++---------------------
- 1 files changed, 125 insertions(+), 109 deletions(-)
+for the SPI this IP is shared between avr2 and arm so keep it in arch is not
+acceptable at all
 
-diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-index 02a6c04..cb8208b 100644
---- a/drivers/gpio/gpio-omap.c
-+++ b/drivers/gpio/gpio-omap.c
-@@ -1144,142 +1144,153 @@ static int omap_gpio_resume(struct device *dev)
- static void omap_gpio_save_context(struct gpio_bank *bank);
- static void omap_gpio_restore_context(struct gpio_bank *bank);
- 
--void omap2_gpio_prepare_for_idle(int off_mode)
-+static int omap_gpio_runtime_suspend(struct device *dev)
- {
--	struct gpio_bank *bank;
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct gpio_bank *bank = platform_get_drvdata(pdev);
-+	u32 l1 = 0, l2 = 0;
-+	int j;
- 
--	list_for_each_entry(bank, &omap_gpio_list, node) {
--		u32 l1 = 0, l2 = 0;
--		int j;
-+	for (j = 0; j < hweight_long(bank->dbck_enable_mask); j++)
-+		clk_disable(bank->dbck);
- 
--		if (!bank->loses_context)
--			continue;
-+	/* If going to OFF, remove triggering for all
-+	 * non-wakeup GPIOs.  Otherwise spurious IRQs will be
-+	 * generated.  See OMAP2420 Errata item 1.101. */
-+	if (!(bank->enabled_non_wakeup_gpios))
-+		goto save_gpio_ctx;
- 
--		for (j = 0; j < hweight_long(bank->dbck_enable_mask); j++)
--			clk_disable(bank->dbck);
-+	bank->saved_datain = __raw_readl(bank->base +
-+						bank->regs->datain);
-+	l1 = __raw_readl(bank->base + bank->regs->fallingdetect);
-+	l2 = __raw_readl(bank->base + bank->regs->risingdetect);
- 
--		if (!off_mode)
--			continue;
-+	bank->saved_fallingdetect = l1;
-+	bank->saved_risingdetect = l2;
-+	l1 &= ~bank->enabled_non_wakeup_gpios;
-+	l2 &= ~bank->enabled_non_wakeup_gpios;
- 
--		if (IS_ERR_VALUE(pm_runtime_put_sync(bank->dev) < 0))
--			dev_err(bank->dev, "%s: GPIO bank %d "
--					"pm_runtime_put_sync failed\n",
--					__func__, bank->id);
-+	__raw_writel(l1, bank->base + bank->regs->fallingdetect);
-+	__raw_writel(l2, bank->base + bank->regs->risingdetect);
-+
-+save_gpio_ctx:
-+	if (bank->get_context_loss_count)
-+		bank->ctx_loss_count = bank->get_context_loss_count(bank->dev);
-+	omap_gpio_save_context(bank);
-+
-+	return 0;
-+}
-+
-+static int omap_gpio_runtime_resume(struct device *dev)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct gpio_bank *bank = platform_get_drvdata(pdev);
-+	u32 ctx_lost_cnt_after;
-+	u32 l = 0, gen, gen0, gen1;
-+	int j;
-+
-+	for (j = 0; j < hweight_long(bank->dbck_enable_mask); j++)
-+		clk_enable(bank->dbck);
- 
--		/* If going to OFF, remove triggering for all
--		 * non-wakeup GPIOs.  Otherwise spurious IRQs will be
--		 * generated.  See OMAP2420 Errata item 1.101. */
--		if (!(bank->enabled_non_wakeup_gpios))
--			goto save_gpio_ctx;
-+	if (bank->get_context_loss_count) {
-+		ctx_lost_cnt_after =
-+			bank->get_context_loss_count(bank->dev);
-+		if (ctx_lost_cnt_after != bank->ctx_loss_count ||
-+						!ctx_lost_cnt_after)
-+			omap_gpio_restore_context(bank);
-+	}
- 
--		bank->saved_datain = __raw_readl(bank->base +
--							bank->regs->datain);
--		l1 = __raw_readl(bank->base + bank->regs->fallingdetect);
--		l2 = __raw_readl(bank->base + bank->regs->risingdetect);
-+	if (!(bank->enabled_non_wakeup_gpios))
-+		return 0;
- 
--		bank->saved_fallingdetect = l1;
--		bank->saved_risingdetect = l2;
--		l1 &= ~bank->enabled_non_wakeup_gpios;
--		l2 &= ~bank->enabled_non_wakeup_gpios;
-+	__raw_writel(bank->saved_fallingdetect,
-+			bank->base + bank->regs->fallingdetect);
-+	__raw_writel(bank->saved_risingdetect,
-+			bank->base + bank->regs->risingdetect);
-+	l = __raw_readl(bank->base + bank->regs->datain);
- 
--		__raw_writel(l1, bank->base + bank->regs->fallingdetect);
--		__raw_writel(l2, bank->base + bank->regs->risingdetect);
-+	/* Check if any of the non-wakeup interrupt GPIOs have changed
-+	 * state.  If so, generate an IRQ by software.  This is
-+	 * horribly racy, but it's the best we can do to work around
-+	 * this silicon bug. */
-+	l ^= bank->saved_datain;
-+	l &= bank->enabled_non_wakeup_gpios;
- 
--save_gpio_ctx:
--		if (bank->get_context_loss_count)
--			bank->ctx_loss_count =
--				bank->get_context_loss_count(bank->dev);
-+	/*
-+	 * No need to generate IRQs for the rising edge for gpio IRQs
-+	 * configured with falling edge only; and vice versa.
-+	 */
-+	gen0 = l & bank->saved_fallingdetect;
-+	gen0 &= bank->saved_datain;
-+	gen1 = l & bank->saved_risingdetect;
-+	gen1 &= ~(bank->saved_datain);
-+
-+	/* FIXME: Consider GPIO IRQs with level detections properly! */
-+	gen = l & (~(bank->saved_fallingdetect) &
-+			~(bank->saved_risingdetect));
-+	/* Consider all GPIO IRQs needed to be updated */
-+	gen |= gen0 | gen1;
-+
-+	if (gen) {
-+		u32 old0, old1;
-+
-+		old0 = __raw_readl(bank->base +
-+					bank->regs->leveldetect0);
-+		old1 = __raw_readl(bank->base +
-+					bank->regs->leveldetect1);
-+
-+		__raw_writel(old0, bank->base +
-+					bank->regs->leveldetect0);
-+		__raw_writel(old1, bank->base +
-+					bank->regs->leveldetect1);
-+		if (cpu_is_omap24xx() || cpu_is_omap34xx()) {
-+			old0 |= gen;
-+			old1 |= gen;
-+		}
- 
--		omap_gpio_save_context(bank);
-+		if (cpu_is_omap44xx()) {
-+			old0 |= l;
-+			old1 |= l;
-+		}
-+		__raw_writel(old0, bank->base +
-+					bank->regs->leveldetect0);
-+		__raw_writel(old1, bank->base +
-+					bank->regs->leveldetect1);
- 	}
-+
-+	return 0;
- }
- 
--void omap2_gpio_resume_after_idle(void)
-+void omap2_gpio_prepare_for_idle(int off_mode)
- {
- 	struct gpio_bank *bank;
- 
--	list_for_each_entry(bank, &omap_gpio_list, node) {
--		u32 ctx_lost_cnt_after;
--		u32 l = 0, gen, gen0, gen1;
--		int j;
-+	if (!off_mode)
-+		return;
- 
--		if (!bank->loses_context)
-+	list_for_each_entry(bank, &omap_gpio_list, node) {
-+		if (!bank->mod_usage || !bank->loses_context)
- 			continue;
- 
--		if (IS_ERR_VALUE(pm_runtime_get_sync(bank->dev) < 0))
-+		if (IS_ERR_VALUE(pm_runtime_put_sync(bank->dev) < 0))
- 			dev_err(bank->dev, "%s: GPIO bank %d "
--					"pm_runtime_get_sync failed\n",
-+					"pm_runtime_put_sync failed\n",
- 					__func__, bank->id);
-+	}
-+}
- 
--		for (j = 0; j < hweight_long(bank->dbck_enable_mask); j++)
--			clk_enable(bank->dbck);
--
--		if (bank->get_context_loss_count) {
--			ctx_lost_cnt_after =
--				bank->get_context_loss_count(bank->dev);
--			if (ctx_lost_cnt_after != bank->ctx_loss_count ||
--				!ctx_lost_cnt_after)
--				omap_gpio_restore_context(bank);
--		}
-+void omap2_gpio_resume_after_idle(void)
-+{
-+	struct gpio_bank *bank;
- 
--		if (!(bank->enabled_non_wakeup_gpios))
-+	list_for_each_entry(bank, &omap_gpio_list, node) {
-+		if (!bank->mod_usage || !bank->loses_context)
- 			continue;
- 
--		__raw_writel(bank->saved_fallingdetect,
--				bank->base + bank->regs->fallingdetect);
--		__raw_writel(bank->saved_risingdetect,
--				bank->base + bank->regs->risingdetect);
--		l = __raw_readl(bank->base + bank->regs->datain);
--
--		/* Check if any of the non-wakeup interrupt GPIOs have changed
--		 * state.  If so, generate an IRQ by software.  This is
--		 * horribly racy, but it's the best we can do to work around
--		 * this silicon bug. */
--		l ^= bank->saved_datain;
--		l &= bank->enabled_non_wakeup_gpios;
--
--		/*
--		 * No need to generate IRQs for the rising edge for gpio IRQs
--		 * configured with falling edge only; and vice versa.
--		 */
--		gen0 = l & bank->saved_fallingdetect;
--		gen0 &= bank->saved_datain;
--
--		gen1 = l & bank->saved_risingdetect;
--		gen1 &= ~(bank->saved_datain);
--
--		/* FIXME: Consider GPIO IRQs with level detections properly! */
--		gen = l & (~(bank->saved_fallingdetect) &
--				~(bank->saved_risingdetect));
--		/* Consider all GPIO IRQs needed to be updated */
--		gen |= gen0 | gen1;
--
--		if (gen) {
--			u32 old0, old1;
--
--			old0 = __raw_readl(bank->base +
--						bank->regs->leveldetect0);
--			old1 = __raw_readl(bank->base +
--						bank->regs->leveldetect1);
--
--			__raw_writel(old0, bank->base +
--						bank->regs->leveldetect0);
--			__raw_writel(old1, bank->base +
--						bank->regs->leveldetect1);
--			if (cpu_is_omap24xx() || cpu_is_omap34xx()) {
--				old0 |= gen;
--				old1 |= gen;
--			}
--
--			if (cpu_is_omap44xx()) {
--				old0 |= l;
--				old1 |= l;
--			}
--			__raw_writel(old0, bank->base +
--						bank->regs->leveldetect0);
--			__raw_writel(old1, bank->base +
--						bank->regs->leveldetect1);
--		}
-+		if (IS_ERR_VALUE(pm_runtime_get_sync(bank->dev) < 0))
-+			dev_err(bank->dev, "%s: GPIO bank %d "
-+					"pm_runtime_get_sync failed\n",
-+					__func__, bank->id);
- 	}
- }
- 
-@@ -1324,9 +1335,14 @@ static void omap_gpio_restore_context(struct gpio_bank *bank)
- 				bank->base + bank->regs->fallingdetect);
- 	__raw_writel(bank->context.dataout, bank->base + bank->regs->dataout);
- }
-+#else
-+#define omap_gpio_runtime_suspend NULL
-+#define omap_gpio_runtime_resume NULL
- #endif
- 
- static const struct dev_pm_ops gpio_pm_ops = {
-+	.runtime_suspend	= omap_gpio_runtime_suspend,
-+	.runtime_resume		= omap_gpio_runtime_resume,
- 	.suspend		= omap_gpio_suspend,
- 	.resume			= omap_gpio_resume,
- };
--- 
-1.6.0.4
+So if you want to add the SPI Slave support you must make is available for
+both ARCH
+
+so NACK to keep this one and the drivers/spi/atmel_spi.h and
+arch/arm/mach-at91/include/mach/at91_spi.h contain the same information
+
+so we drop the one not used
+
+Best Regards,
+J.
