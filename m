@@ -1,80 +1,136 @@
 From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
-Date: Sat, 16 Jul 2011 13:45:38 +0530
-Subject: [PATCH v4 REPOST 06/20] gpio/omap: make non-wakeup GPIO part of pdata
+Date: Sat, 16 Jul 2011 13:45:39 +0530
+Subject: [PATCH v4 REPOST 07/20] gpio/omap: avoid cpu checks during module
+	ena/disable
 In-Reply-To: <1310804152-9243-1-git-send-email-tarun.kanti@ti.com>
 References: <1310804152-9243-1-git-send-email-tarun.kanti@ti.com>
-Message-ID: <1310804152-9243-7-git-send-email-tarun.kanti@ti.com>
+Message-ID: <1310804152-9243-8-git-send-email-tarun.kanti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Charulatha V <charu@ti.com>
 
-Non-wakeup GPIOs are available only in OMAP2. Avoid cpu_is checks by making
-non_wakeup_gpios as part of pdata.
+Remove cpu-is checks while enabling/disabling OMAP GPIO module during a gpio
+request/free.
 
 Signed-off-by: Charulatha V <charu@ti.com>
 ---
- arch/arm/mach-omap2/gpio.c             |    8 ++++++++
+ arch/arm/mach-omap2/gpio.c             |    2 +
  arch/arm/plat-omap/include/plat/gpio.h |    1 +
- drivers/gpio/gpio-omap.c               |    8 +-------
- 3 files changed, 10 insertions(+), 7 deletions(-)
+ drivers/gpio/gpio-omap.c               |   53 ++++++++++++++------------------
+ 3 files changed, 26 insertions(+), 30 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/gpio.c b/arch/arm/mach-omap2/gpio.c
-index 2e65377..4952a9d 100644
+index 4952a9d..cdbc728 100644
 --- a/arch/arm/mach-omap2/gpio.c
 +++ b/arch/arm/mach-omap2/gpio.c
-@@ -84,6 +84,14 @@ static int omap2_gpio_dev_init(struct omap_hwmod *oh, void *unused)
- 
- 	switch (oh->class->rev) {
- 	case 0:
-+		if (id == 1)
-+			/* non-wakeup GPIO pins for OMAP2 Bank1 */
-+			pdata->non_wakeup_gpios = 0xe203ffc0;
-+		else if (id == 2)
-+			/* non-wakeup GPIO pins for OMAP2 Bank2 */
-+			pdata->non_wakeup_gpios = 0x08700040;
-+		/* fall through */
-+
- 	case 1:
- 		pdata->bank_type = METHOD_GPIO_24XX;
- 		pdata->regs->revision = OMAP24XX_GPIO_REVISION;
+@@ -107,6 +107,7 @@ static int omap2_gpio_dev_init(struct omap_hwmod *oh, void *unused)
+ 		pdata->regs->clr_irqenable = OMAP24XX_GPIO_CLEARIRQENABLE1;
+ 		pdata->regs->debounce = OMAP24XX_GPIO_DEBOUNCE_VAL;
+ 		pdata->regs->debounce_en = OMAP24XX_GPIO_DEBOUNCE_EN;
++		pdata->regs->ctrl = OMAP24XX_GPIO_CTRL;
+ 		break;
+ 	case 2:
+ 		pdata->bank_type = METHOD_GPIO_44XX;
+@@ -123,6 +124,7 @@ static int omap2_gpio_dev_init(struct omap_hwmod *oh, void *unused)
+ 		pdata->regs->clr_irqenable = OMAP4_GPIO_IRQSTATUSCLR0;
+ 		pdata->regs->debounce = OMAP4_GPIO_DEBOUNCINGTIME;
+ 		pdata->regs->debounce_en = OMAP4_GPIO_DEBOUNCENABLE;
++		pdata->regs->ctrl = OMAP4_GPIO_CTRL;
+ 		break;
+ 	default:
+ 		WARN(1, "Invalid gpio bank_type\n");
 diff --git a/arch/arm/plat-omap/include/plat/gpio.h b/arch/arm/plat-omap/include/plat/gpio.h
-index f7798b5..ce417cd 100644
+index ce417cd..cf41743 100644
 --- a/arch/arm/plat-omap/include/plat/gpio.h
 +++ b/arch/arm/plat-omap/include/plat/gpio.h
-@@ -199,6 +199,7 @@ struct omap_gpio_platform_data {
- 	int bank_stride;	/* Only needed for omap1 MPUIO */
- 	bool dbck_flag;		/* dbck required or not - True for OMAP3&4 */
- 	bool loses_context;	/* whether the bank would ever lose context */
-+	u32 non_wakeup_gpios;
+@@ -188,6 +188,7 @@ struct omap_gpio_reg_offs {
+ 	u16 clr_irqenable;
+ 	u16 debounce;
+ 	u16 debounce_en;
++	u16 ctrl;
  
- 	struct omap_gpio_reg_offs *regs;
- 
+ 	bool irqenable_inv;
+ };
 diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-index 412a2cb..057f8c0 100644
+index 057f8c0..5862368 100644
 --- a/drivers/gpio/gpio-omap.c
 +++ b/drivers/gpio/gpio-omap.c
-@@ -1020,13 +1020,6 @@ static void omap_gpio_mod_init(struct gpio_bank *bank)
+@@ -83,6 +83,7 @@ struct gpio_bank {
  
- 			/* Initialize interface clk ungated, module enabled */
- 			__raw_writel(0, bank->base + OMAP24XX_GPIO_CTRL);
--		} else if (cpu_is_omap24xx()) {
--			static const u32 non_wakeup_gpios[] = {
--				0xe203ffc0, 0x08700040
--			};
--			if (bank->id < ARRAY_SIZE(non_wakeup_gpios))
--				bank->non_wakeup_gpios =
--						non_wakeup_gpios[bank->id];
- 		}
- 	} else if (cpu_class_is_omap1()) {
- 		if (bank_is_mpuio(bank)) {
-@@ -1174,6 +1167,7 @@ static int __devinit omap_gpio_probe(struct platform_device *pdev)
- 	bank->dbck_flag = pdata->dbck_flag;
- 	bank->stride = pdata->bank_stride;
- 	bank->width = pdata->bank_width;
-+	bank->non_wakeup_gpios = pdata->non_wakeup_gpios;
- 	bank->loses_context = pdata->loses_context;
- 	bank->get_context_loss_count = pdata->get_context_loss_count;
- 	bank->regs = pdata->regs;
+ #define GPIO_INDEX(bank, gpio) (gpio % bank->width)
+ #define GPIO_BIT(bank, gpio) (1 << GPIO_INDEX(bank, gpio))
++#define GPIO_MOD_CTRL_BIT	BIT(0)
+ 
+ static void _set_gpio_direction(struct gpio_bank *bank, int gpio, int is_input)
+ {
+@@ -576,22 +577,18 @@ static int omap_gpio_request(struct gpio_chip *chip, unsigned offset)
+ 		__raw_writel(__raw_readl(reg) | (1 << offset), reg);
+ 	}
+ #endif
+-	if (!cpu_class_is_omap1()) {
+-		if (!bank->mod_usage) {
+-			void __iomem *reg = bank->base;
+-			u32 ctrl;
+-
+-			if (cpu_is_omap24xx() || cpu_is_omap34xx())
+-				reg += OMAP24XX_GPIO_CTRL;
+-			else if (cpu_is_omap44xx())
+-				reg += OMAP4_GPIO_CTRL;
+-			ctrl = __raw_readl(reg);
+-			/* Module is enabled, clocks are not gated */
+-			ctrl &= 0xFFFFFFFE;
+-			__raw_writel(ctrl, reg);
+-		}
+-		bank->mod_usage |= 1 << offset;
++	if (bank->regs->ctrl && !bank->mod_usage) {
++		void __iomem *reg = bank->base + bank->regs->ctrl;
++		u32 ctrl;
++
++		ctrl = __raw_readl(reg);
++		/* Module is enabled, clocks are not gated */
++		ctrl &= ~GPIO_MOD_CTRL_BIT;
++		__raw_writel(ctrl, reg);
+ 	}
++
++	bank->mod_usage |= 1 << offset;
++
+ 	spin_unlock_irqrestore(&bank->lock, flags);
+ 
+ 	return 0;
+@@ -624,22 +621,18 @@ static void omap_gpio_free(struct gpio_chip *chip, unsigned offset)
+ 		__raw_writel(1 << offset, reg);
+ 	}
+ #endif
+-	if (!cpu_class_is_omap1()) {
+-		bank->mod_usage &= ~(1 << offset);
+-		if (!bank->mod_usage) {
+-			void __iomem *reg = bank->base;
+-			u32 ctrl;
+-
+-			if (cpu_is_omap24xx() || cpu_is_omap34xx())
+-				reg += OMAP24XX_GPIO_CTRL;
+-			else if (cpu_is_omap44xx())
+-				reg += OMAP4_GPIO_CTRL;
+-			ctrl = __raw_readl(reg);
+-			/* Module is disabled, clocks are gated */
+-			ctrl |= 1;
+-			__raw_writel(ctrl, reg);
+-		}
++	bank->mod_usage &= ~(1 << offset);
++
++	if (bank->regs->ctrl && !bank->mod_usage) {
++		void __iomem *reg = bank->base + bank->regs->ctrl;
++		u32 ctrl;
++
++		ctrl = __raw_readl(reg);
++		/* Module is disabled, clocks are gated */
++		ctrl |= GPIO_MOD_CTRL_BIT;
++		__raw_writel(ctrl, reg);
+ 	}
++
+ 	_reset_gpio(bank, bank->chip.base + offset);
+ 	spin_unlock_irqrestore(&bank->lock, flags);
+ }
 -- 
 1.6.0.4
