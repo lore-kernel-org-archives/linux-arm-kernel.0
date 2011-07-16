@@ -1,46 +1,35 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 16 Jul 2011 16:21:37 +0900
-Subject: [GIT PULL] Samsung fixes for 3.0
-Message-ID: <037c01cc4389$02934c10$07b9e430$%kim@samsung.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Sat, 16 Jul 2011 00:28:51 -0700
+Subject: [PATCH] OMAP: powerdomains: Make all powerdomain target states
+	as ON at init
+In-Reply-To: <alpine.DEB.2.00.1107150152590.16606@utopia.booyaka.com>
+References: <1310527588-13022-1-git-send-email-santosh.shilimkar@ti.com>
+	<alpine.DEB.2.00.1107150152590.16606@utopia.booyaka.com>
+Message-ID: <4E213DB3.1080809@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On 7/15/2011 12:54 AM, Paul Walmsley wrote:
+> On Wed, 13 Jul 2011, Santosh Shilimkar wrote:
+>
+>> From: Rajendra Nayak<rnayak@ti.com>
+>>
+>> Program all powerdomain target state as ON; This is to
+>> prevent domains from hitting low power states (if bootloader
+>> has target states set to something other than ON) and potentially
+>> even losing context while PM is not fully initilized.
+>> The PM late init code can then program the desired target
+>> state for all the power domains.
+>>
+>> Signed-off-by: Rajendra Nayak<rnayak@ti.com>
+>
+> Thanks, dropped the second hunk of the patch and queued for 3.1-rc fixes
+> at git://git.pwsan.com/linux-2.6 in the 'pwrdm_clkdm_fixes_3.1rc' branch.
+>
+> Santosh, looks like this is missing a Signed-off-by: or similar from you.
+> Do you want me to add it?
+>
+Sure Paul. I missed to add it somehow while posting it.
 
-This is last pull request for v3.0 :)
-
-Please pull Samsung fixes from:
-git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-s5p-fixes-for-linus
-
-If any problems, please let me know.
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
-
-The following changes since commit 620917de59eeb934b9f8cf35cc2d95c1ac8ed0fc:
-
-  Linux 3.0-rc7 (2011-07-11 16:51:52 -0700)
-
-are available in the git repository at:
-   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-s5p-fixes-for-linus
-
-Sangwook Lee (1):
-      ARM: SAMSUNG: DMA Cleanup as per sparse
-
-Todd Poynor (1):
-      ARM: SAMSUNG: Check NULL return from irq_alloc_generic_chip
-
- arch/arm/mach-s3c64xx/dma.c              |   14 +++++++-------
- arch/arm/plat-s3c24xx/dma.c              |   12 ++++++------
- arch/arm/plat-samsung/dma.c              |    6 +++---
- arch/arm/plat-samsung/include/plat/dma.h |   21 +++++++++++----------
- arch/arm/plat-samsung/irq-uart.c         |    7 +++++++
- arch/arm/plat-samsung/irq-vic-timer.c    |    7 +++++++
- 6 files changed, 41 insertions(+), 26 deletions(-)
+Regards
+Santosh
