@@ -1,448 +1,156 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 16 Jul 2011 15:44:19 +0900
-Subject: [PATCH V3 06/13] ARM: EXYNOS4: Use generic DMA PL330 driver
+Date: Sat, 16 Jul 2011 15:44:14 +0900
+Subject: [PATCH V3 01/13] DMA: PL330: Add support runtime PM for PL330 DMAC
 In-Reply-To: <1310798666-7659-1-git-send-email-kgene.kim@samsung.com>
 References: <1310798666-7659-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <1310798666-7659-7-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1310798666-7659-2-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Boojin Kim <boojin.kim@samsung.com>
 
-This patch makes Samsung EXYNOS4 to use DMA PL330 driver
-on DMADEVICE. The EXYNOS4 uses DMA generic APIs instead of
-SAMSUNG specific S3C-PL330 APIs.
-
 Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
+Cc: Vinod Koul <vinod.koul@intel.com>
+Cc: Dan Williams <dan.j.williams@intel.com>
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/mach-exynos4/Kconfig |    2 +-
- arch/arm/mach-exynos4/clock.c |   16 +-
- arch/arm/mach-exynos4/dma.c   |  323 +++++++++++++++++++++++++++--------------
- 3 files changed, 221 insertions(+), 120 deletions(-)
+ drivers/dma/pl330.c |   78 +++++++++++++++++++++++++++++++++++++++++++++++++--
+ 1 files changed, 75 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-exynos4/Kconfig b/arch/arm/mach-exynos4/Kconfig
-index 1435fc3..5cc9b7a 100644
---- a/arch/arm/mach-exynos4/Kconfig
-+++ b/arch/arm/mach-exynos4/Kconfig
-@@ -11,7 +11,7 @@ if ARCH_EXYNOS4
+diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+index 6abe1ec..39e9ffd 100644
+--- a/drivers/dma/pl330.c
++++ b/drivers/dma/pl330.c
+@@ -17,6 +17,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/amba/bus.h>
+ #include <linux/amba/pl330.h>
++#include <linux/pm_runtime.h>
  
- config CPU_EXYNOS4210
- 	bool
--	select S3C_PL330_DMA
-+	select DMADEV_PL330
- 	help
- 	  Enable EXYNOS4210 CPU support
+ #define NR_DEFAULT_DESC	16
  
-diff --git a/arch/arm/mach-exynos4/clock.c b/arch/arm/mach-exynos4/clock.c
-index 871f9d5..1b2e78c 100644
---- a/arch/arm/mach-exynos4/clock.c
-+++ b/arch/arm/mach-exynos4/clock.c
-@@ -47,6 +47,11 @@ static struct clk clk_sclk_usbphy1 = {
- 	.id		= -1,
- };
+@@ -83,6 +84,8 @@ struct dma_pl330_dmac {
  
-+static struct clk dummy_apb_pclk = {
-+	.name		= "apb_pclk",
-+	.id		= -1,
-+};
+ 	/* Peripheral channels connected to this DMAC */
+ 	struct dma_pl330_chan peripherals[0]; /* keep at end */
 +
- static int exynos4_clksrc_mask_top_ctrl(struct clk *clk, int enable)
- {
- 	return s5p_gatectrl(S5P_CLKSRC_MASK_TOP, clk, enable);
-@@ -485,16 +490,11 @@ static struct clk init_clocks_off[] = {
- 		.enable		= exynos4_clk_ip_fsys_ctrl,
- 		.ctrlbit	= (1 << 10),
- 	}, {
--		.name		= "pdma",
--		.id		= 0,
-+		.name		= "dma",
-+		.id		= -1,
- 		.enable		= exynos4_clk_ip_fsys_ctrl,
- 		.ctrlbit	= (1 << 0),
- 	}, {
--		.name		= "pdma",
--		.id		= 1,
--		.enable		= exynos4_clk_ip_fsys_ctrl,
--		.ctrlbit	= (1 << 1),
--	}, {
- 		.name		= "adc",
- 		.id		= -1,
- 		.enable		= exynos4_clk_ip_peril_ctrl,
-@@ -1212,5 +1212,7 @@ void __init exynos4_register_clocks(void)
- 	s3c_register_clocks(init_clocks_off, ARRAY_SIZE(init_clocks_off));
- 	s3c_disable_clocks(init_clocks_off, ARRAY_SIZE(init_clocks_off));
++	struct clk *clk;
+ };
  
-+	s3c24xx_register_clock(&dummy_apb_pclk);
+ struct dma_pl330_desc {
+@@ -688,7 +691,8 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
+ 	pi->mcbufsz = pdat->mcbuf_sz;
+ 
+ 	res = &adev->res;
+-	request_mem_region(res->start, resource_size(res), "dma-pl330");
++	request_mem_region(res->start,
++		resource_size(res), dev_name(&adev->dev));
+ 
+ 	pi->base = ioremap(res->start, resource_size(res));
+ 	if (!pi->base) {
+@@ -696,6 +700,30 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
+ 		goto probe_err1;
+ 	}
+ 
++	pdmac->clk = clk_get(&adev->dev, "dma");
++	if (IS_ERR(pdmac->clk)) {
++		dev_err(&adev->dev, "Cannot get operation clock.\n");
++		ret = -EINVAL;
++		goto probe_err1;
++	}
 +
- 	s3c_pwmclk_init();
- }
-diff --git a/arch/arm/mach-exynos4/dma.c b/arch/arm/mach-exynos4/dma.c
-index 564bb53..e1c00cf 100644
---- a/arch/arm/mach-exynos4/dma.c
-+++ b/arch/arm/mach-exynos4/dma.c
-@@ -21,151 +21,250 @@
-  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-  */
++	amba_set_drvdata(adev, pdmac);
++
++#ifdef CONFIG_PM_RUNTIME
++	/* to use the runtime PM helper functions */
++	pm_runtime_enable(&adev->dev);
++
++	/* enable the power domain */
++	if (pm_runtime_get_sync(&adev->dev)) {
++		dev_err(&adev->dev, "failed to get runtime pm\n");
++		ret = -ENODEV;
++		goto probe_err1;
++	}
++#else
++	/* enable dma clk */
++	clk_enable(pdmac->clk);
++#endif
++
+ 	irq = adev->irq[0];
+ 	ret = request_irq(irq, pl330_irq_handler, 0,
+ 			dev_name(&adev->dev), pi);
+@@ -763,8 +791,6 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
+ 		goto probe_err4;
+ 	}
  
--#include <linux/platform_device.h>
- #include <linux/dma-mapping.h>
-+#include <linux/amba/bus.h>
-+#include <linux/amba/pl330.h>
- 
-+#include <asm/irq.h>
- #include <plat/devs.h>
- #include <plat/irqs.h>
- 
- #include <mach/map.h>
- #include <mach/irqs.h>
+-	amba_set_drvdata(adev, pdmac);
 -
--#include <plat/s3c-pl330-pdata.h>
-+#include <mach/dma.h>
+ 	dev_info(&adev->dev,
+ 		"Loaded driver for PL330 DMAC-%d\n", adev->periphid);
+ 	dev_info(&adev->dev,
+@@ -825,6 +851,13 @@ static int __devexit pl330_remove(struct amba_device *adev)
+ 	res = &adev->res;
+ 	release_mem_region(res->start, resource_size(res));
  
- static u64 dma_dmamask = DMA_BIT_MASK(32);
- 
--static struct resource exynos4_pdma0_resource[] = {
--	[0] = {
--		.start	= EXYNOS4_PA_PDMA0,
--		.end	= EXYNOS4_PA_PDMA0 + SZ_4K,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= IRQ_PDMA0,
--		.end	= IRQ_PDMA0,
--		.flags	= IORESOURCE_IRQ,
-+struct dma_pl330_peri pdma0_peri[32] = {
-+	{
-+		.peri_id = (u8)DMACH_PCM0_RX,
-+		.rqtype = DEVTOMEM,
-+	}, {
-+		.peri_id = (u8)DMACH_PCM0_TX,
-+		.rqtype = MEMTODEV,
-+	}, {
-+		.peri_id = (u8)DMACH_PCM2_RX,
-+		.rqtype = DEVTOMEM,
-+	}, {
-+		.peri_id = (u8)DMACH_PCM2_TX,
-+		.rqtype = MEMTODEV,
-+		.burst_sz = 4,
-+	}, {
-+		.peri_id = (u8)DMACH_MSM_REQ0,
-+	}, {
-+		.peri_id = (u8)DMACH_MSM_REQ2,
-+	}, {
-+		.peri_id = (u8)DMACH_SPI0_RX,
-+		.rqtype = DEVTOMEM,
-+		.burst_sz = 1,
-+	}, {
-+		.peri_id = (u8)DMACH_SPI0_TX,
-+		.rqtype = MEMTODEV,
-+		.burst_sz = 1,
-+	}, {
-+		.peri_id = (u8)DMACH_SPI2_RX,
-+		.rqtype = DEVTOMEM,
-+		.burst_sz = 1,
-+	}, {
-+		.peri_id = (u8)DMACH_SPI2_TX,
-+		.rqtype = MEMTODEV,
-+		.burst_sz = 1,
-+	}, {
-+		.peri_id = (u8)DMACH_I2S0S_TX,
-+		.rqtype = MEMTODEV,
-+	}, {
-+		.peri_id = (u8)DMACH_I2S0_RX,
-+		.rqtype = DEVTOMEM,
-+	}, {
-+		.peri_id = (u8)DMACH_I2S0_TX,
-+		.rqtype = MEMTODEV,
-+	}, {
-+		.peri_id = (u8)DMACH_UART0_RX,
-+		.rqtype = DEVTOMEM,
-+		.burst_sz = 4,
-+	}, {
-+		.peri_id = (u8)DMACH_UART0_TX,
-+		.rqtype = MEMTODEV,
-+		.burst_sz = 4,
-+	}, {
-+		.peri_id = (u8)DMACH_UART2_RX,
-+		.rqtype = DEVTOMEM,
-+		.burst_sz = 4,
-+	}, {
-+		.peri_id = (u8)DMACH_UART2_TX,
-+		.rqtype = MEMTODEV,
-+		.burst_sz = 4,
-+	}, {
-+		.peri_id = (u8)DMACH_UART4_RX,
-+		.rqtype = DEVTOMEM,
-+		.burst_sz = 4,
-+	}, {
-+		.peri_id = (u8)DMACH_UART4_TX,
-+		.rqtype = MEMTODEV,
-+		.burst_sz = 4,
-+	}, {
-+		.peri_id = (u8)DMACH_SLIMBUS0_RX,
-+		.rqtype = DEVTOMEM,
-+	}, {
-+		.peri_id = (u8)DMACH_SLIMBUS0_TX,
-+		.rqtype = MEMTODEV,
-+	}, {
-+		.peri_id = (u8)DMACH_SLIMBUS2_RX,
-+		.rqtype = DEVTOMEM,
-+	}, {
-+		.peri_id = (u8)DMACH_SLIMBUS2_TX,
-+		.rqtype = MEMTODEV,
-+	}, {
-+		.peri_id = (u8)DMACH_SLIMBUS4_RX,
-+		.rqtype = DEVTOMEM,
-+	}, {
-+		.peri_id = (u8)DMACH_SLIMBUS4_TX,
-+		.rqtype = MEMTODEV,
-+	}, {
-+		.peri_id = (u8)DMACH_AC97_MICIN,
-+		.rqtype = DEVTOMEM,
-+		.burst_sz = 4,
-+	}, {
-+		.peri_id = (u8)DMACH_AC97_PCMIN,
-+		.rqtype = DEVTOMEM,
-+		.burst_sz = 4,
-+	}, {
-+		.peri_id = (u8)DMACH_AC97_PCMOUT,
-+		.rqtype = MEMTODEV,
-+		.burst_sz = 4,
- 	},
- };
- 
--static struct s3c_pl330_platdata exynos4_pdma0_pdata = {
--	.peri = {
--		[0] = DMACH_PCM0_RX,
--		[1] = DMACH_PCM0_TX,
--		[2] = DMACH_PCM2_RX,
--		[3] = DMACH_PCM2_TX,
--		[4] = DMACH_MSM_REQ0,
--		[5] = DMACH_MSM_REQ2,
--		[6] = DMACH_SPI0_RX,
--		[7] = DMACH_SPI0_TX,
--		[8] = DMACH_SPI2_RX,
--		[9] = DMACH_SPI2_TX,
--		[10] = DMACH_I2S0S_TX,
--		[11] = DMACH_I2S0_RX,
--		[12] = DMACH_I2S0_TX,
--		[13] = DMACH_I2S2_RX,
--		[14] = DMACH_I2S2_TX,
--		[15] = DMACH_UART0_RX,
--		[16] = DMACH_UART0_TX,
--		[17] = DMACH_UART2_RX,
--		[18] = DMACH_UART2_TX,
--		[19] = DMACH_UART4_RX,
--		[20] = DMACH_UART4_TX,
--		[21] = DMACH_SLIMBUS0_RX,
--		[22] = DMACH_SLIMBUS0_TX,
--		[23] = DMACH_SLIMBUS2_RX,
--		[24] = DMACH_SLIMBUS2_TX,
--		[25] = DMACH_SLIMBUS4_RX,
--		[26] = DMACH_SLIMBUS4_TX,
--		[27] = DMACH_AC97_MICIN,
--		[28] = DMACH_AC97_PCMIN,
--		[29] = DMACH_AC97_PCMOUT,
--		[30] = DMACH_MAX,
--		[31] = DMACH_MAX,
--	},
-+struct dma_pl330_platdata exynos4_pdma0_pdata = {
-+	.nr_valid_peri = 32,
-+	.peri = pdma0_peri,
- };
- 
--static struct platform_device exynos4_device_pdma0 = {
--	.name		= "s3c-pl330",
--	.id		= 0,
--	.num_resources	= ARRAY_SIZE(exynos4_pdma0_resource),
--	.resource	= exynos4_pdma0_resource,
--	.dev		= {
-+struct amba_device exynos4_device_pdma0 = {
-+	.dev = {
-+		.init_name = "dma-pl330.0",
- 		.dma_mask = &dma_dmamask,
- 		.coherent_dma_mask = DMA_BIT_MASK(32),
- 		.platform_data = &exynos4_pdma0_pdata,
--	},
-+		},
-+	.res = {
-+		.start = EXYNOS4_PA_PDMA0,
-+		.end = EXYNOS4_PA_PDMA0 + SZ_4K,
-+		.flags = IORESOURCE_MEM,
-+		},
-+	.irq = {IRQ_PDMA0, NO_IRQ},
-+	.periphid = 0x00041330,
- };
- 
--static struct resource exynos4_pdma1_resource[] = {
--	[0] = {
--		.start	= EXYNOS4_PA_PDMA1,
--		.end	= EXYNOS4_PA_PDMA1 + SZ_4K,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= IRQ_PDMA1,
--		.end	= IRQ_PDMA1,
--		.flags	= IORESOURCE_IRQ,
-+struct dma_pl330_peri pdma1_peri[32] = {
-+	{
-+		.peri_id = (u8)DMACH_PCM0_RX,
-+		.rqtype = DEVTOMEM,
-+	}, {
-+		.peri_id = (u8)DMACH_PCM0_TX,
-+		.rqtype = MEMTODEV,
-+	}, {
-+		.peri_id = (u8)DMACH_PCM1_RX,
-+		.rqtype = DEVTOMEM,
-+	}, {
-+		.peri_id = (u8)DMACH_PCM1_TX,
-+		.rqtype = MEMTODEV,
-+	}, {
-+		.peri_id = (u8)DMACH_MSM_REQ1,
-+	}, {
-+		.peri_id = (u8)DMACH_MSM_REQ3,
-+	}, {
-+		.peri_id = (u8)DMACH_SPI1_RX,
-+		.rqtype = DEVTOMEM,
-+		.burst_sz = 1,
-+	}, {
-+		.peri_id = (u8)DMACH_SPI1_TX,
-+		.rqtype = MEMTODEV,
-+		.burst_sz = 1,
-+	}, {
-+		.peri_id = (u8)DMACH_I2S0S_TX,
-+		.rqtype = MEMTODEV,
-+	}, {
-+		.peri_id = (u8)DMACH_I2S0_RX,
-+		.rqtype = DEVTOMEM,
-+	}, {
-+		.peri_id = (u8)DMACH_I2S0_TX,
-+		.rqtype = MEMTODEV,
-+	}, {
-+		.peri_id = (u8)DMACH_I2S1_RX,
-+		.rqtype = DEVTOMEM,
-+	}, {
-+		.peri_id = (u8)DMACH_I2S1_TX,
-+		.rqtype = MEMTODEV,
-+	}, {
-+		.peri_id = (u8)DMACH_UART0_RX,
-+		.rqtype = DEVTOMEM,
-+		.burst_sz = 4,
-+	}, {
-+		.peri_id = (u8)DMACH_UART0_TX,
-+		.rqtype = MEMTODEV,
-+		.burst_sz = 4,
-+	}, {
-+		.peri_id = (u8)DMACH_UART1_RX,
-+		.rqtype = DEVTOMEM,
-+		.burst_sz = 4,
-+	}, {
-+		.peri_id = (u8)DMACH_UART1_TX,
-+		.rqtype = MEMTODEV,
-+		.burst_sz = 4,
-+	}, {
-+		.peri_id = (u8)DMACH_UART3_RX,
-+		.rqtype = DEVTOMEM,
-+		.burst_sz = 4,
-+	}, {
-+		.peri_id = (u8)DMACH_UART3_TX,
-+		.rqtype = MEMTODEV,
-+		.burst_sz = 4,
-+	}, {
-+		.peri_id = (u8)DMACH_SLIMBUS1_RX,
-+		.rqtype = DEVTOMEM,
-+	}, {
-+		.peri_id = (u8)DMACH_SLIMBUS1_TX,
-+		.rqtype = MEMTODEV,
-+	}, {
-+		.peri_id = (u8)DMACH_SLIMBUS3_RX,
-+		.rqtype = DEVTOMEM,
-+	}, {
-+		.peri_id = (u8)DMACH_SLIMBUS3_TX,
-+		.rqtype = MEMTODEV,
-+	}, {
-+		.peri_id = (u8)DMACH_SLIMBUS5_RX,
-+		.rqtype = DEVTOMEM,
-+	}, {
-+		.peri_id = (u8)DMACH_SLIMBUS5_TX,
-+		.rqtype = MEMTODEV,
- 	},
- };
- 
--static struct s3c_pl330_platdata exynos4_pdma1_pdata = {
--	.peri = {
--		[0] = DMACH_PCM0_RX,
--		[1] = DMACH_PCM0_TX,
--		[2] = DMACH_PCM1_RX,
--		[3] = DMACH_PCM1_TX,
--		[4] = DMACH_MSM_REQ1,
--		[5] = DMACH_MSM_REQ3,
--		[6] = DMACH_SPI1_RX,
--		[7] = DMACH_SPI1_TX,
--		[8] = DMACH_I2S0S_TX,
--		[9] = DMACH_I2S0_RX,
--		[10] = DMACH_I2S0_TX,
--		[11] = DMACH_I2S1_RX,
--		[12] = DMACH_I2S1_TX,
--		[13] = DMACH_UART0_RX,
--		[14] = DMACH_UART0_TX,
--		[15] = DMACH_UART1_RX,
--		[16] = DMACH_UART1_TX,
--		[17] = DMACH_UART3_RX,
--		[18] = DMACH_UART3_TX,
--		[19] = DMACH_SLIMBUS1_RX,
--		[20] = DMACH_SLIMBUS1_TX,
--		[21] = DMACH_SLIMBUS3_RX,
--		[22] = DMACH_SLIMBUS3_TX,
--		[23] = DMACH_SLIMBUS5_RX,
--		[24] = DMACH_SLIMBUS5_TX,
--		[25] = DMACH_SLIMBUS0AUX_RX,
--		[26] = DMACH_SLIMBUS0AUX_TX,
--		[27] = DMACH_SPDIF,
--		[28] = DMACH_MAX,
--		[29] = DMACH_MAX,
--		[30] = DMACH_MAX,
--		[31] = DMACH_MAX,
--	},
-+struct dma_pl330_platdata exynos4_pdma1_pdata = {
-+	.nr_valid_peri = 32,
-+	.peri = pdma1_peri,
- };
- 
--static struct platform_device exynos4_device_pdma1 = {
--	.name		= "s3c-pl330",
--	.id		= 1,
--	.num_resources	= ARRAY_SIZE(exynos4_pdma1_resource),
--	.resource	= exynos4_pdma1_resource,
--	.dev		= {
-+struct amba_device exynos4_device_pdma1 = {
-+	.dev = {
-+		.init_name = "dma-pl330.1",
- 		.dma_mask = &dma_dmamask,
- 		.coherent_dma_mask = DMA_BIT_MASK(32),
- 		.platform_data = &exynos4_pdma1_pdata,
- 	},
--};
--
--static struct platform_device *exynos4_dmacs[] __initdata = {
--	&exynos4_device_pdma0,
--	&exynos4_device_pdma1,
-+	.res = {
-+		.start = EXYNOS4_PA_PDMA1,
-+		.end = EXYNOS4_PA_PDMA1 + SZ_4K,
-+		.flags = IORESOURCE_MEM,
-+	},
-+	.irq = {IRQ_PDMA1, NO_IRQ},
-+	.periphid = 0x00041330,
- };
- 
- static int __init exynos4_dma_init(void)
- {
--	platform_add_devices(exynos4_dmacs, ARRAY_SIZE(exynos4_dmacs));
-+	amba_device_register(&exynos4_device_pdma0, &iomem_resource);
++#ifdef CONFIG_PM_RUNTIME
++	pm_runtime_put(&adev->dev);
++	pm_runtime_disable(&adev->dev);
++#else
++	clk_disable(pdmac->clk);
++#endif
++
+ 	kfree(pdmac);
  
  	return 0;
- }
+@@ -838,10 +871,49 @@ static struct amba_id pl330_ids[] = {
+ 	{ 0, 0 },
+ };
+ 
++#ifdef CONFIG_PM_RUNTIME
++static int pl330_runtime_suspend(struct device *dev)
++{
++	struct dma_pl330_dmac *pdmac = dev_get_drvdata(dev);
++
++	if (!pdmac) {
++		dev_err(dev, "failed to get dmac\n");
++		return -ENODEV;
++	}
++
++	clk_disable(pdmac->clk);
++
++	return 0;
++}
++
++static int pl330_runtime_resume(struct device *dev)
++{
++	struct dma_pl330_dmac *pdmac = dev_get_drvdata(dev);
++
++	if (!pdmac) {
++		dev_err(dev, "failed to get dmac\n");
++		return -ENODEV;
++	}
++
++	clk_enable(pdmac->clk);
++
++	return 0;
++}
++#else
++#define pl330_runtime_suspend	NULL
++#define pl330_runtime_resume	NULL
++#endif /* CONFIG_PM_RUNTIME */
++
++static const struct dev_pm_ops pl330_pm_ops = {
++	.runtime_suspend = pl330_runtime_suspend,
++	.runtime_resume = pl330_runtime_resume,
++};
++
+ static struct amba_driver pl330_driver = {
+ 	.drv = {
+ 		.owner = THIS_MODULE,
+ 		.name = "dma-pl330",
++		.pm = &pl330_pm_ops,
+ 	},
+ 	.id_table = pl330_ids,
+ 	.probe = pl330_probe,
 -- 
 1.7.1
