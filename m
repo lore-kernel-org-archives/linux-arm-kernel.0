@@ -1,47 +1,41 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Sat, 16 Jul 2011 23:24:29 +0200
-Subject: [patch 3/3] imx: efika: Enable pata.
-In-Reply-To: <20110716210155.452675636@rtp-net.org>
-References: <20110716204411.832712955@rtp-net.org>
-	<20110716210155.452675636@rtp-net.org>
-Message-ID: <20110716212429.GB1233@pengutronix.de>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Sat, 16 Jul 2011 18:41:47 -0400 (EDT)
+Subject: [PATCH] ARM: move memory layout sanity checking before meminfo
+	initialization
+In-Reply-To: <CAMbhsRSQpThghsO0X=i8g3MmyZC+cDJaOJ1+MYZV3hvw-8=GXw@mail.gmail.com>
+References: <CAMbhsRT=NNYUYyYZXpz2=PpBXoBGANQHPgOkCE1oZ8XzHKN4og@mail.gmail.com>
+	<CAMbhsRSgUcFPpdTFvEDTFfo_Wk0k7BQzwk6cRtXC6K7mpQ+YDg@mail.gmail.com>
+	<20110715080950.GL23270@n2100.arm.linux.org.uk>
+	<CAMbhsRRCV0ukwbzFc6w_ba6xdVxs=TFmJMGd06UKTiNQPEJqpw@mail.gmail.com>
+	<20110715161628.GA24628@n2100.arm.linux.org.uk>
+	<CAMbhsRSbXTLzhSzBbQ8ebJqAC227ESHGyY2bHS+J4cN+NgzXFg@mail.gmail.com>
+	<20110715181309.GD24628@n2100.arm.linux.org.uk>
+	<CAMbhsRQRjwskzWB06g7rmSVgSdq5oVxA3yY+14qdtTxuQ=NeMQ@mail.gmail.com>
+	<20110715210720.GF24628@n2100.arm.linux.org.uk>
+	<CAMbhsRR=EVhKPkNUnzQ_2Ai9edWpmvHM_9TXwhh-xaa9Dk1Mcw@mail.gmail.com>
+	<20110715215819.GG24628@n2100.arm.linux.org.uk>
+	<CAMbhsRSQpThghsO0X=i8g3MmyZC+cDJaOJ1+MYZV3hvw-8=GXw@mail.gmail.com>
+Message-ID: <alpine.LFD.2.00.1107161837330.4069@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 16, 2011 at 10:44:14PM +0200, Arnaud Patard wrote:
-> Enable pata support on efika mx/sb platforms.
+On Fri, 15 Jul 2011, Colin Cross wrote:
+
+> >> My initial offer was a patch that makes an incorrect overlapping mem=
+> >> command line print a warning and ignore it, instead of doing something
+> >> that is guaranteed to crash the kernel in an obscure way.  I'll post a
+> >> patch.
 > 
-> Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
-> Index: linux-2.6-submit/arch/arm/mach-mx5/Kconfig
-> ===================================================================
-> --- linux-2.6-submit.orig/arch/arm/mach-mx5/Kconfig	2011-07-16 16:19:53.000000000 +0200
-> +++ linux-2.6-submit/arch/arm/mach-mx5/Kconfig	2011-07-16 16:22:34.000000000 +0200
-> @@ -147,6 +147,7 @@ config MX51_EFIKA_COMMON
->  	bool
->  	select SOC_IMX51
->  	select IMX_HAVE_PLATFORM_IMX2_WDT
-> +	select IMX_HAVE_PLATFORM_IMX_PATA
->  	select IMX_HAVE_PLATFORM_IMX_UART
->  	select IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX
->  	select IMX_HAVE_PLATFORM_SPI_IMX
-> Index: linux-2.6-submit/arch/arm/mach-mx5/mx51_efika.c
-> ===================================================================
-> --- linux-2.6-submit.orig/arch/arm/mach-mx5/mx51_efika.c	2011-07-16 16:19:53.000000000 +0200
-> +++ linux-2.6-submit/arch/arm/mach-mx5/mx51_efika.c	2011-07-16 16:21:22.000000000 +0200
-> @@ -629,6 +629,8 @@ void __init efika_board_common_init(void
->  		ARRAY_SIZE(mx51_efika_spi_board_info));
->  	imx51_add_ecspi(0, &mx51_efika_spi_pdata);
->  
-> +	imx_add_mxc_pata(&im51_mxc_pata_data);
-> +
-I'd prefer to have imx51_add_mxc_pata() which expands to
-imx_add_mxc_pata(&imx51_mxc_pata_data)
+> I don't care about making overlapping mem= work, I'm just trying to
+> make it easier to debug when someone screws up and passes conflicting
+> mem= arguments, by printing a big warning.  When the warning is
+> printed, the kernel might as well take a stab at picking which of the
+> two mem= arguments might let it boot far enough to get the console up
+> - taking the smaller of any two overlapping regions seems most likely
+> to work.  If not, DEBUG_LL will show the warning.
 
-Why didn't you add that?
+Please do feel free to propose such a patch.  This is certainly a good 
+thing on its own
 
-Best regards
-Uwe
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Nicolas
