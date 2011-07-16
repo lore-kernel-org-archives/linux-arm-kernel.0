@@ -1,347 +1,108 @@
-From: boojin.kim@samsung.com (Boojin Kim)
-Date: Sat, 16 Jul 2011 10:11:11 +0900
-Subject: [PATCH V2 03/12] DMA: PL330: Add DMA capabilities
-In-Reply-To: <CAPTzV17kaSCP8bnQQKSwL_-97r3dQVBY5L-r+u4Sv9TXH2nwew@mail.gmail.com>
-References: <1310546857-6304-1-git-send-email-kgene.kim@samsung.com>
-	<1310546857-6304-4-git-send-email-kgene.kim@samsung.com>
-	<CAPTzV17kaSCP8bnQQKSwL_-97r3dQVBY5L-r+u4Sv9TXH2nwew@mail.gmail.com>
-Message-ID: <001401cc4355$409c2d80$c1d48880$%kim@samsung.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 15 Jul 2011 20:51:18 -0500
+Subject: [GIT PULL] ARM: make mach/hardware.h optional
+Message-ID: <4E20EE96.6020500@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Arnd,
 
+Here's the hardware.h clean-up in a git tree if you prefer to pull it.
 
-Chanho Park wrote:
+git://git.jdl.com/software/linux-3.0.git for-arm-soc
 
-> 2011/7/13 Kukjin Kim <kgene.kim@samsung.com>:
-> > From: Boojin Kim <boojin.kim@samsung.com>
-> >
-> > This patch adds DMA_CYCLIC capability that is used for audio driver
-> > and SLAVE_CONFIG capability for transmit between device and memory.
-> >
-> > Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
-> > Cc: Vinod Koul <vinod.koul@intel.com>
-> > Cc: Dan Williams <dan.j.williams@intel.com>
-> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> > ---
-> > ?drivers/dma/pl330.c | ?187
-> +++++++++++++++++++++++++++++++++++++++++++++++----
-> > ?1 files changed, 173 insertions(+), 14 deletions(-)
-> >
-> > diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-> > index 9bdda7b..2162ac5 100644
-> > --- a/drivers/dma/pl330.c
-> > +++ b/drivers/dma/pl330.c
-> > @@ -69,6 +69,9 @@ struct dma_pl330_chan {
-> > ? ? ? ? * NULL if the channel is available to be acquired.
-> > ? ? ? ? */
-> > ? ? ? ?void *pl330_chid;
-> > +
-> > + ? ? ? /* taks for cyclic capability */
-> > + ? ? ? struct tasklet_struct *cyclic_task;
-> > ?};
-> >
-> > ?struct dma_pl330_dmac {
-> > @@ -105,6 +108,7 @@ struct dma_pl330_desc {
-> >
-> > ? ? ? ?/* The channel which currently holds this desc */
-> > ? ? ? ?struct dma_pl330_chan *pchan;
-> > + ? ? ? bool cyclic;
-> > ?};
-> >
-> > ?static inline struct dma_pl330_chan *
-> > @@ -184,6 +188,60 @@ static inline void fill_queue(struct dma_pl330_chan
-> *pch)
-> > ? ? ? ?}
-> > ?}
-> >
-> > +static void pl330_tasklet_cyclic(unsigned long data)
-> > +{
-> > + ? ? ? struct dma_pl330_chan *pch = (struct dma_pl330_chan *)data;
-> > + ? ? ? struct dma_pl330_desc *desc, *_dt;
-> > + ? ? ? unsigned long flags;
-> > + ? ? ? LIST_HEAD(list);
-> > +
-> > + ? ? ? spin_lock_irqsave(&pch->lock, flags);
-> > +
-> > + ? ? ? /* Pick up ripe tomatoes */
-> > + ? ? ? list_for_each_entry_safe(desc, _dt, &pch->work_list, node)
-> > + ? ? ? ? ? ? ? if ((desc->status == DONE) && desc->cyclic) {
-> > + ? ? ? ? ? ? ? ? ? ? ? dma_async_tx_callback callback;
-> > +
-> > + ? ? ? ? ? ? ? ? ? ? ? list_move_tail(&desc->node, &pch->work_list);
-> > + ? ? ? ? ? ? ? ? ? ? ? pch->completed = desc->txd.cookie;
-> > +
-> > + ? ? ? ? ? ? ? ? ? ? ? desc->status = PREP;
-> > +
-> > + ? ? ? ? ? ? ? ? ? ? ? /* Try to submit a req imm.
-> > + ? ? ? ? ? ? ? ? ? ? ? next to the last completed cookie */
-> > + ? ? ? ? ? ? ? ? ? ? ? fill_queue(pch);
-> > +
-> > + ? ? ? ? ? ? ? ? ? ? ? /* Make sure the PL330 Channel thread is active
-*/
-> > + ? ? ? ? ? ? ? ? ? ? ? pl330_chan_ctrl(pch->pl330_chid,
-PL330_OP_START);
-> > +
-> > + ? ? ? ? ? ? ? ? ? ? ? callback = desc->txd.callback;
-> > + ? ? ? ? ? ? ? ? ? ? ? if (callback)
-> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? callback(desc->txd.callback_param);
-> > +
-> > + ? ? ? ? ? ? ? }
-> > +
-> > + ? ? ? spin_unlock_irqrestore(&pch->lock, flags);
-> > +}
-> > +
-> > +static void pl330_cyclic_free(struct dma_pl330_chan *pch)
-> > +{
-> > + ? ? ? struct dma_pl330_dmac *pdmac = pch->dmac;
-> > + ? ? ? struct dma_pl330_desc *desc, *_dt;
-> > + ? ? ? unsigned long flags;
-> > + ? ? ? LIST_HEAD(list);
-> > +
-> > + ? ? ? spin_lock_irqsave(&pdmac->pool_lock, flags);
-> > +
-> > + ? ? ? list_for_each_entry_safe(desc, _dt, &pch->work_list, node)
-> > + ? ? ? if (desc->cyclic)
-> > + ? ? ? ? ? ? ? list_move_tail(&desc->node, &list);
-> 
-> nitpick: indentation will be required after for_each
-> 
+Rob
 
-I will address your comment.
+The following changes since commit fe0d42203cb5616eeff68b14576a0f7e2dd56625:
 
-> > +
-> > + ? ? ? list_splice_tail_init(&list, &pdmac->desc_pool);
-> > +
-> > + ? ? ? spin_unlock_irqrestore(&pdmac->pool_lock, flags);
-> > + ? ? ? pch->cyclic_task = NULL;
-> > +}
-> > +
-> > ?static void pl330_tasklet(unsigned long data)
-> > ?{
-> > ? ? ? ?struct dma_pl330_chan *pch = (struct dma_pl330_chan *)data;
-> > @@ -227,6 +285,9 @@ static void dma_pl330_rqcb(void *token, enum
-> pl330_op_err err)
-> >
-> > ? ? ? ?spin_unlock_irqrestore(&pch->lock, flags);
-> >
-> > + ? ? ? if (pch->cyclic_task)
-> > + ? ? ? ? ? ? ? tasklet_schedule(pch->cyclic_task);
-> > + ? ? ? else
-> > ? ? ? ?tasklet_schedule(&pch->task);
-> > ?}
-> >
-> > @@ -256,25 +317,58 @@ static int pl330_alloc_chan_resources(struct
-> dma_chan *chan)
-> > ?static int pl330_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
-> unsigned long arg)
-> > ?{
-> > ? ? ? ?struct dma_pl330_chan *pch = to_pchan(chan);
-> > - ? ? ? struct dma_pl330_desc *desc;
-> > + ? ? ? struct dma_pl330_desc *desc, *_dt;
-> > ? ? ? ?unsigned long flags;
-> > + ? ? ? struct dma_pl330_dmac *pdmac = pch->dmac;
-> > + ? ? ? struct dma_slave_config *slave_config;
-> > + ? ? ? struct dma_pl330_peri *peri;
-> > + ? ? ? int i;
-> > + ? ? ? LIST_HEAD(list);
-> >
-> > - ? ? ? /* Only supports DMA_TERMINATE_ALL */
-> > - ? ? ? if (cmd != DMA_TERMINATE_ALL)
-> > - ? ? ? ? ? ? ? return -ENXIO;
-> > -
-> > - ? ? ? spin_lock_irqsave(&pch->lock, flags);
-> > -
-> > - ? ? ? /* FLUSH the PL330 Channel thread */
-> > - ? ? ? pl330_chan_ctrl(pch->pl330_chid, PL330_OP_FLUSH);
-> > + ? ? ? switch (cmd) {
-> > + ? ? ? case DMA_TERMINATE_ALL:
-> > + ? ? ? ? ? ? ? spin_lock_irqsave(&pch->lock, flags);
-> >
-> > - ? ? ? /* Mark all desc done */
-> > - ? ? ? list_for_each_entry(desc, &pch->work_list, node)
-> > - ? ? ? ? ? ? ? desc->status = DONE;
-> > + ? ? ? ? ? ? ? /* FLUSH the PL330 Channel thread */
-> > + ? ? ? ? ? ? ? pl330_chan_ctrl(pch->pl330_chid, PL330_OP_FLUSH);
-> >
-> > - ? ? ? spin_unlock_irqrestore(&pch->lock, flags);
-> > + ? ? ? ? ? ? ? /* Mark all desc done */
-> > + ? ? ? ? ? ? ? list_for_each_entry_safe(desc, _dt, &pch->work_list ,
-node)
-> {
-> > + ? ? ? ? ? ? ? ? ? ? ? desc->status = DONE;
-> > + ? ? ? ? ? ? ? ? ? ? ? pch->completed = desc->txd.cookie;
-> > + ? ? ? ? ? ? ? ? ? ? ? list_move_tail(&desc->node, &list);
-> > + ? ? ? ? ? ? ? }
-> >
-> > - ? ? ? pl330_tasklet((unsigned long) pch);
-> > + ? ? ? ? ? ? ? list_splice_tail_init(&list, &pdmac->desc_pool);
-> > + ? ? ? ? ? ? ? spin_unlock_irqrestore(&pch->lock, flags);
-> > + ? ? ? ? ? ? ? break;
-> > + ? ? ? case DMA_SLAVE_CONFIG:
-> > + ? ? ? ? ? ? ? slave_config = (struct dma_slave_config *)arg;
-> > + ? ? ? ? ? ? ? peri = pch->chan.private;
-> > +
-> > + ? ? ? ? ? ? ? if (slave_config->direction == DMA_TO_DEVICE) {
-> > + ? ? ? ? ? ? ? ? ? ? ? if (slave_config->dst_addr)
-> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? peri->fifo_addr =
-slave_config->dst_addr;
-> > + ? ? ? ? ? ? ? ? ? ? ? if (slave_config->dst_addr_width) {
-> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? i = 0;
-> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? while (slave_config->dst_addr_width !=
-(1 <<
-> i))
-> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? i++;
-> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? peri->burst_sz = i;
-> > + ? ? ? ? ? ? ? ? ? ? ? }
-> > + ? ? ? ? ? ? ? } else if (slave_config->direction == DMA_FROM_DEVICE) {
-> > + ? ? ? ? ? ? ? ? ? ? ? if (slave_config->src_addr)
-> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? peri->fifo_addr =
-slave_config->src_addr;
-> > + ? ? ? ? ? ? ? ? ? ? ? if (slave_config->src_addr_width) {
-> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? i = 0;
-> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? while (slave_config->src_addr_width !=
-(1 <<
-> i))
-> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? i++;
-> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? peri->burst_sz = i;
-> > + ? ? ? ? ? ? ? ? ? ? ? }
-> > + ? ? ? ? ? ? ? }
-> > + ? ? ? ? ? ? ? break;
-> > + ? ? ? default:
-> > + ? ? ? ? ? ? ? return -ENXIO;
-> 
-> To print error message in the default case will be better.
-> 
+  Linux 3.0-rc6 (2011-07-04 15:56:24 -0700)
 
-I will address your comment.
+are available in the git repository at:
+  git://git.jdl.com/software/linux-3.0.git for-arm-soc
 
-> > + ? ? ? }
-> >
-> > ? ? ? ?return 0;
-> > ?}
-> > @@ -291,6 +385,9 @@ static void pl330_free_chan_resources(struct
-> dma_chan *chan)
-> > ? ? ? ?pl330_release_channel(pch->pl330_chid);
-> > ? ? ? ?pch->pl330_chid = NULL;
-> >
-> > + ? ? ? if (pch->cyclic_task)
-> > + ? ? ? ? ? ? ? pl330_cyclic_free(pch);
-> > +
-> > ? ? ? ?spin_unlock_irqrestore(&pch->lock, flags);
-> > ?}
-> >
-> > @@ -522,6 +619,66 @@ static inline int get_burst_len(struct
-> dma_pl330_desc *desc, size_t len)
-> > ? ? ? ?return burst_len;
-> > ?}
-> >
-> > +static struct dma_async_tx_descriptor *pl330_prep_dma_cyclic(
-> > + ? ? ? ? ? ? ? struct dma_chan *chan, dma_addr_t dma_addr, size_t len,
-> > + ? ? ? ? ? ? ? size_t period_len, enum dma_data_direction direction)
-> > +{
-> > + ? ? ? struct dma_pl330_desc *desc;
-> > + ? ? ? struct dma_pl330_chan *pch = to_pchan(chan);
-> > + ? ? ? struct dma_pl330_peri *peri = chan->private;
-> > + ? ? ? dma_addr_t dst;
-> > + ? ? ? dma_addr_t src;
-> > +
-> > + ? ? ? pch = to_pchan(chan);
-> > + ? ? ? if (!pch) {
-> > + ? ? ? ? ? ? ? dev_err(pch->dmac->pif.dev, "%s:%d Unable to fetch
-desc\n",
-> > + ? ? ? ? ? ? ? ? ? ? ? __func__, __LINE__);
-> > + ? ? ? ? ? ? ? return NULL;
-> > + ? ? ? }
-> 
-> 'pch' is already acquired when defined. It's duplicated.
-> dev_err has a incorrect parameter because pch is NULL.
-> Accessing pch->dmac will be failed.
+Rob Herring (6):
+      powerpc: rename ppc_pci_*_flags to pci_*_flags
+      pci: move microblaze and powerpc pci flag functions into asm-generic
+      ARM: remove unnecessary mach/hardware.h includes
+      ARM: pci: make pcibios_assign_all_busses use pci_has_flag
+      ARM: convert PCI defines to variables
+      ARM: set vga memory base at run-time
 
-I will address your comment.
-
-> 
-> > +
-> > + ? ? ? desc = pl330_get_desc(pch);
-> > + ? ? ? if (!desc) {
-> > + ? ? ? ? ? ? ? dev_err(pch->dmac->pif.dev, "%s:%d Unable to fetch
-desc\n",
-> > + ? ? ? ? ? ? ? ? ? ? ? __func__, __LINE__);
-> > + ? ? ? ? ? ? ? return NULL;
-> > + ? ? ? }
-> > +
-> > + ? ? ? switch (direction) {
-> > + ? ? ? case DMA_TO_DEVICE:
-> > + ? ? ? ? ? ? ? desc->rqcfg.src_inc = 1;
-> > + ? ? ? ? ? ? ? desc->rqcfg.dst_inc = 0;
-> > + ? ? ? ? ? ? ? src = dma_addr;
-> > + ? ? ? ? ? ? ? dst = peri->fifo_addr;
-> > + ? ? ? ? ? ? ? break;
-> > + ? ? ? case DMA_FROM_DEVICE:
-> > + ? ? ? ? ? ? ? desc->rqcfg.src_inc = 0;
-> > + ? ? ? ? ? ? ? desc->rqcfg.dst_inc = 1;
-> > + ? ? ? ? ? ? ? src = peri->fifo_addr;
-> > + ? ? ? ? ? ? ? dst = dma_addr;
-> > + ? ? ? ? ? ? ? break;
-> > + ? ? ? default:
-> > + ? ? ? ? ? ? ? dev_err(pch->dmac->pif.dev, "%s:%d Invalid dma
-> direction\n",
-> > + ? ? ? ? ? ? ? __func__, __LINE__);
-> > + ? ? ? ? ? ? ? return NULL;
-> > + ? ? ? }
-> > +
-> > + ? ? ? desc->rqcfg.brst_size = peri->burst_sz;
-> > + ? ? ? desc->rqcfg.brst_len = 1;
-> > +
-> > + ? ? ? if (!pch->cyclic_task) {
-> > + ? ? ? ? ? ? ? pch->cyclic_task =
-> > + ? ? ? ? ? ? ? ? ? ? ? kmalloc(sizeof(struct tasklet_struct),
-GFP_KERNEL);
-> > + ? ? ? ? ? ? ? tasklet_init(pch->cyclic_task,
-> > + ? ? ? ? ? ? ? ? ? ? ? pl330_tasklet_cyclic, (unsigned int)pch);
-> > + ? ? ? }
-> > +
-> > + ? ? ? desc->cyclic = true;
-> > +
-> > + ? ? ? fill_px(&desc->px, dst, src, period_len);
-> > +
-> > + ? ? ? return &desc->txd;
-> > +}
-> > +
-> > ?static struct dma_async_tx_descriptor *
-> > ?pl330_prep_dma_memcpy(struct dma_chan *chan, dma_addr_t dst,
-> > ? ? ? ? ? ? ? ?dma_addr_t src, size_t len, unsigned long flags)
-> > @@ -756,6 +913,7 @@ pl330_probe(struct amba_device *adev, const struct
-> amba_id *id)
-> > ? ? ? ? ? ? ? ? ? ? ? ?case MEMTODEV:
-> > ? ? ? ? ? ? ? ? ? ? ? ?case DEVTOMEM:
-> > ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?dma_cap_set(DMA_SLAVE, pd->cap_mask);
-> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? dma_cap_set(DMA_CYCLIC, pd->cap_mask);
-> > ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?break;
-> > ? ? ? ? ? ? ? ? ? ? ? ?default:
-> > ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?dev_err(&adev->dev, "DEVTODEV Not
-> Supported\n");
-> > @@ -781,6 +939,7 @@ pl330_probe(struct amba_device *adev, const struct
-> amba_id *id)
-> > ? ? ? ?pd->device_alloc_chan_resources = pl330_alloc_chan_resources;
-> > ? ? ? ?pd->device_free_chan_resources = pl330_free_chan_resources;
-> > ? ? ? ?pd->device_prep_dma_memcpy = pl330_prep_dma_memcpy;
-> > + ? ? ? pd->device_prep_dma_cyclic = pl330_prep_dma_cyclic;
-> > ? ? ? ?pd->device_tx_status = pl330_tx_status;
-> > ? ? ? ?pd->device_prep_slave_sg = pl330_prep_slave_sg;
-> > ? ? ? ?pd->device_control = pl330_control;
-> > --
-> > 1.7.1
-> >
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-samsung-
-> soc" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at ?http://vger.kernel.org/majordomo-info.html
-> >
-> 
-> 
-> 
-> --
-> Best Regards,
-> Chanho Park
+ arch/arm/include/asm/pci.h                       |   12 ++++-
+ arch/arm/include/asm/vga.h                       |    5 +-
+ arch/arm/lib/ecard.S                             |    1 -
+ arch/arm/lib/io-readsw-armv3.S                   |    1 -
+ arch/arm/lib/io-writesw-armv3.S                  |    1 -
+ arch/arm/mach-bcmring/include/mach/hardware.h    |    2 -
+ arch/arm/mach-cns3xxx/cns3420vb.c                |    1 -
+ arch/arm/mach-cns3xxx/include/mach/hardware.h    |   22 -------
+ arch/arm/mach-cns3xxx/pcie.c                     |    3 +
+ arch/arm/mach-dove/include/mach/hardware.h       |    7 --
+ arch/arm/mach-dove/pcie.c                        |    3 +
+ arch/arm/mach-ep93xx/include/mach/hardware.h     |    2 -
+ arch/arm/mach-footbridge/dc21285.c               |    3 +
+ arch/arm/mach-footbridge/include/mach/hardware.h |    5 --
+ arch/arm/mach-integrator/include/mach/hardware.h |    7 --
+ arch/arm/mach-integrator/pci_v3.c                |    5 ++
+ arch/arm/mach-iop13xx/include/mach/hardware.h    |    7 --
+ arch/arm/mach-iop13xx/pci.c                      |    5 +-
+ arch/arm/mach-iop32x/include/mach/hardware.h     |    3 -
+ arch/arm/mach-iop33x/include/mach/hardware.h     |    3 -
+ arch/arm/mach-ixp2000/include/mach/hardware.h    |    8 ---
+ arch/arm/mach-ixp2000/pci.c                      |    5 ++
+ arch/arm/mach-ixp23xx/include/mach/hardware.h    |    4 -
+ arch/arm/mach-ixp23xx/pci.c                      |    5 ++
+ arch/arm/mach-ixp4xx/common-pci.c                |    5 ++
+ arch/arm/mach-ixp4xx/include/mach/hardware.h     |    5 --
+ arch/arm/mach-kirkwood/include/mach/hardware.h   |    7 --
+ arch/arm/mach-kirkwood/pcie.c                    |    3 +
+ arch/arm/mach-ks8695/include/mach/hardware.h     |    9 ---
+ arch/arm/mach-ks8695/pci.c                       |    3 +
+ arch/arm/mach-mv78xx0/include/mach/hardware.h    |    7 --
+ arch/arm/mach-mv78xx0/pcie.c                     |    3 +
+ arch/arm/mach-orion5x/include/mach/hardware.h    |    7 --
+ arch/arm/mach-orion5x/pci.c                      |    2 +
+ arch/arm/mach-pxa/cm-x2xx-pci.c                  |    3 +
+ arch/arm/mach-pxa/include/mach/hardware.h        |    3 -
+ arch/arm/mach-sa1100/include/mach/hardware.h     |    8 ---
+ arch/arm/mach-sa1100/pci-nanoengine.c            |    3 +
+ arch/arm/mach-shark/include/mach/hardware.h      |    6 --
+ arch/arm/mach-shark/pci.c                        |   12 +++-
+ arch/arm/mach-tegra/include/mach/hardware.h      |   28 ---------
+ arch/arm/mach-tegra/include/mach/system.h        |    1 -
+ arch/arm/mach-tegra/io.c                         |    1 -
+ arch/arm/mach-tegra/pcie.c                       |    2 +
+ arch/arm/mach-tegra/platsmp.c                    |    1 -
+ arch/arm/mach-versatile/include/mach/hardware.h  |    6 --
+ arch/arm/mach-versatile/pci.c                    |    3 +
+ arch/arm/mm/iomap.c                              |   12 ++++
+ arch/arm/mm/proc-xsc3.S                          |    1 -
+ arch/arm/plat-iop/pci.c                          |    3 +
+ arch/microblaze/include/asm/pci-bridge.h         |   67
++++------------------
+ arch/powerpc/include/asm/pci-bridge.h            |   50 +----------------
+ arch/powerpc/include/asm/pci.h                   |    2 +-
+ arch/powerpc/kernel/pci-common.c                 |   22 ++++----
+ arch/powerpc/kernel/pci_32.c                     |    2 +-
+ arch/powerpc/kernel/pci_64.c                     |    4 +-
+ arch/powerpc/kernel/rtas_pci.c                   |    2 +-
+ arch/powerpc/platforms/40x/ep405.c               |    2 +-
+ arch/powerpc/platforms/40x/ppc40x_simple.c       |    2 +-
+ arch/powerpc/platforms/40x/walnut.c              |    2 +-
+ arch/powerpc/platforms/44x/canyonlands.c         |    2 +-
+ arch/powerpc/platforms/44x/ebony.c               |    2 +-
+ arch/powerpc/platforms/44x/ppc44x_simple.c       |    2 +-
+ arch/powerpc/platforms/44x/sam440ep.c            |    2 +-
+ arch/powerpc/platforms/52xx/mpc52xx_pci.c        |    2 +-
+ arch/powerpc/platforms/82xx/pq2.c                |    2 +-
+ arch/powerpc/platforms/chrp/pci.c                |    2 +-
+ arch/powerpc/platforms/powermac/pci.c            |    6 +-
+ arch/powerpc/sysdev/fsl_pci.c                    |    4 +-
+ arch/powerpc/sysdev/grackle.c                    |    2 +-
+ arch/powerpc/sysdev/ppc4xx_pci.c                 |    2 +-
+ include/asm-generic/pci-bridge.h                 |   62
+++++++++++++++++++++
+ 72 files changed, 198 insertions(+), 311 deletions(-)
+ delete mode 100644 arch/arm/mach-cns3xxx/include/mach/hardware.h
+ delete mode 100644 arch/arm/mach-tegra/include/mach/hardware.h
+ create mode 100644 include/asm-generic/pci-bridge.h
