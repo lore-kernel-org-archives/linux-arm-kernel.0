@@ -1,25 +1,45 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 16 Jul 2011 12:32:19 +0900
-Subject: [PATCH] ARM: S5P: Remove sysmmu driver from arch tree
-In-Reply-To: <1310720066-19207-1-git-send-email-pullip.cho@samsung.com>
-References: <1310720066-19207-1-git-send-email-pullip.cho@samsung.com>
-Message-ID: <035301cc4368$fa1dab90$ee5902b0$%kim@samsung.com>
+Date: Sat, 16 Jul 2011 12:39:26 +0900
+Subject: [PATCH v2] genirq: replace irq_gc_ack() with {set,
+	clr}_bit variants
+In-Reply-To: <alpine.LFD.2.00.1107041047240.14596@xanadu.home>
+References: <CAMAG_eexDoKrPsrd7+3bpsN3y0pptqwhFRP2NKqd_Nny+M+NGg@mail.gmail.com>
+	<1309789999-2293-1-git-send-email-simon@sequanux.org>
+	<alpine.LFD.2.00.1107041047240.14596@xanadu.home>
+Message-ID: <035701cc4369$f97c6d10$ec754730$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-KyongHo Cho wrote:
+Nicolas Pitre wrote:
 > 
-> This patch remove the System MMU driver from arch/arm/plat-s5p
-> because it will be merged with IOMMU API implementation and moved to
-> drivers/iommu directory.
-> Since the System MMU driver defines custom API and thus is not referred
-> by any device drivers in the mainline kernel, this patch will not
-> cause any problem.
+> On Mon, 4 Jul 2011, Simon Guinot wrote:
 > 
-I think this should be made based on your previous patches which are to move
-sysmmu features into drivers/iommu and to improve sysmmu driver.
-Following is its #0 patch.
-http://marc.info/?l=linux-arm-kernel&m=130974568421704&w=2
+> > From: Simon Guinot <sguinot@lacie.com>
+> >
+> > Depending on the device, interrupts acknowledgement is done by setting
+> > or by clearing a dedicated register. Replace irq_gc_ack() with some
+> > {set,clr}_bit variants allows to handle both cases.
+> >
+> > Note that this patch affects the following SoCs: Davinci, Samsung and
+> > Orion. Except for this last, the change is minor: irq_gc_ack() is just
+> > renamed into irq_gc_ack_set_bit().
+> >
+> > For the Orion SoCs, the edge GPIO interrupts support is currently
+> > broken. irq_gc_ack() try to acknowledge a such interrupt by setting
+> > the corresponding cause register bit. The Orion GPIO device expect the
+> > opposite. To fix this issue, the irq_gc_ack_clr_bit() variant is used.
+> >
+> > Tested on Network Space v2.
+> >
+> > Reported-by: Joey Oravec <joravec@drewtech.com>
+> > Signed-off-by: Simon Guinot <sguinot@lacie.com>
+> 
+> Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+> 
+Sorry for late response...
+
+If required,
+Acked-by: Kukjin Kim <kgene.kim@samsung.com>
 
 Thanks.
 
@@ -29,494 +49,130 @@ Kgene.
 Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
 SW Solution Development Team, Samsung Electronics Co., Ltd.
 
-> Signed-off-by: KyongHo Cho <pullip.cho@samsung.com>
-> ---
->  arch/arm/plat-s5p/Kconfig               |    8 -
->  arch/arm/plat-s5p/Makefile              |    1 -
->  arch/arm/plat-s5p/include/plat/sysmmu.h |   95 ----------
->  arch/arm/plat-s5p/sysmmu.c              |  312
--------------------------------
->  4 files changed, 0 insertions(+), 416 deletions(-)
->  delete mode 100644 arch/arm/plat-s5p/include/plat/sysmmu.h
->  delete mode 100644 arch/arm/plat-s5p/sysmmu.c
 > 
-> diff --git a/arch/arm/plat-s5p/Kconfig b/arch/arm/plat-s5p/Kconfig
-> index 7f9ff2a..8ad962d 100644
-> --- a/arch/arm/plat-s5p/Kconfig
-> +++ b/arch/arm/plat-s5p/Kconfig
-> @@ -43,14 +43,6 @@ config S5P_HRT
->  	help
->  	  Use the High Resolution timer support
-> 
-> -comment "System MMU"
-> -
-> -config S5P_SYSTEM_MMU
-> -	bool "S5P SYSTEM MMU"
-> -	depends on ARCH_EXYNOS4
-> -	help
-> -	  Say Y here if you want to enable System MMU
-> -
->  config S5P_DEV_FIMC0
->  	bool
->  	help
-> diff --git a/arch/arm/plat-s5p/Makefile b/arch/arm/plat-s5p/Makefile
-> index e234cc4..f43d8e7 100644
-> --- a/arch/arm/plat-s5p/Makefile
-> +++ b/arch/arm/plat-s5p/Makefile
-> @@ -19,7 +19,6 @@ obj-y				+= clock.o
->  obj-y				+= irq.o
->  obj-$(CONFIG_S5P_EXT_INT)	+= irq-eint.o
->  obj-$(CONFIG_S5P_GPIO_INT)	+= irq-gpioint.o
-> -obj-$(CONFIG_S5P_SYSTEM_MMU)	+= sysmmu.o
->  obj-$(CONFIG_PM)		+= pm.o
->  obj-$(CONFIG_PM)		+= irq-pm.o
->  obj-$(CONFIG_S5P_HRT) 		+= s5p-time.o
-> diff --git a/arch/arm/plat-s5p/include/plat/sysmmu.h b/arch/arm/plat-
-> s5p/include/plat/sysmmu.h
-> deleted file mode 100644
-> index bf5283c..0000000
-> --- a/arch/arm/plat-s5p/include/plat/sysmmu.h
-> +++ /dev/null
-> @@ -1,95 +0,0 @@
-> -/* linux/arch/arm/plat-s5p/include/plat/sysmmu.h
-> - *
-> - * Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
-> - *		http://www.samsung.com
-> - *
-> - * Samsung System MMU driver for S5P platform
-> - *
-> - * This program is free software; you can redistribute it and/or modify
-> - * it under the terms of the GNU General Public License version 2 as
-> - * published by the Free Software Foundation.
-> -*/
-> -
-> -#ifndef __ASM__PLAT_SYSMMU_H
-> -#define __ASM__PLAT_SYSMMU_H __FILE__
-> -
-> -enum S5P_SYSMMU_INTERRUPT_TYPE {
-> -	SYSMMU_PAGEFAULT,
-> -	SYSMMU_AR_MULTIHIT,
-> -	SYSMMU_AW_MULTIHIT,
-> -	SYSMMU_BUSERROR,
-> -	SYSMMU_AR_SECURITY,
-> -	SYSMMU_AR_ACCESS,
-> -	SYSMMU_AW_SECURITY,
-> -	SYSMMU_AW_PROTECTION, /* 7 */
-> -	SYSMMU_FAULTS_NUM
-> -};
-> -
-> -#ifdef CONFIG_S5P_SYSTEM_MMU
-> -
-> -#include <mach/sysmmu.h>
-> -
-> -/**
-> - * s5p_sysmmu_enable() - enable system mmu of ip
-> - * @ips: The ip connected system mmu.
-> - * #pgd: Base physical address of the 1st level page table
-> - *
-> - * This function enable system mmu to transfer address
-> - * from virtual address to physical address
-> - */
-> -void s5p_sysmmu_enable(sysmmu_ips ips, unsigned long pgd);
-> -
-> -/**
-> - * s5p_sysmmu_disable() - disable sysmmu mmu of ip
-> - * @ips: The ip connected system mmu.
-> - *
-> - * This function disable system mmu to transfer address
-> - * from virtual address to physical address
-> - */
-> -void s5p_sysmmu_disable(sysmmu_ips ips);
-> -
-> -/**
-> - * s5p_sysmmu_set_tablebase_pgd() - set page table base address to refer
-page
-> table
-> - * @ips: The ip connected system mmu.
-> - * @pgd: The page table base address.
-> - *
-> - * This function set page table base address
-> - * When system mmu transfer address from virtaul address to physical
-address,
-> - * system mmu refer address information from page table
-> - */
-> -void s5p_sysmmu_set_tablebase_pgd(sysmmu_ips ips, unsigned long pgd);
-> -
-> -/**
-> - * s5p_sysmmu_tlb_invalidate() - flush all TLB entry in system mmu
-> - * @ips: The ip connected system mmu.
-> - *
-> - * This function flush all TLB entry in system mmu
-> - */
-> -void s5p_sysmmu_tlb_invalidate(sysmmu_ips ips);
-> -
-> -/** s5p_sysmmu_set_fault_handler() - Fault handler for System MMUs
-> - * @itype: type of fault.
-> - * @pgtable_base: the physical address of page table base. This is 0 if
-@ips is
-> - *               SYSMMU_BUSERROR.
-> - * @fault_addr: the device (virtual) address that the System MMU tried to
-> - *             translated. This is 0 if @ips is SYSMMU_BUSERROR.
-> - * Called when interrupt occurred by the System MMUs
-> - * The device drivers of peripheral devices that has a System MMU can
-implement
-> - * a fault handler to resolve address translation fault by System MMU.
-> - * The meanings of return value and parameters are described below.
-> -
-> - * return value: non-zero if the fault is correctly resolved.
-> - *         zero if the fault is not handled.
-> - */
-> -void s5p_sysmmu_set_fault_handler(sysmmu_ips ips,
-> -			int (*handler)(enum S5P_SYSMMU_INTERRUPT_TYPE
-> itype,
-> -					unsigned long pgtable_base,
-> -					unsigned long fault_addr));
-> -#else
-> -#define s5p_sysmmu_enable(ips, pgd) do { } while (0)
-> -#define s5p_sysmmu_disable(ips) do { } while (0)
-> -#define s5p_sysmmu_set_tablebase_pgd(ips, pgd) do { } while (0)
-> -#define s5p_sysmmu_tlb_invalidate(ips) do { } while (0)
-> -#define s5p_sysmmu_set_fault_handler(ips, handler) do { } while (0)
-> -#endif
-> -#endif /* __ASM_PLAT_SYSMMU_H */
-> diff --git a/arch/arm/plat-s5p/sysmmu.c b/arch/arm/plat-s5p/sysmmu.c
-> deleted file mode 100644
-> index 54f5edd..0000000
-> --- a/arch/arm/plat-s5p/sysmmu.c
-> +++ /dev/null
-> @@ -1,312 +0,0 @@
-> -/* linux/arch/arm/plat-s5p/sysmmu.c
-> - *
-> - * Copyright (c) 2010 Samsung Electronics Co., Ltd.
-> - *		http://www.samsung.com
-> - *
-> - * This program is free software; you can redistribute it and/or modify
-> - * it under the terms of the GNU General Public License version 2 as
-> - * published by the Free Software Foundation.
-> - */
-> -
-> -#include <linux/io.h>
-> -#include <linux/interrupt.h>
-> -#include <linux/platform_device.h>
-> -
-> -#include <asm/pgtable.h>
-> -
-> -#include <mach/map.h>
-> -#include <mach/regs-sysmmu.h>
-> -#include <plat/sysmmu.h>
-> -
-> -#define CTRL_ENABLE	0x5
-> -#define CTRL_BLOCK	0x7
-> -#define CTRL_DISABLE	0x0
-> -
-> -static struct device *dev;
-> -
-> -static unsigned short fault_reg_offset[SYSMMU_FAULTS_NUM] = {
-> -	S5P_PAGE_FAULT_ADDR,
-> -	S5P_AR_FAULT_ADDR,
-> -	S5P_AW_FAULT_ADDR,
-> -	S5P_DEFAULT_SLAVE_ADDR,
-> -	S5P_AR_FAULT_ADDR,
-> -	S5P_AR_FAULT_ADDR,
-> -	S5P_AW_FAULT_ADDR,
-> -	S5P_AW_FAULT_ADDR
-> -};
-> -
-> -static char *sysmmu_fault_name[SYSMMU_FAULTS_NUM] = {
-> -	"PAGE FAULT",
-> -	"AR MULTI-HIT FAULT",
-> -	"AW MULTI-HIT FAULT",
-> -	"BUS ERROR",
-> -	"AR SECURITY PROTECTION FAULT",
-> -	"AR ACCESS PROTECTION FAULT",
-> -	"AW SECURITY PROTECTION FAULT",
-> -	"AW ACCESS PROTECTION FAULT"
-> -};
-> -
-> -static int (*fault_handlers[S5P_SYSMMU_TOTAL_IPNUM])(
-> -		enum S5P_SYSMMU_INTERRUPT_TYPE itype,
-> -		unsigned long pgtable_base,
-> -		unsigned long fault_addr);
-> -
-> -/*
-> - * If adjacent 2 bits are true, the system MMU is enabled.
-> - * The system MMU is disabled, otherwise.
-> - */
-> -static unsigned long sysmmu_states;
-> -
-> -static inline void set_sysmmu_active(sysmmu_ips ips)
-> -{
-> -	sysmmu_states |= 3 << (ips * 2);
-> -}
-> -
-> -static inline void set_sysmmu_inactive(sysmmu_ips ips)
-> -{
-> -	sysmmu_states &= ~(3 << (ips * 2));
-> -}
-> -
-> -static inline int is_sysmmu_active(sysmmu_ips ips)
-> -{
-> -	return sysmmu_states & (3 << (ips * 2));
-> -}
-> -
-> -static void __iomem *sysmmusfrs[S5P_SYSMMU_TOTAL_IPNUM];
-> -
-> -static inline void sysmmu_block(sysmmu_ips ips)
-> -{
-> -	__raw_writel(CTRL_BLOCK, sysmmusfrs[ips] + S5P_MMU_CTRL);
-> -	dev_dbg(dev, "%s is blocked.\n", sysmmu_ips_name[ips]);
-> -}
-> -
-> -static inline void sysmmu_unblock(sysmmu_ips ips)
-> -{
-> -	__raw_writel(CTRL_ENABLE, sysmmusfrs[ips] + S5P_MMU_CTRL);
-> -	dev_dbg(dev, "%s is unblocked.\n", sysmmu_ips_name[ips]);
-> -}
-> -
-> -static inline void __sysmmu_tlb_invalidate(sysmmu_ips ips)
-> -{
-> -	__raw_writel(0x1, sysmmusfrs[ips] + S5P_MMU_FLUSH);
-> -	dev_dbg(dev, "TLB of %s is invalidated.\n", sysmmu_ips_name[ips]);
-> -}
-> -
-> -static inline void __sysmmu_set_ptbase(sysmmu_ips ips, unsigned long pgd)
-> -{
-> -	if (unlikely(pgd == 0)) {
-> -		pgd = (unsigned long)ZERO_PAGE(0);
-> -		__raw_writel(0x20, sysmmusfrs[ips] + S5P_MMU_CFG); /* 4KB
-> LV1 */
-> -	} else {
-> -		__raw_writel(0x0, sysmmusfrs[ips] + S5P_MMU_CFG); /* 16KB
-> LV1 */
-> -	}
-> -
-> -	__raw_writel(pgd, sysmmusfrs[ips] + S5P_PT_BASE_ADDR);
-> -
-> -	dev_dbg(dev, "Page table base of %s is initialized with 0x%08lX.\n",
-> -						sysmmu_ips_name[ips],
-> pgd);
-> -	__sysmmu_tlb_invalidate(ips);
-> -}
-> -
-> -void sysmmu_set_fault_handler(sysmmu_ips ips,
-> -			int (*handler)(enum S5P_SYSMMU_INTERRUPT_TYPE
-> itype,
-> -					unsigned long pgtable_base,
-> -					unsigned long fault_addr))
-> -{
-> -	BUG_ON(!((ips >= SYSMMU_MDMA) && (ips <
-> S5P_SYSMMU_TOTAL_IPNUM)));
-> -	fault_handlers[ips] = handler;
-> -}
-> -
-> -static irqreturn_t s5p_sysmmu_irq(int irq, void *dev_id)
-> -{
-> -	/* SYSMMU is in blocked when interrupt occurred. */
-> -	unsigned long base = 0;
-> -	sysmmu_ips ips = (sysmmu_ips)dev_id;
-> -	enum S5P_SYSMMU_INTERRUPT_TYPE itype;
-> -
-> -	itype = (enum S5P_SYSMMU_INTERRUPT_TYPE)
-> -		__ffs(__raw_readl(sysmmusfrs[ips] + S5P_INT_STATUS));
-> -
-> -	BUG_ON(!((itype >= 0) && (itype < 8)));
-> -
-> -	dev_alert(dev, "%s occurred by %s.\n", sysmmu_fault_name[itype],
-> -
-> 	sysmmu_ips_name[ips]);
-> -
-> -	if (fault_handlers[ips]) {
-> -		unsigned long addr;
-> -
-> -		base = __raw_readl(sysmmusfrs[ips] + S5P_PT_BASE_ADDR);
-> -		addr = __raw_readl(sysmmusfrs[ips] +
-fault_reg_offset[itype]);
-> -
-> -		if (fault_handlers[ips](itype, base, addr)) {
-> -			__raw_writel(1 << itype,
-> -					sysmmusfrs[ips] + S5P_INT_CLEAR);
-> -			dev_notice(dev, "%s from %s is resolved."
-> -					" Retrying translation.\n",
-> -				sysmmu_fault_name[itype],
-> sysmmu_ips_name[ips]);
-> -		} else {
-> -			base = 0;
-> -		}
-> -	}
-> -
-> -	sysmmu_unblock(ips);
-> -
-> -	if (!base)
-> -		dev_notice(dev, "%s from %s is not handled.\n",
-> -			sysmmu_fault_name[itype], sysmmu_ips_name[ips]);
-> -
-> -	return IRQ_HANDLED;
-> -}
-> -
-> -void s5p_sysmmu_set_tablebase_pgd(sysmmu_ips ips, unsigned long pgd)
-> -{
-> -	if (is_sysmmu_active(ips)) {
-> -		sysmmu_block(ips);
-> -		__sysmmu_set_ptbase(ips, pgd);
-> -		sysmmu_unblock(ips);
-> -	} else {
-> -		dev_dbg(dev, "%s is disabled. "
-> -			"Skipping initializing page table base.\n",
-> -						sysmmu_ips_name[ips]);
-> -	}
-> -}
-> -
-> -void s5p_sysmmu_enable(sysmmu_ips ips, unsigned long pgd)
-> -{
-> -	if (!is_sysmmu_active(ips)) {
-> -		sysmmu_clk_enable(ips);
-> -
-> -		__sysmmu_set_ptbase(ips, pgd);
-> -
-> -		__raw_writel(CTRL_ENABLE, sysmmusfrs[ips] +
-> S5P_MMU_CTRL);
-> -
-> -		set_sysmmu_active(ips);
-> -		dev_dbg(dev, "%s is enabled.\n", sysmmu_ips_name[ips]);
-> -	} else {
-> -		dev_dbg(dev, "%s is already enabled.\n",
-> sysmmu_ips_name[ips]);
-> -	}
-> -}
-> -
-> -void s5p_sysmmu_disable(sysmmu_ips ips)
-> -{
-> -	if (is_sysmmu_active(ips)) {
-> -		__raw_writel(CTRL_DISABLE, sysmmusfrs[ips] +
-> S5P_MMU_CTRL);
-> -		set_sysmmu_inactive(ips);
-> -		sysmmu_clk_disable(ips);
-> -		dev_dbg(dev, "%s is disabled.\n", sysmmu_ips_name[ips]);
-> -	} else {
-> -		dev_dbg(dev, "%s is already disabled.\n",
-> sysmmu_ips_name[ips]);
-> -	}
-> -}
-> -
-> -void s5p_sysmmu_tlb_invalidate(sysmmu_ips ips)
-> -{
-> -	if (is_sysmmu_active(ips)) {
-> -		sysmmu_block(ips);
-> -		__sysmmu_tlb_invalidate(ips);
-> -		sysmmu_unblock(ips);
-> -	} else {
-> -		dev_dbg(dev, "%s is disabled. "
-> -			"Skipping invalidating TLB.\n",
-sysmmu_ips_name[ips]);
-> -	}
-> -}
-> -
-> -static int s5p_sysmmu_probe(struct platform_device *pdev)
-> -{
-> -	int i, ret;
-> -	struct resource *res, *mem;
-> -
-> -	dev = &pdev->dev;
-> -
-> -	for (i = 0; i < S5P_SYSMMU_TOTAL_IPNUM; i++) {
-> -		int irq;
-> -
-> -		sysmmu_clk_init(dev, i);
-> -		sysmmu_clk_disable(i);
-> -
-> -		res = platform_get_resource(pdev, IORESOURCE_MEM, i);
-> -		if (!res) {
-> -			dev_err(dev, "Failed to get the resource of %s.\n",
-> -
-> 	sysmmu_ips_name[i]);
-> -			ret = -ENODEV;
-> -			goto err_res;
-> -		}
-> -
-> -		mem = request_mem_region(res->start,
-> -				((res->end) - (res->start)) + 1,
-pdev->name);
-> -		if (!mem) {
-> -			dev_err(dev, "Failed to request the memory region
-> of %s.\n",
-> -
-> 	sysmmu_ips_name[i]);
-> -			ret = -EBUSY;
-> -			goto err_res;
-> -		}
-> -
-> -		sysmmusfrs[i] = ioremap(res->start, res->end - res->start +
-1);
-> -		if (!sysmmusfrs[i]) {
-> -			dev_err(dev, "Failed to ioremap() for %s.\n",
-> -
-> 	sysmmu_ips_name[i]);
-> -			ret = -ENXIO;
-> -			goto err_reg;
-> -		}
-> -
-> -		irq = platform_get_irq(pdev, i);
-> -		if (irq <= 0) {
-> -			dev_err(dev, "Failed to get the IRQ resource of
-%s.\n",
-> -
-> 	sysmmu_ips_name[i]);
-> -			ret = -ENOENT;
-> -			goto err_map;
-> -		}
-> -
-> -		if (request_irq(irq, s5p_sysmmu_irq, IRQF_DISABLED,
-> -						pdev->name, (void *)i)) {
-> -			dev_err(dev, "Failed to request IRQ for %s.\n",
-> -
-> 	sysmmu_ips_name[i]);
-> -			ret = -ENOENT;
-> -			goto err_map;
-> -		}
-> -	}
-> -
-> -	return 0;
-> -
-> -err_map:
-> -	iounmap(sysmmusfrs[i]);
-> -err_reg:
-> -	release_mem_region(mem->start, resource_size(mem));
-> -err_res:
-> -	return ret;
-> -}
-> -
-> -static int s5p_sysmmu_remove(struct platform_device *pdev)
-> -{
-> -	return 0;
-> -}
-> -int s5p_sysmmu_runtime_suspend(struct device *dev)
-> -{
-> -	return 0;
-> -}
-> -
-> -int s5p_sysmmu_runtime_resume(struct device *dev)
-> -{
-> -	return 0;
-> -}
-> -
-> -const struct dev_pm_ops s5p_sysmmu_pm_ops = {
-> -	.runtime_suspend	= s5p_sysmmu_runtime_suspend,
-> -	.runtime_resume		= s5p_sysmmu_runtime_resume,
-> -};
-> -
-> -static struct platform_driver s5p_sysmmu_driver = {
-> -	.probe		= s5p_sysmmu_probe,
-> -	.remove		= s5p_sysmmu_remove,
-> -	.driver		= {
-> -		.owner		= THIS_MODULE,
-> -		.name		= "s5p-sysmmu",
-> -		.pm		= &s5p_sysmmu_pm_ops,
-> -	}
-> -};
-> -
-> -static int __init s5p_sysmmu_init(void)
-> -{
-> -	return platform_driver_register(&s5p_sysmmu_driver);
-> -}
-> -arch_initcall(s5p_sysmmu_init);
-> --
+> > ---
+> > Changes for v2: update patch description (mention the affected SoCs).
+> >
+> >  arch/arm/mach-davinci/irq.c      |    2 +-
+> >  arch/arm/plat-orion/gpio.c       |    2 +-
+> >  arch/arm/plat-s5p/irq-gpioint.c  |    2 +-
+> >  arch/arm/plat-samsung/irq-uart.c |    2 +-
+> >  include/linux/irq.h              |    3 ++-
+> >  kernel/irq/generic-chip.c        |   18 ++++++++++++++++--
+> >  6 files changed, 22 insertions(+), 7 deletions(-)
+> >
+> > diff --git a/arch/arm/mach-davinci/irq.c b/arch/arm/mach-davinci/irq.c
+> > index bfe68ec..d8c1af0 100644
+> > --- a/arch/arm/mach-davinci/irq.c
+> > +++ b/arch/arm/mach-davinci/irq.c
+> > @@ -53,7 +53,7 @@ davinci_alloc_gc(void __iomem *base, unsigned int
+> irq_start, unsigned int num)
+> >
+> >  	gc = irq_alloc_generic_chip("AINTC", 1, irq_start, base,
+handle_edge_irq);
+> >  	ct = gc->chip_types;
+> > -	ct->chip.irq_ack = irq_gc_ack;
+> > +	ct->chip.irq_ack = irq_gc_ack_set_bit;
+> >  	ct->chip.irq_mask = irq_gc_mask_clr_bit;
+> >  	ct->chip.irq_unmask = irq_gc_mask_set_bit;
+> >
+> > diff --git a/arch/arm/plat-orion/gpio.c b/arch/arm/plat-orion/gpio.c
+> > index 5b4fffa..41ab97e 100644
+> > --- a/arch/arm/plat-orion/gpio.c
+> > +++ b/arch/arm/plat-orion/gpio.c
+> > @@ -432,7 +432,7 @@ void __init orion_gpio_init(int gpio_base, int
+ngpio,
+> >  	ct->regs.mask = ochip->mask_offset + GPIO_EDGE_MASK_OFF;
+> >  	ct->regs.ack = GPIO_EDGE_CAUSE_OFF;
+> >  	ct->type = IRQ_TYPE_EDGE_RISING | IRQ_TYPE_EDGE_FALLING;
+> > -	ct->chip.irq_ack = irq_gc_ack;
+> > +	ct->chip.irq_ack = irq_gc_ack_clr_bit;
+> >  	ct->chip.irq_mask = irq_gc_mask_clr_bit;
+> >  	ct->chip.irq_unmask = irq_gc_mask_set_bit;
+> >  	ct->chip.irq_set_type = gpio_irq_set_type;
+> > diff --git a/arch/arm/plat-s5p/irq-gpioint.c
+b/arch/arm/plat-s5p/irq-gpioint.c
+> > index 135abda..327ab9f 100644
+> > --- a/arch/arm/plat-s5p/irq-gpioint.c
+> > +++ b/arch/arm/plat-s5p/irq-gpioint.c
+> > @@ -152,7 +152,7 @@ static __init int s5p_gpioint_add(struct
+s3c_gpio_chip
+> *chip)
+> >  	if (!gc)
+> >  		return -ENOMEM;
+> >  	ct = gc->chip_types;
+> > -	ct->chip.irq_ack = irq_gc_ack;
+> > +	ct->chip.irq_ack = irq_gc_ack_set_bit;
+> >  	ct->chip.irq_mask = irq_gc_mask_set_bit;
+> >  	ct->chip.irq_unmask = irq_gc_mask_clr_bit;
+> >  	ct->chip.irq_set_type = s5p_gpioint_set_type,
+> > diff --git a/arch/arm/plat-samsung/irq-uart.c
+b/arch/arm/plat-samsung/irq-uart.c
+> > index 32582c0..0e46588 100644
+> > --- a/arch/arm/plat-samsung/irq-uart.c
+> > +++ b/arch/arm/plat-samsung/irq-uart.c
+> > @@ -55,7 +55,7 @@ static void __init s3c_init_uart_irq(struct
+s3c_uart_irq *uirq)
+> >  	gc = irq_alloc_generic_chip("s3c-uart", 1, uirq->base_irq, reg_base,
+> >  				    handle_level_irq);
+> >  	ct = gc->chip_types;
+> > -	ct->chip.irq_ack = irq_gc_ack;
+> > +	ct->chip.irq_ack = irq_gc_ack_set_bit;
+> >  	ct->chip.irq_mask = irq_gc_mask_set_bit;
+> >  	ct->chip.irq_unmask = irq_gc_mask_clr_bit;
+> >  	ct->regs.ack = S3C64XX_UINTP;
+> > diff --git a/include/linux/irq.h b/include/linux/irq.h
+> > index 8b45384..baa397e 100644
+> > --- a/include/linux/irq.h
+> > +++ b/include/linux/irq.h
+> > @@ -676,7 +676,8 @@ void irq_gc_mask_disable_reg(struct irq_data *d);
+> >  void irq_gc_mask_set_bit(struct irq_data *d);
+> >  void irq_gc_mask_clr_bit(struct irq_data *d);
+> >  void irq_gc_unmask_enable_reg(struct irq_data *d);
+> > -void irq_gc_ack(struct irq_data *d);
+> > +void irq_gc_ack_set_bit(struct irq_data *d);
+> > +void irq_gc_ack_clr_bit(struct irq_data *d);
+> >  void irq_gc_mask_disable_reg_and_ack(struct irq_data *d);
+> >  void irq_gc_eoi(struct irq_data *d);
+> >  int irq_gc_set_wake(struct irq_data *d, unsigned int on);
+> > diff --git a/kernel/irq/generic-chip.c b/kernel/irq/generic-chip.c
+> > index 31a9db7..3a2cab4 100644
+> > --- a/kernel/irq/generic-chip.c
+> > +++ b/kernel/irq/generic-chip.c
+> > @@ -101,10 +101,10 @@ void irq_gc_unmask_enable_reg(struct irq_data *d)
+> >  }
+> >
+> >  /**
+> > - * irq_gc_ack - Ack pending interrupt
+> > + * irq_gc_ack_set_bit - Ack pending interrupt via setting bit
+> >   * @d: irq_data
+> >   */
+> > -void irq_gc_ack(struct irq_data *d)
+> > +void irq_gc_ack_set_bit(struct irq_data *d)
+> >  {
+> >  	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
+> >  	u32 mask = 1 << (d->irq - gc->irq_base);
+> > @@ -115,6 +115,20 @@ void irq_gc_ack(struct irq_data *d)
+> >  }
+> >
+> >  /**
+> > + * irq_gc_ack_clr_bit - Ack pending interrupt via clearing bit
+> > + * @d: irq_data
+> > + */
+> > +void irq_gc_ack_clr_bit(struct irq_data *d)
+> > +{
+> > +	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
+> > +	u32 mask = ~(1 << (d->irq - gc->irq_base));
+> > +
+> > +	irq_gc_lock(gc);
+> > +	irq_reg_writel(mask, gc->reg_base + cur_regs(d)->ack);
+> > +	irq_gc_unlock(gc);
+> > +}
+> > +
+> > +/**
+> >   * irq_gc_mask_disable_reg_and_ack- Mask and ack pending interrupt
+> >   * @d: irq_data
+> >   */
+> > --
+> > 1.7.5.1
+> >
