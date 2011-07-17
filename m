@@ -1,41 +1,64 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Sat, 16 Jul 2011 18:41:47 -0400 (EDT)
-Subject: [PATCH] ARM: move memory layout sanity checking before meminfo
-	initialization
-In-Reply-To: <CAMbhsRSQpThghsO0X=i8g3MmyZC+cDJaOJ1+MYZV3hvw-8=GXw@mail.gmail.com>
-References: <CAMbhsRT=NNYUYyYZXpz2=PpBXoBGANQHPgOkCE1oZ8XzHKN4og@mail.gmail.com>
-	<CAMbhsRSgUcFPpdTFvEDTFfo_Wk0k7BQzwk6cRtXC6K7mpQ+YDg@mail.gmail.com>
-	<20110715080950.GL23270@n2100.arm.linux.org.uk>
-	<CAMbhsRRCV0ukwbzFc6w_ba6xdVxs=TFmJMGd06UKTiNQPEJqpw@mail.gmail.com>
-	<20110715161628.GA24628@n2100.arm.linux.org.uk>
-	<CAMbhsRSbXTLzhSzBbQ8ebJqAC227ESHGyY2bHS+J4cN+NgzXFg@mail.gmail.com>
-	<20110715181309.GD24628@n2100.arm.linux.org.uk>
-	<CAMbhsRQRjwskzWB06g7rmSVgSdq5oVxA3yY+14qdtTxuQ=NeMQ@mail.gmail.com>
-	<20110715210720.GF24628@n2100.arm.linux.org.uk>
-	<CAMbhsRR=EVhKPkNUnzQ_2Ai9edWpmvHM_9TXwhh-xaa9Dk1Mcw@mail.gmail.com>
-	<20110715215819.GG24628@n2100.arm.linux.org.uk>
-	<CAMbhsRSQpThghsO0X=i8g3MmyZC+cDJaOJ1+MYZV3hvw-8=GXw@mail.gmail.com>
-Message-ID: <alpine.LFD.2.00.1107161837330.4069@xanadu.home>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Sun, 17 Jul 2011 04:33:26 +0200
+Subject: [PATCH 4/7] at91: remove non used at91_spi.h
+In-Reply-To: <4E21999A.6060105@vollmann.ch>
+References: <1310687525-22486-1-git-send-email-plagnioj@jcrosoft.com>
+	<1310687525-22486-4-git-send-email-plagnioj@jcrosoft.com>
+	<4E2028E1.1060603@vollmann.ch>
+	<20110715154636.GA20678@game.jcrosoft.org>
+	<4E206E7D.2070708@vollmann.ch>
+	<20110716105752.GD20678@game.jcrosoft.org>
+	<20110716115655.GA1992@pengutronix.de>
+	<4E21999A.6060105@vollmann.ch>
+Message-ID: <20110717023326.GE20678@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 15 Jul 2011, Colin Cross wrote:
-
-> >> My initial offer was a patch that makes an incorrect overlapping mem=
-> >> command line print a warning and ignore it, instead of doing something
-> >> that is guaranteed to crash the kernel in an obscure way.  I'll post a
-> >> patch.
+On 16:00 Sat 16 Jul     , Detlef Vollmann wrote:
+> On 07/16/11 13:56, Wolfram Sang wrote:
+> >
+> >>>About the SPI driver:
+> >>> From Documentation/spi/spi-summary:
+> >>>"At this writing, Linux has no slave side programming interface."
+> >>>So there's no SPI framwork that covers the slave side.
+> >>This what I mean use the SPI framework and add the SPI Slave support there
+> >
+> >[CCing spi-devel]
+> >
+> >If you talk about SPI slaves, be sure to have read Grant's comments in
+> >
+> >http://thread.gmane.org/gmane.linux.kernel.spi.devel/7401
+> >
+> >to see what would be needed for slave support.
+> I completely agree with Gran't comments here.
 > 
-> I don't care about making overlapping mem= work, I'm just trying to
-> make it easier to debug when someone screws up and passes conflicting
-> mem= arguments, by printing a big warning.  When the warning is
-> printed, the kernel might as well take a stab at picking which of the
-> two mem= arguments might let it boot far enough to get the console up
-> - taking the smaller of any two overlapping regions seems most likely
-> to work.  If not, DEBUG_LL will show the warning.
+> >Short note: Would be
+> >seperate subsystem, master subsystem is of limited use. I think a few
+> >slave-drivers would be nice to evaluate, so one can get a feeling if a
+> >subsystem makes sense and if so, how it could look like.
+> >
+> >Detlef, have you posted your slave driver so far?
+> No, and I didn't plan to do so.
+> Not because I don't want to publish it, if you want to look at it,
+> I'm happy to send the driver.
+> But I don't think it makes much sense to put my driver into mainline
+> Linux.
+> The reason for this is very simple: the protocol is specific for this
+> hardware, and the driver needs this specific protocol.
+> The Atmel hardware is not able to maintain information about frame
+> ends when running in DMA mode, so we need to put the length of the
+> frame to the beginning of the frame, and also need to put in some
+> extra information to be able to re-sync in case of transmission errors.
+> 
+> So this driver is very specific for this hardware, and I wrote SPI
+> slave drivers in the past for other hardware that were also very
+> specific.  I really doubt that an SPI slave framework really makes
+> sense.
+> 
+> And that's the reason why I'm keen that the hardware description
+> headers are available to out-of-tree drivers.
+So I'm sorry but this is clear I'm not going to keep the header
+out-of-tree drivers are not an enough reason to keep it
 
-Please do feel free to propose such a patch.  This is certainly a good 
-thing on its own
-
-
-Nicolas
+Best Regards,
+J.
