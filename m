@@ -1,37 +1,39 @@
-From: toddpoynor@google.com (Todd Poynor)
-Date: Sat, 16 Jul 2011 22:39:35 -0700
-Subject: [PATCH v2] ARM: davinci: Check for NULL return from
-	irq_alloc_generic_chip
-Message-ID: <1310881175-26182-1-git-send-email-toddpoynor@google.com>
+From: shubhrajyoti@ti.com (Shubhrajyoti D)
+Date: Sun, 17 Jul 2011 18:13:23 +0530
+Subject: [PATCH v4] OMAP4: hwmod data: I2C: add flag for context restore
+Message-ID: <1310906603-2673-1-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Avoid NULL dereference of irq_alloc_generic_chip return in low
-memory conditions.
+Restore of context is not done for OMAP4. This patch 
+adds the OMAP_I2C_FLAG_RESET_REGS_POSTIDLE in the OMAP4
+hwmod data which activates the restore for OMAP4.
+Currently the OMAP4 does not hit device off still the
+driver may have support for it.
 
-Signed-off-by: Todd Poynor <toddpoynor@google.com>
+Reviewed-by: Kevin Hilman <khilman@ti.com>
+Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 ---
-Found by inspection of the source; have not witnessed an actual crash.
+Applies on top of patches from Andy Green
+http://www.spinics.net/lists/linux-i2c/msg05632.html
+Tested on OMAP4430
 
- arch/arm/mach-davinci/irq.c |    6 ++++++
- 1 files changed, 6 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/irq.c b/arch/arm/mach-davinci/irq.c
-index d8c1af0..952dc12 100644
---- a/arch/arm/mach-davinci/irq.c
-+++ b/arch/arm/mach-davinci/irq.c
-@@ -52,6 +52,12 @@ davinci_alloc_gc(void __iomem *base, unsigned int irq_start, unsigned int num)
- 	struct irq_chip_type *ct;
+diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+index 0fe9556..5e2c748 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+@@ -2130,7 +2130,8 @@ static struct omap_hwmod_class omap44xx_i2c_hwmod_class = {
+ };
  
- 	gc = irq_alloc_generic_chip("AINTC", 1, irq_start, base, handle_edge_irq);
-+	if (!gc) {
-+		pr_err("%s: irq_alloc_generic_chip for IRQ %u failed\n",
-+		       __func__, irq_start);
-+		return;
-+	}
-+
- 	ct = gc->chip_types;
- 	ct->chip.irq_ack = irq_gc_ack_set_bit;
- 	ct->chip.irq_mask = irq_gc_mask_clr_bit;
+ static struct omap_i2c_dev_attr i2c_dev_attr = {
+-	.flags  = OMAP_I2C_FLAG_BUS_SHIFT_NONE,
++	.flags  = OMAP_I2C_FLAG_BUS_SHIFT_NONE |
++			OMAP_I2C_FLAG_RESET_REGS_POSTIDLE,
+ };
+ 
+ /* i2c1 */
 -- 
-1.7.3.1
+1.7.1
