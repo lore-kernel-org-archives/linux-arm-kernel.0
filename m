@@ -1,64 +1,32 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sun, 17 Jul 2011 04:33:26 +0200
+Date: Sun, 17 Jul 2011 04:36:02 +0200
 Subject: [PATCH 4/7] at91: remove non used at91_spi.h
-In-Reply-To: <4E21999A.6060105@vollmann.ch>
+In-Reply-To: <4E21950B.4040109@vollmann.ch>
 References: <1310687525-22486-1-git-send-email-plagnioj@jcrosoft.com>
 	<1310687525-22486-4-git-send-email-plagnioj@jcrosoft.com>
 	<4E2028E1.1060603@vollmann.ch>
 	<20110715154636.GA20678@game.jcrosoft.org>
 	<4E206E7D.2070708@vollmann.ch>
 	<20110716105752.GD20678@game.jcrosoft.org>
-	<20110716115655.GA1992@pengutronix.de>
-	<4E21999A.6060105@vollmann.ch>
-Message-ID: <20110717023326.GE20678@game.jcrosoft.org>
+	<4E21950B.4040109@vollmann.ch>
+Message-ID: <20110717023602.GF20678@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16:00 Sat 16 Jul     , Detlef Vollmann wrote:
-> On 07/16/11 13:56, Wolfram Sang wrote:
-> >
-> >>>About the SPI driver:
-> >>> From Documentation/spi/spi-summary:
-> >>>"At this writing, Linux has no slave side programming interface."
-> >>>So there's no SPI framwork that covers the slave side.
-> >>This what I mean use the SPI framework and add the SPI Slave support there
-> >
-> >[CCing spi-devel]
-> >
-> >If you talk about SPI slaves, be sure to have read Grant's comments in
-> >
-> >http://thread.gmane.org/gmane.linux.kernel.spi.devel/7401
-> >
-> >to see what would be needed for slave support.
-> I completely agree with Gran't comments here.
-> 
-> >Short note: Would be
-> >seperate subsystem, master subsystem is of limited use. I think a few
-> >slave-drivers would be nice to evaluate, so one can get a feeling if a
-> >subsystem makes sense and if so, how it could look like.
-> >
-> >Detlef, have you posted your slave driver so far?
-> No, and I didn't plan to do so.
-> Not because I don't want to publish it, if you want to look at it,
-> I'm happy to send the driver.
-> But I don't think it makes much sense to put my driver into mainline
-> Linux.
-> The reason for this is very simple: the protocol is specific for this
-> hardware, and the driver needs this specific protocol.
-> The Atmel hardware is not able to maintain information about frame
-> ends when running in DMA mode, so we need to put the length of the
-> frame to the beginning of the frame, and also need to put in some
-> extra information to be able to re-sync in case of transmission errors.
-> 
-> So this driver is very specific for this hardware, and I wrote SPI
-> slave drivers in the past for other hardware that were also very
-> specific.  I really doubt that an SPI slave framework really makes
-> sense.
-> 
-> And that's the reason why I'm keen that the hardware description
-> headers are available to out-of-tree drivers.
-So I'm sorry but this is clear I'm not going to keep the header
-out-of-tree drivers are not an enough reason to keep it
+On 15:41 Sat 16 Jul     , Detlef Vollmann wrote:
+> On 07/16/11 12:57, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> >for the SPI this IP is shared between avr2 and arm so keep it in arch is not
+> >acceptable at all
+> Thanks.  This was the motivation I missed.
+> In this case I think such include files should go somewhere under
+> include, so they can be accessed by other drivers.
+> And this is really not only true for this at91_spi.h, but also
+> for the other headers in this patch series.
+no we already have the header in drivers/spi so this one not used at all in
+the mainline is drop
+
+if you need to atmel_spi.h for mainline for other drivers you need to post
+your patch.
 
 Best Regards,
 J.
