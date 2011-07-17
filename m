@@ -1,39 +1,36 @@
-From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Sun, 17 Jul 2011 18:13:23 +0530
-Subject: [PATCH v4] OMAP4: hwmod data: I2C: add flag for context restore
-Message-ID: <1310906603-2673-1-git-send-email-shubhrajyoti@ti.com>
+From: axel.lin@gmail.com (Axel Lin)
+Date: Sun, 17 Jul 2011 21:38:56 +0800
+Subject: [PATCH] omap1: select GENERIC_IRQ_CHIP for TI OMAP1
+In-Reply-To: <87boxi2eep.fsf@ti.com>
+References: <1309251943.3984.1.camel@phoenix> <87boxi2eep.fsf@ti.com>
+Message-ID: <CAF+7xW=DKMi9doKm0XH0+EvJLX0gzUE0_TqrZNrqHqvjuSeHdA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Restore of context is not done for OMAP4. This patch 
-adds the OMAP_I2C_FLAG_RESET_REGS_POSTIDLE in the OMAP4
-hwmod data which activates the restore for OMAP4.
-Currently the OMAP4 does not hit device off still the
-driver may have support for it.
+2011/6/28 Kevin Hilman <khilman@ti.com>:
+> Axel Lin <axel.lin@gmail.com> writes:
+>
+>> The gpio-omap driver has been converted to use generic IRQ chip.
+>> Thus select GENERIC_IRQ_CHIP for TI OMAP1 to fix below build error.
+>>
+>> ? LD ? ? ?vmlinux
+>> drivers/built-in.o: In function `omap_mpuio_alloc_gc':
+>> drivers/gpio/gpio-omap.c:1087: undefined reference to `irq_alloc_generic_chip'
+>> drivers/gpio/gpio-omap.c:1100: undefined reference to `irq_setup_generic_chip'
+>> drivers/built-in.o: In function `omap_gpio_show_rev':
+>> drivers/gpio/gpio-omap.c:998: undefined reference to `irq_gc_mask_clr_bit'
+>> drivers/gpio/gpio-omap.c:998: undefined reference to `irq_gc_mask_set_bit'
+>> make: *** [vmlinux] Error 1
+>>
+>> Signed-off-by: Axel Lin <axel.lin@gmail.com>
+>
+> Thanks, I have a fix for this already queued for v3.0-rc3 series:
+>
+> ? ? ? ?http://marc.info/?l=linux-omap&m=130749135312468&w=2
+>
+Hi,
+Seems this patch is not upstream.
+I still have the same build error with  [linux-next: Tree for July 16].
 
-Reviewed-by: Kevin Hilman <khilman@ti.com>
-Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
----
-Applies on top of patches from Andy Green
-http://www.spinics.net/lists/linux-i2c/msg05632.html
-Tested on OMAP4430
-
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-index 0fe9556..5e2c748 100644
---- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-@@ -2130,7 +2130,8 @@ static struct omap_hwmod_class omap44xx_i2c_hwmod_class = {
- };
- 
- static struct omap_i2c_dev_attr i2c_dev_attr = {
--	.flags  = OMAP_I2C_FLAG_BUS_SHIFT_NONE,
-+	.flags  = OMAP_I2C_FLAG_BUS_SHIFT_NONE |
-+			OMAP_I2C_FLAG_RESET_REGS_POSTIDLE,
- };
- 
- /* i2c1 */
--- 
-1.7.1
+Regards,
+Axel
