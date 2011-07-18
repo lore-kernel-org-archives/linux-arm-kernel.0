@@ -1,17 +1,28 @@
 From: tanmay.upadhyay@einfochips.com (Tanmay Upadhyay)
-Date: Mon, 18 Jul 2011 12:22:08 +0530
-Subject: [PATCH 0/3] ARM: USB: Add support for USB HCD on PXA168
-Message-ID: <1310971931-4825-1-git-send-email-tanmay.upadhyay@einfochips.com>
+Date: Mon, 18 Jul 2011 12:22:11 +0530
+Subject: [PATCH 3/3] ARM: pxa168: Add USB support for gplugD board
+In-Reply-To: <1310971931-4825-1-git-send-email-tanmay.upadhyay@einfochips.com>
+References: <1310971931-4825-1-git-send-email-tanmay.upadhyay@einfochips.com>
+Message-ID: <1310971931-4825-4-git-send-email-tanmay.upadhyay@einfochips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series adds support for on-chip EHCI USB host controller on
-PXA168. The patches depends on patch series that adds support for gplugD
-[1] & a couple of fixes[2,3] followed by the same. All of these[1, 2, 3]
-are accepted by Eric Miao <eric.y.miao@gmail.com>.
+Signed-off-by: Tanmay Upadhyay <tanmay.upadhyay@einfochips.com>
+---
+ arch/arm/mach-mmp/gplugd.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-Patches in this series are based on Linux 2.6.39-rc4
-
-[1] http://lists.arm.linux.org.uk/lurker/message/20110502.055957.4236c42a.en.html
-[2] http://lists.arm.linux.org.uk/lurker/message/20110714.093715.f1b7c910.en.html
-[3] http://lists.arm.linux.org.uk/lurker/message/20110714.093716.615ae7dd.en.html
+diff --git a/arch/arm/mach-mmp/gplugd.c b/arch/arm/mach-mmp/gplugd.c
+index 98e25d9..5a27355 100644
+--- a/arch/arm/mach-mmp/gplugd.c
++++ b/arch/arm/mach-mmp/gplugd.c
+@@ -186,6 +186,7 @@ static void __init gplugd_init(void)
+ 	pxa168_add_twsi(0, NULL, ARRAY_AND_SIZE(gplugd_i2c_board_info));
+ 
+ 	pxa168_add_eth(&gplugd_eth_platform_data);
++	pxa168_add_usb_host(NULL);
+ }
+ 
+ MACHINE_START(SHEEVAD, "PXA168-based GuruPlug Display (gplugD) Platform")
+-- 
+1.7.0.4
