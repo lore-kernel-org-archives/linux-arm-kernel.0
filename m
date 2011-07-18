@@ -1,80 +1,83 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 18 Jul 2011 12:27:57 +0100
-Subject: linux-next regression on ARM926
-In-Reply-To: <CACRpkdbBrVda2oD42tjrWiG6uHXAdWwpr6cZ7qnSc2KM82XCfw@mail.gmail.com>
-References: <CACRpkdbBrVda2oD42tjrWiG6uHXAdWwpr6cZ7qnSc2KM82XCfw@mail.gmail.com>
-Message-ID: <20110718112757.GV23270@n2100.arm.linux.org.uk>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Mon, 18 Jul 2011 17:06:22 +0530
+Subject: [PATCH V3 00/13] To use DMA generic APIs for Samsung DMA
+In-Reply-To: <1310798666-7659-1-git-send-email-kgene.kim@samsung.com>
+References: <1310798666-7659-1-git-send-email-kgene.kim@samsung.com>
+Message-ID: <CABb+yY2SBevnQ4U3qeGe63G6dHi64cjCYoN296r8uPyjgYn-NA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 18, 2011 at 01:02:01PM +0200, Linus Walleij wrote:
-> Hi Dave,
-> 
-> do you have any hints on how to resolve this build error in the -next
-> tree:
-> 
->   LD      .tmp_vmlinux1
-> arch/arm/mm/built-in.o:(.init.data+0xe0): undefined reference to
-> `cpu_arm926_do_suspend'
-> arch/arm/mm/built-in.o:(.init.data+0xe4): undefined reference to
-> `cpu_arm926_do_resume'
-> make[2]: *** [.tmp_vmlinux1] Error 1
-> make[1]: *** [sub-make] Error 2
-> make[1]: Leaving directory `/home/linus/linux-next'
-> make: *** [build] Error 2
-> 
-> This is while building the U300, I can't really tell if the error is on my
-> (U300) side or in the recent patches to the proc_arm926 stuff?
-> It seems all ARM926 SoCs were affected.
+On Sat, Jul 16, 2011 at 12:14 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> Following is diagram of this changes
+>
+> +---------------------------------------------------------------------+
+> | Each drivers which uses DMA ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? |
+> +---------------------------------------------------------------------+
+> | S3C DMA API (such as s3c2410_dma_xxxx) ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?|
+> +-------------------------------+-------------------------------------+
+> | DMA driver for S3C24XX ? ? ? ?| S3C PL330 DMA API driver ? ? ? ? ? ?|
+> | PL080 DMA driver for S3C64XX ?| (arch/arm/plat-samsung/s3c-pl330.c) |
+> | ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? +-------------------------------------+
+> | (arch/arm/plat-s3c24xx/dma.c) | Common DMA core driver ? ? ? ? ? ? ?|
+> | (arch/arm/mach-s3c64xx/dma.c) | (arch/arm/common/pl330.c) ? ? ? ? ? |
+> +-------------------------------+-------------------------------------+
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ||
+> ? ? ? ? ? ? ? (removing S3C DMA API for PL330)
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ||
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \/
+> +---------------------------------------------------------------------+
+> | Each drivers which uses DMA ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? |
+> +-------------------------------+-------------------------------------+
+> | S3C DMA API(s3c2410_dma_xxx) ?| DMA generic API for PL330 ? ? ? ? ? |
+> +-------------------------------+-------------------------------------+
+> | DMA driver for S3C24XX ? ? ? ?| PL330 DMA API driver ? ? ? ? ? ? ? ?|
+> | PL080 DMA driver for S3C64XX ?| (drivers/dma/pl330.c) ? ? ? ? ? ? ? |
+> | ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? +-------------------------------------+
+> | (arch/arm/plat-s3c24xx/dma.c) | Common DMA core driver ? ? ? ? ? ? ?|
+> | (arch/arm/mach-s3c64xx/dma.c) | (arch/arm/common/pl330.c) ? ? ? ? ? |
+> +-------------------------------+-------------------------------------+
+>
 
-Hmm.
+Please share what drivers and use-cases have been tested with the patchset.
 
-That happens because without CONFIG_PM_SLEEP, we do this:
+> [PATCH V3 02/13] DMA: PL330: Update PL330 DMA API driver
+> This patch updates following 3 items.
+>    1. Removes unneccessary code.
+>    2. Add AMBA, PL330 configuration
+>    3. Change the meaning of 'peri_id' variable
+>       from PL330 event number to specific dma id by user.
+Please separate this patch in to at least 2 parts and explain _why_
+you do what you do.
 
-#define cpu_arm926_do_suspend   0
-#define cpu_arm926_do_resume    0
+Ex, the following two snippets looks obviously wrong to me.
+Though I doubt any better changelog can justify that, but atleast that
+will help me take it seriously. This is also why I ask for test-report.
 
-whereas the macro assembler does this:
+@@ -19,7 +19,7 @@ struct dma_pl330_peri {
+         * Peri_Req i/f of the DMAC that is
+         * peripheral could be reached from.
+         */
+-       u8 peri_id; /* {0, 31} */
++       u8 peri_id; /* specific dma id */
 
-        .word   cpu_\name\()_do_suspend
-        .word   cpu_\name\()_do_resume
+@@ -455,7 +455,7 @@ static struct dma_pl330_desc
+*pl330_get_desc(struct dma_pl330_chan *pch)
+        async_tx_ack(&desc->txd);
 
-and this means that neither the preprocessor nor the assembler can tie
-these two together.
+        desc->req.rqtype = peri->rqtype;
+-       desc->req.peri = peri->peri_id;
++       desc->req.peri = pch->chan.chan_id;
 
-One solution would be to put an #ifdef CONFIG_PM_SLEEP around that in
-mm/proc-macros.S to select .word 0 instead, and get rid of the #else
-in the individual proc-*.S files - something like this (untested):
+Please don't only add to changelogs, but also re-think about the above
+two changes. Hint: Read the structure definitions header file and how they
+are used in the pl330 core driver.
 
-diff --git a/arch/arm/mm/proc-arm926.S b/arch/arm/mm/proc-arm926.S
-index b2f9bde..2bbcf05 100644
---- a/arch/arm/mm/proc-arm926.S
-+++ b/arch/arm/mm/proc-arm926.S
-@@ -421,9 +421,6 @@ ENTRY(cpu_arm926_do_resume)
- 		     PMD_SECT_CACHEABLE | PMD_BIT4 | PMD_SECT_AP_WRITE
- 	b	cpu_resume_mmu
- ENDPROC(cpu_arm926_do_resume)
--#else
--#define cpu_arm926_do_suspend	0
--#define cpu_arm926_do_resume	0
- #endif
- 
- 	__CPUINIT
-diff --git a/arch/arm/mm/proc-macros.S b/arch/arm/mm/proc-macros.S
-index 4ae9b44..307a4de 100644
---- a/arch/arm/mm/proc-macros.S
-+++ b/arch/arm/mm/proc-macros.S
-@@ -276,8 +276,13 @@ ENTRY(\name\()_processor_functions)
- 
- 	.if \suspend
- 	.word	cpu_\name\()_suspend_size
-+#ifdef CONFIG_PM_SLEEP
- 	.word	cpu_\name\()_do_suspend
- 	.word	cpu_\name\()_do_resume
-+#else
-+	.word	0
-+	.word	0
-+#endif
- 	.else
- 	.word	0
- 	.word	0
+Since the other patches would be affected by what you do here, I am not
+reviewing them until I have either justification or revert of these.
+
+> [PATCH V3 03/13] DMA: PL330: Add DMA capabilities
+Please don't be conservative with number of patches - segregate independent
+changes in independent patches or you make my life miserable :(
+
+Thnx
+-jassi
