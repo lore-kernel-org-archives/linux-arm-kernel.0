@@ -1,215 +1,196 @@
-From: manjugk@ti.com (G, Manjunath Kondaiah)
-Date: Mon, 18 Jul 2011 11:29:32 +0530
-Subject: [PATCH v2] DT: Use helper function to read u32 values
-In-Reply-To: <CAP6yH7cpP7C_h2mJNBqy-UW9_Sg4734j+2dYsK9bdF+99yY3=w@mail.gmail.com>
-References: <CAP6yH7cpP7C_h2mJNBqy-UW9_Sg4734j+2dYsK9bdF+99yY3=w@mail.gmail.com>
-Message-ID: <CAP6yH7ergt_ySLHerDOuzf3n-6qDYqqMk5SdXpkeX=fka-Aihw@mail.gmail.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Mon, 18 Jul 2011 14:00:10 +0800
+Subject: [PATCH 1/2] ARM: pxa168: gplugD: Get rid of mfp-gplugd.h
+In-Reply-To: <1310636236-3104-1-git-send-email-tanmay.upadhyay@einfochips.com>
+References: <no>
+	<1310636236-3104-1-git-send-email-tanmay.upadhyay@einfochips.com>
+Message-ID: <CAMPhdO9BROOubAj+sfnwCAux9AD8nxaMi54AbKfiTzSxb1npQg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grant/Rob,
-Do you see any issues with this patch?
-
--M
-
-On 4 July 2011 19:42, Manjunatha GK <manjugk@ti.com> wrote:
-> Use helper function of_property_read_u32() in place of
-> of_get_property and be32_to_cpup() api's for code optimization.
+On Thu, Jul 14, 2011 at 5:37 PM, Tanmay Upadhyay
+<tanmay.upadhyay@einfochips.com> wrote:
+> Move definitions from mfp-gplugd.h to mfp-pxa168.h as they aren't
+> gplugD specific.
 >
-> Compile tested the changes.
->
-> Signed-off-by: G, Manjunath Kondaiah <manjugk@ti.com>
+> Signed-off-by: Tanmay Upadhyay <tanmay.upadhyay@einfochips.com>
+
+Applied to 'devel'.
+
 > ---
-> ?drivers/of/irq.c ? ? | ? 39 +++++++++++++++++++--------------------
-> ?drivers/of/of_i2c.c ?| ? ?8 +++-----
-> ?drivers/of/of_mdio.c | ? ?8 +++-----
-> ?3 files changed, 25 insertions(+), 30 deletions(-)
+> ?arch/arm/mach-mmp/gplugd.c ? ? ? ? ? ? ? ? ?| ? 18 +++++++---
+> ?arch/arm/mach-mmp/include/mach/mfp-gplugd.h | ? 52 ---------------------------
+> ?arch/arm/mach-mmp/include/mach/mfp-pxa168.h | ? 37 ++++++++++++++++---
+> ?3 files changed, 45 insertions(+), 62 deletions(-)
+> ?delete mode 100644 arch/arm/mach-mmp/include/mach/mfp-gplugd.h
 >
-> diff --git a/drivers/of/irq.c b/drivers/of/irq.c
-> index 9f689f1..30cd3b7 100644
-> --- a/drivers/of/irq.c
-> +++ b/drivers/of/irq.c
-> @@ -59,20 +59,19 @@ EXPORT_SYMBOL_GPL(irq_of_parse_and_map);
-> ?struct device_node *of_irq_find_parent(struct device_node *child)
-> ?{
-> ? ? ? ?struct device_node *p;
-> - ? ? ? const __be32 *parp;
-> + ? ? ? u32 parp;
+> diff --git a/arch/arm/mach-mmp/gplugd.c b/arch/arm/mach-mmp/gplugd.c
+> index c070c24..0770e51 100644
+> --- a/arch/arm/mach-mmp/gplugd.c
+> +++ b/arch/arm/mach-mmp/gplugd.c
+> @@ -16,16 +16,18 @@
+> ?#include <mach/gpio.h>
+> ?#include <mach/pxa168.h>
+> ?#include <mach/mfp-pxa168.h>
+> -#include <mach/mfp-gplugd.h>
 >
-> ? ? ? ?if (!of_node_get(child))
-> ? ? ? ? ? ? ? ?return NULL;
+> ?#include "common.h"
 >
-> ? ? ? ?do {
-> - ? ? ? ? ? ? ? parp = of_get_property(child, "interrupt-parent", NULL);
-> - ? ? ? ? ? ? ? if (parp == NULL)
-> + ? ? ? ? ? ? ? if (of_property_read_u32(child, "interrupt-parent", &parp))
-> ? ? ? ? ? ? ? ? ? ? ? ?p = of_get_parent(child);
-> ? ? ? ? ? ? ? ?else {
-> ? ? ? ? ? ? ? ? ? ? ? ?if (of_irq_workarounds & OF_IMAP_NO_PHANDLE)
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?p = of_node_get(of_irq_dflt_pic);
-> ? ? ? ? ? ? ? ? ? ? ? ?else
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? p = of_find_node_by_phandle(be32_to_cpup(parp));
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? p = of_find_node_by_phandle(parp);
-> ? ? ? ? ? ? ? ?}
-> ? ? ? ? ? ? ? ?of_node_put(child);
-> ? ? ? ? ? ? ? ?child = p;
-> @@ -100,7 +99,8 @@ int of_irq_map_raw(struct device_node *parent,
-> const __be32 *intspec,
-> ? ? ? ? ? ? ? ? ? u32 ointsize, const __be32 *addr, struct of_irq *out_irq)
-> ?{
-> ? ? ? ?struct device_node *ipar, *tnode, *old = NULL, *newpar = NULL;
-> - ? ? ? const __be32 *tmp, *imap, *imask;
-> + ? ? ? const __be32 *imap, *imask;
-> + ? ? ? u32 tmp;
-> ? ? ? ?u32 intsize = 1, addrsize, newintsize = 0, newaddrsize = 0;
-> ? ? ? ?int imaplen, match, i;
+> ?static unsigned long gplugd_pin_config[] __initdata = {
+> ? ? ? ?/* UART3 */
+> - ? ? ? GPIO8_UART3_SOUT,
+> - ? ? ? GPIO9_UART3_SIN,
+> - ? ? ? GPI1O_UART3_CTS,
+> - ? ? ? GPI11_UART3_RTS,
+> + ? ? ? GPIO8_UART3_TXD,
+> + ? ? ? GPIO9_UART3_RXD,
+> + ? ? ? GPIO1O_UART3_CTS,
+> + ? ? ? GPIO11_UART3_RTS,
+> +
+> + ? ? ? /* USB OTG PEN */
+> + ? ? ? GPIO18_GPIO,
 >
-> @@ -115,9 +115,8 @@ int of_irq_map_raw(struct device_node *parent,
-> const __be32 *intspec,
-> ? ? ? ? * is none, we are nice and just walk up the tree
-> ? ? ? ? */
-> ? ? ? ?do {
-> - ? ? ? ? ? ? ? tmp = of_get_property(ipar, "#interrupt-cells", NULL);
-> - ? ? ? ? ? ? ? if (tmp != NULL) {
-> - ? ? ? ? ? ? ? ? ? ? ? intsize = be32_to_cpu(*tmp);
-> + ? ? ? ? ? ? ? if (!of_property_read_u32(ipar, "#interrupt-cells", &tmp)) {
-> + ? ? ? ? ? ? ? ? ? ? ? intsize = tmp;
-> ? ? ? ? ? ? ? ? ? ? ? ?break;
-> ? ? ? ? ? ? ? ?}
-> ? ? ? ? ? ? ? ?tnode = ipar;
-> @@ -139,14 +138,14 @@ int of_irq_map_raw(struct device_node *parent,
-> const __be32 *intspec,
-> ? ? ? ? */
-> ? ? ? ?old = of_node_get(ipar);
-> ? ? ? ?do {
-> - ? ? ? ? ? ? ? tmp = of_get_property(old, "#address-cells", NULL);
-> + ? ? ? ? ? ? ? i = of_property_read_u32(old, "#address-cells", &tmp);
-> ? ? ? ? ? ? ? ?tnode = of_get_parent(old);
-> ? ? ? ? ? ? ? ?of_node_put(old);
-> ? ? ? ? ? ? ? ?old = tnode;
-> - ? ? ? } while (old && tmp == NULL);
-> + ? ? ? } while (old && i < 0);
-> ? ? ? ?of_node_put(old);
-> ? ? ? ?old = NULL;
-> - ? ? ? addrsize = (tmp == NULL) ? 2 : be32_to_cpu(*tmp);
-> + ? ? ? addrsize = (i < 0) ? 2 : tmp;
+> ? ? ? ?/* MMC2 */
+> ? ? ? ?GPIO28_MMC2_CMD,
+> @@ -109,6 +111,12 @@ static unsigned long gplugd_pin_config[] __initdata = {
+> ? ? ? ?GPIO105_CI2C_SDA,
+> ? ? ? ?GPIO106_CI2C_SCL,
 >
-> ? ? ? ?pr_debug(" -> addrsize=%d\n", addrsize);
+> + ? ? ? /* SPI NOR Flash on SSP2 */
+> + ? ? ? GPIO107_SSP2_RXD,
+> + ? ? ? GPIO108_SSP2_TXD,
+> + ? ? ? GPIO110_GPIO, ? ? /* SPI_CSn */
+> + ? ? ? GPIO111_SSP2_CLK,
+> +
+> ? ? ? ?/* Select JTAG */
+> ? ? ? ?GPIO109_GPIO,
 >
-> @@ -225,14 +224,14 @@ int of_irq_map_raw(struct device_node *parent,
-> const __be32 *intspec,
-> ? ? ? ? ? ? ? ? ? ? ? ?/* Get #interrupt-cells and #address-cells of new
-> ? ? ? ? ? ? ? ? ? ? ? ? * parent
-> ? ? ? ? ? ? ? ? ? ? ? ? */
-> - ? ? ? ? ? ? ? ? ? ? ? tmp = of_get_property(newpar, "#interrupt-cells", NULL);
-> - ? ? ? ? ? ? ? ? ? ? ? if (tmp == NULL) {
-> + ? ? ? ? ? ? ? ? ? ? ? if (of_property_read_u32(newpar, "#interrupt-cells",
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? &tmp)) {
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?pr_debug(" -> parent lacks #interrupt-cells!\n");
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?goto fail;
-> ? ? ? ? ? ? ? ? ? ? ? ?}
-> - ? ? ? ? ? ? ? ? ? ? ? newintsize = be32_to_cpu(*tmp);
-> - ? ? ? ? ? ? ? ? ? ? ? tmp = of_get_property(newpar, "#address-cells", NULL);
-> - ? ? ? ? ? ? ? ? ? ? ? newaddrsize = (tmp == NULL) ? 0 : be32_to_cpu(*tmp);
-> + ? ? ? ? ? ? ? ? ? ? ? newintsize = tmp;
-> + ? ? ? ? ? ? ? ? ? ? ? i = of_property_read_u32(newpar, "#address-cells", &tmp);
-> + ? ? ? ? ? ? ? ? ? ? ? newaddrsize = (i < 0) ? 0 : tmp;
+> diff --git a/arch/arm/mach-mmp/include/mach/mfp-gplugd.h b/arch/arm/mach-mmp/include/mach/mfp-gplugd.h
+> deleted file mode 100644
+> index b8cf38d..0000000
+> --- a/arch/arm/mach-mmp/include/mach/mfp-gplugd.h
+> +++ /dev/null
+> @@ -1,52 +0,0 @@
+> -/*
+> - * linux/arch/arm/mach-mmp/include/mach/mfp-gplugd.h
+> - *
+> - * ? MFP definitions used in gplugD
+> - *
+> - * This program is free software; you can redistribute it and/or modify
+> - * it under the terms of the GNU General Public License version 2 as
+> - * published by the Free Software Foundation.
+> - */
+> -
+> -#ifndef __MACH_MFP_GPLUGD_H
+> -#define __MACH_MFP_GPLUGD_H
+> -
+> -#include <plat/mfp.h>
+> -#include <mach/mfp.h>
+> -
+> -/* UART3 */
+> -#define GPIO8_UART3_SOUT ? ? ? MFP_CFG(GPIO8, AF2)
+> -#define GPIO9_UART3_SIN ? ? ? ?MFP_CFG(GPIO9, AF2)
+> -#define GPI1O_UART3_CTS ? ? ? ?MFP_CFG(GPIO10, AF2)
+> -#define GPI11_UART3_RTS ? ? ? ?MFP_CFG(GPIO11, AF2)
+> -
+> -/* MMC2 */
+> -#define ? ? ? ?GPIO28_MMC2_CMD ? ? ? ? MFP_CFG_DRV(GPIO28, AF6, FAST)
+> -#define ? ? ? ?GPIO29_MMC2_CLK ? ? ? ? MFP_CFG_DRV(GPIO29, AF6, FAST)
+> -#define ? ? ? ?GPIO30_MMC2_DAT0 ? ? ? ?MFP_CFG_DRV(GPIO30, AF6, FAST)
+> -#define ? ? ? ?GPIO31_MMC2_DAT1 ? ? ? ?MFP_CFG_DRV(GPIO31, AF6, FAST)
+> -#define ? ? ? ?GPIO32_MMC2_DAT2 ? ? ? ?MFP_CFG_DRV(GPIO32, AF6, FAST)
+> -#define ? ? ? ?GPIO33_MMC2_DAT3 ? ? ? ?MFP_CFG_DRV(GPIO33, AF6, FAST)
+> -
+> -/* I2S */
+> -#undef GPIO114_I2S_FRM
+> -#undef GPIO115_I2S_BCLK
+> -
+> -#define GPIO114_I2S_FRM ? ? ? ? ? ? ? ?MFP_CFG_DRV(GPIO114, AF1, FAST)
+> -#define GPIO115_I2S_BCLK ? ? ? ?MFP_CFG_DRV(GPIO115, AF1, FAST)
+> -#define GPIO116_I2S_TXD ? ? ? ? MFP_CFG_DRV(GPIO116, AF1, FAST)
+> -
+> -/* MMC4 */
+> -#define GPIO125_MMC4_DAT3 ? ? ? MFP_CFG_DRV(GPIO125, AF7, FAST)
+> -#define GPIO126_MMC4_DAT2 ? ? ? MFP_CFG_DRV(GPIO126, AF7, FAST)
+> -#define GPIO127_MMC4_DAT1 ? ? ? MFP_CFG_DRV(GPIO127, AF7, FAST)
+> -#define GPIO0_2_MMC4_DAT0 ? ? ? MFP_CFG_DRV(GPIO0_2, AF7, FAST)
+> -#define GPIO1_2_MMC4_CMD ? ? ? ?MFP_CFG_DRV(GPIO1_2, AF7, FAST)
+> -#define GPIO2_2_MMC4_CLK ? ? ? ?MFP_CFG_DRV(GPIO2_2, AF7, FAST)
+> -
+> -/* OTG GPIO */
+> -#define GPIO_USB_OTG_PEN ? ? ? ?18
+> -#define GPIO_USB_OIDIR ? ? ? ? ?20
+> -
+> -/* Other GPIOs are 35, 84, 85 */
+> -#endif /* __MACH_MFP_GPLUGD_H */
+> diff --git a/arch/arm/mach-mmp/include/mach/mfp-pxa168.h b/arch/arm/mach-mmp/include/mach/mfp-pxa168.h
+> index 8c78232..92aaa3c 100644
+> --- a/arch/arm/mach-mmp/include/mach/mfp-pxa168.h
+> +++ b/arch/arm/mach-mmp/include/mach/mfp-pxa168.h
+> @@ -203,6 +203,10 @@
+> ?#define GPIO33_CF_nCD2 ? ? ? ? MFP_CFG(GPIO33, AF3)
 >
-> ? ? ? ? ? ? ? ? ? ? ? ?pr_debug(" -> newintsize=%d, newaddrsize=%d\n",
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ?newintsize, newaddrsize);
-> @@ -284,7 +283,8 @@ EXPORT_SYMBOL_GPL(of_irq_map_raw);
-> ?int of_irq_map_one(struct device_node *device, int index, struct
-> of_irq *out_irq)
-> ?{
-> ? ? ? ?struct device_node *p;
-> - ? ? ? const __be32 *intspec, *tmp, *addr;
-> + ? ? ? const __be32 *intspec, *addr;
-> + ? ? ? u32 tmp;
-> ? ? ? ?u32 intsize, intlen;
-> ? ? ? ?int res = -EINVAL;
+> ?/* UART */
+> +#define GPIO8_UART3_TXD ? ? ? ? ? ? ? ?MFP_CFG(GPIO8, AF2)
+> +#define GPIO9_UART3_RXD ? ? ? ? ? ? ? ?MFP_CFG(GPIO9, AF2)
+> +#define GPIO1O_UART3_CTS ? ? ? MFP_CFG(GPIO10, AF2)
+> +#define GPIO11_UART3_RTS ? ? ? MFP_CFG(GPIO11, AF2)
+> ?#define GPIO88_UART2_TXD ? ? ? MFP_CFG(GPIO88, AF2)
+> ?#define GPIO89_UART2_RXD ? ? ? MFP_CFG(GPIO89, AF2)
+> ?#define GPIO107_UART1_TXD ? ? ?MFP_CFG_DRV(GPIO107, AF1, FAST)
+> @@ -232,6 +236,22 @@
+> ?#define GPIO53_MMC1_CD ? ? ? ? MFP_CFG(GPIO53, AF1)
+> ?#define GPIO46_MMC1_WP ? ? ? ? MFP_CFG(GPIO46, AF1)
 >
-> @@ -311,10 +311,9 @@ int of_irq_map_one(struct device_node *device,
-> int index, struct of_irq *out_irq
-> ? ? ? ? ? ? ? ?return -EINVAL;
+> +/* MMC2 */
+> +#define ? ? ? ?GPIO28_MMC2_CMD ? ? ? ? MFP_CFG_DRV(GPIO28, AF6, FAST)
+> +#define ? ? ? ?GPIO29_MMC2_CLK ? ? ? ? MFP_CFG_DRV(GPIO29, AF6, FAST)
+> +#define ? ? ? ?GPIO30_MMC2_DAT0 ? ? ? ?MFP_CFG_DRV(GPIO30, AF6, FAST)
+> +#define ? ? ? ?GPIO31_MMC2_DAT1 ? ? ? ?MFP_CFG_DRV(GPIO31, AF6, FAST)
+> +#define ? ? ? ?GPIO32_MMC2_DAT2 ? ? ? ?MFP_CFG_DRV(GPIO32, AF6, FAST)
+> +#define ? ? ? ?GPIO33_MMC2_DAT3 ? ? ? ?MFP_CFG_DRV(GPIO33, AF6, FAST)
+> +
+> +/* MMC4 */
+> +#define GPIO125_MMC4_DAT3 ? ? ? MFP_CFG_DRV(GPIO125, AF7, FAST)
+> +#define GPIO126_MMC4_DAT2 ? ? ? MFP_CFG_DRV(GPIO126, AF7, FAST)
+> +#define GPIO127_MMC4_DAT1 ? ? ? MFP_CFG_DRV(GPIO127, AF7, FAST)
+> +#define GPIO0_2_MMC4_DAT0 ? ? ? MFP_CFG_DRV(GPIO0_2, AF7, FAST)
+> +#define GPIO1_2_MMC4_CMD ? ? ? ?MFP_CFG_DRV(GPIO1_2, AF7, FAST)
+> +#define GPIO2_2_MMC4_CLK ? ? ? ?MFP_CFG_DRV(GPIO2_2, AF7, FAST)
+> +
+> ?/* LCD */
+> ?#define GPIO84_LCD_CS ? ? ? ? ?MFP_CFG(GPIO84, AF1)
+> ?#define GPIO60_LCD_DD0 ? ? ? ? MFP_CFG(GPIO60, AF1)
+> @@ -269,11 +289,12 @@
+> ?#define GPIO106_CI2C_SCL ? ? ? MFP_CFG(GPIO106, AF1)
 >
-> ? ? ? ?/* Get size of interrupt specifier */
-> - ? ? ? tmp = of_get_property(p, "#interrupt-cells", NULL);
-> - ? ? ? if (tmp == NULL)
-> + ? ? ? if (of_property_read_u32(p, "#interrupt-cells", &tmp))
-> ? ? ? ? ? ? ? ?goto out;
-> - ? ? ? intsize = be32_to_cpu(*tmp);
-> + ? ? ? intsize = tmp;
+> ?/* I2S */
+> -#define GPIO113_I2S_MCLK ? ? ? MFP_CFG(GPIO113,AF6)
+> -#define GPIO114_I2S_FRM ? ? ? ? ? ? ? ?MFP_CFG(GPIO114,AF1)
+> -#define GPIO115_I2S_BCLK ? ? ? MFP_CFG(GPIO115,AF1)
+> -#define GPIO116_I2S_RXD ? ? ? ? ? ? ? ?MFP_CFG(GPIO116,AF2)
+> -#define GPIO117_I2S_TXD ? ? ? ? ? ? ? ?MFP_CFG(GPIO117,AF2)
+> +#define GPIO113_I2S_MCLK ? ? ? MFP_CFG(GPIO113, AF6)
+> +#define GPIO114_I2S_FRM ? ? ? ? ? ? ? ?MFP_CFG(GPIO114, AF1)
+> +#define GPIO115_I2S_BCLK ? ? ? MFP_CFG(GPIO115, AF1)
+> +#define GPIO116_I2S_RXD ? ? ? ? ? ? ? ?MFP_CFG(GPIO116, AF2)
+> +#define GPIO116_I2S_TXD ? ? ? ? MFP_CFG(GPIO116, AF1)
+> +#define GPIO117_I2S_TXD ? ? ? ? ? ? ? ?MFP_CFG(GPIO117, AF2)
 >
-> ? ? ? ?pr_debug(" intsize=%d intlen=%d\n", intsize, intlen);
+> ?/* PWM */
+> ?#define GPIO96_PWM3_OUT ? ? ? ? ? ? ? ?MFP_CFG(GPIO96, AF1)
+> @@ -324,4 +345,10 @@
+> ?#define GPIO101_MII_MDIO ? ? ? MFP_CFG(GPIO101, AF5)
+> ?#define GPIO103_RX_DV ? ? ? ? ?MFP_CFG(GPIO103, AF5)
 >
-> diff --git a/drivers/of/of_i2c.c b/drivers/of/of_i2c.c
-> index f37fbeb..371b591 100644
-> --- a/drivers/of/of_i2c.c
-> +++ b/drivers/of/of_i2c.c
-> @@ -32,8 +32,7 @@ void of_i2c_register_devices(struct i2c_adapter *adap)
-> ? ? ? ?for_each_child_of_node(adap->dev.of_node, node) {
-> ? ? ? ? ? ? ? ?struct i2c_board_info info = {};
-> ? ? ? ? ? ? ? ?struct dev_archdata dev_ad = {};
-> - ? ? ? ? ? ? ? const __be32 *addr;
-> - ? ? ? ? ? ? ? int len;
-> + ? ? ? ? ? ? ? u32 addr;
->
-> ? ? ? ? ? ? ? ?dev_dbg(&adap->dev, "of_i2c: register %s\n", node->full_name);
->
-> @@ -43,14 +42,13 @@ void of_i2c_register_devices(struct i2c_adapter *adap)
-> ? ? ? ? ? ? ? ? ? ? ? ?continue;
-> ? ? ? ? ? ? ? ?}
->
-> - ? ? ? ? ? ? ? addr = of_get_property(node, "reg", &len);
-> - ? ? ? ? ? ? ? if (!addr || (len < sizeof(int))) {
-> + ? ? ? ? ? ? ? if (of_property_read_u32(node, "reg", &addr)) {
-> ? ? ? ? ? ? ? ? ? ? ? ?dev_err(&adap->dev, "of_i2c: invalid reg on %s\n",
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?node->full_name);
-> ? ? ? ? ? ? ? ? ? ? ? ?continue;
-> ? ? ? ? ? ? ? ?}
->
-> - ? ? ? ? ? ? ? info.addr = be32_to_cpup(addr);
-> + ? ? ? ? ? ? ? info.addr = addr;
-> ? ? ? ? ? ? ? ?if (info.addr > (1 << 10) - 1) {
-> ? ? ? ? ? ? ? ? ? ? ? ?dev_err(&adap->dev, "of_i2c: invalid addr=%x on %s\n",
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?info.addr, node->full_name);
-> diff --git a/drivers/of/of_mdio.c b/drivers/of/of_mdio.c
-> index d35e300..9064b76 100644
-> --- a/drivers/of/of_mdio.c
-> +++ b/drivers/of/of_mdio.c
-> @@ -52,19 +52,17 @@ int of_mdiobus_register(struct mii_bus *mdio,
-> struct device_node *np)
->
-> ? ? ? ?/* Loop over the child nodes and register a phy_device for each one */
-> ? ? ? ?for_each_child_of_node(np, child) {
-> - ? ? ? ? ? ? ? const __be32 *paddr;
-> + ? ? ? ? ? ? ? u32 paddr;
-> ? ? ? ? ? ? ? ?u32 addr;
-> - ? ? ? ? ? ? ? int len;
->
-> ? ? ? ? ? ? ? ?/* A PHY must have a reg property in the range [0-31] */
-> - ? ? ? ? ? ? ? paddr = of_get_property(child, "reg", &len);
-> - ? ? ? ? ? ? ? if (!paddr || len < sizeof(*paddr)) {
-> + ? ? ? ? ? ? ? if (of_property_read_u32(child, "reg", &paddr)) {
-> ? ? ? ? ? ? ? ? ? ? ? ?dev_err(&mdio->dev, "%s has invalid PHY address\n",
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?child->full_name);
-> ? ? ? ? ? ? ? ? ? ? ? ?continue;
-> ? ? ? ? ? ? ? ?}
->
-> - ? ? ? ? ? ? ? addr = be32_to_cpup(paddr);
-> + ? ? ? ? ? ? ? addr = paddr;
-> ? ? ? ? ? ? ? ?if (addr >= 32) {
-> ? ? ? ? ? ? ? ? ? ? ? ?dev_err(&mdio->dev, "%s PHY address %i is too large\n",
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?child->full_name, addr);
+> +/* SSP2 */
+> +#define GPIO107_SSP2_RXD ? ? ? MFP_CFG(GPIO107, AF4)
+> +#define GPIO108_SSP2_TXD ? ? ? MFP_CFG(GPIO108, AF4)
+> +#define GPIO111_SSP2_CLK ? ? ? MFP_CFG(GPIO111, AF4)
+> +#define GPIO112_SSP2_FRM ? ? ? MFP_CFG(GPIO112, AF4)
+> +
+> ?#endif /* __ASM_MACH_MFP_PXA168_H */
 > --
-> 1.7.4.1
+> 1.7.0.4
 >
-
-
-
--- 
-Manjunatha GK
-
-Linaro.org???Open source software for ARM SoCs
-
-Follow?Linaro:?Facebook | Twitter | Blog
+>
