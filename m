@@ -1,75 +1,48 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Mon, 18 Jul 2011 16:44:15 +0900
-Subject: [GIT PULL] ARM: consolidate clkdev header files for v3.1
-Message-ID: <20110718074414.GA23995@july>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Mon, 18 Jul 2011 15:51:48 +0800
+Subject: [PATCH 1/3] ARM: pxa168: Remove MTD specific headers
+In-Reply-To: <1310971931-4825-2-git-send-email-tanmay.upadhyay@einfochips.com>
+References: <1310971931-4825-1-git-send-email-tanmay.upadhyay@einfochips.com>
+	<1310971931-4825-2-git-send-email-tanmay.upadhyay@einfochips.com>
+Message-ID: <CAMPhdO_qVn8JaX6orfnHHXjmi8pTQFb1SzMe2RQM9xMdTvimaQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Mon, Jul 18, 2011 at 2:52 PM, Tanmay Upadhyay
+<tanmay.upadhyay@einfochips.com> wrote:
+> mtd.h defines 'DEBUG' which unintentionally changes behavior
 
-Please pull clkdev header files consolidation.
+I guess the right solution is to fix mtd.h instead of pxa3xx_nand.h
 
-Thank you,
-Kyungin Park
+> of other files that includes pxa3xx_nand.h OR pxa168.h. Anyway,
+> neither mtd/mtd.h nor mtd/partitions.h is needed here
 
-The following changes since commit 1765a367a3b5d5e9692949b0c5ec933eff2c0701:
+There is a reference of 'struct mtd_partition' below. Though it's possible
+to remove mtd header references, and declare 'struct mtd_partition' as
+opaque, the mtd header files are still needed when defining partition
+layout in board file.
 
-  Merge branch 'gpio/merge' of git://git.secretlab.ca/git/linux-2.6 (2011-07-15 18:03:30 -0700)
-
-are available in the git repository at:
-
-  git://git.infradead.org/users/kmpark/linux-2.6-samsung clkdev
-
-Kyungmin Park (1):
-      Consolidate the clkdev header files
-
- arch/arm/Kconfig                             |    6 ++++
- arch/arm/include/asm/clkdev.h                |    5 ++++
- arch/arm/mach-at91/include/mach/clkdev.h     |    7 -----
- arch/arm/mach-bcmring/include/mach/clkdev.h  |    7 -----
- arch/arm/mach-davinci/include/mach/clkdev.h  |   15 -----------
- arch/arm/mach-ep93xx/include/mach/clkdev.h   |   11 --------
- arch/arm/mach-lpc32xx/include/mach/clkdev.h  |   25 -------------------
- arch/arm/mach-mmp/include/mach/clkdev.h      |    7 -----
- arch/arm/mach-msm/include/mach/clkdev.h      |   19 --------------
- arch/arm/mach-mxs/include/mach/clkdev.h      |    7 -----
- arch/arm/mach-nomadik/include/mach/clkdev.h  |    7 -----
- arch/arm/mach-nuc93x/include/mach/clkdev.h   |    7 -----
- arch/arm/mach-omap1/include/mach/clkdev.h    |    5 ----
- arch/arm/mach-omap2/include/mach/clkdev.h    |    5 ----
- arch/arm/mach-pnx4008/include/mach/clkdev.h  |    7 -----
- arch/arm/mach-pxa/include/mach/clkdev.h      |    7 -----
- arch/arm/mach-spear3xx/include/mach/clkdev.h |   19 --------------
- arch/arm/mach-spear6xx/include/mach/clkdev.h |   19 --------------
- arch/arm/mach-tegra/include/mach/clkdev.h    |   34 --------------------------
- arch/arm/mach-ux500/include/mach/clkdev.h    |    7 -----
- arch/arm/mach-w90x900/include/mach/clkdev.h  |    7 -----
- arch/arm/plat-mxc/include/mach/clkdev.h      |    7 -----
- arch/arm/plat-omap/include/plat/clkdev.h     |   13 ----------
- arch/arm/plat-spear/include/plat/clkdev.h    |   20 ---------------
- arch/arm/plat-tcc/include/mach/clkdev.h      |    7 -----
- drivers/clk/Kconfig                          |    3 ++
- 26 files changed, 14 insertions(+), 269 deletions(-)
- delete mode 100644 arch/arm/mach-at91/include/mach/clkdev.h
- delete mode 100644 arch/arm/mach-bcmring/include/mach/clkdev.h
- delete mode 100644 arch/arm/mach-davinci/include/mach/clkdev.h
- delete mode 100644 arch/arm/mach-ep93xx/include/mach/clkdev.h
- delete mode 100644 arch/arm/mach-lpc32xx/include/mach/clkdev.h
- delete mode 100644 arch/arm/mach-mmp/include/mach/clkdev.h
- delete mode 100644 arch/arm/mach-msm/include/mach/clkdev.h
- delete mode 100644 arch/arm/mach-mxs/include/mach/clkdev.h
- delete mode 100644 arch/arm/mach-nomadik/include/mach/clkdev.h
- delete mode 100644 arch/arm/mach-nuc93x/include/mach/clkdev.h
- delete mode 100644 arch/arm/mach-omap1/include/mach/clkdev.h
- delete mode 100644 arch/arm/mach-omap2/include/mach/clkdev.h
- delete mode 100644 arch/arm/mach-pnx4008/include/mach/clkdev.h
- delete mode 100644 arch/arm/mach-pxa/include/mach/clkdev.h
- delete mode 100644 arch/arm/mach-spear3xx/include/mach/clkdev.h
- delete mode 100644 arch/arm/mach-spear6xx/include/mach/clkdev.h
- delete mode 100644 arch/arm/mach-tegra/include/mach/clkdev.h
- delete mode 100644 arch/arm/mach-ux500/include/mach/clkdev.h
- delete mode 100644 arch/arm/mach-w90x900/include/mach/clkdev.h
- delete mode 100644 arch/arm/plat-mxc/include/mach/clkdev.h
- delete mode 100644 arch/arm/plat-omap/include/plat/clkdev.h
- delete mode 100644 arch/arm/plat-spear/include/plat/clkdev.h
- delete mode 100644 arch/arm/plat-tcc/include/mach/clkdev.h
+>
+> Signed-off-by: Tanmay Upadhyay <tanmay.upadhyay@einfochips.com>
+> ---
+> ?arch/arm/plat-pxa/include/plat/pxa3xx_nand.h | ? ?3 ---
+> ?1 files changed, 0 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm/plat-pxa/include/plat/pxa3xx_nand.h b/arch/arm/plat-pxa/include/plat/pxa3xx_nand.h
+> index 442301f..641c781 100644
+> --- a/arch/arm/plat-pxa/include/plat/pxa3xx_nand.h
+> +++ b/arch/arm/plat-pxa/include/plat/pxa3xx_nand.h
+> @@ -1,9 +1,6 @@
+> ?#ifndef __ASM_ARCH_PXA3XX_NAND_H
+> ?#define __ASM_ARCH_PXA3XX_NAND_H
+>
+> -#include <linux/mtd/mtd.h>
+> -#include <linux/mtd/partitions.h>
+> -
+> ?struct pxa3xx_nand_timing {
+> ? ? ? ?unsigned int ? ?tCH; ?/* Enable signal hold time */
+> ? ? ? ?unsigned int ? ?tCS; ?/* Enable signal setup time */
+> --
+> 1.7.0.4
+>
+>
