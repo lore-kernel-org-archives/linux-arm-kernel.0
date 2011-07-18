@@ -1,39 +1,43 @@
-From: hzhuang1@marvell.com (Haojian Zhuang)
-Date: Mon, 18 Jul 2011 06:12:49 -0700
-Subject: [PATCH 0/2] Add audio sram support
-In-Reply-To: <1310987888-541-1-git-send-email-leoy@marvell.com>
-References: <1310987888-541-1-git-send-email-leoy@marvell.com>
-Message-ID: <25B60CDC2F704E4E9D88FFD52780CB4C05D3F4F2FA@SC-VEXCH1.marvell.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Mon, 18 Jul 2011 07:52:07 -0700
+Subject: [PATCH] omap1: select GENERIC_IRQ_CHIP for TI OMAP1
+In-Reply-To: <CAF+7xW=DKMi9doKm0XH0+EvJLX0gzUE0_TqrZNrqHqvjuSeHdA@mail.gmail.com>
+	(Axel Lin's message of "Sun, 17 Jul 2011 21:38:56 +0800")
+References: <1309251943.3984.1.camel@phoenix> <87boxi2eep.fsf@ti.com>
+	<CAF+7xW=DKMi9doKm0XH0+EvJLX0gzUE0_TqrZNrqHqvjuSeHdA@mail.gmail.com>
+Message-ID: <87aacbmyjs.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There would be a common sram driver in mainline.
-________________________________________
-From: Leo Yan [leoy at marvell.com]
-Sent: Monday, July 18, 2011 7:18 PM
-To: linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org; Haojian Zhuang; nicolas.pitre at linaro.org; Russell King
-Cc: Leo Yan
-Subject: [PATCH 0/2] Add audio sram support
+Axel Lin <axel.lin@gmail.com> writes:
 
-On mmp platform, there have 16KB sram buffer dedicated
-to audio island. It can be to dynamically allocated for
-versatile pcm devices. So implement the audio sram
-allocator for managing it.
+> 2011/6/28 Kevin Hilman <khilman@ti.com>:
+>> Axel Lin <axel.lin@gmail.com> writes:
+>>
+>>> The gpio-omap driver has been converted to use generic IRQ chip.
+>>> Thus select GENERIC_IRQ_CHIP for TI OMAP1 to fix below build error.
+>>>
+>>> ? LD ? ? ?vmlinux
+>>> drivers/built-in.o: In function `omap_mpuio_alloc_gc':
+>>> drivers/gpio/gpio-omap.c:1087: undefined reference to `irq_alloc_generic_chip'
+>>> drivers/gpio/gpio-omap.c:1100: undefined reference to `irq_setup_generic_chip'
+>>> drivers/built-in.o: In function `omap_gpio_show_rev':
+>>> drivers/gpio/gpio-omap.c:998: undefined reference to `irq_gc_mask_clr_bit'
+>>> drivers/gpio/gpio-omap.c:998: undefined reference to `irq_gc_mask_set_bit'
+>>> make: *** [vmlinux] Error 1
+>>>
+>>> Signed-off-by: Axel Lin <axel.lin@gmail.com>
+>>
+>> Thanks, I have a fix for this already queued for v3.0-rc3 series:
+>>
+>> ? ? ? ?http://marc.info/?l=linux-omap&m=130749135312468&w=2
+>>
+> 
+> Seems this patch is not upstream.
+> I still have the same build error with  [linux-next: Tree for July 16].
 
-Leo Yan (2):
-  ARM: mmp: register audio sram device
-  ARM: mmp: add audio sram allocator
+Hmm, you're right.  Tony hasn't queued that fix yet.
 
- arch/arm/Kconfig                            |    1 +
- arch/arm/mach-mmp/Makefile                  |    2 +-
- arch/arm/mach-mmp/audio_sram.c              |  118 +++++++++++++++++++++++++++
- arch/arm/mach-mmp/brownstone.c              |    1 +
- arch/arm/mach-mmp/include/mach/audio_sram.h |   31 +++++++
- arch/arm/mach-mmp/include/mach/mmp2.h       |    6 ++
- arch/arm/mach-mmp/mmp2.c                    |    1 +
- 7 files changed, 159 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/mach-mmp/audio_sram.c
- create mode 100644 arch/arm/mach-mmp/include/mach/audio_sram.h
+Tony?
 
---
-1.7.4.1
+Kevin
