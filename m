@@ -1,28 +1,29 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 18 Jul 2011 13:02:01 +0200
-Subject: linux-next regression on ARM926
-Message-ID: <CACRpkdbBrVda2oD42tjrWiG6uHXAdWwpr6cZ7qnSc2KM82XCfw@mail.gmail.com>
+From: leoy@marvell.com (Leo Yan)
+Date: Mon, 18 Jul 2011 19:18:06 +0800
+Subject: [PATCH 0/2] Add audio sram support
+Message-ID: <1310987888-541-1-git-send-email-leoy@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dave,
+On mmp platform, there have 16KB sram buffer dedicated
+to audio island. It can be to dynamically allocated for
+versatile pcm devices. So implement the audio sram
+allocator for managing it.
 
-do you have any hints on how to resolve this build error in the -next
-tree:
+Leo Yan (2):
+  ARM: mmp: register audio sram device
+  ARM: mmp: add audio sram allocator
 
-  LD      .tmp_vmlinux1
-arch/arm/mm/built-in.o:(.init.data+0xe0): undefined reference to
-`cpu_arm926_do_suspend'
-arch/arm/mm/built-in.o:(.init.data+0xe4): undefined reference to
-`cpu_arm926_do_resume'
-make[2]: *** [.tmp_vmlinux1] Error 1
-make[1]: *** [sub-make] Error 2
-make[1]: Leaving directory `/home/linus/linux-next'
-make: *** [build] Error 2
+ arch/arm/Kconfig                            |    1 +
+ arch/arm/mach-mmp/Makefile                  |    2 +-
+ arch/arm/mach-mmp/audio_sram.c              |  118 +++++++++++++++++++++++++++
+ arch/arm/mach-mmp/brownstone.c              |    1 +
+ arch/arm/mach-mmp/include/mach/audio_sram.h |   31 +++++++
+ arch/arm/mach-mmp/include/mach/mmp2.h       |    6 ++
+ arch/arm/mach-mmp/mmp2.c                    |    1 +
+ 7 files changed, 159 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/mach-mmp/audio_sram.c
+ create mode 100644 arch/arm/mach-mmp/include/mach/audio_sram.h
 
-This is while building the U300, I can't really tell if the error is on my
-(U300) side or in the recent patches to the proc_arm926 stuff?
-It seems all ARM926 SoCs were affected.
-
-Thanks,
-Linus Walleij
+-- 
+1.7.4.1
