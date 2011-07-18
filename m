@@ -1,18 +1,23 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 19 Jul 2011 00:45:06 +0800
-Subject: [PATCH 0/2] add device tree probe support for gpio_keys
-Message-ID: <1311007508-8096-1-git-send-email-shawn.guo@linaro.org>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Mon, 18 Jul 2011 10:02:44 -0700
+Subject: [PATCH 1/2] Input: gpio-keys: do not reference platform_data
+	after .probe exits
+In-Reply-To: <1311007508-8096-2-git-send-email-shawn.guo@linaro.org>
+References: <1311007508-8096-1-git-send-email-shawn.guo@linaro.org>
+	<1311007508-8096-2-git-send-email-shawn.guo@linaro.org>
+Message-ID: <201107181002.45170.dmitry.torokhov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The first patch gets the driver stop referencing platform_data after
-.probe exits.  And the second patch adds the actual device tree probe
-support for the driver.
+On Monday, July 18, 2011 09:45:07 AM Shawn Guo wrote:
+> The patch makes a copy of platform data into driver data, so that any
+> reference to platform_data after .probe exits can be avoided.
 
-Shawn Guo (2):
-      Input: gpio-keys: do not reference platform_data after .probe exits
-      Input: gpio-keys: add device tree probe support
+And why is this beneficial? I am of the opinion that platform data should
+stay on (and be accessed through a const pointer to ensure that the driver
+will not alter it).
 
- Documentation/devicetree/bindings/gpio/key.txt |   57 +++++++++++
- drivers/input/keyboard/gpio_keys.c             |  128 +++++++++++++++++++-----
- 2 files changed, 161 insertions(+), 24 deletions(-)
+Thanks.
+
+-- 
+Dmitry
