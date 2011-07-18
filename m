@@ -1,114 +1,33 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 18 Jul 2011 16:31:45 -0600
-Subject: [PATCH v2 2/2] dt/irq: add irq_domain_generate_simple() helper
-In-Reply-To: <20110718222610.1911.5673.stgit@ponder>
-References: <20110718222610.1911.5673.stgit@ponder>
-Message-ID: <20110718223145.1911.65317.stgit@ponder>
+From: BJulin@clarku.edu (Brian Julin)
+Date: Mon, 18 Jul 2011 19:54:36 -0400
+Subject: [PATCH] freshen up mm/proc-arm946.S
+In-Reply-To: <CA+wbFdeYFQP6GC2zzPW4EPdG82UECT8Fo1FxxHfYq0Rp2tu7qg@mail.gmail.com>
+References: <5A630F46702DD1498FFD48394B4A664CB39A93520F@john.ad.clarku.edu>,
+	<CA+wbFdeYFQP6GC2zzPW4EPdG82UECT8Fo1FxxHfYq0Rp2tu7qg@mail.gmail.com>
+Message-ID: <5A630F46702DD1498FFD48394B4A664CB39A935210@john.ad.clarku.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-irq_domain_generate_simple() is an easy way to generate an irq translation
-domain for simple irq controllers.  It assumes a flat 1:1 mapping from
-hardware irq number to an offset of the first linux irq number assigned
-to the controller
 
-Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
----
- include/linux/irq.h    |   11 ++++++++++
- kernel/irq/irqdomain.c |   55 +++++++++++++++++++++++++++++++++++++++++++++++-
- 2 files changed, 65 insertions(+), 1 deletions(-)
+On Monday, July 18, 2011 6:32 AM,  Dave Martin [dave.martin at linaro.org] wrote:
+>  If you've not already done so, I suggest you check that your patch
+> applies against Russell's devel-stable branch.  There has been a bit
+> of refactoring of some of these files, but I think your patch will
+> stlil apply (unfortunately I'm not in a position to test it right
+> now).
+>
+> The patch looks at least possibly correct (I'm not able to check that
+> either, today...)
 
-diff --git a/include/linux/irq.h b/include/linux/irq.h
-index a103c01..3e5c35f 100644
---- a/include/linux/irq.h
-+++ b/include/linux/irq.h
-@@ -797,6 +797,17 @@ extern unsigned int irq_domain_map(struct irq_domain *domain,
- 				   irq_hw_number_t hwirq);
- extern void irq_domain_unmap(struct irq_domain *domain, irq_hw_number_t hw);
- 
-+struct of_device_id;
-+#ifdef CONFIG_OF
-+extern void irq_domain_add_simple(struct device_node *controller, int irq_base);
-+extern void irq_domain_generate_simple(const struct of_device_id *match,
-+					u64 phys_base, unsigned int irq_start);
-+#else
-+static inline void irq_domain_generate_simple(const struct of_device_id *match,
-+					u64 phys_base, unsigned int irq_start) { }
-+#endif
-+
-+
- #endif /* !CONFIG_S390 */
- 
- #endif /* _LINUX_IRQ_H */
-diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
-index a7cc910..7e251cd 100644
---- a/kernel/irq/irqdomain.c
-+++ b/kernel/irq/irqdomain.c
-@@ -1,8 +1,9 @@
--
- #include <linux/irq.h>
- #include <linux/module.h>
- #include <linux/mutex.h>
- #include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/slab.h>
- 
- static LIST_HEAD(irq_domain_list);
- static DEFINE_MUTEX(irq_domain_mutex);
-@@ -159,4 +160,56 @@ void irq_dispose_mapping(unsigned int irq)
- }
- EXPORT_SYMBOL_GPL(irq_dispose_mapping);
- 
-+int irq_domain_simple_dt_translate(struct irq_domain *d,
-+			    struct device_node *controller,
-+			    const u32 *intspec, unsigned int intsize,
-+			    irq_hw_number_t *out_hwirq, unsigned int *out_type)
-+{
-+	if (d->of_node != controller)
-+		return -EINVAL;
-+	if (intsize != 1)
-+		return -EINVAL;
-+
-+	*out_hwirq = intspec[0];
-+	*out_type = IRQ_TYPE_NONE;
-+	return 0;
-+}
-+
-+struct irq_domain_ops irq_domain_simple_ops = {
-+	.dt_translate = irq_domain_simple_dt_translate,
-+};
-+
-+/**
-+ * irq_domain_create_simple() - Set up a 'simple' translation range
-+ */
-+void irq_domain_add_simple(struct device_node *controller, int irq_base)
-+{
-+	struct irq_domain *domain;
-+
-+	domain = kzalloc(sizeof(*domain), GFP_KERNEL);
-+	if (!domain) {
-+		WARN_ON(1);
-+		return;
-+	}
-+
-+	domain->irq_base = irq_base;
-+	domain->of_node = of_node_get(controller);
-+	domain->ops = &irq_domain_simple_ops;
-+	irq_domain_add(domain);
-+}
-+EXPORT_SYMBOL_GPL(irq_domain_add_simple);
-+
-+void irq_domain_generate_simple(const struct of_device_id *match,
-+				u64 phys_base, unsigned int irq_start)
-+{
-+	struct device_node *node;
-+	pr_info("looking for phys_base=%llx, irq_start=%i\n",
-+		(unsigned long long) phys_base, (int) irq_start);
-+	node = of_find_matching_node_by_address(NULL, match, phys_base);
-+	if (node)
-+		irq_domain_add_simple(node, irq_start);
-+	else
-+		pr_info("no node found\n");
-+}
-+EXPORT_SYMBOL_GPL(irq_domain_generate_simple);
- #endif
+Hunk #1 succeeded at 411 (offset -36 lines).
+Hunk #2 succeeded at 420 (offset -36 lines).
+
+Good enough?  The "linux-next" tree on kernel.org seems to have the patched from 
+arm:stable that affect this file, and from the looks of things both hunks are still needed 
+and do not conflict with the renovations.
+
+So what now?  The last time I submitted a patch was over a decade ago... gerg mentioned
+something about "rmk's patch system"?
+
+--
+Brian
