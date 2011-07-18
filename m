@@ -1,94 +1,64 @@
-From: sundaram@ti.com (Raju, Sundaram)
-Date: Mon, 18 Jul 2011 13:21:58 +0530
-Subject: [PATCH] dmaengine: add dma_ctrl_cmd to pass buffer stride
-	configuration
-In-Reply-To: <CABb+yY1_vuM7NGxV4o103YmYfte09XKpaXnYARcn3jjnChiBsQ@mail.gmail.com>
-References: <1310310203-12288-1-git-send-email-sundaram@ti.com>
-	<CABb+yY1HJOR+QzmM4-ju4cs+8keoyUbMv+SpVoM6BW=DCMzmQQ@mail.gmail.com>
-	<CACRpkdbLg0+_2kpi4NizFj0fDWb6QPtkcKirKgoH+83vGD0O0A@mail.gmail.com>
-	<CABb+yY1RqHJ6jsMB2RqPNnBLff-bzhwaXG1U-hCD8CpME+a3aA@mail.gmail.com>
-	<E0D41E29EB0DAC4E9F3FF173962E9E94030259DBBE@dbde02.ent.ti.com>
-	<CABb+yY1_vuM7NGxV4o103YmYfte09XKpaXnYARcn3jjnChiBsQ@mail.gmail.com>
-Message-ID: <E0D41E29EB0DAC4E9F3FF173962E9E9403026FE695@dbde02.ent.ti.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Mon, 18 Jul 2011 10:56:51 +0300
+Subject: [PATCH v3] pxa2xx_spi: fix memory corruption
+In-Reply-To: <20110715025331.GL2927@ponder.secretlab.ca>
+References: <201107101609.31405.anarsoul@gmail.com>
+	<1310311099-24638-1-git-send-email-anarsoul@gmail.com>
+	<20110715025331.GL2927@ponder.secretlab.ca>
+Message-ID: <201107181056.51782.anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Jassi Brar [mailto:jassisinghbrar at gmail.com]
-> Sent: Tuesday, July 12, 2011 6:15 PM
-> To: Raju, Sundaram
-> Cc: Linus Walleij; linux-arm-kernel at lists.infradead.org; linux-
-> kernel at vger.kernel.org; davinci-linux-open-source at linux.davincidsp.com;
-> linux at arm.linux.org.uk; dan.j.williams at intel.com; linux-omap at vger.kernel.org
-> Subject: Re: [PATCH] dmaengine: add dma_ctrl_cmd to pass buffer stride
-> configuration
+On Friday 15 July 2011 05:53:31 Grant Likely wrote:
+> On Sun, Jul 10, 2011 at 06:18:19PM +0300, Vasily Khoruzhick wrote:
+> > pxa2xx_spi_probe allocates struct driver_data and null_dma_buf
+> > at same time via spi_alloc_master(), but then calculates
+> > null_dma_buf pointer incorrectly, and it causes memory corruption
+> > later if DMA usage is enabled.
+> > 
+> > Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+> > ---
+> > v2: - add u8 __null_dma_buf[16] to the end of driver_data structure
+> > 
+> >     and use it as null_dma_buf after alignment.
+> >     - use PTR_ALIGN instead of ALIGN
+> > 
+> > v3: - drop (u8 *) cast, use & operator instead, change array name
+> > 
+> >  drivers/spi/pxa2xx_spi.c |    9 +++++----
+> >  1 files changed, 5 insertions(+), 4 deletions(-)
+> > 
+> > diff --git a/drivers/spi/pxa2xx_spi.c b/drivers/spi/pxa2xx_spi.c
+> > index dc25bee..b25fe27 100644
+> > --- a/drivers/spi/pxa2xx_spi.c
+> > +++ b/drivers/spi/pxa2xx_spi.c
+> > @@ -106,6 +106,7 @@ struct driver_data {
+> > 
+> >  	int rx_channel;
+> >  	int tx_channel;
+> >  	u32 *null_dma_buf;
+> > 
+> > +	u8 null_dma_buf_unaligned[16];
 > 
-> On Tue, Jul 12, 2011 at 5:01 PM, Raju, Sundaram <sundaram@ti.com> wrote:
-> >> -----Original Message-----
-> >> From: Jassi Brar [mailto:jassisinghbrar at gmail.com]
-> >> Sent: Tuesday, July 12, 2011 4:51 PM
-> >> To: Linus Walleij
-> >> Cc: Raju, Sundaram; linux-arm-kernel at lists.infradead.org; linux-
-> >> kernel at vger.kernel.org; davinci-linux-open-source at linux.davincidsp.com;
-> >> linux at arm.linux.org.uk; dan.j.williams at intel.com; linux-
-> omap at vger.kernel.org
-> >> Subject: Re: [PATCH] dmaengine: add dma_ctrl_cmd to pass buffer stride
-> >> configuration
-> >>
-> >> On Tue, Jul 12, 2011 at 3:33 PM, Linus Walleij <linus.walleij@linaro.org>
-> >> wrote:
-> >> > On Tue, Jul 12, 2011 at 6:17 AM, Jassi Brar <jassisinghbrar@gmail.com>
-> >> wrote:
-> >> >
-> >> >> 1) Striding, in one form or other, is supported by other DMACs as well.
-> >> >> ? The number will only increase in future.
-> >> >> ? Are we to add ?<VENDOR>_DMA_STRIDE_CONFIG for each case ?
-> >> >
-> >> > If we are sure about this and striding will work in a similar way on all
-> >> > then let's have the enum named DMA_STRIDE_CONFIG and move the
-> >> > passed-in struct to <linux/dmaengine.h) then?
-> >> >
-> >> > Would that be:
-> >> >
-> >> > struct dma_stride_config {
-> >> > ? ?u32 read_bytes;
-> >> > ? ?u32 skip_bytes;
-> >> > };
-> >> >
-> >> > Or something more complex?
-> >> Well, I am not sure if striding needs any special treatment at all.
-> >> Why not have client drivers prepare and submit sg-list.
-> >> Let the DMAC drivers interpret/parse the sg-list and program it
-> >> as strides if the h/w supports it.
-> >> If anything, we should make preparation and submission of sg-list
-> >> as efficient as possible.
-> > Jassi,
-> >
-> > sg_lists describe only a bunch of disjoint buffers. But what if the
-> > DMAC can skip and read the bytes within each of the buffers in
-> > the sg_list? (like TI EDMAC and TI SDMAC)
-> > How can that information be passed to the offload
-> > engine driver from the client?
-> >
-> OK, I overlooked.
-> We do need something new to handle these ultra-fine-grained sg-lists.
-> But still we shouldn't add SoC specific API to the common sub-systems.
-> 
-> Maybe a new api to pass fixed-format variable-length encoded message
-> to the DMAC drivers?
-> Which could be interpreted by DMAC drivers to extract all the needed xfer
-> parameters from the 'header' section and instructions to program the xfers
-> in the DMAC from the variable length body of the 'message' buffer.
-> It might sound complicated but we can have helpers to make the job easy.
-> Btw, the regular single/sg-list xfers could also be expressed by this method.
+> Don't dma buffers need to be cache-line aligned? 
 
-Do you expect this variable length body of the message to be DMAC
-independent? I don't think so. In that case how is this different from what
-we have here already?
+No, on PXA2xx they need to be 8-bytes aligned (according to PXA27x developer's 
+manual)
 
-If it can be DMAC independent, can you illustrate more on how this can
-be done? But the point to note is, if this can be made DMAC independent
-then the control command we have also can be made DMAC independent
-by generalizing the configuration structure passed to it.
+> How large is the actual transfer?
 
-~ Sundaram
+Looks like 8 bytes, but I'm not sure, I'm not author of driver and did not dig 
+deeply into its code. Just attempting to fix memory corruption.
+
+> Using the __aligned() or __cacheline_aligned
+> attribute is the correct way to make sure you've got a data buffer
+> that can be used for DMA mixed with other stuff.  Then you don't need
+> to fool around with PTR_ALIGN or anything.
+
+Errr, it can't be applied to struct field, right? But driver needs per-device 
+null_dma_buf (there's 3 SPI controllers on PXA2xx)
+
+> g.
+
+Regards
+Vasily
