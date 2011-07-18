@@ -1,20 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 17 Jul 2011 23:39:32 +0200
-Subject: conflicts between omap/cleanup branch and omap_dss2 tree
-Message-ID: <201107172339.32516.arnd@arndb.de>
+From: robherring2@gmail.com (Rob Herring)
+Date: Sun, 17 Jul 2011 21:01:36 -0500
+Subject: [PATCH v4 2/2] ARM: l2x0: Add OF based initialization
+In-Reply-To: <201107062326.53737.arnd@arndb.de>
+References: <1309984979-8847-1-git-send-email-robherring2@gmail.com>
+	<1309984979-8847-2-git-send-email-robherring2@gmail.com>
+	<20110706210237.GB5371@ponder.secretlab.ca>
+	<201107062326.53737.arnd@arndb.de>
+Message-ID: <4E239400.30308@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul and Tomi,
+Russell,
 
-I'm trying to get the arm-soc tree integrated into linux-next, but right
-now that fails because of lots of conflicts in the arch/arm/mach-omap2/clock44xx_data.c
-and arch/arm/mach-omap2/omap_hwmod_44xx_data.c files.
+On 07/06/2011 04:26 PM, Arnd Bergmann wrote:
+> On Wednesday 06 July 2011 23:02:37 Grant Likely wrote:
+>>
+>> On Wed, Jul 06, 2011 at 03:42:59PM -0500, Rob Herring wrote:
+>>> From: Rob Herring <rob.herring@calxeda.com>
+>>>
+>>> This adds probing for ARM L2x0 cache controllers via device tree. Support
+>>> includes the L210, L220, and PL310 controllers. The binding allows setting
+>>> up cache RAM latencies and filter addresses (PL310 only).
+>>>
+>>> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+>>
+>> Acked-by: Grant Likely <grant.likely@secretlab.ca>
+>>
+>> By rights, this should go via the arm tree, but it depends on patches
+>> that are already in devicetree/next.  Arnd, how do you want to handle
+>> this?  I want to avoid rebasing devicetree/next.
+> 
+> It's outside of the scope of the arm-soc tree really, the l2x0 code
+> is clearly core arm stuff, so it belongs into Russell's tree.
+> 
+> I think it's best if Russell can provide an Ack for this and you
+> put it in the tree that already has the dependencies.
+> 
 
-I've done a dumb resolution by pulling in the omap_dss2/for_next tree as a
-depedency and taking Tomi's version of the files, which is probably wrong 
-but lets Stephen at least take the arm-soc tree.
+Do you have any objection to this patch or Grant taking it in his tree?
 
-Please fix this properly in either the omap or the omap_dss2 trees.
-
-	Arnd
+Rob
