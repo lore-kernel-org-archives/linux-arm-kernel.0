@@ -1,38 +1,39 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Mon, 18 Jul 2011 15:13:27 +0200
-Subject: [i.MX28 GPMI] problem overwriting all-0xff data in NAND
-Message-ID: <20004.12663.29494.339601@ipc1.ka-ro>
+From: hzhuang1@marvell.com (Haojian Zhuang)
+Date: Mon, 18 Jul 2011 06:12:49 -0700
+Subject: [PATCH 0/2] Add audio sram support
+In-Reply-To: <1310987888-541-1-git-send-email-leoy@marvell.com>
+References: <1310987888-541-1-git-send-email-leoy@marvell.com>
+Message-ID: <25B60CDC2F704E4E9D88FFD52780CB4C05D3F4F2FA@SC-VEXCH1.marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+There would be a common sram driver in mainline.
+________________________________________
+From: Leo Yan [leoy at marvell.com]
+Sent: Monday, July 18, 2011 7:18 PM
+To: linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org; Haojian Zhuang; nicolas.pitre at linaro.org; Russell King
+Cc: Leo Yan
+Subject: [PATCH 0/2] Add audio sram support
 
-with the gpmi-nfc driver for imx28 from Shawn Guo on a TX28 I
-encountered some problems with jffs2 when overwriting pages that have
-been written with 0xff (e.g. from padding from the file system image
-file).
+On mmp platform, there have 16KB sram buffer dedicated
+to audio island. It can be to dynamically allocated for
+versatile pcm devices. So implement the audio sram
+allocator for managing it.
 
-The problem is that the ECC info for an all-0xff block is not all-0xff
-and thus a newly erased block is different from a block that has been
-written with 0xff.
-If such a block is being altered (jffs2 thinking it can simply
-overwrite it without erasing first) the ECC information will be
-corrupted and will produce ECC errors upon read.
+Leo Yan (2):
+  ARM: mmp: register audio sram device
+  ARM: mmp: add audio sram allocator
 
-The only remedy I can think of is to prevent empty pages from actually
-being written to flash, but leaving them in the erased state instead.
+ arch/arm/Kconfig                            |    1 +
+ arch/arm/mach-mmp/Makefile                  |    2 +-
+ arch/arm/mach-mmp/audio_sram.c              |  118 +++++++++++++++++++++++++++
+ arch/arm/mach-mmp/brownstone.c              |    1 +
+ arch/arm/mach-mmp/include/mach/audio_sram.h |   31 +++++++
+ arch/arm/mach-mmp/include/mach/mmp2.h       |    6 ++
+ arch/arm/mach-mmp/mmp2.c                    |    1 +
+ 7 files changed, 159 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/mach-mmp/audio_sram.c
+ create mode 100644 arch/arm/mach-mmp/include/mach/audio_sram.h
 
-Any comments?
-
-
-Lothar Wa?mann
--- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+--
+1.7.4.1
