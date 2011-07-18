@@ -1,51 +1,53 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 18 Jul 2011 22:07:29 -0000
-Subject: [RFC 7/8] drivers: introduce rpmsg, a remote-processor
-	messaging bus
-In-Reply-To: <1308640714-17961-8-git-send-email-ohad@wizery.com>
-References: <1308640714-17961-1-git-send-email-ohad@wizery.com>
-	<1308640714-17961-8-git-send-email-ohad@wizery.com>
-Message-ID: <20110609171210.GB3877@ucw.cz>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Mon, 18 Jul 2011 16:31:34 -0600
+Subject: [PATCH v2 0/2] Simple irq_domain implementation
+Message-ID: <20110718222610.1911.5673.stgit@ponder>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Hi all,
 
-> @@ -0,0 +1,75 @@
-> +What:		/sys/bus/rpmsg/devices/.../name
-> +Date:		June 2011
-> +KernelVersion:	3.2
-> +Contact:	Ohad Ben-Cohen <ohad@wizery.com>
-> +Description:
-> +		Every rpmsg device is a communication channel with a remote
-> +		processor. Channels are identified with a (textual) name,
-> +		which is maximum 32 bytes long (defined as RPMSG_NAME_SIZE in
-> +		rpmsg.h).
-> +
-> +		This sysfs entry contains the name of this channel.
-> +
-> +What:		/sys/bus/rpmsg/devices/.../src
-> +Date:		June 2011
-> +KernelVersion:	3.2
-> +Contact:	Ohad Ben-Cohen <ohad@wizery.com>
-> +Description:
-> +		Every rpmsg device is a communication channel with a remote
-> +		processor. Channels have a local ("source") rpmsg address,
-> +		and remote ("destination") rpmsg address. When an entity
-> +		starts listening on one end of a channel, it assigns it with
-> +		a unique rpmsg address (a 32 bits integer). This way when
-> +		inbound messages arrive to this address, the rpmsg core
-> +		dispatches them to the listening entity (a kernel driver).
-> +
-> +		This sysfs entry contains the src (local) rpmsg address
-> +		of this channel. If it contains 0xffffffff, then an address
-> +		wasn't assigned (can happen if no driver exists for this
-> +		channel).
+Not much has changed with this second posting other than it shouldn't
+break devicetree MIPS and Microblaze platforms anymore.  I've not had
+the time to adapt irq_domain and powerpc to work together, but those a
+changes that can easily be handled in follow-on patches.
 
-So this is basically networking... right? Why not implement it as
-sockets? (accept, connect, read, write)?
+Thomas, though this is not in its final form, I think it would be good
+to merge it now since I've got several ARM device tree board ports
+ready for v3.1 that depend on at least this basic implementation.
+When I rework to get it in line with PowerPC, I'll also take care of
+any changes needed by ARM and other users.
 
-									Pavel
+If you agree and provide an Ack, then I think these changes should go
+in via devicetree/next since there are patches in there that this
+patch depends on.
+
+g.
+
+---
+
+Grant Likely (2):
+      irq: add irq_domain translation infrastructure
+      dt/irq: add irq_domain_generate_simple() helper
+
+
+ arch/arm/include/asm/prom.h           |    5 -
+ arch/arm/kernel/devtree.c             |   14 --
+ arch/microblaze/include/asm/irq.h     |   10 --
+ arch/microblaze/kernel/irq.c          |    7 -
+ arch/mips/include/asm/irq.h           |    5 -
+ arch/mips/kernel/prom.c               |   14 --
+ arch/powerpc/include/asm/irq.h        |    1 
+ arch/x86/include/asm/irq_controller.h |   12 --
+ arch/x86/include/asm/prom.h           |   10 --
+ arch/x86/kernel/devicetree.c          |  101 +++++-----------
+ include/linux/irq.h                   |   92 ++++++++++++++
+ include/linux/of_irq.h                |    2 
+ kernel/irq/Makefile                   |    2 
+ kernel/irq/irqdomain.c                |  215 +++++++++++++++++++++++++++++++++
+ 14 files changed, 346 insertions(+), 144 deletions(-)
+ delete mode 100644 arch/x86/include/asm/irq_controller.h
+ create mode 100644 kernel/irq/irqdomain.c
+
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Signature
