@@ -1,210 +1,85 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 18 Jul 2011 14:35:32 +0900
-Subject: [PATCH v2 1/3] ARM: Samsung: Move duplicate code
-In-Reply-To: <1308655463-8787-2-git-send-email-ch.naveen@samsung.com>
-References: <1308655463-8787-1-git-send-email-ch.naveen@samsung.com>
-	<1308655463-8787-2-git-send-email-ch.naveen@samsung.com>
-Message-ID: <048401cc450c$85a9e5d0$90fdb170$%kim@samsung.com>
+From: padma.kvr@gmail.com (padma venkat)
+Date: Mon, 18 Jul 2011 11:16:45 +0530
+Subject: [PATCH] ARM: S5P64X0: External Interrupt Support
+In-Reply-To: <20110715123429.GP23270@n2100.arm.linux.org.uk>
+References: <1310712094-19831-1-git-send-email-padma.v@samsung.com>
+	<20110715090011.GN23270@n2100.arm.linux.org.uk>
+	<CAAgF-Bcke26iFsgf0DA3LB5CLv=TkS6UG0y+SBLR=F6TzGYU+A@mail.gmail.com>
+	<20110715123429.GP23270@n2100.arm.linux.org.uk>
+Message-ID: <CAAgF-BcBwcoibw8-0d+P=ShcQh2bC3sAyqxznRJN3Bip2PuAyg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Naveen Krishna Chatradhi wrote:
-> 
-> Move the duplicated code for SPDIF ops from S5PV210 and S5PC100.
-> So, the same can be used in EXYNOS4.
-> 
-> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
-> ---
-> Note: Moved common code to plat-s5p, as suggested by Kukjin Kim.
+Hi Russell,
 
-Yes, I did :)
-Looks ok to me, will apply.
-Thanks.
+On Fri, Jul 15, 2011 at 6:04 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, Jul 15, 2011 at 05:23:33PM +0530, padma venkat wrote:
+>> Hi Russell,
+>>
+>> On Fri, Jul 15, 2011 at 2:30 PM, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>> > On Fri, Jul 15, 2011 at 12:11:34PM +0530, Padmavathi Venna wrote:
+>> >> +#define eint_offset(irq) ? ? ((irq) - IRQ_EINT(0))
+>> >> +#define eint_irq_to_bit(irq) ((u32)(1 << eint_offset(irq)))
+>> >> +
+>> >> +static inline void s5p64x0_irq_eint_mask(struct irq_data *data)
+>> >> +{
+>> >> + ? ? u32 mask;
+>> >> +
+>> >> + ? ? mask = __raw_readl(S5P64X0_EINT0MASK);
+>> >> + ? ? mask |= (u32)data->chip_data;
+>> >> + ? ? __raw_writel(mask, S5P64X0_EINT0MASK);
+>> >> +}
+>> >> +
+>> >> +static void s5p64x0_irq_eint_unmask(struct irq_data *data)
+>> >> +{
+>> >> + ? ? u32 mask;
+>> >> +
+>> >> + ? ? mask = __raw_readl(S5P64X0_EINT0MASK);
+>> >> + ? ? mask &= ~((u32)data->chip_data);
+>> >> + ? ? __raw_writel(mask, S5P64X0_EINT0MASK);
+>> >> +}
+>> >> +
+>> >> +static inline void s5p64x0_irq_eint_ack(struct irq_data *data)
+>> >> +{
+>> >> + ? ? __raw_writel((u32)data->chip_data, S5P64X0_EINT0PEND);
+>> >> +}
+>> >> +
+>> >> +static void s5p64x0_irq_eint_maskack(struct irq_data *data)
+>> >> +{
+>> >> + ? ? /* compiler should in-line these */
+>> >> + ? ? s5p64x0_irq_eint_mask(data);
+>> >> + ? ? s5p64x0_irq_eint_ack(data);
+>> >> +}
+>> >
+>> > Won't genirqchip support deal with all of the above for you?
+>> As per my understanding, to deal with low level interrupt hardware access
+>> we need to use the accessor functions. Please suggest me if there is
+>> any better way of doing this.
+>
+> I'm not saying don't have these. ?I'm saying use the _generic_ irqchip
+> support which has the code implemented to set and clear bits in registers.
+> Something like this:
+>
+> ? ? ? ?struct irq_chip_generic *gc;
+>
+> ? ? ? ?gc = irq_alloc_generic_chip(name, 1, first_irq, base_of_controller,
+> ? ? ? ? ? ? ? ? ? ? ? ?handler);
+>
+> ? ? ? ?gc->chip_types->chip.irq_ack = irq_gc_ack;
+> ? ? ? ?gc->chip_types->chip.irq_mask = irq_gc_mask_set_bit;
+> ? ? ? ?gc->chip_types->chip.irq_unmask = irq_gc_mask_clr_bit;
+>
+> ? ? ? ?/* replace the two below with the _real_ offset, rather than these calculations */
+> ? ? ? ?gc->chip_types->reg.ack = S5P64X0_EINT0PEND - base_of_controller;
+> ? ? ? ?gc->chip_types->reg.mask = S5P64X0_EINT0MASK - base_of_controller;
+>
+> ? ? ? ?irq_setup_generic_chip(gc, mask_of_irqs_to_setup,
+> ? ? ? ? ? ? ? ?IRQ_GC_INIT_MASK_CACHE, flags_to_clear, flags_to_set);
+>
+Thanks for your explanation.
+I will remake the patch based on generic_irq_chip support and resend the same.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
-
-> 
->  arch/arm/mach-s5pc100/clock.c              |   37
-+---------------------------
->  arch/arm/mach-s5pv210/clock.c              |   37
-+---------------------------
->  arch/arm/plat-s5p/clock.c                  |   35
-> ++++++++++++++++++++++++++
->  arch/arm/plat-s5p/include/plat/s5p-clock.h |    5 ++++
->  4 files changed, 42 insertions(+), 72 deletions(-)
-> 
-> diff --git a/arch/arm/mach-s5pc100/clock.c b/arch/arm/mach-s5pc100/clock.c
-> index cd248e6..ff5cbb3 100644
-> --- a/arch/arm/mach-s5pc100/clock.c
-> +++ b/arch/arm/mach-s5pc100/clock.c
-> @@ -910,47 +910,12 @@ struct clksrc_sources clk_src_sclk_spdif = {
->  	.nr_sources	= ARRAY_SIZE(clk_sclk_spdif_list),
->  };
-> 
-> -static int s5pc100_spdif_set_rate(struct clk *clk, unsigned long rate)
-> -{
-> -	struct clk *pclk;
-> -	int ret;
-> -
-> -	pclk = clk_get_parent(clk);
-> -	if (IS_ERR(pclk))
-> -		return -EINVAL;
-> -
-> -	ret = pclk->ops->set_rate(pclk, rate);
-> -	clk_put(pclk);
-> -
-> -	return ret;
-> -}
-> -
-> -static unsigned long s5pc100_spdif_get_rate(struct clk *clk)
-> -{
-> -	struct clk *pclk;
-> -	int rate;
-> -
-> -	pclk = clk_get_parent(clk);
-> -	if (IS_ERR(pclk))
-> -		return -EINVAL;
-> -
-> -	rate = pclk->ops->get_rate(clk);
-> -	clk_put(pclk);
-> -
-> -	return rate;
-> -}
-> -
-> -static struct clk_ops s5pc100_sclk_spdif_ops = {
-> -	.set_rate	= s5pc100_spdif_set_rate,
-> -	.get_rate	= s5pc100_spdif_get_rate,
-> -};
-> -
->  static struct clksrc_clk clk_sclk_spdif = {
->  	.clk	= {
->  		.name		= "sclk_spdif",
->  		.ctrlbit	= (1 << 11),
->  		.enable		= s5pc100_sclk1_ctrl,
-> -		.ops		= &s5pc100_sclk_spdif_ops,
-> +		.ops		= &s5p_sclk_spdif_ops,
->  	},
->  	.sources = &clk_src_sclk_spdif,
->  	.reg_src = { .reg = S5P_CLK_SRC3, .shift = 24, .size = 2 },
-> diff --git a/arch/arm/mach-s5pv210/clock.c b/arch/arm/mach-s5pv210/clock.c
-> index b5c95e6..ae72f87 100644
-> --- a/arch/arm/mach-s5pv210/clock.c
-> +++ b/arch/arm/mach-s5pv210/clock.c
-> @@ -686,47 +686,12 @@ static struct clksrc_sources clkset_sclk_spdif = {
->  	.nr_sources	= ARRAY_SIZE(clkset_sclk_spdif_list),
->  };
-> 
-> -static int s5pv210_spdif_set_rate(struct clk *clk, unsigned long rate)
-> -{
-> -	struct clk *pclk;
-> -	int ret;
-> -
-> -	pclk = clk_get_parent(clk);
-> -	if (IS_ERR(pclk))
-> -		return -EINVAL;
-> -
-> -	ret = pclk->ops->set_rate(pclk, rate);
-> -	clk_put(pclk);
-> -
-> -	return ret;
-> -}
-> -
-> -static unsigned long s5pv210_spdif_get_rate(struct clk *clk)
-> -{
-> -	struct clk *pclk;
-> -	int rate;
-> -
-> -	pclk = clk_get_parent(clk);
-> -	if (IS_ERR(pclk))
-> -		return -EINVAL;
-> -
-> -	rate = pclk->ops->get_rate(clk);
-> -	clk_put(pclk);
-> -
-> -	return rate;
-> -}
-> -
-> -static struct clk_ops s5pv210_sclk_spdif_ops = {
-> -	.set_rate	= s5pv210_spdif_set_rate,
-> -	.get_rate	= s5pv210_spdif_get_rate,
-> -};
-> -
->  static struct clksrc_clk clk_sclk_spdif = {
->  	.clk		= {
->  		.name		= "sclk_spdif",
->  		.enable		= s5pv210_clk_mask0_ctrl,
->  		.ctrlbit	= (1 << 27),
-> -		.ops		= &s5pv210_sclk_spdif_ops,
-> +		.ops		= &s5p_sclk_spdif_ops,
->  	},
->  	.sources = &clkset_sclk_spdif,
->  	.reg_src = { .reg = S5P_CLK_SRC6, .shift = 12, .size = 2 },
-> diff --git a/arch/arm/plat-s5p/clock.c b/arch/arm/plat-s5p/clock.c
-> index 8d081d9..02af235 100644
-> --- a/arch/arm/plat-s5p/clock.c
-> +++ b/arch/arm/plat-s5p/clock.c
-> @@ -168,6 +168,41 @@ unsigned long s5p_epll_get_rate(struct clk *clk)
->  	return clk->rate;
->  }
-> 
-> +int s5p_spdif_set_rate(struct clk *clk, unsigned long rate)
-> +{
-> +	struct clk *pclk;
-> +	int ret;
-> +
-> +	pclk = clk_get_parent(clk);
-> +	if (IS_ERR(pclk))
-> +		return -EINVAL;
-> +
-> +	ret = pclk->ops->set_rate(pclk, rate);
-> +	clk_put(pclk);
-> +
-> +	return ret;
-> +}
-> +
-> +unsigned long s5p_spdif_get_rate(struct clk *clk)
-> +{
-> +	struct clk *pclk;
-> +	int rate;
-> +
-> +	pclk = clk_get_parent(clk);
-> +	if (IS_ERR(pclk))
-> +		return -EINVAL;
-> +
-> +	rate = pclk->ops->get_rate(clk);
-> +	clk_put(pclk);
-> +
-> +	return rate;
-> +}
-> +
-> +struct clk_ops s5p_sclk_spdif_ops = {
-> +	.set_rate	= s5p_spdif_set_rate,
-> +	.get_rate	= s5p_spdif_get_rate,
-> +};
-> +
->  static struct clk *s5p_clks[] __initdata = {
->  	&clk_ext_xtal_mux,
->  	&clk_48m,
-> diff --git a/arch/arm/plat-s5p/include/plat/s5p-clock.h b/arch/arm/plat-
-> s5p/include/plat/s5p-clock.h
-> index 2b6dcff..769b5bd 100644
-> --- a/arch/arm/plat-s5p/include/plat/s5p-clock.h
-> +++ b/arch/arm/plat-s5p/include/plat/s5p-clock.h
-> @@ -47,4 +47,9 @@ extern int s5p_gatectrl(void __iomem *reg, struct clk
-*clk, int
-> enable);
->  extern int s5p_epll_enable(struct clk *clk, int enable);
->  extern unsigned long s5p_epll_get_rate(struct clk *clk);
-> 
-> +/* SPDIF clk operations common for S5PC100/V210/C110 and Exynos4 */
-> +extern int s5p_spdif_set_rate(struct clk *clk, unsigned long rate);
-> +extern unsigned long s5p_spdif_get_rate(struct clk *clk);
-> +
-> +extern struct clk_ops s5p_sclk_spdif_ops;
->  #endif /* __ASM_PLAT_S5P_CLOCK_H */
-> --
-> 1.7.2.3
+Best Regards
+Padma
