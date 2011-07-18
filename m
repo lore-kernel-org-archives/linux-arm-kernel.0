@@ -1,46 +1,51 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Mon, 18 Jul 2011 22:38:16 +0200
-Subject: [PATCH v3 00/10] ARM: mxs: add audio support
-In-Reply-To: <1310731780-1645-1-git-send-email-b29396@freescale.com>
-References: <1310731780-1645-1-git-send-email-b29396@freescale.com>
-Message-ID: <20110718203816.GA9457@pengutronix.de>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 18 Jul 2011 22:07:29 -0000
+Subject: [RFC 7/8] drivers: introduce rpmsg, a remote-processor
+	messaging bus
+In-Reply-To: <1308640714-17961-8-git-send-email-ohad@wizery.com>
+References: <1308640714-17961-1-git-send-email-ohad@wizery.com>
+	<1308640714-17961-8-git-send-email-ohad@wizery.com>
+Message-ID: <20110609171210.GB3877@ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 15, 2011 at 08:09:30PM +0800, Dong Aisheng wrote:
+Hi!
 
-> This patch series is to add audio support based on saif for mxs platform.
-> The driver only supports playback currently.
-> For capturing, due to hardware limitation that we have to use two saif
-> instances to implement full duplex (playback & recording), we need to
-> figure out a good design to fit in ASoC as the following work.
+> @@ -0,0 +1,75 @@
+> +What:		/sys/bus/rpmsg/devices/.../name
+> +Date:		June 2011
+> +KernelVersion:	3.2
+> +Contact:	Ohad Ben-Cohen <ohad@wizery.com>
+> +Description:
+> +		Every rpmsg device is a communication channel with a remote
+> +		processor. Channels are identified with a (textual) name,
+> +		which is maximum 32 bytes long (defined as RPMSG_NAME_SIZE in
+> +		rpmsg.h).
+> +
+> +		This sysfs entry contains the name of this channel.
+> +
+> +What:		/sys/bus/rpmsg/devices/.../src
+> +Date:		June 2011
+> +KernelVersion:	3.2
+> +Contact:	Ohad Ben-Cohen <ohad@wizery.com>
+> +Description:
+> +		Every rpmsg device is a communication channel with a remote
+> +		processor. Channels have a local ("source") rpmsg address,
+> +		and remote ("destination") rpmsg address. When an entity
+> +		starts listening on one end of a channel, it assigns it with
+> +		a unique rpmsg address (a 32 bits integer). This way when
+> +		inbound messages arrive to this address, the rpmsg core
+> +		dispatches them to the listening entity (a kernel driver).
+> +
+> +		This sysfs entry contains the src (local) rpmsg address
+> +		of this channel. If it contains 0xffffffff, then an address
+> +		wasn't assigned (can happen if no driver exists for this
+> +		channel).
 
-So, since the codec problems seem to be resolved now (and they were luckily
-really just codec-problems):
+So this is basically networking... right? Why not implement it as
+sockets? (accept, connect, read, write)?
 
-For the ASoC-patches (1-4):
-
-Tested-by: Wolfram Sang <w.sang@pengutronix.de>
-
-For the mach-mxs-Patches (5-9, 10 is already picked up), assuming patch 6 will
-lose the DIGCTRL-handling:
-
-Reviewed-by: Wolfram Sang <w.sang@pengutronix.de>
-
-I think this series is good for 3.1. Now we just need the mxs-dma bugfix on
-top, but that's a different patch...
-
-Regards,
-
-   Wolfram
-
+									Pavel
 -- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110718/48388356/attachment.sig>
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
