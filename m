@@ -1,94 +1,44 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 18 Jul 2011 15:18:09 +0900
-Subject: [PATCHv2] clocksource: convert S5PV210/S5P64X0 32-bit down
-	counting clocksource
-In-Reply-To: <4E2105A2.8060309@samsung.com>
-References: <4E1BE0CF.7060207@samsung.com> <4E2105A2.8060309@samsung.com>
-Message-ID: <048601cc4512$7b45ed90$71d1c8b0$%kim@samsung.com>
+Date: Mon, 18 Jul 2011 15:23:39 +0900
+Subject: [PATCH 4/5] ARM: EXYNOS4: Add SPDIF for SMDKV310
+In-Reply-To: <BANLkTi=NPaw37BPadkA79uwsZkjjASFMrA@mail.gmail.com>
+References: <1307687667-9127-1-git-send-email-ch.naveen@samsung.com>
+	<1307687667-9127-5-git-send-email-ch.naveen@samsung.com>
+	<BANLkTi=NPaw37BPadkA79uwsZkjjASFMrA@mail.gmail.com>
+Message-ID: <048701cc4513$3e4d72e0$bae858a0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Chanwoo Choi wrote:
+Jassi Brar wrote:
 > 
-> Convert the S5PV210/S5P64X0 32-bit down-counting clocksource to
-> the generic mmio clocksource infrastructure
+> On Fri, Jun 10, 2011 at 12:04 PM, Naveen Krishna Chatradhi
+> <ch.naveen@samsung.com> wrote:
+> > This patch adds spdif to the machine supported device list for
+> > SMDKV310.
+> >
+> > Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
+> > ---
+> >  arch/arm/mach-exynos4/mach-smdkv310.c |    1 +
+> >  1 files changed, 1 insertions(+), 0 deletions(-)
+> >
+> > diff --git a/arch/arm/mach-exynos4/mach-smdkv310.c b/arch/arm/mach-
+> exynos4/mach-smdkv310.c
+> > index 7e3ee6c..966c6f2 100644
+> > --- a/arch/arm/mach-exynos4/mach-smdkv310.c
+> > +++ b/arch/arm/mach-exynos4/mach-smdkv310.c
+> > @@ -190,6 +190,7 @@ static struct platform_device *smdkv310_devices[]
+> __initdata = {
+> >        &exynos4_device_pd[PD_CAM],
+> >        &exynos4_device_pd[PD_TV],
+> >        &exynos4_device_pd[PD_GPS],
+> > +       &exynos4_device_spdif,
+> >        &exynos4_device_sysmmu,
+> >        &exynos4_device_pcm0,
+> >        &samsung_asoc_dma,
 > 
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  arch/arm/Kconfig             |    2 ++
->  arch/arm/plat-s5p/s5p-time.c |   20 +++-----------------
->  2 files changed, 5 insertions(+), 17 deletions(-)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 9adc278..98fed17 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -721,6 +721,7 @@ config ARCH_S3C64XX
->  config ARCH_S5P64X0
->  	bool "Samsung S5P6440 S5P6450"
->  	select CPU_V6
-> +	select CLKSRC_MMIO
->  	select GENERIC_GPIO
->  	select HAVE_CLK
->  	select HAVE_S3C2410_WATCHDOG if WATCHDOG
-> @@ -749,6 +750,7 @@ config ARCH_S5PV210
->  	bool "Samsung S5PV210/S5PC110"
->  	select CPU_V7
->  	select ARCH_SPARSEMEM_ENABLE
-> +	select CLKSRC_MMIO
->  	select GENERIC_GPIO
->  	select HAVE_CLK
->  	select ARM_L1_CACHE_SHIFT_6
-> diff --git a/arch/arm/plat-s5p/s5p-time.c b/arch/arm/plat-s5p/s5p-time.c
-> index 612934c..5666f55 100644
-> --- a/arch/arm/plat-s5p/s5p-time.c
-> +++ b/arch/arm/plat-s5p/s5p-time.c
-> @@ -314,13 +314,6 @@ static void __iomem *s5p_timer_reg(void)
->  	return S3C_TIMERREG(offset);
->  }
-> 
-> -static cycle_t s5p_timer_read(struct clocksource *cs)
-> -{
-> -	void __iomem *reg = s5p_timer_reg();
-> -
-> -	return (cycle_t) (reg ? ~__raw_readl(reg) : 0);
-> -}
-> -
->  /*
->   * Override the global weak sched_clock symbol with this
->   * local implementation which uses the clocksource to get some
-> @@ -350,14 +343,6 @@ static void notrace s5p_update_sched_clock(void)
->  	update_sched_clock(&cd, ~__raw_readl(reg), (u32)~0);
->  }
-> 
-> -struct clocksource time_clocksource = {
-> -	.name		= "s5p_clocksource_timer",
-> -	.rating		= 250,
-> -	.read		= s5p_timer_read,
-> -	.mask		= CLOCKSOURCE_MASK(32),
-> -	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
-> -};
-> -
->  static void __init s5p_clocksource_init(void)
->  {
->  	unsigned long pclk;
-> @@ -375,8 +360,9 @@ static void __init s5p_clocksource_init(void)
-> 
->  	init_sched_clock(&cd, s5p_update_sched_clock, 32, clock_rate);
-> 
-> -	if (clocksource_register_hz(&time_clocksource, clock_rate))
-> -		panic("%s: can't register clocksource\n", time_clocksource.name);
-> +	if (clocksource_mmio_init(s5p_timer_reg(), "s5p_clocksource_timer",
-> +			clock_rate, 250, 32, clocksource_mmio_readl_down))
-> +		panic("s5p_clocksource_timer: can't register clocksource\n");
->  }
-> 
->  static void __init s5p_timer_resources(void)
-> --
-> 1.7.0.4
+> Acked-by: Jassi Brar <jassisinghbrar@gmail.com>
 
-Looks ok, applied.
+Applied.
 Thanks.
 
 Best regards,
