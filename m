@@ -1,64 +1,163 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Mon, 18 Jul 2011 10:56:51 +0300
-Subject: [PATCH v3] pxa2xx_spi: fix memory corruption
-In-Reply-To: <20110715025331.GL2927@ponder.secretlab.ca>
-References: <201107101609.31405.anarsoul@gmail.com>
-	<1310311099-24638-1-git-send-email-anarsoul@gmail.com>
-	<20110715025331.GL2927@ponder.secretlab.ca>
-Message-ID: <201107181056.51782.anarsoul@gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 18 Jul 2011 17:00:50 +0900
+Subject: [PATCH 2/2] ARM: EXYNOS4: Add more registers to be saved and
+	restored for PM
+In-Reply-To: <1309395085-22084-2-git-send-email-myungjoo.ham@samsung.com>
+References: <1309395085-22084-1-git-send-email-myungjoo.ham@samsung.com>
+	<1309395085-22084-2-git-send-email-myungjoo.ham@samsung.com>
+Message-ID: <04a601cc4520$d2d97b40$788c71c0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 15 July 2011 05:53:31 Grant Likely wrote:
-> On Sun, Jul 10, 2011 at 06:18:19PM +0300, Vasily Khoruzhick wrote:
-> > pxa2xx_spi_probe allocates struct driver_data and null_dma_buf
-> > at same time via spi_alloc_master(), but then calculates
-> > null_dma_buf pointer incorrectly, and it causes memory corruption
-> > later if DMA usage is enabled.
-> > 
-> > Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
-> > ---
-> > v2: - add u8 __null_dma_buf[16] to the end of driver_data structure
-> > 
-> >     and use it as null_dma_buf after alignment.
-> >     - use PTR_ALIGN instead of ALIGN
-> > 
-> > v3: - drop (u8 *) cast, use & operator instead, change array name
-> > 
-> >  drivers/spi/pxa2xx_spi.c |    9 +++++----
-> >  1 files changed, 5 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/drivers/spi/pxa2xx_spi.c b/drivers/spi/pxa2xx_spi.c
-> > index dc25bee..b25fe27 100644
-> > --- a/drivers/spi/pxa2xx_spi.c
-> > +++ b/drivers/spi/pxa2xx_spi.c
-> > @@ -106,6 +106,7 @@ struct driver_data {
-> > 
-> >  	int rx_channel;
-> >  	int tx_channel;
-> >  	u32 *null_dma_buf;
-> > 
-> > +	u8 null_dma_buf_unaligned[16];
+MyungJoo Ham wrote:
 > 
-> Don't dma buffers need to be cache-line aligned? 
+> We need more registers to be saved and restored for PM of Exynos4210.
+> Otherwise, with additional drivers running, suspend-to-RAM fails to wake
+> up properly. This patch adds registers omitted in the initial PM
+> patches.
+> 
+> Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  arch/arm/mach-exynos4/pm.c |   77
+> +++++++++++++++++++++++++++++++++++++++++++-
+>  1 files changed, 76 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-exynos4/pm.c b/arch/arm/mach-exynos4/pm.c
+> index a103c13..24c9265 100644
+> --- a/arch/arm/mach-exynos4/pm.c
+> +++ b/arch/arm/mach-exynos4/pm.c
+> @@ -27,6 +27,8 @@
+>  #include <plat/cpu.h>
+>  #include <plat/pm.h>
+>  #include <plat/pll.h>
+> +#include <plat/regs-srom.h>
+> +#include <plat/regs-timer.h>
+> 
+>  #include <mach/regs-irq.h>
+>  #include <mach/regs-gpio.h>
+> @@ -60,14 +62,20 @@ static struct sleep_save exynos4_vpll_save[] = {
+> 
+>  static struct sleep_save exynos4_core_save[] = {
+>  	/* CMU side */
+> +	SAVE_ITEM(S5P_CLKSRC_LEFTBUS),
 
-No, on PXA2xx they need to be 8-bytes aligned (according to PXA27x developer's 
-manual)
+I think, the reset/default value(0x0, SCLKMPLL) has no problem.
 
-> How large is the actual transfer?
+> +	SAVE_ITEM(S5P_CLKOUT_CMU_LEFTBUS),
 
-Looks like 8 bytes, but I'm not sure, I'm not author of driver and did not dig 
-deeply into its code. Just attempting to fix memory corruption.
+This is for debugging? So I think no need this.
 
-> Using the __aligned() or __cacheline_aligned
-> attribute is the correct way to make sure you've got a data buffer
-> that can be used for DMA mixed with other stuff.  Then you don't need
-> to fool around with PTR_ALIGN or anything.
+> +	SAVE_ITEM(S5P_CLKSRC_RIGHTBUS),
 
-Errr, it can't be applied to struct field, right? But driver needs per-device 
-null_dma_buf (there's 3 SPI controllers on PXA2xx)
+Same as 'CLKSRC_LEFTBUS'
 
-> g.
+> +	SAVE_ITEM(S5P_CLKOUT_CMU_RIGHTBUS),
 
-Regards
-Vasily
+Same as 'CMU_LEFTBUS'
+
+> +	SAVE_ITEM(S5P_CLKOUT_CMU_TOP),
+
+For debugging...
+
+> +	SAVE_ITEM(S5P_CLKOUT_CMU_DMC),
+
+Same as above.
+
+(snip)
+
+> +	SAVE_ITEM(S5P_APLL_LOCK),
+> +	SAVE_ITEM(S5P_MPLL_LOCK),
+> +	SAVE_ITEM(S5P_APLL_CON0),
+> +	SAVE_ITEM(S5P_APLL_CON1),
+> +	SAVE_ITEM(S5P_MPLL_CON0),
+> +	SAVE_ITEM(S5P_MPLL_CON1),
+
+Basically, these value should be set in boot-loader after wake up.
+
+(snip)
+
+> +	/* PMU */
+> +	SAVE_ITEM(S5P_HDMI_PHY_CONTROL),
+> +	SAVE_ITEM(S5P_USBOTG_PHY_CONTROL),
+> +	SAVE_ITEM(S5P_USBHOST_PHY_CONTROL),
+> +	SAVE_ITEM(S5P_DAC_CONTROL),
+> +	SAVE_ITEM(S5P_MIPI_CONTROL0),
+> +	SAVE_ITEM(S5P_MIPI_CONTROL1),
+> +	SAVE_ITEM(S5P_ADC_CONTROL),
+> +	SAVE_ITEM(S5P_PCIE_CONTROL),
+> +	SAVE_ITEM(S5P_SATA_CONTROL),
+> +	SAVE_ITEM(S5P_PMU_DEBUG),
+> +	SAVE_ITEM(S5P_ARM_CORE0_CONFIGURATION),
+> +	SAVE_ITEM(S5P_ARM_CORE1_CONFIGURATION),
+> +	SAVE_ITEM(S5P_ARM_CPU_L2_0_CONFIGURATION),
+> +	SAVE_ITEM(S5P_ARM_CPU_L2_1_CONFIGURATION),
+> +	SAVE_ITEM(S5P_XUSBXTI_CONFIGURATION),
+> +	SAVE_ITEM(S5P_XXTI_CONFIGURATION),
+> +	SAVE_ITEM(S5P_PMU_CAM_CONF),
+> +	SAVE_ITEM(S5P_PMU_TV_CONF),
+> +	SAVE_ITEM(S5P_PMU_MFC_CONF),
+> +	SAVE_ITEM(S5P_PMU_G3D_CONF),
+> +	SAVE_ITEM(S5P_PMU_LCD0_CONF),
+> +	SAVE_ITEM(S5P_PMU_LCD1_CONF),
+> +	SAVE_ITEM(S5P_MAUDIO_CONFIGURATION),
+> +	SAVE_ITEM(S5P_PMU_GPS_CONF),
+
+Since PMU part is alive block, so no need.
+
+> +
+> +	/* System Controller side */
+> +	SAVE_ITEM(S3C_VA_SYS + 0x0210),
+> +	SAVE_ITEM(S3C_VA_SYS + 0x0214),
+> +	SAVE_ITEM(S3C_VA_SYS + 0x0218),
+> +	SAVE_ITEM(S3C_VA_SYS + 0x0220),
+> +	SAVE_ITEM(S3C_VA_SYS + 0x0230),
+
+Hmm..really need this?
+
+> +
+>  	/* GIC side */
+>  	SAVE_ITEM(S5P_VA_GIC_CPU + 0x000),
+>  	SAVE_ITEM(S5P_VA_GIC_CPU + 0x004),
+> @@ -232,11 +286,32 @@ static struct sleep_save exynos4_core_save[] = {
+>  	SAVE_ITEM(S5P_VA_GIC_DIST + 0xC20),
+>  	SAVE_ITEM(S5P_VA_GIC_DIST + 0xC24),
+> 
+> -
+>  	SAVE_ITEM(S5P_VA_COMBINER_BASE + 0x000),
+>  	SAVE_ITEM(S5P_VA_COMBINER_BASE + 0x010),
+>  	SAVE_ITEM(S5P_VA_COMBINER_BASE + 0x020),
+>  	SAVE_ITEM(S5P_VA_COMBINER_BASE + 0x030),
+> +	SAVE_ITEM(S5P_VA_COMBINER_BASE + 0x040),
+> +	SAVE_ITEM(S5P_VA_COMBINER_BASE + 0x050),
+> +	SAVE_ITEM(S5P_VA_COMBINER_BASE + 0x060),
+> +	SAVE_ITEM(S5P_VA_COMBINER_BASE + 0x070),
+> +	SAVE_ITEM(S5P_VA_COMBINER_BASE + 0x080),
+> +	SAVE_ITEM(S5P_VA_COMBINER_BASE + 0x090),
+
+No need to save/restore external GIC part...
+
+(snip)
+
+> +	/* PWM Register */
+> +	SAVE_ITEM(S3C2410_TCFG0),
+> +	SAVE_ITEM(S3C2410_TCFG1),
+> +	SAVE_ITEM(S3C64XX_TINT_CSTAT),
+> +	SAVE_ITEM(S3C2410_TCON),
+> +	SAVE_ITEM(S3C2410_TCNTB(0)),
+> +	SAVE_ITEM(S3C2410_TCMPB(0)),
+> +	SAVE_ITEM(S3C2410_TCNTO(0)),
+
+PWM? I'm not sure why this is needed here.
+
+(snip)
+
+Others, ok.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
