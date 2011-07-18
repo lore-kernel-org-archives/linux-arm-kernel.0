@@ -1,72 +1,60 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 18 Jul 2011 11:38:24 +0300
-Subject: [PATCH 07/15] pxa25x_udc: drop support for udc_command
-In-Reply-To: <CAMPhdO8vBhod0eWw7dtNSrJHjruoBCZG5KKOHLvJHe+2Y3+TSg@mail.gmail.com>
-References: <1309871321-11305-1-git-send-email-dbaryshkov@gmail.com>
-	<1309871321-11305-8-git-send-email-dbaryshkov@gmail.com>
-	<20110705134615.GJ2820@legolas.emea.dhcp.ti.com>
-	<20110708213428.GA31866@kroah.com>
-	<20110708215442.GG31978@legolas.emea.dhcp.ti.com>
-	<20110708220258.GA29651@suse.de>
-	<CALT56yPuQxY13eAOd9mm7q4A8g6j2mP3F=h-sMv=xwzYzhRQxg@mail.gmail.com>
-	<CAMPhdO8vBhod0eWw7dtNSrJHjruoBCZG5KKOHLvJHe+2Y3+TSg@mail.gmail.com>
-Message-ID: <20110718083822.GC2837@legolas.emea.dhcp.ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 18 Jul 2011 02:07:10 -0700
+Subject: [PATCH 3/4] dt: omap3: add generic board file for dt support
+In-Reply-To: <CACxGe6uzyxf35WDg6COnPVt3dhQv1H80L1svALxp4naySx2BcA@mail.gmail.com>
+References: <1310592975-25773-1-git-send-email-manjugk@ti.com>
+	<1310592975-25773-4-git-send-email-manjugk@ti.com>
+	<CACxGe6sELS=C==16TZ2pfrxJDDyqjS_qOwJUfwzwMO8hqo8Xag@mail.gmail.com>
+	<CAC63_iSqN=rX6MbzFWM6z+zf1Eybg3MOD=qQVdeNg5cyENhPjw@mail.gmail.com>
+	<CAC63_iTf696D6Q_EzFeUUp5R38pYNEJBkmKviEu6-yuF0y=bNA@mail.gmail.com>
+	<CACxGe6uzyxf35WDg6COnPVt3dhQv1H80L1svALxp4naySx2BcA@mail.gmail.com>
+Message-ID: <20110718090710.GZ5783@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Jul 14, 2011 at 10:52:47AM +0800, Eric Miao wrote:
-> On Tue, Jul 12, 2011 at 9:41 PM, Dmitry Eremin-Solenikov
-> <dbaryshkov@gmail.com> wrote:
-> > On 7/9/11, Greg KH <gregkh@suse.de> wrote:
-> >> On Sat, Jul 09, 2011 at 12:54:43AM +0300, Felipe Balbi wrote:
-> >>> On Fri, Jul 08, 2011 at 02:34:28PM -0700, Greg KH wrote:
-> >>> > On Tue, Jul 05, 2011 at 04:46:16PM +0300, Felipe Balbi wrote:
-> >>> > > Hi,
-> >>> > >
-> >>> > > On Tue, Jul 05, 2011 at 05:08:33PM +0400, Dmitry Eremin-Solenikov
-> >>> > > wrote:
-> >>> > > > None of pxa25x devices use udc_command() for UDC functionality.
-> >>> > > > Stop calling this callback from pxa25x_udc code.
-> >>> > >
-> >>> > > looks good to me, Greg since this is a big re-work which depends on
-> >>> > > parts out of the Gadget Framework, can you take all the patches
-> >>> > > straight ? Here's my Acked-by:
-> >>> > >
-> >>> > > Acked-by: Felipe Balbi <balbi@ti.com>
-> >>> >
-> >>> > I can't take these, they should go through the gpio subsystem maintainer
-> >>> > instead.
-> >>>
-> >>> But why ? They only touch drivers/usb/gadget/pxa*.c
-> >>
-> >> All 15 patches? ?No they don't they touch all sorts of things.
-> >>
-> >>> Would it be enough if Grant would Ack them ?
-> >>
-> >> Sure, but it would be easier if Grant took them all, right?
-> >
-> > Colleagues, can you please tell me the current status/future of this patches?
-> > Are they going to 3.1? 3.2? Should they go via ARM/PXA, via usb? usb-gadget?
-> > Via gpio(why?)?? Should I send them to somebody for merging?
+* Grant Likely <grant.likely@secretlab.ca> [110716 22:08]:
 > 
-> Well, I agree with Dmitry the whole patchset is not related to the GPIO
-> subsystem at all. The major cleanup is actually to the PXA machines,
-> and touches part of the pxa25x_udc driver. If some one Acks the USB
-> part, I can help take the remaining patches.
+> The way I see it, you've got two options:
+> 
+> 1) modify the of_platform_bus_create() to call some kind of
+> of_platform_bus_create_omap() for devices that match "ti,omap3-device"
+> or something.
+> 
+> 2) Leave of_platform_bus_create(), and instead us a notifier to attach
+> hwmod data to normal platform devices.  omap_device_build() is
+> actually pretty simple.  It allocated a device, it attaches
+> platform_data and hwmod pointers to the device and registers it.
+> omap_device_register() is just a wrapper around
+> platform_device_register().
+> 
+> My preference is definitely #2, but there is a wrinkle in this
+> approach.  Unfortunately omap_devices are not simply plain
+> platform_devices with extra data attached, an omap_device actually
+> embeds the platform_device inside it, which cannot be attached after
+> the fact.  I think I had talked with Kevin (cc'd) about eliminating
+> the embedding, but I cannot remember clearly on this point.  As long
+> as platform_device remains embedded inside struct omap_device, #2
+> won't work.
+> 
+> In either case, looking up the correct hwmod data should be easy for
+> any device provided the omap code maintains a lookup table of
+> compatible strings and base addresses of devices (much like auxdata).
+> In fact, I'd be okay with extending auxdata to include OMAP fields if
+> that would be easiest since the whole point of auxdata is to ease the
+> transition to DT support.  When a matching device is created, the
+> hwmod pointer can easily be attached.  This should work transparently
+> for all omap devices, not just the i2c bus.
 
-For the gadget part you can have my Ack. Although I don't have how to
-test those patches, they seem simple enough:
+Well we should be able to automgagically build the omap_device for
+each device tree entry.
 
-Acked-by: Felipe Balbi <balbi@ti.com>
+And then the device driver probe and runtime PM should be able to take
+care of the rest for the driver. And then there's no more driver
+specific platform init code needed ;)
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 490 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110718/9c8c4546/attachment.sig>
+How about if we just have the hwmod code call omap_device_build for
+each device tree entry?
+
+Regards,
+
+Tony
