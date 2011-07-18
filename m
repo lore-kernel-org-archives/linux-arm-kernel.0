@@ -1,85 +1,282 @@
-From: padma.kvr@gmail.com (padma venkat)
-Date: Mon, 18 Jul 2011 11:16:45 +0530
-Subject: [PATCH] ARM: S5P64X0: External Interrupt Support
-In-Reply-To: <20110715123429.GP23270@n2100.arm.linux.org.uk>
-References: <1310712094-19831-1-git-send-email-padma.v@samsung.com>
-	<20110715090011.GN23270@n2100.arm.linux.org.uk>
-	<CAAgF-Bcke26iFsgf0DA3LB5CLv=TkS6UG0y+SBLR=F6TzGYU+A@mail.gmail.com>
-	<20110715123429.GP23270@n2100.arm.linux.org.uk>
-Message-ID: <CAAgF-BcBwcoibw8-0d+P=ShcQh2bC3sAyqxznRJN3Bip2PuAyg@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 18 Jul 2011 14:52:03 +0900
+Subject: [PATCH v2 3/3] ARM: EXYNOS4: Add EPLL clock operations
+In-Reply-To: <1308655463-8787-4-git-send-email-ch.naveen@samsung.com>
+References: <1308655463-8787-1-git-send-email-ch.naveen@samsung.com>
+	<1308655463-8787-4-git-send-email-ch.naveen@samsung.com>
+Message-ID: <048501cc450e$d4d7e880$7e87b980$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Naveen Krishna Chatradhi wrote:
+> 
+> S5PV210 and EXYNOS4 uses similar PLL(PLL46XX) for EPLL.
+> So, The EPLL set rate function is duplicated.
+> 
+> Note: Moved common code to plat-s5p, as commented by Kukjin Kim.
+> 
+Since if you want to keep this in git log, this should be moved after below
+'---' :(
 
-On Fri, Jul 15, 2011 at 6:04 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Fri, Jul 15, 2011 at 05:23:33PM +0530, padma venkat wrote:
->> Hi Russell,
->>
->> On Fri, Jul 15, 2011 at 2:30 PM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->> > On Fri, Jul 15, 2011 at 12:11:34PM +0530, Padmavathi Venna wrote:
->> >> +#define eint_offset(irq) ? ? ((irq) - IRQ_EINT(0))
->> >> +#define eint_irq_to_bit(irq) ((u32)(1 << eint_offset(irq)))
->> >> +
->> >> +static inline void s5p64x0_irq_eint_mask(struct irq_data *data)
->> >> +{
->> >> + ? ? u32 mask;
->> >> +
->> >> + ? ? mask = __raw_readl(S5P64X0_EINT0MASK);
->> >> + ? ? mask |= (u32)data->chip_data;
->> >> + ? ? __raw_writel(mask, S5P64X0_EINT0MASK);
->> >> +}
->> >> +
->> >> +static void s5p64x0_irq_eint_unmask(struct irq_data *data)
->> >> +{
->> >> + ? ? u32 mask;
->> >> +
->> >> + ? ? mask = __raw_readl(S5P64X0_EINT0MASK);
->> >> + ? ? mask &= ~((u32)data->chip_data);
->> >> + ? ? __raw_writel(mask, S5P64X0_EINT0MASK);
->> >> +}
->> >> +
->> >> +static inline void s5p64x0_irq_eint_ack(struct irq_data *data)
->> >> +{
->> >> + ? ? __raw_writel((u32)data->chip_data, S5P64X0_EINT0PEND);
->> >> +}
->> >> +
->> >> +static void s5p64x0_irq_eint_maskack(struct irq_data *data)
->> >> +{
->> >> + ? ? /* compiler should in-line these */
->> >> + ? ? s5p64x0_irq_eint_mask(data);
->> >> + ? ? s5p64x0_irq_eint_ack(data);
->> >> +}
->> >
->> > Won't genirqchip support deal with all of the above for you?
->> As per my understanding, to deal with low level interrupt hardware access
->> we need to use the accessor functions. Please suggest me if there is
->> any better way of doing this.
->
-> I'm not saying don't have these. ?I'm saying use the _generic_ irqchip
-> support which has the code implemented to set and clear bits in registers.
-> Something like this:
->
-> ? ? ? ?struct irq_chip_generic *gc;
->
-> ? ? ? ?gc = irq_alloc_generic_chip(name, 1, first_irq, base_of_controller,
-> ? ? ? ? ? ? ? ? ? ? ? ?handler);
->
-> ? ? ? ?gc->chip_types->chip.irq_ack = irq_gc_ack;
-> ? ? ? ?gc->chip_types->chip.irq_mask = irq_gc_mask_set_bit;
-> ? ? ? ?gc->chip_types->chip.irq_unmask = irq_gc_mask_clr_bit;
->
-> ? ? ? ?/* replace the two below with the _real_ offset, rather than these calculations */
-> ? ? ? ?gc->chip_types->reg.ack = S5P64X0_EINT0PEND - base_of_controller;
-> ? ? ? ?gc->chip_types->reg.mask = S5P64X0_EINT0MASK - base_of_controller;
->
-> ? ? ? ?irq_setup_generic_chip(gc, mask_of_irqs_to_setup,
-> ? ? ? ? ? ? ? ?IRQ_GC_INIT_MASK_CACHE, flags_to_clear, flags_to_set);
->
-Thanks for your explanation.
-I will remake the patch based on generic_irq_chip support and resend the same.
+> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
+> ---
+>  arch/arm/mach-exynos4/clock.c        |    1 +
+>  arch/arm/mach-s5pv210/clock.c        |   78
++---------------------------------
+>  arch/arm/plat-s5p/clock.c            |   77
+> +++++++++++++++++++++++++++++++++
+>  arch/arm/plat-s5p/include/plat/pll.h |    3 +
+>  4 files changed, 82 insertions(+), 77 deletions(-)
+> 
+> diff --git a/arch/arm/mach-exynos4/clock.c b/arch/arm/mach-exynos4/clock.c
+> index feeb27e..7687087 100644
+> --- a/arch/arm/mach-exynos4/clock.c
+> +++ b/arch/arm/mach-exynos4/clock.c
+> @@ -1294,6 +1294,7 @@ void __init_or_cpufreq exynos4_setup_clocks(void)
+>  				__raw_readl(S5P_VPLL_CON1), pll_4650);
+> 
+>  	clk_fout_apll.ops = &exynos4_fout_apll_ops;
+> +	clk_fout_epll.ops = &pll46xx_epll_ops;
+>  	clk_fout_mpll.rate = mpll;
+>  	clk_fout_epll.rate = epll;
+>  	clk_fout_vpll.rate = vpll;
+> diff --git a/arch/arm/mach-s5pv210/clock.c b/arch/arm/mach-s5pv210/clock.c
+> index ae72f87..dd77c2c 100644
+> --- a/arch/arm/mach-s5pv210/clock.c
+> +++ b/arch/arm/mach-s5pv210/clock.c
+> @@ -979,82 +979,6 @@ static struct clksrc_clk *sysclks[] = {
+>  	&clk_sclk_spdif,
+>  };
+> 
+> -static u32 epll_div[][6] = {
+> -	{  48000000, 0, 48, 3, 3, 0 },
+> -	{  96000000, 0, 48, 3, 2, 0 },
+> -	{ 144000000, 1, 72, 3, 2, 0 },
+> -	{ 192000000, 0, 48, 3, 1, 0 },
+> -	{ 288000000, 1, 72, 3, 1, 0 },
+> -	{  32750000, 1, 65, 3, 4, 35127 },
+> -	{  32768000, 1, 65, 3, 4, 35127 },
+> -	{  45158400, 0, 45, 3, 3, 10355 },
+> -	{  45000000, 0, 45, 3, 3, 10355 },
+> -	{  45158000, 0, 45, 3, 3, 10355 },
+> -	{  49125000, 0, 49, 3, 3, 9961 },
+> -	{  49152000, 0, 49, 3, 3, 9961 },
+> -	{  67737600, 1, 67, 3, 3, 48366 },
+> -	{  67738000, 1, 67, 3, 3, 48366 },
+> -	{  73800000, 1, 73, 3, 3, 47710 },
+> -	{  73728000, 1, 73, 3, 3, 47710 },
+> -	{  36000000, 1, 32, 3, 4, 0 },
+> -	{  60000000, 1, 60, 3, 3, 0 },
+> -	{  72000000, 1, 72, 3, 3, 0 },
+> -	{  80000000, 1, 80, 3, 3, 0 },
+> -	{  84000000, 0, 42, 3, 2, 0 },
+> -	{  50000000, 0, 50, 3, 3, 0 },
+> -};
+> -
+> -static int s5pv210_epll_set_rate(struct clk *clk, unsigned long rate)
+> -{
+> -	unsigned int epll_con, epll_con_k;
+> -	unsigned int i;
+> -
+> -	/* Return if nothing changed */
+> -	if (clk->rate == rate)
+> -		return 0;
+> -
+> -	epll_con = __raw_readl(S5P_EPLL_CON);
+> -	epll_con_k = __raw_readl(S5P_EPLL_CON1);
+> -
+> -	epll_con_k &= ~PLL46XX_KDIV_MASK;
+> -	epll_con &= ~(1 << 27 |
+> -			PLL46XX_MDIV_MASK << PLL46XX_MDIV_SHIFT |
+> -			PLL46XX_PDIV_MASK << PLL46XX_PDIV_SHIFT |
+> -			PLL46XX_SDIV_MASK << PLL46XX_SDIV_SHIFT);
+> -
+> -	for (i = 0; i < ARRAY_SIZE(epll_div); i++) {
+> -		if (epll_div[i][0] == rate) {
+> -			epll_con_k |= epll_div[i][5] << 0;
+> -			epll_con |= (epll_div[i][1] << 27 |
+> -					epll_div[i][2] <<
+> PLL46XX_MDIV_SHIFT |
+> -					epll_div[i][3] <<
+> PLL46XX_PDIV_SHIFT |
+> -					epll_div[i][4] <<
+> PLL46XX_SDIV_SHIFT);
+> -			break;
+> -		}
+> -	}
+> -
+> -	if (i == ARRAY_SIZE(epll_div)) {
+> -		printk(KERN_ERR "%s: Invalid Clock EPLL Frequency\n",
+> -				__func__);
+> -		return -EINVAL;
+> -	}
+> -
+> -	__raw_writel(epll_con, S5P_EPLL_CON);
+> -	__raw_writel(epll_con_k, S5P_EPLL_CON1);
+> -
+> -	printk(KERN_WARNING "EPLL Rate changes from %lu to %lu\n",
+> -			clk->rate, rate);
+> -
+> -	clk->rate = rate;
+> -
+> -	return 0;
+> -}
+> -
+> -static struct clk_ops s5pv210_epll_ops = {
+> -	.set_rate = s5pv210_epll_set_rate,
+> -	.get_rate = s5p_epll_get_rate,
+> -};
+> -
+>  void __init_or_cpufreq s5pv210_setup_clocks(void)
+>  {
+>  	struct clk *xtal_clk;
+> @@ -1075,7 +999,7 @@ void __init_or_cpufreq s5pv210_setup_clocks(void)
+> 
+>  	/* Set functions for clk_fout_epll */
+>  	clk_fout_epll.enable = s5p_epll_enable;
+> -	clk_fout_epll.ops = &s5pv210_epll_ops;
+> +	clk_fout_epll.ops = &pll46xx_epll_ops;
+> 
+>  	printk(KERN_DEBUG "%s: registering clocks\n", __func__);
+> 
+> diff --git a/arch/arm/plat-s5p/clock.c b/arch/arm/plat-s5p/clock.c
+> index 02af235..2a4678d 100644
+> --- a/arch/arm/plat-s5p/clock.c
+> +++ b/arch/arm/plat-s5p/clock.c
+> @@ -24,6 +24,7 @@
+>  #include <mach/regs-clock.h>
+> 
+>  #include <plat/clock.h>
+> +#include <plat/pll.h>
+>  #include <plat/clock-clksrc.h>
+>  #include <plat/s5p-clock.h>
+> 
+> @@ -203,6 +204,82 @@ struct clk_ops s5p_sclk_spdif_ops = {
+>  	.get_rate	= s5p_spdif_get_rate,
+>  };
+> 
+> +static u32 epll_div[][6] = {
+> +	{  48000000, 0, 48, 3, 3, 0 },
+> +	{  96000000, 0, 48, 3, 2, 0 },
+> +	{ 144000000, 1, 72, 3, 2, 0 },
+> +	{ 192000000, 0, 48, 3, 1, 0 },
+> +	{ 288000000, 1, 72, 3, 1, 0 },
+> +	{  32750000, 1, 65, 3, 4, 35127 },
+> +	{  32768000, 1, 65, 3, 4, 35127 },
+> +	{  45158400, 0, 45, 3, 3, 10355 },
+> +	{  45000000, 0, 45, 3, 3, 10355 },
+> +	{  45158000, 0, 45, 3, 3, 10355 },
+> +	{  49125000, 0, 49, 3, 3, 9961 },
+> +	{  49152000, 0, 49, 3, 3, 9961 },
+> +	{  67737600, 1, 67, 3, 3, 48366 },
+> +	{  67738000, 1, 67, 3, 3, 48366 },
+> +	{  73800000, 1, 73, 3, 3, 47710 },
+> +	{  73728000, 1, 73, 3, 3, 47710 },
+> +	{  36000000, 1, 32, 3, 4, 0 },
+> +	{  60000000, 1, 60, 3, 3, 0 },
+> +	{  72000000, 1, 72, 3, 3, 0 },
+> +	{  80000000, 1, 80, 3, 3, 0 },
+> +	{  84000000, 0, 42, 3, 2, 0 },
+> +	{  50000000, 0, 50, 3, 3, 0 },
+> +};
 
-Best Regards
-Padma
+Hmm, ok for now. But as Seungwhan Youn said, you have to know it can be
+changed according to input clock for EPLL when you add this into common
+plat-s5p.
+
+> +
+> +int pll46xx_epll_set_rate(struct clk *clk, unsigned long rate)
+
+How about to move this in plat-s5p/include/plat/pll.h like other pll helper
+functions?
+
+> +{
+> +	unsigned int epll_con, epll_con_k;
+> +	unsigned int i;
+> +
+> +	/* Return if nothing changed */
+> +	if (clk->rate == rate)
+> +		return 0;
+> +
+> +	epll_con = __raw_readl(S5P_EPLL_CON);
+> +	epll_con_k = __raw_readl(S5P_EPLL_CON1);
+> +
+> +	epll_con_k &= ~PLL46XX_KDIV_MASK;
+> +	epll_con &= ~(1 << 27 |
+> +			PLL46XX_MDIV_MASK << PLL46XX_MDIV_SHIFT |
+> +			PLL46XX_PDIV_MASK << PLL46XX_PDIV_SHIFT |
+> +			PLL46XX_SDIV_MASK << PLL46XX_SDIV_SHIFT);
+> +
+> +	for (i = 0; i < ARRAY_SIZE(epll_div); i++) {
+> +		if (epll_div[i][0] == rate) {
+> +			epll_con_k |= epll_div[i][5] << 0;
+> +			epll_con |= (epll_div[i][1] << 27 |
+> +					epll_div[i][2] <<
+> PLL46XX_MDIV_SHIFT |
+> +					epll_div[i][3] <<
+> PLL46XX_PDIV_SHIFT |
+> +					epll_div[i][4] <<
+> PLL46XX_SDIV_SHIFT);
+> +			break;
+> +		}
+> +	}
+> +
+> +	if (i == ARRAY_SIZE(epll_div)) {
+> +		printk(KERN_ERR "%s: Invalid Clock EPLL Frequency\n",
+> +				__func__);
+> +		return -EINVAL;
+> +	}
+> +
+> +	__raw_writel(epll_con, S5P_EPLL_CON);
+> +	__raw_writel(epll_con_k, S5P_EPLL_CON1);
+
+Basically, need to add check of pll locking after changing PLL value.
+
+> +
+> +	printk(KERN_WARNING "EPLL Rate changes from %lu to %lu\n",
+> +			clk->rate, rate);
+> +
+> +	clk->rate = rate;
+> +
+> +	return 0;
+> +}
+> +
+> +struct clk_ops pll46xx_epll_ops = {
+> +	.set_rate = pll46xx_epll_set_rate,
+> +	.get_rate = s5p_epll_get_rate,
+
+I'm not sure we need .get_rate here.
+Could you please test without this?
+
+> +};
+> +
+>  static struct clk *s5p_clks[] __initdata = {
+>  	&clk_ext_xtal_mux,
+>  	&clk_48m,
+> diff --git a/arch/arm/plat-s5p/include/plat/pll.h
+b/arch/arm/plat-s5p/include/plat/pll.h
+> index bf28fad..911a20e 100644
+> --- a/arch/arm/plat-s5p/include/plat/pll.h
+> +++ b/arch/arm/plat-s5p/include/plat/pll.h
+> @@ -94,6 +94,9 @@ static inline unsigned long s5p_get_pll46xx(unsigned
+long
+> baseclk,
+>  	return result;
+>  }
+> 
+> +extern int pll46xx_epll_set_rate(struct clk *clk, unsigned long rate);
+> +extern struct clk_ops pll46xx_epll_ops;
+> +
+>  #define PLL90XX_MDIV_MASK	(0xFF)
+>  #define PLL90XX_PDIV_MASK	(0x3F)
+>  #define PLL90XX_SDIV_MASK	(0x7)
+> --
+> 1.7.2.3
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
