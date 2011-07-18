@@ -1,65 +1,19 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 18 Jul 2011 10:44:09 +0100
-Subject: [PATCH 0/3] SP805 updates for Versatile Express
-In-Reply-To: <20110715205954.GR3834@infomag.iguana.be>
-References: <1310742242-14647-1-git-send-email-nbowler@elliptictech.com>
-	<20110715205954.GR3834@infomag.iguana.be>
-Message-ID: <20110718094409.GQ23270@n2100.arm.linux.org.uk>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 18 Jul 2011 18:51:34 +0900
+Subject: [PATCH V3 12/13] ASoC: Samsung: Update DMA interface
+In-Reply-To: <1310798666-7659-13-git-send-email-kgene.kim@samsung.com>
+References: <1310798666-7659-1-git-send-email-kgene.kim@samsung.com>
+	<1310798666-7659-13-git-send-email-kgene.kim@samsung.com>
+Message-ID: <20110718095133.GC423@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 15, 2011 at 10:59:54PM +0200, Wim Van Sebroeck wrote:
-> Hi Nick,
+On Sat, Jul 16, 2011 at 03:44:25PM +0900, Kukjin Kim wrote:
+> From: Boojin Kim <boojin.kim@samsung.com>
 > 
-> > Here are some updates to get the SP805 watchdog working on the ARM
-> > Versatile Express.  The first two patches fix observed issues; the
-> > third fixes a potential (but not observed) issue with asynchronous
-> > posted writes.
-> > 
-> > All three patches are independent and should be applicable in any
-> > order, with some fuzz on the third.
-> 
-> looks good at first glance.
-> 
-> Russel: what's your opinion?
+> This patch adds to support the DMA PL330 driver that uses
+> DMA generic API. Samsung sound driver uses DMA generic API
+> if architecture supports it. Otherwise, use samsung specific
+> S3C-PL330 API driver to transfer PCM data.
 
-Win,
-
-This series looks fine.  However, looking through the driver, there's
-a few oddities:
-
-static u32 wdt_timeleft(void)
-{
-        u64 load, rate;
-
-        rate = clk_get_rate(wdt->clk);
-
-        spin_lock(&wdt->lock);
-        load = readl(wdt->base + WDTVALUE);
-
-        /*If the interrupt is inactive then time left is WDTValue + WDTLoad. */
-        if (!(readl(wdt->base + WDTRIS) & INT_MASK))
-                load += wdt->load_val + 1;
-        spin_unlock(&wdt->lock);
-
-        return div_u64(load, rate);
-}
-
-clk_get_rate returns an unsigned long, not a u64.  There's no point
-expanding it to a 64-bit int for div_u64 - rate might as well be
-declared as an unsigned long.
-
-Same goes for wdt_setload, and there stuff like "div_u64(rate, 2)"
-can become normal maths rather than the special 64-bit stuff.
-
-Then there's:
-
-        if (!request_mem_region(adev->res.start, resource_size(&adev->res),
-                                "sp805_wdt")) {
-                dev_warn(&adev->dev, "Failed to get memory region resource\n");
-                ret = -ENOENT;
-                goto err;
-        }
-
-Is amba_request_regions()/amba_release_regions() not good enough to
-handle requesting/releasing these regions?
+Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
