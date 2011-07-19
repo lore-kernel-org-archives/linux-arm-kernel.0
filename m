@@ -1,22 +1,23 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 19 Jul 2011 15:36:49 -0600
+Date: Tue, 19 Jul 2011 15:37:37 -0600
 Subject: [PATCH 3/4] dt: omap3: add generic board file for dt support
-In-Reply-To: <CAP6yH7eSmdU16r5iC2MwvU3RwOBXaJNygMUXG=HSMiWUKnor-w@mail.gmail.com>
+In-Reply-To: <CAC63_iSjCrO31GnTiD9Dd8-ns5+Qer_wJSjY08g-Ft_uKfz6jw@mail.gmail.com>
 References: <1310592975-25773-1-git-send-email-manjugk@ti.com>
 	<1310592975-25773-4-git-send-email-manjugk@ti.com>
 	<CACxGe6sELS=C==16TZ2pfrxJDDyqjS_qOwJUfwzwMO8hqo8Xag@mail.gmail.com>
 	<CAC63_iSqN=rX6MbzFWM6z+zf1Eybg3MOD=qQVdeNg5cyENhPjw@mail.gmail.com>
 	<CAC63_iTf696D6Q_EzFeUUp5R38pYNEJBkmKviEu6-yuF0y=bNA@mail.gmail.com>
 	<CACxGe6uzyxf35WDg6COnPVt3dhQv1H80L1svALxp4naySx2BcA@mail.gmail.com>
-	<CAP6yH7eSmdU16r5iC2MwvU3RwOBXaJNygMUXG=HSMiWUKnor-w@mail.gmail.com>
-Message-ID: <20110719213649.GP6848@ponder.secretlab.ca>
+	<CAC63_iSjCrO31GnTiD9Dd8-ns5+Qer_wJSjY08g-Ft_uKfz6jw@mail.gmail.com>
+Message-ID: <20110719213737.GQ6848@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 18, 2011 at 03:45:57PM +0530, G, Manjunath Kondaiah wrote:
-> Hi Grant,
+On Tue, Jul 19, 2011 at 11:28:53AM +0530, G, Manjunath Kondaiah wrote:
+> Grant/Kevin,
 > 
-> On 17 July 2011 10:43, Grant Likely <grant.likely@secretlab.ca> wrote:
+> On Sun, Jul 17, 2011 at 10:43 AM, Grant Likely
+> <grant.likely@secretlab.ca> wrote:
 > > Hi Manjunath,
 > >
 > > Comments below. ?I left in a lot of context for the new folks that
@@ -26,53 +27,7 @@ On Mon, Jul 18, 2011 at 03:45:57PM +0530, G, Manjunath Kondaiah wrote:
 > >> On Thu, Jul 14, 2011 at 4:45 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
 > >>>> > +static void __init omap3_init(void)
 > >>>> > +{
-> >>>> > + ? ? ? struct device_node *node;
-> >>>> > +
 > [...]
-> >> +static struct omap_device *of_omap_i2c_device_create(struct device_node *node,
-> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?const char *bus_id,
-> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?void *platform_data,
-> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct device *parent)
-> >> +{
-> >> + ? ? ? struct platform_device *pdev;
-> >> + ? ? ? struct i2c_board_info *i2c_board_info;
-> >> + ? ? ? u8 id;
-> >> +
-> >> + ? ? ? printk("Creating omap i2c device %s\n", node->full_name);
-> >> +
-> >> + ? ? ? if (!of_device_is_available(node))
-> >> + ? ? ? ? ? ? ? return NULL;
-> >> +
-> >> + ? ? ? id = simple_strtol(bus_id, NULL, 0);
-> >> + ? ? ? pdev = kzalloc(sizeof(*pdev), GFP_KERNEL);
-> >> + ? ? ? pdev->dev.of_node = of_node_get(node);
-> >> + ? ? ? if (!pdev->dev.of_node) {
-> >> + ? ? ? ? ? ? ? speed = 100;
-> >> + ? ? ? } else {
-> >> + ? ? ? ? ? ? ? u32 prop;
-> >> + ? ? ? ? ? ? ? if (!of_property_read_u32(pdev->dev.of_node, "clock-frequency",
-> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? &prop))
-> >> + ? ? ? ? ? ? ? ? ? ? ? speed = prop/100;
-> >> + ? ? ? ? ? ? ? else
-> >> + ? ? ? ? ? ? ? ? ? ? ? speed = 100;
-> >> + ? ? ? }
-> >> + ? ? ? printk("%s : speed->%d\n",__func__, speed);
-> >> +
-> >> + ? ? ? for_each_child_of_node(bus, child) {
-> >> + ? ? ? ? ? ? ? u32 prop;
-> >> +
-> >> + ? ? ? ? ? ? ? printk(" ? create child: %s\n", child->full_name);
-> >> + ? ? ? ? ? ? ? i2c_board_info = kzalloc(sizeof(*i2c_board_info), GFP_KERNEL);
-> >> + ? ? ? ? ? ? ? if (!of_property_read_u32(pdev->dev.of_node, "reg",
-> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? &prop))
-> >> + ? ? ? ? ? ? ? i2c_board_info->addr = prop;
-> >> + ? ? ? ? ? ? ? if (!of_property_read_u32(pdev->dev.of_node, "interrupts",
-> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? &prop))
-> >> + ? ? ? ? ? ? ? i2c_board_info->irq = prop;
-> >> + ? ? ? ? ? ? ? i2c_board_info->platform_data = platform_data;
-> >> + ? ? ? ? ? ? ? strncpy(i2c_board_info->type, child->name,
-> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? sizeof(i2c_board_info->type));
-> >> + ? ? ? }
 > >> + ? ? ? omap_register_i2c_bus(id, speed, i2c_board_info, 1);
 > >
 > > While this does in a sense work, and creates an omap_device for the
@@ -80,19 +35,58 @@ On Mon, Jul 18, 2011 at 03:45:57PM +0530, G, Manjunath Kondaiah wrote:
 > > device specific details into the generic devicetree support code. ?The
 > > i2c bus driver itself must be responsible for decoding the speed and
 > > child nodes, and in fact it can easily be modified to do so (I've
+> > already demonstrated how to do so). ?The real problem is making sure
+> > the platform_device is created in a way that attaches the correct
+> > hwmod data. For this context, the current omap_register_i2c_bus()
+> > isn't a useful method for doing so.
+> >
+> > So what is to be done? ?omap_register_i2c_bus() does three things;
+> > 1) register an i2c board info for the bus with i2c_register_board_info(),
+> > 2) fill platform_data for the device, and
+> > 3) use omap_i2c_add_bus to create the platform_device with attached hwmod.
+> >
+> > Of these three, 1 & 2 must not be done when using the DT. Only
+> > omap_i2c_add_bus() does something useful, but that is still specific
+> > to the i2c device.
+> >
+> > omap_i2c_add_bus() splits to omap{1,2}_add_bus().
+> >
+> > omap1_i2c_add_bus() sets up pinmux and calls platform_device register.
+> > ?pinmux setup needs to be factored out anyway for generic DT platform
+> > device registration, which just leaves platform_device creation which
+> > is already handled by of_platform_populate().
+> >
+> > omap2_i2c_add_bus() does the same thing, except it also looks up the
+> > hwmod data (*oh) and uses it to call omap_device_build().
+> > omap_device_build() or something equivalent needs to be called for
+> > every omap device in the system, which is to create platform_devices
+> > with hwmod attached. ?Now we're starting to hit generic code. ?:-)
+> >
+> > The way I see it, you've got two options:
+> >
+> > 1) modify the of_platform_bus_create() to call some kind of
+> > of_platform_bus_create_omap() for devices that match "ti,omap3-device"
+> > or something.
+> >
+> > 2) Leave of_platform_bus_create(), and instead us a notifier to attach
+> > hwmod data to normal platform devices. ?omap_device_build() is
+> > actually pretty simple. ?It allocated a device, it attaches
+> > platform_data and hwmod pointers to the device and registers it.
+> > omap_device_register() is just a wrapper around
+> > platform_device_register().
+> >
+> > My preference is definitely #2, but there is a wrinkle in this
+> > approach. ?Unfortunately omap_devices are not simply plain
+> > platform_devices with extra data attached, an omap_device actually
+> > embeds the platform_device inside it, which cannot be attached after
+> > the fact. ?I think I had talked with Kevin (cc'd) about eliminating
+> > the embedding, but I cannot remember clearly on this point. ?As long
+> > as platform_device remains embedded inside struct omap_device, #2
+> > won't work.
 > 
-> Decoding speed in i2c driver seems to be fine. But the i2c child nodes are
-> board specific. We might bring board specific handling code into i2c driver
-> with this approach.
+> Can you please elaborate more on this issue?
 
-It shouldn't.  They're just i2c devices, and the child nodes will
-always follow the i2c device binding.
-
-> BTW, I have observed that, if we create i2c device node in omapx-soc.dtsi
-> file and the define i2c bus clock-frequency in beagle.dts, the clock-frequency
-> is not available in driver probe. Is this expected behavior?
-
-No, it sounds like something isn't getting set up correctly.  Send me
-your current beagle.dts and omap3-soc.dtsi files.
+Look at the of_platform_populate() call path (in devicetree/next) and
+see how it handles amba devices.  Do the same thing for omap_devices.
 
 g.
