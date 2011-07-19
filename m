@@ -1,39 +1,39 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Tue, 19 Jul 2011 13:42:52 -0700
-Subject: [PATCH 0/7] Re-organize linker layouts
-In-Reply-To: <alpine.LFD.2.00.1107191356500.21187@xanadu.home>
-References: <4E165597.90002@codeaurora.org>
-	<20110708090721.GC2414@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1107080941090.14596@xanadu.home>
-	<20110708160329.GF4812@n2100.arm.linux.org.uk>
-	<4E1736A9.9040102@codeaurora.org>
-	<alpine.LFD.2.00.1107081417080.14596@xanadu.home>
-	<4E1B5A57.3010701@codeaurora.org>
-	<alpine.LFD.2.00.1107111803520.14596@xanadu.home>
-	<20110719172201.GA4557@huya.qualcomm.com>
-	<alpine.LFD.2.00.1107191356500.21187@xanadu.home>
-Message-ID: <20110719204252.GA4551@huya.qualcomm.com>
+From: per.forlin@linaro.org (Per Forlin)
+Date: Tue, 19 Jul 2011 23:31:44 +0200
+Subject: [PATCH v2 1/3] fault-inject: make fault injection available for
+	modules
+In-Reply-To: <1311111106-26814-1-git-send-email-per.forlin@linaro.org>
+References: <1311111106-26814-1-git-send-email-per.forlin@linaro.org>
+Message-ID: <1311111106-26814-2-git-send-email-per.forlin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 19, 2011 at 02:02:27PM -0400, Nicolas Pitre wrote:
+export symbols should_fail() and init_fault_attr_dentries() in order
+to make modules use the fault injection functionality
 
-> > What about loading the kernel at the next 128MB boundary,
-> > and coming up with a way to use the 126MB before the kernel for
-> > allocation.  That might end up being more invasive, though.
-> 
-> Indeed. And many targets don't even have that amount of memory.
+Signed-off-by: Per Forlin <per.forlin@linaro.org>
+---
+ lib/fault-inject.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-I wasn't thinking that anything other than MSM would change.  The
-kernel would be at a 128MB+0x8000 boundary.  Non-MSM targets would
-stay the same, and MSM targets would have the kernel 128MB further in
-memory, and reclaim that memory later.
-
-Probably not the best way to do it, and it sounds like Stephen Boyd
-has some better ideas, anyway.
-
-David
-
+diff --git a/lib/fault-inject.c b/lib/fault-inject.c
+index 7e65af7..cd28364 100644
+--- a/lib/fault-inject.c
++++ b/lib/fault-inject.c
+@@ -131,6 +131,7 @@ bool should_fail(struct fault_attr *attr, ssize_t size)
+ 
+ 	return true;
+ }
++EXPORT_SYMBOL(should_fail);
+ 
+ #ifdef CONFIG_FAULT_INJECTION_DEBUG_FS
+ 
+@@ -311,5 +312,6 @@ fail:
+ 	cleanup_fault_attr_dentries(attr);
+ 	return -ENOMEM;
+ }
++EXPORT_SYMBOL(init_fault_attr_dentries);
+ 
+ #endif /* CONFIG_FAULT_INJECTION_DEBUG_FS */
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+1.7.4.1
