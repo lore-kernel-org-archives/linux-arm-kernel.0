@@ -1,64 +1,33 @@
 From: mturquette@ti.com (Mike Turquette)
-Date: Mon, 18 Jul 2011 17:33:22 -0700
-Subject: [PATCH 1/2] ARM: conditionally allow master CPU hotplugging
-Message-ID: <mailman.26.1311286727.20020.linux-arm-kernel@lists.infradead.org>
+Date: Tue, 19 Jul 2011 16:47:11 -0700
+Subject: [PATCH 2/2] OMAP4: Kconfig: remove hotplug control for CPU0
+Message-ID: <mailman.27.1311286727.20020.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently all CPUs are marked as hotpluggable in topology_init().  This
-is not true for all ARM SMP platforms including OMAP4.  In the OMAP4
-case, CPU0 is considered as privileged due to TrustZone software and
-other considerations.
+On OMAP4, CPU0 cannot be dynamically offlined through the usual CPU
+hotplug mechanism due to a variety of constraints.  It is treated as a
+special "master" CPU for these reasons.
 
-This patch introduces a new config option, HOTPLUG_CPU_MASTER, which
-prevents the first CPU in possible_cpu_mask from being marked
-hotpluggable if set.
+Select HOTPLUG_CPU_MASTER to prevent creation of the hotplug control
+entry in sysfs.
 
 Signed-off-by: Mike Turquette <mturquette@ti.com>
 ---
- arch/arm/Kconfig        |    8 ++++++++
- arch/arm/kernel/setup.c |    5 +++++
- 2 files changed, 13 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/Kconfig |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 9adc278..a6e34f5 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1393,6 +1393,14 @@ config HOTPLUG_CPU
- 	  Say Y here to experiment with turning CPUs off and on.  CPUs
- 	  can be controlled through /sys/devices/system/cpu.
+diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+index 4ae6257..b6199e3 100644
+--- a/arch/arm/mach-omap2/Kconfig
++++ b/arch/arm/mach-omap2/Kconfig
+@@ -51,6 +51,7 @@ config ARCH_OMAP4
+ 	select ARCH_HAS_OPP
+ 	select PM_OPP if PM
+ 	select USB_ARCH_HAS_EHCI
++	select HOTPLUG_CPU_MASTER
 
-+config HOTPLUG_CPU_MASTER
-+	bool "Prevent first CPU (master) from hotplugging"
-+	depends on HOTPLUG_CPU
-+	help
-+	  Say Y here if your platform treats the first CPU as a special
-+	  "master" CPU and cannot allow it to hotplug.  This prevents the
-+	  "online" entry in sysfs for that CPU.
-+
- config LOCAL_TIMERS
- 	bool "Use local timer interrupts"
- 	depends on SMP
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index ed11fb0..3785420 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -940,7 +940,12 @@ static int __init topology_init(void)
-
- 	for_each_possible_cpu(cpu) {
- 		struct cpuinfo_arm *cpuinfo =3D &per_cpu(cpu_data, cpu);
-+#ifdef CONFIG_HOTPLUG_CPU_MASTER
-+		if (cpu)
-+			cpuinfo->cpu.hotpluggable =3D 1;
-+#else
- 		cpuinfo->cpu.hotpluggable =3D 1;
-+#endif
- 		register_cpu(&cpuinfo->cpu, cpu);
- 	}
-
+ comment "OMAP Core Type"
+ 	depends on ARCH_OMAP2
 --=20
 1.7.4.1
-
-
-
-and,
