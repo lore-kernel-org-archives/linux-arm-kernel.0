@@ -1,168 +1,72 @@
-From: per.forlin@linaro.org (Per Forlin)
-Date: Tue, 19 Jul 2011 23:31:45 +0200
-Subject: [PATCH v2 2/3] mmc: core: add random fault injection
-In-Reply-To: <1311111106-26814-1-git-send-email-per.forlin@linaro.org>
-References: <1311111106-26814-1-git-send-email-per.forlin@linaro.org>
-Message-ID: <1311111106-26814-3-git-send-email-per.forlin@linaro.org>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Tue, 19 Jul 2011 15:34:58 -0600
+Subject: [PATCH 3/4] dt: omap3: add generic board file for dt support
+In-Reply-To: <20110718090710.GZ5783@atomide.com>
+References: <1310592975-25773-1-git-send-email-manjugk@ti.com>
+	<1310592975-25773-4-git-send-email-manjugk@ti.com>
+	<CACxGe6sELS=C==16TZ2pfrxJDDyqjS_qOwJUfwzwMO8hqo8Xag@mail.gmail.com>
+	<CAC63_iSqN=rX6MbzFWM6z+zf1Eybg3MOD=qQVdeNg5cyENhPjw@mail.gmail.com>
+	<CAC63_iTf696D6Q_EzFeUUp5R38pYNEJBkmKviEu6-yuF0y=bNA@mail.gmail.com>
+	<CACxGe6uzyxf35WDg6COnPVt3dhQv1H80L1svALxp4naySx2BcA@mail.gmail.com>
+	<20110718090710.GZ5783@atomide.com>
+Message-ID: <20110719213458.GO6848@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds support to inject data errors after a completed host transfer.
-The mmc core will return error even though the host transfer is successful.
-This simple fault injection proved to be very useful to test the
-non-blocking error handling in the mmc_blk_issue_rw_rq().
-Random faults can also test how the host driver handles pre_req()
-and post_req() in case of errors.
+On Mon, Jul 18, 2011 at 02:07:10AM -0700, Tony Lindgren wrote:
+> * Grant Likely <grant.likely@secretlab.ca> [110716 22:08]:
+> > 
+> > The way I see it, you've got two options:
+> > 
+> > 1) modify the of_platform_bus_create() to call some kind of
+> > of_platform_bus_create_omap() for devices that match "ti,omap3-device"
+> > or something.
+> > 
+> > 2) Leave of_platform_bus_create(), and instead us a notifier to attach
+> > hwmod data to normal platform devices.  omap_device_build() is
+> > actually pretty simple.  It allocated a device, it attaches
+> > platform_data and hwmod pointers to the device and registers it.
+> > omap_device_register() is just a wrapper around
+> > platform_device_register().
+> > 
+> > My preference is definitely #2, but there is a wrinkle in this
+> > approach.  Unfortunately omap_devices are not simply plain
+> > platform_devices with extra data attached, an omap_device actually
+> > embeds the platform_device inside it, which cannot be attached after
+> > the fact.  I think I had talked with Kevin (cc'd) about eliminating
+> > the embedding, but I cannot remember clearly on this point.  As long
+> > as platform_device remains embedded inside struct omap_device, #2
+> > won't work.
+> > 
+> > In either case, looking up the correct hwmod data should be easy for
+> > any device provided the omap code maintains a lookup table of
+> > compatible strings and base addresses of devices (much like auxdata).
+> > In fact, I'd be okay with extending auxdata to include OMAP fields if
+> > that would be easiest since the whole point of auxdata is to ease the
+> > transition to DT support.  When a matching device is created, the
+> > hwmod pointer can easily be attached.  This should work transparently
+> > for all omap devices, not just the i2c bus.
+> 
+> Well we should be able to automgagically build the omap_device for
+> each device tree entry.
+> 
+> And then the device driver probe and runtime PM should be able to take
+> care of the rest for the driver. And then there's no more driver
+> specific platform init code needed ;)
 
-Signed-off-by: Per Forlin <per.forlin@linaro.org>
----
- drivers/mmc/core/core.c    |   58 ++++++++++++++++++++++++++++++++++++++++++++
- drivers/mmc/core/debugfs.c |    5 ++++
- include/linux/mmc/host.h   |    3 ++
- lib/Kconfig.debug          |   11 ++++++++
- 4 files changed, 77 insertions(+), 0 deletions(-)
+Right!  That's the solution I'd like to see.
 
-diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
-index ab36c7b..3f822b4 100644
---- a/drivers/mmc/core/core.c
-+++ b/drivers/mmc/core/core.c
-@@ -23,6 +23,8 @@
- #include <linux/log2.h>
- #include <linux/regulator/consumer.h>
- #include <linux/pm_runtime.h>
-+#include <linux/fault-inject.h>
-+#include <linux/random.h>
- 
- #include <linux/mmc/card.h>
- #include <linux/mmc/host.h>
-@@ -82,6 +84,58 @@ static void mmc_flush_scheduled_work(void)
- 	flush_workqueue(workqueue);
- }
- 
-+#ifdef CONFIG_FAIL_MMC_REQUEST
-+
-+static DECLARE_FAULT_ATTR(fail_mmc_request);
-+
-+static int __init setup_fail_mmc_request(char *str)
-+{
-+	return setup_fault_attr(&fail_mmc_request, str);
-+}
-+__setup("fail_mmc_request=", setup_fail_mmc_request);
-+
-+static void mmc_should_fail_request(struct mmc_host *host,
-+				    struct mmc_request *mrq)
-+{
-+	struct mmc_command *cmd = mrq->cmd;
-+	struct mmc_data *data = mrq->data;
-+	static const int data_errors[] = {
-+		-ETIMEDOUT,
-+		-EILSEQ,
-+		-EIO,
-+	};
-+
-+	if (!data)
-+		return;
-+
-+	if (cmd->error || data->error || !host->make_it_fail ||
-+	    !should_fail(&fail_mmc_request, data->blksz * data->blocks))
-+		return;
-+
-+	data->error = data_errors[random32() % ARRAY_SIZE(data_errors)];
-+	data->bytes_xfered = (random32() % (data->bytes_xfered >> 9)) << 9;
-+}
-+
-+static int __init fail_mmc_request_debugfs(void)
-+{
-+	return init_fault_attr_dentries(&fail_mmc_request,
-+					"fail_mmc_request");
-+}
-+
-+#else /* CONFIG_FAIL_MMC_REQUEST */
-+
-+static void mmc_should_fail_request(struct mmc_host *host,
-+				    struct mmc_request *mrq)
-+{
-+}
-+
-+static int __init fail_mmc_request_debugfs(void)
-+{
-+	return 0;
-+}
-+#endif /* CONFIG_FAIL_MMC_REQUEST */
-+
-+
- /**
-  *	mmc_request_done - finish processing an MMC request
-  *	@host: MMC host which completed request
-@@ -108,6 +162,8 @@ void mmc_request_done(struct mmc_host *host, struct mmc_request *mrq)
- 		cmd->error = 0;
- 		host->ops->request(host, mrq);
- 	} else {
-+		mmc_should_fail_request(host, mrq);
-+
- 		led_trigger_event(host->led, LED_OFF);
- 
- 		pr_debug("%s: req done (CMD%u): %d: %08x %08x %08x %08x\n",
-@@ -2064,6 +2120,8 @@ static int __init mmc_init(void)
- 	if (ret)
- 		goto unregister_host_class;
- 
-+	fail_mmc_request_debugfs();
-+
- 	return 0;
- 
- unregister_host_class:
-diff --git a/drivers/mmc/core/debugfs.c b/drivers/mmc/core/debugfs.c
-index 998797e..588e76f 100644
---- a/drivers/mmc/core/debugfs.c
-+++ b/drivers/mmc/core/debugfs.c
-@@ -188,6 +188,11 @@ void mmc_add_host_debugfs(struct mmc_host *host)
- 				root, &host->clk_delay))
- 		goto err_node;
- #endif
-+#ifdef CONFIG_FAIL_MMC_REQUEST
-+	if (!debugfs_create_u8("make-it-fail", S_IRUSR | S_IWUSR,
-+			       root, &host->make_it_fail))
-+		goto err_node;
-+#endif
- 	return;
- 
- err_node:
-diff --git a/include/linux/mmc/host.h b/include/linux/mmc/host.h
-index 771455f..250b46d 100644
---- a/include/linux/mmc/host.h
-+++ b/include/linux/mmc/host.h
-@@ -303,6 +303,9 @@ struct mmc_host {
- 
- 	struct mmc_async_req	*areq;		/* active async req */
- 
-+#ifdef CONFIG_FAIL_MMC_REQUEST
-+	u8			make_it_fail;
-+#endif
- 	unsigned long		private[0] ____cacheline_aligned;
- };
- 
-diff --git a/lib/Kconfig.debug b/lib/Kconfig.debug
-index c768bcd..c2d1423 100644
---- a/lib/Kconfig.debug
-+++ b/lib/Kconfig.debug
-@@ -1057,6 +1057,17 @@ config FAIL_IO_TIMEOUT
- 	  Only works with drivers that use the generic timeout handling,
- 	  for others it wont do anything.
- 
-+config FAIL_MMC_REQUEST
-+	bool "Fault-injection capability for MMC IO"
-+	select DEBUG_FS
-+	depends on FAULT_INJECTION && MMC
-+	help
-+	  Provide fault-injection capability for MMC IO.
-+	  This will make the mmc core return data errors. This is
-+	  useful to test the error handling in the mmc block device
-+	  and to test how the mmc host driver handles retries from
-+	  the block device.
-+
- config FAULT_INJECTION_DEBUG_FS
- 	bool "Debugfs entries for fault-injection capabilities"
- 	depends on FAULT_INJECTION && SYSFS && DEBUG_FS
--- 
-1.7.4.1
+> How about if we just have the hwmod code call omap_device_build for
+> each device tree entry?
+
+I think that is pretty much equivalent to suggestion #1 above, only
+I'm suggesting to take advantage of the infrastructure already
+available in driver/of/platform.c in the form of
+of_platform_populate().  The "of_platform_bus_create_omap()" function
+suggested above I assumed would directly call omap_device_build().
+
+There are already hooks in the _populate call path to handle the
+creation of amba_devices.  I have no problem doing the same thing for
+omap devices.
+
+g.
