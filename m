@@ -1,41 +1,50 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Tue, 19 Jul 2011 10:58:37 +0800
-Subject: [alsa-devel] [PATCH v3 00/10] ARM: mxs: add audio support
-In-Reply-To: <20110719014946.GD3838@S2100-06.ap.freescale.net>
-References: <1310731780-1645-1-git-send-email-b29396@freescale.com>
-	<20110718203816.GA9457@pengutronix.de>
-	<20110719014946.GD3838@S2100-06.ap.freescale.net>
-Message-ID: <CAA+hA=TEOtt7-CXjzwRMSYEtLbBEOy1Te7vfJOXsso695zLjNw@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 19 Jul 2011 11:34:04 +0800
+Subject: [PATCH] gpio/mxc/mxs: fix build error introduced by the reanming of
+	irq_gc_ack()
+Message-ID: <1311046444-25423-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/7/19 Shawn Guo <shawn.guo@freescale.com>:
-> On Mon, Jul 18, 2011 at 10:38:16PM +0200, Wolfram Sang wrote:
->> On Fri, Jul 15, 2011 at 08:09:30PM +0800, Dong Aisheng wrote:
->>
->> > This patch series is to add audio support based on saif for mxs platform.
->> > The driver only supports playback currently.
->> > For capturing, due to hardware limitation that we have to use two saif
->> > instances to implement full duplex (playback & recording), we need to
->> > figure out a good design to fit in ASoC as the following work.
->>
->> So, since the codec problems seem to be resolved now (and they were luckily
->> really just codec-problems):
->>
->> For the ASoC-patches (1-4):
->>
->> Tested-by: Wolfram Sang <w.sang@pengutronix.de>
->>
->> For the mach-mxs-Patches (5-9, 10 is already picked up), assuming patch 6 will
->> lose the DIGCTRL-handling:
->>
->> Reviewed-by: Wolfram Sang <w.sang@pengutronix.de>
->>
->> I think this series is good for 3.1. Now we just need the mxs-dma bugfix on
->> top, but that's a different patch...
->>
-> Just to be clear, ?Aisheng, you will submit the mxs-dma fix, right?
-Yes, i'll send it now.
+The following commit renames irq_gc_ack() to irq_gc_ack_set_bit(),
+and makes gpio-mxc and gpio-mxs fail to build.
 
-Regards
-Dong Aisheng
+  659fb32d1b67476f4ade25e9ea0e2642a5b9c4b5
+  genirq: replace irq_gc_ack() with {set,clr}_bit variants (fwd)
+
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+The build error is being seen on linux-next.
+
+ drivers/gpio/gpio-mxc.c |    2 +-
+ drivers/gpio/gpio-mxs.c |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/gpio/gpio-mxc.c b/drivers/gpio/gpio-mxc.c
+index 89fda58..4a46fbe 100644
+--- a/drivers/gpio/gpio-mxc.c
++++ b/drivers/gpio/gpio-mxc.c
+@@ -297,7 +297,7 @@ static void __init mxc_gpio_init_gc(struct mxc_gpio_port *port)
+ 	gc->private = port;
+ 
+ 	ct = gc->chip_types;
+-	ct->chip.irq_ack = irq_gc_ack,
++	ct->chip.irq_ack = irq_gc_ack_set_bit,
+ 	ct->chip.irq_mask = irq_gc_mask_clr_bit;
+ 	ct->chip.irq_unmask = irq_gc_mask_set_bit;
+ 	ct->chip.irq_set_type = gpio_set_irq_type;
+diff --git a/drivers/gpio/gpio-mxs.c b/drivers/gpio/gpio-mxs.c
+index d8cafba..88f8506 100644
+--- a/drivers/gpio/gpio-mxs.c
++++ b/drivers/gpio/gpio-mxs.c
+@@ -156,7 +156,7 @@ static void __init mxs_gpio_init_gc(struct mxs_gpio_port *port)
+ 	gc->private = port;
+ 
+ 	ct = gc->chip_types;
+-	ct->chip.irq_ack = irq_gc_ack,
++	ct->chip.irq_ack = irq_gc_ack_set_bit,
+ 	ct->chip.irq_mask = irq_gc_mask_clr_bit;
+ 	ct->chip.irq_unmask = irq_gc_mask_set_bit;
+ 	ct->chip.irq_set_type = mxs_gpio_set_irq_type;
+-- 
+1.7.4.1
