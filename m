@@ -1,44 +1,39 @@
-From: ralf@linux-mips.org (Ralf Baechle)
-Date: Tue, 19 Jul 2011 11:34:27 +0100
-Subject: [PATCH v2 1/2] irq: add irq_domain translation infrastructure
-In-Reply-To: <20110718223140.1911.80783.stgit@ponder>
-References: <20110718222610.1911.5673.stgit@ponder>
-	<20110718223140.1911.80783.stgit@ponder>
-Message-ID: <20110719103426.GA31394@linux-mips.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 19 Jul 2011 11:43:08 +0100
+Subject: [RFC] Improving scalability of smp_mb__[before|after]_clear_bit
+In-Reply-To: <CAN_5kQAniGQgLix4nAsLpJZ3r=LR_NDjuvaXokJ=NiwLfp=7zw@mail.gmail.com>
+References: <CAN_5kQAniGQgLix4nAsLpJZ3r=LR_NDjuvaXokJ=NiwLfp=7zw@mail.gmail.com>
+Message-ID: <20110719104308.GD26574@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 18, 2011 at 04:31:40PM -0600, Grant Likely wrote:
+On Tue, Jul 12, 2011 at 12:34:59AM -0700, heechul Yun wrote:
+> I think L2 cache sync operation, called by mb(), is not necessary for bitops.
+> This patch improves lat_pagefault of lmbench by up to 11% on a A9 SMP.
+> Higher proceesor
+> counts can benefit more.
 
-> This patch adds irq_domain infrastructure for translating from
-> hardware irq numbers to linux irqs.  This is particularly important
-> for architectures adding device tree support because the current
-> implementation (excluding PowerPC and SPARC) cannot handle
-> translation for more than a single interrupt controller.  irq_domain
-> supports device tree translation for any number of interrupt
-> controllers.
+bitops should only be used on normal memory and not for stuff used for IO,
+so this should be safe.
+
+Could you submit it to the patch system please with Catalins ack?
+
+Thanks.
+
 > 
-> This patch converts x86, Microblaze, ARM and MIPS to use irq_domain
-> for device tree irq translation.  x86 is untested beyond compiling it,
-> irq_domain is enabled for MIPS and Microblaze, but the old behaviour is
-> preserved until the core code is modified to actually register an
-> irq_domain yet.  On ARM it works and is required for much of the new
-> ARM device tree board support.
+> ---
+> diff --git a/arch/arm/include/asm/bitops.h b/arch/arm/include/asm/bitops.h
+> index b4892a0..f428059 100644
+> --- a/arch/arm/include/asm/bitops.h
+> +++ b/arch/arm/include/asm/bitops.h
+> @@ -26,8 +26,8 @@
+>  #include <linux/compiler.h>
+>  #include <asm/system.h>
 > 
-> PowerPC has /not/ been converted to use this new infrastructure.  It
-> is still missing some features before it can replace the virq
-> infrastructure already in powerpc (see documentation on
-> irq_domain_map/unmap for details).  Followup patches will add the
-> missing pieces and migrate PowerPC to use irq_domain.
+> -#define smp_mb__before_clear_bit()     mb()
+> -#define smp_mb__after_clear_bit()      mb()
+> +#define smp_mb__before_clear_bit()     smp_mb()
+> +#define smp_mb__after_clear_bit()      smp_mb()
 > 
-> SPARC has its own method of managing interrupts from the device tree
-> and is unaffected by this change.
-
-I like it - yet another building block of the conversion of MIPS to DT in
-place.
-
-Acked-by: Ralf Baechle <ralf@linux-mips.org>
-
-Thanks,
-
-  Ralf
+>  /*
+>   * These functions are the basis of our bit ops.
