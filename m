@@ -1,34 +1,27 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 19 Jul 2011 17:38:22 +0200
-Subject: [GIT PULL] arm-soc: last minute arm/davinci fixes for 3.0
-In-Reply-To: <20110719145133.GA28651@trinity.fluff.org>
-References: <201107191606.26837.arnd@arndb.de>
-	<20110719145133.GA28651@trinity.fluff.org>
-Message-ID: <201107191738.22695.arnd@arndb.de>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 19 Jul 2011 16:40:03 +0100
+Subject: [PATCH v3 1/6] Samsung SoC ADC: use regulator (VDD for ADC).
+In-Reply-To: <037301cc4376$3d7f5a20$b87e0e60$%kim@samsung.com>
+References: <1309420175-10301-1-git-send-email-myungjoo.ham@samsung.com>
+	<1309420175-10301-2-git-send-email-myungjoo.ham@samsung.com>
+	<201106301122.50800.anarsoul@gmail.com>
+	<20110630160501.GG3249@opensource.wolfsonmicro.com>
+	<037301cc4376$3d7f5a20$b87e0e60$%kim@samsung.com>
+Message-ID: <20110719154003.GK9652@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 19 July 2011, Ben Dooks wrote:
-> > Ido Yariv (1):
-> >       arm: davinci: Fix low level gpio irq handlers' argument
-> > 
-> > Jon Povey (1):
-> >       davinci: DM365 EVM: fix video input mux bits
-> > 
-> > Todd Poynor (1):
-> >       ARM: davinci: Check for NULL return from irq_alloc_generic_chip
-> 
-> any chance we could get a standardisation on the prefix for the
-> commit messages please?
+On Sat, Jul 16, 2011 at 02:07:13PM +0900, Kukjin Kim wrote:
+> Mark Brown wrote:
 
-That sounds like a good idea for the future. My preference would
-be yet another style, 'arm/davinci: ...', but that is not as
-common on ARM today as it is on other architectures.
+> > If there isn't a separate supply for the regulators on S3C24xx devices
+> > then I guess the best option is to provide that supply as a dummy
+> > regulator in the s3c24xx core code.
 
-Statistically, 'ARM: davinci: ...' is the most common style today
-across ARM platforms, followed by 'davinci: ...'. If nobody has
-strong objections, I'll ask people to do the former in the future,
-but I won't make it a requirement until there is a very strong
-bias towards that style.
+> OK, but it means I can't apply this until adding a dummy regulator for
+> S3C24XX?
 
-	Arnd
+That could always come later as a bug fix :)  The regulator API does
+have a couple of methods of substituting in a dummy regulator itself,
+though it does complain a bit, so it should mostly be a simple config
+change to work around on affected systems.
