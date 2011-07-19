@@ -1,96 +1,176 @@
-From: myungjoo.ham@samsung.com (MyungJoo Ham)
-Date: Tue, 19 Jul 2011 15:04:10 +0900
-Subject: [PATCH v2 2/2] ARM: EXYNOS4: Add more registers to be saved and
-	restored for PM
-In-Reply-To: <CAJ0PZbRsnO-W4P=3kZvcSn+st4p38ARjsE458TzSreHAche1gw@mail.gmail.com>
-References: <CAJ0PZbRsnO-W4P=3kZvcSn+st4p38ARjsE458TzSreHAche1gw@mail.gmail.com>
-Message-ID: <1311055450-11751-1-git-send-email-myungjoo.ham@samsung.com>
+From: per.forlin@linaro.org (Per Forlin)
+Date: Tue, 19 Jul 2011 08:17:02 +0200
+Subject: [PATCH v9 11/12] mmc: core: add random fault injection
+In-Reply-To: <1309539333-2606-12-git-send-email-per.forlin@linaro.org>
+References: <1309539333-2606-1-git-send-email-per.forlin@linaro.org>
+	<1309539333-2606-12-git-send-email-per.forlin@linaro.org>
+Message-ID: <CAJ0pr19Ktx_R8Zmr=rDivhc5A__N7OwoSj3ehitX_pS_xmooSA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need more registers to be saved and restored for PM of Exynos4210.
-Otherwise, with additional drivers running, suspend-to-RAM fails to wake
-up properly. This patch adds registers omitted in the initial PM
-patches.
+This patch prevents mmc core to be built as a module if mmc fault
+injection is selected.
 
-Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
---
-Changed from v1
-- removed unnecessary registers
-- As the patch 1/2 is not changed, it is not re-sent.
+Changes needed to resolve this:
+ * remove fault inject module from core.c
+ * export should_fail() and init_fault_attr_dentries() in fault-injection.c
+ * update documentation fault-injection.txt
 
----
- arch/arm/mach-exynos4/pm.c |   15 ++++++++++++++-
- 1 files changed, 14 insertions(+), 1 deletions(-)
+On 1 July 2011 18:55, Per Forlin <per.forlin@linaro.org> wrote:
+> This simple fault injection proved to be very useful to
+> test the error handling in the block.c rw_rq(). It may
+> still be useful to test if the host driver handle
+> pre_req() and post_req() correctly in case of errors.
+>
+> Signed-off-by: Per Forlin <per.forlin@linaro.org>
+> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> Reviewed-by: Venkatraman S <svenkatr@ti.com>
+> Tested-by: Sourav Poddar<sourav.poddar@ti.com>
+> Tested-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ?drivers/mmc/core/core.c ? ?| ? 54 ++++++++++++++++++++++++++++++++++++++++++++
+> ?drivers/mmc/core/debugfs.c | ? ?5 ++++
+> ?include/linux/mmc/host.h ? | ? ?3 ++
+> ?lib/Kconfig.debug ? ? ? ? ?| ? 11 +++++++++
+> ?4 files changed, 73 insertions(+), 0 deletions(-)
+>
+> diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
+> index d2d7239..62a8cc7 100644
+> --- a/drivers/mmc/core/core.c
+> +++ b/drivers/mmc/core/core.c
+> @@ -23,6 +23,8 @@
+> ?#include <linux/log2.h>
+> ?#include <linux/regulator/consumer.h>
+> ?#include <linux/pm_runtime.h>
+> +#include <linux/fault-inject.h>
+> +#include <linux/random.h>
+>
+> ?#include <linux/mmc/card.h>
+> ?#include <linux/mmc/host.h>
+> @@ -82,6 +84,56 @@ static void mmc_flush_scheduled_work(void)
+> ? ? ? ?flush_workqueue(workqueue);
+> ?}
+>
+> +#ifdef CONFIG_FAIL_MMC_REQUEST
+> +
+> +static DECLARE_FAULT_ATTR(fail_mmc_request);
+> +
+> +static int __init setup_fail_mmc_request(char *str)
+> +{
+> + ? ? ? return setup_fault_attr(&fail_mmc_request, str);
+> +}
+> +__setup("fail_mmc_request=", setup_fail_mmc_request);
+> +
+> +static void mmc_should_fail_request(struct mmc_host *host,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct mmc_request *mrq)
+> +{
+> + ? ? ? struct mmc_command *cmd = mrq->cmd;
+> + ? ? ? struct mmc_data *data = mrq->data;
+> + ? ? ? static const int data_errors[] = {
+> + ? ? ? ? ? ? ? -ETIMEDOUT,
+> + ? ? ? ? ? ? ? -EILSEQ,
+> + ? ? ? ? ? ? ? -EIO,
+> + ? ? ? };
+> +
+> + ? ? ? if (!data)
+> + ? ? ? ? ? ? ? return;
+> +
+> + ? ? ? if (cmd->error || data->error || !host->make_it_fail ||
+> + ? ? ? ? ? !should_fail(&fail_mmc_request, data->blksz * data->blocks))
+> + ? ? ? ? ? ? ? return;
+> +
+> + ? ? ? data->error = data_errors[random32() % ARRAY_SIZE(data_errors)];
+> + ? ? ? data->bytes_xfered = (random32() % (data->bytes_xfered >> 9)) << 9;
+> +}
+> +
+> +static int __init fail_mmc_request_debugfs(void)
+> +{
+> + ? ? ? return init_fault_attr_dentries(&fail_mmc_request,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "fail_mmc_request");
+> +}
+> +
+> +late_initcall(fail_mmc_request_debugfs);
+This line prevents mmc core to be built as a module, since there will
+be two init_module (the mmc core one and this one) for the same
+module.
 
-diff --git a/arch/arm/mach-exynos4/pm.c b/arch/arm/mach-exynos4/pm.c
-index a103c13..5d6f768 100644
---- a/arch/arm/mach-exynos4/pm.c
-+++ b/arch/arm/mach-exynos4/pm.c
-@@ -27,6 +27,7 @@
- #include <plat/cpu.h>
- #include <plat/pm.h>
- #include <plat/pll.h>
-+#include <plat/regs-srom.h>
- 
- #include <mach/regs-irq.h>
- #include <mach/regs-gpio.h>
-@@ -67,7 +68,9 @@ static struct sleep_save exynos4_core_save[] = {
- 	SAVE_ITEM(S5P_CLKSRC_TOP0),
- 	SAVE_ITEM(S5P_CLKSRC_TOP1),
- 	SAVE_ITEM(S5P_CLKSRC_CAM),
-+	SAVE_ITEM(S5P_CLKSRC_TV),
- 	SAVE_ITEM(S5P_CLKSRC_MFC),
-+	SAVE_ITEM(S5P_CLKSRC_G3D),
- 	SAVE_ITEM(S5P_CLKSRC_IMAGE),
- 	SAVE_ITEM(S5P_CLKSRC_LCD0),
- 	SAVE_ITEM(S5P_CLKSRC_LCD1),
-@@ -94,6 +97,7 @@ static struct sleep_save exynos4_core_save[] = {
- 	SAVE_ITEM(S5P_CLKDIV_PERIL4),
- 	SAVE_ITEM(S5P_CLKDIV_PERIL5),
- 	SAVE_ITEM(S5P_CLKDIV_TOP),
-+	SAVE_ITEM(S5P_CLKSRC_MASK_TOP),
- 	SAVE_ITEM(S5P_CLKSRC_MASK_CAM),
- 	SAVE_ITEM(S5P_CLKSRC_MASK_TV),
- 	SAVE_ITEM(S5P_CLKSRC_MASK_LCD0),
-@@ -102,6 +106,7 @@ static struct sleep_save exynos4_core_save[] = {
- 	SAVE_ITEM(S5P_CLKSRC_MASK_FSYS),
- 	SAVE_ITEM(S5P_CLKSRC_MASK_PERIL0),
- 	SAVE_ITEM(S5P_CLKSRC_MASK_PERIL1),
-+	SAVE_ITEM(S5P_CLKDIV2_RATIO),
- 	SAVE_ITEM(S5P_CLKGATE_SCLKCAM),
- 	SAVE_ITEM(S5P_CLKGATE_IP_CAM),
- 	SAVE_ITEM(S5P_CLKGATE_IP_TV),
-@@ -122,8 +127,10 @@ static struct sleep_save exynos4_core_save[] = {
- 	SAVE_ITEM(S5P_CLKGATE_IP_DMC),
- 	SAVE_ITEM(S5P_CLKSRC_CPU),
- 	SAVE_ITEM(S5P_CLKDIV_CPU),
-+	SAVE_ITEM(S5P_CLKDIV_CPU + 0x4),
- 	SAVE_ITEM(S5P_CLKGATE_SCLKCPU),
- 	SAVE_ITEM(S5P_CLKGATE_IP_CPU),
-+
- 	/* GIC side */
- 	SAVE_ITEM(S5P_VA_GIC_CPU + 0x000),
- 	SAVE_ITEM(S5P_VA_GIC_CPU + 0x004),
-@@ -232,11 +239,17 @@ static struct sleep_save exynos4_core_save[] = {
- 	SAVE_ITEM(S5P_VA_GIC_DIST + 0xC20),
- 	SAVE_ITEM(S5P_VA_GIC_DIST + 0xC24),
- 
--
- 	SAVE_ITEM(S5P_VA_COMBINER_BASE + 0x000),
- 	SAVE_ITEM(S5P_VA_COMBINER_BASE + 0x010),
- 	SAVE_ITEM(S5P_VA_COMBINER_BASE + 0x020),
- 	SAVE_ITEM(S5P_VA_COMBINER_BASE + 0x030),
-+
-+	/* SROM side */
-+	SAVE_ITEM(S5P_SROM_BW),
-+	SAVE_ITEM(S5P_SROM_BC0),
-+	SAVE_ITEM(S5P_SROM_BC1),
-+	SAVE_ITEM(S5P_SROM_BC2),
-+	SAVE_ITEM(S5P_SROM_BC3),
- };
- 
- static struct sleep_save exynos4_l2cc_save[] = {
--- 
-1.7.4.1
+> +
+> +#else /* CONFIG_FAIL_MMC_REQUEST */
+> +
+> +static void mmc_should_fail_request(struct mmc_host *host,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct mmc_request *mrq)
+> +{
+> +}
+> +
++static int __init fail_mmc_request_debugfs(void)
++{
++}
+Add fail_mmc_request_debugfs here and call it from mmc_init()
+
+> +#endif /* CONFIG_FAIL_MMC_REQUEST */
+> +
+> +
+> ?/**
+> ?* ? ? mmc_request_done - finish processing an MMC request
+> ?* ? ? @host: MMC host which completed request
+> @@ -108,6 +160,8 @@ void mmc_request_done(struct mmc_host *host, struct mmc_request *mrq)
+> ? ? ? ? ? ? ? ?cmd->error = 0;
+> ? ? ? ? ? ? ? ?host->ops->request(host, mrq);
+> ? ? ? ?} else {
+> + ? ? ? ? ? ? ? mmc_should_fail_request(host, mrq);
+> +
+> ? ? ? ? ? ? ? ?led_trigger_event(host->led, LED_OFF);
+>
+> ? ? ? ? ? ? ? ?pr_debug("%s: req done (CMD%u): %d: %08x %08x %08x %08x\n",
+> diff --git a/drivers/mmc/core/debugfs.c b/drivers/mmc/core/debugfs.c
+> index 998797e..588e76f 100644
+> --- a/drivers/mmc/core/debugfs.c
+> +++ b/drivers/mmc/core/debugfs.c
+> @@ -188,6 +188,11 @@ void mmc_add_host_debugfs(struct mmc_host *host)
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?root, &host->clk_delay))
+> ? ? ? ? ? ? ? ?goto err_node;
+> ?#endif
+> +#ifdef CONFIG_FAIL_MMC_REQUEST
+> + ? ? ? if (!debugfs_create_u8("make-it-fail", S_IRUSR | S_IWUSR,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?root, &host->make_it_fail))
+> + ? ? ? ? ? ? ? goto err_node;
+> +#endif
+> ? ? ? ?return;
+>
+> ?err_node:
+> diff --git a/include/linux/mmc/host.h b/include/linux/mmc/host.h
+> index 59db6f2..0d0a48f 100644
+> --- a/include/linux/mmc/host.h
+> +++ b/include/linux/mmc/host.h
+> @@ -301,6 +301,9 @@ struct mmc_host {
+>
+> ? ? ? ?struct mmc_async_req ? ?*areq; ? ? ? ? ?/* active async req */
+>
+> +#ifdef CONFIG_FAIL_MMC_REQUEST
+> + ? ? ? u8 ? ? ? ? ? ? ? ? ? ? ?make_it_fail;
+> +#endif
+> ? ? ? ?unsigned long ? ? ? ? ? private[0] ____cacheline_aligned;
+> ?};
+>
+> diff --git a/lib/Kconfig.debug b/lib/Kconfig.debug
+> index c768bcd..330fc70 100644
+> --- a/lib/Kconfig.debug
+> +++ b/lib/Kconfig.debug
+> @@ -1057,6 +1057,17 @@ config FAIL_IO_TIMEOUT
+> ? ? ? ? ?Only works with drivers that use the generic timeout handling,
+> ? ? ? ? ?for others it wont do anything.
+>
+> +config FAIL_MMC_REQUEST
+> + ? ? ? bool "Fault-injection capability for MMC IO"
+> + ? ? ? select DEBUG_FS
+> + ? ? ? depends on FAULT_INJECTION
+depends on FAULT_INJECTION && MMC
+
+> + ? ? ? help
+> + ? ? ? ? Provide fault-injection capability for MMC IO.
+> + ? ? ? ? This will make the mmc core return data errors. This is
+> + ? ? ? ? useful for testing the error handling in the mmc block device
+> + ? ? ? ? and how the mmc host driver handle retries from
+> + ? ? ? ? the block device.
+and test how the mmc host driver handle retries from
