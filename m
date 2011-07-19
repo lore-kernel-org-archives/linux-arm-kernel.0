@@ -1,34 +1,64 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Tue, 19 Jul 2011 12:36:20 +0800
-Subject: [PATCH v4 08/10] ARM: mxs: add mxs-sgtl5000 device
-In-Reply-To: <1310731780-1645-9-git-send-email-b29396@freescale.com>
-References: <1310731780-1645-9-git-send-email-b29396@freescale.com>
-Message-ID: <1311050180-22355-1-git-send-email-b29396@freescale.com>
+From: manjunath.hadli@ti.com (Hadli, Manjunath)
+Date: Tue, 19 Jul 2011 10:59:49 +0530
+Subject: [PATCH] davinci: fix DM365 EVM video input mux bits
+In-Reply-To: <1311046211-2849-1-git-send-email-jon.povey@racelogic.co.uk>
+References: <1311046211-2849-1-git-send-email-jon.povey@racelogic.co.uk>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024BCEF73E@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Dong Aisheng <b29396@freescale.com>
-Reviewed-by: Wolfram Sang <w.sang@pengutronix.de>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
----
-Just resend for rebase [PATCH v4 06/10] ARM: mxs: add saif device
----
- arch/arm/mach-mxs/mach-mx28evk.c |    3 +++
- 1 files changed, 3 insertions(+), 0 deletions(-)
+Jon,
 
-diff --git a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
-index fe5ea41..521c4d5 100644
---- a/arch/arm/mach-mxs/mach-mx28evk.c
-+++ b/arch/arm/mach-mxs/mach-mx28evk.c
-@@ -424,6 +424,9 @@ static void __init mx28evk_init(void)
- 	i2c_register_board_info(0, mxs_i2c0_board_info,
- 				ARRAY_SIZE(mxs_i2c0_board_info));
- 
-+	mxs_add_platform_device("mxs-sgtl5000", 0, NULL, 0,
-+			NULL, 0);
-+
- 	/* power on mmc slot by writing 0 to the gpio */
- 	ret = gpio_request_one(MX28EVK_MMC0_SLOT_POWER, GPIOF_OUT_INIT_LOW,
- 			       "mmc0-slot-power");
--- 
-1.7.0.4
+The fix looks correct. As a part of a different implementation which will go soon upstream, this has been taken care of, where we have used macros 
+CPLD_VIDEO_INPUT_MUX_TVP7002    0x1
+CPLD_VIDEO_INPUT_MUX_IMAGER     0x2
+
+So, if you can do the same, it will look better.
+
+Thanks,
+-Manju
+
+
+On Tue, Jul 19, 2011 at 09:00:11, Jon Povey wrote:
+> Video input mux settings for tvp7002 and imager inputs were swapped.
+> Comment was correct.
+> 
+> Tested on EVM with tvp7002 input.
+> 
+> Signed-off-by: Jon Povey <jon.povey@racelogic.co.uk>
+> ---
+> As a bugfix maybe this should try to get into 3.0?
+> 
+>  arch/arm/mach-davinci/board-dm365-evm.c |    4 ++--
+>  1 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-davinci/board-dm365-evm.c b/arch/arm/mach-davinci/board-dm365-evm.c
+> index c67f684..09a87e6 100644
+> --- a/arch/arm/mach-davinci/board-dm365-evm.c
+> +++ b/arch/arm/mach-davinci/board-dm365-evm.c
+> @@ -520,7 +520,7 @@ fail:
+>  	 */
+>  	if (have_imager()) {
+>  		label = "HD imager";
+> -		mux |= 1;
+> +		mux |= 2;
+>  
+>  		/* externally mux MMC1/ENET/AIC33 to imager */
+>  		mux |= BIT(6) | BIT(5) | BIT(3);
+> @@ -540,7 +540,7 @@ fail:
+>  		resets &= ~BIT(1);
+>  
+>  		if (have_tvp7002()) {
+> -			mux |= 2;
+> +			mux |= 1;
+>  			resets &= ~BIT(2);
+>  			label = "tvp7002 HD";
+>  		} else {
+> --
+> 1.6.3.3
+> 
+> _______________________________________________
+> Davinci-linux-open-source mailing list
+> Davinci-linux-open-source at linux.davincidsp.com
+> http://linux.davincidsp.com/mailman/listinfo/davinci-linux-open-source
+> 
