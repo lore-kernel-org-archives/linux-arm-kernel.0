@@ -1,143 +1,149 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 19 Jul 2011 13:43:37 -0600
-Subject: [PATCH 6/7] i2c: pxa: support i2c controller from DT
-In-Reply-To: <1311042290-20253-7-git-send-email-haojian.zhuang@marvell.com>
-References: <2011071901>
-	<1311042290-20253-1-git-send-email-haojian.zhuang@marvell.com>
+Date: Tue, 19 Jul 2011 13:47:54 -0600
+Subject: [PATCH 7/7] i2c: pxa: support to parse property
+In-Reply-To: <CAMPhdO-qjR0LSjvMm7hbdqZyrFxa5S8JVa1FO8sDsxOdyUV9Ng@mail.gmail.com>
+References: <1311042290-20253-1-git-send-email-haojian.zhuang@marvell.com>
 	<1311042290-20253-2-git-send-email-haojian.zhuang@marvell.com>
 	<1311042290-20253-3-git-send-email-haojian.zhuang@marvell.com>
 	<1311042290-20253-4-git-send-email-haojian.zhuang@marvell.com>
 	<1311042290-20253-5-git-send-email-haojian.zhuang@marvell.com>
 	<1311042290-20253-6-git-send-email-haojian.zhuang@marvell.com>
 	<1311042290-20253-7-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <20110719194337.GJ6848@ponder.secretlab.ca>
+	<1311042290-20253-8-git-send-email-haojian.zhuang@marvell.com>
+	<CAMPhdO-qjR0LSjvMm7hbdqZyrFxa5S8JVa1FO8sDsxOdyUV9Ng@mail.gmail.com>
+Message-ID: <20110719194754.GL6848@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 19, 2011 at 10:24:49AM +0800, Haojian Zhuang wrote:
-> support i2c-pxa controller from DT.
+On Tue, Jul 19, 2011 at 06:17:21PM +0800, Eric Miao wrote:
+> On Tue, Jul 19, 2011 at 10:24 AM, Haojian Zhuang
+> <haojian.zhuang@marvell.com> wrote:
+> > Support to parse some optional properties. These three properties are
+> > i2c-polling, i2c-frequency, i2c-class.
+> >
+> > After supporting these property, i2c-pxa driver can avoid to use platform
+> > data except for slave mode.
+> >
+> > Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+> > ---
+> > ?.../devicetree/bindings/i2c/pxa255-i2c.txt ? ? ? ? | ? 36 ++++++++++++++++++++
+> > ?drivers/i2c/busses/i2c-pxa.c ? ? ? ? ? ? ? ? ? ? ? | ? 22 ++++++++----
+> > ?2 files changed, 51 insertions(+), 7 deletions(-)
+> > ?create mode 100644 Documentation/devicetree/bindings/i2c/pxa255-i2c.txt
+> >
+> > diff --git a/Documentation/devicetree/bindings/i2c/pxa255-i2c.txt b/Documentation/devicetree/bindings/i2c/pxa255-i2c.txt
+> > new file mode 100644
+> > index 0000000..bf34236
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/i2c/pxa255-i2c.txt
+> > @@ -0,0 +1,36 @@
+> > +PXA255 I2C
+> > +
+> > +The I2C-Controller is first used in PXA255. It's widely used in Intel/Marvell
+> > +silicons.
+> > +
+> > +Optional Property:
+> > + ? ? ? - i2c-polling: Specifies whether I2C-Controller is used in polling
+> > + ? ? ? ? mode or interrupt mode. The type of property should be <u32>.
+> > +
+> > + ? ? ? - i2c-frequency: Specifies the frequency that the I2C-Controller
+> > + ? ? ? ? is working. The type of property should be <string>.
+> > +
+> > + ? ? ? - i2c-class: Specifies the class of I2C-Controller. The type of
+> > + ? ? ? ? property should be <u32>.
+> > +
+> > +Example:
+> > + ? ? ? i2c0: i2c at d4011000 {
+> > + ? ? ? ? ? ? ? compatible = "pxa2xx-i2c";
+> > + ? ? ? ? ? ? ? #address-cells = <1>;
+> > + ? ? ? ? ? ? ? #size-cells = <0>;
+> > + ? ? ? ? ? ? ? reg = <0xd4011000 0x60>;
+> > + ? ? ? ? ? ? ? /* I2C-Controller works in interrupt mode. */
+> > + ? ? ? ? ? ? ? i2c-polling = <0>;
+> > + ? ? ? ? ? ? ? /* I2C-Controller's frequency is FAST. */
+> > + ? ? ? ? ? ? ? i2c-frequency = "fast";
+> > + ? ? ? ? ? ? ? /* interrupt of I2C-Controller */
+> > + ? ? ? ? ? ? ? interrupts = <7>;
+> > + ? ? ? ? ? ? ? interrupt-parent = <&mmp_intc>;
+> > +
+> > + ? ? ? ? ? ? ? pm860x: pmic at 34 {
+> > + ? ? ? ? ? ? ? ? ? ? ? interrupt-controller;
+> > + ? ? ? ? ? ? ? ? ? ? ? /* interrupt of pm860x */
+> > + ? ? ? ? ? ? ? ? ? ? ? interrupts = <4>;
+> > + ? ? ? ? ? ? ? ? ? ? ? interrupt-parent = <&mmp_intc>;
+> > + ? ? ? ? ? ? ? };
+> > + ? ? ? };
+> > diff --git a/drivers/i2c/busses/i2c-pxa.c b/drivers/i2c/busses/i2c-pxa.c
+> > index adac74a..4b9fa71 100644
+> > --- a/drivers/i2c/busses/i2c-pxa.c
+> > +++ b/drivers/i2c/busses/i2c-pxa.c
+> > @@ -1060,7 +1060,8 @@ static int i2c_pxa_probe(struct platform_device *dev)
+> > ? ? ? ?const struct platform_device_id *id = platform_get_device_id(dev);
+> > ? ? ? ?enum pxa_i2c_types i2c_type;
+> > ? ? ? ?struct resource *res;
+> > - ? ? ? int irq, ret;
+> > + ? ? ? int irq, ret, poll;
+> > + ? ? ? char *p = NULL;
+> > ? ? ? ?static int idx = 0;
+> >
+> > ? ? ? ?if (np) {
+> > @@ -1093,11 +1094,24 @@ static int i2c_pxa_probe(struct platform_device *dev)
+> >
+> >
+> > ? ? ? ?if (np) {
+> > + ? ? ? ? ? ? ? of_property_read_u32(np, "i2c-polling", &poll);
+> > + ? ? ? ? ? ? ? i2c->use_pio = (poll) ? 1 : 0;
+> > + ? ? ? ? ? ? ? of_property_read_string(np, "i2c-frequency", &p);
+> > + ? ? ? ? ? ? ? if (p && !strncmp(p, "fast", 4))
+> > + ? ? ? ? ? ? ? ? ? ? ? i2c->fast_mode = 1;
+> > + ? ? ? ? ? ? ? of_property_read_u32(np, "i2c-class", &i2c->adap.class);
+> > +
+> > ? ? ? ? ? ? ? ?i2c->adap.nr = idx++;
+> > ? ? ? ? ? ? ? ?snprintf(i2c->adap.name, sizeof(i2c->adap.name),
+> > ? ? ? ? ? ? ? ? ? ? ? ?"pxa2xx-i2c.%u", i2c->adap.nr);
+> > ? ? ? ? ? ? ? ?i2c->clk = clk_get_sys(i2c->adap.name, NULL);
+> > ? ? ? ?} else {
+> > + ? ? ? ? ? ? ? if (plat) {
+> > + ? ? ? ? ? ? ? ? ? ? ? i2c->adap.class = plat->class;
+> > + ? ? ? ? ? ? ? ? ? ? ? i2c->use_pio = plat->use_pio;
+> > + ? ? ? ? ? ? ? ? ? ? ? i2c->fast_mode = plat->fast_mode;
+> > + ? ? ? ? ? ? ? }
+> > +
 > 
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
-> ---
->  drivers/i2c/busses/i2c-pxa.c |   58 ++++++++++++++++++++++++++++++-----------
->  1 files changed, 42 insertions(+), 16 deletions(-)
+> One concern of DT's impact to existing drivers is _every_ driver has to be
+> modified. While I'm not sure if it's a right way to go in a long run. Or can
+> we have a generic way to automatically map the DT properties to the
+> specific platform data structure?
+
+Not really, since there is no such thing as a generic platform_data
+structure.  We can certainly have helper functions, but any
+driver-specific data must by definition have driver-specific code to
+decode it from the device tree.
+
+It does help though when similar drivers use the same binding.
+
+g.
+
 > 
-> diff --git a/drivers/i2c/busses/i2c-pxa.c b/drivers/i2c/busses/i2c-pxa.c
-> index d603646..adac74a 100644
-> --- a/drivers/i2c/busses/i2c-pxa.c
-> +++ b/drivers/i2c/busses/i2c-pxa.c
-> @@ -29,6 +29,7 @@
->  #include <linux/errno.h>
->  #include <linux/interrupt.h>
->  #include <linux/i2c-pxa.h>
-> +#include <linux/of_device.h>
->  #include <linux/of_i2c.h>
->  #include <linux/platform_device.h>
->  #include <linux/err.h>
-> @@ -1044,15 +1045,31 @@ static const struct i2c_algorithm i2c_pxa_pio_algorithm = {
->  	.functionality	= i2c_pxa_functionality,
->  };
->  
-> +static const struct of_device_id pxa_i2c_of_match[] = {
-> +	{ .compatible = "mrvl,pxa255-i2c",    .data = (void *)REGS_PXA2XX, },
-> +	{ .compatible = "mrvl,pxa300-pwri2c", .data = (void *)REGS_PXA3XX, },
-> +	{},
-> +};
-> +
->  static int i2c_pxa_probe(struct platform_device *dev)
->  {
-> +	struct device_node *np = dev->dev.of_node;
-> +	const struct of_device_id *match;
->  	struct pxa_i2c *i2c;
-> -	struct resource *res;
->  	struct i2c_pxa_platform_data *plat = dev->dev.platform_data;
->  	const struct platform_device_id *id = platform_get_device_id(dev);
-> -	enum pxa_i2c_types i2c_type = id->driver_data;
-> -	int ret;
-> -	int irq;
-> +	enum pxa_i2c_types i2c_type;
-> +	struct resource *res;
-> +	int irq, ret;
-> +	static int idx = 0;
-> +
-> +	if (np) {
-> +		match = of_match_device(pxa_i2c_of_match, &dev->dev);
-> +		if (match == NULL)
-> +			return -ENODEV;
-> +		i2c_type = (int)match->data;
-> +	} else
-> +		i2c_type = id->driver_data;
->  
->  	res = platform_get_resource(dev, IORESOURCE_MEM, 0);
->  	irq = platform_get_irq(dev, 0);
-> @@ -1074,16 +1091,23 @@ static int i2c_pxa_probe(struct platform_device *dev)
->  	spin_lock_init(&i2c->lock);
->  	init_waitqueue_head(&i2c->wait);
->  
-> -	/*
-> -	 * If "dev->id" is negative we consider it as zero.
-> -	 * The reason to do so is to avoid sysfs names that only make
-> -	 * sense when there are multiple adapters.
-> -	 */
-> -	i2c->adap.nr = dev->id;
-> -	snprintf(i2c->adap.name, sizeof(i2c->adap.name), "pxa_i2c-i2c.%u",
-> -		 i2c->adap.nr);
->  
-> -	i2c->clk = clk_get(&dev->dev, NULL);
-> +	if (np) {
-> +		i2c->adap.nr = idx++;
-
-No, just set adap.nr to -1.  The i2c layer will dynamically assign an
-id (there is a chance queued for v3.1 that fixes the i2c add
-numbered adapter function to do this).
-
-> +		snprintf(i2c->adap.name, sizeof(i2c->adap.name),
-> +			"pxa2xx-i2c.%u", i2c->adap.nr);
-> +		i2c->clk = clk_get_sys(i2c->adap.name, NULL);
-> +	} else {
-> +		/*
-> +		 * If "dev->id" is negative we consider it as zero.
-> +		 * The reason to do so is to avoid sysfs names that only make
-> +		 * sense when there are multiple adapters.
-> +		 */
-
-will no longer be necessary in v3.1
-
-> +		i2c->adap.nr = dev->id;
-> +		snprintf(i2c->adap.name, sizeof(i2c->adap.name),
-> +			"pxa_i2c-i2c.%u", i2c->adap.nr);
-> +		i2c->clk = clk_get(&dev->dev, NULL);
-> +	}
->  	if (IS_ERR(i2c->clk)) {
->  		ret = PTR_ERR(i2c->clk);
->  		goto eclk;
-> @@ -1138,11 +1162,12 @@ static int i2c_pxa_probe(struct platform_device *dev)
->  
->  	i2c->adap.algo_data = i2c;
->  	i2c->adap.dev.parent = &dev->dev;
-> -#ifdef CONFIG_OF
->  	i2c->adap.dev.of_node = dev->dev.of_node;
-> -#endif
->  
-> -	ret = i2c_add_numbered_adapter(&i2c->adap);
-> +	if (i2c_type == REGS_CE4100)
-> +		ret = i2c_add_adapter(&i2c->adap);
-> +	else
-> +		ret = i2c_add_numbered_adapter(&i2c->adap);
-
-The hunk can be dropped.
-
->  	if (ret < 0) {
->  		printk(KERN_INFO "I2C: Failed to add bus\n");
->  		goto eadapt;
-> @@ -1234,6 +1259,7 @@ static struct platform_driver i2c_pxa_driver = {
->  		.name	= "pxa2xx-i2c",
->  		.owner	= THIS_MODULE,
->  		.pm	= I2C_PXA_DEV_PM_OPS,
-> +		.of_match_table	= pxa_i2c_of_match,
->  	},
->  	.id_table	= i2c_pxa_id_table,
->  };
-> -- 
-> 1.5.6.5
+> Grant, any idea on this?
 > 
+> > ? ? ? ? ? ? ? ?/*
+> > ? ? ? ? ? ? ? ? * If "dev->id" is negative we consider it as zero.
+> > ? ? ? ? ? ? ? ? * The reason to do so is to avoid sysfs names that only make
+> > @@ -1142,12 +1156,6 @@ static int i2c_pxa_probe(struct platform_device *dev)
+> >
+> > ? ? ? ?clk_enable(i2c->clk);
+> >
+> > - ? ? ? if (plat) {
+> > - ? ? ? ? ? ? ? i2c->adap.class = plat->class;
+> > - ? ? ? ? ? ? ? i2c->use_pio = plat->use_pio;
+> > - ? ? ? ? ? ? ? i2c->fast_mode = plat->fast_mode;
+> > - ? ? ? }
+> > -
+> > ? ? ? ?if (i2c->use_pio) {
+> > ? ? ? ? ? ? ? ?i2c->adap.algo = &i2c_pxa_pio_algorithm;
+> > ? ? ? ?} else {
+> > --
+> > 1.5.6.5
+> >
+> >
