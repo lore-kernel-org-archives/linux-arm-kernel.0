@@ -1,27 +1,33 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 19 Jul 2011 16:40:03 +0100
-Subject: [PATCH v3 1/6] Samsung SoC ADC: use regulator (VDD for ADC).
-In-Reply-To: <037301cc4376$3d7f5a20$b87e0e60$%kim@samsung.com>
-References: <1309420175-10301-1-git-send-email-myungjoo.ham@samsung.com>
-	<1309420175-10301-2-git-send-email-myungjoo.ham@samsung.com>
-	<201106301122.50800.anarsoul@gmail.com>
-	<20110630160501.GG3249@opensource.wolfsonmicro.com>
-	<037301cc4376$3d7f5a20$b87e0e60$%kim@samsung.com>
-Message-ID: <20110719154003.GK9652@opensource.wolfsonmicro.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 19 Jul 2011 18:20:25 +0200
+Subject: [PATCH 08/17] mach-integrator: retire custom LED code
+In-Reply-To: <20110710093306.GV4812@n2100.arm.linux.org.uk>
+References: <1309955687-19365-1-git-send-email-bryan.wu@canonical.com>
+	<1309955687-19365-9-git-send-email-bryan.wu@canonical.com>
+	<20110710093306.GV4812@n2100.arm.linux.org.uk>
+Message-ID: <CACRpkdbp1GanOajE0o_HdZX10rMnoGwyYAJHyVqYY3judHDK2A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 16, 2011 at 02:07:13PM +0900, Kukjin Kim wrote:
-> Mark Brown wrote:
+On Sun, Jul 10, 2011 at 11:33 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Jul 06, 2011 at 08:34:38PM +0800, Bryan Wu wrote:
+>> Use 4 LEDs in baseboard instead of the LED in core module.
+>>
+>> The CPU activity LED is now handled by the trigger in the leds
+>> subsystem, retire this old CONFIG_LEDS-based code.
+>
+> This is a functional change. ?Integrator CP has four baseboard LEDs.
+> I don't remember Integrator AP having those,
 
-> > If there isn't a separate supply for the regulators on S3C24xx devices
-> > then I guess the best option is to provide that supply as a dummy
-> > regulator in the s3c24xx core code.
+I have one here, it has three LEDs: green, yellow, red.
+It appears the yellow one wasn't used for anything before.
 
-> OK, but it means I can't apply this until adding a dummy regulator for
-> S3C24XX?
+> but it does have the LED on the core module, which is used for
+> CPU activity on all Integrator platforms.
 
-That could always come later as a bug fix :)  The regulator API does
-have a couple of methods of substituting in a dummy regulator itself,
-though it does complain a bit, so it should mostly be a simple config
-change to work around on affected systems.
+Sounds more intuitive too, if that LED is to be used for anything,
+it's for this.
+
+Thanks,
+Linus Walleij
