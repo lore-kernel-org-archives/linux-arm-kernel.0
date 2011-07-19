@@ -1,33 +1,36 @@
-From: Jon.Povey@racelogic.co.uk (Jon Povey)
-Date: Tue, 19 Jul 2011 07:28:19 +0100
-Subject: [PATCH] davinci: fix DM365 EVM video input mux bits
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024BCEF73E@dbde02.ent.ti.com>
-Message-ID: <70E876B0EA86DD4BAF101844BC814DFE0B4E0859D7@Cloud.RL.local>
+From: ivan.djelic@parrot.com (Ivan Djelic)
+Date: Tue, 19 Jul 2011 08:48:02 +0200
+Subject: [i.MX28 GPMI] problem overwriting all-0xff data in NAND
+In-Reply-To: <20005.7506.283476.184839@ipc1.ka-ro>
+References: <20004.12663.29494.339601@ipc1.ka-ro>
+	<20110718145635.GA24419@parrot.com>
+	<20005.7506.283476.184839@ipc1.ka-ro>
+Message-ID: <20110719064802.GA5788@parrot.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hadli, Manjunath wrote:
-> Jon,
->
-> The fix looks correct. As a part of a different
-> implementation which will go soon upstream, this has been
-> taken care of, where we have used macros
-> CPLD_VIDEO_INPUT_MUX_TVP7002    0x1
-> CPLD_VIDEO_INPUT_MUX_IMAGER     0x2
->
-> So, if you can do the same, it will look better.
+On Tue, Jul 19, 2011 at 06:59:46AM +0100, Lothar Wa?mann wrote:
+> I'm writing a JFFS2 image file that is padded with 0xff to eraseblock
+> size to flash (either from the bootloader or with the nandwrite
+> utility from Linux).
+> When mounting the filesystem everything is OK until the first file is
+> being written. A subsequent read of the affected flash page gives ECC
+> errors.
+> 
+> JFFS2 is giving out the first all-FF page in the last used block for
+> creating the new file. Since that block has a non-FF ECC pattern, the
+> ECC information is being corrupted on write.
 
-If you have a patch you can split out that has your defines
-where and how you want them then great.
+OK, thanks for the clarification. So the problem only happens on partially
+programmed blocks in the JFFS2 image, that end up fully programmed on the
+device because of the 0xff padding.
 
-Otherwise I'd suggest just getting this or something equivalent
-in to fix the bug first, and reimplement it later.
+I think the cleaner solution is to use a non-padded image and avoid programming
+pages with 0xff in the last used block; programming nand pages multiple times
+should be avoided if possible, as it is not supported on all (especially the
+most recent) devices.
+
+BR,
 
 --
-Jon Povey
-jon.povey at racelogic.co.uk
-
-Racelogic is a limited company registered in England. Registered number 2743719 .
-Registered Office Unit 10, Swan Business Centre, Osier Way, Buckingham, Bucks, MK18 1TB .
-
-The information contained in this electronic mail transmission is intended by Racelogic Ltd for the use of the named individual or entity to which it is directed and may contain information that is confidential or privileged. If you have received this electronic mail transmission in error, please delete it from your system without copying or forwarding it, and notify the sender of the error by reply email so that the sender's address records can be corrected. The views expressed by the sender of this communication do not necessarily represent those of Racelogic Ltd. Please note that Racelogic reserves the right to monitor e-mail communications passing through its network
+Ivan
