@@ -1,64 +1,32 @@
-From: manjunath.hadli@ti.com (Hadli, Manjunath)
-Date: Tue, 19 Jul 2011 10:59:49 +0530
-Subject: [PATCH] davinci: fix DM365 EVM video input mux bits
-In-Reply-To: <1311046211-2849-1-git-send-email-jon.povey@racelogic.co.uk>
-References: <1311046211-2849-1-git-send-email-jon.povey@racelogic.co.uk>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024BCEF73E@dbde02.ent.ti.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Tue, 19 Jul 2011 08:38:28 +0300
+Subject: [RFC 7/8] drivers: introduce rpmsg,
+	a remote-processor messaging bus
+In-Reply-To: <20110609171210.GB3877@ucw.cz>
+References: <1308640714-17961-1-git-send-email-ohad@wizery.com>
+	<1308640714-17961-8-git-send-email-ohad@wizery.com>
+	<20110609171210.GB3877@ucw.cz>
+Message-ID: <CAK=WgbY=gay-mLKhssinPhv1ic6FszGoLyLo9E6y7=3QOLx2FQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jon,
+Hi Pavel,
 
-The fix looks correct. As a part of a different implementation which will go soon upstream, this has been taken care of, where we have used macros 
-CPLD_VIDEO_INPUT_MUX_TVP7002    0x1
-CPLD_VIDEO_INPUT_MUX_IMAGER     0x2
+On Thu, Jun 9, 2011 at 8:12 PM, Pavel Machek <pavel@ucw.cz> wrote:
+> So this is basically networking... right? Why not implement it as
+> sockets? (accept, connect, read, write)?
 
-So, if you can do the same, it will look better.
+This patch focuses on adding the core rpmsg kernel infrastructure. The
+next step, after getting the basic stuff in, would be adding rpmsg
+drivers, and exposing user space API.
+
+For some use cases, where userland talks directly with remote entities
+(and otherwise requires no kernel involvement besides exposing the
+transport), socket API is very nice as it's flexible and prevalent.
+
+We already have several rpmsg drivers and a rpmsg-based socket API
+implementation too, but we'll get to it only after the core stuff gets
+in.
 
 Thanks,
--Manju
-
-
-On Tue, Jul 19, 2011 at 09:00:11, Jon Povey wrote:
-> Video input mux settings for tvp7002 and imager inputs were swapped.
-> Comment was correct.
-> 
-> Tested on EVM with tvp7002 input.
-> 
-> Signed-off-by: Jon Povey <jon.povey@racelogic.co.uk>
-> ---
-> As a bugfix maybe this should try to get into 3.0?
-> 
->  arch/arm/mach-davinci/board-dm365-evm.c |    4 ++--
->  1 files changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-davinci/board-dm365-evm.c b/arch/arm/mach-davinci/board-dm365-evm.c
-> index c67f684..09a87e6 100644
-> --- a/arch/arm/mach-davinci/board-dm365-evm.c
-> +++ b/arch/arm/mach-davinci/board-dm365-evm.c
-> @@ -520,7 +520,7 @@ fail:
->  	 */
->  	if (have_imager()) {
->  		label = "HD imager";
-> -		mux |= 1;
-> +		mux |= 2;
->  
->  		/* externally mux MMC1/ENET/AIC33 to imager */
->  		mux |= BIT(6) | BIT(5) | BIT(3);
-> @@ -540,7 +540,7 @@ fail:
->  		resets &= ~BIT(1);
->  
->  		if (have_tvp7002()) {
-> -			mux |= 2;
-> +			mux |= 1;
->  			resets &= ~BIT(2);
->  			label = "tvp7002 HD";
->  		} else {
-> --
-> 1.6.3.3
-> 
-> _______________________________________________
-> Davinci-linux-open-source mailing list
-> Davinci-linux-open-source at linux.davincidsp.com
-> http://linux.davincidsp.com/mailman/listinfo/davinci-linux-open-source
-> 
+Ohad.
