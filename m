@@ -1,47 +1,57 @@
 From: haojian.zhuang@marvell.com (Haojian Zhuang)
-Date: Tue, 19 Jul 2011 10:24:43 +0800
-Subject: [PATCH 0/7] support DT on ARCH-MMP
-In-Reply-To: <2011071901>
+Date: Tue, 19 Jul 2011 10:24:45 +0800
+Subject: [PATCH 2/7] ARM: mmp: append MMP_USE_OF config
+In-Reply-To: <1311042290-20253-2-git-send-email-haojian.zhuang@marvell.com>
 References: <2011071901>
-Message-ID: <1311042290-20253-1-git-send-email-haojian.zhuang@marvell.com>
+	<1311042290-20253-1-git-send-email-haojian.zhuang@marvell.com>
+	<1311042290-20253-2-git-send-email-haojian.zhuang@marvell.com>
+Message-ID: <1311042290-20253-3-git-send-email-haojian.zhuang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Since NR_IRQS is defined in irqs.h, parsing irq specifier will be started
+from NR_IRQS while both CONFIG_USE_OF and CONFIG_SPARSE_IRQ is enabled.
+It breaks the assumption that base irq is started from 0.
 
-It's used to support DT on ARCH-MMP.
+Add CONFIG_MMP_USE_OF config to distinguish. If CONFIG_MMP_USE_OF is set,
+NR_IRQS is defined as 0. Otherwise, it follows the original definition.
 
-Haojian Zhuang (7):
-      ARM: mmp: parse irq from DT
-      ARM: mmp: append MMP_USE_OF config
-      ARM: mmp: support DT on both dkb and brownstone
-      tty: serial: support device tree in pxa
-      tty: serial: check ops before registering console
-      i2c: pxa: support i2c controller from DT
-      i2c: pxa: support to parse property
+Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+---
+ arch/arm/mach-mmp/Kconfig             |    7 +++++++
+ arch/arm/mach-mmp/include/mach/irqs.h |    4 ++++
+ 2 files changed, 11 insertions(+), 0 deletions(-)
 
- .../devicetree/bindings/arm/marvell/boards.txt     |    7 +
- .../devicetree/bindings/arm/marvell/intc.txt       |  120 ++++++++++
- .../devicetree/bindings/i2c/pxa255-i2c.txt         |   36 +++
- arch/arm/Kconfig                                   |    1 +
- arch/arm/boot/dts/mmp2-brownstone.dts              |  242 ++++++++++++++++++++
- arch/arm/boot/dts/ttc-dkb.dts                      |   80 +++++++
- arch/arm/mach-mmp/Kconfig                          |    7 +
- arch/arm/mach-mmp/Makefile                         |    6 +
- arch/arm/mach-mmp/boards.c                         |  159 +++++++++++++
- arch/arm/mach-mmp/common.h                         |    1 +
- arch/arm/mach-mmp/include/mach/irqs.h              |    4 +
- arch/arm/mach-mmp/intc.c                           |  223 ++++++++++++++++++
- drivers/i2c/busses/i2c-pxa.c                       |   78 +++++--
- drivers/tty/serial/Kconfig                         |    4 +-
- drivers/tty/serial/of_serial.c                     |   12 +
- drivers/tty/serial/pxa.c                           |   95 ++++++++-
- include/linux/serial_pxa.h                         |   17 ++
- 17 files changed, 1065 insertions(+), 27 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/marvell/boards.txt
- create mode 100644 Documentation/devicetree/bindings/arm/marvell/intc.txt
- create mode 100644 Documentation/devicetree/bindings/i2c/pxa255-i2c.txt
- create mode 100644 arch/arm/boot/dts/mmp2-brownstone.dts
- create mode 100644 arch/arm/boot/dts/ttc-dkb.dts
- create mode 100644 arch/arm/mach-mmp/boards.c
- create mode 100644 arch/arm/mach-mmp/intc.c
- create mode 100644 include/linux/serial_pxa.h
+diff --git a/arch/arm/mach-mmp/Kconfig b/arch/arm/mach-mmp/Kconfig
+index 67793a6..1efe994 100644
+--- a/arch/arm/mach-mmp/Kconfig
++++ b/arch/arm/mach-mmp/Kconfig
+@@ -96,4 +96,11 @@ config CPU_MMP2
+ 	select CPU_PJ4
+ 	help
+ 	  Select code specific to MMP2. MMP2 is ARMv7 compatible.
++
++config MMP_USE_OF
++	bool "MMP Use OF"
++	select USE_OF
++	help
++	  Select OF code to ARCH-MMP.
++
+ endif
+diff --git a/arch/arm/mach-mmp/include/mach/irqs.h b/arch/arm/mach-mmp/include/mach/irqs.h
+index a09d328..538bb69 100644
+--- a/arch/arm/mach-mmp/include/mach/irqs.h
++++ b/arch/arm/mach-mmp/include/mach/irqs.h
+@@ -224,6 +224,10 @@
+ 
+ #define IRQ_BOARD_START			(IRQ_GPIO_START + IRQ_GPIO_NUM)
+ 
++#ifdef CONFIG_MMP_USE_OF
++#define NR_IRQS				0
++#else
+ #define NR_IRQS				(IRQ_BOARD_START)
++#endif
+ 
+ #endif /* __ASM_MACH_IRQS_H */
+-- 
+1.5.6.5
