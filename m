@@ -1,58 +1,43 @@
-From: khali@linux-fr.org (Jean Delvare)
-Date: Tue, 19 Jul 2011 09:12:07 +0200
-Subject: [PATCH 0/7] support DT on ARCH-MMP
-In-Reply-To: <1311042290-20253-1-git-send-email-haojian.zhuang@marvell.com>
-References: <2011071901>
-	<1311042290-20253-1-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <20110719091207.7cb06f47@endymion.delvare>
+From: manjunath.hadli@ti.com (Hadli, Manjunath)
+Date: Tue, 19 Jul 2011 12:55:13 +0530
+Subject: [PATCH] davinci: fix DM365 EVM video input mux bits
+In-Reply-To: <70E876B0EA86DD4BAF101844BC814DFE0B4E0859D7@Cloud.RL.local>
+References: <B85A65D85D7EB246BE421B3FB0FBB593024BCEF73E@dbde02.ent.ti.com>
+	<70E876B0EA86DD4BAF101844BC814DFE0B4E0859D7@Cloud.RL.local>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024BCEF73F@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Haojian,
+Will not be able to give you a sub-patch as it is combined as part of a larger implementation.
 
-On Tue, 19 Jul 2011 10:24:43 +0800, Haojian Zhuang wrote:
-> 
-> It's used to support DT on ARCH-MMP.
-> 
-> Haojian Zhuang (7):
->       ARM: mmp: parse irq from DT
->       ARM: mmp: append MMP_USE_OF config
->       ARM: mmp: support DT on both dkb and brownstone
->       tty: serial: support device tree in pxa
->       tty: serial: check ops before registering console
->       i2c: pxa: support i2c controller from DT
->       i2c: pxa: support to parse property
-> 
->  .../devicetree/bindings/arm/marvell/boards.txt     |    7 +
->  .../devicetree/bindings/arm/marvell/intc.txt       |  120 ++++++++++
->  .../devicetree/bindings/i2c/pxa255-i2c.txt         |   36 +++
->  arch/arm/Kconfig                                   |    1 +
->  arch/arm/boot/dts/mmp2-brownstone.dts              |  242 ++++++++++++++++++++
->  arch/arm/boot/dts/ttc-dkb.dts                      |   80 +++++++
->  arch/arm/mach-mmp/Kconfig                          |    7 +
->  arch/arm/mach-mmp/Makefile                         |    6 +
->  arch/arm/mach-mmp/boards.c                         |  159 +++++++++++++
->  arch/arm/mach-mmp/common.h                         |    1 +
->  arch/arm/mach-mmp/include/mach/irqs.h              |    4 +
->  arch/arm/mach-mmp/intc.c                           |  223 ++++++++++++++++++
->  drivers/i2c/busses/i2c-pxa.c                       |   78 +++++--
->  drivers/tty/serial/Kconfig                         |    4 +-
->  drivers/tty/serial/of_serial.c                     |   12 +
->  drivers/tty/serial/pxa.c                           |   95 ++++++++-
->  include/linux/serial_pxa.h                         |   17 ++
->  17 files changed, 1065 insertions(+), 27 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/arm/marvell/boards.txt
->  create mode 100644 Documentation/devicetree/bindings/arm/marvell/intc.txt
->  create mode 100644 Documentation/devicetree/bindings/i2c/pxa255-i2c.txt
->  create mode 100644 arch/arm/boot/dts/mmp2-brownstone.dts
->  create mode 100644 arch/arm/boot/dts/ttc-dkb.dts
->  create mode 100644 arch/arm/mach-mmp/boards.c
->  create mode 100644 arch/arm/mach-mmp/intc.c
->  create mode 100644 include/linux/serial_pxa.h
+Since the bug fix needs to go into 3.0, I am Ok if you fix the bug, and the macros can be substituted later.
 
-I am not involved in this in any way so please don't include me in the
-Cc list.
+-Manju
 
-Thanks,
--- 
-Jean Delvare
+On Tue, Jul 19, 2011 at 11:58:19, Jon Povey wrote:
+> Hadli, Manjunath wrote:
+> > Jon,
+> >
+> > The fix looks correct. As a part of a different implementation which 
+> > will go soon upstream, this has been taken care of, where we have used 
+> > macros
+> > CPLD_VIDEO_INPUT_MUX_TVP7002    0x1
+> > CPLD_VIDEO_INPUT_MUX_IMAGER     0x2
+> >
+> > So, if you can do the same, it will look better.
+> 
+> If you have a patch you can split out that has your defines where and how you want them then great.
+> 
+> Otherwise I'd suggest just getting this or something equivalent in to fix the bug first, and reimplement it later.
+> 
+> --
+> Jon Povey
+> jon.povey at racelogic.co.uk
+> 
+> Racelogic is a limited company registered in England. Registered number 2743719 . 
+> Registered Office Unit 10, Swan Business Centre, Osier Way, Buckingham, Bucks, MK18 1TB .
+> 
+> The information contained in this electronic mail transmission is intended by Racelogic Ltd for the use of the named individual or entity to which it is directed and may contain information that is confidential or privileged. If you have received this electronic mail transmission in error, please delete it from your system without copying or forwarding it, and notify the sender of the error by reply email so that the sender's address records can be corrected. The views expressed by the sender of this communication do not necessarily represent those of Racelogic Ltd. Please note that Racelogic reserves the right to monitor e-mail communications passing through its network
+> 
+> 
+> 
