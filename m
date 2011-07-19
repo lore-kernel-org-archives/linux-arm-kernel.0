@@ -1,65 +1,59 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 19 Jul 2011 21:16:56 +0800
-Subject: [PATCH v2] gpio/mxc/mxs: fix build error introduced by the
-	irq_gc_ack() renaming
-In-Reply-To: <1311046444-25423-1-git-send-email-shawn.guo@linaro.org>
-References: <1311046444-25423-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1311081416-1251-1-git-send-email-shawn.guo@linaro.org>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 19 Jul 2011 09:14:54 -0400 (EDT)
+Subject: Git pull request: boot_params to atag_offset conversion
+In-Reply-To: <20110719074321.GA26574@n2100.arm.linux.org.uk>
+References: <alpine.LFD.2.00.1107190042280.21187@xanadu.home>
+	<20110719074321.GA26574@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1107190834540.21187@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following commit renames irq_gc_ack() to irq_gc_ack_set_bit(),
-and makes gpio-mxc and gpio-mxs fail to build.
+On Tue, 19 Jul 2011, Russell King - ARM Linux wrote:
 
-  659fb32d1b67476f4ade25e9ea0e2642a5b9c4b5
-  genirq: replace irq_gc_ack() with {set,clr}_bit variants (fwd)
+> On Tue, Jul 19, 2011 at 12:55:46AM -0400, Nicolas Pitre wrote:
+> > Russell, could you please pull:
+> > 
+> > 	git://git.linaro.org/people/nico/linux atag_offset
+> > 
+> > This contains the previously posted patches, plus the collected 
+> > Acked-by/Tested-by tags so far.  Since the discussion has died down, I 
+> > don't expect further changes.
+> > 
+> > Alternatively, this can go via the linux-arm-soc tree if you prefer 
+> > that.
+> 
+> Nope, I don't want it to go in this time around - the amount of patches
+> you posted last week was _far_ too much for what was billed as the last
+> week before the merge window, and by doing so you significantly
+> contributed to my stress levels.
 
-The patch fixed a couple of typo of comma to semicolon.
+I posted those patches on July 5th which was two weeks ago.  I wasn't 
+expecting them to go in if the merge window had opened last week. But 
+one more week has passed, people tested those patches, they commented 
+back, etc.
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
-Changes since v1:
- * Fix a couple of typo of comma to semicolon
+> I've not been following the discussion on these patches, and don't plan
+> to until after the merge window has closed.  Ditto for your other patches.
 
- drivers/gpio/gpio-mxc.c |    4 ++--
- drivers/gpio/gpio-mxs.c |    4 ++--
- 2 files changed, 4 insertions(+), 4 deletions(-)
+No problem.  As I said already, those patch series are far from being 
+complete yet (i.e. many more similar patches are missing) before they 
+can truly make a difference (except maybe for ep93xx).  So this is not 
+like if new functionality was held back.
 
-diff --git a/drivers/gpio/gpio-mxc.c b/drivers/gpio/gpio-mxc.c
-index 89fda58..4340aca 100644
---- a/drivers/gpio/gpio-mxc.c
-+++ b/drivers/gpio/gpio-mxc.c
-@@ -297,11 +297,11 @@ static void __init mxc_gpio_init_gc(struct mxc_gpio_port *port)
- 	gc->private = port;
- 
- 	ct = gc->chip_types;
--	ct->chip.irq_ack = irq_gc_ack,
-+	ct->chip.irq_ack = irq_gc_ack_set_bit;
- 	ct->chip.irq_mask = irq_gc_mask_clr_bit;
- 	ct->chip.irq_unmask = irq_gc_mask_set_bit;
- 	ct->chip.irq_set_type = gpio_set_irq_type;
--	ct->chip.irq_set_wake = gpio_set_wake_irq,
-+	ct->chip.irq_set_wake = gpio_set_wake_irq;
- 	ct->regs.ack = GPIO_ISR;
- 	ct->regs.mask = GPIO_IMR;
- 
-diff --git a/drivers/gpio/gpio-mxs.c b/drivers/gpio/gpio-mxs.c
-index d8cafba..af55a85 100644
---- a/drivers/gpio/gpio-mxs.c
-+++ b/drivers/gpio/gpio-mxs.c
-@@ -156,11 +156,11 @@ static void __init mxs_gpio_init_gc(struct mxs_gpio_port *port)
- 	gc->private = port;
- 
- 	ct = gc->chip_types;
--	ct->chip.irq_ack = irq_gc_ack,
-+	ct->chip.irq_ack = irq_gc_ack_set_bit;
- 	ct->chip.irq_mask = irq_gc_mask_clr_bit;
- 	ct->chip.irq_unmask = irq_gc_mask_set_bit;
- 	ct->chip.irq_set_type = mxs_gpio_set_irq_type;
--	ct->chip.irq_set_wake = mxs_gpio_set_wake_irq,
-+	ct->chip.irq_set_wake = mxs_gpio_set_wake_irq;
- 	ct->regs.ack = PINCTRL_IRQSTAT(port->id) + MXS_CLR;
- 	ct->regs.mask = PINCTRL_IRQEN(port->id);
- 
--- 
-1.7.4.1
+I can't tell if you followed the discussion that ensued or not, 
+especially when you were one of the initiators of it.  Without any other 
+indication to the contrary, I may only presume that you are OK with the 
+set. In any case, just asking to resubmit after the merge window has 
+closed is fine with me.
+
+As to being unfair, I don't feel mistreated at all.  I however wouldn't 
+like to see you stressed out even when the non core stuff is split away 
+from your tree.  Given that ARM is becoming a bigger architecture than 
+X86 even at the core stuff alone for which 3 people are sharing the 
+maintenance load amongst themselves, I'm a bit concerned that 
+scalability issues could wear you out if a backlog starts growing, given 
+that more significant core changes are in the pipeline already.  But we 
+can discuss this next time we have a beer together.
+
+
+Nicolas
