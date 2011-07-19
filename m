@@ -1,44 +1,64 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Thu, 21 Jul 2011 15:18:18 -0700
-Subject: [PATCH] ARM: do not mark CPU 0 as hotpluggable
-In-Reply-To: <20110721074511.GK26574@n2100.arm.linux.org.uk>
-References: <1311204745-6276-1-git-send-email-mturquette@ti.com>
-	<20110721074511.GK26574@n2100.arm.linux.org.uk>
-Message-ID: <CAJOA=zN-PmFcdAwkoFsUv7t2_gBGtUiBipG7j=AbVH9K=smqwQ@mail.gmail.com>
+From: mturquette@ti.com (Mike Turquette)
+Date: Mon, 18 Jul 2011 17:33:22 -0700
+Subject: [PATCH 1/2] ARM: conditionally allow master CPU hotplugging
+Message-ID: <mailman.26.1311286727.20020.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 21, 2011 at 12:45 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, Jul 20, 2011 at 04:32:25PM -0700, Mike Turquette wrote:
->> A quick poll of the ARM platforms that implement CPU Hotplug support
->> shows that every platform treats CPU 0 as a special case that cannot be
->> hotplugged. ?In fact every platform has identical code for
->> platform_cpu_die which returns -EPERM in the case of CPU 0.
->
-> Are you sure that's just not because everyone copied what Realview has
-> been doing (highly likely)?
+Currently all CPUs are marked as hotpluggable in topology_init().  This
+is not true for all ARM SMP platforms including OMAP4.  In the OMAP4
+case, CPU0 is considered as privileged due to TrustZone software and
+other considerations.
 
-Copy/paste is always likely.  Would be nice for other platform folks
-to weigh in on this.
+This patch introduces a new config option, HOTPLUG_CPU_MASTER, which
+prevents the first CPU in possible_cpu_mask from being marked
+hotpluggable if set.
 
-> I suspect that there's no reason that CPU0 can't be taken down, especially
-> on those platforms which don't take the CPU fully offline but just put it
-> into a WFI loop.
->
-> Those which restart the CPUs through the boot loader probably detect CPU0
-> as the boot CPU, so they probably can't take CPU0 down.
+Signed-off-by: Mike Turquette <mturquette@ti.com>
+---
+ arch/arm/Kconfig        |    8 ++++++++
+ arch/arm/kernel/setup.c |    5 +++++
+ 2 files changed, 13 insertions(+), 0 deletions(-)
 
-OMAP does seem to have this limitation and Santosh/Richard can provide
-much better details than me in the parallel thread.  Again, would be
-nice to hear if other platforms have similar limitations from their
-stakeholders.
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 9adc278..a6e34f5 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1393,6 +1393,14 @@ config HOTPLUG_CPU
+ 	  Say Y here to experiment with turning CPUs off and on.  CPUs
+ 	  can be controlled through /sys/devices/system/cpu.
 
-The idea here is to not mark a CPU hotpluggable if it cannot be
-hotplugged.  If the limitations turn out to be legitimate for some
-platforms but not others, what's the best way to handle it?  Either
-move the topology initialization to platform code or allow platforms
-to set some config option.  Patches for the latter are below, but I
-think the current discussion on whether or not other platforms can
-actually hotplug CPU0 should run its course before considering below
-patches too seriously.
++config HOTPLUG_CPU_MASTER
++	bool "Prevent first CPU (master) from hotplugging"
++	depends on HOTPLUG_CPU
++	help
++	  Say Y here if your platform treats the first CPU as a special
++	  "master" CPU and cannot allow it to hotplug.  This prevents the
++	  "online" entry in sysfs for that CPU.
++
+ config LOCAL_TIMERS
+ 	bool "Use local timer interrupts"
+ 	depends on SMP
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index ed11fb0..3785420 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -940,7 +940,12 @@ static int __init topology_init(void)
+
+ 	for_each_possible_cpu(cpu) {
+ 		struct cpuinfo_arm *cpuinfo =3D &per_cpu(cpu_data, cpu);
++#ifdef CONFIG_HOTPLUG_CPU_MASTER
++		if (cpu)
++			cpuinfo->cpu.hotpluggable =3D 1;
++#else
+ 		cpuinfo->cpu.hotpluggable =3D 1;
++#endif
+ 		register_cpu(&cpuinfo->cpu, cpu);
+ 	}
+
+--=20
+1.7.4.1
+
+
+
+and,
