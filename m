@@ -1,28 +1,65 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 19 Jul 2011 14:59:44 +0200
-Subject: conflicts between omap/cleanup branch and omap_dss2 tree
-In-Reply-To: <4E25784D.8070300@ti.com>
-References: <201107172339.32516.arnd@arndb.de>
-	<20110718080856.GW5783@atomide.com> <4E25784D.8070300@ti.com>
-Message-ID: <201107191459.44992.arnd@arndb.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 19 Jul 2011 21:16:56 +0800
+Subject: [PATCH v2] gpio/mxc/mxs: fix build error introduced by the
+	irq_gc_ack() renaming
+In-Reply-To: <1311046444-25423-1-git-send-email-shawn.guo@linaro.org>
+References: <1311046444-25423-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1311081416-1251-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 19 July 2011, Archit Taneja wrote:
-> Tomi is on vacation right now, but he checks his mail once in a while, 
-> so we may get a response soon.
-> 
-> Tomi's for-next branch is not up to date yet. So it shouldn't be 
-> considered for now. The HWMOD patches in Tomi's for-next branch will be 
-> pushed by Paul as 3.1-rc fixes.
-> 
-> We will make a temporary branch which will contain all the DSS2 patches 
-> which Tomi intended to push for this merge window, once he gets a 
-> chance, he can quickly update his for-next branch with it.
+The following commit renames irq_gc_ack() to irq_gc_ack_set_bit(),
+and makes gpio-mxc and gpio-mxs fail to build.
 
-Ok, just let me know when you upload that branch so I can remove the
-dependency from the arm-soc tree. Right now, I'm pulling the
-omap_dss2/for_next branch into arm-soc/for_next as a dependency
-to resolve the conflict.
+  659fb32d1b67476f4ade25e9ea0e2642a5b9c4b5
+  genirq: replace irq_gc_ack() with {set,clr}_bit variants (fwd)
 
-	Arnd
+The patch fixed a couple of typo of comma to semicolon.
+
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+Changes since v1:
+ * Fix a couple of typo of comma to semicolon
+
+ drivers/gpio/gpio-mxc.c |    4 ++--
+ drivers/gpio/gpio-mxs.c |    4 ++--
+ 2 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/gpio/gpio-mxc.c b/drivers/gpio/gpio-mxc.c
+index 89fda58..4340aca 100644
+--- a/drivers/gpio/gpio-mxc.c
++++ b/drivers/gpio/gpio-mxc.c
+@@ -297,11 +297,11 @@ static void __init mxc_gpio_init_gc(struct mxc_gpio_port *port)
+ 	gc->private = port;
+ 
+ 	ct = gc->chip_types;
+-	ct->chip.irq_ack = irq_gc_ack,
++	ct->chip.irq_ack = irq_gc_ack_set_bit;
+ 	ct->chip.irq_mask = irq_gc_mask_clr_bit;
+ 	ct->chip.irq_unmask = irq_gc_mask_set_bit;
+ 	ct->chip.irq_set_type = gpio_set_irq_type;
+-	ct->chip.irq_set_wake = gpio_set_wake_irq,
++	ct->chip.irq_set_wake = gpio_set_wake_irq;
+ 	ct->regs.ack = GPIO_ISR;
+ 	ct->regs.mask = GPIO_IMR;
+ 
+diff --git a/drivers/gpio/gpio-mxs.c b/drivers/gpio/gpio-mxs.c
+index d8cafba..af55a85 100644
+--- a/drivers/gpio/gpio-mxs.c
++++ b/drivers/gpio/gpio-mxs.c
+@@ -156,11 +156,11 @@ static void __init mxs_gpio_init_gc(struct mxs_gpio_port *port)
+ 	gc->private = port;
+ 
+ 	ct = gc->chip_types;
+-	ct->chip.irq_ack = irq_gc_ack,
++	ct->chip.irq_ack = irq_gc_ack_set_bit;
+ 	ct->chip.irq_mask = irq_gc_mask_clr_bit;
+ 	ct->chip.irq_unmask = irq_gc_mask_set_bit;
+ 	ct->chip.irq_set_type = mxs_gpio_set_irq_type;
+-	ct->chip.irq_set_wake = mxs_gpio_set_wake_irq,
++	ct->chip.irq_set_wake = mxs_gpio_set_wake_irq;
+ 	ct->regs.ack = PINCTRL_IRQSTAT(port->id) + MXS_CLR;
+ 	ct->regs.mask = PINCTRL_IRQEN(port->id);
+ 
+-- 
+1.7.4.1
