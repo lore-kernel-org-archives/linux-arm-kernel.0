@@ -1,44 +1,60 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Mon, 18 Jul 2011 21:51:28 -0400
-Subject: [PATCH v3 0/4] Add device tree probe for sdhci-esdhc-imx
-In-Reply-To: <20110710013708.GA14492@S2100-06.ap.freescale.net> (Shawn Guo's
-	message of "Sun, 10 Jul 2011 09:37:09 +0800")
-References: <1309970870-13336-1-git-send-email-shawn.guo@linaro.org>
-	<m2pqljje3w.fsf@bob.laptop.org>
-	<20110710013708.GA14492@S2100-06.ap.freescale.net>
-Message-ID: <m262mzavhb.fsf@bob.laptop.org>
+From: b32955@freescale.com (Huang Shijie)
+Date: Tue, 19 Jul 2011 10:12:20 +0800
+Subject: [i.MX28 GPMI] problem overwriting all-0xff data in NAND
+In-Reply-To: <20110718164354.GA3328@S2100-06.ap.freescale.net>
+References: <20004.12663.29494.339601@ipc1.ka-ro>
+	<20110718164354.GA3328@S2100-06.ap.freescale.net>
+Message-ID: <4E24E804.10002@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn, Sascha,
-
-On Sat, Jul 09 2011, Shawn Guo wrote:
->> > Shawn Guo (4):
->> >       mmc: sdhci-esdhc-imx: do not reference platform data after probe
->> >       mmc: sdhci-esdhc-imx: get rid of the uses of cpu_is_mx()
->> >       mmc: sdhci-pltfm: dt device does not pass parent to sdhci_alloc_host
->> >       mmc: sdhci-esdhc-imx: add device tree probe support
->> 
->> These don't apply against mmc-next -- what is your tree based on?
->> 
-> It's based on linux-next with following patch applied.
+hi  Lothar:
+> On Mon, Jul 18, 2011 at 03:13:27PM +0200, Lothar Wa?mann wrote:
+>> Hi,
+>>
+>> with the gpmi-nfc driver for imx28 from Shawn Guo on a TX28 I
+> To be clear, the author of gpmi-nfc driver is Huang Shijie (Cc-ed).
 >
-> [PATCH v4 4/4] mmc: sdhci-esdhc-imx: extend card_detect and
-> write_protect support for mx5
-> http://permalink.gmane.org/gmane.linux.kernel.mmc/8748
+> Regards,
+> Shawn
 >
-> You applied the 3 of 4 patches in that series, and expect Sascha to
-> send this one through his tree after you send those 3.
+>> encountered some problems with jffs2 when overwriting pages that have
+>> been written with 0xff (e.g. from padding from the file system image
+>> file).
+The GPMI driver now does not support the JFFS2 very well.
+The JFFS2 will write the OOB, while the BCH of GPMI will use the OOB too.
+So I have to disable the JFFS2 to use the OOB. I have not finish the 
+code about it now.
 
-I see.  In that case, either Sascha can send this new series with my:
+I recommend you use the UBIFS. But the latest version of GPMI driver 
+meets a DMA bug.
+I am debugging the DMA bug now. and I will send it out when i fix it.
 
-Acked-by: Chris Ball <cjb@laptop.org>
+Best Regards
+Huang Shijie
 
-or I'll send it as a second pull request after Sascha sends [4/4].
-
-Thanks,
-
-- Chris.
--- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+>> The problem is that the ECC info for an all-0xff block is not all-0xff
+>> and thus a newly erased block is different from a block that has been
+>> written with 0xff.
+>> If such a block is being altered (jffs2 thinking it can simply
+>> overwrite it without erasing first) the ECC information will be
+>> corrupted and will produce ECC errors upon read.
+>>
+>> The only remedy I can think of is to prevent empty pages from actually
+>> being written to flash, but leaving them in the erased state instead.
+>>
+>> Any comments?
+>>
+>>
+>> Lothar Wa?mann
+>> -- 
+>> ___________________________________________________________
+>>
+>> Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+>> Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+>> Gesch?ftsf?hrer: Matthias Kaussen
+>> Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+>>
+>> www.karo-electronics.de | info at karo-electronics.de
+>> ___________________________________________________________
+>>
