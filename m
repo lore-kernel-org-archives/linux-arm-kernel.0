@@ -1,55 +1,58 @@
-From: archit@ti.com (Archit Taneja)
-Date: Tue, 19 Jul 2011 17:57:57 +0530
-Subject: conflicts between omap/cleanup branch and omap_dss2 tree
-In-Reply-To: <20110718080856.GW5783@atomide.com>
-References: <201107172339.32516.arnd@arndb.de>
-	<20110718080856.GW5783@atomide.com>
-Message-ID: <4E25784D.8070300@ti.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Tue, 19 Jul 2011 16:38:37 +0400
+Subject: [PATCH] gpio/mxc/mxs: fix build error introduced by the reanming
+	of irq_gc_ack()
+In-Reply-To: <1311046444-25423-1-git-send-email-shawn.guo@linaro.org>
+References: <1311046444-25423-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <4E257ACD.6080608@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello.
 
-On Monday 18 July 2011 01:38 PM, Tony Lindgren wrote:
-> * Arnd Bergmann<arnd@arndb.de>  [110717 14:36]:
->> Hi Paul and Tomi,
->>
->> I'm trying to get the arm-soc tree integrated into linux-next, but right
->> now that fails because of lots of conflicts in the arch/arm/mach-omap2/clock44xx_data.c
->> and arch/arm/mach-omap2/omap_hwmod_44xx_data.c files.
->>
->> I've done a dumb resolution by pulling in the omap_dss2/for_next tree as a
->> depedency and taking Tomi's version of the files, which is probably wrong
->> but lets Stephen at least take the arm-soc tree.
->
-> Yes that's the wrong way around for these files..
->
->> Please fix this properly in either the omap or the omap_dss2 trees.
->
-> The clock and hwmod data patches should get queued by Benoit and Paul,
-> so I'm suspecting these are some of Tomi's patches still in development.
->
-> Tomi can you please check what you have in for-next?
+On 19-07-2011 7:34, Shawn Guo wrote:
 
-Tomi is on vacation right now, but he checks his mail once in a while, 
-so we may get a response soon.
+> The following commit renames irq_gc_ack() to irq_gc_ack_set_bit(),
+> and makes gpio-mxc and gpio-mxs fail to build.
 
-Tomi's for-next branch is not up to date yet. So it shouldn't be 
-considered for now. The HWMOD patches in Tomi's for-next branch will be 
-pushed by Paul as 3.1-rc fixes.
+>    659fb32d1b67476f4ade25e9ea0e2642a5b9c4b5
+>    genirq: replace irq_gc_ack() with {set,clr}_bit variants (fwd)
 
-We will make a temporary branch which will contain all the DSS2 patches 
-which Tomi intended to push for this merge window, once he gets a 
-chance, he can quickly update his for-next branch with it.
+> Signed-off-by: Shawn Guo<shawn.guo@linaro.org>
+> ---
+> The build error is being seen on linux-next.
 
-Archit
+>   drivers/gpio/gpio-mxc.c |    2 +-
+>   drivers/gpio/gpio-mxs.c |    2 +-
+>   2 files changed, 2 insertions(+), 2 deletions(-)
 
+> diff --git a/drivers/gpio/gpio-mxc.c b/drivers/gpio/gpio-mxc.c
+> index 89fda58..4a46fbe 100644
+> --- a/drivers/gpio/gpio-mxc.c
+> +++ b/drivers/gpio/gpio-mxc.c
+> @@ -297,7 +297,7 @@ static void __init mxc_gpio_init_gc(struct mxc_gpio_port *port)
+>   	gc->private = port;
 >
-> Regards,
+>   	ct = gc->chip_types;
+> -	ct->chip.irq_ack = irq_gc_ack,
+> +	ct->chip.irq_ack = irq_gc_ack_set_bit,
+
+    There should be semicolon rathern than comma at the end.
+
+>   	ct->chip.irq_mask = irq_gc_mask_clr_bit;
+>   	ct->chip.irq_unmask = irq_gc_mask_set_bit;
+>   	ct->chip.irq_set_type = gpio_set_irq_type;
+> diff --git a/drivers/gpio/gpio-mxs.c b/drivers/gpio/gpio-mxs.c
+> index d8cafba..88f8506 100644
+> --- a/drivers/gpio/gpio-mxs.c
+> +++ b/drivers/gpio/gpio-mxs.c
+> @@ -156,7 +156,7 @@ static void __init mxs_gpio_init_gc(struct mxs_gpio_port *port)
+>   	gc->private = port;
 >
-> Tony
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
+>   	ct = gc->chip_types;
+> -	ct->chip.irq_ack = irq_gc_ack,
+> +	ct->chip.irq_ack = irq_gc_ack_set_bit,
+
+    Same here.
+
+WBR, Sergei
