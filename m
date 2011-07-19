@@ -1,39 +1,26 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 19 Jul 2011 11:43:08 +0100
-Subject: [RFC] Improving scalability of smp_mb__[before|after]_clear_bit
-In-Reply-To: <CAN_5kQAniGQgLix4nAsLpJZ3r=LR_NDjuvaXokJ=NiwLfp=7zw@mail.gmail.com>
-References: <CAN_5kQAniGQgLix4nAsLpJZ3r=LR_NDjuvaXokJ=NiwLfp=7zw@mail.gmail.com>
-Message-ID: <20110719104308.GD26574@n2100.arm.linux.org.uk>
+Date: Tue, 19 Jul 2011 11:53:02 +0100
+Subject: [PATCH] ARM: get rid of a few StrongARM cache-related build
+	time constants
+In-Reply-To: <20110711211058.GF8486@n2100.arm.linux.org.uk>
+References: <1309919636-20546-1-git-send-email-nicolas.pitre@linaro.org>
+	<20110706075542.GK8286@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1107060912490.14596@xanadu.home>
+	<20110707170631.GB20403@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1107111021020.14596@xanadu.home>
+	<20110711211058.GF8486@n2100.arm.linux.org.uk>
+Message-ID: <20110719105302.GE26574@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 12, 2011 at 12:34:59AM -0700, heechul Yun wrote:
-> I think L2 cache sync operation, called by mb(), is not necessary for bitops.
-> This patch improves lat_pagefault of lmbench by up to 11% on a A9 SMP.
-> Higher proceesor
-> counts can benefit more.
-
-bitops should only be used on normal memory and not for stuff used for IO,
-so this should be safe.
-
-Could you submit it to the patch system please with Catalins ack?
-
-Thanks.
-
+On Mon, Jul 11, 2011 at 10:10:58PM +0100, Russell King - ARM Linux wrote:
+> On Mon, Jul 11, 2011 at 10:38:54AM -0400, Nicolas Pitre wrote:
+> > So here is this patch again with all fixes folded in:
 > 
-> ---
-> diff --git a/arch/arm/include/asm/bitops.h b/arch/arm/include/asm/bitops.h
-> index b4892a0..f428059 100644
-> --- a/arch/arm/include/asm/bitops.h
-> +++ b/arch/arm/include/asm/bitops.h
-> @@ -26,8 +26,8 @@
->  #include <linux/compiler.h>
->  #include <asm/system.h>
-> 
-> -#define smp_mb__before_clear_bit()     mb()
-> -#define smp_mb__after_clear_bit()      mb()
-> +#define smp_mb__before_clear_bit()     smp_mb()
-> +#define smp_mb__after_clear_bit()      smp_mb()
-> 
->  /*
->   * These functions are the basis of our bit ops.
+> Thanks.  I didn't get a chance to test the original on anything but
+> Assabet yet.  I'll try to make some time for the other platforms this
+> week.
+
+You've put it in the patch system.  I still haven't tested it, and I'm
+not going to test it this side of the merge window, so I'm not applying
+it yet.
