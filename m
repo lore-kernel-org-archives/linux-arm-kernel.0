@@ -1,68 +1,130 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Sun, 31 Jul 2011 23:42:26 +0200
-Subject: [PULL] at91 init factorize
-In-Reply-To: <20110731034417.GA6255@game.jcrosoft.org>
-References: <20110727121156.GK10037@game.jcrosoft.org>
-	<201107271647.44015.arnd@arndb.de>
-	<20110727233452.GN10037@game.jcrosoft.org>
-	<201107281758.27738.arnd@arndb.de>
-	<20110730074623.GG25658@game.jcrosoft.org>
-	<alpine.LFD.2.00.1107301434160.12766@xanadu.home>
-	<20110731034417.GA6255@game.jcrosoft.org>
-Message-ID: <4E35CC42.8050403@atmel.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 19 Jul 2011 09:37:10 +0100
+Subject: [RFC PATCH 04/15] ARM: perf: remove active_mask
+Message-ID: <mailman.74.1313415781.20020.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/31/2011 05:44 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 14:39 Sat 30 Jul     , Nicolas Pitre wrote:
->> On Sat, 30 Jul 2011, Jean-Christophe PLAGNIOL-VILLARD wrote:
->>
->>> On 17:58 Thu 28 Jul     , Arnd Bergmann wrote:
->>>> On Thursday 28 July 2011, Jean-Christophe PLAGNIOL-VILLARD wrote:
->>>>>> The patches look good, but come at an inconvenient time. We're still
->>>>>> in the merge window, so I don't want to add stuff to linux-next yet
->>>>>> that is destined for 3.2, and I have already sent out all the arm-soc
->>>>>> patches for the 3.1 merge window, so I don't really want to send another
->>>>>> round of patches at the last minute.
->>>>> this are waiting ofr 2 release already
->>>>>
->>>>> and was inthe next last release for more than 1 month
->>>>>
->>>>> can we have them merge this time
->>>>
->>>> What I don't understand at all is why you are waiting instead of sending
->>>> a pull request for all that time then. I've repeatedly given announcements
->>>> about the state of the arm-soc tree and asked people to send patches
->>>> they want in 3.1, and you actually sent bug fixes that way earlier
->>>>
->>>> You've had more than enough time before the merge window, and would even
->>>> have made an exception if you had sent your stuff a few hours earlier,
->>>> before I sent everything to Linus.
->>>> Also, the branch you sent me was created on the same day, meaning that
->>>> it can't possibly have had a lot of testing (though it looks harmless
->>>> enough). When you send a pull request, the patches should always be
->>>> based on an -rc or main release to simplify the merge history, and
->>>> it's better not to rebase to the latest one if you already have the
->>>> patches.
->>> sorry but those patch are 4 motnhs old and yes I rebase the branch to the
->>> current linus tree before send the pull request.
->>
->> Please don't do that.  It is best if you keep the same branch content
->> identical to what has been tested and validated for a while.
-> except I send time to retest it
+Currently, pmu_hw_events::active_mask is used to keep track of which
+events are active in hardware. As we can stop counters and their
+interrupts, this is unnecessary.
 
-Jean-Christophe,
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Reviewed-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/kernel/perf_event.c        |    8 --------
+ arch/arm/kernel/perf_event_v6.c     |   19 ++++++++++++++++++-
+ arch/arm/kernel/perf_event_v7.c     |    3 ---
+ arch/arm/kernel/perf_event_xscale.c |    6 ------
+ 4 files changed, 18 insertions(+), 18 deletions(-)
 
-There is nothing to say in addition:
-1/ Arnd has been kind enough to pull those changes in his tree (even 
-correcting little things)
-2/ Arnd has been kind enough to send a late pull request to Linus
-3/ Linus has merged those changes in his tree.
-
-So there is only one word to tell to those people: thanks guys!
-
-Yes, and maybe one more thing to tell them: next time we will do better...
-
-Bye,
+diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
+index dfde928..438482f 100644
+--- a/arch/arm/kernel/perf_event.c
++++ b/arch/arm/kernel/perf_event.c
+@@ -57,12 +57,6 @@ struct cpu_hw_events {
+ 	 * an event. A 0 means that the counter can be used.
+ 	 */
+ 	unsigned long		used_mask[BITS_TO_LONGS(ARMPMU_MAX_HWEVENTS)];
+-
+-	/*
+-	 * A 1 bit for an index indicates that the counter is actively being
+-	 * used.
+-	 */
+-	unsigned long		active_mask[BITS_TO_LONGS(ARMPMU_MAX_HWEVENTS)];
+ };
+ static DEFINE_PER_CPU(struct cpu_hw_events, cpu_hw_events);
+ 
+@@ -295,7 +289,6 @@ armpmu_del(struct perf_event *event, int flags)
+ 
+ 	WARN_ON(idx < 0);
+ 
+-	clear_bit(idx, cpuc->active_mask);
+ 	armpmu_stop(event, PERF_EF_UPDATE);
+ 	cpuc->events[idx] = NULL;
+ 	clear_bit(idx, cpuc->used_mask);
+@@ -327,7 +320,6 @@ armpmu_add(struct perf_event *event, int flags)
+ 	event->hw.idx = idx;
+ 	armpmu->disable(hwc, idx);
+ 	cpuc->events[idx] = event;
+-	set_bit(idx, cpuc->active_mask);
+ 
+ 	hwc->state = PERF_HES_STOPPED | PERF_HES_UPTODATE;
+ 	if (flags & PERF_EF_START)
+diff --git a/arch/arm/kernel/perf_event_v6.c b/arch/arm/kernel/perf_event_v6.c
+index 87f29b5..8390128 100644
+--- a/arch/arm/kernel/perf_event_v6.c
++++ b/arch/arm/kernel/perf_event_v6.c
+@@ -462,6 +462,23 @@ armv6pmu_enable_event(struct hw_perf_event *hwc,
+ 	raw_spin_unlock_irqrestore(&pmu_lock, flags);
+ }
+ 
++static int counter_is_active(unsigned long pmcr, int idx)
++{
++	unsigned long mask = 0;
++	if (idx == ARMV6_CYCLE_COUNTER)
++		mask = ARMV6_PMCR_CCOUNT_IEN;
++	else if (idx == ARMV6_COUNTER0)
++		mask = ARMV6_PMCR_COUNT0_IEN;
++	else if (idx == ARMV6_COUNTER1)
++		mask = ARMV6_PMCR_COUNT1_IEN;
++
++	if (mask)
++		return pmcr & mask;
++
++	WARN_ONCE(1, "invalid counter number (%d)\n", idx);
++	return 0;
++}
++
+ static irqreturn_t
+ armv6pmu_handle_irq(int irq_num,
+ 		    void *dev)
+@@ -491,7 +508,7 @@ armv6pmu_handle_irq(int irq_num,
+ 		struct perf_event *event = cpuc->events[idx];
+ 		struct hw_perf_event *hwc;
+ 
+-		if (!test_bit(idx, cpuc->active_mask))
++		if (!counter_is_active(pmcr, idx))
+ 			continue;
+ 
+ 		/*
+diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
+index fe6c931..f4170fc 100644
+--- a/arch/arm/kernel/perf_event_v7.c
++++ b/arch/arm/kernel/perf_event_v7.c
+@@ -1022,9 +1022,6 @@ static irqreturn_t armv7pmu_handle_irq(int irq_num, void *dev)
+ 		struct perf_event *event = cpuc->events[idx];
+ 		struct hw_perf_event *hwc;
+ 
+-		if (!test_bit(idx, cpuc->active_mask))
+-			continue;
+-
+ 		/*
+ 		 * We have a single interrupt for all counters. Check that
+ 		 * each counter has overflowed before we process it.
+diff --git a/arch/arm/kernel/perf_event_xscale.c b/arch/arm/kernel/perf_event_xscale.c
+index 54312fc..ca89a06 100644
+--- a/arch/arm/kernel/perf_event_xscale.c
++++ b/arch/arm/kernel/perf_event_xscale.c
+@@ -253,9 +253,6 @@ xscale1pmu_handle_irq(int irq_num, void *dev)
+ 		struct perf_event *event = cpuc->events[idx];
+ 		struct hw_perf_event *hwc;
+ 
+-		if (!test_bit(idx, cpuc->active_mask))
+-			continue;
+-
+ 		if (!xscale1_pmnc_counter_has_overflowed(pmnc, idx))
+ 			continue;
+ 
+@@ -585,9 +582,6 @@ xscale2pmu_handle_irq(int irq_num, void *dev)
+ 		struct perf_event *event = cpuc->events[idx];
+ 		struct hw_perf_event *hwc;
+ 
+-		if (!test_bit(idx, cpuc->active_mask))
+-			continue;
+-
+ 		if (!xscale2_pmnc_counter_has_overflowed(pmnc, idx))
+ 			continue;
+ 
 -- 
-Nicolas Ferre
+1.7.0.4
