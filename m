@@ -1,43 +1,47 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 19 Jul 2011 16:59:45 +0800
-Subject: [PATCH v3 0/4] Add device tree probe for sdhci-esdhc-imx
-In-Reply-To: <20110719081027.GM20587@pengutronix.de>
-References: <1309970870-13336-1-git-send-email-shawn.guo@linaro.org>
-	<m2pqljje3w.fsf@bob.laptop.org>
-	<20110710013708.GA14492@S2100-06.ap.freescale.net>
-	<m262mzavhb.fsf@bob.laptop.org>
-	<20110719081027.GM20587@pengutronix.de>
-Message-ID: <20110719085944.GJ3838@S2100-06.ap.freescale.net>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Tue, 19 Jul 2011 14:26:50 +0530
+Subject: [PATCH] davinci: fix DM365 EVM video input mux bits
+In-Reply-To: <1311046211-2849-1-git-send-email-jon.povey@racelogic.co.uk>
+References: <1311046211-2849-1-git-send-email-jon.povey@racelogic.co.uk>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024DBDC68A@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 19, 2011 at 10:10:27AM +0200, Sascha Hauer wrote:
-> On Mon, Jul 18, 2011 at 09:51:28PM -0400, Chris Ball wrote:
-> > Hi Shawn, Sascha,
-> > 
-> > On Sat, Jul 09 2011, Shawn Guo wrote:
-> > >> > Shawn Guo (4):
-> > >> >       mmc: sdhci-esdhc-imx: do not reference platform data after probe
-> > >> >       mmc: sdhci-esdhc-imx: get rid of the uses of cpu_is_mx()
-> > >> >       mmc: sdhci-pltfm: dt device does not pass parent to sdhci_alloc_host
-> > >> >       mmc: sdhci-esdhc-imx: add device tree probe support
-> > >> 
-> > >> These don't apply against mmc-next -- what is your tree based on?
-> > >> 
-> > > It's based on linux-next with following patch applied.
-> > >
-> > > [PATCH v4 4/4] mmc: sdhci-esdhc-imx: extend card_detect and
-> > > write_protect support for mx5
-> > > http://permalink.gmane.org/gmane.linux.kernel.mmc/8748
-> > >
-> > > You applied the 3 of 4 patches in that series, and expect Sascha to
-> > > send this one through his tree after you send those 3.
-> 
-> Shawn, please ping me once all dependencies have been merged. I have no
-> influence when my patches get merged since my patches go via Arnd.
-> 
-Ok, will do.
+Hi Jon,
 
--- 
-Regards,
-Shawn
+On Tue, Jul 19, 2011 at 09:00:11, Jon Povey wrote:
+> Video input mux settings for tvp7002 and imager inputs were swapped.
+> Comment was correct.
+> 
+> Tested on EVM with tvp7002 input.
+> 
+> Signed-off-by: Jon Povey <jon.povey@racelogic.co.uk>
+
+Thanks for the fix.
+
+Since this part of the code hasn't changed since it
+was written, this is a good candidate for stable
+kernel series. You can just add:
+
+Cc: stable at kernel.org
+
+Also, this way if the fix fails to make it to 3.0,
+it can make it into its stable series. I will add
+the Cc line when I queue this patch.
+
+> ---
+> As a bugfix maybe this should try to get into 3.0?
+
+I am going queue this to Arnd for sending it for v3.0.
+He hasn't yet picked up my earlier pull request yet so
+keep fingers crossed :)
+
+BTW, I changed the subject to:
+
+"davinci: DM365 EVM: fix video input mux bits"
+
+Nothing really wrong with what you had, just that
+I prefer it this way.
+
+Thanks,
+Sekhar
