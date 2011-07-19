@@ -1,43 +1,31 @@
-From: jon.povey@racelogic.co.uk (Jon Povey)
-Date: Tue, 19 Jul 2011 12:30:11 +0900
-Subject: [PATCH] davinci: fix DM365 EVM video input mux bits
-Message-ID: <1311046211-2849-1-git-send-email-jon.povey@racelogic.co.uk>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Tue, 19 Jul 2011 12:09:56 +0800
+Subject: [PATCH 1/1] ARM: mxs-dma: reset after disable channel
+Message-ID: <1311048596-19932-1-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Video input mux settings for tvp7002 and imager inputs were swapped.
-Comment was correct.
+We met some channels in abnormal state after disable.
+Reset it to get a clean state.
 
-Tested on EVM with tvp7002 input.
-
-Signed-off-by: Jon Povey <jon.povey@racelogic.co.uk>
+Signed-off-by: Dong Aisheng <b29396@freescale.com>
+Cc: Vinod Koul <vinod.koul@intel.com>
+Cc: Shawn Guo <shawn.guo@linaro.org>
 ---
-As a bugfix maybe this should try to get into 3.0?
+ drivers/dma/mxs-dma.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
- arch/arm/mach-davinci/board-dm365-evm.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-davinci/board-dm365-evm.c b/arch/arm/mach-davinci/board-dm365-evm.c
-index c67f684..09a87e6 100644
---- a/arch/arm/mach-davinci/board-dm365-evm.c
-+++ b/arch/arm/mach-davinci/board-dm365-evm.c
-@@ -520,7 +520,7 @@ fail:
- 	 */
- 	if (have_imager()) {
- 		label = "HD imager";
--		mux |= 1;
-+		mux |= 2;
- 
- 		/* externally mux MMC1/ENET/AIC33 to imager */
- 		mux |= BIT(6) | BIT(5) | BIT(3);
-@@ -540,7 +540,7 @@ fail:
- 		resets &= ~BIT(1);
- 
- 		if (have_tvp7002()) {
--			mux |= 2;
-+			mux |= 1;
- 			resets &= ~BIT(2);
- 			label = "tvp7002 HD";
- 		} else {
+diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
+index 88aad4f..5a24010 100644
+--- a/drivers/dma/mxs-dma.c
++++ b/drivers/dma/mxs-dma.c
+@@ -535,6 +535,7 @@ static int mxs_dma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+ 	switch (cmd) {
+ 	case DMA_TERMINATE_ALL:
+ 		mxs_dma_disable_chan(mxs_chan);
++		mxs_dma_reset_chan(mxs_chan);
+ 		break;
+ 	case DMA_PAUSE:
+ 		mxs_dma_pause_chan(mxs_chan);
 -- 
-1.6.3.3
+1.7.0.4
