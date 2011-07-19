@@ -1,176 +1,33 @@
-From: per.forlin@linaro.org (Per Forlin)
-Date: Tue, 19 Jul 2011 08:17:02 +0200
-Subject: [PATCH v9 11/12] mmc: core: add random fault injection
-In-Reply-To: <1309539333-2606-12-git-send-email-per.forlin@linaro.org>
-References: <1309539333-2606-1-git-send-email-per.forlin@linaro.org>
-	<1309539333-2606-12-git-send-email-per.forlin@linaro.org>
-Message-ID: <CAJ0pr19Ktx_R8Zmr=rDivhc5A__N7OwoSj3ehitX_pS_xmooSA@mail.gmail.com>
+From: Jon.Povey@racelogic.co.uk (Jon Povey)
+Date: Tue, 19 Jul 2011 07:28:19 +0100
+Subject: [PATCH] davinci: fix DM365 EVM video input mux bits
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024BCEF73E@dbde02.ent.ti.com>
+Message-ID: <70E876B0EA86DD4BAF101844BC814DFE0B4E0859D7@Cloud.RL.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch prevents mmc core to be built as a module if mmc fault
-injection is selected.
+Hadli, Manjunath wrote:
+> Jon,
+>
+> The fix looks correct. As a part of a different
+> implementation which will go soon upstream, this has been
+> taken care of, where we have used macros
+> CPLD_VIDEO_INPUT_MUX_TVP7002    0x1
+> CPLD_VIDEO_INPUT_MUX_IMAGER     0x2
+>
+> So, if you can do the same, it will look better.
 
-Changes needed to resolve this:
- * remove fault inject module from core.c
- * export should_fail() and init_fault_attr_dentries() in fault-injection.c
- * update documentation fault-injection.txt
+If you have a patch you can split out that has your defines
+where and how you want them then great.
 
-On 1 July 2011 18:55, Per Forlin <per.forlin@linaro.org> wrote:
-> This simple fault injection proved to be very useful to
-> test the error handling in the block.c rw_rq(). It may
-> still be useful to test if the host driver handle
-> pre_req() and post_req() correctly in case of errors.
->
-> Signed-off-by: Per Forlin <per.forlin@linaro.org>
-> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> Reviewed-by: Venkatraman S <svenkatr@ti.com>
-> Tested-by: Sourav Poddar<sourav.poddar@ti.com>
-> Tested-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> ?drivers/mmc/core/core.c ? ?| ? 54 ++++++++++++++++++++++++++++++++++++++++++++
-> ?drivers/mmc/core/debugfs.c | ? ?5 ++++
-> ?include/linux/mmc/host.h ? | ? ?3 ++
-> ?lib/Kconfig.debug ? ? ? ? ?| ? 11 +++++++++
-> ?4 files changed, 73 insertions(+), 0 deletions(-)
->
-> diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
-> index d2d7239..62a8cc7 100644
-> --- a/drivers/mmc/core/core.c
-> +++ b/drivers/mmc/core/core.c
-> @@ -23,6 +23,8 @@
-> ?#include <linux/log2.h>
-> ?#include <linux/regulator/consumer.h>
-> ?#include <linux/pm_runtime.h>
-> +#include <linux/fault-inject.h>
-> +#include <linux/random.h>
->
-> ?#include <linux/mmc/card.h>
-> ?#include <linux/mmc/host.h>
-> @@ -82,6 +84,56 @@ static void mmc_flush_scheduled_work(void)
-> ? ? ? ?flush_workqueue(workqueue);
-> ?}
->
-> +#ifdef CONFIG_FAIL_MMC_REQUEST
-> +
-> +static DECLARE_FAULT_ATTR(fail_mmc_request);
-> +
-> +static int __init setup_fail_mmc_request(char *str)
-> +{
-> + ? ? ? return setup_fault_attr(&fail_mmc_request, str);
-> +}
-> +__setup("fail_mmc_request=", setup_fail_mmc_request);
-> +
-> +static void mmc_should_fail_request(struct mmc_host *host,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct mmc_request *mrq)
-> +{
-> + ? ? ? struct mmc_command *cmd = mrq->cmd;
-> + ? ? ? struct mmc_data *data = mrq->data;
-> + ? ? ? static const int data_errors[] = {
-> + ? ? ? ? ? ? ? -ETIMEDOUT,
-> + ? ? ? ? ? ? ? -EILSEQ,
-> + ? ? ? ? ? ? ? -EIO,
-> + ? ? ? };
-> +
-> + ? ? ? if (!data)
-> + ? ? ? ? ? ? ? return;
-> +
-> + ? ? ? if (cmd->error || data->error || !host->make_it_fail ||
-> + ? ? ? ? ? !should_fail(&fail_mmc_request, data->blksz * data->blocks))
-> + ? ? ? ? ? ? ? return;
-> +
-> + ? ? ? data->error = data_errors[random32() % ARRAY_SIZE(data_errors)];
-> + ? ? ? data->bytes_xfered = (random32() % (data->bytes_xfered >> 9)) << 9;
-> +}
-> +
-> +static int __init fail_mmc_request_debugfs(void)
-> +{
-> + ? ? ? return init_fault_attr_dentries(&fail_mmc_request,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "fail_mmc_request");
-> +}
-> +
-> +late_initcall(fail_mmc_request_debugfs);
-This line prevents mmc core to be built as a module, since there will
-be two init_module (the mmc core one and this one) for the same
-module.
+Otherwise I'd suggest just getting this or something equivalent
+in to fix the bug first, and reimplement it later.
 
-> +
-> +#else /* CONFIG_FAIL_MMC_REQUEST */
-> +
-> +static void mmc_should_fail_request(struct mmc_host *host,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct mmc_request *mrq)
-> +{
-> +}
-> +
-+static int __init fail_mmc_request_debugfs(void)
-+{
-+}
-Add fail_mmc_request_debugfs here and call it from mmc_init()
+--
+Jon Povey
+jon.povey at racelogic.co.uk
 
-> +#endif /* CONFIG_FAIL_MMC_REQUEST */
-> +
-> +
-> ?/**
-> ?* ? ? mmc_request_done - finish processing an MMC request
-> ?* ? ? @host: MMC host which completed request
-> @@ -108,6 +160,8 @@ void mmc_request_done(struct mmc_host *host, struct mmc_request *mrq)
-> ? ? ? ? ? ? ? ?cmd->error = 0;
-> ? ? ? ? ? ? ? ?host->ops->request(host, mrq);
-> ? ? ? ?} else {
-> + ? ? ? ? ? ? ? mmc_should_fail_request(host, mrq);
-> +
-> ? ? ? ? ? ? ? ?led_trigger_event(host->led, LED_OFF);
->
-> ? ? ? ? ? ? ? ?pr_debug("%s: req done (CMD%u): %d: %08x %08x %08x %08x\n",
-> diff --git a/drivers/mmc/core/debugfs.c b/drivers/mmc/core/debugfs.c
-> index 998797e..588e76f 100644
-> --- a/drivers/mmc/core/debugfs.c
-> +++ b/drivers/mmc/core/debugfs.c
-> @@ -188,6 +188,11 @@ void mmc_add_host_debugfs(struct mmc_host *host)
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?root, &host->clk_delay))
-> ? ? ? ? ? ? ? ?goto err_node;
-> ?#endif
-> +#ifdef CONFIG_FAIL_MMC_REQUEST
-> + ? ? ? if (!debugfs_create_u8("make-it-fail", S_IRUSR | S_IWUSR,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?root, &host->make_it_fail))
-> + ? ? ? ? ? ? ? goto err_node;
-> +#endif
-> ? ? ? ?return;
->
-> ?err_node:
-> diff --git a/include/linux/mmc/host.h b/include/linux/mmc/host.h
-> index 59db6f2..0d0a48f 100644
-> --- a/include/linux/mmc/host.h
-> +++ b/include/linux/mmc/host.h
-> @@ -301,6 +301,9 @@ struct mmc_host {
->
-> ? ? ? ?struct mmc_async_req ? ?*areq; ? ? ? ? ?/* active async req */
->
-> +#ifdef CONFIG_FAIL_MMC_REQUEST
-> + ? ? ? u8 ? ? ? ? ? ? ? ? ? ? ?make_it_fail;
-> +#endif
-> ? ? ? ?unsigned long ? ? ? ? ? private[0] ____cacheline_aligned;
-> ?};
->
-> diff --git a/lib/Kconfig.debug b/lib/Kconfig.debug
-> index c768bcd..330fc70 100644
-> --- a/lib/Kconfig.debug
-> +++ b/lib/Kconfig.debug
-> @@ -1057,6 +1057,17 @@ config FAIL_IO_TIMEOUT
-> ? ? ? ? ?Only works with drivers that use the generic timeout handling,
-> ? ? ? ? ?for others it wont do anything.
->
-> +config FAIL_MMC_REQUEST
-> + ? ? ? bool "Fault-injection capability for MMC IO"
-> + ? ? ? select DEBUG_FS
-> + ? ? ? depends on FAULT_INJECTION
-depends on FAULT_INJECTION && MMC
+Racelogic is a limited company registered in England. Registered number 2743719 .
+Registered Office Unit 10, Swan Business Centre, Osier Way, Buckingham, Bucks, MK18 1TB .
 
-> + ? ? ? help
-> + ? ? ? ? Provide fault-injection capability for MMC IO.
-> + ? ? ? ? This will make the mmc core return data errors. This is
-> + ? ? ? ? useful for testing the error handling in the mmc block device
-> + ? ? ? ? and how the mmc host driver handle retries from
-> + ? ? ? ? the block device.
-and test how the mmc host driver handle retries from
+The information contained in this electronic mail transmission is intended by Racelogic Ltd for the use of the named individual or entity to which it is directed and may contain information that is confidential or privileged. If you have received this electronic mail transmission in error, please delete it from your system without copying or forwarding it, and notify the sender of the error by reply email so that the sender's address records can be corrected. The views expressed by the sender of this communication do not necessarily represent those of Racelogic Ltd. Please note that Racelogic reserves the right to monitor e-mail communications passing through its network
