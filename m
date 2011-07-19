@@ -1,36 +1,57 @@
-From: ivan.djelic@parrot.com (Ivan Djelic)
-Date: Tue, 19 Jul 2011 08:48:02 +0200
+From: b32955@freescale.com (Huang Shijie)
+Date: Tue, 19 Jul 2011 15:03:45 +0800
 Subject: [i.MX28 GPMI] problem overwriting all-0xff data in NAND
-In-Reply-To: <20005.7506.283476.184839@ipc1.ka-ro>
-References: <20004.12663.29494.339601@ipc1.ka-ro>
-	<20110718145635.GA24419@parrot.com>
-	<20005.7506.283476.184839@ipc1.ka-ro>
-Message-ID: <20110719064802.GA5788@parrot.com>
+In-Reply-To: <20005.7677.145955.789329@ipc1.ka-ro>
+References: <20004.12663.29494.339601@ipc1.ka-ro>	<20110718164354.GA3328@S2100-06.ap.freescale.net>	<4E24E804.10002@freescale.com>
+	<20005.7677.145955.789329@ipc1.ka-ro>
+Message-ID: <4E252C51.8070900@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 19, 2011 at 06:59:46AM +0100, Lothar Wa?mann wrote:
-> I'm writing a JFFS2 image file that is padded with 0xff to eraseblock
-> size to flash (either from the bootloader or with the nandwrite
-> utility from Linux).
-> When mounting the filesystem everything is OK until the first file is
-> being written. A subsequent read of the affected flash page gives ECC
-> errors.
-> 
-> JFFS2 is giving out the first all-FF page in the last used block for
-> creating the new file. Since that block has a non-FF ECC pattern, the
-> ECC information is being corrupted on write.
+? 2011?07?19? 14:02, Lothar Wa?mann ??:
+> Hi,
+>
+> Huang Shijie writes:
+>> hi  Lothar:
+>>> On Mon, Jul 18, 2011 at 03:13:27PM +0200, Lothar Wa?mann wrote:
+>>>> Hi,
+>>>>
+>>>> with the gpmi-nfc driver for imx28 from Shawn Guo on a TX28 I
+>>> To be clear, the author of gpmi-nfc driver is Huang Shijie (Cc-ed).
+>>>
+>>> Regards,
+>>> Shawn
+>>>
+>>>> encountered some problems with jffs2 when overwriting pages that have
+>>>> been written with 0xff (e.g. from padding from the file system image
+>>>> file).
+>> The GPMI driver now does not support the JFFS2 very well.
+>> The JFFS2 will write the OOB, while the BCH of GPMI will use the OOB too.
+>>
+> I have applied a patch (from the Freescale BSPs) that prevents JFFS2
+> from using the OOB area. But this still doesn't help.
+>
+Could you show the log ?
 
-OK, thanks for the clarification. So the problem only happens on partially
-programmed blocks in the JFFS2 image, that end up fully programmed on the
-device because of the 0xff padding.
+>> So I have to disable the JFFS2 to use the OOB. I have not finish the
+>> code about it now.
+>>
+>> I recommend you use the UBIFS. But the latest version of GPMI driver
+>> meets a DMA bug.
+>> I am debugging the DMA bug now. and I will send it out when i fix it.
+>>
+> What sort of DMA bug?
+>
 
-I think the cleaner solution is to use a non-padded image and avoid programming
-pages with 0xff in the last used block; programming nand pages multiple times
-should be avoided if possible, as it is not supported on all (especially the
-most recent) devices.
+The DMA may time-out. :(
 
-BR,
+The DMA time-out may occur in two situations:
+[1] send a command DMA descriptor, see the nfc->send_command() function.
+[2] read the non-ecc data from nand, see the nfc->read_data() function.
 
---
-Ivan
+I don't know why. Maybe caused by the timing, or something else.
+
+Best Regards
+Huang Shijie
+
+> Lothar Wa?mann
