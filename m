@@ -1,56 +1,39 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 19 Jul 2011 10:10:27 +0200
-Subject: [PATCH v3 0/4] Add device tree probe for sdhci-esdhc-imx
-In-Reply-To: <m262mzavhb.fsf@bob.laptop.org>
-References: <1309970870-13336-1-git-send-email-shawn.guo@linaro.org>
-	<m2pqljje3w.fsf@bob.laptop.org>
-	<20110710013708.GA14492@S2100-06.ap.freescale.net>
-	<m262mzavhb.fsf@bob.laptop.org>
-Message-ID: <20110719081027.GM20587@pengutronix.de>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Tue, 19 Jul 2011 10:21:46 +0200
+Subject: [PATCH 1/1] ARM: mxs-dma: reset after disable channel
+In-Reply-To: <20110719040215.GF3838@S2100-06.ap.freescale.net>
+References: <1311048596-19932-1-git-send-email-b29396@freescale.com>
+	<20110719040215.GF3838@S2100-06.ap.freescale.net>
+Message-ID: <20110719082146.GA1951@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 18, 2011 at 09:51:28PM -0400, Chris Ball wrote:
-> Hi Shawn, Sascha,
+On Tue, Jul 19, 2011 at 12:02:16PM +0800, Shawn Guo wrote:
+> On Tue, Jul 19, 2011 at 12:09:56PM +0800, Dong Aisheng wrote:
+> > We met some channels in abnormal state after disable.
+> > Reset it to get a clean state.
+> > 
+> > Signed-off-by: Dong Aisheng <b29396@freescale.com>
+> > Cc: Vinod Koul <vinod.koul@intel.com>
+> > Cc: Shawn Guo <shawn.guo@linaro.org>
+> > ---
 > 
-> On Sat, Jul 09 2011, Shawn Guo wrote:
-> >> > Shawn Guo (4):
-> >> >       mmc: sdhci-esdhc-imx: do not reference platform data after probe
-> >> >       mmc: sdhci-esdhc-imx: get rid of the uses of cpu_is_mx()
-> >> >       mmc: sdhci-pltfm: dt device does not pass parent to sdhci_alloc_host
-> >> >       mmc: sdhci-esdhc-imx: add device tree probe support
-> >> 
-> >> These don't apply against mmc-next -- what is your tree based on?
-> >> 
-> > It's based on linux-next with following patch applied.
-> >
-> > [PATCH v4 4/4] mmc: sdhci-esdhc-imx: extend card_detect and
-> > write_protect support for mx5
-> > http://permalink.gmane.org/gmane.linux.kernel.mmc/8748
-> >
-> > You applied the 3 of 4 patches in that series, and expect Sascha to
-> > send this one through his tree after you send those 3.
+> Acked-by: Shawn Guo <shawn.guo@linaro.org>
 
-Shawn, please ping me once all dependencies have been merged. I have no
-influence when my patches get merged since my patches go via Arnd.
+Just to make sure: Did you investigate where the "abnormal" state came
+from and if that could be fixed?
 
-> 
-> I see.  In that case, either Sascha can send this new series with my:
-> 
-> Acked-by: Chris Ball <cjb@laptop.org>
-> 
-> or I'll send it as a second pull request after Sascha sends [4/4].
-> 
-> Thanks,
-> 
-> - Chris.
-> -- 
-> Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-> One Laptop Per Child
-> 
+Regards,
+
+   Wolfram
 
 -- 
-Pengutronix e.K.                           |                             |
+Pengutronix e.K.                           | Wolfram Sang                |
 Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110719/f22834db/attachment.sig>
