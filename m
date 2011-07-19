@@ -1,39 +1,45 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 19 Jul 2011 09:49:47 +0800
-Subject: [alsa-devel] [PATCH v3 00/10] ARM: mxs: add audio support
-In-Reply-To: <20110718203816.GA9457@pengutronix.de>
-References: <1310731780-1645-1-git-send-email-b29396@freescale.com>
-	<20110718203816.GA9457@pengutronix.de>
-Message-ID: <20110719014946.GD3838@S2100-06.ap.freescale.net>
+From: leoy@marvell.com (Leo Yan)
+Date: Tue, 19 Jul 2011 09:53:37 +0800
+Subject: [PATCH 0/2] Add audio sram support
+In-Reply-To: <25B60CDC2F704E4E9D88FFD52780CB4C05D3F4F2FA@SC-VEXCH1.marvell.com>
+References: <1310987888-541-1-git-send-email-leoy@marvell.com>
+	<25B60CDC2F704E4E9D88FFD52780CB4C05D3F4F2FA@SC-VEXCH1.marvell.com>
+Message-ID: <4E24E3A1.9080906@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 18, 2011 at 10:38:16PM +0200, Wolfram Sang wrote:
-> On Fri, Jul 15, 2011 at 08:09:30PM +0800, Dong Aisheng wrote:
-> 
-> > This patch series is to add audio support based on saif for mxs platform.
-> > The driver only supports playback currently.
-> > For capturing, due to hardware limitation that we have to use two saif
-> > instances to implement full duplex (playback & recording), we need to
-> > figure out a good design to fit in ASoC as the following work.
-> 
-> So, since the codec problems seem to be resolved now (and they were luckily
-> really just codec-problems):
-> 
-> For the ASoC-patches (1-4):
-> 
-> Tested-by: Wolfram Sang <w.sang@pengutronix.de>
-> 
-> For the mach-mxs-Patches (5-9, 10 is already picked up), assuming patch 6 will
-> lose the DIGCTRL-handling:
-> 
-> Reviewed-by: Wolfram Sang <w.sang@pengutronix.de>
-> 
-> I think this series is good for 3.1. Now we just need the mxs-dma bugfix on
-> top, but that's a different patch...
-> 
-Just to be clear,  Aisheng, you will submit the mxs-dma fix, right?
+So i need hold on after SRAM consolidation patches by Russell
+has been merged, right?
 
--- 
-Regards,
-Shawn
+On 2011?07?18? 21:12, Haojian Zhuang wrote:
+> There would be a common sram driver in mainline.
+> ________________________________________
+> From: Leo Yan [leoy at marvell.com]
+> Sent: Monday, July 18, 2011 7:18 PM
+> To: linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org; Haojian Zhuang; nicolas.pitre at linaro.org; Russell King
+> Cc: Leo Yan
+> Subject: [PATCH 0/2] Add audio sram support
+>
+> On mmp platform, there have 16KB sram buffer dedicated
+> to audio island. It can be to dynamically allocated for
+> versatile pcm devices. So implement the audio sram
+> allocator for managing it.
+>
+> Leo Yan (2):
+>    ARM: mmp: register audio sram device
+>    ARM: mmp: add audio sram allocator
+>
+>   arch/arm/Kconfig                            |    1 +
+>   arch/arm/mach-mmp/Makefile                  |    2 +-
+>   arch/arm/mach-mmp/audio_sram.c              |  118 +++++++++++++++++++++++++++
+>   arch/arm/mach-mmp/brownstone.c              |    1 +
+>   arch/arm/mach-mmp/include/mach/audio_sram.h |   31 +++++++
+>   arch/arm/mach-mmp/include/mach/mmp2.h       |    6 ++
+>   arch/arm/mach-mmp/mmp2.c                    |    1 +
+>   7 files changed, 159 insertions(+), 1 deletions(-)
+>   create mode 100644 arch/arm/mach-mmp/audio_sram.c
+>   create mode 100644 arch/arm/mach-mmp/include/mach/audio_sram.h
+>
+> --
+> 1.7.4.1
+>
