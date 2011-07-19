@@ -1,33 +1,31 @@
-From: BJulin@clarku.edu (Brian Julin)
-Date: Mon, 18 Jul 2011 19:54:36 -0400
-Subject: [PATCH] freshen up mm/proc-arm946.S
-In-Reply-To: <CA+wbFdeYFQP6GC2zzPW4EPdG82UECT8Fo1FxxHfYq0Rp2tu7qg@mail.gmail.com>
-References: <5A630F46702DD1498FFD48394B4A664CB39A93520F@john.ad.clarku.edu>,
-	<CA+wbFdeYFQP6GC2zzPW4EPdG82UECT8Fo1FxxHfYq0Rp2tu7qg@mail.gmail.com>
-Message-ID: <5A630F46702DD1498FFD48394B4A664CB39A935210@john.ad.clarku.edu>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 19 Jul 2011 09:17:26 +0800
+Subject: [PATCH 1/2] Input: gpio-keys: do not reference platform_data
+	after .probe exits
+In-Reply-To: <201107181002.45170.dmitry.torokhov@gmail.com>
+References: <1311007508-8096-1-git-send-email-shawn.guo@linaro.org>
+	<1311007508-8096-2-git-send-email-shawn.guo@linaro.org>
+	<201107181002.45170.dmitry.torokhov@gmail.com>
+Message-ID: <20110719011725.GB3838@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Jul 18, 2011 at 10:02:44AM -0700, Dmitry Torokhov wrote:
+> On Monday, July 18, 2011 09:45:07 AM Shawn Guo wrote:
+> > The patch makes a copy of platform data into driver data, so that any
+> > reference to platform_data after .probe exits can be avoided.
+> 
+> And why is this beneficial? I am of the opinion that platform data should
+> stay on (and be accessed through a const pointer to ensure that the driver
+> will not alter it).
+> 
+To me, it's a common sense that platform data should not be referenced
+after .probe exits, so that any platform code providing the data can
+claim the data as __initconst.  When we build multiple platforms which
+all have their own platform data for gpio_keys in the kernel, there is
+only one of them will be used by gpio_keys driver, others should be
+freed after init, no?
 
-On Monday, July 18, 2011 6:32 AM,  Dave Martin [dave.martin at linaro.org] wrote:
->  If you've not already done so, I suggest you check that your patch
-> applies against Russell's devel-stable branch.  There has been a bit
-> of refactoring of some of these files, but I think your patch will
-> stlil apply (unfortunately I'm not in a position to test it right
-> now).
->
-> The patch looks at least possibly correct (I'm not able to check that
-> either, today...)
-
-Hunk #1 succeeded at 411 (offset -36 lines).
-Hunk #2 succeeded at 420 (offset -36 lines).
-
-Good enough?  The "linux-next" tree on kernel.org seems to have the patched from 
-arm:stable that affect this file, and from the looks of things both hunks are still needed 
-and do not conflict with the renovations.
-
-So what now?  The last time I submitted a patch was over a decade ago... gerg mentioned
-something about "rmk's patch system"?
-
---
-Brian
+-- 
+Regards,
+Shawn
