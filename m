@@ -1,87 +1,77 @@
-From: manjugk@ti.com (G, Manjunath Kondaiah)
-Date: Tue, 19 Jul 2011 11:28:53 +0530
-Subject: [PATCH 3/4] dt: omap3: add generic board file for dt support
-In-Reply-To: <CACxGe6uzyxf35WDg6COnPVt3dhQv1H80L1svALxp4naySx2BcA@mail.gmail.com>
-References: <1310592975-25773-1-git-send-email-manjugk@ti.com>
-	<1310592975-25773-4-git-send-email-manjugk@ti.com>
-	<CACxGe6sELS=C==16TZ2pfrxJDDyqjS_qOwJUfwzwMO8hqo8Xag@mail.gmail.com>
-	<CAC63_iSqN=rX6MbzFWM6z+zf1Eybg3MOD=qQVdeNg5cyENhPjw@mail.gmail.com>
-	<CAC63_iTf696D6Q_EzFeUUp5R38pYNEJBkmKviEu6-yuF0y=bNA@mail.gmail.com>
-	<CACxGe6uzyxf35WDg6COnPVt3dhQv1H80L1svALxp4naySx2BcA@mail.gmail.com>
-Message-ID: <CAC63_iSjCrO31GnTiD9Dd8-ns5+Qer_wJSjY08g-Ft_uKfz6jw@mail.gmail.com>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Tue, 19 Jul 2011 07:59:46 +0200
+Subject: [i.MX28 GPMI] problem overwriting all-0xff data in NAND
+In-Reply-To: <20110718145635.GA24419@parrot.com>
+References: <20004.12663.29494.339601@ipc1.ka-ro>
+	<20110718145635.GA24419@parrot.com>
+Message-ID: <20005.7506.283476.184839@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Grant/Kevin,
+Hi,
 
-On Sun, Jul 17, 2011 at 10:43 AM, Grant Likely
-<grant.likely@secretlab.ca> wrote:
-> Hi Manjunath,
->
-> Comments below. ?I left in a lot of context for the new folks that
-> I've cc'd (Tony and Kevin).
->
-> On Sat, Jul 16, 2011 at 2:07 PM, G, Manjunath Kondaiah <manjugk@ti.com> wrote:
->> On Thu, Jul 14, 2011 at 4:45 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
->>>> > +static void __init omap3_init(void)
->>>> > +{
-[...]
->> + ? ? ? omap_register_i2c_bus(id, speed, i2c_board_info, 1);
->
-> While this does in a sense work, and creates an omap_device for the
-> i2c bus that does get probed, it ends up encoding an awful lot of
-> device specific details into the generic devicetree support code. ?The
-> i2c bus driver itself must be responsible for decoding the speed and
-> child nodes, and in fact it can easily be modified to do so (I've
-> already demonstrated how to do so). ?The real problem is making sure
-> the platform_device is created in a way that attaches the correct
-> hwmod data. For this context, the current omap_register_i2c_bus()
-> isn't a useful method for doing so.
->
-> So what is to be done? ?omap_register_i2c_bus() does three things;
-> 1) register an i2c board info for the bus with i2c_register_board_info(),
-> 2) fill platform_data for the device, and
-> 3) use omap_i2c_add_bus to create the platform_device with attached hwmod.
->
-> Of these three, 1 & 2 must not be done when using the DT. Only
-> omap_i2c_add_bus() does something useful, but that is still specific
-> to the i2c device.
->
-> omap_i2c_add_bus() splits to omap{1,2}_add_bus().
->
-> omap1_i2c_add_bus() sets up pinmux and calls platform_device register.
-> ?pinmux setup needs to be factored out anyway for generic DT platform
-> device registration, which just leaves platform_device creation which
-> is already handled by of_platform_populate().
->
-> omap2_i2c_add_bus() does the same thing, except it also looks up the
-> hwmod data (*oh) and uses it to call omap_device_build().
-> omap_device_build() or something equivalent needs to be called for
-> every omap device in the system, which is to create platform_devices
-> with hwmod attached. ?Now we're starting to hit generic code. ?:-)
->
-> The way I see it, you've got two options:
->
-> 1) modify the of_platform_bus_create() to call some kind of
-> of_platform_bus_create_omap() for devices that match "ti,omap3-device"
-> or something.
->
-> 2) Leave of_platform_bus_create(), and instead us a notifier to attach
-> hwmod data to normal platform devices. ?omap_device_build() is
-> actually pretty simple. ?It allocated a device, it attaches
-> platform_data and hwmod pointers to the device and registers it.
-> omap_device_register() is just a wrapper around
-> platform_device_register().
->
-> My preference is definitely #2, but there is a wrinkle in this
-> approach. ?Unfortunately omap_devices are not simply plain
-> platform_devices with extra data attached, an omap_device actually
-> embeds the platform_device inside it, which cannot be attached after
-> the fact. ?I think I had talked with Kevin (cc'd) about eliminating
-> the embedding, but I cannot remember clearly on this point. ?As long
-> as platform_device remains embedded inside struct omap_device, #2
-> won't work.
+Ivan Djelic writes:
+> On Mon, Jul 18, 2011 at 02:13:27PM +0100, Lothar Wa?mann wrote:
+> > Hi,
+> > 
+> > with the gpmi-nfc driver for imx28 from Shawn Guo on a TX28 I
+> > encountered some problems with jffs2 when overwriting pages that have
+> > been written with 0xff (e.g. from padding from the file system image
+> > file).
+> > 
+> > The problem is that the ECC info for an all-0xff block is not all-0xff
+> > and thus a newly erased block is different from a block that has been
+> > written with 0xff.
+> > If such a block is being altered (jffs2 thinking it can simply
+> > overwrite it without erasing first) the ECC information will be
+> > corrupted and will produce ECC errors upon read.
+> 
+> Hello Lothar,
+> 
+> Can you describe more precisely what is happening ? How did you come to the
+> conclusion that JFFS2 "thinks it can simply overwrite a block without erasing it
+> first" ?
+> 
+I'm writing a JFFS2 image file that is padded with 0xff to eraseblock
+size to flash (either from the bootloader or with the nandwrite
+utility from Linux).
+When mounting the filesystem everything is OK until the first file is
+being written. A subsequent read of the affected flash page gives ECC
+errors.
 
-Can you please elaborate more on this issue?
+JFFS2 is giving out the first all-FF page in the last used block for
+creating the new file. Since that block has a non-FF ECC pattern, the
+ECC information is being corrupted on write.
 
--Manjunath
+> JFFS2 normally marks a block as clean just after it has erased it; it won't
+> blindly assume a block is erased and write to it.
+> 
+The GPMI driver does not allow the OOB area to be written, so JFFS2
+cannot and does not use cleanmarkers.
+I applied a patch that is distributed by Freescale with their BSPs
+that prevents the OOB area from being used by JFFS2:
+http://git.tqc.de/cgi-bin/gitweb.cgi?p=linux-2.6-denx.git;a=commitdiff;h=93c3823f2fdb889ad9a56fc4bb926f952c2c5dba
+
+> I am not very familiar with how JFFS2 metadata work, but I doubt it would
+> confuse a blank page with a page containing a piece of file with 0xff bytes.
+> 
+> Are you sure your gpmi-nfc driver is not writing ECC info when JFFS2 writes its
+> cleanmarker, like in the issue previously discussed in
+> http://lists.infradead.org/pipermail/linux-mtd/2011-June/036538.html ?
+> 
+No. The ECC is written by the bootloader (or nandwrite utility) when
+the image file is initially programmed. I have checked that by dumping
+the flash contents right after writing the image file.
+
+
+Lothar Wa?mann
+-- 
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
