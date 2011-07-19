@@ -1,61 +1,33 @@
-From: vinod.koul@intel.com (Koul, Vinod)
-Date: Tue, 19 Jul 2011 19:14:00 +0530
-Subject: [PATCH 1/1] ARM: mxs-dma: reset after disable channel
-In-Reply-To: <20110719040215.GF3838@S2100-06.ap.freescale.net>
-References: <1311048596-19932-1-git-send-email-b29396@freescale.com>
-	<20110719040215.GF3838@S2100-06.ap.freescale.net>
-Message-ID: <438BB0150E931F4B9CE701519A4463010871D6C501@bgsmsx502.gar.corp.intel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 19 Jul 2011 15:58:32 +0200
+Subject: [GIT PULL v2] DaVinci fixes for v3.0
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024DBDC6EF@dbde02.ent.ti.com>
+References: <B85A65D85D7EB246BE421B3FB0FBB593024DBDC6EF@dbde02.ent.ti.com>
+Message-ID: <201107191558.32577.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 19, 2011 at 12: 6:02 AM +0100, Shawn Guo wrote:
-> > We met some channels in abnormal state after disable.
-> > Reset it to get a clean state.
-> >
-> > Signed-off-by: Dong Aisheng <b29396@freescale.com>
-> > Cc: Vinod Koul <vinod.koul@intel.com>
-> > Cc: Shawn Guo <shawn.guo@linaro.org>
-> > ---
+On Tuesday 19 July 2011, Nori, Sekhar wrote:
+> Can you please pull these DaVinci fixes for v3.0?
 > 
-> Acked-by: Shawn Guo <shawn.guo@linaro.org>
+> Thanks,
+> Sekhar
 > 
-> Hi Vinod,
+> The following changes since commit 620917de59eeb934b9f8cf35cc2d95c1ac8ed0fc:
+>   Linus Torvalds (1):
+>         Linux 3.0-rc7
 > 
-> Please consider to merge it for v3.1.  The mxs audio driver needs the
-> fix.
-This looks good to me, in my queue now.
-I am travelling back home tomorrow, so you should see this get pushed in my 
-tree latest by weekend
+> are available in the git repository at:
+> 
+>   git://gitorious.org/linux-davinci/linux-davinci.git fixes
 
-~Vinod
+Hi Sekhar,
 
-> 
-> Regards,
-> Shawn
-> 
-> >  drivers/dma/mxs-dma.c |    1 +
-> >  1 files changed, 1 insertions(+), 0 deletions(-)
-> >
-> > diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
-> > index 88aad4f..5a24010 100644
-> > --- a/drivers/dma/mxs-dma.c
-> > +++ b/drivers/dma/mxs-dma.c
-> > @@ -535,6 +535,7 @@ static int mxs_dma_control(struct dma_chan *chan, enum
-> dma_ctrl_cmd cmd,
-> >  	switch (cmd) {
-> >  	case DMA_TERMINATE_ALL:
-> >  		mxs_dma_disable_chan(mxs_chan);
-> > +		mxs_dma_reset_chan(mxs_chan);
-> >  		break;
-> >  	case DMA_PAUSE:
-> >  		mxs_dma_pause_chan(mxs_chan);
-> > --
-> > 1.7.0.4
-> >
-> >
-> >
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> >
+I've pulled it now, thanks!
+
+Sorry for being slow, I was waiting for other fixes to come in, but there
+was only one. If it ends up being too late for 3.0, I'll tag the
+patches for stable backports and send them with the first batch of
+fixes for 3.1.
+
+	Arnd
