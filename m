@@ -1,26 +1,25 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 19 Jul 2011 11:53:02 +0100
-Subject: [PATCH] ARM: get rid of a few StrongARM cache-related build
-	time constants
-In-Reply-To: <20110711211058.GF8486@n2100.arm.linux.org.uk>
-References: <1309919636-20546-1-git-send-email-nicolas.pitre@linaro.org>
-	<20110706075542.GK8286@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1107060912490.14596@xanadu.home>
-	<20110707170631.GB20403@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1107111021020.14596@xanadu.home>
-	<20110711211058.GF8486@n2100.arm.linux.org.uk>
-Message-ID: <20110719105302.GE26574@n2100.arm.linux.org.uk>
+Date: Tue, 19 Jul 2011 11:55:32 +0100
+Subject: [PATCH] davinci: fix DM365 EVM video input mux bits
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024DBDC68A@dbde02.ent.ti.com>
+References: <1311046211-2849-1-git-send-email-jon.povey@racelogic.co.uk>
+	<B85A65D85D7EB246BE421B3FB0FBB593024DBDC68A@dbde02.ent.ti.com>
+Message-ID: <20110719105532.GF26574@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 11, 2011 at 10:10:58PM +0100, Russell King - ARM Linux wrote:
-> On Mon, Jul 11, 2011 at 10:38:54AM -0400, Nicolas Pitre wrote:
-> > So here is this patch again with all fixes folded in:
+On Tue, Jul 19, 2011 at 02:26:50PM +0530, Nori, Sekhar wrote:
+> Since this part of the code hasn't changed since it
+> was written, this is a good candidate for stable
+> kernel series. You can just add:
 > 
-> Thanks.  I didn't get a chance to test the original on anything but
-> Assabet yet.  I'll try to make some time for the other platforms this
-> week.
+> Cc: stable at kernel.org
 
-You've put it in the patch system.  I still haven't tested it, and I'm
-not going to test it this side of the merge window, so I'm not applying
-it yet.
+Be careful when doing that - if you have git mail the patches out for
+review, and it picks that up, it'll send it to the stable team as well.
+The stable team will then complain "that's not how to submit patches
+to them".
+
+So, while you can add "Cc: stable at kernel.org" to the patch, its best
+to only add that just before you publish the commit after review, but
+before merging.
