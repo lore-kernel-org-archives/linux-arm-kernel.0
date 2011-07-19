@@ -1,51 +1,35 @@
-From: james_p_freyensee@linux.intel.com (J Freyensee)
-Date: Tue, 19 Jul 2011 16:44:29 -0700
-Subject: [PATCH v2 1/3] fault-inject: make fault injection available for
-	modules
-In-Reply-To: <1311111106-26814-2-git-send-email-per.forlin@linaro.org>
-References: <1311111106-26814-1-git-send-email-per.forlin@linaro.org>
-	<1311111106-26814-2-git-send-email-per.forlin@linaro.org>
-Message-ID: <4E2616DD.3010607@linux.intel.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 19 Jul 2011 16:56:46 -0700
+Subject: [PATCH] arm/dt: tegra devicetree support
+In-Reply-To: <20110719234158.2779.15394.stgit@ponder>
+References: <20110719234158.2779.15394.stgit@ponder>
+Message-ID: <CAOesGMiy1t-98KZ_imFkGO-ify3S_00d_0XKc2vcLNRekxOvpw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/19/2011 02:31 PM, Per Forlin wrote:
-> export symbols should_fail() and init_fault_attr_dentries() in order
-> to make modules use the fault injection functionality
->
-> Signed-off-by: Per Forlin<per.forlin@linaro.org>
-> ---
->   lib/fault-inject.c |    2 ++
->   1 files changed, 2 insertions(+), 0 deletions(-)
->
-> diff --git a/lib/fault-inject.c b/lib/fault-inject.c
-> index 7e65af7..cd28364 100644
-> --- a/lib/fault-inject.c
-> +++ b/lib/fault-inject.c
-> @@ -131,6 +131,7 @@ bool should_fail(struct fault_attr *attr, ssize_t size)
->
->   	return true;
->   }
-> +EXPORT_SYMBOL(should_fail);
-
-Should this be EXPORT_SYMBOL_GPL()?
-
->
->   #ifdef CONFIG_FAULT_INJECTION_DEBUG_FS
->
-> @@ -311,5 +312,6 @@ fail:
->   	cleanup_fault_attr_dentries(attr);
->   	return -ENOMEM;
->   }
-> +EXPORT_SYMBOL(init_fault_attr_dentries);
-
-and here too?
-
->
->   #endif /* CONFIG_FAULT_INJECTION_DEBUG_FS */
+Nice!
 
 
--- 
-J (James/Jay) Freyensee
-Storage Technology Group
-Intel Corporation
+On Tue, Jul 19, 2011 at 4:43 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
+> Everything required to populate NVIDIA Tegra devices from the device
+> tree. ?This patch adds a new DT_MACHINE_DESC() which matches against
+> a tegra20 device tree. ?So far it only registers the on-chip devices,
+> but it will be refined in follow on patches to configure clocks and
+> pin IO from the device tree also.
+>
+> Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
+
+Acked-by: Olof Johansson <olof@lixom.net
+
+
+Minor nit:
+
+> +++ b/arch/arm/boot/dts/tegra20.dtsi
+> @@ -0,0 +1,148 @@
+> +/include/ "skeleton.dtsi"
+> +
+> +/ {
+> + ? ? ? model = "NVIDIA Tegra 250";
+
+NVIDIA Tegra2 or Tegra20 to be more in line with the recent 250->20
+conversion (and Harmony)
