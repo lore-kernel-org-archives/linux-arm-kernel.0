@@ -1,136 +1,45 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 19 Jul 2011 17:43:43 +0100
-Subject: [PATCH 1/1 V2] Add Thread Support for the Context ID Register
-	of ARM v6 & v7 Architectures
-In-Reply-To: <4E251465.4070001@st.com>
-References: <cover.1310544641.git.wolfgang.betz@st.com>
-	<a4ef7565bd6013f56c5c10071bd36739c59768b7.1310544641.git.wolfgang.betz@st.com>
-	<20110714100254.GA20903@e102144-lin.cambridge.arm.com>
-	<4E1ECDD4.1020800@st.com>
-	<20110714113625.GB20903@e102144-lin.cambridge.arm.com>
-	<4E241E60.7040403@st.com>
-	<20110718125719.GA7410@e102144-lin.cambridge.arm.com>
-	<4E24446C.4060204@st.com>
-	<20110718170952.GC7410@e102144-lin.cambridge.arm.com>
-	<4E251465.4070001@st.com>
-Message-ID: <20110719164343.GD1560@e102144-lin.cambridge.arm.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Tue, 19 Jul 2011 10:22:01 -0700
+Subject: [PATCH 0/7] Re-organize linker layouts
+In-Reply-To: <alpine.LFD.2.00.1107111803520.14596@xanadu.home>
+References: <4E15ECB6.40100@codeaurora.org>
+	<20110707223620.GG20403@n2100.arm.linux.org.uk>
+	<4E165597.90002@codeaurora.org>
+	<20110708090721.GC2414@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1107080941090.14596@xanadu.home>
+	<20110708160329.GF4812@n2100.arm.linux.org.uk>
+	<4E1736A9.9040102@codeaurora.org>
+	<alpine.LFD.2.00.1107081417080.14596@xanadu.home>
+	<4E1B5A57.3010701@codeaurora.org>
+	<alpine.LFD.2.00.1107111803520.14596@xanadu.home>
+Message-ID: <20110719172201.GA4557@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 19, 2011 at 06:21:41AM +0100, Wolfgang BETZ wrote:
->     We don't use fake PIDs for anything. The only thing that can go wrong is
->     during task switch where we switch the mm and then switch the PID in your
->     thread notifier. Reading the context ID between these two points will give
->     you the PID of the previous task.
+On Mon, Jul 11, 2011 at 06:14:38PM -0400, Nicolas Pitre wrote:
+
+> > Anyway, maybe we've been going about this the wrong way. Couldn't we
+> > just make TEXT_OFFSET be 0x00208000 and then make sure to remove the
+> > first 2MB of memory in a machine->reserve() routine if we're MSM?
 > 
-> Well, don't we set the CONTEXTIDR also during mm switch (in cpu_switch_mm())?
-> And in this occasion we will copy the value coming from mm->context.id, i.e.
-> with a "PID" value which does not correspond to a thread identifier but to what
-> is used for ASID rollover handling!?! I am afraid that this will/can confuse
-> external tools.
-
-Yes, but that's easy to fix. We just make switch_mm do read-modify-write of
-the upper bits. It also doesn't require us to change the type signature of
-that function (see patch below)
-
-> Furthermore, I do not like the idea that we are sending out over the trace
-> logic two times the CONTEXTIDR content for each context switch. Seems not to be
-> a very clean solution to me :-\
-
-Fair enough, but I think it's a lot better than changing the ASID handling
-code.
-
->     I don't think this is a big problem since
->     we're in the middle of context switch anyway, so it's hard to define when
->     the thread switch has completed. You just have to be aware that the
->     current mm_struct / ASID may not correspond to the PID. One nice property is
->     that you can be sure the PID is correct once you've returned to userspace.
+> I think that would certainly be a worthwhile thing to do.  This would 
+> even make ARM_PATCH_PHYS_VIRT more efficient as you won't have to enable 
+> ARM_PATCH_PHYS_VIRT_16BIT anymore.  And even without 
+> ARM_PATCH_PHYS_VIRT, the compiled code for virt_to_phys() and 
+> phys_to_virt() would be more efficient.
 > 
-> OK, once you return to user-space everything will be good, but the tools we are
-> talking about here do not care (only) about user- or kernel-space, these want
-> to trace both (simultaneously)!
+> Whether or not we would like to still keep the ARM_PATCH_PHYS_VIRT_16BIT 
+> code around is a separate question.
 
-I was just giving an example as to an easy way of knowing when the PID is in
-sync with the ASID by looking at traces.
+Wouldn't it still be needed if people want to build an ARM kernel that
+works on both MSM targets and non-MSM targets?
 
-Will
+What about loading the kernel at the next 128MB boundary,
+and coming up with a way to use the 126MB before the kernel for
+allocation.  That might end up being more invasive, though.
 
+David
 
-So here's something I hacked up. I've compiled it but that's all. I'm also
-not sure that the notifier belongs in mm/context.c and you may or may not want
-an isb after updating the register.
-
-
-diff --git a/arch/arm/mm/context.c b/arch/arm/mm/context.c
-index b0ee9ba..59ab68a 100644
---- a/arch/arm/mm/context.c
-+++ b/arch/arm/mm/context.c
-@@ -14,6 +14,7 @@
- #include <linux/percpu.h>
- 
- #include <asm/mmu_context.h>
-+#include <asm/thread_notify.h>
- #include <asm/tlbflush.h>
- 
- static DEFINE_SPINLOCK(cpu_asid_lock);
-@@ -155,3 +156,43 @@ void __new_context(struct mm_struct *mm)
- 	set_mm_context(mm, asid);
- 	spin_unlock(&cpu_asid_lock);
- }
-+
-+#ifdef CONFIG_PID_IN_CONTEXTIDR
-+static int contextidr_notifier(struct notifier_block *unused, unsigned long cmd,
-+			       void *t)
-+{
-+	unsigned long flags;
-+	u32 contextid;
-+	struct thread_info *thread = t;
-+
-+	if (cmd != THREAD_NOTIFY_SWITCH)
-+		return NOTIFY_DONE;
-+
-+	local_irq_save(flags);
-+	asm volatile("mrc	p15, 0, %0, c15, c0, 1\n"
-+		     "bic	%0, %0, #0xffffff00\n"
-+		     "orr	%0, %0, %1, lsl #8\n"
-+		     "mcr	p15, 0, %0, c15, c0, 1"
-+		     : "=&r" (contextid)
-+		     : "r" (task_tgid_vnr(thread->task)));
-+	local_irq_restore(flags);
-+
-+	return NOTIFY_OK;
-+}
-+
-+static struct notifier_block contextidr_notifier_block = {
-+	.notifier_call = contextidr_notifier,
-+};
-+
-+static int __init contextidr_init(void)
-+{
-+	unsigned int cpu_arch = cpu_architecture();
-+
-+	if (cpu_arch < CPU_ARCH_ARMv6)
-+		return 0;
-+
-+	thread_register_notifier(&contextidr_notifier_block);
-+	return 0;
-+}
-+arch_initcall(contextidr_init);
-+#endif
-diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index 089c0b5..3605c00 100644
---- a/arch/arm/mm/proc-v7.S
-+++ b/arch/arm/mm/proc-v7.S
-@@ -111,6 +111,12 @@ ENTRY(cpu_v7_switch_mm)
- #ifdef CONFIG_ARM_ERRATA_754322
- 	dsb
- #endif
-+#ifdef CONFIG_PID_IN_CONTEXTIDR
-+	mrc	p15, 0, r2, c15, c0, 1
-+	bic	r2, r2, #0xff
-+	bfc	r1, #8, #24
-+	orr	r1, r1, r2
-+#endif
- 	mcr	p15, 0, r2, c13, c0, 1		@ set reserved context ID
- 	isb
- 1:	mcr	p15, 0, r0, c2, c0, 0		@ set TTB 0
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
