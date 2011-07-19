@@ -1,43 +1,40 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 19 Jul 2011 08:43:21 +0100
-Subject: Git pull request: boot_params to atag_offset conversion
-In-Reply-To: <alpine.LFD.2.00.1107190042280.21187@xanadu.home>
-References: <alpine.LFD.2.00.1107190042280.21187@xanadu.home>
-Message-ID: <20110719074321.GA26574@n2100.arm.linux.org.uk>
+Date: Tue, 19 Jul 2011 08:48:41 +0100
+Subject: [PATCH 1/2] Input: gpio-keys: do not reference platform_data
+	after .probe exits
+In-Reply-To: <20110719011725.GB3838@S2100-06.ap.freescale.net>
+References: <1311007508-8096-1-git-send-email-shawn.guo@linaro.org>
+	<1311007508-8096-2-git-send-email-shawn.guo@linaro.org>
+	<201107181002.45170.dmitry.torokhov@gmail.com>
+	<20110719011725.GB3838@S2100-06.ap.freescale.net>
+Message-ID: <20110719074841.GB26574@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 19, 2011 at 12:55:46AM -0400, Nicolas Pitre wrote:
-> Russell, could you please pull:
-> 
-> 	git://git.linaro.org/people/nico/linux atag_offset
-> 
-> This contains the previously posted patches, plus the collected 
-> Acked-by/Tested-by tags so far.  Since the discussion has died down, I 
-> don't expect further changes.
-> 
-> Alternatively, this can go via the linux-arm-soc tree if you prefer 
-> that.
+On Tue, Jul 19, 2011 at 09:17:26AM +0800, Shawn Guo wrote:
+> On Mon, Jul 18, 2011 at 10:02:44AM -0700, Dmitry Torokhov wrote:
+> > On Monday, July 18, 2011 09:45:07 AM Shawn Guo wrote:
+> > > The patch makes a copy of platform data into driver data, so that any
+> > > reference to platform_data after .probe exits can be avoided.
+> > 
+> > And why is this beneficial? I am of the opinion that platform data should
+> > stay on (and be accessed through a const pointer to ensure that the driver
+> > will not alter it).
+> > 
+> To me, it's a common sense that platform data should not be referenced
+> after .probe exits, so that any platform code providing the data can
+> claim the data as __initconst.
 
-Nope, I don't want it to go in this time around - the amount of patches
-you posted last week was _far_ too much for what was billed as the last
-week before the merge window, and by doing so you significantly
-contributed to my stress levels.
+That's totally buggered, and that's putting it kindly.
 
-I've not been following the discussion on these patches, and don't plan
-to until after the merge window has closed.  Ditto for your other patches.
+Consider a driver built as a module, vs built-in.  If you build it as a
+module, your driver data is stale by the time you insert the module.
+It's not much better with it built-in - if you have hotplug enabled, you
+can unbind and rebind the driver, which means that the .probe function
+can be called long after the .init sections have been discarded.
 
-The last week before a merge window is supposed to be for final testing,
-publishing "what's queued" stuff etc.  I wonder why I don't do that -
-could it be because I'm always working right up to the next merge window
-putting stuff in my git tree so I don't have any time to stablize it?
+So no, this is no justification for the patch.
 
-Before you get the idea that I'm being unfair, I too have a few series of
-patches which I've not published, and I'm not pushing this merge window.
-There's also patch series which I have posted, but haven't had a chance
-to update for comments back, and so too aren't going to be going in this
-time around.
-
-Please, spread out posting of patches over the cycle.  Don't post 100+
-patches across several patch series in just one day, and then expect
-them to get merged within a week.
+Don't *ever* make any platform devices or any data pointed to by a
+platform device discardable after init time.  It's an oops waiting to
+happen.
