@@ -1,43 +1,43 @@
-From: manjunath.hadli@ti.com (Hadli, Manjunath)
-Date: Tue, 19 Jul 2011 12:55:13 +0530
-Subject: [PATCH] davinci: fix DM365 EVM video input mux bits
-In-Reply-To: <70E876B0EA86DD4BAF101844BC814DFE0B4E0859D7@Cloud.RL.local>
-References: <B85A65D85D7EB246BE421B3FB0FBB593024BCEF73E@dbde02.ent.ti.com>
-	<70E876B0EA86DD4BAF101844BC814DFE0B4E0859D7@Cloud.RL.local>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024BCEF73F@dbde02.ent.ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 19 Jul 2011 08:43:21 +0100
+Subject: Git pull request: boot_params to atag_offset conversion
+In-Reply-To: <alpine.LFD.2.00.1107190042280.21187@xanadu.home>
+References: <alpine.LFD.2.00.1107190042280.21187@xanadu.home>
+Message-ID: <20110719074321.GA26574@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Will not be able to give you a sub-patch as it is combined as part of a larger implementation.
+On Tue, Jul 19, 2011 at 12:55:46AM -0400, Nicolas Pitre wrote:
+> Russell, could you please pull:
+> 
+> 	git://git.linaro.org/people/nico/linux atag_offset
+> 
+> This contains the previously posted patches, plus the collected 
+> Acked-by/Tested-by tags so far.  Since the discussion has died down, I 
+> don't expect further changes.
+> 
+> Alternatively, this can go via the linux-arm-soc tree if you prefer 
+> that.
 
-Since the bug fix needs to go into 3.0, I am Ok if you fix the bug, and the macros can be substituted later.
+Nope, I don't want it to go in this time around - the amount of patches
+you posted last week was _far_ too much for what was billed as the last
+week before the merge window, and by doing so you significantly
+contributed to my stress levels.
 
--Manju
+I've not been following the discussion on these patches, and don't plan
+to until after the merge window has closed.  Ditto for your other patches.
 
-On Tue, Jul 19, 2011 at 11:58:19, Jon Povey wrote:
-> Hadli, Manjunath wrote:
-> > Jon,
-> >
-> > The fix looks correct. As a part of a different implementation which 
-> > will go soon upstream, this has been taken care of, where we have used 
-> > macros
-> > CPLD_VIDEO_INPUT_MUX_TVP7002    0x1
-> > CPLD_VIDEO_INPUT_MUX_IMAGER     0x2
-> >
-> > So, if you can do the same, it will look better.
-> 
-> If you have a patch you can split out that has your defines where and how you want them then great.
-> 
-> Otherwise I'd suggest just getting this or something equivalent in to fix the bug first, and reimplement it later.
-> 
-> --
-> Jon Povey
-> jon.povey at racelogic.co.uk
-> 
-> Racelogic is a limited company registered in England. Registered number 2743719 . 
-> Registered Office Unit 10, Swan Business Centre, Osier Way, Buckingham, Bucks, MK18 1TB .
-> 
-> The information contained in this electronic mail transmission is intended by Racelogic Ltd for the use of the named individual or entity to which it is directed and may contain information that is confidential or privileged. If you have received this electronic mail transmission in error, please delete it from your system without copying or forwarding it, and notify the sender of the error by reply email so that the sender's address records can be corrected. The views expressed by the sender of this communication do not necessarily represent those of Racelogic Ltd. Please note that Racelogic reserves the right to monitor e-mail communications passing through its network
-> 
-> 
-> 
+The last week before a merge window is supposed to be for final testing,
+publishing "what's queued" stuff etc.  I wonder why I don't do that -
+could it be because I'm always working right up to the next merge window
+putting stuff in my git tree so I don't have any time to stablize it?
+
+Before you get the idea that I'm being unfair, I too have a few series of
+patches which I've not published, and I'm not pushing this merge window.
+There's also patch series which I have posted, but haven't had a chance
+to update for comments back, and so too aren't going to be going in this
+time around.
+
+Please, spread out posting of patches over the cycle.  Don't post 100+
+patches across several patch series in just one day, and then expect
+them to get merged within a week.
