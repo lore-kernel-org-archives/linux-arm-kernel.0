@@ -1,51 +1,21 @@
-From: ben@trinity.fluff.org (Ben Dooks)
-Date: Tue, 19 Jul 2011 15:51:33 +0100
-Subject: [GIT PULL] arm-soc: last minute arm/davinci fixes for 3.0
-In-Reply-To: <201107191606.26837.arnd@arndb.de>
-References: <201107191606.26837.arnd@arndb.de>
-Message-ID: <20110719145133.GA28651@trinity.fluff.org>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 19 Jul 2011 15:57:25 +0100
+Subject: [PATCH v4 06/10] ARM: mxs: add saif device
+In-Reply-To: <1311050056-22295-1-git-send-email-b29396@freescale.com>
+References: <1310731780-1645-7-git-send-email-b29396@freescale.com>
+	<1311050056-22295-1-git-send-email-b29396@freescale.com>
+Message-ID: <20110719145725.GB9652@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 19, 2011 at 04:06:26PM +0200, Arnd Bergmann wrote:
-> Hi Linus,
-> 
-> I got some last bug fixes for 3.0. Please pull if you still take 3.0 related
-> changes, otherwise I'll mark them for stable backports and put them into
-> the first arm-soc batch for the 3.1 merge window.
-> 
-> 	Arnd
-> 
-> The following changes since commit 620917de59eeb934b9f8cf35cc2d95c1ac8ed0fc:
-> 
->   Linux 3.0-rc7 (2011-07-11 16:51:52 -0700)
-> 
-> are available in the git repository at:
->   git+ssh://master.kernel.org/pub/scm/linux/kernel/git/arm/linux-arm-soc.git fixes
-> 
-> Ido Yariv (1):
->       arm: davinci: Fix low level gpio irq handlers' argument
-> 
-> Jon Povey (1):
->       davinci: DM365 EVM: fix video input mux bits
-> 
-> Todd Poynor (1):
->       ARM: davinci: Check for NULL return from irq_alloc_generic_chip
+On Tue, Jul 19, 2011 at 12:34:16PM +0800, Dong Aisheng wrote:
+> Signed-off-by: Dong Aisheng <b29396@freescale.com>
+> Reviewed-by: Wolfram Sang <w.sang@pengutronix.de>
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+> Changes since v3:
+> 	Drop DIGCTRL-handling based on Wolfram's comment
 
-any chance we could get a standardisation on the prefix for the
-commit messages please?
- 
->  arch/arm/mach-davinci/board-dm365-evm.c |    4 ++--
->  arch/arm/mach-davinci/gpio.c            |   21 ++++++++++++++++-----
->  arch/arm/mach-davinci/irq.c             |    6 ++++++
->  3 files changed, 24 insertions(+), 7 deletions(-)
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
--- 
-Ben Dooks, ben at fluff.org, http://www.fluff.org/ben/
-
-Large Hadron Colada: A large Pina Colada that makes the universe disappear.
+When reposting you should repost the whole series separately rather than
+following up into the middle of the series, it makes it much easier for
+people to follow what's going on.
