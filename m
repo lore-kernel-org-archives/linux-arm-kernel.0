@@ -1,39 +1,36 @@
 From: per.forlin@linaro.org (Per Forlin)
-Date: Tue, 19 Jul 2011 23:31:44 +0200
-Subject: [PATCH v2 1/3] fault-inject: make fault injection available for
-	modules
+Date: Tue, 19 Jul 2011 23:31:46 +0200
+Subject: [PATCH v2 3/3] fault injection: add documentation on MMC IO fault
+	injection
 In-Reply-To: <1311111106-26814-1-git-send-email-per.forlin@linaro.org>
 References: <1311111106-26814-1-git-send-email-per.forlin@linaro.org>
-Message-ID: <1311111106-26814-2-git-send-email-per.forlin@linaro.org>
+Message-ID: <1311111106-26814-4-git-send-email-per.forlin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-export symbols should_fail() and init_fault_attr_dentries() in order
-to make modules use the fault injection functionality
+Add description on how to enable random fault injection
+for MMC IO
 
 Signed-off-by: Per Forlin <per.forlin@linaro.org>
 ---
- lib/fault-inject.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+ Documentation/fault-injection/fault-injection.txt |    5 +++++
+ 1 files changed, 5 insertions(+), 0 deletions(-)
 
-diff --git a/lib/fault-inject.c b/lib/fault-inject.c
-index 7e65af7..cd28364 100644
---- a/lib/fault-inject.c
-+++ b/lib/fault-inject.c
-@@ -131,6 +131,7 @@ bool should_fail(struct fault_attr *attr, ssize_t size)
+diff --git a/Documentation/fault-injection/fault-injection.txt b/Documentation/fault-injection/fault-injection.txt
+index 7be15e4..27eede4 100644
+--- a/Documentation/fault-injection/fault-injection.txt
++++ b/Documentation/fault-injection/fault-injection.txt
+@@ -21,6 +21,11 @@ o fail_make_request
+   /sys/block/<device>/make-it-fail or
+   /sys/block/<device>/<partition>/make-it-fail. (generic_make_request())
  
- 	return true;
- }
-+EXPORT_SYMBOL(should_fail);
++o fail_mmc_request
++
++  injects MMC data errors on devices permitted by setting
++  /sys/kernel/debug/mmc0/make-it-fail
++
+ Configure fault-injection capabilities behavior
+ -----------------------------------------------
  
- #ifdef CONFIG_FAULT_INJECTION_DEBUG_FS
- 
-@@ -311,5 +312,6 @@ fail:
- 	cleanup_fault_attr_dentries(attr);
- 	return -ENOMEM;
- }
-+EXPORT_SYMBOL(init_fault_attr_dentries);
- 
- #endif /* CONFIG_FAULT_INJECTION_DEBUG_FS */
 -- 
 1.7.4.1
