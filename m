@@ -1,137 +1,44 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Tue, 19 Jul 2011 18:17:21 +0800
-Subject: [PATCH 7/7] i2c: pxa: support to parse property
-In-Reply-To: <1311042290-20253-8-git-send-email-haojian.zhuang@marvell.com>
-References: <1311042290-20253-1-git-send-email-haojian.zhuang@marvell.com>
-	<1311042290-20253-2-git-send-email-haojian.zhuang@marvell.com>
-	<1311042290-20253-3-git-send-email-haojian.zhuang@marvell.com>
-	<1311042290-20253-4-git-send-email-haojian.zhuang@marvell.com>
-	<1311042290-20253-5-git-send-email-haojian.zhuang@marvell.com>
-	<1311042290-20253-6-git-send-email-haojian.zhuang@marvell.com>
-	<1311042290-20253-7-git-send-email-haojian.zhuang@marvell.com>
-	<1311042290-20253-8-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <CAMPhdO-qjR0LSjvMm7hbdqZyrFxa5S8JVa1FO8sDsxOdyUV9Ng@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 19 Jul 2011 11:23:17 +0100
+Subject: [PATCH 1/1 V2] Add Thread Support for the Context ID Register
+	of ARM v6 & v7 Architectures
+In-Reply-To: <20110718125719.GA7410@e102144-lin.cambridge.arm.com>
+References: <cover.1310544641.git.wolfgang.betz@st.com>
+	<a4ef7565bd6013f56c5c10071bd36739c59768b7.1310544641.git.wolfgang.betz@st.com>
+	<20110714100254.GA20903@e102144-lin.cambridge.arm.com>
+	<4E1ECDD4.1020800@st.com>
+	<20110714113625.GB20903@e102144-lin.cambridge.arm.com>
+	<4E241E60.7040403@st.com>
+	<20110718125719.GA7410@e102144-lin.cambridge.arm.com>
+Message-ID: <20110719102317.GC26574@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 19, 2011 at 10:24 AM, Haojian Zhuang
-<haojian.zhuang@marvell.com> wrote:
-> Support to parse some optional properties. These three properties are
-> i2c-polling, i2c-frequency, i2c-class.
->
-> After supporting these property, i2c-pxa driver can avoid to use platform
-> data except for slave mode.
->
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
-> ---
-> ?.../devicetree/bindings/i2c/pxa255-i2c.txt ? ? ? ? | ? 36 ++++++++++++++++++++
-> ?drivers/i2c/busses/i2c-pxa.c ? ? ? ? ? ? ? ? ? ? ? | ? 22 ++++++++----
-> ?2 files changed, 51 insertions(+), 7 deletions(-)
-> ?create mode 100644 Documentation/devicetree/bindings/i2c/pxa255-i2c.txt
->
-> diff --git a/Documentation/devicetree/bindings/i2c/pxa255-i2c.txt b/Documentation/devicetree/bindings/i2c/pxa255-i2c.txt
-> new file mode 100644
-> index 0000000..bf34236
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/i2c/pxa255-i2c.txt
-> @@ -0,0 +1,36 @@
-> +PXA255 I2C
-> +
-> +The I2C-Controller is first used in PXA255. It's widely used in Intel/Marvell
-> +silicons.
-> +
-> +Optional Property:
-> + ? ? ? - i2c-polling: Specifies whether I2C-Controller is used in polling
-> + ? ? ? ? mode or interrupt mode. The type of property should be <u32>.
-> +
-> + ? ? ? - i2c-frequency: Specifies the frequency that the I2C-Controller
-> + ? ? ? ? is working. The type of property should be <string>.
-> +
-> + ? ? ? - i2c-class: Specifies the class of I2C-Controller. The type of
-> + ? ? ? ? property should be <u32>.
-> +
-> +Example:
-> + ? ? ? i2c0: i2c at d4011000 {
-> + ? ? ? ? ? ? ? compatible = "pxa2xx-i2c";
-> + ? ? ? ? ? ? ? #address-cells = <1>;
-> + ? ? ? ? ? ? ? #size-cells = <0>;
-> + ? ? ? ? ? ? ? reg = <0xd4011000 0x60>;
-> + ? ? ? ? ? ? ? /* I2C-Controller works in interrupt mode. */
-> + ? ? ? ? ? ? ? i2c-polling = <0>;
-> + ? ? ? ? ? ? ? /* I2C-Controller's frequency is FAST. */
-> + ? ? ? ? ? ? ? i2c-frequency = "fast";
-> + ? ? ? ? ? ? ? /* interrupt of I2C-Controller */
-> + ? ? ? ? ? ? ? interrupts = <7>;
-> + ? ? ? ? ? ? ? interrupt-parent = <&mmp_intc>;
-> +
-> + ? ? ? ? ? ? ? pm860x: pmic at 34 {
-> + ? ? ? ? ? ? ? ? ? ? ? interrupt-controller;
-> + ? ? ? ? ? ? ? ? ? ? ? /* interrupt of pm860x */
-> + ? ? ? ? ? ? ? ? ? ? ? interrupts = <4>;
-> + ? ? ? ? ? ? ? ? ? ? ? interrupt-parent = <&mmp_intc>;
-> + ? ? ? ? ? ? ? };
-> + ? ? ? };
-> diff --git a/drivers/i2c/busses/i2c-pxa.c b/drivers/i2c/busses/i2c-pxa.c
-> index adac74a..4b9fa71 100644
-> --- a/drivers/i2c/busses/i2c-pxa.c
-> +++ b/drivers/i2c/busses/i2c-pxa.c
-> @@ -1060,7 +1060,8 @@ static int i2c_pxa_probe(struct platform_device *dev)
-> ? ? ? ?const struct platform_device_id *id = platform_get_device_id(dev);
-> ? ? ? ?enum pxa_i2c_types i2c_type;
-> ? ? ? ?struct resource *res;
-> - ? ? ? int irq, ret;
-> + ? ? ? int irq, ret, poll;
-> + ? ? ? char *p = NULL;
-> ? ? ? ?static int idx = 0;
->
-> ? ? ? ?if (np) {
-> @@ -1093,11 +1094,24 @@ static int i2c_pxa_probe(struct platform_device *dev)
->
->
-> ? ? ? ?if (np) {
-> + ? ? ? ? ? ? ? of_property_read_u32(np, "i2c-polling", &poll);
-> + ? ? ? ? ? ? ? i2c->use_pio = (poll) ? 1 : 0;
-> + ? ? ? ? ? ? ? of_property_read_string(np, "i2c-frequency", &p);
-> + ? ? ? ? ? ? ? if (p && !strncmp(p, "fast", 4))
-> + ? ? ? ? ? ? ? ? ? ? ? i2c->fast_mode = 1;
-> + ? ? ? ? ? ? ? of_property_read_u32(np, "i2c-class", &i2c->adap.class);
-> +
-> ? ? ? ? ? ? ? ?i2c->adap.nr = idx++;
-> ? ? ? ? ? ? ? ?snprintf(i2c->adap.name, sizeof(i2c->adap.name),
-> ? ? ? ? ? ? ? ? ? ? ? ?"pxa2xx-i2c.%u", i2c->adap.nr);
-> ? ? ? ? ? ? ? ?i2c->clk = clk_get_sys(i2c->adap.name, NULL);
-> ? ? ? ?} else {
-> + ? ? ? ? ? ? ? if (plat) {
-> + ? ? ? ? ? ? ? ? ? ? ? i2c->adap.class = plat->class;
-> + ? ? ? ? ? ? ? ? ? ? ? i2c->use_pio = plat->use_pio;
-> + ? ? ? ? ? ? ? ? ? ? ? i2c->fast_mode = plat->fast_mode;
-> + ? ? ? ? ? ? ? }
-> +
+On Mon, Jul 18, 2011 at 01:57:19PM +0100, Will Deacon wrote:
+> I still maintain that you will struggle to get this code past Russell (based
+> on his previous comments) so keeping the changes to a minimum is in your
+> best interest if you want to convince him to merge it.
 
-One concern of DT's impact to existing drivers is _every_ driver has to be
-modified. While I'm not sure if it's a right way to go in a long run. Or can
-we have a generic way to automatically map the DT properties to the
-specific platform data structure?
+One of the reasons that there'll be a struggle is the abuse that's in the
+patch.
 
-Grant, any idea on this?
+If Wolfgang wants to pass something into a function which isn't already
+being passed, then the prototype needs to be changed - and all
+implementations and users need to be fixed up for that change.  Fudging
+it with casts to an existing arguments type so something else can be
+passed is just not on.
 
-> ? ? ? ? ? ? ? ?/*
-> ? ? ? ? ? ? ? ? * If "dev->id" is negative we consider it as zero.
-> ? ? ? ? ? ? ? ? * The reason to do so is to avoid sysfs names that only make
-> @@ -1142,12 +1156,6 @@ static int i2c_pxa_probe(struct platform_device *dev)
->
-> ? ? ? ?clk_enable(i2c->clk);
->
-> - ? ? ? if (plat) {
-> - ? ? ? ? ? ? ? i2c->adap.class = plat->class;
-> - ? ? ? ? ? ? ? i2c->use_pio = plat->use_pio;
-> - ? ? ? ? ? ? ? i2c->fast_mode = plat->fast_mode;
-> - ? ? ? }
-> -
-> ? ? ? ?if (i2c->use_pio) {
-> ? ? ? ? ? ? ? ?i2c->adap.algo = &i2c_pxa_pio_algorithm;
-> ? ? ? ?} else {
-> --
-> 1.5.6.5
->
->
+How does Wolfgang know that he's fixed up everywhere which calls
+cpu_switch_mm() to ensure that it now passes the context ID value in r1
+rather than the struct mm_struct pointer?  Or more to the point, how do
+we know that there isn't a new call to cpu_switch_mm() which hasn't been
+fixed up.  There is no way for the compiler to tell us because the
+information is hidden from the compiler by those casts.
+
+C is a typed language for a reason.  Don't destroy it with casts.
+
+So, the _minimum_ that needs to change in this patch is for those casts
+to go, and cpu_switch_mm() needs to be fixed to take the context ID
+value, rather a context ID value casted to a mm_struct.  If that results
+in the mm_struct argument not being used by any implementation, that
+argument can then be removed.
