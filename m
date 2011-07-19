@@ -1,59 +1,31 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 19 Jul 2011 09:14:54 -0400 (EDT)
-Subject: Git pull request: boot_params to atag_offset conversion
-In-Reply-To: <20110719074321.GA26574@n2100.arm.linux.org.uk>
-References: <alpine.LFD.2.00.1107190042280.21187@xanadu.home>
-	<20110719074321.GA26574@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1107190834540.21187@xanadu.home>
+From: nbowler@elliptictech.com (Nick Bowler)
+Date: Tue, 19 Jul 2011 09:15:08 -0400
+Subject: [PATCH 0/3] SP805 updates for Versatile Express
+In-Reply-To: <20110718094409.GQ23270@n2100.arm.linux.org.uk>
+References: <1310742242-14647-1-git-send-email-nbowler@elliptictech.com>
+	<20110715205954.GR3834@infomag.iguana.be>
+	<20110718094409.GQ23270@n2100.arm.linux.org.uk>
+Message-ID: <20110719131508.GA30207@elliptictech.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 19 Jul 2011, Russell King - ARM Linux wrote:
-
-> On Tue, Jul 19, 2011 at 12:55:46AM -0400, Nicolas Pitre wrote:
-> > Russell, could you please pull:
+On 2011-07-18 10:44 +0100, Russell King - ARM Linux wrote:
+> On Fri, Jul 15, 2011 at 10:59:54PM +0200, Wim Van Sebroeck wrote:
+> > looks good at first glance.
 > > 
-> > 	git://git.linaro.org/people/nico/linux atag_offset
-> > 
-> > This contains the previously posted patches, plus the collected 
-> > Acked-by/Tested-by tags so far.  Since the discussion has died down, I 
-> > don't expect further changes.
-> > 
-> > Alternatively, this can go via the linux-arm-soc tree if you prefer 
-> > that.
+> > Russel: what's your opinion?
 > 
-> Nope, I don't want it to go in this time around - the amount of patches
-> you posted last week was _far_ too much for what was billed as the last
-> week before the merge window, and by doing so you significantly
-> contributed to my stress levels.
+> Win,
+> 
+> This series looks fine.  However, looking through the driver, there's
+> a few oddities:
 
-I posted those patches on July 5th which was two weeks ago.  I wasn't 
-expecting them to go in if the merge window had opened last week. But 
-one more week has passed, people tested those patches, they commented 
-back, etc.
+Indeed, there are likely several other ways in which this driver can be
+improved.  My goal was to get it working on our board first. :)
 
-> I've not been following the discussion on these patches, and don't plan
-> to until after the merge window has closed.  Ditto for your other patches.
+So if this series is fine, I'll submit #1 (the V2M patch) to Russel's
+patch tracker.  I suppose #2 and #3 should go through the watchdog tree?
 
-No problem.  As I said already, those patch series are far from being 
-complete yet (i.e. many more similar patches are missing) before they 
-can truly make a difference (except maybe for ep93xx).  So this is not 
-like if new functionality was held back.
-
-I can't tell if you followed the discussion that ensued or not, 
-especially when you were one of the initiators of it.  Without any other 
-indication to the contrary, I may only presume that you are OK with the 
-set. In any case, just asking to resubmit after the merge window has 
-closed is fine with me.
-
-As to being unfair, I don't feel mistreated at all.  I however wouldn't 
-like to see you stressed out even when the non core stuff is split away 
-from your tree.  Given that ARM is becoming a bigger architecture than 
-X86 even at the core stuff alone for which 3 people are sharing the 
-maintenance load amongst themselves, I'm a bit concerned that 
-scalability issues could wear you out if a backlog starts growing, given 
-that more significant core changes are in the pipeline already.  But we 
-can discuss this next time we have a beer together.
-
-
-Nicolas
+Thanks,
+-- 
+Nick Bowler, Elliptic Technologies (http://www.elliptictech.com/)
