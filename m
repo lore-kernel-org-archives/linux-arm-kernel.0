@@ -1,99 +1,55 @@
-From: banajit.g@samsung.com (Banajit Goswami)
-Date: Tue, 19 Jul 2011 17:35:06 +0530
-Subject: [PATCH 7/7] ARM: S3C24XX: Use generic s3c_set_platdata for devices
-In-Reply-To: <1311077106-28351-1-git-send-email-banajit.g@samsung.com>
-References: <1311077106-28351-1-git-send-email-banajit.g@samsung.com>
-Message-ID: <1311077106-28351-8-git-send-email-banajit.g@samsung.com>
+From: archit@ti.com (Archit Taneja)
+Date: Tue, 19 Jul 2011 17:57:57 +0530
+Subject: conflicts between omap/cleanup branch and omap_dss2 tree
+In-Reply-To: <20110718080856.GW5783@atomide.com>
+References: <201107172339.32516.arnd@arndb.de>
+	<20110718080856.GW5783@atomide.com>
+Message-ID: <4E25784D.8070300@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Call the generic s3c_set_platdata for various set_platdata functions
-of S3C24XX
+Hi,
 
-Signed-off-by: Banajit Goswami <banajit.g@samsung.com>
----
- arch/arm/plat-s3c24xx/devs.c |   38 +++++++-------------------------------
- 1 files changed, 7 insertions(+), 31 deletions(-)
+On Monday 18 July 2011 01:38 PM, Tony Lindgren wrote:
+> * Arnd Bergmann<arnd@arndb.de>  [110717 14:36]:
+>> Hi Paul and Tomi,
+>>
+>> I'm trying to get the arm-soc tree integrated into linux-next, but right
+>> now that fails because of lots of conflicts in the arch/arm/mach-omap2/clock44xx_data.c
+>> and arch/arm/mach-omap2/omap_hwmod_44xx_data.c files.
+>>
+>> I've done a dumb resolution by pulling in the omap_dss2/for_next tree as a
+>> depedency and taking Tomi's version of the files, which is probably wrong
+>> but lets Stephen at least take the arm-soc tree.
+>
+> Yes that's the wrong way around for these files..
+>
+>> Please fix this properly in either the omap or the omap_dss2 trees.
+>
+> The clock and hwmod data patches should get queued by Benoit and Paul,
+> so I'm suspecting these are some of Tomi's patches still in development.
+>
+> Tomi can you please check what you have in for-next?
 
-diff --git a/arch/arm/plat-s3c24xx/devs.c b/arch/arm/plat-s3c24xx/devs.c
-index 7366799..a76bf2d 100644
---- a/arch/arm/plat-s3c24xx/devs.c
-+++ b/arch/arm/plat-s3c24xx/devs.c
-@@ -150,9 +150,8 @@ void __init s3c24xx_fb_set_platdata(struct s3c2410fb_mach_info *pd)
- {
- 	struct s3c2410fb_mach_info *npd;
- 
--	npd = kmemdup(pd, sizeof(*npd), GFP_KERNEL);
-+	npd = s3c_set_platdata(pd, sizeof(*npd), &s3c_device_lcd);
- 	if (npd) {
--		s3c_device_lcd.dev.platform_data = npd;
- 		npd->displays = kmemdup(pd->displays,
- 			sizeof(struct s3c2410fb_display) * npd->num_displays,
- 			GFP_KERNEL);
-@@ -188,12 +187,10 @@ struct platform_device s3c_device_ts = {
- };
- EXPORT_SYMBOL(s3c_device_ts);
- 
--static struct s3c2410_ts_mach_info s3c2410ts_info;
--
- void __init s3c24xx_ts_set_platdata(struct s3c2410_ts_mach_info *hard_s3c2410ts_info)
- {
--	memcpy(&s3c2410ts_info, hard_s3c2410ts_info, sizeof(struct s3c2410_ts_mach_info));
--	s3c_device_ts.dev.platform_data = &s3c2410ts_info;
-+	s3c_set_platdata(hard_s3c2410ts_info,
-+			 sizeof(struct s3c2410_ts_mach_info), &s3c_device_ts);
- }
- 
- /* USB Device (Gadget)*/
-@@ -223,15 +220,7 @@ EXPORT_SYMBOL(s3c_device_usbgadget);
- 
- void __init s3c24xx_udc_set_platdata(struct s3c2410_udc_mach_info *pd)
- {
--	struct s3c2410_udc_mach_info *npd;
--
--	npd = kmalloc(sizeof(*npd), GFP_KERNEL);
--	if (npd) {
--		memcpy(npd, pd, sizeof(*npd));
--		s3c_device_usbgadget.dev.platform_data = npd;
--	} else {
--		printk(KERN_ERR "no memory for udc platform data\n");
--	}
-+	s3c_set_platdata(pd, sizeof(*pd), &s3c_device_usbgadget);
- }
- 
- /* USB High Speed 2.0 Device (Gadget) */
-@@ -263,15 +252,7 @@ struct platform_device s3c_device_usb_hsudc = {
- 
- void __init s3c24xx_hsudc_set_platdata(struct s3c24xx_hsudc_platdata *pd)
- {
--	struct s3c24xx_hsudc_platdata *npd;
--
--	npd = kmalloc(sizeof(*npd), GFP_KERNEL);
--	if (npd) {
--		memcpy(npd, pd, sizeof(*npd));
--		s3c_device_usb_hsudc.dev.platform_data = npd;
--	} else {
--		printk(KERN_ERR "no memory for udc platform data\n");
--	}
-+	s3c_set_platdata(pd, sizeof(*pd), &s3c_device_usb_hsudc);
- }
- 
- /* IIS */
-@@ -383,13 +364,8 @@ EXPORT_SYMBOL(s3c_device_sdi);
- 
- void __init s3c24xx_mci_set_platdata(struct s3c24xx_mci_pdata *pdata)
- {
--	struct s3c24xx_mci_pdata *npd;
--
--	npd = kmemdup(pdata, sizeof(struct s3c24xx_mci_pdata), GFP_KERNEL);
--	if (!npd)
--		printk(KERN_ERR "%s: no memory to copy pdata", __func__);
--
--	s3c_device_sdi.dev.platform_data = npd;
-+	s3c_set_platdata(pdata, sizeof(struct s3c24xx_mci_pdata),
-+			 &s3c_device_sdi);
- }
- 
- 
--- 
-1.7.2.3
+Tomi is on vacation right now, but he checks his mail once in a while, 
+so we may get a response soon.
+
+Tomi's for-next branch is not up to date yet. So it shouldn't be 
+considered for now. The HWMOD patches in Tomi's for-next branch will be 
+pushed by Paul as 3.1-rc fixes.
+
+We will make a temporary branch which will contain all the DSS2 patches 
+which Tomi intended to push for this merge window, once he gets a 
+chance, he can quickly update his for-next branch with it.
+
+Archit
+
+>
+> Regards,
+>
+> Tony
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
