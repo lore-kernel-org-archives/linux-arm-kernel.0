@@ -1,58 +1,53 @@
-From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
-Date: Wed, 20 Jul 2011 15:38:02 +0530
-Subject: [PATCH v4 REPOST 18/20] gpio/omap: use pm-runtime framework
-In-Reply-To: <20110716190734.GB990@google.com>
-References: <1310804152-9243-1-git-send-email-tarun.kanti@ti.com>
-	<1310804152-9243-19-git-send-email-tarun.kanti@ti.com>
-	<20110716190734.GB990@google.com>
-Message-ID: <5A47E75E594F054BAF48C5E4FC4B92AB037C0C4DBE@dbde02.ent.ti.com>
+From: tony.lin@freescale.com (Tony Lin)
+Date: Wed, 20 Jul 2011 19:08:22 +0800
+Subject: [PATCH 3/7] add usb phy clocks to clock tree
+In-Reply-To: <1311160106-4898-1-git-send-email-tony.lin@freescale.com>
+References: <1311160106-4898-1-git-send-email-tony.lin@freescale.com>
+Message-ID: <1311160106-4898-4-git-send-email-tony.lin@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[...]
-> >
-> > +	/*
-> > +	 * If this is the first gpio_request for the bank,
-> > +	 * enable the bank module.
-> > +	 */
-> > +	if (!bank->mod_usage) {
-> > +		if (IS_ERR_VALUE(pm_runtime_get_sync(bank->dev) < 0)) {
-> > +			dev_err(bank->dev, "%s: GPIO bank %d "
-> > +					"pm_runtime_get_sync failed\n",
-> > +					__func__, bank->id);
-> > +			return -EINVAL;
-> 
-> 
-> Must spin_unlock_irqrestore() first.
-Yes.
+Signed-off-by: Tony Lin <tony.lin@freescale.com>
+---
+ arch/arm/mach-mxs/clock-mx28.c |   18 ++++++++++++++++++
+ 1 files changed, 18 insertions(+), 0 deletions(-)
 
-> 
-> > +		}
-> > +
-> > +		/* Initialize the gpio bank registers to init time value */
-> > +		omap_gpio_mod_init(bank);
-> 
-> omap_gpio_mod_init calls mpuio_init calls platform_driver_register
-> which can't be called in an IRQs off and spinlocked atomic context,
-> for example, device_private_init calls kzalloc with GFP_KERNEL.
-Right! The present form of *_mod_init() is not suitable here.
-
-> 
-> Concurrency protection for this will need to happen prior to the
-> spinlock (assuming it really does need to be an IRQ saving spinlock
-> and not a mutex).   Possibly a new mutex is needed to protect the
-> check for first usage and init'ing the bank (and blocking a racing
-> second caller until the init is done).
-I looked at the implementation once again with the comments at background.
-There are gaps which require fixing. Thanks.
-
-> 
-> The omap_gpio_mod_init may be unbalanced with the code performed below
-> on last free of a GPIO for the bank?  If all GPIOs are freed and then
-> a new GPIO used, does omap_gpio_mod_init do the right thing?  Need a
-> separate flag to indicate whether one-time init has ever been
-> performed, vs. needing runtime PM enable/disable?
-Yes, there is imbalance. I am re-looking and fixing.
---
-Tarun
-[...]
+diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
+index 5dcc59d..6fd0fe6 100644
+--- a/arch/arm/mach-mxs/clock-mx28.c
++++ b/arch/arm/mach-mxs/clock-mx28.c
+@@ -570,7 +570,23 @@ static struct clk usb1_clk = {
+ 	.disable = _raw_clk_disable,
+ 	.parent = &pll1_clk,
+ };
++/* usb phy clock for usb0 */
++static struct clk usb_phy_clk0 = {
++	.parent = &pll0_clk,
++	.enable = _raw_clk_disable, /* EN_USB_CLKS = 1 means ON */
++	.disable = _raw_clk_enable,
++	.enable_reg = CLKCTRL_BASE_ADDR + HW_CLKCTRL_PLL0CTRL0,
++	.enable_shift = 18,
++};
+ 
++/* usb phy clock for usb1 */
++static struct clk usb_phy_clk1 = {
++	.parent = &pll1_clk,
++	.enable = _raw_clk_disable,
++	.disable = _raw_clk_enable,
++	.enable_reg = CLKCTRL_BASE_ADDR + HW_CLKCTRL_PLL1CTRL0,
++	.enable_shift = 18,
++};
+ #define _DEFINE_CLOCK(name, er, es, p)					\
+ 	static struct clk name = {					\
+ 		.enable_reg	= CLKCTRL_BASE_ADDR + HW_CLKCTRL_##er,	\
+@@ -629,6 +645,8 @@ static struct clk_lookup lookups[] = {
+ 	_REGISTER_CLOCK("flexcan.1", NULL, can1_clk)
+ 	_REGISTER_CLOCK(NULL, "usb0", usb0_clk)
+ 	_REGISTER_CLOCK(NULL, "usb1", usb1_clk)
++	_REGISTER_CLOCK(NULL, "usb0_phy", usb_phy_clk0)
++	_REGISTER_CLOCK(NULL, "usb1_phy", usb_phy_clk1)
+ 	_REGISTER_CLOCK("mxs-pwm.0", NULL, pwm_clk)
+ 	_REGISTER_CLOCK("mxs-pwm.1", NULL, pwm_clk)
+ 	_REGISTER_CLOCK("mxs-pwm.2", NULL, pwm_clk)
+-- 
+1.7.0.4
