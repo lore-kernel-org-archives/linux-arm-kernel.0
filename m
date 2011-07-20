@@ -1,42 +1,74 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 20 Jul 2011 12:56:07 -0600
-Subject: [PATCH] arm/dt: tegra devicetree support
-In-Reply-To: <CAOesGMiy1t-98KZ_imFkGO-ify3S_00d_0XKc2vcLNRekxOvpw@mail.gmail.com>
-References: <20110719234158.2779.15394.stgit@ponder>
-	<CAOesGMiy1t-98KZ_imFkGO-ify3S_00d_0XKc2vcLNRekxOvpw@mail.gmail.com>
-Message-ID: <20110720185607.GJ4642@ponder.secretlab.ca>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 20 Jul 2011 21:08:40 +0200
+Subject: [PATCH 2/7] enable usb1 phy power supply
+In-Reply-To: <1311160106-4898-3-git-send-email-tony.lin@freescale.com>
+References: <1311160106-4898-1-git-send-email-tony.lin@freescale.com>
+	<1311160106-4898-3-git-send-email-tony.lin@freescale.com>
+Message-ID: <20110720190840.GK26347@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 19, 2011 at 04:56:46PM -0700, Olof Johansson wrote:
-> Nice!
-> 
-> 
-> On Tue, Jul 19, 2011 at 4:43 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
-> > Everything required to populate NVIDIA Tegra devices from the device
-> > tree. ?This patch adds a new DT_MACHINE_DESC() which matches against
-> > a tegra20 device tree. ?So far it only registers the on-chip devices,
-> > but it will be refined in follow on patches to configure clocks and
-> > pin IO from the device tree also.
-> >
-> > Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
-> 
-> Acked-by: Olof Johansson <olof@lixom.net
-> 
-> 
-> Minor nit:
-> 
-> > +++ b/arch/arm/boot/dts/tegra20.dtsi
-> > @@ -0,0 +1,148 @@
-> > +/include/ "skeleton.dtsi"
-> > +
-> > +/ {
-> > + ? ? ? model = "NVIDIA Tegra 250";
-> 
-> NVIDIA Tegra2 or Tegra20 to be more in line with the recent 250->20
-> conversion (and Harmony)
+On Wed, Jul 20, 2011 at 07:08:21PM +0800, Tony Lin wrote:
+> configure usb1 phy power enable gpio and enable usb1 phy power
 
-I'll remove the model property entirely.  It doesn't make any sense
-for the soc include file since "model" describes the system.
+You should add the architecture and board name to the subject so that
+it's clear what this patch is about.
 
-g.
+Sascha
+
+> 
+> Signed-off-by: Tony Lin <tony.lin@freescale.com>
+> ---
+>  arch/arm/mach-mxs/mach-mx28evk.c |    9 +++++++++
+>  1 files changed, 9 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
+> index eaaf6ff..6934867 100644
+> --- a/arch/arm/mach-mxs/mach-mx28evk.c
+> +++ b/arch/arm/mach-mxs/mach-mx28evk.c
+> @@ -34,6 +34,7 @@
+>  #define MX28EVK_BL_ENABLE	MXS_GPIO_NR(3, 18)
+>  #define MX28EVK_LCD_ENABLE	MXS_GPIO_NR(3, 30)
+>  #define MX28EVK_FEC_PHY_RESET	MXS_GPIO_NR(4, 13)
+> +#define MX28EVK_USB1_PWR_EN	MXS_GPIO_NR(3, 8)
+>  
+>  #define MX28EVK_MMC0_WRITE_PROTECT	MXS_GPIO_NR(2, 12)
+>  #define MX28EVK_MMC1_WRITE_PROTECT	MXS_GPIO_NR(0, 28)
+> @@ -183,6 +184,8 @@ static const iomux_cfg_t mx28evk_pads[] __initconst = {
+>  
+>  	/* led */
+>  	MX28_PAD_AUART1_TX__GPIO_3_5 | MXS_PAD_CTRL,
+> +	/* usb1 */
+> +	MX28_PAD_AUART2_RX__GPIO_3_8 | MXS_PAD_CTRL,
+>  };
+>  
+>  /* led */
+> @@ -405,6 +408,12 @@ static void __init mx28evk_init(void)
+>  		pr_warn("failed to request gpio mmc1-slot-power: %d\n", ret);
+>  	mx28_add_mxs_mmc(1, &mx28evk_mmc_pdata[1]);
+>  
+> +	ret = gpio_request_one(MX28EVK_USB1_PWR_EN, GPIOF_DIR_OUT,
+> +			       "usb1-power-en");
+> +	if (ret)
+> +		pr_warn("failed to request gpio usb1-power-en %d\n", ret);
+> +	else
+> +		gpio_set_value(MX28EVK_USB1_PWR_EN, 1);
+>  	gpio_led_register_device(0, &mx28evk_led_data);
+>  }
+>  
+> -- 
+> 1.7.0.4
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
