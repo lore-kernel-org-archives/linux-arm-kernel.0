@@ -1,37 +1,23 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 20 Jul 2011 12:55:48 +0800
-Subject: [PATCH v2] mtd: dataflash: add device tree probe support
-In-Reply-To: <1311136844.20738.131.camel@sauron>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Wed, 20 Jul 2011 07:51:30 +0300
+Subject: [PATCH v3] mtd: dataflash: add device tree probe support
+In-Reply-To: <1310719136-21565-1-git-send-email-shawn.guo@linaro.org>
 References: <1310283313-32087-1-git-send-email-shawn.guo@linaro.org>
-	<1310658757-17018-1-git-send-email-shawn.guo@linaro.org>
-	<20110715025407.GF2927@ponder.secretlab.ca>
-	<20110715044919.GB1840@S2100-06.ap.freescale.net>
-	<1311136844.20738.131.camel@sauron>
-Message-ID: <20110720045547.GA5766@S2100-06.ap.freescale.net>
+	<1310719136-21565-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1311137496.20738.133.camel@sauron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 20, 2011 at 07:40:38AM +0300, Artem Bityutskiy wrote:
-> On Fri, 2011-07-15 at 12:49 +0800, Shawn Guo wrote:
-> > > > +static const struct of_device_id dataflash_dt_ids[] = {
-> > > > +	{ .compatible = "atmel,at45xxx", },
-> > > > +	{ .compatible = "atmel,dataflash", },
-> > > > +	{ /* sentinel */ }
-> > > > +};
-> > > > +
-> > > 
-> > > This should be protected with a #ifdef CONFIG_OF/#else/#endif, and
-> > > there should be a MODULE_DEVICE_TABLE().
-> > > 
-> > I personally hate #ifdef stuff.  But okay, I can do it since there
-> > are people being concerned by this little waste of space.
+On Fri, 2011-07-15 at 16:38 +0800, Shawn Guo wrote:
+> It adds device tree probe support for mtd_dataflash driver.
 > 
-> I guess the question is - will it compile and work if CONFIG_OF is
-> unset?
-> 
-Yes, it will compile, as 'struct of_device_id' is defined in
-include/linux/mod_devicetable.h unconditionally.
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Cc: David Woodhouse <dwmw2@infradead.org>
+> Cc: Artem Bityutskiy <Artem.Bityutskiy@nokia.com>
+
+Pushed to l2-mtd-2.6.git, thanks!
 
 -- 
-Regards,
-Shawn
+Best Regards,
+Artem Bityutskiy
