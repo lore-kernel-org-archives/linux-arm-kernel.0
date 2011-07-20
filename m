@@ -1,49 +1,87 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Wed, 20 Jul 2011 22:10:57 +0530
-Subject: [PATCH] davinci: fix DM365 EVM video input mux bits
-In-Reply-To: <20110719105532.GF26574@n2100.arm.linux.org.uk>
-References: <1311046211-2849-1-git-send-email-jon.povey@racelogic.co.uk>
-	<B85A65D85D7EB246BE421B3FB0FBB593024DBDC68A@dbde02.ent.ti.com>
-	<20110719105532.GF26574@n2100.arm.linux.org.uk>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024DC70E2A@dbde02.ent.ti.com>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Thu, 21 Jul 2011 00:43:18 +0800
+Subject: [alsa-devel] [PATCH v4 02/10] ASoc: mxs: add mxs-saif driver
+In-Reply-To: <4E27007C.6090805@ti.com>
+References: <1311133306-9496-1-git-send-email-b29396@freescale.com>
+	<1311133306-9496-3-git-send-email-b29396@freescale.com>
+	<4E27007C.6090805@ti.com>
+Message-ID: <CAA+hA=SRbRr2m43UTf4hp3iwmt2xVxn6-1p0R1wkwQ+gKaAXVw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+2011/7/21 Liam Girdwood <lrg@ti.com>:
+> On 20/07/11 04:41, Dong Aisheng wrote:
+>> Signed-off-by: Dong Aisheng <b29396@freescale.com>
+>> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+>> Cc: Liam Girdwood <lrg@ti.com>
+>> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+>> Tested-by: Wolfram Sang <w.sang@pengutronix.de>
+>> ---
+>> ?sound/soc/mxs/mxs-saif.c | ?677 ++++++++++++++++++++++++++++++++++++++++++++++
+>> ?sound/soc/mxs/mxs-saif.h | ?130 +++++++++
+>> ?2 files changed, 807 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/sound/soc/mxs/mxs-saif.c b/sound/soc/mxs/mxs-saif.c
+>> new file mode 100644
+>> index 0000000..0b3adae
+>> --- /dev/null
+>> +++ b/sound/soc/mxs/mxs-saif.c
+>> @@ -0,0 +1,677 @@
+>> +/*
+>> + * Copyright 2011 Freescale Semiconductor, Inc.
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License as published by
+>> + * the Free Software Foundation; either version 2 of the License, or
+>> + * (at your option) any later version.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. ?See the
+>> + * GNU General Public License for more details.
+>> + *
+>> + * You should have received a copy of the GNU General Public License along
+>> + * with this program; if not, write to the Free Software Foundation, Inc.,
+>> + * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+>> + */
+>> +
+>> +#include <linux/module.h>
+>> +#include <linux/init.h>
+>> +#include <linux/platform_device.h>
+>> +#include <linux/slab.h>
+>> +#include <linux/dma-mapping.h>
+>> +#include <linux/clk.h>
+>> +#include <linux/delay.h>
+>> +#include <sound/core.h>
+>> +#include <sound/pcm.h>
+>> +#include <sound/pcm_params.h>
+>> +#include <sound/soc.h>
+>> +#include <mach/dma.h>
+>> +#include <asm/mach-types.h>
+>> +#include <mach/hardware.h>
+>> +#include <mach/mxs.h>
+>> +
+>> +#include "mxs-saif.h"
+>> +
+>> +static struct mxs_saif *mxs_saif[2];
+>> +
+>
+> Is there any reason why this struct cant be part of your DAI private data ?
 
-On Tue, Jul 19, 2011 at 16:25:32, Russell King - ARM Linux wrote:
-> On Tue, Jul 19, 2011 at 02:26:50PM +0530, Nori, Sekhar wrote:
-> > Since this part of the code hasn't changed since it
-> > was written, this is a good candidate for stable
-> > kernel series. You can just add:
-> > 
-> > Cc: stable at kernel.org
-> 
-> Be careful when doing that - if you have git mail the patches out for
-> review, and it picks that up, it'll send it to the stable team as well.
-> The stable team will then complain "that's not how to submit patches
-> to them".
-> 
-> So, while you can add "Cc: stable at kernel.org" to the patch, its best
-> to only add that just before you publish the commit after review, but
-> before merging.
+Yes, it is because we provide a interface mxs_saif_get_mclk for
+machine driver to get the mclk if needed in a very early stage such as
+probe.
+And during that time, the machine driver will not be able to provide a
+DAI as parameter
+(card is still not registered).
 
-But its very tough to guess what the last version
-ready for merging will be. Review comments can come
-at any stage.
++ * Get MCLK and set clock rate, then enable it
++ *
++ * This interface is used for codecs who are using MCLK provided
++ * by saif.
++ */
++int mxs_saif_get_mclk(unsigned int saif_id, unsigned int mclk,
++                                       unsigned int rate)
 
-Would adding "Cc: stable at kernel.org" to the commit text
-but taking care to not actually send mail to stable at kernel.org
-help? The stable_kernel_rules.txt document seems to suggest
-this is an acceptable way:
-
-"
-- To have the patch automatically included in the stable tree, add the tag
-     Cc: stable at kernel.org
-   in the sign-off area. Once the patch is merged it will be applied to
-   the stable tree without anything else needing to be done by the author
-   or subsystem maintainer.
-"
-
-Thanks,
-Sekhar
+Regards
+Dong Aisheng
