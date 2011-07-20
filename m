@@ -1,180 +1,58 @@
-From: naveenkrishna.ch@gmail.com (Naveen Krishna Ch)
-Date: Wed, 20 Jul 2011 15:22:05 +0530
-Subject: [PATCH v2 2/3] ARM: EXYNOS4: Add sclk_spdif clocks.
-In-Reply-To: <CAHfPSqAAmu+DMTuiT89TpQ7He-HVqBcA+HHpziG0CyviGrtd_g@mail.gmail.com>
-References: <1308655463-8787-1-git-send-email-ch.naveen@samsung.com>
-	<1308655463-8787-3-git-send-email-ch.naveen@samsung.com>
-	<048301cc450c$37dc4b90$a794e2b0$%kim@samsung.com>
-	<CAHfPSqAAmu+DMTuiT89TpQ7He-HVqBcA+HHpziG0CyviGrtd_g@mail.gmail.com>
-Message-ID: <CAHfPSqAWxasV--nXtC7JBsV3yKQLY1MVGp=HMAdy-gnB8c-urA@mail.gmail.com>
+From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
+Date: Wed, 20 Jul 2011 15:38:02 +0530
+Subject: [PATCH v4 REPOST 18/20] gpio/omap: use pm-runtime framework
+In-Reply-To: <20110716190734.GB990@google.com>
+References: <1310804152-9243-1-git-send-email-tarun.kanti@ti.com>
+	<1310804152-9243-19-git-send-email-tarun.kanti@ti.com>
+	<20110716190734.GB990@google.com>
+Message-ID: <5A47E75E594F054BAF48C5E4FC4B92AB037C0C4DBE@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Everyone,
+[...]
+> >
+> > +	/*
+> > +	 * If this is the first gpio_request for the bank,
+> > +	 * enable the bank module.
+> > +	 */
+> > +	if (!bank->mod_usage) {
+> > +		if (IS_ERR_VALUE(pm_runtime_get_sync(bank->dev) < 0)) {
+> > +			dev_err(bank->dev, "%s: GPIO bank %d "
+> > +					"pm_runtime_get_sync failed\n",
+> > +					__func__, bank->id);
+> > +			return -EINVAL;
+> 
+> 
+> Must spin_unlock_irqrestore() first.
+Yes.
 
-Any suggestions regarding this below problem.
+> 
+> > +		}
+> > +
+> > +		/* Initialize the gpio bank registers to init time value */
+> > +		omap_gpio_mod_init(bank);
+> 
+> omap_gpio_mod_init calls mpuio_init calls platform_driver_register
+> which can't be called in an IRQs off and spinlocked atomic context,
+> for example, device_private_init calls kzalloc with GFP_KERNEL.
+Right! The present form of *_mod_init() is not suitable here.
 
-On 18 July 2011 16:55, Naveen Krishna Ch <naveenkrishna.ch@gmail.com> wrote:
-> Hi Every one,
->
-> On 18 July 2011 11:03, Kukjin Kim <kgene.kim@samsung.com> wrote:
->> Naveen Krishna Chatradhi wrote:
->>>
->>> Add the sclk_spdif clock is of type 'struct clksrc_clk' clock.
->>> Also, add clk_spdifextclk clocks of type 'struct clk' clock.
->>>
->>> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
->>> ---
->>> ?arch/arm/mach-exynos4/clock.c | ? 35
->>> +++++++++++++++++++++++++++++++++++
->>> ?1 files changed, 35 insertions(+), 0 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-exynos4/clock.c b/arch/arm/mach-exynos4/clock.c
->>> index 937335a..feeb27e 100644
->>> --- a/arch/arm/mach-exynos4/clock.c
->>> +++ b/arch/arm/mach-exynos4/clock.c
->>> @@ -64,6 +64,11 @@ static struct clk clk_audiocdclk2 = {
->>> ? ? ? .name ? ? ? ? ? = "audiocdclk",
->>> ?};
->>>
->>> +static struct clk clk_spdifextclk = {
->>> + ? ? .name ? ? ? ? ? = "spdif_extclk",
->>> + ? ? .id ? ? ? ? ? ? = -1,
->>> +};
->>> +
->>> ?static int exynos4_clksrc_mask_top_ctrl(struct clk *clk, int enable)
->>> ?{
->>> ? ? ? return s5p_gatectrl(S5P_CLKSRC_MASK_TOP, clk, enable);
->>> @@ -550,6 +555,11 @@ static struct clk init_clocks_off[] = {
->>> ? ? ? ? ? ? ? .enable ? ? ? ? = exynos4_clk_ip_peril_ctrl,
->>> ? ? ? ? ? ? ? .ctrlbit ? ? ? ?= (1 << 21),
->>> ? ? ? }, {
->>> + ? ? ? ? ? ? .name ? ? ? ? ? = "spdif",
->>> + ? ? ? ? ? ? .id ? ? ? ? ? ? = -1,
->>> + ? ? ? ? ? ? .enable ? ? ? ? = exynos4_clk_ip_peril_ctrl,
->>> + ? ? ? ? ? ? .ctrlbit ? ? ? ?= (1 << 26),
->>> + ? ? }, {
->>
->> Need to re-work based on clkdev :)
-> Sure, will rebase on updated for-next branch.
->>
->>> ? ? ? ? ? ? ? .name ? ? ? ? ? = "ac97",
->>> ? ? ? ? ? ? ? .id ? ? ? ? ? ? = -1,
->>> ? ? ? ? ? ? ? .enable ? ? ? ? = exynos4_clk_ip_peril_ctrl,
->>> @@ -801,6 +811,30 @@ static struct clk init_clocks[] = {
->>> ? ? ? }
->>> ?};
->>>
->>> +static struct clk *clkset_sclk_spdif_list[] = {
->>> + ? ? [0] = &clk_sclk_audio0.clk,
->>> + ? ? [1] = &clk_sclk_audio1.clk,
->>> + ? ? [2] = &clk_sclk_audio2.clk,
->>> + ? ? [3] = &clk_spdifextclk,
->>> +};
->>> +
->>> +static struct clksrc_sources clkset_sclk_spdif = {
->>> + ? ? .sources ? ? ? ?= clkset_sclk_spdif_list,
->>> + ? ? .nr_sources ? ? = ARRAY_SIZE(clkset_sclk_spdif_list),
->>> +};
->>> +
->>> +static struct clksrc_clk clk_sclk_spdif = {
->>> + ? ? .clk ? ?= {
->>> + ? ? ? ? ? ? .name ? ? ? ? ? = "sclk_spdif",
->>> + ? ? ? ? ? ? .id ? ? ? ? ? ? = -1,
->>> + ? ? ? ? ? ? .enable ? ? ? ? = exynos4_clksrc_mask_peril1_ctrl,
->>> + ? ? ? ? ? ? .ctrlbit ? ? ? ?= (1 << 8),
->>> + ? ? ? ? ? ? .ops ? ? ? ? ? ?= &s5p_sclk_spdif_ops,
->>> + ? ? },
->>> + ? ? ? ? ? ? .sources = &clkset_sclk_spdif,
->>> + ? ? ? ? ? ? .reg_src = { .reg = S5P_CLKSRC_PERIL1, .shift = 8, .size = 2
->> },
->>> +};
->>
->> Hmm...is it possible to move this into struct clksrc_clk clksrcs[] ?
-> When i try to move it under struct clksrc_clk clksrcs[], I encountered
-> a problem with .ops field
-> The sample code as follows (I'm not sure if i can copy paste the code for RFC)
->
-> +static struct clk *clkset_sclk_spdif_list[] = {
-> + ? ? ? [0] = &clk_sclk_audio0.clk,
-> + ? ? ? [1] = &clk_sclk_audio1.clk,
-> + ? ? ? [2] = &clk_sclk_audio2.clk,
-> + ? ? ? [3] = &clk_spdifextclk,
-> +};
-> +
-> +static struct clksrc_sources clkset_sclk_spdif = {
-> + ? ? ? .sources ? ? ? ?= clkset_sclk_spdif_list,
-> + ? ? ? .nr_sources ? ? = ARRAY_SIZE(clkset_sclk_spdif_list),
-> +};
-> +
-> ?static struct clk *clkset_group_list[] = {
-> ? ? ? ?[0] = &clk_ext_xtal_mux,
-> ? ? ? ?[1] = &clk_xusbxti,
-> @@ -1175,6 +1197,17 @@ static struct clksrc_clk clksrcs[] = {
-> ? ? ? ? ? ? ? ? ? ? ? ?.parent ? ? ? ? = &clk_sclk_audio2.clk,
-> ? ? ? ? ? ? ? ?},
-> ? ? ? ? ? ? ? ?.reg_div = { .reg = S5P_CLKDIV_PERIL4, .shift = 20, .size = 8 },
-> + ? ? ? }, {
-> + ? ? ? ? ? ? ? .clk ? ?= {
-> + ? ? ? ? ? ? ? ? ? ? ? .name ? ? ? ? ? = "sclk_spdif",
-> + ? ? ? ? ? ? ? ? ? ? ? .id ? ? ? ? ? ? = 0,
-> + ? ? ? ? ? ? ? ? ? ? ? .parent ? ? ? ? = &clk_sclk_audio0.clk,
-> + ? ? ? // ? ? ? ? ? ? ?.ops ? ? ? ? ? ?= &s5p_sclk_spdif_ops,
-> "When i keep this .ops, The system hangs during boot up.
-> If i don't define the .ops, The WARN_ON would print a stack of call
-> trace for undefined set_rate function"
-> I did not find any set_ops kind off utility functions.
->
-> Kindly, point me towards any better way of doing the same.
->
-> + ? ? ? ? ? ? ? ? ? ? ? .enable ? ? ? ? = exynos4_clksrc_mask_peril1_ctrl,
-> + ? ? ? ? ? ? ? ? ? ? ? .ctrlbit ? ? ? ?= (1 << 8),
-> + ? ? ? ? ? ? ? },
-> + ? ? ? ? ? ? ? .sources = &clkset_sclk_spdif,
-> + ? ? ? ? ? ? ? .reg_src = { .reg = S5P_CLKSRC_PERIL1, .shift = 8, .size = 2 },
-> ? ? ? ?},
-> ?};
->
->>
->>> +
->>> ?static struct clk *clkset_group_list[] = {
->>> ? ? ? [0] = &clk_ext_xtal_mux,
->>> ? ? ? [1] = &clk_xusbxti,
->>> @@ -1206,6 +1240,7 @@ static struct clksrc_clk *sysclks[] = {
->>> ? ? ? &clk_sclk_audio0,
->>> ? ? ? &clk_sclk_audio1,
->>> ? ? ? &clk_sclk_audio2,
->>> + ? ? &clk_sclk_spdif,
->>> ?};
->>>
->>> ?static int xtal_rate;
->>> --
->>> 1.7.2.3
->>
->>
->> Thanks.
->>
->> Best regards,
->> Kgene.
->> --
->> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
->> SW Solution Development Team, Samsung Electronics Co., Ltd.
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->>
->
->
->
-> --
-> Shine bright,
-> (: Nav :)
->
+> 
+> Concurrency protection for this will need to happen prior to the
+> spinlock (assuming it really does need to be an IRQ saving spinlock
+> and not a mutex).   Possibly a new mutex is needed to protect the
+> check for first usage and init'ing the bank (and blocking a racing
+> second caller until the init is done).
+I looked at the implementation once again with the comments at background.
+There are gaps which require fixing. Thanks.
 
-
-
--- 
-Shine bright,
-(: Nav :)
+> 
+> The omap_gpio_mod_init may be unbalanced with the code performed below
+> on last free of a GPIO for the bank?  If all GPIOs are freed and then
+> a new GPIO used, does omap_gpio_mod_init do the right thing?  Need a
+> separate flag to indicate whether one-time init has ever been
+> performed, vs. needing runtime PM enable/disable?
+Yes, there is imbalance. I am re-looking and fixing.
+--
+Tarun
+[...]
