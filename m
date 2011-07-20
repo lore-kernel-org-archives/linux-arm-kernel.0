@@ -1,78 +1,167 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 20 Jul 2011 21:26:22 +0200
-Subject: [PATCH 4/7] mx28: add usb host phy functions
-In-Reply-To: <1311160106-4898-5-git-send-email-tony.lin@freescale.com>
+Date: Wed, 20 Jul 2011 21:41:12 +0200
+Subject: [PATCH 5/7] ehci mxc: make it more flexible to be used for mx28
+In-Reply-To: <1311160106-4898-6-git-send-email-tony.lin@freescale.com>
 References: <1311160106-4898-1-git-send-email-tony.lin@freescale.com>
-	<1311160106-4898-5-git-send-email-tony.lin@freescale.com>
-Message-ID: <20110720192622.GM26347@pengutronix.de>
+	<1311160106-4898-6-git-send-email-tony.lin@freescale.com>
+Message-ID: <20110720194112.GN26347@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 20, 2011 at 07:08:23PM +0800, Tony Lin wrote:
-> add usb phy register definitions and functions
-> usb host driver will use these functions to initialize
-> usb phy and change phy working mode
+On Wed, Jul 20, 2011 at 07:08:24PM +0800, Tony Lin wrote:
+> old driver uses some hard coding for clks' name which could
+> not be used for mx28. So workaround these hard codings by
+> judging the cpu is mx28 or not.
+> add platform callback funtions in usb irq handler in the case
+> usb phy need to change its disconnect detector mode after usb
+> device is connected and disconnected. These callbacks also
+> could be used for other machines whose usb phy need such kind
+> of operations
 > 
+> Signed-off-by: Tony Lin <tony.lin@freescale.com>
+> ---
+>  drivers/usb/host/Kconfig    |    2 +-
+>  drivers/usb/host/ehci-mxc.c |   57 +++++++++++++++++++++++++++++++-----------
+>  2 files changed, 43 insertions(+), 16 deletions(-)
+> 
+> diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
+> index ab085f1..6a5905b 100644
+> --- a/drivers/usb/host/Kconfig
+> +++ b/drivers/usb/host/Kconfig
+> @@ -139,7 +139,7 @@ config USB_EHCI_FSL
 >  
->  obj-y += devices/
-> diff --git a/arch/arm/mach-mxs/regs-usbphy-mx28.h b/arch/arm/mach-mxs/regs-usbphy-mx28.h
-> new file mode 100644
-> index 0000000..a367927
-> --- /dev/null
-> +++ b/arch/arm/mach-mxs/regs-usbphy-mx28.h
-> @@ -0,0 +1,323 @@
-> +/*
-> + * Freescale USBPHY Register Definitions
-> + *
-> + * Copyright 2008-2011 Freescale Semiconductor, Inc. All Rights Reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program; if not, write to the Free Software
-> + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
-> + *
-> + * This file is created by xml file. Don't Edit it.
-
-Please remove this comment. We can and will change this header if need
-arises.
-
-> + *
-> + * Xml Revision: 1.52
-> + * Template revision: 26195
-> + */
+>  config USB_EHCI_MXC
+>  	bool "Support for Freescale on-chip EHCI USB controller"
+> -	depends on USB_EHCI_HCD && ARCH_MXC
+> +	depends on USB_EHCI_HCD && (ARCH_MXC || ARCH_MXS)
+>  	select USB_EHCI_ROOT_HUB_TT
+>  	---help---
+>  	  Variation of ARC USB block used in some Freescale chips.
+> diff --git a/drivers/usb/host/ehci-mxc.c b/drivers/usb/host/ehci-mxc.c
+> index 0c058be..65e78cd 100644
+> --- a/drivers/usb/host/ehci-mxc.c
+> +++ b/drivers/usb/host/ehci-mxc.c
+> @@ -23,9 +23,7 @@
+>  #include <linux/usb/otg.h>
+>  #include <linux/usb/ulpi.h>
+>  #include <linux/slab.h>
+> -
+> -#include <mach/mxc_ehci.h>
+> -
+> +#include <linux/fsl_devices.h>
+>  #include <asm/mach-types.h>
+>  
+>  #define ULPI_VIEWPORT_OFFSET	0x170
+> @@ -66,6 +64,30 @@ static int ehci_mxc_setup(struct usb_hcd *hcd)
+>  	return 0;
+>  }
+>  
+> +static irqreturn_t fsl_ehci_irq(struct usb_hcd *hcd)
+> +{
+> +	struct mxc_usbh_platform_data *pdata;
+> +	struct ehci_hcd		*ehci = hcd_to_ehci(hcd);
+> +	u32			status;
 > +
-> +#ifndef __ARCH_ARM___USBPHY_H
-> +#define __ARCH_ARM___USBPHY_H
-> +
-> +
-> +#define HW_USBPHY_PWD	(0x00000000)
-> +#define HW_USBPHY_PWD_SET	(0x00000004)
-> +#define HW_USBPHY_PWD_CLR	(0x00000008)
-> +#define HW_USBPHY_PWD_TOG	(0x0000000c)
-> +
-> +#define BP_USBPHY_PWD_RSVD2	21
-> +#define BM_USBPHY_PWD_RSVD2	0xFFE00000
-> +#define BF_USBPHY_PWD_RSVD2(v) \
-> +		(((v) << 21) & BM_USBPHY_PWD_RSVD2)
-> +#define BM_USBPHY_PWD_RXPWDRX	0x00100000
-> +#define BM_USBPHY_PWD_RXPWDDIFF	0x00080000
-> +#define BM_USBPHY_PWD_RXPWD1PT1	0x00040000
-> +#define BM_USBPHY_PWD_RXPWDENV	0x00020000
-> +#define BP_USBPHY_PWD_RSVD1	13
-> +#define BM_USBPHY_PWD_RSVD1	0x0001E000
-> +#define BF_USBPHY_PWD_RSVD1(v)  \
-> +		(((v) << 13) & BM_USBPHY_PWD_RSVD1)
+> +	pdata = hcd->self.controller->platform_data;
+> +	if (pdata->plt_get_usb_connect_status == NULL || \
 
-Please remove all these reserved bits. They only reduce readability
+This backslash is unnecessary
 
+> +		pdata->plt_usb_disconnect_detect == NULL)
+> +		goto out;
+> +
+> +	spin_lock(&ehci->lock);
+> +	status = ehci_readl(ehci, &ehci->regs->status);
+> +	if (status & STS_PCD) {
+> +		if (pdata->plt_get_usb_connect_status())
+> +			pdata->plt_usb_disconnect_detect(true);
+> +		else
+> +			pdata->plt_usb_disconnect_detect(false);
+> +	}
+> +	spin_unlock(&ehci->lock);
+> +out:
+> +	return ehci_irq(hcd);
+> +}
+> +
+>  static const struct hc_driver ehci_mxc_hc_driver = {
+>  	.description = hcd_name,
+>  	.product_desc = "Freescale On-Chip EHCI Host Controller",
+> @@ -74,7 +96,7 @@ static const struct hc_driver ehci_mxc_hc_driver = {
+>  	/*
+>  	 * generic hardware linkage
+>  	 */
+> -	.irq = ehci_irq,
+> +	.irq = fsl_ehci_irq,
+>  	.flags = HCD_USB2 | HCD_MEMORY,
+>  
+>  	/*
+> @@ -165,14 +187,15 @@ static int ehci_mxc_drv_probe(struct platform_device *pdev)
+>  	}
+>  
+>  	/* enable clocks */
+> -	priv->usbclk = clk_get(dev, "usb");
+> -	if (IS_ERR(priv->usbclk)) {
+> -		ret = PTR_ERR(priv->usbclk);
+> -		goto err_clk;
+> +	if (!cpu_is_mx28()) {
+> +		priv->usbclk = clk_get(dev, "usb");
+> +		if (IS_ERR(priv->usbclk)) {
+> +			ret = PTR_ERR(priv->usbclk);
+> +			goto err_clk;
+> +		}
+> +		clk_enable(priv->usbclk);
+>  	}
 
-> diff --git a/arch/arm/mach-mxs/usb_h1.c b/arch/arm/mach-mxs/usb_h1.c
+We should start and provide dummy clocks for usb and ahb clock on
+platform which do not have them. Then we can get rid of the cpu checks
+in the driver.
+
+> -	clk_enable(priv->usbclk);
+> -
+> -	if (!cpu_is_mx35() && !cpu_is_mx25()) {
+> +	if (!cpu_is_mx35() && !cpu_is_mx25() && !cpu_is_mx28()) {
+>  		priv->ahbclk = clk_get(dev, "usb_ahb");
+>  		if (IS_ERR(priv->ahbclk)) {
+>  			ret = PTR_ERR(priv->ahbclk);
+> @@ -272,8 +295,10 @@ err_clk_phy:
+>  		clk_put(priv->ahbclk);
+>  	}
+>  err_clk_ahb:
+> -	clk_disable(priv->usbclk);
+> -	clk_put(priv->usbclk);
+> +	if (priv->usbclk) {
+> +		clk_disable(priv->usbclk);
+> +		clk_put(priv->usbclk);
+> +	}
+>  err_clk:
+>  	iounmap(hcd->regs);
+>  err_ioremap:
+> @@ -304,8 +329,10 @@ static int __exit ehci_mxc_drv_remove(struct platform_device *pdev)
+>  	usb_put_hcd(hcd);
+>  	platform_set_drvdata(pdev, NULL);
+>  
+> -	clk_disable(priv->usbclk);
+> -	clk_put(priv->usbclk);
+> +	if (priv->usbclk) {
+> +		clk_disable(priv->usbclk);
+> +		clk_put(priv->usbclk);
+> +	}
+>  	if (priv->ahbclk) {
+>  		clk_disable(priv->ahbclk);
+>  		clk_put(priv->ahbclk);
+> -- 
+> 1.7.0.4
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
