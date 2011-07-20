@@ -1,41 +1,41 @@
-From: mturquette@ti.com (Mike Turquette)
-Date: Wed, 20 Jul 2011 16:32:25 -0700
-Subject: [PATCH] ARM: do not mark CPU 0 as hotpluggable
-Message-ID: <1311204745-6276-1-git-send-email-mturquette@ti.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 20 Jul 2011 16:36:29 -0700
+Subject: [PATCH] ARM: Migrate to asm-generic wrapper support
+In-Reply-To: <20110720232819.GC20310@n2100.arm.linux.org.uk>
+References: <1311204225-13169-1-git-send-email-sboyd@codeaurora.org>
+	<20110720232819.GC20310@n2100.arm.linux.org.uk>
+Message-ID: <4E27667D.9060200@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A quick poll of the ARM platforms that implement CPU Hotplug support
-shows that every platform treats CPU 0 as a special case that cannot be
-hotplugged.  In fact every platform has identical code for
-platform_cpu_die which returns -EPERM in the case of CPU 0.
+On 07/20/2011 04:28 PM, Russell King - ARM Linux wrote:
+> On Wed, Jul 20, 2011 at 04:23:45PM -0700, Stephen Boyd wrote:
+>> With d8ecc5c (kbuild: asm-generic support, 2011-04-27) we can
+>> remove a handful of asm-generic wrappers in ARM code.
+>>
+>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+>> Cc: Imre Kaloz <kaloz@openwrt.org>
+>> Cc: Krzysztof Halasa <khc@pm.waw.pl>
+>> Cc: Eric Miao <eric.y.miao@gmail.com>
+>> ---
+>>
+>> I've specifically left out topology.h as it looks like that will not
+>> be generic much longer.
+>
+> You don't mention in the commit log about the change to SZ_48M.
+>
 
-The user-facing sysfs interfaces should reflect this by not populating
-an 'online' entry for CPU 0 at all.  This better reflects reality by
-making it clear to users that CPU 0 cannot be hotplugged.
+Sorry. I figured it was a minor detail. How about:
 
-This patch prevents CPU 0 from being marked as hotpluggable on all ARM
-platforms during CPU registration.  This in turn prevents the creation
-of an 'online' sysfs interface for that CPU.
+With d8ecc5c (kbuild: asm-generic support, 2011-04-27) we can
+remove a handful of asm-generic wrappers in ARM code. Since the
+generic version of sizes.h doesn't contain SZ_48M, we replace
+the 3 users of SZ_48M with the equivalent SZ_32M + SZ_16M.
 
-Signed-off-by: Mike Turquette <mturquette@ti.com>
----
- arch/arm/kernel/setup.c |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index ed11fb0..a5fc969 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -940,7 +940,8 @@ static int __init topology_init(void)
- 
- 	for_each_possible_cpu(cpu) {
- 		struct cpuinfo_arm *cpuinfo = &per_cpu(cpu_data, cpu);
--		cpuinfo->cpu.hotpluggable = 1;
-+		if (cpu)
-+			cpuinfo->cpu.hotpluggable = 1;
- 		register_cpu(&cpuinfo->cpu, cpu);
- 	}
- 
+? If that works I'll make sure to include it when submitting to the
+patch tracker.
+
 -- 
-1.7.4.1
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
