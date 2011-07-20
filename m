@@ -1,92 +1,25 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 20 Jul 2011 21:43:18 +0200
-Subject: [PATCH 6/7] add macro definitions according to ehci-mxc driver
-	change
-In-Reply-To: <1311160106-4898-7-git-send-email-tony.lin@freescale.com>
-References: <1311160106-4898-1-git-send-email-tony.lin@freescale.com>
-	<1311160106-4898-7-git-send-email-tony.lin@freescale.com>
-Message-ID: <20110720194318.GO26347@pengutronix.de>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 20 Jul 2011 20:49:16 +0100
+Subject: [PATCH] arm/dt: tegra devicetree support
+In-Reply-To: <20110720184758.GG4642@ponder.secretlab.ca>
+References: <20110719234158.2779.15394.stgit@ponder>
+	<74CDBE0F657A3D45AFBB94109FB122FF049EBDEE27@HQMAIL01.nvidia.com>
+	<20110720160355.GB2406@sirena.org.uk>
+	<20110720183133.GE4642@ponder.secretlab.ca>
+	<74CDBE0F657A3D45AFBB94109FB122FF049EBDEF01@HQMAIL01.nvidia.com>
+	<20110720184758.GG4642@ponder.secretlab.ca>
+Message-ID: <20110720194915.GA26043@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 20, 2011 at 07:08:25PM +0800, Tony Lin wrote:
-> Signed-off-by: Tony Lin <tony.lin@freescale.com>
-> ---
->  arch/arm/mach-mxs/include/mach/hardware.h |    2 ++
->  arch/arm/mach-mxs/include/mach/mxs.h      |   12 +++++++++++-
->  arch/arm/plat-mxc/include/mach/mxc.h      |    3 +++
->  3 files changed, 16 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mxs/include/mach/hardware.h b/arch/arm/mach-mxs/include/mach/hardware.h
-> index 53e89a0..affa72b 100644
-> --- a/arch/arm/mach-mxs/include/mach/hardware.h
-> +++ b/arch/arm/mach-mxs/include/mach/hardware.h
-> @@ -26,4 +26,6 @@
->  #define IOMEM(addr)	((void __force __iomem *)(addr))
->  #endif
->  
-> +#include "mxs.h"
-> +
->  #endif /* __MACH_MXS_HARDWARE_H__ */
-> diff --git a/arch/arm/mach-mxs/include/mach/mxs.h b/arch/arm/mach-mxs/include/mach/mxs.h
-> index 35a89dd..6e5928d 100644
-> --- a/arch/arm/mach-mxs/include/mach/mxs.h
-> +++ b/arch/arm/mach-mxs/include/mach/mxs.h
-> @@ -35,7 +35,17 @@
->  		machine_is_mx28evk() ||					\
->  		machine_is_tx28() ||					\
->  		0)
-> -
-> +#define cpu_is_mx1()		(0)
-> +#define cpu_is_mx21()		(0)
-> +#define cpu_is_mx25()		(0)
-> +#define cpu_is_mx27()		(0)
-> +#define cpu_is_mx31()		(0)
-> +#define cpu_is_mx35()		(0)
-> +#define cpu_is_mx50()		(0)
-> +#define cpu_is_mx51()		(0)
-> +#define cpu_is_mx53()		(0)
-> +#define cpu_is_mx3()		(cpu_is_mx31() || cpu_is_mx35())
-> +#define cpu_is_mx2()		(cpu_is_mx21() || cpu_is_mx27())
+On Wed, Jul 20, 2011 at 12:47:58PM -0600, Grant Likely wrote:
 
-As said before, please get rid of the usage of the macros in the driver
-instead.
+> Sure, the tegra-wm8903 property can be dropped.  If we start to see a
+> really well established pattern of the tegra paired with a wm8903,
+> then at that point we can define a compatible property for it and
+> document exactly what it means (document the boundaries and
+> assumptions that the compatible value requires).
 
-BTW this patch would have to be earlier in the series to maintain
-bisectability.
-
-Sascha
-
->  /*
->   * IO addresses common to MXS-based
->   */
-> diff --git a/arch/arm/plat-mxc/include/mach/mxc.h b/arch/arm/plat-mxc/include/mach/mxc.h
-> index 0987923..d4dbe9e 100644
-> --- a/arch/arm/plat-mxc/include/mach/mxc.h
-> +++ b/arch/arm/plat-mxc/include/mach/mxc.h
-> @@ -176,6 +176,9 @@ extern unsigned int __mxc_cpu_type;
->  # define cpu_is_mx53()		(0)
->  #endif
->  
-> +# define cpu_is_mx23()		(0)
-> +# define cpu_is_mx28()		(0)
-> +
->  #ifndef __ASSEMBLY__
->  
->  struct cpu_op {
-> -- 
-> 1.7.0.4
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+There is actually such a pattern, for various reasons a huge proportion
+of Tegra systems are straight clones of the reference designs and the
+reference designs mostly used WM8903.
