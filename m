@@ -1,203 +1,49 @@
-From: tgih.jun@samsung.com (Seungwon Jeon)
-Date: Wed, 20 Jul 2011 10:22:13 +0900
-Subject: [PATCH v3] ARM: EXYNOS4: Add platform device for dwmci driver.
-Message-ID: <1311124933-8133-1-git-send-email-tgih.jun@samsung.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Wed, 20 Jul 2011 10:18:26 +0800
+Subject: [i.MX28 GPMI] problem overwriting all-0xff data in NAND
+In-Reply-To: <20110719133602.GJ1951@pengutronix.de>
+References: <20004.12663.29494.339601@ipc1.ka-ro>
+	<20110718164354.GA3328@S2100-06.ap.freescale.net>
+	<4E24E804.10002@freescale.com>
+	<20005.7677.145955.789329@ipc1.ka-ro>
+	<4E252C51.8070900@freescale.com>
+	<20005.21635.427202.49313@ipc1.ka-ro> <20110719133602
+Message-ID: <4E263AF2.60103@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds platform device for Synopsys DesignWare Multimedia Card
-Interface driver.
+Hi Wolfram:
+>>>>> I am debugging the DMA bug now. and I will send it out when i fix it.
+>>>>>
+>>>> What sort of DMA bug?
+>>>>
+>>> The DMA may time-out. :(
+>>>
+>>> The DMA time-out may occur in two situations:
+>>> [1] send a command DMA descriptor, see the nfc->send_command() function.
+>>> [2] read the non-ecc data from nand, see the nfc->read_data() function.
+>>>
+>>> I don't know why. Maybe caused by the timing, or something else.
+> I am confused. The send-command DMA timeout prevents any write for me.
+> You guys surely would have noticed if you have been bitten as well. Does
+> it depend on the NAND chip?
+I think It does not depend on the NAND chip.
+My test chip is Samsung K9G8G08U0M.
+Sometimes, I can run a long time while there is no DMA timeout occurring;
+Sometimes, the bug appears right away.
 
-Signed-off-by: Seungwon Jeon <tgih.jun@samsung.com>
----
- arch/arm/mach-exynos4/Kconfig              |    5 ++
- arch/arm/mach-exynos4/Makefile             |    1 +
- arch/arm/mach-exynos4/dev-dwmci.c          |   82 ++++++++++++++++++++++++++++
- arch/arm/mach-exynos4/include/mach/dwmci.h |   20 +++++++
- arch/arm/mach-exynos4/include/mach/irqs.h  |    1 +
- arch/arm/mach-exynos4/include/mach/map.h   |    1 +
- arch/arm/plat-samsung/include/plat/devs.h  |    1 +
- 7 files changed, 111 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-exynos4/dev-dwmci.c
- create mode 100644 arch/arm/mach-exynos4/include/mach/dwmci.h
 
-diff --git a/arch/arm/mach-exynos4/Kconfig b/arch/arm/mach-exynos4/Kconfig
-index a4fb109..31f798c 100644
---- a/arch/arm/mach-exynos4/Kconfig
-+++ b/arch/arm/mach-exynos4/Kconfig
-@@ -36,6 +36,11 @@ config EXYNOS4_DEV_SYSMMU
- 	help
- 	  Common setup code for SYSTEM MMU in EXYNOS4
+>> Maybe you are missing this patch:
+>> http://lists.infradead.org/pipermail/linux-arm-kernel/2011-April/049105.html
+>> I sent it in April, but apparently it has not been integrated in
+>> mainline or the pengutronix git.
+> Well, just resend them; might be worth trying Shawn's comment, too (if
+> that reset is really needed). BTW they didn't help for my case :(
+I also tested the patch. It did not work too.
 
-+config EXYNOS4_DEV_DWMCI
-+	bool
-+	help
-+	  Compile in platform device definitions for DWMCI
-+
- config EXYNOS4_SETUP_I2C1
- 	bool
- 	help
-diff --git a/arch/arm/mach-exynos4/Makefile b/arch/arm/mach-exynos4/Makefile
-index c3c70ab..4c4ea6b 100644
---- a/arch/arm/mach-exynos4/Makefile
-+++ b/arch/arm/mach-exynos4/Makefile
-@@ -38,6 +38,7 @@ obj-y					+= dev-audio.o
- obj-$(CONFIG_EXYNOS4_DEV_AHCI)		+= dev-ahci.o
- obj-$(CONFIG_EXYNOS4_DEV_PD)		+= dev-pd.o
- obj-$(CONFIG_EXYNOS4_DEV_SYSMMU)	+= dev-sysmmu.o
-+obj-$(CONFIG_EXYNOS4_DEV_DWMCI)	+= dev-dwmci.o
-
- obj-$(CONFIG_EXYNOS4_SETUP_FIMC)	+= setup-fimc.o
- obj-$(CONFIG_EXYNOS4_SETUP_I2C1)	+= setup-i2c1.o
-diff --git a/arch/arm/mach-exynos4/dev-dwmci.c b/arch/arm/mach-exynos4/dev-dwmci.c
-new file mode 100644
-index 0000000..b025db4
---- /dev/null
-+++ b/arch/arm/mach-exynos4/dev-dwmci.c
-@@ -0,0 +1,82 @@
-+/*
-+ * linux/arch/arm/mach-exynos4/dev-dwmci.c
-+ *
-+ * Copyright (c) 2011 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com
-+ *
-+ * Platform device for Synopsys DesignWare Mobile Storage IP
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/dma-mapping.h>
-+#include <linux/platform_device.h>
-+#include <linux/interrupt.h>
-+#include <linux/mmc/dw_mmc.h>
-+
-+#include <plat/devs.h>
-+
-+#include <mach/map.h>
-+
-+static int exynos4_dwmci_get_bus_wd(u32 slot_id)
-+{
-+	return 4;
-+}
-+
-+static int exynos4_dwmci_init(u32 slot_id, irq_handler_t handler, void *data)
-+{
-+	return 0;
-+}
-+
-+static struct resource exynos4_dwmci_resource[] = {
-+	[0] = {
-+		.start	= EXYNOS4_PA_DWMCI,
-+		.end	= EXYNOS4_PA_DWMCI + SZ_4K - 1,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	[1] = {
-+		.start	= IRQ_DWMCI,
-+		.end	= IRQ_DWMCI,
-+		.flags	= IORESOURCE_IRQ,
-+	}
-+};
-+
-+static struct dw_mci_board exynos4_dwci_pdata = {
-+	.num_slots			= 1,
-+	.quirks				= DW_MCI_QUIRK_BROKEN_CARD_DETECTION,
-+	.bus_hz				= 80 * 1000 * 1000,
-+	.detect_delay_ms	= 200,
-+	.init				= exynos4_dwmci_init,
-+	.get_bus_wd			= exynos4_dwmci_get_bus_wd,
-+};
-+
-+static u64 exynos4_dwmci_dmamask = DMA_BIT_MASK(32);
-+
-+struct platform_device exynos4_device_dwmci = {
-+	.name		= "dw_mmc",
-+	.id		= -1,
-+	.num_resources	= ARRAY_SIZE(exynos4_dwmci_resource),
-+	.resource	= exynos4_dwmci_resource,
-+	.dev		= {
-+		.dma_mask		= &exynos4_dwmci_dmamask,
-+		.coherent_dma_mask	= DMA_BIT_MASK(32),
-+		.platform_data	= &exynos4_dwci_pdata,
-+	},
-+};
-+
-+void __init exynos4_dwmci_set_platdata(struct dw_mci_board *pd)
-+{
-+	struct dw_mci_board *npd;
-+
-+	npd = s3c_set_platdata(pd, sizeof(struct dw_mci_board),
-+			&exynos4_device_dwmci);
-+
-+	if (!npd->init)
-+		npd->init = exynos4_dwmci_init;
-+	if (!npd->get_bus_wd)
-+		npd->get_bus_wd = exynos4_dwmci_get_bus_wd;
-+}
-diff --git a/arch/arm/mach-exynos4/include/mach/dwmci.h b/arch/arm/mach-exynos4/include/mach/dwmci.h
-new file mode 100644
-index 0000000..7ce6574
---- /dev/null
-+++ b/arch/arm/mach-exynos4/include/mach/dwmci.h
-@@ -0,0 +1,20 @@
-+/* linux/arch/arm/mach-exynos4/include/mach/dwmci.h
-+ *
-+ * Copyright (c) 2011 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com/
-+ *
-+ * Synopsys DesignWare Mobile Storage for EXYNOS4210
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef __ASM_ARM_ARCH_DWMCI_H
-+#define __ASM_ARM_ARCH_DWMCI_H __FILE__
-+
-+#include <linux/mmc/dw_mmc.h>
-+
-+extern void exynos4_dwmci_set_platdata(struct dw_mci_board *pd);
-+
-+#endif /* __ASM_ARM_ARCH_DWMCI_H */
-diff --git a/arch/arm/mach-exynos4/include/mach/irqs.h b/arch/arm/mach-exynos4/include/mach/irqs.h
-index 250427f..47ff87f 100644
---- a/arch/arm/mach-exynos4/include/mach/irqs.h
-+++ b/arch/arm/mach-exynos4/include/mach/irqs.h
-@@ -78,6 +78,7 @@
- #define IRQ_HSMMC1		IRQ_SPI(74)
- #define IRQ_HSMMC2		IRQ_SPI(75)
- #define IRQ_HSMMC3		IRQ_SPI(76)
-+#define IRQ_DWMCI		IRQ_SPI(77)
-
- #define IRQ_MIPICSI0		IRQ_SPI(78)
-
-diff --git a/arch/arm/mach-exynos4/include/mach/map.h b/arch/arm/mach-exynos4/include/mach/map.h
-index 3677356..49356d2 100644
---- a/arch/arm/mach-exynos4/include/mach/map.h
-+++ b/arch/arm/mach-exynos4/include/mach/map.h
-@@ -96,6 +96,7 @@
- #define EXYNOS4_PA_MIPI_CSIS1		0x11890000
-
- #define EXYNOS4_PA_HSMMC(x)		(0x12510000 + ((x) * 0x10000))
-+#define EXYNOS4_PA_DWMCI		0x12550000
-
- #define EXYNOS4_PA_SATA			0x12560000
- #define EXYNOS4_PA_SATAPHY		0x125D0000
-diff --git a/arch/arm/plat-samsung/include/plat/devs.h b/arch/arm/plat-samsung/include/plat/devs.h
-index e3b31c2..29fa1cf 100644
---- a/arch/arm/plat-samsung/include/plat/devs.h
-+++ b/arch/arm/plat-samsung/include/plat/devs.h
-@@ -112,6 +112,7 @@ extern struct platform_device exynos4_device_i2s2;
- extern struct platform_device exynos4_device_spdif;
- extern struct platform_device exynos4_device_pd[];
- extern struct platform_device exynos4_device_ahci;
-+extern struct platform_device exynos4_device_dwmci;
-
- extern struct platform_device s5p6440_device_pcm;
- extern struct platform_device s5p6440_device_iis;
---
-1.7.2.3
+Best Regards
+Huang Shijie
+> Regards,
+>
+>     Wolfram
+>
