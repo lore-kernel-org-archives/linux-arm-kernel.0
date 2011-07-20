@@ -1,61 +1,62 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 20 Jul 2011 21:08:40 +0200
-Subject: [PATCH 2/7] enable usb1 phy power supply
-In-Reply-To: <1311160106-4898-3-git-send-email-tony.lin@freescale.com>
+Date: Wed, 20 Jul 2011 21:10:34 +0200
+Subject: [PATCH 3/7] add usb phy clocks to clock tree
+In-Reply-To: <1311160106-4898-4-git-send-email-tony.lin@freescale.com>
 References: <1311160106-4898-1-git-send-email-tony.lin@freescale.com>
-	<1311160106-4898-3-git-send-email-tony.lin@freescale.com>
-Message-ID: <20110720190840.GK26347@pengutronix.de>
+	<1311160106-4898-4-git-send-email-tony.lin@freescale.com>
+Message-ID: <20110720191034.GL26347@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 20, 2011 at 07:08:21PM +0800, Tony Lin wrote:
-> configure usb1 phy power enable gpio and enable usb1 phy power
+On Wed, Jul 20, 2011 at 07:08:22PM +0800, Tony Lin wrote:
+> Signed-off-by: Tony Lin <tony.lin@freescale.com>
+> ---
+>  arch/arm/mach-mxs/clock-mx28.c |   18 ++++++++++++++++++
+>  1 files changed, 18 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
+> index 5dcc59d..6fd0fe6 100644
+> --- a/arch/arm/mach-mxs/clock-mx28.c
+> +++ b/arch/arm/mach-mxs/clock-mx28.c
+> @@ -570,7 +570,23 @@ static struct clk usb1_clk = {
+>  	.disable = _raw_clk_disable,
+>  	.parent = &pll1_clk,
+>  };
+> +/* usb phy clock for usb0 */
+> +static struct clk usb_phy_clk0 = {
+> +	.parent = &pll0_clk,
+> +	.enable = _raw_clk_disable, /* EN_USB_CLKS = 1 means ON */
+> +	.disable = _raw_clk_enable,
+> +	.enable_reg = CLKCTRL_BASE_ADDR + HW_CLKCTRL_PLL0CTRL0,
+> +	.enable_shift = 18,
+> +};
+>  
+> +/* usb phy clock for usb1 */
+> +static struct clk usb_phy_clk1 = {
+> +	.parent = &pll1_clk,
+> +	.enable = _raw_clk_disable,
+> +	.disable = _raw_clk_enable,
+> +	.enable_reg = CLKCTRL_BASE_ADDR + HW_CLKCTRL_PLL1CTRL0,
+> +	.enable_shift = 18,
+> +};
+>  #define _DEFINE_CLOCK(name, er, es, p)					\
+>  	static struct clk name = {					\
+>  		.enable_reg	= CLKCTRL_BASE_ADDR + HW_CLKCTRL_##er,	\
+> @@ -629,6 +645,8 @@ static struct clk_lookup lookups[] = {
+>  	_REGISTER_CLOCK("flexcan.1", NULL, can1_clk)
+>  	_REGISTER_CLOCK(NULL, "usb0", usb0_clk)
+>  	_REGISTER_CLOCK(NULL, "usb1", usb1_clk)
+> +	_REGISTER_CLOCK(NULL, "usb0_phy", usb_phy_clk0)
+> +	_REGISTER_CLOCK(NULL, "usb1_phy", usb_phy_clk1)
 
-You should add the architecture and board name to the subject so that
-it's clear what this patch is about.
+This looks suspicious. The phys are real devices, but this shows you
+do not intend to use them as devices. Really the phys should be drivers.
 
 Sascha
 
-> 
-> Signed-off-by: Tony Lin <tony.lin@freescale.com>
-> ---
->  arch/arm/mach-mxs/mach-mx28evk.c |    9 +++++++++
->  1 files changed, 9 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
-> index eaaf6ff..6934867 100644
-> --- a/arch/arm/mach-mxs/mach-mx28evk.c
-> +++ b/arch/arm/mach-mxs/mach-mx28evk.c
-> @@ -34,6 +34,7 @@
->  #define MX28EVK_BL_ENABLE	MXS_GPIO_NR(3, 18)
->  #define MX28EVK_LCD_ENABLE	MXS_GPIO_NR(3, 30)
->  #define MX28EVK_FEC_PHY_RESET	MXS_GPIO_NR(4, 13)
-> +#define MX28EVK_USB1_PWR_EN	MXS_GPIO_NR(3, 8)
->  
->  #define MX28EVK_MMC0_WRITE_PROTECT	MXS_GPIO_NR(2, 12)
->  #define MX28EVK_MMC1_WRITE_PROTECT	MXS_GPIO_NR(0, 28)
-> @@ -183,6 +184,8 @@ static const iomux_cfg_t mx28evk_pads[] __initconst = {
->  
->  	/* led */
->  	MX28_PAD_AUART1_TX__GPIO_3_5 | MXS_PAD_CTRL,
-> +	/* usb1 */
-> +	MX28_PAD_AUART2_RX__GPIO_3_8 | MXS_PAD_CTRL,
->  };
->  
->  /* led */
-> @@ -405,6 +408,12 @@ static void __init mx28evk_init(void)
->  		pr_warn("failed to request gpio mmc1-slot-power: %d\n", ret);
->  	mx28_add_mxs_mmc(1, &mx28evk_mmc_pdata[1]);
->  
-> +	ret = gpio_request_one(MX28EVK_USB1_PWR_EN, GPIOF_DIR_OUT,
-> +			       "usb1-power-en");
-> +	if (ret)
-> +		pr_warn("failed to request gpio usb1-power-en %d\n", ret);
-> +	else
-> +		gpio_set_value(MX28EVK_USB1_PWR_EN, 1);
->  	gpio_led_register_device(0, &mx28evk_led_data);
->  }
->  
+>  	_REGISTER_CLOCK("mxs-pwm.0", NULL, pwm_clk)
+>  	_REGISTER_CLOCK("mxs-pwm.1", NULL, pwm_clk)
+>  	_REGISTER_CLOCK("mxs-pwm.2", NULL, pwm_clk)
 > -- 
 > 1.7.0.4
 > 
