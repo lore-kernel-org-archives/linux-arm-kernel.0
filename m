@@ -1,145 +1,109 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 20 Jul 2011 12:28:23 -0600
-Subject: [PATCH] arm/dt: tegra devicetree support
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF049EBDEE27@HQMAIL01.nvidia.com>
-References: <20110719234158.2779.15394.stgit@ponder>
-	<74CDBE0F657A3D45AFBB94109FB122FF049EBDEE27@HQMAIL01.nvidia.com>
-Message-ID: <20110720182823.GD4642@ponder.secretlab.ca>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 21 Jul 2011 03:31:09 +0900
+Subject: [PATCH v2 2/2] ARM: EXYNOS4: Add more registers to be saved and
+	restored for PM
+In-Reply-To: <1311055450-11751-1-git-send-email-myungjoo.ham@samsung.com>
+References: <CAJ0PZbRsnO-W4P=3kZvcSn+st4p38ARjsE458TzSreHAche1gw@mail.gmail.com>
+	<1311055450-11751-1-git-send-email-myungjoo.ham@samsung.com>
+Message-ID: <000501cc470b$34a32060$9de96120$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 20, 2011 at 08:37:19AM -0700, Stephen Warren wrote:
-> Grant Likely wrote at Tuesday, July 19, 2011 5:43 PM:
-> > Everything required to populate NVIDIA Tegra devices from the device
-> > tree.  This patch adds a new DT_MACHINE_DESC() which matches against
-> > a tegra20 device tree.  So far it only registers the on-chip devices,
-> > but it will be refined in follow on patches to configure clocks and
-> > pin IO from the device tree also.
-> > 
-> > Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
-
-Oops, I merged patches, but missed some attribution.  This patch is
-is also composed of work from John Bonesio and Stephen Warren.
-
-> > ---
-> > 
-> > Hi all,
-> > 
-> > Similar to the versatile patch I just posted, this is certainly not
-> > complete board support, but it is enough to be useful.  I'd like to
-> > merge this for v3.1.  It should not break any existing board support.
+MyungJoo Ham wrote:
 > 
-> > diff --git a/arch/arm/boot/dts/tegra-harmony.dts b/arch/arm/boot/dts/tegra-harmony.dts
+> We need more registers to be saved and restored for PM of Exynos4210.
+> Otherwise, with additional drivers running, suspend-to-RAM fails to wake
+> up properly. This patch adds registers omitted in the initial PM
+> patches.
 > 
-> tegra-*.dts don't include status="disable" for all the unused controllers.
-> Should that be added?
-
-I dropped that pattern since my preference has been to have boards
-explicitly disable unused cores and that has generally been the
-pattern on other DT platforms.
-
+> Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> --
+> Changed from v1
+> - removed unnecessary registers
+> - As the patch 1/2 is not changed, it is not re-sent.
 > 
-> > +	sound {
-> > +		compatible = "nvidia,harmony-sound", "nvidia,tegra-wm8903";
+> ---
+>  arch/arm/mach-exynos4/pm.c |   15 ++++++++++++++-
+>  1 files changed, 14 insertions(+), 1 deletions(-)
 > 
-> I thought the sound bindings were still somewhat experimental and not
-> completely agreed upon. One issue I see is that Device Tree is
-> supposed to represent pure HW, rather than driver-required abstractions,
-> and at least the compatible name here is pretty Linux-driver-specific.
+> diff --git a/arch/arm/mach-exynos4/pm.c b/arch/arm/mach-exynos4/pm.c
+> index a103c13..5d6f768 100644
+> --- a/arch/arm/mach-exynos4/pm.c
+> +++ b/arch/arm/mach-exynos4/pm.c
+> @@ -27,6 +27,7 @@
+>  #include <plat/cpu.h>
+>  #include <plat/pm.h>
+>  #include <plat/pll.h>
+> +#include <plat/regs-srom.h>
 > 
-> I think there are some devices missing from the DT file for audio too,
-> e.g. the ALSA "PCM" (DMA) driver.
+>  #include <mach/regs-irq.h>
+>  #include <mach/regs-gpio.h>
+> @@ -67,7 +68,9 @@ static struct sleep_save exynos4_core_save[] = {
+>  	SAVE_ITEM(S5P_CLKSRC_TOP0),
+>  	SAVE_ITEM(S5P_CLKSRC_TOP1),
+>  	SAVE_ITEM(S5P_CLKSRC_CAM),
+> +	SAVE_ITEM(S5P_CLKSRC_TV),
+>  	SAVE_ITEM(S5P_CLKSRC_MFC),
+> +	SAVE_ITEM(S5P_CLKSRC_G3D),
+>  	SAVE_ITEM(S5P_CLKSRC_IMAGE),
+>  	SAVE_ITEM(S5P_CLKSRC_LCD0),
+>  	SAVE_ITEM(S5P_CLKSRC_LCD1),
+> @@ -94,6 +97,7 @@ static struct sleep_save exynos4_core_save[] = {
+>  	SAVE_ITEM(S5P_CLKDIV_PERIL4),
+>  	SAVE_ITEM(S5P_CLKDIV_PERIL5),
+>  	SAVE_ITEM(S5P_CLKDIV_TOP),
+> +	SAVE_ITEM(S5P_CLKSRC_MASK_TOP),
+>  	SAVE_ITEM(S5P_CLKSRC_MASK_CAM),
+>  	SAVE_ITEM(S5P_CLKSRC_MASK_TV),
+>  	SAVE_ITEM(S5P_CLKSRC_MASK_LCD0),
+> @@ -102,6 +106,7 @@ static struct sleep_save exynos4_core_save[] = {
+>  	SAVE_ITEM(S5P_CLKSRC_MASK_FSYS),
+>  	SAVE_ITEM(S5P_CLKSRC_MASK_PERIL0),
+>  	SAVE_ITEM(S5P_CLKSRC_MASK_PERIL1),
+> +	SAVE_ITEM(S5P_CLKDIV2_RATIO),
+>  	SAVE_ITEM(S5P_CLKGATE_SCLKCAM),
+>  	SAVE_ITEM(S5P_CLKGATE_IP_CAM),
+>  	SAVE_ITEM(S5P_CLKGATE_IP_TV),
+> @@ -122,8 +127,10 @@ static struct sleep_save exynos4_core_save[] = {
+>  	SAVE_ITEM(S5P_CLKGATE_IP_DMC),
+>  	SAVE_ITEM(S5P_CLKSRC_CPU),
+>  	SAVE_ITEM(S5P_CLKDIV_CPU),
+> +	SAVE_ITEM(S5P_CLKDIV_CPU + 0x4),
+>  	SAVE_ITEM(S5P_CLKGATE_SCLKCPU),
+>  	SAVE_ITEM(S5P_CLKGATE_IP_CPU),
+> +
+>  	/* GIC side */
+>  	SAVE_ITEM(S5P_VA_GIC_CPU + 0x000),
+>  	SAVE_ITEM(S5P_VA_GIC_CPU + 0x004),
+> @@ -232,11 +239,17 @@ static struct sleep_save exynos4_core_save[] = {
+>  	SAVE_ITEM(S5P_VA_GIC_DIST + 0xC20),
+>  	SAVE_ITEM(S5P_VA_GIC_DIST + 0xC24),
 > 
-> Also, the bindings for this aren't documented IIRC.
+> -
+>  	SAVE_ITEM(S5P_VA_COMBINER_BASE + 0x000),
+>  	SAVE_ITEM(S5P_VA_COMBINER_BASE + 0x010),
+>  	SAVE_ITEM(S5P_VA_COMBINER_BASE + 0x020),
+>  	SAVE_ITEM(S5P_VA_COMBINER_BASE + 0x030),
+> +
+> +	/* SROM side */
+> +	SAVE_ITEM(S5P_SROM_BW),
+> +	SAVE_ITEM(S5P_SROM_BC0),
+> +	SAVE_ITEM(S5P_SROM_BC1),
+> +	SAVE_ITEM(S5P_SROM_BC2),
+> +	SAVE_ITEM(S5P_SROM_BC3),
+>  };
 > 
-> I'd suggest dropping the audio part of the DT file until the audio side
-> is more mature.
+>  static struct sleep_save exynos4_l2cc_save[] = {
+> --
+> 1.7.4.1
 
-Yes, I'll drop the audio bits from this patch. I had taken John's dts
-file which includes the work he's performed on the audio.  Actually, I
-haven't looked critically at this .dts, so there is probably a lot of
-cruft that should be tightened up.
+Since we don't need some definitions, please update your 1/2 patch also.
 
-> > +		spkr-en-gpios = <&codec 2 0>;
-> 
-> Should that be "gpio" not "gpios", since there is only one?
+Thanks.
 
-Originally I though about that, but for consistency I think it is
-better to have all gpio properties use a "gpios" suffix instead of a
-mixture of "-gpio" and "-gpios".
-
-> > +		hp-det-gpios = <&gpio 178 0>;
-> > +		int-mic-en-gpios = <&gpio 184 0>;
-> > +		ext-mic-en-gpios = <&gpio 185 0>;
-> > +	};
-> 
-> > diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
-> ...
-> > +/ {
-> ...
-> > +	amba {
-> > +		compatible = "simple-bus";
-> ...
-> > +		intc: interrupt-controller at 50041000 {
-> ...
-> > +		};
-> > +	};
-> ...
-> > +	i2c at 7000c000 {
-> 
-> I've always wondered why all the devices aren't included inside the amba
-> node. Or put another way, if the devices are outside the amba node, why
-> not move everything outside the amba node and remove the amba node?
-
-It is sometimes convenient to have all the SoC devices contained in a
-collection node, such as if there is shared clock or power management
-contect, but it is certainly not required.  It is probabaly best if the
-hierarchy reflects the actual bus layout of the SoC instead of an
-anonymous "soc" or "amba" node.
-
-> > diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
-> > index 823c703..6d3d695 100644
-> > --- a/arch/arm/mach-tegra/Makefile
-> > +++ b/arch/arm/mach-tegra/Makefile
-> > @@ -30,5 +30,8 @@ obj-${CONFIG_MACH_PAZ00}		+= board-paz00-pinmux.o
-> >  obj-${CONFIG_MACH_SEABOARD}             += board-seaboard.o
-> >  obj-${CONFIG_MACH_SEABOARD}             += board-seaboard-pinmux.o
-> > 
-> > +obj-${CONFIG_MACH_TEGRA_DT}             += board-dt.o
-> > +obj-${CONFIG_MACH_TEGRA_DT}             += board-harmony-pinmux.o
-> 
-> You need board-seaboard-pinmux.o here too.
-
-Yes.  Actually, what I really need is a better way to handle pinmux,
-and it isn't very sane to have board-*-pinmux.o added multiple times
-to obj-y.  I'll tidy this up.
-
-> 
-> > diff --git a/arch/arm/mach-tegra/board-dt.c b/arch/arm/mach-tegra/board-dt.c
-> ...
-> > +static __initdata struct tegra_clk_init_table tegra_dt_clk_init_table[] = {
-> > +	/* name		parent		rate		enabled */
-> > +	{ "uartd",	"pll_p",	216000000,	true },
-> > +	{ NULL,		NULL,		0,		0},
-> > +};
-> 
-> For audio to work, you'll need more clock entries here currently; another
-> reason I suggested to simply drop the audio stuff for now to keep things
-> simple.
-
-I've split the audio changes into a separate patch since that work
-isn't complete yet.
-
-> 
-> > +static void __init tegra_dt_init(void)
-> ...
-> > +	if (of_machine_is_compatible("nvidia,harmony"))
-> > +		harmony_pinmux_init();
-> > +	else if (of_machine_is_compatible("nvidia,seaboard"))
-> > +		seaboard_pinmux_init();
-> 
-> else error, or at least warn?
-
-Yeah, at least until I can remove this ugly hunk entirely.
-
-g.
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
