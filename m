@@ -1,111 +1,144 @@
-From: B19295@freescale.com (Lin Tony-B19295)
-Date: Wed, 20 Jul 2011 11:03:56 +0000
-Subject: [PATCH 1/7] consolidate definitions and structures to share
-	among platforms
-In-Reply-To: <20110720105933.GJ764@legolas.emea.dhcp.ti.com>
-References: <1311160106-4898-1-git-send-email-tony.lin@freescale.com>
-	<1311160106-4898-2-git-send-email-tony.lin@freescale.com>
-	<20110720105933.GJ764@legolas.emea.dhcp.ti.com>
-Message-ID: <97D3A72708D04647A5AC84A04996E5B5161640@039-SN1MPN1-006.039d.mgd.msft.net>
+From: boojin.kim@samsung.com (Boojin Kim)
+Date: Wed, 20 Jul 2011 19:46:10 +0900
+Subject: [PATCH V4 01/13] DMA: PL330: Add support runtime PM for PL330 DMAC
+In-Reply-To: <1311158773-30314-1-git-send-email-boojin.kim@samsung.com>
+References: <1311158773-30314-1-git-send-email-boojin.kim@samsung.com>
+Message-ID: <1311158773-30314-2-git-send-email-boojin.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Felipe Balbi [mailto:balbi at ti.com]
-> Sent: Wednesday, July 20, 2011 7:00 PM
-> To: Lin Tony-B19295
-> Cc: linux-usb at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> balbi at ti.com; koen.beel.barco at gmail.com
-> Subject: Re: [PATCH 1/7] consolidate definitions and structures to share
-> among platforms
-> 
-> Hi,
-> 
-> On Wed, Jul 20, 2011 at 07:08:20PM +0800, Tony Lin wrote:
-> > move common definitions and data structures used for mxs and mxc
-> > platforms to fsl_device.h from mxc_ehci.h so that these definitions
-> > and structures could be shared without duplicated copies.
-> >
-> > Signed-off-by: Tony Lin <tony.lin@freescale.com>
-> >
-> > ---
-> >  arch/arm/plat-mxc/include/mach/mxc_ehci.h |   19 -------------------
-> >  include/linux/fsl_devices.h               |   21 +++++++++++++++++++++
-> >  2 files changed, 21 insertions(+), 19 deletions(-)
-> >
-> > diff --git a/arch/arm/plat-mxc/include/mach/mxc_ehci.h
-> > b/arch/arm/plat-mxc/include/mach/mxc_ehci.h
-> > index 2c159dc..8775807 100644
-> > --- a/arch/arm/plat-mxc/include/mach/mxc_ehci.h
-> > +++ b/arch/arm/plat-mxc/include/mach/mxc_ehci.h
-> > @@ -1,17 +1,6 @@
-> >  #ifndef __INCLUDE_ASM_ARCH_MXC_EHCI_H  #define
-> > __INCLUDE_ASM_ARCH_MXC_EHCI_H
-> >
-> > -/* values for portsc field */
-> > -#define MXC_EHCI_PHY_LOW_POWER_SUSPEND	(1 << 23)
-> > -#define MXC_EHCI_FORCE_FS		(1 << 24)
-> > -#define MXC_EHCI_UTMI_8BIT		(0 << 28)
-> > -#define MXC_EHCI_UTMI_16BIT		(1 << 28)
-> > -#define MXC_EHCI_SERIAL			(1 << 29)
-> > -#define MXC_EHCI_MODE_UTMI		(0 << 30)
-> > -#define MXC_EHCI_MODE_PHILIPS		(1 << 30)
-> > -#define MXC_EHCI_MODE_ULPI		(2 << 30)
-> > -#define MXC_EHCI_MODE_SERIAL		(3 << 30)
-> > -
-> >  /* values for flags field */
-> >  #define MXC_EHCI_INTERFACE_DIFF_UNI	(0 << 0)
-> >  #define MXC_EHCI_INTERFACE_DIFF_BI	(1 << 0)
-> > @@ -39,14 +28,6 @@
-> >  #define MX5_USB_UTMI_PHYCTRL1_PLLDIV_MASK		0x3
-> >  #define MX5_USB_UTMI_PHYCTRL1_PLLDIV_SHIFT		0
-> >
-> > -struct mxc_usbh_platform_data {
-> > -	int (*init)(struct platform_device *pdev);
-> > -	int (*exit)(struct platform_device *pdev);
-> > -
-> > -	unsigned int		 portsc;
-> > -	struct otg_transceiver	*otg;
-> > -};
-> > -
-> >  int mx51_initialize_usb_hw(int port, unsigned int flags);  int
-> > mx25_initialize_usb_hw(int port, unsigned int flags);  int
-> > mx31_initialize_usb_hw(int port, unsigned int flags); diff --git
-> > a/include/linux/fsl_devices.h b/include/linux/fsl_devices.h index
-> > fffdf00..c138988 100644
-> > --- a/include/linux/fsl_devices.h
-> > +++ b/include/linux/fsl_devices.h
-> > @@ -103,6 +103,27 @@ struct fsl_usb2_platform_data {
-> >
-> >  #define FLS_USB2_WORKAROUND_ENGCM09152	(1 << 0)
-> >
-> > +/* values for portsc field */
-> > +#define MXC_EHCI_PHY_LOW_POWER_SUSPEND	(1 << 23)
-> > +#define MXC_EHCI_FORCE_FS		(1 << 24)
-> > +#define MXC_EHCI_UTMI_8BIT		(0 << 28)
-> > +#define MXC_EHCI_UTMI_16BIT		(1 << 28)
-> > +#define MXC_EHCI_SERIAL			(1 << 29)
-> > +#define MXC_EHCI_MODE_UTMI		(0 << 30)
-> > +#define MXC_EHCI_MODE_PHILIPS		(1 << 30)
-> > +#define MXC_EHCI_MODE_ULPI		(2 << 30)
-> > +#define MXC_EHCI_MODE_SERIAL		(3 << 30)
-> > +
-> > +struct mxc_usbh_platform_data {
-> > +	int (*init)(struct platform_device *pdev);
-> > +	int (*exit)(struct platform_device *pdev);
-> > +
-> > +	unsigned int		 portsc;
-> > +	struct otg_transceiver	*otg;
-> > +	int (*plt_get_usb_connect_status)(void);
-> > +	void (*plt_usb_disconnect_detect)(int enable); };
-> > +
-> >  struct spi_device;
-> >
-> >  struct fsl_spi_platform_data {
-> 
-> I believe this patch will cause build breakage since ehci-mxc.c doesn't
-> include <linux/fsl_devices.h> ??
-Ehci-mxc.c does include <linux/fsl_devices.h>, please check patch 5/7. Thanks
+Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
+Cc: Vinod Koul <vinod.koul@intel.com>
+Cc: Dan Williams <dan.j.williams@intel.com>
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+---
+ drivers/dma/pl330.c |   75 +++++++++++++++++++++++++++++++++++++++++++++++++-
+ 1 files changed, 73 insertions(+), 2 deletions(-)
 
-BR
-Tony
+diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+index 6abe1ec..b7ecf47 100644
+--- a/drivers/dma/pl330.c
++++ b/drivers/dma/pl330.c
+@@ -17,6 +17,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/amba/bus.h>
+ #include <linux/amba/pl330.h>
++#include <linux/pm_runtime.h>
+ 
+ #define NR_DEFAULT_DESC	16
+ 
+@@ -83,6 +84,8 @@ struct dma_pl330_dmac {
+ 
+ 	/* Peripheral channels connected to this DMAC */
+ 	struct dma_pl330_chan peripherals[0]; /* keep at end */
++
++	struct clk *clk;
+ };
+ 
+ struct dma_pl330_desc {
+@@ -696,6 +699,30 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
+ 		goto probe_err1;
+ 	}
+ 
++	pdmac->clk = clk_get(&adev->dev, "dma");
++	if (IS_ERR(pdmac->clk)) {
++		dev_err(&adev->dev, "Cannot get operation clock.\n");
++		ret = -EINVAL;
++		goto probe_err1;
++	}
++
++	amba_set_drvdata(adev, pdmac);
++
++#ifdef CONFIG_PM_RUNTIME
++	/* to use the runtime PM helper functions */
++	pm_runtime_enable(&adev->dev);
++
++	/* enable the power domain */
++	if (pm_runtime_get_sync(&adev->dev)) {
++		dev_err(&adev->dev, "failed to get runtime pm\n");
++		ret = -ENODEV;
++		goto probe_err1;
++	}
++#else
++	/* enable dma clk */
++	clk_enable(pdmac->clk);
++#endif
++
+ 	irq = adev->irq[0];
+ 	ret = request_irq(irq, pl330_irq_handler, 0,
+ 			dev_name(&adev->dev), pi);
+@@ -763,8 +790,6 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
+ 		goto probe_err4;
+ 	}
+ 
+-	amba_set_drvdata(adev, pdmac);
+-
+ 	dev_info(&adev->dev,
+ 		"Loaded driver for PL330 DMAC-%d\n", adev->periphid);
+ 	dev_info(&adev->dev,
+@@ -825,6 +850,13 @@ static int __devexit pl330_remove(struct amba_device *adev)
+ 	res = &adev->res;
+ 	release_mem_region(res->start, resource_size(res));
+ 
++#ifdef CONFIG_PM_RUNTIME
++	pm_runtime_put(&adev->dev);
++	pm_runtime_disable(&adev->dev);
++#else
++	clk_disable(pdmac->clk);
++#endif
++
+ 	kfree(pdmac);
+ 
+ 	return 0;
+@@ -838,10 +870,49 @@ static struct amba_id pl330_ids[] = {
+ 	{ 0, 0 },
+ };
+ 
++#ifdef CONFIG_PM_RUNTIME
++static int pl330_runtime_suspend(struct device *dev)
++{
++	struct dma_pl330_dmac *pdmac = dev_get_drvdata(dev);
++
++	if (!pdmac) {
++		dev_err(dev, "failed to get dmac\n");
++		return -ENODEV;
++	}
++
++	clk_disable(pdmac->clk);
++
++	return 0;
++}
++
++static int pl330_runtime_resume(struct device *dev)
++{
++	struct dma_pl330_dmac *pdmac = dev_get_drvdata(dev);
++
++	if (!pdmac) {
++		dev_err(dev, "failed to get dmac\n");
++		return -ENODEV;
++	}
++
++	clk_enable(pdmac->clk);
++
++	return 0;
++}
++#else
++#define pl330_runtime_suspend	NULL
++#define pl330_runtime_resume	NULL
++#endif /* CONFIG_PM_RUNTIME */
++
++static const struct dev_pm_ops pl330_pm_ops = {
++	.runtime_suspend = pl330_runtime_suspend,
++	.runtime_resume = pl330_runtime_resume,
++};
++
+ static struct amba_driver pl330_driver = {
+ 	.drv = {
+ 		.owner = THIS_MODULE,
+ 		.name = "dma-pl330",
++		.pm = &pl330_pm_ops,
+ 	},
+ 	.id_table = pl330_ids,
+ 	.probe = pl330_probe,
+-- 
+1.7.1
