@@ -1,92 +1,66 @@
 From: tony.lin@freescale.com (Tony Lin)
-Date: Wed, 20 Jul 2011 19:08:20 +0800
-Subject: [PATCH 1/7] consolidate definitions and structures to share among
-	platforms
+Date: Wed, 20 Jul 2011 19:08:25 +0800
+Subject: [PATCH 6/7] add macro definitions according to ehci-mxc driver change
 In-Reply-To: <1311160106-4898-1-git-send-email-tony.lin@freescale.com>
 References: <1311160106-4898-1-git-send-email-tony.lin@freescale.com>
-Message-ID: <1311160106-4898-2-git-send-email-tony.lin@freescale.com>
+Message-ID: <1311160106-4898-7-git-send-email-tony.lin@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-move common definitions and data structures used for mxs and mxc
-platforms to fsl_device.h from mxc_ehci.h
-so that these definitions and structures could be shared without
-duplicated copies.
-
 Signed-off-by: Tony Lin <tony.lin@freescale.com>
 ---
- arch/arm/plat-mxc/include/mach/mxc_ehci.h |   19 -------------------
- include/linux/fsl_devices.h               |   21 +++++++++++++++++++++
- 2 files changed, 21 insertions(+), 19 deletions(-)
+ arch/arm/mach-mxs/include/mach/hardware.h |    2 ++
+ arch/arm/mach-mxs/include/mach/mxs.h      |   12 +++++++++++-
+ arch/arm/plat-mxc/include/mach/mxc.h      |    3 +++
+ 3 files changed, 16 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/plat-mxc/include/mach/mxc_ehci.h b/arch/arm/plat-mxc/include/mach/mxc_ehci.h
-index 2c159dc..8775807 100644
---- a/arch/arm/plat-mxc/include/mach/mxc_ehci.h
-+++ b/arch/arm/plat-mxc/include/mach/mxc_ehci.h
-@@ -1,17 +1,6 @@
- #ifndef __INCLUDE_ASM_ARCH_MXC_EHCI_H
- #define __INCLUDE_ASM_ARCH_MXC_EHCI_H
+diff --git a/arch/arm/mach-mxs/include/mach/hardware.h b/arch/arm/mach-mxs/include/mach/hardware.h
+index 53e89a0..affa72b 100644
+--- a/arch/arm/mach-mxs/include/mach/hardware.h
++++ b/arch/arm/mach-mxs/include/mach/hardware.h
+@@ -26,4 +26,6 @@
+ #define IOMEM(addr)	((void __force __iomem *)(addr))
+ #endif
  
--/* values for portsc field */
--#define MXC_EHCI_PHY_LOW_POWER_SUSPEND	(1 << 23)
--#define MXC_EHCI_FORCE_FS		(1 << 24)
--#define MXC_EHCI_UTMI_8BIT		(0 << 28)
--#define MXC_EHCI_UTMI_16BIT		(1 << 28)
--#define MXC_EHCI_SERIAL			(1 << 29)
--#define MXC_EHCI_MODE_UTMI		(0 << 30)
--#define MXC_EHCI_MODE_PHILIPS		(1 << 30)
--#define MXC_EHCI_MODE_ULPI		(2 << 30)
--#define MXC_EHCI_MODE_SERIAL		(3 << 30)
--
- /* values for flags field */
- #define MXC_EHCI_INTERFACE_DIFF_UNI	(0 << 0)
- #define MXC_EHCI_INTERFACE_DIFF_BI	(1 << 0)
-@@ -39,14 +28,6 @@
- #define MX5_USB_UTMI_PHYCTRL1_PLLDIV_MASK		0x3
- #define MX5_USB_UTMI_PHYCTRL1_PLLDIV_SHIFT		0
- 
--struct mxc_usbh_platform_data {
--	int (*init)(struct platform_device *pdev);
--	int (*exit)(struct platform_device *pdev);
--
--	unsigned int		 portsc;
--	struct otg_transceiver	*otg;
--};
--
- int mx51_initialize_usb_hw(int port, unsigned int flags);
- int mx25_initialize_usb_hw(int port, unsigned int flags);
- int mx31_initialize_usb_hw(int port, unsigned int flags);
-diff --git a/include/linux/fsl_devices.h b/include/linux/fsl_devices.h
-index fffdf00..c138988 100644
---- a/include/linux/fsl_devices.h
-+++ b/include/linux/fsl_devices.h
-@@ -103,6 +103,27 @@ struct fsl_usb2_platform_data {
- 
- #define FLS_USB2_WORKAROUND_ENGCM09152	(1 << 0)
- 
-+/* values for portsc field */
-+#define MXC_EHCI_PHY_LOW_POWER_SUSPEND	(1 << 23)
-+#define MXC_EHCI_FORCE_FS		(1 << 24)
-+#define MXC_EHCI_UTMI_8BIT		(0 << 28)
-+#define MXC_EHCI_UTMI_16BIT		(1 << 28)
-+#define MXC_EHCI_SERIAL			(1 << 29)
-+#define MXC_EHCI_MODE_UTMI		(0 << 30)
-+#define MXC_EHCI_MODE_PHILIPS		(1 << 30)
-+#define MXC_EHCI_MODE_ULPI		(2 << 30)
-+#define MXC_EHCI_MODE_SERIAL		(3 << 30)
++#include "mxs.h"
 +
-+struct mxc_usbh_platform_data {
-+	int (*init)(struct platform_device *pdev);
-+	int (*exit)(struct platform_device *pdev);
-+
-+	unsigned int		 portsc;
-+	struct otg_transceiver	*otg;
-+	int (*plt_get_usb_connect_status)(void);
-+	void (*plt_usb_disconnect_detect)(int enable);
-+};
-+
- struct spi_device;
+ #endif /* __MACH_MXS_HARDWARE_H__ */
+diff --git a/arch/arm/mach-mxs/include/mach/mxs.h b/arch/arm/mach-mxs/include/mach/mxs.h
+index 35a89dd..6e5928d 100644
+--- a/arch/arm/mach-mxs/include/mach/mxs.h
++++ b/arch/arm/mach-mxs/include/mach/mxs.h
+@@ -35,7 +35,17 @@
+ 		machine_is_mx28evk() ||					\
+ 		machine_is_tx28() ||					\
+ 		0)
+-
++#define cpu_is_mx1()		(0)
++#define cpu_is_mx21()		(0)
++#define cpu_is_mx25()		(0)
++#define cpu_is_mx27()		(0)
++#define cpu_is_mx31()		(0)
++#define cpu_is_mx35()		(0)
++#define cpu_is_mx50()		(0)
++#define cpu_is_mx51()		(0)
++#define cpu_is_mx53()		(0)
++#define cpu_is_mx3()		(cpu_is_mx31() || cpu_is_mx35())
++#define cpu_is_mx2()		(cpu_is_mx21() || cpu_is_mx27())
+ /*
+  * IO addresses common to MXS-based
+  */
+diff --git a/arch/arm/plat-mxc/include/mach/mxc.h b/arch/arm/plat-mxc/include/mach/mxc.h
+index 0987923..d4dbe9e 100644
+--- a/arch/arm/plat-mxc/include/mach/mxc.h
++++ b/arch/arm/plat-mxc/include/mach/mxc.h
+@@ -176,6 +176,9 @@ extern unsigned int __mxc_cpu_type;
+ # define cpu_is_mx53()		(0)
+ #endif
  
- struct fsl_spi_platform_data {
++# define cpu_is_mx23()		(0)
++# define cpu_is_mx28()		(0)
++
+ #ifndef __ASSEMBLY__
+ 
+ struct cpu_op {
 -- 
 1.7.0.4
