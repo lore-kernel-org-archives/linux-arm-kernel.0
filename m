@@ -1,41 +1,63 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 20 Jul 2011 21:59:22 +0800
-Subject: [PATCH] arm/mxc: add the missing UART_PADDR for i.mx53
-In-Reply-To: <20110720134530.GA15471@pengutronix.de>
-References: <1310251913-9877-1-git-send-email-troy.kisky@boundarydevices.com>
-	<1311167599-21790-1-git-send-email-shawn.guo@linaro.org>
-	<20110720130830.GD2377@pengutronix.de>
-	<20110720132418.GB6999@S2100-06.ap.freescale.net>
-	<20110720132720.GE2377@pengutronix.de>
-	<20110720134426.GD6999@S2100-06.ap.freescale.net>
-	<20110720134530.GA15471@pengutronix.de>
-Message-ID: <20110720135921.GE6999@S2100-06.ap.freescale.net>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Wed, 20 Jul 2011 09:59:10 -0400 (EDT)
+Subject: [PATCH 5/7] ehci mxc: make it more flexible to be used for mx28
+In-Reply-To: <1311160106-4898-6-git-send-email-tony.lin@freescale.com>
+Message-ID: <Pine.LNX.4.44L0.1107200954120.2071-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 20, 2011 at 03:45:30PM +0200, Wolfram Sang wrote:
-> On Wed, Jul 20, 2011 at 09:44:27PM +0800, Shawn Guo wrote:
-> > On Wed, Jul 20, 2011 at 03:27:20PM +0200, Wolfram Sang wrote:
-> > > > > Then you should at least add his Signed-off. And maybe also mark him as
-> > > > > the author of the patch?
-> > > > > 
-> > > > I did exactly what you suggested here on a mx53 fec patch, but I was
-> > > > told by Troy to change his s-o-b to reported-by.  So let's see what
-> > > > he would say about this one.
-> > > 
-> > > Okay, not much of a deal for such a patch. Though, I have doubts if one
-> > > can request removing the SoB for a patch other people put work on top
-> > > of.
-> > > 
-> > So you are telling you are not following the list closely?
-> 
-> If "following closely" == "reading every single mail", then surely not.
-> Why?
-> 
-Well, not really.  But since you are co-maintaining i.mx, I *thought*
-you may have read the mail with "i.mx" in the subject.  It seems not
-the case, apparently.
+On Wed, 20 Jul 2011, Tony Lin wrote:
 
--- 
-Regards,
-Shawn
+> old driver uses some hard coding for clks' name which could
+> not be used for mx28. So workaround these hard codings by
+> judging the cpu is mx28 or not.
+> add platform callback funtions in usb irq handler in the case
+> usb phy need to change its disconnect detector mode after usb
+> device is connected and disconnected. These callbacks also
+> could be used for other machines whose usb phy need such kind
+> of operations
+> 
+> Signed-off-by: Tony Lin <tony.lin@freescale.com>
+
+...
+
+> --- a/drivers/usb/host/ehci-mxc.c
+> +++ b/drivers/usb/host/ehci-mxc.c
+
+...
+
+> +static irqreturn_t fsl_ehci_irq(struct usb_hcd *hcd)
+> +{
+> +	struct mxc_usbh_platform_data *pdata;
+> +	struct ehci_hcd		*ehci = hcd_to_ehci(hcd);
+> +	u32			status;
+> +
+> +	pdata = hcd->self.controller->platform_data;
+> +	if (pdata->plt_get_usb_connect_status == NULL || \
+> +		pdata->plt_usb_disconnect_detect == NULL)
+> +		goto out;
+> +
+> +	spin_lock(&ehci->lock);
+
+Do you really need to use this spinlock?  I don't see any reason for
+it.
+
+> +	status = ehci_readl(ehci, &ehci->regs->status);
+> +	if (status & STS_PCD) {
+> +		if (pdata->plt_get_usb_connect_status())
+> +			pdata->plt_usb_disconnect_detect(true);
+> +		else
+> +			pdata->plt_usb_disconnect_detect(false);
+
+How about just this:
+
+		pdata->plt_usb_disconnect_detect(
+				pdata->plt_get_usb_connect_status());
+
+> +	}
+> +	spin_unlock(&ehci->lock);
+> +out:
+> +	return ehci_irq(hcd);
+> +}
+
+Alan Stern
