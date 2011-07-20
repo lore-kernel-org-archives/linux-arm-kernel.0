@@ -1,39 +1,53 @@
-From: per.forlin@linaro.org (Per Forlin)
-Date: Thu, 21 Jul 2011 00:01:59 +0200
-Subject: [PATCH v3 1/3] fault-inject: make fault injection available for
-	modules
-In-Reply-To: <1311199321-4618-1-git-send-email-per.forlin@linaro.org>
-References: <1311199321-4618-1-git-send-email-per.forlin@linaro.org>
-Message-ID: <1311199321-4618-2-git-send-email-per.forlin@linaro.org>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 21 Jul 2011 06:33:49 +0800
+Subject: [RFC PATCH 1/5] OMAP3:I2C: Add device tree nodes for beagle board
+In-Reply-To: <20110720185513.GI4642@ponder.secretlab.ca>
+References: <1309426647-31587-1-git-send-email-manjugk@ti.com>
+	<1309426647-31587-2-git-send-email-manjugk@ti.com>
+	<20110706185546.GJ4871@ponder.secretlab.ca>
+	<74CDBE0F657A3D45AFBB94109FB122FF049E21C203@HQMAIL01.nvidia.com>
+	<CACxGe6u8qq7FA7kFXbU5uCk6m_GA8GWLqsdjFCXN+NMJfFKxmA@mail.gmail.com>
+	<20110720110419.GA6999@S2100-06.ap.freescale.net>
+	<20110720185513.GI4642@ponder.secretlab.ca>
+Message-ID: <20110720223348.GH6999@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-export symbols should_fail() and init_fault_attr_dentries() in order
-to make modules use the fault injection functionality
+On Wed, Jul 20, 2011 at 12:55:13PM -0600, Grant Likely wrote:
+> On Wed, Jul 20, 2011 at 07:04:20PM +0800, Shawn Guo wrote:
+> > > Mostly consistency.  Most of the experience we have with the flattened
+> > > device tree up to this point hasn't bothered with the 'status'
+> > > property.  It is only when AMP and hypervisors cam online that it
+> > > became important to use a status property, and that only when the
+> > > kernel needs to be told that the device does indeed exist, but it must
+> > > not be touched.  I'd like to continue that pattern for new DT users
+> > > with the default assumption that a device is enabled unless the board
+> > > .dts explicitly disables it.
+> [...]
+> > Besides the bothering that we have to list so many unused controllers
+> > in individual board dts file, it's also hard to tell which controllers
+> > are actually available on the board.  People have to look at imx53.dts
+> > to get a full list and then exclude the ones in imx53-<board>.dts as
+> > "disabled".
+> > 
+> > And if we go the way opposite, adding "disabled" status for everyone
+> > in imx53.dts, we will only need to specify the peripherals that are
+> > actually available on board with "okay" status in imx53-<board>.dts.
+> > And it's much more clear for people to see what peripherals are
+> > available on individual board.
+> > 
+> > So I'm going the way than you suggested.  Please let me know if you
+> > strongly dislikes it.
+> 
+> Yes, I strongly dislike it.  I understand the concern, but at this
+> early stage with converting to device tree I think consistency between
+> platforms is more important.  We can talk about the issue at Linaro
+> Connect in 2 weeks, but in the mean time please use the
+> enabled-by-default/explicitly-disabled pattern.
+> 
+Okay, hope you will not ask me to use the opposite pattern when you
+actually see the patch :)
 
-Signed-off-by: Per Forlin <per.forlin@linaro.org>
----
- lib/fault-inject.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
-
-diff --git a/lib/fault-inject.c b/lib/fault-inject.c
-index 7e65af7..27783da 100644
---- a/lib/fault-inject.c
-+++ b/lib/fault-inject.c
-@@ -131,6 +131,7 @@ bool should_fail(struct fault_attr *attr, ssize_t size)
- 
- 	return true;
- }
-+EXPORT_SYMBOL_GPL(should_fail);
- 
- #ifdef CONFIG_FAULT_INJECTION_DEBUG_FS
- 
-@@ -311,5 +312,6 @@ fail:
- 	cleanup_fault_attr_dentries(attr);
- 	return -ENOMEM;
- }
-+EXPORT_SYMBOL_GPL(init_fault_attr_dentries);
- 
- #endif /* CONFIG_FAULT_INJECTION_DEBUG_FS */
 -- 
-1.7.4.1
+Regards,
+Shawn
