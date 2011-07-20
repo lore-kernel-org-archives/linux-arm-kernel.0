@@ -1,75 +1,83 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 20 Jul 2011 21:10:34 +0200
-Subject: [PATCH 3/7] add usb phy clocks to clock tree
-In-Reply-To: <1311160106-4898-4-git-send-email-tony.lin@freescale.com>
-References: <1311160106-4898-1-git-send-email-tony.lin@freescale.com>
-	<1311160106-4898-4-git-send-email-tony.lin@freescale.com>
-Message-ID: <20110720191034.GL26347@pengutronix.de>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Thu, 21 Jul 2011 00:47:49 +0530
+Subject: [PATCH V4 03-1/13] DMA: PL330: Support DMA_SLAVE_CONFIG command
+In-Reply-To: <1311158773-30314-3-git-send-email-boojin.kim@samsung.com>
+References: <1311158773-30314-1-git-send-email-boojin.kim@samsung.com>
+	<1311158773-30314-3-git-send-email-boojin.kim@samsung.com>
+Message-ID: <CABb+yY2_XKyCr2mEzqd0bCYJk3U7+sg8Xz4b4ma2KB1BconYOw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 20, 2011 at 07:08:22PM +0800, Tony Lin wrote:
-> Signed-off-by: Tony Lin <tony.lin@freescale.com>
+On Wed, Jul 20, 2011 at 4:16 PM, Boojin Kim <boojin.kim@samsung.com> wrote:
+> Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 > ---
->  arch/arm/mach-mxs/clock-mx28.c |   18 ++++++++++++++++++
->  1 files changed, 18 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
-> index 5dcc59d..6fd0fe6 100644
-> --- a/arch/arm/mach-mxs/clock-mx28.c
-> +++ b/arch/arm/mach-mxs/clock-mx28.c
-> @@ -570,7 +570,23 @@ static struct clk usb1_clk = {
->  	.disable = _raw_clk_disable,
->  	.parent = &pll1_clk,
->  };
-> +/* usb phy clock for usb0 */
-> +static struct clk usb_phy_clk0 = {
-> +	.parent = &pll0_clk,
-> +	.enable = _raw_clk_disable, /* EN_USB_CLKS = 1 means ON */
-> +	.disable = _raw_clk_enable,
-> +	.enable_reg = CLKCTRL_BASE_ADDR + HW_CLKCTRL_PLL0CTRL0,
-> +	.enable_shift = 18,
-> +};
->  
-> +/* usb phy clock for usb1 */
-> +static struct clk usb_phy_clk1 = {
-> +	.parent = &pll1_clk,
-> +	.enable = _raw_clk_disable,
-> +	.disable = _raw_clk_enable,
-> +	.enable_reg = CLKCTRL_BASE_ADDR + HW_CLKCTRL_PLL1CTRL0,
-> +	.enable_shift = 18,
-> +};
->  #define _DEFINE_CLOCK(name, er, es, p)					\
->  	static struct clk name = {					\
->  		.enable_reg	= CLKCTRL_BASE_ADDR + HW_CLKCTRL_##er,	\
-> @@ -629,6 +645,8 @@ static struct clk_lookup lookups[] = {
->  	_REGISTER_CLOCK("flexcan.1", NULL, can1_clk)
->  	_REGISTER_CLOCK(NULL, "usb0", usb0_clk)
->  	_REGISTER_CLOCK(NULL, "usb1", usb1_clk)
-> +	_REGISTER_CLOCK(NULL, "usb0_phy", usb_phy_clk0)
-> +	_REGISTER_CLOCK(NULL, "usb1_phy", usb_phy_clk1)
+> ?drivers/dma/pl330.c | ? 53 +++++++++++++++++++++++++++++++++++++-------------
+> ?1 files changed, 39 insertions(+), 14 deletions(-)
+>
+> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+> index 586ab39..880f010 100644
+> --- a/drivers/dma/pl330.c
+> +++ b/drivers/dma/pl330.c
+> @@ -256,25 +256,50 @@ static int pl330_alloc_chan_resources(struct dma_chan *chan)
+> ?static int pl330_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd, unsigned long arg)
+> ?{
+> ? ? ? ?struct dma_pl330_chan *pch = to_pchan(chan);
+> - ? ? ? struct dma_pl330_desc *desc;
+> + ? ? ? struct dma_pl330_desc *desc, *_dt;
+> ? ? ? ?unsigned long flags;
+> + ? ? ? struct dma_pl330_dmac *pdmac = pch->dmac;
+> + ? ? ? struct dma_slave_config *slave_config;
+> + ? ? ? struct dma_pl330_peri *peri;
+> + ? ? ? LIST_HEAD(list);
+>
+> - ? ? ? /* Only supports DMA_TERMINATE_ALL */
+> - ? ? ? if (cmd != DMA_TERMINATE_ALL)
+> - ? ? ? ? ? ? ? return -ENXIO;
+> -
+> - ? ? ? spin_lock_irqsave(&pch->lock, flags);
+> -
+> - ? ? ? /* FLUSH the PL330 Channel thread */
+> - ? ? ? pl330_chan_ctrl(pch->pl330_chid, PL330_OP_FLUSH);
+> + ? ? ? switch (cmd) {
+> + ? ? ? case DMA_TERMINATE_ALL:
+> + ? ? ? ? ? ? ? spin_lock_irqsave(&pch->lock, flags);
+>
+> - ? ? ? /* Mark all desc done */
+> - ? ? ? list_for_each_entry(desc, &pch->work_list, node)
+> - ? ? ? ? ? ? ? desc->status = DONE;
+> + ? ? ? ? ? ? ? /* FLUSH the PL330 Channel thread */
+> + ? ? ? ? ? ? ? pl330_chan_ctrl(pch->pl330_chid, PL330_OP_FLUSH);
+>
+> - ? ? ? spin_unlock_irqrestore(&pch->lock, flags);
+> + ? ? ? ? ? ? ? /* Mark all desc done */
+> + ? ? ? ? ? ? ? list_for_each_entry_safe(desc, _dt, &pch->work_list , node) {
+> + ? ? ? ? ? ? ? ? ? ? ? desc->status = DONE;
+> + ? ? ? ? ? ? ? ? ? ? ? pch->completed = desc->txd.cookie;
+> + ? ? ? ? ? ? ? ? ? ? ? list_move_tail(&desc->node, &list);
+> + ? ? ? ? ? ? ? }
+>
+> - ? ? ? pl330_tasklet((unsigned long) pch);
+> + ? ? ? ? ? ? ? list_splice_tail_init(&list, &pdmac->desc_pool);
+> + ? ? ? ? ? ? ? spin_unlock_irqrestore(&pch->lock, flags);
+> + ? ? ? ? ? ? ? break;
+> + ? ? ? case DMA_SLAVE_CONFIG:
+Please protect this section too using spin_lock.
 
-This looks suspicious. The phys are real devices, but this shows you
-do not intend to use them as devices. Really the phys should be drivers.
 
-Sascha
+> + ? ? ? ? ? ? ? if (slave_config->direction == DMA_TO_DEVICE) {
+> + ? ? ? ? ? ? ? ? ? ? ? if (slave_config->dst_addr)
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? peri->fifo_addr = slave_config->dst_addr;
+> + ? ? ? ? ? ? ? ? ? ? ? if (slave_config->dst_addr_width)
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? peri->burst_sz = __ffs(slave_config->dst_addr_width);
+> + ? ? ? ? ? ? ? } else if (slave_config->direction == DMA_FROM_DEVICE) {
+> + ? ? ? ? ? ? ? ? ? ? ? if (slave_config->src_addr)
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? peri->fifo_addr = slave_config->src_addr;
+> + ? ? ? ? ? ? ? ? ? ? ? if (slave_config->src_addr_width)
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? peri->burst_sz = __ffs(slave_config->src_addr_width);
+> + ? ? ? ? ? ? ? }
+PL330 has fixed channels to peripherals.
+So FIFO addresses(burst_sz too?) should already be set via platform data.
+Client drivers shouldn't bother.
 
->  	_REGISTER_CLOCK("mxs-pwm.0", NULL, pwm_clk)
->  	_REGISTER_CLOCK("mxs-pwm.1", NULL, pwm_clk)
->  	_REGISTER_CLOCK("mxs-pwm.2", NULL, pwm_clk)
-> -- 
-> 1.7.0.4
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+<will review remaining patches soon, gotta go now>
