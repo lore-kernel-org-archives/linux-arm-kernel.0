@@ -1,102 +1,81 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 21 Jul 2011 02:07:46 +0900
-Subject: [PATCH] ARM: S5P64X0: External Interrupt Support
-In-Reply-To: <CAAgF-BcBwcoibw8-0d+P=ShcQh2bC3sAyqxznRJN3Bip2PuAyg@mail.gmail.com>
-References: <1310712094-19831-1-git-send-email-padma.v@samsung.com>
-	<20110715090011.GN23270@n2100.arm.linux.org.uk>
-	<CAAgF-Bcke26iFsgf0DA3LB5CLv=TkS6UG0y+SBLR=F6TzGYU+A@mail.gmail.com>
-	<20110715123429.GP23270@n2100.arm.linux.org.uk>
-	<CAAgF-BcBwcoibw8-0d+P=ShcQh2bC3sAyqxznRJN3Bip2PuAyg@mail.gmail.com>
-Message-ID: <06cb01cc46ff$8dc9a8f0$a95cfad0$%kim@samsung.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Wed, 20 Jul 2011 19:12:15 +0200
+Subject: S3C6410 UART resume problem
+In-Reply-To: <1534460.6WAISbrX4v@flatron>
+References: <1534460.6WAISbrX4v@flatron>
+Message-ID: <8865715.7kkxAXkp10@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-padma venkat wrote:
-> 
-> Hi Russell,
-> 
-> On Fri, Jul 15, 2011 at 6:04 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Fri, Jul 15, 2011 at 05:23:33PM +0530, padma venkat wrote:
-> >> Hi Russell,
-> >>
-> >> On Fri, Jul 15, 2011 at 2:30 PM, Russell King - ARM Linux
-> >> <linux@arm.linux.org.uk> wrote:
-> >> > On Fri, Jul 15, 2011 at 12:11:34PM +0530, Padmavathi Venna wrote:
-> >> >> +#define eint_offset(irq) ? ? ((irq) - IRQ_EINT(0))
-> >> >> +#define eint_irq_to_bit(irq) ((u32)(1 << eint_offset(irq)))
-> >> >> +
-> >> >> +static inline void s5p64x0_irq_eint_mask(struct irq_data *data)
-> >> >> +{
-> >> >> + ? ? u32 mask;
-> >> >> +
-> >> >> + ? ? mask = __raw_readl(S5P64X0_EINT0MASK);
-> >> >> + ? ? mask |= (u32)data->chip_data;
-> >> >> + ? ? __raw_writel(mask, S5P64X0_EINT0MASK);
-> >> >> +}
-> >> >> +
-> >> >> +static void s5p64x0_irq_eint_unmask(struct irq_data *data)
-> >> >> +{
-> >> >> + ? ? u32 mask;
-> >> >> +
-> >> >> + ? ? mask = __raw_readl(S5P64X0_EINT0MASK);
-> >> >> + ? ? mask &= ~((u32)data->chip_data);
-> >> >> + ? ? __raw_writel(mask, S5P64X0_EINT0MASK);
-> >> >> +}
-> >> >> +
-> >> >> +static inline void s5p64x0_irq_eint_ack(struct irq_data *data)
-> >> >> +{
-> >> >> + ? ? __raw_writel((u32)data->chip_data, S5P64X0_EINT0PEND);
-> >> >> +}
-> >> >> +
-> >> >> +static void s5p64x0_irq_eint_maskack(struct irq_data *data)
-> >> >> +{
-> >> >> + ? ? /* compiler should in-line these */
-> >> >> + ? ? s5p64x0_irq_eint_mask(data);
-> >> >> + ? ? s5p64x0_irq_eint_ack(data);
-> >> >> +}
-> >> >
-> >> > Won't genirqchip support deal with all of the above for you?
-> >> As per my understanding, to deal with low level interrupt hardware
-access
-> >> we need to use the accessor functions. Please suggest me if there is
-> >> any better way of doing this.
-> >
-> > I'm not saying don't have these. ?I'm saying use the _generic_ irqchip
-> > support which has the code implemented to set and clear bits in
-registers.
-> > Something like this:
-> >
-> > ? ? ? ?struct irq_chip_generic *gc;
-> >
-> > ? ? ? ?gc = irq_alloc_generic_chip(name, 1, first_irq,
-base_of_controller,
-> > ? ? ? ? ? ? ? ? ? ? ? ?handler);
-> >
-> > ? ? ? ?gc->chip_types->chip.irq_ack = irq_gc_ack;
-> > ? ? ? ?gc->chip_types->chip.irq_mask = irq_gc_mask_set_bit;
-> > ? ? ? ?gc->chip_types->chip.irq_unmask = irq_gc_mask_clr_bit;
-> >
-> > ? ? ? ?/* replace the two below with the _real_ offset, rather than
-these
-> calculations */
-> > ? ? ? ?gc->chip_types->reg.ack = S5P64X0_EINT0PEND - base_of_controller;
-> > ? ? ? ?gc->chip_types->reg.mask = S5P64X0_EINT0MASK -
-base_of_controller;
-> >
-> > ? ? ? ?irq_setup_generic_chip(gc, mask_of_irqs_to_setup,
-> > ? ? ? ? ? ? ? ?IRQ_GC_INIT_MASK_CACHE, flags_to_clear, flags_to_set);
-> >
-> Thanks for your explanation.
-> I will remake the patch based on generic_irq_chip support and resend the
-same.
-> 
-Hmm...any updated patch on this?
+I have managed to implement a workaround that works for me, but I am not sure 
+whether it could not be done in a better way. I have attached a patch based on 
+Linux 2.6.38.
 
-Thanks.
+P.S. Please excuse me sending my last message incorrectly, using To instead of 
+CC fields, as my mail client automatically sets all address text fields as To 
+and I have forgotten to switch them to CC.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+---
+ arch/arm/mach-s3c64xx/pm.c |   27 +++++++++++++++++++++++++++
+ 1 files changed, 27 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-s3c64xx/pm.c b/arch/arm/mach-s3c64xx/pm.c
+index 79412f7..7818bdd 100644
+--- a/arch/arm/mach-s3c64xx/pm.c
++++ b/arch/arm/mach-s3c64xx/pm.c
+@@ -22,6 +22,7 @@
+ 
+ #include <plat/pm.h>
+ #include <plat/wakeup-mask.h>
++#include <plat/regs-serial.h>
+ 
+ #include <mach/regs-sys.h>
+ #include <mach/regs-gpio.h>
+@@ -29,6 +30,8 @@
+ #include <mach/regs-syscon-power.h>
+ #include <mach/regs-gpio-memport.h>
+ 
++#include <asm/delay.h>
++
+ #ifdef CONFIG_S3C_PM_DEBUG_LED_SMDK
+ #include <mach/gpio-bank-n.h>
+ 
+@@ -101,12 +104,36 @@ void s3c_pm_configure_extint(void)
+ 
+ void s3c_pm_restore_core(void)
+ {
++	u32 pclkgate, tmp;
++	int i;
++
+ 	__raw_writel(0, S3C64XX_EINT_MASK);
+ 
+ 	s3c_pm_debug_smdkled(1 << 2, 0);
+ 
+ 	s3c_pm_do_restore_core(core_save, ARRAY_SIZE(core_save));
+ 	s3c_pm_do_restore(misc_save, ARRAY_SIZE(misc_save));
++
++	tmp = pclkgate = __raw_readl(S3C_PCLK_GATE);
++
++	/* re-start uart clocks */
++	tmp |= S3C_CLKCON_PCLK_UART0;
++	tmp |= S3C_CLKCON_PCLK_UART1;
++	tmp |= S3C_CLKCON_PCLK_UART2;
++	tmp |= S3C_CLKCON_PCLK_UART3;
++
++	__raw_writel(tmp, S3C_PCLK_GATE);
++
++	udelay(10);
++
++	for (i = 0; i < 4; ++i) {
++		__raw_writel(15, S3C_VA_UARTx(i) + S3C64XX_UINTM);
++		__raw_writel(15, S3C_VA_UARTx(i) + S3C64XX_UINTP);
++	}
++
++	udelay(10);
++
++	__raw_writel(pclkgate, S3C_PCLK_GATE);
+ }
+ 
+ void s3c_pm_save_core(void)
+-- 
+1.7.6
