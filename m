@@ -1,67 +1,55 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 21 Jul 2011 07:16:39 +0800
-Subject: [PATCH] arm/mxc: add the missing UART_PADDR for i.mx53
-In-Reply-To: <4E27444D.2010005@boundarydevices.com>
-References: <1310251913-9877-1-git-send-email-troy.kisky@boundarydevices.com>
-	<1311167599-21790-1-git-send-email-shawn.guo@linaro.org>
-	<4E27444D.2010005@boundarydevices.com>
-Message-ID: <20110720231638.GK6999@S2100-06.ap.freescale.net>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 20 Jul 2011 17:14:05 -0600
+Subject: [RFC PATCH 1/5] OMAP3:I2C: Add device tree nodes for beagle board
+In-Reply-To: <20110720223348.GH6999@S2100-06.ap.freescale.net>
+References: <1309426647-31587-1-git-send-email-manjugk@ti.com>
+	<1309426647-31587-2-git-send-email-manjugk@ti.com>
+	<20110706185546.GJ4871@ponder.secretlab.ca>
+	<74CDBE0F657A3D45AFBB94109FB122FF049E21C203@HQMAIL01.nvidia.com>
+	<CACxGe6u8qq7FA7kFXbU5uCk6m_GA8GWLqsdjFCXN+NMJfFKxmA@mail.gmail.com>
+	<20110720110419.GA6999@S2100-06.ap.freescale.net>
+	<20110720185513.GI4642@ponder.secretlab.ca>
+	<20110720223348.GH6999@S2100-06.ap.freescale.net>
+Message-ID: <CACxGe6utwx_LpMx0sqfuTRLst1-0eoi8ZrwA2ZVRyjiVzxKT1g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 20, 2011 at 02:10:37PM -0700, Troy Kisky wrote:
-> On 7/20/2011 6:13 AM, Shawn Guo wrote:
-> > The UART_PADDR definition for i.mx53 and i.mx50 is missing in
-> > debug-macro.S.  It causes the build of i.mx53/50 fail.
-> > 
-> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > Reported-by: Troy Kisky <troy.kisky@boundarydevices.com>
-> > ---
-> > Troy,
-> > 
-> > Since I'm keen to get the build failure fixed, I just repost
-> > the patch you sent with Sascha's comment fixed.  Hope you do
-> > not mind.
-> > 
-> >  arch/arm/plat-mxc/include/mach/debug-macro.S |    8 ++++++++
-> >  1 files changed, 8 insertions(+), 0 deletions(-)
-> > 
-> > diff --git a/arch/arm/plat-mxc/include/mach/debug-macro.S b/arch/arm/plat-mxc/include/mach/debug-macro.S
-> > index 91fc7cd..8cf8dee 100644
-> > --- a/arch/arm/plat-mxc/include/mach/debug-macro.S
-> > +++ b/arch/arm/plat-mxc/include/mach/debug-macro.S
-> > @@ -44,6 +44,14 @@
-> >  #define UART_PADDR	MX51_UART1_BASE_ADDR
-> >  #endif
-> >  
-> > +#if defined(CONFIG_SOC_IMX50) || defined(CONFIG_SOC_IMX53)
-> > +#ifdef UART_PADDR
-> > +#error "CONFIG_DEBUG_LL is incompatible with multiple archs"
-> > +#endif
-> > +/* i.MX50 gets the same UART1 base address as i.MX53 */
-> > +#define UART_PADDR	MX53_UART1_BASE_ADDR
-> > +#endif
-> > +
-> 
-> If your debug-macro.S is like mine then you should have
-> 
-No, it is not.
+On Wed, Jul 20, 2011 at 4:33 PM, Shawn Guo <shawn.guo@freescale.com> wrote:
+> On Wed, Jul 20, 2011 at 12:55:13PM -0600, Grant Likely wrote:
+>> On Wed, Jul 20, 2011 at 07:04:20PM +0800, Shawn Guo wrote:
+>> > > Mostly consistency. ?Most of the experience we have with the flattened
+>> > > device tree up to this point hasn't bothered with the 'status'
+>> > > property. ?It is only when AMP and hypervisors cam online that it
+>> > > became important to use a status property, and that only when the
+>> > > kernel needs to be told that the device does indeed exist, but it must
+>> > > not be touched. ?I'd like to continue that pattern for new DT users
+>> > > with the default assumption that a device is enabled unless the board
+>> > > .dts explicitly disables it.
+>> [...]
+>> > Besides the bothering that we have to list so many unused controllers
+>> > in individual board dts file, it's also hard to tell which controllers
+>> > are actually available on the board. ?People have to look at imx53.dts
+>> > to get a full list and then exclude the ones in imx53-<board>.dts as
+>> > "disabled".
+>> >
+>> > And if we go the way opposite, adding "disabled" status for everyone
+>> > in imx53.dts, we will only need to specify the peripherals that are
+>> > actually available on board with "okay" status in imx53-<board>.dts.
+>> > And it's much more clear for people to see what peripherals are
+>> > available on individual board.
+>> >
+>> > So I'm going the way than you suggested. ?Please let me know if you
+>> > strongly dislikes it.
+>>
+>> Yes, I strongly dislike it. ?I understand the concern, but at this
+>> early stage with converting to device tree I think consistency between
+>> platforms is more important. ?We can talk about the issue at Linaro
+>> Connect in 2 weeks, but in the mean time please use the
+>> enabled-by-default/explicitly-disabled pattern.
+>>
+> Okay, hope you will not ask me to use the opposite pattern when you
+> actually see the patch :)
 
-> #ifdef CONFIG_ARCH_MX5
-> #ifdef UART_PADDR
-> #error "CONFIG_DEBUG_LL is incompatible with multiple archs"
-> #endif
-> #define UART_PADDR      MX51_UART1_BASE_ADDR
-> #endif
-> 
-> 
-> So, all MX5's are using MX51_UART1_BASE_ADDR.
-> I can't see that your patch changes CONFIG_ARCH_MX5
-> to CONFIG_SOC_IMX51. It isn't functionally the same as my version.
-> 
-We started from the difference base.  No, it is not functionally the
-same as yours, so even remove your reported-by? :)
+:-)
 
--- 
-Regards,
-Shawn
+g.
