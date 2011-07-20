@@ -1,37 +1,152 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Wed, 20 Jul 2011 11:33:56 -0700
-Subject: [PATCH] arm/dt: tegra devicetree support
-In-Reply-To: <20110720182823.GD4642@ponder.secretlab.ca>
-References: <20110719234158.2779.15394.stgit@ponder>
-	<74CDBE0F657A3D45AFBB94109FB122FF049EBDEE27@HQMAIL01.nvidia.com>
-	<20110720182823.GD4642@ponder.secretlab.ca>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF049EBDEEFA@HQMAIL01.nvidia.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Thu, 21 Jul 2011 00:05:26 +0530
+Subject: [PATCH V4 01/13] DMA: PL330: Add support runtime PM for PL330 DMAC
+In-Reply-To: <1311158773-30314-2-git-send-email-boojin.kim@samsung.com>
+References: <1311158773-30314-1-git-send-email-boojin.kim@samsung.com>
+	<1311158773-30314-2-git-send-email-boojin.kim@samsung.com>
+Message-ID: <CABb+yY3iseS4pSc1TbUxJ+axC=h5EYEA+JRumZcJt8f0x3FCTg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Grant Likely wrote at Wednesday, July 20, 2011 12:28 PM:
-> On Wed, Jul 20, 2011 at 08:37:19AM -0700, Stephen Warren wrote:
-> > Grant Likely wrote at Tuesday, July 19, 2011 5:43 PM:
-> > > Everything required to populate NVIDIA Tegra devices from the device
-> > > tree.  This patch adds a new DT_MACHINE_DESC() which matches against
-> > > a tegra20 device tree.  So far it only registers the on-chip devices,
-> > > but it will be refined in follow on patches to configure clocks and
-> > > pin IO from the device tree also.
-...
-> > > diff --git a/arch/arm/boot/dts/tegra-harmony.dts b/arch/arm/boot/dts/tegra-harmony.dts
-> >
-> > tegra-*.dts don't include status="disable" for all the unused controllers.
-> > Should that be added?
-> 
-> I dropped that pattern since my preference has been to have boards
-> explicitly disable unused cores and that has generally been the
-> pattern on other DT platforms.
+On Wed, Jul 20, 2011 at 4:16 PM, Boojin Kim <boojin.kim@samsung.com> wrote:
+> Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
+> Cc: Vinod Koul <vinod.koul@intel.com>
+> Cc: Dan Williams <dan.j.williams@intel.com>
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 
-Sorry if I wasn't clear, but what I meant was that the board-specific
-files tegra-harmony.dts and tegra-seaboard.dts don't include the status=
-"disable" entries for the modules/ports they don't use.
+Acked-by: Jassi Brar <jassisinghbrar@gmail.com>
 
-Still, everything probably works OK without that...
 
--- 
-nvpublic
+> ---
+> ?drivers/dma/pl330.c | ? 75 +++++++++++++++++++++++++++++++++++++++++++++++++-
+> ?1 files changed, 73 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+> index 6abe1ec..b7ecf47 100644
+> --- a/drivers/dma/pl330.c
+> +++ b/drivers/dma/pl330.c
+> @@ -17,6 +17,7 @@
+> ?#include <linux/interrupt.h>
+> ?#include <linux/amba/bus.h>
+> ?#include <linux/amba/pl330.h>
+> +#include <linux/pm_runtime.h>
+>
+> ?#define NR_DEFAULT_DESC ? ? ? ?16
+>
+> @@ -83,6 +84,8 @@ struct dma_pl330_dmac {
+>
+> ? ? ? ?/* Peripheral channels connected to this DMAC */
+> ? ? ? ?struct dma_pl330_chan peripherals[0]; /* keep at end */
+> +
+> + ? ? ? struct clk *clk;
+> ?};
+>
+> ?struct dma_pl330_desc {
+> @@ -696,6 +699,30 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
+> ? ? ? ? ? ? ? ?goto probe_err1;
+> ? ? ? ?}
+>
+> + ? ? ? pdmac->clk = clk_get(&adev->dev, "dma");
+> + ? ? ? if (IS_ERR(pdmac->clk)) {
+> + ? ? ? ? ? ? ? dev_err(&adev->dev, "Cannot get operation clock.\n");
+> + ? ? ? ? ? ? ? ret = -EINVAL;
+> + ? ? ? ? ? ? ? goto probe_err1;
+> + ? ? ? }
+> +
+> + ? ? ? amba_set_drvdata(adev, pdmac);
+> +
+> +#ifdef CONFIG_PM_RUNTIME
+> + ? ? ? /* to use the runtime PM helper functions */
+> + ? ? ? pm_runtime_enable(&adev->dev);
+> +
+> + ? ? ? /* enable the power domain */
+> + ? ? ? if (pm_runtime_get_sync(&adev->dev)) {
+> + ? ? ? ? ? ? ? dev_err(&adev->dev, "failed to get runtime pm\n");
+> + ? ? ? ? ? ? ? ret = -ENODEV;
+> + ? ? ? ? ? ? ? goto probe_err1;
+> + ? ? ? }
+> +#else
+> + ? ? ? /* enable dma clk */
+> + ? ? ? clk_enable(pdmac->clk);
+> +#endif
+> +
+> ? ? ? ?irq = adev->irq[0];
+> ? ? ? ?ret = request_irq(irq, pl330_irq_handler, 0,
+> ? ? ? ? ? ? ? ? ? ? ? ?dev_name(&adev->dev), pi);
+> @@ -763,8 +790,6 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
+> ? ? ? ? ? ? ? ?goto probe_err4;
+> ? ? ? ?}
+>
+> - ? ? ? amba_set_drvdata(adev, pdmac);
+> -
+> ? ? ? ?dev_info(&adev->dev,
+> ? ? ? ? ? ? ? ?"Loaded driver for PL330 DMAC-%d\n", adev->periphid);
+> ? ? ? ?dev_info(&adev->dev,
+> @@ -825,6 +850,13 @@ static int __devexit pl330_remove(struct amba_device *adev)
+> ? ? ? ?res = &adev->res;
+> ? ? ? ?release_mem_region(res->start, resource_size(res));
+>
+> +#ifdef CONFIG_PM_RUNTIME
+> + ? ? ? pm_runtime_put(&adev->dev);
+> + ? ? ? pm_runtime_disable(&adev->dev);
+> +#else
+> + ? ? ? clk_disable(pdmac->clk);
+> +#endif
+> +
+> ? ? ? ?kfree(pdmac);
+>
+> ? ? ? ?return 0;
+> @@ -838,10 +870,49 @@ static struct amba_id pl330_ids[] = {
+> ? ? ? ?{ 0, 0 },
+> ?};
+>
+> +#ifdef CONFIG_PM_RUNTIME
+> +static int pl330_runtime_suspend(struct device *dev)
+> +{
+> + ? ? ? struct dma_pl330_dmac *pdmac = dev_get_drvdata(dev);
+> +
+> + ? ? ? if (!pdmac) {
+> + ? ? ? ? ? ? ? dev_err(dev, "failed to get dmac\n");
+> + ? ? ? ? ? ? ? return -ENODEV;
+> + ? ? ? }
+> +
+> + ? ? ? clk_disable(pdmac->clk);
+> +
+> + ? ? ? return 0;
+> +}
+> +
+> +static int pl330_runtime_resume(struct device *dev)
+> +{
+> + ? ? ? struct dma_pl330_dmac *pdmac = dev_get_drvdata(dev);
+> +
+> + ? ? ? if (!pdmac) {
+> + ? ? ? ? ? ? ? dev_err(dev, "failed to get dmac\n");
+> + ? ? ? ? ? ? ? return -ENODEV;
+> + ? ? ? }
+> +
+> + ? ? ? clk_enable(pdmac->clk);
+> +
+> + ? ? ? return 0;
+> +}
+> +#else
+> +#define pl330_runtime_suspend ?NULL
+> +#define pl330_runtime_resume ? NULL
+> +#endif /* CONFIG_PM_RUNTIME */
+> +
+> +static const struct dev_pm_ops pl330_pm_ops = {
+> + ? ? ? .runtime_suspend = pl330_runtime_suspend,
+> + ? ? ? .runtime_resume = pl330_runtime_resume,
+> +};
+> +
+> ?static struct amba_driver pl330_driver = {
+> ? ? ? ?.drv = {
+> ? ? ? ? ? ? ? ?.owner = THIS_MODULE,
+> ? ? ? ? ? ? ? ?.name = "dma-pl330",
+> + ? ? ? ? ? ? ? .pm = &pl330_pm_ops,
+> ? ? ? ?},
+> ? ? ? ?.id_table = pl330_ids,
+> ? ? ? ?.probe = pl330_probe,
+> --
+> 1.7.1
+>
+>
