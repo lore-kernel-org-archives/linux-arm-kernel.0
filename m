@@ -1,81 +1,145 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Wed, 20 Jul 2011 19:12:15 +0200
-Subject: S3C6410 UART resume problem
-In-Reply-To: <1534460.6WAISbrX4v@flatron>
-References: <1534460.6WAISbrX4v@flatron>
-Message-ID: <8865715.7kkxAXkp10@flatron>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 20 Jul 2011 12:28:23 -0600
+Subject: [PATCH] arm/dt: tegra devicetree support
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF049EBDEE27@HQMAIL01.nvidia.com>
+References: <20110719234158.2779.15394.stgit@ponder>
+	<74CDBE0F657A3D45AFBB94109FB122FF049EBDEE27@HQMAIL01.nvidia.com>
+Message-ID: <20110720182823.GD4642@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I have managed to implement a workaround that works for me, but I am not sure 
-whether it could not be done in a better way. I have attached a patch based on 
-Linux 2.6.38.
+On Wed, Jul 20, 2011 at 08:37:19AM -0700, Stephen Warren wrote:
+> Grant Likely wrote at Tuesday, July 19, 2011 5:43 PM:
+> > Everything required to populate NVIDIA Tegra devices from the device
+> > tree.  This patch adds a new DT_MACHINE_DESC() which matches against
+> > a tegra20 device tree.  So far it only registers the on-chip devices,
+> > but it will be refined in follow on patches to configure clocks and
+> > pin IO from the device tree also.
+> > 
+> > Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
 
-P.S. Please excuse me sending my last message incorrectly, using To instead of 
-CC fields, as my mail client automatically sets all address text fields as To 
-and I have forgotten to switch them to CC.
+Oops, I merged patches, but missed some attribution.  This patch is
+is also composed of work from John Bonesio and Stephen Warren.
 
----
- arch/arm/mach-s3c64xx/pm.c |   27 +++++++++++++++++++++++++++
- 1 files changed, 27 insertions(+), 0 deletions(-)
+> > ---
+> > 
+> > Hi all,
+> > 
+> > Similar to the versatile patch I just posted, this is certainly not
+> > complete board support, but it is enough to be useful.  I'd like to
+> > merge this for v3.1.  It should not break any existing board support.
+> 
+> > diff --git a/arch/arm/boot/dts/tegra-harmony.dts b/arch/arm/boot/dts/tegra-harmony.dts
+> 
+> tegra-*.dts don't include status="disable" for all the unused controllers.
+> Should that be added?
 
-diff --git a/arch/arm/mach-s3c64xx/pm.c b/arch/arm/mach-s3c64xx/pm.c
-index 79412f7..7818bdd 100644
---- a/arch/arm/mach-s3c64xx/pm.c
-+++ b/arch/arm/mach-s3c64xx/pm.c
-@@ -22,6 +22,7 @@
- 
- #include <plat/pm.h>
- #include <plat/wakeup-mask.h>
-+#include <plat/regs-serial.h>
- 
- #include <mach/regs-sys.h>
- #include <mach/regs-gpio.h>
-@@ -29,6 +30,8 @@
- #include <mach/regs-syscon-power.h>
- #include <mach/regs-gpio-memport.h>
- 
-+#include <asm/delay.h>
-+
- #ifdef CONFIG_S3C_PM_DEBUG_LED_SMDK
- #include <mach/gpio-bank-n.h>
- 
-@@ -101,12 +104,36 @@ void s3c_pm_configure_extint(void)
- 
- void s3c_pm_restore_core(void)
- {
-+	u32 pclkgate, tmp;
-+	int i;
-+
- 	__raw_writel(0, S3C64XX_EINT_MASK);
- 
- 	s3c_pm_debug_smdkled(1 << 2, 0);
- 
- 	s3c_pm_do_restore_core(core_save, ARRAY_SIZE(core_save));
- 	s3c_pm_do_restore(misc_save, ARRAY_SIZE(misc_save));
-+
-+	tmp = pclkgate = __raw_readl(S3C_PCLK_GATE);
-+
-+	/* re-start uart clocks */
-+	tmp |= S3C_CLKCON_PCLK_UART0;
-+	tmp |= S3C_CLKCON_PCLK_UART1;
-+	tmp |= S3C_CLKCON_PCLK_UART2;
-+	tmp |= S3C_CLKCON_PCLK_UART3;
-+
-+	__raw_writel(tmp, S3C_PCLK_GATE);
-+
-+	udelay(10);
-+
-+	for (i = 0; i < 4; ++i) {
-+		__raw_writel(15, S3C_VA_UARTx(i) + S3C64XX_UINTM);
-+		__raw_writel(15, S3C_VA_UARTx(i) + S3C64XX_UINTP);
-+	}
-+
-+	udelay(10);
-+
-+	__raw_writel(pclkgate, S3C_PCLK_GATE);
- }
- 
- void s3c_pm_save_core(void)
--- 
-1.7.6
+I dropped that pattern since my preference has been to have boards
+explicitly disable unused cores and that has generally been the
+pattern on other DT platforms.
+
+> 
+> > +	sound {
+> > +		compatible = "nvidia,harmony-sound", "nvidia,tegra-wm8903";
+> 
+> I thought the sound bindings were still somewhat experimental and not
+> completely agreed upon. One issue I see is that Device Tree is
+> supposed to represent pure HW, rather than driver-required abstractions,
+> and at least the compatible name here is pretty Linux-driver-specific.
+> 
+> I think there are some devices missing from the DT file for audio too,
+> e.g. the ALSA "PCM" (DMA) driver.
+> 
+> Also, the bindings for this aren't documented IIRC.
+> 
+> I'd suggest dropping the audio part of the DT file until the audio side
+> is more mature.
+
+Yes, I'll drop the audio bits from this patch. I had taken John's dts
+file which includes the work he's performed on the audio.  Actually, I
+haven't looked critically at this .dts, so there is probably a lot of
+cruft that should be tightened up.
+
+> > +		spkr-en-gpios = <&codec 2 0>;
+> 
+> Should that be "gpio" not "gpios", since there is only one?
+
+Originally I though about that, but for consistency I think it is
+better to have all gpio properties use a "gpios" suffix instead of a
+mixture of "-gpio" and "-gpios".
+
+> > +		hp-det-gpios = <&gpio 178 0>;
+> > +		int-mic-en-gpios = <&gpio 184 0>;
+> > +		ext-mic-en-gpios = <&gpio 185 0>;
+> > +	};
+> 
+> > diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
+> ...
+> > +/ {
+> ...
+> > +	amba {
+> > +		compatible = "simple-bus";
+> ...
+> > +		intc: interrupt-controller at 50041000 {
+> ...
+> > +		};
+> > +	};
+> ...
+> > +	i2c at 7000c000 {
+> 
+> I've always wondered why all the devices aren't included inside the amba
+> node. Or put another way, if the devices are outside the amba node, why
+> not move everything outside the amba node and remove the amba node?
+
+It is sometimes convenient to have all the SoC devices contained in a
+collection node, such as if there is shared clock or power management
+contect, but it is certainly not required.  It is probabaly best if the
+hierarchy reflects the actual bus layout of the SoC instead of an
+anonymous "soc" or "amba" node.
+
+> > diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
+> > index 823c703..6d3d695 100644
+> > --- a/arch/arm/mach-tegra/Makefile
+> > +++ b/arch/arm/mach-tegra/Makefile
+> > @@ -30,5 +30,8 @@ obj-${CONFIG_MACH_PAZ00}		+= board-paz00-pinmux.o
+> >  obj-${CONFIG_MACH_SEABOARD}             += board-seaboard.o
+> >  obj-${CONFIG_MACH_SEABOARD}             += board-seaboard-pinmux.o
+> > 
+> > +obj-${CONFIG_MACH_TEGRA_DT}             += board-dt.o
+> > +obj-${CONFIG_MACH_TEGRA_DT}             += board-harmony-pinmux.o
+> 
+> You need board-seaboard-pinmux.o here too.
+
+Yes.  Actually, what I really need is a better way to handle pinmux,
+and it isn't very sane to have board-*-pinmux.o added multiple times
+to obj-y.  I'll tidy this up.
+
+> 
+> > diff --git a/arch/arm/mach-tegra/board-dt.c b/arch/arm/mach-tegra/board-dt.c
+> ...
+> > +static __initdata struct tegra_clk_init_table tegra_dt_clk_init_table[] = {
+> > +	/* name		parent		rate		enabled */
+> > +	{ "uartd",	"pll_p",	216000000,	true },
+> > +	{ NULL,		NULL,		0,		0},
+> > +};
+> 
+> For audio to work, you'll need more clock entries here currently; another
+> reason I suggested to simply drop the audio stuff for now to keep things
+> simple.
+
+I've split the audio changes into a separate patch since that work
+isn't complete yet.
+
+> 
+> > +static void __init tegra_dt_init(void)
+> ...
+> > +	if (of_machine_is_compatible("nvidia,harmony"))
+> > +		harmony_pinmux_init();
+> > +	else if (of_machine_is_compatible("nvidia,seaboard"))
+> > +		seaboard_pinmux_init();
+> 
+> else error, or at least warn?
+
+Yeah, at least until I can remove this ugly hunk entirely.
+
+g.
