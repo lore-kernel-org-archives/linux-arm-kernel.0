@@ -1,49 +1,66 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Wed, 20 Jul 2011 10:51:42 +0200
-Subject: [i.MX28 GPMI] problem overwriting all-0xff data in NAND
-In-Reply-To: <4E263AF2.60103@freescale.com>
-References: <20004.12663.29494.339601@ipc1.ka-ro>
-	<20110718164354.GA3328@S2100-06.ap.freescale.net>
-	<4E24E804.10002@freescale.com>
-	<20005.7677.145955.789329@ipc1.ka-ro>
-	<4E252C51.8070900@freescale.com>
-	<20005.21635.427202.49313@ipc1.ka-ro>
-	<4E263AF2.60103@freescale.com>
-Message-ID: <20110720085142.GA2377@pengutronix.de>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 20 Jul 2011 10:57:20 +0200
+Subject: [PATCH 8/8] ARM: S5PV210: example of CMA private area for FIMC device
+	on Goni board
+In-Reply-To: <1311152240-16384-1-git-send-email-m.szyprowski@samsung.com>
+References: <1311152240-16384-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1311152240-16384-9-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch is an example how device private CMA area can be activated.
+It creates one CMA region and assigns it to the first s5p-fimc device on
+Samsung Goni S5PC110 board.
 
-> >>>>>I am debugging the DMA bug now. and I will send it out when i fix it.
-> >>>>>
-> >>>>What sort of DMA bug?
-> >>>>
-> >>>The DMA may time-out. :(
-> >>>
-> >>>The DMA time-out may occur in two situations:
-> >>>[1] send a command DMA descriptor, see the nfc->send_command() function.
-> >>>[2] read the non-ecc data from nand, see the nfc->read_data() function.
-> >>>
-> >>>I don't know why. Maybe caused by the timing, or something else.
-> >I am confused. The send-command DMA timeout prevents any write for me.
-> >You guys surely would have noticed if you have been bitten as well. Does
-> >it depend on the NAND chip?
-> I think It does not depend on the NAND chip.
-> My test chip is Samsung K9G8G08U0M.
-> Sometimes, I can run a long time while there is no DMA timeout occurring;
-> Sometimes, the bug appears right away.
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ arch/arm/mach-s5pv210/Kconfig     |    1 +
+ arch/arm/mach-s5pv210/mach-goni.c |    8 ++++++++
+ 2 files changed, 9 insertions(+), 0 deletions(-)
 
-For me, the bug always happens right away. So, if you need logs or debug
-output or can give me a pointer into some direction, I am glad to
-assist.
-
+diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
+index 37b5a97..c09a92c 100644
+--- a/arch/arm/mach-s5pv210/Kconfig
++++ b/arch/arm/mach-s5pv210/Kconfig
+@@ -64,6 +64,7 @@ menu "S5PC110 Machines"
+ config MACH_AQUILA
+ 	bool "Aquila"
+ 	select CPU_S5PV210
++	select CMA
+ 	select S3C_DEV_FB
+ 	select S5P_DEV_FIMC0
+ 	select S5P_DEV_FIMC1
+diff --git a/arch/arm/mach-s5pv210/mach-goni.c b/arch/arm/mach-s5pv210/mach-goni.c
+index 31d5aa7..d9e565d 100644
+--- a/arch/arm/mach-s5pv210/mach-goni.c
++++ b/arch/arm/mach-s5pv210/mach-goni.c
+@@ -26,6 +26,7 @@
+ #include <linux/input.h>
+ #include <linux/gpio.h>
+ #include <linux/interrupt.h>
++#include <linux/dma-contiguous.h>
+ 
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+@@ -886,6 +887,12 @@ static void __init goni_machine_init(void)
+ 	platform_add_devices(goni_devices, ARRAY_SIZE(goni_devices));
+ }
+ 
++static void __init goni_reserve(void)
++{
++	/* Create private 16MiB contiguous memory area for s5p-fimc.0 device */
++	dma_declare_contiguous(&s5p_device_fimc0.dev, 16*SZ_1M, 0);
++}
++
+ MACHINE_START(GONI, "GONI")
+ 	/* Maintainers: Kyungmin Park <kyungmin.park@samsung.com> */
+ 	.boot_params	= S5P_PA_SDRAM + 0x100,
+@@ -893,4 +900,5 @@ MACHINE_START(GONI, "GONI")
+ 	.map_io		= goni_map_io,
+ 	.init_machine	= goni_machine_init,
+ 	.timer		= &s5p_timer,
++	.reserve	= goni_reserve,
+ MACHINE_END
 -- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110720/6ee8c27d/attachment.sig>
+1.7.1.569.g6f426
