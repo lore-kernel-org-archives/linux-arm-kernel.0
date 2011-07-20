@@ -1,42 +1,89 @@
 From: b29396@freescale.com (Dong Aisheng)
-Date: Wed, 20 Jul 2011 11:41:41 +0800
-Subject: [PATCH v4 05/10] ARM: mxs: add saif clock
+Date: Wed, 20 Jul 2011 11:41:40 +0800
+Subject: [PATCH v4 04/10] ASoc: mxs: add asoc configuration files
 In-Reply-To: <1311133306-9496-1-git-send-email-b29396@freescale.com>
 References: <1311133306-9496-1-git-send-email-b29396@freescale.com>
-Message-ID: <1311133306-9496-6-git-send-email-b29396@freescale.com>
+Message-ID: <1311133306-9496-5-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Set pll0 as parent.
-
 Signed-off-by: Dong Aisheng <b29396@freescale.com>
+Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Cc: Liam Girdwood <lrg@ti.com>
 Cc: Sascha Hauer <s.hauer@pengutronix.de>
-Reviewed-by: Wolfram Sang <w.sang@pengutronix.de>
+Tested-by: Wolfram Sang <w.sang@pengutronix.de>
 ---
- arch/arm/mach-mxs/clock-mx28.c |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+ sound/soc/Kconfig      |    1 +
+ sound/soc/Makefile     |    1 +
+ sound/soc/mxs/Kconfig  |   20 ++++++++++++++++++++
+ sound/soc/mxs/Makefile |   10 ++++++++++
+ 4 files changed, 32 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
-index 5dcc59d..7b3657b 100644
---- a/arch/arm/mach-mxs/clock-mx28.c
-+++ b/arch/arm/mach-mxs/clock-mx28.c
-@@ -640,6 +640,8 @@ static struct clk_lookup lookups[] = {
- 	_REGISTER_CLOCK(NULL, "lradc", lradc_clk)
- 	_REGISTER_CLOCK(NULL, "spdif", spdif_clk)
- 	_REGISTER_CLOCK("imx28-fb", NULL, lcdif_clk)
-+	_REGISTER_CLOCK("mxs-saif.0", NULL, saif0_clk)
-+	_REGISTER_CLOCK("mxs-saif.1", NULL, saif1_clk)
- };
- 
- static int clk_misc_init(void)
-@@ -774,6 +776,8 @@ int __init mx28_clocks_init(void)
- 	clk_enable(&uart_clk);
- 
- 	clk_set_parent(&lcdif_clk, &ref_pix_clk);
-+	clk_set_parent(&saif0_clk, &pll0_clk);
-+	clk_set_parent(&saif1_clk, &pll0_clk);
- 
- 	clkdev_add_table(lookups, ARRAY_SIZE(lookups));
- 
+diff --git a/sound/soc/Kconfig b/sound/soc/Kconfig
+index 8224db5..47d07ce 100644
+--- a/sound/soc/Kconfig
++++ b/sound/soc/Kconfig
+@@ -51,6 +51,7 @@ source "sound/soc/nuc900/Kconfig"
+ source "sound/soc/omap/Kconfig"
+ source "sound/soc/kirkwood/Kconfig"
+ source "sound/soc/mid-x86/Kconfig"
++source "sound/soc/mxs/Kconfig"
+ source "sound/soc/pxa/Kconfig"
+ source "sound/soc/samsung/Kconfig"
+ source "sound/soc/s6000/Kconfig"
+diff --git a/sound/soc/Makefile b/sound/soc/Makefile
+index 1ed61c5..fc4136e 100644
+--- a/sound/soc/Makefile
++++ b/sound/soc/Makefile
+@@ -11,6 +11,7 @@ obj-$(CONFIG_SND_SOC)	+= fsl/
+ obj-$(CONFIG_SND_SOC)   += imx/
+ obj-$(CONFIG_SND_SOC)	+= jz4740/
+ obj-$(CONFIG_SND_SOC)	+= mid-x86/
++obj-$(CONFIG_SND_SOC)	+= mxs/
+ obj-$(CONFIG_SND_SOC)	+= nuc900/
+ obj-$(CONFIG_SND_SOC)	+= omap/
+ obj-$(CONFIG_SND_SOC)	+= kirkwood/
+diff --git a/sound/soc/mxs/Kconfig b/sound/soc/mxs/Kconfig
+new file mode 100644
+index 0000000..e4ba8d5
+--- /dev/null
++++ b/sound/soc/mxs/Kconfig
+@@ -0,0 +1,20 @@
++menuconfig SND_MXS_SOC
++	tristate "SoC Audio for Freescale MXS CPUs"
++	depends on ARCH_MXS
++	select SND_PCM
++	help
++	  Say Y or M if you want to add support for codecs attached to
++	  the MXS SAIF interface.
++
++
++if SND_MXS_SOC
++
++config SND_SOC_MXS_SGTL5000
++	tristate "SoC Audio support for i.MX boards with sgtl5000"
++	depends on I2C
++	select SND_SOC_SGTL5000
++	help
++	  Say Y if you want to add support for SoC audio on an MXS board with
++	  a sgtl5000 codec.
++
++endif	# SND_MXS_SOC
+diff --git a/sound/soc/mxs/Makefile b/sound/soc/mxs/Makefile
+new file mode 100644
+index 0000000..565b5b5
+--- /dev/null
++++ b/sound/soc/mxs/Makefile
+@@ -0,0 +1,10 @@
++# MXS Platform Support
++snd-soc-mxs-objs := mxs-saif.o
++snd-soc-mxs-pcm-objs := mxs-pcm.o
++
++obj-$(CONFIG_SND_MXS_SOC) += snd-soc-mxs.o snd-soc-mxs-pcm.o
++
++# i.MX Machine Support
++snd-soc-mxs-sgtl5000-objs := mxs-sgtl5000.o
++
++obj-$(CONFIG_SND_SOC_MXS_SGTL5000) += snd-soc-mxs-sgtl5000.o
 -- 
 1.7.0.4
