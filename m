@@ -1,37 +1,79 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 20 Jul 2011 14:27:43 +0300
-Subject: [PATCH 5/7] ehci mxc: make it more flexible to be used for mx28
-In-Reply-To: <97D3A72708D04647A5AC84A04996E5B51616D5@039-SN1MPN1-006.039d.mgd.msft.net>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Wed, 20 Jul 2011 13:41:00 +0200
+Subject: [PATCH 2/7] enable usb1 phy power supply
+In-Reply-To: <1311160106-4898-3-git-send-email-tony.lin@freescale.com>
 References: <1311160106-4898-1-git-send-email-tony.lin@freescale.com>
-	<1311160106-4898-6-git-send-email-tony.lin@freescale.com>
-	<20110720111442.GN764@legolas.emea.dhcp.ti.com>
-	<97D3A72708D04647A5AC84A04996E5B51616AD@039-SN1MPN1-006.039d.mgd.msft.net>
-	<20110720112305.GP764@legolas.emea.dhcp.ti.com>
-	<97D3A72708D04647A5AC84A04996E5B51616D5@039-SN1MPN1-006.039d.mgd.msft.net>
-Message-ID: <20110720112742.GQ764@legolas.emea.dhcp.ti.com>
+	<1311160106-4898-3-git-send-email-tony.lin@freescale.com>
+Message-ID: <20110720114100.GB2377@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Jul 20, 2011 at 07:08:21PM +0800, Tony Lin wrote:
+> configure usb1 phy power enable gpio and enable usb1 phy power
+> 
+> Signed-off-by: Tony Lin <tony.lin@freescale.com>
+> ---
+>  arch/arm/mach-mxs/mach-mx28evk.c |    9 +++++++++
+>  1 files changed, 9 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
+> index eaaf6ff..6934867 100644
+> --- a/arch/arm/mach-mxs/mach-mx28evk.c
+> +++ b/arch/arm/mach-mxs/mach-mx28evk.c
+> @@ -34,6 +34,7 @@
+>  #define MX28EVK_BL_ENABLE	MXS_GPIO_NR(3, 18)
+>  #define MX28EVK_LCD_ENABLE	MXS_GPIO_NR(3, 30)
+>  #define MX28EVK_FEC_PHY_RESET	MXS_GPIO_NR(4, 13)
+> +#define MX28EVK_USB1_PWR_EN	MXS_GPIO_NR(3, 8)
+>  
+>  #define MX28EVK_MMC0_WRITE_PROTECT	MXS_GPIO_NR(2, 12)
+>  #define MX28EVK_MMC1_WRITE_PROTECT	MXS_GPIO_NR(0, 28)
+> @@ -183,6 +184,8 @@ static const iomux_cfg_t mx28evk_pads[] __initconst = {
+>  
+>  	/* led */
+>  	MX28_PAD_AUART1_TX__GPIO_3_5 | MXS_PAD_CTRL,
+> +	/* usb1 */
 
-On Wed, Jul 20, 2011 at 11:25:07AM +0000, Lin Tony-B19295 wrote:
-> > > But I had to following the existing framework. I didn't add any new
-> > special to the driver.
-> > > Just try some ways to workaround these ugly points.
-> > 
-> > but in that case, since you're already there... why not cleaning those
-> > things up before making your changes ?
-> > 
-> Ok, I'll clean up these things. Thanks, balbi.
+/* usb1 power enable */
 
-no problem ;-)
+> +	MX28_PAD_AUART2_RX__GPIO_3_8 | MXS_PAD_CTRL,
+>  };
+>  
+>  /* led */
+> @@ -405,6 +408,12 @@ static void __init mx28evk_init(void)
+>  		pr_warn("failed to request gpio mmc1-slot-power: %d\n", ret);
+>  	mx28_add_mxs_mmc(1, &mx28evk_mmc_pdata[1]);
+>  
+> +	ret = gpio_request_one(MX28EVK_USB1_PWR_EN, GPIOF_DIR_OUT,
+
+use GPIOF_OUT_INIT_HIGH here to save the set_value below and have less
+glitch on the line
+
+> +			       "usb1-power-en");
+> +	if (ret)
+> +		pr_warn("failed to request gpio usb1-power-en %d\n", ret);
+> +	else
+> +		gpio_set_value(MX28EVK_USB1_PWR_EN, 1);
+>  	gpio_led_register_device(0, &mx28evk_led_data);
+>  }
+>  
+> -- 
+> 1.7.0.4
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
 -- 
-balbi
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: not available
 Type: application/pgp-signature
-Size: 490 bytes
+Size: 198 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110720/d31e72d9/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110720/779662c5/attachment.sig>
