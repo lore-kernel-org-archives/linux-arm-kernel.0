@@ -1,45 +1,556 @@
-From: B19295@freescale.com (Lin Tony-B19295)
-Date: Wed, 20 Jul 2011 11:08:06 +0000
-Subject: [PATCH 5/7] ehci mxc: make it more flexible to be used for mx28
-In-Reply-To: <874o2hp5z0.fsf@lebrac.rtp-net.org>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 20 Jul 2011 14:12:58 +0300
+Subject: [PATCH 4/7] mx28: add usb host phy functions
+In-Reply-To: <1311160106-4898-5-git-send-email-tony.lin@freescale.com>
 References: <1311160106-4898-1-git-send-email-tony.lin@freescale.com>
-	<1311160106-4898-6-git-send-email-tony.lin@freescale.com>
-	<874o2hp5z0.fsf@lebrac.rtp-net.org>
-Message-ID: <97D3A72708D04647A5AC84A04996E5B5161673@039-SN1MPN1-006.039d.mgd.msft.net>
+	<1311160106-4898-5-git-send-email-tony.lin@freescale.com>
+Message-ID: <20110720111257.GM764@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Arnaud Patard [mailto:arnaud.patard at rtp-net.org]
-> Sent: Wednesday, July 20, 2011 7:06 PM
-> To: Lin Tony-B19295
-> Cc: linux-usb at vger.kernel.org; koen.beel.barco at gmail.com; balbi at ti.com;
-> linux-arm-kernel at lists.infradead.org; Sascha Hauer
-> Subject: Re: [PATCH 5/7] ehci mxc: make it more flexible to be used for
-> mx28
-> 
-> Tony Lin <tony.lin@freescale.com> writes:
-> Hi,
-> 
-> > old driver uses some hard coding for clks' name which could not be
-> > used for mx28. So workaround these hard codings by judging the cpu is
-> > mx28 or not.
-> 
-> Sascha had some patches to solve this in a different way, avoiding to add
-> yet an other cpu_is_* check for ahb clock. Don't know their current
-> status.
+Hi,
 
-Yes, using cpu_is_* is really a bad method here :-)
-But I had to follow that bad method so far, hope we could see some change from sascha. 
-
-
+On Wed, Jul 20, 2011 at 07:08:23PM +0800, Tony Lin wrote:
+> add usb phy register definitions and functions
+> usb host driver will use these functions to initialize
+> usb phy and change phy working mode
 > 
-> See:
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2011-
-> February/040364.html
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2011-
-> February/040365.html
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2011-
-> February/040363.html
+> Signed-off-by: Tony Lin <tony.lin@freescale.com>
+
+I don't like this patch...
+
+> ---
+>  arch/arm/mach-mxs/Kconfig            |    1 +
+>  arch/arm/mach-mxs/Makefile           |    1 +
+>  arch/arm/mach-mxs/regs-usbphy-mx28.h |  323 ++++++++++++++++++++++++++++++++++
+>  arch/arm/mach-mxs/usb_h1.c           |  230 ++++++++++++++++++++++++
+
+there's no point in keeping this under arch/arm/
+
+>  4 files changed, 555 insertions(+), 0 deletions(-)
 > 
-> Arnaud
+> diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
+> index 4cd0231..1c4264f 100644
+> --- a/arch/arm/mach-mxs/Kconfig
+> +++ b/arch/arm/mach-mxs/Kconfig
+> @@ -49,6 +49,7 @@ config MACH_MX28EVK
+>  	select MXS_HAVE_PLATFORM_MXS_MMC
+>  	select MXS_HAVE_PLATFORM_MXSFB
+>  	select MXS_OCOTP
+> +	select USB_ARCH_HAS_EHCI
+>  	help
+>  	  Include support for MX28EVK platform. This includes specific
+>  	  configurations for the board and its peripherals.
+> diff --git a/arch/arm/mach-mxs/Makefile b/arch/arm/mach-mxs/Makefile
+> index 6c38262..48fc2f5 100644
+> --- a/arch/arm/mach-mxs/Makefile
+> +++ b/arch/arm/mach-mxs/Makefile
+> @@ -12,5 +12,6 @@ obj-$(CONFIG_MACH_MX23EVK) += mach-mx23evk.o
+>  obj-$(CONFIG_MACH_MX28EVK) += mach-mx28evk.o
+>  obj-$(CONFIG_MODULE_TX28) += module-tx28.o
+>  obj-$(CONFIG_MACH_TX28)    += mach-tx28.o
+> +obj-$(CONFIG_USB_EHCI_MXC)   += usb_h1.o
+>  
+>  obj-y += devices/
+> diff --git a/arch/arm/mach-mxs/regs-usbphy-mx28.h b/arch/arm/mach-mxs/regs-usbphy-mx28.h
+> new file mode 100644
+> index 0000000..a367927
+> --- /dev/null
+> +++ b/arch/arm/mach-mxs/regs-usbphy-mx28.h
+> @@ -0,0 +1,323 @@
+> +/*
+> + * Freescale USBPHY Register Definitions
+> + *
+> + * Copyright 2008-2011 Freescale Semiconductor, Inc. All Rights Reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program; if not, write to the Free Software
+> + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
+> + *
+> + * This file is created by xml file. Don't Edit it.
+> + *
+> + * Xml Revision: 1.52
+> + * Template revision: 26195
+> + */
+> +
+> +#ifndef __ARCH_ARM___USBPHY_H
+> +#define __ARCH_ARM___USBPHY_H
+> +
+> +
+> +#define HW_USBPHY_PWD	(0x00000000)
+> +#define HW_USBPHY_PWD_SET	(0x00000004)
+> +#define HW_USBPHY_PWD_CLR	(0x00000008)
+> +#define HW_USBPHY_PWD_TOG	(0x0000000c)
+> +
+> +#define BP_USBPHY_PWD_RSVD2	21
+> +#define BM_USBPHY_PWD_RSVD2	0xFFE00000
+> +#define BF_USBPHY_PWD_RSVD2(v) \
+> +		(((v) << 21) & BM_USBPHY_PWD_RSVD2)
+> +#define BM_USBPHY_PWD_RXPWDRX	0x00100000
+> +#define BM_USBPHY_PWD_RXPWDDIFF	0x00080000
+> +#define BM_USBPHY_PWD_RXPWD1PT1	0x00040000
+> +#define BM_USBPHY_PWD_RXPWDENV	0x00020000
+> +#define BP_USBPHY_PWD_RSVD1	13
+> +#define BM_USBPHY_PWD_RSVD1	0x0001E000
+> +#define BF_USBPHY_PWD_RSVD1(v)  \
+> +		(((v) << 13) & BM_USBPHY_PWD_RSVD1)
+> +#define BM_USBPHY_PWD_TXPWDV2I	0x00001000
+> +#define BM_USBPHY_PWD_TXPWDIBIAS	0x00000800
+> +#define BM_USBPHY_PWD_TXPWDFS	0x00000400
+> +#define BP_USBPHY_PWD_RSVD0	0
+> +#define BM_USBPHY_PWD_RSVD0	0x000003FF
+> +#define BF_USBPHY_PWD_RSVD0(v)  \
+> +		(((v) << 0) & BM_USBPHY_PWD_RSVD0)
+> +
+> +#define HW_USBPHY_TX	(0x00000010)
+> +#define HW_USBPHY_TX_SET	(0x00000014)
+> +#define HW_USBPHY_TX_CLR	(0x00000018)
+> +#define HW_USBPHY_TX_TOG	(0x0000001c)
+> +
+> +#define BP_USBPHY_TX_RSVD5	29
+> +#define BM_USBPHY_TX_RSVD5	0xE0000000
+> +#define BF_USBPHY_TX_RSVD5(v) \
+> +		(((v) << 29) & BM_USBPHY_TX_RSVD5)
+> +#define BP_USBPHY_TX_USBPHY_TX_EDGECTRL	26
+> +#define BM_USBPHY_TX_USBPHY_TX_EDGECTRL	0x1C000000
+> +#define BF_USBPHY_TX_USBPHY_TX_EDGECTRL(v)  \
+> +		(((v) << 26) & BM_USBPHY_TX_USBPHY_TX_EDGECTRL)
+> +#define BM_USBPHY_TX_USBPHY_TX_SYNC_INVERT	0x02000000
+> +#define BM_USBPHY_TX_USBPHY_TX_SYNC_MUX	0x01000000
+> +#define BP_USBPHY_TX_RSVD4	22
+> +#define BM_USBPHY_TX_RSVD4	0x00C00000
+> +#define BF_USBPHY_TX_RSVD4(v)  \
+> +		(((v) << 22) & BM_USBPHY_TX_RSVD4)
+> +#define BM_USBPHY_TX_TXENCAL45DP	0x00200000
+> +#define BM_USBPHY_TX_RSVD3	0x00100000
+> +#define BP_USBPHY_TX_TXCAL45DP	16
+> +#define BM_USBPHY_TX_TXCAL45DP	0x000F0000
+> +#define BF_USBPHY_TX_TXCAL45DP(v)  \
+> +		(((v) << 16) & BM_USBPHY_TX_TXCAL45DP)
+> +#define BP_USBPHY_TX_RSVD2	14
+> +#define BM_USBPHY_TX_RSVD2	0x0000C000
+> +#define BF_USBPHY_TX_RSVD2(v)  \
+> +		(((v) << 14) & BM_USBPHY_TX_RSVD2)
+> +#define BM_USBPHY_TX_TXENCAL45DN	0x00002000
+> +#define BM_USBPHY_TX_RSVD1	0x00001000
+> +#define BP_USBPHY_TX_TXCAL45DN	8
+> +#define BM_USBPHY_TX_TXCAL45DN	0x00000F00
+> +#define BF_USBPHY_TX_TXCAL45DN(v)  \
+> +		(((v) << 8) & BM_USBPHY_TX_TXCAL45DN)
+> +#define BP_USBPHY_TX_RSVD0	4
+> +#define BM_USBPHY_TX_RSVD0	0x000000F0
+> +#define BF_USBPHY_TX_RSVD0(v)  \
+> +		(((v) << 4) & BM_USBPHY_TX_RSVD0)
+> +#define BP_USBPHY_TX_D_CAL	0
+> +#define BM_USBPHY_TX_D_CAL	0x0000000F
+> +#define BF_USBPHY_TX_D_CAL(v)  \
+> +		(((v) << 0) & BM_USBPHY_TX_D_CAL)
+> +
+> +#define HW_USBPHY_RX	(0x00000020)
+> +#define HW_USBPHY_RX_SET	(0x00000024)
+> +#define HW_USBPHY_RX_CLR	(0x00000028)
+> +#define HW_USBPHY_RX_TOG	(0x0000002c)
+> +
+> +#define BP_USBPHY_RX_RSVD2	23
+> +#define BM_USBPHY_RX_RSVD2	0xFF800000
+> +#define BF_USBPHY_RX_RSVD2(v) \
+> +		(((v) << 23) & BM_USBPHY_RX_RSVD2)
+> +#define BM_USBPHY_RX_RXDBYPASS	0x00400000
+> +#define BP_USBPHY_RX_RSVD1	7
+> +#define BM_USBPHY_RX_RSVD1	0x003FFF80
+> +#define BF_USBPHY_RX_RSVD1(v)  \
+> +		(((v) << 7) & BM_USBPHY_RX_RSVD1)
+> +#define BP_USBPHY_RX_DISCONADJ	4
+> +#define BM_USBPHY_RX_DISCONADJ	0x00000070
+> +#define BF_USBPHY_RX_DISCONADJ(v)  \
+> +		(((v) << 4) & BM_USBPHY_RX_DISCONADJ)
+> +#define BM_USBPHY_RX_RSVD0	0x00000008
+> +#define BP_USBPHY_RX_ENVADJ	0
+> +#define BM_USBPHY_RX_ENVADJ	0x00000007
+> +#define BF_USBPHY_RX_ENVADJ(v)  \
+> +		(((v) << 0) & BM_USBPHY_RX_ENVADJ)
+> +
+> +#define HW_USBPHY_CTRL	(0x00000030)
+> +#define HW_USBPHY_CTRL_SET	(0x00000034)
+> +#define HW_USBPHY_CTRL_CLR	(0x00000038)
+> +#define HW_USBPHY_CTRL_TOG	(0x0000003c)
+> +
+> +#define BM_USBPHY_CTRL_SFTRST	0x80000000
+> +#define BM_USBPHY_CTRL_CLKGATE	0x40000000
+> +#define BM_USBPHY_CTRL_UTMI_SUSPENDM	0x20000000
+> +#define BM_USBPHY_CTRL_HOST_FORCE_LS_SE0	0x10000000
+> +#define BM_USBPHY_CTRL_RSVD3	0x08000000
+> +#define BM_USBPHY_CTRL_ENAUTOSET_USBCLKS	0x04000000
+> +#define BM_USBPHY_CTRL_ENAUTOCLR_USBCLKGATE	0x02000000
+> +#define BM_USBPHY_CTRL_FSDLL_RST_EN	0x01000000
+> +#define BM_USBPHY_CTRL_ENVBUSCHG_WKUP	0x00800000
+> +#define BM_USBPHY_CTRL_ENIDCHG_WKUP	0x00400000
+> +#define BM_USBPHY_CTRL_ENDPDMCHG_WKUP	0x00200000
+> +#define BM_USBPHY_CTRL_ENAUTOCLR_PHY_PWD	0x00100000
+> +#define BM_USBPHY_CTRL_ENAUTOCLR_CLKGATE	0x00080000
+> +#define BM_USBPHY_CTRL_ENAUTO_PWRON_PLL	0x00040000
+> +#define BM_USBPHY_CTRL_WAKEUP_IRQ	0x00020000
+> +#define BM_USBPHY_CTRL_ENIRQWAKEUP	0x00010000
+> +#define BM_USBPHY_CTRL_ENUTMILEVEL3	0x00008000
+> +#define BM_USBPHY_CTRL_ENUTMILEVEL2	0x00004000
+> +#define BM_USBPHY_CTRL_DATA_ON_LRADC	0x00002000
+> +#define BM_USBPHY_CTRL_DEVPLUGIN_IRQ	0x00001000
+> +#define BM_USBPHY_CTRL_ENIRQDEVPLUGIN	0x00000800
+> +#define BM_USBPHY_CTRL_RESUME_IRQ	0x00000400
+> +#define BM_USBPHY_CTRL_ENIRQRESUMEDETECT	0x00000200
+> +#define BM_USBPHY_CTRL_RESUMEIRQSTICKY	0x00000100
+> +#define BM_USBPHY_CTRL_ENOTGIDDETECT	0x00000080
+> +#define BM_USBPHY_CTRL_RSVD1	0x00000040
+> +#define BM_USBPHY_CTRL_DEVPLUGIN_POLARITY	0x00000020
+> +#define BM_USBPHY_CTRL_ENDEVPLUGINDETECT	0x00000010
+> +#define BM_USBPHY_CTRL_HOSTDISCONDETECT_IRQ	0x00000008
+> +#define BM_USBPHY_CTRL_ENIRQHOSTDISCON	0x00000004
+> +#define BM_USBPHY_CTRL_ENHOSTDISCONDETECT	0x00000002
+> +#define BM_USBPHY_CTRL_RSVD0	0x00000001
+> +
+> +#define HW_USBPHY_STATUS	(0x00000040)
+> +
+> +#define BP_USBPHY_STATUS_RSVD4	11
+> +#define BM_USBPHY_STATUS_RSVD4	0xFFFFF800
+> +#define BF_USBPHY_STATUS_RSVD4(v) \
+> +		(((v) << 11) & BM_USBPHY_STATUS_RSVD4)
+> +#define BM_USBPHY_STATUS_RESUME_STATUS	0x00000400
+> +#define BM_USBPHY_STATUS_RSVD3	0x00000200
+> +#define BM_USBPHY_STATUS_OTGID_STATUS	0x00000100
+> +#define BM_USBPHY_STATUS_RSVD2	0x00000080
+> +#define BM_USBPHY_STATUS_DEVPLUGIN_STATUS	0x00000040
+> +#define BP_USBPHY_STATUS_RSVD1	4
+> +#define BM_USBPHY_STATUS_RSVD1	0x00000030
+> +#define BF_USBPHY_STATUS_RSVD1(v)  \
+> +		(((v) << 4) & BM_USBPHY_STATUS_RSVD1)
+> +#define BM_USBPHY_STATUS_HOSTDISCONDETECT_STATUS	0x00000008
+> +#define BP_USBPHY_STATUS_RSVD0	0
+> +#define BM_USBPHY_STATUS_RSVD0	0x00000007
+> +#define BF_USBPHY_STATUS_RSVD0(v)  \
+> +		(((v) << 0) & BM_USBPHY_STATUS_RSVD0)
+> +
+> +#define HW_USBPHY_DEBUG	(0x00000050)
+> +#define HW_USBPHY_DEBUG_SET	(0x00000054)
+> +#define HW_USBPHY_DEBUG_CLR	(0x00000058)
+> +#define HW_USBPHY_DEBUG_TOG	(0x0000005c)
+> +
+> +#define BM_USBPHY_DEBUG_RSVD3	0x80000000
+> +#define BM_USBPHY_DEBUG_CLKGATE	0x40000000
+> +#define BM_USBPHY_DEBUG_HOST_RESUME_DEBUG	0x20000000
+> +#define BP_USBPHY_DEBUG_SQUELCHRESETLENGTH	25
+> +#define BM_USBPHY_DEBUG_SQUELCHRESETLENGTH	0x1E000000
+> +#define BF_USBPHY_DEBUG_SQUELCHRESETLENGTH(v)  \
+> +		(((v) << 25) & BM_USBPHY_DEBUG_SQUELCHRESETLENGTH)
+> +#define BM_USBPHY_DEBUG_ENSQUELCHRESET	0x01000000
+> +#define BP_USBPHY_DEBUG_RSVD2	21
+> +#define BM_USBPHY_DEBUG_RSVD2	0x00E00000
+> +#define BF_USBPHY_DEBUG_RSVD2(v)  \
+> +		(((v) << 21) & BM_USBPHY_DEBUG_RSVD2)
+> +#define BP_USBPHY_DEBUG_SQUELCHRESETCOUNT	16
+> +#define BM_USBPHY_DEBUG_SQUELCHRESETCOUNT	0x001F0000
+> +#define BF_USBPHY_DEBUG_SQUELCHRESETCOUNT(v)  \
+> +		(((v) << 16) & BM_USBPHY_DEBUG_SQUELCHRESETCOUNT)
+> +#define BP_USBPHY_DEBUG_RSVD1	13
+> +#define BM_USBPHY_DEBUG_RSVD1	0x0000E000
+> +#define BF_USBPHY_DEBUG_RSVD1(v)  \
+> +		(((v) << 13) & BM_USBPHY_DEBUG_RSVD1)
+> +#define BM_USBPHY_DEBUG_ENTX2RXCOUNT	0x00001000
+> +#define BP_USBPHY_DEBUG_TX2RXCOUNT	8
+> +#define BM_USBPHY_DEBUG_TX2RXCOUNT	0x00000F00
+> +#define BF_USBPHY_DEBUG_TX2RXCOUNT(v)  \
+> +		(((v) << 8) & BM_USBPHY_DEBUG_TX2RXCOUNT)
+> +#define BP_USBPHY_DEBUG_RSVD0	6
+> +#define BM_USBPHY_DEBUG_RSVD0	0x000000C0
+> +#define BF_USBPHY_DEBUG_RSVD0(v)  \
+> +		(((v) << 6) & BM_USBPHY_DEBUG_RSVD0)
+> +#define BP_USBPHY_DEBUG_ENHSTPULLDOWN	4
+> +#define BM_USBPHY_DEBUG_ENHSTPULLDOWN	0x00000030
+> +#define BF_USBPHY_DEBUG_ENHSTPULLDOWN(v)  \
+> +		(((v) << 4) & BM_USBPHY_DEBUG_ENHSTPULLDOWN)
+> +#define BP_USBPHY_DEBUG_HSTPULLDOWN	2
+> +#define BM_USBPHY_DEBUG_HSTPULLDOWN	0x0000000C
+> +#define BF_USBPHY_DEBUG_HSTPULLDOWN(v)  \
+> +		(((v) << 2) & BM_USBPHY_DEBUG_HSTPULLDOWN)
+> +#define BM_USBPHY_DEBUG_DEBUG_INTERFACE_HOLD	0x00000002
+> +#define BM_USBPHY_DEBUG_OTGIDPIOLOCK	0x00000001
+> +
+> +#define HW_USBPHY_DEBUG0_STATUS	(0x00000060)
+> +
+> +#define BP_USBPHY_DEBUG0_STATUS_SQUELCH_COUNT	26
+> +#define BM_USBPHY_DEBUG0_STATUS_SQUELCH_COUNT	0xFC000000
+> +#define BF_USBPHY_DEBUG0_STATUS_SQUELCH_COUNT(v) \
+> +		(((v) << 26) & BM_USBPHY_DEBUG0_STATUS_SQUELCH_COUNT)
+> +#define BP_USBPHY_DEBUG0_STATUS_UTMI_RXERROR_FAIL_COUNT	16
+> +#define BM_USBPHY_DEBUG0_STATUS_UTMI_RXERROR_FAIL_COUNT	0x03FF0000
+> +#define BF_USBPHY_DEBUG0_STATUS_UTMI_RXERROR_FAIL_COUNT(v)  \
+> +		(((v) << 16) & BM_USBPHY_DEBUG0_STATUS_UTMI_RXERROR_FAIL_COUNT)
+> +#define BP_USBPHY_DEBUG0_STATUS_LOOP_BACK_FAIL_COUNT	0
+> +#define BM_USBPHY_DEBUG0_STATUS_LOOP_BACK_FAIL_COUNT	0x0000FFFF
+> +#define BF_USBPHY_DEBUG0_STATUS_LOOP_BACK_FAIL_COUNT(v)  \
+> +		(((v) << 0) & BM_USBPHY_DEBUG0_STATUS_LOOP_BACK_FAIL_COUNT)
+> +
+> +#define HW_USBPHY_DEBUG1	(0x00000070)
+> +#define HW_USBPHY_DEBUG1_SET	(0x00000074)
+> +#define HW_USBPHY_DEBUG1_CLR	(0x00000078)
+> +#define HW_USBPHY_DEBUG1_TOG	(0x0000007c)
+> +
+> +#define BP_USBPHY_DEBUG1_RSVD1	15
+> +#define BM_USBPHY_DEBUG1_RSVD1	0xFFFF8000
+> +#define BF_USBPHY_DEBUG1_RSVD1(v) \
+> +		(((v) << 15) & BM_USBPHY_DEBUG1_RSVD1)
+> +#define BP_USBPHY_DEBUG1_ENTAILADJVD	13
+> +#define BM_USBPHY_DEBUG1_ENTAILADJVD	0x00006000
+> +#define BF_USBPHY_DEBUG1_ENTAILADJVD(v)  \
+> +		(((v) << 13) & BM_USBPHY_DEBUG1_ENTAILADJVD)
+> +#define BM_USBPHY_DEBUG1_ENTX2TX	0x00001000
+> +#define BP_USBPHY_DEBUG1_RSVD0	4
+> +#define BM_USBPHY_DEBUG1_RSVD0	0x00000FF0
+> +#define BF_USBPHY_DEBUG1_RSVD0(v)  \
+> +		(((v) << 4) & BM_USBPHY_DEBUG1_RSVD0)
+> +#define BP_USBPHY_DEBUG1_DBG_ADDRESS	0
+> +#define BM_USBPHY_DEBUG1_DBG_ADDRESS	0x0000000F
+> +#define BF_USBPHY_DEBUG1_DBG_ADDRESS(v)  \
+> +		(((v) << 0) & BM_USBPHY_DEBUG1_DBG_ADDRESS)
+> +
+> +#define HW_USBPHY_VERSION	(0x00000080)
+> +
+> +#define BP_USBPHY_VERSION_MAJOR	24
+> +#define BM_USBPHY_VERSION_MAJOR	0xFF000000
+> +#define BF_USBPHY_VERSION_MAJOR(v) \
+> +		(((v) << 24) & BM_USBPHY_VERSION_MAJOR)
+> +#define BP_USBPHY_VERSION_MINOR	16
+> +#define BM_USBPHY_VERSION_MINOR	0x00FF0000
+> +#define BF_USBPHY_VERSION_MINOR(v)  \
+> +		(((v) << 16) & BM_USBPHY_VERSION_MINOR)
+> +#define BP_USBPHY_VERSION_STEP	0
+> +#define BM_USBPHY_VERSION_STEP	0x0000FFFF
+> +#define BF_USBPHY_VERSION_STEP(v)  \
+> +		(((v) << 0) & BM_USBPHY_VERSION_STEP)
+> +
+> +#define HW_USBPHY_IP	(0x00000090)
+> +#define HW_USBPHY_IP_SET	(0x00000094)
+> +#define HW_USBPHY_IP_CLR	(0x00000098)
+> +#define HW_USBPHY_IP_TOG	(0x0000009c)
+> +
+> +#define BP_USBPHY_IP_RSVD1	25
+> +#define BM_USBPHY_IP_RSVD1	0xFE000000
+> +#define BF_USBPHY_IP_RSVD1(v) \
+> +		(((v) << 25) & BM_USBPHY_IP_RSVD1)
+> +#define BP_USBPHY_IP_DIV_SEL	23
+> +#define BM_USBPHY_IP_DIV_SEL	0x01800000
+> +#define BF_USBPHY_IP_DIV_SEL(v)  \
+> +		(((v) << 23) & BM_USBPHY_IP_DIV_SEL)
+> +#define BV_USBPHY_IP_DIV_SEL__DEFAULT   0x0
+> +#define BV_USBPHY_IP_DIV_SEL__LOWER     0x1
+> +#define BV_USBPHY_IP_DIV_SEL__LOWEST    0x2
+> +#define BV_USBPHY_IP_DIV_SEL__UNDEFINED 0x3
+> +#define BP_USBPHY_IP_LFR_SEL	21
+> +#define BM_USBPHY_IP_LFR_SEL	0x00600000
+> +#define BF_USBPHY_IP_LFR_SEL(v)  \
+> +		(((v) << 21) & BM_USBPHY_IP_LFR_SEL)
+> +#define BV_USBPHY_IP_LFR_SEL__DEFAULT   0x0
+> +#define BV_USBPHY_IP_LFR_SEL__TIMES_2   0x1
+> +#define BV_USBPHY_IP_LFR_SEL__TIMES_05  0x2
+> +#define BV_USBPHY_IP_LFR_SEL__UNDEFINED 0x3
+> +#define BP_USBPHY_IP_CP_SEL	19
+> +#define BM_USBPHY_IP_CP_SEL	0x00180000
+> +#define BF_USBPHY_IP_CP_SEL(v)  \
+> +		(((v) << 19) & BM_USBPHY_IP_CP_SEL)
+> +#define BV_USBPHY_IP_CP_SEL__DEFAULT   0x0
+> +#define BV_USBPHY_IP_CP_SEL__TIMES_2   0x1
+> +#define BV_USBPHY_IP_CP_SEL__TIMES_05  0x2
+> +#define BV_USBPHY_IP_CP_SEL__UNDEFINED 0x3
+> +#define BM_USBPHY_IP_TSTI_TX_DP	0x00040000
+> +#define BM_USBPHY_IP_TSTI_TX_DM	0x00020000
+> +#define BM_USBPHY_IP_ANALOG_TESTMODE	0x00010000
+> +#define BP_USBPHY_IP_RSVD0	3
+> +#define BM_USBPHY_IP_RSVD0	0x0000FFF8
+> +#define BF_USBPHY_IP_RSVD0(v)  \
+> +		(((v) << 3) & BM_USBPHY_IP_RSVD0)
+> +#define BM_USBPHY_IP_EN_USB_CLKS	0x00000004
+> +#define BM_USBPHY_IP_PLL_LOCKED	0x00000002
+> +#define BM_USBPHY_IP_PLL_POWER	0x00000001
+> +#endif /* __ARCH_ARM___USBPHY_H */
+> diff --git a/arch/arm/mach-mxs/usb_h1.c b/arch/arm/mach-mxs/usb_h1.c
+> new file mode 100644
+> index 0000000..9ca5236
+> --- /dev/null
+> +++ b/arch/arm/mach-mxs/usb_h1.c
+> @@ -0,0 +1,230 @@
+> +/*
+> + * Copyright (C) 2009-2011 Freescale Semiconductor, Inc. All Rights Reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License along
+> + * with this program; if not, write to the Free Software Foundation, Inc.,
+> + * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/types.h>
+> +#include <linux/clk.h>
+> +#include <linux/delay.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/io.h>
+> +#include <linux/err.h>
+> +#include <linux/fsl_devices.h>
+> +#include <linux/gpio.h>
+> +#include <asm/mach-types.h>
+> +#include <asm/mach/arch.h>
+> +#include <mach/irqs.h>
+> +#include <mach/mx28.h>
+> +#include "regs-usbphy-mx28.h"
+> +
+> +/* EHCI registers: */
+> +#define UOG_USBCMD		(0x140)/* USB command register */
+> +#define UOG_PORTSC1		(0x184)/* port status and control */
+> +/* x_PORTSCx */
+> +#define PORTSC_PTS_MASK		(3 << 30)/* parallel xcvr mask */
+> +#define PORTSC_PTS_UTMI		(0 << 30)/* UTMI/UTMI+ */
+> +#define PORTSC_PTW		(1 << 28)/* UTMI width */
+> +/* USBCMD */
+> +#define UCMD_RUN_STOP           (1 << 0)/* controller run/stop */
+> +#define UCMD_RESET		(1 << 1)/* controller reset */
+> +
+> +#define HOSTPHY_CONNECT_STATE	(1 << 3)
+> +
+> +static struct clk *usb_clk;
+> +static struct clk *usb_phy_clk;
+> +static int internal_phy_clk_already_on;
+> +
+> +/* The dmamask must be set for EHCI to work */
+> +static u64 ehci_dmamask = ~(u32) 0;
+> +static int instance_id = ~(u32) 0;
+> +
+> +static int fsl_platform_get_usb_conn_status(void)
+> +{
+> +	u32 status;
+> +
+> +	status = __raw_readl(MX28_IO_ADDRESS(MX28_USBPHY1_BASE_ADDR) + \
+
+you should, probably, avoid using this macro and pass here ioremapped
+address base. Ditto to all below.
+
+> +			HW_USBPHY_STATUS);
+> +	return ((status & HOSTPHY_CONNECT_STATE) == 0);
+> +}
+> +
+> +/* enable/disable high-speed disconnect detector of phy ctrl */
+> +static void fsl_platform_set_usb_phy_dis(int enable)
+> +{
+> +	if (enable)
+> +		__raw_writel(BM_USBPHY_CTRL_ENHOSTDISCONDETECT,
+> +		MX28_IO_ADDRESS(MX28_USBPHY1_BASE_ADDR) + HW_USBPHY_CTRL_SET);
+> +	else
+> +		__raw_writel(BM_USBPHY_CTRL_ENHOSTDISCONDETECT,
+> +		MX28_IO_ADDRESS(MX28_USBPHY1_BASE_ADDR) + HW_USBPHY_CTRL_CLR);
+> +}
+> +
+> +static int usb_phy_enable(struct mxc_usbh_platform_data *pdata)
+> +{
+> +	u32 tmp;
+> +	void __iomem *phy_reg = MX28_IO_ADDRESS(MX28_USBPHY1_BASE_ADDR);
+> +	void __iomem *usb_reg = MX28_IO_ADDRESS(MX28_USBCTRL1_BASE_ADDR);
+> +	void __iomem *usbcmd, *phy_ctrl, *portsc;
+> +	/* Reset USB IP */
+> +	usbcmd = usb_reg + UOG_USBCMD;
+> +	tmp = __raw_readl(usbcmd); /* usb command */
+> +	tmp &= ~UCMD_RUN_STOP;
+> +	__raw_writel(tmp, usbcmd);
+> +	while (__raw_readl(usbcmd) & UCMD_RUN_STOP)
+> +		;
+> +	tmp |= UCMD_RESET;
+> +	__raw_writel(tmp, usbcmd);
+> +	while (__raw_readl(usbcmd) & UCMD_RESET)
+> +		;
+> +	mdelay(10);
+> +	/* Reset USBPHY module */
+> +	phy_ctrl = phy_reg + HW_USBPHY_CTRL;
+> +	tmp = __raw_readl(phy_ctrl);
+> +	tmp |= BM_USBPHY_CTRL_SFTRST;
+> +	__raw_writel(tmp, phy_ctrl);
+> +	udelay(10);
+> +	/* Remove CLKGATE and SFTRST */
+> +	tmp = __raw_readl(phy_ctrl);
+> +	tmp &= ~(BM_USBPHY_CTRL_CLKGATE | BM_USBPHY_CTRL_SFTRST);
+> +	__raw_writel(tmp, phy_ctrl);
+> +	udelay(10);
+> +	/* set UTMI xcvr */
+> +	/* Workaround an IC issue for ehci driver:
+> +	 * when turn off root hub port power, EHCI set
+> +	 * PORTSC reserved bits to be 0, but PTW with 0
+> +	 * means 8 bits tranceiver width, here change
+> +	 * it back to be 16 bits and do PHY diable and
+> +	 * then enable.
+> +	 */
+> +	portsc = usb_reg + UOG_PORTSC1;
+> +	tmp = __raw_readl(portsc);
+> +	tmp &=  ~PORTSC_PTS_MASK;
+> +	tmp |= (PORTSC_PTS_UTMI | PORTSC_PTW);
+> +	__raw_writel(tmp, portsc);
+> +	/* Power up the PHY */
+> +	__raw_writel(0, phy_reg + HW_USBPHY_PWD);
+> +	return 0;
+
+readability can be greatly improved here and on all below
+
+> +static int __init usbh1_init(void)
+> +{
+> +	struct platform_device *pdev;
+> +	int rc;
+> +
+> +	if (!cpu_is_mx28())
+> +		return 0;
+> +
+> +	pdev = platform_device_register_simple("mxc-ehci",
+> +		instance_id, usbh1_resources, ARRAY_SIZE(usbh1_resources));
+> +	if (IS_ERR(pdev)) {
+> +		pr_debug("can't register Host, %ld\n",
+> +			 PTR_ERR(pdev));
+> +		return -EFAULT;
+> +	}
+> +
+> +	pdev->dev.coherent_dma_mask = 0xffffffff;
+> +	pdev->dev.dma_mask = &ehci_dmamask;
+> +
+> +	rc = platform_device_add_data(pdev, &usbh1_config,
+> +				      sizeof(struct mxc_usbh_platform_data));
+> +	if (rc) {
+> +		platform_device_unregister(pdev);
+> +		return -EFAULT;
+> +	}
+
+all of this can be combine in:
+
+platform_device_register_rsndata(NULL, "mxc-ehci", instance_id,
+	usbh1_resources, ARRAY_SIZE(usbh1_resources), &usbh1_config,
+	sizeof(usbh1_config);
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 490 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110720/8a32d444/attachment-0001.sig>
