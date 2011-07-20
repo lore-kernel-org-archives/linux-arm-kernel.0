@@ -1,86 +1,116 @@
-From: boojin.kim@samsung.com (Boojin Kim)
-Date: Wed, 20 Jul 2011 19:46:11 +0900
-Subject: [PATCH V4 03-1/13] DMA: PL330: Support DMA_SLAVE_CONFIG command
-In-Reply-To: <1311158773-30314-1-git-send-email-boojin.kim@samsung.com>
-References: <1311158773-30314-1-git-send-email-boojin.kim@samsung.com>
-Message-ID: <1311158773-30314-3-git-send-email-boojin.kim@samsung.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 20 Jul 2011 19:04:20 +0800
+Subject: [RFC PATCH 1/5] OMAP3:I2C: Add device tree nodes for beagle board
+In-Reply-To: <CACxGe6u8qq7FA7kFXbU5uCk6m_GA8GWLqsdjFCXN+NMJfFKxmA@mail.gmail.com>
+References: <1309426647-31587-1-git-send-email-manjugk@ti.com>
+	<1309426647-31587-2-git-send-email-manjugk@ti.com>
+	<20110706185546.GJ4871@ponder.secretlab.ca>
+	<74CDBE0F657A3D45AFBB94109FB122FF049E21C203@HQMAIL01.nvidia.com>
+	<CACxGe6u8qq7FA7kFXbU5uCk6m_GA8GWLqsdjFCXN+NMJfFKxmA@mail.gmail.com>
+Message-ID: <20110720110419.GA6999@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
-Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
----
- drivers/dma/pl330.c |   53 +++++++++++++++++++++++++++++++++++++-------------
- 1 files changed, 39 insertions(+), 14 deletions(-)
+On Wed, Jul 06, 2011 at 06:12:49PM -0600, Grant Likely wrote:
+> On Wed, Jul 6, 2011 at 5:26 PM, Stephen Warren <swarren@nvidia.com> wrote:
+> > Grant Likely wrote at Wednesday, July 06, 2011 12:56 PM:
+> >> On Thu, Jun 30, 2011 at 03:07:23PM +0500, G, Manjunath Kondaiah wrote:
+> >> > Add I2C and it's child device nodes for beagle board.
+> >> > The I2C1 controller child devices are not populated and it
+> >> > should be handled along with OMAP clock changes.
+> > ...
+> >> > diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
+> > ...
+> >> > + ? i2c at 48070000 {
+> > ...
+> >> > + ? ? ? ? ? clock-frequency = <2600>;
+> >> > + ? ? ? ? ? status = "disabled";
+> >>
+> >> Drop 'status' when you move this node definition to
+> >> arch/arm/boot/dts/omap3.dtsi. ?Board overlay files that include the
+> >> omap3.dtsi should explicitly disable any devices that it does not use
+> >> (which is opposite to what tegra currently does, but I'm going to
+> >> change that).
+> >
+> > Purely out of idle curiosity: What's the benefit of one way over the other?
+> 
+> Mostly consistency.  Most of the experience we have with the flattened
+> device tree up to this point hasn't bothered with the 'status'
+> property.  It is only when AMP and hypervisors cam online that it
+> became important to use a status property, and that only when the
+> kernel needs to be told that the device does indeed exist, but it must
+> not be touched.  I'd like to continue that pattern for new DT users
+> with the default assumption that a device is enabled unless the board
+> .dts explicitly disables it.
+> 
+When going this way with my i.mx53 related dts files, I feel I like the
+opposite way.
 
-diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-index 586ab39..880f010 100644
---- a/drivers/dma/pl330.c
-+++ b/drivers/dma/pl330.c
-@@ -256,25 +256,50 @@ static int pl330_alloc_chan_resources(struct dma_chan *chan)
- static int pl330_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd, unsigned long arg)
- {
- 	struct dma_pl330_chan *pch = to_pchan(chan);
--	struct dma_pl330_desc *desc;
-+	struct dma_pl330_desc *desc, *_dt;
- 	unsigned long flags;
-+	struct dma_pl330_dmac *pdmac = pch->dmac;
-+	struct dma_slave_config *slave_config;
-+	struct dma_pl330_peri *peri;
-+	LIST_HEAD(list);
- 
--	/* Only supports DMA_TERMINATE_ALL */
--	if (cmd != DMA_TERMINATE_ALL)
--		return -ENXIO;
--
--	spin_lock_irqsave(&pch->lock, flags);
--
--	/* FLUSH the PL330 Channel thread */
--	pl330_chan_ctrl(pch->pl330_chid, PL330_OP_FLUSH);
-+	switch (cmd) {
-+	case DMA_TERMINATE_ALL:
-+		spin_lock_irqsave(&pch->lock, flags);
- 
--	/* Mark all desc done */
--	list_for_each_entry(desc, &pch->work_list, node)
--		desc->status = DONE;
-+		/* FLUSH the PL330 Channel thread */
-+		pl330_chan_ctrl(pch->pl330_chid, PL330_OP_FLUSH);
- 
--	spin_unlock_irqrestore(&pch->lock, flags);
-+		/* Mark all desc done */
-+		list_for_each_entry_safe(desc, _dt, &pch->work_list , node) {
-+			desc->status = DONE;
-+			pch->completed = desc->txd.cookie;
-+			list_move_tail(&desc->node, &list);
-+		}
- 
--	pl330_tasklet((unsigned long) pch);
-+		list_splice_tail_init(&list, &pdmac->desc_pool);
-+		spin_unlock_irqrestore(&pch->lock, flags);
-+		break;
-+	case DMA_SLAVE_CONFIG:
-+		slave_config = (struct dma_slave_config *)arg;
-+		peri = pch->chan.private;
-+
-+		if (slave_config->direction == DMA_TO_DEVICE) {
-+			if (slave_config->dst_addr)
-+				peri->fifo_addr = slave_config->dst_addr;
-+			if (slave_config->dst_addr_width)
-+				peri->burst_sz = __ffs(slave_config->dst_addr_width);
-+		} else if (slave_config->direction == DMA_FROM_DEVICE) {
-+			if (slave_config->src_addr)
-+				peri->fifo_addr = slave_config->src_addr;
-+			if (slave_config->src_addr_width)
-+				peri->burst_sz = __ffs(slave_config->src_addr_width);
-+		}
-+		break;
-+	default:
-+		dev_err(pch->dmac->pif.dev, "Not supported command.\n");
-+		return -ENXIO;
-+	}
- 
- 	return 0;
- }
+i.mx53 has many number of peripherals inside, while individual board
+might only use small portion there.  For example, i.mx53 has 5 uart
+controller instances inside, while quick start (aka loco) board only
+uses one.  With the way you suggest here, we will have the following
+in imx53.dtsi.
+
+uart0: uart at ... {
+	...
+};
+
+uart1: uart at ... {
+	...
+};
+
+uart2: uart at ... {
+	...
+};
+
+uart3: uart at ... {
+	...
+};
+
+uart4: uart at ... {
+	...
+};
+
+And we will have to tell the 4 we do not use on quick start board in
+imx53-qs.dtsi
+
+
+uart1: uart at ... {
+	...
+	status = "disabled";
+};
+
+uart2: uart at ... {
+	...
+	status = "disabled";
+};
+
+uart3: uart at ... {
+	...
+	status = "disabled";
+};
+
+uart4: uart at ... {
+	...
+	status = "disabled";
+};
+
+Besides the bothering that we have to list so many unused controllers
+in individual board dts file, it's also hard to tell which controllers
+are actually available on the board.  People have to look at imx53.dts
+to get a full list and then exclude the ones in imx53-<board>.dts as
+"disabled".
+
+And if we go the way opposite, adding "disabled" status for everyone
+in imx53.dts, we will only need to specify the peripherals that are
+actually available on board with "okay" status in imx53-<board>.dts.
+And it's much more clear for people to see what peripherals are
+available on individual board.
+
+So I'm going the way than you suggested.  Please let me know if you
+strongly dislikes it.
+
 -- 
-1.7.1
+Regards,
+Shawn
