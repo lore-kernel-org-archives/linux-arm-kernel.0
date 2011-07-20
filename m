@@ -1,40 +1,45 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 20 Jul 2011 21:23:26 +0900
-Subject: [PATCH v3 1/6] Samsung SoC ADC: use regulator (VDD for ADC).
-In-Reply-To: <20110719154003.GK9652@opensource.wolfsonmicro.com>
-References: <1309420175-10301-1-git-send-email-myungjoo.ham@samsung.com>
-	<1309420175-10301-2-git-send-email-myungjoo.ham@samsung.com>
-	<201106301122.50800.anarsoul@gmail.com>
-	<20110630160501.GG3249@opensource.wolfsonmicro.com>
-	<037301cc4376$3d7f5a20$b87e0e60$%kim@samsung.com>
-	<20110719154003.GK9652@opensource.wolfsonmicro.com>
-Message-ID: <069501cc46d7$d355f2c0$7a01d840$%kim@samsung.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 20 Jul 2011 21:13:19 +0800
+Subject: [PATCH] arm/mxc: add the missing UART_PADDR for i.mx53
+In-Reply-To: <1310251913-9877-1-git-send-email-troy.kisky@boundarydevices.com>
+References: <1310251913-9877-1-git-send-email-troy.kisky@boundarydevices.com>
+Message-ID: <1311167599-21790-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown wrote:
-> 
-> On Sat, Jul 16, 2011 at 02:07:13PM +0900, Kukjin Kim wrote:
-> > Mark Brown wrote:
-> 
-> > > If there isn't a separate supply for the regulators on S3C24xx devices
-> > > then I guess the best option is to provide that supply as a dummy
-> > > regulator in the s3c24xx core code.
-> 
-> > OK, but it means I can't apply this until adding a dummy regulator for
-> > S3C24XX?
-> 
-> That could always come later as a bug fix :)  The regulator API does
-> have a couple of methods of substituting in a dummy regulator itself,
-> though it does complain a bit, so it should mostly be a simple config
-> change to work around on affected systems.
+The UART_PADDR definition for i.mx53 and i.mx50 is missing in
+debug-macro.S.  It causes the build of i.mx53/50 fail.
 
-OK, I agree with your opinions.
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Reported-by: Troy Kisky <troy.kisky@boundarydevices.com>
+---
+Troy,
 
-Thanks :)
+Since I'm keen to get the build failure fixed, I just repost
+the patch you sent with Sascha's comment fixed.  Hope you do
+not mind.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+ arch/arm/plat-mxc/include/mach/debug-macro.S |    8 ++++++++
+ 1 files changed, 8 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/plat-mxc/include/mach/debug-macro.S b/arch/arm/plat-mxc/include/mach/debug-macro.S
+index 91fc7cd..8cf8dee 100644
+--- a/arch/arm/plat-mxc/include/mach/debug-macro.S
++++ b/arch/arm/plat-mxc/include/mach/debug-macro.S
+@@ -44,6 +44,14 @@
+ #define UART_PADDR	MX51_UART1_BASE_ADDR
+ #endif
+ 
++#if defined(CONFIG_SOC_IMX50) || defined(CONFIG_SOC_IMX53)
++#ifdef UART_PADDR
++#error "CONFIG_DEBUG_LL is incompatible with multiple archs"
++#endif
++/* i.MX50 gets the same UART1 base address as i.MX53 */
++#define UART_PADDR	MX53_UART1_BASE_ADDR
++#endif
++
+ #define UART_VADDR	IMX_IO_ADDRESS(UART_PADDR)
+ 
+ 		.macro	addruart, rp, rv
+-- 
+1.7.4.1
