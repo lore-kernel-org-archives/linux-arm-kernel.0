@@ -1,58 +1,49 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 21 Jul 2011 01:35:25 +0900
-Subject: [PATCH] ARM: S3C64XX: Configure backup battery charger on
-	Cragganmore
-In-Reply-To: <1311179228-9981-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-References: <1311179228-9981-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <06c301cc46fb$099977d0$1ccc6770$%kim@samsung.com>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Wed, 20 Jul 2011 22:10:57 +0530
+Subject: [PATCH] davinci: fix DM365 EVM video input mux bits
+In-Reply-To: <20110719105532.GF26574@n2100.arm.linux.org.uk>
+References: <1311046211-2849-1-git-send-email-jon.povey@racelogic.co.uk>
+	<B85A65D85D7EB246BE421B3FB0FBB593024DBDC68A@dbde02.ent.ti.com>
+	<20110719105532.GF26574@n2100.arm.linux.org.uk>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024DC70E2A@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown wrote:
-> 
-> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> ---
->  arch/arm/mach-s3c64xx/mach-crag6410.c |    8 ++++++++
->  1 files changed, 8 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-s3c64xx/mach-crag6410.c b/arch/arm/mach-
-> s3c64xx/mach-crag6410.c
-> index 3ba6e93..5995c77 100644
-> --- a/arch/arm/mach-s3c64xx/mach-crag6410.c
-> +++ b/arch/arm/mach-s3c64xx/mach-crag6410.c
-> @@ -497,6 +497,12 @@ static struct regulator_init_data vddalive __initdata
-= {
->  	.supply_regulator = "WALLVDD",
->  };
-> 
-> +static struct wm831x_backup_pdata banff_backup_pdata __initdata = {
-> +	.charger_enable = 1,
-> +	.vlim = 2500,  /* mV */
-> +	.ilim = 200,   /* uA */
-> +};
-> +
->  static struct wm831x_status_pdata banff_red_led __initdata = {
->  	.name = "banff:red:",
->  	.default_src = WM831X_STATUS_MANUAL,
-> @@ -517,6 +523,8 @@ static struct wm831x_pdata crag_pmic_pdata __initdata
-=
-> {
->  	.irq_base = BANFF_PMIC_IRQ_BASE,
->  	.gpio_base = GPIO_BOARD_START + 8,
-> 
-> +	.backup = &banff_backup_pdata,
-> +
->  	.gpio_defaults = {
->  		/* GPIO11: Touchscreen data - CMOS, DBVDD, active high*/
->  		[10] = WM831X_GPN_POL | WM831X_GPN_ENA | 0x6,
-> --
-> 1.7.5.4
+Hi Russell,
 
-Applied.
-Thanks.
+On Tue, Jul 19, 2011 at 16:25:32, Russell King - ARM Linux wrote:
+> On Tue, Jul 19, 2011 at 02:26:50PM +0530, Nori, Sekhar wrote:
+> > Since this part of the code hasn't changed since it
+> > was written, this is a good candidate for stable
+> > kernel series. You can just add:
+> > 
+> > Cc: stable at kernel.org
+> 
+> Be careful when doing that - if you have git mail the patches out for
+> review, and it picks that up, it'll send it to the stable team as well.
+> The stable team will then complain "that's not how to submit patches
+> to them".
+> 
+> So, while you can add "Cc: stable at kernel.org" to the patch, its best
+> to only add that just before you publish the commit after review, but
+> before merging.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+But its very tough to guess what the last version
+ready for merging will be. Review comments can come
+at any stage.
+
+Would adding "Cc: stable at kernel.org" to the commit text
+but taking care to not actually send mail to stable at kernel.org
+help? The stable_kernel_rules.txt document seems to suggest
+this is an acceptable way:
+
+"
+- To have the patch automatically included in the stable tree, add the tag
+     Cc: stable at kernel.org
+   in the sign-off area. Once the patch is merged it will be applied to
+   the stable tree without anything else needing to be done by the author
+   or subsystem maintainer.
+"
+
+Thanks,
+Sekhar
