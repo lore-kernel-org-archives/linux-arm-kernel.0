@@ -1,45 +1,48 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 21 Jul 2011 02:04:55 +0900
-Subject: [PATCH v3 1/6] ARM: EXYNOS4: Increase NR_IRQS for devices with
-	more IRQs
-In-Reply-To: <1309421729-11172-2-git-send-email-myungjoo.ham@samsung.com>
-References: <1309421729-11172-1-git-send-email-myungjoo.ham@samsung.com>
-	<1309421729-11172-2-git-send-email-myungjoo.ham@samsung.com>
-Message-ID: <06c801cc46ff$29855330$7c8ff990$%kim@samsung.com>
+Date: Thu, 21 Jul 2011 02:07:26 +0900
+Subject: [PATCH 0/7] ARM: SAMSUNG: Code cleanup for various devices
+In-Reply-To: <1311077106-28351-1-git-send-email-banajit.g@samsung.com>
+References: <1311077106-28351-1-git-send-email-banajit.g@samsung.com>
+Message-ID: <06c901cc46ff$826a9690$873fc3b0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MyungJoo Ham wrote:
+Banajit Goswami wrote:
 > 
-> MAX8997/17042, which are used by Exynos4-NURI, use additional IRQ
-> numbers after GPIO's IRQs. The patch creates some room for those
-> devices.
+>  Use generic s3c_set_platdata to perform the same job. Saves a few lines
+>  of code.
 > 
-> Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  arch/arm/mach-exynos4/include/mach/irqs.h |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
+>  The patches are created against "for-next" branch of Kukjin Kim's tree
+at:
+>  git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
 > 
-> diff --git a/arch/arm/mach-exynos4/include/mach/irqs.h b/arch/arm/mach-
-> exynos4/include/mach/irqs.h
-> index 31f6bed..51b5db5 100644
-> --- a/arch/arm/mach-exynos4/include/mach/irqs.h
-> +++ b/arch/arm/mach-exynos4/include/mach/irqs.h
-> @@ -154,6 +154,6 @@
->  #define IRQ_GPIO_END		(S5P_GPIOINT_BASE + S5P_GPIOINT_COUNT)
+>  These patches are only compile tested.
 > 
->  /* Set the default NR_IRQS */
-> -#define NR_IRQS			(IRQ_GPIO_END)
-> +#define NR_IRQS			(IRQ_GPIO_END + 64)
+>  o To Kukjin Kim
+>   PATCH[1/7] ARM: SAMSUNG: Use generic s3c_set_platdata for TS
+>   PATCH[2/7] ARM: SAMSUNG: Use generic s3c_set_platdata for FB
+>   PATCH[3/7] ARM: SAMSUNG: Use generic s3c_set_platdata for HWMON
+>   PATCH[4/7] ARM: SAMSUNG: Use generic s3c_set_platdata for USB OHCI
+>   PATCH[5/7] ARM: SAMSUNG: Use generic s3c_set_platdata for NAND
+> 
+>  o To Ben Dooks
+>   PATCH[6/7] ARM: S3C64XX: Use generic s3c_set_platdata for OneNAND
+>   PATCH[7/7] ARM: S3C24XX: Use generic s3c_set_platdata for devices
+> 
+>  arch/arm/mach-s3c64xx/dev-onenand1.c |   10 +++-----
+>  arch/arm/plat-s3c24xx/devs.c         |   38
+++++++---------------------------
+>  arch/arm/plat-samsung/dev-fb.c       |   14 +----------
+>  arch/arm/plat-samsung/dev-hwmon.c    |   14 +----------
+>  arch/arm/plat-samsung/dev-nand.c     |    9 ++-----
+>  arch/arm/plat-samsung/dev-ts.c       |   14 +----------
+>  arch/arm/plat-samsung/dev-usb.c      |    9 +------
+>  7 files changed, 22 insertions(+), 86 deletions(-)
+> 
+> --
+> 1.7.2.3
 
-I applied but basically, we have to avoid using hard coded value like 64 on
-this. The NR_IRQS depends on CPU not board but this change is needed for
-supporting some specific board and if you need more interrupt numbers, will
-you increase it? It is not good way.
-
-We need to fix this up next time.
-
+Applied.
 Thanks.
 
 Best regards,
