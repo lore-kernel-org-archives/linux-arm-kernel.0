@@ -1,34 +1,28 @@
-From: B19295@freescale.com (Lin Tony-B19295)
-Date: Wed, 20 Jul 2011 11:05:34 +0000
-Subject: [PATCH 3/7] add usb phy clocks to clock tree
-In-Reply-To: <20110720110240.GL764@legolas.emea.dhcp.ti.com>
+From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
+Date: Wed, 20 Jul 2011 13:05:39 +0200
+Subject: [PATCH 5/7] ehci mxc: make it more flexible to be used for mx28
+In-Reply-To: <1311160106-4898-6-git-send-email-tony.lin@freescale.com> (Tony
+	Lin's message of "Wed, 20 Jul 2011 19:08:24 +0800")
 References: <1311160106-4898-1-git-send-email-tony.lin@freescale.com>
-	<1311160106-4898-4-git-send-email-tony.lin@freescale.com>
-	<20110720110240.GL764@legolas.emea.dhcp.ti.com>
-Message-ID: <97D3A72708D04647A5AC84A04996E5B5161656@039-SN1MPN1-006.039d.mgd.msft.net>
+	<1311160106-4898-6-git-send-email-tony.lin@freescale.com>
+Message-ID: <874o2hp5z0.fsf@lebrac.rtp-net.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Felipe Balbi [mailto:balbi at ti.com]
-> Sent: Wednesday, July 20, 2011 7:03 PM
-> To: Lin Tony-B19295
-> Cc: linux-usb at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> balbi at ti.com; koen.beel.barco at gmail.com
-> Subject: Re: [PATCH 3/7] add usb phy clocks to clock tree
-> 
-> On Wed, Jul 20, 2011 at 07:08:22PM +0800, Tony Lin wrote:
-> 
-> it would be nice to have some changelog here even though the change is
-> obvious.
-Ok, accepted
+Tony Lin <tony.lin@freescale.com> writes:
+Hi,
 
-> 
-> > Signed-off-by: Tony Lin <tony.lin@freescale.com>
-> 
-> FWIW:
-> 
-> Reviewed-by: Felipe Balbi <balbi@ti.com>
-> 
-> --
-> balbi
+> old driver uses some hard coding for clks' name which could
+> not be used for mx28. So workaround these hard codings by
+> judging the cpu is mx28 or not.
+
+Sascha had some patches to solve this in a different way, avoiding to
+add yet an other cpu_is_* check for ahb clock. Don't know their current
+status.
+
+See:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2011-February/040364.html
+http://lists.infradead.org/pipermail/linux-arm-kernel/2011-February/040365.html
+http://lists.infradead.org/pipermail/linux-arm-kernel/2011-February/040363.html
+
+Arnaud
