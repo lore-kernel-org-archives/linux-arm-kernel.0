@@ -1,32 +1,24 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 20 Jul 2011 14:14:43 +0300
-Subject: [PATCH 5/7] ehci mxc: make it more flexible to be used for mx28
-In-Reply-To: <1311160106-4898-6-git-send-email-tony.lin@freescale.com>
+Date: Wed, 20 Jul 2011 14:16:31 +0300
+Subject: [PATCH 1/7] consolidate definitions and structures to share
+	among platforms
+In-Reply-To: <97D3A72708D04647A5AC84A04996E5B5161640@039-SN1MPN1-006.039d.mgd.msft.net>
 References: <1311160106-4898-1-git-send-email-tony.lin@freescale.com>
-	<1311160106-4898-6-git-send-email-tony.lin@freescale.com>
-Message-ID: <20110720111442.GN764@legolas.emea.dhcp.ti.com>
+	<1311160106-4898-2-git-send-email-tony.lin@freescale.com>
+	<20110720105933.GJ764@legolas.emea.dhcp.ti.com>
+	<97D3A72708D04647A5AC84A04996E5B5161640@039-SN1MPN1-006.039d.mgd.msft.net>
+Message-ID: <20110720111630.GO764@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Wed, Jul 20, 2011 at 07:08:24PM +0800, Tony Lin wrote:
-> @@ -165,14 +187,15 @@ static int ehci_mxc_drv_probe(struct platform_device *pdev)
->  	}
->  
->  	/* enable clocks */
-> -	priv->usbclk = clk_get(dev, "usb");
-> -	if (IS_ERR(priv->usbclk)) {
-> -		ret = PTR_ERR(priv->usbclk);
-> -		goto err_clk;
-> +	if (!cpu_is_mx28()) {
+On Wed, Jul 20, 2011 at 11:03:56AM +0000, Lin Tony-B19295 wrote:
+> > I believe this patch will cause build breakage since ehci-mxc.c doesn't
+> > include <linux/fsl_devices.h> ??
+> Ehci-mxc.c does include <linux/fsl_devices.h>, please check patch 5/7. Thanks
 
-this should not be used in drivers, IMHO.
-
-> +		priv->usbclk = clk_get(dev, "usb");
-
-drivers should not have to care about clock names, are you sure your
-clkdev support is correct ?
+that's too late. You will always have the broken bisection point.
 
 -- 
 balbi
@@ -36,4 +28,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 490 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110720/9f05a300/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110720/3b981ab7/attachment.sig>
