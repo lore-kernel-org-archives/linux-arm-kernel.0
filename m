@@ -1,46 +1,50 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 21 Jul 2011 02:07:26 +0900
-Subject: [PATCH 0/7] ARM: SAMSUNG: Code cleanup for various devices
-In-Reply-To: <1311077106-28351-1-git-send-email-banajit.g@samsung.com>
-References: <1311077106-28351-1-git-send-email-banajit.g@samsung.com>
-Message-ID: <06c901cc46ff$826a9690$873fc3b0$%kim@samsung.com>
+Date: Thu, 21 Jul 2011 02:07:33 +0900
+Subject: [PATCH 0/3] ARM: SAMSUNG: Cleanup mach/regs-fb.h from various
+	machines
+In-Reply-To: <1311168751-30336-1-git-send-email-ajaykumar.rs@samsung.com>
+References: <1311168751-30336-1-git-send-email-ajaykumar.rs@samsung.com>
+Message-ID: <06ca01cc46ff$83f666b0$8be33410$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Banajit Goswami wrote:
+Ajay Kumar wrote:
 > 
->  Use generic s3c_set_platdata to perform the same job. Saves a few lines
->  of code.
+> This patchset cleans up mach/regs-fb.h from S3C64XX, S5PC100, and S5PV210.
+> plat/regs-fb-v4.h is used instead to provide the same support.
 > 
->  The patches are created against "for-next" branch of Kukjin Kim's tree
-at:
->  git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> Display testing done on SMDK6410, SMDKC100 and SMDKV210.
+> For other machines, its compile tested.
 > 
->  These patches are only compile tested.
+> o To Kukjin Kim, Jingoo Han, Marek Szyprowski.
+>   ARM: S5PC100: Cleanup mach/regs-fb.h from mach-s5pc100
+>   ARM: S5PV210: Cleanup mach/regs-fb.h from mach-s5pv210
+>   ARM: S3C64XX: Cleanup mach/regs-fb.h from mach-s3c64xx
 > 
->  o To Kukjin Kim
->   PATCH[1/7] ARM: SAMSUNG: Use generic s3c_set_platdata for TS
->   PATCH[2/7] ARM: SAMSUNG: Use generic s3c_set_platdata for FB
->   PATCH[3/7] ARM: SAMSUNG: Use generic s3c_set_platdata for HWMON
->   PATCH[4/7] ARM: SAMSUNG: Use generic s3c_set_platdata for USB OHCI
->   PATCH[5/7] ARM: SAMSUNG: Use generic s3c_set_platdata for NAND
-> 
->  o To Ben Dooks
->   PATCH[6/7] ARM: S3C64XX: Use generic s3c_set_platdata for OneNAND
->   PATCH[7/7] ARM: S3C24XX: Use generic s3c_set_platdata for devices
-> 
->  arch/arm/mach-s3c64xx/dev-onenand1.c |   10 +++-----
->  arch/arm/plat-s3c24xx/devs.c         |   38
-++++++---------------------------
->  arch/arm/plat-samsung/dev-fb.c       |   14 +----------
->  arch/arm/plat-samsung/dev-hwmon.c    |   14 +----------
->  arch/arm/plat-samsung/dev-nand.c     |    9 ++-----
->  arch/arm/plat-samsung/dev-ts.c       |   14 +----------
->  arch/arm/plat-samsung/dev-usb.c      |    9 +------
->  7 files changed, 22 insertions(+), 86 deletions(-)
-> 
-> --
-> 1.7.2.3
+>  arch/arm/mach-s3c64xx/include/mach/regs-fb.h |   21 -----
+>  arch/arm/mach-s3c64xx/mach-anw6410.c         |    2 +-
+>  arch/arm/mach-s3c64xx/mach-crag6410.c        |    2 +-
+>  arch/arm/mach-s3c64xx/mach-hmt.c             |    2 +-
+>  arch/arm/mach-s3c64xx/mach-mini6410.c        |    2 +-
+>  arch/arm/mach-s3c64xx/mach-ncp.c             |    2 +-
+>  arch/arm/mach-s3c64xx/mach-real6410.c        |    2 +-
+>  arch/arm/mach-s3c64xx/mach-smartq5.c         |    2 +-
+>  arch/arm/mach-s3c64xx/mach-smartq7.c         |    2 +-
+>  arch/arm/mach-s3c64xx/mach-smdk6410.c        |    2 +-
+>  arch/arm/mach-s3c64xx/setup-fb-24bpp.c       |    1 -
+>  arch/arm/mach-s5pc100/include/mach/regs-fb.h |  105
+--------------------------
+>  arch/arm/mach-s5pc100/mach-smdkc100.c        |    2 +-
+>  arch/arm/mach-s5pc100/setup-fb-24bpp.c       |    1 -
+>  arch/arm/mach-s5pv210/include/mach/regs-fb.h |   21 -----
+>  arch/arm/mach-s5pv210/mach-aquila.c          |    2 +-
+>  arch/arm/mach-s5pv210/mach-goni.c            |    2 +-
+>  arch/arm/mach-s5pv210/mach-smdkv210.c        |    2 +-
+>  arch/arm/mach-s5pv210/setup-fb-24bpp.c       |    1 -
+>  19 files changed, 13 insertions(+), 163 deletions(-)
+>  delete mode 100644 arch/arm/mach-s3c64xx/include/mach/regs-fb.h
+>  delete mode 100644 arch/arm/mach-s5pc100/include/mach/regs-fb.h
+>  delete mode 100644 arch/arm/mach-s5pv210/include/mach/regs-fb.h
 
 Applied.
 Thanks.
