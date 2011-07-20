@@ -1,61 +1,66 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 21 Jul 2011 06:49:11 +0800
-Subject: [PATCH] arm/dt: tegra devicetree support
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF049EBDEE27@HQMAIL01.nvidia.com>
-References: <20110719234158.2779.15394.stgit@ponder>
-	<74CDBE0F657A3D45AFBB94109FB122FF049EBDEE27@HQMAIL01.nvidia.com>
-Message-ID: <20110720224910.GI6999@S2100-06.ap.freescale.net>
+From: davidb@codeaurora.org (David Brown)
+Date: Wed, 20 Jul 2011 15:50:10 -0700
+Subject: [GIT PULL] MSM fix
+In-Reply-To: <1989166.1WcWHOXyl7@wuerfel>
+References: <20110720203703.GA4495@huya.qualcomm.com>
+	<1989166.1WcWHOXyl7@wuerfel>
+Message-ID: <20110720225010.GA18381@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 20, 2011 at 08:37:19AM -0700, Stephen Warren wrote:
-> Grant Likely wrote at Tuesday, July 19, 2011 5:43 PM:
-> > Everything required to populate NVIDIA Tegra devices from the device
-> > tree.  This patch adds a new DT_MACHINE_DESC() which matches against
-> > a tegra20 device tree.  So far it only registers the on-chip devices,
-> > but it will be refined in follow on patches to configure clocks and
-> > pin IO from the device tree also.
+On Wed, Jul 20, 2011 at 11:06:15PM +0200, Arnd Bergmann wrote:
+> On Wednesday 20 July 2011 13:37:03 David Brown wrote:
+> > I seem to have missed this fix when it was sent out in April.
 > > 
-> > Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
-> > ---
+> > The following changes since commit 620917de59eeb934b9f8cf35cc2d95c1ac8ed0fc:
 > > 
-> > Hi all,
+> >   Linux 3.0-rc7 (2011-07-11 16:51:52 -0700)
 > > 
-> > Similar to the versatile patch I just posted, this is certainly not
-> > complete board support, but it is enough to be useful.  I'd like to
-> > merge this for v3.1.  It should not break any existing board support.
+> > are available in the git repository at:
+> >   git://codeaurora.org/quic/kernel/davidb/linux-msm.git msm-fix
+> > 
+> > Jeff Ohlstein (1):
+> >       msm: platsmp: actually read core count in get_core_count
+> > 
 > 
-> > diff --git a/arch/arm/boot/dts/tegra-harmony.dts b/arch/arm/boot/dts/tegra-harmony.dts
-> 
-> tegra-*.dts don't include status="disable" for all the unused controllers.
-> Should that be added?
-> 
-> > +	sound {
-> > +		compatible = "nvidia,harmony-sound", "nvidia,tegra-wm8903";
-> 
-> I thought the sound bindings were still somewhat experimental and not
-> completely agreed upon. One issue I see is that Device Tree is
-> supposed to represent pure HW, rather than driver-required abstractions,
-> and at least the compatible name here is pretty Linux-driver-specific.
-> 
-> I think there are some devices missing from the DT file for audio too,
-> e.g. the ALSA "PCM" (DMA) driver.
-> 
-> Also, the bindings for this aren't documented IIRC.
-> 
-> I'd suggest dropping the audio part of the DT file until the audio side
-> is more mature.
-> 
-> > +		spkr-en-gpios = <&codec 2 0>;
-> 
-> Should that be "gpio" not "gpios", since there is only one?
-> 
-My reason for using "gpios" over "gpio" is that
-Documentation/devicetree/bindings/gpio/gpio.txt says so.  Unless you
-want to change the document to elaborate the difference between "gpio"
-and "gpios", which I do not see the necessity ...
+> Hmm, this one seems like it really applies to older kernels as well, so
+> we can just as well add a cc:stable at kernel.org tag and put it into the
+> arm-soc/next/fixes branch, right?
 
-GPIO properties should be named "[<name>-]gpios".
+It looks like it would apply to 2.6.38 and 39 as well.  I'm not sure
+it qualifies under the "It must fix a real bug that bothers people".
+It would only apply if someone had set NR_CPUS to more than 2.
 
-Regards,
-Shawn
+> Linus has just pulled the 'last arm-soc fixes for 3.0' branch, and I don't
+> really want to follow up with 'last fix, this time for real' pull request
+> unless it's for a serious regression.
+
+It's not serious, so 3.1 is fine.
+
+> On a related topic, what's the deal with the msm-core and msm-move-gpio
+> branches in the same tree? I have the impression that they should be
+> in arm-soc.git, but I never received a pull request.
+
+I had sent a pull request for msm-move-gpio to Grant, but apparently
+that didn't happen.  If more appropriate, I can send one to you for
+it, or resend to Grant.
+
+The msm-core stuff happened before the snafu about ARM, and I was
+holding off on these things.  The authors of these patches say they
+are working on cleaned up versions.
+
+I'm not sure we want the dummy clocks code in the kernel.  It's
+intended as a placeholder.  Stephen Boyd has a 26-series patch that
+adds better clock support.  Given the size (13047 insertions), this
+may need some cleanup or even device-tree work to include.
+
+Unfortunately, a lot of the Qualcomm development seems to have moved
+back to private trees.
+
+BTW, I am planning on being at the Linaro Connect in August.
+
+David
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
