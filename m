@@ -1,49 +1,32 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Wed, 20 Jul 2011 10:18:26 +0800
-Subject: [i.MX28 GPMI] problem overwriting all-0xff data in NAND
-In-Reply-To: <20110719133602.GJ1951@pengutronix.de>
-References: <20004.12663.29494.339601@ipc1.ka-ro>
-	<20110718164354.GA3328@S2100-06.ap.freescale.net>
-	<4E24E804.10002@freescale.com>
-	<20005.7677.145955.789329@ipc1.ka-ro>
-	<4E252C51.8070900@freescale.com>
-	<20005.21635.427202.49313@ipc1.ka-ro> <20110719133602
-Message-ID: <4E263AF2.60103@freescale.com>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Wed, 20 Jul 2011 10:43:19 +0800
+Subject: [alsa-devel] [PATCH v4 06/10] ARM: mxs: add saif device
+In-Reply-To: <20110719145725.GB9652@opensource.wolfsonmicro.com>
+References: <1310731780-1645-7-git-send-email-b29396@freescale.com>
+	<1311050056-22295-1-git-send-email-b29396@freescale.com>
+	<20110719145725.GB9652@opensource.wolfsonmicro.com>
+Message-ID: <CAA+hA=SqYTKzX1+uRuThUxfhFqO=vxCdV6G25ccO0S8SLzmGSA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolfram:
->>>>> I am debugging the DMA bug now. and I will send it out when i fix it.
->>>>>
->>>> What sort of DMA bug?
->>>>
->>> The DMA may time-out. :(
->>>
->>> The DMA time-out may occur in two situations:
->>> [1] send a command DMA descriptor, see the nfc->send_command() function.
->>> [2] read the non-ecc data from nand, see the nfc->read_data() function.
->>>
->>> I don't know why. Maybe caused by the timing, or something else.
-> I am confused. The send-command DMA timeout prevents any write for me.
-> You guys surely would have noticed if you have been bitten as well. Does
-> it depend on the NAND chip?
-I think It does not depend on the NAND chip.
-My test chip is Samsung K9G8G08U0M.
-Sometimes, I can run a long time while there is no DMA timeout occurring;
-Sometimes, the bug appears right away.
-
-
->> Maybe you are missing this patch:
->> http://lists.infradead.org/pipermail/linux-arm-kernel/2011-April/049105.html
->> I sent it in April, but apparently it has not been integrated in
->> mainline or the pengutronix git.
-> Well, just resend them; might be worth trying Shawn's comment, too (if
-> that reset is really needed). BTW they didn't help for my case :(
-I also tested the patch. It did not work too.
-
-Best Regards
-Huang Shijie
-> Regards,
+2011/7/19 Mark Brown <broonie@opensource.wolfsonmicro.com>:
+> On Tue, Jul 19, 2011 at 12:34:16PM +0800, Dong Aisheng wrote:
+>> Signed-off-by: Dong Aisheng <b29396@freescale.com>
+>> Reviewed-by: Wolfram Sang <w.sang@pengutronix.de>
+>> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+>> ---
+>> Changes since v3:
+>> ? ? ? Drop DIGCTRL-handling based on Wolfram's comment
 >
->     Wolfram
->
+> When reposting you should repost the whole series separately rather than
+> following up into the middle of the series, it makes it much easier for
+> people to follow what's going on.
+Sorry about that.
+Since only one patch changed with another two for rebase, i just
+resend these three.
+Anyway, i think you are right.
+I will resent them all.
+Thanks for your suggestions.
+
+Regards
+Dong Aisheng
