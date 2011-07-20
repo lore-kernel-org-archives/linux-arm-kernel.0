@@ -1,17 +1,15 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Wed, 20 Jul 2011 10:10:30 +0200
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Wed, 20 Jul 2011 11:35:43 +0300
 Subject: [i.MX28 GPMI] problem overwriting all-0xff data in NAND
 In-Reply-To: <4E26794D.8040004@freescale.com>
 References: <20004.12663.29494.339601@ipc1.ka-ro>
 	<20110718164354.GA3328@S2100-06.ap.freescale.net>
 	<4E26794D.8040004@freescale.com>
-Message-ID: <20006.36214.352337.659803@ipc1.ka-ro>
+Message-ID: <1311150947.20738.167.camel@sauron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Huang Shijie writes:
+On Wed, 2011-07-20 at 14:44 +0800, Huang Shijie wrote:
 > Hi Lothar:
 > > On Mon, Jul 18, 2011 at 03:13:27PM +0200, Lothar Wa?mann wrote:
 > >> Hi,
@@ -41,19 +39,19 @@ Huang Shijie writes:
 > erased state.
 > 
 > Am I right?
-> 
-Exactly. But it seems others think this should be handled by userspace
-tools rather than in the kernel driver.
+
+Please, no! The driver should just write what it is asked to write. Your
+driver has a limitation - a NAND page can be written only _once_. If a
+piece of software writes a page twice (1st with all 0xFFs, then with
+something else) - this is a problem in _that piece of software_.
 
 
-Lothar Wa?mann
+Additionally, all 0xFFs are just data, it needs ECC corrections in case
+of bit-flips just like any other data. Eve you decided to do that
+horrible "skip all 0xFFs" hack, you'd need to make sure bit-flips in
+"skipped" pages are still corrected. Indeed, there is not reason why a
+never written NAND page would not have bit-flips.
+
 -- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Best Regards,
+Artem Bityutskiy
