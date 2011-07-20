@@ -1,109 +1,37 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 21 Jul 2011 03:31:09 +0900
-Subject: [PATCH v2 2/2] ARM: EXYNOS4: Add more registers to be saved and
-	restored for PM
-In-Reply-To: <1311055450-11751-1-git-send-email-myungjoo.ham@samsung.com>
-References: <CAJ0PZbRsnO-W4P=3kZvcSn+st4p38ARjsE458TzSreHAche1gw@mail.gmail.com>
-	<1311055450-11751-1-git-send-email-myungjoo.ham@samsung.com>
-Message-ID: <000501cc470b$34a32060$9de96120$%kim@samsung.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Wed, 20 Jul 2011 11:33:56 -0700
+Subject: [PATCH] arm/dt: tegra devicetree support
+In-Reply-To: <20110720182823.GD4642@ponder.secretlab.ca>
+References: <20110719234158.2779.15394.stgit@ponder>
+	<74CDBE0F657A3D45AFBB94109FB122FF049EBDEE27@HQMAIL01.nvidia.com>
+	<20110720182823.GD4642@ponder.secretlab.ca>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF049EBDEEFA@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MyungJoo Ham wrote:
+Grant Likely wrote at Wednesday, July 20, 2011 12:28 PM:
+> On Wed, Jul 20, 2011 at 08:37:19AM -0700, Stephen Warren wrote:
+> > Grant Likely wrote at Tuesday, July 19, 2011 5:43 PM:
+> > > Everything required to populate NVIDIA Tegra devices from the device
+> > > tree.  This patch adds a new DT_MACHINE_DESC() which matches against
+> > > a tegra20 device tree.  So far it only registers the on-chip devices,
+> > > but it will be refined in follow on patches to configure clocks and
+> > > pin IO from the device tree also.
+...
+> > > diff --git a/arch/arm/boot/dts/tegra-harmony.dts b/arch/arm/boot/dts/tegra-harmony.dts
+> >
+> > tegra-*.dts don't include status="disable" for all the unused controllers.
+> > Should that be added?
 > 
-> We need more registers to be saved and restored for PM of Exynos4210.
-> Otherwise, with additional drivers running, suspend-to-RAM fails to wake
-> up properly. This patch adds registers omitted in the initial PM
-> patches.
-> 
-> Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> --
-> Changed from v1
-> - removed unnecessary registers
-> - As the patch 1/2 is not changed, it is not re-sent.
-> 
-> ---
->  arch/arm/mach-exynos4/pm.c |   15 ++++++++++++++-
->  1 files changed, 14 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-exynos4/pm.c b/arch/arm/mach-exynos4/pm.c
-> index a103c13..5d6f768 100644
-> --- a/arch/arm/mach-exynos4/pm.c
-> +++ b/arch/arm/mach-exynos4/pm.c
-> @@ -27,6 +27,7 @@
->  #include <plat/cpu.h>
->  #include <plat/pm.h>
->  #include <plat/pll.h>
-> +#include <plat/regs-srom.h>
-> 
->  #include <mach/regs-irq.h>
->  #include <mach/regs-gpio.h>
-> @@ -67,7 +68,9 @@ static struct sleep_save exynos4_core_save[] = {
->  	SAVE_ITEM(S5P_CLKSRC_TOP0),
->  	SAVE_ITEM(S5P_CLKSRC_TOP1),
->  	SAVE_ITEM(S5P_CLKSRC_CAM),
-> +	SAVE_ITEM(S5P_CLKSRC_TV),
->  	SAVE_ITEM(S5P_CLKSRC_MFC),
-> +	SAVE_ITEM(S5P_CLKSRC_G3D),
->  	SAVE_ITEM(S5P_CLKSRC_IMAGE),
->  	SAVE_ITEM(S5P_CLKSRC_LCD0),
->  	SAVE_ITEM(S5P_CLKSRC_LCD1),
-> @@ -94,6 +97,7 @@ static struct sleep_save exynos4_core_save[] = {
->  	SAVE_ITEM(S5P_CLKDIV_PERIL4),
->  	SAVE_ITEM(S5P_CLKDIV_PERIL5),
->  	SAVE_ITEM(S5P_CLKDIV_TOP),
-> +	SAVE_ITEM(S5P_CLKSRC_MASK_TOP),
->  	SAVE_ITEM(S5P_CLKSRC_MASK_CAM),
->  	SAVE_ITEM(S5P_CLKSRC_MASK_TV),
->  	SAVE_ITEM(S5P_CLKSRC_MASK_LCD0),
-> @@ -102,6 +106,7 @@ static struct sleep_save exynos4_core_save[] = {
->  	SAVE_ITEM(S5P_CLKSRC_MASK_FSYS),
->  	SAVE_ITEM(S5P_CLKSRC_MASK_PERIL0),
->  	SAVE_ITEM(S5P_CLKSRC_MASK_PERIL1),
-> +	SAVE_ITEM(S5P_CLKDIV2_RATIO),
->  	SAVE_ITEM(S5P_CLKGATE_SCLKCAM),
->  	SAVE_ITEM(S5P_CLKGATE_IP_CAM),
->  	SAVE_ITEM(S5P_CLKGATE_IP_TV),
-> @@ -122,8 +127,10 @@ static struct sleep_save exynos4_core_save[] = {
->  	SAVE_ITEM(S5P_CLKGATE_IP_DMC),
->  	SAVE_ITEM(S5P_CLKSRC_CPU),
->  	SAVE_ITEM(S5P_CLKDIV_CPU),
-> +	SAVE_ITEM(S5P_CLKDIV_CPU + 0x4),
->  	SAVE_ITEM(S5P_CLKGATE_SCLKCPU),
->  	SAVE_ITEM(S5P_CLKGATE_IP_CPU),
-> +
->  	/* GIC side */
->  	SAVE_ITEM(S5P_VA_GIC_CPU + 0x000),
->  	SAVE_ITEM(S5P_VA_GIC_CPU + 0x004),
-> @@ -232,11 +239,17 @@ static struct sleep_save exynos4_core_save[] = {
->  	SAVE_ITEM(S5P_VA_GIC_DIST + 0xC20),
->  	SAVE_ITEM(S5P_VA_GIC_DIST + 0xC24),
-> 
-> -
->  	SAVE_ITEM(S5P_VA_COMBINER_BASE + 0x000),
->  	SAVE_ITEM(S5P_VA_COMBINER_BASE + 0x010),
->  	SAVE_ITEM(S5P_VA_COMBINER_BASE + 0x020),
->  	SAVE_ITEM(S5P_VA_COMBINER_BASE + 0x030),
-> +
-> +	/* SROM side */
-> +	SAVE_ITEM(S5P_SROM_BW),
-> +	SAVE_ITEM(S5P_SROM_BC0),
-> +	SAVE_ITEM(S5P_SROM_BC1),
-> +	SAVE_ITEM(S5P_SROM_BC2),
-> +	SAVE_ITEM(S5P_SROM_BC3),
->  };
-> 
->  static struct sleep_save exynos4_l2cc_save[] = {
-> --
-> 1.7.4.1
+> I dropped that pattern since my preference has been to have boards
+> explicitly disable unused cores and that has generally been the
+> pattern on other DT platforms.
 
-Since we don't need some definitions, please update your 1/2 patch also.
+Sorry if I wasn't clear, but what I meant was that the board-specific
+files tegra-harmony.dts and tegra-seaboard.dts don't include the status=
+"disable" entries for the modules/ports they don't use.
 
-Thanks.
+Still, everything probably works OK without that...
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+-- 
+nvpublic
