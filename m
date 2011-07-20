@@ -1,55 +1,304 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 20 Jul 2011 17:14:05 -0600
-Subject: [RFC PATCH 1/5] OMAP3:I2C: Add device tree nodes for beagle board
-In-Reply-To: <20110720223348.GH6999@S2100-06.ap.freescale.net>
-References: <1309426647-31587-1-git-send-email-manjugk@ti.com>
-	<1309426647-31587-2-git-send-email-manjugk@ti.com>
-	<20110706185546.GJ4871@ponder.secretlab.ca>
-	<74CDBE0F657A3D45AFBB94109FB122FF049E21C203@HQMAIL01.nvidia.com>
-	<CACxGe6u8qq7FA7kFXbU5uCk6m_GA8GWLqsdjFCXN+NMJfFKxmA@mail.gmail.com>
-	<20110720110419.GA6999@S2100-06.ap.freescale.net>
-	<20110720185513.GI4642@ponder.secretlab.ca>
-	<20110720223348.GH6999@S2100-06.ap.freescale.net>
-Message-ID: <CACxGe6utwx_LpMx0sqfuTRLst1-0eoi8ZrwA2ZVRyjiVzxKT1g@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 20 Jul 2011 16:23:45 -0700
+Subject: [PATCH] ARM: Migrate to asm-generic wrapper support
+Message-ID: <1311204225-13169-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 20, 2011 at 4:33 PM, Shawn Guo <shawn.guo@freescale.com> wrote:
-> On Wed, Jul 20, 2011 at 12:55:13PM -0600, Grant Likely wrote:
->> On Wed, Jul 20, 2011 at 07:04:20PM +0800, Shawn Guo wrote:
->> > > Mostly consistency. ?Most of the experience we have with the flattened
->> > > device tree up to this point hasn't bothered with the 'status'
->> > > property. ?It is only when AMP and hypervisors cam online that it
->> > > became important to use a status property, and that only when the
->> > > kernel needs to be told that the device does indeed exist, but it must
->> > > not be touched. ?I'd like to continue that pattern for new DT users
->> > > with the default assumption that a device is enabled unless the board
->> > > .dts explicitly disables it.
->> [...]
->> > Besides the bothering that we have to list so many unused controllers
->> > in individual board dts file, it's also hard to tell which controllers
->> > are actually available on the board. ?People have to look at imx53.dts
->> > to get a full list and then exclude the ones in imx53-<board>.dts as
->> > "disabled".
->> >
->> > And if we go the way opposite, adding "disabled" status for everyone
->> > in imx53.dts, we will only need to specify the peripherals that are
->> > actually available on board with "okay" status in imx53-<board>.dts.
->> > And it's much more clear for people to see what peripherals are
->> > available on individual board.
->> >
->> > So I'm going the way than you suggested. ?Please let me know if you
->> > strongly dislikes it.
->>
->> Yes, I strongly dislike it. ?I understand the concern, but at this
->> early stage with converting to device tree I think consistency between
->> platforms is more important. ?We can talk about the issue at Linaro
->> Connect in 2 weeks, but in the mean time please use the
->> enabled-by-default/explicitly-disabled pattern.
->>
-> Okay, hope you will not ask me to use the opposite pattern when you
-> actually see the patch :)
+With d8ecc5c (kbuild: asm-generic support, 2011-04-27) we can
+remove a handful of asm-generic wrappers in ARM code.
 
-:-)
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+Cc: Imre Kaloz <kaloz@openwrt.org>
+Cc: Krzysztof Halasa <khc@pm.waw.pl>
+Cc: Eric Miao <eric.y.miao@gmail.com>
+---
 
-g.
+I've specifically left out topology.h as it looks like that will not
+be generic much longer.
+
+ arch/arm/include/asm/Kbuild              |   17 +++++++++++++++++
+ arch/arm/include/asm/auxvec.h            |    4 ----
+ arch/arm/include/asm/bitsperlong.h       |    1 -
+ arch/arm/include/asm/cputime.h           |    6 ------
+ arch/arm/include/asm/emergency-restart.h |    6 ------
+ arch/arm/include/asm/errno.h             |    6 ------
+ arch/arm/include/asm/ioctl.h             |    1 -
+ arch/arm/include/asm/irq_regs.h          |    1 -
+ arch/arm/include/asm/kdebug.h            |    1 -
+ arch/arm/include/asm/local.h             |    1 -
+ arch/arm/include/asm/local64.h           |    1 -
+ arch/arm/include/asm/percpu.h            |    6 ------
+ arch/arm/include/asm/poll.h              |    1 -
+ arch/arm/include/asm/resource.h          |    6 ------
+ arch/arm/include/asm/sections.h          |    1 -
+ arch/arm/include/asm/siginfo.h           |    6 ------
+ arch/arm/include/asm/sizes.h             |   21 ---------------------
+ arch/arm/mach-ixp4xx/common-pci.c        |    3 ++-
+ arch/arm/mach-mmp/aspenite.c             |    2 +-
+ arch/arm/mach-mmp/ttc_dkb.c              |    2 +-
+ arch/arm/mach-pxa/saar.c                 |    2 +-
+ 21 files changed, 22 insertions(+), 73 deletions(-)
+ delete mode 100644 arch/arm/include/asm/auxvec.h
+ delete mode 100644 arch/arm/include/asm/bitsperlong.h
+ delete mode 100644 arch/arm/include/asm/cputime.h
+ delete mode 100644 arch/arm/include/asm/emergency-restart.h
+ delete mode 100644 arch/arm/include/asm/errno.h
+ delete mode 100644 arch/arm/include/asm/ioctl.h
+ delete mode 100644 arch/arm/include/asm/irq_regs.h
+ delete mode 100644 arch/arm/include/asm/kdebug.h
+ delete mode 100644 arch/arm/include/asm/local.h
+ delete mode 100644 arch/arm/include/asm/local64.h
+ delete mode 100644 arch/arm/include/asm/percpu.h
+ delete mode 100644 arch/arm/include/asm/poll.h
+ delete mode 100644 arch/arm/include/asm/resource.h
+ delete mode 100644 arch/arm/include/asm/sections.h
+ delete mode 100644 arch/arm/include/asm/siginfo.h
+ delete mode 100644 arch/arm/include/asm/sizes.h
+
+diff --git a/arch/arm/include/asm/Kbuild b/arch/arm/include/asm/Kbuild
+index 6550db3..960abce 100644
+--- a/arch/arm/include/asm/Kbuild
++++ b/arch/arm/include/asm/Kbuild
+@@ -1,3 +1,20 @@
+ include include/asm-generic/Kbuild.asm
+ 
+ header-y += hwcap.h
++
++generic-y += auxvec.h
++generic-y += bitsperlong.h
++generic-y += cputime.h
++generic-y += emergency-restart.h
++generic-y += errno.h
++generic-y += ioctl.h
++generic-y += irq_regs.h
++generic-y += kdebug.h
++generic-y += local.h
++generic-y += local64.h
++generic-y += percpu.h
++generic-y += poll.h
++generic-y += resource.h
++generic-y += sections.h
++generic-y += siginfo.h
++generic-y += sizes.h
+diff --git a/arch/arm/include/asm/auxvec.h b/arch/arm/include/asm/auxvec.h
+deleted file mode 100644
+index c0536f6..0000000
+--- a/arch/arm/include/asm/auxvec.h
++++ /dev/null
+@@ -1,4 +0,0 @@
+-#ifndef __ASMARM_AUXVEC_H
+-#define __ASMARM_AUXVEC_H
+-
+-#endif
+diff --git a/arch/arm/include/asm/bitsperlong.h b/arch/arm/include/asm/bitsperlong.h
+deleted file mode 100644
+index 6dc0bb0..0000000
+--- a/arch/arm/include/asm/bitsperlong.h
++++ /dev/null
+@@ -1 +0,0 @@
+-#include <asm-generic/bitsperlong.h>
+diff --git a/arch/arm/include/asm/cputime.h b/arch/arm/include/asm/cputime.h
+deleted file mode 100644
+index 3a8002a..0000000
+--- a/arch/arm/include/asm/cputime.h
++++ /dev/null
+@@ -1,6 +0,0 @@
+-#ifndef __ARM_CPUTIME_H
+-#define __ARM_CPUTIME_H
+-
+-#include <asm-generic/cputime.h>
+-
+-#endif /* __ARM_CPUTIME_H */
+diff --git a/arch/arm/include/asm/emergency-restart.h b/arch/arm/include/asm/emergency-restart.h
+deleted file mode 100644
+index 108d8c4..0000000
+--- a/arch/arm/include/asm/emergency-restart.h
++++ /dev/null
+@@ -1,6 +0,0 @@
+-#ifndef _ASM_EMERGENCY_RESTART_H
+-#define _ASM_EMERGENCY_RESTART_H
+-
+-#include <asm-generic/emergency-restart.h>
+-
+-#endif /* _ASM_EMERGENCY_RESTART_H */
+diff --git a/arch/arm/include/asm/errno.h b/arch/arm/include/asm/errno.h
+deleted file mode 100644
+index 6e60f06..0000000
+--- a/arch/arm/include/asm/errno.h
++++ /dev/null
+@@ -1,6 +0,0 @@
+-#ifndef _ARM_ERRNO_H
+-#define _ARM_ERRNO_H
+-
+-#include <asm-generic/errno.h>
+-
+-#endif
+diff --git a/arch/arm/include/asm/ioctl.h b/arch/arm/include/asm/ioctl.h
+deleted file mode 100644
+index b279fe0..0000000
+--- a/arch/arm/include/asm/ioctl.h
++++ /dev/null
+@@ -1 +0,0 @@
+-#include <asm-generic/ioctl.h>
+diff --git a/arch/arm/include/asm/irq_regs.h b/arch/arm/include/asm/irq_regs.h
+deleted file mode 100644
+index 3dd9c0b..0000000
+--- a/arch/arm/include/asm/irq_regs.h
++++ /dev/null
+@@ -1 +0,0 @@
+-#include <asm-generic/irq_regs.h>
+diff --git a/arch/arm/include/asm/kdebug.h b/arch/arm/include/asm/kdebug.h
+deleted file mode 100644
+index 6ece1b0..0000000
+--- a/arch/arm/include/asm/kdebug.h
++++ /dev/null
+@@ -1 +0,0 @@
+-#include <asm-generic/kdebug.h>
+diff --git a/arch/arm/include/asm/local.h b/arch/arm/include/asm/local.h
+deleted file mode 100644
+index c11c530..0000000
+--- a/arch/arm/include/asm/local.h
++++ /dev/null
+@@ -1 +0,0 @@
+-#include <asm-generic/local.h>
+diff --git a/arch/arm/include/asm/local64.h b/arch/arm/include/asm/local64.h
+deleted file mode 100644
+index 36c93b5..0000000
+--- a/arch/arm/include/asm/local64.h
++++ /dev/null
+@@ -1 +0,0 @@
+-#include <asm-generic/local64.h>
+diff --git a/arch/arm/include/asm/percpu.h b/arch/arm/include/asm/percpu.h
+deleted file mode 100644
+index b4e32d8..0000000
+--- a/arch/arm/include/asm/percpu.h
++++ /dev/null
+@@ -1,6 +0,0 @@
+-#ifndef __ARM_PERCPU
+-#define __ARM_PERCPU
+-
+-#include <asm-generic/percpu.h>
+-
+-#endif
+diff --git a/arch/arm/include/asm/poll.h b/arch/arm/include/asm/poll.h
+deleted file mode 100644
+index c98509d..0000000
+--- a/arch/arm/include/asm/poll.h
++++ /dev/null
+@@ -1 +0,0 @@
+-#include <asm-generic/poll.h>
+diff --git a/arch/arm/include/asm/resource.h b/arch/arm/include/asm/resource.h
+deleted file mode 100644
+index 734b581..0000000
+--- a/arch/arm/include/asm/resource.h
++++ /dev/null
+@@ -1,6 +0,0 @@
+-#ifndef _ARM_RESOURCE_H
+-#define _ARM_RESOURCE_H
+-
+-#include <asm-generic/resource.h>
+-
+-#endif
+diff --git a/arch/arm/include/asm/sections.h b/arch/arm/include/asm/sections.h
+deleted file mode 100644
+index 2b8c516..0000000
+--- a/arch/arm/include/asm/sections.h
++++ /dev/null
+@@ -1 +0,0 @@
+-#include <asm-generic/sections.h>
+diff --git a/arch/arm/include/asm/siginfo.h b/arch/arm/include/asm/siginfo.h
+deleted file mode 100644
+index 5e21852..0000000
+--- a/arch/arm/include/asm/siginfo.h
++++ /dev/null
+@@ -1,6 +0,0 @@
+-#ifndef _ASMARM_SIGINFO_H
+-#define _ASMARM_SIGINFO_H
+-
+-#include <asm-generic/siginfo.h>
+-
+-#endif
+diff --git a/arch/arm/include/asm/sizes.h b/arch/arm/include/asm/sizes.h
+deleted file mode 100644
+index 154b89b..0000000
+--- a/arch/arm/include/asm/sizes.h
++++ /dev/null
+@@ -1,21 +0,0 @@
+-/*
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+- */
+-/*  Size definitions
+- *  Copyright (C) ARM Limited 1998. All rights reserved.
+- */
+-#include <asm-generic/sizes.h>
+-
+-#define SZ_48M	(SZ_32M + SZ_16M)
+diff --git a/arch/arm/mach-ixp4xx/common-pci.c b/arch/arm/mach-ixp4xx/common-pci.c
+index e2e98bb..9e651da 100644
+--- a/arch/arm/mach-ixp4xx/common-pci.c
++++ b/arch/arm/mach-ixp4xx/common-pci.c
+@@ -392,7 +392,8 @@ void __init ixp4xx_pci_preinit(void)
+ 		local_write_config(PCI_BASE_ADDRESS_0, 4, PHYS_OFFSET);
+ 		local_write_config(PCI_BASE_ADDRESS_1, 4, PHYS_OFFSET + SZ_16M);
+ 		local_write_config(PCI_BASE_ADDRESS_2, 4, PHYS_OFFSET + SZ_32M);
+-		local_write_config(PCI_BASE_ADDRESS_3, 4, PHYS_OFFSET + SZ_48M);
++		local_write_config(PCI_BASE_ADDRESS_3, 4,
++					PHYS_OFFSET + SZ_32M + SZ_16M);
+ 
+ 		/*
+ 		 * Enable CSR window at 64 MiB to allow PCI masters
+diff --git a/arch/arm/mach-mmp/aspenite.c b/arch/arm/mach-mmp/aspenite.c
+index 06b5fa8..49c5d6d 100644
+--- a/arch/arm/mach-mmp/aspenite.c
++++ b/arch/arm/mach-mmp/aspenite.c
+@@ -160,7 +160,7 @@ static struct mtd_partition aspenite_nand_partitions[] = {
+ 	}, {
+ 		.name		= "filesystem",
+ 		.offset		= MTDPART_OFS_APPEND,
+-		.size		= SZ_48M,
++		.size		= SZ_32M + SZ_16M,
+ 		.mask_flags	= 0,
+ 	}
+ };
+diff --git a/arch/arm/mach-mmp/ttc_dkb.c b/arch/arm/mach-mmp/ttc_dkb.c
+index e411039..c5b068e 100644
+--- a/arch/arm/mach-mmp/ttc_dkb.c
++++ b/arch/arm/mach-mmp/ttc_dkb.c
+@@ -81,7 +81,7 @@ static struct mtd_partition ttc_dkb_onenand_partitions[] = {
+ 	}, {
+ 		.name		= "filesystem",
+ 		.offset		= MTDPART_OFS_APPEND,
+-		.size		= SZ_48M,
++		.size		= SZ_32M + SZ_16M,
+ 		.mask_flags	= 0,
+ 	}
+ };
+diff --git a/arch/arm/mach-pxa/saar.c b/arch/arm/mach-pxa/saar.c
+index fee97a9..19e7b36 100644
+--- a/arch/arm/mach-pxa/saar.c
++++ b/arch/arm/mach-pxa/saar.c
+@@ -540,7 +540,7 @@ static struct mtd_partition saar_onenand_partitions[] = {
+ 	}, {
+ 		.name		= "filesystem",
+ 		.offset		= MTDPART_OFS_APPEND,
+-		.size		= SZ_48M,
++		.size		= SZ_32M + SZ_16M,
+ 		.mask_flags	= 0,
+ 	}
+ };
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
