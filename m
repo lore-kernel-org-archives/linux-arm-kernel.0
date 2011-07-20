@@ -1,54 +1,55 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Wed, 20 Jul 2011 16:44:21 -0700
-Subject: [GIT PULL] MSM fix
-In-Reply-To: <20110720225406.GB20310@n2100.arm.linux.org.uk>
-References: <20110720203703.GA4495@huya.qualcomm.com>
-	<1989166.1WcWHOXyl7@wuerfel>
-	<20110720225010.GA18381@huya.qualcomm.com>
-	<20110720225406.GB20310@n2100.arm.linux.org.uk>
-Message-ID: <20110720234421.GA22665@huya.qualcomm.com>
+From: simon@sequanux.org (Simon Guinot)
+Date: Wed, 20 Jul 2011 23:45:37 +0000
+Subject: plat-orion gpio regression for mixed level and edge sensitive IRQs
+In-Reply-To: <4E25DBC5.9010308@drewtech.com>
+References: <4E25DBC5.9010308@drewtech.com>
+Message-ID: <20110720234537.GD16297@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 20, 2011 at 11:54:06PM +0100, Russell King - ARM Linux wrote:
-> On Wed, Jul 20, 2011 at 03:50:10PM -0700, David Brown wrote:
-> > On Wed, Jul 20, 2011 at 11:06:15PM +0200, Arnd Bergmann wrote:
-> > > On Wednesday 20 July 2011 13:37:03 David Brown wrote:
-> > > > I seem to have missed this fix when it was sent out in April.
-> > > > 
-> > > > The following changes since commit 620917de59eeb934b9f8cf35cc2d95c1ac8ed0fc:
-> > > > 
-> > > >   Linux 3.0-rc7 (2011-07-11 16:51:52 -0700)
-> > > > 
-> > > > are available in the git repository at:
-> > > >   git://codeaurora.org/quic/kernel/davidb/linux-msm.git msm-fix
-> > > > 
-> > > > Jeff Ohlstein (1):
-> > > >       msm: platsmp: actually read core count in get_core_count
-> > > > 
-> > > 
-> > > Hmm, this one seems like it really applies to older kernels as well, so
-> > > we can just as well add a cc:stable at kernel.org tag and put it into the
-> > > arm-soc/next/fixes branch, right?
-> > 
-> > It looks like it would apply to 2.6.38 and 39 as well.  I'm not sure
-> > it qualifies under the "It must fix a real bug that bothers people".
-> > It would only apply if someone had set NR_CPUS to more than 2.
+Hi Joey,
+
+On Tue, Jul 19, 2011 at 03:32:21PM -0400, Joey Oravec wrote:
+> Orion maintainers,
 > 
-> Err, this makes no sense.  MSM doesn't have a get_core_count function
-> and as far as I can see never has done in mainline.
+> I've found a problem on plat-orion when requesting IRQs on GPIO
+> lines in the linux-3.0rc. This was introduced with the change to
+> generic IRQ chip.
 > 
-> And where is the patch?
+> Processors in this family have separate mask registers for level and
+> edge sensitive interrupts, but generic IRQ chip functions like
+> irq_gc_mask_set_bit() are designed for chips with a single mask
+> register. Test with the following sequence:
 > 
-> We shouldn't be pulling git requests into arm-soc without having seen
-> the patches on LAKML.
+> 1. Register a level sensitive interrupt on pinA
+> 2. Register an edge sensitive interrupt on pinB
+> 
+> During #2, the mask_cache (with pinA unmasked) gets written to the
+> edge sensitive mask register. At the end of this call pinA is
+> unmasked for edge sensitive interrupts. Now you can get into a state
+> where an edge interrupt is asserted for pinA, but that edge
+> interrupt never gets ack'ed since pinA is registered to handle level
+> IRQs.
+> 
+> The older version of arch/arm/plat-orion/gpio.c does not have the
+> problem because it treats the registers separately and doesn't use a
+> cache. I've only tested this on MV78200 but any processor that uses
+> plat-orion with separate registers will experience this problem.
 
-It was sent back in April.
+The same mask cache (stored within struct irq_chip_generic) is shared
+between all the irq_chip_type instances. As they can use different mask
+registers, there is a problem.
 
-https://patchwork.kernel.org/patch/693881/
+We should probably move mask_cache into struct irq_chip_type.
 
-David
+Note that this issue only affect the Orion SoCs. On the other platform
+using the generic interrupt chip API, a single irq_chip_type is defined.
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Simon
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110720/e4ea6982/attachment.sig>
