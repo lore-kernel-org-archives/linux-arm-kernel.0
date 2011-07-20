@@ -1,65 +1,59 @@
-From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
-Date: Wed, 20 Jul 2011 12:37:15 +0530
-Subject: [PATCH v4 REPOST 13/20] gpio/omap: cleanup omap_gpio_mod_init
-	function
-In-Reply-To: <20110716182649.GA990@google.com>
-References: <1310804152-9243-1-git-send-email-tarun.kanti@ti.com>
-	<1310804152-9243-14-git-send-email-tarun.kanti@ti.com>
-	<20110716182649.GA990@google.com>
-Message-ID: <5A47E75E594F054BAF48C5E4FC4B92AB037C0C4CBE@dbde02.ent.ti.com>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Wed, 20 Jul 2011 10:10:30 +0200
+Subject: [i.MX28 GPMI] problem overwriting all-0xff data in NAND
+In-Reply-To: <4E26794D.8040004@freescale.com>
+References: <20004.12663.29494.339601@ipc1.ka-ro>
+	<20110718164354.GA3328@S2100-06.ap.freescale.net>
+	<4E26794D.8040004@freescale.com>
+Message-ID: <20006.36214.352337.659803@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[...]
-> >  static int __init omap16xx_gpio_init(void)
-> >  {
-> >  	int i;
-> > +	void __iomem *base;
-> > +	struct resource *res;
-> > +	struct platform_device *pdev;
-> > +	struct omap_gpio_platform_data *pdata;
-> >
-> >  	if (!cpu_is_omap16xx())
-> >  		return -EINVAL;
-> >
-> > -	for (i = 0; i < ARRAY_SIZE(omap16xx_gpio_dev); i++)
-> > +	for (i = 0; i < ARRAY_SIZE(omap16xx_gpio_dev); i++) {
-> > +		pdev = omap16xx_gpio_dev[i];
-> > +		pdata = pdev->dev.platform_data;
-> > +
-> > +		res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> > +		if (unlikely(!res)) {
-> > +			dev_err(&pdev->dev, "Invalid mem resource.\n");
-> > +			return -ENODEV;
-> > +		}
-> > +
-> > +		base = ioremap(res->start, resource_size(res));
-> > +		if (unlikely(!base)) {
-> > +			dev_err(&pdev->dev, "ioremap failed.\n");
-> > +			return -ENOMEM;
-> > +		}
-> 
-> The value of base isn't saved anywhere, and the memory is not
-> unmapped, looks like a virtual memory leak.  If the purpose of the
-> ioremap is to perform the single write below then iounmap when done?
-This is one time write only.
-I will iounmap(base) after use. Thanks.
+Hi,
 
-> The previous code to perform that write used a
-> struct gpio_bank *bank->base ioremapped by omap_gpio_probe, but
-> apparently omap16xx_gpio_init isn't called in that path.
-Right.
+Huang Shijie writes:
+> Hi Lothar:
+> > On Mon, Jul 18, 2011 at 03:13:27PM +0200, Lothar Wa?mann wrote:
+> >> Hi,
+> >>
+> >> with the gpmi-nfc driver for imx28 from Shawn Guo on a TX28 I
+> > To be clear, the author of gpmi-nfc driver is Huang Shijie (Cc-ed).
+> >
+> > Regards,
+> > Shawn
+> >
+> >> encountered some problems with jffs2 when overwriting pages that have
+> >> been written with 0xff (e.g. from padding from the file system image
+> >> file).
+> >>
+> >> The problem is that the ECC info for an all-0xff block is not all-0xff
+> >> and thus a newly erased block is different from a block that has been
+> >> written with 0xff.
+> >> If such a block is being altered (jffs2 thinking it can simply
+> >> overwrite it without erasing first) the ECC information will be
+> >> corrupted and will produce ECC errors upon read.
+> >>
+> >> The only remedy I can think of is to prevent empty pages from actually
+> >> being written to flash, but leaving them in the erased state instead.
+> Did you mean that:
+> If the gpmi have to write a page which is full of 0xff,
+> the gpmi driver should skip the writting, and leave the page in the 
+> erased state.
+> 
+> Am I right?
+> 
+Exactly. But it seems others think this should be handled by userspace
+tools rather than in the kernel driver.
 
-> 
-> > +
-> > +		__raw_writel(0x0014, base + OMAP1610_GPIO_SYSCONFIG);
-> 
-> Suggest a symbol for the 0x14 value, or add a comment describing what
-> this does.  (I realize the existing code has many naked constants.)
-Sure.
---
-Tarun
-> 
-> 
-> 
-> Todd
+
+Lothar Wa?mann
+-- 
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
