@@ -1,32 +1,28 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Wed, 20 Jul 2011 10:43:19 +0800
-Subject: [alsa-devel] [PATCH v4 06/10] ARM: mxs: add saif device
-In-Reply-To: <20110719145725.GB9652@opensource.wolfsonmicro.com>
-References: <1310731780-1645-7-git-send-email-b29396@freescale.com>
-	<1311050056-22295-1-git-send-email-b29396@freescale.com>
-	<20110719145725.GB9652@opensource.wolfsonmicro.com>
-Message-ID: <CAA+hA=SqYTKzX1+uRuThUxfhFqO=vxCdV6G25ccO0S8SLzmGSA@mail.gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 20 Jul 2011 04:49:33 +0200
+Subject: [PATCH v5] Consolidate SRAM support
+In-Reply-To: <1310300379-2882-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1310300379-2882-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <20110720024933.GC15388@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/7/19 Mark Brown <broonie@opensource.wolfsonmicro.com>:
-> On Tue, Jul 19, 2011 at 12:34:16PM +0800, Dong Aisheng wrote:
->> Signed-off-by: Dong Aisheng <b29396@freescale.com>
->> Reviewed-by: Wolfram Sang <w.sang@pengutronix.de>
->> Cc: Sascha Hauer <s.hauer@pengutronix.de>
->> ---
->> Changes since v3:
->> ? ? ? Drop DIGCTRL-handling based on Wolfram's comment
->
-> When reposting you should repost the whole series separately rather than
-> following up into the middle of the series, it makes it much easier for
-> people to follow what's going on.
-Sorry about that.
-Since only one patch changed with another two for rebase, i just
-resend these three.
-Anyway, i think you are right.
-I will resent them all.
-Thanks for your suggestions.
+On 14:19 Sun 10 Jul     , Jean-Christophe PLAGNIOL-VILLARD wrote:
+> From: Russell King - ARM Linux <linux@arm.linux.org.uk>
+> 
+> We have two SoCs using SRAM, both with their own allocation systems,
+> and both with their own ways of copying functions into the SRAM.
+> 
+> Let's unify this before we have additional SoCs re-implementing this
+> obviously common functionality themselves.
+> 
+> For this use the generic allocator and the newly introduce
+> gen_pool_add_virt and gen_pool_virt_to_phys
+> 
+> Uio_pruss should probably take the SRAM pool pointer via
+> platform data so that it doesn't have to include Davinci specific
+> includes.
+Russell can I have a go?
 
-Regards
-Dong Aisheng
+Best Regards,
+J.
