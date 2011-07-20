@@ -1,56 +1,101 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 20 Jul 2011 13:57:43 +0300
-Subject: [PATCH 0/7] ARM: mx28: add usb host function
-In-Reply-To: <1311160106-4898-1-git-send-email-tony.lin@freescale.com>
+Date: Wed, 20 Jul 2011 13:59:34 +0300
+Subject: [PATCH 1/7] consolidate definitions and structures to share
+	among platforms
+In-Reply-To: <1311160106-4898-2-git-send-email-tony.lin@freescale.com>
 References: <1311160106-4898-1-git-send-email-tony.lin@freescale.com>
-Message-ID: <20110720105742.GI764@legolas.emea.dhcp.ti.com>
+	<1311160106-4898-2-git-send-email-tony.lin@freescale.com>
+Message-ID: <20110720105933.GJ764@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Wed, Jul 20, 2011 at 07:08:19PM +0800, Tony Lin wrote:
-> this patch series is to add mx28 usb host function.
-> the driver only support usb host mode on usb port1.
-> the driver reuses ehci-mxc.c under usb/host, but did
-> some modifications based on it to satisfy mx28 usb host
-> requirement. The modifications will not affect other
-> platforms.
+On Wed, Jul 20, 2011 at 07:08:20PM +0800, Tony Lin wrote:
+> move common definitions and data structures used for mxs and mxc
+> platforms to fsl_device.h from mxc_ehci.h
+> so that these definitions and structures could be shared without
+> duplicated copies.
 > 
-> Code is based on the branch for-next in sascha's tree
-> http://git.pengutronix.de/git/imx/linux-2.6.git
+> Signed-off-by: Tony Lin <tony.lin@freescale.com>
+>
+> ---
+>  arch/arm/plat-mxc/include/mach/mxc_ehci.h |   19 -------------------
+>  include/linux/fsl_devices.h               |   21 +++++++++++++++++++++
+>  2 files changed, 21 insertions(+), 19 deletions(-)
 > 
-> Tested on MX28 EVK.
-> 
-> Tony Lin (7):
->   consolidate definitions and structures to share among platforms
->   enable usb1 phy power supply
->   add usb phy clocks to clock tree
->   mx28: add usb host phy functions
->   ehci mxc: make it more flexible to be used for mx28
->   add macro definitions according to ehci-mxc driver change
->   add usb host function to default config
-> 
->  arch/arm/configs/mxs_defconfig            |    8 +-
->  arch/arm/mach-mxs/Kconfig                 |    1 +
->  arch/arm/mach-mxs/Makefile                |    1 +
->  arch/arm/mach-mxs/clock-mx28.c            |   18 ++
->  arch/arm/mach-mxs/include/mach/hardware.h |    2 +
->  arch/arm/mach-mxs/include/mach/mxs.h      |   12 +-
->  arch/arm/mach-mxs/mach-mx28evk.c          |    9 +
->  arch/arm/mach-mxs/regs-usbphy-mx28.h      |  323 +++++++++++++++++++++++++++++
->  arch/arm/mach-mxs/usb_h1.c                |  230 ++++++++++++++++++++
->  arch/arm/plat-mxc/include/mach/mxc.h      |    3 +
->  arch/arm/plat-mxc/include/mach/mxc_ehci.h |   19 --
->  drivers/usb/host/Kconfig                  |    2 +-
->  drivers/usb/host/ehci-mxc.c               |   57 ++++--
->  include/linux/fsl_devices.h               |   21 ++
->  14 files changed, 669 insertions(+), 37 deletions(-)
->  create mode 100644 arch/arm/mach-mxs/regs-usbphy-mx28.h
->  create mode 100644 arch/arm/mach-mxs/usb_h1.c
+> diff --git a/arch/arm/plat-mxc/include/mach/mxc_ehci.h b/arch/arm/plat-mxc/include/mach/mxc_ehci.h
+> index 2c159dc..8775807 100644
+> --- a/arch/arm/plat-mxc/include/mach/mxc_ehci.h
+> +++ b/arch/arm/plat-mxc/include/mach/mxc_ehci.h
+> @@ -1,17 +1,6 @@
+>  #ifndef __INCLUDE_ASM_ARCH_MXC_EHCI_H
+>  #define __INCLUDE_ASM_ARCH_MXC_EHCI_H
+>  
+> -/* values for portsc field */
+> -#define MXC_EHCI_PHY_LOW_POWER_SUSPEND	(1 << 23)
+> -#define MXC_EHCI_FORCE_FS		(1 << 24)
+> -#define MXC_EHCI_UTMI_8BIT		(0 << 28)
+> -#define MXC_EHCI_UTMI_16BIT		(1 << 28)
+> -#define MXC_EHCI_SERIAL			(1 << 29)
+> -#define MXC_EHCI_MODE_UTMI		(0 << 30)
+> -#define MXC_EHCI_MODE_PHILIPS		(1 << 30)
+> -#define MXC_EHCI_MODE_ULPI		(2 << 30)
+> -#define MXC_EHCI_MODE_SERIAL		(3 << 30)
+> -
+>  /* values for flags field */
+>  #define MXC_EHCI_INTERFACE_DIFF_UNI	(0 << 0)
+>  #define MXC_EHCI_INTERFACE_DIFF_BI	(1 << 0)
+> @@ -39,14 +28,6 @@
+>  #define MX5_USB_UTMI_PHYCTRL1_PLLDIV_MASK		0x3
+>  #define MX5_USB_UTMI_PHYCTRL1_PLLDIV_SHIFT		0
+>  
+> -struct mxc_usbh_platform_data {
+> -	int (*init)(struct platform_device *pdev);
+> -	int (*exit)(struct platform_device *pdev);
+> -
+> -	unsigned int		 portsc;
+> -	struct otg_transceiver	*otg;
+> -};
+> -
+>  int mx51_initialize_usb_hw(int port, unsigned int flags);
+>  int mx25_initialize_usb_hw(int port, unsigned int flags);
+>  int mx31_initialize_usb_hw(int port, unsigned int flags);
+> diff --git a/include/linux/fsl_devices.h b/include/linux/fsl_devices.h
+> index fffdf00..c138988 100644
+> --- a/include/linux/fsl_devices.h
+> +++ b/include/linux/fsl_devices.h
+> @@ -103,6 +103,27 @@ struct fsl_usb2_platform_data {
+>  
+>  #define FLS_USB2_WORKAROUND_ENGCM09152	(1 << 0)
+>  
+> +/* values for portsc field */
+> +#define MXC_EHCI_PHY_LOW_POWER_SUSPEND	(1 << 23)
+> +#define MXC_EHCI_FORCE_FS		(1 << 24)
+> +#define MXC_EHCI_UTMI_8BIT		(0 << 28)
+> +#define MXC_EHCI_UTMI_16BIT		(1 << 28)
+> +#define MXC_EHCI_SERIAL			(1 << 29)
+> +#define MXC_EHCI_MODE_UTMI		(0 << 30)
+> +#define MXC_EHCI_MODE_PHILIPS		(1 << 30)
+> +#define MXC_EHCI_MODE_ULPI		(2 << 30)
+> +#define MXC_EHCI_MODE_SERIAL		(3 << 30)
+> +
+> +struct mxc_usbh_platform_data {
+> +	int (*init)(struct platform_device *pdev);
+> +	int (*exit)(struct platform_device *pdev);
+> +
+> +	unsigned int		 portsc;
+> +	struct otg_transceiver	*otg;
+> +	int (*plt_get_usb_connect_status)(void);
+> +	void (*plt_usb_disconnect_detect)(int enable);
+> +};
+> +
+>  struct spi_device;
+>  
+>  struct fsl_spi_platform_data {
 
-Alan Stern is the maintainer for the EHCI driver. I'll have a look on
-this series anyway ;-)
+I believe this patch will cause build breakage since ehci-mxc.c doesn't
+include <linux/fsl_devices.h> ??
 
 -- 
 balbi
@@ -60,4 +105,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 490 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110720/c9e77787/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110720/8d49f4ef/attachment.sig>
