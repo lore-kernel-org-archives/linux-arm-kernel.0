@@ -1,42 +1,48 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 20 Jul 2011 17:48:07 +0100
-Subject: [PATCH] davinci: fix DM365 EVM video input mux bits
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024DC70E2A@dbde02.ent.ti.com>
-References: <1311046211-2849-1-git-send-email-jon.povey@racelogic.co.uk>
-	<B85A65D85D7EB246BE421B3FB0FBB593024DBDC68A@dbde02.ent.ti.com>
-	<20110719105532.GF26574@n2100.arm.linux.org.uk>
-	<B85A65D85D7EB246BE421B3FB0FBB593024DC70E2A@dbde02.ent.ti.com>
-Message-ID: <20110720164807.GA20310@n2100.arm.linux.org.uk>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Thu, 21 Jul 2011 00:49:28 +0800
+Subject: [alsa-devel] [PATCH v4 01/10] ASoc: mxs: add mxs-pcm driver
+In-Reply-To: <4E26FF9D.1070000@ti.com>
+References: <1311133306-9496-1-git-send-email-b29396@freescale.com>
+	<1311133306-9496-2-git-send-email-b29396@freescale.com>
+	<4E26FF9D.1070000@ti.com>
+Message-ID: <CAA+hA=SDDdf-Px1J_0CjE57QA2-n-=+=vH0Xpnqt=E5v1L1p7A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 20, 2011 at 10:10:57PM +0530, Nori, Sekhar wrote:
-> Hi Russell,
-> 
-> On Tue, Jul 19, 2011 at 16:25:32, Russell King - ARM Linux wrote:
-> > On Tue, Jul 19, 2011 at 02:26:50PM +0530, Nori, Sekhar wrote:
-> > > Since this part of the code hasn't changed since it
-> > > was written, this is a good candidate for stable
-> > > kernel series. You can just add:
-> > > 
-> > > Cc: stable at kernel.org
-> > 
-> > Be careful when doing that - if you have git mail the patches out for
-> > review, and it picks that up, it'll send it to the stable team as well.
-> > The stable team will then complain "that's not how to submit patches
-> > to them".
-> > 
-> > So, while you can add "Cc: stable at kernel.org" to the patch, its best
-> > to only add that just before you publish the commit after review, but
-> > before merging.
-> 
-> But its very tough to guess what the last version
-> ready for merging will be. Review comments can come
-> at any stage.
-> 
-> Would adding "Cc: stable at kernel.org" to the commit text
-> but taking care to not actually send mail to stable at kernel.org
-> help? The stable_kernel_rules.txt document seems to suggest
-> this is an acceptable way:
+2011/7/21 Liam Girdwood <lrg@ti.com>:
+> On 20/07/11 04:41, Dong Aisheng wrote:
+>> Signed-off-by: Dong Aisheng <b29396@freescale.com>
+>> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+>> Cc: Liam Girdwood <lrg@ti.com>
+>> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+>> Tested-by: Wolfram Sang <w.sang@pengutronix.de>
+>> ---
+>> ?sound/soc/mxs/mxs-pcm.c | ?359 +++++++++++++++++++++++++++++++++++++++++++++++
+>> ?sound/soc/mxs/mxs-pcm.h | ? 43 ++++++
+>> ?2 files changed, 402 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/sound/soc/mxs/mxs-pcm.c b/sound/soc/mxs/mxs-pcm.c
+>> new file mode 100644
+>> index 0000000..f9063e7
+>> --- /dev/null
+>> +++ b/sound/soc/mxs/mxs-pcm.c
+>> @@ -0,0 +1,359 @@
+>> +/*
+>
+> snip
+>
+>> +
+>> +static u64 mxs_pcm_dmamask = DMA_BIT_MASK(32);
+>> +static int mxs_pcm_new(struct snd_card *card, struct snd_soc_dai *dai,
+>> + ? ? ? struct snd_pcm *pcm)
+>>
+>
+> This API has been updated to pass in the runtime data only. Can you redo against -next.
+>
 
-Correct.
+Yes, i will do that and send an updated version based on for-next branch.
+BTW, please let me know if the driver has any more issues or the patch
+series version may increase a lot. :)
+
+Regards
+Dong Aisheng
