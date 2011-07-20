@@ -1,36 +1,68 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Wed, 20 Jul 2011 13:45:22 +0200
-Subject: [PATCH 5/7] ehci mxc: make it more flexible to be used for mx28
-In-Reply-To: <97D3A72708D04647A5AC84A04996E5B5161673@039-SN1MPN1-006.039d.mgd.msft.net>
-References: <1311160106-4898-1-git-send-email-tony.lin@freescale.com>
-	<1311160106-4898-6-git-send-email-tony.lin@freescale.com>
-	<874o2hp5z0.fsf@lebrac.rtp-net.org>
-	<97D3A72708D04647A5AC84A04996E5B5161673@039-SN1MPN1-006.039d.mgd.msft.net>
-Message-ID: <20110720114522.GC2377@pengutronix.de>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 20 Jul 2011 21:22:18 +0900
+Subject: [PATCH v3 0/6] Update Samsung-SoC ADC to support recent CPUs
+In-Reply-To: <1309420175-10301-1-git-send-email-myungjoo.ham@samsung.com>
+References: <1309420175-10301-1-git-send-email-myungjoo.ham@samsung.com>
+Message-ID: <069401cc46d7$d33dfdf0$79b9f9d0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+MyungJoo Ham wrote:
+> 
+> Patch 1/6: Add regulator support in ADC driver.
+> 	If CONFIG_REGULATOR is enabled, "vdd" regulator for the ADC driver
+> 	(e.g., "s5p-adc") should exist for the adc driver.
+> 
+> Patch 2/6: Channel selection method for S5PC110 and Exynos4
+> 	Recent Samsung SoCs have different register addresses for
+> 	channel selection. Use "s5p-adc" to support such chips.
+> 
+> Patch 3/6: Bugfix for suspend/resume of ADC driver.
+> 
+> Patch 4/6: Support ADC at Exynos4
+> 	Define register addresses and device name for Exynos4
+> 
+> Patch 5/6: Support ADC at S5PC110/S5PV210
+> 	Correct ADC device name for S5PC110/S5PV210
+> 
+> Patch 6/6: Header file correction (plat/devs.h)
+> 	The long-overdue bugfix for compiler errors. ADC for Exynos4 fails
+to
+> 	be compiled without this patch.
+> 
+> 
+> MyungJoo Ham (6):
+>   Samsung SoC ADC: use regulator (VDD for ADC).
+>   Samsung SoC ADC: Channel selection for S5PV210, S5PC110, and Exynos4
+>   Samsung SoC ADC: Revise PM for 12-bit ADC operations
+>   ARM: EXYNOS4: Support ADC
+>   ARM: S5PC110/S5PV210: Support ADC
+>   Samsung SoC: header file revised to prevent declaring duplicated.
+> 
+>  arch/arm/mach-exynos4/Kconfig                 |    1 +
+>  arch/arm/mach-exynos4/cpu.c                   |    4 +
+>  arch/arm/mach-exynos4/include/mach/irqs.h     |    3 +
+>  arch/arm/mach-exynos4/include/mach/map.h      |    5 ++
+>  arch/arm/mach-s5pv210/cpu.c                   |    2 +-
+>  arch/arm/plat-samsung/adc.c                   |   84
+> +++++++++++++++++++------
+>  arch/arm/plat-samsung/include/plat/devs.h     |    5 ++
+>  arch/arm/plat-samsung/include/plat/regs-adc.h |    1 +
+>  8 files changed, 84 insertions(+), 21 deletions(-)
+> 
+> --
+> 1.7.4.1
 
-> Yes, using cpu_is_* is really a bad method here :-)
-> But I had to follow that bad method so far,
+OK, applied but some comments.
 
-I don't think you 'had to'...
+- If you want to add just 'note', please add it under '---' not '--'.
+- I don't think we need many developers in Cc like your Cc list.
+- We should fix S3C SoCs' breaks during 3.1-rc.
 
-> hope we could see some change from sascha. 
+Thanks.
 
-...because you could have asked him about the status of these patches.
-
-Regerds,
-
-   Wolfram
-
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110720/0c3df8fc/attachment.sig>
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
