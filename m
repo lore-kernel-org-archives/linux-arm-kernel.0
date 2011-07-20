@@ -1,42 +1,73 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 20 Jul 2011 23:54:06 +0100
-Subject: [GIT PULL] MSM fix
-In-Reply-To: <20110720225010.GA18381@huya.qualcomm.com>
-References: <20110720203703.GA4495@huya.qualcomm.com>
-	<1989166.1WcWHOXyl7@wuerfel>
-	<20110720225010.GA18381@huya.qualcomm.com>
-Message-ID: <20110720225406.GB20310@n2100.arm.linux.org.uk>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 21 Jul 2011 07:13:55 +0800
+Subject: [PATCH] arm/mxc: add the missing UART_PADDR for i.mx53
+In-Reply-To: <4E2736E0.40105@boundarydevices.com>
+References: <1310251913-9877-1-git-send-email-troy.kisky@boundarydevices.com>
+	<1311167599-21790-1-git-send-email-shawn.guo@linaro.org>
+	<20110720130830.GD2377@pengutronix.de>
+	<20110720132418.GB6999@S2100-06.ap.freescale.net>
+	<20110720132720.GE2377@pengutronix.de>
+	<20110720134426.GD6999@S2100-06.ap.freescale.net>
+	<20110720134530.GA15471@pengutronix.de>
+	<4E2736E0.40105@boundarydevices.com>
+Message-ID: <20110720231354.GJ6999@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 20, 2011 at 03:50:10PM -0700, David Brown wrote:
-> On Wed, Jul 20, 2011 at 11:06:15PM +0200, Arnd Bergmann wrote:
-> > On Wednesday 20 July 2011 13:37:03 David Brown wrote:
-> > > I seem to have missed this fix when it was sent out in April.
-> > > 
-> > > The following changes since commit 620917de59eeb934b9f8cf35cc2d95c1ac8ed0fc:
-> > > 
-> > >   Linux 3.0-rc7 (2011-07-11 16:51:52 -0700)
-> > > 
-> > > are available in the git repository at:
-> > >   git://codeaurora.org/quic/kernel/davidb/linux-msm.git msm-fix
-> > > 
-> > > Jeff Ohlstein (1):
-> > >       msm: platsmp: actually read core count in get_core_count
-> > > 
+On Wed, Jul 20, 2011 at 01:13:20PM -0700, Troy Kisky wrote:
+> On 7/20/2011 6:45 AM, Wolfram Sang wrote:
+> > On Wed, Jul 20, 2011 at 09:44:27PM +0800, Shawn Guo wrote:
+> >> On Wed, Jul 20, 2011 at 03:27:20PM +0200, Wolfram Sang wrote:
+> >>>>> Then you should at least add his Signed-off. And maybe also mark him as
+> >>>>> the author of the patch?
+> >>>>>
+> >>>> I did exactly what you suggested here on a mx53 fec patch, but I was
+> >>>> told by Troy to change his s-o-b to reported-by.  So let's see what
+> >>>> he would say about this one.
+> >>>
+> >>> Okay, not much of a deal for such a patch. Though, I have doubts if one
+> >>> can request removing the SoB for a patch other people put work on top
+> >>> of.
+> >>>
+> >> So you are telling you are not following the list closely?
 > > 
-> > Hmm, this one seems like it really applies to older kernels as well, so
-> > we can just as well add a cc:stable at kernel.org tag and put it into the
-> > arm-soc/next/fixes branch, right?
+> > If "following closely" == "reading every single mail", then surely not.
+> > Why?
+> > 
+> Shawn,
 > 
-> It looks like it would apply to 2.6.38 and 39 as well.  I'm not sure
-> it qualifies under the "It must fix a real bug that bothers people".
-> It would only apply if someone had set NR_CPUS to more than 2.
+> The reason I requested to change to reported-by on the FEC patch was
+> because your patch was extremely different from mine and you deserved to
+> be listed as the author, not me.
+> 
+> 
+> For this, both patches are tiny. And since I still think that
+> CONFIG_ARCH_MX53 is more appropriate than CONFIG_SOC_IMX53,
+> I am also fine with a reported-by. Though your commit message
+> could be better. It is a run time problem, not compile-time.
+> 
+No.  It is a compile-time problem.  The reason we see difference there
+is because I based off linux-next (essentially linux-arm-soc/next <-
+Sascha's 'devel' branch), while you probably based off Sascha's
+for-next branch.
 
-Err, this makes no sense.  MSM doesn't have a get_core_count function
-and as far as I can see never has done in mainline.
+Sascha,
 
-And where is the patch?
+You forgot to apply the following patch on your for-next branch?
 
-We shouldn't be pulling git requests into arm-soc without having seen
-the patches on LAKML.
+commit fad107086d5a869c1c07e5bb35b7b57a10ecf578
+Author: Sascha Hauer <s.hauer@pengutronix.de>
+Date:   Thu May 19 17:25:05 2011 +0200
+
+    ARM i.MX debug macro: use CONFIG_SOC_* instead of CONFIG_ARCH_*
+
+    CONFIG_ARCH_* are deprecated, so remove one user.
+
+    Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+
+I think you still need to keep your for-next branch as a bleeding-edge
+for i.mx since people base their i.mx works off there.
+
+-- 
+Regards,
+Shawn
