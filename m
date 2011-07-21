@@ -1,55 +1,39 @@
-From: simon@sequanux.org (Simon Guinot)
-Date: Wed, 20 Jul 2011 23:45:37 +0000
-Subject: plat-orion gpio regression for mixed level and edge sensitive IRQs
-In-Reply-To: <4E25DBC5.9010308@drewtech.com>
-References: <4E25DBC5.9010308@drewtech.com>
-Message-ID: <20110720234537.GD16297@kw.sim.vm.gnt>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 20 Jul 2011 20:03:58 -0400 (EDT)
+Subject: dynamic VMALLOC_END, was Re: [PATCH 1/3] ARM: CSR: Adding CSR
+	SiRFprimaII board support
+In-Reply-To: <201107082337.15584.arnd@arndb.de>
+References: <1309945678-18813-1-git-send-email-bs14@csr.com>
+	<20110708162718.GI4812@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1107081327190.14596@xanadu.home>
+	<201107082337.15584.arnd@arndb.de>
+Message-ID: <alpine.LFD.2.00.1107201951090.21187@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joey,
+On Fri, 8 Jul 2011, Arnd Bergmann wrote:
 
-On Tue, Jul 19, 2011 at 03:32:21PM -0400, Joey Oravec wrote:
-> Orion maintainers,
+> On Friday 08 July 2011 20:09:29 Nicolas Pitre wrote:
+> > Indeed.  The VMALLOC_END case is possibly different as we were trying to 
+> > find a way to adjust it automatically at run time which would be one 
+> > thing less for platforms to care about.  Having a globally fixed value 
+> > for it would also solve the multiple definition problem.  But some 
+> > machines have a large set of IO mappings while some others have a 
+> > small one, so having a one size fits all solution here might be 
+> > suboptimal.
 > 
-> I've found a problem on plat-orion when requesting IRQs on GPIO
-> lines in the linux-3.0rc. This was introduced with the change to
-> generic IRQ chip.
+> Is everything between VMALLOC_END and 0xfeffffff guaranteed to come
+> from iotable_init? If so, we could perhaps turn it into a variable
+> that gets initialized to 0xfeffffff and decreased by iotable_init
+> to be just below the lowest address that has actually been mapped.
 > 
-> Processors in this family have separate mask registers for level and
-> edge sensitive interrupts, but generic IRQ chip functions like
-> irq_gc_mask_set_bit() are designed for chips with a single mask
-> register. Test with the following sequence:
-> 
-> 1. Register a level sensitive interrupt on pinA
-> 2. Register an edge sensitive interrupt on pinB
-> 
-> During #2, the mask_cache (with pinA unmasked) gets written to the
-> edge sensitive mask register. At the end of this call pinA is
-> unmasked for edge sensitive interrupts. Now you can get into a state
-> where an edge interrupt is asserted for pinA, but that edge
-> interrupt never gets ack'ed since pinA is registered to handle level
-> IRQs.
-> 
-> The older version of arch/arm/plat-orion/gpio.c does not have the
-> problem because it treats the registers separately and doesn't use a
-> cache. I've only tested this on MV78200 but any processor that uses
-> plat-orion with separate registers will experience this problem.
+> Obviously, anything that derives values from VMALLOC_END at compile
+> time would need to change, too.
 
-The same mask cache (stored within struct irq_chip_generic) is shared
-between all the irq_chip_type instances. As they can use different mask
-registers, there is a problem.
+You then have a catch22 situation, because one thing that gets derived 
+from VMALLOC_END is the highmem threshold, and that has to be determined 
+before iotable_init can be used.  And having a fixed highmem threshold 
+is not any better than a globally fixed VMALLOC_END of course.
 
-We should probably move mask_cache into struct irq_chip_type.
 
-Note that this issue only affect the Orion SoCs. On the other platform
-using the generic interrupt chip API, a single irq_chip_type is defined.
-
-Simon
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110720/e4ea6982/attachment.sig>
+Nicolas
