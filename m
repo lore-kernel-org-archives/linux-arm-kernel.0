@@ -1,31 +1,32 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Thu, 21 Jul 2011 16:39:09 +0530
-Subject: [PATCHV2 0/5] I2C: driver updates
-Message-ID: <1311246554-22975-1-git-send-email-shubhrajyoti@ti.com>
+Date: Thu, 21 Jul 2011 16:39:10 +0530
+Subject: [PATCHV2 1/5] OMAP: I2C: Add a device reset field to platform data
+In-Reply-To: <1311246554-22975-1-git-send-email-shubhrajyoti@ti.com>
+References: <1311246554-22975-1-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1311246554-22975-2-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The series attempts to do the following
-- The reset should not be done in the driver 
-  have support for the same.
-- Remove the sysc register access in the driver.
-- Restore the context only if the context is lost.
+Under some conditions the driver may want to do a reset
+of the device. Adding a reset field  to the platform
+data.
 
-version 2
- - Fix the indentation.
- - Restore in the error path is not needed as we are
-   doing a init.
+Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+---
+ include/linux/i2c-omap.h |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-Tested on sdp4430 and on omap3430
-
-Shubhrajyoti D (5):
-  OMAP: I2C: Add a device reset field to platform data
-  OMAP: I2C: Reset support
-  OMAP: I2C: Remove the reset in the init path
-  OMAP: I2C: Remove the SYSC register definition
-  OMAP: I2C: Restore only if context is lost
-
- arch/arm/plat-omap/i2c.c      |   17 +++++++
- drivers/i2c/busses/i2c-omap.c |  101 ++++++++++++++++-------------------------
- include/linux/i2c-omap.h      |    1 +
- 3 files changed, 57 insertions(+), 62 deletions(-)
+diff --git a/include/linux/i2c-omap.h b/include/linux/i2c-omap.h
+index 98ae49b..8aa91b6 100644
+--- a/include/linux/i2c-omap.h
++++ b/include/linux/i2c-omap.h
+@@ -38,6 +38,7 @@ struct omap_i2c_bus_platform_data {
+ 	int		(*device_enable) (struct platform_device *pdev);
+ 	int		(*device_shutdown) (struct platform_device *pdev);
+ 	int		(*device_idle) (struct platform_device *pdev);
++	int		(*device_reset) (struct device *dev);
+ };
+ 
+ #endif
+-- 
+1.7.1
