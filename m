@@ -1,57 +1,41 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 21 Jul 2011 10:34:40 +0900
-Subject: [PATCH 0/3] ARM: Add SDMMC support for S5P64X0
-In-Reply-To: <1308571049-4412-1-git-send-email-rajeshwari.s@samsung.com>
-References: <1308571049-4412-1-git-send-email-rajeshwari.s@samsung.com>
-Message-ID: <003601cc4746$61b27570$25176050$%kim@samsung.com>
+From: myungjoo.ham@samsung.com (MyungJoo Ham)
+Date: Thu, 21 Jul 2011 11:11:31 +0900
+Subject: [PATCH] ARM: EXYNOS4: Add more register addresses of CMU.
+In-Reply-To: <000501cc470b$34a32060$9de96120$%kim@samsung.com>
+References: <000501cc470b$34a32060$9de96120$%kim@samsung.com>
+Message-ID: <1311214291-32151-1-git-send-email-myungjoo.ham@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rajeshwari Shinde wrote:
-> 
-> From: rajeshwari.s <rajeshwari.s@samsung.com>
-> 
-> S5P64X0 supports 3 Channel MMC/SDHC/SDIO.
-> 
-> This patchset adds the setup files, gpio configs and enables the HSMMC
-device
-> for S5P64X0.
-> 
->  o To Kukjin Kim and Sangbeom Kim
-> [PATCH 1/3] ARM: S5P64X0: Add HSMMC setup for host Controller
-> [PATCH 2/3] ARM: S5P64X0: Initialize default SDHCI devices and platform
-data
-> [PATCH 3/3] ARM: S5P64X0: Enable SDHCI support
-> ---
+These registers are crucial for PM to work properly.
 
-As I know, I got your reply on my comments like following.
+Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ arch/arm/mach-exynos4/include/mach/regs-clock.h |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
 
---
-Hi Kukjin Kim,
+diff --git a/arch/arm/mach-exynos4/include/mach/regs-clock.h b/arch/arm/mach-exynos4/include/mach/regs-clock.h
+index 64bdd24..d493fdb 100644
+--- a/arch/arm/mach-exynos4/include/mach/regs-clock.h
++++ b/arch/arm/mach-exynos4/include/mach/regs-clock.h
+@@ -36,7 +36,9 @@
+ #define S5P_CLKSRC_TOP0			S5P_CLKREG(0x0C210)
+ #define S5P_CLKSRC_TOP1			S5P_CLKREG(0x0C214)
+ #define S5P_CLKSRC_CAM			S5P_CLKREG(0x0C220)
++#define S5P_CLKSRC_TV			S5P_CLKREG(0x0C224)
+ #define S5P_CLKSRC_MFC			S5P_CLKREG(0x0C228)
++#define S5P_CLKSRC_G3D			S5P_CLKREG(0x0C22C)
+ #define S5P_CLKSRC_IMAGE		S5P_CLKREG(0x0C230)
+ #define S5P_CLKSRC_LCD0			S5P_CLKREG(0x0C234)
+ #define S5P_CLKSRC_LCD1			S5P_CLKREG(0x0C238)
+@@ -64,6 +66,7 @@
+ #define S5P_CLKDIV_PERIL3		S5P_CLKREG(0x0C55C)
+ #define S5P_CLKDIV_PERIL4		S5P_CLKREG(0x0C560)
+ #define S5P_CLKDIV_PERIL5		S5P_CLKREG(0x0C564)
++#define S5P_CLKDIV2_RATIO		S5P_CLKREG(0x0C580)
  
-Thank you for your comments.
-Will modify the patches as per comments and resend the same.
- 
-Regards,
-Rajeshwari Shinde.
---
-Hi Russell,
- 
-Thank you for the comment will do the change as specified.
- 
-Regards,
-Rajeshwari Shinde.
---
-
-But I didn't get any updated patch and unfortunately, we don't have much
-time for upcoming merge window.
-
-One more, please don't use html type e-mail in mailing list.
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+ #define S5P_CLKSRC_MASK_TOP		S5P_CLKREG(0x0C310)
+ #define S5P_CLKSRC_MASK_CAM		S5P_CLKREG(0x0C320)
+-- 
+1.7.4.1
