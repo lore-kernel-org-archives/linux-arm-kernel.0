@@ -1,58 +1,40 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Thu, 21 Jul 2011 18:00:05 +0100
-Subject: linux-next regression on ARM926
-In-Reply-To: <20110721165210.GD20310@n2100.arm.linux.org.uk>
-References: <CACRpkdbBrVda2oD42tjrWiG6uHXAdWwpr6cZ7qnSc2KM82XCfw@mail.gmail.com>
-	<20110718112757.GV23270@n2100.arm.linux.org.uk>
-	<CA+wbFdfNAjqQf4T48_cVbNOb6ac84TQC-2QvHKD43dfRou-i9w@mail.gmail.com>
-	<20110719110904.GJ26574@n2100.arm.linux.org.uk>
-	<CA+wbFdcifNu1W1BtehSxEMf4G48NhYiCHx+uAGjFuRQ4hr_rLA@mail.gmail.com>
-	<20110721134804.GO26574@n2100.arm.linux.org.uk>
-	<CA+wbFdeohxm64qpDs+i4TaYBeL0vjqeG6LU0_3VucZ0hvVxCMQ@mail.gmail.com>
-	<20110721165210.GD20310@n2100.arm.linux.org.uk>
-Message-ID: <CA+wbFddfkSAeg95YpPQ42qTxmfjjfKyop+z0zJxiEvEE3ScMFQ@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 21 Jul 2011 18:10:20 +0100
+Subject: [PATCH] mtd: s3c2410 nand: Remove uncessary null check
+In-Reply-To: <4E27CD14.4090702@nvidia.com>
+References: <1311230038-6111-1-git-send-email-jhbird.choi@samsung.com>
+	<4E27CD14.4090702@nvidia.com>
+Message-ID: <20110721171020.GE20310@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 21, 2011 at 5:52 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Thu, Jul 21, 2011 at 05:39:06PM +0100, Dave Martin wrote:
->> Did you miss proc-v6, or is that touched by some other patch? ?I
->> already have the relevant patch, so I'm happy to post that if you
->> don't already have it.
->
-> Well spotted, I've just corrected that.
+On Thu, Jul 21, 2011 at 12:24:12PM +0530, Varun Wadekar wrote:
+> On Thursday 21 July 2011 12:03 PM, jhbird.choi at samsung.com wrote:
+> > From: Jonghwan Choi <jhbird.choi@samsung.com>
+> >
+> > clk_get() return a pointer to the struct clk or an ERR_PTR().
+> >
+> > Signed-off-by: Jonghwan Choi <jhbird.choi@samsung.com>
+> > ---
+> >  drivers/mtd/nand/s3c2410.c |    2 +-
+> >  1 files changed, 1 insertions(+), 1 deletions(-)
+> >
+> > diff --git a/drivers/mtd/nand/s3c2410.c b/drivers/mtd/nand/s3c2410.c
+> > index 4405468..18ff2f5 100644
+> > --- a/drivers/mtd/nand/s3c2410.c
+> > +++ b/drivers/mtd/nand/s3c2410.c
+> > @@ -723,7 +723,7 @@ static int s3c24xx_nand_remove(struct platform_device *pdev)
+> >  
+> >  	/* free the common resources */
+> >  
+> > -	if (info->clk != NULL && !IS_ERR(info->clk)) {
+> > +	if (!IS_ERR(info->clk)) {
+> 
+> I think you should use IS_ERR_OR_NULL instead.
 
-I think that should be all of them -- I had hacked up a quick script
-to find and change all instances, but proc-v6 was the only one it
-touched which wasn't in your series.
+No.  Jonghwan Choi's patch is correct.
 
-I also build-tested the change in several configurations just to be
-sure.  It looks sound, so far as I can tell.
-
->
->> My proc-maros.S patch is slightly different in that it avoids defining
->> the default values twice (i.e., once for !CONFIG_PM_SUSPEND and once
->> for suspend=0); but it's otherwise equivalent.
->>
->> I also took the opportunity to remove the definitions of
->> cpu_<name>_suspend_size for the !CONFIG_PM_SUSPEND case, since this
->> helps to ensure they are not used accidentally. ?That's a more
->> cosmetic change.
->
-> The missing symbols for do_suspend/do_resume should be enough on their
-> own to catch people using it, so I don't think that's necessary.
-
-OK, agreed.
-
->> Do you want me to post my whole series anyway, or otherwise can you
->> point me to where you applied the patches so I can filter my series?
->
-> I'll push it out later this evening, it'll be part of the devel-stable
-> branch so once pushed it becomes immutable.
-
-in that that case I guess I don't have anything to add, so I'll drop
-my patches.  Apologies for the last-minute churn...
-
-Thanks
----Dave
+As per the patch description, the only error value which a driver can
+attribute any problem with is something which passes IS_ERR().  Everything
+else the driver must treat as a _valid_ struct clk - and the clk API
+implementation must accept non-IS_ERR() clk_get() values.
