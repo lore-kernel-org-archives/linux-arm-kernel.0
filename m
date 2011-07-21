@@ -1,162 +1,60 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 21 Jul 2011 17:57:27 +0100
-Subject: [RFC PATCH v9 3/4] ARM: local timers: drop local_timer_ack()
-In-Reply-To: <1311267448-14652-1-git-send-email-marc.zyngier@arm.com>
-References: <1311267448-14652-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1311267448-14652-4-git-send-email-marc.zyngier@arm.com>
+Date: Thu, 21 Jul 2011 17:57:24 +0100
+Subject: [RFC PATCH v9 0/4] Consolidating GIC per-cpu interrupts
+Message-ID: <1311267448-14652-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Only TWD uses local_timer_ack() to perform something useful.
-Make it the real (private) interrupt handler, remove the
-common interrupt handler as well as the useless stubs from
-MCT and MSM.
+The current GIC per-cpu interrupts (aka PPIs) suffer from a number of
+problems:
 
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Cc: David Brown <davidb@codeaurora.org>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/include/asm/localtimer.h |    7 -------
- arch/arm/include/asm/smp_twd.h    |    1 -
- arch/arm/kernel/smp.c             |   14 --------------
- arch/arm/kernel/smp_twd.c         |   17 +++++++----------
- arch/arm/mach-exynos4/mct.c       |    6 ------
- arch/arm/mach-msm/timer.c         |    6 ------
- 6 files changed, 7 insertions(+), 44 deletions(-)
+- They use a completely separate scheme to handle the interrupts,
+  mostly because the PPI concept doesn't really match the kernel view
+  of an interrupt.
+- PPIs can only be used by the timer code, unless we add more low-level
+  assembly code.
+- The local timer code can only be used by devices generating PPIs,
+  and not SPIs.
+- At least one platform (msm) has started implementing its own
+  alternative scheme.
+- Some low-level code gets duplicated, as usual...
 
-diff --git a/arch/arm/include/asm/localtimer.h b/arch/arm/include/asm/localtimer.h
-index 9b0dfbb..12ce9f8 100644
---- a/arch/arm/include/asm/localtimer.h
-+++ b/arch/arm/include/asm/localtimer.h
-@@ -30,18 +30,11 @@ irqreturn_t percpu_timer_handler(int irq, void *dev_id);
- 
- #include "smp_twd.h"
- 
--#define local_timer_ack()	twd_timer_ack()
- #define local_timer_stop(c)	twd_timer_stop((c))
- 
- #else
- 
- /*
-- * Platform provides this to acknowledge a local timer IRQ.
-- * Returns true if the local timer IRQ is to be processed.
-- */
--int local_timer_ack(void);
--
--/*
-  * Stop the local timer
-  */
- void local_timer_stop(struct clock_event_device *);
-diff --git a/arch/arm/include/asm/smp_twd.h b/arch/arm/include/asm/smp_twd.h
-index 6923037..ef9ffba 100644
---- a/arch/arm/include/asm/smp_twd.h
-+++ b/arch/arm/include/asm/smp_twd.h
-@@ -22,7 +22,6 @@ struct clock_event_device;
- 
- extern void __iomem *twd_base;
- 
--int twd_timer_ack(void);
- void twd_timer_setup(struct clock_event_device *);
- void twd_timer_stop(struct clock_event_device *);
- 
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 9bcdbba..882ab49 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -453,20 +453,6 @@ static void ipi_timer(void)
- 	irq_exit();
- }
- 
--#ifdef CONFIG_LOCAL_TIMERS
--irqreturn_t percpu_timer_handler(int irq, void *dev_id)
--{
--	struct clock_event_device *evt = dev_id;
--
--	if (local_timer_ack()) {
--		evt->event_handler(evt);
--		return IRQ_HANDLED;
--	}
--
--	return IRQ_NONE;
--}
--#endif
--
- #ifdef CONFIG_GENERIC_CLOCKEVENTS_BROADCAST
- static void smp_timer_broadcast(const struct cpumask *mask)
- {
-diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-index b2c4543..1ad69f8 100644
---- a/arch/arm/kernel/smp_twd.c
-+++ b/arch/arm/kernel/smp_twd.c
-@@ -65,20 +65,17 @@ static int twd_set_next_event(unsigned long evt,
- 	return 0;
- }
- 
--/*
-- * local_timer_ack: checks for a local timer interrupt.
-- *
-- * If a local timer interrupt has occurred, acknowledge and return 1.
-- * Otherwise, return 0.
-- */
--int twd_timer_ack(void)
-+static irqreturn_t twd_timer_handler(int irq, void *dev_id)
- {
-+	struct clock_event_device *clk = dev_id;
-+
- 	if (__raw_readl(twd_base + TWD_TIMER_INTSTAT)) {
- 		__raw_writel(1, twd_base + TWD_TIMER_INTSTAT);
--		return 1;
-+		clk->event_handler(clk);
-+		return IRQ_HANDLED;
- 	}
- 
--	return 0;
-+	return IRQ_NONE;
- }
- 
- void twd_timer_stop(struct clock_event_device *clk)
-@@ -146,7 +143,7 @@ void __cpuinit twd_timer_setup(struct clock_event_device *clk)
- 	clk->max_delta_ns = clockevent_delta2ns(0xffffffff, clk);
- 	clk->min_delta_ns = clockevent_delta2ns(0xf, clk);
- 
--	err = gic_request_ppi(clk->irq, percpu_timer_handler, clk);
-+	err = gic_request_ppi(clk->irq, twd_timer_handler, clk);
- 	if (err) {
- 		pr_err("%s: can't register interrupt %d on cpu %d (%d)\n",
- 		       clk->name, clk->irq, smp_processor_id(), err);
-diff --git a/arch/arm/mach-exynos4/mct.c b/arch/arm/mach-exynos4/mct.c
-index 1ae059b..194fc6d 100644
---- a/arch/arm/mach-exynos4/mct.c
-+++ b/arch/arm/mach-exynos4/mct.c
-@@ -393,12 +393,6 @@ void __cpuinit local_timer_setup(struct clock_event_device *evt)
- {
- 	exynos4_mct_tick_init(evt);
- }
--
--int local_timer_ack(void)
--{
--	return 0;
--}
--
- #endif /* CONFIG_LOCAL_TIMERS */
- 
- static void __init exynos4_timer_resources(void)
-diff --git a/arch/arm/mach-msm/timer.c b/arch/arm/mach-msm/timer.c
-index 0f49b5c..02f03f4 100644
---- a/arch/arm/mach-msm/timer.c
-+++ b/arch/arm/mach-msm/timer.c
-@@ -305,12 +305,6 @@ void local_timer_stop(struct clock_event_device *evt)
- 	evt->set_mode(CLOCK_EVT_MODE_UNUSED, evt);
- 	gic_free_ppi(evt->irq, evt);
- }
--
--inline int local_timer_ack(void)
--{
--	return 1;
--}
--
- #endif
- 
- struct sys_timer msm_timer = {
--- 
-1.7.0.4
+As the previous solution which tried to map PPIs to normal interrupts
+has been proved to be buggy, I've opted to a much simpler scheme
+(based on Russell's input).
+
+The proposed solution is to handle the interrupt using the same path
+as SPIs, with a common handler for all PPIs. Each PPI can be requested
+using gic_request_ppi(), similar to request_irq(). The local timer
+code is updated to reflect these changes.
+
+Patches against next-20110721, tested on PB11MP. As this patch series
+is quite different from the previous one, I've dropped all previous
+acks from platform maintainers.
+
+Marc Zyngier (4):
+  ARM: gic: consolidate PPI handling
+  ARM: gic: Add PPI registration interface
+  ARM: local timers: drop local_timer_ack()
+  ARM: gic: add compute_irqnr macro for exynos4
+
+ arch/arm/common/gic.c                             |  150 +++++++++++++++++++--
+ arch/arm/include/asm/entry-macro-multi.S          |    7 -
+ arch/arm/include/asm/hardirq.h                    |    3 -
+ arch/arm/include/asm/hardware/entry-macro-gic.S   |   22 +---
+ arch/arm/include/asm/hardware/gic.h               |    5 +-
+ arch/arm/include/asm/localtimer.h                 |   14 +-
+ arch/arm/include/asm/smp.h                        |    5 -
+ arch/arm/include/asm/smp_twd.h                    |    2 +-
+ arch/arm/kernel/irq.c                             |    3 -
+ arch/arm/kernel/smp.c                             |   33 +-----
+ arch/arm/kernel/smp_twd.c                         |   32 +++--
+ arch/arm/mach-exynos4/include/mach/entry-macro.S  |   61 +--------
+ arch/arm/mach-exynos4/mct.c                       |    6 -
+ arch/arm/mach-msm/board-msm8x60.c                 |   11 --
+ arch/arm/mach-msm/include/mach/entry-macro-qgic.S |   73 +----------
+ arch/arm/mach-msm/timer.c                         |   52 +++----
+ arch/arm/mach-omap2/include/mach/entry-macro.S    |   14 +--
+ arch/arm/mach-shmobile/entry-intc.S               |    3 -
+ arch/arm/mach-shmobile/include/mach/entry-macro.S |    3 -
+ 19 files changed, 208 insertions(+), 291 deletions(-)
