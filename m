@@ -1,39 +1,26 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 20 Jul 2011 20:03:58 -0400 (EDT)
-Subject: dynamic VMALLOC_END, was Re: [PATCH 1/3] ARM: CSR: Adding CSR
-	SiRFprimaII board support
-In-Reply-To: <201107082337.15584.arnd@arndb.de>
-References: <1309945678-18813-1-git-send-email-bs14@csr.com>
-	<20110708162718.GI4812@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1107081327190.14596@xanadu.home>
-	<201107082337.15584.arnd@arndb.de>
-Message-ID: <alpine.LFD.2.00.1107201951090.21187@xanadu.home>
+From: troy.kisky@boundarydevices.com (Troy Kisky)
+Date: Wed, 20 Jul 2011 17:31:24 -0700
+Subject: [PATCH] arm/mxc: add the missing UART_PADDR for i.mx53
+In-Reply-To: <20110720231638.GK6999@S2100-06.ap.freescale.net>
+References: <1310251913-9877-1-git-send-email-troy.kisky@boundarydevices.com>	<1311167599-21790-1-git-send-email-shawn.guo@linaro.org>	<4E27444D.2010005@boundarydevices.com>
+	<20110720231638.GK6999@S2100-06.ap.freescale.net>
+Message-ID: <4E27735C.90906@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 8 Jul 2011, Arnd Bergmann wrote:
-
-> On Friday 08 July 2011 20:09:29 Nicolas Pitre wrote:
-> > Indeed.  The VMALLOC_END case is possibly different as we were trying to 
-> > find a way to adjust it automatically at run time which would be one 
-> > thing less for platforms to care about.  Having a globally fixed value 
-> > for it would also solve the multiple definition problem.  But some 
-> > machines have a large set of IO mappings while some others have a 
-> > small one, so having a one size fits all solution here might be 
-> > suboptimal.
+On 7/20/2011 4:16 PM, Shawn Guo wrote:
+> On Wed, Jul 20, 2011 at 02:10:37PM -0700, Troy Kisky wrote:
+>> On 7/20/2011 6:13 AM, Shawn Guo wrote:
+>>
+>> So, all MX5's are using MX51_UART1_BASE_ADDR.
+>> I can't see that your patch changes CONFIG_ARCH_MX5
+>> to CONFIG_SOC_IMX51. It isn't functionally the same as my version.
+>>
+> We started from the difference base.  No, it is not functionally the
+> same as yours, so even remove your reported-by? :)
 > 
-> Is everything between VMALLOC_END and 0xfeffffff guaranteed to come
-> from iotable_init? If so, we could perhaps turn it into a variable
-> that gets initialized to 0xfeffffff and decreased by iotable_init
-> to be just below the lowest address that has actually been mapped.
-> 
-> Obviously, anything that derives values from VMALLOC_END at compile
-> time would need to change, too.
 
-You then have a catch22 situation, because one thing that gets derived 
-from VMALLOC_END is the highmem threshold, and that has to be determined 
-before iotable_init can be used.  And having a fixed highmem threshold 
-is not any better than a globally fixed VMALLOC_END of course.
+Thanks for the explanation. You'll get no complaints from me. Do as you
+like.
 
-
-Nicolas
+Troy
