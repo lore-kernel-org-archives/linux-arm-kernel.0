@@ -1,84 +1,33 @@
-From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Thu, 21 Jul 2011 19:23:01 +0530
-Subject: [PATCHV3 4/4] OMAP: I2C: I2C register restore only if context is lost
-In-Reply-To: <1311256381-25548-1-git-send-email-shubhrajyoti@ti.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 21 Jul 2011 16:59:39 +0300
+Subject: [PATCHV3 2/4] OMAP: I2C: Remove the reset in the init path
+In-Reply-To: <1311256381-25548-3-git-send-email-shubhrajyoti@ti.com>
 References: <1311256381-25548-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1311256381-25548-5-git-send-email-shubhrajyoti@ti.com>
+	<1311256381-25548-3-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <20110721135938.GC30943@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Currently i2c register restore is done always.
- Adding conditional restore.
- The i2c register restore is done only if the context is lost.
+Hi,
 
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com> 
-Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
----
- drivers/i2c/busses/i2c-omap.c |   24 +++++++++++++++++-------
- 1 files changed, 17 insertions(+), 7 deletions(-)
+On Thu, Jul 21, 2011 at 07:22:59PM +0530, Shubhrajyoti D wrote:
+> The reset in the driver at init is not needed
+> anymore as the hwmod framework takes care of
+> reseting it.
+> 
+> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 
-diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 75bb62d..dffdbfd 100644
---- a/drivers/i2c/busses/i2c-omap.c
-+++ b/drivers/i2c/busses/i2c-omap.c
-@@ -40,6 +40,7 @@
- #include <linux/slab.h>
- #include <linux/i2c-omap.h>
- #include <linux/pm_runtime.h>
-+#include <plat/omap_device.h>
- 
- /* I2C controller revisions */
- #define OMAP_I2C_OMAP1_REV_2		0x20
-@@ -200,6 +201,7 @@ struct omap_i2c_dev {
- 	u16			syscstate;
- 	u16			westate;
- 	u16			errata;
-+	u32			dev_lost_count;
- };
- 
- const static u8 reg_map_ip_v1[] = {
-@@ -260,6 +262,17 @@ static inline u16 omap_i2c_read_reg(struct omap_i2c_dev *i2c_dev, int reg)
- 				(i2c_dev->regs[reg] << i2c_dev->reg_shift));
- }
- 
-+static void omap_i2c_restore(struct omap_i2c_dev *dev)
-+{
-+	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
-+	omap_i2c_write_reg(dev, OMAP_I2C_PSC_REG, dev->pscstate);
-+	omap_i2c_write_reg(dev, OMAP_I2C_SCLL_REG, dev->scllstate);
-+	omap_i2c_write_reg(dev, OMAP_I2C_SCLH_REG, dev->sclhstate);
-+	omap_i2c_write_reg(dev, OMAP_I2C_BUF_REG, dev->bufstate);
-+	omap_i2c_write_reg(dev, OMAP_I2C_WE_REG, dev->westate);
-+	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, OMAP_I2C_CON_EN);
-+}
-+
- static void omap_i2c_unidle(struct omap_i2c_dev *dev)
- {
- 	struct platform_device *pdev;
-@@ -273,13 +286,9 @@ static void omap_i2c_unidle(struct omap_i2c_dev *dev)
- 	pm_runtime_get_sync(&pdev->dev);
- 
- 	if (pdata->flags & OMAP_I2C_FLAG_RESET_REGS_POSTIDLE) {
--		omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
--		omap_i2c_write_reg(dev, OMAP_I2C_PSC_REG, dev->pscstate);
--		omap_i2c_write_reg(dev, OMAP_I2C_SCLL_REG, dev->scllstate);
--		omap_i2c_write_reg(dev, OMAP_I2C_SCLH_REG, dev->sclhstate);
--		omap_i2c_write_reg(dev, OMAP_I2C_BUF_REG, dev->bufstate);
--		omap_i2c_write_reg(dev, OMAP_I2C_WE_REG, dev->westate);
--		omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, OMAP_I2C_CON_EN);
-+		u32 loss_cnt = omap_device_get_context_loss_count(pdev);
-+		if (dev->dev_lost_count != loss_cnt)
-+			omap_i2c_restore(dev);
- 	}
- 	dev->idle = 0;
- 
-@@ -318,6 +327,7 @@ static void omap_i2c_idle(struct omap_i2c_dev *dev)
- 	}
- 	dev->idle = 1;
- 
-+	dev->dev_lost_count = omap_device_get_context_loss_count(pdev);
- 	pm_runtime_put_sync(&pdev->dev);
- }
- 
+this is still doing two things:
+
+a. remove the reset from init path
+b. add and use ->device_reset() when needed.
+
 -- 
-1.7.1
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 490 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110721/98c6501c/attachment.sig>
