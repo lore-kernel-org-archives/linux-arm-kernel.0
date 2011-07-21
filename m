@@ -1,97 +1,182 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 21 Jul 2011 10:07:36 +0900
-Subject: [PATCH 2/6] ARM: S5P64X0: Add register base and IRQ for
-	Framebuffer
-In-Reply-To: <1310650036-28836-3-git-send-email-ajaykumar.rs@samsung.com>
+Date: Thu, 21 Jul 2011 10:21:26 +0900
+Subject: [PATCH 4/6] ARM: S5P64X0: Add GPIO and SPCON settings for LCD
+In-Reply-To: <1310650036-28836-5-git-send-email-ajaykumar.rs@samsung.com>
 References: <1310650036-28836-1-git-send-email-ajaykumar.rs@samsung.com>
-	<1310650036-28836-3-git-send-email-ajaykumar.rs@samsung.com>
-Message-ID: <003301cc4742$98c51c10$ca4f5430$%kim@samsung.com>
+	<1310650036-28836-5-git-send-email-ajaykumar.rs@samsung.com>
+Message-ID: <003401cc4744$8aec4530$a0c4cf90$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Ajay Kumar wrote:
 > 
 > This patch adds:
-> o Framebuffer related register mappings and bit fields.
-> o IRQ number being used.
+> o GPIO lines settings(HSYNC, VSYNC, VCLK and VD) for LCD.
+> o Function to select type of LCD interface (RGB/i80)
 > 
 > Signed-off-by: Ajay Kumar <ajaykumar.rs@samsung.com>
 > ---
->  arch/arm/mach-s5p64x0/include/mach/irqs.h    |    4 ++++
->  arch/arm/mach-s5p64x0/include/mach/map.h     |    3 +++
->  arch/arm/mach-s5p64x0/include/mach/regs-fb.h |   19 +++++++++++++++++++
->  3 files changed, 26 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/mach-s5p64x0/include/mach/regs-fb.h
+>  arch/arm/mach-s5p64x0/Kconfig                  |    6 +++
+>  arch/arm/mach-s5p64x0/Makefile                 |    1 +
+>  arch/arm/mach-s5p64x0/include/mach/regs-gpio.h |    4 ++
+>  arch/arm/mach-s5p64x0/setup-fb.c               |   48
+> ++++++++++++++++++++++++
+>  arch/arm/plat-samsung/include/plat/fb.h        |   14 +++++++
+>  5 files changed, 73 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-s5p64x0/setup-fb.c
 > 
-> diff --git a/arch/arm/mach-s5p64x0/include/mach/irqs.h b/arch/arm/mach-
-> s5p64x0/include/mach/irqs.h
-> index 513abff..09995b8 100644
-> --- a/arch/arm/mach-s5p64x0/include/mach/irqs.h
-> +++ b/arch/arm/mach-s5p64x0/include/mach/irqs.h
-> @@ -85,6 +85,10 @@
->  #define IRQ_S3CUART_RX4		IRQ_S5P_UART_RX4
->  #define IRQ_S3CUART_RX5		IRQ_S5P_UART_RX5
+> diff --git a/arch/arm/mach-s5p64x0/Kconfig b/arch/arm/mach-s5p64x0/Kconfig
+> index 017af4c..2ca5ac0 100644
+> --- a/arch/arm/mach-s5p64x0/Kconfig
+> +++ b/arch/arm/mach-s5p64x0/Kconfig
+> @@ -21,6 +21,12 @@ config CPU_S5P6450
+>  	help
+>  	  Enable S5P6450 CPU support
 > 
-> +#define IRQ_LCD_FIFO		IRQ_DISPCON0
-> +#define IRQ_LCD_VSYNC		IRQ_DISPCON1
-> +#define IRQ_LCD_SYSTEM		IRQ_DISPCON2
+> +config S5P64X0_SETUP_FB
+> +	bool
+> +	help
+> +	  Common setup code for S5P64X0 based boards with a LCD display
+> +	  through RGB interface.
 > +
->  /* S5P6450 EINT feature will be added */
+>  config S5P64X0_SETUP_I2C1
+>  	bool
+>  	help
+> diff --git a/arch/arm/mach-s5p64x0/Makefile
+b/arch/arm/mach-s5p64x0/Makefile
+> index ae6bf6f..43698c6 100644
+> --- a/arch/arm/mach-s5p64x0/Makefile
+> +++ b/arch/arm/mach-s5p64x0/Makefile
+> @@ -28,3 +28,4 @@ obj-y				+= dev-audio.o
+>  obj-$(CONFIG_S3C64XX_DEV_SPI)	+= dev-spi.o
 > 
->  /*
-> diff --git a/arch/arm/mach-s5p64x0/include/mach/map.h b/arch/arm/mach-
-> s5p64x0/include/mach/map.h
-> index 95c9125..c5ef50c 100644
-> --- a/arch/arm/mach-s5p64x0/include/mach/map.h
-> +++ b/arch/arm/mach-s5p64x0/include/mach/map.h
-> @@ -47,6 +47,8 @@
+>  obj-$(CONFIG_S5P64X0_SETUP_I2C1)	+= setup-i2c1.o
+> +obj-$(CONFIG_S5P64X0_SETUP_FB)		+= setup-fb.o
+> diff --git a/arch/arm/mach-s5p64x0/include/mach/regs-gpio.h
+b/arch/arm/mach-
+> s5p64x0/include/mach/regs-gpio.h
+> index 0953ef6..2f07cbd 100644
+> --- a/arch/arm/mach-s5p64x0/include/mach/regs-gpio.h
+> +++ b/arch/arm/mach-s5p64x0/include/mach/regs-gpio.h
+> @@ -34,4 +34,8 @@
+>  #define S5P6450_GPQ_BASE		(S5P_VA_GPIO + 0x0180)
+>  #define S5P6450_GPS_BASE		(S5P_VA_GPIO + 0x0300)
 > 
->  #define S5P64X0_PA_HSMMC(x)	(0xED800000 + ((x) * 0x100000))
-> 
-> +#define S5P64X0_PA_FB		0xEE000000
+> +#define S5P64X0_SPCON0			(S5P_VA_GPIO + 0x1A0)
+> +#define S5P64X0_SPCON0_LCD_SEL_MASK	(0x3 << 0)
+> +#define S5P64X0_SPCON0_LCD_SEL_RGB	(0x1 << 0)
 > +
->  #define S5P64X0_PA_I2S		0xF2000000
->  #define S5P6450_PA_I2S1		0xF2800000
->  #define S5P6450_PA_I2S2		0xF2900000
-> @@ -64,6 +66,7 @@
->  #define S3C_PA_IIC1		S5P6440_PA_IIC1
->  #define S3C_PA_RTC		S5P64X0_PA_RTC
->  #define S3C_PA_WDT		S5P64X0_PA_WDT
-> +#define S3C_PA_FB		S5P64X0_PA_FB
-> 
->  #define S5P_PA_CHIPID		S5P64X0_PA_CHIPID
->  #define S5P_PA_SROMC		S5P64X0_PA_SROMC
-> diff --git a/arch/arm/mach-s5p64x0/include/mach/regs-fb.h b/arch/arm/mach-
-> s5p64x0/include/mach/regs-fb.h
+>  #endif /* __ASM_ARCH_REGS_GPIO_H */
+> diff --git a/arch/arm/mach-s5p64x0/setup-fb.c
+b/arch/arm/mach-s5p64x0/setup-fb.c
 > new file mode 100644
-> index 0000000..cbb8d8c
+> index 0000000..3e8ffad
 > --- /dev/null
-> +++ b/arch/arm/mach-s5p64x0/include/mach/regs-fb.h
-> @@ -0,0 +1,19 @@
-> +/*
-> + * linux/arch/arm/mach-s5p64x0/include/mach/regs-fb.h
+> +++ b/arch/arm/mach-s5p64x0/setup-fb.c
+> @@ -0,0 +1,48 @@
+> +/* linux/arch/arm/mach-s5p64x0/setup-fb.c
 > + *
 > + * Copyright (c) 2011 Samsung Electronics Co., Ltd.
-> + *		http://www.samsung.com/
+> + * 		http://www.samsung.com/
 > + *
-> + * Framebuffer register definitions for Samsung S5P64X0.
+> + * Base S5P64X0 GPIO setup information for LCD framebuffer
+> + *
+> + * GPIO settings for LCD on any other board based on s5p64x0
+> + * should go in this file.
 > + *
 > + * This program is free software; you can redistribute it and/or modify
 > + * it under the terms of the GNU General Public License version 2 as
 > + * published by the Free Software Foundation.
 > +*/
 > +
-> +#ifndef __ASM_ARCH_MACH_REGS_FB_H
-> +#define __ASM_ARCH_MACH_REGS_FB_H __FILE__
+> +#include <linux/fb.h>
+> +#include <linux/gpio.h>
 > +
-> +#include <plat/regs-fb.h>
+> +#include <plat/fb.h>
+> +#include <plat/gpio-cfg.h>
 > +
-> +#endif /* __ASM_ARCH_MACH_REGS_FB_H */
+> +#include <mach/regs-clock.h>
+> +#include <mach/regs-gpio.h>
+> +
+> +void s5p64x0_fb_init(int lcd_interface_type)
+> +{
+> +	unsigned int cfg;
+> +
+> +	/* select TFT LCD type (RGB I/F) */
+> +	cfg = readl(S5P64X0_SPCON0);
+
+Since no need memory barrier here, just use __raw_readl
+
+> +	cfg &= ~S5P64X0_SPCON0_LCD_SEL_MASK;
+> +	cfg |= lcd_interface_type;
+> +	writel(cfg, S5P64X0_SPCON0);
+
+__raw_writel
+
+> +}
+> +
+> +void s5p64x0_fb_gpio_setup_24bpp(void)
+> +{
+> +	unsigned int cfg;
+> +
+> +	cfg = readl(S5P64X0_SYS_ID) & 0xf0000;
+> +	if (cfg == 0x40000) {
+> +		s3c_gpio_cfgrange_nopull(S5P6440_GPI(0), 16,
+> S3C_GPIO_SFN(2));
+> +		s3c_gpio_cfgrange_nopull(S5P6440_GPJ(0), 12,
+> S3C_GPIO_SFN(2));
+> +	} else if (cfg == 0x50000) {
+> +		s3c_gpio_cfgrange_nopull(S5P6450_GPI(0), 16,
+> S3C_GPIO_SFN(2));
+> +		s3c_gpio_cfgrange_nopull(S5P6450_GPJ(0), 12,
+> S3C_GPIO_SFN(2));
+> +	}
+
+Following is more make sense ?
+
++	unsigned int chipid;
++
++	chipid = __raw_readl(S5P64X0_SYS_ID) & 0xff000;
++	if (chipd == 0x50000) {
++		s3c_gpio_cfgrange_nopull(S5P6450_GPI(0), 16,
+S3C_GPIO_SFN(2));
++		s3c_gpio_cfgrange_nopull(S5P6450_GPJ(0), 12,
+S3C_GPIO_SFN(2));
++	} else {
++		s3c_gpio_cfgrange_nopull(S5P6440_GPI(0), 16,
+S3C_GPIO_SFN(2));
++		s3c_gpio_cfgrange_nopull(S5P6440_GPJ(0), 12,
+S3C_GPIO_SFN(2));
++	}
+
+> +}
+> diff --git a/arch/arm/plat-samsung/include/plat/fb.h b/arch/arm/plat-
+> samsung/include/plat/fb.h
+> index cb3ca3a..8147c59 100644
+> --- a/arch/arm/plat-samsung/include/plat/fb.h
+> +++ b/arch/arm/plat-samsung/include/plat/fb.h
+> @@ -94,4 +94,18 @@ extern void s5pc100_fb_gpio_setup_24bpp(void);
+>   */
+>  extern void s5pv210_fb_gpio_setup_24bpp(void);
+> 
+> +/**
+> + * s5p64x0_fb_init() - Common setup function for LCD
+> + *
+> + * Select LCD I/F configuration-RGB style or i80 style
+> + */
+> +extern void s5p64x0_fb_init(int lcd_interface_type);
+> +
+> +/**
+> + * s5p64x0_fb_gpio_setup_24bpp() - Common GPIO setup function for LCD
+> + *
+> + * Initialise the GPIO for a LCD display on the RGB interface.
+> + */
+> +extern void s5p64x0_fb_gpio_setup_24bpp(void);
+> +
+>  #endif /* __PLAT_S3C_FB_H */
 > --
 > 1.7.1
 
-Since I applied your cleanup mach/regs-fb.h, you have to update this to
-avoid conflicts.
 
 Thanks.
 
