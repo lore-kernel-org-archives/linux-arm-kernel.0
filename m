@@ -1,46 +1,25 @@
-From: philippe.retornaz@epfl.ch (=?utf-8?q?Philippe=20R=C3=A9tornaz?=)
-Date: Thu, 21 Jul 2011 20:04:21 +0200
-Subject: [PATCH 4/6] mc13xxx: remove unused define
-In-Reply-To: <1311271463-4356-4-git-send-email-philippe.retornaz@epfl.ch>
-References: <1311271463-4356-1-git-send-email-philippe.retornaz@epfl.ch>
-	<1311271463-4356-2-git-send-email-philippe.retornaz@epfl.ch>
-	<1311271463-4356-3-git-send-email-philippe.retornaz@epfl.ch>
-	<1311271463-4356-4-git-send-email-philippe.retornaz@epfl.ch>
-Message-ID: <1311271463-4356-5-git-send-email-philippe.retornaz@epfl.ch>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 21 Jul 2011 11:36:30 -0700
+Subject: [PATCH] ARM: Migrate to asm-generic wrapper support
+In-Reply-To: <m31uxje8o4.fsf@intrepid.localdomain>
+References: <1311204225-13169-1-git-send-email-sboyd@codeaurora.org>	<20110720232819.GC20310@n2100.arm.linux.org.uk>	<4E27667D.9060200@codeaurora.org>
+	<m31uxje8o4.fsf@intrepid.localdomain>
+Message-ID: <4E2871AE.8030603@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Philippe R?tornaz <philippe.retornaz@epfl.ch>
----
- include/linux/mfd/mc13783.h |    2 --
- include/linux/mfd/mc13xxx.h |    2 --
- 2 files changed, 0 insertions(+), 4 deletions(-)
+On 07/21/2011 12:27 PM, Krzysztof Halasa wrote:
+> Stephen Boyd <sboyd@codeaurora.org> writes:
+>
+>> With d8ecc5c (kbuild: asm-generic support, 2011-04-27) we can
+>> remove a handful of asm-generic wrappers in ARM code. Since the
+>> generic version of sizes.h doesn't contain SZ_48M, we replace
+>> the 3 users of SZ_48M with the equivalent SZ_32M + SZ_16M.
+> Perhaps simply adding SZ_48M to the generic version is better. Can live
+> with either.
 
-diff --git a/include/linux/mfd/mc13783.h b/include/linux/mfd/mc13783.h
-index 7d0f3d6..3756a30 100644
---- a/include/linux/mfd/mc13783.h
-+++ b/include/linux/mfd/mc13783.h
-@@ -112,8 +112,6 @@ static inline int mc13783_irq_ack(struct mc13783 *mc13783, int irq)
- #define MC13783_USE_CODEC	MC13XXX_USE_CODEC
- #define MC13783_USE_ADC		MC13XXX_USE_ADC
- #define MC13783_USE_RTC		MC13XXX_USE_RTC
--#define MC13783_USE_REGULATOR	MC13XXX_USE_REGULATOR
--#define MC13783_USE_LED		MC13XXX_USE_LED
- 
- #define MC13783_ADC_MODE_TS		1
- #define MC13783_ADC_MODE_SINGLE_CHAN	2
-diff --git a/include/linux/mfd/mc13xxx.h b/include/linux/mfd/mc13xxx.h
-index c064bea..cef1497 100644
---- a/include/linux/mfd/mc13xxx.h
-+++ b/include/linux/mfd/mc13xxx.h
-@@ -142,8 +142,6 @@ struct mc13xxx_platform_data {
- #define MC13XXX_USE_CODEC	(1 << 1)
- #define MC13XXX_USE_ADC		(1 << 2)
- #define MC13XXX_USE_RTC		(1 << 3)
--#define MC13XXX_USE_REGULATOR	(1 << 4)
--#define MC13XXX_USE_LED		(1 << 5)
- 	unsigned int flags;
- 
- 	struct mc13xxx_regulator_platform_data regulators;
+This was simpler (1 patch, 1 maintainer). Is that an ack?
+
 -- 
-1.6.3.3
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
