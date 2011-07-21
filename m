@@ -1,66 +1,63 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Thu, 21 Jul 2011 08:06:09 +0200
-Subject: [PATCH 6/7] add macro definitions according to ehci-mxc driver
-	change
-In-Reply-To: <1311160106-4898-7-git-send-email-tony.lin@freescale.com>
-References: <1311160106-4898-1-git-send-email-tony.lin@freescale.com>
-	<1311160106-4898-7-git-send-email-tony.lin@freescale.com>
-Message-ID: <20007.49617.516780.740614@ipc1.ka-ro>
+From: b32955@freescale.com (Huang Shijie)
+Date: Thu, 21 Jul 2011 14:47:26 +0800
+Subject: [PATCH v8 3/3] MTD : add GPMI-NAND driver in the config and Makefile
+In-Reply-To: <1311230846-26437-1-git-send-email-b32955@freescale.com>
+References: <1311230846-26437-1-git-send-email-b32955@freescale.com>
+Message-ID: <1311230846-26437-4-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+add the GPMI-NAND driver in the relevant Kconfig and Makefile in the MTD.
 
-Tony Lin writes:
-> Signed-off-by: Tony Lin <tony.lin@freescale.com>
-> ---
->  arch/arm/mach-mxs/include/mach/hardware.h |    2 ++
->  arch/arm/mach-mxs/include/mach/mxs.h      |   12 +++++++++++-
->  arch/arm/plat-mxc/include/mach/mxc.h      |    3 +++
->  3 files changed, 16 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mxs/include/mach/hardware.h b/arch/arm/mach-mxs/include/mach/hardware.h
-> index 53e89a0..affa72b 100644
-> --- a/arch/arm/mach-mxs/include/mach/hardware.h
-> +++ b/arch/arm/mach-mxs/include/mach/hardware.h
-> @@ -26,4 +26,6 @@
->  #define IOMEM(addr)	((void __force __iomem *)(addr))
->  #endif
->  
-> +#include "mxs.h"
-> +
->  #endif /* __MACH_MXS_HARDWARE_H__ */
-> diff --git a/arch/arm/mach-mxs/include/mach/mxs.h b/arch/arm/mach-mxs/include/mach/mxs.h
-> index 35a89dd..6e5928d 100644
-> --- a/arch/arm/mach-mxs/include/mach/mxs.h
-> +++ b/arch/arm/mach-mxs/include/mach/mxs.h
-> @@ -35,7 +35,17 @@
->  		machine_is_mx28evk() ||					\
->  		machine_is_tx28() ||					\
->  		0)
-> -
-> +#define cpu_is_mx1()		(0)
-> +#define cpu_is_mx21()		(0)
-> +#define cpu_is_mx25()		(0)
-> +#define cpu_is_mx27()		(0)
-> +#define cpu_is_mx31()		(0)
-> +#define cpu_is_mx35()		(0)
-> +#define cpu_is_mx50()		(0)
-> +#define cpu_is_mx51()		(0)
-> +#define cpu_is_mx53()		(0)
->
-No need for parens around bare numbers.
+Signed-off-by: Huang Shijie <b32955@freescale.com>
+---
+ drivers/mtd/nand/Kconfig            |   11 +++++++++++
+ drivers/mtd/nand/Makefile           |    1 +
+ drivers/mtd/nand/gpmi-nand/Makefile |    3 +++
+ 3 files changed, 15 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/mtd/nand/gpmi-nand/Makefile
 
-
-
-Lothar Wa?mann
+diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
+index 4c34252..97a1350 100644
+--- a/drivers/mtd/nand/Kconfig
++++ b/drivers/mtd/nand/Kconfig
+@@ -423,6 +423,17 @@ config MTD_NAND_NANDSIM
+ 	  The simulator may simulate various NAND flash chips for the
+ 	  MTD nand layer.
+ 
++config MTD_NAND_GPMI_NAND
++        bool "GPMI NAND Flash Controller driver"
++        depends on MTD_NAND && (SOC_IMX23 || SOC_IMX28)
++	select MTD_PARTITIONS
++	select MTD_CMDLINE_PARTS
++        help
++	 Enables NAND Flash support for IMX23 or IMX28.
++	 The GPMI controller is very powerful, with the help of BCH
++	 module, it can do the hardware ECC. The GPMI supports several
++	 NAND flashs at the same time.
++
+ config MTD_NAND_PLATFORM
+ 	tristate "Support for generic platform NAND driver"
+ 	help
+diff --git a/drivers/mtd/nand/Makefile b/drivers/mtd/nand/Makefile
+index 5745d83..b187f82 100644
+--- a/drivers/mtd/nand/Makefile
++++ b/drivers/mtd/nand/Makefile
+@@ -49,5 +49,6 @@ obj-$(CONFIG_MTD_NAND_BCM_UMI)		+= bcm_umi_nand.o nand_bcm_umi.o
+ obj-$(CONFIG_MTD_NAND_MPC5121_NFC)	+= mpc5121_nfc.o
+ obj-$(CONFIG_MTD_NAND_RICOH)		+= r852.o
+ obj-$(CONFIG_MTD_NAND_JZ4740)		+= jz4740_nand.o
++obj-$(CONFIG_MTD_NAND_GPMI_NAND)	+= gpmi-nand/
+ 
+ nand-objs := nand_base.o nand_bbt.o
+diff --git a/drivers/mtd/nand/gpmi-nand/Makefile b/drivers/mtd/nand/gpmi-nand/Makefile
+new file mode 100644
+index 0000000..3a46248
+--- /dev/null
++++ b/drivers/mtd/nand/gpmi-nand/Makefile
+@@ -0,0 +1,3 @@
++obj-$(CONFIG_MTD_NAND_GPMI_NAND) += gpmi_nand.o
++gpmi_nand-objs += gpmi-nand.o
++gpmi_nand-objs += gpmi-lib.o
 -- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+1.7.0.4
