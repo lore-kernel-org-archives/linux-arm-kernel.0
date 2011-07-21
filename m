@@ -1,24 +1,196 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 21 Jul 2011 08:45:11 +0100
-Subject: [PATCH] ARM: do not mark CPU 0 as hotpluggable
-In-Reply-To: <1311204745-6276-1-git-send-email-mturquette@ti.com>
-References: <1311204745-6276-1-git-send-email-mturquette@ti.com>
-Message-ID: <20110721074511.GK26574@n2100.arm.linux.org.uk>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 21 Jul 2011 16:53:50 +0900
+Subject: [PATCH V2] ARM: EXYNOS4: Add support for ORIGEN board
+In-Reply-To: <1311220670-20395-1-git-send-email-tushar.behera@linaro.org>
+References: <1311220670-20395-1-git-send-email-tushar.behera@linaro.org>
+Message-ID: <006901cc477b$561cf6b0$0256e410$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 20, 2011 at 04:32:25PM -0700, Mike Turquette wrote:
-> A quick poll of the ARM platforms that implement CPU Hotplug support
-> shows that every platform treats CPU 0 as a special case that cannot be
-> hotplugged.  In fact every platform has identical code for
-> platform_cpu_die which returns -EPERM in the case of CPU 0.
+Tushar Behera wrote:
+> 
+> From: JeongHyeon Kim <jhkim@insignal.co.kr>
+> 
+> Insignal's ORIGEN board is based Samsung EXYNOS4210 SoC.
+> 
+> Signed-off-by: JeongHyeon Kim <jhkim@insignal.co.kr>
+> Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
+> ---
+> 
+> Changes for V2:
+>  - Reworked based on Kukjin's comments and rebased to kgene/for-next
+> 
+>  arch/arm/mach-exynos4/Kconfig       |   10 +++
+>  arch/arm/mach-exynos4/Makefile      |    1 +
+>  arch/arm/mach-exynos4/mach-origen.c |  108
+> +++++++++++++++++++++++++++++++++++
+>  3 files changed, 119 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-exynos4/mach-origen.c
+> 
+> diff --git a/arch/arm/mach-exynos4/Kconfig b/arch/arm/mach-exynos4/Kconfig
+> index 52fc172..012c034 100644
+> --- a/arch/arm/mach-exynos4/Kconfig
+> +++ b/arch/arm/mach-exynos4/Kconfig
+> @@ -205,6 +205,16 @@ config MACH_NURI
+>  	help
+>  	  Machine support for Samsung Mobile NURI Board.
+> 
+> +config MACH_ORIGEN
+> +	bool "ORIGEN"
+> +	select CPU_EXYNOS4210
+> +	select S3C_DEV_RTC
+> +	select S3C_DEV_WDT
+> +	select S3C_DEV_HSMMC2
+> +	select EXYNOS4_SETUP_SDHCI
+> +	help
+> +	  Machine support for ORIGEN based on Samsung S5PV310
+> +
+>  endmenu
+> 
+>  comment "Configuration for HSMMC bus width"
+> diff --git a/arch/arm/mach-exynos4/Makefile
+b/arch/arm/mach-exynos4/Makefile
+> index 2a0b682..ebec49c 100644
+> --- a/arch/arm/mach-exynos4/Makefile
+> +++ b/arch/arm/mach-exynos4/Makefile
+> @@ -31,6 +31,7 @@ obj-$(CONFIG_MACH_SMDKV310)		+= mach-
+> smdkv310.o
+>  obj-$(CONFIG_MACH_ARMLEX4210)		+= mach-armlex4210.o
+>  obj-$(CONFIG_MACH_UNIVERSAL_C210)	+= mach-universal_c210.o
+>  obj-$(CONFIG_MACH_NURI)			+= mach-nuri.o
+> +obj-$(CONFIG_MACH_ORIGEN)		+= mach-origen.o
+> 
+>  # device support
+> 
+> diff --git a/arch/arm/mach-exynos4/mach-origen.c
+b/arch/arm/mach-exynos4/mach-
+> origen.c
+> new file mode 100644
+> index 0000000..ed59f86
+> --- /dev/null
+> +++ b/arch/arm/mach-exynos4/mach-origen.c
+> @@ -0,0 +1,108 @@
+> +/* linux/arch/arm/mach-exynos4/mach-origen.c
+> + *
+> + * Copyright (c) 2011 Insignal Co., Ltd.
+> + *		http://www.insignal.co.kr/
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> +*/
+> +
+> +#include <linux/serial_core.h>
+> +#include <linux/gpio.h>
+> +#include <linux/mmc/host.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/io.h>
+> +#include <linux/input.h>
+> +
+> +#include <asm/mach/arch.h>
+> +#include <asm/mach-types.h>
+> +
+> +#include <plat/regs-serial.h>
+> +#include <plat/exynos4.h>
+> +#include <plat/cpu.h>
+> +#include <plat/devs.h>
+> +#include <plat/sdhci.h>
+> +#include <plat/iic.h>
+> +
+> +#include <mach/map.h>
+> +
+> +/* Following are default values for UCON, ULCON and UFCON UART registers
+*/
+> +#define ORIGEN_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
+> +				 S3C2410_UCON_RXILEVEL |	\
+> +				 S3C2410_UCON_TXIRQMODE |	\
+> +				 S3C2410_UCON_RXIRQMODE |	\
+> +				 S3C2410_UCON_RXFIFO_TOI |	\
+> +				 S3C2443_UCON_RXERR_IRQEN)
+> +
+> +#define ORIGEN_ULCON_DEFAULT	S3C2410_LCON_CS8
+> +
+> +#define ORIGEN_UFCON_DEFAULT	(S3C2410_UFCON_FIFOMODE |	\
+> +				 S5PV210_UFCON_TXTRIG4 |	\
+> +				 S5PV210_UFCON_RXTRIG4)
+> +
+> +static struct s3c2410_uartcfg origen_uartcfgs[] __initdata = {
+> +	[0] = {
+> +		.hwport		= 0,
+> +		.flags		= 0,
+> +		.ucon		= ORIGEN_UCON_DEFAULT,
+> +		.ulcon		= ORIGEN_ULCON_DEFAULT,
+> +		.ufcon		= ORIGEN_UFCON_DEFAULT,
+> +	},
+> +	[1] = {
+> +		.hwport		= 1,
+> +		.flags		= 0,
+> +		.ucon		= ORIGEN_UCON_DEFAULT,
+> +		.ulcon		= ORIGEN_ULCON_DEFAULT,
+> +		.ufcon		= ORIGEN_UFCON_DEFAULT,
+> +	},
+> +	[2] = {
+> +		.hwport		= 2,
+> +		.flags		= 0,
+> +		.ucon		= ORIGEN_UCON_DEFAULT,
+> +		.ulcon		= ORIGEN_ULCON_DEFAULT,
+> +		.ufcon		= ORIGEN_UFCON_DEFAULT,
+> +	},
+> +	[3] = {
+> +		.hwport		= 3,
+> +		.flags		= 0,
+> +		.ucon		= ORIGEN_UCON_DEFAULT,
+> +		.ulcon		= ORIGEN_ULCON_DEFAULT,
+> +		.ufcon		= ORIGEN_UFCON_DEFAULT,
+> +	},
+> +};
+> +
+> +static struct s3c_sdhci_platdata origen_hsmmc2_pdata __initdata = {
+> +	.cd_type		= S3C_SDHCI_CD_GPIO,
+> +	.ext_cd_gpio		= EXYNOS4_GPK2(2),
+> +	.ext_cd_gpio_invert	= 1,
+> +	.clk_type		= S3C_SDHCI_CLK_DIV_EXTERNAL,
+> +};
+> +
+> +static struct platform_device *origen_devices[] __initdata = {
+> +	&s3c_device_hsmmc2,
+> +	&s3c_device_rtc,
+> +	&s3c_device_wdt,
+> +};
+> +
+> +static void __init origen_map_io(void)
+> +{
+> +	s5p_init_io(NULL, 0, S5P_VA_CHIPID);
+> +	s3c24xx_init_clocks(24000000);
+> +	s3c24xx_init_uarts(origen_uartcfgs, ARRAY_SIZE(origen_uartcfgs));
+> +}
+> +
+> +static void __init origen_machine_init(void)
+> +{
+> +	s3c_sdhci2_set_platdata(&origen_hsmmc2_pdata);
+> +	platform_add_devices(origen_devices, ARRAY_SIZE(origen_devices));
+> +}
+> +
+> +MACHINE_START(ORIGEN, "ORIGEN")
+> +	/* Maintainer: JeongHyeon Kim <jhkim@insignal.co.kr> */
+> +	.boot_params	= S5P_PA_SDRAM + 0x100,
+> +	.init_irq	= exynos4_init_irq,
+> +	.map_io		= origen_map_io,
+> +	.init_machine	= origen_machine_init,
+> +	.timer		= &exynos4_timer,
+> +MACHINE_END
+> --
+> 1.7.4.1
 
-Are you sure that's just not because everyone copied what Realview has
-been doing (highly likely)?
+Hi,
 
-I suspect that there's no reason that CPU0 can't be taken down, especially
-on those platforms which don't take the CPU fully offline but just put it
-into a WFI loop.
+Yes, I remember this :)
 
-Those which restart the CPUs through the boot loader probably detect CPU0
-as the boot CPU, so they probably can't take CPU0 down.
+Looks ok to me, applied.
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
