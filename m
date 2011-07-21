@@ -1,84 +1,63 @@
-From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Thu, 21 Jul 2011 20:53:38 +0530
-Subject: [PATCHV4 4/4] OMAP: I2C: I2C register restore only if context is lost
-In-Reply-To: <1311261818-25784-1-git-send-email-shubhrajyoti@ti.com>
-References: <1311261818-25784-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1311261818-25784-5-git-send-email-shubhrajyoti@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 21 Jul 2011 16:23:42 +0100
+Subject: [PATCH V4 03-1/13] DMA: PL330: Support DMA_SLAVE_CONFIG command
+In-Reply-To: <CABb+yY2p8VNSvhv+LjoYnunrYS8+3+841bKM-4aUsg5vNx=Mig@mail.gmail.com>
+References: <1311158773-30314-1-git-send-email-boojin.kim@samsung.com>
+	<1311158773-30314-3-git-send-email-boojin.kim@samsung.com>
+	<CABb+yY2_XKyCr2mEzqd0bCYJk3U7+sg8Xz4b4ma2KB1BconYOw@mail.gmail.com>
+	<20110721081138.GL26574@n2100.arm.linux.org.uk>
+	<CABb+yY2obv5JMBiRSXS-4tSCYX+7nVVaA0Q7gurA+NndrGVuvA@mail.gmail.com>
+	<20110721112920.GM26574@n2100.arm.linux.org.uk>
+	<CABb+yY2p8VNSvhv+LjoYnunrYS8+3+841bKM-4aUsg5vNx=Mig@mail.gmail.com>
+Message-ID: <20110721152342.GE28942@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Currently i2c register restore is done always.
- Adding conditional restore.
- The i2c register restore is done only if the context is lost.
+On Thu, Jul 21, 2011 at 08:42:40PM +0530, Jassi Brar wrote:
+> On Thu, Jul 21, 2011 at 4:59 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > Does your hardware have a hardware block from the device itself containing
+> > all the systems FIFOs ?
+> I am not sure what you ask, but let me say what I know.
+> In this case atleast, all PL330 DMA channels have fixed source/destination
+> address on the device side. So it's not like developer doesn't know
+> fifo_addr here.
 
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com> 
-Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
----
- drivers/i2c/busses/i2c-omap.c |   24 +++++++++++++++++-------
- 1 files changed, 17 insertions(+), 7 deletions(-)
+Even so, your approach is _conceptually_ wrong.  Think about it.
 
-diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 75bb62d..dffdbfd 100644
---- a/drivers/i2c/busses/i2c-omap.c
-+++ b/drivers/i2c/busses/i2c-omap.c
-@@ -40,6 +40,7 @@
- #include <linux/slab.h>
- #include <linux/i2c-omap.h>
- #include <linux/pm_runtime.h>
-+#include <plat/omap_device.h>
- 
- /* I2C controller revisions */
- #define OMAP_I2C_OMAP1_REV_2		0x20
-@@ -200,6 +201,7 @@ struct omap_i2c_dev {
- 	u16			syscstate;
- 	u16			westate;
- 	u16			errata;
-+	u32			dev_lost_count;
- };
- 
- const static u8 reg_map_ip_v1[] = {
-@@ -260,6 +262,17 @@ static inline u16 omap_i2c_read_reg(struct omap_i2c_dev *i2c_dev, int reg)
- 				(i2c_dev->regs[reg] << i2c_dev->reg_shift));
- }
- 
-+static void omap_i2c_restore(struct omap_i2c_dev *dev)
-+{
-+	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
-+	omap_i2c_write_reg(dev, OMAP_I2C_PSC_REG, dev->pscstate);
-+	omap_i2c_write_reg(dev, OMAP_I2C_SCLL_REG, dev->scllstate);
-+	omap_i2c_write_reg(dev, OMAP_I2C_SCLH_REG, dev->sclhstate);
-+	omap_i2c_write_reg(dev, OMAP_I2C_BUF_REG, dev->bufstate);
-+	omap_i2c_write_reg(dev, OMAP_I2C_WE_REG, dev->westate);
-+	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, OMAP_I2C_CON_EN);
-+}
-+
- static void omap_i2c_unidle(struct omap_i2c_dev *dev)
- {
- 	struct platform_device *pdev;
-@@ -273,13 +286,9 @@ static void omap_i2c_unidle(struct omap_i2c_dev *dev)
- 	pm_runtime_get_sync(&pdev->dev);
- 
- 	if (pdata->flags & OMAP_I2C_FLAG_RESET_REGS_POSTIDLE) {
--		omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
--		omap_i2c_write_reg(dev, OMAP_I2C_PSC_REG, dev->pscstate);
--		omap_i2c_write_reg(dev, OMAP_I2C_SCLL_REG, dev->scllstate);
--		omap_i2c_write_reg(dev, OMAP_I2C_SCLH_REG, dev->sclhstate);
--		omap_i2c_write_reg(dev, OMAP_I2C_BUF_REG, dev->bufstate);
--		omap_i2c_write_reg(dev, OMAP_I2C_WE_REG, dev->westate);
--		omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, OMAP_I2C_CON_EN);
-+		u32 loss_cnt = omap_device_get_context_loss_count(pdev);
-+		if (dev->dev_lost_count != loss_cnt)
-+			omap_i2c_restore(dev);
- 	}
- 	dev->idle = 0;
- 
-@@ -318,6 +327,7 @@ static void omap_i2c_idle(struct omap_i2c_dev *dev)
- 	}
- 	dev->idle = 1;
- 
-+	dev->dev_lost_count = omap_device_get_context_loss_count(pdev);
- 	pm_runtime_put_sync(&pdev->dev);
- }
- 
--- 
-1.7.1
+You declare your devices giving the bus address where they're located.
+So, lets say for argument that your UART is located at 0x10001000.
+
+Your UART driver knows that the FIFO register is at offset 0x20 from
+the base address.  Your platform data provides the UART driver with a
+DMA match function and data specific for that match function.  This
+data encodes the specific DMA channel.
+
+Now, why should you have to encode into the DMA drivers platform data
+that DMA channel X has its FIFO at 0x10001020?  Not only do you have
+to declare the base address of the UART but also you have to know the
+offset into the UART.
+
+Why not just let the UART driver - which knows that the base address
+is 0x10001000, and the FIFO is at offset 0x20 above that - tell the
+DMA driver that's where the FIFO is located?
+
+Finally, your specific SoC may have a PL330, which may have FIFOs tied
+to specific DMA request signals.  That's an _implementation_ _detail_.
+That doesn't mean that's always going to be the case.
+
+I've heard that ARM Ltd may start using the PL330 on their evaluation
+boards.  They have a habbit of muxing several DMA request signals to
+several different peripherals.  Will I need to rewrite all the Samsung
+users of PL330 when that happens because they've decided they don't
+like the DMA engine API and have gone off and done their own thing
+instead?
+
+So no, encoding the FIFO addresses into platform data for the DMA
+controller is brain dead and totally the wrong thing to do.  And when
+you come to moving stuff over to DT, you'll see that's even more true
+there.
+
+So don't make the mistake now.  Do things sensibly and follow the DMA
+engine API.  Arrange for all your drivers to call DMA_SLAVE_CONFIG
+with the address of the FIFO.
