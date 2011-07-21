@@ -1,82 +1,35 @@
-From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Thu, 21 Jul 2011 16:39:14 +0530
-Subject: [PATCHV2 5/5] OMAP: I2C: Restore only if context is lost
-In-Reply-To: <1311246554-22975-1-git-send-email-shubhrajyoti@ti.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 21 Jul 2011 16:48:11 +0530
+Subject: [PATCHV2 1/5] OMAP: I2C: Add a device reset field to platform data
+In-Reply-To: <1311246554-22975-2-git-send-email-shubhrajyoti@ti.com>
 References: <1311246554-22975-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1311246554-22975-6-git-send-email-shubhrajyoti@ti.com>
+	<1311246554-22975-2-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <4E280AF3.5000907@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently restore is done always.
-Adding conditional restore. The restore is done only if the context is lost.
+Shubro,
 
-Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
----
- drivers/i2c/busses/i2c-omap.c |   24 +++++++++++++++++-------
- 1 files changed, 17 insertions(+), 7 deletions(-)
-
-diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 75bb62d..dffdbfd 100644
---- a/drivers/i2c/busses/i2c-omap.c
-+++ b/drivers/i2c/busses/i2c-omap.c
-@@ -40,6 +40,7 @@
- #include <linux/slab.h>
- #include <linux/i2c-omap.h>
- #include <linux/pm_runtime.h>
-+#include <plat/omap_device.h>
- 
- /* I2C controller revisions */
- #define OMAP_I2C_OMAP1_REV_2		0x20
-@@ -200,6 +201,7 @@ struct omap_i2c_dev {
- 	u16			syscstate;
- 	u16			westate;
- 	u16			errata;
-+	u32			dev_lost_count;
- };
- 
- const static u8 reg_map_ip_v1[] = {
-@@ -260,6 +262,17 @@ static inline u16 omap_i2c_read_reg(struct omap_i2c_dev *i2c_dev, int reg)
- 				(i2c_dev->regs[reg] << i2c_dev->reg_shift));
- }
- 
-+static void omap_i2c_restore(struct omap_i2c_dev *dev)
-+{
-+	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
-+	omap_i2c_write_reg(dev, OMAP_I2C_PSC_REG, dev->pscstate);
-+	omap_i2c_write_reg(dev, OMAP_I2C_SCLL_REG, dev->scllstate);
-+	omap_i2c_write_reg(dev, OMAP_I2C_SCLH_REG, dev->sclhstate);
-+	omap_i2c_write_reg(dev, OMAP_I2C_BUF_REG, dev->bufstate);
-+	omap_i2c_write_reg(dev, OMAP_I2C_WE_REG, dev->westate);
-+	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, OMAP_I2C_CON_EN);
-+}
-+
- static void omap_i2c_unidle(struct omap_i2c_dev *dev)
- {
- 	struct platform_device *pdev;
-@@ -273,13 +286,9 @@ static void omap_i2c_unidle(struct omap_i2c_dev *dev)
- 	pm_runtime_get_sync(&pdev->dev);
- 
- 	if (pdata->flags & OMAP_I2C_FLAG_RESET_REGS_POSTIDLE) {
--		omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
--		omap_i2c_write_reg(dev, OMAP_I2C_PSC_REG, dev->pscstate);
--		omap_i2c_write_reg(dev, OMAP_I2C_SCLL_REG, dev->scllstate);
--		omap_i2c_write_reg(dev, OMAP_I2C_SCLH_REG, dev->sclhstate);
--		omap_i2c_write_reg(dev, OMAP_I2C_BUF_REG, dev->bufstate);
--		omap_i2c_write_reg(dev, OMAP_I2C_WE_REG, dev->westate);
--		omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, OMAP_I2C_CON_EN);
-+		u32 loss_cnt = omap_device_get_context_loss_count(pdev);
-+		if (dev->dev_lost_count != loss_cnt)
-+			omap_i2c_restore(dev);
- 	}
- 	dev->idle = 0;
- 
-@@ -318,6 +327,7 @@ static void omap_i2c_idle(struct omap_i2c_dev *dev)
- 	}
- 	dev->idle = 1;
- 
-+	dev->dev_lost_count = omap_device_get_context_loss_count(pdev);
- 	pm_runtime_put_sync(&pdev->dev);
- }
- 
--- 
-1.7.1
+On 7/21/2011 4:39 PM, Shubhrajyoti D wrote:
+> Under some conditions the driver may want to do a reset
+> of the device. Adding a reset field  to the platform
+> data.
+>
+> Signed-off-by: Shubhrajyoti D<shubhrajyoti@ti.com>
+> ---
+>   include/linux/i2c-omap.h |    1 +
+>   1 files changed, 1 insertions(+), 0 deletions(-)
+>
+> diff --git a/include/linux/i2c-omap.h b/include/linux/i2c-omap.h
+> index 98ae49b..8aa91b6 100644
+> --- a/include/linux/i2c-omap.h
+> +++ b/include/linux/i2c-omap.h
+> @@ -38,6 +38,7 @@ struct omap_i2c_bus_platform_data {
+>   	int		(*device_enable) (struct platform_device *pdev);
+>   	int		(*device_shutdown) (struct platform_device *pdev);
+>   	int		(*device_idle) (struct platform_device *pdev);
+> +	int		(*device_reset) (struct device *dev);
+Any reason you haven't clubbed this with the omap i2c reset
+implementation patch ?
+Since i2c-omap.h isn't a generic header file and specific
+to omap i2c drive, you could combine 1/5 and 2/5
