@@ -1,60 +1,120 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 21 Jul 2011 17:57:24 +0100
-Subject: [RFC PATCH v9 0/4] Consolidating GIC per-cpu interrupts
-Message-ID: <1311267448-14652-1-git-send-email-marc.zyngier@arm.com>
+Date: Thu, 21 Jul 2011 17:57:28 +0100
+Subject: [RFC PATCH v9 4/4] ARM: gic: add compute_irqnr macro for exynos4
+In-Reply-To: <1311267448-14652-1-git-send-email-marc.zyngier@arm.com>
+References: <1311267448-14652-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1311267448-14652-5-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current GIC per-cpu interrupts (aka PPIs) suffer from a number of
-problems:
+exynos4 has a full copy of entry-macro-gic.S, just for the sake
+of an offset added to the IRQ number read from the GIC.
 
-- They use a completely separate scheme to handle the interrupts,
-  mostly because the PPI concept doesn't really match the kernel view
-  of an interrupt.
-- PPIs can only be used by the timer code, unless we add more low-level
-  assembly code.
-- The local timer code can only be used by devices generating PPIs,
-  and not SPIs.
-- At least one platform (msm) has started implementing its own
-  alternative scheme.
-- Some low-level code gets duplicated, as usual...
+Add a compute_irqnr macro to entry-macro-gic.S so that any platform
+can add it's own hook without having to copy the whole file again.
 
-As the previous solution which tried to map PPIs to normal interrupts
-has been proved to be buggy, I've opted to a much simpler scheme
-(based on Russell's input).
+Cc: Ben Dooks <ben-linux@fluff.org>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/include/asm/hardware/entry-macro-gic.S  |    3 +
+ arch/arm/mach-exynos4/include/mach/entry-macro.S |   57 +++-------------------
+ 2 files changed, 10 insertions(+), 50 deletions(-)
 
-The proposed solution is to handle the interrupt using the same path
-as SPIs, with a common handler for all PPIs. Each PPI can be requested
-using gic_request_ppi(), similar to request_irq(). The local timer
-code is updated to reflect these changes.
-
-Patches against next-20110721, tested on PB11MP. As this patch series
-is quite different from the previous one, I've dropped all previous
-acks from platform maintainers.
-
-Marc Zyngier (4):
-  ARM: gic: consolidate PPI handling
-  ARM: gic: Add PPI registration interface
-  ARM: local timers: drop local_timer_ack()
-  ARM: gic: add compute_irqnr macro for exynos4
-
- arch/arm/common/gic.c                             |  150 +++++++++++++++++++--
- arch/arm/include/asm/entry-macro-multi.S          |    7 -
- arch/arm/include/asm/hardirq.h                    |    3 -
- arch/arm/include/asm/hardware/entry-macro-gic.S   |   22 +---
- arch/arm/include/asm/hardware/gic.h               |    5 +-
- arch/arm/include/asm/localtimer.h                 |   14 +-
- arch/arm/include/asm/smp.h                        |    5 -
- arch/arm/include/asm/smp_twd.h                    |    2 +-
- arch/arm/kernel/irq.c                             |    3 -
- arch/arm/kernel/smp.c                             |   33 +-----
- arch/arm/kernel/smp_twd.c                         |   32 +++--
- arch/arm/mach-exynos4/include/mach/entry-macro.S  |   61 +--------
- arch/arm/mach-exynos4/mct.c                       |    6 -
- arch/arm/mach-msm/board-msm8x60.c                 |   11 --
- arch/arm/mach-msm/include/mach/entry-macro-qgic.S |   73 +----------
- arch/arm/mach-msm/timer.c                         |   52 +++----
- arch/arm/mach-omap2/include/mach/entry-macro.S    |   14 +--
- arch/arm/mach-shmobile/entry-intc.S               |    3 -
- arch/arm/mach-shmobile/include/mach/entry-macro.S |    3 -
- 19 files changed, 208 insertions(+), 291 deletions(-)
+diff --git a/arch/arm/include/asm/hardware/entry-macro-gic.S b/arch/arm/include/asm/hardware/entry-macro-gic.S
+index 74ebc80..fbb50dc 100644
+--- a/arch/arm/include/asm/hardware/entry-macro-gic.S
++++ b/arch/arm/include/asm/hardware/entry-macro-gic.S
+@@ -43,6 +43,9 @@
+ 	cmpcc	\irqnr, \irqnr
+ 	cmpne	\irqnr, \tmp
+ 	cmpcs	\irqnr, \irqnr
++#ifdef HAVE_GIC_BASE_OFFSET
++	compute_irqnr	\irqnr, \tmp
++#endif
+ 	.endm
+ 
+ /* We assume that irqstat (the raw value of the IRQ acknowledge
+diff --git a/arch/arm/mach-exynos4/include/mach/entry-macro.S b/arch/arm/mach-exynos4/include/mach/entry-macro.S
+index 807d05d..ea578b5 100644
+--- a/arch/arm/mach-exynos4/include/mach/entry-macro.S
++++ b/arch/arm/mach-exynos4/include/mach/entry-macro.S
+@@ -9,11 +9,15 @@
+  * warranty of any kind, whether express or implied.
+ */
+ 
++#define HAVE_GIC_BASE_OFFSET	1
++
+ #include <mach/hardware.h>
+ #include <mach/map.h>
+ #include <asm/hardware/gic.h>
++#include <asm/hardware/entry-macro-gic.S>
+ 
+-		.macro	disable_fiq
++		.macro	compute_irqnr, irqnr, tmp
++		addne	\irqnr, #32
+ 		.endm
+ 
+ 		.macro  get_irqnr_preamble, base, tmp
+@@ -23,57 +27,10 @@
+ 		and     \tmp, \tmp, #3
+ 		cmp     \tmp, #1
+ 		addeq   \base, \base, #EXYNOS4_GIC_BANK_OFFSET
+-		.endm
+-
+-		.macro  arch_ret_to_user, tmp1, tmp2
+-		.endm
+-
+-		/*
+-		 * The interrupt numbering scheme is defined in the
+-		 * interrupt controller spec.  To wit:
+-		 *
+-		 * Interrupts 0-15 are IPI
+-		 * 16-28 are reserved
+-		 * 29-31 are local.  We allow 30 to be used for the watchdog.
+-		 * 32-1020 are global
+-		 * 1021-1022 are reserved
+-		 * 1023 is "spurious" (no interrupt)
+-		 *
+-		 * For now, we ignore all local interrupts so only return an interrupt if it's
+-		 * between 30 and 1020.  The test_for_ipi routine below will pick up on IPIs.
+-		 *
+-		 * A simple read from the controller will tell us the number of the highest
+-                 * priority enabled interrupt.  We then just need to check whether it is in the
+-		 * valid range for an IRQ (30-1020 inclusive).
+-		 */
+-
+-		.macro  get_irqnr_and_base, irqnr, irqstat, base, tmp
+-
+-		ldr     \irqstat, [\base, #GIC_CPU_INTACK] /* bits 12-10 = src CPU, 9-0 = int # */
+-
+-		ldr	\tmp, =1021
+-
+-		bic     \irqnr, \irqstat, #0x1c00
+-
+-		cmp     \irqnr, #15
+-		cmpcc	\irqnr, \irqnr
+-		cmpne	\irqnr, \tmp
+-		cmpcs	\irqnr, \irqnr
+-		addne	\irqnr, \irqnr, #32
+ 
++		.macro	disable_fiq
+ 		.endm
+ 
+-		/* We assume that irqstat (the raw value of the IRQ acknowledge
+-		 * register) is preserved from the macro above.
+-		 * If there is an IPI, we immediately signal end of interrupt on the
+-		 * controller, since this requires the original irqstat value which
+-		 * we won't easily be able to recreate later.
+-		 */
+-
+-		.macro test_for_ipi, irqnr, irqstat, base, tmp
+-		bic	\irqnr, \irqstat, #0x1c00
+-		cmp	\irqnr, #16
+-		strcc	\irqstat, [\base, #GIC_CPU_EOI]
+-		cmpcs	\irqnr, \irqnr
++		.macro  arch_ret_to_user, tmp1, tmp2
+ 		.endm
+ 
+-- 
+1.7.0.4
