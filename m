@@ -1,9 +1,9 @@
 From: b29396@freescale.com (Dong Aisheng)
-Date: Thu, 21 Jul 2011 12:36:55 +0800
-Subject: [PATCH v5 1/4] ASoC: mxs: add mxs-pcm driver
+Date: Thu, 21 Jul 2011 12:36:56 +0800
+Subject: [PATCH v5 2/4] ASoC: mxs: add mxs-saif driver
 In-Reply-To: <1311223018-9553-1-git-send-email-b29396@freescale.com>
 References: <1311223018-9553-1-git-send-email-b29396@freescale.com>
-Message-ID: <1311223018-9553-2-git-send-email-b29396@freescale.com>
+Message-ID: <1311223018-9553-3-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,20 +13,18 @@ Cc: Liam Girdwood <lrg@ti.com>
 Cc: Sascha Hauer <s.hauer@pengutronix.de>
 Tested-by: Wolfram Sang <w.sang@pengutronix.de>
 ---
- sound/soc/mxs/mxs-pcm.c |  359 +++++++++++++++++++++++++++++++++++++++++++++++
- sound/soc/mxs/mxs-pcm.h |   43 ++++++
- 2 files changed, 402 insertions(+), 0 deletions(-)
+ sound/soc/mxs/mxs-saif.c |  677 ++++++++++++++++++++++++++++++++++++++++++++++
+ sound/soc/mxs/mxs-saif.h |  130 +++++++++
+ 2 files changed, 807 insertions(+), 0 deletions(-)
 
-diff --git a/sound/soc/mxs/mxs-pcm.c b/sound/soc/mxs/mxs-pcm.c
+diff --git a/sound/soc/mxs/mxs-saif.c b/sound/soc/mxs/mxs-saif.c
 new file mode 100644
-index 0000000..dea5aa4
+index 0000000..0b3adae
 --- /dev/null
-+++ b/sound/soc/mxs/mxs-pcm.c
-@@ -0,0 +1,359 @@
++++ b/sound/soc/mxs/mxs-saif.c
+@@ -0,0 +1,677 @@
 +/*
-+ * Copyright (C) 2011 Freescale Semiconductor, Inc. All Rights Reserved.
-+ *
-+ * Based on sound/soc/imx/imx-pcm-dma-mx2.c
++ * Copyright 2011 Freescale Semiconductor, Inc.
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License as published by
@@ -43,165 +41,424 @@ index 0000000..dea5aa4
 + * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 + */
 +
-+#include <linux/clk.h>
-+#include <linux/delay.h>
-+#include <linux/device.h>
-+#include <linux/dma-mapping.h>
-+#include <linux/init.h>
-+#include <linux/interrupt.h>
 +#include <linux/module.h>
++#include <linux/init.h>
 +#include <linux/platform_device.h>
 +#include <linux/slab.h>
-+#include <linux/dmaengine.h>
-+
++#include <linux/dma-mapping.h>
++#include <linux/clk.h>
++#include <linux/delay.h>
 +#include <sound/core.h>
-+#include <sound/initval.h>
 +#include <sound/pcm.h>
 +#include <sound/pcm_params.h>
 +#include <sound/soc.h>
-+
 +#include <mach/dma.h>
-+#include "mxs-pcm.h"
++#include <asm/mach-types.h>
++#include <mach/hardware.h>
++#include <mach/mxs.h>
 +
-+static struct snd_pcm_hardware snd_mxs_hardware = {
-+	.info			= SNDRV_PCM_INFO_MMAP |
-+				  SNDRV_PCM_INFO_MMAP_VALID |
-+				  SNDRV_PCM_INFO_PAUSE |
-+				  SNDRV_PCM_INFO_RESUME |
-+				  SNDRV_PCM_INFO_INTERLEAVED,
-+	.formats		= SNDRV_PCM_FMTBIT_S16_LE |
-+				  SNDRV_PCM_FMTBIT_S20_3LE |
-+				  SNDRV_PCM_FMTBIT_S24_LE,
-+	.channels_min		= 2,
-+	.channels_max		= 2,
-+	.period_bytes_min	= 32,
-+	.period_bytes_max	= 8192,
-+	.periods_min		= 1,
-+	.periods_max		= 52,
-+	.buffer_bytes_max	= 64 * 1024,
-+	.fifo_size		= 32,
++#include "mxs-saif.h"
 +
-+};
++static struct mxs_saif *mxs_saif[2];
 +
-+static void audio_dma_irq(void *data)
++static int mxs_saif_set_dai_sysclk(struct snd_soc_dai *cpu_dai,
++			int clk_id, unsigned int freq, int dir)
 +{
-+	struct snd_pcm_substream *substream = (struct snd_pcm_substream *)data;
-+	struct snd_pcm_runtime *runtime = substream->runtime;
-+	struct mxs_pcm_runtime_data *iprtd = runtime->private_data;
++	struct mxs_saif *saif = snd_soc_dai_get_drvdata(cpu_dai);
 +
-+	iprtd->offset += iprtd->period_bytes;
-+	iprtd->offset %= iprtd->period_bytes * iprtd->periods;
-+	snd_pcm_period_elapsed(substream);
-+}
-+
-+static bool filter(struct dma_chan *chan, void *param)
-+{
-+	struct mxs_pcm_runtime_data *iprtd = param;
-+	struct mxs_pcm_dma_params *dma_params = iprtd->dma_params;
-+
-+	if (!mxs_dma_is_apbx(chan))
-+		return false;
-+
-+	if (chan->chan_id != dma_params->chan_num)
-+		return false;
-+
-+	chan->private = &iprtd->dma_data;
-+
-+	return true;
-+}
-+
-+static int mxs_dma_alloc(struct snd_pcm_substream *substream,
-+				struct snd_pcm_hw_params *params)
-+{
-+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-+	struct snd_pcm_runtime *runtime = substream->runtime;
-+	struct mxs_pcm_runtime_data *iprtd = runtime->private_data;
-+	dma_cap_mask_t mask;
-+
-+	iprtd->dma_params = snd_soc_dai_get_dma_data(rtd->cpu_dai, substream);
-+
-+	dma_cap_zero(mask);
-+	dma_cap_set(DMA_SLAVE, mask);
-+	iprtd->dma_data.chan_irq = iprtd->dma_params->chan_irq;
-+	iprtd->dma_chan = dma_request_channel(mask, filter, iprtd);
-+	if (!iprtd->dma_chan)
++	switch (clk_id) {
++	case MXS_SAIF_MCLK:
++		saif->mclk = freq;
++		break;
++	default:
 +		return -EINVAL;
-+
++	}
 +	return 0;
 +}
 +
-+static int snd_mxs_pcm_hw_params(struct snd_pcm_substream *substream,
-+				struct snd_pcm_hw_params *params)
++/*
++ * Set SAIF clock and MCLK
++ */
++static int mxs_saif_set_clk(struct mxs_saif *saif,
++				  unsigned int mclk,
++				  unsigned int rate)
 +{
-+	struct snd_pcm_runtime *runtime = substream->runtime;
-+	struct mxs_pcm_runtime_data *iprtd = runtime->private_data;
-+	unsigned long dma_addr;
-+	struct dma_chan *chan;
++	u32 scr;
 +	int ret;
 +
-+	ret = mxs_dma_alloc(substream, params);
++	scr = __raw_readl(saif->base + SAIF_CTRL);
++	scr &= ~BM_SAIF_CTRL_BITCLK_MULT_RATE;
++	scr &= ~BM_SAIF_CTRL_BITCLK_BASE_RATE;
++
++	/*
++	 * Set SAIF clock
++	 *
++	 * The SAIF clock should be either 384*fs or 512*fs.
++	 * If MCLK is used, the SAIF clk ratio need to match mclk ratio.
++	 *  For 32x mclk, set saif clk as 512*fs.
++	 *  For 48x mclk, set saif clk as 384*fs.
++	 *
++	 * If MCLK is not used, we just set saif clk to 512*fs.
++	 */
++	if (saif->mclk_in_use) {
++		if (mclk % 32 == 0) {
++			scr &= ~BM_SAIF_CTRL_BITCLK_BASE_RATE;
++			ret = clk_set_rate(saif->clk, 512 * rate);
++		} else if (mclk % 48 == 0) {
++			scr |= BM_SAIF_CTRL_BITCLK_BASE_RATE;
++			ret = clk_set_rate(saif->clk, 384 * rate);
++		} else {
++			/* SAIF MCLK should be either 32x or 48x */
++			return -EINVAL;
++		}
++	} else {
++		ret = clk_set_rate(saif->clk, 512 * rate);
++		scr &= ~BM_SAIF_CTRL_BITCLK_BASE_RATE;
++	}
++
 +	if (ret)
 +		return ret;
-+	chan = iprtd->dma_chan;
 +
-+	iprtd->size = params_buffer_bytes(params);
-+	iprtd->periods = params_periods(params);
-+	iprtd->period_bytes = params_period_bytes(params);
-+	iprtd->offset = 0;
-+	iprtd->period_time = HZ / (params_rate(params) /
-+			params_period_size(params));
++	if (!saif->mclk_in_use) {
++		__raw_writel(scr, saif->base + SAIF_CTRL);
++		return 0;
++	}
 +
-+	snd_pcm_set_runtime_buffer(substream, &substream->dma_buffer);
-+
-+	dma_addr = runtime->dma_addr;
-+
-+	iprtd->buf = substream->dma_buffer.area;
-+
-+	iprtd->desc = chan->device->device_prep_dma_cyclic(chan, dma_addr,
-+			iprtd->period_bytes * iprtd->periods,
-+			iprtd->period_bytes,
-+			substream->stream == SNDRV_PCM_STREAM_PLAYBACK ?
-+			DMA_TO_DEVICE : DMA_FROM_DEVICE);
-+	if (!iprtd->desc) {
-+		dev_err(&chan->dev->device, "cannot prepare slave dma\n");
++	/*
++	 * Program the over-sample rate for MCLK output
++	 *
++	 * The available MCLK range is 32x, 48x... 512x. The rate
++	 * could be from 8kHz to 192kH.
++	 */
++	switch (mclk / rate) {
++	case 32:
++		scr |= BF_SAIF_CTRL_BITCLK_MULT_RATE(4);
++		break;
++	case 64:
++		scr |= BF_SAIF_CTRL_BITCLK_MULT_RATE(3);
++		break;
++	case 128:
++		scr |= BF_SAIF_CTRL_BITCLK_MULT_RATE(2);
++		break;
++	case 256:
++		scr |= BF_SAIF_CTRL_BITCLK_MULT_RATE(1);
++		break;
++	case 512:
++		scr |= BF_SAIF_CTRL_BITCLK_MULT_RATE(0);
++		break;
++	case 48:
++		scr |= BF_SAIF_CTRL_BITCLK_MULT_RATE(3);
++		break;
++	case 96:
++		scr |= BF_SAIF_CTRL_BITCLK_MULT_RATE(2);
++		break;
++	case 192:
++		scr |= BF_SAIF_CTRL_BITCLK_MULT_RATE(1);
++		break;
++	case 384:
++		scr |= BF_SAIF_CTRL_BITCLK_MULT_RATE(0);
++		break;
++	default:
 +		return -EINVAL;
 +	}
 +
-+	iprtd->desc->callback = audio_dma_irq;
-+	iprtd->desc->callback_param = substream;
++	__raw_writel(scr, saif->base + SAIF_CTRL);
 +
 +	return 0;
 +}
 +
-+static int snd_mxs_pcm_hw_free(struct snd_pcm_substream *substream)
++/*
++ * Put and disable MCLK.
++ */
++int mxs_saif_put_mclk(unsigned int saif_id)
 +{
-+	struct snd_pcm_runtime *runtime = substream->runtime;
-+	struct mxs_pcm_runtime_data *iprtd = runtime->private_data;
++	struct mxs_saif *saif = mxs_saif[saif_id];
++	u32 stat;
 +
-+	if (iprtd->dma_chan) {
-+		dma_release_channel(iprtd->dma_chan);
-+		iprtd->dma_chan = NULL;
++	if (!saif)
++		return -EINVAL;
++
++	stat = __raw_readl(saif->base + SAIF_STAT);
++	if (stat & BM_SAIF_STAT_BUSY) {
++		dev_err(saif->dev, "error: busy\n");
++		return -EBUSY;
++	}
++
++	clk_disable(saif->clk);
++
++	/* disable MCLK output */
++	__raw_writel(BM_SAIF_CTRL_CLKGATE,
++		saif->base + SAIF_CTRL + MXS_SET_ADDR);
++	__raw_writel(BM_SAIF_CTRL_RUN,
++		saif->base + SAIF_CTRL + MXS_CLR_ADDR);
++
++	saif->mclk_in_use = 0;
++	return 0;
++}
++
++/*
++ * Get MCLK and set clock rate, then enable it
++ *
++ * This interface is used for codecs who are using MCLK provided
++ * by saif.
++ */
++int mxs_saif_get_mclk(unsigned int saif_id, unsigned int mclk,
++					unsigned int rate)
++{
++	struct mxs_saif *saif = mxs_saif[saif_id];
++	u32 stat;
++	int ret;
++
++	if (!saif)
++		return -EINVAL;
++
++	stat = __raw_readl(saif->base + SAIF_STAT);
++	if (stat & BM_SAIF_STAT_BUSY) {
++		dev_err(saif->dev, "error: busy\n");
++		return -EBUSY;
++	}
++
++	/* Clear Reset */
++	__raw_writel(BM_SAIF_CTRL_SFTRST,
++		saif->base + SAIF_CTRL + MXS_CLR_ADDR);
++
++	saif->mclk_in_use = 1;
++	ret = mxs_saif_set_clk(saif, mclk, rate);
++	if (ret)
++		return ret;
++
++	ret = clk_enable(saif->clk);
++	if (ret)
++		return ret;
++
++	/* enable MCLK output */
++	__raw_writel(BM_SAIF_CTRL_CLKGATE,
++		saif->base + SAIF_CTRL + MXS_CLR_ADDR);
++	__raw_writel(BM_SAIF_CTRL_RUN,
++		saif->base + SAIF_CTRL + MXS_SET_ADDR);
++
++	return 0;
++}
++
++/*
++ * SAIF DAI format configuration.
++ * Should only be called when port is inactive.
++ */
++static int mxs_saif_set_dai_fmt(struct snd_soc_dai *cpu_dai, unsigned int fmt)
++{
++	u32 scr, stat;
++	u32 scr0;
++	struct mxs_saif *saif = snd_soc_dai_get_drvdata(cpu_dai);
++
++	stat = __raw_readl(saif->base + SAIF_STAT);
++	if (stat & BM_SAIF_STAT_BUSY) {
++		dev_err(cpu_dai->dev, "error: busy\n");
++		return -EBUSY;
++	}
++
++	scr0 = __raw_readl(saif->base + SAIF_CTRL);
++	scr0 = scr0 & ~BM_SAIF_CTRL_BITCLK_EDGE & ~BM_SAIF_CTRL_LRCLK_POLARITY \
++		& ~BM_SAIF_CTRL_JUSTIFY & ~BM_SAIF_CTRL_DELAY;
++	scr = 0;
++
++	/* DAI mode */
++	switch (fmt & SND_SOC_DAIFMT_FORMAT_MASK) {
++	case SND_SOC_DAIFMT_I2S:
++		/* data frame low 1clk before data */
++		scr |= BM_SAIF_CTRL_DELAY;
++		scr &= ~BM_SAIF_CTRL_LRCLK_POLARITY;
++		break;
++	case SND_SOC_DAIFMT_LEFT_J:
++		/* data frame high with data */
++		scr &= ~BM_SAIF_CTRL_DELAY;
++		scr &= ~BM_SAIF_CTRL_LRCLK_POLARITY;
++		scr &= ~BM_SAIF_CTRL_JUSTIFY;
++		break;
++	default:
++		return -EINVAL;
++	}
++
++	/* DAI clock inversion */
++	switch (fmt & SND_SOC_DAIFMT_INV_MASK) {
++	case SND_SOC_DAIFMT_IB_IF:
++		scr |= BM_SAIF_CTRL_BITCLK_EDGE;
++		scr |= BM_SAIF_CTRL_LRCLK_POLARITY;
++		break;
++	case SND_SOC_DAIFMT_IB_NF:
++		scr |= BM_SAIF_CTRL_BITCLK_EDGE;
++		scr &= ~BM_SAIF_CTRL_LRCLK_POLARITY;
++		break;
++	case SND_SOC_DAIFMT_NB_IF:
++		scr &= ~BM_SAIF_CTRL_BITCLK_EDGE;
++		scr |= BM_SAIF_CTRL_LRCLK_POLARITY;
++		break;
++	case SND_SOC_DAIFMT_NB_NF:
++		scr &= ~BM_SAIF_CTRL_BITCLK_EDGE;
++		scr &= ~BM_SAIF_CTRL_LRCLK_POLARITY;
++		break;
++	}
++
++	/*
++	 * Note: We simply just support master mode since SAIF TX can only
++	 * work as master.
++	 */
++	switch (fmt & SND_SOC_DAIFMT_MASTER_MASK) {
++	case SND_SOC_DAIFMT_CBS_CFS:
++		scr &= ~BM_SAIF_CTRL_SLAVE_MODE;
++		__raw_writel(scr | scr0, saif->base + SAIF_CTRL);
++		break;
++	default:
++		return -EINVAL;
 +	}
 +
 +	return 0;
 +}
 +
-+static int snd_mxs_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
++static int mxs_saif_startup(struct snd_pcm_substream *substream,
++			   struct snd_soc_dai *cpu_dai)
 +{
-+	struct snd_pcm_runtime *runtime = substream->runtime;
-+	struct mxs_pcm_runtime_data *iprtd = runtime->private_data;
++	struct mxs_saif *saif = snd_soc_dai_get_drvdata(cpu_dai);
++	snd_soc_dai_set_dma_data(cpu_dai, substream, &saif->dma_param);
++
++	/* clear error status to 0 for each re-open */
++	saif->fifo_underrun = 0;
++	saif->fifo_overrun = 0;
++
++	/* Clear Reset for normal operations */
++	__raw_writel(BM_SAIF_CTRL_SFTRST,
++		saif->base + SAIF_CTRL + MXS_CLR_ADDR);
++
++	return 0;
++}
++
++/*
++ * Should only be called when port is inactive.
++ * although can be called multiple times by upper layers.
++ */
++static int mxs_saif_hw_params(struct snd_pcm_substream *substream,
++			     struct snd_pcm_hw_params *params,
++			     struct snd_soc_dai *cpu_dai)
++{
++	struct mxs_saif *saif = snd_soc_dai_get_drvdata(cpu_dai);
++	u32 scr, stat;
++	int ret;
++
++	/* mclk should already be set */
++	if (!saif->mclk && saif->mclk_in_use) {
++		dev_err(cpu_dai->dev, "set mclk first\n");
++		return -EINVAL;
++	}
++
++	stat = __raw_readl(saif->base + SAIF_STAT);
++	if (stat & BM_SAIF_STAT_BUSY) {
++		dev_err(cpu_dai->dev, "error: busy\n");
++		return -EBUSY;
++	}
++
++	/*
++	 * Set saif clk based on sample rate.
++	 * If mclk is used, we also set mclk, if not, saif->mclk is
++	 * default 0, means not used.
++	 */
++	ret = mxs_saif_set_clk(saif, saif->mclk, params_rate(params));
++	if (ret) {
++		dev_err(cpu_dai->dev, "unable to get proper clk\n");
++		return ret;
++	}
++
++	scr = __raw_readl(saif->base + SAIF_CTRL);
++
++	scr &= ~BM_SAIF_CTRL_WORD_LENGTH;
++	scr &= ~BM_SAIF_CTRL_BITCLK_48XFS_ENABLE;
++	switch (params_format(params)) {
++	case SNDRV_PCM_FORMAT_S16_LE:
++		scr |= BF_SAIF_CTRL_WORD_LENGTH(0);
++		break;
++	case SNDRV_PCM_FORMAT_S20_3LE:
++		scr |= BF_SAIF_CTRL_WORD_LENGTH(4);
++		scr |= BM_SAIF_CTRL_BITCLK_48XFS_ENABLE;
++		break;
++	case SNDRV_PCM_FORMAT_S24_LE:
++		scr |= BF_SAIF_CTRL_WORD_LENGTH(8);
++		scr |= BM_SAIF_CTRL_BITCLK_48XFS_ENABLE;
++		break;
++	default:
++		return -EINVAL;
++	}
++
++	/* Tx/Rx config */
++	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
++		/* enable TX mode */
++		scr &= ~BM_SAIF_CTRL_READ_MODE;
++	} else {
++		/* enable RX mode */
++		scr |= BM_SAIF_CTRL_READ_MODE;
++	}
++
++	__raw_writel(scr, saif->base + SAIF_CTRL);
++	return 0;
++}
++
++static int mxs_saif_prepare(struct snd_pcm_substream *substream,
++			   struct snd_soc_dai *cpu_dai)
++{
++	struct mxs_saif *saif = snd_soc_dai_get_drvdata(cpu_dai);
++
++	/* clear clock gate */
++	__raw_writel(BM_SAIF_CTRL_CLKGATE,
++		saif->base + SAIF_CTRL + MXS_CLR_ADDR);
++
++	/* enable FIFO error irqs */
++	__raw_writel(BM_SAIF_CTRL_FIFO_ERROR_IRQ_EN,
++		saif->base + SAIF_CTRL + MXS_SET_ADDR);
++
++	return 0;
++}
++
++static int mxs_saif_trigger(struct snd_pcm_substream *substream, int cmd,
++				struct snd_soc_dai *cpu_dai)
++{
++	struct mxs_saif *saif = snd_soc_dai_get_drvdata(cpu_dai);
 +
 +	switch (cmd) {
 +	case SNDRV_PCM_TRIGGER_START:
 +	case SNDRV_PCM_TRIGGER_RESUME:
 +	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
-+		dmaengine_submit(iprtd->desc);
++		dev_dbg(cpu_dai->dev, "start\n");
++
++		clk_enable(saif->clk);
++		if (!saif->mclk_in_use)
++			__raw_writel(BM_SAIF_CTRL_RUN,
++				saif->base + SAIF_CTRL + MXS_SET_ADDR);
++
++		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
++			/*
++			 * write a data to saif data register to trigger
++			 * the transfer
++			 */
++			__raw_writel(0, saif->base + SAIF_DATA);
++		} else {
++			/*
++			 * read a data from saif data register to trigger
++			 * the receive
++			 */
++			__raw_readl(saif->base + SAIF_DATA);
++		}
++
++		dev_dbg(cpu_dai->dev, "CTRL 0x%x STAT 0x%x\n",
++			__raw_readl(saif->base + SAIF_CTRL),
++			__raw_readl(saif->base + SAIF_STAT));
 +
 +		break;
-+	case SNDRV_PCM_TRIGGER_STOP:
 +	case SNDRV_PCM_TRIGGER_SUSPEND:
++	case SNDRV_PCM_TRIGGER_STOP:
 +	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
-+		dmaengine_terminate_all(iprtd->dma_chan);
++		dev_dbg(cpu_dai->dev, "stop\n");
++
++		clk_disable(saif->clk);
++		if (!saif->mclk_in_use)
++			__raw_writel(BM_SAIF_CTRL_RUN,
++				saif->base + SAIF_CTRL + MXS_CLR_ADDR);
 +
 +		break;
 +	default:
@@ -211,183 +468,244 @@ index 0000000..dea5aa4
 +	return 0;
 +}
 +
-+static snd_pcm_uframes_t snd_mxs_pcm_pointer(
-+		struct snd_pcm_substream *substream)
-+{
-+	struct snd_pcm_runtime *runtime = substream->runtime;
-+	struct mxs_pcm_runtime_data *iprtd = runtime->private_data;
++#define MXS_SAIF_RATES		SNDRV_PCM_RATE_8000_192000
++#define MXS_SAIF_FORMATS \
++	(SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S20_3LE | \
++	SNDRV_PCM_FMTBIT_S24_LE)
 +
-+	return bytes_to_frames(substream->runtime, iprtd->offset);
-+}
-+
-+static int snd_mxs_open(struct snd_pcm_substream *substream)
-+{
-+	struct snd_pcm_runtime *runtime = substream->runtime;
-+	struct mxs_pcm_runtime_data *iprtd;
-+	int ret;
-+
-+	iprtd = kzalloc(sizeof(*iprtd), GFP_KERNEL);
-+	if (iprtd == NULL)
-+		return -ENOMEM;
-+	runtime->private_data = iprtd;
-+
-+	ret = snd_pcm_hw_constraint_integer(substream->runtime,
-+			SNDRV_PCM_HW_PARAM_PERIODS);
-+	if (ret < 0) {
-+		kfree(iprtd);
-+		return ret;
-+	}
-+
-+	snd_soc_set_runtime_hwparams(substream, &snd_mxs_hardware);
-+
-+	return 0;
-+}
-+
-+static int snd_mxs_close(struct snd_pcm_substream *substream)
-+{
-+	struct snd_pcm_runtime *runtime = substream->runtime;
-+	struct mxs_pcm_runtime_data *iprtd = runtime->private_data;
-+
-+	kfree(iprtd);
-+
-+	return 0;
-+}
-+
-+static int snd_mxs_pcm_mmap(struct snd_pcm_substream *substream,
-+		struct vm_area_struct *vma)
-+{
-+	struct snd_pcm_runtime *runtime = substream->runtime;
-+
-+	return dma_mmap_writecombine(substream->pcm->card->dev, vma,
-+					runtime->dma_area,
-+					runtime->dma_addr,
-+					runtime->dma_bytes);
-+}
-+
-+static struct snd_pcm_ops mxs_pcm_ops = {
-+	.open		= snd_mxs_open,
-+	.close		= snd_mxs_close,
-+	.ioctl		= snd_pcm_lib_ioctl,
-+	.hw_params	= snd_mxs_pcm_hw_params,
-+	.hw_free	= snd_mxs_pcm_hw_free,
-+	.trigger	= snd_mxs_pcm_trigger,
-+	.pointer	= snd_mxs_pcm_pointer,
-+	.mmap		= snd_mxs_pcm_mmap,
++static struct snd_soc_dai_ops mxs_saif_dai_ops = {
++	.startup = mxs_saif_startup,
++	.trigger = mxs_saif_trigger,
++	.prepare = mxs_saif_prepare,
++	.hw_params = mxs_saif_hw_params,
++	.set_sysclk = mxs_saif_set_dai_sysclk,
++	.set_fmt = mxs_saif_set_dai_fmt,
 +};
 +
-+static int mxs_pcm_preallocate_dma_buffer(struct snd_pcm *pcm, int stream)
++static int mxs_saif_dai_probe(struct snd_soc_dai *dai)
 +{
-+	struct snd_pcm_substream *substream = pcm->streams[stream].substream;
-+	struct snd_dma_buffer *buf = &substream->dma_buffer;
-+	size_t size = snd_mxs_hardware.buffer_bytes_max;
++	struct mxs_saif *saif = dev_get_drvdata(dai->dev);
 +
-+	buf->dev.type = SNDRV_DMA_TYPE_DEV;
-+	buf->dev.dev = pcm->card->dev;
-+	buf->private_data = NULL;
-+	buf->area = dma_alloc_writecombine(pcm->card->dev, size,
-+					   &buf->addr, GFP_KERNEL);
-+	if (!buf->area)
-+		return -ENOMEM;
-+	buf->bytes = size;
++	snd_soc_dai_set_drvdata(dai, saif);
 +
 +	return 0;
 +}
 +
-+static u64 mxs_pcm_dmamask = DMA_BIT_MASK(32);
-+static int mxs_pcm_new(struct snd_soc_pcm_runtime *rtd)
++static struct snd_soc_dai_driver mxs_saif_dai = {
++	.name = "mxs-saif",
++	.probe = mxs_saif_dai_probe,
++	.playback = {
++		.channels_min = 2,
++		.channels_max = 2,
++		.rates = MXS_SAIF_RATES,
++		.formats = MXS_SAIF_FORMATS,
++	},
++	.capture = {
++		.channels_min = 2,
++		.channels_max = 2,
++		.rates = MXS_SAIF_RATES,
++		.formats = MXS_SAIF_FORMATS,
++	},
++	.ops = &mxs_saif_dai_ops,
++};
++
++static irqreturn_t mxs_saif_irq(int irq, void *dev_id)
 +{
-+	struct snd_card *card = rtd->card->snd_card;
-+	struct snd_pcm *pcm = rtd->pcm;
++	struct mxs_saif *saif = dev_id;
++	unsigned int stat;
++
++	stat = __raw_readl(saif->base + SAIF_STAT);
++	if (!(stat & (BM_SAIF_STAT_FIFO_UNDERFLOW_IRQ |
++			BM_SAIF_STAT_FIFO_OVERFLOW_IRQ)))
++		return IRQ_NONE;
++
++	if (stat & BM_SAIF_STAT_FIFO_UNDERFLOW_IRQ) {
++		dev_dbg(saif->dev, "underrun!!! %d\n", ++saif->fifo_underrun);
++		__raw_writel(BM_SAIF_STAT_FIFO_UNDERFLOW_IRQ,
++				saif->base + SAIF_STAT + MXS_CLR_ADDR);
++	}
++
++	if (stat & BM_SAIF_STAT_FIFO_OVERFLOW_IRQ) {
++		dev_dbg(saif->dev, "overrun!!! %d\n", ++saif->fifo_overrun);
++		__raw_writel(BM_SAIF_STAT_FIFO_OVERFLOW_IRQ,
++				saif->base + SAIF_STAT + MXS_CLR_ADDR);
++	}
++
++	dev_dbg(saif->dev, "SAIF_CTRL %x SAIF_STAT %x\n",
++	       __raw_readl(saif->base + SAIF_CTRL),
++	       __raw_readl(saif->base + SAIF_STAT));
++
++	return IRQ_HANDLED;
++}
++
++static int mxs_saif_probe(struct platform_device *pdev)
++{
++	struct resource *res;
++	struct mxs_saif *saif;
 +	int ret = 0;
 +
-+	if (!card->dev->dma_mask)
-+		card->dev->dma_mask = &mxs_pcm_dmamask;
-+	if (!card->dev->coherent_dma_mask)
-+		card->dev->coherent_dma_mask = DMA_BIT_MASK(32);
++	saif = kzalloc(sizeof(*saif), GFP_KERNEL);
++	if (!saif)
++		return -ENOMEM;
 +
-+	if (pcm->streams[SNDRV_PCM_STREAM_PLAYBACK].substream) {
-+		ret = mxs_pcm_preallocate_dma_buffer(pcm,
-+			SNDRV_PCM_STREAM_PLAYBACK);
-+		if (ret)
-+			goto out;
++	if (pdev->id >= ARRAY_SIZE(mxs_saif))
++		return -EINVAL;
++	mxs_saif[pdev->id] = saif;
++
++	saif->clk = clk_get(&pdev->dev, NULL);
++	if (IS_ERR(saif->clk)) {
++		ret = PTR_ERR(saif->clk);
++		dev_err(&pdev->dev, "Cannot get the clock: %d\n",
++			ret);
++		goto failed_clk;
 +	}
 +
-+	if (pcm->streams[SNDRV_PCM_STREAM_CAPTURE].substream) {
-+		ret = mxs_pcm_preallocate_dma_buffer(pcm,
-+			SNDRV_PCM_STREAM_CAPTURE);
-+		if (ret)
-+			goto out;
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!res) {
++		ret = -ENODEV;
++		dev_err(&pdev->dev, "failed to get io resource: %d\n",
++			ret);
++		goto failed_get_resource;
 +	}
 +
-+out:
++	if (!request_mem_region(res->start, resource_size(res), "mxs-saif")) {
++		dev_err(&pdev->dev, "request_mem_region failed\n");
++		ret = -EBUSY;
++		goto failed_get_resource;
++	}
++
++	saif->base = ioremap(res->start, resource_size(res));
++	if (!saif->base) {
++		dev_err(&pdev->dev, "ioremap failed\n");
++		ret = -ENODEV;
++		goto failed_ioremap;
++	}
++
++	res = platform_get_resource(pdev, IORESOURCE_DMA, 0);
++	if (!res) {
++		ret = -ENODEV;
++		dev_err(&pdev->dev, "failed to get dma resource: %d\n",
++			ret);
++		goto failed_ioremap;
++	}
++	saif->dma_param.chan_num = res->start;
++
++	saif->irq = platform_get_irq(pdev, 0);
++	if (saif->irq < 0) {
++		ret = saif->irq;
++		dev_err(&pdev->dev, "failed to get irq resource: %d\n",
++			ret);
++		goto failed_get_irq1;
++	}
++
++	saif->dev = &pdev->dev;
++	ret = request_irq(saif->irq, mxs_saif_irq, 0, "mxs-saif", saif);
++	if (ret) {
++		dev_err(&pdev->dev, "failed to request irq\n");
++		goto failed_get_irq1;
++	}
++
++	saif->dma_param.chan_irq = platform_get_irq(pdev, 1);
++	if (saif->dma_param.chan_irq < 0) {
++		ret = saif->dma_param.chan_irq;
++		dev_err(&pdev->dev, "failed to get dma irq resource: %d\n",
++			ret);
++		goto failed_get_irq2;
++	}
++
++	platform_set_drvdata(pdev, saif);
++
++	ret = snd_soc_register_dai(&pdev->dev, &mxs_saif_dai);
++	if (ret) {
++		dev_err(&pdev->dev, "register DAI failed\n");
++		goto failed_register;
++	}
++
++	saif->soc_platform_pdev = platform_device_alloc(
++					"mxs-pcm-audio", pdev->id);
++	if (!saif->soc_platform_pdev) {
++		ret = -ENOMEM;
++		goto failed_pdev_alloc;
++	}
++
++	platform_set_drvdata(saif->soc_platform_pdev, saif);
++	ret = platform_device_add(saif->soc_platform_pdev);
++	if (ret) {
++		dev_err(&pdev->dev, "failed to add soc platform device\n");
++		goto failed_pdev_add;
++	}
++
++	return 0;
++
++failed_pdev_add:
++	platform_device_put(saif->soc_platform_pdev);
++failed_pdev_alloc:
++	snd_soc_unregister_dai(&pdev->dev);
++failed_register:
++failed_get_irq2:
++	free_irq(saif->irq, saif);
++failed_get_irq1:
++	iounmap(saif->base);
++failed_ioremap:
++	release_mem_region(res->start, resource_size(res));
++failed_get_resource:
++	clk_put(saif->clk);
++failed_clk:
++	kfree(saif);
++
 +	return ret;
 +}
 +
-+static void mxs_pcm_free(struct snd_pcm *pcm)
++static int __devexit mxs_saif_remove(struct platform_device *pdev)
 +{
-+	struct snd_pcm_substream *substream;
-+	struct snd_dma_buffer *buf;
-+	int stream;
++	struct resource *res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	struct mxs_saif *saif = platform_get_drvdata(pdev);
 +
-+	for (stream = 0; stream < 2; stream++) {
-+		substream = pcm->streams[stream].substream;
-+		if (!substream)
-+			continue;
++	platform_device_unregister(saif->soc_platform_pdev);
 +
-+		buf = &substream->dma_buffer;
-+		if (!buf->area)
-+			continue;
++	snd_soc_unregister_dai(&pdev->dev);
 +
-+		dma_free_writecombine(pcm->card->dev, buf->bytes,
-+				      buf->area, buf->addr);
-+		buf->area = NULL;
-+	}
-+}
++	iounmap(saif->base);
++	release_mem_region(res->start, resource_size(res));
++	free_irq(saif->irq, saif);
 +
-+static struct snd_soc_platform_driver mxs_soc_platform = {
-+	.ops		= &mxs_pcm_ops,
-+	.pcm_new	= mxs_pcm_new,
-+	.pcm_free	= mxs_pcm_free,
-+};
-+
-+static int __devinit mxs_soc_platform_probe(struct platform_device *pdev)
-+{
-+	return snd_soc_register_platform(&pdev->dev, &mxs_soc_platform);
-+}
-+
-+static int __devexit mxs_soc_platform_remove(struct platform_device *pdev)
-+{
-+	snd_soc_unregister_platform(&pdev->dev);
++	clk_put(saif->clk);
++	kfree(saif);
 +
 +	return 0;
 +}
 +
-+static struct platform_driver mxs_pcm_driver = {
++static struct platform_driver mxs_saif_driver = {
++	.probe = mxs_saif_probe,
++	.remove = __devexit_p(mxs_saif_remove),
++
 +	.driver = {
-+		.name = "mxs-pcm-audio",
++		.name = "mxs-saif",
 +		.owner = THIS_MODULE,
 +	},
-+	.probe = mxs_soc_platform_probe,
-+	.remove = __devexit_p(mxs_soc_platform_remove),
 +};
 +
-+static int __init snd_mxs_pcm_init(void)
++static int __init mxs_saif_init(void)
 +{
-+	return platform_driver_register(&mxs_pcm_driver);
++	return platform_driver_register(&mxs_saif_driver);
 +}
-+module_init(snd_mxs_pcm_init);
 +
-+static void __exit snd_mxs_pcm_exit(void)
++static void __exit mxs_saif_exit(void)
 +{
-+	platform_driver_unregister(&mxs_pcm_driver);
++	platform_driver_unregister(&mxs_saif_driver);
 +}
-+module_exit(snd_mxs_pcm_exit);
-diff --git a/sound/soc/mxs/mxs-pcm.h b/sound/soc/mxs/mxs-pcm.h
++
++module_init(mxs_saif_init);
++module_exit(mxs_saif_exit);
++MODULE_AUTHOR("Freescale Semiconductor, Inc.");
++MODULE_DESCRIPTION("MXS ASoC SAIF driver");
++MODULE_LICENSE("GPL");
+diff --git a/sound/soc/mxs/mxs-saif.h b/sound/soc/mxs/mxs-saif.h
 new file mode 100644
-index 0000000..f55ac4f
+index 0000000..0e2ff8c
 --- /dev/null
-+++ b/sound/soc/mxs/mxs-pcm.h
-@@ -0,0 +1,43 @@
++++ b/sound/soc/mxs/mxs-saif.h
+@@ -0,0 +1,130 @@
 +/*
 + * Copyright (C) 2011 Freescale Semiconductor, Inc. All Rights Reserved.
 + *
@@ -406,30 +724,117 @@ index 0000000..f55ac4f
 + * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 + */
 +
-+#ifndef _MXS_PCM_H
-+#define _MXS_PCM_H
 +
-+#include <mach/dma.h>
++#ifndef _MXS_SAIF_H
++#define _MXS_SAIF_H
 +
-+struct mxs_pcm_dma_params {
-+	int chan_irq;
-+	int chan_num;
++#define SAIF_CTRL	0x0
++#define SAIF_STAT	0x10
++#define SAIF_DATA	0x20
++#define SAIF_VERSION	0X30
++
++/* SAIF_CTRL */
++#define BM_SAIF_CTRL_SFTRST		0x80000000
++#define BM_SAIF_CTRL_CLKGATE		0x40000000
++#define BP_SAIF_CTRL_BITCLK_MULT_RATE	27
++#define BM_SAIF_CTRL_BITCLK_MULT_RATE	0x38000000
++#define BF_SAIF_CTRL_BITCLK_MULT_RATE(v) \
++		(((v) << 27) & BM_SAIF_CTRL_BITCLK_MULT_RATE)
++#define BM_SAIF_CTRL_BITCLK_BASE_RATE	0x04000000
++#define BM_SAIF_CTRL_FIFO_ERROR_IRQ_EN	0x02000000
++#define BM_SAIF_CTRL_FIFO_SERVICE_IRQ_EN	0x01000000
++#define BP_SAIF_CTRL_RSRVD2		21
++#define BM_SAIF_CTRL_RSRVD2		0x00E00000
++
++#define BP_SAIF_CTRL_DMAWAIT_COUNT	16
++#define BM_SAIF_CTRL_DMAWAIT_COUNT	0x001F0000
++#define BF_SAIF_CTRL_DMAWAIT_COUNT(v) \
++		(((v) << 16) & BM_SAIF_CTRL_DMAWAIT_COUNT)
++#define BP_SAIF_CTRL_CHANNEL_NUM_SELECT 14
++#define BM_SAIF_CTRL_CHANNEL_NUM_SELECT 0x0000C000
++#define BF_SAIF_CTRL_CHANNEL_NUM_SELECT(v) \
++		(((v) << 14) & BM_SAIF_CTRL_CHANNEL_NUM_SELECT)
++#define BM_SAIF_CTRL_LRCLK_PULSE	0x00002000
++#define BM_SAIF_CTRL_BIT_ORDER		0x00001000
++#define BM_SAIF_CTRL_DELAY		0x00000800
++#define BM_SAIF_CTRL_JUSTIFY		0x00000400
++#define BM_SAIF_CTRL_LRCLK_POLARITY	0x00000200
++#define BM_SAIF_CTRL_BITCLK_EDGE	0x00000100
++#define BP_SAIF_CTRL_WORD_LENGTH	4
++#define BM_SAIF_CTRL_WORD_LENGTH	0x000000F0
++#define BF_SAIF_CTRL_WORD_LENGTH(v) \
++		(((v) << 4) & BM_SAIF_CTRL_WORD_LENGTH)
++#define BM_SAIF_CTRL_BITCLK_48XFS_ENABLE	0x00000008
++#define BM_SAIF_CTRL_SLAVE_MODE		0x00000004
++#define BM_SAIF_CTRL_READ_MODE		0x00000002
++#define BM_SAIF_CTRL_RUN		0x00000001
++
++/* SAIF_STAT */
++#define BM_SAIF_STAT_PRESENT		0x80000000
++#define BP_SAIF_STAT_RSRVD2		17
++#define BM_SAIF_STAT_RSRVD2		0x7FFE0000
++#define BF_SAIF_STAT_RSRVD2(v) \
++		(((v) << 17) & BM_SAIF_STAT_RSRVD2)
++#define BM_SAIF_STAT_DMA_PREQ		0x00010000
++#define BP_SAIF_STAT_RSRVD1		7
++#define BM_SAIF_STAT_RSRVD1		0x0000FF80
++#define BF_SAIF_STAT_RSRVD1(v) \
++		(((v) << 7) & BM_SAIF_STAT_RSRVD1)
++
++#define BM_SAIF_STAT_FIFO_UNDERFLOW_IRQ 0x00000040
++#define BM_SAIF_STAT_FIFO_OVERFLOW_IRQ	0x00000020
++#define BM_SAIF_STAT_FIFO_SERVICE_IRQ	0x00000010
++#define BP_SAIF_STAT_RSRVD0		1
++#define BM_SAIF_STAT_RSRVD0		0x0000000E
++#define BF_SAIF_STAT_RSRVD0(v) \
++		(((v) << 1) & BM_SAIF_STAT_RSRVD0)
++#define BM_SAIF_STAT_BUSY		0x00000001
++
++/* SAFI_DATA */
++#define BP_SAIF_DATA_PCM_RIGHT		16
++#define BM_SAIF_DATA_PCM_RIGHT		0xFFFF0000
++#define BF_SAIF_DATA_PCM_RIGHT(v) \
++		(((v) << 16) & BM_SAIF_DATA_PCM_RIGHT)
++#define BP_SAIF_DATA_PCM_LEFT		0
++#define BM_SAIF_DATA_PCM_LEFT		0x0000FFFF
++#define BF_SAIF_DATA_PCM_LEFT(v)	\
++		(((v) << 0) & BM_SAIF_DATA_PCM_LEFT)
++
++/* SAIF_VERSION */
++#define BP_SAIF_VERSION_MAJOR		24
++#define BM_SAIF_VERSION_MAJOR		0xFF000000
++#define BF_SAIF_VERSION_MAJOR(v) \
++		(((v) << 24) & BM_SAIF_VERSION_MAJOR)
++#define BP_SAIF_VERSION_MINOR		16
++#define BM_SAIF_VERSION_MINOR		0x00FF0000
++#define BF_SAIF_VERSION_MINOR(v) \
++		(((v) << 16) & BM_SAIF_VERSION_MINOR)
++#define BP_SAIF_VERSION_STEP		0
++#define BM_SAIF_VERSION_STEP		0x0000FFFF
++#define BF_SAIF_VERSION_STEP(v) \
++		(((v) << 0) & BM_SAIF_VERSION_STEP)
++
++#define MXS_SAIF_MCLK		0
++
++#include "mxs-pcm.h"
++
++struct mxs_saif {
++	struct device *dev;
++	struct clk *clk;
++	unsigned int mclk;
++	unsigned int mclk_in_use;
++	void __iomem *base;
++	int irq;
++	struct mxs_pcm_dma_params dma_param;
++
++	struct platform_device *soc_platform_pdev;
++	u32 fifo_underrun;
++	u32 fifo_overrun;
 +};
 +
-+struct mxs_pcm_runtime_data {
-+	int period_bytes;
-+	int periods;
-+	int dma;
-+	unsigned long offset;
-+	unsigned long size;
-+	void *buf;
-+	int period_time;
-+	struct dma_async_tx_descriptor *desc;
-+	struct dma_chan *dma_chan;
-+	struct mxs_dma_data dma_data;
-+	struct mxs_pcm_dma_params *dma_params;
-+};
-+
++extern int mxs_saif_put_mclk(unsigned int saif_id);
++extern int mxs_saif_get_mclk(unsigned int saif_id, unsigned int mclk,
++					unsigned int rate);
 +#endif
 -- 
 1.7.0.4
