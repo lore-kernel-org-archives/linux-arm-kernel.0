@@ -1,32 +1,207 @@
-From: B29396@freescale.com (Dong Aisheng-B29396)
-Date: Thu, 21 Jul 2011 04:14:58 +0000
-Subject: [PATCH v5 0/4] ASoC: mxs: add audio support
-In-Reply-To: <1311223018-9553-1-git-send-email-b29396@freescale.com>
-References: <1311223018-9553-1-git-send-email-b29396@freescale.com>
-Message-ID: <65EE16ACC360FA4D99C96DC085B3F7721E9B48@039-SN1MPN1-002.039d.mgd.msft.net>
+From: tushar.behera@linaro.org (Tushar Behera)
+Date: Thu, 21 Jul 2011 10:10:08 +0530
+Subject: [PATCH V2] ARM: EXYNOS4: Add support for ORIGEN board
+In-Reply-To: <CAK9yfHzbfEMTdhBk21o2BXSo_doDmdi9Oh=fStZT5aQVeYsCxw@mail.gmail.com>
+References: <1311220670-20395-1-git-send-email-tushar.behera@linaro.org>
+	<CAK9yfHzbfEMTdhBk21o2BXSo_doDmdi9Oh=fStZT5aQVeYsCxw@mail.gmail.com>
+Message-ID: <4E27ADA8.2050604@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-
-> kernel-bounces at lists.infradead.org] On Behalf Of Dong Aisheng
-> Sent: Thursday, July 21, 2011 12:37 PM
-> To: alsa-devel at alsa-project.org
-> Cc: s.hauer at pengutronix.de; broonie at opensource.wolfsonmicro.com;
-> lrg at ti.com; linux-arm-kernel at lists.infradead.org; w.sang at pengutronix.de
-> Subject: [PATCH v5 0/4] ASoC: mxs: add audio support
-> 
-> According to Liam's comment, i redo the patch set based on the for-next
-> branch on Mark's sound-2.6 tree.
-> The based one is [PATCH v4 00/10] ARM: mxs: add audio support.
-> 
-> For asoc part (1-4), only one change is updating mxs_pcm_new since this
-> API has been updated to pass in the runtime data only For mxs part, no
-> changes made.
-Hi Wolfram & Sascha,
+On Thursday 21 July 2011 10:02 AM, Sachin Kamat wrote:
+> On 21 July 2011 09:27, Tushar Behera<tushar.behera@linaro.org>  wrote:
+>
+>> From: JeongHyeon Kim<jhkim@insignal.co.kr>
+>>
+>> Insignal's ORIGEN board is based Samsung EXYNOS4210 SoC.
+>>
+>> Signed-off-by: JeongHyeon Kim<jhkim@insignal.co.kr>
+>> Signed-off-by: Tushar Behera<tushar.behera@linaro.org>
+>> ---
+>>
+>> Changes for V2:
+>>   - Reworked based on Kukjin's comments and rebased to kgene/for-next
+>>
+>>   arch/arm/mach-exynos4/Kconfig       |   10 +++
+>>   arch/arm/mach-exynos4/Makefile      |    1 +
+>>   arch/arm/mach-exynos4/mach-origen.c |  108
+>> +++++++++++++++++++++++++++++++++++
+>>   3 files changed, 119 insertions(+), 0 deletions(-)
+>>   create mode 100644 arch/arm/mach-exynos4/mach-origen.c
+>>
+>> diff --git a/arch/arm/mach-exynos4/Kconfig b/arch/arm/mach-exynos4/Kconfig
+>> index 52fc172..012c034 100644
+>> --- a/arch/arm/mach-exynos4/Kconfig
+>> +++ b/arch/arm/mach-exynos4/Kconfig
+>> @@ -205,6 +205,16 @@ config MACH_NURI
+>>         help
+>>           Machine support for Samsung Mobile NURI Board.
+>>
+>> +config MACH_ORIGEN
+>> +       bool "ORIGEN"
+>> +       select CPU_EXYNOS4210
+>> +       select S3C_DEV_RTC
+>> +       select S3C_DEV_WDT
+>> +       select S3C_DEV_HSMMC2
+>> +       select EXYNOS4_SETUP_SDHCI
+>> +       help
+>> +         Machine support for ORIGEN based on Samsung S5PV310
+>>
+> Use Exynos4(210) instead of S5PV310.
+>
 
-For the mxs part, it has no changes since v4, do you want me to resend an
-v5 version?
+Ok.
 
-Regards
-Dong Aisheng
+Hi Kukjin,
+
+Should I re-submit with this change?
+
+>> +
+>>   endmenu
+>>
+>>   comment "Configuration for HSMMC bus width"
+>> diff --git a/arch/arm/mach-exynos4/Makefile
+>> b/arch/arm/mach-exynos4/Makefile
+>> index 2a0b682..ebec49c 100644
+>> --- a/arch/arm/mach-exynos4/Makefile
+>> +++ b/arch/arm/mach-exynos4/Makefile
+>> @@ -31,6 +31,7 @@ obj-$(CONFIG_MACH_SMDKV310)           += mach-smdkv310.o
+>>   obj-$(CONFIG_MACH_ARMLEX4210)          += mach-armlex4210.o
+>>   obj-$(CONFIG_MACH_UNIVERSAL_C210)      += mach-universal_c210.o
+>>   obj-$(CONFIG_MACH_NURI)                        += mach-nuri.o
+>> +obj-$(CONFIG_MACH_ORIGEN)              += mach-origen.o
+>>
+>>   # device support
+>>
+>> diff --git a/arch/arm/mach-exynos4/mach-origen.c
+>> b/arch/arm/mach-exynos4/mach-origen.c
+>> new file mode 100644
+>> index 0000000..ed59f86
+>> --- /dev/null
+>> +++ b/arch/arm/mach-exynos4/mach-origen.c
+>> @@ -0,0 +1,108 @@
+>> +/* linux/arch/arm/mach-exynos4/mach-origen.c
+>> + *
+>> + * Copyright (c) 2011 Insignal Co., Ltd.
+>> + *             http://www.insignal.co.kr/
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> +*/
+>> +
+>> +#include<linux/serial_core.h>
+>> +#include<linux/gpio.h>
+>> +#include<linux/mmc/host.h>
+>> +#include<linux/platform_device.h>
+>> +#include<linux/io.h>
+>> +#include<linux/input.h>
+>> +
+>> +#include<asm/mach/arch.h>
+>> +#include<asm/mach-types.h>
+>> +
+>> +#include<plat/regs-serial.h>
+>> +#include<plat/exynos4.h>
+>> +#include<plat/cpu.h>
+>> +#include<plat/devs.h>
+>> +#include<plat/sdhci.h>
+>> +#include<plat/iic.h>
+>> +
+>> +#include<mach/map.h>
+>> +
+>> +/* Following are default values for UCON, ULCON and UFCON UART registers
+>> */
+>> +#define ORIGEN_UCON_DEFAULT    (S3C2410_UCON_TXILEVEL |        \
+>> +                                S3C2410_UCON_RXILEVEL |        \
+>> +                                S3C2410_UCON_TXIRQMODE |       \
+>> +                                S3C2410_UCON_RXIRQMODE |       \
+>> +                                S3C2410_UCON_RXFIFO_TOI |      \
+>> +                                S3C2443_UCON_RXERR_IRQEN)
+>> +
+>> +#define ORIGEN_ULCON_DEFAULT   S3C2410_LCON_CS8
+>> +
+>> +#define ORIGEN_UFCON_DEFAULT   (S3C2410_UFCON_FIFOMODE |       \
+>> +                                S5PV210_UFCON_TXTRIG4 |        \
+>> +                                S5PV210_UFCON_RXTRIG4)
+>> +
+>> +static struct s3c2410_uartcfg origen_uartcfgs[] __initdata = {
+>> +       [0] = {
+>> +               .hwport         = 0,
+>> +               .flags          = 0,
+>> +               .ucon           = ORIGEN_UCON_DEFAULT,
+>> +               .ulcon          = ORIGEN_ULCON_DEFAULT,
+>> +               .ufcon          = ORIGEN_UFCON_DEFAULT,
+>> +       },
+>> +       [1] = {
+>> +               .hwport         = 1,
+>> +               .flags          = 0,
+>> +               .ucon           = ORIGEN_UCON_DEFAULT,
+>> +               .ulcon          = ORIGEN_ULCON_DEFAULT,
+>> +               .ufcon          = ORIGEN_UFCON_DEFAULT,
+>> +       },
+>> +       [2] = {
+>> +               .hwport         = 2,
+>> +               .flags          = 0,
+>> +               .ucon           = ORIGEN_UCON_DEFAULT,
+>> +               .ulcon          = ORIGEN_ULCON_DEFAULT,
+>> +               .ufcon          = ORIGEN_UFCON_DEFAULT,
+>> +       },
+>> +       [3] = {
+>> +               .hwport         = 3,
+>> +               .flags          = 0,
+>> +               .ucon           = ORIGEN_UCON_DEFAULT,
+>> +               .ulcon          = ORIGEN_ULCON_DEFAULT,
+>> +               .ufcon          = ORIGEN_UFCON_DEFAULT,
+>> +       },
+>> +};
+>> +
+>> +static struct s3c_sdhci_platdata origen_hsmmc2_pdata __initdata = {
+>> +       .cd_type                = S3C_SDHCI_CD_GPIO,
+>> +       .ext_cd_gpio            = EXYNOS4_GPK2(2),
+>> +       .ext_cd_gpio_invert     = 1,
+>> +       .clk_type               = S3C_SDHCI_CLK_DIV_EXTERNAL,
+>> +};
+>> +
+>> +static struct platform_device *origen_devices[] __initdata = {
+>> +&s3c_device_hsmmc2,
+>> +&s3c_device_rtc,
+>> +&s3c_device_wdt,
+>> +};
+>> +
+>> +static void __init origen_map_io(void)
+>> +{
+>> +       s5p_init_io(NULL, 0, S5P_VA_CHIPID);
+>> +       s3c24xx_init_clocks(24000000);
+>> +       s3c24xx_init_uarts(origen_uartcfgs, ARRAY_SIZE(origen_uartcfgs));
+>> +}
+>> +
+>> +static void __init origen_machine_init(void)
+>> +{
+>> +       s3c_sdhci2_set_platdata(&origen_hsmmc2_pdata);
+>> +       platform_add_devices(origen_devices, ARRAY_SIZE(origen_devices));
+>> +}
+>> +
+>> +MACHINE_START(ORIGEN, "ORIGEN")
+>> +       /* Maintainer: JeongHyeon Kim<jhkim@insignal.co.kr>  */
+>> +       .boot_params    = S5P_PA_SDRAM + 0x100,
+>> +       .init_irq       = exynos4_init_irq,
+>> +       .map_io         = origen_map_io,
+>> +       .init_machine   = origen_machine_init,
+>> +       .timer          =&exynos4_timer,
+>> +MACHINE_END
+>> --
+>> 1.7.4.1
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe
+>> linux-samsung-soc" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>
+>
+>
+>
+
+
+-- 
+Tushar Behera
