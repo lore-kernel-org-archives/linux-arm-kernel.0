@@ -1,33 +1,36 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Thu, 21 Jul 2011 11:55:41 -0700
-Subject: [PATCH 2/2] MTD: pxa3xx_nand: Fix blank page ECC mismatch
-In-Reply-To: <BANLkTi=7f2+LK32p6WG1doXzYWGf1wJQJQ@mail.gmail.com>
-References: <1307440867-18993-1-git-send-email-leiwen@marvell.com>
-	<1307440867-18993-2-git-send-email-leiwen@marvell.com>
-	<1307445467.11104.80.camel@localhost>
-	<BANLkTin_Z8ndAjp9vw6QcNb5bT82uoR9ng@mail.gmail.com>
-	<BANLkTi=7f2+LK32p6WG1doXzYWGf1wJQJQ@mail.gmail.com>
-Message-ID: <CAN8TOE8n_+FBr3_6fCTpM4Sp80ShWHftP9YsGqYsCT9T6-Pytw@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 21 Jul 2011 21:05:36 +0200
+Subject: [PATCH] iMX28: Fix emi_ddr_open pinmux
+In-Reply-To: <1311264490-5485-1-git-send-email-marek.vasut@gmail.com>
+References: <1311264490-5485-1-git-send-email-marek.vasut@gmail.com>
+Message-ID: <20110721190536.GC16561@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 25, 2011 at 4:48 AM, Daniel Mack <zonque@gmail.com> wrote:
-> Has anyone queued this for 3.0 yet? This fixes a serious regression,
-> so we need this merged, along with Lei's other patch titled "MTD:
-> pxa3xx_nand: fix nand detection issue".
+On Thu, Jul 21, 2011 at 06:08:10PM +0200, Marek Vasut wrote:
+> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+> ---
+>  arch/arm/mach-mxs/include/mach/iomux-mx28.h |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mxs/include/mach/iomux-mx28.h b/arch/arm/mach-mxs/include/mach/iomux-mx28.h
+> index f50fefd..1a95ecd 100644
+> --- a/arch/arm/mach-mxs/include/mach/iomux-mx28.h
+> +++ b/arch/arm/mach-mxs/include/mach/iomux-mx28.h
+> @@ -203,7 +203,7 @@
+>  #define MX28_PAD_EMI_WEN__EMI_WEN			MXS_IOMUX_PAD_NAKED(6, 21, PAD_MUXSEL_0)
+>  #define MX28_PAD_EMI_CE0N__EMI_CE0N			MXS_IOMUX_PAD_NAKED(6, 22, PAD_MUXSEL_0)
+>  #define MX28_PAD_EMI_CE1N__EMI_CE1N			MXS_IOMUX_PAD_NAKED(6, 23, PAD_MUXSEL_0)
+> -#define MX28_PAD_EMI_CKE__EMI_CKE			MXS_IOMUX_PAD_NAKED(6, 24, PAD_MUXSEL_0)
+> +#define MX28_PAD_EMI_CKE__EMI_CKE			MXS_IOMUX_PAD_NAKED(6, 26, PAD_MUXSEL_0)
+In my version of the i.MX28 Reference Manual (Rev. 1, 2010) pin24 is
+correct. So if you're still convinced that 26 is correct you should point
+out in the commit log that the Reference Manual is wrong and why you're
+convinced it really is.
 
-Hmm, I'm a little late on this one...I was just sorting through a few
-e-mails and saw this one.
+Best regards
+Uwe
 
-It looks like it made it as far as Artem's l2-mtd-2.6.git:
-http://git.infradead.org/users/dedekind/l2-mtd-2.6.git/commit/e119967aad8df3b87834e28249feca696c650647
-
-but things have been sitting there for months now. I believe every so
-often, dwmw sorts through Artem's l2-mtd-2.6 repo, pulls patches into
-mtd-2.6, and gets them merged upstream. I think the last time this
-happened was early June (between v3.0-rc1 and v3.0-rc2). Once such
-patches hit mainline, then the stable team is alerted and the
-appropriately-labeled patches are sent to the stable repos. Don't know
-when this will happen though. I'm kinda wondering myself...
-
-Brian
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
