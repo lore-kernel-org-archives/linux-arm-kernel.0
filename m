@@ -1,323 +1,81 @@
-From: vishwanath.bs@ti.com (Vishwanath Sripathy)
-Date: Thu, 21 Jul 2011 10:26:15 +0530
-Subject: [PATCHV2] OMAP4: OPP: add OMAP4460 definitions
-In-Reply-To: <4e27b0d0.100e8e0a.43e0.ffffe6d9SMTPIN_ADDED@mx.google.com>
-References: <yes> <4e27b0d0.100e8e0a.43e0.ffffe6d9SMTPIN_ADDED@mx.google.com>
-Message-ID: <22f8b069792a0dc1e22e843a9fec7422@mail.gmail.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Thu, 21 Jul 2011 10:30:11 +0530
+Subject: [PATCH V4 03-1/13] DMA: PL330: Support DMA_SLAVE_CONFIG command
+In-Reply-To: <000101cc475c$9b5bcdb0$d2136910$%kim@samsung.com>
+References: <1311158773-30314-1-git-send-email-boojin.kim@samsung.com>
+	<1311158773-30314-3-git-send-email-boojin.kim@samsung.com>
+	<CABb+yY2_XKyCr2mEzqd0bCYJk3U7+sg8Xz4b4ma2KB1BconYOw@mail.gmail.com>
+	<000101cc475c$9b5bcdb0$d2136910$%kim@samsung.com>
+Message-ID: <CABb+yY05U0Q58F93TEZ8xt727e6YAxwxZT2HbeTTV6nVcg5DQw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-My mailer seems to have goofed the from email-id. Pls ignore this email. I
-have sent another patch correcting the same.
+On Thu, Jul 21, 2011 at 9:43 AM, Boojin Kim <boojin.kim@samsung.com> wrote:
 
-Vishwa
-> -----Original Message-----
-> From: yes at dbdp31.itg.ti.com [mailto:yes at dbdp31.itg.ti.com]
-> Sent: Thursday, July 21, 2011 10:23 AM
-> To: linux-omap at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org; Sripathy, Vishwanath;
-> Nishanth Menon
-> Subject: [PATCHV2] OMAP4: OPP: add OMAP4460 definitions
+>> > - ? ? ? pl330_tasklet((unsigned long) pch);
+>> > + ? ? ? ? ? ? ? list_splice_tail_init(&list, &pdmac->desc_pool);
+>> > + ? ? ? ? ? ? ? spin_unlock_irqrestore(&pch->lock, flags);
+>> > + ? ? ? ? ? ? ? break;
+>> > + ? ? ? case DMA_SLAVE_CONFIG:
+>> Please protect this section too using spin_lock.
+> Why is spin_lock need here?
+> This code just sets configuration data into own channel structure.
+It does seem unncessary, but the configuration that is set here is read
+in other parts of the driver. However unlikely but there is theoretical
+possibility of race here - one shouldn't count upon goodness of client drivers.
+
+>>
+>> > + ? ? ? ? ? ? ? if (slave_config->direction == DMA_TO_DEVICE) {
+>> > + ? ? ? ? ? ? ? ? ? ? ? if (slave_config->dst_addr)
+>> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? peri->fifo_addr = slave_config->dst_addr;
+>> > + ? ? ? ? ? ? ? ? ? ? ? if (slave_config->dst_addr_width)
+>> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? peri->burst_sz = __ffs(slave_config-
+>> >dst_addr_width);
+>> > + ? ? ? ? ? ? ? } else if (slave_config->direction == DMA_FROM_DEVICE) {
+>> > + ? ? ? ? ? ? ? ? ? ? ? if (slave_config->src_addr)
+>> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? peri->fifo_addr = slave_config->src_addr;
+>> > + ? ? ? ? ? ? ? ? ? ? ? if (slave_config->src_addr_width)
+>> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? peri->burst_sz = __ffs(slave_config-
+>> >src_addr_width);
+>> > + ? ? ? ? ? ? ? }
+>> PL330 has fixed channels to peripherals.
+>> So FIFO addresses(burst_sz too?) should already be set via platform data.
+>> Client drivers shouldn't bother.
 >
-> From: Sripathy, Vishwanath <vishwanath.bs@ti.com>
+> First, DMA machine code should know the FIFO address of all client drivers to
+> set via platform data.
+> In this case, Problem is that the definition of FIFO address is almost
+> declared to the header file of client driver.
+> For example, sound\soc\samsung\regs-i2s-v2.h only has the definition of fifo
+> address as following.
 >
-> Add OMAP4460 OPP definitions for voltage and frequencies based on
-> OMAP4460 ES1.0 DM Operating Condition Addendum Version 0.1
+> #define S3C2412_IISTXD ? ? ? ? ? ? ? ? ?(0x10)
+> #define S3C2412_IISRXD ? ? ? ? ? ? ? ? ?(0x14)
 >
-> The following exceptions are present:
-> * Smartreflex support is still on experimental mode: the gains and
-> min
->   limits are currently pending characterization data. Currently
-> OMAP4430 values
->   are used.
-> * Efuse offset for core OPP100-OV setting is not clear in
-> documentation.
-> * IVA OPPs beyond OPP100 are disabled due to the delta between max
-> OMAP4460
->   current requirements and Phoenix Max supply on VCORE2 in the
-> default
->   configuration - boards which have supply which can support this
-> should
->   explicitly call opp_enable and enable the same.
-> * MPU OPPs > OPPTURBO can easily be detected using a efuse burnt -
-> currently
->   disabled pending clock changes to support DCC feature.
+> These definitions should be referred to DMA machine code to set fifo address
+> through platform data.
+> I think it's not good method.
+Crap!
+Client drivers don't conjure up the fifo address - if not hardcoded they
+are gotten via platform_data already.
+
+
+> And, SLAVE_CONFIG command exist to pass slave configuration data from client
+> driver to DMA driver.
+> So, I think that it's proper to pass fifo address through SLAVE_CONFIG
+> command.
+If it's still not clear, read the para above definition of 'struct
+dma_slave_config'
+in include/linux/dmaengine.h
+
 >
-> [nm at ti.com: cleanups and updates from Datamanual]
-> Signed-off-by: Nishanth Menon <nm@ti.com>
-> Signed-off-by: Vishwanath BS <vishwanath.bs@ti.com>
-> ---
-> Patch is generated against latest lo master.
-> Changes in V2: Updated the commit log as per Nishant's comments.
-> Patch has some checkpatch warnings related to line over 80 chars.
-> They have
-> been retained to keep the readability of the code.
+> Second, 'burst_sz' isn't fixed value. Namely, Client driver changes 'burst_sz'
+> according to its usecase.
+> For example, I2S driver sets 'burst_sz' to 4 in case of stereo
+> playback/recording. But in case of mono playback/recording, It changes
+> 'burst_sz' to 2.
+> So, Client driver should use SLAVE_CONFIG command to set 'burst_sz' because
+> it's not fixed value.
 >
->  arch/arm/mach-omap2/control.h                 |    1 +
->  arch/arm/mach-omap2/omap_opp_data.h           |    9 ++-
->  arch/arm/mach-omap2/opp4xxx_data.c            |   96
-> ++++++++++++++++++++++---
->  arch/arm/mach-omap2/voltagedomains44xx_data.c |   14 +++-
->  4 files changed, 105 insertions(+), 15 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/control.h b/arch/arm/mach-
-> omap2/control.h
-> index a016c8b..a41b9a7 100644
-> --- a/arch/arm/mach-omap2/control.h
-> +++ b/arch/arm/mach-omap2/control.h
-> @@ -195,6 +195,7 @@
->  #define OMAP44XX_CONTROL_FUSE_MPU_OPPNITRO	0x249
->  #define OMAP44XX_CONTROL_FUSE_CORE_OPP50	0x254
->  #define OMAP44XX_CONTROL_FUSE_CORE_OPP100	0x257
-> +#define OMAP44XX_CONTROL_FUSE_CORE_OPP100OV	0x25A
->
->  /* AM35XX only CONTROL_GENERAL register offsets */
->  #define AM35XX_CONTROL_MSUSPENDMUX_6    (OMAP2_CONTROL_GENERAL +
-> 0x0038)
-> diff --git a/arch/arm/mach-omap2/omap_opp_data.h b/arch/arm/mach-
-> omap2/omap_opp_data.h
-> index c784c12..18a750e 100644
-> --- a/arch/arm/mach-omap2/omap_opp_data.h
-> +++ b/arch/arm/mach-omap2/omap_opp_data.h
-> @@ -89,8 +89,11 @@ extern struct omap_volt_data
-> omap34xx_vddcore_volt_data[];
->  extern struct omap_volt_data omap36xx_vddmpu_volt_data[];
->  extern struct omap_volt_data omap36xx_vddcore_volt_data[];
->
-> -extern struct omap_volt_data omap44xx_vdd_mpu_volt_data[];
-> -extern struct omap_volt_data omap44xx_vdd_iva_volt_data[];
-> -extern struct omap_volt_data omap44xx_vdd_core_volt_data[];
-> +extern struct omap_volt_data omap443x_vdd_mpu_volt_data[];
-> +extern struct omap_volt_data omap443x_vdd_iva_volt_data[];
-> +extern struct omap_volt_data omap443x_vdd_core_volt_data[];
-> +extern struct omap_volt_data omap446x_vdd_mpu_volt_data[];
-> +extern struct omap_volt_data omap446x_vdd_iva_volt_data[];
-> +extern struct omap_volt_data omap446x_vdd_core_volt_data[];
->
->  #endif		/* __ARCH_ARM_MACH_OMAP2_OMAP_OPP_DATA_H */
-> diff --git a/arch/arm/mach-omap2/opp4xxx_data.c b/arch/arm/mach-
-> omap2/opp4xxx_data.c
-> index 2293ba2..8c285e4 100644
-> --- a/arch/arm/mach-omap2/opp4xxx_data.c
-> +++ b/arch/arm/mach-omap2/opp4xxx_data.c
-> @@ -1,7 +1,7 @@
->  /*
->   * OMAP4 OPP table definitions.
->   *
-> - * Copyright (C) 2010 Texas Instruments Incorporated -
-> http://www.ti.com/
-> + * Copyright (C) 2010-2011 Texas Instruments Incorporated -
-> http://www.ti.com/
->   *	Nishanth Menon
->   *	Kevin Hilman
->   *	Thara Gopinath
-> @@ -36,7 +36,7 @@
->  #define OMAP4430_VDD_MPU_OPPTURBO_UV		1313000
->  #define OMAP4430_VDD_MPU_OPPNITRO_UV		1375000
->
-> -struct omap_volt_data omap44xx_vdd_mpu_volt_data[] = {
-> +struct omap_volt_data omap443x_vdd_mpu_volt_data[] = {
->  	VOLT_DATA_DEFINE(OMAP4430_VDD_MPU_OPP50_UV,
-> OMAP44XX_CONTROL_FUSE_MPU_OPP50, 0xf4, 0x0c),
->  	VOLT_DATA_DEFINE(OMAP4430_VDD_MPU_OPP100_UV,
-> OMAP44XX_CONTROL_FUSE_MPU_OPP100, 0xf9, 0x16),
->  	VOLT_DATA_DEFINE(OMAP4430_VDD_MPU_OPPTURBO_UV,
-> OMAP44XX_CONTROL_FUSE_MPU_OPPTURBO, 0xfa, 0x23),
-> @@ -48,7 +48,7 @@ struct omap_volt_data omap44xx_vdd_mpu_volt_data[]
-> = {
->  #define OMAP4430_VDD_IVA_OPP100_UV		1188000
->  #define OMAP4430_VDD_IVA_OPPTURBO_UV		1300000
->
-> -struct omap_volt_data omap44xx_vdd_iva_volt_data[] = {
-> +struct omap_volt_data omap443x_vdd_iva_volt_data[] = {
->  	VOLT_DATA_DEFINE(OMAP4430_VDD_IVA_OPP50_UV,
-> OMAP44XX_CONTROL_FUSE_IVA_OPP50, 0xf4, 0x0c),
->  	VOLT_DATA_DEFINE(OMAP4430_VDD_IVA_OPP100_UV,
-> OMAP44XX_CONTROL_FUSE_IVA_OPP100, 0xf9, 0x16),
->  	VOLT_DATA_DEFINE(OMAP4430_VDD_IVA_OPPTURBO_UV,
-> OMAP44XX_CONTROL_FUSE_IVA_OPPTURBO, 0xfa, 0x23),
-> @@ -58,14 +58,14 @@ struct omap_volt_data
-> omap44xx_vdd_iva_volt_data[] = {
->  #define OMAP4430_VDD_CORE_OPP50_UV		1025000
->  #define OMAP4430_VDD_CORE_OPP100_UV		1200000
->
-> -struct omap_volt_data omap44xx_vdd_core_volt_data[] = {
-> +struct omap_volt_data omap443x_vdd_core_volt_data[] = {
->  	VOLT_DATA_DEFINE(OMAP4430_VDD_CORE_OPP50_UV,
-> OMAP44XX_CONTROL_FUSE_CORE_OPP50, 0xf4, 0x0c),
->  	VOLT_DATA_DEFINE(OMAP4430_VDD_CORE_OPP100_UV,
-> OMAP44XX_CONTROL_FUSE_CORE_OPP100, 0xf9, 0x16),
->  	VOLT_DATA_DEFINE(0, 0, 0, 0),
->  };
->
->
-> -static struct omap_opp_def __initdata omap44xx_opp_def_list[] = {
-> +static struct omap_opp_def __initdata omap443x_opp_def_list[] = {
->  	/* MPU OPP1 - OPP50 */
->  	OPP_INITIALIZER("mpu", true, 300000000,
-> OMAP4430_VDD_MPU_OPP50_UV),
->  	/* MPU OPP2 - OPP100 */
-> @@ -87,6 +87,82 @@ static struct omap_opp_def __initdata
-> omap44xx_opp_def_list[] = {
->  	/* TODO: add DSP, aess, fdif, gpu */
->  };
->
-> +#define OMAP4460_VDD_MPU_OPP50_UV		1025000
-> +#define OMAP4460_VDD_MPU_OPP100_UV		1200000
-> +#define OMAP4460_VDD_MPU_OPPTURBO_UV		1313000
-> +#define OMAP4460_VDD_MPU_OPPNITRO_UV		1375000
-> +
-> +struct omap_volt_data omap446x_vdd_mpu_volt_data[] = {
-> +	VOLT_DATA_DEFINE(OMAP4460_VDD_MPU_OPP50_UV,
-> OMAP44XX_CONTROL_FUSE_MPU_OPP50, 0xf4, 0x0c),
-> +	VOLT_DATA_DEFINE(OMAP4460_VDD_MPU_OPP100_UV,
-> OMAP44XX_CONTROL_FUSE_MPU_OPP100, 0xf9, 0x16),
-> +	VOLT_DATA_DEFINE(OMAP4460_VDD_MPU_OPPTURBO_UV,
-> OMAP44XX_CONTROL_FUSE_MPU_OPPTURBO, 0xfa, 0x23),
-> +	VOLT_DATA_DEFINE(OMAP4460_VDD_MPU_OPPNITRO_UV,
-> OMAP44XX_CONTROL_FUSE_MPU_OPPNITRO, 0xfa, 0x27),
-> +	VOLT_DATA_DEFINE(0, 0, 0, 0),
-> +};
-> +
-> +#define OMAP4460_VDD_IVA_OPP50_UV		1025000
-> +#define OMAP4460_VDD_IVA_OPP100_UV		1200000
-> +#define OMAP4460_VDD_IVA_OPPTURBO_UV		1313000
-> +#define OMAP4460_VDD_IVA_OPPNITRO_UV		1375000
-> +
-> +struct omap_volt_data omap446x_vdd_iva_volt_data[] = {
-> +	VOLT_DATA_DEFINE(OMAP4460_VDD_IVA_OPP50_UV,
-> OMAP44XX_CONTROL_FUSE_IVA_OPP50, 0xf4, 0x0c),
-> +	VOLT_DATA_DEFINE(OMAP4460_VDD_IVA_OPP100_UV,
-> OMAP44XX_CONTROL_FUSE_IVA_OPP100, 0xf9, 0x16),
-> +	VOLT_DATA_DEFINE(OMAP4460_VDD_IVA_OPPTURBO_UV,
-> OMAP44XX_CONTROL_FUSE_IVA_OPPTURBO, 0xfa, 0x23),
-> +	VOLT_DATA_DEFINE(OMAP4460_VDD_IVA_OPPNITRO_UV,
-> OMAP44XX_CONTROL_FUSE_IVA_OPPNITRO, 0xfa, 0x23),
-> +	VOLT_DATA_DEFINE(0, 0, 0, 0),
-> +};
-> +
-> +#define OMAP4460_VDD_CORE_OPP50_UV		1025000
-> +#define OMAP4460_VDD_CORE_OPP100_UV		1200000
-> +#define OMAP4460_VDD_CORE_OPP100_OV_UV		1250000
-> +
-> +struct omap_volt_data omap446x_vdd_core_volt_data[] = {
-> +	VOLT_DATA_DEFINE(OMAP4460_VDD_CORE_OPP50_UV,
-> OMAP44XX_CONTROL_FUSE_CORE_OPP50, 0xf4, 0x0c),
-> +	VOLT_DATA_DEFINE(OMAP4460_VDD_CORE_OPP100_UV,
-> OMAP44XX_CONTROL_FUSE_CORE_OPP100, 0xf9, 0x16),
-> +	VOLT_DATA_DEFINE(OMAP4460_VDD_CORE_OPP100_OV_UV,
-> OMAP44XX_CONTROL_FUSE_CORE_OPP100OV, 0xf9, 0x16),
-> +	VOLT_DATA_DEFINE(0, 0, 0, 0),
-> +};
-> +
-> +static struct omap_opp_def __initdata omap446x_opp_def_list[] = {
-> +	/* MPU OPP1 - OPP50 */
-> +	OPP_INITIALIZER("mpu", true, 350000000,
-> OMAP4460_VDD_MPU_OPP50_UV),
-> +	/* MPU OPP2 - OPP100 */
-> +	OPP_INITIALIZER("mpu", true, 700000000,
-> OMAP4460_VDD_MPU_OPP100_UV),
-> +	/* MPU OPP3 - OPP-Turbo */
-> +	OPP_INITIALIZER("mpu", true, 920000000,
-> OMAP4460_VDD_MPU_OPPTURBO_UV),
-> +	/*
-> +	 * MPU OPP4 - OPP-Nitro + Disabled as the reference schematics
-> +	 * recommends TPS623631 - confirm and enable the opp in board
-> file
-> +	 * XXX: May be we should enable these based on mpu capability
-> and
-> +	 * Exception board files disable it...
-> +	 */
-> +	OPP_INITIALIZER("mpu", false, 1200000000,
-> OMAP4460_VDD_MPU_OPPNITRO_UV),
-> +	/* MPU OPP4 - OPP-Nitro SpeedBin */
-> +	OPP_INITIALIZER("mpu", false, 1500000000,
-> OMAP4460_VDD_MPU_OPPNITRO_UV),
-> +	/* L3 OPP1 - OPP50 */
-> +	OPP_INITIALIZER("l3_main_1", true, 100000000,
-> OMAP4460_VDD_CORE_OPP50_UV),
-> +	/* L3 OPP2 - OPP100 */
-> +	OPP_INITIALIZER("l3_main_1", true, 200000000,
-> OMAP4460_VDD_CORE_OPP100_UV),
-> +	/* IVA OPP1 - OPP50 */
-> +	OPP_INITIALIZER("iva", true, 133000000,
-> OMAP4460_VDD_IVA_OPP50_UV),
-> +	/* IVA OPP2 - OPP100 */
-> +	OPP_INITIALIZER("iva", true, 266100000,
-> OMAP4460_VDD_IVA_OPP100_UV),
-> +	/*
-> +	 * IVA OPP3 - OPP-Turbo + Disabled as the reference schematics
-> +	 * recommends Phoenix VCORE2 which can supply only 600mA - so
-> the ones
-> +	 * above this OPP frequency, even though OMAP is capable,
-> should be
-> +	 * enabled by board file which is sure of the chip power
-> capability
-> +	 */
-> +	OPP_INITIALIZER("iva", false, 332000000,
-> OMAP4460_VDD_IVA_OPPTURBO_UV),
-> +	/* IVA OPP4 - OPP-Nitro */
-> +	OPP_INITIALIZER("iva", false, 430000000,
-> OMAP4460_VDD_IVA_OPPNITRO_UV),
-> +	/* IVA OPP5 - OPP-Nitro SpeedBin*/
-> +	OPP_INITIALIZER("iva", false, 500000000,
-> OMAP4460_VDD_IVA_OPPNITRO_UV),
-> +
-> +	/* TODO: add DSP, aess, fdif, gpu */
-> +};
-> +
->  /**
->   * omap4_opp_init() - initialize omap4 opp table
->   */
-> @@ -96,10 +172,12 @@ int __init omap4_opp_init(void)
->
->  	if (!cpu_is_omap44xx())
->  		return r;
-> -
-> -	r = omap_init_opp_table(omap44xx_opp_def_list,
-> -			ARRAY_SIZE(omap44xx_opp_def_list));
-> -
-> +	if (cpu_is_omap443x())
-> +		r = omap_init_opp_table(omap443x_opp_def_list,
-> +			ARRAY_SIZE(omap443x_opp_def_list));
-> +	else if (cpu_is_omap446x())
-> +		r = omap_init_opp_table(omap446x_opp_def_list,
-> +			ARRAY_SIZE(omap446x_opp_def_list));
->  	return r;
->  }
->  device_initcall(omap4_opp_init);
-> diff --git a/arch/arm/mach-omap2/voltagedomains44xx_data.c
-> b/arch/arm/mach-omap2/voltagedomains44xx_data.c
-> index cb64996..f516cfe 100644
-> --- a/arch/arm/mach-omap2/voltagedomains44xx_data.c
-> +++ b/arch/arm/mach-omap2/voltagedomains44xx_data.c
-> @@ -91,9 +91,17 @@ static int __init
-> omap44xx_voltage_early_init(void)
->  	 * XXX Will depend on the process, validation, and binning
->  	 * for the currently-running IC
->  	 */
-> -	omap4_vdd_mpu_info.volt_data = omap44xx_vdd_mpu_volt_data;
-> -	omap4_vdd_iva_info.volt_data = omap44xx_vdd_iva_volt_data;
-> -	omap4_vdd_core_info.volt_data = omap44xx_vdd_core_volt_data;
-> +	if (cpu_is_omap443x()) {
-> +		omap4_vdd_mpu_info.volt_data =
-> omap443x_vdd_mpu_volt_data;
-> +		omap4_vdd_iva_info.volt_data =
-> omap443x_vdd_iva_volt_data;
-> +		omap4_vdd_core_info.volt_data =
-> omap443x_vdd_core_volt_data;
-> +	} else if (cpu_is_omap446x()) {
-> +		omap4_vdd_mpu_info.volt_data =
-> omap446x_vdd_mpu_volt_data;
-> +		omap4_vdd_iva_info.volt_data =
-> omap446x_vdd_iva_volt_data;
-> +		omap4_vdd_core_info.volt_data =
-> omap446x_vdd_core_volt_data;
-> +	} else {
-> +		return -ENODATA;
-> +	}
->
->  	return omap_voltage_early_init(prm_mod, prm_irqst_ocp_mod,
->  				       omap4_vdd_info,
-> --
-> 1.7.0.4
+Yeah yeah, ok, that's why I put that with a ? in bracket.
+I just don't remember testing with fixed burst_sz with pl330.
