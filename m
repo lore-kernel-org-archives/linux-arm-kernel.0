@@ -1,37 +1,83 @@
-From: ccross@android.com (Colin Cross)
-Date: Thu, 21 Jul 2011 11:48:11 -0700
-Subject: [PATCH 1/2] ARM: Tegra: Seaboard board updates for audio
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF049EBDF13E@HQMAIL01.nvidia.com>
-References: <1310594272-8229-1-git-send-email-swarren@nvidia.com>
-	<CAOesGMjiakgvs8wcu8zRkuA9mxD5Z=S-hV3HNgqFC49pEGVADw@mail.gmail.com>
-	<74CDBE0F657A3D45AFBB94109FB122FF049EBDF13E@HQMAIL01.nvidia.com>
-Message-ID: <CAMbhsRQuzO2EW33vFGcDM+=bKLkfEY6WLn_dr7Q7o7uOekA0gA@mail.gmail.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 21 Jul 2011 11:52:36 -0700
+Subject: [PATCH] OMAP: omap_device: replace pr_* prints with dev_*
+In-Reply-To: <20110721174306.GD32058@legolas.emea.dhcp.ti.com>
+References: <1311269976-4035-1-git-send-email-khilman@ti.com>
+	<20110721174306.GD32058@legolas.emea.dhcp.ti.com>
+Message-ID: <1311274356.8322.98.camel@vence>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 21, 2011 at 8:37 AM, Stephen Warren <swarren@nvidia.com> wrote:
-> Olof Johansson wrote at Wednesday, July 13, 2011 5:17 PM:
->> On Wed, Jul 13, 2011 at 2:57 PM, Stephen Warren <swarren@nvidia.com> wrote:
->> > * Initialize clock tree for audio
->> > * Add GPIO base definitions
->> > * Add audio GPIO definitions
->> > * Define platform data for WM8903 and ASoC machine driver
->> > * Add special case for Kaen to handle HP_MUTE GPIO
->> > * Register platform devices for audio
->> > * Update pinmux to cater for new GPIOs used for audio
->> >
->> > Signed-off-by: Stephen Warren <swarren@nvidia.com>
->>
->> Colin, sounds like you're collecting board patches this merge window, so:
->>
->> Acked-by: Olof Johansson <olof@lixom.net>
->
-> Colin,
->
-> Do you want me to ask Arnd to pick these patches up directly, or do you
-> want to apply them to the Tegra for-next tree, and have Arnd pull them?
+On Thu, 2011-07-21 at 20:43 +0300, Felipe Balbi wrote:
+> On Thu, Jul 21, 2011 at 10:39:36AM -0700, Kevin Hilman wrote:
+> > For consistency in kernel printk output for devices, use dev_dbg(),
+> > dev_warn(), dev_err() instead of pr_debug(), pr_warning() and
+> > pr_err(), some of which currently use direct access of name from
+> > platform_device and others of which use dev_name().  Using the dev_*
+> > versions uses the standard device naming from the driver core.
+> > 
+> > Some pr_* prints were not converted with this patch since they are
+> > used before the platform_device and struct device are created so
+> > neither the dev_* prints or dev_name() is valid.
+> > 
+> > Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> > Cc: Felipe Balbi <balbi@ti.com>
+> > Signed-off-by: Kevin Hilman <khilman@ti.com>
+> > ---
+> 
+> FWIW:
+> 
+> Reviewed-by: Felipe Balbi <balbi@ti.com>
 
-Normally I would want them to go through me so I have a chance to deal
-with conflicts before it hits the arm-soc tree, but since Arnd has
-already taken some patches for this release cycle, they might as well
-go directly to him.
+Thanks.
+
+> BTW, I tried applying this to today's linus/master, but it fails
+> (rejects below), are you depending on some other changes ?
+
+Oops, I forgot to mention it applies on top of a bunch of stuff queued
+for v3.1.  Specifically, it's on top of Paul's prcm-devel-3.1 branch[1],
+which Arnd has merged into the arm-soc tree.
+
+Kevin
+
+[1] git://git.pwsan.com/linux-2.6 prcm-devel-3.1
+
+> --- arch/arm/plat-omap/omap_device.c
+> +++ arch/arm/plat-omap/omap_device.c
+> @@ -242,28 +239,27 @@
+>  	if (!clk_alias || !clk_name)
+>  		return;
+>  
+> -	pr_debug("omap_device: %s: Creating %s -> %s\n",
+> -		 dev_name(&od->pdev.dev), clk_alias, clk_name);
+> +	dev_dbg(&od->pdev.dev, "Creating %s -> %s\n", clk_alias, clk_name);
+>  
+>  	r = clk_get_sys(dev_name(&od->pdev.dev), clk_alias);
+>  	if (!IS_ERR(r)) {
+> -		pr_warning("omap_device: %s: alias %s already exists\n",
+> -			   dev_name(&od->pdev.dev), clk_alias);
+> +		dev_warn(&od->pdev.dev,
+> +			 "alias %s already exists\n", clk_alias);
+>  		clk_put(r);
+>  		return;
+>  	}
+>  
+>  	r = omap_clk_get_by_name(clk_name);
+>  	if (IS_ERR(r)) {
+> -		pr_err("omap_device: %s: omap_clk_get_by_name for %s failed\n",
+> -		       dev_name(&od->pdev.dev), clk_name);
+> +		dev_err(&od->pdev.dev,
+> +			"omap_clk_get_by_name for %s failed\n", clk_name);
+>  		return;
+>  	}
+>  
+>  	l = clkdev_alloc(r, clk_alias, dev_name(&od->pdev.dev));
+>  	if (!l) {
+> -		pr_err("omap_device: %s: clkdev_alloc for %s failed\n",
+> -		       dev_name(&od->pdev.dev), clk_alias);
+> +		dev_err(&od->pdev.dev,
+> +			"clkdev_alloc for %s failed\n", clk_alias);
+>  		return;
+>  	}
+>  
+> 
