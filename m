@@ -1,63 +1,55 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 21 Jul 2011 16:23:42 +0100
-Subject: [PATCH V4 03-1/13] DMA: PL330: Support DMA_SLAVE_CONFIG command
-In-Reply-To: <CABb+yY2p8VNSvhv+LjoYnunrYS8+3+841bKM-4aUsg5vNx=Mig@mail.gmail.com>
-References: <1311158773-30314-1-git-send-email-boojin.kim@samsung.com>
-	<1311158773-30314-3-git-send-email-boojin.kim@samsung.com>
-	<CABb+yY2_XKyCr2mEzqd0bCYJk3U7+sg8Xz4b4ma2KB1BconYOw@mail.gmail.com>
-	<20110721081138.GL26574@n2100.arm.linux.org.uk>
-	<CABb+yY2obv5JMBiRSXS-4tSCYX+7nVVaA0Q7gurA+NndrGVuvA@mail.gmail.com>
-	<20110721112920.GM26574@n2100.arm.linux.org.uk>
-	<CABb+yY2p8VNSvhv+LjoYnunrYS8+3+841bKM-4aUsg5vNx=Mig@mail.gmail.com>
-Message-ID: <20110721152342.GE28942@n2100.arm.linux.org.uk>
+Date: Thu, 21 Jul 2011 16:24:34 +0100
+Subject: [PATCH 1/4] ARM: CPU hotplug: fix abuse of irqdesc->node
+In-Reply-To: <20110721151413.GD28942@n2100.arm.linux.org.uk>
+References: <20110721151413.GD28942@n2100.arm.linux.org.uk>
+Message-ID: <E1Qjv74-0003IS-Qn@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 21, 2011 at 08:42:40PM +0530, Jassi Brar wrote:
-> On Thu, Jul 21, 2011 at 4:59 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > Does your hardware have a hardware block from the device itself containing
-> > all the systems FIFOs ?
-> I am not sure what you ask, but let me say what I know.
-> In this case atleast, all PL330 DMA channels have fixed source/destination
-> address on the device side. So it's not like developer doesn't know
-> fifo_addr here.
+irqdesc's node member is supposed to mark the numa node number for the
+interrupt.  Our use of it is non-standard.  Remove this, replacing the
+functionality with a test of the affinity mask.
 
-Even so, your approach is _conceptually_ wrong.  Think about it.
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/common/gic.c |    1 -
+ arch/arm/kernel/irq.c |   10 ++--------
+ 2 files changed, 2 insertions(+), 9 deletions(-)
 
-You declare your devices giving the bus address where they're located.
-So, lets say for argument that your UART is located at 0x10001000.
-
-Your UART driver knows that the FIFO register is at offset 0x20 from
-the base address.  Your platform data provides the UART driver with a
-DMA match function and data specific for that match function.  This
-data encodes the specific DMA channel.
-
-Now, why should you have to encode into the DMA drivers platform data
-that DMA channel X has its FIFO at 0x10001020?  Not only do you have
-to declare the base address of the UART but also you have to know the
-offset into the UART.
-
-Why not just let the UART driver - which knows that the base address
-is 0x10001000, and the FIFO is at offset 0x20 above that - tell the
-DMA driver that's where the FIFO is located?
-
-Finally, your specific SoC may have a PL330, which may have FIFOs tied
-to specific DMA request signals.  That's an _implementation_ _detail_.
-That doesn't mean that's always going to be the case.
-
-I've heard that ARM Ltd may start using the PL330 on their evaluation
-boards.  They have a habbit of muxing several DMA request signals to
-several different peripherals.  Will I need to rewrite all the Samsung
-users of PL330 when that happens because they've decided they don't
-like the DMA engine API and have gone off and done their own thing
-instead?
-
-So no, encoding the FIFO addresses into platform data for the DMA
-controller is brain dead and totally the wrong thing to do.  And when
-you come to moving stuff over to DT, you'll see that's even more true
-there.
-
-So don't make the mistake now.  Do things sensibly and follow the DMA
-engine API.  Arrange for all your drivers to call DMA_SLAVE_CONFIG
-with the address of the FIFO.
+diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+index 4ddd0a6..635d985 100644
+--- a/arch/arm/common/gic.c
++++ b/arch/arm/common/gic.c
+@@ -189,7 +189,6 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
+ 	bit = 1 << (cpu + shift);
+ 
+ 	spin_lock(&irq_controller_lock);
+-	d->node = cpu;
+ 	val = readl_relaxed(reg) & ~mask;
+ 	writel_relaxed(val | bit, reg);
+ 	spin_unlock(&irq_controller_lock);
+diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
+index 83bbad0..d7aa5c9 100644
+--- a/arch/arm/kernel/irq.c
++++ b/arch/arm/kernel/irq.c
+@@ -166,15 +166,9 @@ void migrate_irqs(void)
+ 		bool affinity_broken = false;
+ 
+ 		raw_spin_lock(&desc->lock);
+-		do {
+-			if (desc->action == NULL)
+-				break;
+-
+-			if (d->node != cpu)
+-				break;
+-
++		if (desc->action != NULL &&
++		    cpumask_test_cpu(smp_processor_id(), d->affinity))
+ 			affinity_broken = migrate_one_irq(d);
+-		} while (0);
+ 		raw_spin_unlock(&desc->lock);
+ 
+ 		if (affinity_broken && printk_ratelimit())
+-- 
+1.7.4.4
