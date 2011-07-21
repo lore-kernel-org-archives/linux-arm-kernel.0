@@ -1,41 +1,71 @@
 From: myungjoo.ham@samsung.com (MyungJoo Ham)
-Date: Thu, 21 Jul 2011 11:11:31 +0900
-Subject: [PATCH] ARM: EXYNOS4: Add more register addresses of CMU.
-In-Reply-To: <000501cc470b$34a32060$9de96120$%kim@samsung.com>
-References: <000501cc470b$34a32060$9de96120$%kim@samsung.com>
-Message-ID: <1311214291-32151-1-git-send-email-myungjoo.ham@samsung.com>
+Date: Thu, 21 Jul 2011 11:18:29 +0900
+Subject: [PATCH v3 1/6] ARM: EXYNOS4: Increase NR_IRQS for devices with
+	more IRQs
+In-Reply-To: <06c801cc46ff$29855330$7c8ff990$%kim@samsung.com>
+References: <1309421729-11172-1-git-send-email-myungjoo.ham@samsung.com>
+	<1309421729-11172-2-git-send-email-myungjoo.ham@samsung.com>
+	<06c801cc46ff$29855330$7c8ff990$%kim@samsung.com>
+Message-ID: <CAJ0PZbRuCCbbTz-qhcY0OsaXF+zgAu3_OZBj+LRz=OczyTrcGg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These registers are crucial for PM to work properly.
+On Thu, Jul 21, 2011 at 2:04 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> MyungJoo Ham wrote:
+>>
+>> MAX8997/17042, which are used by Exynos4-NURI, use additional IRQ
+>> numbers after GPIO's IRQs. The patch creates some room for those
+>> devices.
+>>
+>> Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
+>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+>> ---
+>> ?arch/arm/mach-exynos4/include/mach/irqs.h | ? ?2 +-
+>> ?1 files changed, 1 insertions(+), 1 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-exynos4/include/mach/irqs.h b/arch/arm/mach-
+>> exynos4/include/mach/irqs.h
+>> index 31f6bed..51b5db5 100644
+>> --- a/arch/arm/mach-exynos4/include/mach/irqs.h
+>> +++ b/arch/arm/mach-exynos4/include/mach/irqs.h
+>> @@ -154,6 +154,6 @@
+>> ?#define IRQ_GPIO_END ? ? ? ? (S5P_GPIOINT_BASE + S5P_GPIOINT_COUNT)
+>>
+>> ?/* Set the default NR_IRQS */
+>> -#define NR_IRQS ? ? ? ? ? ? ? ? ? ? ?(IRQ_GPIO_END)
+>> +#define NR_IRQS ? ? ? ? ? ? ? ? ? ? ?(IRQ_GPIO_END + 64)
+>
+> I applied but basically, we have to avoid using hard coded value like 64 on
+> this. The NR_IRQS depends on CPU not board but this change is needed for
+> supporting some specific board and if you need more interrupt numbers, will
+> you increase it? It is not good way.
+>
+> We need to fix this up next time.
+>
+> Thanks.
+>
+> Best regards,
+> Kgene.
 
-Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- arch/arm/mach-exynos4/include/mach/regs-clock.h |    3 +++
- 1 files changed, 3 insertions(+), 0 deletions(-)
+Alright. I'll try to let it assign or change NR_IRQS adaptively either
+in run-time, boot-time, or compile-time later as a seperated patch.
 
-diff --git a/arch/arm/mach-exynos4/include/mach/regs-clock.h b/arch/arm/mach-exynos4/include/mach/regs-clock.h
-index 64bdd24..d493fdb 100644
---- a/arch/arm/mach-exynos4/include/mach/regs-clock.h
-+++ b/arch/arm/mach-exynos4/include/mach/regs-clock.h
-@@ -36,7 +36,9 @@
- #define S5P_CLKSRC_TOP0			S5P_CLKREG(0x0C210)
- #define S5P_CLKSRC_TOP1			S5P_CLKREG(0x0C214)
- #define S5P_CLKSRC_CAM			S5P_CLKREG(0x0C220)
-+#define S5P_CLKSRC_TV			S5P_CLKREG(0x0C224)
- #define S5P_CLKSRC_MFC			S5P_CLKREG(0x0C228)
-+#define S5P_CLKSRC_G3D			S5P_CLKREG(0x0C22C)
- #define S5P_CLKSRC_IMAGE		S5P_CLKREG(0x0C230)
- #define S5P_CLKSRC_LCD0			S5P_CLKREG(0x0C234)
- #define S5P_CLKSRC_LCD1			S5P_CLKREG(0x0C238)
-@@ -64,6 +66,7 @@
- #define S5P_CLKDIV_PERIL3		S5P_CLKREG(0x0C55C)
- #define S5P_CLKDIV_PERIL4		S5P_CLKREG(0x0C560)
- #define S5P_CLKDIV_PERIL5		S5P_CLKREG(0x0C564)
-+#define S5P_CLKDIV2_RATIO		S5P_CLKREG(0x0C580)
- 
- #define S5P_CLKSRC_MASK_TOP		S5P_CLKREG(0x0C310)
- #define S5P_CLKSRC_MASK_CAM		S5P_CLKREG(0x0C320)
+
+Thank you.
+
+- MyungJoo
+
+> --
+> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+> SW Solution Development Team, Samsung Electronics Co., Ltd.
+>
+>
+
+
+
 -- 
-1.7.4.1
+MyungJoo Ham (???), Ph.D.
+Mobile Software Platform Lab,
+Digital Media and Communications (DMC) Business
+Samsung Electronics
+cell: 82-10-6714-2858
