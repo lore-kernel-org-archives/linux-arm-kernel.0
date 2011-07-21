@@ -1,241 +1,95 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 21 Jul 2011 17:06:45 +0900
-Subject: [PATCH][RESEND] ARM: S5P64X0: External Interrupt Support
-In-Reply-To: <1311247385-10854-1-git-send-email-padma.v@samsung.com>
-References: <1311247385-10854-1-git-send-email-padma.v@samsung.com>
-Message-ID: <006a01cc477d$24673750$6d35a5f0$%kim@samsung.com>
+From: balajitk@ti.com (T Krishnamoorthy, Balaji)
+Date: Thu, 21 Jul 2011 13:44:25 +0530
+Subject: [PATCH 5/5] OMAP: I2C: Restore only if context is lost
+In-Reply-To: <1311231185-5503-6-git-send-email-shubhrajyoti@ti.com>
+References: <1311231185-5503-1-git-send-email-shubhrajyoti@ti.com>
+	<1311231185-5503-6-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <CANrkHUbRh0GG2XN4xDm84c3vV7U-4Am3a9CPLx+G-cR4X841GA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Padmavathi Venna wrote:
-> 
-> Add external interrupt support for S5P64X0.The external interrupt
-> group 0(0 to 15) is used for wake-up source in stop and sleep mode.
-> Add generic irq chip support
-> 
-> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+On Thu, Jul 21, 2011 at 12:23 PM, Shubhrajyoti D <shubhrajyoti@ti.com> wrote:
+> Currently restore is done always.
+> Adding conditional restore.The restore is done only if the context is lost.
+>
+> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 > ---
-> 
-> Please ignore my previous patch due to wrong return value.
-> 
->  arch/arm/mach-s5p64x0/Makefile                 |    2 +-
->  arch/arm/mach-s5p64x0/include/mach/regs-gpio.h |   10 ++
->  arch/arm/mach-s5p64x0/irq-eint.c               |  152
-> ++++++++++++++++++++++++
->  3 files changed, 163 insertions(+), 1 deletions(-)
->  create mode 100644 arch/arm/mach-s5p64x0/irq-eint.c
-> 
-> diff --git a/arch/arm/mach-s5p64x0/Makefile
-b/arch/arm/mach-s5p64x0/Makefile
-> index ae6bf6f..5f6afdf 100644
-> --- a/arch/arm/mach-s5p64x0/Makefile
-> +++ b/arch/arm/mach-s5p64x0/Makefile
-> @@ -13,7 +13,7 @@ obj-				:=
->  # Core support for S5P64X0 system
-> 
->  obj-$(CONFIG_ARCH_S5P64X0)	+= cpu.o init.o clock.o dma.o gpiolib.o
-> -obj-$(CONFIG_ARCH_S5P64X0)	+= setup-i2c0.o
-> +obj-$(CONFIG_ARCH_S5P64X0)	+= setup-i2c0.o irq-eint.o
->  obj-$(CONFIG_CPU_S5P6440)	+= clock-s5p6440.o
->  obj-$(CONFIG_CPU_S5P6450)	+= clock-s5p6450.o
-> 
-> diff --git a/arch/arm/mach-s5p64x0/include/mach/regs-gpio.h
-b/arch/arm/mach-
-> s5p64x0/include/mach/regs-gpio.h
-> index 0953ef6..6ce2547 100644
-> --- a/arch/arm/mach-s5p64x0/include/mach/regs-gpio.h
-> +++ b/arch/arm/mach-s5p64x0/include/mach/regs-gpio.h
-> @@ -34,4 +34,14 @@
->  #define S5P6450_GPQ_BASE		(S5P_VA_GPIO + 0x0180)
->  #define S5P6450_GPS_BASE		(S5P_VA_GPIO + 0x0300)
-> 
-> +/* External interrupt control registers for group0 */
+> @@ -261,6 +263,18 @@ static inline u16 omap_i2c_read_reg(struct omap_i2c_dev *i2c_dev, int reg)
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?(i2c_dev->regs[reg] << i2c_dev->reg_shift));
+> ?}
+>
 > +
-> +#define EINT0CON0_OFFSET		(0x900)
-> +#define EINT0MASK_OFFSET		(0x920)
-> +#define EINT0PEND_OFFSET		(0x924)
-> +
-> +#define S5P64X0_EINT0CON0		(S5P_VA_GPIO +
-> EINT0CON0_OFFSET)
-> +#define S5P64X0_EINT0MASK		(S5P_VA_GPIO +
-> EINT0MASK_OFFSET)
-> +#define S5P64X0_EINT0PEND		(S5P_VA_GPIO +
-> EINT0PEND_OFFSET)
-> +
->  #endif /* __ASM_ARCH_REGS_GPIO_H */
-> diff --git a/arch/arm/mach-s5p64x0/irq-eint.c
-b/arch/arm/mach-s5p64x0/irq-eint.c
-> new file mode 100644
-> index 0000000..69ed454
-> --- /dev/null
-> +++ b/arch/arm/mach-s5p64x0/irq-eint.c
-> @@ -0,0 +1,152 @@
-> +/* arch/arm/mach-s5p64x0/irq-eint.c
-> + *
-> + * Copyright (c) 2011 Samsung Electronics Co., Ltd
-> + *		http://www.samsung.com/
-> + *
-> + * Based on linux/arch/arm/mach-s3c64xx/irq-eint.c
-> + *
-> + * S5P64X0 - Interrupt handling for External Interrupts.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/gpio.h>
-> +#include <linux/irq.h>
-> +#include <linux/io.h>
-> +
-> +#include <plat/regs-irqtype.h>
-> +#include <plat/gpio-cfg.h>
-> +
-> +#include <mach/regs-gpio.h>
-> +#include <mach/regs-clock.h>
-> +
-> +#define eint_offset(irq)	((irq) - IRQ_EINT(0))
-> +
-> +static int s5p64x0_irq_eint_set_type(struct irq_data *data, unsigned int
-type)
+spurious line
+
+> +static void omap_i2c_restore(struct omap_i2c_dev *dev)
 > +{
-> +	int offs = eint_offset(data->irq);
-> +	int shift;
-> +	u32 ctrl, mask;
-> +	u32 newvalue = 0;
-> +
-> +	if (offs > 15)
-> +		return -EINVAL;
-> +
-> +	switch (type) {
-> +	case IRQ_TYPE_NONE:
-> +		printk(KERN_WARNING "No edge setting!\n");
-> +		break;
-> +	case IRQ_TYPE_EDGE_RISING:
-> +		newvalue = S3C2410_EXTINT_RISEEDGE;
-> +		break;
-> +	case IRQ_TYPE_EDGE_FALLING:
-> +		newvalue = S3C2410_EXTINT_FALLEDGE;
-> +		break;
-> +	case IRQ_TYPE_EDGE_BOTH:
-> +		newvalue = S3C2410_EXTINT_BOTHEDGE;
-> +		break;
-> +	case IRQ_TYPE_LEVEL_LOW:
-> +		newvalue = S3C2410_EXTINT_LOWLEV;
-> +		break;
-> +	case IRQ_TYPE_LEVEL_HIGH:
-> +		newvalue = S3C2410_EXTINT_HILEV;
-> +		break;
-> +	default:
-> +		printk(KERN_ERR "No such irq type %d", type);
-> +		return -EINVAL;
-> +	}
-> +
-> +	shift = (offs / 2) * 4;
-> +	mask = 0x7 << shift;
-> +
-> +	ctrl = __raw_readl(S5P64X0_EINT0CON0) & ~mask;
-> +	ctrl |= newvalue << shift;
-> +	__raw_writel(ctrl, S5P64X0_EINT0CON0);
-> +
-> +	/* Configure the GPIO pin for 6450 or 6440 based on CPU ID */
-> +	if (0x50000 == (__raw_readl(S5P64X0_SYS_ID) & 0xFF000))
-> +		s3c_gpio_cfgpin(S5P6450_GPN(offs), S3C_GPIO_SFN(2));
-> +	else
-> +		s3c_gpio_cfgpin(S5P6440_GPN(offs), S3C_GPIO_SFN(2));
-> +
-> +	return 0;
+> + ? ? ? omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
+> + ? ? ? omap_i2c_write_reg(dev, OMAP_I2C_PSC_REG, dev->pscstate);
+> + ? ? ? omap_i2c_write_reg(dev, OMAP_I2C_SCLL_REG, dev->scllstate);
+> + ? ? ? omap_i2c_write_reg(dev, OMAP_I2C_SCLH_REG, dev->sclhstate);
+> + ? ? ? omap_i2c_write_reg(dev, OMAP_I2C_BUF_REG, dev->bufstate);
+> + ? ? ? omap_i2c_write_reg(dev, OMAP_I2C_WE_REG, dev->westate);
+> + ? ? ? omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, OMAP_I2C_CON_EN);
 > +}
 > +
-> +/*
-> + * s5p64x0_irq_demux_eint
-> + *
-> + * This function demuxes the IRQ from the group0 external interrupts,
-> + * from IRQ_EINT(0) to IRQ_EINT(15). It is designed to be inlined into
-> + * the specific handlers s5p64x0_irq_demux_eintX_Y.
-> + */
-> +static inline void s5p64x0_irq_demux_eint(unsigned int start, unsigned
-int end)
-> +{
-> +	u32 status = __raw_readl(S5P64X0_EINT0PEND);
-> +	u32 mask = __raw_readl(S5P64X0_EINT0MASK);
-> +	unsigned int irq;
+> ?static void omap_i2c_unidle(struct omap_i2c_dev *dev)
+> ?{
+> ? ? ? ?struct platform_device *pdev;
+> @@ -274,14 +288,11 @@ static void omap_i2c_unidle(struct omap_i2c_dev *dev)
+> ? ? ? ?pm_runtime_get_sync(&pdev->dev);
+>
+> ? ? ? ?if (pdata->flags & OMAP_I2C_FLAG_RESET_REGS_POSTIDLE) {
+> - ? ? ? ? ? ? ? omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
+> - ? ? ? ? ? ? ? omap_i2c_write_reg(dev, OMAP_I2C_PSC_REG, dev->pscstate);
+> - ? ? ? ? ? ? ? omap_i2c_write_reg(dev, OMAP_I2C_SCLL_REG, dev->scllstate);
+> - ? ? ? ? ? ? ? omap_i2c_write_reg(dev, OMAP_I2C_SCLH_REG, dev->sclhstate);
+> - ? ? ? ? ? ? ? omap_i2c_write_reg(dev, OMAP_I2C_BUF_REG, dev->bufstate);
+> - ? ? ? ? ? ? ? omap_i2c_write_reg(dev, OMAP_I2C_WE_REG, dev->westate);
+> - ? ? ? ? ? ? ? omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, OMAP_I2C_CON_EN);
+> + ? ? ? ? ? ? ? u32 loss_cnt = omap_device_get_context_loss_count(pdev);
+> + ? ? ? ? ? ? ? if (dev->dev_lost_count != loss_cnt)
+> + ? ? ? ? ? ? ? ? ? ? ? omap_i2c_restore(dev);
+> ? ? ? ?}
 > +
-> +	status &= ~mask;
-> +	status >>= start;
-> +	status &= (1 << (end - start + 1)) - 1;
-> +
-> +	for (irq = IRQ_EINT(start); irq <= IRQ_EINT(end); irq++) {
-> +		if (status & 1)
-> +			generic_handle_irq(irq);
-> +		status >>= 1;
-> +	}
-> +}
-> +
-> +static void s5p64x0_irq_demux_eint0_3(unsigned int irq, struct irq_desc
-*desc)
-> +{
-> +	s5p64x0_irq_demux_eint(0, 3);
-> +}
-> +
-> +static void s5p64x0_irq_demux_eint4_11(unsigned int irq, struct irq_desc
-*desc)
-> +{
-> +	s5p64x0_irq_demux_eint(4, 11);
-> +}
-> +
-> +static void s5p64x0_irq_demux_eint12_15(unsigned int irq,
-> +					struct irq_desc *desc)
-> +{
-> +	s5p64x0_irq_demux_eint(12, 15);
-> +}
-> +
-> +static int s5p64x0_alloc_gc(void)
-> +{
-> +	struct irq_chip_generic *gc;
-> +	struct irq_chip_type *ct;
-> +
-> +	gc = irq_alloc_generic_chip("s5p64x0-eint", 1, S5P_IRQ_EINT_BASE,
-> +				    S5P_VA_GPIO, handle_level_irq);
-> +	if (!gc) {
-> +		printk(KERN_ERR "%s: irq_alloc_generic_chip for group 0"
-> +			"external interrupts failed\n", __func__);
-> +		return -EINVAL;
-> +	}
-> +
-> +	ct = gc->chip_types;
-> +	ct->chip.irq_ack = irq_gc_ack;
-> +	ct->chip.irq_mask = irq_gc_mask_set_bit;
-> +	ct->chip.irq_unmask = irq_gc_mask_clr_bit;
-> +	ct->chip.irq_set_type = s5p64x0_irq_eint_set_type;
-> +	ct->regs.ack = EINT0PEND_OFFSET;
-> +	ct->regs.mask = EINT0MASK_OFFSET;
-> +	irq_setup_generic_chip(gc, IRQ_MSK(16), IRQ_GC_INIT_MASK_CACHE,
-> +			       IRQ_NOREQUEST | IRQ_NOPROBE, 0);
-> +	return 0;
-> +}
-> +
-> +static int __init s5p64x0_init_irq_eint(void)
-> +{
-> +	int ret = s5p64x0_alloc_gc();
-> +	irq_set_chained_handler(IRQ_EINT0_3, s5p64x0_irq_demux_eint0_3);
-> +	irq_set_chained_handler(IRQ_EINT4_11, s5p64x0_irq_demux_eint4_11);
-> +	irq_set_chained_handler(IRQ_EINT12_15, s5p64x0_irq_demux_eint12_15);
-> +
-> +	return ret;
-> +}
-> +arch_initcall(s5p64x0_init_irq_eint);
+> ? ? ? ?dev->idle = 0;
+>
+> ? ? ? ?/*
+> @@ -318,7 +329,7 @@ static void omap_i2c_idle(struct omap_i2c_dev *dev)
+> ? ? ? ? ? ? ? ?omap_i2c_read_reg(dev, OMAP_I2C_STAT_REG);
+> ? ? ? ?}
+> ? ? ? ?dev->idle = 1;
+> -
+> + ? ? ? dev->dev_lost_count = omap_device_get_context_loss_count(pdev);
+> ? ? ? ?pm_runtime_put_sync(&pdev->dev);
+> ?}
+>
+> @@ -574,6 +585,7 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
+> ? ? ? ? ? ? ? ? ? ? ? ?r = dev->device_reset(dev->dev);
+> ? ? ? ? ? ? ? ? ? ? ? ?if (r < 0)
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?dev_err(dev->dev, "reset failed\n");
+> + ? ? ? ? ? ? ? ? ? ? ? omap_i2c_restore(dev);
+> ? ? ? ? ? ? ? ?}
+> ? ? ? ? ? ? ? ?omap_i2c_init(dev);
+
+Are you sure you need both omap_i2c_restore, omap_i2c_init calls here ?
+
+> ? ? ? ? ? ? ? ?return -ETIMEDOUT;
+> @@ -589,6 +601,7 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
+> ? ? ? ? ? ? ? ? ? ? ? ?r = dev->device_reset(dev->dev);
+> ? ? ? ? ? ? ? ? ? ? ? ?if (r < 0)
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?dev_err(dev->dev, "reset failed\n");
+> + ? ? ? ? ? ? ? ? ? ? ? omap_i2c_restore(dev);
+
+same comment here
+
+> ? ? ? ? ? ? ? ?}
+> ? ? ? ? ? ? ? ?omap_i2c_init(dev);
+> ? ? ? ? ? ? ? ?return -EIO;
 > --
-> 1.7.0.4
-
-Maybe this is my last guest :)
-
-Ok, applied.
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+> 1.7.1
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>
