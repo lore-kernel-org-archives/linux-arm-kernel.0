@@ -1,53 +1,64 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Thu, 21 Jul 2011 14:44:28 +0530
-Subject: [PATCH V4 03-1/13] DMA: PL330: Support DMA_SLAVE_CONFIG command
-In-Reply-To: <20110721081138.GL26574@n2100.arm.linux.org.uk>
-References: <1311158773-30314-1-git-send-email-boojin.kim@samsung.com>
-	<1311158773-30314-3-git-send-email-boojin.kim@samsung.com>
-	<CABb+yY2_XKyCr2mEzqd0bCYJk3U7+sg8Xz4b4ma2KB1BconYOw@mail.gmail.com>
-	<20110721081138.GL26574@n2100.arm.linux.org.uk>
-Message-ID: <CABb+yY2obv5JMBiRSXS-4tSCYX+7nVVaA0Q7gurA+NndrGVuvA@mail.gmail.com>
+From: mike.rapoport@gmail.com (Mike Rapoport)
+Date: Thu, 21 Jul 2011 12:17:18 +0300
+Subject: [PATCH v2] ARM: Tegra: Trimslice: Tri-state DAP3 pinmux
+In-Reply-To: <CABpLfohE+PmssbicDjS3p13i=T4X5dZ=P-KhXmytvPX2An62=w@mail.gmail.com>
+References: <1310596967-19996-1-git-send-email-swarren@nvidia.com>
+	<CABpLfohE+PmssbicDjS3p13i=T4X5dZ=P-KhXmytvPX2An62=w@mail.gmail.com>
+Message-ID: <CABpLfohhtux1S6eJg+U7kgckw4j2vhMuWo8mBRaMpoZr5PuBiA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 21, 2011 at 1:41 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Thu, Jul 21, 2011 at 12:47:49AM +0530, Jassi Brar wrote:
->> On Wed, Jul 20, 2011 at 4:16 PM, Boojin Kim <boojin.kim@samsung.com> wrote:
->> > + ? ? ? ? ? ? ? if (slave_config->direction == DMA_TO_DEVICE) {
->> > + ? ? ? ? ? ? ? ? ? ? ? if (slave_config->dst_addr)
->> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? peri->fifo_addr = slave_config->dst_addr;
->> > + ? ? ? ? ? ? ? ? ? ? ? if (slave_config->dst_addr_width)
->> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? peri->burst_sz = __ffs(slave_config->dst_addr_width);
->> > + ? ? ? ? ? ? ? } else if (slave_config->direction == DMA_FROM_DEVICE) {
->> > + ? ? ? ? ? ? ? ? ? ? ? if (slave_config->src_addr)
->> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? peri->fifo_addr = slave_config->src_addr;
->> > + ? ? ? ? ? ? ? ? ? ? ? if (slave_config->src_addr_width)
->> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? peri->burst_sz = __ffs(slave_config->src_addr_width);
->> > + ? ? ? ? ? ? ? }
->> PL330 has fixed channels to peripherals.
->> So FIFO addresses(burst_sz too?) should already be set via platform data.
->> Client drivers shouldn't bother.
+On Thu, Jul 21, 2011 at 10:10 AM, Mike Rapoport <mike.rapoport@gmail.com> wrote:
+>> DAP3 is used for a bunch of GPIOs. Not tri-stating the pins means audio
+>> signals get sent out there, and this ends up resetting USB and breaking
+>> SDHCI too.
+>>
+>> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+>> ---
+>> v2: s/DAP2/DAP3/ in patch subject/description.
 >
-> That's utter crap, and isn't what the DMA engine API is about.
+> Setting DAP3 pins to tristate is necessary but not sufficient :) I
+> don't know why, but if we don't tristate DAP2 and DAP4 as well USB and
+> SDIO are broken.
+> If you can amend your patch with tristating also DAP2 and DAP4 feel
+> free to add my
+
+Oops, I should have read the diff context as well... DAP{2,4} are
+anyway tristate, so you can discard my previous comment. So the
+Acked-by applies to the original patch. Sorry for the noise.
+
+> Acked-by: Mike Rapoport <mike@compulab.co.il>
 >
-> The above looks correctly implemented. ?Slave DMA engine users are
-> supposed to supply the device DMA register address via this
-> DMA_SLAVE_CONFIG call. ?Doing this via platform data for the DMA
-> device is braindead.
+>> ?arch/arm/mach-tegra/board-trimslice-pinmux.c | ? ?2 +-
+>> ?1 files changed, 1 insertions(+), 1 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-tegra/board-trimslice-pinmux.c b/arch/arm/mach-tegra/board-trimslice-pinmux.c
+>> index 82646a4..47c596c 100644
+>> --- a/arch/arm/mach-tegra/board-trimslice-pinmux.c
+>> +++ b/arch/arm/mach-tegra/board-trimslice-pinmux.c
+>> @@ -35,7 +35,7 @@ static __initdata struct tegra_pingroup_config trimslice_pinmux[] = {
+>> ? ? ? ?{TEGRA_PINGROUP_CSUS, ?TEGRA_MUX_VI_SENSOR_CLK, TEGRA_PUPD_PULL_DOWN, ? TEGRA_TRI_TRISTATE},
+>> ? ? ? ?{TEGRA_PINGROUP_DAP1, ?TEGRA_MUX_DAP1, ? ? ? ? ?TEGRA_PUPD_NORMAL, ? ? ?TEGRA_TRI_NORMAL},
+>> ? ? ? ?{TEGRA_PINGROUP_DAP2, ?TEGRA_MUX_DAP2, ? ? ? ? ?TEGRA_PUPD_NORMAL, ? ? ?TEGRA_TRI_TRISTATE},
+>> - ? ? ? {TEGRA_PINGROUP_DAP3, ?TEGRA_MUX_DAP3, ? ? ? ? ?TEGRA_PUPD_NORMAL, ? ? ?TEGRA_TRI_NORMAL},
+>> + ? ? ? {TEGRA_PINGROUP_DAP3, ?TEGRA_MUX_DAP3, ? ? ? ? ?TEGRA_PUPD_NORMAL, ? ? ?TEGRA_TRI_TRISTATE},
+>> ? ? ? ?{TEGRA_PINGROUP_DAP4, ?TEGRA_MUX_DAP4, ? ? ? ? ?TEGRA_PUPD_NORMAL, ? ? ?TEGRA_TRI_TRISTATE},
+>> ? ? ? ?{TEGRA_PINGROUP_DDC, ? TEGRA_MUX_I2C2, ? ? ? ? ?TEGRA_PUPD_PULL_UP, ? ? TEGRA_TRI_NORMAL},
+>> ? ? ? ?{TEGRA_PINGROUP_DTA, ? TEGRA_MUX_VI, ? ? ? ? ? ?TEGRA_PUPD_NORMAL, ? ? ?TEGRA_TRI_TRISTATE},
+>> --
+>> 1.7.0.4
+>>
+>>
+>
+>
+>
+> --
+> Sincerely Yours,
+> Mike.
+>
 
-Rather than have 32 client drivers expect fifo_address from the
-platform and then
-provide to the DMAC, IMHO it is better for a single driver(DMAC) to
-get 32 addresses
-from the platform.
-Esp when the DMAC driver already expect similar h/w parameter -- *direction*.
 
-I don't understand why is 'fifo_address' a property much different
-than 'direction' of the
-channel ?
-If a channel is flexible enough to change it's 'fifo_address', most probably it
-could also change direction of transfers.
- So, why do we want to take seriously 'fifo_address' provided by the
-client drivers
-and not the 'direction' ?
+
+-- 
+Sincerely Yours,
+Mike.
