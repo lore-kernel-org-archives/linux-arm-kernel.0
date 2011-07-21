@@ -1,25 +1,37 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 21 Jul 2011 11:36:30 -0700
-Subject: [PATCH] ARM: Migrate to asm-generic wrapper support
-In-Reply-To: <m31uxje8o4.fsf@intrepid.localdomain>
-References: <1311204225-13169-1-git-send-email-sboyd@codeaurora.org>	<20110720232819.GC20310@n2100.arm.linux.org.uk>	<4E27667D.9060200@codeaurora.org>
-	<m31uxje8o4.fsf@intrepid.localdomain>
-Message-ID: <4E2871AE.8030603@codeaurora.org>
+From: ccross@android.com (Colin Cross)
+Date: Thu, 21 Jul 2011 11:48:11 -0700
+Subject: [PATCH 1/2] ARM: Tegra: Seaboard board updates for audio
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF049EBDF13E@HQMAIL01.nvidia.com>
+References: <1310594272-8229-1-git-send-email-swarren@nvidia.com>
+	<CAOesGMjiakgvs8wcu8zRkuA9mxD5Z=S-hV3HNgqFC49pEGVADw@mail.gmail.com>
+	<74CDBE0F657A3D45AFBB94109FB122FF049EBDF13E@HQMAIL01.nvidia.com>
+Message-ID: <CAMbhsRQuzO2EW33vFGcDM+=bKLkfEY6WLn_dr7Q7o7uOekA0gA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/21/2011 12:27 PM, Krzysztof Halasa wrote:
-> Stephen Boyd <sboyd@codeaurora.org> writes:
+On Thu, Jul 21, 2011 at 8:37 AM, Stephen Warren <swarren@nvidia.com> wrote:
+> Olof Johansson wrote at Wednesday, July 13, 2011 5:17 PM:
+>> On Wed, Jul 13, 2011 at 2:57 PM, Stephen Warren <swarren@nvidia.com> wrote:
+>> > * Initialize clock tree for audio
+>> > * Add GPIO base definitions
+>> > * Add audio GPIO definitions
+>> > * Define platform data for WM8903 and ASoC machine driver
+>> > * Add special case for Kaen to handle HP_MUTE GPIO
+>> > * Register platform devices for audio
+>> > * Update pinmux to cater for new GPIOs used for audio
+>> >
+>> > Signed-off-by: Stephen Warren <swarren@nvidia.com>
+>>
+>> Colin, sounds like you're collecting board patches this merge window, so:
+>>
+>> Acked-by: Olof Johansson <olof@lixom.net>
 >
->> With d8ecc5c (kbuild: asm-generic support, 2011-04-27) we can
->> remove a handful of asm-generic wrappers in ARM code. Since the
->> generic version of sizes.h doesn't contain SZ_48M, we replace
->> the 3 users of SZ_48M with the equivalent SZ_32M + SZ_16M.
-> Perhaps simply adding SZ_48M to the generic version is better. Can live
-> with either.
+> Colin,
+>
+> Do you want me to ask Arnd to pick these patches up directly, or do you
+> want to apply them to the Tegra for-next tree, and have Arnd pull them?
 
-This was simpler (1 patch, 1 maintainer). Is that an ack?
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Normally I would want them to go through me so I have a chance to deal
+with conflicts before it hits the arm-soc tree, but since Arnd has
+already taken some patches for this release cycle, they might as well
+go directly to him.
