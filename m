@@ -1,20 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 21 Jul 2011 16:14:13 +0100
-Subject: [PATCH 0/4] Fix CPU hotplug IRQ migration
-Message-ID: <20110721151413.GD28942@n2100.arm.linux.org.uk>
+From: shubhrajyoti@ti.com (Shubhrajyoti D)
+Date: Thu, 21 Jul 2011 20:53:34 +0530
+Subject: [PATCHV4 0/4] I2C: driver updates 
+Message-ID: <1311261818-25784-1-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series fixes a bunch of issues with IRQ migration:
+The series attempts to do the following
 
-1. Preventing affinity changes causing IRQs to be directed to off-line CPUs.
-2. Preventing oopses with non-GIC interrupt controllers.
-3. Preventing per-CPU IRQs being candidates for migration.
-4. Removing the abuse of irqdesc's node member.
+- The reset should not be done in the driver 
+  have support for the same.
+- Remove the sysc register access in the driver.
+- Restore the context only if the context is lost.
 
-This prevents crashes on OMAP4430 SDP when non-default IRQ affinity
-settings are used and a CPU which owns some IRQs is offlined.
+version 2
+ - Fix the indentation.
+ - Restore in the error path is not needed as we are
+   doing a init.
 
-With this patch set applied, there is no reason core code can't handle
-CPU0 being offlined - on OMAP4, the only remaining issue is CPU0
-being woken from WFI and falsely passing the non-spurious wake-up test.
+version 3
+ - Combine the patch 1 and 2 as i2c-omap.h isn't a generic header
+
+version 4
+ - Adding the description of patch 2.	
+
+Acknowledge Balaji and Santosh for the review comments.
+Tested on sdp4430 and on omap3430
+
+Shubhrajyoti D (4):
+  OMAP: I2C: Reset support
+  OMAP: I2C: Remove the reset in the init path
+  OMAP: I2C: Remove the SYSC register definition
+  OMAP: I2C: I2C register restore only if context is lost
+
+ arch/arm/plat-omap/i2c.c      |   17 +++++++
+ drivers/i2c/busses/i2c-omap.c |  101 ++++++++++++++++-------------------------
+ include/linux/i2c-omap.h      |    1 +
+ 3 files changed, 57 insertions(+), 62 deletions(-)
