@@ -1,43 +1,30 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Thu, 21 Jul 2011 11:54:46 +0530
-Subject: 
-In-Reply-To: <CAAgF-BcTUTN5B59NO+yo7o=r=AtzvEHHOPwLBUgL15ifyYfFWA@mail.gmail.com>
-References: <1311246765-4161-1-git-send-email-padma.v@samsung.com>	<4E27B914.3050809@linaro.org>
-	<CAAgF-BcTUTN5B59NO+yo7o=r=AtzvEHHOPwLBUgL15ifyYfFWA@mail.gmail.com>
-Message-ID: <4E27C62E.8010005@linaro.org>
+From: jhbird.choi@samsung.com (jhbird.choi at samsung.com)
+Date: Thu, 21 Jul 2011 15:21:37 +0900
+Subject: [PATCH] ARM: EXYNOS4: Add missing S3C_VA_UARTx
+Message-ID: <1311229297-4423-1-git-send-email-jhbird.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 21 July 2011 11:13 AM, padma venkat wrote:
-> Hi Tushar,
->
-> On Thu, Jul 21, 2011 at 10:58 AM, Tushar Behera
-> <tushar.behera@linaro.org>  wrote:
->> On Thursday 21 July 2011 04:42 PM, Padmavathi Venna wrote:
->>>
+From: Jonghwan Choi <jhbird.choi@samsung.com>
 
-[snip]
+Fix compile error with CONFIG_SAMSUNG_PM_DEBUG
 
->>> +       gc = irq_alloc_generic_chip("s5p64x0-eint", 1, S5P_IRQ_EINT_BASE,
->>> +                                   S5P_VA_GPIO, handle_level_irq);
->>
->>                                ^^^^
-> Added spaces purposefully to make the parameters aligned properly in
-> the next line
+Signed-off-by: Jonghwan Choi <jhbird.choi@samsung.com>
+---
+ arch/arm/mach-exynos4/include/mach/map.h |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-But spaces should never be used for indentation.
-
-Quoting from http://www.kernel.org/doc/Documentation/CodingStyle
-
-"Outside of comments, documentation and except in Kconfig, spaces are 
-never used for indentation"
-
->> nitpick: Should be TABS
->
-> Thanks&Regards
-> Padma
-
-[snip]
-
+diff --git a/arch/arm/mach-exynos4/include/mach/map.h b/arch/arm/mach-exynos4/include/mach/map.h
+index 0009e77..5ddbfe3 100644
+--- a/arch/arm/mach-exynos4/include/mach/map.h
++++ b/arch/arm/mach-exynos4/include/mach/map.h
+@@ -151,6 +151,7 @@
+ #define SAMSUNG_PA_KEYPAD		EXYNOS4_PA_KEYPAD
+ 
+ /* UART */
++#define S3C_VA_UARTx(x)			(S3C_VA_UART + ((x) * S3C_UART_OFFSET))
+ 
+ #define S3C_PA_UART			EXYNOS4_PA_UART
+ 
 -- 
-Tushar Behera
+1.7.0
