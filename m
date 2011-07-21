@@ -1,63 +1,79 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 21 Jul 2011 16:44:42 +0200
-Subject: [PATCH v4 0/6] mc13783: add pwr button support
-In-Reply-To: <1311261006-28048-1-git-send-email-philippe.retornaz@epfl.ch>
-References: <1311261006-28048-1-git-send-email-philippe.retornaz@epfl.ch>
-Message-ID: <20110721144442.GA16561@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 21 Jul 2011 16:49:39 +0200
+Subject: [GIT PULL] MSM fix
+In-Reply-To: <20110720225406.GB20310@n2100.arm.linux.org.uk>
+References: <20110720203703.GA4495@huya.qualcomm.com>
+	<20110720225010.GA18381@huya.qualcomm.com>
+	<20110720225406.GB20310@n2100.arm.linux.org.uk>
+Message-ID: <201107211649.39902.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Philippe,
+On Thursday 21 July 2011, Russell King - ARM Linux wrote:
+> > It looks like it would apply to 2.6.38 and 39 as well.  I'm not sure
+> > it qualifies under the "It must fix a real bug that bothers people".
+> > It would only apply if someone had set NR_CPUS to more than 2.
+> 
+> Err, this makes no sense.  MSM doesn't have a get_core_count function
+> and as far as I can see never has done in mainline.
 
-On Thu, Jul 21, 2011 at 05:10:00PM +0200, Philippe R?tornaz wrote:
-> This add button handling for the MC13783 PMIC.
-> The first patch modify the mc13783 MFD driver to add a button
-> subdevice and also adds the mc13783-pwrbutton driver using a misc
-> input device.
-> 
-> The second patch adds the power on button support to the mx31moboard boards.
-> 
-> Patch 3 & 4 modify the mc13xxx MFD driver to use the platform data to 
-> register the led subdevice and unconditionally register the regulator
-> subdevice (as suggested by Mark and Uwe).
-> 
-> Patch 5 remove the use of the *_USE_REGULATOR and *_USE_LED in the platform
-> files.
-> 
-> Patch 6 must be applied after patch 3,4,5 to remove the obsolete define.
-> 
-> v2: first patch modified according to comments by Dmitry Torokhov
-> v3: Implement review by Uwe
-> v4: Implement comments by Uwe and Mark
-> 
-> Philippe R?tornaz (6):
->   mc13783: add power button support
->   mx31moboard: Add MC13783 power button support
->   mc13xxx: Unconditionally register regulator subdevice
->   mc13xxx: implicitly register led subdevice
->   mc13xxx: remove obsolete leds and regualtors flags
->   mc13xxx: remove unused define
-I think Arndt would like to have the clean up stuff first (assuming this
-goes via the arm-soc tree). That is 3-6, then 1-2.
+I've committed the version below now, with a clarified title.
+The patch looks reasonable to me, but there may be some issue
+I'm missing of course. The other platforms that used to have
+a get_core_count function no longer have that because you changed
+them to use scu_get_core_count, but that doesn't seem to apply
+to mach-msm.
 
-Other than that I think the series looks good now (at least the arch/arm
-bits, didn't recheck the rest).
+I did not add a stable tag though.
+
+	Arnd
+
+8<---
+Subject: [PATCH] ARM: msm: platsmp: determine number of CPU cores at boot time
+
+Previously we just assumed there were CONFIG_NR_CPUS cpus present in
+the system. Instead, figure out the number of cpus from the MIDR
+register.
+
+Signed-off-by: Jeff Ohlstein <johlstei@codeaurora.org>
+Signed-off-by: David Brown <davidb@codeaurora.org>
+[arnd: clarified patch title]
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+diff --git a/arch/arm/mach-msm/platsmp.c b/arch/arm/mach-msm/platsmp.c
+index 2034098..5ba77d0 100644
+--- a/arch/arm/mach-msm/platsmp.c
++++ b/arch/arm/mach-msm/platsmp.c
+@@ -18,6 +18,7 @@
  
->  arch/arm/mach-imx/mach-mx27_3ds.c      |    1 -
->  arch/arm/mach-imx/mach-mx31_3ds.c      |    2 +-
->  arch/arm/mach-imx/mach-mx31lite.c      |    3 +-
->  arch/arm/mach-imx/mach-mx31moboard.c   |   11 +-
->  arch/arm/mach-imx/mach-pcm038.c        |    3 +-
->  arch/arm/mach-mx5/mx51_efika.c         |    2 +-
->  drivers/input/misc/Kconfig             |   10 +
->  drivers/input/misc/Makefile            |    1 +
->  drivers/input/misc/mc13783-pwrbutton.c |  288 ++++++++++++++++++++++++++++++++
->  drivers/mfd/mc13xxx-core.c             |   12 +-
->  include/linux/mfd/mc13783.h            |    3 +-
->  include/linux/mfd/mc13xxx.h            |   19 ++-
->  12 files changed, 337 insertions(+), 18 deletions(-)
->  create mode 100644 drivers/input/misc/mc13783-pwrbutton.c
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+ #include <asm/hardware/gic.h>
+ #include <asm/cacheflush.h>
++#include <asm/cputype.h>
+ #include <asm/mach-types.h>
+ 
+ #include <mach/msm_iomap.h>
+@@ -40,6 +41,12 @@ volatile int pen_release = -1;
+ 
+ static DEFINE_SPINLOCK(boot_lock);
+ 
++static inline int get_core_count(void)
++{
++	/* 1 + the PART[1:0] field of MIDR */
++	return ((read_cpuid_id() >> 4) & 3) + 1;
++}
++
+ void __cpuinit platform_secondary_init(unsigned int cpu)
+ {
+ 	/* Configure edge-triggered PPIs */
+@@ -147,9 +154,9 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
+  */
+ void __init smp_init_cpus(void)
+ {
+-	unsigned int i;
++	unsigned int i, ncores = get_core_count();
+ 
+-	for (i = 0; i < NR_CPUS; i++)
++	for (i = 0; i < ncores; i++)
+ 		set_cpu_possible(i, true);
+ 
+         set_smp_cross_call(gic_raise_softirq);
