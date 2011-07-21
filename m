@@ -1,33 +1,21 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 21 Jul 2011 16:59:39 +0300
-Subject: [PATCHV3 2/4] OMAP: I2C: Remove the reset in the init path
-In-Reply-To: <1311256381-25548-3-git-send-email-shubhrajyoti@ti.com>
-References: <1311256381-25548-1-git-send-email-shubhrajyoti@ti.com>
-	<1311256381-25548-3-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <20110721135938.GC30943@legolas.emea.dhcp.ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 21 Jul 2011 16:20:21 +0200
+Subject: conflicts between omap/cleanup branch and omap_dss2 tree
+In-Reply-To: <1311232784.1874.3.camel@deskari>
+References: <201107172339.32516.arnd@arndb.de>
+	<201107191459.44992.arnd@arndb.de>
+	<1311232784.1874.3.camel@deskari>
+Message-ID: <201107211620.21138.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Jul 21, 2011 at 07:22:59PM +0530, Shubhrajyoti D wrote:
-> The reset in the driver at init is not needed
-> anymore as the hwmod framework takes care of
-> reseting it.
+On Thursday 21 July 2011, Tomi Valkeinen wrote:
+> I've pushed a new for-next branch to
+> git://gitorious.org/linux-omap-dss2/linux.git for-next. However, I
+> decided to just reset it to -rc4 for now.
 > 
-> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+Ok, thanks!
 
-this is still doing two things:
+I've removed the merge with that branch from arm-soc/for-next now.
 
-a. remove the reset from init path
-b. add and use ->device_reset() when needed.
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 490 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110721/98c6501c/attachment.sig>
+	Arnd
