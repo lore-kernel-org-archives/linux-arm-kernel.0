@@ -1,27 +1,38 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Thu, 21 Jul 2011 18:08:10 +0200
-Subject: [PATCH] iMX28: Fix emi_ddr_open pinmux
-Message-ID: <1311264490-5485-1-git-send-email-marek.vasut@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 21 Jul 2011 17:11:26 +0100
+Subject: [PATCH 1/9] DMA: PL08x: remove unused constants
+In-Reply-To: <20110721160800.GR26574@n2100.arm.linux.org.uk>
+References: <20110721160800.GR26574@n2100.arm.linux.org.uk>
+Message-ID: <E1QjvqQ-0003MA-Au@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
----
- arch/arm/mach-mxs/include/mach/iomux-mx28.h |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+PL08X_WQ_PERIODMIN and PL08X_MAX_ALLOCS are not used, remove them.
 
-diff --git a/arch/arm/mach-mxs/include/mach/iomux-mx28.h b/arch/arm/mach-mxs/include/mach/iomux-mx28.h
-index f50fefd..1a95ecd 100644
---- a/arch/arm/mach-mxs/include/mach/iomux-mx28.h
-+++ b/arch/arm/mach-mxs/include/mach/iomux-mx28.h
-@@ -203,7 +203,7 @@
- #define MX28_PAD_EMI_WEN__EMI_WEN			MXS_IOMUX_PAD_NAKED(6, 21, PAD_MUXSEL_0)
- #define MX28_PAD_EMI_CE0N__EMI_CE0N			MXS_IOMUX_PAD_NAKED(6, 22, PAD_MUXSEL_0)
- #define MX28_PAD_EMI_CE1N__EMI_CE1N			MXS_IOMUX_PAD_NAKED(6, 23, PAD_MUXSEL_0)
--#define MX28_PAD_EMI_CKE__EMI_CKE			MXS_IOMUX_PAD_NAKED(6, 24, PAD_MUXSEL_0)
-+#define MX28_PAD_EMI_CKE__EMI_CKE			MXS_IOMUX_PAD_NAKED(6, 26, PAD_MUXSEL_0)
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ drivers/dma/amba-pl08x.c |    4 ----
+ 1 files changed, 0 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
+index e6d7228..90db51f 100644
+--- a/drivers/dma/amba-pl08x.c
++++ b/drivers/dma/amba-pl08x.c
+@@ -156,14 +156,10 @@ struct pl08x_driver_data {
+ #define PL08X_BOUNDARY_SHIFT		(10)	/* 1KB 0x400 */
+ #define PL08X_BOUNDARY_SIZE		(1 << PL08X_BOUNDARY_SHIFT)
  
- /* MUXSEL_1 */
- #define MX28_PAD_GPMI_D00__SSP1_D0			MXS_IOMUX_PAD_NAKED(0,  0, PAD_MUXSEL_1)
+-/* Minimum period between work queue runs */
+-#define PL08X_WQ_PERIODMIN	20
+-
+ /* Size (bytes) of each LLI buffer allocated for one transfer */
+ # define PL08X_LLI_TSFR_SIZE	0x2000
+ 
+ /* Maximum times we call dma_pool_alloc on this pool without freeing */
+-#define PL08X_MAX_ALLOCS	0x40
+ #define MAX_NUM_TSFR_LLIS	(PL08X_LLI_TSFR_SIZE/sizeof(struct pl08x_lli))
+ #define PL08X_ALIGN		8
+ 
 -- 
-1.7.5.3
+1.7.4.4
