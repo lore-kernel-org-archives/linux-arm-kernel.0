@@ -1,71 +1,19 @@
-From: myungjoo.ham@samsung.com (MyungJoo Ham)
-Date: Thu, 21 Jul 2011 11:18:29 +0900
-Subject: [PATCH v3 1/6] ARM: EXYNOS4: Increase NR_IRQS for devices with
-	more IRQs
-In-Reply-To: <06c801cc46ff$29855330$7c8ff990$%kim@samsung.com>
-References: <1309421729-11172-1-git-send-email-myungjoo.ham@samsung.com>
-	<1309421729-11172-2-git-send-email-myungjoo.ham@samsung.com>
-	<06c801cc46ff$29855330$7c8ff990$%kim@samsung.com>
-Message-ID: <CAJ0PZbRuCCbbTz-qhcY0OsaXF+zgAu3_OZBj+LRz=OczyTrcGg@mail.gmail.com>
+From: zhangfei.gao@marvell.com (Zhangfei Gao)
+Date: Thu, 21 Jul 2011 10:34:31 +0800
+Subject: [PATCH] sdio add regulator vsdio to dynamic control sdio power
+Message-ID: <1311215673-2489-1-git-send-email-zhangfei.gao@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 21, 2011 at 2:04 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> MyungJoo Ham wrote:
->>
->> MAX8997/17042, which are used by Exynos4-NURI, use additional IRQ
->> numbers after GPIO's IRQs. The patch creates some room for those
->> devices.
->>
->> Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
->> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
->> ---
->> ?arch/arm/mach-exynos4/include/mach/irqs.h | ? ?2 +-
->> ?1 files changed, 1 insertions(+), 1 deletions(-)
->>
->> diff --git a/arch/arm/mach-exynos4/include/mach/irqs.h b/arch/arm/mach-
->> exynos4/include/mach/irqs.h
->> index 31f6bed..51b5db5 100644
->> --- a/arch/arm/mach-exynos4/include/mach/irqs.h
->> +++ b/arch/arm/mach-exynos4/include/mach/irqs.h
->> @@ -154,6 +154,6 @@
->> ?#define IRQ_GPIO_END ? ? ? ? (S5P_GPIOINT_BASE + S5P_GPIOINT_COUNT)
->>
->> ?/* Set the default NR_IRQS */
->> -#define NR_IRQS ? ? ? ? ? ? ? ? ? ? ?(IRQ_GPIO_END)
->> +#define NR_IRQS ? ? ? ? ? ? ? ? ? ? ?(IRQ_GPIO_END + 64)
->
-> I applied but basically, we have to avoid using hard coded value like 64 on
-> this. The NR_IRQS depends on CPU not board but this change is needed for
-> supporting some specific board and if you need more interrupt numbers, will
-> you increase it? It is not good way.
->
-> We need to fix this up next time.
->
-> Thanks.
->
-> Best regards,
-> Kgene.
+sdio client has the requirement to dynamically power on/off
+With regulator vsdio, so sdio client power on/off when mmc_power_up/down
+Add brownstone support sdio with regulator vsdio, 
 
-Alright. I'll try to let it assign or change NR_IRQS adaptively either
-in run-time, boot-time, or compile-time later as a seperated patch.
+Zhangfei Gao (2):
+  mmc: sdio add regulator vsdio
+  ARM: mmp2: support sdio with regulator vsdio
 
-
-Thank you.
-
-- MyungJoo
-
-> --
-> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-> SW Solution Development Team, Samsung Electronics Co., Ltd.
->
->
-
-
-
--- 
-MyungJoo Ham (???), Ph.D.
-Mobile Software Platform Lab,
-Digital Media and Communications (DMC) Business
-Samsung Electronics
-cell: 82-10-6714-2858
+ arch/arm/mach-mmp/brownstone.c |   60 ++++++++++++++++++++++++++++++++++++++-
+ drivers/mmc/host/sdhci.c       |   24 ++++++++++++++++
+ include/linux/mmc/sdhci.h      |    2 +
+ 3 files changed, 84 insertions(+), 2 deletions(-)
