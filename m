@@ -1,31 +1,24 @@
-From: jhbird.choi@samsung.com (jhbird.choi at samsung.com)
-Date: Thu, 21 Jul 2011 15:33:58 +0900
-Subject: [PATCH] mtd: s3c2410 nand: Remove uncessary null check
-Message-ID: <1311230038-6111-1-git-send-email-jhbird.choi@samsung.com>
+From: shubhrajyoti@ti.com (Shubhrajyoti D)
+Date: Thu, 21 Jul 2011 12:23:00 +0530
+Subject: [PATCH 0/5] I2C: driver updates
+Message-ID: <1311231185-5503-1-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jonghwan Choi <jhbird.choi@samsung.com>
+The series attempts to do the following
+- The reset should not be done in the driver 
+  have support for the same.
+- Remove the sysc register access in the driver.
+- Restore the context only if the context is lost.
 
-clk_get() return a pointer to the struct clk or an ERR_PTR().
+Shubhrajyoti D (5):
+  OMAP: I2C: Add a device reset field to platform data
+  OMAP: I2C: Reset support
+  OMAP: I2C: Remove the reset in the init path
+  OMAP: I2C: Remove the SYSC register definition
+  OMAP: I2C: Restore only if context is lost
 
-Signed-off-by: Jonghwan Choi <jhbird.choi@samsung.com>
----
- drivers/mtd/nand/s3c2410.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/drivers/mtd/nand/s3c2410.c b/drivers/mtd/nand/s3c2410.c
-index 4405468..18ff2f5 100644
---- a/drivers/mtd/nand/s3c2410.c
-+++ b/drivers/mtd/nand/s3c2410.c
-@@ -723,7 +723,7 @@ static int s3c24xx_nand_remove(struct platform_device *pdev)
- 
- 	/* free the common resources */
- 
--	if (info->clk != NULL && !IS_ERR(info->clk)) {
-+	if (!IS_ERR(info->clk)) {
- 		s3c2410_nand_clk_set_state(info, CLOCK_DISABLE);
- 		clk_put(info->clk);
- 	}
--- 
-1.7.0
+ arch/arm/plat-omap/i2c.c      |   18 ++++++++
+ drivers/i2c/busses/i2c-omap.c |   90 ++++++++++++++++------------------------
+ include/linux/i2c-omap.h      |    1 +
+ 3 files changed, 55 insertions(+), 54 deletions(-)
