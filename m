@@ -1,28 +1,52 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 21 Jul 2011 19:01:38 +0100
-Subject: linux-next regression on ARM926
-In-Reply-To: <CACRpkdb=FB8k00_g5ycMmAOQ8PKijiw9izB0rfWhtCP3qkdLYQ@mail.gmail.com>
-References: <CACRpkdbBrVda2oD42tjrWiG6uHXAdWwpr6cZ7qnSc2KM82XCfw@mail.gmail.com>
-	<20110718112757.GV23270@n2100.arm.linux.org.uk>
-	<CA+wbFdfNAjqQf4T48_cVbNOb6ac84TQC-2QvHKD43dfRou-i9w@mail.gmail.com>
-	<20110719110904.GJ26574@n2100.arm.linux.org.uk>
-	<CA+wbFdcifNu1W1BtehSxEMf4G48NhYiCHx+uAGjFuRQ4hr_rLA@mail.gmail.com>
-	<20110721134804.GO26574@n2100.arm.linux.org.uk>
-	<CACRpkdb=FB8k00_g5ycMmAOQ8PKijiw9izB0rfWhtCP3qkdLYQ@mail.gmail.com>
-Message-ID: <20110721180138.GF20310@n2100.arm.linux.org.uk>
+From: philippe.retornaz@epfl.ch (=?utf-8?q?Philippe=20R=C3=A9tornaz?=)
+Date: Thu, 21 Jul 2011 20:04:17 +0200
+Subject: [PATCH v5 0/6] mc13783: add pwr button support
+Message-ID: <1311271463-4356-1-git-send-email-philippe.retornaz@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 21, 2011 at 07:46:13PM +0200, Linus Walleij wrote:
-> On Thu, Jul 21, 2011 at 3:48 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Wed, Jul 20, 2011 at 09:35:03AM +0100, Dave Martin wrote:
-> >> Hmmm, I'll take a closer look at the implications ... but
-> >> unfortunately I'm not going to be able to do much until Thursday.
-> >
-> > I've just applied such an extended patch covering the other proc-*.S
-> > files - with your ack:
-> 
-> Looks good to me too, thanks Russell!
+Hello
 
-Before it push it out, is that an ack or something like that?
+This add button handling for the MC13783 PMIC.
+
+Patch 1 & 2 modify the mc13xxx MFD driver to use the platform data to
+resgister the led subdevice and unconditionally register the regulator
+subdevice (as suggested by Mark and Uwe).
+
+Patch 3 remove the use of the *_USE_REGULATOR and *_USE_LED macros in
+the platform files.
+
+Patch 4 must be applied after patch 1,2,3 to remove the obsolete define.
+
+Patch 5 modify the mc13xxx MFD driver to add a button subdevice and
+also adds the mc13783-pwrbutton driver using a misc input device.
+
+The last patch adds the power on button support to the mx31moboard boards.
+
+v2: first patch modified according to comments by Dmitry Torokhov
+v3: Implement review by Uwe
+v4: Implement comments by Uwe and Mark
+v5: Reorder patchset
+
+Philippe R?tornaz (6):
+  mc13xxx: Unconditionally register regulator subdevice
+  mc13xxx: implicitly register led subdevice
+  mc13xxx: remove obsolete leds and regualtors flags
+  mc13xxx: remove unused define
+  mc13783: add power button support
+  mx31moboard: Add MC13783 power button support
+
+ arch/arm/mach-imx/mach-mx27_3ds.c      |    1 -
+ arch/arm/mach-imx/mach-mx31_3ds.c      |    2 +-
+ arch/arm/mach-imx/mach-mx31lite.c      |    3 +-
+ arch/arm/mach-imx/mach-mx31moboard.c   |   11 +-
+ arch/arm/mach-imx/mach-pcm038.c        |    3 +-
+ arch/arm/mach-mx5/mx51_efika.c         |    2 +-
+ drivers/input/misc/Kconfig             |   10 +
+ drivers/input/misc/Makefile            |    1 +
+ drivers/input/misc/mc13783-pwrbutton.c |  288 ++++++++++++++++++++++++++++++++
+ drivers/mfd/mc13xxx-core.c             |   12 +-
+ include/linux/mfd/mc13783.h            |    3 +-
+ include/linux/mfd/mc13xxx.h            |   19 ++-
+ 12 files changed, 337 insertions(+), 18 deletions(-)
+ create mode 100644 drivers/input/misc/mc13783-pwrbutton.c
