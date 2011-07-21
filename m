@@ -1,108 +1,24 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Thu, 21 Jul 2011 13:01:46 +0530
-Subject: [PATCH V4 03-1/13] DMA: PL330: Support DMA_SLAVE_CONFIG command
-In-Reply-To: <000c01cc4770$3a391330$aeab3990$%kim@samsung.com>
-References: <1311158773-30314-1-git-send-email-boojin.kim@samsung.com>
-	<1311158773-30314-3-git-send-email-boojin.kim@samsung.com>
-	<CABb+yY2_XKyCr2mEzqd0bCYJk3U7+sg8Xz4b4ma2KB1BconYOw@mail.gmail.com>
-	<000101cc475c$9b5bcdb0$d2136910$%kim@samsung.com>
-	<CABb+yY05U0Q58F93TEZ8xt727e6YAxwxZT2HbeTTV6nVcg5DQw@mail.gmail.com>
-	<000c01cc4770$3a391330$aeab3990$%kim@samsung.com>
-Message-ID: <CABb+yY1dJbkP9Qb38tHYW=SZXB=TEQ_NGXpWE2jz7Bb0Z-A7Rw@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 21 Jul 2011 08:45:11 +0100
+Subject: [PATCH] ARM: do not mark CPU 0 as hotpluggable
+In-Reply-To: <1311204745-6276-1-git-send-email-mturquette@ti.com>
+References: <1311204745-6276-1-git-send-email-mturquette@ti.com>
+Message-ID: <20110721074511.GK26574@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 21, 2011 at 12:04 PM, Boojin Kim <boojin.kim@samsung.com> wrote:
-> Jassi Brar wrote:
->> Sent: Thursday, July 21, 2011 2:00 PM
->> To: Boojin Kim
->> Cc: linux-arm-kernel at lists.infradead.org; linux-samsung-soc at vger.kernel.org;
->> Vinod Koul; Dan Williams; Kukjin Kim
->> Subject: Re: [PATCH V4 03-1/13] DMA: PL330: Support DMA_SLAVE_CONFIG command
->>
->> On Thu, Jul 21, 2011 at 9:43 AM, Boojin Kim <boojin.kim@samsung.com> wrote:
->>
->> >> > - ? ? ? pl330_tasklet((unsigned long) pch);
->> >> > + ? ? ? ? ? ? ? list_splice_tail_init(&list, &pdmac->desc_pool);
->> >> > + ? ? ? ? ? ? ? spin_unlock_irqrestore(&pch->lock, flags);
->> >> > + ? ? ? ? ? ? ? break;
->> >> > + ? ? ? case DMA_SLAVE_CONFIG:
->> >> Please protect this section too using spin_lock.
->> > Why is spin_lock need here?
->> > This code just sets configuration data into own channel structure.
->> It does seem unncessary, but the configuration that is set here is read
->> in other parts of the driver. However unlikely but there is theoretical
->> possibility of race here - one shouldn't count upon goodness of client
->> drivers.
-> Yes, Client driver doesn't afflict the configuration data again.
-> So, I think spin_lock isn't required here.
->
->>
->> >>
->> >> > + ? ? ? ? ? ? ? if (slave_config->direction == DMA_TO_DEVICE) {
->> >> > + ? ? ? ? ? ? ? ? ? ? ? if (slave_config->dst_addr)
->> >> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? peri->fifo_addr =
->> >> > slave_config->dst_addr;
->> >> > + ? ? ? ? ? ? ? ? ? ? ? if (slave_config->dst_addr_width)
->> >> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? peri->burst_sz = __ffs(slave_config-
->> >> >dst_addr_width);
->> >> > + ? ? ? ? ? ? ? } else if (slave_config->direction == DMA_FROM_DEVICE)
->> >> > {
->> >> > + ? ? ? ? ? ? ? ? ? ? ? if (slave_config->src_addr)
->> >> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? peri->fifo_addr =
->> >> > slave_config->src_addr;
->> >> > + ? ? ? ? ? ? ? ? ? ? ? if (slave_config->src_addr_width)
->> >> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? peri->burst_sz = __ffs(slave_config-
->> >> >src_addr_width);
->> >> > + ? ? ? ? ? ? ? }
->> >> PL330 has fixed channels to peripherals.
->> >> So FIFO addresses(burst_sz too?) should already be set via platform data.
->> >> Client drivers shouldn't bother.
->> >
->> > First, DMA machine code should know the FIFO address of all client drivers
->> to
->> > set via platform data.
->> > In this case, Problem is that the definition of FIFO address is almost
->> > declared to the header file of client driver.
->> > For example, sound\soc\samsung\regs-i2s-v2.h only has the definition of
->> fifo
->> > address as following.
->> >
->> > #define S3C2412_IISTXD ? ? ? ? ? ? ? ? ?(0x10)
->> > #define S3C2412_IISRXD ? ? ? ? ? ? ? ? ?(0x14)
->> >
->> > These definitions should be referred to DMA machine code to set fifo
->> address
->> > through platform data.
->> > I think it's not good method.
->> Crap!
->> Client drivers don't conjure up the fifo address - if not hardcoded they
->> are gotten via platform_data already.
->
-> For it, DMA machine code should include all header files of client driver that
-> has definition of FIFO address.
-> The number of header file would be more than 10. And I think it make the code
-> a little complicated.
->
->>
->> > And, SLAVE_CONFIG command exist to pass slave configuration data from
->> client
->> > driver to DMA driver.
->> > So, I think that it's proper to pass fifo address through SLAVE_CONFIG
->> > command.
->> If it's still not clear, read the para above definition of 'struct
->> dma_slave_config'
->> in include/linux/dmaengine.h
->
-> Other DMA client drivers in mainline code already use SLAVE_CONFIG command to
-> pass fifo address as following.
-> Please refer to Sound/soc/imx/imx-pcm-dma/mx2.c, Driver/mmc/host/mmci.c,
-> Drivers/mmc/host/mxcmmc.c and so on.
->
-> And, Other DMA drivers also support to SLAVE_CONFIG command for it.
-> Please refer to amba-pl08x.c, coh901318.c, ste_dma40.c and so on in
-> 'driver/dma' directory.
-> So, In my opinion, this is proper method to handle the client's fifo address.
->
+On Wed, Jul 20, 2011 at 04:32:25PM -0700, Mike Turquette wrote:
+> A quick poll of the ARM platforms that implement CPU Hotplug support
+> shows that every platform treats CPU 0 as a special case that cannot be
+> hotplugged.  In fact every platform has identical code for
+> platform_cpu_die which returns -EPERM in the case of CPU 0.
 
-NAK.
+Are you sure that's just not because everyone copied what Realview has
+been doing (highly likely)?
+
+I suspect that there's no reason that CPU0 can't be taken down, especially
+on those platforms which don't take the CPU fully offline but just put it
+into a WFI loop.
+
+Those which restart the CPUs through the boot loader probably detect CPU0
+as the boot CPU, so they probably can't take CPU0 down.
