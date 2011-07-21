@@ -1,28 +1,37 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 21 Jul 2011 08:32:49 -0700
-Subject: [PATCHV3 0/4] The series attempts to do the following
-In-Reply-To: <1311256381-25548-1-git-send-email-shubhrajyoti@ti.com>
-	(Shubhrajyoti D.'s message of "Thu, 21 Jul 2011 19:22:57 +0530")
-References: <1311256381-25548-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <877h7babtq.fsf@ti.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Thu, 21 Jul 2011 08:33:31 -0700
+Subject: [PATCH v2] ARM: Tegra: Trimslice: Tri-state DAP3 pinmux
+In-Reply-To: <CABpLfohhtux1S6eJg+U7kgckw4j2vhMuWo8mBRaMpoZr5PuBiA@mail.gmail.com>
+References: <1310596967-19996-1-git-send-email-swarren@nvidia.com>
+	<CABpLfohE+PmssbicDjS3p13i=T4X5dZ=P-KhXmytvPX2An62=w@mail.gmail.com>
+	<CABpLfohhtux1S6eJg+U7kgckw4j2vhMuWo8mBRaMpoZr5PuBiA@mail.gmail.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF049EBDF13B@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shubhrajyoti D <shubhrajyoti@ti.com> writes:
+Mike Rapoport wrote at Thursday, July 21, 2011 3:17 AM:
+> On Thu, Jul 21, 2011 at 10:10 AM, Mike Rapoport <mike.rapoport@gmail.com> wrote:
+> >> DAP3 is used for a bunch of GPIOs. Not tri-stating the pins means audio
+> >> signals get sent out there, and this ends up resetting USB and breaking
+> >> SDHCI too.
+> >>
+> >> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> >> ---
+> >> v2: s/DAP2/DAP3/ in patch subject/description.
+> >
+> > Setting DAP3 pins to tristate is necessary but not sufficient :) I
+> > don't know why, but if we don't tristate DAP2 and DAP4 as well USB and
+> > SDIO are broken.
+> > If you can amend your patch with tristating also DAP2 and DAP4 feel
+> > free to add my
+> 
+> Oops, I should have read the diff context as well... DAP{2,4} are
+> anyway tristate, so you can discard my previous comment. So the
+> Acked-by applies to the original patch. Sorry for the noise.
+> 
+> > Acked-by: Mike Rapoport <mike@compulab.co.il>
 
-> - The reset should not be done in the driver 
->   have support for the same.
-> - Remove the sysc register access in the driver.
-> - Restore the context only if the context is lost.
+Thanks! Note that Arnd already picked this patch up in arm-soc.git.
 
-Hello,
-
-Can you base the next version of this on my wip/i2c branch[1] which has a
-couple other misc. cleanup patches that will be queued for v3.2.
-
-Thanks,
-
-Kevin
-
-
-[1] git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git wip/i2c
+-- 
+nvpublic
