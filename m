@@ -1,33 +1,53 @@
-From: mturquette@ti.com (Mike Turquette)
-Date: Tue, 19 Jul 2011 16:47:11 -0700
-Subject: [PATCH 2/2] OMAP4: Kconfig: remove hotplug control for CPU0
-Message-ID: <mailman.27.1311286727.20020.linux-arm-kernel@lists.infradead.org>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 21 Jul 2011 16:52:10 -0700
+Subject: [RFC/PATCH 0/7] decouple platform_device from omap_device
+Message-ID: <1311292338-11830-1-git-send-email-khilman@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On OMAP4, CPU0 cannot be dynamically offlined through the usual CPU
-hotplug mechanism due to a variety of constraints.  It is treated as a
-special "master" CPU for these reasons.
+Here's a first whack, proof-of-concept on how we could start to
+decouple the platform_device from an omap_device.
 
-Select HOTPLUG_CPU_MASTER to prevent creation of the hotplug control
-entry in sysfs.
+The main RFC is in the last patch, and everything leading up to it are
+misc. omap_device cleanups that make the last patch cleaner and
+clearer.  It's really the last patch that does the decoupling.
 
-Signed-off-by: Mike Turquette <mturquette@ti.com>
----
- arch/arm/mach-omap2/Kconfig |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+This will be necessary if we're going to decouple the platform_device
+creation from the omap_device/omap_hwmod creation etc.  This patch
+leaves them both done in omap_device_build(), but shows that they can
+be decoupled.
 
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index 4ae6257..b6199e3 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -51,6 +51,7 @@ config ARCH_OMAP4
- 	select ARCH_HAS_OPP
- 	select PM_OPP if PM
- 	select USB_ARCH_HAS_EHCI
-+	select HOTPLUG_CPU_MASTER
 
- comment "OMAP Core Type"
- 	depends on ARCH_OMAP2
---=20
-1.7.4.1
+Kevin Hilman (7):
+  OMAP: omap_device: replace debug/warning/error prints with dev_*
+    macros
+  OMAP3: beagle: don't touch omap_device internals
+  OMAP: McBSP: use existing macros for converting between devices
+  OMAP: omap_device: remove internal functions from omap_device.h
+  OMAP: omap_device: when building return platform_device instead of
+    omap_device
+  OMAP: omap_device: device register functions now take platform_device
+    pointer
+  WIP: HACK/RFC: omap_device: begin to decouple platform_device from
+    omap_device
+
+ arch/arm/mach-omap2/board-omap3beagle.c       |   23 ++--
+ arch/arm/mach-omap2/devices.c                 |   44 ++++----
+ arch/arm/mach-omap2/display.c                 |    6 +-
+ arch/arm/mach-omap2/dma.c                     |   16 ++--
+ arch/arm/mach-omap2/gpio.c                    |    8 +-
+ arch/arm/mach-omap2/hsmmc.c                   |    8 +-
+ arch/arm/mach-omap2/hwspinlock.c              |    8 +-
+ arch/arm/mach-omap2/mcbsp.c                   |    8 +-
+ arch/arm/mach-omap2/opp.c                     |    2 +-
+ arch/arm/mach-omap2/pm.c                      |    8 +-
+ arch/arm/mach-omap2/serial.c                  |   12 +-
+ arch/arm/plat-omap/i2c.c                      |    8 +-
+ arch/arm/plat-omap/include/plat/omap_device.h |   14 +--
+ arch/arm/plat-omap/mcbsp.c                    |    6 +-
+ arch/arm/plat-omap/omap_device.c              |  165 ++++++++++++++-----------
+ drivers/base/dd.c                             |    2 +-
+ 16 files changed, 173 insertions(+), 165 deletions(-)
+
+-- 
+1.7.6
