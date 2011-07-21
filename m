@@ -1,29 +1,60 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 21 Jul 2011 17:02:55 +0100
-Subject: [PATCH V4 03-1/13] DMA: PL330: Support DMA_SLAVE_CONFIG command
-In-Reply-To: <CABb+yY193Tg1XfnkK3GYYaYWmZYRgeqnGnS_dNC4H1TFTGO_pA@mail.gmail.com>
-References: <1311158773-30314-1-git-send-email-boojin.kim@samsung.com>
-	<1311158773-30314-3-git-send-email-boojin.kim@samsung.com>
-	<CABb+yY2_XKyCr2mEzqd0bCYJk3U7+sg8Xz4b4ma2KB1BconYOw@mail.gmail.com>
-	<20110721081138.GL26574@n2100.arm.linux.org.uk>
-	<CABb+yY2obv5JMBiRSXS-4tSCYX+7nVVaA0Q7gurA+NndrGVuvA@mail.gmail.com>
-	<20110721112920.GM26574@n2100.arm.linux.org.uk>
-	<CABb+yY2p8VNSvhv+LjoYnunrYS8+3+841bKM-4aUsg5vNx=Mig@mail.gmail.com>
-	<20110721152342.GE28942@n2100.arm.linux.org.uk>
-	<CABb+yY193Tg1XfnkK3GYYaYWmZYRgeqnGnS_dNC4H1TFTGO_pA@mail.gmail.com>
-Message-ID: <20110721160255.GQ26574@n2100.arm.linux.org.uk>
+Date: Thu, 21 Jul 2011 17:08:00 +0100
+Subject: [PATCH 0/9] PL08x further cleanups
+In-Reply-To: <1310598328.1536.27.camel@vkoul-udesk3>
+References: <20110705131030.GE8286@n2100.arm.linux.org.uk>
+	<1310598328.1536.27.camel@vkoul-udesk3>
+Message-ID: <20110721160800.GR26574@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 21, 2011 at 09:26:22PM +0530, Jassi Brar wrote:
-> Though you might want to consider changing the DMA_SLAVE_CONFIG API from
-> optional to mandatory for Slave capable DMACs. Otherwise I don't see common
-> client drivers working over different DMACs.
+On Thu, Jul 14, 2011 at 04:35:28AM +0530, Koul, Vinod wrote:
+> On Tue, 2011-07-05 at 14:10 +0100, Russell King - ARM Linux wrote:
+> > This patch series is the remainder of the PL08x work I did earlier
+> > this year while trying to get the ARM platforms working with DMA.
+> > 
+> > Unfortunately, due to the state of the hardware, I was not able to
+> > properly test these changes.  However, they do compile, and I think
+> > if others are going to be looking at the PL08x DMA engine driver,
+> > they're worth having.
+> > 
+> > Linus, can you check these out on your hardware please?
+> 
+> Russell,
+> 
+> The fail to build for me, on line 550 it refers to bd.llil_bus whereas
+> the bd is a pointer. Further the WIDTH macros seem to be missing.
 
-Yes, I think we will have to, otherwise we can't ensure we have cross-
-compatibility between different DMA engine implementations.
+Grr, I've updated the patches and will post the two updated ones.  I
+have them in my git tree - would you like them via git instead, or
+would you prefer to provide acks and let me push them upstream?
 
-We already have platforms where we have peripheral drivers making use of
-several different DMA engine implementations, so nailing this down now,
-before the number of DMA engine implementations increases still further
-is definitely something that needs doing.
+Are there any conflicting changes in amba-pl08x?
+
+> While you are fixing this, you may want to fix the minor checkpatch
+> warning as well.
+
+No, the checkpatch warning is inappropriate - and yet again this
+illustrates why checkpatch should be a _guide_ and not mandatory.
+Checkpatch is warning about:
+
++       if (plchan->runtime_direction == DMA_FROM_DEVICE) {
++               plchan->src_addr = config->src_addr;
++       } else {
++               plchan->dst_addr = config->dst_addr;
++       }
+
+but in the very next patch this changes to:
+
+        if (plchan->runtime_direction == DMA_FROM_DEVICE) {
+                plchan->src_addr = config->src_addr;
++               plchan->src_cctl = pl08x_cctl(cctl);
+        } else {
+                plchan->dst_addr = config->dst_addr;
++               plchan->dst_cctl = pl08x_cctl(cctl);
+        }
+
+Changing this so that the first patch doesn't use the braces, and add
+them in the second patch makes the second patch needlessly more noisy
+for no benefit.  So no, I'm not fixing that because it makes things
+unnecessarily more complex.
