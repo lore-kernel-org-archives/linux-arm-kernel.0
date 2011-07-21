@@ -1,120 +1,58 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 21 Jul 2011 17:57:28 +0100
-Subject: [RFC PATCH v9 4/4] ARM: gic: add compute_irqnr macro for exynos4
-In-Reply-To: <1311267448-14652-1-git-send-email-marc.zyngier@arm.com>
-References: <1311267448-14652-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1311267448-14652-5-git-send-email-marc.zyngier@arm.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Thu, 21 Jul 2011 18:00:05 +0100
+Subject: linux-next regression on ARM926
+In-Reply-To: <20110721165210.GD20310@n2100.arm.linux.org.uk>
+References: <CACRpkdbBrVda2oD42tjrWiG6uHXAdWwpr6cZ7qnSc2KM82XCfw@mail.gmail.com>
+	<20110718112757.GV23270@n2100.arm.linux.org.uk>
+	<CA+wbFdfNAjqQf4T48_cVbNOb6ac84TQC-2QvHKD43dfRou-i9w@mail.gmail.com>
+	<20110719110904.GJ26574@n2100.arm.linux.org.uk>
+	<CA+wbFdcifNu1W1BtehSxEMf4G48NhYiCHx+uAGjFuRQ4hr_rLA@mail.gmail.com>
+	<20110721134804.GO26574@n2100.arm.linux.org.uk>
+	<CA+wbFdeohxm64qpDs+i4TaYBeL0vjqeG6LU0_3VucZ0hvVxCMQ@mail.gmail.com>
+	<20110721165210.GD20310@n2100.arm.linux.org.uk>
+Message-ID: <CA+wbFddfkSAeg95YpPQ42qTxmfjjfKyop+z0zJxiEvEE3ScMFQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-exynos4 has a full copy of entry-macro-gic.S, just for the sake
-of an offset added to the IRQ number read from the GIC.
+On Thu, Jul 21, 2011 at 5:52 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Thu, Jul 21, 2011 at 05:39:06PM +0100, Dave Martin wrote:
+>> Did you miss proc-v6, or is that touched by some other patch? ?I
+>> already have the relevant patch, so I'm happy to post that if you
+>> don't already have it.
+>
+> Well spotted, I've just corrected that.
 
-Add a compute_irqnr macro to entry-macro-gic.S so that any platform
-can add it's own hook without having to copy the whole file again.
+I think that should be all of them -- I had hacked up a quick script
+to find and change all instances, but proc-v6 was the only one it
+touched which wasn't in your series.
 
-Cc: Ben Dooks <ben-linux@fluff.org>
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/include/asm/hardware/entry-macro-gic.S  |    3 +
- arch/arm/mach-exynos4/include/mach/entry-macro.S |   57 +++-------------------
- 2 files changed, 10 insertions(+), 50 deletions(-)
+I also build-tested the change in several configurations just to be
+sure.  It looks sound, so far as I can tell.
 
-diff --git a/arch/arm/include/asm/hardware/entry-macro-gic.S b/arch/arm/include/asm/hardware/entry-macro-gic.S
-index 74ebc80..fbb50dc 100644
---- a/arch/arm/include/asm/hardware/entry-macro-gic.S
-+++ b/arch/arm/include/asm/hardware/entry-macro-gic.S
-@@ -43,6 +43,9 @@
- 	cmpcc	\irqnr, \irqnr
- 	cmpne	\irqnr, \tmp
- 	cmpcs	\irqnr, \irqnr
-+#ifdef HAVE_GIC_BASE_OFFSET
-+	compute_irqnr	\irqnr, \tmp
-+#endif
- 	.endm
- 
- /* We assume that irqstat (the raw value of the IRQ acknowledge
-diff --git a/arch/arm/mach-exynos4/include/mach/entry-macro.S b/arch/arm/mach-exynos4/include/mach/entry-macro.S
-index 807d05d..ea578b5 100644
---- a/arch/arm/mach-exynos4/include/mach/entry-macro.S
-+++ b/arch/arm/mach-exynos4/include/mach/entry-macro.S
-@@ -9,11 +9,15 @@
-  * warranty of any kind, whether express or implied.
- */
- 
-+#define HAVE_GIC_BASE_OFFSET	1
-+
- #include <mach/hardware.h>
- #include <mach/map.h>
- #include <asm/hardware/gic.h>
-+#include <asm/hardware/entry-macro-gic.S>
- 
--		.macro	disable_fiq
-+		.macro	compute_irqnr, irqnr, tmp
-+		addne	\irqnr, #32
- 		.endm
- 
- 		.macro  get_irqnr_preamble, base, tmp
-@@ -23,57 +27,10 @@
- 		and     \tmp, \tmp, #3
- 		cmp     \tmp, #1
- 		addeq   \base, \base, #EXYNOS4_GIC_BANK_OFFSET
--		.endm
--
--		.macro  arch_ret_to_user, tmp1, tmp2
--		.endm
--
--		/*
--		 * The interrupt numbering scheme is defined in the
--		 * interrupt controller spec.  To wit:
--		 *
--		 * Interrupts 0-15 are IPI
--		 * 16-28 are reserved
--		 * 29-31 are local.  We allow 30 to be used for the watchdog.
--		 * 32-1020 are global
--		 * 1021-1022 are reserved
--		 * 1023 is "spurious" (no interrupt)
--		 *
--		 * For now, we ignore all local interrupts so only return an interrupt if it's
--		 * between 30 and 1020.  The test_for_ipi routine below will pick up on IPIs.
--		 *
--		 * A simple read from the controller will tell us the number of the highest
--                 * priority enabled interrupt.  We then just need to check whether it is in the
--		 * valid range for an IRQ (30-1020 inclusive).
--		 */
--
--		.macro  get_irqnr_and_base, irqnr, irqstat, base, tmp
--
--		ldr     \irqstat, [\base, #GIC_CPU_INTACK] /* bits 12-10 = src CPU, 9-0 = int # */
--
--		ldr	\tmp, =1021
--
--		bic     \irqnr, \irqstat, #0x1c00
--
--		cmp     \irqnr, #15
--		cmpcc	\irqnr, \irqnr
--		cmpne	\irqnr, \tmp
--		cmpcs	\irqnr, \irqnr
--		addne	\irqnr, \irqnr, #32
- 
-+		.macro	disable_fiq
- 		.endm
- 
--		/* We assume that irqstat (the raw value of the IRQ acknowledge
--		 * register) is preserved from the macro above.
--		 * If there is an IPI, we immediately signal end of interrupt on the
--		 * controller, since this requires the original irqstat value which
--		 * we won't easily be able to recreate later.
--		 */
--
--		.macro test_for_ipi, irqnr, irqstat, base, tmp
--		bic	\irqnr, \irqstat, #0x1c00
--		cmp	\irqnr, #16
--		strcc	\irqstat, [\base, #GIC_CPU_EOI]
--		cmpcs	\irqnr, \irqnr
-+		.macro  arch_ret_to_user, tmp1, tmp2
- 		.endm
- 
--- 
-1.7.0.4
+>
+>> My proc-maros.S patch is slightly different in that it avoids defining
+>> the default values twice (i.e., once for !CONFIG_PM_SUSPEND and once
+>> for suspend=0); but it's otherwise equivalent.
+>>
+>> I also took the opportunity to remove the definitions of
+>> cpu_<name>_suspend_size for the !CONFIG_PM_SUSPEND case, since this
+>> helps to ensure they are not used accidentally. ?That's a more
+>> cosmetic change.
+>
+> The missing symbols for do_suspend/do_resume should be enough on their
+> own to catch people using it, so I don't think that's necessary.
+
+OK, agreed.
+
+>> Do you want me to post my whole series anyway, or otherwise can you
+>> point me to where you applied the patches so I can filter my series?
+>
+> I'll push it out later this evening, it'll be part of the devel-stable
+> branch so once pushed it becomes immutable.
+
+in that that case I guess I don't have anything to add, so I'll drop
+my patches.  Apologies for the last-minute churn...
+
+Thanks
+---Dave
