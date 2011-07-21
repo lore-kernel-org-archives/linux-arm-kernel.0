@@ -1,68 +1,38 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 21 Jul 2011 16:52:13 -0700
-Subject: [RFC/PATCH 2/7] OMAP3: beagle: don't touch omap_device internals
+Date: Thu, 21 Jul 2011 16:52:14 -0700
+Subject: [RFC/PATCH 3/7] OMAP: McBSP: use existing macros for converting
+	between devices
 In-Reply-To: <1311292338-11830-1-git-send-email-khilman@ti.com>
 References: <1311292338-11830-1-git-send-email-khilman@ti.com>
-Message-ID: <1311292338-11830-4-git-send-email-khilman@ti.com>
+Message-ID: <1311292338-11830-5-git-send-email-khilman@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Board code should not touch omap_device internals.  To get the MPU/IVA devices,
-use existing APIs: omap2_get_mpu_device(), omap2_get_iva_device().
+For converting from struct device to platform_device, and from
+platform_device to struct device, there are existing macros.  Use
+them instead of manual use of container_of().
 
 Signed-off-by: Kevin Hilman <khilman@ti.com>
 ---
- arch/arm/mach-omap2/board-omap3beagle.c |   23 ++++++++++-------------
- 1 files changed, 10 insertions(+), 13 deletions(-)
+ arch/arm/plat-omap/mcbsp.c |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
-index 32f5f89..3ae16b4 100644
---- a/arch/arm/mach-omap2/board-omap3beagle.c
-+++ b/arch/arm/mach-omap2/board-omap3beagle.c
-@@ -491,23 +491,22 @@ static void __init beagle_opp_init(void)
- 
- 	/* Custom OPP enabled for all xM versions */
- 	if (cpu_is_omap3630()) {
--		struct omap_hwmod *mh = omap_hwmod_lookup("mpu");
--		struct omap_hwmod *dh = omap_hwmod_lookup("iva");
--		struct device *dev;
-+		struct device *mpu_dev, *iva_dev;
- 
--		if (!mh || !dh) {
-+		mpu_dev = omap2_get_mpuss_device();
-+		iva_dev = omap2_get_iva_device();
+diff --git a/arch/arm/plat-omap/mcbsp.c b/arch/arm/plat-omap/mcbsp.c
+index 6c62af1..02199e8 100644
+--- a/arch/arm/plat-omap/mcbsp.c
++++ b/arch/arm/plat-omap/mcbsp.c
+@@ -260,9 +260,9 @@ EXPORT_SYMBOL(omap_mcbsp_dma_reg_params);
+ #ifdef CONFIG_ARCH_OMAP3
+ static struct omap_device *find_omap_device_by_dev(struct device *dev)
+ {
+-	struct platform_device *pdev = container_of(dev,
+-					struct platform_device, dev);
+-	return container_of(pdev, struct omap_device, pdev);
++	struct platform_device *pdev = to_platform_device(dev);
 +
-+		if (!mpu_dev || !iva_dev) {
- 			pr_err("%s: Aiee.. no mpu/dsp devices? %p %p\n",
--				__func__, mh, dh);
-+				__func__, mpu_dev, iva_dev);
- 			return;
- 		}
- 		/* Enable MPU 1GHz and lower opps */
--		dev = &mh->od->pdev.dev;
--		r = opp_enable(dev, 800000000);
-+		r = opp_enable(mpu_dev, 800000000);
- 		/* TODO: MPU 1GHz needs SR and ABB */
++	return to_omap_device(pdev);
+ }
  
- 		/* Enable IVA 800MHz and lower opps */
--		dev = &dh->od->pdev.dev;
--		r |= opp_enable(dev, 660000000);
-+		r |= opp_enable(iva_dev, 660000000);
- 		/* TODO: DSP 800MHz needs SR and ABB */
- 		if (r) {
- 			pr_err("%s: failed to enable higher opp %d\n",
-@@ -516,10 +515,8 @@ static void __init beagle_opp_init(void)
- 			 * Cleanup - disable the higher freqs - we dont care
- 			 * about the results
- 			 */
--			dev = &mh->od->pdev.dev;
--			opp_disable(dev, 800000000);
--			dev = &dh->od->pdev.dev;
--			opp_disable(dev, 660000000);
-+			opp_disable(mpu_dev, 800000000);
-+			opp_disable(iva_dev, 660000000);
- 		}
- 	}
- 	return;
+ static void omap_st_on(struct omap_mcbsp *mcbsp)
 -- 
 1.7.6
