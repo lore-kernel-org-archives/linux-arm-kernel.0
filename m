@@ -1,93 +1,89 @@
 From: b29396@freescale.com (Dong Aisheng)
-Date: Thu, 21 Jul 2011 12:36:54 +0800
-Subject: [PATCH v5 0/4] ASoC: mxs: add audio support
-Message-ID: <1311223018-9553-1-git-send-email-b29396@freescale.com>
+Date: Thu, 21 Jul 2011 12:36:58 +0800
+Subject: [PATCH v5 4/4] ASoC: mxs: add asoc configuration files
+In-Reply-To: <1311223018-9553-1-git-send-email-b29396@freescale.com>
+References: <1311223018-9553-1-git-send-email-b29396@freescale.com>
+Message-ID: <1311223018-9553-5-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to Liam's comment, i redo the patch set based on the for-next
-branch on Mark's sound-2.6 tree.
-The based one is [PATCH v4 00/10] ARM: mxs: add audio support.
+Signed-off-by: Dong Aisheng <b29396@freescale.com>
+Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Cc: Liam Girdwood <lrg@ti.com>
+Cc: Sascha Hauer <s.hauer@pengutronix.de>
+Tested-by: Wolfram Sang <w.sang@pengutronix.de>
+---
+ sound/soc/Kconfig      |    1 +
+ sound/soc/Makefile     |    1 +
+ sound/soc/mxs/Kconfig  |   20 ++++++++++++++++++++
+ sound/soc/mxs/Makefile |   10 ++++++++++
+ 4 files changed, 32 insertions(+), 0 deletions(-)
 
-For asoc part (1-4), only one change is updating mxs_pcm_new
-since this API has been updated to pass in the runtime data only
-For mxs part, no changes made.
-
-This patch series is to add audio support based on saif for mxs platform.
-The driver only supports playback currently.
-For capturing, due to hardware limitation that we have to use two saif
-instances to implement full duplex (playback & recording), we need to
-figure out a good design to fit in ASoC as the following work.
-
-In addition, we simply just support master mode since saif tx can
-only work as a master due to hw limitation(rx can work in both
-master & slave mode).
-
-Tested on MX28EVK.
-
-For the ASoC-patches (1-4):
- Tested-by: Wolfram Sang <w.sang@pengutronix.de>
-For the mach-mxs-Patches (5-10):
- Reviewed-by: Wolfram Sang <w.sang@pengutronix.de>
-
-Changes since v4:
- * ASoC: mxs: add mxs-pcm driver
-	update mxs_pcm_new due to this API's parameter number is changed.
-
-Changes since v3:
-This version only has one patch changed with another two for rebase
-the changed one.
- * [PATCH v4 06/10] ARM: mxs: add saif device
-	Drop DIGCTRL-handling based on Wolfram's comment
- * [PATCH v4 07/10] ARM: mxs: add sgtl5000 i2c device
- 	Resend for rebase [PATCH v4 06/10] ARM: mxs: add saif device
- * [PATCH v4 08/10] ARM: mxs: add mxs-sgtl5000 device
- 	Resend for rebase [PATCH v4 06/10] ARM: mxs: add saif device
-
-changes since v2:
- * mxs-pcm
-    - fix wrong periods_max.
-    - For robustness replace the channels_min check with a check
-      for the relevant substream being present
- * mxs-saif
-    - Add IRQ_NONE handle
-    - improve mxs_saif_set_clk to make it more easy to read
-    - correct return value
-    - request_irq sequence changed to after ioremap
- * mxs-sgtl5000
-    - clean up a few unused code
- * Kconfig&Makefile
-    - SND_SOC_MXS_SGTL5000 should depend on I2C in Kconfig
- * mxs
-    - Select MXS_I2C in kconfig for mxs-sgtl5000
-
-changes since v1:
- * export saif mclk control interface to machine driver.
-   Machine driver can decide whether it needs to use mclk supplied by
-   saif according to its requirement.
- * error checking improvement
- * remove a few unneccesary code
-
-Dong Aisheng (4):
-  ASoC: mxs: add mxs-pcm driver
-  ASoC: mxs: add mxs-saif driver
-  ASoC: mxs: add mxs-sgtl5000 machine driver
-  ASoC: mxs: add asoc configuration files
-
- sound/soc/Kconfig            |    1 +
- sound/soc/Makefile           |    1 +
- sound/soc/mxs/Kconfig        |   20 ++
- sound/soc/mxs/Makefile       |   10 +
- sound/soc/mxs/mxs-pcm.c      |  359 ++++++++++++++++++++++
- sound/soc/mxs/mxs-pcm.h      |   43 +++
- sound/soc/mxs/mxs-saif.c     |  677 ++++++++++++++++++++++++++++++++++++++++++
- sound/soc/mxs/mxs-saif.h     |  130 ++++++++
- sound/soc/mxs/mxs-sgtl5000.c |  165 ++++++++++
- 9 files changed, 1406 insertions(+), 0 deletions(-)
- create mode 100644 sound/soc/mxs/Kconfig
- create mode 100644 sound/soc/mxs/Makefile
- create mode 100644 sound/soc/mxs/mxs-pcm.c
- create mode 100644 sound/soc/mxs/mxs-pcm.h
- create mode 100644 sound/soc/mxs/mxs-saif.c
- create mode 100644 sound/soc/mxs/mxs-saif.h
- create mode 100644 sound/soc/mxs/mxs-sgtl5000.c
+diff --git a/sound/soc/Kconfig b/sound/soc/Kconfig
+index 8224db5..47d07ce 100644
+--- a/sound/soc/Kconfig
++++ b/sound/soc/Kconfig
+@@ -51,6 +51,7 @@ source "sound/soc/nuc900/Kconfig"
+ source "sound/soc/omap/Kconfig"
+ source "sound/soc/kirkwood/Kconfig"
+ source "sound/soc/mid-x86/Kconfig"
++source "sound/soc/mxs/Kconfig"
+ source "sound/soc/pxa/Kconfig"
+ source "sound/soc/samsung/Kconfig"
+ source "sound/soc/s6000/Kconfig"
+diff --git a/sound/soc/Makefile b/sound/soc/Makefile
+index 4f91387..9ea8ac8 100644
+--- a/sound/soc/Makefile
++++ b/sound/soc/Makefile
+@@ -12,6 +12,7 @@ obj-$(CONFIG_SND_SOC)	+= fsl/
+ obj-$(CONFIG_SND_SOC)   += imx/
+ obj-$(CONFIG_SND_SOC)	+= jz4740/
+ obj-$(CONFIG_SND_SOC)	+= mid-x86/
++obj-$(CONFIG_SND_SOC)	+= mxs/
+ obj-$(CONFIG_SND_SOC)	+= nuc900/
+ obj-$(CONFIG_SND_SOC)	+= omap/
+ obj-$(CONFIG_SND_SOC)	+= kirkwood/
+diff --git a/sound/soc/mxs/Kconfig b/sound/soc/mxs/Kconfig
+new file mode 100644
+index 0000000..e4ba8d5
+--- /dev/null
++++ b/sound/soc/mxs/Kconfig
+@@ -0,0 +1,20 @@
++menuconfig SND_MXS_SOC
++	tristate "SoC Audio for Freescale MXS CPUs"
++	depends on ARCH_MXS
++	select SND_PCM
++	help
++	  Say Y or M if you want to add support for codecs attached to
++	  the MXS SAIF interface.
++
++
++if SND_MXS_SOC
++
++config SND_SOC_MXS_SGTL5000
++	tristate "SoC Audio support for i.MX boards with sgtl5000"
++	depends on I2C
++	select SND_SOC_SGTL5000
++	help
++	  Say Y if you want to add support for SoC audio on an MXS board with
++	  a sgtl5000 codec.
++
++endif	# SND_MXS_SOC
+diff --git a/sound/soc/mxs/Makefile b/sound/soc/mxs/Makefile
+new file mode 100644
+index 0000000..565b5b5
+--- /dev/null
++++ b/sound/soc/mxs/Makefile
+@@ -0,0 +1,10 @@
++# MXS Platform Support
++snd-soc-mxs-objs := mxs-saif.o
++snd-soc-mxs-pcm-objs := mxs-pcm.o
++
++obj-$(CONFIG_SND_MXS_SOC) += snd-soc-mxs.o snd-soc-mxs-pcm.o
++
++# i.MX Machine Support
++snd-soc-mxs-sgtl5000-objs := mxs-sgtl5000.o
++
++obj-$(CONFIG_SND_SOC_MXS_SGTL5000) += snd-soc-mxs-sgtl5000.o
+-- 
+1.7.0.4
