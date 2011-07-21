@@ -1,31 +1,31 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Thu, 21 Jul 2011 08:44:20 +0200
-Subject: [PATCH v5 0/4] ASoC: mxs: add audio support
-In-Reply-To: <65EE16ACC360FA4D99C96DC085B3F7721E9B48@039-SN1MPN1-002.039d.mgd.msft.net>
-References: <1311223018-9553-1-git-send-email-b29396@freescale.com>
-	<65EE16ACC360FA4D99C96DC085B3F7721E9B48@039-SN1MPN1-002.039d.mgd.msft.net>
-Message-ID: <20110721064420.GA15571@pengutronix.de>
+From: jhbird.choi@samsung.com (jhbird.choi at samsung.com)
+Date: Thu, 21 Jul 2011 15:33:58 +0900
+Subject: [PATCH] mtd: s3c2410 nand: Remove uncessary null check
+Message-ID: <1311230038-6111-1-git-send-email-jhbird.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Jonghwan Choi <jhbird.choi@samsung.com>
 
-> For the mxs part, it has no changes since v4, do you want me to resend an
-> v5 version?
+clk_get() return a pointer to the struct clk or an ERR_PTR().
 
-Thanks, but not needed. I'll create a branch for Sascha which will also have my
-fixed regulator patch.
+Signed-off-by: Jonghwan Choi <jhbird.choi@samsung.com>
+---
+ drivers/mtd/nand/s3c2410.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Regards,
-
-   Wolfram
-
+diff --git a/drivers/mtd/nand/s3c2410.c b/drivers/mtd/nand/s3c2410.c
+index 4405468..18ff2f5 100644
+--- a/drivers/mtd/nand/s3c2410.c
++++ b/drivers/mtd/nand/s3c2410.c
+@@ -723,7 +723,7 @@ static int s3c24xx_nand_remove(struct platform_device *pdev)
+ 
+ 	/* free the common resources */
+ 
+-	if (info->clk != NULL && !IS_ERR(info->clk)) {
++	if (!IS_ERR(info->clk)) {
+ 		s3c2410_nand_clk_set_state(info, CLOCK_DISABLE);
+ 		clk_put(info->clk);
+ 	}
 -- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110721/f75a2fe8/attachment.sig>
+1.7.0
