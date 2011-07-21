@@ -1,42 +1,80 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 21 Jul 2011 17:13:07 +0100
-Subject: [PATCH 6/9] DMA: PL08x: constify plchan->cd and plat->slave_channels
+Date: Thu, 21 Jul 2011 17:13:28 +0100
+Subject: [PATCH 7/9] DMA: PL08x: cleanup selection of buswidth
 In-Reply-To: <20110721160800.GR26574@n2100.arm.linux.org.uk>
 References: <20110721160800.GR26574@n2100.arm.linux.org.uk>
-Message-ID: <E1Qjvs3-0003MX-I5@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1QjvsO-0003Mb-29@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-We no longer write to the channel data structure, so we can make it
-const throughout the driver.
 
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- include/linux/amba/pl08x.h |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+ drivers/dma/amba-pl08x.c |   34 +++++++++++++++++++---------------
+ 1 files changed, 19 insertions(+), 15 deletions(-)
 
-diff --git a/include/linux/amba/pl08x.h b/include/linux/amba/pl08x.h
-index 47cfe31..e6e28f3 100644
---- a/include/linux/amba/pl08x.h
-+++ b/include/linux/amba/pl08x.h
-@@ -172,7 +172,7 @@ struct pl08x_dma_chan {
- 	int phychan_hold;
- 	struct tasklet_struct tasklet;
- 	char *name;
--	struct pl08x_channel_data *cd;
-+	const struct pl08x_channel_data *cd;
- 	dma_addr_t src_addr;
- 	dma_addr_t dst_addr;
- 	u32 src_cctl;
-@@ -205,7 +205,7 @@ struct pl08x_dma_chan {
-  * @mem_buses: buses which memory can be accessed from: PL08X_AHB1 | PL08X_AHB2
-  */
- struct pl08x_platform_data {
--	struct pl08x_channel_data *slave_channels;
-+	const struct pl08x_channel_data *slave_channels;
- 	unsigned int num_slave_channels;
- 	struct pl08x_channel_data memcpy_channel;
- 	int (*get_signal)(struct pl08x_dma_chan *);
+diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
+index ba617e3f..2dd37ff 100644
+--- a/drivers/dma/amba-pl08x.c
++++ b/drivers/dma/amba-pl08x.c
+@@ -1105,13 +1105,26 @@ static u32 pl08x_cctl(u32 cctl)
+ 	return cctl | PL080_CONTROL_PROT_SYS;
+ }
+ 
++static u32 pl08x_width(enum dma_slave_buswidth width)
++{
++	switch (width) {
++	case DMA_SLAVE_BUSWIDTH_1_BYTE:
++		return PL080_WIDTH_8BIT;
++	case DMA_SLAVE_BUSWIDTH_2_BYTES:
++		return PL080_WIDTH_16BIT;
++	case DMA_SLAVE_BUSWIDTH_4_BYTES:
++		return PL080_WIDTH_32BIT;
++	}
++	return ~0;
++}
++
+ static int dma_set_runtime_config(struct dma_chan *chan,
+ 				  struct dma_slave_config *config)
+ {
+ 	struct pl08x_dma_chan *plchan = to_pl08x_chan(chan);
+ 	struct pl08x_driver_data *pl08x = plchan->host;
+ 	enum dma_slave_buswidth addr_width;
+-	u32 maxburst;
++	u32 width, maxburst;
+ 	u32 cctl = 0;
+ 	int i;
+ 
+@@ -1132,25 +1145,16 @@ static int dma_set_runtime_config(struct dma_chan *chan,
+ 		return -EINVAL;
+ 	}
+ 
+-	switch (addr_width) {
+-	case DMA_SLAVE_BUSWIDTH_1_BYTE:
+-		cctl |= (PL080_WIDTH_8BIT << PL080_CONTROL_SWIDTH_SHIFT) |
+-			(PL080_WIDTH_8BIT << PL080_CONTROL_DWIDTH_SHIFT);
+-		break;
+-	case DMA_SLAVE_BUSWIDTH_2_BYTES:
+-		cctl |= (PL080_WIDTH_16BIT << PL080_CONTROL_SWIDTH_SHIFT) |
+-			(PL080_WIDTH_16BIT << PL080_CONTROL_DWIDTH_SHIFT);
+-		break;
+-	case DMA_SLAVE_BUSWIDTH_4_BYTES:
+-		cctl |= (PL080_WIDTH_32BIT << PL080_CONTROL_SWIDTH_SHIFT) |
+-			(PL080_WIDTH_32BIT << PL080_CONTROL_DWIDTH_SHIFT);
+-		break;
+-	default:
++	width = pl08x_width(addr_width);
++	if (width == ~0) {
+ 		dev_err(&pl08x->adev->dev,
+ 			"bad runtime_config: alien address width\n");
+ 		return -EINVAL;
+ 	}
+ 
++	cctl |= width << PL080_CONTROL_SWIDTH_SHIFT;
++	cctl |= width << PL080_CONTROL_DWIDTH_SHIFT;
++
+ 	/*
+ 	 * Now decide on a maxburst:
+ 	 * If this channel will only request single transfers, set this
 -- 
 1.7.4.4
