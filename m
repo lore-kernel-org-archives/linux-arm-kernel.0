@@ -1,57 +1,48 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 21 Jul 2011 11:37:54 +0900
-Subject: [PATCH] ARM: EXYNOS4: Add more register addresses of CMU.
-In-Reply-To: <1311214291-32151-1-git-send-email-myungjoo.ham@samsung.com>
-References: <000501cc470b$34a32060$9de96120$%kim@samsung.com>
-	<1311214291-32151-1-git-send-email-myungjoo.ham@samsung.com>
-Message-ID: <003901cc474f$377625a0$a66270e0$%kim@samsung.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 20 Jul 2011 22:02:50 -0500
+Subject: [PATCH] ARM: do not mark CPU 0 as hotpluggable
+In-Reply-To: <1311204745-6276-1-git-send-email-mturquette@ti.com>
+References: <1311204745-6276-1-git-send-email-mturquette@ti.com>
+Message-ID: <4E2796DA.80001@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MyungJoo Ham wrote:
+On 07/20/2011 06:32 PM, Mike Turquette wrote:
+> A quick poll of the ARM platforms that implement CPU Hotplug support
+> shows that every platform treats CPU 0 as a special case that cannot be
+> hotplugged.  In fact every platform has identical code for
+> platform_cpu_die which returns -EPERM in the case of CPU 0.
 > 
-> These registers are crucial for PM to work properly.
+> The user-facing sysfs interfaces should reflect this by not populating
+> an 'online' entry for CPU 0 at all.  This better reflects reality by
+> making it clear to users that CPU 0 cannot be hotplugged.
 > 
-> Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> This patch prevents CPU 0 from being marked as hotpluggable on all ARM
+> platforms during CPU registration.  This in turn prevents the creation
+> of an 'online' sysfs interface for that CPU.
+> 
+Unless there is a kernel limitation why CPU0 can't be hot unplugged,
+then this should remain a platform decision. This may be another case of
+everybody just copying other platforms' code, not a platform limitation.
+
+Rob
+
+> Signed-off-by: Mike Turquette <mturquette@ti.com>
 > ---
->  arch/arm/mach-exynos4/include/mach/regs-clock.h |    3 +++
->  1 files changed, 3 insertions(+), 0 deletions(-)
+>  arch/arm/kernel/setup.c |    3 ++-
+>  1 files changed, 2 insertions(+), 1 deletions(-)
 > 
-> diff --git a/arch/arm/mach-exynos4/include/mach/regs-clock.h
-b/arch/arm/mach-
-> exynos4/include/mach/regs-clock.h
-> index 64bdd24..d493fdb 100644
-> --- a/arch/arm/mach-exynos4/include/mach/regs-clock.h
-> +++ b/arch/arm/mach-exynos4/include/mach/regs-clock.h
-> @@ -36,7 +36,9 @@
->  #define S5P_CLKSRC_TOP0			S5P_CLKREG(0x0C210)
->  #define S5P_CLKSRC_TOP1			S5P_CLKREG(0x0C214)
->  #define S5P_CLKSRC_CAM			S5P_CLKREG(0x0C220)
-> +#define S5P_CLKSRC_TV			S5P_CLKREG(0x0C224)
->  #define S5P_CLKSRC_MFC			S5P_CLKREG(0x0C228)
-> +#define S5P_CLKSRC_G3D			S5P_CLKREG(0x0C22C)
->  #define S5P_CLKSRC_IMAGE		S5P_CLKREG(0x0C230)
->  #define S5P_CLKSRC_LCD0			S5P_CLKREG(0x0C234)
->  #define S5P_CLKSRC_LCD1			S5P_CLKREG(0x0C238)
-> @@ -64,6 +66,7 @@
->  #define S5P_CLKDIV_PERIL3		S5P_CLKREG(0x0C55C)
->  #define S5P_CLKDIV_PERIL4		S5P_CLKREG(0x0C560)
->  #define S5P_CLKDIV_PERIL5		S5P_CLKREG(0x0C564)
-> +#define S5P_CLKDIV2_RATIO		S5P_CLKREG(0x0C580)
-> 
->  #define S5P_CLKSRC_MASK_TOP		S5P_CLKREG(0x0C310)
->  #define S5P_CLKSRC_MASK_CAM		S5P_CLKREG(0x0C320)
-> --
-> 1.7.4.1
-
-Thanks for your updating.
-
-Applied with your 'ARM: EXYNOS4: Add more registers to be saved and restored
-for PM'.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> index ed11fb0..a5fc969 100644
+> --- a/arch/arm/kernel/setup.c
+> +++ b/arch/arm/kernel/setup.c
+> @@ -940,7 +940,8 @@ static int __init topology_init(void)
+>  
+>  	for_each_possible_cpu(cpu) {
+>  		struct cpuinfo_arm *cpuinfo = &per_cpu(cpu_data, cpu);
+> -		cpuinfo->cpu.hotpluggable = 1;
+> +		if (cpu)
+> +			cpuinfo->cpu.hotpluggable = 1;
+>  		register_cpu(&cpuinfo->cpu, cpu);
+>  	}
+>  
