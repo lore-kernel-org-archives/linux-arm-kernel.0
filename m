@@ -1,46 +1,52 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Thu, 21 Jul 2011 21:44:12 +0200
-Subject: [PATCH] iMX28: Fix emi_ddr_open pinmux
-In-Reply-To: <20110721190536.GC16561@pengutronix.de>
-References: <1311264490-5485-1-git-send-email-marek.vasut@gmail.com>
-	<20110721190536.GC16561@pengutronix.de>
-Message-ID: <201107212144.12410.marek.vasut@gmail.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Thu, 21 Jul 2011 12:57:09 -0700
+Subject: [PATCH 1/2] ARM: Tegra: Seaboard board updates for audio
+In-Reply-To: <CAMbhsRQuzO2EW33vFGcDM+=bKLkfEY6WLn_dr7Q7o7uOekA0gA@mail.gmail.com>
+References: <1310594272-8229-1-git-send-email-swarren@nvidia.com>
+	<CAOesGMjiakgvs8wcu8zRkuA9mxD5Z=S-hV3HNgqFC49pEGVADw@mail.gmail.com>
+	<74CDBE0F657A3D45AFBB94109FB122FF049EBDF13E@HQMAIL01.nvidia.com>
+	<CAMbhsRQuzO2EW33vFGcDM+=bKLkfEY6WLn_dr7Q7o7uOekA0gA@mail.gmail.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF049EBDF249@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, July 21, 2011 09:05:36 PM Uwe Kleine-K?nig wrote:
-> On Thu, Jul 21, 2011 at 06:08:10PM +0200, Marek Vasut wrote:
-> > Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
-> > ---
-> > 
-> >  arch/arm/mach-mxs/include/mach/iomux-mx28.h |    2 +-
-> >  1 files changed, 1 insertions(+), 1 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-mxs/include/mach/iomux-mx28.h
-> > b/arch/arm/mach-mxs/include/mach/iomux-mx28.h index f50fefd..1a95ecd
-> > 100644
-> > --- a/arch/arm/mach-mxs/include/mach/iomux-mx28.h
-> > +++ b/arch/arm/mach-mxs/include/mach/iomux-mx28.h
-> > @@ -203,7 +203,7 @@
-> > 
-> >  #define MX28_PAD_EMI_WEN__EMI_WEN			MXS_IOMUX_PAD_NAKED(6, 21,
-> >  PAD_MUXSEL_0) #define
-> >  MX28_PAD_EMI_CE0N__EMI_CE0N			MXS_IOMUX_PAD_NAKED(6, 22, 
-PAD_MUXSEL_0)
-> >  #define MX28_PAD_EMI_CE1N__EMI_CE1N			MXS_IOMUX_PAD_NAKED(6, 23,
-> >  PAD_MUXSEL_0)
-> > 
-> > -#define MX28_PAD_EMI_CKE__EMI_CKE			MXS_IOMUX_PAD_NAKED(6, 24,
-> > PAD_MUXSEL_0) +#define
-> > MX28_PAD_EMI_CKE__EMI_CKE			MXS_IOMUX_PAD_NAKED(6, 26, 
-PAD_MUXSEL_0)
+Colin Cross wrote at Thursday, July 21, 2011 12:48 PM:
+> On Thu, Jul 21, 2011 at 8:37 AM, Stephen Warren <swarren@nvidia.com> wrote:
+...
+> > Colin,
+> >
+> > Do you want me to ask Arnd to pick these patches up directly, or do you
+> > want to apply them to the Tegra for-next tree, and have Arnd pull them?
 > 
-> In my version of the i.MX28 Reference Manual (Rev. 1, 2010) pin24 is
-> correct. So if you're still convinced that 26 is correct you should point
-> out in the commit log that the Reference Manual is wrong and why you're
-> convinced it really is.
+> Normally I would want them to go through me so I have a chance to deal
+> with conflicts before it hits the arm-soc tree, but since Arnd has
+> already taken some patches for this release cycle, they might as well
+> go directly to him.
 
-Scrap this, you're right.
-> 
-> Best regards
-> Uwe
+Arnd,
+
+Per Colin's note above, can you please pick up the patches below into
+arm-soc.git. Let me know if you need me to repost them so you have a
+good copy. These are probably appropriate for your tegra/devel branch,
+although they're actually based on a merge of linux-next and Tegra's
+for-next from a week ago.
+
+Both Acked-by Olof already:
+
+[PATCH 1/2] ARM: Tegra: Seaboard board updates for audio
+http://www.spinics.net/lists/arm-kernel/msg133180.html
+
+[PATCH 2/2] ARM: Tegra: Seaboard: Add USB devices
+http://www.spinics.net/lists/arm-kernel/msg133181.html
+
+Not yet Acked-by anyone (Colin, Olof, could you please oblige; thanks):
+
+[PATCH 2/2] ARM: Tegra: Harmony: Add USB device
+http://www.spinics.net/lists/arm-kernel/msg133175.html
+(don't pick up patch 1 of this series; there's discussion on how to handle
+that better)
+
+Thanks very much!
+
+-- 
+nvpublic
