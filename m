@@ -1,38 +1,36 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 21 Jul 2011 16:28:38 +0100
-Subject: [PATCH V4 03-1/13] DMA: PL330: Support DMA_SLAVE_CONFIG command
-In-Reply-To: <CABb+yY2wTj5i-koQhD+dqNWaL4TvUYk1XP3YT0jE3oDZT57U4g@mail.gmail.com>
-References: <1311158773-30314-1-git-send-email-boojin.kim@samsung.com>
-	<1311158773-30314-3-git-send-email-boojin.kim@samsung.com>
-	<CABb+yY2_XKyCr2mEzqd0bCYJk3U7+sg8Xz4b4ma2KB1BconYOw@mail.gmail.com>
-	<20110721081138.GL26574@n2100.arm.linux.org.uk>
-	<CABb+yY2obv5JMBiRSXS-4tSCYX+7nVVaA0Q7gurA+NndrGVuvA@mail.gmail.com>
-	<CACRpkdaP5D=URqAXAytm9s2e9HRVMB-MzsKZeLJ9v6ktkJUCRA@mail.gmail.com>
-	<CABb+yY2wTj5i-koQhD+dqNWaL4TvUYk1XP3YT0jE3oDZT57U4g@mail.gmail.com>
-Message-ID: <20110721152838.GF28942@n2100.arm.linux.org.uk>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 21 Jul 2011 08:30:29 -0700
+Subject: [PATCHV3 2/4] OMAP: I2C: Remove the reset in the init path
+In-Reply-To: <1311256381-25548-3-git-send-email-shubhrajyoti@ti.com>
+	(Shubhrajyoti D.'s message of "Thu, 21 Jul 2011 19:22:59 +0530")
+References: <1311256381-25548-1-git-send-email-shubhrajyoti@ti.com>
+	<1311256381-25548-3-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <87hb6fabxm.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 21, 2011 at 07:58:03PM +0530, Jassi Brar wrote:
-> While that does make sense, it makes mandatory the ritual of calling
-> DMA_SLAVE_CONFIG mandatory for most of the cases.
-> And I think the effort to set fifo_addr for peripherals is overrated.
+Shubhrajyoti D <shubhrajyoti@ti.com> writes:
 
-You have to do that anyway.  You're dealing with DMA engine drivers which
-you don't know the implementation details of.
+> The reset in the driver at init is not needed
+> anymore as the hwmod framework takes care of
+> reseting it.
 
-Think about it for a moment, please.  The point of the DMA engine
-abstraction is to make DMA users independent of the DMA engine actually
-being used.
+Agreed, but...
 
-That means all DMA engine drivers and all DMA engine users have to
-provide a basic set of information to allow them to interact with each
-other.
+The addition of the new places for reset (after timeout, after error) is
+not immediately clear, and not described here at all.
 
-Encoding random bits of information into inappropriate places like FIFO
-addresses into DMA engine platform data just means you might was well
-stay with your private API, because that driver may never be able to
-work with another DMA engine implementation.
+After digging myself (since it wasn't described in the changelog), I see
+that since the reset was removed from omap_i2c_init(), which was called
+not only during probe, but also after time out and error handling, new
+reset calls were added back in those locations.
 
-So please, either do the job properly, or don't waste peoples time with
-a half hearted mess of inappropriate platform data.
+This is the kind of thing that needs to be thoroughly described in the
+changelog so reviewers who are not necessarily experts in this driver
+will easily and *quickly* understand what is going on without having to
+dig into all the details themselves.
+
+Summary: Descriptive, detailed changelogs are invaluable to
+reviewers/maintainers.
+
+Kevin
