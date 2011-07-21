@@ -1,92 +1,46 @@
-From: ccross@android.com (Colin Cross)
-Date: Thu, 21 Jul 2011 12:06:07 -0700
-Subject: [PATCH 03/17] ARM: gic: Use cpu pm notifiers to save gic state
-In-Reply-To: <4E2803A1.7000908@ti.com>
-References: <1310053830-23779-1-git-send-email-lorenzo.pieralisi@arm.com>
-	<1310053830-23779-4-git-send-email-lorenzo.pieralisi@arm.com>
-	<4E27E40C.6020006@ti.com>
-	<20110721102736.GA3087@e102568-lin.cambridge.arm.com>
-	<4E2803A1.7000908@ti.com>
-Message-ID: <CAMbhsRRT58vJWJ0ACSp_NJsvQJqzeBUKDD5bGGWM6tYh-zTxJQ@mail.gmail.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Thu, 21 Jul 2011 21:44:12 +0200
+Subject: [PATCH] iMX28: Fix emi_ddr_open pinmux
+In-Reply-To: <20110721190536.GC16561@pengutronix.de>
+References: <1311264490-5485-1-git-send-email-marek.vasut@gmail.com>
+	<20110721190536.GC16561@pengutronix.de>
+Message-ID: <201107212144.12410.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 21, 2011 at 3:46 AM, Santosh Shilimkar
-<santosh.shilimkar@ti.com> wrote:
-> On 7/21/2011 3:57 PM, Lorenzo Pieralisi wrote:
->>
->> On Thu, Jul 21, 2011 at 09:32:12AM +0100, Santosh Shilimkar wrote:
->>>
->>> Lorenzo, Colin,
->>>
->>> On 7/7/2011 9:20 PM, Lorenzo Pieralisi wrote:
->>>>
->>>> From: Colin Cross<ccross@android.com>
->>>>
->>>> When the cpu is powered down in a low power mode, the gic cpu
->>>> interface may be reset, and when the cpu complex is powered
->>>> down, the gic distributor may also be reset.
->>>>
->>>> This patch uses CPU_PM_ENTER and CPU_PM_EXIT notifiers to save
->>>> and restore the gic cpu interface registers, and the
->>>> CPU_COMPLEX_PM_ENTER and CPU_COMPLEX_PM_EXIT notifiers to save
->>>> and restore the gic distributor registers.
->>>>
->>>> Signed-off-by: Colin Cross<ccross@android.com>
->>>> ---
->>>> ? arch/arm/common/gic.c | ?212
->>>> +++++++++++++++++++++++++++++++++++++++++++++++++
->>>> ? 1 files changed, 212 insertions(+), 0 deletions(-)
->>>>
->>>> diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
->>>> index 4ddd0a6..8d62e07 100644
->>>> --- a/arch/arm/common/gic.c
->>>> +++ b/arch/arm/common/gic.c
->>>
->>> [...]
->>>
->>> I missed one more comment in the last review.
->>>
->>>> +static int gic_notifier(struct notifier_block *self, unsigned long cmd,
->>>> ? ? ? ?void *v)
->>>> +{
->>>> + ? ? ? int i;
->>>> +
->>>> + ? ? ? for (i = 0; i< ? MAX_GIC_NR; i++) {
->>>> + ? ? ? ? ? ? ? switch (cmd) {
->>>> + ? ? ? ? ? ? ? case CPU_PM_ENTER:
->>>> + ? ? ? ? ? ? ? ? ? ? ? gic_cpu_save(i);
->>>
->>> On OMAP, GIC cpu interface context is lost only when CPU cluster
->>> is powered down.
->>
->> Yes, it's true, but that's the only chance we have to save the GIC CPU IF
->> state if the GIC context is lost, right ?
->> It is a private memory map per processor; I agree, it might be useless
->> if just one CPU is shutdown, but at that point in time you do not know
->> the state of other CPUs. If the cluster moves to a state where GIC context
->> is lost at least you had the GIC CPU IF state saved. If we do not
->> save it, well, there is no way to do that anymore since the last CPU
->> cannot
->> access other CPUs GIC CPU IF registers (or better, banked GIC distributor
->> registers).
->> If you force hotplug on CPUs other than 0 (that's the way it is done on
->> OMAP4
->> in cpuidle, right ?) to hit deep low-power states you reinit the GIC CPU
->> IF
->> state as per cold boot, so yes, it is useless there.
->>
-> Actually, on OMAP there is no need to save any CPU interface registers.
->
-> For my OMAP4 PM rebasing, for time-being I will go with exported
-> GIC functions so that I don't have too many redundancies with GIC
-> save/restore code.
+On Thursday, July 21, 2011 09:05:36 PM Uwe Kleine-K?nig wrote:
+> On Thu, Jul 21, 2011 at 06:08:10PM +0200, Marek Vasut wrote:
+> > Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+> > ---
+> > 
+> >  arch/arm/mach-mxs/include/mach/iomux-mx28.h |    2 +-
+> >  1 files changed, 1 insertions(+), 1 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-mxs/include/mach/iomux-mx28.h
+> > b/arch/arm/mach-mxs/include/mach/iomux-mx28.h index f50fefd..1a95ecd
+> > 100644
+> > --- a/arch/arm/mach-mxs/include/mach/iomux-mx28.h
+> > +++ b/arch/arm/mach-mxs/include/mach/iomux-mx28.h
+> > @@ -203,7 +203,7 @@
+> > 
+> >  #define MX28_PAD_EMI_WEN__EMI_WEN			MXS_IOMUX_PAD_NAKED(6, 21,
+> >  PAD_MUXSEL_0) #define
+> >  MX28_PAD_EMI_CE0N__EMI_CE0N			MXS_IOMUX_PAD_NAKED(6, 22, 
+PAD_MUXSEL_0)
+> >  #define MX28_PAD_EMI_CE1N__EMI_CE1N			MXS_IOMUX_PAD_NAKED(6, 23,
+> >  PAD_MUXSEL_0)
+> > 
+> > -#define MX28_PAD_EMI_CKE__EMI_CKE			MXS_IOMUX_PAD_NAKED(6, 24,
+> > PAD_MUXSEL_0) +#define
+> > MX28_PAD_EMI_CKE__EMI_CKE			MXS_IOMUX_PAD_NAKED(6, 26, 
+PAD_MUXSEL_0)
+> 
+> In my version of the i.MX28 Reference Manual (Rev. 1, 2010) pin24 is
+> correct. So if you're still convinced that 26 is correct you should point
+> out in the commit log that the Reference Manual is wrong and why you're
+> convinced it really is.
 
-I think you should try to balance cpu idle latency with reuse of
-common code.  In this case, you are avoiding restoring 7 registers by
-reimplementing the bare minimum that is necessary for OMAP4, which is
-unlikely to make a measurable impact on wakeup latency.  Can you try
-starting with reusing all the common code, and add some timestamps
-during wakeup to measure where the longest delays are, to determine
-where you should diverge from the common code and use omap-optimized
-code?
+Scrap this, you're right.
+> 
+> Best regards
+> Uwe
