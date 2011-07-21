@@ -1,95 +1,74 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 21 Jul 2011 12:23:23 +0200
-Subject: [PATCH V4 03-1/13] DMA: PL330: Support DMA_SLAVE_CONFIG command
-In-Reply-To: <CABb+yY2obv5JMBiRSXS-4tSCYX+7nVVaA0Q7gurA+NndrGVuvA@mail.gmail.com>
-References: <1311158773-30314-1-git-send-email-boojin.kim@samsung.com>
-	<1311158773-30314-3-git-send-email-boojin.kim@samsung.com>
-	<CABb+yY2_XKyCr2mEzqd0bCYJk3U7+sg8Xz4b4ma2KB1BconYOw@mail.gmail.com>
-	<20110721081138.GL26574@n2100.arm.linux.org.uk>
-	<CABb+yY2obv5JMBiRSXS-4tSCYX+7nVVaA0Q7gurA+NndrGVuvA@mail.gmail.com>
-Message-ID: <CACRpkdaP5D=URqAXAytm9s2e9HRVMB-MzsKZeLJ9v6ktkJUCRA@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 21 Jul 2011 16:16:57 +0530
+Subject: [PATCH 03/17] ARM: gic: Use cpu pm notifiers to save gic state
+In-Reply-To: <20110721102736.GA3087@e102568-lin.cambridge.arm.com>
+References: <1310053830-23779-1-git-send-email-lorenzo.pieralisi@arm.com>
+	<1310053830-23779-4-git-send-email-lorenzo.pieralisi@arm.com>
+	<4E27E40C.6020006@ti.com>
+	<20110721102736.GA3087@e102568-lin.cambridge.arm.com>
+Message-ID: <4E2803A1.7000908@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 21, 2011 at 11:14 AM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
-> On Thu, Jul 21, 2011 at 1:41 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
->> On Thu, Jul 21, 2011 at 12:47:49AM +0530, Jassi Brar wrote:
->>> PL330 has fixed channels to peripherals.
->>> So FIFO addresses(burst_sz too?) should already be set via platform data.
->>> Client drivers shouldn't bother.
+On 7/21/2011 3:57 PM, Lorenzo Pieralisi wrote:
+> On Thu, Jul 21, 2011 at 09:32:12AM +0100, Santosh Shilimkar wrote:
+>> Lorenzo, Colin,
 >>
->> That's utter crap, and isn't what the DMA engine API is about.
+>> On 7/7/2011 9:20 PM, Lorenzo Pieralisi wrote:
+>>> From: Colin Cross<ccross@android.com>
+>>>
+>>> When the cpu is powered down in a low power mode, the gic cpu
+>>> interface may be reset, and when the cpu complex is powered
+>>> down, the gic distributor may also be reset.
+>>>
+>>> This patch uses CPU_PM_ENTER and CPU_PM_EXIT notifiers to save
+>>> and restore the gic cpu interface registers, and the
+>>> CPU_COMPLEX_PM_ENTER and CPU_COMPLEX_PM_EXIT notifiers to save
+>>> and restore the gic distributor registers.
+>>>
+>>> Signed-off-by: Colin Cross<ccross@android.com>
+>>> ---
+>>>    arch/arm/common/gic.c |  212 +++++++++++++++++++++++++++++++++++++++++++++++++
+>>>    1 files changed, 212 insertions(+), 0 deletions(-)
+>>>
+>>> diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+>>> index 4ddd0a6..8d62e07 100644
+>>> --- a/arch/arm/common/gic.c
+>>> +++ b/arch/arm/common/gic.c
 >>
->> The above looks correctly implemented. ?Slave DMA engine users are
->> supposed to supply the device DMA register address via this
->> DMA_SLAVE_CONFIG call. ?Doing this via platform data for the DMA
->> device is braindead.
+>> [...]
+>>
+>> I missed one more comment in the last review.
+>>
+>>> +static int gic_notifier(struct notifier_block *self, unsigned long cmd,	void *v)
+>>> +{
+>>> +	int i;
+>>> +
+>>> +	for (i = 0; i<   MAX_GIC_NR; i++) {
+>>> +		switch (cmd) {
+>>> +		case CPU_PM_ENTER:
+>>> +			gic_cpu_save(i);
+>> On OMAP, GIC cpu interface context is lost only when CPU cluster
+>> is powered down.
 >
-> Rather than have 32 client drivers expect fifo_address from the
-> platform and then
-> provide to the DMAC, IMHO it is better for a single driver(DMAC) to
-> get 32 addresses
-> from the platform.
-
-My idea (when I implemented it) is that the device driver knows the
-physical and virtual base and thus the address where DMA data is
-destined. It knows all other registers, it remaps them, noone else should
-be bothered with containing the knowledge of adress ranges for the
-specific hardware block.
-
-Passing this through platform data requires the machine to keep track
-not only of the base adress of the peripheral (as is generally contained
-in the machine or device tree) but also the offset of specific registers
-in that memory region, which is too much.
-
-Usually this means the offsets are defined in files like <mach/perfoo.h>
-which means they can't be pushed down into drivers/foo/foo.c and
-creates unnecessary bindings and de-encapsulation of the driver.
-We want to get rid of such stuff. (I think?)
-
-Therefore I introduced this to confine the different registers into
-the driver itself and ask the DMA engine to transfer to a specific
-address.
-
-> Esp when the DMAC driver already expect similar h/w
-> parameter -- *direction*.
+> Yes, it's true, but that's the only chance we have to save the GIC CPU IF
+> state if the GIC context is lost, right ?
+> It is a private memory map per processor; I agree, it might be useless
+> if just one CPU is shutdown, but at that point in time you do not know
+> the state of other CPUs. If the cluster moves to a state where GIC context
+> is lost at least you had the GIC CPU IF state saved. If we do not
+> save it, well, there is no way to do that anymore since the last CPU cannot
+> access other CPUs GIC CPU IF registers (or better, banked GIC distributor
+> registers).
+> If you force hotplug on CPUs other than 0 (that's the way it is done on OMAP4
+> in cpuidle, right ?) to hit deep low-power states you reinit the GIC CPU IF
+> state as per cold boot, so yes, it is useless there.
 >
-> I don't understand why is 'fifo_address' a property much different
-> than 'direction' of the
-> channel ?
+Actually, on OMAP there is no need to save any CPU interface registers.
 
-struct dma_slave_config {
-        enum dma_data_direction direction;
-        dma_addr_t src_addr;
-        dma_addr_t dst_addr;
-        enum dma_slave_buswidth src_addr_width;
-        enum dma_slave_buswidth dst_addr_width;
-        u32 src_maxburst;
-        u32 dst_maxburst;
-};
+For my OMAP4 PM rebasing, for time-being I will go with exported
+GIC functions so that I don't have too many redundancies with GIC
+save/restore code.
 
-We do support changing direction as well as src and dst address
-(i.e. FIFO endpoint) at runtime.
-
-Check drivers/mmc/host/mmci.c for an example of how we switch
-a single channel from TX to RX in runtime using this one property.
-
-However it has been noted by Russell that the direction member
-is unnecessary since the device_prep_slave_sg() function in the
-dmaengine vtable already takes a direction argument like this:
-
-        struct dma_async_tx_descriptor *(*device_prep_slave_sg)(
-                struct dma_chan *chan, struct scatterlist *sgl,
-                unsigned int sg_len, enum dma_data_direction direction,
-                unsigned long flags);
-
-Therefore the direction setting needs to go from either the config
-struct or the device_prep_slave_sg() call, as right now the channel
-is being told about the direction twice which is not elegant and
-confusing.
-
-So you even have two ways of changing direction at runtime...
-
-Yours,
-Linus Walleij
+Regards
+Santosh
