@@ -1,109 +1,38 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 21 Jul 2011 16:25:35 +0100
-Subject: [PATCH 4/4] ARM: CPU hotplug: ensure we migrate all IRQs off a
-	downed CPU
-In-Reply-To: <20110721151413.GD28942@n2100.arm.linux.org.uk>
-References: <20110721151413.GD28942@n2100.arm.linux.org.uk>
-Message-ID: <E1Qjv83-0003Ie-Ui@rmk-PC.arm.linux.org.uk>
+Date: Thu, 21 Jul 2011 16:28:38 +0100
+Subject: [PATCH V4 03-1/13] DMA: PL330: Support DMA_SLAVE_CONFIG command
+In-Reply-To: <CABb+yY2wTj5i-koQhD+dqNWaL4TvUYk1XP3YT0jE3oDZT57U4g@mail.gmail.com>
+References: <1311158773-30314-1-git-send-email-boojin.kim@samsung.com>
+	<1311158773-30314-3-git-send-email-boojin.kim@samsung.com>
+	<CABb+yY2_XKyCr2mEzqd0bCYJk3U7+sg8Xz4b4ma2KB1BconYOw@mail.gmail.com>
+	<20110721081138.GL26574@n2100.arm.linux.org.uk>
+	<CABb+yY2obv5JMBiRSXS-4tSCYX+7nVVaA0Q7gurA+NndrGVuvA@mail.gmail.com>
+	<CACRpkdaP5D=URqAXAytm9s2e9HRVMB-MzsKZeLJ9v6ktkJUCRA@mail.gmail.com>
+	<CABb+yY2wTj5i-koQhD+dqNWaL4TvUYk1XP3YT0jE3oDZT57U4g@mail.gmail.com>
+Message-ID: <20110721152838.GF28942@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Our selection of interrupts to consider for IRQ migration is sub-
-standard.  We were potentially including per-CPU interrupts in our
-migration strategy, but omitting chained interrupts.  This caused
-some interrupts to remain on a downed CPU.
+On Thu, Jul 21, 2011 at 07:58:03PM +0530, Jassi Brar wrote:
+> While that does make sense, it makes mandatory the ritual of calling
+> DMA_SLAVE_CONFIG mandatory for most of the cases.
+> And I think the effort to set fifo_addr for peripherals is overrated.
 
-We were also trying to migrate interrupts which were not migratable,
-resulting in an OOPS.
+You have to do that anyway.  You're dealing with DMA engine drivers which
+you don't know the implementation details of.
 
-Instead, iterate over all interrupts, skipping per-CPU interrupts
-or interrupts whose affinity does not include the downed CPU, and
-attempt to set the affinity for every one else if their chip
-implements irq_set_affinity().
+Think about it for a moment, please.  The point of the DMA engine
+abstraction is to make DMA users independent of the DMA engine actually
+being used.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/kernel/irq.c |   39 ++++++++++++++++++++++++++++-----------
- 1 files changed, 28 insertions(+), 11 deletions(-)
+That means all DMA engine drivers and all DMA engine users have to
+provide a basic set of information to allow them to interact with each
+other.
 
-diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
-index ab63c05..0f928a1 100644
---- a/arch/arm/kernel/irq.c
-+++ b/arch/arm/kernel/irq.c
-@@ -131,46 +131,63 @@ int __init arch_probe_nr_irqs(void)
- 
- #ifdef CONFIG_HOTPLUG_CPU
- 
--static bool migrate_one_irq(struct irq_data *d)
-+static bool migrate_one_irq(struct irq_desc *desc)
- {
-+	struct irq_data *d = irq_desc_get_irq_data(desc);
- 	const struct cpumask *affinity = d->affinity;
-+	struct irq_chip *c;
- 	bool ret = false;
- 
-+	/*
-+	 * If this is a per-CPU interrupt, or the affinity does not
-+	 * include this CPU, then we have nothing to do.
-+	 */
-+	if (irqd_is_per_cpu(d) || !cpumask_test_cpu(smp_processor_id(), affinity))
-+		return false;
-+
- 	if (cpumask_any_and(affinity, cpu_online_mask) >= nr_cpu_ids) {
--		affinity cpu_online_mask;
-+		affinity = cpu_online_mask;
- 		ret = true;
- 	}
- 
--	d->chip->irq_set_affinity(d, affinity, true);
-+	c = irq_data_get_irq_chip(d);
-+	if (c->irq_set_affinity)
-+		c->irq_set_affinity(d, affinity, true);
-+	else
-+		pr_debug("IRQ%u: unable to set affinity\n", d->irq);
- 
- 	return ret;
- }
- 
- /*
-- * The CPU has been marked offline.  Migrate IRQs off this CPU.  If
-- * the affinity settings do not allow other CPUs, force them onto any
-+ * The current CPU has been marked offline.  Migrate IRQs off this CPU.
-+ * If the affinity settings do not allow other CPUs, force them onto any
-  * available CPU.
-+ *
-+ * Note: we must iterate over all IRQs, whether they have an attached
-+ * action structure or not, as we need to get chained interrupts too.
-  */
- void migrate_irqs(void)
- {
--	unsigned int i, cpu = smp_processor_id();
-+	unsigned int i;
- 	struct irq_desc *desc;
- 	unsigned long flags;
- 
- 	local_irq_save(flags);
- 
- 	for_each_irq_desc(i, desc) {
--		struct irq_data *d = &desc->irq_data;
- 		bool affinity_broken = false;
- 
-+		if (!desc)
-+			continue;
-+
- 		raw_spin_lock(&desc->lock);
--		if (desc->action != NULL &&
--		    cpumask_test_cpu(smp_processor_id(), d->affinity))
--			affinity_broken = migrate_one_irq(d);
-+		affinity_broken = migrate_one_irq(desc);
- 		raw_spin_unlock(&desc->lock);
- 
- 		if (affinity_broken && printk_ratelimit())
--			pr_warning("IRQ%u no longer affine to CPU%u\n", i, cpu);
-+			pr_warning("IRQ%u no longer affine to CPU%u\n", i,
-+				smp_processor_id());
- 	}
- 
- 	local_irq_restore(flags);
--- 
-1.7.4.4
+Encoding random bits of information into inappropriate places like FIFO
+addresses into DMA engine platform data just means you might was well
+stay with your private API, because that driver may never be able to
+work with another DMA engine implementation.
+
+So please, either do the job properly, or don't waste peoples time with
+a half hearted mess of inappropriate platform data.
