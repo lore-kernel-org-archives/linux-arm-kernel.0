@@ -1,34 +1,35 @@
-From: notasas@gmail.com (Grazvydas Ignotas)
-Date: Fri, 22 Jul 2011 16:15:27 +0300
-Subject: [PATCH] OMAP: omap_device: replace pr_* prints with dev_*
-In-Reply-To: <1311269976-4035-1-git-send-email-khilman@ti.com>
-References: <1311269976-4035-1-git-send-email-khilman@ti.com>
-Message-ID: <CANOLnOOAJMyHUjrf_cM2LVSAs6Zm2bK3RWK73ibNcVg=7vQP4w@mail.gmail.com>
+From: mikpe@it.uu.se (Mikael Pettersson)
+Date: Fri, 22 Jul 2011 14:43:47 +0200
+Subject: [PATCH 3.0] fix compile warnings in plat-iop/cp6.c
+Message-ID: <20009.28803.497535.598471@pilspetsen.it.uu.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 21, 2011 at 8:39 PM, Kevin Hilman <khilman@ti.com> wrote:
-> ? ? ? ? ? ? ? ?if (act_lat > odpl->activate_lat) {
-> ? ? ? ? ? ? ? ? ? ? ? ?odpl->activate_lat_worst = act_lat;
-> ? ? ? ? ? ? ? ? ? ? ? ?if (odpl->flags & OMAP_DEVICE_LATENCY_AUTO_ADJUST) {
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?odpl->activate_lat = act_lat;
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? pr_warning("omap_device: %s.%d: new worst case "
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?"activate latency %d: %llu\n",
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?od->pdev.name, od->pdev.id,
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?od->pm_lat_level, act_lat);
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? dev_warn(&od->pdev.dev,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?"new worst case activate latency "
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?"%d: %llu\n",
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?od->pm_lat_level, act_lat);
+Building 3.0 for an n2100 (plat-iop) results in:
 
-I wonder why these have to be warnings, I get quite a lot of them and
-find them rather annoying. Or is my hardware broken or something?
+In file included from arch/arm/plat-iop/cp6.c:20:
+/tmp/linux-3.0/arch/arm/include/asm/traps.h:12: warning: 'struct pt_regs' declared inside parameter list
+/tmp/linux-3.0/arch/arm/include/asm/traps.h:12: warning: its scope is only this definition or declaration, which is probably not what you want
+/tmp/linux-3.0/arch/arm/include/asm/traps.h:48: warning: 'struct pt_regs' declared inside parameter list
+/tmp/linux-3.0/arch/arm/include/asm/traps.h:48: warning: 'struct task_struct' declared inside parameter list
+arch/arm/plat-iop/cp6.c:45: warning: initialization from incompatible pointer type
 
-I know other people are disabling this in their trees too:
-http://www.sakoman.com/cgi-bin/gitweb.cgi?p=linux-omap-2.6.git;a=commitdiff;h=145cf9a7d4ba7c260df7071a28ef40c6a481b6df
+The pt_regs and incompatible pointer type warnings are fixed by including
+<asm/ptrace.h> before <asm/traps.h>.  Nothing here depends on task_struct,
+so that warning can be fixed by a forward struct declaration.
 
-
-
-
--- 
-Gra?vydas
+Signed-off-by: Mikael Pettersson <mikpe@it.uu.se>
+---
+--- linux-3.0/arch/arm/plat-iop/cp6.c.~1~	2011-07-22 12:01:07.000000000 +0200
++++ linux-3.0/arch/arm/plat-iop/cp6.c	2011-07-22 14:26:51.000000000 +0200
+@@ -17,8 +17,9 @@
+  *
+  */
+ #include <linux/init.h>
+-#include <asm/traps.h>
+ #include <asm/ptrace.h>
++struct task_struct;
++#include <asm/traps.h>
+ 
+ static int cp6_trap(struct pt_regs *regs, unsigned int instr)
+ {
