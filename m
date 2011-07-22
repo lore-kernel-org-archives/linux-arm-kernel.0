@@ -1,115 +1,49 @@
-From: ccross@android.com (Colin Cross)
-Date: Thu, 21 Jul 2011 22:21:26 -0700
-Subject: [PATCH 03/17] ARM: gic: Use cpu pm notifiers to save gic state
-In-Reply-To: <4E290663.30403@ti.com>
-References: <1310053830-23779-1-git-send-email-lorenzo.pieralisi@arm.com>
-	<1310053830-23779-4-git-send-email-lorenzo.pieralisi@arm.com>
-	<4E27E40C.6020006@ti.com>
-	<20110721102736.GA3087@e102568-lin.cambridge.arm.com>
-	<4E2803A1.7000908@ti.com>
-	<CAMbhsRRT58vJWJ0ACSp_NJsvQJqzeBUKDD5bGGWM6tYh-zTxJQ@mail.gmail.com>
-	<4E290663.30403@ti.com>
-Message-ID: <CAMbhsRQX+faGH9xPZPQKrtq5=Rb8JhRLo0ibJ1cOfTHrLRjw9A@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 22 Jul 2011 11:05:01 +0530
+Subject: [PATCH 0/4] Fix CPU hotplug IRQ migration
+In-Reply-To: <20110721151413.GD28942@n2100.arm.linux.org.uk>
+References: <20110721151413.GD28942@n2100.arm.linux.org.uk>
+Message-ID: <4E290C05.7020209@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 21, 2011 at 10:10 PM, Santosh Shilimkar
-<santosh.shilimkar@ti.com> wrote:
-> On 7/22/2011 12:36 AM, Colin Cross wrote:
->>
->> On Thu, Jul 21, 2011 at 3:46 AM, Santosh Shilimkar
->> <santosh.shilimkar@ti.com> ?wrote:
->>>
->>> On 7/21/2011 3:57 PM, Lorenzo Pieralisi wrote:
->>>>
->>>> On Thu, Jul 21, 2011 at 09:32:12AM +0100, Santosh Shilimkar wrote:
->>>>>
->>>>> Lorenzo, Colin,
->>>>>
->>>>> On 7/7/2011 9:20 PM, Lorenzo Pieralisi wrote:
->>>>>>
->>>>>> From: Colin Cross<ccross@android.com>
->>>>>>
->>>>>> When the cpu is powered down in a low power mode, the gic cpu
->>>>>> interface may be reset, and when the cpu complex is powered
->>>>>> down, the gic distributor may also be reset.
->>>>>>
->>>>>> This patch uses CPU_PM_ENTER and CPU_PM_EXIT notifiers to save
->>>>>> and restore the gic cpu interface registers, and the
->>>>>> CPU_COMPLEX_PM_ENTER and CPU_COMPLEX_PM_EXIT notifiers to save
->>>>>> and restore the gic distributor registers.
->>>>>>
->>>>>> Signed-off-by: Colin Cross<ccross@android.com>
->>>>>> ---
->>>>>> ? arch/arm/common/gic.c | ?212
->>>>>> +++++++++++++++++++++++++++++++++++++++++++++++++
->>>>>> ? 1 files changed, 212 insertions(+), 0 deletions(-)
->>>>>>
->>>>>> diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
->>>>>> index 4ddd0a6..8d62e07 100644
->>>>>> --- a/arch/arm/common/gic.c
->>>>>> +++ b/arch/arm/common/gic.c
->>>>>
->>>>> [...]
->>>>>
->>>>> I missed one more comment in the last review.
->>>>>
->>>>>> +static int gic_notifier(struct notifier_block *self, unsigned long
->>>>>> cmd,
->>>>>> ? ? ? ?void *v)
->>>>>> +{
->>>>>> + ? ? ? int i;
->>>>>> +
->>>>>> + ? ? ? for (i = 0; i< ? ? MAX_GIC_NR; i++) {
->>>>>> + ? ? ? ? ? ? ? switch (cmd) {
->>>>>> + ? ? ? ? ? ? ? case CPU_PM_ENTER:
->>>>>> + ? ? ? ? ? ? ? ? ? ? ? gic_cpu_save(i);
->>>>>
->>>>> On OMAP, GIC cpu interface context is lost only when CPU cluster
->>>>> is powered down.
->>>>
->>>> Yes, it's true, but that's the only chance we have to save the GIC CPU
->>>> IF
->>>> state if the GIC context is lost, right ?
->>>> It is a private memory map per processor; I agree, it might be useless
->>>> if just one CPU is shutdown, but at that point in time you do not know
->>>> the state of other CPUs. If the cluster moves to a state where GIC
->>>> context
->>>> is lost at least you had the GIC CPU IF state saved. If we do not
->>>> save it, well, there is no way to do that anymore since the last CPU
->>>> cannot
->>>> access other CPUs GIC CPU IF registers (or better, banked GIC
->>>> distributor
->>>> registers).
->>>> If you force hotplug on CPUs other than 0 (that's the way it is done on
->>>> OMAP4
->>>> in cpuidle, right ?) to hit deep low-power states you reinit the GIC CPU
->>>> IF
->>>> state as per cold boot, so yes, it is useless there.
->>>>
->>> Actually, on OMAP there is no need to save any CPU interface registers.
->>>
->>> For my OMAP4 PM rebasing, for time-being I will go with exported
->>> GIC functions so that I don't have too many redundancies with GIC
->>> save/restore code.
->>
->> I think you should try to balance cpu idle latency with reuse of
->> common code. ?In this case, you are avoiding restoring 7 registers by
->> reimplementing the bare minimum that is necessary for OMAP4, which is
->> unlikely to make a measurable impact on wakeup latency. ?Can you try
->> starting with reusing all the common code, and add some timestamps
->> during wakeup to measure where the longest delays are, to determine
->> where you should diverge from the common code and use omap-optimized
->> code?
->
-> I am going to use all the common code but having them exported
-> functions gives more flexibility to call them in right and needed
-> places. As discussed earlier, I plan to use the common GIC code
-> wherever it's needed on OMAP.
->
-> My main point was we are saving and restoring GIC CPU interface
-> registers for a case where they are actually not lost.
++ Colin,
 
-Yes, but you're still avoiding 7 registers, which is unlikely to be
-worth the complexity of calling these functions differently from every
-other platform.
+On 7/21/2011 8:44 PM, Russell King - ARM Linux wrote:
+> This series fixes a bunch of issues with IRQ migration:
+>
+> 1. Preventing affinity changes causing IRQs to be directed to off-line CPUs.
+> 2. Preventing oopses with non-GIC interrupt controllers.
+> 3. Preventing per-CPU IRQs being candidates for migration.
+> 4. Removing the abuse of irqdesc's node member.
+>
+> This prevents crashes on OMAP4430 SDP when non-default IRQ affinity
+> settings are used and a CPU which owns some IRQs is offlined.
+>
+Firstly thanks for fixing the IRQ migration and affinity issues
+with hotplug code. Colin found the hotplug irq affinity issue
+last week.
+
+Colin quoted ..
+----------------------------------
+The irq affinity mask is not kept up to date by the ARM irq
+code.  In particular, migrate_one_irq is not called when
+the irq node does not match the cpu going offline, and
+when it is called, it doesn't update the irq affinity
+mask before calling the irq chip's set_affinity function.
+This causes the use of the affinity mask in the mask
+and unmask functions to be unreliable, possibly unmasking
+an interrupt on a cpu that is offline.
+----------------------------------
+
+Need to check if this series addresses above issue as well.
+
+> With this patch set applied, there is no reason core code can't handle
+> CPU0 being offlined - on OMAP4, the only remaining issue is CPU0
+> being woken from WFI and falsely passing the non-spurious wake-up test.
+There is one as commented in other thread. The Secure code runs only
+on CPU0 so if you offline the CPU0, all the secure services are not
+available.
+
+Regards
+Santosh
