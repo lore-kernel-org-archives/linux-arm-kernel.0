@@ -1,46 +1,51 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 22 Jul 2011 09:39:23 +0800
-Subject: [PATCH 1/6] mc13783: add power button support
-In-Reply-To: <1311261006-28048-2-git-send-email-philippe.retornaz@epfl.ch>
-References: <1311261006-28048-1-git-send-email-philippe.retornaz@epfl.ch>
-	<1311261006-28048-2-git-send-email-philippe.retornaz@epfl.ch>
-Message-ID: <20110722013922.GC26837@S2100-06.ap.freescale.net>
+Date: Fri, 22 Jul 2011 09:53:36 +0800
+Subject: [PATCH RESEND v3 0/2] Add device tree probe support for
+	tty/serial/imx
+In-Reply-To: <1309972820-18547-1-git-send-email-shawn.guo@linaro.org>
+References: <1309972820-18547-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20110722015335.GD26837@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 21, 2011 at 05:10:01PM +0200, Philippe R?tornaz wrote:
-> This adds support for the power-on buttons of MC13783 PMIC.
-> This is done using a misc input device.
+On Thu, Jul 07, 2011 at 01:20:18AM +0800, Shawn Guo wrote:
+> The first patch removes the use of cpu_is_mx1().  The second patch
+> adds device tree probe with a dependency on the following patch.
 > 
-> Signed-off-by: Philippe R?tornaz <philippe.retornaz@epfl.ch>
-> ---
->  drivers/input/misc/Kconfig             |   10 +
->  drivers/input/misc/Makefile            |    1 +
->  drivers/input/misc/mc13783-pwrbutton.c |  288 ++++++++++++++++++++++++++++++++
->  drivers/mfd/mc13xxx-core.c             |    4 +
->  include/linux/mfd/mc13783.h            |    1 +
->  include/linux/mfd/mc13xxx.h            |   17 ++
->  6 files changed, 321 insertions(+), 0 deletions(-)
->  create mode 100644 drivers/input/misc/mc13783-pwrbutton.c
+>   http://article.gmane.org/gmane.linux.drivers.devicetree/6128
 > 
-[...]
-> diff --git a/drivers/mfd/mc13xxx-core.c b/drivers/mfd/mc13xxx-core.c
-> index 7e4d44b..573e16b 100644
-> --- a/drivers/mfd/mc13xxx-core.c
-> +++ b/drivers/mfd/mc13xxx-core.c
-> @@ -778,6 +778,10 @@ err_revision:
->  		mc13xxx_add_subdevice_pdata(mc13xxx, "%s-led",
->  				pdata->leds, sizeof(*pdata->leds));
->  
-> +	if (pdata->buttons)
-> +		mc13xxx_add_subdevice_pdata(mc13xxx, "%s-pwrbutton",
-> +				pdata->buttons, sizeof(*pdata->buttons));
-> +
+> Changes with resend:
+>  * Fix typo
+>  * Change a few macros to inline functions
+> 
+> Changes since v2:
+>  * Not use generic naming imx-uart, instead use specific soc name
+>    to show uart type compatibility (Sascha's suggestion)
+> 
+> Changes since v1:
+>  * Address review comments given by Grant and Uwe
+> 
+> Shawn Guo (2):
+>       serial/imx: get rid of the uses of cpu_is_mx1()
+>       serial/imx: add device tree probe support
+> 
+>  .../bindings/tty/serial/fsl-imx-uart.txt           |   19 +++
+>  arch/arm/mach-imx/clock-imx1.c                     |    6 +-
+>  arch/arm/mach-imx/clock-imx21.c                    |    8 +-
+>  arch/arm/mach-imx/clock-imx25.c                    |   11 +-
+>  arch/arm/mach-imx/clock-imx27.c                    |   13 +-
+>  arch/arm/mach-imx/clock-imx31.c                    |   11 +-
+>  arch/arm/mach-imx/clock-imx35.c                    |    7 +-
+>  arch/arm/mach-mx5/clock-mx51-mx53.c                |   18 ++-
+>  arch/arm/plat-mxc/devices/platform-imx-uart.c      |    7 +-
+>  drivers/tty/serial/imx.c                           |  167 +++++++++++++++++---
+>  10 files changed, 205 insertions(+), 62 deletions(-)
+> 
+To avoid conflict, will repost the series when Grant's devicetree/next
+and i.mx tree get merged on mainline in the coming merge window.
 
-I do not see pdata has been checked for not being a NULL pointer
-before using it in this function.  I know it's not you who started
-it, but since you have been there, I'm wondering if you can give
-it a fix.
+Alan, hopefully, you can give your ack then, so that Sascha can pick
+it up.
 
 -- 
 Regards,
