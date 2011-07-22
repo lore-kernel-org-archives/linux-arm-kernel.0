@@ -1,30 +1,47 @@
-From: vinod.koul@intel.com (Koul, Vinod)
-Date: Fri, 22 Jul 2011 17:37:20 +0530
-Subject: [PATCH V4 00/13] To use DMA generic APIs for Samsung DMA
-In-Reply-To: <1311158773-30314-1-git-send-email-boojin.kim@samsung.com>
-References: <1311158773-30314-1-git-send-email-boojin.kim@samsung.com>
-Message-ID: <438BB0150E931F4B9CE701519A4463010871DC9B13@bgsmsx502.gar.corp.intel.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Fri, 22 Jul 2011 16:32:59 +0400
+Subject: [RFC/PATCH 3/7] OMAP: McBSP: use existing macros for converting
+	between devices
+In-Reply-To: <1311292338-11830-5-git-send-email-khilman@ti.com>
+References: <1311292338-11830-1-git-send-email-khilman@ti.com>
+	<1311292338-11830-5-git-send-email-khilman@ti.com>
+Message-ID: <4E296DFB.3010205@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> 
-> This patchset adds support DMA generic APIs for Samsung DMA.
-> V4 doesn't has whole patch series and only has the patches differed from V3.
-> 
-> Changes from V3:
-> - Divided 03-patch into two patchs.
-> 	- First is 03-1-patch for DMA_SLAVE_CONFIG command.
-> 	- Another is 03-2-patch for DMA_CYCLIC capability.
-> - Code clean-up
-> 	- Remove unnecessary variable referance.
-> 	- Remove redunancy code
-> 
-> [PATCH V4 01/13] DMA: PL330: Add support runtime PM for PL330 DMAC
-> [PATCH V4 03-1/13] DMA: PL330: Support DMA_SLAVE_CONFIG command
-> [PATCH V4 03-2/13] DMA: PL330: Add DMA_CYCLIC capability
-> [PATCH V4 05/13] ARM: SAMSUNG: Add common DMA operations
+Hello.
 
-Can you pls send entire patchset again,
-it makes things difficult to review patches
+On 22-07-2011 3:52, Kevin Hilman wrote:
 
-~Vinod
+> For converting from struct device to platform_device, and from
+> platform_device to struct device,
+
+    You mean from platform_device to omap_device?
+
+> there are existing macros.  Use
+> them instead of manual use of container_of().
+
+> Signed-off-by: Kevin Hilman<khilman@ti.com>
+> ---
+>   arch/arm/plat-omap/mcbsp.c |    6 +++---
+>   1 files changed, 3 insertions(+), 3 deletions(-)
+
+> diff --git a/arch/arm/plat-omap/mcbsp.c b/arch/arm/plat-omap/mcbsp.c
+> index 6c62af1..02199e8 100644
+> --- a/arch/arm/plat-omap/mcbsp.c
+> +++ b/arch/arm/plat-omap/mcbsp.c
+> @@ -260,9 +260,9 @@ EXPORT_SYMBOL(omap_mcbsp_dma_reg_params);
+>   #ifdef CONFIG_ARCH_OMAP3
+>   static struct omap_device *find_omap_device_by_dev(struct device *dev)
+>   {
+> -	struct platform_device *pdev = container_of(dev,
+> -					struct platform_device, dev);
+> -	return container_of(pdev, struct omap_device, pdev);
+> +	struct platform_device *pdev = to_platform_device(dev);
+> +
+> +	return to_omap_device(pdev);
+>   }
+>
+>   static void omap_st_on(struct omap_mcbsp *mcbsp)
+
+WBR, Sergei
