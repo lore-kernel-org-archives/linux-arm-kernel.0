@@ -1,37 +1,41 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 22 Jul 2011 10:16:04 +0100
-Subject: [PATCH v2] ARM: support XZ compressed kernels
-In-Reply-To: <20110719110717.GI26574@n2100.arm.linux.org.uk>
-References: <1310475369-3000-1-git-send-email-kaloz@openwrt.org>
-	<20110715162519.GC24628@n2100.arm.linux.org.uk>
-	<op.vyptiwow2s3iss@ecaz>
-	<20110719110235.GH26574@n2100.arm.linux.org.uk>
-	<20110719110717.GI26574@n2100.arm.linux.org.uk>
-Message-ID: <20110722091604.GC21416@n2100.arm.linux.org.uk>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 22 Jul 2011 11:18:44 +0200
+Subject: [PATCH 3/7] add usb phy clocks to clock tree
+In-Reply-To: <97D3A72708D04647A5AC84A04996E5B51622DF@039-SN1MPN1-006.039d.mgd.msft.net>
+References: <1311160106-4898-1-git-send-email-tony.lin@freescale.com>
+	<1311160106-4898-4-git-send-email-tony.lin@freescale.com>
+	<20110720191034.GL26347@pengutronix.de>
+	<97D3A72708D04647A5AC84A04996E5B51622DF@039-SN1MPN1-006.039d.mgd.msft.net>
+Message-ID: <20110722091844.GW20587@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 19, 2011 at 12:07:17PM +0100, Russell King - ARM Linux wrote:
-> On Tue, Jul 19, 2011 at 12:02:35PM +0100, Russell King - ARM Linux wrote:
-> > On Sat, Jul 16, 2011 at 04:07:34PM +0200, Imre Kaloz wrote:
-> > > On Fri, 15 Jul 2011 18:25:19 +0200, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> > >
-> > >> On Tue, Jul 12, 2011 at 02:56:09PM +0200, Imre Kaloz wrote:
-> > >>> Wire up support for the XZ decompressor
-> > >>
-> > >> Ok.
-> > >
-> > > Thanks, added to the patch system.
+On Fri, Jul 22, 2011 at 06:02:00AM +0000, Lin Tony-B19295 wrote:
+> > >  	_REGISTER_CLOCK(NULL, "usb1", usb1_clk)
+> > > +	_REGISTER_CLOCK(NULL, "usb0_phy", usb_phy_clk0)
+> > > +	_REGISTER_CLOCK(NULL, "usb1_phy", usb_phy_clk1)
 > > 
-> > FYI:
+> > This looks suspicious. The phys are real devices, but this shows you do
+> > not intend to use them as devices. Really the phys should be drivers.
 > > 
-> > Patching 7001/1...
-> > <stdin>:56: space before tab in indent.
-> >                 $(addprefix $(obj)/, $(OBJS)) $(lib1funcs) $(ashldi3) FORCE
-> > warning: 1 line applied after fixing whitespace errors.
+> > Sascha
+> > 
+> Hi Sascha:
 > 
-> BTW, has anyone outside of the ARM community seen the patch to
-> lib/xz/xz_dec_stream.c adding the linux/kernel.h include?  How
-> well tested is that change on other architectures?
+> 	I didn't get it. Shouldn't I register PHY clocks here?
+> '_REGISTER_CLOCK("mxc-ehci.0", "usb_phy1", usb_phy1_clk)'
+> 	This is what mx51/53 did in clock-mx51-mx53.c
 
-Ok, no reply to this, so I'm dropping your patch for the merge window.
+Yes, you should register them, but like this:
+
+_REGISTER_CLOCK("mxs-usb-phy.0", NULL, usb_phy_clk0)
+_REGISTER_CLOCK("mxs-usb-phy.1", NULL, usb_phy_clk1)
+
+Sascha
+
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
