@@ -1,32 +1,74 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 22 Jul 2011 21:07:31 +0100
-Subject: [PATCH v2] ARM: support XZ compressed kernels
-In-Reply-To: <op.vy1dpjip2s3iss@ecaz>
-References: <1310475369-3000-1-git-send-email-kaloz@openwrt.org>
-	<20110715162519.GC24628@n2100.arm.linux.org.uk>
-	<op.vyptiwow2s3iss@ecaz>
-	<20110719110235.GH26574@n2100.arm.linux.org.uk>
-	<20110719110717.GI26574@n2100.arm.linux.org.uk>
-	<20110722091604.GC21416@n2100.arm.linux.org.uk>
-	<op.vy0lphg52s3iss@ecaz>
-	<20110722095738.GE21416@n2100.arm.linux.org.uk>
-	<20110722125036.GG21416@n2100.arm.linux.org.uk>
-	<op.vy1dpjip2s3iss@ecaz>
-Message-ID: <20110722200731.GH25947@n2100.arm.linux.org.uk>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri, 22 Jul 2011 13:10:53 -0700
+Subject: [PATCH 2/2] OMAP2+: PM: SR: add suspend/resume handlers
+In-Reply-To: <1311314153-23531-3-git-send-email-nm@ti.com> (Nishanth Menon's
+	message of "Fri, 22 Jul 2011 00:55:53 -0500")
+References: <1311314153-23531-1-git-send-email-nm@ti.com>
+	<1311314153-23531-3-git-send-email-nm@ti.com>
+Message-ID: <87hb6e13g2.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 22, 2011 at 09:57:09PM +0200, Imre Kaloz wrote:
-> I've already proposed the right way to fix it in http://lists.arm.linux.org.uk/lurker/message/20110722.102718.6e9fe66c.en.html
+Nishanth Menon <nm@ti.com> writes:
 
-I think you're missing the point.
+> Suspend and Resume paths are safe enough to do it in
 
-So, as I've already said I've dropped your original patch, and I'm now
-talking directly to Lasse about how best to resolve this (which IMHO is
-what should've already happened.)  If Lasse doesn't want to fix it in his
-code then we'll see about modifying ARM specific stuff.
+What is 'it'  ?
 
-As you've already pointed out, the code uses min_t, but doesn't contain
-an include of linux/kernel.h - so maybe its also broken on other arches.
+> the standard LDM suspend/resume handlers where one can
+> sleep. Add suspend/resume handlers for SmartReflex.
 
-Until it's discussed, we won't know.
+Minor comments on the code below, but this changelog doesn't read well,
+or at least I can't make any sense of it.
+
+[...]
+
+> @@ -684,6 +685,12 @@ void omap_sr_enable(struct voltagedomain *voltdm)
+>  	if (!sr->autocomp_active)
+>  		return;
+>  
+> +	if (sr->is_suspended) {
+> +		dev_dbg(&sr->pdev->dev, "%s: in suspended state\n", __func__);
+> +		return;
+> +	}
+> +
+> +
+
+extra blank line
+
+>  	if (!sr_class || !(sr_class->enable) || !(sr_class->configure)) {
+>  		dev_warn(&sr->pdev->dev, "%s: smartreflex class driver not"
+>  			"registered\n", __func__);
+
+[...]
+
+>  static struct platform_driver smartreflex_driver = {
+>  	.remove         = omap_sr_remove,
+> +	.suspend	= omap_sr_suspend,
+> +	.resume		= omap_sr_resume,
+
+You're using the legacy methods here, please use dev_pm_ops.
+
+That means you'll need to create a struct dev_pm_ops and fill in these
+mehods there (and note the dev_pm_ops methods don't have a 'state'
+argument.
+
+Also, when implementing suspend/resume, you need to make sure the
+hibernate callbacks are populated also.  They should be populated with
+the same callbacks, so the best way to do this is to use
+SIMPLE_DEV_PM_OPS() (see <linux/pm.h>).  That macro also takes care of
+the !CONFIG_PM case as well.
+
+IOW, the result would look someting like this (not even compile tested):
+
+static SIMPLE_DEV_PM_OPS(omap_sr_pm_ops, omap_sr_suspend, omap_sr_resume)
+
+static struct platform_driver smartreflex_driver = {
+	.remove         = omap_sr_remove,
+	.driver		= {
+		.name	= "smartreflex",
+                .pm     = &omap_sr_pm_ops,
+	},
+};
+
+Kevin
