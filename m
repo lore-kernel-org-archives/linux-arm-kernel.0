@@ -1,41 +1,55 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 22 Jul 2011 12:51:06 -0700
-Subject: [PATCH] OMAP: omap_device: replace pr_* prints with dev_*
-In-Reply-To: <CANOLnOOAJMyHUjrf_cM2LVSAs6Zm2bK3RWK73ibNcVg=7vQP4w@mail.gmail.com>
-	(Grazvydas Ignotas's message of "Fri, 22 Jul 2011 16:15:27 +0300")
-References: <1311269976-4035-1-git-send-email-khilman@ti.com>
-	<CANOLnOOAJMyHUjrf_cM2LVSAs6Zm2bK3RWK73ibNcVg=7vQP4w@mail.gmail.com>
-Message-ID: <87hb6e2ixh.fsf@ti.com>
+From: kaloz@openwrt.org (Imre Kaloz)
+Date: Fri, 22 Jul 2011 21:57:09 +0200
+Subject: [PATCH v2] ARM: support XZ compressed kernels
+In-Reply-To: <20110722125036.GG21416@n2100.arm.linux.org.uk>
+References: <1310475369-3000-1-git-send-email-kaloz@openwrt.org>
+	<20110715162519.GC24628@n2100.arm.linux.org.uk>
+	<op.vyptiwow2s3iss@ecaz>
+	<20110719110235.GH26574@n2100.arm.linux.org.uk>
+	<20110719110717.GI26574@n2100.arm.linux.org.uk>
+	<20110722091604.GC21416@n2100.arm.linux.org.uk>
+	<op.vy0lphg52s3iss@ecaz>
+	<20110722095738.GE21416@n2100.arm.linux.org.uk>
+	<20110722125036.GG21416@n2100.arm.linux.org.uk>
+Message-ID: <op.vy1dpjip2s3iss@ecaz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Grazvydas Ignotas <notasas@gmail.com> writes:
+On Fri, 22 Jul 2011 14:50:36 +0200, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
 
-> On Thu, Jul 21, 2011 at 8:39 PM, Kevin Hilman <khilman@ti.com> wrote:
->> ? ? ? ? ? ? ? ?if (act_lat > odpl->activate_lat) {
->> ? ? ? ? ? ? ? ? ? ? ? ?odpl->activate_lat_worst = act_lat;
->> ? ? ? ? ? ? ? ? ? ? ? ?if (odpl->flags & OMAP_DEVICE_LATENCY_AUTO_ADJUST) {
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?odpl->activate_lat = act_lat;
->> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? pr_warning("omap_device: %s.%d: new worst case "
->> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?"activate latency %d: %llu\n",
->> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?od->pdev.name, od->pdev.id,
->> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?od->pm_lat_level, act_lat);
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? dev_warn(&od->pdev.dev,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?"new worst case activate latency "
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?"%d: %llu\n",
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?od->pm_lat_level, act_lat);
+> On Fri, Jul 22, 2011 at 10:57:38AM +0100, Russell King - ARM Linux wrote:
+>> What I'm concerned about is the apparant lack of exposure of the patch
+>> to people outside of ARM, especially as it touches lib/xz/xz_dec_stream.c.
+>>
+>> I have no idea whether that breaks some architecture or not.
+>>
+>> Is Lasse Collin (the original contributer of that file) aware of this
+>> change?
 >
-> I wonder why these have to be warnings, I get quite a lot of them and
-> find them rather annoying. Or is my hardware broken or something?
+> I forwarded it to Lasse, and got some comments back... essentially
+> putting includes in xz_dec_stream.c could be problematical.  Lasse
+> would - as I did - like to have the full information on why the
+> include was necessary.
+>
+> Lasse is - again like me - concerned about dragging stuff into the
+> pre-boot environment which can cause it to fail unexpectedly,
+> especially as linux/kernel.h includes a whole raft of other includes.
+>
+> What I don't understand is if this code requires min_t, where does it
+> get this for everyone else - that's something to be discussed in the
+> wider discussion over this.  Does it build outside of the decompressor
+> on ARM already?
+>
+> So... given the increasing number of questions over this, I think you
+> need to put something together which describes the problem, how its
+> caused, why it seems to only exhibit on ARM, and discuss solutions
+> with all those involved.  I know Lasse is very interested to find out
+> more information about your patch...
+>
+> But in the mean time, this isn't a patch for 3.1.
+>
 
-No, your hardware is not broken.
+I've already proposed the right way to fix it in http://lists.arm.linux.org.uk/lurker/message/20110722.102718.6e9fe66c.en.html
 
-> I know other people are disabling this in their trees too:
-> http://www.sakoman.com/cgi-bin/gitweb.cgi?p=linux-omap-2.6.git;a=commitdiff;h=145cf9a7d4ba7c260df7071a28ef40c6a481b6df
 
-Patches to change that are welcome on the list.  
-
-It's not related to this patch which just changes from pr_warning to
-dev_warn, so needs to be done in a separate patch.
-
-Kevin
+Imre
