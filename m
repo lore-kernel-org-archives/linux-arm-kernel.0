@@ -1,48 +1,140 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 21 Jul 2011 16:53:04 -0700
-Subject: [PATCH 3/4] dt: omap3: add generic board file for dt support
-In-Reply-To: <CACxGe6uzyxf35WDg6COnPVt3dhQv1H80L1svALxp4naySx2BcA@mail.gmail.com>
-	(Grant Likely's message of "Sat, 16 Jul 2011 23:13:17 -0600")
-References: <1310592975-25773-1-git-send-email-manjugk@ti.com>
-	<1310592975-25773-4-git-send-email-manjugk@ti.com>
-	<CACxGe6sELS=C==16TZ2pfrxJDDyqjS_qOwJUfwzwMO8hqo8Xag@mail.gmail.com>
-	<CAC63_iSqN=rX6MbzFWM6z+zf1Eybg3MOD=qQVdeNg5cyENhPjw@mail.gmail.com>
-	<CAC63_iTf696D6Q_EzFeUUp5R38pYNEJBkmKviEu6-yuF0y=bNA@mail.gmail.com>
-	<CACxGe6uzyxf35WDg6COnPVt3dhQv1H80L1svALxp4naySx2BcA@mail.gmail.com>
-Message-ID: <87r55j5gyn.fsf@ti.com>
+From: prakity@marvell.com (Philip Rakity)
+Date: Thu, 21 Jul 2011 17:12:17 -0700
+Subject: ARM: mmp2: support sdio with regulator vsdio
+In-Reply-To: <37C1B996-A455-4EA9-A916-F4ED8C034167@marvell.com>
+References: <37C1B996-A455-4EA9-A916-F4ED8C034167@marvell.com>
+Message-ID: <95D75AEA-6086-4F45-B19B-43375EC252E0@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Grant Likely <grant.likely@secretlab.ca> writes:
 
-[...]
+With correct subject
 
-> The way I see it, you've got two options:
->
-> 1) modify the of_platform_bus_create() to call some kind of
-> of_platform_bus_create_omap() for devices that match "ti,omap3-device"
-> or something.
->
-> 2) Leave of_platform_bus_create(), and instead us a notifier to attach
-> hwmod data to normal platform devices.  omap_device_build() is
-> actually pretty simple.  It allocated a device, it attaches
-> platform_data and hwmod pointers to the device and registers it.
-> omap_device_register() is just a wrapper around
-> platform_device_register().
->
-> My preference is definitely #2, but there is a wrinkle in this
-> approach.  Unfortunately omap_devices are not simply plain
-> platform_devices with extra data attached, an omap_device actually
-> embeds the platform_device inside it, which cannot be attached after
-> the fact.  I think I had talked with Kevin (cc'd) about eliminating
-> the embedding, but I cannot remember clearly on this point.  As long
-> as platform_device remains embedded inside struct omap_device, #2
-> won't work.
+On Jul 21, 2011, at 5:10 PM, Philip Rakity wrote:
 
-I agree with #2, and I think we need to go down this de-coupling route
-also.
-
-I just sent an RFC series that starts down this path to at least
-demonstrate that it's possible.
-
-Kevin
+> Hi Zhangfei,
+> 
+> Comments below.
+> 
+> Philip
+> 
+> 
+>> Add regulator vsdio, which controled by mmc core to handle sdio chip power
+>> 
+>> Test With CONFIG_PM_RUNTIME=y
+>> 8787 power is enabled if any client module over sdio is insmod, and disbled automatically after all client modules over sdio are rmmod
+>> Also 8787 power could be controled by mmc_start/stop_host
+>> 
+>> Signed-off-by: Zhangfei Gao <zhangfei.gao@marvell.com>
+>> 
+>> ---
+>> arch/arm/mach-mmp/brownstone.c |   60 ++++++++++++++++++++++++++++++++++++++-
+>> 1 files changed, 58 insertions(+), 2 deletions(-)
+>> 
+>> diff --git a/arch/arm/mach-mmp/brownstone.c b/arch/arm/mach-mmp/brownstone.c
+>> index c79162a..63315e2 100644
+>> --- a/arch/arm/mach-mmp/brownstone.c
+>> +++ b/arch/arm/mach-mmp/brownstone.c
+>> @@ -89,6 +89,9 @@ static unsigned long brownstone_pin_config[] __initdata = {
+>> 	GPIO41_MMC2_CMD | MFP_PULL_HIGH,
+>> 	GPIO42_MMC2_CLK,
+>> 
+>> +	GPIO57_GPIO | MFP_LPM_DRIVE_HIGH | MFP_PULL_HIGH,
+>> +	GPIO58_GPIO | MFP_LPM_DRIVE_HIGH | MFP_PULL_HIGH,
+>> +
+>> 	/* MMC2 */
+>> 	GPIO165_MMC3_DAT7 | MFP_PULL_HIGH,
+>> 	GPIO162_MMC3_DAT6 | MFP_PULL_HIGH,
+>> @@ -180,12 +183,66 @@ static struct sdhci_pxa_platdata mmp2_sdh_platdata_mmc0 = {
+>> 	.clk_delay_cycles = 0x1f,
+>> };
+>> 
+>> +static struct sdhci_pxa_platdata mmp2_sdh_platdata_mmc1 = {
+>> +	.flags = PXA_FLAG_CARD_PERMANENT,
+>> +};
+>> +
+>> static struct sdhci_pxa_platdata mmp2_sdh_platdata_mmc2 = {
+>> 	.clk_delay_cycles = 0x1f,
+>> 	.flags = PXA_FLAG_CARD_PERMANENT
+>> 		| PXA_FLAG_SD_8_BIT_CAPABLE_SLOT,
+>> };
+>> 
+>> +static struct regulator_consumer_supply sdio_power_supplies[] = {
+>> +	REGULATOR_SUPPLY("vsdio", "sdhci-pxav3.1"),
+>> +};
+>> +
+>> +static struct regulator_init_data sdio_power_data = {
+>> +	.constraints	= {
+>> +		.valid_ops_mask		= REGULATOR_CHANGE_STATUS,
+>> +	},
+>> +	.num_consumer_supplies	= ARRAY_SIZE(sdio_power_supplies),
+>> +	.consumer_supplies	= sdio_power_supplies,
+>> +};
+>> +
+>> +static struct fixed_voltage_config sdio_power = {
+>> +	.supply_name		= "vsdio",
+>> +	.microvolts		= 3000000,
+>> +	.gpio			= mfp_to_gpio(MFP_PIN_GPIO57),
+>> +	.enable_high		= 1,
+>> +	.enabled_at_boot	= 0,
+>> +	.init_data		= &sdio_power_data,
+>> +};
+>> +
+>> +static struct platform_device sdio_power_device = {
+>> +	.name		= "reg-fixed-voltage",
+>> +	.id		= 2,
+>> +	.dev = {
+>> +		.platform_data = &sdio_power,
+>> +	},
+>> +};
+>> +
+>> +static int __init brownstone_init_mmc(void)
+>> +{
+>> +	/*
+>> +	 * PDn: GPIO58; RESETn: GPIO57
+>> +	 * 8787, RESETn keeps high, PDn control power
+>> +	 * on: PDn 1; off: PDn 0;
+>> +	 */
+> 
+> Comment unclear
+> 
+> GPIO57 is power
+> GPIO58 is reset
+> 
+> 
+> 
+>> +	int RESETn = mfp_to_gpio(MFP_PIN_GPIO58);
+>> +
+>> +	if (gpio_request(RESETn, "sdio RESETn")) {
+>> +		pr_err("Failed to request sdio RESETn gpio\n");
+>> +		return -EIO;
+>> +	}
+>> +	gpio_direction_output(RESETn, 1);
+>> +	gpio_free(RESETn);
+> 
+> 
+> The 8787  data sheet indicated that PDn should be inactive as well as reset before
+> initiating power up.
+> 
+> Pull PDn high.
+> 
+> 
+>> +
+>> +	platform_device_register(&sdio_power_device);
+>> +	mmp2_add_sdhost(0, &mmp2_sdh_platdata_mmc0); /* SD/MMC */
+>> +	mmp2_add_sdhost(1, &mmp2_sdh_platdata_mmc1); /* sdio */
+>> +	mmp2_add_sdhost(2, &mmp2_sdh_platdata_mmc2); /* eMMC */
+>> +}
+>> 
+>> static void __init brownstone_init(void)
+>> {
+>> @@ -195,8 +252,7 @@ static void __init brownstone_init(void)
+>> 	mmp2_add_uart(1);
+>> 	mmp2_add_uart(3);
+>> 	mmp2_add_twsi(1, NULL, ARRAY_AND_SIZE(brownstone_twsi1_info));
+>> -	mmp2_add_sdhost(0, &mmp2_sdh_platdata_mmc0); /* SD/MMC */
+>> -	mmp2_add_sdhost(2, &mmp2_sdh_platdata_mmc2); /* eMMC */
+>> +	brownstone_init_mmc();
+>> 
+>> 	/* enable 5v regulator */
+>> 	platform_device_register(&brownstone_v_5vp_device);
