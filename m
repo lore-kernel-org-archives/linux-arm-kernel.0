@@ -1,21 +1,30 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 22 Jul 2011 21:10:28 +0200
-Subject: [patch 1/3] imx51: add pata device
-In-Reply-To: <20110722103832.403681566@rtp-net.org>
-References: <20110722103710.226100346@rtp-net.org>
-	<20110722103832.403681566@rtp-net.org>
-Message-ID: <20110722191028.GG16561@pengutronix.de>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 22 Jul 2011 22:47:21 +0300
+Subject: [PATCH 1/2] of: address: use resource_size helper
+Message-ID: <1311364042-8325-1-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Arnaud,
+that should be the approved way of calculating
+the size of resources. No functional changes.
 
-On Fri, Jul 22, 2011 at 12:37:11PM +0200, Arnaud Patard wrote:
-> +extern const struct imx_mxc_pata_data im51_mxc_pata_data;
-imx51 please
+Cc: Grant Likely <grant.likely@secretlab.ca>
+Signed-off-by: Felipe Balbi <balbi@ti.com>
+---
+ drivers/of/address.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Uwe
-
+diff --git a/drivers/of/address.c b/drivers/of/address.c
+index deefc0c..6e7b2cf 100644
+--- a/drivers/of/address.c
++++ b/drivers/of/address.c
+@@ -624,6 +624,6 @@ void __iomem *of_iomap(struct device_node *np, int index)
+ 	if (of_address_to_resource(np, index, &res))
+ 		return NULL;
+ 
+-	return ioremap(res.start, 1 + res.end - res.start);
++	return ioremap(res.start, resource_size(&res));
+ }
+ EXPORT_SYMBOL(of_iomap);
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.7.6
