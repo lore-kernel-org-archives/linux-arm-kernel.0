@@ -1,28 +1,24 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 22 Jul 2011 10:30:53 +0100
-Subject: [RFC PATCH v9 2/4] ARM: gic: Add PPI registration interface
-In-Reply-To: <4E28C290.3090604@codeaurora.org>
-References: <1311267448-14652-1-git-send-email-marc.zyngier@arm.com>	<1311267448-14652-3-git-send-email-marc.zyngier@arm.com>
-	<4E28C290.3090604@codeaurora.org>
-Message-ID: <4E29434D.6020007@arm.com>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Fri, 22 Jul 2011 12:37:03 +0300
+Subject: [PATCH 2/2] MTD: pxa3xx_nand: Fix blank page ECC mismatch
+In-Reply-To: <1311323755.20707.19.camel@sauron>
+References: <1307440867-18993-1-git-send-email-leiwen@marvell.com>
+	<1307440867-18993-2-git-send-email-leiwen@marvell.com>
+	<1307445467.11104.80.camel@localhost>
+	<BANLkTin_Z8ndAjp9vw6QcNb5bT82uoR9ng@mail.gmail.com>
+	<BANLkTi=7f2+LK32p6WG1doXzYWGf1wJQJQ@mail.gmail.com>
+	<CAN8TOE8n_+FBr3_6fCTpM4Sp80ShWHftP9YsGqYsCT9T6-Pytw@mail.gmail.com>
+	<1311323755.20707.19.camel@sauron>
+Message-ID: <1311327428.20707.20.camel@sauron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/07/11 01:21, Jeff Ohlstein wrote:
-> Marc Zyngier wrote:
->> @@ -298,14 +289,23 @@ int __cpuinit local_timer_setup(struct clock_event_device *evt)
->>  		clockevent_delta2ns(0xf0000000 >> clock->shift, evt);
->>  	evt->min_delta_ns = clockevent_delta2ns(4, evt);
->>  
->> -	local_clock_event = evt;
->> -
->> -	gic_enable_ppi(clock->irq.irq);
->> +	res = git_request_ppi(evt->irq, msm_timer_interrupt, evt);
-> 
-> Typo, should be gic_request_ppi.
+On Fri, 2011-07-22 at 11:35 +0300, Artem Bityutskiy wrote:
+> My guess is that this patch will reach upstream only when the linux-3.1
+> merge window opens.
 
-Doh... Thanks for noticing this.
+And it is open now :-)
 
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Best Regards,
+Artem Bityutskiy
