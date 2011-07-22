@@ -1,21 +1,24 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 22 Jul 2011 00:16:06 -0600
-Subject: [RFC/PATCH 6/7] OMAP: omap_device: device register functions now
-	take platform_device pointer
-In-Reply-To: <1311292338-11830-8-git-send-email-khilman@ti.com>
-References: <1311292338-11830-1-git-send-email-khilman@ti.com>
-	<1311292338-11830-8-git-send-email-khilman@ti.com>
-Message-ID: <20110722061606.GA18383@ponder.secretlab.ca>
+From: dsd@laptop.org (Daniel Drake)
+Date: Fri, 22 Jul 2011 07:50:14 +0100
+Subject: [PATCH] mmc: sdio add regulator vsdio
+In-Reply-To: <1311215673-2489-2-git-send-email-zhangfei.gao@marvell.com>
+References: <1311215673-2489-1-git-send-email-zhangfei.gao@marvell.com>
+	<1311215673-2489-2-git-send-email-zhangfei.gao@marvell.com>
+Message-ID: <CAGq3pz6-MQPpsyEWbDQBnnW4q2rXSKFF9qzRvTLtwmzvG+xJKw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 21, 2011 at 04:52:17PM -0700, Kevin Hilman wrote:
-> The internal device register functions do not need or use any omap_device
-> internals, so pass in a platform_device pointer instead of an omap_device
-> pointer.
-> 
-> Signed-off-by: Kevin Hilman <khilman@ti.com>
+On 21 July 2011 03:34, Zhangfei Gao <zhangfei.gao@marvell.com> wrote:
+> sdio client may be required power on/off dynamically.
+> With regulator vsdio, sdio client power on/off could be executed by mmc_power_up/down
 
-FWIW, all 6 of these cleanups look sane.
+I think you can/should do this with vmmc. When the device gets powered
+down (e.g. in runtime suspend), the voltage should be cut, so it
+should be possible to use the existing regulator.
 
-Reviewed-by: Grant Likely <grant.likely@secretlab.ca>
+I also looked at doing this before, when it looked like we would have
+to manipulate a GPIO reset line for SD8686. I decided that the current
+vmmc implementation in sdhci wasn't quite complete enough, but it
+wouldn't be much effort to correct this.
+
+Daniel
