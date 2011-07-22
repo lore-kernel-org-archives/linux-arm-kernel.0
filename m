@@ -1,41 +1,28 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 22 Jul 2011 11:18:44 +0200
-Subject: [PATCH 3/7] add usb phy clocks to clock tree
-In-Reply-To: <97D3A72708D04647A5AC84A04996E5B51622DF@039-SN1MPN1-006.039d.mgd.msft.net>
-References: <1311160106-4898-1-git-send-email-tony.lin@freescale.com>
-	<1311160106-4898-4-git-send-email-tony.lin@freescale.com>
-	<20110720191034.GL26347@pengutronix.de>
-	<97D3A72708D04647A5AC84A04996E5B51622DF@039-SN1MPN1-006.039d.mgd.msft.net>
-Message-ID: <20110722091844.GW20587@pengutronix.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 22 Jul 2011 10:30:53 +0100
+Subject: [RFC PATCH v9 2/4] ARM: gic: Add PPI registration interface
+In-Reply-To: <4E28C290.3090604@codeaurora.org>
+References: <1311267448-14652-1-git-send-email-marc.zyngier@arm.com>	<1311267448-14652-3-git-send-email-marc.zyngier@arm.com>
+	<4E28C290.3090604@codeaurora.org>
+Message-ID: <4E29434D.6020007@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 22, 2011 at 06:02:00AM +0000, Lin Tony-B19295 wrote:
-> > >  	_REGISTER_CLOCK(NULL, "usb1", usb1_clk)
-> > > +	_REGISTER_CLOCK(NULL, "usb0_phy", usb_phy_clk0)
-> > > +	_REGISTER_CLOCK(NULL, "usb1_phy", usb_phy_clk1)
-> > 
-> > This looks suspicious. The phys are real devices, but this shows you do
-> > not intend to use them as devices. Really the phys should be drivers.
-> > 
-> > Sascha
-> > 
-> Hi Sascha:
+On 22/07/11 01:21, Jeff Ohlstein wrote:
+> Marc Zyngier wrote:
+>> @@ -298,14 +289,23 @@ int __cpuinit local_timer_setup(struct clock_event_device *evt)
+>>  		clockevent_delta2ns(0xf0000000 >> clock->shift, evt);
+>>  	evt->min_delta_ns = clockevent_delta2ns(4, evt);
+>>  
+>> -	local_clock_event = evt;
+>> -
+>> -	gic_enable_ppi(clock->irq.irq);
+>> +	res = git_request_ppi(evt->irq, msm_timer_interrupt, evt);
 > 
-> 	I didn't get it. Shouldn't I register PHY clocks here?
-> '_REGISTER_CLOCK("mxc-ehci.0", "usb_phy1", usb_phy1_clk)'
-> 	This is what mx51/53 did in clock-mx51-mx53.c
+> Typo, should be gic_request_ppi.
 
-Yes, you should register them, but like this:
+Doh... Thanks for noticing this.
 
-_REGISTER_CLOCK("mxs-usb-phy.0", NULL, usb_phy_clk0)
-_REGISTER_CLOCK("mxs-usb-phy.1", NULL, usb_phy_clk1)
-
-Sascha
-
-
+	M.
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Jazz is not dead. It just smells funny...
