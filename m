@@ -1,33 +1,33 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 22 Jul 2011 10:08:19 +0800
-Subject: [PATCH v2 0/3] Add device tree probe support for imx fec driver
-In-Reply-To: <20110705.232252.897826991160254269.davem@davemloft.net>
-References: <20110705.194854.1875695946300840388.davem@davemloft.net>
-	<20110705.223045.738515407552627580.davem@davemloft.net>
-	<20110706061901.GH9978@ponder.secretlab.ca>
-	<20110705.232252.897826991160254269.davem@davemloft.net>
-Message-ID: <20110722020818.GF26837@S2100-06.ap.freescale.net>
+Date: Fri, 22 Jul 2011 10:15:25 +0800
+Subject: [PATCH 0/2] Add device tree probe for i2c-imx driver
+In-Reply-To: <1310659425-17499-1-git-send-email-shawn.guo@linaro.org>
+References: <1310659425-17499-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20110722021524.GG26837@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 05, 2011 at 11:22:52PM -0700, David Miller wrote:
-> From: Grant Likely <grant.likely@secretlab.ca>
-> Date: Wed, 6 Jul 2011 00:19:01 -0600
-> 
-> > Sorry about that, I missed the reference to that function which is
-> > currently in my devicetree/next branch.  I can either take the series
-> > via devicetree/next, or I can provide you with a topic branch
-> > containing the needed commit that you can merge.  Whichever you prefer.
-> 
-> Please just take the series, thanks.
-> 
-I think the easier way is that I repost the series after
-devicetree/next and i.mx tree get merged in the coming window, and
-let them go through i.mx tree.
+Hi Ben,
 
-David, I assume I can add your acks to all 3 patches, otherwise
-please let me know.
+Any comments, or it's been good for you to queue them for v3.1 window?
 
--- 
 Regards,
 Shawn
+
+On Fri, Jul 15, 2011 at 12:03:43AM +0800, Shawn Guo wrote:
+> The first patch removes unused init/exit hooks from platform data,
+> and the second one actually adds the actual device tree probe support.
+> 
+> Shawn Guo (2):
+>       i2c/imx: remove init/exit hooks from platform data
+>       i2c/imx: add device tree probe support
+> 
+>  .../devicetree/bindings/i2c/fsl-imx-i2c.txt        |   25 +++++++++++
+>  arch/arm/plat-mxc/include/mach/i2c.h               |    4 --
+>  drivers/i2c/busses/i2c-imx.c                       |   46 +++++++++----------
+>  3 files changed, 47 insertions(+), 28 deletions(-)
+> _______________________________________________
+> devicetree-discuss mailing list
+> devicetree-discuss at lists.ozlabs.org
+> https://lists.ozlabs.org/listinfo/devicetree-discuss
+> 
