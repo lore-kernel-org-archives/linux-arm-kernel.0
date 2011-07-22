@@ -1,103 +1,46 @@
 From: philippe.retornaz@epfl.ch (=?utf-8?q?Philippe=20R=C3=A9tornaz?=)
-Date: Fri, 22 Jul 2011 16:17:09 +0200
-Subject: [PATCH 3/6] mc13xxx: remove obsolete leds and regulators flags
-In-Reply-To: <1311344232-29902-3-git-send-email-philippe.retornaz@epfl.ch>
+Date: Fri, 22 Jul 2011 16:17:10 +0200
+Subject: [PATCH 4/6] mc13xxx: remove unused define
+In-Reply-To: <1311344232-29902-4-git-send-email-philippe.retornaz@epfl.ch>
 References: <1311344232-29902-1-git-send-email-philippe.retornaz@epfl.ch>
 	<1311344232-29902-2-git-send-email-philippe.retornaz@epfl.ch>
 	<1311344232-29902-3-git-send-email-philippe.retornaz@epfl.ch>
-Message-ID: <1311344232-29902-4-git-send-email-philippe.retornaz@epfl.ch>
+	<1311344232-29902-4-git-send-email-philippe.retornaz@epfl.ch>
+Message-ID: <1311344232-29902-5-git-send-email-philippe.retornaz@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Philippe R?tornaz <philippe.retornaz@epfl.ch>
 ---
- arch/arm/mach-imx/mach-mx27_3ds.c    |    1 -
- arch/arm/mach-imx/mach-mx31_3ds.c    |    2 +-
- arch/arm/mach-imx/mach-mx31lite.c    |    3 +--
- arch/arm/mach-imx/mach-mx31moboard.c |    3 +--
- arch/arm/mach-imx/mach-pcm038.c      |    3 +--
- arch/arm/mach-mx5/mx51_efika.c       |    2 +-
- 6 files changed, 5 insertions(+), 9 deletions(-)
+ include/linux/mfd/mc13783.h |    2 --
+ include/linux/mfd/mc13xxx.h |    2 --
+ 2 files changed, 0 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-imx/mach-mx27_3ds.c b/arch/arm/mach-imx/mach-mx27_3ds.c
-index 6e1accf..8cd507d 100644
---- a/arch/arm/mach-imx/mach-mx27_3ds.c
-+++ b/arch/arm/mach-imx/mach-mx27_3ds.c
-@@ -238,7 +238,6 @@ static struct mc13xxx_platform_data mc13783_pdata = {
- 		.num_regulators = ARRAY_SIZE(mx27_3ds_regulators),
+diff --git a/include/linux/mfd/mc13783.h b/include/linux/mfd/mc13783.h
+index 7d0f3d6..3756a30 100644
+--- a/include/linux/mfd/mc13783.h
++++ b/include/linux/mfd/mc13783.h
+@@ -112,8 +112,6 @@ static inline int mc13783_irq_ack(struct mc13783 *mc13783, int irq)
+ #define MC13783_USE_CODEC	MC13XXX_USE_CODEC
+ #define MC13783_USE_ADC		MC13XXX_USE_ADC
+ #define MC13783_USE_RTC		MC13XXX_USE_RTC
+-#define MC13783_USE_REGULATOR	MC13XXX_USE_REGULATOR
+-#define MC13783_USE_LED		MC13XXX_USE_LED
  
- 	},
--	.flags  = MC13783_USE_REGULATOR,
- };
+ #define MC13783_ADC_MODE_TS		1
+ #define MC13783_ADC_MODE_SINGLE_CHAN	2
+diff --git a/include/linux/mfd/mc13xxx.h b/include/linux/mfd/mc13xxx.h
+index c064bea..cef1497 100644
+--- a/include/linux/mfd/mc13xxx.h
++++ b/include/linux/mfd/mc13xxx.h
+@@ -142,8 +142,6 @@ struct mc13xxx_platform_data {
+ #define MC13XXX_USE_CODEC	(1 << 1)
+ #define MC13XXX_USE_ADC		(1 << 2)
+ #define MC13XXX_USE_RTC		(1 << 3)
+-#define MC13XXX_USE_REGULATOR	(1 << 4)
+-#define MC13XXX_USE_LED		(1 << 5)
+ 	unsigned int flags;
  
- /* SPI */
-diff --git a/arch/arm/mach-imx/mach-mx31_3ds.c b/arch/arm/mach-imx/mach-mx31_3ds.c
-index 9b98244..7978f58 100644
---- a/arch/arm/mach-imx/mach-mx31_3ds.c
-+++ b/arch/arm/mach-imx/mach-mx31_3ds.c
-@@ -496,7 +496,7 @@ static struct mc13xxx_platform_data mc13783_pdata = {
- 		.regulators = mx31_3ds_regulators,
- 		.num_regulators = ARRAY_SIZE(mx31_3ds_regulators),
- 	},
--	.flags  = MC13783_USE_REGULATOR | MC13783_USE_TOUCHSCREEN,
-+	.flags  = MC13783_USE_TOUCHSCREEN,
- };
- 
- /* SPI */
-diff --git a/arch/arm/mach-imx/mach-mx31lite.c b/arch/arm/mach-imx/mach-mx31lite.c
-index ac9b4ca..ae99cae 100644
---- a/arch/arm/mach-imx/mach-mx31lite.c
-+++ b/arch/arm/mach-imx/mach-mx31lite.c
-@@ -112,8 +112,7 @@ static const struct spi_imx_master spi1_pdata __initconst = {
- };
- 
- static struct mc13xxx_platform_data mc13783_pdata __initdata = {
--	.flags  = MC13XXX_USE_RTC |
--		  MC13XXX_USE_REGULATOR,
-+	.flags  = MC13XXX_USE_RTC,
- };
- 
- static struct spi_board_info mc13783_spi_dev __initdata = {
-diff --git a/arch/arm/mach-imx/mach-mx31moboard.c b/arch/arm/mach-imx/mach-mx31moboard.c
-index 12ee755..579ca1f 100644
---- a/arch/arm/mach-imx/mach-mx31moboard.c
-+++ b/arch/arm/mach-imx/mach-mx31moboard.c
-@@ -270,8 +270,7 @@ static struct mc13xxx_platform_data moboard_pmic = {
- 		.num_regulators = ARRAY_SIZE(moboard_regulators),
- 	},
- 	.leds = &moboard_leds,
--	.flags = MC13XXX_USE_REGULATOR | MC13XXX_USE_RTC |
--		MC13XXX_USE_ADC | MC13XXX_USE_LED,
-+	.flags = MC13XXX_USE_RTC | MC13XXX_USE_ADC,
- };
- 
- static struct spi_board_info moboard_spi_board_info[] __initdata = {
-diff --git a/arch/arm/mach-imx/mach-pcm038.c b/arch/arm/mach-imx/mach-pcm038.c
-index 853bb87..70aaa7d 100644
---- a/arch/arm/mach-imx/mach-pcm038.c
-+++ b/arch/arm/mach-imx/mach-pcm038.c
-@@ -266,8 +266,7 @@ static struct mc13xxx_platform_data pcm038_pmic = {
- 		.regulators = pcm038_regulators,
- 		.num_regulators = ARRAY_SIZE(pcm038_regulators),
- 	},
--	.flags = MC13783_USE_ADC | MC13783_USE_REGULATOR |
--		 MC13783_USE_TOUCHSCREEN,
-+	.flags = MC13783_USE_ADC | MC13783_USE_TOUCHSCREEN,
- };
- 
- static struct spi_board_info pcm038_spi_board_info[] __initdata = {
-diff --git a/arch/arm/mach-mx5/mx51_efika.c b/arch/arm/mach-mx5/mx51_efika.c
-index 1105ef3..e2e4096 100644
---- a/arch/arm/mach-mx5/mx51_efika.c
-+++ b/arch/arm/mach-mx5/mx51_efika.c
-@@ -567,7 +567,7 @@ static struct mc13xxx_regulator_init_data mx51_efika_regulators[] = {
- };
- 
- static struct mc13xxx_platform_data mx51_efika_mc13892_data = {
--	.flags = MC13XXX_USE_RTC | MC13XXX_USE_REGULATOR,
-+	.flags = MC13XXX_USE_RTC,
- 	.regulators = {
- 		.num_regulators = ARRAY_SIZE(mx51_efika_regulators),
- 		.regulators = mx51_efika_regulators,
+ 	struct mc13xxx_regulator_platform_data regulators;
 -- 
 1.6.3.3
