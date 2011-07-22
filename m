@@ -1,67 +1,82 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Fri, 22 Jul 2011 16:07:43 +0800
-Subject: [PATCH v8 0/3] add the GPMI controller driver for IMX23/IMX28
-In-Reply-To: <20110722055731.GI26837@S2100-06.ap.freescale.net>
-References: <1311230846-26437-1-git-send-email-b32955@freescale.com>
-	<20110721215020.GA25344@pengutronix.de>
-	<4E28EEE1.2050008@freescale.com>
-	<20110722055731.GI26837@S2100-06.ap.freescale.net>
-Message-ID: <4E292FCF.6010608@freescale.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 22 Jul 2011 09:12:44 +0100
+Subject: [PATCH 0/4] Fix CPU hotplug IRQ migration
+In-Reply-To: <4E290C05.7020209@ti.com>
+References: <20110721151413.GD28942@n2100.arm.linux.org.uk>
+	<4E290C05.7020209@ti.com>
+Message-ID: <20110722081244.GA21416@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolfram:
-> On Fri, Jul 22, 2011 at 11:30:41AM +0800, Huang Shijie wrote:
->> Hi,
->>>> The general-purpose media interface(GPMI) controller is a flexible interface
->>>> to up to several NAND flashs.
->>> ...
->>>> To Walfram&  Artem:
->>>>      About how to disable the JFFS2 to use the OOB:
->>>>      I read the code, and I still have no idea about how to use the ecclayout
->>>>      to do the job. Could you give me some hint? thanks.
->>> Have you checked mxc_nand.c for example? There is
->>>
->>> static struct nand_ecclayout nandv1_hw_eccoob_smallpage = {
->>>          .eccbytes = 5,
->>>          .eccpos = {6, 7, 8, 9, 10},
->>>          .oobfree = {{0, 5}, {12, 4}, }
->>> }
->>>
->>> defined as one layout. Now, you could define one where oobfree is empty and
->>> eccbytes as big as the oob-area.
->>>
->> thanks. I will check the code.
->>>> The driver depends on another GPMI-NAND device patch set, you can find them at :
->>>> 	[1] http://lists.infradead.org/pipermail/linux-mtd/2011-July/037033.html
->>>> 	[2] http://lists.infradead.org/pipermail/linux-mtd/2011-July/037031.html
->>>> 	[3] http://lists.infradead.org/pipermail/linux-mtd/2011-July/037032.html
->>>> 	[4] http://lists.infradead.org/pipermail/linux-mtd/2011-July/037034.html
->>>>
->>>> The driver also depends on another DMA patch by Shawn:
->>>> 	[0] http://lists.infradead.org/pipermail/linux-mtd/2011-June/036820.html
->>> This makes it difficult for testers/reviewers. Please try to get a git-branch
->>> from Freescale or Linaro.
->>>
->> Shawn will merge my patches to his Linaro branch.
->>
-> git://git.linaro.org/people/shawnguo/linux-2.6.git mxs-gpmi
-Please test the GPMI driver based this git tree.
-
-I tested, and the DMA-timeout does not occur any more.
-
-I notice that Shawn added two more patched to 
-/arch/arm/config/mxs_defconfig:
-[1] ARM: mxs_defconfig: Add mx23evk and mx28evk build
-[2] ARM: mxs_defconfig: Change CONFIG_RTC_CLASS 'm' to 'y'
-
-Please check it. Maybe your kernel code misses them.
-
-Of course, you can use the my_config (i sent you last mail) for .config.
-
-Best Regards
-Huang Shijie
-
-
-> Shijie, please check and test it.  I only did a build test.
+On Fri, Jul 22, 2011 at 11:05:01AM +0530, Santosh Shilimkar wrote:
+> + Colin,
 >
+> On 7/21/2011 8:44 PM, Russell King - ARM Linux wrote:
+>> This series fixes a bunch of issues with IRQ migration:
+>>
+>> 1. Preventing affinity changes causing IRQs to be directed to off-line CPUs.
+>> 2. Preventing oopses with non-GIC interrupt controllers.
+>> 3. Preventing per-CPU IRQs being candidates for migration.
+>> 4. Removing the abuse of irqdesc's node member.
+>>
+>> This prevents crashes on OMAP4430 SDP when non-default IRQ affinity
+>> settings are used and a CPU which owns some IRQs is offlined.
+>>
+> Firstly thanks for fixing the IRQ migration and affinity issues
+> with hotplug code. Colin found the hotplug irq affinity issue
+> last week.
+>
+> Colin quoted ..
+> ----------------------------------
+> The irq affinity mask is not kept up to date by the ARM irq
+> code.  In particular, migrate_one_irq is not called when
+> the irq node does not match the cpu going offline, and
+> when it is called, it doesn't update the irq affinity
+> mask before calling the irq chip's set_affinity function.
+> This causes the use of the affinity mask in the mask
+> and unmask functions to be unreliable, possibly unmasking
+> an interrupt on a cpu that is offline.
+> ----------------------------------
+
+I don't have a copy of that message... where was it posted?
+
+> Need to check if this series addresses above issue as well.
+
+It does not, and it is wrong to change the affinity mask of the interrupt
+due to a CPU going offline.  Think about it.
+
+If you offline CPU0, which migrates all IRQs to CPU1.  You then update
+the affinity mask to exclude CPU0.  Now you online CPU0, and offline CPU1.
+You now get a pile of kernel messages about breaking the _apparant_ users
+affinity settings for the interrupts, because you have to move them off
+CPU1 which is the only CPU they are now affine to.
+
+The affinity mask is a policy setting from userspace.  It is not an
+absolute setting which the kernel must keep updated.
+
+And actually you _can't_ tell what CPU the interrupt is routed to from
+the affinity mask - the affinity mask gives a hint as to which CPU_s_
+(plural) are permitted to receive the interrupt.  The fact we choose -
+at the moment - the first CPU to route stuff to from the masks is merely
+an implementation detail which must not be relied upon.
+
+So, Colin is wrong on the affinity mask issue.  The correct behaviour
+is that the affinity at any point is the set of CPUs in the current
+affinity mask _and_ the CPU online mask.  If that is an empty set, then
+any online CPU will be chosen to handle the interrupt.
+
+>> With this patch set applied, there is no reason core code can't handle
+>> CPU0 being offlined - on OMAP4, the only remaining issue is CPU0
+>> being woken from WFI and falsely passing the non-spurious wake-up test.
+> There is one as commented in other thread. The Secure code runs only
+> on CPU0 so if you offline the CPU0, all the secure services are not
+> available.
+
+Secure code is called on CPU1 too, so I don't think your statement is
+accurate.  Eg:
+
+	omap_modify_auxcoreboot0(0x0, 0x200)
+
+	omap_read_auxcoreboot0()
+
+both result in calling secure code on CPU1.
