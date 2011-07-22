@@ -1,46 +1,59 @@
-From: kaloz@openwrt.org (Imre Kaloz)
-Date: Fri, 22 Jul 2011 11:52:19 +0200
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 22 Jul 2011 10:57:38 +0100
 Subject: [PATCH v2] ARM: support XZ compressed kernels
-In-Reply-To: <20110722091604.GC21416@n2100.arm.linux.org.uk>
+In-Reply-To: <op.vy0lphg52s3iss@ecaz>
 References: <1310475369-3000-1-git-send-email-kaloz@openwrt.org>
 	<20110715162519.GC24628@n2100.arm.linux.org.uk>
 	<op.vyptiwow2s3iss@ecaz>
 	<20110719110235.GH26574@n2100.arm.linux.org.uk>
 	<20110719110717.GI26574@n2100.arm.linux.org.uk>
 	<20110722091604.GC21416@n2100.arm.linux.org.uk>
-Message-ID: <op.vy0lphg52s3iss@ecaz>
+	<op.vy0lphg52s3iss@ecaz>
+Message-ID: <20110722095738.GE21416@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 22 Jul 2011 11:16:04 +0200, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-
-> On Tue, Jul 19, 2011 at 12:07:17PM +0100, Russell King - ARM Linux wrote:
->> On Tue, Jul 19, 2011 at 12:02:35PM +0100, Russell King - ARM Linux wrote:
->> > On Sat, Jul 16, 2011 at 04:07:34PM +0200, Imre Kaloz wrote:
->> > > On Fri, 15 Jul 2011 18:25:19 +0200, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
->> > >
->> > >> On Tue, Jul 12, 2011 at 02:56:09PM +0200, Imre Kaloz wrote:
->> > >>> Wire up support for the XZ decompressor
->> > >>
->> > >> Ok.
->> > >
->> > > Thanks, added to the patch system.
->> >
->> > FYI:
->> >
->> > Patching 7001/1...
->> > <stdin>:56: space before tab in indent.
->> >                 $(addprefix $(obj)/, $(OBJS)) $(lib1funcs) $(ashldi3) FORCE
->> > warning: 1 line applied after fixing whitespace errors.
+On Fri, Jul 22, 2011 at 11:52:19AM +0200, Imre Kaloz wrote:
+> On Fri, 22 Jul 2011 11:16:04 +0200, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+>
+>> On Tue, Jul 19, 2011 at 12:07:17PM +0100, Russell King - ARM Linux wrote:
+>>> On Tue, Jul 19, 2011 at 12:02:35PM +0100, Russell King - ARM Linux wrote:
+>>> > On Sat, Jul 16, 2011 at 04:07:34PM +0200, Imre Kaloz wrote:
+>>> > > On Fri, 15 Jul 2011 18:25:19 +0200, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+>>> > >
+>>> > >> On Tue, Jul 12, 2011 at 02:56:09PM +0200, Imre Kaloz wrote:
+>>> > >>> Wire up support for the XZ decompressor
+>>> > >>
+>>> > >> Ok.
+>>> > >
+>>> > > Thanks, added to the patch system.
+>>> >
+>>> > FYI:
+>>> >
+>>> > Patching 7001/1...
+>>> > <stdin>:56: space before tab in indent.
+>>> >                 $(addprefix $(obj)/, $(OBJS)) $(lib1funcs) $(ashldi3) FORCE
+>>> > warning: 1 line applied after fixing whitespace errors.
+>>>
+>>> BTW, has anyone outside of the ARM community seen the patch to
+>>> lib/xz/xz_dec_stream.c adding the linux/kernel.h include?  How
+>>> well tested is that change on other architectures?
 >>
->> BTW, has anyone outside of the ARM community seen the patch to
->> lib/xz/xz_dec_stream.c adding the linux/kernel.h include?  How
->> well tested is that change on other architectures?
+>> Ok, no reply to this, so I'm dropping your patch for the merge window.
+>>
 >
-> Ok, no reply to this, so I'm dropping your patch for the merge window.
->
+> Guessed I'm not the one outside the ARM community, so.. I can say it
+> didn't break neither ppc or mips for me, but have no idea who's feedback
+> are you waiting for.
 
-Guessed I'm not the one outside the ARM community, so.. I can say it didn't break neither ppc or mips for me, but have no idea who's feedback are you waiting for.
+What I'm concerned about is the apparant lack of exposure of the patch
+to people outside of ARM, especially as it touches lib/xz/xz_dec_stream.c.
 
+I have no idea whether that breaks some architecture or not.
 
-Imre
+Is Lasse Collin (the original contributer of that file) aware of this
+change?
+
+What is the additional include fixing on ARM?  Why isn't this include
+needed on other architectures?  And why isn't any of this mentioned in
+the patch commit log?
