@@ -1,28 +1,37 @@
-From: r-woodruff2@ti.com (Woodruff, Richard)
-Date: Fri, 22 Jul 2011 07:45:11 -0500
-Subject: [PATCH] ARM: do not mark CPU 0 as hotpluggable
-In-Reply-To: <4E2902E7.6000108@ti.com>
-References: <1311204745-6276-1-git-send-email-mturquette@ti.com>
-	<4E2796DA.80001@gmail.com> <4E27BA10.3060203@ti.com>
-	<20110721133033.GN26574@n2100.arm.linux.org.uk>
-	<4E2902E7.6000108@ti.com>
-Message-ID: <13B9B4C6EF24D648824FF11BE896716203F2398D3A@dlee02.ent.ti.com>
+From: simon.budig@kernelconcepts.de (Simon Budig)
+Date: Fri, 22 Jul 2011 14:47:43 +0200
+Subject: Patch: Fix for wrong logic in tx_empty for serial/amba-pl011.c
+Message-ID: <4E29716F.2090003@kernelconcepts.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
 
-> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-
-> kernel-bounces at lists.infradead.org] On Behalf Of Shilimkar, Santosh
+Hi all.
 
-> > With fixed IRQ migration and forcing CPU0 into an infinite WFI loop,
-> > I can offline CPU0 and still have a running system.
-> >
-> The secure software runs only on CPU0 and that's the biggest limitation.
-> Other issues like hand-shake as you pointed out, power sequencing etc
-> can be worked around.
+There is a problem with the logic of tx_empty in the amba-pl011 serial
+port driver. Instead of checking for an empty FIFO it checks for a
+not-full FIFO.
 
-As you know well some of the secure APIs work on CPU1 and others do not.
+Attached is a patch that fixes this.
 
-I notice in other thread Russell made assumption about CPU1 being able to use all because it could run some. This is not the case.
+Bye,
+        Simon Budig
 
-I'll re-add because of the many power states omap4 adds atop of standard 3 arm states there exists a lot of states and not all state transitions are valid. This will increase complexity of practical usage.
+- -- 
+       Simon Budig                        kernel concepts GbR
+       simon.budig at kernelconcepts.de      Sieghuetter Hauptweg 48
+       +49-271-771091-17                  D-57072 Siegen
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1.4.10 (GNU/Linux)
+Comment: Using GnuPG with Mozilla - http://enigmail.mozdev.org/
+
+iEYEARECAAYFAk4pcW8ACgkQO2O/RXesiHDwWACeO4HQ2BfdZj/8pEakHQ/njVjs
+XuUAoKuyQeBaSJeX3oWp+3OWE4A0+0V3
+=nOMx
+-----END PGP SIGNATURE-----
+-------------- next part --------------
+An embedded and charset-unspecified text was scrubbed...
+Name: amba-serial-fix.mbox
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110722/431dabb9/attachment-0001.ksh>
