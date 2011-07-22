@@ -1,100 +1,67 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 22 Jul 2011 10:40:59 +0530
-Subject: [PATCH 03/17] ARM: gic: Use cpu pm notifiers to save gic state
-In-Reply-To: <CAMbhsRRT58vJWJ0ACSp_NJsvQJqzeBUKDD5bGGWM6tYh-zTxJQ@mail.gmail.com>
-References: <1310053830-23779-1-git-send-email-lorenzo.pieralisi@arm.com>	<1310053830-23779-4-git-send-email-lorenzo.pieralisi@arm.com>	<4E27E40C.6020006@ti.com>	<20110721102736.GA3087@e102568-lin.cambridge.arm.com>	<4E2803A1.7000908@ti.com>
-	<CAMbhsRRT58vJWJ0ACSp_NJsvQJqzeBUKDD5bGGWM6tYh-zTxJQ@mail.gmail.com>
-Message-ID: <4E290663.30403@ti.com>
+From: B19295@freescale.com (Lin Tony-B19295)
+Date: Fri, 22 Jul 2011 05:18:07 +0000
+Subject: [PATCH 5/7] ehci mxc: make it more flexible to be used for mx28
+In-Reply-To: <Pine.LNX.4.44L0.1107200954120.2071-100000@iolanthe.rowland.org>
+References: <1311160106-4898-6-git-send-email-tony.lin@freescale.com>
+	<Pine.LNX.4.44L0.1107200954120.2071-100000@iolanthe.rowland.org>
+Message-ID: <97D3A72708D04647A5AC84A04996E5B5162263@039-SN1MPN1-006.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/22/2011 12:36 AM, Colin Cross wrote:
-> On Thu, Jul 21, 2011 at 3:46 AM, Santosh Shilimkar
-> <santosh.shilimkar@ti.com>  wrote:
->> On 7/21/2011 3:57 PM, Lorenzo Pieralisi wrote:
->>>
->>> On Thu, Jul 21, 2011 at 09:32:12AM +0100, Santosh Shilimkar wrote:
->>>>
->>>> Lorenzo, Colin,
->>>>
->>>> On 7/7/2011 9:20 PM, Lorenzo Pieralisi wrote:
->>>>>
->>>>> From: Colin Cross<ccross@android.com>
->>>>>
->>>>> When the cpu is powered down in a low power mode, the gic cpu
->>>>> interface may be reset, and when the cpu complex is powered
->>>>> down, the gic distributor may also be reset.
->>>>>
->>>>> This patch uses CPU_PM_ENTER and CPU_PM_EXIT notifiers to save
->>>>> and restore the gic cpu interface registers, and the
->>>>> CPU_COMPLEX_PM_ENTER and CPU_COMPLEX_PM_EXIT notifiers to save
->>>>> and restore the gic distributor registers.
->>>>>
->>>>> Signed-off-by: Colin Cross<ccross@android.com>
->>>>> ---
->>>>>    arch/arm/common/gic.c |  212
->>>>> +++++++++++++++++++++++++++++++++++++++++++++++++
->>>>>    1 files changed, 212 insertions(+), 0 deletions(-)
->>>>>
->>>>> diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
->>>>> index 4ddd0a6..8d62e07 100644
->>>>> --- a/arch/arm/common/gic.c
->>>>> +++ b/arch/arm/common/gic.c
->>>>
->>>> [...]
->>>>
->>>> I missed one more comment in the last review.
->>>>
->>>>> +static int gic_notifier(struct notifier_block *self, unsigned long cmd,
->>>>>         void *v)
->>>>> +{
->>>>> +       int i;
->>>>> +
->>>>> +       for (i = 0; i<     MAX_GIC_NR; i++) {
->>>>> +               switch (cmd) {
->>>>> +               case CPU_PM_ENTER:
->>>>> +                       gic_cpu_save(i);
->>>>
->>>> On OMAP, GIC cpu interface context is lost only when CPU cluster
->>>> is powered down.
->>>
->>> Yes, it's true, but that's the only chance we have to save the GIC CPU IF
->>> state if the GIC context is lost, right ?
->>> It is a private memory map per processor; I agree, it might be useless
->>> if just one CPU is shutdown, but at that point in time you do not know
->>> the state of other CPUs. If the cluster moves to a state where GIC context
->>> is lost at least you had the GIC CPU IF state saved. If we do not
->>> save it, well, there is no way to do that anymore since the last CPU
->>> cannot
->>> access other CPUs GIC CPU IF registers (or better, banked GIC distributor
->>> registers).
->>> If you force hotplug on CPUs other than 0 (that's the way it is done on
->>> OMAP4
->>> in cpuidle, right ?) to hit deep low-power states you reinit the GIC CPU
->>> IF
->>> state as per cold boot, so yes, it is useless there.
->>>
->> Actually, on OMAP there is no need to save any CPU interface registers.
->>
->> For my OMAP4 PM rebasing, for time-being I will go with exported
->> GIC functions so that I don't have too many redundancies with GIC
->> save/restore code.
->
-> I think you should try to balance cpu idle latency with reuse of
-> common code.  In this case, you are avoiding restoring 7 registers by
-> reimplementing the bare minimum that is necessary for OMAP4, which is
-> unlikely to make a measurable impact on wakeup latency.  Can you try
-> starting with reusing all the common code, and add some timestamps
-> during wakeup to measure where the longest delays are, to determine
-> where you should diverge from the common code and use omap-optimized
-> code?
-I am going to use all the common code but having them exported
-functions gives more flexibility to call them in right and needed
-places. As discussed earlier, I plan to use the common GIC code
-wherever it's needed on OMAP.
+> On Wed, 20 Jul 2011, Tony Lin wrote:
+> 
+> > old driver uses some hard coding for clks' name which could not be
+> > used for mx28. So workaround these hard codings by judging the cpu is
+> > mx28 or not.
+> > add platform callback funtions in usb irq handler in the case usb phy
+> > need to change its disconnect detector mode after usb device is
+> > connected and disconnected. These callbacks also could be used for
+> > other machines whose usb phy need such kind of operations
+> >
+> > Signed-off-by: Tony Lin <tony.lin@freescale.com>
+> 
+> ...
+> 
+> > --- a/drivers/usb/host/ehci-mxc.c
+> > +++ b/drivers/usb/host/ehci-mxc.c
+> 
+> ...
+> 
+> > +static irqreturn_t fsl_ehci_irq(struct usb_hcd *hcd) {
+> > +	struct mxc_usbh_platform_data *pdata;
+> > +	struct ehci_hcd		*ehci = hcd_to_ehci(hcd);
+> > +	u32			status;
+> > +
+> > +	pdata = hcd->self.controller->platform_data;
+> > +	if (pdata->plt_get_usb_connect_status == NULL || \
+> > +		pdata->plt_usb_disconnect_detect == NULL)
+> > +		goto out;
+> > +
+> > +	spin_lock(&ehci->lock);
+> 
+> Do you really need to use this spinlock?  I don't see any reason for it.
+> 
+I'll remove it. Thanks for pointing out.
 
-My main point was we are saving and restoring GIC CPU interface
-registers for a case where they are actually not lost.
+> > +	status = ehci_readl(ehci, &ehci->regs->status);
+> > +	if (status & STS_PCD) {
+> > +		if (pdata->plt_get_usb_connect_status())
+> > +			pdata->plt_usb_disconnect_detect(true);
+> > +		else
+> > +			pdata->plt_usb_disconnect_detect(false);
+> 
+> How about just this:
+> 
+> 		pdata->plt_usb_disconnect_detect(
+> 				pdata->plt_get_usb_connect_status());
+> 
+That's better.
 
-Regards
-Santosh
+> > +	}
+> > +	spin_unlock(&ehci->lock);
+> > +out:
+> > +	return ehci_irq(hcd);
+> > +}
+> 
+> Alan Stern
+> 
