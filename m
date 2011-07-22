@@ -1,60 +1,63 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 22 Jul 2011 23:10:43 +0200
-Subject: [patch 1/3] imx51: add pata device
-In-Reply-To: <878vrqnjpa.fsf@lebrac.rtp-net.org>
-References: <20110722103710.226100346@rtp-net.org>
-	<20110722103832.403681566@rtp-net.org>
-	<CAOMZO5Cx2Bkz2HGVV5JT2ietT1c4bvt9583FT8iorwsrAN_ZFA@mail.gmail.com>
-	<20110722190957.GF16561@pengutronix.de>
-	<878vrqnjpa.fsf@lebrac.rtp-net.org>
-Message-ID: <20110722211043.GI16561@pengutronix.de>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri, 22 Jul 2011 14:17:11 -0700
+Subject: [RFC/PATCH] PM / Runtime: allow _put_sync() from interrupts-disabled
+	context
+Message-ID: <1311369431-28775-1-git-send-email-khilman@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 22, 2011 at 10:28:49PM +0200, Arnaud Patard wrote:
-> Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> writes:
-> 
-> > On Fri, Jul 22, 2011 at 12:14:15PM -0300, Fabio Estevam wrote:
-> >> On Fri, Jul 22, 2011 at 7:37 AM, Arnaud Patard
-> >> <arnaud.patard@rtp-net.org> wrote:
-> >> ...
-> >> > +#define imx_mxc_pata_data_entry_single(soc) ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
-> >> > + ? ? ? { ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
-> >> > + ? ? ? ? ? ? ? .iobase = soc ## _ATA_BASE_ADDR, ? ? ? ? ? ? ? ? ? ? ? ?\
-> >> > + ? ? ? ? ? ? ? .irq = soc ## _MXC_INT_ATA, ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
-> >> 
-> >> Why not imx_pata_data_entry_single instead?
-> >> 
-> >>  "imx_mxc" looks redundant.
-> > imx is the platform prefix, mxc_pata the device's name. So IMHO the name
-> > is right and consistent with the other device registration stuff.
-> 
-> From looking at devices-imx51.h, I don't see no obvious consistant
-> naming scheme :
-> 
-> extern const struct imx_fec_data imx51_fec_data;
-driver name: fec
-> ...
-> extern const struct imx_imx_i2c_data imx51_imx_i2c_data[];
-driver name: imx_i2c
-> ...
-> extern const struct imx_mxc_nand_data imx51_mxc_nand_data;
-driver name: mxc_nand
-> ...
-> extern const struct imx_spi_imx_data imx51_cspi_data;
-driver name: spi_imx
+Currently the use of pm_runtime_put_sync() is not safe from
+interrupts-disabled context because rpm_idle() will release the
+spinlock and enable interrupts for the idle callbacks.  This enables
+interrupts during a time where interrupts were expected to be
+disabled, and can have strange side effects on drivers that expected
+interrupts to be disabled.
 
-So the driver names are not consistent, ok. But the names used in
-devices-imx51.h match these. It's always imx_${drivername}_data.
+This is not a bug since the documentation clearly states that only
+_put_sync_suspend() is safe in IRQ-safe mode.
 
-> So, I can use either imx_pata_data or keep imx_mxc_pata_data or
-> imx_imx_pata_data or imx_pata_imx_data. What do you both prefer ?
-So if your driver is called "mxc_pata", please use
-imx_mxc_pata_data_entry_single.
+However, pm_runtime_put_sync() could be made safe when in IRQ-safe
+mode by releasing the spinlock but not re-enabling interrupts, which
+is what this patch aims to do.
 
-Best regards
-Uwe
+Problem was found when using some buggy drivers that set
+pm_runtime_irq_safe() and used _put_sync() in interrupts-disabled
+context.
 
+The offending drivers have been fixed to use _put_sync_suspend(),
+But this patch is an RFC to see if it might make sense to allow
+using _put_sync() from interrupts-disabled context.
+
+Reported-by: Colin Cross <ccross@google.com>
+Tested-by: Nishanth Menon <nm@ti.com>
+Signed-off-by: Kevin Hilman <khilman@ti.com>
+---
+ drivers/base/power/runtime.c |   10 ++++++++--
+ 1 files changed, 8 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/base/power/runtime.c b/drivers/base/power/runtime.c
+index 8dc247c..acb3f83 100644
+--- a/drivers/base/power/runtime.c
++++ b/drivers/base/power/runtime.c
+@@ -226,11 +226,17 @@ static int rpm_idle(struct device *dev, int rpmflags)
+ 		callback = NULL;
+ 
+ 	if (callback) {
+-		spin_unlock_irq(&dev->power.lock);
++		if (dev->power.irq_safe)
++			spin_unlock(&dev->power.lock);
++		else
++			spin_unlock_irq(&dev->power.lock);
+ 
+ 		callback(dev);
+ 
+-		spin_lock_irq(&dev->power.lock);
++		if (dev->power.irq_safe)
++			spin_lock(&dev->power.lock);
++		else
++			spin_lock_irq(&dev->power.lock);
+ 	}
+ 
+ 	dev->power.idle_notification = false;
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.7.6
