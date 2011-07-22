@@ -1,25 +1,30 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 22 Jul 2011 12:14:15 -0300
-Subject: [patch 1/3] imx51: add pata device
-In-Reply-To: <20110722103832.403681566@rtp-net.org>
-References: <20110722103710.226100346@rtp-net.org>
-	<20110722103832.403681566@rtp-net.org>
-Message-ID: <CAOMZO5Cx2Bkz2HGVV5JT2ietT1c4bvt9583FT8iorwsrAN_ZFA@mail.gmail.com>
+From: jbarnes@virtuousgeek.org (Jesse Barnes)
+Date: Fri, 22 Jul 2011 08:53:05 -0700
+Subject: [PATCH 4/6] ARM: pci: make pcibios_assign_all_busses use
+	pci_has_flag
+In-Reply-To: <1310489612-8625-5-git-send-email-robherring2@gmail.com>
+References: <1310489612-8625-1-git-send-email-robherring2@gmail.com>
+	<1310489612-8625-5-git-send-email-robherring2@gmail.com>
+Message-ID: <20110722085305.2f5b6160@jbarnes-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 22, 2011 at 7:37 AM, Arnaud Patard
-<arnaud.patard@rtp-net.org> wrote:
-...
-> +#define imx_mxc_pata_data_entry_single(soc) ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
-> + ? ? ? { ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
-> + ? ? ? ? ? ? ? .iobase = soc ## _ATA_BASE_ADDR, ? ? ? ? ? ? ? ? ? ? ? ?\
-> + ? ? ? ? ? ? ? .irq = soc ## _MXC_INT_ATA, ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+On Tue, 12 Jul 2011 11:53:30 -0500
+Rob Herring <robherring2@gmail.com> wrote:
 
-Why not imx_pata_data_entry_single instead?
+> From: Rob Herring <rob.herring@calxeda.com>
+> 
+> Convert pcibios_assign_all_busses from a define to inline so platforms can
+> control this setting.
+> 
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+> Reviewed-by: Arnd Bergmann <arnd@arndb.de>
+> ---
 
- "imx_mxc" looks redundant.
+Looks fine to me.  Assuming it's not already upstream... :)
 
-Regards,
+Acked-by: Jesse Barnes <jbarnes@virtuousgeek.org>
 
-Fabio Estevam
+-- 
+Jesse Barnes, Intel Open Source Technology Center
