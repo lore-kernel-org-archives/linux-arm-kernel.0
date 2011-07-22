@@ -1,63 +1,56 @@
-From: mikpe@it.uu.se (Mikael Pettersson)
-Date: Fri, 22 Jul 2011 18:01:45 +0200
-Subject: [PATCH 3.0] fix compile warnings in plat-iop/cp6.c
-In-Reply-To: <20110722150716.GD25947@n2100.arm.linux.org.uk>
-References: <20009.28803.497535.598471@pilspetsen.it.uu.se>
-	<20110722132721.GA25947@n2100.arm.linux.org.uk>
-	<20009.35057.432746.47293@pilspetsen.it.uu.se>
-	<20110722150716.GD25947@n2100.arm.linux.org.uk>
-Message-ID: <20009.40681.149776.290908@pilspetsen.it.uu.se>
+From: prakity@marvell.com (Philip Rakity)
+Date: Fri, 22 Jul 2011 09:05:56 -0700
+Subject: [PATCH] mmc: sdio add regulator vsdio
+In-Reply-To: <CAGq3pz6-MQPpsyEWbDQBnnW4q2rXSKFF9qzRvTLtwmzvG+xJKw@mail.gmail.com>
+References: <1311215673-2489-1-git-send-email-zhangfei.gao@marvell.com>
+	<1311215673-2489-2-git-send-email-zhangfei.gao@marvell.com>
+	<CAGq3pz6-MQPpsyEWbDQBnnW4q2rXSKFF9qzRvTLtwmzvG+xJKw@mail.gmail.com>
+Message-ID: <09FC057A-EABC-414A-A6AE-C5309825873A@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux writes:
- > On Fri, Jul 22, 2011 at 04:28:01PM +0200, Mikael Pettersson wrote:
- > > Sure, that works too.  Revised patch below.  Only tested on n2100 so far.
- > 
- > Do you know when this started to go wrong - do we need to copy it to some
- > stable trees?
 
-2.6.39 doesn't have this problem so backporting shouldn't be necessary.
+Could we have an architecture discussion about how this is supposed to be done and a picture please !
+(a pointer to good working code would be nice)
 
- > Other than that, looks fine, so -> patch system please.
+On brownstone the SDIO 8787 power is supplied by a ldo which is dedicated to the internal SDIO chip.  
+The Power GPIO (PDn) is an on/off switch for the 8787.  It does not affect the power from the ldo.
 
-Done, it's now "7004/1 fix traps.h compile warnings".
+What is the responsibility of the 8787 SDIO driver for power management ?  It is obviously called at
+probe / init time.  Is it supposed to turn on power ?  I realize that it may not be aware of what device
+to power on?  Does it register a call back ?  Is it responsible for turning itself on/off at suspend/resume
+time?   Thought about open time but the firmware needs to be loaded before the device can respond.
+Is firmware loading done at the right place ?  Should it be done at open and NOT at probe? That way
+the driver could look present and open might handle firmware loading and power control.
 
-Thanks.
+What is the responsibilty of MMC layer.  Obviously it needs to supply power to the device on the bus.
+Is there supposed to be a callback in the board file that handles these specifics ?  Would this call back
+then call then set the ldo on and turn on the 8787 ?
 
- > 
- > Thanks.
- > 
- > > 
- > > Building kernel 3.0 for an n2100 (plat-iop) results in:
- > > 
- > > In file included from arch/arm/plat-iop/cp6.c:20:
- > > /tmp/linux-3.0/arch/arm/include/asm/traps.h:12: warning: 'struct pt_regs' declared inside parameter list
- > > /tmp/linux-3.0/arch/arm/include/asm/traps.h:12: warning: its scope is only this definition or declaration, which is probably not what you want
- > > /tmp/linux-3.0/arch/arm/include/asm/traps.h:48: warning: 'struct pt_regs' declared inside parameter list
- > > /tmp/linux-3.0/arch/arm/include/asm/traps.h:48: warning: 'struct task_struct' declared inside parameter list
- > > arch/arm/plat-iop/cp6.c:45: warning: initialization from incompatible pointer type
- > > 
- > > Nothing here depends on the layout of pt_regs or task_struct, so this
- > > can be fixed by adding forward struct declarations to asm/traps.h.
- > > 
- > > Signed-off-by: Mikael Pettersson <mikpe@it.uu.se>
- > > ---
- > > --- linux-3.0/arch/arm/include/asm/traps.h.~1~	2011-05-19 06:06:34.000000000 +0200
- > > +++ linux-3.0/arch/arm/include/asm/traps.h	2011-07-22 16:14:50.000000000 +0200
- > > @@ -3,6 +3,9 @@
- > >  
- > >  #include <linux/list.h>
- > >  
- > > +struct pt_regs;
- > > +struct task_struct;
- > > +
- > >  struct undef_hook {
- > >  	struct list_head node;
- > >  	u32 instr_mask;
- > > 
- > > _______________________________________________
- > > linux-arm-kernel mailing list
- > > linux-arm-kernel at lists.infradead.org
- > > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
- > 
+
+regards,
+
+Philip
+
+ 
+
+On Jul 21, 2011, at 11:50 PM, Daniel Drake wrote:
+
+> On 21 July 2011 03:34, Zhangfei Gao <zhangfei.gao@marvell.com> wrote:
+>> sdio client may be required power on/off dynamically.
+>> With regulator vsdio, sdio client power on/off could be executed by mmc_power_up/down
+> 
+> I think you can/should do this with vmmc. When the device gets powered
+> down (e.g. in runtime suspend), the voltage should be cut, so it
+> should be possible to use the existing regulator.
+> 
+> I also looked at doing this before, when it looked like we would have
+> to manipulate a GPIO reset line for SD8686. I decided that the current
+> vmmc implementation in sdhci wasn't quite complete enough, but it
+> wouldn't be much effort to correct this.
+> 
+> Daniel
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
