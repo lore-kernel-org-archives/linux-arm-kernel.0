@@ -1,47 +1,28 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Fri, 22 Jul 2011 16:32:59 +0400
-Subject: [RFC/PATCH 3/7] OMAP: McBSP: use existing macros for converting
-	between devices
-In-Reply-To: <1311292338-11830-5-git-send-email-khilman@ti.com>
-References: <1311292338-11830-1-git-send-email-khilman@ti.com>
-	<1311292338-11830-5-git-send-email-khilman@ti.com>
-Message-ID: <4E296DFB.3010205@ru.mvista.com>
+From: r-woodruff2@ti.com (Woodruff, Richard)
+Date: Fri, 22 Jul 2011 07:45:11 -0500
+Subject: [PATCH] ARM: do not mark CPU 0 as hotpluggable
+In-Reply-To: <4E2902E7.6000108@ti.com>
+References: <1311204745-6276-1-git-send-email-mturquette@ti.com>
+	<4E2796DA.80001@gmail.com> <4E27BA10.3060203@ti.com>
+	<20110721133033.GN26574@n2100.arm.linux.org.uk>
+	<4E2902E7.6000108@ti.com>
+Message-ID: <13B9B4C6EF24D648824FF11BE896716203F2398D3A@dlee02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
 
-On 22-07-2011 3:52, Kevin Hilman wrote:
+> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-
+> kernel-bounces at lists.infradead.org] On Behalf Of Shilimkar, Santosh
 
-> For converting from struct device to platform_device, and from
-> platform_device to struct device,
+> > With fixed IRQ migration and forcing CPU0 into an infinite WFI loop,
+> > I can offline CPU0 and still have a running system.
+> >
+> The secure software runs only on CPU0 and that's the biggest limitation.
+> Other issues like hand-shake as you pointed out, power sequencing etc
+> can be worked around.
 
-    You mean from platform_device to omap_device?
+As you know well some of the secure APIs work on CPU1 and others do not.
 
-> there are existing macros.  Use
-> them instead of manual use of container_of().
+I notice in other thread Russell made assumption about CPU1 being able to use all because it could run some. This is not the case.
 
-> Signed-off-by: Kevin Hilman<khilman@ti.com>
-> ---
->   arch/arm/plat-omap/mcbsp.c |    6 +++---
->   1 files changed, 3 insertions(+), 3 deletions(-)
-
-> diff --git a/arch/arm/plat-omap/mcbsp.c b/arch/arm/plat-omap/mcbsp.c
-> index 6c62af1..02199e8 100644
-> --- a/arch/arm/plat-omap/mcbsp.c
-> +++ b/arch/arm/plat-omap/mcbsp.c
-> @@ -260,9 +260,9 @@ EXPORT_SYMBOL(omap_mcbsp_dma_reg_params);
->   #ifdef CONFIG_ARCH_OMAP3
->   static struct omap_device *find_omap_device_by_dev(struct device *dev)
->   {
-> -	struct platform_device *pdev = container_of(dev,
-> -					struct platform_device, dev);
-> -	return container_of(pdev, struct omap_device, pdev);
-> +	struct platform_device *pdev = to_platform_device(dev);
-> +
-> +	return to_omap_device(pdev);
->   }
->
->   static void omap_st_on(struct omap_mcbsp *mcbsp)
-
-WBR, Sergei
+I'll re-add because of the many power states omap4 adds atop of standard 3 arm states there exists a lot of states and not all state transitions are valid. This will increase complexity of practical usage.
