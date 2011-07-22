@@ -1,56 +1,28 @@
-From: prakity@marvell.com (Philip Rakity)
-Date: Fri, 22 Jul 2011 09:05:56 -0700
-Subject: [PATCH] mmc: sdio add regulator vsdio
-In-Reply-To: <CAGq3pz6-MQPpsyEWbDQBnnW4q2rXSKFF9qzRvTLtwmzvG+xJKw@mail.gmail.com>
-References: <1311215673-2489-1-git-send-email-zhangfei.gao@marvell.com>
-	<1311215673-2489-2-git-send-email-zhangfei.gao@marvell.com>
-	<CAGq3pz6-MQPpsyEWbDQBnnW4q2rXSKFF9qzRvTLtwmzvG+xJKw@mail.gmail.com>
-Message-ID: <09FC057A-EABC-414A-A6AE-C5309825873A@marvell.com>
+From: khc@pm.waw.pl (Krzysztof Halasa)
+Date: Fri, 22 Jul 2011 18:28:18 +0200
+Subject: [PATCH] ARM: Migrate to asm-generic wrapper support
+In-Reply-To: <4E2871AE.8030603@codeaurora.org> (Stephen Boyd's message of
+	"Thu, 21 Jul 2011 11:36:30 -0700")
+References: <1311204225-13169-1-git-send-email-sboyd@codeaurora.org>
+	<20110720232819.GC20310@n2100.arm.linux.org.uk>
+	<4E27667D.9060200@codeaurora.org>
+	<m31uxje8o4.fsf@intrepid.localdomain>
+	<4E2871AE.8030603@codeaurora.org>
+Message-ID: <m3d3h25lgd.fsf@intrepid.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Stephen Boyd <sboyd@codeaurora.org> writes:
 
-Could we have an architecture discussion about how this is supposed to be done and a picture please !
-(a pointer to good working code would be nice)
+>>> With d8ecc5c (kbuild: asm-generic support, 2011-04-27) we can
+>>> remove a handful of asm-generic wrappers in ARM code. Since the
+>>> generic version of sizes.h doesn't contain SZ_48M, we replace
+>>> the 3 users of SZ_48M with the equivalent SZ_32M + SZ_16M.
+>> Perhaps simply adding SZ_48M to the generic version is better. Can live
+>> with either.
+>
+> This was simpler (1 patch, 1 maintainer). Is that an ack?
 
-On brownstone the SDIO 8787 power is supplied by a ldo which is dedicated to the internal SDIO chip.  
-The Power GPIO (PDn) is an on/off switch for the 8787.  It does not affect the power from the ldo.
-
-What is the responsibility of the 8787 SDIO driver for power management ?  It is obviously called at
-probe / init time.  Is it supposed to turn on power ?  I realize that it may not be aware of what device
-to power on?  Does it register a call back ?  Is it responsible for turning itself on/off at suspend/resume
-time?   Thought about open time but the firmware needs to be loaded before the device can respond.
-Is firmware loading done at the right place ?  Should it be done at open and NOT at probe? That way
-the driver could look present and open might handle firmware loading and power control.
-
-What is the responsibilty of MMC layer.  Obviously it needs to supply power to the device on the bus.
-Is there supposed to be a callback in the board file that handles these specifics ?  Would this call back
-then call then set the ldo on and turn on the 8787 ?
-
-
-regards,
-
-Philip
-
- 
-
-On Jul 21, 2011, at 11:50 PM, Daniel Drake wrote:
-
-> On 21 July 2011 03:34, Zhangfei Gao <zhangfei.gao@marvell.com> wrote:
->> sdio client may be required power on/off dynamically.
->> With regulator vsdio, sdio client power on/off could be executed by mmc_power_up/down
-> 
-> I think you can/should do this with vmmc. When the device gets powered
-> down (e.g. in runtime suspend), the voltage should be cut, so it
-> should be possible to use the existing regulator.
-> 
-> I also looked at doing this before, when it looked like we would have
-> to manipulate a GPIO reset line for SD8686. I decided that the current
-> vmmc implementation in sdhci wasn't quite complete enough, but it
-> wouldn't be much effort to correct this.
-> 
-> Daniel
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Sure, Acked-by: Krzysztof Ha?asa <khc@pm.waw.pl>
+-- 
+Krzysztof Halasa
