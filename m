@@ -1,105 +1,41 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 22 Jul 2011 22:47:22 +0300
-Subject: [PATCH 2/2] arm: omap: mark dt_compat __initconst
-In-Reply-To: <1311364042-8325-1-git-send-email-balbi@ti.com>
-References: <1311364042-8325-1-git-send-email-balbi@ti.com>
-Message-ID: <1311364042-8325-2-git-send-email-balbi@ti.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri, 22 Jul 2011 12:51:06 -0700
+Subject: [PATCH] OMAP: omap_device: replace pr_* prints with dev_*
+In-Reply-To: <CANOLnOOAJMyHUjrf_cM2LVSAs6Zm2bK3RWK73ibNcVg=7vQP4w@mail.gmail.com>
+	(Grazvydas Ignotas's message of "Fri, 22 Jul 2011 16:15:27 +0300")
+References: <1311269976-4035-1-git-send-email-khilman@ti.com>
+	<CANOLnOOAJMyHUjrf_cM2LVSAs6Zm2bK3RWK73ibNcVg=7vQP4w@mail.gmail.com>
+Message-ID: <87hb6e2ixh.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-we have a special section for const data
-which is only needed during init, that's
-__initconst. Use that instead of __initdata
-which is for non-const data.
+Grazvydas Ignotas <notasas@gmail.com> writes:
 
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Signed-off-by: Felipe Balbi <balbi@ti.com>
----
- arch/arm/mach-omap2/board-igep0020.c    |    2 +-
- arch/arm/mach-omap2/board-igep0030.c    |    2 +-
- arch/arm/mach-omap2/board-omap3beagle.c |    2 +-
- arch/arm/mach-omap2/board-omap4panda.c  |    2 +-
- arch/arm/mach-omap2/board-overo.c       |    2 +-
- arch/arm/mach-omap2/board-zoom.c        |    2 +-
- 6 files changed, 6 insertions(+), 6 deletions(-)
+> On Thu, Jul 21, 2011 at 8:39 PM, Kevin Hilman <khilman@ti.com> wrote:
+>> ? ? ? ? ? ? ? ?if (act_lat > odpl->activate_lat) {
+>> ? ? ? ? ? ? ? ? ? ? ? ?odpl->activate_lat_worst = act_lat;
+>> ? ? ? ? ? ? ? ? ? ? ? ?if (odpl->flags & OMAP_DEVICE_LATENCY_AUTO_ADJUST) {
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?odpl->activate_lat = act_lat;
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? pr_warning("omap_device: %s.%d: new worst case "
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?"activate latency %d: %llu\n",
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?od->pdev.name, od->pdev.id,
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?od->pm_lat_level, act_lat);
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? dev_warn(&od->pdev.dev,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?"new worst case activate latency "
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?"%d: %llu\n",
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?od->pm_lat_level, act_lat);
+>
+> I wonder why these have to be warnings, I get quite a lot of them and
+> find them rather annoying. Or is my hardware broken or something?
 
-diff --git a/arch/arm/mach-omap2/board-igep0020.c b/arch/arm/mach-omap2/board-igep0020.c
-index eb198a6..d9888eb 100644
---- a/arch/arm/mach-omap2/board-igep0020.c
-+++ b/arch/arm/mach-omap2/board-igep0020.c
-@@ -703,7 +703,7 @@ static void __init igep2_init(void)
- 
- }
- 
--static const char *igep2_dt_compat[] __initdata = {
-+static const char *igep2_dt_compat[] __initconst = {
- 	"ISEE,igep-v2",
- 	NULL
- };
-diff --git a/arch/arm/mach-omap2/board-igep0030.c b/arch/arm/mach-omap2/board-igep0030.c
-index e13fdf0..984e4a1 100644
---- a/arch/arm/mach-omap2/board-igep0030.c
-+++ b/arch/arm/mach-omap2/board-igep0030.c
-@@ -447,7 +447,7 @@ static void __init igep3_init(void)
- 
- }
- 
--static const char *igep3_dt_compat[] __initdata = {
-+static const char *igep3_dt_compat[] __initconst = {
- 	"ISEE,igep-v3",
- 	NULL
- };
-diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
-index b9ad453..85ca38f 100644
---- a/arch/arm/mach-omap2/board-omap3beagle.c
-+++ b/arch/arm/mach-omap2/board-omap3beagle.c
-@@ -681,7 +681,7 @@ static void __init omap3_beagle_init(void)
- 	beagle_opp_init();
- }
- 
--static const char *omap3_beagle_dt_match[] __initdata = {
-+static const char *omap3_beagle_dt_match[] __initconst = {
- 	"ti,omap3-beagle",
- 	NULL
- };
-diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
-index 47738db..58adeaf 100644
---- a/arch/arm/mach-omap2/board-omap4panda.c
-+++ b/arch/arm/mach-omap2/board-omap4panda.c
-@@ -741,7 +741,7 @@ static void __init omap4_panda_map_io(void)
- 	omap44xx_map_common_io();
- }
- 
--static const char *omap4_panda_match[] __initdata = {
-+static const char *omap4_panda_match[] __initconst = {
- 	"ti,omap4-panda",
- 	NULL,
- };
-diff --git a/arch/arm/mach-omap2/board-overo.c b/arch/arm/mach-omap2/board-overo.c
-index e91942a..e88f846 100644
---- a/arch/arm/mach-omap2/board-overo.c
-+++ b/arch/arm/mach-omap2/board-overo.c
-@@ -785,7 +785,7 @@ static void __init overo_init(void)
- 					"OVERO_GPIO_USBH_CPEN\n");
- }
- 
--static const char *omap3_overo_dt_match[] __initdata = {
-+static const char *omap3_overo_dt_match[] __initconst = {
- 	"gumstix,omap3-overo",
- 	NULL
- };
-diff --git a/arch/arm/mach-omap2/board-zoom.c b/arch/arm/mach-omap2/board-zoom.c
-index 6cc9569..0627ea2 100644
---- a/arch/arm/mach-omap2/board-zoom.c
-+++ b/arch/arm/mach-omap2/board-zoom.c
-@@ -132,7 +132,7 @@ static void __init omap_zoom_init(void)
- 	zoom_display_init();
- }
- 
--static const char *zoom3_dt_match[] __initdata = {
-+static const char *zoom3_dt_match[] __initconst = {
- 	"ti,zoom3",
- 	NULL
- };
--- 
-1.7.6
+No, your hardware is not broken.
+
+> I know other people are disabling this in their trees too:
+> http://www.sakoman.com/cgi-bin/gitweb.cgi?p=linux-omap-2.6.git;a=commitdiff;h=145cf9a7d4ba7c260df7071a28ef40c6a481b6df
+
+Patches to change that are welcome on the list.  
+
+It's not related to this patch which just changes from pr_warning to
+dev_warn, so needs to be done in a separate patch.
+
+Kevin
