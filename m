@@ -1,44 +1,50 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 22 Jul 2011 11:58:20 +0300
-Subject: [RFC/PATCH 3/7] OMAP: McBSP: use existing macros for converting
-	between devices
-In-Reply-To: <1311292338-11830-5-git-send-email-khilman@ti.com>
-References: <1311292338-11830-1-git-send-email-khilman@ti.com>
-	<1311292338-11830-5-git-send-email-khilman@ti.com>
-Message-ID: <20110722085819.GJ32058@legolas.emea.dhcp.ti.com>
+Date: Fri, 22 Jul 2011 12:13:04 +0300
+Subject: [PATCH 2/2] OMAP2+: PM: SR: add suspend/resume handlers
+In-Reply-To: <1311314153-23531-3-git-send-email-nm@ti.com>
+References: <1311314153-23531-1-git-send-email-nm@ti.com>
+	<1311314153-23531-3-git-send-email-nm@ti.com>
+Message-ID: <20110722091303.GK32058@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 21, 2011 at 04:52:14PM -0700, Kevin Hilman wrote:
-> For converting from struct device to platform_device, and from
-> platform_device to struct device, there are existing macros.  Use
-> them instead of manual use of container_of().
+Hi,
+
+On Fri, Jul 22, 2011 at 12:55:53AM -0500, Nishanth Menon wrote:
+> Suspend and Resume paths are safe enough to do it in
+> the standard LDM suspend/resume handlers where one can
+> sleep. Add suspend/resume handlers for SmartReflex.
 > 
-> Signed-off-by: Kevin Hilman <khilman@ti.com>
+> Signed-off-by: Nishanth Menon <nm@ti.com>
 > ---
->  arch/arm/plat-omap/mcbsp.c |    6 +++---
->  1 files changed, 3 insertions(+), 3 deletions(-)
+>  arch/arm/mach-omap2/smartreflex.c |   87 +++++++++++++++++++++++++++++++++++++
+>  1 files changed, 87 insertions(+), 0 deletions(-)
 > 
-> diff --git a/arch/arm/plat-omap/mcbsp.c b/arch/arm/plat-omap/mcbsp.c
-> index 6c62af1..02199e8 100644
-> --- a/arch/arm/plat-omap/mcbsp.c
-> +++ b/arch/arm/plat-omap/mcbsp.c
-> @@ -260,9 +260,9 @@ EXPORT_SYMBOL(omap_mcbsp_dma_reg_params);
->  #ifdef CONFIG_ARCH_OMAP3
->  static struct omap_device *find_omap_device_by_dev(struct device *dev)
->  {
-> -	struct platform_device *pdev = container_of(dev,
-> -					struct platform_device, dev);
-> -	return container_of(pdev, struct omap_device, pdev);
-> +	struct platform_device *pdev = to_platform_device(dev);
-> +
-> +	return to_omap_device(pdev);
+> diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
+> index 33a027f..fb90bd2 100644
+> --- a/arch/arm/mach-omap2/smartreflex.c
+> +++ b/arch/arm/mach-omap2/smartreflex.c
+> @@ -39,6 +39,7 @@ struct omap_sr {
+>  	int				ip_type;
+>  	int				nvalue_count;
+>  	bool				autocomp_active;
+> +	bool				is_suspended;
+>  	u32				clk_length;
+>  	u32				err_weight;
+>  	u32				err_minlimit;
+> @@ -684,6 +685,12 @@ void omap_sr_enable(struct voltagedomain *voltdm)
+>  	if (!sr->autocomp_active)
+>  		return;
+>  
+> +	if (sr->is_suspended) {
+> +		dev_dbg(&sr->pdev->dev, "%s: in suspended state\n", __func__);
+> +		return;
+> +	}
 
-could simplify to:
-
-	return to_omap_device(to_platform_device(dev));
-
-but it won't change much. Only decrease readability, probably.
+I wonder why you get these called if you're in suspend state. If this is
+called by some other driver, then shouldn't you pm_runtime_get_sync();
+do_whatever_you_need_to_do(); and pm_runtime_put(); rather then just
+returning ?
 
 -- 
 balbi
@@ -48,4 +54,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 490 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110722/62086604/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110722/1df9ca98/attachment.sig>
