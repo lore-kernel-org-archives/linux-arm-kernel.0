@@ -1,49 +1,44 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 22 Jul 2011 11:57:17 +0300
-Subject: [RFC/PATCH 2/7] OMAP3: beagle: don't touch omap_device internals
-In-Reply-To: <1311292338-11830-4-git-send-email-khilman@ti.com>
+Date: Fri, 22 Jul 2011 11:58:20 +0300
+Subject: [RFC/PATCH 3/7] OMAP: McBSP: use existing macros for converting
+	between devices
+In-Reply-To: <1311292338-11830-5-git-send-email-khilman@ti.com>
 References: <1311292338-11830-1-git-send-email-khilman@ti.com>
-	<1311292338-11830-4-git-send-email-khilman@ti.com>
-Message-ID: <20110722085716.GI32058@legolas.emea.dhcp.ti.com>
+	<1311292338-11830-5-git-send-email-khilman@ti.com>
+Message-ID: <20110722085819.GJ32058@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Jul 21, 2011 at 04:52:13PM -0700, Kevin Hilman wrote:
-> Board code should not touch omap_device internals.  To get the MPU/IVA devices,
-> use existing APIs: omap2_get_mpu_device(), omap2_get_iva_device().
+On Thu, Jul 21, 2011 at 04:52:14PM -0700, Kevin Hilman wrote:
+> For converting from struct device to platform_device, and from
+> platform_device to struct device, there are existing macros.  Use
+> them instead of manual use of container_of().
 > 
 > Signed-off-by: Kevin Hilman <khilman@ti.com>
 > ---
->  arch/arm/mach-omap2/board-omap3beagle.c |   23 ++++++++++-------------
->  1 files changed, 10 insertions(+), 13 deletions(-)
+>  arch/arm/plat-omap/mcbsp.c |    6 +++---
+>  1 files changed, 3 insertions(+), 3 deletions(-)
 > 
-> diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
-> index 32f5f89..3ae16b4 100644
-> --- a/arch/arm/mach-omap2/board-omap3beagle.c
-> +++ b/arch/arm/mach-omap2/board-omap3beagle.c
-> @@ -491,23 +491,22 @@ static void __init beagle_opp_init(void)
->  
->  	/* Custom OPP enabled for all xM versions */
->  	if (cpu_is_omap3630()) {
-> -		struct omap_hwmod *mh = omap_hwmod_lookup("mpu");
-> -		struct omap_hwmod *dh = omap_hwmod_lookup("iva");
-> -		struct device *dev;
-> +		struct device *mpu_dev, *iva_dev;
->  
-> -		if (!mh || !dh) {
-> +		mpu_dev = omap2_get_mpuss_device();
-> +		iva_dev = omap2_get_iva_device();
+> diff --git a/arch/arm/plat-omap/mcbsp.c b/arch/arm/plat-omap/mcbsp.c
+> index 6c62af1..02199e8 100644
+> --- a/arch/arm/plat-omap/mcbsp.c
+> +++ b/arch/arm/plat-omap/mcbsp.c
+> @@ -260,9 +260,9 @@ EXPORT_SYMBOL(omap_mcbsp_dma_reg_params);
+>  #ifdef CONFIG_ARCH_OMAP3
+>  static struct omap_device *find_omap_device_by_dev(struct device *dev)
+>  {
+> -	struct platform_device *pdev = container_of(dev,
+> -					struct platform_device, dev);
+> -	return container_of(pdev, struct omap_device, pdev);
+> +	struct platform_device *pdev = to_platform_device(dev);
+> +
+> +	return to_omap_device(pdev);
 
-out of curiosity again, nothing to do with this patch.
+could simplify to:
 
-Maybe it would be nicer to have an api such as:
+	return to_omap_device(to_platform_device(dev));
 
-omap2_get_device(name);
-
-there are already four devices to be gotten, if that number grows any
-bigger, so will the number of helper functions.
+but it won't change much. Only decrease readability, probably.
 
 -- 
 balbi
@@ -53,4 +48,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 490 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110722/139764a3/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110722/62086604/attachment.sig>
