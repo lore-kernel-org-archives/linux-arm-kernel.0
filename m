@@ -1,37 +1,33 @@
-From: simon.budig@kernelconcepts.de (Simon Budig)
-Date: Fri, 22 Jul 2011 14:47:43 +0200
-Subject: Patch: Fix for wrong logic in tx_empty for serial/amba-pl011.c
-Message-ID: <4E29716F.2090003@kernelconcepts.de>
+From: simon@budig.de (Simon Budig)
+Date: Fri, 22 Jul 2011 13:07:42 +0200
+Subject: [PATCH] Fix logic of tx_empty.
+Message-ID: <mailman.28.1311338872.20020.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------BEGIN PGP SIGNED MESSAGE-----
-Hash: SHA1
+   test for TX-FIFO *not empty* instead of TX-FIFO full.
 
-Hi all.
+Signed-off-by: Simon Budig <simon.budig@kernelconcepts.de>
+---
+ drivers/tty/serial/amba-pl011.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-There is a problem with the logic of tx_empty in the amba-pl011 serial
-port driver. Instead of checking for an empty FIFO it checks for a
-not-full FIFO.
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index 05eb292..a23b419 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -792,7 +792,7 @@ static unsigned int pl01x_tx_empty(struct uart_port *port)
+ {
+ 	struct uart_amba_port *uap = (struct uart_amba_port *)port;
+ 	unsigned int status = readw(uap->port.membase + UART01x_FR);
+-	return status & (UART01x_FR_BUSY|UART01x_FR_TXFF) ? 0 : TIOCSER_TEMT;
++	return (status & UART01x_FR_BUSY) || !(status & UART011_FR_TXFE) ? 0 : TIOCSER_TEMT;
+ }
+ 
+ static unsigned int pl01x_get_mctrl(struct uart_port *port)
+-- 
+1.7.0.4
 
-Attached is a patch that fixes this.
 
-Bye,
-        Simon Budig
 
-- -- 
-       Simon Budig                        kernel concepts GbR
-       simon.budig at kernelconcepts.de      Sieghuetter Hauptweg 48
-       +49-271-771091-17                  D-57072 Siegen
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v1.4.10 (GNU/Linux)
-Comment: Using GnuPG with Mozilla - http://enigmail.mozdev.org/
-
-iEYEARECAAYFAk4pcW8ACgkQO2O/RXesiHDwWACeO4HQ2BfdZj/8pEakHQ/njVjs
-XuUAoKuyQeBaSJeX3oWp+3OWE4A0+0V3
-=nOMx
------END PGP SIGNATURE-----
--------------- next part --------------
-An embedded and charset-unspecified text was scrubbed...
-Name: amba-serial-fix.mbox
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110722/431dabb9/attachment-0001.ksh>
+--------------060708010803060308030706--
