@@ -1,85 +1,53 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Fri, 22 Jul 2011 11:12:10 +0530
-Subject: [PATCH V4 03-1/13] DMA: PL330: Support DMA_SLAVE_CONFIG command
-In-Reply-To: <1311158773-30314-3-git-send-email-boojin.kim@samsung.com>
-References: <1311158773-30314-1-git-send-email-boojin.kim@samsung.com>
-	<1311158773-30314-3-git-send-email-boojin.kim@samsung.com>
-Message-ID: <CABb+yY058yBZnmYcqbqFCfsBUcxU=JbTZmopLApZaaKim+MMfg@mail.gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Fri, 22 Jul 2011 13:57:32 +0800
+Subject: [PATCH v8 0/3] add the GPMI controller driver for IMX23/IMX28
+In-Reply-To: <4E28EEE1.2050008@freescale.com>
+References: <1311230846-26437-1-git-send-email-b32955@freescale.com>
+	<20110721215020.GA25344@pengutronix.de>
+	<4E28EEE1.2050008@freescale.com>
+Message-ID: <20110722055731.GI26837@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 20, 2011 at 4:16 PM, Boojin Kim <boojin.kim@samsung.com> wrote:
-> Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> ---
-> ?drivers/dma/pl330.c | ? 53 +++++++++++++++++++++++++++++++++++++-------------
-> ?1 files changed, 39 insertions(+), 14 deletions(-)
->
-> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-> index 586ab39..880f010 100644
-> --- a/drivers/dma/pl330.c
-> +++ b/drivers/dma/pl330.c
-> @@ -256,25 +256,50 @@ static int pl330_alloc_chan_resources(struct dma_chan *chan)
-> ?static int pl330_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd, unsigned long arg)
-> ?{
-> ? ? ? ?struct dma_pl330_chan *pch = to_pchan(chan);
-> - ? ? ? struct dma_pl330_desc *desc;
-> + ? ? ? struct dma_pl330_desc *desc, *_dt;
-> ? ? ? ?unsigned long flags;
-> + ? ? ? struct dma_pl330_dmac *pdmac = pch->dmac;
-> + ? ? ? struct dma_slave_config *slave_config;
-> + ? ? ? struct dma_pl330_peri *peri;
-> + ? ? ? LIST_HEAD(list);
->
-> - ? ? ? /* Only supports DMA_TERMINATE_ALL */
-> - ? ? ? if (cmd != DMA_TERMINATE_ALL)
-> - ? ? ? ? ? ? ? return -ENXIO;
-> -
-> - ? ? ? spin_lock_irqsave(&pch->lock, flags);
-> -
-> - ? ? ? /* FLUSH the PL330 Channel thread */
-> - ? ? ? pl330_chan_ctrl(pch->pl330_chid, PL330_OP_FLUSH);
-> + ? ? ? switch (cmd) {
-> + ? ? ? case DMA_TERMINATE_ALL:
-> + ? ? ? ? ? ? ? spin_lock_irqsave(&pch->lock, flags);
->
-> - ? ? ? /* Mark all desc done */
-> - ? ? ? list_for_each_entry(desc, &pch->work_list, node)
-> - ? ? ? ? ? ? ? desc->status = DONE;
-> + ? ? ? ? ? ? ? /* FLUSH the PL330 Channel thread */
-> + ? ? ? ? ? ? ? pl330_chan_ctrl(pch->pl330_chid, PL330_OP_FLUSH);
->
-> - ? ? ? spin_unlock_irqrestore(&pch->lock, flags);
-> + ? ? ? ? ? ? ? /* Mark all desc done */
-> + ? ? ? ? ? ? ? list_for_each_entry_safe(desc, _dt, &pch->work_list , node) {
-> + ? ? ? ? ? ? ? ? ? ? ? desc->status = DONE;
-> + ? ? ? ? ? ? ? ? ? ? ? pch->completed = desc->txd.cookie;
-> + ? ? ? ? ? ? ? ? ? ? ? list_move_tail(&desc->node, &list);
-> + ? ? ? ? ? ? ? }
->
-> - ? ? ? pl330_tasklet((unsigned long) pch);
-> + ? ? ? ? ? ? ? list_splice_tail_init(&list, &pdmac->desc_pool);
-> + ? ? ? ? ? ? ? spin_unlock_irqrestore(&pch->lock, flags);
-> + ? ? ? ? ? ? ? break;
-> + ? ? ? case DMA_SLAVE_CONFIG:
-> + ? ? ? ? ? ? ? slave_config = (struct dma_slave_config *)arg;
-> + ? ? ? ? ? ? ? peri = pch->chan.private;
-> +
-> + ? ? ? ? ? ? ? if (slave_config->direction == DMA_TO_DEVICE) {
-> + ? ? ? ? ? ? ? ? ? ? ? if (slave_config->dst_addr)
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? peri->fifo_addr = slave_config->dst_addr;
-> + ? ? ? ? ? ? ? ? ? ? ? if (slave_config->dst_addr_width)
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? peri->burst_sz = __ffs(slave_config->dst_addr_width);
-> + ? ? ? ? ? ? ? } else if (slave_config->direction == DMA_FROM_DEVICE) {
-> + ? ? ? ? ? ? ? ? ? ? ? if (slave_config->src_addr)
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? peri->fifo_addr = slave_config->src_addr;
-> + ? ? ? ? ? ? ? ? ? ? ? if (slave_config->src_addr_width)
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? peri->burst_sz = __ffs(slave_config->src_addr_width);
-> + ? ? ? ? ? ? ? }
-> + ? ? ? ? ? ? ? break;
-   As discussed yesterday, DMA_SLAVE_CONFIG is assumed to be madatory,
-so please dismantle the 'struct dma_pl330_peri', move fifo_addr,
-burst_sz and rqtype
-to 'struct dma_pl330_chan' and poison them - that will force clients
-to do DMA_SLAVE_CONFIG. Move 'peri_id' to 'struct dma_pl330_platdata'
-  And protect the changes to channel parameters with lock.
+On Fri, Jul 22, 2011 at 11:30:41AM +0800, Huang Shijie wrote:
+> Hi,
+> >> The general-purpose media interface(GPMI) controller is a flexible interface
+> >> to up to several NAND flashs.
+> > ...
+> >> To Walfram & Artem:
+> >>     About how to disable the JFFS2 to use the OOB:
+> >>     I read the code, and I still have no idea about how to use the ecclayout
+> >>     to do the job. Could you give me some hint? thanks.
+> > Have you checked mxc_nand.c for example? There is
+> >
+> > static struct nand_ecclayout nandv1_hw_eccoob_smallpage = {
+> >         .eccbytes = 5,
+> >         .eccpos = {6, 7, 8, 9, 10},
+> >         .oobfree = {{0, 5}, {12, 4}, }
+> > }
+> >
+> > defined as one layout. Now, you could define one where oobfree is empty and
+> > eccbytes as big as the oob-area.
+> >
+> thanks. I will check the code.
+> >> The driver depends on another GPMI-NAND device patch set, you can find them at :
+> >> 	[1] http://lists.infradead.org/pipermail/linux-mtd/2011-July/037033.html
+> >> 	[2] http://lists.infradead.org/pipermail/linux-mtd/2011-July/037031.html
+> >> 	[3] http://lists.infradead.org/pipermail/linux-mtd/2011-July/037032.html
+> >> 	[4] http://lists.infradead.org/pipermail/linux-mtd/2011-July/037034.html
+> >>
+> >> The driver also depends on another DMA patch by Shawn:
+> >> 	[0] http://lists.infradead.org/pipermail/linux-mtd/2011-June/036820.html
+> > This makes it difficult for testers/reviewers. Please try to get a git-branch
+> > from Freescale or Linaro.
+> >
+> Shawn will merge my patches to his Linaro branch.
+> 
+
+git://git.linaro.org/people/shawnguo/linux-2.6.git mxs-gpmi
+
+Shijie, please check and test it.  I only did a build test.
+
+-- 
+Regards,
+Shawn
