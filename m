@@ -1,29 +1,49 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 22 Jul 2011 11:53:57 +0300
-Subject: [PATCH] OMAP: omap_device: replace _find_by_pdev() with
-	to_omap_device()
-In-Reply-To: <1311292338-11830-2-git-send-email-khilman@ti.com>
+Date: Fri, 22 Jul 2011 11:57:17 +0300
+Subject: [RFC/PATCH 2/7] OMAP3: beagle: don't touch omap_device internals
+In-Reply-To: <1311292338-11830-4-git-send-email-khilman@ti.com>
 References: <1311292338-11830-1-git-send-email-khilman@ti.com>
-	<1311292338-11830-2-git-send-email-khilman@ti.com>
-Message-ID: <20110722085356.GH32058@legolas.emea.dhcp.ti.com>
+	<1311292338-11830-4-git-send-email-khilman@ti.com>
+Message-ID: <20110722085716.GI32058@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 21, 2011 at 04:52:11PM -0700, Kevin Hilman wrote:
-> The omap_device layer currently has two ways of getting an omap_device
-> pointer from a platform_device pointer.
+Hi,
+
+On Thu, Jul 21, 2011 at 04:52:13PM -0700, Kevin Hilman wrote:
+> Board code should not touch omap_device internals.  To get the MPU/IVA devices,
+> use existing APIs: omap2_get_mpu_device(), omap2_get_iva_device().
 > 
-> Replace current usage of _find_by_pdev() with to_omap_device() since
-> to_omap_device() is more familiar to the existing to_platform_device()
-> used when getting a platform_device pointer from a struct device pointer.
+> Signed-off-by: Kevin Hilman <khilman@ti.com>
+> ---
+>  arch/arm/mach-omap2/board-omap3beagle.c |   23 ++++++++++-------------
+>  1 files changed, 10 insertions(+), 13 deletions(-)
 > 
+> diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
+> index 32f5f89..3ae16b4 100644
+> --- a/arch/arm/mach-omap2/board-omap3beagle.c
+> +++ b/arch/arm/mach-omap2/board-omap3beagle.c
+> @@ -491,23 +491,22 @@ static void __init beagle_opp_init(void)
+>  
+>  	/* Custom OPP enabled for all xM versions */
+>  	if (cpu_is_omap3630()) {
+> -		struct omap_hwmod *mh = omap_hwmod_lookup("mpu");
+> -		struct omap_hwmod *dh = omap_hwmod_lookup("iva");
+> -		struct device *dev;
+> +		struct device *mpu_dev, *iva_dev;
+>  
+> -		if (!mh || !dh) {
+> +		mpu_dev = omap2_get_mpuss_device();
+> +		iva_dev = omap2_get_iva_device();
 
-FWIW:
+out of curiosity again, nothing to do with this patch.
 
-you can use either Reported-by: Felipe Balbi <balbi@ti.com> or
-Reviewed-by: Felipe Balbi <balbi@ti.com>
+Maybe it would be nicer to have an api such as:
 
-thanks for posting the patch Kevin.
+omap2_get_device(name);
+
+there are already four devices to be gotten, if that number grows any
+bigger, so will the number of helper functions.
 
 -- 
 balbi
@@ -33,4 +53,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 490 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110722/51abee0b/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110722/139764a3/attachment.sig>
