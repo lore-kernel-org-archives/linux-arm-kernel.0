@@ -1,94 +1,32 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 22 Jul 2011 14:46:28 -0700
-Subject: [RFC/PATCH v2] PM / Runtime: allow _put_sync() from
-	interrupts-disabled context
-Message-ID: <1311371188-28879-1-git-send-email-khilman@ti.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Sat, 23 Jul 2011 19:15:17 +0200 (CEST)
+Subject: [PATCH] arm: Call do_notify_resume() with interrupts enabled
+Message-ID: <alpine.LFD.2.02.1107231914050.2702@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the use of pm_runtime_put_sync() is not safe from
-interrupts-disabled context because rpm_idle() will release the
-spinlock and enable interrupts for the idle callbacks.  This enables
-interrupts during a time where interrupts were expected to be
-disabled, and can have strange side effects on drivers that expected
-interrupts to be disabled.
+When a signal is delivered from do_notify_resume() __put_user() is
+currently called with interrupts disabled.
 
-This is not a bug since the documentation clearly states that only
-_put_sync_suspend() is safe in IRQ-safe mode.
+When the access faults then the fault code trips over the interrupts
+disabled check in might_sleep(). No biscuit!
 
-However, pm_runtime_put_sync() could be made safe when in IRQ-safe
-mode by releasing the spinlock but not re-enabling interrupts, which
-is what this patch aims to do.
+Enable interrupts before calling do_notify_resume().
 
-Problem was found when using some buggy drivers that set
-pm_runtime_irq_safe() and used _put_sync() in interrupts-disabled
-context.
-
-The offending drivers have been fixed to use _put_sync_suspend(),
-But this patch is an RFC to see if it might make sense to allow
-using _put_sync() from interrupts-disabled context.
-
-Reported-by: Colin Cross <ccross@google.com>
-Tested-by: Nishanth Menon <nm@ti.com>
-Signed-off-by: Kevin Hilman <khilman@ti.com>
+Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
 ---
-v2: update documentation also
+ arch/arm/kernel/entry-common.S |    1 +
+ 1 file changed, 1 insertion(+)
 
- Documentation/power/runtime_pm.txt |   10 +++++-----
- drivers/base/power/runtime.c       |   10 ++++++++--
- 2 files changed, 13 insertions(+), 7 deletions(-)
-
-diff --git a/Documentation/power/runtime_pm.txt b/Documentation/power/runtime_pm.txt
-index 14dd3c6..4ce5450 100644
---- a/Documentation/power/runtime_pm.txt
-+++ b/Documentation/power/runtime_pm.txt
-@@ -54,11 +54,10 @@ referred to as subsystem-level callbacks in what follows.
- By default, the callbacks are always invoked in process context with interrupts
- enabled.  However, subsystems can use the pm_runtime_irq_safe() helper function
- to tell the PM core that a device's ->runtime_suspend() and ->runtime_resume()
--callbacks should be invoked in atomic context with interrupts disabled
--(->runtime_idle() is still invoked the default way).  This implies that these
--callback routines must not block or sleep, but it also means that the
--synchronous helper functions listed at the end of Section 4 can be used within
--an interrupt handler or in an atomic context.
-+callbacks should be invoked in atomic context with interrupts disabled.
-+This implies that these callback routines must not block or sleep, but it also
-+means that the synchronous helper functions listed at the end of Section 4 can
-+be used within an interrupt handler or in an atomic context.
- 
- The subsystem-level suspend callback is _entirely_ _responsible_ for handling
- the suspend of the device as appropriate, which may, but need not include
-@@ -483,6 +482,7 @@ pm_runtime_suspend()
- pm_runtime_autosuspend()
- pm_runtime_resume()
- pm_runtime_get_sync()
-+pm_runtime_put_sync()
- pm_runtime_put_sync_suspend()
- 
- 5. Runtime PM Initialization, Device Probing and Removal
-diff --git a/drivers/base/power/runtime.c b/drivers/base/power/runtime.c
-index 8dc247c..acb3f83 100644
---- a/drivers/base/power/runtime.c
-+++ b/drivers/base/power/runtime.c
-@@ -226,11 +226,17 @@ static int rpm_idle(struct device *dev, int rpmflags)
- 		callback = NULL;
- 
- 	if (callback) {
--		spin_unlock_irq(&dev->power.lock);
-+		if (dev->power.irq_safe)
-+			spin_unlock(&dev->power.lock);
-+		else
-+			spin_unlock_irq(&dev->power.lock);
- 
- 		callback(dev);
- 
--		spin_lock_irq(&dev->power.lock);
-+		if (dev->power.irq_safe)
-+			spin_lock(&dev->power.lock);
-+		else
-+			spin_lock_irq(&dev->power.lock);
- 	}
- 
- 	dev->power.idle_notification = false;
--- 
-1.7.6
+Index: linux-2.6/arch/arm/kernel/entry-common.S
+===================================================================
+--- linux-2.6.orig/arch/arm/kernel/entry-common.S
++++ linux-2.6/arch/arm/kernel/entry-common.S
+@@ -49,6 +49,7 @@ work_pending:
+ 	bne	work_resched
+ 	tst	r1, #_TIF_SIGPENDING|_TIF_NOTIFY_RESUME
+ 	beq	no_work_pending
++	enable_irq
+ 	mov	r0, sp				@ 'regs'
+ 	mov	r2, why				@ 'syscall'
+ 	tst	r1, #_TIF_SIGPENDING		@ delivering a signal?
