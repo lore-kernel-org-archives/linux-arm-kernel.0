@@ -1,35 +1,66 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Mon, 25 Jul 2011 17:33:45 +0400
-Subject: [PATCH v2 2/6] arm: davinci: Explicitly set channel controllers'
-	default queues
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024DD2CE05@dbde02.ent.ti.com>
-References: <1310303679-17936-1-git-send-email-ido@wizery.com>	<1310303679-17936-3-git-send-email-ido@wizery.com>
-	<B85A65D85D7EB246BE421B3FB0FBB593024DD2CE05@dbde02.ent.ti.com>
-Message-ID: <4E2D70B9.7060202@mvista.com>
+From: vkoul@infradead.org (Vinod Koul)
+Date: Mon, 25 Jul 2011 19:08:31 +0530
+Subject: [PATCH 0/9] PL08x further cleanups
+In-Reply-To: <20110721160800.GR26574@n2100.arm.linux.org.uk>
+References: <20110705131030.GE8286@n2100.arm.linux.org.uk>
+	<1310598328.1536.27.camel@vkoul-udesk3>
+	<20110721160800.GR26574@n2100.arm.linux.org.uk>
+Message-ID: <1311601111.8206.5.camel@vkoul-mobl4>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Thu, 2011-07-21 at 17:08 +0100, Russell King - ARM Linux wrote:
+> On Thu, Jul 14, 2011 at 04:35:28AM +0530, Koul, Vinod wrote:
+> > On Tue, 2011-07-05 at 14:10 +0100, Russell King - ARM Linux wrote:
+> > > This patch series is the remainder of the PL08x work I did earlier
+> > > this year while trying to get the ARM platforms working with DMA.
+> > > 
+> > > Unfortunately, due to the state of the hardware, I was not able to
+> > > properly test these changes.  However, they do compile, and I think
+> > > if others are going to be looking at the PL08x DMA engine driver,
+> > > they're worth having.
+> > > 
+> > > Linus, can you check these out on your hardware please?
+> > 
+> > Russell,
+> > 
+> > The fail to build for me, on line 550 it refers to bd.llil_bus whereas
+> > the bd is a pointer. Further the WIDTH macros seem to be missing.
+> 
+> Grr, I've updated the patches and will post the two updated ones.  I
+> have them in my git tree - would you like them via git instead, or
+> would you prefer to provide acks and let me push them upstream?
+> 
+Russell,
+Thanks I have applied this
 
-Nori, Sekhar wrote:
+Although gcc didnt like not handling other enums so warned:
 
->> Davinci platforms may define a default queue for each channel
->> controller. If one is not defined, the default queue is set to EVENTQ_1.
->> However, there's no way to distinguish between an unset default queue to
->> one that is set to EVENTQ_0, as EVENTQ_0 = 0.
+drivers/dma/amba-pl08x.c: In function 'pl08x_width':
+drivers/dma/amba-pl08x.c:1119: warning: enumeration value
+'DMA_SLAVE_BUSWIDTH_UNDEFINED' not handled in switch
+drivers/dma/amba-pl08x.c:1119: warning: enumeration value
+'DMA_SLAVE_BUSWIDTH_8_BYTES' not handled in switch
 
->> Explicitly specify the default queue for all channel controllers on all
->> Davinci platforms to EVENTQ_1, and don't overwrite it in the EDMA probe
->> function.
+which can be fixed as:
 
->> One exception is the DA850 board, for which EVENTQ_1 is not a valid
->> option for its second channel controller. Use EVENTQ_0 instead for that
->> channel controller.
+diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
+index 9aa2bd4..4925e0d 100644
+--- a/drivers/dma/amba-pl08x.c
++++ b/drivers/dma/amba-pl08x.c
+@@ -1123,6 +1123,8 @@ static u32 pl08x_width(enum dma_slave_buswidth
+width)
+ 		return PL080_WIDTH_16BIT;
+ 	case DMA_SLAVE_BUSWIDTH_4_BYTES:
+ 		return PL080_WIDTH_32BIT;
++	default:
++		return -EINVAL;
+ 	}
+ 	return ~0;
+ }
 
->> Signed-off-by: Ido Yariv <ido@wizery.com>
+If you are okay, pls ack it
 
-> Looks good to me. Will queue for v3.2/fixes
-
-    Why wait for 3.2? If this is considered a fix, it should be applied to 3.1, no?
-
-WBR, Sergei
+-- 
+~Vinod Koul
+Intel Corp.
