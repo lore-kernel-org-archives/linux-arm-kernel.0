@@ -1,51 +1,106 @@
 From: tony.lin@freescale.com (Tony Lin)
-Date: Mon, 25 Jul 2011 15:01:20 +0800
-Subject: [PATCH v2 2/6] ARM: mxs: enable usb1 phy power supply
+Date: Mon, 25 Jul 2011 15:01:19 +0800
+Subject: [PATCH v2 1/6] ARM: mxs: ehci: consolidate definitions and structures
+	to share among platforms
 In-Reply-To: <1311577284-11506-1-git-send-email-tony.lin@freescale.com>
 References: <1311577284-11506-1-git-send-email-tony.lin@freescale.com>
-Message-ID: <1311577284-11506-3-git-send-email-tony.lin@freescale.com>
+Message-ID: <1311577284-11506-2-git-send-email-tony.lin@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-configure usb1 phy power enable gpio and enable usb1 phy power
+move common definitions and data structures used for mxs and mxc
+platforms to fsl_device.h from mxc_ehci.h
+so that these definitions and structures could be shared without
+duplicated copies.
 
 Signed-off-by: Tony Lin <tony.lin@freescale.com>
 ---
- arch/arm/mach-mxs/mach-mx28evk.c |    8 ++++++++
- 1 files changed, 8 insertions(+), 0 deletions(-)
+ arch/arm/plat-mxc/include/mach/mxc_ehci.h |   19 -------------------
+ drivers/usb/host/ehci-mxc.c               |    4 +---
+ include/linux/fsl_devices.h               |   19 +++++++++++++++++++
+ 3 files changed, 20 insertions(+), 22 deletions(-)
 
-diff --git a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
-index eaaf6ff..9901547 100644
---- a/arch/arm/mach-mxs/mach-mx28evk.c
-+++ b/arch/arm/mach-mxs/mach-mx28evk.c
-@@ -34,6 +34,7 @@
- #define MX28EVK_BL_ENABLE	MXS_GPIO_NR(3, 18)
- #define MX28EVK_LCD_ENABLE	MXS_GPIO_NR(3, 30)
- #define MX28EVK_FEC_PHY_RESET	MXS_GPIO_NR(4, 13)
-+#define MX28EVK_USB1_PWR_EN	MXS_GPIO_NR(3, 8)
+diff --git a/arch/arm/plat-mxc/include/mach/mxc_ehci.h b/arch/arm/plat-mxc/include/mach/mxc_ehci.h
+index 2c159dc..8775807 100644
+--- a/arch/arm/plat-mxc/include/mach/mxc_ehci.h
++++ b/arch/arm/plat-mxc/include/mach/mxc_ehci.h
+@@ -1,17 +1,6 @@
+ #ifndef __INCLUDE_ASM_ARCH_MXC_EHCI_H
+ #define __INCLUDE_ASM_ARCH_MXC_EHCI_H
  
- #define MX28EVK_MMC0_WRITE_PROTECT	MXS_GPIO_NR(2, 12)
- #define MX28EVK_MMC1_WRITE_PROTECT	MXS_GPIO_NR(0, 28)
-@@ -183,6 +184,8 @@ static const iomux_cfg_t mx28evk_pads[] __initconst = {
+-/* values for portsc field */
+-#define MXC_EHCI_PHY_LOW_POWER_SUSPEND	(1 << 23)
+-#define MXC_EHCI_FORCE_FS		(1 << 24)
+-#define MXC_EHCI_UTMI_8BIT		(0 << 28)
+-#define MXC_EHCI_UTMI_16BIT		(1 << 28)
+-#define MXC_EHCI_SERIAL			(1 << 29)
+-#define MXC_EHCI_MODE_UTMI		(0 << 30)
+-#define MXC_EHCI_MODE_PHILIPS		(1 << 30)
+-#define MXC_EHCI_MODE_ULPI		(2 << 30)
+-#define MXC_EHCI_MODE_SERIAL		(3 << 30)
+-
+ /* values for flags field */
+ #define MXC_EHCI_INTERFACE_DIFF_UNI	(0 << 0)
+ #define MXC_EHCI_INTERFACE_DIFF_BI	(1 << 0)
+@@ -39,14 +28,6 @@
+ #define MX5_USB_UTMI_PHYCTRL1_PLLDIV_MASK		0x3
+ #define MX5_USB_UTMI_PHYCTRL1_PLLDIV_SHIFT		0
  
- 	/* led */
- 	MX28_PAD_AUART1_TX__GPIO_3_5 | MXS_PAD_CTRL,
-+	/* usb1 */
-+	MX28_PAD_AUART2_RX__GPIO_3_8 | MXS_PAD_CTRL,
- };
+-struct mxc_usbh_platform_data {
+-	int (*init)(struct platform_device *pdev);
+-	int (*exit)(struct platform_device *pdev);
+-
+-	unsigned int		 portsc;
+-	struct otg_transceiver	*otg;
+-};
+-
+ int mx51_initialize_usb_hw(int port, unsigned int flags);
+ int mx25_initialize_usb_hw(int port, unsigned int flags);
+ int mx31_initialize_usb_hw(int port, unsigned int flags);
+diff --git a/drivers/usb/host/ehci-mxc.c b/drivers/usb/host/ehci-mxc.c
+index 0c058be..cbf60a6 100644
+--- a/drivers/usb/host/ehci-mxc.c
++++ b/drivers/usb/host/ehci-mxc.c
+@@ -23,9 +23,7 @@
+ #include <linux/usb/otg.h>
+ #include <linux/usb/ulpi.h>
+ #include <linux/slab.h>
+-
+-#include <mach/mxc_ehci.h>
+-
++#include <linux/fsl_devices.h>
+ #include <asm/mach-types.h>
  
- /* led */
-@@ -405,6 +408,11 @@ static void __init mx28evk_init(void)
- 		pr_warn("failed to request gpio mmc1-slot-power: %d\n", ret);
- 	mx28_add_mxs_mmc(1, &mx28evk_mmc_pdata[1]);
+ #define ULPI_VIEWPORT_OFFSET	0x170
+diff --git a/include/linux/fsl_devices.h b/include/linux/fsl_devices.h
+index fffdf00..bc2c1bf 100644
+--- a/include/linux/fsl_devices.h
++++ b/include/linux/fsl_devices.h
+@@ -103,6 +103,25 @@ struct fsl_usb2_platform_data {
  
-+	ret = gpio_request_one(MX28EVK_USB1_PWR_EN, GPIOF_OUT_INIT_HIGH,
-+			       "usb1-power-en");
-+	if (ret)
-+		pr_warn("failed to request gpio usb1-power-en %d\n", ret);
+ #define FLS_USB2_WORKAROUND_ENGCM09152	(1 << 0)
+ 
++/* values for portsc field */
++#define MXC_EHCI_PHY_LOW_POWER_SUSPEND	(1 << 23)
++#define MXC_EHCI_FORCE_FS		(1 << 24)
++#define MXC_EHCI_UTMI_8BIT		(0 << 28)
++#define MXC_EHCI_UTMI_16BIT		(1 << 28)
++#define MXC_EHCI_SERIAL			(1 << 29)
++#define MXC_EHCI_MODE_UTMI		(0 << 30)
++#define MXC_EHCI_MODE_PHILIPS		(1 << 30)
++#define MXC_EHCI_MODE_ULPI		(2 << 30)
++#define MXC_EHCI_MODE_SERIAL		(3 << 30)
 +
- 	gpio_led_register_device(0, &mx28evk_led_data);
- }
++struct mxc_usbh_platform_data {
++	int (*init)(struct platform_device *pdev);
++	int (*exit)(struct platform_device *pdev);
++
++	unsigned int		 portsc;
++	struct otg_transceiver	*otg;
++};
++
+ struct spi_device;
  
+ struct fsl_spi_platform_data {
 -- 
 1.7.0.4
