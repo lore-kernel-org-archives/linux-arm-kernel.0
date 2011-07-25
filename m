@@ -1,211 +1,81 @@
-From: boojin.kim@samsung.com (Boojin Kim)
-Date: Mon, 25 Jul 2011 21:59:33 +0900
-Subject: [PATCH V4 07/14] ARM: EXYNOS4: Use generic DMA PL330 driver
-In-Reply-To: <CABb+yY3yEDuWv3n=fJK5TfeXi0=P96NpL3=EXHmXAqmpaium8A@mail.gmail.com>
-References: <1311557312-26107-1-git-send-email-boojin.kim@samsung.com>
-	<1311557312-26107-8-git-send-email-boojin.kim@samsung.com>
-	<CABb+yY3yEDuWv3n=fJK5TfeXi0=P96NpL3=EXHmXAqmpaium8A@mail.gmail.com>
-Message-ID: <002501cc4aca$b3436750$19ca35f0$%kim@samsung.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 25 Jul 2011 18:34:07 +0530
+Subject: [PATCH 0/4] Fix CPU hotplug IRQ migration
+In-Reply-To: <4E290C05.7020209@ti.com>
+References: <20110721151413.GD28942@n2100.arm.linux.org.uk>
+	<4E290C05.7020209@ti.com>
+Message-ID: <4E2D69C7.4040609@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jassi Brar Wrote:
-> Sent: Monday, July 25, 2011 9:00 PM
-> To: Boojin Kim
-> Cc: linux-arm-kernel at lists.infradead.org; linux-samsung-
-> soc at vger.kernel.org; Vinod Koul; Dan Williams; Kukjin Kim; Grant
-> Likely; Mark Brown
-> Subject: Re: [PATCH V4 07/14] ARM: EXYNOS4: Use generic DMA PL330
-> driver
+Russell,
+On 7/22/2011 11:05 AM, Santosh Shilimkar wrote:
+> + Colin,
 >
-> On Mon, Jul 25, 2011 at 6:58 AM, Boojin Kim <boojin.kim@samsung.com>
-> wrote:
+> On 7/21/2011 8:44 PM, Russell King - ARM Linux wrote:
+>> This series fixes a bunch of issues with IRQ migration:
+>>
+>> 1. Preventing affinity changes causing IRQs to be directed to off-line
+>> CPUs.
+>> 2. Preventing oopses with non-GIC interrupt controllers.
+>> 3. Preventing per-CPU IRQs being candidates for migration.
+>> 4. Removing the abuse of irqdesc's node member.
+>>
+>> This prevents crashes on OMAP4430 SDP when non-default IRQ affinity
+>> settings are used and a CPU which owns some IRQs is offlined.
+>>
+> Firstly thanks for fixing the IRQ migration and affinity issues
+> with hotplug code. Colin found the hotplug irq affinity issue
+> last week.
 >
-> > diff --git a/arch/arm/mach-exynos4/dma.c b/arch/arm/mach-
-> exynos4/dma.c
-> > index 564bb53..e1c00cf 100644
-> > --- a/arch/arm/mach-exynos4/dma.c
-> > +++ b/arch/arm/mach-exynos4/dma.c
-> > @@ -21,151 +21,250 @@
-> >  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-> >  */
-> >
-> > -#include <linux/platform_device.h>
-> >  #include <linux/dma-mapping.h>
-> > +#include <linux/amba/bus.h>
-> > +#include <linux/amba/pl330.h>
-> >
-> > +#include <asm/irq.h>
-> >  #include <plat/devs.h>
-> >  #include <plat/irqs.h>
-> >
-> >  #include <mach/map.h>
-> >  #include <mach/irqs.h>
-> > -
-> > -#include <plat/s3c-pl330-pdata.h>
-> > +#include <mach/dma.h>
-> >
-> >  static u64 dma_dmamask = DMA_BIT_MASK(32);
-> >
-> > -static struct resource exynos4_pdma0_resource[] = {
-> > -       [0] = {
-> > -               .start  = EXYNOS4_PA_PDMA0,
-> > -               .end    = EXYNOS4_PA_PDMA0 + SZ_4K,
-> > -               .flags  = IORESOURCE_MEM,
-> > -       },
-> > -       [1] = {
-> > -               .start  = IRQ_PDMA0,
-> > -               .end    = IRQ_PDMA0,
-> > -               .flags  = IORESOURCE_IRQ,
-> > +struct dma_pl330_peri pdma0_peri[32] = {
-> Please remove 32 from the list (it seems you don't always pass 32
-> elements)
-> Also for completeness, please explicitly write element indices below
-> because
-> it's not some array of randomly placed elements.
-> Same for every other such occurance.
-I will address your comment.
+I have tested and revtested this series on OMAP4. Though I made one 
+interesting observations while testing.
 
->
-> > +       {
-> > +               .peri_id = (u8)DMACH_PCM0_RX,
-> > +               .rqtype = DEVTOMEM,
-> > +       }, {
-> > +               .peri_id = (u8)DMACH_PCM0_TX,
-> > +               .rqtype = MEMTODEV,
-> > +       }, {
-> > +               .peri_id = (u8)DMACH_PCM2_RX,
-> > +               .rqtype = DEVTOMEM,
-> > +       }, {
-> > +               .peri_id = (u8)DMACH_PCM2_TX,
-> > +               .rqtype = MEMTODEV,
-> > +               .burst_sz = 4,
-> > +       }, {
-> > +               .peri_id = (u8)DMACH_MSM_REQ0,
-> > +       }, {
-> > +               .peri_id = (u8)DMACH_MSM_REQ2,
-> > +       }, {
-> > +               .peri_id = (u8)DMACH_SPI0_RX,
-> > +               .rqtype = DEVTOMEM,
-> > +               .burst_sz = 1,
-> > +       }, {
-> > +               .peri_id = (u8)DMACH_SPI0_TX,
-> > +               .rqtype = MEMTODEV,
-> > +               .burst_sz = 1,
-> > +       }, {
-> > +               .peri_id = (u8)DMACH_SPI2_RX,
-> > +               .rqtype = DEVTOMEM,
-> > +               .burst_sz = 1,
-> > +       }, {
-> > +               .peri_id = (u8)DMACH_SPI2_TX,
-> > +               .rqtype = MEMTODEV,
-> > +               .burst_sz = 1,
-> > +       }, {
-> > +               .peri_id = (u8)DMACH_I2S0S_TX,
-> > +               .rqtype = MEMTODEV,
-> > +       }, {
-> > +               .peri_id = (u8)DMACH_I2S0_RX,
-> > +               .rqtype = DEVTOMEM,
-> > +       }, {
-> > +               .peri_id = (u8)DMACH_I2S0_TX,
-> > +               .rqtype = MEMTODEV,
-> > +       }, {
-> > +               .peri_id = (u8)DMACH_UART0_RX,
-> > +               .rqtype = DEVTOMEM,
-> > +               .burst_sz = 4,
-> > +       }, {
-> > +               .peri_id = (u8)DMACH_UART0_TX,
-> > +               .rqtype = MEMTODEV,
-> > +               .burst_sz = 4,
-> > +       }, {
-> > +               .peri_id = (u8)DMACH_UART2_RX,
-> > +               .rqtype = DEVTOMEM,
-> > +               .burst_sz = 4,
-> > +       }, {
-> > +               .peri_id = (u8)DMACH_UART2_TX,
-> > +               .rqtype = MEMTODEV,
-> > +               .burst_sz = 4,
-> > +       }, {
-> > +               .peri_id = (u8)DMACH_UART4_RX,
-> > +               .rqtype = DEVTOMEM,
-> > +               .burst_sz = 4,
-> > +       }, {
-> > +               .peri_id = (u8)DMACH_UART4_TX,
-> > +               .rqtype = MEMTODEV,
-> > +               .burst_sz = 4,
-> > +       }, {
-> > +               .peri_id = (u8)DMACH_SLIMBUS0_RX,
-> > +               .rqtype = DEVTOMEM,
-> > +       }, {
-> > +               .peri_id = (u8)DMACH_SLIMBUS0_TX,
-> > +               .rqtype = MEMTODEV,
-> > +       }, {
-> > +               .peri_id = (u8)DMACH_SLIMBUS2_RX,
-> > +               .rqtype = DEVTOMEM,
-> > +       }, {
-> > +               .peri_id = (u8)DMACH_SLIMBUS2_TX,
-> > +               .rqtype = MEMTODEV,
-> > +       }, {
-> > +               .peri_id = (u8)DMACH_SLIMBUS4_RX,
-> > +               .rqtype = DEVTOMEM,
-> > +       }, {
-> > +               .peri_id = (u8)DMACH_SLIMBUS4_TX,
-> > +               .rqtype = MEMTODEV,
-> > +       }, {
-> > +               .peri_id = (u8)DMACH_AC97_MICIN,
-> > +               .rqtype = DEVTOMEM,
-> > +               .burst_sz = 4,
-> > +       }, {
-> > +               .peri_id = (u8)DMACH_AC97_PCMIN,
-> > +               .rqtype = DEVTOMEM,
-> > +               .burst_sz = 4,
-> > +       }, {
-> > +               .peri_id = (u8)DMACH_AC97_PCMOUT,
-> > +               .rqtype = MEMTODEV,
-> > +               .burst_sz = 4,
-> >        },
-> >  };
->
->
-> >
-> > -static struct s3c_pl330_platdata exynos4_pdma0_pdata = {
-> > -       .peri = {
-> > -               [0] = DMACH_PCM0_RX,
-> > -               [1] = DMACH_PCM0_TX,
-> > -               [2] = DMACH_PCM2_RX,
-> > -               [3] = DMACH_PCM2_TX,
-> > -               [4] = DMACH_MSM_REQ0,
-> > -               [5] = DMACH_MSM_REQ2,
-> > -               [6] = DMACH_SPI0_RX,
-> > -               [7] = DMACH_SPI0_TX,
-> > -               [8] = DMACH_SPI2_RX,
-> > -               [9] = DMACH_SPI2_TX,
-> > -               [10] = DMACH_I2S0S_TX,
-> > -               [11] = DMACH_I2S0_RX,
-> > -               [12] = DMACH_I2S0_TX,
-> > -               [13] = DMACH_I2S2_RX,
-> > -               [14] = DMACH_I2S2_TX,
-> > -               [15] = DMACH_UART0_RX,
-> > -               [16] = DMACH_UART0_TX,
-> > -               [17] = DMACH_UART2_RX,
-> > -               [18] = DMACH_UART2_TX,
-> > -               [19] = DMACH_UART4_RX,
-> > -               [20] = DMACH_UART4_TX,
-> > -               [21] = DMACH_SLIMBUS0_RX,
-> > -               [22] = DMACH_SLIMBUS0_TX,
-> > -               [23] = DMACH_SLIMBUS2_RX,
-> > -               [24] = DMACH_SLIMBUS2_TX,
-> > -               [25] = DMACH_SLIMBUS4_RX,
-> > -               [26] = DMACH_SLIMBUS4_TX,
-> > -               [27] = DMACH_AC97_MICIN,
-> > -               [28] = DMACH_AC97_PCMIN,
-> > -               [29] = DMACH_AC97_PCMOUT,
-> > -               [30] = DMACH_MAX,
-> > -               [31] = DMACH_MAX,
-> > -       },
-> > +struct dma_pl330_platdata exynos4_pdma0_pdata = {
-> > +       .nr_valid_peri = 32,
-> Perhaps, this is why you had to add the NULL peri check.
-> Please use ARRAY_SIZE here.
-> Same for every other such occurance.
-I will address your comment.
+# cat /proc/irq/44/smp_affinity
+3
+# echo 2 > /proc/irq/44/smp_affinity
+# cat /proc/irq/44/smp_affinity
+2
+
+# cat /proc/interrupts
+            CPU0       CPU1
+  44:       5179         38       GIC  DMA
+
+# echo 0 > /sys/devices/system/cpu/cpu1/online
+[  137.663208] CPU1: shutdown
+#
+# cat /proc/interrupts
+            CPU0
+  44:       5241       GIC  DMA
+
+After CPU1 offline, the IRQ is handled by CPU0
+even though masks say's it's CPU0. Mask should have
+been corrected by hotplug code but as per your comments
+this is just userspace settings and shouldn't dictate
+which CPU handles the IRQ.
+
+The interesting part is once you online CPU now,
+IRQ44 continues to be on CPU0.
+
+You think above behavior is fine? My i686 UBUNTU box,
+I don't see above behaviour. The hotplug code updates
+the IRQ mask to available CPU.
+
+Secondly, GIC smp_set_affinity is kind of set_target_cpu
+function. How can we relay the target CPU information to
+gic_arch_extn, so that they can update their settings as
+per GIC.
+
+And lastly, we need to ensure that migrate_irq()
+should be relayed to gic_arch_extn(), so that all
+the interrupt on dying CPU can be masked.
+
+Apart from one comment in patch 3/4, and above observations,
+this series looks good to me.
+
+If you need one, can add my
+Reviewedd-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Tested-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+
+Regards
+Santosh
