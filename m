@@ -1,37 +1,102 @@
-From: vkoul@infradead.org (Vinod Koul)
-Date: Mon, 25 Jul 2011 19:55:37 +0530
-Subject: [PATCH 1/1] ARM: mxs-dma: reset after disable channel
-In-Reply-To: <1311048596-19932-1-git-send-email-b29396@freescale.com>
-References: <1311048596-19932-1-git-send-email-b29396@freescale.com>
-Message-ID: <1311603937.8206.18.camel@vkoul-mobl4>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 25 Jul 2011 19:57:36 +0530
+Subject: [PATCH 0/4] Fix CPU hotplug IRQ migration
+In-Reply-To: <20110725132353.GJ9653@n2100.arm.linux.org.uk>
+References: <20110721151413.GD28942@n2100.arm.linux.org.uk>
+	<4E290C05.7020209@ti.com> <4E2D69C7.4040609@ti.com>
+	<20110725132353.GJ9653@n2100.arm.linux.org.uk>
+Message-ID: <4E2D7D58.8080309@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2011-07-19 at 12:09 +0800, Dong Aisheng wrote:
-> We met some channels in abnormal state after disable.
-> Reset it to get a clean state.
-> 
-> Signed-off-by: Dong Aisheng <b29396@freescale.com>
-> Cc: Vinod Koul <vinod.koul@intel.com>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> ---
->  drivers/dma/mxs-dma.c |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
-> index 88aad4f..5a24010 100644
-> --- a/drivers/dma/mxs-dma.c
-> +++ b/drivers/dma/mxs-dma.c
-> @@ -535,6 +535,7 @@ static int mxs_dma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
->  	switch (cmd) {
->  	case DMA_TERMINATE_ALL:
->  		mxs_dma_disable_chan(mxs_chan);
-> +		mxs_dma_reset_chan(mxs_chan);
->  		break;
->  	case DMA_PAUSE:
->  		mxs_dma_pause_chan(mxs_chan);
-Applied, Thanks
+On 7/25/2011 6:53 PM, Russell King - ARM Linux wrote:
+> On Mon, Jul 25, 2011 at 06:34:07PM +0530, Santosh Shilimkar wrote:
+>> After CPU1 offline, the IRQ is handled by CPU0
+>> even though masks say's it's CPU0. Mask should have
+>
+> ITYM CPU1 here.
+>
+right.
 
--- 
-~Vinod Koul
-Intel Corp.
+>> been corrected by hotplug code but as per your comments
+>> this is just userspace settings and shouldn't dictate
+>> which CPU handles the IRQ.
+>>
+>> The interesting part is once you online CPU now,
+>> IRQ44 continues to be on CPU0.
+>
+> Yes, we don't migrate IRQs back onto their affine CPUs when they come
+> back online - I don't think anyone does.
+>
+>> You think above behavior is fine? My i686 UBUNTU box,
+>> I don't see above behaviour. The hotplug code updates
+>> the IRQ mask to available CPU.
+>
+> Yes, I noticed that, and the code is really weird - and I think buggy -
+> there for two reasons:
+>
+> 1. If you bind an interrupt to CPUs 1, and you take CPU 1 offline,
+>     the result is that the interrupt now is bound to _all_ CPUs even
+>     when CPU 1 comes back online.
+>
+> 2. irq_set_affinity() returns a code to indicate whether the affinity
+>     mask is to be updated (see __irq_set_affinity_locked - IRQ_SET_MASK_OK
+>     or IRQ_SET_MASK_OK_NOCOPY which defines whether irq_data->affinity
+>     is updated.
+>
+> To have the individual irq_set_affinity() directly set irq_data->affinity
+> like x86 does seems to go against the intentions of
+> __irq_set_affinity_locked().
+>
+ok.
+
+>> Secondly, GIC smp_set_affinity is kind of set_target_cpu function.
+>
+> No, the gic_set_affinity() has always been a "set this interrupt to be
+> routed to one of these IRQs", except when our IRQ migration code used
+> to call it with a specific CPU.  That's an exceptional (and incorrect)
+> case though.
+>
+> Why?  The interface is that the affinity mask contains a set of CPUs,
+> and that's how generic code will call it when you write to the
+> /proc/irq/*/smp_affinity files.  If you have a 4-CPU system, and you
+> echo '3' into one of those files, gic_set_affinity() will be called
+> with a mask containing CPU0,1 and not 2,3.
+>
+> The fact that gic_set_affinity() has always chosen the first CPU in the
+> mask is an implementation detail, one which should stay private to
+> gic_set_affinity().
+>
+This is probably the contention point considering 'gic_arch_extn'
+exist and can have control per CPU. But as long as we ensure GIC
+and 'gic_arch_extn' have same implementation, it should be fine.
+
+>> How can we relay the target CPU information to gic_arch_extn, so that
+>> they can update their settings as per GIC.
+>
+> That was my point to Colin - the set_affinity() interface, nor
+> irq_data->affinity really isn't suitable for doing that.
+>
+Good. We are aligned here.
+
+> One way we _could_ do it is have the GIC code recompose a CPU mask
+> containing exactly one CPU - but if we ever end up with NR_CPUS>  32
+> the CPU mask idea may become unmanagable - it may be better to pass
+> the exact CPU number down.  It depends how its going to be used, and
+> so far I can see no examples of that.
+Will make you OMAP4 IRQ code available for this particular aspect and
+may be we can take it from there. There are two main problems I am
+seeing currently.
+
+1)Which CPU gic_arch_extn_[mask/unmask] operate on?
+Can we assume that whichever CPU the call being executed
+should be the target CPU ? This might not be safe assumption
+though. For the extn, there is no other way to know the target
+CPU for mask/unmask of an IRQ
+
+2) Relaying the IRQ migration information to gic_arch_extns
+
+Thanks for good discussion.
+
+Regards
+Santosh
