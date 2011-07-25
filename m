@@ -1,58 +1,49 @@
-From: philippe.retornaz@epfl.ch (Philippe =?iso-8859-1?q?R=E9tornaz?=)
-Date: Mon, 25 Jul 2011 08:49:25 +0200
-Subject: [PATCH v6 0/6] mc13783: add pwr button support
-In-Reply-To: <20110724034418.GA28189@S2100-06.ap.freescale.net>
-References: <1311344232-29902-1-git-send-email-philippe.retornaz@epfl.ch>
-	<20110724034418.GA28189@S2100-06.ap.freescale.net>
-Message-ID: <201107250849.26071.philippe.retornaz@epfl.ch>
+From: tony.lin@freescale.com (Tony Lin)
+Date: Mon, 25 Jul 2011 15:01:18 +0800
+Subject: [PATCH v2 0/6] ARM: mx28: add usb host function
+Message-ID: <1311577284-11506-1-git-send-email-tony.lin@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le dimanche 24 juillet 2011 05:44:19, Shawn Guo a ?crit :
-> On Fri, Jul 22, 2011 at 04:17:06PM +0200, Philippe R?tornaz wrote:
-> > Hello
-> > 
-> > This add button handling for the MC13783 PMIC.
-> > 
-> > Patch 1 & 2 modify the mc13xxx MFD driver to use the platform data to
-> > resgister the led subdevice and unconditionally register the regulator
-> > subdevice (as suggested by Mark and Uwe).
-> > 
-> > Patch 3 remove the use of the *_USE_REGULATOR and *_USE_LED macros in
-> > the platform files.
-> > 
-> > Patch 4 must be applied after patch 1,2,3 to remove the obsolete define.
-> > 
-> > Patch 5 modify the mc13xxx MFD driver to add a button subdevice and
-> > also adds the mc13783-pwrbutton driver using a misc input device.
-> > 
-> > The last patch adds the power on button support to the mx31moboard
-> > boards.
-> > 
-> > v2: first patch modified according to comments by Dmitry Torokhov
-> > v3: Implement review by Uwe
-> > v4: Implement comments by Uwe and Mark
-> > v5: Reorder patchset
-> > v6: Minor corrections
-> 
-> It seems you did not address the comment about possible NULL pdata I
-> put on v4?
+this patch series is to add mx28 usb host function.
+the driver only support usb host mode on usb port1.
+the driver reuses ehci-mxc.c under usb/host, but did
+some modifications based on it to satisfy mx28 usb host
+requirement. The modifications will not affect other
+platforms.
 
-Yes I did in patch 5:
+Code is based on the branch for-next in sascha's tree http://git.pengutronix.de/git/imx/linux-2.6.git
 
---- a/drivers/mfd/mc13xxx-core.c
-+++ b/drivers/mfd/mc13xxx-core.c
-@@ -716,6 +716,11 @@ static int mc13xxx_probe(struct spi_device *spi)
-        enum mc13xxx_id id;
-        int ret;
- 
-+       if (!pdata) {
-+               dev_err(&spi->dev, "invalid platform data\n");
-+               return -EINVAL;
-+       }
-+
+Tested on MX28 EVK.
 
+changes since v1:
+ * add dummy clock to avoid adding cpu judgement in driver for Sascha's request.
+ * use context in phy functions, so that usb device could share the code.
+ * some code consolidation and patch reorgnization.
+ * error checking improvement.
+ * remove a few unneccesary code.
 
-Thanks,
+Tony Lin (6):
+  ARM: mxs: ehci: consolidate definitions and structures to share among platforms
+  ARM: mxs: enable usb1 phy power supply
+  ARM: mxs: add usb clocks to clock tree
+  ARM: mxs: make ehci-mxc more flexible to be used on different platforms
+  ARM: mxs: add usb phy operations
+  ARM: mxs: add usb host function to default config
 
-Philippe
+ arch/arm/configs/mxs_defconfig            |    8 +-
+ arch/arm/mach-mxs/Kconfig                 |    1 +
+ arch/arm/mach-mxs/Makefile                |    1 +
+ arch/arm/mach-mxs/clock-mx28.c            |   28 ++-
+ arch/arm/mach-mxs/include/mach/hardware.h |    2 +
+ arch/arm/mach-mxs/include/mach/mxs.h      |   12 +-
+ arch/arm/mach-mxs/mach-mx28evk.c          |    8 +
+ arch/arm/mach-mxs/mxs_usb.c               |  286 +++++++++++++++++++++++++++++
+ arch/arm/mach-mxs/regs-usbphy-mx28.h      |  240 ++++++++++++++++++++++++
+ arch/arm/plat-mxc/include/mach/mxc_ehci.h |   19 --
+ drivers/usb/host/Kconfig                  |    2 +-
+ drivers/usb/host/ehci-mxc.c               |   21 ++-
+ include/linux/fsl_devices.h               |   21 ++
+ 13 files changed, 613 insertions(+), 36 deletions(-)
+ create mode 100644 arch/arm/mach-mxs/mxs_usb.c
+ create mode 100644 arch/arm/mach-mxs/regs-usbphy-mx28.h
