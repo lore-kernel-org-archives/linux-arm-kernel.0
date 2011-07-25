@@ -1,5 +1,5 @@
 From: vkoul@infradead.org (Vinod Koul)
-Date: Mon, 25 Jul 2011 19:21:12 +0530
+Date: Mon, 25 Jul 2011 19:21:51 +0530
 Subject: [PATCH 0/9] PL08x further cleanups
 In-Reply-To: <20110725134340.GK9653@n2100.arm.linux.org.uk>
 References: <20110705131030.GE8286@n2100.arm.linux.org.uk>
@@ -7,7 +7,7 @@ References: <20110705131030.GE8286@n2100.arm.linux.org.uk>
 	<20110721160800.GR26574@n2100.arm.linux.org.uk>
 	<1311601111.8206.5.camel@vkoul-mobl4>
 	<20110725134340.GK9653@n2100.arm.linux.org.uk>
-Message-ID: <1311601872.8206.10.camel@vkoul-mobl4>
+Message-ID: <1311601911.8206.11.camel@vkoul-mobl4>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -60,8 +60,6 @@ On Mon, 2011-07-25 at 14:43 +0100, Russell King - ARM Linux wrote:
 > as a default case to shut it up.
 Okay but shouldn't this ideally check for width < 0, that way we can
 return proper errors?
-
-If yo
 
 -- 
 ~Vinod Koul
