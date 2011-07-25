@@ -1,90 +1,15 @@
-From: nm@ti.com (Menon, Nishanth)
-Date: Mon, 25 Jul 2011 12:55:39 -0500
-Subject: [PATCH 2/2 V2] OMAP3+: PM: SR: add suspend/resume handlers
-In-Reply-To: <20110725171317.GH18062@legolas.emea.dhcp.ti.com>
-References: <1311526357-7578-1-git-send-email-nm@ti.com>
-	<20110725084238.GC18062@legolas.emea.dhcp.ti.com>
-	<CAOMWX4dC60SuF9=KDCrQo7zD5_PhTJhwuyqRkqj0ag8FHDQaxw@mail.gmail.com>
-	<20110725171317.GH18062@legolas.emea.dhcp.ti.com>
-Message-ID: <CAOMWX4dnD+GX+G8eFBgqqtwF0=+mgcqdJc2vfhf7eMW+LLnwSw@mail.gmail.com>
+From: scwilliams@nvidia.com (Scott Williams)
+Date: Mon, 25 Jul 2011 11:49:43 -0700
+Subject: cpu_suspend does not flush the L2 cache
+Message-ID: <74C67D49A66F0848B6F4548360B2EDB58DED35BC42@HQMAIL04.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 25, 2011 at 12:13, Felipe Balbi <balbi@ti.com> wrote:
-[..]
->> > while at that, SR's IRQ is never freed on exit path, could fix it while
->> > you're already there ?
->>
->> This is not really related to this patch is it? IMHO IRQ handling is
->
-> I didn't say to put it on the same patch ;-) I meant that while at that,
-> you could add that simple fix before this patch ;-)
-Not really that simple - it is just one part of the equation, my point
-being - if we are cleaning up, we better cleanup completely on that
-thread at least.
+In 2.6.39, CPU suspend/resumes crashes if an outer cache controller (like a PL310) is configured and enabled. cpu_suspend only flushes the L1 cache. If an outer cache controller is enabled, the context and saved stack pointer are left sitting in the L2 memory. An attempt to resume a secondary CPU without shutting down the entire CPU complex and flushing the entire L2 cache will cause the secondary CPU to crash because the stack pointer in sleep_save_sp is invalid in L3 memory.
 
->
->> broken badly. Current support is for SmartReflex class3 - which does
->> not use the IRQ, Class2 and Class1.5 use it, but the current code
->> requires major fixes which I dont intend to support in this series.
->
-> And that's exactly what I mean. IMHO it's far better to fix the mess
-> before adding more stuff, otherwise it just becomes an even bigger mess,
-> even more difficult to fix in the long run. We've seen that with GPIO
-> and sDMA drivers _at_least_ ;-(
+Scott Williams
+Sr. Software Engineer
+NVIDIA Corporation
 
-I tried pushing the cleanups in my series
-http://marc.info/?l=linux-omap&m=129933897910785&w=2
-
-few of them did go through and I have since personally lost interest
-and depending on my next free slot (not forthcoming for next few
-months), I might want to retry it, but I guess there is more interest
-in turning things into regulators than add new code.
-
-I am ok if folks want to drop this patch - like previously, things
-tend to get forgotten..
-
->
->> >> @@ -998,10 +1020,75 @@ static int __devexit omap_sr_remove(struct platform_device *pdev)
->> >> ? ? ? return 0;
->> >> ?}
->> >>
->> >> +static int omap_sr_suspend(struct device *dev)
->> >> +{
->> >> + ? ? struct omap_sr_data *pdata;
->> >> + ? ? struct omap_sr *sr_info;
->> >> +
->> >> + ? ? pdata = dev_get_platdata(dev);
->> >
->> > I'm not sure you need to use platform data here...
->> see below
->> >
->> >> + ? ? if (!pdata) {
->> >> + ? ? ? ? ? ? dev_err(dev, "%s: platform data missing\n", __func__);
->> >> + ? ? ? ? ? ? return -EINVAL;
->> >> + ? ? }
->> >> +
->> >> + ? ? sr_info = _sr_lookup(pdata->voltdm);
->> >
->> > this field is held on struct omap_sr. Can't you:
->> >
->> > ? ? ? ?struct omap_sr ?*info = dev_get_drvdata(dev);
->> >
->> > ?? I see that a platform_set_drvdata() is missing from the driver, but
->> > maybe you should add that instead of accessing platform_data.
->> omap_sr_data is added in arch/arm/mach-omap2/sr_device.c
->>
->> With the current handling - it needs sr_data from which sr_info is
->> pulled out. in the current implementation, sr_data contains the voltdm
->> pointer from which sr_info is pulled out.
->
-> but sr_info is allocated on probe() isn't it ? if you add
-> platform_set_drvdata(pdev, sr_info) on probe, you won't need sr_data to
-> fetch sr_info, all you need is to use dev_get_drvdata(dev). Am I missing
-> something ?
-sr_info - I am not debating that this is not possible - I am just
-explaining how it is being done now. I just dont have the bandwidth to
-kill all evils in smartreflex driver. :(
-
-Regards,
-Nishanth Menon
+--
+nvpublic
