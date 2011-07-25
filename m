@@ -1,28 +1,52 @@
-From: linuxram@us.ibm.com (Ram Pai)
-Date: Mon, 25 Jul 2011 12:17:47 -0700
-Subject: [PATCH 1/6] microblaze: move pci flag functions into asm-generic
-In-Reply-To: <20110629095436.154cff94@jbarnes-desktop>
-References: <1309366019-24379-1-git-send-email-robherring2@gmail.com>
-	<1309366019-24379-2-git-send-email-robherring2@gmail.com>
-	<20110629095436.154cff94@jbarnes-desktop>
-Message-ID: <20110725191747.GA14274@ram-ThinkPad-T61>
+From: per.forlin@linaro.org (Per Forlin)
+Date: Mon, 25 Jul 2011 21:19:21 +0200
+Subject: [PATCH v3 2/3] mmc: core: add random fault injection
+In-Reply-To: <CAC5umyg44tQxrFEYRL-tjzBMA2+KNXjB+nQveH3KcB_LPmYVHw@mail.gmail.com>
+References: <1311199321-4618-1-git-send-email-per.forlin@linaro.org>
+	<1311199321-4618-3-git-send-email-per.forlin@linaro.org>
+	<CAC5umyg44tQxrFEYRL-tjzBMA2+KNXjB+nQveH3KcB_LPmYVHw@mail.gmail.com>
+Message-ID: <CAJ0pr1_rL8rsEbDR-PL6fs9EzyGfUMbmeUjTGk=WspvrAkdy+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 29, 2011 at 09:54:36AM -0700, Jesse Barnes wrote:
-> On Wed, 29 Jun 2011 11:46:54 -0500
-> Rob Herring <robherring2@gmail.com> wrote:
-> 
-> > From: Rob Herring <rob.herring@calxeda.com>
-> > 
-> > Move pci_set_flags, pci_add_flags, and pci_has_flag into
-> > asm-generic/pci-bridge.h so other archs can use them.
-> 
-> Looks like something Ram may be able to re-use when adding resource
-> alloc behavior flags for the new bridge realloc code.
-> 
-Hmm..these functions modify the global pci_flags variable.  If there
-were macros that helped check/set/reset for flags in a given variable,
-I could use them.
+On 25 July 2011 17:58, Akinobu Mita <akinobu.mita@gmail.com> wrote:
+> 2011/7/21 Per Forlin <per.forlin@linaro.org>:
+>> This adds support to inject data errors after a completed host transfer.
+>> The mmc core will return error even though the host transfer is successful.
+>> This simple fault injection proved to be very useful to test the
+>> non-blocking error handling in the mmc_blk_issue_rw_rq().
+>> Random faults can also test how the host driver handles pre_req()
+>> and post_req() in case of errors.
+>
+> Looks good to me.
+>
+Thanks,
 
-RP
+>> @@ -82,6 +87,66 @@ static void mmc_flush_scheduled_work(void)
+>> ? ? ? ?flush_workqueue(workqueue);
+>> ?}
+>>
+>> +#ifdef CONFIG_FAIL_MMC_REQUEST
+>> +
+>> +static DECLARE_FAULT_ATTR(fail_mmc_request);
+>
+> I think the fail_attr should be defined for each mmc_host like make_it_fail
+> in struct mmc_host and debugfs entries should also be created in a
+> subdirectory of mmc host debugfs.
+>
+I looked at blk-core.c and used the same code here. Current code
+creates the entry under the debugfs root. This means one fail_attr for
+all hosts.
+I agree, it's more clean to move the fail_attr to the
+host-debugfs-entry which require the fail_attr to be stored same way
+as make_it_fail.
+
+> And I know that init_fault_attr_dentries() can only create a
+> subdirectory in debugfs root directory. ?But I have a patch which
+> support for creating it in arbitrary directory. ?Could you take a look
+> at this? (Note that this patch is based on mmotm and not yet tested)
+>
+Thanks, I will check it out.
+
+Regards,
+Per
