@@ -1,130 +1,113 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 25 Jul 2011 18:22:10 +0200
-Subject: [GIT PULL] arm-soc fixes for 3.1
-Message-ID: <201107251822.10265.arnd@arndb.de>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Mon, 25 Jul 2011 17:26:05 +0100
+Subject: [PATCH] ARM: alignment: Prevent ignoring of faults with ARMv6
+	unaligned access model
+Message-ID: <1311611165-20064-1-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Currently, it's possible to set the kernel to ignore alignment
+faults when changing the alignment fault handling mode at runtime
+via /proc/sys/alignment, even though this is undesirable on ARMv6
+and above, where it can result in infinite spins where an un-fixed-
+up instruction repeatedly faults.
 
-This is the first out of about ten pull requests for the arm-soc tree
-in this merge window, consisting of low-priority bug fixes that
-have no other dependencies. 
+In addition, the kernel clobbers any alignment mode specified on
+the command-line if running on ARMv6 or above.
 
-These should all be uncontroversial, and are a prerequisite for
-patches in the cleanup branch that a number of other branches
-are depending on.
+This patch factors out the necessary safety check into a couple of
+new helper functions, and checks and modifies the fault handling
+mode as appropriate on boot and on writes to /proc/cpu/alignment.
 
-You can see the bigger picture in the for-next branch of the
-same tree if you are interested in what else is coming for this
-tree. Please tell me if you are unhappy about the split between
-the branches and would rather see smaller or larger pull requests.
+Prior to ARMv6, the behaviour is unchanged.
 
-	Arnd
+For ARMv6 and above, the behaviour changes as follows:
 
-[resent with mailing lists on Cc]
+  * Attempting to ignore faults on ARMv6 results in the mode being
+    forced to UM_FIXUP instead.  A warning is printed if this
+    happened as a result of a write to /proc/cpu/alignment.  The
+    user's UM_WARN bit (if present) is still honoured.
 
-The following changes since commit 02f8c6aee8df3cdc935e9bdd4f2d020306035dbe:
+  * An alignment= argument from the kernel command-line is now
+    honoured, except that the kernel will modify the specified mode
+    as described above.  This is allows modes such as UM_SIGNAL and
+    UM_WARN to be active immediately from boot, which is useful for
+    debugging purposes.
 
-  Linux 3.0 (2011-07-21 19:17:23 -0700)
+Signed-off-by: Dave Martin <dave.martin@linaro.org>
+---
+ arch/arm/mm/alignment.c |   42 ++++++++++++++++++++++++++++++------------
+ 1 files changed, 30 insertions(+), 12 deletions(-)
 
-are available in the git repository at:
-  git+ssh://master.kernel.org/pub/scm/linux/kernel/git/arm/linux-arm-soc.git next/fixes
-
-Arnd Bergmann (4):
-      Merge branch 'fixes-for-arnd' of git://git.pengutronix.de/git/imx/linux-2.6 into imx/fixes
-      Merge branches 'at91/fixes', 'imx/fixes' and 'pxa/fixes' of git+ssh://master.kernel.org/.../arm/linux-arm-soc into next/fixes
-      Merge branch 'msm/fixes' into next/fixes
-      Merge branch 'tegra/fixes' of git+ssh://master.kernel.org/.../arm/linux-arm-soc into next/fixes
-
-Axel Lin (1):
-      ARM i.MX23/28: platform-mxsfb: Add missing include of linux/dma-mapping.h
-
-Barry Song (3):
-      ARM: CNS3XXX: add UL suffix to VMALLOC_END to ensure it is properly typed
-      ARM: LPC32XXX: add UL suffix to VMALLOC_END to ensure it is properly typed
-      ARM: NUC93X: add UL suffix to VMALLOC_END to ensure it is properly typed
-
-Dong Aisheng (1):
-      ARM: mxs-dma: include <linux/dmaengine.h>
-
-Fabio Estevam (11):
-      mx51: Let USB Storage be built by default
-      ARM: mx53: Fix alternate modes for MX53_PAD_PATA_DATA6
-      ARM: mx53: Fix the chip select addresses
-      ARM: mach-imx/mx27_3ds: Use the standard i.MX macro for GPIO numbering
-      ARM: mach-imx/mx31_3ds: Fix IOMUX for SPI1 signals
-      mxc: iomuxv1: Do not use gpio_request when setting the pin as GPIO
-      ARM: mach-imx/mx27_3ds: Fix regulator support
-      ARM: mxc: iomux-v1: Fix build warning
-      ARM: mx51: Fix the address space length for SSI
-      ARM: mx53: Fix some interrupts marked as reserved.
-      ARM: mx25: Fix typo on CAN1_RX pad setting
-
-Imre Kaloz (1):
-      ARM: orion5x: fixup 5181 MPP mask check
-
-Jeff Ohlstein (1):
-      ARM: msm: platsmp: determine number of CPU cores at boot time
-
-Lothar Wa??mann (2):
-      mach-mx5: fix the I2C clock parents
-      iomux-mx53: add missing 'IOMUX_CONFIG_SION' for some I2C pad definitions
-
-Marc Kleine-Budde (1):
-      ARM: mx53: Fix the base addresses for the DDR memory regions
-
-Sascha Hauer (1):
-      ARM i.MX dma: Fix burstsize settings
-
-Shawn Guo (5):
-      ARM: mxs_defconfig: Change CONFIG_RTC_CLASS 'm' to 'y'
-      ARM: mxc: imx-sdma device gets 16K iosize than 4K
-      ARM: mxc: sdma on imx25 is a V2 block
-      ARM: mxc: change imx-dma default to_version to 1
-      ARM: mxc: imx-dma on imx25 has no other TO version but TO1
-
-Stephen Warren (2):
-      ARM: Tegra: Trimslice: Tri-state DAP3 pinmux
-      ARM: Tegra: Seaboard: Fix I2C bus numbering for ADT7461
-
-Troy Kisky (5):
-      MXC: iomux-v3: correct NO_PAD_CTRL definition
-      ARM: i.MX53: Fix IOMUX type o's
-      ARM: i.MX53: UARTn_TXD pin should not change RXD input select
-      ARM: i.MX53: UARTn_CTS pin should not change RTS input select
-      ARM: i.MX53: consistently use MX53_UART_PAD_CTRL for uart txd/rxd/rts/cts
-
-Uwe Kleine-K??nig (1):
-      ARM: mxs/tx28: according to the TX28's datasheet D4-D7 are not used for MMC0
-
- arch/arm/configs/mx51_defconfig              |    3 +-
- arch/arm/configs/mxs_defconfig               |    2 +-
- arch/arm/mach-cns3xxx/include/mach/vmalloc.h |    2 +-
- arch/arm/mach-imx/mach-mx27_3ds.c            |   29 +++++-
- arch/arm/mach-imx/mach-mx31_3ds.c            |   10 +-
- arch/arm/mach-lpc32xx/include/mach/vmalloc.h |    2 +-
- arch/arm/mach-mmp/pxa168.c                   |    2 +-
- arch/arm/mach-mmp/pxa910.c                   |    2 +-
- arch/arm/mach-msm/platsmp.c                  |   11 ++-
- arch/arm/mach-mx5/clock-mx51-mx53.c          |    4 +-
- arch/arm/mach-mxs/devices/platform-mxsfb.c   |    1 +
- arch/arm/mach-mxs/include/mach/dma.h         |    2 +
- arch/arm/mach-mxs/mach-tx28.c                |    8 --
- arch/arm/mach-nuc93x/include/mach/vmalloc.h  |    2 +-
- arch/arm/mach-orion5x/mpp.c                  |    2 +-
- arch/arm/mach-pxa/mfp-pxa2xx.c               |    4 +-
- arch/arm/mach-tegra/board-seaboard.c         |    2 +-
- arch/arm/mach-tegra/board-trimslice-pinmux.c |    2 +-
- arch/arm/plat-mxc/devices/platform-imx-dma.c |   14 ++--
- arch/arm/plat-mxc/devices/platform-imx-ssi.c |    2 +-
- arch/arm/plat-mxc/include/mach/iomux-mx25.h  |    2 +-
- arch/arm/plat-mxc/include/mach/iomux-mx53.h  |  128 +++++++++++++-------------
- arch/arm/plat-mxc/include/mach/iomux-v1.h    |    1 -
- arch/arm/plat-mxc/include/mach/iomux-v3.h    |    2 +-
- arch/arm/plat-mxc/include/mach/mx53.h        |   26 +++---
- arch/arm/plat-mxc/iomux-v1.c                 |   34 +-------
- drivers/dma/imx-dma.c                        |    3 +-
- drivers/mmc/host/mxcmmc.c                    |    8 +-
- sound/soc/imx/imx-pcm-dma-mx2.c              |    4 +-
- 29 files changed, 152 insertions(+), 162 deletions(-)
+diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
+index 724ba3b..a55c6fc 100644
+--- a/arch/arm/mm/alignment.c
++++ b/arch/arm/mm/alignment.c
+@@ -95,6 +95,33 @@ static const char *usermode_action[] = {
+ 	"signal+warn"
+ };
+ 
++/* Return true if and only if the ARMv6 unaligned access model is in use. */
++static bool cpu_is_v6_unaligned(void)
++{
++	return cpu_architecture() >= CPU_ARCH_ARMv6 && (cr_alignment & CR_U);
++}
++
++static int safe_usermode(int new_usermode, bool warn)
++{
++	/*
++	 * ARMv6 and later CPUs can perform unaligned accesses for
++	 * most single load and store instructions up to word size.
++	 * LDM, STM, LDRD and STRD still need to be handled.
++	 *
++	 * Ignoring the alignment fault is not an option on these
++	 * CPUs since we spin re-faulting the instruction without
++	 * making any progress.
++	 */
++	if (cpu_is_v6_unaligned() && !(new_usermode & (UM_FIXUP | UM_SIGNAL))) {
++		new_usermode |= UM_FIXUP;
++
++		if (warn)
++			printk(KERN_WARNING "alignment: ignoring faults is unsafe on this CPU.  Defaulting to fixup mode.\n");
++	}
++
++	return new_usermode;
++}
++
+ static int alignment_proc_show(struct seq_file *m, void *v)
+ {
+ 	seq_printf(m, "User:\t\t%lu\n", ai_user);
+@@ -125,7 +152,7 @@ static ssize_t alignment_proc_write(struct file *file, const char __user *buffer
+ 		if (get_user(mode, buffer))
+ 			return -EFAULT;
+ 		if (mode >= '0' && mode <= '5')
+-			ai_usermode = mode - '0';
++			ai_usermode = safe_usermode(mode - '0', true)
+ 	}
+ 	return count;
+ }
+@@ -923,20 +950,11 @@ static int __init alignment_init(void)
+ 		return -ENOMEM;
+ #endif
+ 
+-	/*
+-	 * ARMv6 and later CPUs can perform unaligned accesses for
+-	 * most single load and store instructions up to word size.
+-	 * LDM, STM, LDRD and STRD still need to be handled.
+-	 *
+-	 * Ignoring the alignment fault is not an option on these
+-	 * CPUs since we spin re-faulting the instruction without
+-	 * making any progress.
+-	 */
+-	if (cpu_architecture() >= CPU_ARCH_ARMv6 && (cr_alignment & CR_U)) {
++	if (cpu_is_v6_unaligned()) {
+ 		cr_alignment &= ~CR_A;
+ 		cr_no_alignment &= ~CR_A;
+ 		set_cr(cr_alignment);
+-		ai_usermode = UM_FIXUP;
++		ai_usermode = safe_usermode(ai_usermode, false);
+ 	}
+ 
+ 	hook_fault_code(1, do_alignment, SIGBUS, BUS_ADRALN,
+-- 
+1.7.4.1
