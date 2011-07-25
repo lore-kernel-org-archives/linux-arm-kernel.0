@@ -1,18 +1,73 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 25 Jul 2011 10:40:02 +0100
-Subject: [PATCH V4 12/14] spi/s3c64xx: Add support DMA engine API
-In-Reply-To: <1311557312-26107-13-git-send-email-boojin.kim@samsung.com>
+From: boojin.kim@samsung.com (Boojin Kim)
+Date: Mon, 25 Jul 2011 18:48:42 +0900
+Subject: [PATCH V4 02/14] DMA: PL330: Update PL330 DMA API driver
+In-Reply-To: <CABb+yY2YdFLua8gNEJOwCyJPz3kyLwhKLXXoc8_V59t9yLMt1g@mail.gmail.com>
 References: <1311557312-26107-1-git-send-email-boojin.kim@samsung.com>
-	<1311557312-26107-13-git-send-email-boojin.kim@samsung.com>
-Message-ID: <20110725094002.GD9653@n2100.arm.linux.org.uk>
+	<1311557312-26107-3-git-send-email-boojin.kim@samsung.com>
+	<CABb+yY2YdFLua8gNEJOwCyJPz3kyLwhKLXXoc8_V59t9yLMt1g@mail.gmail.com>
+Message-ID: <001e01cc4ab0$0a233200$1e699600$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 25, 2011 at 10:28:30AM +0900, Boojin Kim wrote:
-> +static void s3c64xx_spi_dma_rxcb(void *data)
-> +{
-> +	struct s3c64xx_spi_driver_data *sdd
-> +		= (struct s3c64xx_spi_driver_data *)data;
 
-You never need explicit casts from void * or to void *.  Please remove
-these.
+
+> -----Original Message-----
+> From: Jassi Brar [mailto:jassisinghbrar at gmail.com]
+> Sent: Monday, July 25, 2011 5:58 PM
+> To: Boojin Kim
+> Cc: linux-arm-kernel at lists.infradead.org; linux-samsung-soc at vger.kernel.org;
+> Vinod Koul; Dan Williams; Kukjin Kim; Grant Likely; Mark Brown
+> Subject: Re: [PATCH V4 02/14] DMA: PL330: Update PL330 DMA API driver
+>
+> On Mon, Jul 25, 2011 at 6:58 AM, Boojin Kim <boojin.kim@samsung.com> wrote:
+>
+> > diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+> > index b7ecf47..586ab39 100644
+> > --- a/drivers/dma/pl330.c
+> > +++ b/drivers/dma/pl330.c
+> > @@ -455,7 +455,7 @@ static struct dma_pl330_desc *pl330_get_desc(struct
+> dma_pl330_chan *pch)
+> >        async_tx_ack(&desc->txd);
+> >
+> >        desc->req.rqtype = peri->rqtype;
+> > -       desc->req.peri = peri->peri_id;
+> > +       desc->req.peri = pch->chan.chan_id;
+> Btw, I plan to revert this if my patch is accepted that proposes
+> to free chan_id solely for use by DMAC drivers(which we should
+> employ to pass paltform assigned channel ID to client drivers)
+>
+> > @@ -748,17 +747,19 @@ pl330_probe(struct amba_device *adev, const struct
+> amba_id *id)
+> >                struct dma_pl330_peri *peri = &pdat->peri[i];
+> >                pch = &pdmac->peripherals[i];
+> >
+> > -               switch (peri->rqtype) {
+> > -               case MEMTOMEM:
+> > -                       dma_cap_set(DMA_MEMCPY, pd->cap_mask);
+> > -                       break;
+> > -               case MEMTODEV:
+> > -               case DEVTOMEM:
+> > -                       dma_cap_set(DMA_SLAVE, pd->cap_mask);
+> > -                       break;
+> > -               default:
+> > -                       dev_err(&adev->dev, "DEVTODEV Not Supported\n");
+> > -                       continue;
+> > +               if (peri) {
+> > +                       switch (peri->rqtype) {
+> > +                       case MEMTOMEM:
+> > +                               dma_cap_set(DMA_MEMCPY, pd->cap_mask);
+> > +                               break;
+> > +                       case MEMTODEV:
+> > +                       case DEVTOMEM:
+> > +                               dma_cap_set(DMA_SLAVE, pd->cap_mask);
+> > +                               break;
+> > +                       default:
+> > +                               dev_err(&adev->dev, "DEVTODEV Not
+> Supported\n");
+> > +                               continue;
+> > +                       }
+> >                }
+> If you pass platform data correctly, you don't need to check against NULL
+> peri.
+
+Ok, It may be excessive error check. I will remove this point.
