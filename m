@@ -1,93 +1,58 @@
-From: hrishikesh.b@ti.com (Hrishikesh Bhandiwad)
-Date: Mon, 25 Jul 2011 19:10:53 +0530
-Subject: [PATCH] OMAP3: NAND: Adding NAND support and specifying NAND
-	partitions.
-Message-ID: <1311601253-2933-1-git-send-email-hrishikesh.b@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 25 Jul 2011 14:43:40 +0100
+Subject: [PATCH 0/9] PL08x further cleanups
+In-Reply-To: <1311601111.8206.5.camel@vkoul-mobl4>
+References: <20110705131030.GE8286@n2100.arm.linux.org.uk>
+	<1310598328.1536.27.camel@vkoul-udesk3>
+	<20110721160800.GR26574@n2100.arm.linux.org.uk>
+	<1311601111.8206.5.camel@vkoul-mobl4>
+Message-ID: <20110725134340.GK9653@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the NAND support on OMAP3EVM board and also allocates
-five partitions  on NAND.
-Referred to file: arch/arm/mach-omap2/board-omap3beagle.c
+On Mon, Jul 25, 2011 at 07:08:31PM +0530, Vinod Koul wrote:
+> Although gcc didnt like not handling other enums so warned:
+> 
+> drivers/dma/amba-pl08x.c: In function 'pl08x_width':
+> drivers/dma/amba-pl08x.c:1119: warning: enumeration value
+> 'DMA_SLAVE_BUSWIDTH_UNDEFINED' not handled in switch
+> drivers/dma/amba-pl08x.c:1119: warning: enumeration value
+> 'DMA_SLAVE_BUSWIDTH_8_BYTES' not handled in switch
 
-Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-Signed-off-by: Sanjeev Premi <premi@ti.com>
-Signed-off-by: Hrishikesh Bhandiwad <hrishikesh.b@ti.com>
----
- arch/arm/mach-omap2/board-omap3evm.c |   40 ++++++++++++++++++++++++++++++++++
- 1 files changed, 40 insertions(+), 0 deletions(-)
+Those must be new since I wrote the patch.
 
-diff --git a/arch/arm/mach-omap2/board-omap3evm.c b/arch/arm/mach-omap2/board-omap3evm.c
-index b4d4346..be45b63 100644
---- a/arch/arm/mach-omap2/board-omap3evm.c
-+++ b/arch/arm/mach-omap2/board-omap3evm.c
-@@ -30,6 +30,10 @@
- #include <linux/usb/otg.h>
- #include <linux/smsc911x.h>
- 
-+#include <linux/mtd/mtd.h>
-+#include <linux/mtd/partitions.h>
-+#include <linux/mtd/nand.h>
-+
- #include <linux/wl12xx.h>
- #include <linux/regulator/fixed.h>
- #include <linux/regulator/machine.h>
-@@ -46,6 +50,8 @@
- #include <plat/mcspi.h>
- #include <video/omapdss.h>
- #include <video/omap-panel-generic-dpi.h>
-+#include <plat/gpmc.h>
-+#include <plat/nand.h>
- 
- #include "mux.h"
- #include "sdram-micron-mt46h32m32lf-6.h"
-@@ -101,6 +107,37 @@ static void __init omap3_evm_get_revision(void)
- 	}
- }
- 
-+static struct mtd_partition omap3evm_nand_partitions[] = {
-+	/* All the partition sizes are listed in terms of NAND block size */
-+	{
-+		.name		= "X-Loader",
-+		.offset		= 0,
-+		.size		= 4 * NAND_BLOCK_SIZE,
-+		.mask_flags	= MTD_WRITEABLE,	/* force read-only */
-+	},
-+	{
-+		.name		= "U-Boot",
-+		.offset         = 0x80000
-+		.size           = 15 * NAND_BLOCK_SIZE,
-+		.mask_flags	= MTD_WRITEABLE,	/* force read-only */
-+	},
-+	{
-+		.name		= "U-Boot Env",
-+		.offset		= 0x260000
-+		.size		= 1 * NAND_BLOCK_SIZE,
-+	},
-+	{
-+		.name		= "Kernel",
-+		.offset		= 0x280000
-+		.size		= 32 * NAND_BLOCK_SIZE,
-+	},
-+	{
-+		.name		= "File System",
-+		.offset		= 0x680000
-+		.size		= MTDPART_SIZ_FULL,
-+	},
-+};
-+
- #if defined(CONFIG_SMSC911X) || defined(CONFIG_SMSC911X_MODULE)
- #include <plat/gpmc-smsc911x.h>
- 
-@@ -696,6 +733,9 @@ static void __init omap3_evm_init(void)
- 
- 	omap_serial_init();
- 
-+	omap_nand_flash_init(NAND_BUSWIDTH_16, omap3evm_nand_partitions,
-+			ARRAY_SIZE(omap3evm_nand_partitions));
-+
- 	/* OMAP3EVM uses ISP1504 phy and so register nop transceiver */
- 	usb_nop_xceiv_register();
- 
--- 
-1.6.2.4
+> which can be fixed as:
+> 
+> diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
+> index 9aa2bd4..4925e0d 100644
+> --- a/drivers/dma/amba-pl08x.c
+> +++ b/drivers/dma/amba-pl08x.c
+> @@ -1123,6 +1123,8 @@ static u32 pl08x_width(enum dma_slave_buswidth
+> width)
+>  		return PL080_WIDTH_16BIT;
+>  	case DMA_SLAVE_BUSWIDTH_4_BYTES:
+>  		return PL080_WIDTH_32BIT;
+> +	default:
+> +		return -EINVAL;
+>  	}
+>  	return ~0;
+>  }
+> 
+> If you are okay, pls ack it
+
+No.  This function is used as:
+
++       width = pl08x_width(addr_width);
++       if (width == ~0) {
+                dev_err(&pl08x->adev->dev,
+                        "bad runtime_config: alien address width\n");
+                return -EINVAL;
+        }
+
+Notice that it returns a u32 so negative errnos don't make sense.  It
+returns ~0 to indicate error.
+
+The code is actually correct as it stands, it's just gcc deciding to
+emit a warning for an unhandled enum value which isn't really unhandled.
+Just move the 'return ~0;' at the end of the function inside the switch
+as a default case to shut it up.
