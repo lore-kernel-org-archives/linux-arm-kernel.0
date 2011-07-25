@@ -1,54 +1,33 @@
-From: rdunlap@xenotime.net (Randy Dunlap)
-Date: Mon, 25 Jul 2011 14:29:24 -0700
-Subject: [PATCH] Documentation: Document ARM's user_debug parameter
-In-Reply-To: <1311556514-24728-1-git-send-email-sboyd@codeaurora.org>
-References: <1311556514-24728-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20110725142924.85de25dd.rdunlap@xenotime.net>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 25 Jul 2011 22:31:11 +0100
+Subject: cpu_suspend does not flush the L2 cache
+In-Reply-To: <20110725200820.GE14955@n2100.arm.linux.org.uk>
+References: <74C67D49A66F0848B6F4548360B2EDB58DED35BC42@HQMAIL04.nvidia.com>
+	<20110725200820.GE14955@n2100.arm.linux.org.uk>
+Message-ID: <20110725213111.GB20187@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 24 Jul 2011 18:15:14 -0700 Stephen Boyd wrote:
-
-> Usually kernel parameters are documented in kernel-parameters.txt
-> but user_debug is only documented in the Kconfig. Document the
-> option and point to the Kconfig help text for more info.
+On Mon, Jul 25, 2011 at 09:08:20PM +0100, Russell King - ARM Linux wrote:
+> On Mon, Jul 25, 2011 at 11:49:43AM -0700, Scott Williams wrote:
+> > In 2.6.39, CPU suspend/resumes crashes if an outer cache controller
+> > (like a PL310) is configured and enabled. cpu_suspend only flushes
+> > the L1 cache.
 > 
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> Cc: Russell King <linux@arm.linux.org.uk>
-
-Is this a superset of 'print_fatal_signals'?
-
-Applied, thanks.
-
-> ---
->  Documentation/kernel-parameters.txt |   10 ++++++++++
->  1 files changed, 10 insertions(+), 0 deletions(-)
+> Correct.  cpu_suspend is been a _consolidation_ effort across the various
+> implementations.  Only one implementation deals with the L2 cache issues
+> at present.
 > 
-> diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
-> index aa47be7..8186adc 100644
-> --- a/Documentation/kernel-parameters.txt
-> +++ b/Documentation/kernel-parameters.txt
-> @@ -2612,6 +2612,16 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
->  					medium is write-protected).
->  			Example: quirks=0419:aaf5:rl,0421:0433:rc
->  
-> +	user_debug=	[KNL,ARM]
-> +			Format: <int>
-> +			See arch/arm/Kconfig.debug help text.
-> +				 1 - undefined instruction events
-> +				 2 - system calls
-> +				 4 - invalid data aborts
-> +				 8 - SIGSEGV faults
-> +				16 - SIGBUS faults
-> +			Example: user_debug=31
-> +
->  	userpte=
->  			[X86] Flags controlling user PTE allocations.
->  
-> -- 
-> Sent by an employee of the Qualcomm Innovation Center, Inc.
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+> A bunch of patches have gone in during this merge window to continue
+> that consolidation effort and improve the cpu_suspend interfaces.
+> Eventually the L2 cache issues will be dealt with in core code.
 
----
-~Randy
-*** Remember to use Documentation/SubmitChecklist when testing your code ***
+I seem to have the outer L2 stuff working pretty well in my latest kexec
+series (my vexpress happily ran init=/kexec.sh all weekend). That should
+hopefully provide all the necessary hooks in the core code. If not, we
+should work something out.
+
+I'll post what I have after the merge window (SMP still not quite there
+yet).
+
+Will
