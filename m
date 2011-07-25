@@ -1,15 +1,28 @@
-From: scwilliams@nvidia.com (Scott Williams)
-Date: Mon, 25 Jul 2011 11:49:43 -0700
-Subject: cpu_suspend does not flush the L2 cache
-Message-ID: <74C67D49A66F0848B6F4548360B2EDB58DED35BC42@HQMAIL04.nvidia.com>
+From: linuxram@us.ibm.com (Ram Pai)
+Date: Mon, 25 Jul 2011 12:17:47 -0700
+Subject: [PATCH 1/6] microblaze: move pci flag functions into asm-generic
+In-Reply-To: <20110629095436.154cff94@jbarnes-desktop>
+References: <1309366019-24379-1-git-send-email-robherring2@gmail.com>
+	<1309366019-24379-2-git-send-email-robherring2@gmail.com>
+	<20110629095436.154cff94@jbarnes-desktop>
+Message-ID: <20110725191747.GA14274@ram-ThinkPad-T61>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In 2.6.39, CPU suspend/resumes crashes if an outer cache controller (like a PL310) is configured and enabled. cpu_suspend only flushes the L1 cache. If an outer cache controller is enabled, the context and saved stack pointer are left sitting in the L2 memory. An attempt to resume a secondary CPU without shutting down the entire CPU complex and flushing the entire L2 cache will cause the secondary CPU to crash because the stack pointer in sleep_save_sp is invalid in L3 memory.
+On Wed, Jun 29, 2011 at 09:54:36AM -0700, Jesse Barnes wrote:
+> On Wed, 29 Jun 2011 11:46:54 -0500
+> Rob Herring <robherring2@gmail.com> wrote:
+> 
+> > From: Rob Herring <rob.herring@calxeda.com>
+> > 
+> > Move pci_set_flags, pci_add_flags, and pci_has_flag into
+> > asm-generic/pci-bridge.h so other archs can use them.
+> 
+> Looks like something Ram may be able to re-use when adding resource
+> alloc behavior flags for the new bridge realloc code.
+> 
+Hmm..these functions modify the global pci_flags variable.  If there
+were macros that helped check/set/reset for flags in a given variable,
+I could use them.
 
-Scott Williams
-Sr. Software Engineer
-NVIDIA Corporation
-
---
-nvpublic
+RP
