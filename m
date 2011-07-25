@@ -1,43 +1,93 @@
 From: vkoul@infradead.org (Vinod Koul)
-Date: Mon, 25 Jul 2011 15:47:00 +0530
-Subject: [RESEND] [PATCH V4 0/14] To use DMA generic APIs for Samsung DMA
-In-Reply-To: <1311557312-26107-1-git-send-email-boojin.kim@samsung.com>
+Date: Mon, 25 Jul 2011 15:56:57 +0530
+Subject: [PATCH V4 03/14] DMA: PL330: Support DMA_SLAVE_CONFIG command
+In-Reply-To: <1311557312-26107-4-git-send-email-boojin.kim@samsung.com>
 References: <1311557312-26107-1-git-send-email-boojin.kim@samsung.com>
-Message-ID: <1311589020.27357.1.camel@vkoul-mobl4>
+	<1311557312-26107-4-git-send-email-boojin.kim@samsung.com>
+Message-ID: <1311589617.27357.3.camel@vkoul-mobl4>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Mon, 2011-07-25 at 10:28 +0900, Boojin Kim wrote:
-> This patchset adds support DMA generic APIs for Samsung DMA
-> and is re-sent by the request of DMA maintainer, Vinod Koul.
+> This patch adds support DMA_SLAVE_CONFIG command.
 > 
-> V4 has the changes about 3 patches from V3.
-> Changes from V3:
-> - Divided '[03/13 patch] DMA: PL330: Add DMA capabilites' on V3 patchset
->   into two patches.
-> 	- One is '03/14 patch' for supporting DMA_SLAVE_CONFIG command.
-> 	- Another is '04/14 patch' for supporting DMA_CYCLIC capability.
-> - Code clean-up
-> 	- Remove unnecessary vairable referance on '01/14 patch'.
-> 	- Remove redunancy code on '06/14 patch'
+> Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
+> ---
+>  drivers/dma/pl330.c |   53 +++++++++++++++++++++++++++++++++++++-------------
+>  1 files changed, 39 insertions(+), 14 deletions(-)
 > 
-> [PATCH V4 01/14] DMA: PL330: Add support runtime PM for PL330 DMAC
-> [PATCH V4 02/14] DMA: PL330: Update PL330 DMA API driver
-> [PATCH V4 03/14] DMA: PL330: Support DMA_SLAVE_CONFIG command
-> [PATCH V4 04/14] DMA: PL330: Add DMA_CYCLIC capability
-> [PATCH V4 05/14] ARM: SAMSUNG: Update to use PL330-DMA driver
-> [PATCH V4 06/14] ARM: SAMSUNG: Add common DMA operations
-> [PATCH V4 07/14] ARM: EXYNOS4: Use generic DMA PL330 driver
-> [PATCH V4 08/14] ARM: S5PV210: Use generic DMA PL330 driver
-> [PATCH V4 09/14] ARM: S5PC100: Use generic DMA PL330 driver
-> [PATCH V4 10/14] ARM: S5P64X0: Use generic DMA PL330 driver
-> [PATCH V4 11/14] ARM: SAMSUNG: Remove S3C-PL330-DMA driver
-> [PATCH V4 12/14] spi/s3c64xx: Add support DMA engine API
-> [PATCH V4 13/14] ASoC: Samsung: Update DMA interface
-> [PATCH V4 14/14] ARM: SAMSUNG: Remove Samsung specific enum type for dma direction
-> 
-Thanks for resending I will review them now, You should use git
---cover-letter to generate this
+> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+> index 586ab39..880f010 100644
+> --- a/drivers/dma/pl330.c
+> +++ b/drivers/dma/pl330.c
+> @@ -256,25 +256,50 @@ static int pl330_alloc_chan_resources(struct dma_chan *chan)
+>  static int pl330_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd, unsigned long arg)
+>  {
+>  	struct dma_pl330_chan *pch = to_pchan(chan);
+> -	struct dma_pl330_desc *desc;
+> +	struct dma_pl330_desc *desc, *_dt;
+>  	unsigned long flags;
+> +	struct dma_pl330_dmac *pdmac = pch->dmac;
+> +	struct dma_slave_config *slave_config;
+> +	struct dma_pl330_peri *peri;
+> +	LIST_HEAD(list);
+>  
+> -	/* Only supports DMA_TERMINATE_ALL */
+> -	if (cmd != DMA_TERMINATE_ALL)
+> -		return -ENXIO;
+> -
+> -	spin_lock_irqsave(&pch->lock, flags);
+> -
+> -	/* FLUSH the PL330 Channel thread */
+> -	pl330_chan_ctrl(pch->pl330_chid, PL330_OP_FLUSH);
+> +	switch (cmd) {
+> +	case DMA_TERMINATE_ALL:
+> +		spin_lock_irqsave(&pch->lock, flags);
+>  
+> -	/* Mark all desc done */
+> -	list_for_each_entry(desc, &pch->work_list, node)
+> -		desc->status = DONE;
+> +		/* FLUSH the PL330 Channel thread */
+> +		pl330_chan_ctrl(pch->pl330_chid, PL330_OP_FLUSH);
+>  
+> -	spin_unlock_irqrestore(&pch->lock, flags);
+> +		/* Mark all desc done */
+> +		list_for_each_entry_safe(desc, _dt, &pch->work_list , node) {
+> +			desc->status = DONE;
+> +			pch->completed = desc->txd.cookie;
+> +			list_move_tail(&desc->node, &list);
+> +		}
+>  
+> -	pl330_tasklet((unsigned long) pch);
+> +		list_splice_tail_init(&list, &pdmac->desc_pool);
+> +		spin_unlock_irqrestore(&pch->lock, flags);
+> +		break;
+> +	case DMA_SLAVE_CONFIG:
+> +		slave_config = (struct dma_slave_config *)arg;
+> +		peri = pch->chan.private;
+> +
+> +		if (slave_config->direction == DMA_TO_DEVICE) {
+> +			if (slave_config->dst_addr)
+> +				peri->fifo_addr = slave_config->dst_addr;
+> +			if (slave_config->dst_addr_width)
+> +				peri->burst_sz = __ffs(slave_config->dst_addr_width);
+This doesn't sound right, why can't you use xxx_maxburst field instead?
+
+> +		} else if (slave_config->direction == DMA_FROM_DEVICE) {
+> +			if (slave_config->src_addr)
+> +				peri->fifo_addr = slave_config->src_addr;
+> +			if (slave_config->src_addr_width)
+> +				peri->burst_sz = __ffs(slave_config->src_addr_width);
+ditto...
+> +		}
+> +		break;
+> +	default:
+> +		dev_err(pch->dmac->pif.dev, "Not supported command.\n");
+> +		return -ENXIO;
+> +	}
+>  
+>  	return 0;
+>  }
 
 -- 
 ~Vinod Koul
