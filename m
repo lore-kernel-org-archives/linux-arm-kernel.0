@@ -1,109 +1,29 @@
-From: boojin.kim@samsung.com (Boojin Kim)
-Date: Mon, 25 Jul 2011 11:10:57 +0900
-Subject: [PATCH V4 03-1/13] DMA: PL330: Support DMA_SLAVE_CONFIG command
-In-Reply-To: <CABb+yY058yBZnmYcqbqFCfsBUcxU=JbTZmopLApZaaKim+MMfg@mail.gmail.com>
-References: <1311158773-30314-1-git-send-email-boojin.kim@samsung.com>
-	<1311158773-30314-3-git-send-email-boojin.kim@samsung.com>
-	<CABb+yY058yBZnmYcqbqFCfsBUcxU=JbTZmopLApZaaKim+MMfg@mail.gmail.com>
-Message-ID: <001701cc4a70$17de50e0$479af2a0$%kim@samsung.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Mon, 25 Jul 2011 12:17:22 +0800
+Subject: linux-next: merge error in arch/arm/mm/Kconfig?
+Message-ID: <20110725041720.GA21641@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jassi Brar wrote:
-> Sent: Friday, July 22, 2011 2:42 PM
-> To: Boojin Kim
-> Cc: linux-arm-kernel at lists.infradead.org; linux-samsung-soc at vger.kernel.org;
-> Vinod Koul; Dan Williams; Kukjin Kim
-> Subject: Re: [PATCH V4 03-1/13] DMA: PL330: Support DMA_SLAVE_CONFIG command
->
-> On Wed, Jul 20, 2011 at 4:16 PM, Boojin Kim <boojin.kim@samsung.com> wrote:
-> > Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
-> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> > ---
-> >  drivers/dma/pl330.c |   53 
-> > +++++++++++++++++++++++++++++++++++++----------
-> ---
-> >  1 files changed, 39 insertions(+), 14 deletions(-)
-> >
-> > diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-> > index 586ab39..880f010 100644
-> > --- a/drivers/dma/pl330.c
-> > +++ b/drivers/dma/pl330.c
-> > @@ -256,25 +256,50 @@ static int pl330_alloc_chan_resources(struct 
-> > dma_chan
-> *chan)
-> >  static int pl330_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
-> unsigned long arg)
-> >  {
-> >        struct dma_pl330_chan *pch = to_pchan(chan);
-> > -       struct dma_pl330_desc *desc;
-> > +       struct dma_pl330_desc *desc, *_dt;
-> >        unsigned long flags;
-> > +       struct dma_pl330_dmac *pdmac = pch->dmac;
-> > +       struct dma_slave_config *slave_config;
-> > +       struct dma_pl330_peri *peri;
-> > +       LIST_HEAD(list);
-> >
-> > -       /* Only supports DMA_TERMINATE_ALL */
-> > -       if (cmd != DMA_TERMINATE_ALL)
-> > -               return -ENXIO;
-> > -
-> > -       spin_lock_irqsave(&pch->lock, flags);
-> > -
-> > -       /* FLUSH the PL330 Channel thread */
-> > -       pl330_chan_ctrl(pch->pl330_chid, PL330_OP_FLUSH);
-> > +       switch (cmd) {
-> > +       case DMA_TERMINATE_ALL:
-> > +               spin_lock_irqsave(&pch->lock, flags);
-> >
-> > -       /* Mark all desc done */
-> > -       list_for_each_entry(desc, &pch->work_list, node)
-> > -               desc->status = DONE;
-> > +               /* FLUSH the PL330 Channel thread */
-> > +               pl330_chan_ctrl(pch->pl330_chid, PL330_OP_FLUSH);
-> >
-> > -       spin_unlock_irqrestore(&pch->lock, flags);
-> > +               /* Mark all desc done */
-> > +               list_for_each_entry_safe(desc, _dt, &pch->work_list , 
-> > node)
-> {
-> > +                       desc->status = DONE;
-> > +                       pch->completed = desc->txd.cookie;
-> > +                       list_move_tail(&desc->node, &list);
-> > +               }
-> >
-> > -       pl330_tasklet((unsigned long) pch);
-> > +               list_splice_tail_init(&list, &pdmac->desc_pool);
-> > +               spin_unlock_irqrestore(&pch->lock, flags);
-> > +               break;
-> > +       case DMA_SLAVE_CONFIG:
-> > +               slave_config = (struct dma_slave_config *)arg;
-> > +               peri = pch->chan.private;
-> > +
-> > +               if (slave_config->direction == DMA_TO_DEVICE) {
-> > +                       if (slave_config->dst_addr)
-> > +                               peri->fifo_addr = slave_config->dst_addr;
-> > +                       if (slave_config->dst_addr_width)
-> > +                               peri->burst_sz = __ffs(slave_config-
-> >dst_addr_width);
-> > +               } else if (slave_config->direction == DMA_FROM_DEVICE) {
-> > +                       if (slave_config->src_addr)
-> > +                               peri->fifo_addr = slave_config->src_addr;
-> > +                       if (slave_config->src_addr_width)
-> > +                               peri->burst_sz = __ffs(slave_config-
-> >src_addr_width);
-> > +               }
-> > +               break;
->    As discussed yesterday, DMA_SLAVE_CONFIG is assumed to be madatory,
-> so please dismantle the 'struct dma_pl330_peri', move fifo_addr,
-> burst_sz and rqtype
-> to 'struct dma_pl330_chan' and poison them - that will force clients
-> to do DMA_SLAVE_CONFIG. Move 'peri_id' to 'struct dma_pl330_platdata'
->   And protect the changes to channel parameters with lock.
+There is a merge error (?) causing 'make ARCH=arm menuconfig' fails on
+next-20110722.
 
-It's fine that you understand my implementation.
-I'm agree to remove unnecessary structure.
-But, this item should bring the change of all DMA machine code and doesn't has 
-deeply relationship with the purpose of this patch series (samsung dma usage).
-So, I'd like to make it to another patch and submit it.
-How about my opinion ?
+---8<-------------
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index d490c4a..2df5504 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -834,7 +834,7 @@ config CACHE_L2X0
+        depends on REALVIEW_EB_ARM11MP || MACH_REALVIEW_PB11MP || MACH_REALVIEW_PB1176 || \
+                   REALVIEW_EB_A9MP || SOC_IMX35 || SOC_IMX31 || MACH_REALVIEW_PBX || \
+                   ARCH_NOMADIK || ARCH_OMAP4 || ARCH_EXYNOS4 || ARCH_TEGRA || \
+-                  ARCH_U8500 || ARCH_VEXPRESS_CA9X4 || ARCH_SHMOBILE ||
++                  ARCH_U8500 || ARCH_VEXPRESS_CA9X4 || ARCH_SHMOBILE || \
+                   ARCH_PRIMA2 || ARCH_ZYNQ || ARCH_CNS3XXX
+        default y
+        select OUTER_CACHE
+
+
+-- 
+Regards,
+Shawn
