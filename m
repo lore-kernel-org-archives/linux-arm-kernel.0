@@ -1,51 +1,103 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Mon, 25 Jul 2011 22:01:23 +0530
-Subject: [PATCH v2 2/6] arm: davinci: Explicitly set channel
-	controllers' default queues
-In-Reply-To: <4E2D70B9.7060202@mvista.com>
-References: <1310303679-17936-1-git-send-email-ido@wizery.com>
-	<1310303679-17936-3-git-send-email-ido@wizery.com>
-	<B85A65D85D7EB246BE421B3FB0FBB593024DD2CE05@dbde02.ent.ti.com>
-	<4E2D70B9.7060202@mvista.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024DD2CEA5@dbde02.ent.ti.com>
+From: nm@ti.com (Menon, Nishanth)
+Date: Mon, 25 Jul 2011 11:59:10 -0500
+Subject: [PATCH 2/2 V2] OMAP3+: PM: SR: add suspend/resume handlers
+In-Reply-To: <20110725084238.GC18062@legolas.emea.dhcp.ti.com>
+References: <1311526357-7578-1-git-send-email-nm@ti.com>
+	<20110725084238.GC18062@legolas.emea.dhcp.ti.com>
+Message-ID: <CAOMWX4dC60SuF9=KDCrQo7zD5_PhTJhwuyqRkqj0ag8FHDQaxw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+On Mon, Jul 25, 2011 at 03:42, Felipe Balbi <balbi@ti.com> wrote:
+> Hi,
+>
+> On Sun, Jul 24, 2011 at 11:52:37AM -0500, Nishanth Menon wrote:
+>> SmartReflex should be disabled while entering low power mode due to
+>> the following reasons:
+>> a) SmartReflex values are not defined for retention voltage.
+>> b) With SmartReflex enabled, if the CPU enters low power state, FSM
+>> ? ?will try to bump the voltage to current OPP's voltage for which
+>> ? ?it has entered low power state, causing power loss and potential
+>> ? ?unknown states for the SoC.
+>> Since we are sure to attempt entering the lowest possible power state
+>> during suspend operation, SmartReflex needs to be disabled for the
+>> voltage domains in suspend path before achieving auto retention voltage
+>> on the device.
+>>
+>> Traditionally, this has been done with interrupts disabled as part of
+>> the common code which handles the idle sequence. Instead, by using the
+>> fact that we have to disable SmartReflex for sure during suspend
+>> operations, we can opportunistically disable SmartReflex in device
+>> standard pm ops, instead of disabling it as part of the code which
+>> executes with interrupts disabled and slave CPU{s} shutdown. This
+>> allows the system to do other parallel activities(such as suspending
+>> other devices in the system using slave CPU{s}) and save the time
+>> required to achieve suspend and resume from suspended state as a
+>> sequential activity.
+>>
+>> However, by being opportunistic as described above, we also increase
+>> the likelihood of SmartReflex library access functions being invoked in
+>> parallel contexts *after* SmartReflex driver's suspend handler (during
+>> suspend operation) or *before* resume handler (during resume operation)
+>> have been invoked (Example: DVFS for dependent devices, cpufreq for
+>> MPU etc.). We prevent this by using a flag to reject the callers in
+>> the duration where SmartReflex has been disabled.
+>
+> while at that, SR's IRQ is never freed on exit path, could fix it while
+> you're already there ?
 
-On Mon, Jul 25, 2011 at 19:03:45, Sergei Shtylyov wrote:
-> Hello.
-> 
-> Nori, Sekhar wrote:
-> 
-> >> Davinci platforms may define a default queue for each channel
-> >> controller. If one is not defined, the default queue is set to EVENTQ_1.
-> >> However, there's no way to distinguish between an unset default queue to
-> >> one that is set to EVENTQ_0, as EVENTQ_0 = 0.
-> 
-> >> Explicitly specify the default queue for all channel controllers on all
-> >> Davinci platforms to EVENTQ_1, and don't overwrite it in the EDMA probe
-> >> function.
-> 
-> >> One exception is the DA850 board, for which EVENTQ_1 is not a valid
-> >> option for its second channel controller. Use EVENTQ_0 instead for that
-> >> channel controller.
-> 
-> >> Signed-off-by: Ido Yariv <ido@wizery.com>
-> 
-> > Looks good to me. Will queue for v3.2/fixes
-> 
->     Why wait for 3.2? If this is considered a fix, it should be applied to 3.1, no?
+This is not really related to this patch is it? IMHO IRQ handling is
+broken badly. Current support is for SmartReflex class3 - which does
+not use the IRQ, Class2 and Class1.5 use it, but the current code
+requires major fixes which I dont intend to support in this series.
 
-3.2/fixes just indicates it will be queued as a fix/cleanup
-for 3.2 so it will have higher priority for merge when compared
-to a new feature.
+>
+>> @@ -998,10 +1020,75 @@ static int __devexit omap_sr_remove(struct platform_device *pdev)
+>> ? ? ? return 0;
+>> ?}
+>>
+>> +static int omap_sr_suspend(struct device *dev)
+>> +{
+>> + ? ? struct omap_sr_data *pdata;
+>> + ? ? struct omap_sr *sr_info;
+>> +
+>> + ? ? pdata = dev_get_platdata(dev);
+>
+> I'm not sure you need to use platform data here...
+see below
+>
+>> + ? ? if (!pdata) {
+>> + ? ? ? ? ? ? dev_err(dev, "%s: platform data missing\n", __func__);
+>> + ? ? ? ? ? ? return -EINVAL;
+>> + ? ? }
+>> +
+>> + ? ? sr_info = _sr_lookup(pdata->voltdm);
+>
+> this field is held on struct omap_sr. Can't you:
+>
+> ? ? ? ?struct omap_sr ?*info = dev_get_drvdata(dev);
+>
+> ?? I see that a platform_set_drvdata() is missing from the driver, but
+> maybe you should add that instead of accessing platform_data.
+omap_sr_data is added in arch/arm/mach-omap2/sr_device.c
 
-This patch doesn't really fix any existing broken functionality.
-It corrects event queue configuration for EDMA CC1 on DA850 for
-which there are no current users in mainline.
+With the current handling - it needs sr_data from which sr_info is
+pulled out. in the current implementation, sr_data contains the voltdm
+pointer from which sr_info is pulled out.
 
-So, not sending for v3.1.
+>
+>> ?static struct platform_driver smartreflex_driver = {
+>> ? ? ? .remove ? ? ? ? = omap_sr_remove,
+>> ? ? ? .driver ? ? ? ? = {
+>> ? ? ? ? ? ? ? .name ? = "smartreflex",
+>> + ? ? ? ? ? ? .pm ? ? = &omap_sr_dev_pm_ops,
+>
+> this should not be valid in case CONFIG_PM isn't enabled.
+a) arch/arm/plat-omap/Kconfig
+CONFIG_OMAP_SMARTREFLEX depends on PM.
+b) SmartReflex is PM feature
 
-Thanks,
-Sekhar
+I dont see a need to add redundant code here.
+
+Regards,
+Nishanth Menon
