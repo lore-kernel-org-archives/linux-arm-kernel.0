@@ -1,161 +1,184 @@
 From: boojin.kim@samsung.com (Boojin Kim)
-Date: Mon, 25 Jul 2011 10:28:23 +0900
-Subject: [PATCH V4 05/14] ARM: SAMSUNG: Update to use PL330-DMA driver
+Date: Mon, 25 Jul 2011 10:28:22 +0900
+Subject: [PATCH V4 04/14] DMA: PL330: Add DMA_CYCLIC capability
 In-Reply-To: <1311557312-26107-1-git-send-email-boojin.kim@samsung.com>
 References: <1311557312-26107-1-git-send-email-boojin.kim@samsung.com>
-Message-ID: <1311557312-26107-6-git-send-email-boojin.kim@samsung.com>
+Message-ID: <1311557312-26107-5-git-send-email-boojin.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds to support PL330-DMA driver on DMADEVICE for S5P SoCs.
+This patch adds DMA_CYCLIC capability that is used for audio driver.
+DMA driver with DMA_CYCLIC capability reuses the dma requests that
+were submitted through tx_submit().
 
 Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
-Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/mach-exynos4/include/mach/dma.h           |    4 +-
- arch/arm/mach-s5p64x0/include/mach/dma.h           |    2 +-
- arch/arm/mach-s5pc100/include/mach/dma.h           |    2 +-
- arch/arm/mach-s5pv210/include/mach/dma.h           |    2 +-
- arch/arm/plat-samsung/Kconfig                      |    8 +++++++
- .../include/plat/{s3c-dma-pl330.h => dma-pl330.h}  |   21 +++++++++++++------
- .../plat-samsung/include/plat/s3c-pl330-pdata.h    |    2 +-
- 7 files changed, 28 insertions(+), 13 deletions(-)
- rename arch/arm/plat-samsung/include/plat/{s3c-dma-pl330.h => dma-pl330.h} (84%)
+ drivers/dma/pl330.c |  111 +++++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 111 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-exynos4/include/mach/dma.h b/arch/arm/mach-exynos4/include/mach/dma.h
-index 81209eb..201842a 100644
---- a/arch/arm/mach-exynos4/include/mach/dma.h
-+++ b/arch/arm/mach-exynos4/include/mach/dma.h
-@@ -20,7 +20,7 @@
- #ifndef __MACH_DMA_H
- #define __MACH_DMA_H
- 
--/* This platform uses the common S3C DMA API driver for PL330 */
--#include <plat/s3c-dma-pl330.h>
-+/* This platform uses the common DMA API driver for PL330 */
-+#include <plat/dma-pl330.h>
- 
- #endif /* __MACH_DMA_H */
-diff --git a/arch/arm/mach-s5p64x0/include/mach/dma.h b/arch/arm/mach-s5p64x0/include/mach/dma.h
-index 81209eb..1beae2c 100644
---- a/arch/arm/mach-s5p64x0/include/mach/dma.h
-+++ b/arch/arm/mach-s5p64x0/include/mach/dma.h
-@@ -21,6 +21,6 @@
- #define __MACH_DMA_H
- 
- /* This platform uses the common S3C DMA API driver for PL330 */
--#include <plat/s3c-dma-pl330.h>
-+#include <plat/dma-pl330.h>
- 
- #endif /* __MACH_DMA_H */
-diff --git a/arch/arm/mach-s5pc100/include/mach/dma.h b/arch/arm/mach-s5pc100/include/mach/dma.h
-index 81209eb..1beae2c 100644
---- a/arch/arm/mach-s5pc100/include/mach/dma.h
-+++ b/arch/arm/mach-s5pc100/include/mach/dma.h
-@@ -21,6 +21,6 @@
- #define __MACH_DMA_H
- 
- /* This platform uses the common S3C DMA API driver for PL330 */
--#include <plat/s3c-dma-pl330.h>
-+#include <plat/dma-pl330.h>
- 
- #endif /* __MACH_DMA_H */
-diff --git a/arch/arm/mach-s5pv210/include/mach/dma.h b/arch/arm/mach-s5pv210/include/mach/dma.h
-index 81209eb..1beae2c 100644
---- a/arch/arm/mach-s5pv210/include/mach/dma.h
-+++ b/arch/arm/mach-s5pv210/include/mach/dma.h
-@@ -21,6 +21,6 @@
- #define __MACH_DMA_H
- 
- /* This platform uses the common S3C DMA API driver for PL330 */
--#include <plat/s3c-dma-pl330.h>
-+#include <plat/dma-pl330.h>
- 
- #endif /* __MACH_DMA_H */
-diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
-index 4d79519..cb170a6 100644
---- a/arch/arm/plat-samsung/Kconfig
-+++ b/arch/arm/plat-samsung/Kconfig
-@@ -300,6 +300,14 @@ config S3C_PL330_DMA
- 	help
- 	  S3C DMA API Driver for PL330 DMAC.
- 
-+config DMADEV_PL330
-+	bool
-+	select DMADEVICES
-+	select PL330_DMA
-+	select ARM_AMBA
-+	help
-+	  Use DMA device engine for PL330 DMAC.
+diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+index 880f010..121c75a 100644
+--- a/drivers/dma/pl330.c
++++ b/drivers/dma/pl330.c
+@@ -69,6 +69,11 @@ struct dma_pl330_chan {
+ 	 * NULL if the channel is available to be acquired.
+ 	 */
+ 	void *pl330_chid;
 +
- comment "Power management"
- 
- config SAMSUNG_PM_DEBUG
-diff --git a/arch/arm/plat-samsung/include/plat/s3c-dma-pl330.h b/arch/arm/plat-samsung/include/plat/dma-pl330.h
-similarity index 84%
-rename from arch/arm/plat-samsung/include/plat/s3c-dma-pl330.h
-rename to arch/arm/plat-samsung/include/plat/dma-pl330.h
-index 8107442..c402719 100644
---- a/arch/arm/plat-samsung/include/plat/s3c-dma-pl330.h
-+++ b/arch/arm/plat-samsung/include/plat/dma-pl330.h
-@@ -8,19 +8,18 @@
-  * (at your option) any later version.
-  */
- 
--#ifndef	__S3C_DMA_PL330_H_
--#define	__S3C_DMA_PL330_H_
--
--#define S3C2410_DMAF_AUTOSTART		(1 << 0)
--#define S3C2410_DMAF_CIRCULAR		(1 << 1)
-+#ifndef __DMA_PL330_H_
-+#define __DMA_PL330_H_ __FILE__
- 
-+#define S3C2410_DMAF_AUTOSTART	(1 << 0)
-+#define S3C2410_DMAF_CIRCULAR	(1 << 1)
- /*
-  * PL330 can assign any channel to communicate with
-  * any of the peripherals attched to the DMAC.
-  * For the sake of consistency across client drivers,
-  * We keep the channel names unchanged and only add
-  * missing peripherals are added.
-- * Order is not important since S3C PL330 API driver
-+ * Order is not important since DMA PL330 API driver
-  * use these just as IDs.
-  */
- enum dma_ch {
-@@ -84,6 +83,14 @@ enum dma_ch {
- 	DMACH_SLIMBUS4_TX,
- 	DMACH_SLIMBUS5_RX,
- 	DMACH_SLIMBUS5_TX,
-+	DMACH_MTOM_0,
-+	DMACH_MTOM_1,
-+	DMACH_MTOM_2,
-+	DMACH_MTOM_3,
-+	DMACH_MTOM_4,
-+	DMACH_MTOM_5,
-+	DMACH_MTOM_6,
-+	DMACH_MTOM_7,
- 	/* END Marker, also used to denote a reserved channel */
- 	DMACH_MAX,
++	/* taks for cyclic capability */
++	struct tasklet_struct *cyclic_task;
++
++	bool cyclic;
  };
-@@ -95,4 +102,4 @@ static inline bool s3c_dma_has_circular(void)
  
- #include <plat/dma.h>
+ struct dma_pl330_dmac {
+@@ -184,6 +189,41 @@ static inline void fill_queue(struct dma_pl330_chan *pch)
+ 	}
+ }
  
--#endif	/* __S3C_DMA_PL330_H_ */
-+#endif	/* __DMA_PL330_H_ */
-diff --git a/arch/arm/plat-samsung/include/plat/s3c-pl330-pdata.h b/arch/arm/plat-samsung/include/plat/s3c-pl330-pdata.h
-index bf5e2a9..64fdf66 100644
---- a/arch/arm/plat-samsung/include/plat/s3c-pl330-pdata.h
-+++ b/arch/arm/plat-samsung/include/plat/s3c-pl330-pdata.h
-@@ -12,7 +12,7 @@
- #ifndef __S3C_PL330_PDATA_H
- #define __S3C_PL330_PDATA_H
++static void pl330_tasklet_cyclic(unsigned long data)
++{
++	struct dma_pl330_chan *pch = (struct dma_pl330_chan *)data;
++	struct dma_pl330_desc *desc, *_dt;
++	unsigned long flags;
++	LIST_HEAD(list);
++
++	spin_lock_irqsave(&pch->lock, flags);
++
++	/* Pick up ripe tomatoes */
++	list_for_each_entry_safe(desc, _dt, &pch->work_list, node)
++		if (desc->status == DONE) {
++			dma_async_tx_callback callback;
++
++			list_move_tail(&desc->node, &pch->work_list);
++			pch->completed = desc->txd.cookie;
++
++			desc->status = PREP;
++
++			/* Try to submit a req imm.
++			next to the last completed cookie */
++			fill_queue(pch);
++
++			/* Make sure the PL330 Channel thread is active */
++			pl330_chan_ctrl(pch->pl330_chid, PL330_OP_START);
++
++			callback = desc->txd.callback;
++			if (callback)
++				callback(desc->txd.callback_param);
++
++		}
++
++	spin_unlock_irqrestore(&pch->lock, flags);
++}
++
+ static void pl330_tasklet(unsigned long data)
+ {
+ 	struct dma_pl330_chan *pch = (struct dma_pl330_chan *)data;
+@@ -227,6 +267,9 @@ static void dma_pl330_rqcb(void *token, enum pl330_op_err err)
  
--#include <plat/s3c-dma-pl330.h>
-+#include <plat/dma-pl330.h>
+ 	spin_unlock_irqrestore(&pch->lock, flags);
  
- /*
-  * Every PL330 DMAC has max 32 peripheral interfaces,
++	if (pch->cyclic_task)
++		tasklet_schedule(pch->cyclic_task);
++	else
+ 	tasklet_schedule(&pch->task);
+ }
+ 
+@@ -316,6 +359,15 @@ static void pl330_free_chan_resources(struct dma_chan *chan)
+ 	pl330_release_channel(pch->pl330_chid);
+ 	pch->pl330_chid = NULL;
+ 
++	if (pch->cyclic) {
++		pch->cyclic = false;
++		list_splice_tail_init(&pch->work_list, &pch->dmac->desc_pool);
++		if (pch->cyclic_task) {
++			tasklet_kill(pch->cyclic_task);
++			pch->cyclic_task = NULL;
++		}
++	}
++
+ 	spin_unlock_irqrestore(&pch->lock, flags);
+ }
+ 
+@@ -547,6 +599,63 @@ static inline int get_burst_len(struct dma_pl330_desc *desc, size_t len)
+ 	return burst_len;
+ }
+ 
++static struct dma_async_tx_descriptor *pl330_prep_dma_cyclic(
++		struct dma_chan *chan, dma_addr_t dma_addr, size_t len,
++		size_t period_len, enum dma_data_direction direction)
++{
++	struct dma_pl330_desc *desc;
++	struct dma_pl330_chan *pch = to_pchan(chan);
++	struct dma_pl330_peri *peri = chan->private;
++	dma_addr_t dst;
++	dma_addr_t src;
++
++	pch = to_pchan(chan);
++	if (!pch)
++		return NULL;
++
++	desc = pl330_get_desc(pch);
++	if (!desc) {
++		dev_err(pch->dmac->pif.dev, "%s:%d Unable to fetch desc\n",
++			__func__, __LINE__);
++		return NULL;
++	}
++
++	switch (direction) {
++	case DMA_TO_DEVICE:
++		desc->rqcfg.src_inc = 1;
++		desc->rqcfg.dst_inc = 0;
++		src = dma_addr;
++		dst = peri->fifo_addr;
++		break;
++	case DMA_FROM_DEVICE:
++		desc->rqcfg.src_inc = 0;
++		desc->rqcfg.dst_inc = 1;
++		src = peri->fifo_addr;
++		dst = dma_addr;
++		break;
++	default:
++		dev_err(pch->dmac->pif.dev, "%s:%d Invalid dma direction\n",
++		__func__, __LINE__);
++		return NULL;
++	}
++
++	desc->rqcfg.brst_size = peri->burst_sz;
++	desc->rqcfg.brst_len = 1;
++
++	if (!pch->cyclic_task) {
++		pch->cyclic_task =
++			kmalloc(sizeof(struct tasklet_struct), GFP_KERNEL);
++		tasklet_init(pch->cyclic_task,
++			pl330_tasklet_cyclic, (unsigned int)pch);
++	}
++
++	pch->cyclic = true;
++
++	fill_px(&desc->px, dst, src, period_len);
++
++	return &desc->txd;
++}
++
+ static struct dma_async_tx_descriptor *
+ pl330_prep_dma_memcpy(struct dma_chan *chan, dma_addr_t dst,
+ 		dma_addr_t src, size_t len, unsigned long flags)
+@@ -780,6 +889,7 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
+ 			case MEMTODEV:
+ 			case DEVTOMEM:
+ 				dma_cap_set(DMA_SLAVE, pd->cap_mask);
++				dma_cap_set(DMA_CYCLIC, pd->cap_mask);
+ 				break;
+ 			default:
+ 				dev_err(&adev->dev, "DEVTODEV Not Supported\n");
+@@ -805,6 +915,7 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
+ 	pd->device_alloc_chan_resources = pl330_alloc_chan_resources;
+ 	pd->device_free_chan_resources = pl330_free_chan_resources;
+ 	pd->device_prep_dma_memcpy = pl330_prep_dma_memcpy;
++	pd->device_prep_dma_cyclic = pl330_prep_dma_cyclic;
+ 	pd->device_tx_status = pl330_tx_status;
+ 	pd->device_prep_slave_sg = pl330_prep_slave_sg;
+ 	pd->device_control = pl330_control;
 -- 
 1.7.1
