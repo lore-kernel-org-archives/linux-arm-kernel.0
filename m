@@ -1,43 +1,30 @@
-From: akinobu.mita@gmail.com (Akinobu Mita)
-Date: Tue, 26 Jul 2011 00:58:31 +0900
-Subject: [PATCH v3 2/3] mmc: core: add random fault injection
-In-Reply-To: <1311199321-4618-3-git-send-email-per.forlin@linaro.org>
-References: <1311199321-4618-1-git-send-email-per.forlin@linaro.org>
-	<1311199321-4618-3-git-send-email-per.forlin@linaro.org>
-Message-ID: <CAC5umyg44tQxrFEYRL-tjzBMA2+KNXjB+nQveH3KcB_LPmYVHw@mail.gmail.com>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Mon, 25 Jul 2011 17:09:57 +0100
+Subject: [PATCH 0/3] Add device tree based initialisation for VIC
+Message-ID: <1311610200-12408-1-git-send-email-jamie@jamieiles.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/7/21 Per Forlin <per.forlin@linaro.org>:
-> This adds support to inject data errors after a completed host transfer.
-> The mmc core will return error even though the host transfer is successful.
-> This simple fault injection proved to be very useful to test the
-> non-blocking error handling in the mmc_blk_issue_rw_rq().
-> Random faults can also test how the host driver handles pre_req()
-> and post_req() in case of errors.
+This series aims to allow VIC devices to be probed from the device tree.
+Currently the only in-tree device tree enabled user of the VIC is versatile,
+but I'll shortly submit patches for picoxcell on device tree that uses 2
+VIC's.
 
-Looks good to me.
+I've split this into 3 patches for bisectability, but this could be fairly
+squashed into 2.
 
-> @@ -82,6 +87,66 @@ static void mmc_flush_scheduled_work(void)
-> ? ? ? ?flush_workqueue(workqueue);
-> ?}
->
-> +#ifdef CONFIG_FAIL_MMC_REQUEST
-> +
-> +static DECLARE_FAULT_ATTR(fail_mmc_request);
+Jamie Iles (3):
+  vic: add device tree bindings
+  versatile dt: set the irq-start property for the vic
+  versatile: convert to common VIC DT probing
 
-I think the fail_attr should be defined for each mmc_host like make_it_fail
-in struct mmc_host and debugfs entries should also be created in a
-subdirectory of mmc host debugfs.
+ Documentation/devicetree/bindings/arm/vic.txt |   21 +++++++++++++++
+ arch/arm/boot/dts/versatile-ab.dts            |    1 +
+ arch/arm/common/vic.c                         |   35 +++++++++++++++++++++++++
+ arch/arm/include/asm/hardware/vic.h           |    5 +++
+ arch/arm/mach-versatile/core.c                |    9 +-----
+ 5 files changed, 63 insertions(+), 8 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/vic.txt
 
-And I know that init_fault_attr_dentries() can only create a
-subdirectory in debugfs root directory.  But I have a patch which
-support for creating it in arbitrary directory.  Could you take a look
-at this? (Note that this patch is based on mmotm and not yet tested)
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-fault-injection-support-for-creating-debugfs-entries.patch
-Type: text/x-diff
-Size: 6870 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110726/5e2e0b6b/attachment.bin>
+-- 
+1.7.4.1
