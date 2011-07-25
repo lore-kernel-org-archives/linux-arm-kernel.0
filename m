@@ -1,194 +1,294 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Mon, 25 Jul 2011 17:29:38 +0530
-Subject: [PATCH V4 07/14] ARM: EXYNOS4: Use generic DMA PL330 driver
-In-Reply-To: <1311557312-26107-8-git-send-email-boojin.kim@samsung.com>
+From: vkoul@infradead.org (Vinod Koul)
+Date: Mon, 25 Jul 2011 17:31:43 +0530
+Subject: [PATCH V4 04/14] DMA: PL330: Add DMA_CYCLIC capability
+In-Reply-To: <20110725113926.GH9653@n2100.arm.linux.org.uk>
 References: <1311557312-26107-1-git-send-email-boojin.kim@samsung.com>
-	<1311557312-26107-8-git-send-email-boojin.kim@samsung.com>
-Message-ID: <CABb+yY3yEDuWv3n=fJK5TfeXi0=P96NpL3=EXHmXAqmpaium8A@mail.gmail.com>
+	<1311557312-26107-5-git-send-email-boojin.kim@samsung.com>
+	<20110725092749.GB9653@n2100.arm.linux.org.uk>
+	<002001cc4ab6$0d7cd590$287680b0$%kim@samsung.com>
+	<20110725103629.GF9653@n2100.arm.linux.org.uk>
+	<1311590884.29703.2.camel@vkoul-mobl4>
+	<20110725105754.GG9653@n2100.arm.linux.org.uk>
+	<1311591717.29703.7.camel@vkoul-mobl4>
+	<20110725113926.GH9653@n2100.arm.linux.org.uk>
+Message-ID: <1311595303.29703.31.camel@vkoul-mobl4>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 25, 2011 at 6:58 AM, Boojin Kim <boojin.kim@samsung.com> wrote:
+On Mon, 2011-07-25 at 12:39 +0100, Russell King - ARM Linux wrote:
+> On Mon, Jul 25, 2011 at 04:31:57PM +0530, Vinod Koul wrote:
+> > > I know that very well thank you.  Please look at my previous post in the
+> > > previous round of patches, and the response from Boojin Kim to see why
+> > > I used this as an *EXAMPLE* to get this fixed.
+> > Russell,
+> > Sorry that was not intended for you but for the author of patch Boojin
+> > Kim... Agree on your EXAMPLE, just wanted to ensure authors have read it
+> > as going thru this patch made it clear that they haven't.
+> 
+> That wasn't obvious because of the To: and the use of 'you' in your reply.
+Laziness on a rainy monday evening caused me to miss that
 
-> diff --git a/arch/arm/mach-exynos4/dma.c b/arch/arm/mach-exynos4/dma.c
-> index 564bb53..e1c00cf 100644
-> --- a/arch/arm/mach-exynos4/dma.c
-> +++ b/arch/arm/mach-exynos4/dma.c
-> @@ -21,151 +21,250 @@
-> ?* Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-> ?*/
->
-> -#include <linux/platform_device.h>
-> ?#include <linux/dma-mapping.h>
-> +#include <linux/amba/bus.h>
-> +#include <linux/amba/pl330.h>
->
-> +#include <asm/irq.h>
-> ?#include <plat/devs.h>
-> ?#include <plat/irqs.h>
->
-> ?#include <mach/map.h>
-> ?#include <mach/irqs.h>
+> 
+> In any case, let's fix up the documentation to be a little more complete
+> and expansive about these conditions, and improve its formatting so it's
+> easier to read.
+> 
+> A few points:
+> 
+> 1. This really should describe the dma_slave_config structure in detail
+>    (or refer to the documentation in dmaengine.h) especially describing
+>    what is mandatory there.
+I think you missed mandatory fields here, Pls note I am dropping the
+direction field in this, as we have discussed it makes no sense
+
+> 
+> 2. Note the filter function thing - I think this should be mandatory
+>    for slave and cyclic channels.  These typically have a DMA request
+>    signal associated with each channel, and so 'any random channel' isn't
+>    really acceptable like it is for the async_tx APIs.
+> 
+> 3. I think this should specify that dmaengine_slave_config() should be
+>    specified as mandatory after obtaining the DMA engine channel.
+> 
+> Any comments on this before I prepare this as a proper patch?
+> 
+> diff --git a/Documentation/dmaengine.txt b/Documentation/dmaengine.txt
+> index 5a0cb1e..8ba8d3c 100644
+> --- a/Documentation/dmaengine.txt
+> +++ b/Documentation/dmaengine.txt
+> @@ -10,87 +10,163 @@
+>  Below is a guide to device driver writers on how to use the Slave-DMA API of the
+>  DMA Engine. This is applicable only for slave DMA usage only.
+>  
+> -The slave DMA usage consists of following steps
+> +The slave DMA usage consists of following steps:
+>  1. Allocate a DMA slave channel
+>  2. Set slave and controller specific parameters
+>  3. Get a descriptor for transaction
+>  4. Submit the transaction and wait for callback notification
+> +5. Issue pending requests
+>  
+>  1. Allocate a DMA slave channel
+> -Channel allocation is slightly different in the slave DMA context, client
+> -drivers typically need a channel from a particular DMA controller only and even
+> -in some cases a specific channel is desired. To request a channel
+> -dma_request_channel() API is used.
 > -
-> -#include <plat/s3c-pl330-pdata.h>
-> +#include <mach/dma.h>
->
-> ?static u64 dma_dmamask = DMA_BIT_MASK(32);
->
-> -static struct resource exynos4_pdma0_resource[] = {
-> - ? ? ? [0] = {
-> - ? ? ? ? ? ? ? .start ?= EXYNOS4_PA_PDMA0,
-> - ? ? ? ? ? ? ? .end ? ?= EXYNOS4_PA_PDMA0 + SZ_4K,
-> - ? ? ? ? ? ? ? .flags ?= IORESOURCE_MEM,
-> - ? ? ? },
-> - ? ? ? [1] = {
-> - ? ? ? ? ? ? ? .start ?= IRQ_PDMA0,
-> - ? ? ? ? ? ? ? .end ? ?= IRQ_PDMA0,
-> - ? ? ? ? ? ? ? .flags ?= IORESOURCE_IRQ,
-> +struct dma_pl330_peri pdma0_peri[32] = {
-Please remove 32 from the list (it seems you don't always pass 32 elements)
-Also for completeness, please explicitly write element indices below because
-it's not some array of randomly placed elements.
-Same for every other such occurance.
+> -Interface:
+> -struct dma_chan *dma_request_channel(dma_cap_mask_t mask,
+> -		dma_filter_fn filter_fn,
+> -		void *filter_param);
+> -where dma_filter_fn is defined as:
+> -typedef bool (*dma_filter_fn)(struct dma_chan *chan, void *filter_param);
+> -
+> -When the optional 'filter_fn' parameter is set to NULL dma_request_channel
+> -simply returns the first channel that satisfies the capability mask.  Otherwise,
+> -when the mask parameter is insufficient for specifying the necessary channel,
+> -the filter_fn routine can be used to disposition the available channels in the
+> -system. The filter_fn routine is called once for each free channel in the
+> -system.  Upon seeing a suitable channel filter_fn returns DMA_ACK which flags
+> -that channel to be the return value from dma_request_channel.  A channel
+> -allocated via this interface is exclusive to the caller, until
+> -dma_release_channel() is called.
+> +
+> +   Channel allocation is slightly different in the slave DMA context,
+> +   client drivers typically need a channel from a particular DMA
+> +   controller only and even in some cases a specific channel is desired.
+> +   To request a channel dma_request_channel() API is used.
+> +
+> +   Interface:
+> +	struct dma_chan *dma_request_channel(dma_cap_mask_t mask,
+> +			dma_filter_fn filter_fn,
+> +			void *filter_param);
+> +   where dma_filter_fn is defined as:
+> +	typedef bool (*dma_filter_fn)(struct dma_chan *chan, void *filter_param);
+> +
+> +   The 'filter_fn' parameter is optional, but highly recommended for
+> +   slave and cyclic channels as they typically need to obtain a specific
+> +   DMA channel.
+> +
+> +   When the optional 'filter_fn' parameter is NULL, dma_request_channel()
+> +   simply returns the first channel that satisfies the capability mask.
+> +
+> +   Otherwise, the 'filter_fn' routine will be called once for each free
+> +   channel which has a capability in 'mask'.  'filter_fn' is expected to
+> +   return 'true' when the desired DMA channel is found.
+> +
+> +   A channel allocated via this interface is exclusive to the caller,
+> +   until dma_release_channel() is called.
+>  
+>  2. Set slave and controller specific parameters
+> -Next step is always to pass some specific information to the DMA driver. Most of
+> -the generic information which a slave DMA can use is in struct dma_slave_config.
+> -It allows the clients to specify DMA direction, DMA addresses, bus widths, DMA
+> -burst lengths etc. If some DMA controllers have more parameters to be sent then
+> -they should try to embed struct dma_slave_config in their controller specific
+> -structure. That gives flexibility to client to pass more parameters, if
+> -required.
+> -
+> -Interface:
+> -int dmaengine_slave_config(struct dma_chan *chan,
+> -					  struct dma_slave_config *config)
+> +
+> +   Next step is always to pass some specific information to the DMA
+> +   driver.  Most of the generic information which a slave DMA can use
+> +   is in struct dma_slave_config.  This allows the clients to specify
+> +   DMA direction, DMA addresses, bus widths, DMA burst lengths etc
+> +   for the peripheral.
+> +
+> +   If some DMA controllers have more parameters to be sent then they
+> +   should try to embed struct dma_slave_config in their controller
+> +   specific structure. That gives flexibility to client to pass more
+> +   parameters, if required.
+> +
+> +   Interface:
+> +	int dmaengine_slave_config(struct dma_chan *chan,
+> +				  struct dma_slave_config *config)
+>  
+>  3. Get a descriptor for transaction
+> -For slave usage the various modes of slave transfers supported by the
+> -DMA-engine are:
+> -slave_sg	- DMA a list of scatter gather buffers from/to a peripheral
+> -dma_cyclic	- Perform a cyclic DMA operation from/to a peripheral till the
+> +
+> +   For slave usage the various modes of slave transfers supported by the
+> +   DMA-engine are:
+> +
+> +   slave_sg	- DMA a list of scatter gather buffers from/to a peripheral
+> +   dma_cyclic	- Perform a cyclic DMA operation from/to a peripheral till the
+>  		  operation is explicitly stopped.
+> -The non NULL return of this transfer API represents a "descriptor" for the given
+> -transaction.
+>  
+> -Interface:
+> -struct dma_async_tx_descriptor *(*chan->device->device_prep_dma_sg)(
+> +   A non-NULL return of this transfer API represents a "descriptor" for
+> +   the given transaction.
+> +
+> +   Interface:
+> +	struct dma_async_tx_descriptor *(*chan->device->device_prep_dma_sg)(
+>  		struct dma_chan *chan,
+>  		struct scatterlist *dst_sg, unsigned int dst_nents,
+>  		struct scatterlist *src_sg, unsigned int src_nents,
+>  		unsigned long flags);
+> -struct dma_async_tx_descriptor *(*chan->device->device_prep_dma_cyclic)(
+> +
+> +	struct dma_async_tx_descriptor *(*chan->device->device_prep_dma_cyclic)(
+>  		struct dma_chan *chan, dma_addr_t buf_addr, size_t buf_len,
+>  		size_t period_len, enum dma_data_direction direction);
+>  
+> +   Once a descriptor has been obtained, the callback information can be
+> +   added and must then be submitted.  Some DMA engine drivers may hold a
+> +   spinlock between a successful preparation and submission so it is
+> +   important that these two operations are closely paired.
+> +
+> +   Note:
+> +	Although the async_tx API specifies that completion callback
+> +	routines cannot submit any new operations, this is not the
+> +	case for slave/cyclic DMA.
+> +
+> +	For slave DMA, the subsequent transaction may not be available
+> +	for submission prior to callback function being invoked, so
+> +	slave DMA callbacks are permitted to prepare and submit a new
+> +	transaction.
+> +
+> +	For cyclic DMA, a callback function may wish to terminate the
+> +	DMA via dmaengine_terminate_all().
+> +
+> +	Therefore, it is important that DMA engine drivers drop any
+> +	locks before calling the callback function which may cause a
+> +	deadlock.
+> +
+> +	Note that callbacks will always be invoked from the DMA
+> +	engines tasklet, never from interrupt context.
+> +
+>  4. Submit the transaction and wait for callback notification
+As you are adding 5 for issue pending then this needs change
 
-> + ? ? ? {
-> + ? ? ? ? ? ? ? .peri_id = (u8)DMACH_PCM0_RX,
-> + ? ? ? ? ? ? ? .rqtype = DEVTOMEM,
-> + ? ? ? }, {
-> + ? ? ? ? ? ? ? .peri_id = (u8)DMACH_PCM0_TX,
-> + ? ? ? ? ? ? ? .rqtype = MEMTODEV,
-> + ? ? ? }, {
-> + ? ? ? ? ? ? ? .peri_id = (u8)DMACH_PCM2_RX,
-> + ? ? ? ? ? ? ? .rqtype = DEVTOMEM,
-> + ? ? ? }, {
-> + ? ? ? ? ? ? ? .peri_id = (u8)DMACH_PCM2_TX,
-> + ? ? ? ? ? ? ? .rqtype = MEMTODEV,
-> + ? ? ? ? ? ? ? .burst_sz = 4,
-> + ? ? ? }, {
-> + ? ? ? ? ? ? ? .peri_id = (u8)DMACH_MSM_REQ0,
-> + ? ? ? }, {
-> + ? ? ? ? ? ? ? .peri_id = (u8)DMACH_MSM_REQ2,
-> + ? ? ? }, {
-> + ? ? ? ? ? ? ? .peri_id = (u8)DMACH_SPI0_RX,
-> + ? ? ? ? ? ? ? .rqtype = DEVTOMEM,
-> + ? ? ? ? ? ? ? .burst_sz = 1,
-> + ? ? ? }, {
-> + ? ? ? ? ? ? ? .peri_id = (u8)DMACH_SPI0_TX,
-> + ? ? ? ? ? ? ? .rqtype = MEMTODEV,
-> + ? ? ? ? ? ? ? .burst_sz = 1,
-> + ? ? ? }, {
-> + ? ? ? ? ? ? ? .peri_id = (u8)DMACH_SPI2_RX,
-> + ? ? ? ? ? ? ? .rqtype = DEVTOMEM,
-> + ? ? ? ? ? ? ? .burst_sz = 1,
-> + ? ? ? }, {
-> + ? ? ? ? ? ? ? .peri_id = (u8)DMACH_SPI2_TX,
-> + ? ? ? ? ? ? ? .rqtype = MEMTODEV,
-> + ? ? ? ? ? ? ? .burst_sz = 1,
-> + ? ? ? }, {
-> + ? ? ? ? ? ? ? .peri_id = (u8)DMACH_I2S0S_TX,
-> + ? ? ? ? ? ? ? .rqtype = MEMTODEV,
-> + ? ? ? }, {
-> + ? ? ? ? ? ? ? .peri_id = (u8)DMACH_I2S0_RX,
-> + ? ? ? ? ? ? ? .rqtype = DEVTOMEM,
-> + ? ? ? }, {
-> + ? ? ? ? ? ? ? .peri_id = (u8)DMACH_I2S0_TX,
-> + ? ? ? ? ? ? ? .rqtype = MEMTODEV,
-> + ? ? ? }, {
-> + ? ? ? ? ? ? ? .peri_id = (u8)DMACH_UART0_RX,
-> + ? ? ? ? ? ? ? .rqtype = DEVTOMEM,
-> + ? ? ? ? ? ? ? .burst_sz = 4,
-> + ? ? ? }, {
-> + ? ? ? ? ? ? ? .peri_id = (u8)DMACH_UART0_TX,
-> + ? ? ? ? ? ? ? .rqtype = MEMTODEV,
-> + ? ? ? ? ? ? ? .burst_sz = 4,
-> + ? ? ? }, {
-> + ? ? ? ? ? ? ? .peri_id = (u8)DMACH_UART2_RX,
-> + ? ? ? ? ? ? ? .rqtype = DEVTOMEM,
-> + ? ? ? ? ? ? ? .burst_sz = 4,
-> + ? ? ? }, {
-> + ? ? ? ? ? ? ? .peri_id = (u8)DMACH_UART2_TX,
-> + ? ? ? ? ? ? ? .rqtype = MEMTODEV,
-> + ? ? ? ? ? ? ? .burst_sz = 4,
-> + ? ? ? }, {
-> + ? ? ? ? ? ? ? .peri_id = (u8)DMACH_UART4_RX,
-> + ? ? ? ? ? ? ? .rqtype = DEVTOMEM,
-> + ? ? ? ? ? ? ? .burst_sz = 4,
-> + ? ? ? }, {
-> + ? ? ? ? ? ? ? .peri_id = (u8)DMACH_UART4_TX,
-> + ? ? ? ? ? ? ? .rqtype = MEMTODEV,
-> + ? ? ? ? ? ? ? .burst_sz = 4,
-> + ? ? ? }, {
-> + ? ? ? ? ? ? ? .peri_id = (u8)DMACH_SLIMBUS0_RX,
-> + ? ? ? ? ? ? ? .rqtype = DEVTOMEM,
-> + ? ? ? }, {
-> + ? ? ? ? ? ? ? .peri_id = (u8)DMACH_SLIMBUS0_TX,
-> + ? ? ? ? ? ? ? .rqtype = MEMTODEV,
-> + ? ? ? }, {
-> + ? ? ? ? ? ? ? .peri_id = (u8)DMACH_SLIMBUS2_RX,
-> + ? ? ? ? ? ? ? .rqtype = DEVTOMEM,
-> + ? ? ? }, {
-> + ? ? ? ? ? ? ? .peri_id = (u8)DMACH_SLIMBUS2_TX,
-> + ? ? ? ? ? ? ? .rqtype = MEMTODEV,
-> + ? ? ? }, {
-> + ? ? ? ? ? ? ? .peri_id = (u8)DMACH_SLIMBUS4_RX,
-> + ? ? ? ? ? ? ? .rqtype = DEVTOMEM,
-> + ? ? ? }, {
-> + ? ? ? ? ? ? ? .peri_id = (u8)DMACH_SLIMBUS4_TX,
-> + ? ? ? ? ? ? ? .rqtype = MEMTODEV,
-> + ? ? ? }, {
-> + ? ? ? ? ? ? ? .peri_id = (u8)DMACH_AC97_MICIN,
-> + ? ? ? ? ? ? ? .rqtype = DEVTOMEM,
-> + ? ? ? ? ? ? ? .burst_sz = 4,
-> + ? ? ? }, {
-> + ? ? ? ? ? ? ? .peri_id = (u8)DMACH_AC97_PCMIN,
-> + ? ? ? ? ? ? ? .rqtype = DEVTOMEM,
-> + ? ? ? ? ? ? ? .burst_sz = 4,
-> + ? ? ? }, {
-> + ? ? ? ? ? ? ? .peri_id = (u8)DMACH_AC97_PCMOUT,
-> + ? ? ? ? ? ? ? .rqtype = MEMTODEV,
-> + ? ? ? ? ? ? ? .burst_sz = 4,
-> ? ? ? ?},
-> ?};
+> -To schedule the transaction to be scheduled by dma device, the "descriptor"
+> -returned in above (3) needs to be submitted.
+> -To tell the dma driver that a transaction is ready to be serviced, the
+> -descriptor->submit() callback needs to be invoked. This chains the descriptor to
+> -the pending queue.
+> -The transactions in the pending queue can be activated by calling the
+> -issue_pending API. If channel is idle then the first transaction in queue is
+> -started and subsequent ones queued up.
+> -On completion of the DMA operation the next in queue is submitted and a tasklet
+> -triggered. The tasklet would then call the client driver completion callback
+> -routine for notification, if set.
+> -Interface:
+> -void dma_async_issue_pending(struct dma_chan *chan);
+> -
+> -==============================================================================
+> -
+> -Additional usage notes for dma driver writers
+> -1/ Although DMA engine specifies that completion callback routines cannot submit
+> -any new operations, but typically for slave DMA subsequent transaction may not
+> -be available for submit prior to callback routine being called. This requirement
+> -is not a requirement for DMA-slave devices. But they should take care to drop
+> -the spin-lock they might be holding before calling the callback routine
+> +
+> +   Once the descriptor has been prepared and the callback information
+> +   added, it must be placed on the DMA engine drivers pending queue.
+> +
+> +   Interface:
+> +	dma_cookie_t dmaengine_submit(struct dma_async_tx_descriptor *desc)
+> +
+> +   This returns a cookie can be used to check the progress of DMA engine
+> +   activity via other DMA engine calls not covered in this document.
+> +
+> +   dmaengine_submit() will not start the DMA operation, it merely adds
+> +   it to the pending queue.  For this, see step 5, dma_async_issue_pending.
+> +
+> +5. Issue pending DMA requests
+and getting callback notification
+> +
+> +   The transactions in the pending queue can be activated by calling the
+> +   issue_pending API. If channel is idle then the first transaction in
+> +   queue is started and subsequent ones queued up.
+> +
+> +   On completion of each DMA operation, the next in queue is started and
+> +   a tasklet triggered. The tasklet will then call the client driver
+> +   completion callback routine for notification, if set.
+> +
+> +   Interface:
+> +	void dma_async_issue_pending(struct dma_chan *chan);
+> +
+> +Further APIs:
+> +
+> +1. int dmaengine_terminate_all(struct dma_chan *chan)
+> +
+> +   This causes all activity for the DMA channel to be stopped, and may
+> +   discard data in the DMA FIFO which hasn't been fully transferred.
+> +   No callback functions will be called for any incomplete transfers.
+> +
+> +2. int dmaengine_pause(struct dma_chan *chan)
+> +
+> +   This pauses activity on the DMA channel without data loss.
+> +
+> +3. int dmaengine_resume(struct dma_chan *chan)
+> +
+> +   Resume a previously paused DMA channel.  It is invalid to resume a
+> +   channel which is not currently paused.
+> +
+> +4. enum dma_status dma_async_is_tx_complete(struct dma_chan *chan,
+> +        dma_cookie_t cookie, dma_cookie_t *last, dma_cookie_t *used)
+> +
+> +   This can be used to check the status of the channel.  Please see
+> +   the documentation in include/linux/dmaengine.h for a more complete
+> +   description of this API.
+> +
+> +   This can be used in conjunction with dma_async_is_complete() and
+> +   the cookie returned from 'descriptor->submit()' to check for
+> +   completion of a specific DMA transaction.
+> +
+> +   Note:
+> +	Not all DMA engine drivers can return reliable information for
+> +	a running DMA channel.  It is recommended that DMA engine users
+> +	pause or stop (via dmaengine_terminate_all) the channel before
+> +	using this API.
+> 
 
-
->
-> -static struct s3c_pl330_platdata exynos4_pdma0_pdata = {
-> - ? ? ? .peri = {
-> - ? ? ? ? ? ? ? [0] = DMACH_PCM0_RX,
-> - ? ? ? ? ? ? ? [1] = DMACH_PCM0_TX,
-> - ? ? ? ? ? ? ? [2] = DMACH_PCM2_RX,
-> - ? ? ? ? ? ? ? [3] = DMACH_PCM2_TX,
-> - ? ? ? ? ? ? ? [4] = DMACH_MSM_REQ0,
-> - ? ? ? ? ? ? ? [5] = DMACH_MSM_REQ2,
-> - ? ? ? ? ? ? ? [6] = DMACH_SPI0_RX,
-> - ? ? ? ? ? ? ? [7] = DMACH_SPI0_TX,
-> - ? ? ? ? ? ? ? [8] = DMACH_SPI2_RX,
-> - ? ? ? ? ? ? ? [9] = DMACH_SPI2_TX,
-> - ? ? ? ? ? ? ? [10] = DMACH_I2S0S_TX,
-> - ? ? ? ? ? ? ? [11] = DMACH_I2S0_RX,
-> - ? ? ? ? ? ? ? [12] = DMACH_I2S0_TX,
-> - ? ? ? ? ? ? ? [13] = DMACH_I2S2_RX,
-> - ? ? ? ? ? ? ? [14] = DMACH_I2S2_TX,
-> - ? ? ? ? ? ? ? [15] = DMACH_UART0_RX,
-> - ? ? ? ? ? ? ? [16] = DMACH_UART0_TX,
-> - ? ? ? ? ? ? ? [17] = DMACH_UART2_RX,
-> - ? ? ? ? ? ? ? [18] = DMACH_UART2_TX,
-> - ? ? ? ? ? ? ? [19] = DMACH_UART4_RX,
-> - ? ? ? ? ? ? ? [20] = DMACH_UART4_TX,
-> - ? ? ? ? ? ? ? [21] = DMACH_SLIMBUS0_RX,
-> - ? ? ? ? ? ? ? [22] = DMACH_SLIMBUS0_TX,
-> - ? ? ? ? ? ? ? [23] = DMACH_SLIMBUS2_RX,
-> - ? ? ? ? ? ? ? [24] = DMACH_SLIMBUS2_TX,
-> - ? ? ? ? ? ? ? [25] = DMACH_SLIMBUS4_RX,
-> - ? ? ? ? ? ? ? [26] = DMACH_SLIMBUS4_TX,
-> - ? ? ? ? ? ? ? [27] = DMACH_AC97_MICIN,
-> - ? ? ? ? ? ? ? [28] = DMACH_AC97_PCMIN,
-> - ? ? ? ? ? ? ? [29] = DMACH_AC97_PCMOUT,
-> - ? ? ? ? ? ? ? [30] = DMACH_MAX,
-> - ? ? ? ? ? ? ? [31] = DMACH_MAX,
-> - ? ? ? },
-> +struct dma_pl330_platdata exynos4_pdma0_pdata = {
-> + ? ? ? .nr_valid_peri = 32,
-Perhaps, this is why you had to add the NULL peri check.
-Please use ARRAY_SIZE here.
-Same for every other such occurance.
+-- 
+~Vinod Koul
+Intel Corp.
