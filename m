@@ -1,102 +1,40 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 25 Jul 2011 19:57:36 +0530
-Subject: [PATCH 0/4] Fix CPU hotplug IRQ migration
-In-Reply-To: <20110725132353.GJ9653@n2100.arm.linux.org.uk>
-References: <20110721151413.GD28942@n2100.arm.linux.org.uk>
-	<4E290C05.7020209@ti.com> <4E2D69C7.4040609@ti.com>
-	<20110725132353.GJ9653@n2100.arm.linux.org.uk>
-Message-ID: <4E2D7D58.8080309@ti.com>
+From: jaswinder.singh@linaro.org (Jaswinder Singh)
+Date: Mon, 25 Jul 2011 20:06:50 +0530
+Subject: [RFC] DMAEngine: Define generic transfer request api
+In-Reply-To: <1311593444.29703.20.camel@vkoul-mobl4>
+References: <1311453088-5063-1-git-send-email-jaswinder.singh@linaro.org>
+	<1311593444.29703.20.camel@vkoul-mobl4>
+Message-ID: <CAJe_Zhc8HjHoF=wjhw76x=UmjE879RWNZigq9TwhjecsiSu9sg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/25/2011 6:53 PM, Russell King - ARM Linux wrote:
-> On Mon, Jul 25, 2011 at 06:34:07PM +0530, Santosh Shilimkar wrote:
->> After CPU1 offline, the IRQ is handled by CPU0
->> even though masks say's it's CPU0. Mask should have
->
-> ITYM CPU1 here.
->
-right.
-
->> been corrected by hotplug code but as per your comments
->> this is just userspace settings and shouldn't dictate
->> which CPU handles the IRQ.
+On 25 July 2011 17:00, Vinod Koul <vkoul@infradead.org> wrote:
+> On Sun, 2011-07-24 at 02:01 +0530, Jassi Brar wrote:
+>> This is an attempt to define an api that could be used for doing
+>> fancy data transfers like interleaved to contiguous copy and vice-versa.
+>> Traditional SG_list based transfers tend to be very inefficient
+>> in such cases. Such cases call for some very condensed api to convey
+>> pattern of the transfer. This is an attempt at that condensed api.
 >>
->> The interesting part is once you online CPU now,
->> IRQ44 continues to be on CPU0.
->
-> Yes, we don't migrate IRQs back onto their affine CPUs when they come
-> back online - I don't think anyone does.
->
->> You think above behavior is fine? My i686 UBUNTU box,
->> I don't see above behaviour. The hotplug code updates
->> the IRQ mask to available CPU.
->
-> Yes, I noticed that, and the code is really weird - and I think buggy -
-> there for two reasons:
->
-> 1. If you bind an interrupt to CPUs 1, and you take CPU 1 offline,
->     the result is that the interrupt now is bound to _all_ CPUs even
->     when CPU 1 comes back online.
->
-> 2. irq_set_affinity() returns a code to indicate whether the affinity
->     mask is to be updated (see __irq_set_affinity_locked - IRQ_SET_MASK_OK
->     or IRQ_SET_MASK_OK_NOCOPY which defines whether irq_data->affinity
->     is updated.
->
-> To have the individual irq_set_affinity() directly set irq_data->affinity
-> like x86 does seems to go against the intentions of
-> __irq_set_affinity_locked().
->
-ok.
+>> The api supports all 4 variants of scatter-gather and contiguous transfer.
+>> Besides, it could easily represent common operations like
+>> ? ? ? device_prep_dma_{cyclic, memset, memcpy}
+> and how do you specify if the transfer is cyclic, memset or mempcy...
+Sorry I missed this in the dense. Maybe it's a good idea to isolate
+enough the context and reply in a post ?
 
->> Secondly, GIC smp_set_affinity is kind of set_target_cpu function.
->
-> No, the gic_set_affinity() has always been a "set this interrupt to be
-> routed to one of these IRQs", except when our IRQ migration code used
-> to call it with a specific CPU.  That's an exceptional (and incorrect)
-> case though.
->
-> Why?  The interface is that the affinity mask contains a set of CPUs,
-> and that's how generic code will call it when you write to the
-> /proc/irq/*/smp_affinity files.  If you have a 4-CPU system, and you
-> echo '3' into one of those files, gic_set_affinity() will be called
-> with a mask containing CPU0,1 and not 2,3.
->
-> The fact that gic_set_affinity() has always chosen the first CPU in the
-> mask is an implementation detail, one which should stay private to
-> gic_set_affinity().
->
-This is probably the contention point considering 'gic_arch_extn'
-exist and can have control per CPU. But as long as we ensure GIC
-and 'gic_arch_extn' have same implementation, it should be fine.
+Cyclic - I have already explained to Linus. Please ask for clarifications.
 
->> How can we relay the target CPU information to gic_arch_extn, so that
->> they can update their settings as per GIC.
->
-> That was my point to Colin - the set_affinity() interface, nor
-> irq_data->affinity really isn't suitable for doing that.
->
-Good. We are aligned here.
+Memset (with pattern of source bus-width size)
+*********
+struct xfer_template {
+       bool src_inc = false;
+       bool dst_inc = true;
+       size_t numf = memset_length / pattern_size;
+       size_t frame_size = 1;
+       struct data_chunk sgl[0]   represents the pattern to be repeated
+};
 
-> One way we _could_ do it is have the GIC code recompose a CPU mask
-> containing exactly one CPU - but if we ever end up with NR_CPUS>  32
-> the CPU mask idea may become unmanagable - it may be better to pass
-> the exact CPU number down.  It depends how its going to be used, and
-> so far I can see no examples of that.
-Will make you OMAP4 IRQ code available for this particular aspect and
-may be we can take it from there. There are two main problems I am
-seeing currently.
-
-1)Which CPU gic_arch_extn_[mask/unmask] operate on?
-Can we assume that whichever CPU the call being executed
-should be the target CPU ? This might not be safe assumption
-though. For the extn, there is no other way to know the target
-CPU for mask/unmask of an IRQ
-
-2) Relaying the IRQ migration information to gic_arch_extns
-
-Thanks for good discussion.
-
-Regards
-Santosh
+If we need to set memory with a pattern or arbitrary length, we can
+add read-width and write-width members(actually I just removed before
+posting).
