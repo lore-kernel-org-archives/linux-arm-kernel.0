@@ -1,125 +1,266 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 25 Jul 2011 20:13:17 +0300
-Subject: [PATCH 2/2 V2] OMAP3+: PM: SR: add suspend/resume handlers
-In-Reply-To: <CAOMWX4dC60SuF9=KDCrQo7zD5_PhTJhwuyqRkqj0ag8FHDQaxw@mail.gmail.com>
-References: <1311526357-7578-1-git-send-email-nm@ti.com>
-	<20110725084238.GC18062@legolas.emea.dhcp.ti.com>
-	<CAOMWX4dC60SuF9=KDCrQo7zD5_PhTJhwuyqRkqj0ag8FHDQaxw@mail.gmail.com>
-Message-ID: <20110725171317.GH18062@legolas.emea.dhcp.ti.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 25 Jul 2011 10:19:21 -0700
+Subject: [PATCHv2 1/2] ARM: Set proper TEXT_OFFSET for newer MSMs
+Message-ID: <1311614362-9011-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+MSMs post 8x50 have 2Mb at the beginning of RAM reserved for
+shared memory. Since the kernel hasn't typically been told this
+RAM exists, PHYS_OFFSET has been set to 0xN0200000 and the memory
+atags passed to the kernel have matched. This doesn't play nicely
+with things such as AUTO_ZRELADDR, which doesn't work at all, and
+dynamic phys to virt, which requires an MSM specific workaround.
 
-On Mon, Jul 25, 2011 at 11:59:10AM -0500, Menon, Nishanth wrote:
-> > On Sun, Jul 24, 2011 at 11:52:37AM -0500, Nishanth Menon wrote:
-> >> SmartReflex should be disabled while entering low power mode due to
-> >> the following reasons:
-> >> a) SmartReflex values are not defined for retention voltage.
-> >> b) With SmartReflex enabled, if the CPU enters low power state, FSM
-> >> ? ?will try to bump the voltage to current OPP's voltage for which
-> >> ? ?it has entered low power state, causing power loss and potential
-> >> ? ?unknown states for the SoC.
-> >> Since we are sure to attempt entering the lowest possible power state
-> >> during suspend operation, SmartReflex needs to be disabled for the
-> >> voltage domains in suspend path before achieving auto retention voltage
-> >> on the device.
-> >>
-> >> Traditionally, this has been done with interrupts disabled as part of
-> >> the common code which handles the idle sequence. Instead, by using the
-> >> fact that we have to disable SmartReflex for sure during suspend
-> >> operations, we can opportunistically disable SmartReflex in device
-> >> standard pm ops, instead of disabling it as part of the code which
-> >> executes with interrupts disabled and slave CPU{s} shutdown. This
-> >> allows the system to do other parallel activities(such as suspending
-> >> other devices in the system using slave CPU{s}) and save the time
-> >> required to achieve suspend and resume from suspended state as a
-> >> sequential activity.
-> >>
-> >> However, by being opportunistic as described above, we also increase
-> >> the likelihood of SmartReflex library access functions being invoked in
-> >> parallel contexts *after* SmartReflex driver's suspend handler (during
-> >> suspend operation) or *before* resume handler (during resume operation)
-> >> have been invoked (Example: DVFS for dependent devices, cpufreq for
-> >> MPU etc.). We prevent this by using a flag to reject the callers in
-> >> the duration where SmartReflex has been disabled.
-> >
-> > while at that, SR's IRQ is never freed on exit path, could fix it while
-> > you're already there ?
-> 
-> This is not really related to this patch is it? IMHO IRQ handling is
+Work around these issues by telling the kernel RAM starts at
+0xN0000000 (it actually does) and fixup the atags from the
+bootloader (if necessary) to say the same. In addition, make sure
+to set TEXT_OFFSET at least 2Mb beyond the start of RAM so that
+the kernel doesn't end up being decompressed into shared memory.
 
-I didn't say to put it on the same patch ;-) I meant that while at that,
-you could add that simple fix before this patch ;-)
+After doing this, AUTO_ZRELADDR should work on MSM with no
+problems and ARM_PATCH_PHYS_VIRT_16BIT should no longer be
+necessary.
 
-> broken badly. Current support is for SmartReflex class3 - which does
-> not use the IRQ, Class2 and Class1.5 use it, but the current code
-> requires major fixes which I dont intend to support in this series.
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+---
 
-And that's exactly what I mean. IMHO it's far better to fix the mess
-before adding more stuff, otherwise it just becomes an even bigger mess,
-even more difficult to fix in the long run. We've seen that with GPIO
-and sDMA drivers _at_least_ ;-(
+Changes since v1:
 
-> >> @@ -998,10 +1020,75 @@ static int __devexit omap_sr_remove(struct platform_device *pdev)
-> >> ? ? ? return 0;
-> >> ?}
-> >>
-> >> +static int omap_sr_suspend(struct device *dev)
-> >> +{
-> >> + ? ? struct omap_sr_data *pdata;
-> >> + ? ? struct omap_sr *sr_info;
-> >> +
-> >> + ? ? pdata = dev_get_platdata(dev);
-> >
-> > I'm not sure you need to use platform data here...
-> see below
-> >
-> >> + ? ? if (!pdata) {
-> >> + ? ? ? ? ? ? dev_err(dev, "%s: platform data missing\n", __func__);
-> >> + ? ? ? ? ? ? return -EINVAL;
-> >> + ? ? }
-> >> +
-> >> + ? ? sr_info = _sr_lookup(pdata->voltdm);
-> >
-> > this field is held on struct omap_sr. Can't you:
-> >
-> > ? ? ? ?struct omap_sr ?*info = dev_get_drvdata(dev);
-> >
-> > ?? I see that a platform_set_drvdata() is missing from the driver, but
-> > maybe you should add that instead of accessing platform_data.
-> omap_sr_data is added in arch/arm/mach-omap2/sr_device.c
-> 
-> With the current handling - it needs sr_data from which sr_info is
-> pulled out. in the current implementation, sr_data contains the voltdm
-> pointer from which sr_info is pulled out.
+ - Add 2MB to the fixed-up atag's size
 
-but sr_info is allocated on probe() isn't it ? if you add
-platform_set_drvdata(pdev, sr_info) on probe, you won't need sr_data to
-fetch sr_info, all you need is to use dev_get_drvdata(dev). Am I missing
-something ?
+ arch/arm/Makefile                       |    3 +++
+ arch/arm/mach-msm/board-msm7x30.c       |   22 ++++++++++++++++++++++
+ arch/arm/mach-msm/board-msm8960.c       |   22 ++++++++++++++++++++++
+ arch/arm/mach-msm/board-msm8x60.c       |   25 +++++++++++++++++++++++++
+ arch/arm/mach-msm/include/mach/memory.h |    6 +++---
+ 5 files changed, 75 insertions(+), 3 deletions(-)
 
-> >> ?static struct platform_driver smartreflex_driver = {
-> >> ? ? ? .remove ? ? ? ? = omap_sr_remove,
-> >> ? ? ? .driver ? ? ? ? = {
-> >> ? ? ? ? ? ? ? .name ? = "smartreflex",
-> >> + ? ? ? ? ? ? .pm ? ? = &omap_sr_dev_pm_ops,
-> >
-> > this should not be valid in case CONFIG_PM isn't enabled.
-> a) arch/arm/plat-omap/Kconfig
-> CONFIG_OMAP_SMARTREFLEX depends on PM.
-> b) SmartReflex is PM feature
-> 
-> I dont see a need to add redundant code here.
-
-fair enough if this will never build without CONFIG_PM ;-)
-
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index 3a4a04b..8c35e19 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -128,6 +128,9 @@ textofs-$(CONFIG_PM_H1940)      := 0x00108000
+ ifeq ($(CONFIG_ARCH_SA1100),y)
+ textofs-$(CONFIG_SA1111) := 0x00208000
+ endif
++textofs-$(CONFIG_ARCH_MSM7X30) := 0x00208000
++textofs-$(CONFIG_ARCH_MSM8X60) := 0x00208000
++textofs-$(CONFIG_ARCH_MSM8960) := 0x00208000
+ 
+ # Machine directory name.  This list is sorted alphanumerically
+ # by CONFIG_* macro name.
+diff --git a/arch/arm/mach-msm/board-msm7x30.c b/arch/arm/mach-msm/board-msm7x30.c
+index 8d21769..240d562 100644
+--- a/arch/arm/mach-msm/board-msm7x30.c
++++ b/arch/arm/mach-msm/board-msm7x30.c
+@@ -24,6 +24,7 @@
+ #include <linux/smsc911x.h>
+ #include <linux/usb/msm_hsusb.h>
+ #include <linux/clkdev.h>
++#include <linux/memblock.h>
+ 
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+@@ -42,6 +43,21 @@
+ 
+ extern struct sys_timer msm_timer;
+ 
++static void __init msm7x30_fixup(struct machine_desc *desc, struct tag *tag,
++			 char **cmdline, struct meminfo *mi)
++{
++	for (; tag->hdr.size; tag = tag_next(tag))
++		if (tag->hdr.tag == ATAG_MEM && tag->u.mem.start == 0x200000) {
++			tag->u.mem.start = 0;
++			tag->u.mem.size += SZ_2M;
++		}
++}
++
++static void __init msm7x30_reserve(void)
++{
++	memblock_remove(0x0, SZ_2M);
++}
++
+ static int hsusb_phy_init_seq[] = {
+ 	0x30, 0x32,	/* Enable and set Pre-Emphasis Depth to 20% */
+ 	0x02, 0x36,	/* Disable CDR Auto Reset feature */
+@@ -108,6 +124,8 @@ static void __init msm7x30_map_io(void)
+ 
+ MACHINE_START(MSM7X30_SURF, "QCT MSM7X30 SURF")
+ 	.boot_params = PLAT_PHYS_OFFSET + 0x100,
++	.fixup = msm7x30_fixup,
++	.reserve = msm7x30_reserve,
+ 	.map_io = msm7x30_map_io,
+ 	.init_irq = msm7x30_init_irq,
+ 	.init_machine = msm7x30_init,
+@@ -116,6 +134,8 @@ MACHINE_END
+ 
+ MACHINE_START(MSM7X30_FFA, "QCT MSM7X30 FFA")
+ 	.boot_params = PLAT_PHYS_OFFSET + 0x100,
++	.fixup = msm7x30_fixup,
++	.reserve = msm7x30_reserve,
+ 	.map_io = msm7x30_map_io,
+ 	.init_irq = msm7x30_init_irq,
+ 	.init_machine = msm7x30_init,
+@@ -124,6 +144,8 @@ MACHINE_END
+ 
+ MACHINE_START(MSM7X30_FLUID, "QCT MSM7X30 FLUID")
+ 	.boot_params = PLAT_PHYS_OFFSET + 0x100,
++	.fixup = msm7x30_fixup,
++	.reserve = msm7x30_reserve,
+ 	.map_io = msm7x30_map_io,
+ 	.init_irq = msm7x30_init_irq,
+ 	.init_machine = msm7x30_init,
+diff --git a/arch/arm/mach-msm/board-msm8960.c b/arch/arm/mach-msm/board-msm8960.c
+index 8294692..dab58ef 100644
+--- a/arch/arm/mach-msm/board-msm8960.c
++++ b/arch/arm/mach-msm/board-msm8960.c
+@@ -20,16 +20,34 @@
+ #include <linux/io.h>
+ #include <linux/irq.h>
+ #include <linux/clkdev.h>
++#include <linux/memblock.h>
+ 
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+ #include <asm/hardware/gic.h>
++#include <asm/setup.h>
+ 
+ #include <mach/board.h>
+ #include <mach/msm_iomap.h>
+ 
+ #include "devices.h"
+ 
++static void __init msm8960_fixup(struct machine_desc *desc, struct tag *tag,
++			 char **cmdline, struct meminfo *mi)
++{
++	for (; tag->hdr.size; tag = tag_next(tag))
++		if (tag->hdr.tag == ATAG_MEM &&
++				tag->u.mem.start == 0x40200000) {
++			tag->u.mem.start = 0x40000000;
++			tag->u.mem.size += SZ_2M;
++		}
++}
++
++static void __init msm8960_reserve(void)
++{
++	memblock_remove(0x40000000, SZ_2M);
++}
++
+ static void __init msm8960_map_io(void)
+ {
+ 	msm_map_msm8960_io();
+@@ -92,6 +110,8 @@ static void __init msm8960_rumi3_init(void)
+ }
+ 
+ MACHINE_START(MSM8960_SIM, "QCT MSM8960 SIMULATOR")
++	.fixup = msm8960_fixup,
++	.reserve = msm8960_reserve,
+ 	.map_io = msm8960_map_io,
+ 	.init_early = msm8960_init_early,
+ 	.init_irq = msm8960_init_irq,
+@@ -100,6 +120,8 @@ MACHINE_START(MSM8960_SIM, "QCT MSM8960 SIMULATOR")
+ MACHINE_END
+ 
+ MACHINE_START(MSM8960_RUMI3, "QCT MSM8960 RUMI3")
++	.fixup = msm8960_fixup,
++	.reserve = msm8960_reserve,
+ 	.map_io = msm8960_map_io,
+ 	.init_early = msm8960_init_early,
+ 	.init_irq = msm8960_init_irq,
+diff --git a/arch/arm/mach-msm/board-msm8x60.c b/arch/arm/mach-msm/board-msm8x60.c
+index 98c47ce..5b47ec8 100644
+--- a/arch/arm/mach-msm/board-msm8x60.c
++++ b/arch/arm/mach-msm/board-msm8x60.c
+@@ -20,15 +20,32 @@
+ #include <linux/platform_device.h>
+ #include <linux/io.h>
+ #include <linux/irq.h>
++#include <linux/memblock.h>
+ 
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+ #include <asm/hardware/gic.h>
++#include <asm/setup.h>
+ 
+ #include <mach/board.h>
+ #include <mach/msm_iomap.h>
+ #include "devices.h"
+ 
++static void __init msm8x60_fixup(struct machine_desc *desc, struct tag *tag,
++			 char **cmdline, struct meminfo *mi)
++{
++	for (; tag->hdr.size; tag = tag_next(tag))
++		if (tag->hdr.tag == ATAG_MEM &&
++				tag->u.mem.start == 0x40200000) {
++			tag->u.mem.start = 0x40000000;
++			tag->u.mem.size += SZ_2M;
++		}
++}
++
++static void __init msm8x60_reserve(void)
++{
++	memblock_remove(0x40000000, SZ_2M);
++}
+ 
+ static void __init msm8x60_map_io(void)
+ {
+@@ -72,6 +89,8 @@ static void __init msm8x60_init(void)
+ }
+ 
+ MACHINE_START(MSM8X60_RUMI3, "QCT MSM8X60 RUMI3")
++	.fixup = msm8x60_fixup,
++	.reserve = msm8x60_reserve,
+ 	.map_io = msm8x60_map_io,
+ 	.init_irq = msm8x60_init_irq,
+ 	.init_machine = msm8x60_init,
+@@ -79,6 +98,8 @@ MACHINE_START(MSM8X60_RUMI3, "QCT MSM8X60 RUMI3")
+ MACHINE_END
+ 
+ MACHINE_START(MSM8X60_SURF, "QCT MSM8X60 SURF")
++	.fixup = msm8x60_fixup,
++	.reserve = msm8x60_reserve,
+ 	.map_io = msm8x60_map_io,
+ 	.init_irq = msm8x60_init_irq,
+ 	.init_machine = msm8x60_init,
+@@ -86,6 +107,8 @@ MACHINE_START(MSM8X60_SURF, "QCT MSM8X60 SURF")
+ MACHINE_END
+ 
+ MACHINE_START(MSM8X60_SIM, "QCT MSM8X60 SIMULATOR")
++	.fixup = msm8x60_fixup,
++	.reserve = msm8x60_reserve,
+ 	.map_io = msm8x60_map_io,
+ 	.init_irq = msm8x60_init_irq,
+ 	.init_machine = msm8x60_init,
+@@ -93,6 +116,8 @@ MACHINE_START(MSM8X60_SIM, "QCT MSM8X60 SIMULATOR")
+ MACHINE_END
+ 
+ MACHINE_START(MSM8X60_FFA, "QCT MSM8X60 FFA")
++	.fixup = msm8x60_fixup,
++	.reserve = msm8x60_reserve,
+ 	.map_io = msm8x60_map_io,
+ 	.init_irq = msm8x60_init_irq,
+ 	.init_machine = msm8x60_init,
+diff --git a/arch/arm/mach-msm/include/mach/memory.h b/arch/arm/mach-msm/include/mach/memory.h
+index f2f8d29..58d5e7e 100644
+--- a/arch/arm/mach-msm/include/mach/memory.h
++++ b/arch/arm/mach-msm/include/mach/memory.h
+@@ -22,11 +22,11 @@
+ #elif defined(CONFIG_ARCH_QSD8X50)
+ #define PLAT_PHYS_OFFSET		UL(0x20000000)
+ #elif defined(CONFIG_ARCH_MSM7X30)
+-#define PLAT_PHYS_OFFSET		UL(0x00200000)
++#define PLAT_PHYS_OFFSET		UL(0x00000000)
+ #elif defined(CONFIG_ARCH_MSM8X60)
+-#define PLAT_PHYS_OFFSET		UL(0x40200000)
++#define PLAT_PHYS_OFFSET		UL(0x40000000)
+ #elif defined(CONFIG_ARCH_MSM8960)
+-#define PLAT_PHYS_OFFSET		UL(0x40200000)
++#define PLAT_PHYS_OFFSET		UL(0x40000000)
+ #else
+ #define PLAT_PHYS_OFFSET		UL(0x10000000)
+ #endif
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 490 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110725/b13e3df7/attachment.sig>
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
