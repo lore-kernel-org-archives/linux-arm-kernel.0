@@ -1,64 +1,46 @@
-From: per.forlin@linaro.org (Per Forlin)
-Date: Mon, 25 Jul 2011 23:20:33 +0200
-Subject: [PATCH v3 2/3] mmc: core: add random fault injection
-In-Reply-To: <CAJ0pr1_rL8rsEbDR-PL6fs9EzyGfUMbmeUjTGk=WspvrAkdy+g@mail.gmail.com>
-References: <1311199321-4618-1-git-send-email-per.forlin@linaro.org>
-	<1311199321-4618-3-git-send-email-per.forlin@linaro.org>
-	<CAC5umyg44tQxrFEYRL-tjzBMA2+KNXjB+nQveH3KcB_LPmYVHw@mail.gmail.com>
-	<CAJ0pr1_rL8rsEbDR-PL6fs9EzyGfUMbmeUjTGk=WspvrAkdy+g@mail.gmail.com>
-Message-ID: <CAJ0pr19oTmt5PQw45wbRO8qEzVi3J1OgL=w9Ma7XxX-=1A=A=A@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 25 Jul 2011 22:27:40 +0100
+Subject: [PATCH 1/1 V2] Add Thread Support for the Context ID Register
+	of ARM v6 & v7 Architectures
+In-Reply-To: <20110725103323.GE9653@n2100.arm.linux.org.uk>
+References: <cover.1310544641.git.wolfgang.betz@st.com>
+	<a4ef7565bd6013f56c5c10071bd36739c59768b7.1310544641.git.wolfgang.betz@st.com>
+	<20110714100254.GA20903@e102144-lin.cambridge.arm.com>
+	<4E1ECDD4.1020800@st.com>
+	<20110714113625.GB20903@e102144-lin.cambridge.arm.com>
+	<4E241E60.7040403@st.com>
+	<20110718125719.GA7410@e102144-lin.cambridge.arm.com>
+	<20110719102317.GC26574@n2100.arm.linux.org.uk>
+	<4E2D418D.4000800@st.com>
+	<20110725103323.GE9653@n2100.arm.linux.org.uk>
+Message-ID: <20110725212740.GA20187@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Akinobu,
+On Mon, Jul 25, 2011 at 11:33:23AM +0100, Russell King - ARM Linux wrote:
+> On Mon, Jul 25, 2011 at 12:12:29PM +0200, Wolfgang BETZ wrote:
+> > C is a typed language for a reason.  Don't destroy it with casts.
+> > 
+> > So, the _minimum_ that needs to change in this patch is for those casts
+> > to go, and cpu_switch_mm() needs to be fixed to take the context ID
+> > value, rather a context ID value casted to a mm_struct.
+> > 
+> > Well, this is exactly what the patch is doing right now.
+> > I have intentionally avoided to centralize this cast into cpu_switch_mm() in order to be sure to not miss any call to it, accidentally. As said above, the compiler will warn about something like this.
+> > Maybe you could take a closer look at v3 of the patch, which I will send out within today.
+> 
+> You've completely missed my point.  What's the really scary thing here
+> is that you can't see that you're doing something very very wrong.
 
-On 25 July 2011 21:19, Per Forlin <per.forlin@linaro.org> wrote:
-> On 25 July 2011 17:58, Akinobu Mita <akinobu.mita@gmail.com> wrote:
->> 2011/7/21 Per Forlin <per.forlin@linaro.org>:
->>> This adds support to inject data errors after a completed host transfer.
->>> The mmc core will return error even though the host transfer is successful.
->>> This simple fault injection proved to be very useful to test the
->>> non-blocking error handling in the mmc_blk_issue_rw_rq().
->>> Random faults can also test how the host driver handles pre_req()
->>> and post_req() in case of errors.
->>
->> Looks good to me.
->>
-> Thanks,
->
->>> @@ -82,6 +87,66 @@ static void mmc_flush_scheduled_work(void)
->>> ? ? ? ?flush_workqueue(workqueue);
->>> ?}
->>>
->>> +#ifdef CONFIG_FAIL_MMC_REQUEST
->>> +
->>> +static DECLARE_FAULT_ATTR(fail_mmc_request);
->>
->> I think the fail_attr should be defined for each mmc_host like make_it_fail
->> in struct mmc_host and debugfs entries should also be created in a
->> subdirectory of mmc host debugfs.
->>
-> I looked at blk-core.c and used the same code here. Current code
-> creates the entry under the debugfs root. This means one fail_attr for
-> all hosts.
-> I agree, it's more clean to move the fail_attr to the
-> host-debugfs-entry which require the fail_attr to be stored same way
-> as make_it_fail.
->
->> And I know that init_fault_attr_dentries() can only create a
->> subdirectory in debugfs root directory. ?But I have a patch which
->> support for creating it in arbitrary directory. ?Could you take a look
->> at this? (Note that this patch is based on mmotm and not yet tested)
->>
-I looked at your patch and it raised two questions.
-I can't use FAULT_ATTR_INITIALIZER since mmc_host is allocated on the
-heap. It looks like setup_fault_attr(attr, str) will fail if str is
-NULL. How can I initialise the fault_attrs if not stack allocated?
-About the boot param initialisation of fault attr. There can only be
-one fault_mmc_request boot param for the entire kernel but there is
-one fault_attr per host, and there may be many hosts. It would be
-convenient if setup_fault_attrs would take (attr, boot_param_name),
-look up boot_param_name and use that otherwise set default values.
+I'd still like to know why we can't avoid piggybacking on the switch_mm code
+by doing similar to the hack I posted here:
 
-Regards,
-Per
+http://lists.infradead.org/pipermail/linux-arm-kernel/2011-July/058436.html
+
+Given that future cores (>= A15) put the ASID in a different register and
+there's apparently a need for a thread switch notifier anyway, tying the
+contextidr up so tightly with switch_mm doesn't feel right to me.
+
+So, ugly casts aside, I'm not convinced by the approach taken here.
+
+Will
