@@ -1,168 +1,115 @@
-From: boojin.kim@samsung.com (Boojin Kim)
-Date: Mon, 25 Jul 2011 19:31:45 +0900
-Subject: [PATCH V4 04/14] DMA: PL330: Add DMA_CYCLIC capability
-In-Reply-To: <20110725092749.GB9653@n2100.arm.linux.org.uk>
-References: <1311557312-26107-1-git-send-email-boojin.kim@samsung.com>
-	<1311557312-26107-5-git-send-email-boojin.kim@samsung.com>
-	<20110725092749.GB9653@n2100.arm.linux.org.uk>
-Message-ID: <002001cc4ab6$0d7cd590$287680b0$%kim@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 25 Jul 2011 11:33:23 +0100
+Subject: [PATCH 1/1 V2] Add Thread Support for the Context ID Register
+	of ARM v6 & v7 Architectures
+In-Reply-To: <4E2D418D.4000800@st.com>
+References: <cover.1310544641.git.wolfgang.betz@st.com>
+	<a4ef7565bd6013f56c5c10071bd36739c59768b7.1310544641.git.wolfgang.betz@st.com>
+	<20110714100254.GA20903@e102144-lin.cambridge.arm.com>
+	<4E1ECDD4.1020800@st.com>
+	<20110714113625.GB20903@e102144-lin.cambridge.arm.com>
+	<4E241E60.7040403@st.com>
+	<20110718125719.GA7410@e102144-lin.cambridge.arm.com>
+	<20110719102317.GC26574@n2100.arm.linux.org.uk>
+	<4E2D418D.4000800@st.com>
+Message-ID: <20110725103323.GE9653@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux Wrote:
+On Mon, Jul 25, 2011 at 12:12:29PM +0200, Wolfgang BETZ wrote:
+> Hi Russell,
+> 
+> On 07/19/2011 12:23 PM, Russell King - ARM Linux wrote:
+> 
+> 
+> One of the reasons that there'll be a struggle is the abuse that's in the
+> patch.
+> 
+> If Wolfgang wants to pass something into a function which isn't already
+> being passed, then the prototype needs to be changed - and all
+> implementations and users need to be fixed up for that change.  Fudging
+> it with casts to an existing arguments type so something else can be
+> passed is just not on.
+> 
+> How does Wolfgang know that he's fixed up everywhere which calls
+> cpu_switch_mm() to ensure that it now passes the context ID value in r1
+> rather than the struct mm_struct pointer?  Or more to the point, how do
+> we know that there isn't a new call to cpu_switch_mm() which hasn't been
+> fixed up.  There is no way for the compiler to tell us because the
+> information is hidden from the compiler by those casts.
+> 
+> Please note, that only for ARM v6 and v7 the context ID value will be passed in r1 at the place of the struct mm_struct pointer. For other platforms/architecture nothing has changed!
+> So the compiler will (continue to) throw out a warning, in case you pass something else which is not a pointer to mm_struct.
+> 
+> 
+> 
+> 
+> C is a typed language for a reason.  Don't destroy it with casts.
+> 
+> So, the _minimum_ that needs to change in this patch is for those casts
+> to go, and cpu_switch_mm() needs to be fixed to take the context ID
+> value, rather a context ID value casted to a mm_struct.
+> 
+> Well, this is exactly what the patch is doing right now.
+> I have intentionally avoided to centralize this cast into cpu_switch_mm() in order to be sure to not miss any call to it, accidentally. As said above, the compiler will warn about something like this.
+> Maybe you could take a closer look at v3 of the patch, which I will send out within today.
 
-> Sent: Monday, July 25, 2011 6:28 PM
-> To: Boojin Kim
-> Cc: linux-arm-kernel at lists.infradead.org;
-linux-samsung-soc at vger.kernel.org;
-> Kukjin Kim; Vinod Koul; Jassi Brar; Grant Likely; Mark Brown; Dan Williams
-> Subject: Re: [PATCH V4 04/14] DMA: PL330: Add DMA_CYCLIC capability
->
-> On Mon, Jul 25, 2011 at 10:28:22AM +0900, Boojin Kim wrote:
-> > +static void pl330_tasklet_cyclic(unsigned long data)
-> > +{
-> > +	struct dma_pl330_chan *pch = (struct dma_pl330_chan *)data;
-> > +	struct dma_pl330_desc *desc, *_dt;
-> > +	unsigned long flags;
-> > +	LIST_HEAD(list);
-> > +
-> > +	spin_lock_irqsave(&pch->lock, flags);
-> ...
-> > +			callback = desc->txd.callback;
-> > +			if (callback)
-> > +				callback(desc->txd.callback_param);
->
-> On this again - what if the callback wants to terminate the DMA activity
-> because there's no more audio data to be sent/received from the device?
+You've completely missed my point.  What's the really scary thing here
+is that you can't see that you're doing something very very wrong.
 
-Do you mean what is happened if the callback() is called after channel is
-terminated ?
-Or What is happened if Callback() calls 'dma_release_channel()' to terminate
-DMA?
+Think about this case:
 
->
-> > +
->
-> Useless blank line.
-I will address your comment.
->
-> > +		}
-> > +
-> > +	spin_unlock_irqrestore(&pch->lock, flags);
-> > +}
-> > +
-> >  static void pl330_tasklet(unsigned long data)
-> >  {
-> >  	struct dma_pl330_chan *pch = (struct dma_pl330_chan *)data;
-> > @@ -227,6 +267,9 @@ static void dma_pl330_rqcb(void *token, enum
-> pl330_op_err err)
-> >
-> >  	spin_unlock_irqrestore(&pch->lock, flags);
-> >
-> > +	if (pch->cyclic_task)
-> > +		tasklet_schedule(pch->cyclic_task);
-> > +	else
-> >  	tasklet_schedule(&pch->task);
->
-> Indentation error.
-Sorry again.. I will address your comment.
+	static inline struct mm_struct *some_function(struct mm_struct *mm)
+	{
+		return (struct mm_struct *)mm->context.id;
+	}
 
->
-> >  }
-> >
-> > @@ -316,6 +359,15 @@ static void pl330_free_chan_resources(struct
-dma_chan
-> *chan)
-> >  	pl330_release_channel(pch->pl330_chid);
-> >  	pch->pl330_chid = NULL;
-> >
-> > +	if (pch->cyclic) {
-> > +		pch->cyclic = false;
-> > +		list_splice_tail_init(&pch->work_list,
-&pch->dmac->desc_pool);
-> > +		if (pch->cyclic_task) {
-> > +			tasklet_kill(pch->cyclic_task);
-> > +			pch->cyclic_task = NULL;
-> > +		}
-> > +	}
-> > +
-> >  	spin_unlock_irqrestore(&pch->lock, flags);
-> >  }
-> >
-> > @@ -547,6 +599,63 @@ static inline int get_burst_len(struct
-dma_pl330_desc
-> *desc, size_t len)
-> >  	return burst_len;
-> >  }
-> >
-> > +static struct dma_async_tx_descriptor *pl330_prep_dma_cyclic(
-> > +		struct dma_chan *chan, dma_addr_t dma_addr, size_t len,
-> > +		size_t period_len, enum dma_data_direction direction)
-> > +{
-> > +	struct dma_pl330_desc *desc;
-> > +	struct dma_pl330_chan *pch = to_pchan(chan);
-> > +	struct dma_pl330_peri *peri = chan->private;
-> > +	dma_addr_t dst;
-> > +	dma_addr_t src;
-> > +
-> > +	pch = to_pchan(chan);
-> > +	if (!pch)
-> > +		return NULL;
->
-> You've already done the to_pchan() thing when declaring pch.  You've
-> already dereferenced 'chan', so there's no way that pch could be NULL
-> here.
-I will address your comment.
+	cpu_switch_mm(pgd, some_function(mm));
 
->
-> > +
-> > +	desc = pl330_get_desc(pch);
-> > +	if (!desc) {
-> > +		dev_err(pch->dmac->pif.dev, "%s:%d Unable to fetch desc\n",
-> > +			__func__, __LINE__);
-> > +		return NULL;
-> > +	}
-> > +
-> > +	switch (direction) {
-> > +	case DMA_TO_DEVICE:
-> > +		desc->rqcfg.src_inc = 1;
-> > +		desc->rqcfg.dst_inc = 0;
-> > +		src = dma_addr;
-> > +		dst = peri->fifo_addr;
-> > +		break;
-> > +	case DMA_FROM_DEVICE:
-> > +		desc->rqcfg.src_inc = 0;
-> > +		desc->rqcfg.dst_inc = 1;
-> > +		src = peri->fifo_addr;
-> > +		dst = dma_addr;
-> > +		break;
-> > +	default:
-> > +		dev_err(pch->dmac->pif.dev, "%s:%d Invalid dma direction\n",
-> > +		__func__, __LINE__);
-> > +		return NULL;
-> > +	}
-> > +
-> > +	desc->rqcfg.brst_size = peri->burst_sz;
-> > +	desc->rqcfg.brst_len = 1;
-> > +
-> > +	if (!pch->cyclic_task) {
-> > +		pch->cyclic_task =
-> > +			kmalloc(sizeof(struct tasklet_struct), GFP_KERNEL);
-> > +		tasklet_init(pch->cyclic_task,
-> > +			pl330_tasklet_cyclic, (unsigned int)pch);
->
-> Here you allocate memory for the cyclic task.  Above you set this pointer
-> to NULL.  That sounds like a memory leak to me.  Why are you kmallocing
-> this memory - why can't it be part of the dma_pl330_chan structure?  It's
-> only 28 bytes.
+and somewhere else there's another call to:
 
-It's my mistake. I should have been free of the memory.
+	cpu_switch_mm(pgd, mm);
 
-And the reason why I use kmalloc for 'cyclic_task' is following.
-This memory size for 'cyclic_tasklet' is the 896 bytes ( = the number of
-channel * sizeof(struct tasklet_struct)= 32*28) for each DMAC. And This
-memory size is increased according to the number of DMAC.
-And Samsung has the DMAC that is dedicated for Mem-to-Mem operation. If I
-make 'cyclic_task' be part of dma_pl330_chan, this DMAC that is dedicated
-for Mem-to-Mem operation should hold unused data.
-So, I think it's loss that all dma channels hold own 'cyclic_task'.
+You've destroyed the ability of the compiler to spot that error because
+of your insistance to use idiotic casts and avoid doing the job properly.
+Had you changed the second argument to 'unsigned long' or 'u32' or
+something like that - or even added that - the compiler would be able to
+spot the calls which hadn't been fixed up.
+
+So, here's what I want you to do:
+
+1. Change the cpu_switch_mm() prototype.
+2. Get rid of the madness of sometimes passing a real mm_struct and
+   sometimes passing the context ID value depending on configuration.
+
+Here's some examples:
+
+	cpu_switch_mm(pgd, mm);
+
+where mm is a real mm_struct => good.
+
+	cpu_switch_mm(pgd, some_function(mm));
+
+	#ifdef CONFIG_I_WANTING_TO_BE_RANTED_AT
+	static inline struct mm_struct *some_function(struct mm_struct *mm)
+	{
+		return (struct mm_struct *)mm->context.id;
+	}
+	#else
+	static inline struct mm_struct *some_function(struct mm_struct *mm)
+	{
+		return mm;
+	}
+	#endif
+
+unacceptable, potentially buggy, violates the principles of C's type
+checking etc.
+
+	cpu_switch_mm(pgd, mm, context_id(mm));
+
+better.
+
+	cpu_switch_mm(pgd, context_id(mm));
+
+even better if 'mm' becomes unused by _all_ implementations of
+cpu_switch_mm().
