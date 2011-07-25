@@ -1,113 +1,51 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Mon, 25 Jul 2011 17:26:05 +0100
-Subject: [PATCH] ARM: alignment: Prevent ignoring of faults with ARMv6
-	unaligned access model
-Message-ID: <1311611165-20064-1-git-send-email-dave.martin@linaro.org>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Mon, 25 Jul 2011 22:01:23 +0530
+Subject: [PATCH v2 2/6] arm: davinci: Explicitly set channel
+	controllers' default queues
+In-Reply-To: <4E2D70B9.7060202@mvista.com>
+References: <1310303679-17936-1-git-send-email-ido@wizery.com>
+	<1310303679-17936-3-git-send-email-ido@wizery.com>
+	<B85A65D85D7EB246BE421B3FB0FBB593024DD2CE05@dbde02.ent.ti.com>
+	<4E2D70B9.7060202@mvista.com>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024DD2CEA5@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, it's possible to set the kernel to ignore alignment
-faults when changing the alignment fault handling mode at runtime
-via /proc/sys/alignment, even though this is undesirable on ARMv6
-and above, where it can result in infinite spins where an un-fixed-
-up instruction repeatedly faults.
+Hi Sergei,
 
-In addition, the kernel clobbers any alignment mode specified on
-the command-line if running on ARMv6 or above.
+On Mon, Jul 25, 2011 at 19:03:45, Sergei Shtylyov wrote:
+> Hello.
+> 
+> Nori, Sekhar wrote:
+> 
+> >> Davinci platforms may define a default queue for each channel
+> >> controller. If one is not defined, the default queue is set to EVENTQ_1.
+> >> However, there's no way to distinguish between an unset default queue to
+> >> one that is set to EVENTQ_0, as EVENTQ_0 = 0.
+> 
+> >> Explicitly specify the default queue for all channel controllers on all
+> >> Davinci platforms to EVENTQ_1, and don't overwrite it in the EDMA probe
+> >> function.
+> 
+> >> One exception is the DA850 board, for which EVENTQ_1 is not a valid
+> >> option for its second channel controller. Use EVENTQ_0 instead for that
+> >> channel controller.
+> 
+> >> Signed-off-by: Ido Yariv <ido@wizery.com>
+> 
+> > Looks good to me. Will queue for v3.2/fixes
+> 
+>     Why wait for 3.2? If this is considered a fix, it should be applied to 3.1, no?
 
-This patch factors out the necessary safety check into a couple of
-new helper functions, and checks and modifies the fault handling
-mode as appropriate on boot and on writes to /proc/cpu/alignment.
+3.2/fixes just indicates it will be queued as a fix/cleanup
+for 3.2 so it will have higher priority for merge when compared
+to a new feature.
 
-Prior to ARMv6, the behaviour is unchanged.
+This patch doesn't really fix any existing broken functionality.
+It corrects event queue configuration for EDMA CC1 on DA850 for
+which there are no current users in mainline.
 
-For ARMv6 and above, the behaviour changes as follows:
+So, not sending for v3.1.
 
-  * Attempting to ignore faults on ARMv6 results in the mode being
-    forced to UM_FIXUP instead.  A warning is printed if this
-    happened as a result of a write to /proc/cpu/alignment.  The
-    user's UM_WARN bit (if present) is still honoured.
-
-  * An alignment= argument from the kernel command-line is now
-    honoured, except that the kernel will modify the specified mode
-    as described above.  This is allows modes such as UM_SIGNAL and
-    UM_WARN to be active immediately from boot, which is useful for
-    debugging purposes.
-
-Signed-off-by: Dave Martin <dave.martin@linaro.org>
----
- arch/arm/mm/alignment.c |   42 ++++++++++++++++++++++++++++++------------
- 1 files changed, 30 insertions(+), 12 deletions(-)
-
-diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
-index 724ba3b..a55c6fc 100644
---- a/arch/arm/mm/alignment.c
-+++ b/arch/arm/mm/alignment.c
-@@ -95,6 +95,33 @@ static const char *usermode_action[] = {
- 	"signal+warn"
- };
- 
-+/* Return true if and only if the ARMv6 unaligned access model is in use. */
-+static bool cpu_is_v6_unaligned(void)
-+{
-+	return cpu_architecture() >= CPU_ARCH_ARMv6 && (cr_alignment & CR_U);
-+}
-+
-+static int safe_usermode(int new_usermode, bool warn)
-+{
-+	/*
-+	 * ARMv6 and later CPUs can perform unaligned accesses for
-+	 * most single load and store instructions up to word size.
-+	 * LDM, STM, LDRD and STRD still need to be handled.
-+	 *
-+	 * Ignoring the alignment fault is not an option on these
-+	 * CPUs since we spin re-faulting the instruction without
-+	 * making any progress.
-+	 */
-+	if (cpu_is_v6_unaligned() && !(new_usermode & (UM_FIXUP | UM_SIGNAL))) {
-+		new_usermode |= UM_FIXUP;
-+
-+		if (warn)
-+			printk(KERN_WARNING "alignment: ignoring faults is unsafe on this CPU.  Defaulting to fixup mode.\n");
-+	}
-+
-+	return new_usermode;
-+}
-+
- static int alignment_proc_show(struct seq_file *m, void *v)
- {
- 	seq_printf(m, "User:\t\t%lu\n", ai_user);
-@@ -125,7 +152,7 @@ static ssize_t alignment_proc_write(struct file *file, const char __user *buffer
- 		if (get_user(mode, buffer))
- 			return -EFAULT;
- 		if (mode >= '0' && mode <= '5')
--			ai_usermode = mode - '0';
-+			ai_usermode = safe_usermode(mode - '0', true)
- 	}
- 	return count;
- }
-@@ -923,20 +950,11 @@ static int __init alignment_init(void)
- 		return -ENOMEM;
- #endif
- 
--	/*
--	 * ARMv6 and later CPUs can perform unaligned accesses for
--	 * most single load and store instructions up to word size.
--	 * LDM, STM, LDRD and STRD still need to be handled.
--	 *
--	 * Ignoring the alignment fault is not an option on these
--	 * CPUs since we spin re-faulting the instruction without
--	 * making any progress.
--	 */
--	if (cpu_architecture() >= CPU_ARCH_ARMv6 && (cr_alignment & CR_U)) {
-+	if (cpu_is_v6_unaligned()) {
- 		cr_alignment &= ~CR_A;
- 		cr_no_alignment &= ~CR_A;
- 		set_cr(cr_alignment);
--		ai_usermode = UM_FIXUP;
-+		ai_usermode = safe_usermode(ai_usermode, false);
- 	}
- 
- 	hook_fault_code(1, do_alignment, SIGBUS, BUS_ADRALN,
--- 
-1.7.4.1
+Thanks,
+Sekhar
