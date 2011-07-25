@@ -1,47 +1,66 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Mon, 25 Jul 2011 20:33:23 +0530
-Subject: [PATCH] dmaengine: pl330: make platform data optional
-In-Reply-To: <1311603872.8206.15.camel@vkoul-mobl4>
-References: <1310518811-379-1-git-send-email-robherring2@gmail.com>
-	<1311603872.8206.15.camel@vkoul-mobl4>
-Message-ID: <CABb+yY1mVHHLdmBh-3RJxc9zSNQkxQQrTiLsD6OJC1rSN3WW9w@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 25 Jul 2011 20:33:55 +0530
+Subject: [PATCH 0/4] Fix CPU hotplug IRQ migration
+In-Reply-To: <20110725144634.GC14955@n2100.arm.linux.org.uk>
+References: <20110721151413.GD28942@n2100.arm.linux.org.uk>
+	<4E290C05.7020209@ti.com> <4E2D69C7.4040609@ti.com>
+	<20110725132353.GJ9653@n2100.arm.linux.org.uk>
+	<4E2D7D58.8080309@ti.com>
+	<20110725144634.GC14955@n2100.arm.linux.org.uk>
+Message-ID: <4E2D85DB.8030902@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 25, 2011 at 7:54 PM, Vinod Koul <vkoul@infradead.org> wrote:
-> On Tue, 2011-07-12 at 20:00 -0500, Rob Herring wrote:
->> From: Rob Herring <rob.herring@calxeda.com>
+On 7/25/2011 8:16 PM, Russell King - ARM Linux wrote:
+> On Mon, Jul 25, 2011 at 07:57:36PM +0530, Santosh Shilimkar wrote:
+>> Will make you OMAP4 IRQ code available for this particular aspect and
+>> may be we can take it from there. There are two main problems I am
+>> seeing currently.
 >>
->> The pl330 needs platform data for describing peripheral connections, but
->> some platforms may only support memory to memory dma channels. In this
->> case, we can probe for how many channels there are and don't need the
->> platform data.
->>
->> As memcpy requests don't need channel private data to hold peripheral
->> info, allow private data to be NULL in this case.
->>
->> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
->> Cc: Jassi Brar <jassi.brar@samsung.com>
->> Cc: Vinod Koul <vinod.koul@intel.com>
->> Cc: Dan Williams <dan.j.williams@intel.com>
->> ---
->> ?drivers/dma/pl330.c | ? 64 ++++++++++++++++++++++++++++----------------------
->> ?1 files changed, 36 insertions(+), 28 deletions(-)
-> Applied, Thanks
+>> 1)Which CPU gic_arch_extn_[mask/unmask] operate on?
+>> Can we assume that whichever CPU the call being executed
+>> should be the target CPU ? This might not be safe assumption
+>> though. For the extn, there is no other way to know the target
+>> CPU for mask/unmask of an IRQ
+>
+> This goes back to the mistake that was made with the initial set of
+> GIC PPI patches.
+>
+> You can't assume anything about which CPU the mask/unmask functions end
+> up running on.  Between code calling request_irq() and the relevant
+> unmask function being called, we can end up scheduling, either because
+> of a mutex being waited for or because of a preemption event.  That
+> means we can end up on a different CPU to that which we started out
+> on.
+>
+Thanks for confirming the same.
 
-Oops, sorry Rob. I failed to reply as I assured you. I have been just
-too deep into other stuff.
+> So, the only thing you can do is remember the CPU number which it was
+> last associated with - a simple 'unsigned int' should do in the
+> extensions data structures, one per IRQ.
+>
+How do you build the per IRQ CPU association information?
+The point is fist mask/unmask call itself can be happening from
+a CPU which is not the target CPU for that IRQ.
+We can do something like GIC init does. Mark all the IRQ's
+to boot CPU, save this info and keep using it in mask/unmask.
+This association can be changed by CPU hotplug or force IRQ
+affinity setting and we take care of updating the stored
+PER IRQ cpu association.
 
->> @@ -717,27 +717,35 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
->> ? ? ? INIT_LIST_HEAD(&pd->channels);
->>
->> ? ? ? /* Initialize channel parameters */
->> - ? ? for (i = 0; i < pdat->nr_valid_peri; i++) {
->> - ? ? ? ? ? ? struct dma_pl330_peri *peri = &pdat->peri[i];
->> - ? ? ? ? ? ? pch = &pdmac->peripherals[i];
->> + ? ? num_chan = max(pdat->nr_valid_peri, (u8)pi->pcfg.num_chan);
-Perhaps you need to check against NULL pointer on 'pdat' ?
+> However, my point is that doing this:
+>
+> 	gic_arch_extn.irq_set_affinity(d, cpumask_of(cpu), force);
+>
+> and then:
+>
+> 	cpu = cpumask_first(affinity);
+>
+> in the extensions code is a very long winded way of communicating a
+> single CPU number down into the IRQ extension code.
+Agree. As you suggested , the GIC code recompose a CPU mask
+containing exactly one CPU and relaying that information with
+some custom function might be more efficient.
 
-Rest looks ok.
-
-thnx
+Regards
+Santosh
