@@ -1,31 +1,51 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 25 Jul 2011 17:46:31 -0300
-Subject: [PATCH] ARM: board-mx51_babbage: Fix UART2 registration
-Message-ID: <1311626791-7197-1-git-send-email-festevam@gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 25 Jul 2011 21:52:57 +0100
+Subject: [PATCH] ARM: S3C64XX: Hook up GPIO initiated DVS on Cragganmore
+Message-ID: <1311627177-26388-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On MX51 Babbage board the RTS/CTS pins are not used on UART2 port.
+Allow us to ramp VDDARM quickly by using a GPIO to signal a voltage change
+instead of doing a register write.
 
-Fix the registration of this port.
-
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 ---
- arch/arm/mach-mx5/board-mx51_babbage.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/mach-s3c64xx/mach-crag6410.c |    9 +++++++++
+ 1 files changed, 9 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-mx5/board-mx51_babbage.c b/arch/arm/mach-mx5/board-mx51_babbage.c
-index 15c6000..62aa2af 100644
---- a/arch/arm/mach-mx5/board-mx51_babbage.c
-+++ b/arch/arm/mach-mx5/board-mx51_babbage.c
-@@ -367,7 +367,7 @@ static void __init mx51_babbage_init(void)
- 					ARRAY_SIZE(mx51babbage_pads));
+diff --git a/arch/arm/mach-s3c64xx/mach-crag6410.c b/arch/arm/mach-s3c64xx/mach-crag6410.c
+index d59afa1..2005d5f 100644
+--- a/arch/arm/mach-s3c64xx/mach-crag6410.c
++++ b/arch/arm/mach-s3c64xx/mach-crag6410.c
+@@ -376,6 +376,12 @@ static struct pca953x_platform_data crag6410_pca_data = {
+ 	.irq_base	= 0,
+ };
  
- 	imx51_add_imx_uart(0, &uart_pdata);
--	imx51_add_imx_uart(1, &uart_pdata);
-+	imx51_add_imx_uart(1, NULL);
- 	imx51_add_imx_uart(2, &uart_pdata);
++/* VDDARM is controlled by DVS1 connected to GPK(0) */
++static struct wm831x_buckv_pdata vddarm_pdata = {
++	.dvs_control_src = 1,
++	.dvs_gpio = S3C64XX_GPK(0),
++};
++
+ static struct regulator_consumer_supply vddarm_consumers[] __initdata = {
+ 	REGULATOR_SUPPLY("vddarm", NULL),
+ };
+@@ -391,6 +397,7 @@ static struct regulator_init_data vddarm __initdata = {
+ 	.num_consumer_supplies = ARRAY_SIZE(vddarm_consumers),
+ 	.consumer_supplies = vddarm_consumers,
+ 	.supply_regulator = "WALLVDD",
++	.driver_data = &vddarm_pdata,
+ };
  
- 	babbage_fec_reset();
+ static struct regulator_init_data vddint __initdata = {
+@@ -526,6 +533,8 @@ static struct wm831x_pdata crag_pmic_pdata __initdata = {
+ 	.backup = &banff_backup_pdata,
+ 
+ 	.gpio_defaults = {
++		/* GPIO5: DVS1_REQ - CMOS, DBVDD, active high */
++		[4] = WM831X_GPN_DIR | WM831X_GPN_POL | WM831X_GPN_ENA | 0x8,
+ 		/* GPIO11: Touchscreen data - CMOS, DBVDD, active high*/
+ 		[10] = WM831X_GPN_POL | WM831X_GPN_ENA | 0x6,
+ 		/* GPIO12: Touchscreen pen down - CMOS, DBVDD, active high*/
 -- 
-1.7.1
+1.7.5.4
