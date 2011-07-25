@@ -1,37 +1,31 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 25 Jul 2011 10:19:22 -0700
-Subject: [PATCHv2 2/2] ARM: ARM_PATCH_PHYS_VIRT_16BIT no longer depends on MSM
-In-Reply-To: <1311614362-9011-1-git-send-email-sboyd@codeaurora.org>
-References: <1311614362-9011-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1311614362-9011-2-git-send-email-sboyd@codeaurora.org>
+From: davidb@codeaurora.org (David Brown)
+Date: Mon, 25 Jul 2011 10:40:31 -0700
+Subject: [PATCH v2] i2c: QUP based bus driver for Qualcomm MSM chipsets
+In-Reply-To: <1308018114-19709-1-git-send-email-kheitke@codeaurora.org>
+References: <1308018114-19709-1-git-send-email-kheitke@codeaurora.org>
+Message-ID: <20110725174030.GA20835@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MSM no longer requires the 16bit version of dynamic P2V. Drop the
-dependency.
+On Mon, Jun 13, 2011 at 08:21:53PM -0600, Kenneth Heitke wrote:
+> This bus driver supports the QUP i2c hardware controller in the Qualcomm
+> MSM SOCs.  The Qualcomm Universal Peripheral Engine (QUP) is a general
+> purpose data path engine with input/output FIFOs and an embedded i2c
+> mini-core. The driver supports FIFO mode (for low bandwidth applications)
+> and block mode (interrupt generated for each block-size data transfer).
+> The driver currently does not support DMA transfers.
+> 
+> Signed-off-by: Kenneth Heitke <kheitke@codeaurora.org>
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
-Cc: David Brown <davidb@codeaurora.org>
----
- arch/arm/Kconfig |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+Ben, I was wondering if there were any outstanding issues with this
+driver that Ken needs to address, or if it just got overlooked.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index c24f97a..da4508d 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -209,8 +209,8 @@ config ARM_PATCH_PHYS_VIRT
- 	  for the MSM machine class.
- 
- config ARM_PATCH_PHYS_VIRT_16BIT
--	def_bool y
--	depends on ARM_PATCH_PHYS_VIRT && ARCH_MSM
-+	bool
-+	depends on ARM_PATCH_PHYS_VIRT
- 	help
- 	  This option extends the physical to virtual translation patching
- 	  to allow physical memory down to a theoretical minimum of 64K
+FWIW:
+  Acked-By: David Brown <davidb@codeaurora.org>
+
+Thanks,
+David
+
 -- 
 Sent by an employee of the Qualcomm Innovation Center, Inc.
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
