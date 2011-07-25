@@ -1,186 +1,47 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 25 Jul 2011 23:07:46 +0800
-Subject: [PATCH 1/2] arm/mx5: parse iomuxc pad configuratoin from device tree
-In-Reply-To: <1311606467-28985-1-git-send-email-shawn.guo@linaro.org>
-References: <1311606467-28985-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1311606467-28985-2-git-send-email-shawn.guo@linaro.org>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Mon, 25 Jul 2011 20:33:23 +0530
+Subject: [PATCH] dmaengine: pl330: make platform data optional
+In-Reply-To: <1311603872.8206.15.camel@vkoul-mobl4>
+References: <1310518811-379-1-git-send-email-robherring2@gmail.com>
+	<1311603872.8206.15.camel@vkoul-mobl4>
+Message-ID: <CABb+yY1mVHHLdmBh-3RJxc9zSNQkxQQrTiLsD6OJC1rSN3WW9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It adds function mxc_iomuxc_dt_init() to parse iomuxc pad configuration
-from device tree.
+On Mon, Jul 25, 2011 at 7:54 PM, Vinod Koul <vkoul@infradead.org> wrote:
+> On Tue, 2011-07-12 at 20:00 -0500, Rob Herring wrote:
+>> From: Rob Herring <rob.herring@calxeda.com>
+>>
+>> The pl330 needs platform data for describing peripheral connections, but
+>> some platforms may only support memory to memory dma channels. In this
+>> case, we can probe for how many channels there are and don't need the
+>> platform data.
+>>
+>> As memcpy requests don't need channel private data to hold peripheral
+>> info, allow private data to be NULL in this case.
+>>
+>> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+>> Cc: Jassi Brar <jassi.brar@samsung.com>
+>> Cc: Vinod Koul <vinod.koul@intel.com>
+>> Cc: Dan Williams <dan.j.williams@intel.com>
+>> ---
+>> ?drivers/dma/pl330.c | ? 64 ++++++++++++++++++++++++++++----------------------
+>> ?1 files changed, 36 insertions(+), 28 deletions(-)
+> Applied, Thanks
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
----
- .../devicetree/bindings/arm/fsl/iomuxc.txt         |   47 +++++++++++++
- arch/arm/mach-mx5/Makefile                         |    2 +
- arch/arm/mach-mx5/iomuxc-dt.c                      |   72 ++++++++++++++++++++
- arch/arm/plat-mxc/include/mach/common.h            |    3 +
- 4 files changed, 124 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/fsl/iomuxc.txt
- create mode 100644 arch/arm/mach-mx5/iomuxc-dt.c
+Oops, sorry Rob. I failed to reply as I assured you. I have been just
+too deep into other stuff.
 
-diff --git a/Documentation/devicetree/bindings/arm/fsl/iomuxc.txt b/Documentation/devicetree/bindings/arm/fsl/iomuxc.txt
-new file mode 100644
-index 0000000..ae9292b
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/fsl/iomuxc.txt
-@@ -0,0 +1,47 @@
-+* Freescale i.MX IOMUX Controller (IOMUXC)
-+
-+Required properties:
-+- compatible : "fsl,<soc>-iomuxc";
-+
-+Sub-nodes present individual PAD configuration, and node name is the
-+PAD name given by hardware document.
-+
-+Required properties:
-+- reg : Should contain the offset of registers
-+  IOMUXC_SW_MUX_CTL_PAD_<pad-name> and IOMUXC_SW_PAD_CTL_PAD_<pad-name>.
-+- fsl,iomuxc-mux-mode : Should specify the MUX_MODE setting of register
-+  IOMUXC_SW_MUX_CTL_PAD_<pad-name>.
-+
-+Optional properties:
-+- fsl,iomuxc-sion : Indicates that bit SION of register
-+  IOMUXC_SW_MUX_CTL_PAD_<pad-name> needs to be set for given MUX_MODE
-+  setting of the PAD.
-+- fsl,iomuxc-select-input : Specify the offset of register
-+  IOMUXC_<...>_SELECT_INPUT and the value of bit-field DAISY for given
-+  MUX_MODE setting of the PAD.
-+
-+Examples:
-+
-+iomuxc at 53fa8000 {
-+	#address-cells = <2>;
-+	#size-cells = <0>;
-+	compatible = "fsl,imx53-iomuxc";
-+	reg = <0x53fa8000 0x4000>;
-+
-+	/*
-+	 * I2C2
-+	 */
-+	key-col3 { /* I2C2_SCL */
-+		reg = <0x3c 0x364>;
-+		fsl,iomuxc-mux-mode = <4>;
-+		fsl,iomuxc-sion;
-+		fsl,iomuxc-select-input = <0x81c 0x0>;
-+	};
-+
-+	key-row3 { /* I2C2_SDA */
-+		reg = <0x40 0x368>;
-+		fsl,iomuxc-mux-mode = <4>;
-+		fsl,iomuxc-sion;
-+		fsl,iomuxc-select-input = <0x820 0x0>;
-+	};
-+};
-diff --git a/arch/arm/mach-mx5/Makefile b/arch/arm/mach-mx5/Makefile
-index 383e7cd..71379f6 100644
---- a/arch/arm/mach-mx5/Makefile
-+++ b/arch/arm/mach-mx5/Makefile
-@@ -22,3 +22,5 @@ obj-$(CONFIG_MX51_EFIKA_COMMON) += mx51_efika.o
- obj-$(CONFIG_MACH_MX51_EFIKAMX) += board-mx51_efikamx.o
- obj-$(CONFIG_MACH_MX51_EFIKASB) += board-mx51_efikasb.o
- obj-$(CONFIG_MACH_MX50_RDP) += board-mx50_rdp.o
-+
-+obj-$(CONFIG_OF) += iomuxc-dt.o
-diff --git a/arch/arm/mach-mx5/iomuxc-dt.c b/arch/arm/mach-mx5/iomuxc-dt.c
-new file mode 100644
-index 0000000..2cfe6e7
---- /dev/null
-+++ b/arch/arm/mach-mx5/iomuxc-dt.c
-@@ -0,0 +1,72 @@
-+/*
-+ * Copyright 2011 Freescale Semiconductor, Inc. All Rights Reserved.
-+ * Copyright 2011 Linaro Ltd.
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+#include <linux/of.h>
-+#include <asm/io.h>
-+
-+#define IOMUXC_CONFIG_SION	(1 << 4)
-+
-+void mxc_iomuxc_dt_init(const struct of_device_id *match)
-+{
-+	struct device_node *node = of_find_matching_node(NULL, match);
-+	struct device_node *child;
-+	void __iomem *base;
-+	u32 reg[2], select_input[2];
-+	u32 mux_mode, pad_ctl;
-+
-+	if (!node) {
-+		pr_warn("%s: no iomuxc node found\n", __func__);
-+		return;
-+	}
-+
-+	if (of_property_read_u32_array(node, "reg", reg, ARRAY_SIZE(reg))) {
-+		pr_warn("%s: property 'reg' not found\n", __func__);
-+		goto out;
-+	}
-+
-+	base = ioremap(reg[0], reg[1]);
-+	if (!base) {
-+		pr_warn("%s: ioremap failed\n", __func__);
-+		goto out;
-+	}
-+
-+	for_each_child_of_node(node, child) {
-+		/* get regsister offset of mux_ctl and pad_ctl */
-+		if (of_property_read_u32_array(child, "reg", reg,
-+					       ARRAY_SIZE(reg)))
-+			continue;
-+
-+		/* set register mux_ctl */
-+		if (of_property_read_u32(child, "fsl,iomuxc-mux-mode",
-+					 &mux_mode))
-+			continue;
-+		if (of_get_property(child, "fsl,iomuxc-sion", NULL))
-+			mux_mode |= IOMUXC_CONFIG_SION;
-+		writel(mux_mode, base + reg[0]);
-+
-+		/* set register pad_ctl */
-+		if (!of_property_read_u32(child, "fsl,iomuxc-pad-ctl",
-+					  &pad_ctl))
-+			writel(pad_ctl, base + reg[1]);
-+
-+		/* get offset/value pair and set select_input register */
-+		if (!of_property_read_u32_array(child,
-+				"fsl,iomuxc-select-input", select_input,
-+				ARRAY_SIZE(select_input)))
-+			writel(select_input[1], base + select_input[0]);
-+	}
-+
-+	iounmap(base);
-+
-+out:
-+	of_node_put(node);
-+}
-diff --git a/arch/arm/plat-mxc/include/mach/common.h b/arch/arm/plat-mxc/include/mach/common.h
-index 4e3d978..12b7499 100644
---- a/arch/arm/plat-mxc/include/mach/common.h
-+++ b/arch/arm/plat-mxc/include/mach/common.h
-@@ -13,6 +13,7 @@
- 
- struct platform_device;
- struct clk;
-+struct of_device_id;
- 
- extern void mx1_map_io(void);
- extern void mx21_map_io(void);
-@@ -72,4 +73,6 @@ extern void mxc_arch_reset_init(void __iomem *);
- extern void mx51_efikamx_reset(void);
- extern int mx53_revision(void);
- extern int mx53_display_revision(void);
-+
-+extern void mxc_iomuxc_dt_init(const struct of_device_id *match);
- #endif
--- 
-1.7.4.1
+>> @@ -717,27 +717,35 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
+>> ? ? ? INIT_LIST_HEAD(&pd->channels);
+>>
+>> ? ? ? /* Initialize channel parameters */
+>> - ? ? for (i = 0; i < pdat->nr_valid_peri; i++) {
+>> - ? ? ? ? ? ? struct dma_pl330_peri *peri = &pdat->peri[i];
+>> - ? ? ? ? ? ? pch = &pdmac->peripherals[i];
+>> + ? ? num_chan = max(pdat->nr_valid_peri, (u8)pi->pcfg.num_chan);
+Perhaps you need to check against NULL pointer on 'pdat' ?
+
+Rest looks ok.
+
+thnx
