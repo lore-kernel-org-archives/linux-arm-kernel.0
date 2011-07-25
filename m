@@ -1,87 +1,124 @@
 From: boojin.kim@samsung.com (Boojin Kim)
-Date: Mon, 25 Jul 2011 10:28:21 +0900
-Subject: [PATCH V4 03/14] DMA: PL330: Support DMA_SLAVE_CONFIG command
+Date: Mon, 25 Jul 2011 10:28:20 +0900
+Subject: [PATCH V4 02/14] DMA: PL330: Update PL330 DMA API driver
 In-Reply-To: <1311557312-26107-1-git-send-email-boojin.kim@samsung.com>
 References: <1311557312-26107-1-git-send-email-boojin.kim@samsung.com>
-Message-ID: <1311557312-26107-4-git-send-email-boojin.kim@samsung.com>
+Message-ID: <1311557312-26107-3-git-send-email-boojin.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support DMA_SLAVE_CONFIG command.
+This patch updates following 3 items.
+1. Removes unneccessary code.
+2. Add AMBA, PL330 configuration
+3. Change the meaning of 'peri_id' variable
+   from PL330 event number to specific dma id by user.
 
 Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
+Cc: Vinod Koul <vinod.koul@intel.com>
+Cc: Dan Williams <dan.j.williams@intel.com>
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- drivers/dma/pl330.c |   53 +++++++++++++++++++++++++++++++++++++-------------
- 1 files changed, 39 insertions(+), 14 deletions(-)
+ drivers/dma/Kconfig        |    3 ++-
+ drivers/dma/pl330.c        |   31 ++++++++++++++++---------------
+ include/linux/amba/pl330.h |    2 +-
+ 3 files changed, 19 insertions(+), 17 deletions(-)
 
+diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
+index 25cf327..569cb14 100644
+--- a/drivers/dma/Kconfig
++++ b/drivers/dma/Kconfig
+@@ -193,7 +193,8 @@ config ARCH_HAS_ASYNC_TX_FIND_CHANNEL
+ config PL330_DMA
+ 	tristate "DMA API Driver for PL330"
+ 	select DMA_ENGINE
+-	depends on PL330
++	depends on ARM_AMBA
++	select PL330
+ 	help
+ 	  Select if your platform has one or more PL330 DMACs.
+ 	  You need to provide platform specific settings via
 diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-index 586ab39..880f010 100644
+index b7ecf47..586ab39 100644
 --- a/drivers/dma/pl330.c
 +++ b/drivers/dma/pl330.c
-@@ -256,25 +256,50 @@ static int pl330_alloc_chan_resources(struct dma_chan *chan)
- static int pl330_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd, unsigned long arg)
- {
- 	struct dma_pl330_chan *pch = to_pchan(chan);
--	struct dma_pl330_desc *desc;
-+	struct dma_pl330_desc *desc, *_dt;
+@@ -455,7 +455,7 @@ static struct dma_pl330_desc *pl330_get_desc(struct dma_pl330_chan *pch)
+ 	async_tx_ack(&desc->txd);
+ 
+ 	desc->req.rqtype = peri->rqtype;
+-	desc->req.peri = peri->peri_id;
++	desc->req.peri = pch->chan.chan_id;
+ 
+ 	dma_async_tx_descriptor_init(&desc->txd, &pch->chan);
+ 
+@@ -577,7 +577,7 @@ pl330_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
+ 	struct dma_pl330_peri *peri = chan->private;
+ 	struct scatterlist *sg;
  	unsigned long flags;
-+	struct dma_pl330_dmac *pdmac = pch->dmac;
-+	struct dma_slave_config *slave_config;
-+	struct dma_pl330_peri *peri;
-+	LIST_HEAD(list);
+-	int i, burst_size;
++	int i;
+ 	dma_addr_t addr;
  
--	/* Only supports DMA_TERMINATE_ALL */
--	if (cmd != DMA_TERMINATE_ALL)
--		return -ENXIO;
--
--	spin_lock_irqsave(&pch->lock, flags);
--
--	/* FLUSH the PL330 Channel thread */
--	pl330_chan_ctrl(pch->pl330_chid, PL330_OP_FLUSH);
-+	switch (cmd) {
-+	case DMA_TERMINATE_ALL:
-+		spin_lock_irqsave(&pch->lock, flags);
+ 	if (unlikely(!pch || !sgl || !sg_len))
+@@ -594,7 +594,6 @@ pl330_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
+ 	}
  
--	/* Mark all desc done */
--	list_for_each_entry(desc, &pch->work_list, node)
--		desc->status = DONE;
-+		/* FLUSH the PL330 Channel thread */
-+		pl330_chan_ctrl(pch->pl330_chid, PL330_OP_FLUSH);
+ 	addr = peri->fifo_addr;
+-	burst_size = peri->burst_sz;
  
--	spin_unlock_irqrestore(&pch->lock, flags);
-+		/* Mark all desc done */
-+		list_for_each_entry_safe(desc, _dt, &pch->work_list , node) {
-+			desc->status = DONE;
-+			pch->completed = desc->txd.cookie;
-+			list_move_tail(&desc->node, &list);
-+		}
+ 	first = NULL;
  
--	pl330_tasklet((unsigned long) pch);
-+		list_splice_tail_init(&list, &pdmac->desc_pool);
-+		spin_unlock_irqrestore(&pch->lock, flags);
-+		break;
-+	case DMA_SLAVE_CONFIG:
-+		slave_config = (struct dma_slave_config *)arg;
-+		peri = pch->chan.private;
-+
-+		if (slave_config->direction == DMA_TO_DEVICE) {
-+			if (slave_config->dst_addr)
-+				peri->fifo_addr = slave_config->dst_addr;
-+			if (slave_config->dst_addr_width)
-+				peri->burst_sz = __ffs(slave_config->dst_addr_width);
-+		} else if (slave_config->direction == DMA_FROM_DEVICE) {
-+			if (slave_config->src_addr)
-+				peri->fifo_addr = slave_config->src_addr;
-+			if (slave_config->src_addr_width)
-+				peri->burst_sz = __ffs(slave_config->src_addr_width);
-+		}
-+		break;
-+	default:
-+		dev_err(pch->dmac->pif.dev, "Not supported command.\n");
-+		return -ENXIO;
-+	}
+@@ -642,7 +641,7 @@ pl330_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
+ 				sg_dma_address(sg), addr, sg_dma_len(sg));
+ 		}
  
- 	return 0;
- }
+-		desc->rqcfg.brst_size = burst_size;
++		desc->rqcfg.brst_size = peri->burst_sz;
+ 		desc->rqcfg.brst_len = 1;
+ 	}
+ 
+@@ -748,17 +747,19 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
+ 		struct dma_pl330_peri *peri = &pdat->peri[i];
+ 		pch = &pdmac->peripherals[i];
+ 
+-		switch (peri->rqtype) {
+-		case MEMTOMEM:
+-			dma_cap_set(DMA_MEMCPY, pd->cap_mask);
+-			break;
+-		case MEMTODEV:
+-		case DEVTOMEM:
+-			dma_cap_set(DMA_SLAVE, pd->cap_mask);
+-			break;
+-		default:
+-			dev_err(&adev->dev, "DEVTODEV Not Supported\n");
+-			continue;
++		if (peri) {
++			switch (peri->rqtype) {
++			case MEMTOMEM:
++				dma_cap_set(DMA_MEMCPY, pd->cap_mask);
++				break;
++			case MEMTODEV:
++			case DEVTOMEM:
++				dma_cap_set(DMA_SLAVE, pd->cap_mask);
++				break;
++			default:
++				dev_err(&adev->dev, "DEVTODEV Not Supported\n");
++				continue;
++			}
+ 		}
+ 
+ 		INIT_LIST_HEAD(&pch->work_list);
+diff --git a/include/linux/amba/pl330.h b/include/linux/amba/pl330.h
+index cbee7de..17b0ada 100644
+--- a/include/linux/amba/pl330.h
++++ b/include/linux/amba/pl330.h
+@@ -19,7 +19,7 @@ struct dma_pl330_peri {
+ 	 * Peri_Req i/f of the DMAC that is
+ 	 * peripheral could be reached from.
+ 	 */
+-	u8 peri_id; /* {0, 31} */
++	u8 peri_id; /* specific dma id */
+ 	enum pl330_reqtype rqtype;
+ 
+ 	/* For M->D and D->M Channels */
 -- 
 1.7.1
