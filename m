@@ -1,96 +1,43 @@
-From: boojin.kim@samsung.com (Boojin Kim)
-Date: Mon, 25 Jul 2011 21:36:47 +0900
-Subject: [PATCH V4 04/14] DMA: PL330: Add DMA_CYCLIC capability
-In-Reply-To: <1311590884.29703.2.camel@vkoul-mobl4>
-References: <1311557312-26107-1-git-send-email-boojin.kim@samsung.com>
-	<1311557312-26107-5-git-send-email-boojin.kim@samsung.com>
-	<20110725092749.GB9653@n2100.arm.linux.org.uk>
-	<002001cc4ab6$0d7cd590$287680b0$%kim@samsung.com>
-	<20110725103629.GF9653@n2100.arm.linux.org.uk>
-	<1311590884.29703.2.camel@vkoul-mobl4>
-Message-ID: <002301cc4ac7$84ce6d50$8e6b47f0$%kim@samsung.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 25 Jul 2011 18:08:59 +0530
+Subject: [PATCH 3/4] ARM: CPU hotplug: pass in proper affinity mask on
+	IRQ migration
+In-Reply-To: <E1Qjv7j-0003Ia-FD@rmk-PC.arm.linux.org.uk>
+References: <20110721151413.GD28942@n2100.arm.linux.org.uk>
+	<E1Qjv7j-0003Ia-FD@rmk-PC.arm.linux.org.uk>
+Message-ID: <4E2D63E3.8000308@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vinod Koul Wrote:
-> Sent: Monday, July 25, 2011 7:48 PM
-> To: Russell King - ARM Linux
-> Cc: vinod.koul at intel.com; Boojin Kim; 'Kukjin Kim'; 'Jassi Brar';
-> 'Grant Likely'; linux-samsung-soc at vger.kernel.org; 'Mark Brown'; 'Dan
-> Williams'; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH V4 04/14] DMA: PL330: Add DMA_CYCLIC capability
+On 7/21/2011 8:55 PM, Russell King - ARM Linux wrote:
+> Now that the GIC takes care of selecting a target interrupt from the
+> affinity mask, we don't need all this complexity in the core code
+> anymore.  Just detect when we need to break affinity.
 >
-> On Mon, 2011-07-25 at 11:36 +0100, Russell King - ARM Linux wrote:
-> > On Mon, Jul 25, 2011 at 07:31:45PM +0900, Boojin Kim wrote:
-> > > > On Mon, Jul 25, 2011 at 10:28:22AM +0900, Boojin Kim wrote:
-> > > > > +static void pl330_tasklet_cyclic(unsigned long data)
-> > > > > +{
-> > > > > +	struct dma_pl330_chan *pch = (struct dma_pl330_chan *)data;
-> > > > > +	struct dma_pl330_desc *desc, *_dt;
-> > > > > +	unsigned long flags;
-> > > > > +	LIST_HEAD(list);
-> > > > > +
-> > > > > +	spin_lock_irqsave(&pch->lock, flags);
-> > > > ...
-> > > > > +			callback = desc->txd.callback;
-> > > > > +			if (callback)
-> > > > > +				callback(desc->txd.callback_param);
-> > > >
-> > > > On this again - what if the callback wants to terminate the DMA
-> activity
-> > > > because there's no more audio data to be sent/received from the
-> device?
-> > >
-> > > Do you mean what is happened if the callback() is called after
-> channel is
-> > > terminated ?
-> > > Or What is happened if Callback() calls 'dma_release_channel()' to
-> terminate
-> > > DMA?
-> >
-> > No.  I mean what if the callback wants to call
-> dmaengine_terminate_all().
-> you are supposed to drop the lock here, that way callback can call any
-> DMA API, otherwise it will result in deadlock.
-> This make me wonder you haven't read the documentation at all, please
-> ensure you have read Documentation/dmaengine.txt before next posting
-I found the deadlock problem that you post. I will fix it and read the 
-document again.
+> Signed-off-by: Russell King<rmk+kernel@arm.linux.org.uk>
+> ---
+>   arch/arm/kernel/irq.c |   10 ++++------
+>   1 files changed, 4 insertions(+), 6 deletions(-)
+>
+> diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
+> index d7aa5c9..ab63c05 100644
+> --- a/arch/arm/kernel/irq.c
+> +++ b/arch/arm/kernel/irq.c
+> @@ -133,17 +133,15 @@ int __init arch_probe_nr_irqs(void)
+>
+>   static bool migrate_one_irq(struct irq_data *d)
+>   {
+> -	unsigned int cpu = cpumask_any_and(d->affinity, cpu_online_mask);
+> +	const struct cpumask *affinity = d->affinity;
+>   	bool ret = false;
+>
+> -	if (cpu>= nr_cpu_ids) {
+> -		cpu = cpumask_any(cpu_online_mask);
+> +	if (cpumask_any_and(affinity, cpu_online_mask)>= nr_cpu_ids) {
+> +		affinity cpu_online_mask;
 
-> >
-> > > > > +	if (!pch->cyclic_task) {
-> > > > > +		pch->cyclic_task =
-> > > > > +			kmalloc(sizeof(struct tasklet_struct),
-> GFP_KERNEL);
-> > > > > +		tasklet_init(pch->cyclic_task,
-> > > > > +			pl330_tasklet_cyclic, (unsigned int)pch);
-> > > >
-> > > > Here you allocate memory for the cyclic task.  Above you set this
-> pointer
-> > > > to NULL.  That sounds like a memory leak to me.  Why are you
-> kmallocing
-> > > > this memory - why can't it be part of the dma_pl330_chan
-> structure?  It's
-> > > > only 28 bytes.
-> > >
-> > > It's my mistake. I should have been free of the memory.
-> > >
-> > > And the reason why I use kmalloc for 'cyclic_task' is following.
-> > > This memory size for 'cyclic_tasklet' is the 896 bytes ( = the
-> number of
-> > > channel * sizeof(struct tasklet_struct)= 32*28) for each DMAC. And
-> This
-> > > memory size is increased according to the number of DMAC.
-> > > And Samsung has the DMAC that is dedicated for Mem-to-Mem
-> operation. If I
-> > > make 'cyclic_task' be part of dma_pl330_chan, this DMAC that is
-> dedicated
-> > > for Mem-to-Mem operation should hold unused data.
-> > > So, I think it's loss that all dma channels hold own 'cyclic_task'.
-> >
-> > Could you re-use the tasklet that already exists?
->
->
-> --
-> ~Vinod Koul
-> Intel Corp.
+I noticed, you missed '=' above and same is corrected in PATCH 4/4.
+Should be fixed in this patch itself to avoid git-bisect breakage.
+
+Regards
+Santosh
