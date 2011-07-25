@@ -1,58 +1,102 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 25 Jul 2011 14:43:40 +0100
-Subject: [PATCH 0/9] PL08x further cleanups
-In-Reply-To: <1311601111.8206.5.camel@vkoul-mobl4>
-References: <20110705131030.GE8286@n2100.arm.linux.org.uk>
-	<1310598328.1536.27.camel@vkoul-udesk3>
-	<20110721160800.GR26574@n2100.arm.linux.org.uk>
-	<1311601111.8206.5.camel@vkoul-mobl4>
-Message-ID: <20110725134340.GK9653@n2100.arm.linux.org.uk>
+From: vkoul@infradead.org (Vinod Koul)
+Date: Mon, 25 Jul 2011 19:18:20 +0530
+Subject: [PATCH V4 03/14] DMA: PL330: Support DMA_SLAVE_CONFIG command
+In-Reply-To: <002401cc4ac9$97737570$c65a6050$%kim@samsung.com>
+References: <1311557312-26107-1-git-send-email-boojin.kim@samsung.com>
+	<1311557312-26107-4-git-send-email-boojin.kim@samsung.com>
+	<1311589617.27357.3.camel@vkoul-mobl4>
+	<002401cc4ac9$97737570$c65a6050$%kim@samsung.com>
+Message-ID: <1311601700.8206.7.camel@vkoul-mobl4>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 25, 2011 at 07:08:31PM +0530, Vinod Koul wrote:
-> Although gcc didnt like not handling other enums so warned:
+On Mon, 2011-07-25 at 21:51 +0900, Boojin Kim wrote:
+> Vinod Koul Wrote:
+> > Sent: Monday, July 25, 2011 7:27 PM
+> > To: Boojin Kim
+> > Cc: vinod.koul at intel.com; linux-arm-kernel at lists.infradead.org; linux-
+> > samsung-soc at vger.kernel.org; Kukjin Kim; Jassi Brar; Grant Likely;
+> > Mark Brown; Dan Williams
+> > Subject: Re: [PATCH V4 03/14] DMA: PL330: Support DMA_SLAVE_CONFIG
+> > command
+> >
+> > On Mon, 2011-07-25 at 10:28 +0900, Boojin Kim wrote:
+> > > This patch adds support DMA_SLAVE_CONFIG command.
+> > >
+> > > Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
+> > > ---
+> > >  drivers/dma/pl330.c |   53 +++++++++++++++++++++++++++++++++++++----
+> > ---------
+> > >  1 files changed, 39 insertions(+), 14 deletions(-)
+> > >
+> > > diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+> > > index 586ab39..880f010 100644
+> > > --- a/drivers/dma/pl330.c
+> > > +++ b/drivers/dma/pl330.c
+> > > @@ -256,25 +256,50 @@ static int pl330_alloc_chan_resources(struct
+> > dma_chan *chan)
+> > >  static int pl330_control(struct dma_chan *chan, enum dma_ctrl_cmd
+> > cmd, unsigned long arg)
+> > >  {
+> > >  	struct dma_pl330_chan *pch = to_pchan(chan);
+> > > -	struct dma_pl330_desc *desc;
+> > > +	struct dma_pl330_desc *desc, *_dt;
+> > >  	unsigned long flags;
+> > > +	struct dma_pl330_dmac *pdmac = pch->dmac;
+> > > +	struct dma_slave_config *slave_config;
+> > > +	struct dma_pl330_peri *peri;
+> > > +	LIST_HEAD(list);
+> > >
+> > > -	/* Only supports DMA_TERMINATE_ALL */
+> > > -	if (cmd != DMA_TERMINATE_ALL)
+> > > -		return -ENXIO;
+> > > -
+> > > -	spin_lock_irqsave(&pch->lock, flags);
+> > > -
+> > > -	/* FLUSH the PL330 Channel thread */
+> > > -	pl330_chan_ctrl(pch->pl330_chid, PL330_OP_FLUSH);
+> > > +	switch (cmd) {
+> > > +	case DMA_TERMINATE_ALL:
+> > > +		spin_lock_irqsave(&pch->lock, flags);
+> > >
+> > > -	/* Mark all desc done */
+> > > -	list_for_each_entry(desc, &pch->work_list, node)
+> > > -		desc->status = DONE;
+> > > +		/* FLUSH the PL330 Channel thread */
+> > > +		pl330_chan_ctrl(pch->pl330_chid, PL330_OP_FLUSH);
+> > >
+> > > -	spin_unlock_irqrestore(&pch->lock, flags);
+> > > +		/* Mark all desc done */
+> > > +		list_for_each_entry_safe(desc, _dt, &pch->work_list , node)
+> > {
+> > > +			desc->status = DONE;
+> > > +			pch->completed = desc->txd.cookie;
+> > > +			list_move_tail(&desc->node, &list);
+> > > +		}
+> > >
+> > > -	pl330_tasklet((unsigned long) pch);
+> > > +		list_splice_tail_init(&list, &pdmac->desc_pool);
+> > > +		spin_unlock_irqrestore(&pch->lock, flags);
+> > > +		break;
+> > > +	case DMA_SLAVE_CONFIG:
+> > > +		slave_config = (struct dma_slave_config *)arg;
+> > > +		peri = pch->chan.private;
+> > > +
+> > > +		if (slave_config->direction == DMA_TO_DEVICE) {
+> > > +			if (slave_config->dst_addr)
+> > > +				peri->fifo_addr = slave_config->dst_addr;
+> > > +			if (slave_config->dst_addr_width)
+> > > +				peri->burst_sz = __ffs(slave_config-
+> > >dst_addr_width);
+> > This doesn't sound right, why can't you use xxx_maxburst field instead?
+> Can you explain the problem in more detail?
+> Do you mean that 'xxx_maxburst' takes place of 'xxx_addr_width' or __ffs() 
+> isn't proper here?
 > 
-> drivers/dma/amba-pl08x.c: In function 'pl08x_width':
-> drivers/dma/amba-pl08x.c:1119: warning: enumeration value
-> 'DMA_SLAVE_BUSWIDTH_UNDEFINED' not handled in switch
-> drivers/dma/amba-pl08x.c:1119: warning: enumeration value
-> 'DMA_SLAVE_BUSWIDTH_8_BYTES' not handled in switch
-
-Those must be new since I wrote the patch.
-
-> which can be fixed as:
-> 
-> diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
-> index 9aa2bd4..4925e0d 100644
-> --- a/drivers/dma/amba-pl08x.c
-> +++ b/drivers/dma/amba-pl08x.c
-> @@ -1123,6 +1123,8 @@ static u32 pl08x_width(enum dma_slave_buswidth
-> width)
->  		return PL080_WIDTH_16BIT;
->  	case DMA_SLAVE_BUSWIDTH_4_BYTES:
->  		return PL080_WIDTH_32BIT;
-> +	default:
-> +		return -EINVAL;
->  	}
->  	return ~0;
->  }
-> 
-> If you are okay, pls ack it
-
-No.  This function is used as:
-
-+       width = pl08x_width(addr_width);
-+       if (width == ~0) {
-                dev_err(&pl08x->adev->dev,
-                        "bad runtime_config: alien address width\n");
-                return -EINVAL;
-        }
-
-Notice that it returns a u32 so negative errnos don't make sense.  It
-returns ~0 to indicate error.
-
-The code is actually correct as it stands, it's just gcc deciding to
-emit a warning for an unhandled enum value which isn't really unhandled.
-Just move the 'return ~0;' at the end of the function inside the switch
-as a default case to shut it up.
+> Additionally, I will modify this code to consider '_maxburst' field.
+__ffs is okay and sensible.
+I meant you should use proper fields for passing info, which in this
+case would be dst_maxburst for specifying destination burst sizes
+-- 
+~Vinod Koul
+Intel Corp.
