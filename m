@@ -1,42 +1,43 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 25 Jul 2011 09:56:50 -0600
-Subject: [GIT PULL] Basic arm device tree support patches for v3.1
-Message-ID: <CACxGe6s8uDd_3+QyE7G5CetL0XySMZhCgg_NEn2PBRxDsGWcnA@mail.gmail.com>
+From: akinobu.mita@gmail.com (Akinobu Mita)
+Date: Tue, 26 Jul 2011 00:58:31 +0900
+Subject: [PATCH v3 2/3] mmc: core: add random fault injection
+In-Reply-To: <1311199321-4618-3-git-send-email-per.forlin@linaro.org>
+References: <1311199321-4618-1-git-send-email-per.forlin@linaro.org>
+	<1311199321-4618-3-git-send-email-per.forlin@linaro.org>
+Message-ID: <CAC5umyg44tQxrFEYRL-tjzBMA2+KNXjB+nQveH3KcB_LPmYVHw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+2011/7/21 Per Forlin <per.forlin@linaro.org>:
+> This adds support to inject data errors after a completed host transfer.
+> The mmc core will return error even though the host transfer is successful.
+> This simple fault injection proved to be very useful to test the
+> non-blocking error handling in the mmc_blk_issue_rw_rq().
+> Random faults can also test how the host driver handles pre_req()
+> and post_req() in case of errors.
 
-Here are some of the basic DT patches that are needed for arm in v3.1.
- This isn't board support yet (need an ack on irq_domain first), but
-it is some of the prerequisites.
+Looks good to me.
 
-g.
+> @@ -82,6 +87,66 @@ static void mmc_flush_scheduled_work(void)
+> ? ? ? ?flush_workqueue(workqueue);
+> ?}
+>
+> +#ifdef CONFIG_FAIL_MMC_REQUEST
+> +
+> +static DECLARE_FAULT_ATTR(fail_mmc_request);
 
-The following changes since commit b6844e8f64920cdee620157252169ba63afb0c89:
+I think the fail_attr should be defined for each mmc_host like make_it_fail
+in struct mmc_host and debugfs entries should also be created in a
+subdirectory of mmc host debugfs.
 
-  Merge branch 'for-linus' of
-master.kernel.org:/home/rmk/linux-2.6-arm (2011-07-24 10:20:54 -0700)
-
-are available in the git repository at:
-
-  git://git.secretlab.ca/git/linux-2.6 devicetree/next-arm
-
-Grant Likely (2):
-      arm/dt: Add dt machine definition
-      arm/dt: Add skeleton dtsi file
-
-Rob Herring (1):
-      arm/dt: Add dtb make rule
-
- arch/arm/Makefile                |    7 +++++++
- arch/arm/boot/Makefile           |    6 ++++++
- arch/arm/boot/dts/skeleton.dtsi  |   13 +++++++++++++
- arch/arm/include/asm/mach/arch.h |    7 +++++++
- 4 files changed, 33 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/boot/dts/skeleton.dtsi
-
-
--- 
-Grant Likely, B.Sc., P.Eng.
-Secret Lab Technologies Ltd.
+And I know that init_fault_attr_dentries() can only create a
+subdirectory in debugfs root directory.  But I have a patch which
+support for creating it in arbitrary directory.  Could you take a look
+at this? (Note that this patch is based on mmotm and not yet tested)
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-fault-injection-support-for-creating-debugfs-entries.patch
+Type: text/x-diff
+Size: 6870 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110726/5e2e0b6b/attachment.bin>
