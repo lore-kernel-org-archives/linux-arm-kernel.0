@@ -1,130 +1,75 @@
 From: tony.lin@freescale.com (Tony Lin)
-Date: Mon, 25 Jul 2011 15:01:22 +0800
-Subject: [PATCH v2 4/6] ARM: mxs: make ehci-mxc more flexible to be used on
-	different platforms
+Date: Mon, 25 Jul 2011 15:01:21 +0800
+Subject: [PATCH v2 3/6] ARM: mxs: add usb clocks to clock tree
 In-Reply-To: <1311577284-11506-1-git-send-email-tony.lin@freescale.com>
 References: <1311577284-11506-1-git-send-email-tony.lin@freescale.com>
-Message-ID: <1311577284-11506-5-git-send-email-tony.lin@freescale.com>
+Message-ID: <1311577284-11506-4-git-send-email-tony.lin@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-change ehci_irq to mxc_ehci_irq to give chance do some platform specific
-actions in irq handler for different platforms.
-add void pointer in the last of mxc_usbh_platform_data structure so that
-additional information could be added to that field if needed.
+add usb host clock and usb host phy clock to clock tree
+add usb dummy clocks to clock tree to get rid of adding
+more cpu_is_mx macros
 
 Signed-off-by: Tony Lin <tony.lin@freescale.com>
 ---
- arch/arm/mach-mxs/include/mach/hardware.h |    2 ++
- arch/arm/mach-mxs/include/mach/mxs.h      |   12 +++++++++++-
- drivers/usb/host/Kconfig                  |    2 +-
- drivers/usb/host/ehci-mxc.c               |   17 +++++++++++++++--
- include/linux/fsl_devices.h               |    4 +++-
- 5 files changed, 32 insertions(+), 5 deletions(-)
+ arch/arm/mach-mxs/clock-mx28.c |   28 +++++++++++++++++++---------
+ 1 files changed, 19 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/mach-mxs/include/mach/hardware.h b/arch/arm/mach-mxs/include/mach/hardware.h
-index 53e89a0..affa72b 100644
---- a/arch/arm/mach-mxs/include/mach/hardware.h
-+++ b/arch/arm/mach-mxs/include/mach/hardware.h
-@@ -26,4 +26,6 @@
- #define IOMEM(addr)	((void __force __iomem *)(addr))
- #endif
- 
-+#include "mxs.h"
-+
- #endif /* __MACH_MXS_HARDWARE_H__ */
-diff --git a/arch/arm/mach-mxs/include/mach/mxs.h b/arch/arm/mach-mxs/include/mach/mxs.h
-index 35a89dd..0661e90 100644
---- a/arch/arm/mach-mxs/include/mach/mxs.h
-+++ b/arch/arm/mach-mxs/include/mach/mxs.h
-@@ -35,7 +35,17 @@
- 		machine_is_mx28evk() ||					\
- 		machine_is_tx28() ||					\
- 		0)
--
-+#define cpu_is_mx1()		0
-+#define cpu_is_mx21()		0
-+#define cpu_is_mx25()		0
-+#define cpu_is_mx27()		0
-+#define cpu_is_mx31()		0
-+#define cpu_is_mx35()		0
-+#define cpu_is_mx50()		0
-+#define cpu_is_mx51()		0
-+#define cpu_is_mx53()		0
-+#define cpu_is_mx3()		(cpu_is_mx31() || cpu_is_mx35())
-+#define cpu_is_mx2()		(cpu_is_mx21() || cpu_is_mx27())
- /*
-  * IO addresses common to MXS-based
-  */
-diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-index ab085f1..6a5905b 100644
---- a/drivers/usb/host/Kconfig
-+++ b/drivers/usb/host/Kconfig
-@@ -139,7 +139,7 @@ config USB_EHCI_FSL
- 
- config USB_EHCI_MXC
- 	bool "Support for Freescale on-chip EHCI USB controller"
--	depends on USB_EHCI_HCD && ARCH_MXC
-+	depends on USB_EHCI_HCD && (ARCH_MXC || ARCH_MXS)
- 	select USB_EHCI_ROOT_HUB_TT
- 	---help---
- 	  Variation of ARC USB block used in some Freescale chips.
-diff --git a/drivers/usb/host/ehci-mxc.c b/drivers/usb/host/ehci-mxc.c
-index cbf60a6..b22d6cf 100644
---- a/drivers/usb/host/ehci-mxc.c
-+++ b/drivers/usb/host/ehci-mxc.c
-@@ -64,6 +64,19 @@ static int ehci_mxc_setup(struct usb_hcd *hcd)
- 	return 0;
- }
- 
-+static irqreturn_t mxc_ehci_irq(struct usb_hcd *hcd)
-+{
-+	struct mxc_usbh_platform_data *pdata;
-+
-+	pdata = hcd->self.controller->platform_data;
-+	if (pdata->plt_irq_handler == NULL)
-+		goto out;
-+	pdata->plt_irq_handler(pdata);
-+
-+out:
-+	return ehci_irq(hcd);
-+}
-+
- static const struct hc_driver ehci_mxc_hc_driver = {
- 	.description = hcd_name,
- 	.product_desc = "Freescale On-Chip EHCI Host Controller",
-@@ -72,7 +85,7 @@ static const struct hc_driver ehci_mxc_hc_driver = {
- 	/*
- 	 * generic hardware linkage
- 	 */
--	.irq = ehci_irq,
-+	.irq = mxc_ehci_irq,
- 	.flags = HCD_USB2 | HCD_MEMORY,
- 
- 	/*
-@@ -334,6 +347,6 @@ static struct platform_driver ehci_mxc_driver = {
- 	.remove = __exit_p(ehci_mxc_drv_remove),
- 	.shutdown = ehci_mxc_drv_shutdown,
- 	.driver = {
--		   .name = "mxc-ehci",
-+		.name = "mxc-ehci",
- 	},
- };
-diff --git a/include/linux/fsl_devices.h b/include/linux/fsl_devices.h
-index bc2c1bf..cf441e8 100644
---- a/include/linux/fsl_devices.h
-+++ b/include/linux/fsl_devices.h
-@@ -118,8 +118,10 @@ struct mxc_usbh_platform_data {
- 	int (*init)(struct platform_device *pdev);
- 	int (*exit)(struct platform_device *pdev);
- 
--	unsigned int		 portsc;
-+	unsigned int		portsc;
- 	struct otg_transceiver	*otg;
-+	void (*plt_irq_handler)(struct mxc_usbh_platform_data *pdata);
-+	void		*ppriv;
+diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
+index 5dcc59d..6f3cd40 100644
+--- a/arch/arm/mach-mxs/clock-mx28.c
++++ b/arch/arm/mach-mxs/clock-mx28.c
+@@ -554,15 +554,15 @@ static struct clk rtc_clk = {
+ 	.parent = &ref_xtal_clk,
  };
  
- struct spi_device;
+-/* usb_clk gate is controlled in DIGCTRL other than CLKCTRL */
+-static struct clk usb0_clk = {
+-	.enable_reg = DIGCTRL_BASE_ADDR,
+-	.enable_shift = 2,
+-	.enable = _raw_clk_enable,
+-	.disable = _raw_clk_disable,
+-	.parent = &pll0_clk,
++static struct clk dummy_clk = {
++	.enable_reg = 0,
++	.enable_shift = 0,
++	.enable = NULL,
++	.disable = NULL,
++	.parent = NULL,
+ };
+ 
++/* usb_clk gate is controlled in DIGCTRL other than CLKCTRL */
+ static struct clk usb1_clk = {
+ 	.enable_reg = DIGCTRL_BASE_ADDR,
+ 	.enable_shift = 16,
+@@ -571,6 +571,14 @@ static struct clk usb1_clk = {
+ 	.parent = &pll1_clk,
+ };
+ 
++/* usb phy clock for usb1 */
++static struct clk usb_phy_clk1 = {
++	.parent = &pll1_clk,
++	.enable = _raw_clk_disable,
++	.disable = _raw_clk_enable,
++	.enable_reg = CLKCTRL_BASE_ADDR + HW_CLKCTRL_PLL1CTRL0,
++	.enable_shift = 18,
++};
+ #define _DEFINE_CLOCK(name, er, es, p)					\
+ 	static struct clk name = {					\
+ 		.enable_reg	= CLKCTRL_BASE_ADDR + HW_CLKCTRL_##er,	\
+@@ -627,8 +635,10 @@ static struct clk_lookup lookups[] = {
+ 	_REGISTER_CLOCK("mxs-mmc.1", NULL, ssp1_clk)
+ 	_REGISTER_CLOCK("flexcan.0", NULL, can0_clk)
+ 	_REGISTER_CLOCK("flexcan.1", NULL, can1_clk)
+-	_REGISTER_CLOCK(NULL, "usb0", usb0_clk)
+-	_REGISTER_CLOCK(NULL, "usb1", usb1_clk)
++	_REGISTER_CLOCK("mxc-ehci", "usb1", usb1_clk)
++	_REGISTER_CLOCK("mxc-ehci", "usb1_phy", usb_phy_clk1)
++	_REGISTER_CLOCK("mxc-ehci", "usb", dummy_clk)
++	_REGISTER_CLOCK("mxc-ehci", "usb_ahb", dummy_clk)
+ 	_REGISTER_CLOCK("mxs-pwm.0", NULL, pwm_clk)
+ 	_REGISTER_CLOCK("mxs-pwm.1", NULL, pwm_clk)
+ 	_REGISTER_CLOCK("mxs-pwm.2", NULL, pwm_clk)
 -- 
 1.7.0.4
