@@ -1,166 +1,81 @@
-From: vkoul@infradead.org (Vinod Koul)
-Date: Mon, 25 Jul 2011 16:22:59 +0530
-Subject: [PATCH V4 05/14] ARM: SAMSUNG: Update to use PL330-DMA driver
-In-Reply-To: <1311557312-26107-6-git-send-email-boojin.kim@samsung.com>
-References: <1311557312-26107-1-git-send-email-boojin.kim@samsung.com>
-	<1311557312-26107-6-git-send-email-boojin.kim@samsung.com>
-Message-ID: <1311591179.29703.4.camel@vkoul-mobl4>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Mon, 25 Jul 2011 12:55:07 +0200
+Subject: [RFC] DMAEngine: Define generic transfer request api
+In-Reply-To: <1311453088-5063-1-git-send-email-jaswinder.singh@linaro.org>
+References: <1311453088-5063-1-git-send-email-jaswinder.singh@linaro.org>
+Message-ID: <CAKnu2MpVwYSYgKBtpuqrrjHFQdjCEU_Q5iYe8qdfO9D1kzN0gw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2011-07-25 at 10:28 +0900, Boojin Kim wrote:
-> This patch adds to support PL330-DMA driver on DMADEVICE for S5P SoCs.
-> 
-> Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> ---
->  arch/arm/mach-exynos4/include/mach/dma.h           |    4 +-
->  arch/arm/mach-s5p64x0/include/mach/dma.h           |    2 +-
->  arch/arm/mach-s5pc100/include/mach/dma.h           |    2 +-
->  arch/arm/mach-s5pv210/include/mach/dma.h           |    2 +-
->  arch/arm/plat-samsung/Kconfig                      |    8 +++++++
->  .../include/plat/{s3c-dma-pl330.h => dma-pl330.h}  |   21 +++++++++++++------
->  .../plat-samsung/include/plat/s3c-pl330-pdata.h    |    2 +-
->  7 files changed, 28 insertions(+), 13 deletions(-)
->  rename arch/arm/plat-samsung/include/plat/{s3c-dma-pl330.h => dma-pl330.h} (84%)
-> 
-> diff --git a/arch/arm/mach-exynos4/include/mach/dma.h b/arch/arm/mach-exynos4/include/mach/dma.h
-> index 81209eb..201842a 100644
-> --- a/arch/arm/mach-exynos4/include/mach/dma.h
-> +++ b/arch/arm/mach-exynos4/include/mach/dma.h
-> @@ -20,7 +20,7 @@
->  #ifndef __MACH_DMA_H
->  #define __MACH_DMA_H
->  
-> -/* This platform uses the common S3C DMA API driver for PL330 */
-> -#include <plat/s3c-dma-pl330.h>
-> +/* This platform uses the common DMA API driver for PL330 */
-> +#include <plat/dma-pl330.h>
->  
->  #endif /* __MACH_DMA_H */
-> diff --git a/arch/arm/mach-s5p64x0/include/mach/dma.h b/arch/arm/mach-s5p64x0/include/mach/dma.h
-> index 81209eb..1beae2c 100644
-> --- a/arch/arm/mach-s5p64x0/include/mach/dma.h
-> +++ b/arch/arm/mach-s5p64x0/include/mach/dma.h
-> @@ -21,6 +21,6 @@
->  #define __MACH_DMA_H
->  
->  /* This platform uses the common S3C DMA API driver for PL330 */
-> -#include <plat/s3c-dma-pl330.h>
-> +#include <plat/dma-pl330.h>
->  
->  #endif /* __MACH_DMA_H */
-> diff --git a/arch/arm/mach-s5pc100/include/mach/dma.h b/arch/arm/mach-s5pc100/include/mach/dma.h
-> index 81209eb..1beae2c 100644
-> --- a/arch/arm/mach-s5pc100/include/mach/dma.h
-> +++ b/arch/arm/mach-s5pc100/include/mach/dma.h
-> @@ -21,6 +21,6 @@
->  #define __MACH_DMA_H
->  
->  /* This platform uses the common S3C DMA API driver for PL330 */
-> -#include <plat/s3c-dma-pl330.h>
-> +#include <plat/dma-pl330.h>
->  
->  #endif /* __MACH_DMA_H */
-> diff --git a/arch/arm/mach-s5pv210/include/mach/dma.h b/arch/arm/mach-s5pv210/include/mach/dma.h
-> index 81209eb..1beae2c 100644
-> --- a/arch/arm/mach-s5pv210/include/mach/dma.h
-> +++ b/arch/arm/mach-s5pv210/include/mach/dma.h
-> @@ -21,6 +21,6 @@
->  #define __MACH_DMA_H
->  
->  /* This platform uses the common S3C DMA API driver for PL330 */
-> -#include <plat/s3c-dma-pl330.h>
-> +#include <plat/dma-pl330.h>
->  
->  #endif /* __MACH_DMA_H */
-> diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
-> index 4d79519..cb170a6 100644
-> --- a/arch/arm/plat-samsung/Kconfig
-> +++ b/arch/arm/plat-samsung/Kconfig
-> @@ -300,6 +300,14 @@ config S3C_PL330_DMA
->  	help
->  	  S3C DMA API Driver for PL330 DMAC.
->  
-> +config DMADEV_PL330
-> +	bool
-> +	select DMADEVICES
-> +	select PL330_DMA
-> +	select ARM_AMBA
-> +	help
-> +	  Use DMA device engine for PL330 DMAC.
-> +
->  comment "Power management"
->  
->  config SAMSUNG_PM_DEBUG
-> diff --git a/arch/arm/plat-samsung/include/plat/s3c-dma-pl330.h b/arch/arm/plat-samsung/include/plat/dma-pl330.h
-> similarity index 84%
-> rename from arch/arm/plat-samsung/include/plat/s3c-dma-pl330.h
-> rename to arch/arm/plat-samsung/include/plat/dma-pl330.h
-> index 8107442..c402719 100644
-> --- a/arch/arm/plat-samsung/include/plat/s3c-dma-pl330.h
-> +++ b/arch/arm/plat-samsung/include/plat/dma-pl330.h
-> @@ -8,19 +8,18 @@
->   * (at your option) any later version.
->   */
->  
-> -#ifndef	__S3C_DMA_PL330_H_
-> -#define	__S3C_DMA_PL330_H_
-> -
-> -#define S3C2410_DMAF_AUTOSTART		(1 << 0)
-> -#define S3C2410_DMAF_CIRCULAR		(1 << 1)
-> +#ifndef __DMA_PL330_H_
-> +#define __DMA_PL330_H_ __FILE__
->  
-> +#define S3C2410_DMAF_AUTOSTART	(1 << 0)
-> +#define S3C2410_DMAF_CIRCULAR	(1 << 1)
-this looks like bogus diff and can be avoided
->  /*
->   * PL330 can assign any channel to communicate with
->   * any of the peripherals attched to the DMAC.
->   * For the sake of consistency across client drivers,
->   * We keep the channel names unchanged and only add
->   * missing peripherals are added.
-> - * Order is not important since S3C PL330 API driver
-> + * Order is not important since DMA PL330 API driver
->   * use these just as IDs.
->   */
->  enum dma_ch {
-> @@ -84,6 +83,14 @@ enum dma_ch {
->  	DMACH_SLIMBUS4_TX,
->  	DMACH_SLIMBUS5_RX,
->  	DMACH_SLIMBUS5_TX,
-> +	DMACH_MTOM_0,
-> +	DMACH_MTOM_1,
-> +	DMACH_MTOM_2,
-> +	DMACH_MTOM_3,
-> +	DMACH_MTOM_4,
-> +	DMACH_MTOM_5,
-> +	DMACH_MTOM_6,
-> +	DMACH_MTOM_7,
->  	/* END Marker, also used to denote a reserved channel */
->  	DMACH_MAX,
->  };
-> @@ -95,4 +102,4 @@ static inline bool s3c_dma_has_circular(void)
->  
->  #include <plat/dma.h>
->  
-> -#endif	/* __S3C_DMA_PL330_H_ */
-> +#endif	/* __DMA_PL330_H_ */
-> diff --git a/arch/arm/plat-samsung/include/plat/s3c-pl330-pdata.h b/arch/arm/plat-samsung/include/plat/s3c-pl330-pdata.h
-> index bf5e2a9..64fdf66 100644
-> --- a/arch/arm/plat-samsung/include/plat/s3c-pl330-pdata.h
-> +++ b/arch/arm/plat-samsung/include/plat/s3c-pl330-pdata.h
-> @@ -12,7 +12,7 @@
->  #ifndef __S3C_PL330_PDATA_H
->  #define __S3C_PL330_PDATA_H
->  
-> -#include <plat/s3c-dma-pl330.h>
-> +#include <plat/dma-pl330.h>
->  
->  /*
->   * Every PL330 DMAC has max 32 peripheral interfaces,
+2011/7/23 Jassi Brar <jaswinder.singh@linaro.org>:
 
--- 
-~Vinod Koul
-Intel Corp.
+> This is an attempt to define an api that could be used for doing
+> fancy data transfers like interleaved to contiguous copy and vice-versa.
+> Traditional SG_list based transfers tend to be very inefficient
+> in such cases. Such cases call for some very condensed api to convey
+> pattern of the transfer. This is an attempt at that condensed api.
+>
+> The api supports all 4 variants of scatter-gather and contiguous transfer.
+> Besides, it could easily represent common operations like
+> ? ? ? ?device_prep_dma_{cyclic, memset, memcpy}
+> and maybe some more that I am not sure of.
+>
+> Of course, this api too can't help transfers that don't lend to DMA by
+> nature, i.e, scattered tiny read/writes with no periodic pattern.
+>
+> Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
+
+I think this also looks interesting, it's the same idea as for using
+control commands to set up striding, but by supporting a totally
+new function call instead.
+
+Do you think this method can be filled in with a default
+implementation that converts the request to a plain sglist request
+to memory or slave if interleaved transfers are not available?
+That would mean that drivers can use this API on any DMA
+engine, no matter whether it supports ICG/striding or not.
+
+If we do that, this is much better than using a special control
+command.
+
++ * @src_inc: If the source address increments after reading from it.
++ * @dst_inc: If the destination address increments after writing to it.
+
+Currently whether source/destination increments or not is
+implicit from transaction type, i.e. if it's a mem2mem transfer
+it is implicit that both increment, if it's a slave transfer we can
+infer from the direction (to/from peripheral) whether source or
+destination is supposed to increment.
+
+IMO this means duplication, and removes abstraction from the
+API, it looks more like specific bits to be set in the DMA
+hardware to control increments.
+
+In this form it makes possible to set up nonsensical operations like
+a memory-to-memory transfer to a non-incrementing address
+which is not a peripheral FIFO, which is not good IMO. The API
+should be semantically designed for setting up sensible operations.
+
++ * @op: The operation to perform on source data before writing it on
++ *      to destination address.
+
+It is a enum dma_transaction_type after all, so can't it just say
+"type of transfer"?
+
+I think you can infer the above increment settings from this type,
+so they should be removed.
+
++ * @frm_irq: If the client expects DMAC driver to do callback after each frame.
+
+I don't understand the usecase for getting this IRQ, and it deviates
+from the DMAengine way of setting a flag on the descriptor.
+Instead I think you should maybe provide a new flag for the
+unsigned long flags you're already passing in here:
+
++       struct dma_async_tx_descriptor *(*device_prep_dma_xfer)(
++               struct dma_chan *chan, struct xfer_template *xt,
++               unsigned long flags);
+                 ^^^^^^^^^^^^^^^^^^^^^^
+
+Thanks,
+Linus Walleij
