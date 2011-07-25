@@ -1,77 +1,35 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 25 Jul 2011 21:37:43 +0800
-Subject: [PATCH] mtd/m25p80: add device tree probe support
-Message-ID: <1311601063-16581-1-git-send-email-shawn.guo@linaro.org>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Mon, 25 Jul 2011 17:33:45 +0400
+Subject: [PATCH v2 2/6] arm: davinci: Explicitly set channel controllers'
+	default queues
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024DD2CE05@dbde02.ent.ti.com>
+References: <1310303679-17936-1-git-send-email-ido@wizery.com>	<1310303679-17936-3-git-send-email-ido@wizery.com>
+	<B85A65D85D7EB246BE421B3FB0FBB593024DD2CE05@dbde02.ent.ti.com>
+Message-ID: <4E2D70B9.7060202@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It adds device tree probe support for m25p80 driver.
+Hello.
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Cc: Artem Bityutskiy <artem.bityutskiy@intel.com>
----
- Documentation/devicetree/bindings/mtd/st-m25p.txt |   14 ++++++++++++++
- drivers/mtd/devices/m25p80.c                      |   12 ++++++++++++
- 2 files changed, 26 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/mtd/st-m25p.txt
+Nori, Sekhar wrote:
 
-diff --git a/Documentation/devicetree/bindings/mtd/st-m25p.txt b/Documentation/devicetree/bindings/mtd/st-m25p.txt
-new file mode 100644
-index 0000000..a8c0485
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mtd/st-m25p.txt
-@@ -0,0 +1,14 @@
-+* STMicroelectronics SPI Flash
-+
-+Required properties:
-+- compatible : "st,<model>", "st,m25p".
-+
-+Examples:
-+
-+flash: m25p32 at 1 {
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+	compatible = "st,m25p32", "st,m25p";
-+	spi-max-frequency = <20000000>;
-+	reg = <1>;
-+};
-diff --git a/drivers/mtd/devices/m25p80.c b/drivers/mtd/devices/m25p80.c
-index e6ba034..d9d4101 100644
---- a/drivers/mtd/devices/m25p80.c
-+++ b/drivers/mtd/devices/m25p80.c
-@@ -26,6 +26,7 @@
- #include <linux/slab.h>
- #include <linux/sched.h>
- #include <linux/mod_devicetable.h>
-+#include <linux/of_device.h>
- 
- #include <linux/mtd/cfi.h>
- #include <linux/mtd/mtd.h>
-@@ -767,6 +768,16 @@ static const struct spi_device_id m25p_ids[] = {
- };
- MODULE_DEVICE_TABLE(spi, m25p_ids);
- 
-+#ifdef CONFIG_OF
-+static const struct of_device_id m25p_dt_ids[] = {
-+	{ .compatible = "st,m25p", },
-+	{ /* sentinel */ }
-+};
-+MODULE_DEVICE_TABLE(of, m25p_dt_ids);
-+#else
-+#define m25p_dt_ids NULL
-+#endif
-+
- static const struct spi_device_id *__devinit jedec_probe(struct spi_device *spi)
- {
- 	int			tmp;
-@@ -986,6 +997,7 @@ static struct spi_driver m25p80_driver = {
- 		.name	= "m25p80",
- 		.bus	= &spi_bus_type,
- 		.owner	= THIS_MODULE,
-+		.of_match_table = m25p_dt_ids,
- 	},
- 	.id_table	= m25p_ids,
- 	.probe	= m25p_probe,
--- 
-1.7.4.1
+>> Davinci platforms may define a default queue for each channel
+>> controller. If one is not defined, the default queue is set to EVENTQ_1.
+>> However, there's no way to distinguish between an unset default queue to
+>> one that is set to EVENTQ_0, as EVENTQ_0 = 0.
+
+>> Explicitly specify the default queue for all channel controllers on all
+>> Davinci platforms to EVENTQ_1, and don't overwrite it in the EDMA probe
+>> function.
+
+>> One exception is the DA850 board, for which EVENTQ_1 is not a valid
+>> option for its second channel controller. Use EVENTQ_0 instead for that
+>> channel controller.
+
+>> Signed-off-by: Ido Yariv <ido@wizery.com>
+
+> Looks good to me. Will queue for v3.2/fixes
+
+    Why wait for 3.2? If this is considered a fix, it should be applied to 3.1, no?
+
+WBR, Sergei
