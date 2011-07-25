@@ -1,50 +1,47 @@
-From: vkoul@infradead.org (Vinod Koul)
-Date: Mon, 25 Jul 2011 20:08:31 +0530
-Subject: [PATCH 0/9] PL08x further cleanups
-In-Reply-To: <20110725142201.GA14955@n2100.arm.linux.org.uk>
-References: <20110705131030.GE8286@n2100.arm.linux.org.uk>
-	<1310598328.1536.27.camel@vkoul-udesk3>
-	<20110721160800.GR26574@n2100.arm.linux.org.uk>
-	<1311601111.8206.5.camel@vkoul-mobl4>
-	<20110725134340.GK9653@n2100.arm.linux.org.uk>
-	<1311601872.8206.10.camel@vkoul-mobl4>
-	<20110725142201.GA14955@n2100.arm.linux.org.uk>
-Message-ID: <1311604711.8206.19.camel@vkoul-mobl4>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 25 Jul 2011 15:46:35 +0100
+Subject: [PATCH 0/4] Fix CPU hotplug IRQ migration
+In-Reply-To: <4E2D7D58.8080309@ti.com>
+References: <20110721151413.GD28942@n2100.arm.linux.org.uk>
+	<4E290C05.7020209@ti.com> <4E2D69C7.4040609@ti.com>
+	<20110725132353.GJ9653@n2100.arm.linux.org.uk>
+	<4E2D7D58.8080309@ti.com>
+Message-ID: <20110725144634.GC14955@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2011-07-25 at 15:22 +0100, Russell King - ARM Linux wrote:
-> On Mon, Jul 25, 2011 at 07:21:12PM +0530, Vinod Koul wrote:
-> > On Mon, 2011-07-25 at 14:43 +0100, Russell King - ARM Linux wrote:
-> > > No.  This function is used as:
-> > > 
-> > > +       width = pl08x_width(addr_width);
-> > > +       if (width == ~0) {
-> > >                 dev_err(&pl08x->adev->dev,
-> > >                         "bad runtime_config: alien address width\n");
-> > >                 return -EINVAL;
-> > >         }
-> > > 
-> > > Notice that it returns a u32 so negative errnos don't make sense.  It
-> > > returns ~0 to indicate error.
-> > > 
-> > > The code is actually correct as it stands, it's just gcc deciding to
-> > > emit a warning for an unhandled enum value which isn't really unhandled.
-> > > Just move the 'return ~0;' at the end of the function inside the switch
-> > > as a default case to shut it up.
-> > Okay but shouldn't this ideally check for width < 0, that way we can
-> > return proper errors?
-> 
-> No.  Two reasons:
-> 
-> 1. u32 < 0 does not exist.
-> 
-> 2. It's returning a sub bitmask value for the register, so signed numbers
->    conceptually don't make sense.
-Agreed, Pushed this with return ~0;
-You should be able to see your patchset along with this change in my
-tree now
+On Mon, Jul 25, 2011 at 07:57:36PM +0530, Santosh Shilimkar wrote:
+> Will make you OMAP4 IRQ code available for this particular aspect and
+> may be we can take it from there. There are two main problems I am
+> seeing currently.
+>
+> 1)Which CPU gic_arch_extn_[mask/unmask] operate on?
+> Can we assume that whichever CPU the call being executed
+> should be the target CPU ? This might not be safe assumption
+> though. For the extn, there is no other way to know the target
+> CPU for mask/unmask of an IRQ
 
--- 
-~Vinod Koul
-Intel Corp.
+This goes back to the mistake that was made with the initial set of
+GIC PPI patches.
+
+You can't assume anything about which CPU the mask/unmask functions end
+up running on.  Between code calling request_irq() and the relevant
+unmask function being called, we can end up scheduling, either because
+of a mutex being waited for or because of a preemption event.  That
+means we can end up on a different CPU to that which we started out
+on.
+
+So, the only thing you can do is remember the CPU number which it was
+last associated with - a simple 'unsigned int' should do in the
+extensions data structures, one per IRQ.
+
+However, my point is that doing this:
+
+	gic_arch_extn.irq_set_affinity(d, cpumask_of(cpu), force);
+
+and then:
+
+	cpu = cpumask_first(affinity);
+
+in the extensions code is a very long winded way of communicating a
+single CPU number down into the IRQ extension code.
