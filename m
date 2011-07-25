@@ -1,116 +1,211 @@
 From: boojin.kim@samsung.com (Boojin Kim)
-Date: Mon, 25 Jul 2011 21:51:37 +0900
-Subject: [PATCH V4 03/14] DMA: PL330: Support DMA_SLAVE_CONFIG command
-In-Reply-To: <1311589617.27357.3.camel@vkoul-mobl4>
+Date: Mon, 25 Jul 2011 21:59:33 +0900
+Subject: [PATCH V4 07/14] ARM: EXYNOS4: Use generic DMA PL330 driver
+In-Reply-To: <CABb+yY3yEDuWv3n=fJK5TfeXi0=P96NpL3=EXHmXAqmpaium8A@mail.gmail.com>
 References: <1311557312-26107-1-git-send-email-boojin.kim@samsung.com>
-	<1311557312-26107-4-git-send-email-boojin.kim@samsung.com>
-	<1311589617.27357.3.camel@vkoul-mobl4>
-Message-ID: <002401cc4ac9$97737570$c65a6050$%kim@samsung.com>
+	<1311557312-26107-8-git-send-email-boojin.kim@samsung.com>
+	<CABb+yY3yEDuWv3n=fJK5TfeXi0=P96NpL3=EXHmXAqmpaium8A@mail.gmail.com>
+Message-ID: <002501cc4aca$b3436750$19ca35f0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vinod Koul Wrote:
-> Sent: Monday, July 25, 2011 7:27 PM
+Jassi Brar Wrote:
+> Sent: Monday, July 25, 2011 9:00 PM
 > To: Boojin Kim
-> Cc: vinod.koul at intel.com; linux-arm-kernel at lists.infradead.org; linux-
-> samsung-soc at vger.kernel.org; Kukjin Kim; Jassi Brar; Grant Likely;
-> Mark Brown; Dan Williams
-> Subject: Re: [PATCH V4 03/14] DMA: PL330: Support DMA_SLAVE_CONFIG
-> command
+> Cc: linux-arm-kernel at lists.infradead.org; linux-samsung-
+> soc at vger.kernel.org; Vinod Koul; Dan Williams; Kukjin Kim; Grant
+> Likely; Mark Brown
+> Subject: Re: [PATCH V4 07/14] ARM: EXYNOS4: Use generic DMA PL330
+> driver
 >
-> On Mon, 2011-07-25 at 10:28 +0900, Boojin Kim wrote:
-> > This patch adds support DMA_SLAVE_CONFIG command.
+> On Mon, Jul 25, 2011 at 6:58 AM, Boojin Kim <boojin.kim@samsung.com>
+> wrote:
+>
+> > diff --git a/arch/arm/mach-exynos4/dma.c b/arch/arm/mach-
+> exynos4/dma.c
+> > index 564bb53..e1c00cf 100644
+> > --- a/arch/arm/mach-exynos4/dma.c
+> > +++ b/arch/arm/mach-exynos4/dma.c
+> > @@ -21,151 +21,250 @@
+> >  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+> >  */
 > >
-> > Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
-> > ---
-> >  drivers/dma/pl330.c |   53 +++++++++++++++++++++++++++++++++++++----
-> ---------
-> >  1 files changed, 39 insertions(+), 14 deletions(-)
+> > -#include <linux/platform_device.h>
+> >  #include <linux/dma-mapping.h>
+> > +#include <linux/amba/bus.h>
+> > +#include <linux/amba/pl330.h>
 > >
-> > diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-> > index 586ab39..880f010 100644
-> > --- a/drivers/dma/pl330.c
-> > +++ b/drivers/dma/pl330.c
-> > @@ -256,25 +256,50 @@ static int pl330_alloc_chan_resources(struct
-> dma_chan *chan)
-> >  static int pl330_control(struct dma_chan *chan, enum dma_ctrl_cmd
-> cmd, unsigned long arg)
-> >  {
-> >  	struct dma_pl330_chan *pch = to_pchan(chan);
-> > -	struct dma_pl330_desc *desc;
-> > +	struct dma_pl330_desc *desc, *_dt;
-> >  	unsigned long flags;
-> > +	struct dma_pl330_dmac *pdmac = pch->dmac;
-> > +	struct dma_slave_config *slave_config;
-> > +	struct dma_pl330_peri *peri;
-> > +	LIST_HEAD(list);
+> > +#include <asm/irq.h>
+> >  #include <plat/devs.h>
+> >  #include <plat/irqs.h>
 > >
-> > -	/* Only supports DMA_TERMINATE_ALL */
-> > -	if (cmd != DMA_TERMINATE_ALL)
-> > -		return -ENXIO;
+> >  #include <mach/map.h>
+> >  #include <mach/irqs.h>
 > > -
-> > -	spin_lock_irqsave(&pch->lock, flags);
-> > -
-> > -	/* FLUSH the PL330 Channel thread */
-> > -	pl330_chan_ctrl(pch->pl330_chid, PL330_OP_FLUSH);
-> > +	switch (cmd) {
-> > +	case DMA_TERMINATE_ALL:
-> > +		spin_lock_irqsave(&pch->lock, flags);
+> > -#include <plat/s3c-pl330-pdata.h>
+> > +#include <mach/dma.h>
 > >
-> > -	/* Mark all desc done */
-> > -	list_for_each_entry(desc, &pch->work_list, node)
-> > -		desc->status = DONE;
-> > +		/* FLUSH the PL330 Channel thread */
-> > +		pl330_chan_ctrl(pch->pl330_chid, PL330_OP_FLUSH);
+> >  static u64 dma_dmamask = DMA_BIT_MASK(32);
 > >
-> > -	spin_unlock_irqrestore(&pch->lock, flags);
-> > +		/* Mark all desc done */
-> > +		list_for_each_entry_safe(desc, _dt, &pch->work_list , node)
-> {
-> > +			desc->status = DONE;
-> > +			pch->completed = desc->txd.cookie;
-> > +			list_move_tail(&desc->node, &list);
-> > +		}
-> >
-> > -	pl330_tasklet((unsigned long) pch);
-> > +		list_splice_tail_init(&list, &pdmac->desc_pool);
-> > +		spin_unlock_irqrestore(&pch->lock, flags);
-> > +		break;
-> > +	case DMA_SLAVE_CONFIG:
-> > +		slave_config = (struct dma_slave_config *)arg;
-> > +		peri = pch->chan.private;
-> > +
-> > +		if (slave_config->direction == DMA_TO_DEVICE) {
-> > +			if (slave_config->dst_addr)
-> > +				peri->fifo_addr = slave_config->dst_addr;
-> > +			if (slave_config->dst_addr_width)
-> > +				peri->burst_sz = __ffs(slave_config-
-> >dst_addr_width);
-> This doesn't sound right, why can't you use xxx_maxburst field instead?
-Can you explain the problem in more detail?
-Do you mean that 'xxx_maxburst' takes place of 'xxx_addr_width' or __ffs() 
-isn't proper here?
-
-Additionally, I will modify this code to consider '_maxburst' field.
+> > -static struct resource exynos4_pdma0_resource[] = {
+> > -       [0] = {
+> > -               .start  = EXYNOS4_PA_PDMA0,
+> > -               .end    = EXYNOS4_PA_PDMA0 + SZ_4K,
+> > -               .flags  = IORESOURCE_MEM,
+> > -       },
+> > -       [1] = {
+> > -               .start  = IRQ_PDMA0,
+> > -               .end    = IRQ_PDMA0,
+> > -               .flags  = IORESOURCE_IRQ,
+> > +struct dma_pl330_peri pdma0_peri[32] = {
+> Please remove 32 from the list (it seems you don't always pass 32
+> elements)
+> Also for completeness, please explicitly write element indices below
+> because
+> it's not some array of randomly placed elements.
+> Same for every other such occurance.
+I will address your comment.
 
 >
-> > +		} else if (slave_config->direction == DMA_FROM_DEVICE) {
-> > +			if (slave_config->src_addr)
-> > +				peri->fifo_addr = slave_config->src_addr;
-> > +			if (slave_config->src_addr_width)
-> > +				peri->burst_sz = __ffs(slave_config-
-> >src_addr_width);
-> ditto...
-> > +		}
-> > +		break;
-> > +	default:
-> > +		dev_err(pch->dmac->pif.dev, "Not supported command.\n");
-> > +		return -ENXIO;
-> > +	}
-> >
-> >  	return 0;
-> >  }
+> > +       {
+> > +               .peri_id = (u8)DMACH_PCM0_RX,
+> > +               .rqtype = DEVTOMEM,
+> > +       }, {
+> > +               .peri_id = (u8)DMACH_PCM0_TX,
+> > +               .rqtype = MEMTODEV,
+> > +       }, {
+> > +               .peri_id = (u8)DMACH_PCM2_RX,
+> > +               .rqtype = DEVTOMEM,
+> > +       }, {
+> > +               .peri_id = (u8)DMACH_PCM2_TX,
+> > +               .rqtype = MEMTODEV,
+> > +               .burst_sz = 4,
+> > +       }, {
+> > +               .peri_id = (u8)DMACH_MSM_REQ0,
+> > +       }, {
+> > +               .peri_id = (u8)DMACH_MSM_REQ2,
+> > +       }, {
+> > +               .peri_id = (u8)DMACH_SPI0_RX,
+> > +               .rqtype = DEVTOMEM,
+> > +               .burst_sz = 1,
+> > +       }, {
+> > +               .peri_id = (u8)DMACH_SPI0_TX,
+> > +               .rqtype = MEMTODEV,
+> > +               .burst_sz = 1,
+> > +       }, {
+> > +               .peri_id = (u8)DMACH_SPI2_RX,
+> > +               .rqtype = DEVTOMEM,
+> > +               .burst_sz = 1,
+> > +       }, {
+> > +               .peri_id = (u8)DMACH_SPI2_TX,
+> > +               .rqtype = MEMTODEV,
+> > +               .burst_sz = 1,
+> > +       }, {
+> > +               .peri_id = (u8)DMACH_I2S0S_TX,
+> > +               .rqtype = MEMTODEV,
+> > +       }, {
+> > +               .peri_id = (u8)DMACH_I2S0_RX,
+> > +               .rqtype = DEVTOMEM,
+> > +       }, {
+> > +               .peri_id = (u8)DMACH_I2S0_TX,
+> > +               .rqtype = MEMTODEV,
+> > +       }, {
+> > +               .peri_id = (u8)DMACH_UART0_RX,
+> > +               .rqtype = DEVTOMEM,
+> > +               .burst_sz = 4,
+> > +       }, {
+> > +               .peri_id = (u8)DMACH_UART0_TX,
+> > +               .rqtype = MEMTODEV,
+> > +               .burst_sz = 4,
+> > +       }, {
+> > +               .peri_id = (u8)DMACH_UART2_RX,
+> > +               .rqtype = DEVTOMEM,
+> > +               .burst_sz = 4,
+> > +       }, {
+> > +               .peri_id = (u8)DMACH_UART2_TX,
+> > +               .rqtype = MEMTODEV,
+> > +               .burst_sz = 4,
+> > +       }, {
+> > +               .peri_id = (u8)DMACH_UART4_RX,
+> > +               .rqtype = DEVTOMEM,
+> > +               .burst_sz = 4,
+> > +       }, {
+> > +               .peri_id = (u8)DMACH_UART4_TX,
+> > +               .rqtype = MEMTODEV,
+> > +               .burst_sz = 4,
+> > +       }, {
+> > +               .peri_id = (u8)DMACH_SLIMBUS0_RX,
+> > +               .rqtype = DEVTOMEM,
+> > +       }, {
+> > +               .peri_id = (u8)DMACH_SLIMBUS0_TX,
+> > +               .rqtype = MEMTODEV,
+> > +       }, {
+> > +               .peri_id = (u8)DMACH_SLIMBUS2_RX,
+> > +               .rqtype = DEVTOMEM,
+> > +       }, {
+> > +               .peri_id = (u8)DMACH_SLIMBUS2_TX,
+> > +               .rqtype = MEMTODEV,
+> > +       }, {
+> > +               .peri_id = (u8)DMACH_SLIMBUS4_RX,
+> > +               .rqtype = DEVTOMEM,
+> > +       }, {
+> > +               .peri_id = (u8)DMACH_SLIMBUS4_TX,
+> > +               .rqtype = MEMTODEV,
+> > +       }, {
+> > +               .peri_id = (u8)DMACH_AC97_MICIN,
+> > +               .rqtype = DEVTOMEM,
+> > +               .burst_sz = 4,
+> > +       }, {
+> > +               .peri_id = (u8)DMACH_AC97_PCMIN,
+> > +               .rqtype = DEVTOMEM,
+> > +               .burst_sz = 4,
+> > +       }, {
+> > +               .peri_id = (u8)DMACH_AC97_PCMOUT,
+> > +               .rqtype = MEMTODEV,
+> > +               .burst_sz = 4,
+> >        },
+> >  };
 >
-> --
-> ~Vinod Koul
-> Intel Corp.
+>
+> >
+> > -static struct s3c_pl330_platdata exynos4_pdma0_pdata = {
+> > -       .peri = {
+> > -               [0] = DMACH_PCM0_RX,
+> > -               [1] = DMACH_PCM0_TX,
+> > -               [2] = DMACH_PCM2_RX,
+> > -               [3] = DMACH_PCM2_TX,
+> > -               [4] = DMACH_MSM_REQ0,
+> > -               [5] = DMACH_MSM_REQ2,
+> > -               [6] = DMACH_SPI0_RX,
+> > -               [7] = DMACH_SPI0_TX,
+> > -               [8] = DMACH_SPI2_RX,
+> > -               [9] = DMACH_SPI2_TX,
+> > -               [10] = DMACH_I2S0S_TX,
+> > -               [11] = DMACH_I2S0_RX,
+> > -               [12] = DMACH_I2S0_TX,
+> > -               [13] = DMACH_I2S2_RX,
+> > -               [14] = DMACH_I2S2_TX,
+> > -               [15] = DMACH_UART0_RX,
+> > -               [16] = DMACH_UART0_TX,
+> > -               [17] = DMACH_UART2_RX,
+> > -               [18] = DMACH_UART2_TX,
+> > -               [19] = DMACH_UART4_RX,
+> > -               [20] = DMACH_UART4_TX,
+> > -               [21] = DMACH_SLIMBUS0_RX,
+> > -               [22] = DMACH_SLIMBUS0_TX,
+> > -               [23] = DMACH_SLIMBUS2_RX,
+> > -               [24] = DMACH_SLIMBUS2_TX,
+> > -               [25] = DMACH_SLIMBUS4_RX,
+> > -               [26] = DMACH_SLIMBUS4_TX,
+> > -               [27] = DMACH_AC97_MICIN,
+> > -               [28] = DMACH_AC97_PCMIN,
+> > -               [29] = DMACH_AC97_PCMOUT,
+> > -               [30] = DMACH_MAX,
+> > -               [31] = DMACH_MAX,
+> > -       },
+> > +struct dma_pl330_platdata exynos4_pdma0_pdata = {
+> > +       .nr_valid_peri = 32,
+> Perhaps, this is why you had to add the NULL peri check.
+> Please use ARRAY_SIZE here.
+> Same for every other such occurance.
+I will address your comment.
