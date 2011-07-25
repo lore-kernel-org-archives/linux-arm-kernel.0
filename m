@@ -1,46 +1,54 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 25 Jul 2011 22:27:40 +0100
-Subject: [PATCH 1/1 V2] Add Thread Support for the Context ID Register
-	of ARM v6 & v7 Architectures
-In-Reply-To: <20110725103323.GE9653@n2100.arm.linux.org.uk>
-References: <cover.1310544641.git.wolfgang.betz@st.com>
-	<a4ef7565bd6013f56c5c10071bd36739c59768b7.1310544641.git.wolfgang.betz@st.com>
-	<20110714100254.GA20903@e102144-lin.cambridge.arm.com>
-	<4E1ECDD4.1020800@st.com>
-	<20110714113625.GB20903@e102144-lin.cambridge.arm.com>
-	<4E241E60.7040403@st.com>
-	<20110718125719.GA7410@e102144-lin.cambridge.arm.com>
-	<20110719102317.GC26574@n2100.arm.linux.org.uk>
-	<4E2D418D.4000800@st.com>
-	<20110725103323.GE9653@n2100.arm.linux.org.uk>
-Message-ID: <20110725212740.GA20187@e102144-lin.cambridge.arm.com>
+From: rdunlap@xenotime.net (Randy Dunlap)
+Date: Mon, 25 Jul 2011 14:29:24 -0700
+Subject: [PATCH] Documentation: Document ARM's user_debug parameter
+In-Reply-To: <1311556514-24728-1-git-send-email-sboyd@codeaurora.org>
+References: <1311556514-24728-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20110725142924.85de25dd.rdunlap@xenotime.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 25, 2011 at 11:33:23AM +0100, Russell King - ARM Linux wrote:
-> On Mon, Jul 25, 2011 at 12:12:29PM +0200, Wolfgang BETZ wrote:
-> > C is a typed language for a reason.  Don't destroy it with casts.
-> > 
-> > So, the _minimum_ that needs to change in this patch is for those casts
-> > to go, and cpu_switch_mm() needs to be fixed to take the context ID
-> > value, rather a context ID value casted to a mm_struct.
-> > 
-> > Well, this is exactly what the patch is doing right now.
-> > I have intentionally avoided to centralize this cast into cpu_switch_mm() in order to be sure to not miss any call to it, accidentally. As said above, the compiler will warn about something like this.
-> > Maybe you could take a closer look at v3 of the patch, which I will send out within today.
+On Sun, 24 Jul 2011 18:15:14 -0700 Stephen Boyd wrote:
+
+> Usually kernel parameters are documented in kernel-parameters.txt
+> but user_debug is only documented in the Kconfig. Document the
+> option and point to the Kconfig help text for more info.
 > 
-> You've completely missed my point.  What's the really scary thing here
-> is that you can't see that you're doing something very very wrong.
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> Cc: Russell King <linux@arm.linux.org.uk>
 
-I'd still like to know why we can't avoid piggybacking on the switch_mm code
-by doing similar to the hack I posted here:
+Is this a superset of 'print_fatal_signals'?
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2011-July/058436.html
+Applied, thanks.
 
-Given that future cores (>= A15) put the ASID in a different register and
-there's apparently a need for a thread switch notifier anyway, tying the
-contextidr up so tightly with switch_mm doesn't feel right to me.
+> ---
+>  Documentation/kernel-parameters.txt |   10 ++++++++++
+>  1 files changed, 10 insertions(+), 0 deletions(-)
+> 
+> diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
+> index aa47be7..8186adc 100644
+> --- a/Documentation/kernel-parameters.txt
+> +++ b/Documentation/kernel-parameters.txt
+> @@ -2612,6 +2612,16 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
+>  					medium is write-protected).
+>  			Example: quirks=0419:aaf5:rl,0421:0433:rc
+>  
+> +	user_debug=	[KNL,ARM]
+> +			Format: <int>
+> +			See arch/arm/Kconfig.debug help text.
+> +				 1 - undefined instruction events
+> +				 2 - system calls
+> +				 4 - invalid data aborts
+> +				 8 - SIGSEGV faults
+> +				16 - SIGBUS faults
+> +			Example: user_debug=31
+> +
+>  	userpte=
+>  			[X86] Flags controlling user PTE allocations.
+>  
+> -- 
+> Sent by an employee of the Qualcomm Innovation Center, Inc.
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
 
-So, ugly casts aside, I'm not convinced by the approach taken here.
-
-Will
+---
+~Randy
+*** Remember to use Documentation/SubmitChecklist when testing your code ***
