@@ -1,66 +1,93 @@
-From: vkoul@infradead.org (Vinod Koul)
-Date: Mon, 25 Jul 2011 19:08:31 +0530
-Subject: [PATCH 0/9] PL08x further cleanups
-In-Reply-To: <20110721160800.GR26574@n2100.arm.linux.org.uk>
-References: <20110705131030.GE8286@n2100.arm.linux.org.uk>
-	<1310598328.1536.27.camel@vkoul-udesk3>
-	<20110721160800.GR26574@n2100.arm.linux.org.uk>
-Message-ID: <1311601111.8206.5.camel@vkoul-mobl4>
+From: hrishikesh.b@ti.com (Hrishikesh Bhandiwad)
+Date: Mon, 25 Jul 2011 19:10:53 +0530
+Subject: [PATCH] OMAP3: NAND: Adding NAND support and specifying NAND
+	partitions.
+Message-ID: <1311601253-2933-1-git-send-email-hrishikesh.b@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-07-21 at 17:08 +0100, Russell King - ARM Linux wrote:
-> On Thu, Jul 14, 2011 at 04:35:28AM +0530, Koul, Vinod wrote:
-> > On Tue, 2011-07-05 at 14:10 +0100, Russell King - ARM Linux wrote:
-> > > This patch series is the remainder of the PL08x work I did earlier
-> > > this year while trying to get the ARM platforms working with DMA.
-> > > 
-> > > Unfortunately, due to the state of the hardware, I was not able to
-> > > properly test these changes.  However, they do compile, and I think
-> > > if others are going to be looking at the PL08x DMA engine driver,
-> > > they're worth having.
-> > > 
-> > > Linus, can you check these out on your hardware please?
-> > 
-> > Russell,
-> > 
-> > The fail to build for me, on line 550 it refers to bd.llil_bus whereas
-> > the bd is a pointer. Further the WIDTH macros seem to be missing.
-> 
-> Grr, I've updated the patches and will post the two updated ones.  I
-> have them in my git tree - would you like them via git instead, or
-> would you prefer to provide acks and let me push them upstream?
-> 
-Russell,
-Thanks I have applied this
+This patch adds the NAND support on OMAP3EVM board and also allocates
+five partitions  on NAND.
+Referred to file: arch/arm/mach-omap2/board-omap3beagle.c
 
-Although gcc didnt like not handling other enums so warned:
+Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+Signed-off-by: Sanjeev Premi <premi@ti.com>
+Signed-off-by: Hrishikesh Bhandiwad <hrishikesh.b@ti.com>
+---
+ arch/arm/mach-omap2/board-omap3evm.c |   40 ++++++++++++++++++++++++++++++++++
+ 1 files changed, 40 insertions(+), 0 deletions(-)
 
-drivers/dma/amba-pl08x.c: In function 'pl08x_width':
-drivers/dma/amba-pl08x.c:1119: warning: enumeration value
-'DMA_SLAVE_BUSWIDTH_UNDEFINED' not handled in switch
-drivers/dma/amba-pl08x.c:1119: warning: enumeration value
-'DMA_SLAVE_BUSWIDTH_8_BYTES' not handled in switch
-
-which can be fixed as:
-
-diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
-index 9aa2bd4..4925e0d 100644
---- a/drivers/dma/amba-pl08x.c
-+++ b/drivers/dma/amba-pl08x.c
-@@ -1123,6 +1123,8 @@ static u32 pl08x_width(enum dma_slave_buswidth
-width)
- 		return PL080_WIDTH_16BIT;
- 	case DMA_SLAVE_BUSWIDTH_4_BYTES:
- 		return PL080_WIDTH_32BIT;
-+	default:
-+		return -EINVAL;
+diff --git a/arch/arm/mach-omap2/board-omap3evm.c b/arch/arm/mach-omap2/board-omap3evm.c
+index b4d4346..be45b63 100644
+--- a/arch/arm/mach-omap2/board-omap3evm.c
++++ b/arch/arm/mach-omap2/board-omap3evm.c
+@@ -30,6 +30,10 @@
+ #include <linux/usb/otg.h>
+ #include <linux/smsc911x.h>
+ 
++#include <linux/mtd/mtd.h>
++#include <linux/mtd/partitions.h>
++#include <linux/mtd/nand.h>
++
+ #include <linux/wl12xx.h>
+ #include <linux/regulator/fixed.h>
+ #include <linux/regulator/machine.h>
+@@ -46,6 +50,8 @@
+ #include <plat/mcspi.h>
+ #include <video/omapdss.h>
+ #include <video/omap-panel-generic-dpi.h>
++#include <plat/gpmc.h>
++#include <plat/nand.h>
+ 
+ #include "mux.h"
+ #include "sdram-micron-mt46h32m32lf-6.h"
+@@ -101,6 +107,37 @@ static void __init omap3_evm_get_revision(void)
  	}
- 	return ~0;
  }
-
-If you are okay, pls ack it
-
+ 
++static struct mtd_partition omap3evm_nand_partitions[] = {
++	/* All the partition sizes are listed in terms of NAND block size */
++	{
++		.name		= "X-Loader",
++		.offset		= 0,
++		.size		= 4 * NAND_BLOCK_SIZE,
++		.mask_flags	= MTD_WRITEABLE,	/* force read-only */
++	},
++	{
++		.name		= "U-Boot",
++		.offset         = 0x80000
++		.size           = 15 * NAND_BLOCK_SIZE,
++		.mask_flags	= MTD_WRITEABLE,	/* force read-only */
++	},
++	{
++		.name		= "U-Boot Env",
++		.offset		= 0x260000
++		.size		= 1 * NAND_BLOCK_SIZE,
++	},
++	{
++		.name		= "Kernel",
++		.offset		= 0x280000
++		.size		= 32 * NAND_BLOCK_SIZE,
++	},
++	{
++		.name		= "File System",
++		.offset		= 0x680000
++		.size		= MTDPART_SIZ_FULL,
++	},
++};
++
+ #if defined(CONFIG_SMSC911X) || defined(CONFIG_SMSC911X_MODULE)
+ #include <plat/gpmc-smsc911x.h>
+ 
+@@ -696,6 +733,9 @@ static void __init omap3_evm_init(void)
+ 
+ 	omap_serial_init();
+ 
++	omap_nand_flash_init(NAND_BUSWIDTH_16, omap3evm_nand_partitions,
++			ARRAY_SIZE(omap3evm_nand_partitions));
++
+ 	/* OMAP3EVM uses ISP1504 phy and so register nop transceiver */
+ 	usb_nop_xceiv_register();
+ 
 -- 
-~Vinod Koul
-Intel Corp.
+1.6.2.4
