@@ -1,162 +1,36 @@
 From: vkoul@infradead.org (Vinod Koul)
-Date: Mon, 25 Jul 2011 19:54:32 +0530
-Subject: [PATCH] dmaengine: pl330: make platform data optional
-In-Reply-To: <1310518811-379-1-git-send-email-robherring2@gmail.com>
-References: <1310518811-379-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1311603872.8206.15.camel@vkoul-mobl4>
+Date: Mon, 25 Jul 2011 19:55:37 +0530
+Subject: [PATCH 1/1] ARM: mxs-dma: reset after disable channel
+In-Reply-To: <1311048596-19932-1-git-send-email-b29396@freescale.com>
+References: <1311048596-19932-1-git-send-email-b29396@freescale.com>
+Message-ID: <1311603937.8206.18.camel@vkoul-mobl4>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2011-07-12 at 20:00 -0500, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
+On Tue, 2011-07-19 at 12:09 +0800, Dong Aisheng wrote:
+> We met some channels in abnormal state after disable.
+> Reset it to get a clean state.
 > 
-> The pl330 needs platform data for describing peripheral connections, but
-> some platforms may only support memory to memory dma channels. In this
-> case, we can probe for how many channels there are and don't need the
-> platform data.
-> 
-> As memcpy requests don't need channel private data to hold peripheral
-> info, allow private data to be NULL in this case.
-> 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> Cc: Jassi Brar <jassi.brar@samsung.com>
+> Signed-off-by: Dong Aisheng <b29396@freescale.com>
 > Cc: Vinod Koul <vinod.koul@intel.com>
-> Cc: Dan Williams <dan.j.williams@intel.com>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
 > ---
->  drivers/dma/pl330.c |   64 ++++++++++++++++++++++++++++----------------------
->  1 files changed, 36 insertions(+), 28 deletions(-)
-Applied, Thanks
+>  drivers/dma/mxs-dma.c |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
 > 
-> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-> index 7181e43..76fd403 100644
-> --- a/drivers/dma/pl330.c
-> +++ b/drivers/dma/pl330.c
-> @@ -82,7 +82,7 @@ struct dma_pl330_dmac {
->  	spinlock_t pool_lock;
->  
->  	/* Peripheral channels connected to this DMAC */
-> -	struct dma_pl330_chan peripherals[0]; /* keep at end */
-> +	struct dma_pl330_chan *peripherals; /* keep at end */
->  };
->  
->  struct dma_pl330_desc {
-> @@ -451,8 +451,13 @@ static struct dma_pl330_desc *pl330_get_desc(struct dma_pl330_chan *pch)
->  	desc->txd.cookie = 0;
->  	async_tx_ack(&desc->txd);
->  
-> -	desc->req.rqtype = peri->rqtype;
-> -	desc->req.peri = peri->peri_id;
-> +	if (peri) {
-> +		desc->req.rqtype = peri->rqtype;
-> +		desc->req.peri = peri->peri_id;
-> +	} else {
-> +		desc->req.rqtype = MEMTOMEM;
-> +		desc->req.peri = 0;
-> +	}
->  
->  	dma_async_tx_descriptor_init(&desc->txd, &pch->chan);
->  
-> @@ -529,10 +534,10 @@ pl330_prep_dma_memcpy(struct dma_chan *chan, dma_addr_t dst,
->  	struct pl330_info *pi;
->  	int burst;
->  
-> -	if (unlikely(!pch || !len || !peri))
-> +	if (unlikely(!pch || !len))
->  		return NULL;
->  
-> -	if (peri->rqtype != MEMTOMEM)
-> +	if (peri && peri->rqtype != MEMTOMEM)
->  		return NULL;
->  
->  	pi = &pch->dmac->pif;
-> @@ -577,7 +582,7 @@ pl330_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
->  	int i, burst_size;
->  	dma_addr_t addr;
->  
-> -	if (unlikely(!pch || !sgl || !sg_len))
-> +	if (unlikely(!pch || !sgl || !sg_len || !peri))
->  		return NULL;
->  
->  	/* Make sure the direction is consistent */
-> @@ -666,17 +671,12 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
->  	struct dma_device *pd;
->  	struct resource *res;
->  	int i, ret, irq;
-> +	int num_chan;
->  
->  	pdat = adev->dev.platform_data;
->  
-> -	if (!pdat || !pdat->nr_valid_peri) {
-> -		dev_err(&adev->dev, "platform data missing\n");
-> -		return -ENODEV;
-> -	}
-> -
->  	/* Allocate a new DMAC and its Channels */
-> -	pdmac = kzalloc(pdat->nr_valid_peri * sizeof(*pch)
-> -				+ sizeof(*pdmac), GFP_KERNEL);
-> +	pdmac = kzalloc(sizeof(*pdmac), GFP_KERNEL);
->  	if (!pdmac) {
->  		dev_err(&adev->dev, "unable to allocate mem\n");
->  		return -ENOMEM;
-> @@ -685,7 +685,7 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
->  	pi = &pdmac->pif;
->  	pi->dev = &adev->dev;
->  	pi->pl330_data = NULL;
-> -	pi->mcbufsz = pdat->mcbuf_sz;
-> +	pi->mcbufsz = pdat ? pdat->mcbuf_sz : 0;
->  
->  	res = &adev->res;
->  	request_mem_region(res->start, resource_size(res), "dma-pl330");
-> @@ -717,27 +717,35 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
->  	INIT_LIST_HEAD(&pd->channels);
->  
->  	/* Initialize channel parameters */
-> -	for (i = 0; i < pdat->nr_valid_peri; i++) {
-> -		struct dma_pl330_peri *peri = &pdat->peri[i];
-> -		pch = &pdmac->peripherals[i];
-> +	num_chan = max(pdat->nr_valid_peri, (u8)pi->pcfg.num_chan);
-> +	pdmac->peripherals = kzalloc(num_chan * sizeof(*pch), GFP_KERNEL);
->  
-> -		switch (peri->rqtype) {
-> -		case MEMTOMEM:
-> +	for (i = 0; i < num_chan; i++) {
-> +		pch = &pdmac->peripherals[i];
-> +		if (pdat) {
-> +			struct dma_pl330_peri *peri = &pdat->peri[i];
-> +
-> +			switch (peri->rqtype) {
-> +			case MEMTOMEM:
-> +				dma_cap_set(DMA_MEMCPY, pd->cap_mask);
-> +				break;
-> +			case MEMTODEV:
-> +			case DEVTOMEM:
-> +				dma_cap_set(DMA_SLAVE, pd->cap_mask);
-> +				break;
-> +			default:
-> +				dev_err(&adev->dev, "DEVTODEV Not Supported\n");
-> +				continue;
-> +			}
-> +			pch->chan.private = peri;
-> +		} else {
->  			dma_cap_set(DMA_MEMCPY, pd->cap_mask);
-> -			break;
-> -		case MEMTODEV:
-> -		case DEVTOMEM:
-> -			dma_cap_set(DMA_SLAVE, pd->cap_mask);
-> -			break;
-> -		default:
-> -			dev_err(&adev->dev, "DEVTODEV Not Supported\n");
-> -			continue;
-> +			pch->chan.private = NULL;
->  		}
->  
->  		INIT_LIST_HEAD(&pch->work_list);
->  		spin_lock_init(&pch->lock);
->  		pch->pl330_chid = NULL;
-> -		pch->chan.private = peri;
->  		pch->chan.device = pd;
->  		pch->chan.chan_id = i;
->  		pch->dmac = pdmac;
+> diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
+> index 88aad4f..5a24010 100644
+> --- a/drivers/dma/mxs-dma.c
+> +++ b/drivers/dma/mxs-dma.c
+> @@ -535,6 +535,7 @@ static int mxs_dma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+>  	switch (cmd) {
+>  	case DMA_TERMINATE_ALL:
+>  		mxs_dma_disable_chan(mxs_chan);
+> +		mxs_dma_reset_chan(mxs_chan);
+>  		break;
+>  	case DMA_PAUSE:
+>  		mxs_dma_pause_chan(mxs_chan);
+Applied, Thanks
 
 -- 
 ~Vinod Koul
