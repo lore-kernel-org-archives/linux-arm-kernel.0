@@ -1,34 +1,59 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Mon, 25 Jul 2011 18:45:51 +0530
-Subject: [PATCH v2 2/6] arm: davinci: Explicitly set channel
-	controllers'	default queues
-In-Reply-To: <1310303679-17936-3-git-send-email-ido@wizery.com>
-References: <1310303679-17936-1-git-send-email-ido@wizery.com>
-	<1310303679-17936-3-git-send-email-ido@wizery.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024DD2CE05@dbde02.ent.ti.com>
+From: notasas@gmail.com (Grazvydas Ignotas)
+Date: Mon, 25 Jul 2011 16:18:24 +0300
+Subject: [PATCH] OMAP: omap_device: make latency autoadjust messages debug
+Message-ID: <1311599904-5981-1-git-send-email-notasas@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 10, 2011 at 18:44:35, Ido Yariv wrote:
-> Davinci platforms may define a default queue for each channel
-> controller. If one is not defined, the default queue is set to EVENTQ_1.
-> However, there's no way to distinguish between an unset default queue to
-> one that is set to EVENTQ_0, as EVENTQ_0 = 0.
-> 
-> Explicitly specify the default queue for all channel controllers on all
-> Davinci platforms to EVENTQ_1, and don't overwrite it in the EDMA probe
-> function.
-> 
-> One exception is the DA850 board, for which EVENTQ_1 is not a valid
-> option for its second channel controller. Use EVENTQ_0 instead for that
-> channel controller.
-> 
-> Signed-off-by: Ido Yariv <ido@wizery.com>
+During normal system operation warning messages similar to this
+are appearing quite often:
+omap_device: omap4-keypad.-1: new worst case activate latency 0: 61035
 
-Looks good to me. Will queue for v3.2/fixes
+This doesn't seem to be reporting a problem, nor is it very useful for
+non-developers, so reduce it to debug level.
 
-BTW, Arnd has indicated a preference for "ARM: davinci: "
-prefix so I will make that change while applying.
+Cc: Steve Sakoman <steve@sakoman.com>
+Signed-off-by: Grazvydas Ignotas <notasas@gmail.com>
+---
+Applies on top of git://git.pwsan.com/linux-2.6 prcm-devel-3.1
++ Kevin's "OMAP: omap_device: replace pr_* prints with dev_*".
 
-Thanks,
-Sekhar
+ arch/arm/plat-omap/omap_device.c |   16 ++++++++--------
+ 1 files changed, 8 insertions(+), 8 deletions(-)
+
+diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
+index 1914d7e..f363cbf 100644
+--- a/arch/arm/plat-omap/omap_device.c
++++ b/arch/arm/plat-omap/omap_device.c
+@@ -146,10 +146,10 @@ static int _omap_device_activate(struct omap_device *od, u8 ignore_lat)
+ 			odpl->activate_lat_worst = act_lat;
+ 			if (odpl->flags & OMAP_DEVICE_LATENCY_AUTO_ADJUST) {
+ 				odpl->activate_lat = act_lat;
+-				dev_warn(&od->pdev.dev,
+-					 "new worst case activate latency "
+-					 "%d: %llu\n",
+-					 od->pm_lat_level, act_lat);
++				dev_dbg(&od->pdev.dev,
++					"new worst case activate latency "
++					"%d: %llu\n",
++					od->pm_lat_level, act_lat);
+ 			} else
+ 				dev_warn(&od->pdev.dev,
+ 					 "activate latency %d "
+@@ -213,10 +213,10 @@ static int _omap_device_deactivate(struct omap_device *od, u8 ignore_lat)
+ 			odpl->deactivate_lat_worst = deact_lat;
+ 			if (odpl->flags & OMAP_DEVICE_LATENCY_AUTO_ADJUST) {
+ 				odpl->deactivate_lat = deact_lat;
+-				dev_warn(&od->pdev.dev,
+-					 "new worst case deactivate latency "
+-					 "%d: %llu\n",
+-					 od->pm_lat_level, deact_lat);
++				dev_dbg(&od->pdev.dev,
++					"new worst case deactivate latency "
++					"%d: %llu\n",
++					od->pm_lat_level, deact_lat);
+ 			} else
+ 				dev_warn(&od->pdev.dev,
+ 					 "deactivate latency %d "
+-- 
+1.7.0.4
