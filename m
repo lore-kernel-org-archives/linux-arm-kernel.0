@@ -1,242 +1,102 @@
-From: vkoul@infradead.org (Vinod Koul)
-Date: Mon, 25 Jul 2011 16:47:10 +0530
-Subject: [PATCH V4 12/14] spi/s3c64xx: Add support DMA engine API
-In-Reply-To: <1311557312-26107-13-git-send-email-boojin.kim@samsung.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Mon, 25 Jul 2011 16:54:28 +0530
+Subject: [PATCH V4 04/14] DMA: PL330: Add DMA_CYCLIC capability
+In-Reply-To: <1311557312-26107-5-git-send-email-boojin.kim@samsung.com>
 References: <1311557312-26107-1-git-send-email-boojin.kim@samsung.com>
-	<1311557312-26107-13-git-send-email-boojin.kim@samsung.com>
-Message-ID: <1311592630.29703.13.camel@vkoul-mobl4>
+	<1311557312-26107-5-git-send-email-boojin.kim@samsung.com>
+Message-ID: <CABb+yY1x=E4pO8Uyrz9+cs-B-NuhqzXzQwcxKCkrm0mthp0FWA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2011-07-25 at 10:28 +0900, Boojin Kim wrote:
-> This patch adds to support DMA generic API to transfer raw
-> SPI data. Basiclly the spi driver uses DMA generic API if
-> architecture supports it. Otherwise, uses Samsung specific
-> S3C-PL330 APIs.
-> 
+On Mon, Jul 25, 2011 at 6:58 AM, Boojin Kim <boojin.kim@samsung.com> wrote:
+> This patch adds DMA_CYCLIC capability that is used for audio driver.
+> DMA driver with DMA_CYCLIC capability reuses the dma requests that
+> were submitted through tx_submit().
+>
 > Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 > ---
->  drivers/spi/spi_s3c64xx.c |  141 ++++++++++++++++++++++-----------------------
->  1 files changed, 69 insertions(+), 72 deletions(-)
-> 
-> diff --git a/drivers/spi/spi_s3c64xx.c b/drivers/spi/spi_s3c64xx.c
-> index 8945e20..a4cf76a 100644
-> --- a/drivers/spi/spi_s3c64xx.c
-> +++ b/drivers/spi/spi_s3c64xx.c
-> @@ -172,6 +172,9 @@ struct s3c64xx_spi_driver_data {
->  	unsigned                        state;
->  	unsigned                        cur_mode, cur_bpw;
->  	unsigned                        cur_speed;
-> +	unsigned			rx_ch;
-> +	unsigned			tx_ch;
-> +	struct samsung_dma_ops		*ops;
->  };
->  
->  static struct s3c2410_dma_client s3c64xx_spi_dma_client = {
-> @@ -227,6 +230,38 @@ static void flush_fifo(struct s3c64xx_spi_driver_data *sdd)
->  	writel(val, regs + S3C64XX_SPI_CH_CFG);
->  }
->  
-> +static void s3c64xx_spi_dma_rxcb(void *data)
-> +{
-> +	struct s3c64xx_spi_driver_data *sdd
-> +		= (struct s3c64xx_spi_driver_data *)data;
-> +	unsigned long flags;
+> ?drivers/dma/pl330.c | ?111 +++++++++++++++++++++++++++++++++++++++++++++++++++
+> ?1 files changed, 111 insertions(+), 0 deletions(-)
+>
+> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+> index 880f010..121c75a 100644
+> --- a/drivers/dma/pl330.c
+> +++ b/drivers/dma/pl330.c
+> @@ -69,6 +69,11 @@ struct dma_pl330_chan {
+> ? ? ? ? * NULL if the channel is available to be acquired.
+> ? ? ? ? */
+> ? ? ? ?void *pl330_chid;
 > +
-> +	spin_lock_irqsave(&sdd->lock, flags);
+> + ? ? ? /* taks for cyclic capability */
+> + ? ? ? struct tasklet_struct *cyclic_task;
 > +
-> +	sdd->state &= ~RXBUSY;
-> +	/* If the other done */
-> +	if (!(sdd->state & TXBUSY))
-> +		complete(&sdd->xfer_completion);
-> +
-> +	spin_unlock_irqrestore(&sdd->lock, flags);
-> +}
-> +
-> +static void s3c64xx_spi_dma_txcb(void *data)
-> +{
-> +	struct s3c64xx_spi_driver_data *sdd
-> +		= (struct s3c64xx_spi_driver_data *)data;
-> +	unsigned long flags;
-> +
-> +	spin_lock_irqsave(&sdd->lock, flags);
-> +
-> +	sdd->state &= ~TXBUSY;
-> +	/* If the other done */
-> +	if (!(sdd->state & RXBUSY))
-> +		complete(&sdd->xfer_completion);
-> +
-> +	spin_unlock_irqrestore(&sdd->lock, flags);
-> +}
-I don't see much diff in these two functions and you should be able to
-use a generic one which takes care of both TX and RX, does your callback
-data know if the channel is for TX or RX? If not then a helper to do
-above should take care well and making code simpler
+> + ? ? ? bool cyclic;
+> ?};
+We already have a tasklet_struct member here.
+This 'cyclic' flag can indicate if we are doing cyclic or serial
+transfers. So, this cyclic_task seems unnecessary.
 
+> +static void pl330_tasklet_cyclic(unsigned long data)
+> +{
+> + ? ? ? struct dma_pl330_chan *pch = (struct dma_pl330_chan *)data;
+> + ? ? ? struct dma_pl330_desc *desc, *_dt;
+> + ? ? ? unsigned long flags;
+> + ? ? ? LIST_HEAD(list);
 > +
->  static void enable_datapath(struct s3c64xx_spi_driver_data *sdd,
->  				struct spi_device *spi,
->  				struct spi_transfer *xfer, int dma_mode)
-> @@ -234,6 +269,7 @@ static void enable_datapath(struct s3c64xx_spi_driver_data *sdd,
->  	struct s3c64xx_spi_info *sci = sdd->cntrlr_info;
->  	void __iomem *regs = sdd->regs;
->  	u32 modecfg, chcfg;
-> +	struct samsung_dma_prep_info info;
->  
->  	modecfg = readl(regs + S3C64XX_SPI_MODE_CFG);
->  	modecfg &= ~(S3C64XX_SPI_MODE_TXDMA_ON | S3C64XX_SPI_MODE_RXDMA_ON);
-> @@ -259,10 +295,14 @@ static void enable_datapath(struct s3c64xx_spi_driver_data *sdd,
->  		chcfg |= S3C64XX_SPI_CH_TXCH_ON;
->  		if (dma_mode) {
->  			modecfg |= S3C64XX_SPI_MODE_TXDMA_ON;
-> -			s3c2410_dma_config(sdd->tx_dmach, sdd->cur_bpw / 8);
-> -			s3c2410_dma_enqueue(sdd->tx_dmach, (void *)sdd,
-> -						xfer->tx_dma, xfer->len);
-> -			s3c2410_dma_ctrl(sdd->tx_dmach, S3C2410_DMAOP_START);
-> +			info.cap = DMA_SLAVE;
-> +			info.direction = DMA_TO_DEVICE;
-> +			info.buf = xfer->tx_dma;
-> +			info.len = xfer->len;
-> +			info.fp = s3c64xx_spi_dma_txcb;
-> +			info.fp_param = sdd;
-> +			sdd->ops->prepare(sdd->tx_ch, &info);
-> +			sdd->ops->trigger(sdd->tx_ch);
->  		} else {
->  			switch (sdd->cur_bpw) {
->  			case 32:
-> @@ -294,10 +334,14 @@ static void enable_datapath(struct s3c64xx_spi_driver_data *sdd,
->  			writel(((xfer->len * 8 / sdd->cur_bpw) & 0xffff)
->  					| S3C64XX_SPI_PACKET_CNT_EN,
->  					regs + S3C64XX_SPI_PACKET_CNT);
-> -			s3c2410_dma_config(sdd->rx_dmach, sdd->cur_bpw / 8);
-> -			s3c2410_dma_enqueue(sdd->rx_dmach, (void *)sdd,
-> -						xfer->rx_dma, xfer->len);
-> -			s3c2410_dma_ctrl(sdd->rx_dmach, S3C2410_DMAOP_START);
-> +			info.cap = DMA_SLAVE;
-> +			info.direction = DMA_FROM_DEVICE;
-> +			info.buf = xfer->rx_dma;
-> +			info.len = xfer->len;
-> +			info.fp = s3c64xx_spi_dma_rxcb;
-> +			info.fp_param = sdd;
-> +			sdd->ops->prepare(sdd->rx_ch, &info);
-> +			sdd->ops->trigger(sdd->rx_ch);
->  		}
->  	}
->  
-> @@ -483,46 +527,6 @@ static void s3c64xx_spi_config(struct s3c64xx_spi_driver_data *sdd)
->  	}
->  }
->  
-> -static void s3c64xx_spi_dma_rxcb(struct s3c2410_dma_chan *chan, void *buf_id,
-> -				 int size, enum s3c2410_dma_buffresult res)
-> -{
-> -	struct s3c64xx_spi_driver_data *sdd = buf_id;
-> -	unsigned long flags;
-> -
-> -	spin_lock_irqsave(&sdd->lock, flags);
-> -
-> -	if (res == S3C2410_RES_OK)
-> -		sdd->state &= ~RXBUSY;
-> -	else
-> -		dev_err(&sdd->pdev->dev, "DmaAbrtRx-%d\n", size);
-> -
-> -	/* If the other done */
-> -	if (!(sdd->state & TXBUSY))
-> -		complete(&sdd->xfer_completion);
-> -
-> -	spin_unlock_irqrestore(&sdd->lock, flags);
-> -}
-> -
-> -static void s3c64xx_spi_dma_txcb(struct s3c2410_dma_chan *chan, void *buf_id,
-> -				 int size, enum s3c2410_dma_buffresult res)
-> -{
-> -	struct s3c64xx_spi_driver_data *sdd = buf_id;
-> -	unsigned long flags;
-> -
-> -	spin_lock_irqsave(&sdd->lock, flags);
-> -
-> -	if (res == S3C2410_RES_OK)
-> -		sdd->state &= ~TXBUSY;
-> -	else
-> -		dev_err(&sdd->pdev->dev, "DmaAbrtTx-%d \n", size);
-> -
-> -	/* If the other done */
-> -	if (!(sdd->state & RXBUSY))
-> -		complete(&sdd->xfer_completion);
-> -
-> -	spin_unlock_irqrestore(&sdd->lock, flags);
-> -}
-> -
->  #define XFER_DMAADDR_INVALID DMA_BIT_MASK(32)
->  
->  static int s3c64xx_spi_map_mssg(struct s3c64xx_spi_driver_data *sdd,
-> @@ -697,12 +701,10 @@ static void handle_msg(struct s3c64xx_spi_driver_data *sdd,
->  			if (use_dma) {
->  				if (xfer->tx_buf != NULL
->  						&& (sdd->state & TXBUSY))
-> -					s3c2410_dma_ctrl(sdd->tx_dmach,
-> -							S3C2410_DMAOP_FLUSH);
-> +					sdd->ops->stop(sdd->tx_ch);
->  				if (xfer->rx_buf != NULL
->  						&& (sdd->state & RXBUSY))
-> -					s3c2410_dma_ctrl(sdd->rx_dmach,
-> -							S3C2410_DMAOP_FLUSH);
-> +					sdd->ops->stop(sdd->rx_ch);
->  			}
->  
->  			goto out;
-> @@ -742,24 +744,19 @@ out:
->  
->  static int acquire_dma(struct s3c64xx_spi_driver_data *sdd)
->  {
-> -	if (s3c2410_dma_request(sdd->rx_dmach,
-> -					&s3c64xx_spi_dma_client, NULL) < 0) {
-> -		dev_err(&sdd->pdev->dev, "cannot get RxDMA\n");
-> -		return 0;
-> -	}
-> -	s3c2410_dma_set_buffdone_fn(sdd->rx_dmach, s3c64xx_spi_dma_rxcb);
-> -	s3c2410_dma_devconfig(sdd->rx_dmach, S3C2410_DMASRC_HW,
-> -					sdd->sfr_start + S3C64XX_SPI_RX_DATA);
-> -
-> -	if (s3c2410_dma_request(sdd->tx_dmach,
-> -					&s3c64xx_spi_dma_client, NULL) < 0) {
-> -		dev_err(&sdd->pdev->dev, "cannot get TxDMA\n");
-> -		s3c2410_dma_free(sdd->rx_dmach, &s3c64xx_spi_dma_client);
-> -		return 0;
-> -	}
-> -	s3c2410_dma_set_buffdone_fn(sdd->tx_dmach, s3c64xx_spi_dma_txcb);
-> -	s3c2410_dma_devconfig(sdd->tx_dmach, S3C2410_DMASRC_MEM,
-> -					sdd->sfr_start + S3C64XX_SPI_TX_DATA);
+> + ? ? ? spin_lock_irqsave(&pch->lock, flags);
 > +
-> +	struct samsung_dma_info info;
-> +	sdd->ops = samsung_dma_get_ops();
+> + ? ? ? /* Pick up ripe tomatoes */
+> + ? ? ? list_for_each_entry_safe(desc, _dt, &pch->work_list, node)
+> + ? ? ? ? ? ? ? if (desc->status == DONE) {
+> + ? ? ? ? ? ? ? ? ? ? ? dma_async_tx_callback callback;
 > +
-> +	info.cap = DMA_SLAVE;
-> +	info.client = &s3c64xx_spi_dma_client;
-> +	info.direction = DMA_FROM_DEVICE;
-> +	info.fifo = sdd->sfr_start + S3C64XX_SPI_RX_DATA;
-> +	info.width = sdd->cur_bpw / 8;
-> +	sdd->rx_ch = sdd->ops->request(sdd->rx_dmach, &info);
-> +	info.direction = DMA_TO_DEVICE;
-> +	info.fifo = sdd->sfr_start + S3C64XX_SPI_TX_DATA;
-> +	sdd->tx_ch = sdd->ops->request(sdd->tx_dmach, &info);
->  
->  	return 1;
->  }
-> @@ -800,8 +797,8 @@ static void s3c64xx_spi_work(struct work_struct *work)
->  	spin_unlock_irqrestore(&sdd->lock, flags);
->  
->  	/* Free DMA channels */
-> -	s3c2410_dma_free(sdd->tx_dmach, &s3c64xx_spi_dma_client);
-> -	s3c2410_dma_free(sdd->rx_dmach, &s3c64xx_spi_dma_client);
-> +	sdd->ops->release(sdd->rx_ch, &s3c64xx_spi_dma_client);
-> +	sdd->ops->release(sdd->tx_ch, &s3c64xx_spi_dma_client);
->  }
->  
->  static int s3c64xx_spi_transfer(struct spi_device *spi,
+> + ? ? ? ? ? ? ? ? ? ? ? list_move_tail(&desc->node, &pch->work_list);
+> + ? ? ? ? ? ? ? ? ? ? ? pch->completed = desc->txd.cookie;
+> +
+> + ? ? ? ? ? ? ? ? ? ? ? desc->status = PREP;
+> +
+> + ? ? ? ? ? ? ? ? ? ? ? /* Try to submit a req imm.
+> + ? ? ? ? ? ? ? ? ? ? ? next to the last completed cookie */
+> + ? ? ? ? ? ? ? ? ? ? ? fill_queue(pch);
+> +
+> + ? ? ? ? ? ? ? ? ? ? ? /* Make sure the PL330 Channel thread is active */
+> + ? ? ? ? ? ? ? ? ? ? ? pl330_chan_ctrl(pch->pl330_chid, PL330_OP_START);
+> +
+> + ? ? ? ? ? ? ? ? ? ? ? callback = desc->txd.callback;
+> + ? ? ? ? ? ? ? ? ? ? ? if (callback)
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? callback(desc->txd.callback_param);
+> +
+> + ? ? ? ? ? ? ? }
+> +
+> + ? ? ? spin_unlock_irqrestore(&pch->lock, flags);
+> +}
+Please merge this with pl330_tasklet and use 'cyclic' flag to differentiate.
 
--- 
-~Vinod Koul
-Intel Corp.
+> @@ -227,6 +267,9 @@ static void dma_pl330_rqcb(void *token, enum pl330_op_err err)
+>
+> ? ? ? ?spin_unlock_irqrestore(&pch->lock, flags);
+>
+> + ? ? ? if (pch->cyclic_task)
+> + ? ? ? ? ? ? ? tasklet_schedule(pch->cyclic_task);
+> + ? ? ? else
+> ? ? ? ?tasklet_schedule(&pch->task);
+A tab here please, and check for 'cyclic' flag.
+
+
+> @@ -316,6 +359,15 @@ static void pl330_free_chan_resources(struct dma_chan *chan)
+> ? ? ? ?pl330_release_channel(pch->pl330_chid);
+> ? ? ? ?pch->pl330_chid = NULL;
+>
+> + ? ? ? if (pch->cyclic) {
+> + ? ? ? ? ? ? ? pch->cyclic = false;
+> + ? ? ? ? ? ? ? list_splice_tail_init(&pch->work_list, &pch->dmac->desc_pool);
+> + ? ? ? ? ? ? ? if (pch->cyclic_task) {
+> + ? ? ? ? ? ? ? ? ? ? ? tasklet_kill(pch->cyclic_task);
+> + ? ? ? ? ? ? ? ? ? ? ? pch->cyclic_task = NULL;
+> + ? ? ? ? ? ? ? }
+> + ? ? ? }
+> +
+> ? ? ? ?spin_unlock_irqrestore(&pch->lock, flags);
+> ?}
+To be explicit, please initialize 'cyclic' flag to false in
+pl330_alloc_chan_resources
