@@ -1,75 +1,115 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 26 Jul 2011 14:54:28 +0100
-Subject: at91sam9g45: Issues while working with RAM that is separated
-	on physical address space
-In-Reply-To: <20110726133702.GA14526@taskit.de>
-References: <CAA2DH4u1kcky3xzxpepS=gtDK1Xas17zDxcRkDR7qRNLHQyoxw@mail.gmail.com>
-	<20110722135505.GB25947@n2100.arm.linux.org.uk>
-	<CAA2DH4u9GANxUTnTqRzUR=GihNLS8EEDAKm8u8SFZ_Yq48qXOg@mail.gmail.com>
-	<CAA2DH4sviHkHEHZTR+0AHP3pToC7fEgTc+irw0vk_WU5q0XEQQ@mail.gmail.com>
-	<20110726133702.GA14526@taskit.de>
-Message-ID: <20110726135428.GC1655@n2100.arm.linux.org.uk>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Tue, 26 Jul 2011 15:14:11 +0100
+Subject: [PATCH v2] ARM: alignment: Prevent ignoring of faults with ARMv6
+	unaligned access model
+Message-ID: <1311689651-7372-1-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 26, 2011 at 03:37:02PM +0200, Christian Glindkamp wrote:
-> The only problem that still exits with highmem for me is the following:
-> Even on non-highmem/non-sparsemem systems I get the following warning
-> when using an mmc as the rootfs:
-> 
-> ------------[ cut here ]------------
-> WARNING: at kernel/irq/handle.c:130 handle_irq_event_percpu+0x70/0x194()
-> irq 29 handler atmci_interrupt+0x0/0x64c enabled interrupts
-> Backtrace: 
-> [<c018ed00>] (dump_backtrace+0x0/0x110) from [<c018f274>] (dump_stack+0x18/0x1c)
->  r6:c01c9254 r5:c04831ac r4:00000082
-> [<c018f25c>] (dump_stack+0x0/0x1c) from [<c019c73c>] (warn_slowpath_common+0x54/0x6c)
-> [<c019c6e8>] (warn_slowpath_common+0x0/0x6c) from [<c019c7f8>] (warn_slowpath_fmt+0x38/0x40)
->  r8:00000000 r7:c04ba500 r6:00000001 r5:0000001d r4:cf8f7b40
-> [<c019c7c0>] (warn_slowpath_fmt+0x0/0x40) from [<c01c9254>] (handle_irq_event_percpu+0x70/0x194)
->  r3:0000001d r2:c04831c0
-> [<c01c91e4>] (handle_irq_event_percpu+0x0/0x194) from [<c01c93ac>] (handle_irq_event+0x34/0x44)
-> [<c01c9378>] (handle_irq_event+0x0/0x44) from [<c01cb6c0>] (handle_level_irq+0xd4/0xe8)
->  r4:c04ba500
-> [<c01cb5ec>] (handle_level_irq+0x0/0xe8) from [<c01c8f5c>] (generic_handle_irq+0x34/0x3c)
->  r4:0000001d
-> [<c01c8f28>] (generic_handle_irq+0x0/0x3c) from [<c018b068>] (asm_do_IRQ+0x68/0x98)
->  r4:0000001d
-> [<c018b000>] (asm_do_IRQ+0x0/0x98) from [<c018ba54>] (__irq_svc+0x34/0x60)
-> Exception stack(0xc04b1f40 to 0xc04b1f88)
-> 1f40: 00000000 0005317f 0005217f 60000013 c04b0000 c04b4b80 c04d32b0 c04b2000
-> 1f60: 70004000 41069265 70022940 c04b1f94 600000d3 c04b1f88 c018cdb0 c018cdbc
-> 1f80: 60000013 ffffffff
->  r5:fefff000 r4:ffffffff
-> [<c018cd80>] (default_idle+0x0/0x40) from [<c018cbcc>] (cpu_idle+0x68/0xb0)
-> [<c018cb64>] (cpu_idle+0x0/0xb0) from [<c041db78>] (rest_init+0x5c/0x74)
->  r6:c018730c r5:c04d3200 r4:c04b20e4
-> [<c041db1c>] (rest_init+0x0/0x74) from [<c0008d08>] (start_kernel+0x358/0x3c8)
-> [<c00089b0>] (start_kernel+0x0/0x3c8) from [<70008040>] (0x70008040)
-> ---[ end trace ac1fb351351e0957 ]---
+Currently, it's possible to set the kernel to ignore alignment
+faults when changing the alignment fault handling mode at runtime
+via /proc/sys/alignment, even though this is undesirable on ARMv6
+and above, where it can result in infinite spins where an un-fixed-
+up instruction repeatedly faults.
 
-That'll be because the driver is still using flush_dcache_page(), whereas
-it should be using flush_kernel_dcache_page().  flush_dcache_page()
-unfortunately results in IRQs being enabled due to the
-flush_dcache_mmap_lock().
+In addition, the kernel clobbers any alignment mode specified on
+the command-line if running on ARMv6 or above.
 
-> The system is still stable, but if switch to highmem, the kernel crashes
-> completely when doing this (using and USB drive as rootfs still works
-> flawlessly):
+This patch factors out the necessary safety check into a couple of
+new helper functions, and checks and modifies the fault handling
+mode as appropriate on boot and on writes to /proc/cpu/alignment.
 
-That's because the driver is basically broken:
+Prior to ARMv6, the behaviour is unchanged.
 
-        void                    *buf = sg_virt(sg);
-        unsigned int            offset = host->pio_offset;
+For ARMv6 and above, the behaviour changes as follows:
 
-                        memcpy(buf + offset, &value, remaining);
+  * Attempting to ignore faults on ARMv6 results in the mode being
+    forced to UM_FIXUP instead.  A warning is printed if this
+    happened as a result of a write to /proc/cpu/alignment.  The
+    user's UM_WARN bit (if present) is still honoured.
 
-Highmem pages have a NULL sg_virt(sg) because they're by definition not
-mapped.  Drivers really should not be using sg_virt() directly - who
-knows how this got through the review process...
+  * An alignment= argument from the kernel command-line is now
+    honoured, except that the kernel will modify the specified mode
+    as described above.  This is allows modes such as UM_SIGNAL and
+    UM_WARN to be active immediately from boot, which is useful for
+    debugging purposes.
 
-There's a well defined API for walking scatterlists in drivers - see
-the sg_miter_* API in linux/scatterlist.h.  This takes care of the
-highmem issues automatically, as well as using flush_kernel_dcache_page().
+Signed-off-by: Dave Martin <dave.martin@linaro.org>
+---
+v2: Missing semicolon added in safe_usermode();
 
-In short: the Atmel MCI driver is buggy and needs fixing.
+ arch/arm/mm/alignment.c |   42 ++++++++++++++++++++++++++++++------------
+ 1 files changed, 30 insertions(+), 12 deletions(-)
+
+diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
+index 724ba3b..8611f5d 100644
+--- a/arch/arm/mm/alignment.c
++++ b/arch/arm/mm/alignment.c
+@@ -95,6 +95,33 @@ static const char *usermode_action[] = {
+ 	"signal+warn"
+ };
+ 
++/* Return true if and only if the ARMv6 unaligned access model is in use. */
++static bool cpu_is_v6_unaligned(void)
++{
++	return cpu_architecture() >= CPU_ARCH_ARMv6 && (cr_alignment & CR_U);
++}
++
++static int safe_usermode(int new_usermode, bool warn)
++{
++	/*
++	 * ARMv6 and later CPUs can perform unaligned accesses for
++	 * most single load and store instructions up to word size.
++	 * LDM, STM, LDRD and STRD still need to be handled.
++	 *
++	 * Ignoring the alignment fault is not an option on these
++	 * CPUs since we spin re-faulting the instruction without
++	 * making any progress.
++	 */
++	if (cpu_is_v6_unaligned() && !(new_usermode & (UM_FIXUP | UM_SIGNAL))) {
++		new_usermode |= UM_FIXUP;
++
++		if (warn)
++			printk(KERN_WARNING "alignment: ignoring faults is unsafe on this CPU.  Defaulting to fixup mode.\n");
++	}
++
++	return new_usermode;
++}
++
+ static int alignment_proc_show(struct seq_file *m, void *v)
+ {
+ 	seq_printf(m, "User:\t\t%lu\n", ai_user);
+@@ -125,7 +152,7 @@ static ssize_t alignment_proc_write(struct file *file, const char __user *buffer
+ 		if (get_user(mode, buffer))
+ 			return -EFAULT;
+ 		if (mode >= '0' && mode <= '5')
+-			ai_usermode = mode - '0';
++			ai_usermode = safe_usermode(mode - '0', true);
+ 	}
+ 	return count;
+ }
+@@ -923,20 +950,11 @@ static int __init alignment_init(void)
+ 		return -ENOMEM;
+ #endif
+ 
+-	/*
+-	 * ARMv6 and later CPUs can perform unaligned accesses for
+-	 * most single load and store instructions up to word size.
+-	 * LDM, STM, LDRD and STRD still need to be handled.
+-	 *
+-	 * Ignoring the alignment fault is not an option on these
+-	 * CPUs since we spin re-faulting the instruction without
+-	 * making any progress.
+-	 */
+-	if (cpu_architecture() >= CPU_ARCH_ARMv6 && (cr_alignment & CR_U)) {
++	if (cpu_is_v6_unaligned()) {
+ 		cr_alignment &= ~CR_A;
+ 		cr_no_alignment &= ~CR_A;
+ 		set_cr(cr_alignment);
+-		ai_usermode = UM_FIXUP;
++		ai_usermode = safe_usermode(ai_usermode, false);
+ 	}
+ 
+ 	hook_fault_code(1, do_alignment, SIGBUS, BUS_ADRALN,
+-- 
+1.7.4.1
