@@ -1,49 +1,17 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 26 Jul 2011 16:17:19 +0300
-Subject: [PATCH V3 03/19] OMAP3+: voltage: remove initial voltage
-In-Reply-To: <20110308015232.GA4702@maz>
+Date: Tue, 26 Jul 2011 16:18:03 +0300
+Subject: [PATCH V3 04/19] OMAP3+: voltage: remove spurious pr_notice for
+	debugfs
+In-Reply-To: <1299338962-5602-5-git-send-email-nm@ti.com>
 References: <1299338962-5602-1-git-send-email-nm@ti.com>
-	<1299338962-5602-4-git-send-email-nm@ti.com>
-	<4D738E04.5090207@ru.mvista.com> <4D744870.20909@ti.com>
-	<4D750673.702@ru.mvista.com> <20110308015232.GA4702@maz>
-Message-ID: <20110726131718.GP32582@legolas.emea.dhcp.ti.com>
+	<1299338962-5602-5-git-send-email-nm@ti.com>
+Message-ID: <20110726131802.GQ32582@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 08, 2011 at 07:22:32AM +0530, Nishanth Menon wrote:
-> On Mon, Mar 07, 2011 at 07:23:15PM +0300, Sergei Shtylyov wrote:
-> > Hello.
-> > 
-> > On 07-03-2011 5:52, Nishanth Menon wrote:
-> > 
-> > >>>Blindly setting a 1.2V setting
-> > 
-> > >>Hm, seems tautological...
-> > 
-> > >As a non native English speaker, I would like to understand how we could
-> > >improve this. I suppose you mean "Blindly setting 1.2V" is better here. Am i
-> > >correct?
-> > 
-> >    Yes.
-> OK, here is the update as per the suggestion:
-> Regards,
-> Nishanth Menon
-> From: Nishanth Menon <nm@ti.com>
-> Date: Tue, 15 Feb 2011 09:37:18 +0530
-> Subject: [PATCH V4 3/19] OMAP3+: voltage: remove initial voltage
-> 
-> Blindly setting 1.2V in the initial structure may not even match the
-> default voltages stored in the voltage table which are supported for
-> the domain. For example, OMAP3430 core domain does not use 1.2V and
-> ends up generating a warning on the first transition.
-> 
-> Further, since omap2_set_init_voltage is called as part of the pm
-> framework's initialization sequence to configure the voltage required
-> for the current OPP, the call does(and has to) setup the system
-> voltage(curr_volt as a result) using the right mechanisms appropriate
-> for the system at that point of time. This also overrides
-> initialization we are currently doing in voltage.c making it
-> redundant. So, remove the wrong and redundant initialization.
+On Sat, Mar 05, 2011 at 08:59:07PM +0530, Nishanth Menon wrote:
+> cat of debugfs entry for vp_volt provides voltage. The additional pr_notice
+> is just spam on console and provides no additional information.
 > 
 > Signed-off-by: Nishanth Menon <nm@ti.com>
 
@@ -56,17 +24,17 @@ Reviewed-by: Felipe Balbi <balbi@ti.com>
 >  1 files changed, 0 insertions(+), 1 deletions(-)
 > 
 > diff --git a/arch/arm/mach-omap2/voltage.c b/arch/arm/mach-omap2/voltage.c
-> index 56961df..1b40aa0 100644
+> index 1b40aa0..53c399f 100644
 > --- a/arch/arm/mach-omap2/voltage.c
 > +++ b/arch/arm/mach-omap2/voltage.c
-> @@ -116,7 +116,6 @@ static int __init _config_common_vdd_data(struct omap_vdd_info *vdd)
->  	sys_clk_speed /= 1000;
+> @@ -150,7 +150,6 @@ static int vp_volt_debug_get(void *data, u64 *val)
+>  	}
 >  
->  	/* Generic voltage parameters */
-> -	vdd->curr_volt = 1200000;
->  	vdd->volt_scale = vp_forceupdate_scale_voltage;
->  	vdd->vp_enabled = false;
+>  	vsel = vdd->read_reg(prm_mod_offs, vdd->vp_data->voltage);
+> -	pr_notice("curr_vsel = %x\n", vsel);
 >  
+>  	if (!vdd->pmic_info->vsel_to_uv) {
+>  		pr_warning("PMIC function to convert vsel to voltage"
 > -- 
 > 1.7.1
 > 
@@ -83,4 +51,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 490 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110726/44d6beb9/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110726/3e8b2b6e/attachment.sig>
