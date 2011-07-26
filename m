@@ -1,45 +1,46 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 26 Jul 2011 11:03:34 -0700
-Subject: [RFC] ARM Subarchitecture group maintainership
-In-Reply-To: <201105181047.17309.arnd@arndb.de>
-References: <201105181047.17309.arnd@arndb.de>
-Message-ID: <4E2F0176.1080403@codeaurora.org>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Tue, 26 Jul 2011 12:03:53 -0600
+Subject: [PATCH] Improve slave/cyclic DMA engine documentation (was:
+	[PATCH V4 04/14] DMA: PL330: Add DMA_CYCLIC capability)
+In-Reply-To: <CABb+yY31N6ubWcjQnMqze5hH66eoSxPQCaRVqf7=jZ3L_h+P6Q@mail.gmail.com>
+References: <002001cc4ab6$0d7cd590$287680b0$%kim@samsung.com>
+	<20110725103629.GF9653@n2100.arm.linux.org.uk>
+	<1311590884.29703.2.camel@vkoul-mobl4>
+	<20110725105754.GG9653@n2100.arm.linux.org.uk>
+	<1311591717.29703.7.camel@vkoul-mobl4>
+	<20110725113926.GH9653@n2100.arm.linux.org.uk>
+	<1311595303.29703.31.camel@vkoul-mobl4>
+	<20110726075720.GL9653@n2100.arm.linux.org.uk>
+	<1311672933.24316.1.camel@vkoul-mobl4>
+	<CABb+yY1P21hbMD2mG_cCvW3N5WqWzc2ZVt-HTOrC1J3dc5RbhA@mail.gmail.com>
+	<20110726172027.GD1655@n2100.arm.linux.org.uk>
+	<CABb+yY31N6ubWcjQnMqze5hH66eoSxPQCaRVqf7=jZ3L_h+P6Q@mail.gmail.com>
+Message-ID: <CACxGe6vCNkGZYKdT3Gmf_GD84dZTiYsmOYa-V4ztZZmZCNrNCA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/18/2011 01:47 AM, Arnd Bergmann wrote:
-> This is the draft plan for maintaining the ARM subarchitectures in a common
-> tree, as a way to help coordinate the upstream merging of the
-> arch/arm/{plat,mach}-* changes into Linus' tree.
+On Tue, Jul 26, 2011 at 11:55 AM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+> On Tue, Jul 26, 2011 at 10:50 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+>> On Tue, Jul 26, 2011 at 08:07:44PM +0530, Jassi Brar wrote:
+>>> Dear Vinod,
+>>>
+>>> ?Since it came from the RMK, most probably it'll be the best.
+>>>
+>>> But applying patches upon personal timeout seems very dangerous.
+>>
+>> Ehh what? ?Is there any contention over this documentation patch?
+> I haven't yet read it... even after reading I would object only if I found
+> your patch disturbing enough to disrupt my bowel movements. Which
+> I don't think would be the case.
 >
-[snip]
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 8fce5e6..942d052 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -630,6 +630,17 @@ S:	Maintained
->  F:	drivers/amba/
->  F:	include/linux/amba/bus.h
->  
-> +ARM SUBARCHITECTURES
-> +M:	Arnd Bergmann <arnd@arndb.de>
-> +M:	Nicolas Pitre <nico@fluxnic.net>
-> +M:	Thomas Gleixner <tglx@linutronix.de>
-> +M:	arm at kernel.org
-> +L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-> +S:	MAINTAINED
-> +F:	arch/arm/mach-*/
-> +F:	arch/arm/plat-*/
-> +T:	git git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-subarch.git
-> +
->  ARM/ADI ROADRUNNER MACHINE SUPPORT
->  M:	Lennert Buytenhek <kernel@wantstofly.org>
->  L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
->
+> I just observed it is second time that Vinod applied a patch without any
+> ack or prior alert.
 
-Is this patch (or something similar) going to be merged now that the ARM
-SoC tree is up and running? Also, is the arm at kernel.org alias working?
+Applying patches without waiting for other Acks is absolutely a
+reasonable thing for a maintainer to do.  The job of maintainership is
+to apply good judgement on when patches can immediately be applied
+(and therefore no longer consuming limited attention) and when patches
+need further acks.
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+g.
