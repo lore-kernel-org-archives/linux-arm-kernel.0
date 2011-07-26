@@ -1,129 +1,102 @@
-From: boojin.kim@samsung.com (Boojin Kim)
-Date: Tue, 26 Jul 2011 22:04:10 +0900
-Subject: [PATCH V4 03/14] DMA: PL330: Support DMA_SLAVE_CONFIG command
-In-Reply-To: <1311601700.8206.7.camel@vkoul-mobl4>
-References: <1311557312-26107-1-git-send-email-boojin.kim@samsung.com>
-	<1311557312-26107-4-git-send-email-boojin.kim@samsung.com>
-	<1311589617.27357.3.camel@vkoul-mobl4>
-	<002401cc4ac9$97737570$c65a6050$%kim@samsung.com>
-	<1311601700.8206.7.camel@vkoul-mobl4>
-Message-ID: <003c01cc4b94$82e39e20$88aada60$%kim@samsung.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 26 Jul 2011 16:11:40 +0300
+Subject: [PATCH V3 01/19] OMAP3: hwmod: add SmartReflex IRQs
+In-Reply-To: <1299338962-5602-2-git-send-email-nm@ti.com>
+References: <1299338962-5602-1-git-send-email-nm@ti.com>
+	<1299338962-5602-2-git-send-email-nm@ti.com>
+Message-ID: <20110726131139.GN32582@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vinod Koul Wrote:
-> Sent: Monday, July 25, 2011 10:48 PM
-> To: Boojin Kim
-> Cc: vinod.koul at intel.com; linux-arm-kernel at lists.infradead.org; linux-
-> samsung-soc at vger.kernel.org; 'Kukjin Kim'; 'Jassi Brar'; 'Grant
-> Likely'; 'Mark Brown'; 'Dan Williams'
-> Subject: RE: [PATCH V4 03/14] DMA: PL330: Support DMA_SLAVE_CONFIG
-> command
->
-> On Mon, 2011-07-25 at 21:51 +0900, Boojin Kim wrote:
-> > Vinod Koul Wrote:
-> > > Sent: Monday, July 25, 2011 7:27 PM
-> > > To: Boojin Kim
-> > > Cc: vinod.koul at intel.com; linux-arm-kernel at lists.infradead.org;
-> linux-
-> > > samsung-soc at vger.kernel.org; Kukjin Kim; Jassi Brar; Grant Likely;
-> > > Mark Brown; Dan Williams
-> > > Subject: Re: [PATCH V4 03/14] DMA: PL330: Support DMA_SLAVE_CONFIG
-> > > command
-> > >
-> > > On Mon, 2011-07-25 at 10:28 +0900, Boojin Kim wrote:
-> > > > This patch adds support DMA_SLAVE_CONFIG command.
-> > > >
-> > > > Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
-> > > > ---
-> > > >  drivers/dma/pl330.c |   53
-> +++++++++++++++++++++++++++++++++++++----
-> > > ---------
-> > > >  1 files changed, 39 insertions(+), 14 deletions(-)
-> > > >
-> > > > diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-> > > > index 586ab39..880f010 100644
-> > > > --- a/drivers/dma/pl330.c
-> > > > +++ b/drivers/dma/pl330.c
-> > > > @@ -256,25 +256,50 @@ static int
-> pl330_alloc_chan_resources(struct
-> > > dma_chan *chan)
-> > > >  static int pl330_control(struct dma_chan *chan, enum
-> dma_ctrl_cmd
-> > > cmd, unsigned long arg)
-> > > >  {
-> > > >  	struct dma_pl330_chan *pch = to_pchan(chan);
-> > > > -	struct dma_pl330_desc *desc;
-> > > > +	struct dma_pl330_desc *desc, *_dt;
-> > > >  	unsigned long flags;
-> > > > +	struct dma_pl330_dmac *pdmac = pch->dmac;
-> > > > +	struct dma_slave_config *slave_config;
-> > > > +	struct dma_pl330_peri *peri;
-> > > > +	LIST_HEAD(list);
-> > > >
-> > > > -	/* Only supports DMA_TERMINATE_ALL */
-> > > > -	if (cmd != DMA_TERMINATE_ALL)
-> > > > -		return -ENXIO;
-> > > > -
-> > > > -	spin_lock_irqsave(&pch->lock, flags);
-> > > > -
-> > > > -	/* FLUSH the PL330 Channel thread */
-> > > > -	pl330_chan_ctrl(pch->pl330_chid, PL330_OP_FLUSH);
-> > > > +	switch (cmd) {
-> > > > +	case DMA_TERMINATE_ALL:
-> > > > +		spin_lock_irqsave(&pch->lock, flags);
-> > > >
-> > > > -	/* Mark all desc done */
-> > > > -	list_for_each_entry(desc, &pch->work_list, node)
-> > > > -		desc->status = DONE;
-> > > > +		/* FLUSH the PL330 Channel thread */
-> > > > +		pl330_chan_ctrl(pch->pl330_chid, PL330_OP_FLUSH);
-> > > >
-> > > > -	spin_unlock_irqrestore(&pch->lock, flags);
-> > > > +		/* Mark all desc done */
-> > > > +		list_for_each_entry_safe(desc, _dt, &pch-
-> >work_list , node)
-> > > {
-> > > > +			desc->status = DONE;
-> > > > +			pch->completed = desc->txd.cookie;
-> > > > +			list_move_tail(&desc->node, &list);
-> > > > +		}
-> > > >
-> > > > -	pl330_tasklet((unsigned long) pch);
-> > > > +		list_splice_tail_init(&list, &pdmac->desc_pool);
-> > > > +		spin_unlock_irqrestore(&pch->lock, flags);
-> > > > +		break;
-> > > > +	case DMA_SLAVE_CONFIG:
-> > > > +		slave_config = (struct dma_slave_config *)arg;
-> > > > +		peri = pch->chan.private;
-> > > > +
-> > > > +		if (slave_config->direction == DMA_TO_DEVICE) {
-> > > > +			if (slave_config->dst_addr)
-> > > > +				peri->fifo_addr = slave_config-
-> >dst_addr;
-> > > > +			if (slave_config->dst_addr_width)
-> > > > +				peri->burst_sz = __ffs(slave_config-
-> > > >dst_addr_width);
-> > > This doesn't sound right, why can't you use xxx_maxburst field
-> instead?
-> > Can you explain the problem in more detail?
-> > Do you mean that 'xxx_maxburst' takes place of 'xxx_addr_width' or
-> __ffs()
-> > isn't proper here?
-> >
-> > Additionally, I will modify this code to consider '_maxburst' field.
-> __ffs is okay and sensible.
-> I meant you should use proper fields for passing info, which in this
-> case would be dst_maxburst for specifying destination burst sizes
-I think the naming seems to make confusion.
-'Peri->burst_sz' on this code means the width of fifo in bytes of the peri. 
-It's same with the meaning 'xxx_addr_width'. So, I think it's proper usage.
-'peri->burst_sz' is passed to PL330 HW. PL330 HW wants to get the power of 2 
-based the fifo width for it.
-For example, If fifo width is 8 bytes, PL330 HW should get '3' for it.
-And I will modify code to consider xxx_maxburst.
+Hi,
 
+On Sat, Mar 05, 2011 at 08:59:04PM +0530, Nishanth Menon wrote:
+> OMAP3 SmartReflex IRQs in hwmod structures with the same naming as
+> present in OMAP4. Without these IRQs being registered, SmartReflex
+> driver will be unable to get the IRQ numbers to handle notifications
+> 
+> Signed-off-by: Nishanth Menon <nm@ti.com>
 
+FWIW:
+
+Acked-by: Felipe Balbi <balbi@ti.com>
+
+According to 36xx TRM page 383, the IRQ numbers are correct.
+
+> ---
+>  arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |   17 +++++++++++++++++
+>  1 files changed, 17 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+> index 196a834..2d464bc 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+> @@ -378,6 +378,15 @@ static struct omap_hwmod_ocp_if omap3_l4_core__i2c3 = {
+>  	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+>  };
+>  
+> +
+> +static struct omap_hwmod_irq_info omap3_smartreflex_mpu_irqs[] = {
+> +	{.name = "sr1_irq", .irq = 18},
+> +};
+> +
+> +static struct omap_hwmod_irq_info omap3_smartreflex_core_irqs[] = {
+> +	{.name = "sr2_irq", .irq = 19},
+> +};
+> +
+>  /* L4 CORE -> SR1 interface */
+>  static struct omap_hwmod_addr_space omap3_sr1_addr_space[] = {
+>  	{
+> @@ -2925,6 +2934,8 @@ static struct omap_hwmod omap34xx_sr1_hwmod = {
+>  	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP3430ES2 |
+>  					CHIP_IS_OMAP3430ES3_0 |
+>  					CHIP_IS_OMAP3430ES3_1),
+> +	.mpu_irqs	= omap3_smartreflex_mpu_irqs,
+> +	.mpu_irqs_cnt	= ARRAY_SIZE(omap3_smartreflex_mpu_irqs),
+>  	.flags		= HWMOD_SET_DEFAULT_CLOCKACT,
+>  };
+>  
+> @@ -2945,6 +2956,8 @@ static struct omap_hwmod omap36xx_sr1_hwmod = {
+>  	.slaves		= omap3_sr1_slaves,
+>  	.slaves_cnt	= ARRAY_SIZE(omap3_sr1_slaves),
+>  	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP3630ES1),
+> +	.mpu_irqs	= omap3_smartreflex_mpu_irqs,
+> +	.mpu_irqs_cnt	= ARRAY_SIZE(omap3_smartreflex_mpu_irqs),
+>  };
+>  
+>  /* SR2 */
+> @@ -2971,6 +2984,8 @@ static struct omap_hwmod omap34xx_sr2_hwmod = {
+>  	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP3430ES2 |
+>  					CHIP_IS_OMAP3430ES3_0 |
+>  					CHIP_IS_OMAP3430ES3_1),
+> +	.mpu_irqs	= omap3_smartreflex_core_irqs,
+> +	.mpu_irqs_cnt	= ARRAY_SIZE(omap3_smartreflex_core_irqs),
+>  	.flags		= HWMOD_SET_DEFAULT_CLOCKACT,
+>  };
+>  
+> @@ -2991,6 +3006,8 @@ static struct omap_hwmod omap36xx_sr2_hwmod = {
+>  	.slaves		= omap3_sr2_slaves,
+>  	.slaves_cnt	= ARRAY_SIZE(omap3_sr2_slaves),
+>  	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP3630ES1),
+> +	.mpu_irqs	= omap3_smartreflex_core_irqs,
+> +	.mpu_irqs_cnt	= ARRAY_SIZE(omap3_smartreflex_core_irqs),
+>  };
+>  
+>  /*
+> -- 
+> 1.7.1
+> 
 > --
-> ~Vinod Koul
-> Intel Corp.
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 490 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110726/b8a7a704/attachment-0001.sig>
