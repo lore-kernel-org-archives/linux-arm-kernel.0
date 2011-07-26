@@ -1,82 +1,115 @@
-From: boojin.kim@samsung.com (Boojin Kim)
-Date: Tue, 26 Jul 2011 18:35:12 +0900
-Subject: [PATCH V4 06/14] ARM: SAMSUNG: Add common DMA operations
-In-Reply-To: <CABb+yY0nWLpdVGqTJPO2YwkGWiDw5tRjC2xn7Le0bO0ZNFHC_g@mail.gmail.com>
-References: <1311557312-26107-1-git-send-email-boojin.kim@samsung.com>
-	<1311557312-26107-7-git-send-email-boojin.kim@samsung.com>
-	<CABb+yY0nWLpdVGqTJPO2YwkGWiDw5tRjC2xn7Le0bO0ZNFHC_g@mail.gmail.com>
-Message-ID: <003801cc4b77$51e9f3e0$f5bddba0$%kim@samsung.com>
+From: notasas@gmail.com (Grazvydas Ignotas)
+Date: Tue, 26 Jul 2011 12:38:46 +0300
+Subject: [PATCH] OMAP3: NAND: Adding NAND support and specifying NAND
+	partitions.
+In-Reply-To: <1311601253-2933-1-git-send-email-hrishikesh.b@ti.com>
+References: <1311601253-2933-1-git-send-email-hrishikesh.b@ti.com>
+Message-ID: <CANOLnOODuPKAmRfiokC_4UgwrxCcw5xY1a9vhMsWN0T2LzNzAQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jassi Brar Wrote:
-> Sent: Monday, July 25, 2011 8:52 PM
-> To: Boojin Kim
-> Cc: linux-arm-kernel at lists.infradead.org; linux-samsung-
-> soc at vger.kernel.org; Vinod Koul; Dan Williams; Kukjin Kim; Grant
-> Likely; Mark Brown
-> Subject: Re: [PATCH V4 06/14] ARM: SAMSUNG: Add common DMA operations
+On Mon, Jul 25, 2011 at 4:40 PM, Hrishikesh Bhandiwad
+<hrishikesh.b@ti.com> wrote:
+> This patch adds the NAND support on OMAP3EVM board and also allocates
+> five partitions ?on NAND.
+> Referred to file: arch/arm/mach-omap2/board-omap3beagle.c
 >
-> On Mon, Jul 25, 2011 at 6:58 AM, Boojin Kim <boojin.kim@samsung.com>
-> wrote:
+> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+> Signed-off-by: Sanjeev Premi <premi@ti.com>
+> Signed-off-by: Hrishikesh Bhandiwad <hrishikesh.b@ti.com>
+> ---
+> ?arch/arm/mach-omap2/board-omap3evm.c | ? 40 ++++++++++++++++++++++++++++++++++
+> ?1 files changed, 40 insertions(+), 0 deletions(-)
 >
-> > +
-> > +static bool pl330_filter(struct dma_chan *chan, void *param)
-> > +{
-> > +       struct dma_pl330_peri *peri = (struct dma_pl330_peri *)chan-
-> >private;
-> > +       unsigned dma_ch = (unsigned)param;
-> > +
-> > +       if (peri->peri_id != dma_ch)
-> > +               return false;
-> > +
-> > +       return true;
-> > +}
-> This is what I meant... if we keep chan_id for paltform assigned IDs,
-> these filter functions could simply become
+> diff --git a/arch/arm/mach-omap2/board-omap3evm.c b/arch/arm/mach-omap2/board-omap3evm.c
+> index b4d4346..be45b63 100644
+> --- a/arch/arm/mach-omap2/board-omap3evm.c
+> +++ b/arch/arm/mach-omap2/board-omap3evm.c
+> @@ -30,6 +30,10 @@
+> ?#include <linux/usb/otg.h>
+> ?#include <linux/smsc911x.h>
 >
-> static bool pl330_filter(struct dma_chan *chan, void *param)
-> {
->         return chan->chan_id == param
-> }
->
-> And ideally in the long run, we could just drop the filter callback
-> and add expected channel ID to the request_channel call.
-The chan_id is set by dmaengine. So, We don't use it to hold the user specific 
-Id.
+> +#include <linux/mtd/mtd.h>
+
+You don't need this include.
+
+> +#include <linux/mtd/partitions.h>
+> +#include <linux/mtd/nand.h>
+> +
+> ?#include <linux/wl12xx.h>
+> ?#include <linux/regulator/fixed.h>
+> ?#include <linux/regulator/machine.h>
+> @@ -46,6 +50,8 @@
+> ?#include <plat/mcspi.h>
+> ?#include <video/omapdss.h>
+> ?#include <video/omap-panel-generic-dpi.h>
+> +#include <plat/gpmc.h>
+> +#include <plat/nand.h>
+
+These 2 too.
 
 >
+> ?#include "mux.h"
+> ?#include "sdram-micron-mt46h32m32lf-6.h"
+> @@ -101,6 +107,37 @@ static void __init omap3_evm_get_revision(void)
+> ? ? ? ?}
+> ?}
 >
+> +static struct mtd_partition omap3evm_nand_partitions[] = {
+> + ? ? ? /* All the partition sizes are listed in terms of NAND block size */
+> + ? ? ? {
+> + ? ? ? ? ? ? ? .name ? ? ? ? ? = "X-Loader",
+> + ? ? ? ? ? ? ? .offset ? ? ? ? = 0,
+> + ? ? ? ? ? ? ? .size ? ? ? ? ? = 4 * NAND_BLOCK_SIZE,
+> + ? ? ? ? ? ? ? .mask_flags ? ? = MTD_WRITEABLE, ? ? ? ?/* force read-only */
+> + ? ? ? },
+> + ? ? ? {
+> + ? ? ? ? ? ? ? .name ? ? ? ? ? = "U-Boot",
+> + ? ? ? ? ? ? ? .offset ? ? ? ? = 0x80000
+
+Missing comma. Have you at least tried compiling this?
+
+> + ? ? ? ? ? ? ? .size ? ? ? ? ? = 15 * NAND_BLOCK_SIZE,
+> + ? ? ? ? ? ? ? .mask_flags ? ? = MTD_WRITEABLE, ? ? ? ?/* force read-only */
+> + ? ? ? },
+> + ? ? ? {
+> + ? ? ? ? ? ? ? .name ? ? ? ? ? = "U-Boot Env",
+> + ? ? ? ? ? ? ? .offset ? ? ? ? = 0x260000
+> + ? ? ? ? ? ? ? .size ? ? ? ? ? = 1 * NAND_BLOCK_SIZE,
+> + ? ? ? },
+> + ? ? ? {
+> + ? ? ? ? ? ? ? .name ? ? ? ? ? = "Kernel",
+> + ? ? ? ? ? ? ? .offset ? ? ? ? = 0x280000
+> + ? ? ? ? ? ? ? .size ? ? ? ? ? = 32 * NAND_BLOCK_SIZE,
+> + ? ? ? },
+> + ? ? ? {
+> + ? ? ? ? ? ? ? .name ? ? ? ? ? = "File System",
+> + ? ? ? ? ? ? ? .offset ? ? ? ? = 0x680000
+> + ? ? ? ? ? ? ? .size ? ? ? ? ? = MTDPART_SIZ_FULL,
+> + ? ? ? },
+> +};
+> +
+> ?#if defined(CONFIG_SMSC911X) || defined(CONFIG_SMSC911X_MODULE)
+> ?#include <plat/gpmc-smsc911x.h>
 >
-> > +
-> > +static inline int s3c_dma_trigger(unsigned ch)
-> > +{
-> > +       return s3c2410_dma_ctrl(ch, S3C2410_DMAOP_START);
-> > +}
-> > +
-> > +static inline int s3c_dma_started(unsigned ch)
-> > +{
-> > +       return s3c2410_dma_ctrl(ch, S3C2410_DMAOP_STARTED);
-> > +}
-> > +
-> > +static inline int s3c_dma_flush(unsigned ch)
-> > +{
-> > +       return s3c2410_dma_ctrl(ch, S3C2410_DMAOP_FLUSH);
-> > +}
-> > +
-> > +static inline int s3c_dma_stop(unsigned ch)
-> > +{
-> > +       return s3c2410_dma_ctrl(ch, S3C2410_DMAOP_STOP);
-> > +}
-> > +
-> > +static struct samsung_dma_ops s3c_dma_ops = {
-> > +       .request        = s3c_dma_request,
-> > +       .release        = s3c_dma_release,
-> > +       .prepare        = s3c_dma_prepare,
-> > +       .trigger        = s3c_dma_trigger,
-> > +       .started        = s3c_dma_started,
-> > +       .flush          = s3c_dma_flush,
-> > +       .stop           = s3c_dma_stop,
+> @@ -696,6 +733,9 @@ static void __init omap3_evm_init(void)
 >
-> These last 4 should be gnereallized into one callback with OP argument.
-I don't have any idea about it. Can you explain it in more detail?
+> ? ? ? ?omap_serial_init();
+>
+> + ? ? ? omap_nand_flash_init(NAND_BUSWIDTH_16, omap3evm_nand_partitions,
+> + ? ? ? ? ? ? ? ? ? ? ? ARRAY_SIZE(omap3evm_nand_partitions));
+> +
+> ? ? ? ?/* OMAP3EVM uses ISP1504 phy and so register nop transceiver */
+> ? ? ? ?usb_nop_xceiv_register();
+>
+> --
+> 1.6.2.4
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>
+
+-- 
+Gra?vydas
