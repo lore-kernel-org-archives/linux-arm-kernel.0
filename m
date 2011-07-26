@@ -1,24 +1,18 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 26 Jul 2011 17:45:25 +0300
-Subject: [PATCH] USB: s3c2410_udc: fix unterminated platform_device_id
-	table
-In-Reply-To: <1310468729.6590.3.camel@phoenix>
-References: <1310468729.6590.3.camel@phoenix>
-Message-ID: <20110726144524.GB32582@legolas.emea.dhcp.ti.com>
+From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
+Date: Tue, 26 Jul 2011 16:54:24 +0200
+Subject: [patch 0/3] imx: Efika: Add pata device
+Message-ID: <20110726145424.575429100@rtp-net.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 12, 2011 at 07:05:29PM +0800, Axel Lin wrote:
-> Signed-off-by: Axel Lin <axel.lin@gmail.com>
 
-applied, thanks
+This patchset is adding ressources, clock and device declarations for the
+pata device available on imx51. Last patch enables pata on efika platforms.
+To be complete, this patchset needs a driver, which is about to be sent for
+merge to ata developers.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 490 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110726/145b75fe/attachment.sig>
+v2: Created a imx51_add_mxc_pata() as suggested
+v3: Fix naming
+v4: Change clock name to pata_imx
+
+Arnaud
