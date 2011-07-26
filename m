@@ -1,79 +1,34 @@
-From: ccross@android.com (Colin Cross)
-Date: Tue, 26 Jul 2011 16:00:20 -0700
-Subject: [PATCH v2] ARM: tegra: only select MACH_HAS_SND_SOC_TEGRA_WM8903
-	if SND_SOC
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF049EBDF7DE@HQMAIL01.nvidia.com>
-References: <74CDBE0F657A3D45AFBB94109FB122FF049EBDF52B@HQMAIL01.nvidia.com>
-	<1311668159-11337-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<74CDBE0F657A3D45AFBB94109FB122FF049EBDF7DE@HQMAIL01.nvidia.com>
-Message-ID: <CAMbhsRRnNcokjeyy8HKf0MNvXVvFSQ0dpjGYApvUXtZsrrh66Q@mail.gmail.com>
+From: akinobu.mita@gmail.com (Akinobu Mita)
+Date: Wed, 27 Jul 2011 08:17:18 +0900
+Subject: [PATCH v4 2/3] mmc: core: add random fault injection
+In-Reply-To: <1311711119-6286-3-git-send-email-per.forlin@linaro.org>
+References: <1311711119-6286-1-git-send-email-per.forlin@linaro.org>
+	<1311711119-6286-3-git-send-email-per.forlin@linaro.org>
+Message-ID: <CAC5umygcfno0-=rA9G0OcxuVK2YK9UokfoYoy45qBT8w0+ytvg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 26, 2011 at 8:48 AM, Stephen Warren <swarren@nvidia.com> wrote:
-> Uwe Kleine-K?nig wrote at Tuesday, July 26, 2011 2:16 AM:
->> This fixes:
->> ? ? ? warning: (MACH_HARMONY && MACH_KAEN && MACH_SEABOARD) selects MACH_HAS_SND_SOC_TEGRA_WM8903
->> which has unmet direct dependencies (SOUND && !M68K && SND && SND_SOC)
->>
->> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
->
-> Acked-by: Stephen Warren <swarren@nvidia.com>
->
-> (I'm also CC'ing the various maintainers explicitly, so they see the patch,
-> and can decide which git tree to take this through)
+2011/7/27 Per Forlin <per.forlin@linaro.org>:
+> This adds support to inject data errors after a completed host transfer.
+> The mmc core will return error even though the host transfer is successful.
+> This simple fault injection proved to be very useful to test the
+> non-blocking error handling in the mmc_blk_issue_rw_rq().
+> Random faults can also test how the host driver handles pre_req()
+> and post_req() in case of errors.
 
-Acked-By: Colin Cross <ccross@android.com>
+Looks good but I have one question.
 
-Arnd, can you take this?
+> @@ -304,6 +307,10 @@ struct mmc_host {
+>
+> ? ? ? ?struct mmc_async_req ? ?*areq; ? ? ? ? ?/* active async req */
+>
+> +#ifdef CONFIG_FAIL_MMC_REQUEST
+> + ? ? ? u8 ? ? ? ? ? ? ? ? ? ? ?make_it_fail;
+> + ? ? ? struct fault_attr ? ? ? fail_mmc_request;
+> +#endif
+> ? ? ? ?unsigned long ? ? ? ? ? private[0] ____cacheline_aligned;
+> ?};
 
->> ---
->> Changes since (implicit) v1:
->> ?- correctly depend on SND_SOC instead of the non-existent SOUND_SOC
->> ?- fix commit log accordingly
->>
->> Thanks to Stephen Warren for noticing.
->>
->> Best regards
->> Uwe
->>
->> ?arch/arm/mach-tegra/Kconfig | ? ?6 +++---
->> ?1 files changed, 3 insertions(+), 3 deletions(-)
->>
->> diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
->> index 5ec1846..fec64f3 100644
->> --- a/arch/arm/mach-tegra/Kconfig
->> +++ b/arch/arm/mach-tegra/Kconfig
->> @@ -27,14 +27,14 @@ comment "Tegra board type"
->>
->> ?config MACH_HARMONY
->> ? ? ? ? bool "Harmony board"
->> - ? ? ? select MACH_HAS_SND_SOC_TEGRA_WM8903
->> + ? ? ? select MACH_HAS_SND_SOC_TEGRA_WM8903 if SND_SOC
->> ? ? ? ? help
->> ? ? ? ? ? Support for nVidia Harmony development platform
->>
->> ?config MACH_KAEN
->> ? ? ? ? bool "Kaen board"
->> ? ? ? ? select MACH_SEABOARD
->> - ? ? ? select MACH_HAS_SND_SOC_TEGRA_WM8903
->> + ? ? ? select MACH_HAS_SND_SOC_TEGRA_WM8903 if SND_SOC
->> ? ? ? ? help
->> ? ? ? ? ? Support for the Kaen version of Seaboard
->>
->> @@ -45,7 +45,7 @@ config MACH_PAZ00
->>
->> ?config MACH_SEABOARD
->> ? ? ? ? bool "Seaboard board"
->> - ? ? ? select MACH_HAS_SND_SOC_TEGRA_WM8903
->> + ? ? ? select MACH_HAS_SND_SOC_TEGRA_WM8903 if SND_SOC
->> ? ? ? ? help
->> ? ? ? ? ? Support for nVidia Seaboard development platform. It will
->> ? ? ? ?also be included for some of the derivative boards that
->> --
->> 1.7.5.4
->
-> --
-> nvpublic
->
->
+I think make_it_fail is not needed anymore because if fail_attr is
+defined per-host then you can enable it by setting probability=0
+or times=0 per-host.
