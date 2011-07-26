@@ -1,64 +1,84 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 27 Jul 2011 00:41:38 +0800
-Subject: [PATCH 1/2] arm/mx5: parse iomuxc pad configuratoin from device
-	tree
-In-Reply-To: <20110726063914.GB20587@pengutronix.de>
-References: <1311606467-28985-1-git-send-email-shawn.guo@linaro.org>
-	<1311606467-28985-2-git-send-email-shawn.guo@linaro.org>
-	<20110726063914.GB20587@pengutronix.de>
-Message-ID: <20110726164137.GD19600@S2100-06.ap.freescale.net>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Tue, 26 Jul 2011 18:16:42 +0100
+Subject: [PATCH 1/2] ARM: alignment: Make SIGBUS sent to userspace
+	POSIXly correct
+In-Reply-To: <20110726162905.GA4969@shutemov.name>
+References: <1311689686-7451-1-git-send-email-dave.martin@linaro.org>
+	<20110726162905.GA4969@shutemov.name>
+Message-ID: <20110726171642.GA7639@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 26, 2011 at 08:39:14AM +0200, Sascha Hauer wrote:
-> On Mon, Jul 25, 2011 at 11:07:46PM +0800, Shawn Guo wrote:
-> > It adds function mxc_iomuxc_dt_init() to parse iomuxc pad configuration
-> > from device tree.
+On Tue, Jul 26, 2011 at 07:29:05PM +0300, Kirill A. Shutemov wrote:
+> On Tue, Jul 26, 2011 at 03:14:46PM +0100, Dave Martin wrote:
+> > With the UM_SIGNAL alignment fault mode, no siginfo structure is
+> > passed to userspace.
 > > 
-> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > Cc: Grant Likely <grant.likely@secretlab.ca>
-> > Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> > POSIX specifies how siginfo_t should be populated for alignment
+> > faults, so this patch does just that:
+> > 
+> >   * si_signo = SIGBUS
+> >   * si_code = BUS_ADRALN
+> >   * si_addr = address of the faulted instruction
+> > 
+> > Signed-off-by: Dave Martin <dave.martin@linaro.org>
 > > ---
-> >  .../devicetree/bindings/arm/fsl/iomuxc.txt         |   47 +++++++++++++
-> >  arch/arm/mach-mx5/Makefile                         |    2 +
-> >  arch/arm/mach-mx5/iomuxc-dt.c                      |   72 ++++++++++++++++++++
-> >  arch/arm/plat-mxc/include/mach/common.h            |    3 +
-> >  4 files changed, 124 insertions(+), 0 deletions(-)
-> >  create mode 100644 Documentation/devicetree/bindings/arm/fsl/iomuxc.txt
-> >  create mode 100644 arch/arm/mach-mx5/iomuxc-dt.c
+> >  arch/arm/mm/alignment.c |   14 +++++++++++---
+> >  1 files changed, 11 insertions(+), 3 deletions(-)
 > > 
-> > + */
-> > +
-> > +#include <linux/of.h>
-> > +#include <asm/io.h>
-> 
-> linux/io.h
-> 
-Ok.
+> > diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
 
+[...]
+
+> > @@ -883,9 +884,16 @@ do_alignment(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+
+[...]
+
+> > +	if (ai_usermode & UM_SIGNAL) {
+> > +		siginfo_t si;
 > > +
-> > +#define IOMUXC_CONFIG_SION	(1 << 4)
-> > +
-> > +void mxc_iomuxc_dt_init(const struct of_device_id *match)
-> > +{
-> > +	struct device_node *node = of_find_matching_node(NULL, match);
-> > +	struct device_node *child;
-> > +	void __iomem *base;
-> > +	u32 reg[2], select_input[2];
-> > +	u32 mux_mode, pad_ctl;
-> > +
-> > +	if (!node) {
-> > +		pr_warn("%s: no iomuxc node found\n", __func__);
-> > +		return;
-> > +	}
+> > +		si.si_signo = SIGBUS;
+> > +		si.si_errno = 0;
+> > +		si.si_code = BUS_ADRALN;
+> > +		si.si_addr = (void __user *)instruction_pointer(regs);
 > 
-> Please remove this warning. Some boards may intentionally do the iomux
-> setup in the bootloader and skip the iomux setup nodes in the device
-> tree.
-Ok.
+> This is wrong. You need something like:
+> 
+> si.si_addr = (void __user *)instruction_pointer(regs) -
+> 	(thumb_mode(regs) ? 2 : 4);
 
-Thanks for review, Sascha.
+I don't think so.  The appropriate adjustment is already made on
+vector entry by the vector_stub macro in entry-armv.S:
 
--- 
-Regards,
-Shawn
+	.macro	vector_stub, name, mode, correction=0
+	.align	5
+
+vector_\name:
+	.if \correction
+	sub	lr, lr, #\correction
+	.endif
+
+
+I'm pretty sure that instruction_pointer(regs) must already point to the
+faulted instruction when we enter do_alignment(), because the first thing
+this function does is:
+
+	instrptr = instruction_pointer(regs);
+	if (thumb_mode(regs)) {
+		fault = __get_user(tinstr, (u16 *)(instrptr & ~1));
+		/* ... */
+	} else
+		fault = __get_user(instr, (u32 *)instrptr);
+
+
+When I test the code, my observations bear this out: the address returned
+in si_addr does match the address of the faulting instruction.
+
+Does that satisfy your concerns, or have I missed something?
+
+
+It might make sense to set bit 1 of si_addr to match the Thumb-ness of
+the faulting instruction though.  Currently I don't do that.
+
+Cheers
+---Dave
