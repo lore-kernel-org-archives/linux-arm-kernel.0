@@ -1,43 +1,36 @@
-From: rusty@rustcorp.com.au (Rusty Russell)
-Date: Tue, 26 Jul 2011 11:34:00 +0930
-Subject: [Lguest] Current state of the lguest arm patch
-In-Reply-To: <CAEx4DoFYP1JWx+c56T6s0N1soiEqU+Hnw+Fd0Kr8igOREbC5zA@mail.gmail.com>
-References: <CAEx4DoFYP1JWx+c56T6s0N1soiEqU+Hnw+Fd0Kr8igOREbC5zA@mail.gmail.com>
-Message-ID: <87d3gxyezz.fsf@rustcorp.com.au>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Tue, 26 Jul 2011 10:09:51 +0530
+Subject: [PATCH v2] dmaengine: pl330: make platform data optional
+In-Reply-To: <1311627904-24045-1-git-send-email-robherring2@gmail.com>
+References: <1310518811-379-1-git-send-email-robherring2@gmail.com>
+	<1311627904-24045-1-git-send-email-robherring2@gmail.com>
+Message-ID: <CABb+yY1BydX=YMe_nenkYr+bsH-3k3gObO3qav5AA5DrxMP=2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 25 Jul 2011 11:18:39 +0100, Nuno Felicio <nuno.felicio@gmail.com> wrote:
-> Hello, first i would like to say thanks for the fantastic lguest hypervisor
-> :)
-> 
-> Im testing the lguest arm patch, after some issues using the patched kernel
-> tree given by the board builder , i have found that using some commands
-> inside  the guest crashes the host.
-> 
-> running reboot -f, crashes the board.
-> 
-> 
-> and
-> 
-> running a dummy test like this
-> 
-> while [ 1 ]; do dd if=/bin/busybox of=/teste.bin; sleep 1 ; done
-> 1910+1 records in
-> 1910+1 records out
-> 978416 bytes (955.5KB) copied, Illegal instruction
-> 
-> 
-> 
-> What is the current state of the arm patch? Im asking because i not sure if
-> the issue is the current state of the arm patch, or my clumsy merge
-> work :)
+On Tue, Jul 26, 2011 at 2:35 AM, Rob Herring <robherring2@gmail.com> wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
+>
+> The pl330 needs platform data for describing peripheral connections, but
+> some platforms may only support memory to memory dma channels. In this
+> case, we can probe for how many channels there are and don't need the
+> platform data.
+>
+> As memcpy requests don't need channel private data to hold peripheral
+> info, allow private data to be NULL in this case.
+>
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> Cc: Jassi Brar <jassisinghbrar@gmail.com>
+> Cc: Vinod Koul <vkoul@infradead.org>
+> Cc: Dan Williams <dan.j.williams@intel.com>
+>
+> ---
+> Vinod, Can you apply this updated version instead?
+>
+> v2:
+> ?- Added null ptr check
+>
+> ?drivers/dma/pl330.c | ? 64 ++++++++++++++++++++++++++++----------------------
+> ?1 files changed, 36 insertions(+), 28 deletions(-)
 
-I don't know... I've never actually run it myself.  I was really hoping
-that someone who knows the ARM kernel would assist in preparing the
-patch for inclusion...
-
-Volunteers welcome :)
-
-Thanks,
-Rusty.
+Acked-by: Jassi Brar <jassisinghbrar@gmail.com>
