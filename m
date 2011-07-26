@@ -1,94 +1,129 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 26 Jul 2011 14:56:38 +0200
-Subject: [PATCH 1/8] ARM: dma-mapping: remove offset parameter to prepare
-	for generic dma_ops
-In-Reply-To: <20110703152826.GL21898@n2100.arm.linux.org.uk>
-References: <1308556213-24970-1-git-send-email-m.szyprowski@samsung.com>
-	<1308556213-24970-2-git-send-email-m.szyprowski@samsung.com>
-	<20110703152826.GL21898@n2100.arm.linux.org.uk>
-Message-ID: <00c401cc4b93$75bae4c0$6130ae40$%szyprowski@samsung.com>
+From: boojin.kim@samsung.com (Boojin Kim)
+Date: Tue, 26 Jul 2011 22:04:10 +0900
+Subject: [PATCH V4 03/14] DMA: PL330: Support DMA_SLAVE_CONFIG command
+In-Reply-To: <1311601700.8206.7.camel@vkoul-mobl4>
+References: <1311557312-26107-1-git-send-email-boojin.kim@samsung.com>
+	<1311557312-26107-4-git-send-email-boojin.kim@samsung.com>
+	<1311589617.27357.3.camel@vkoul-mobl4>
+	<002401cc4ac9$97737570$c65a6050$%kim@samsung.com>
+	<1311601700.8206.7.camel@vkoul-mobl4>
+Message-ID: <003c01cc4b94$82e39e20$88aada60$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Vinod Koul Wrote:
+> Sent: Monday, July 25, 2011 10:48 PM
+> To: Boojin Kim
+> Cc: vinod.koul at intel.com; linux-arm-kernel at lists.infradead.org; linux-
+> samsung-soc at vger.kernel.org; 'Kukjin Kim'; 'Jassi Brar'; 'Grant
+> Likely'; 'Mark Brown'; 'Dan Williams'
+> Subject: RE: [PATCH V4 03/14] DMA: PL330: Support DMA_SLAVE_CONFIG
+> command
+>
+> On Mon, 2011-07-25 at 21:51 +0900, Boojin Kim wrote:
+> > Vinod Koul Wrote:
+> > > Sent: Monday, July 25, 2011 7:27 PM
+> > > To: Boojin Kim
+> > > Cc: vinod.koul at intel.com; linux-arm-kernel at lists.infradead.org;
+> linux-
+> > > samsung-soc at vger.kernel.org; Kukjin Kim; Jassi Brar; Grant Likely;
+> > > Mark Brown; Dan Williams
+> > > Subject: Re: [PATCH V4 03/14] DMA: PL330: Support DMA_SLAVE_CONFIG
+> > > command
+> > >
+> > > On Mon, 2011-07-25 at 10:28 +0900, Boojin Kim wrote:
+> > > > This patch adds support DMA_SLAVE_CONFIG command.
+> > > >
+> > > > Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
+> > > > ---
+> > > >  drivers/dma/pl330.c |   53
+> +++++++++++++++++++++++++++++++++++++----
+> > > ---------
+> > > >  1 files changed, 39 insertions(+), 14 deletions(-)
+> > > >
+> > > > diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+> > > > index 586ab39..880f010 100644
+> > > > --- a/drivers/dma/pl330.c
+> > > > +++ b/drivers/dma/pl330.c
+> > > > @@ -256,25 +256,50 @@ static int
+> pl330_alloc_chan_resources(struct
+> > > dma_chan *chan)
+> > > >  static int pl330_control(struct dma_chan *chan, enum
+> dma_ctrl_cmd
+> > > cmd, unsigned long arg)
+> > > >  {
+> > > >  	struct dma_pl330_chan *pch = to_pchan(chan);
+> > > > -	struct dma_pl330_desc *desc;
+> > > > +	struct dma_pl330_desc *desc, *_dt;
+> > > >  	unsigned long flags;
+> > > > +	struct dma_pl330_dmac *pdmac = pch->dmac;
+> > > > +	struct dma_slave_config *slave_config;
+> > > > +	struct dma_pl330_peri *peri;
+> > > > +	LIST_HEAD(list);
+> > > >
+> > > > -	/* Only supports DMA_TERMINATE_ALL */
+> > > > -	if (cmd != DMA_TERMINATE_ALL)
+> > > > -		return -ENXIO;
+> > > > -
+> > > > -	spin_lock_irqsave(&pch->lock, flags);
+> > > > -
+> > > > -	/* FLUSH the PL330 Channel thread */
+> > > > -	pl330_chan_ctrl(pch->pl330_chid, PL330_OP_FLUSH);
+> > > > +	switch (cmd) {
+> > > > +	case DMA_TERMINATE_ALL:
+> > > > +		spin_lock_irqsave(&pch->lock, flags);
+> > > >
+> > > > -	/* Mark all desc done */
+> > > > -	list_for_each_entry(desc, &pch->work_list, node)
+> > > > -		desc->status = DONE;
+> > > > +		/* FLUSH the PL330 Channel thread */
+> > > > +		pl330_chan_ctrl(pch->pl330_chid, PL330_OP_FLUSH);
+> > > >
+> > > > -	spin_unlock_irqrestore(&pch->lock, flags);
+> > > > +		/* Mark all desc done */
+> > > > +		list_for_each_entry_safe(desc, _dt, &pch-
+> >work_list , node)
+> > > {
+> > > > +			desc->status = DONE;
+> > > > +			pch->completed = desc->txd.cookie;
+> > > > +			list_move_tail(&desc->node, &list);
+> > > > +		}
+> > > >
+> > > > -	pl330_tasklet((unsigned long) pch);
+> > > > +		list_splice_tail_init(&list, &pdmac->desc_pool);
+> > > > +		spin_unlock_irqrestore(&pch->lock, flags);
+> > > > +		break;
+> > > > +	case DMA_SLAVE_CONFIG:
+> > > > +		slave_config = (struct dma_slave_config *)arg;
+> > > > +		peri = pch->chan.private;
+> > > > +
+> > > > +		if (slave_config->direction == DMA_TO_DEVICE) {
+> > > > +			if (slave_config->dst_addr)
+> > > > +				peri->fifo_addr = slave_config-
+> >dst_addr;
+> > > > +			if (slave_config->dst_addr_width)
+> > > > +				peri->burst_sz = __ffs(slave_config-
+> > > >dst_addr_width);
+> > > This doesn't sound right, why can't you use xxx_maxburst field
+> instead?
+> > Can you explain the problem in more detail?
+> > Do you mean that 'xxx_maxburst' takes place of 'xxx_addr_width' or
+> __ffs()
+> > isn't proper here?
+> >
+> > Additionally, I will modify this code to consider '_maxburst' field.
+> __ffs is okay and sensible.
+> I meant you should use proper fields for passing info, which in this
+> case would be dst_maxburst for specifying destination burst sizes
+I think the naming seems to make confusion.
+'Peri->burst_sz' on this code means the width of fifo in bytes of the peri. 
+It's same with the meaning 'xxx_addr_width'. So, I think it's proper usage.
+'peri->burst_sz' is passed to PL330 HW. PL330 HW wants to get the power of 2 
+based the fifo width for it.
+For example, If fifo width is 8 bytes, PL330 HW should get '3' for it.
+And I will modify code to consider xxx_maxburst.
 
-On Sunday, July 03, 2011 5:28 PM Russell King wrote:
 
-> On Mon, Jun 20, 2011 at 09:50:06AM +0200, Marek Szyprowski wrote:
-> > This patch removes the need for offset parameter in dma bounce
-> > functions. This is required to let dma-mapping framework on ARM
-> > architecture use common, generic dma-mapping helpers.
-> 
-> I really don't like this.  Really as in hate.  Why?  I've said in the past
-> that the whole idea of getting rid of the sub-range functions is idiotic.
-> 
-> If you have to deal with cache coherence, what you _really_ want is an
-> API which tells you the size of the original buffer and the section of
-> that buffer which you want to handle - because the edges of the buffer
-> need special handling.
-> 
-> Lets say that you have a buffer which is 256 bytes long, misaligned to
-> half a cache line.  Let's first look at the sequence for whole-buffer:
-> 
-> 1. You map it for DMA from the device.  This means you writeback the
->    first and last cache lines to perserve any data shared in the
->    overlapping cache line.  The remainder you can just invalidate.
-> 
-> 2. You want to access the buffer, so you use the sync_for_cpu function.
->    If your CPU doesn't do any speculative prefetching, then you don't
->    need to do anything.  If you do, you have to invalidate the buffer,
->    but you must preserve the overlapping cache lines which again must
->    be written back.
-> 
-> 3. You transfer ownership back to the device using sync_for_device.
->    As you may have caused cache lines to be read in, again you need to
->    invalidate, and the overlapping cache lines must be written back.
-> 
-> Now, if you ask for a sub-section of the buffer to be sync'd, you can
-> actually eliminate those writebacks which are potentially troublesome,
-> and which could corrupt neighbouring data.
-> 
-> If you get rid of the sub-buffer functions and start using the whole
-> buffer functions for that purpose, you no longer know whether the
-> partial cache lines are part of the buffer or not, so you have to write
-> those back every time too.
-> 
-> So far, we haven't had any reports of corruption of this type (maybe
-> folk using the sync functions are rare on ARM - thankfully) but getting
-> rid of the range sync functions means that solving this becomes a lot
-> more difficult because we've lost the information to make the decision.
-
-Well, right now I haven't heard anyone who wants to remove 
-dma_sync_single_range_for_{cpu,device}. All this is about internal
-implementation and dma_map_ops which uses the simplified calls, not
-exposed to the drivers or any public API. 
-
-I also see no reason why we loose the information. All drivers are still
-required to call dma_map_{single,page} to aquire dma address first. This
-way DMA mapping subsystem perfectly knows that the range from returned 
-dma_addr to dma_addr+size has been used for dma operations. All calls to
-dma_sync_single_* operations takes dma_addr as one of the arguments, so
-there is no problem to check which dma range this particular sync 
-operation fits.
-
-In my patch I have shown that it is perfectly possible to use the common
-dma_map_ops structure on ARM and unify dma mapping implementation a bit
-with other architectures.
-
-IMHO this is the right way. There is a need for custom dma mapping 
-implementations (mainly related to taking the advantage of iommu controllers
-available on newer SoCs). I would really like to avoid another set of ifdefs
-or sequences of "if (iommu_supported())" all over the dma-mapping code. Even
-now all this code is hard to understand in the first read (due to coherent/
-non-coherent sub-architectures and dmabounce code mixed in).
-
-> So I've always believed - and continue to do so - that those who want
-> to get rid of the range sync functions are misguided and are storing up
-> problems for the future.
-
-I never said that I want to remove these operations from drivers API.
-
-Best regards
--- 
-Marek Szyprowski
-Samsung Poland R&D Center
+> --
+> ~Vinod Koul
+> Intel Corp.
