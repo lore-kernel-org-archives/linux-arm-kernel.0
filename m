@@ -1,32 +1,79 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 26 Jul 2011 17:48:06 -0400 (EDT)
-Subject: at91sam9g45: Issues while working with RAM that is separated on
-	physical address space
-In-Reply-To: <CAA2DH4u3n3JmLcnFurQRXbc2Me5aHw2wR4sHUbZOA+zoex3c7Q@mail.gmail.com>
-References: <CAA2DH4u1kcky3xzxpepS=gtDK1Xas17zDxcRkDR7qRNLHQyoxw@mail.gmail.com>
-	<20110722135505.GB25947@n2100.arm.linux.org.uk>
-	<CAA2DH4u9GANxUTnTqRzUR=GihNLS8EEDAKm8u8SFZ_Yq48qXOg@mail.gmail.com>
-	<CAA2DH4sviHkHEHZTR+0AHP3pToC7fEgTc+irw0vk_WU5q0XEQQ@mail.gmail.com>
-	<20110726133702.GA14526@taskit.de>
-	<20110726135428.GC1655@n2100.arm.linux.org.uk>
-	<CAA2DH4u3n3JmLcnFurQRXbc2Me5aHw2wR4sHUbZOA+zoex3c7Q@mail.gmail.com>
-Message-ID: <alpine.LFD.2.00.1107261741090.12766@xanadu.home>
+From: ccross@android.com (Colin Cross)
+Date: Tue, 26 Jul 2011 16:00:20 -0700
+Subject: [PATCH v2] ARM: tegra: only select MACH_HAS_SND_SOC_TEGRA_WM8903
+	if SND_SOC
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF049EBDF7DE@HQMAIL01.nvidia.com>
+References: <74CDBE0F657A3D45AFBB94109FB122FF049EBDF52B@HQMAIL01.nvidia.com>
+	<1311668159-11337-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<74CDBE0F657A3D45AFBB94109FB122FF049EBDF7DE@HQMAIL01.nvidia.com>
+Message-ID: <CAMbhsRRnNcokjeyy8HKf0MNvXVvFSQ0dpjGYApvUXtZsrrh66Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 26 Jul 2011, P J wrote:
+On Tue, Jul 26, 2011 at 8:48 AM, Stephen Warren <swarren@nvidia.com> wrote:
+> Uwe Kleine-K?nig wrote at Tuesday, July 26, 2011 2:16 AM:
+>> This fixes:
+>> ? ? ? warning: (MACH_HARMONY && MACH_KAEN && MACH_SEABOARD) selects MACH_HAS_SND_SOC_TEGRA_WM8903
+>> which has unmet direct dependencies (SOUND && !M68K && SND && SND_SOC)
+>>
+>> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+>
+> Acked-by: Stephen Warren <swarren@nvidia.com>
+>
+> (I'm also CC'ing the various maintainers explicitly, so they see the patch,
+> and can decide which git tree to take this through)
 
-> The mapping of second memory bank is going wrong because of the
-> reasons I have said earlier, so my second memory bank gets overlapped
-> with the vmalloc region and is ignored. With highemem seems like the
-> problem should have been solved but my kernel does not boot with
-> highmem enabled.
-> 
-> Any suggestions ? I'm using Linux 2.6.30..
+Acked-By: Colin Cross <ccross@android.com>
 
-Highmem support was introduced on ARM in v2.6.29 and became somewhat 
-"reliable" on v2.6.31.  In any case, v2.6.30 is more than 2 years old. 
-Please try to upgrade your kernel.
+Arnd, can you take this?
 
-
-Nicolas
+>> ---
+>> Changes since (implicit) v1:
+>> ?- correctly depend on SND_SOC instead of the non-existent SOUND_SOC
+>> ?- fix commit log accordingly
+>>
+>> Thanks to Stephen Warren for noticing.
+>>
+>> Best regards
+>> Uwe
+>>
+>> ?arch/arm/mach-tegra/Kconfig | ? ?6 +++---
+>> ?1 files changed, 3 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
+>> index 5ec1846..fec64f3 100644
+>> --- a/arch/arm/mach-tegra/Kconfig
+>> +++ b/arch/arm/mach-tegra/Kconfig
+>> @@ -27,14 +27,14 @@ comment "Tegra board type"
+>>
+>> ?config MACH_HARMONY
+>> ? ? ? ? bool "Harmony board"
+>> - ? ? ? select MACH_HAS_SND_SOC_TEGRA_WM8903
+>> + ? ? ? select MACH_HAS_SND_SOC_TEGRA_WM8903 if SND_SOC
+>> ? ? ? ? help
+>> ? ? ? ? ? Support for nVidia Harmony development platform
+>>
+>> ?config MACH_KAEN
+>> ? ? ? ? bool "Kaen board"
+>> ? ? ? ? select MACH_SEABOARD
+>> - ? ? ? select MACH_HAS_SND_SOC_TEGRA_WM8903
+>> + ? ? ? select MACH_HAS_SND_SOC_TEGRA_WM8903 if SND_SOC
+>> ? ? ? ? help
+>> ? ? ? ? ? Support for the Kaen version of Seaboard
+>>
+>> @@ -45,7 +45,7 @@ config MACH_PAZ00
+>>
+>> ?config MACH_SEABOARD
+>> ? ? ? ? bool "Seaboard board"
+>> - ? ? ? select MACH_HAS_SND_SOC_TEGRA_WM8903
+>> + ? ? ? select MACH_HAS_SND_SOC_TEGRA_WM8903 if SND_SOC
+>> ? ? ? ? help
+>> ? ? ? ? ? Support for nVidia Seaboard development platform. It will
+>> ? ? ? ?also be included for some of the derivative boards that
+>> --
+>> 1.7.5.4
+>
+> --
+> nvpublic
+>
+>
