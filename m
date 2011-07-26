@@ -1,123 +1,94 @@
-From: boojin.kim@samsung.com (Boojin Kim)
-Date: Tue, 26 Jul 2011 21:28:01 +0900
-Subject: [PATCH V4 04/14] DMA: PL330: Add DMA_CYCLIC capability
-In-Reply-To: <CABb+yY1x=E4pO8Uyrz9+cs-B-NuhqzXzQwcxKCkrm0mthp0FWA@mail.gmail.com>
-References: <1311557312-26107-1-git-send-email-boojin.kim@samsung.com>
-	<1311557312-26107-5-git-send-email-boojin.kim@samsung.com>
-	<CABb+yY1x=E4pO8Uyrz9+cs-B-NuhqzXzQwcxKCkrm0mthp0FWA@mail.gmail.com>
-Message-ID: <003a01cc4b8f$763ce2d0$62b6a870$%kim@samsung.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 26 Jul 2011 14:56:38 +0200
+Subject: [PATCH 1/8] ARM: dma-mapping: remove offset parameter to prepare
+	for generic dma_ops
+In-Reply-To: <20110703152826.GL21898@n2100.arm.linux.org.uk>
+References: <1308556213-24970-1-git-send-email-m.szyprowski@samsung.com>
+	<1308556213-24970-2-git-send-email-m.szyprowski@samsung.com>
+	<20110703152826.GL21898@n2100.arm.linux.org.uk>
+Message-ID: <00c401cc4b93$75bae4c0$6130ae40$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jassi Brar Wrote:
-> Sent: Monday, July 25, 2011 8:24 PM
-> To: Boojin Kim
-> Cc: linux-arm-kernel at lists.infradead.org; linux-samsung-
-> soc at vger.kernel.org; Vinod Koul; Dan Williams; Kukjin Kim; Grant
-> Likely; Mark Brown
-> Subject: Re: [PATCH V4 04/14] DMA: PL330: Add DMA_CYCLIC capability
->
-> On Mon, Jul 25, 2011 at 6:58 AM, Boojin Kim <boojin.kim@samsung.com>
-> wrote:
-> > This patch adds DMA_CYCLIC capability that is used for audio driver.
-> > DMA driver with DMA_CYCLIC capability reuses the dma requests that
-> > were submitted through tx_submit().
-> >
-> > Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
-> > ---
-> >  drivers/dma/pl330.c |  111
-> +++++++++++++++++++++++++++++++++++++++++++++++++++
-> >  1 files changed, 111 insertions(+), 0 deletions(-)
-> >
-> > diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-> > index 880f010..121c75a 100644
-> > --- a/drivers/dma/pl330.c
-> > +++ b/drivers/dma/pl330.c
-> > @@ -69,6 +69,11 @@ struct dma_pl330_chan {
-> >         * NULL if the channel is available to be acquired.
-> >         */
-> >        void *pl330_chid;
-> > +
-> > +       /* taks for cyclic capability */
-> > +       struct tasklet_struct *cyclic_task;
-> > +
-> > +       bool cyclic;
-> >  };
-> We already have a tasklet_struct member here.
-> This 'cyclic' flag can indicate if we are doing cyclic or serial
-> transfers. So, this cyclic_task seems unnecessary.
-I will change cyclic operation base on your comment.
-Cyclic_task will be removed.
+Hello,
 
->
-> > +static void pl330_tasklet_cyclic(unsigned long data)
-> > +{
-> > +       struct dma_pl330_chan *pch = (struct dma_pl330_chan *)data;
-> > +       struct dma_pl330_desc *desc, *_dt;
-> > +       unsigned long flags;
-> > +       LIST_HEAD(list);
-> > +
-> > +       spin_lock_irqsave(&pch->lock, flags);
-> > +
-> > +       /* Pick up ripe tomatoes */
-> > +       list_for_each_entry_safe(desc, _dt, &pch->work_list, node)
-> > +               if (desc->status == DONE) {
-> > +                       dma_async_tx_callback callback;
-> > +
-> > +                       list_move_tail(&desc->node, &pch->work_list);
-> > +                       pch->completed = desc->txd.cookie;
-> > +
-> > +                       desc->status = PREP;
-> > +
-> > +                       /* Try to submit a req imm.
-> > +                       next to the last completed cookie */
-> > +                       fill_queue(pch);
-> > +
-> > +                       /* Make sure the PL330 Channel thread is active
-> */
-> > +                       pl330_chan_ctrl(pch->pl330_chid,
-> PL330_OP_START);
-> > +
-> > +                       callback = desc->txd.callback;
-> > +                       if (callback)
-> > +                               callback(desc->txd.callback_param);
-> > +
-> > +               }
-> > +
-> > +       spin_unlock_irqrestore(&pch->lock, flags);
-> > +}
-> Please merge this with pl330_tasklet and use 'cyclic' flag to
-> differentiate.
->
-> > @@ -227,6 +267,9 @@ static void dma_pl330_rqcb(void *token, enum
-> pl330_op_err err)
-> >
-> >        spin_unlock_irqrestore(&pch->lock, flags);
-> >
-> > +       if (pch->cyclic_task)
-> > +               tasklet_schedule(pch->cyclic_task);
-> > +       else
-> >        tasklet_schedule(&pch->task);
-> A tab here please, and check for 'cyclic' flag.
->
->
-> > @@ -316,6 +359,15 @@ static void pl330_free_chan_resources(struct
-> dma_chan *chan)
-> >        pl330_release_channel(pch->pl330_chid);
-> >        pch->pl330_chid = NULL;
-> >
-> > +       if (pch->cyclic) {
-> > +               pch->cyclic = false;
-> > +               list_splice_tail_init(&pch->work_list, &pch->dmac-
-> >desc_pool);
-> > +               if (pch->cyclic_task) {
-> > +                       tasklet_kill(pch->cyclic_task);
-> > +                       pch->cyclic_task = NULL;
-> > +               }
-> > +       }
-> > +
-> >        spin_unlock_irqrestore(&pch->lock, flags);
-> >  }
-> To be explicit, please initialize 'cyclic' flag to false in
-> pl330_alloc_chan_resources
-I will address your comment.
+On Sunday, July 03, 2011 5:28 PM Russell King wrote:
+
+> On Mon, Jun 20, 2011 at 09:50:06AM +0200, Marek Szyprowski wrote:
+> > This patch removes the need for offset parameter in dma bounce
+> > functions. This is required to let dma-mapping framework on ARM
+> > architecture use common, generic dma-mapping helpers.
+> 
+> I really don't like this.  Really as in hate.  Why?  I've said in the past
+> that the whole idea of getting rid of the sub-range functions is idiotic.
+> 
+> If you have to deal with cache coherence, what you _really_ want is an
+> API which tells you the size of the original buffer and the section of
+> that buffer which you want to handle - because the edges of the buffer
+> need special handling.
+> 
+> Lets say that you have a buffer which is 256 bytes long, misaligned to
+> half a cache line.  Let's first look at the sequence for whole-buffer:
+> 
+> 1. You map it for DMA from the device.  This means you writeback the
+>    first and last cache lines to perserve any data shared in the
+>    overlapping cache line.  The remainder you can just invalidate.
+> 
+> 2. You want to access the buffer, so you use the sync_for_cpu function.
+>    If your CPU doesn't do any speculative prefetching, then you don't
+>    need to do anything.  If you do, you have to invalidate the buffer,
+>    but you must preserve the overlapping cache lines which again must
+>    be written back.
+> 
+> 3. You transfer ownership back to the device using sync_for_device.
+>    As you may have caused cache lines to be read in, again you need to
+>    invalidate, and the overlapping cache lines must be written back.
+> 
+> Now, if you ask for a sub-section of the buffer to be sync'd, you can
+> actually eliminate those writebacks which are potentially troublesome,
+> and which could corrupt neighbouring data.
+> 
+> If you get rid of the sub-buffer functions and start using the whole
+> buffer functions for that purpose, you no longer know whether the
+> partial cache lines are part of the buffer or not, so you have to write
+> those back every time too.
+> 
+> So far, we haven't had any reports of corruption of this type (maybe
+> folk using the sync functions are rare on ARM - thankfully) but getting
+> rid of the range sync functions means that solving this becomes a lot
+> more difficult because we've lost the information to make the decision.
+
+Well, right now I haven't heard anyone who wants to remove 
+dma_sync_single_range_for_{cpu,device}. All this is about internal
+implementation and dma_map_ops which uses the simplified calls, not
+exposed to the drivers or any public API. 
+
+I also see no reason why we loose the information. All drivers are still
+required to call dma_map_{single,page} to aquire dma address first. This
+way DMA mapping subsystem perfectly knows that the range from returned 
+dma_addr to dma_addr+size has been used for dma operations. All calls to
+dma_sync_single_* operations takes dma_addr as one of the arguments, so
+there is no problem to check which dma range this particular sync 
+operation fits.
+
+In my patch I have shown that it is perfectly possible to use the common
+dma_map_ops structure on ARM and unify dma mapping implementation a bit
+with other architectures.
+
+IMHO this is the right way. There is a need for custom dma mapping 
+implementations (mainly related to taking the advantage of iommu controllers
+available on newer SoCs). I would really like to avoid another set of ifdefs
+or sequences of "if (iommu_supported())" all over the dma-mapping code. Even
+now all this code is hard to understand in the first read (due to coherent/
+non-coherent sub-architectures and dmabounce code mixed in).
+
+> So I've always believed - and continue to do so - that those who want
+> to get rid of the range sync functions are misguided and are storing up
+> problems for the future.
+
+I never said that I want to remove these operations from drivers API.
+
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
