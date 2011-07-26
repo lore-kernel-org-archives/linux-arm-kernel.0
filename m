@@ -1,61 +1,48 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 26 Jul 2011 09:45:55 +0200
-Subject: [PATCH v2] ARM: mx50: Select IMX_HAVE_PLATFORM_FEC as done on
-	other i.MX devices
-In-Reply-To: <1311630006-7685-1-git-send-email-festevam@gmail.com>
-References: <1311630006-7685-1-git-send-email-festevam@gmail.com>
-Message-ID: <20110726074555.GJ20587@pengutronix.de>
+Date: Tue, 26 Jul 2011 09:50:59 +0200
+Subject: [patch 2/3] imx51: add pata clock
+In-Reply-To: <20110724184012.416899531@rtp-net.org>
+References: <20110724183901.988974144@rtp-net.org>
+	<20110724184012.416899531@rtp-net.org>
+Message-ID: <20110726075059.GK20587@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 25, 2011 at 06:40:06PM -0300, Fabio Estevam wrote:
-> Currently it is only the MX50_RDP board that selects IMX_HAVE_PLATFORM_FEC in its board Kconfig.
+On Sun, Jul 24, 2011 at 08:39:04PM +0200, Arnaud Patard wrote:
+> Define the clock used by the imx51 pata device.
 > 
-> Do like the other i.MX processors, which select IMX_HAVE_PLATFORM_FEC based on the processor type.
+> Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
 > 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
-> Changes since v1:
 > 
-> - Keep the processor list sorted
+> Index: linux-2.6-submit/arch/arm/mach-mx5/clock-mx51-mx53.c
+> ===================================================================
+> --- linux-2.6-submit.orig/arch/arm/mach-mx5/clock-mx51-mx53.c	2011-07-22 23:29:09.000000000 +0200
+> +++ linux-2.6-submit/arch/arm/mach-mx5/clock-mx51-mx53.c	2011-07-24 20:35:17.000000000 +0200
+> @@ -1414,6 +1414,10 @@ DEFINE_CLOCK(ipu_di0_clk, 0, MXC_CCM_CCG
+>  DEFINE_CLOCK(ipu_di1_clk, 0, MXC_CCM_CCGR6, MXC_CCM_CCGRx_CG6_OFFSET,
+>  		NULL, NULL, &pll3_sw_clk, NULL);
+>  
+> +/* PATA */
+> +DEFINE_CLOCK(pata_clk, 0, MXC_CCM_CCGR4, MXC_CCM_CCGRx_CG0_OFFSET,
+> +		NULL, NULL, &ipg_clk, &spba_clk);
+> +
+>  #define _REGISTER_CLOCK(d, n, c) \
+>         { \
+>  		.dev_id = d, \
+> @@ -1466,6 +1470,7 @@ static struct clk_lookup mx51_lookups[]
+>  	_REGISTER_CLOCK("imx-ipuv3", "di0", ipu_di0_clk)
+>  	_REGISTER_CLOCK("imx-ipuv3", "di1", ipu_di1_clk)
+>  	_REGISTER_CLOCK(NULL, "gpc_dvfs", gpc_dvfs_clk)
+> +	_REGISTER_CLOCK("imx-pata", NULL, pata_clk)
 
-Ok, took this one instead, now that you already reposted it.
+First argument to _REGISTER_CLOCK must match the device name, but the
+driver you posted uses pata_imx as device name. The second argument
+which you correctly set to NULL here is an additional identifier which
+must match if it exists. There is only one clock in the pata driver, so
+you should use clk_get(&pdev->dev, NULL) in you driver.
 
 Sascha
 
-> 
->  arch/arm/mach-mx5/Kconfig         |    1 -
->  arch/arm/plat-mxc/devices/Kconfig |    2 +-
->  2 files changed, 1 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mx5/Kconfig b/arch/arm/mach-mx5/Kconfig
-> index b4e7c58..a303445 100644
-> --- a/arch/arm/mach-mx5/Kconfig
-> +++ b/arch/arm/mach-mx5/Kconfig
-> @@ -52,7 +52,6 @@ config MACH_MX50_RDP
->  	select IMX_HAVE_PLATFORM_IMX_UART
->  	select IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX
->  	select IMX_HAVE_PLATFORM_SPI_IMX
-> -	select IMX_HAVE_PLATFORM_FEC
->  	help
->  	  Include support for MX50 reference design platform (RDP) board. This
->  	  includes specific configurations for the board and its peripherals.
-> diff --git a/arch/arm/plat-mxc/devices/Kconfig b/arch/arm/plat-mxc/devices/Kconfig
-> index bd294ad..4c8b00b 100644
-> --- a/arch/arm/plat-mxc/devices/Kconfig
-> +++ b/arch/arm/plat-mxc/devices/Kconfig
-> @@ -1,6 +1,6 @@
->  config IMX_HAVE_PLATFORM_FEC
->  	bool
-> -	default y if ARCH_MX25 || SOC_IMX27 || SOC_IMX35 || SOC_IMX51 || SOC_IMX53
-> +	default y if ARCH_MX25 || SOC_IMX27 || SOC_IMX35 || SOC_IMX50 || SOC_IMX51 || SOC_IMX53
->  
->  config IMX_HAVE_PLATFORM_FLEXCAN
->  	select HAVE_CAN_FLEXCAN if CAN
-> -- 
-> 1.7.1
-> 
-> 
 
 -- 
 Pengutronix e.K.                           |                             |
