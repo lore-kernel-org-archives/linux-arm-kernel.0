@@ -1,56 +1,71 @@
-From: simon@sequanux.org (Simon Guinot)
-Date: Tue, 26 Jul 2011 15:39:31 +0000
-Subject: [PATCH] genirq: move mask_cache into struct irq_chip_type
-In-Reply-To: <CAMAG_edBy1kjmEGDD76-C5T0xtha9YxMFJ6B3D8A5kHBwQ1PMQ@mail.gmail.com>
-References: <20110720234537.GD16297@kw.sim.vm.gnt>
-	<1311295758-27493-1-git-send-email-simon@sequanux.org>
-	<CAMAG_edBy1kjmEGDD76-C5T0xtha9YxMFJ6B3D8A5kHBwQ1PMQ@mail.gmail.com>
-Message-ID: <20110726153930.GG16297@kw.sim.vm.gnt>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Tue, 26 Jul 2011 08:48:08 -0700
+Subject: [PATCH v2] ARM: tegra: only select
+	MACH_HAS_SND_SOC_TEGRA_WM8903 if SND_SOC
+In-Reply-To: <1311668159-11337-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <74CDBE0F657A3D45AFBB94109FB122FF049EBDF52B@HQMAIL01.nvidia.com>
+	<1311668159-11337-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF049EBDF7DE@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Saeed,
+Uwe Kleine-K?nig wrote at Tuesday, July 26, 2011 2:16 AM:
+> This fixes:
+> 	warning: (MACH_HARMONY && MACH_KAEN && MACH_SEABOARD) selects MACH_HAS_SND_SOC_TEGRA_WM8903
+> which has unmet direct dependencies (SOUND && !M68K && SND && SND_SOC)
+> 
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-On Tue, Jul 26, 2011 at 05:35:50PM +0300, saeed bishara wrote:
-> On Fri, Jul 22, 2011 at 3:49 AM, Simon Guinot <simon@sequanux.org> wrote:
-> > From: Simon Guinot <sguinot@lacie.com>
-> >
-> > This fixes a regression introduced by e59347a
-> > "arm: orion: Use generic irq chip".
-> >
-> > The same interrupt mask cache (stored within struct irq_chip_generic)
-> > is shared between all the irq_chip_type instances. As each irq_chip_type
-> > can use a distinct mask register, share a single mask cache is not
-> > correct. This bug affects Orion SoCs, which have separate mask registers
-> > for edge and level interrupts.
-> >
-> > This patch move mask_cache from struct irq_chip_generic into struct
-> > irq_chip_type. Note that the interrupt support for Samsung SoCs is also
-> > slightly affected.
-> The patch looks to fix the issue with orion, but it seems that it
-> won't work for SoC with multiple irq_chip_type that use one mask
-> register.
+Acked-by: Stephen Warren <swarren@nvidia.com>
 
-Yes indeed, but does such SoCs exists ? I mean that the only supported
-SoC using multiple irq_chip_type (for now) is Orion. What is the most
-generic case for edge/level interrupts ? shared or separated mask
-registers ?
+(I'm also CC'ing the various maintainers explicitly, so they see the patch,
+and can decide which git tree to take this through)
 
-If Orion is the specific case, maybe we could provide a dedicated
-irq_mask() handler instead of using the generic one. It would be a
-little sad.
+> ---
+> Changes since (implicit) v1:
+>  - correctly depend on SND_SOC instead of the non-existent SOUND_SOC
+>  - fix commit log accordingly
+> 
+> Thanks to Stephen Warren for noticing.
+> 
+> Best regards
+> Uwe
+> 
+>  arch/arm/mach-tegra/Kconfig |    6 +++---
+>  1 files changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
+> index 5ec1846..fec64f3 100644
+> --- a/arch/arm/mach-tegra/Kconfig
+> +++ b/arch/arm/mach-tegra/Kconfig
+> @@ -27,14 +27,14 @@ comment "Tegra board type"
+> 
+>  config MACH_HARMONY
+>         bool "Harmony board"
+> -       select MACH_HAS_SND_SOC_TEGRA_WM8903
+> +       select MACH_HAS_SND_SOC_TEGRA_WM8903 if SND_SOC
+>         help
+>           Support for nVidia Harmony development platform
+> 
+>  config MACH_KAEN
+>         bool "Kaen board"
+>         select MACH_SEABOARD
+> -       select MACH_HAS_SND_SOC_TEGRA_WM8903
+> +       select MACH_HAS_SND_SOC_TEGRA_WM8903 if SND_SOC
+>         help
+>           Support for the Kaen version of Seaboard
+> 
+> @@ -45,7 +45,7 @@ config MACH_PAZ00
+> 
+>  config MACH_SEABOARD
+>         bool "Seaboard board"
+> -       select MACH_HAS_SND_SOC_TEGRA_WM8903
+> +       select MACH_HAS_SND_SOC_TEGRA_WM8903 if SND_SOC
+>         help
+>           Support for nVidia Seaboard development platform. It will
+>  	 also be included for some of the derivative boards that
+> --
+> 1.7.5.4
 
-Or we could find a way to make coexist this two mask cache policies
-(even if I don't see how to do that cleanly) ?
-Alternatively, we could allow to bypass this mask cache...
-
-Regards,
-
-Simon
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110726/b92b8b8b/attachment.sig>
+-- 
+nvpublic
