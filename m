@@ -1,52 +1,86 @@
-From: B19295@freescale.com (Lin Tony-B19295)
-Date: Tue, 26 Jul 2011 02:05:31 +0000
-Subject: [PATCH v2 5/6] ARM: mxs: add usb phy operations
-In-Reply-To: <20110725082403.GA9653@n2100.arm.linux.org.uk>
-References: <1311577284-11506-1-git-send-email-tony.lin@freescale.com>
-	<1311577284-11506-6-git-send-email-tony.lin@freescale.com>
-	<20013.6155.531965.918650@ipc1.ka-ro>
-	<20110725082403.GA9653@n2100.arm.linux.org.uk>
-Message-ID: <97D3A72708D04647A5AC84A04996E5B51661DD@039-SN1MPN1-006.039d.mgd.msft.net>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 25 Jul 2011 22:28:05 -0400 (EDT)
+Subject: [PATCH] net/smsc911x: add device tree probe support
+In-Reply-To: <20110726013026.GH21641@S2100-06.ap.freescale.net>
+References: <1311587040-8988-1-git-send-email-shawn.guo@linaro.org>
+	<20110725213723.GI26735@ponder.secretlab.ca>
+	<20110726010154.GG21641@S2100-06.ap.freescale.net>
+	<alpine.LFD.2.00.1107252105561.12766@xanadu.home>
+	<20110726013026.GH21641@S2100-06.ap.freescale.net>
+Message-ID: <alpine.LFD.2.00.1107252222540.12766@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
-> Sent: Monday, July 25, 2011 4:24 PM
-> To: Lothar Wa?mann
-> Cc: Lin Tony-B19295; koen.beel.barco at gmail.com; linux-usb at vger.kernel.org;
-> stern at rowland.harvard.edu; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH v2 5/6] ARM: mxs: add usb phy operations
-> 
-> On Mon, Jul 25, 2011 at 09:15:23AM +0200, Lothar Wa?mann wrote:
-> > > +	if (WARN_ON(ppriv->internal_phy_clk_already_on < 0))
-> > > +		printk(KERN_ERR "please check phy clock ON/OFF sequence\n"); }
-> 
-> And there should be a blank line here.
-> 
-> > > +static int fsl_usb_host_init(struct platform_device *pdev) {
-> > > +	struct mxc_usbh_platform_data *pdata = pdev->dev.platform_data;
-> > > +	struct mxs_usb_private_date *ppriv = pdata->ppriv;
-> > > +
-> > > +	ppriv->phy_regs = ioremap(MX28_USBPHY1_BASE_ADDR, SZ_8K);
-> > > +	if (ppriv->phy_regs == NULL)
-> > > +		return -ENOMEM;
-> > > +
-> > > +	ppriv->ctrl_regs = ioremap(MX28_USBCTRL1_BASE_ADDR, SZ_8K);
-> > > +	if (ppriv->ctrl_regs == NULL)
-> > > +		return -ENOMEM;
-> > > +
-> > What about proper cleanup in the error case?
-> 
-> Doing something like this is probably easiest:
-> 
-> 	ppriv->phy_regs = ioremap(MX28_USBPHY1_BASE_ADDR, SZ_8K);
-> 	ppriv->ctrl_regs = ioremap(MX28_USBCTRL1_BASE_ADDR, SZ_8K);
-> 	if (!ppriv->phy_regs || !ppriv_ctrl_regs) {
-> 		iounmap(ppriv->phy_regs);
-> 		iounmap(ppriv->ctrl_regs);
-> 		return -ENOMEM;
-> 	}
-> 
-> As iounmap ignores NULL pointers.
- good suggestion, thank you.
+On Tue, 26 Jul 2011, Shawn Guo wrote:
+
+> On Mon, Jul 25, 2011 at 09:16:40PM -0400, Nicolas Pitre wrote:
+> > On Tue, 26 Jul 2011, Shawn Guo wrote:
+> > 
+> > > On Mon, Jul 25, 2011 at 03:37:23PM -0600, Grant Likely wrote:
+> > > > On Mon, Jul 25, 2011 at 05:44:00PM +0800, Shawn Guo wrote:
+> > > > > It adds device tree probe support for smsc911x driver.
+> > > > > 
+> > > > > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > > > > Cc: Grant Likely <grant.likely@secretlab.ca>
+> > > > > Cc: Steve Glendinning <steve.glendinning@smsc.com>
+> > > > > Cc: David S. Miller <davem@davemloft.net>
+> > > > > ---
+> > > > >  Documentation/devicetree/bindings/net/smsc.txt |   34 +++++++
+> > > > >  drivers/net/smsc911x.c                         |  123 +++++++++++++++++++-----
+> > > > >  2 files changed, 132 insertions(+), 25 deletions(-)
+> > > > >  create mode 100644 Documentation/devicetree/bindings/net/smsc.txt
+> > > > > 
+> > > > > diff --git a/Documentation/devicetree/bindings/net/smsc.txt b/Documentation/devicetree/bindings/net/smsc.txt
+> > > > > new file mode 100644
+> > > > > index 0000000..1920695
+> > > > > --- /dev/null
+> > > > > +++ b/Documentation/devicetree/bindings/net/smsc.txt
+> > > > > @@ -0,0 +1,34 @@
+> > > > > +* Smart Mixed-Signal Connectivity (SMSC) LAN Controller
+> > > > > +
+> > > > > +Required properties:
+> > > > > +- compatible : Should be "smsc,lan<model>""smsc,lan"
+> > > > 
+> > > > Drop "smsc,lan".  That's far too generic.
+> > > > 
+> > > The following devices are supported by the driver.
+> > > 
+> > > LAN9115, LAN9116, LAN9117, LAN9118
+> > > LAN9215, LAN9216, LAN9217, LAN9218
+> > > LAN9210, LAN9211
+> > > LAN9220, LAN9221
+> > > 
+> > > If we only keep specific <model> as the compatible, we will have a
+> > > long match table which is actually used nowhere to distinguish the
+> > > device.
+> > > 
+> > > So we need some level generic compatible to save the meaningless
+> > > long match table.  What about: 
+> > > 
+> > > static const struct of_device_id smsc_dt_ids[] = {
+> > >         { .compatible = "smsc,lan9", },
+> > >         { /* sentinel */ }
+> > > };
+> > > 
+> > > Or:
+> > > 
+> > > static const struct of_device_id smsc_dt_ids[] = {
+> > >         { .compatible = "smsc,lan91", },
+> > >         { .compatible = "smsc,lan92", },
+> > >         { /* sentinel */ }
+> > > };
+> > 
+> > None of this unambiguously distinguish the devices supported by this 
+> > driver and the smc91x driver which supports LAN91C92, LAN91C94, 
+> > LAN91C95, LAN91C96, LAN91C100, LAN91C110.
+> > 
+> So you suggest to make a long list to explicitly tell the device type
+> that the driver supports?
+
+I'm not suggesting anything.  :-)  I'm merely pointing out that the 
+above .compatible = "smsc,lan9" or .compatible = "smsc,lan91" are too 
+generic given that there is another driver with different devices to 
+which they could also apply.
+
+
+Nicolas
