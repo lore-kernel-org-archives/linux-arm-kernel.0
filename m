@@ -1,33 +1,28 @@
-From: leoy@marvell.com (Leo Yan)
-Date: Tue, 26 Jul 2011 15:19:01 +0800
-Subject: [PATCH] lib/genalloc: fix gen_pool_virt_to_phys locking
-Message-ID: <1311664741-21336-1-git-send-email-leoy@marvell.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 26 Jul 2011 09:41:25 +0200
+Subject: [PATCH] ARM: mx50: Select IMX_HAVE_PLATFORM_FEC as done on other
+	i.MX devices
+In-Reply-To: <20110725211400.GN16561@pengutronix.de>
+References: <1311621941-4227-1-git-send-email-festevam@gmail.com>
+	<20110725211400.GN16561@pengutronix.de>
+Message-ID: <20110726074125.GH20587@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The func gen_pool_virt_to_phys will iterate the chunk list;
-if find the correct chunk it should need release pool's lock.
+On Mon, Jul 25, 2011 at 11:14:00PM +0200, Uwe Kleine-K?nig wrote:
+> Hello Fabio,
+> 
+> On Mon, Jul 25, 2011 at 04:25:41PM -0300, Fabio Estevam wrote:
+> > -	default y if ARCH_MX25 || SOC_IMX27 || SOC_IMX35 || SOC_IMX51 || SOC_IMX53
+> > +	default y if ARCH_MX25 || SOC_IMX27 || SOC_IMX35 || SOC_IMX51 || SOC_IMX53 || SOC_IMX50
+> Maybe add i.MX50 between 35 and 51? I don't care much though.
 
-Signed-off-by: Leo Yan <leoy@marvell.com>
----
- lib/genalloc.c |    4 +++-
- 1 files changed, 3 insertions(+), 1 deletions(-)
+Me neither. Applied.
 
-diff --git a/lib/genalloc.c b/lib/genalloc.c
-index 577ddf8..e625df5 100644
---- a/lib/genalloc.c
-+++ b/lib/genalloc.c
-@@ -92,8 +92,10 @@ phys_addr_t gen_pool_virt_to_phys(struct gen_pool *pool, unsigned long addr)
- 	list_for_each(_chunk, &pool->chunks) {
- 		chunk = list_entry(_chunk, struct gen_pool_chunk, next_chunk);
- 
--		if (addr >= chunk->start_addr && addr < chunk->end_addr)
-+		if (addr >= chunk->start_addr && addr < chunk->end_addr) {
-+			read_unlock(&pool->lock);
- 			return chunk->phys_addr + addr - chunk->start_addr;
-+		}
- 	}
- 	read_unlock(&pool->lock);
- 
+Sascha
+
 -- 
-1.7.4.1
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
