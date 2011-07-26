@@ -1,152 +1,46 @@
-From: cwchoi00@gmail.com (Chanwoo Choi)
-Date: Tue, 26 Jul 2011 15:03:27 +0900
-Subject: [PATCH V4 01/14] DMA: PL330: Add support runtime PM for PL330 DMAC
-In-Reply-To: <1311557312-26107-2-git-send-email-boojin.kim@samsung.com>
-References: <1311557312-26107-1-git-send-email-boojin.kim@samsung.com>
-	<1311557312-26107-2-git-send-email-boojin.kim@samsung.com>
-Message-ID: <4E2E58AF.4000409@gmail.com>
+From: r65037@freescale.com (Zhu Richard-R65037)
+Date: Tue, 26 Jul 2011 06:27:30 +0000
+Subject: Status of AHCI support for iMX53 and for loco board
+In-Reply-To: <87k4b7mrfz.fsf@lebrac.rtp-net.org>
+References: <87k4b7mrfz.fsf@lebrac.rtp-net.org>
+Message-ID: <010C9052C42A00499CE76D637FA5EE9010A1BD@039-SN1MPN1-006.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Boojin Kim wrote:
-> Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
-> ---
->  drivers/dma/pl330.c |   75 +++++++++++++++++++++++++++++++++++++++++++++++++-
->  1 files changed, 73 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-> index 6abe1ec..b7ecf47 100644
-> --- a/drivers/dma/pl330.c
-> +++ b/drivers/dma/pl330.c
-> @@ -17,6 +17,7 @@
->  #include <linux/interrupt.h>
->  #include <linux/amba/bus.h>
->  #include <linux/amba/pl330.h>
-> +#include <linux/pm_runtime.h>
->  
->  #define NR_DEFAULT_DESC	16
->  
-> @@ -83,6 +84,8 @@ struct dma_pl330_dmac {
->  
->  	/* Peripheral channels connected to this DMAC */
->  	struct dma_pl330_chan peripherals[0]; /* keep at end */
-> +
-> +	struct clk *clk;
->  };
->  
->  struct dma_pl330_desc {
-> @@ -696,6 +699,30 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
->  		goto probe_err1;
->  	}
->  
-> +	pdmac->clk = clk_get(&adev->dev, "dma");
-> +	if (IS_ERR(pdmac->clk)) {
-> +		dev_err(&adev->dev, "Cannot get operation clock.\n");
-> +		ret = -EINVAL;
-> +		goto probe_err1;
-> +	}
-> +
-> +	amba_set_drvdata(adev, pdmac);
-> +
-> +#ifdef CONFIG_PM_RUNTIME
-> +	/* to use the runtime PM helper functions */
-> +	pm_runtime_enable(&adev->dev);
-> +
-> +	/* enable the power domain */
-> +	if (pm_runtime_get_sync(&adev->dev)) {
-> +		dev_err(&adev->dev, "failed to get runtime pm\n");
-> +		ret = -ENODEV;
-> +		goto probe_err1;
-> +	}
-> +#else
-> +	/* enable dma clk */
-> +	clk_enable(pdmac->clk);
-> +#endif
-> +
->  	irq = adev->irq[0];
->  	ret = request_irq(irq, pl330_irq_handler, 0,
->  			dev_name(&adev->dev), pi);
-> @@ -763,8 +790,6 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
->  		goto probe_err4;
->  	}
->  
-> -	amba_set_drvdata(adev, pdmac);
-> -
->  	dev_info(&adev->dev,
->  		"Loaded driver for PL330 DMAC-%d\n", adev->periphid);
->  	dev_info(&adev->dev,
-> @@ -825,6 +850,13 @@ static int __devexit pl330_remove(struct amba_device *adev)
->  	res = &adev->res;
->  	release_mem_region(res->start, resource_size(res));
->  
-> +#ifdef CONFIG_PM_RUNTIME
-> +	pm_runtime_put(&adev->dev);
-> +	pm_runtime_disable(&adev->dev);
-> +#else
-> +	clk_disable(pdmac->clk);
-> +#endif
-> +
->  	kfree(pdmac);
->  
->  	return 0;
-> @@ -838,10 +870,49 @@ static struct amba_id pl330_ids[] = {
->  	{ 0, 0 },
->  };
->  
-> +#ifdef CONFIG_PM_RUNTIME
-> +static int pl330_runtime_suspend(struct device *dev)
-> +{
-> +	struct dma_pl330_dmac *pdmac = dev_get_drvdata(dev);
-> +
-> +	if (!pdmac) {
-> +		dev_err(dev, "failed to get dmac\n");
-> +		return -ENODEV;
-> +	}
-> +
-> +	clk_disable(pdmac->clk);
-> +
-> +	return 0;
-> +}
-> +
-> +static int pl330_runtime_resume(struct device *dev)
-> +{
-> +	struct dma_pl330_dmac *pdmac = dev_get_drvdata(dev);
-> +
-> +	if (!pdmac) {
-> +		dev_err(dev, "failed to get dmac\n");
-> +		return -ENODEV;
-> +	}
-> +
-> +	clk_enable(pdmac->clk);
-> +
-> +	return 0;
-> +}
-> +#else
-> +#define pl330_runtime_suspend	NULL
-> +#define pl330_runtime_resume	NULL
-> +#endif /* CONFIG_PM_RUNTIME */
-> +
-> +static const struct dev_pm_ops pl330_pm_ops = {
-> +	.runtime_suspend = pl330_runtime_suspend,
-> +	.runtime_resume = pl330_runtime_resume,
-> +};
-> +
->  static struct amba_driver pl330_driver = {
->  	.drv = {
->  		.owner = THIS_MODULE,
->  		.name = "dma-pl330",
-> +		.pm = &pl330_pm_ops,
->  	},
->  	.id_table = pl330_ids,
->  	.probe = pl330_probe,
+Hi Arnaud:
+the review is proceeded to Version5, and no more comments.
+The attached files are the latest review email.
 
-I have a question for runtime PM of PL330 DMAC
+Best Regards
+Richard Zhu
 
-This patch support runtime PM for PL330 DMAC, but the clock of "dma" is always on.
-If the clock of "dma" is always on, additional power(10mA) is consumed. I tested it.
 
-I think that the PL330 DMAC only turn on the clock of "dma" when using DMA.
+-----Original Message-----
+From: Arnaud Patard [mailto:arnaud.patard at rtp-net.org] 
+Sent: 2011?7?25? 3:04
+To: linux-arm-kernel at lists.infradead.org
+Cc: Zhu Richard-R65037
+Subject: Status of AHCI support for iMX53 and for loco board
+
+Hi,
+
+I remember seeing some patches to add ahci support for iMX53 and also to loco/imx53qsb board but I don't see any track of them being on their way to mainline. Have they been merged in some tree and are going to be merged mainline for next kernel release or do they still need some fixes, preventing them to be merged ?
 
 
 Thanks,
-Chanwoo Choi
+Arnaud
+
+-------------- next part --------------
+An embedded message was scrubbed...
+From: Zhu Richard-R65037 <r65037@freescale.com>
+Subject: [PATCH V5 2/2] MX53 Enable the AHCI SATA on MX53 LOCO
+Date: Thu, 14 Apr 2011 10:28:12 +0000
+Size: 5080
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110726/0661d252/attachment-0002.mht>
+-------------- next part --------------
+An embedded message was scrubbed...
+From: Zhu Richard-R65037 <r65037@freescale.com>
+Subject: [PATCH V5 1/2] AHCI Add the AHCI SATA feature on MX53 platforms
+Date: Thu, 14 Apr 2011 10:28:11 +0000
+Size: 12828
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110726/0661d252/attachment-0003.mht>
