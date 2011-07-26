@@ -1,46 +1,36 @@
-From: r65037@freescale.com (Zhu Richard-R65037)
-Date: Tue, 26 Jul 2011 06:27:30 +0000
-Subject: Status of AHCI support for iMX53 and for loco board
-In-Reply-To: <87k4b7mrfz.fsf@lebrac.rtp-net.org>
-References: <87k4b7mrfz.fsf@lebrac.rtp-net.org>
-Message-ID: <010C9052C42A00499CE76D637FA5EE9010A1BD@039-SN1MPN1-006.039d.mgd.msft.net>
+From: jhbird.choi@samsung.com (jhbird.choi at samsung.com)
+Date: Tue, 26 Jul 2011 15:21:52 +0900
+Subject: [PATCH] ARM: EXYNOS4: Change the pwm device name to supprot clkdev
+Message-ID: <1311661312-24470-1-git-send-email-jhbird.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnaud:
-the review is proceeded to Version5, and no more comments.
-The attached files are the latest review email.
+From: Jonghwan Choi <jhbird.choi@samsung.com>
 
-Best Regards
-Richard Zhu
+Signed-off-by: Jonghwan Choi <jhbird.choi@samsung.com>
+---
+ arch/arm/mach-exynos4/time.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-
------Original Message-----
-From: Arnaud Patard [mailto:arnaud.patard at rtp-net.org] 
-Sent: 2011?7?25? 3:04
-To: linux-arm-kernel at lists.infradead.org
-Cc: Zhu Richard-R65037
-Subject: Status of AHCI support for iMX53 and for loco board
-
-Hi,
-
-I remember seeing some patches to add ahci support for iMX53 and also to loco/imx53qsb board but I don't see any track of them being on their way to mainline. Have they been merged in some tree and are going to be merged mainline for next kernel release or do they still need some fixes, preventing them to be merged ?
-
-
-Thanks,
-Arnaud
-
--------------- next part --------------
-An embedded message was scrubbed...
-From: Zhu Richard-R65037 <r65037@freescale.com>
-Subject: [PATCH V5 2/2] MX53 Enable the AHCI SATA on MX53 LOCO
-Date: Thu, 14 Apr 2011 10:28:12 +0000
-Size: 5080
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110726/0661d252/attachment-0002.mht>
--------------- next part --------------
-An embedded message was scrubbed...
-From: Zhu Richard-R65037 <r65037@freescale.com>
-Subject: [PATCH V5 1/2] AHCI Add the AHCI SATA feature on MX53 platforms
-Date: Thu, 14 Apr 2011 10:28:11 +0000
-Size: 12828
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110726/0661d252/attachment-0003.mht>
+diff --git a/arch/arm/mach-exynos4/time.c b/arch/arm/mach-exynos4/time.c
+index ebb8f38..9a74294 100644
+--- a/arch/arm/mach-exynos4/time.c
++++ b/arch/arm/mach-exynos4/time.c
+@@ -264,6 +264,7 @@ static void __init exynos4_timer_resources(void)
+ 	clk_enable(timerclk);
+ 
+ 	tmpdev.id = 2;
++	tmpdev.dev.init_name = "s3c24xx-pwm.2";
+ 	tin2 = clk_get(&tmpdev.dev, "pwm-tin");
+ 	if (IS_ERR(tin2))
+ 		panic("failed to get pwm-tin2 clock for system timer");
+@@ -274,6 +275,7 @@ static void __init exynos4_timer_resources(void)
+ 	clk_enable(tin2);
+ 
+ 	tmpdev.id = 4;
++	tmpdev.dev.init_name = "s3c24xx-pwm.4";
+ 	tin4 = clk_get(&tmpdev.dev, "pwm-tin");
+ 	if (IS_ERR(tin4))
+ 		panic("failed to get pwm-tin4 clock for system timer");
+-- 
+1.7.0
