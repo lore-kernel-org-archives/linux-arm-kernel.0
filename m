@@ -1,52 +1,44 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 26 Jul 2011 11:09:28 +0100
-Subject: [RFC PATCH 2/2] GPIO: add gpiolib and irqchip for CSR
-	SiRFprimaII GPIO controller
-In-Reply-To: <1311667993-27189-3-git-send-email-bs14@csr.com>
+Date: Tue, 26 Jul 2011 11:46:28 +0100
+Subject: PLEA: Please fix mach/gpio.h includes (was: Re: [RFC PATCH
+	2/2] GPIO: add gpiolib and irqchip for CSR SiRFprimaII GPIO
+	controller)
+In-Reply-To: <20110726100928.GO9653@n2100.arm.linux.org.uk>
 References: <1311667993-27189-1-git-send-email-bs14@csr.com>
 	<1311667993-27189-3-git-send-email-bs14@csr.com>
-Message-ID: <20110726100928.GO9653@n2100.arm.linux.org.uk>
+	<20110726100928.GO9653@n2100.arm.linux.org.uk>
+Message-ID: <20110726104628.GP9653@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 26, 2011 at 01:13:13AM -0700, Barry Song wrote:
-> diff --git a/arch/arm/mach-prima2/include/mach/gpio.h b/arch/arm/mach-prima2/include/mach/gpio.h
-> new file mode 100644
-> index 0000000..25673b1
-> --- /dev/null
-> +++ b/arch/arm/mach-prima2/include/mach/gpio.h
-> @@ -0,0 +1,34 @@
-> +/*
-> + * arch/arm/mach-prima2/include/mach/gpio.h
-> + *
-> + * Copyright (c) 2011 Cambridge Silicon Radio Limited, a CSR plc group company.
-> + *
-> + * Licensed under GPLv2 or later.
-> + */
-> +
-> +#ifndef __MACH_GPIO_H
-> +#define __MACH_GPIO_H
-> +
-> +#include <mach/irqs.h>
-> +
-> +#ifndef CONFIG_GPIO_SIRFCPLD
-> +#define ARCH_NR_GPIOS	(SIRFSOC_GPIO_BANK_SIZE * SIRFSOC_GPIO_NO_OF_BANKS)
-> +#else
-> +#define ARCH_NR_GPIOS	(SIRFSOC_GPIO_BANK_SIZE * SIRFSOC_GPIO_NO_OF_BANKS + \
-> +	SIRFSOC_GPIO_CPLD_SIZE + SIRFSOC_GPIO_IO_CPLD_SIZE + \
-> +	SIRFSOC_GPIO_HS_CPLD_SIZE)
-> +#endif
-> +
-> +#include <linux/errno.h>
+On Tue, Jul 26, 2011 at 11:09:28AM +0100, Russell King - ARM Linux wrote:
+> Hmm, yet another trivial gpio implementation.  We have 24 others just like
+> this.  Well, mainline does... I have just one.  Patches after the merge
+> window closes.
 
-Why do you need linux/errno.h?  asm-generic/gpio.h already includes this.
+As an additional note to this: we _really_ need to get on top of the
+includes of mach/gpio.h rather than linux/gpio.h - there are around 139
+files in mainline (this morning) which include mach/gpio.h directly.
 
-> +#include <asm-generic/gpio.h>
-> +
-> +#define gpio_get_value	__gpio_get_value
-> +#define gpio_set_value	__gpio_set_value
-> +#define gpio_cansleep	__gpio_cansleep
+There's one which includes both asm/gpio.h and mach/gpio.h, which is
+silly when you look at what asm/gpio.h contains - maybe one attempt
+to include mach/gpio.h wasn't enough!
 
-Hmm, yet another trivial gpio implementation.  We have 24 others just like
-this.  Well, mainline does... I have just one.  Patches after the merge
-window closes.
+These includes get in the way of consolidating stuff out of mach/gpio.h
+into asm/gpio.h - moving stuff out of mach/gpio.h could take it out of
+view of these files, thereby causing build errors.
+
+What is even less clear is whether changing these mach/gpio.h includes
+to linux/gpio.h is correct or not.
+
+So, what I'd like all platform and all soc maintainers to do is to:
+
+	grep -rl '<mach/gpio.h>' arch/arm drivers
+
+and investigate their files from that list which they're responsible for,
+and submit patches to _me_ to fix these includes up (preferably to use
+linux/gpio.h).  I'd also like them to do a better job at spotting these
+while reviewing patches on the list to help reduce new occurances of
+this.
+
+Thanks.
