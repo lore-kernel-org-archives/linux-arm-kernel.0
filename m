@@ -1,25 +1,38 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 26 Jul 2011 09:00:52 +0100
-Subject: [PATCH V2 5/7] ARM: S5P64X0: Add file to hold common
-	Framebuffer and LCD code
-In-Reply-To: <1311624025-2643-6-git-send-email-ajaykumar.rs@samsung.com>
-References: <1311624025-2643-1-git-send-email-ajaykumar.rs@samsung.com>
-	<1311624025-2643-6-git-send-email-ajaykumar.rs@samsung.com>
-Message-ID: <20110726080052.GM9653@n2100.arm.linux.org.uk>
+Date: Tue, 26 Jul 2011 09:02:33 +0100
+Subject: [PATCH V4 06/14] ARM: SAMSUNG: Add common DMA operations
+In-Reply-To: <CABb+yY0nWLpdVGqTJPO2YwkGWiDw5tRjC2xn7Le0bO0ZNFHC_g@mail.gmail.com>
+References: <1311557312-26107-1-git-send-email-boojin.kim@samsung.com>
+	<1311557312-26107-7-git-send-email-boojin.kim@samsung.com>
+	<CABb+yY0nWLpdVGqTJPO2YwkGWiDw5tRjC2xn7Le0bO0ZNFHC_g@mail.gmail.com>
+Message-ID: <20110726080233.GN9653@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 25, 2011 at 04:00:23PM -0400, Ajay Kumar wrote:
-> diff --git a/arch/arm/mach-s5p64x0/Kconfig b/arch/arm/mach-s5p64x0/Kconfig
-> index 4fee745..ed87151 100644
-> --- a/arch/arm/mach-s5p64x0/Kconfig
-> +++ b/arch/arm/mach-s5p64x0/Kconfig
-> @@ -32,6 +32,11 @@ config S5P64X0_SETUP_I2C1
->  	help
->  	  Common setup code for i2c bus 1.
->  
-> +config COMMON_FB
+On Mon, Jul 25, 2011 at 05:21:44PM +0530, Jassi Brar wrote:
+> On Mon, Jul 25, 2011 at 6:58 AM, Boojin Kim <boojin.kim@samsung.com> wrote:
+> 
+> > +
+> > +static bool pl330_filter(struct dma_chan *chan, void *param)
+> > +{
+> > + ? ? ? struct dma_pl330_peri *peri = (struct dma_pl330_peri *)chan->private;
+> > + ? ? ? unsigned dma_ch = (unsigned)param;
+> > +
+> > + ? ? ? if (peri->peri_id != dma_ch)
+> > + ? ? ? ? ? ? ? return false;
+> > +
+> > + ? ? ? return true;
+> > +}
+> This is what I meant... if we keep chan_id for paltform assigned IDs,
+> these filter functions could simply become
+> 
+> static bool pl330_filter(struct dma_chan *chan, void *param)
+> {
+>         return chan->chan_id == param
+> }
+> 
+> And ideally in the long run, we could just drop the filter callback
+> and add expected channel ID to the request_channel call.
 
-This is a very bad config name.  It's specific to a group of SoCs but it
-seems to be advertising itself as something which isn't.  What if
-drivers/video/Kconfig gets a COMMON_FB symbol too?
+So what if you have a PL080 and PL330 drivers registered with the DMA
+engine code, and you need to match a specific PL330 channel?
