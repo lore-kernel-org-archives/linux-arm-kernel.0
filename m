@@ -1,14 +1,15 @@
-From: kirill@shutemov.name (Kirill A. Shutemov)
-Date: Tue, 26 Jul 2011 23:18:58 +0300
-Subject: [PATCH 1/2] ARM: alignment: Make SIGBUS sent to userspace
-	POSIXly correct
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 26 Jul 2011 16:34:15 -0400 (EDT)
+Subject: [PATCH 1/2] ARM: alignment: Make SIGBUS sent to userspace POSIXly
+	correct
 In-Reply-To: <1311689686-7451-1-git-send-email-dave.martin@linaro.org>
 References: <1311689686-7451-1-git-send-email-dave.martin@linaro.org>
-Message-ID: <20110726201858.GA6322@shutemov.name>
+Message-ID: <alpine.LFD.2.00.1107261633390.12766@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 26, 2011 at 03:14:46PM +0100, Dave Martin wrote:
+On Tue, 26 Jul 2011, Dave Martin wrote:
+
 > With the UM_SIGNAL alignment fault mode, no siginfo structure is
 > passed to userspace.
 > 
@@ -21,7 +22,7 @@ On Tue, Jul 26, 2011 at 03:14:46PM +0100, Dave Martin wrote:
 > 
 > Signed-off-by: Dave Martin <dave.martin@linaro.org>
 
-Reviewed-by: Kirill A. Shutemov <kirill@shutemov.name>
+Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 
 > ---
 >  arch/arm/mm/alignment.c |   14 +++++++++++---
@@ -62,11 +63,3 @@ Reviewed-by: Kirill A. Shutemov <kirill@shutemov.name>
 > -- 
 > 1.7.4.1
 > 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
--- 
- Kirill A. Shutemov
