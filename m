@@ -1,36 +1,72 @@
-From: per.forlin@linaro.org (Per Forlin)
-Date: Tue, 26 Jul 2011 22:11:59 +0200
-Subject: [PATCH v4 3/3] fault injection: add documentation on MMC IO fault
-	injection
-In-Reply-To: <1311711119-6286-1-git-send-email-per.forlin@linaro.org>
-References: <1311711119-6286-1-git-send-email-per.forlin@linaro.org>
-Message-ID: <1311711119-6286-4-git-send-email-per.forlin@linaro.org>
+From: kirill@shutemov.name (Kirill A. Shutemov)
+Date: Tue, 26 Jul 2011 23:18:58 +0300
+Subject: [PATCH 1/2] ARM: alignment: Make SIGBUS sent to userspace
+	POSIXly correct
+In-Reply-To: <1311689686-7451-1-git-send-email-dave.martin@linaro.org>
+References: <1311689686-7451-1-git-send-email-dave.martin@linaro.org>
+Message-ID: <20110726201858.GA6322@shutemov.name>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add description on how to enable random fault injection
-for MMC IO
+On Tue, Jul 26, 2011 at 03:14:46PM +0100, Dave Martin wrote:
+> With the UM_SIGNAL alignment fault mode, no siginfo structure is
+> passed to userspace.
+> 
+> POSIX specifies how siginfo_t should be populated for alignment
+> faults, so this patch does just that:
+> 
+>   * si_signo = SIGBUS
+>   * si_code = BUS_ADRALN
+>   * si_addr = address of the faulted instruction
+> 
+> Signed-off-by: Dave Martin <dave.martin@linaro.org>
 
-Signed-off-by: Per Forlin <per.forlin@linaro.org>
----
- Documentation/fault-injection/fault-injection.txt |    5 +++++
- 1 files changed, 5 insertions(+), 0 deletions(-)
+Reviewed-by: Kirill A. Shutemov <kirill@shutemov.name>
 
-diff --git a/Documentation/fault-injection/fault-injection.txt b/Documentation/fault-injection/fault-injection.txt
-index 7be15e4..27eede4 100644
---- a/Documentation/fault-injection/fault-injection.txt
-+++ b/Documentation/fault-injection/fault-injection.txt
-@@ -21,6 +21,11 @@ o fail_make_request
-   /sys/block/<device>/make-it-fail or
-   /sys/block/<device>/<partition>/make-it-fail. (generic_make_request())
- 
-+o fail_mmc_request
-+
-+  injects MMC data errors on devices permitted by setting
-+  /sys/kernel/debug/mmc0/make-it-fail
-+
- Configure fault-injection capabilities behavior
- -----------------------------------------------
- 
+> ---
+>  arch/arm/mm/alignment.c |   14 +++++++++++---
+>  1 files changed, 11 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
+> index 724ba3b..9a65aaf 100644
+> --- a/arch/arm/mm/alignment.c
+> +++ b/arch/arm/mm/alignment.c
+> @@ -22,6 +22,7 @@
+>  #include <linux/sched.h>
+>  #include <linux/uaccess.h>
+>  
+> +#include <asm/system.h>
+>  #include <asm/unaligned.h>
+>  
+>  #include "fault.h"
+> @@ -883,9 +884,16 @@ do_alignment(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+>  	if (ai_usermode & UM_FIXUP)
+>  		goto fixup;
+>  
+> -	if (ai_usermode & UM_SIGNAL)
+> -		force_sig(SIGBUS, current);
+> -	else {
+> +	if (ai_usermode & UM_SIGNAL) {
+> +		siginfo_t si;
+> +
+> +		si.si_signo = SIGBUS;
+> +		si.si_errno = 0;
+> +		si.si_code = BUS_ADRALN;
+> +		si.si_addr = (void __user *)instruction_pointer(regs);
+> +
+> +		force_sig_info(si.si_signo, &si, current);
+> +	} else {
+>  		/*
+>  		 * We're about to disable the alignment trap and return to
+>  		 * user space.  But if an interrupt occurs before actually
+> -- 
+> 1.7.4.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
 -- 
-1.7.4.1
+ Kirill A. Shutemov
