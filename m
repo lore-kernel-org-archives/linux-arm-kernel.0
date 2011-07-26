@@ -1,59 +1,74 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Tue, 26 Jul 2011 10:15:59 +0200
-Subject: [PATCH v2] ARM: tegra: only select MACH_HAS_SND_SOC_TEGRA_WM8903 if
-	SND_SOC
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF049EBDF52B@HQMAIL01.nvidia.com>
-References: <74CDBE0F657A3D45AFBB94109FB122FF049EBDF52B@HQMAIL01.nvidia.com>
-Message-ID: <1311668159-11337-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Tue, 26 Jul 2011 09:57:25 +0100
+Subject: [PATCH] Documentation: Document ARM's user_debug parameter
+In-Reply-To: <20110725142924.85de25dd.rdunlap@xenotime.net>
+References: <1311556514-24728-1-git-send-email-sboyd@codeaurora.org>
+	<20110725142924.85de25dd.rdunlap@xenotime.net>
+Message-ID: <20110726085721.GB2075@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This fixes:
-	warning: (MACH_HARMONY && MACH_KAEN && MACH_SEABOARD) selects MACH_HAS_SND_SOC_TEGRA_WM8903 which has unmet direct dependencies (SOUND && !M68K && SND && SND_SOC)
+On Mon, Jul 25, 2011 at 02:29:24PM -0700, Randy Dunlap wrote:
+> On Sun, 24 Jul 2011 18:15:14 -0700 Stephen Boyd wrote:
+> 
+> > Usually kernel parameters are documented in kernel-parameters.txt
+> > but user_debug is only documented in the Kconfig. Document the
+> > option and point to the Kconfig help text for more info.
+> > 
+> > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> > Cc: Russell King <linux@arm.linux.org.uk>
+> 
+> Is this a superset of 'print_fatal_signals'?
+> 
+> Applied, thanks.
+> 
+> > ---
+> >  Documentation/kernel-parameters.txt |   10 ++++++++++
+> >  1 files changed, 10 insertions(+), 0 deletions(-)
+> > 
+> > diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
+> > index aa47be7..8186adc 100644
+> > --- a/Documentation/kernel-parameters.txt
+> > +++ b/Documentation/kernel-parameters.txt
+> > @@ -2612,6 +2612,16 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
+> >  					medium is write-protected).
+> >  			Example: quirks=0419:aaf5:rl,0421:0433:rc
+> >  
+> > +	user_debug=	[KNL,ARM]
+> > +			Format: <int>
+> > +			See arch/arm/Kconfig.debug help text.
+> > +				 1 - undefined instruction events
+> > +				 2 - system calls
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
-Changes since (implicit) v1:
- - correctly depend on SND_SOC instead of the non-existent SOUND_SOC
- - fix commit log accordingly
+linux$ git grep UDBG_SYSCALL -- arch/arm/
+include/asm/system.h:#define UDBG_SYSCALL       (1 << 1)
+kernel/traps.c: if (user_debug & UDBG_SYSCALL) {
+kernel/traps.c: if (user_debug & UDBG_SYSCALL) {
 
-Thanks to Stephen Warren for noticing.
+Looking@kernel/traps.c, it looks like only undefined or obsolete
+syscalls are logged.  It could be worth clarifying this in the wording,
+both here and in arch/arm/Kconfig.debug.
 
-Best regards
-Uwe
+Cheers
+---Dave
 
- arch/arm/mach-tegra/Kconfig |    6 +++---
- 1 files changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
-index 5ec1846..fec64f3 100644
---- a/arch/arm/mach-tegra/Kconfig
-+++ b/arch/arm/mach-tegra/Kconfig
-@@ -27,14 +27,14 @@ comment "Tegra board type"
- 
- config MACH_HARMONY
-        bool "Harmony board"
--       select MACH_HAS_SND_SOC_TEGRA_WM8903
-+       select MACH_HAS_SND_SOC_TEGRA_WM8903 if SND_SOC
-        help
-          Support for nVidia Harmony development platform
- 
- config MACH_KAEN
-        bool "Kaen board"
-        select MACH_SEABOARD
--       select MACH_HAS_SND_SOC_TEGRA_WM8903
-+       select MACH_HAS_SND_SOC_TEGRA_WM8903 if SND_SOC
-        help
-          Support for the Kaen version of Seaboard
- 
-@@ -45,7 +45,7 @@ config MACH_PAZ00
- 
- config MACH_SEABOARD
-        bool "Seaboard board"
--       select MACH_HAS_SND_SOC_TEGRA_WM8903
-+       select MACH_HAS_SND_SOC_TEGRA_WM8903 if SND_SOC
-        help
-          Support for nVidia Seaboard development platform. It will
- 	 also be included for some of the derivative boards that
--- 
-1.7.5.4
+> > +				 4 - invalid data aborts
+> > +				 8 - SIGSEGV faults
+> > +				16 - SIGBUS faults
+> > +			Example: user_debug=31
+> > +
+> >  	userpte=
+> >  			[X86] Flags controlling user PTE allocations.
+> >  
+> > -- 
+> > Sent by an employee of the Qualcomm Innovation Center, Inc.
+> > The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+> 
+> ---
+> ~Randy
+> *** Remember to use Documentation/SubmitChecklist when testing your code ***
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
