@@ -1,79 +1,56 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 26 Jul 2011 09:30:26 +0800
-Subject: [PATCH] net/smsc911x: add device tree probe support
-In-Reply-To: <alpine.LFD.2.00.1107252105561.12766@xanadu.home>
-References: <1311587040-8988-1-git-send-email-shawn.guo@linaro.org>
-	<20110725213723.GI26735@ponder.secretlab.ca>
-	<20110726010154.GG21641@S2100-06.ap.freescale.net>
-	<alpine.LFD.2.00.1107252105561.12766@xanadu.home>
-Message-ID: <20110726013026.GH21641@S2100-06.ap.freescale.net>
+From: akinobu.mita@gmail.com (Akinobu Mita)
+Date: Tue, 26 Jul 2011 10:41:22 +0900
+Subject: [PATCH v3 2/3] mmc: core: add random fault injection
+In-Reply-To: <CAJ0pr19oTmt5PQw45wbRO8qEzVi3J1OgL=w9Ma7XxX-=1A=A=A@mail.gmail.com>
+References: <1311199321-4618-1-git-send-email-per.forlin@linaro.org>
+	<1311199321-4618-3-git-send-email-per.forlin@linaro.org>
+	<CAC5umyg44tQxrFEYRL-tjzBMA2+KNXjB+nQveH3KcB_LPmYVHw@mail.gmail.com>
+	<CAJ0pr1_rL8rsEbDR-PL6fs9EzyGfUMbmeUjTGk=WspvrAkdy+g@mail.gmail.com>
+	<CAJ0pr19oTmt5PQw45wbRO8qEzVi3J1OgL=w9Ma7XxX-=1A=A=A@mail.gmail.com>
+Message-ID: <CAC5umyjR3V2uFtWZ7tQQtGH2B=s+-C43U1H01qYysBScYc8fxQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 25, 2011 at 09:16:40PM -0400, Nicolas Pitre wrote:
-> On Tue, 26 Jul 2011, Shawn Guo wrote:
-> 
-> > On Mon, Jul 25, 2011 at 03:37:23PM -0600, Grant Likely wrote:
-> > > On Mon, Jul 25, 2011 at 05:44:00PM +0800, Shawn Guo wrote:
-> > > > It adds device tree probe support for smsc911x driver.
-> > > > 
-> > > > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > > > Cc: Grant Likely <grant.likely@secretlab.ca>
-> > > > Cc: Steve Glendinning <steve.glendinning@smsc.com>
-> > > > Cc: David S. Miller <davem@davemloft.net>
-> > > > ---
-> > > >  Documentation/devicetree/bindings/net/smsc.txt |   34 +++++++
-> > > >  drivers/net/smsc911x.c                         |  123 +++++++++++++++++++-----
-> > > >  2 files changed, 132 insertions(+), 25 deletions(-)
-> > > >  create mode 100644 Documentation/devicetree/bindings/net/smsc.txt
-> > > > 
-> > > > diff --git a/Documentation/devicetree/bindings/net/smsc.txt b/Documentation/devicetree/bindings/net/smsc.txt
-> > > > new file mode 100644
-> > > > index 0000000..1920695
-> > > > --- /dev/null
-> > > > +++ b/Documentation/devicetree/bindings/net/smsc.txt
-> > > > @@ -0,0 +1,34 @@
-> > > > +* Smart Mixed-Signal Connectivity (SMSC) LAN Controller
-> > > > +
-> > > > +Required properties:
-> > > > +- compatible : Should be "smsc,lan<model>""smsc,lan"
-> > > 
-> > > Drop "smsc,lan".  That's far too generic.
-> > > 
-> > The following devices are supported by the driver.
-> > 
-> > LAN9115, LAN9116, LAN9117, LAN9118
-> > LAN9215, LAN9216, LAN9217, LAN9218
-> > LAN9210, LAN9211
-> > LAN9220, LAN9221
-> > 
-> > If we only keep specific <model> as the compatible, we will have a
-> > long match table which is actually used nowhere to distinguish the
-> > device.
-> > 
-> > So we need some level generic compatible to save the meaningless
-> > long match table.  What about: 
-> > 
-> > static const struct of_device_id smsc_dt_ids[] = {
-> >         { .compatible = "smsc,lan9", },
-> >         { /* sentinel */ }
-> > };
-> > 
-> > Or:
-> > 
-> > static const struct of_device_id smsc_dt_ids[] = {
-> >         { .compatible = "smsc,lan91", },
-> >         { .compatible = "smsc,lan92", },
-> >         { /* sentinel */ }
-> > };
-> 
-> None of this unambiguously distinguish the devices supported by this 
-> driver and the smc91x driver which supports LAN91C92, LAN91C94, 
-> LAN91C95, LAN91C96, LAN91C100, LAN91C110.
-> 
-So you suggest to make a long list to explicitly tell the device type
-that the driver supports?
+2011/7/26 Per Forlin <per.forlin@linaro.org>:
+>>> And I know that init_fault_attr_dentries() can only create a
+>>> subdirectory in debugfs root directory. ?But I have a patch which
+>>> support for creating it in arbitrary directory. ?Could you take a look
+>>> at this? (Note that this patch is based on mmotm and not yet tested)
+>>>
+> I looked at your patch and it raised two questions.
+> I can't use FAULT_ATTR_INITIALIZER since mmc_host is allocated on the
+> heap. It looks like setup_fault_attr(attr, str) will fail if str is
+> NULL. How can I initialise the fault_attrs if not stack allocated?
+> About the boot param initialisation of fault attr. There can only be
+> one fault_mmc_request boot param for the entire kernel but there is
+> one fault_attr per host, and there may be many hosts. It would be
+> convenient if setup_fault_attrs would take (attr, boot_param_name),
+> look up boot_param_name and use that otherwise set default values.
 
--- 
-Regards,
-Shawn
+I think you can define one default fail_attr for boot time configuration
+and copy it to per-host fail_attr in mmc_add_host_debugfs().
+
+/* pseudo-code */
+
+static DECLARE_FAULT_ATTR(default_mmc_fail_attr);
+
+static int __init setup_fail_mmc_request(char *str)
+{
+	return setup_fault_attr(&default_mmc_fail_attr, str);
+}
+__setup("fail_mmc_request=", setup_fail_mmc_request);
+
+...
+
+void mmc_add_host_debugfs(struct mmc_host *host)
+{
+	...
+
+#ifdef CONFIG_FAIL_MMC_REQUEST
+	host->fail_attr = default_mmc_fail_attr;
+	if (!debugfs_create_fault_attr("fail_mmc_request",
+					root, &host->fail_attr))
+		goto err_node;
+#endif
+	...
+}
