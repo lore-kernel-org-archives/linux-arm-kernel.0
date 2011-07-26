@@ -1,38 +1,37 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 26 Jul 2011 09:02:33 +0100
-Subject: [PATCH V4 06/14] ARM: SAMSUNG: Add common DMA operations
-In-Reply-To: <CABb+yY0nWLpdVGqTJPO2YwkGWiDw5tRjC2xn7Le0bO0ZNFHC_g@mail.gmail.com>
-References: <1311557312-26107-1-git-send-email-boojin.kim@samsung.com>
-	<1311557312-26107-7-git-send-email-boojin.kim@samsung.com>
-	<CABb+yY0nWLpdVGqTJPO2YwkGWiDw5tRjC2xn7Le0bO0ZNFHC_g@mail.gmail.com>
-Message-ID: <20110726080233.GN9653@n2100.arm.linux.org.uk>
+From: bs14@csr.com (Barry Song)
+Date: Tue, 26 Jul 2011 01:13:11 -0700
+Subject: [RFC PATCH 0/2] add pinmux and gpio for CSR SiRFprimaII
+Message-ID: <1311667993-27189-1-git-send-email-bs14@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 25, 2011 at 05:21:44PM +0530, Jassi Brar wrote:
-> On Mon, Jul 25, 2011 at 6:58 AM, Boojin Kim <boojin.kim@samsung.com> wrote:
-> 
-> > +
-> > +static bool pl330_filter(struct dma_chan *chan, void *param)
-> > +{
-> > + ? ? ? struct dma_pl330_peri *peri = (struct dma_pl330_peri *)chan->private;
-> > + ? ? ? unsigned dma_ch = (unsigned)param;
-> > +
-> > + ? ? ? if (peri->peri_id != dma_ch)
-> > + ? ? ? ? ? ? ? return false;
-> > +
-> > + ? ? ? return true;
-> > +}
-> This is what I meant... if we keep chan_id for paltform assigned IDs,
-> these filter functions could simply become
-> 
-> static bool pl330_filter(struct dma_chan *chan, void *param)
-> {
->         return chan->chan_id == param
-> }
-> 
-> And ideally in the long run, we could just drop the filter callback
-> and add expected channel ID to the request_channel call.
+The following two patches add pinmux and gpio support for CSR SiRFprimaII.
 
-So what if you have a PL080 and PL330 drivers registered with the DMA
-engine code, and you need to match a specific PL330 channel?
+Now the pinmux subsystem of Linus Walleij, so patch 1 isn't based on it yet.
+But it is easy to move that to use new framework once pinmux subsystem is merged.
+
+Rongjun Ying (1):
+  ARM: CSR: Add pinmux support for SiRFprimaII
+
+Yuping Luo (1):
+  GPIO: add gpiolib and irqchip for CSR SiRFprimaII GPIO controller
+
+ arch/arm/boot/dts/prima2-cb.dts               |    2 +-
+ arch/arm/mach-prima2/Makefile                 |    1 +
+ arch/arm/mach-prima2/include/mach/gpio.h      |   34 +
+ arch/arm/mach-prima2/include/mach/irqs.h      |   11 +
+ arch/arm/mach-prima2/include/mach/regs-gpio.h |   30 +
+ arch/arm/mach-prima2/pinmux.c                 |  824 +++++++++++++++++++++++++
+ drivers/gpio/Kconfig                          |    6 +
+ drivers/gpio/Makefile                         |    1 +
+ drivers/gpio/gpio-sirf.c                      |  529 ++++++++++++++++
+ 9 files changed, 1437 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/mach-prima2/include/mach/gpio.h
+ create mode 100644 arch/arm/mach-prima2/include/mach/regs-gpio.h
+ create mode 100644 arch/arm/mach-prima2/pinmux.c
+ create mode 100644 drivers/gpio/gpio-sirf.c
+
+
+
+Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
+More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
