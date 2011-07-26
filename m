@@ -1,34 +1,86 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 26 Jul 2011 14:12:57 +0100
-Subject: [PATCH V4 03/14] DMA: PL330: Support DMA_SLAVE_CONFIG command
-In-Reply-To: <003c01cc4b94$82e39e20$88aada60$%kim@samsung.com>
-References: <1311557312-26107-1-git-send-email-boojin.kim@samsung.com>
-	<1311557312-26107-4-git-send-email-boojin.kim@samsung.com>
-	<1311589617.27357.3.camel@vkoul-mobl4>
-	<002401cc4ac9$97737570$c65a6050$%kim@samsung.com>
-	<1311601700.8206.7.camel@vkoul-mobl4>
-	<003c01cc4b94$82e39e20$88aada60$%kim@samsung.com>
-Message-ID: <20110726131257.GA1655@n2100.arm.linux.org.uk>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 26 Jul 2011 16:17:19 +0300
+Subject: [PATCH V3 03/19] OMAP3+: voltage: remove initial voltage
+In-Reply-To: <20110308015232.GA4702@maz>
+References: <1299338962-5602-1-git-send-email-nm@ti.com>
+	<1299338962-5602-4-git-send-email-nm@ti.com>
+	<4D738E04.5090207@ru.mvista.com> <4D744870.20909@ti.com>
+	<4D750673.702@ru.mvista.com> <20110308015232.GA4702@maz>
+Message-ID: <20110726131718.GP32582@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 26, 2011 at 10:04:10PM +0900, Boojin Kim wrote:
-> Vinod Koul Wrote:
-> > I meant you should use proper fields for passing info, which in this
-> > case would be dst_maxburst for specifying destination burst sizes
-> I think the naming seems to make confusion.
-> 'Peri->burst_sz' on this code means the width of fifo in bytes of the peri. 
-> It's same with the meaning 'xxx_addr_width'. So, I think it's proper usage.
-> 'peri->burst_sz' is passed to PL330 HW. PL330 HW wants to get the power of 2 
-> based the fifo width for it.
-> For example, If fifo width is 8 bytes, PL330 HW should get '3' for it.
-> And I will modify code to consider xxx_maxburst.
+On Tue, Mar 08, 2011 at 07:22:32AM +0530, Nishanth Menon wrote:
+> On Mon, Mar 07, 2011 at 07:23:15PM +0300, Sergei Shtylyov wrote:
+> > Hello.
+> > 
+> > On 07-03-2011 5:52, Nishanth Menon wrote:
+> > 
+> > >>>Blindly setting a 1.2V setting
+> > 
+> > >>Hm, seems tautological...
+> > 
+> > >As a non native English speaker, I would like to understand how we could
+> > >improve this. I suppose you mean "Blindly setting 1.2V" is better here. Am i
+> > >correct?
+> > 
+> >    Yes.
+> OK, here is the update as per the suggestion:
+> Regards,
+> Nishanth Menon
+> From: Nishanth Menon <nm@ti.com>
+> Date: Tue, 15 Feb 2011 09:37:18 +0530
+> Subject: [PATCH V4 3/19] OMAP3+: voltage: remove initial voltage
+> 
+> Blindly setting 1.2V in the initial structure may not even match the
+> default voltages stored in the voltage table which are supported for
+> the domain. For example, OMAP3430 core domain does not use 1.2V and
+> ends up generating a warning on the first transition.
+> 
+> Further, since omap2_set_init_voltage is called as part of the pm
+> framework's initialization sequence to configure the voltage required
+> for the current OPP, the call does(and has to) setup the system
+> voltage(curr_volt as a result) using the right mechanisms appropriate
+> for the system at that point of time. This also overrides
+> initialization we are currently doing in voltage.c making it
+> redundant. So, remove the wrong and redundant initialization.
+> 
+> Signed-off-by: Nishanth Menon <nm@ti.com>
 
-IMHO from your description above, peri->burst_sz is misnamed.  Please
-add a comment at this location to say something like:
+FWIW:
 
-	/* peri->burst_sz is the peripheral fifo width */
+Reviewed-by: Felipe Balbi <balbi@ti.com>
 
-to explain this.
+> ---
+>  arch/arm/mach-omap2/voltage.c |    1 -
+>  1 files changed, 0 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/voltage.c b/arch/arm/mach-omap2/voltage.c
+> index 56961df..1b40aa0 100644
+> --- a/arch/arm/mach-omap2/voltage.c
+> +++ b/arch/arm/mach-omap2/voltage.c
+> @@ -116,7 +116,6 @@ static int __init _config_common_vdd_data(struct omap_vdd_info *vdd)
+>  	sys_clk_speed /= 1000;
+>  
+>  	/* Generic voltage parameters */
+> -	vdd->curr_volt = 1200000;
+>  	vdd->volt_scale = vp_forceupdate_scale_voltage;
+>  	vdd->vp_enabled = false;
+>  
+> -- 
+> 1.7.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-Thanks.
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 490 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110726/44d6beb9/attachment.sig>
