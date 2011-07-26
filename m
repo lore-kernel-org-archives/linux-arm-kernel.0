@@ -1,61 +1,25 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 26 Jul 2011 08:39:14 +0200
-Subject: [PATCH 1/2] arm/mx5: parse iomuxc pad configuratoin from device
-	tree
-In-Reply-To: <1311606467-28985-2-git-send-email-shawn.guo@linaro.org>
-References: <1311606467-28985-1-git-send-email-shawn.guo@linaro.org>
-	<1311606467-28985-2-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20110726063914.GB20587@pengutronix.de>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Tue, 26 Jul 2011 06:57:27 +0000 (UTC)
+Subject: [PATCH 0/8] ARM: SAMSUNG: Add common PWM Backlight support
+References: <1310740968-26722-1-git-send-email-banajit.g@samsung.com>
+Message-ID: <j0logn$1bn$1@dough.gmane.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 25, 2011 at 11:07:46PM +0800, Shawn Guo wrote:
-> It adds function mxc_iomuxc_dt_init() to parse iomuxc pad configuration
-> from device tree.
+Hello,
+
+On Fri, 15 Jul 2011 20:12:40 +0530, Banajit Goswami wrote:
+
+> The patches are created against "for-next" branch of Kukjin Kim's tree
+> at:
+>  git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
 > 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> ---
->  .../devicetree/bindings/arm/fsl/iomuxc.txt         |   47 +++++++++++++
->  arch/arm/mach-mx5/Makefile                         |    2 +
->  arch/arm/mach-mx5/iomuxc-dt.c                      |   72 ++++++++++++++++++++
->  arch/arm/plat-mxc/include/mach/common.h            |    3 +
->  4 files changed, 124 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/arm/fsl/iomuxc.txt
->  create mode 100644 arch/arm/mach-mx5/iomuxc-dt.c
-> 
-> + */
-> +
-> +#include <linux/of.h>
-> +#include <asm/io.h>
+>  Patch [1/8]
+>   -- add a common infrastructure to support PWM backlight for various
+>      Samsung boards.
 
-linux/io.h
-
-> +
-> +#define IOMUXC_CONFIG_SION	(1 << 4)
-> +
-> +void mxc_iomuxc_dt_init(const struct of_device_id *match)
-> +{
-> +	struct device_node *node = of_find_matching_node(NULL, match);
-> +	struct device_node *child;
-> +	void __iomem *base;
-> +	u32 reg[2], select_input[2];
-> +	u32 mux_mode, pad_ctl;
-> +
-> +	if (!node) {
-> +		pr_warn("%s: no iomuxc node found\n", __func__);
-> +		return;
-> +	}
-
-Please remove this warning. Some boards may intentionally do the iomux
-setup in the bootloader and skip the iomux setup nodes in the device
-tree.
-
-Sascha
+Why can't you use the drivers/video/backlight/pwm-bl.c ?
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+With best wishes
+Dmitry
