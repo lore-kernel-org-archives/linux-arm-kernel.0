@@ -1,74 +1,55 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Tue, 26 Jul 2011 09:57:25 +0100
-Subject: [PATCH] Documentation: Document ARM's user_debug parameter
-In-Reply-To: <20110725142924.85de25dd.rdunlap@xenotime.net>
-References: <1311556514-24728-1-git-send-email-sboyd@codeaurora.org>
-	<20110725142924.85de25dd.rdunlap@xenotime.net>
-Message-ID: <20110726085721.GB2075@arm.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Tue, 26 Jul 2011 18:01:56 +0900
+Subject: [PATCH] ARM: EXYNOS4: Add support power-domain of EXYNOS4210 on NURI
+	board
+Message-ID: <4E2E8284.9000500@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 25, 2011 at 02:29:24PM -0700, Randy Dunlap wrote:
-> On Sun, 24 Jul 2011 18:15:14 -0700 Stephen Boyd wrote:
-> 
-> > Usually kernel parameters are documented in kernel-parameters.txt
-> > but user_debug is only documented in the Kconfig. Document the
-> > option and point to the Kconfig help text for more info.
-> > 
-> > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> > Cc: Russell King <linux@arm.linux.org.uk>
-> 
-> Is this a superset of 'print_fatal_signals'?
-> 
-> Applied, thanks.
-> 
-> > ---
-> >  Documentation/kernel-parameters.txt |   10 ++++++++++
-> >  1 files changed, 10 insertions(+), 0 deletions(-)
-> > 
-> > diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
-> > index aa47be7..8186adc 100644
-> > --- a/Documentation/kernel-parameters.txt
-> > +++ b/Documentation/kernel-parameters.txt
-> > @@ -2612,6 +2612,16 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
-> >  					medium is write-protected).
-> >  			Example: quirks=0419:aaf5:rl,0421:0433:rc
-> >  
-> > +	user_debug=	[KNL,ARM]
-> > +			Format: <int>
-> > +			See arch/arm/Kconfig.debug help text.
-> > +				 1 - undefined instruction events
-> > +				 2 - system calls
+Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ arch/arm/mach-exynos4/Kconfig     |    1 +
+ arch/arm/mach-exynos4/mach-nuri.c |    8 ++++++++
+ 2 files changed, 9 insertions(+), 0 deletions(-)
 
-linux$ git grep UDBG_SYSCALL -- arch/arm/
-include/asm/system.h:#define UDBG_SYSCALL       (1 << 1)
-kernel/traps.c: if (user_debug & UDBG_SYSCALL) {
-kernel/traps.c: if (user_debug & UDBG_SYSCALL) {
-
-Looking@kernel/traps.c, it looks like only undefined or obsolete
-syscalls are logged.  It could be worth clarifying this in the wording,
-both here and in arch/arm/Kconfig.debug.
-
-Cheers
----Dave
-
-> > +				 4 - invalid data aborts
-> > +				 8 - SIGSEGV faults
-> > +				16 - SIGBUS faults
-> > +			Example: user_debug=31
-> > +
-> >  	userpte=
-> >  			[X86] Flags controlling user PTE allocations.
-> >  
-> > -- 
-> > Sent by an employee of the Qualcomm Innovation Center, Inc.
-> > The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
-> 
-> ---
-> ~Randy
-> *** Remember to use Documentation/SubmitChecklist when testing your code ***
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/arch/arm/mach-exynos4/Kconfig b/arch/arm/mach-exynos4/Kconfig
+index ed97f05..c7d6f07 100644
+--- a/arch/arm/mach-exynos4/Kconfig
++++ b/arch/arm/mach-exynos4/Kconfig
+@@ -197,6 +197,7 @@ config MACH_NURI
+ 	select EXYNOS4_SETUP_I2C5
+ 	select EXYNOS4_SETUP_SDHCI
+ 	select EXYNOS4_SETUP_USB_PHY
++	select EXYNOS4_DEV_PD
+ 	select SAMSUNG_DEV_PWM
+ 	select SAMSUNG_DEV_ADC
+ 	help
+diff --git a/arch/arm/mach-exynos4/mach-nuri.c b/arch/arm/mach-exynos4/mach-nuri.c
+index 1cc4d0b..09770c0 100644
+--- a/arch/arm/mach-exynos4/mach-nuri.c
++++ b/arch/arm/mach-exynos4/mach-nuri.c
+@@ -41,6 +41,7 @@
+ #include <plat/clock.h>
+ #include <plat/gpio-cfg.h>
+ #include <plat/iic.h>
++#include <plat/pd.h>
+ 
+ #include <mach/map.h>
+ 
+@@ -1103,6 +1104,13 @@ static struct platform_device *nuri_devices[] __initdata = {
+ 	&i2c9_gpio,
+ 	&s3c_device_adc,
+ 	&s3c_device_rtc,
++	&exynos4_device_pd[PD_MFC],
++	&exynos4_device_pd[PD_G3D],
++	&exynos4_device_pd[PD_LCD0],
++	&exynos4_device_pd[PD_LCD1],
++	&exynos4_device_pd[PD_CAM],
++	&exynos4_device_pd[PD_TV],
++	&exynos4_device_pd[PD_GPS],
+ 
+ 	/* NURI Devices */
+ 	&nuri_gpio_keys,
+-- 
+1.7.0.4
