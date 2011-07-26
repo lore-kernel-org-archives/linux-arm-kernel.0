@@ -1,65 +1,41 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 26 Jul 2011 16:34:15 -0400 (EDT)
-Subject: [PATCH 1/2] ARM: alignment: Make SIGBUS sent to userspace POSIXly
-	correct
-In-Reply-To: <1311689686-7451-1-git-send-email-dave.martin@linaro.org>
-References: <1311689686-7451-1-git-send-email-dave.martin@linaro.org>
-Message-ID: <alpine.LFD.2.00.1107261633390.12766@xanadu.home>
+Date: Tue, 26 Jul 2011 17:28:57 -0400 (EDT)
+Subject: [PATCH v2] ARM: alignment: Prevent ignoring of faults with ARMv6
+	unaligned access model
+In-Reply-To: <1311689651-7372-1-git-send-email-dave.martin@linaro.org>
+References: <1311689651-7372-1-git-send-email-dave.martin@linaro.org>
+Message-ID: <alpine.LFD.2.00.1107261723040.12766@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, 26 Jul 2011, Dave Martin wrote:
 
-> With the UM_SIGNAL alignment fault mode, no siginfo structure is
-> passed to userspace.
-> 
-> POSIX specifies how siginfo_t should be populated for alignment
-> faults, so this patch does just that:
-> 
->   * si_signo = SIGBUS
->   * si_code = BUS_ADRALN
->   * si_addr = address of the faulted instruction
-> 
-> Signed-off-by: Dave Martin <dave.martin@linaro.org>
+> Currently, it's possible to set the kernel to ignore alignment
+> faults when changing the alignment fault handling mode at runtime
+> via /proc/sys/alignment, even though this is undesirable on ARMv6
+> and above, where it can result in infinite spins where an un-fixed-
+> up instruction repeatedly faults.
 
-Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+This may be the case only if the U bit in CP15 reg 1 is set, right?
 
-> ---
->  arch/arm/mm/alignment.c |   14 +++++++++++---
->  1 files changed, 11 insertions(+), 3 deletions(-)
+> In addition, the kernel clobbers any alignment mode specified on
+> the command-line if running on ARMv6 or above.
 > 
-> diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
-> index 724ba3b..9a65aaf 100644
-> --- a/arch/arm/mm/alignment.c
-> +++ b/arch/arm/mm/alignment.c
-> @@ -22,6 +22,7 @@
->  #include <linux/sched.h>
->  #include <linux/uaccess.h>
->  
-> +#include <asm/system.h>
->  #include <asm/unaligned.h>
->  
->  #include "fault.h"
-> @@ -883,9 +884,16 @@ do_alignment(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
->  	if (ai_usermode & UM_FIXUP)
->  		goto fixup;
->  
-> -	if (ai_usermode & UM_SIGNAL)
-> -		force_sig(SIGBUS, current);
-> -	else {
-> +	if (ai_usermode & UM_SIGNAL) {
-> +		siginfo_t si;
-> +
-> +		si.si_signo = SIGBUS;
-> +		si.si_errno = 0;
-> +		si.si_code = BUS_ADRALN;
-> +		si.si_addr = (void __user *)instruction_pointer(regs);
-> +
-> +		force_sig_info(si.si_signo, &si, current);
-> +	} else {
->  		/*
->  		 * We're about to disable the alignment trap and return to
->  		 * user space.  But if an interrupt occurs before actually
-> -- 
-> 1.7.4.1
+> This patch factors out the necessary safety check into a couple of
+> new helper functions, and checks and modifies the fault handling
+> mode as appropriate on boot and on writes to /proc/cpu/alignment.
 > 
+> Prior to ARMv6, the behaviour is unchanged.
+> 
+> For ARMv6 and above, the behaviour changes as follows:
+> 
+>   * Attempting to ignore faults on ARMv6 results in the mode being
+>     forced to UM_FIXUP instead.  A warning is printed if this
+>     happened as a result of a write to /proc/cpu/alignment.  The
+>     user's UM_WARN bit (if present) is still honoured.
+
+Why not clearing the U bit as well as the A bit to preserve consistency 
+with the pre ARMv6 behavior?
+
+
+Nicolas
