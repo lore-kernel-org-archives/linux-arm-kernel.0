@@ -1,56 +1,52 @@
-From: akinobu.mita@gmail.com (Akinobu Mita)
-Date: Tue, 26 Jul 2011 10:41:22 +0900
-Subject: [PATCH v3 2/3] mmc: core: add random fault injection
-In-Reply-To: <CAJ0pr19oTmt5PQw45wbRO8qEzVi3J1OgL=w9Ma7XxX-=1A=A=A@mail.gmail.com>
-References: <1311199321-4618-1-git-send-email-per.forlin@linaro.org>
-	<1311199321-4618-3-git-send-email-per.forlin@linaro.org>
-	<CAC5umyg44tQxrFEYRL-tjzBMA2+KNXjB+nQveH3KcB_LPmYVHw@mail.gmail.com>
-	<CAJ0pr1_rL8rsEbDR-PL6fs9EzyGfUMbmeUjTGk=WspvrAkdy+g@mail.gmail.com>
-	<CAJ0pr19oTmt5PQw45wbRO8qEzVi3J1OgL=w9Ma7XxX-=1A=A=A@mail.gmail.com>
-Message-ID: <CAC5umyjR3V2uFtWZ7tQQtGH2B=s+-C43U1H01qYysBScYc8fxQ@mail.gmail.com>
+From: B19295@freescale.com (Lin Tony-B19295)
+Date: Tue, 26 Jul 2011 02:05:31 +0000
+Subject: [PATCH v2 5/6] ARM: mxs: add usb phy operations
+In-Reply-To: <20110725082403.GA9653@n2100.arm.linux.org.uk>
+References: <1311577284-11506-1-git-send-email-tony.lin@freescale.com>
+	<1311577284-11506-6-git-send-email-tony.lin@freescale.com>
+	<20013.6155.531965.918650@ipc1.ka-ro>
+	<20110725082403.GA9653@n2100.arm.linux.org.uk>
+Message-ID: <97D3A72708D04647A5AC84A04996E5B51661DD@039-SN1MPN1-006.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/7/26 Per Forlin <per.forlin@linaro.org>:
->>> And I know that init_fault_attr_dentries() can only create a
->>> subdirectory in debugfs root directory. ?But I have a patch which
->>> support for creating it in arbitrary directory. ?Could you take a look
->>> at this? (Note that this patch is based on mmotm and not yet tested)
->>>
-> I looked at your patch and it raised two questions.
-> I can't use FAULT_ATTR_INITIALIZER since mmc_host is allocated on the
-> heap. It looks like setup_fault_attr(attr, str) will fail if str is
-> NULL. How can I initialise the fault_attrs if not stack allocated?
-> About the boot param initialisation of fault attr. There can only be
-> one fault_mmc_request boot param for the entire kernel but there is
-> one fault_attr per host, and there may be many hosts. It would be
-> convenient if setup_fault_attrs would take (attr, boot_param_name),
-> look up boot_param_name and use that otherwise set default values.
-
-I think you can define one default fail_attr for boot time configuration
-and copy it to per-host fail_attr in mmc_add_host_debugfs().
-
-/* pseudo-code */
-
-static DECLARE_FAULT_ATTR(default_mmc_fail_attr);
-
-static int __init setup_fail_mmc_request(char *str)
-{
-	return setup_fault_attr(&default_mmc_fail_attr, str);
-}
-__setup("fail_mmc_request=", setup_fail_mmc_request);
-
-...
-
-void mmc_add_host_debugfs(struct mmc_host *host)
-{
-	...
-
-#ifdef CONFIG_FAIL_MMC_REQUEST
-	host->fail_attr = default_mmc_fail_attr;
-	if (!debugfs_create_fault_attr("fail_mmc_request",
-					root, &host->fail_attr))
-		goto err_node;
-#endif
-	...
-}
+> -----Original Message-----
+> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
+> Sent: Monday, July 25, 2011 4:24 PM
+> To: Lothar Wa?mann
+> Cc: Lin Tony-B19295; koen.beel.barco at gmail.com; linux-usb at vger.kernel.org;
+> stern at rowland.harvard.edu; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH v2 5/6] ARM: mxs: add usb phy operations
+> 
+> On Mon, Jul 25, 2011 at 09:15:23AM +0200, Lothar Wa?mann wrote:
+> > > +	if (WARN_ON(ppriv->internal_phy_clk_already_on < 0))
+> > > +		printk(KERN_ERR "please check phy clock ON/OFF sequence\n"); }
+> 
+> And there should be a blank line here.
+> 
+> > > +static int fsl_usb_host_init(struct platform_device *pdev) {
+> > > +	struct mxc_usbh_platform_data *pdata = pdev->dev.platform_data;
+> > > +	struct mxs_usb_private_date *ppriv = pdata->ppriv;
+> > > +
+> > > +	ppriv->phy_regs = ioremap(MX28_USBPHY1_BASE_ADDR, SZ_8K);
+> > > +	if (ppriv->phy_regs == NULL)
+> > > +		return -ENOMEM;
+> > > +
+> > > +	ppriv->ctrl_regs = ioremap(MX28_USBCTRL1_BASE_ADDR, SZ_8K);
+> > > +	if (ppriv->ctrl_regs == NULL)
+> > > +		return -ENOMEM;
+> > > +
+> > What about proper cleanup in the error case?
+> 
+> Doing something like this is probably easiest:
+> 
+> 	ppriv->phy_regs = ioremap(MX28_USBPHY1_BASE_ADDR, SZ_8K);
+> 	ppriv->ctrl_regs = ioremap(MX28_USBCTRL1_BASE_ADDR, SZ_8K);
+> 	if (!ppriv->phy_regs || !ppriv_ctrl_regs) {
+> 		iounmap(ppriv->phy_regs);
+> 		iounmap(ppriv->ctrl_regs);
+> 		return -ENOMEM;
+> 	}
+> 
+> As iounmap ignores NULL pointers.
+ good suggestion, thank you.
