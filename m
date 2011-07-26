@@ -1,116 +1,103 @@
 From: bs14@csr.com (Barry Song)
-Date: Tue, 26 Jul 2011 01:13:12 -0700
-Subject: [RFC PATCH 1/2] ARM: CSR: Add pinmux support for SiRFprimaII
+Date: Tue, 26 Jul 2011 01:13:13 -0700
+Subject: [RFC PATCH 2/2] GPIO: add gpiolib and irqchip for CSR SiRFprimaII
+	GPIO controller
 In-Reply-To: <1311667993-27189-1-git-send-email-bs14@csr.com>
 References: <1311667993-27189-1-git-send-email-bs14@csr.com>
-Message-ID: <1311667993-27189-2-git-send-email-bs14@csr.com>
+Message-ID: <1311667993-27189-3-git-send-email-bs14@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rongjun Ying <rongjun.ying@csr.com>
+From: Yuping Luo <yuping.luo@csr.com>
 
-Signed-off-by: Rongjun Ying <rongjun.ying@csr.com>
+Signed-off-by: Yuping Luo <yuping.luo@csr.com>
 Signed-off-by: Barry Song <baohua.song@csr.com>
 ---
- arch/arm/boot/dts/prima2-cb.dts               |    2 +-
- arch/arm/mach-prima2/Makefile                 |    1 +
- arch/arm/mach-prima2/include/mach/irqs.h      |   11 +
- arch/arm/mach-prima2/include/mach/regs-gpio.h |   30 +
- arch/arm/mach-prima2/pinmux.c                 |  824 +++++++++++++++++++++++++
- 5 files changed, 867 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/mach-prima2/include/mach/regs-gpio.h
- create mode 100644 arch/arm/mach-prima2/pinmux.c
+ arch/arm/mach-prima2/include/mach/gpio.h |   34 ++
+ drivers/gpio/Kconfig                     |    6 +
+ drivers/gpio/Makefile                    |    1 +
+ drivers/gpio/gpio-sirf.c                 |  529 ++++++++++++++++++++++++++++++
+ 4 files changed, 570 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-prima2/include/mach/gpio.h
+ create mode 100644 drivers/gpio/gpio-sirf.c
 
-diff --git a/arch/arm/boot/dts/prima2-cb.dts b/arch/arm/boot/dts/prima2-cb.dts
-index 6fecc88..07249c2 100644
---- a/arch/arm/boot/dts/prima2-cb.dts
-+++ b/arch/arm/boot/dts/prima2-cb.dts
-@@ -274,7 +274,7 @@
- 			gpio: gpio-controller at b0120000 {
- 				#gpio-cells = <2>;
- 				#interrupt-cells = <2>;
--				compatible = "sirf,prima2-gpio";
-+				compatible = "sirf,prima2-gpio", "sirf,prima2-pinmux";
- 				reg = <0xb0120000 0x10000>;
- 				gpio-controller;
- 				interrupt-controller;
-diff --git a/arch/arm/mach-prima2/Makefile b/arch/arm/mach-prima2/Makefile
-index 7af7fc0..efb8489 100644
---- a/arch/arm/mach-prima2/Makefile
-+++ b/arch/arm/mach-prima2/Makefile
-@@ -3,5 +3,6 @@ obj-y += irq.o
- obj-y += clock.o
- obj-y += rstc.o
- obj-y += prima2.o
-+obj-y += pinmux.o
- obj-$(CONFIG_DEBUG_LL) += lluart.o
- obj-$(CONFIG_CACHE_L2X0) += l2x0.o
-diff --git a/arch/arm/mach-prima2/include/mach/irqs.h b/arch/arm/mach-prima2/include/mach/irqs.h
-index bb354f9..06fe4e0 100644
---- a/arch/arm/mach-prima2/include/mach/irqs.h
-+++ b/arch/arm/mach-prima2/include/mach/irqs.h
-@@ -12,6 +12,17 @@
- #define SIRFSOC_INTENAL_IRQ_START  0
- #define SIRFSOC_INTENAL_IRQ_END    59
- 
-+#define SIRFSOC_GPIO_IO_CPLD_SIZE	(5 * 8)
-+#define SIRFSOC_GPIO_HS_CPLD_SIZE	(16 * 8)
-+
-+#define SIRFSOC_GPIO_IRQ_START     (SIRFSOC_INTENAL_IRQ_END + 1)
-+
-+#define SIRFSOC_GPIO_NO_OF_BANKS        5
-+#define SIRFSOC_GPIO_BANK_SIZE          32
-+
-+#define SIRFSOC_GPIO_IRQ_END       (SIRFSOC_GPIO_IRQ_START + \
-+		SIRFSOC_GPIO_NO_OF_BANKS * SIRFSOC_GPIO_BANK_SIZE)
-+
- #define NR_IRQS	220
- 
- #endif
-diff --git a/arch/arm/mach-prima2/include/mach/regs-gpio.h b/arch/arm/mach-prima2/include/mach/regs-gpio.h
+diff --git a/arch/arm/mach-prima2/include/mach/gpio.h b/arch/arm/mach-prima2/include/mach/gpio.h
 new file mode 100644
-index 0000000..e3489eb
+index 0000000..25673b1
 --- /dev/null
-+++ b/arch/arm/mach-prima2/include/mach/regs-gpio.h
-@@ -0,0 +1,30 @@
++++ b/arch/arm/mach-prima2/include/mach/gpio.h
+@@ -0,0 +1,34 @@
 +/*
-+ * arch/arm/mach-prima2/include/mach/regs-gpio.h
++ * arch/arm/mach-prima2/include/mach/gpio.h
 + *
 + * Copyright (c) 2011 Cambridge Silicon Radio Limited, a CSR plc group company.
 + *
 + * Licensed under GPLv2 or later.
 + */
 +
-+#ifndef __REGS_GPIO_H_
-+#define __REGS_GPIO_H_
++#ifndef __MACH_GPIO_H
++#define __MACH_GPIO_H
 +
-+#define SIRFSOC_GPIO_CTRL(g, i)			((g)*0x100 + (i)*4)
-+#define SIRFSOC_GPIO_DSP_EN0			(0x80)
-+#define SIRFSOC_GPIO_PAD_EN(g)			((g)*0x100 + 0x84)
-+#define SIRFSOC_GPIO_INT_STATUS(g) 		((g)*0x100 + 0x8C)
++#include <mach/irqs.h>
 +
-+#define SIRFSOC_GPIO_CTL_INTR_LOW_MASK		0x1
-+#define SIRFSOC_GPIO_CTL_INTR_HIGH_MASK		0x2
-+#define SIRFSOC_GPIO_CTL_INTR_TYPE_MASK		0x4
-+#define SIRFSOC_GPIO_CTL_INTR_EN_MASK		0x8
-+#define SIRFSOC_GPIO_CTL_INTR_STS_MASK		0x10
-+#define SIRFSOC_GPIO_CTL_OUT_EN_MASK		0x20
-+#define SIRFSOC_GPIO_CTL_DATAOUT_MASK		0x40
-+#define SIRFSOC_GPIO_CTL_DATAIN_MASK		0x80
-+#define SIRFSOC_GPIO_CTL_PULL_MASK		0x100
-+#define SIRFSOC_GPIO_CTL_PULL_HIGH      	0x200
-+#define SIRFSOC_GPIO_CTL_DSP_INT		0x400
-+
-+#define SIRFSOC_GPIO_NUM(bank, index)	(((bank)*(32)) + (index))
++#ifndef CONFIG_GPIO_SIRFCPLD
++#define ARCH_NR_GPIOS	(SIRFSOC_GPIO_BANK_SIZE * SIRFSOC_GPIO_NO_OF_BANKS)
++#else
++#define ARCH_NR_GPIOS	(SIRFSOC_GPIO_BANK_SIZE * SIRFSOC_GPIO_NO_OF_BANKS + \
++	SIRFSOC_GPIO_CPLD_SIZE + SIRFSOC_GPIO_IO_CPLD_SIZE + \
++	SIRFSOC_GPIO_HS_CPLD_SIZE)
 +#endif
-diff --git a/arch/arm/mach-prima2/pinmux.c b/arch/arm/mach-prima2/pinmux.c
++
++#include <linux/errno.h>
++#include <asm-generic/gpio.h>
++
++#define gpio_get_value	__gpio_get_value
++#define gpio_set_value	__gpio_set_value
++#define gpio_cansleep	__gpio_cansleep
++#define gpio_to_irq	__gpio_to_irq
++
++void gpio_set_pull(unsigned gpio, int enable);
++void gpio_pull_down(unsigned gpio);
++void gpio_pull_up(unsigned gpio);
++
++#endif
+diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
+index 3634986..c5da284 100644
+--- a/drivers/gpio/Kconfig
++++ b/drivers/gpio/Kconfig
+@@ -162,6 +162,12 @@ config GPIO_SCH
+ 	  The Intel Tunnel Creek processor has 5 GPIOs powered by the
+ 	  core power rail and 9 from suspend power supply.
+ 
++config GPIO_SIRF
++	bool "CSR SiRFprimaII GPIO"
++	default y
++	help
++	  Say yes here to support GPIO interface on CSR SiRFprimaII.
++
+ config GPIO_VX855
+ 	tristate "VIA VX855/VX875 GPIO"
+ 	depends on MFD_SUPPORT && PCI
+diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
+index 7207112..f4ffd0e 100644
+--- a/drivers/gpio/Makefile
++++ b/drivers/gpio/Makefile
+@@ -42,6 +42,7 @@ obj-$(CONFIG_GPIO_S5PC100)	+= gpio-s5pc100.o
+ obj-$(CONFIG_GPIO_S5PV210)	+= gpio-s5pv210.o
+ 
+ obj-$(CONFIG_GPIO_SCH)		+= gpio-sch.o
++obj-$(CONFIG_GPIO_SIRF)		+= gpio-sirf.o
+ obj-$(CONFIG_GPIO_STMPE)	+= gpio-stmpe.o
+ obj-$(CONFIG_GPIO_SX150X)	+= gpio-sx150x.o
+ obj-$(CONFIG_GPIO_TC3589X)	+= gpio-tc3589x.o
+diff --git a/drivers/gpio/gpio-sirf.c b/drivers/gpio/gpio-sirf.c
 new file mode 100644
-index 0000000..37873fb
+index 0000000..34b5820
 --- /dev/null
-+++ b/arch/arm/mach-prima2/pinmux.c
-@@ -0,0 +1,824 @@
++++ b/drivers/gpio/gpio-sirf.c
+@@ -0,0 +1,529 @@
 +/*
-+ * pinmux for CSR SiRF prima2
++ * GPIO controller driver for CSR SiRFprimaII
 + *
 + * Copyright (c) 2011 Cambridge Silicon Radio Limited, a CSR plc group company.
 + *
@@ -118,821 +105,526 @@ index 0000000..37873fb
 + */
 +
 +#include <linux/kernel.h>
-+#include <linux/spinlock.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
++#include <linux/module.h>
++#include <linux/irq.h>
 +#include <linux/io.h>
-+#include <asm/mach/irq.h>
-+#include <mach/pinmux.h>
++#include <linux/of.h>
++#include <linux/of_platform.h>
++#include <linux/of_address.h>
++
++#include <mach/hardware.h>
++#include <mach/irqs.h>
 +#include <mach/regs-gpio.h>
-+#include "common.h"
++#include <mach/gpio.h>
++#include <mach/pinmux.h>
 +
-+#define SIRFSOC_RSC_PIN_MUX        0x0004
++#define SIRFSOC_IRQ_SIRFSOC_GPIO_GROUP0         43
++#define SIRFSOC_IRQ_SIRFSOC_GPIO_GROUP1         44
++#define SIRFSOC_IRQ_SIRFSOC_GPIO_GROUP2         45
++#define SIRFSOC_IRQ_SIRFSOC_GPIO_GROUP3         46
++#define SIRFSOC_IRQ_SIRFSOC_GPIO_GROUP4         47
 +
-+struct muxmask {
-+	unsigned long group;
-+	unsigned long mask;
++struct gpio_bank {
++	u8 group;
++	u16 irq;
++	u32 paden_bk_map;
++	u8 wake_mask;
++
++	spinlock_t lock;
++	struct gpio_chip chip;
 +};
 +
-+struct padmux {
-+	char *name;
-+	unsigned long muxmask_counts;
-+	struct muxmask *pad_muxmask;
-+	unsigned long funcmask;
-+	unsigned long funcval;
++static struct gpio_bank sirfsoc_gpio_bank[SIRFSOC_GPIO_NO_OF_BANKS] = {
++	{.group = 0, .irq = SIRFSOC_IRQ_SIRFSOC_GPIO_GROUP0,},
++	{.group = 1, .irq = SIRFSOC_IRQ_SIRFSOC_GPIO_GROUP1,},
++	{.group = 2, .irq = SIRFSOC_IRQ_SIRFSOC_GPIO_GROUP2,},
++	{.group = 3, .irq = SIRFSOC_IRQ_SIRFSOC_GPIO_GROUP3,},
++	{.group = 4, .irq = SIRFSOC_IRQ_SIRFSOC_GPIO_GROUP4,}
 +};
 +
-+void __iomem *sirfsoc_gpio_pinmux_base;
++static DEFINE_SPINLOCK(gpio_lock);
 +
-+static unsigned long pad_gpio_used_map[SIRFSOC_GPIO_NO_OF_BANKS];
-+static unsigned long pad_module_used_map[SIRFSOC_GPIO_NO_OF_BANKS];
-+
-+static DEFINE_SPINLOCK(pad_lock);
-+
-+void sirfsoc_put_gpios(int group, u32 bitmask)
++static struct gpio_bank *sirfsoc_irq_to_bank(unsigned int irq)
 +{
-+	if (group >= SIRFSOC_GPIO_NO_OF_BANKS) {
-+		pr_err("%d th group is not valid. Only %d groups are available\n",
-+			group, SIRFSOC_GPIO_NO_OF_BANKS);
++	int bk;
++
++	if ((irq < SIRFSOC_GPIO_IRQ_START) || (irq >= SIRFSOC_GPIO_IRQ_END)) {
++		printk(KERN_ALERT " Invalid GPIO IRQ/Bank: %d\n", irq);
++		return NULL;
++	}
++
++	bk = (irq - SIRFSOC_GPIO_IRQ_START) / SIRFSOC_GPIO_BANK_SIZE;
++	return &sirfsoc_gpio_bank[bk];
++}
++
++static int sirfsoc_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
++{
++	return SIRFSOC_GPIO_IRQ_START + (chip->base + offset);
++}
++
++static int sirfsoc_irq_to_indx(unsigned int irq)
++{
++	return (irq - SIRFSOC_GPIO_IRQ_START) % SIRFSOC_GPIO_BANK_SIZE;
++}
++
++static struct gpio_bank *sirfsoc_gpio_to_bank(unsigned int gpio)
++{
++	unsigned int bk = gpio / SIRFSOC_GPIO_BANK_SIZE;
++
++	if (bk >= SIRFSOC_GPIO_NO_OF_BANKS) {
++		printk(KERN_ALERT "Invalid GPIO Number: %d\n", gpio);
++		return NULL;
 +	} else {
-+		int muxval;
-+		unsigned long flags;
-+		spin_lock_irqsave(&pad_lock, flags);
-+		if (pad_module_used_map[group] & bitmask) {
-+			pr_warning("%d th group is used by other modules\n", group);
-+		}
-+		pad_gpio_used_map[group] &= (~bitmask);
-+		muxval = readl(sirfsoc_gpio_pinmux_base + SIRFSOC_GPIO_PAD_EN(group));
-+		muxval = muxval & (~bitmask);
-+		writel(muxval, sirfsoc_gpio_pinmux_base + SIRFSOC_GPIO_PAD_EN(group));
-+		spin_unlock_irqrestore(&pad_lock, flags);
++		return &sirfsoc_gpio_bank[bk];
 +	}
 +}
-+EXPORT_SYMBOL(sirfsoc_put_gpios);
 +
-+void sirfsoc_put_gpio(int group, int bitno)
++static int sirfsoc_gpio_to_indx(unsigned int gpio)
 +{
-+	sirfsoc_put_gpios(group, 1 << bitno);
++	return gpio % SIRFSOC_GPIO_BANK_SIZE;
 +}
-+EXPORT_SYMBOL(sirfsoc_put_gpio);
 +
-+void sirfsoc_get_gpios(int group, u32 bitmask)
++static void sirfsoc_gpio_irq_ack(struct irq_data *d)
 +{
-+	if (group >= SIRFSOC_GPIO_NO_OF_BANKS) {
-+		pr_err("%d th group is not valid. Only %d groups are available\n",
-+			group, SIRFSOC_GPIO_NO_OF_BANKS);
-+	} else {
-+		int muxval;
-+		unsigned long flags;
-+		spin_lock_irqsave(&pad_lock, flags);
-+		if (pad_module_used_map[group] & bitmask) {
-+			pr_err("%d th group is used by other modules\n", group);
-+			spin_unlock_irqrestore(&pad_lock, flags);
-+			return;
-+		}
-+		pad_gpio_used_map[group] |= bitmask;
-+		muxval = readl(sirfsoc_gpio_pinmux_base + SIRFSOC_GPIO_PAD_EN(group));
-+		muxval = muxval | (bitmask);
-+		writel(muxval, sirfsoc_gpio_pinmux_base + SIRFSOC_GPIO_PAD_EN(group));
-+		spin_unlock_irqrestore(&pad_lock, flags);
++	struct gpio_bank *bank = sirfsoc_irq_to_bank(d->irq);
++	int index = sirfsoc_irq_to_indx(d->irq);
++	u32 status, offset;
++	unsigned long flags;
++
++	if (bank != NULL) {
++		offset = SIRFSOC_GPIO_CTRL(bank->group, index);
++		spin_lock_irqsave(&gpio_lock, flags);
++
++		status = readl(sirfsoc_gpio_pinmux_base + offset);
++
++		writel(status, sirfsoc_gpio_pinmux_base + offset);
++		pr_debug("%s: ack gpio group %d index %d, status %#x\n",
++			__func__, bank->group, index,
++			readl(sirfsoc_gpio_pinmux_base + offset));
++		spin_unlock_irqrestore(&gpio_lock, flags);
++	}
++
++}
++
++static void _sirfsoc_gpio_irq_mask(unsigned int irq)
++{
++	struct gpio_bank *bank = sirfsoc_irq_to_bank(irq);
++	int index = sirfsoc_irq_to_indx(irq);
++	u32 status, offset;
++	unsigned long flags;
++
++	if (bank != NULL) {
++		pr_debug("%s: unmask gpio group %d index %d\n", __func__,
++			bank->group, index);
++		offset = SIRFSOC_GPIO_CTRL(bank->group, index);
++		spin_lock_irqsave(&gpio_lock, flags);
++		status = readl(sirfsoc_gpio_pinmux_base + offset);
++
++		status &= ~SIRFSOC_GPIO_CTL_INTR_EN_MASK;
++		status &= ~SIRFSOC_GPIO_CTL_INTR_STS_MASK;
++
++		writel(status, sirfsoc_gpio_pinmux_base + offset);
++
++		spin_unlock_irqrestore(&gpio_lock, flags);
 +	}
 +}
-+EXPORT_SYMBOL(sirfsoc_get_gpios);
 +
-+void sirfsoc_get_gpio(int group, int bitno)
++
++static void sirfsoc_gpio_irq_mask(struct irq_data *d)
 +{
-+	sirfsoc_get_gpios(group, 1 << bitno);
++	_sirfsoc_gpio_irq_mask(d->irq);
 +}
-+EXPORT_SYMBOL(sirfsoc_get_gpio);
 +
-+static struct muxmask lcd_16bits_muxmask[] = {
-+	{
-+		.group = 3,
-+		.mask =
-+			~((1 << 0) | (1 << 1) | (1 << 2) | (1 << 3) | (1 << 4) | (1 << 5) |
-+				(1 << 6) | (1 << 7)
-+				| (1 << 8) | (1 << 9) | (1 << 10) | (1 << 11) | (1 << 12) | (1 << 13)
-+				| (1 << 14) | (1 << 15)
-+				| (1 << 16) | (1 << 17) | (1 << 18)),
-+	}, {
-+		.group = 2,
-+		.mask = ~(1 << 31),
-+	},
-+};
-+
-+static struct padmux lcd_16bits_padmux = {
-+	.name = "lcd_16bits",
-+	.muxmask_counts = ARRAY_SIZE(lcd_16bits_muxmask),
-+	.pad_muxmask = lcd_16bits_muxmask,
-+	.funcmask = (1 << 4),
-+	.funcval = (0 << 4),
-+};
-+
-+static struct muxmask lcd_18bits_muxmask[] = {
-+	{
-+		.group = 3,
-+		.mask =
-+			~((1 << 0) | (1 << 1) | (1 << 2) | (1 << 3) | (1 << 4) | (1 << 5) |
-+				(1 << 6) | (1 << 7)
-+				| (1 << 8) | (1 << 9) | (1 << 10) | (1 << 11) | (1 << 12) | (1 << 13)
-+				| (1 << 14) | (1 << 15)
-+				| (1 << 16) | (1 << 17) | (1 << 18)),
-+	}, {
-+		.group = 2,
-+		.mask = ~(1 << 31),
-+	}, {
-+		.group = 0,
-+		.mask = ~((1 << 16) | (1 << 17)),
-+	},
-+};
-+
-+static struct padmux lcd_18bits_padmux = {
-+	.name = "lcd_18bits",
-+	.muxmask_counts = ARRAY_SIZE(lcd_18bits_muxmask),
-+	.pad_muxmask = lcd_18bits_muxmask,
-+	.funcmask = (1 << 4),
-+	.funcval = (0 << 4),
-+};
-+
-+static struct muxmask lcd_24bits_muxmask[] = {
-+	{
-+		.group = 3,
-+		.mask =
-+			~((1 << 0) | (1 << 1) | (1 << 2) | (1 << 3) | (1 << 4) | (1 << 5) |
-+				(1 << 6) | (1 << 7)
-+				| (1 << 8) | (1 << 9) | (1 << 10) | (1 << 11) | (1 << 12) | (1 << 13)
-+				| (1 << 14) | (1 << 15)
-+				| (1 << 16) | (1 << 17) | (1 << 18)),
-+	}, {
-+		.group = 2,
-+		.mask = ~(1 << 31),
-+	}, {
-+		.group = 0,
-+		.mask =
-+			~((1 << 16) | (1 << 17) | (1 << 18) | (1 << 19) | (1 << 20) |
-+				(1 << 21) | (1 << 22) | (1 << 23)),
-+	},
-+};
-+
-+static struct padmux lcd_24bits_padmux = {
-+	.name = "lcd_24bits",
-+	.muxmask_counts = ARRAY_SIZE(lcd_24bits_muxmask),
-+	.pad_muxmask = lcd_24bits_muxmask,
-+	.funcmask = (1 << 4),
-+	.funcval = (0 << 4),
-+};
-+
-+static struct muxmask lcdrom_muxmask[] = {
-+	{
-+		.group = 3,
-+		.mask =
-+			~((1 << 0) | (1 << 1) | (1 << 2) | (1 << 3) | (1 << 4) | (1 << 5) |
-+				(1 << 6) | (1 << 7)
-+				| (1 << 8) | (1 << 9) | (1 << 10) | (1 << 11) | (1 << 12) | (1 << 13)
-+				| (1 << 14) | (1 << 15)
-+				| (1 << 16) | (1 << 17) | (1 << 18)),
-+	}, {
-+		.group = 2,
-+		.mask = ~(1 << 31),
-+	}, {
-+		.group = 0,
-+		.mask = ~((1 << 23)),
-+	},
-+};
-+
-+static struct padmux lcdrom_padmux = {
-+	.name = "lcdrom",
-+	.muxmask_counts = ARRAY_SIZE(lcdrom_muxmask),
-+	.pad_muxmask = lcdrom_muxmask,
-+	.funcmask = (1 << 4),
-+	.funcval = (1 << 4),
-+};
-+
-+static struct muxmask sdmmc3_muxmask[] = {
-+	{
-+		.group = 0,
-+		.mask = ~((1 << 30) | (1 << 31)),
-+	}, {
-+		.group = 1,
-+		.mask = ~((1 << 0) | (1 << 1) | (1 << 2) | (1 << 3)),
-+	},
-+};
-+
-+static struct padmux sdmmc3_padmux = {
-+	.name = "sdmmc3",
-+	.muxmask_counts = ARRAY_SIZE(sdmmc3_muxmask),
-+	.pad_muxmask = sdmmc3_muxmask,
-+	.funcmask = (1 << 7),
-+	.funcval = (0 << 7),
-+};
-+
-+static struct muxmask spi0_muxmask[] = {
-+	{
-+		.group = 1,
-+		.mask = ~((1 << 0) | (1 << 1) | (1 << 2) | (1 << 3)),
-+	},
-+};
-+
-+static struct padmux spi0_padmux = {
-+	.name = "spi0",
-+	.muxmask_counts = ARRAY_SIZE(spi0_muxmask),
-+	.pad_muxmask = spi0_muxmask,
-+	.funcmask = (1 << 7),
-+	.funcval = (1 << 7),
-+};
-+
-+static struct muxmask sdmmc4_muxmask[] = {
-+	{
-+		.group = 1,
-+		.mask =
-+			~((1 << 4) | (1 << 5) | (1 << 6) | (1 << 7) | (1 << 8) | (1 << 9)),
-+	},
-+};
-+
-+static struct padmux sdmmc4_padmux = {
-+	.name = "sdmmc4",
-+	.muxmask_counts = ARRAY_SIZE(sdmmc4_muxmask),
-+	.pad_muxmask = sdmmc4_muxmask,
-+};
-+
-+static struct muxmask cko1_muxmask[] = {
-+	{
-+		.group = 1,
-+		.mask = ~(1 << 10),
-+	},
-+};
-+
-+static struct padmux cko1_padmux = {
-+	.name = "cko1",
-+	.muxmask_counts = ARRAY_SIZE(cko1_muxmask),
-+	.pad_muxmask = cko1_muxmask,
-+	.funcmask = (1 << 3),
-+	.funcval = (0 << 3),
-+};
-+
-+static struct muxmask i2s_muxmask[] = {
-+	{
-+		.group = 1,
-+		.mask =
-+			~((1 << 10) | (1 << 11) | (1 << 12) | (1 << 13) | (1 << 14) | (1 << 19)
-+				| (1 << 23) | (1 << 28)),
-+	},
-+};
-+
-+static struct padmux i2s_padmux = {
-+	.name = "i2s",
-+	.muxmask_counts = ARRAY_SIZE(i2s_muxmask),
-+	.pad_muxmask = i2s_muxmask,
-+	.funcmask = (1 << 3) | (1 << 9),
-+	.funcval = (1 << 3) | (0 << 9),
-+};
-+
-+static struct muxmask ac97_muxmask[] = {
-+	{
-+		.group = 1,
-+		.mask = ~((1 << 11) | (1 << 12) | (1 << 13) | (1 << 14)),
-+	},
-+};
-+
-+static struct padmux ac97_padmux = {
-+	.name = "ac97",
-+	.muxmask_counts = ARRAY_SIZE(ac97_muxmask),
-+	.pad_muxmask = ac97_muxmask,
-+	.funcmask = (1 << 8),
-+	.funcval = (0 << 8),
-+};
-+
-+static struct muxmask spi1_muxmask[] = {
-+	{
-+		.group = 1,
-+		.mask = ~((1 << 11) | (1 << 12) | (1 << 13) | (1 << 14)),
-+	},
-+};
-+
-+static struct padmux spi1_padmux = {
-+	.name = "spi1",
-+	.muxmask_counts = ARRAY_SIZE(spi1_muxmask),
-+	.pad_muxmask = spi1_muxmask,
-+	.funcmask = (1 << 8),
-+	.funcval = (1 << 8),
-+};
-+
-+static struct muxmask sdmmc1_muxmask[] = {
-+	{
-+		.group = 0,
-+		.mask = ~((1 << 27) | (1 << 28) | (1 << 29)),
-+	},
-+};
-+
-+static struct padmux sdmmc1_padmux = {
-+	.name = "sdmmc1",
-+	.muxmask_counts = ARRAY_SIZE(sdmmc1_muxmask),
-+	.pad_muxmask = sdmmc1_muxmask,
-+};
-+
-+static struct muxmask gps_muxmask[] = {
-+	{
-+		.group = 0,
-+		.mask = ~((1 << 24) | (1 << 25) | (1 << 26) | (1 << 4)),
-+	},
-+};
-+
-+static struct padmux gps_padmux = {
-+	.name = "gps",
-+	.muxmask_counts = ARRAY_SIZE(gps_muxmask),
-+	.pad_muxmask = gps_muxmask,
-+	.funcmask = (1 << 12) | (1 << 13) | (1 << 14),
-+	.funcval = (1 << 12) | (0 << 13) | (0 << 14),
-+};
-+
-+static struct muxmask sdmmc5_muxmask[] = {
-+	{
-+		.group = 0,
-+		.mask = ~((1 << 24) | (1 << 25) | (1 << 26)),
-+	}, {
-+		.group = 1,
-+		.mask = ~(1 << 29),
-+	}, {
-+		.group = 2,
-+		.mask = ~((1 << 0) | (1 << 1)),
-+	},
-+};
-+
-+static struct padmux sdmmc5_padmux = {
-+	.name = "sdmmc5",
-+	.muxmask_counts = ARRAY_SIZE(sdmmc5_muxmask),
-+	.pad_muxmask = sdmmc5_muxmask,
-+	.funcmask = (1 << 13) | (1 << 14),
-+	.funcval = (1 << 13) | (1 << 14),
-+};
-+
-+static struct muxmask uart1_muxmask[] = {
-+	{
-+		.group = 1,
-+		.mask = ~((1 << 15) | (1 << 17)),
-+	},
-+};
-+
-+static struct padmux uart1_padmux = {
-+	.name = "uart1",
-+	.muxmask_counts = ARRAY_SIZE(uart1_muxmask),
-+	.pad_muxmask = uart1_muxmask,
-+};
-+
-+static struct muxmask uart2_muxmask[] = {
-+	{
-+		.group = 1,
-+		.mask = ~((1 << 16) | (1 << 18) | (1 << 24) | (1 << 27)),
-+	},
-+};
-+
-+static struct padmux uart2_padmux = {
-+	.name = "uart2",
-+	.muxmask_counts = ARRAY_SIZE(uart2_muxmask),
-+	.pad_muxmask = uart2_muxmask,
-+	.funcmask = (1 << 10),
-+	.funcval = (1 << 10),
-+};
-+
-+static struct muxmask uart2_nostreamctrl_muxmask[] = {
-+	{
-+		.group = 1,
-+		.mask = ~((1 << 16) | (1 << 18)),
-+	},
-+};
-+
-+static struct padmux uart2_nostreamctrl_padmux = {
-+	.name = "uart2_nostreamctrl",
-+	.muxmask_counts = ARRAY_SIZE(uart2_nostreamctrl_muxmask),
-+	.pad_muxmask = uart2_nostreamctrl_muxmask,
-+};
-+
-+static struct muxmask usp0_muxmask[] = {
-+	{
-+		.group = 1,
-+		.mask = ~((1 << 19) | (1 << 20) | (1 << 21) | (1 << 22) | (1 << 23)),
-+	},
-+};
-+
-+static struct padmux usp0_padmux = {
-+	.name = "usp0",
-+	.muxmask_counts = ARRAY_SIZE(usp0_muxmask),
-+	.pad_muxmask = usp0_muxmask,
-+	.funcmask = (1 << 1) | (1 << 2) | (1 << 6) | (1 << 9),
-+	.funcval = (0 << 1) | (0 << 2) | (0 << 6) | (0 << 9),
-+};
-+
-+static struct muxmask usp1_muxmask[] = {
-+	{
-+		.group = 1,
-+		.mask = ~((1 << 24) | (1 << 25) | (1 << 26) | (1 << 27) | (1 << 28)),
-+	},
-+};
-+
-+static struct padmux usp1_padmux = {
-+	.name = "usp1",
-+	.muxmask_counts = ARRAY_SIZE(usp1_muxmask),
-+	.pad_muxmask = usp1_muxmask,
-+	.funcmask = (1 << 1) | (1 << 9) | (1 << 10) | (1 << 11),
-+	.funcval = (0 << 1) | (0 << 9) | (0 << 10) | (0 << 11),
-+};
-+
-+static struct muxmask usp2_muxmask[] = {
-+	{
-+		.group = 1,
-+		.mask = ~((1 << 29) | (1 << 30) | (1 << 31)),
-+	}, {
-+		.group = 2,
-+		.mask = ~((1 << 0) | (1 << 1)),
-+	},
-+};
-+
-+static struct padmux usp2_padmux = {
-+	.name = "usp2",
-+	.muxmask_counts = ARRAY_SIZE(usp2_muxmask),
-+	.pad_muxmask = usp2_muxmask,
-+	.funcmask = (1 << 13) | (1 << 14),
-+	.funcval = (0 << 13) | (0 << 14),
-+};
-+
-+static struct muxmask nand_muxmask[] = {
-+	{
-+		.group = 2,
-+		.mask = ~((1 << 2) | (1 << 3) | (1 << 28) | (1 << 29) | (1 << 30)),
-+	},
-+};
-+
-+static struct padmux nand_padmux = {
-+	.name = "nand",
-+	.muxmask_counts = ARRAY_SIZE(nand_muxmask),
-+	.pad_muxmask = nand_muxmask,
-+	.funcmask = (1 << 5),
-+	.funcval = (0 << 5),
-+};
-+
-+static struct padmux sdmmc0_padmux = {
-+	.name = "sdmmc0",
-+	.muxmask_counts = 0,
-+	.funcmask = (1 << 5),
-+	.funcval = (0 << 5),
-+};
-+
-+static struct muxmask sdmmc2_muxmask[] = {
-+	{
-+		.group = 2,
-+		.mask = ~((1 << 2) | (1 << 3)),
-+	},
-+};
-+
-+static struct padmux sdmmc2_padmux = {
-+	.name = "sdmmc2",
-+	.muxmask_counts = ARRAY_SIZE(sdmmc2_muxmask),
-+	.pad_muxmask = nand_muxmask,
-+	.funcmask = (1 << 5),
-+	.funcval = (1 << 5),
-+};
-+
-+static struct muxmask uart0_muxmask[] = {
-+	{
-+		.group = 2,
-+		.mask = ~((1 << 4) | (1 << 5)),
-+	}, {
-+		.group = 1,
-+		.mask = ~((1 << 23) | (1 << 28)),
-+	},
-+};
-+
-+static struct padmux uart0_padmux = {
-+	.name = "uart0",
-+	.muxmask_counts = ARRAY_SIZE(uart0_muxmask),
-+	.pad_muxmask = uart0_muxmask,
-+	.funcmask = (1 << 9),
-+	.funcval = (1 << 9),
-+};
-+
-+static struct muxmask uart0_nostreamctrl_muxmask[] = {
-+	{
-+		.group = 2,
-+		.mask = ~((1 << 4) | (1 << 5)),
-+	},
-+};
-+
-+static struct padmux uart0_nostreamctrl_padmux = {
-+	.name = "uart0_nostreamctrl",
-+	.muxmask_counts = ARRAY_SIZE(uart0_nostreamctrl_muxmask),
-+	.pad_muxmask = uart0_nostreamctrl_muxmask,
-+};
-+
-+static struct muxmask cko0_muxmask[] = {
-+	{
-+		.group = 2,
-+		.mask = ~((1 << 14)),
-+	},
-+};
-+
-+static struct padmux cko0_padmux = {
-+	.name = "cko0",
-+	.muxmask_counts = ARRAY_SIZE(cko0_muxmask),
-+	.pad_muxmask = cko0_muxmask,
-+};
-+
-+static struct muxmask vip_muxmask[] = {
-+	{
-+		.group = 2,
-+		.mask = ~((1 << 15) | (1 << 16) | (1 << 17) | (1 << 18) | (1 << 19)
-+			| (1 << 20) | (1 << 21) | (1 << 22) | (1 << 23) | (1 << 24) |
-+			(1 << 25)),
-+	},
-+};
-+
-+static struct padmux vip_padmux = {
-+	.name = "vip",
-+	.muxmask_counts = ARRAY_SIZE(vip_muxmask),
-+	.pad_muxmask = vip_muxmask,
-+	.funcmask = (1 << 0),
-+	.funcval = (0 << 0),
-+};
-+
-+static struct muxmask i2c0_muxmask[] = {
-+	{
-+		.group = 2,
-+		.mask = ~((1 << 26) | (1 << 27)),
-+	},
-+};
-+
-+static struct padmux i2c0_padmux = {
-+	.name = "i2c0",
-+	.muxmask_counts = ARRAY_SIZE(i2c0_muxmask),
-+	.pad_muxmask = i2c0_muxmask,
-+};
-+
-+static struct muxmask i2c1_muxmask[] = {
-+	{
-+		.group = 0,
-+		.mask = ~((1 << 13) | (1 << 15)),
-+	},
-+};
-+
-+static struct padmux i2c1_padmux = {
-+	.name = "i2c1",
-+	.muxmask_counts = ARRAY_SIZE(i2c1_muxmask),
-+	.pad_muxmask = i2c1_muxmask,
-+};
-+
-+static struct muxmask viprom_muxmask[] = {
-+	{
-+		.group = 2,
-+		.mask = ~((1 << 15) | (1 << 16) | (1 << 17) | (1 << 18) | (1 << 19)
-+			| (1 << 20) | (1 << 21) | (1 << 22) | (1 << 23) | (1 << 24) |
-+			(1 << 25)),
-+	}, {
-+		.group = 0,
-+		.mask = ~(1 << 12),
-+	},
-+};
-+
-+static struct padmux viprom_padmux = {
-+	.name = "viprom",
-+	.muxmask_counts = ARRAY_SIZE(viprom_muxmask),
-+	.pad_muxmask = viprom_muxmask,
-+	.funcmask = (1 << 0),
-+	.funcval = (1 << 0),
-+};
-+
-+static struct muxmask pwm0_muxmask[] = {
-+	{
-+		.group = 0,
-+		.mask = ~(1 << 4),
-+	},
-+};
-+
-+static struct padmux pwm0_padmux = {
-+	.name = "pwm0",
-+	.muxmask_counts = ARRAY_SIZE(pwm0_muxmask),
-+	.pad_muxmask = pwm0_muxmask,
-+	.funcmask = (1 << 12),
-+	.funcval = (0 << 12),
-+};
-+
-+static struct muxmask pwm1_muxmask[] = {
-+	{
-+		.group = 0,
-+		.mask = ~(1 << 5),
-+	},
-+};
-+
-+static struct padmux pwm1_padmux = {
-+	.name = "pwm1",
-+	.muxmask_counts = ARRAY_SIZE(pwm1_muxmask),
-+	.pad_muxmask = pwm1_muxmask,
-+};
-+
-+static struct muxmask pwm2_muxmask[] = {
-+	{
-+		.group = 0,
-+		.mask = ~(1 << 6),
-+	},
-+};
-+
-+static struct padmux pwm2_padmux = {
-+	.name = "pwm2",
-+	.muxmask_counts = ARRAY_SIZE(pwm2_muxmask),
-+	.pad_muxmask = pwm2_muxmask,
-+};
-+
-+static struct muxmask pwm3_muxmask[] = {
-+	{
-+		.group = 0,
-+		.mask = ~(1 << 7),
-+	},
-+};
-+
-+static struct padmux pwm3_padmux = {
-+	.name = "pwm3",
-+	.muxmask_counts = ARRAY_SIZE(pwm3_muxmask),
-+	.pad_muxmask = pwm3_muxmask,
-+};
-+
-+static struct muxmask warm_rst_muxmask[] = {
-+	{
-+		.group = 0,
-+		.mask = ~(1 << 8),
-+	},
-+};
-+
-+static struct padmux warm_rst_padmux = {
-+	.name = "warm_rst",
-+	.muxmask_counts = ARRAY_SIZE(warm_rst_muxmask),
-+	.pad_muxmask = warm_rst_muxmask,
-+};
-+
-+static struct muxmask usb0_utmi_drvbus_muxmask[] = {
-+	{
-+		.group = 1,
-+		.mask = ~(1 << 22),
-+	},
-+};
-+static struct padmux usb0_utmi_drvbus_padmux = {
-+	.name = "usb0_utmi",
-+	.muxmask_counts = ARRAY_SIZE(usb0_utmi_drvbus_muxmask),
-+	.pad_muxmask = usb0_utmi_drvbus_muxmask,
-+	.funcmask = (1 << 6),
-+	.funcval = (1 << 6), /* refer to PAD_UTMI_DRVVBUS0_ENABLE */
-+};
-+
-+static struct muxmask usb1_utmi_drvbus_muxmask[] = {
-+	{
-+		.group = 1,
-+		.mask = ~(1 << 27),
-+	},
-+};
-+static struct padmux usb1_utmi_drvbus_padmux = {
-+	.name = "usb1_utmi",
-+	.muxmask_counts = ARRAY_SIZE(usb1_utmi_drvbus_muxmask),
-+	.pad_muxmask = usb1_utmi_drvbus_muxmask,
-+	.funcmask = (1 << 11),
-+	.funcval = (1 << 11), /* refer to PAD_UTMI_DRVVBUS1_ENABLE */
-+};
-+
-+static struct padmux *prima2_all_padmux[] = {
-+	&lcd_16bits_padmux,
-+	&lcd_18bits_padmux,
-+	&lcd_24bits_padmux,
-+	&lcdrom_padmux,
-+	&sdmmc3_padmux,
-+	&spi0_padmux,
-+	&sdmmc4_padmux,
-+	&cko1_padmux,
-+	&i2s_padmux,
-+	&ac97_padmux,
-+	&spi1_padmux,
-+	&sdmmc1_padmux,
-+	&gps_padmux,
-+	&sdmmc5_padmux,
-+	&uart1_padmux,
-+	&uart2_padmux,
-+	&uart2_nostreamctrl_padmux,
-+	&usp0_padmux,
-+	&usp1_padmux,
-+	&usp2_padmux,
-+	&nand_padmux,
-+	&sdmmc0_padmux,
-+	&sdmmc2_padmux,
-+	&uart0_padmux,
-+	&uart0_nostreamctrl_padmux,
-+	&cko0_padmux,
-+	&vip_padmux,
-+	&i2c0_padmux,
-+	&i2c1_padmux,
-+	&viprom_padmux,
-+	&pwm0_padmux,
-+	&pwm1_padmux,
-+	&pwm2_padmux,
-+	&pwm3_padmux,
-+	&warm_rst_padmux,
-+	&usb0_utmi_drvbus_padmux,
-+	&usb1_utmi_drvbus_padmux,
-+};
-+
-+void sirfsoc_pad_get(const char *name)
++static void sirfsoc_gpio_irq_unmask(struct irq_data *d)
 +{
-+	int i, j;
-+	for (i = 0; i < ARRAY_SIZE(prima2_all_padmux); i++) {
-+		struct padmux *mux = prima2_all_padmux[i];
-+		struct muxmask *mask = mux->pad_muxmask;
-+		unsigned long flags;
++	struct gpio_bank *bank = sirfsoc_irq_to_bank(d->irq);
++	int index = sirfsoc_irq_to_indx(d->irq);
++	u32 status, offset;
++	unsigned long flags;
 +
-+		if (strcmp(mux->name, name))
-+			continue;
++	if (bank != NULL) {
++		pr_debug("%s: unmask gpio group %d index %d\n", __func__,
++			bank->group, index);
++		offset = SIRFSOC_GPIO_CTRL(bank->group, index);
 +
-+		spin_lock_irqsave(&pad_lock, flags);
-+		for (j = 0; j < mux->muxmask_counts; j++) {
-+			int muxval;
-+			if (pad_gpio_used_map[mask[j].group] &
-+				(~(mask[j].mask))) {
-+				pr_err(
-+					"This pad is used by gpio\n");
-+				spin_unlock_irqrestore(&pad_lock,
-+					flags);
-+				return;
-+			}
-+			pad_module_used_map[mask[j].group] |=
-+				(~(mask[j].mask));
-+			muxval =
-+				readl(sirfsoc_gpio_pinmux_base +
-+					SIRFSOC_GPIO_PAD_EN(mask[j].group));
-+			muxval = muxval & (mask[j].mask);
-+			writel(muxval,
-+				sirfsoc_gpio_pinmux_base + SIRFSOC_GPIO_PAD_EN(mask[j].group));
-+		}
-+		if (mux->funcmask) {
-+			unsigned long func_en_val;
-+			func_en_val =
-+				readl(sirfsoc_rstc_base + SIRFSOC_RSC_PIN_MUX);
-+			func_en_val =
-+				(func_en_val & (~(mux->funcmask))) | (mux->
-+					funcval);
-+			writel(func_en_val,
-+				sirfsoc_rstc_base + SIRFSOC_RSC_PIN_MUX);
-+		}
-+		spin_unlock_irqrestore(&pad_lock, flags);
++		spin_lock_irqsave(&gpio_lock, flags);
++		status = readl(sirfsoc_gpio_pinmux_base + offset);
++
++		status &= ~SIRFSOC_GPIO_CTL_INTR_STS_MASK;
++		status |= SIRFSOC_GPIO_CTL_INTR_EN_MASK;
++
++		writel(status, sirfsoc_gpio_pinmux_base + offset);
++		spin_unlock_irqrestore(&gpio_lock, flags);
 +	}
 +}
-+EXPORT_SYMBOL(sirfsoc_pad_get);
 +
-+void sirfsoc_pad_put(const char *name)
++static int sirfsoc_gpio_irq_type(struct irq_data *d, unsigned type)
 +{
-+	int i, j;
-+	for (i = 0; i < ARRAY_SIZE(prima2_all_padmux); i++) {
-+		struct padmux *mux = prima2_all_padmux[i];
-+		struct muxmask *mask = mux->pad_muxmask;
-+		unsigned long flags;
++	struct gpio_bank *bank = sirfsoc_irq_to_bank(d->irq);
++	int index = sirfsoc_irq_to_indx(d->irq);
++	u32 status, offset;
++	unsigned long flags;
 +
-+		if (strcmp(mux->name, name))
-+			continue;
++	if (bank == NULL)
++		return -EINVAL;
 +
-+		spin_lock_irqsave(&pad_lock, flags);
-+		for (j = 0; j < mux->muxmask_counts; j++) {
-+			int muxval;
-+			if (pad_gpio_used_map[mask[j].group] &
-+				(~(mask[j].mask)))
-+				pr_warning("This pad is used by gpio\n");
-+			pad_module_used_map[mask[j].group] &=
-+				mask[j].mask;
-+			muxval =
-+				readl(sirfsoc_gpio_pinmux_base +
-+					SIRFSOC_GPIO_PAD_EN(mask[j].group));
-+			muxval = muxval | (~(mask[j].mask));
-+			writel(muxval,
-+				sirfsoc_gpio_pinmux_base + SIRFSOC_GPIO_PAD_EN(mask[j].group));
-+		}
-+		spin_unlock_irqrestore(&pad_lock, flags);
++	offset = SIRFSOC_GPIO_CTRL(bank->group, index);
++	spin_lock_irqsave(&gpio_lock, flags);
++	status = readl(sirfsoc_gpio_pinmux_base + offset);
++	status &= ~SIRFSOC_GPIO_CTL_INTR_STS_MASK;
++
++	switch (type) {
++	case IRQ_TYPE_NONE:
++		break;
++	case IRQ_TYPE_EDGE_RISING:
++		status |= (SIRFSOC_GPIO_CTL_INTR_HIGH_MASK | SIRFSOC_GPIO_CTL_INTR_TYPE_MASK);
++		status &= ~SIRFSOC_GPIO_CTL_INTR_LOW_MASK;
++		break;
++	case IRQ_TYPE_EDGE_FALLING:
++		status &= ~SIRFSOC_GPIO_CTL_INTR_HIGH_MASK;
++		status |= (SIRFSOC_GPIO_CTL_INTR_LOW_MASK | SIRFSOC_GPIO_CTL_INTR_TYPE_MASK);
++		break;
++	case IRQ_TYPE_EDGE_BOTH:
++		status |=
++			(SIRFSOC_GPIO_CTL_INTR_HIGH_MASK | SIRFSOC_GPIO_CTL_INTR_LOW_MASK |
++			 SIRFSOC_GPIO_CTL_INTR_TYPE_MASK);
++		break;
++	case IRQ_TYPE_LEVEL_LOW:
++		status &= ~(SIRFSOC_GPIO_CTL_INTR_HIGH_MASK | SIRFSOC_GPIO_CTL_INTR_TYPE_MASK);
++		status |= SIRFSOC_GPIO_CTL_INTR_LOW_MASK;
++		break;
++	case IRQ_TYPE_LEVEL_HIGH:
++		status |= SIRFSOC_GPIO_CTL_INTR_HIGH_MASK;
++		status &= ~(SIRFSOC_GPIO_CTL_INTR_LOW_MASK | SIRFSOC_GPIO_CTL_INTR_TYPE_MASK);
++		break;
 +	}
-+}
-+EXPORT_SYMBOL(sirfsoc_pad_put);
 +
-+static struct of_device_id pinmux_ids[]  = {
-+	{ .compatible = "sirf,prima2-pinmux" },
-+};
++	writel(status, sirfsoc_gpio_pinmux_base + offset);
 +
-+static int __init sirfsoc_of_pinmux_init(void)
-+{
-+	struct device_node *np;
-+
-+	np = of_find_matching_node(NULL, pinmux_ids);
-+	if (!np)
-+		panic("unable to find compatible pinmux node in dtb\n");
-+
-+	sirfsoc_gpio_pinmux_base = of_iomap(np, 0);
-+	if (!sirfsoc_gpio_pinmux_base)
-+		panic("unable to map gpio/pinmux cpu registers\n");
-+
-+	of_node_put(np);
++	spin_unlock_irqrestore(&gpio_lock, flags);
 +
 +	return 0;
 +}
-+early_initcall(sirfsoc_of_pinmux_init);
 +
++static struct irq_chip sirfsoc_irq_chip = {
++	.name = "SiRF SoC GPIO IRQ",
++	.irq_ack = sirfsoc_gpio_irq_ack,
++	.irq_mask = sirfsoc_gpio_irq_mask,
++	.irq_unmask = sirfsoc_gpio_irq_unmask,
++	.irq_set_type = sirfsoc_gpio_irq_type,
++};
++
++static void sirfsoc_gpio_handle_irq(unsigned int irq, struct irq_desc *desc)
++{
++	struct gpio_bank *bank = NULL;
++	u32 status, ctrl;
++	int i, index = 0;
++
++	pr_debug("%s: irq %d\n", __func__, irq);
++
++	for (i = 0; i < SIRFSOC_GPIO_NO_OF_BANKS; i++) {
++		if (sirfsoc_gpio_bank[i].irq == irq) {
++			bank = &sirfsoc_gpio_bank[i];
++			break;
++		}
++	}
++
++	if (bank == NULL) {
++		printk(KERN_ALERT " Invalid GPIO IRQ/Bank: %d\n", irq);
++		handle_bad_irq(irq, desc);
++		return;
++	}
++
++	status = readl(sirfsoc_gpio_pinmux_base + SIRFSOC_GPIO_INT_STATUS(bank->group));
++	if (!status) {
++		printk(KERN_WARNING
++			"%s: gpio group %d status %#x no interrupt is flaged\n",
++			__func__, bank->group, status);
++		handle_bad_irq(irq, desc);
++		return;
++	}
++
++	while (status) {
++		ctrl = readl(sirfsoc_gpio_pinmux_base + SIRFSOC_GPIO_CTRL(bank->group, index));
++
++		/*
++		 * Here we must check whether the corresponding GPIO's interrupt
++		 * has been enabled, otherwise just skip it
++		 */
++		if ((status & 0x1) && (ctrl & SIRFSOC_GPIO_CTL_INTR_EN_MASK)) {
++			pr_debug("%s: gpio group %d index %d happens\n",
++				__func__, bank->group, index);
++			irq =
++				(SIRFSOC_GPIO_IRQ_START +
++				 (bank->group * SIRFSOC_GPIO_BANK_SIZE)) + index;
++			generic_handle_irq(irq);
++		}
++
++		index++;
++		status = status >> 1;
++	}
++
++	return;
++}
++
++static inline void sirfsoc_gpio_set_input(struct gpio_bank *bank, unsigned ctrl_offset)
++{
++	u32 status;
++	status = readl(sirfsoc_gpio_pinmux_base + ctrl_offset);
++	status &= ~SIRFSOC_GPIO_CTL_OUT_EN_MASK;
++	writel(status, sirfsoc_gpio_pinmux_base + ctrl_offset);
++}
++
++static int sirfsoc_gpio_request(struct gpio_chip *chip, unsigned offset)
++{
++	struct gpio_bank *bank = container_of(chip, struct gpio_bank, chip);
++	unsigned long flags;
++
++	spin_lock_irqsave(&bank->lock, flags);
++
++	/*set direction as input and disable/mask irq */
++	sirfsoc_gpio_set_input(bank, SIRFSOC_GPIO_CTRL(bank->group, offset));
++	_sirfsoc_gpio_irq_mask(sirfsoc_gpio_to_irq(chip, offset));
++	sirfsoc_get_gpio(bank->group, offset);
++
++	spin_unlock_irqrestore(&bank->lock, flags);
++	return 0;
++}
++
++static void sirfsoc_gpio_free(struct gpio_chip *chip, unsigned offset)
++{
++	struct gpio_bank *bank = container_of(chip, struct gpio_bank, chip);
++	unsigned long flags;
++
++	spin_lock_irqsave(&bank->lock, flags);
++
++	/*disable irq */
++	_sirfsoc_gpio_irq_mask(sirfsoc_gpio_to_irq(chip, offset));
++
++	/*set gpio to input */
++	sirfsoc_gpio_set_input(bank, SIRFSOC_GPIO_CTRL(bank->group, offset));
++
++	if (bank->paden_bk_map & (1 << offset))
++		sirfsoc_get_gpio(bank->group, offset);
++	else
++		sirfsoc_put_gpio(bank->group, offset);
++}
++
++static int sirfsoc_gpio_direction_input(struct gpio_chip *chip, unsigned gpio)
++{
++	struct gpio_bank *bank = container_of(chip, struct gpio_bank, chip);
++	int index = sirfsoc_gpio_to_indx(gpio);
++	unsigned long flags;
++	unsigned offset;
++
++	offset = SIRFSOC_GPIO_CTRL(bank->group, index);
++	spin_lock_irqsave(&bank->lock, flags);
++	sirfsoc_gpio_set_input(bank, offset);
++	spin_unlock_irqrestore(&bank->lock, flags);
++	return 0;
++}
++
++static inline void sirfsoc_gpio_set_output(struct gpio_bank *bank, unsigned offset,
++	int value)
++{
++	u32 status;
++
++	status = readl(sirfsoc_gpio_pinmux_base + offset);
++	if (value)
++		status |= SIRFSOC_GPIO_CTL_DATAOUT_MASK;
++	else
++		status &= ~SIRFSOC_GPIO_CTL_DATAOUT_MASK;
++
++	status &= ~SIRFSOC_GPIO_CTL_INTR_EN_MASK;
++	status |= SIRFSOC_GPIO_CTL_OUT_EN_MASK;
++
++	writel(status, sirfsoc_gpio_pinmux_base + offset);
++}
++
++static int sirfsoc_gpio_direction_output(struct gpio_chip *chip, unsigned gpio, int value)
++{
++	struct gpio_bank *bank = container_of(chip, struct gpio_bank, chip);
++	int index = sirfsoc_gpio_to_indx(gpio);
++	u32 offset;
++	unsigned long flags;
++
++	offset = SIRFSOC_GPIO_CTRL(bank->group, index);
++	spin_lock_irqsave(&gpio_lock, flags);
++	sirfsoc_gpio_set_output(bank, offset, value);
++	spin_unlock_irqrestore(&gpio_lock, flags);
++
++	return 0;
++}
++
++void gpio_set_pull(unsigned gpio, int enable)
++{
++	struct gpio_bank *bank = sirfsoc_gpio_to_bank(gpio);
++	int index = sirfsoc_gpio_to_indx(gpio);
++	u32 status, offset;
++	unsigned long flags;
++
++	BUG_ON(!bank);
++
++	offset = SIRFSOC_GPIO_CTRL(bank->group, index);
++
++	spin_lock_irqsave(&gpio_lock, flags);
++
++	status = readl(sirfsoc_gpio_pinmux_base + offset);
++
++	if (enable)
++		status |= SIRFSOC_GPIO_CTL_PULL_MASK;
++	else
++		status &= ~SIRFSOC_GPIO_CTL_PULL_MASK;
++
++	writel(status, sirfsoc_gpio_pinmux_base + offset);
++
++	spin_unlock_irqrestore(&gpio_lock, flags);
++}
++EXPORT_SYMBOL(gpio_set_pull);
++
++void gpio_pull_up(unsigned int gpio)
++{
++	struct gpio_bank *bank = sirfsoc_gpio_to_bank(gpio);
++	int index = sirfsoc_gpio_to_indx(gpio);
++	u32 status, offset;
++	unsigned long flags;
++
++	BUG_ON(!bank);
++
++	gpio_set_pull(gpio, 1);
++
++	offset = SIRFSOC_GPIO_CTRL(bank->group, index);
++
++	spin_lock_irqsave(&gpio_lock, flags);
++
++	status = readl(sirfsoc_gpio_pinmux_base + offset);
++	status |= SIRFSOC_GPIO_CTL_PULL_HIGH;
++	writel(status, sirfsoc_gpio_pinmux_base + offset);
++
++	spin_unlock_irqrestore(&gpio_lock, flags);
++}
++EXPORT_SYMBOL(gpio_pull_up);
++
++void gpio_pull_down(unsigned int gpio)
++{
++	struct gpio_bank *bank = sirfsoc_gpio_to_bank(gpio);
++	int index = sirfsoc_gpio_to_indx(gpio);
++	u32 status, offset;
++	unsigned long flags;
++
++	BUG_ON(!bank);
++
++	gpio_set_pull(gpio, 1);
++
++	offset = SIRFSOC_GPIO_CTRL(bank->group, index);
++
++	spin_lock_irqsave(&gpio_lock, flags);
++
++	status = readl(sirfsoc_gpio_pinmux_base + offset);
++	status &= ~SIRFSOC_GPIO_CTL_PULL_HIGH;
++	writel(status, sirfsoc_gpio_pinmux_base + offset);
++
++	spin_unlock_irqrestore(&gpio_lock, flags);
++}
++EXPORT_SYMBOL(gpio_pull_down);
++
++static int sirfsoc_gpio_get_value(struct gpio_chip *chip, unsigned offset)
++{
++	struct gpio_bank *bank = container_of(chip, struct gpio_bank, chip);
++	u32 status;
++
++	status = readl(sirfsoc_gpio_pinmux_base + SIRFSOC_GPIO_CTRL(bank->group, offset));
++
++	return !!(status & SIRFSOC_GPIO_CTL_DATAIN_MASK);
++}
++
++static void sirfsoc_gpio_set_value(struct gpio_chip *chip, unsigned offset,
++	int value)
++{
++	struct gpio_bank *bank = container_of(chip, struct gpio_bank, chip);
++	u32 status;
++
++	status = readl(sirfsoc_gpio_pinmux_base + SIRFSOC_GPIO_CTRL(bank->group, offset));
++	if (value)
++		status |= SIRFSOC_GPIO_CTL_DATAOUT_MASK;
++	else
++		status &= ~SIRFSOC_GPIO_CTL_DATAOUT_MASK;
++	writel(status, sirfsoc_gpio_pinmux_base + SIRFSOC_GPIO_CTRL(bank->group, offset));
++}
++
++static int sirfsoc_gpio_probe(struct platform_device *pdev)
++{
++	int i;
++
++	struct gpio_bank *bank;
++	int gpio = 0;
++
++	for (i = 0; i < SIRFSOC_GPIO_NO_OF_BANKS; i++) {
++		bank = &sirfsoc_gpio_bank[i];
++		spin_lock_init(&bank->lock);
++		bank->paden_bk_map = readl(sirfsoc_gpio_pinmux_base + SIRFSOC_GPIO_PAD_EN(i));
++		irq_set_chained_handler(bank->irq, sirfsoc_gpio_handle_irq);
++
++		bank->chip.request = sirfsoc_gpio_request;
++		bank->chip.free = sirfsoc_gpio_free;
++		bank->chip.direction_input = sirfsoc_gpio_direction_input;
++		bank->chip.get = sirfsoc_gpio_get_value;
++		bank->chip.direction_output = sirfsoc_gpio_direction_output;
++		bank->chip.set = sirfsoc_gpio_set_value;
++		bank->chip.to_irq = sirfsoc_gpio_to_irq;
++
++		bank->chip.label = "gpio";
++		bank->chip.base = gpio;
++
++		gpio += SIRFSOC_GPIO_BANK_SIZE;
++		bank->chip.ngpio = SIRFSOC_GPIO_BANK_SIZE;
++		gpiochip_add(&bank->chip);
++	}
++
++	for (i = SIRFSOC_GPIO_IRQ_START; i < SIRFSOC_GPIO_IRQ_END; i++) {
++		irq_set_chip(i, &sirfsoc_irq_chip);
++		irq_set_handler(i, handle_level_irq);
++		set_irq_flags(i, IRQF_VALID | IRQF_PROBE);
++	}
++
++	return 0;
++}
++
++static int sirfsoc_gpio_remove(struct platform_device *dev)
++{
++	return 0;
++}
++
++static const struct of_device_id sirf_gpio_of_match[] = {
++	{.compatible = "sirf,prima2-gpio", },
++	{},
++};
++MODULE_DEVICE_TABLE(of, sirf_gpio_of_match);
++
++static struct platform_driver sirfsoc_gpio_driver = {
++	.driver		= {
++		.name	= "sirfsoc_gpio",
++		.of_match_table = sirf_gpio_of_match,
++	},
++	.probe		= sirfsoc_gpio_probe,
++	.remove		= sirfsoc_gpio_remove,
++};
++
++static int __init sirfsoc_gpio_init(void)
++{
++	return platform_driver_register(&sirfsoc_gpio_driver);
++}
++core_initcall(sirfsoc_gpio_init);
++
++static void __exit sirfsoc_gpio_exit(void)
++{
++	platform_driver_unregister(&sirfsoc_gpio_driver);
++}
++module_exit(sirfsoc_gpio_exit);
++
++MODULE_DESCRIPTION("SiRFSoC gpio driver");
++MODULE_AUTHOR("Yuping Luo <yuping.luo@csr.com>, Barry Song <baohua.song@csr.com>");
++MODULE_LICENSE("GPL");
 -- 
 1.7.1
 
