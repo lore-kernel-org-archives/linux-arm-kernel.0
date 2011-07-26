@@ -1,36 +1,35 @@
-From: jhbird.choi@samsung.com (jhbird.choi at samsung.com)
-Date: Tue, 26 Jul 2011 15:21:52 +0900
-Subject: [PATCH] ARM: EXYNOS4: Change the pwm device name to supprot clkdev
-Message-ID: <1311661312-24470-1-git-send-email-jhbird.choi@samsung.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 26 Jul 2011 08:29:32 +0200
+Subject: [PATCH 1/2] arm/mx5: parse iomuxc pad configuratoin from device
+	tree
+In-Reply-To: <20110726024354.GI21641@S2100-06.ap.freescale.net>
+References: <1311606467-28985-1-git-send-email-shawn.guo@linaro.org>
+	<1311606467-28985-2-git-send-email-shawn.guo@linaro.org>
+	<20110725204630.GD26735@ponder.secretlab.ca>
+	<20110726024354.GI21641@S2100-06.ap.freescale.net>
+Message-ID: <20110726062931.GZ20587@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jonghwan Choi <jhbird.choi@samsung.com>
+On Tue, Jul 26, 2011 at 10:43:55AM +0800, Shawn Guo wrote:
+> On Mon, Jul 25, 2011 at 02:46:30PM -0600, Grant Likely wrote:
+> > On Mon, Jul 25, 2011 at 11:07:46PM +0800, Shawn Guo wrote:
+> > > It adds function mxc_iomuxc_dt_init() to parse iomuxc pad configuration
+> > 
+> Specifying string in dts, and then parsing the string, mapping it to
+> one of the huge MX53_PAD_ definition in kernel init code?
+> 
+> One thing I'm trying to do is to replace those huge iomux-mx*.h headers
+> with dts binding, and then get rid of those headers from Linux tree.
 
-Signed-off-by: Jonghwan Choi <jhbird.choi@samsung.com>
----
- arch/arm/mach-exynos4/time.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+I don't like these files either, so getting rid of them looks promising.
+OTOH don't forget that we need some of the pins during runtime for
+gpio/function switching.
 
-diff --git a/arch/arm/mach-exynos4/time.c b/arch/arm/mach-exynos4/time.c
-index ebb8f38..9a74294 100644
---- a/arch/arm/mach-exynos4/time.c
-+++ b/arch/arm/mach-exynos4/time.c
-@@ -264,6 +264,7 @@ static void __init exynos4_timer_resources(void)
- 	clk_enable(timerclk);
- 
- 	tmpdev.id = 2;
-+	tmpdev.dev.init_name = "s3c24xx-pwm.2";
- 	tin2 = clk_get(&tmpdev.dev, "pwm-tin");
- 	if (IS_ERR(tin2))
- 		panic("failed to get pwm-tin2 clock for system timer");
-@@ -274,6 +275,7 @@ static void __init exynos4_timer_resources(void)
- 	clk_enable(tin2);
- 
- 	tmpdev.id = 4;
-+	tmpdev.dev.init_name = "s3c24xx-pwm.4";
- 	tin4 = clk_get(&tmpdev.dev, "pwm-tin");
- 	if (IS_ERR(tin4))
- 		panic("failed to get pwm-tin4 clock for system timer");
+Sascha
+
 -- 
-1.7.0
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
