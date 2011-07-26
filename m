@@ -1,84 +1,44 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Tue, 26 Jul 2011 18:16:42 +0100
-Subject: [PATCH 1/2] ARM: alignment: Make SIGBUS sent to userspace
-	POSIXly correct
-In-Reply-To: <20110726162905.GA4969@shutemov.name>
-References: <1311689686-7451-1-git-send-email-dave.martin@linaro.org>
-	<20110726162905.GA4969@shutemov.name>
-Message-ID: <20110726171642.GA7639@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 26 Jul 2011 18:20:27 +0100
+Subject: [PATCH] Improve slave/cyclic DMA engine documentation (was:
+	[PATCH V4 04/14] DMA: PL330: Add DMA_CYCLIC capability)
+In-Reply-To: <CABb+yY1P21hbMD2mG_cCvW3N5WqWzc2ZVt-HTOrC1J3dc5RbhA@mail.gmail.com>
+References: <002001cc4ab6$0d7cd590$287680b0$%kim@samsung.com>
+	<20110725103629.GF9653@n2100.arm.linux.org.uk>
+	<1311590884.29703.2.camel@vkoul-mobl4>
+	<20110725105754.GG9653@n2100.arm.linux.org.uk>
+	<1311591717.29703.7.camel@vkoul-mobl4>
+	<20110725113926.GH9653@n2100.arm.linux.org.uk>
+	<1311595303.29703.31.camel@vkoul-mobl4>
+	<20110726075720.GL9653@n2100.arm.linux.org.uk>
+	<1311672933.24316.1.camel@vkoul-mobl4>
+	<CABb+yY1P21hbMD2mG_cCvW3N5WqWzc2ZVt-HTOrC1J3dc5RbhA@mail.gmail.com>
+Message-ID: <20110726172027.GD1655@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 26, 2011 at 07:29:05PM +0300, Kirill A. Shutemov wrote:
-> On Tue, Jul 26, 2011 at 03:14:46PM +0100, Dave Martin wrote:
-> > With the UM_SIGNAL alignment fault mode, no siginfo structure is
-> > passed to userspace.
-> > 
-> > POSIX specifies how siginfo_t should be populated for alignment
-> > faults, so this patch does just that:
-> > 
-> >   * si_signo = SIGBUS
-> >   * si_code = BUS_ADRALN
-> >   * si_addr = address of the faulted instruction
-> > 
-> > Signed-off-by: Dave Martin <dave.martin@linaro.org>
-> > ---
-> >  arch/arm/mm/alignment.c |   14 +++++++++++---
-> >  1 files changed, 11 insertions(+), 3 deletions(-)
-> > 
-> > diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
-
-[...]
-
-> > @@ -883,9 +884,16 @@ do_alignment(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
-
-[...]
-
-> > +	if (ai_usermode & UM_SIGNAL) {
-> > +		siginfo_t si;
-> > +
-> > +		si.si_signo = SIGBUS;
-> > +		si.si_errno = 0;
-> > +		si.si_code = BUS_ADRALN;
-> > +		si.si_addr = (void __user *)instruction_pointer(regs);
+On Tue, Jul 26, 2011 at 08:07:44PM +0530, Jassi Brar wrote:
+> Dear Vinod,
 > 
-> This is wrong. You need something like:
+>  Since it came from the RMK, most probably it'll be the best.
 > 
-> si.si_addr = (void __user *)instruction_pointer(regs) -
-> 	(thumb_mode(regs) ? 2 : 4);
+> But applying patches upon personal timeout seems very dangerous.
 
-I don't think so.  The appropriate adjustment is already made on
-vector entry by the vector_stub macro in entry-armv.S:
+Ehh what?  Is there any contention over this documentation patch?
 
-	.macro	vector_stub, name, mode, correction=0
-	.align	5
+It's not adding anything new, it's just documenting the facts as they
+stand today about the API and its use.
 
-vector_\name:
-	.if \correction
-	sub	lr, lr, #\correction
-	.endif
+> People not responding doesn't mean only either people agree completely
+> or they don't care. Some might be interested but too busy with current tasks
+> that they need time to check... please make some policy for such cases.
+> 
+> It already happened with the patch from Rob, which you probably have to
+> revert.
+> 
+> IMHO, if nobody replied, maybe you could first ack the patch and wait
+> for, say a week, before applying?
+> That way people will know they have to hurry if they care otherwise
+> the patch is going upstream as such.
 
-
-I'm pretty sure that instruction_pointer(regs) must already point to the
-faulted instruction when we enter do_alignment(), because the first thing
-this function does is:
-
-	instrptr = instruction_pointer(regs);
-	if (thumb_mode(regs)) {
-		fault = __get_user(tinstr, (u16 *)(instrptr & ~1));
-		/* ... */
-	} else
-		fault = __get_user(instr, (u32 *)instrptr);
-
-
-When I test the code, my observations bear this out: the address returned
-in si_addr does match the address of the faulting instruction.
-
-Does that satisfy your concerns, or have I missed something?
-
-
-It might make sense to set bit 1 of si_addr to match the Thumb-ness of
-the faulting instruction though.  Currently I don't do that.
-
-Cheers
----Dave
+A week is far too long.  That's how patches get lost and missed.
