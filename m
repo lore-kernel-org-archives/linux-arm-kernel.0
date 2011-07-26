@@ -1,75 +1,129 @@
-From: pj0585@gmail.com (P J)
-Date: Tue, 26 Jul 2011 16:38:48 +0530
-Subject: at91sam9g45: Issues while working with RAM that is separated on
-	physical address space
-In-Reply-To: <CAA2DH4u9GANxUTnTqRzUR=GihNLS8EEDAKm8u8SFZ_Yq48qXOg@mail.gmail.com>
-References: <CAA2DH4u1kcky3xzxpepS=gtDK1Xas17zDxcRkDR7qRNLHQyoxw@mail.gmail.com>
-	<20110722135505.GB25947@n2100.arm.linux.org.uk>
-	<CAA2DH4u9GANxUTnTqRzUR=GihNLS8EEDAKm8u8SFZ_Yq48qXOg@mail.gmail.com>
-Message-ID: <CAA2DH4sviHkHEHZTR+0AHP3pToC7fEgTc+irw0vk_WU5q0XEQQ@mail.gmail.com>
+From: hrishikesh.b@ti.com (Bhandiwad, Hrishikesh)
+Date: Tue, 26 Jul 2011 16:36:54 +0530
+Subject: [PATCH] OMAP3: NAND: Adding NAND support and specifying NAND
+	partitions.
+In-Reply-To: <CANOLnOODuPKAmRfiokC_4UgwrxCcw5xY1a9vhMsWN0T2LzNzAQ@mail.gmail.com>
+References: <1311601253-2933-1-git-send-email-hrishikesh.b@ti.com>,
+	<CANOLnOODuPKAmRfiokC_4UgwrxCcw5xY1a9vhMsWN0T2LzNzAQ@mail.gmail.com>
+Message-ID: <ADF30F4D7BDE934D9B632CE7D5C7ACA4047C4D08A08E@dbde03.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 25, 2011 at 7:36 PM, P J <pj0585@gmail.com> wrote:
-> Hi Russell,
+My Replies inline.
+
+Thanks & Regards,
+Hrishikesh
+________________________________________
+From: Grazvydas Ignotas [notasas at gmail.com]
+Sent: Tuesday, July 26, 2011 3:08 PM
+To: Bhandiwad, Hrishikesh
+Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org; linux-mtd at lists.infradead.org; Hiremath, Vaibhav; Premi, Sanjeev
+Subject: Re: [PATCH] OMAP3: NAND: Adding NAND support and specifying NAND partitions.
+
+On Mon, Jul 25, 2011 at 4:40 PM, Hrishikesh Bhandiwad
+<hrishikesh.b@ti.com> wrote:
+> This patch adds the NAND support on OMAP3EVM board and also allocates
+> five partitions  on NAND.
+> Referred to file: arch/arm/mach-omap2/board-omap3beagle.c
 >
-> On Fri, Jul 22, 2011 at 7:25 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
->> On Fri, Jul 22, 2011 at 07:06:40PM +0530, P J wrote:
->>> The memory map (required) is as follows:
->>> ? ? phys ? ? ? ? ? => ? ? ? ? ?virt
->>> 0x70000000 ? ?=> ? ?0xC0000000 ?(128 MB)
->>> 0x20000000 ? ?=> ? ?0xC8000000 ?(128 MB)
->>
->> There is no way that the kernel will support this kind of hair-brained
->> memory layout. ?This is even more true than it once was since we've moved
->> to using memblock to manage the physical memory layout in later kernels.
->>
->> What the kernel will support is using 0x20000000 as the first bank and
->> 0x70000000 as the second bank of memory. ?I suggest trying with it mapped
->> that way around, and failing that then using highmem support without
->> sparse.
->>
+> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+> Signed-off-by: Sanjeev Premi <premi@ti.com>
+> Signed-off-by: Hrishikesh Bhandiwad <hrishikesh.b@ti.com>
+> ---
+>  arch/arm/mach-omap2/board-omap3evm.c |   40 ++++++++++++++++++++++++++++++++++
+>  1 files changed, 40 insertions(+), 0 deletions(-)
 >
-> I do not completely understand why this layout is not possible.
+> diff --git a/arch/arm/mach-omap2/board-omap3evm.c b/arch/arm/mach-omap2/board-omap3evm.c
+> index b4d4346..be45b63 100644
+> --- a/arch/arm/mach-omap2/board-omap3evm.c
+> +++ b/arch/arm/mach-omap2/board-omap3evm.c
+> @@ -30,6 +30,10 @@
+>  #include <linux/usb/otg.h>
+>  #include <linux/smsc911x.h>
 >
-> Anyways, my one memory bank (128 MB DDR2) is located at physical
-> address 0x70000000 to 0x77FFFFFF and is virtually mapped to 0xC0000000
-> to 0xC7FFFFFF.
+> +#include <linux/mtd/mtd.h>
+
+You don't need this include.
+
+> +#include <linux/mtd/partitions.h>
+> +#include <linux/mtd/nand.h>
+> +
+>  #include <linux/wl12xx.h>
+>  #include <linux/regulator/fixed.h>
+>  #include <linux/regulator/machine.h>
+> @@ -46,6 +50,8 @@
+>  #include <plat/mcspi.h>
+>  #include <video/omapdss.h>
+>  #include <video/omap-panel-generic-dpi.h>
+> +#include <plat/gpmc.h>
+> +#include <plat/nand.h>
+
+These 2 too.
+
 >
-> If I have to continue to use this bank as per the above mapping then
-> how can I use the other memory bank (128MB DDR2) which is located at
-> physical address 0x20000000 to 0x27FFFFFF ?
+>  #include "mux.h"
+>  #include "sdram-micron-mt46h32m32lf-6.h"
+> @@ -101,6 +107,37 @@ static void __init omap3_evm_get_revision(void)
+>        }
+>  }
 >
+> +static struct mtd_partition omap3evm_nand_partitions[] = {
+> +       /* All the partition sizes are listed in terms of NAND block size */
+> +       {
+> +               .name           = "X-Loader",
+> +               .offset         = 0,
+> +               .size           = 4 * NAND_BLOCK_SIZE,
+> +               .mask_flags     = MTD_WRITEABLE,        /* force read-only */
+> +       },
+> +       {
+> +               .name           = "U-Boot",
+> +               .offset         = 0x80000
+
+Missing comma. Have you at least tried compiling this?
+[Hrishikesh] Apologies. I maintain different git repositories .Had compiled and tested in other one , missed out the commas while making changes in this one.
+Will send out a patch with perfect changes in my next revision.
+
+> +               .size           = 15 * NAND_BLOCK_SIZE,
+> +               .mask_flags     = MTD_WRITEABLE,        /* force read-only */
+> +       },
+> +       {
+> +               .name           = "U-Boot Env",
+> +               .offset         = 0x260000
+> +               .size           = 1 * NAND_BLOCK_SIZE,
+> +       },
+> +       {
+> +               .name           = "Kernel",
+> +               .offset         = 0x280000
+> +               .size           = 32 * NAND_BLOCK_SIZE,
+> +       },
+> +       {
+> +               .name           = "File System",
+> +               .offset         = 0x680000
+> +               .size           = MTDPART_SIZ_FULL,
+> +       },
+> +};
+> +
+>  #if defined(CONFIG_SMSC911X) || defined(CONFIG_SMSC911X_MODULE)
+>  #include <plat/gpmc-smsc911x.h>
 >
-> -Prasant J
+> @@ -696,6 +733,9 @@ static void __init omap3_evm_init(void)
+>
+>        omap_serial_init();
+>
+> +       omap_nand_flash_init(NAND_BUSWIDTH_16, omap3evm_nand_partitions,
+> +                       ARRAY_SIZE(omap3evm_nand_partitions));
+> +
+>        /* OMAP3EVM uses ISP1504 phy and so register nop transceiver */
+>        usb_nop_xceiv_register();
+>
+> --
+> 1.6.2.4
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 >
 
-
-I think that if I change my memory banks (like I use the memory bank
-at 0x20000000 as the first one and the memory bank at 0x70000000 as
-the second one) then also I will have issues.
-
-The issue is because the memory banks are not getting correctly mapped
-because the __virt_to_phys() and __phys_to_virt() are defined as
-linear:
-
-#define __virt_to_phys(x)	((x) - PAGE_OFFSET + PHYS_OFFSET)
-#define __phys_to_virt(x)	((x) - PHYS_OFFSET + PAGE_OFFSET)
-
-where PHYS_OFFSET is 0x70000000 and PAGE_OFFSET is 0xC0000000
-
-
-Now the first bank which is at 0x70000000 gets correctly mapped
-virtually but the second bank which is at 0x20000000 gets mapped
-incorrectly. Even if I change the order of banks, (also I change the
-PHYS_OFFSET to 0x20000000) then, always, only one bank gets mapped
-correctly and the other one gets incorrectly mapped.
-
-If I change the above defines to map both my memories correctly then
-Linux does not boot.
-
-
-Any suggestions, as to how I can get the mappings correct.
-
--Prasant J
+--
+Gra?vydas
