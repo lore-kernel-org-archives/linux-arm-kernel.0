@@ -1,131 +1,152 @@
-From: padma.v@samsung.com (Padmavathi Venna)
-Date: Tue, 26 Jul 2011 07:00:12 -0400
-Subject: [RFC][PATCH] spi: s3c64xx: Use clkdev for bus clock lookup
-Message-ID: <1311678012-21473-1-git-send-email-padma.v@samsung.com>
+From: cwchoi00@gmail.com (Chanwoo Choi)
+Date: Tue, 26 Jul 2011 15:03:27 +0900
+Subject: [PATCH V4 01/14] DMA: PL330: Add support runtime PM for PL330 DMAC
+In-Reply-To: <1311557312-26107-2-git-send-email-boojin.kim@samsung.com>
+References: <1311557312-26107-1-git-send-email-boojin.kim@samsung.com>
+	<1311557312-26107-2-git-send-email-boojin.kim@samsung.com>
+Message-ID: <4E2E58AF.4000409@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Create a clkdev alias for spi bus clock and modify the spi
-driver to lookup the clock using the alias name instead of
-passing clock name from platform data.
+Boojin Kim wrote:
+> Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
+> ---
+>  drivers/dma/pl330.c |   75 +++++++++++++++++++++++++++++++++++++++++++++++++-
+>  1 files changed, 73 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+> index 6abe1ec..b7ecf47 100644
+> --- a/drivers/dma/pl330.c
+> +++ b/drivers/dma/pl330.c
+> @@ -17,6 +17,7 @@
+>  #include <linux/interrupt.h>
+>  #include <linux/amba/bus.h>
+>  #include <linux/amba/pl330.h>
+> +#include <linux/pm_runtime.h>
+>  
+>  #define NR_DEFAULT_DESC	16
+>  
+> @@ -83,6 +84,8 @@ struct dma_pl330_dmac {
+>  
+>  	/* Peripheral channels connected to this DMAC */
+>  	struct dma_pl330_chan peripherals[0]; /* keep at end */
+> +
+> +	struct clk *clk;
+>  };
+>  
+>  struct dma_pl330_desc {
+> @@ -696,6 +699,30 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
+>  		goto probe_err1;
+>  	}
+>  
+> +	pdmac->clk = clk_get(&adev->dev, "dma");
+> +	if (IS_ERR(pdmac->clk)) {
+> +		dev_err(&adev->dev, "Cannot get operation clock.\n");
+> +		ret = -EINVAL;
+> +		goto probe_err1;
+> +	}
+> +
+> +	amba_set_drvdata(adev, pdmac);
+> +
+> +#ifdef CONFIG_PM_RUNTIME
+> +	/* to use the runtime PM helper functions */
+> +	pm_runtime_enable(&adev->dev);
+> +
+> +	/* enable the power domain */
+> +	if (pm_runtime_get_sync(&adev->dev)) {
+> +		dev_err(&adev->dev, "failed to get runtime pm\n");
+> +		ret = -ENODEV;
+> +		goto probe_err1;
+> +	}
+> +#else
+> +	/* enable dma clk */
+> +	clk_enable(pdmac->clk);
+> +#endif
+> +
+>  	irq = adev->irq[0];
+>  	ret = request_irq(irq, pl330_irq_handler, 0,
+>  			dev_name(&adev->dev), pi);
+> @@ -763,8 +790,6 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
+>  		goto probe_err4;
+>  	}
+>  
+> -	amba_set_drvdata(adev, pdmac);
+> -
+>  	dev_info(&adev->dev,
+>  		"Loaded driver for PL330 DMAC-%d\n", adev->periphid);
+>  	dev_info(&adev->dev,
+> @@ -825,6 +850,13 @@ static int __devexit pl330_remove(struct amba_device *adev)
+>  	res = &adev->res;
+>  	release_mem_region(res->start, resource_size(res));
+>  
+> +#ifdef CONFIG_PM_RUNTIME
+> +	pm_runtime_put(&adev->dev);
+> +	pm_runtime_disable(&adev->dev);
+> +#else
+> +	clk_disable(pdmac->clk);
+> +#endif
+> +
+>  	kfree(pdmac);
+>  
+>  	return 0;
+> @@ -838,10 +870,49 @@ static struct amba_id pl330_ids[] = {
+>  	{ 0, 0 },
+>  };
+>  
+> +#ifdef CONFIG_PM_RUNTIME
+> +static int pl330_runtime_suspend(struct device *dev)
+> +{
+> +	struct dma_pl330_dmac *pdmac = dev_get_drvdata(dev);
+> +
+> +	if (!pdmac) {
+> +		dev_err(dev, "failed to get dmac\n");
+> +		return -ENODEV;
+> +	}
+> +
+> +	clk_disable(pdmac->clk);
+> +
+> +	return 0;
+> +}
+> +
+> +static int pl330_runtime_resume(struct device *dev)
+> +{
+> +	struct dma_pl330_dmac *pdmac = dev_get_drvdata(dev);
+> +
+> +	if (!pdmac) {
+> +		dev_err(dev, "failed to get dmac\n");
+> +		return -ENODEV;
+> +	}
+> +
+> +	clk_enable(pdmac->clk);
+> +
+> +	return 0;
+> +}
+> +#else
+> +#define pl330_runtime_suspend	NULL
+> +#define pl330_runtime_resume	NULL
+> +#endif /* CONFIG_PM_RUNTIME */
+> +
+> +static const struct dev_pm_ops pl330_pm_ops = {
+> +	.runtime_suspend = pl330_runtime_suspend,
+> +	.runtime_resume = pl330_runtime_resume,
+> +};
+> +
+>  static struct amba_driver pl330_driver = {
+>  	.drv = {
+>  		.owner = THIS_MODULE,
+>  		.name = "dma-pl330",
+> +		.pm = &pl330_pm_ops,
+>  	},
+>  	.id_table = pl330_ids,
+>  	.probe = pl330_probe,
 
-Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
----
-This patch is tested for S5PV210 platform and similar
-changes can be adopted for rest of the Samsung's s3c
-and s5p platforms, if this approach is accepted.
+I have a question for runtime PM of PL330 DMAC
 
- arch/arm/mach-s5pv210/dev-spi.c                  |   16 ++++++++++++++--
- arch/arm/plat-samsung/include/plat/s3c64xx-spi.h |    2 --
- drivers/spi/spi_s3c64xx.c                        |   13 +++----------
- 3 files changed, 17 insertions(+), 14 deletions(-)
+This patch support runtime PM for PL330 DMAC, but the clock of "dma" is always on.
+If the clock of "dma" is always on, additional power(10mA) is consumed. I tested it.
 
-diff --git a/arch/arm/mach-s5pv210/dev-spi.c b/arch/arm/mach-s5pv210/dev-spi.c
-index eaf9a7b..44480d1 100644
---- a/arch/arm/mach-s5pv210/dev-spi.c
-+++ b/arch/arm/mach-s5pv210/dev-spi.c
-@@ -11,6 +11,7 @@
- #include <linux/platform_device.h>
- #include <linux/dma-mapping.h>
- #include <linux/gpio.h>
-+#include <linux/clk.h>
- 
- #include <mach/dma.h>
- #include <mach/map.h>
-@@ -148,6 +149,9 @@ struct platform_device s5pv210_device_spi1 = {
- void __init s5pv210_spi_set_info(int cntrlr, int src_clk_nr, int num_cs)
- {
- 	struct s3c64xx_spi_info *pd;
-+	struct device *dev;
-+	char devname[16];
-+	int ret;
- 
- 	/* Reject invalid configuration */
- 	if (!num_cs || src_clk_nr < 0
-@@ -159,17 +163,25 @@ void __init s5pv210_spi_set_info(int cntrlr, int src_clk_nr, int num_cs)
- 	switch (cntrlr) {
- 	case 0:
- 		pd = &s5pv210_spi0_pdata;
-+		dev = (src_clk_nr) ? &s5pv210_device_spi0.dev : NULL;
- 		break;
- 	case 1:
- 		pd = &s5pv210_spi1_pdata;
-+		dev = (src_clk_nr) ? &s5pv210_device_spi1.dev : NULL;
- 		break;
- 	default:
- 		printk(KERN_ERR "%s: Invalid SPI controller(%d)\n",
- 							__func__, cntrlr);
- 		return;
- 	}
--
-+	sprintf(devname, "s3c64xx-spi.%d", cntrlr);
-+	ret = clk_add_alias("clk_spi_bus", devname,
-+				spi_src_clks[src_clk_nr], dev);
-+	if (0 != ret) {
-+		printk(KERN_ERR "failed to create alias for SPI%d clock",
-+			cntrlr);
-+		return;
-+	}
- 	pd->num_cs = num_cs;
- 	pd->src_clk_nr = src_clk_nr;
--	pd->src_clk_name = spi_src_clks[src_clk_nr];
- }
-diff --git a/arch/arm/plat-samsung/include/plat/s3c64xx-spi.h b/arch/arm/plat-samsung/include/plat/s3c64xx-spi.h
-index 4c16fa3..c3d82a5 100644
---- a/arch/arm/plat-samsung/include/plat/s3c64xx-spi.h
-+++ b/arch/arm/plat-samsung/include/plat/s3c64xx-spi.h
-@@ -31,7 +31,6 @@ struct s3c64xx_spi_csinfo {
- /**
-  * struct s3c64xx_spi_info - SPI Controller defining structure
-  * @src_clk_nr: Clock source index for the CLK_CFG[SPI_CLKSEL] field.
-- * @src_clk_name: Platform name of the corresponding clock.
-  * @clk_from_cmu: If the SPI clock/prescalar control block is present
-  *     by the platform's clock-management-unit and not in SPI controller.
-  * @num_cs: Number of CS this controller emulates.
-@@ -43,7 +42,6 @@ struct s3c64xx_spi_csinfo {
-  */
- struct s3c64xx_spi_info {
- 	int src_clk_nr;
--	char *src_clk_name;
- 	bool clk_from_cmu;
- 
- 	int num_cs;
-diff --git a/drivers/spi/spi_s3c64xx.c b/drivers/spi/spi_s3c64xx.c
-index 8945e20..e5431bd 100644
---- a/drivers/spi/spi_s3c64xx.c
-+++ b/drivers/spi/spi_s3c64xx.c
-@@ -978,11 +978,6 @@ static int __init s3c64xx_spi_probe(struct platform_device *pdev)
- 	}
- 
- 	sci = pdev->dev.platform_data;
--	if (!sci->src_clk_name) {
--		dev_err(&pdev->dev,
--			"Board init must call s3c64xx_spi_set_info()\n");
--		return -EINVAL;
--	}
- 
- 	/* Check for availability of necessary resource */
- 
-@@ -1065,17 +1060,15 @@ static int __init s3c64xx_spi_probe(struct platform_device *pdev)
- 		goto err4;
- 	}
- 
--	sdd->src_clk = clk_get(&pdev->dev, sci->src_clk_name);
-+	sdd->src_clk = clk_get(&pdev->dev, "clk_spi_bus");
- 	if (IS_ERR(sdd->src_clk)) {
--		dev_err(&pdev->dev,
--			"Unable to acquire clock '%s'\n", sci->src_clk_name);
-+		dev_err(&pdev->dev, "Unable to acquire clock 'clk_spi_bus'\n");
- 		ret = PTR_ERR(sdd->src_clk);
- 		goto err5;
- 	}
- 
- 	if (clk_enable(sdd->src_clk)) {
--		dev_err(&pdev->dev, "Couldn't enable clock '%s'\n",
--							sci->src_clk_name);
-+		dev_err(&pdev->dev, "Couldn't enable clock 'clk_spi_bus'\n");
- 		ret = -EBUSY;
- 		goto err6;
- 	}
--- 
-1.7.0.4
+I think that the PL330 DMAC only turn on the clock of "dma" when using DMA.
+
+
+Thanks,
+Chanwoo Choi
