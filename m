@@ -1,25 +1,20 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Tue, 26 Jul 2011 06:57:27 +0000 (UTC)
-Subject: [PATCH 0/8] ARM: SAMSUNG: Add common PWM Backlight support
-References: <1310740968-26722-1-git-send-email-banajit.g@samsung.com>
-Message-ID: <j0logn$1bn$1@dough.gmane.org>
+From: zhangfei.gao@marvell.com (Zhangfei Gao)
+Date: Tue, 26 Jul 2011 15:06:11 +0800
+Subject: [PATCH v2 0/2] set_ios handle vmmc 
+Message-ID: <1311663973-23715-1-git-send-email-zhangfei.gao@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+v2: reuse vmmc
 
-On Fri, 15 Jul 2011 20:12:40 +0530, Banajit Goswami wrote:
+vmmc is controled inside set_ios according to mmc_power_up/down
+Brownstone add support of sdio device 8787
 
-> The patches are created against "for-next" branch of Kukjin Kim's tree
-> at:
->  git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> 
->  Patch [1/8]
->   -- add a common infrastructure to support PWM backlight for various
->      Samsung boards.
+Zhangfei Gao (2):
+  mmc: sdhci move vmmc to set_ios
+  ARM: mmp2: support sdio device 8787
 
-Why can't you use the drivers/video/backlight/pwm-bl.c ?
-
--- 
-With best wishes
-Dmitry
+ arch/arm/mach-mmp/brownstone.c |   60 ++++++++++++++++++++++++++++++++++++++-
+ drivers/mmc/host/sdhci.c       |   27 ++++++++++--------
+ include/linux/mmc/sdhci.h      |    1 +
+ 3 files changed, 74 insertions(+), 14 deletions(-)
