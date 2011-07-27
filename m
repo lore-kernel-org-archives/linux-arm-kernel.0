@@ -1,34 +1,72 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 27 Jul 2011 10:10:46 -0400 (EDT)
-Subject: [PATCH v2] ARM: alignment: Prevent ignoring of faults with ARMv6
-	unaligned access model
-In-Reply-To: <20110727094359.GA2171@arm.com>
-References: <1311689651-7372-1-git-send-email-dave.martin@linaro.org>
-	<alpine.LFD.2.00.1107261723040.12766@xanadu.home>
-	<20110727094359.GA2171@arm.com>
-Message-ID: <alpine.LFD.2.00.1107271009580.12766@xanadu.home>
+Date: Wed, 27 Jul 2011 10:13:57 -0400 (EDT)
+Subject: [PATCH v2] ARM: alignment: Make SIGBUS sent to userspace POSIXly
+	correct
+In-Reply-To: <1311768636-29582-1-git-send-email-dave.martin@linaro.org>
+References: <1311768636-29582-1-git-send-email-dave.martin@linaro.org>
+Message-ID: <alpine.LFD.2.00.1107271013110.12766@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wed, 27 Jul 2011, Dave Martin wrote:
 
-> On Tue, Jul 26, 2011 at 05:28:57PM -0400, Nicolas Pitre wrote:
-> > Why not clearing the U bit as well as the A bit to preserve consistency 
-> > with the pre ARMv6 behavior?
+> With the UM_SIGNAL alignment fault mode, no siginfo structure is
+> passed to userspace.
 > 
-> The old unaligned access behaviour is deprecated in ARMv6 (I believe)
-> and is not supported at all in ARMv7 -- i.e., you can't turn the U bit
-> off.  So this would be an additional special behaviour for ARMv6 only.
+> POSIX specifies how siginfo_t should be populated for alignment
+> faults, so this patch does just that:
 > 
-> I'm not sure that introducing yet another behaviour is useful here;
-> anyone with legacy userspace software relying on the old unaligned
-> access model presumably fixed it years ago.
+>   * si_signo = SIGBUS
+>   * si_code = BUS_ADRALN
+>   * si_addr = misaligned data address at which access was attempted
 > 
-> Really, the patch was just intended resolve the inconsistency where
-> the policy the kernel enforces for the alignment fixup mode on bootup
-> is not enforced at run-time.
+> Signed-off-by: Dave Martin <dave.martin@linaro.org>
+> ---
+> v2: si_addr in siginfo_t changed to contain the faulting data
+>     access address, not the address of the faulting instruction.
+> 
+>     This behaviour is consistent with the way other fault signals
+>     such as SIGSEGV are already reported, as well as matching the
+>     apparent intent of the POSIX sigaction interface.
 
-OK, that makes sense then.
+Makes sense.  ACK.
 
-
-Nicolas
+> 
+>  arch/arm/mm/alignment.c |   14 +++++++++++---
+>  1 files changed, 11 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
+> index 724ba3b..65ed9c6 100644
+> --- a/arch/arm/mm/alignment.c
+> +++ b/arch/arm/mm/alignment.c
+> @@ -22,6 +22,7 @@
+>  #include <linux/sched.h>
+>  #include <linux/uaccess.h>
+>  
+> +#include <asm/system.h>
+>  #include <asm/unaligned.h>
+>  
+>  #include "fault.h"
+> @@ -883,9 +884,16 @@ do_alignment(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+>  	if (ai_usermode & UM_FIXUP)
+>  		goto fixup;
+>  
+> -	if (ai_usermode & UM_SIGNAL)
+> -		force_sig(SIGBUS, current);
+> -	else {
+> +	if (ai_usermode & UM_SIGNAL) {
+> +		siginfo_t si;
+> +
+> +		si.si_signo = SIGBUS;
+> +		si.si_errno = 0;
+> +		si.si_code = BUS_ADRALN;
+> +		si.si_addr = (void __user *)addr;
+> +
+> +		force_sig_info(si.si_signo, &si, current);
+> +	} else {
+>  		/*
+>  		 * We're about to disable the alignment trap and return to
+>  		 * user space.  But if an interrupt occurs before actually
+> -- 
+> 1.7.4.1
+> 
