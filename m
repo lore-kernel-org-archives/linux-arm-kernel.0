@@ -1,60 +1,160 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Wed, 27 Jul 2011 09:47:37 +0800
-Subject: [RFC] ARM Subarchitecture group maintainership
-In-Reply-To: <4E2F0176.1080403@codeaurora.org>
-References: <201105181047.17309.arnd@arndb.de>
-	<4E2F0176.1080403@codeaurora.org>
-Message-ID: <CAGsJ_4wKdgSD1vEn5LeTnWjWWUcprMxsBV3NPgywqBbSsnVXiw@mail.gmail.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Wed, 27 Jul 2011 09:53:20 +0800
+Subject: [PATCH v8 0/3] add the GPMI controller driver for IMX23/IMX28
+In-Reply-To: <CAHMSPgMHrqWcJ=BThDLgQ=XyTBDCMvNS4SVjQWfk=Jf682TEig@mail.gmail.com>
+References: <1311230846-26437-1-git-send-email-b32955@freescale.com>	<20110721215020.GA25344@pengutronix.de>	<4E28EEE1.2050008@freescale.com>	<20110722055731.GI26837@S2100-06.ap.freescale.net>	<4E292FCF.6010608@freescale.com>
+	<CAHMSPgMHrqWcJ=BThDLgQ=XyTBDCMvNS4SVjQWfk=Jf682TEig@mail.gmail.com>
+Message-ID: <4E2F6F90.7030207@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/7/27 Stephen Boyd <sboyd@codeaurora.org>:
-> On 05/18/2011 01:47 AM, Arnd Bergmann wrote:
->> This is the draft plan for maintaining the ARM subarchitectures in a common
->> tree, as a way to help coordinate the upstream merging of the
->> arch/arm/{plat,mach}-* changes into Linus' tree.
->>
-> [snip]
->> diff --git a/MAINTAINERS b/MAINTAINERS
->> index 8fce5e6..942d052 100644
->> --- a/MAINTAINERS
->> +++ b/MAINTAINERS
->> @@ -630,6 +630,17 @@ S: ? ? ? Maintained
->> ?F: ? drivers/amba/
->> ?F: ? include/linux/amba/bus.h
->>
->> +ARM SUBARCHITECTURES
->> +M: ? Arnd Bergmann <arnd@arndb.de>
->> +M: ? Nicolas Pitre <nico@fluxnic.net>
->> +M: ? Thomas Gleixner <tglx@linutronix.de>
->> +M: ? arm at kernel.org
->> +L: ? linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
->> +S: ? MAINTAINED
->> +F: ? arch/arm/mach-*/
->> +F: ? arch/arm/plat-*/
->> +T: ? git git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-subarch.git
->> +
->> ?ARM/ADI ROADRUNNER MACHINE SUPPORT
->> ?M: ? Lennert Buytenhek <kernel@wantstofly.org>
->> ?L: ? linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
->>
->
-> Is this patch (or something similar) going to be merged now that the ARM
-> SoC tree is up and running? Also, is the arm at kernel.org alias working?
+Hi,
 
-yes. arm soc tree has been working and 3.1 window has pulled from Arnd
-several times.
+Thanks for your test.
 
-http://git.kernel.org/?p=linux/kernel/git/arm/linux-arm-soc.git;a=summary
+> Hi,
+>
+> It's not really working for me.
+> I've applied all gpmi-nand driver patches and the dma driver patches.
+>
+> I have added following kernel parameters:
+> mtdparts=gpmi-nand:20m(boot),-(user) ubi.mtd=1 root=ubi0:rootfs0
+> rootfstype=ubifs gpmi_debug_init
+>
+> During boot I get already get DMA timeout:
+> [    2.560000] [ start_dma_without_bch_irq : 392 ] DMA timeout, last DMA :1
+> [    3.560000] [ start_dma_with_bch_irq : 427 ] bch timeout!!!
+> ...
+> (see log file in attach line 89)
+>
+> When trying flash_erraseall /dev/mtd1 I get:
+> Erasing 128 Kibyte @ 20000 --  0 % complete [   16.700000] [
+> gpmi_read_data : 832 ] step 1 error
+> [   16.700000] [ gpmi_send_command : 749 ] step 1 error
+> [   16.700000] [ mil_cmd_ctrl : 894 ] Chip: 0, Error -1
+> [   16.700000] [ gpmi_send_command : 749 ] step 1 error
+> [   16.700000] [ mil_cmd_ctrl : 894 ] Chip: 0, Error -1
+> [   16.700000] [ gpmi_send_command : 749 ] step 1 error
+> [   16.700000] [ mil_cmd_ctrl : 894 ] Chip: 0, Error -1
+> [   16.700000] [ gpmi_read_data : 832 ] step 1 error
+> libmtd: error!: MEMERA[   16.740000] [ gpmi_send_command : 749 ] step 1 error
+> SE64 ioctl failed for eraseblock[   16.750000] [ mil_cmd_ctrl : 894 ]
+> Chip: 0, Error -1
+>   1 (mtd1)
+>          error 5 (Input/output error)
+> flash_erase: error!: /dev/mtd1: MTD Erase failure
+>               error 5 (Input/output error)
+> ...
+> (see log file in attach line 128 and further)
+>
+> Environment:
+> - patches on a 2.6.39.1 kernel (needed to modify the patch a little
+> for changed mtd add/del interface).
+Please test the driver on :
+   git://git.linaro.org/people/shawnguo/linux-2.6.git mxs-gpmi
 
+or on
+
+  git://git.pengutronix.de/git/imx/linux-2.6.git  imx-for-3.1
+
+
+
+I found the .config may influence the DMA.
+I guess there is some module which has impact to the DMA.
+So You should use the right .config first, you can get the right
+.config by two ways:
+[1] use the 'make mxs_defconfig' in the imx-for-3.1 branch of
+   tree: git://git.pengutronix.de/git/imx/linux-2.6.git
+
+[2] use the attachment which is tested by me.
+
+Best Regards
+Huang Shijie
+
+
+
+> - using this on our own mx23 based board, so also added some board
+> init code for that.
 >
-> --
-> Sent by an employee of the Qualcomm Innovation Center, Inc.
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
 >
+> On Fri, Jul 22, 2011 at 10:07 AM, Huang Shijie<b32955@freescale.com>  wrote:
+>> Hi Wolfram:
+>>> On Fri, Jul 22, 2011 at 11:30:41AM +0800, Huang Shijie wrote:
+>>>> Hi,
+>>>>>> The general-purpose media interface(GPMI) controller is a flexible
+>>>>>> interface
+>>>>>> to up to several NAND flashs.
+>>>>> ...
+>>>>>> To Walfram&    Artem:
+>>>>>>      About how to disable the JFFS2 to use the OOB:
+>>>>>>      I read the code, and I still have no idea about how to use the
+>>>>>> ecclayout
+>>>>>>      to do the job. Could you give me some hint? thanks.
+>>>>> Have you checked mxc_nand.c for example? There is
+>>>>>
+>>>>> static struct nand_ecclayout nandv1_hw_eccoob_smallpage = {
+>>>>>          .eccbytes = 5,
+>>>>>          .eccpos = {6, 7, 8, 9, 10},
+>>>>>          .oobfree = {{0, 5}, {12, 4}, }
+>>>>> }
+>>>>>
+>>>>> defined as one layout. Now, you could define one where oobfree is empty
+>>>>> and
+>>>>> eccbytes as big as the oob-area.
+>>>>>
+>>>> thanks. I will check the code.
+>>>>>> The driver depends on another GPMI-NAND device patch set, you can find
+>>>>>> them at :
+>>>>>>         [1]
+>>>>>> http://lists.infradead.org/pipermail/linux-mtd/2011-July/037033.html
+>>>>>>         [2]
+>>>>>> http://lists.infradead.org/pipermail/linux-mtd/2011-July/037031.html
+>>>>>>         [3]
+>>>>>> http://lists.infradead.org/pipermail/linux-mtd/2011-July/037032.html
+>>>>>>         [4]
+>>>>>> http://lists.infradead.org/pipermail/linux-mtd/2011-July/037034.html
+>>>>>>
+>>>>>> The driver also depends on another DMA patch by Shawn:
+>>>>>>         [0]
+>>>>>> http://lists.infradead.org/pipermail/linux-mtd/2011-June/036820.html
+>>>>> This makes it difficult for testers/reviewers. Please try to get a
+>>>>> git-branch
+>>>>> from Freescale or Linaro.
+>>>>>
+>>>> Shawn will merge my patches to his Linaro branch.
+> I don't see the DMA patch in the git?
 >
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>> git://git.linaro.org/people/shawnguo/linux-2.6.git mxs-gpmi
+>> Please test the GPMI driver based this git tree.
+> I will try that on an mx23evk board.
 >
+>> I tested, and the DMA-timeout does not occur any more.
+>>
+>> I notice that Shawn added two more patched to
+>> /arch/arm/config/mxs_defconfig:
+>> [1] ARM: mxs_defconfig: Add mx23evk and mx28evk build
+>> [2] ARM: mxs_defconfig: Change CONFIG_RTC_CLASS 'm' to 'y'
+>>
+>> Please check it. Maybe your kernel code misses them.
+> I don't see any of this in the git?
+>
+>> Of course, you can use the my_config (i sent you last mail) for .config.
+>>
+>> Best Regards
+>> Huang Shijie
+>>
+>>
+>>> Shijie, please check and test it.  I only did a build test.
+>>>
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
+
+-------------- next part --------------
+An embedded and charset-unspecified text was scrubbed...
+Name: my_config
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110727/ac087c9b/attachment-0001.ksh>
