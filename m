@@ -1,31 +1,95 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Tue, 26 Jul 2011 17:51:16 -0700
-Subject: [GIT PULL] arm-soc new features (part 2/2) for 3.1
-In-Reply-To: <5039974.y3GReu3Vjy@wuerfel>
-References: <3057645.NjCAYUXHGt@wuerfel> <5818290.TCY0zMWmbr@wuerfel>
-	<1698068.Mn9Tmtfmzl@wuerfel> <5039974.y3GReu3Vjy@wuerfel>
-Message-ID: <CA+55aFygBzynb_4kZQEHQAU0Np0H9UCBFoW1hoRJ571QCMo42Q@mail.gmail.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Wed, 27 Jul 2011 07:03:36 +0530
+Subject: [PATCH V4 06/14] ARM: SAMSUNG: Add common DMA operations
+In-Reply-To: <003801cc4b77$51e9f3e0$f5bddba0$%kim@samsung.com>
+References: <1311557312-26107-1-git-send-email-boojin.kim@samsung.com>
+	<1311557312-26107-7-git-send-email-boojin.kim@samsung.com>
+	<CABb+yY0nWLpdVGqTJPO2YwkGWiDw5tRjC2xn7Le0bO0ZNFHC_g@mail.gmail.com>
+	<003801cc4b77$51e9f3e0$f5bddba0$%kim@samsung.com>
+Message-ID: <CABb+yY3shX+myCgO++rUQrFuT81cdhhf18398Wa-S=88UK3rkg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 26, 2011 at 4:36 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->
-> This is the final branch I have for now, although I hope to get one more
-> for actual device tree conversions for a lot of drivers.
+On Tue, Jul 26, 2011 at 3:05 PM, Boojin Kim <boojin.kim@samsung.com> wrote:
+> Jassi Brar Wrote:
+>> Sent: Monday, July 25, 2011 8:52 PM
+>> To: Boojin Kim
+>> Cc: linux-arm-kernel at lists.infradead.org; linux-samsung-
+>> soc at vger.kernel.org; Vinod Koul; Dan Williams; Kukjin Kim; Grant
+>> Likely; Mark Brown
+>> Subject: Re: [PATCH V4 06/14] ARM: SAMSUNG: Add common DMA operations
+>>
+>> On Mon, Jul 25, 2011 at 6:58 AM, Boojin Kim <boojin.kim@samsung.com>
+>> wrote:
+>>
+>> > +
+>> > +static bool pl330_filter(struct dma_chan *chan, void *param)
+>> > +{
+>> > + ? ? ? struct dma_pl330_peri *peri = (struct dma_pl330_peri *)chan-
+>> >private;
+>> > + ? ? ? unsigned dma_ch = (unsigned)param;
+>> > +
+>> > + ? ? ? if (peri->peri_id != dma_ch)
+>> > + ? ? ? ? ? ? ? return false;
+>> > +
+>> > + ? ? ? return true;
+>> > +}
+>> This is what I meant... if we keep chan_id for paltform assigned IDs,
+>> these filter functions could simply become
+>>
+>> static bool pl330_filter(struct dma_chan *chan, void *param)
+>> {
+>> ? ? ? ? return chan->chan_id == param
+>> }
+>>
+>> And ideally in the long run, we could just drop the filter callback
+>> and add expected channel ID to the request_channel call.
+> The chan_id is set by dmaengine. So, We don't use it to hold the user specific
+> Id.
+Not for long.
+See  https://lkml.org/lkml/2011/7/26/245
 
-Ok, everything merged.
 
-I compared the end result with yours, and we did some things a bit
-differently, but on the whole it looks pretty identical. We have a
-different resolution for "exynos4_cpu_suspend()", but afaik mine is
-better (it looks like from a type standpoint it should return int, but
-due to the panic it doesn't matter). And we did those
-OMAP4430_DLL_OVERRIDE_SHIFT/MASK defines in a different order. I have
-some other changes in my tree (Andrew's patch-set for asm/atomic.h
-etc), so that makes for other differences in arch/arm, but it looks
-like it's ok.
+>> > +
+>> > +static inline int s3c_dma_trigger(unsigned ch)
+>> > +{
+>> > + ? ? ? return s3c2410_dma_ctrl(ch, S3C2410_DMAOP_START);
+>> > +}
+>> > +
+>> > +static inline int s3c_dma_started(unsigned ch)
+>> > +{
+>> > + ? ? ? return s3c2410_dma_ctrl(ch, S3C2410_DMAOP_STARTED);
+>> > +}
+>> > +
+>> > +static inline int s3c_dma_flush(unsigned ch)
+>> > +{
+>> > + ? ? ? return s3c2410_dma_ctrl(ch, S3C2410_DMAOP_FLUSH);
+>> > +}
+>> > +
+>> > +static inline int s3c_dma_stop(unsigned ch)
+>> > +{
+>> > + ? ? ? return s3c2410_dma_ctrl(ch, S3C2410_DMAOP_STOP);
+>> > +}
+>> > +
+>> > +static struct samsung_dma_ops s3c_dma_ops = {
+>> > + ? ? ? .request ? ? ? ?= s3c_dma_request,
+>> > + ? ? ? .release ? ? ? ?= s3c_dma_release,
+>> > + ? ? ? .prepare ? ? ? ?= s3c_dma_prepare,
+>> > + ? ? ? .trigger ? ? ? ?= s3c_dma_trigger,
+>> > + ? ? ? .started ? ? ? ?= s3c_dma_started,
+>> > + ? ? ? .flush ? ? ? ? ?= s3c_dma_flush,
+>> > + ? ? ? .stop ? ? ? ? ? = s3c_dma_stop,
+>>
+>> These last 4 should be gnereallized into one callback with OP argument.
+> I don't have any idea about it. Can you explain it in more detail?
 
-But you should double-check. I didn't compile-test any of it, I don't
-do the cross-compile thing, and maybe I missed something.
+static int s3c_dma_control(unsigned ch, enum s3c2410_chan_op/*or similar*/ op)
+ {
+        return s3c2410_dma_ctrl(ch, op);
+ }
 
-                       Linus
+static struct samsung_dma_ops s3c_dma_ops = {
+        .request        = s3c_dma_request,
+        .release        = s3c_dma_release,
+        .prepare        = s3c_dma_prepare,
+        .control        = s3c_dma_control,
