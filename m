@@ -1,246 +1,168 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 27 Jul 2011 14:21:28 +0200
-Subject: [PATCH V2 1/3] dmaengine: at_hdmac: replace spin_lock* with irqsave
-	variants
-In-Reply-To: <1311677514.24316.6.camel@vkoul-mobl4>
-References: <1311677514.24316.6.camel@vkoul-mobl4>
-Message-ID: <3c302a7166c2aa6ae4b6d7b7cdfe21e640b73603.1311627477.git.nicolas.ferre@atmel.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 27 Jul 2011 14:05:58 +0200
+Subject: [PATCH 3/8 v2] at91: remove AT91_DBGU offset from dbgu register macro
+In-Reply-To: <1309502682-16897-3-git-send-email-plagnioj@jcrosoft.com>
+References: <1309502682-16897-3-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1311768358-4589-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-dmaengine routines can be called from interrupt context and with
-interrupts disabled. Whereas spin_unlock_bh can't be called from
-such contexts. So this patch converts all spin_lock* routines
-to irqsave variants.
+to make the soc base specified at runtime instead of compiled time
 
-Also, spin_lock() used in tasklet is converted to irqsave variants,
-as tasklet can be interrupted, and dma requests from such interruptions
-may also call spin_lock.
-
-Idea from dw_dmac patch by Viresh Kumar.
-
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 ---
-V2: no change but resent to ease the patch series understanding
+v2:
 
- drivers/dma/at_hdmac.c |   52 +++++++++++++++++++++++++++--------------------
- 1 files changed, 30 insertions(+), 22 deletions(-)
+update commit
 
-diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
-index 36144f8..6ee8f1c 100644
---- a/drivers/dma/at_hdmac.c
-+++ b/drivers/dma/at_hdmac.c
-@@ -107,10 +107,11 @@ static struct at_desc *atc_desc_get(struct at_dma_chan *atchan)
+Best Regards,
+J.
+ arch/arm/mach-at91/at91sam9260.c              |    2 +-
+ arch/arm/mach-at91/at91sam9rl.c               |    2 +-
+ arch/arm/mach-at91/include/mach/at91_dbgu.h   |   27 +++++++++++++-----------
+ arch/arm/mach-at91/include/mach/cpu.h         |    8 +++---
+ arch/arm/mach-at91/include/mach/debug-macro.S |   14 ++++++------
+ 5 files changed, 28 insertions(+), 25 deletions(-)
+
+diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
+index 164873f..57974b1 100644
+--- a/arch/arm/mach-at91/at91sam9260.c
++++ b/arch/arm/mach-at91/at91sam9260.c
+@@ -324,7 +324,7 @@ static void __init at91sam9xe_map_io(void)
  {
- 	struct at_desc *desc, *_desc;
- 	struct at_desc *ret = NULL;
-+	unsigned long flags;
- 	unsigned int i = 0;
- 	LIST_HEAD(tmp_list);
+ 	unsigned long cidr, sram_size;
  
--	spin_lock_bh(&atchan->lock);
-+	spin_lock_irqsave(&atchan->lock, flags);
- 	list_for_each_entry_safe(desc, _desc, &atchan->free_list, desc_node) {
- 		i++;
- 		if (async_tx_test_ack(&desc->txd)) {
-@@ -121,7 +122,7 @@ static struct at_desc *atc_desc_get(struct at_dma_chan *atchan)
- 		dev_dbg(chan2dev(&atchan->chan_common),
- 				"desc %p not ACKed\n", desc);
- 	}
--	spin_unlock_bh(&atchan->lock);
-+	spin_unlock_irqrestore(&atchan->lock, flags);
- 	dev_vdbg(chan2dev(&atchan->chan_common),
- 		"scanned %u descriptors on freelist\n", i);
+-	cidr = at91_sys_read(AT91_DBGU_CIDR);
++	cidr = dbgu_readl(AT91_DBGU, CIDR);
  
-@@ -129,9 +130,9 @@ static struct at_desc *atc_desc_get(struct at_dma_chan *atchan)
- 	if (!ret) {
- 		ret = atc_alloc_descriptor(&atchan->chan_common, GFP_ATOMIC);
- 		if (ret) {
--			spin_lock_bh(&atchan->lock);
-+			spin_lock_irqsave(&atchan->lock, flags);
- 			atchan->descs_allocated++;
--			spin_unlock_bh(&atchan->lock);
-+			spin_unlock_irqrestore(&atchan->lock, flags);
- 		} else {
- 			dev_err(chan2dev(&atchan->chan_common),
- 					"not enough descriptors available\n");
-@@ -150,8 +151,9 @@ static void atc_desc_put(struct at_dma_chan *atchan, struct at_desc *desc)
+ 	switch (cidr & AT91_CIDR_SRAMSIZ) {
+ 		case AT91_CIDR_SRAMSIZ_32K:
+diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
+index 9c87bac..0788adb 100644
+--- a/arch/arm/mach-at91/at91sam9rl.c
++++ b/arch/arm/mach-at91/at91sam9rl.c
+@@ -283,7 +283,7 @@ static void __init at91sam9rl_map_io(void)
  {
- 	if (desc) {
- 		struct at_desc *child;
-+		unsigned long flags;
+ 	unsigned long cidr, sram_size;
  
--		spin_lock_bh(&atchan->lock);
-+		spin_lock_irqsave(&atchan->lock, flags);
- 		list_for_each_entry(child, &desc->tx_list, desc_node)
- 			dev_vdbg(chan2dev(&atchan->chan_common),
- 					"moving child desc %p to freelist\n",
-@@ -160,7 +162,7 @@ static void atc_desc_put(struct at_dma_chan *atchan, struct at_desc *desc)
- 		dev_vdbg(chan2dev(&atchan->chan_common),
- 			 "moving desc %p to freelist\n", desc);
- 		list_add(&desc->desc_node, &atchan->free_list);
--		spin_unlock_bh(&atchan->lock);
-+		spin_unlock_irqrestore(&atchan->lock, flags);
- 	}
+-	cidr = at91_sys_read(AT91_DBGU_CIDR);
++	cidr = dbgu_readl(AT91_DBGU, CIDR);
+ 
+ 	switch (cidr & AT91_CIDR_SRAMSIZ) {
+ 		case AT91_CIDR_SRAMSIZ_32K:
+diff --git a/arch/arm/mach-at91/include/mach/at91_dbgu.h b/arch/arm/mach-at91/include/mach/at91_dbgu.h
+index 6dcaa77..dbfe455a 100644
+--- a/arch/arm/mach-at91/include/mach/at91_dbgu.h
++++ b/arch/arm/mach-at91/include/mach/at91_dbgu.h
+@@ -16,22 +16,25 @@
+ #ifndef AT91_DBGU_H
+ #define AT91_DBGU_H
+ 
++#define dbgu_readl(dbgu, field) \
++	__raw_readl(AT91_VA_BASE_SYS + dbgu + AT91_DBGU_ ## field)
++
+ #ifdef AT91_DBGU
+-#define AT91_DBGU_CR		(AT91_DBGU + 0x00)	/* Control Register */
+-#define AT91_DBGU_MR		(AT91_DBGU + 0x04)	/* Mode Register */
+-#define AT91_DBGU_IER		(AT91_DBGU + 0x08)	/* Interrupt Enable Register */
++#define AT91_DBGU_CR		(0x00)	/* Control Register */
++#define AT91_DBGU_MR		(0x04)	/* Mode Register */
++#define AT91_DBGU_IER		(0x08)	/* Interrupt Enable Register */
+ #define		AT91_DBGU_TXRDY		(1 << 1)		/* Transmitter Ready */
+ #define		AT91_DBGU_TXEMPTY	(1 << 9)		/* Transmitter Empty */
+-#define AT91_DBGU_IDR		(AT91_DBGU + 0x0c)	/* Interrupt Disable Register */
+-#define AT91_DBGU_IMR		(AT91_DBGU + 0x10)	/* Interrupt Mask Register */
+-#define AT91_DBGU_SR		(AT91_DBGU + 0x14)	/* Status Register */
+-#define AT91_DBGU_RHR		(AT91_DBGU + 0x18)	/* Receiver Holding Register */
+-#define AT91_DBGU_THR		(AT91_DBGU + 0x1c)	/* Transmitter Holding Register */
+-#define AT91_DBGU_BRGR		(AT91_DBGU + 0x20)	/* Baud Rate Generator Register */
++#define AT91_DBGU_IDR		(0x0c)	/* Interrupt Disable Register */
++#define AT91_DBGU_IMR		(0x10)	/* Interrupt Mask Register */
++#define AT91_DBGU_SR		(0x14)	/* Status Register */
++#define AT91_DBGU_RHR		(0x18)	/* Receiver Holding Register */
++#define AT91_DBGU_THR		(0x1c)	/* Transmitter Holding Register */
++#define AT91_DBGU_BRGR		(0x20)	/* Baud Rate Generator Register */
+ 
+-#define AT91_DBGU_CIDR		(AT91_DBGU + 0x40)	/* Chip ID Register */
+-#define AT91_DBGU_EXID		(AT91_DBGU + 0x44)	/* Chip ID Extension Register */
+-#define AT91_DBGU_FNR		(AT91_DBGU + 0x48)	/* Force NTRST Register [SAM9 only] */
++#define AT91_DBGU_CIDR		(0x40)	/* Chip ID Register */
++#define AT91_DBGU_EXID		(0x44)	/* Chip ID Extension Register */
++#define AT91_DBGU_FNR		(0x48)	/* Force NTRST Register [SAM9 only] */
+ #define		AT91_DBGU_FNTRST	(1 << 0)		/* Force NTRST */
+ 
+ #endif /* AT91_DBGU */
+diff --git a/arch/arm/mach-at91/include/mach/cpu.h b/arch/arm/mach-at91/include/mach/cpu.h
+index df966c2..3cf6919 100644
+--- a/arch/arm/mach-at91/include/mach/cpu.h
++++ b/arch/arm/mach-at91/include/mach/cpu.h
+@@ -41,12 +41,12 @@
+ 
+ static inline unsigned long at91_cpu_identify(void)
+ {
+-	return (at91_sys_read(AT91_DBGU_CIDR) & ~AT91_CIDR_VERSION);
++	return (dbgu_readl(AT91_DBGU, CIDR) & ~AT91_CIDR_VERSION);
  }
  
-@@ -471,8 +473,9 @@ static void atc_handle_cyclic(struct at_dma_chan *atchan)
- static void atc_tasklet(unsigned long data)
+ static inline unsigned long at91_cpu_fully_identify(void)
  {
- 	struct at_dma_chan *atchan = (struct at_dma_chan *)data;
-+	unsigned long flags;
- 
--	spin_lock(&atchan->lock);
-+	spin_lock_irqsave(&atchan->lock, flags);
- 	if (test_and_clear_bit(ATC_IS_ERROR, &atchan->status))
- 		atc_handle_error(atchan);
- 	else if (test_bit(ATC_IS_CYCLIC, &atchan->status))
-@@ -480,7 +483,7 @@ static void atc_tasklet(unsigned long data)
- 	else
- 		atc_advance_work(atchan);
- 
--	spin_unlock(&atchan->lock);
-+	spin_unlock_irqrestore(&atchan->lock, flags);
+-	return at91_sys_read(AT91_DBGU_CIDR);
++	return dbgu_readl(AT91_DBGU, CIDR);
  }
  
- static irqreturn_t at_dma_interrupt(int irq, void *dev_id)
-@@ -539,8 +542,9 @@ static dma_cookie_t atc_tx_submit(struct dma_async_tx_descriptor *tx)
- 	struct at_desc		*desc = txd_to_at_desc(tx);
- 	struct at_dma_chan	*atchan = to_at_dma_chan(tx->chan);
- 	dma_cookie_t		cookie;
-+	unsigned long		flags;
+ #define ARCH_EXID_AT91SAM9M11	0x00000001
+@@ -62,7 +62,7 @@ static inline unsigned long at91_cpu_fully_identify(void)
  
--	spin_lock_bh(&atchan->lock);
-+	spin_lock_irqsave(&atchan->lock, flags);
- 	cookie = atc_assign_cookie(atchan, desc);
- 
- 	if (list_empty(&atchan->active_list)) {
-@@ -554,7 +558,7 @@ static dma_cookie_t atc_tx_submit(struct dma_async_tx_descriptor *tx)
- 		list_add_tail(&desc->desc_node, &atchan->queue);
- 	}
- 
--	spin_unlock_bh(&atchan->lock);
-+	spin_unlock_irqrestore(&atchan->lock, flags);
- 
- 	return cookie;
- }
-@@ -927,28 +931,29 @@ static int atc_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
- 	struct at_dma_chan	*atchan = to_at_dma_chan(chan);
- 	struct at_dma		*atdma = to_at_dma(chan->device);
- 	int			chan_id = atchan->chan_common.chan_id;
-+	unsigned long		flags;
- 
- 	LIST_HEAD(list);
- 
- 	dev_vdbg(chan2dev(chan), "atc_control (%d)\n", cmd);
- 
- 	if (cmd == DMA_PAUSE) {
--		spin_lock_bh(&atchan->lock);
-+		spin_lock_irqsave(&atchan->lock, flags);
- 
- 		dma_writel(atdma, CHER, AT_DMA_SUSP(chan_id));
- 		set_bit(ATC_IS_PAUSED, &atchan->status);
- 
--		spin_unlock_bh(&atchan->lock);
-+		spin_unlock_irqrestore(&atchan->lock, flags);
- 	} else if (cmd == DMA_RESUME) {
- 		if (!test_bit(ATC_IS_PAUSED, &atchan->status))
- 			return 0;
- 
--		spin_lock_bh(&atchan->lock);
-+		spin_lock_irqsave(&atchan->lock, flags);
- 
- 		dma_writel(atdma, CHDR, AT_DMA_RES(chan_id));
- 		clear_bit(ATC_IS_PAUSED, &atchan->status);
- 
--		spin_unlock_bh(&atchan->lock);
-+		spin_unlock_irqrestore(&atchan->lock, flags);
- 	} else if (cmd == DMA_TERMINATE_ALL) {
- 		struct at_desc	*desc, *_desc;
- 		/*
-@@ -957,7 +962,7 @@ static int atc_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
- 		 * channel. We still have to poll the channel enable bit due
- 		 * to AHB/HSB limitations.
- 		 */
--		spin_lock_bh(&atchan->lock);
-+		spin_lock_irqsave(&atchan->lock, flags);
- 
- 		/* disabling channel: must also remove suspend state */
- 		dma_writel(atdma, CHDR, AT_DMA_RES(chan_id) | atchan->mask);
-@@ -978,7 +983,7 @@ static int atc_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
- 		/* if channel dedicated to cyclic operations, free it */
- 		clear_bit(ATC_IS_CYCLIC, &atchan->status);
- 
--		spin_unlock_bh(&atchan->lock);
-+		spin_unlock_irqrestore(&atchan->lock, flags);
- 	} else {
- 		return -ENXIO;
- 	}
-@@ -1004,9 +1009,10 @@ atc_tx_status(struct dma_chan *chan,
- 	struct at_dma_chan	*atchan = to_at_dma_chan(chan);
- 	dma_cookie_t		last_used;
- 	dma_cookie_t		last_complete;
-+	unsigned long		flags;
- 	enum dma_status		ret;
- 
--	spin_lock_bh(&atchan->lock);
-+	spin_lock_irqsave(&atchan->lock, flags);
- 
- 	last_complete = atchan->completed_cookie;
- 	last_used = chan->cookie;
-@@ -1021,7 +1027,7 @@ atc_tx_status(struct dma_chan *chan,
- 		ret = dma_async_is_complete(cookie, last_complete, last_used);
- 	}
- 
--	spin_unlock_bh(&atchan->lock);
-+	spin_unlock_irqrestore(&atchan->lock, flags);
- 
- 	if (ret != DMA_SUCCESS)
- 		dma_set_tx_state(txstate, last_complete, last_used,
-@@ -1046,6 +1052,7 @@ atc_tx_status(struct dma_chan *chan,
- static void atc_issue_pending(struct dma_chan *chan)
+ static inline unsigned long at91_exid_identify(void)
  {
- 	struct at_dma_chan	*atchan = to_at_dma_chan(chan);
-+	unsigned long		flags;
- 
- 	dev_vdbg(chan2dev(chan), "issue_pending\n");
- 
-@@ -1053,11 +1060,11 @@ static void atc_issue_pending(struct dma_chan *chan)
- 	if (test_bit(ATC_IS_CYCLIC, &atchan->status))
- 		return;
- 
--	spin_lock_bh(&atchan->lock);
-+	spin_lock_irqsave(&atchan->lock, flags);
- 	if (!atc_chan_is_enabled(atchan)) {
- 		atc_advance_work(atchan);
- 	}
--	spin_unlock_bh(&atchan->lock);
-+	spin_unlock_irqrestore(&atchan->lock, flags);
+-	return at91_sys_read(AT91_DBGU_EXID);
++	return dbgu_readl(AT91_DBGU, EXID);
  }
  
- /**
-@@ -1073,6 +1080,7 @@ static int atc_alloc_chan_resources(struct dma_chan *chan)
- 	struct at_dma		*atdma = to_at_dma(chan->device);
- 	struct at_desc		*desc;
- 	struct at_dma_slave	*atslave;
-+	unsigned long		flags;
- 	int			i;
- 	u32			cfg;
- 	LIST_HEAD(tmp_list);
-@@ -1116,11 +1124,11 @@ static int atc_alloc_chan_resources(struct dma_chan *chan)
- 		list_add_tail(&desc->desc_node, &tmp_list);
- 	}
  
--	spin_lock_bh(&atchan->lock);
-+	spin_lock_irqsave(&atchan->lock, flags);
- 	atchan->descs_allocated = i;
- 	list_splice(&tmp_list, &atchan->free_list);
- 	atchan->completed_cookie = chan->cookie = 1;
--	spin_unlock_bh(&atchan->lock);
-+	spin_unlock_irqrestore(&atchan->lock, flags);
+@@ -72,7 +72,7 @@ static inline unsigned long at91_exid_identify(void)
  
- 	/* channel parameters */
- 	channel_writel(atchan, CFG, cfg);
+ static inline unsigned long at91_arch_identify(void)
+ {
+-	return (at91_sys_read(AT91_DBGU_CIDR) & AT91_CIDR_ARCH);
++	return (dbgu_readl(AT91_DBGU, CIDR) & AT91_CIDR_ARCH);
+ }
+ 
+ #ifdef CONFIG_ARCH_AT91CAP9
+diff --git a/arch/arm/mach-at91/include/mach/debug-macro.S b/arch/arm/mach-at91/include/mach/debug-macro.S
+index 0f959fa..bc1e0b2 100644
+--- a/arch/arm/mach-at91/include/mach/debug-macro.S
++++ b/arch/arm/mach-at91/include/mach/debug-macro.S
+@@ -15,23 +15,23 @@
+ #include <mach/at91_dbgu.h>
+ 
+ 	.macro	addruart, rp, rv
+-	ldr	\rp, =(AT91_BASE_SYS + AT91_DBGU)		@ System peripherals (phys address)
+-	ldr	\rv, =(AT91_VA_BASE_SYS	+ AT91_DBGU)		@ System peripherals (virt address)
++	ldr	\rp, =(AT91_BASE_SYS + AT91_DBGU)	@ System peripherals (phys address)
++	ldr	\rv, =(AT91_VA_BASE_SYS	+ AT91_DBGU)	@ System peripherals (virt address)
+ 	.endm
+ 
+ 	.macro	senduart,rd,rx
+-	strb	\rd, [\rx, #(AT91_DBGU_THR - AT91_DBGU)]	@ Write to Transmitter Holding Register
++	strb	\rd, [\rx, #(AT91_DBGU_THR)]		@ Write to Transmitter Holding Register
+ 	.endm
+ 
+ 	.macro	waituart,rd,rx
+-1001:	ldr	\rd, [\rx, #(AT91_DBGU_SR - AT91_DBGU)]		@ Read Status Register
+-	tst	\rd, #AT91_DBGU_TXRDY				@ DBGU_TXRDY = 1 when ready to transmit
++1001:	ldr	\rd, [\rx, #(AT91_DBGU_SR)]		@ Read Status Register
++	tst	\rd, #AT91_DBGU_TXRDY			@ DBGU_TXRDY = 1 when ready to transmit
+ 	beq	1001b
+ 	.endm
+ 
+ 	.macro	busyuart,rd,rx
+-1001:	ldr	\rd, [\rx, #(AT91_DBGU_SR - AT91_DBGU)]		@ Read Status Register
+-	tst	\rd, #AT91_DBGU_TXEMPTY				@ DBGU_TXEMPTY = 1 when transmission complete
++1001:	ldr	\rd, [\rx, #(AT91_DBGU_SR)]		@ Read Status Register
++	tst	\rd, #AT91_DBGU_TXEMPTY			@ DBGU_TXEMPTY = 1 when transmission complete
+ 	beq	1001b
+ 	.endm
+ 
 -- 
-1.7.4.1
+1.7.5.4
