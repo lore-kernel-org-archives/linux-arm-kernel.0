@@ -1,42 +1,55 @@
-From: per.forlin@linaro.org (Per Forlin)
-Date: Wed, 27 Jul 2011 21:46:21 +0200
-Subject: [PATCH v4 2/3] mmc: core: add random fault injection
-In-Reply-To: <CAC5umygDP6WCrHmhRqMSDBmnOyB1aw+3nuCqvyz9xGXg9QeePw@mail.gmail.com>
-References: <1311711119-6286-1-git-send-email-per.forlin@linaro.org>
-	<1311711119-6286-3-git-send-email-per.forlin@linaro.org>
-	<CAC5umygcfno0-=rA9G0OcxuVK2YK9UokfoYoy45qBT8w0+ytvg@mail.gmail.com>
-	<CAJ0pr19RWjCJAvnkVR+gL7y8_X4TSFfs7JqXgydWuWMAPPb1ZQ@mail.gmail.com>
-	<CAC5umygDP6WCrHmhRqMSDBmnOyB1aw+3nuCqvyz9xGXg9QeePw@mail.gmail.com>
-Message-ID: <CAJ0pr1_--ubHVW792iQP5juSzFFcJR2tTcnO4mLE4Sh=rX+Jhg@mail.gmail.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Wed, 27 Jul 2011 16:42:40 -0400 (EDT)
+Subject: [PATCH] usb/ehci-mxc: add missing inclusion of mach/hardware.h
+In-Reply-To: <20110727020951.GF19600@S2100-06.ap.freescale.net>
+Message-ID: <Pine.LNX.4.44L0.1107271641200.2738-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 July 2011 18:08, Akinobu Mita <akinobu.mita@gmail.com> wrote:
-> 2011/7/27 Per Forlin <per.forlin@linaro.org>:
->
->> There is an issue with patch v4 now when fault_attr is per-host.
->> Without your patch the entry is still created at the root but there
->> are many instances of fault-attr. I think it's better to wait for your
->> patch to make it into the mmc-next tree before submitting my patch. I
->> will prepare a patch v5 that depends on your upcoming changes in
->> fault-inject with a note that states the dependency.
->
-> Or you can prepare a patch for -mm and ask Andrew to add it to the -mm
-> tree.
->
-Thanks for the tip,
+On Wed, 27 Jul 2011, Shawn Guo wrote:
 
->> Would you mind adding "patch 1/3" (export_symbol_gpl) to your
->> patch-set since it depends on the new function names in your patch?
->> If not, I can resend the patch on top of your changes to match the new
->> function names if you prefer to have this patch separate.
->
-> I recommend it to be a part of your patchset. ?The new function name
-> (fault_create_debugfs_attr) is not likely to change for a time. ?You can
-> add Acked-by: Akinobu Mita <akinobu.mita@gmail.com>
->
-Beside fault_create_debugfs_attr() the other function is should_fail.
-I presume this name will be changed too, and start with the fault_?
+> Hi Alan,
+> 
+> Linus tree is currently failing on i.mx build because of this.
 
-Regards,
-Per
+Greg KH is the USB maintainer.  He's on vacation right now, but he'll
+merge your patch when he has a chance.
+
+Alan Stern
+
+> Regards,
+> Shawn
+> 
+> On Thu, Jul 21, 2011 at 10:24:10PM +0800, Shawn Guo wrote:
+> > As cpu_is_mx stuff is being used in the driver, header mach/hardware.h
+> > should be explicitly included.
+> > 
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > ---
+> > The missing of the header is causing today's linux-next build error
+> > as bleow.
+> > 
+> >   CC      drivers/usb/host/ehci-hcd.o
+> > In file included from linux-next/drivers/usb/host/ehci-hcd.c:1190:0:
+> > linux-next/drivers/usb/host/ehci-mxc.c: In function 'ehci_mxc_drv_probe':
+> > linux-next/drivers/usb/host/ehci-mxc.c:175:2: error: implicit declaration of function 'cpu_is_mx35'
+> > linux-next/drivers/usb/host/ehci-mxc.c:175:2: error: implicit declaration of function 'cpu_is_mx25'
+> > linux-next/drivers/usb/host/ehci-mxc.c:185:2: error: implicit declaration of function 'cpu_is_mx51'
+> > 
+> >  drivers/usb/host/ehci-mxc.c |    1 +
+> >  1 files changed, 1 insertions(+), 0 deletions(-)
+> > 
+> > diff --git a/drivers/usb/host/ehci-mxc.c b/drivers/usb/host/ehci-mxc.c
+> > index 0c058be..555a73c 100644
+> > --- a/drivers/usb/host/ehci-mxc.c
+> > +++ b/drivers/usb/host/ehci-mxc.c
+> > @@ -24,6 +24,7 @@
+> >  #include <linux/usb/ulpi.h>
+> >  #include <linux/slab.h>
+> >  
+> > +#include <mach/hardware.h>
+> >  #include <mach/mxc_ehci.h>
+> >  
+> >  #include <asm/mach-types.h>
+> > -- 
+> > 1.7.4.1
