@@ -1,31 +1,35 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 27 Jul 2011 11:04:28 -0400 (EDT)
-Subject: [PATCHv3 2/2] ARM: P2V: Remove ARM_PATCH_PHYS_VIRT_16BIT
-In-Reply-To: <20110727145330.GA32004@huya.qualcomm.com>
-References: <1311733255-25207-1-git-send-email-sboyd@codeaurora.org>
-	<1311733255-25207-2-git-send-email-sboyd@codeaurora.org>
-	<20110727145330.GA32004@huya.qualcomm.com>
-Message-ID: <alpine.LFD.2.00.1107271102370.12766@xanadu.home>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 27 Jul 2011 17:07:53 +0200
+Subject: [GIT PULL] arm-soc new features (part 2/2) for 3.1
+In-Reply-To: <CA+55aFygBzynb_4kZQEHQAU0Np0H9UCBFoW1hoRJ571QCMo42Q@mail.gmail.com>
+References: <3057645.NjCAYUXHGt@wuerfel> <5039974.y3GReu3Vjy@wuerfel>
+	<CA+55aFygBzynb_4kZQEHQAU0Np0H9UCBFoW1hoRJ571QCMo42Q@mail.gmail.com>
+Message-ID: <201107271707.54059.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 27 Jul 2011, David Brown wrote:
-
-> On Tue, Jul 26, 2011 at 07:20:55PM -0700, Stephen Boyd wrote:
-> > From: Nicolas Pitre <nicolas.pitre@linaro.org>
-> > 
-> > Now that MSM targets no longer need the 16-bit offsets for P2V, this
-> > code can be removed.
-> > 
-> > Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-> > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+On Wednesday 27 July 2011, Linus Torvalds wrote:
+> I compared the end result with yours, and we did some things a bit
+> differently, but on the whole it looks pretty identical. We have a
+> different resolution for "exynos4_cpu_suspend()", but afaik mine is
+> better (it looks like from a type standpoint it should return int, but
+> due to the panic it doesn't matter). And we did those
+> OMAP4430_DLL_OVERRIDE_SHIFT/MASK defines in a different order. I have
+> some other changes in my tree (Andrew's patch-set for asm/atomic.h
+> etc), so that makes for other differences in arch/arm, but it looks
+> like it's ok.
 > 
-> I've tested this on MSM, but without an actual offset.  It'd be good
-> to test this on a target with an actual adjustment being used, to make
-> sure nothing breaks.
+> But you should double-check. I didn't compile-test any of it, I don't
+> do the cross-compile thing, and maybe I missed something.
 
-Unless your RAM is physically located at 0xc0000000, you do end up 
-having an offset already.
+Looks all good as far as I can tell. Your exynos4_cpu_suspend is
+better than the solution I had in next and everything else
+is equivalent.
 
+I'm still in the process of fixing randconfig builds that have never
+been working for most arm platforms, so I can do a better job
+at automatically doing build tests myself. My guess is that there
+will be several build regressions due to stuff coming in but that
+they are not the result of mismerges.
 
-Nicolas
+	Arnd
