@@ -1,263 +1,423 @@
 From: boojin.kim@samsung.com (Boojin Kim)
-Date: Wed, 27 Jul 2011 14:31:35 +0900
-Subject: [PATCH 13/15] spi/s3c64xx: Merge dma control code
+Date: Wed, 27 Jul 2011 14:31:29 +0900
+Subject: [PATCH 07/15] ARM: EXYNOS4: Use generic DMA PL330 driver
 In-Reply-To: <1311744697-10264-1-git-send-email-boojin.kim@samsung.com>
 References: <1311744697-10264-1-git-send-email-boojin.kim@samsung.com>
-Message-ID: <1311744697-10264-14-git-send-email-boojin.kim@samsung.com>
+Message-ID: <1311744697-10264-8-git-send-email-boojin.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch modifies to merge the dma control code.
-Original s3c64xx spi driver has each dma control code for rx and tx channel.
-This patch merges these dma control codes into one.
-With this patch, a dma setup function and callback function handle
-for both rx and tx channel.
+This patch makes Samsung EXYNOS4 to use DMA PL330 driver
+on DMADEVICE. The EXYNOS4 uses DMA generic APIs instead of
+SAMSUNG specific S3C-PL330 APIs.
 
 Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- drivers/spi/spi_s3c64xx.c |  140 ++++++++++++++++++++++++--------------------
- 1 files changed, 76 insertions(+), 64 deletions(-)
+ arch/arm/mach-exynos4/Kconfig |    2 +-
+ arch/arm/mach-exynos4/clock.c |   16 ++-
+ arch/arm/mach-exynos4/dma.c   |  299 ++++++++++++++++++++++++++---------------
+ 3 files changed, 198 insertions(+), 119 deletions(-)
 
-diff --git a/drivers/spi/spi_s3c64xx.c b/drivers/spi/spi_s3c64xx.c
-index a4cf76a..de71f55 100644
---- a/drivers/spi/spi_s3c64xx.c
-+++ b/drivers/spi/spi_s3c64xx.c
-@@ -132,6 +132,12 @@
- #define RXBUSY    (1<<2)
- #define TXBUSY    (1<<3)
+diff --git a/arch/arm/mach-exynos4/Kconfig b/arch/arm/mach-exynos4/Kconfig
+index 1435fc3..0c006c5 100644
+--- a/arch/arm/mach-exynos4/Kconfig
++++ b/arch/arm/mach-exynos4/Kconfig
+@@ -11,7 +11,7 @@ if ARCH_EXYNOS4
  
-+struct s3c64xx_spi_dma_data {
-+	unsigned		ch;
-+	enum dma_data_direction direction;
-+	enum dma_ch	dmach;
-+};
-+
- /**
-  * struct s3c64xx_spi_driver_data - Runtime info holder for SPI driver.
-  * @clk: Pointer to the spi clock.
-@@ -165,15 +171,13 @@ struct s3c64xx_spi_driver_data {
- 	struct work_struct              work;
- 	struct list_head                queue;
- 	spinlock_t                      lock;
--	enum dma_ch                     rx_dmach;
--	enum dma_ch                     tx_dmach;
- 	unsigned long                   sfr_start;
- 	struct completion               xfer_completion;
- 	unsigned                        state;
- 	unsigned                        cur_mode, cur_bpw;
- 	unsigned                        cur_speed;
--	unsigned			rx_ch;
--	unsigned			tx_ch;
-+	struct s3c64xx_spi_dma_data	rx_dma;
-+	struct s3c64xx_spi_dma_data	tx_dma;
- 	struct samsung_dma_ops		*ops;
+ config CPU_EXYNOS4210
+ 	bool
+-	select S3C_PL330_DMA
++	select SAMSUNG_DMA_PL330
+ 	help
+ 	  Enable EXYNOS4210 CPU support
+ 
+diff --git a/arch/arm/mach-exynos4/clock.c b/arch/arm/mach-exynos4/clock.c
+index 871f9d5..1b2e78c 100644
+--- a/arch/arm/mach-exynos4/clock.c
++++ b/arch/arm/mach-exynos4/clock.c
+@@ -47,6 +47,11 @@ static struct clk clk_sclk_usbphy1 = {
+ 	.id		= -1,
  };
  
-@@ -230,36 +234,76 @@ static void flush_fifo(struct s3c64xx_spi_driver_data *sdd)
- 	writel(val, regs + S3C64XX_SPI_CH_CFG);
- }
- 
--static void s3c64xx_spi_dma_rxcb(void *data)
-+static void s3c64xx_spi_dmacb(void *data)
++static struct clk dummy_apb_pclk = {
++	.name		= "apb_pclk",
++	.id		= -1,
++};
++
+ static int exynos4_clksrc_mask_top_ctrl(struct clk *clk, int enable)
  {
--	struct s3c64xx_spi_driver_data *sdd
--		= (struct s3c64xx_spi_driver_data *)data;
-+	struct s3c64xx_spi_driver_data *sdd;
-+	struct s3c64xx_spi_dma_data *dma = data;
- 	unsigned long flags;
+ 	return s5p_gatectrl(S5P_CLKSRC_MASK_TOP, clk, enable);
+@@ -485,16 +490,11 @@ static struct clk init_clocks_off[] = {
+ 		.enable		= exynos4_clk_ip_fsys_ctrl,
+ 		.ctrlbit	= (1 << 10),
+ 	}, {
+-		.name		= "pdma",
+-		.id		= 0,
++		.name		= "dma",
++		.id		= -1,
+ 		.enable		= exynos4_clk_ip_fsys_ctrl,
+ 		.ctrlbit	= (1 << 0),
+ 	}, {
+-		.name		= "pdma",
+-		.id		= 1,
+-		.enable		= exynos4_clk_ip_fsys_ctrl,
+-		.ctrlbit	= (1 << 1),
+-	}, {
+ 		.name		= "adc",
+ 		.id		= -1,
+ 		.enable		= exynos4_clk_ip_peril_ctrl,
+@@ -1212,5 +1212,7 @@ void __init exynos4_register_clocks(void)
+ 	s3c_register_clocks(init_clocks_off, ARRAY_SIZE(init_clocks_off));
+ 	s3c_disable_clocks(init_clocks_off, ARRAY_SIZE(init_clocks_off));
  
-+	if (dma->direction == DMA_FROM_DEVICE)
-+		sdd = container_of(data,
-+			struct s3c64xx_spi_driver_data, rx_dma);
-+	else
-+		sdd = container_of(data,
-+			struct s3c64xx_spi_driver_data, tx_dma);
++	s3c24xx_register_clock(&dummy_apb_pclk);
 +
- 	spin_lock_irqsave(&sdd->lock, flags);
- 
--	sdd->state &= ~RXBUSY;
--	/* If the other done */
--	if (!(sdd->state & TXBUSY))
--		complete(&sdd->xfer_completion);
-+	if (dma->direction == DMA_FROM_DEVICE) {
-+		sdd->state &= ~RXBUSY;
-+		if (!(sdd->state & TXBUSY))
-+			complete(&sdd->xfer_completion);
-+	} else {
-+		sdd->state &= ~TXBUSY;
-+		if (!(sdd->state & RXBUSY))
-+			complete(&sdd->xfer_completion);
-+	}
- 
- 	spin_unlock_irqrestore(&sdd->lock, flags);
+ 	s3c_pwmclk_init();
  }
+diff --git a/arch/arm/mach-exynos4/dma.c b/arch/arm/mach-exynos4/dma.c
+index 564bb53..d57d662 100644
+--- a/arch/arm/mach-exynos4/dma.c
++++ b/arch/arm/mach-exynos4/dma.c
+@@ -21,151 +21,228 @@
+  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+  */
  
--static void s3c64xx_spi_dma_txcb(void *data)
-+static void prepare_dma(struct s3c64xx_spi_dma_data *dma,
-+					unsigned len, dma_addr_t buf)
+-#include <linux/platform_device.h>
+ #include <linux/dma-mapping.h>
++#include <linux/amba/bus.h>
++#include <linux/amba/pl330.h>
+ 
++#include <asm/irq.h>
+ #include <plat/devs.h>
+ #include <plat/irqs.h>
+ 
+ #include <mach/map.h>
+ #include <mach/irqs.h>
+-
+-#include <plat/s3c-pl330-pdata.h>
++#include <mach/dma.h>
+ 
+ static u64 dma_dmamask = DMA_BIT_MASK(32);
+ 
+-static struct resource exynos4_pdma0_resource[] = {
+-	[0] = {
+-		.start	= EXYNOS4_PA_PDMA0,
+-		.end	= EXYNOS4_PA_PDMA0 + SZ_4K,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	[1] = {
+-		.start	= IRQ_PDMA0,
+-		.end	= IRQ_PDMA0,
+-		.flags	= IORESOURCE_IRQ,
++struct dma_pl330_peri pdma0_peri[28] = {
++	{
++		.peri_id = (u8)DMACH_PCM0_RX,
++		.rqtype = DEVTOMEM,
++	}, {
++		.peri_id = (u8)DMACH_PCM0_TX,
++		.rqtype = MEMTODEV,
++	}, {
++		.peri_id = (u8)DMACH_PCM2_RX,
++		.rqtype = DEVTOMEM,
++	}, {
++		.peri_id = (u8)DMACH_PCM2_TX,
++		.rqtype = MEMTODEV,
++	}, {
++		.peri_id = (u8)DMACH_MSM_REQ0,
++	}, {
++		.peri_id = (u8)DMACH_MSM_REQ2,
++	}, {
++		.peri_id = (u8)DMACH_SPI0_RX,
++		.rqtype = DEVTOMEM,
++	}, {
++		.peri_id = (u8)DMACH_SPI0_TX,
++		.rqtype = MEMTODEV,
++	}, {
++		.peri_id = (u8)DMACH_SPI2_RX,
++		.rqtype = DEVTOMEM,
++	}, {
++		.peri_id = (u8)DMACH_SPI2_TX,
++		.rqtype = MEMTODEV,
++	}, {
++		.peri_id = (u8)DMACH_I2S0S_TX,
++		.rqtype = MEMTODEV,
++	}, {
++		.peri_id = (u8)DMACH_I2S0_RX,
++		.rqtype = DEVTOMEM,
++	}, {
++		.peri_id = (u8)DMACH_I2S0_TX,
++		.rqtype = MEMTODEV,
++	}, {
++		.peri_id = (u8)DMACH_UART0_RX,
++		.rqtype = DEVTOMEM,
++	}, {
++		.peri_id = (u8)DMACH_UART0_TX,
++		.rqtype = MEMTODEV,
++	}, {
++		.peri_id = (u8)DMACH_UART2_RX,
++		.rqtype = DEVTOMEM,
++	}, {
++		.peri_id = (u8)DMACH_UART2_TX,
++		.rqtype = MEMTODEV,
++	}, {
++		.peri_id = (u8)DMACH_UART4_RX,
++		.rqtype = DEVTOMEM,
++	}, {
++		.peri_id = (u8)DMACH_UART4_TX,
++		.rqtype = MEMTODEV,
++	}, {
++		.peri_id = (u8)DMACH_SLIMBUS0_RX,
++		.rqtype = DEVTOMEM,
++	}, {
++		.peri_id = (u8)DMACH_SLIMBUS0_TX,
++		.rqtype = MEMTODEV,
++	}, {
++		.peri_id = (u8)DMACH_SLIMBUS2_RX,
++		.rqtype = DEVTOMEM,
++	}, {
++		.peri_id = (u8)DMACH_SLIMBUS2_TX,
++		.rqtype = MEMTODEV,
++	}, {
++		.peri_id = (u8)DMACH_SLIMBUS4_RX,
++		.rqtype = DEVTOMEM,
++	}, {
++		.peri_id = (u8)DMACH_SLIMBUS4_TX,
++		.rqtype = MEMTODEV,
++	}, {
++		.peri_id = (u8)DMACH_AC97_MICIN,
++		.rqtype = DEVTOMEM,
++	}, {
++		.peri_id = (u8)DMACH_AC97_PCMIN,
++		.rqtype = DEVTOMEM,
++	}, {
++		.peri_id = (u8)DMACH_AC97_PCMOUT,
++		.rqtype = MEMTODEV,
+ 	},
+ };
+ 
+-static struct s3c_pl330_platdata exynos4_pdma0_pdata = {
+-	.peri = {
+-		[0] = DMACH_PCM0_RX,
+-		[1] = DMACH_PCM0_TX,
+-		[2] = DMACH_PCM2_RX,
+-		[3] = DMACH_PCM2_TX,
+-		[4] = DMACH_MSM_REQ0,
+-		[5] = DMACH_MSM_REQ2,
+-		[6] = DMACH_SPI0_RX,
+-		[7] = DMACH_SPI0_TX,
+-		[8] = DMACH_SPI2_RX,
+-		[9] = DMACH_SPI2_TX,
+-		[10] = DMACH_I2S0S_TX,
+-		[11] = DMACH_I2S0_RX,
+-		[12] = DMACH_I2S0_TX,
+-		[13] = DMACH_I2S2_RX,
+-		[14] = DMACH_I2S2_TX,
+-		[15] = DMACH_UART0_RX,
+-		[16] = DMACH_UART0_TX,
+-		[17] = DMACH_UART2_RX,
+-		[18] = DMACH_UART2_TX,
+-		[19] = DMACH_UART4_RX,
+-		[20] = DMACH_UART4_TX,
+-		[21] = DMACH_SLIMBUS0_RX,
+-		[22] = DMACH_SLIMBUS0_TX,
+-		[23] = DMACH_SLIMBUS2_RX,
+-		[24] = DMACH_SLIMBUS2_TX,
+-		[25] = DMACH_SLIMBUS4_RX,
+-		[26] = DMACH_SLIMBUS4_TX,
+-		[27] = DMACH_AC97_MICIN,
+-		[28] = DMACH_AC97_PCMIN,
+-		[29] = DMACH_AC97_PCMOUT,
+-		[30] = DMACH_MAX,
+-		[31] = DMACH_MAX,
+-	},
++struct dma_pl330_platdata exynos4_pdma0_pdata = {
++	.nr_valid_peri = ARRAY_SIZE(pdma0_peri),
++	.peri = pdma0_peri,
+ };
+ 
+-static struct platform_device exynos4_device_pdma0 = {
+-	.name		= "s3c-pl330",
+-	.id		= 0,
+-	.num_resources	= ARRAY_SIZE(exynos4_pdma0_resource),
+-	.resource	= exynos4_pdma0_resource,
+-	.dev		= {
++struct amba_device exynos4_device_pdma0 = {
++	.dev = {
++		.init_name = "dma-pl330.0",
+ 		.dma_mask = &dma_dmamask,
+ 		.coherent_dma_mask = DMA_BIT_MASK(32),
+ 		.platform_data = &exynos4_pdma0_pdata,
+ 	},
++	.res = {
++		.start = EXYNOS4_PA_PDMA0,
++		.end = EXYNOS4_PA_PDMA0 + SZ_4K,
++		.flags = IORESOURCE_MEM,
++	},
++	.irq = {IRQ_PDMA0, NO_IRQ},
++	.periphid = 0x00041330,
+ };
+ 
+-static struct resource exynos4_pdma1_resource[] = {
+-	[0] = {
+-		.start	= EXYNOS4_PA_PDMA1,
+-		.end	= EXYNOS4_PA_PDMA1 + SZ_4K,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	[1] = {
+-		.start	= IRQ_PDMA1,
+-		.end	= IRQ_PDMA1,
+-		.flags	= IORESOURCE_IRQ,
++struct dma_pl330_peri pdma1_peri[25] = {
++	{
++		.peri_id = (u8)DMACH_PCM0_RX,
++		.rqtype = DEVTOMEM,
++	}, {
++		.peri_id = (u8)DMACH_PCM0_TX,
++		.rqtype = MEMTODEV,
++	}, {
++		.peri_id = (u8)DMACH_PCM1_RX,
++		.rqtype = DEVTOMEM,
++	}, {
++		.peri_id = (u8)DMACH_PCM1_TX,
++		.rqtype = MEMTODEV,
++	}, {
++		.peri_id = (u8)DMACH_MSM_REQ1,
++	}, {
++		.peri_id = (u8)DMACH_MSM_REQ3,
++	}, {
++		.peri_id = (u8)DMACH_SPI1_RX,
++		.rqtype = DEVTOMEM,
++	}, {
++		.peri_id = (u8)DMACH_SPI1_TX,
++		.rqtype = MEMTODEV,
++	}, {
++		.peri_id = (u8)DMACH_I2S0S_TX,
++		.rqtype = MEMTODEV,
++	}, {
++		.peri_id = (u8)DMACH_I2S0_RX,
++		.rqtype = DEVTOMEM,
++	}, {
++		.peri_id = (u8)DMACH_I2S0_TX,
++		.rqtype = MEMTODEV,
++	}, {
++		.peri_id = (u8)DMACH_I2S1_RX,
++		.rqtype = DEVTOMEM,
++	}, {
++		.peri_id = (u8)DMACH_I2S1_TX,
++		.rqtype = MEMTODEV,
++	}, {
++		.peri_id = (u8)DMACH_UART0_RX,
++		.rqtype = DEVTOMEM,
++	}, {
++		.peri_id = (u8)DMACH_UART0_TX,
++		.rqtype = MEMTODEV,
++	}, {
++		.peri_id = (u8)DMACH_UART1_RX,
++		.rqtype = DEVTOMEM,
++	}, {
++		.peri_id = (u8)DMACH_UART1_TX,
++		.rqtype = MEMTODEV,
++	}, {
++		.peri_id = (u8)DMACH_UART3_RX,
++		.rqtype = DEVTOMEM,
++	}, {
++		.peri_id = (u8)DMACH_UART3_TX,
++		.rqtype = MEMTODEV,
++	}, {
++		.peri_id = (u8)DMACH_SLIMBUS1_RX,
++		.rqtype = DEVTOMEM,
++	}, {
++		.peri_id = (u8)DMACH_SLIMBUS1_TX,
++		.rqtype = MEMTODEV,
++	}, {
++		.peri_id = (u8)DMACH_SLIMBUS3_RX,
++		.rqtype = DEVTOMEM,
++	}, {
++		.peri_id = (u8)DMACH_SLIMBUS3_TX,
++		.rqtype = MEMTODEV,
++	}, {
++		.peri_id = (u8)DMACH_SLIMBUS5_RX,
++		.rqtype = DEVTOMEM,
++	}, {
++		.peri_id = (u8)DMACH_SLIMBUS5_TX,
++		.rqtype = MEMTODEV,
+ 	},
+ };
+ 
+-static struct s3c_pl330_platdata exynos4_pdma1_pdata = {
+-	.peri = {
+-		[0] = DMACH_PCM0_RX,
+-		[1] = DMACH_PCM0_TX,
+-		[2] = DMACH_PCM1_RX,
+-		[3] = DMACH_PCM1_TX,
+-		[4] = DMACH_MSM_REQ1,
+-		[5] = DMACH_MSM_REQ3,
+-		[6] = DMACH_SPI1_RX,
+-		[7] = DMACH_SPI1_TX,
+-		[8] = DMACH_I2S0S_TX,
+-		[9] = DMACH_I2S0_RX,
+-		[10] = DMACH_I2S0_TX,
+-		[11] = DMACH_I2S1_RX,
+-		[12] = DMACH_I2S1_TX,
+-		[13] = DMACH_UART0_RX,
+-		[14] = DMACH_UART0_TX,
+-		[15] = DMACH_UART1_RX,
+-		[16] = DMACH_UART1_TX,
+-		[17] = DMACH_UART3_RX,
+-		[18] = DMACH_UART3_TX,
+-		[19] = DMACH_SLIMBUS1_RX,
+-		[20] = DMACH_SLIMBUS1_TX,
+-		[21] = DMACH_SLIMBUS3_RX,
+-		[22] = DMACH_SLIMBUS3_TX,
+-		[23] = DMACH_SLIMBUS5_RX,
+-		[24] = DMACH_SLIMBUS5_TX,
+-		[25] = DMACH_SLIMBUS0AUX_RX,
+-		[26] = DMACH_SLIMBUS0AUX_TX,
+-		[27] = DMACH_SPDIF,
+-		[28] = DMACH_MAX,
+-		[29] = DMACH_MAX,
+-		[30] = DMACH_MAX,
+-		[31] = DMACH_MAX,
+-	},
++struct dma_pl330_platdata exynos4_pdma1_pdata = {
++	.nr_valid_peri = ARRAY_SIZE(pdma1_peri),
++	.peri = pdma1_peri,
+ };
+ 
+-static struct platform_device exynos4_device_pdma1 = {
+-	.name		= "s3c-pl330",
+-	.id		= 1,
+-	.num_resources	= ARRAY_SIZE(exynos4_pdma1_resource),
+-	.resource	= exynos4_pdma1_resource,
+-	.dev		= {
++struct amba_device exynos4_device_pdma1 = {
++	.dev = {
++		.init_name = "dma-pl330.1",
+ 		.dma_mask = &dma_dmamask,
+ 		.coherent_dma_mask = DMA_BIT_MASK(32),
+ 		.platform_data = &exynos4_pdma1_pdata,
+ 	},
+-};
+-
+-static struct platform_device *exynos4_dmacs[] __initdata = {
+-	&exynos4_device_pdma0,
+-	&exynos4_device_pdma1,
++	.res = {
++		.start = EXYNOS4_PA_PDMA1,
++		.end = EXYNOS4_PA_PDMA1 + SZ_4K,
++		.flags = IORESOURCE_MEM,
++	},
++	.irq = {IRQ_PDMA1, NO_IRQ},
++	.periphid = 0x00041330,
+ };
+ 
+ static int __init exynos4_dma_init(void)
  {
--	struct s3c64xx_spi_driver_data *sdd
--		= (struct s3c64xx_spi_driver_data *)data;
--	unsigned long flags;
-+	struct s3c64xx_spi_driver_data *sdd;
-+	struct samsung_dma_prep_info info;
- 
--	spin_lock_irqsave(&sdd->lock, flags);
-+	if (dma->direction == DMA_FROM_DEVICE)
-+		sdd = container_of((void *)dma,
-+			struct s3c64xx_spi_driver_data, rx_dma);
-+	else
-+		sdd = container_of((void *)dma,
-+			struct s3c64xx_spi_driver_data, tx_dma);
- 
--	sdd->state &= ~TXBUSY;
--	/* If the other done */
--	if (!(sdd->state & RXBUSY))
--		complete(&sdd->xfer_completion);
-+	info.cap = DMA_SLAVE;
-+	info.len = len;
-+	info.fp = s3c64xx_spi_dmacb;
-+	info.fp_param = dma;
-+	info.direction = dma->direction;
-+	info.buf = buf;
-+
-+	sdd->ops->prepare(dma->ch, &info);
-+	sdd->ops->trigger(dma->ch);
-+}
- 
--	spin_unlock_irqrestore(&sdd->lock, flags);
-+static int acquire_dma(struct s3c64xx_spi_driver_data *sdd)
-+{
-+	struct samsung_dma_info info;
-+
-+	sdd->ops = samsung_dma_get_ops();
-+
-+	info.cap = DMA_SLAVE;
-+	info.client = &s3c64xx_spi_dma_client;
-+	info.width = sdd->cur_bpw / 8;
-+
-+	info.direction = sdd->rx_dma.direction;
-+	info.fifo = sdd->sfr_start + S3C64XX_SPI_RX_DATA;
-+	sdd->rx_dma.ch = sdd->ops->request(sdd->rx_dma.dmach, &info);
-+	info.direction =  sdd->tx_dma.direction;
-+	info.fifo = sdd->sfr_start + S3C64XX_SPI_TX_DATA;
-+	sdd->tx_dma.ch = sdd->ops->request(sdd->tx_dma.dmach, &info);
-+
-+	return 1;
- }
- 
- static void enable_datapath(struct s3c64xx_spi_driver_data *sdd,
-@@ -269,7 +313,6 @@ static void enable_datapath(struct s3c64xx_spi_driver_data *sdd,
- 	struct s3c64xx_spi_info *sci = sdd->cntrlr_info;
- 	void __iomem *regs = sdd->regs;
- 	u32 modecfg, chcfg;
--	struct samsung_dma_prep_info info;
- 
- 	modecfg = readl(regs + S3C64XX_SPI_MODE_CFG);
- 	modecfg &= ~(S3C64XX_SPI_MODE_TXDMA_ON | S3C64XX_SPI_MODE_RXDMA_ON);
-@@ -295,14 +338,7 @@ static void enable_datapath(struct s3c64xx_spi_driver_data *sdd,
- 		chcfg |= S3C64XX_SPI_CH_TXCH_ON;
- 		if (dma_mode) {
- 			modecfg |= S3C64XX_SPI_MODE_TXDMA_ON;
--			info.cap = DMA_SLAVE;
--			info.direction = DMA_TO_DEVICE;
--			info.buf = xfer->tx_dma;
--			info.len = xfer->len;
--			info.fp = s3c64xx_spi_dma_txcb;
--			info.fp_param = sdd;
--			sdd->ops->prepare(sdd->tx_ch, &info);
--			sdd->ops->trigger(sdd->tx_ch);
-+			prepare_dma(&sdd->tx_dma, xfer->len, xfer->tx_dma);
- 		} else {
- 			switch (sdd->cur_bpw) {
- 			case 32:
-@@ -334,14 +370,7 @@ static void enable_datapath(struct s3c64xx_spi_driver_data *sdd,
- 			writel(((xfer->len * 8 / sdd->cur_bpw) & 0xffff)
- 					| S3C64XX_SPI_PACKET_CNT_EN,
- 					regs + S3C64XX_SPI_PACKET_CNT);
--			info.cap = DMA_SLAVE;
--			info.direction = DMA_FROM_DEVICE;
--			info.buf = xfer->rx_dma;
--			info.len = xfer->len;
--			info.fp = s3c64xx_spi_dma_rxcb;
--			info.fp_param = sdd;
--			sdd->ops->prepare(sdd->rx_ch, &info);
--			sdd->ops->trigger(sdd->rx_ch);
-+			prepare_dma(&sdd->rx_dma, xfer->len, xfer->rx_dma);
- 		}
- 	}
- 
-@@ -701,10 +730,10 @@ static void handle_msg(struct s3c64xx_spi_driver_data *sdd,
- 			if (use_dma) {
- 				if (xfer->tx_buf != NULL
- 						&& (sdd->state & TXBUSY))
--					sdd->ops->stop(sdd->tx_ch);
-+					sdd->ops->stop(sdd->tx_dma.ch);
- 				if (xfer->rx_buf != NULL
- 						&& (sdd->state & RXBUSY))
--					sdd->ops->stop(sdd->rx_ch);
-+					sdd->ops->stop(sdd->rx_dma.ch);
- 			}
- 
- 			goto out;
-@@ -742,25 +771,6 @@ out:
- 		msg->complete(msg->context);
- }
- 
--static int acquire_dma(struct s3c64xx_spi_driver_data *sdd)
--{
--
--	struct samsung_dma_info info;
--	sdd->ops = samsung_dma_get_ops();
--
--	info.cap = DMA_SLAVE;
--	info.client = &s3c64xx_spi_dma_client;
--	info.direction = DMA_FROM_DEVICE;
--	info.fifo = sdd->sfr_start + S3C64XX_SPI_RX_DATA;
--	info.width = sdd->cur_bpw / 8;
--	sdd->rx_ch = sdd->ops->request(sdd->rx_dmach, &info);
--	info.direction = DMA_TO_DEVICE;
--	info.fifo = sdd->sfr_start + S3C64XX_SPI_TX_DATA;
--	sdd->tx_ch = sdd->ops->request(sdd->tx_dmach, &info);
--
--	return 1;
--}
--
- static void s3c64xx_spi_work(struct work_struct *work)
- {
- 	struct s3c64xx_spi_driver_data *sdd = container_of(work,
-@@ -797,8 +807,8 @@ static void s3c64xx_spi_work(struct work_struct *work)
- 	spin_unlock_irqrestore(&sdd->lock, flags);
- 
- 	/* Free DMA channels */
--	sdd->ops->release(sdd->rx_ch, &s3c64xx_spi_dma_client);
--	sdd->ops->release(sdd->tx_ch, &s3c64xx_spi_dma_client);
-+	sdd->ops->release(sdd->rx_dma.ch, &s3c64xx_spi_dma_client);
-+	sdd->ops->release(sdd->tx_dma.ch, &s3c64xx_spi_dma_client);
- }
- 
- static int s3c64xx_spi_transfer(struct spi_device *spi,
-@@ -1015,8 +1025,10 @@ static int __init s3c64xx_spi_probe(struct platform_device *pdev)
- 	sdd->cntrlr_info = sci;
- 	sdd->pdev = pdev;
- 	sdd->sfr_start = mem_res->start;
--	sdd->tx_dmach = dmatx_res->start;
--	sdd->rx_dmach = dmarx_res->start;
-+	sdd->tx_dma.dmach = dmatx_res->start;
-+	sdd->tx_dma.direction = DMA_TO_DEVICE;
-+	sdd->rx_dma.dmach = dmarx_res->start;
-+	sdd->rx_dma.direction = DMA_FROM_DEVICE;
- 
- 	sdd->cur_bpw = 8;
- 
-@@ -1104,7 +1116,7 @@ static int __init s3c64xx_spi_probe(struct platform_device *pdev)
- 					pdev->id, master->num_chipselect);
- 	dev_dbg(&pdev->dev, "\tIOmem=[0x%x-0x%x]\tDMA=[Rx-%d, Tx-%d]\n",
- 					mem_res->end, mem_res->start,
--					sdd->rx_dmach, sdd->tx_dmach);
-+					sdd->rx_dma.dmach, sdd->tx_dma.dmach);
+-	platform_add_devices(exynos4_dmacs, ARRAY_SIZE(exynos4_dmacs));
++	amba_device_register(&exynos4_device_pdma0, &iomem_resource);
  
  	return 0;
- 
+ }
 -- 
 1.7.1
