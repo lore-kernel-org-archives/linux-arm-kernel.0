@@ -1,160 +1,112 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Wed, 27 Jul 2011 09:53:20 +0800
-Subject: [PATCH v8 0/3] add the GPMI controller driver for IMX23/IMX28
-In-Reply-To: <CAHMSPgMHrqWcJ=BThDLgQ=XyTBDCMvNS4SVjQWfk=Jf682TEig@mail.gmail.com>
-References: <1311230846-26437-1-git-send-email-b32955@freescale.com>	<20110721215020.GA25344@pengutronix.de>	<4E28EEE1.2050008@freescale.com>	<20110722055731.GI26837@S2100-06.ap.freescale.net>	<4E292FCF.6010608@freescale.com>
-	<CAHMSPgMHrqWcJ=BThDLgQ=XyTBDCMvNS4SVjQWfk=Jf682TEig@mail.gmail.com>
-Message-ID: <4E2F6F90.7030207@freescale.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 27 Jul 2011 10:06:48 +0800
+Subject: [GIT PULL] i.mx driver device tree patches for 3.1
+In-Reply-To: <20110726173048.GA19741@S2100-06.ap.freescale.net>
+References: <20110726173048.GA19741@S2100-06.ap.freescale.net>
+Message-ID: <20110727020647.GE19600@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Jul 27, 2011 at 01:30:49AM +0800, Shawn Guo wrote:
+> Hi Arnd,
+> 
+> Here are a bunch of i.mx driver device tree support patches, which have
+> gone through the review and got acks from Grant and subsystem
+> maintainers (except serial).  I had ping Alan Cox several times for his
+> ack, but he never responded, so I Cc-ed Greg here to see if I can get
+> his ack on those two serial/imx patches.
+> 
+> The reason these patches were not included in Sascha's pull-req is they
+> had dependency on spi/gpio/mmc trees.  Since Linus has merged these
+> trees, I start sending them out.
+> 
+> Sascha,
+> 
+> Since your imx-features branch has been moving forward, I chose to send
+> this pull-req off arm-soc/imx/devel.  Can you please ack this pull-req?
+> 
 
-Thanks for your test.
+Since Linus just merged Arnd's branch which my patches have dependency
+on, it becomes the easiest for me to send pull request based on
+mainline.  Here it is.
 
-> Hi,
->
-> It's not really working for me.
-> I've applied all gpmi-nand driver patches and the dma driver patches.
->
-> I have added following kernel parameters:
-> mtdparts=gpmi-nand:20m(boot),-(user) ubi.mtd=1 root=ubi0:rootfs0
-> rootfstype=ubifs gpmi_debug_init
->
-> During boot I get already get DMA timeout:
-> [    2.560000] [ start_dma_without_bch_irq : 392 ] DMA timeout, last DMA :1
-> [    3.560000] [ start_dma_with_bch_irq : 427 ] bch timeout!!!
-> ...
-> (see log file in attach line 89)
->
-> When trying flash_erraseall /dev/mtd1 I get:
-> Erasing 128 Kibyte @ 20000 --  0 % complete [   16.700000] [
-> gpmi_read_data : 832 ] step 1 error
-> [   16.700000] [ gpmi_send_command : 749 ] step 1 error
-> [   16.700000] [ mil_cmd_ctrl : 894 ] Chip: 0, Error -1
-> [   16.700000] [ gpmi_send_command : 749 ] step 1 error
-> [   16.700000] [ mil_cmd_ctrl : 894 ] Chip: 0, Error -1
-> [   16.700000] [ gpmi_send_command : 749 ] step 1 error
-> [   16.700000] [ mil_cmd_ctrl : 894 ] Chip: 0, Error -1
-> [   16.700000] [ gpmi_read_data : 832 ] step 1 error
-> libmtd: error!: MEMERA[   16.740000] [ gpmi_send_command : 749 ] step 1 error
-> SE64 ioctl failed for eraseblock[   16.750000] [ mil_cmd_ctrl : 894 ]
-> Chip: 0, Error -1
->   1 (mtd1)
->          error 5 (Input/output error)
-> flash_erase: error!: /dev/mtd1: MTD Erase failure
->               error 5 (Input/output error)
-> ...
-> (see log file in attach line 128 and further)
->
-> Environment:
-> - patches on a 2.6.39.1 kernel (needed to modify the patch a little
-> for changed mtd add/del interface).
-Please test the driver on :
-   git://git.linaro.org/people/shawnguo/linux-2.6.git mxs-gpmi
+PS. The mainline currently fails to build i.mx, caused by the missing
+inclusion of mach/hardware.h in usb/host/ehci-mxc.c.  I noticed it on
+linux-next days ago, and had sent a patch for it.  With this fixed, my
+branch works fine.
 
-or on
+https://patchwork.kernel.org/patch/995032/
 
-  git://git.pengutronix.de/git/imx/linux-2.6.git  imx-for-3.1
+Regards,
+Shawn
 
+The following changes since commit b0189cd087aa82bd23277cb5c8960ab030e13e5c:
 
+  Merge branch 'next/devel2' of git://git.kernel.org/pub/scm/linux/kernel/git/arm/linux-arm-soc (2011-07-26 17:42:18 -0700)
 
-I found the .config may influence the DMA.
-I guess there is some module which has impact to the DMA.
-So You should use the right .config first, you can get the right
-.config by two ways:
-[1] use the 'make mxs_defconfig' in the imx-for-3.1 branch of
-   tree: git://git.pengutronix.de/git/imx/linux-2.6.git
+are available in the git repository at:
 
-[2] use the attachment which is tested by me.
+  git://git.linaro.org/people/shawnguo/linux-2.6.git for-arnd
 
-Best Regards
-Huang Shijie
+Shawn Guo (14):
+      serial/imx: get rid of the uses of cpu_is_mx1()
+      serial/imx: add device tree probe support
+      net/fec: gasket needs to be enabled for some i.mx
+      dt/net: add helper function of_get_phy_mode
+      net: ibm_newemac: convert it to use of_get_phy_mode
+      net/fec: add device tree probe support
+      mmc: sdhci-esdhc-imx: extend card_detect and write_protect support for mx5
+      mmc: sdhci-esdhc-imx: do not reference platform data after probe
+      mmc: sdhci-esdhc-imx: get rid of the uses of cpu_is_mx()
+      mmc: sdhci-pltfm: dt device does not pass parent to sdhci_alloc_host
+      mmc: sdhci-esdhc-imx: add device tree probe support
+      dmaengine: imx-sdma: use platform_device_id to identify sdma version
+      dmaengine: imx-sdma: sdma_get_firmware does not need to copy fw_name
+      dmaengine: imx-sdma: add device tree probe support
 
-
-
-> - using this on our own mx23 based board, so also added some board
-> init code for that.
->
->
-> On Fri, Jul 22, 2011 at 10:07 AM, Huang Shijie<b32955@freescale.com>  wrote:
->> Hi Wolfram:
->>> On Fri, Jul 22, 2011 at 11:30:41AM +0800, Huang Shijie wrote:
->>>> Hi,
->>>>>> The general-purpose media interface(GPMI) controller is a flexible
->>>>>> interface
->>>>>> to up to several NAND flashs.
->>>>> ...
->>>>>> To Walfram&    Artem:
->>>>>>      About how to disable the JFFS2 to use the OOB:
->>>>>>      I read the code, and I still have no idea about how to use the
->>>>>> ecclayout
->>>>>>      to do the job. Could you give me some hint? thanks.
->>>>> Have you checked mxc_nand.c for example? There is
->>>>>
->>>>> static struct nand_ecclayout nandv1_hw_eccoob_smallpage = {
->>>>>          .eccbytes = 5,
->>>>>          .eccpos = {6, 7, 8, 9, 10},
->>>>>          .oobfree = {{0, 5}, {12, 4}, }
->>>>> }
->>>>>
->>>>> defined as one layout. Now, you could define one where oobfree is empty
->>>>> and
->>>>> eccbytes as big as the oob-area.
->>>>>
->>>> thanks. I will check the code.
->>>>>> The driver depends on another GPMI-NAND device patch set, you can find
->>>>>> them at :
->>>>>>         [1]
->>>>>> http://lists.infradead.org/pipermail/linux-mtd/2011-July/037033.html
->>>>>>         [2]
->>>>>> http://lists.infradead.org/pipermail/linux-mtd/2011-July/037031.html
->>>>>>         [3]
->>>>>> http://lists.infradead.org/pipermail/linux-mtd/2011-July/037032.html
->>>>>>         [4]
->>>>>> http://lists.infradead.org/pipermail/linux-mtd/2011-July/037034.html
->>>>>>
->>>>>> The driver also depends on another DMA patch by Shawn:
->>>>>>         [0]
->>>>>> http://lists.infradead.org/pipermail/linux-mtd/2011-June/036820.html
->>>>> This makes it difficult for testers/reviewers. Please try to get a
->>>>> git-branch
->>>>> from Freescale or Linaro.
->>>>>
->>>> Shawn will merge my patches to his Linaro branch.
-> I don't see the DMA patch in the git?
->
->>> git://git.linaro.org/people/shawnguo/linux-2.6.git mxs-gpmi
->> Please test the GPMI driver based this git tree.
-> I will try that on an mx23evk board.
->
->> I tested, and the DMA-timeout does not occur any more.
->>
->> I notice that Shawn added two more patched to
->> /arch/arm/config/mxs_defconfig:
->> [1] ARM: mxs_defconfig: Add mx23evk and mx28evk build
->> [2] ARM: mxs_defconfig: Change CONFIG_RTC_CLASS 'm' to 'y'
->>
->> Please check it. Maybe your kernel code misses them.
-> I don't see any of this in the git?
->
->> Of course, you can use the my_config (i sent you last mail) for .config.
->>
->> Best Regards
->> Huang Shijie
->>
->>
->>> Shijie, please check and test it.  I only did a build test.
->>>
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
-
--------------- next part --------------
-An embedded and charset-unspecified text was scrubbed...
-Name: my_config
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110727/ac087c9b/attachment-0001.ksh>
+ .../devicetree/bindings/dma/fsl-imx-sdma.txt       |   17 ++
+ .../devicetree/bindings/mmc/fsl-imx-esdhc.txt      |   34 +++
+ Documentation/devicetree/bindings/net/fsl-fec.txt  |   24 ++
+ .../bindings/tty/serial/fsl-imx-uart.txt           |   19 ++
+ arch/arm/mach-imx/clock-imx1.c                     |    6 +-
+ arch/arm/mach-imx/clock-imx21.c                    |    8 +-
+ arch/arm/mach-imx/clock-imx25.c                    |   20 +-
+ arch/arm/mach-imx/clock-imx27.c                    |   15 +-
+ arch/arm/mach-imx/clock-imx31.c                    |   13 +-
+ arch/arm/mach-imx/clock-imx35.c                    |   18 +-
+ arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c     |    3 +-
+ arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c     |    3 +-
+ arch/arm/mach-imx/mach-mx25_3ds.c                  |    2 +
+ arch/arm/mach-imx/mach-pcm043.c                    |    2 +
+ arch/arm/mach-imx/mm-imx25.c                       |    4 +-
+ arch/arm/mach-imx/mm-imx31.c                       |    3 +-
+ arch/arm/mach-imx/mm-imx35.c                       |    3 +-
+ arch/arm/mach-mx5/board-mx51_babbage.c             |   14 +-
+ arch/arm/mach-mx5/board-mx53_loco.c                |    4 +
+ arch/arm/mach-mx5/clock-mx51-mx53.c                |   46 ++--
+ arch/arm/mach-mx5/mm.c                             |    8 +-
+ arch/arm/mach-mx5/mx51_efika.c                     |    4 +-
+ arch/arm/plat-mxc/devices/platform-fec.c           |   21 +-
+ arch/arm/plat-mxc/devices/platform-imx-dma.c       |    4 +-
+ arch/arm/plat-mxc/devices/platform-imx-uart.c      |    7 +-
+ .../plat-mxc/devices/platform-sdhci-esdhc-imx.c    |   29 ++-
+ arch/arm/plat-mxc/include/mach/devices-common.h    |    4 +-
+ arch/arm/plat-mxc/include/mach/dma.h               |    3 +-
+ arch/arm/plat-mxc/include/mach/esdhc.h             |   25 ++-
+ arch/arm/plat-mxc/include/mach/sdma.h              |    2 -
+ drivers/dma/imx-sdma.c                             |   94 ++++++--
+ drivers/mmc/host/sdhci-esdhc-imx.c                 |  261 +++++++++++++++-----
+ drivers/mmc/host/sdhci-pltfm.c                     |    3 +-
+ drivers/net/fec.c                                  |  125 +++++++++-
+ drivers/net/ibm_newemac/core.c                     |   33 +---
+ drivers/net/ibm_newemac/emac.h                     |   19 +-
+ drivers/net/ibm_newemac/phy.c                      |    7 +-
+ drivers/of/of_net.c                                |   45 ++++
+ drivers/tty/serial/imx.c                           |  166 +++++++++++--
+ include/linux/of_net.h                             |    1 +
+ include/linux/phy.h                                |    4 +-
+ 41 files changed, 861 insertions(+), 262 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/dma/fsl-imx-sdma.txt
+ create mode 100644 Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt
+ create mode 100644 Documentation/devicetree/bindings/net/fsl-fec.txt
+ create mode 100644 Documentation/devicetree/bindings/tty/serial/fsl-imx-uart.txt
