@@ -1,121 +1,148 @@
-From: B19295@freescale.com (Lin Tony-B19295)
-Date: Wed, 27 Jul 2011 08:16:34 +0000
-Subject: [PATCH v3 5/6] ARM: mxs: add usb phy operations
-In-Reply-To: <20110727080315.GN20587@pengutronix.de>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Wed, 27 Jul 2011 10:19:35 +0200
+Subject: [PATCH v3 4/6] ARM: mxs: make ehci-mxc more flexible to be used
+	on	different platforms
+In-Reply-To: <1311744574-3610-5-git-send-email-tony.lin@freescale.com>
 References: <1311744574-3610-1-git-send-email-tony.lin@freescale.com>
-	<1311744574-3610-6-git-send-email-tony.lin@freescale.com>
-	<20110727080315.GN20587@pengutronix.de>
-Message-ID: <97D3A72708D04647A5AC84A04996E5B5166A4B@039-SN1MPN1-006.039d.mgd.msft.net>
+	<1311744574-3610-5-git-send-email-tony.lin@freescale.com>
+Message-ID: <4E2FCA17.7010606@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Sascha Hauer [mailto:s.hauer at pengutronix.de]
-> Sent: Wednesday, July 27, 2011 4:03 PM
-> To: Lin Tony-B19295
-> Cc: linux-usb at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> stern at rowland.harvard.edu; koen.beel.barco at gmail.com
-> Subject: Re: [PATCH v3 5/6] ARM: mxs: add usb phy operations
+On 07/27/2011 07:29 AM, Tony Lin wrote:
+> change ehci_irq to mxc_ehci_irq to give chance do some platform specific
+> actions in irq handler for different platforms.
+> add void pointer in the last of mxc_usbh_platform_data structure so that
+> additional information could be added to that field if needed.
 > 
-> On Wed, Jul 27, 2011 at 01:29:33PM +0800, Tony Lin wrote:
-> > add usb phy register definitions and functions usb host driver will
-> > use these callback functions to initialize usb phy and change working
-> > mode
-> >
-> > Signed-off-by: Tony Lin <tony.lin@freescale.com>
-> > ---
-> >  arch/arm/mach-mxs/Kconfig           |    1 +
-> >  arch/arm/mach-mxs/Makefile          |    1 +
-> >  arch/arm/mach-mxs/mxs_usb.c         |  288
-> +++++++++++++++++++++++++++++++++++
-> >  arch/arm/mach-mxs/regs-usbphy-mxs.h |  240
-> > +++++++++++++++++++++++++++++
-> >  4 files changed, 530 insertions(+), 0 deletions(-)
-> >
-> > +}
-> > +static int fsl_usb_host_init(struct platform_device *pdev) {
-> > +	struct mxc_usbh_platform_data *pdata = pdev->dev.platform_data;
-> > +	struct mxs_usb_private_date *ppriv = pdata->ppriv;
-> > +
-> > +	ppriv->phy_regs = ioremap(MX28_USBPHY1_BASE_ADDR, SZ_8K);
-> > +	ppriv->ctrl_regs = ioremap(MX28_USBCTRL1_BASE_ADDR, SZ_8K);
+> Signed-off-by: Tony Lin <tony.lin@freescale.com>
+> ---
+>  arch/arm/mach-mxs/include/mach/hardware.h |    2 ++
+>  arch/arm/mach-mxs/include/mach/mxs.h      |   12 +++++++++++-
+>  drivers/usb/host/Kconfig                  |    2 +-
+>  drivers/usb/host/ehci-mxc.c               |   15 ++++++++++++++-
+>  include/linux/fsl_devices.h               |    2 ++
+>  5 files changed, 30 insertions(+), 3 deletions(-)
 > 
-> Did I mention that the i.MX28 has *two* USB controllers?
-> 
-Yes, i.MX28 has two USB, one is pure USB host, another is USB OTG.
-I hard code USB1 here just because we want another USB OTG to be a pure USB device.
-Anyway, I could make it more flexible in later patch. thanks
+> diff --git a/arch/arm/mach-mxs/include/mach/hardware.h b/arch/arm/mach-mxs/include/mach/hardware.h
+> index 53e89a0..affa72b 100644
+> --- a/arch/arm/mach-mxs/include/mach/hardware.h
+> +++ b/arch/arm/mach-mxs/include/mach/hardware.h
+> @@ -26,4 +26,6 @@
+>  #define IOMEM(addr)	((void __force __iomem *)(addr))
+>  #endif
+>  
+> +#include "mxs.h"
+> +
+>  #endif /* __MACH_MXS_HARDWARE_H__ */
+> diff --git a/arch/arm/mach-mxs/include/mach/mxs.h b/arch/arm/mach-mxs/include/mach/mxs.h
+> index 35a89dd..0661e90 100644
+> --- a/arch/arm/mach-mxs/include/mach/mxs.h
+> +++ b/arch/arm/mach-mxs/include/mach/mxs.h
+> @@ -35,7 +35,17 @@
+>  		machine_is_mx28evk() ||					\
+>  		machine_is_tx28() ||					\
+>  		0)
+> -
+> +#define cpu_is_mx1()		0
+> +#define cpu_is_mx21()		0
+> +#define cpu_is_mx25()		0
+> +#define cpu_is_mx27()		0
+> +#define cpu_is_mx31()		0
+> +#define cpu_is_mx35()		0
+> +#define cpu_is_mx50()		0
+> +#define cpu_is_mx51()		0
+> +#define cpu_is_mx53()		0
+> +#define cpu_is_mx3()		(cpu_is_mx31() || cpu_is_mx35())
+> +#define cpu_is_mx2()		(cpu_is_mx21() || cpu_is_mx27())
+>  /*
+>   * IO addresses common to MXS-based
+>   */
+> diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
+> index ab085f1..6a5905b 100644
+> --- a/drivers/usb/host/Kconfig
+> +++ b/drivers/usb/host/Kconfig
+> @@ -139,7 +139,7 @@ config USB_EHCI_FSL
+>  
+>  config USB_EHCI_MXC
+>  	bool "Support for Freescale on-chip EHCI USB controller"
+> -	depends on USB_EHCI_HCD && ARCH_MXC
+> +	depends on USB_EHCI_HCD && (ARCH_MXC || ARCH_MXS)
+>  	select USB_EHCI_ROOT_HUB_TT
+>  	---help---
+>  	  Variation of ARC USB block used in some Freescale chips.
+> diff --git a/drivers/usb/host/ehci-mxc.c b/drivers/usb/host/ehci-mxc.c
+> index cbf60a6..c93f9ae 100644
+> --- a/drivers/usb/host/ehci-mxc.c
+> +++ b/drivers/usb/host/ehci-mxc.c
+> @@ -64,6 +64,19 @@ static int ehci_mxc_setup(struct usb_hcd *hcd)
+>  	return 0;
+>  }
+>  
+> +static irqreturn_t mxc_ehci_irq(struct usb_hcd *hcd)
+> +{
+> +	struct mxc_usbh_platform_data *pdata;
+> +
+> +	pdata = hcd->self.controller->platform_data;
+> +	if (pdata->plt_irq_handler == NULL)
+> +		goto out;
+> +	pdata->plt_irq_handler(pdata);
+> +
+> +out:
+> +	return ehci_irq(hcd);
 
-> > +	if (!ppriv->phy_regs || !ppriv->ctrl_regs) {
-> > +		iounmap(ppriv->phy_regs);
-> > +		iounmap(ppriv->ctrl_regs);
-> > +		return -ENOMEM;
-> > +	}
-> 
-> So you call iounmap(0) here.
-> 
-Yes, iounmap will ignore NULL pointers, right?
+Writing it this way, the code would be shorter more readable:
+{
+	struct mxc_usbh_platform_data *pdata = hcd->self.controller->platform_data;
 
-> > +	ppriv->usb_clk = clk_get(&pdev->dev, "usb1");
-> > +	if (IS_ERR(ppriv->usb_clk)) {
-> > +		iounmap(ppriv->phy_regs);
-> > +		iounmap(ppriv->ctrl_regs);
-> > +		return PTR_ERR(ppriv->usb_clk);
-> 
-> In the kernel community we are not afraid of 'goto'.
-> 
-Ok. Will change it.
+	if (pdata->plt_irq_handler)
+		pdata->plt_irq_handler(pdata);
 
-> > +	}
-> > +	clk_enable(ppriv->usb_clk);
-> > +
-> > +	ppriv->usb_phy_clk = clk_get(&pdev->dev, "usb1_phy");
-> > +	if (IS_ERR(ppriv->usb_phy_clk)) {
-> > +		clk_disable(ppriv->usb_clk);
-> > +		clk_put(ppriv->usb_clk);
-> > +		iounmap(ppriv->phy_regs);
-> > +		iounmap(ppriv->ctrl_regs);
-> > +		return PTR_ERR(ppriv->usb_phy_clk);
-> > +	}
-> > +	clk_enable(ppriv->usb_phy_clk);
-> > +
-> > +	phy_clock_gate(ppriv, true);
-> > +	return fsl_usbh_init(pdev);
-> > +}
-> > +
-> > +static int fsl_usb_host_uninit(struct platform_device *pdev) {
-> > +	struct mxc_usbh_platform_data *pdata = pdev->dev.platform_data;
-> > +	struct mxs_usb_private_date *ppriv = pdata->ppriv;
-> > +
-> > +	phy_clock_gate(ppriv, false);
-> > +	clk_disable(ppriv->usb_phy_clk);
-> > +	clk_put(ppriv->usb_phy_clk);
-> > +	clk_disable(ppriv->usb_clk);
-> > +	clk_put(ppriv->usb_clk);
-> > +	iounmap(ppriv->phy_regs);
-> > +	iounmap(ppriv->ctrl_regs);
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static struct mxs_usb_private_date usbh_private = {
-> > +	.internal_phy_clk_already_on = 0,
-> > +};
-> 
-> unitialized fields in static initializers are zero anyway.
-> Remove all this ppriv crap. clk_enable/disable will do the reference
-> counting for you.
->
-Ok. Accepted. Thanks Sascha.
- 
-> Sascha
-> 
-> --
-> Pengutronix e.K.                           |
-> |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/
-> |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0
-> |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555
-> |
+	return ehci_irq(hcd);
+}
+> +}
+> +
+>  static const struct hc_driver ehci_mxc_hc_driver = {
+>  	.description = hcd_name,
+>  	.product_desc = "Freescale On-Chip EHCI Host Controller",
+> @@ -72,7 +85,7 @@ static const struct hc_driver ehci_mxc_hc_driver = {
+>  	/*
+>  	 * generic hardware linkage
+>  	 */
+> -	.irq = ehci_irq,
+> +	.irq = mxc_ehci_irq,
+>  	.flags = HCD_USB2 | HCD_MEMORY,
+>  
+>  	/*
+> diff --git a/include/linux/fsl_devices.h b/include/linux/fsl_devices.h
+> index cb19260..cf441e8 100644
+> --- a/include/linux/fsl_devices.h
+> +++ b/include/linux/fsl_devices.h
+> @@ -120,6 +120,8 @@ struct mxc_usbh_platform_data {
+>  
+>  	unsigned int		portsc;
+>  	struct otg_transceiver	*otg;
+> +	void (*plt_irq_handler)(struct mxc_usbh_platform_data *pdata);
+> +	void		*ppriv;
+
+In linux we don't prefix pointers with "p", so void *priv is referred.
+
+>  };
+>  
+>  struct spi_device;
+
+cheers, Marc
+
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 262 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110727/0f634249/attachment.sig>
