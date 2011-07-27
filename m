@@ -1,124 +1,98 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Wed, 27 Jul 2011 13:27:56 +0530
-Subject: [PATCH V4 06/14] ARM: SAMSUNG: Add common DMA operations
-In-Reply-To: <000401cc4c1c$71d63240$558296c0$%kim@samsung.com>
-References: <1311557312-26107-1-git-send-email-boojin.kim@samsung.com>
-	<1311557312-26107-7-git-send-email-boojin.kim@samsung.com>
-	<CABb+yY0nWLpdVGqTJPO2YwkGWiDw5tRjC2xn7Le0bO0ZNFHC_g@mail.gmail.com>
-	<003801cc4b77$51e9f3e0$f5bddba0$%kim@samsung.com>
-	<CABb+yY3shX+myCgO++rUQrFuT81cdhhf18398Wa-S=88UK3rkg@mail.gmail.com>
-	<000401cc4c1c$71d63240$558296c0$%kim@samsung.com>
-Message-ID: <CABb+yY2i1rnvqWTFQUnMSrX7_h9KHnNL9xPZ2aHv8hO5Y7j+uA@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 27 Jul 2011 10:03:15 +0200
+Subject: [PATCH v3 5/6] ARM: mxs: add usb phy operations
+In-Reply-To: <1311744574-3610-6-git-send-email-tony.lin@freescale.com>
+References: <1311744574-3610-1-git-send-email-tony.lin@freescale.com>
+	<1311744574-3610-6-git-send-email-tony.lin@freescale.com>
+Message-ID: <20110727080315.GN20587@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 27, 2011 at 10:47 AM, Boojin Kim <boojin.kim@samsung.com> wrote:
-> Jassi Brar wrote:
->> Sent: Wednesday, July 27, 2011 10:34 AM
->> To: Boojin Kim
->> Cc: linux-arm-kernel at lists.infradead.org; linux-samsung-
->> soc at vger.kernel.org; Vinod Koul; Dan Williams; Kukjin Kim; Grant
->> Likely; Mark Brown
->> Subject: Re: [PATCH V4 06/14] ARM: SAMSUNG: Add common DMA operations
->>
->> On Tue, Jul 26, 2011 at 3:05 PM, Boojin Kim <boojin.kim@samsung.com>
->> wrote:
->> > Jassi Brar Wrote:
->> >> Sent: Monday, July 25, 2011 8:52 PM
->> >> To: Boojin Kim
->> >> Cc: linux-arm-kernel at lists.infradead.org; linux-samsung-
->> >> soc at vger.kernel.org; Vinod Koul; Dan Williams; Kukjin Kim; Grant
->> >> Likely; Mark Brown
->> >> Subject: Re: [PATCH V4 06/14] ARM: SAMSUNG: Add common DMA
->> operations
->> >>
->> >> On Mon, Jul 25, 2011 at 6:58 AM, Boojin Kim
->> <boojin.kim@samsung.com>
->> >> wrote:
->> >>
->> >> > +
->> >> > +static bool pl330_filter(struct dma_chan *chan, void *param)
->> >> > +{
->> >> > + ? ? ? struct dma_pl330_peri *peri = (struct dma_pl330_peri
->> *)chan-
->> >> >private;
->> >> > + ? ? ? unsigned dma_ch = (unsigned)param;
->> >> > +
->> >> > + ? ? ? if (peri->peri_id != dma_ch)
->> >> > + ? ? ? ? ? ? ? return false;
->> >> > +
->> >> > + ? ? ? return true;
->> >> > +}
->> >> This is what I meant... if we keep chan_id for paltform assigned
->> IDs,
->> >> these filter functions could simply become
->> >>
->> >> static bool pl330_filter(struct dma_chan *chan, void *param)
->> >> {
->> >> ? ? ? ? return chan->chan_id == param
->> >> }
->> >>
->> >> And ideally in the long run, we could just drop the filter callback
->> >> and add expected channel ID to the request_channel call.
->> > The chan_id is set by dmaengine. So, We don't use it to hold the
->> user specific
->> > Id.
->> Not for long.
->> See ?https://lkml.org/lkml/2011/7/26/245
->>
->>
->> >> > +
->> >> > +static inline int s3c_dma_trigger(unsigned ch)
->> >> > +{
->> >> > + ? ? ? return s3c2410_dma_ctrl(ch, S3C2410_DMAOP_START);
->> >> > +}
->> >> > +
->> >> > +static inline int s3c_dma_started(unsigned ch)
->> >> > +{
->> >> > + ? ? ? return s3c2410_dma_ctrl(ch, S3C2410_DMAOP_STARTED);
->> >> > +}
->> >> > +
->> >> > +static inline int s3c_dma_flush(unsigned ch)
->> >> > +{
->> >> > + ? ? ? return s3c2410_dma_ctrl(ch, S3C2410_DMAOP_FLUSH);
->> >> > +}
->> >> > +
->> >> > +static inline int s3c_dma_stop(unsigned ch)
->> >> > +{
->> >> > + ? ? ? return s3c2410_dma_ctrl(ch, S3C2410_DMAOP_STOP);
->> >> > +}
->> >> > +
->> >> > +static struct samsung_dma_ops s3c_dma_ops = {
->> >> > + ? ? ? .request ? ? ? ?= s3c_dma_request,
->> >> > + ? ? ? .release ? ? ? ?= s3c_dma_release,
->> >> > + ? ? ? .prepare ? ? ? ?= s3c_dma_prepare,
->> >> > + ? ? ? .trigger ? ? ? ?= s3c_dma_trigger,
->> >> > + ? ? ? .started ? ? ? ?= s3c_dma_started,
->> >> > + ? ? ? .flush ? ? ? ? ?= s3c_dma_flush,
->> >> > + ? ? ? .stop ? ? ? ? ? = s3c_dma_stop,
->> >>
->> >> These last 4 should be gnereallized into one callback with OP
->> argument.
->> > I don't have any idea about it. Can you explain it in more detail?
->>
->> static int s3c_dma_control(unsigned ch, enum s3c2410_chan_op/*or
->> similar*/ op)
->> ?{
->> ? ? ? ? return s3c2410_dma_ctrl(ch, op);
->> ?}
->>
->> static struct samsung_dma_ops s3c_dma_ops = {
->> ? ? ? ? .request ? ? ? ?= s3c_dma_request,
->> ? ? ? ? .release ? ? ? ?= s3c_dma_release,
->> ? ? ? ? .prepare ? ? ? ?= s3c_dma_prepare,
->> ? ? ? ? .control ? ? ? ?= s3c_dma_control,
-> 'Struct samsung_dma_ops' is used for both 'S3C-DMA-OPS' for 's3c dma' and
-> 'DMA-OPS' for 'dmaengine'.
-> If I modify "Struct samsung_dma_ops" as your guide, It gives un-expectable
-> effect to DMA-OPS.
-> Actually, We don't want the client with 'DMA-OPS' uses 'enum s3c2410_chan_op'
-> operation anymore.
+On Wed, Jul 27, 2011 at 01:29:33PM +0800, Tony Lin wrote:
+> add usb phy register definitions and functions
+> usb host driver will use these callback functions
+> to initialize usb phy and change working mode
+> 
+> Signed-off-by: Tony Lin <tony.lin@freescale.com>
+> ---
+>  arch/arm/mach-mxs/Kconfig           |    1 +
+>  arch/arm/mach-mxs/Makefile          |    1 +
+>  arch/arm/mach-mxs/mxs_usb.c         |  288 +++++++++++++++++++++++++++++++++++
+>  arch/arm/mach-mxs/regs-usbphy-mxs.h |  240 +++++++++++++++++++++++++++++
+>  4 files changed, 530 insertions(+), 0 deletions(-)
+> 
+> +}
+> +static int fsl_usb_host_init(struct platform_device *pdev)
+> +{
+> +	struct mxc_usbh_platform_data *pdata = pdev->dev.platform_data;
+> +	struct mxs_usb_private_date *ppriv = pdata->ppriv;
+> +
+> +	ppriv->phy_regs = ioremap(MX28_USBPHY1_BASE_ADDR, SZ_8K);
+> +	ppriv->ctrl_regs = ioremap(MX28_USBCTRL1_BASE_ADDR, SZ_8K);
 
-" enum s3c2410_chan_op /* or similar */ "  <<<<  note 'or similar'
+Did I mention that the i.MX28 has *two* USB controllers?
 
-Defining a callback for each value of the argument doesn't make sense.
+> +	if (!ppriv->phy_regs || !ppriv->ctrl_regs) {
+> +		iounmap(ppriv->phy_regs);
+> +		iounmap(ppriv->ctrl_regs);
+> +		return -ENOMEM;
+> +	}
+
+So you call iounmap(0) here.
+
+> +	ppriv->usb_clk = clk_get(&pdev->dev, "usb1");
+> +	if (IS_ERR(ppriv->usb_clk)) {
+> +		iounmap(ppriv->phy_regs);
+> +		iounmap(ppriv->ctrl_regs);
+> +		return PTR_ERR(ppriv->usb_clk);
+
+In the kernel community we are not afraid of 'goto'.
+
+> +	}
+> +	clk_enable(ppriv->usb_clk);
+> +
+> +	ppriv->usb_phy_clk = clk_get(&pdev->dev, "usb1_phy");
+> +	if (IS_ERR(ppriv->usb_phy_clk)) {
+> +		clk_disable(ppriv->usb_clk);
+> +		clk_put(ppriv->usb_clk);
+> +		iounmap(ppriv->phy_regs);
+> +		iounmap(ppriv->ctrl_regs);
+> +		return PTR_ERR(ppriv->usb_phy_clk);
+> +	}
+> +	clk_enable(ppriv->usb_phy_clk);
+> +
+> +	phy_clock_gate(ppriv, true);
+> +	return fsl_usbh_init(pdev);
+> +}
+> +
+> +static int fsl_usb_host_uninit(struct platform_device *pdev)
+> +{
+> +	struct mxc_usbh_platform_data *pdata = pdev->dev.platform_data;
+> +	struct mxs_usb_private_date *ppriv = pdata->ppriv;
+> +
+> +	phy_clock_gate(ppriv, false);
+> +	clk_disable(ppriv->usb_phy_clk);
+> +	clk_put(ppriv->usb_phy_clk);
+> +	clk_disable(ppriv->usb_clk);
+> +	clk_put(ppriv->usb_clk);
+> +	iounmap(ppriv->phy_regs);
+> +	iounmap(ppriv->ctrl_regs);
+> +
+> +	return 0;
+> +}
+> +
+> +static struct mxs_usb_private_date usbh_private = {
+> +	.internal_phy_clk_already_on = 0,
+> +};
+
+unitialized fields in static initializers are zero anyway.
+Remove all this ppriv crap. clk_enable/disable will do the
+reference counting for you.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
