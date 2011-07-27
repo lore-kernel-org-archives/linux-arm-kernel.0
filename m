@@ -1,87 +1,38 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Wed, 27 Jul 2011 10:48:25 +0200
-Subject: [PATCH v3 5/6] ARM: mxs: add usb phy operations
-In-Reply-To: <1311744574-3610-6-git-send-email-tony.lin@freescale.com>
-References: <1311744574-3610-1-git-send-email-tony.lin@freescale.com>
-	<1311744574-3610-6-git-send-email-tony.lin@freescale.com>
-Message-ID: <20015.53465.485660.500080@ipc1.ka-ro>
+From: banajit.goswami@gmail.com (Banajit Goswami)
+Date: Wed, 27 Jul 2011 14:26:02 +0530
+Subject: [PATCH 0/8] ARM: SAMSUNG: Add common PWM Backlight support
+In-Reply-To: <j0logn$1bn$1@dough.gmane.org>
+References: <1310740968-26722-1-git-send-email-banajit.g@samsung.com>
+	<j0logn$1bn$1@dough.gmane.org>
+Message-ID: <CABK8_vRJG16jkSXOmQuDycSb6gZMHwX9vzTccaWS1-JCH1q4_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Dmitry,
 
-Tony Lin writes:
-> add usb phy register definitions and functions
-> usb host driver will use these callback functions
-> to initialize usb phy and change working mode
-> 
-> Signed-off-by: Tony Lin <tony.lin@freescale.com>
-> ---
->  arch/arm/mach-mxs/Kconfig           |    1 +
->  arch/arm/mach-mxs/Makefile          |    1 +
->  arch/arm/mach-mxs/mxs_usb.c         |  288 +++++++++++++++++++++++++++++++++++
->  arch/arm/mach-mxs/regs-usbphy-mxs.h |  240 +++++++++++++++++++++++++++++
->  4 files changed, 530 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
-> index 4cd0231..1c4264f 100644
-> --- a/arch/arm/mach-mxs/Kconfig
-> +++ b/arch/arm/mach-mxs/Kconfig
-> @@ -49,6 +49,7 @@ config MACH_MX28EVK
->  	select MXS_HAVE_PLATFORM_MXS_MMC
->  	select MXS_HAVE_PLATFORM_MXSFB
->  	select MXS_OCOTP
-> +	select USB_ARCH_HAS_EHCI
->  	help
->  	  Include support for MX28EVK platform. This includes specific
->  	  configurations for the board and its peripherals.
-> diff --git a/arch/arm/mach-mxs/Makefile b/arch/arm/mach-mxs/Makefile
-> index 6c38262..726c49f 100644
-> --- a/arch/arm/mach-mxs/Makefile
-> +++ b/arch/arm/mach-mxs/Makefile
-> @@ -12,5 +12,6 @@ obj-$(CONFIG_MACH_MX23EVK) += mach-mx23evk.o
->  obj-$(CONFIG_MACH_MX28EVK) += mach-mx28evk.o
->  obj-$(CONFIG_MODULE_TX28) += module-tx28.o
->  obj-$(CONFIG_MACH_TX28)    += mach-tx28.o
-> +obj-$(CONFIG_USB_EHCI_MXC)   += mxs_usb.o
->  
->  obj-y += devices/
-> diff --git a/arch/arm/mach-mxs/mxs_usb.c b/arch/arm/mach-mxs/mxs_usb.c
-> new file mode 100644
-> index 0000000..9acc611
-> --- /dev/null
-> +++ b/arch/arm/mach-mxs/mxs_usb.c
-[...]
-> +static struct mxs_usb_private_date usbh_private = {
-> +	.internal_phy_clk_already_on = 0,
-> +};
-> +
-> +static struct mxc_usbh_platform_data usbh_config = {
-> +	.init = fsl_usb_host_init,
-> +	.exit = fsl_usb_host_uninit,
-> +	.portsc = MXC_EHCI_MODE_ULPI,
-> +	.otg = NULL,
-> +	.plt_irq_handler = fsl_plt_usbh_irq_handler,
-> +	.ppriv = &usbh_private,
-        ^^^^^^^^^^^^^^^^^^^^^^^
-This is an abuse of the platform_data. platform_data is meant to
-convey platform specific information to a driver, not for drivers
-storing their internal state. It should be handled read-only by
-drivers.
-
-If you want to associate driver internal data with a platform_device
-you should use platform_set_drvdata()/platform_get_drvdata() to
-store/retrieve a pointer to the driver's internal data.
-
-
-Lothar Wa?mann
--- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+On Tue, Jul 26, 2011 at 12:27 PM, Dmitry Eremin-Solenikov
+<dbaryshkov@gmail.com> wrote:
+> Hello,
+>
+> On Fri, 15 Jul 2011 20:12:40 +0530, Banajit Goswami wrote:
+>
+>> The patches are created against "for-next" branch of Kukjin Kim's tree
+>> at:
+>> ?git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+>>
+>> ?Patch [1/8]
+>> ? -- add a common infrastructure to support PWM backlight for various
+>> ? ? ?Samsung boards.
+>
+> Why can't you use the drivers/video/backlight/pwm-bl.c ?
+These patches indeed use the drivers/video/backlight/pwm-bl.c driver (do not
+replace it), and provide board specific data from a common place.
+The patches are meant to avoid any duplicate code which might be needed
+for different Samsung boards.
+>
+> --
+> With best wishes
+> Dmitry
+>
+Thanks and Regards,
+Banajit
