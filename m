@@ -1,109 +1,124 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 27 Jul 2011 09:47:10 +0200
-Subject: [PATCH 1/1] fix card interrupt losing issue on freescale eSDHC
-In-Reply-To: <1310966402-12318-1-git-send-email-tony.lin@freescale.com>
-References: <1310966402-12318-1-git-send-email-tony.lin@freescale.com>
-Message-ID: <20110727074710.GS16561@pengutronix.de>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Wed, 27 Jul 2011 13:27:56 +0530
+Subject: [PATCH V4 06/14] ARM: SAMSUNG: Add common DMA operations
+In-Reply-To: <000401cc4c1c$71d63240$558296c0$%kim@samsung.com>
+References: <1311557312-26107-1-git-send-email-boojin.kim@samsung.com>
+	<1311557312-26107-7-git-send-email-boojin.kim@samsung.com>
+	<CABb+yY0nWLpdVGqTJPO2YwkGWiDw5tRjC2xn7Le0bO0ZNFHC_g@mail.gmail.com>
+	<003801cc4b77$51e9f3e0$f5bddba0$%kim@samsung.com>
+	<CABb+yY3shX+myCgO++rUQrFuT81cdhhf18398Wa-S=88UK3rkg@mail.gmail.com>
+	<000401cc4c1c$71d63240$558296c0$%kim@samsung.com>
+Message-ID: <CABb+yY2i1rnvqWTFQUnMSrX7_h9KHnNL9xPZ2aHv8hO5Y7j+uA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Tony,
+On Wed, Jul 27, 2011 at 10:47 AM, Boojin Kim <boojin.kim@samsung.com> wrote:
+> Jassi Brar wrote:
+>> Sent: Wednesday, July 27, 2011 10:34 AM
+>> To: Boojin Kim
+>> Cc: linux-arm-kernel at lists.infradead.org; linux-samsung-
+>> soc at vger.kernel.org; Vinod Koul; Dan Williams; Kukjin Kim; Grant
+>> Likely; Mark Brown
+>> Subject: Re: [PATCH V4 06/14] ARM: SAMSUNG: Add common DMA operations
+>>
+>> On Tue, Jul 26, 2011 at 3:05 PM, Boojin Kim <boojin.kim@samsung.com>
+>> wrote:
+>> > Jassi Brar Wrote:
+>> >> Sent: Monday, July 25, 2011 8:52 PM
+>> >> To: Boojin Kim
+>> >> Cc: linux-arm-kernel at lists.infradead.org; linux-samsung-
+>> >> soc at vger.kernel.org; Vinod Koul; Dan Williams; Kukjin Kim; Grant
+>> >> Likely; Mark Brown
+>> >> Subject: Re: [PATCH V4 06/14] ARM: SAMSUNG: Add common DMA
+>> operations
+>> >>
+>> >> On Mon, Jul 25, 2011 at 6:58 AM, Boojin Kim
+>> <boojin.kim@samsung.com>
+>> >> wrote:
+>> >>
+>> >> > +
+>> >> > +static bool pl330_filter(struct dma_chan *chan, void *param)
+>> >> > +{
+>> >> > + ? ? ? struct dma_pl330_peri *peri = (struct dma_pl330_peri
+>> *)chan-
+>> >> >private;
+>> >> > + ? ? ? unsigned dma_ch = (unsigned)param;
+>> >> > +
+>> >> > + ? ? ? if (peri->peri_id != dma_ch)
+>> >> > + ? ? ? ? ? ? ? return false;
+>> >> > +
+>> >> > + ? ? ? return true;
+>> >> > +}
+>> >> This is what I meant... if we keep chan_id for paltform assigned
+>> IDs,
+>> >> these filter functions could simply become
+>> >>
+>> >> static bool pl330_filter(struct dma_chan *chan, void *param)
+>> >> {
+>> >> ? ? ? ? return chan->chan_id == param
+>> >> }
+>> >>
+>> >> And ideally in the long run, we could just drop the filter callback
+>> >> and add expected channel ID to the request_channel call.
+>> > The chan_id is set by dmaengine. So, We don't use it to hold the
+>> user specific
+>> > Id.
+>> Not for long.
+>> See ?https://lkml.org/lkml/2011/7/26/245
+>>
+>>
+>> >> > +
+>> >> > +static inline int s3c_dma_trigger(unsigned ch)
+>> >> > +{
+>> >> > + ? ? ? return s3c2410_dma_ctrl(ch, S3C2410_DMAOP_START);
+>> >> > +}
+>> >> > +
+>> >> > +static inline int s3c_dma_started(unsigned ch)
+>> >> > +{
+>> >> > + ? ? ? return s3c2410_dma_ctrl(ch, S3C2410_DMAOP_STARTED);
+>> >> > +}
+>> >> > +
+>> >> > +static inline int s3c_dma_flush(unsigned ch)
+>> >> > +{
+>> >> > + ? ? ? return s3c2410_dma_ctrl(ch, S3C2410_DMAOP_FLUSH);
+>> >> > +}
+>> >> > +
+>> >> > +static inline int s3c_dma_stop(unsigned ch)
+>> >> > +{
+>> >> > + ? ? ? return s3c2410_dma_ctrl(ch, S3C2410_DMAOP_STOP);
+>> >> > +}
+>> >> > +
+>> >> > +static struct samsung_dma_ops s3c_dma_ops = {
+>> >> > + ? ? ? .request ? ? ? ?= s3c_dma_request,
+>> >> > + ? ? ? .release ? ? ? ?= s3c_dma_release,
+>> >> > + ? ? ? .prepare ? ? ? ?= s3c_dma_prepare,
+>> >> > + ? ? ? .trigger ? ? ? ?= s3c_dma_trigger,
+>> >> > + ? ? ? .started ? ? ? ?= s3c_dma_started,
+>> >> > + ? ? ? .flush ? ? ? ? ?= s3c_dma_flush,
+>> >> > + ? ? ? .stop ? ? ? ? ? = s3c_dma_stop,
+>> >>
+>> >> These last 4 should be gnereallized into one callback with OP
+>> argument.
+>> > I don't have any idea about it. Can you explain it in more detail?
+>>
+>> static int s3c_dma_control(unsigned ch, enum s3c2410_chan_op/*or
+>> similar*/ op)
+>> ?{
+>> ? ? ? ? return s3c2410_dma_ctrl(ch, op);
+>> ?}
+>>
+>> static struct samsung_dma_ops s3c_dma_ops = {
+>> ? ? ? ? .request ? ? ? ?= s3c_dma_request,
+>> ? ? ? ? .release ? ? ? ?= s3c_dma_release,
+>> ? ? ? ? .prepare ? ? ? ?= s3c_dma_prepare,
+>> ? ? ? ? .control ? ? ? ?= s3c_dma_control,
+> 'Struct samsung_dma_ops' is used for both 'S3C-DMA-OPS' for 's3c dma' and
+> 'DMA-OPS' for 'dmaengine'.
+> If I modify "Struct samsung_dma_ops" as your guide, It gives un-expectable
+> effect to DMA-OPS.
+> Actually, We don't want the client with 'DMA-OPS' uses 'enum s3c2410_chan_op'
+> operation anymore.
 
-On Mon, Jul 18, 2011 at 01:20:02PM +0800, Tony Lin wrote:
-> apply workaround for imx eSDHC controller to avoid
-> missing card interrupt so that SDIO function is workable
-Fixing a few typos (but note, I'm not a native speaker):
+" enum s3c2410_chan_op /* or similar */ "  <<<<  note 'or similar'
 
-	mmc/sdhci-esdhc-imx: fix losing card interrupt
-
-	Apply workaround for the imx eSDHC controller to avoid missing a
-	card interrupt.
-
-	Signed-off-by: ...
-
-> Signed-off-by: Tony Lin <tony.lin@freescale.com>
-> ---
->  drivers/mmc/host/sdhci-esdhc-imx.c |   39 +++++++++++++++++++++++++++--------
->  1 files changed, 30 insertions(+), 9 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-> index a19967d..da77cae 100644
-> --- a/drivers/mmc/host/sdhci-esdhc-imx.c
-> +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-> @@ -32,6 +32,8 @@
->  #define  SDHCI_VENDOR_SPEC_SDIO_QUIRK	0x00000002
->  
->  #define ESDHC_FLAG_GPIO_FOR_CD_WP	(1 << 0)
-> +
-> +#define	SDHCI_CTRL_D3CD			0x08
->  /*
->   * The CMDTYPE of the CMD register (offset 0xE) should be set to
->   * "11" when the STOP CMD12 is issued on imx53 to abort one
-> @@ -87,14 +89,31 @@ static void esdhc_writel_le(struct sdhci_host *host, u32 val, int reg)
->  {
->  	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
->  	struct pltfm_imx_data *imx_data = pltfm_host->priv;
-> -
-> -	if (unlikely((reg == SDHCI_INT_ENABLE || reg == SDHCI_SIGNAL_ENABLE)
-> -			&& (imx_data->flags & ESDHC_FLAG_GPIO_FOR_CD_WP)))
-> -		/*
-> -		 * these interrupts won't work with a custom card_detect gpio
-> -		 * (only applied to mx25/35)
-> -		 */
-> -		val &= ~(SDHCI_INT_CARD_REMOVE | SDHCI_INT_CARD_INSERT);
-> +	u32 data;
-> +
-> +	if (unlikely((reg == SDHCI_INT_ENABLE || reg == SDHCI_SIGNAL_ENABLE))) {
-> +		if (imx_data->flags & ESDHC_FLAG_GPIO_FOR_CD_WP)
-> +			/*
-> +			 * these interrupts won't work with a custom
-> +			 * card_detect gpio (only applied to mx25/35)
-hmm, ok, this was here before, but I wonder about the "only applied to
-mx25/35" part. How is that meant? I don't see logic to prevent other
-socs using this workaround.
-
-> +			 */
-> +			val &= ~(SDHCI_INT_CARD_REMOVE | \
-> +				SDHCI_INT_CARD_INSERT);
-> +
-> +		if (val & SDHCI_INT_CARD_INT) {
-> +			/*
-> +			 * clear D3CD bit and set D3CD bit to avoid
-> +			 * missing card interrupt
-> +			 * this is a eSDHC controller problem so that
-> +			 * we need to apply following workaround
-s/following/this/ ? If not, according to my (non-native) English you
-need to add a "the" before "following".
-
-> +			 */
-> +			data = readl(host->ioaddr + SDHCI_HOST_CONTROL);
-> +			data &= ~SDHCI_CTRL_D3CD;
-> +			writel(data, host->ioaddr + SDHCI_HOST_CONTROL);
-> +			data |= SDHCI_CTRL_D3CD;
-> +			writel(data, host->ioaddr + SDHCI_HOST_CONTROL);
-Is there some Documentation about this problem? If yes, maybe add a link
-to it? Alternatively describe the problem more exact in a comment
-please.
-
-> +		}
-> +	}
->  
->  	if (unlikely((imx_data->flags & ESDHC_FLAG_MULTIBLK_NO_INT)
->  				&& (reg == SDHCI_INT_STATUS)
-> @@ -165,7 +184,9 @@ static void esdhc_writeb_le(struct sdhci_host *host, u8 val, int reg)
->  		return;
->  	case SDHCI_HOST_CONTROL:
->  		/* FSL messed up here, so we can just keep those two */
-> -		new_val = val & (SDHCI_CTRL_LED | SDHCI_CTRL_4BITBUS);
-> +		new_val = val & (SDHCI_CTRL_LED | \
-> +				SDHCI_CTRL_4BITBUS | \
-> +				SDHCI_CTRL_D3CD);
-This makes the comment wrong---now there are three bits that can be
-preserved.
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Defining a callback for each value of the argument doesn't make sense.
