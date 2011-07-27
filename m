@@ -1,95 +1,60 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Wed, 27 Jul 2011 07:03:36 +0530
-Subject: [PATCH V4 06/14] ARM: SAMSUNG: Add common DMA operations
-In-Reply-To: <003801cc4b77$51e9f3e0$f5bddba0$%kim@samsung.com>
-References: <1311557312-26107-1-git-send-email-boojin.kim@samsung.com>
-	<1311557312-26107-7-git-send-email-boojin.kim@samsung.com>
-	<CABb+yY0nWLpdVGqTJPO2YwkGWiDw5tRjC2xn7Le0bO0ZNFHC_g@mail.gmail.com>
-	<003801cc4b77$51e9f3e0$f5bddba0$%kim@samsung.com>
-Message-ID: <CABb+yY3shX+myCgO++rUQrFuT81cdhhf18398Wa-S=88UK3rkg@mail.gmail.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Wed, 27 Jul 2011 09:47:37 +0800
+Subject: [RFC] ARM Subarchitecture group maintainership
+In-Reply-To: <4E2F0176.1080403@codeaurora.org>
+References: <201105181047.17309.arnd@arndb.de>
+	<4E2F0176.1080403@codeaurora.org>
+Message-ID: <CAGsJ_4wKdgSD1vEn5LeTnWjWWUcprMxsBV3NPgywqBbSsnVXiw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 26, 2011 at 3:05 PM, Boojin Kim <boojin.kim@samsung.com> wrote:
-> Jassi Brar Wrote:
->> Sent: Monday, July 25, 2011 8:52 PM
->> To: Boojin Kim
->> Cc: linux-arm-kernel at lists.infradead.org; linux-samsung-
->> soc at vger.kernel.org; Vinod Koul; Dan Williams; Kukjin Kim; Grant
->> Likely; Mark Brown
->> Subject: Re: [PATCH V4 06/14] ARM: SAMSUNG: Add common DMA operations
+2011/7/27 Stephen Boyd <sboyd@codeaurora.org>:
+> On 05/18/2011 01:47 AM, Arnd Bergmann wrote:
+>> This is the draft plan for maintaining the ARM subarchitectures in a common
+>> tree, as a way to help coordinate the upstream merging of the
+>> arch/arm/{plat,mach}-* changes into Linus' tree.
 >>
->> On Mon, Jul 25, 2011 at 6:58 AM, Boojin Kim <boojin.kim@samsung.com>
->> wrote:
+> [snip]
+>> diff --git a/MAINTAINERS b/MAINTAINERS
+>> index 8fce5e6..942d052 100644
+>> --- a/MAINTAINERS
+>> +++ b/MAINTAINERS
+>> @@ -630,6 +630,17 @@ S: ? ? ? Maintained
+>> ?F: ? drivers/amba/
+>> ?F: ? include/linux/amba/bus.h
 >>
->> > +
->> > +static bool pl330_filter(struct dma_chan *chan, void *param)
->> > +{
->> > + ? ? ? struct dma_pl330_peri *peri = (struct dma_pl330_peri *)chan-
->> >private;
->> > + ? ? ? unsigned dma_ch = (unsigned)param;
->> > +
->> > + ? ? ? if (peri->peri_id != dma_ch)
->> > + ? ? ? ? ? ? ? return false;
->> > +
->> > + ? ? ? return true;
->> > +}
->> This is what I meant... if we keep chan_id for paltform assigned IDs,
->> these filter functions could simply become
+>> +ARM SUBARCHITECTURES
+>> +M: ? Arnd Bergmann <arnd@arndb.de>
+>> +M: ? Nicolas Pitre <nico@fluxnic.net>
+>> +M: ? Thomas Gleixner <tglx@linutronix.de>
+>> +M: ? arm at kernel.org
+>> +L: ? linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+>> +S: ? MAINTAINED
+>> +F: ? arch/arm/mach-*/
+>> +F: ? arch/arm/plat-*/
+>> +T: ? git git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-subarch.git
+>> +
+>> ?ARM/ADI ROADRUNNER MACHINE SUPPORT
+>> ?M: ? Lennert Buytenhek <kernel@wantstofly.org>
+>> ?L: ? linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
 >>
->> static bool pl330_filter(struct dma_chan *chan, void *param)
->> {
->> ? ? ? ? return chan->chan_id == param
->> }
->>
->> And ideally in the long run, we could just drop the filter callback
->> and add expected channel ID to the request_channel call.
-> The chan_id is set by dmaengine. So, We don't use it to hold the user specific
-> Id.
-Not for long.
-See  https://lkml.org/lkml/2011/7/26/245
+>
+> Is this patch (or something similar) going to be merged now that the ARM
+> SoC tree is up and running? Also, is the arm at kernel.org alias working?
 
+yes. arm soc tree has been working and 3.1 window has pulled from Arnd
+several times.
 
->> > +
->> > +static inline int s3c_dma_trigger(unsigned ch)
->> > +{
->> > + ? ? ? return s3c2410_dma_ctrl(ch, S3C2410_DMAOP_START);
->> > +}
->> > +
->> > +static inline int s3c_dma_started(unsigned ch)
->> > +{
->> > + ? ? ? return s3c2410_dma_ctrl(ch, S3C2410_DMAOP_STARTED);
->> > +}
->> > +
->> > +static inline int s3c_dma_flush(unsigned ch)
->> > +{
->> > + ? ? ? return s3c2410_dma_ctrl(ch, S3C2410_DMAOP_FLUSH);
->> > +}
->> > +
->> > +static inline int s3c_dma_stop(unsigned ch)
->> > +{
->> > + ? ? ? return s3c2410_dma_ctrl(ch, S3C2410_DMAOP_STOP);
->> > +}
->> > +
->> > +static struct samsung_dma_ops s3c_dma_ops = {
->> > + ? ? ? .request ? ? ? ?= s3c_dma_request,
->> > + ? ? ? .release ? ? ? ?= s3c_dma_release,
->> > + ? ? ? .prepare ? ? ? ?= s3c_dma_prepare,
->> > + ? ? ? .trigger ? ? ? ?= s3c_dma_trigger,
->> > + ? ? ? .started ? ? ? ?= s3c_dma_started,
->> > + ? ? ? .flush ? ? ? ? ?= s3c_dma_flush,
->> > + ? ? ? .stop ? ? ? ? ? = s3c_dma_stop,
->>
->> These last 4 should be gnereallized into one callback with OP argument.
-> I don't have any idea about it. Can you explain it in more detail?
+http://git.kernel.org/?p=linux/kernel/git/arm/linux-arm-soc.git;a=summary
 
-static int s3c_dma_control(unsigned ch, enum s3c2410_chan_op/*or similar*/ op)
- {
-        return s3c2410_dma_ctrl(ch, op);
- }
-
-static struct samsung_dma_ops s3c_dma_ops = {
-        .request        = s3c_dma_request,
-        .release        = s3c_dma_release,
-        .prepare        = s3c_dma_prepare,
-        .control        = s3c_dma_control,
+>
+> --
+> Sent by an employee of the Qualcomm Innovation Center, Inc.
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
