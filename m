@@ -1,48 +1,42 @@
-From: khilman@ti.com (Hilman, Kevin)
-Date: Wed, 27 Jul 2011 14:45:33 -0700
-Subject: [RFC/PATCH 0/7] decouple platform_device from omap_device
-In-Reply-To: <20110727140457.GA8558@manju-desktop>
-References: <1311292338-11830-1-git-send-email-khilman@ti.com>
-	<20110727140457.GA8558@manju-desktop>
-Message-ID: <CALyTGODe8r9zr4fA+AX=-XhpLjNXKtfHzxFUWMNSehDawEDMBA@mail.gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Thu, 28 Jul 2011 01:34:52 +0200
+Subject: [PULL] at91 init factorize
+In-Reply-To: <201107271647.44015.arnd@arndb.de>
+References: <20110727121156.GK10037@game.jcrosoft.org>
+	<201107271647.44015.arnd@arndb.de>
+Message-ID: <20110727233452.GN10037@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Manjunath,
+On 16:47 Wed 27 Jul     , Arnd Bergmann wrote:
+> On Wednesday 27 July 2011, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> >         This patch series factorize the init of the at91 soc and start the
+> >         work to make the at91 capable to choose the soc at runtime instead of
+> >         compile time.
+> > 
+> >         The next work will be to factorize the device resource registration
+> >         and then switch to the device tree
+> > 
+> >         please pull
+> > 
+> > The following changes since commit e371d46ae45488bcb112a99a7de462e9e3aa6764:
+> > 
+> >   Merge branch 'for-linus' of git://git.kernel.org/pub/scm/linux/kernel/git/viro/vfs-2.6 (2011-07-26 18:30:20 -0700)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://github.com/at91linux/linux-2.6-at91.git j/soc-detect
+> 
+> The patches look good, but come at an inconvenient time. We're still
+> in the merge window, so I don't want to add stuff to linux-next yet
+> that is destined for 3.2, and I have already sent out all the arm-soc
+> patches for the 3.1 merge window, so I don't really want to send another
+> round of patches at the last minute.
+this are waiting ofr 2 release already
 
-On Wed, Jul 27, 2011 at 7:04 AM, G, Manjunath Kondaiah <manjugk@ti.com> wrote:
-> Kevin,
->
-> On Thu, Jul 21, 2011 at 04:52:10PM -0700, Kevin Hilman wrote:
->> Here's a first whack, proof-of-concept on how we could start to
->> decouple the platform_device from an omap_device.
->>
->> The main RFC is in the last patch, and everything leading up to it are
->> misc. omap_device cleanups that make the last patch cleaner and
->> clearer. ?It's really the last patch that does the decoupling.
->>
->> This will be necessary if we're going to decouple the platform_device
->> creation from the omap_device/omap_hwmod creation etc. ?This patch
->> leaves them both done in omap_device_build(), but shows that they can
->> be decoupled.
-> Can you pls mention baseline used for these patches? I tried applying on
-> latest mainline, v3.0 and ?git://git.pwsan.com/linux-2.6 prcm-devel-3.1
+and was inthe next last release for more than 1 month
 
-Oops, sorry.  I forgot to mention it.
+can we have them merge this time
 
-Due to some misc. dependencies (mainly on Beagle board file), I've
-temporarily based it on the for-next branch of the arm-soc tree[1]
-since that has everything already queued for the next merge window. I
-also based it on the omap_device patch I posted which changes the pr_*
-prints to dev_*.
-
-For convenience, I've pushed this series to the 'wip/od-devres' branch
-of my tree[2].
-
-Sorry for the confusion,
-
-Kevin
-
-[1] git://git.kernel.org/pub/scm/linux/kernel/git/arm/linux-arm-soc.git
-
-[2] git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git
+Best Regards,
+J.
