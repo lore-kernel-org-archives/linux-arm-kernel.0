@@ -1,60 +1,87 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 27 Jul 2011 10:01:07 +0100
-Subject: [PATCH] Improve slave/cyclic DMA engine documentation (was:
-	[PATCH V4 04/14] DMA: PL330: Add DMA_CYCLIC capability)
-In-Reply-To: <1311672933.24316.1.camel@vkoul-mobl4>
-References: <20110725092749.GB9653@n2100.arm.linux.org.uk>
-	<002001cc4ab6$0d7cd590$287680b0$%kim@samsung.com>
-	<20110725103629.GF9653@n2100.arm.linux.org.uk>
-	<1311590884.29703.2.camel@vkoul-mobl4>
-	<20110725105754.GG9653@n2100.arm.linux.org.uk>
-	<1311591717.29703.7.camel@vkoul-mobl4>
-	<20110725113926.GH9653@n2100.arm.linux.org.uk>
-	<1311595303.29703.31.camel@vkoul-mobl4>
-	<20110726075720.GL9653@n2100.arm.linux.org.uk>
-	<1311672933.24316.1.camel@vkoul-mobl4>
-Message-ID: <20110727090107.GC21584@n2100.arm.linux.org.uk>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Wed, 27 Jul 2011 11:01:50 +0200
+Subject: [PATCH v3 0/6] ARM: mx28: add usb host function
+In-Reply-To: <1311744574-3610-1-git-send-email-tony.lin@freescale.com>
+References: <1311744574-3610-1-git-send-email-tony.lin@freescale.com>
+Message-ID: <4E2FD3FE.5080100@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 26, 2011 at 03:05:33PM +0530, Vinod Koul wrote:
-> On Tue, 2011-07-26 at 08:57 +0100, Russell King - ARM Linux wrote:
-> > Here's an updated patch.
-> > 
-> > 8<----------
-> > From: Russell King <rmk+kernel@arm.linux.org.uk>
-> > DMAEngine: Improve slave/cyclic documentation
-> > 
-> > Improve the documentation for the slave and cyclic DMA engine support
-> > reformatting it for easier reading, adding further APIs, splitting it
-> > into five steps, and including references to the documentation in
-> > dmaengine.h.
-> > 
-> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > ---
-> >  Documentation/dmaengine.txt |  211 ++++++++++++++++++++++++++++++-------------
-> >  1 files changed, 146 insertions(+), 65 deletions(-)
-> > 
-> > diff --git a/Documentation/dmaengine.txt b/Documentation/dmaengine.txt
-> > index 5a0cb1e..8c2e888 100644
-> > --- a/Documentation/dmaengine.txt
-> > +++ b/Documentation/dmaengine.txt
-> > @@ -10,87 +10,168 @@
-> >  Below is a guide to device driver writers on how to use the Slave-DMA API of the
-> >  DMA Engine. This is applicable only for slave DMA usage only.
-> >  
-> > -The slave DMA usage consists of following steps
-> > +The slave DMA usage consists of following steps:
-> >  1. Allocate a DMA slave channel
-> >  2. Set slave and controller specific parameters
-> >  3. Get a descriptor for transaction
-> >  4. Submit the transaction and wait for callback notification
-> > +5. Issue pending requests
-> Thanks Russell,
+On 07/27/2011 07:29 AM, Tony Lin wrote:
+> this patch series is to add mx28 usb host function.
+> the driver only support usb host mode on usb port1.
+> the driver reuses ehci-mxc.c under usb/host, but add
+> platform irq handler routines if platform wants to 
+> do something specific in irq handler.
+> the patch also consolidates some macro definitions
+> and structure definitions to make ehci-mxc.c better
+> reusable among mxs/mxc platforms.
 > 
-> Applied with change to 4 above. Moved "and wait for callback
-> notification" to 5.
+> Code is based on the branch for-next in sascha's tree http://git.pengutronix.de/git/imx/linux-2.6.git
+> 
+> Tested on MX28 EVK.
+> 
+> changes since v2:
+>  * add error condition clean up code.
+>  * remove unnecessary initial code.
+>  * change file name from regs-usbphy-mx28 to regs-usbphy-mxs.h.
+> 
+> changes since v1:
+>  * add dummy clock to avoid adding cpu judgement in driver for Sascha's request.
 
-BTW, did you apply this one or the later one with the improved
-documentation for dma mapping and fixed interface for slave
-transfers etc. ?
+What about providing dummy clock definitions to the mxc's that don't
+have the clocks, too. This way you can remove all the cpu_is from
+"drivers/usb/host/ehci-mxc.c". You don't have to add all cpu_is_mx* to
+your "arch/arm/mach-mxs/include/mach/mxs.h".
+
+>  * use context in phy functions, so that usb device could share the code.
+>  * some code consolidation and patch reorgnization.
+>  * error checking improvement.
+>  * remove a few unneccesary code.
+> 
+> Tony Lin (6):
+>   ARM: mxs: ehci: consolidate definitions and structures to share among platforms
+>   ARM: mxs: enable usb1 phy power supply
+>   ARM: mxs: add usb clocks to clock tree
+>   ARM: mxs: make ehci-mxc more flexible to be used on different platforms
+>   ARM: mxs: add usb phy operations
+>   ARM: mxs: add usb host function to default config
+> 
+>  arch/arm/configs/mxs_defconfig            |    8 +-
+>  arch/arm/mach-mxs/Kconfig                 |    1 +
+>  arch/arm/mach-mxs/Makefile                |    1 +
+>  arch/arm/mach-mxs/clock-mx28.c            |   16 ++-
+>  arch/arm/mach-mxs/include/mach/hardware.h |    2 +
+>  arch/arm/mach-mxs/include/mach/mxs.h      |   12 +-
+>  arch/arm/mach-mxs/mach-mx28evk.c          |    8 +
+>  arch/arm/mach-mxs/mxs_usb.c               |  288 +++++++++++++++++++++++++++++
+>  arch/arm/mach-mxs/regs-usbphy-mxs.h       |  240 ++++++++++++++++++++++++
+>  arch/arm/plat-mxc/include/mach/mxc_ehci.h |   19 --
+>  drivers/usb/host/Kconfig                  |    2 +-
+>  drivers/usb/host/ehci-mxc.c               |   19 ++-
+>  include/linux/fsl_devices.h               |   21 ++
+>  13 files changed, 609 insertions(+), 28 deletions(-)
+>  create mode 100644 arch/arm/mach-mxs/mxs_usb.c
+>  create mode 100644 arch/arm/mach-mxs/regs-usbphy-mxs.h
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+cheers, Marc
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 262 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110727/5105717c/attachment.sig>
