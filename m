@@ -1,55 +1,48 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Wed, 27 Jul 2011 16:42:40 -0400 (EDT)
-Subject: [PATCH] usb/ehci-mxc: add missing inclusion of mach/hardware.h
-In-Reply-To: <20110727020951.GF19600@S2100-06.ap.freescale.net>
-Message-ID: <Pine.LNX.4.44L0.1107271641200.2738-100000@iolanthe.rowland.org>
+From: khilman@ti.com (Hilman, Kevin)
+Date: Wed, 27 Jul 2011 14:45:33 -0700
+Subject: [RFC/PATCH 0/7] decouple platform_device from omap_device
+In-Reply-To: <20110727140457.GA8558@manju-desktop>
+References: <1311292338-11830-1-git-send-email-khilman@ti.com>
+	<20110727140457.GA8558@manju-desktop>
+Message-ID: <CALyTGODe8r9zr4fA+AX=-XhpLjNXKtfHzxFUWMNSehDawEDMBA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 27 Jul 2011, Shawn Guo wrote:
+Hi Manjunath,
 
-> Hi Alan,
-> 
-> Linus tree is currently failing on i.mx build because of this.
+On Wed, Jul 27, 2011 at 7:04 AM, G, Manjunath Kondaiah <manjugk@ti.com> wrote:
+> Kevin,
+>
+> On Thu, Jul 21, 2011 at 04:52:10PM -0700, Kevin Hilman wrote:
+>> Here's a first whack, proof-of-concept on how we could start to
+>> decouple the platform_device from an omap_device.
+>>
+>> The main RFC is in the last patch, and everything leading up to it are
+>> misc. omap_device cleanups that make the last patch cleaner and
+>> clearer. ?It's really the last patch that does the decoupling.
+>>
+>> This will be necessary if we're going to decouple the platform_device
+>> creation from the omap_device/omap_hwmod creation etc. ?This patch
+>> leaves them both done in omap_device_build(), but shows that they can
+>> be decoupled.
+> Can you pls mention baseline used for these patches? I tried applying on
+> latest mainline, v3.0 and ?git://git.pwsan.com/linux-2.6 prcm-devel-3.1
 
-Greg KH is the USB maintainer.  He's on vacation right now, but he'll
-merge your patch when he has a chance.
+Oops, sorry.  I forgot to mention it.
 
-Alan Stern
+Due to some misc. dependencies (mainly on Beagle board file), I've
+temporarily based it on the for-next branch of the arm-soc tree[1]
+since that has everything already queued for the next merge window. I
+also based it on the omap_device patch I posted which changes the pr_*
+prints to dev_*.
 
-> Regards,
-> Shawn
-> 
-> On Thu, Jul 21, 2011 at 10:24:10PM +0800, Shawn Guo wrote:
-> > As cpu_is_mx stuff is being used in the driver, header mach/hardware.h
-> > should be explicitly included.
-> > 
-> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > ---
-> > The missing of the header is causing today's linux-next build error
-> > as bleow.
-> > 
-> >   CC      drivers/usb/host/ehci-hcd.o
-> > In file included from linux-next/drivers/usb/host/ehci-hcd.c:1190:0:
-> > linux-next/drivers/usb/host/ehci-mxc.c: In function 'ehci_mxc_drv_probe':
-> > linux-next/drivers/usb/host/ehci-mxc.c:175:2: error: implicit declaration of function 'cpu_is_mx35'
-> > linux-next/drivers/usb/host/ehci-mxc.c:175:2: error: implicit declaration of function 'cpu_is_mx25'
-> > linux-next/drivers/usb/host/ehci-mxc.c:185:2: error: implicit declaration of function 'cpu_is_mx51'
-> > 
-> >  drivers/usb/host/ehci-mxc.c |    1 +
-> >  1 files changed, 1 insertions(+), 0 deletions(-)
-> > 
-> > diff --git a/drivers/usb/host/ehci-mxc.c b/drivers/usb/host/ehci-mxc.c
-> > index 0c058be..555a73c 100644
-> > --- a/drivers/usb/host/ehci-mxc.c
-> > +++ b/drivers/usb/host/ehci-mxc.c
-> > @@ -24,6 +24,7 @@
-> >  #include <linux/usb/ulpi.h>
-> >  #include <linux/slab.h>
-> >  
-> > +#include <mach/hardware.h>
-> >  #include <mach/mxc_ehci.h>
-> >  
-> >  #include <asm/mach-types.h>
-> > -- 
-> > 1.7.4.1
+For convenience, I've pushed this series to the 'wip/od-devres' branch
+of my tree[2].
+
+Sorry for the confusion,
+
+Kevin
+
+[1] git://git.kernel.org/pub/scm/linux/kernel/git/arm/linux-arm-soc.git
+
+[2] git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git
