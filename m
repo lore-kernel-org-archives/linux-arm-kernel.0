@@ -1,29 +1,34 @@
-From: manjugk@ti.com (G, Manjunath Kondaiah)
-Date: Wed, 27 Jul 2011 19:34:57 +0530
-Subject: [RFC/PATCH 0/7] decouple platform_device from omap_device
-In-Reply-To: <1311292338-11830-1-git-send-email-khilman@ti.com>
-References: <1311292338-11830-1-git-send-email-khilman@ti.com>
-Message-ID: <20110727140457.GA8558@manju-desktop>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 27 Jul 2011 10:10:46 -0400 (EDT)
+Subject: [PATCH v2] ARM: alignment: Prevent ignoring of faults with ARMv6
+	unaligned access model
+In-Reply-To: <20110727094359.GA2171@arm.com>
+References: <1311689651-7372-1-git-send-email-dave.martin@linaro.org>
+	<alpine.LFD.2.00.1107261723040.12766@xanadu.home>
+	<20110727094359.GA2171@arm.com>
+Message-ID: <alpine.LFD.2.00.1107271009580.12766@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kevin,
+On Wed, 27 Jul 2011, Dave Martin wrote:
 
-On Thu, Jul 21, 2011 at 04:52:10PM -0700, Kevin Hilman wrote:
-> Here's a first whack, proof-of-concept on how we could start to
-> decouple the platform_device from an omap_device.
+> On Tue, Jul 26, 2011 at 05:28:57PM -0400, Nicolas Pitre wrote:
+> > Why not clearing the U bit as well as the A bit to preserve consistency 
+> > with the pre ARMv6 behavior?
 > 
-> The main RFC is in the last patch, and everything leading up to it are
-> misc. omap_device cleanups that make the last patch cleaner and
-> clearer.  It's really the last patch that does the decoupling.
+> The old unaligned access behaviour is deprecated in ARMv6 (I believe)
+> and is not supported at all in ARMv7 -- i.e., you can't turn the U bit
+> off.  So this would be an additional special behaviour for ARMv6 only.
 > 
-> This will be necessary if we're going to decouple the platform_device
-> creation from the omap_device/omap_hwmod creation etc.  This patch
-> leaves them both done in omap_device_build(), but shows that they can
-> be decoupled.
-Can you pls mention baseline used for these patches? I tried applying on
-latest mainline, v3.0 and  git://git.pwsan.com/linux-2.6 prcm-devel-3.1
+> I'm not sure that introducing yet another behaviour is useful here;
+> anyone with legacy userspace software relying on the old unaligned
+> access model presumably fixed it years ago.
+> 
+> Really, the patch was just intended resolve the inconsistency where
+> the policy the kernel enforces for the alignment fixup mode on bootup
+> is not enforced at run-time.
 
-It will not apply cleanly.
+OK, that makes sense then.
 
--M
+
+Nicolas
