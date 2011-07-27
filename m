@@ -1,64 +1,64 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Wed, 27 Jul 2011 13:10:36 +0100
-Subject: [PATCH v2] ARM: alignment: Make SIGBUS sent to userspace POSIXly
-	correct
-Message-ID: <1311768636-29582-1-git-send-email-dave.martin@linaro.org>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 27 Jul 2011 12:20:06 -0000
+Subject: Updated mach-types update
+In-Reply-To: <201105231839.57083.arnd@arndb.de>
+References: <201105231652.28497.arnd@arndb.de>
+	<20110523151051.GB6489@sirena.org.uk>
+	<20110523153326.GB15153@n2100.arm.linux.org.uk>
+	<201105231839.57083.arnd@arndb.de>
+Message-ID: <20110524020653.GA28118@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the UM_SIGNAL alignment fault mode, no siginfo structure is
-passed to userspace.
+On Mon, May 23, 2011 at 06:39:56PM +0200, Arnd Bergmann wrote:
+> On Monday 23 May 2011, Russell King - ARM Linux wrote:
 
-POSIX specifies how siginfo_t should be populated for alignment
-faults, so this patch does just that:
+> > Don't get me wrong - 15k LOC removal is a good start, but it's just that,
+> > a start.  It's well below what I was hoping for.
 
-  * si_signo = SIGBUS
-  * si_code = BUS_ADRALN
-  * si_addr = misaligned data address at which access was attempted
+> Agreed. The 15k LOC were also partially just the low-hanging fruit, so
+> we won't be able to do much larger reductions without doing more
+> groundwork first, like the stuff that is going in now (clkdev, irq,
+> clksource, device tree, ...).
 
-Signed-off-by: Dave Martin <dave.martin@linaro.org>
----
-v2: si_addr in siginfo_t changed to contain the faulting data
-    access address, not the address of the faulting instruction.
+Indeed.
 
-    This behaviour is consistent with the way other fault signals
-    such as SIGSEGV are already reported, as well as matching the
-    apparent intent of the POSIX sigaction interface.
+> We need to do more of those before we see significant reductions from
+> being able to remove a lot of the existing board files. At the same
+> time, a number of people obviously have new boards that they want to
+> see supported. The tactical answer that I'd give to them is that they
+> can still add board files, provided that they also help do the work
+> that is required to remove them later (depends the specific capabilities
+> of the people and the complexity of the code they want to add).
 
- arch/arm/mm/alignment.c |   14 +++++++++++---
- 1 files changed, 11 insertions(+), 3 deletions(-)
+This should also be really helpful for getting people to actually work
+on the infrastructure.  If we're just telling anyone working on actual
+systems on ARM to go away then we're creating additional barriers to
+working with the improved infrastructure and reducing the visibility the
+community has of what's going on, pushing people back into BSP land
+which really isn't where we want things to be going.
 
-diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
-index 724ba3b..65ed9c6 100644
---- a/arch/arm/mm/alignment.c
-+++ b/arch/arm/mm/alignment.c
-@@ -22,6 +22,7 @@
- #include <linux/sched.h>
- #include <linux/uaccess.h>
- 
-+#include <asm/system.h>
- #include <asm/unaligned.h>
- 
- #include "fault.h"
-@@ -883,9 +884,16 @@ do_alignment(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
- 	if (ai_usermode & UM_FIXUP)
- 		goto fixup;
- 
--	if (ai_usermode & UM_SIGNAL)
--		force_sig(SIGBUS, current);
--	else {
-+	if (ai_usermode & UM_SIGNAL) {
-+		siginfo_t si;
-+
-+		si.si_signo = SIGBUS;
-+		si.si_errno = 0;
-+		si.si_code = BUS_ADRALN;
-+		si.si_addr = (void __user *)addr;
-+
-+		force_sig_info(si.si_signo, &si, current);
-+	} else {
- 		/*
- 		 * We're about to disable the alignment trap and return to
- 		 * user space.  But if an interrupt occurs before actually
--- 
-1.7.4.1
+It's also coming back to the thing I was saying when this approach was
+originally announced - if we're just telling people that there's no way
+they can work with mainline until some non-specific set of generic ARM
+improvements has been done that's really not going them anything
+concrete they can work with.  The work that needs doing is both open
+ended and long term, it's not something with any end in sight and it
+requires a good degree of comfortability with working with tree wide
+changes.  That's tough and it seems more likely to put people off than
+to stimulate new contributors.
+
+If we can give people specific feedback on their code that they can
+directly address that's entirely reasonable.  Saying things like "your
+code isn't up to standard, you should be doing this other thing" or
+"this thing you're doing is actually pretty generic, you should submit
+some infrastructure for it then build on top of that" gives people a
+clear thing they can actually do that they can relate to the work
+they're doing.  Saying that we're not going to be accepting any support
+for new hardware into Linux for the forseeable future is more of an
+impenetrable cliff face.
+
+If Linus is pushing back in this way it seems like the thing to do is
+push back on him, it seems like we should be able to point to concrete
+things that are being done to improve the situation without also stalling
+work on new platforms.
