@@ -1,106 +1,61 @@
 From: tony.lin@freescale.com (Tony Lin)
-Date: Wed, 27 Jul 2011 13:29:29 +0800
-Subject: [PATCH v3 1/6] ARM: mxs: ehci: consolidate definitions and structures
-	to share among platforms
+Date: Wed, 27 Jul 2011 13:29:31 +0800
+Subject: [PATCH v3 3/6] ARM: mxs: add usb clocks to clock tree
 In-Reply-To: <1311744574-3610-1-git-send-email-tony.lin@freescale.com>
 References: <1311744574-3610-1-git-send-email-tony.lin@freescale.com>
-Message-ID: <1311744574-3610-2-git-send-email-tony.lin@freescale.com>
+Message-ID: <1311744574-3610-4-git-send-email-tony.lin@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-move common definitions and data structures used for mxs and mxc
-platforms to fsl_device.h from mxc_ehci.h
-so that these definitions and structures could be shared without
-duplicated copies.
+add usb host clock and usb host phy clock to clock tree
+add usb dummy clocks to clock tree to get rid of adding
+more cpu_is_mx macros
 
 Signed-off-by: Tony Lin <tony.lin@freescale.com>
 ---
- arch/arm/plat-mxc/include/mach/mxc_ehci.h |   19 -------------------
- drivers/usb/host/ehci-mxc.c               |    4 +---
- include/linux/fsl_devices.h               |   19 +++++++++++++++++++
- 3 files changed, 20 insertions(+), 22 deletions(-)
+ arch/arm/mach-mxs/clock-mx28.c |   16 ++++++++++++++--
+ 1 files changed, 14 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/plat-mxc/include/mach/mxc_ehci.h b/arch/arm/plat-mxc/include/mach/mxc_ehci.h
-index 2c159dc..8775807 100644
---- a/arch/arm/plat-mxc/include/mach/mxc_ehci.h
-+++ b/arch/arm/plat-mxc/include/mach/mxc_ehci.h
-@@ -1,17 +1,6 @@
- #ifndef __INCLUDE_ASM_ARCH_MXC_EHCI_H
- #define __INCLUDE_ASM_ARCH_MXC_EHCI_H
+diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
+index 5dcc59d..0afc98f 100644
+--- a/arch/arm/mach-mxs/clock-mx28.c
++++ b/arch/arm/mach-mxs/clock-mx28.c
+@@ -554,6 +554,8 @@ static struct clk rtc_clk = {
+ 	.parent = &ref_xtal_clk,
+ };
  
--/* values for portsc field */
--#define MXC_EHCI_PHY_LOW_POWER_SUSPEND	(1 << 23)
--#define MXC_EHCI_FORCE_FS		(1 << 24)
--#define MXC_EHCI_UTMI_8BIT		(0 << 28)
--#define MXC_EHCI_UTMI_16BIT		(1 << 28)
--#define MXC_EHCI_SERIAL			(1 << 29)
--#define MXC_EHCI_MODE_UTMI		(0 << 30)
--#define MXC_EHCI_MODE_PHILIPS		(1 << 30)
--#define MXC_EHCI_MODE_ULPI		(2 << 30)
--#define MXC_EHCI_MODE_SERIAL		(3 << 30)
--
- /* values for flags field */
- #define MXC_EHCI_INTERFACE_DIFF_UNI	(0 << 0)
- #define MXC_EHCI_INTERFACE_DIFF_BI	(1 << 0)
-@@ -39,14 +28,6 @@
- #define MX5_USB_UTMI_PHYCTRL1_PLLDIV_MASK		0x3
- #define MX5_USB_UTMI_PHYCTRL1_PLLDIV_SHIFT		0
- 
--struct mxc_usbh_platform_data {
--	int (*init)(struct platform_device *pdev);
--	int (*exit)(struct platform_device *pdev);
--
--	unsigned int		 portsc;
--	struct otg_transceiver	*otg;
--};
--
- int mx51_initialize_usb_hw(int port, unsigned int flags);
- int mx25_initialize_usb_hw(int port, unsigned int flags);
- int mx31_initialize_usb_hw(int port, unsigned int flags);
-diff --git a/drivers/usb/host/ehci-mxc.c b/drivers/usb/host/ehci-mxc.c
-index 0c058be..cbf60a6 100644
---- a/drivers/usb/host/ehci-mxc.c
-+++ b/drivers/usb/host/ehci-mxc.c
-@@ -23,9 +23,7 @@
- #include <linux/usb/otg.h>
- #include <linux/usb/ulpi.h>
- #include <linux/slab.h>
--
--#include <mach/mxc_ehci.h>
--
-+#include <linux/fsl_devices.h>
- #include <asm/mach-types.h>
- 
- #define ULPI_VIEWPORT_OFFSET	0x170
-diff --git a/include/linux/fsl_devices.h b/include/linux/fsl_devices.h
-index fffdf00..cb19260 100644
---- a/include/linux/fsl_devices.h
-+++ b/include/linux/fsl_devices.h
-@@ -103,6 +103,25 @@ struct fsl_usb2_platform_data {
- 
- #define FLS_USB2_WORKAROUND_ENGCM09152	(1 << 0)
- 
-+/* values for portsc field */
-+#define MXC_EHCI_PHY_LOW_POWER_SUSPEND	(1 << 23)
-+#define MXC_EHCI_FORCE_FS		(1 << 24)
-+#define MXC_EHCI_UTMI_8BIT		(0 << 28)
-+#define MXC_EHCI_UTMI_16BIT		(1 << 28)
-+#define MXC_EHCI_SERIAL			(1 << 29)
-+#define MXC_EHCI_MODE_UTMI		(0 << 30)
-+#define MXC_EHCI_MODE_PHILIPS		(1 << 30)
-+#define MXC_EHCI_MODE_ULPI		(2 << 30)
-+#define MXC_EHCI_MODE_SERIAL		(3 << 30)
++static struct clk dummy_clk; /* initial to 0 and NULL */
 +
-+struct mxc_usbh_platform_data {
-+	int (*init)(struct platform_device *pdev);
-+	int (*exit)(struct platform_device *pdev);
-+
-+	unsigned int		portsc;
-+	struct otg_transceiver	*otg;
+ /* usb_clk gate is controlled in DIGCTRL other than CLKCTRL */
+ static struct clk usb0_clk = {
+ 	.enable_reg = DIGCTRL_BASE_ADDR,
+@@ -571,6 +573,14 @@ static struct clk usb1_clk = {
+ 	.parent = &pll1_clk,
+ };
+ 
++/* usb phy clock for usb1 */
++static struct clk usb_phy_clk1 = {
++	.parent = &pll1_clk,
++	.enable = _raw_clk_disable,
++	.disable = _raw_clk_enable,
++	.enable_reg = CLKCTRL_BASE_ADDR + HW_CLKCTRL_PLL1CTRL0,
++	.enable_shift = 18,
 +};
-+
- struct spi_device;
- 
- struct fsl_spi_platform_data {
+ #define _DEFINE_CLOCK(name, er, es, p)					\
+ 	static struct clk name = {					\
+ 		.enable_reg	= CLKCTRL_BASE_ADDR + HW_CLKCTRL_##er,	\
+@@ -627,8 +637,10 @@ static struct clk_lookup lookups[] = {
+ 	_REGISTER_CLOCK("mxs-mmc.1", NULL, ssp1_clk)
+ 	_REGISTER_CLOCK("flexcan.0", NULL, can0_clk)
+ 	_REGISTER_CLOCK("flexcan.1", NULL, can1_clk)
+-	_REGISTER_CLOCK(NULL, "usb0", usb0_clk)
+-	_REGISTER_CLOCK(NULL, "usb1", usb1_clk)
++	_REGISTER_CLOCK("mxc-ehci", "usb1", usb1_clk)
++	_REGISTER_CLOCK("mxc-ehci", "usb1_phy", usb_phy_clk1)
++	_REGISTER_CLOCK("mxc-ehci", "usb", dummy_clk)
++	_REGISTER_CLOCK("mxc-ehci", "usb_ahb", dummy_clk)
+ 	_REGISTER_CLOCK("mxs-pwm.0", NULL, pwm_clk)
+ 	_REGISTER_CLOCK("mxs-pwm.1", NULL, pwm_clk)
+ 	_REGISTER_CLOCK("mxs-pwm.2", NULL, pwm_clk)
 -- 
 1.7.0.4
