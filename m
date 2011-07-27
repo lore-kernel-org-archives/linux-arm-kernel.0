@@ -1,38 +1,144 @@
-From: tony.lin@freescale.com (Tony Lin)
-Date: Wed, 27 Jul 2011 13:29:34 +0800
-Subject: [PATCH v3 6/6] ARM: mxs: add usb host function to default config
-In-Reply-To: <1311744574-3610-1-git-send-email-tony.lin@freescale.com>
-References: <1311744574-3610-1-git-send-email-tony.lin@freescale.com>
-Message-ID: <1311744574-3610-7-git-send-email-tony.lin@freescale.com>
+From: boojin.kim@samsung.com (Boojin Kim)
+Date: Wed, 27 Jul 2011 14:31:23 +0900
+Subject: [PATCH 01/15] DMA: PL330: Add support runtime PM for PL330 DMAC
+In-Reply-To: <1311744697-10264-1-git-send-email-boojin.kim@samsung.com>
+References: <1311744697-10264-1-git-send-email-boojin.kim@samsung.com>
+Message-ID: <1311744697-10264-2-git-send-email-boojin.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-change mxs_defconfig.
-
-Signed-off-by: Tony Lin <tony.lin@freescale.com>
+Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
+Cc: Vinod Koul <vinod.koul@intel.com>
+Cc: Dan Williams <dan.j.williams@intel.com>
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/configs/mxs_defconfig |    8 +++++++-
- 1 files changed, 7 insertions(+), 1 deletions(-)
+ drivers/dma/pl330.c |   75 +++++++++++++++++++++++++++++++++++++++++++++++++-
+ 1 files changed, 73 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/configs/mxs_defconfig b/arch/arm/configs/mxs_defconfig
-index db2cb7d..0a187a2 100644
---- a/arch/arm/configs/mxs_defconfig
-+++ b/arch/arm/configs/mxs_defconfig
-@@ -87,8 +87,14 @@ CONFIG_GPIO_SYSFS=y
- # CONFIG_HWMON is not set
- # CONFIG_MFD_SUPPORT is not set
- CONFIG_DISPLAY_SUPPORT=m
-+CONFIG_USB_ARCH_HAS_EHCI=y
- # CONFIG_HID_SUPPORT is not set
--# CONFIG_USB_SUPPORT is not set
-+CONFIG_USB_SUPPORT=y
-+CONFIG_USB=y
-+CONFIG_USB_EHCI_HCD=y
-+CONFIG_USB_EHCI_ROOT_HUB_TT=y
-+CONFIG_USB_EHCI_TT_NEWSCHED=y
-+CONFIG_USB_EHCI_MXC=y
- CONFIG_MMC=y
- CONFIG_MMC_MXS=y
- CONFIG_RTC_CLASS=y
+diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+index 6abe1ec..b7ecf47 100644
+--- a/drivers/dma/pl330.c
++++ b/drivers/dma/pl330.c
+@@ -17,6 +17,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/amba/bus.h>
+ #include <linux/amba/pl330.h>
++#include <linux/pm_runtime.h>
+ 
+ #define NR_DEFAULT_DESC	16
+ 
+@@ -83,6 +84,8 @@ struct dma_pl330_dmac {
+ 
+ 	/* Peripheral channels connected to this DMAC */
+ 	struct dma_pl330_chan peripherals[0]; /* keep at end */
++
++	struct clk *clk;
+ };
+ 
+ struct dma_pl330_desc {
+@@ -696,6 +699,30 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
+ 		goto probe_err1;
+ 	}
+ 
++	pdmac->clk = clk_get(&adev->dev, "dma");
++	if (IS_ERR(pdmac->clk)) {
++		dev_err(&adev->dev, "Cannot get operation clock.\n");
++		ret = -EINVAL;
++		goto probe_err1;
++	}
++
++	amba_set_drvdata(adev, pdmac);
++
++#ifdef CONFIG_PM_RUNTIME
++	/* to use the runtime PM helper functions */
++	pm_runtime_enable(&adev->dev);
++
++	/* enable the power domain */
++	if (pm_runtime_get_sync(&adev->dev)) {
++		dev_err(&adev->dev, "failed to get runtime pm\n");
++		ret = -ENODEV;
++		goto probe_err1;
++	}
++#else
++	/* enable dma clk */
++	clk_enable(pdmac->clk);
++#endif
++
+ 	irq = adev->irq[0];
+ 	ret = request_irq(irq, pl330_irq_handler, 0,
+ 			dev_name(&adev->dev), pi);
+@@ -763,8 +790,6 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
+ 		goto probe_err4;
+ 	}
+ 
+-	amba_set_drvdata(adev, pdmac);
+-
+ 	dev_info(&adev->dev,
+ 		"Loaded driver for PL330 DMAC-%d\n", adev->periphid);
+ 	dev_info(&adev->dev,
+@@ -825,6 +850,13 @@ static int __devexit pl330_remove(struct amba_device *adev)
+ 	res = &adev->res;
+ 	release_mem_region(res->start, resource_size(res));
+ 
++#ifdef CONFIG_PM_RUNTIME
++	pm_runtime_put(&adev->dev);
++	pm_runtime_disable(&adev->dev);
++#else
++	clk_disable(pdmac->clk);
++#endif
++
+ 	kfree(pdmac);
+ 
+ 	return 0;
+@@ -838,10 +870,49 @@ static struct amba_id pl330_ids[] = {
+ 	{ 0, 0 },
+ };
+ 
++#ifdef CONFIG_PM_RUNTIME
++static int pl330_runtime_suspend(struct device *dev)
++{
++	struct dma_pl330_dmac *pdmac = dev_get_drvdata(dev);
++
++	if (!pdmac) {
++		dev_err(dev, "failed to get dmac\n");
++		return -ENODEV;
++	}
++
++	clk_disable(pdmac->clk);
++
++	return 0;
++}
++
++static int pl330_runtime_resume(struct device *dev)
++{
++	struct dma_pl330_dmac *pdmac = dev_get_drvdata(dev);
++
++	if (!pdmac) {
++		dev_err(dev, "failed to get dmac\n");
++		return -ENODEV;
++	}
++
++	clk_enable(pdmac->clk);
++
++	return 0;
++}
++#else
++#define pl330_runtime_suspend	NULL
++#define pl330_runtime_resume	NULL
++#endif /* CONFIG_PM_RUNTIME */
++
++static const struct dev_pm_ops pl330_pm_ops = {
++	.runtime_suspend = pl330_runtime_suspend,
++	.runtime_resume = pl330_runtime_resume,
++};
++
+ static struct amba_driver pl330_driver = {
+ 	.drv = {
+ 		.owner = THIS_MODULE,
+ 		.name = "dma-pl330",
++		.pm = &pl330_pm_ops,
+ 	},
+ 	.id_table = pl330_ids,
+ 	.probe = pl330_probe,
 -- 
-1.7.0.4
+1.7.1
