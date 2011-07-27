@@ -1,34 +1,28 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 27 Jul 2011 16:47:43 +0200
-Subject: [PULL] at91 init factorize
-In-Reply-To: <20110727121156.GK10037@game.jcrosoft.org>
-References: <20110727121156.GK10037@game.jcrosoft.org>
-Message-ID: <201107271647.44015.arnd@arndb.de>
+From: davidb@codeaurora.org (David Brown)
+Date: Wed, 27 Jul 2011 07:53:30 -0700
+Subject: [PATCHv3 2/2] ARM: P2V: Remove ARM_PATCH_PHYS_VIRT_16BIT
+In-Reply-To: <1311733255-25207-2-git-send-email-sboyd@codeaurora.org>
+References: <1311733255-25207-1-git-send-email-sboyd@codeaurora.org>
+	<1311733255-25207-2-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20110727145330.GA32004@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 27 July 2011, Jean-Christophe PLAGNIOL-VILLARD wrote:
->         This patch series factorize the init of the at91 soc and start the
->         work to make the at91 capable to choose the soc at runtime instead of
->         compile time.
+On Tue, Jul 26, 2011 at 07:20:55PM -0700, Stephen Boyd wrote:
+> From: Nicolas Pitre <nicolas.pitre@linaro.org>
 > 
->         The next work will be to factorize the device resource registration
->         and then switch to the device tree
+> Now that MSM targets no longer need the 16-bit offsets for P2V, this
+> code can be removed.
 > 
->         please pull
-> 
-> The following changes since commit e371d46ae45488bcb112a99a7de462e9e3aa6764:
-> 
->   Merge branch 'for-linus' of git://git.kernel.org/pub/scm/linux/kernel/git/viro/vfs-2.6 (2011-07-26 18:30:20 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://github.com/at91linux/linux-2.6-at91.git j/soc-detect
+> Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 
-The patches look good, but come at an inconvenient time. We're still
-in the merge window, so I don't want to add stuff to linux-next yet
-that is destined for 3.2, and I have already sent out all the arm-soc
-patches for the 3.1 merge window, so I don't really want to send another
-round of patches at the last minute.
+I've tested this on MSM, but without an actual offset.  It'd be good
+to test this on a target with an actual adjustment being used, to make
+sure nothing breaks.
 
-	Arnd
+David
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
