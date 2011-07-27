@@ -1,119 +1,118 @@
 From: boojin.kim@samsung.com (Boojin Kim)
-Date: Wed, 27 Jul 2011 14:05:39 +0900
-Subject: [PATCH V4 12/14] spi/s3c64xx: Add support DMA engine API
-In-Reply-To: <1311675280.24316.3.camel@vkoul-mobl4>
+Date: Wed, 27 Jul 2011 14:17:13 +0900
+Subject: [PATCH V4 06/14] ARM: SAMSUNG: Add common DMA operations
+In-Reply-To: <CABb+yY3shX+myCgO++rUQrFuT81cdhhf18398Wa-S=88UK3rkg@mail.gmail.com>
 References: <1311557312-26107-1-git-send-email-boojin.kim@samsung.com>
-	<1311557312-26107-13-git-send-email-boojin.kim@samsung.com>
-	<1311592630.29703.13.camel@vkoul-mobl4>
-	<003701cc4b76$c52963f0$4f7c2bd0$%kim@samsung.com>
-	<1311675280.24316.3.camel@vkoul-mobl4>
-Message-ID: <000301cc4c1a$d494bd40$7dbe37c0$%kim@samsung.com>
+	<1311557312-26107-7-git-send-email-boojin.kim@samsung.com>
+	<CABb+yY0nWLpdVGqTJPO2YwkGWiDw5tRjC2xn7Le0bO0ZNFHC_g@mail.gmail.com>
+	<003801cc4b77$51e9f3e0$f5bddba0$%kim@samsung.com>
+	<CABb+yY3shX+myCgO++rUQrFuT81cdhhf18398Wa-S=88UK3rkg@mail.gmail.com>
+Message-ID: <000401cc4c1c$71d63240$558296c0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vinod Koul Wrote:
-> Sent: Tuesday, July 26, 2011 7:15 PM
+Jassi Brar wrote:
+> Sent: Wednesday, July 27, 2011 10:34 AM
 > To: Boojin Kim
-> Cc: vinod.koul at intel.com; 'Kukjin Kim'; 'Jassi Brar'; 'Grant Likely';
-> linux-samsung-soc at vger.kernel.org; 'Mark Brown'; 'Dan Williams';
-> linux-arm-kernel at lists.infradead.org
-> Subject: RE: [PATCH V4 12/14] spi/s3c64xx: Add support DMA engine API
+> Cc: linux-arm-kernel at lists.infradead.org; linux-samsung-
+> soc at vger.kernel.org; Vinod Koul; Dan Williams; Kukjin Kim; Grant
+> Likely; Mark Brown
+> Subject: Re: [PATCH V4 06/14] ARM: SAMSUNG: Add common DMA operations
 >
-> On Tue, 2011-07-26 at 18:31 +0900, Boojin Kim wrote:
-> > Vinod Koul Wrote:
-> > > Sent: Monday, July 25, 2011 8:17 PM
-> > > To: Boojin Kim
-> > > Cc: vinod.koul at intel.com; linux-arm-kernel at lists.infradead.org;
-> linux-
-> > > samsung-soc at vger.kernel.org; Kukjin Kim; Jassi Brar; Grant Likely;
-> > > Mark Brown; Dan Williams
-> > > Subject: Re: [PATCH V4 12/14] spi/s3c64xx: Add support DMA engine
-> API
-> > >
-> > > On Mon, 2011-07-25 at 10:28 +0900, Boojin Kim wrote:
-> > > > This patch adds to support DMA generic API to transfer raw
-> > > > SPI data. Basiclly the spi driver uses DMA generic API if
-> > > > architecture supports it. Otherwise, uses Samsung specific
-> > > > S3C-PL330 APIs.
-> > > >
-> > > > Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
-> > > > Cc: Grant Likely <grant.likely@secretlab.ca>
-> > > > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> > > > ---
-> > > >  drivers/spi/spi_s3c64xx.c |  141 ++++++++++++++++++++++---------
-> ----
-> > > ----------
-> > > >  1 files changed, 69 insertions(+), 72 deletions(-)
-> > > >
-> > > > diff --git a/drivers/spi/spi_s3c64xx.c
-> b/drivers/spi/spi_s3c64xx.c
-> > > > index 8945e20..a4cf76a 100644
-> > > > --- a/drivers/spi/spi_s3c64xx.c
-> > > > +++ b/drivers/spi/spi_s3c64xx.c
-> > > > @@ -172,6 +172,9 @@ struct s3c64xx_spi_driver_data {
-> > > >  	unsigned                        state;
-> > > >  	unsigned                        cur_mode, cur_bpw;
-> > > >  	unsigned                        cur_speed;
-> > > > +	unsigned			rx_ch;
-> > > > +	unsigned			tx_ch;
-> > > > +	struct samsung_dma_ops		*ops;
-> > > >  };
-> > > >
-> > > >  static struct s3c2410_dma_client s3c64xx_spi_dma_client = {
-> > > > @@ -227,6 +230,38 @@ static void flush_fifo(struct
-> > > s3c64xx_spi_driver_data *sdd)
-> > > >  	writel(val, regs + S3C64XX_SPI_CH_CFG);
-> > > >  }
-> > > >
-> > > > +static void s3c64xx_spi_dma_rxcb(void *data)
-> > > > +{
-> > > > +	struct s3c64xx_spi_driver_data *sdd
-> > > > +		= (struct s3c64xx_spi_driver_data *)data;
-> > > > +	unsigned long flags;
-> > > > +
-> > > > +	spin_lock_irqsave(&sdd->lock, flags);
-> > > > +
-> > > > +	sdd->state &= ~RXBUSY;
-> > > > +	/* If the other done */
-> > > > +	if (!(sdd->state & TXBUSY))
-> > > > +		complete(&sdd->xfer_completion);
-> > > > +
-> > > > +	spin_unlock_irqrestore(&sdd->lock, flags);
-> > > > +}
-> > > > +
-> > > > +static void s3c64xx_spi_dma_txcb(void *data)
-> > > > +{
-> > > > +	struct s3c64xx_spi_driver_data *sdd
-> > > > +		= (struct s3c64xx_spi_driver_data *)data;
-> > > > +	unsigned long flags;
-> > > > +
-> > > > +	spin_lock_irqsave(&sdd->lock, flags);
-> > > > +
-> > > > +	sdd->state &= ~TXBUSY;
-> > > > +	/* If the other done */
-> > > > +	if (!(sdd->state & RXBUSY))
-> > > > +		complete(&sdd->xfer_completion);
-> > > > +
-> > > > +	spin_unlock_irqrestore(&sdd->lock, flags);
-> > > > +}
-> > > I don't see much diff in these two functions and you should be
-> able to
-> > > use a generic one which takes care of both TX and RX, does your
-> > > callback
-> > > data know if the channel is for TX or RX? If not then a helper to
-> do
-> > > above should take care well and making code simpler
-> > I'm very agree with you.
-> > But, I think it isn't deeply related to this patch series. So, I
-> wish to make
-> > and submit it after this patch series is finished.
-> >
-> Since you are reworking this driver would make sense to do now, it
-> doesn't sound to be a big change.
-Ok. I will follow your request.
-I will make new patch for it and send it with V5 patchset.
-
+> On Tue, Jul 26, 2011 at 3:05 PM, Boojin Kim <boojin.kim@samsung.com>
+> wrote:
+> > Jassi Brar Wrote:
+> >> Sent: Monday, July 25, 2011 8:52 PM
+> >> To: Boojin Kim
+> >> Cc: linux-arm-kernel at lists.infradead.org; linux-samsung-
+> >> soc at vger.kernel.org; Vinod Koul; Dan Williams; Kukjin Kim; Grant
+> >> Likely; Mark Brown
+> >> Subject: Re: [PATCH V4 06/14] ARM: SAMSUNG: Add common DMA
+> operations
+> >>
+> >> On Mon, Jul 25, 2011 at 6:58 AM, Boojin Kim
+> <boojin.kim@samsung.com>
+> >> wrote:
+> >>
+> >> > +
+> >> > +static bool pl330_filter(struct dma_chan *chan, void *param)
+> >> > +{
+> >> > +       struct dma_pl330_peri *peri = (struct dma_pl330_peri
+> *)chan-
+> >> >private;
+> >> > +       unsigned dma_ch = (unsigned)param;
+> >> > +
+> >> > +       if (peri->peri_id != dma_ch)
+> >> > +               return false;
+> >> > +
+> >> > +       return true;
+> >> > +}
+> >> This is what I meant... if we keep chan_id for paltform assigned
+> IDs,
+> >> these filter functions could simply become
+> >>
+> >> static bool pl330_filter(struct dma_chan *chan, void *param)
+> >> {
+> >>         return chan->chan_id == param
+> >> }
+> >>
+> >> And ideally in the long run, we could just drop the filter callback
+> >> and add expected channel ID to the request_channel call.
+> > The chan_id is set by dmaengine. So, We don't use it to hold the
+> user specific
+> > Id.
+> Not for long.
+> See  https://lkml.org/lkml/2011/7/26/245
 >
-> --
-> ~Vinod Koul
-> Intel Corp.
+>
+> >> > +
+> >> > +static inline int s3c_dma_trigger(unsigned ch)
+> >> > +{
+> >> > +       return s3c2410_dma_ctrl(ch, S3C2410_DMAOP_START);
+> >> > +}
+> >> > +
+> >> > +static inline int s3c_dma_started(unsigned ch)
+> >> > +{
+> >> > +       return s3c2410_dma_ctrl(ch, S3C2410_DMAOP_STARTED);
+> >> > +}
+> >> > +
+> >> > +static inline int s3c_dma_flush(unsigned ch)
+> >> > +{
+> >> > +       return s3c2410_dma_ctrl(ch, S3C2410_DMAOP_FLUSH);
+> >> > +}
+> >> > +
+> >> > +static inline int s3c_dma_stop(unsigned ch)
+> >> > +{
+> >> > +       return s3c2410_dma_ctrl(ch, S3C2410_DMAOP_STOP);
+> >> > +}
+> >> > +
+> >> > +static struct samsung_dma_ops s3c_dma_ops = {
+> >> > +       .request        = s3c_dma_request,
+> >> > +       .release        = s3c_dma_release,
+> >> > +       .prepare        = s3c_dma_prepare,
+> >> > +       .trigger        = s3c_dma_trigger,
+> >> > +       .started        = s3c_dma_started,
+> >> > +       .flush          = s3c_dma_flush,
+> >> > +       .stop           = s3c_dma_stop,
+> >>
+> >> These last 4 should be gnereallized into one callback with OP
+> argument.
+> > I don't have any idea about it. Can you explain it in more detail?
+>
+> static int s3c_dma_control(unsigned ch, enum s3c2410_chan_op/*or
+> similar*/ op)
+>  {
+>         return s3c2410_dma_ctrl(ch, op);
+>  }
+>
+> static struct samsung_dma_ops s3c_dma_ops = {
+>         .request        = s3c_dma_request,
+>         .release        = s3c_dma_release,
+>         .prepare        = s3c_dma_prepare,
+>         .control        = s3c_dma_control,
+'Struct samsung_dma_ops' is used for both 'S3C-DMA-OPS' for 's3c dma' and 
+'DMA-OPS' for 'dmaengine'.
+If I modify "Struct samsung_dma_ops" as your guide, It gives un-expectable 
+effect to DMA-OPS.
+Actually, We don't want the client with 'DMA-OPS' uses 'enum s3c2410_chan_op' 
+operation anymore.
