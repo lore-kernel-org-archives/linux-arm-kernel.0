@@ -1,46 +1,31 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 26 Jul 2011 17:28:39 -0700
-Subject: [linux-pm] [RFC/PATCH v2] PM / Runtime: allow _put_sync() from
-	interrupts-disabled context
-In-Reply-To: <201107240102.09698.rjw@sisk.pl> (Rafael J. Wysocki's message of
-	"Sun, 24 Jul 2011 01:02:09 +0200")
-References: <1311371188-28879-1-git-send-email-khilman@ti.com>
-	<201107240102.09698.rjw@sisk.pl>
-Message-ID: <87r55cpnwo.fsf@ti.com>
+From: torvalds@linux-foundation.org (Linus Torvalds)
+Date: Tue, 26 Jul 2011 17:51:16 -0700
+Subject: [GIT PULL] arm-soc new features (part 2/2) for 3.1
+In-Reply-To: <5039974.y3GReu3Vjy@wuerfel>
+References: <3057645.NjCAYUXHGt@wuerfel> <5818290.TCY0zMWmbr@wuerfel>
+	<1698068.Mn9Tmtfmzl@wuerfel> <5039974.y3GReu3Vjy@wuerfel>
+Message-ID: <CA+55aFygBzynb_4kZQEHQAU0Np0H9UCBFoW1hoRJ571QCMo42Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Rafael J. Wysocki" <rjw@sisk.pl> writes:
-
-> On Friday, July 22, 2011, Kevin Hilman wrote:
->> Currently the use of pm_runtime_put_sync() is not safe from
->> interrupts-disabled context because rpm_idle() will release the
->> spinlock and enable interrupts for the idle callbacks.  This enables
->> interrupts during a time where interrupts were expected to be
->> disabled, and can have strange side effects on drivers that expected
->> interrupts to be disabled.
->> 
->> This is not a bug since the documentation clearly states that only
->> _put_sync_suspend() is safe in IRQ-safe mode.
->> 
->> However, pm_runtime_put_sync() could be made safe when in IRQ-safe
->> mode by releasing the spinlock but not re-enabling interrupts, which
->> is what this patch aims to do.
->> 
->> Problem was found when using some buggy drivers that set
->> pm_runtime_irq_safe() and used _put_sync() in interrupts-disabled
->> context.
->> 
->> The offending drivers have been fixed to use _put_sync_suspend(),
->> But this patch is an RFC to see if it might make sense to allow
->> using _put_sync() from interrupts-disabled context.
+On Tue, Jul 26, 2011 at 4:36 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 >
-> OK, I'm going to take this for 3.2.
->
+> This is the final branch I have for now, although I hope to get one more
+> for actual device tree conversions for a lot of drivers.
 
-OK, great.  Thanks.
+Ok, everything merged.
 
-Might want to just drop the last paragraph from the changelog since it
-doesn't really belong in the permanant history.
+I compared the end result with yours, and we did some things a bit
+differently, but on the whole it looks pretty identical. We have a
+different resolution for "exynos4_cpu_suspend()", but afaik mine is
+better (it looks like from a type standpoint it should return int, but
+due to the panic it doesn't matter). And we did those
+OMAP4430_DLL_OVERRIDE_SHIFT/MASK defines in a different order. I have
+some other changes in my tree (Andrew's patch-set for asm/atomic.h
+etc), so that makes for other differences in arch/arm, but it looks
+like it's ok.
 
-Kevin
+But you should double-check. I didn't compile-test any of it, I don't
+do the cross-compile thing, and maybe I missed something.
+
+                       Linus
