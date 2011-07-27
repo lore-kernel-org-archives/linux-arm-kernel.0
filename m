@@ -1,51 +1,38 @@
 From: tony.lin@freescale.com (Tony Lin)
-Date: Wed, 27 Jul 2011 13:29:30 +0800
-Subject: [PATCH v3 2/6] ARM: mxs: enable usb1 phy power supply
+Date: Wed, 27 Jul 2011 13:29:34 +0800
+Subject: [PATCH v3 6/6] ARM: mxs: add usb host function to default config
 In-Reply-To: <1311744574-3610-1-git-send-email-tony.lin@freescale.com>
 References: <1311744574-3610-1-git-send-email-tony.lin@freescale.com>
-Message-ID: <1311744574-3610-3-git-send-email-tony.lin@freescale.com>
+Message-ID: <1311744574-3610-7-git-send-email-tony.lin@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-configure usb1 phy power enable gpio and enable usb1 phy power
+change mxs_defconfig.
 
 Signed-off-by: Tony Lin <tony.lin@freescale.com>
 ---
- arch/arm/mach-mxs/mach-mx28evk.c |    8 ++++++++
- 1 files changed, 8 insertions(+), 0 deletions(-)
+ arch/arm/configs/mxs_defconfig |    8 +++++++-
+ 1 files changed, 7 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
-index eaaf6ff..9901547 100644
---- a/arch/arm/mach-mxs/mach-mx28evk.c
-+++ b/arch/arm/mach-mxs/mach-mx28evk.c
-@@ -34,6 +34,7 @@
- #define MX28EVK_BL_ENABLE	MXS_GPIO_NR(3, 18)
- #define MX28EVK_LCD_ENABLE	MXS_GPIO_NR(3, 30)
- #define MX28EVK_FEC_PHY_RESET	MXS_GPIO_NR(4, 13)
-+#define MX28EVK_USB1_PWR_EN	MXS_GPIO_NR(3, 8)
- 
- #define MX28EVK_MMC0_WRITE_PROTECT	MXS_GPIO_NR(2, 12)
- #define MX28EVK_MMC1_WRITE_PROTECT	MXS_GPIO_NR(0, 28)
-@@ -183,6 +184,8 @@ static const iomux_cfg_t mx28evk_pads[] __initconst = {
- 
- 	/* led */
- 	MX28_PAD_AUART1_TX__GPIO_3_5 | MXS_PAD_CTRL,
-+	/* usb1 */
-+	MX28_PAD_AUART2_RX__GPIO_3_8 | MXS_PAD_CTRL,
- };
- 
- /* led */
-@@ -405,6 +408,11 @@ static void __init mx28evk_init(void)
- 		pr_warn("failed to request gpio mmc1-slot-power: %d\n", ret);
- 	mx28_add_mxs_mmc(1, &mx28evk_mmc_pdata[1]);
- 
-+	ret = gpio_request_one(MX28EVK_USB1_PWR_EN, GPIOF_OUT_INIT_HIGH,
-+			       "usb1-power-en");
-+	if (ret)
-+		pr_warn("failed to request gpio usb1-power-en %d\n", ret);
-+
- 	gpio_led_register_device(0, &mx28evk_led_data);
- }
- 
+diff --git a/arch/arm/configs/mxs_defconfig b/arch/arm/configs/mxs_defconfig
+index db2cb7d..0a187a2 100644
+--- a/arch/arm/configs/mxs_defconfig
++++ b/arch/arm/configs/mxs_defconfig
+@@ -87,8 +87,14 @@ CONFIG_GPIO_SYSFS=y
+ # CONFIG_HWMON is not set
+ # CONFIG_MFD_SUPPORT is not set
+ CONFIG_DISPLAY_SUPPORT=m
++CONFIG_USB_ARCH_HAS_EHCI=y
+ # CONFIG_HID_SUPPORT is not set
+-# CONFIG_USB_SUPPORT is not set
++CONFIG_USB_SUPPORT=y
++CONFIG_USB=y
++CONFIG_USB_EHCI_HCD=y
++CONFIG_USB_EHCI_ROOT_HUB_TT=y
++CONFIG_USB_EHCI_TT_NEWSCHED=y
++CONFIG_USB_EHCI_MXC=y
+ CONFIG_MMC=y
+ CONFIG_MMC_MXS=y
+ CONFIG_RTC_CLASS=y
 -- 
 1.7.0.4
