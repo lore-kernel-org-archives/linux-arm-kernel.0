@@ -1,32 +1,29 @@
-From: akinobu.mita@gmail.com (Akinobu Mita)
-Date: Thu, 28 Jul 2011 01:08:19 +0900
-Subject: [PATCH v4 2/3] mmc: core: add random fault injection
-In-Reply-To: <CAJ0pr19RWjCJAvnkVR+gL7y8_X4TSFfs7JqXgydWuWMAPPb1ZQ@mail.gmail.com>
-References: <1311711119-6286-1-git-send-email-per.forlin@linaro.org>
-	<1311711119-6286-3-git-send-email-per.forlin@linaro.org>
-	<CAC5umygcfno0-=rA9G0OcxuVK2YK9UokfoYoy45qBT8w0+ytvg@mail.gmail.com>
-	<CAJ0pr19RWjCJAvnkVR+gL7y8_X4TSFfs7JqXgydWuWMAPPb1ZQ@mail.gmail.com>
-Message-ID: <CAC5umygDP6WCrHmhRqMSDBmnOyB1aw+3nuCqvyz9xGXg9QeePw@mail.gmail.com>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Wed, 27 Jul 2011 21:48:45 +0530
+Subject: [PATCH] DaVinci: correct MDSTAT_STATE_MASK
+In-Reply-To: <201107081924.57577.sshtylyov@ru.mvista.com>
+References: <201107081924.57577.sshtylyov@ru.mvista.com>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024DDC1083@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/7/27 Per Forlin <per.forlin@linaro.org>:
+On Fri, Jul 08, 2011 at 20:54:57, Sergei Shtylyov wrote:
+> MDSTAT.STATE occupies bits 0..5 according to all available documentation, so fix
+> the #define MDSTAT_STATE_MASK at last. Using the wrong value seems to have been
+> harmless though...
+> 
+> This was noticed by me back in 2009 but I didn't follow up with the patch back
+> then... :-/
+> 
+> Signed-off-by: Sergei Shtylyov <sshtylyov@ru.mvista.com>
 
-> There is an issue with patch v4 now when fault_attr is per-host.
-> Without your patch the entry is still created at the root but there
-> are many instances of fault-attr. I think it's better to wait for your
-> patch to make it into the mmc-next tree before submitting my patch. I
-> will prepare a patch v5 that depends on your upcoming changes in
-> fault-inject with a note that states the dependency.
+I applied this with two changes.
 
-Or you can prepare a patch for -mm and ask Andrew to add it to the -mm
-tree.
+Changed the headline to "ARM: davinci: correct MDSTAT_STATE_MASK"
+to get the standardization requested by Arnd.
 
-> Would you mind adding "patch 1/3" (export_symbol_gpl) to your
-> patch-set since it depends on the new function names in your patch?
-> If not, I can resend the patch on top of your changes to match the new
-> function names if you prefer to have this patch separate.
+Also dropped the second paragraph of the commit text since it
+doesn't really belong to the permanent history ;)
 
-I recommend it to be a part of your patchset.  The new function name
-(fault_create_debugfs_attr) is not likely to change for a time.  You can
-add Acked-by: Akinobu Mita <akinobu.mita@gmail.com>
+Thanks,
+Sekhar
