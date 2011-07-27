@@ -1,64 +1,184 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 27 Jul 2011 12:20:06 -0000
-Subject: Updated mach-types update
-In-Reply-To: <201105231839.57083.arnd@arndb.de>
-References: <201105231652.28497.arnd@arndb.de>
-	<20110523151051.GB6489@sirena.org.uk>
-	<20110523153326.GB15153@n2100.arm.linux.org.uk>
-	<201105231839.57083.arnd@arndb.de>
-Message-ID: <20110524020653.GA28118@opensource.wolfsonmicro.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 27 Jul 2011 14:21:29 +0200
+Subject: [PATCH V2 2/3] dmaengine: at_hdmac: improve power management routines
+In-Reply-To: <3c302a7166c2aa6ae4b6d7b7cdfe21e640b73603.1311627477.git.nicolas.ferre@atmel.com>
+References: <1311677514.24316.6.camel@vkoul-mobl4>
+	<3c302a7166c2aa6ae4b6d7b7cdfe21e640b73603.1311627477.git.nicolas.ferre@atmel.com>
+Message-ID: <c7fe1b06565dd6660543bcea32699a34993cfa13.1311627477.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 23, 2011 at 06:39:56PM +0200, Arnd Bergmann wrote:
-> On Monday 23 May 2011, Russell King - ARM Linux wrote:
+Save/restore dma controller state across a suspend-resume sequence.
+The prepare() function will wait for the non-cyclic channels to become idle.
+It also deals with cyclic operations with the start at next period while
+resuming.
 
-> > Don't get me wrong - 15k LOC removal is a good start, but it's just that,
-> > a start.  It's well below what I was hoping for.
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+V2: fix indentation
 
-> Agreed. The 15k LOC were also partially just the low-hanging fruit, so
-> we won't be able to do much larger reductions without doing more
-> groundwork first, like the stuff that is going in now (clkdev, irq,
-> clksource, device tree, ...).
+ drivers/dma/at_hdmac.c      |   88 ++++++++++++++++++++++++++++++++++++++++++-
+ drivers/dma/at_hdmac_regs.h |    7 +++
+ 2 files changed, 94 insertions(+), 1 deletions(-)
 
-Indeed.
-
-> We need to do more of those before we see significant reductions from
-> being able to remove a lot of the existing board files. At the same
-> time, a number of people obviously have new boards that they want to
-> see supported. The tactical answer that I'd give to them is that they
-> can still add board files, provided that they also help do the work
-> that is required to remove them later (depends the specific capabilities
-> of the people and the complexity of the code they want to add).
-
-This should also be really helpful for getting people to actually work
-on the infrastructure.  If we're just telling anyone working on actual
-systems on ARM to go away then we're creating additional barriers to
-working with the improved infrastructure and reducing the visibility the
-community has of what's going on, pushing people back into BSP land
-which really isn't where we want things to be going.
-
-It's also coming back to the thing I was saying when this approach was
-originally announced - if we're just telling people that there's no way
-they can work with mainline until some non-specific set of generic ARM
-improvements has been done that's really not going them anything
-concrete they can work with.  The work that needs doing is both open
-ended and long term, it's not something with any end in sight and it
-requires a good degree of comfortability with working with tree wide
-changes.  That's tough and it seems more likely to put people off than
-to stimulate new contributors.
-
-If we can give people specific feedback on their code that they can
-directly address that's entirely reasonable.  Saying things like "your
-code isn't up to standard, you should be doing this other thing" or
-"this thing you're doing is actually pretty generic, you should submit
-some infrastructure for it then build on top of that" gives people a
-clear thing they can actually do that they can relate to the work
-they're doing.  Saying that we're not going to be accepting any support
-for new hardware into Linux for the forseeable future is more of an
-impenetrable cliff face.
-
-If Linus is pushing back in this way it seems like the thing to do is
-push back on him, it seems like we should be able to point to concrete
-things that are being done to improve the situation without also stalling
-work on new platforms.
+diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
+index 6ee8f1c..99bd2c18 100644
+--- a/drivers/dma/at_hdmac.c
++++ b/drivers/dma/at_hdmac.c
+@@ -1385,27 +1385,113 @@ static void at_dma_shutdown(struct platform_device *pdev)
+ 	clk_disable(atdma->clk);
+ }
+ 
++static int at_dma_prepare(struct device *dev)
++{
++	struct platform_device *pdev = to_platform_device(dev);
++	struct at_dma *atdma = platform_get_drvdata(pdev);
++	struct dma_chan *chan, *_chan;
++
++	list_for_each_entry_safe(chan, _chan, &atdma->dma_common.channels,
++			device_node) {
++		struct at_dma_chan *atchan = to_at_dma_chan(chan);
++		/* wait for transaction completion (except in cyclic case) */
++		if (atc_chan_is_enabled(atchan) &&
++		   !test_bit(ATC_IS_CYCLIC, &atchan->status))
++			return -EAGAIN;
++	}
++	return 0;
++}
++
++static void atc_suspend_cyclic(struct at_dma_chan *atchan)
++{
++	struct dma_chan	*chan = &atchan->chan_common;
++
++	/* Channel should be paused by user
++	 * do it anyway even if it is not done already */
++	if (!test_bit(ATC_IS_PAUSED, &atchan->status)) {
++		dev_warn(chan2dev(chan),
++		"cyclic channel not paused, should be done by channel user\n");
++		atc_control(chan, DMA_PAUSE, 0);
++	}
++
++	/* now preserve additional data for cyclic operations */
++	/* next descriptor address in the cyclic list */
++	atchan->save_dscr = channel_readl(atchan, DSCR);
++
++	vdbg_dump_regs(atchan);
++}
++
+ static int at_dma_suspend_noirq(struct device *dev)
+ {
+ 	struct platform_device *pdev = to_platform_device(dev);
+ 	struct at_dma *atdma = platform_get_drvdata(pdev);
++	struct dma_chan *chan, *_chan;
+ 
+-	at_dma_off(platform_get_drvdata(pdev));
++	/* preserve data */
++	list_for_each_entry_safe(chan, _chan, &atdma->dma_common.channels,
++			device_node) {
++		struct at_dma_chan *atchan = to_at_dma_chan(chan);
++
++		if (test_bit(ATC_IS_CYCLIC, &atchan->status))
++			atc_suspend_cyclic(atchan);
++		atchan->save_cfg = channel_readl(atchan, CFG);
++	}
++	atdma->save_imr = dma_readl(atdma, EBCIMR);
++
++	/* disable DMA controller */
++	at_dma_off(atdma);
+ 	clk_disable(atdma->clk);
+ 	return 0;
+ }
+ 
++static void atc_resume_cyclic(struct at_dma_chan *atchan)
++{
++	struct at_dma	*atdma = to_at_dma(atchan->chan_common.device);
++
++	/* restore channel status for cyclic descriptors list:
++	 * next descriptor in the cyclic list at the time of suspend */
++	channel_writel(atchan, SADDR, 0);
++	channel_writel(atchan, DADDR, 0);
++	channel_writel(atchan, CTRLA, 0);
++	channel_writel(atchan, CTRLB, 0);
++	channel_writel(atchan, DSCR, atchan->save_dscr);
++	dma_writel(atdma, CHER, atchan->mask);
++
++	/* channel pause status should be removed by channel user
++	 * We cannot take the initiative to do it here */
++
++	vdbg_dump_regs(atchan);
++}
++
+ static int at_dma_resume_noirq(struct device *dev)
+ {
+ 	struct platform_device *pdev = to_platform_device(dev);
+ 	struct at_dma *atdma = platform_get_drvdata(pdev);
++	struct dma_chan *chan, *_chan;
+ 
++	/* bring back DMA controller */
+ 	clk_enable(atdma->clk);
+ 	dma_writel(atdma, EN, AT_DMA_ENABLE);
++
++	/* clear any pending interrupt */
++	while (dma_readl(atdma, EBCISR))
++		cpu_relax();
++
++	/* restore saved data */
++	dma_writel(atdma, EBCIER, atdma->save_imr);
++	list_for_each_entry_safe(chan, _chan, &atdma->dma_common.channels,
++			device_node) {
++		struct at_dma_chan *atchan = to_at_dma_chan(chan);
++
++		channel_writel(atchan, CFG, atchan->save_cfg);
++		if (test_bit(ATC_IS_CYCLIC, &atchan->status))
++			atc_resume_cyclic(atchan);
++	}
+ 	return 0;
+ }
+ 
+ static const struct dev_pm_ops at_dma_dev_pm_ops = {
++	.prepare = at_dma_prepare,
+ 	.suspend_noirq = at_dma_suspend_noirq,
+ 	.resume_noirq = at_dma_resume_noirq,
+ };
+diff --git a/drivers/dma/at_hdmac_regs.h b/drivers/dma/at_hdmac_regs.h
+index 087dbf1..6f0c4a3 100644
+--- a/drivers/dma/at_hdmac_regs.h
++++ b/drivers/dma/at_hdmac_regs.h
+@@ -204,6 +204,9 @@ enum atc_status {
+  * @status: transmit status information from irq/prep* functions
+  *                to tasklet (use atomic operations)
+  * @tasklet: bottom half to finish transaction work
++ * @save_cfg: configuration register that is saved on suspend/resume cycle
++ * @save_dscr: for cyclic operations, preserve next descriptor address in
++ *             the cyclic list on suspend/resume cycle
+  * @lock: serializes enqueue/dequeue operations to descriptors lists
+  * @completed_cookie: identifier for the most recently completed operation
+  * @active_list: list of descriptors dmaengine is being running on
+@@ -218,6 +221,8 @@ struct at_dma_chan {
+ 	u8			mask;
+ 	unsigned long		status;
+ 	struct tasklet_struct	tasklet;
++	u32			save_cfg;
++	u32			save_dscr;
+ 
+ 	spinlock_t		lock;
+ 
+@@ -248,6 +253,7 @@ static inline struct at_dma_chan *to_at_dma_chan(struct dma_chan *dchan)
+  * @chan_common: common dmaengine dma_device object members
+  * @ch_regs: memory mapped register base
+  * @clk: dma controller clock
++ * @save_imr: interrupt mask register that is saved on suspend/resume cycle
+  * @all_chan_mask: all channels availlable in a mask
+  * @dma_desc_pool: base of DMA descriptor region (DMA address)
+  * @chan: channels table to store at_dma_chan structures
+@@ -256,6 +262,7 @@ struct at_dma {
+ 	struct dma_device	dma_common;
+ 	void __iomem		*regs;
+ 	struct clk		*clk;
++	u32			save_imr;
+ 
+ 	u8			all_chan_mask;
+ 
+-- 
+1.7.4.1
