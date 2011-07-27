@@ -1,61 +1,51 @@
 From: tony.lin@freescale.com (Tony Lin)
-Date: Wed, 27 Jul 2011 13:29:31 +0800
-Subject: [PATCH v3 3/6] ARM: mxs: add usb clocks to clock tree
+Date: Wed, 27 Jul 2011 13:29:30 +0800
+Subject: [PATCH v3 2/6] ARM: mxs: enable usb1 phy power supply
 In-Reply-To: <1311744574-3610-1-git-send-email-tony.lin@freescale.com>
 References: <1311744574-3610-1-git-send-email-tony.lin@freescale.com>
-Message-ID: <1311744574-3610-4-git-send-email-tony.lin@freescale.com>
+Message-ID: <1311744574-3610-3-git-send-email-tony.lin@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add usb host clock and usb host phy clock to clock tree
-add usb dummy clocks to clock tree to get rid of adding
-more cpu_is_mx macros
+configure usb1 phy power enable gpio and enable usb1 phy power
 
 Signed-off-by: Tony Lin <tony.lin@freescale.com>
 ---
- arch/arm/mach-mxs/clock-mx28.c |   16 ++++++++++++++--
- 1 files changed, 14 insertions(+), 2 deletions(-)
+ arch/arm/mach-mxs/mach-mx28evk.c |    8 ++++++++
+ 1 files changed, 8 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
-index 5dcc59d..0afc98f 100644
---- a/arch/arm/mach-mxs/clock-mx28.c
-+++ b/arch/arm/mach-mxs/clock-mx28.c
-@@ -554,6 +554,8 @@ static struct clk rtc_clk = {
- 	.parent = &ref_xtal_clk,
+diff --git a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
+index eaaf6ff..9901547 100644
+--- a/arch/arm/mach-mxs/mach-mx28evk.c
++++ b/arch/arm/mach-mxs/mach-mx28evk.c
+@@ -34,6 +34,7 @@
+ #define MX28EVK_BL_ENABLE	MXS_GPIO_NR(3, 18)
+ #define MX28EVK_LCD_ENABLE	MXS_GPIO_NR(3, 30)
+ #define MX28EVK_FEC_PHY_RESET	MXS_GPIO_NR(4, 13)
++#define MX28EVK_USB1_PWR_EN	MXS_GPIO_NR(3, 8)
+ 
+ #define MX28EVK_MMC0_WRITE_PROTECT	MXS_GPIO_NR(2, 12)
+ #define MX28EVK_MMC1_WRITE_PROTECT	MXS_GPIO_NR(0, 28)
+@@ -183,6 +184,8 @@ static const iomux_cfg_t mx28evk_pads[] __initconst = {
+ 
+ 	/* led */
+ 	MX28_PAD_AUART1_TX__GPIO_3_5 | MXS_PAD_CTRL,
++	/* usb1 */
++	MX28_PAD_AUART2_RX__GPIO_3_8 | MXS_PAD_CTRL,
  };
  
-+static struct clk dummy_clk; /* initial to 0 and NULL */
+ /* led */
+@@ -405,6 +408,11 @@ static void __init mx28evk_init(void)
+ 		pr_warn("failed to request gpio mmc1-slot-power: %d\n", ret);
+ 	mx28_add_mxs_mmc(1, &mx28evk_mmc_pdata[1]);
+ 
++	ret = gpio_request_one(MX28EVK_USB1_PWR_EN, GPIOF_OUT_INIT_HIGH,
++			       "usb1-power-en");
++	if (ret)
++		pr_warn("failed to request gpio usb1-power-en %d\n", ret);
 +
- /* usb_clk gate is controlled in DIGCTRL other than CLKCTRL */
- static struct clk usb0_clk = {
- 	.enable_reg = DIGCTRL_BASE_ADDR,
-@@ -571,6 +573,14 @@ static struct clk usb1_clk = {
- 	.parent = &pll1_clk,
- };
+ 	gpio_led_register_device(0, &mx28evk_led_data);
+ }
  
-+/* usb phy clock for usb1 */
-+static struct clk usb_phy_clk1 = {
-+	.parent = &pll1_clk,
-+	.enable = _raw_clk_disable,
-+	.disable = _raw_clk_enable,
-+	.enable_reg = CLKCTRL_BASE_ADDR + HW_CLKCTRL_PLL1CTRL0,
-+	.enable_shift = 18,
-+};
- #define _DEFINE_CLOCK(name, er, es, p)					\
- 	static struct clk name = {					\
- 		.enable_reg	= CLKCTRL_BASE_ADDR + HW_CLKCTRL_##er,	\
-@@ -627,8 +637,10 @@ static struct clk_lookup lookups[] = {
- 	_REGISTER_CLOCK("mxs-mmc.1", NULL, ssp1_clk)
- 	_REGISTER_CLOCK("flexcan.0", NULL, can0_clk)
- 	_REGISTER_CLOCK("flexcan.1", NULL, can1_clk)
--	_REGISTER_CLOCK(NULL, "usb0", usb0_clk)
--	_REGISTER_CLOCK(NULL, "usb1", usb1_clk)
-+	_REGISTER_CLOCK("mxc-ehci", "usb1", usb1_clk)
-+	_REGISTER_CLOCK("mxc-ehci", "usb1_phy", usb_phy_clk1)
-+	_REGISTER_CLOCK("mxc-ehci", "usb", dummy_clk)
-+	_REGISTER_CLOCK("mxc-ehci", "usb_ahb", dummy_clk)
- 	_REGISTER_CLOCK("mxs-pwm.0", NULL, pwm_clk)
- 	_REGISTER_CLOCK("mxs-pwm.1", NULL, pwm_clk)
- 	_REGISTER_CLOCK("mxs-pwm.2", NULL, pwm_clk)
 -- 
 1.7.0.4
