@@ -1,99 +1,55 @@
-From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
-Date: Wed, 27 Jul 2011 11:42:51 +0200
-Subject: [PATCH 1/1] fix card interrupt losing issue on freescale eSDHC
-In-Reply-To: <97D3A72708D04647A5AC84A04996E5B5166B17@039-SN1MPN1-006.039d.mgd.msft.net>
-	(Lin Tony-B's message of "Wed, 27 Jul 2011 09:27:15 +0000")
-References: <1310966402-12318-1-git-send-email-tony.lin@freescale.com>
-	<20110727074710.GS16561@pengutronix.de>
-	<97D3A72708D04647A5AC84A04996E5B5166B17@039-SN1MPN1-006.039d.mgd.msft.net>
-Message-ID: <8762mokqjo.fsf@lebrac.rtp-net.org>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Wed, 27 Jul 2011 10:44:09 +0100
+Subject: [PATCH v2] ARM: alignment: Prevent ignoring of faults with ARMv6
+	unaligned access model
+In-Reply-To: <alpine.LFD.2.00.1107261723040.12766@xanadu.home>
+References: <1311689651-7372-1-git-send-email-dave.martin@linaro.org>
+	<alpine.LFD.2.00.1107261723040.12766@xanadu.home>
+Message-ID: <20110727094359.GA2171@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lin Tony-B19295 <B19295@freescale.com> writes:
+On Tue, Jul 26, 2011 at 05:28:57PM -0400, Nicolas Pitre wrote:
+> On Tue, 26 Jul 2011, Dave Martin wrote:
+> 
+> > Currently, it's possible to set the kernel to ignore alignment
+> > faults when changing the alignment fault handling mode at runtime
+> > via /proc/sys/alignment, even though this is undesirable on ARMv6
+> > and above, where it can result in infinite spins where an un-fixed-
+> > up instruction repeatedly faults.
+> 
+> This may be the case only if the U bit in CP15 reg 1 is set, right?
+> 
+> > In addition, the kernel clobbers any alignment mode specified on
+> > the command-line if running on ARMv6 or above.
+> > 
+> > This patch factors out the necessary safety check into a couple of
+> > new helper functions, and checks and modifies the fault handling
+> > mode as appropriate on boot and on writes to /proc/cpu/alignment.
+> > 
+> > Prior to ARMv6, the behaviour is unchanged.
+> > 
+> > For ARMv6 and above, the behaviour changes as follows:
+> > 
+> >   * Attempting to ignore faults on ARMv6 results in the mode being
+> >     forced to UM_FIXUP instead.  A warning is printed if this
+> >     happened as a result of a write to /proc/cpu/alignment.  The
+> >     user's UM_WARN bit (if present) is still honoured.
+> 
+> Why not clearing the U bit as well as the A bit to preserve consistency 
+> with the pre ARMv6 behavior?
 
-Hi,
+The old unaligned access behaviour is deprecated in ARMv6 (I believe)
+and is not supported at all in ARMv7 -- i.e., you can't turn the U bit
+off.  So this would be an additional special behaviour for ARMv6 only.
 
->> -----Original Message-----
->> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-
->> kernel-bounces at lists.infradead.org] On Behalf Of Uwe Kleine-K?nig
->> Sent: Wednesday, July 27, 2011 3:47 PM
->> To: Lin Tony-B19295
->> Cc: cjb at laptop.org; linux-mmc at vger.kernel.org; kernel at pengutronix.de;
->> linux-arm-kernel at lists.infradead.org
->> Subject: Re: [PATCH 1/1] fix card interrupt losing issue on freescale
->> eSDHC
->> 
->> Hello Tony,
->> 
->> On Mon, Jul 18, 2011 at 01:20:02PM +0800, Tony Lin wrote:
->> > apply workaround for imx eSDHC controller to avoid missing card
->> > interrupt so that SDIO function is workable
->> Fixing a few typos (but note, I'm not a native speaker):
->> 
->> 	mmc/sdhci-esdhc-imx: fix losing card interrupt
->> 
->> 	Apply workaround for the imx eSDHC controller to avoid missing a
->> 	card interrupt.
->> 
->> 	Signed-off-by: ...
->> 
->> > Signed-off-by: Tony Lin <tony.lin@freescale.com>
->> > ---
->> >  drivers/mmc/host/sdhci-esdhc-imx.c |   39 +++++++++++++++++++++++++++-
->> -------
->> >  1 files changed, 30 insertions(+), 9 deletions(-)
->> >
->> > diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c
->> > b/drivers/mmc/host/sdhci-esdhc-imx.c
->> > index a19967d..da77cae 100644
->> > --- a/drivers/mmc/host/sdhci-esdhc-imx.c
->> > +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
->> > @@ -32,6 +32,8 @@
->> >  #define  SDHCI_VENDOR_SPEC_SDIO_QUIRK	0x00000002
->> >
->> >  #define ESDHC_FLAG_GPIO_FOR_CD_WP	(1 << 0)
->> > +
->> > +#define	SDHCI_CTRL_D3CD			0x08
->> >  /*
->> >   * The CMDTYPE of the CMD register (offset 0xE) should be set to
->> >   * "11" when the STOP CMD12 is issued on imx53 to abort one @@ -87,14
->> > +89,31 @@ static void esdhc_writel_le(struct sdhci_host *host, u32
->> > val, int reg)  {
->> >  	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
->> >  	struct pltfm_imx_data *imx_data = pltfm_host->priv;
->> > -
->> > -	if (unlikely((reg == SDHCI_INT_ENABLE || reg == SDHCI_SIGNAL_ENABLE)
->> > -			&& (imx_data->flags & ESDHC_FLAG_GPIO_FOR_CD_WP)))
->> > -		/*
->> > -		 * these interrupts won't work with a custom card_detect gpio
->> > -		 * (only applied to mx25/35)
->> > -		 */
->> > -		val &= ~(SDHCI_INT_CARD_REMOVE | SDHCI_INT_CARD_INSERT);
->> > +	u32 data;
->> > +
->> > +	if (unlikely((reg == SDHCI_INT_ENABLE || reg ==
->> SDHCI_SIGNAL_ENABLE))) {
->> > +		if (imx_data->flags & ESDHC_FLAG_GPIO_FOR_CD_WP)
->> > +			/*
->> > +			 * these interrupts won't work with a custom
->> > +			 * card_detect gpio (only applied to mx25/35)
->> hmm, ok, this was here before, but I wonder about the "only applied to
->> mx25/35" part. How is that meant? I don't see logic to prevent other socs
->> using this workaround.
-> Sorry, not so sure about mx25/35 history. But the flag is set only if it's mx25 or mx35. 
-> You can check the code in esdhc_pltfm_init.
+I'm not sure that introducing yet another behaviour is useful here;
+anyone with legacy userspace software relying on the old unaligned
+access model presumably fixed it years ago.
 
-btw, I didn't notice when looking at the patch but this flag has been
-renamed and maybe will be gone. See :
-- latest commits on this file on mmc for-next:
-http://git.kernel.org/?p=linux/kernel/git/cjb/mmc.git;a=commitdiff;h=e8cd77e467f7bb1d4b942037c47b087334a484d4
-- last patch of the imx mmc fixes for cd/wp:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2011-June/052743.html
+Really, the patch was just intended resolve the inconsistency where
+the policy the kernel enforces for the alignment fixup mode on bootup
+is not enforced at run-time.
 
-So, imho, it would be better to use an other way to check for mx25/35 as
-current one won't work (at least won't compile but won't work as
-intended if the last patch mentionned is merged. There are other systems
-using gpio for cd or wp which are not mx25/35).
-
-Arnaud
+Cheers
+---Dave
