@@ -1,30 +1,33 @@
-From: philippe.retornaz@epfl.ch (Philippe =?iso-8859-15?q?R=E9tornaz?=)
-Date: Wed, 27 Jul 2011 10:28:09 +0200
-Subject: [RFC PATCH] ARM ASoC: add sound driver for imx27pdk using mc13783
-	codec
-In-Reply-To: <4E1711EA.5070209@televic.com>
-References: <1310131491-625-1-git-send-email-J.Lambrecht@televic.com>
-	<201107081611.25998.philippe.retornaz@epfl.ch>
-	<4E1711EA.5070209@televic.com>
-Message-ID: <201107271028.09928.philippe.retornaz@epfl.ch>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 27 Jul 2011 10:43:37 +0200
+Subject: [GIT PULL] i.mx driver device tree patches for 3.1
+In-Reply-To: <20110727020647.GE19600@S2100-06.ap.freescale.net>
+References: <20110726173048.GA19741@S2100-06.ap.freescale.net>
+	<20110727020647.GE19600@S2100-06.ap.freescale.net>
+Message-ID: <20110727084337.GP20587@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
-
-Le vendredi 8 juillet 2011 16:19:22, Lambrecht J?rgen a ?crit :
-> indeed, doesn't work at all. I know it used to work on 2.6.34.
-> We also have a fsl linux 2.6.22 were it works.
-> I must say: when i use aplay to play a mono file, then there is no
-> error, it just never ends, and no sound also.
-> For a stereo file, it gives the error.
-> Mark also that when I use madplay (v0.15.2) (or mp3play) to play a mono
-> or stereo mp3, it allocates 3 DMA channels, but only frees one after the
-> error.
+On Wed, Jul 27, 2011 at 10:06:48AM +0800, Shawn Guo wrote:
+> On Wed, Jul 27, 2011 at 01:30:49AM +0800, Shawn Guo wrote:
+> > Hi Arnd,
+> > 
 > 
+> The following changes since commit b0189cd087aa82bd23277cb5c8960ab030e13e5c:
+> 
+>   Merge branch 'next/devel2' of git://git.kernel.org/pub/scm/linux/kernel/git/arm/linux-arm-soc (2011-07-26 17:42:18 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.linaro.org/people/shawnguo/linux-2.6.git for-arnd
 
-Did you made any progress on this ? 
+I'm fine with this one. Arnd, please pull if you like.
 
-Regards,
+Sascha
 
-Philippe
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
