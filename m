@@ -1,29 +1,30 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 27 Jul 2011 10:27:54 +0200
-Subject: please add MACH_APF9328 to mach-types
-In-Reply-To: <20110727082303.GA21584@n2100.arm.linux.org.uk>
-References: <20110725210859.GL16561@pengutronix.de>
-	<20110727082303.GA21584@n2100.arm.linux.org.uk>
-Message-ID: <20110727082754.GT16561@pengutronix.de>
+From: philippe.retornaz@epfl.ch (Philippe =?iso-8859-15?q?R=E9tornaz?=)
+Date: Wed, 27 Jul 2011 10:28:09 +0200
+Subject: [RFC PATCH] ARM ASoC: add sound driver for imx27pdk using mc13783
+	codec
+In-Reply-To: <4E1711EA.5070209@televic.com>
+References: <1310131491-625-1-git-send-email-J.Lambrecht@televic.com>
+	<201107081611.25998.philippe.retornaz@epfl.ch>
+	<4E1711EA.5070209@televic.com>
+Message-ID: <201107271028.09928.philippe.retornaz@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 27, 2011 at 09:23:03AM +0100, Russell King - ARM Linux wrote:
-> On Mon, Jul 25, 2011 at 11:08:59PM +0200, Uwe Kleine-K?nig wrote:
-> > mx1_defconfig currently fails to build because MACH_APF9328 is missing
-> > in arch/arm/tools/mach-types.
-> > 
-> > Can you please add it back?
+Hi
+
+Le vendredi 8 juillet 2011 16:19:22, Lambrecht J?rgen a ?crit :
+> indeed, doesn't work at all. I know it used to work on 2.6.34.
+> We also have a fsl linux 2.6.22 were it works.
+> I must say: when i use aplay to play a mono file, then there is no
+> error, it just never ends, and no sound also.
+> For a stereo file, it gives the error.
+> Mark also that when I use madplay (v0.15.2) (or mp3play) to play a mono
+> or stereo mp3, it allocates 3 DMA channels, but only frees one after the
+> error.
 > 
-> Most people tell me the number.
-I'll interpret this as an hit to give it to you. The complete line to
-add is:
 
-apf9328			MACH_APF9328		APF9328			906
+Did you made any progress on this ? 
 
-Thanks,
-Uwe
+Regards,
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Philippe
