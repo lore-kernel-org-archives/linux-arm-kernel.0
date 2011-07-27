@@ -1,87 +1,55 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Wed, 27 Jul 2011 11:01:50 +0200
-Subject: [PATCH v3 0/6] ARM: mx28: add usb host function
-In-Reply-To: <1311744574-3610-1-git-send-email-tony.lin@freescale.com>
-References: <1311744574-3610-1-git-send-email-tony.lin@freescale.com>
-Message-ID: <4E2FD3FE.5080100@pengutronix.de>
+From: per.forlin@linaro.org (Per Forlin)
+Date: Wed, 27 Jul 2011 11:02:12 +0200
+Subject: [PATCH v4 2/3] mmc: core: add random fault injection
+In-Reply-To: <CAC5umygcfno0-=rA9G0OcxuVK2YK9UokfoYoy45qBT8w0+ytvg@mail.gmail.com>
+References: <1311711119-6286-1-git-send-email-per.forlin@linaro.org>
+	<1311711119-6286-3-git-send-email-per.forlin@linaro.org>
+	<CAC5umygcfno0-=rA9G0OcxuVK2YK9UokfoYoy45qBT8w0+ytvg@mail.gmail.com>
+Message-ID: <CAJ0pr19RWjCJAvnkVR+gL7y8_X4TSFfs7JqXgydWuWMAPPb1ZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/27/2011 07:29 AM, Tony Lin wrote:
-> this patch series is to add mx28 usb host function.
-> the driver only support usb host mode on usb port1.
-> the driver reuses ehci-mxc.c under usb/host, but add
-> platform irq handler routines if platform wants to 
-> do something specific in irq handler.
-> the patch also consolidates some macro definitions
-> and structure definitions to make ehci-mxc.c better
-> reusable among mxs/mxc platforms.
-> 
-> Code is based on the branch for-next in sascha's tree http://git.pengutronix.de/git/imx/linux-2.6.git
-> 
-> Tested on MX28 EVK.
-> 
-> changes since v2:
->  * add error condition clean up code.
->  * remove unnecessary initial code.
->  * change file name from regs-usbphy-mx28 to regs-usbphy-mxs.h.
-> 
-> changes since v1:
->  * add dummy clock to avoid adding cpu judgement in driver for Sascha's request.
+On 27 July 2011 01:17, Akinobu Mita <akinobu.mita@gmail.com> wrote:
+> 2011/7/27 Per Forlin <per.forlin@linaro.org>:
+>> This adds support to inject data errors after a completed host transfer.
+>> The mmc core will return error even though the host transfer is successful.
+>> This simple fault injection proved to be very useful to test the
+>> non-blocking error handling in the mmc_blk_issue_rw_rq().
+>> Random faults can also test how the host driver handles pre_req()
+>> and post_req() in case of errors.
+>
+> Looks good but I have one question.
+>
+>> @@ -304,6 +307,10 @@ struct mmc_host {
+>>
+>> ? ? ? ?struct mmc_async_req ? ?*areq; ? ? ? ? ?/* active async req */
+>>
+>> +#ifdef CONFIG_FAIL_MMC_REQUEST
+>> + ? ? ? u8 ? ? ? ? ? ? ? ? ? ? ?make_it_fail;
+>> + ? ? ? struct fault_attr ? ? ? fail_mmc_request;
+>> +#endif
+>> ? ? ? ?unsigned long ? ? ? ? ? private[0] ____cacheline_aligned;
+>> ?};
+>
+> I think make_it_fail is not needed anymore because if fail_attr is
+> defined per-host then you can enable it by setting probability=0
+> or times=0 per-host.
+>
+Yes, if there are many debugfs entries, one for each host make_if_fail
+is no longer necessary.
+There is an issue with patch v4 now when fault_attr is per-host.
+Without your patch the entry is still created at the root but there
+are many instances of fault-attr. I think it's better to wait for your
+patch to make it into the mmc-next tree before submitting my patch. I
+will prepare a patch v5 that depends on your upcoming changes in
+fault-inject with a note that states the dependency.
 
-What about providing dummy clock definitions to the mxc's that don't
-have the clocks, too. This way you can remove all the cpu_is from
-"drivers/usb/host/ehci-mxc.c". You don't have to add all cpu_is_mx* to
-your "arch/arm/mach-mxs/include/mach/mxs.h".
+Would you mind adding "patch 1/3" (export_symbol_gpl) to your
+patch-set since it depends on the new function names in your patch?
+If not, I can resend the patch on top of your changes to match the new
+function names if you prefer to have this patch separate.
 
->  * use context in phy functions, so that usb device could share the code.
->  * some code consolidation and patch reorgnization.
->  * error checking improvement.
->  * remove a few unneccesary code.
-> 
-> Tony Lin (6):
->   ARM: mxs: ehci: consolidate definitions and structures to share among platforms
->   ARM: mxs: enable usb1 phy power supply
->   ARM: mxs: add usb clocks to clock tree
->   ARM: mxs: make ehci-mxc more flexible to be used on different platforms
->   ARM: mxs: add usb phy operations
->   ARM: mxs: add usb host function to default config
-> 
->  arch/arm/configs/mxs_defconfig            |    8 +-
->  arch/arm/mach-mxs/Kconfig                 |    1 +
->  arch/arm/mach-mxs/Makefile                |    1 +
->  arch/arm/mach-mxs/clock-mx28.c            |   16 ++-
->  arch/arm/mach-mxs/include/mach/hardware.h |    2 +
->  arch/arm/mach-mxs/include/mach/mxs.h      |   12 +-
->  arch/arm/mach-mxs/mach-mx28evk.c          |    8 +
->  arch/arm/mach-mxs/mxs_usb.c               |  288 +++++++++++++++++++++++++++++
->  arch/arm/mach-mxs/regs-usbphy-mxs.h       |  240 ++++++++++++++++++++++++
->  arch/arm/plat-mxc/include/mach/mxc_ehci.h |   19 --
->  drivers/usb/host/Kconfig                  |    2 +-
->  drivers/usb/host/ehci-mxc.c               |   19 ++-
->  include/linux/fsl_devices.h               |   21 ++
->  13 files changed, 609 insertions(+), 28 deletions(-)
->  create mode 100644 arch/arm/mach-mxs/mxs_usb.c
->  create mode 100644 arch/arm/mach-mxs/regs-usbphy-mxs.h
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Please let me know.
 
-cheers, Marc
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 262 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110727/5105717c/attachment.sig>
+Thanks,
+Per
