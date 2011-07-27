@@ -1,38 +1,34 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Wed, 27 Jul 2011 15:32:34 +0100
-Subject: [PATCH v2] ARM: alignment: Prevent ignoring of faults with ARMv6
-	unaligned access model
-In-Reply-To: <alpine.LFD.2.00.1107271009580.12766@xanadu.home>
-References: <1311689651-7372-1-git-send-email-dave.martin@linaro.org>
-	<alpine.LFD.2.00.1107261723040.12766@xanadu.home>
-	<20110727094359.GA2171@arm.com>
-	<alpine.LFD.2.00.1107271009580.12766@xanadu.home>
-Message-ID: <20110727143233.GC2171@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 27 Jul 2011 16:47:43 +0200
+Subject: [PULL] at91 init factorize
+In-Reply-To: <20110727121156.GK10037@game.jcrosoft.org>
+References: <20110727121156.GK10037@game.jcrosoft.org>
+Message-ID: <201107271647.44015.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 27, 2011 at 10:10:46AM -0400, Nicolas Pitre wrote:
-> On Wed, 27 Jul 2011, Dave Martin wrote:
+On Wednesday 27 July 2011, Jean-Christophe PLAGNIOL-VILLARD wrote:
+>         This patch series factorize the init of the at91 soc and start the
+>         work to make the at91 capable to choose the soc at runtime instead of
+>         compile time.
 > 
-> > On Tue, Jul 26, 2011 at 05:28:57PM -0400, Nicolas Pitre wrote:
-> > > Why not clearing the U bit as well as the A bit to preserve consistency 
-> > > with the pre ARMv6 behavior?
-> > 
-> > The old unaligned access behaviour is deprecated in ARMv6 (I believe)
-> > and is not supported at all in ARMv7 -- i.e., you can't turn the U bit
-> > off.  So this would be an additional special behaviour for ARMv6 only.
-> > 
-> > I'm not sure that introducing yet another behaviour is useful here;
-> > anyone with legacy userspace software relying on the old unaligned
-> > access model presumably fixed it years ago.
-> > 
-> > Really, the patch was just intended resolve the inconsistency where
-> > the policy the kernel enforces for the alignment fixup mode on bootup
-> > is not enforced at run-time.
+>         The next work will be to factorize the device resource registration
+>         and then switch to the device tree
 > 
-> OK, that makes sense then.
+>         please pull
+> 
+> The following changes since commit e371d46ae45488bcb112a99a7de462e9e3aa6764:
+> 
+>   Merge branch 'for-linus' of git://git.kernel.org/pub/scm/linux/kernel/git/viro/vfs-2.6 (2011-07-26 18:30:20 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://github.com/at91linux/linux-2.6-at91.git j/soc-detect
 
-Can I take that as an Ack?
+The patches look good, but come at an inconvenient time. We're still
+in the merge window, so I don't want to add stuff to linux-next yet
+that is destined for 3.2, and I have already sent out all the arm-soc
+patches for the 3.1 merge window, so I don't really want to send another
+round of patches at the last minute.
 
-Cheers
----Dave
+	Arnd
