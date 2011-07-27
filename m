@@ -1,112 +1,49 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 27 Jul 2011 10:06:48 +0800
-Subject: [GIT PULL] i.mx driver device tree patches for 3.1
-In-Reply-To: <20110726173048.GA19741@S2100-06.ap.freescale.net>
-References: <20110726173048.GA19741@S2100-06.ap.freescale.net>
-Message-ID: <20110727020647.GE19600@S2100-06.ap.freescale.net>
+Date: Wed, 27 Jul 2011 10:09:57 +0800
+Subject: [PATCH] usb/ehci-mxc: add missing inclusion of mach/hardware.h
+In-Reply-To: <1311258250-22013-1-git-send-email-shawn.guo@linaro.org>
+References: <1311258250-22013-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20110727020951.GF19600@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 27, 2011 at 01:30:49AM +0800, Shawn Guo wrote:
-> Hi Arnd,
-> 
-> Here are a bunch of i.mx driver device tree support patches, which have
-> gone through the review and got acks from Grant and subsystem
-> maintainers (except serial).  I had ping Alan Cox several times for his
-> ack, but he never responded, so I Cc-ed Greg here to see if I can get
-> his ack on those two serial/imx patches.
-> 
-> The reason these patches were not included in Sascha's pull-req is they
-> had dependency on spi/gpio/mmc trees.  Since Linus has merged these
-> trees, I start sending them out.
-> 
-> Sascha,
-> 
-> Since your imx-features branch has been moving forward, I chose to send
-> this pull-req off arm-soc/imx/devel.  Can you please ack this pull-req?
-> 
+Hi Alan,
 
-Since Linus just merged Arnd's branch which my patches have dependency
-on, it becomes the easiest for me to send pull request based on
-mainline.  Here it is.
-
-PS. The mainline currently fails to build i.mx, caused by the missing
-inclusion of mach/hardware.h in usb/host/ehci-mxc.c.  I noticed it on
-linux-next days ago, and had sent a patch for it.  With this fixed, my
-branch works fine.
-
-https://patchwork.kernel.org/patch/995032/
+Linus tree is currently failing on i.mx build because of this.
 
 Regards,
 Shawn
 
-The following changes since commit b0189cd087aa82bd23277cb5c8960ab030e13e5c:
-
-  Merge branch 'next/devel2' of git://git.kernel.org/pub/scm/linux/kernel/git/arm/linux-arm-soc (2011-07-26 17:42:18 -0700)
-
-are available in the git repository at:
-
-  git://git.linaro.org/people/shawnguo/linux-2.6.git for-arnd
-
-Shawn Guo (14):
-      serial/imx: get rid of the uses of cpu_is_mx1()
-      serial/imx: add device tree probe support
-      net/fec: gasket needs to be enabled for some i.mx
-      dt/net: add helper function of_get_phy_mode
-      net: ibm_newemac: convert it to use of_get_phy_mode
-      net/fec: add device tree probe support
-      mmc: sdhci-esdhc-imx: extend card_detect and write_protect support for mx5
-      mmc: sdhci-esdhc-imx: do not reference platform data after probe
-      mmc: sdhci-esdhc-imx: get rid of the uses of cpu_is_mx()
-      mmc: sdhci-pltfm: dt device does not pass parent to sdhci_alloc_host
-      mmc: sdhci-esdhc-imx: add device tree probe support
-      dmaengine: imx-sdma: use platform_device_id to identify sdma version
-      dmaengine: imx-sdma: sdma_get_firmware does not need to copy fw_name
-      dmaengine: imx-sdma: add device tree probe support
-
- .../devicetree/bindings/dma/fsl-imx-sdma.txt       |   17 ++
- .../devicetree/bindings/mmc/fsl-imx-esdhc.txt      |   34 +++
- Documentation/devicetree/bindings/net/fsl-fec.txt  |   24 ++
- .../bindings/tty/serial/fsl-imx-uart.txt           |   19 ++
- arch/arm/mach-imx/clock-imx1.c                     |    6 +-
- arch/arm/mach-imx/clock-imx21.c                    |    8 +-
- arch/arm/mach-imx/clock-imx25.c                    |   20 +-
- arch/arm/mach-imx/clock-imx27.c                    |   15 +-
- arch/arm/mach-imx/clock-imx31.c                    |   13 +-
- arch/arm/mach-imx/clock-imx35.c                    |   18 +-
- arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c     |    3 +-
- arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c     |    3 +-
- arch/arm/mach-imx/mach-mx25_3ds.c                  |    2 +
- arch/arm/mach-imx/mach-pcm043.c                    |    2 +
- arch/arm/mach-imx/mm-imx25.c                       |    4 +-
- arch/arm/mach-imx/mm-imx31.c                       |    3 +-
- arch/arm/mach-imx/mm-imx35.c                       |    3 +-
- arch/arm/mach-mx5/board-mx51_babbage.c             |   14 +-
- arch/arm/mach-mx5/board-mx53_loco.c                |    4 +
- arch/arm/mach-mx5/clock-mx51-mx53.c                |   46 ++--
- arch/arm/mach-mx5/mm.c                             |    8 +-
- arch/arm/mach-mx5/mx51_efika.c                     |    4 +-
- arch/arm/plat-mxc/devices/platform-fec.c           |   21 +-
- arch/arm/plat-mxc/devices/platform-imx-dma.c       |    4 +-
- arch/arm/plat-mxc/devices/platform-imx-uart.c      |    7 +-
- .../plat-mxc/devices/platform-sdhci-esdhc-imx.c    |   29 ++-
- arch/arm/plat-mxc/include/mach/devices-common.h    |    4 +-
- arch/arm/plat-mxc/include/mach/dma.h               |    3 +-
- arch/arm/plat-mxc/include/mach/esdhc.h             |   25 ++-
- arch/arm/plat-mxc/include/mach/sdma.h              |    2 -
- drivers/dma/imx-sdma.c                             |   94 ++++++--
- drivers/mmc/host/sdhci-esdhc-imx.c                 |  261 +++++++++++++++-----
- drivers/mmc/host/sdhci-pltfm.c                     |    3 +-
- drivers/net/fec.c                                  |  125 +++++++++-
- drivers/net/ibm_newemac/core.c                     |   33 +---
- drivers/net/ibm_newemac/emac.h                     |   19 +-
- drivers/net/ibm_newemac/phy.c                      |    7 +-
- drivers/of/of_net.c                                |   45 ++++
- drivers/tty/serial/imx.c                           |  166 +++++++++++--
- include/linux/of_net.h                             |    1 +
- include/linux/phy.h                                |    4 +-
- 41 files changed, 861 insertions(+), 262 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/dma/fsl-imx-sdma.txt
- create mode 100644 Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt
- create mode 100644 Documentation/devicetree/bindings/net/fsl-fec.txt
- create mode 100644 Documentation/devicetree/bindings/tty/serial/fsl-imx-uart.txt
+On Thu, Jul 21, 2011 at 10:24:10PM +0800, Shawn Guo wrote:
+> As cpu_is_mx stuff is being used in the driver, header mach/hardware.h
+> should be explicitly included.
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+> The missing of the header is causing today's linux-next build error
+> as bleow.
+> 
+>   CC      drivers/usb/host/ehci-hcd.o
+> In file included from linux-next/drivers/usb/host/ehci-hcd.c:1190:0:
+> linux-next/drivers/usb/host/ehci-mxc.c: In function 'ehci_mxc_drv_probe':
+> linux-next/drivers/usb/host/ehci-mxc.c:175:2: error: implicit declaration of function 'cpu_is_mx35'
+> linux-next/drivers/usb/host/ehci-mxc.c:175:2: error: implicit declaration of function 'cpu_is_mx25'
+> linux-next/drivers/usb/host/ehci-mxc.c:185:2: error: implicit declaration of function 'cpu_is_mx51'
+> 
+>  drivers/usb/host/ehci-mxc.c |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/usb/host/ehci-mxc.c b/drivers/usb/host/ehci-mxc.c
+> index 0c058be..555a73c 100644
+> --- a/drivers/usb/host/ehci-mxc.c
+> +++ b/drivers/usb/host/ehci-mxc.c
+> @@ -24,6 +24,7 @@
+>  #include <linux/usb/ulpi.h>
+>  #include <linux/slab.h>
+>  
+> +#include <mach/hardware.h>
+>  #include <mach/mxc_ehci.h>
+>  
+>  #include <asm/mach-types.h>
+> -- 
+> 1.7.4.1
