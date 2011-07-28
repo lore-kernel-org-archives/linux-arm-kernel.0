@@ -1,112 +1,115 @@
-From: manuel.pezzin@free.fr (manu)
-Date: Thu, 28 Jul 2011 21:22:59 +0200
-Subject: [PATCH] mtd/m25p80: add device tree probe support
-In-Reply-To: <20110725211910.GG26735@ponder.secretlab.ca>
-References: <1311601063-16581-1-git-send-email-shawn.guo@linaro.org>
-	<20110725211910.GG26735@ponder.secretlab.ca>
-Message-ID: <4E31B713.1030901@free.fr>
+From: davidb@codeaurora.org (David Brown)
+Date: Thu, 28 Jul 2011 13:18:10 -0700
+Subject: [PATCH 1/2] ARM: msm: Remove .boot_params from MSM boardfiles
+In-Reply-To: <1311794355-26988-2-git-send-email-sboyd@codeaurora.org>
+References: <1311794355-26988-2-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1311884291-5409-1-git-send-email-davidb@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Grant, Shawn,
-I don't this patch is required as m25p** serial flashes are supported 
-already with generic OF/SPI and OF/MTD schemes.
-I have successfully used it myself on an unmodified 2.6.36.3 vanilla 
-kernel on a xilinx/powerpc platform with a m25p32 part from STM.
-You will find attached the corresponding working defconfig + dts files 
-(appart from partitions which I didn't managed to configure properly...).
-Best Regards,
+The bootloaders on MSM always pass the ATAGs address to the kernel in
+r2.  It isn't necessary to set .boot_params in the machine
+descriptors, and this unnecessarily hinders having a common kernel for
+multiple targets, so remove them.
 
-Manuel
+Signed-off-by: David Brown <davidb@codeaurora.org>
 
-
-Le 25/07/2011 23:19, Grant Likely a ?crit :
-> On Mon, Jul 25, 2011 at 09:37:43PM +0800, Shawn Guo wrote:
->> It adds device tree probe support for m25p80 driver.
->>
->> Signed-off-by: Shawn Guo<shawn.guo@linaro.org>
->> Cc: Grant Likely<grant.likely@secretlab.ca>
->> Cc: Artem Bityutskiy<artem.bityutskiy@intel.com>
-> Acked-by: Grant Likely<grant.likely@secretlab.ca>
->> ---
->>   Documentation/devicetree/bindings/mtd/st-m25p.txt |   14 ++++++++++++++
->>   drivers/mtd/devices/m25p80.c                      |   12 ++++++++++++
->>   2 files changed, 26 insertions(+), 0 deletions(-)
->>   create mode 100644 Documentation/devicetree/bindings/mtd/st-m25p.txt
->>
->> diff --git a/Documentation/devicetree/bindings/mtd/st-m25p.txt b/Documentation/devicetree/bindings/mtd/st-m25p.txt
->> new file mode 100644
->> index 0000000..a8c0485
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/mtd/st-m25p.txt
->> @@ -0,0 +1,14 @@
->> +* STMicroelectronics SPI Flash
->> +
->> +Required properties:
->> +- compatible : "st,<model>", "st,m25p".
->> +
->> +Examples:
->> +
->> +flash: m25p32 at 1 {
->> +	#address-cells =<1>;
->> +	#size-cells =<1>;
->> +	compatible = "st,m25p32", "st,m25p";
->> +	spi-max-frequency =<20000000>;
->> +	reg =<1>;
->> +};
->> diff --git a/drivers/mtd/devices/m25p80.c b/drivers/mtd/devices/m25p80.c
->> index e6ba034..d9d4101 100644
->> --- a/drivers/mtd/devices/m25p80.c
->> +++ b/drivers/mtd/devices/m25p80.c
->> @@ -26,6 +26,7 @@
->>   #include<linux/slab.h>
->>   #include<linux/sched.h>
->>   #include<linux/mod_devicetable.h>
->> +#include<linux/of_device.h>
->>
->>   #include<linux/mtd/cfi.h>
->>   #include<linux/mtd/mtd.h>
->> @@ -767,6 +768,16 @@ static const struct spi_device_id m25p_ids[] = {
->>   };
->>   MODULE_DEVICE_TABLE(spi, m25p_ids);
->>
->> +#ifdef CONFIG_OF
->> +static const struct of_device_id m25p_dt_ids[] = {
->> +	{ .compatible = "st,m25p", },
->> +	{ /* sentinel */ }
->> +};
->> +MODULE_DEVICE_TABLE(of, m25p_dt_ids);
->> +#else
->> +#define m25p_dt_ids NULL
->> +#endif
->> +
->>   static const struct spi_device_id *__devinit jedec_probe(struct spi_device *spi)
->>   {
->>   	int			tmp;
->> @@ -986,6 +997,7 @@ static struct spi_driver m25p80_driver = {
->>   		.name	= "m25p80",
->>   		.bus	=&spi_bus_type,
->>   		.owner	= THIS_MODULE,
->> +		.of_match_table = m25p_dt_ids,
->>   	},
->>   	.id_table	= m25p_ids,
->>   	.probe	= m25p_probe,
->> -- 
->> 1.7.4.1
->>
->>
-> _______________________________________________
-> devicetree-discuss mailing list
-> devicetree-discuss at lists.ozlabs.org
-> https://lists.ozlabs.org/listinfo/devicetree-discuss
->
->
-
--------------- next part --------------
-An embedded and charset-unspecified text was scrubbed...
-Name: sample_defconfig
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110728/584402c8/attachment-0002.ksh>
--------------- next part --------------
-An embedded and charset-unspecified text was scrubbed...
-Name: sample_devtree.dts
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110728/584402c8/attachment-0003.ksh>
+diff --git a/arch/arm/mach-msm/board-msm7x27.c b/arch/arm/mach-msm/board-msm7x27.c
+index c03f269..f7acdc5 100644
+--- a/arch/arm/mach-msm/board-msm7x27.c
++++ b/arch/arm/mach-msm/board-msm7x27.c
+@@ -130,7 +130,6 @@ static void __init msm7x2x_map_io(void)
+ }
+ 
+ MACHINE_START(MSM7X27_SURF, "QCT MSM7x27 SURF")
+-	.boot_params	= PLAT_PHYS_OFFSET + 0x100,
+ 	.map_io		= msm7x2x_map_io,
+ 	.init_irq	= msm7x2x_init_irq,
+ 	.init_machine	= msm7x2x_init,
+@@ -138,7 +137,6 @@ MACHINE_START(MSM7X27_SURF, "QCT MSM7x27 SURF")
+ MACHINE_END
+ 
+ MACHINE_START(MSM7X27_FFA, "QCT MSM7x27 FFA")
+-	.boot_params	= PLAT_PHYS_OFFSET + 0x100,
+ 	.map_io		= msm7x2x_map_io,
+ 	.init_irq	= msm7x2x_init_irq,
+ 	.init_machine	= msm7x2x_init,
+@@ -146,7 +144,6 @@ MACHINE_START(MSM7X27_FFA, "QCT MSM7x27 FFA")
+ MACHINE_END
+ 
+ MACHINE_START(MSM7X25_SURF, "QCT MSM7x25 SURF")
+-	.boot_params	= PLAT_PHYS_OFFSET + 0x100,
+ 	.map_io		= msm7x2x_map_io,
+ 	.init_irq	= msm7x2x_init_irq,
+ 	.init_machine	= msm7x2x_init,
+@@ -154,7 +151,6 @@ MACHINE_START(MSM7X25_SURF, "QCT MSM7x25 SURF")
+ MACHINE_END
+ 
+ MACHINE_START(MSM7X25_FFA, "QCT MSM7x25 FFA")
+-	.boot_params	= PLAT_PHYS_OFFSET + 0x100,
+ 	.map_io		= msm7x2x_map_io,
+ 	.init_irq	= msm7x2x_init_irq,
+ 	.init_machine	= msm7x2x_init,
+diff --git a/arch/arm/mach-msm/board-msm7x30.c b/arch/arm/mach-msm/board-msm7x30.c
+index d1e4cc8..4d5065f 100644
+--- a/arch/arm/mach-msm/board-msm7x30.c
++++ b/arch/arm/mach-msm/board-msm7x30.c
+@@ -122,7 +122,6 @@ static void __init msm7x30_map_io(void)
+ }
+ 
+ MACHINE_START(MSM7X30_SURF, "QCT MSM7X30 SURF")
+-	.boot_params = PLAT_PHYS_OFFSET + 0x100,
+ 	.fixup = msm7x30_fixup,
+ 	.reserve = msm7x30_reserve,
+ 	.map_io = msm7x30_map_io,
+@@ -132,7 +131,6 @@ MACHINE_START(MSM7X30_SURF, "QCT MSM7X30 SURF")
+ MACHINE_END
+ 
+ MACHINE_START(MSM7X30_FFA, "QCT MSM7X30 FFA")
+-	.boot_params = PLAT_PHYS_OFFSET + 0x100,
+ 	.fixup = msm7x30_fixup,
+ 	.reserve = msm7x30_reserve,
+ 	.map_io = msm7x30_map_io,
+@@ -142,7 +140,6 @@ MACHINE_START(MSM7X30_FFA, "QCT MSM7X30 FFA")
+ MACHINE_END
+ 
+ MACHINE_START(MSM7X30_FLUID, "QCT MSM7X30 FLUID")
+-	.boot_params = PLAT_PHYS_OFFSET + 0x100,
+ 	.fixup = msm7x30_fixup,
+ 	.reserve = msm7x30_reserve,
+ 	.map_io = msm7x30_map_io,
+diff --git a/arch/arm/mach-msm/board-qsd8x50.c b/arch/arm/mach-msm/board-qsd8x50.c
+index 6a96911..94cca95 100644
+--- a/arch/arm/mach-msm/board-qsd8x50.c
++++ b/arch/arm/mach-msm/board-qsd8x50.c
+@@ -193,7 +193,6 @@ static void __init qsd8x50_init(void)
+ }
+ 
+ MACHINE_START(QSD8X50_SURF, "QCT QSD8X50 SURF")
+-	.boot_params = PLAT_PHYS_OFFSET + 0x100,
+ 	.map_io = qsd8x50_map_io,
+ 	.init_irq = qsd8x50_init_irq,
+ 	.init_machine = qsd8x50_init,
+@@ -201,7 +200,6 @@ MACHINE_START(QSD8X50_SURF, "QCT QSD8X50 SURF")
+ MACHINE_END
+ 
+ MACHINE_START(QSD8X50A_ST1_5, "QCT QSD8X50A ST1.5")
+-	.boot_params = PLAT_PHYS_OFFSET + 0x100,
+ 	.map_io = qsd8x50_map_io,
+ 	.init_irq = qsd8x50_init_irq,
+ 	.init_machine = qsd8x50_init,
+diff --git a/arch/arm/mach-msm/board-sapphire.c b/arch/arm/mach-msm/board-sapphire.c
+index 68f930f..950a27e 100644
+--- a/arch/arm/mach-msm/board-sapphire.c
++++ b/arch/arm/mach-msm/board-sapphire.c
+@@ -105,7 +105,6 @@ static void __init sapphire_map_io(void)
+ 
+ MACHINE_START(SAPPHIRE, "sapphire")
+ /* Maintainer: Brian Swetland <swetland@google.com> */
+-	.boot_params    = PLAT_PHYS_OFFSET + 0x100,
+ 	.fixup          = sapphire_fixup,
+ 	.map_io         = sapphire_map_io,
+ 	.init_irq       = sapphire_init_irq,
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
