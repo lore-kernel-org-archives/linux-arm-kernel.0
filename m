@@ -1,32 +1,35 @@
 From: akpm@linux-foundation.org (akpm at linux-foundation.org)
-Date: Thu, 28 Jul 2011 13:50:55 -0700
-Subject: [patch 2/2] arm, exec: remove redundant set_fs(USER_DS)
-Message-ID: <201107282050.p6SKot9w007801@imap1.linux-foundation.org>
+Date: Thu, 28 Jul 2011 13:50:54 -0700
+Subject: [patch 1/2] arch/arm/mach-ux500/mbox-db5500.c: world-writable sysfs
+	fifo file
+Message-ID: <201107282050.p6SKos0I007798@imap1.linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mathias Krause <minipli@googlemail.com>
+From: Vasiliy Kulikov <segoon@openwall.com>
 
-The address limit is already set in flush_old_exec() so this
-set_fs(USER_DS) is redundant.
+Don't allow everybody to use a modem.
 
-Signed-off-by: Mathias Krause <minipli@googlemail.com>
-Cc: Russell King <rmk@arm.linux.org.uk>
+Signed-off-by: Vasiliy Kulikov <segoon@openwall.com>
+Cc: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
+Cc: Linus Walleij <linus.walleij@stericsson.com>
+Cc: Russell King <linux@arm.linux.org.uk>
 Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
 ---
 
- arch/arm/include/asm/processor.h |    1 -
- 1 file changed, 1 deletion(-)
+ arch/arm/mach-ux500/mbox-db5500.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff -puN arch/arm/include/asm/processor.h~arm-exec-remove-redundant-set_fsuser_ds arch/arm/include/asm/processor.h
---- a/arch/arm/include/asm/processor.h~arm-exec-remove-redundant-set_fsuser_ds
-+++ a/arch/arm/include/asm/processor.h
-@@ -55,7 +55,6 @@ struct thread_struct {
- #define start_thread(regs,pc,sp)					\
- ({									\
- 	unsigned long *stack = (unsigned long *)sp;			\
--	set_fs(USER_DS);						\
- 	memset(regs->uregs, 0, sizeof(regs->uregs));			\
- 	if (current->personality & ADDR_LIMIT_32BIT)			\
- 		regs->ARM_cpsr = USR_MODE;				\
+diff -puN arch/arm/mach-ux500/mbox-db5500.c~arch-arm-mach-ux500-mbox-db5500c-world-writable-sysfs-fifo-file arch/arm/mach-ux500/mbox-db5500.c
+--- a/arch/arm/mach-ux500/mbox-db5500.c~arch-arm-mach-ux500-mbox-db5500c-world-writable-sysfs-fifo-file
++++ a/arch/arm/mach-ux500/mbox-db5500.c
+@@ -168,7 +168,7 @@ static ssize_t mbox_read_fifo(struct dev
+ 	return sprintf(buf, "0x%X\n", mbox_value);
+ }
+ 
+-static DEVICE_ATTR(fifo, S_IWUGO | S_IRUGO, mbox_read_fifo, mbox_write_fifo);
++static DEVICE_ATTR(fifo, S_IWUSR | S_IRUGO, mbox_read_fifo, mbox_write_fifo);
+ 
+ static int mbox_show(struct seq_file *s, void *data)
+ {
 _
