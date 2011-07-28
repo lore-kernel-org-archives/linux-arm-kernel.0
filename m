@@ -1,28 +1,42 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 28 Jul 2011 11:06:48 +0100
-Subject: [PATCH 3/3] arch: arm: mach-cns3xxx: Add external interrupt
-	pin demo program
-In-Reply-To: <1311873475-26111-1-git-send-email-tommy.lin.1101@gmail.com>
-References: <1311873475-26111-1-git-send-email-tommy.lin.1101@gmail.com>
-Message-ID: <20110728100648.GD31473@n2100.arm.linux.org.uk>
+Date: Thu, 28 Jul 2011 11:10:12 +0100
+Subject: [RFC/PATCH 2/7] OMAP3: beagle: don't touch omap_device internals
+In-Reply-To: <20110728055346.GA11921@foobar>
+References: <1311292338-11830-1-git-send-email-khilman@ti.com>
+	<1311292338-11830-4-git-send-email-khilman@ti.com>
+	<20110722085716.GI32058@legolas.emea.dhcp.ti.com>
+	<20110728055346.GA11921@foobar>
+Message-ID: <20110728101012.GA8446@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 29, 2011 at 01:17:55AM +0800, Tommy Lin wrote:
-> +#include <mach/gpio.h>
-
-Need I mention it...
-> +static irqreturn_t cns3xxx_ext_intr1_handler(int irq, void *dev_id)
+On Thu, Jul 28, 2011 at 12:53:47AM -0500, Nishanth Menon wrote:
+> +struct device *omap_hwmod_to_device(const char *oh_name)
 > +{
-> +	int value;
+> +	struct omap_hwmod *oh;
 > +
-> +	value = gpio_get_value(led_D6);
+> +	if (!oh_name) {
+> +		WARN(1, "%s: no hwmod name!\n", __func__);
+> +		return ERR_PTR(-EINVAL);
+> +	}
 > +
-> +	disable_irq_nosync(irq);
-> +
-> +	gpio_set_value(led_D6, !value);
-> +
-> +	enable_irq(irq);
+> +	oh = _lookup(oh_name);
+> +	if (IS_ERR_OR_NULL(oh)) {
+> +		WARN(1, "%s: no hwmod for %s\n", __func__,
+> +			oh_name);
+> +		return ERR_PTR(-ENODEV);
 
-Why do you need the disable_irq/enable_irq ?  The interrupt you're
-dealing with will already be masked by the core genirq code.
+It is good practice to always propagate back the error codes from functions
+which failed.  So you may need something like:
+
+		return ERR_PTR(oh ? PTR_ERR(oh) : -ENODEV);
+
+here.
+
+> +	}
+> +	if (IS_ERR_OR_NULL(oh->od)) {
+> +		WARN(1, "%s: no omap_device for %s\n", __func__,
+> +			oh_name);
+> +		return ERR_PTR(-ENODEV);
+
+Same here.
