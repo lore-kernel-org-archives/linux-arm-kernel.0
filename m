@@ -1,64 +1,25 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Thu, 28 Jul 2011 10:40:48 +0200
-Subject: [RFC/PATCH 2/7] OMAP3: beagle: don't touch omap_device internals
-In-Reply-To: <20110722085716.GI32058@legolas.emea.dhcp.ti.com>
-References: <1311292338-11830-1-git-send-email-khilman@ti.com>
-	<1311292338-11830-4-git-send-email-khilman@ti.com>
-	<20110722085716.GI32058@legolas.emea.dhcp.ti.com>
-Message-ID: <CAORVsuXsZXU+rH7ujYJuYDvYjWkCVnZrvkkinFPd9DEBYtdduQ@mail.gmail.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Thu, 28 Jul 2011 11:30:54 +0200
+Subject: [PATCH v2 3/5] OMAP4: powerdomain data: Fix core mem states and
+	missing cefuse flag
+In-Reply-To: <alpine.DEB.2.00.1107052358450.4217@utopia.booyaka.com>
+References: <1309552060-4547-1-git-send-email-b-cousson@ti.com>
+	<1309552060-4547-4-git-send-email-b-cousson@ti.com>
+	<alpine.DEB.2.00.1107052358450.4217@utopia.booyaka.com>
+Message-ID: <4E312C4E.6000208@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Paul
 
-On Fri, Jul 22, 2011 at 10:57 AM, Felipe Balbi <balbi@ti.com> wrote:
-> Hi,
+On 7/6/2011 7:59 AM, Paul Walmsley wrote:
+> Hi
 >
-> On Thu, Jul 21, 2011 at 04:52:13PM -0700, Kevin Hilman wrote:
->> Board code should not touch omap_device internals. ?To get the MPU/IVA devices,
->> use existing APIs: omap2_get_mpu_device(), omap2_get_iva_device().
->>
->> Signed-off-by: Kevin Hilman <khilman@ti.com>
->> ---
->> ?arch/arm/mach-omap2/board-omap3beagle.c | ? 23 ++++++++++-------------
->> ?1 files changed, 10 insertions(+), 13 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
->> index 32f5f89..3ae16b4 100644
->> --- a/arch/arm/mach-omap2/board-omap3beagle.c
->> +++ b/arch/arm/mach-omap2/board-omap3beagle.c
->> @@ -491,23 +491,22 @@ static void __init beagle_opp_init(void)
->>
->> ? ? ? /* Custom OPP enabled for all xM versions */
->> ? ? ? if (cpu_is_omap3630()) {
->> - ? ? ? ? ? ? struct omap_hwmod *mh = omap_hwmod_lookup("mpu");
->> - ? ? ? ? ? ? struct omap_hwmod *dh = omap_hwmod_lookup("iva");
->> - ? ? ? ? ? ? struct device *dev;
->> + ? ? ? ? ? ? struct device *mpu_dev, *iva_dev;
->>
->> - ? ? ? ? ? ? if (!mh || !dh) {
->> + ? ? ? ? ? ? mpu_dev = omap2_get_mpuss_device();
->> + ? ? ? ? ? ? iva_dev = omap2_get_iva_device();
->
-> out of curiosity again, nothing to do with this patch.
->
-> Maybe it would be nicer to have an api such as:
->
-> omap2_get_device(name);
->
-> there are already four devices to be gotten, if that number grows any
-> bigger, so will the number of helper functions.
+> I split the indentation changes into the following patch, queued for 3.1
+> at git://git.pwsan.com/linux-2.6 in the 'prcm_cleanup_a_3.1' branch.
 
-I agree with this.
-The API is also helpful for the PM QoS devices constraints API, which
-requires the pointers to devices structs. At the present time only a
-few devices can be used and it would be good to have a generic
-implementation.
+Thanks a lot for the re-organization of the series and for taking care 
+of the upstream.
 
 Regards,
-Jean
-
->
-> --
-> balbi
->
+Benoit
