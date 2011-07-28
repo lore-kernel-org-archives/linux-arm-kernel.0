@@ -1,70 +1,32 @@
-From: ido@wizery.com (Ido Yariv)
-Date: Thu, 28 Jul 2011 23:49:09 +0300
-Subject: [PATCH REPOST v2] mmc: davinci: Add support for set_power callback
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024DD2CE0A@dbde02.ent.ti.com>
-References: <B85A65D85D7EB246BE421B3FB0FBB593024DD2CE0A@dbde02.ent.ti.com>
-Message-ID: <1311886149-3009-1-git-send-email-ido@wizery.com>
+From: akpm@linux-foundation.org (akpm at linux-foundation.org)
+Date: Thu, 28 Jul 2011 13:50:55 -0700
+Subject: [patch 2/2] arm, exec: remove redundant set_fs(USER_DS)
+Message-ID: <201107282050.p6SKot9w007801@imap1.linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some devices connected to the MMC bus are power controlled by external
-means. For instance, an SDIO device may be powered down/up by an
-external gpio line.
+From: Mathias Krause <minipli@googlemail.com>
 
-In order to avoid toggling power from within the MMC host driver, add a
-set_power callback function, which will be called by set_ios upon
-powering down/up.
+The address limit is already set in flush_old_exec() so this
+set_fs(USER_DS) is redundant.
 
-Signed-off-by: Ido Yariv <ido@wizery.com>
-CC: Chris Ball <cjb@laptop.org>
+Signed-off-by: Mathias Krause <minipli@googlemail.com>
+Cc: Russell King <rmk@arm.linux.org.uk>
+Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
 ---
- arch/arm/mach-davinci/include/mach/mmc.h |    3 +++
- drivers/mmc/host/davinci_mmc.c           |   13 +++++++++++++
- 2 files changed, 16 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/include/mach/mmc.h b/arch/arm/mach-davinci/include/mach/mmc.h
-index d4f1e96..5ba6b22 100644
---- a/arch/arm/mach-davinci/include/mach/mmc.h
-+++ b/arch/arm/mach-davinci/include/mach/mmc.h
-@@ -12,6 +12,9 @@ struct davinci_mmc_config {
- 	/* get_cd()/get_wp() may sleep */
- 	int	(*get_cd)(int module);
- 	int	(*get_ro)(int module);
-+
-+	void	(*set_power)(int module, bool on);
-+
- 	/* wires == 0 is equivalent to wires == 4 (4-bit parallel) */
- 	u8	wires;
- 
-diff --git a/drivers/mmc/host/davinci_mmc.c b/drivers/mmc/host/davinci_mmc.c
-index 0076c74..64a8325 100644
---- a/drivers/mmc/host/davinci_mmc.c
-+++ b/drivers/mmc/host/davinci_mmc.c
-@@ -807,12 +807,25 @@ static void calculate_clk_divider(struct mmc_host *mmc, struct mmc_ios *ios)
- static void mmc_davinci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
- {
- 	struct mmc_davinci_host *host = mmc_priv(mmc);
-+	struct platform_device *pdev = to_platform_device(mmc->parent);
-+	struct davinci_mmc_config *config = pdev->dev.platform_data;
- 
- 	dev_dbg(mmc_dev(host->mmc),
- 		"clock %dHz busmode %d powermode %d Vdd %04x\n",
- 		ios->clock, ios->bus_mode, ios->power_mode,
- 		ios->vdd);
- 
-+	switch (ios->power_mode) {
-+	case MMC_POWER_OFF:
-+		if (config && config->set_power)
-+			config->set_power(pdev->id, false);
-+		break;
-+	case MMC_POWER_UP:
-+		if (config && config->set_power)
-+			config->set_power(pdev->id, true);
-+		break;
-+	}
-+
- 	switch (ios->bus_width) {
- 	case MMC_BUS_WIDTH_8:
- 		dev_dbg(mmc_dev(host->mmc), "Enabling 8 bit mode\n");
--- 
-1.7.4.1
+ arch/arm/include/asm/processor.h |    1 -
+ 1 file changed, 1 deletion(-)
+
+diff -puN arch/arm/include/asm/processor.h~arm-exec-remove-redundant-set_fsuser_ds arch/arm/include/asm/processor.h
+--- a/arch/arm/include/asm/processor.h~arm-exec-remove-redundant-set_fsuser_ds
++++ a/arch/arm/include/asm/processor.h
+@@ -55,7 +55,6 @@ struct thread_struct {
+ #define start_thread(regs,pc,sp)					\
+ ({									\
+ 	unsigned long *stack = (unsigned long *)sp;			\
+-	set_fs(USER_DS);						\
+ 	memset(regs->uregs, 0, sizeof(regs->uregs));			\
+ 	if (current->personality & ADDR_LIMIT_32BIT)			\
+ 		regs->ARM_cpsr = USR_MODE;				\
+_
