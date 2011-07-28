@@ -1,21 +1,14 @@
-From: lrg@ti.com (Liam Girdwood)
-Date: Thu, 28 Jul 2011 11:41:23 +0100
-Subject: [PATCH v5 0/4] ASoC: mxs: add audio support
-In-Reply-To: <20110728103446.GA3976@opensource.wolfsonmicro.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 28 Jul 2011 11:48:07 +0100
+Subject: [PATCH v5 1/4] ASoC: mxs: add mxs-pcm driver
+In-Reply-To: <1311223018-9553-2-git-send-email-b29396@freescale.com>
 References: <1311223018-9553-1-git-send-email-b29396@freescale.com>
-	<65EE16ACC360FA4D99C96DC085B3F7721EF253@039-SN1MPN1-002.039d.mgd.msft.net>
-	<20110728103446.GA3976@opensource.wolfsonmicro.com>
-Message-ID: <1311849683.2539.0.camel@CNA0741383>
+	<1311223018-9553-2-git-send-email-b29396@freescale.com>
+Message-ID: <20110728104807.GB3976@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-07-28 at 12:34 +0200, Mark Brown wrote:
-> On Thu, Jul 28, 2011 at 05:56:04AM +0000, Dong Aisheng-B29396 wrote:
-> 
-> > Do you have any comment on this new patch series?
-> 
-> No.  I'm waiting for Liam to review.
+On Thu, Jul 21, 2011 at 12:36:55PM +0800, Dong Aisheng wrote:
+> Signed-off-by: Dong Aisheng <b29396@freescale.com>
 
-Sorry, look fine to me.
-
-Acked-by: Liam Girdwood <lrg@ti.com>
+All applied, thanks.
