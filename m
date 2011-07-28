@@ -1,44 +1,64 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Thu, 28 Jul 2011 16:15:39 +0800
-Subject: cpu_suspend does not flush the L2 cache
-In-Reply-To: <20110725200820.GE14955@n2100.arm.linux.org.uk>
-References: <74C67D49A66F0848B6F4548360B2EDB58DED35BC42@HQMAIL04.nvidia.com>
-	<20110725200820.GE14955@n2100.arm.linux.org.uk>
-Message-ID: <CAGsJ_4xSyiJOBf_sBw7eKZY3B+un-zO0tYUKtW5FDkWoBhgLjQ@mail.gmail.com>
+From: jean.pihet@newoldbits.com (Jean Pihet)
+Date: Thu, 28 Jul 2011 10:36:14 +0200
+Subject: [RFC/PATCH 2/7] OMAP3: beagle: don't touch omap_device internals
+In-Reply-To: <20110722085716.GI32058@legolas.emea.dhcp.ti.com>
+References: <1311292338-11830-1-git-send-email-khilman@ti.com>
+	<1311292338-11830-4-git-send-email-khilman@ti.com>
+	<20110722085716.GI32058@legolas.emea.dhcp.ti.com>
+Message-ID: <CAORVsuUX4uvJW4MaHNZmF=u_Jn7sNjEYGwxpRmcd-b0DPpChPg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/7/26 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Mon, Jul 25, 2011 at 11:49:43AM -0700, Scott Williams wrote:
->> In 2.6.39, CPU suspend/resumes crashes if an outer cache controller
->> (like a PL310) is configured and enabled. cpu_suspend only flushes
->> the L1 cache.
->
-> Correct. ?cpu_suspend is been a _consolidation_ effort across the various
-> implementations. ?Only one implementation deals with the L2 cache issues
-> at present.
->
-> A bunch of patches have gone in during this merge window to continue
-> that consolidation effort and improve the cpu_suspend interfaces.
-> Eventually the L2 cache issues will be dealt with in core code.
->
-> So at the moment, platforms are expected to deal with this in their own
-> suspend finisher code.
+Hi,
 
-So one possible way is that platforms clean and flush L2 cache while
-suspending, then disable L2.
-After resuming from wake-up entry, platforms reinitilized L2 by some
-hardware setting and l2x_init.
+On Fri, Jul 22, 2011 at 10:57 AM, Felipe Balbi <balbi@ti.com> wrote:
+> Hi,
+>
+> On Thu, Jul 21, 2011 at 04:52:13PM -0700, Kevin Hilman wrote:
+>> Board code should not touch omap_device internals. ?To get the MPU/IVA devices,
+>> use existing APIs: omap2_get_mpu_device(), omap2_get_iva_device().
+>>
+>> Signed-off-by: Kevin Hilman <khilman@ti.com>
+>> ---
+>> ?arch/arm/mach-omap2/board-omap3beagle.c | ? 23 ++++++++++-------------
+>> ?1 files changed, 10 insertions(+), 13 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
+>> index 32f5f89..3ae16b4 100644
+>> --- a/arch/arm/mach-omap2/board-omap3beagle.c
+>> +++ b/arch/arm/mach-omap2/board-omap3beagle.c
+>> @@ -491,23 +491,22 @@ static void __init beagle_opp_init(void)
+>>
+>> ? ? ? /* Custom OPP enabled for all xM versions */
+>> ? ? ? if (cpu_is_omap3630()) {
+>> - ? ? ? ? ? ? struct omap_hwmod *mh = omap_hwmod_lookup("mpu");
+>> - ? ? ? ? ? ? struct omap_hwmod *dh = omap_hwmod_lookup("iva");
+>> - ? ? ? ? ? ? struct device *dev;
+>> + ? ? ? ? ? ? struct device *mpu_dev, *iva_dev;
+>>
+>> - ? ? ? ? ? ? if (!mh || !dh) {
+>> + ? ? ? ? ? ? mpu_dev = omap2_get_mpuss_device();
+>> + ? ? ? ? ? ? iva_dev = omap2_get_iva_device();
+>
+> out of curiosity again, nothing to do with this patch.
+>
+> Maybe it would be nicer to have an api such as:
+>
+> omap2_get_device(name);
+>
+> there are already four devices to be gotten, if that number grows any
+> bigger, so will the number of helper functions.
+
+I agree with this.
+The API is also helpful for the PM QoS devices constraints API, which
+requires the pointers to devices structs. At the present time only a
+few devices can be used and it would be good to have a generic
+implementation.
+
+Regards,
+Jean
 
 >
-> FYI, I have no platforms at present with L2 cache and are capable of
-> suspend. ?I'm still waiting on TI for some prototype code for OMAP4
-> suspend support... until that time, I am unable to progress it further
-> unless I try to address these issues blind.
-
-On SiRFprimaII, we have tried the suspend/resume when L2 is on. i'd
-like to give a platform example.
-Finally, L2 cache suspend/resume can be in core code.
+> --
+> balbi
 >
-
--barry
