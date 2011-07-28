@@ -1,97 +1,83 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 29 Jul 2011 00:04:14 +0200
-Subject: [GIT PULL] arm soc cleanups for 3.1, part 2
-Message-ID: <1516952.7OUnxdoZRc@wuerfel>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 29 Jul 2011 00:15:23 +0200
+Subject: [PATCH] mach-integrator: update defconfig
+Message-ID: <1311891323-18021-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Update the Integrator defconfig with some sensible defaults:
+- NOHZ (tickless) and HRTIMERS turned on
+- Compile using EABI, let's assume recent compilers are used
+  now (tested using GCC 4.4.1)
+- Remove forced 32MiB at command line, the bootloader usually
+  knows this better
+- Enable the MTD Physmap flash driver, so that the changes done
+  earlier by Marc Zyngier replacing integrator-flash takes
+  effect
 
-This is a late set of cleanups that I got from Jean-Christophe after you
-had already merged all the other patches. I already told him that it's too
-late for 3.1, but it seems a bit unfair when I'm also pushing the device
-tree rework now.
+This has been tested on the real hardware Integrator AP with an
+ARM920T core module.
 
-Please pull if you really feel like it.
+Cc: Marc Zyngier <Marc.Zyngier@arm.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/configs/integrator_defconfig |   11 +++++++----
+ 1 files changed, 7 insertions(+), 4 deletions(-)
 
-	Arnd
-
-The following changes since commit 95b6886526bb510b8370b625a49bc0ab3b8ff10f:
-
-  Merge branch 'for-linus' of git://git.kernel.org/pub/scm/linux/kernel/git/jmorris/security-testing-2.6 (2011-07-27 19:26:38 -0700)
-
-are available in the git repository at:
-
-  git+ssh://master.kernel.org/pub/scm/linux/kernel/git/arm/linux-arm-soc.git/ at91/cleanup
-
-Jean-Christophe PLAGNIOL-VILLARD (8):
-      at91: introduce commom AT91_BASE_SYS
-      at91: factorize at91 interrupts init to soc
-      at91: remove AT91_DBGU offset from dbgu register macro
-      at91: use structure to store the current soc
-      at91: move clock subsystem init to soc generic init
-      at91: move register clocks to soc generic init
-      at91: factorize sram init
-      at91: add arch specific ioremap support
-
- arch/arm/mach-at91/Makefile                   |    2 +-
- arch/arm/mach-at91/at91cap9.c                 |   45 +---
- arch/arm/mach-at91/at91rm9200.c               |   47 +---
- arch/arm/mach-at91/at91sam9260.c              |  100 ++-------
- arch/arm/mach-at91/at91sam9261.c              |   62 +-----
- arch/arm/mach-at91/at91sam9263.c              |   51 +----
- arch/arm/mach-at91/at91sam9g45.c              |   45 +---
- arch/arm/mach-at91/at91sam9rl.c               |   59 +----
- arch/arm/mach-at91/board-1arm.c               |   11 +-
- arch/arm/mach-at91/board-afeb-9260v1.c        |   12 +-
- arch/arm/mach-at91/board-cam60.c              |   12 +-
- arch/arm/mach-at91/board-cap9adk.c            |   12 +-
- arch/arm/mach-at91/board-carmeva.c            |   11 +-
- arch/arm/mach-at91/board-cpu9krea.c           |   11 +-
- arch/arm/mach-at91/board-cpuat91.c            |   11 +-
- arch/arm/mach-at91/board-csb337.c             |   11 +-
- arch/arm/mach-at91/board-csb637.c             |   11 +-
- arch/arm/mach-at91/board-eb9200.c             |   11 +-
- arch/arm/mach-at91/board-ecbat91.c            |   11 +-
- arch/arm/mach-at91/board-eco920.c             |   11 +-
- arch/arm/mach-at91/board-flexibity.c          |   11 +-
- arch/arm/mach-at91/board-foxg20.c             |   12 +-
- arch/arm/mach-at91/board-gsia18s.c            |    9 +-
- arch/arm/mach-at91/board-kafa.c               |   11 +-
- arch/arm/mach-at91/board-kb9202.c             |   11 +-
- arch/arm/mach-at91/board-neocore926.c         |   12 +-
- arch/arm/mach-at91/board-pcontrol-g20.c       |   11 +-
- arch/arm/mach-at91/board-picotux200.c         |   11 +-
- arch/arm/mach-at91/board-qil-a9260.c          |   12 +-
- arch/arm/mach-at91/board-rm9200dk.c           |   11 +-
- arch/arm/mach-at91/board-rm9200ek.c           |   11 +-
- arch/arm/mach-at91/board-sam9-l9260.c         |   12 +-
- arch/arm/mach-at91/board-sam9260ek.c          |   12 +-
- arch/arm/mach-at91/board-sam9261ek.c          |   12 +-
- arch/arm/mach-at91/board-sam9263ek.c          |   12 +-
- arch/arm/mach-at91/board-sam9g20ek.c          |   16 +-
- arch/arm/mach-at91/board-sam9m10g45ek.c       |   12 +-
- arch/arm/mach-at91/board-sam9rlek.c           |   12 +-
- arch/arm/mach-at91/board-snapper9260.c        |   11 +-
- arch/arm/mach-at91/board-stamp9g20.c          |   16 +-
- arch/arm/mach-at91/board-usb-a9260.c          |   12 +-
- arch/arm/mach-at91/board-usb-a9263.c          |   12 +-
- arch/arm/mach-at91/board-yl-9200.c            |   12 +-
- arch/arm/mach-at91/generic.h                  |   34 +--
- arch/arm/mach-at91/include/mach/at91_dbgu.h   |   27 ++-
- arch/arm/mach-at91/include/mach/at91cap9.h    |    1 -
- arch/arm/mach-at91/include/mach/at91rm9200.h  |    1 -
- arch/arm/mach-at91/include/mach/at91sam9260.h |    1 -
- arch/arm/mach-at91/include/mach/at91sam9261.h |    1 -
- arch/arm/mach-at91/include/mach/at91sam9263.h |    1 -
- arch/arm/mach-at91/include/mach/at91sam9g45.h |    1 -
- arch/arm/mach-at91/include/mach/at91sam9rl.h  |    1 -
- arch/arm/mach-at91/include/mach/cpu.h         |  159 ++++++++------
- arch/arm/mach-at91/include/mach/debug-macro.S |   14 +-
- arch/arm/mach-at91/include/mach/hardware.h    |   14 ++
- arch/arm/mach-at91/include/mach/io.h          |   11 +-
- arch/arm/mach-at91/setup.c                    |  297 +++++++++++++++++++++++++
- arch/arm/mach-at91/soc.h                      |   59 +++++
- 58 files changed, 696 insertions(+), 745 deletions(-)
- create mode 100644 arch/arm/mach-at91/setup.c
- create mode 100644 arch/arm/mach-at91/soc.h
+diff --git a/arch/arm/configs/integrator_defconfig b/arch/arm/configs/integrator_defconfig
+index 7196ade..baf4301 100644
+--- a/arch/arm/configs/integrator_defconfig
++++ b/arch/arm/configs/integrator_defconfig
+@@ -1,5 +1,6 @@
+ CONFIG_EXPERIMENTAL=y
+ CONFIG_SYSVIPC=y
++CONFIG_TINY_RCU=y
+ CONFIG_IKCONFIG=y
+ CONFIG_IKCONFIG_PROC=y
+ CONFIG_LOG_BUF_SHIFT=14
+@@ -11,17 +12,20 @@ CONFIG_ARCH_INTEGRATOR_AP=y
+ CONFIG_CPU_ARM720T=y
+ CONFIG_CPU_ARM920T=y
+ CONFIG_PCI=y
++CONFIG_NO_HZ=y
++CONFIG_HIGH_RES_TIMERS=y
++CONFIG_PREEMPT=y
++CONFIG_AEABI=y
+ CONFIG_LEDS=y
+ CONFIG_LEDS_CPU=y
+ CONFIG_ZBOOT_ROM_TEXT=0x0
+ CONFIG_ZBOOT_ROM_BSS=0x0
+-CONFIG_CMDLINE="console=ttyAM0,38400n8 root=/dev/nfs ip=bootp mem=32M"
++CONFIG_CMDLINE="console=ttyAM0,38400n8 root=/dev/nfs ip=bootp"
+ CONFIG_CPU_FREQ=y
+ CONFIG_CPU_FREQ_GOV_POWERSAVE=y
+ CONFIG_CPU_FREQ_GOV_USERSPACE=y
+ CONFIG_CPU_FREQ_GOV_ONDEMAND=y
+ CONFIG_FPE_NWFPE=y
+-CONFIG_PM=y
+ CONFIG_NET=y
+ CONFIG_PACKET=y
+ CONFIG_UNIX=y
+@@ -32,7 +36,6 @@ CONFIG_IP_PNP_DHCP=y
+ CONFIG_IP_PNP_BOOTP=y
+ # CONFIG_IPV6 is not set
+ CONFIG_MTD=y
+-CONFIG_MTD_PARTITIONS=y
+ CONFIG_MTD_CMDLINE_PARTS=y
+ CONFIG_MTD_AFS_PARTS=y
+ CONFIG_MTD_CHAR=y
+@@ -40,6 +43,7 @@ CONFIG_MTD_BLOCK=y
+ CONFIG_MTD_CFI=y
+ CONFIG_MTD_CFI_ADV_OPTIONS=y
+ CONFIG_MTD_CFI_INTELEXT=y
++CONFIG_MTD_PHYSMAP=y
+ CONFIG_BLK_DEV_LOOP=y
+ CONFIG_BLK_DEV_RAM=y
+ CONFIG_BLK_DEV_RAM_SIZE=8192
+@@ -68,4 +72,3 @@ CONFIG_NFSD_V3=y
+ CONFIG_PARTITION_ADVANCED=y
+ CONFIG_MAGIC_SYSRQ=y
+ CONFIG_DEBUG_KERNEL=y
+-CONFIG_DEBUG_ERRORS=y
+-- 
+1.7.6
