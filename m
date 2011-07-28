@@ -1,39 +1,39 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 27 Jul 2011 22:32:11 -0500
-Subject: [RFC PATCH 0/3] ARM: Add default system.h and uncompress.h
-Message-ID: <1311823934-29553-1-git-send-email-robherring2@gmail.com>
+Date: Wed, 27 Jul 2011 22:32:12 -0500
+Subject: [RFC PATCH 1/3] ARM: include mach headers before common arm headers
+In-Reply-To: <1311823934-29553-1-git-send-email-robherring2@gmail.com>
+References: <1311823934-29553-1-git-send-email-robherring2@gmail.com>
+Message-ID: <1311823934-29553-2-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-This is a relatively simple way to remove the platform requirement for
-some header files without making changes in every existing platform.
-It's perhaps not a solution for the difficult cases, but can get the
-simple cases out of the way making it clear what remains to be fixed.
-I've done this for system.h and uncompress.h so far. timex.h and io.h
-may be additional candidates.
+In preparation to add an arch/arm/include/mach directory for default
+mach headers, make arch/arm/mach-*/include path be searched before
+arch/arm/include. This allows platforms to override default header
+implementation.
 
-One downside is you lose print capability in the decompressor. However,
-I don't think the complexity that adds is worth the 1 line print. Perhaps
-the include path ordering could be conditionalized on a config setting
-for multi-platform kernels such that the platform's headers are used
-on single machine kernels. There's already such a limitation on LL_DEBUG.
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+---
+ arch/arm/Makefile |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-Rob
-
-Rob Herring (3):
-  ARM: include mach headers before common arm headers
-  ARM: add a default mach/uncompress.h header
-  ARM: add a default mach/system.h header
-
- arch/arm/Makefile                  |    4 ++--
- arch/arm/include/mach/system.h     |   13 +++++++++++++
- arch/arm/include/mach/uncompress.h |    9 +++++++++
- arch/arm/kernel/process.c          |    5 ++++-
- 4 files changed, 28 insertions(+), 3 deletions(-)
- create mode 100644 arch/arm/include/mach/system.h
- create mode 100644 arch/arm/include/mach/uncompress.h
-
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index 30a19b6..1c41a2e 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -234,9 +234,9 @@ machdirs := $(patsubst %,arch/arm/mach-%/,$(machine-y))
+ platdirs := $(patsubst %,arch/arm/plat-%/,$(plat-y))
+ 
+ ifeq ($(KBUILD_SRC),)
+-KBUILD_CPPFLAGS += $(patsubst %,-I%include,$(machdirs) $(platdirs))
++LINUXINCLUDE := $(patsubst %,-I%include,$(machdirs) $(platdirs)) $(LINUXINCLUDE)
+ else
+-KBUILD_CPPFLAGS += $(patsubst %,-I$(srctree)/%include,$(machdirs) $(platdirs))
++LINUXINCLUDE := $(patsubst %,-I$(srctree)/%include,$(machdirs) $(platdirs)) $(LINUXINCLUDE)
+ endif
+ 
+ export	TEXT_OFFSET GZFLAGS MMUEXT
 -- 
 1.7.4.1
