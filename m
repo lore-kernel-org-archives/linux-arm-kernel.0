@@ -1,22 +1,35 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Thu, 28 Jul 2011 14:17:33 +0800
-Subject: [PATCH v4 2/2] ARM: l2x0: Add OF based initialization
-In-Reply-To: <1309984979-8847-2-git-send-email-robherring2@gmail.com>
-References: <1309984979-8847-1-git-send-email-robherring2@gmail.com>
-	<1309984979-8847-2-git-send-email-robherring2@gmail.com>
-Message-ID: <CAGsJ_4zXY4HVF6=e4w0ja90HrQzwaaokoSM6tEt06amFMZYMHg@mail.gmail.com>
+From: e.voevodin@samsung.com (Evgeny Voevodin)
+Date: Thu, 28 Jul 2011 10:20:59 +0400
+Subject: [PATCH] arm: exynos4: Fix write to nonexistent TCMPB4 PWM register
+	on samsung exynos4 platform
+In-Reply-To: <4E3004E3.80003@ru.mvista.com>
+References: <20110727032718.GA17800@july> <4E3004E3.80003@ru.mvista.com>
+Message-ID: <4E30FFCB.50201@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/7/7 Rob Herring <robherring2@gmail.com>:
-> From: Rob Herring <rob.herring@calxeda.com>
->
-> This adds probing for ARM L2x0 cache controllers via device tree. Support
-> includes the L210, L220, and PL310 controllers. The binding allows setting
-> up cache RAM latencies and filter addresses (PL310 only).
->
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+From: Evgeny Voevodin <e.voevodin@samsung.com>
 
-Acked-by: Barry Song <21cnbao@gmail.com>
+There is no TCMPB register for Pulse Width Modulation timer4 on samsung 
+exynos4 board. Remove unsupported register write.
 
--barry
+Signed-off-by: Evgeny Voevodin <e.voevodin@samsung.com>
+---
+  arch/arm/mach-exynos4/time.c |    1 -
+  1 files changed, 0 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-exynos4/time.c b/arch/arm/mach-exynos4/time.c
+index 86b9fa0..48389bf 100644
+--- a/arch/arm/mach-exynos4/time.c
++++ b/arch/arm/mach-exynos4/time.c
+@@ -77,7 +77,6 @@ static void exynos4_pwm_init(unsigned int pwm_id, 
+unsigned long tcnt)
+  		tcon |= S3C2410_TCON_T4MANUALUPD;
+
+  		__raw_writel(tcnt, S3C2410_TCNTB(4));
+-		__raw_writel(tcnt, S3C2410_TCMPB(4));
+  		__raw_writel(tcon, S3C2410_TCON);
+
+  		break;
+-- 
+1.7.4.1
