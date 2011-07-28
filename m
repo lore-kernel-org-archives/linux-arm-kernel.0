@@ -1,34 +1,31 @@
 From: ludovic.desroches@atmel.com (ludovic.desroches at atmel.com)
-Date: Thu, 28 Jul 2011 16:29:56 +0200
-Subject: [RFC PATCH 7/9] mmc: atmel-mci: use ATMEL_PDC_SCND_BUF_OFF instead of
-	a literal value
+Date: Thu, 28 Jul 2011 16:29:55 +0200
+Subject: [RFC PATCH 6/9] atmel_pdc: add ATMEL_PDC_SCND_BUF_OFF
 In-Reply-To: <1311863398-31579-1-git-send-email-ludovic.desroches@atmel.com>
 References: <1311863398-31579-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <1311863398-31579-8-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <1311863398-31579-7-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ludovic Desroches <ludovic.desroches@atmel.com>
 
+Add define for the offset value between first and second buffer registers.
+
 Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 ---
- drivers/mmc/host/atmel-mci.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+ include/linux/atmel_pdc.h |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
-index 7955697..c415322 100644
---- a/drivers/mmc/host/atmel-mci.c
-+++ b/drivers/mmc/host/atmel-mci.c
-@@ -603,8 +603,8 @@ static void atmci_pdc_set_single_buf(struct atmel_mci *host,
- 	}
+diff --git a/include/linux/atmel_pdc.h b/include/linux/atmel_pdc.h
+index 5058a31..63499ce 100644
+--- a/include/linux/atmel_pdc.h
++++ b/include/linux/atmel_pdc.h
+@@ -33,4 +33,6 @@
  
- 	if (buf_nb == PDC_SECOND_BUF) {
--		pointer_reg += 0x10;
--		counter_reg += 0x10;
-+		pointer_reg += ATMEL_PDC_SCND_BUF_OFF;
-+		counter_reg += ATMEL_PDC_SCND_BUF_OFF;
- 	}
+ #define ATMEL_PDC_PTSR		0x124	/* Transfer Status Register */
  
- 	atmci_writel(host, pointer_reg, sg_dma_address(host->sg));
++#define ATMEL_PDC_SCND_BUF_OFF	0x10	/* Offset between first and second buffer registers */
++
+ #endif
 -- 
 1.7.0.4
