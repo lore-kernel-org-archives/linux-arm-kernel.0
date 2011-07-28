@@ -1,116 +1,48 @@
-From: B19295@freescale.com (Lin Tony-B19295)
-Date: Thu, 28 Jul 2011 07:39:53 +0000
-Subject: [PATCH v3 5/6] ARM: mxs: add usb phy operations
-In-Reply-To: <20110727080315.GN20587@pengutronix.de>
-References: <1311744574-3610-1-git-send-email-tony.lin@freescale.com>
-	<1311744574-3610-6-git-send-email-tony.lin@freescale.com>
-	<20110727080315.GN20587@pengutronix.de>
-Message-ID: <97D3A72708D04647A5AC84A04996E5B516709C@039-SN1MPN1-006.039d.mgd.msft.net>
+From: toddpoynor@google.com (Todd Poynor)
+Date: Thu, 28 Jul 2011 00:43:27 -0700
+Subject: [PATCH v4 REPOST 18/20] gpio/omap: use pm-runtime framework
+In-Reply-To: <5A47E75E594F054BAF48C5E4FC4B92AB037C202D59@dbde02.ent.ti.com>
+References: <1310804152-9243-1-git-send-email-tarun.kanti@ti.com>
+	<1310804152-9243-19-git-send-email-tarun.kanti@ti.com>
+	<20110716190734.GB990@google.com>
+	<5A47E75E594F054BAF48C5E4FC4B92AB037C202D59@dbde02.ent.ti.com>
+Message-ID: <20110728074327.GA12916@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Sascha Hauer [mailto:s.hauer at pengutronix.de]
-> Sent: Wednesday, July 27, 2011 4:03 PM
-> To: Lin Tony-B19295
-> Cc: linux-usb at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> stern at rowland.harvard.edu; koen.beel.barco at gmail.com
-> Subject: Re: [PATCH v3 5/6] ARM: mxs: add usb phy operations
-> 
-> On Wed, Jul 27, 2011 at 01:29:33PM +0800, Tony Lin wrote:
-> > add usb phy register definitions and functions usb host driver will
-> > use these callback functions to initialize usb phy and change working
-> > mode
-> >
-> > Signed-off-by: Tony Lin <tony.lin@freescale.com>
-> > ---
-> >  arch/arm/mach-mxs/Kconfig           |    1 +
-> >  arch/arm/mach-mxs/Makefile          |    1 +
-> >  arch/arm/mach-mxs/mxs_usb.c         |  288
-> +++++++++++++++++++++++++++++++++++
-> >  arch/arm/mach-mxs/regs-usbphy-mxs.h |  240
-> > +++++++++++++++++++++++++++++
-> >  4 files changed, 530 insertions(+), 0 deletions(-)
-> >
-> > +}
-> > +static int fsl_usb_host_init(struct platform_device *pdev) {
-> > +	struct mxc_usbh_platform_data *pdata = pdev->dev.platform_data;
-> > +	struct mxs_usb_private_date *ppriv = pdata->ppriv;
-> > +
-> > +	ppriv->phy_regs = ioremap(MX28_USBPHY1_BASE_ADDR, SZ_8K);
-> > +	ppriv->ctrl_regs = ioremap(MX28_USBCTRL1_BASE_ADDR, SZ_8K);
-> 
-> Did I mention that the i.MX28 has *two* USB controllers?
-> 
-> > +	if (!ppriv->phy_regs || !ppriv->ctrl_regs) {
-> > +		iounmap(ppriv->phy_regs);
-> > +		iounmap(ppriv->ctrl_regs);
-> > +		return -ENOMEM;
-> > +	}
-> 
-> So you call iounmap(0) here.
-> 
-> > +	ppriv->usb_clk = clk_get(&pdev->dev, "usb1");
-> > +	if (IS_ERR(ppriv->usb_clk)) {
-> > +		iounmap(ppriv->phy_regs);
-> > +		iounmap(ppriv->ctrl_regs);
-> > +		return PTR_ERR(ppriv->usb_clk);
-> 
-> In the kernel community we are not afraid of 'goto'.
-> 
-> > +	}
-> > +	clk_enable(ppriv->usb_clk);
-> > +
-> > +	ppriv->usb_phy_clk = clk_get(&pdev->dev, "usb1_phy");
-> > +	if (IS_ERR(ppriv->usb_phy_clk)) {
-> > +		clk_disable(ppriv->usb_clk);
-> > +		clk_put(ppriv->usb_clk);
-> > +		iounmap(ppriv->phy_regs);
-> > +		iounmap(ppriv->ctrl_regs);
-> > +		return PTR_ERR(ppriv->usb_phy_clk);
-> > +	}
-> > +	clk_enable(ppriv->usb_phy_clk);
-> > +
-> > +	phy_clock_gate(ppriv, true);
-> > +	return fsl_usbh_init(pdev);
-> > +}
-> > +
-> > +static int fsl_usb_host_uninit(struct platform_device *pdev) {
-> > +	struct mxc_usbh_platform_data *pdata = pdev->dev.platform_data;
-> > +	struct mxs_usb_private_date *ppriv = pdata->ppriv;
-> > +
-> > +	phy_clock_gate(ppriv, false);
-> > +	clk_disable(ppriv->usb_phy_clk);
-> > +	clk_put(ppriv->usb_phy_clk);
-> > +	clk_disable(ppriv->usb_clk);
-> > +	clk_put(ppriv->usb_clk);
-> > +	iounmap(ppriv->phy_regs);
-> > +	iounmap(ppriv->ctrl_regs);
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static struct mxs_usb_private_date usbh_private = {
-> > +	.internal_phy_clk_already_on = 0,
-> > +};
-> 
-> unitialized fields in static initializers are zero anyway.
-> Remove all this ppriv crap. clk_enable/disable will do the reference
-> counting for you.
-> 
-> Sascha
-> 
-Hi Sascha:
-	I could remove the initial, but not the variable. The variable is not used for counting in clk_enable/disable.
-	Instead, it's used in phy_clock_gate function.
+On Wed, Jul 27, 2011 at 05:14:58PM +0530, DebBarma, Tarun Kanti wrote:
+...
+> > omap_gpio_mod_init calls mpuio_init calls platform_driver_register
+> > which can't be called in an IRQs off and spinlocked atomic context,
+...
+> I have isolated mpuio_init() from omap_gpio_mod_init().
+> mpuio_init() is now called once in omap_gpio_probe().
+
+Looking at omap_gpio_mod_init() it seems like much of its processing
+could probably be done once at probe time (or at pm_runtime_get_sync
+time) as well, namely setting the IRQ enable masks.
+
+Ungating the interface clock, enabling wakeup, setting smart idle for
+the module, and enabling the (old-style) system clock seem like either
+one-time actions at probe, or a part of the pm_runtime_get_sync
+callback.
+
+Or is there some other reason these power management actions should be
+taken each time a GPIO is requested in the block (when none were
+previously requested), after the runtime PM get_sync callback, but
+not as part of the get_sync callback?  If so, what caused
+the smart idle setting to be lost, or the interface clock gated, if
+not the pm_runtime_put_sync?
 
 
+Todd
+
+> > The omap_gpio_mod_init may be unbalanced with the code performed below
+> > on last free of a GPIO for the bank?  If all GPIOs are freed and then
+> > a new GPIO used, does omap_gpio_mod_init do the right thing?  Need a
+> > separate flag to indicate whether one-time init has ever been
+> > performed, vs. needing runtime PM enable/disable?
+> With the above changes I am seeing omap_gpio_mod_init() is balanced.
+> Let me know if I am still missing something.
 > --
-> Pengutronix e.K.                           |
-> |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/
-> |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0
-> |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555
-> |
+> Tarun
