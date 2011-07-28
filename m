@@ -1,53 +1,25 @@
 From: ludovic.desroches@atmel.com (ludovic.desroches at atmel.com)
-Date: Thu, 28 Jul 2011 16:29:54 +0200
-Subject: [RFC PATCH 5/9] mmc: atmel-mci: change atmci_start_command to
-	atmci_send_command
-In-Reply-To: <1311863398-31579-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1311863398-31579-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <1311863398-31579-6-git-send-email-ludovic.desroches@atmel.com>
+Date: Thu, 28 Jul 2011 16:29:49 +0200
+Subject: [RFC PATCH 0/9] Add pdc feature to atmel-mci
+Message-ID: <1311863398-31579-1-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ludovic Desroches <ludovic.desroches@atmel.com>
+The purpose of these patches is to merge at91_mci and atmel atmel-mci drivers.
+The first one is used only for old atmel mci core and provides the PDC feature.
+The second one works with the old core but doesn't provide the PDC feature so
+the goal is to implement this feature in order to remove at91_mci.
 
-Change atmci_start_command function name to atmci_send_command which is more
-appropriate to no think we are sending a start command.
+This new version of the atmel-mci driver detects mci core version at runtime.
+Then it knows if we have to use pio, pdc or dma for transfers.
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
----
- drivers/mmc/host/atmel-mci.c |    6 +++---
- 1 files changed, 3 insertions(+), 3 deletions(-)
+These patches are based on "mmc: atmel-mci: add suspend/resume support" from
+Nicolas.
 
-diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
-index efbee87..7955697 100644
---- a/drivers/mmc/host/atmel-mci.c
-+++ b/drivers/mmc/host/atmel-mci.c
-@@ -565,7 +565,7 @@ static u32 atmci_prepare_command(struct mmc_host *mmc,
- 	return cmdr;
- }
- 
--static void atmci_start_command(struct atmel_mci *host,
-+static void atmci_send_command(struct atmel_mci *host,
- 		struct mmc_command *cmd, u32 cmd_flags)
- {
- 	WARN_ON(host->cmd);
-@@ -581,7 +581,7 @@ static void atmci_start_command(struct atmel_mci *host,
- 
- static void atmci_send_stop_cmd(struct atmel_mci *host, struct mmc_data *data)
- {
--	atmci_start_command(host, data->stop, host->stop_cmdr);
-+	atmci_send_command(host, data->stop, host->stop_cmdr);
- 	atmci_writel(host, ATMCI_IER, ATMCI_CMDRDY);
- }
- 
-@@ -1003,7 +1003,7 @@ static void atmci_start_request(struct atmel_mci *host,
- 	iflags |= ATMCI_CMDRDY;
- 	cmd = mrq->cmd;
- 	cmdflags = atmci_prepare_command(slot->mmc, cmd);
--	atmci_start_command(host, cmd, cmdflags);
-+	atmci_send_command(host, cmd, cmdflags);
- 
- 	if (data)
- 		host->submit_data(host, data);
--- 
-1.7.0.4
+
+arch/arm/mach-at91/at91sam9260_devices.c |    2 +-
+drivers/mmc/host/atmel-mci-regs.h        |  220 +++++----
+drivers/mmc/host/atmel-mci.c             |  824 ++++++++++++++++++++----------
+include/linux/atmel-mci.h                |    4 +-
+include/linux/atmel_pdc.h                |    2 +
+5 files changed, 681 insertions(+), 371 deletions(-)
