@@ -1,89 +1,116 @@
-From: tony.lin@freescale.com (Tony Lin)
-Date: Thu, 28 Jul 2011 15:16:00 +0800
-Subject: [PATCH v2 1/1] ARM: mxc: fix card interrupt losing issue on freescale
-	eSDHC
-In-Reply-To: <1311837360-16179-1-git-send-email-tony.lin@freescale.com>
-References: <1311837360-16179-1-git-send-email-tony.lin@freescale.com>
-Message-ID: <1311837360-16179-2-git-send-email-tony.lin@freescale.com>
+From: B19295@freescale.com (Lin Tony-B19295)
+Date: Thu, 28 Jul 2011 07:39:53 +0000
+Subject: [PATCH v3 5/6] ARM: mxs: add usb phy operations
+In-Reply-To: <20110727080315.GN20587@pengutronix.de>
+References: <1311744574-3610-1-git-send-email-tony.lin@freescale.com>
+	<1311744574-3610-6-git-send-email-tony.lin@freescale.com>
+	<20110727080315.GN20587@pengutronix.de>
+Message-ID: <97D3A72708D04647A5AC84A04996E5B516709C@039-SN1MPN1-006.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-apply workaround for imx eSDHC controller to avoid missing
-the card interrupt so that SDIO function is workable
+> -----Original Message-----
+> From: Sascha Hauer [mailto:s.hauer at pengutronix.de]
+> Sent: Wednesday, July 27, 2011 4:03 PM
+> To: Lin Tony-B19295
+> Cc: linux-usb at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> stern at rowland.harvard.edu; koen.beel.barco at gmail.com
+> Subject: Re: [PATCH v3 5/6] ARM: mxs: add usb phy operations
+> 
+> On Wed, Jul 27, 2011 at 01:29:33PM +0800, Tony Lin wrote:
+> > add usb phy register definitions and functions usb host driver will
+> > use these callback functions to initialize usb phy and change working
+> > mode
+> >
+> > Signed-off-by: Tony Lin <tony.lin@freescale.com>
+> > ---
+> >  arch/arm/mach-mxs/Kconfig           |    1 +
+> >  arch/arm/mach-mxs/Makefile          |    1 +
+> >  arch/arm/mach-mxs/mxs_usb.c         |  288
+> +++++++++++++++++++++++++++++++++++
+> >  arch/arm/mach-mxs/regs-usbphy-mxs.h |  240
+> > +++++++++++++++++++++++++++++
+> >  4 files changed, 530 insertions(+), 0 deletions(-)
+> >
+> > +}
+> > +static int fsl_usb_host_init(struct platform_device *pdev) {
+> > +	struct mxc_usbh_platform_data *pdata = pdev->dev.platform_data;
+> > +	struct mxs_usb_private_date *ppriv = pdata->ppriv;
+> > +
+> > +	ppriv->phy_regs = ioremap(MX28_USBPHY1_BASE_ADDR, SZ_8K);
+> > +	ppriv->ctrl_regs = ioremap(MX28_USBCTRL1_BASE_ADDR, SZ_8K);
+> 
+> Did I mention that the i.MX28 has *two* USB controllers?
+> 
+> > +	if (!ppriv->phy_regs || !ppriv->ctrl_regs) {
+> > +		iounmap(ppriv->phy_regs);
+> > +		iounmap(ppriv->ctrl_regs);
+> > +		return -ENOMEM;
+> > +	}
+> 
+> So you call iounmap(0) here.
+> 
+> > +	ppriv->usb_clk = clk_get(&pdev->dev, "usb1");
+> > +	if (IS_ERR(ppriv->usb_clk)) {
+> > +		iounmap(ppriv->phy_regs);
+> > +		iounmap(ppriv->ctrl_regs);
+> > +		return PTR_ERR(ppriv->usb_clk);
+> 
+> In the kernel community we are not afraid of 'goto'.
+> 
+> > +	}
+> > +	clk_enable(ppriv->usb_clk);
+> > +
+> > +	ppriv->usb_phy_clk = clk_get(&pdev->dev, "usb1_phy");
+> > +	if (IS_ERR(ppriv->usb_phy_clk)) {
+> > +		clk_disable(ppriv->usb_clk);
+> > +		clk_put(ppriv->usb_clk);
+> > +		iounmap(ppriv->phy_regs);
+> > +		iounmap(ppriv->ctrl_regs);
+> > +		return PTR_ERR(ppriv->usb_phy_clk);
+> > +	}
+> > +	clk_enable(ppriv->usb_phy_clk);
+> > +
+> > +	phy_clock_gate(ppriv, true);
+> > +	return fsl_usbh_init(pdev);
+> > +}
+> > +
+> > +static int fsl_usb_host_uninit(struct platform_device *pdev) {
+> > +	struct mxc_usbh_platform_data *pdata = pdev->dev.platform_data;
+> > +	struct mxs_usb_private_date *ppriv = pdata->ppriv;
+> > +
+> > +	phy_clock_gate(ppriv, false);
+> > +	clk_disable(ppriv->usb_phy_clk);
+> > +	clk_put(ppriv->usb_phy_clk);
+> > +	clk_disable(ppriv->usb_clk);
+> > +	clk_put(ppriv->usb_clk);
+> > +	iounmap(ppriv->phy_regs);
+> > +	iounmap(ppriv->ctrl_regs);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static struct mxs_usb_private_date usbh_private = {
+> > +	.internal_phy_clk_already_on = 0,
+> > +};
+> 
+> unitialized fields in static initializers are zero anyway.
+> Remove all this ppriv crap. clk_enable/disable will do the reference
+> counting for you.
+> 
+> Sascha
+> 
+Hi Sascha:
+	I could remove the initial, but not the variable. The variable is not used for counting in clk_enable/disable.
+	Instead, it's used in phy_clock_gate function.
 
-Signed-off-by: Tony Lin <tony.lin@freescale.com>
----
- drivers/mmc/host/sdhci-esdhc-imx.c |   44 +++++++++++++++++++++++++++--------
- 1 files changed, 34 insertions(+), 10 deletions(-)
 
-diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-index 710b706..e62d33f 100644
---- a/drivers/mmc/host/sdhci-esdhc-imx.c
-+++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-@@ -25,6 +25,7 @@
- #include "sdhci-pltfm.h"
- #include "sdhci-esdhc.h"
- 
-+#define	SDHCI_CTRL_D3CD			0x08
- /* VENDOR SPEC register */
- #define SDHCI_VENDOR_SPEC		0xC0
- #define  SDHCI_VENDOR_SPEC_SDIO_QUIRK	0x00000002
-@@ -85,14 +86,35 @@ static void esdhc_writel_le(struct sdhci_host *host, u32 val, int reg)
- {
- 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
- 	struct pltfm_imx_data *imx_data = pltfm_host->priv;
--
--	if (unlikely((reg == SDHCI_INT_ENABLE || reg == SDHCI_SIGNAL_ENABLE)
--			&& (imx_data->flags & ESDHC_FLAG_GPIO_FOR_CD)))
--		/*
--		 * these interrupts won't work with a custom card_detect gpio
--		 * (only applied to mx25/35)
--		 */
--		val &= ~(SDHCI_INT_CARD_REMOVE | SDHCI_INT_CARD_INSERT);
-+	u32 data;
-+
-+	if (unlikely(reg == SDHCI_INT_ENABLE || reg == SDHCI_SIGNAL_ENABLE)) {
-+		if (imx_data->flags & ESDHC_FLAG_GPIO_FOR_CD)
-+			/*
-+			 * these interrupts won't work with a
-+			 * custom card_detect gpio
-+			 * (only applied to mx25/35)
-+			 */
-+			val &= ~(SDHCI_INT_CARD_REMOVE | SDHCI_INT_CARD_INSERT);
-+
-+		if (val & SDHCI_INT_CARD_INT) {
-+			/*
-+			 * clear D3CD bit and set D3CD bit to avoid
-+			 * missing the card interrupt
-+			 * this is a eSDHC controller problem so that
-+			 * we need to apply the following workaround
-+			 * clear and set D3CD bit will make eSDHC
-+			 * re-sample the card interrupt, In case
-+			 * a card interrupt was lost, re-sample it by
-+			 * the following steps.
-+			 */
-+			data = readl(host->ioaddr + SDHCI_HOST_CONTROL);
-+			data &= ~SDHCI_CTRL_D3CD;
-+			writel(data, host->ioaddr + SDHCI_HOST_CONTROL);
-+			data |= SDHCI_CTRL_D3CD;
-+			writel(data, host->ioaddr + SDHCI_HOST_CONTROL);
-+		}
-+	}
- 
- 	if (unlikely((imx_data->flags & ESDHC_FLAG_MULTIBLK_NO_INT)
- 				&& (reg == SDHCI_INT_STATUS)
-@@ -162,8 +184,10 @@ static void esdhc_writeb_le(struct sdhci_host *host, u8 val, int reg)
- 		 */
- 		return;
- 	case SDHCI_HOST_CONTROL:
--		/* FSL messed up here, so we can just keep those two */
--		new_val = val & (SDHCI_CTRL_LED | SDHCI_CTRL_4BITBUS);
-+		/* FSL messed up here, so we can just keep those three */
-+		new_val = val & (SDHCI_CTRL_LED | \
-+				SDHCI_CTRL_4BITBUS | \
-+				SDHCI_CTRL_D3CD);
- 		/* ensure the endianess */
- 		new_val |= ESDHC_HOST_CONTROL_LE;
- 		/* DMA mode bits are shifted */
--- 
-1.7.0.4
+> --
+> Pengutronix e.K.                           |
+> |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/
+> |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0
+> |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555
+> |
