@@ -1,80 +1,41 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Thu, 28 Jul 2011 18:02:04 -0400
-Subject: [PATCH REPOST v2] mmc: davinci: Add support for set_power callback
-In-Reply-To: <1311886149-3009-1-git-send-email-ido@wizery.com> (Ido Yariv's
-	message of "Thu, 28 Jul 2011 23:49:09 +0300")
-References: <B85A65D85D7EB246BE421B3FB0FBB593024DD2CE0A@dbde02.ent.ti.com>
-	<1311886149-3009-1-git-send-email-ido@wizery.com>
-Message-ID: <m2y5zijc83.fsf@bob.laptop.org>
+From: ido@wizery.com (Ido Yariv)
+Date: Fri, 29 Jul 2011 01:06:43 +0300
+Subject: [PATCH v3] davinci: Add wl1271/wlan support for AM18x
+In-Reply-To: <4E31D17D.6050000@boundarydevices.com>
+References: <B85A65D85D7EB246BE421B3FB0FBB593024DD2CEC2@dbde02.ent.ti.com>
+	<1311886373-3060-1-git-send-email-ido@wizery.com>
+	<4E31D17D.6050000@boundarydevices.com>
+Message-ID: <20110728220643.GG1985@WorkStation>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Troy,
 
-On Thu, Jul 28 2011, Ido Yariv wrote:
-> Some devices connected to the MMC bus are power controlled by external
-> means. For instance, an SDIO device may be powered down/up by an
-> external gpio line.
->
-> In order to avoid toggling power from within the MMC host driver, add a
-> set_power callback function, which will be called by set_ios upon
-> powering down/up.
->
-> Signed-off-by: Ido Yariv <ido@wizery.com>
+On Thu, Jul 28, 2011 at 02:15:41PM -0700, Troy Kisky wrote:
+> > +	if (power_on) {
+> > +		/* Power up sequence required for wl127x devices */
+> > +		gpio_set_value(DA850_WLAN_EN, 1);
+> > +		usleep_range(15000, 15000);
+> > +		gpio_set_value(DA850_WLAN_EN, 0);
+> > +		usleep_range(1000, 1000);
+> > +		gpio_set_value(DA850_WLAN_EN, 1);
+> > +		msleep(70);
+> 
+> Why turn on, then off, and then back on?
+> Isn't off, then back on sufficient?
 
-Acked-by: Chris Ball <cjb@laptop.org>
+Unfortunately, no. This is a required power up sequence for some
+hardware revisions of the 1271 chip.
 
-> CC: Chris Ball <cjb@laptop.org>
-> ---
->  arch/arm/mach-davinci/include/mach/mmc.h |    3 +++
->  drivers/mmc/host/davinci_mmc.c           |   13 +++++++++++++
->  2 files changed, 16 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/mach-davinci/include/mach/mmc.h b/arch/arm/mach-davinci/include/mach/mmc.h
-> index d4f1e96..5ba6b22 100644
-> --- a/arch/arm/mach-davinci/include/mach/mmc.h
-> +++ b/arch/arm/mach-davinci/include/mach/mmc.h
-> @@ -12,6 +12,9 @@ struct davinci_mmc_config {
->  	/* get_cd()/get_wp() may sleep */
->  	int	(*get_cd)(int module);
->  	int	(*get_ro)(int module);
-> +
-> +	void	(*set_power)(int module, bool on);
-> +
->  	/* wires == 0 is equivalent to wires == 4 (4-bit parallel) */
->  	u8	wires;
->  
-> diff --git a/drivers/mmc/host/davinci_mmc.c b/drivers/mmc/host/davinci_mmc.c
-> index 0076c74..64a8325 100644
-> --- a/drivers/mmc/host/davinci_mmc.c
-> +++ b/drivers/mmc/host/davinci_mmc.c
-> @@ -807,12 +807,25 @@ static void calculate_clk_divider(struct mmc_host *mmc, struct mmc_ios *ios)
->  static void mmc_davinci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
->  {
->  	struct mmc_davinci_host *host = mmc_priv(mmc);
-> +	struct platform_device *pdev = to_platform_device(mmc->parent);
-> +	struct davinci_mmc_config *config = pdev->dev.platform_data;
->  
->  	dev_dbg(mmc_dev(host->mmc),
->  		"clock %dHz busmode %d powermode %d Vdd %04x\n",
->  		ios->clock, ios->bus_mode, ios->power_mode,
->  		ios->vdd);
->  
-> +	switch (ios->power_mode) {
-> +	case MMC_POWER_OFF:
-> +		if (config && config->set_power)
-> +			config->set_power(pdev->id, false);
-> +		break;
-> +	case MMC_POWER_UP:
-> +		if (config && config->set_power)
-> +			config->set_power(pdev->id, true);
-> +		break;
-> +	}
-> +
->  	switch (ios->bus_width) {
->  	case MMC_BUS_WIDTH_8:
->  		dev_dbg(mmc_dev(host->mmc), "Enabling 8 bit mode\n");
+> Also, why not use regulator API like panda board does?
 
--- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+Unlike omap_hsmmc, davinci's MMC host driver does not toggle any
+regulators. To keep things simple, a set_power callback function was
+added to the mmc host as part of this patch series.
+I've considered adding regulator support instead, but found it to be
+a bit over-complicated for this task. In addition, it would require
+either modifying the fixed regulator or adding a new one in order to
+support the above power sequence.
+
+Thanks for your review,
+Ido.
