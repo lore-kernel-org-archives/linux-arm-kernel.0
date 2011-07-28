@@ -1,68 +1,37 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 27 Jul 2011 22:32:14 -0500
-Subject: [RFC PATCH 3/3] ARM: add a default mach/system.h header
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Thu, 28 Jul 2011 00:40:50 -0400 (EDT)
+Subject: [RFC PATCH 0/3] ARM: Add default system.h and uncompress.h
 In-Reply-To: <1311823934-29553-1-git-send-email-robherring2@gmail.com>
 References: <1311823934-29553-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1311823934-29553-4-git-send-email-robherring2@gmail.com>
+Message-ID: <alpine.LFD.2.00.1107280023140.12766@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+On Wed, 27 Jul 2011, Rob Herring wrote:
 
-This adds default implementations of arch_idle and arch_reset. Any
-platform with a system.h will pickup their version of the functions.
+> From: Rob Herring <rob.herring@calxeda.com>
+> 
+> This is a relatively simple way to remove the platform requirement for
+> some header files without making changes in every existing platform.
+> It's perhaps not a solution for the difficult cases, but can get the
+> simple cases out of the way making it clear what remains to be fixed.
+> I've done this for system.h and uncompress.h so far. timex.h and io.h
+> may be additional candidates.
 
-Platforms needing custom idle and reset functions can set pm_idle and
-machine_reset, respectively, to custom implementations at boot time.
+I'm of two minds about this.  It is true that this makes things easy and 
+would avoid some of the #ifdef'ery that is otherwise necessary.  On the 
+other hand this gives us more opportunity for procrastinating and not 
+really do a complete and thorough job.  It would also be easier for some 
+platform to sneak in some of those header files to work around some 
+shortcomings in the generic version which is not helping maintainers 
+keeping a good discipline.  AS we are working on this, I might prefer 
+that mistakes do break the build rather than silently causing a 
+fallback with a dummy generic version to be picked up which might only 
+cause problems at run time much later.
 
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
----
- arch/arm/include/mach/system.h |   13 +++++++++++++
- arch/arm/kernel/process.c      |    5 ++++-
- 2 files changed, 17 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/include/mach/system.h
+A Linaro event is taking place next week in England where a focused 
+effort will be deployed to work on this.  Let's see how much we'll be 
+able to clean up.
 
-diff --git a/arch/arm/include/mach/system.h b/arch/arm/include/mach/system.h
-new file mode 100644
-index 0000000..9ab0684
---- /dev/null
-+++ b/arch/arm/include/mach/system.h
-@@ -0,0 +1,13 @@
-+#ifndef __MACH_SYSTEM_H
-+#define __MACH_SYSTEM_H
-+
-+static inline void arch_idle(void)
-+{
-+	cpu_do_idle();
-+}
-+
-+static inline void arch_reset(char mode, const char *cmd)
-+{
-+}
-+
-+#endif
-diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-index 5e1e541..b3b10bc 100644
---- a/arch/arm/kernel/process.c
-+++ b/arch/arm/kernel/process.c
-@@ -91,6 +91,9 @@ static int __init hlt_setup(char *__unused)
- __setup("nohlt", nohlt_setup);
- __setup("hlt", hlt_setup);
- 
-+void (*machine_reset)(char mode, const char *cmd) = arch_reset;
-+EXPORT_SYMBOL(machine_reset);
-+
- void arm_machine_restart(char mode, const char *cmd)
- {
- 	/* Disable interrupts first */
-@@ -116,7 +119,7 @@ void arm_machine_restart(char mode, const char *cmd)
- 	/*
- 	 * Now call the architecture specific reboot code.
- 	 */
--	arch_reset(mode, cmd);
-+	machine_reset(mode, cmd);
- 
- 	/*
- 	 * Whoops - the architecture was unable to reboot.
--- 
-1.7.4.1
+
+Nicolas
