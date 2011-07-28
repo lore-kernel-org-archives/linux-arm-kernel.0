@@ -1,61 +1,208 @@
-From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
-Date: Thu, 28 Jul 2011 15:05:29 +0530
-Subject: [PATCH v4 REPOST 18/20] gpio/omap: use pm-runtime framework
-In-Reply-To: <20110728074327.GA12916@google.com>
-References: <1310804152-9243-1-git-send-email-tarun.kanti@ti.com>
-	<1310804152-9243-19-git-send-email-tarun.kanti@ti.com>
-	<20110716190734.GB990@google.com>
-	<5A47E75E594F054BAF48C5E4FC4B92AB037C202D59@dbde02.ent.ti.com>
-	<20110728074327.GA12916@google.com>
-Message-ID: <5A47E75E594F054BAF48C5E4FC4B92AB037C2030F7@dbde02.ent.ti.com>
+From: koen.beel.barco@gmail.com (Koen Beel)
+Date: Thu, 28 Jul 2011 11:38:43 +0200
+Subject: [PATCH v8 0/3] add the GPMI controller driver for IMX23/IMX28
+In-Reply-To: <4E2F6F90.7030207@freescale.com>
+References: <1311230846-26437-1-git-send-email-b32955@freescale.com>
+	<20110721215020.GA25344@pengutronix.de>
+	<4E28EEE1.2050008@freescale.com>
+	<20110722055731.GI26837@S2100-06.ap.freescale.net>
+	<4E292FCF.6010608@freescale.com>
+	<CAHMSPgMHrqWcJ=BThDLgQ=XyTBDCMvNS4SVjQWfk=Jf682TEig@mail.gmail.com>
+	<4E2F6F90.7030207@freescale.com>
+Message-ID: <CAHMSPgPC4whyskfuFGeFd7WHx-=5htezWajm_rNi9Xa+03PV0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Todd,
-[...]
-> > > omap_gpio_mod_init calls mpuio_init calls platform_driver_register
-> > > which can't be called in an IRQs off and spinlocked atomic context,
-> ...
-> > I have isolated mpuio_init() from omap_gpio_mod_init().
-> > mpuio_init() is now called once in omap_gpio_probe().
-> 
-> Looking at omap_gpio_mod_init() it seems like much of its processing
-> could probably be done once at probe time (or at pm_runtime_get_sync
-> time) as well, namely setting the IRQ enable masks.
-This must be called at the beginning of bank access to get reset state.
-Otherwise, it would contain settings related to previous bank access.
+Hi,
 
-> 
-> Ungating the interface clock, enabling wakeup, setting smart idle for
-> the module, and enabling the (old-style) system clock seem like either
-> one-time actions at probe, or a part of the pm_runtime_get_sync
-> callback.
-Yes... sysconfig related settings are done by hwmod framework.
-Debounce clocks are enabled in callback.
+I have test on mx23evk board. Still see the same issues.
 
-> 
-> Or is there some other reason these power management actions should be
-> taken each time a GPIO is requested in the block (when none were
-> previously requested), after the runtime PM get_sync callback, but
-> not as part of the get_sync callback?  If so, what caused
-> the smart idle setting to be lost, or the interface clock gated, if
-> not the pm_runtime_put_sync?
-I am not sure which smart idle setting you are referring to.
-Most stuffs done in *_get_sync() callback can skip first time.
-Omap_gpio_mod_init() does resetting irqenable settings to reset value.
-This should not be part of callback.
---
-Tarun
-> 
-> 
-> Todd
-> 
-> > > The omap_gpio_mod_init may be unbalanced with the code performed below
-> > > on last free of a GPIO for the bank?  If all GPIOs are freed and then
-> > > a new GPIO used, does omap_gpio_mod_init do the right thing?  Need a
-> > > separate flag to indicate whether one-time init has ever been
-> > > performed, vs. needing runtime PM enable/disable?
-> > With the above changes I am seeing omap_gpio_mod_init() is balanced.
-> > Let me know if I am still missing something.
-> > --
-> > Tarun
+On Wed, Jul 27, 2011 at 3:53 AM, Huang Shijie <b32955@freescale.com> wrote:
+> Hi,
+>
+> Thanks for your test.
+>
+>> Hi,
+>>
+>> It's not really working for me.
+>> I've applied all gpmi-nand driver patches and the dma driver patches.
+>>
+>> I have added following kernel parameters:
+>> mtdparts=gpmi-nand:20m(boot),-(user) ubi.mtd=1 root=ubi0:rootfs0
+>> rootfstype=ubifs gpmi_debug_init
+>>
+>> During boot I get already get DMA timeout:
+>> [ ? ?2.560000] [ start_dma_without_bch_irq : 392 ] DMA timeout, last DMA
+>> :1
+>> [ ? ?3.560000] [ start_dma_with_bch_irq : 427 ] bch timeout!!!
+>> ...
+>> (see log file in attach line 89)
+
+I still see this DMA timeout when booting.
+What kernel parameters do you use? I still use same as above.
+
+>>
+>> When trying flash_erraseall /dev/mtd1 I get:
+>> Erasing 128 Kibyte @ 20000 -- ?0 % complete [ ? 16.700000] [
+>> gpmi_read_data : 832 ] step 1 error
+>> [ ? 16.700000] [ gpmi_send_command : 749 ] step 1 error
+>> [ ? 16.700000] [ mil_cmd_ctrl : 894 ] Chip: 0, Error -1
+>> [ ? 16.700000] [ gpmi_send_command : 749 ] step 1 error
+>> [ ? 16.700000] [ mil_cmd_ctrl : 894 ] Chip: 0, Error -1
+>> [ ? 16.700000] [ gpmi_send_command : 749 ] step 1 error
+>> [ ? 16.700000] [ mil_cmd_ctrl : 894 ] Chip: 0, Error -1
+>> [ ? 16.700000] [ gpmi_read_data : 832 ] step 1 error
+>> libmtd: error!: MEMERA[ ? 16.740000] [ gpmi_send_command : 749 ] step 1
+>> error
+>> SE64 ioctl failed for eraseblock[ ? 16.750000] [ mil_cmd_ctrl : 894 ]
+>> Chip: 0, Error -1
+>> ?1 (mtd1)
+>> ? ? ? ? error 5 (Input/output error)
+>> flash_erase: error!: /dev/mtd1: MTD Erase failure
+>> ? ? ? ? ? ? ?error 5 (Input/output error)
+>> ...
+>> (see log file in attach line 128 and further)
+
+Also still same issue here.
+
+>>
+>> Environment:
+>> - patches on a 2.6.39.1 kernel (needed to modify the patch a little
+>> for changed mtd add/del interface).
+>
+> Please test the driver on :
+> ?git://git.linaro.org/people/shawnguo/linux-2.6.git mxs-gpmi
+
+I have used this branch.
+
+>
+> or on
+>
+> ?git://git.pengutronix.de/git/imx/linux-2.6.git ?imx-for-3.1
+>
+>
+>
+> I found the .config may influence the DMA.
+> I guess there is some module which has impact to the DMA.
+> So You should use the right .config first, you can get the right
+> .config by two ways:
+> [1] use the 'make mxs_defconfig' in the imx-for-3.1 branch of
+> ?tree: git://git.pengutronix.de/git/imx/linux-2.6.git
+>
+> [2] use the attachment which is tested by me.
+
+I have used this config file. Only thing changed to the config file is
+(uboot savenv not working):
+CONFIG_CMDLINE="console=ttyAMA0,115200
+mtdparts=gpmi-nand:20m(boot),-(user) ubi.mtd=1 root=ubi0:rootfs0
+rootfstype=ubifs gpmi_debug_init"
+CONFIG_CMDLINE_FORCE=y
+
+
+br,
+Koen
+
+>
+> Best Regards
+> Huang Shijie
+>
+>
+>
+>> - using this on our own mx23 based board, so also added some board
+>> init code for that.
+>>
+>>
+>> On Fri, Jul 22, 2011 at 10:07 AM, Huang Shijie<b32955@freescale.com>
+>> ?wrote:
+>>>
+>>> Hi Wolfram:
+>>>>
+>>>> On Fri, Jul 22, 2011 at 11:30:41AM +0800, Huang Shijie wrote:
+>>>>>
+>>>>> Hi,
+>>>>>>>
+>>>>>>> The general-purpose media interface(GPMI) controller is a flexible
+>>>>>>> interface
+>>>>>>> to up to several NAND flashs.
+>>>>>>
+>>>>>> ...
+>>>>>>>
+>>>>>>> To Walfram& ? ?Artem:
+>>>>>>> ? ? About how to disable the JFFS2 to use the OOB:
+>>>>>>> ? ? I read the code, and I still have no idea about how to use the
+>>>>>>> ecclayout
+>>>>>>> ? ? to do the job. Could you give me some hint? thanks.
+>>>>>>
+>>>>>> Have you checked mxc_nand.c for example? There is
+>>>>>>
+>>>>>> static struct nand_ecclayout nandv1_hw_eccoob_smallpage = {
+>>>>>> ? ? ? ? .eccbytes = 5,
+>>>>>> ? ? ? ? .eccpos = {6, 7, 8, 9, 10},
+>>>>>> ? ? ? ? .oobfree = {{0, 5}, {12, 4}, }
+>>>>>> }
+>>>>>>
+>>>>>> defined as one layout. Now, you could define one where oobfree is
+>>>>>> empty
+>>>>>> and
+>>>>>> eccbytes as big as the oob-area.
+>>>>>>
+>>>>> thanks. I will check the code.
+>>>>>>>
+>>>>>>> The driver depends on another GPMI-NAND device patch set, you can
+>>>>>>> find
+>>>>>>> them at :
+>>>>>>> ? ? ? ?[1]
+>>>>>>> http://lists.infradead.org/pipermail/linux-mtd/2011-July/037033.html
+>>>>>>> ? ? ? ?[2]
+>>>>>>> http://lists.infradead.org/pipermail/linux-mtd/2011-July/037031.html
+>>>>>>> ? ? ? ?[3]
+>>>>>>> http://lists.infradead.org/pipermail/linux-mtd/2011-July/037032.html
+>>>>>>> ? ? ? ?[4]
+>>>>>>> http://lists.infradead.org/pipermail/linux-mtd/2011-July/037034.html
+>>>>>>>
+>>>>>>> The driver also depends on another DMA patch by Shawn:
+>>>>>>> ? ? ? ?[0]
+>>>>>>> http://lists.infradead.org/pipermail/linux-mtd/2011-June/036820.html
+>>>>>>
+>>>>>> This makes it difficult for testers/reviewers. Please try to get a
+>>>>>> git-branch
+>>>>>> from Freescale or Linaro.
+>>>>>>
+>>>>> Shawn will merge my patches to his Linaro branch.
+>>
+>> I don't see the DMA patch in the git?
+>>
+>>>> git://git.linaro.org/people/shawnguo/linux-2.6.git mxs-gpmi
+>>>
+>>> Please test the GPMI driver based this git tree.
+>>
+>> I will try that on an mx23evk board.
+>>
+>>> I tested, and the DMA-timeout does not occur any more.
+>>>
+>>> I notice that Shawn added two more patched to
+>>> /arch/arm/config/mxs_defconfig:
+>>> [1] ARM: mxs_defconfig: Add mx23evk and mx28evk build
+>>> [2] ARM: mxs_defconfig: Change CONFIG_RTC_CLASS 'm' to 'y'
+>>>
+>>> Please check it. Maybe your kernel code misses them.
+>>
+>> I don't see any of this in the git?
+>>
+>>> Of course, you can use the my_config (i sent you last mail) for .config.
+>>>
+>>> Best Regards
+>>> Huang Shijie
+>>>
+>>>
+>>>> Shijie, please check and test it. ?I only did a build test.
+>>>>
+>>>
+>>>
+>>> _______________________________________________
+>>> linux-arm-kernel mailing list
+>>> linux-arm-kernel at lists.infradead.org
+>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>>
+>
+>
