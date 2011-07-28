@@ -1,119 +1,74 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Thu, 28 Jul 2011 20:20:45 +0200
-Subject: [PATCH 3/4] dt: omap3: add generic board file for dt support
-In-Reply-To: <4E27E967.7090501@ti.com>
-References: <1310592975-25773-1-git-send-email-manjugk@ti.com>
-	<1310592975-25773-4-git-send-email-manjugk@ti.com>
-	<CACxGe6sELS=C==16TZ2pfrxJDDyqjS_qOwJUfwzwMO8hqo8Xag@mail.gmail.com>
-	<CAC63_iSqN=rX6MbzFWM6z+zf1Eybg3MOD=qQVdeNg5cyENhPjw@mail.gmail.com>
-	<CAC63_iTf696D6Q_EzFeUUp5R38pYNEJBkmKviEu6-yuF0y=bNA@mail.gmail.com>
-	<CACxGe6uzyxf35WDg6COnPVt3dhQv1H80L1svALxp4naySx2BcA@mail.gmail.com>
-	<20110718090710.GZ5783@atomide.com>
-	<20110719213458.GO6848@ponder.secretlab.ca>
-	<4E27E967.7090501@ti.com>
-Message-ID: <4E31A87D.5070704@ti.com>
+From: ido@wizery.com (Ido Yariv)
+Date: Thu, 28 Jul 2011 21:34:54 +0300
+Subject: [PATCH v2 6/6] arm: davinci: DA850: Add wl1271/wlan support
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024DD2CEC2@dbde02.ent.ti.com>
+References: <1310303679-17936-1-git-send-email-ido@wizery.com>
+	<1310303679-17936-7-git-send-email-ido@wizery.com>
+	<B85A65D85D7EB246BE421B3FB0FBB593024DD2CEC2@dbde02.ent.ti.com>
+Message-ID: <20110728183454.GE1985@WorkStation>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rajendra,
+Hi Sekhar,
 
-On 7/21/2011 10:55 AM, Nayak, Rajendra wrote:
-> On 7/20/2011 3:04 AM, Grant Likely wrote:
->> On Mon, Jul 18, 2011 at 02:07:10AM -0700, Tony Lindgren wrote:
->>> * Grant Likely<grant.likely@secretlab.ca>   [110716 22:08]:
->>>>
->>>> The way I see it, you've got two options:
->>>>
->>>> 1) modify the of_platform_bus_create() to call some kind of
->>>> of_platform_bus_create_omap() for devices that match "ti,omap3-device"
->>>> or something.
->>>>
->>>> 2) Leave of_platform_bus_create(), and instead us a notifier to attach
->>>> hwmod data to normal platform devices.  omap_device_build() is
->>>> actually pretty simple.  It allocated a device, it attaches
->>>> platform_data and hwmod pointers to the device and registers it.
->>>> omap_device_register() is just a wrapper around
->>>> platform_device_register().
->>>>
->>>> My preference is definitely #2, but there is a wrinkle in this
->>>> approach.  Unfortunately omap_devices are not simply plain
->>>> platform_devices with extra data attached, an omap_device actually
->>>> embeds the platform_device inside it, which cannot be attached after
->>>> the fact.  I think I had talked with Kevin (cc'd) about eliminating
->>>> the embedding, but I cannot remember clearly on this point.  As long
->>>> as platform_device remains embedded inside struct omap_device, #2
->>>> won't work.
->>>>
->>>> In either case, looking up the correct hwmod data should be easy for
->>>> any device provided the omap code maintains a lookup table of
->>>> compatible strings and base addresses of devices (much like auxdata).
->>>> In fact, I'd be okay with extending auxdata to include OMAP fields if
->>>> that would be easiest since the whole point of auxdata is to ease the
->>>> transition to DT support.  When a matching device is created, the
->>>> hwmod pointer can easily be attached.  This should work transparently
->>>> for all omap devices, not just the i2c bus.
->>>
->>> Well we should be able to automgagically build the omap_device for
->>> each device tree entry.
->>>
->>> And then the device driver probe and runtime PM should be able to take
->>> care of the rest for the driver. And then there's no more driver
->>> specific platform init code needed ;)
->>
->> Right!  That's the solution I'd like to see.
->>
->>> How about if we just have the hwmod code call omap_device_build for
->>> each device tree entry?
->>
->> I think that is pretty much equivalent to suggestion #1 above, only
->> I'm suggesting to take advantage of the infrastructure already
->> available in driver/of/platform.c in the form of
->> of_platform_populate().  The "of_platform_bus_create_omap()" function
->> suggested above I assumed would directly call omap_device_build().
->
-> In fact a lot of what omap_device_build() does today might not even be
-> needed anymore. A lot of what it does is populate the platform_device
-> structure by looking up the hwmod structs.
-> Most of that information would now come from DT and hence all of that
-> can be taken off from the hwmod structs. What will still be needed in
-> hwmod is other data needed to runtime enable/idle the devices. That
-> data however still needs to be linked with the platform_device's that
-> DT would create which is what I guess could be done in something
-> like a of_platform_bus_create_omap().
->
-> Paul/Benoit, do you guys agree we can get rid of some of the data
-> from hwmod, whatever would now get passed in from DT, and keep
-> only the PRCM/OCP related stuff for runtime handling?
+On Mon, Jul 25, 2011 at 11:10:55PM +0530, Nori, Sekhar wrote:
+> Adding a new kernel parameter requires update to
+> Documentation/kernel-parameters.txt as well.
+> 
+> I am Ccing a couple of folks in case they have ideas on
+> whether there is a better way to pass this information
+> to the kernel. I assume there is no way to detect
+> this from hardware.
 
-We need to discuss that further, but last time we discussed with Paul 
-and Tony, we were considering starting with a DT that will just contain 
-the list of devices and a reference to one of several hwmod name.
+Unfortunately, auto-detection of the reference clock is not currently
+possible. However, it might be a better idea to have the ability to
+override this value with a wl12xx module parameter instead of a kernel
+parameter. I'll drop this kernel parameter.
 
-That will allow us to get rid of all the crappy devices init code we 
-have here and there in OMAP today.
-That phase can already keep us busy for some time :-)
+> > +static struct davinci_mmc_config da850_mmc_wl12xx_config = {
+> > +	.get_ro		= NULL,
+> > +	.get_cd		= NULL,
+> 
+> You can get rid of these NULL initializers.
 
-The DT format has some limitation today to describe a device that is 
-connected to several buses and thus have several addresses.
-The DT format is providing only the CPU view of the system, meaning that 
-we cannot take advantage of it to give the memory map of the DSP, or the 
-CortexM3 inside OMAP4 for example. OK, I know, hwmod is not providing 
-that information either today... but that was the plan:-)
+Sure.
 
-Because of that we will miss a lot of data we are retrieving today from 
-hwmod. So for sure, we can define any kind of data in DT, but it will be 
-much better to support that kind of details in the format directly 
-instead of adding some custom TI nodes.
+> > +	.set_power	= wl12xx_set_power,
+> > +	.wires		= 4,
+> > +	.max_freq	= 25000000,
+> > +	.caps		= MMC_CAP_4_BIT_DATA | MMC_CAP_NONREMOVABLE |
+> > +			  MMC_CAP_POWER_OFF_CARD,
+> > +	.version	= MMC_CTLR_VERSION_2,
+> > +};
 
-For my point of view, the DT format should evolve toward a full 
-hierarchical HW representation from the board level instead of a CPU 
-centric one. But that just my .2 cents.
+[...]
 
-Meanwhile, maybe we can start moving basic data from hwmod to DT.
-At first we should probably just do the device -> hwmod binding using DT.
+> > +	ret = gpio_request_one(DA850_WLAN_EN, GPIOF_OUT_INIT_LOW, "wl12xx_en");
+> > +	if (ret) {
+> > +		pr_err("Error initializing the wl12xx enable gpio: %d\n", ret);
+> > +		return;
+> > +	}
+> > +
+> > +	ret = gpio_request_one(DA850_WLAN_IRQ, GPIOF_IN, "wl12xx_irq");
+> > +	if (ret) {
+> > +		pr_err("Error initializing the wl12xx irq gpio: %d\n", ret);
+> > +		gpio_free(DA850_WLAN_EN);
+> > +		return;
+> > +	}
+> > +
+> > +	da850_wl12xx_wlan_data.irq = gpio_to_irq(DA850_WLAN_IRQ);
+> > +	da850_wl12xx_wlan_data.board_ref_clock = da850_wl12xx_fref;
+> > +
+> > +	ret = wl12xx_set_platform_data(&da850_wl12xx_wlan_data);
+> > +	if (ret) {
+> > +		pr_err("Error setting wl12xx data: %d\n", ret);
+> > +		gpio_free(DA850_WLAN_IRQ);
+> > +		gpio_free(DA850_WLAN_EN);
+> 
+> Why not just use the traditional goto based bail out
+> mechanism? You will avoid the multiple gpio_free() calls.
 
-There is so much stuff to do, that the hardest part is to figure out 
-where to start:-)
+Sure.
 
-Regards,
-Benoit
+Thanks for your review,
+Ido.
