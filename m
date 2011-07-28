@@ -1,11 +1,11 @@
 From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Thu, 28 Jul 2011 10:36:14 +0200
+Date: Thu, 28 Jul 2011 10:40:48 +0200
 Subject: [RFC/PATCH 2/7] OMAP3: beagle: don't touch omap_device internals
 In-Reply-To: <20110722085716.GI32058@legolas.emea.dhcp.ti.com>
 References: <1311292338-11830-1-git-send-email-khilman@ti.com>
 	<1311292338-11830-4-git-send-email-khilman@ti.com>
 	<20110722085716.GI32058@legolas.emea.dhcp.ti.com>
-Message-ID: <CAORVsuUX4uvJW4MaHNZmF=u_Jn7sNjEYGwxpRmcd-b0DPpChPg@mail.gmail.com>
+Message-ID: <CAORVsuXsZXU+rH7ujYJuYDvYjWkCVnZrvkkinFPd9DEBYtdduQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
