@@ -1,41 +1,97 @@
-From: ido@wizery.com (Ido Yariv)
-Date: Fri, 29 Jul 2011 01:06:43 +0300
-Subject: [PATCH v3] davinci: Add wl1271/wlan support for AM18x
-In-Reply-To: <4E31D17D.6050000@boundarydevices.com>
-References: <B85A65D85D7EB246BE421B3FB0FBB593024DD2CEC2@dbde02.ent.ti.com>
-	<1311886373-3060-1-git-send-email-ido@wizery.com>
-	<4E31D17D.6050000@boundarydevices.com>
-Message-ID: <20110728220643.GG1985@WorkStation>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 29 Jul 2011 00:04:14 +0200
+Subject: [GIT PULL] arm soc cleanups for 3.1, part 2
+Message-ID: <1516952.7OUnxdoZRc@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Troy,
+Hi Linus,
 
-On Thu, Jul 28, 2011 at 02:15:41PM -0700, Troy Kisky wrote:
-> > +	if (power_on) {
-> > +		/* Power up sequence required for wl127x devices */
-> > +		gpio_set_value(DA850_WLAN_EN, 1);
-> > +		usleep_range(15000, 15000);
-> > +		gpio_set_value(DA850_WLAN_EN, 0);
-> > +		usleep_range(1000, 1000);
-> > +		gpio_set_value(DA850_WLAN_EN, 1);
-> > +		msleep(70);
-> 
-> Why turn on, then off, and then back on?
-> Isn't off, then back on sufficient?
+This is a late set of cleanups that I got from Jean-Christophe after you
+had already merged all the other patches. I already told him that it's too
+late for 3.1, but it seems a bit unfair when I'm also pushing the device
+tree rework now.
 
-Unfortunately, no. This is a required power up sequence for some
-hardware revisions of the 1271 chip.
+Please pull if you really feel like it.
 
-> Also, why not use regulator API like panda board does?
+	Arnd
 
-Unlike omap_hsmmc, davinci's MMC host driver does not toggle any
-regulators. To keep things simple, a set_power callback function was
-added to the mmc host as part of this patch series.
-I've considered adding regulator support instead, but found it to be
-a bit over-complicated for this task. In addition, it would require
-either modifying the fixed regulator or adding a new one in order to
-support the above power sequence.
+The following changes since commit 95b6886526bb510b8370b625a49bc0ab3b8ff10f:
 
-Thanks for your review,
-Ido.
+  Merge branch 'for-linus' of git://git.kernel.org/pub/scm/linux/kernel/git/jmorris/security-testing-2.6 (2011-07-27 19:26:38 -0700)
+
+are available in the git repository at:
+
+  git+ssh://master.kernel.org/pub/scm/linux/kernel/git/arm/linux-arm-soc.git/ at91/cleanup
+
+Jean-Christophe PLAGNIOL-VILLARD (8):
+      at91: introduce commom AT91_BASE_SYS
+      at91: factorize at91 interrupts init to soc
+      at91: remove AT91_DBGU offset from dbgu register macro
+      at91: use structure to store the current soc
+      at91: move clock subsystem init to soc generic init
+      at91: move register clocks to soc generic init
+      at91: factorize sram init
+      at91: add arch specific ioremap support
+
+ arch/arm/mach-at91/Makefile                   |    2 +-
+ arch/arm/mach-at91/at91cap9.c                 |   45 +---
+ arch/arm/mach-at91/at91rm9200.c               |   47 +---
+ arch/arm/mach-at91/at91sam9260.c              |  100 ++-------
+ arch/arm/mach-at91/at91sam9261.c              |   62 +-----
+ arch/arm/mach-at91/at91sam9263.c              |   51 +----
+ arch/arm/mach-at91/at91sam9g45.c              |   45 +---
+ arch/arm/mach-at91/at91sam9rl.c               |   59 +----
+ arch/arm/mach-at91/board-1arm.c               |   11 +-
+ arch/arm/mach-at91/board-afeb-9260v1.c        |   12 +-
+ arch/arm/mach-at91/board-cam60.c              |   12 +-
+ arch/arm/mach-at91/board-cap9adk.c            |   12 +-
+ arch/arm/mach-at91/board-carmeva.c            |   11 +-
+ arch/arm/mach-at91/board-cpu9krea.c           |   11 +-
+ arch/arm/mach-at91/board-cpuat91.c            |   11 +-
+ arch/arm/mach-at91/board-csb337.c             |   11 +-
+ arch/arm/mach-at91/board-csb637.c             |   11 +-
+ arch/arm/mach-at91/board-eb9200.c             |   11 +-
+ arch/arm/mach-at91/board-ecbat91.c            |   11 +-
+ arch/arm/mach-at91/board-eco920.c             |   11 +-
+ arch/arm/mach-at91/board-flexibity.c          |   11 +-
+ arch/arm/mach-at91/board-foxg20.c             |   12 +-
+ arch/arm/mach-at91/board-gsia18s.c            |    9 +-
+ arch/arm/mach-at91/board-kafa.c               |   11 +-
+ arch/arm/mach-at91/board-kb9202.c             |   11 +-
+ arch/arm/mach-at91/board-neocore926.c         |   12 +-
+ arch/arm/mach-at91/board-pcontrol-g20.c       |   11 +-
+ arch/arm/mach-at91/board-picotux200.c         |   11 +-
+ arch/arm/mach-at91/board-qil-a9260.c          |   12 +-
+ arch/arm/mach-at91/board-rm9200dk.c           |   11 +-
+ arch/arm/mach-at91/board-rm9200ek.c           |   11 +-
+ arch/arm/mach-at91/board-sam9-l9260.c         |   12 +-
+ arch/arm/mach-at91/board-sam9260ek.c          |   12 +-
+ arch/arm/mach-at91/board-sam9261ek.c          |   12 +-
+ arch/arm/mach-at91/board-sam9263ek.c          |   12 +-
+ arch/arm/mach-at91/board-sam9g20ek.c          |   16 +-
+ arch/arm/mach-at91/board-sam9m10g45ek.c       |   12 +-
+ arch/arm/mach-at91/board-sam9rlek.c           |   12 +-
+ arch/arm/mach-at91/board-snapper9260.c        |   11 +-
+ arch/arm/mach-at91/board-stamp9g20.c          |   16 +-
+ arch/arm/mach-at91/board-usb-a9260.c          |   12 +-
+ arch/arm/mach-at91/board-usb-a9263.c          |   12 +-
+ arch/arm/mach-at91/board-yl-9200.c            |   12 +-
+ arch/arm/mach-at91/generic.h                  |   34 +--
+ arch/arm/mach-at91/include/mach/at91_dbgu.h   |   27 ++-
+ arch/arm/mach-at91/include/mach/at91cap9.h    |    1 -
+ arch/arm/mach-at91/include/mach/at91rm9200.h  |    1 -
+ arch/arm/mach-at91/include/mach/at91sam9260.h |    1 -
+ arch/arm/mach-at91/include/mach/at91sam9261.h |    1 -
+ arch/arm/mach-at91/include/mach/at91sam9263.h |    1 -
+ arch/arm/mach-at91/include/mach/at91sam9g45.h |    1 -
+ arch/arm/mach-at91/include/mach/at91sam9rl.h  |    1 -
+ arch/arm/mach-at91/include/mach/cpu.h         |  159 ++++++++------
+ arch/arm/mach-at91/include/mach/debug-macro.S |   14 +-
+ arch/arm/mach-at91/include/mach/hardware.h    |   14 ++
+ arch/arm/mach-at91/include/mach/io.h          |   11 +-
+ arch/arm/mach-at91/setup.c                    |  297 +++++++++++++++++++++++++
+ arch/arm/mach-at91/soc.h                      |   59 +++++
+ 58 files changed, 696 insertions(+), 745 deletions(-)
+ create mode 100644 arch/arm/mach-at91/setup.c
+ create mode 100644 arch/arm/mach-at91/soc.h
