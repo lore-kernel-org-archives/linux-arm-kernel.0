@@ -1,65 +1,70 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 28 Jul 2011 16:49:18 -0400 (EDT)
-Subject: [PATCH 2/2] ARM: msm: Remove PLAT_PHYS_OFFSETS from MSM
- targets
-In-Reply-To: <1311884291-5409-2-git-send-email-davidb@codeaurora.org>
-References: <1311794355-26988-2-git-send-email-sboyd@codeaurora.org>
-	<1311884291-5409-1-git-send-email-davidb@codeaurora.org>
-	<1311884291-5409-2-git-send-email-davidb@codeaurora.org>
-Message-ID: <alpine.LFD.2.00.1107281647060.12766@xanadu.home>
+From: ido@wizery.com (Ido Yariv)
+Date: Thu, 28 Jul 2011 23:49:09 +0300
+Subject: [PATCH REPOST v2] mmc: davinci: Add support for set_power callback
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024DD2CE0A@dbde02.ent.ti.com>
+References: <B85A65D85D7EB246BE421B3FB0FBB593024DD2CE0A@dbde02.ent.ti.com>
+Message-ID: <1311886149-3009-1-git-send-email-ido@wizery.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 28 Jul 2011, David Brown wrote:
+Some devices connected to the MMC bus are power controlled by external
+means. For instance, an SDIO device may be powered down/up by an
+external gpio line.
 
-> Now that MSM can boot with the phys offset patching, eliminate the
-> definitions of the phys offsets, and instead select
-> ARM_PATCH_PHYS_VIRT.
-> 
-> Signed-off-by: David Brown <davidb@codeaurora.org>
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index ced9371..3a4d87c 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -618,6 +618,7 @@ config ARCH_MSM
->  	select GENERIC_CLOCKEVENTS
->  	select ARCH_REQUIRE_GPIOLIB
->  	select CLKDEV_LOOKUP
-> +	select ARM_PATCH_PHYS_VIRT
->  	help
->  	  Support for Qualcomm MSM/QSD based systems.  This runs on the
->  	  apps processor of the MSM/QSD and depends on a shared memory
-> diff --git a/arch/arm/mach-msm/include/mach/memory.h b/arch/arm/mach-msm/include/mach/memory.h
-> index 58d5e7e..deed41a 100644
-> --- a/arch/arm/mach-msm/include/mach/memory.h
-> +++ b/arch/arm/mach-msm/include/mach/memory.h
-> @@ -17,19 +17,12 @@
->  #define __ASM_ARCH_MEMORY_H
->  
->  /* physical offset of RAM */
-> -#if defined(CONFIG_ARCH_QSD8X50) && defined(CONFIG_MSM_SOC_REV_A)
-> -#define PLAT_PHYS_OFFSET		UL(0x00000000)
-> -#elif defined(CONFIG_ARCH_QSD8X50)
-> -#define PLAT_PHYS_OFFSET		UL(0x20000000)
-> -#elif defined(CONFIG_ARCH_MSM7X30)
-> -#define PLAT_PHYS_OFFSET		UL(0x00000000)
-> -#elif defined(CONFIG_ARCH_MSM8X60)
-> -#define PLAT_PHYS_OFFSET		UL(0x40000000)
-> -#elif defined(CONFIG_ARCH_MSM8960)
-> -#define PLAT_PHYS_OFFSET		UL(0x40000000)
-> -#else
-> -#define PLAT_PHYS_OFFSET		UL(0x10000000)
-> -#endif
-> +#define QSD8X50A_PHYS_OFFSET		UL(0x00000000)
-> +#define QSD8X50_PHYS_OFFSET		UL(0x20000000)
-> +#define MSM7X30_PHYS_OFFSET		UL(0x00000000)
-> +#define MSM8X60_PHYS_OFFSET		UL(0x10000000)
-> +#define MSM8960_PHYS_OFFSET		UL(0x40000000)
-> +#define MSM7X01_PHYS_OFFSET		UL(0x10000000)
+In order to avoid toggling power from within the MMC host driver, add a
+set_power callback function, which will be called by set_ios upon
+powering down/up.
 
-Do you really need those defines?  If you do I'd suggest moving them 
-elsewhere so your mach/memory.h can become empty.
+Signed-off-by: Ido Yariv <ido@wizery.com>
+CC: Chris Ball <cjb@laptop.org>
+---
+ arch/arm/mach-davinci/include/mach/mmc.h |    3 +++
+ drivers/mmc/host/davinci_mmc.c           |   13 +++++++++++++
+ 2 files changed, 16 insertions(+), 0 deletions(-)
 
-
-Nicolas
+diff --git a/arch/arm/mach-davinci/include/mach/mmc.h b/arch/arm/mach-davinci/include/mach/mmc.h
+index d4f1e96..5ba6b22 100644
+--- a/arch/arm/mach-davinci/include/mach/mmc.h
++++ b/arch/arm/mach-davinci/include/mach/mmc.h
+@@ -12,6 +12,9 @@ struct davinci_mmc_config {
+ 	/* get_cd()/get_wp() may sleep */
+ 	int	(*get_cd)(int module);
+ 	int	(*get_ro)(int module);
++
++	void	(*set_power)(int module, bool on);
++
+ 	/* wires == 0 is equivalent to wires == 4 (4-bit parallel) */
+ 	u8	wires;
+ 
+diff --git a/drivers/mmc/host/davinci_mmc.c b/drivers/mmc/host/davinci_mmc.c
+index 0076c74..64a8325 100644
+--- a/drivers/mmc/host/davinci_mmc.c
++++ b/drivers/mmc/host/davinci_mmc.c
+@@ -807,12 +807,25 @@ static void calculate_clk_divider(struct mmc_host *mmc, struct mmc_ios *ios)
+ static void mmc_davinci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ {
+ 	struct mmc_davinci_host *host = mmc_priv(mmc);
++	struct platform_device *pdev = to_platform_device(mmc->parent);
++	struct davinci_mmc_config *config = pdev->dev.platform_data;
+ 
+ 	dev_dbg(mmc_dev(host->mmc),
+ 		"clock %dHz busmode %d powermode %d Vdd %04x\n",
+ 		ios->clock, ios->bus_mode, ios->power_mode,
+ 		ios->vdd);
+ 
++	switch (ios->power_mode) {
++	case MMC_POWER_OFF:
++		if (config && config->set_power)
++			config->set_power(pdev->id, false);
++		break;
++	case MMC_POWER_UP:
++		if (config && config->set_power)
++			config->set_power(pdev->id, true);
++		break;
++	}
++
+ 	switch (ios->bus_width) {
+ 	case MMC_BUS_WIDTH_8:
+ 		dev_dbg(mmc_dev(host->mmc), "Enabling 8 bit mode\n");
+-- 
+1.7.4.1
