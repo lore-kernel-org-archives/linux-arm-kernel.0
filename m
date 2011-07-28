@@ -1,201 +1,99 @@
-From: omar.ramirez@ti.com (Ramirez Luna, Omar)
-Date: Thu, 28 Jul 2011 16:09:34 -0500
-Subject: [RFC] ARM: dma_map|unmap_sg plus iommu
-Message-ID: <CAB-zwWjb+2ExjNDB3OtHmRmgaHMnO-VgEe9VZk_wU=ryrq_AGw@mail.gmail.com>
+From: troy.kisky@boundarydevices.com (Troy Kisky)
+Date: Thu, 28 Jul 2011 14:15:41 -0700
+Subject: [PATCH v3] davinci: Add wl1271/wlan support for AM18x
+In-Reply-To: <1311886373-3060-1-git-send-email-ido@wizery.com>
+References: <B85A65D85D7EB246BE421B3FB0FBB593024DD2CEC2@dbde02.ent.ti.com>
+	<1311886373-3060-1-git-send-email-ido@wizery.com>
+Message-ID: <4E31D17D.6050000@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 7/28/2011 1:52 PM, Ido Yariv wrote:
+> The wl1271 daughter card for AM18x EVMs is a combo wireless connectivity
+> add-on card, based on the LS Research TiWi module with Texas
+> Instruments' wl1271 solution.
+> It is a 4-wire, 1.8V, embedded SDIO WLAN device with an external IRQ
+> line and is power-controlled by a GPIO-based fixed regulator.
+> 
+> Add support for the WLAN capabilities of this expansion board.
+> 
+> Signed-off-by: Ido Yariv <ido@wizery.com>
+> ---
+>  arch/arm/mach-davinci/Kconfig           |   10 +++
+>  arch/arm/mach-davinci/board-da850-evm.c |  114 +++++++++++++++++++++++++++++++
+>  2 files changed, 124 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-davinci/Kconfig b/arch/arm/mach-davinci/Kconfig
+> index c0deaca..32d837d 100644
+> --- a/arch/arm/mach-davinci/Kconfig
+> +++ b/arch/arm/mach-davinci/Kconfig
+> @@ -192,6 +192,16 @@ config DA850_UI_RMII
+>  
+>  endchoice
+>  
+> +config DA850_WL12XX
+> +	bool "AM18x wl1271 daughter board"
+> +	depends on MACH_DAVINCI_DA850_EVM
+> +	help
+> +	  The wl1271 daughter card for AM18x EVMs is a combo wireless
+> +	  connectivity add-on card, based on the LS Research TiWi module with
+> +	  Texas Instruments' wl1271 solution.
+> +	  Say Y if you want to use a wl1271 expansion card connected to the
+> +	  AM18x EVM.
+> +
+>  config GPIO_PCA953X
+>  	default MACH_DAVINCI_DA850_EVM
+>  
+> diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
+> index bd53945..d817626 100644
+> --- a/arch/arm/mach-davinci/board-da850-evm.c
+> +++ b/arch/arm/mach-davinci/board-da850-evm.c
+> @@ -31,6 +31,8 @@
+>  #include <linux/input/tps6507x-ts.h>
+>  #include <linux/spi/spi.h>
+>  #include <linux/spi/flash.h>
+> +#include <linux/delay.h>
+> +#include <linux/wl12xx.h>
+>  
+>  #include <asm/mach-types.h>
+>  #include <asm/mach/arch.h>
+> @@ -49,6 +51,9 @@
+>  #define DA850_MMCSD_CD_PIN		GPIO_TO_PIN(4, 0)
+>  #define DA850_MMCSD_WP_PIN		GPIO_TO_PIN(4, 1)
+>  
+> +#define DA850_WLAN_EN			GPIO_TO_PIN(6, 9)
+> +#define DA850_WLAN_IRQ			GPIO_TO_PIN(6, 10)
+> +
+>  #define DA850_MII_MDIO_CLKEN_PIN	GPIO_TO_PIN(2, 6)
+>  
+>  static struct mtd_partition da850evm_spiflash_part[] = {
+> @@ -1117,6 +1122,110 @@ static __init int da850_evm_init_cpufreq(void)
+>  static __init int da850_evm_init_cpufreq(void) { return 0; }
+>  #endif
+>  
+> +#ifdef CONFIG_DA850_WL12XX
+> +
+> +static void wl12xx_set_power(int index, bool power_on)
+> +{
+> +	static bool power_state;
+> +
+> +	pr_debug("Powering %s wl12xx", power_on ? "on" : "off");
+> +
+> +	if (power_on == power_state)
+> +		return;
+> +	power_state = power_on;
+> +
+> +	if (power_on) {
+> +		/* Power up sequence required for wl127x devices */
+> +		gpio_set_value(DA850_WLAN_EN, 1);
+> +		usleep_range(15000, 15000);
+> +		gpio_set_value(DA850_WLAN_EN, 0);
+> +		usleep_range(1000, 1000);
+> +		gpio_set_value(DA850_WLAN_EN, 1);
+> +		msleep(70);
 
-I know it is very early but here it is a tryout of the dma_map_sg and
-dma_unmap_sg with iommu, I made it to roughly understand what is needed to
-remove drivers/omap-iovmm.c (which is a virtual memory manager
-implementation on top of omap iommu driver).
 
-This patch is placed on top of Marek Szyprowsk initial work:
+Why turn on, then off, and then back on?
+Isn't off, then back on sufficient?
 
-ARM: DMA-mapping & IOMMU integration
-http://thread.gmane.org/gmane.linux.kernel.mm/63727/
-
-It was tested on an OMAP zoom3 platform and tidspbridge driver. The patch
-is used to map user space buffers to dsp's iommu, get_user_pages is used to
-form the sg list that will be passed to dma_map_sg.
-
-While at it, I bumped into some issues that I would like to get some
-feedback or know if they are being considered:
-
-1. There is no way to keep track of what virtual address are being mapped
-in the scatterlist, which we need to propagate to the dsp, in order that it
-knows where does the buffers start and end on its virtual address space.
-I ended up adding an iov_address to scatterlist which if accepted should be
-toggled/affected by the selection of CONFIG_IOMMU_API.
-
-2. tidspbridge driver sometimes needs to map a physical address into a
-fixed virtual address (i.e. the start of a firmware section is expected to
-be at dsp va 0x20000000), there is no straight forward way to do this with
-the dma api given that it only expects to receive a cpu_addr, a sg or a
-page, by adding iov_address I could pass phys and iov addresses in a sg
-and overcome this limitation, but, these addresses belong to:
-
-  2a. Shared memory between ARM and DSP: this memory is allocated through
-      memblock API which takes it out of kernel control to be later
-      ioremap'd and iommu map'd to the dsp (this because a non-cacheable
-      requirement), so, these physical addresses doesn't have a linear
-      virtual address translation, which is what dma api expects.
-  2b. Bus addresses: of dsp peripherals which are also ioremap'd and
-      affected by the same thing.
-
-  So: kmemcheck_mark_initialized(sg_virt(s), s->length);
-
-  sg_virt might be returning a wrong virtual address, which is different to
-  what ioremap returns.
-
-I leave the code below and appreciate any comments or feedback
-
-Regards,
-
-Omar
-
----
- arch/arm/mm/dma-mapping.c         |   68 +++++++++++++++++++++++++++++++++++++
- drivers/iommu/omap-iommu.c        |    9 ++++-
- include/asm-generic/scatterlist.h |    3 ++
- 3 files changed, 79 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index b6397c1..2cc4853 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -1318,10 +1318,78 @@ void arm_iommu_free_attrs(struct device *dev,
-size_t size, void *cpu_addr,
- 	mutex_unlock(&mapping->lock);
- }
-
-+int arm_iommu_map_sg(struct device *dev, struct scatterlist *sg, int nents,
-+					enum dma_data_direction dir)
-+{
-+	struct dma_iommu_mapping *mapping = dev->archdata.mapping;
-+	struct scatterlist *s;
-+	dma_addr_t iova;
-+	size_t size = 0;
-+	int i, j;
-+
-+	BUG_ON(!valid_dma_direction(dir));
-+
-+	/* XXX do not assume al ents of PAGE_SIZE */
-+	size = nents * PAGE_SIZE;
-+	iova = gen_pool_alloc(mapping->pool, size);
-+	if (iova == 0)
-+		return 0;
-+
-+	for_each_sg(sg, s, nents, i) {
-+		int ret;
-+		unsigned int phys = page_to_phys(sg_page(s));
-+
-+		/* XXX Add arch flags */
-+		ret = iommu_map(mapping->domain, iova, phys, 0, 0);
-+		if (ret < 0)
-+			goto bad_mapping;
-+
-+		s->iov_address = iova;
-+		iova += PAGE_SIZE;
-+
-+		/* XXX do something on error to clean iommu map*/
-+		s->dma_address = __dma_map_page(dev, sg_page(s), s->offset,
-+						s->length, dir);
-+		if (dma_mapping_error(dev, s->dma_address))
-+			goto bad_mapping;
-+	}
-+	debug_dma_map_sg(dev, sg, nents, nents, dir);
-+	return nents;
-+
-+ bad_mapping:
-+	for_each_sg(sg, s, i, j)
-+		__dma_unmap_page(dev, sg_dma_address(s), sg_dma_len(s), dir);
-+	return 0;
-+
-+}
-+
-+void arm_iommu_unmap_sg(struct device *dev, struct scatterlist *sg, int nents,
-+					enum dma_data_direction dir)
-+{
-+	struct dma_iommu_mapping *mapping = dev->archdata.mapping;
-+	dma_addr_t iova = sg_iov_address(sg);
-+	struct scatterlist *s;
-+	size_t size = 0;
-+	int i;
-+
-+	debug_dma_unmap_sg(dev, sg, nents, dir);
-+
-+	for_each_sg(sg, s, nents, i) {
-+		__dma_unmap_page(dev, sg_dma_address(s), sg_dma_len(s), dir);
-+		iommu_unmap(mapping->domain, sg_iov_address(s), 0);
-+	}
-+
-+	size = nents * PAGE_SIZE;
-+	gen_pool_free(mapping->pool, iova, size);
-+}
-+
-+
- struct arm_dma_map_ops iommu_ops = {
- 	.alloc_attrs = arm_iommu_alloc_attrs,
- 	.free_attrs = arm_iommu_free_attrs,
- 	.mmap_attrs = arm_iommu_mmap_attrs,
-+	.map_sg = arm_iommu_map_sg,
-+	.unmap_sg = arm_iommu_unmap_sg,
- };
- EXPORT_SYMBOL_GPL(iommu_ops);
-
-diff --git a/drivers/iommu/omap-iommu.c b/drivers/iommu/omap-iommu.c
-index 9b21b80..6b2a3e1 100644
---- a/drivers/iommu/omap-iommu.c
-+++ b/drivers/iommu/omap-iommu.c
-@@ -22,6 +22,7 @@
- #include <linux/mutex.h>
-
- #include <asm/cacheflush.h>
-+#include <asm/dma-iommu.h>
-
- #include <plat/iommu.h>
- #include <plat/iopgtable.h>
-@@ -879,9 +880,15 @@ EXPORT_SYMBOL_GPL(iommu_set_da_range);
-  */
- struct device *omap_find_iommu_device(const char *name)
- {
--	return driver_find_device(&omap_iommu_driver.driver, NULL,
-+	struct device *dev;
-+
-+	dev = driver_find_device(&omap_iommu_driver.driver, NULL,
- 				(void *)name,
- 				device_match_by_alias);
-+
-+	arm_iommu_assign_device(dev, 0x204f0000, 0x304f0000);
-+
-+	return dev;
- }
- EXPORT_SYMBOL_GPL(omap_find_iommu_device);
-
-diff --git a/include/asm-generic/scatterlist.h
-b/include/asm-generic/scatterlist.h
-index 5de0735..831d626 100644
---- a/include/asm-generic/scatterlist.h
-+++ b/include/asm-generic/scatterlist.h
-@@ -11,6 +11,7 @@ struct scatterlist {
- 	unsigned int	offset;
- 	unsigned int	length;
- 	dma_addr_t	dma_address;
-+	dma_addr_t	iov_address;
- #ifdef CONFIG_NEED_SG_DMA_LENGTH
- 	unsigned int	dma_length;
- #endif
-@@ -25,6 +26,8 @@ struct scatterlist {
-  */
- #define sg_dma_address(sg)	((sg)->dma_address)
-
-+#define sg_iov_address(sg)      ((sg)->iov_address)
-+
- #ifdef CONFIG_NEED_SG_DMA_LENGTH
- #define sg_dma_len(sg)		((sg)->dma_length)
- #else
--- 
-1.7.0.4
+Also, why not use regulator API like panda board does?
