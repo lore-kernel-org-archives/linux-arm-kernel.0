@@ -1,99 +1,142 @@
-From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Thu, 28 Jul 2011 14:15:41 -0700
-Subject: [PATCH v3] davinci: Add wl1271/wlan support for AM18x
-In-Reply-To: <1311886373-3060-1-git-send-email-ido@wizery.com>
-References: <B85A65D85D7EB246BE421B3FB0FBB593024DD2CEC2@dbde02.ent.ti.com>
-	<1311886373-3060-1-git-send-email-ido@wizery.com>
-Message-ID: <4E31D17D.6050000@boundarydevices.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 28 Jul 2011 15:32:46 -0600
+Subject: [PATCH 4/4] dt: i2c-omap: Convert i2c driver to use device tree
+In-Reply-To: <4E319DA7.5050608@ti.com>
+References: <1310592975-25773-1-git-send-email-manjugk@ti.com>
+	<1310592975-25773-5-git-send-email-manjugk@ti.com>
+	<CACxGe6vG9BKUDvthOKFtx3u=Vq0EfBaZakxVqx8AYfRe_ruNdg@mail.gmail.com>
+	<4E319DA7.5050608@ti.com>
+Message-ID: <CACxGe6speWWuhSL1m3ysc6zrTvxYRyNf8Qj3Rt0jjdUGYi_v8g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/28/2011 1:52 PM, Ido Yariv wrote:
-> The wl1271 daughter card for AM18x EVMs is a combo wireless connectivity
-> add-on card, based on the LS Research TiWi module with Texas
-> Instruments' wl1271 solution.
-> It is a 4-wire, 1.8V, embedded SDIO WLAN device with an external IRQ
-> line and is power-controlled by a GPIO-based fixed regulator.
-> 
-> Add support for the WLAN capabilities of this expansion board.
-> 
-> Signed-off-by: Ido Yariv <ido@wizery.com>
-> ---
->  arch/arm/mach-davinci/Kconfig           |   10 +++
->  arch/arm/mach-davinci/board-da850-evm.c |  114 +++++++++++++++++++++++++++++++
->  2 files changed, 124 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-davinci/Kconfig b/arch/arm/mach-davinci/Kconfig
-> index c0deaca..32d837d 100644
-> --- a/arch/arm/mach-davinci/Kconfig
-> +++ b/arch/arm/mach-davinci/Kconfig
-> @@ -192,6 +192,16 @@ config DA850_UI_RMII
->  
->  endchoice
->  
-> +config DA850_WL12XX
-> +	bool "AM18x wl1271 daughter board"
-> +	depends on MACH_DAVINCI_DA850_EVM
-> +	help
-> +	  The wl1271 daughter card for AM18x EVMs is a combo wireless
-> +	  connectivity add-on card, based on the LS Research TiWi module with
-> +	  Texas Instruments' wl1271 solution.
-> +	  Say Y if you want to use a wl1271 expansion card connected to the
-> +	  AM18x EVM.
-> +
->  config GPIO_PCA953X
->  	default MACH_DAVINCI_DA850_EVM
->  
-> diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
-> index bd53945..d817626 100644
-> --- a/arch/arm/mach-davinci/board-da850-evm.c
-> +++ b/arch/arm/mach-davinci/board-da850-evm.c
-> @@ -31,6 +31,8 @@
->  #include <linux/input/tps6507x-ts.h>
->  #include <linux/spi/spi.h>
->  #include <linux/spi/flash.h>
-> +#include <linux/delay.h>
-> +#include <linux/wl12xx.h>
->  
->  #include <asm/mach-types.h>
->  #include <asm/mach/arch.h>
-> @@ -49,6 +51,9 @@
->  #define DA850_MMCSD_CD_PIN		GPIO_TO_PIN(4, 0)
->  #define DA850_MMCSD_WP_PIN		GPIO_TO_PIN(4, 1)
->  
-> +#define DA850_WLAN_EN			GPIO_TO_PIN(6, 9)
-> +#define DA850_WLAN_IRQ			GPIO_TO_PIN(6, 10)
-> +
->  #define DA850_MII_MDIO_CLKEN_PIN	GPIO_TO_PIN(2, 6)
->  
->  static struct mtd_partition da850evm_spiflash_part[] = {
-> @@ -1117,6 +1122,110 @@ static __init int da850_evm_init_cpufreq(void)
->  static __init int da850_evm_init_cpufreq(void) { return 0; }
->  #endif
->  
-> +#ifdef CONFIG_DA850_WL12XX
-> +
-> +static void wl12xx_set_power(int index, bool power_on)
-> +{
-> +	static bool power_state;
-> +
-> +	pr_debug("Powering %s wl12xx", power_on ? "on" : "off");
-> +
-> +	if (power_on == power_state)
-> +		return;
-> +	power_state = power_on;
-> +
-> +	if (power_on) {
-> +		/* Power up sequence required for wl127x devices */
-> +		gpio_set_value(DA850_WLAN_EN, 1);
-> +		usleep_range(15000, 15000);
-> +		gpio_set_value(DA850_WLAN_EN, 0);
-> +		usleep_range(1000, 1000);
-> +		gpio_set_value(DA850_WLAN_EN, 1);
-> +		msleep(70);
+On Thu, Jul 28, 2011 at 11:34 AM, Cousson, Benoit <b-cousson@ti.com> wrote:
+> Hi Grant,
+>
+> On 7/14/2011 1:20 AM, Grant Likely wrote:
+>>
+>> On Thu, Jul 14, 2011 at 7:06 AM, G, Manjunath Kondaiah<manjugk@ti.com>
+>> ?wrote:
+>>>
+>>> The i2c-omap driver is converted for supporting both
+>>> dt and non dt builds and driver is modified to use dt
+>>> data partially.
+>
+> [...]
+>
+>>> ? ? ? ?/* NOTE: driver uses the static register mapping */
+>>> ? ? ? ?mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>>> ? ? ? ?if (!mem) {
+>>> @@ -1011,11 +1026,25 @@ omap_i2c_probe(struct platform_device *pdev)
+>>> ? ? ? ?if (pdata != NULL) {
+>>> ? ? ? ? ? ? ? ?speed = pdata->clkrate;
+>>> ? ? ? ? ? ? ? ?dev->set_mpu_wkup_lat = pdata->set_mpu_wkup_lat;
+>>> +#if defined(CONFIG_OF)
+>>> + ? ? ? } else if (pdev->dev.of_node) {
+>>> + ? ? ? ? ? ? ? u32 prop;
+>>> + ? ? ? ? ? ? ? if (!of_property_read_u32(pdev->dev.of_node,
+>>> "clock-frequency",
+>>> +&prop))
+>>> + ? ? ? ? ? ? ? ? ? ? ? speed = prop/100;
+>>> + ? ? ? ? ? ? ? else
+>>> + ? ? ? ? ? ? ? ? ? ? ? speed = 100;
+>
+> Do we have to modify every drivers in order to take advantage of the DT bus?
+> Cannot we init the already existing pdata during device creation and let the
+> driver untouched?
+>
+> I think it is a pity to add all that #ifdefry in the driver to be able to
+> support two kinds of bus.
+
+It's not supporting 2 different kinds of bus.  There is no such think
+as a dt bus type (anymore. there used to be and of_platform_bus_type,
+but that was a mistake).  DT is only a different configuration
+representation.
+
+> Cannot we have an intermediate phase that will deal only with the device
+> creation with DT?
+>
+> That will allow us to clean the omap_device creation from hwmod we have
+> today spread everywhere in plat-omap and mach-omap2.
+
+Consider what you're suggesting...  Pretty much every driver that
+needs platform data has as a unique platform_data structure.  That
+means that for every driver there needs to be a separate block of code
+to translate from DT data into struct <driver>_platform_data.  There
+is no way to make that generic.  That translation code needs to live
+somewhere, and something needs to be responsible for executing it when
+relevant devices appear.  It can either be built into the driver, or
+it can be done sometime before the driver is probed.
+
+Option 1: If it is part of the driver, the sequence looks like this:
+...early boot:
+1) allocate and register platform_devices for DT nodes (generic code,
+attach device_node)
+... boot progresses to initcalls...
+2) probe platform_driver (DT translation code to obtain
+<device>_platform_data from device_node)
+
+Option 2: If it is part of platform_device registration, the sequence
+looks something like:
+...early boot:
+1) allocate and register platform_devices for DT nodes (call device
+specific translation code for each device to create
+<device>_platform_data)
+...boot progresses to initcalls
+2) probe platform_driver (use platform_data, nothing changes here)
+
+Option 3: decoupled from device registration and the device driver:
+...early boot:
+1) allocate and register platform_devices for DT nodes (generic code,
+attach device_node)
+...boot progresses to initcalls
+2) hook into device model *before* drivers get probed to call device
+specific translation code.
+3) probe platform_driver (use platform_data, nothing changes here)
+
+I understand the desire to not change the drivers, but going with
+either option 2 or 3 causes a giant mess in figuring out how to make
+sure the correct translation code gets called.  Option 2 is a disaster
+because the translation code for any device that may possibly be
+attached to the kernel must be statically linked in.  It cannot be in
+modules because it must be available during early init.  Option 2 is
+similarly a no-go because it requires a new hunk of infrastructure to
+take care of finding and executing translation code before the device
+can get probed by the device driver.
+
+Besides, no matter how you look at it, the DT translation code is
+always device-driver-specific.  It isn't something that can be handled
+by generic code for all devices, and the *whole point* of the DT
+transition is to get away from board specific code during early init.
+Why wouldn't DT translation code live inside the one device driver
+that it supports?
+
+g.
+
+Note: This is only an issue if a driver requires platform data.
+Drivers that only need register and irq resources work without any
+additional code.
+
+As for the #ifdef issue, yes it can look ugly if it is done in the
+wrong way.  Generally, I split the translation code out into a
+separate function that can be made an empty static inline when
+CONFIG_OF is not selected so that all the DT specific code can be
+factored out into a single #ifdef block.
+
+g.
+
+>
+> Regards
+> Benoit
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
 
 
-Why turn on, then off, and then back on?
-Isn't off, then back on sufficient?
 
-Also, why not use regulator API like panda board does?
+-- 
+Grant Likely, B.Sc., P.Eng.
+Secret Lab Technologies Ltd.
