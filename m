@@ -1,34 +1,23 @@
-From: kirill@shutemov.name (Kirill A. Shutemov)
-Date: Thu, 28 Jul 2011 14:17:02 +0300
-Subject: [PATCH v2] ARM: alignment: Make SIGBUS sent to userspace POSIXly
-	correct
-In-Reply-To: <1311768636-29582-1-git-send-email-dave.martin@linaro.org>
-References: <1311768636-29582-1-git-send-email-dave.martin@linaro.org>
-Message-ID: <20110728111702.GA22645@shutemov.name>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 28 Jul 2011 12:27:02 +0100
+Subject: [PATCH v3 5/6] ARM: mxs: add usb phy operations
+In-Reply-To: <20110727080315.GN20587@pengutronix.de>
+References: <1311744574-3610-1-git-send-email-tony.lin@freescale.com>
+	<1311744574-3610-6-git-send-email-tony.lin@freescale.com>
+	<20110727080315.GN20587@pengutronix.de>
+Message-ID: <20110728112702.GE31473@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 27, 2011 at 01:10:36PM +0100, Dave Martin wrote:
-> With the UM_SIGNAL alignment fault mode, no siginfo structure is
-> passed to userspace.
+On Wed, Jul 27, 2011 at 10:03:15AM +0200, Sascha Hauer wrote:
+> On Wed, Jul 27, 2011 at 01:29:33PM +0800, Tony Lin wrote:
+> > +	if (!ppriv->phy_regs || !ppriv->ctrl_regs) {
+> > +		iounmap(ppriv->phy_regs);
+> > +		iounmap(ppriv->ctrl_regs);
+> > +		return -ENOMEM;
+> > +	}
 > 
-> POSIX specifies how siginfo_t should be populated for alignment
-> faults, so this patch does just that:
-> 
->   * si_signo = SIGBUS
->   * si_code = BUS_ADRALN
->   * si_addr = misaligned data address at which access was attempted
-> 
-> Signed-off-by: Dave Martin <dave.martin@linaro.org>
-> ---
-> v2: si_addr in siginfo_t changed to contain the faulting data
->     access address, not the address of the faulting instruction.
-> 
->     This behaviour is consistent with the way other fault signals
->     such as SIGSEGV are already reported, as well as matching the
->     apparent intent of the POSIX sigaction interface.
+> So you call iounmap(0) here.
 
-Acked-by: Kirill A. Shutemov <kirill@shutemov.name>
-
--- 
- Kirill A. Shutemov
+That is not a problem.  iounmap() is like kfree().  It's designed to cope
+with NULL.
