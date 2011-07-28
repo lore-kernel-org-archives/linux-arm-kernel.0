@@ -1,33 +1,22 @@
-From: B29396@freescale.com (Dong Aisheng-B29396)
-Date: Thu, 28 Jul 2011 05:56:04 +0000
-Subject: [PATCH v5 0/4] ASoC: mxs: add audio support
-In-Reply-To: <1311223018-9553-1-git-send-email-b29396@freescale.com>
-References: <1311223018-9553-1-git-send-email-b29396@freescale.com>
-Message-ID: <65EE16ACC360FA4D99C96DC085B3F7721EF253@039-SN1MPN1-002.039d.mgd.msft.net>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Thu, 28 Jul 2011 14:17:33 +0800
+Subject: [PATCH v4 2/2] ARM: l2x0: Add OF based initialization
+In-Reply-To: <1309984979-8847-2-git-send-email-robherring2@gmail.com>
+References: <1309984979-8847-1-git-send-email-robherring2@gmail.com>
+	<1309984979-8847-2-git-send-email-robherring2@gmail.com>
+Message-ID: <CAGsJ_4zXY4HVF6=e4w0ja90HrQzwaaokoSM6tEt06amFMZYMHg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-
-> kernel-bounces at lists.infradead.org] On Behalf Of Dong Aisheng
-> Sent: Thursday, July 21, 2011 12:37 PM
-> To: alsa-devel at alsa-project.org
-> Cc: s.hauer at pengutronix.de; broonie at opensource.wolfsonmicro.com;
-> lrg at ti.com; linux-arm-kernel at lists.infradead.org; w.sang at pengutronix.de
-> Subject: [PATCH v5 0/4] ASoC: mxs: add audio support
-> 
-> According to Liam's comment, i redo the patch set based on the for-next
-> branch on Mark's sound-2.6 tree.
-> The based one is [PATCH v4 00/10] ARM: mxs: add audio support.
-> 
-> For asoc part (1-4), only one change is updating mxs_pcm_new since this
-> API has been updated to pass in the runtime data only For mxs part, no
-> changes made.
-> 
+2011/7/7 Rob Herring <robherring2@gmail.com>:
+> From: Rob Herring <rob.herring@calxeda.com>
+>
+> This adds probing for ARM L2x0 cache controllers via device tree. Support
+> includes the L210, L220, and PL310 controllers. The binding allows setting
+> up cache RAM latencies and filter addresses (PL310 only).
+>
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 
-Hi Mark,
+Acked-by: Barry Song <21cnbao@gmail.com>
 
-Do you have any comment on this new patch series?
-
-Regards
-Dong Aisheng
+-barry
