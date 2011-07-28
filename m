@@ -1,48 +1,107 @@
-From: toddpoynor@google.com (Todd Poynor)
-Date: Thu, 28 Jul 2011 00:43:27 -0700
-Subject: [PATCH v4 REPOST 18/20] gpio/omap: use pm-runtime framework
-In-Reply-To: <5A47E75E594F054BAF48C5E4FC4B92AB037C202D59@dbde02.ent.ti.com>
-References: <1310804152-9243-1-git-send-email-tarun.kanti@ti.com>
-	<1310804152-9243-19-git-send-email-tarun.kanti@ti.com>
-	<20110716190734.GB990@google.com>
-	<5A47E75E594F054BAF48C5E4FC4B92AB037C202D59@dbde02.ent.ti.com>
-Message-ID: <20110728074327.GA12916@google.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Thu, 28 Jul 2011 15:43:25 +0800
+Subject: [PATCH] ARM: mm: cache-l2x0: Add support for re-enabling l2x0
+In-Reply-To: <1307926019-28958-1-git-send-email-ccross@android.com>
+References: <1307926019-28958-1-git-send-email-ccross@android.com>
+Message-ID: <CAGsJ_4xX=XhuyRZyMra+e1nuLXGYABcug49T8tYMwqkJ7urf7g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 27, 2011 at 05:14:58PM +0530, DebBarma, Tarun Kanti wrote:
-...
-> > omap_gpio_mod_init calls mpuio_init calls platform_driver_register
-> > which can't be called in an IRQs off and spinlocked atomic context,
-...
-> I have isolated mpuio_init() from omap_gpio_mod_init().
-> mpuio_init() is now called once in omap_gpio_probe().
+2011/6/13 Colin Cross <ccross@android.com>:
+> Remove __init annotation from l2x0_init so it can be used to
+> reinitialize the l2x0 after it has been reset during suspend.
 
-Looking at omap_gpio_mod_init() it seems like much of its processing
-could probably be done once at probe time (or at pm_runtime_get_sync
-time) as well, namely setting the IRQ enable masks.
+__init before l2x0_init can be deleted and make it available after resume.
 
-Ungating the interface clock, enabling wakeup, setting smart idle for
-the module, and enabling the (old-style) system clock seem like either
-one-time actions at probe, or a part of the pm_runtime_get_sync
-callback.
+We just tried the following flow for l2 cache on CSR SiRFprimaII, it
+seems to be working:
 
-Or is there some other reason these power management actions should be
-taken each time a GPIO is requested in the block (when none were
-previously requested), after the runtime PM get_sync callback, but
-not as part of the get_sync callback?  If so, what caused
-the smart idle setting to be lost, or the interface clock gated, if
-not the pm_runtime_put_sync?
+suspend: sync and invalidate l2 cache, then disable L2
 
+        v7_flush_kern_cache_all
 
-Todd
+#ifdef CONFIG_CACHE_L2X0
+        ldr     r0, =SIRFSOC_L2CC_VA_BASE
+        ldr     r1, =L2X0_CLEAN_INV_WAY
+        mov     r2, #0xff
+        str     r2, [r0,r1]
+        mov     r2, #0
+1:
+        ldr     r3, [r0,r1]
+        cmp     r2,r3
+        bne     1b
+        ldr     r1, =L2X0_CACHE_SYNC
+        mov     r2, #0
+        str     r2, [r0,r1]
 
-> > The omap_gpio_mod_init may be unbalanced with the code performed below
-> > on last free of a GPIO for the bank?  If all GPIOs are freed and then
-> > a new GPIO used, does omap_gpio_mod_init do the right thing?  Need a
-> > separate flag to indicate whether one-time init has ever been
-> > performed, vs. needing runtime PM enable/disable?
-> With the above changes I am seeing omap_gpio_mod_init() is balanced.
-> Let me know if I am still missing something.
-> --
-> Tarun
+        ldr     r1, =L2X0_CTRL
+        mov     r2, #0
+        str     r2, [r0,r1]
+#endif
+
+resume:  re-initilized l2x:
+
+ l2x0_init((void __iomem *)SIRFSOC_L2CC_VA_BASE, 0x00040000, 0x00000000);
+
+>
+> Only print the init messages the first time l2x0_init is called.
+>
+> Add l2x0_enable to re-enable the l2x0 after l2x0_disable if
+> the l2x0 was not reset.
+>
+> l2x0_disable cannot use writel, as writel calls wmb(), and wmb()
+> may call outer_cache_sync, which takes the same spinlock as
+> l2x0_disable.
+>
+> Signed-off-by: Colin Cross <ccross@android.com>
+> ---
+> ?arch/arm/include/asm/hardware/cache-l2x0.h | ? ?3 ++-
+> ?arch/arm/mm/cache-l2x0.c ? ? ? ? ? ? ? ? ? | ? 18 ++++++++++++++----
+> ?2 files changed, 16 insertions(+), 5 deletions(-)
+>
+> diff --git a/arch/arm/include/asm/hardware/cache-l2x0.h b/arch/arm/include/asm/hardware/cache-l2x0.h
+> index 16bd480..8fd87fe 100644
+> --- a/arch/arm/include/asm/hardware/cache-l2x0.h
+> +++ b/arch/arm/include/asm/hardware/cache-l2x0.h
+> @@ -73,7 +73,8 @@
+> ?#define L2X0_AUX_CTRL_EARLY_BRESP_SHIFT ? ? ? ? ? ? ? ?30
+>
+> ?#ifndef __ASSEMBLY__
+> -extern void __init l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask);
+> +extern void l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask);
+> +extern void l2x0_enable(void);
+> ?#endif
+>
+> ?#endif
+> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+> index ef59099..4db0d9c 100644
+> --- a/arch/arm/mm/cache-l2x0.c
+> +++ b/arch/arm/mm/cache-l2x0.c
+> @@ -261,16 +261,26 @@ static void l2x0_flush_range(unsigned long start, unsigned long end)
+> ? ? ? ?spin_unlock_irqrestore(&l2x0_lock, flags);
+> ?}
+>
+> +/* enables l2x0 after l2x0_disable, does not invalidate */
+> +void l2x0_enable(void)
+> +{
+> + ? ? ? unsigned long flags;
+> +
+> + ? ? ? spin_lock_irqsave(&l2x0_lock, flags);
+> + ? ? ? writel_relaxed(1, l2x0_base + L2X0_CTRL);
+> + ? ? ? spin_unlock_irqrestore(&l2x0_lock, flags);
+> +}
+> +
+> ?static void l2x0_disable(void)
+> ?{
+> ? ? ? ?unsigned long flags;
+>
+> ? ? ? ?spin_lock_irqsave(&l2x0_lock, flags);
+> - ? ? ? writel(0, l2x0_base + L2X0_CTRL);
+> + ? ? ? writel_relaxed(0, l2x0_base + L2X0_CTRL);
+> ? ? ? ?spin_unlock_irqrestore(&l2x0_lock, flags);
+> ?}
+>
+
+can you show your context calling l2x0_disable and l2x0_enable?
+
+-barry
