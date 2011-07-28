@@ -1,53 +1,105 @@
 From: ludovic.desroches@atmel.com (ludovic.desroches at atmel.com)
-Date: Thu, 28 Jul 2011 16:29:57 +0200
-Subject: [RFC PATCH 8/9] mmc: atmel-mci: correct sg buffer size evaluation
+Date: Thu, 28 Jul 2011 16:29:58 +0200
+Subject: [RFC PATCH 9/9] mmc: atmel-mci: fix a potential issue about pending
+	PDC interrupts
 In-Reply-To: <1311863398-31579-1-git-send-email-ludovic.desroches@atmel.com>
 References: <1311863398-31579-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <1311863398-31579-9-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <1311863398-31579-10-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-Assuming that a sg buffer size is a page size is false so use sg_dma_len.
-A 4096 bytes can be required with two 2048-bytes sg buffer.
+This patch fixes a potential issue about PDC interrupts. For example we have
+a ENDRX pending interrupt and a RXBUFF pending interrupt. We have received the
+RXBUFF interrupt but the transfer is not finished (so we didn't have time to
+give a new buffer to the PDC controller). Then we will compute ENDRX interrupt
+and we will give a new buffer to the PDC controller, just after we will
+compute the RXBUFF interrupt and give one or two new buffers to the PDC
+controller but we are not sure that the first buffer given has been filled. So
+in this situation we may "lost" one sg buffer. It's the same for transmission.
 
 Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 ---
- drivers/mmc/host/atmel-mci.c |    7 +++----
- 1 files changed, 3 insertions(+), 4 deletions(-)
+ drivers/mmc/host/atmel-mci.c |   32 +++++++++++++++++---------------
+ 1 files changed, 17 insertions(+), 15 deletions(-)
 
 diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
-index c415322..963e320 100644
+index 963e320..7108f64 100644
 --- a/drivers/mmc/host/atmel-mci.c
 +++ b/drivers/mmc/host/atmel-mci.c
-@@ -608,7 +608,7 @@ static void atmci_pdc_set_single_buf(struct atmel_mci *host,
- 	}
+@@ -1729,17 +1729,9 @@ static irqreturn_t atmci_interrupt(int irq, void *dev_id)
+ 			tasklet_schedule(&host->tasklet);
+ 		}
  
- 	atmci_writel(host, pointer_reg, sg_dma_address(host->sg));
--	if (host->data_size <= PAGE_SIZE) {
-+	if (host->data_size <= sg_dma_len(host->sg)) {
- 		if (host->data_size & 0x3) {
- 			/* If size is different from modulo 4, transfer bytes */
- 			atmci_writel(host, counter_reg, host->data_size);
-@@ -620,8 +620,8 @@ static void atmci_pdc_set_single_buf(struct atmel_mci *host,
- 		host->data_size = 0;
- 	} else {
- 		/* We assume the size of a page is 32-bits aligned */
--		atmci_writel(host, counter_reg, PAGE_SIZE / 4);
--		host->data_size -= PAGE_SIZE;
-+		atmci_writel(host, counter_reg, sg_dma_len(host->sg) / 4);
-+		host->data_size -= sg_dma_len(host->sg);
- 		if (host->data_size)
- 			host->sg = sg_next(host->sg);
- 	}
-@@ -808,7 +808,6 @@ atmci_prepare_data_pdc(struct atmel_mci *host, struct mmc_data *data)
- 	/* Configure PDC */
- 	host->data_size = data->blocks * data->blksz;
- 	sg_len = dma_map_sg(&host->pdev->dev, data->sg, data->sg_len, dir);
--	BUG_ON(sg_len < host->data_size / PAGE_SIZE);
- 	if (host->data_size)
- 		atmci_pdc_set_both_buf(host,
- 			((dir == DMA_FROM_DEVICE)?XFER_RECEIVE:XFER_TRANSMIT));
+-		if (pending & ATMCI_ENDTX) {
+-			atmci_writel(host, ATMCI_IDR, ATMCI_ENDTX);
+-			if (host->data_size) {
+-				atmci_pdc_set_single_buf(host,
+-						XFER_TRANSMIT, PDC_SECOND_BUF);
+-				atmci_writel(host, ATMCI_IER, ATMCI_ENDTX);
+-			}
+-		}
+-
+ 		if (pending & ATMCI_TXBUFE) {
+ 			atmci_writel(host, ATMCI_IDR, ATMCI_TXBUFE);
++			atmci_writel(host, ATMCI_IDR, ATMCI_ENDTX);
+ 			/*
+ 			 * We can receive this interruption before having configured
+ 			 * the second pdc buffer, so we need to reconfigure first and
+@@ -1747,24 +1739,24 @@ static irqreturn_t atmci_interrupt(int irq, void *dev_id)
+ 			 */
+ 			if (host->data_size) {
+ 				atmci_pdc_set_both_buf(host, XFER_TRANSMIT);
++				atmci_writel(host, ATMCI_IER, ATMCI_ENDTX);
+ 				atmci_writel(host, ATMCI_IER, ATMCI_TXBUFE);
+ 			} else {
+ 				atmci_pdc_complete(host);
+ 			}
+-		}
+-
+-		if (pending & ATMCI_ENDRX) {
+-			atmci_writel(host, ATMCI_IDR, ATMCI_ENDRX);
++		} else if (pending & ATMCI_ENDTX) {
++			atmci_writel(host, ATMCI_IDR, ATMCI_ENDTX);
+ 
+ 			if (host->data_size) {
+ 				atmci_pdc_set_single_buf(host,
+-						XFER_RECEIVE, PDC_SECOND_BUF);
+-				atmci_writel(host, ATMCI_IER, ATMCI_ENDRX);
++						XFER_TRANSMIT, PDC_SECOND_BUF);
++				atmci_writel(host, ATMCI_IER, ATMCI_ENDTX);
+ 			}
+ 		}
+ 
+ 		if (pending & ATMCI_RXBUFF) {
+ 			atmci_writel(host, ATMCI_IDR, ATMCI_RXBUFF);
++			atmci_writel(host, ATMCI_IDR, ATMCI_ENDRX);
+ 			/*
+ 			 * We can receive this interruption before having configured
+ 			 * the second pdc buffer, so we need to reconfigure first and
+@@ -1772,12 +1764,22 @@ static irqreturn_t atmci_interrupt(int irq, void *dev_id)
+ 			 */
+ 			if (host->data_size) {
+ 				atmci_pdc_set_both_buf(host, XFER_RECEIVE);
++				atmci_writel(host, ATMCI_IER, ATMCI_ENDRX);
+ 				atmci_writel(host, ATMCI_IER, ATMCI_RXBUFF);
+ 			} else {
+ 				atmci_pdc_complete(host);
+ 			}
++		} else if (pending & ATMCI_ENDRX) {
++			atmci_writel(host, ATMCI_IDR, ATMCI_ENDRX);
++
++			if (host->data_size) {
++				atmci_pdc_set_single_buf(host,
++						XFER_RECEIVE, PDC_SECOND_BUF);
++				atmci_writel(host, ATMCI_IER, ATMCI_ENDRX);
++			}
+ 		}
+ 
++
+ 		if (pending & ATMCI_NOTBUSY) {
+ 			atmci_writel(host, ATMCI_IDR,
+ 					ATMCI_DATA_ERROR_FLAGS | ATMCI_NOTBUSY);
 -- 
 1.7.0.4
