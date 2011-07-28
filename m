@@ -1,44 +1,39 @@
-From: boojin.kim@samsung.com (Boojin Kim)
-Date: Thu, 28 Jul 2011 10:23:18 +0900
-Subject: [PATCH V4 14/14] ARM: SAMSUNG: Remove Samsung specific enum type
-	for dma direction
-In-Reply-To: <20110725211532.GF26735@ponder.secretlab.ca>
-References: <1311557312-26107-1-git-send-email-boojin.kim@samsung.com>
-	<1311557312-26107-15-git-send-email-boojin.kim@samsung.com>
-	<CABb+yY3dwshghgXPuMyLzm=ArYdELBOqVf4AcxN77MV1jV8Ang@mail.gmail.com>
-	<20110725211532.GF26735@ponder.secretlab.ca>
-Message-ID: <001401cc4cc4$ef557d40$ce0077c0$%kim@samsung.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 27 Jul 2011 22:32:11 -0500
+Subject: [RFC PATCH 0/3] ARM: Add default system.h and uncompress.h
+Message-ID: <1311823934-29553-1-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Grant Likely Wrote:
-> Likely
-> Sent: Tuesday, July 26, 2011 6:16 AM
-> To: Jassi Brar
-> Cc: Boojin Kim; linux-arm-kernel at lists.infradead.org; linux-samsung-
-> soc at vger.kernel.org; Vinod Koul; Dan Williams; Kukjin Kim; Mark Brown
-> Subject: Re: [PATCH V4 14/14] ARM: SAMSUNG: Remove Samsung specific
-> enum type for dma direction
->
-> On Mon, Jul 25, 2011 at 05:38:37PM +0530, Jassi Brar wrote:
-> > On Mon, Jul 25, 2011 at 6:58 AM, Boojin Kim <boojin.kim@samsung.com>
-> wrote:
-> > > This patch removes the samsung specific enum type 's3c2410_dmasrc'
-> > > and uses 'dma_data_direction' instead.
-> > >
-> > > Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
-> > > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> >
-> > Acked-by: Jassi Brar <jassisinghbrar@gmail.com>
-> >
-> > If this patch was first in the patchset, probably it could have been
-> > already merged.
->
-> Indeed.  If you move this to the front when you post the next version
-> then it can be merged right away.
-I tried to move it ahead. But It made some conflicts.
-So, I pushed as it is on V5 release.
-Sorry.. I would have noticed it before I release V5.
+From: Rob Herring <rob.herring@calxeda.com>
 
->
-> Acked-by: Grant Likely <grant.likely@secretlab.ca>
+This is a relatively simple way to remove the platform requirement for
+some header files without making changes in every existing platform.
+It's perhaps not a solution for the difficult cases, but can get the
+simple cases out of the way making it clear what remains to be fixed.
+I've done this for system.h and uncompress.h so far. timex.h and io.h
+may be additional candidates.
+
+One downside is you lose print capability in the decompressor. However,
+I don't think the complexity that adds is worth the 1 line print. Perhaps
+the include path ordering could be conditionalized on a config setting
+for multi-platform kernels such that the platform's headers are used
+on single machine kernels. There's already such a limitation on LL_DEBUG.
+
+Rob
+
+Rob Herring (3):
+  ARM: include mach headers before common arm headers
+  ARM: add a default mach/uncompress.h header
+  ARM: add a default mach/system.h header
+
+ arch/arm/Makefile                  |    4 ++--
+ arch/arm/include/mach/system.h     |   13 +++++++++++++
+ arch/arm/include/mach/uncompress.h |    9 +++++++++
+ arch/arm/kernel/process.c          |    5 ++++-
+ 4 files changed, 28 insertions(+), 3 deletions(-)
+ create mode 100644 arch/arm/include/mach/system.h
+ create mode 100644 arch/arm/include/mach/uncompress.h
+
+-- 
+1.7.4.1
