@@ -1,192 +1,73 @@
-From: ido@wizery.com (Ido Yariv)
-Date: Thu, 28 Jul 2011 23:52:53 +0300
-Subject: [PATCH v3] davinci: Add wl1271/wlan support for AM18x
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024DD2CEC2@dbde02.ent.ti.com>
-References: <B85A65D85D7EB246BE421B3FB0FBB593024DD2CEC2@dbde02.ent.ti.com>
-Message-ID: <1311886373-3060-1-git-send-email-ido@wizery.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Thu, 28 Jul 2011 14:00:41 -0700
+Subject: [PATCH 2/2] ARM: msm: Remove PLAT_PHYS_OFFSETS from MSM targets
+In-Reply-To: <alpine.LFD.2.00.1107281647060.12766@xanadu.home>
+References: <1311794355-26988-2-git-send-email-sboyd@codeaurora.org>
+	<1311884291-5409-1-git-send-email-davidb@codeaurora.org>
+	<1311884291-5409-2-git-send-email-davidb@codeaurora.org>
+	<alpine.LFD.2.00.1107281647060.12766@xanadu.home>
+Message-ID: <20110728210041.GA7983@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The wl1271 daughter card for AM18x EVMs is a combo wireless connectivity
-add-on card, based on the LS Research TiWi module with Texas
-Instruments' wl1271 solution.
-It is a 4-wire, 1.8V, embedded SDIO WLAN device with an external IRQ
-line and is power-controlled by a GPIO-based fixed regulator.
+On Thu, Jul 28, 2011 at 04:49:18PM -0400, Nicolas Pitre wrote:
+> On Thu, 28 Jul 2011, David Brown wrote:
+> 
+> > Now that MSM can boot with the phys offset patching, eliminate the
+> > definitions of the phys offsets, and instead select
+> > ARM_PATCH_PHYS_VIRT.
+> > 
+> > Signed-off-by: David Brown <davidb@codeaurora.org>
+> > 
+> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> > index ced9371..3a4d87c 100644
+> > --- a/arch/arm/Kconfig
+> > +++ b/arch/arm/Kconfig
+> > @@ -618,6 +618,7 @@ config ARCH_MSM
+> >  	select GENERIC_CLOCKEVENTS
+> >  	select ARCH_REQUIRE_GPIOLIB
+> >  	select CLKDEV_LOOKUP
+> > +	select ARM_PATCH_PHYS_VIRT
+> >  	help
+> >  	  Support for Qualcomm MSM/QSD based systems.  This runs on the
+> >  	  apps processor of the MSM/QSD and depends on a shared memory
+> > diff --git a/arch/arm/mach-msm/include/mach/memory.h b/arch/arm/mach-msm/include/mach/memory.h
+> > index 58d5e7e..deed41a 100644
+> > --- a/arch/arm/mach-msm/include/mach/memory.h
+> > +++ b/arch/arm/mach-msm/include/mach/memory.h
+> > @@ -17,19 +17,12 @@
+> >  #define __ASM_ARCH_MEMORY_H
+> >  
+> >  /* physical offset of RAM */
+> > -#if defined(CONFIG_ARCH_QSD8X50) && defined(CONFIG_MSM_SOC_REV_A)
+> > -#define PLAT_PHYS_OFFSET		UL(0x00000000)
+> > -#elif defined(CONFIG_ARCH_QSD8X50)
+> > -#define PLAT_PHYS_OFFSET		UL(0x20000000)
+> > -#elif defined(CONFIG_ARCH_MSM7X30)
+> > -#define PLAT_PHYS_OFFSET		UL(0x00000000)
+> > -#elif defined(CONFIG_ARCH_MSM8X60)
+> > -#define PLAT_PHYS_OFFSET		UL(0x40000000)
+> > -#elif defined(CONFIG_ARCH_MSM8960)
+> > -#define PLAT_PHYS_OFFSET		UL(0x40000000)
+> > -#else
+> > -#define PLAT_PHYS_OFFSET		UL(0x10000000)
+> > -#endif
+> > +#define QSD8X50A_PHYS_OFFSET		UL(0x00000000)
+> > +#define QSD8X50_PHYS_OFFSET		UL(0x20000000)
+> > +#define MSM7X30_PHYS_OFFSET		UL(0x00000000)
+> > +#define MSM8X60_PHYS_OFFSET		UL(0x10000000)
+> > +#define MSM8960_PHYS_OFFSET		UL(0x40000000)
+> > +#define MSM7X01_PHYS_OFFSET		UL(0x10000000)
+> 
+> Do you really need those defines?  If you do I'd suggest moving them 
+> elsewhere so your mach/memory.h can become empty.
 
-Add support for the WLAN capabilities of this expansion board.
+Currently, they aren't needed at all.  I'll just remove them entirely
+until something needs them.  The values will be in the history.
 
-Signed-off-by: Ido Yariv <ido@wizery.com>
----
- arch/arm/mach-davinci/Kconfig           |   10 +++
- arch/arm/mach-davinci/board-da850-evm.c |  114 +++++++++++++++++++++++++++++++
- 2 files changed, 124 insertions(+), 0 deletions(-)
+Thanks,
+David
 
-diff --git a/arch/arm/mach-davinci/Kconfig b/arch/arm/mach-davinci/Kconfig
-index c0deaca..32d837d 100644
---- a/arch/arm/mach-davinci/Kconfig
-+++ b/arch/arm/mach-davinci/Kconfig
-@@ -192,6 +192,16 @@ config DA850_UI_RMII
- 
- endchoice
- 
-+config DA850_WL12XX
-+	bool "AM18x wl1271 daughter board"
-+	depends on MACH_DAVINCI_DA850_EVM
-+	help
-+	  The wl1271 daughter card for AM18x EVMs is a combo wireless
-+	  connectivity add-on card, based on the LS Research TiWi module with
-+	  Texas Instruments' wl1271 solution.
-+	  Say Y if you want to use a wl1271 expansion card connected to the
-+	  AM18x EVM.
-+
- config GPIO_PCA953X
- 	default MACH_DAVINCI_DA850_EVM
- 
-diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
-index bd53945..d817626 100644
---- a/arch/arm/mach-davinci/board-da850-evm.c
-+++ b/arch/arm/mach-davinci/board-da850-evm.c
-@@ -31,6 +31,8 @@
- #include <linux/input/tps6507x-ts.h>
- #include <linux/spi/spi.h>
- #include <linux/spi/flash.h>
-+#include <linux/delay.h>
-+#include <linux/wl12xx.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -49,6 +51,9 @@
- #define DA850_MMCSD_CD_PIN		GPIO_TO_PIN(4, 0)
- #define DA850_MMCSD_WP_PIN		GPIO_TO_PIN(4, 1)
- 
-+#define DA850_WLAN_EN			GPIO_TO_PIN(6, 9)
-+#define DA850_WLAN_IRQ			GPIO_TO_PIN(6, 10)
-+
- #define DA850_MII_MDIO_CLKEN_PIN	GPIO_TO_PIN(2, 6)
- 
- static struct mtd_partition da850evm_spiflash_part[] = {
-@@ -1117,6 +1122,110 @@ static __init int da850_evm_init_cpufreq(void)
- static __init int da850_evm_init_cpufreq(void) { return 0; }
- #endif
- 
-+#ifdef CONFIG_DA850_WL12XX
-+
-+static void wl12xx_set_power(int index, bool power_on)
-+{
-+	static bool power_state;
-+
-+	pr_debug("Powering %s wl12xx", power_on ? "on" : "off");
-+
-+	if (power_on == power_state)
-+		return;
-+	power_state = power_on;
-+
-+	if (power_on) {
-+		/* Power up sequence required for wl127x devices */
-+		gpio_set_value(DA850_WLAN_EN, 1);
-+		usleep_range(15000, 15000);
-+		gpio_set_value(DA850_WLAN_EN, 0);
-+		usleep_range(1000, 1000);
-+		gpio_set_value(DA850_WLAN_EN, 1);
-+		msleep(70);
-+	} else {
-+		gpio_set_value(DA850_WLAN_EN, 0);
-+	}
-+}
-+
-+static struct davinci_mmc_config da850_wl12xx_mmc_config = {
-+	.set_power	= wl12xx_set_power,
-+	.wires		= 4,
-+	.max_freq	= 25000000,
-+	.caps		= MMC_CAP_4_BIT_DATA | MMC_CAP_NONREMOVABLE |
-+			  MMC_CAP_POWER_OFF_CARD,
-+	.version	= MMC_CTLR_VERSION_2,
-+};
-+
-+static const short da850_wl12xx_pins[] __initconst = {
-+	DA850_MMCSD1_DAT_0, DA850_MMCSD1_DAT_1, DA850_MMCSD1_DAT_2,
-+	DA850_MMCSD1_DAT_3, DA850_MMCSD1_CLK, DA850_MMCSD1_CMD,
-+	DA850_GPIO6_9, DA850_GPIO6_10,
-+	-1
-+};
-+
-+static struct wl12xx_platform_data da850_wl12xx_wlan_data __initdata = {
-+	.irq			= -1,
-+	.board_ref_clock	= WL12XX_REFCLOCK_38,
-+	.platform_quirks	= WL12XX_PLATFORM_QUIRK_EDGE_IRQ,
-+};
-+
-+static __init int da850_wl12xx_init(void)
-+{
-+	int ret;
-+
-+	ret = davinci_cfg_reg_list(da850_wl12xx_pins);
-+	if (ret) {
-+		pr_err("wl12xx/mmc mux setup failed: %d\n", ret);
-+		goto exit;
-+	}
-+
-+	ret = da850_register_mmcsd1(&da850_wl12xx_mmc_config);
-+	if (ret) {
-+		pr_err("wl12xx/mmc registration failed: %d\n", ret);
-+		goto exit;
-+	}
-+
-+	ret = gpio_request_one(DA850_WLAN_EN, GPIOF_OUT_INIT_LOW, "wl12xx_en");
-+	if (ret) {
-+		pr_err("Could not request wl12xx enable gpio: %d\n", ret);
-+		goto exit;
-+	}
-+
-+	ret = gpio_request_one(DA850_WLAN_IRQ, GPIOF_IN, "wl12xx_irq");
-+	if (ret) {
-+		pr_err("Could not request wl12xx irq gpio: %d\n", ret);
-+		goto free_wlan_en;
-+	}
-+
-+	da850_wl12xx_wlan_data.irq = gpio_to_irq(DA850_WLAN_IRQ);
-+
-+	ret = wl12xx_set_platform_data(&da850_wl12xx_wlan_data);
-+	if (ret) {
-+		pr_err("Could not set wl12xx data: %d\n", ret);
-+		goto free_wlan_irq;
-+	}
-+
-+	return 0;
-+
-+free_wlan_irq:
-+	gpio_free(DA850_WLAN_IRQ);
-+
-+free_wlan_en:
-+	gpio_free(DA850_WLAN_EN);
-+
-+exit:
-+	return ret;
-+}
-+
-+#else /* CONFIG_DA850_WL12XX */
-+
-+static __init int da850_wl12xx_init(void)
-+{
-+	return 0;
-+}
-+
-+#endif /* CONFIG_DA850_WL12XX */
-+
- #define DA850EVM_SATA_REFCLKPN_RATE	(100 * 1000 * 1000)
- 
- static __init void da850_evm_init(void)
-@@ -1171,6 +1280,11 @@ static __init void da850_evm_init(void)
- 		if (ret)
- 			pr_warning("da850_evm_init: mmcsd0 registration failed:"
- 					" %d\n", ret);
-+
-+		ret = da850_wl12xx_init();
-+		if (ret)
-+			pr_warning("da850_evm_init: wl12xx initialization"
-+				   " failed: %d\n", ret);
- 	}
- 
- 	davinci_serial_init(&da850_evm_uart_config);
 -- 
-1.7.4.1
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
