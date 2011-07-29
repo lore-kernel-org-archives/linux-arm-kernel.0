@@ -1,54 +1,65 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 29 Jul 2011 16:24:52 +0200
-Subject: [RFC] ARM: dma_map|unmap_sg plus iommu
-In-Reply-To: <20110729105422.GB13522@8bytes.org>
-References: <CAB-zwWjb+2ExjNDB3OtHmRmgaHMnO-VgEe9VZk_wU=ryrq_AGw@mail.gmail.com>
-	<000301cc4dc4$31b53630$951fa290$%szyprowski@samsung.com>
-	<20110729093555.GA13522@8bytes.org>
-	<001901cc4dd8$4afb4e40$e0f1eac0$%szyprowski@samsung.com>
-	<20110729105422.GB13522@8bytes.org>
-Message-ID: <004201cc4dfb$47ee4770$d7cad650$%szyprowski@samsung.com>
+From: bengardiner@nanometrics.ca (Ben Gardiner)
+Date: Fri, 29 Jul 2011 10:42:36 -0400
+Subject: [PATCH v2 2/6] arm: davinci: Explicitly set channel controllers'
+	default queues
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024DD2CEA5@dbde02.ent.ti.com>
+References: <1310303679-17936-1-git-send-email-ido@wizery.com>
+	<1310303679-17936-3-git-send-email-ido@wizery.com>
+	<B85A65D85D7EB246BE421B3FB0FBB593024DD2CE05@dbde02.ent.ti.com>
+	<4E2D70B9.7060202@mvista.com>
+	<B85A65D85D7EB246BE421B3FB0FBB593024DD2CEA5@dbde02.ent.ti.com>
+Message-ID: <CAPcSpEJRjE-vD3XaTcVBUoBH_Ud+gBMgBSd=F0S1ON6cUy0vvg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Mon, Jul 25, 2011 at 12:31 PM, Nori, Sekhar <nsekhar@ti.com> wrote:
+> Hi Sergei,
+>
+> On Mon, Jul 25, 2011 at 19:03:45, Sergei Shtylyov wrote:
+>> Hello.
+>>
+>> Nori, Sekhar wrote:
+>>
+>> >> Davinci platforms may define a default queue for each channel
+>> >> controller. If one is not defined, the default queue is set to EVENTQ_1.
+>> >> However, there's no way to distinguish between an unset default queue to
+>> >> one that is set to EVENTQ_0, as EVENTQ_0 = 0.
+>>
+>> >> Explicitly specify the default queue for all channel controllers on all
+>> >> Davinci platforms to EVENTQ_1, and don't overwrite it in the EDMA probe
+>> >> function.
+>>
+>> >> One exception is the DA850 board, for which EVENTQ_1 is not a valid
+>> >> option for its second channel controller. Use EVENTQ_0 instead for that
+>> >> channel controller.
+>>
+>> >> Signed-off-by: Ido Yariv <ido@wizery.com>
+>>
+>> > Looks good to me. Will queue for v3.2/fixes
+>>
+>> ? ? Why wait for 3.2? If this is considered a fix, it should be applied to 3.1, no?
+>
+> 3.2/fixes just indicates it will be queued as a fix/cleanup
+> for 3.2 so it will have higher priority for merge when compared
+> to a new feature.
+>
+> This patch doesn't really fix any existing broken functionality.
+> It corrects event queue configuration for EDMA CC1 on DA850 for
+> which there are no current users in mainline.
+>
+> So, not sending for v3.1.
 
-On Friday, July 29, 2011 12:54 PM Joerg Roedel wrote:
+If it's not too late:
 
-> On Fri, Jul 29, 2011 at 12:14:25PM +0200, Marek Szyprowski wrote:
-> > > This sounds rather hacky. How about partitioning the address space for
-> > > the device and give the dma-api only a part of it. The other parts can
-> > > be directly mapped using the iommu-api then.
-> >
-> > Well, I'm not convinced that iommu-api should be used by the device drivers
-> > directly. If possible we should rather extend dma-mapping than use such
-hacks.
-> 
-> Building this into dma-api would turn it into an iommu-api. The line
-> between the apis are clear. The iommu-api provides direct mapping
-> of bus-addresses to system-addresses while the dma-api puts a memory
-> manager on-top which deals with bus-address allocation itself.
-> So if you want to map bus-addresses directly the iommu-api is the way to
-> go. This is in no way a hack.
+Tested this patch and it fixes SD/MMC1 support on da850.
 
-The problem starts when you want to use the same driver on two different
-systems:
-one with iommu and one without. Our driver depends only on dma-mapping and the
-fact
-that the first allocation starts from the right address. On systems without
-iommu,
-board code calls bootmem_reserve() and dma_declare_coherent() for the required 
-memory range. Systems with IOMMU just sets up device io address space to start 
-at the specified address. This works fine, because in our system each device has
-its own, private iommu controller and private address space.
+Tested-by: Ben Gardiner <bengardiner@nanometrics.ca>
 
-Right now I have no idea how to handle this better. Perhaps with should be
-possible
-to specify somehow the target dma_address when doing memory allocation, but I'm
-not
-really convinced yet if this is really required.
+Thanks, Ido!
 
-Best regards
--- 
-Marek Szyprowski
-Samsung Poland R&D Center
+Best Regards,
+Ben Gardiner
+
+---
+Nanometrics Inc.
+http://www.nanometrics.ca
