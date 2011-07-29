@@ -1,126 +1,70 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 29 Jul 2011 10:52:22 -0600
-Subject: [PATCH v2 6/7] i2c: pxa: support i2c controller from DT
-In-Reply-To: <1311835293-18125-7-git-send-email-haojian.zhuang@marvell.com>
+Date: Fri, 29 Jul 2011 10:53:00 -0600
+Subject: [PATCH v2 4/7] tty: serial: support device tree in pxa
+In-Reply-To: <20110729164922.GA30298@n2100.arm.linux.org.uk>
 References: <1311835293-18125-1-git-send-email-haojian.zhuang@marvell.com>
 	<1311835293-18125-2-git-send-email-haojian.zhuang@marvell.com>
 	<1311835293-18125-3-git-send-email-haojian.zhuang@marvell.com>
 	<1311835293-18125-4-git-send-email-haojian.zhuang@marvell.com>
 	<1311835293-18125-5-git-send-email-haojian.zhuang@marvell.com>
-	<1311835293-18125-6-git-send-email-haojian.zhuang@marvell.com>
-	<1311835293-18125-7-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <20110729165222.GN11164@ponder.secretlab.ca>
+	<20110729164539.GM11164@ponder.secretlab.ca>
+	<20110729164922.GA30298@n2100.arm.linux.org.uk>
+Message-ID: <20110729165300.GO11164@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 28, 2011 at 02:41:32PM +0800, Haojian Zhuang wrote:
-> support i2c-pxa controller from DT.
+On Fri, Jul 29, 2011 at 05:49:22PM +0100, Russell King - ARM Linux wrote:
+> On Fri, Jul 29, 2011 at 10:45:39AM -0600, Grant Likely wrote:
+> > On Thu, Jul 28, 2011 at 02:41:30PM +0800, Haojian Zhuang wrote:
+> > > +#ifdef CONFIG_OF
+> > > +	for (i = 0; i < PXA_SERIAL_NR; i++) {
+> > > +		if (serial_pxa_ports[i] == NULL)
+> > > +			break;
+> > > +	}
+> > > +	if (i >= PXA_SERIAL_NR) {
+> > > +		pr_warn("can't find pxa serial port\n");
+> > > +		return -ENODEV;
+> > > +	}
+> > > +
+> > > +	if (of_property_read_u32(np, "clock-frequency", &clk)) {
+> > > +		pr_warn("no clock-frequency property set\n");
+> > > +		return -ENODEV;
+> > > +	}
+> > > +	if (of_property_read_u32(np, "current-speed", &spd) == 0)
+> > > +		sport->port.custom_divisor = clk / (16 * spd);
+> > > +
+> > > +	sprintf(name, "pxa2xx-uart.%d", i);
+> > > +	sport->clk = clk_get_sys(name, NULL);
+> > > +	if (IS_ERR(sport->clk)) {
+> > > +		ret = PTR_ERR(sport->clk);
+> > > +		goto err_free;
+> > > +	}
+> > > +	sport->port.uartclk = clk;
+> > > +#else
+> > > +	i = dev->id;
+> > >  	sport->clk = clk_get(&dev->dev, NULL);
+> > >  	if (IS_ERR(sport->clk)) {
+> > >  		ret = PTR_ERR(sport->clk);
+> > >  		goto err_free;
+> > >  	}
+> > > +	sport->port.uartclk = clk_get_rate(sport->clk);
+> > > +#endif
+> > 
+> > This means a kernel build can either support DT or non-DT, but not
+> > both.  DT & non-DT booting are full supported with the same kernel
+> > image, so don't do it this way.
+> > 
+> > Instead, check for the presence of an of_node.  If it is there, do the
+> > DT parsing.  If now, still support the old method.
 > 
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
-> ---
->  drivers/i2c/busses/i2c-pxa.c |   51 +++++++++++++++++++++++++++++++----------
->  1 files changed, 38 insertions(+), 13 deletions(-)
+> Oh ffs, why is this DT stuff causing all the clk stuff to have to change.
+> And specifically why is stuff converting to use clk_get_sys().
 > 
-> diff --git a/drivers/i2c/busses/i2c-pxa.c b/drivers/i2c/busses/i2c-pxa.c
-> index d603646..8c27733 100644
-> --- a/drivers/i2c/busses/i2c-pxa.c
-> +++ b/drivers/i2c/busses/i2c-pxa.c
-> @@ -29,6 +29,7 @@
->  #include <linux/errno.h>
->  #include <linux/interrupt.h>
->  #include <linux/i2c-pxa.h>
-> +#include <linux/of_device.h>
->  #include <linux/of_i2c.h>
->  #include <linux/platform_device.h>
->  #include <linux/err.h>
-> @@ -1044,15 +1045,31 @@ static const struct i2c_algorithm i2c_pxa_pio_algorithm = {
->  	.functionality	= i2c_pxa_functionality,
->  };
->  
-> +static const struct of_device_id pxa_i2c_of_match[] = {
-> +	{ .compatible = "mrvl,pxa255-i2c",    .data = (void *)REGS_PXA2XX, },
-> +	{ .compatible = "mrvl,pxa300-pwri2c", .data = (void *)REGS_PXA3XX, },
-> +	{},
-> +};
-> +
->  static int i2c_pxa_probe(struct platform_device *dev)
->  {
-> +	struct device_node *np = dev->dev.of_node;
-> +	const struct of_device_id *match;
->  	struct pxa_i2c *i2c;
-> -	struct resource *res;
->  	struct i2c_pxa_platform_data *plat = dev->dev.platform_data;
->  	const struct platform_device_id *id = platform_get_device_id(dev);
-> -	enum pxa_i2c_types i2c_type = id->driver_data;
-> -	int ret;
-> -	int irq;
-> +	enum pxa_i2c_types i2c_type;
-> +	struct resource *res;
-> +	int irq, ret;
-> +	static int idx = 0;
-> +
-> +	if (np) {
-> +		match = of_match_device(pxa_i2c_of_match, &dev->dev);
-> +		if (match == NULL)
-> +			return -ENODEV;
-> +		i2c_type = (int)match->data;
-> +	} else
-> +		i2c_type = id->driver_data;
->  
->  	res = platform_get_resource(dev, IORESOURCE_MEM, 0);
->  	irq = platform_get_irq(dev, 0);
-> @@ -1074,16 +1091,23 @@ static int i2c_pxa_probe(struct platform_device *dev)
->  	spin_lock_init(&i2c->lock);
->  	init_waitqueue_head(&i2c->wait);
->  
-> -	/*
-> -	 * If "dev->id" is negative we consider it as zero.
-> -	 * The reason to do so is to avoid sysfs names that only make
-> -	 * sense when there are multiple adapters.
-> -	 */
-> -	i2c->adap.nr = dev->id;
-> -	snprintf(i2c->adap.name, sizeof(i2c->adap.name), "pxa_i2c-i2c.%u",
-> -		 i2c->adap.nr);
->  
-> -	i2c->clk = clk_get(&dev->dev, NULL);
-> +	if (np) {
-> +		i2c->adap.nr = idx++;
-
-Use this so that a bus number gets dynamically assigned:
-		i2c->adap.nr = -1;
-
-> +		snprintf(i2c->adap.name, sizeof(i2c->adap.name),
-> +			"pxa2xx-i2c.%u", i2c->adap.nr);
-> +		i2c->clk = clk_get_sys(i2c->adap.name, NULL);
-
-Missing i2c->adap.dev.of_node = dev->dev.of_node;
-
-and after the bus is registered:
-
-of_i2c_register_devices(&i2c->adap);
-
-> +	} else {
-> +		/*
-> +		 * If "dev->id" is negative we consider it as zero.
-> +		 * The reason to do so is to avoid sysfs names that only make
-> +		 * sense when there are multiple adapters.
-> +		 */
-> +		i2c->adap.nr = dev->id;
-> +		snprintf(i2c->adap.name, sizeof(i2c->adap.name),
-> +			"pxa_i2c-i2c.%u", i2c->adap.nr);
-> +		i2c->clk = clk_get(&dev->dev, NULL);
-> +	}
->  	if (IS_ERR(i2c->clk)) {
->  		ret = PTR_ERR(i2c->clk);
->  		goto eclk;
-> @@ -1234,6 +1258,7 @@ static struct platform_driver i2c_pxa_driver = {
->  		.name	= "pxa2xx-i2c",
->  		.owner	= THIS_MODULE,
->  		.pm	= I2C_PXA_DEV_PM_OPS,
-> +		.of_match_table	= pxa_i2c_of_match,
->  	},
->  	.id_table	= i2c_pxa_id_table,
->  };
-> -- 
-> 1.5.6.5
+> clk_get_sys() is there to allow system devices to get their clocks.
+> It's not for general drivers to use.
 > 
+> Please, stop this madness.
+
+indeed.
+
+g.
