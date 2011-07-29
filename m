@@ -1,58 +1,38 @@
-From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Fri, 29 Jul 2011 11:51:46 -0700
-Subject: [PATCH v3] davinci: Add wl1271/wlan support for AM18x
-In-Reply-To: <20110728220643.GG1985@WorkStation>
-References: <B85A65D85D7EB246BE421B3FB0FBB593024DD2CEC2@dbde02.ent.ti.com>	<1311886373-3060-1-git-send-email-ido@wizery.com>	<4E31D17D.6050000@boundarydevices.com>
-	<20110728220643.GG1985@WorkStation>
-Message-ID: <4E330142.6040809@boundarydevices.com>
+From: juergen.lambrecht@gmail.com (=?UTF-8?Q?J=C3=BCrgen_Lambrecht?=)
+Date: Fri, 29 Jul 2011 21:14:47 +0200
+Subject: [RFC PATCH] ARM ASoC: add sound driver for imx27pdk using mc13783
+	codec
+In-Reply-To: <201107271028.09928.philippe.retornaz@epfl.ch>
+References: <1310131491-625-1-git-send-email-J.Lambrecht@televic.com>
+	<201107081611.25998.philippe.retornaz@epfl.ch>
+	<4E1711EA.5070209@televic.com>
+	<201107271028.09928.philippe.retornaz@epfl.ch>
+Message-ID: <CAPPnRU2LyJdHfA9W2porz_mWNo0fxAD+RSxrViNSK0Auinwpaw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/28/2011 3:06 PM, Ido Yariv wrote:
-> Hi Troy,
-> 
-> On Thu, Jul 28, 2011 at 02:15:41PM -0700, Troy Kisky wrote:
->>> +	if (power_on) {
->>> +		/* Power up sequence required for wl127x devices */
->>> +		gpio_set_value(DA850_WLAN_EN, 1);
->>> +		usleep_range(15000, 15000);
->>> +		gpio_set_value(DA850_WLAN_EN, 0);
->>> +		usleep_range(1000, 1000);
->>> +		gpio_set_value(DA850_WLAN_EN, 1);
->>> +		msleep(70);
+2011/7/27 Philippe R?tornaz <philippe.retornaz@epfl.ch>:
+> Hi
+>
+> Le vendredi 8 juillet 2011 16:19:22, Lambrecht J?rgen a ?crit :
+>> indeed, doesn't work at all. I know it used to work on 2.6.34.
+>> We also have a fsl linux 2.6.22 were it works.
+>> I must say: when i use aplay to play a mono file, then there is no
+>> error, it just never ends, and no sound also.
+>> For a stereo file, it gives the error.
+>> Mark also that when I use madplay (v0.15.2) (or mp3play) to play a mono
+>> or stereo mp3, it allocates 3 DMA channels, but only frees one after the
+>> error.
 >>
->> Why turn on, then off, and then back on?
->> Isn't off, then back on sufficient?
-> 
-> Unfortunately, no. This is a required power up sequence for some
-> hardware revisions of the 1271 chip.
-
-That's too bad.
-
-> 
->> Also, why not use regulator API like panda board does?
-> 
-> Unlike omap_hsmmc, davinci's MMC host driver does not toggle any
-> regulators. To keep things simple, a set_power callback function was
-> added to the mmc host as part of this patch series.
-> I've considered adding regulator support instead, but found it to be
-> a bit over-complicated for this task. In addition, it would require
-> either modifying the fixed regulator or adding a new one in order to
-> support the above power sequence.
-
-Yes, that is more effort. I'm fine with your method, but with all
-the consolidation effort that's being expended currently, it would
-be nice if all boards could use a common method to power up sdio cards.
-It might make a device tree implementation for this driver easier too,
-though I am certainly no expert there.
-
-
-> 
-> Thanks for your review,
-> Ido.
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+>
+> Did you made any progress on this ?
+Yes. Sascha fixed it, and will commit it.
+Regards,
+J?rgen
+>
+> Regards,
+>
+> Philippe
+>
+>
+>
