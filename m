@@ -1,34 +1,26 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 29 Jul 2011 08:42:15 -0400 (EDT)
-Subject: [PATCH 2/2] ARM: msm: Remove PLAT_PHYS_OFFSETS from MSM
- targets
-In-Reply-To: <20110729103239.GC25640@n2100.arm.linux.org.uk>
-References: <1311794355-26988-2-git-send-email-sboyd@codeaurora.org>
-	<1311884291-5409-1-git-send-email-davidb@codeaurora.org>
-	<1311884291-5409-2-git-send-email-davidb@codeaurora.org>
-	<20110729103239.GC25640@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1107290841300.12766@xanadu.home>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 29 Jul 2011 13:43:46 +0100
+Subject: [PATCH 00/18] dmaengine/amba-pl08x updates
+In-Reply-To: <4E329848.7070606@st.com>
+References: <cover.1311936523.git.viresh.kumar@st.com>
+	<20110729105759.GE25640@n2100.arm.linux.org.uk>
+	<4E329616.2030505@st.com>
+	<20110729111920.GK25640@n2100.arm.linux.org.uk>
+	<4E329848.7070606@st.com>
+Message-ID: <20110729124346.GL25640@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 29 Jul 2011, Russell King - ARM Linux wrote:
-
-> On Thu, Jul 28, 2011 at 01:18:11PM -0700, David Brown wrote:
-> > Now that MSM can boot with the phys offset patching, eliminate the
-> > definitions of the phys offsets, and instead select
-> > ARM_PATCH_PHYS_VIRT.
+On Fri, Jul 29, 2011 at 04:53:52PM +0530, viresh kumar wrote:
+> On 07/29/2011 04:49 PM, Russell King - ARM Linux wrote:
+> > Ok, so lets have the driver explicitly enforce one SG entry if peripheral
+> > flow is set.  It would also be a good idea to pass not zero length, but
+> > the real transfer size in the SG entry for the sake of having the API
+> > know the full information about the transfer.
 > 
-> I think it may be better to remove the EXPERIMENTAL status of
-> ARM_PATCH_PHYS_VIRT, and make the option default to 'y' now, so that
-> we start building all kernels with this enabled.  If people don't
-> want it (and know what they're doing) they can disable it manually
-> (maybe make the option only appear for EXPERT).
+> In my case, JPEG driver doesn't know how much data to transfer. So i have to
+> send zero from there. Also, i am not sure why would peripheral needs to be
+> flow controller if the peripherals driver already know how much to transfer?
 
-One of my jumbo patch series is doing that.
-
-> Lets see about that after this merge window is over.
-
-Right.
-
-
-Nicolas
+If the jpeg driver doesn't know how much data will be transferred, how
+can it allocate a buffer for the device to DMA into?
