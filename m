@@ -1,41 +1,131 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Fri, 29 Jul 2011 16:19:16 +0530
-Subject: [PATCH 06/18] dmaengine/amba-pl08x: Simplify pl08x_ensure_on()
+Date: Fri, 29 Jul 2011 16:19:25 +0530
+Subject: [PATCH 15/18] dmaengine/amba-pl08x: Pass flow controller information
+	with slave channel data
 In-Reply-To: <cover.1311936523.git.viresh.kumar@st.com>
 References: <cover.1311936523.git.viresh.kumar@st.com>
-Message-ID: <88035b0bd1f3fd755b6a157193c39477e21ec60a.1311936524.git.viresh.kumar@st.com>
+Message-ID: <2f6001455c4e54f56716a245c7e319eb25a9bb0d.1311936524.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Simply writing 1 on bit 0 is sufficient instead of reading and clearing bits.
-Also as per manual, for bit 3-31 of DMACConfiguration register:
-"read undefined, write as 0"
+At least, on SPEAr platforms there is one peripheral, JPEG, which can be flow
+controller for DMA transfer. Currently DMA controller driver didn't support
+peripheral flow controller configurations.
 
-So, we must not rely on values read from this registers bit 3-31.
+This patch adds fc field in struct pl08x_channel_data, which will be used only
+for slave transfers and is not used in case of mem2mem transfers. In case this
+is passed as 0, then flow controller is decided based on DMA_DIRECTION.
 
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
- drivers/dma/amba-pl08x.c |    8 +-------
- 1 files changed, 1 insertions(+), 7 deletions(-)
+ drivers/dma/amba-pl08x.c   |   46 +++++++++++++++++++++++++++++++++++++++----
+ include/linux/amba/pl08x.h |    5 ++++
+ 2 files changed, 46 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
-index 56a9670..53d722e 100644
+index 6b0ca26..9eea0d1 100644
 --- a/drivers/dma/amba-pl08x.c
 +++ b/drivers/dma/amba-pl08x.c
-@@ -1505,13 +1505,7 @@ bool pl08x_filter_id(struct dma_chan *chan, void *chan_id)
-  */
- static void pl08x_ensure_on(struct pl08x_driver_data *pl08x)
- {
--	u32 val;
--
--	val = readl(pl08x->base + PL080_CONFIG);
--	val &= ~(PL080_CONFIG_M2_BE | PL080_CONFIG_M1_BE | PL080_CONFIG_ENABLE);
--	/* We implicitly clear bit 1 and that means little-endian mode */
--	val |= PL080_CONFIG_ENABLE;
--	writel(val, pl08x->base + PL080_CONFIG);
-+	writel(PL080_CONFIG_ENABLE, pl08x->base + PL080_CONFIG);
- }
+@@ -632,6 +632,38 @@ static int pl08x_fill_llis_for_desc(struct pl08x_driver_data *pl08x,
  
- static void pl08x_unmap_buffers(struct pl08x_txd *txd)
+ 	if (bd.remainder) {
+ 		/*
++		 * Zero length is only allowed if all these requirements are
++		 * met:
++		 * - flow controller is peripheral.
++		 * - src.addr is aligned to src.width
++		 * - dst.addr is aligned to dst.width
++		 */
++		if (!bd.remainder) {
++			u32 fc = (txd->cctl & PL080_CONFIG_FLOW_CONTROL_MASK) >>
++				PL080_CONFIG_FLOW_CONTROL_SHIFT;
++			if (!((fc >= PL080_FLOW_SRC2DST_DST) &&
++					(fc <= PL080_FLOW_SRC2DST_SRC))) {
++				dev_err(&pl08x->adev->dev, "%s sg len can't be "
++						"zero", __func__);
++				return 0;
++			}
++
++			if ((bd.srcbus.addr % bd.srcbus.buswidth) ||
++					(bd.srcbus.addr % bd.srcbus.buswidth)) {
++				dev_err(&pl08x->adev->dev, "%s src & dst "
++						"address must be aligned to src"
++						" & dst width if peripheral is "
++						"flow controller", __func__);
++				return 0;
++			}
++
++			cctl = pl08x_cctl_bits(cctl, bd.srcbus.buswidth,
++					bd.dstbus.buswidth, 0);
++			pl08x_fill_lli_for_desc(&bd, num_llis++, 0, cctl);
++			continue;
++		}
++
++		/*
+ 		 * Master now aligned
+ 		 * - if slave is not then we must set its width down
+ 		 */
+@@ -1255,7 +1287,7 @@ static struct dma_async_tx_descriptor *pl08x_prep_slave_sg(
+ 	struct pl08x_dma_chan *plchan = to_pl08x_chan(chan);
+ 	struct pl08x_driver_data *pl08x = plchan->host;
+ 	struct pl08x_txd *txd;
+-	int ret;
++	int ret, tmp;
+ 
+ 	/*
+ 	 * Current implementation ASSUMES only one sg
+@@ -1289,14 +1321,10 @@ static struct dma_async_tx_descriptor *pl08x_prep_slave_sg(
+ 	txd->len = sgl->length;
+ 
+ 	if (direction == DMA_TO_DEVICE) {
+-		txd->ccfg |= PL080_FLOW_MEM2PER <<
+-			PL080_CONFIG_FLOW_CONTROL_SHIFT;
+ 		txd->cctl = plchan->dst_cctl;
+ 		txd->src_addr = sgl->dma_address;
+ 		txd->dst_addr = plchan->dst_addr;
+ 	} else if (direction == DMA_FROM_DEVICE) {
+-		txd->ccfg |= PL080_FLOW_PER2MEM <<
+-			PL080_CONFIG_FLOW_CONTROL_SHIFT;
+ 		txd->cctl = plchan->src_cctl;
+ 		txd->src_addr = plchan->src_addr;
+ 		txd->dst_addr = sgl->dma_address;
+@@ -1306,6 +1334,14 @@ static struct dma_async_tx_descriptor *pl08x_prep_slave_sg(
+ 		return NULL;
+ 	}
+ 
++	if (plchan->cd->fc)
++		tmp = plchan->cd->fc;
++	else
++		tmp = (direction == DMA_TO_DEVICE) ? PL080_FLOW_MEM2PER :
++			PL080_FLOW_PER2MEM;
++
++	txd->ccfg |= tmp << PL080_CONFIG_FLOW_CONTROL_SHIFT;
++
+ 	ret = pl08x_prep_channel_resources(plchan, txd);
+ 	if (ret)
+ 		return NULL;
+diff --git a/include/linux/amba/pl08x.h b/include/linux/amba/pl08x.h
+index 98628a8..febb0da 100644
+--- a/include/linux/amba/pl08x.h
++++ b/include/linux/amba/pl08x.h
+@@ -47,6 +47,10 @@ enum {
+  * @muxval: a number usually used to poke into some mux regiser to
+  * mux in the signal to this channel
+  * @cctl_opt: default options for the channel control register
++ * @fc: Flow Controller Settings for ccfg register. Only valid for slave
++ * channels. Fill with any PL080_FLOW_* macro's present in
++ * <asm/hardware/pl080.h>. If passed as 0, then Flow control will be decided
++ * according to DMA direction.
+  * @addr: source/target address in physical memory for this DMA channel,
+  * can be the address of a FIFO register for burst requests for example.
+  * This can be left undefined if the PrimeCell API is used for configuring
+@@ -65,6 +69,7 @@ struct pl08x_channel_data {
+ 	int max_signal;
+ 	u32 muxval;
+ 	u32 cctl;
++	u32 fc;
+ 	dma_addr_t addr;
+ 	bool circular_buffer;
+ 	bool single;
 -- 
 1.7.2.2
