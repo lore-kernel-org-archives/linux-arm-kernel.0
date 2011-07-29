@@ -1,72 +1,231 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 29 Jul 2011 09:50:32 +0200
-Subject: [RFC] ARM: dma_map|unmap_sg plus iommu
-In-Reply-To: <CAB-zwWjb+2ExjNDB3OtHmRmgaHMnO-VgEe9VZk_wU=ryrq_AGw@mail.gmail.com>
-References: <CAB-zwWjb+2ExjNDB3OtHmRmgaHMnO-VgEe9VZk_wU=ryrq_AGw@mail.gmail.com>
-Message-ID: <000301cc4dc4$31b53630$951fa290$%szyprowski@samsung.com>
+From: sjg@chromium.org (Simon Glass)
+Date: Fri, 29 Jul 2011 00:56:40 -0700
+Subject: [PATCH v5] ARM: Use generic BUG() handler
+Message-ID: <1311926200-24806-1-git-send-email-sjg@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+From: Simon Glass <sjg@google.com>
 
-On Thursday, July 28, 2011 11:10 PM Ramirez Luna, Omar wrote:
+ARM uses its own BUG() handler which makes its output slightly different
+from other archtectures.
 
-> I know it is very early but here it is a tryout of the dma_map_sg and
-> dma_unmap_sg with iommu, I made it to roughly understand what is needed to
-> remove drivers/omap-iovmm.c (which is a virtual memory manager
-> implementation on top of omap iommu driver).
-> 
-> This patch is placed on top of Marek Szyprowsk initial work:
-> 
-> ARM: DMA-mapping & IOMMU integration
-> http://thread.gmane.org/gmane.linux.kernel.mm/63727/
-> 
-> It was tested on an OMAP zoom3 platform and tidspbridge driver. The patch
-> is used to map user space buffers to dsp's iommu, get_user_pages is used to
-> form the sg list that will be passed to dma_map_sg.
-> 
-> While at it, I bumped into some issues that I would like to get some
-> feedback or know if they are being considered:
-> 
-> 1. There is no way to keep track of what virtual address are being mapped
-> in the scatterlist, which we need to propagate to the dsp, in order that it
-> knows where does the buffers start and end on its virtual address space.
-> I ended up adding an iov_address to scatterlist which if accepted should be
-> toggled/affected by the selection of CONFIG_IOMMU_API.
+One of the problems is that the ARM implementation doesn't report the function
+with the BUG() in it, but always reports the PC being in __bug(). The generic
+implementation doesn't have this problem.
 
-Sorry, but your patch is completely wrong. You should not add any additional
-entries to scatterlist. dma_addr IS the virtual address in the device's io 
-address space, so the dma_addr is a value that your device should put into 
-it's own registers to start dma transfer to provided memory pages.
+Currently we get something like:
 
-> 2. tidspbridge driver sometimes needs to map a physical address into a
-> fixed virtual address (i.e. the start of a firmware section is expected to
-> be at dsp va 0x20000000), there is no straight forward way to do this with
-> the dma api given that it only expects to receive a cpu_addr, a sg or a
-> page, by adding iov_address I could pass phys and iov addresses in a sg
-> and overcome this limitation, but, these addresses belong to:
+kernel BUG at fs/proc/breakme.c:35!
+Unable to handle kernel NULL pointer dereference at virtual address 00000000
+...
+PC is at __bug+0x20/0x2c
 
-We also encountered the problem of fixed firmware address. We addressed is by
-setting io address space start to this address and letting device driver to
-rely on the fact that the first call to dma_alloc() will match this address. 
+With this patch it displays:
 
->   2a. Shared memory between ARM and DSP: this memory is allocated through
->       memblock API which takes it out of kernel control to be later
->       ioremap'd and iommu map'd to the dsp (this because a non-cacheable
->       requirement), so, these physical addresses doesn't have a linear
->       virtual address translation, which is what dma api expects.
+kernel BUG at fs/proc/breakme.c:35!
+Internal error: Oops - undefined instruction: 0 [#1] PREEMPT SMP
+...
+PC is at write_breakme+0xd0/0x1b4
 
-I hope that the issue with page cache attributes can be resolved if we always
-allocate memory from CMA (see the latest CMAv12 patches: 
-http://www.spinics.net/lists/linux-media/msg35674.html )
+This implementation uses an undefined instruction to implement BUG, and sets up
+a bug table containing the relevant information. Many versions of gcc do not
+support %c properly for ARM (inserting a # when they shouldn't) so we work
+around this using distasteful macro magic.
 
->   2b. Bus addresses: of dsp peripherals which are also ioremap'd and
->       affected by the same thing.
+v1: Initial version to replace existing ARM BUG() implementation with something
+more similar to other architectures.
 
-Right now I have no idea how to handle ioremapped areas in dma-mapping 
-framework, but do we really need to support them?
+v2: Add Thumb support, remove backtrace whitespace output changes. Change to
+use macros instead of requiring the asm %d flag to work (thanks to
+Dave Martin <dave.martin@linaro.org>)
 
-Best regards
+v3: Remove old BUG() implementation in favor of this one.
+Remove the Backtrace: message (will submit this separately).
+Use ARM_EXIT_KEEP() so that some architectures can dump exit text at link time
+thanks to Stephen Boyd <sboyd@codeaurora.org> (although since we always
+define GENERIC_BUG this might be academic.)
+Rebase to linux-2.6.git master.
+
+v4: Allow BUGS in modules (these were not reported correctly in v3)
+(thanks to Stephen Boyd <sboyd@codeaurora.org> for suggesting that.)
+Remove __bug() as this is no longer needed.
+
+v5: Add %progbits as the section flags.
+
+Change-Id: I07d77c832e816f5ad2390e25f466ddf750adecf4
+
+Signed-off-by: Simon Glass <sjg@chromium.org>
+---
+ arch/arm/Kconfig              |    4 +++
+ arch/arm/include/asm/bug.h    |   55 ++++++++++++++++++++++++++++++++++------
+ arch/arm/kernel/traps.c       |   31 +++++++++++++++-------
+ arch/arm/kernel/vmlinux.lds.S |    3 +-
+ 4 files changed, 73 insertions(+), 20 deletions(-)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 09ebf0b..4570473 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -216,6 +216,10 @@ config ARM_PATCH_PHYS_VIRT_16BIT
+ 	  to allow physical memory down to a theoretical minimum of 64K
+ 	  boundaries.
+ 
++config GENERIC_BUG
++	def_bool y
++	depends on BUG
++
+ source "init/Kconfig"
+ 
+ source "kernel/Kconfig.freezer"
+diff --git a/arch/arm/include/asm/bug.h b/arch/arm/include/asm/bug.h
+index 4d88425..9abe7a0 100644
+--- a/arch/arm/include/asm/bug.h
++++ b/arch/arm/include/asm/bug.h
+@@ -3,21 +3,58 @@
+ 
+ 
+ #ifdef CONFIG_BUG
+-#ifdef CONFIG_DEBUG_BUGVERBOSE
+-extern void __bug(const char *file, int line) __attribute__((noreturn));
+-
+-/* give file/line information */
+-#define BUG()		__bug(__FILE__, __LINE__)
+ 
++/*
++ * Use a suitable undefined instruction to use for ARM/Thumb2 bug handling.
++ * We need to be careful not to conflict with those used by other modules and
++ * the register_undef_hook() system.
++ */
++#ifdef CONFIG_THUMB2_KERNEL
++#define BUG_INSTR_VALUE 0xde02
++#define BUG_INSTR_TYPE ".hword "
+ #else
++#define BUG_INSTR_VALUE 0xe7f001f2
++#define BUG_INSTR_TYPE ".word "
++#endif
+ 
+-/* this just causes an oops */
+-#define BUG()		do { *(int *)0 = 0; } while (1)
+ 
+-#endif
++#define BUG() _BUG(__FILE__, __LINE__, BUG_INSTR_VALUE)
++#define _BUG(file, line, value) __BUG(file, line, value)
++
++#ifdef CONFIG_DEBUG_BUGVERBOSE
++
++/*
++ * The extra indirection is to ensure that the __FILE__ string comes through
++ * OK. Many version of gcc do not support the asm %c parameter which would be
++ * preferable to this unpleasantness. We use mergeable string sections to
++ * avoid multiple copies of the string appearing in the kernel image.
++ */
++
++#define __BUG(__file, __line, __value)				\
++do {								\
++	BUILD_BUG_ON(sizeof(struct bug_entry) != 12);		\
++	asm volatile("1:\t" BUG_INSTR_TYPE #__value "\n"	\
++		".pushsection .rodata.str, \"aMS\", %progbits, 1\n" \
++		"2:\t.asciz " #__file "\n" 			\
++		".popsection\n" 				\
++		".pushsection __bug_table,\"a\"\n"		\
++		"3:\t.word 1b, 2b\n"				\
++		"\t.hword " #__line ", 0\n"			\
++		".popsection");					\
++	unreachable();						\
++} while (0)
++
++#else  /* not CONFIG_DEBUG_BUGVERBOSE */
++
++#define __BUG(__file, __line, __value)				\
++do {								\
++	asm volatile(BUG_INSTR_TYPE #__value);			\
++	unreachable();						\
++} while (0)
++#endif  /* CONFIG_DEBUG_BUGVERBOSE */
+ 
+ #define HAVE_ARCH_BUG
+-#endif
++#endif  /* CONFIG_BUG */
+ 
+ #include <asm-generic/bug.h>
+ 
+diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+index bc9f9da..7496924 100644
+--- a/arch/arm/kernel/traps.c
++++ b/arch/arm/kernel/traps.c
+@@ -21,6 +21,7 @@
+ #include <linux/kdebug.h>
+ #include <linux/module.h>
+ #include <linux/kexec.h>
++#include <linux/bug.h>
+ #include <linux/delay.h>
+ #include <linux/init.h>
+ #include <linux/sched.h>
+@@ -270,6 +271,8 @@ void die(const char *str, struct pt_regs *regs, int err)
+ 	spin_lock_irq(&die_lock);
+ 	console_verbose();
+ 	bust_spinlocks(1);
++	if (!user_mode(regs))
++		report_bug(regs->ARM_pc, regs);
+ 	ret = __die(str, err, thread, regs);
+ 
+ 	if (regs && kexec_should_crash(thread->task))
+@@ -301,6 +304,24 @@ void arm_notify_die(const char *str, struct pt_regs *regs,
+ 	}
+ }
+ 
++#ifdef CONFIG_GENERIC_BUG
++
++int is_valid_bugaddr(unsigned long pc)
++{
++#ifdef CONFIG_THUMB2_KERNEL
++	unsigned short bkpt;
++#else
++	unsigned long bkpt;
++#endif
++
++	if (probe_kernel_address((unsigned *)pc, bkpt))
++		return 0;
++
++	return bkpt == BUG_INSTR_VALUE;
++}
++
++#endif
++
+ static LIST_HEAD(undef_hook);
+ static DEFINE_SPINLOCK(undef_lock);
+ 
+@@ -706,16 +727,6 @@ baddataabort(int code, unsigned long instr, struct pt_regs *regs)
+ 	arm_notify_die("unknown data abort code", regs, &info, instr, 0);
+ }
+ 
+-void __attribute__((noreturn)) __bug(const char *file, int line)
+-{
+-	printk(KERN_CRIT"kernel BUG at %s:%d!\n", file, line);
+-	*(int *)0 = 0;
+-
+-	/* Avoid "noreturn function does return" */
+-	for (;;);
+-}
+-EXPORT_SYMBOL(__bug);
+-
+ void __readwrite_bug(const char *fn)
+ {
+ 	printk("%s called, but not implemented\n", fn);
+diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
+index bf977f8..7b2541e 100644
+--- a/arch/arm/kernel/vmlinux.lds.S
++++ b/arch/arm/kernel/vmlinux.lds.S
+@@ -21,7 +21,8 @@
+ #define ARM_CPU_KEEP(x)
+ #endif
+ 
+-#if defined(CONFIG_SMP_ON_UP) && !defined(CONFIG_DEBUG_SPINLOCK)
++#if (defined(CONFIG_SMP_ON_UP) && !defined(CONFIG_DEBUG_SPINLOCK)) || \
++	defined(CONFIG_GENERIC_BUG)
+ #define ARM_EXIT_KEEP(x)	x
+ #else
+ #define ARM_EXIT_KEEP(x)
 -- 
-Marek Szyprowski
-Samsung Poland R&D Center
+1.7.3.1
