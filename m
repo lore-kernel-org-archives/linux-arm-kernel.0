@@ -1,58 +1,28 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Fri, 29 Jul 2011 13:30:20 +0200
-Subject: Question about "Inconsistent kallsyms data"
-In-Reply-To: <2563791.8cBqodrk1o@flatron>
-References: <02ae01cc4d91$aed71670$0c854350$%kim@samsung.com>
-	<20110729100241.GB25640@n2100.arm.linux.org.uk>
-	<2563791.8cBqodrk1o@flatron>
-Message-ID: <1514384.7oMe1aulyC@flatron>
+From: viresh.kumar@st.com (viresh kumar)
+Date: Fri, 29 Jul 2011 17:00:07 +0530
+Subject: [PATCH 12/18] dmaengine/amba-pl08x: Add	prep_single_byte_llis()
+	routine
+In-Reply-To: <20110729110638.GH25640@n2100.arm.linux.org.uk>
+References: <cover.1311936523.git.viresh.kumar@st.com>
+	<cacf3470c622f311c894e6c72f13ba02be82af73.1311936524.git.viresh.kumar@st.com>
+	<20110729110638.GH25640@n2100.arm.linux.org.uk>
+Message-ID: <4E3299BF.6030707@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 29 of July 2011 at 12:58:32, Tomasz Figa wrote:
-> On Friday 29 of July 2011 at 11:02:41, Russell King - ARM Linux wrote:
-> > On Fri, Jul 29, 2011 at 12:00:07PM +0200, Tomasz Figa wrote:
-> > > Hi,
-> > > 
-> > > On Friday 29 of July 2011 at 10:48:46, Kukjin Kim wrote:
-> > > > Hi all,
-> > > > 
-> > > > When build with s5pc100_defconfig, happens following.
-> > > > 
-> > > > ...
-> > > > KSYM    .tmp_kallsyms2.S
-> > > > AS      .tmp_kallsyms2.o
-> > > > LD      vmlinux
-> > > > SYSMAP  System.map
-> > > > SYSMAP  .tmp_System.map
-> > > > Inconsistent kallsyms data
-> > > > This is a bug - please report about it
-> > > > Try make KALLSYMS_EXTRA_PASS=1 as a workaround
-> > > > make[1]: *** [vmlinux] Error 1
-> > > > make: *** [sub-make] Error 2
-> > > > 
-> > > > Its HEAD is following (current latest mainline)
-> > > > (commit 55f9c40ff632d03c527d6a6ceddcda0a224587a6)
-> > > > Merge git://git.kernel.org/pub/scm/linux/kernel/git/davem/sparc
-> > > 
-> > > I can confirm that it also happens when building with
-> > > s3c6400_defconfig
-> > > and HEAD at commit 5fd00b031530cc476240f654c078c930f1dcd6ea (Merge
-> > > branch 'for- linus' of
-> > > git://git.kernel.org/pub/scm/linux/kernel/git/shaggy/jfs-2.6).
-> > > 
-> > > The suggested workaround (make KALLSYMS_EXTRA_PASS=1) helps, but it
-> > > is
-> > > only a workaround and not a solution.
-> > > 
-> > > Any suggestions?
-> > 
-> > Someone want to try bisecting to find the commit?
+On 07/29/2011 04:36 PM, Russell King - ARM Linux wrote:
+>> > +static inline void prep_byte_width_lli(struct pl08x_lli_build_data *bd,
+>> > +		u32 *cctl, u32 len, int num_llis, size_t *total_bytes)
+>> > +{
+>> > +		*cctl = pl08x_cctl_bits(*cctl, 1, 1, len);
+>> > +		pl08x_fill_lli_for_desc(bd, num_llis, len, *cctl);
+>> > +		(*total_bytes) += len;
+> Seeing as your patch series started with a cleanup of spacing/tabbing,
+> it's surprising to find a patch introducing new code which has broken
+> tabbing.
 > 
-> I will try to bisect the case with s3c6400 defconfig.
 
-I have no idea why, but I cannot reproduce the issue anymore, even after make 
-distclean or starting with a clean tree. A build system bug?
+Haah.... How can i do this? Sorry will fix this.
 
-I do not know much technical details about the kernel build system, but might 
-it be a concurrency issue (I use make -j5 for building with 5 jobs)?
+-- 
+viresh
