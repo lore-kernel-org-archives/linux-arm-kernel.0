@@ -1,31 +1,10 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 21 Jul 2011 14:57:35 +0200
-Subject: [PATCH 3/5] ARM: s3c64xx: Save/restore S3C64XX_SDMA_SEL on
- suspend/resume.
-Message-ID: <mailman.45.1311955585.20020.linux-arm-kernel@lists.infradead.org>
+Date: Fri, 29 Jul 2011 18:07:05 +0200
+Subject: [PATCH 4/5] ARM: s3c64xx: Save/restore S3C64XX_MODEM_MIFPCON on
+	suspend/resume to preserve LCD bypass state.
+In-Reply-To: <5661373.tZL1ZnPyVO@flatron>
+References: <5661373.tZL1ZnPyVO@flatron>
+Message-ID: <3229875.NXd5Ri8ua9@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch makes sure that S3C64XX_SDMA_SEL register is preserved during
-sleep mode, as it is critical for DMA operation and the DMA driver alone
-does not provide any power management facilities.
-
----
- arch/arm/mach-s3c64xx/pm.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-s3c64xx/pm.c b/arch/arm/mach-s3c64xx/pm.c
-index 799a212..9756321 100644
---- a/arch/arm/mach-s3c64xx/pm.c
-+++ b/arch/arm/mach-s3c64xx/pm.c
-@@ -86,6 +86,8 @@ static struct sleep_save misc_save[] = {
- 	SAVE_ITEM(S3C64XX_MEM0CONSLP0),
- 	SAVE_ITEM(S3C64XX_MEM0CONSLP1),
- 	SAVE_ITEM(S3C64XX_MEM1CONSLP),
-+
-+	SAVE_ITEM(S3C64XX_SDMA_SEL),
- };
- 
- void s3c_pm_configure_extint(void)
--- 
-1.7.6
