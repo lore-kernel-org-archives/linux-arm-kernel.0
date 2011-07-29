@@ -1,20 +1,86 @@
-From: viresh.linux@gmail.com (viresh kumar)
-Date: Fri, 29 Jul 2011 08:40:00 -0700
-Subject: [PATCH 10/18] dmaengine/amba-pl08x: Get rid of
-	pl08x_pre_boundary()
-In-Reply-To: <1311941980.1536.534.camel@vkoul-udesk3>
-References: <cover.1311936523.git.viresh.kumar@st.com>
-	<c147ba3a755935e93fdb40b5531a6e18d34e0fd7.1311936524.git.viresh.kumar@st.com>
-	<1311941980.1536.534.camel@vkoul-udesk3>
-Message-ID: <CAOh2x==6m_UgWN=qour+0P1R7FrKvPHXy9Mu51U36br7vKHKUQ@mail.gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Fri, 29 Jul 2011 09:45:12 -0600
+Subject: [PATCH] net/smsc911x: add device tree probe support
+In-Reply-To: <20110726013026.GH21641@S2100-06.ap.freescale.net>
+References: <1311587040-8988-1-git-send-email-shawn.guo@linaro.org>
+	<20110725213723.GI26735@ponder.secretlab.ca>
+	<20110726010154.GG21641@S2100-06.ap.freescale.net>
+	<alpine.LFD.2.00.1107252105561.12766@xanadu.home>
+	<20110726013026.GH21641@S2100-06.ap.freescale.net>
+Message-ID: <20110729154512.GB11164@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/29/11, Koul, Vinod <vinod.koul@intel.com> wrote:
-> On Fri, 2011-07-29 at 16:19 +0530, Viresh Kumar wrote:
->> You can still issue bursts within the PL080 that are in excess o f 1KB.
->> The
-> 								^^^^^^
-> of
+On Tue, Jul 26, 2011 at 09:30:26AM +0800, Shawn Guo wrote:
+> On Mon, Jul 25, 2011 at 09:16:40PM -0400, Nicolas Pitre wrote:
+> > On Tue, 26 Jul 2011, Shawn Guo wrote:
+> > 
+> > > On Mon, Jul 25, 2011 at 03:37:23PM -0600, Grant Likely wrote:
+> > > > On Mon, Jul 25, 2011 at 05:44:00PM +0800, Shawn Guo wrote:
+> > > > > It adds device tree probe support for smsc911x driver.
+> > > > > 
+> > > > > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > > > > Cc: Grant Likely <grant.likely@secretlab.ca>
+> > > > > Cc: Steve Glendinning <steve.glendinning@smsc.com>
+> > > > > Cc: David S. Miller <davem@davemloft.net>
+> > > > > ---
+> > > > >  Documentation/devicetree/bindings/net/smsc.txt |   34 +++++++
+> > > > >  drivers/net/smsc911x.c                         |  123 +++++++++++++++++++-----
+> > > > >  2 files changed, 132 insertions(+), 25 deletions(-)
+> > > > >  create mode 100644 Documentation/devicetree/bindings/net/smsc.txt
+> > > > > 
+> > > > > diff --git a/Documentation/devicetree/bindings/net/smsc.txt b/Documentation/devicetree/bindings/net/smsc.txt
+> > > > > new file mode 100644
+> > > > > index 0000000..1920695
+> > > > > --- /dev/null
+> > > > > +++ b/Documentation/devicetree/bindings/net/smsc.txt
+> > > > > @@ -0,0 +1,34 @@
+> > > > > +* Smart Mixed-Signal Connectivity (SMSC) LAN Controller
+> > > > > +
+> > > > > +Required properties:
+> > > > > +- compatible : Should be "smsc,lan<model>""smsc,lan"
+> > > > 
+> > > > Drop "smsc,lan".  That's far too generic.
+> > > > 
+> > > The following devices are supported by the driver.
+> > > 
+> > > LAN9115, LAN9116, LAN9117, LAN9118
+> > > LAN9215, LAN9216, LAN9217, LAN9218
+> > > LAN9210, LAN9211
+> > > LAN9220, LAN9221
+> > > 
+> > > If we only keep specific <model> as the compatible, we will have a
+> > > long match table which is actually used nowhere to distinguish the
+> > > device.
+> > > 
+> > > So we need some level generic compatible to save the meaningless
+> > > long match table.  What about: 
+> > > 
+> > > static const struct of_device_id smsc_dt_ids[] = {
+> > >         { .compatible = "smsc,lan9", },
+> > >         { /* sentinel */ }
+> > > };
+> > > 
+> > > Or:
+> > > 
+> > > static const struct of_device_id smsc_dt_ids[] = {
+> > >         { .compatible = "smsc,lan91", },
+> > >         { .compatible = "smsc,lan92", },
+> > >         { /* sentinel */ }
+> > > };
+> > 
+> > None of this unambiguously distinguish the devices supported by this 
+> > driver and the smc91x driver which supports LAN91C92, LAN91C94, 
+> > LAN91C95, LAN91C96, LAN91C100, LAN91C110.
+> > 
+> So you suggest to make a long list to explicitly tell the device type
+> that the driver supports?
 
-Ok.
+If newer devices are 100% backwards compatible with an older device,
+then the newer device doesn't need to appear in this list because the
+device node can claim compatibility.
+
+If it isn't backwards compatible, then you do need an entry in this
+list.
+
+g.
