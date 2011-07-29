@@ -1,32 +1,52 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 29 Jul 2011 12:19:20 +0100
-Subject: [PATCH 00/18] dmaengine/amba-pl08x updates
-In-Reply-To: <4E329616.2030505@st.com>
+From: viresh.kumar@st.com (viresh kumar)
+Date: Fri, 29 Jul 2011 16:51:17 +0530
+Subject: [PATCH 02/18] dmaengine/amba-pl08x: Resolve formatting issues
+In-Reply-To: <20110729110013.GF25640@n2100.arm.linux.org.uk>
 References: <cover.1311936523.git.viresh.kumar@st.com>
-	<20110729105759.GE25640@n2100.arm.linux.org.uk>
-	<4E329616.2030505@st.com>
-Message-ID: <20110729111920.GK25640@n2100.arm.linux.org.uk>
+	<1e5012faf0649e7ed0113960a9ac8302e46f1354.1311936524.git.viresh.kumar@st.com>
+	<20110729110013.GF25640@n2100.arm.linux.org.uk>
+Message-ID: <4E3297AD.5010506@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 29, 2011 at 04:44:30PM +0530, viresh kumar wrote:
-> There can be two cases here:
+On 07/29/2011 04:30 PM, Russell King - ARM Linux wrote:
+> On Fri, Jul 29, 2011 at 04:19:12PM +0530, Viresh Kumar wrote:
+>> - Remove extra blank lines and spaces
 > 
-> - Memory addresses are contiguous and are not scattered.
-> Here, Only one sg will be passed by user driver, with memory address and
-> zero length. We pass this to controller and after the transfer it will
-> receive the last burst request from peripheral and so transfer finishes.
+> A double space after a full-stop is standard practice for many people.
+> Please don't reformat that.
 > 
-> - Memory addresses are scattered and are not contiguous.
-> Here, Obviously as DMA controller doesn't know when a lli's transfer gets over,
-> it can't load next lli. So in this case, there has to be an assumption that only
-> one lli is supported. Thus, we can't have scattered addresses.
 
-Ok, so lets have the driver explicitly enforce one SG entry if peripheral
-flow is set.  It would also be a good idea to pass not zero length, but
-the real transfer size in the SG entry for the sake of having the API
-know the full information about the transfer.
+Ok. I didn't knew it.
 
-(Ok, it already only supports one SG entry, but that's something else
-which needs fixing - which may be possible now that you've cleaned up
-the LLI creation code.)
+>> @@ -284,7 +284,7 @@ static void pl08x_terminate_phy_chan(struct pl08x_driver_data *pl08x,
+>>  	u32 val = readl(ch->base + PL080_CH_CONFIG);
+>>  
+>>  	val &= ~(PL080_CONFIG_ENABLE | PL080_CONFIG_ERR_IRQ_MASK |
+>> -	         PL080_CONFIG_TC_IRQ_MASK);
+>> +			PL080_CONFIG_TC_IRQ_MASK);
+> 
+> This looks worse than the original.
+> 
+
+> 
+> And many more of that.
+> 
+
+Ok. Should i leave tabs and spaces mixed or just delete one tab in my change.
+
+>>  	ret = dma_async_device_register(&pl08x->memcpy);
+>>  	if (ret) {
+>> -		dev_warn(&pl08x->adev->dev,
+>> -			"%s failed to register memcpy as an async device - %d\n",
+>> -			__func__, ret);
+>> +		dev_warn(&pl08x->adev->dev, "%s failed to register memcpy as an"
+>> +				" async device - %d\n", __func__, ret);
+> 
+> Definitely not acceptable.  Ignore warnings about wrapping 80 columns for
+> kernel messages.
+
+Ok.
+
+-- 
+viresh
