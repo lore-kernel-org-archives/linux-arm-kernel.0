@@ -1,36 +1,60 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 29 Jul 2011 10:48:46 +0900
-Subject: Question about "Inconsistent kallsyms data"
-Message-ID: <02ae01cc4d91$aed71670$0c854350$%kim@samsung.com>
+From: leoy@marvell.com (Leo Yan)
+Date: Fri, 29 Jul 2011 10:25:02 +0800
+Subject: [PATCH] lib/genalloc: fix gen_pool_virt_to_phys locking
+In-Reply-To: <CAMk6uBmE01EpAw3e8kB9v6tEkU0rAPqt8T7+k54QDzDxtDn7PQ@mail.gmail.com>
+References: <1311664741-21336-1-git-send-email-leoy@marvell.com>
+	<CAMk6uBmE01EpAw3e8kB9v6tEkU0rAPqt8T7+k54QDzDxtDn7PQ@mail.gmail.com>
+Message-ID: <4E3219FE.6020306@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+real mz,
 
-When build with s5pc100_defconfig, happens following.
-
-...
-KSYM    .tmp_kallsyms2.S
-AS      .tmp_kallsyms2.o
-LD      vmlinux
-SYSMAP  System.map
-SYSMAP  .tmp_System.map
-Inconsistent kallsyms data
-This is a bug - please report about it
-Try make KALLSYMS_EXTRA_PASS=1 as a workaround
-make[1]: *** [vmlinux] Error 1
-make: *** [sub-make] Error 2
-
-Its HEAD is following (current latest mainline)
-(commit 55f9c40ff632d03c527d6a6ceddcda0a224587a6)
-Merge git://git.kernel.org/pub/scm/linux/kernel/git/davem/sparc
-
-Please kindly let me know how it should be fixed...
-
-Thanks.
+You are right. :-) it's long time not see you guy.
+For i am developed based on mainline, so if without this
+patch, then the kernel will panic.
 
 Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Leo Yan
+
+
+On 2011?07?28? 18:39, real mz wrote:
+> this fix seems already on next tree
+>
+> http://git.kernel.org/?p=linux/kernel/git/next/linux-next.git;a=blob;f=lib/genalloc.c;h=f352cc42f4f8a58b8e4c8304de32cb31b4e29b67;hb=HEAD
+>
+>
+> On Tue, Jul 26, 2011 at 3:19 PM, Leo Yan<leoy@marvell.com>  wrote:
+>> The func gen_pool_virt_to_phys will iterate the chunk list;
+>> if find the correct chunk it should need release pool's lock.
+>>
+>> Signed-off-by: Leo Yan<leoy@marvell.com>
+>> ---
+>>   lib/genalloc.c |    4 +++-
+>>   1 files changed, 3 insertions(+), 1 deletions(-)
+>>
+>> diff --git a/lib/genalloc.c b/lib/genalloc.c
+>> index 577ddf8..e625df5 100644
+>> --- a/lib/genalloc.c
+>> +++ b/lib/genalloc.c
+>> @@ -92,8 +92,10 @@ phys_addr_t gen_pool_virt_to_phys(struct gen_pool *pool, unsigned long addr)
+>>         list_for_each(_chunk,&pool->chunks) {
+>>                 chunk = list_entry(_chunk, struct gen_pool_chunk, next_chunk);
+>>
+>> -               if (addr>= chunk->start_addr&&  addr<  chunk->end_addr)
+>> +               if (addr>= chunk->start_addr&&  addr<  chunk->end_addr) {
+>> +                       read_unlock(&pool->lock);
+>>                         return chunk->phys_addr + addr - chunk->start_addr;
+>> +               }
+>>         }
+>>         read_unlock(&pool->lock);
+>>
+>> --
+>> 1.7.4.1
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
