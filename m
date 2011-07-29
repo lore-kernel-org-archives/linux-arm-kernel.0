@@ -1,23 +1,65 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 29 Jul 2011 11:32:39 +0100
-Subject: [PATCH 2/2] ARM: msm: Remove PLAT_PHYS_OFFSETS from MSM targets
-In-Reply-To: <1311884291-5409-2-git-send-email-davidb@codeaurora.org>
-References: <1311794355-26988-2-git-send-email-sboyd@codeaurora.org>
-	<1311884291-5409-1-git-send-email-davidb@codeaurora.org>
-	<1311884291-5409-2-git-send-email-davidb@codeaurora.org>
-Message-ID: <20110729103239.GC25640@n2100.arm.linux.org.uk>
+From: shubhrajyoti@ti.com (Shubhrajyoti D)
+Date: Fri, 29 Jul 2011 16:06:53 +0530
+Subject: [PATCHv5 3/3] OMAP: I2C: Remove the SYSC register definition
+In-Reply-To: <1311935813-8481-1-git-send-email-shubhrajyoti@ti.com>
+References: <1311935813-8481-1-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1311935813-8481-4-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 28, 2011 at 01:18:11PM -0700, David Brown wrote:
-> Now that MSM can boot with the phys offset patching, eliminate the
-> definitions of the phys offsets, and instead select
-> ARM_PATCH_PHYS_VIRT.
+The SYSC register should not accessed in the driver removing the
+define from the driver.
+Also clean up the syscstate from the omap_i2c_dev struct.
 
-I think it may be better to remove the EXPERIMENTAL status of
-ARM_PATCH_PHYS_VIRT, and make the option default to 'y' now, so that
-we start building all kernels with this enabled.  If people don't
-want it (and know what they're doing) they can disable it manually
-(maybe make the option only appear for EXPERT).
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+---
+ drivers/i2c/busses/i2c-omap.c |    5 -----
+ 1 files changed, 0 insertions(+), 5 deletions(-)
 
-Lets see about that after this merge window is over.
+diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+index d8f4470..d05efe7 100644
+--- a/drivers/i2c/busses/i2c-omap.c
++++ b/drivers/i2c/busses/i2c-omap.c
+@@ -63,7 +63,6 @@ enum {
+ 	OMAP_I2C_BUF_REG,
+ 	OMAP_I2C_CNT_REG,
+ 	OMAP_I2C_DATA_REG,
+-	OMAP_I2C_SYSC_REG,
+ 	OMAP_I2C_CON_REG,
+ 	OMAP_I2C_OA_REG,
+ 	OMAP_I2C_SA_REG,
+@@ -187,7 +186,6 @@ struct omap_i2c_dev {
+ 	u16			scllstate;
+ 	u16			sclhstate;
+ 	u16			bufstate;
+-	u16			syscstate;
+ 	u16			westate;
+ 	u16			errata;
+ };
+@@ -202,7 +200,6 @@ const static u8 reg_map_ip_v1[] = {
+ 	[OMAP_I2C_BUF_REG] = 0x05,
+ 	[OMAP_I2C_CNT_REG] = 0x06,
+ 	[OMAP_I2C_DATA_REG] = 0x07,
+-	[OMAP_I2C_SYSC_REG] = 0x08,
+ 	[OMAP_I2C_CON_REG] = 0x09,
+ 	[OMAP_I2C_OA_REG] = 0x0a,
+ 	[OMAP_I2C_SA_REG] = 0x0b,
+@@ -223,7 +220,6 @@ const static u8 reg_map_ip_v2[] = {
+ 	[OMAP_I2C_BUF_REG] = 0x94,
+ 	[OMAP_I2C_CNT_REG] = 0x98,
+ 	[OMAP_I2C_DATA_REG] = 0x9c,
+-	[OMAP_I2C_SYSC_REG] = 0x20,
+ 	[OMAP_I2C_CON_REG] = 0xa4,
+ 	[OMAP_I2C_OA_REG] = 0xa8,
+ 	[OMAP_I2C_SA_REG] = 0xac,
+@@ -264,7 +260,6 @@ static void omap_i2c_unidle(struct omap_i2c_dev *dev)
+ 		omap_i2c_write_reg(dev, OMAP_I2C_SCLL_REG, dev->scllstate);
+ 		omap_i2c_write_reg(dev, OMAP_I2C_SCLH_REG, dev->sclhstate);
+ 		omap_i2c_write_reg(dev, OMAP_I2C_BUF_REG, dev->bufstate);
+-		omap_i2c_write_reg(dev, OMAP_I2C_SYSC_REG, dev->syscstate);
+ 		omap_i2c_write_reg(dev, OMAP_I2C_WE_REG, dev->westate);
+ 		omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, OMAP_I2C_CON_EN);
+ 	}
+-- 
+1.7.1
