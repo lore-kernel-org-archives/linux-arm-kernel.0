@@ -1,41 +1,41 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 29 Jul 2011 12:05:25 +0100
-Subject: [PATCH 10/18] dmaengine/amba-pl08x: Get rid of
-	pl08x_pre_boundary()
-In-Reply-To: <c147ba3a755935e93fdb40b5531a6e18d34e0fd7.1311936524.git.viresh.kumar@st.com>
+Date: Fri, 29 Jul 2011 12:06:38 +0100
+Subject: [PATCH 12/18] dmaengine/amba-pl08x: Add
+	prep_single_byte_llis() routine
+In-Reply-To: <cacf3470c622f311c894e6c72f13ba02be82af73.1311936524.git.viresh.kumar@st.com>
 References: <cover.1311936523.git.viresh.kumar@st.com>
-	<c147ba3a755935e93fdb40b5531a6e18d34e0fd7.1311936524.git.viresh.kumar@st.com>
-Message-ID: <20110729110525.GG25640@n2100.arm.linux.org.uk>
+	<cacf3470c622f311c894e6c72f13ba02be82af73.1311936524.git.viresh.kumar@st.com>
+Message-ID: <20110729110638.GH25640@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 29, 2011 at 04:19:20PM +0530, Viresh Kumar wrote:
-> Pl080 Manual says: "Bursts do not cross the 1KB address boundary"
+On Fri, Jul 29, 2011 at 04:19:22PM +0530, Viresh Kumar wrote:
+> Code for creating single byte llis is present at several places. Create a
+> routine to avoid code redundancy.
 > 
-> We can program the controller to cross 1 KB boundary on a burst and controller
-> can take care of this boundary condition by itself.
+> Also, we don't need one lli per single byte transfer, we can have single lli to
+> do all single byte transfer.
 > 
-> Following is the discussion with ARM Technical Support Guys (David):
-> [Viresh] Manual says: "Bursts do not cross the 1KB address boundary"
+> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+> ---
+>  drivers/dma/amba-pl08x.c |   61 +++++++++++++++++++++++++---------------------
+>  1 files changed, 33 insertions(+), 28 deletions(-)
 > 
-> What does that actually mean? As, Maximum size transferable with a single LLI is
-> 4095 * 4 =16380 ~ 16KB. So, if we don't have src/dest address aligned to burst
-> size, we can't use this big of an LLI.
-> 
-> [David] There is a difference between bursts describing the total data
-> transferred by the DMA controller and AHB bursts. Bursts described by the
-> programmable parameters in the PL080 have no direct connection with the bursts
-> that are seen on the AHB bus.
-> 
-> The statement that "Bursts do not cross the 1KB address boundary" in the TRM is
-> referring to AHB bursts, where this limitation is a requirement of the AHB spec.
-> You can still issue bursts within the PL080 that are in excess o f 1KB. The
-> PL080 will make sure that its bursts are broken down into legal AHB bursts which
-> will be formatted to ensure that no AHB burst crosses a 1KB boundary.
-> 
-> Based on above discussion, this patch removes all code related to 1 KB boundary
-> as we are not required to handle this in driver.
+> diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
+> index 3b7357e..590397d 100644
+> --- a/drivers/dma/amba-pl08x.c
+> +++ b/drivers/dma/amba-pl08x.c
+> @@ -552,6 +552,14 @@ static void pl08x_fill_lli_for_desc(struct pl08x_lli_build_data *bd,
+>  	bd->remainder -= len;
+>  }
+>  
+> +static inline void prep_byte_width_lli(struct pl08x_lli_build_data *bd,
+> +		u32 *cctl, u32 len, int num_llis, size_t *total_bytes)
+> +{
+> +		*cctl = pl08x_cctl_bits(*cctl, 1, 1, len);
+> +		pl08x_fill_lli_for_desc(bd, num_llis, len, *cctl);
+> +		(*total_bytes) += len;
 
-Good.  I'm glad someone's finally getting to the bottom of what's
-actually required and what isn't...  This driver has been a mess for
-quite a long time and is in desperate need of these kinds of cleanups.
+Seeing as your patch series started with a cleanup of spacing/tabbing,
+it's surprising to find a patch introducing new code which has broken
+tabbing.
