@@ -1,48 +1,40 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu, 28 Jul 2011 17:07:28 -0500
-Subject: [PATCH 2/2] OMAP: PM: omap_device: add few quick access functions
-Message-ID: <mailman.41.1311947385.20020.linux-arm-kernel@lists.infradead.org>
+From: davidb@codeaurora.org (David Brown)
+Date: Fri, 29 Jul 2011 07:01:27 -0700
+Subject: [PATCH 2/2] ARM: msm: Remove PLAT_PHYS_OFFSETS from MSM targets
+In-Reply-To: <alpine.LFD.2.00.1107290841300.12766@xanadu.home>
+References: <1311794355-26988-2-git-send-email-sboyd@codeaurora.org>
+	<1311884291-5409-1-git-send-email-davidb@codeaurora.org>
+	<1311884291-5409-2-git-send-email-davidb@codeaurora.org>
+	<20110729103239.GC25640@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1107290841300.12766@xanadu.home>
+Message-ID: <20110729140127.GA17137@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide a quick set of access functions:
-a) Convert omap_device to platform_device - This is the flip of
-   to_omap_device for equivalent usage
-b) Convert omap_device to device pointer - This is useful for
-   most devices that need to go through standard linux functions that
-   take device pointer.
-c) Convert hwmod to device pointer - This wrapper provides ability for
-   drivers to convert directly from hwmod name back to device pointer
-   without having to handle this on a driver by driver basis
+On Fri, Jul 29, 2011 at 08:42:15AM -0400, Nicolas Pitre wrote:
+> On Fri, 29 Jul 2011, Russell King - ARM Linux wrote:
+> 
+> > On Thu, Jul 28, 2011 at 01:18:11PM -0700, David Brown wrote:
+> > > Now that MSM can boot with the phys offset patching, eliminate the
+> > > definitions of the phys offsets, and instead select
+> > > ARM_PATCH_PHYS_VIRT.
+> > 
+> > I think it may be better to remove the EXPERIMENTAL status of
+> > ARM_PATCH_PHYS_VIRT, and make the option default to 'y' now, so that
+> > we start building all kernels with this enabled.  If people don't
+> > want it (and know what they're doing) they can disable it manually
+> > (maybe make the option only appear for EXPERT).
+> 
+> One of my jumbo patch series is doing that.
+> 
+> > Lets see about that after this merge window is over.
 
-Change-Id: I0fe16eeb41c32d5b166d5cb3f78af4fda140d398
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
- arch/arm/plat-omap/include/plat/omap_device.h |   13 +++++++++++++
- 1 files changed, 13 insertions(+), 0 deletions(-)
+In that case, I'll resend just the second of my patches after this
+series.
 
-diff --git a/arch/arm/plat-omap/include/plat/omap_device.h b/arch/arm/plat-omap/include/plat/omap_device.h
-index 7a3c046..11cb471 100644
---- a/arch/arm/plat-omap/include/plat/omap_device.h
-+++ b/arch/arm/plat-omap/include/plat/omap_device.h
-@@ -150,5 +150,18 @@ struct omap_device_pm_latency {
- 
- /* Get omap_device pointer from platform_device pointer */
- #define to_omap_device(x) container_of((x), struct omap_device, pdev)
-+/* Convert omap_device to platform device pointer */
-+#define omap_device_get_pdev(x) (&(x)->pdev)
-+/* Convert omap_device to device pointer */
-+#define omap_device_get_dev(x) (&omap_device_get_pdev(x)->dev)
-+/* Convert omap_hwmod name to device pointer */
-+static inline struct device *omap_hwmod_name_get_dev(const char *oh_name)
-+{
-+	struct omap_device *od;
-+	od = omap_hwmod_name_get_dev(oh_name);
-+	if (IS_ERR_OR_NULL(od))
-+		return ERR_PTR(od ? PTR_ERR(od) : -ENODEV);
-+	return omap_device_get_dev(od);
-+}
- 
- #endif
+Thanks,
+David
+
 -- 
-1.7.4.1
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
