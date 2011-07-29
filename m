@@ -1,231 +1,218 @@
-From: sjg@chromium.org (Simon Glass)
-Date: Fri, 29 Jul 2011 00:56:40 -0700
-Subject: [PATCH v5] ARM: Use generic BUG() handler
-Message-ID: <1311926200-24806-1-git-send-email-sjg@chromium.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 29 Jul 2011 16:43:16 +0800
+Subject: [PATCH v2] net/smsc911x: add device tree probe support
+In-Reply-To: <1311587040-8988-1-git-send-email-shawn.guo@linaro.org>
+References: <1311587040-8988-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1311928996-10729-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Simon Glass <sjg@google.com>
+It adds device tree probe support for smsc911x driver.
 
-ARM uses its own BUG() handler which makes its output slightly different
-from other archtectures.
-
-One of the problems is that the ARM implementation doesn't report the function
-with the BUG() in it, but always reports the PC being in __bug(). The generic
-implementation doesn't have this problem.
-
-Currently we get something like:
-
-kernel BUG at fs/proc/breakme.c:35!
-Unable to handle kernel NULL pointer dereference at virtual address 00000000
-...
-PC is at __bug+0x20/0x2c
-
-With this patch it displays:
-
-kernel BUG at fs/proc/breakme.c:35!
-Internal error: Oops - undefined instruction: 0 [#1] PREEMPT SMP
-...
-PC is at write_breakme+0xd0/0x1b4
-
-This implementation uses an undefined instruction to implement BUG, and sets up
-a bug table containing the relevant information. Many versions of gcc do not
-support %c properly for ARM (inserting a # when they shouldn't) so we work
-around this using distasteful macro magic.
-
-v1: Initial version to replace existing ARM BUG() implementation with something
-more similar to other architectures.
-
-v2: Add Thumb support, remove backtrace whitespace output changes. Change to
-use macros instead of requiring the asm %d flag to work (thanks to
-Dave Martin <dave.martin@linaro.org>)
-
-v3: Remove old BUG() implementation in favor of this one.
-Remove the Backtrace: message (will submit this separately).
-Use ARM_EXIT_KEEP() so that some architectures can dump exit text at link time
-thanks to Stephen Boyd <sboyd@codeaurora.org> (although since we always
-define GENERIC_BUG this might be academic.)
-Rebase to linux-2.6.git master.
-
-v4: Allow BUGS in modules (these were not reported correctly in v3)
-(thanks to Stephen Boyd <sboyd@codeaurora.org> for suggesting that.)
-Remove __bug() as this is no longer needed.
-
-v5: Add %progbits as the section flags.
-
-Change-Id: I07d77c832e816f5ad2390e25f466ddf750adecf4
-
-Signed-off-by: Simon Glass <sjg@chromium.org>
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Cc: Grant Likely <grant.likely@secretlab.ca>
+Cc: Steve Glendinning <steve.glendinning@smsc.com>
+Cc: David S. Miller <davem@davemloft.net>
 ---
- arch/arm/Kconfig              |    4 +++
- arch/arm/include/asm/bug.h    |   55 ++++++++++++++++++++++++++++++++++------
- arch/arm/kernel/traps.c       |   31 +++++++++++++++-------
- arch/arm/kernel/vmlinux.lds.S |    3 +-
- 4 files changed, 73 insertions(+), 20 deletions(-)
+Changes since v1:
+ * Instead of getting irq line from gpio number, it use irq domain
+   to keep platform_get_resource(IORESOURCE_IRQ) works for dt too.
+ * Use 'lan9115' the first model that smsc911x supports in the match
+   table
+ * Use reg-shift and reg-io-width which already used in of_serial for
+   shift and access size binding
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 09ebf0b..4570473 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -216,6 +216,10 @@ config ARM_PATCH_PHYS_VIRT_16BIT
- 	  to allow physical memory down to a theoretical minimum of 64K
- 	  boundaries.
- 
-+config GENERIC_BUG
-+	def_bool y
-+	depends on BUG
+ Documentation/devicetree/bindings/net/smsc911x.txt |   38 +++++++++
+ drivers/net/smsc911x.c                             |   85 +++++++++++++++++---
+ 2 files changed, 112 insertions(+), 11 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/net/smsc911x.txt
+
+diff --git a/Documentation/devicetree/bindings/net/smsc911x.txt b/Documentation/devicetree/bindings/net/smsc911x.txt
+new file mode 100644
+index 0000000..271c454
+--- /dev/null
++++ b/Documentation/devicetree/bindings/net/smsc911x.txt
+@@ -0,0 +1,38 @@
++* Smart Mixed-Signal Connectivity (SMSC) LAN911x/912x Controller
 +
- source "init/Kconfig"
- 
- source "kernel/Kconfig.freezer"
-diff --git a/arch/arm/include/asm/bug.h b/arch/arm/include/asm/bug.h
-index 4d88425..9abe7a0 100644
---- a/arch/arm/include/asm/bug.h
-+++ b/arch/arm/include/asm/bug.h
-@@ -3,21 +3,58 @@
- 
- 
- #ifdef CONFIG_BUG
--#ifdef CONFIG_DEBUG_BUGVERBOSE
--extern void __bug(const char *file, int line) __attribute__((noreturn));
--
--/* give file/line information */
--#define BUG()		__bug(__FILE__, __LINE__)
- 
-+/*
-+ * Use a suitable undefined instruction to use for ARM/Thumb2 bug handling.
-+ * We need to be careful not to conflict with those used by other modules and
-+ * the register_undef_hook() system.
-+ */
-+#ifdef CONFIG_THUMB2_KERNEL
-+#define BUG_INSTR_VALUE 0xde02
-+#define BUG_INSTR_TYPE ".hword "
- #else
-+#define BUG_INSTR_VALUE 0xe7f001f2
-+#define BUG_INSTR_TYPE ".word "
-+#endif
- 
--/* this just causes an oops */
--#define BUG()		do { *(int *)0 = 0; } while (1)
- 
--#endif
-+#define BUG() _BUG(__FILE__, __LINE__, BUG_INSTR_VALUE)
-+#define _BUG(file, line, value) __BUG(file, line, value)
++Required properties:
++- compatible : Should be "smsc,lan<model>", "smsc,lan9115"
++- reg : Address and length of the io space for SMSC LAN
++- interrupts : Should contain SMSC LAN interrupt line
++- interrupt-parent : Should be the phandle for the interrupt controller
++  that services interrupts for this device
++- phy-mode : String, operation mode of the PHY interface.
++  Supported values are: "mii", "gmii", "sgmii", "tbi", "rmii",
++  "rgmii", "rgmii-id", "rgmii-rxid", "rgmii-txid", "rtbi", "smii".
 +
-+#ifdef CONFIG_DEBUG_BUGVERBOSE
++Optional properties:
++- reg-shift : Specify the quantity to shift the register offsets by
++- reg-io-width : Specify the size (in bytes) of the IO accesses that
++  should be performed on the device.  Valid value for SMSC LAN is
++  2 or 4.  If it's omitted or invalid, the size would be 2.
++- smsc,irq-active-high : Indicates the IRQ polarity is active-low
++- smsc,irq-push-pull : Indicates the IRQ type is push-pull
++- smsc,force-internal-phy : Forces SMSC LAN controller to use
++  internal PHY
++- smsc,force-external-phy : Forces SMSC LAN controller to use
++  external PHY
++- smsc,save-mac-address : Indicates that mac address needs to be saved
++  before resetting the controller
++- local-mac-address : 6 bytes, mac address
 +
-+/*
-+ * The extra indirection is to ensure that the __FILE__ string comes through
-+ * OK. Many version of gcc do not support the asm %c parameter which would be
-+ * preferable to this unpleasantness. We use mergeable string sections to
-+ * avoid multiple copies of the string appearing in the kernel image.
-+ */
++Examples:
 +
-+#define __BUG(__file, __line, __value)				\
-+do {								\
-+	BUILD_BUG_ON(sizeof(struct bug_entry) != 12);		\
-+	asm volatile("1:\t" BUG_INSTR_TYPE #__value "\n"	\
-+		".pushsection .rodata.str, \"aMS\", %progbits, 1\n" \
-+		"2:\t.asciz " #__file "\n" 			\
-+		".popsection\n" 				\
-+		".pushsection __bug_table,\"a\"\n"		\
-+		"3:\t.word 1b, 2b\n"				\
-+		"\t.hword " #__line ", 0\n"			\
-+		".popsection");					\
-+	unreachable();						\
-+} while (0)
-+
-+#else  /* not CONFIG_DEBUG_BUGVERBOSE */
-+
-+#define __BUG(__file, __line, __value)				\
-+do {								\
-+	asm volatile(BUG_INSTR_TYPE #__value);			\
-+	unreachable();						\
-+} while (0)
-+#endif  /* CONFIG_DEBUG_BUGVERBOSE */
++lan9220 at f4000000 {
++	compatible = "smsc,lan9220", "smsc,lan9115";
++	reg = <0xf4000000 0x2000000>;
++	phy-mode = "mii";
++	interrupt-parent = <&gpio1>;
++	interrupts = <31>;
++	reg-io-width = <4>;
++	smsc,irq-push-pull;
++};
+diff --git a/drivers/net/smsc911x.c b/drivers/net/smsc911x.c
+index b9016a3..75c08a5 100644
+--- a/drivers/net/smsc911x.c
++++ b/drivers/net/smsc911x.c
+@@ -53,6 +53,10 @@
+ #include <linux/phy.h>
+ #include <linux/smsc911x.h>
+ #include <linux/device.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
++#include <linux/of_gpio.h>
++#include <linux/of_net.h>
+ #include "smsc911x.h"
  
- #define HAVE_ARCH_BUG
--#endif
-+#endif  /* CONFIG_BUG */
+ #define SMSC_CHIPNAME		"smsc911x"
+@@ -2095,8 +2099,58 @@ static const struct smsc911x_ops shifted_smsc911x_ops = {
+ 	.tx_writefifo = smsc911x_tx_writefifo_shift,
+ };
  
- #include <asm-generic/bug.h>
- 
-diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-index bc9f9da..7496924 100644
---- a/arch/arm/kernel/traps.c
-+++ b/arch/arm/kernel/traps.c
-@@ -21,6 +21,7 @@
- #include <linux/kdebug.h>
- #include <linux/module.h>
- #include <linux/kexec.h>
-+#include <linux/bug.h>
- #include <linux/delay.h>
- #include <linux/init.h>
- #include <linux/sched.h>
-@@ -270,6 +271,8 @@ void die(const char *str, struct pt_regs *regs, int err)
- 	spin_lock_irq(&die_lock);
- 	console_verbose();
- 	bust_spinlocks(1);
-+	if (!user_mode(regs))
-+		report_bug(regs->ARM_pc, regs);
- 	ret = __die(str, err, thread, regs);
- 
- 	if (regs && kexec_should_crash(thread->task))
-@@ -301,6 +304,24 @@ void arm_notify_die(const char *str, struct pt_regs *regs,
- 	}
- }
- 
-+#ifdef CONFIG_GENERIC_BUG
-+
-+int is_valid_bugaddr(unsigned long pc)
++#ifdef CONFIG_OF
++static int __devinit smsc911x_probe_config_dt(
++				struct smsc911x_platform_config *config,
++				struct device_node *np)
 +{
-+#ifdef CONFIG_THUMB2_KERNEL
-+	unsigned short bkpt;
-+#else
-+	unsigned long bkpt;
-+#endif
++	const char *mac;
++	u32 width = 0;
 +
-+	if (probe_kernel_address((unsigned *)pc, bkpt))
-+		return 0;
++	if (!np)
++		return -ENODEV;
 +
-+	return bkpt == BUG_INSTR_VALUE;
++	config->phy_interface = of_get_phy_mode(np);
++
++	mac = of_get_mac_address(np);
++	if (mac)
++		memcpy(config->mac, mac, ETH_ALEN);
++
++	of_property_read_u32(np, "reg-shift", &config->shift);
++
++	of_property_read_u32(np, "reg-io-width", &width);
++	if (width == 4)
++		config->flags |= SMSC911X_USE_32BIT;
++
++	if (of_get_property(np, "smsc,irq-active-high", NULL))
++		config->irq_polarity = SMSC911X_IRQ_POLARITY_ACTIVE_HIGH;
++
++	if (of_get_property(np, "smsc,irq-push-pull", NULL))
++		config->irq_type = SMSC911X_IRQ_TYPE_PUSH_PULL;
++
++	if (of_get_property(np, "smsc,force-internal-phy", NULL))
++		config->flags |= SMSC911X_FORCE_INTERNAL_PHY;
++
++	if (of_get_property(np, "smsc,force-external-phy", NULL))
++		config->flags |= SMSC911X_FORCE_EXTERNAL_PHY;
++
++	if (of_get_property(np, "smsc,save-mac-address", NULL))
++		config->flags |= SMSC911X_SAVE_MAC_ADDRESS;
++
++	return 0;
 +}
++#else
++static inline int smsc911x_probe_config_dt(
++				struct smsc911x_platform_config *config,
++				struct device_node *np)
++{
++	return -ENODEV;
++}
++#endif /* CONFIG_OF */
 +
-+#endif
-+
- static LIST_HEAD(undef_hook);
- static DEFINE_SPINLOCK(undef_lock);
- 
-@@ -706,16 +727,6 @@ baddataabort(int code, unsigned long instr, struct pt_regs *regs)
- 	arm_notify_die("unknown data abort code", regs, &info, instr, 0);
- }
- 
--void __attribute__((noreturn)) __bug(const char *file, int line)
--{
--	printk(KERN_CRIT"kernel BUG at %s:%d!\n", file, line);
--	*(int *)0 = 0;
--
--	/* Avoid "noreturn function does return" */
--	for (;;);
--}
--EXPORT_SYMBOL(__bug);
--
- void __readwrite_bug(const char *fn)
+ static int __devinit smsc911x_drv_probe(struct platform_device *pdev)
  {
- 	printk("%s called, but not implemented\n", fn);
-diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-index bf977f8..7b2541e 100644
---- a/arch/arm/kernel/vmlinux.lds.S
-+++ b/arch/arm/kernel/vmlinux.lds.S
-@@ -21,7 +21,8 @@
- #define ARM_CPU_KEEP(x)
++	struct device_node *np = pdev->dev.of_node;
+ 	struct net_device *dev;
+ 	struct smsc911x_data *pdata;
+ 	struct smsc911x_platform_config *config = pdev->dev.platform_data;
+@@ -2107,13 +2161,6 @@ static int __devinit smsc911x_drv_probe(struct platform_device *pdev)
+ 
+ 	pr_info("Driver version %s\n", SMSC_DRV_VERSION);
+ 
+-	/* platform data specifies irq & dynamic bus configuration */
+-	if (!pdev->dev.platform_data) {
+-		pr_warn("platform_data not provided\n");
+-		retval = -ENODEV;
+-		goto out_0;
+-	}
+-
+ 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
+ 					   "smsc911x-memory");
+ 	if (!res)
+@@ -2152,9 +2199,6 @@ static int __devinit smsc911x_drv_probe(struct platform_device *pdev)
+ 	irq_flags = irq_res->flags & IRQF_TRIGGER_MASK;
+ 	pdata->ioaddr = ioremap_nocache(res->start, res_size);
+ 
+-	/* copy config parameters across to pdata */
+-	memcpy(&pdata->config, config, sizeof(pdata->config));
+-
+ 	pdata->dev = dev;
+ 	pdata->msg_enable = ((1 << debug) - 1);
+ 
+@@ -2164,10 +2208,22 @@ static int __devinit smsc911x_drv_probe(struct platform_device *pdev)
+ 		goto out_free_netdev_2;
+ 	}
+ 
++	retval = smsc911x_probe_config_dt(&pdata->config, np);
++	if (retval && config) {
++		/* copy config parameters across to pdata */
++		memcpy(&pdata->config, config, sizeof(pdata->config));
++		retval = 0;
++	}
++
++	if (retval) {
++		SMSC_WARN(pdata, probe, "Error smsc911x config not found");
++		goto out_unmap_io_3;
++	}
++
+ 	/* assume standard, non-shifted, access to HW registers */
+ 	pdata->ops = &standard_smsc911x_ops;
+ 	/* apply the right access if shifting is needed */
+-	if (config->shift)
++	if (pdata->config.shift)
+ 		pdata->ops = &shifted_smsc911x_ops;
+ 
+ 	retval = smsc911x_init(dev);
+@@ -2314,6 +2370,12 @@ static const struct dev_pm_ops smsc911x_pm_ops = {
+ #define SMSC911X_PM_OPS NULL
  #endif
  
--#if defined(CONFIG_SMP_ON_UP) && !defined(CONFIG_DEBUG_SPINLOCK)
-+#if (defined(CONFIG_SMP_ON_UP) && !defined(CONFIG_DEBUG_SPINLOCK)) || \
-+	defined(CONFIG_GENERIC_BUG)
- #define ARM_EXIT_KEEP(x)	x
- #else
- #define ARM_EXIT_KEEP(x)
++static const struct of_device_id smsc911x_dt_ids[] = {
++	{ .compatible = "smsc,lan9115", },
++	{ /* sentinel */ }
++};
++MODULE_DEVICE_TABLE(of, smsc911x_dt_ids);
++
+ static struct platform_driver smsc911x_driver = {
+ 	.probe = smsc911x_drv_probe,
+ 	.remove = __devexit_p(smsc911x_drv_remove),
+@@ -2321,6 +2383,7 @@ static struct platform_driver smsc911x_driver = {
+ 		.name	= SMSC_CHIPNAME,
+ 		.owner	= THIS_MODULE,
+ 		.pm	= SMSC911X_PM_OPS,
++		.of_match_table = smsc911x_dt_ids,
+ 	},
+ };
+ 
 -- 
-1.7.3.1
+1.7.4.1
