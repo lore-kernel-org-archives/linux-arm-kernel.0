@@ -1,32 +1,85 @@
-From: joro@8bytes.org ('Joerg Roedel')
-Date: Fri, 29 Jul 2011 11:35:55 +0200
-Subject: [RFC] ARM: dma_map|unmap_sg plus iommu
-In-Reply-To: <000301cc4dc4$31b53630$951fa290$%szyprowski@samsung.com>
-References: <CAB-zwWjb+2ExjNDB3OtHmRmgaHMnO-VgEe9VZk_wU=ryrq_AGw@mail.gmail.com>
-	<000301cc4dc4$31b53630$951fa290$%szyprowski@samsung.com>
-Message-ID: <20110729093555.GA13522@8bytes.org>
+From: b32955@freescale.com (Huang Shijie)
+Date: Fri, 29 Jul 2011 17:49:48 +0800
+Subject: [PATCH v8 0/3] add the GPMI controller driver for IMX23/IMX28
+In-Reply-To: <CAHMSPgM5W8=mE4sRDGMMfo39fvThBo_jrdG8hyhJNQ_ceV=_pA@mail.gmail.com>
+References: <1311230846-26437-1-git-send-email-b32955@freescale.com>	<20110721215020.GA25344@pengutronix.de>	<4E28EEE1.2050008@freescale.com>	<20110722055731.GI26837@S2100-06.ap.freescale.net>	<4E292FCF.6010608@freescale.com>	<CAHMSPgMHrqWcJ=BThDLgQ=XyTBDCMvNS4SVjQWfk=Jf682TEig@mail.gmail.com>	<4E2F6F90.7030207@freescale.com>	<CAHMSPgPC4whyskfuFGeFd7WHx-=5htezWajm_rNi9Xa+03PV0A@mail.gmail.com>	<20018.24364.787244.956361@ipc1.ka-ro>
+	<CAHMSPgM5W8=mE4sRDGMMfo39fvThBo_jrdG8hyhJNQ_ceV=_pA@mail.gmail.com>
+Message-ID: <4E32823C.3060007@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 29, 2011 at 09:50:32AM +0200, Marek Szyprowski wrote:
-> On Thursday, July 28, 2011 11:10 PM Ramirez Luna, Omar wrote:
+? 2011?07?29? 15:40, Koen Beel ??:
+> Hi,
+>
+> On Fri, Jul 29, 2011 at 9:20 AM, Lothar Wa?mann<LW@karo-electronics.de>  wrote:
+>> Hi,
+>>
+>> Koen Beel writes:
+>>> Hi,
+>>>
+>>> I have test on mx23evk board. Still see the same issues.
+>>>
+>>> On Wed, Jul 27, 2011 at 3:53 AM, Huang Shijie<b32955@freescale.com>  wrote:
+>>>> Hi,
+>>>>
+>>>> Thanks for your test.
+>>>>
+>>>>> Hi,
+>>>>>
+>>>>> It's not really working for me.
+>>>>> I've applied all gpmi-nand driver patches and the dma driver patches.
+>>>>>
+>>>>> I have added following kernel parameters:
+>>>>> mtdparts=gpmi-nand:20m(boot),-(user) ubi.mtd=1 root=ubi0:rootfs0
+>>>>> rootfstype=ubifs gpmi_debug_init
+>>>>>
+>>>>> During boot I get already get DMA timeout:
+>>>>> [    2.560000] [ start_dma_without_bch_irq : 392 ] DMA timeout, last DMA
+>>>>> :1
+>>>>> [    3.560000] [ start_dma_with_bch_irq : 427 ] bch timeout!!!
+>>>>> ...
+>>>>> (see log file in attach line 89)
+>>> I still see this DMA timeout when booting.
+>>> What kernel parameters do you use? I still use same as above.
+>>>
+>> Do you have an SD card in the system? I'm getting the same error when
+>> accessing an SD card. Without SD card I can use the flash without any
+>> errors.
+> No SD card in the system. At least not on my mx23evk board.
+> My real target hardware has a SDIO wifi chip.
+Does it conflict with the GPMI?
+> Are you also testing on the mx23evk board? Really strange it is not
+> reproducible here then.
+> Anyone using mx23evk please give:
+I tested the code in mx23evk.
+After boot the kernel and login the shell, I met a problem:
+  the flash_eraseall can not run with the log:
+"Floating point exception"
+:(
 
-> > 2. tidspbridge driver sometimes needs to map a physical address into a
-> > fixed virtual address (i.e. the start of a firmware section is expected to
-> > be at dsp va 0x20000000), there is no straight forward way to do this with
-> > the dma api given that it only expects to receive a cpu_addr, a sg or a
-> > page, by adding iov_address I could pass phys and iov addresses in a sg
-> > and overcome this limitation, but, these addresses belong to:
-> 
-> We also encountered the problem of fixed firmware address. We addressed is by
-> setting io address space start to this address and letting device driver to
-> rely on the fact that the first call to dma_alloc() will match this address.
 
-This sounds rather hacky. How about partitioning the address space for
-the device and give the dma-api only a part of it. The other parts can
-be directly mapped using the iommu-api then.
+> - revision number of board (I have tested on rev C1)
+Revision number is C.
+> - kernel parameter used (see previous mail for mine)
+>
+"console=ttyAMA0,115200 root=/dev/mmcblk0p1 rw rootwait gpmi_debug_init"
 
-Regards,
 
-	Joerg
-1
+Best Regards
+Huang Shijie
+> Regards,
+> Koen
+>
+>>
+>> Lothar Wa?mann
+>> --
+>> ___________________________________________________________
+>>
+>> Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+>> Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+>> Gesch?ftsf?hrer: Matthias Kaussen
+>> Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+>>
+>> www.karo-electronics.de | info at karo-electronics.de
+>> ___________________________________________________________
+>>
