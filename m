@@ -1,60 +1,93 @@
-From: leoy@marvell.com (Leo Yan)
-Date: Fri, 29 Jul 2011 10:25:02 +0800
-Subject: [PATCH] lib/genalloc: fix gen_pool_virt_to_phys locking
-In-Reply-To: <CAMk6uBmE01EpAw3e8kB9v6tEkU0rAPqt8T7+k54QDzDxtDn7PQ@mail.gmail.com>
-References: <1311664741-21336-1-git-send-email-leoy@marvell.com>
-	<CAMk6uBmE01EpAw3e8kB9v6tEkU0rAPqt8T7+k54QDzDxtDn7PQ@mail.gmail.com>
-Message-ID: <4E3219FE.6020306@marvell.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Fri, 29 Jul 2011 10:36:26 +0800
+Subject: [PATCH] net/smsc911x: add device tree probe support
+In-Reply-To: <alpine.LFD.2.00.1107252222540.12766@xanadu.home>
+References: <1311587040-8988-1-git-send-email-shawn.guo@linaro.org>
+	<20110725213723.GI26735@ponder.secretlab.ca>
+	<20110726010154.GG21641@S2100-06.ap.freescale.net>
+	<alpine.LFD.2.00.1107252105561.12766@xanadu.home>
+	<20110726013026.GH21641@S2100-06.ap.freescale.net>
+	<alpine.LFD.2.00.1107252222540.12766@xanadu.home>
+Message-ID: <20110729023626.GB1946@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-real mz,
+On Mon, Jul 25, 2011 at 10:28:05PM -0400, Nicolas Pitre wrote:
+> On Tue, 26 Jul 2011, Shawn Guo wrote:
+> 
+> > On Mon, Jul 25, 2011 at 09:16:40PM -0400, Nicolas Pitre wrote:
+> > > On Tue, 26 Jul 2011, Shawn Guo wrote:
+> > > 
+> > > > On Mon, Jul 25, 2011 at 03:37:23PM -0600, Grant Likely wrote:
+> > > > > On Mon, Jul 25, 2011 at 05:44:00PM +0800, Shawn Guo wrote:
+> > > > > > It adds device tree probe support for smsc911x driver.
+> > > > > > 
+> > > > > > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > > > > > Cc: Grant Likely <grant.likely@secretlab.ca>
+> > > > > > Cc: Steve Glendinning <steve.glendinning@smsc.com>
+> > > > > > Cc: David S. Miller <davem@davemloft.net>
+> > > > > > ---
+> > > > > >  Documentation/devicetree/bindings/net/smsc.txt |   34 +++++++
+> > > > > >  drivers/net/smsc911x.c                         |  123 +++++++++++++++++++-----
+> > > > > >  2 files changed, 132 insertions(+), 25 deletions(-)
+> > > > > >  create mode 100644 Documentation/devicetree/bindings/net/smsc.txt
+> > > > > > 
+> > > > > > diff --git a/Documentation/devicetree/bindings/net/smsc.txt b/Documentation/devicetree/bindings/net/smsc.txt
+> > > > > > new file mode 100644
+> > > > > > index 0000000..1920695
+> > > > > > --- /dev/null
+> > > > > > +++ b/Documentation/devicetree/bindings/net/smsc.txt
+> > > > > > @@ -0,0 +1,34 @@
+> > > > > > +* Smart Mixed-Signal Connectivity (SMSC) LAN Controller
+> > > > > > +
+> > > > > > +Required properties:
+> > > > > > +- compatible : Should be "smsc,lan<model>""smsc,lan"
+> > > > > 
+> > > > > Drop "smsc,lan".  That's far too generic.
+> > > > > 
+> > > > The following devices are supported by the driver.
+> > > > 
+> > > > LAN9115, LAN9116, LAN9117, LAN9118
+> > > > LAN9215, LAN9216, LAN9217, LAN9218
+> > > > LAN9210, LAN9211
+> > > > LAN9220, LAN9221
+> > > > 
+> > > > If we only keep specific <model> as the compatible, we will have a
+> > > > long match table which is actually used nowhere to distinguish the
+> > > > device.
+> > > > 
+> > > > So we need some level generic compatible to save the meaningless
+> > > > long match table.  What about: 
+> > > > 
+> > > > static const struct of_device_id smsc_dt_ids[] = {
+> > > >         { .compatible = "smsc,lan9", },
+> > > >         { /* sentinel */ }
+> > > > };
+> > > > 
+> > > > Or:
+> > > > 
+> > > > static const struct of_device_id smsc_dt_ids[] = {
+> > > >         { .compatible = "smsc,lan91", },
+> > > >         { .compatible = "smsc,lan92", },
+> > > >         { /* sentinel */ }
+> > > > };
+> > > 
+> > > None of this unambiguously distinguish the devices supported by this 
+> > > driver and the smc91x driver which supports LAN91C92, LAN91C94, 
+> > > LAN91C95, LAN91C96, LAN91C100, LAN91C110.
+> > > 
+> > So you suggest to make a long list to explicitly tell the device type
+> > that the driver supports?
+> 
+> I'm not suggesting anything.  :-)  I'm merely pointing out that the 
+> above .compatible = "smsc,lan9" or .compatible = "smsc,lan91" are too 
+> generic given that there is another driver with different devices to 
+> which they could also apply.
+> 
+Since I do not get any suggestion here, I'm going to follow the driver
+name to use '911' as the model number.  Please tell me if there is any
+better one.
 
-You are right. :-) it's long time not see you guy.
-For i am developed based on mainline, so if without this
-patch, then the kernel will panic.
-
-Best regards,
-Leo Yan
-
-
-On 2011?07?28? 18:39, real mz wrote:
-> this fix seems already on next tree
->
-> http://git.kernel.org/?p=linux/kernel/git/next/linux-next.git;a=blob;f=lib/genalloc.c;h=f352cc42f4f8a58b8e4c8304de32cb31b4e29b67;hb=HEAD
->
->
-> On Tue, Jul 26, 2011 at 3:19 PM, Leo Yan<leoy@marvell.com>  wrote:
->> The func gen_pool_virt_to_phys will iterate the chunk list;
->> if find the correct chunk it should need release pool's lock.
->>
->> Signed-off-by: Leo Yan<leoy@marvell.com>
->> ---
->>   lib/genalloc.c |    4 +++-
->>   1 files changed, 3 insertions(+), 1 deletions(-)
->>
->> diff --git a/lib/genalloc.c b/lib/genalloc.c
->> index 577ddf8..e625df5 100644
->> --- a/lib/genalloc.c
->> +++ b/lib/genalloc.c
->> @@ -92,8 +92,10 @@ phys_addr_t gen_pool_virt_to_phys(struct gen_pool *pool, unsigned long addr)
->>         list_for_each(_chunk,&pool->chunks) {
->>                 chunk = list_entry(_chunk, struct gen_pool_chunk, next_chunk);
->>
->> -               if (addr>= chunk->start_addr&&  addr<  chunk->end_addr)
->> +               if (addr>= chunk->start_addr&&  addr<  chunk->end_addr) {
->> +                       read_unlock(&pool->lock);
->>                         return chunk->phys_addr + addr - chunk->start_addr;
->> +               }
->>         }
->>         read_unlock(&pool->lock);
->>
->> --
->> 1.7.4.1
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
+-- 
+Regards,
+Shawn
