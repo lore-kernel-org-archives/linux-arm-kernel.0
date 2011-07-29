@@ -1,65 +1,98 @@
-From: bengardiner@nanometrics.ca (Ben Gardiner)
-Date: Fri, 29 Jul 2011 10:42:36 -0400
-Subject: [PATCH v2 2/6] arm: davinci: Explicitly set channel controllers'
-	default queues
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024DD2CEA5@dbde02.ent.ti.com>
-References: <1310303679-17936-1-git-send-email-ido@wizery.com>
-	<1310303679-17936-3-git-send-email-ido@wizery.com>
-	<B85A65D85D7EB246BE421B3FB0FBB593024DD2CE05@dbde02.ent.ti.com>
-	<4E2D70B9.7060202@mvista.com>
-	<B85A65D85D7EB246BE421B3FB0FBB593024DD2CEA5@dbde02.ent.ti.com>
-Message-ID: <CAPcSpEJRjE-vD3XaTcVBUoBH_Ud+gBMgBSd=F0S1ON6cUy0vvg@mail.gmail.com>
+From: koen.beel.barco@gmail.com (Koen Beel)
+Date: Fri, 29 Jul 2011 17:00:48 +0200
+Subject: [PATCH v8 0/3] add the GPMI controller driver for IMX23/IMX28
+In-Reply-To: <20018.43621.688990.319528@ipc1.ka-ro>
+References: <1311230846-26437-1-git-send-email-b32955@freescale.com>
+	<20110721215020.GA25344@pengutronix.de>
+	<4E28EEE1.2050008@freescale.com>
+	<20110722055731.GI26837@S2100-06.ap.freescale.net>
+	<4E292FCF.6010608@freescale.com>
+	<CAHMSPgMHrqWcJ=BThDLgQ=XyTBDCMvNS4SVjQWfk=Jf682TEig@mail.gmail.com>
+	<4E2F6F90.7030207@freescale.com>
+	<CAHMSPgPC4whyskfuFGeFd7WHx-=5htezWajm_rNi9Xa+03PV0A@mail.gmail.com>
+	<20018.24364.787244.956361@ipc1.ka-ro>
+	<CAHMSPgM5W8=mE4sRDGMMfo39fvThBo_jrdG8hyhJNQ_ceV=_pA@mail.gmail.com>
+	<20018.43621.688990.319528@ipc1.ka-ro>
+Message-ID: <CAHMSPgPXnDVO630P9fnogQ0XvPSrwz0MYzXfXZLJoJNRf1gifA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 25, 2011 at 12:31 PM, Nori, Sekhar <nsekhar@ti.com> wrote:
-> Hi Sergei,
+On Fri, Jul 29, 2011 at 2:41 PM, Lothar Wa?mann <LW@karo-electronics.de> wrote:
+> Hi,
 >
-> On Mon, Jul 25, 2011 at 19:03:45, Sergei Shtylyov wrote:
->> Hello.
+> Koen Beel writes:
+>> Hi,
 >>
->> Nori, Sekhar wrote:
+>> On Fri, Jul 29, 2011 at 9:20 AM, Lothar Wa?mann <LW@karo-electronics.de> wrote:
+>> > Hi,
+>> >
+>> > Koen Beel writes:
+>> >> Hi,
+>> >>
+>> >> I have test on mx23evk board. Still see the same issues.
+>> >>
+>> >> On Wed, Jul 27, 2011 at 3:53 AM, Huang Shijie <b32955@freescale.com> wrote:
+>> >> > Hi,
+>> >> >
+>> >> > Thanks for your test.
+>> >> >
+>> >> >> Hi,
+>> >> >>
+>> >> >> It's not really working for me.
+>> >> >> I've applied all gpmi-nand driver patches and the dma driver patches.
+>> >> >>
+>> >> >> I have added following kernel parameters:
+>> >> >> mtdparts=gpmi-nand:20m(boot),-(user) ubi.mtd=1 root=ubi0:rootfs0
+>> >> >> rootfstype=ubifs gpmi_debug_init
+>> >> >>
+>> >> >> During boot I get already get DMA timeout:
+>> >> >> [ ? ?2.560000] [ start_dma_without_bch_irq : 392 ] DMA timeout, last DMA
+>> >> >> :1
+>> >> >> [ ? ?3.560000] [ start_dma_with_bch_irq : 427 ] bch timeout!!!
+>> >> >> ...
+>> >> >> (see log file in attach line 89)
+>> >>
+>> >> I still see this DMA timeout when booting.
+>> >> What kernel parameters do you use? I still use same as above.
+>> >>
+>> > Do you have an SD card in the system? I'm getting the same error when
+>> > accessing an SD card. Without SD card I can use the flash without any
+>> > errors.
 >>
->> >> Davinci platforms may define a default queue for each channel
->> >> controller. If one is not defined, the default queue is set to EVENTQ_1.
->> >> However, there's no way to distinguish between an unset default queue to
->> >> one that is set to EVENTQ_0, as EVENTQ_0 = 0.
+>> No SD card in the system. At least not on my mx23evk board.
+>> My real target hardware has a SDIO wifi chip.
 >>
->> >> Explicitly specify the default queue for all channel controllers on all
->> >> Davinci platforms to EVENTQ_1, and don't overwrite it in the EDMA probe
->> >> function.
+>> Are you also testing on the mx23evk board? Really strange it is not
+>> reproducible here then.
+>> Anyone using mx23evk please give:
+>> - revision number of board (I have tested on rev C1)
+>> - kernel parameter used (see previous mail for mine)
 >>
->> >> One exception is the DA850 board, for which EVENTQ_1 is not a valid
->> >> option for its second channel controller. Use EVENTQ_0 instead for that
->> >> channel controller.
->>
->> >> Signed-off-by: Ido Yariv <ido@wizery.com>
->>
->> > Looks good to me. Will queue for v3.2/fixes
->>
->> ? ? Why wait for 3.2? If this is considered a fix, it should be applied to 3.1, no?
+> It's getting ever more strange. I only have problems with concurrent
+> access to the flash and SD-card when I do file system based accessed
+> to the SD card.
+> A 'dd if=/dev/mmcblk0 of=/dev/null' while excessively using the flash
+> works well, while mounting the SD card and doing an 'ls' produces
+> immediate BCH DMA timeouts.
 >
-> 3.2/fixes just indicates it will be queued as a fix/cleanup
-> for 3.2 so it will have higher priority for merge when compared
-> to a new feature.
+> Perhaps someone can make anything out of that.
+
+I have checked and the function dma_irq_callback is never called
+during my tests. This means the DMA transfer does not even works once.
+
+Also no clue here ...
+
 >
-> This patch doesn't really fix any existing broken functionality.
-> It corrects event queue configuration for EDMA CC1 on DA850 for
-> which there are no current users in mainline.
 >
-> So, not sending for v3.1.
-
-If it's not too late:
-
-Tested this patch and it fixes SD/MMC1 support on da850.
-
-Tested-by: Ben Gardiner <bengardiner@nanometrics.ca>
-
-Thanks, Ido!
-
-Best Regards,
-Ben Gardiner
-
----
-Nanometrics Inc.
-http://www.nanometrics.ca
+> Lothar Wa?mann
+> --
+> ___________________________________________________________
+>
+> Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+> Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+> Gesch?ftsf?hrer: Matthias Kaussen
+> Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+>
+> www.karo-electronics.de | info at karo-electronics.de
+> ___________________________________________________________
+>
