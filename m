@@ -1,32 +1,80 @@
-From: viresh.kumar@st.com (viresh kumar)
-Date: Fri, 29 Jul 2011 16:53:52 +0530
-Subject: [PATCH 00/18] dmaengine/amba-pl08x updates
-In-Reply-To: <20110729111920.GK25640@n2100.arm.linux.org.uk>
-References: <cover.1311936523.git.viresh.kumar@st.com>
-	<20110729105759.GE25640@n2100.arm.linux.org.uk>
-	<4E329616.2030505@st.com>
-	<20110729111920.GK25640@n2100.arm.linux.org.uk>
-Message-ID: <4E329848.7070606@st.com>
+From: shubhrajyoti@ti.com (Shubhrajyoti)
+Date: Fri, 29 Jul 2011 16:57:44 +0530
+Subject: [PATCHV2 3/5] OMAP: I2C: Remove the reset in the init path
+In-Reply-To: <4E280D0B.1040701@ti.com>
+References: <1311246554-22975-1-git-send-email-shubhrajyoti@ti.com>
+	<1311246554-22975-4-git-send-email-shubhrajyoti@ti.com>
+	<4E280D0B.1040701@ti.com>
+Message-ID: <4E329930.4040301@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/29/2011 04:49 PM, Russell King - ARM Linux wrote:
-> Ok, so lets have the driver explicitly enforce one SG entry if peripheral
-> flow is set.  It would also be a good idea to pass not zero length, but
-> the real transfer size in the SG entry for the sake of having the API
-> know the full information about the transfer.
+On Thursday 21 July 2011 04:57 PM, Santosh Shilimkar wrote:
+Thanks for your review.
+> On 7/21/2011 4:39 PM, Shubhrajyoti D wrote:
+>
+<snip>
+>> +        /*
+>> +         * Enabling all wakup sources to stop I2C freezing on
+>> +         * WFI instruction.
+>> +         * REVISIT: Some wkup sources might not be needed.
+>> +         */
+> Surely not related to your patch. But the 'REVISIT:' caught
+> my attention. Is the comment still valid.
 
-In my case, JPEG driver doesn't know how much data to transfer. So i have to
-send zero from there. Also, i am not sure why would peripheral needs to be
-flow controller if the peripherals driver already know how much to transfer?
+Yes I will look and optimise the settings. Obviously all of them may not 
+be needed.
+Will get back on this.
 
-> 
-> (Ok, it already only supports one SG entry, but that's something else
-> which needs fixing - which may be possible now that you've cleaned up
-> the LLI creation code.)
-> .
+Also I see that we are not writing it for " < OMAP_I2C_REV_ON_3530_4430"
+I will send a patch correcting the same.
 
-Yes. I cleaned it up.
-
--- 
-viresh
+>
+>> +        dev->westate = OMAP_I2C_WE_ALL;
+>> +        if (dev->rev<  OMAP_I2C_REV_ON_3530_4430)
+> Space if (dev->rev <  OMAP_I2C_REV_ON_3530_4430)
+>> +            omap_i2c_write_reg(dev, OMAP_I2C_WE_REG,
+>> +                            dev->westate);
+>>       }
+>>       omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
+>>
+>> @@ -612,6 +572,11 @@ static int omap_i2c_xfer_msg(struct i2c_adapter 
+>> *adap,
+>>           return r;
+>>       if (r == 0) {
+>>           dev_err(dev->dev, "controller timed out\n");
+>> +        if (dev->device_reset != NULL) {
+>> +            r = dev->device_reset(dev->dev);
+>> +            if (r<  0)
+> ditto
+>> +                dev_err(dev->dev, "reset failed\n");
+>> +        }
+>>           omap_i2c_init(dev);
+>>           return -ETIMEDOUT;
+>>       }
+>> @@ -622,6 +587,11 @@ static int omap_i2c_xfer_msg(struct i2c_adapter 
+>> *adap,
+>>       /* We have an error */
+>>       if (dev->cmd_err&  (OMAP_I2C_STAT_AL | OMAP_I2C_STAT_ROVR |
+> You can fix this one as well.
+>>                   OMAP_I2C_STAT_XUDF)) {
+>> +        if (dev->device_reset != NULL) {
+>> +            r = dev->device_reset(dev->dev);
+>> +            if (r<  0)
+> here too.
+>> +                dev_err(dev->dev, "reset failed\n");
+>> +        }
+>>           omap_i2c_init(dev);
+>>           return -EIO;
+>>       }
+>> @@ -1024,6 +994,7 @@ omap_i2c_probe(struct platform_device *pdev)
+>>       if (pdata != NULL) {
+>>           speed = pdata->clkrate;
+>>           dev->set_mpu_wkup_lat = pdata->set_mpu_wkup_lat;
+>> +        dev->device_reset = pdata->device_reset;
+>>       } else {
+>>           speed = 100;    /* Default speed */
+>>           dev->set_mpu_wkup_lat = NULL;
+>
+> Regards
+> Santosh
