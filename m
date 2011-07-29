@@ -1,153 +1,516 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 29 Jul 2011 10:40:45 -0600
-Subject: [PATCH v2 2/7] ARM: mmp: parse timer configuration from DT
-In-Reply-To: <1311835293-18125-3-git-send-email-haojian.zhuang@marvell.com>
+Date: Fri, 29 Jul 2011 10:42:18 -0600
+Subject: [PATCH v2 3/7] ARM: mmp: support DT on both dkb and brownstone
+In-Reply-To: <1311835293-18125-4-git-send-email-haojian.zhuang@marvell.com>
 References: <1311835293-18125-1-git-send-email-haojian.zhuang@marvell.com>
 	<1311835293-18125-2-git-send-email-haojian.zhuang@marvell.com>
 	<1311835293-18125-3-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <20110729164045.GK11164@ponder.secretlab.ca>
+	<1311835293-18125-4-git-send-email-haojian.zhuang@marvell.com>
+Message-ID: <20110729164218.GL11164@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 28, 2011 at 02:41:28PM +0800, Haojian Zhuang wrote:
-> Parse timer configuration from DT. Now we can merge pxa910_timer and
-> mmp2_timer into mmp_timer. Since most configuration between these two
-> timers are same. The difference is recorded in DT.
+On Thu, Jul 28, 2011 at 02:41:29PM +0800, Haojian Zhuang wrote:
+> Add new boards.c to support both TTC-DKB and MMP2-BROWNSTONE. If CONFIG_OF
+> isn't selected, we continue to use original ttc_dkb.c and brownstone.c.
+> 
+> While everything moving to DT in ARCH-MMP, ttc_dkb.c and brownstone.c
+> will be abandoned.
 > 
 > Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
 > ---
->  .../devicetree/bindings/arm/marvell/timer.txt      |   24 +++++++++
->  arch/arm/mach-mmp/common.h                         |    2 +
->  arch/arm/mach-mmp/time.c                           |   50 +++++++++++++++++++-
->  3 files changed, 75 insertions(+), 1 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/arm/marvell/timer.txt
+>  .../devicetree/bindings/arm/marvell/boards.txt     |    7 +
+>  arch/arm/boot/dts/mmp2-brownstone.dts              |  216 ++++++++++++++++++++
+>  arch/arm/boot/dts/pxa910-dkb.dts                   |   81 ++++++++
+>  arch/arm/mach-mmp/Makefile                         |    1 +
+>  arch/arm/mach-mmp/boards.c                         |  138 +++++++++++++
+>  5 files changed, 443 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/arm/marvell/boards.txt
+>  create mode 100644 arch/arm/boot/dts/mmp2-brownstone.dts
+>  create mode 100644 arch/arm/boot/dts/pxa910-dkb.dts
+>  create mode 100644 arch/arm/mach-mmp/boards.c
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/marvell/timer.txt b/Documentation/devicetree/bindings/arm/marvell/timer.txt
+> diff --git a/Documentation/devicetree/bindings/arm/marvell/boards.txt b/Documentation/devicetree/bindings/arm/marvell/boards.txt
 > new file mode 100644
-> index 0000000..24a6f97
+> index 0000000..a031a26
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/marvell/timer.txt
-> @@ -0,0 +1,24 @@
-> +* Timer Controller Binding for ARCH-MMP
+> +++ b/Documentation/devicetree/bindings/arm/marvell/boards.txt
+> @@ -0,0 +1,7 @@
+> +TTC(pxa910) "DKB" evalutation board
+> +Required root node properties:
+> +	- compatible = "mrvl,pxa910-dkb", "mrvl,pxa910";
 > +
-> +This binding specifies what properties must be available in device tree
-> +representation of an ARCH-MMP compliant timer controller.
+> +mmp2(armada610) "Brownstone" evalutation board
+> +Required root node properties:
+> +	- compatible = "mrvl,mmp2-brownstone", "mrvl,mmp2";
+> diff --git a/arch/arm/boot/dts/mmp2-brownstone.dts b/arch/arm/boot/dts/mmp2-brownstone.dts
+> new file mode 100644
+> index 0000000..2673282
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/mmp2-brownstone.dts
+> @@ -0,0 +1,216 @@
+> +/dts-v1/;
 > +
-> +Required properties:
+> +/include/ "skeleton.dtsi"
 > +
-> +	- compatible: Specifies the compatibility list of the timer controller.
-> +	  The type shall be <string> and the value shall be
-> +	  "mrvl,pxa168-timer".
+> +/ {
+> +	model = "Marvell MMP2 Brownstone";
+> +	compatible = "mrvl,mmp2-brownstone", "mrvl,mmp2";
+> +	#address-cells = <1>;
+> +	#size-cells = <1>;
+> +	interrupt-parent = <&mmp_intc>;
 > +
-> +	- mrvl,clk-conf: Specifies the address and value of timer 
-> +	  configuration register.
-> +	  The type shall be <prop-encoded-array>. The first value indicates
-> +	  the physical address of timer configuration register. The second
-> +	  value indicates data should be written to timer configuration
-> +	  register.
-> +
-> +* Example
-> +
-> +	mmp_timer: {
-> +		compatible = "mrvl,pxa168-timer";
-> +		mrvl,clk-conf = <0xd4000034 0x33>;
+> +	memory {
+> +		reg = <0x00000000 0x20000000>;
 > +	};
-> diff --git a/arch/arm/mach-mmp/common.h b/arch/arm/mach-mmp/common.h
-> index 1c563c2..890c664 100644
-> --- a/arch/arm/mach-mmp/common.h
-> +++ b/arch/arm/mach-mmp/common.h
-> @@ -2,6 +2,8 @@
->  
->  struct sys_timer;
->  
-> +extern struct sys_timer mmp_timer;
 > +
->  extern void timer_init(int irq);
+> +	chosen {
+> +		bootargs = "console=ttyS2,38400 root=/dev/nfs nfsroot=192.168.1.100:192.168.1.101::255.255.255.0::eth0:on";
+> +		linux,stdout-path = &uart2;
+> +	};
+> +
+> +	soc at d4000000 {
+> +		compatible = "mrvl,mmp2", "mrvl,armada610", "simple-bus";
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges;
+> +
+> +		mmp_intc: interrupt-controller at d4282000 {
+> +			compatible = "mrvl,pxa168-intc";
+> +			/* reg: <offset & size> */
+> +			reg = <0xd4282000 0x400>;
+> +
+> +			#interrupt-cells = <1>;
+> +			interrupt-controller;
+> +			mrvl,intc-numbers = <64>;
+> +			/* priority bits in conf register */
+> +			mrvl,intc-priority = <0x20>;
+> +		};
+> +
+> +		mux_intc4: interrupt-controller at d4282150 {
+> +			compatible = "mrvl,mmp2-mux-intc";
+> +			reg = <0xd4282150 0>;
+> +
+> +			#interrupt-cells = <1>;
+> +			interrupt-controller;
+> +			interrupts = <4>;
+> +			mrvl,intc-numbers = <2>;
+> +			mrvl,status-offset = <0x150>;
+> +			mrvl,mask-offset = <0x168>;
+> +			/* mfp register & interrupt index */
+> +			mrvl,mfp-edge = <0xd401e2c4 1>;
+> +		};
+> +
+> +		mux_intc5: interrupt-controller at d4282154 {
+> +			compatible = "mrvl,mmp2-mux-intc";
+> +			reg = <0xd4282154 0>;
+> +
+> +			#interrupt-cells = <1>;
+> +			interrupt-controller;
+> +			interrupts = <5>;
+> +			mrvl,intc-numbers = <2>;
+> +			mrvl,status-offset = <0x154>;
+> +			mrvl,mask-offset = <0x16c>;
+> +		};
+> +
+> +		mux_intc9: interrupt-controller at d4282180 {
+> +			compatible = "mrvl,mmp2-mux-intc";
+> +			reg = <0xd4282180 0>;
+> +
+> +			#interrupt-cells = <1>;
+> +			interrupt-controller;
+> +			interrupts = <9>;
+> +			mrvl,intc-numbers = <3>;
+> +			mrvl,status-offset = <0x180>;
+> +			mrvl,mask-offset = <0x17c>;
+> +		};
+> +
+> +		mux_intc17: interrupt-controller at d4282158 {
+> +			compatible = "mrvl,mmp2-mux-intc";
+> +			reg = <0xd4282158 0>;
+> +
+> +			#interrupt-cells = <1>;
+> +			interrupt-controller;
+> +			interrupts = <17>;
+> +			mrvl,intc-numbers = <5>;
+> +			mrvl,status-offset = <0x158>;
+> +			mrvl,mask-offset = <0x170>;
+> +		};
+> +
+> +		mux_intc35: interrupt-controller at d428215c {
+> +			compatible = "mrvl,mmp2-mux-intc";
+> +			reg = <0xd428215c 0>;
+> +
+> +			#interrupt-cells = <1>;
+> +			interrupt-controller;
+> +			interrupts = <35>;
+> +			mrvl,intc-numbers = <15>;
+> +			mrvl,status-offset = <0x15c>;
+> +			mrvl,mask-offset = <0x174>;
+> +		};
+> +
+> +		mux_intc51: interrupt-controller at d4282160 {
+> +			compatible = "mrvl,mmp2-mux-intc";
+> +			reg = <0xd4282160 0>;
+> +
+> +			#interrupt-cells = <1>;
+> +			interrupt-controller;
+> +			interrupts = <51>;
+> +			mrvl,intc-numbers = <2>;
+> +			mrvl,status-offset = <0x160>;
+> +			mrvl,mask-offset = <0x178>;
+> +		};
+> +
+> +		mux_intc55: interrupt-controller at d4282188 {
+> +			compatible = "mrvl,mmp2-mux-intc";
+> +			reg = <0xd4282188 0>;
+> +
+> +			#interrupt-cells = <1>;
+> +			interrupt-controller;
+> +			interrupts = <55>;
+> +			mrvl,intc-numbers = <2>;
+> +			mrvl,status-offset = <0x188>;
+> +			mrvl,mask-offset = <0x184>;
+> +		};
+> +
+> +		mmp_timer: timer at 0 {
+> +			compatible = "mrvl,pxa168-timer";
+> +			interrupts = <13>;
+> +			mrvl,clk-conf = <0xd4000024 0x13>;
+> +		};
+> +
+> +		i2c0: i2c at d4011000 {
+> +			compatible = "mrvl,pxa255-i2c";
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			reg = <0xd4011000 0x60>;
+> +			interrupts = <7>;
+> +			mrvl,i2c-frequency = "fast";
+> +		};
+> +
+> +		i2c1: i2c at d4031000 {
+> +			compatible = "mrvl,pxa255-i2c";
+> +			reg = <0xd4031000 0x60>;
+> +			interrupts = <0>;
+> +			interrupt-parent = <&mux_intc17>;
+> +			mrvl,i2c-frequency = "fast";
+> +		};
+> +
+> +		i2c2: i2c at d4032000 {
+> +			compatible = "mrvl,pxa255-i2c";
+> +			reg = <0xd4032000 0x60>;
+> +			interrupts = <1>;
+> +			interrupt-parent = <&mux_intc17>;
+> +			mrvl,i2c-frequency = "fast";
+> +		};
+> +
+> +		i2c3: i2c at d4033000 {
+> +			compatible = "mrvl,pxa255-i2c";
+> +			reg = <0xd4033000 0x60>;
+> +			interrupts = <2>;
+> +			interrupt-parent = <&mux_intc17>;
+> +			mrvl,i2c-frequency = "fast";
+> +		};
+> +
+> +		i2c4: i2c at d4033800 {
+> +			compatible = "mrvl,pxa255-i2c";
+> +			reg = <0xd4033800 0x60>;
+> +			interrupts = <3>;
+> +			interrupt-parent = <&mux_intc17>;
+> +			mrvl,i2c-frequency = "fast";
+> +		};
+> +
+> +		i2c5: i2c at d4034000 {
+> +			compatible = "mrvl,pxa255-i2c";
+> +			reg = <0xd4034000 0x60>;
+> +			interrupts = <4>;
+> +			interrupt-parent = <&mux_intc17>;
+> +			mrvl,i2c-frequency = "fast";
+> +		};
+> +
+> +		uart0: uart at d4030000 {
+> +			compatible = "mrvl,pxa270-serial";
+> +			reg = <0xd4030000 0x1000>;
+> +			reg-shift = <2>;
+> +			interrupts = <27>;
+> +			clock-frequency = <26000000>;
+> +			current-speed = <115200>;
+> +		};
+> +
+> +		uart1: uart at d4017000 {
+> +			compatible = "mrvl,pxa270-serial";
+> +			reg = <0xd4017000 0x1000>;
+> +			reg-shift = <2>;
+> +			interrupts = <28>;
+> +			clock-frequency = <26000000>;
+> +			current-speed = <115200>;
+> +		};
+> +
+> +		uart2: uart at d4018000 {
+> +			compatible = "mrvl,pxa270-serial";
+> +			reg = <0xd4018000 0x1000>;
+> +			reg-shift = <2>;
+> +			interrupts = <24>;
+> +			clock-frequency = <26000000>;
+> +			current-speed = <38400>;
+> +		};
+> +
+> +		uart3: uart at d4016000 {
+> +			compatible = "mrvl,pxa270-serial";
+> +			reg = <0xd4016000 0x1000>;
+> +			reg-shift = <2>;
+> +			interrupts = <46>;
+> +			clock-frequency = <26000000>;
+> +			current-speed = <115200>;
+> +		};
+> +	};
+> +};
+> diff --git a/arch/arm/boot/dts/pxa910-dkb.dts b/arch/arm/boot/dts/pxa910-dkb.dts
+> new file mode 100644
+> index 0000000..b9f75b7
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/pxa910-dkb.dts
+> @@ -0,0 +1,81 @@
+> +/dts-v1/;
+> +
+> +/include/ "skeleton.dtsi"
+> +
+> +/ {
+> +	model = "Marvell TTC DKB";
+> +	compatible = "mrvl,pxa910-dkb", "mrvl,pxa910";
+> +	#address-cells = <1>;
+> +	#size-cells = <1>;
+> +	interrupt-parent = <&mmp_intc>;
+> +
+> +	memory {
+> +		reg = <0x00000000 0x20000000>;
+> +	};
+> +
+> +	chosen {
+> +		bootargs = "console=ttyS0,115200 root=/dev/nfs nfsroot=192.168.1.100:192.168.1.101::255.255.255.0::eth0:on";
+> +		linux,stdout-path = &uart0;
+> +	};
+> +
+> +	soc at d4000000 {
+> +		compatible = "mrvl,pxa910", "simple-bus";
+> +		device_type = "soc";
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges = <0xd4000000 0xd4000000 0x00200000	/* APB */
+> +			0xd4200000 0xd4200000 0x00200000>;	/* AXI */
+> +
+> +		mmp_intc: interrupt-controller at d4282000 {
+> +			compatible = "mrvl,pxa168-intc";
+> +			/* reg: <offset & size> */
+> +			reg = <0xd4282000 0x400>;
+> +
+> +			#interrupt-cells = <1>;
+> +			interrupt-controller;
+> +			mrvl,intc-numbers = <64>;
+> +			/* priority bits in conf register */
+> +			mrvl,intc-priority = <0x51>;
+> +		};
+> +
+> +		mmp_timer: timer at 0 {
+> +			compatible = "mrvl,pxa168-timer";
+> +			interrupts = <13>;
+> +			mrvl,clk-conf = <0xd4000034 0x33>;
+> +		};
+> +
+> +		i2c0: i2c at d4011000 {
+> +			compatible = "mrvl,pxa255-i2c";
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			reg = <0xd4011000 0x60>;
+> +			interrupts = <7>;
+> +			mrvl,i2c-frequency = "fast";
+> +		};
+> +
+> +		i2c1: i2c at d4037000 {
+> +			compatible = "mrvl,pxa255-i2c";
+> +			reg = <0xd4037000 0x60>;
+> +			interrupts = <54>;
+> +			mrvl,i2c-frequency = "fast";
+> +		};
+> +
+> +		uart0: uart at d4017000 {
+> +			compatible = "mrvl,pxa270-serial";
+> +			reg = <0xd4017000 0x1000>;
+> +			reg-shift = <2>;
+> +			interrupts = <27>;
+> +			clock-frequency = <14745600>;
+> +			current-speed = <115200>;
+> +		};
+> +
+> +		uart1: uart at d4018000 {
+> +			compatible = "mrvl,pxa270-serial";
+> +			reg = <0xd4018000 0x1000>;
+> +			reg-shift = <2>;
+> +			interrupts = <28>;
+> +			clock-frequency = <14745600>;
+> +			current-speed = <115200>;
+> +		};
+> +	};
+> +};
+> diff --git a/arch/arm/mach-mmp/Makefile b/arch/arm/mach-mmp/Makefile
+> index e7862ea..bdf5b23 100644
+> --- a/arch/arm/mach-mmp/Makefile
+> +++ b/arch/arm/mach-mmp/Makefile
+> @@ -12,6 +12,7 @@ obj-$(CONFIG_CPU_PXA910)	+= pxa910.o irq-pxa168.o
+>  obj-$(CONFIG_CPU_MMP2)		+= mmp2.o irq-mmp2.o
 >  
->  extern void __init icu_init_irq(void);
-> diff --git a/arch/arm/mach-mmp/time.c b/arch/arm/mach-mmp/time.c
-> index 99833b9..5a90b27 100644
-> --- a/arch/arm/mach-mmp/time.c
-> +++ b/arch/arm/mach-mmp/time.c
-> @@ -25,6 +25,8 @@
->  
->  #include <linux/io.h>
->  #include <linux/irq.h>
+>  # board support
+> +obj-$(CONFIG_OF)		+= boards.o
+>  obj-$(CONFIG_MACH_ASPENITE)	+= aspenite.o
+>  obj-$(CONFIG_MACH_ZYLONITE2)	+= aspenite.o
+>  obj-$(CONFIG_MACH_AVENGERS_LITE)+= avengers_lite.o
+> diff --git a/arch/arm/mach-mmp/boards.c b/arch/arm/mach-mmp/boards.c
+> new file mode 100644
+> index 0000000..13e61fb
+> --- /dev/null
+> +++ b/arch/arm/mach-mmp/boards.c
+> @@ -0,0 +1,138 @@
+> +/*
+> + *  linux/arch/arm/mach-mmp/boards.c
+> + *
+> + *  Support for the Multiple Marvell Development Platforms.
+> + *
+> + *  Copyright (C) 2009-2011 Marvell International Ltd.
+> + *
+> + *  This program is free software; you can redistribute it and/or modify
+> + *  it under the terms of the GNU General Public License version 2 as
+> + *  publishhed by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/init.h>
+> +#include <linux/kernel.h>
 > +#include <linux/of.h>
-> +#include <linux/of_irq.h>
->  #include <linux/sched.h>
->  
->  #include <asm/sched_clock.h>
-> @@ -150,7 +152,7 @@ static void __init timer_config(void)
->  
->  	__raw_writel(cer & ~0x1, TIMERS_VIRT_BASE + TMR_CER); /* disable */
->  
-> -	ccr &= (cpu_is_mmp2()) ? TMR_CCR_CS_0(0) : TMR_CCR_CS_0(3);
-> +	ccr &= TMR_CCR_CS_0(0);
->  	__raw_writel(ccr, TIMERS_VIRT_BASE + TMR_CCR);
->  
->  	/* free-running mode */
-> @@ -187,3 +189,49 @@ void __init timer_init(int irq)
->  	clocksource_register_hz(&cksrc, CLOCK_TICK_RATE);
->  	clockevents_register_device(&ckevt);
->  }
+> +#include <linux/of_fdt.h>
+> +#include <linux/of_platform.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/i2c/pxa-i2c.h>
 > +
-> +#ifdef CONFIG_OF
-> +static void __init mmp_timer_init(void)
+> +#include <asm/mach-types.h>
+> +#include <asm/mach/arch.h>
+> +
+> +#include <mach/pxa910.h>
+> +#include <mach/mmp2.h>
+> +#include <mach/mfp-mmp2.h>
+> +
+> +#include "common.h"
+> +
+> +static void __init ttc_dkb_init(void)
 > +{
-> +	struct device_node *np;
-> +	const __be32 *clk_offs;
-> +	void __iomem *conf;
-> +	unsigned int addr = 0, offs = 0;
-> +	int size, irq;
-> +
-> +	np = of_find_compatible_node(NULL, NULL, "mrvl,pxa168-timer");
-> +
-> +	BUG_ON(!np);
-> +
-> +	of_node_get(np);
-> +	irq = irq_of_parse_and_map(np, 0);
-> +
-> +	clk_offs = of_get_property(np, "mrvl,clk-conf", &size);
-> +	if ((clk_offs == NULL) || (size != sizeof(int) * 2)) {
-
-sizeof(u32)
-
-I would recommend using of_property_read_u32_array() which does the
-sanity checking for you.
-
-> +		pr_warn("mmp-timer: mrvl,clk-conf property is wrong\n");
-> +		goto out;
-> +	}
-> +	addr = be32_to_cpu(*clk_offs) & PAGE_MASK;
-> +	offs = be32_to_cpu(*clk_offs) - addr;
-> +	conf = ioremap(addr, PAGE_SIZE);
-
-base addresses should be in a 'reg' property.  I would put the
-register region into a 'reg' tuple so that of_iomap() works, and then
-encode just the offset/config-value pair into mrvl,clk-conf.
-
-> +	if (conf == NULL) {
-> +		pr_warn("mmp-timer: failed on mapping 0x%x\n", (uint32_t)conf);
-> +		goto out;
-> +	}
-> +	/* reset and configure */
-> +	__raw_writel(APBC_APBCLK | APBC_RST, conf + offs);
-> +	__raw_writel(be32_to_cpu(*++clk_offs), conf + offs);
-> +	__raw_readl(conf + offs);
-> +	iounmap(conf);
-> +
-> +	timer_init(irq);
-> +	return;
-> +out:
-> +	of_node_put(np);
-> +	return;
+> +	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
 > +}
 > +
-> +struct sys_timer mmp_timer = {
-> +	.init	= mmp_timer_init,
+> +static const char *ttc_dkb_dt_match[] __initdata = {
+> +	"mrvl,pxa910-dkb",
+> +	NULL,
 > +};
-> +#endif
+> +
+> +DT_MACHINE_START(TTC_DKB, "PXA910-based TTC-DKB Development Platform")
+> +	.map_io		= mmp_map_io,
+> +	.init_irq	= mmp_init_intc,
+> +	.timer		= &mmp_timer,
+> +	.init_machine	= ttc_dkb_init,
+> +	.dt_compat	= ttc_dkb_dt_match,
+> +MACHINE_END
+> +
+> +static unsigned long brownstone_pin_config[] __initdata = {
+> +	/* UART1 */
+> +	GPIO29_UART1_RXD,
+> +	GPIO30_UART1_TXD,
+> +
+> +	/* UART3 */
+> +	GPIO51_UART3_RXD,
+> +	GPIO52_UART3_TXD,
+> +
+> +	/* DFI */
+> +	GPIO168_DFI_D0,
+> +	GPIO167_DFI_D1,
+> +	GPIO166_DFI_D2,
+> +	GPIO165_DFI_D3,
+> +	GPIO107_DFI_D4,
+> +	GPIO106_DFI_D5,
+> +	GPIO105_DFI_D6,
+> +	GPIO104_DFI_D7,
+> +	GPIO111_DFI_D8,
+> +	GPIO164_DFI_D9,
+> +	GPIO163_DFI_D10,
+> +	GPIO162_DFI_D11,
+> +	GPIO161_DFI_D12,
+> +	GPIO110_DFI_D13,
+> +	GPIO109_DFI_D14,
+> +	GPIO108_DFI_D15,
+> +	GPIO143_ND_nCS0,
+> +	GPIO144_ND_nCS1,
+> +	GPIO147_ND_nWE,
+> +	GPIO148_ND_nRE,
+> +	GPIO150_ND_ALE,
+> +	GPIO149_ND_CLE,
+> +	GPIO112_ND_RDY0,
+> +	GPIO160_ND_RDY1,
+> +
+> +	/* PMIC */
+> +	PMIC_PMIC_INT | MFP_LPM_EDGE_FALL,
+> +
+> +	/* MMC0 */
+> +	GPIO131_MMC1_DAT3 | MFP_PULL_HIGH,
+> +	GPIO132_MMC1_DAT2 | MFP_PULL_HIGH,
+> +	GPIO133_MMC1_DAT1 | MFP_PULL_HIGH,
+> +	GPIO134_MMC1_DAT0 | MFP_PULL_HIGH,
+> +	GPIO136_MMC1_CMD | MFP_PULL_HIGH,
+> +	GPIO139_MMC1_CLK,
+> +	GPIO140_MMC1_CD | MFP_PULL_LOW,
+> +	GPIO141_MMC1_WP | MFP_PULL_LOW,
+> +
+> +	/* MMC1 */
+> +	GPIO37_MMC2_DAT3 | MFP_PULL_HIGH,
+> +	GPIO38_MMC2_DAT2 | MFP_PULL_HIGH,
+> +	GPIO39_MMC2_DAT1 | MFP_PULL_HIGH,
+> +	GPIO40_MMC2_DAT0 | MFP_PULL_HIGH,
+> +	GPIO41_MMC2_CMD | MFP_PULL_HIGH,
+> +	GPIO42_MMC2_CLK,
+> +
+> +	/* MMC2 */
+> +	GPIO165_MMC3_DAT7 | MFP_PULL_HIGH,
+> +	GPIO162_MMC3_DAT6 | MFP_PULL_HIGH,
+> +	GPIO166_MMC3_DAT5 | MFP_PULL_HIGH,
+> +	GPIO163_MMC3_DAT4 | MFP_PULL_HIGH,
+> +	GPIO167_MMC3_DAT3 | MFP_PULL_HIGH,
+> +	GPIO164_MMC3_DAT2 | MFP_PULL_HIGH,
+> +	GPIO168_MMC3_DAT1 | MFP_PULL_HIGH,
+> +	GPIO111_MMC3_DAT0 | MFP_PULL_HIGH,
+> +	GPIO112_MMC3_CMD | MFP_PULL_HIGH,
+> +	GPIO151_MMC3_CLK,
+> +
+> +	/* 5V regulator */
+> +	GPIO89_GPIO,
+> +};
+
+This table is /already/ in brownstone.c.  Why duplicate it?
+
+> +
+> +static void __init brownstone_init(void)
+> +{
+> +	mfp_config(ARRAY_AND_SIZE(brownstone_pin_config));
+> +
+> +	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+> +}
+> +
+> +static const char *brownstone_dt_match[] __initdata = {
+> +	"mrvl,mmp2-brownstone",
+> +	NULL,
+> +};
+> +
+> +DT_MACHINE_START(BROWNSTONE, "Brownstone Development Platform")
+> +	.map_io		= mmp_map_io,
+> +	.init_irq	= mmp_init_intc,
+> +	.timer		= &mmp_timer,
+> +	.init_machine	= brownstone_init,
+> +	.dt_compat	= brownstone_dt_match,
+> +MACHINE_END
 > -- 
 > 1.5.6.5
 > 
