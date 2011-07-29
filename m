@@ -1,43 +1,94 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Fri, 29 Jul 2011 16:19:15 +0530
-Subject: [PATCH 05/18] dmaengine/amba-pl08x: Changing few prints to dev_dbg
-	from dev_info
+Date: Fri, 29 Jul 2011 16:19:21 +0530
+Subject: [PATCH 11/18] dmaengine/amba-pl08x: max_bytes_per_lli is
+	TRANSFER_SIZE * src_width (not MIN(width))
 In-Reply-To: <cover.1311936523.git.viresh.kumar@st.com>
 References: <cover.1311936523.git.viresh.kumar@st.com>
-Message-ID: <7ef7d86e78a74b140c7c5a87fd2b7a117120ce6f.1311936524.git.viresh.kumar@st.com>
+Message-ID: <5521ee74eef41cf26a9f1ece6dadd32cca529cce.1311936524.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For 8 memory and 16 slave channels 35 boot print lines are printed. And that is
-too much. Most of this would be more useful for debugging. So moving few of them
-to dev_dbg instead of dev_info. Now only 3 prints will be printed.
+max_bytes_per_lli = bd.srcbus.buswidth * PL080_CONTROL_TRANSFER_SIZE_MASK;
+This is confirmed by ARM support guys.
+
+Below is summary of mail exchange with them:
+
+[Viresh] What is the total data to be transferred in case source and destination
+bus widths are different. Suppose, source bus width is 2 bytes and destination
+is 4 bytes. Now in order to transfer 80 bytes, what should be value of
+TransferSize field in control reg: 40? or 20?.
+
+[David from ARM] The value that is programmed into the TransferSize field should
+be the number of <SourceWidth> transfers needed to achieve the required data
+transfer.
+
+So, to transfer 80 bytes, with a Source Width of 2, the TransferSize field =
+should be programmed with:
+
+        Total transfer size
+        ------------------- = 40
+          <source width>
+
+[Viresh] Will this change if source is 4 bytes and dest is 2?
+
+[David] Yes - the calculation then becomes:
+
+        Total transfer size
+        ------------------- =20
+          <source width>
+
+Also, max_bytes_per_lli must be calculated after fixing src and dest widths not
+before that. So move this code to the correct place.
+
+This patch also removes max_bytes_per_lli from earlier print message, as till
+that point max_bytes_per_lli is unknown.
 
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
- drivers/dma/amba-pl08x.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+ drivers/dma/amba-pl08x.c |   15 ++++++---------
+ 1 files changed, 6 insertions(+), 9 deletions(-)
 
 diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
-index 4a64fdf..56a9670 100644
+index 04f7889..3b7357e 100644
 --- a/drivers/dma/amba-pl08x.c
 +++ b/drivers/dma/amba-pl08x.c
-@@ -1724,7 +1724,7 @@ static int pl08x_dma_init_virtual_channels(struct pl08x_driver_data *pl08x,
- 			kfree(chan);
- 			continue;
- 		}
--		dev_info(&pl08x->adev->dev,
-+		dev_dbg(&pl08x->adev->dev,
- 			 "initialize virtual channel \"%s\"\n",
- 			 chan->name);
+@@ -597,24 +597,17 @@ static int pl08x_fill_llis_for_desc(struct pl08x_driver_data *pl08x,
+ 	bd.srcbus.buswidth = bd.srcbus.maxwidth;
+ 	bd.dstbus.buswidth = bd.dstbus.maxwidth;
  
-@@ -1952,7 +1952,7 @@ static int pl08x_probe(struct amba_device *adev, const struct amba_id *id)
- 		spin_lock_init(&ch->lock);
- 		ch->serving = NULL;
- 		ch->signal = -1;
--		dev_info(&adev->dev,
-+		dev_dbg(&adev->dev,
- 			 "physical channel %d is %s\n", i,
- 			 pl08x_phy_channel_busy(ch) ? "BUSY" : "FREE");
- 	}
+-	/*
+-	 * Bytes transferred == tsize * MIN(buswidths), not max(buswidths)
+-	 */
+-	max_bytes_per_lli = min(bd.srcbus.buswidth, bd.dstbus.buswidth) *
+-		PL080_CONTROL_TRANSFER_SIZE_MASK;
+-
+ 	/* We need to count this down to zero */
+ 	bd.remainder = txd->len;
+ 
+ 	pl08x_choose_master_bus(&bd, &mbus, &sbus, cctl);
+ 
+-	dev_vdbg(&pl08x->adev->dev, "src=0x%08x%s/%u dst=0x%08x%s/%u len=%zu "
+-			"llimax=%zu\n",
++	dev_vdbg(&pl08x->adev->dev, "src=0x%08x%s/%u dst=0x%08x%s/%u len=%zu\n",
+ 		 bd.srcbus.addr, cctl & PL080_CONTROL_SRC_INCR ? "+" : "",
+ 		 bd.srcbus.buswidth,
+ 		 bd.dstbus.addr, cctl & PL080_CONTROL_DST_INCR ? "+" : "",
+ 		 bd.dstbus.buswidth,
+-		 bd.remainder, max_bytes_per_lli);
++		 bd.remainder);
+ 	dev_vdbg(&pl08x->adev->dev, "mbus=%s sbus=%s\n",
+ 		 mbus == &bd.srcbus ? "src" : "dst",
+ 		 sbus == &bd.srcbus ? "src" : "dst");
+@@ -654,6 +647,10 @@ static int pl08x_fill_llis_for_desc(struct pl08x_driver_data *pl08x,
+ 			sbus->buswidth = 1;
+ 		}
+ 
++		/* Bytes transferred = tsize * src width, not MIN(buswidths) */
++		max_bytes_per_lli = bd.srcbus.buswidth *
++			PL080_CONTROL_TRANSFER_SIZE_MASK;
++
+ 		/*
+ 		 * Make largest possible LLIs until less than one bus
+ 		 * width left
 -- 
 1.7.2.2
