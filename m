@@ -1,93 +1,63 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 29 Jul 2011 10:36:26 +0800
-Subject: [PATCH] net/smsc911x: add device tree probe support
-In-Reply-To: <alpine.LFD.2.00.1107252222540.12766@xanadu.home>
-References: <1311587040-8988-1-git-send-email-shawn.guo@linaro.org>
-	<20110725213723.GI26735@ponder.secretlab.ca>
-	<20110726010154.GG21641@S2100-06.ap.freescale.net>
-	<alpine.LFD.2.00.1107252105561.12766@xanadu.home>
-	<20110726013026.GH21641@S2100-06.ap.freescale.net>
-	<alpine.LFD.2.00.1107252222540.12766@xanadu.home>
-Message-ID: <20110729023626.GB1946@S2100-06.ap.freescale.net>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Fri, 29 Jul 2011 09:20:12 +0200
+Subject: [PATCH v8 0/3] add the GPMI controller driver for IMX23/IMX28
+In-Reply-To: <CAHMSPgPC4whyskfuFGeFd7WHx-=5htezWajm_rNi9Xa+03PV0A@mail.gmail.com>
+References: <1311230846-26437-1-git-send-email-b32955@freescale.com>
+	<20110721215020.GA25344@pengutronix.de>
+	<4E28EEE1.2050008@freescale.com>
+	<20110722055731.GI26837@S2100-06.ap.freescale.net>
+	<4E292FCF.6010608@freescale.com>
+	<CAHMSPgMHrqWcJ=BThDLgQ=XyTBDCMvNS4SVjQWfk=Jf682TEig@mail.gmail.com>
+	<4E2F6F90.7030207@freescale.com>
+	<CAHMSPgPC4whyskfuFGeFd7WHx-=5htezWajm_rNi9Xa+03PV0A@mail.gmail.com>
+Message-ID: <20018.24364.787244.956361@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 25, 2011 at 10:28:05PM -0400, Nicolas Pitre wrote:
-> On Tue, 26 Jul 2011, Shawn Guo wrote:
-> 
-> > On Mon, Jul 25, 2011 at 09:16:40PM -0400, Nicolas Pitre wrote:
-> > > On Tue, 26 Jul 2011, Shawn Guo wrote:
-> > > 
-> > > > On Mon, Jul 25, 2011 at 03:37:23PM -0600, Grant Likely wrote:
-> > > > > On Mon, Jul 25, 2011 at 05:44:00PM +0800, Shawn Guo wrote:
-> > > > > > It adds device tree probe support for smsc911x driver.
-> > > > > > 
-> > > > > > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > > > > > Cc: Grant Likely <grant.likely@secretlab.ca>
-> > > > > > Cc: Steve Glendinning <steve.glendinning@smsc.com>
-> > > > > > Cc: David S. Miller <davem@davemloft.net>
-> > > > > > ---
-> > > > > >  Documentation/devicetree/bindings/net/smsc.txt |   34 +++++++
-> > > > > >  drivers/net/smsc911x.c                         |  123 +++++++++++++++++++-----
-> > > > > >  2 files changed, 132 insertions(+), 25 deletions(-)
-> > > > > >  create mode 100644 Documentation/devicetree/bindings/net/smsc.txt
-> > > > > > 
-> > > > > > diff --git a/Documentation/devicetree/bindings/net/smsc.txt b/Documentation/devicetree/bindings/net/smsc.txt
-> > > > > > new file mode 100644
-> > > > > > index 0000000..1920695
-> > > > > > --- /dev/null
-> > > > > > +++ b/Documentation/devicetree/bindings/net/smsc.txt
-> > > > > > @@ -0,0 +1,34 @@
-> > > > > > +* Smart Mixed-Signal Connectivity (SMSC) LAN Controller
-> > > > > > +
-> > > > > > +Required properties:
-> > > > > > +- compatible : Should be "smsc,lan<model>""smsc,lan"
-> > > > > 
-> > > > > Drop "smsc,lan".  That's far too generic.
-> > > > > 
-> > > > The following devices are supported by the driver.
-> > > > 
-> > > > LAN9115, LAN9116, LAN9117, LAN9118
-> > > > LAN9215, LAN9216, LAN9217, LAN9218
-> > > > LAN9210, LAN9211
-> > > > LAN9220, LAN9221
-> > > > 
-> > > > If we only keep specific <model> as the compatible, we will have a
-> > > > long match table which is actually used nowhere to distinguish the
-> > > > device.
-> > > > 
-> > > > So we need some level generic compatible to save the meaningless
-> > > > long match table.  What about: 
-> > > > 
-> > > > static const struct of_device_id smsc_dt_ids[] = {
-> > > >         { .compatible = "smsc,lan9", },
-> > > >         { /* sentinel */ }
-> > > > };
-> > > > 
-> > > > Or:
-> > > > 
-> > > > static const struct of_device_id smsc_dt_ids[] = {
-> > > >         { .compatible = "smsc,lan91", },
-> > > >         { .compatible = "smsc,lan92", },
-> > > >         { /* sentinel */ }
-> > > > };
-> > > 
-> > > None of this unambiguously distinguish the devices supported by this 
-> > > driver and the smc91x driver which supports LAN91C92, LAN91C94, 
-> > > LAN91C95, LAN91C96, LAN91C100, LAN91C110.
-> > > 
-> > So you suggest to make a long list to explicitly tell the device type
-> > that the driver supports?
-> 
-> I'm not suggesting anything.  :-)  I'm merely pointing out that the 
-> above .compatible = "smsc,lan9" or .compatible = "smsc,lan91" are too 
-> generic given that there is another driver with different devices to 
-> which they could also apply.
-> 
-Since I do not get any suggestion here, I'm going to follow the driver
-name to use '911' as the model number.  Please tell me if there is any
-better one.
+Hi,
 
+Koen Beel writes:
+> Hi,
+> 
+> I have test on mx23evk board. Still see the same issues.
+> 
+> On Wed, Jul 27, 2011 at 3:53 AM, Huang Shijie <b32955@freescale.com> wrote:
+> > Hi,
+> >
+> > Thanks for your test.
+> >
+> >> Hi,
+> >>
+> >> It's not really working for me.
+> >> I've applied all gpmi-nand driver patches and the dma driver patches.
+> >>
+> >> I have added following kernel parameters:
+> >> mtdparts=gpmi-nand:20m(boot),-(user) ubi.mtd=1 root=ubi0:rootfs0
+> >> rootfstype=ubifs gpmi_debug_init
+> >>
+> >> During boot I get already get DMA timeout:
+> >> [ ? ?2.560000] [ start_dma_without_bch_irq : 392 ] DMA timeout, last DMA
+> >> :1
+> >> [ ? ?3.560000] [ start_dma_with_bch_irq : 427 ] bch timeout!!!
+> >> ...
+> >> (see log file in attach line 89)
+> 
+> I still see this DMA timeout when booting.
+> What kernel parameters do you use? I still use same as above.
+> 
+Do you have an SD card in the system? I'm getting the same error when
+accessing an SD card. Without SD card I can use the flash without any
+errors.
+
+
+Lothar Wa?mann
 -- 
-Regards,
-Shawn
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
