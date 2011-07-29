@@ -1,36 +1,96 @@
-From: viresh.linux@gmail.com (viresh kumar)
-Date: Fri, 29 Jul 2011 08:47:06 -0700
-Subject: [PATCH 04/18] dmaengine/amba-pl08x: Remove redundant comment and
-	rewrite original
-In-Reply-To: <1311941355.1536.529.camel@vkoul-udesk3>
-References: <cover.1311936523.git.viresh.kumar@st.com>
-	<e2c1bd6941e88f8988b1942c13c20cf436b3a963.1311936524.git.viresh.kumar@st.com>
-	<1311941355.1536.529.camel@vkoul-udesk3>
-Message-ID: <CAOh2x=kqa0GxRH9o=8faPhuyyLcqxH8+AOowBTK_gMaDgJyeVA@mail.gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Fri, 29 Jul 2011 09:47:23 -0600
+Subject: [PATCH] net/smsc911x: add device tree probe support
+In-Reply-To: <20110729023626.GB1946@S2100-06.ap.freescale.net>
+References: <1311587040-8988-1-git-send-email-shawn.guo@linaro.org>
+	<20110725213723.GI26735@ponder.secretlab.ca>
+	<20110726010154.GG21641@S2100-06.ap.freescale.net>
+	<alpine.LFD.2.00.1107252105561.12766@xanadu.home>
+	<20110726013026.GH21641@S2100-06.ap.freescale.net>
+	<alpine.LFD.2.00.1107252222540.12766@xanadu.home>
+	<20110729023626.GB1946@S2100-06.ap.freescale.net>
+Message-ID: <20110729154723.GC11164@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/29/11, Koul, Vinod <vinod.koul@intel.com> wrote:
-> On Fri, 2011-07-29 at 16:19 +0530, Viresh Kumar wrote:
->>  /*
->> - * Autoselect a master bus to use for the transfer this prefers the
->> - * destination bus if both available if fixed address on one bus the
->> - * other will be chosen
->> + * Autoselect a master bus to use for the transfer
->> + * - prefers the destination bus if both available
->> + * - if fixed address on one bus the other will be chosen
-> Not sure I get it, English is not my first language :)
+On Fri, Jul 29, 2011 at 10:36:26AM +0800, Shawn Guo wrote:
+> On Mon, Jul 25, 2011 at 10:28:05PM -0400, Nicolas Pitre wrote:
+> > On Tue, 26 Jul 2011, Shawn Guo wrote:
+> > 
+> > > On Mon, Jul 25, 2011 at 09:16:40PM -0400, Nicolas Pitre wrote:
+> > > > On Tue, 26 Jul 2011, Shawn Guo wrote:
+> > > > 
+> > > > > On Mon, Jul 25, 2011 at 03:37:23PM -0600, Grant Likely wrote:
+> > > > > > On Mon, Jul 25, 2011 at 05:44:00PM +0800, Shawn Guo wrote:
+> > > > > > > It adds device tree probe support for smsc911x driver.
+> > > > > > > 
+> > > > > > > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > > > > > > Cc: Grant Likely <grant.likely@secretlab.ca>
+> > > > > > > Cc: Steve Glendinning <steve.glendinning@smsc.com>
+> > > > > > > Cc: David S. Miller <davem@davemloft.net>
+> > > > > > > ---
+> > > > > > >  Documentation/devicetree/bindings/net/smsc.txt |   34 +++++++
+> > > > > > >  drivers/net/smsc911x.c                         |  123 +++++++++++++++++++-----
+> > > > > > >  2 files changed, 132 insertions(+), 25 deletions(-)
+> > > > > > >  create mode 100644 Documentation/devicetree/bindings/net/smsc.txt
+> > > > > > > 
+> > > > > > > diff --git a/Documentation/devicetree/bindings/net/smsc.txt b/Documentation/devicetree/bindings/net/smsc.txt
+> > > > > > > new file mode 100644
+> > > > > > > index 0000000..1920695
+> > > > > > > --- /dev/null
+> > > > > > > +++ b/Documentation/devicetree/bindings/net/smsc.txt
+> > > > > > > @@ -0,0 +1,34 @@
+> > > > > > > +* Smart Mixed-Signal Connectivity (SMSC) LAN Controller
+> > > > > > > +
+> > > > > > > +Required properties:
+> > > > > > > +- compatible : Should be "smsc,lan<model>""smsc,lan"
+> > > > > > 
+> > > > > > Drop "smsc,lan".  That's far too generic.
+> > > > > > 
+> > > > > The following devices are supported by the driver.
+> > > > > 
+> > > > > LAN9115, LAN9116, LAN9117, LAN9118
+> > > > > LAN9215, LAN9216, LAN9217, LAN9218
+> > > > > LAN9210, LAN9211
+> > > > > LAN9220, LAN9221
+> > > > > 
+> > > > > If we only keep specific <model> as the compatible, we will have a
+> > > > > long match table which is actually used nowhere to distinguish the
+> > > > > device.
+> > > > > 
+> > > > > So we need some level generic compatible to save the meaningless
+> > > > > long match table.  What about: 
+> > > > > 
+> > > > > static const struct of_device_id smsc_dt_ids[] = {
+> > > > >         { .compatible = "smsc,lan9", },
+> > > > >         { /* sentinel */ }
+> > > > > };
+> > > > > 
+> > > > > Or:
+> > > > > 
+> > > > > static const struct of_device_id smsc_dt_ids[] = {
+> > > > >         { .compatible = "smsc,lan91", },
+> > > > >         { .compatible = "smsc,lan92", },
+> > > > >         { /* sentinel */ }
+> > > > > };
+> > > > 
+> > > > None of this unambiguously distinguish the devices supported by this 
+> > > > driver and the smc91x driver which supports LAN91C92, LAN91C94, 
+> > > > LAN91C95, LAN91C96, LAN91C100, LAN91C110.
+> > > > 
+> > > So you suggest to make a long list to explicitly tell the device type
+> > > that the driver supports?
+> > 
+> > I'm not suggesting anything.  :-)  I'm merely pointing out that the 
+> > above .compatible = "smsc,lan9" or .compatible = "smsc,lan91" are too 
+> > generic given that there is another driver with different devices to 
+> > which they could also apply.
+> > 
+> Since I do not get any suggestion here, I'm going to follow the driver
+> name to use '911' as the model number.  Please tell me if there is any
+> better one.
 
-Nor mine either. :)
+What is the manufacturer part name?  lan9111 or lan91c11?  The
+manufacturer's documented part number is almost always preferred.
 
-Will give some more explanation.
-
-But before that i wanted to know the exact purpose of this
-master-slave concept here.
-Probably it is for choosing the victim for reduction of width, in case
-src and dest addresses
-are misaligned to each other.
-@Russell and Linus: Is this correct?
-
---
-viresh
+g.
