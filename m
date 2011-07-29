@@ -1,119 +1,30 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Fri, 29 Jul 2011 16:19:22 +0530
-Subject: [PATCH 12/18] dmaengine/amba-pl08x: Add prep_single_byte_llis()
-	routine
-In-Reply-To: <cover.1311936523.git.viresh.kumar@st.com>
-References: <cover.1311936523.git.viresh.kumar@st.com>
-Message-ID: <cacf3470c622f311c894e6c72f13ba02be82af73.1311936524.git.viresh.kumar@st.com>
+From: joro@8bytes.org ('Joerg Roedel')
+Date: Fri, 29 Jul 2011 12:54:22 +0200
+Subject: [RFC] ARM: dma_map|unmap_sg plus iommu
+In-Reply-To: <001901cc4dd8$4afb4e40$e0f1eac0$%szyprowski@samsung.com>
+References: <CAB-zwWjb+2ExjNDB3OtHmRmgaHMnO-VgEe9VZk_wU=ryrq_AGw@mail.gmail.com>
+	<000301cc4dc4$31b53630$951fa290$%szyprowski@samsung.com>
+	<20110729093555.GA13522@8bytes.org>
+	<001901cc4dd8$4afb4e40$e0f1eac0$%szyprowski@samsung.com>
+Message-ID: <20110729105422.GB13522@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Code for creating single byte llis is present at several places. Create a
-routine to avoid code redundancy.
+On Fri, Jul 29, 2011 at 12:14:25PM +0200, Marek Szyprowski wrote:
+> > This sounds rather hacky. How about partitioning the address space for
+> > the device and give the dma-api only a part of it. The other parts can
+> > be directly mapped using the iommu-api then.
+> 
+> Well, I'm not convinced that iommu-api should be used by the device drivers 
+> directly. If possible we should rather extend dma-mapping than use such hacks.
 
-Also, we don't need one lli per single byte transfer, we can have single lli to
-do all single byte transfer.
+Building this into dma-api would turn it into an iommu-api. The line
+between the apis are clear. The iommu-api provides direct mapping
+of bus-addresses to system-addresses while the dma-api puts a memory
+manager on-top which deals with bus-address allocation itself.
+So if you want to map bus-addresses directly the iommu-api is the way to
+go. This is in no way a hack.
 
-Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
----
- drivers/dma/amba-pl08x.c |   61 +++++++++++++++++++++++++---------------------
- 1 files changed, 33 insertions(+), 28 deletions(-)
+Regards,
 
-diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
-index 3b7357e..590397d 100644
---- a/drivers/dma/amba-pl08x.c
-+++ b/drivers/dma/amba-pl08x.c
-@@ -552,6 +552,14 @@ static void pl08x_fill_lli_for_desc(struct pl08x_lli_build_data *bd,
- 	bd->remainder -= len;
- }
- 
-+static inline void prep_byte_width_lli(struct pl08x_lli_build_data *bd,
-+		u32 *cctl, u32 len, int num_llis, size_t *total_bytes)
-+{
-+		*cctl = pl08x_cctl_bits(*cctl, 1, 1, len);
-+		pl08x_fill_lli_for_desc(bd, num_llis, len, *cctl);
-+		(*total_bytes) += len;
-+}
-+
- /*
-  * This fills in the table of LLIs for the transfer descriptor
-  * Note that we assume we never have to change the burst sizes
-@@ -563,7 +571,7 @@ static int pl08x_fill_llis_for_desc(struct pl08x_driver_data *pl08x,
- 	struct pl08x_bus_data *mbus, *sbus;
- 	struct pl08x_lli_build_data bd;
- 	int num_llis = 0;
--	u32 cctl;
-+	u32 cctl, early_bytes = 0;
- 	size_t max_bytes_per_lli, total_bytes = 0;
- 	struct pl08x_lli *llis_va;
- 
-@@ -612,29 +620,27 @@ static int pl08x_fill_llis_for_desc(struct pl08x_driver_data *pl08x,
- 		 mbus == &bd.srcbus ? "src" : "dst",
- 		 sbus == &bd.srcbus ? "src" : "dst");
- 
--	if (txd->len < mbus->buswidth) {
--		/* Less than a bus width available - send as single bytes */
--		while (bd.remainder) {
--			dev_vdbg(&pl08x->adev->dev,
--				 "%s single byte LLIs for a transfer of "
--				 "less than a bus width (remain 0x%08x)\n",
--				 __func__, bd.remainder);
--			cctl = pl08x_cctl_bits(cctl, 1, 1, 1);
--			pl08x_fill_lli_for_desc(&bd, num_llis++, 1, cctl);
--			total_bytes++;
--		}
--	} else {
--		/* Make one byte LLIs until master bus is aligned */
--		while ((mbus->addr) % (mbus->buswidth)) {
--			dev_vdbg(&pl08x->adev->dev,
--				"%s adjustment lli for less than bus width "
--				 "(remain 0x%08x)\n",
--				 __func__, bd.remainder);
--			cctl = pl08x_cctl_bits(cctl, 1, 1, 1);
--			pl08x_fill_lli_for_desc(&bd, num_llis++, 1, cctl);
--			total_bytes++;
--		}
-+	/*
-+	 * Send byte by byte for following cases
-+	 * - Less than a bus width available
-+	 * - until master bus is aligned
-+	 */
-+	if (bd.remainder < mbus->buswidth)
-+		early_bytes = bd.remainder;
-+	else if ((mbus->addr) % (mbus->buswidth)) {
-+		early_bytes = mbus->buswidth - (mbus->addr) % (mbus->buswidth);
-+		if ((bd.remainder - early_bytes) < mbus->buswidth)
-+			early_bytes = bd.remainder;
-+	}
-+
-+	if (early_bytes) {
-+		dev_vdbg(&pl08x->adev->dev, "%s byte width LLIs "
-+				"(remain 0x%08x)\n", __func__, bd.remainder);
-+		prep_byte_width_lli(&bd, &cctl, early_bytes, num_llis++,
-+				&total_bytes);
-+	}
- 
-+	if (bd.remainder) {
- 		/*
- 		 * Master now aligned
- 		 * - if slave is not then we must set its width down
-@@ -685,13 +691,12 @@ static int pl08x_fill_llis_for_desc(struct pl08x_driver_data *pl08x,
- 		/*
- 		 * Send any odd bytes
- 		 */
--		while (bd.remainder) {
--			cctl = pl08x_cctl_bits(cctl, 1, 1, 1);
-+		if (bd.remainder) {
- 			dev_vdbg(&pl08x->adev->dev,
--				"%s align with boundary, single odd byte "
-+				"%s align with boundary, send odd bytes "
- 				"(remain %zu)\n", __func__, bd.remainder);
--			pl08x_fill_lli_for_desc(&bd, num_llis++, 1, cctl);
--			total_bytes++;
-+			prep_byte_width_lli(&bd, &cctl, bd.remainder,
-+					num_llis++, &total_bytes);
- 		}
- 	}
- 
--- 
-1.7.2.2
+	Joerg
