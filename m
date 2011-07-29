@@ -1,56 +1,35 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Fri, 29 Jul 2011 17:58:12 +0200
-Subject: PLEA: Please fix mach/gpio.h includes (was: Re: [RFC PATCH 2/2]
-	GPIO: add gpiolib and irqchip for CSR SiRFprimaII GPIO controller)
-In-Reply-To: <alpine.LFD.2.00.1107261502251.12766@xanadu.home>
-References: <1311667993-27189-1-git-send-email-bs14@csr.com>
-	<1311667993-27189-3-git-send-email-bs14@csr.com>
-	<20110726100928.GO9653@n2100.arm.linux.org.uk>
-	<20110726104628.GP9653@n2100.arm.linux.org.uk>
-	<CAMbhsRRr5FPtu-kUbcLO56=rsHkb2XNDf21-G3pymPBTcmYmRQ@mail.gmail.com>
-	<20110726183958.GG1655@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1107261502251.12766@xanadu.home>
-Message-ID: <CAKnu2MpjOT8y5DfeAtrgBAKh0asqNouyhuin=z+ScAwx0Fa5rA@mail.gmail.com>
+From: viresh.linux@gmail.com (viresh kumar)
+Date: Fri, 29 Jul 2011 08:58:48 -0700
+Subject: [PATCH 10/18] dmaengine/amba-pl08x: Get rid of
+	pl08x_pre_boundary()
+In-Reply-To: <1311942777.1536.547.camel@vkoul-udesk3>
+References: <cover.1311936523.git.viresh.kumar@st.com>
+	<c147ba3a755935e93fdb40b5531a6e18d34e0fd7.1311936524.git.viresh.kumar@st.com>
+	<20110729110525.GG25640@n2100.arm.linux.org.uk>
+	<1311942777.1536.547.camel@vkoul-udesk3>
+Message-ID: <CAOh2x=kRz70etXbaCPO2HCysftyixai44=ZZdLAnZde5N5PmrA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/7/26 Nicolas Pitre <nicolas.pitre@linaro.org>:
-> On Tue, 26 Jul 2011, Russell King - ARM Linux wrote:
+On 7/29/11, Koul, Vinod <vinod.koul@intel.com> wrote:
+> On Fri, 2011-07-29 at 12:05 +0100, Russell King - ARM Linux wrote:
+>> On Fri, Jul 29, 2011 at 04:19:20PM +0530, Viresh Kumar wrote:
+> Typically in few dmac IPs i know of:
+> There is max limitation of what a burst length can be for dma, and what
+> a max transfer length can be.
+> The dma will push/pull data into peripheral FIFO based on
+> max_burst_length parameter (note length in dma terminology is always
+> items not bytes, and one item is usually defined as
+> transfer_length/src_width). For a transfer (single block or in
+> multi-block) the dmac will break the transaction into multiple bursts
+> and based on max_burst_length it will push/pull data to/from FIFO. Also
+> matching FIFO thresholds with max_burst_length is also important and can
+> be tuned based on perf/power requirements.
 >
->> I don't think there's any plans to break the:
->>
->> linux/gpio.h -> asm/gpio.h -> mach/gpio.h
->>
->> include path at the moment, as platforms do define ARCH_NR_GPIO,
->> which has to be done before asm-generic/gpiolib.h is included.
+> Sharing my knowledge, hopefully it helps :)
 >
-> Well, this GPIO business is the biggest hurdle towards a single kernel
-> image that can support multiple SOCs at the moment, and the only one for
-> which I have no solution yet. ?Anything that could help removing
-> mach/gpio.h from asm/gpio.h would be welcome.
 
-I've been trying to address it somewhat by converting existing users to
-use struct gpio_chip and struct irq_chip.
+Thanks. It was indeed helpful. :)
 
-However I ran into a brick wall as soon as an advanced GPIO controller
-such as those in U8500 or the OMAPs needed anything custom apart
-from what is done in the API in <linux/gpio.h>, such as configuring pin
-bias and muxing pins.
-
-Different alternatives have been floated to LKML, also a post
-of two different approaches for patches resolving the issue
-in two different ways (see subject [PATCH 0/2] RFC:
-gpio: driver-local pin configuration)
-
-Due to lack of interest i.e. no ACKing nor NACKing of the patches,
-nor any approach being chosen by the subsystem maintainer, I'm
-mainly resting my case, intially we (me & Grant) planned to have
-a solution for this early in the 3.1 cycle but that has failed.
-
-A third solution is to complete the pincfg subsystem that I'm
-working on and which will naturally (hopefully) split off the
-controversial parts of GPIO drivers. Sadly this will involve a bit of
-upfront overhead work :-/
-
-Thanks,
-Linus Walleij
+--
+viresh
