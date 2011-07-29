@@ -1,28 +1,89 @@
-From: vinod.koul@intel.com (Koul, Vinod)
-Date: Fri, 29 Jul 2011 17:28:32 +0530
-Subject: [PATCH 00/18] dmaengine/amba-pl08x updates
-In-Reply-To: <cover.1311936523.git.viresh.kumar@st.com>
-References: <cover.1311936523.git.viresh.kumar@st.com>
-Message-ID: <1311940712.1536.523.camel@vkoul-udesk3>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Fri, 29 Jul 2011 14:41:09 +0200
+Subject: [PATCH v8 0/3] add the GPMI controller driver for IMX23/IMX28
+In-Reply-To: <CAHMSPgM5W8=mE4sRDGMMfo39fvThBo_jrdG8hyhJNQ_ceV=_pA@mail.gmail.com>
+References: <1311230846-26437-1-git-send-email-b32955@freescale.com>
+	<20110721215020.GA25344@pengutronix.de>
+	<4E28EEE1.2050008@freescale.com>
+	<20110722055731.GI26837@S2100-06.ap.freescale.net>
+	<4E292FCF.6010608@freescale.com>
+	<CAHMSPgMHrqWcJ=BThDLgQ=XyTBDCMvNS4SVjQWfk=Jf682TEig@mail.gmail.com>
+	<4E2F6F90.7030207@freescale.com>
+	<CAHMSPgPC4whyskfuFGeFd7WHx-=5htezWajm_rNi9Xa+03PV0A@mail.gmail.com>
+	<20018.24364.787244.956361@ipc1.ka-ro>
+	<CAHMSPgM5W8=mE4sRDGMMfo39fvThBo_jrdG8hyhJNQ_ceV=_pA@mail.gmail.com>
+Message-ID: <20018.43621.688990.319528@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2011-07-29 at 16:19 +0530, Viresh Kumar wrote:
-> Hi Linus,
+Hi,
+
+Koen Beel writes:
+> Hi,
 > 
-> This patchset contains patches for ARM's pl08x DMA controller driver.
-> Main changes introduced by this patchset are:
-> - Formatting fixes
-> - Logical Fixes
-> - Support for Peripheral as flow controller
-> - Support for sg_len to be greater than 1 for slave transfers
-> - Schedule tasklet for error interrupts
-> - remove pl08x_pre_boundary() routine
-> - etc
-Viresh,
+> On Fri, Jul 29, 2011 at 9:20 AM, Lothar Wa?mann <LW@karo-electronics.de> wrote:
+> > Hi,
+> >
+> > Koen Beel writes:
+> >> Hi,
+> >>
+> >> I have test on mx23evk board. Still see the same issues.
+> >>
+> >> On Wed, Jul 27, 2011 at 3:53 AM, Huang Shijie <b32955@freescale.com> wrote:
+> >> > Hi,
+> >> >
+> >> > Thanks for your test.
+> >> >
+> >> >> Hi,
+> >> >>
+> >> >> It's not really working for me.
+> >> >> I've applied all gpmi-nand driver patches and the dma driver patches.
+> >> >>
+> >> >> I have added following kernel parameters:
+> >> >> mtdparts=gpmi-nand:20m(boot),-(user) ubi.mtd=1 root=ubi0:rootfs0
+> >> >> rootfstype=ubifs gpmi_debug_init
+> >> >>
+> >> >> During boot I get already get DMA timeout:
+> >> >> [ ? ?2.560000] [ start_dma_without_bch_irq : 392 ] DMA timeout, last DMA
+> >> >> :1
+> >> >> [ ? ?3.560000] [ start_dma_with_bch_irq : 427 ] bch timeout!!!
+> >> >> ...
+> >> >> (see log file in attach line 89)
+> >>
+> >> I still see this DMA timeout when booting.
+> >> What kernel parameters do you use? I still use same as above.
+> >>
+> > Do you have an SD card in the system? I'm getting the same error when
+> > accessing an SD card. Without SD card I can use the flash without any
+> > errors.
+> 
+> No SD card in the system. At least not on my mx23evk board.
+> My real target hardware has a SDIO wifi chip.
+> 
+> Are you also testing on the mx23evk board? Really strange it is not
+> reproducible here then.
+> Anyone using mx23evk please give:
+> - revision number of board (I have tested on rev C1)
+> - kernel parameter used (see previous mail for mine)
+> 
+It's getting ever more strange. I only have problems with concurrent
+access to the flash and SD-card when I do file system based accessed
+to the SD card.
+A 'dd if=/dev/mmcblk0 of=/dev/null' while excessively using the flash
+works well, while mounting the SD card and doing an 'ls' produces
+immediate BCH DMA timeouts.
 
-There were some fixes required in your driver for changing submit and
-issue_pending behavior, was it this one?
+Perhaps someone can make anything out of that.
 
+
+Lothar Wa?mann
 -- 
-~Vinod
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
