@@ -1,36 +1,36 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 29 Jul 2011 09:51:18 +0800
-Subject: [PATCH 0/2] Add device tree probe for i2c-imx driver
-In-Reply-To: <20110722021524.GG26837@S2100-06.ap.freescale.net>
-References: <1310659425-17499-1-git-send-email-shawn.guo@linaro.org>
-	<20110722021524.GG26837@S2100-06.ap.freescale.net>
-Message-ID: <20110729015116.GA1946@S2100-06.ap.freescale.net>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 29 Jul 2011 10:48:46 +0900
+Subject: Question about "Inconsistent kallsyms data"
+Message-ID: <02ae01cc4d91$aed71670$0c854350$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ping ...
+Hi all,
 
-On Fri, Jul 22, 2011 at 10:15:25AM +0800, Shawn Guo wrote:
-> Hi Ben,
-> 
-> Any comments, or it's been good for you to queue them for v3.1 window?
-> 
-> Regards,
-> Shawn
-> 
-> On Fri, Jul 15, 2011 at 12:03:43AM +0800, Shawn Guo wrote:
-> > The first patch removes unused init/exit hooks from platform data,
-> > and the second one actually adds the actual device tree probe support.
-> > 
-> > Shawn Guo (2):
-> >       i2c/imx: remove init/exit hooks from platform data
-> >       i2c/imx: add device tree probe support
-> > 
-> >  .../devicetree/bindings/i2c/fsl-imx-i2c.txt        |   25 +++++++++++
-> >  arch/arm/plat-mxc/include/mach/i2c.h               |    4 --
-> >  drivers/i2c/busses/i2c-imx.c                       |   46 +++++++++----------
-> >  3 files changed, 47 insertions(+), 28 deletions(-)
+When build with s5pc100_defconfig, happens following.
 
--- 
-Regards,
-Shawn
+...
+KSYM    .tmp_kallsyms2.S
+AS      .tmp_kallsyms2.o
+LD      vmlinux
+SYSMAP  System.map
+SYSMAP  .tmp_System.map
+Inconsistent kallsyms data
+This is a bug - please report about it
+Try make KALLSYMS_EXTRA_PASS=1 as a workaround
+make[1]: *** [vmlinux] Error 1
+make: *** [sub-make] Error 2
+
+Its HEAD is following (current latest mainline)
+(commit 55f9c40ff632d03c527d6a6ceddcda0a224587a6)
+Merge git://git.kernel.org/pub/scm/linux/kernel/git/davem/sparc
+
+Please kindly let me know how it should be fixed...
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
