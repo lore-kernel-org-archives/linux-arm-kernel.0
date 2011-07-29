@@ -1,55 +1,87 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Fri, 29 Jul 2011 16:19:17 +0530
-Subject: [PATCH 07/18] dmaengine/amba-pl08x: Enable/Disable amba_pclk with
-	channel requests
+Date: Fri, 29 Jul 2011 16:19:23 +0530
+Subject: [PATCH 13/18] dmaengine/amba-pl08x: Align lli_len to max(src.width,
+	dst.width)
 In-Reply-To: <cover.1311936523.git.viresh.kumar@st.com>
 References: <cover.1311936523.git.viresh.kumar@st.com>
-Message-ID: <96781d46e41fa6ffc04b88527a25d73f5a59eda8.1311936524.git.viresh.kumar@st.com>
+Message-ID: <afe9e5154d96c0f44c64c411c98b5db75969db6c.1311936524.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Amba devices have interface clocks attached as adev->pclk. This is the only
-clock associated with DMAC and it can be disabled when DMAC is not in use. This
-patch adds support to enable/disable this clk as and when channels are requested
-and freed. Also it disables this clock at the end of probe.
+Currently lli_len is aligned to min of two widths, which looks to be incorrect.
+Instead it should be aligned to max of both widths.
+
+Lets say, total_size = 441 bytes
+
+MIN: lets check if min() suits or not:
+
+CASE 1: srcwidth = 1, dstwidth = 4
+min(src, dst) = 1
+
+i.e. We program transfer size in control reg to 441.
+Now, till 440 bytes everything is fine, but on the last byte DMAC can't transfer
+1 byte to dst, as its width is 4.
+
+CASE 2: srcwidth = 4, dstwidth = 1
+min(src, dst) = 1
+
+i.e. we program transfer size in control reg to 110 (data transferred = 110 * srcwidth).
+So, here too 1 byte is left, but on the source side.
+
+MAX: Lets check if max() suits or not:
+
+CASE 3: srcwidth = 1, dstwidth = 4
+max(src, dst) = 4
+
+Aligned size is 440
+
+i.e. We program transfer size in control reg to 440.
+Now, all 440 bytes will be transferred without any issues.
+
+CASE 4: srcwidth = 4, dstwidth = 1
+max(src, dst) = 4
+
+Aligned size is 440
+
+i.e. We program transfer size in control reg to 110 (data transferred = 110 * srcwidth).
+Now, also all 440 bytes will be transferred without any issues.
 
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
- drivers/dma/amba-pl08x.c |   10 ++++++++++
- 1 files changed, 10 insertions(+), 0 deletions(-)
+ drivers/dma/amba-pl08x.c |   12 +++++++-----
+ 1 files changed, 7 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
-index 53d722e..f1a25cf 100644
+index 590397d..44f317a 100644
 --- a/drivers/dma/amba-pl08x.c
 +++ b/drivers/dma/amba-pl08x.c
-@@ -881,11 +881,19 @@ static void pl08x_free_txd_list(struct pl08x_driver_data *pl08x,
-  */
- static int pl08x_alloc_chan_resources(struct dma_chan *chan)
- {
-+	struct pl08x_dma_chan *plchan = to_pl08x_chan(chan);
-+	struct pl08x_driver_data *pl08x = plchan->host;
-+
-+	amba_pclk_enable(pl08x->adev);
- 	return 0;
- }
+@@ -662,20 +662,22 @@ static int pl08x_fill_llis_for_desc(struct pl08x_driver_data *pl08x,
+ 		 * width left
+ 		 */
+ 		while (bd.remainder > (mbus->buswidth - 1)) {
+-			size_t lli_len, tsize;
++			size_t lli_len, tsize, width;
  
- static void pl08x_free_chan_resources(struct dma_chan *chan)
- {
-+	struct pl08x_dma_chan *plchan = to_pl08x_chan(chan);
-+	struct pl08x_driver_data *pl08x = plchan->host;
+ 			/*
+ 			 * If enough left try to send max possible,
+ 			 * otherwise try to send the remainder
+ 			 */
+ 			lli_len = min(bd.remainder, max_bytes_per_lli);
 +
-+	amba_pclk_disable(pl08x->adev);
- }
+ 			/*
+-			 * Check against minimum bus alignment: Calculate actual
++			 * Check against maximum bus alignment: Calculate actual
+ 			 * transfer size in relation to bus width and get a
+-			 * maximum remainder of the smallest bus width - 1
++			 * maximum remainder of the highest bus width - 1
+ 			 */
+-			tsize = lli_len / min(mbus->buswidth, sbus->buswidth);
+-			lli_len	= tsize * min(mbus->buswidth, sbus->buswidth);
++			width = max(mbus->buswidth, sbus->buswidth);
++			lli_len = (lli_len / width) * width;
++			tsize = lli_len / bd.srcbus.buswidth;
  
- /*
-@@ -1993,6 +2001,8 @@ static int pl08x_probe(struct amba_device *adev, const struct amba_id *id)
- 	dev_info(&pl08x->adev->dev, "DMA: PL%03x rev%u at 0x%08llx irq %d\n",
- 		 amba_part(adev), amba_rev(adev),
- 		 (unsigned long long)adev->res.start, adev->irq[0]);
-+
-+	amba_pclk_disable(adev);
- 	return 0;
- 
- out_no_slave_reg:
+ 			dev_vdbg(&pl08x->adev->dev,
+ 					"%s fill lli with single lli chunk of "
 -- 
 1.7.2.2
