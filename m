@@ -1,33 +1,32 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Fri, 29 Jul 2011 16:19:27 +0530
-Subject: [PATCH 17/18] dmaengine/amba-pl08x: Check txd->llis_va before freeing
-	dma_pool
-In-Reply-To: <cover.1311936523.git.viresh.kumar@st.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 29 Jul 2011 12:19:20 +0100
+Subject: [PATCH 00/18] dmaengine/amba-pl08x updates
+In-Reply-To: <4E329616.2030505@st.com>
 References: <cover.1311936523.git.viresh.kumar@st.com>
-Message-ID: <1ce7eda8117f76d1e9d35bcf59d188351d1b9465.1311936524.git.viresh.kumar@st.com>
+	<20110729105759.GE25640@n2100.arm.linux.org.uk>
+	<4E329616.2030505@st.com>
+Message-ID: <20110729111920.GK25640@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In pl08x_free_txd(), check if pool is allocated successfully before freeing it.
+On Fri, Jul 29, 2011 at 04:44:30PM +0530, viresh kumar wrote:
+> There can be two cases here:
+> 
+> - Memory addresses are contiguous and are not scattered.
+> Here, Only one sg will be passed by user driver, with memory address and
+> zero length. We pass this to controller and after the transfer it will
+> receive the last burst request from peripheral and so transfer finishes.
+> 
+> - Memory addresses are scattered and are not contiguous.
+> Here, Obviously as DMA controller doesn't know when a lli's transfer gets over,
+> it can't load next lli. So in this case, there has to be an assumption that only
+> one lli is supported. Thus, we can't have scattered addresses.
 
-Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
----
- drivers/dma/amba-pl08x.c |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
+Ok, so lets have the driver explicitly enforce one SG entry if peripheral
+flow is set.  It would also be a good idea to pass not zero length, but
+the real transfer size in the SG entry for the sake of having the API
+know the full information about the transfer.
 
-diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
-index ddc06bd..a72255c 100644
---- a/drivers/dma/amba-pl08x.c
-+++ b/drivers/dma/amba-pl08x.c
-@@ -784,7 +784,8 @@ static void pl08x_free_txd(struct pl08x_driver_data *pl08x,
- 	struct pl08x_sg *dsg, *_dsg;
- 
- 	/* Free the LLI */
--	dma_pool_free(pl08x->pool, txd->llis_va, txd->llis_bus);
-+	if (txd->llis_va)
-+		dma_pool_free(pl08x->pool, txd->llis_va, txd->llis_bus);
- 
- 	pl08x->pool_ctr--;
- 
--- 
-1.7.2.2
+(Ok, it already only supports one SG entry, but that's something else
+which needs fixing - which may be possible now that you've cleaned up
+the LLI creation code.)
