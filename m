@@ -1,79 +1,48 @@
-From: shaohua.li@intel.com (Shaohua Li)
-Date: Sat, 30 Jul 2011 17:30:55 +0800
-Subject: questions about memory hotplug
-In-Reply-To: <20110729221230.GA3466@labbmf-linux.qualcomm.com>
-References: <20110729221230.GA3466@labbmf-linux.qualcomm.com>
-Message-ID: <20110730093055.GA10672@sli10-conroe.sh.intel.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 30 Jul 2011 13:03:32 +0100
+Subject: [RFC/PATCH 7/7] WIP: HACK/RFC: omap_device: begin to decouple
+	platform_device from omap_device
+In-Reply-To: <1311292338-11830-9-git-send-email-khilman@ti.com>
+References: <1311292338-11830-1-git-send-email-khilman@ti.com>
+	<1311292338-11830-9-git-send-email-khilman@ti.com>
+Message-ID: <20110730120332.GA15539@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 30, 2011 at 06:12:31AM +0800, Larry Bassel wrote:
-> We want to handle the following 2 use cases we have on
-> some of our (ARM) platforms:
+On Thu, Jul 21, 2011 at 04:52:18PM -0700, Kevin Hilman wrote:
+> Rather than embedding a struct platform_device inside a struct
+> omap_device, decouple them, leaving only a pointer to the
+> platform_device inside the omap_device.
 > 
-> 1. A platform where part of the memory may be powered
-> off. The location and size of this memory is not known
-> until the kernel parses the memory tags (there aren't
-> any non-standard tags used, but the memory layout and
-> a memory bank size which is obtained from HW are used
-> to figure out where and how large this memory is). All
-> of this memory must either be on or off. For a given
-> configuration the location of this memory can't be moved.
+> This patch uses devres to allocate and attach the omap_device to the
+> struct device, so finding an omap_device from a struct device means
+> using devres_find(), and the to_omap_device() helper function was
+> modified accordingly.
 > 
-> 2. A (different) platform where part of the memory
-> is occasionally needed as a large physically contiguous 
-> block, but usually is not (and then should be usable
-> by the kernel as normal memory). When the memory is
-> needed for the contiguous block, the pages in this
-> range currently being used by the kernel will
-> need to be migrated out.
+> RFC/Hack alert:
 > 
-> The size of this is known at compile time and can be
-> placed at any reasonable place in memory (but should
-> be SPARSEMEM section aligned -- its size may however
-> not be a power of 2 and thus this memory could
-> span more than one section). This memory will not be
-> powered off, but must either be completely used for
-> one purpose or the other.
+> Currently the driver core (drivers/base/dd.c) doesn't expect any
+> devres resources to exist before the driver's ->probe() is called.  In
+> this patch, I just comment out the warning, but we'll need to
+> understand why that limitation exists, and if it's a real limitation.
+> A first glance suggests that it's not really needed.  If this is a
+> true limitation, we'll need to find some way other than devres to
+> attach an omap_device to a struct device.
 > 
-> The size of memory in question for #1 is generally
-> much larger than that of #2.
-> 
-> Memory hotplug/hotremove (logical and physical for #1,
-> only logical for #2) approximately solves these problems,
-> but there is some functionality we need that AFAIK is
-> not present:
-> 
-> * The memory in #1 and #2 above must be in a movable
-> zone so that the chance of migration is maximized.
-> I'm familiar with the kernelcore= and movablecore=
-> commandline options, but they don't do what is necessary
-> here, because we need control on where the movable zone
-> is formed as well as the size. Also the location and size
-> of these special memory areas is not known until the
-> kernel comes up (in #1 it is conceivable that the bootloader
-> could locate the memory that can be powered on and off and
-> pass it in via some commandline option, but AFAICT this won't
-> work at all for #2).
-> 
-> One could hack up find_zone_movable_pfns_for_nodes() presumably,
-> but I wonder if there is an already existing way of doing
-> this (or at least a clean extension to the current
-> functionality that someone might suggest).
-> 
-> Would CONFIG_ARCH_POPULATES_NODE_MAP help here? Does anyone
-> use this? It doesn't seem to be in any defconfig or Kconfig
-> on 3.0 (or earlier versions I've looked at).
-> 
-> Perhaps CMA (which is not merged yet and AFAIK still has some
-> issues on ARM) might handle #2 better than memory
-> hotplug/hotremove. Or is there a better way to handle #2
-> than either CMA or memory hotplug?
-is such memory always at the end of memory? if yes, such memory
-can be added to MOVABLE_ZONE.
-or if such memory can be at the middle of memory, maybe we can add
-a new mirgate type, the migrate type is movable but other type allocation
-can't fallback into.
+> On OMAP, we will need an omap_device attached to a struct device
+> before probe because device HW may be disabled in probe and drivers
+> are expected to use runtime PM in ->probe() to activate the hardware
+> before access.  Because the runtime PM API calls use omap_device (via
+> our PM domain layer), we need omap_device attached to a
+> platform_device before probe.
 
-Thanks,
-Shaohua
+This feels really wrong to overload devres with this.  devres purpose is
+to provide the device's _drivers_ with a way to allocate and free resources
+in such a way to avoid leaks on .remove or probe failure.  So I think that
+overloading it with something that has a different lifetime is completely
+wrong.
+
+We could add a new member to struct dev_archdata or pdev_archdata to carry
+a pointer to this data, which I think would be a far cleaner (and saner)
+way to deal with this.  In much the same way as we already have an of_node
+member in struct device.
