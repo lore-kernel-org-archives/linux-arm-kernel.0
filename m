@@ -1,21 +1,21 @@
-From: richard.weinberger@gmail.com (richard -rw- weinberger)
-Date: Sat, 30 Jul 2011 18:41:12 +0200
-Subject: [PATCH] Remove remaining references of CONFIG_GENERIC_TIME
-In-Reply-To: <1312042478-26012-1-git-send-email-zdevai@gmail.com>
-References: <1312042478-26012-1-git-send-email-zdevai@gmail.com>
-Message-ID: <CAFLxGvyGQ3Ao4BLHzuZOraOTf=PMFG67OgjTR3J8_-dFp_tf8w@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sun, 31 Jul 2011 02:21:25 +0800
+Subject: [PATCH v2 0/2] Add device tree probe for i2c-imx driver
+Message-ID: <1312050087-15701-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 30, 2011 at 6:14 PM, Zoltan Devai <zdevai@gmail.com> wrote:
-> Commit 592913ecb87a9e06f98ddb55b298f1a66bf94c6b has killed off any
-> use of this config option long ago.
->
-> Signed-off-by: Zoltan Devai <zdevai@gmail.com>
+The first patch removes unused init/exit hooks from platform data,
+and the second one actually adds the actual device tree probe support.
 
-For arch/um/:
-Acked-by: Richard Weinberger <richard@nod.at>
+Changes since v1:
+ * Fix a couple of typo in fsl-imx-i2c.txt
 
--- 
-Thanks,
-//richard
+Shawn Guo (2):
+      i2c/imx: remove init/exit hooks from platform data
+      i2c/imx: add device tree probe support
+
+ .../devicetree/bindings/i2c/fsl-imx-i2c.txt        |   25 +++++++++++
+ arch/arm/plat-mxc/include/mach/i2c.h               |    4 --
+ drivers/i2c/busses/i2c-imx.c                       |   46 +++++++++----------
+ 3 files changed, 47 insertions(+), 28 deletions(-)
