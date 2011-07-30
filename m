@@ -1,139 +1,221 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sun, 31 Jul 2011 02:21:27 +0800
-Subject: [PATCH v2 2/2] i2c/imx: add device tree probe support
-In-Reply-To: <1312050087-15701-1-git-send-email-shawn.guo@linaro.org>
-References: <1312050087-15701-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1312050087-15701-3-git-send-email-shawn.guo@linaro.org>
+Date: Sun, 31 Jul 2011 02:26:00 +0800
+Subject: [PATCH v3] net/smsc911x: add device tree probe support
+In-Reply-To: <1311587040-8988-1-git-send-email-shawn.guo@linaro.org>
+References: <1311587040-8988-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1312050360-15767-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It adds device tree probe support for i2c-imx driver.
+It adds device tree probe support for smsc911x driver.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 Cc: Grant Likely <grant.likely@secretlab.ca>
-Cc: Darius Augulis <augulis.darius@gmail.com>
-Cc: Ben Dooks <ben-linux@fluff.org>
-Acked-by: Grant Likely <grant.likely@secretlab.ca>
+Cc: Steve Glendinning <steve.glendinning@smsc.com>
+Cc: David S. Miller <davem@davemloft.net>
+Reviewed-by: Grant Likely <grant.likely@secretlab.ca>
 ---
- .../devicetree/bindings/i2c/fsl-imx-i2c.txt        |   25 ++++++++++++++++++++
- drivers/i2c/busses/i2c-imx.c                       |   25 +++++++++++++++----
- 2 files changed, 44 insertions(+), 6 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/i2c/fsl-imx-i2c.txt
+Changes since v2:
+ * Fix a typo in smsc911x.txt
 
-diff --git a/Documentation/devicetree/bindings/i2c/fsl-imx-i2c.txt b/Documentation/devicetree/bindings/i2c/fsl-imx-i2c.txt
+Changes since v1:
+ * Instead of getting irq line from gpio number, it use irq domain
+   to keep platform_get_resource(IORESOURCE_IRQ) works for dt too.
+ * Use 'lan9115' the first model that smsc911x supports in the match
+   table
+ * Use reg-shift and reg-io-width which already used in of_serial for
+   shift and access size binding
+
+ Documentation/devicetree/bindings/net/smsc911x.txt |   38 +++++++++
+ drivers/net/smsc911x.c                             |   85 +++++++++++++++++---
+ 2 files changed, 112 insertions(+), 11 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/net/smsc911x.txt
+
+diff --git a/Documentation/devicetree/bindings/net/smsc911x.txt b/Documentation/devicetree/bindings/net/smsc911x.txt
 new file mode 100644
-index 0000000..f3cf43b
+index 0000000..adb5b57
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/i2c/fsl-imx-i2c.txt
-@@ -0,0 +1,25 @@
-+* Freescale Inter IC (I2C) and High Speed Inter IC (HS-I2C) for i.MX
++++ b/Documentation/devicetree/bindings/net/smsc911x.txt
+@@ -0,0 +1,38 @@
++* Smart Mixed-Signal Connectivity (SMSC) LAN911x/912x Controller
 +
 +Required properties:
-+- compatible : Should be "fsl,<chip>-i2c"
-+- reg : Should contain I2C/HS-I2C registers location and length
-+- interrupts : Should contain I2C/HS-I2C interrupt
++- compatible : Should be "smsc,lan<model>", "smsc,lan9115"
++- reg : Address and length of the io space for SMSC LAN
++- interrupts : Should contain SMSC LAN interrupt line
++- interrupt-parent : Should be the phandle for the interrupt controller
++  that services interrupts for this device
++- phy-mode : String, operation mode of the PHY interface.
++  Supported values are: "mii", "gmii", "sgmii", "tbi", "rmii",
++  "rgmii", "rgmii-id", "rgmii-rxid", "rgmii-txid", "rtbi", "smii".
 +
 +Optional properties:
-+- clock-frequency : Constains desired I2C/HS-I2C bus clock frequency in Hz.
-+  The absence of the propoerty indicates the default frequency 100 kHz.
++- reg-shift : Specify the quantity to shift the register offsets by
++- reg-io-width : Specify the size (in bytes) of the IO accesses that
++  should be performed on the device.  Valid value for SMSC LAN is
++  2 or 4.  If it's omitted or invalid, the size would be 2.
++- smsc,irq-active-high : Indicates the IRQ polarity is active-high
++- smsc,irq-push-pull : Indicates the IRQ type is push-pull
++- smsc,force-internal-phy : Forces SMSC LAN controller to use
++  internal PHY
++- smsc,force-external-phy : Forces SMSC LAN controller to use
++  external PHY
++- smsc,save-mac-address : Indicates that mac address needs to be saved
++  before resetting the controller
++- local-mac-address : 6 bytes, mac address
 +
 +Examples:
 +
-+i2c at 83fc4000 { /* I2C2 on i.MX51 */
-+	compatible = "fsl,imx51-i2c", "fsl,imx1-i2c";
-+	reg = <0x83fc4000 0x4000>;
-+	interrupts = <63>;
++lan9220 at f4000000 {
++	compatible = "smsc,lan9220", "smsc,lan9115";
++	reg = <0xf4000000 0x2000000>;
++	phy-mode = "mii";
++	interrupt-parent = <&gpio1>;
++	interrupts = <31>;
++	reg-io-width = <4>;
++	smsc,irq-push-pull;
 +};
-+
-+i2c at 70038000 { /* HS-I2C on i.MX51 */
-+	compatible = "fsl,imx51-i2c", "fsl,imx1-i2c";
-+	reg = <0x70038000 0x4000>;
-+	interrupts = <64>;
-+	clock-frequency = <400000>;
-+};
-diff --git a/drivers/i2c/busses/i2c-imx.c b/drivers/i2c/busses/i2c-imx.c
-index 54d809e..58832e5 100644
---- a/drivers/i2c/busses/i2c-imx.c
-+++ b/drivers/i2c/busses/i2c-imx.c
-@@ -48,6 +48,9 @@
- #include <linux/platform_device.h>
- #include <linux/clk.h>
- #include <linux/slab.h>
+diff --git a/drivers/net/smsc911x.c b/drivers/net/smsc911x.c
+index b9016a3..75c08a5 100644
+--- a/drivers/net/smsc911x.c
++++ b/drivers/net/smsc911x.c
+@@ -53,6 +53,10 @@
+ #include <linux/phy.h>
+ #include <linux/smsc911x.h>
+ #include <linux/device.h>
 +#include <linux/of.h>
 +#include <linux/of_device.h>
-+#include <linux/of_i2c.h>
++#include <linux/of_gpio.h>
++#include <linux/of_net.h>
+ #include "smsc911x.h"
  
- #include <mach/irqs.h>
- #include <mach/hardware.h>
-@@ -125,6 +128,11 @@ struct imx_i2c_struct {
- 	unsigned int		ifdr; /* IMX_I2C_IFDR */
+ #define SMSC_CHIPNAME		"smsc911x"
+@@ -2095,8 +2099,58 @@ static const struct smsc911x_ops shifted_smsc911x_ops = {
+ 	.tx_writefifo = smsc911x_tx_writefifo_shift,
  };
  
-+static const struct of_device_id i2c_imx_dt_ids[] = {
-+	{ .compatible = "fsl,imx1-i2c", },
++#ifdef CONFIG_OF
++static int __devinit smsc911x_probe_config_dt(
++				struct smsc911x_platform_config *config,
++				struct device_node *np)
++{
++	const char *mac;
++	u32 width = 0;
++
++	if (!np)
++		return -ENODEV;
++
++	config->phy_interface = of_get_phy_mode(np);
++
++	mac = of_get_mac_address(np);
++	if (mac)
++		memcpy(config->mac, mac, ETH_ALEN);
++
++	of_property_read_u32(np, "reg-shift", &config->shift);
++
++	of_property_read_u32(np, "reg-io-width", &width);
++	if (width == 4)
++		config->flags |= SMSC911X_USE_32BIT;
++
++	if (of_get_property(np, "smsc,irq-active-high", NULL))
++		config->irq_polarity = SMSC911X_IRQ_POLARITY_ACTIVE_HIGH;
++
++	if (of_get_property(np, "smsc,irq-push-pull", NULL))
++		config->irq_type = SMSC911X_IRQ_TYPE_PUSH_PULL;
++
++	if (of_get_property(np, "smsc,force-internal-phy", NULL))
++		config->flags |= SMSC911X_FORCE_INTERNAL_PHY;
++
++	if (of_get_property(np, "smsc,force-external-phy", NULL))
++		config->flags |= SMSC911X_FORCE_EXTERNAL_PHY;
++
++	if (of_get_property(np, "smsc,save-mac-address", NULL))
++		config->flags |= SMSC911X_SAVE_MAC_ADDRESS;
++
++	return 0;
++}
++#else
++static inline int smsc911x_probe_config_dt(
++				struct smsc911x_platform_config *config,
++				struct device_node *np)
++{
++	return -ENODEV;
++}
++#endif /* CONFIG_OF */
++
+ static int __devinit smsc911x_drv_probe(struct platform_device *pdev)
+ {
++	struct device_node *np = pdev->dev.of_node;
+ 	struct net_device *dev;
+ 	struct smsc911x_data *pdata;
+ 	struct smsc911x_platform_config *config = pdev->dev.platform_data;
+@@ -2107,13 +2161,6 @@ static int __devinit smsc911x_drv_probe(struct platform_device *pdev)
+ 
+ 	pr_info("Driver version %s\n", SMSC_DRV_VERSION);
+ 
+-	/* platform data specifies irq & dynamic bus configuration */
+-	if (!pdev->dev.platform_data) {
+-		pr_warn("platform_data not provided\n");
+-		retval = -ENODEV;
+-		goto out_0;
+-	}
+-
+ 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
+ 					   "smsc911x-memory");
+ 	if (!res)
+@@ -2152,9 +2199,6 @@ static int __devinit smsc911x_drv_probe(struct platform_device *pdev)
+ 	irq_flags = irq_res->flags & IRQF_TRIGGER_MASK;
+ 	pdata->ioaddr = ioremap_nocache(res->start, res_size);
+ 
+-	/* copy config parameters across to pdata */
+-	memcpy(&pdata->config, config, sizeof(pdata->config));
+-
+ 	pdata->dev = dev;
+ 	pdata->msg_enable = ((1 << debug) - 1);
+ 
+@@ -2164,10 +2208,22 @@ static int __devinit smsc911x_drv_probe(struct platform_device *pdev)
+ 		goto out_free_netdev_2;
+ 	}
+ 
++	retval = smsc911x_probe_config_dt(&pdata->config, np);
++	if (retval && config) {
++		/* copy config parameters across to pdata */
++		memcpy(&pdata->config, config, sizeof(pdata->config));
++		retval = 0;
++	}
++
++	if (retval) {
++		SMSC_WARN(pdata, probe, "Error smsc911x config not found");
++		goto out_unmap_io_3;
++	}
++
+ 	/* assume standard, non-shifted, access to HW registers */
+ 	pdata->ops = &standard_smsc911x_ops;
+ 	/* apply the right access if shifting is needed */
+-	if (config->shift)
++	if (pdata->config.shift)
+ 		pdata->ops = &shifted_smsc911x_ops;
+ 
+ 	retval = smsc911x_init(dev);
+@@ -2314,6 +2370,12 @@ static const struct dev_pm_ops smsc911x_pm_ops = {
+ #define SMSC911X_PM_OPS NULL
+ #endif
+ 
++static const struct of_device_id smsc911x_dt_ids[] = {
++	{ .compatible = "smsc,lan9115", },
 +	{ /* sentinel */ }
 +};
++MODULE_DEVICE_TABLE(of, smsc911x_dt_ids);
 +
- /** Functions for IMX I2C adapter driver ***************************************
- *******************************************************************************/
- 
-@@ -469,7 +477,7 @@ static int __init i2c_imx_probe(struct platform_device *pdev)
- 	struct imxi2c_platform_data *pdata = pdev->dev.platform_data;
- 	void __iomem *base;
- 	resource_size_t res_size;
--	int irq;
-+	int irq, bitrate;
- 	int ret;
- 
- 	dev_dbg(&pdev->dev, "<%s>\n", __func__);
-@@ -512,6 +520,7 @@ static int __init i2c_imx_probe(struct platform_device *pdev)
- 	i2c_imx->adapter.algo		= &i2c_imx_algo;
- 	i2c_imx->adapter.dev.parent	= &pdev->dev;
- 	i2c_imx->adapter.nr 		= pdev->id;
-+	i2c_imx->adapter.dev.of_node	= pdev->dev.of_node;
- 	i2c_imx->irq			= irq;
- 	i2c_imx->base			= base;
- 	i2c_imx->res			= res;
-@@ -538,10 +547,12 @@ static int __init i2c_imx_probe(struct platform_device *pdev)
- 	i2c_set_adapdata(&i2c_imx->adapter, i2c_imx);
- 
- 	/* Set up clock divider */
--	if (pdata && pdata->bitrate)
--		i2c_imx_set_clk(i2c_imx, pdata->bitrate);
--	else
--		i2c_imx_set_clk(i2c_imx, IMX_I2C_BIT_RATE);
-+	bitrate = IMX_I2C_BIT_RATE;
-+	ret = of_property_read_u32(pdev->dev.of_node,
-+				   "clock-frequency", &bitrate);
-+	if (ret < 0 && pdata && pdata->bitrate)
-+		bitrate = pdata->bitrate;
-+	i2c_imx_set_clk(i2c_imx, bitrate);
- 
- 	/* Set up chip registers to defaults */
- 	writeb(0, i2c_imx->base + IMX_I2C_I2CR);
-@@ -554,6 +565,8 @@ static int __init i2c_imx_probe(struct platform_device *pdev)
- 		goto fail5;
- 	}
- 
-+	of_i2c_register_devices(&i2c_imx->adapter);
-+
- 	/* Set up platform driver data */
- 	platform_set_drvdata(pdev, i2c_imx);
- 
-@@ -584,7 +597,6 @@ fail1:
- static int __exit i2c_imx_remove(struct platform_device *pdev)
- {
- 	struct imx_i2c_struct *i2c_imx = platform_get_drvdata(pdev);
--	struct imxi2c_platform_data *pdata = pdev->dev.platform_data;
- 
- 	/* remove adapter */
- 	dev_dbg(&i2c_imx->adapter.dev, "adapter removed\n");
-@@ -613,6 +625,7 @@ static struct platform_driver i2c_imx_driver = {
- 	.driver	= {
- 		.name	= DRIVER_NAME,
+ static struct platform_driver smsc911x_driver = {
+ 	.probe = smsc911x_drv_probe,
+ 	.remove = __devexit_p(smsc911x_drv_remove),
+@@ -2321,6 +2383,7 @@ static struct platform_driver smsc911x_driver = {
+ 		.name	= SMSC_CHIPNAME,
  		.owner	= THIS_MODULE,
-+		.of_match_table = i2c_imx_dt_ids,
- 	}
+ 		.pm	= SMSC911X_PM_OPS,
++		.of_match_table = smsc911x_dt_ids,
+ 	},
  };
  
 -- 
