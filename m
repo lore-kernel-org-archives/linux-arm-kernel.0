@@ -1,85 +1,64 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 30 Jul 2011 14:05:37 +0100
-Subject: [PATCH 07/18] dmaengine/amba-pl08x: Enable/Disable amba_pclk
-	with channel requests
-In-Reply-To: <20110730120740.GA15791@n2100.arm.linux.org.uk>
-References: <cover.1311936523.git.viresh.kumar@st.com>
-	<96781d46e41fa6ffc04b88527a25d73f5a59eda8.1311936524.git.viresh.kumar@st.com>
-	<20110730120740.GA15791@n2100.arm.linux.org.uk>
-Message-ID: <20110730130537.GB15791@n2100.arm.linux.org.uk>
+From: wmb@firmworks.com (Mitch Bradley)
+Date: Sat, 30 Jul 2011 04:29:50 -1000
+Subject: [PATCH v2 6/7] i2c: pxa: support i2c controller from DT
+In-Reply-To: <20110729165547.GB30298@n2100.arm.linux.org.uk>
+References: <1311835293-18125-1-git-send-email-haojian.zhuang@marvell.com>
+	<1311835293-18125-2-git-send-email-haojian.zhuang@marvell.com>
+	<1311835293-18125-3-git-send-email-haojian.zhuang@marvell.com>
+	<1311835293-18125-4-git-send-email-haojian.zhuang@marvell.com>
+	<1311835293-18125-5-git-send-email-haojian.zhuang@marvell.com>
+	<1311835293-18125-6-git-send-email-haojian.zhuang@marvell.com>
+	<1311835293-18125-7-git-send-email-haojian.zhuang@marvell.com>
+	<20110729165222.GN11164@ponder.secretlab.ca>
+	<20110729165547.GB30298@n2100.arm.linux.org.uk>
+Message-ID: <4E34155E.8010606@firmworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 30, 2011 at 01:07:40PM +0100, Russell King - ARM Linux wrote:
-> On Fri, Jul 29, 2011 at 04:19:17PM +0530, Viresh Kumar wrote:
-> > Amba devices have interface clocks attached as adev->pclk. This is the only
-> > clock associated with DMAC and it can be disabled when DMAC is not in use. This
-> > patch adds support to enable/disable this clk as and when channels are requested
-> > and freed. Also it disables this clock at the end of probe.
-> 
-> It may make better sense to convert this to runtime PM.  I suspect
-> that there's core support which the amba/bus.c can do to help in that
-> respect (eg, managing the apb pclk itself) so that we don't have to
-> add the same code to every primecell driver.
+On 7/29/2011 6:55 AM, Russell King - ARM Linux wrote:
+> On Fri, Jul 29, 2011 at 10:52:22AM -0600, Grant Likely wrote:
+>> On Thu, Jul 28, 2011 at 02:41:32PM +0800, Haojian Zhuang wrote:
+>>> -	/*
+>>> -	 * If "dev->id" is negative we consider it as zero.
+>>> -	 * The reason to do so is to avoid sysfs names that only make
+>>> -	 * sense when there are multiple adapters.
+>>> -	 */
+>>> -	i2c->adap.nr = dev->id;
+>>> -	snprintf(i2c->adap.name, sizeof(i2c->adap.name), "pxa_i2c-i2c.%u",
+>>> -		 i2c->adap.nr);
+>>>
+>>> -	i2c->clk = clk_get(&dev->dev, NULL);
+>>> +	if (np) {
+>>> +		i2c->adap.nr = idx++;
+>>
+>> Use this so that a bus number gets dynamically assigned:
+>> 		i2c->adap.nr = -1;
+>>
+>>> +		snprintf(i2c->adap.name, sizeof(i2c->adap.name),
+>>> +			"pxa2xx-i2c.%u", i2c->adap.nr);
+>>> +		i2c->clk = clk_get_sys(i2c->adap.name, NULL);
+>>
+>> Missing i2c->adap.dev.of_node = dev->dev.of_node;
+>
+> And here we go again.  Is it really the case that this DT stuff doesn't
+> have stable device names?
 
-Something like this for the bus driver (untested):
+Device tree names are completely stable, based on hardware addresses 
+that don't change from boot to boot.  Even for buses where access 
+addresses are dynamically assigned, the device tree "reg property" 
+address is based on a stable addressing form.  For example, PCI devices 
+use the (stable) configuration address as the reg property and USB 
+devices use the (stable) hub port number.
 
- drivers/amba/bus.c |   38 ++++++++++++++++++++++++++++++++++++--
- 1 files changed, 36 insertions(+), 2 deletions(-)
+People's tendency to want to assign sequential small integers in Linux 
+has nothing to do with the device tree.  I suspect that it's a carryover 
+from the historical Unix major/minor device numbering model, but in any 
+case, there's nothing unstable about the device tree naming model. 
+Quite the opposite - stable naming was a fundamental criterion when I 
+designed Open Firmware.
 
-diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
-index d74926e..9e93f34 100644
---- a/drivers/amba/bus.c
-+++ b/drivers/amba/bus.c
-@@ -365,6 +365,40 @@ static int amba_pm_restore_noirq(struct device *dev)
- 
- #endif /* !CONFIG_HIBERNATE_CALLBACKS */
- 
-+#ifdef CONFIG_PM_RUNTIME
-+/*
-+ * Hooks to provide runtime PM of the pclk (bus clock).  It is safe to
-+ * enable/disable the bus clock at runtime PM suspend/resume as this
-+ * does not result in loss of context.  However, disabling vcore power
-+ * would do, so we leave that to the driver.
-+ */
-+static int amba_pm_runtime_suspend(struct device *dev)
-+{
-+	struct amba_device *pcdev = to_amba_device(dev);
-+	int ret = pm_generic_runtime_suspend(dev);
-+
-+	if (ret == 0 && dev->driver)
-+		clk_disable(pcdev->pclk);
-+
-+	return ret;
-+}
-+
-+static int amba_pm_runtime_resume(struct device *dev)
-+{
-+	struct amba_device *pcdev = to_amba_device(dev);
-+	int ret;
-+
-+	if (dev->driver) {
-+		ret = clk_enable(pcdev->pclk);
-+		/* Failure is probably fatal to the system, but... */
-+		if (ret)
-+			return ret;
-+	}
-+
-+	return pm_generic_runtime_resume(dev);
-+}
-+#endif
-+
- #ifdef CONFIG_PM
- 
- static const struct dev_pm_ops amba_pm = {
-@@ -383,8 +417,8 @@ static const struct dev_pm_ops amba_pm = {
- 	.poweroff_noirq	= amba_pm_poweroff_noirq,
- 	.restore_noirq	= amba_pm_restore_noirq,
- 	SET_RUNTIME_PM_OPS(
--		pm_generic_runtime_suspend,
--		pm_generic_runtime_resume,
-+		amba_pm_runtime_suspend,
-+		amba_pm_runtime_resume,
- 		pm_generic_runtime_idle
- 	)
- };
+> _______________________________________________
+> devicetree-discuss mailing list
+> devicetree-discuss at lists.ozlabs.org
+> https://lists.ozlabs.org/listinfo/devicetree-discuss
+>
