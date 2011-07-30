@@ -1,36 +1,25 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Sat, 30 Jul 2011 23:54:17 +0200
-Subject: [PATCH] usb/ehci-mxc: add missing inclusion of mach/hardware.h
-In-Reply-To: <1311258250-22013-1-git-send-email-shawn.guo@linaro.org>
-References: <1311258250-22013-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20110730215417.GB26262@pengutronix.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sun, 31 Jul 2011 00:16:31 +0200
+Subject: [PATCH 01/18] ARM: asm/pl080.h: Protect against multiple
+	inclusion of header file
+In-Reply-To: <cbd8c0a36115615ea0d80055de7a27ef1b8b7ce6.1311936524.git.viresh.kumar@st.com>
+References: <cover.1311936523.git.viresh.kumar@st.com>
+	<cbd8c0a36115615ea0d80055de7a27ef1b8b7ce6.1311936524.git.viresh.kumar@st.com>
+Message-ID: <CAKnu2Mo9ABNfePnSfKjZeOtHr0JpkGO76x+=qtQp+XaEdtWWVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 21, 2011 at 10:24:10PM +0800, Shawn Guo wrote:
-> As cpu_is_mx stuff is being used in the driver, header mach/hardware.h
-> should be explicitly included.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> ---
-> The missing of the header is causing today's linux-next build error
-> as bleow.
-> 
->   CC      drivers/usb/host/ehci-hcd.o
-> In file included from linux-next/drivers/usb/host/ehci-hcd.c:1190:0:
-> linux-next/drivers/usb/host/ehci-mxc.c: In function 'ehci_mxc_drv_probe':
-> linux-next/drivers/usb/host/ehci-mxc.c:175:2: error: implicit declaration of function 'cpu_is_mx35'
-> linux-next/drivers/usb/host/ehci-mxc.c:175:2: error: implicit declaration of function 'cpu_is_mx25'
-> linux-next/drivers/usb/host/ehci-mxc.c:185:2: error: implicit declaration of function 'cpu_is_mx51'
-I just hit this problem while build testing some of my patches.
+2011/7/29 Viresh Kumar <viresh.kumar@st.com>:
 
-IMHO the build failure can go in the commit log, too.
+> <asm/hardware/pl080.h> doesn't have protection to deal with multiple inclusion.
+> And so we get compilation errors in cases where this file is included more than
+> once. This patch adds #ifdefs at the top of file to protect it against multiple
+> inclusions.
+>
+> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 
-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Good idea.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Thanks,
+Linus Walleij
