@@ -1,61 +1,47 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Sat, 30 Jul 2011 20:58:07 -0600
-Subject: [RFC/PATCH 7/7] WIP: HACK/RFC: omap_device: begin to decouple
-	platform_device from omap_device
-In-Reply-To: <20110730120332.GA15539@n2100.arm.linux.org.uk>
-References: <1311292338-11830-1-git-send-email-khilman@ti.com>
-	<1311292338-11830-9-git-send-email-khilman@ti.com>
-	<20110730120332.GA15539@n2100.arm.linux.org.uk>
-Message-ID: <20110731025807.GA24334@ponder.secretlab.ca>
+Date: Sat, 30 Jul 2011 22:11:07 -0600
+Subject: [PATCH 1/3] vic: add device tree bindings
+In-Reply-To: <20110725223151.GB3001@gallagher>
+References: <1311610200-12408-1-git-send-email-jamie@jamieiles.com>
+	<1311610200-12408-2-git-send-email-jamie@jamieiles.com>
+	<20110725200434.GB26735@ponder.secretlab.ca>
+	<20110725223151.GB3001@gallagher>
+Message-ID: <20110731041107.GN24334@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 30, 2011 at 01:03:32PM +0100, Russell King - ARM Linux wrote:
-> On Thu, Jul 21, 2011 at 04:52:18PM -0700, Kevin Hilman wrote:
-> > Rather than embedding a struct platform_device inside a struct
-> > omap_device, decouple them, leaving only a pointer to the
-> > platform_device inside the omap_device.
-> > 
-> > This patch uses devres to allocate and attach the omap_device to the
-> > struct device, so finding an omap_device from a struct device means
-> > using devres_find(), and the to_omap_device() helper function was
-> > modified accordingly.
-> > 
-> > RFC/Hack alert:
-> > 
-> > Currently the driver core (drivers/base/dd.c) doesn't expect any
-> > devres resources to exist before the driver's ->probe() is called.  In
-> > this patch, I just comment out the warning, but we'll need to
-> > understand why that limitation exists, and if it's a real limitation.
-> > A first glance suggests that it's not really needed.  If this is a
-> > true limitation, we'll need to find some way other than devres to
-> > attach an omap_device to a struct device.
-> > 
-> > On OMAP, we will need an omap_device attached to a struct device
-> > before probe because device HW may be disabled in probe and drivers
-> > are expected to use runtime PM in ->probe() to activate the hardware
-> > before access.  Because the runtime PM API calls use omap_device (via
-> > our PM domain layer), we need omap_device attached to a
-> > platform_device before probe.
+On Mon, Jul 25, 2011 at 11:31:51PM +0100, Jamie Iles wrote:
+> Hi Grant,
 > 
-> This feels really wrong to overload devres with this.  devres purpose is
-> to provide the device's _drivers_ with a way to allocate and free resources
-> in such a way to avoid leaks on .remove or probe failure.  So I think that
-> overloading it with something that has a different lifetime is completely
-> wrong.
+> On Mon, Jul 25, 2011 at 02:04:34PM -0600, Grant Likely wrote:
+> > irq_domain_add_simple() is a stop-gap shortcut for interrupt
+> > controllers that don't use irq_domain directly.  I'm okay with doing
+> > this in the short term, but I imagine it will want to change in the
+> > near future to take advantage of hw->linux irq translation provided by
+> > irq_domain when it matures.
+> 
+> I have to admit to taking this from other controllers without fully 
+> understanding it.  Is there any documentation on how this should be done 
+> correctly in the longer term?
 
-I disagree; extending devres to also handle device lifetime scoped
-resources makes perfect sense. It is a clean extension, and struct device
-is really getting rather huge.  I certainly prefer re-scoping devres
-to adding more elements to struct device.
+Documentation?  Ummmm... no, not yet.  :-/  There will be though.
 
-> We could add a new member to struct dev_archdata or pdev_archdata to carry
-> a pointer to this data, which I think would be a far cleaner (and saner)
-> way to deal with this.  In much the same way as we already have an of_node
-> member in struct device.
+> 
+> > > +	}
+> > 
+> > I think that rather than writing a interrupt-controller-specific
+> > parse route like this one, it would be much better to have a generic
+> > helper that finds and sorts all the interrupt controllers before
+> > calling a setup callback for each one.
+> 
+> Hmm, not sure I follow this.  I can see that many controllers would have 
+> some common properties so there will be some common code - are you 
+> suggesting having something do all the parsing then callbacks for each 
+> controller type that takes some kind of template or am I way off the 
+> mark?
 
-Since this is just for omap_device, which by definition is arm-only, I
-don't have any strong objection to using pdev_archdata. If it was
-cross-architecture, then I'd argue strongly for the devres approach.
+No, I'm more talking about having a routine that finds all the
+interrupt controllers and figures out the cascading order, and then
+calls each irq controller setup routine in order.
 
 g.
