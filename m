@@ -1,42 +1,31 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 31 Jul 2011 02:19:11 +0200
-Subject: [PATCH 09/18] dmaengine/amba-pl08x: Schedule tasklet in case of
-	error interrupt
-In-Reply-To: <9c81beb9cd84f84b58abbd24ebfae85dfe8d8ee1.1311936524.git.viresh.kumar@st.com>
+Date: Sun, 31 Jul 2011 02:24:56 +0200
+Subject: [PATCH 10/18] dmaengine/amba-pl08x: Get rid of
+	pl08x_pre_boundary()
+In-Reply-To: <c147ba3a755935e93fdb40b5531a6e18d34e0fd7.1311936524.git.viresh.kumar@st.com>
 References: <cover.1311936523.git.viresh.kumar@st.com>
-	<9c81beb9cd84f84b58abbd24ebfae85dfe8d8ee1.1311936524.git.viresh.kumar@st.com>
-Message-ID: <CAKnu2Mp0Xs3ivj0Vd1=Euj1CyKsWpBLrf_L_jYWuOnoRMpxGGQ@mail.gmail.com>
+	<c147ba3a755935e93fdb40b5531a6e18d34e0fd7.1311936524.git.viresh.kumar@st.com>
+Message-ID: <CAKnu2MrBB_QEn4Psa9aeyNLvF86oM-KnaNiFZ5=zMVkz_U5GOQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 2011/7/29 Viresh Kumar <viresh.kumar@st.com>:
 
-(...)
-> - ? ? ? u32 mask = 0;
-(...)
-> + ? ? ? if (!err && !tc)
-> + ? ? ? ? ? ? ? return IRQ_NONE;
-(...)
-> -
-> - ? ? ? ? ? ? ? ? ? ? ? mask |= (1 << i);
-> - ? ? ? /* Clear only the terminal interrupts on channels we processed */
-> - ? ? ? writel(mask, pl08x->base + PL080_TC_CLEAR);
+> Based on above discussion, this patch removes all code related to 1 KB boundary
+> as we are not required to handle this in driver.
 >
-> - ? ? ? return mask ? IRQ_HANDLED : IRQ_NONE;
-> + ? ? ? return IRQ_HANDLED;
+> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 
-NAK.
+OMG yes that makes perfect sense. I questioned this in the past and was
+pointed to the same manual page.
 
-These snippets illustrate what is not good about this patch, you're making
-the driver fragile by removing checks for spurious IRQ.
+What is fun is that the code was written by ARM.
 
-So for example if there is an error or TC IRQ on a channel that is not
-in use, what happens now?
+Let's merge this and I'll test it on the PB11MPCore, I think Mem2Mem
+with the DMA engine compile-in tests may work on a few other boards as
+well so maybe Russell can test it too.
 
-It used to result in IRQ_NONE, now all of a sudden we start handling
-spurious IRQs and claim IRQ_HANDLED with totally unpredictable
-results, whereas they would previously gather error metrics for
-spurious IRQs.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
 Yours,
 Linus Walleij
