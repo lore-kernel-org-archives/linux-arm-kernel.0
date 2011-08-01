@@ -1,120 +1,101 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  1 Aug 2011 18:04:20 +0100
-Subject: [RFC PATCH v10 4/4] ARM: gic: add compute_irqnr macro for exynos4
-In-Reply-To: <1312218260-14866-1-git-send-email-marc.zyngier@arm.com>
-References: <1312218260-14866-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1312218260-14866-5-git-send-email-marc.zyngier@arm.com>
+From: lbassel@codeaurora.org (Larry Bassel)
+Date: Mon, 1 Aug 2011 10:08:50 -0700
+Subject: questions about memory hotplug
+In-Reply-To: <20110730093055.GA10672@sli10-conroe.sh.intel.com>
+References: <20110729221230.GA3466@labbmf-linux.qualcomm.com>
+	<20110730093055.GA10672@sli10-conroe.sh.intel.com>
+Message-ID: <20110801170850.GB3466@labbmf-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-exynos4 has a full copy of entry-macro-gic.S, just for the sake
-of an offset added to the IRQ number read from the GIC.
+On 30 Jul 11 17:30, Shaohua Li wrote:
+> On Sat, Jul 30, 2011 at 06:12:31AM +0800, Larry Bassel wrote:
+> > We want to handle the following 2 use cases we have on
+> > some of our (ARM) platforms:
+> > 
+> > 1. A platform where part of the memory may be powered
+> > off. The location and size of this memory is not known
+> > until the kernel parses the memory tags (there aren't
+> > any non-standard tags used, but the memory layout and
+> > a memory bank size which is obtained from HW are used
+> > to figure out where and how large this memory is). All
+> > of this memory must either be on or off. For a given
+> > configuration the location of this memory can't be moved.
+> > 
+> > 2. A (different) platform where part of the memory
+> > is occasionally needed as a large physically contiguous 
+> > block, but usually is not (and then should be usable
+> > by the kernel as normal memory). When the memory is
+> > needed for the contiguous block, the pages in this
+> > range currently being used by the kernel will
+> > need to be migrated out.
+> > 
+> > The size of this is known at compile time and can be
+> > placed at any reasonable place in memory (but should
+> > be SPARSEMEM section aligned -- its size may however
+> > not be a power of 2 and thus this memory could
+> > span more than one section). This memory will not be
+> > powered off, but must either be completely used for
+> > one purpose or the other.
+> > 
+> > The size of memory in question for #1 is generally
+> > much larger than that of #2.
+> > 
+> > Memory hotplug/hotremove (logical and physical for #1,
+> > only logical for #2) approximately solves these problems,
+> > but there is some functionality we need that AFAIK is
+> > not present:
+> > 
+> > * The memory in #1 and #2 above must be in a movable
+> > zone so that the chance of migration is maximized.
+> > I'm familiar with the kernelcore= and movablecore=
+> > commandline options, but they don't do what is necessary
+> > here, because we need control on where the movable zone
+> > is formed as well as the size. Also the location and size
+> > of these special memory areas is not known until the
+> > kernel comes up (in #1 it is conceivable that the bootloader
+> > could locate the memory that can be powered on and off and
+> > pass it in via some commandline option, but AFAICT this won't
+> > work at all for #2).
+> > 
+> > One could hack up find_zone_movable_pfns_for_nodes() presumably,
+> > but I wonder if there is an already existing way of doing
+> > this (or at least a clean extension to the current
+> > functionality that someone might suggest).
+> > 
+> > Would CONFIG_ARCH_POPULATES_NODE_MAP help here? Does anyone
+> > use this? It doesn't seem to be in any defconfig or Kconfig
+> > on 3.0 (or earlier versions I've looked at).
+> > 
+> > Perhaps CMA (which is not merged yet and AFAIK still has some
+> > issues on ARM) might handle #2 better than memory
+> > hotplug/hotremove. Or is there a better way to handle #2
+> > than either CMA or memory hotplug?
+> is such memory always at the end of memory? if yes, such memory
+> can be added to MOVABLE_ZONE.
 
-Add a compute_irqnr macro to entry-macro-gic.S so that any platform
-can add it's own hook without having to copy the whole file again.
+In use case #1 yes, maybe not in #2 (we can arrange it to be
+at the end of memory, but then might waste memory as it may
+not be aligned on a SPARSEMEM section boundary and so would
+need to be padded).
 
-Cc: Ben Dooks <ben-linux@fluff.org>
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/include/asm/hardware/entry-macro-gic.S  |    3 +
- arch/arm/mach-exynos4/include/mach/entry-macro.S |   57 +++-------------------
- 2 files changed, 10 insertions(+), 50 deletions(-)
+> or if such memory can be at the middle of memory, maybe we can add
+> a new mirgate type, the migrate type is movable but other type allocation
+> can't fallback into.
+> 
+> Thanks,
+> Shaohua
 
-diff --git a/arch/arm/include/asm/hardware/entry-macro-gic.S b/arch/arm/include/asm/hardware/entry-macro-gic.S
-index 74ebc80..fbb50dc 100644
---- a/arch/arm/include/asm/hardware/entry-macro-gic.S
-+++ b/arch/arm/include/asm/hardware/entry-macro-gic.S
-@@ -43,6 +43,9 @@
- 	cmpcc	\irqnr, \irqnr
- 	cmpne	\irqnr, \tmp
- 	cmpcs	\irqnr, \irqnr
-+#ifdef HAVE_GIC_BASE_OFFSET
-+	compute_irqnr	\irqnr, \tmp
-+#endif
- 	.endm
- 
- /* We assume that irqstat (the raw value of the IRQ acknowledge
-diff --git a/arch/arm/mach-exynos4/include/mach/entry-macro.S b/arch/arm/mach-exynos4/include/mach/entry-macro.S
-index 807d05d..ea578b5 100644
---- a/arch/arm/mach-exynos4/include/mach/entry-macro.S
-+++ b/arch/arm/mach-exynos4/include/mach/entry-macro.S
-@@ -9,11 +9,15 @@
-  * warranty of any kind, whether express or implied.
- */
- 
-+#define HAVE_GIC_BASE_OFFSET	1
-+
- #include <mach/hardware.h>
- #include <mach/map.h>
- #include <asm/hardware/gic.h>
-+#include <asm/hardware/entry-macro-gic.S>
- 
--		.macro	disable_fiq
-+		.macro	compute_irqnr, irqnr, tmp
-+		addne	\irqnr, #32
- 		.endm
- 
- 		.macro  get_irqnr_preamble, base, tmp
-@@ -23,57 +27,10 @@
- 		and     \tmp, \tmp, #3
- 		cmp     \tmp, #1
- 		addeq   \base, \base, #EXYNOS4_GIC_BANK_OFFSET
--		.endm
--
--		.macro  arch_ret_to_user, tmp1, tmp2
--		.endm
--
--		/*
--		 * The interrupt numbering scheme is defined in the
--		 * interrupt controller spec.  To wit:
--		 *
--		 * Interrupts 0-15 are IPI
--		 * 16-28 are reserved
--		 * 29-31 are local.  We allow 30 to be used for the watchdog.
--		 * 32-1020 are global
--		 * 1021-1022 are reserved
--		 * 1023 is "spurious" (no interrupt)
--		 *
--		 * For now, we ignore all local interrupts so only return an interrupt if it's
--		 * between 30 and 1020.  The test_for_ipi routine below will pick up on IPIs.
--		 *
--		 * A simple read from the controller will tell us the number of the highest
--                 * priority enabled interrupt.  We then just need to check whether it is in the
--		 * valid range for an IRQ (30-1020 inclusive).
--		 */
--
--		.macro  get_irqnr_and_base, irqnr, irqstat, base, tmp
--
--		ldr     \irqstat, [\base, #GIC_CPU_INTACK] /* bits 12-10 = src CPU, 9-0 = int # */
--
--		ldr	\tmp, =1021
--
--		bic     \irqnr, \irqstat, #0x1c00
--
--		cmp     \irqnr, #15
--		cmpcc	\irqnr, \irqnr
--		cmpne	\irqnr, \tmp
--		cmpcs	\irqnr, \irqnr
--		addne	\irqnr, \irqnr, #32
- 
-+		.macro	disable_fiq
- 		.endm
- 
--		/* We assume that irqstat (the raw value of the IRQ acknowledge
--		 * register) is preserved from the macro above.
--		 * If there is an IPI, we immediately signal end of interrupt on the
--		 * controller, since this requires the original irqstat value which
--		 * we won't easily be able to recreate later.
--		 */
--
--		.macro test_for_ipi, irqnr, irqstat, base, tmp
--		bic	\irqnr, \irqstat, #0x1c00
--		cmp	\irqnr, #16
--		strcc	\irqstat, [\base, #GIC_CPU_EOI]
--		cmpcs	\irqnr, \irqnr
-+		.macro  arch_ret_to_user, tmp1, tmp2
- 		.endm
- 
+Larry
+
+> 
+> --
+> To unsubscribe, send a message with 'unsubscribe linux-mm' in
+> the body to majordomo at kvack.org.  For more info on Linux MM,
+> see: http://www.linux-mm.org/ .
+> Fight unfair telecom internet charges in Canada: sign http://stopthemeter.ca/
+> Don't email: <a href=mailto:"dont@kvack.org"> email at kvack.org </a>
+
 -- 
-1.7.0.4
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
