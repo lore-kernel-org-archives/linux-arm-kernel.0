@@ -1,461 +1,521 @@
 From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Mon, 1 Aug 2011 10:47:06 +0800
-Subject: [PATCH v2 1/7] ARM: mmp: parse irq from DT
-In-Reply-To: <20110729163616.GJ11164@ponder.secretlab.ca>
+Date: Mon, 1 Aug 2011 10:48:54 +0800
+Subject: [PATCH v2 3/7] ARM: mmp: support DT on both dkb and brownstone
+In-Reply-To: <20110729164218.GL11164@ponder.secretlab.ca>
 References: <1311835293-18125-1-git-send-email-haojian.zhuang@marvell.com>
 	<1311835293-18125-2-git-send-email-haojian.zhuang@marvell.com>
-	<20110729163616.GJ11164@ponder.secretlab.ca>
-Message-ID: <CAN1soZxX6EBRPvzV_00njioBn1NfiAbLBoD7EYc-wV-uQM_VoQ@mail.gmail.com>
+	<1311835293-18125-3-git-send-email-haojian.zhuang@marvell.com>
+	<1311835293-18125-4-git-send-email-haojian.zhuang@marvell.com>
+	<20110729164218.GL11164@ponder.secretlab.ca>
+Message-ID: <CAN1soZzh-bovcAy3bBN18=0EfXregYWFAKrAjxqWA_Ra9Rxvzw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 30, 2011 at 12:36 AM, Grant Likely
+On Sat, Jul 30, 2011 at 12:42 AM, Grant Likely
 <grant.likely@secretlab.ca> wrote:
-> On Thu, Jul 28, 2011 at 02:41:27PM +0800, Haojian Zhuang wrote:
->> Parse irq sepcifier from DT and translate it to Linux irq number.
->> Remove the definition of NR_IRQS in irqs.h. Since sparse irq is
->> enabled, nr_irqs will be calculated automatically.
+> On Thu, Jul 28, 2011 at 02:41:29PM +0800, Haojian Zhuang wrote:
+>> Add new boards.c to support both TTC-DKB and MMP2-BROWNSTONE. If CONFIG_OF
+>> isn't selected, we continue to use original ttc_dkb.c and brownstone.c.
+>>
+>> While everything moving to DT in ARCH-MMP, ttc_dkb.c and brownstone.c
+>> will be abandoned.
 >>
 >> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
 >> ---
->> ?.../devicetree/bindings/arm/marvell/intc.txt ? ? ? | ?114 ++++++++++
->> ?arch/arm/Kconfig ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ?1 +
->> ?arch/arm/mach-mmp/Makefile ? ? ? ? ? ? ? ? ? ? ? ? | ? ?2 +
->> ?arch/arm/mach-mmp/common.h ? ? ? ? ? ? ? ? ? ? ? ? | ? ?1 +
->> ?arch/arm/mach-mmp/include/mach/irqs.h ? ? ? ? ? ? ?| ? ?2 +-
->> ?arch/arm/mach-mmp/intc.c ? ? ? ? ? ? ? ? ? ? ? ? ? | ?224 ++++++++++++++++++++
->> ?6 files changed, 343 insertions(+), 1 deletions(-)
->> ?create mode 100644 Documentation/devicetree/bindings/arm/marvell/intc.txt
->> ?create mode 100644 arch/arm/mach-mmp/intc.c
+>> ?.../devicetree/bindings/arm/marvell/boards.txt ? ? | ? ?7 +
+>> ?arch/arm/boot/dts/mmp2-brownstone.dts ? ? ? ? ? ? ?| ?216 ++++++++++++++++++++
+>> ?arch/arm/boot/dts/pxa910-dkb.dts ? ? ? ? ? ? ? ? ? | ? 81 ++++++++
+>> ?arch/arm/mach-mmp/Makefile ? ? ? ? ? ? ? ? ? ? ? ? | ? ?1 +
+>> ?arch/arm/mach-mmp/boards.c ? ? ? ? ? ? ? ? ? ? ? ? | ?138 +++++++++++++
+>> ?5 files changed, 443 insertions(+), 0 deletions(-)
+>> ?create mode 100644 Documentation/devicetree/bindings/arm/marvell/boards.txt
+>> ?create mode 100644 arch/arm/boot/dts/mmp2-brownstone.dts
+>> ?create mode 100644 arch/arm/boot/dts/pxa910-dkb.dts
+>> ?create mode 100644 arch/arm/mach-mmp/boards.c
 >>
->> diff --git a/Documentation/devicetree/bindings/arm/marvell/intc.txt b/Documentation/devicetree/bindings/arm/marvell/intc.txt
+>> diff --git a/Documentation/devicetree/bindings/arm/marvell/boards.txt b/Documentation/devicetree/bindings/arm/marvell/boards.txt
 >> new file mode 100644
->> index 0000000..80cef58
+>> index 0000000..a031a26
 >> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/arm/marvell/intc.txt
->> @@ -0,0 +1,114 @@
->> +* Interrupt Controller Binding for ARCH-MMP
+>> +++ b/Documentation/devicetree/bindings/arm/marvell/boards.txt
+>> @@ -0,0 +1,7 @@
+>> +TTC(pxa910) "DKB" evalutation board
+>> +Required root node properties:
+>> + ? ? - compatible = "mrvl,pxa910-dkb", "mrvl,pxa910";
 >> +
->> +This binding specifies what properties must be available in device tree representation of an ARCH-MMP compliant interrupt controller.
+>> +mmp2(armada610) "Brownstone" evalutation board
+>> +Required root node properties:
+>> + ? ? - compatible = "mrvl,mmp2-brownstone", "mrvl,mmp2";
+>> diff --git a/arch/arm/boot/dts/mmp2-brownstone.dts b/arch/arm/boot/dts/mmp2-brownstone.dts
+>> new file mode 100644
+>> index 0000000..2673282
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/mmp2-brownstone.dts
+>> @@ -0,0 +1,216 @@
+>> +/dts-v1/;
 >> +
->> +Required properties:
+>> +/include/ "skeleton.dtsi"
 >> +
->> + ? ? - compatible: Specifies the compatibility list of the interrupt
->> + ? ? ? controller. The type shall be <string> and the value shall be
->> + ? ? ? "mrvl,pxa168-intc" or "mrvl,mmp2-mux-intc".
->> + ? ? ? "mrvl,pxa168-intc" is the base interrupt controller. It must be
->> + ? ? ? included. It's compatible for pxa910, mmp2. "mrvl,mmp2-mux-intc"
->> + ? ? ? is the expanded interrupt controller, and it's optional.
+>> +/ {
+>> + ? ? model = "Marvell MMP2 Brownstone";
+>> + ? ? compatible = "mrvl,mmp2-brownstone", "mrvl,mmp2";
+>> + ? ? #address-cells = <1>;
+>> + ? ? #size-cells = <1>;
+>> + ? ? interrupt-parent = <&mmp_intc>;
 >> +
->> + ? ? - reg: Specified the base physical address(s) and size(s) of the
->> + ? ? ? interrupt controller's addressable register space. The type
->> + ? ? ? should be <prop-encoded-array>.
+>> + ? ? memory {
+>> + ? ? ? ? ? ? reg = <0x00000000 0x20000000>;
+>> + ? ? };
 >> +
->> + ? ? - interrupt-controller: The presence of this property identifies
->> + ? ? ? the node as interrupt controller. No property value should be
->> + ? ? ? defined.
+>> + ? ? chosen {
+>> + ? ? ? ? ? ? bootargs = "console=ttyS2,38400 root=/dev/nfs nfsroot=192.168.1.100:192.168.1.101::255.255.255.0::eth0:on";
+>> + ? ? ? ? ? ? linux,stdout-path = &uart2;
+>> + ? ? };
 >> +
->> + ? ? - #interrupt-cells: Specifies the number of cells needed to encode
->> + ? ? ? an interrupt source. The type should be <u32> and the value should
->> + ? ? ? be 1.
->> +
->> + ? ? - mrvl,intc-numbers: Specifies the number of interrupts is supported
->> + ? ? ? in this interrupt controller. The type should be <u32>.
->> +
->> +Optional properties:
->> +
->> + ? ? - mrvl,intc-priority: Specifies the which path the interrupt is routed
->> + ? ? ? and the priority of this interrupt. The property is used in
->> + ? ? ? pxa168-intc. The value should be <u32>.
->> +
->> + ? ? - mrvl,status-offset: Specifies the offset of status register. The
->> + ? ? ? property is used in mmp2-mux-intc. The type should be <u32>.
->> +
->> + ? ? - mrvl,mask-offset: Specifies the offset of mask register. The
->> + ? ? ? property is used in mmp2-mux-intc. The type should be <u32>.
->> +
->> + ? ? - mrvl,mfp-edge: Specifies the address of mfp edge detection register.
->> + ? ? ? The property is used while acking specified interrupt. The type
->> + ? ? ? should be <prop-encoded-array>. The first cell indicates the address
->> + ? ? ? of mfp edge detection register. The second cell indicates the
->> + ? ? ? index of interrupt in current interrupt controller that should
->> + ? ? ? handle mfp edge detection.
->> +
->> +* Examples
->> +
->> +Example 1:
->> +
->> + ? ? /*
->> + ? ? ?* base INTC
->> + ? ? ?*/
->> + ? ? mmp_intc: interrupt-controller at d4282000 {
->> + ? ? ? ? ? ? /* Compatible with pxa168-intc. */
->> + ? ? ? ? ? ? compatible = "mrvl,pxa168-intc";
+>> + ? ? soc at d4000000 {
+>> + ? ? ? ? ? ? compatible = "mrvl,mmp2", "mrvl,armada610", "simple-bus";
 >> + ? ? ? ? ? ? #address-cells = <1>;
 >> + ? ? ? ? ? ? #size-cells = <1>;
->> + ? ? ? ? ? ? /* Offset address of 0xd4282000 and size of 0x400. */
->> + ? ? ? ? ? ? reg = <0xd4282000 0x400>;
+>> + ? ? ? ? ? ? ranges;
 >> +
->> + ? ? ? ? ? ? #interrupt-cells = <1>;
->> + ? ? ? ? ? ? interrupt-controller;
+>> + ? ? ? ? ? ? mmp_intc: interrupt-controller at d4282000 {
+>> + ? ? ? ? ? ? ? ? ? ? compatible = "mrvl,pxa168-intc";
+>> + ? ? ? ? ? ? ? ? ? ? /* reg: <offset & size> */
+>> + ? ? ? ? ? ? ? ? ? ? reg = <0xd4282000 0x400>;
 >> +
->> + ? ? ? ? ? ? /* 64 interrupts are supported in this INTC. */
->> + ? ? ? ? ? ? mrvl,intc-numbers = <64>;
+>> + ? ? ? ? ? ? ? ? ? ? #interrupt-cells = <1>;
+>> + ? ? ? ? ? ? ? ? ? ? interrupt-controller;
+>> + ? ? ? ? ? ? ? ? ? ? mrvl,intc-numbers = <64>;
+>> + ? ? ? ? ? ? ? ? ? ? /* priority bits in conf register */
+>> + ? ? ? ? ? ? ? ? ? ? mrvl,intc-priority = <0x20>;
+>> + ? ? ? ? ? ? };
 >> +
->> + ? ? ? ? ? ? /* priority bits in configuration register */
->> + ? ? ? ? ? ? mrvl,intc-priority = <0x20>;
+>> + ? ? ? ? ? ? mux_intc4: interrupt-controller at d4282150 {
+>> + ? ? ? ? ? ? ? ? ? ? compatible = "mrvl,mmp2-mux-intc";
+>> + ? ? ? ? ? ? ? ? ? ? reg = <0xd4282150 0>;
+>> +
+>> + ? ? ? ? ? ? ? ? ? ? #interrupt-cells = <1>;
+>> + ? ? ? ? ? ? ? ? ? ? interrupt-controller;
+>> + ? ? ? ? ? ? ? ? ? ? interrupts = <4>;
+>> + ? ? ? ? ? ? ? ? ? ? mrvl,intc-numbers = <2>;
+>> + ? ? ? ? ? ? ? ? ? ? mrvl,status-offset = <0x150>;
+>> + ? ? ? ? ? ? ? ? ? ? mrvl,mask-offset = <0x168>;
+>> + ? ? ? ? ? ? ? ? ? ? /* mfp register & interrupt index */
+>> + ? ? ? ? ? ? ? ? ? ? mrvl,mfp-edge = <0xd401e2c4 1>;
+>> + ? ? ? ? ? ? };
+>> +
+>> + ? ? ? ? ? ? mux_intc5: interrupt-controller at d4282154 {
+>> + ? ? ? ? ? ? ? ? ? ? compatible = "mrvl,mmp2-mux-intc";
+>> + ? ? ? ? ? ? ? ? ? ? reg = <0xd4282154 0>;
+>> +
+>> + ? ? ? ? ? ? ? ? ? ? #interrupt-cells = <1>;
+>> + ? ? ? ? ? ? ? ? ? ? interrupt-controller;
+>> + ? ? ? ? ? ? ? ? ? ? interrupts = <5>;
+>> + ? ? ? ? ? ? ? ? ? ? mrvl,intc-numbers = <2>;
+>> + ? ? ? ? ? ? ? ? ? ? mrvl,status-offset = <0x154>;
+>> + ? ? ? ? ? ? ? ? ? ? mrvl,mask-offset = <0x16c>;
+>> + ? ? ? ? ? ? };
+>> +
+>> + ? ? ? ? ? ? mux_intc9: interrupt-controller at d4282180 {
+>> + ? ? ? ? ? ? ? ? ? ? compatible = "mrvl,mmp2-mux-intc";
+>> + ? ? ? ? ? ? ? ? ? ? reg = <0xd4282180 0>;
+>> +
+>> + ? ? ? ? ? ? ? ? ? ? #interrupt-cells = <1>;
+>> + ? ? ? ? ? ? ? ? ? ? interrupt-controller;
+>> + ? ? ? ? ? ? ? ? ? ? interrupts = <9>;
+>> + ? ? ? ? ? ? ? ? ? ? mrvl,intc-numbers = <3>;
+>> + ? ? ? ? ? ? ? ? ? ? mrvl,status-offset = <0x180>;
+>> + ? ? ? ? ? ? ? ? ? ? mrvl,mask-offset = <0x17c>;
+>> + ? ? ? ? ? ? };
+>> +
+>> + ? ? ? ? ? ? mux_intc17: interrupt-controller at d4282158 {
+>> + ? ? ? ? ? ? ? ? ? ? compatible = "mrvl,mmp2-mux-intc";
+>> + ? ? ? ? ? ? ? ? ? ? reg = <0xd4282158 0>;
+>> +
+>> + ? ? ? ? ? ? ? ? ? ? #interrupt-cells = <1>;
+>> + ? ? ? ? ? ? ? ? ? ? interrupt-controller;
+>> + ? ? ? ? ? ? ? ? ? ? interrupts = <17>;
+>> + ? ? ? ? ? ? ? ? ? ? mrvl,intc-numbers = <5>;
+>> + ? ? ? ? ? ? ? ? ? ? mrvl,status-offset = <0x158>;
+>> + ? ? ? ? ? ? ? ? ? ? mrvl,mask-offset = <0x170>;
+>> + ? ? ? ? ? ? };
+>> +
+>> + ? ? ? ? ? ? mux_intc35: interrupt-controller at d428215c {
+>> + ? ? ? ? ? ? ? ? ? ? compatible = "mrvl,mmp2-mux-intc";
+>> + ? ? ? ? ? ? ? ? ? ? reg = <0xd428215c 0>;
+>> +
+>> + ? ? ? ? ? ? ? ? ? ? #interrupt-cells = <1>;
+>> + ? ? ? ? ? ? ? ? ? ? interrupt-controller;
+>> + ? ? ? ? ? ? ? ? ? ? interrupts = <35>;
+>> + ? ? ? ? ? ? ? ? ? ? mrvl,intc-numbers = <15>;
+>> + ? ? ? ? ? ? ? ? ? ? mrvl,status-offset = <0x15c>;
+>> + ? ? ? ? ? ? ? ? ? ? mrvl,mask-offset = <0x174>;
+>> + ? ? ? ? ? ? };
+>> +
+>> + ? ? ? ? ? ? mux_intc51: interrupt-controller at d4282160 {
+>> + ? ? ? ? ? ? ? ? ? ? compatible = "mrvl,mmp2-mux-intc";
+>> + ? ? ? ? ? ? ? ? ? ? reg = <0xd4282160 0>;
+>> +
+>> + ? ? ? ? ? ? ? ? ? ? #interrupt-cells = <1>;
+>> + ? ? ? ? ? ? ? ? ? ? interrupt-controller;
+>> + ? ? ? ? ? ? ? ? ? ? interrupts = <51>;
+>> + ? ? ? ? ? ? ? ? ? ? mrvl,intc-numbers = <2>;
+>> + ? ? ? ? ? ? ? ? ? ? mrvl,status-offset = <0x160>;
+>> + ? ? ? ? ? ? ? ? ? ? mrvl,mask-offset = <0x178>;
+>> + ? ? ? ? ? ? };
+>> +
+>> + ? ? ? ? ? ? mux_intc55: interrupt-controller at d4282188 {
+>> + ? ? ? ? ? ? ? ? ? ? compatible = "mrvl,mmp2-mux-intc";
+>> + ? ? ? ? ? ? ? ? ? ? reg = <0xd4282188 0>;
+>> +
+>> + ? ? ? ? ? ? ? ? ? ? #interrupt-cells = <1>;
+>> + ? ? ? ? ? ? ? ? ? ? interrupt-controller;
+>> + ? ? ? ? ? ? ? ? ? ? interrupts = <55>;
+>> + ? ? ? ? ? ? ? ? ? ? mrvl,intc-numbers = <2>;
+>> + ? ? ? ? ? ? ? ? ? ? mrvl,status-offset = <0x188>;
+>> + ? ? ? ? ? ? ? ? ? ? mrvl,mask-offset = <0x184>;
+>> + ? ? ? ? ? ? };
+>> +
+>> + ? ? ? ? ? ? mmp_timer: timer at 0 {
+>> + ? ? ? ? ? ? ? ? ? ? compatible = "mrvl,pxa168-timer";
+>> + ? ? ? ? ? ? ? ? ? ? interrupts = <13>;
+>> + ? ? ? ? ? ? ? ? ? ? mrvl,clk-conf = <0xd4000024 0x13>;
+>> + ? ? ? ? ? ? };
+>> +
+>> + ? ? ? ? ? ? i2c0: i2c at d4011000 {
+>> + ? ? ? ? ? ? ? ? ? ? compatible = "mrvl,pxa255-i2c";
+>> + ? ? ? ? ? ? ? ? ? ? #address-cells = <1>;
+>> + ? ? ? ? ? ? ? ? ? ? #size-cells = <0>;
+>> + ? ? ? ? ? ? ? ? ? ? reg = <0xd4011000 0x60>;
+>> + ? ? ? ? ? ? ? ? ? ? interrupts = <7>;
+>> + ? ? ? ? ? ? ? ? ? ? mrvl,i2c-frequency = "fast";
+>> + ? ? ? ? ? ? };
+>> +
+>> + ? ? ? ? ? ? i2c1: i2c at d4031000 {
+>> + ? ? ? ? ? ? ? ? ? ? compatible = "mrvl,pxa255-i2c";
+>> + ? ? ? ? ? ? ? ? ? ? reg = <0xd4031000 0x60>;
+>> + ? ? ? ? ? ? ? ? ? ? interrupts = <0>;
+>> + ? ? ? ? ? ? ? ? ? ? interrupt-parent = <&mux_intc17>;
+>> + ? ? ? ? ? ? ? ? ? ? mrvl,i2c-frequency = "fast";
+>> + ? ? ? ? ? ? };
+>> +
+>> + ? ? ? ? ? ? i2c2: i2c at d4032000 {
+>> + ? ? ? ? ? ? ? ? ? ? compatible = "mrvl,pxa255-i2c";
+>> + ? ? ? ? ? ? ? ? ? ? reg = <0xd4032000 0x60>;
+>> + ? ? ? ? ? ? ? ? ? ? interrupts = <1>;
+>> + ? ? ? ? ? ? ? ? ? ? interrupt-parent = <&mux_intc17>;
+>> + ? ? ? ? ? ? ? ? ? ? mrvl,i2c-frequency = "fast";
+>> + ? ? ? ? ? ? };
+>> +
+>> + ? ? ? ? ? ? i2c3: i2c at d4033000 {
+>> + ? ? ? ? ? ? ? ? ? ? compatible = "mrvl,pxa255-i2c";
+>> + ? ? ? ? ? ? ? ? ? ? reg = <0xd4033000 0x60>;
+>> + ? ? ? ? ? ? ? ? ? ? interrupts = <2>;
+>> + ? ? ? ? ? ? ? ? ? ? interrupt-parent = <&mux_intc17>;
+>> + ? ? ? ? ? ? ? ? ? ? mrvl,i2c-frequency = "fast";
+>> + ? ? ? ? ? ? };
+>> +
+>> + ? ? ? ? ? ? i2c4: i2c at d4033800 {
+>> + ? ? ? ? ? ? ? ? ? ? compatible = "mrvl,pxa255-i2c";
+>> + ? ? ? ? ? ? ? ? ? ? reg = <0xd4033800 0x60>;
+>> + ? ? ? ? ? ? ? ? ? ? interrupts = <3>;
+>> + ? ? ? ? ? ? ? ? ? ? interrupt-parent = <&mux_intc17>;
+>> + ? ? ? ? ? ? ? ? ? ? mrvl,i2c-frequency = "fast";
+>> + ? ? ? ? ? ? };
+>> +
+>> + ? ? ? ? ? ? i2c5: i2c at d4034000 {
+>> + ? ? ? ? ? ? ? ? ? ? compatible = "mrvl,pxa255-i2c";
+>> + ? ? ? ? ? ? ? ? ? ? reg = <0xd4034000 0x60>;
+>> + ? ? ? ? ? ? ? ? ? ? interrupts = <4>;
+>> + ? ? ? ? ? ? ? ? ? ? interrupt-parent = <&mux_intc17>;
+>> + ? ? ? ? ? ? ? ? ? ? mrvl,i2c-frequency = "fast";
+>> + ? ? ? ? ? ? };
+>> +
+>> + ? ? ? ? ? ? uart0: uart at d4030000 {
+>> + ? ? ? ? ? ? ? ? ? ? compatible = "mrvl,pxa270-serial";
+>> + ? ? ? ? ? ? ? ? ? ? reg = <0xd4030000 0x1000>;
+>> + ? ? ? ? ? ? ? ? ? ? reg-shift = <2>;
+>> + ? ? ? ? ? ? ? ? ? ? interrupts = <27>;
+>> + ? ? ? ? ? ? ? ? ? ? clock-frequency = <26000000>;
+>> + ? ? ? ? ? ? ? ? ? ? current-speed = <115200>;
+>> + ? ? ? ? ? ? };
+>> +
+>> + ? ? ? ? ? ? uart1: uart at d4017000 {
+>> + ? ? ? ? ? ? ? ? ? ? compatible = "mrvl,pxa270-serial";
+>> + ? ? ? ? ? ? ? ? ? ? reg = <0xd4017000 0x1000>;
+>> + ? ? ? ? ? ? ? ? ? ? reg-shift = <2>;
+>> + ? ? ? ? ? ? ? ? ? ? interrupts = <28>;
+>> + ? ? ? ? ? ? ? ? ? ? clock-frequency = <26000000>;
+>> + ? ? ? ? ? ? ? ? ? ? current-speed = <115200>;
+>> + ? ? ? ? ? ? };
+>> +
+>> + ? ? ? ? ? ? uart2: uart at d4018000 {
+>> + ? ? ? ? ? ? ? ? ? ? compatible = "mrvl,pxa270-serial";
+>> + ? ? ? ? ? ? ? ? ? ? reg = <0xd4018000 0x1000>;
+>> + ? ? ? ? ? ? ? ? ? ? reg-shift = <2>;
+>> + ? ? ? ? ? ? ? ? ? ? interrupts = <24>;
+>> + ? ? ? ? ? ? ? ? ? ? clock-frequency = <26000000>;
+>> + ? ? ? ? ? ? ? ? ? ? current-speed = <38400>;
+>> + ? ? ? ? ? ? };
+>> +
+>> + ? ? ? ? ? ? uart3: uart at d4016000 {
+>> + ? ? ? ? ? ? ? ? ? ? compatible = "mrvl,pxa270-serial";
+>> + ? ? ? ? ? ? ? ? ? ? reg = <0xd4016000 0x1000>;
+>> + ? ? ? ? ? ? ? ? ? ? reg-shift = <2>;
+>> + ? ? ? ? ? ? ? ? ? ? interrupts = <46>;
+>> + ? ? ? ? ? ? ? ? ? ? clock-frequency = <26000000>;
+>> + ? ? ? ? ? ? ? ? ? ? current-speed = <115200>;
+>> + ? ? ? ? ? ? };
+>> + ? ? };
+>> +};
+>> diff --git a/arch/arm/boot/dts/pxa910-dkb.dts b/arch/arm/boot/dts/pxa910-dkb.dts
+>> new file mode 100644
+>> index 0000000..b9f75b7
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/pxa910-dkb.dts
+>> @@ -0,0 +1,81 @@
+>> +/dts-v1/;
+>> +
+>> +/include/ "skeleton.dtsi"
+>> +
+>> +/ {
+>> + ? ? model = "Marvell TTC DKB";
+>> + ? ? compatible = "mrvl,pxa910-dkb", "mrvl,pxa910";
+>> + ? ? #address-cells = <1>;
+>> + ? ? #size-cells = <1>;
+>> + ? ? interrupt-parent = <&mmp_intc>;
+>> +
+>> + ? ? memory {
+>> + ? ? ? ? ? ? reg = <0x00000000 0x20000000>;
 >> + ? ? };
 >> +
->> +Example 2:
+>> + ? ? chosen {
+>> + ? ? ? ? ? ? bootargs = "console=ttyS0,115200 root=/dev/nfs nfsroot=192.168.1.100:192.168.1.101::255.255.255.0::eth0:on";
+>> + ? ? ? ? ? ? linux,stdout-path = &uart0;
+>> + ? ? };
 >> +
->> + ? ? /*
->> + ? ? ?* mux INTC that is internal wired to base INTC
->> + ? ? ?*/
->> + ? ? mux_intc4: interrupt-controller at d4282150 {
->> + ? ? ? ? ? ? compatible = "mrvl,mmp2-mux-intc";
+>> + ? ? soc at d4000000 {
+>> + ? ? ? ? ? ? compatible = "mrvl,pxa910", "simple-bus";
+>> + ? ? ? ? ? ? device_type = "soc";
 >> + ? ? ? ? ? ? #address-cells = <1>;
 >> + ? ? ? ? ? ? #size-cells = <1>;
->> + ? ? ? ? ? ? reg = <0xd4282000 0x400>;
+>> + ? ? ? ? ? ? ranges = <0xd4000000 0xd4000000 0x00200000 ? ? ?/* APB */
+>> + ? ? ? ? ? ? ? ? ? ? 0xd4200000 0xd4200000 0x00200000>; ? ? ?/* AXI */
 >> +
->> + ? ? ? ? ? ? #interrupt-cells = <1>;
->> + ? ? ? ? ? ? interrupt-controller;
->> + ? ? ? ? ? ? interrupt-parent = <&mmp_intc>;
+>> + ? ? ? ? ? ? mmp_intc: interrupt-controller at d4282000 {
+>> + ? ? ? ? ? ? ? ? ? ? compatible = "mrvl,pxa168-intc";
+>> + ? ? ? ? ? ? ? ? ? ? /* reg: <offset & size> */
+>> + ? ? ? ? ? ? ? ? ? ? reg = <0xd4282000 0x400>;
 >> +
->> + ? ? ? ? ? ? /* interrupt source '4' of parent INTC. */
->> + ? ? ? ? ? ? interrupts = <4>;
+>> + ? ? ? ? ? ? ? ? ? ? #interrupt-cells = <1>;
+>> + ? ? ? ? ? ? ? ? ? ? interrupt-controller;
+>> + ? ? ? ? ? ? ? ? ? ? mrvl,intc-numbers = <64>;
+>> + ? ? ? ? ? ? ? ? ? ? /* priority bits in conf register */
+>> + ? ? ? ? ? ? ? ? ? ? mrvl,intc-priority = <0x51>;
+>> + ? ? ? ? ? ? };
 >> +
->> + ? ? ? ? ? ? /* 2 interrupts are supported in this INTC. */
->> + ? ? ? ? ? ? mrvl,intc-numbers = <2>;
+>> + ? ? ? ? ? ? mmp_timer: timer at 0 {
+>> + ? ? ? ? ? ? ? ? ? ? compatible = "mrvl,pxa168-timer";
+>> + ? ? ? ? ? ? ? ? ? ? interrupts = <13>;
+>> + ? ? ? ? ? ? ? ? ? ? mrvl,clk-conf = <0xd4000034 0x33>;
+>> + ? ? ? ? ? ? };
 >> +
->> + ? ? ? ? ? ? /* Status offset address of 0x150. */
->> + ? ? ? ? ? ? mrvl,status-offset = <0x150>;
+>> + ? ? ? ? ? ? i2c0: i2c at d4011000 {
+>> + ? ? ? ? ? ? ? ? ? ? compatible = "mrvl,pxa255-i2c";
+>> + ? ? ? ? ? ? ? ? ? ? #address-cells = <1>;
+>> + ? ? ? ? ? ? ? ? ? ? #size-cells = <0>;
+>> + ? ? ? ? ? ? ? ? ? ? reg = <0xd4011000 0x60>;
+>> + ? ? ? ? ? ? ? ? ? ? interrupts = <7>;
+>> + ? ? ? ? ? ? ? ? ? ? mrvl,i2c-frequency = "fast";
+>> + ? ? ? ? ? ? };
 >> +
->> + ? ? ? ? ? ? /* Mask offset address of 0x168. */
->> + ? ? ? ? ? ? mrvl,mask-offset = <0x168>;
+>> + ? ? ? ? ? ? i2c1: i2c at d4037000 {
+>> + ? ? ? ? ? ? ? ? ? ? compatible = "mrvl,pxa255-i2c";
+>> + ? ? ? ? ? ? ? ? ? ? reg = <0xd4037000 0x60>;
+>> + ? ? ? ? ? ? ? ? ? ? interrupts = <54>;
+>> + ? ? ? ? ? ? ? ? ? ? mrvl,i2c-frequency = "fast";
+>> + ? ? ? ? ? ? };
 >> +
->> + ? ? ? ? ? ? /* mfp register of 0xd401e2c4 & interrupt index of 1 */
->> + ? ? ? ? ? ? mrvl,mfp-edge = <0xd401e2c4 1>;
+>> + ? ? ? ? ? ? uart0: uart at d4017000 {
+>> + ? ? ? ? ? ? ? ? ? ? compatible = "mrvl,pxa270-serial";
+>> + ? ? ? ? ? ? ? ? ? ? reg = <0xd4017000 0x1000>;
+>> + ? ? ? ? ? ? ? ? ? ? reg-shift = <2>;
+>> + ? ? ? ? ? ? ? ? ? ? interrupts = <27>;
+>> + ? ? ? ? ? ? ? ? ? ? clock-frequency = <14745600>;
+>> + ? ? ? ? ? ? ? ? ? ? current-speed = <115200>;
+>> + ? ? ? ? ? ? };
+>> +
+>> + ? ? ? ? ? ? uart1: uart at d4018000 {
+>> + ? ? ? ? ? ? ? ? ? ? compatible = "mrvl,pxa270-serial";
+>> + ? ? ? ? ? ? ? ? ? ? reg = <0xd4018000 0x1000>;
+>> + ? ? ? ? ? ? ? ? ? ? reg-shift = <2>;
+>> + ? ? ? ? ? ? ? ? ? ? interrupts = <28>;
+>> + ? ? ? ? ? ? ? ? ? ? clock-frequency = <14745600>;
+>> + ? ? ? ? ? ? ? ? ? ? current-speed = <115200>;
+>> + ? ? ? ? ? ? };
 >> + ? ? };
->> +
->> +Example 3:
->> + ? ? /*
->> + ? ? ?* An interrupt generating device that is wired to an INTC.
->> + ? ? ?*/
->> + ? ? uart0: uart at d4030000 {
->> + ? ? ? ? ? ? /* parent's '#interrupt-cells' property. */
->> + ? ? ? ? ? ? interrupts = <27>;
->> +
->> + ? ? ? ? ? ? /* The INTC that this device is wired to. */
->> + ? ? ? ? ? ? interrupt-parent = <&mmp_intc>;
->> + ? ? };
->> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
->> index 17507b8..f18eb14 100644
->> --- a/arch/arm/Kconfig
->> +++ b/arch/arm/Kconfig
->> @@ -542,6 +542,7 @@ config ARCH_MMP
->> ? ? ? select ARCH_REQUIRE_GPIOLIB
->> ? ? ? select CLKDEV_LOOKUP
->> ? ? ? select GENERIC_CLOCKEVENTS
->> + ? ? select GENERIC_IRQ_CHIP
->> ? ? ? select HAVE_SCHED_CLOCK
->> ? ? ? select TICK_ONESHOT
->> ? ? ? select PLAT_PXA
+>> +};
 >> diff --git a/arch/arm/mach-mmp/Makefile b/arch/arm/mach-mmp/Makefile
->> index 5c68382..e7862ea 100644
+>> index e7862ea..bdf5b23 100644
 >> --- a/arch/arm/mach-mmp/Makefile
 >> +++ b/arch/arm/mach-mmp/Makefile
->> @@ -4,6 +4,8 @@
+>> @@ -12,6 +12,7 @@ obj-$(CONFIG_CPU_PXA910) ? ?+= pxa910.o irq-pxa168.o
+>> ?obj-$(CONFIG_CPU_MMP2) ? ? ? ? ? ? ? += mmp2.o irq-mmp2.o
 >>
->> ?obj-y ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?+= common.o clock.o devices.o time.o
->>
->> +obj-$(CONFIG_OF_IRQ) ? ? ? ? += intc.o
->> +
->
-> I'm still really confused about why an entirely new interrupt
-> controller file is being added. ?Drivers already exist in mach-mmp
-> for the mux and pxa168 interrupt controllers, but this adds a whole
-> new driver. ?I would expect the existing drivers should be refactored
-> to use irq generic chip, and then extend them to add DT support.
->
-Before applying this patch, two irq (irq-pxa168.c & irq-mmp2.c) exists.
-The block issue of merging them together is different register.
-Now DT can resolve different register. I'm planning to remove both of
-irq-pxa168.c & irq-mmp2.c after these DT patches.
-
->> ?# SoC support
->> ?obj-$(CONFIG_CPU_PXA168) ? ? += pxa168.o irq-pxa168.o
->> ?obj-$(CONFIG_CPU_PXA910) ? ? += pxa910.o irq-pxa168.o
->> diff --git a/arch/arm/mach-mmp/common.h b/arch/arm/mach-mmp/common.h
->> index ec8d65d..1c563c2 100644
->> --- a/arch/arm/mach-mmp/common.h
->> +++ b/arch/arm/mach-mmp/common.h
->> @@ -6,3 +6,4 @@ extern void timer_init(int irq);
->>
->> ?extern void __init icu_init_irq(void);
->> ?extern void __init mmp_map_io(void);
->> +extern void __init mmp_init_intc(void);
->> diff --git a/arch/arm/mach-mmp/include/mach/irqs.h b/arch/arm/mach-mmp/include/mach/irqs.h
->> index a09d328..65ec176 100644
->> --- a/arch/arm/mach-mmp/include/mach/irqs.h
->> +++ b/arch/arm/mach-mmp/include/mach/irqs.h
->> @@ -224,6 +224,6 @@
->>
->> ?#define IRQ_BOARD_START ? ? ? ? ? ? ? ? ? ? ?(IRQ_GPIO_START + IRQ_GPIO_NUM)
->>
->> -#define NR_IRQS ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?(IRQ_BOARD_START)
->> +#define NR_IRQS ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?0
->
-> Why is NR_IRQs getting changed? ?I think this will break
-> !CONFIG_SPARSE_IRQS, and it shouldn't be necessary for this
-> conversion.
->
-If CONFIG_SPARSE_IRQ is enabled, arch_probe_nr_irqs() returns NR_IRQS in arm.
-It results registering NR_IRQS in early_irq_init(). If NR_IRQS is 200,
-200 irqs are
-registered in early_irq_init(). It's not my requirement. What I need
-is registering irq
-from DT.
-
-So I have to define NR_IRQS to 0. And CONFIG_SPARSE_IRQS is always enabled
-in ARCH_MMP. So it's selected in Kconfig by default.
-
->>
->>
->> --
->> Regards,
->> Shawn
->>
->> ?#endif /* __ASM_MACH_IRQS_H */
->> diff --git a/arch/arm/mach-mmp/intc.c b/arch/arm/mach-mmp/intc.c
+>> ?# board support
+>> +obj-$(CONFIG_OF) ? ? ? ? ? ? += boards.o
+>> ?obj-$(CONFIG_MACH_ASPENITE) ?+= aspenite.o
+>> ?obj-$(CONFIG_MACH_ZYLONITE2) += aspenite.o
+>> ?obj-$(CONFIG_MACH_AVENGERS_LITE)+= avengers_lite.o
+>> diff --git a/arch/arm/mach-mmp/boards.c b/arch/arm/mach-mmp/boards.c
 >> new file mode 100644
->> index 0000000..2e44057
+>> index 0000000..13e61fb
 >> --- /dev/null
->> +++ b/arch/arm/mach-mmp/intc.c
->> @@ -0,0 +1,224 @@
+>> +++ b/arch/arm/mach-mmp/boards.c
+>> @@ -0,0 +1,138 @@
 >> +/*
->> + * ?linux/arch/arm/mach-mmp/intc.c
+>> + * ?linux/arch/arm/mach-mmp/boards.c
 >> + *
->> + * ?Generic IRQ handling
+>> + * ?Support for the Multiple Marvell Development Platforms.
 >> + *
->> + * ?Author: ?Haojian Zhuang <haojian.zhuang@marvell.com>
->> + * ?Copyright: ? ? ? Marvell International Ltd. 2011
+>> + * ?Copyright (C) 2009-2011 Marvell International Ltd.
 >> + *
 >> + * ?This program is free software; you can redistribute it and/or modify
 >> + * ?it under the terms of the GNU General Public License version 2 as
->> + * ?published by the Free Software Foundation.
+>> + * ?publishhed by the Free Software Foundation.
 >> + */
 >> +
->> +#include <linux/errno.h>
->> +#include <linux/io.h>
+>> +#include <linux/init.h>
 >> +#include <linux/kernel.h>
 >> +#include <linux/of.h>
->> +#include <linux/of_address.h>
->> +#include <linux/of_irq.h>
->> +#include <linux/slab.h>
+>> +#include <linux/of_fdt.h>
+>> +#include <linux/of_platform.h>
+>> +#include <linux/platform_device.h>
+>> +#include <linux/i2c/pxa-i2c.h>
 >> +
->> +struct mmp_intc_info {
->> + ? ? unsigned int ? ? ? ? ? ?en_mask;
->> + ? ? void __iomem ? ? ? ? ? ?*virt_base;
->> + ? ? void __iomem ? ? ? ? ? ?*status;
->> + ? ? void __iomem ? ? ? ? ? ?*mfp_edge;
->> + ? ? unsigned int ? ? ? ? ? ?mfp_edge_index; /* index in irq domain */
+>> +#include <asm/mach-types.h>
+>> +#include <asm/mach/arch.h>
+>> +
+>> +#include <mach/pxa910.h>
+>> +#include <mach/mmp2.h>
+>> +#include <mach/mfp-mmp2.h>
+>> +
+>> +#include "common.h"
+>> +
+>> +static void __init ttc_dkb_init(void)
+>> +{
+>> + ? ? of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+>> +}
+>> +
+>> +static const char *ttc_dkb_dt_match[] __initdata = {
+>> + ? ? "mrvl,pxa910-dkb",
+>> + ? ? NULL,
 >> +};
 >> +
->> +static void mux_irq_ack(struct irq_data *d)
->> +{
->> + ? ? struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
->> + ? ? struct irq_chip_type *ct;
->> + ? ? struct mmp_intc_info *info;
->> + ? ? unsigned int data, irq_offs;
+>> +DT_MACHINE_START(TTC_DKB, "PXA910-based TTC-DKB Development Platform")
+>> + ? ? .map_io ? ? ? ? = mmp_map_io,
+>> + ? ? .init_irq ? ? ? = mmp_init_intc,
+>> + ? ? .timer ? ? ? ? ?= &mmp_timer,
+>> + ? ? .init_machine ? = ttc_dkb_init,
+>> + ? ? .dt_compat ? ? ?= ttc_dkb_dt_match,
+>> +MACHINE_END
 >> +
->> + ? ? ct = gc->chip_types;
->> + ? ? info = (struct mmp_intc_info *)ct->regs.ack;
->> + ? ? irq_offs = d->irq - gc->irq_base;
->> + ? ? /* clear MFP edge-detect */
->> + ? ? if (info->mfp_edge && (info->mfp_edge_index == irq_offs)) {
->> + ? ? ? ? ? ? data = __raw_readl(info->mfp_edge);
->> + ? ? ? ? ? ? __raw_writel(data | (1 << 6), info->mfp_edge);
->> + ? ? ? ? ? ? __raw_writel(data, info->mfp_edge);
->> + ? ? }
+>> +static unsigned long brownstone_pin_config[] __initdata = {
+>> + ? ? /* UART1 */
+>> + ? ? GPIO29_UART1_RXD,
+>> + ? ? GPIO30_UART1_TXD,
+>> +
+>> + ? ? /* UART3 */
+>> + ? ? GPIO51_UART3_RXD,
+>> + ? ? GPIO52_UART3_TXD,
+>> +
+>> + ? ? /* DFI */
+>> + ? ? GPIO168_DFI_D0,
+>> + ? ? GPIO167_DFI_D1,
+>> + ? ? GPIO166_DFI_D2,
+>> + ? ? GPIO165_DFI_D3,
+>> + ? ? GPIO107_DFI_D4,
+>> + ? ? GPIO106_DFI_D5,
+>> + ? ? GPIO105_DFI_D6,
+>> + ? ? GPIO104_DFI_D7,
+>> + ? ? GPIO111_DFI_D8,
+>> + ? ? GPIO164_DFI_D9,
+>> + ? ? GPIO163_DFI_D10,
+>> + ? ? GPIO162_DFI_D11,
+>> + ? ? GPIO161_DFI_D12,
+>> + ? ? GPIO110_DFI_D13,
+>> + ? ? GPIO109_DFI_D14,
+>> + ? ? GPIO108_DFI_D15,
+>> + ? ? GPIO143_ND_nCS0,
+>> + ? ? GPIO144_ND_nCS1,
+>> + ? ? GPIO147_ND_nWE,
+>> + ? ? GPIO148_ND_nRE,
+>> + ? ? GPIO150_ND_ALE,
+>> + ? ? GPIO149_ND_CLE,
+>> + ? ? GPIO112_ND_RDY0,
+>> + ? ? GPIO160_ND_RDY1,
+>> +
+>> + ? ? /* PMIC */
+>> + ? ? PMIC_PMIC_INT | MFP_LPM_EDGE_FALL,
+>> +
+>> + ? ? /* MMC0 */
+>> + ? ? GPIO131_MMC1_DAT3 | MFP_PULL_HIGH,
+>> + ? ? GPIO132_MMC1_DAT2 | MFP_PULL_HIGH,
+>> + ? ? GPIO133_MMC1_DAT1 | MFP_PULL_HIGH,
+>> + ? ? GPIO134_MMC1_DAT0 | MFP_PULL_HIGH,
+>> + ? ? GPIO136_MMC1_CMD | MFP_PULL_HIGH,
+>> + ? ? GPIO139_MMC1_CLK,
+>> + ? ? GPIO140_MMC1_CD | MFP_PULL_LOW,
+>> + ? ? GPIO141_MMC1_WP | MFP_PULL_LOW,
+>> +
+>> + ? ? /* MMC1 */
+>> + ? ? GPIO37_MMC2_DAT3 | MFP_PULL_HIGH,
+>> + ? ? GPIO38_MMC2_DAT2 | MFP_PULL_HIGH,
+>> + ? ? GPIO39_MMC2_DAT1 | MFP_PULL_HIGH,
+>> + ? ? GPIO40_MMC2_DAT0 | MFP_PULL_HIGH,
+>> + ? ? GPIO41_MMC2_CMD | MFP_PULL_HIGH,
+>> + ? ? GPIO42_MMC2_CLK,
+>> +
+>> + ? ? /* MMC2 */
+>> + ? ? GPIO165_MMC3_DAT7 | MFP_PULL_HIGH,
+>> + ? ? GPIO162_MMC3_DAT6 | MFP_PULL_HIGH,
+>> + ? ? GPIO166_MMC3_DAT5 | MFP_PULL_HIGH,
+>> + ? ? GPIO163_MMC3_DAT4 | MFP_PULL_HIGH,
+>> + ? ? GPIO167_MMC3_DAT3 | MFP_PULL_HIGH,
+>> + ? ? GPIO164_MMC3_DAT2 | MFP_PULL_HIGH,
+>> + ? ? GPIO168_MMC3_DAT1 | MFP_PULL_HIGH,
+>> + ? ? GPIO111_MMC3_DAT0 | MFP_PULL_HIGH,
+>> + ? ? GPIO112_MMC3_CMD | MFP_PULL_HIGH,
+>> + ? ? GPIO151_MMC3_CLK,
+>> +
+>> + ? ? /* 5V regulator */
+>> + ? ? GPIO89_GPIO,
+>> +};
+>
+> This table is /already/ in brownstone.c. ?Why duplicate it?
+>
+As I mentioned, brownstone.c will be abandoned later.
+
+>> +
+>> +static void __init brownstone_init(void)
+>> +{
+>> + ? ? mfp_config(ARRAY_AND_SIZE(brownstone_pin_config));
+>> +
+>> + ? ? of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
 >> +}
 >> +
->> +static void mmp_irq_demux_handler(unsigned int irq, struct irq_desc *desc)
->> +{
->> + ? ? struct irq_chip_generic *gc = irq_get_handler_data(irq);
->> + ? ? struct irq_chip_type *ct;
->> + ? ? struct mmp_intc_info *info;
->> + ? ? unsigned long status, n;
->> +
->> + ? ? ct = gc->chip_types;
->> + ? ? info = (struct mmp_intc_info *)ct->regs.ack;
->> + ? ? while (1) {
->> + ? ? ? ? ? ? status = __raw_readl(info->status) & ~gc->mask_cache;
->> + ? ? ? ? ? ? if (status == 0)
->> + ? ? ? ? ? ? ? ? ? ? break;
->> + ? ? ? ? ? ? n = find_first_bit(&status, BITS_PER_LONG);
->> + ? ? ? ? ? ? while (n < BITS_PER_LONG) {
->> + ? ? ? ? ? ? ? ? ? ? generic_handle_irq(gc->irq_base + n);
->> + ? ? ? ? ? ? ? ? ? ? n = find_next_bit(&status, BITS_PER_LONG, n + 1);
->> + ? ? ? ? ? ? }
->> + ? ? }
->> +}
->> +
->> +static void mux_init_intc(struct mmp_intc_info *mmp_info)
->> +{
->> + ? ? struct device_node *np;
->> + ? ? struct mmp_intc_info *mux_info;
->> + ? ? struct irq_chip_generic *gc;
->> + ? ? struct irq_chip_type *ct;
->> + ? ? const __be32 *edge;
->> + ? ? unsigned int addr = 0, offs = 0;
->> + ? ? unsigned int status, mask, irq_base, nr, data;
->> + ? ? int cascade;
->> +
->> + ? ? for_each_compatible_node(np, NULL, "mrvl,mmp2-mux-intc") {
->> + ? ? ? ? ? ? if (of_get_property(np, "interrupt-controller", NULL) == NULL)
->> + ? ? ? ? ? ? ? ? ? ? continue;
->> + ? ? ? ? ? ? if (of_property_read_u32(np, "mrvl,intc-numbers", &nr) < 0) {
->> + ? ? ? ? ? ? ? ? ? ? pr_warn("intc-numbers property is missed\n");
->> + ? ? ? ? ? ? ? ? ? ? continue;
->> + ? ? ? ? ? ? }
->> + ? ? ? ? ? ? if (of_property_read_u32(np, "mrvl,status-offset", &status)
->> + ? ? ? ? ? ? ? ? ? ? < 0) {
->> + ? ? ? ? ? ? ? ? ? ? pr_warn("intc-status property is missed\n");
->> + ? ? ? ? ? ? ? ? ? ? continue;
->> + ? ? ? ? ? ? }
->> + ? ? ? ? ? ? if (of_property_read_u32(np, "mrvl,mask-offset", &mask) < 0) {
->> + ? ? ? ? ? ? ? ? ? ? pr_warn("intc-mask property is missed\n");
->> + ? ? ? ? ? ? ? ? ? ? continue;
->> + ? ? ? ? ? ? }
->> +
->> + ? ? ? ? ? ? mux_info = kzalloc(sizeof(*mux_info), GFP_KERNEL);
->> + ? ? ? ? ? ? if (mux_info == NULL)
->> + ? ? ? ? ? ? ? ? ? ? goto out;
->> + ? ? ? ? ? ? status += (unsigned int)mmp_info->virt_base;
->> + ? ? ? ? ? ? mux_info->status = (void __iomem *)status;
->> +
->> + ? ? ? ? ? ? edge = of_get_property(np, "mrvl,mfp-edge", NULL);
->> + ? ? ? ? ? ? if (edge) {
->> + ? ? ? ? ? ? ? ? ? ? addr = be32_to_cpu(*edge) & PAGE_MASK;
->> + ? ? ? ? ? ? ? ? ? ? offs = be32_to_cpu(*edge) - addr;
->> + ? ? ? ? ? ? ? ? ? ? mux_info->mfp_edge = ioremap(addr, PAGE_SIZE) + offs;
->> + ? ? ? ? ? ? ? ? ? ? mux_info->mfp_edge_index = be32_to_cpu(*++edge);
->> + ? ? ? ? ? ? ? ? ? ? /* clear mfp edge detection for initialization */
->> + ? ? ? ? ? ? ? ? ? ? data = __raw_readl(mux_info->mfp_edge);
->> + ? ? ? ? ? ? ? ? ? ? __raw_writel(data | (1 << 6), mux_info->mfp_edge);
->> + ? ? ? ? ? ? ? ? ? ? __raw_writel(data, mux_info->mfp_edge);
->> + ? ? ? ? ? ? }
->> +
->> + ? ? ? ? ? ? /* allocate new irq */
->> + ? ? ? ? ? ? cascade = irq_of_parse_and_map(np, 0);
->> + ? ? ? ? ? ? irq_base = irq_alloc_descs(-1, 0, nr, 0);
->> + ? ? ? ? ? ? irq_domain_add_simple(np, irq_base);
->> +
->> + ? ? ? ? ? ? gc = irq_alloc_generic_chip("mux-intc", 1, irq_base,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? mmp_info->virt_base, handle_level_irq);
->> + ? ? ? ? ? ? ct = gc->chip_types;
->> + ? ? ? ? ? ? ct->regs.ack = (unsigned int)mux_info;
->> + ? ? ? ? ? ? ct->regs.mask = mask;
->> + ? ? ? ? ? ? ct->chip.irq_ack = mux_irq_ack;
->> + ? ? ? ? ? ? ct->chip.irq_mask = irq_gc_mask_set_bit;
->> + ? ? ? ? ? ? ct->chip.irq_unmask = irq_gc_mask_clr_bit;
->> + ? ? ? ? ? ? irq_setup_generic_chip(gc, IRQ_MSK(nr), IRQ_GC_INIT_MASK_CACHE,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? IRQ_NOREQUEST | IRQ_NOPROBE, 0);
->> +
->> + ? ? ? ? ? ? irq_set_handler_data(cascade, gc);
->> + ? ? ? ? ? ? irq_set_chained_handler(cascade, mmp_irq_demux_handler);
->> + ? ? }
->> +out:
->> + ? ? return;
->> +}
->> +
->> +static void mmp_irq_unmask(struct irq_data *d)
->> +{
->> + ? ? struct mmp_intc_info *info = irq_data_get_irq_chip_data(d);
->> +
->> + ? ? /* ICU_INT_CONF */
->> + ? ? __raw_writel(info->en_mask, info->virt_base + (d->irq << 2));
->> +}
->> +
->> +static void mmp_irq_mask(struct irq_data *d)
->> +{
->> + ? ? struct mmp_intc_info *info = irq_data_get_irq_chip_data(d);
->> +
->> + ? ? __raw_writel(0, info->virt_base + (d->irq << 2));
->> +}
->> +
->> +static struct irq_chip mmp_irq_chip = {
->> + ? ? .name ? ? ? ? ? = "mmp-intc",
->> + ? ? .irq_unmask ? ? = mmp_irq_unmask,
->> + ? ? .irq_mask ? ? ? = mmp_irq_mask,
->> + ? ? .irq_ack ? ? ? ?= mmp_irq_mask,
+>> +static const char *brownstone_dt_match[] __initdata = {
+>> + ? ? "mrvl,mmp2-brownstone",
+>> + ? ? NULL,
 >> +};
 >> +
->> +void __init mmp_init_intc(void)
->> +{
->> + ? ? struct mmp_intc_info *info;
->> + ? ? struct device_node *np;
->> + ? ? struct resource rs;
->> + ? ? unsigned int cells, nr, enable, irq_base;
->> + ? ? int i;
->> +
->> + ? ? np = of_find_compatible_node(NULL, NULL, "mrvl,pxa168-intc");
->> +
->> + ? ? BUG_ON(!np);
->> +
->> + ? ? of_node_get(np);
->> + ? ? if (of_get_property(np, "interrupt-controller", NULL) == NULL)
->> + ? ? ? ? ? ? goto out;
->> + ? ? if (of_property_read_u32(np, "#interrupt-cells", &cells) < 0) {
->> + ? ? ? ? ? ? pr_warn("mmp-intc: interrupt-cells property is missed\n");
->> + ? ? ? ? ? ? goto out;
->> + ? ? }
->> + ? ? if (cells != 1) {
->> + ? ? ? ? ? ? pr_warn("mmp-intc: interrupt-cells property is incorrect\n");
->> + ? ? ? ? ? ? goto out;
->> + ? ? }
->> + ? ? if (of_property_read_u32(np, "mrvl,intc-numbers", &nr) < 0) {
->> + ? ? ? ? ? ? pr_warn("mmp-intc: mrvl,intc-numbers property is missed\n");
->> + ? ? ? ? ? ? goto out;
->> + ? ? }
->> + ? ? if (of_property_read_u32(np, "mrvl,intc-priority", &enable) < 0) {
->> + ? ? ? ? ? ? pr_warn("mmp-intc: mrvl,intc-priority property is missed\n");
->> + ? ? ? ? ? ? goto out;
->> + ? ? }
->> + ? ? if (of_address_to_resource(np, 0, &rs) < 0) {
->> + ? ? ? ? ? ? pr_warn("mmp-intc: invalid reg property\n");
->> + ? ? ? ? ? ? goto out;
->> + ? ? }
->> +
->> + ? ? info = kzalloc(sizeof(struct mmp_intc_info), GFP_KERNEL);
->> + ? ? if (info == NULL)
->> + ? ? ? ? ? ? goto out;
->> + ? ? info->en_mask = enable;
->> + ? ? info->virt_base = ioremap(rs.start, PAGE_SIZE);
->> + ? ? if (info->virt_base == NULL) {
->> + ? ? ? ? ? ? pr_warn("mmp-intc: failed to remap reg base\n");
->> + ? ? ? ? ? ? goto out_mem;
->> + ? ? }
->> +
->> + ? ? /* allocate new irq */
->> + ? ? irq_base = irq_alloc_descs(-1, 0, nr, 0);
->> + ? ? irq_domain_add_simple(np, 0);
->> +
->> + ? ? for (i = irq_base; i < irq_base + nr; i++) {
->> + ? ? ? ? ? ? irq_set_chip_data(i, info);
->> + ? ? ? ? ? ? mmp_irq_mask(irq_get_irq_data(i));
->> + ? ? ? ? ? ? irq_set_chip_and_handler(i, &mmp_irq_chip, handle_level_irq);
->> + ? ? ? ? ? ? set_irq_flags(i, IRQF_VALID);
->> + ? ? }
->> + ? ? mux_init_intc(info);
->> + ? ? of_node_put(np);
->> + ? ? return;
->> +out_mem:
->> + ? ? kfree(info);
->> +out:
->> + ? ? of_node_put(np);
->> + ? ? return;
->> +}
+>> +DT_MACHINE_START(BROWNSTONE, "Brownstone Development Platform")
+>> + ? ? .map_io ? ? ? ? = mmp_map_io,
+>> + ? ? .init_irq ? ? ? = mmp_init_intc,
+>> + ? ? .timer ? ? ? ? ?= &mmp_timer,
+>> + ? ? .init_machine ? = brownstone_init,
+>> + ? ? .dt_compat ? ? ?= brownstone_dt_match,
+>> +MACHINE_END
 >> --
 >> 1.5.6.5
 >>
