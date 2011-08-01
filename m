@@ -1,74 +1,59 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 1 Aug 2011 15:43:40 +0100
-Subject: [PATCH v2 1/7] ARM: mmp: parse irq from DT
-In-Reply-To: <CAN1soZwSiEojxC6uBAGYdUxJKPA2X+360ZsLEMyeUcBKdBn_SA@mail.gmail.com>
-References: <1311835293-18125-1-git-send-email-haojian.zhuang@marvell.com>
-	<1311835293-18125-2-git-send-email-haojian.zhuang@marvell.com>
-	<20110729163616.GJ11164@ponder.secretlab.ca>
-	<CAN1soZxX6EBRPvzV_00njioBn1NfiAbLBoD7EYc-wV-uQM_VoQ@mail.gmail.com>
-	<20110801141036.GA21627@ponder.secretlab.ca>
-	<CAN1soZwSiEojxC6uBAGYdUxJKPA2X+360ZsLEMyeUcBKdBn_SA@mail.gmail.com>
-Message-ID: <CACxGe6tmUq3Awujdbhawr_xMi+cGhHNhOaPWiuu_XtrNXHP7FQ@mail.gmail.com>
+From: lacombar@gmail.com (Arnaud Lacombe)
+Date: Mon, 1 Aug 2011 11:04:37 -0400
+Subject: [PATCH] Remove remaining references of CONFIG_GENERIC_TIME
+In-Reply-To: <CAMuHMdUiLjMVwOqKPF6tHLpPxROrx=rRf3ednfTLrwGuZ2VF7A@mail.gmail.com>
+References: <1312042478-26012-1-git-send-email-zdevai@gmail.com>
+	<20110801083614.GC15578@n2100.arm.linux.org.uk>
+	<CAMuHMdUpTDSRP_JmWqcCBtYwzna0hwmaBshpiF8kgvqoNcqYZA@mail.gmail.com>
+	<20110801101410.GE15578@n2100.arm.linux.org.uk>
+	<CAMuHMdUiLjMVwOqKPF6tHLpPxROrx=rRf3ednfTLrwGuZ2VF7A@mail.gmail.com>
+Message-ID: <CACqU3MVUxTYmD+4VGBAeN8PTs83fR0xQQrQS5h4QGMZXgMxEvA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 1, 2011 at 3:42 PM, Haojian Zhuang <haojian.zhuang@gmail.com> wrote:
-> On Mon, Aug 1, 2011 at 10:10 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
->> On Mon, Aug 01, 2011 at 10:47:06AM +0800, Haojian Zhuang wrote:
->>> On Sat, Jul 30, 2011 at 12:36 AM, Grant Likely
->>> <grant.likely@secretlab.ca> wrote:
->>> >> diff --git a/arch/arm/mach-mmp/common.h b/arch/arm/mach-mmp/common.h
->>> >> index ec8d65d..1c563c2 100644
->>> >> --- a/arch/arm/mach-mmp/common.h
->>> >> +++ b/arch/arm/mach-mmp/common.h
->>> >> @@ -6,3 +6,4 @@ extern void timer_init(int irq);
->>> >>
->>> >> ?extern void __init icu_init_irq(void);
->>> >> ?extern void __init mmp_map_io(void);
->>> >> +extern void __init mmp_init_intc(void);
->>> >> diff --git a/arch/arm/mach-mmp/include/mach/irqs.h b/arch/arm/mach-mmp/include/mach/irqs.h
->>> >> index a09d328..65ec176 100644
->>> >> --- a/arch/arm/mach-mmp/include/mach/irqs.h
->>> >> +++ b/arch/arm/mach-mmp/include/mach/irqs.h
->>> >> @@ -224,6 +224,6 @@
->>> >>
->>> >> ?#define IRQ_BOARD_START ? ? ? ? ? ? ? ? ? ? ?(IRQ_GPIO_START + IRQ_GPIO_NUM)
->>> >>
->>> >> -#define NR_IRQS ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?(IRQ_BOARD_START)
->>> >> +#define NR_IRQS ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?0
+Hi,
+
+On Mon, Aug 1, 2011 at 7:27 AM, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+> On Mon, Aug 1, 2011 at 12:14, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+>> On Mon, Aug 01, 2011 at 12:09:02PM +0200, Geert Uytterhoeven wrote:
+>>> On Mon, Aug 1, 2011 at 10:36, Russell King - ARM Linux
+>>> <linux@arm.linux.org.uk> wrote:
+>>> > On Sat, Jul 30, 2011 at 06:14:38PM +0200, Zoltan Devai wrote:
+>>> >> Commit 592913ecb87a9e06f98ddb55b298f1a66bf94c6b has killed off any
+>>> >> use of this config option long ago.
 >>> >
->>> > Why is NR_IRQs getting changed? ?I think this will break
->>> > !CONFIG_SPARSE_IRQS, and it shouldn't be necessary for this
->>> > conversion.
+>>> > I don't see the point of this - we were free of GENERIC_TIME on ARM
+>>> > shortly after it was originally killed off. ?The problem is you can't
+>>> > stop people introducing new uses of this - because it existed once and
+>>> > there's nothing which errors out on its presence, people are going to
+>>> > continue submitting patches with it in. ?And it's going to continue
+>>> > being missed at the review stage.
 >>> >
->>> If CONFIG_SPARSE_IRQ is enabled, arch_probe_nr_irqs() returns NR_IRQS in arm.
->>> It results registering NR_IRQS in early_irq_init(). If NR_IRQS is 200,
->>> 200 irqs are
->>> registered in early_irq_init(). It's not my requirement. What I need
->>> is registering irq
->>> from DT.
+>>> > I've a similar problem with folk on ARM including mach/gpio.h as their
+>>> > sole gpio header file rather than linux/gpio.h - I've been trying for
+>>> > the last 1-2 years to educate people to use linux/ in preference. ?You
+>>> > can't do it, and I'm still just about the only one who picks up on that.
+>>> > (SoC maintainers don't care.) ?They will end up caring when I push a
+>>> > change during the next merge window though, so I'll eventually stop
+>>> > mach/gpio.h being included. ?(Instead, it'll be asm/gpio.h).
+>>> >
+>>> > GENERIC_TIME though... I don't think you'll ever stop new uses of it
+>>> > creeping in unless you can arrange for something to error out.
 >>>
->>> So I have to define NR_IRQS to 0. And CONFIG_SPARSE_IRQS is always enabled
->>> in ARCH_MMP. So it's selected in Kconfig by default.
+>>> Doesn't kconf error out when trying to select a non-existent symbol?
 >>
->> My point is, that applying this patch will break anyone depending on
->> non-DT mach-mmp support. ?I'm completely fine with you doing so, but
->> you need to be extra careful that it is done in a bisectable way. ?At
->> no point in the commit series should the kernel be unable to build a
->> working mmp image.
->>
->> g.
->>
->>
+>> Nope.
 >
-> Since .nr_irqs property is assigned in machine descriptor of brownstone.c or
-> ttc_dkb.c, nr_irqs equals to machine_desc->nr_irqs (arch/arm/kernel/irq.c).
+> You're right. So that's a bug.
 >
-> Even NR_IRQS is defined as 0, machine_desc->nr_irqs can help us to
-> pre-allocate irq numbers while CONFIG_OF isn't defined.
->
-> So it's not an issue in ARCH_MMP. And I tested it that everything is well.
+depends on what you are trying to achieve and what the problem is.
 
-Okay, that answers my question.  Thanks.
+Internally kconfig will create a dummy symbol when it encounter a
+missing symbol so that arch/arm/Kconfig can reference a symbol which
+will be fully defined later on. I do not think you want to forward
+decl all the symbol which can be used. That'd be a mess. That said, we
+can come with a form of symbol deprecation that would error-out when
+used.
 
-g.
+ - Arnaud
