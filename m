@@ -1,40 +1,55 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Mon, 1 Aug 2011 15:07:15 +0530
-Subject: [PATCH V2 05/20] dmaengine/amba-pl08x: Complete doc comment for
-	struct pl08x_txd
-In-Reply-To: <cover.1312190881.git.viresh.kumar@st.com>
-References: <cover.1312190881.git.viresh.kumar@st.com>
-Message-ID: <fc93aa2f373943b30d251d540f41b1acc8b9e438.1312190881.git.viresh.kumar@st.com>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Mon,  1 Aug 2011 11:38:29 +0200
+Subject: [PATCH 8/8] ARM: mxc: drop now unused function mxc_register_device
+In-Reply-To: <1312191509-21895-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <20110801093759.GD9250@pengutronix.de>
+	<1312191509-21895-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1312191509-21895-8-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Doc comment for struct pl08x_txd was incomplete. Complete that.
-
-Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- include/linux/amba/pl08x.h |    8 ++++++++
- 1 files changed, 8 insertions(+), 0 deletions(-)
+ arch/arm/plat-mxc/devices.c             |   14 --------------
+ arch/arm/plat-mxc/include/mach/common.h |    1 -
+ 2 files changed, 0 insertions(+), 15 deletions(-)
 
-diff --git a/include/linux/amba/pl08x.h b/include/linux/amba/pl08x.h
-index e6e28f3..cd8f629 100644
---- a/include/linux/amba/pl08x.h
-+++ b/include/linux/amba/pl08x.h
-@@ -105,8 +105,16 @@ struct pl08x_phy_chan {
+diff --git a/arch/arm/plat-mxc/devices.c b/arch/arm/plat-mxc/devices.c
+index 0d6ed31..5aaa8c5 100644
+--- a/arch/arm/plat-mxc/devices.c
++++ b/arch/arm/plat-mxc/devices.c
+@@ -23,20 +23,6 @@
+ #include <linux/platform_device.h>
+ #include <mach/common.h>
  
- /**
-  * struct pl08x_txd - wrapper for struct dma_async_tx_descriptor
-+ * @tx: async tx descriptor
-+ * @node: node for txd list for channels
-+ * @src_addr: src address of txd
-+ * @dst_addr: dst address of txd
-+ * @len: transfer len in bytes
-+ * @direction: direction of transfer
-  * @llis_bus: DMA memory address (physical) start for the LLIs
-  * @llis_va: virtual memory address start for the LLIs
-+ * @cctl: control reg values for current txd
-+ * @ccfg: config reg values for current txd
-  */
- struct pl08x_txd {
- 	struct dma_async_tx_descriptor tx;
+-int __init mxc_register_device(struct platform_device *pdev, void *data)
+-{
+-	int ret;
+-
+-	pdev->dev.platform_data = data;
+-
+-	ret = platform_device_register(pdev);
+-	if (ret)
+-		pr_debug("Unable to register platform device '%s': %d\n",
+-			 pdev->name, ret);
+-
+-	return ret;
+-}
+-
+ struct platform_device *__init imx_add_platform_device_dmamask(
+ 		const char *name, int id,
+ 		const struct resource *res, unsigned int num_resources,
+diff --git a/arch/arm/plat-mxc/include/mach/common.h b/arch/arm/plat-mxc/include/mach/common.h
+index 4e3d978..91d810ce 100644
+--- a/arch/arm/plat-mxc/include/mach/common.h
++++ b/arch/arm/plat-mxc/include/mach/common.h
+@@ -66,7 +66,6 @@ extern int mx53_clocks_init(unsigned long ckil, unsigned long osc,
+ 			unsigned long ckih1, unsigned long ckih2);
+ extern struct platform_device *mxc_register_gpio(char *name, int id,
+ 	resource_size_t iobase, resource_size_t iosize, int irq, int irq_high);
+-extern int mxc_register_device(struct platform_device *pdev, void *data);
+ extern void mxc_set_cpu_type(unsigned int type);
+ extern void mxc_arch_reset_init(void __iomem *);
+ extern void mx51_efikamx_reset(void);
 -- 
-1.7.2.2
+1.7.5.4
