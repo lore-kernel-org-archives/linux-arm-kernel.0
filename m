@@ -1,20 +1,19 @@
-From: viresh.kumar@st.com (viresh kumar)
-Date: Mon, 1 Aug 2011 11:00:47 +0530
-Subject: [PATCH 00/18] dmaengine/amba-pl08x updates
-In-Reply-To: <1311940712.1536.523.camel@vkoul-udesk3>
-References: <cover.1311936523.git.viresh.kumar@st.com>
-	<1311940712.1536.523.camel@vkoul-udesk3>
-Message-ID: <4E363A07.30500@st.com>
+From: holzmayr@rsi-elektrotechnik.de (Josef Holzmayr)
+Date: Mon,  1 Aug 2011 09:09:58 +0200
+Subject: [AT91] Add support for RSI EWS board (machine type 1609)
+Message-ID: <1312182599-2134-1-git-send-email-holzmayr@rsi-elektrotechnik.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/29/2011 05:28 PM, Koul, Vinod wrote:
-> There were some fixes required in your driver for changing submit and
-> issue_pending behavior, was it this one?
 
-Actually not. Also, i just wanted to understand their purpose
-(submit & issue_pending) and there were no issues as such in
-this driver.
+This adds support for the RSI EWS machine (at91rm9200-based), machine type 1609. Includes smaller cleanups as suggested by Russell and R.Schwebel. Applies cleanly to Linus' latest git, but the machine id is missing in mainlines mach-types file.
 
--- 
-viresh
+Please yell if something is wrong, inadequate, obscure.
+
+Thanks, Josef
+
+
+
+Amtsgericht Ingolstadt - GmbH: HRB 191328 - KG: HRA 170363
+Gesch?ftsf?hrer: Dr.-Ing. Michael Sorg, Dipl.-Ing. Franz Sorg
+USt-IdNr.: DE 128592548
