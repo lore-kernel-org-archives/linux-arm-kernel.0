@@ -1,46 +1,34 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 1 Aug 2011 11:52:52 +0300
-Subject: [RFC/PATCH 2/7] OMAP3: beagle: don't touch omap_device internals
-In-Reply-To: <CAOMWX4e0CODd8YT4LC2zHdGhzzZpOqRc0CU8roV-Pw1VTx5XCw@mail.gmail.com>
-References: <1311292338-11830-1-git-send-email-khilman@ti.com>
-	<1311292338-11830-4-git-send-email-khilman@ti.com>
-	<20110722085716.GI32058@legolas.emea.dhcp.ti.com>
-	<20110728055346.GA11921@foobar> <4E315C9F.1030801@ti.com>
-	<CAOMWX4fYGD4aRomoHZjvy_F9CRb_U9UV4OOa0BgrzZhx81iQtQ@mail.gmail.com>
-	<20110729134932.GA2258@foobar>
-	<20110729140515.GV31013@legolas.emea.dhcp.ti.com>
-	<CAOMWX4e0CODd8YT4LC2zHdGhzzZpOqRc0CU8roV-Pw1VTx5XCw@mail.gmail.com>
-Message-ID: <20110801085251.GF31013@legolas.emea.dhcp.ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 1 Aug 2011 10:28:06 +0100
+Subject: [PATCH] Add sched_clock to AT91 TCB clocksource driver
+In-Reply-To: <CANqCtQJwUsLXfA408GzAr0rQtc2DRjtKqP8-m2UBUGEy-YP5dg@mail.gmail.com>
+References: <1312124593-6088-1-git-send-email-linux@bohmer.net>
+	<20110731150707.GA2975@n2100.arm.linux.org.uk>
+	<CANqCtQJwUsLXfA408GzAr0rQtc2DRjtKqP8-m2UBUGEy-YP5dg@mail.gmail.com>
+Message-ID: <20110801092806.GD15578@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Aug 01, 2011 at 10:42:35AM +0200, Remy Bohmer wrote:
+> OK, I know that too, but the jiffies based fallback does it even
+> worse, since it does not run at all...  (It only updates in steps of a
+> couple of 100msecs and stops after a while, and even does not display
+> a real time...) This sched_clock implementation at least works before
+> the drivers are being initialised...
 
-On Fri, Jul 29, 2011 at 06:07:17PM -0500, Menon, Nishanth wrote:
-> On Fri, Jul 29, 2011 at 09:05, Felipe Balbi <balbi@ti.com> wrote:
-> >
-> >> +}
-> >> +EXPORT_SYMBOL(omap_hwmod_name_get_odev);
-> >
-> > maybe EXPORT_SYMBOL_GPL() ?? Not sure we want non-GPL code to access
-> > this ;-)
-> 
-> Sure.. but is this the way we want to go? if yes, I can post the
-> series in a formal way to the list.
+You're forgetting that jiffies doesn't jump about.  A late initializing
+sched_clock could jump.
 
-I would expect so, but if there are concerns of other non-GPL drivers
-needing this, you can at least use:
+> Anyway, do you have a better suggestion how to fix this? The tcb
+> clocksource is loaded during a arch_initcall(), perhaps we need
+> something before that point.
+> I do not see an easy way to integrate it in MACHINE_START(.timer).
+> Would 'late_time_init' be a better solution?
 
-EXPORT_SYMBOL_GPL_FUTURE();
+late_time_init() is not that much better as that still happens after
+sched_init() has been called.  sched_init() initializes various
+structures which involves reading sched_clock().
 
-this would allow you to catch non-GPL drivers accessing this symbol.
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 490 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110801/09caadd1/attachment-0001.sig>
+Why can't it initialize itself at the standard point during the boot
+sequence, which is time_init() - which in turn is as you say the
+.timer callback?
