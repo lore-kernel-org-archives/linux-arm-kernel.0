@@ -1,35 +1,26 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 01 Aug 2011 09:20:55 +0100
-Subject: [RFC PATCH v9 0/4] Consolidating GIC per-cpu interrupts
-In-Reply-To: <4E3102F0.4030705@codeaurora.org>
-References: <1311267448-14652-1-git-send-email-marc.zyngier@arm.com>
-	<4E3102F0.4030705@codeaurora.org>
-Message-ID: <4E3661E7.2000003@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 1 Aug 2011 09:26:50 +0100
+Subject: [PATCH v2 1/7] ARM: mmp: parse irq from DT
+In-Reply-To: <1311835293-18125-2-git-send-email-haojian.zhuang@marvell.com>
+References: <1311835293-18125-1-git-send-email-haojian.zhuang@marvell.com>
+	<1311835293-18125-2-git-send-email-haojian.zhuang@marvell.com>
+Message-ID: <20110801082649.GA15578@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/07/11 07:34, Stephen Boyd wrote:
-> On 07/21/2011 09:57 AM, Marc Zyngier wrote:
->> The current GIC per-cpu interrupts (aka PPIs) suffer from a number of
->> problems:
->>
-> [snip]
->>
->> Patches against next-20110721, tested on PB11MP. As this patch series
->> is quite different from the previous one, I've dropped all previous
->> acks from platform maintainers.
-> 
-> I tried this out the other day and it didn't work. The setup_irq() calls
-> in msm timer code fails and then we calibrate delay forever. I haven't
-> looked further.
+On Thu, Jul 28, 2011 at 02:41:27PM +0800, Haojian Zhuang wrote:
+> +	unsigned int status, mask, irq_base, nr, data;
+> +	int cascade;
+> +
+...
+> +		mux_info = kzalloc(sizeof(*mux_info), GFP_KERNEL);
+> +		if (mux_info == NULL)
+> +			goto out;
+> +		status += (unsigned int)mmp_info->virt_base;
+> +		mux_info->status = (void __iomem *)status;
 
-Ah, of course. Need to do a gic_request_ppi() on CPU0's timer instead of
-request_irq(), but only on msm8x60/msm8960. Not very nice.
+This is silly.  Why not just do:
 
-I'll update the patches and repost them later today.
+		mux_info->status = mmp_info->virt_base + status;
 
-Cheers,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+and avoid those horrible casts?
