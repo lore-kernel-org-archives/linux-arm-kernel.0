@@ -1,143 +1,42 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 01 Aug 2011 15:18:42 +0100
-Subject: [PATCH V2 3/3] dmaengine: at_hdmac: add wrappers for testing
-	channel state
-In-Reply-To: <a04c691d57da727d0b68affb424e3fec44cfd421.1311627477.git.nicolas.ferre@atmel.com>
-References: <1311677514.24316.6.camel@vkoul-mobl4>
-	<3c302a7166c2aa6ae4b6d7b7cdfe21e640b73603.1311627477.git.nicolas.ferre@atmel.com>
-	<a04c691d57da727d0b68affb424e3fec44cfd421.1311627477.git.nicolas.ferre@atmel.com>
-Message-ID: <4E36B5C2.6050305@atmel.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 1 Aug 2011 15:25:22 +0100
+Subject: [PATCH] Remove remaining references of CONFIG_GENERIC_TIME
+In-Reply-To: <CAGVye5Nh2E4L3Ox=OKvG09v4hO6BjGmLUGZ5=Ha2QzbXar+deA@mail.gmail.com>
+References: <1312042478-26012-1-git-send-email-zdevai@gmail.com>
+	<20110801083614.GC15578@n2100.arm.linux.org.uk>
+	<CAGVye5Nh2E4L3Ox=OKvG09v4hO6BjGmLUGZ5=Ha2QzbXar+deA@mail.gmail.com>
+Message-ID: <20110801142522.GC19079@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/27/2011 01:21 PM, Nicolas Ferre wrote:
-> Cyclic property and paused state are encoded as bits in the channel status
-> bitfield. Tests of those bits are wrapped in convenient helper functions.
->
-> Signed-off-by: Nicolas Ferre<nicolas.ferre@atmel.com>
-> ---
-> V2: match V2 2/3 patch indentation fixing
+On Mon, Aug 01, 2011 at 01:41:32PM +0200, Zoltan Devai wrote:
+> 2011/8/1 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> > On Sat, Jul 30, 2011 at 06:14:38PM +0200, Zoltan Devai wrote:
+> >> Commit 592913ecb87a9e06f98ddb55b298f1a66bf94c6b has killed off any
+> >> use of this config option long ago.
+> >
+> > I don't see the point of this - we were free of GENERIC_TIME on ARM
+> > shortly after it was originally killed off. ?The problem is you can't
+> > stop people introducing new uses of this - because it existed once and
+> > there's nothing which errors out on its presence, people are going to
+> > continue submitting patches with it in. ?And it's going to continue
+> > being missed at the review stage.
+> >
+> > I've a similar problem with folk on ARM including mach/gpio.h as their
+> > sole gpio header file rather than linux/gpio.h - I've been trying for
+> > the last 1-2 years to educate people to use linux/ in preference. ?You
+> > can't do it, and I'm still just about the only one who picks up on that.
+> > (SoC maintainers don't care.) ?They will end up caring when I push a
+> > change during the next merge window though, so I'll eventually stop
+> > mach/gpio.h being included. ?(Instead, it'll be asm/gpio.h).
+> >
+> > GENERIC_TIME though... I don't think you'll ever stop new uses of it
+> > creeping in unless you can arrange for something to error out.
+> 
+> Sure, but the patch at least reduces the chances of copy-pasting it,
+> and makes it obvious by a simple grep that there's no use of it at all,
+> so I still think it's wort merging.
 
-Vinod, any news on this V2 series?
-
-Thanks, bye,
-
-
->   drivers/dma/at_hdmac.c      |   19 +++++++++----------
->   drivers/dma/at_hdmac_regs.h |   17 +++++++++++++++++
->   2 files changed, 26 insertions(+), 10 deletions(-)
->
-> diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
-> index 99bd2c18..26a1196 100644
-> --- a/drivers/dma/at_hdmac.c
-> +++ b/drivers/dma/at_hdmac.c
-> @@ -301,7 +301,7 @@ atc_chain_complete(struct at_dma_chan *atchan, struct at_desc *desc)
->
->   	/* for cyclic transfers,
->   	 * no need to replay callback function while stopping */
-> -	if (!test_bit(ATC_IS_CYCLIC,&atchan->status)) {
-> +	if (!atc_chan_is_cyclic(atchan)) {
->   		dma_async_tx_callback	callback = txd->callback;
->   		void			*param = txd->callback_param;
->
-> @@ -478,7 +478,7 @@ static void atc_tasklet(unsigned long data)
->   	spin_lock_irqsave(&atchan->lock, flags);
->   	if (test_and_clear_bit(ATC_IS_ERROR,&atchan->status))
->   		atc_handle_error(atchan);
-> -	else if (test_bit(ATC_IS_CYCLIC,&atchan->status))
-> +	else if (atc_chan_is_cyclic(atchan))
->   		atc_handle_cyclic(atchan);
->   	else
->   		atc_advance_work(atchan);
-> @@ -945,7 +945,7 @@ static int atc_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
->
->   		spin_unlock_irqrestore(&atchan->lock, flags);
->   	} else if (cmd == DMA_RESUME) {
-> -		if (!test_bit(ATC_IS_PAUSED,&atchan->status))
-> +		if (!atc_chan_is_paused(atchan))
->   			return 0;
->
->   		spin_lock_irqsave(&atchan->lock, flags);
-> @@ -1035,7 +1035,7 @@ atc_tx_status(struct dma_chan *chan,
->   	else
->   		dma_set_tx_state(txstate, last_complete, last_used, 0);
->
-> -	if (test_bit(ATC_IS_PAUSED,&atchan->status))
-> +	if (atc_chan_is_paused(atchan))
->   		ret = DMA_PAUSED;
->
->   	dev_vdbg(chan2dev(chan), "tx_status %d: cookie = %d (d%d, u%d)\n",
-> @@ -1057,7 +1057,7 @@ static void atc_issue_pending(struct dma_chan *chan)
->   	dev_vdbg(chan2dev(chan), "issue_pending\n");
->
->   	/* Not needed for cyclic transfers */
-> -	if (test_bit(ATC_IS_CYCLIC,&atchan->status))
-> +	if (atc_chan_is_cyclic(atchan))
->   		return;
->
->   	spin_lock_irqsave(&atchan->lock, flags);
-> @@ -1395,8 +1395,7 @@ static int at_dma_prepare(struct device *dev)
->   			device_node) {
->   		struct at_dma_chan *atchan = to_at_dma_chan(chan);
->   		/* wait for transaction completion (except in cyclic case) */
-> -		if (atc_chan_is_enabled(atchan)&&
-> -		   !test_bit(ATC_IS_CYCLIC,&atchan->status))
-> +		if (atc_chan_is_enabled(atchan)&&  !atc_chan_is_cyclic(atchan))
->   			return -EAGAIN;
->   	}
->   	return 0;
-> @@ -1408,7 +1407,7 @@ static void atc_suspend_cyclic(struct at_dma_chan *atchan)
->
->   	/* Channel should be paused by user
->   	 * do it anyway even if it is not done already */
-> -	if (!test_bit(ATC_IS_PAUSED,&atchan->status)) {
-> +	if (!atc_chan_is_paused(atchan)) {
->   		dev_warn(chan2dev(chan),
->   		"cyclic channel not paused, should be done by channel user\n");
->   		atc_control(chan, DMA_PAUSE, 0);
-> @@ -1432,7 +1431,7 @@ static int at_dma_suspend_noirq(struct device *dev)
->   			device_node) {
->   		struct at_dma_chan *atchan = to_at_dma_chan(chan);
->
-> -		if (test_bit(ATC_IS_CYCLIC,&atchan->status))
-> +		if (atc_chan_is_cyclic(atchan))
->   			atc_suspend_cyclic(atchan);
->   		atchan->save_cfg = channel_readl(atchan, CFG);
->   	}
-> @@ -1484,7 +1483,7 @@ static int at_dma_resume_noirq(struct device *dev)
->   		struct at_dma_chan *atchan = to_at_dma_chan(chan);
->
->   		channel_writel(atchan, CFG, atchan->save_cfg);
-> -		if (test_bit(ATC_IS_CYCLIC,&atchan->status))
-> +		if (atc_chan_is_cyclic(atchan))
->   			atc_resume_cyclic(atchan);
->   	}
->   	return 0;
-> diff --git a/drivers/dma/at_hdmac_regs.h b/drivers/dma/at_hdmac_regs.h
-> index 6f0c4a3..aa4c9ae 100644
-> --- a/drivers/dma/at_hdmac_regs.h
-> +++ b/drivers/dma/at_hdmac_regs.h
-> @@ -362,6 +362,23 @@ static inline int atc_chan_is_enabled(struct at_dma_chan *atchan)
->   	return !!(dma_readl(atdma, CHSR)&  atchan->mask);
->   }
->
-> +/**
-> + * atc_chan_is_paused - test channel pause/resume status
-> + * @atchan: channel we want to test status
-> + */
-> +static inline int atc_chan_is_paused(struct at_dma_chan *atchan)
-> +{
-> +	return test_bit(ATC_IS_PAUSED,&atchan->status);
-> +}
-> +
-> +/**
-> + * atc_chan_is_cyclic - test if given channel has cyclic property set
-> + * @atchan: channel we want to test status
-> + */
-> +static inline int atc_chan_is_cyclic(struct at_dma_chan *atchan)
-> +{
-> +	return test_bit(ATC_IS_CYCLIC,&atchan->status);
-> +}
->
->   /**
->    * set_desc_eol - set end-of-link to descriptor so it will end transfer
+That argument doesn't work - as can be seen from my first paragraph.
+The fact that we have new references to it in arch/arm/Kconfig is
+proof of that.
