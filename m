@@ -1,21 +1,14 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 1 Aug 2011 16:21:34 -0600 (MDT)
-Subject: [PATCH v2] OMAP: ctrl: Fix CONTROL_DSIPHY register fields
-In-Reply-To: <1311762839-31663-1-git-send-email-archit@ti.com>
-References: <1311762839-31663-1-git-send-email-archit@ti.com>
-Message-ID: <alpine.DEB.2.00.1108011619520.28427@utopia.booyaka.com>
+From: buytenh@wantstofly.org (Lennert Buytenhek)
+Date: Tue, 2 Aug 2011 00:42:50 +0200
+Subject: [PATCH 0/3] mmp clockevent handling race fix
+Message-ID: <20110801224250.GF912@wantstofly.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 27 Jul 2011, Archit Taneja wrote:
+This is a minimal fix for the mmp clockevent handling race reported
+earlier:
 
-> Fix the shift and mask macros for DSIx_PPID fields in CONTROL_DSIPHY. The
-> OMAP4430 Public TRM vV has these fields mentioned correctly.
+	http://marc.info/?l=linux-arm-kernel&m=130745534131879&w=2
+	http://dev.laptop.org/ticket/10945
 
-Thanks, queued for 3.2 in the scm_fixes_3.2 branch of 
-git://git.pwsan.com/linux-2.6
-
-Also added Santosh's ack.
-
-
-- Paul
+This version needs some more testing, but looks OK so far.
