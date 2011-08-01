@@ -1,152 +1,70 @@
-From: koen.beel.barco@gmail.com (Koen Beel)
-Date: Mon, 1 Aug 2011 17:14:07 +0200
-Subject: [PATCH v8 0/3] add the GPMI controller driver for IMX23/IMX28
-In-Reply-To: <201107311551.48223.marek.vasut@gmail.com>
-References: <1311230846-26437-1-git-send-email-b32955@freescale.com>
-	<20018.43621.688990.319528@ipc1.ka-ro>
-	<CAHMSPgPXnDVO630P9fnogQ0XvPSrwz0MYzXfXZLJoJNRf1gifA@mail.gmail.com>
-	<201107311551.48223.marek.vasut@gmail.com>
-Message-ID: <CAHMSPgMK_zM17NXgsbrzs8Zw0VXtDoP12_1V7oeROSF=aBDuYg@mail.gmail.com>
+From: kyle@moffetthome.net (Kyle Moffett)
+Date: Mon, 1 Aug 2011 11:15:24 -0400
+Subject: [PATCH] Remove remaining references of CONFIG_GENERIC_TIME
+In-Reply-To: <CACqU3MVUxTYmD+4VGBAeN8PTs83fR0xQQrQS5h4QGMZXgMxEvA@mail.gmail.com>
+References: <1312042478-26012-1-git-send-email-zdevai@gmail.com>
+	<20110801083614.GC15578@n2100.arm.linux.org.uk>
+	<CAMuHMdUpTDSRP_JmWqcCBtYwzna0hwmaBshpiF8kgvqoNcqYZA@mail.gmail.com>
+	<20110801101410.GE15578@n2100.arm.linux.org.uk>
+	<CAMuHMdUiLjMVwOqKPF6tHLpPxROrx=rRf3ednfTLrwGuZ2VF7A@mail.gmail.com>
+	<CACqU3MVUxTYmD+4VGBAeN8PTs83fR0xQQrQS5h4QGMZXgMxEvA@mail.gmail.com>
+Message-ID: <CAGZ=bqL=VAx5jnSBkE2q5KJSY_+An-VRTRAzJmJ3waQUvrRFFg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Don't think it's a hardware issue. After all it is working on the
-mx23evk using the Freescale BSP based on 2.6.35.3.
-Now I tested using this kernel command line:
-mtdparts=gpmi-nand:20m(boot),-(user) gpmi_debug_init
-(So I removed the ubi rootfs stuff, see previous mails).
-
-Its booting fine now without complaining about dma timeouts.
-
-Have tried flash_eraseall /dev/mtd1. Now it's complaining and thinking
-all blocks are bad. So a "flash_erase: Skipping bad block at 1db00000"
-message for every erase block.
-Writing 1 to /sys/devices/platform/imx23-gpmi-nand/ignorebad, makes to
-go a little further giving 'only one' error but I doubt it's working
-at all. See attached log file.
-
-When the trying ubiformat /dev/mtd1 its stopping with a dma timeout.
-Every subsequent action (e.g. using ubiformat or flash_eraseall) using
-that dma channel is failing.
-I have put a printk in mxs-dma.c around line 387:
-
-    if (mxs_chan->status == DMA_IN_PROGRESS && !append)
-    {
-        pr_err("dma already in progess!\n");
-        return NULL;
-    }
-
-I see that printk also in the log file in attach. Seems like the
-mxs-dma is failing at some point and for the rest of the time always
-keeps it's status at DMA_IN_PROGRESS
-
-Any input or feedback is welcome.
-
-Regards,
-Koen
-
-
-On Sun, Jul 31, 2011 at 3:51 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
-> On Friday, July 29, 2011 05:00:48 PM Koen Beel wrote:
->> On Fri, Jul 29, 2011 at 2:41 PM, Lothar Wa?mann <LW@karo-electronics.de>
-> wrote:
->> > Hi,
->> >
->> > Koen Beel writes:
->> >> Hi,
->> >>
->> >> On Fri, Jul 29, 2011 at 9:20 AM, Lothar Wa?mann <LW@karo-electronics.de>
-> wrote:
->> >> > Hi,
->> >> >
->> >> > Koen Beel writes:
->> >> >> Hi,
->> >> >>
->> >> >> I have test on mx23evk board. Still see the same issues.
->> >> >>
->> >> >> On Wed, Jul 27, 2011 at 3:53 AM, Huang Shijie <b32955@freescale.com>
-> wrote:
->> >> >> > Hi,
->> >> >> >
->> >> >> > Thanks for your test.
->> >> >> >
->> >> >> >> Hi,
->> >> >> >>
->> >> >> >> It's not really working for me.
->> >> >> >> I've applied all gpmi-nand driver patches and the dma driver
->> >> >> >> patches.
->> >> >> >>
->> >> >> >> I have added following kernel parameters:
->> >> >> >> mtdparts=gpmi-nand:20m(boot),-(user) ubi.mtd=1 root=ubi0:rootfs0
->> >> >> >> rootfstype=ubifs gpmi_debug_init
->> >> >> >>
->> >> >> >> During boot I get already get DMA timeout:
->> >> >> >> [ ? ?2.560000] [ start_dma_without_bch_irq : 392 ] DMA timeout,
->> >> >> >> last DMA
->> >> >> >>
->> >> >> >> :1
->> >> >> >>
->> >> >> >> [ ? ?3.560000] [ start_dma_with_bch_irq : 427 ] bch timeout!!!
->> >> >> >> ...
->> >> >> >> (see log file in attach line 89)
->> >> >>
->> >> >> I still see this DMA timeout when booting.
->> >> >> What kernel parameters do you use? I still use same as above.
->> >> >
->> >> > Do you have an SD card in the system? I'm getting the same error when
->> >> > accessing an SD card. Without SD card I can use the flash without any
->> >> > errors.
->> >>
->> >> No SD card in the system. At least not on my mx23evk board.
->> >> My real target hardware has a SDIO wifi chip.
->> >>
->> >> Are you also testing on the mx23evk board? Really strange it is not
->> >> reproducible here then.
->> >> Anyone using mx23evk please give:
->> >> - revision number of board (I have tested on rev C1)
->> >> - kernel parameter used (see previous mail for mine)
->> >
->> > It's getting ever more strange. I only have problems with concurrent
->> > access to the flash and SD-card when I do file system based accessed
->> > to the SD card.
->> > A 'dd if=/dev/mmcblk0 of=/dev/null' while excessively using the flash
->> > works well, while mounting the SD card and doing an 'ls' produces
->> > immediate BCH DMA timeouts.
->> >
->> > Perhaps someone can make anything out of that.
->>
->> I have checked and the function dma_irq_callback is never called
->> during my tests. This means the DMA transfer does not even works once.
->>
->> Also no clue here ...
+On Mon, Aug 1, 2011 at 11:04, Arnaud Lacombe <lacombar@gmail.com> wrote:
+> Hi,
 >
-> Aren't you getting some undervolt on the powerrail for example ? btw the driver
-> looks a bit crappy to me, but let's believe it works ;-)
->
+> On Mon, Aug 1, 2011 at 7:27 AM, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+>> On Mon, Aug 1, 2011 at 12:14, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>>> On Mon, Aug 01, 2011 at 12:09:02PM +0200, Geert Uytterhoeven wrote:
+>>>> On Mon, Aug 1, 2011 at 10:36, Russell King - ARM Linux
+>>>> <linux@arm.linux.org.uk> wrote:
+>>>> > On Sat, Jul 30, 2011 at 06:14:38PM +0200, Zoltan Devai wrote:
+>>>> >> Commit 592913ecb87a9e06f98ddb55b298f1a66bf94c6b has killed off any
+>>>> >> use of this config option long ago.
+>>>> >
+>>>> > I don't see the point of this - we were free of GENERIC_TIME on ARM
+>>>> > shortly after it was originally killed off. ?The problem is you can't
+>>>> > stop people introducing new uses of this - because it existed once and
+>>>> > there's nothing which errors out on its presence, people are going to
+>>>> > continue submitting patches with it in. ?And it's going to continue
+>>>> > being missed at the review stage.
+>>>> >
+>>>> > I've a similar problem with folk on ARM including mach/gpio.h as their
+>>>> > sole gpio header file rather than linux/gpio.h - I've been trying for
+>>>> > the last 1-2 years to educate people to use linux/ in preference. ?You
+>>>> > can't do it, and I'm still just about the only one who picks up on that.
+>>>> > (SoC maintainers don't care.) ?They will end up caring when I push a
+>>>> > change during the next merge window though, so I'll eventually stop
+>>>> > mach/gpio.h being included. ?(Instead, it'll be asm/gpio.h).
+>>>> >
+>>>> > GENERIC_TIME though... I don't think you'll ever stop new uses of it
+>>>> > creeping in unless you can arrange for something to error out.
+>>>>
+>>>> Doesn't kconf error out when trying to select a non-existent symbol?
+>>>
+>>> Nope.
 >>
->> > Lothar Wa?mann
->> > --
->> > ___________________________________________________________
->> >
->> > Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
->> > Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
->> > Gesch?ftsf?hrer: Matthias Kaussen
->> > Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
->> >
->> > www.karo-electronics.de | info at karo-electronics.de
->> > ___________________________________________________________
+>> You're right. So that's a bug.
 >>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> depends on what you are trying to achieve and what the problem is.
 >
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: log1
-Type: application/octet-stream
-Size: 2644 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110801/32011204/attachment-0001.obj>
+> Internally kconfig will create a dummy symbol when it encounter a
+> missing symbol so that arch/arm/Kconfig can reference a symbol which
+> will be fully defined later on. I do not think you want to forward
+> decl all the symbol which can be used. That'd be a mess. That said, we
+> can come with a form of symbol deprecation that would error-out when
+> used.
+
+Would it be possible instead to make Kconfig go through all the symbols
+after everything is processed and identify any remaining "dummy symbols"
+which were not actually declared anywhere?
+
+Right now if you typo a "select" statement you get no warnings that you
+are selecting something that does not exist, which is probably a cause
+of many kinds of errors beyond this particular one.
+
+Cheers,
+Kyle Moffett
