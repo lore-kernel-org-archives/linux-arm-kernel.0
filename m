@@ -1,40 +1,56 @@
-From: zdevai@gmail.com (Zoltan Devai)
-Date: Mon, 1 Aug 2011 13:41:32 +0200
-Subject: [PATCH] Remove remaining references of CONFIG_GENERIC_TIME
-In-Reply-To: <20110801083614.GC15578@n2100.arm.linux.org.uk>
-References: <1312042478-26012-1-git-send-email-zdevai@gmail.com>
-	<20110801083614.GC15578@n2100.arm.linux.org.uk>
-Message-ID: <CAGVye5Nh2E4L3Ox=OKvG09v4hO6BjGmLUGZ5=Ha2QzbXar+deA@mail.gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Mon, 1 Aug 2011 12:50:39 +0100
+Subject: [GIT PULL] msm gpio move to drivers/gpio
+In-Reply-To: <20110801112244.GA24384@huya.qualcomm.com>
+References: <20110801112244.GA24384@huya.qualcomm.com>
+Message-ID: <20110801115039.GA2191@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/8/1 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Sat, Jul 30, 2011 at 06:14:38PM +0200, Zoltan Devai wrote:
->> Commit 592913ecb87a9e06f98ddb55b298f1a66bf94c6b has killed off any
->> use of this config option long ago.
->
-> I don't see the point of this - we were free of GENERIC_TIME on ARM
-> shortly after it was originally killed off. ?The problem is you can't
-> stop people introducing new uses of this - because it existed once and
-> there's nothing which errors out on its presence, people are going to
-> continue submitting patches with it in. ?And it's going to continue
-> being missed at the review stage.
->
-> I've a similar problem with folk on ARM including mach/gpio.h as their
-> sole gpio header file rather than linux/gpio.h - I've been trying for
-> the last 1-2 years to educate people to use linux/ in preference. ?You
-> can't do it, and I'm still just about the only one who picks up on that.
-> (SoC maintainers don't care.) ?They will end up caring when I push a
-> change during the next merge window though, so I'll eventually stop
-> mach/gpio.h being included. ?(Instead, it'll be asm/gpio.h).
->
-> GENERIC_TIME though... I don't think you'll ever stop new uses of it
-> creeping in unless you can arrange for something to error out.
+On Mon, Aug 01, 2011 at 04:22:45AM -0700, David Brown wrote:
+> The following changes since commit 02f8c6aee8df3cdc935e9bdd4f2d020306035dbe:
+> 
+>   Linux 3.0 (2011-07-21 19:17:23 -0700)
+> 
+> are available in the git repository at:
+>   git://codeaurora.org/quic/kernel/davidb/linux-msm.git msm-move-gpio
+> 
+> David Brown (7):
+>       msm: gpio: Remove unsupported devices
+>       msm: Remove chip-ifdefs for GPIO io mappings
+>       msm: gpio: Remove chip-specific register definitions
+>       msm: gpio: Remove ifdefs on gpio chip registers
+>       msm: gpiomux: Move public API to public header
+>       gpio_msm: Move Qualcomm v6 MSM driver into drivers
+>       gpio_msm: Move Qualcomm MSM v2 gpio driver into drivers
+> 
+>  arch/arm/mach-msm/Kconfig                          |    4 +
+>  arch/arm/mach-msm/Makefile                         |    8 -
+>  arch/arm/mach-msm/gpio_hw.h                        |  278 --------------------
+>  arch/arm/mach-msm/gpiomux.h                        |   17 +--
+>  arch/arm/mach-msm/include/mach/msm_gpiomux.h       |   38 +++
+>  arch/arm/mach-msm/include/mach/msm_iomap-7x00.h    |   10 +-
+>  arch/arm/mach-msm/include/mach/msm_iomap-7x30.h    |   10 +-
+>  arch/arm/mach-msm/include/mach/msm_iomap-8x50.h    |   10 +-
+>  arch/arm/mach-msm/include/mach/msm_iomap.h         |    2 +
+>  arch/arm/mach-msm/io.c                             |   12 +-
+>  drivers/gpio/Kconfig                               |   16 ++
+>  drivers/gpio/Makefile                              |    2 +
+>  arch/arm/mach-msm/gpio.c => drivers/gpio/msm_v1.c  |  111 +++++----
+>  drivers/gpio/msm_v1.h                              |  271 +++++++++++++++++++
+>  .../mach-msm/gpio-v2.c => drivers/gpio/msm_v2.c    |    2 +-
 
-Sure, but the patch at least reduces the chances of copy-pasting it,
-and makes it obvious by a simple grep that there's no use of it at all,
-so I still think it's wort merging.
+As discussed f2f at linaro Connect: filenames in drivers/gpio/ should be "gpio-*.{c,h}
 
-Don't know though who should pick this up...
+g.
 
-Z
+>  15 files changed, 414 insertions(+), 377 deletions(-)
+>  delete mode 100644 arch/arm/mach-msm/gpio_hw.h
+>  create mode 100644 arch/arm/mach-msm/include/mach/msm_gpiomux.h
+>  rename arch/arm/mach-msm/gpio.c => drivers/gpio/msm_v1.c (82%)
+>  create mode 100644 drivers/gpio/msm_v1.h
+>  rename arch/arm/mach-msm/gpio-v2.c => drivers/gpio/msm_v2.c (99%)
+> 
+> -- 
+> Sent by an employee of the Qualcomm Innovation Center, Inc.
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
