@@ -1,101 +1,98 @@
-From: lbassel@codeaurora.org (Larry Bassel)
-Date: Mon, 1 Aug 2011 10:08:50 -0700
-Subject: questions about memory hotplug
-In-Reply-To: <20110730093055.GA10672@sli10-conroe.sh.intel.com>
-References: <20110729221230.GA3466@labbmf-linux.qualcomm.com>
-	<20110730093055.GA10672@sli10-conroe.sh.intel.com>
-Message-ID: <20110801170850.GB3466@labbmf-linux.qualcomm.com>
+From: lacombar@gmail.com (Arnaud Lacombe)
+Date: Mon, 1 Aug 2011 13:14:36 -0400
+Subject: [PATCH] Remove remaining references of CONFIG_GENERIC_TIME
+In-Reply-To: <CAGZ=bqLHjzpKQP63dnSK0fML2ZycmfFnSbiApV4naMCN_UrZdg@mail.gmail.com>
+References: <1312042478-26012-1-git-send-email-zdevai@gmail.com>
+	<20110801083614.GC15578@n2100.arm.linux.org.uk>
+	<CAMuHMdUpTDSRP_JmWqcCBtYwzna0hwmaBshpiF8kgvqoNcqYZA@mail.gmail.com>
+	<20110801101410.GE15578@n2100.arm.linux.org.uk>
+	<CAMuHMdUiLjMVwOqKPF6tHLpPxROrx=rRf3ednfTLrwGuZ2VF7A@mail.gmail.com>
+	<CACqU3MVUxTYmD+4VGBAeN8PTs83fR0xQQrQS5h4QGMZXgMxEvA@mail.gmail.com>
+	<CAGZ=bqL=VAx5jnSBkE2q5KJSY_+An-VRTRAzJmJ3waQUvrRFFg@mail.gmail.com>
+	<CACqU3MUoxSNmcYsSF4zOTgADdedb7TcciPuBPMviG02M5oUPDQ@mail.gmail.com>
+	<CAGZ=bqLHjzpKQP63dnSK0fML2ZycmfFnSbiApV4naMCN_UrZdg@mail.gmail.com>
+Message-ID: <CACqU3MV1PWWttCdXpafwovc_X-CxUp_Dcng1i8jKx5bA0+NGPQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 Jul 11 17:30, Shaohua Li wrote:
-> On Sat, Jul 30, 2011 at 06:12:31AM +0800, Larry Bassel wrote:
-> > We want to handle the following 2 use cases we have on
-> > some of our (ARM) platforms:
-> > 
-> > 1. A platform where part of the memory may be powered
-> > off. The location and size of this memory is not known
-> > until the kernel parses the memory tags (there aren't
-> > any non-standard tags used, but the memory layout and
-> > a memory bank size which is obtained from HW are used
-> > to figure out where and how large this memory is). All
-> > of this memory must either be on or off. For a given
-> > configuration the location of this memory can't be moved.
-> > 
-> > 2. A (different) platform where part of the memory
-> > is occasionally needed as a large physically contiguous 
-> > block, but usually is not (and then should be usable
-> > by the kernel as normal memory). When the memory is
-> > needed for the contiguous block, the pages in this
-> > range currently being used by the kernel will
-> > need to be migrated out.
-> > 
-> > The size of this is known at compile time and can be
-> > placed at any reasonable place in memory (but should
-> > be SPARSEMEM section aligned -- its size may however
-> > not be a power of 2 and thus this memory could
-> > span more than one section). This memory will not be
-> > powered off, but must either be completely used for
-> > one purpose or the other.
-> > 
-> > The size of memory in question for #1 is generally
-> > much larger than that of #2.
-> > 
-> > Memory hotplug/hotremove (logical and physical for #1,
-> > only logical for #2) approximately solves these problems,
-> > but there is some functionality we need that AFAIK is
-> > not present:
-> > 
-> > * The memory in #1 and #2 above must be in a movable
-> > zone so that the chance of migration is maximized.
-> > I'm familiar with the kernelcore= and movablecore=
-> > commandline options, but they don't do what is necessary
-> > here, because we need control on where the movable zone
-> > is formed as well as the size. Also the location and size
-> > of these special memory areas is not known until the
-> > kernel comes up (in #1 it is conceivable that the bootloader
-> > could locate the memory that can be powered on and off and
-> > pass it in via some commandline option, but AFAICT this won't
-> > work at all for #2).
-> > 
-> > One could hack up find_zone_movable_pfns_for_nodes() presumably,
-> > but I wonder if there is an already existing way of doing
-> > this (or at least a clean extension to the current
-> > functionality that someone might suggest).
-> > 
-> > Would CONFIG_ARCH_POPULATES_NODE_MAP help here? Does anyone
-> > use this? It doesn't seem to be in any defconfig or Kconfig
-> > on 3.0 (or earlier versions I've looked at).
-> > 
-> > Perhaps CMA (which is not merged yet and AFAIK still has some
-> > issues on ARM) might handle #2 better than memory
-> > hotplug/hotremove. Or is there a better way to handle #2
-> > than either CMA or memory hotplug?
-> is such memory always at the end of memory? if yes, such memory
-> can be added to MOVABLE_ZONE.
+Hi,
 
-In use case #1 yes, maybe not in #2 (we can arrange it to be
-at the end of memory, but then might waste memory as it may
-not be aligned on a SPARSEMEM section boundary and so would
-need to be padded).
+On Mon, Aug 1, 2011 at 12:48 PM, Kyle Moffett <kyle@moffetthome.net> wrote:
+> On Mon, Aug 1, 2011 at 12:08, Arnaud Lacombe <lacombar@gmail.com> wrote:
+>> On Mon, Aug 1, 2011 at 11:15 AM, Kyle Moffett <kyle@moffetthome.net> wrote:
+>>> On Mon, Aug 1, 2011 at 11:04, Arnaud Lacombe <lacombar@gmail.com> wrote:
+>>>> On Mon, Aug 1, 2011 at 7:27 AM, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+>>>>> On Mon, Aug 1, 2011 at 12:14, Russell King - ARM Linux
+>>>>>>>[...]
+>>>>>>>
+>>>>>>> Doesn't kconf error out when trying to select a non-existent symbol?
+>>>>>>
+>>>>>> Nope.
+>>>>>
+>>>>> You're right. So that's a bug.
+>>>>>
+>>>> depends on what you are trying to achieve and what the problem is.
+>>>>
+>>>> Internally kconfig will create a dummy symbol when it encounter a
+>>>> missing symbol so that arch/arm/Kconfig can reference a symbol which
+>>>> will be fully defined later on. I do not think you want to forward
+>>>> decl all the symbol which can be used. That'd be a mess. That said, we
+>>>> can come with a form of symbol deprecation that would error-out when
+>>>> used.
+>>>
+>>> Would it be possible instead to make Kconfig go through all the symbols
+>>> after everything is processed and identify any remaining "dummy symbols"
+>>> which were not actually declared anywhere?
+>>>
+>> this is software, everything is possible.
+>>
+>>> Right now if you typo a "select" statement you get no warnings that you
+>>> are selecting something that does not exist, which is probably a cause
+>>> of many kinds of errors beyond this particular one.
+>>>
+>> d'oh! ... I'm not sure we want that. Dummy symbol are heavily used
+>> internally, a trivial implementation[0] triggered:
+>>
+>> % make REGENERATE_PARSERS=y alldefconfig 2>&1 | grep 'defined without
+>> type' | wc -l
+>> 817
+>>
+>> Moreover, this approach is deemed to fail. The current symbol
+>> namespace is tied to an arch, so whenever you do:
+>>
+>> arch/arm/Kconfig:
+>> config FOO
+>> ? ?bool
+>>
+>> config BAZ
+>> ? ?bool
+>>
+>> drivers/cpufreq/Kconfig
+>> config BAR
+>> ? ?depends on ARM && FOO
+>> ? ?select BAZ
+>>
+>> You will end up triggering the warning for every ARCH != ARM...
+>
+> Perhaps that's an argument for building a single Kconfig namespace?
+I'm working on that, but this is a real mess :)
 
-> or if such memory can be at the middle of memory, maybe we can add
-> a new mirgate type, the migrate type is movable but other type allocation
-> can't fallback into.
-> 
-> Thanks,
-> Shaohua
+> At the very least, most of the architecture-generic warnings could be
+> worked around with trivial predeclarations in an "arch/Kconfig" file:
+>
+> config ARM
+> ? ? ? ?bool
+> [...]
+> config X86
+> ? ? ? ?bool
+>
+> There's probably technical issues that I'm missing that would make
+> that inordinately painful, but I can't see them right now... any ideas?
+>
+not I directly forsee.
 
-Larry
+ - Arnaud
 
-> 
-> --
-> To unsubscribe, send a message with 'unsubscribe linux-mm' in
-> the body to majordomo at kvack.org.  For more info on Linux MM,
-> see: http://www.linux-mm.org/ .
-> Fight unfair telecom internet charges in Canada: sign http://stopthemeter.ca/
-> Don't email: <a href=mailto:"dont@kvack.org"> email at kvack.org </a>
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+> Cheers,
+> Kyle Moffett
+>
