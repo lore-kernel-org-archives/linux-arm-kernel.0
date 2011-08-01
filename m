@@ -1,46 +1,53 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 01 Aug 2011 18:26:52 +0100 (BST)
-Subject: [PATCH] arm: fix compile failure in orion5x/dns323-setup.c
-In-Reply-To: <1312216934-29710-1-git-send-email-paul.gortmaker@windriver.com>
-References: <1312216934-29710-1-git-send-email-paul.gortmaker@windriver.com>
-Message-ID: <alpine.LFD.2.00.1108011825190.18706@xanadu.home>
+From: linux@bohmer.net (Remy Bohmer)
+Date: Mon, 1 Aug 2011 20:08:19 +0200
+Subject: [PATCH] Add sched_clock to AT91 TCB clocksource driver
+In-Reply-To: <20110801092806.GD15578@n2100.arm.linux.org.uk>
+References: <1312124593-6088-1-git-send-email-linux@bohmer.net>
+	<20110731150707.GA2975@n2100.arm.linux.org.uk>
+	<CANqCtQJwUsLXfA408GzAr0rQtc2DRjtKqP8-m2UBUGEy-YP5dg@mail.gmail.com>
+	<20110801092806.GD15578@n2100.arm.linux.org.uk>
+Message-ID: <CANqCtQK=H_B04A7knZSiuE5RLogTgMKxwtMK1HSqSgKA_U2J7A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 1 Aug 2011, Paul Gortmaker wrote:
+Hi,
 
-> Upstream commit d5341942d784134f2997b3ff82cd63cf71d1f932 "PCI: Make the
-> struct pci_dev * argument of pci_fixup_irqs const." leaked an extra
-> "const" into an actual call site (vs a proto/decl) which causes this:
-> 
-> arch/arm/mach-orion5x/dns323-setup.c: In function 'dns323_pci_map_irq':
-> arch/arm/mach-orion5x/dns323-setup.c:80: error: expected expression before 'const'
-> arch/arm/mach-orion5x/dns323-setup.c:80: error: too few arguments to function 'orion5x_pci_map_irq'
-> make[3]: *** [arch/arm/mach-orion5x/dns323-setup.o] Error 1
-> 
-> Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+> You're forgetting that jiffies doesn't jump about. ?A late initializing
+> sched_clock could jump.
 
-Acked-by: Nicolas Pitre <nico@fluxnic.net>
- 
-> diff --git a/arch/arm/mach-orion5x/dns323-setup.c b/arch/arm/mach-orion5x/dns323-setup.c
-> index a6eddae..c105556 100644
-> --- a/arch/arm/mach-orion5x/dns323-setup.c
-> +++ b/arch/arm/mach-orion5x/dns323-setup.c
-> @@ -77,7 +77,7 @@ static int __init dns323_pci_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
->  	/*
->  	 * Check for devices with hard-wired IRQs.
->  	 */
-> -	irq = orion5x_pci_map_irq(const dev, slot, pin);
-> +	irq = orion5x_pci_map_irq(dev, slot, pin);
->  	if (irq != -1)
->  		return irq;
->  
-> -- 
-> 1.7.6
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
-> 
+Agreed. Currently the jiffies based clock does not move at all, thus
+it surely does not jump... ;-)
+
+>> Anyway, do you have a better suggestion how to fix this? The tcb
+>> clocksource is loaded during a arch_initcall(), perhaps we need
+>> something before that point.
+>> I do not see an easy way to integrate it in MACHINE_START(.timer).
+>> Would 'late_time_init' be a better solution?
+>
+> late_time_init() is not that much better as that still happens after
+> sched_init() has been called. ?sched_init() initializes various
+> structures which involves reading sched_clock().
+
+But late_time_init does it before the sched_clock is declared stable.
+Until that point sched_clock will always return zero, as such we can
+IMHO safely assume that the scheduler is designed such that it can
+handle fixed zero timestamps for a while. The new sched_clock also
+nicely starts counting from zero once enabled, and does not make a
+jump start.
+
+> Why can't it initialize itself at the standard point during the boot
+> sequence, which is time_init() - which in turn is as you say the
+> .timer callback?
+
+In that case it has to replace the PIT based clocksource completely.
+Since the TCB based clocksource and event device are
+optional/configurable for this architecture and it is implemented as a
+clocksource driver instead of part of the BSP, it would result in a
+lot of ifdefs throughout that code.
+The arch_initcall() has to be removed and replaced by something else...
+I will try to work out a different solution, and post an update, see
+how that looks like...
+
+Kind regards,
+
+Remy
