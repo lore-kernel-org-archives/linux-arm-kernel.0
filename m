@@ -1,30 +1,57 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 1 Aug 2011 09:36:14 +0100
-Subject: [PATCH] Remove remaining references of CONFIG_GENERIC_TIME
-In-Reply-To: <1312042478-26012-1-git-send-email-zdevai@gmail.com>
-References: <1312042478-26012-1-git-send-email-zdevai@gmail.com>
-Message-ID: <20110801083614.GC15578@n2100.arm.linux.org.uk>
+From: linux@bohmer.net (Remy Bohmer)
+Date: Mon, 1 Aug 2011 10:42:35 +0200
+Subject: [PATCH] Add sched_clock to AT91 TCB clocksource driver
+In-Reply-To: <20110731150707.GA2975@n2100.arm.linux.org.uk>
+References: <1312124593-6088-1-git-send-email-linux@bohmer.net>
+	<20110731150707.GA2975@n2100.arm.linux.org.uk>
+Message-ID: <CANqCtQJwUsLXfA408GzAr0rQtc2DRjtKqP8-m2UBUGEy-YP5dg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 30, 2011 at 06:14:38PM +0200, Zoltan Devai wrote:
-> Commit 592913ecb87a9e06f98ddb55b298f1a66bf94c6b has killed off any
-> use of this config option long ago.
+Hi Russell,
 
-I don't see the point of this - we were free of GENERIC_TIME on ARM
-shortly after it was originally killed off.  The problem is you can't
-stop people introducing new uses of this - because it existed once and
-there's nothing which errors out on its presence, people are going to
-continue submitting patches with it in.  And it's going to continue
-being missed at the review stage.
+2011/7/31 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+>> +++ b/arch/arm/Kconfig
+>> @@ -296,6 +296,7 @@ config ARCH_AT91
+>> ? ? ? select HAVE_CLK
+>> ? ? ? select CLKDEV_LOOKUP
+>> ? ? ? select ARM_PATCH_PHYS_VIRT if MMU
+>> + ? ? select HAVE_SCHED_CLOCK if ATMEL_TCB_CLKSRC
+>> ? ? ? help
+>> ? ? ? ? This enables support for systems based on the Atmel AT91RM9200,
+>> ? ? ? ? AT91SAM9 and AT91CAP9 processors.
+>> diff --git a/arch/arm/kernel/sched_clock.c b/arch/arm/kernel/sched_clock.c
+>> index 9a46370..f9028e4 100644
+>> --- a/arch/arm/kernel/sched_clock.c
+>> +++ b/arch/arm/kernel/sched_clock.c
+>> @@ -20,6 +20,13 @@ static void (*sched_clock_update_fn)(void);
+>>
+>> ?static void sched_clock_poll(unsigned long wrap_ticks)
+>> ?{
+>> + ? ? /*
+>> + ? ? ?* The sched_clock_update_fn may be initialised AFTER first call to
+>> + ? ? ?* time_init()
+>> + ? ? ?*/
+>> + ? ? if (unlikely(!sched_clock_update_fn))
+>> + ? ? ? ? ? ? return;
+>
+> NAK. ?I've said this before - sched_clock _must_ be up and running by the
+> time this function is called - because shortly after this call is when
+> the scheduler initializes, and the scheduler wants sched_clock() working
+> at that point.
 
-I've a similar problem with folk on ARM including mach/gpio.h as their
-sole gpio header file rather than linux/gpio.h - I've been trying for
-the last 1-2 years to educate people to use linux/ in preference.  You
-can't do it, and I'm still just about the only one who picks up on that.
-(SoC maintainers don't care.)  They will end up caring when I push a
-change during the next merge window though, so I'll eventually stop
-mach/gpio.h being included.  (Instead, it'll be asm/gpio.h).
+OK, I know that too, but the jiffies based fallback does it even
+worse, since it does not run at all...  (It only updates in steps of a
+couple of 100msecs and stops after a while, and even does not display
+a real time...) This sched_clock implementation at least works before
+the drivers are being initialised...
 
-GENERIC_TIME though... I don't think you'll ever stop new uses of it
-creeping in unless you can arrange for something to error out.
+Anyway, do you have a better suggestion how to fix this? The tcb
+clocksource is loaded during a arch_initcall(), perhaps we need
+something before that point.
+I do not see an easy way to integrate it in MACHINE_START(.timer).
+Would 'late_time_init' be a better solution?
+
+Kind regards,
+
+Remy
