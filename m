@@ -1,57 +1,46 @@
-From: linux@bohmer.net (Remy Bohmer)
-Date: Mon, 1 Aug 2011 10:42:35 +0200
-Subject: [PATCH] Add sched_clock to AT91 TCB clocksource driver
-In-Reply-To: <20110731150707.GA2975@n2100.arm.linux.org.uk>
-References: <1312124593-6088-1-git-send-email-linux@bohmer.net>
-	<20110731150707.GA2975@n2100.arm.linux.org.uk>
-Message-ID: <CANqCtQJwUsLXfA408GzAr0rQtc2DRjtKqP8-m2UBUGEy-YP5dg@mail.gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 1 Aug 2011 11:52:52 +0300
+Subject: [RFC/PATCH 2/7] OMAP3: beagle: don't touch omap_device internals
+In-Reply-To: <CAOMWX4e0CODd8YT4LC2zHdGhzzZpOqRc0CU8roV-Pw1VTx5XCw@mail.gmail.com>
+References: <1311292338-11830-1-git-send-email-khilman@ti.com>
+	<1311292338-11830-4-git-send-email-khilman@ti.com>
+	<20110722085716.GI32058@legolas.emea.dhcp.ti.com>
+	<20110728055346.GA11921@foobar> <4E315C9F.1030801@ti.com>
+	<CAOMWX4fYGD4aRomoHZjvy_F9CRb_U9UV4OOa0BgrzZhx81iQtQ@mail.gmail.com>
+	<20110729134932.GA2258@foobar>
+	<20110729140515.GV31013@legolas.emea.dhcp.ti.com>
+	<CAOMWX4e0CODd8YT4LC2zHdGhzzZpOqRc0CU8roV-Pw1VTx5XCw@mail.gmail.com>
+Message-ID: <20110801085251.GF31013@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Hi,
 
-2011/7/31 Russell King - ARM Linux <linux@arm.linux.org.uk>:
->> +++ b/arch/arm/Kconfig
->> @@ -296,6 +296,7 @@ config ARCH_AT91
->> ? ? ? select HAVE_CLK
->> ? ? ? select CLKDEV_LOOKUP
->> ? ? ? select ARM_PATCH_PHYS_VIRT if MMU
->> + ? ? select HAVE_SCHED_CLOCK if ATMEL_TCB_CLKSRC
->> ? ? ? help
->> ? ? ? ? This enables support for systems based on the Atmel AT91RM9200,
->> ? ? ? ? AT91SAM9 and AT91CAP9 processors.
->> diff --git a/arch/arm/kernel/sched_clock.c b/arch/arm/kernel/sched_clock.c
->> index 9a46370..f9028e4 100644
->> --- a/arch/arm/kernel/sched_clock.c
->> +++ b/arch/arm/kernel/sched_clock.c
->> @@ -20,6 +20,13 @@ static void (*sched_clock_update_fn)(void);
->>
->> ?static void sched_clock_poll(unsigned long wrap_ticks)
->> ?{
->> + ? ? /*
->> + ? ? ?* The sched_clock_update_fn may be initialised AFTER first call to
->> + ? ? ?* time_init()
->> + ? ? ?*/
->> + ? ? if (unlikely(!sched_clock_update_fn))
->> + ? ? ? ? ? ? return;
->
-> NAK. ?I've said this before - sched_clock _must_ be up and running by the
-> time this function is called - because shortly after this call is when
-> the scheduler initializes, and the scheduler wants sched_clock() working
-> at that point.
+On Fri, Jul 29, 2011 at 06:07:17PM -0500, Menon, Nishanth wrote:
+> On Fri, Jul 29, 2011 at 09:05, Felipe Balbi <balbi@ti.com> wrote:
+> >
+> >> +}
+> >> +EXPORT_SYMBOL(omap_hwmod_name_get_odev);
+> >
+> > maybe EXPORT_SYMBOL_GPL() ?? Not sure we want non-GPL code to access
+> > this ;-)
+> 
+> Sure.. but is this the way we want to go? if yes, I can post the
+> series in a formal way to the list.
 
-OK, I know that too, but the jiffies based fallback does it even
-worse, since it does not run at all...  (It only updates in steps of a
-couple of 100msecs and stops after a while, and even does not display
-a real time...) This sched_clock implementation at least works before
-the drivers are being initialised...
+I would expect so, but if there are concerns of other non-GPL drivers
+needing this, you can at least use:
 
-Anyway, do you have a better suggestion how to fix this? The tcb
-clocksource is loaded during a arch_initcall(), perhaps we need
-something before that point.
-I do not see an easy way to integrate it in MACHINE_START(.timer).
-Would 'late_time_init' be a better solution?
+EXPORT_SYMBOL_GPL_FUTURE();
 
-Kind regards,
+this would allow you to catch non-GPL drivers accessing this symbol.
 
-Remy
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 490 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110801/09caadd1/attachment-0001.sig>
