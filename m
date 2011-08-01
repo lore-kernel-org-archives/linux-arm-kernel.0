@@ -1,42 +1,31 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 1 Aug 2011 15:25:22 +0100
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 1 Aug 2011 16:36:36 +0200
 Subject: [PATCH] Remove remaining references of CONFIG_GENERIC_TIME
-In-Reply-To: <CAGVye5Nh2E4L3Ox=OKvG09v4hO6BjGmLUGZ5=Ha2QzbXar+deA@mail.gmail.com>
+In-Reply-To: <CAMuHMdUiLjMVwOqKPF6tHLpPxROrx=rRf3ednfTLrwGuZ2VF7A@mail.gmail.com>
 References: <1312042478-26012-1-git-send-email-zdevai@gmail.com>
 	<20110801083614.GC15578@n2100.arm.linux.org.uk>
-	<CAGVye5Nh2E4L3Ox=OKvG09v4hO6BjGmLUGZ5=Ha2QzbXar+deA@mail.gmail.com>
-Message-ID: <20110801142522.GC19079@n2100.arm.linux.org.uk>
+	<CAMuHMdUpTDSRP_JmWqcCBtYwzna0hwmaBshpiF8kgvqoNcqYZA@mail.gmail.com>
+	<20110801101410.GE15578@n2100.arm.linux.org.uk>
+	<CAMuHMdUiLjMVwOqKPF6tHLpPxROrx=rRf3ednfTLrwGuZ2VF7A@mail.gmail.com>
+Message-ID: <20110801143636.GE9250@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 01, 2011 at 01:41:32PM +0200, Zoltan Devai wrote:
-> 2011/8/1 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> > On Sat, Jul 30, 2011 at 06:14:38PM +0200, Zoltan Devai wrote:
-> >> Commit 592913ecb87a9e06f98ddb55b298f1a66bf94c6b has killed off any
-> >> use of this config option long ago.
+On Mon, Aug 01, 2011 at 01:27:52PM +0200, Geert Uytterhoeven wrote:
+> On Mon, Aug 1, 2011 at 12:14, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Mon, Aug 01, 2011 at 12:09:02PM +0200, Geert Uytterhoeven wrote:
+> >> Doesn't kconf error out when trying to select a non-existent symbol?
 > >
-> > I don't see the point of this - we were free of GENERIC_TIME on ARM
-> > shortly after it was originally killed off. ?The problem is you can't
-> > stop people introducing new uses of this - because it existed once and
-> > there's nothing which errors out on its presence, people are going to
-> > continue submitting patches with it in. ?And it's going to continue
-> > being missed at the review stage.
-> >
-> > I've a similar problem with folk on ARM including mach/gpio.h as their
-> > sole gpio header file rather than linux/gpio.h - I've been trying for
-> > the last 1-2 years to educate people to use linux/ in preference. ?You
-> > can't do it, and I'm still just about the only one who picks up on that.
-> > (SoC maintainers don't care.) ?They will end up caring when I push a
-> > change during the next merge window though, so I'll eventually stop
-> > mach/gpio.h being included. ?(Instead, it'll be asm/gpio.h).
-> >
-> > GENERIC_TIME though... I don't think you'll ever stop new uses of it
-> > creeping in unless you can arrange for something to error out.
+> > Nope.
 > 
-> Sure, but the patch at least reduces the chances of copy-pasting it,
-> and makes it obvious by a simple grep that there's no use of it at all,
-> so I still think it's wort merging.
+> You're right. So that's a bug.
+Not sure, this might have been done on purpose to make cross-tree series
+easier!?
 
-That argument doesn't work - as can be seen from my first paragraph.
-The fact that we have new references to it in arch/arm/Kconfig is
-proof of that.
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
