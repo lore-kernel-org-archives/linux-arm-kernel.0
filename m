@@ -1,88 +1,58 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Mon, 1 Aug 2011 15:07:25 +0530
-Subject: [PATCH V2 15/20] dmaengine/amba-pl08x: Align lli_len to max(src.width,
-	dst.width)
-In-Reply-To: <cover.1312190881.git.viresh.kumar@st.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Mon, 01 Aug 2011 13:52:54 +0400
+Subject: [PATCH V2 03/20] dmaengine/amba-pl08x: Rearrange inclusion of
+	header files in ascending order
+In-Reply-To: <16f5abd9452832860f3a11fe1ddabde05fa3ae8c.1312190881.git.viresh.kumar@st.com>
 References: <cover.1312190881.git.viresh.kumar@st.com>
-Message-ID: <aa50fd324708557b6e904da8f62a567bb54c9dd8.1312190881.git.viresh.kumar@st.com>
+	<16f5abd9452832860f3a11fe1ddabde05fa3ae8c.1312190881.git.viresh.kumar@st.com>
+Message-ID: <4E367776.1070008@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently lli_len is aligned to min of two widths, which looks to be incorrect.
-Instead it should be aligned to max of both widths.
+Hello.
 
-Lets say, total_size = 441 bytes
+On 01-08-2011 13:37, Viresh Kumar wrote:
 
-MIN: lets check if min() suits or not:
+> Header files included in driver are not present in alphabetical order. Rearrange
+> them in alphabetical order.
 
-CASE 1: srcwidth = 1, dstwidth = 4
-min(src, dst) = 1
+> Signed-off-by: Viresh Kumar<viresh.kumar@st.com>
+> ---
+>   drivers/dma/amba-pl08x.c |   17 ++++++++---------
+>   1 files changed, 8 insertions(+), 9 deletions(-)
 
-i.e. We program transfer size in control reg to 441.
-Now, till 440 bytes everything is fine, but on the last byte DMAC can't transfer
-1 byte to dst, as its width is 4.
+> diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
+> index 4c4a309..8e2056b 100644
+> --- a/drivers/dma/amba-pl08x.c
+> +++ b/drivers/dma/amba-pl08x.c
+> @@ -74,19 +74,18 @@
+>    * Global TODO:
+>    * - Break out common code from arch/arm/mach-s3c64xx and share
+>    */
+> -#include<linux/device.h>
+> -#include<linux/init.h>
+> -#include<linux/module.h>
+> -#include<linux/interrupt.h>
+> -#include<linux/slab.h>
+> -#include<linux/delay.h>
+> -#include<linux/dmapool.h>
+> -#include<linux/dmaengine.h>
+>   #include<linux/amba/bus.h>
+>   #include<linux/amba/pl08x.h>
+>   #include<linux/debugfs.h>
+> +#include<linux/delay.h>
+> +#include<linux/device.h>
+> +#include<linux/dmaengine.h>
+> +#include<linux/dmapool.h>
+> +#include<linux/init.h>
+> +#include<linux/interrupt.h>
+> +#include<linux/module.h>
+>   #include<linux/seq_file.h>
+> -
+> +#include<linux/slab.h>
 
-CASE 2: srcwidth = 4, dstwidth = 1
-min(src, dst) = 1
+    Shouldn't there be emoty line here?
 
-i.e. we program transfer size in control reg to 110 (data transferred = 110 * srcwidth).
-So, here too 1 byte is left, but on the source side.
+>   #include<asm/hardware/pl080.h>
 
-MAX: Lets check if max() suits or not:
-
-CASE 3: srcwidth = 1, dstwidth = 4
-max(src, dst) = 4
-
-Aligned size is 440
-
-i.e. We program transfer size in control reg to 440.
-Now, all 440 bytes will be transferred without any issues.
-
-CASE 4: srcwidth = 4, dstwidth = 1
-max(src, dst) = 4
-
-Aligned size is 440
-
-i.e. We program transfer size in control reg to 110 (data transferred = 110 * srcwidth).
-Now, also all 440 bytes will be transferred without any issues.
-
-Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/dma/amba-pl08x.c |   12 +++++++-----
- 1 files changed, 7 insertions(+), 5 deletions(-)
-
-diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
-index 0bdf3b8..ef02fb9 100644
---- a/drivers/dma/amba-pl08x.c
-+++ b/drivers/dma/amba-pl08x.c
-@@ -666,20 +666,22 @@ static int pl08x_fill_llis_for_desc(struct pl08x_driver_data *pl08x,
- 		 * width left
- 		 */
- 		while (bd.remainder > (mbus->buswidth - 1)) {
--			size_t lli_len, tsize;
-+			size_t lli_len, tsize, width;
- 
- 			/*
- 			 * If enough left try to send max possible,
- 			 * otherwise try to send the remainder
- 			 */
- 			lli_len = min(bd.remainder, max_bytes_per_lli);
-+
- 			/*
--			 * Check against minimum bus alignment: Calculate actual
-+			 * Check against maximum bus alignment: Calculate actual
- 			 * transfer size in relation to bus width and get a
--			 * maximum remainder of the smallest bus width - 1
-+			 * maximum remainder of the highest bus width - 1
- 			 */
--			tsize = lli_len / min(mbus->buswidth, sbus->buswidth);
--			lli_len	= tsize * min(mbus->buswidth, sbus->buswidth);
-+			width = max(mbus->buswidth, sbus->buswidth);
-+			lli_len = (lli_len / width) * width;
-+			tsize = lli_len / bd.srcbus.buswidth;
- 
- 			dev_vdbg(&pl08x->adev->dev,
- 				"%s fill lli with single lli chunk of "
--- 
-1.7.2.2
+WBR, Sergei
