@@ -1,33 +1,107 @@
 From: buytenh@wantstofly.org (Lennert Buytenhek)
-Date: Tue, 2 Aug 2011 00:43:15 +0200
-Subject: [PATCH 2/3] ARM: mmp: Switch to using timer 1 as clocksource timer.
-Message-ID: <20110801224315.GH912@wantstofly.org>
+Date: Tue, 2 Aug 2011 00:43:42 +0200
+Subject: [PATCH 3/3] ARM: mmp: Change the way we use timer 0 as clockevent
+	timer.
+Message-ID: <20110801224342.GI912@wantstofly.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Instead of setting up a match interrupt for 'current_time + delta'
+on ->set_next_event(), program timer 0 to count down from 'delta - 1'
+and trigger an interrupt when it reaches zero.
+
 Signed-off-by: Lennert Buytenhek <buytenh@laptop.org>
 ---
- arch/arm/mach-mmp/time.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-mmp/time.c |   47 ++++++++++++++++++++++++++++++++++-----------
+ 1 files changed, 35 insertions(+), 12 deletions(-)
 
 diff --git a/arch/arm/mach-mmp/time.c b/arch/arm/mach-mmp/time.c
-index b0ce1a8..80d8870 100644
+index 80d8870..d8e8726 100644
 --- a/arch/arm/mach-mmp/time.c
 +++ b/arch/arm/mach-mmp/time.c
-@@ -51,12 +51,12 @@ static inline uint32_t timer_read(void)
+@@ -75,28 +75,51 @@ static irqreturn_t timer_interrupt(int irq, void *dev_id)
  {
- 	int delay = 100;
+ 	struct clock_event_device *c = dev_id;
  
--	__raw_writel(1, TIMERS_VIRT_BASE + TMR_CVWR(0));
-+	__raw_writel(1, TIMERS_VIRT_BASE + TMR_CVWR(1));
- 
- 	while (delay--)
- 		cpu_relax();
- 
--	return __raw_readl(TIMERS_VIRT_BASE + TMR_CVWR(0));
-+	return __raw_readl(TIMERS_VIRT_BASE + TMR_CVWR(1));
+-	/* disable and clear pending interrupt status */
+-	__raw_writel(0x0, TIMERS_VIRT_BASE + TMR_IER(0));
+-	__raw_writel(0x1, TIMERS_VIRT_BASE + TMR_ICR(0));
++	/*
++	 * Clear pending interrupt status.
++	 */
++	__raw_writel(0x01, TIMERS_VIRT_BASE + TMR_ICR(0));
++
++	/*
++	 * Disable timer 0.
++	 */
++	__raw_writel(0x02, TIMERS_VIRT_BASE + TMR_CER);
++
+ 	c->event_handler(c);
++
+ 	return IRQ_HANDLED;
  }
  
- unsigned long long notrace sched_clock(void)
+ static int timer_set_next_event(unsigned long delta,
+ 				struct clock_event_device *dev)
+ {
+-	unsigned long flags, next;
++	unsigned long flags;
+ 
+ 	local_irq_save(flags);
+ 
+-	/* clear pending interrupt status and enable */
++	/*
++	 * Disable timer 0.
++	 */
++	__raw_writel(0x02, TIMERS_VIRT_BASE + TMR_CER);
++
++	/*
++	 * Clear and enable timer match 0 interrupt.
++	 */
+ 	__raw_writel(0x01, TIMERS_VIRT_BASE + TMR_ICR(0));
+ 	__raw_writel(0x01, TIMERS_VIRT_BASE + TMR_IER(0));
+ 
+-	next = timer_read() + delta;
+-	__raw_writel(next, TIMERS_VIRT_BASE + TMR_TN_MM(0, 0));
++	/*
++	 * Setup new clockevent timer value.
++	 */
++	__raw_writel(delta - 1, TIMERS_VIRT_BASE + TMR_TN_MM(0, 0));
++
++	/*
++	 * Enable timer 0.
++	 */
++	__raw_writel(0x03, TIMERS_VIRT_BASE + TMR_CER);
+ 
+ 	local_irq_restore(flags);
++
+ 	return 0;
+ }
+ 
+@@ -152,10 +175,10 @@ static void __init timer_config(void)
+ 		(TMR_CCR_CS_0(3) | TMR_CCR_CS_1(3));
+ 	__raw_writel(ccr, TIMERS_VIRT_BASE + TMR_CCR);
+ 
+-	/* free-running mode */
+-	__raw_writel(0x3, TIMERS_VIRT_BASE + TMR_CMR);
++	/* set timer 0 to periodic mode, and timer 1 to free-running mode */
++	__raw_writel(0x2, TIMERS_VIRT_BASE + TMR_CMR);
+ 
+-	__raw_writel(0x0, TIMERS_VIRT_BASE + TMR_PLCR(0)); /* free-running */
++	__raw_writel(0x1, TIMERS_VIRT_BASE + TMR_PLCR(0)); /* periodic */
+ 	__raw_writel(0x7, TIMERS_VIRT_BASE + TMR_ICR(0));  /* clear status */
+ 	__raw_writel(0x0, TIMERS_VIRT_BASE + TMR_IER(0));
+ 
+@@ -163,8 +186,8 @@ static void __init timer_config(void)
+ 	__raw_writel(0x7, TIMERS_VIRT_BASE + TMR_ICR(1));  /* clear status */
+ 	__raw_writel(0x0, TIMERS_VIRT_BASE + TMR_IER(1));
+ 
+-	/* enable timer counter */
+-	__raw_writel(0x3, TIMERS_VIRT_BASE + TMR_CER);
++	/* enable timer 1 counter */
++	__raw_writel(0x2, TIMERS_VIRT_BASE + TMR_CER);
+ }
+ 
+ static struct irqaction timer_irq = {
 -- 
 1.7.6
