@@ -1,39 +1,81 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 1 Aug 2011 11:14:10 +0100
-Subject: [PATCH] Remove remaining references of CONFIG_GENERIC_TIME
-In-Reply-To: <CAMuHMdUpTDSRP_JmWqcCBtYwzna0hwmaBshpiF8kgvqoNcqYZA@mail.gmail.com>
-References: <1312042478-26012-1-git-send-email-zdevai@gmail.com>
-	<20110801083614.GC15578@n2100.arm.linux.org.uk>
-	<CAMuHMdUpTDSRP_JmWqcCBtYwzna0hwmaBshpiF8kgvqoNcqYZA@mail.gmail.com>
-Message-ID: <20110801101410.GE15578@n2100.arm.linux.org.uk>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 1 Aug 2011 12:19:12 +0200
+Subject: [PATCH] i.MX25 GPT clock fix: ensure correct the clock source
+In-Reply-To: <3F263ABB4EDE344D974E1983B56807734FFAB7A9@EX-DAG02.eckelmann.group>
+References: <3F263ABB4EDE344D974E1983B56807734FFAB7A9@EX-DAG02.eckelmann.group>
+Message-ID: <20110801101912.GI31404@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 01, 2011 at 12:09:02PM +0200, Geert Uytterhoeven wrote:
-> On Mon, Aug 1, 2011 at 10:36, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Sat, Jul 30, 2011 at 06:14:38PM +0200, Zoltan Devai wrote:
-> >> Commit 592913ecb87a9e06f98ddb55b298f1a66bf94c6b has killed off any
-> >> use of this config option long ago.
-> >
-> > I don't see the point of this - we were free of GENERIC_TIME on ARM
-> > shortly after it was originally killed off. ?The problem is you can't
-> > stop people introducing new uses of this - because it existed once and
-> > there's nothing which errors out on its presence, people are going to
-> > continue submitting patches with it in. ?And it's going to continue
-> > being missed at the review stage.
-> >
-> > I've a similar problem with folk on ARM including mach/gpio.h as their
-> > sole gpio header file rather than linux/gpio.h - I've been trying for
-> > the last 1-2 years to educate people to use linux/ in preference. ?You
-> > can't do it, and I'm still just about the only one who picks up on that.
-> > (SoC maintainers don't care.) ?They will end up caring when I push a
-> > change during the next merge window though, so I'll eventually stop
-> > mach/gpio.h being included. ?(Instead, it'll be asm/gpio.h).
-> >
-> > GENERIC_TIME though... I don't think you'll ever stop new uses of it
-> > creeping in unless you can arrange for something to error out.
+On Mon, Aug 01, 2011 at 08:02:07AM +0000, Mehnert, Torsten wrote:
+> Request for comment and commit.
 > 
-> Doesn't kconf error out when trying to select a non-existent symbol?
+> 
+> From: T. Mehnert <t.mehnert@eckelmann.de>
+> Date: Mon, 4 Jul 2011 15:53:30 +0200
+> Subject: [PATCH] i.MX25 GPT clock fix: ensure correct the clock source
+> 
+> This patch ensures, that Linux will take the correct clock source (AHB_DIV)
+> for gpt in the ARM i.MX25 implementation. The currect code depends on the reset
+> defaults of the CCM_MCR register. So on some boards it could happen that the
+> UPLL is used for clock source, which results in faulty time behavior in Linux.
+> In this case all delays or sleeps will will be faktor 1.8 too long.
+> 
+> Signed-off-by: Torsten Mehnert <t.mehnert@eckelmann.de>
 
-Nope.
+Your mailer converts tabs to spaces, so this patch does not apply.
+Fixed this manually this time, but please resolve this issue for
+next time.
+
+Sascha
+
+> ---
+>  arch/arm/mach-imx/clock-imx25.c |    4 ++++
+>  1 files changed, 4 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/clock-imx25.c b/arch/arm/mach-imx/clock-imx25.c
+> index a65838f..bf1ecda 100644
+> --- a/arch/arm/mach-imx/clock-imx25.c
+> +++ b/arch/arm/mach-imx/clock-imx25.c
+> @@ -328,6 +328,10 @@ int __init mx25_clocks_init(void)
+>         __raw_writel(__raw_readl(CRM_BASE+0x64) | (1 << 7) | (1 << 0),
+>                         CRM_BASE + 0x64);
+> 
+> +       /* Clock source for gpt is ahb_div */
+> +       __raw_writel(__raw_readl(CRM_BASE+0x64) & ~(1 << 5),
+> +                       CRM_BASE + 0x64);
+> +
+>         mxc_timer_init(&gpt_clk, MX25_IO_ADDRESS(MX25_GPT1_BASE_ADDR), 54);
+> 
+>         return 0;
+> --
+> 1.7.0.4
+> 
+> best regards,
+>         Torsten
+> 
+> Torsten Mehnert
+> K?lte- und Geb?udeleittechnik (KGL)
+> 
+> ECKELMANN AG
+> Berliner Stra?e 161
+> D - 65205 Wiesbaden
+> 
+> Phone:  +49 (0) 611 / 7103 - 370
+> Fax:    +49 (0) 611 / 7103 - 133
+> 
+> e-Mail: mailto:t.mehnert at eckelmann.de
+> Web:    http://www.eckelmann.de
+> 
+> ECKELMANN AG
+> Vorstand: Dr.-Ing. Gerd Eckelmann (Vorsitzender), Dr.-Ing. Peter Cordes, Dr.-Ing. Frank-Thomas Mellert
+> Vorsitzender des Aufsichtsrats: Hubertus G. Krossa
+> Sitz der Gesellschaft: Wiesbaden
+> Amtsgericht Wiesbaden, HRB 12636
+> 
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
