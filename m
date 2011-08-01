@@ -1,35 +1,30 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Mon,  1 Aug 2011 13:31:10 +0100
-Subject: [PATCH 9/9] omap: make __arch_ioremap() with 0 size return NULL
-In-Reply-To: <1312201870-12921-1-git-send-email-jamie@jamieiles.com>
-References: <1312201870-12921-1-git-send-email-jamie@jamieiles.com>
-Message-ID: <1312201870-12921-9-git-send-email-jamie@jamieiles.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Mon, 1 Aug 2011 15:04:40 +0200
+Subject: [PATCH 1/1] ASoC: sgtl5000: add one missed cache reg
+In-Reply-To: <1312198878-13453-1-git-send-email-b29396@freescale.com>
+References: <1312198878-13453-1-git-send-email-b29396@freescale.com>
+Message-ID: <20110801130440.GD10024@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Without __arch_ioremap(), __get_vm_area_node() with a zero size will
-return a NULL pointer.  Make the arch specific ioremap() do the same
-thing.
+On Mon, Aug 01, 2011 at 07:41:18PM +0800, Dong Aisheng wrote:
+> Signed-off-by: Dong Aisheng <b29396@freescale.com>
+> Signed-off-by: Zeng Zhaoming <zhaoming.zeng@freescale.com>
+> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> Cc: Liam Girdwood <lrg@ti.com>
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
 
-Cc: Tony Lindgren <tony@atomide.com>
-Signed-off-by: Jamie Iles <jamie@jamieiles.com>
----
- arch/arm/plat-omap/io.c |    3 +++
- 1 files changed, 3 insertions(+), 0 deletions(-)
+Yup, found this, too:
 
-diff --git a/arch/arm/plat-omap/io.c b/arch/arm/plat-omap/io.c
-index f1ecfa9..e7bc77f 100644
---- a/arch/arm/plat-omap/io.c
-+++ b/arch/arm/plat-omap/io.c
-@@ -28,6 +28,9 @@
-  */
- void __iomem *omap_ioremap(unsigned long p, size_t size, unsigned int type)
- {
-+	if (!size)
-+		return NULL;
-+
- #ifdef CONFIG_ARCH_OMAP1
- 	if (cpu_class_is_omap1()) {
- 		if (BETWEEN(p, OMAP1_IO_PHYS, OMAP1_IO_SIZE))
+Acked-by: Wolfram Sang <w.sang@pengutronix.de>
+
 -- 
-1.7.4.1
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110801/fe908b53/attachment.sig>
