@@ -1,58 +1,53 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Mon,  1 Aug 2011 11:38:27 +0200
-Subject: [PATCH 6/8] ARM: imx/mx1ads: dynamically allocate physmap-flash device
-In-Reply-To: <1312191509-21895-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <20110801093759.GD9250@pengutronix.de>
-	<1312191509-21895-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <1312191509-21895-6-git-send-email-u.kleine-koenig@pengutronix.de>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Mon, 1 Aug 2011 15:07:16 +0530
+Subject: [PATCH V2 06/20] dmaengine/amba-pl08x: Remove redundant comment and
+	rewrite original
+In-Reply-To: <cover.1312190881.git.viresh.kumar@st.com>
+References: <cover.1312190881.git.viresh.kumar@st.com>
+Message-ID: <295c3ca443ecc1a22f67b32ba4d185b94b79dd95.1312190881.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- arch/arm/mach-imx/mach-mx1ads.c |   15 +++++----------
- 1 files changed, 5 insertions(+), 10 deletions(-)
+Similar comment is present over routine also pl08x_choose_master_bus(). Keeping
+one of them. Also rewrite that comment to convey message clearly.
 
-diff --git a/arch/arm/mach-imx/mach-mx1ads.c b/arch/arm/mach-imx/mach-mx1ads.c
-index 5cd8bee..e8867ff 100644
---- a/arch/arm/mach-imx/mach-mx1ads.c
-+++ b/arch/arm/mach-imx/mach-mx1ads.c
-@@ -68,23 +68,16 @@ static const struct imxuart_platform_data uart1_pdata __initconst = {
-  * Physmap flash
-  */
- 
--static struct physmap_flash_data mx1ads_flash_data = {
-+static const struct physmap_flash_data mx1ads_flash_data __initconst = {
- 	.width		= 4,		/* bankwidth in bytes */
+Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+---
+ drivers/dma/amba-pl08x.c |   15 +++++++--------
+ 1 files changed, 7 insertions(+), 8 deletions(-)
+
+diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
+index 01c2f50..6c52959 100644
+--- a/drivers/dma/amba-pl08x.c
++++ b/drivers/dma/amba-pl08x.c
+@@ -497,9 +497,13 @@ struct pl08x_lli_build_data {
  };
  
--static struct resource flash_resource = {
-+static const struct resource flash_resource __initconst = {
- 	.start	= MX1_CS0_PHYS,
- 	.end	= MX1_CS0_PHYS + SZ_32M - 1,
- 	.flags	= IORESOURCE_MEM,
- };
- 
--static struct platform_device flash_device = {
--	.name	= "physmap-flash",
--	.id	= 0,
--	.resource = &flash_resource,
--	.num_resources = 1,
--};
--
  /*
-  * I2C
+- * Autoselect a master bus to use for the transfer this prefers the
+- * destination bus if both available if fixed address on one bus the
+- * other will be chosen
++ * Autoselect a master bus to use for the transfer. Slave will be the chosen as
++ * victim in case src & dest are not similarly aligned. i.e. If after aligning
++ * masters address with width requirements of transfer (by sending few byte by
++ * byte data), slave is still not aligned, then its width will be reduced to
++ * BYTE.
++ * - prefers the destination bus if both available
++ * - if fixed address on one bus the other will be chosen
   */
-@@ -125,7 +118,9 @@ static void __init mx1ads_init(void)
- 	imx1_add_imx_uart1(&uart1_pdata);
+ static void pl08x_choose_master_bus(struct pl08x_lli_build_data *bd,
+ 	struct pl08x_bus_data **mbus, struct pl08x_bus_data **sbus, u32 cctl)
+@@ -625,11 +629,6 @@ static int pl08x_fill_llis_for_desc(struct pl08x_driver_data *pl08x,
+ 	/* We need to count this down to zero */
+ 	bd.remainder = txd->len;
  
- 	/* Physmap flash */
--	mxc_register_device(&flash_device, &mx1ads_flash_data);
-+	platform_device_register_resndata(NULL, "physmap-flash", 0,
-+			&flash_resource, 1,
-+			&mx1ads_flash_data, sizeof(mx1ads_flash_data));
+-	/*
+-	 * Choose bus to align to
+-	 * - prefers destination bus if both available
+-	 * - if fixed address on one bus chooses other
+-	 */
+ 	pl08x_choose_master_bus(&bd, &mbus, &sbus, cctl);
  
- 	/* I2C */
- 	i2c_register_board_info(0, mx1ads_i2c_devices,
+ 	dev_vdbg(&pl08x->adev->dev, "src=0x%08x%s/%u dst=0x%08x%s/%u len=%zu llimax=%zu\n",
 -- 
-1.7.5.4
+1.7.2.2
