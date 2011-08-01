@@ -1,31 +1,30 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 1 Aug 2011 09:27:48 +0100
-Subject: [PATCH v2 4/7] tty: serial: support device tree in pxa
-In-Reply-To: <CAN1soZwYjQp5c=4f=CbqjrXFxzSURSv6i9QHMyjyPszs=kzh9w@mail.gmail.com>
-References: <1311835293-18125-1-git-send-email-haojian.zhuang@marvell.com>
-	<1311835293-18125-2-git-send-email-haojian.zhuang@marvell.com>
-	<1311835293-18125-3-git-send-email-haojian.zhuang@marvell.com>
-	<1311835293-18125-4-git-send-email-haojian.zhuang@marvell.com>
-	<1311835293-18125-5-git-send-email-haojian.zhuang@marvell.com>
-	<20110729164539.GM11164@ponder.secretlab.ca>
-	<20110729164922.GA30298@n2100.arm.linux.org.uk>
-	<CAN1soZwYjQp5c=4f=CbqjrXFxzSURSv6i9QHMyjyPszs=kzh9w@mail.gmail.com>
-Message-ID: <20110801082748.GB15578@n2100.arm.linux.org.uk>
+Date: Mon, 1 Aug 2011 09:36:14 +0100
+Subject: [PATCH] Remove remaining references of CONFIG_GENERIC_TIME
+In-Reply-To: <1312042478-26012-1-git-send-email-zdevai@gmail.com>
+References: <1312042478-26012-1-git-send-email-zdevai@gmail.com>
+Message-ID: <20110801083614.GC15578@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 01, 2011 at 10:50:47AM +0800, Haojian Zhuang wrote:
-> On Sat, Jul 30, 2011 at 12:49 AM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > Oh ffs, why is this DT stuff causing all the clk stuff to have to change.
-> > And specifically why is stuff converting to use clk_get_sys().
-> >
-> > clk_get_sys() is there to allow system devices to get their clocks.
-> > It's not for general drivers to use.
-> >
-> > Please, stop this madness.
-> >
-> 
-> So how could I get these clocks?
+On Sat, Jul 30, 2011 at 06:14:38PM +0200, Zoltan Devai wrote:
+> Commit 592913ecb87a9e06f98ddb55b298f1a66bf94c6b has killed off any
+> use of this config option long ago.
 
-Add the new _stable_ DT device name to the clkdev list.
+I don't see the point of this - we were free of GENERIC_TIME on ARM
+shortly after it was originally killed off.  The problem is you can't
+stop people introducing new uses of this - because it existed once and
+there's nothing which errors out on its presence, people are going to
+continue submitting patches with it in.  And it's going to continue
+being missed at the review stage.
+
+I've a similar problem with folk on ARM including mach/gpio.h as their
+sole gpio header file rather than linux/gpio.h - I've been trying for
+the last 1-2 years to educate people to use linux/ in preference.  You
+can't do it, and I'm still just about the only one who picks up on that.
+(SoC maintainers don't care.)  They will end up caring when I push a
+change during the next merge window though, so I'll eventually stop
+mach/gpio.h being included.  (Instead, it'll be asm/gpio.h).
+
+GENERIC_TIME though... I don't think you'll ever stop new uses of it
+creeping in unless you can arrange for something to error out.
