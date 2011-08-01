@@ -1,9 +1,9 @@
 From: jamie@jamieiles.com (Jamie Iles)
-Date: Mon,  1 Aug 2011 13:31:07 +0100
-Subject: [PATCH 6/9] orion: make __arch_ioremap() with 0 size return NULL
+Date: Mon,  1 Aug 2011 13:31:08 +0100
+Subject: [PATCH 7/9] tegra: make __arch_ioremap() with 0 size return NULL
 In-Reply-To: <1312201870-12921-1-git-send-email-jamie@jamieiles.com>
 References: <1312201870-12921-1-git-send-email-jamie@jamieiles.com>
-Message-ID: <1312201870-12921-6-git-send-email-jamie@jamieiles.com>
+Message-ID: <1312201870-12921-7-git-send-email-jamie@jamieiles.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,26 +11,28 @@ Without __arch_ioremap(), __get_vm_area_node() with a zero size will
 return a NULL pointer.  Make the arch specific ioremap() do the same
 thing.
 
-Cc: Lennert Buytenhek <kernel@wantstofly.org>
+Cc: Colin Cross <ccross@android.com>
+Cc: Erik Gilling <konkers@android.com>
+Cc: Olof Johansson <olof@lixom.net>
 Signed-off-by: Jamie Iles <jamie@jamieiles.com>
 ---
- arch/arm/mach-orion5x/include/mach/io.h |    4 ++++
+ arch/arm/mach-tegra/io.c |    4 ++++
  1 files changed, 4 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-orion5x/include/mach/io.h b/arch/arm/mach-orion5x/include/mach/io.h
-index c519610..8763328 100644
---- a/arch/arm/mach-orion5x/include/mach/io.h
-+++ b/arch/arm/mach-orion5x/include/mach/io.h
-@@ -20,6 +20,10 @@ __arch_ioremap(unsigned long paddr, size_t size, unsigned int mtype)
+diff --git a/arch/arm/mach-tegra/io.c b/arch/arm/mach-tegra/io.c
+index ea50fe2..4f8d68c 100644
+--- a/arch/arm/mach-tegra/io.c
++++ b/arch/arm/mach-tegra/io.c
+@@ -67,6 +67,10 @@ void __init tegra_map_common_io(void)
+ void __iomem *tegra_ioremap(unsigned long p, size_t size, unsigned int type)
  {
- 	void __iomem *retval;
- 	unsigned long offs = paddr - ORION5X_REGS_PHYS_BASE;
+ 	void __iomem *v = IO_ADDRESS(p);
 +
 +	if (!size)
 +		return NULL;
 +
- 	if (mtype == MT_DEVICE && size && offs < ORION5X_REGS_SIZE &&
- 	    size <= ORION5X_REGS_SIZE && offs + size <= ORION5X_REGS_SIZE) {
- 		retval = (void __iomem *)ORION5X_REGS_VIRT_BASE + offs;
+ 	if (v == NULL)
+ 		v = __arm_ioremap(p, size, type);
+ 	return v;
 -- 
 1.7.4.1
