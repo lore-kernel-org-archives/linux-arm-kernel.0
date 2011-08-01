@@ -1,58 +1,46 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Mon, 01 Aug 2011 13:52:54 +0400
-Subject: [PATCH V2 03/20] dmaengine/amba-pl08x: Rearrange inclusion of
-	header files in ascending order
-In-Reply-To: <16f5abd9452832860f3a11fe1ddabde05fa3ae8c.1312190881.git.viresh.kumar@st.com>
-References: <cover.1312190881.git.viresh.kumar@st.com>
-	<16f5abd9452832860f3a11fe1ddabde05fa3ae8c.1312190881.git.viresh.kumar@st.com>
-Message-ID: <4E367776.1070008@ru.mvista.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 1 Aug 2011 12:09:02 +0200
+Subject: [PATCH] Remove remaining references of CONFIG_GENERIC_TIME
+In-Reply-To: <20110801083614.GC15578@n2100.arm.linux.org.uk>
+References: <1312042478-26012-1-git-send-email-zdevai@gmail.com>
+	<20110801083614.GC15578@n2100.arm.linux.org.uk>
+Message-ID: <CAMuHMdUpTDSRP_JmWqcCBtYwzna0hwmaBshpiF8kgvqoNcqYZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Mon, Aug 1, 2011 at 10:36, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Sat, Jul 30, 2011 at 06:14:38PM +0200, Zoltan Devai wrote:
+>> Commit 592913ecb87a9e06f98ddb55b298f1a66bf94c6b has killed off any
+>> use of this config option long ago.
+>
+> I don't see the point of this - we were free of GENERIC_TIME on ARM
+> shortly after it was originally killed off. ?The problem is you can't
+> stop people introducing new uses of this - because it existed once and
+> there's nothing which errors out on its presence, people are going to
+> continue submitting patches with it in. ?And it's going to continue
+> being missed at the review stage.
+>
+> I've a similar problem with folk on ARM including mach/gpio.h as their
+> sole gpio header file rather than linux/gpio.h - I've been trying for
+> the last 1-2 years to educate people to use linux/ in preference. ?You
+> can't do it, and I'm still just about the only one who picks up on that.
+> (SoC maintainers don't care.) ?They will end up caring when I push a
+> change during the next merge window though, so I'll eventually stop
+> mach/gpio.h being included. ?(Instead, it'll be asm/gpio.h).
+>
+> GENERIC_TIME though... I don't think you'll ever stop new uses of it
+> creeping in unless you can arrange for something to error out.
 
-On 01-08-2011 13:37, Viresh Kumar wrote:
+Doesn't kconf error out when trying to select a non-existent symbol?
 
-> Header files included in driver are not present in alphabetical order. Rearrange
-> them in alphabetical order.
+Gr{oetje,eeting}s,
 
-> Signed-off-by: Viresh Kumar<viresh.kumar@st.com>
-> ---
->   drivers/dma/amba-pl08x.c |   17 ++++++++---------
->   1 files changed, 8 insertions(+), 9 deletions(-)
+? ? ? ? ? ? ? ? ? ? ? ? Geert
 
-> diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
-> index 4c4a309..8e2056b 100644
-> --- a/drivers/dma/amba-pl08x.c
-> +++ b/drivers/dma/amba-pl08x.c
-> @@ -74,19 +74,18 @@
->    * Global TODO:
->    * - Break out common code from arch/arm/mach-s3c64xx and share
->    */
-> -#include<linux/device.h>
-> -#include<linux/init.h>
-> -#include<linux/module.h>
-> -#include<linux/interrupt.h>
-> -#include<linux/slab.h>
-> -#include<linux/delay.h>
-> -#include<linux/dmapool.h>
-> -#include<linux/dmaengine.h>
->   #include<linux/amba/bus.h>
->   #include<linux/amba/pl08x.h>
->   #include<linux/debugfs.h>
-> +#include<linux/delay.h>
-> +#include<linux/device.h>
-> +#include<linux/dmaengine.h>
-> +#include<linux/dmapool.h>
-> +#include<linux/init.h>
-> +#include<linux/interrupt.h>
-> +#include<linux/module.h>
->   #include<linux/seq_file.h>
-> -
-> +#include<linux/slab.h>
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-    Shouldn't there be emoty line here?
-
->   #include<asm/hardware/pl080.h>
-
-WBR, Sergei
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+? ? ? ? ? ? ? ? ? ? ? ? ? ?? ?? -- Linus Torvalds
