@@ -1,119 +1,48 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Mon, 1 Aug 2011 07:03:19 -0400
-Subject: [PATCH] ARM: SAMSUNG: Fix build of dev- infrastructure for
-	module.h changes
-In-Reply-To: <1312158567-22483-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-References: <1312158567-22483-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <20110801110318.GA11811@windriver.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Mon, 1 Aug 2011 04:22:45 -0700
+Subject: [GIT PULL] msm gpio move to drivers/gpio
+Message-ID: <20110801112244.GA24384@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[[PATCH] ARM: SAMSUNG: Fix build of dev- infrastructure for module.h changes] On 01/08/2011 (Mon 09:29) Mark Brown wrote:
+The following changes since commit 02f8c6aee8df3cdc935e9bdd4f2d020306035dbe:
 
-> The recent module.h changes cause a bunch of missing includes in the
-> Samsung dev- infrastructure.
+  Linux 3.0 (2011-07-21 19:17:23 -0700)
 
-Thanks, but I've already fixed these just last night when I built
-each and every one of all the arch/arm/config/* files.  So it should
-be OK now.
+are available in the git repository at:
+  git://codeaurora.org/quic/kernel/davidb/linux-msm.git msm-move-gpio
 
-I double checked what I did against yours, and I was using the
-more minimal export.h in dev-wdt.c file.  Did I miss something
-where it really requires all of module.h file?
+David Brown (7):
+      msm: gpio: Remove unsupported devices
+      msm: Remove chip-ifdefs for GPIO io mappings
+      msm: gpio: Remove chip-specific register definitions
+      msm: gpio: Remove ifdefs on gpio chip registers
+      msm: gpiomux: Move public API to public header
+      gpio_msm: Move Qualcomm v6 MSM driver into drivers
+      gpio_msm: Move Qualcomm MSM v2 gpio driver into drivers
 
-Thanks,
-Paul.
+ arch/arm/mach-msm/Kconfig                          |    4 +
+ arch/arm/mach-msm/Makefile                         |    8 -
+ arch/arm/mach-msm/gpio_hw.h                        |  278 --------------------
+ arch/arm/mach-msm/gpiomux.h                        |   17 +--
+ arch/arm/mach-msm/include/mach/msm_gpiomux.h       |   38 +++
+ arch/arm/mach-msm/include/mach/msm_iomap-7x00.h    |   10 +-
+ arch/arm/mach-msm/include/mach/msm_iomap-7x30.h    |   10 +-
+ arch/arm/mach-msm/include/mach/msm_iomap-8x50.h    |   10 +-
+ arch/arm/mach-msm/include/mach/msm_iomap.h         |    2 +
+ arch/arm/mach-msm/io.c                             |   12 +-
+ drivers/gpio/Kconfig                               |   16 ++
+ drivers/gpio/Makefile                              |    2 +
+ arch/arm/mach-msm/gpio.c => drivers/gpio/msm_v1.c  |  111 +++++----
+ drivers/gpio/msm_v1.h                              |  271 +++++++++++++++++++
+ .../mach-msm/gpio-v2.c => drivers/gpio/msm_v2.c    |    2 +-
+ 15 files changed, 414 insertions(+), 377 deletions(-)
+ delete mode 100644 arch/arm/mach-msm/gpio_hw.h
+ create mode 100644 arch/arm/mach-msm/include/mach/msm_gpiomux.h
+ rename arch/arm/mach-msm/gpio.c => drivers/gpio/msm_v1.c (82%)
+ create mode 100644 drivers/gpio/msm_v1.h
+ rename arch/arm/mach-msm/gpio-v2.c => drivers/gpio/msm_v2.c (99%)
 
-> 
-> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> ---
->  arch/arm/plat-samsung/dev-adc.c       |    2 ++
->  arch/arm/plat-samsung/dev-backlight.c |    3 +++
->  arch/arm/plat-samsung/dev-ide.c       |    2 ++
->  arch/arm/plat-samsung/dev-ts.c        |    2 ++
->  arch/arm/plat-samsung/dev-wdt.c       |    3 +++
->  arch/arm/plat-samsung/platformdata.c  |    1 +
->  6 files changed, 13 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/plat-samsung/dev-adc.c b/arch/arm/plat-samsung/dev-adc.c
-> index 9d903d4..c7e3257 100644
-> --- a/arch/arm/plat-samsung/dev-adc.c
-> +++ b/arch/arm/plat-samsung/dev-adc.c
-> @@ -13,6 +13,8 @@
->  #include <linux/string.h>
->  #include <linux/platform_device.h>
->  
-> +#include <asm/sizes.h>
-> +
->  #include <mach/irqs.h>
->  #include <mach/map.h>
->  
-> diff --git a/arch/arm/plat-samsung/dev-backlight.c b/arch/arm/plat-samsung/dev-backlight.c
-> index 3cedd4c..825a884 100644
-> --- a/arch/arm/plat-samsung/dev-backlight.c
-> +++ b/arch/arm/plat-samsung/dev-backlight.c
-> @@ -14,6 +14,9 @@
->  #include <linux/platform_device.h>
->  #include <linux/io.h>
->  #include <linux/pwm_backlight.h>
-> +#include <linux/slab.h>
-> +
-> +#include <asm/sizes.h>
->  
->  #include <plat/devs.h>
->  #include <plat/gpio-cfg.h>
-> diff --git a/arch/arm/plat-samsung/dev-ide.c b/arch/arm/plat-samsung/dev-ide.c
-> index b497982..5407574 100644
-> --- a/arch/arm/plat-samsung/dev-ide.c
-> +++ b/arch/arm/plat-samsung/dev-ide.c
-> @@ -14,6 +14,8 @@
->  #include <linux/interrupt.h>
->  #include <linux/platform_device.h>
->  
-> +#include <asm/sizes.h>
-> +
->  #include <mach/map.h>
->  #include <plat/ata.h>
->  #include <plat/devs.h>
-> diff --git a/arch/arm/plat-samsung/dev-ts.c b/arch/arm/plat-samsung/dev-ts.c
-> index 82543f0..3eede40 100644
-> --- a/arch/arm/plat-samsung/dev-ts.c
-> +++ b/arch/arm/plat-samsung/dev-ts.c
-> @@ -17,6 +17,8 @@
->  #include <linux/string.h>
->  #include <linux/platform_device.h>
->  
-> +#include <asm/sizes.h>
-> +
->  #include <mach/irqs.h>
->  #include <mach/map.h>
->  
-> diff --git a/arch/arm/plat-samsung/dev-wdt.c b/arch/arm/plat-samsung/dev-wdt.c
-> index 019b5b8..207a213 100644
-> --- a/arch/arm/plat-samsung/dev-wdt.c
-> +++ b/arch/arm/plat-samsung/dev-wdt.c
-> @@ -12,6 +12,9 @@
->  
->  #include <linux/kernel.h>
->  #include <linux/platform_device.h>
-> +#include <linux/module.h>
-> +
-> +#include <asm/sizes.h>
->  
->  #include <mach/irqs.h>
->  #include <mach/map.h>
-> diff --git a/arch/arm/plat-samsung/platformdata.c b/arch/arm/plat-samsung/platformdata.c
-> index 7cf2e1e..f857593 100644
-> --- a/arch/arm/plat-samsung/platformdata.c
-> +++ b/arch/arm/plat-samsung/platformdata.c
-> @@ -12,6 +12,7 @@
->  #include <linux/kernel.h>
->  #include <linux/string.h>
->  #include <linux/platform_device.h>
-> +#include <linux/slab.h>
->  
->  #include <plat/devs.h>
->  
-> -- 
-> 1.7.5.4
-> 
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
