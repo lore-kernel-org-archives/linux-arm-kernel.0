@@ -1,52 +1,69 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 1 Aug 2011 21:07:43 +0100
-Subject: [RFC/PATCH 7/7] WIP: HACK/RFC: omap_device: begin to decouple
-	platform_device from omap_device
-In-Reply-To: <20110801185009.GA5217@legolas.emea.dhcp.ti.com>
-References: <1311292338-11830-1-git-send-email-khilman@ti.com>
-	<1311292338-11830-9-git-send-email-khilman@ti.com>
-	<20110730120332.GA15539@n2100.arm.linux.org.uk>
-	<20110731025807.GA24334@ponder.secretlab.ca>
-	<20110731150540.GA3019@n2100.arm.linux.org.uk>
-	<871ux5nnop.fsf@ti.com>
-	<CACxGe6t4tNeD-Pn6WFt1XOMC=_Q0cf4uD3kRkOckKH+S1JUJDA@mail.gmail.com>
-	<20110801185009.GA5217@legolas.emea.dhcp.ti.com>
-Message-ID: <20110801200743.GA21535@n2100.arm.linux.org.uk>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Mon,  1 Aug 2011 21:09:36 +0100
+Subject: [PATCH] CSR: add missing sentinels to of_device_id tables
+Message-ID: <1312229376-5982-1-git-send-email-jamie@jamieiles.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 01, 2011 at 09:50:09PM +0300, Felipe Balbi wrote:
-> Hi,
-> 
-> On Mon, Aug 01, 2011 at 04:44:20PM +0100, Grant Likely wrote:
-> > On Mon, Aug 1, 2011 at 4:42 PM, Kevin Hilman <khilman@ti.com> wrote:
-> > > diff --git a/arch/arm/include/asm/device.h b/arch/arm/include/asm/device.h
-> > > index 9f390ce..bb777cd 100644
-> > > --- a/arch/arm/include/asm/device.h
-> > > +++ b/arch/arm/include/asm/device.h
-> > > @@ -13,6 +13,7 @@ struct dev_archdata {
-> > > ?};
-> > >
-> > > ?struct pdev_archdata {
-> > > + ? ? ? void *p;
-> > > ?};
-> > 
-> > struct omap_device *p;
-> > 
-> > Otherwise it is just asking for type safety problems.
-> 
-> considering that struct omap_device isn't ARM-wide, is it really wise to
-> to do that ? I guess a void * will do better here.
+The of_device_id tables used for matching should be terminated with
+empty sentinel values.
 
-Help the typechecker do its job.  As we have only one (at the moment...)
-And make it:
+Cc: Barry Song <baohua.song@csr.com>
+Signed-off-by: Jamie Iles <jamie@jamieiles.com>
+---
+ arch/arm/mach-prima2/clock.c |    1 +
+ arch/arm/mach-prima2/irq.c   |    1 +
+ arch/arm/mach-prima2/rstc.c  |    1 +
+ arch/arm/mach-prima2/timer.c |    1 +
+ 4 files changed, 4 insertions(+), 0 deletions(-)
 
-+struct omap_device;
-
- struct pdev_archdata {
-+#ifdef CONFIG_ARCH_OMAP
-+	struct omap_device *omap;
-+#endif
+diff --git a/arch/arm/mach-prima2/clock.c b/arch/arm/mach-prima2/clock.c
+index f9a2aaf..615a4e7 100644
+--- a/arch/arm/mach-prima2/clock.c
++++ b/arch/arm/mach-prima2/clock.c
+@@ -481,6 +481,7 @@ static void __init sirfsoc_clk_init(void)
+ 
+ static struct of_device_id clkc_ids[] = {
+ 	{ .compatible = "sirf,prima2-clkc" },
++	{},
  };
-
-for bonus points, so we only get the additional pointer for OMAP.
+ 
+ void __init sirfsoc_of_clk_init(void)
+diff --git a/arch/arm/mach-prima2/irq.c b/arch/arm/mach-prima2/irq.c
+index c3404cb..7af254d 100644
+--- a/arch/arm/mach-prima2/irq.c
++++ b/arch/arm/mach-prima2/irq.c
+@@ -51,6 +51,7 @@ static __init void sirfsoc_irq_init(void)
+ 
+ static struct of_device_id intc_ids[]  = {
+ 	{ .compatible = "sirf,prima2-intc" },
++	{},
+ };
+ 
+ void __init sirfsoc_of_irq_init(void)
+diff --git a/arch/arm/mach-prima2/rstc.c b/arch/arm/mach-prima2/rstc.c
+index d074786..492cfa8 100644
+--- a/arch/arm/mach-prima2/rstc.c
++++ b/arch/arm/mach-prima2/rstc.c
+@@ -19,6 +19,7 @@ static DEFINE_MUTEX(rstc_lock);
+ 
+ static struct of_device_id rstc_ids[]  = {
+ 	{ .compatible = "sirf,prima2-rstc" },
++	{},
+ };
+ 
+ static int __init sirfsoc_of_rstc_init(void)
+diff --git a/arch/arm/mach-prima2/timer.c b/arch/arm/mach-prima2/timer.c
+index 44027f3..ed7ec48 100644
+--- a/arch/arm/mach-prima2/timer.c
++++ b/arch/arm/mach-prima2/timer.c
+@@ -190,6 +190,7 @@ static void __init sirfsoc_timer_init(void)
+ 
+ static struct of_device_id timer_ids[] = {
+ 	{ .compatible = "sirf,prima2-tick" },
++	{},
+ };
+ 
+ static void __init sirfsoc_of_timer_map(void)
+-- 
+1.7.4.1
