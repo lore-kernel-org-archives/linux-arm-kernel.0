@@ -1,49 +1,46 @@
-From: lacombar@gmail.com (Arnaud Lacombe)
-Date: Mon, 1 Aug 2011 13:20:26 -0400
-Subject: [PATCH] Remove remaining references of CONFIG_GENERIC_TIME
-In-Reply-To: <alpine.LFD.2.00.1108011737030.18706@xanadu.home>
-References: <1312042478-26012-1-git-send-email-zdevai@gmail.com>
-	<20110801083614.GC15578@n2100.arm.linux.org.uk>
-	<CAMuHMdUpTDSRP_JmWqcCBtYwzna0hwmaBshpiF8kgvqoNcqYZA@mail.gmail.com>
-	<20110801101410.GE15578@n2100.arm.linux.org.uk>
-	<CAMuHMdUiLjMVwOqKPF6tHLpPxROrx=rRf3ednfTLrwGuZ2VF7A@mail.gmail.com>
-	<CACqU3MVUxTYmD+4VGBAeN8PTs83fR0xQQrQS5h4QGMZXgMxEvA@mail.gmail.com>
-	<CAGZ=bqL=VAx5jnSBkE2q5KJSY_+An-VRTRAzJmJ3waQUvrRFFg@mail.gmail.com>
-	<CACqU3MUoxSNmcYsSF4zOTgADdedb7TcciPuBPMviG02M5oUPDQ@mail.gmail.com>
-	<alpine.LFD.2.00.1108011737030.18706@xanadu.home>
-Message-ID: <CACqU3MU_oq+RYydenKG_8U08rdJ-N+2hftH+2xEPZU0uVP6i5A@mail.gmail.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 01 Aug 2011 18:26:52 +0100 (BST)
+Subject: [PATCH] arm: fix compile failure in orion5x/dns323-setup.c
+In-Reply-To: <1312216934-29710-1-git-send-email-paul.gortmaker@windriver.com>
+References: <1312216934-29710-1-git-send-email-paul.gortmaker@windriver.com>
+Message-ID: <alpine.LFD.2.00.1108011825190.18706@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, 1 Aug 2011, Paul Gortmaker wrote:
 
-On Mon, Aug 1, 2011 at 12:40 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
-> On Mon, 1 Aug 2011, Arnaud Lacombe wrote:
->
->> Moreover, this approach is deemed to fail. The current symbol
->> namespace is tied to an arch, so whenever you do:
->>
->> arch/arm/Kconfig:
->> config FOO
->> ? ? bool
->>
->> config BAZ
->> ? ? bool
->>
->> drivers/cpufreq/Kconfig
->> config BAR
->> ? ? depends on ARM && FOO
->> ? ? select BAZ
->>
->> You will end up triggering the warning for every ARCH != ARM...
->
-> You can keep a state for those symbols with regard to their level of
-> reference. ?Surely if ARM isn't true, BAZ is not "actively" referenced
-> in the end.
->
-he :) we enter in compilers optimizations. As much as I agree with
-you, that might not be trivial to implement given the internal,
-ad-hoc, structure of kconfig. All of that would be useless if we had a
-single global namespace.
+> Upstream commit d5341942d784134f2997b3ff82cd63cf71d1f932 "PCI: Make the
+> struct pci_dev * argument of pci_fixup_irqs const." leaked an extra
+> "const" into an actual call site (vs a proto/decl) which causes this:
+> 
+> arch/arm/mach-orion5x/dns323-setup.c: In function 'dns323_pci_map_irq':
+> arch/arm/mach-orion5x/dns323-setup.c:80: error: expected expression before 'const'
+> arch/arm/mach-orion5x/dns323-setup.c:80: error: too few arguments to function 'orion5x_pci_map_irq'
+> make[3]: *** [arch/arm/mach-orion5x/dns323-setup.o] Error 1
+> 
+> Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
 
- - Arnaud
+Acked-by: Nicolas Pitre <nico@fluxnic.net>
+ 
+> diff --git a/arch/arm/mach-orion5x/dns323-setup.c b/arch/arm/mach-orion5x/dns323-setup.c
+> index a6eddae..c105556 100644
+> --- a/arch/arm/mach-orion5x/dns323-setup.c
+> +++ b/arch/arm/mach-orion5x/dns323-setup.c
+> @@ -77,7 +77,7 @@ static int __init dns323_pci_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
+>  	/*
+>  	 * Check for devices with hard-wired IRQs.
+>  	 */
+> -	irq = orion5x_pci_map_irq(const dev, slot, pin);
+> +	irq = orion5x_pci_map_irq(dev, slot, pin);
+>  	if (irq != -1)
+>  		return irq;
+>  
+> -- 
+> 1.7.6
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+> 
