@@ -1,162 +1,120 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  1 Aug 2011 18:04:19 +0100
-Subject: [RFC PATCH v10 3/4] ARM: local timers: drop local_timer_ack()
+Date: Mon,  1 Aug 2011 18:04:20 +0100
+Subject: [RFC PATCH v10 4/4] ARM: gic: add compute_irqnr macro for exynos4
 In-Reply-To: <1312218260-14866-1-git-send-email-marc.zyngier@arm.com>
 References: <1312218260-14866-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1312218260-14866-4-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1312218260-14866-5-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Only TWD uses local_timer_ack() to perform something useful.
-Make it the real (private) interrupt handler, remove the
-common interrupt handler as well as the useless stubs from
-MCT and MSM.
+exynos4 has a full copy of entry-macro-gic.S, just for the sake
+of an offset added to the IRQ number read from the GIC.
 
+Add a compute_irqnr macro to entry-macro-gic.S so that any platform
+can add it's own hook without having to copy the whole file again.
+
+Cc: Ben Dooks <ben-linux@fluff.org>
 Cc: Kukjin Kim <kgene.kim@samsung.com>
-Cc: David Brown <davidb@codeaurora.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/localtimer.h |    7 -------
- arch/arm/include/asm/smp_twd.h    |    1 -
- arch/arm/kernel/smp.c             |   14 --------------
- arch/arm/kernel/smp_twd.c         |   17 +++++++----------
- arch/arm/mach-exynos4/mct.c       |    6 ------
- arch/arm/mach-msm/timer.c         |    6 ------
- 6 files changed, 7 insertions(+), 44 deletions(-)
+ arch/arm/include/asm/hardware/entry-macro-gic.S  |    3 +
+ arch/arm/mach-exynos4/include/mach/entry-macro.S |   57 +++-------------------
+ 2 files changed, 10 insertions(+), 50 deletions(-)
 
-diff --git a/arch/arm/include/asm/localtimer.h b/arch/arm/include/asm/localtimer.h
-index 9b0dfbb..12ce9f8 100644
---- a/arch/arm/include/asm/localtimer.h
-+++ b/arch/arm/include/asm/localtimer.h
-@@ -30,18 +30,11 @@ irqreturn_t percpu_timer_handler(int irq, void *dev_id);
+diff --git a/arch/arm/include/asm/hardware/entry-macro-gic.S b/arch/arm/include/asm/hardware/entry-macro-gic.S
+index 74ebc80..fbb50dc 100644
+--- a/arch/arm/include/asm/hardware/entry-macro-gic.S
++++ b/arch/arm/include/asm/hardware/entry-macro-gic.S
+@@ -43,6 +43,9 @@
+ 	cmpcc	\irqnr, \irqnr
+ 	cmpne	\irqnr, \tmp
+ 	cmpcs	\irqnr, \irqnr
++#ifdef HAVE_GIC_BASE_OFFSET
++	compute_irqnr	\irqnr, \tmp
++#endif
+ 	.endm
  
- #include "smp_twd.h"
+ /* We assume that irqstat (the raw value of the IRQ acknowledge
+diff --git a/arch/arm/mach-exynos4/include/mach/entry-macro.S b/arch/arm/mach-exynos4/include/mach/entry-macro.S
+index 807d05d..ea578b5 100644
+--- a/arch/arm/mach-exynos4/include/mach/entry-macro.S
++++ b/arch/arm/mach-exynos4/include/mach/entry-macro.S
+@@ -9,11 +9,15 @@
+  * warranty of any kind, whether express or implied.
+ */
  
--#define local_timer_ack()	twd_timer_ack()
- #define local_timer_stop(c)	twd_timer_stop((c))
- 
- #else
- 
- /*
-- * Platform provides this to acknowledge a local timer IRQ.
-- * Returns true if the local timer IRQ is to be processed.
-- */
--int local_timer_ack(void);
--
--/*
-  * Stop the local timer
-  */
- void local_timer_stop(struct clock_event_device *);
-diff --git a/arch/arm/include/asm/smp_twd.h b/arch/arm/include/asm/smp_twd.h
-index 6923037..ef9ffba 100644
---- a/arch/arm/include/asm/smp_twd.h
-+++ b/arch/arm/include/asm/smp_twd.h
-@@ -22,7 +22,6 @@ struct clock_event_device;
- 
- extern void __iomem *twd_base;
- 
--int twd_timer_ack(void);
- void twd_timer_setup(struct clock_event_device *);
- void twd_timer_stop(struct clock_event_device *);
- 
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 980b800..03abde8 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -453,20 +453,6 @@ static void ipi_timer(void)
- 	irq_exit();
- }
- 
--#ifdef CONFIG_LOCAL_TIMERS
--irqreturn_t percpu_timer_handler(int irq, void *dev_id)
--{
--	struct clock_event_device *evt = dev_id;
--
--	if (local_timer_ack()) {
--		evt->event_handler(evt);
--		return IRQ_HANDLED;
--	}
--
--	return IRQ_NONE;
--}
--#endif
--
- #ifdef CONFIG_GENERIC_CLOCKEVENTS_BROADCAST
- static void smp_timer_broadcast(const struct cpumask *mask)
- {
-diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-index b2c4543..1ad69f8 100644
---- a/arch/arm/kernel/smp_twd.c
-+++ b/arch/arm/kernel/smp_twd.c
-@@ -65,20 +65,17 @@ static int twd_set_next_event(unsigned long evt,
- 	return 0;
- }
- 
--/*
-- * local_timer_ack: checks for a local timer interrupt.
-- *
-- * If a local timer interrupt has occurred, acknowledge and return 1.
-- * Otherwise, return 0.
-- */
--int twd_timer_ack(void)
-+static irqreturn_t twd_timer_handler(int irq, void *dev_id)
- {
-+	struct clock_event_device *clk = dev_id;
++#define HAVE_GIC_BASE_OFFSET	1
 +
- 	if (__raw_readl(twd_base + TWD_TIMER_INTSTAT)) {
- 		__raw_writel(1, twd_base + TWD_TIMER_INTSTAT);
--		return 1;
-+		clk->event_handler(clk);
-+		return IRQ_HANDLED;
- 	}
+ #include <mach/hardware.h>
+ #include <mach/map.h>
+ #include <asm/hardware/gic.h>
++#include <asm/hardware/entry-macro-gic.S>
  
--	return 0;
-+	return IRQ_NONE;
- }
+-		.macro	disable_fiq
++		.macro	compute_irqnr, irqnr, tmp
++		addne	\irqnr, #32
+ 		.endm
  
- void twd_timer_stop(struct clock_event_device *clk)
-@@ -146,7 +143,7 @@ void __cpuinit twd_timer_setup(struct clock_event_device *clk)
- 	clk->max_delta_ns = clockevent_delta2ns(0xffffffff, clk);
- 	clk->min_delta_ns = clockevent_delta2ns(0xf, clk);
- 
--	err = gic_request_ppi(clk->irq, percpu_timer_handler, clk);
-+	err = gic_request_ppi(clk->irq, twd_timer_handler, clk);
- 	if (err) {
- 		pr_err("%s: can't register interrupt %d on cpu %d (%d)\n",
- 		       clk->name, clk->irq, smp_processor_id(), err);
-diff --git a/arch/arm/mach-exynos4/mct.c b/arch/arm/mach-exynos4/mct.c
-index 1ae059b..194fc6d 100644
---- a/arch/arm/mach-exynos4/mct.c
-+++ b/arch/arm/mach-exynos4/mct.c
-@@ -393,12 +393,6 @@ void __cpuinit local_timer_setup(struct clock_event_device *evt)
- {
- 	exynos4_mct_tick_init(evt);
- }
+ 		.macro  get_irqnr_preamble, base, tmp
+@@ -23,57 +27,10 @@
+ 		and     \tmp, \tmp, #3
+ 		cmp     \tmp, #1
+ 		addeq   \base, \base, #EXYNOS4_GIC_BANK_OFFSET
+-		.endm
 -
--int local_timer_ack(void)
--{
--	return 0;
--}
+-		.macro  arch_ret_to_user, tmp1, tmp2
+-		.endm
 -
- #endif /* CONFIG_LOCAL_TIMERS */
+-		/*
+-		 * The interrupt numbering scheme is defined in the
+-		 * interrupt controller spec.  To wit:
+-		 *
+-		 * Interrupts 0-15 are IPI
+-		 * 16-28 are reserved
+-		 * 29-31 are local.  We allow 30 to be used for the watchdog.
+-		 * 32-1020 are global
+-		 * 1021-1022 are reserved
+-		 * 1023 is "spurious" (no interrupt)
+-		 *
+-		 * For now, we ignore all local interrupts so only return an interrupt if it's
+-		 * between 30 and 1020.  The test_for_ipi routine below will pick up on IPIs.
+-		 *
+-		 * A simple read from the controller will tell us the number of the highest
+-                 * priority enabled interrupt.  We then just need to check whether it is in the
+-		 * valid range for an IRQ (30-1020 inclusive).
+-		 */
+-
+-		.macro  get_irqnr_and_base, irqnr, irqstat, base, tmp
+-
+-		ldr     \irqstat, [\base, #GIC_CPU_INTACK] /* bits 12-10 = src CPU, 9-0 = int # */
+-
+-		ldr	\tmp, =1021
+-
+-		bic     \irqnr, \irqstat, #0x1c00
+-
+-		cmp     \irqnr, #15
+-		cmpcc	\irqnr, \irqnr
+-		cmpne	\irqnr, \tmp
+-		cmpcs	\irqnr, \irqnr
+-		addne	\irqnr, \irqnr, #32
  
- static void __init exynos4_timer_resources(void)
-diff --git a/arch/arm/mach-msm/timer.c b/arch/arm/mach-msm/timer.c
-index 1bcdf66..94e6fc5 100644
---- a/arch/arm/mach-msm/timer.c
-+++ b/arch/arm/mach-msm/timer.c
-@@ -309,12 +309,6 @@ void local_timer_stop(struct clock_event_device *evt)
- 	evt->set_mode(CLOCK_EVT_MODE_UNUSED, evt);
- 	gic_free_ppi(evt->irq, evt);
- }
--
--inline int local_timer_ack(void)
--{
--	return 1;
--}
--
- #endif
++		.macro	disable_fiq
+ 		.endm
  
- struct sys_timer msm_timer = {
+-		/* We assume that irqstat (the raw value of the IRQ acknowledge
+-		 * register) is preserved from the macro above.
+-		 * If there is an IPI, we immediately signal end of interrupt on the
+-		 * controller, since this requires the original irqstat value which
+-		 * we won't easily be able to recreate later.
+-		 */
+-
+-		.macro test_for_ipi, irqnr, irqstat, base, tmp
+-		bic	\irqnr, \irqstat, #0x1c00
+-		cmp	\irqnr, #16
+-		strcc	\irqstat, [\base, #GIC_CPU_EOI]
+-		cmpcs	\irqnr, \irqnr
++		.macro  arch_ret_to_user, tmp1, tmp2
+ 		.endm
+ 
 -- 
 1.7.0.4
