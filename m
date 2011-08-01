@@ -1,39 +1,81 @@
-From: viresh.kumar@st.com (viresh kumar)
-Date: Mon, 1 Aug 2011 17:25:42 +0530
-Subject: [PATCH V2 08/20] dmaengine/amba-pl08x: support runtime PM
-In-Reply-To: <20110801102627.GF15578@n2100.arm.linux.org.uk>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Mon, 1 Aug 2011 17:26:30 +0530
+Subject: [PATCH V3 08/20] dmaengine/amba-pl08x: support runtime PM
+In-Reply-To: <cover.1312190881.git.viresh.kumar@st.com>
 References: <cover.1312190881.git.viresh.kumar@st.com>
-	<bc59bbd3709a7af1723d37ab846bf44c6867c00e.1312190881.git.viresh.kumar@st.com>
-	<20110801102627.GF15578@n2100.arm.linux.org.uk>
-Message-ID: <4E36943E.5020105@st.com>
+Message-ID: <cbf7119fa968fa54077729aabf1ecca5d21db629.1312190881.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/01/2011 03:56 PM, Russell King - ARM Linux wrote:
-> I think a primecell's probe function should look like this:
-> 
-> primecell_probe()
-> {
-> 	ret = amba_request_regions(adev, NULL);
-> 	if (ret)
-> 		return ret;
-> 
-> 	... allocate stuff, don't access primecell though ...
-> 
-> 	pm_runtime_set_active(&adev->dev);
-> 	pm_runtime_enable(&adev->dev);
-> 
-> 	... get clocks and enable them, do rest of init ...
-> 
-> 	pm_runtime_put_sync(&adev->dev);
-> 	return 0;
-> }
+Insert notifiers for the runtime PM API. With this the runtime PM layer kicks in
+to action where used. This will also handle enabling/disabling of interface
+clock (Code will be added in amba/bus.c by Russell King).
 
-Ok. I didn't had much knowhow of pm_runtime* framework. I will
-send V3 for this patch alone, please see if that one is fine or still
-needs some updation.
+Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+---
+ drivers/dma/amba-pl08x.c |   17 +++++++++++++++++
+ 1 files changed, 17 insertions(+), 0 deletions(-)
 
-Thanks for your help.
-
+diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
+index 3fbaf0e..a829f0e 100644
+--- a/drivers/dma/amba-pl08x.c
++++ b/drivers/dma/amba-pl08x.c
+@@ -84,6 +84,7 @@
+ #include <linux/init.h>
+ #include <linux/interrupt.h>
+ #include <linux/module.h>
++#include <linux/pm_runtime.h>
+ #include <linux/seq_file.h>
+ #include <linux/slab.h>
+ #include <asm/hardware/pl080.h>
+@@ -879,11 +880,19 @@ static void pl08x_free_txd_list(struct pl08x_driver_data *pl08x,
+  */
+ static int pl08x_alloc_chan_resources(struct dma_chan *chan)
+ {
++	struct pl08x_dma_chan *plchan = to_pl08x_chan(chan);
++	struct pl08x_driver_data *pl08x = plchan->host;
++
++	pm_runtime_get_sync(&pl08x->adev->dev);
+ 	return 0;
+ }
+ 
+ static void pl08x_free_chan_resources(struct dma_chan *chan)
+ {
++	struct pl08x_dma_chan *plchan = to_pl08x_chan(chan);
++	struct pl08x_driver_data *pl08x = plchan->host;
++
++	pm_runtime_put_sync(&pl08x->adev->dev);
+ }
+ 
+ /*
+@@ -1855,6 +1864,9 @@ static int pl08x_probe(struct amba_device *adev, const struct amba_id *id)
+ 		goto out_no_pl08x;
+ 	}
+ 
++	pm_runtime_set_active(&adev->dev);
++	pm_runtime_enable(&adev->dev);
++
+ 	/* Initialize memcpy engine */
+ 	dma_cap_set(DMA_MEMCPY, pl08x->memcpy.cap_mask);
+ 	pl08x->memcpy.dev = &adev->dev;
+@@ -1993,6 +2005,8 @@ static int pl08x_probe(struct amba_device *adev, const struct amba_id *id)
+ 	dev_info(&pl08x->adev->dev, "DMA: PL%03x rev%u at 0x%08llx irq %d\n",
+ 		 amba_part(adev), amba_rev(adev),
+ 		 (unsigned long long)adev->res.start, adev->irq[0]);
++
++	pm_runtime_put_sync(&adev->dev);
+ 	return 0;
+ 
+ out_no_slave_reg:
+@@ -2011,6 +2025,9 @@ out_no_ioremap:
+ 	dma_pool_destroy(pl08x->pool);
+ out_no_lli_pool:
+ out_no_platdata:
++	pm_runtime_put_sync(&adev->dev);
++	pm_runtime_disable(&adev->dev);
++
+ 	kfree(pl08x);
+ out_no_pl08x:
+ 	amba_release_regions(adev);
 -- 
-viresh
+1.7.2.2
