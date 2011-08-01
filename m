@@ -1,7 +1,7 @@
 From: lacombar@gmail.com (Arnaud Lacombe)
-Date: Mon, 1 Aug 2011 13:15:37 -0400
+Date: Mon, 1 Aug 2011 13:20:26 -0400
 Subject: [PATCH] Remove remaining references of CONFIG_GENERIC_TIME
-In-Reply-To: <CACqU3MUoxSNmcYsSF4zOTgADdedb7TcciPuBPMviG02M5oUPDQ@mail.gmail.com>
+In-Reply-To: <alpine.LFD.2.00.1108011737030.18706@xanadu.home>
 References: <1312042478-26012-1-git-send-email-zdevai@gmail.com>
 	<20110801083614.GC15578@n2100.arm.linux.org.uk>
 	<CAMuHMdUpTDSRP_JmWqcCBtYwzna0hwmaBshpiF8kgvqoNcqYZA@mail.gmail.com>
@@ -10,76 +10,40 @@ References: <1312042478-26012-1-git-send-email-zdevai@gmail.com>
 	<CACqU3MVUxTYmD+4VGBAeN8PTs83fR0xQQrQS5h4QGMZXgMxEvA@mail.gmail.com>
 	<CAGZ=bqL=VAx5jnSBkE2q5KJSY_+An-VRTRAzJmJ3waQUvrRFFg@mail.gmail.com>
 	<CACqU3MUoxSNmcYsSF4zOTgADdedb7TcciPuBPMviG02M5oUPDQ@mail.gmail.com>
-Message-ID: <CACqU3MVRNmAOm+hTBR34YJ-A2H18NgMZqgvs_ejjQ6hqjG6NBA@mail.gmail.com>
+	<alpine.LFD.2.00.1108011737030.18706@xanadu.home>
+Message-ID: <CACqU3MU_oq+RYydenKG_8U08rdJ-N+2hftH+2xEPZU0uVP6i5A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Mon, Aug 1, 2011 at 12:08 PM, Arnaud Lacombe <lacombar@gmail.com> wrote:
-> Hi,
+On Mon, Aug 1, 2011 at 12:40 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
+> On Mon, 1 Aug 2011, Arnaud Lacombe wrote:
 >
-> On Mon, Aug 1, 2011 at 11:15 AM, Kyle Moffett <kyle@moffetthome.net> wrote:
->> On Mon, Aug 1, 2011 at 11:04, Arnaud Lacombe <lacombar@gmail.com> wrote:
->>> Hi,
->>>
->>> On Mon, Aug 1, 2011 at 7:27 AM, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
->>>> On Mon, Aug 1, 2011 at 12:14, Russell King - ARM Linux
->>>>>>[...]
->>>>>>
->>>>>> Doesn't kconf error out when trying to select a non-existent symbol?
->>>>>
->>>>> Nope.
->>>>
->>>> You're right. So that's a bug.
->>>>
->>> depends on what you are trying to achieve and what the problem is.
->>>
->>> Internally kconfig will create a dummy symbol when it encounter a
->>> missing symbol so that arch/arm/Kconfig can reference a symbol which
->>> will be fully defined later on. I do not think you want to forward
->>> decl all the symbol which can be used. That'd be a mess. That said, we
->>> can come with a form of symbol deprecation that would error-out when
->>> used.
+>> Moreover, this approach is deemed to fail. The current symbol
+>> namespace is tied to an arch, so whenever you do:
 >>
->> Would it be possible instead to make Kconfig go through all the symbols
->> after everything is processed and identify any remaining "dummy symbols"
->> which were not actually declared anywhere?
+>> arch/arm/Kconfig:
+>> config FOO
+>> ? ? bool
 >>
-> this is software, everything is possible.
->
->> Right now if you typo a "select" statement you get no warnings that you
->> are selecting something that does not exist, which is probably a cause
->> of many kinds of errors beyond this particular one.
+>> config BAZ
+>> ? ? bool
 >>
-> d'oh! ... I'm not sure we want that. Dummy symbol are heavily used
-> internally, a trivial implementation[0] triggered:
+>> drivers/cpufreq/Kconfig
+>> config BAR
+>> ? ? depends on ARM && FOO
+>> ? ? select BAZ
+>>
+>> You will end up triggering the warning for every ARCH != ARM...
 >
-> % make REGENERATE_PARSERS=y alldefconfig 2>&1 | grep 'defined without
-> type' | wc -l
-> 817
+> You can keep a state for those symbols with regard to their level of
+> reference. ?Surely if ARM isn't true, BAZ is not "actively" referenced
+> in the end.
 >
-> Moreover, this approach is deemed to fail. The current symbol
-> namespace is tied to an arch, so whenever you do:
->
-> arch/arm/Kconfig:
-> config FOO
-> ? ?bool
->
-> config BAZ
-> ? ?bool
->
-> drivers/cpufreq/Kconfig
-> config BAR
-> ? ?depends on ARM && FOO
-> ? ?select BAZ
->
-> You will end up triggering the warning for every ARCH != ARM...
->
-Ok, I restricted the tagging to selected symbol, and we definitively
-have this pattern occurring. It shall be fixed when/if we ends up
-having a global configuration namespace.
-
-I think I can work a patch.
+he :) we enter in compilers optimizations. As much as I agree with
+you, that might not be trivial to implement given the internal,
+ad-hoc, structure of kconfig. All of that would be useless if we had a
+single global namespace.
 
  - Arnaud
