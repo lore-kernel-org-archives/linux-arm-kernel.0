@@ -1,61 +1,36 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Mon, 1 Aug 2011 15:07:18 +0530
-Subject: [PATCH V2 08/20] dmaengine/amba-pl08x: support runtime PM
+Date: Mon, 1 Aug 2011 15:07:20 +0530
+Subject: [PATCH V2 10/20] dmaengine/amba-pl08x: No need to check "ch->signal <
+	0"
 In-Reply-To: <cover.1312190881.git.viresh.kumar@st.com>
 References: <cover.1312190881.git.viresh.kumar@st.com>
-Message-ID: <bc59bbd3709a7af1723d37ab846bf44c6867c00e.1312190881.git.viresh.kumar@st.com>
+Message-ID: <41f085d3f399d2a60ef1afbf04b75104c5794af3.1312190881.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Insert notifiers for the runtime PM API. With this the runtime PM layer kicks in
-to action where used. This will also handle enabling/disabling of interface
-clock (Code will be added in amba/bus.c by Russell King).
+We have just executed following in pl08x_get_phy_channel():
+	ch->signal = -1;
+
+We don't have to compare "ch->signal < 0", as this will always be true.
 
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/dma/amba-pl08x.c |   11 +++++++++++
- 1 files changed, 11 insertions(+), 0 deletions(-)
+ drivers/dma/amba-pl08x.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
 diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
-index 3fbaf0e..428a67b 100644
+index da17249..f463841 100644
 --- a/drivers/dma/amba-pl08x.c
 +++ b/drivers/dma/amba-pl08x.c
-@@ -84,6 +84,7 @@
- #include <linux/init.h>
- #include <linux/interrupt.h>
- #include <linux/module.h>
-+#include <linux/pm_runtime.h>
- #include <linux/seq_file.h>
- #include <linux/slab.h>
- #include <asm/hardware/pl080.h>
-@@ -879,11 +880,19 @@ static void pl08x_free_txd_list(struct pl08x_driver_data *pl08x,
-  */
- static int pl08x_alloc_chan_resources(struct dma_chan *chan)
- {
-+	struct pl08x_dma_chan *plchan = to_pl08x_chan(chan);
-+	struct pl08x_driver_data *pl08x = plchan->host;
-+
-+	pm_runtime_resume(&pl08x->adev->dev);
- 	return 0;
- }
- 
- static void pl08x_free_chan_resources(struct dma_chan *chan)
- {
-+	struct pl08x_dma_chan *plchan = to_pl08x_chan(chan);
-+	struct pl08x_driver_data *pl08x = plchan->host;
-+
-+	pm_runtime_suspend(&pl08x->adev->dev);
- }
- 
- /*
-@@ -1993,6 +2002,8 @@ static int pl08x_probe(struct amba_device *adev, const struct amba_id *id)
- 	dev_info(&pl08x->adev->dev, "DMA: PL%03x rev%u at 0x%08llx irq %d\n",
- 		 amba_part(adev), amba_rev(adev),
- 		 (unsigned long long)adev->res.start, adev->irq[0]);
-+
-+	pm_runtime_suspend(&adev->dev);
- 	return 0;
- 
- out_no_slave_reg:
+@@ -921,7 +921,7 @@ static int prep_phy_channel(struct pl08x_dma_chan *plchan,
+ 	 * need, but for slaves the physical signals may be muxed!
+ 	 * Can the platform allow us to use this channel?
+ 	 */
+-	if (plchan->slave && ch->signal < 0 && pl08x->pd->get_signal) {
++	if (plchan->slave && pl08x->pd->get_signal) {
+ 		ret = pl08x->pd->get_signal(plchan);
+ 		if (ret < 0) {
+ 			dev_dbg(&pl08x->adev->dev,
 -- 
 1.7.2.2
