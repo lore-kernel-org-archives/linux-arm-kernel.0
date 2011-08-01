@@ -1,113 +1,128 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 1 Aug 2011 23:01:39 +0100
-Subject: [PATCH v3 1/2] arm/mx5: add device tree support for imx53 boards
-In-Reply-To: <1312226252-8566-2-git-send-email-shawn.guo@linaro.org>
-References: <1312226252-8566-1-git-send-email-shawn.guo@linaro.org>
-	<1312226252-8566-2-git-send-email-shawn.guo@linaro.org>
-Message-ID: <CACxGe6vvL=xGCGMR0yhyJ8r2zLvBgYhYS1b9_VF3dg5hRNhNzQ@mail.gmail.com>
+Date: Mon, 1 Aug 2011 23:04:49 +0100
+Subject: [PATCH] DT: OMAP: Convert I2C driver to use device tree
+In-Reply-To: <1312235294-4397-1-git-send-email-manjugk@ti.com>
+References: <1312235294-4397-1-git-send-email-manjugk@ti.com>
+Message-ID: <CACxGe6ugCVJJb32uie=Kh7sKrKREH8h0euuZVUrGeLab4zSgVw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 1, 2011 at 8:17 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> From: Shawn Guo <shawn.guo@freescale.com>
+On Mon, Aug 1, 2011 at 10:48 PM, G, Manjunath Kondaiah <manjugk@ti.com> wrote:
+> The i2c-omap driver is modified to support both DT and non DT builds
+> and driver is updated to use dt data partially.
 >
-> It adds device tree support for imx53 boards.
+> Tested on OMAP3 beagle board for dt and non dt builds.
 >
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-
-It's *really* close, but I see a problem...
-
-> +static const char *imx53_dt_board_compat[] __initdata = {
-> + ? ? ? "fsl,imx53-ard",
-> + ? ? ? "fsl,imx53-evk",
-> + ? ? ? "fsl,imx53-qsb",
-> + ? ? ? "fsl,imx53-smd",
-> + ? ? ? NULL
-> +};
+> Signed-off-by: G, Manjunath Kondaiah <manjugk@ti.com>
+> ---
+> ?drivers/i2c/busses/i2c-omap.c | ? 33 ++++++++++++++++++++++++++++++---
+> ?1 files changed, 30 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+> index 1a766cf..cf82f89 100644
+> --- a/drivers/i2c/busses/i2c-omap.c
+> +++ b/drivers/i2c/busses/i2c-omap.c
+> @@ -37,6 +37,8 @@
+> ?#include <linux/platform_device.h>
+> ?#include <linux/clk.h>
+> ?#include <linux/io.h>
+> +#include <linux/of_i2c.h>
+> +#include <linux/of_device.h>
+> ?#include <linux/slab.h>
+> ?#include <linux/i2c-omap.h>
+> ?#include <linux/pm_runtime.h>
+> @@ -971,6 +973,16 @@ static const struct i2c_algorithm omap_i2c_algo = {
+> ? ? ? ?.functionality ?= omap_i2c_func,
+> ?};
+>
+> +#if defined(CONFIG_OF)
+> +static const struct of_device_id omap_i2c_of_match[] = {
+> + ? ? ? {.compatible = "ti,omap3-i2c", },
+> + ? ? ? {},
+> +}
+> +MODULE_DEVICE_TABLE(of, omap_i2c_of_match);
+> +#else
+> +#define omap_i2c_of_match NULL
+> +#endif
 > +
-> +DT_MACHINE_START(IMX53_DT, "Freescale i.MX53 (Device Tree Support)")
-> + ? ? ? .map_io ? ? ? ? = mx53_map_io,
-> + ? ? ? .init_early ? ? = imx53_init_early,
-> + ? ? ? .init_irq ? ? ? = mx53_init_irq,
-> + ? ? ? .timer ? ? ? ? ?= &imx53_timer,
-> + ? ? ? .init_machine ? = imx53_dt_init,
-> + ? ? ? .dt_compat ? ? ?= imx53_dt_board_compat,
-> +MACHINE_END
-> +
-> +DT_MACHINE_START(IMX53_DT_ARD, "Freescale i.MX53 ARD (Device Tree Support)")
-> + ? ? ? .map_io ? ? ? ? = mx53_map_io,
-> + ? ? ? .init_early ? ? = imx53_init_early,
-> + ? ? ? .init_irq ? ? ? = mx53_init_irq,
-> + ? ? ? .timer ? ? ? ? ?= &imx53_timer,
-> + ? ? ? .init_machine ? = imx53_ard_init,
-> + ? ? ? .dt_compat ? ? ?= imx53_dt_board_compat,
-> +MACHINE_END
-
-These two machine_descs will match on exactly the same boards because
-they use the same dt_compat table.  So the ard variant will probably
-never get matched since it will be picked up by the IMX53_DT variant
-first.  Each machine_desc must have a different match table.
-
-However, today when we were talking you asked if it would be better to
-use a callback into board-specific code instead of the iomux table
-that is implemented in this patch.  I was fine either way, but my
-opinion was that the table would probably result in less code.  Well,
-combined with the above problem, I think I was wrong.  Since the only
-difference in the ard variant is the call to
-imx53_ard_weim_cs_config(), both the cs config and the iomux setup
-will be simpler if both are handled in a callback.  You're original
-instinct was correct.
-
-g.
-
-> diff --git a/arch/arm/plat-mxc/include/mach/common.h b/arch/arm/plat-mxc/include/mach/common.h
-> index 4e3d978..32c24a4 100644
-> --- a/arch/arm/plat-mxc/include/mach/common.h
-> +++ b/arch/arm/plat-mxc/include/mach/common.h
-> @@ -72,4 +72,6 @@ extern void mxc_arch_reset_init(void __iomem *);
-> ?extern void mx51_efikamx_reset(void);
-> ?extern int mx53_revision(void);
-> ?extern int mx53_display_revision(void);
-> +extern int imx53_ard_weim_cs_config(void);
-> +
-> ?#endif
-> diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx53.h b/arch/arm/plat-mxc/include/mach/iomux-mx53.h
-> index 9440b9e..adcf2c0 100644
-> --- a/arch/arm/plat-mxc/include/mach/iomux-mx53.h
-> +++ b/arch/arm/plat-mxc/include/mach/iomux-mx53.h
-> @@ -21,6 +21,11 @@
+> ?static int __devinit
+> ?omap_i2c_probe(struct platform_device *pdev)
+> ?{
+> @@ -978,10 +990,13 @@ omap_i2c_probe(struct platform_device *pdev)
+> ? ? ? ?struct i2c_adapter ? ? ?*adap;
+> ? ? ? ?struct resource ? ? ? ? *mem, *irq, *ioarea;
+> ? ? ? ?struct omap_i2c_bus_platform_data *pdata = pdev->dev.platform_data;
+> + ? ? ? const struct of_device_id *match;
+> ? ? ? ?irq_handler_t isr;
+> ? ? ? ?int r;
+> ? ? ? ?u32 speed = 0;
 >
-> ?#include <mach/iomux-v3.h>
->
-> +extern struct iomux_v3_pad_data imx53_ard_pad_data;
-> +extern struct iomux_v3_pad_data imx53_evk_pad_data;
-> +extern struct iomux_v3_pad_data imx53_loco_pad_data;
-> +extern struct iomux_v3_pad_data imx53_smd_pad_data;
+> + ? ? ? match = of_match_device(omap_i2c_of_match, &pdev->dev);
 > +
-> ?/* These 2 defines are for pins that may not have a mux register, but could
-> ?* have a pad setting register, and vice-versa. */
-> ?#define NON_PAD_I ? ? ?0x00
-> diff --git a/arch/arm/plat-mxc/include/mach/iomux-v3.h b/arch/arm/plat-mxc/include/mach/iomux-v3.h
-> index ebbce33..5689965 100644
-> --- a/arch/arm/plat-mxc/include/mach/iomux-v3.h
-> +++ b/arch/arm/plat-mxc/include/mach/iomux-v3.h
-> @@ -55,6 +55,11 @@
+> ? ? ? ?/* NOTE: driver uses the static register mapping */
+> ? ? ? ?mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> ? ? ? ?if (!mem) {
+> @@ -1007,14 +1022,23 @@ omap_i2c_probe(struct platform_device *pdev)
+> ? ? ? ? ? ? ? ?goto err_release_region;
+> ? ? ? ?}
 >
-> ?typedef u64 iomux_v3_cfg_t;
+> + ? ? ? speed = 100; ? ?/* Default speed */
+> ? ? ? ?if (pdata != NULL) {
+> ? ? ? ? ? ? ? ?speed = pdata->clkrate;
+> ? ? ? ? ? ? ? ?dev->set_mpu_wkup_lat = pdata->set_mpu_wkup_lat;
+> - ? ? ? } else {
+> - ? ? ? ? ? ? ? speed = 100; ? ?/* Default speed */
+> - ? ? ? ? ? ? ? dev->set_mpu_wkup_lat = NULL;
+> +#if defined(CONFIG_OF)
+> + ? ? ? } else if (pdev->dev.of_node) {
+> + ? ? ? ? ? ? ? u32 prop;
+> + ? ? ? ? ? ? ? if (!of_property_read_u32(pdev->dev.of_node, "clock-frequency",
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? &prop))
+> + ? ? ? ? ? ? ? ? ? ? ? speed = prop/100;
+> +#endif
+> ? ? ? ?}
 >
-> +struct iomux_v3_pad_data {
-> + ? ? ? iomux_v3_cfg_t *pads;
-> + ? ? ? int num;
-> +};
+> + ? ? ? /* TODO: remove this after DT depencies with hwmod are resolved */
+> + ? ? ? if (match)
+> + ? ? ? ? ? ? ? return 0;
 > +
-> ?#define MUX_CTRL_OFS_SHIFT ? ? 0
-> ?#define MUX_CTRL_OFS_MASK ? ? ?((iomux_v3_cfg_t)0xfff << MUX_CTRL_OFS_SHIFT)
-> ?#define MUX_PAD_CTRL_OFS_SHIFT 12
+
+Drop this hunk for the patch you're submitting to mainline.  It's okay
+to have it in while you're testing, but the code that is actually
+merged shouldn't have it.  We'll have a workaround for the hwmod issue
+sorted out this week.  After doing this you can add:
+
+Acked-by: Grant Likely <grant.likely@secretlab.ca>
+
+> ? ? ? ?dev->speed = speed;
+> ? ? ? ?dev->idle = 1;
+> ? ? ? ?dev->dev = &pdev->dev;
+> @@ -1095,6 +1119,7 @@ omap_i2c_probe(struct platform_device *pdev)
+> ? ? ? ?strlcpy(adap->name, "OMAP I2C adapter", sizeof(adap->name));
+> ? ? ? ?adap->algo = &omap_i2c_algo;
+> ? ? ? ?adap->dev.parent = &pdev->dev;
+> + ? ? ? adap->dev.of_node = pdev->dev.of_node;
+>
+> ? ? ? ?/* i2c device drivers may be active on return from add_adapter() */
+> ? ? ? ?adap->nr = pdev->id;
+> @@ -1103,6 +1128,7 @@ omap_i2c_probe(struct platform_device *pdev)
+> ? ? ? ? ? ? ? ?dev_err(dev->dev, "failure adding adapter\n");
+> ? ? ? ? ? ? ? ?goto err_free_irq;
+> ? ? ? ?}
+> + ? ? ? of_i2c_register_devices(adap);
+>
+> ? ? ? ?return 0;
+>
+> @@ -1174,6 +1200,7 @@ static struct platform_driver omap_i2c_driver = {
+> ? ? ? ? ? ? ? ?.name ? = "omap_i2c",
+> ? ? ? ? ? ? ? ?.owner ?= THIS_MODULE,
+> ? ? ? ? ? ? ? ?.pm ? ? = OMAP_I2C_PM_OPS,
+> + ? ? ? ? ? ? ? .of_match_table = omap_i2c_of_match,
+> ? ? ? ?},
+> ?};
+>
 > --
-> 1.7.4.1
->
+> 1.7.1
 >
 >
 
