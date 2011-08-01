@@ -1,107 +1,63 @@
-From: buytenh@wantstofly.org (Lennert Buytenhek)
-Date: Tue, 2 Aug 2011 00:43:42 +0200
-Subject: [PATCH 3/3] ARM: mmp: Change the way we use timer 0 as clockevent
-	timer.
-Message-ID: <20110801224342.GI912@wantstofly.org>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 2 Aug 2011 01:55:55 +0300
+Subject: [RFC/PATCH 7/7] WIP: HACK/RFC: omap_device: begin to decouple
+	platform_device from omap_device
+In-Reply-To: <87pqkon5n6.fsf@ti.com>
+References: <1311292338-11830-1-git-send-email-khilman@ti.com>
+	<1311292338-11830-9-git-send-email-khilman@ti.com>
+	<20110730120332.GA15539@n2100.arm.linux.org.uk>
+	<20110731025807.GA24334@ponder.secretlab.ca>
+	<20110731150540.GA3019@n2100.arm.linux.org.uk>
+	<871ux5nnop.fsf@ti.com>
+	<CACxGe6t4tNeD-Pn6WFt1XOMC=_Q0cf4uD3kRkOckKH+S1JUJDA@mail.gmail.com>
+	<20110801185009.GA5217@legolas.emea.dhcp.ti.com>
+	<20110801200743.GA21535@n2100.arm.linux.org.uk>
+	<87pqkon5n6.fsf@ti.com>
+Message-ID: <20110801225554.GC6244@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of setting up a match interrupt for 'current_time + delta'
-on ->set_next_event(), program timer 0 to count down from 'delta - 1'
-and trigger an interrupt when it reaches zero.
+Hi,
 
-Signed-off-by: Lennert Buytenhek <buytenh@laptop.org>
----
- arch/arm/mach-mmp/time.c |   47 ++++++++++++++++++++++++++++++++++-----------
- 1 files changed, 35 insertions(+), 12 deletions(-)
+On Mon, Aug 01, 2011 at 03:11:57PM -0700, Kevin Hilman wrote:
+> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+> 
+> > Help the typechecker do its job.  As we have only one (at the moment...)
+> > And make it:
+> >
+> > +struct omap_device;
+> >
+> >  struct pdev_archdata {
+> > +#ifdef CONFIG_ARCH_OMAP
+> > +	struct omap_device *omap;
+> > +#endif
+> >  };
+> >
+> > for bonus points, so we only get the additional pointer for OMAP.
+> 
+> OK, will do it this way.
 
-diff --git a/arch/arm/mach-mmp/time.c b/arch/arm/mach-mmp/time.c
-index 80d8870..d8e8726 100644
---- a/arch/arm/mach-mmp/time.c
-+++ b/arch/arm/mach-mmp/time.c
-@@ -75,28 +75,51 @@ static irqreturn_t timer_interrupt(int irq, void *dev_id)
- {
- 	struct clock_event_device *c = dev_id;
- 
--	/* disable and clear pending interrupt status */
--	__raw_writel(0x0, TIMERS_VIRT_BASE + TMR_IER(0));
--	__raw_writel(0x1, TIMERS_VIRT_BASE + TMR_ICR(0));
-+	/*
-+	 * Clear pending interrupt status.
-+	 */
-+	__raw_writel(0x01, TIMERS_VIRT_BASE + TMR_ICR(0));
-+
-+	/*
-+	 * Disable timer 0.
-+	 */
-+	__raw_writel(0x02, TIMERS_VIRT_BASE + TMR_CER);
-+
- 	c->event_handler(c);
-+
- 	return IRQ_HANDLED;
- }
- 
- static int timer_set_next_event(unsigned long delta,
- 				struct clock_event_device *dev)
- {
--	unsigned long flags, next;
-+	unsigned long flags;
- 
- 	local_irq_save(flags);
- 
--	/* clear pending interrupt status and enable */
-+	/*
-+	 * Disable timer 0.
-+	 */
-+	__raw_writel(0x02, TIMERS_VIRT_BASE + TMR_CER);
-+
-+	/*
-+	 * Clear and enable timer match 0 interrupt.
-+	 */
- 	__raw_writel(0x01, TIMERS_VIRT_BASE + TMR_ICR(0));
- 	__raw_writel(0x01, TIMERS_VIRT_BASE + TMR_IER(0));
- 
--	next = timer_read() + delta;
--	__raw_writel(next, TIMERS_VIRT_BASE + TMR_TN_MM(0, 0));
-+	/*
-+	 * Setup new clockevent timer value.
-+	 */
-+	__raw_writel(delta - 1, TIMERS_VIRT_BASE + TMR_TN_MM(0, 0));
-+
-+	/*
-+	 * Enable timer 0.
-+	 */
-+	__raw_writel(0x03, TIMERS_VIRT_BASE + TMR_CER);
- 
- 	local_irq_restore(flags);
-+
- 	return 0;
- }
- 
-@@ -152,10 +175,10 @@ static void __init timer_config(void)
- 		(TMR_CCR_CS_0(3) | TMR_CCR_CS_1(3));
- 	__raw_writel(ccr, TIMERS_VIRT_BASE + TMR_CCR);
- 
--	/* free-running mode */
--	__raw_writel(0x3, TIMERS_VIRT_BASE + TMR_CMR);
-+	/* set timer 0 to periodic mode, and timer 1 to free-running mode */
-+	__raw_writel(0x2, TIMERS_VIRT_BASE + TMR_CMR);
- 
--	__raw_writel(0x0, TIMERS_VIRT_BASE + TMR_PLCR(0)); /* free-running */
-+	__raw_writel(0x1, TIMERS_VIRT_BASE + TMR_PLCR(0)); /* periodic */
- 	__raw_writel(0x7, TIMERS_VIRT_BASE + TMR_ICR(0));  /* clear status */
- 	__raw_writel(0x0, TIMERS_VIRT_BASE + TMR_IER(0));
- 
-@@ -163,8 +186,8 @@ static void __init timer_config(void)
- 	__raw_writel(0x7, TIMERS_VIRT_BASE + TMR_ICR(1));  /* clear status */
- 	__raw_writel(0x0, TIMERS_VIRT_BASE + TMR_IER(1));
- 
--	/* enable timer counter */
--	__raw_writel(0x3, TIMERS_VIRT_BASE + TMR_CER);
-+	/* enable timer 1 counter */
-+	__raw_writel(0x2, TIMERS_VIRT_BASE + TMR_CER);
- }
- 
- static struct irqaction timer_irq = {
+this has the tendency to grow larger, no ? What if all other ARMs decide
+to add their own pointers there too ? Counting the mach directories we
+have:
+
+$ ls arch/arm/ | grep mach | wc -l
+64
+
+minus a few duplicates like mach-omap1 and mach-omap2. Still, if we
+count 40 different subarchs and each one of them adds their own pointer
+here, this will become quite a messy piece of code, no ?
+
+I agree we should try to have type checks, but considering the
+possibility of many different pointers, does it really make sense ?
+Nothing against it either, though.
+
 -- 
-1.7.6
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 490 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110802/934e7289/attachment.sig>
