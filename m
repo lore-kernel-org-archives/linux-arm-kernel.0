@@ -1,85 +1,146 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Mon, 1 Aug 2011 15:07:10 +0530
-Subject: [PATCH V2 00/20] dmaengine/amba-pl08x updates
-Message-ID: <cover.1312190881.git.viresh.kumar@st.com>
+Date: Mon, 1 Aug 2011 15:07:12 +0530
+Subject: [PATCH V2 02/20] dmaengine/amba-pl08x: Resolve formatting issues
+In-Reply-To: <cover.1312190881.git.viresh.kumar@st.com>
+References: <cover.1312190881.git.viresh.kumar@st.com>
+Message-ID: <31328fe755a9a5d1d45739e66a58d4e0aef47cb0.1312190881.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+There were few formatting related issues in code. This patch fixes them.
+Fixes include:
+- Remove extra blank lines
+- align code to 80 cols
+- combine several lines to one line
 
-This patchset contains patches for ARM's pl08x DMA controller driver.
-Main changes introduced by this patchset are:
-- Formatting fixes
-- Logical Fixes
-- Support for Peripheral as flow controller
-- Support for sg_len to be greater than 1 for slave transfers
-- Schedule tasklet for error interrupts
-- remove pl08x_pre_boundary() routine
-- support for runtime PM
-- etc
+Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+---
+ drivers/dma/amba-pl08x.c |   41 ++++++++++++++++-------------------------
+ 1 files changed, 16 insertions(+), 25 deletions(-)
 
-This patchset is tested on SPEAr600 for following tests:
-- memory to memory copy (using drivers/dma/dmatest, upto 16 threads per channel)
-- peripheral to memory and vice versa (Peripheral: JPEG)
-
-This was rebased on Vinod's slave-dma.git/next, over following patch:
-
-commit 1ae105aa7416087f2920c35c3cd16831d0d09c9c
-Merge: 02f8c6a 5a42fb9
-Author: Vinod Koul <vinod.koul@intel.com>
-Date:   Wed Jul 27 20:43:21 2011 +0530
-
-    Merge branch 'next' into for-linus-3.0
-
-Changes Since V1:
-- Dropped many formatting fixes which were added earlier, as they made things
-  look even bad.
-- Fixed tabbing issues in PATCH "Add prep_single_byte_llis() routine"
-- Many comments are updated throughout the patchset.
-- Fixed interrupt handler to report spurious interrupt for channels which are
-  not used.
-- Clk enabling/disabling done via runtime PM
-- Complete mask of flow controller is not passed from platform data now,
-  direction is decided at runtime.
-- pl08x_free_txd() called with locks.
-- Two new patches are added:
-  - Rearrange inclusion of header files in ascending order
-  - pass (*ptr) to sizeof() instead of (struct xyz)
-
-
-Hope i haven't missed any review comments.
-
-Viresh Kumar (20):
-  ARM: asm/pl080.h: Protect against multiple inclusion of header file
-  dmaengine/amba-pl08x: Resolve formatting issues
-  dmaengine/amba-pl08x: Rearrange inclusion of header files in
-    ascending order
-  dmaengine/amba-pl08x: pass (*ptr) to sizeof() instead of (struct xyz)
-  dmaengine/amba-pl08x: Complete doc comment for struct pl08x_txd
-  dmaengine/amba-pl08x: Remove redundant comment and rewrite original
-  dmaengine/amba-pl08x: Changing few prints to dev_dbg from dev_info
-  dmaengine/amba-pl08x: support runtime PM
-  dmaengine/amba-pl08x: Simplify pl08x_ensure_on()
-  dmaengine/amba-pl08x: No need to check "ch->signal < 0"
-  dmaengine/amba-pl08x: Schedule tasklet in case of error interrupt
-  dmaengine/amba-pl08x: Get rid of pl08x_pre_boundary()
-  dmaengine/amba-pl08x: max_bytes_per_lli is TRANSFER_SIZE * src_width
-    (not MIN(width))
-  dmaengine/amba-pl08x: Add prep_single_byte_llis() routine
-  dmaengine/amba-pl08x: Align lli_len to max(src.width, dst.width)
-  dmaengine/amba-pl08x: Choose peripheral bus as master bus
-  dmaengine/amba-pl08x: Pass flow controller information with slave
-    channel data
-  dmaengine/amba-pl08x: Add support for sg len greater than one for
-    slave transfers
-  dmaengine/amba-pl08x: Check txd->llis_va before freeing dma_pool
-  dmaengine/amba-pl08x: Call pl08x_free_txd() instead of calling
-    kfree() directly
-
- arch/arm/include/asm/hardware/pl080.h |    4 +
- drivers/dma/amba-pl08x.c              |  623 ++++++++++++++++-----------------
- include/linux/amba/pl08x.h            |   30 ++-
- 3 files changed, 332 insertions(+), 325 deletions(-)
-
+diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
+index 196a737..4c4a309 100644
+--- a/drivers/dma/amba-pl08x.c
++++ b/drivers/dma/amba-pl08x.c
+@@ -125,7 +125,8 @@ struct pl08x_lli {
+  * @phy_chans: array of data for the physical channels
+  * @pool: a pool for the LLI descriptors
+  * @pool_ctr: counter of LLIs in the pool
+- * @lli_buses: bitmask to or in to LLI pointer selecting AHB port for LLI fetches
++ * @lli_buses: bitmask to or in to LLI pointer selecting AHB port for LLI
++ * fetches
+  * @mem_buses: set to indicate memory transfers on AHB2.
+  * @lock: a spinlock for this struct
+  */
+@@ -271,7 +272,6 @@ static void pl08x_resume_phy_chan(struct pl08x_phy_chan *ch)
+ 	writel(val, ch->base + PL080_CH_CONFIG);
+ }
+ 
+-
+ /*
+  * pl08x_terminate_phy_chan() stops the channel, clears the FIFO and
+  * clears any pending interrupt status.  This should not be used for
+@@ -546,7 +546,8 @@ static void pl08x_fill_lli_for_desc(struct pl08x_lli_build_data *bd,
+ 	llis_va[num_llis].cctl = cctl;
+ 	llis_va[num_llis].src = bd->srcbus.addr;
+ 	llis_va[num_llis].dst = bd->dstbus.addr;
+-	llis_va[num_llis].lli = llis_bus + (num_llis + 1) * sizeof(struct pl08x_lli);
++	llis_va[num_llis].lli = llis_bus + (num_llis + 1) *
++		sizeof(struct pl08x_lli);
+ 	llis_va[num_llis].lli |= bd->lli_bus;
+ 
+ 	if (cctl & PL080_CONTROL_SRC_INCR)
+@@ -583,12 +584,10 @@ static int pl08x_fill_llis_for_desc(struct pl08x_driver_data *pl08x,
+ 	struct pl08x_lli_build_data bd;
+ 	int num_llis = 0;
+ 	u32 cctl;
+-	size_t max_bytes_per_lli;
+-	size_t total_bytes = 0;
++	size_t max_bytes_per_lli, total_bytes = 0;
+ 	struct pl08x_lli *llis_va;
+ 
+-	txd->llis_va = dma_pool_alloc(pl08x->pool, GFP_NOWAIT,
+-				      &txd->llis_bus);
++	txd->llis_va = dma_pool_alloc(pl08x->pool, GFP_NOWAIT, &txd->llis_bus);
+ 	if (!txd->llis_va) {
+ 		dev_err(&pl08x->adev->dev, "%s no memory for llis\n", __func__);
+ 		return 0;
+@@ -779,7 +778,6 @@ static int pl08x_fill_llis_for_desc(struct pl08x_driver_data *pl08x,
+ 				total_bytes += lli_len;
+ 			}
+ 
+-
+ 			if (odd_bytes) {
+ 				/*
+ 				 * Creep past the boundary, maintaining
+@@ -916,9 +914,7 @@ static int prep_phy_channel(struct pl08x_dma_chan *plchan,
+ 	 * need, but for slaves the physical signals may be muxed!
+ 	 * Can the platform allow us to use this channel?
+ 	 */
+-	if (plchan->slave &&
+-	    ch->signal < 0 &&
+-	    pl08x->pd->get_signal) {
++	if (plchan->slave && ch->signal < 0 && pl08x->pd->get_signal) {
+ 		ret = pl08x->pd->get_signal(plchan);
+ 		if (ret < 0) {
+ 			dev_dbg(&pl08x->adev->dev,
+@@ -1007,10 +1003,8 @@ static struct dma_async_tx_descriptor *pl08x_prep_dma_interrupt(
+  * If slaves are relying on interrupts to signal completion this function
+  * must not be called with interrupts disabled.
+  */
+-static enum dma_status
+-pl08x_dma_tx_status(struct dma_chan *chan,
+-		    dma_cookie_t cookie,
+-		    struct dma_tx_state *txstate)
++static enum dma_status pl08x_dma_tx_status(struct dma_chan *chan,
++		dma_cookie_t cookie, struct dma_tx_state *txstate)
+ {
+ 	struct pl08x_dma_chan *plchan = to_pl08x_chan(chan);
+ 	dma_cookie_t last_used;
+@@ -1588,8 +1582,8 @@ static void pl08x_tasklet(unsigned long data)
+ 		 */
+ 		list_for_each_entry(waiting, &pl08x->memcpy.channels,
+ 				    chan.device_node) {
+-		  if (waiting->state == PL08X_CHAN_WAITING &&
+-			    waiting->waiting != NULL) {
++			if (waiting->state == PL08X_CHAN_WAITING &&
++				waiting->waiting != NULL) {
+ 				int ret;
+ 
+ 				/* This should REALLY not fail now */
+@@ -1684,9 +1678,7 @@ static void pl08x_dma_slave_init(struct pl08x_dma_chan *chan)
+  * Make a local wrapper to hold required data
+  */
+ static int pl08x_dma_init_virtual_channels(struct pl08x_driver_data *pl08x,
+-					   struct dma_device *dmadev,
+-					   unsigned int channels,
+-					   bool slave)
++		struct dma_device *dmadev, unsigned int channels, bool slave)
+ {
+ 	struct pl08x_dma_chan *chan;
+ 	int i;
+@@ -1836,9 +1828,9 @@ static const struct file_operations pl08x_debugfs_operations = {
+ static void init_pl08x_debugfs(struct pl08x_driver_data *pl08x)
+ {
+ 	/* Expose a simple debugfs interface to view all clocks */
+-	(void) debugfs_create_file(dev_name(&pl08x->adev->dev), S_IFREG | S_IRUGO,
+-				   NULL, pl08x,
+-				   &pl08x_debugfs_operations);
++	(void) debugfs_create_file(dev_name(&pl08x->adev->dev),
++			S_IFREG | S_IRUGO, NULL, pl08x,
++			&pl08x_debugfs_operations);
+ }
+ 
+ #else
+@@ -1973,8 +1965,7 @@ static int pl08x_probe(struct amba_device *adev, const struct amba_id *id)
+ 
+ 	/* Register slave channels */
+ 	ret = pl08x_dma_init_virtual_channels(pl08x, &pl08x->slave,
+-					      pl08x->pd->num_slave_channels,
+-					      true);
++			pl08x->pd->num_slave_channels, true);
+ 	if (ret <= 0) {
+ 		dev_warn(&pl08x->adev->dev,
+ 			"%s failed to enumerate slave channels - %d\n",
 -- 
 1.7.2.2
