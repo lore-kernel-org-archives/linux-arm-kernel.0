@@ -1,33 +1,87 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Mon,  1 Aug 2011 12:42:14 -0400
-Subject: [PATCH] arm: fix compile failure in orion5x/dns323-setup.c
-Message-ID: <1312216934-29710-1-git-send-email-paul.gortmaker@windriver.com>
+From: kyle@moffetthome.net (Kyle Moffett)
+Date: Mon, 1 Aug 2011 12:48:19 -0400
+Subject: [PATCH] Remove remaining references of CONFIG_GENERIC_TIME
+In-Reply-To: <CACqU3MUoxSNmcYsSF4zOTgADdedb7TcciPuBPMviG02M5oUPDQ@mail.gmail.com>
+References: <1312042478-26012-1-git-send-email-zdevai@gmail.com>
+	<20110801083614.GC15578@n2100.arm.linux.org.uk>
+	<CAMuHMdUpTDSRP_JmWqcCBtYwzna0hwmaBshpiF8kgvqoNcqYZA@mail.gmail.com>
+	<20110801101410.GE15578@n2100.arm.linux.org.uk>
+	<CAMuHMdUiLjMVwOqKPF6tHLpPxROrx=rRf3ednfTLrwGuZ2VF7A@mail.gmail.com>
+	<CACqU3MVUxTYmD+4VGBAeN8PTs83fR0xQQrQS5h4QGMZXgMxEvA@mail.gmail.com>
+	<CAGZ=bqL=VAx5jnSBkE2q5KJSY_+An-VRTRAzJmJ3waQUvrRFFg@mail.gmail.com>
+	<CACqU3MUoxSNmcYsSF4zOTgADdedb7TcciPuBPMviG02M5oUPDQ@mail.gmail.com>
+Message-ID: <CAGZ=bqLHjzpKQP63dnSK0fML2ZycmfFnSbiApV4naMCN_UrZdg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Upstream commit d5341942d784134f2997b3ff82cd63cf71d1f932 "PCI: Make the
-struct pci_dev * argument of pci_fixup_irqs const." leaked an extra
-"const" into an actual call site (vs a proto/decl) which causes this:
+On Mon, Aug 1, 2011 at 12:08, Arnaud Lacombe <lacombar@gmail.com> wrote:
+> On Mon, Aug 1, 2011 at 11:15 AM, Kyle Moffett <kyle@moffetthome.net> wrote:
+>> On Mon, Aug 1, 2011 at 11:04, Arnaud Lacombe <lacombar@gmail.com> wrote:
+>>> On Mon, Aug 1, 2011 at 7:27 AM, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+>>>> On Mon, Aug 1, 2011 at 12:14, Russell King - ARM Linux
+>>>>>>[...]
+>>>>>>
+>>>>>> Doesn't kconf error out when trying to select a non-existent symbol?
+>>>>>
+>>>>> Nope.
+>>>>
+>>>> You're right. So that's a bug.
+>>>>
+>>> depends on what you are trying to achieve and what the problem is.
+>>>
+>>> Internally kconfig will create a dummy symbol when it encounter a
+>>> missing symbol so that arch/arm/Kconfig can reference a symbol which
+>>> will be fully defined later on. I do not think you want to forward
+>>> decl all the symbol which can be used. That'd be a mess. That said, we
+>>> can come with a form of symbol deprecation that would error-out when
+>>> used.
+>>
+>> Would it be possible instead to make Kconfig go through all the symbols
+>> after everything is processed and identify any remaining "dummy symbols"
+>> which were not actually declared anywhere?
+>>
+> this is software, everything is possible.
+>
+>> Right now if you typo a "select" statement you get no warnings that you
+>> are selecting something that does not exist, which is probably a cause
+>> of many kinds of errors beyond this particular one.
+>>
+> d'oh! ... I'm not sure we want that. Dummy symbol are heavily used
+> internally, a trivial implementation[0] triggered:
+>
+> % make REGENERATE_PARSERS=y alldefconfig 2>&1 | grep 'defined without
+> type' | wc -l
+> 817
+>
+> Moreover, this approach is deemed to fail. The current symbol
+> namespace is tied to an arch, so whenever you do:
+>
+> arch/arm/Kconfig:
+> config FOO
+> ? ?bool
+>
+> config BAZ
+> ? ?bool
+>
+> drivers/cpufreq/Kconfig
+> config BAR
+> ? ?depends on ARM && FOO
+> ? ?select BAZ
+>
+> You will end up triggering the warning for every ARCH != ARM...
 
-arch/arm/mach-orion5x/dns323-setup.c: In function 'dns323_pci_map_irq':
-arch/arm/mach-orion5x/dns323-setup.c:80: error: expected expression before 'const'
-arch/arm/mach-orion5x/dns323-setup.c:80: error: too few arguments to function 'orion5x_pci_map_irq'
-make[3]: *** [arch/arm/mach-orion5x/dns323-setup.o] Error 1
+Perhaps that's an argument for building a single Kconfig namespace?
+At the very least, most of the architecture-generic warnings could be
+worked around with trivial predeclarations in an "arch/Kconfig" file:
 
-Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+config ARM
+        bool
+[...]
+config X86
+        bool
 
-diff --git a/arch/arm/mach-orion5x/dns323-setup.c b/arch/arm/mach-orion5x/dns323-setup.c
-index a6eddae..c105556 100644
---- a/arch/arm/mach-orion5x/dns323-setup.c
-+++ b/arch/arm/mach-orion5x/dns323-setup.c
-@@ -77,7 +77,7 @@ static int __init dns323_pci_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
- 	/*
- 	 * Check for devices with hard-wired IRQs.
- 	 */
--	irq = orion5x_pci_map_irq(const dev, slot, pin);
-+	irq = orion5x_pci_map_irq(dev, slot, pin);
- 	if (irq != -1)
- 		return irq;
- 
--- 
-1.7.6
+There's probably technical issues that I'm missing that would make
+that inordinately painful, but I can't see them right now... any ideas?
+
+Cheers,
+Kyle Moffett
