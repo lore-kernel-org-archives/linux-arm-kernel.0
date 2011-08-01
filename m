@@ -1,7 +1,9 @@
 From: jamie@jamieiles.com (Jamie Iles)
-Date: Mon,  1 Aug 2011 13:31:02 +0100
-Subject: [PATCH 1/9] davinci: make __arch_ioremap() with 0 size return NULL
-Message-ID: <1312201870-12921-1-git-send-email-jamie@jamieiles.com>
+Date: Mon,  1 Aug 2011 13:31:03 +0100
+Subject: [PATCH 2/9] ebsa110: make __arch_ioremap() with 0 size return NULL
+In-Reply-To: <1312201870-12921-1-git-send-email-jamie@jamieiles.com>
+References: <1312201870-12921-1-git-send-email-jamie@jamieiles.com>
+Message-ID: <1312201870-12921-2-git-send-email-jamie@jamieiles.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -9,26 +11,25 @@ Without __arch_ioremap(), __get_vm_area_node() with a zero size will
 return a NULL pointer.  Make the arch specific ioremap() do the same
 thing.
 
-Cc: Sekhar Nori <nsekhar@ti.com> (supporter:TI DAVINCI MACHIN...)
-Cc: Kevin Hilman <khilman@ti.com> (supporter:TI DAVINCI MACHIN...)
+Cc: Russell King <linux@arm.linux.org.uk>
 Signed-off-by: Jamie Iles <jamie@jamieiles.com>
 ---
- arch/arm/mach-davinci/io.c |    3 +++
+ arch/arm/mach-ebsa110/include/mach/io.h |    3 +++
  1 files changed, 3 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/io.c b/arch/arm/mach-davinci/io.c
-index 8ea60a8..4eb169b 100644
---- a/arch/arm/mach-davinci/io.c
-+++ b/arch/arm/mach-davinci/io.c
-@@ -25,6 +25,9 @@ void __iomem *davinci_ioremap(unsigned long p, size_t size, unsigned int type)
- 	int desc_num = davinci_soc_info.io_desc_num;
- 	int i;
- 
+diff --git a/arch/arm/mach-ebsa110/include/mach/io.h b/arch/arm/mach-ebsa110/include/mach/io.h
+index f68daa63..d8dc6ee 100644
+--- a/arch/arm/mach-ebsa110/include/mach/io.h
++++ b/arch/arm/mach-ebsa110/include/mach/io.h
+@@ -67,6 +67,9 @@ void __writel(u32 val, void __iomem *addr);
+ static inline void __iomem *__arch_ioremap(unsigned long cookie, size_t size,
+ 					   unsigned int flags)
+ {
 +	if (!size)
 +		return NULL;
 +
- 	for (i = 0; i < desc_num; i++, desc++) {
- 		unsigned long iophys = __pfn_to_phys(desc->pfn);
- 		unsigned long iosize = desc->length;
+ 	return (void __iomem *)cookie;
+ }
+ 
 -- 
 1.7.4.1
