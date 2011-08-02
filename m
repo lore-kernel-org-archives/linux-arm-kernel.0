@@ -1,66 +1,42 @@
-From: m.kloucek.m@gmail.com (=?UTF-8?B?TWlsb8WhIEd5bVJL?=)
-Date: Tue, 2 Aug 2011 23:18:02 +0200
-Subject: pandaboard brctl oops
-In-Reply-To: <4E375FD6.4090404@cn.fujitsu.com>
-References: <201108012325.17312.marek.vasut@gmail.com>
-	<4E375FD6.4090404@cn.fujitsu.com>
-Message-ID: <CAPOFEBOnaqn_gaGNu33_JhiEtGo8R_jyjkHCTLv02KmnbhvzmQ@mail.gmail.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Wed,  3 Aug 2011 00:08:25 +0100
+Subject: [PATCH 0/4] Add device tree enabled Exynos4 machine
+Message-ID: <1312326509-2723-1-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/2/11, Shan Wei <shanwei@cn.fujitsu.com> wrote:
-> hi
->
-> Marek Vasut wrote, at 08/02/2011 05:25 AM:
->> Hi,
->>
->> recently a friend of mine sent me this backtrace. I put him in CC so
->> please any
->> subsequent questions shall be forwarded to him.
->>
->> He claims this happens on pandaboard.
->>
->> Cheers
->>
->> root at box:~# brctl addif br0 eth0
->> [   77.795776] Unable to handle kernel NULL pointer dereference at virtual
->>
->> address 00000000
->> [   77.804321] pgd = ee8d4000
->> [   77.807312] [00000000] *pgd=af8e6831, *pte=00000000, *ppte=00000000
->> [   77.813995] Internal error: Oops: 80000007 [#1] SMP
->> [   77.819122] last sysfs file: /sys/devices/virtual/net/br0/uevent
->> [   77.825439] Modules linked in: bridge stp llc wl12xx_sdio wl12xx
->> [   77.831787] CPU: 0    Not tainted  (2.6.39.2-omap4 #3)
->> [   77.837188] PC is at 0x0
->> [   77.839904] LR is at br_change_mtu+0x64/0x7c [bridge]
->
-> This one has been fixed in latest kernel.
->
-> commit 6407d74c5106bb362b4087693688afd34942b094
-> Author: Alexander Holler <holler@ahsoftware.de>
-> Date:   Tue Jun 7 00:51:35 2011 -0700
->
->     bridge: provide a cow_metrics method for fake_ops
->
->     Like in commit 0972ddb237 (provide cow_metrics() methods to blackhole
->     dst_ops), we must provide a cow_metrics for bridges fake_dst_ops as
->     well.
->
->     This fixes a regression coming from commits 62fa8a846d7d (net: Implement
->     read-only protection and COW'ing of metrics.) and 33eb9873a28 (bridge:
->     initialize fake_rtable metrics)
->
->     ip link set mybridge mtu 1234
->
-> --
-> Best Regards
-> -----
-> Shan Wei
->
+This patchset adds a basic device tree enabled machine for Samsung's Exynos4
+processor. This enables further development of device tree coverge for
+Exynos4. A basic device tree source file for Exynos4 processor and the
+smdkv310 board is also included.
 
-I expected something rare or architecture-dependent, because I had no
-problems when adding wlan0 to the bridge
+The device tree enabled machine has been boot tested till serial console.
+The watchdog driver is probed with information from dtb.
 
-Chery-picking the commit indeed fixed the problem
-thanks for such quick reply
+Notes:
+- The interrupt controller device tree bindings are not documented yet. That
+  is because, it will be replaced with a new irq_domain support soon.
+
+
+Thomas Abraham (4):
+  serial: samsung: Keep a copy of the location of platform data in driver's private data
+  serial: s5pv210: Add device tree support
+  arm: exynos4: Add a new Exynos4 device tree enabled machine
+  arm: dts: Add device tree source file for Exynos4 platforms
+
+ Documentation/devicetree/bindings/arm/samsung.txt  |    8 ++
+ .../devicetree/bindings/serial/samsung_uart.txt    |   16 ++++
+ arch/arm/boot/dts/exynos4-smdkv310.dts             |   31 +++++++
+ arch/arm/boot/dts/exynos4.dtsi                     |   72 +++++++++++++++++
+ arch/arm/mach-exynos4/Kconfig                      |   10 +++
+ arch/arm/mach-exynos4/Makefile                     |    1 +
+ arch/arm/mach-exynos4/mach-exynos4-dt.c            |   84 ++++++++++++++++++++
+ drivers/tty/serial/s5pv210.c                       |   55 ++++++++++++-
+ drivers/tty/serial/samsung.c                       |   19 ++++-
+ drivers/tty/serial/samsung.h                       |    4 +-
+ 10 files changed, 292 insertions(+), 8 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/samsung.txt
+ create mode 100644 Documentation/devicetree/bindings/serial/samsung_uart.txt
+ create mode 100644 arch/arm/boot/dts/exynos4-smdkv310.dts
+ create mode 100644 arch/arm/boot/dts/exynos4.dtsi
+ create mode 100644 arch/arm/mach-exynos4/mach-exynos4-dt.c
