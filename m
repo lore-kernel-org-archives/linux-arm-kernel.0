@@ -1,45 +1,37 @@
-From: julia@diku.dk (Julia Lawall)
-Date: Tue,  2 Aug 2011 12:34:56 +0200
-Subject: [PATCH 3/11] arch/arm/mach-s3c64xx/dma.c: trivial: use BUG_ON
-In-Reply-To: <1312281304-11847-1-git-send-email-julia@diku.dk>
-References: <1312281304-11847-1-git-send-email-julia@diku.dk>
-Message-ID: <1312281304-11847-4-git-send-email-julia@diku.dk>
+From: tiwai@suse.de (Takashi Iwai)
+Date: Tue, 02 Aug 2011 12:38:59 +0200
+Subject: [alsa-devel] [PATCH 1/1] ASoC: core: cache index fix
+In-Reply-To: <20110802095141.GA2095@pengutronix.de>
+References: <1312198690-13237-1-git-send-email-b29396@freescale.com>
+	<20110801115150.GB16629@opensource.wolfsonmicro.com>
+	<65EE16ACC360FA4D99C96DC085B3F7721F410B@039-SN1MPN1-002.039d.mgd.msft.net>
+	<20110802083850.GB9553@opensource.wolfsonmicro.com>
+	<20110802095141.GA2095@pengutronix.de>
+Message-ID: <s5hvcugnlmk.wl%tiwai@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Julia Lawall <julia@diku.dk>
+At Tue, 2 Aug 2011 11:51:41 +0200,
+Wolfram Sang wrote:
+> 
+> @@ -1023,12 +981,10 @@ static int sgtl5000_suspend(struct snd_soc_codec *codec, pm_message_t state)
+>  static int sgtl5000_restore_regs(struct snd_soc_codec *codec)
+>  {
+>  	u16 *cache = codec->reg_cache;
+> -	int i;
+> -	int regular_regs = SGTL5000_CHIP_SHORT_CTRL >> 1;
+> +	u16 reg;
+>  
+>  	/* restore regular registers */
+> -	for (i = 0; i < regular_regs; i++) {
+> -		int reg = i << 1;
+> +	for (reg = 0; reg <= SGTL5000_CHIP_SHORT_CTRL; reg += 2) {
 
-Use BUG_ON(x) rather than if(x) BUG();
+Heh, this exposed another bug in the original code :)
+It should have been
+	for (i = 0; i <= regular_regs; i++) {
 
-The semantic patch that fixes this problem is as follows:
-(http://coccinelle.lip6.fr/)
 
-// <smpl>
-@@ identifier x; @@
--if (x) BUG();
-+BUG_ON(x);
+thanks,
 
-@@ identifier x; @@
--if (!x) BUG();
-+BUG_ON(!x);
-// </smpl>
-
-Signed-off-by: Julia Lawall <julia@diku.dk>
-
----
- arch/arm/mach-s3c64xx/dma.c |    3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
-
-diff -u -p a/arch/arm/mach-s3c64xx/dma.c b/arch/arm/mach-s3c64xx/dma.c
---- a/arch/arm/mach-s3c64xx/dma.c
-+++ b/arch/arm/mach-s3c64xx/dma.c
-@@ -603,8 +603,7 @@ static irqreturn_t s3c64xx_dma_irq(int i
- 				&& buff->next != chan->next)
- 			buff = buff->next;
- 
--		if (!buff)
--			BUG();
-+		BUG_ON(!buff);
- 
- 		if (buff == chan->next)
- 			buff = chan->end;
+Takashi
