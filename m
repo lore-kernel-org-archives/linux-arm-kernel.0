@@ -1,83 +1,55 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 2 Aug 2011 11:05:38 +0200
-Subject: [PATCH 07/18] dmaengine/amba-pl08x: Enable/Disable amba_pclk with
-	channel requests
-In-Reply-To: <20110731170451.GC2975@n2100.arm.linux.org.uk>
-References: <cover.1311936523.git.viresh.kumar@st.com>
-	<96781d46e41fa6ffc04b88527a25d73f5a59eda8.1311936524.git.viresh.kumar@st.com>
-	<20110730120740.GA15791@n2100.arm.linux.org.uk>
-	<20110730130537.GB15791@n2100.arm.linux.org.uk>
-	<CAKnu2MqTYF43wW3axM--jXdtvsCyRBTLEHDc3hPoJYAmTAL5UA@mail.gmail.com>
-	<CAKnu2MppEKxZD2Z77tfShMfG80d-Xx26yBGhZtJkJ2C6SjE=1w@mail.gmail.com>
-	<20110731170451.GC2975@n2100.arm.linux.org.uk>
-Message-ID: <CACRpkdZTsD=7woN1qV-sFpsJTyT0LQBq+q=xTOwuewAk=ijBjQ@mail.gmail.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Tue,  2 Aug 2011 11:29:24 +0200
+Subject: [PATCH] spi/pl022: remove function cannot exit
+Message-ID: <1312277364-12945-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 31, 2011 at 7:04 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Sun, Jul 31, 2011 at 02:04:47AM +0200, Linus Walleij wrote:
->>
->> ..and while it will just cause some double refcounts on the clock,
->> it makes sense to delete the pclk manipulation from the PL022
->> driver code as part of the patch, like this:
->
-> Yes, this looks fine. ?Shall I wrap it up as part of my patch?
+From: Linus Walleij <linus.walleij@linaro.org>
 
-Yes please.
-Acked-by.
+The remove function in the PL022 driver cannot abort the remove
+function any way, so restructure the code so as not to make that
+assumption. Remove will now proceed no matter whether it can
+stop the transfer queue or not.
 
-> Two other things I've spotted in this driver are:
->
-> 1. The remove function doesn't undo what the probe function did to
-> the pclk and vcore. ?It needs to keep things balanced. ?For a driver
-> which doesn't manage its pclk, this is what happens:
-> ? ? ? ?- core gets pclk
-> ? ? ? ?- core enables pclk
-> ? ? ? ?- core calls driver's probe
-> ? ? ? ? ? ? ? ?- driver sets stuff up
-> ...
-> ? ? ? ?- core calls driver's remove
-> ? ? ? ? ? ? ? ?- driver tidies up
-> ? ? ? ?- core disables pclk
-> ? ? ? ?- core puts pclk
->
-> And PL022 does this:
-> ? ? ? ?- core gets pclk
-> ? ? ? ?- core enables pclk
-> ? ? ? ?- core calls driver's probe
-> ? ? ? ? ? ? ? ?- driver sets stuff up
-> ? ? ? ? ? ? ? ?- driver disables pclk
-> ...
-> ? ? ? ?- core calls driver's remove
-> ? ? ? ? ? ? ? ?- driver tidies up
-> ? ? ? ?- core disables pclk
-> ? ? ? ?- core puts pclk
->
-> Notice the double-disable of pclk in that sequence. ?If ->probe disables
-> pclk, ->remove needs to return with that disable balanced with an enable.
+Reported-by: Russell King <linux@arm.linux.org.uk>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/spi/spi-pl022.c |   11 +++--------
+ 1 files changed, 3 insertions(+), 8 deletions(-)
 
-Ah yes. Can you fix this as part of the patch since it's pretty related?
-Much appreciated if you do.
-
-> 2. It thinks it can refuse 'remove' by returning an error code. ?This
-> is false. ?removes can't be aborted - here's the code from drivers/base/dd.c:
->
-> static void __device_release_driver(struct device *dev)
-> {
-> ...
-> ? ? ? ? ? ? ? ?if (dev->bus && dev->bus->remove)
-> ? ? ? ? ? ? ? ? ? ? ? ?dev->bus->remove(dev);
-> ? ? ? ? ? ? ? ?else if (drv->remove)
-> ? ? ? ? ? ? ? ? ? ? ? ?drv->remove(dev);
-> ...
-> }
->
-> Notice how return codes go nowhere. ?remove should _really_ be a void
-> function to stop people thinking that it can be aborted. ?It can't.
-
-Correct, thanks for spotting this. I'll send a separate patch to Grant
-fixing this up.
-
-Yours,
-Linus Walleij
+diff --git a/drivers/spi/spi-pl022.c b/drivers/spi/spi-pl022.c
+index eba88c7..730b4a3 100644
+--- a/drivers/spi/spi-pl022.c
++++ b/drivers/spi/spi-pl022.c
+@@ -2267,17 +2267,13 @@ static int __devexit
+ pl022_remove(struct amba_device *adev)
+ {
+ 	struct pl022 *pl022 = amba_get_drvdata(adev);
+-	int status = 0;
++
+ 	if (!pl022)
+ 		return 0;
+ 
+ 	/* Remove the queue */
+-	status = destroy_queue(pl022);
+-	if (status != 0) {
+-		dev_err(&adev->dev,
+-			"queue remove failed (%d)\n", status);
+-		return status;
+-	}
++	if (destroy_queue(pl022) != 0)
++		dev_err(&adev->dev, "queue remove failed\n");
+ 	load_ssp_default_config(pl022);
+ 	pl022_dma_remove(pl022);
+ 	free_irq(adev->irq[0], pl022);
+@@ -2289,7 +2285,6 @@ pl022_remove(struct amba_device *adev)
+ 	spi_unregister_master(pl022->master);
+ 	spi_master_put(pl022->master);
+ 	amba_set_drvdata(adev, NULL);
+-	dev_dbg(&adev->dev, "remove succeeded\n");
+ 	return 0;
+ }
+ 
+-- 
+1.7.6
