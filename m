@@ -1,115 +1,221 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 2 Aug 2011 15:53:51 +0800
-Subject: [PATCH v3 1/2] arm/mx5: add device tree support for imx53 boards
-In-Reply-To: <20110802065814.GM31404@pengutronix.de>
-References: <1312226252-8566-1-git-send-email-shawn.guo@linaro.org>
-	<1312226252-8566-2-git-send-email-shawn.guo@linaro.org>
-	<20110802065814.GM31404@pengutronix.de>
-Message-ID: <20110802075351.GB17297@freescale.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Tue,  2 Aug 2011 19:42:19 +0200
+Subject: [PATCH RESEND] ASoC: sgtl5000: fix cache handling
+Message-ID: <1312306939-5140-1-git-send-email-w.sang@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 02, 2011 at 08:58:14AM +0200, Sascha Hauer wrote:
-> On Tue, Aug 02, 2011 at 03:17:31AM +0800, Shawn Guo wrote:
-> > From: Shawn Guo <shawn.guo@freescale.com>
-> > 
-> > It adds device tree support for imx53 boards.
-> > 
-> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > Cc: Grant Likely <grant.likely@secretlab.ca>
-> > Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> > ---
-> >  .../devicetree/bindings/arm/fsl/boards.txt         |   15 ++
-> >  arch/arm/boot/dts/imx53-ard.dts                    |  158 +++++++++++++
-> >  arch/arm/boot/dts/imx53-evk.dts                    |  144 ++++++++++++
-> >  arch/arm/boot/dts/imx53-qsb.dts                    |  148 ++++++++++++
-> >  arch/arm/boot/dts/imx53-smd.dts                    |  169 ++++++++++++++
-> >  arch/arm/boot/dts/imx53.dtsi                       |  244 ++++++++++++++++++++
-> >  arch/arm/mach-mx5/Kconfig                          |   12 +
-> >  arch/arm/mach-mx5/Makefile                         |    2 +
-> >  arch/arm/mach-mx5/board-mx53_ard.c                 |    9 +-
-> >  arch/arm/mach-mx5/board-mx53_evk.c                 |    5 +
-> >  arch/arm/mach-mx5/board-mx53_loco.c                |    5 +
-> >  arch/arm/mach-mx5/board-mx53_smd.c                 |    5 +
-> >  arch/arm/mach-mx5/imx53-dt.c                       |  143 ++++++++++++
-> >  arch/arm/plat-mxc/include/mach/common.h            |    2 +
-> >  arch/arm/plat-mxc/include/mach/iomux-mx53.h        |    5 +
-> >  arch/arm/plat-mxc/include/mach/iomux-v3.h          |    5 +
-> >  16 files changed, 1069 insertions(+), 2 deletions(-)
-> >  create mode 100644 Documentation/devicetree/bindings/arm/fsl/boards.txt
-> >  create mode 100644 arch/arm/boot/dts/imx53-ard.dts
-> >  create mode 100644 arch/arm/boot/dts/imx53-evk.dts
-> >  create mode 100644 arch/arm/boot/dts/imx53-qsb.dts
-> >  create mode 100644 arch/arm/boot/dts/imx53-smd.dts
-> >  create mode 100644 arch/arm/boot/dts/imx53.dtsi
-> >  create mode 100644 arch/arm/mach-mx5/imx53-dt.c
-> 
-> I noticed that the iomux setup is gone for now which makes me very
-> happy :) I didn't have a good feeling about this.
-> 
+Cache handling in this driver is broken. The chip has 16-bit registers, yet the
+register numbers also increase by 2 per register, i.e.  there are only
+even-numbered registers. The cache in this driver, though, simply increments
+register numbers, so it does need some mapping as seen in
+sgtl5000_restore_regs(), note the '>> 1':
 
-But it's just for now :)  We anyway need to set it up from device tree
-sooner or later.
+	snd_soc_write(codec, SGTL5000_CHIP_LINREG_CTRL,
+                        cache[SGTL5000_CHIP_LINREG_CTRL >> 1]);
 
-> > 
-> > diff --git a/arch/arm/boot/dts/imx53-ard.dts b/arch/arm/boot/dts/imx53-ard.dts
-> > new file mode 100644
-> > index 0000000..fd0cf2c
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/imx53-ard.dts
-> > @@ -0,0 +1,158 @@
-> > +/*
-> > + * Copyright 2011 Freescale Semiconductor, Inc.
-> > + * Copyright 2011 Linaro Ltd.
-> > + *
-> > + * The code contained herein is licensed under the GNU General Public
-> > + * License. You may obtain a copy of the GNU General Public License
-> > + * Version 2 or later at the following locations:
-> > + *
-> > + * http://www.opensource.org/licenses/gpl-license.html
-> > + * http://www.gnu.org/copyleft/gpl.html
-> > + */
-> > +
-> > +/dts-v1/;
-> > +/include/ "imx53.dtsi"
-> > +
-> > +/ {
-> > +	model = "Freescale i.MX53 Automotive Reference Design Board";
-> > +	compatible = "fsl,imx53-ard", "fsl,imx53";
-> > +
-> > +	chosen {
-> > +		bootargs = "console=ttymxc0,115200 root=/dev/mmcblk0p3 rootwait";
-> > +	};
-> > +
-> > +	memory {
-> > +		reg = <0x70000000 0x40000000>;
-> > +	};
-> > +
-> > +	aips at 50000000 { /* AIPS1 */
-> > +		spba at 50000000 {
-> > +			esdhc at 50004000 { /* ESDHC1 */
-> > +				cd-gpios = <&gpio0 1 0>; /* GPIO1_1 */
-> > +				wp-gpios = <&gpio0 9 0>; /* GPIO1_9 */
-> > +			};
-> > +
-> > +			esdhc at 50008000 { /* ESDHC2 */
-> > +				status = "disabled";
-> > +			};
-> 
-> I know the decision is that all devices are enabled by default and must
-> be explicitely disabled like this. I really hope we can change this in
-> the future for the following reasons:
-> 
-> - The imx53 device tree is not complete, several devices like nand, ipu
->   and rtc are missing. Now when imx53.dtsi gets the nand device, all
->   board devicetrees have to be changed to keep the old behaviour.
-> - Most enabled device entries like the esdhc1 above have additional
->   nodes like cd-gpios anyway, so they must appear in the board tree
->   whereas the disabled devices just add additional churn.
-> 
-I have your back on this point.  Let's give one more try to change
-Grant's mind.
+That, of course, won't work with snd_soc_update_bits(). (Thus, we won't even
+notice the missing register 0x1c in the default regs which shifted all follwing
+registers to wrong values.) Noticed on the MX28EVK where enabling the regulators
+simply locked up the chip.
 
+Refactor the routines and use a properly sized default_regs array which matches
+the register layout of the underlying chip, i.e. create a truly flat cache.
+This also saves some code which should make up for the bigger array a little.
+When soc-core will somewhen have another cache type which handles a step size,
+this conversion will also ease the transition.
+
+Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
+Tested-by: Dong Aisheng <b29396@freescale.com>
+Tested-by: Shawn Guo <shawn.guo@linaro.org>
+Cc: Zeng Zhaoming <b32542@freescale.com>
+Cc: Liam Girdwood <lrg@ti.com>
+Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+---
+
+Resending as suggested in a previous thread.
+
+ sound/soc/codecs/sgtl5000.c |  128 ++++++++++++-------------------------------
+ 1 files changed, 35 insertions(+), 93 deletions(-)
+
+diff --git a/sound/soc/codecs/sgtl5000.c b/sound/soc/codecs/sgtl5000.c
+index 76258f2..7e4066e 100644
+--- a/sound/soc/codecs/sgtl5000.c
++++ b/sound/soc/codecs/sgtl5000.c
+@@ -33,73 +33,31 @@
+ #define SGTL5000_DAP_REG_OFFSET	0x0100
+ #define SGTL5000_MAX_REG_OFFSET	0x013A
+ 
+-/* default value of sgtl5000 registers except DAP */
+-static const u16 sgtl5000_regs[SGTL5000_MAX_REG_OFFSET >> 1] =  {
+-	0xa011, /* 0x0000, CHIP_ID. 11 stand for revison 17 */
+-	0x0000, /* 0x0002, CHIP_DIG_POWER. */
+-	0x0008, /* 0x0004, CHIP_CKL_CTRL */
+-	0x0010, /* 0x0006, CHIP_I2S_CTRL */
+-	0x0000, /* 0x0008, reserved */
+-	0x0008, /* 0x000A, CHIP_SSS_CTRL */
+-	0x0000, /* 0x000C, reserved */
+-	0x020c, /* 0x000E, CHIP_ADCDAC_CTRL */
+-	0x3c3c, /* 0x0010, CHIP_DAC_VOL */
+-	0x0000, /* 0x0012, reserved */
+-	0x015f, /* 0x0014, CHIP_PAD_STRENGTH */
+-	0x0000, /* 0x0016, reserved */
+-	0x0000, /* 0x0018, reserved */
+-	0x0000, /* 0x001A, reserved */
+-	0x0000, /* 0x001E, reserved */
+-	0x0000, /* 0x0020, CHIP_ANA_ADC_CTRL */
+-	0x1818, /* 0x0022, CHIP_ANA_HP_CTRL */
+-	0x0111, /* 0x0024, CHIP_ANN_CTRL */
+-	0x0000, /* 0x0026, CHIP_LINREG_CTRL */
+-	0x0000, /* 0x0028, CHIP_REF_CTRL */
+-	0x0000, /* 0x002A, CHIP_MIC_CTRL */
+-	0x0000, /* 0x002C, CHIP_LINE_OUT_CTRL */
+-	0x0404, /* 0x002E, CHIP_LINE_OUT_VOL */
+-	0x7060, /* 0x0030, CHIP_ANA_POWER */
+-	0x5000, /* 0x0032, CHIP_PLL_CTRL */
+-	0x0000, /* 0x0034, CHIP_CLK_TOP_CTRL */
+-	0x0000, /* 0x0036, CHIP_ANA_STATUS */
+-	0x0000, /* 0x0038, reserved */
+-	0x0000, /* 0x003A, CHIP_ANA_TEST2 */
+-	0x0000, /* 0x003C, CHIP_SHORT_CTRL */
+-	0x0000, /* reserved */
+-};
+-
+-/* default value of dap registers */
+-static const u16 sgtl5000_dap_regs[] = {
+-	0x0000, /* 0x0100, DAP_CONTROL */
+-	0x0000, /* 0x0102, DAP_PEQ */
+-	0x0040, /* 0x0104, DAP_BASS_ENHANCE */
+-	0x051f, /* 0x0106, DAP_BASS_ENHANCE_CTRL */
+-	0x0000, /* 0x0108, DAP_AUDIO_EQ */
+-	0x0040, /* 0x010A, DAP_SGTL_SURROUND */
+-	0x0000, /* 0x010C, DAP_FILTER_COEF_ACCESS */
+-	0x0000, /* 0x010E, DAP_COEF_WR_B0_MSB */
+-	0x0000, /* 0x0110, DAP_COEF_WR_B0_LSB */
+-	0x0000, /* 0x0112, reserved */
+-	0x0000, /* 0x0114, reserved */
+-	0x002f, /* 0x0116, DAP_AUDIO_EQ_BASS_BAND0 */
+-	0x002f, /* 0x0118, DAP_AUDIO_EQ_BAND0 */
+-	0x002f, /* 0x011A, DAP_AUDIO_EQ_BAND2 */
+-	0x002f, /* 0x011C, DAP_AUDIO_EQ_BAND3 */
+-	0x002f, /* 0x011E, DAP_AUDIO_EQ_TREBLE_BAND4 */
+-	0x8000, /* 0x0120, DAP_MAIN_CHAN */
+-	0x0000, /* 0x0122, DAP_MIX_CHAN */
+-	0x0510, /* 0x0124, DAP_AVC_CTRL */
+-	0x1473, /* 0x0126, DAP_AVC_THRESHOLD */
+-	0x0028, /* 0x0128, DAP_AVC_ATTACK */
+-	0x0050, /* 0x012A, DAP_AVC_DECAY */
+-	0x0000, /* 0x012C, DAP_COEF_WR_B1_MSB */
+-	0x0000, /* 0x012E, DAP_COEF_WR_B1_LSB */
+-	0x0000, /* 0x0130, DAP_COEF_WR_B2_MSB */
+-	0x0000, /* 0x0132, DAP_COEF_WR_B2_LSB */
+-	0x0000, /* 0x0134, DAP_COEF_WR_A1_MSB */
+-	0x0000, /* 0x0136, DAP_COEF_WR_A1_LSB */
+-	0x0000, /* 0x0138, DAP_COEF_WR_A2_MSB */
+-	0x0000, /* 0x013A, DAP_COEF_WR_A2_LSB */
++/* default value of sgtl5000 registers */
++static const u16 sgtl5000_regs[SGTL5000_MAX_REG_OFFSET] =  {
++	[SGTL5000_CHIP_CLK_CTRL] = 0x0008,
++	[SGTL5000_CHIP_I2S_CTRL] = 0x0010,
++	[SGTL5000_CHIP_SSS_CTRL] = 0x0008,
++	[SGTL5000_CHIP_DAC_VOL] = 0x3c3c,
++	[SGTL5000_CHIP_PAD_STRENGTH] = 0x015f,
++	[SGTL5000_CHIP_ANA_HP_CTRL] = 0x1818,
++	[SGTL5000_CHIP_ANA_CTRL] = 0x0111,
++	[SGTL5000_CHIP_LINE_OUT_VOL] = 0x0404,
++	[SGTL5000_CHIP_ANA_POWER] = 0x7060,
++	[SGTL5000_CHIP_PLL_CTRL] = 0x5000,
++	[SGTL5000_DAP_BASS_ENHANCE] = 0x0040,
++	[SGTL5000_DAP_BASS_ENHANCE_CTRL] = 0x051f,
++	[SGTL5000_DAP_SURROUND] = 0x0040,
++	[SGTL5000_DAP_EQ_BASS_BAND0] = 0x002f,
++	[SGTL5000_DAP_EQ_BASS_BAND1] = 0x002f,
++	[SGTL5000_DAP_EQ_BASS_BAND2] = 0x002f,
++	[SGTL5000_DAP_EQ_BASS_BAND3] = 0x002f,
++	[SGTL5000_DAP_EQ_BASS_BAND4] = 0x002f,
++	[SGTL5000_DAP_MAIN_CHAN] = 0x8000,
++	[SGTL5000_DAP_AVC_CTRL] = 0x0510,
++	[SGTL5000_DAP_AVC_THRESHOLD] = 0x1473,
++	[SGTL5000_DAP_AVC_ATTACK] = 0x0028,
++	[SGTL5000_DAP_AVC_DECAY] = 0x0050,
+ };
+ 
+ /* regulator supplies for sgtl5000, VDDD is an optional external supply */
+@@ -1023,12 +981,10 @@ static int sgtl5000_suspend(struct snd_soc_codec *codec, pm_message_t state)
+ static int sgtl5000_restore_regs(struct snd_soc_codec *codec)
+ {
+ 	u16 *cache = codec->reg_cache;
+-	int i;
+-	int regular_regs = SGTL5000_CHIP_SHORT_CTRL >> 1;
++	u16 reg;
+ 
+ 	/* restore regular registers */
+-	for (i = 0; i < regular_regs; i++) {
+-		int reg = i << 1;
++	for (reg = 0; reg <= SGTL5000_CHIP_SHORT_CTRL; reg += 2) {
+ 
+ 		/* this regs depends on the others */
+ 		if (reg == SGTL5000_CHIP_ANA_POWER ||
+@@ -1038,35 +994,31 @@ static int sgtl5000_restore_regs(struct snd_soc_codec *codec)
+ 			reg == SGTL5000_CHIP_CLK_CTRL)
+ 			continue;
+ 
+-		snd_soc_write(codec, reg, cache[i]);
++		snd_soc_write(codec, reg, cache[reg]);
+ 	}
+ 
+ 	/* restore dap registers */
+-	for (i = SGTL5000_DAP_REG_OFFSET >> 1;
+-			i < SGTL5000_MAX_REG_OFFSET >> 1; i++) {
+-		int reg = i << 1;
+-
+-		snd_soc_write(codec, reg, cache[i]);
+-	}
++	for (reg = SGTL5000_DAP_REG_OFFSET; reg < SGTL5000_MAX_REG_OFFSET; reg += 2)
++		snd_soc_write(codec, reg, cache[reg]);
+ 
+ 	/*
+ 	 * restore power and other regs according
+ 	 * to set_power() and set_clock()
+ 	 */
+ 	snd_soc_write(codec, SGTL5000_CHIP_LINREG_CTRL,
+-			cache[SGTL5000_CHIP_LINREG_CTRL >> 1]);
++			cache[SGTL5000_CHIP_LINREG_CTRL]);
+ 
+ 	snd_soc_write(codec, SGTL5000_CHIP_ANA_POWER,
+-			cache[SGTL5000_CHIP_ANA_POWER >> 1]);
++			cache[SGTL5000_CHIP_ANA_POWER]);
+ 
+ 	snd_soc_write(codec, SGTL5000_CHIP_CLK_CTRL,
+-			cache[SGTL5000_CHIP_CLK_CTRL >> 1]);
++			cache[SGTL5000_CHIP_CLK_CTRL]);
+ 
+ 	snd_soc_write(codec, SGTL5000_CHIP_REF_CTRL,
+-			cache[SGTL5000_CHIP_REF_CTRL >> 1]);
++			cache[SGTL5000_CHIP_REF_CTRL]);
+ 
+ 	snd_soc_write(codec, SGTL5000_CHIP_LINE_OUT_CTRL,
+-			cache[SGTL5000_CHIP_LINE_OUT_CTRL >> 1]);
++			cache[SGTL5000_CHIP_LINE_OUT_CTRL]);
+ 	return 0;
+ }
+ 
+@@ -1454,16 +1406,6 @@ static __devinit int sgtl5000_i2c_probe(struct i2c_client *client,
+ 	if (!sgtl5000)
+ 		return -ENOMEM;
+ 
+-	/*
+-	 * copy DAP default values to default value array.
+-	 * sgtl5000 register space has a big hole, merge it
+-	 * at init phase makes life easy.
+-	 * FIXME: should we drop 'const' of sgtl5000_regs?
+-	 */
+-	memcpy((void *)(&sgtl5000_regs[0] + (SGTL5000_DAP_REG_OFFSET >> 1)),
+-			sgtl5000_dap_regs,
+-			SGTL5000_MAX_REG_OFFSET - SGTL5000_DAP_REG_OFFSET);
+-
+ 	i2c_set_clientdata(client, sgtl5000);
+ 
+ 	ret = snd_soc_register_codec(&client->dev,
 -- 
-Regards,
-Shawn
+1.7.2.5
