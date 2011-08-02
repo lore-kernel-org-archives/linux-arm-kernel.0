@@ -1,50 +1,71 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 2 Aug 2011 14:52:23 +0800
-Subject: [PATCH 2/2] arm/mx5: add device tree support for imx51 babbage
+Date: Tue, 2 Aug 2011 14:52:22 +0800
+Subject: [PATCH 1/2] arm/mx5: add device tree support for imx53 boards
 In-Reply-To: <1312267943-25551-1-git-send-email-shawn.guo@linaro.org>
 References: <1312267943-25551-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1312267943-25551-3-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1312267943-25551-2-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It adds device tree support for imx51 babbage board.
+From: Shawn Guo <shawn.guo@freescale.com>
+
+It adds device tree support for imx53 boards.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 Cc: Grant Likely <grant.likely@secretlab.ca>
 Cc: Sascha Hauer <s.hauer@pengutronix.de>
 Acked-by: Grant Likely <grant.likely@secretlab.ca>
 ---
- .../devicetree/bindings/arm/fsl/boards.txt         |    4 +
- arch/arm/boot/dts/imx51-babbage.dts                |  141 ++++++++++++++
- arch/arm/boot/dts/imx51.dtsi                       |  203 ++++++++++++++++++++
- arch/arm/mach-mx5/Kconfig                          |    9 +
- arch/arm/mach-mx5/Makefile                         |    1 +
- arch/arm/mach-mx5/board-mx51_babbage.c             |    9 +-
- arch/arm/mach-mx5/imx51-dt.c                       |  111 +++++++++++
- arch/arm/plat-mxc/include/mach/common.h            |    1 +
- 8 files changed, 477 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm/boot/dts/imx51-babbage.dts
- create mode 100644 arch/arm/boot/dts/imx51.dtsi
- create mode 100644 arch/arm/mach-mx5/imx51-dt.c
+ .../devicetree/bindings/arm/fsl/boards.txt         |   15 ++
+ arch/arm/boot/dts/imx53-ard.dts                    |  158 +++++++++++++
+ arch/arm/boot/dts/imx53-evk.dts                    |  144 ++++++++++++
+ arch/arm/boot/dts/imx53-qsb.dts                    |  148 ++++++++++++
+ arch/arm/boot/dts/imx53-smd.dts                    |  169 ++++++++++++++
+ arch/arm/boot/dts/imx53.dtsi                       |  244 ++++++++++++++++++++
+ arch/arm/mach-mx5/Kconfig                          |   12 +
+ arch/arm/mach-mx5/Makefile                         |    2 +
+ arch/arm/mach-mx5/board-mx53_ard.c                 |   12 +-
+ arch/arm/mach-mx5/board-mx53_evk.c                 |    9 +-
+ arch/arm/mach-mx5/board-mx53_loco.c                |    9 +-
+ arch/arm/mach-mx5/board-mx53_smd.c                 |    9 +-
+ arch/arm/mach-mx5/imx53-dt.c                       |  127 ++++++++++
+ arch/arm/plat-mxc/include/mach/common.h            |    5 +
+ 14 files changed, 1053 insertions(+), 10 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/fsl/boards.txt
+ create mode 100644 arch/arm/boot/dts/imx53-ard.dts
+ create mode 100644 arch/arm/boot/dts/imx53-evk.dts
+ create mode 100644 arch/arm/boot/dts/imx53-qsb.dts
+ create mode 100644 arch/arm/boot/dts/imx53-smd.dts
+ create mode 100644 arch/arm/boot/dts/imx53.dtsi
+ create mode 100644 arch/arm/mach-mx5/imx53-dt.c
 
 diff --git a/Documentation/devicetree/bindings/arm/fsl/boards.txt b/Documentation/devicetree/bindings/arm/fsl/boards.txt
-index d1e8d6f..e2401cd 100644
---- a/Documentation/devicetree/bindings/arm/fsl/boards.txt
-+++ b/Documentation/devicetree/bindings/arm/fsl/boards.txt
-@@ -1,3 +1,7 @@
-+i.MX51 Babbage Board
-+Required root node properties:
-+    - compatible = "fsl,imx51-babbage", "fsl,imx51";
-+
- i.MX53 Automotive Reference Design Board
- Required root node properties:
-     - compatible = "fsl,imx53-ard", "fsl,imx53";
-diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
 new file mode 100644
-index 0000000..67fc0bf
+index 0000000..d1e8d6f
 --- /dev/null
-+++ b/arch/arm/boot/dts/imx51-babbage.dts
-@@ -0,0 +1,141 @@
++++ b/Documentation/devicetree/bindings/arm/fsl/boards.txt
+@@ -0,0 +1,15 @@
++i.MX53 Automotive Reference Design Board
++Required root node properties:
++    - compatible = "fsl,imx53-ard", "fsl,imx53";
++
++i.MX53 Evaluation Kit
++Required root node properties:
++    - compatible = "fsl,imx53-evk", "fsl,imx53";
++
++i.MX53 Quick Start Board
++Required root node properties:
++    - compatible = "fsl,imx53-qsb", "fsl,imx53";
++
++i.MX53 Smart Mobile Reference Design Board
++Required root node properties:
++    - compatible = "fsl,imx53-smd", "fsl,imx53";
+diff --git a/arch/arm/boot/dts/imx53-ard.dts b/arch/arm/boot/dts/imx53-ard.dts
+new file mode 100644
+index 0000000..fd0cf2c
+--- /dev/null
++++ b/arch/arm/boot/dts/imx53-ard.dts
+@@ -0,0 +1,158 @@
 +/*
 + * Copyright 2011 Freescale Semiconductor, Inc.
 + * Copyright 2011 Linaro Ltd.
@@ -58,50 +79,203 @@ index 0000000..67fc0bf
 + */
 +
 +/dts-v1/;
-+/include/ "imx51.dtsi"
++/include/ "imx53.dtsi"
 +
 +/ {
-+	model = "Freescale i.MX51 Babbage Board";
-+	compatible = "fsl,imx51-babbage", "fsl,imx51";
++	model = "Freescale i.MX53 Automotive Reference Design Board";
++	compatible = "fsl,imx53-ard", "fsl,imx53";
 +
 +	chosen {
 +		bootargs = "console=ttymxc0,115200 root=/dev/mmcblk0p3 rootwait";
 +	};
 +
 +	memory {
-+		reg = <0x90000000 0x20000000>;
++		reg = <0x70000000 0x40000000>;
 +	};
 +
-+	aips at 70000000 { /* aips-1 */
-+		spba at 70000000 {
-+			esdhc at 70004000 { /* ESDHC1 */
-+				fsl,cd-internal;
-+				fsl,wp-internal;
++	aips at 50000000 { /* AIPS1 */
++		spba at 50000000 {
++			esdhc at 50004000 { /* ESDHC1 */
++				cd-gpios = <&gpio0 1 0>; /* GPIO1_1 */
++				wp-gpios = <&gpio0 9 0>; /* GPIO1_9 */
 +			};
 +
-+			esdhc at 70008000 { /* ESDHC2 */
-+				cd-gpios = <&gpio0 6 0>; /* GPIO1_6 */
-+				wp-gpios = <&gpio0 5 0>; /* GPIO1_5 */
++			esdhc at 50008000 { /* ESDHC2 */
++				status = "disabled";
 +			};
 +
-+			uart2: uart at 7000c000 { /* UART3 */
-+				fsl,uart-has-rtscts;
++			uart2: uart at 5000c000 { /* UART3 */
++				status = "disabled";
 +			};
 +
-+			ecspi at 70010000 { /* ECSPI1 */
++			ecspi at 50010000 { /* ECSPI1 */
++				status = "disabled";
++			};
++
++			esdhc at 50020000 { /* ESDHC3 */
++				status = "disabled";
++			};
++
++			esdhc at 50024000 { /* ESDHC4 */
++				status = "disabled";
++			};
++		};
++
++		iomuxc at 53fa8000 {
++			compatible = "fsl,imx53-iomuxc-ard";
++			reg = <0x53fa8000 0x4000>;
++		};
++
++		uart1: uart at 53fc0000 { /* UART2 */
++			status = "disabled";
++		};
++
++		i2c at 53fec000 { /* I2C3 */
++			status = "disabled";
++		};
++
++		uart3: uart at 53ff0000 { /* UART4 */
++			status = "disabled";
++		};
++	};
++
++	aips at 60000000 {	/* AIPS2 */
++		uart4: uart at 63f90000 { /* UART5 */
++			status = "disabled";
++		};
++
++		ecspi at 63fac000 { /* ECSPI2 */
++			status = "disabled";
++		};
++
++		sdma at 63fb0000 {
++			fsl,sdma-ram-script-name = "imx/sdma/sdma-imx53.bin";
++		};
++
++		cspi at 63fc0000 {
++			status = "disabled";
++		};
++
++		i2c at 63fc4000 { /* I2C2 */
++			status = "disabled";
++		};
++
++		i2c at 63fc8000 { /* I2C1 */
++			status = "disabled";
++		};
++
++		fec at 63fec000 {
++			status = "disabled";
++		};
++	};
++
++	eim-cs1 at f4000000 {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "fsl,eim-bus", "simple-bus";
++		reg = <0xf4000000 0x3ff0000>;
++		ranges;
++
++		lan9220 at f4000000 {
++			compatible = "smsc,lan9220", "smsc,lan9115";
++			reg = <0xf4000000 0x2000000>;
++			phy-mode = "mii";
++			interrupt-parent = <&gpio1>;
++			interrupts = <31>;
++			reg-io-width = <4>;
++			smsc,irq-push-pull;
++		};
++	};
++
++	gpio-keys {
++		compatible = "gpio-keys";
++
++		home {
++			label = "Home";
++			gpios = <&gpio4 10 0>; /* GPIO5_10 */
++			linux,code = <102>; /* KEY_HOME */
++			gpio-key,wakeup;
++		};
++
++		back {
++			label = "Back";
++			gpios = <&gpio4 11 0>; /* GPIO5_11 */
++			linux,code = <158>; /* KEY_BACK */
++			gpio-key,wakeup;
++		};
++
++		program {
++			label = "Program";
++			gpios = <&gpio4 12 0>; /* GPIO5_12 */
++			linux,code = <362>; /* KEY_PROGRAM */
++			gpio-key,wakeup;
++		};
++
++		volume-up {
++			label = "Volume Up";
++			gpios = <&gpio4 13 0>; /* GPIO5_13 */
++			linux,code = <115>; /* KEY_VOLUMEUP */
++		};
++
++		volume-down {
++			label = "Volume Down";
++			gpios = <&gpio3 0 0>; /* GPIO4_0 */
++			linux,code = <114>; /* KEY_VOLUMEDOWN */
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/imx53-evk.dts b/arch/arm/boot/dts/imx53-evk.dts
+new file mode 100644
+index 0000000..5b51588
+--- /dev/null
++++ b/arch/arm/boot/dts/imx53-evk.dts
+@@ -0,0 +1,144 @@
++/*
++ * Copyright 2011 Freescale Semiconductor, Inc.
++ * Copyright 2011 Linaro Ltd.
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++/dts-v1/;
++/include/ "imx53.dtsi"
++
++/ {
++	model = "Freescale i.MX53 Evaluation Kit";
++	compatible = "fsl,imx53-evk", "fsl,imx53";
++
++	chosen {
++		bootargs = "console=ttymxc0,115200 root=/dev/mmcblk0p3 rootwait";
++	};
++
++	memory {
++		reg = <0x70000000 0x80000000>;
++	};
++
++	aips at 50000000 { /* AIPS1 */
++		spba at 50000000 {
++			esdhc at 50004000 { /* ESDHC1 */
++				cd-gpios = <&gpio2 13 0>; /* GPIO3_13 */
++				wp-gpios = <&gpio2 14 0>; /* GPIO3_14 */
++			};
++
++			esdhc at 50008000 { /* ESDHC2 */
++				status = "disabled";
++			};
++
++			uart2: uart at 5000c000 { /* UART3 */
++				status = "disabled";
++			};
++
++			ecspi at 50010000 { /* ECSPI1 */
 +				fsl,spi-num-chipselects = <2>;
-+				cs-gpios = <&gpio3 24 0>, /* GPIO4_24 */
-+					   <&gpio3 25 0>; /* GPIO4_25 */
-+
-+				pmic: mc13892 at 0 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					compatible = "fsl,mc13892";
-+					spi-max-frequency = <6000000>;
-+					reg = <0>;
-+					mc13xxx-irq-gpios = <&gpio0 8 0>; /* GPIO1_8 */
-+					fsl,mc13xxx-uses-regulator;
-+				};
++				cs-gpios = <&gpio1 30 0>, /* GPIO2_30 */
++					   <&gpio2 19 0>; /* GPIO3_19 */
 +
 +				flash: at45db321d at 1 {
 +					#address-cells = <1>;
@@ -123,55 +297,201 @@ index 0000000..67fc0bf
 +				};
 +			};
 +
-+			esdhc at 70020000 { /* ESDHC3 */
-+				status = "disabled";
++			esdhc at 50020000 { /* ESDHC3 */
++				cd-gpios = <&gpio2 11 0>; /* GPIO3_11 */
++				wp-gpios = <&gpio2 12 0>; /* GPIO3_12 */
 +			};
 +
-+			esdhc at 70024000 { /* ESDHC4 */
-+				status = "disabled";
-+			};
-+
-+			i2c at 70038000 { /* HS-I2C */
++			esdhc at 50024000 { /* ESDHC4 */
 +				status = "disabled";
 +			};
 +		};
 +
-+		iomuxc at 73fa8000 {
-+			compatible = "fsl,imx51-iomuxc-babbage";
-+			reg = <0x73fa8000 0x4000>;
++		iomuxc at 53fa8000 {
++			compatible = "fsl,imx53-iomuxc-evk";
++			reg = <0x53fa8000 0x4000>;
 +		};
 +
-+		uart0: uart at 73fbc000 {
-+			fsl,uart-has-rtscts;
++		uart1: uart at 53fc0000 { /* UART2 */
++			status = "disabled";
++		};
++
++		i2c at 53fec000 { /* I2C3 */
++			status = "disabled";
++		};
++
++		uart3: uart at 53ff0000 { /* UART4 */
++			status = "disabled";
 +		};
 +	};
 +
-+	aips at 80000000 {	/* aips-2 */
-+		ecspi at 83fac000 { /* ECSPI2 */
++	aips at 60000000 {	/* AIPS2 */
++		uart4: uart at 63f90000 { /* UART5 */
 +			status = "disabled";
 +		};
 +
-+		sdma at 83fb0000 {
-+			fsl,sdma-ram-script-name = "imx/sdma/sdma-imx51.bin";
-+		};
-+
-+		cspi at 83fc0000 {
++		ecspi at 63fac000 { /* ECSPI2 */
 +			status = "disabled";
 +		};
 +
-+		i2c at 83fc4000 { /* I2C2 */
++		sdma at 63fb0000 {
++			fsl,sdma-ram-script-name = "imx/sdma/sdma-imx53.bin";
++		};
++
++		cspi at 63fc0000 {
++			status = "disabled";
++		};
++
++		i2c at 63fc4000 { /* I2C2 */
++			pmic: mc13892 at 08 {
++				compatible = "fsl,mc13892", "fsl,mc13xxx";
++				reg = <0x08>;
++			};
++
 +			codec: sgtl5000 at 0a {
 +				compatible = "fsl,sgtl5000";
 +				reg = <0x0a>;
 +			};
 +		};
 +
-+		i2c at 83fc8000 { /* I2C1 */
++		i2c at 63fc8000 { /* I2C1 */
 +			status = "disabled";
 +		};
 +
-+		fec at 83fec000 {
-+			phy-mode = "mii";
++		fec at 63fec000 {
++			phy-mode = "rmii";
++			phy-reset-gpios = <&gpio6 6 0>; /* GPIO7_6 */
++		};
++	};
++
++	leds {
++		compatible = "gpio-leds";
++
++		green {
++			label = "Heartbeat";
++			gpios = <&gpio6 7 0>; /* GPIO7_7 */
++			linux,default-trigger = "heartbeat";
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/imx53-qsb.dts b/arch/arm/boot/dts/imx53-qsb.dts
+new file mode 100644
+index 0000000..035de71
+--- /dev/null
++++ b/arch/arm/boot/dts/imx53-qsb.dts
+@@ -0,0 +1,148 @@
++/*
++ * Copyright 2011 Freescale Semiconductor, Inc.
++ * Copyright 2011 Linaro Ltd.
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++/dts-v1/;
++/include/ "imx53.dtsi"
++
++/ {
++	model = "Freescale i.MX53 Quick Start Board";
++	compatible = "fsl,imx53-qsb", "fsl,imx53";
++
++	chosen {
++		bootargs = "console=ttymxc0,115200 root=/dev/mmcblk0p3 rootwait";
++	};
++
++	memory {
++		reg = <0x70000000 0x40000000>;
++	};
++
++	aips at 50000000 { /* AIPS1 */
++		spba at 50000000 {
++			esdhc at 50004000 { /* ESDHC1 */
++				cd-gpios = <&gpio2 13 0>; /* GPIO3_13 */
++			};
++
++			esdhc at 50008000 { /* ESDHC2 */
++				status = "disabled";
++			};
++
++			uart2: uart at 5000c000 { /* UART3 */
++				status = "disabled";
++			};
++
++			ecspi at 50010000 { /* ECSPI1 */
++				status = "disabled";
++			};
++
++			esdhc at 50020000 { /* ESDHC3 */
++				cd-gpios = <&gpio2 11 0>; /* GPIO3_11 */
++				wp-gpios = <&gpio2 12 0>; /* GPIO3_12 */
++			};
++
++			esdhc at 50024000 { /* ESDHC4 */
++				status = "disabled";
++			};
++		};
++
++		iomuxc at 53fa8000 {
++			compatible = "fsl,imx53-iomuxc-qsb";
++			reg = <0x53fa8000 0x4000>;
++		};
++
++		uart1: uart at 53fc0000 { /* UART2 */
++			status = "disabled";
++		};
++
++		i2c at 53fec000 { /* I2C3 */
++			status = "disabled";
++		};
++
++		uart3: uart at 53ff0000 { /* UART4 */
++			status = "disabled";
++		};
++	};
++
++	aips at 60000000 {	/* AIPS2 */
++		uart4: uart at 63f90000 { /* UART5 */
++			status = "disabled";
++		};
++
++		ecspi at 63fac000 { /* ECSPI2 */
++			status = "disabled";
++		};
++
++		sdma at 63fb0000 {
++			fsl,sdma-ram-script-name = "imx/sdma/sdma-imx53.bin";
++		};
++
++		cspi at 63fc0000 {
++			status = "disabled";
++		};
++
++		i2c at 63fc4000 { /* I2C2 */
++			codec: sgtl5000 at 0a {
++				compatible = "fsl,sgtl5000";
++				reg = <0x0a>;
++			};
++		};
++
++		i2c at 63fc8000 { /* I2C1 */
++			accelerometer: mma8450 at 1c {
++				compatible = "fsl,mma8450";
++				reg = <0x1c>;
++			};
++
++			pmic: dialog at 48 {
++				compatible = "dialog,da9053", "dialog,da9052";
++				reg = <0x48>;
++			};
++		};
++
++		fec at 63fec000 {
++			phy-mode = "rmii";
++			phy-reset-gpios = <&gpio6 6 0>; /* GPIO7_6 */
 +		};
 +	};
 +
@@ -180,18 +500,215 @@ index 0000000..67fc0bf
 +
 +		power {
 +			label = "Power Button";
-+			gpios = <&gpio1 21 0>;
++			gpios = <&gpio0 8 0>; /* GPIO1_8 */
 +			linux,code = <116>; /* KEY_POWER */
 +			gpio-key,wakeup;
 +		};
++
++		volume-up {
++			label = "Volume Up";
++			gpios = <&gpio1 14 0>; /* GPIO2_14 */
++			linux,code = <115>; /* KEY_VOLUMEUP */
++		};
++
++		volume-down {
++			label = "Volume Down";
++			gpios = <&gpio1 15 0>; /* GPIO2_15 */
++			linux,code = <114>; /* KEY_VOLUMEDOWN */
++		};
++	};
++
++	leds {
++		compatible = "gpio-leds";
++
++		user {
++			label = "Heartbeat";
++			gpios = <&gpio6 7 0>; /* GPIO7_7 */
++			linux,default-trigger = "heartbeat";
++		};
 +	};
 +};
-diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
+diff --git a/arch/arm/boot/dts/imx53-smd.dts b/arch/arm/boot/dts/imx53-smd.dts
 new file mode 100644
-index 0000000..f456ebd
+index 0000000..b2af475
 --- /dev/null
-+++ b/arch/arm/boot/dts/imx51.dtsi
-@@ -0,0 +1,203 @@
++++ b/arch/arm/boot/dts/imx53-smd.dts
+@@ -0,0 +1,169 @@
++/*
++ * Copyright 2011 Freescale Semiconductor, Inc.
++ * Copyright 2011 Linaro Ltd.
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++/dts-v1/;
++/include/ "imx53.dtsi"
++
++/ {
++	model = "Freescale i.MX53 Smart Mobile Reference Design Board";
++	compatible = "fsl,imx53-smd", "fsl,imx53";
++
++	chosen {
++		bootargs = "console=ttymxc0,115200 root=/dev/mmcblk0p3 rootwait";
++	};
++
++	memory {
++		reg = <0x70000000 0x40000000>;
++	};
++
++	aips at 50000000 { /* AIPS1 */
++		spba at 50000000 {
++			esdhc at 50004000 { /* ESDHC1 */
++				cd-gpios = <&gpio2 13 0>; /* GPIO3_13 */
++				wp-gpios = <&gpio3 11 0>; /* GPIO4_11 */
++			};
++
++			esdhc at 50008000 { /* ESDHC2 */
++				fsl,card-wired;
++			};
++
++			uart2: uart at 5000c000 { /* UART3 */
++				fsl,uart-has-rtscts;
++			};
++
++			ecspi at 50010000 { /* ECSPI1 */
++				fsl,spi-num-chipselects = <2>;
++				cs-gpios = <&gpio1 30 0>, /* GPIO2_30 */
++					   <&gpio2 19 0>; /* GPIO3_19 */
++
++				zigbee: mc1323 at 0 {
++					compatible = "fsl,mc1323";
++					spi-max-frequency = <8000000>;
++					reg = <0>;
++				};
++
++				flash: m25p32 at 1 {
++					#address-cells = <1>;
++					#size-cells = <1>;
++					compatible = "st,m25p32", "st,m25p";
++					spi-max-frequency = <20000000>;
++					reg = <1>;
++
++					partition at 0 {
++						label = "U-Boot";
++						reg = <0x0 0x40000>;
++						read-only;
++					};
++
++					partition at 40000 {
++						label = "Kernel";
++						reg = <0x40000 0x3c0000>;
++					};
++				};
++			};
++
++			esdhc at 50020000 { /* ESDHC3 */
++				fsl,card-wired;
++			};
++
++			esdhc at 50024000 { /* ESDHC4 */
++				status = "disabled";
++			};
++		};
++
++		iomuxc at 53fa8000 {
++			compatible = "fsl,imx53-iomuxc-smd";
++			reg = <0x53fa8000 0x4000>;
++		};
++
++		i2c at 53fec000 { /* I2C3 */
++			status = "disabled";
++		};
++
++		uart3: uart at 53ff0000 { /* UART4 */
++			status = "disabled";
++		};
++	};
++
++	aips at 60000000 {	/* AIPS2 */
++		uart4: uart at 63f90000 { /* UART5 */
++			status = "disabled";
++		};
++
++		ecspi at 63fac000 { /* ECSPI2 */
++			status = "disabled";
++		};
++
++		sdma at 63fb0000 {
++			fsl,sdma-ram-script-name = "imx/sdma/sdma-imx53.bin";
++		};
++
++		cspi at 63fc0000 {
++			status = "disabled";
++		};
++
++		i2c at 63fc4000 { /* I2C2 */
++			codec: sgtl5000 at 0a {
++				compatible = "fsl,sgtl5000";
++				reg = <0x0a>;
++			};
++
++			magnetometer: mag3110 at 0e {
++				compatible = "fsl,mag3110";
++				reg = <0x0e>;
++			};
++
++			touchkey: mpr121 at 5a {
++				compatible = "fsl,mpr121";
++				reg = <0x5a>;
++			};
++		};
++
++		i2c at 63fc8000 { /* I2C1 */
++			accelerometer: mma8450 at 1c {
++				compatible = "fsl,mma8450";
++				reg = <0x1c>;
++			};
++
++			camera: ov5642 at 3c {
++				compatible = "ovti,ov5642";
++				reg = <0x3c>;
++			};
++
++			pmic: dialog at 48 {
++				compatible = "dialog,da9053", "dialog,da9052";
++				reg = <0x48>;
++			};
++		};
++
++		fec at 63fec000 {
++			phy-mode = "rmii";
++			phy-reset-gpios = <&gpio6 6 0>; /* GPIO7_6 */
++		};
++	};
++
++	gpio-keys {
++		compatible = "gpio-keys";
++
++		volume-up {
++			label = "Volume Up";
++			gpios = <&gpio1 14 0>; /* GPIO2_14 */
++			linux,code = <115>; /* KEY_VOLUMEUP */
++		};
++
++		volume-down {
++			label = "Volume Down";
++			gpios = <&gpio1 15 0>; /* GPIO2_15 */
++			linux,code = <114>; /* KEY_VOLUMEDOWN */
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+new file mode 100644
+index 0000000..41383b5
+--- /dev/null
++++ b/arch/arm/boot/dts/imx53.dtsi
+@@ -0,0 +1,244 @@
 +/*
 + * Copyright 2011 Freescale Semiconductor, Inc.
 + * Copyright 2011 Linaro Ltd.
@@ -213,80 +730,73 @@ index 0000000..f456ebd
 +		serial0 = &uart0;
 +		serial1 = &uart1;
 +		serial2 = &uart2;
++		serial3 = &uart3;
++		serial4 = &uart4;
 +	};
 +
-+	tzic: tz-interrupt-controller at e0000000 {
-+		compatible = "fsl,imx51-tzic", "fsl,tzic";
++	tzic: tz-interrupt-controller at 0fffc000 {
++		compatible = "fsl,imx53-tzic", "fsl,tzic";
 +		interrupt-controller;
 +		#interrupt-cells = <1>;
-+		reg = <0xe0000000 0x4000>;
++		reg = <0x0fffc000 0x4000>;
 +	};
 +
-+	aips at 70000000 { /* AIPS1 */
++	aips at 50000000 { /* AIPS1 */
 +		compatible = "fsl,aips-bus", "simple-bus";
 +		#address-cells = <1>;
 +		#size-cells = <1>;
-+		reg = <0x70000000 0x10000000>;
++		reg = <0x50000000 0x10000000>;
 +		ranges;
 +
-+		spba at 70000000 {
++		spba at 50000000 {
 +			compatible = "fsl,spba-bus", "simple-bus";
 +			#address-cells = <1>;
 +			#size-cells = <1>;
-+			reg = <0x70000000 0x40000>;
++			reg = <0x50000000 0x40000>;
 +			ranges;
 +
-+			esdhc at 70004000 { /* ESDHC1 */
-+				compatible = "fsl,imx51-esdhc";
-+				reg = <0x70004000 0x4000>;
++			esdhc at 50004000 { /* ESDHC1 */
++				compatible = "fsl,imx53-esdhc";
++				reg = <0x50004000 0x4000>;
 +				interrupts = <1>;
 +			};
 +
-+			esdhc at 70008000 { /* ESDHC2 */
-+				compatible = "fsl,imx51-esdhc";
-+				reg = <0x70008000 0x4000>;
++			esdhc at 50008000 { /* ESDHC2 */
++				compatible = "fsl,imx53-esdhc";
++				reg = <0x50008000 0x4000>;
 +				interrupts = <2>;
 +			};
 +
-+			uart2: uart at 7000c000 { /* UART3 */
-+				compatible = "fsl,imx51-uart", "fsl,imx21-uart";
-+				reg = <0x7000c000 0x4000>;
++			uart2: uart at 5000c000 { /* UART3 */
++				compatible = "fsl,imx53-uart", "fsl,imx21-uart";
++				reg = <0x5000c000 0x4000>;
 +				interrupts = <33>;
 +			};
 +
-+			ecspi at 70010000 { /* ECSPI1 */
++			ecspi at 50010000 { /* ECSPI1 */
 +				#address-cells = <1>;
 +				#size-cells = <0>;
-+				compatible = "fsl,imx51-ecspi";
-+				reg = <0x70010000 0x4000>;
++				compatible = "fsl,imx53-ecspi", "fsl,imx51-ecspi";
++				reg = <0x50010000 0x4000>;
 +				interrupts = <36>;
 +			};
 +
-+			esdhc at 70020000 { /* ESDHC3 */
-+				compatible = "fsl,imx51-esdhc";
-+				reg = <0x70020000 0x4000>;
++			esdhc at 50020000 { /* ESDHC3 */
++				compatible = "fsl,imx53-esdhc";
++				reg = <0x50020000 0x4000>;
 +				interrupts = <3>;
 +			};
 +
-+			esdhc at 70024000 { /* ESDHC4 */
-+				compatible = "fsl,imx51-esdhc";
-+				reg = <0x70024000 0x4000>;
++			esdhc at 50024000 { /* ESDHC4 */
++				compatible = "fsl,imx53-esdhc";
++				reg = <0x50024000 0x4000>;
 +				interrupts = <4>;
-+			};
-+
-+			i2c at 70038000 { /* HS-I2C */
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				compatible = "fsl,imx51-i2c", "fsl,imx1-i2c";
-+				reg = <0x70038000 0x4000>;
-+				interrupts = <64>;
-+				clock-frequency = <400000>;
 +			};
 +		};
 +
-+		gpio0: gpio at 73f84000 { /* GPIO1 */
-+			compatible = "fsl,imx51-gpio", "fsl,imx31-gpio";
-+			reg = <0x73f84000 0x4000>;
++		gpio0: gpio at 53f84000 { /* GPIO1 */
++			compatible = "fsl,imx53-gpio", "fsl,imx31-gpio";
++			reg = <0x53f84000 0x4000>;
 +			interrupts = <50 51>;
 +			gpio-controller;
 +			#gpio-cells = <2>;
@@ -294,9 +804,9 @@ index 0000000..f456ebd
 +			#interrupt-cells = <1>;
 +		};
 +
-+		gpio1: gpio at 73f88000 { /* GPIO2 */
-+			compatible = "fsl,imx51-gpio", "fsl,imx31-gpio";
-+			reg = <0x73f88000 0x4000>;
++		gpio1: gpio at 53f88000 { /* GPIO2 */
++			compatible = "fsl,imx53-gpio", "fsl,imx31-gpio";
++			reg = <0x53f88000 0x4000>;
 +			interrupts = <52 53>;
 +			gpio-controller;
 +			#gpio-cells = <2>;
@@ -304,9 +814,9 @@ index 0000000..f456ebd
 +			#interrupt-cells = <1>;
 +		};
 +
-+		gpio2: gpio at 73f8c000 { /* GPIO3 */
-+			compatible = "fsl,imx51-gpio", "fsl,imx31-gpio";
-+			reg = <0x73f8c000 0x4000>;
++		gpio2: gpio at 53f8c000 { /* GPIO3 */
++			compatible = "fsl,imx53-gpio", "fsl,imx31-gpio";
++			reg = <0x53f8c000 0x4000>;
 +			interrupts = <54 55>;
 +			gpio-controller;
 +			#gpio-cells = <2>;
@@ -314,9 +824,9 @@ index 0000000..f456ebd
 +			#interrupt-cells = <1>;
 +		};
 +
-+		gpio3: gpio at 73f90000 { /* GPIO4 */
-+			compatible = "fsl,imx51-gpio", "fsl,imx31-gpio";
-+			reg = <0x73f90000 0x4000>;
++		gpio3: gpio at 53f90000 { /* GPIO4 */
++			compatible = "fsl,imx53-gpio", "fsl,imx31-gpio";
++			reg = <0x53f90000 0x4000>;
 +			interrupts = <56 57>;
 +			gpio-controller;
 +			#gpio-cells = <2>;
@@ -324,140 +834,274 @@ index 0000000..f456ebd
 +			#interrupt-cells = <1>;
 +		};
 +
-+		wdt at 73f98000 { /* WDOG1 */
-+			compatible = "fsl,imx51-wdt", "fsl,imx21-wdt";
-+			reg = <0x73f98000 0x4000>;
++		wdt at 53f98000 { /* WDOG1 */
++			compatible = "fsl,imx53-wdt", "fsl,imx21-wdt";
++			reg = <0x53f98000 0x4000>;
 +			interrupts = <58>;
 +		};
 +
-+		uart0: uart at 73fbc000 {
-+			compatible = "fsl,imx51-uart", "fsl,imx21-uart";
-+			reg = <0x73fbc000 0x4000>;
++		uart0: uart at 53fbc000 { /* UART1 */
++			compatible = "fsl,imx53-uart", "fsl,imx21-uart";
++			reg = <0x53fbc000 0x4000>;
 +			interrupts = <31>;
 +		};
 +
-+		uart1: uart at 73fc0000 {
-+			compatible = "fsl,imx51-uart", "fsl,imx21-uart";
-+			reg = <0x73fc0000 0x4000>;
++		uart1: uart at 53fc0000 { /* UART2 */
++			compatible = "fsl,imx53-uart", "fsl,imx21-uart";
++			reg = <0x53fc0000 0x4000>;
 +			interrupts = <32>;
++		};
++
++		gpio4: gpio at 53fdc000 { /* GPIO5 */
++			compatible = "fsl,imx53-gpio", "fsl,imx31-gpio";
++			reg = <0x53fdc000 0x4000>;
++			interrupts = <103 104>;
++			gpio-controller;
++			#gpio-cells = <2>;
++			interrupt-controller;
++			#interrupt-cells = <1>;
++		};
++
++		gpio5: gpio at 53fe0000 { /* GPIO6 */
++			compatible = "fsl,imx53-gpio", "fsl,imx31-gpio";
++			reg = <0x53fe0000 0x4000>;
++			interrupts = <105 106>;
++			gpio-controller;
++			#gpio-cells = <2>;
++			interrupt-controller;
++			#interrupt-cells = <1>;
++		};
++
++		gpio6: gpio at 53fe4000 { /* GPIO7 */
++			compatible = "fsl,imx53-gpio", "fsl,imx31-gpio";
++			reg = <0x53fe4000 0x4000>;
++			interrupts = <107 108>;
++			gpio-controller;
++			#gpio-cells = <2>;
++			interrupt-controller;
++			#interrupt-cells = <1>;
++		};
++
++		i2c at 53fec000 { /* I2C3 */
++			#address-cells = <1>;
++			#size-cells = <0>;
++			compatible = "fsl,imx53-i2c", "fsl,imx1-i2c";
++			reg = <0x53fec000 0x4000>;
++			interrupts = <64>;
++		};
++
++		uart3: uart at 53ff0000 { /* UART4 */
++			compatible = "fsl,imx53-uart", "fsl,imx21-uart";
++			reg = <0x53ff0000 0x4000>;
++			interrupts = <13>;
 +		};
 +	};
 +
-+	aips at 80000000 {	/* AIPS2 */
++	aips at 60000000 {	/* AIPS2 */
 +		compatible = "fsl,aips-bus", "simple-bus";
 +		#address-cells = <1>;
 +		#size-cells = <1>;
-+		reg = <0x80000000 0x10000000>;
++		reg = <0x60000000 0x10000000>;
 +		ranges;
 +
-+		ecspi at 83fac000 { /* ECSPI2 */
++		uart4: uart at 63f90000 { /* UART5 */
++			compatible = "fsl,imx53-uart", "fsl,imx21-uart";
++			reg = <0x63f90000 0x4000>;
++			interrupts = <86>;
++		};
++
++		ecspi at 63fac000 { /* ECSPI2 */
 +			#address-cells = <1>;
 +			#size-cells = <0>;
-+			compatible = "fsl,imx51-ecspi";
-+			reg = <0x83fac000 0x4000>;
++			compatible = "fsl,imx53-ecspi", "fsl,imx51-ecspi";
++			reg = <0x63fac000 0x4000>;
 +			interrupts = <37>;
 +		};
 +
-+		sdma at 83fb0000 {
-+			compatible = "fsl,imx51-sdma", "fsl,imx35-sdma";
-+			reg = <0x83fb0000 0x4000>;
-+			interrupts = <6>;
++		sdma at 63fb0000 {
++			fsl,sdma-ram-script-name = "imx/sdma/sdma-imx53.bin";
 +		};
 +
-+		cspi at 83fc0000 {
++		cspi at 63fc0000 {
 +			#address-cells = <1>;
 +			#size-cells = <0>;
-+			compatible = "fsl,imx51-cspi", "fsl,imx35-cspi";
-+			reg = <0x83fc0000 0x4000>;
++			compatible = "fsl,imx53-cspi", "fsl,imx35-cspi";
++			reg = <0x63fc0000 0x4000>;
 +			interrupts = <38>;
 +		};
 +
-+		i2c at 83fc4000 { /* I2C2 */
++		i2c at 63fc4000 { /* I2C2 */
 +			#address-cells = <1>;
 +			#size-cells = <0>;
-+			compatible = "fsl,imx51-i2c", "fsl,imx1-i2c";
-+			reg = <0x83fc4000 0x4000>;
++			compatible = "fsl,imx53-i2c", "fsl,imx1-i2c";
++			reg = <0x63fc4000 0x4000>;
 +			interrupts = <63>;
 +		};
 +
-+		i2c at 83fc8000 { /* I2C1 */
++		i2c at 63fc8000 { /* I2C1 */
 +			#address-cells = <1>;
 +			#size-cells = <0>;
-+			compatible = "fsl,imx51-i2c", "fsl,imx1-i2c";
-+			reg = <0x83fc8000 0x4000>;
++			compatible = "fsl,imx53-i2c", "fsl,imx1-i2c";
++			reg = <0x63fc8000 0x4000>;
 +			interrupts = <62>;
 +		};
 +
-+		fec at 83fec000 {
-+			compatible = "fsl,imx51-fec", "fsl,imx27-fec";
-+			reg = <0x83fec000 0x4000>;
++		fec at 63fec000 {
++			compatible = "fsl,imx53-fec", "fsl,imx25-fec";
++			reg = <0x63fec000 0x4000>;
 +			interrupts = <87>;
 +		};
 +	};
 +};
 diff --git a/arch/arm/mach-mx5/Kconfig b/arch/arm/mach-mx5/Kconfig
-index 0ac676c..bda12e8 100644
+index b4e7c58..0ac676c 100644
 --- a/arch/arm/mach-mx5/Kconfig
 +++ b/arch/arm/mach-mx5/Kconfig
-@@ -62,6 +62,15 @@ endif # ARCH_MX50_SUPPORTED
- if ARCH_MX51
- comment "i.MX51 machines:"
+@@ -172,6 +172,18 @@ endif # ARCH_MX51
+ if ARCH_MX53_SUPPORTED
+ comment "i.MX53 machines:"
  
-+config MACH_IMX51_DT
-+	bool "Support i.MX51 platforms from device tree"
-+	select SOC_IMX51
++config MACH_IMX53_DT
++	bool "Support i.MX53 platforms from device tree"
++	select SOC_IMX53
 +	select USE_OF
-+	select MACH_MX51_BABBAGE
++	select MACH_MX53_ARD
++	select MACH_MX53_EVK
++	select MACH_MX53_LOCO
++	select MACH_MX53_SMD
 +	help
-+	  Include support for Freescale i.MX51 based platforms
++	  Include support for Freescale i.MX53 based platforms
 +	  using the device tree for discovery
 +
- config MACH_MX51_BABBAGE
- 	bool "Support MX51 BABBAGE platforms"
- 	select SOC_IMX51
+ config MACH_MX53_EVK
+ 	bool "Support MX53 EVK platforms"
+ 	select SOC_IMX53
 diff --git a/arch/arm/mach-mx5/Makefile b/arch/arm/mach-mx5/Makefile
-index 3dbe5e2..a3c75f3 100644
+index 383e7cd..3dbe5e2 100644
 --- a/arch/arm/mach-mx5/Makefile
 +++ b/arch/arm/mach-mx5/Makefile
-@@ -23,4 +23,5 @@ obj-$(CONFIG_MACH_MX51_EFIKAMX) += board-mx51_efikamx.o
+@@ -22,3 +22,5 @@ obj-$(CONFIG_MX51_EFIKA_COMMON) += mx51_efika.o
+ obj-$(CONFIG_MACH_MX51_EFIKAMX) += board-mx51_efikamx.o
  obj-$(CONFIG_MACH_MX51_EFIKASB) += board-mx51_efikasb.o
  obj-$(CONFIG_MACH_MX50_RDP) += board-mx50_rdp.o
++
++obj-$(CONFIG_MACH_IMX53_DT) += imx53-dt.o
+diff --git a/arch/arm/mach-mx5/board-mx53_ard.c b/arch/arm/mach-mx5/board-mx53_ard.c
+index 76a67c4..9b4395d 100644
+--- a/arch/arm/mach-mx5/board-mx53_ard.c
++++ b/arch/arm/mach-mx5/board-mx53_ard.c
+@@ -171,9 +171,6 @@ static struct imxi2c_platform_data mx53_ard_i2c3_data = {
  
-+obj-$(CONFIG_MACH_IMX51_DT) += imx51-dt.o
- obj-$(CONFIG_MACH_IMX53_DT) += imx53-dt.o
-diff --git a/arch/arm/mach-mx5/board-mx51_babbage.c b/arch/arm/mach-mx5/board-mx51_babbage.c
-index e400b09..fdde34b 100644
---- a/arch/arm/mach-mx5/board-mx51_babbage.c
-+++ b/arch/arm/mach-mx5/board-mx51_babbage.c
-@@ -351,6 +351,12 @@ static const struct esdhc_platform_data mx51_babbage_sd2_data __initconst = {
- 	.wp_type = ESDHC_WP_GPIO,
- };
+ static void __init mx53_ard_io_init(void)
+ {
+-	mxc_iomux_v3_setup_multiple_pads(mx53_ard_pads,
+-				ARRAY_SIZE(mx53_ard_pads));
+-
+ 	gpio_request(ARD_ETHERNET_INT_B, "eth-int-b");
+ 	gpio_direction_input(ARD_ETHERNET_INT_B);
  
-+void __init imx51_babbage_common_init(void)
+@@ -216,6 +213,13 @@ static int weim_cs_config(void)
+ 	return 0;
+ }
+ 
++void __init imx53_ard_common_init(void)
 +{
-+	mxc_iomux_v3_setup_multiple_pads(mx51babbage_pads,
-+					 ARRAY_SIZE(mx51babbage_pads));
++	mxc_iomux_v3_setup_multiple_pads(mx53_ard_pads,
++					 ARRAY_SIZE(mx53_ard_pads));
++	weim_cs_config();
 +}
 +
- /*
-  * Board specific initialization.
-  */
-@@ -365,8 +371,7 @@ static void __init mx51_babbage_init(void)
- #if defined(CONFIG_CPU_FREQ_IMX)
- 	get_cpu_op = mx51_get_cpu_op;
- #endif
--	mxc_iomux_v3_setup_multiple_pads(mx51babbage_pads,
--					ARRAY_SIZE(mx51babbage_pads));
-+	imx51_babbage_common_init();
+ static struct platform_device *devices[] __initdata = {
+ 	&ard_smsc_lan9220_device,
+ };
+@@ -225,8 +229,8 @@ static void __init mx53_ard_board_init(void)
+ 	imx53_soc_init();
+ 	imx53_add_imx_uart(0, NULL);
  
- 	imx51_add_imx_uart(0, &uart_pdata);
- 	imx51_add_imx_uart(1, &uart_pdata);
-diff --git a/arch/arm/mach-mx5/imx51-dt.c b/arch/arm/mach-mx5/imx51-dt.c
++	imx53_ard_common_init();
+ 	mx53_ard_io_init();
+-	weim_cs_config();
+ 	platform_add_devices(devices, ARRAY_SIZE(devices));
+ 
+ 	imx53_add_sdhci_esdhc_imx(0, &mx53_ard_sd1_data);
+diff --git a/arch/arm/mach-mx5/board-mx53_evk.c b/arch/arm/mach-mx5/board-mx53_evk.c
+index 1b417b0..7663905 100644
+--- a/arch/arm/mach-mx5/board-mx53_evk.c
++++ b/arch/arm/mach-mx5/board-mx53_evk.c
+@@ -131,12 +131,17 @@ static const struct spi_imx_master mx53_evk_spi_data __initconst = {
+ 	.num_chipselect = ARRAY_SIZE(mx53_evk_spi_cs),
+ };
+ 
++void __init imx53_evk_common_init(void)
++{
++	mxc_iomux_v3_setup_multiple_pads(mx53_evk_pads,
++					 ARRAY_SIZE(mx53_evk_pads));
++}
++
+ static void __init mx53_evk_board_init(void)
+ {
+ 	imx53_soc_init();
++	imx53_evk_common_init();
+ 
+-	mxc_iomux_v3_setup_multiple_pads(mx53_evk_pads,
+-					ARRAY_SIZE(mx53_evk_pads));
+ 	mx53_evk_init_uart();
+ 	mx53_evk_fec_reset();
+ 	imx53_add_fec(&mx53_evk_fec_pdata);
+diff --git a/arch/arm/mach-mx5/board-mx53_loco.c b/arch/arm/mach-mx5/board-mx53_loco.c
+index 4e1d51d..3922cd5 100644
+--- a/arch/arm/mach-mx5/board-mx53_loco.c
++++ b/arch/arm/mach-mx5/board-mx53_loco.c
+@@ -257,12 +257,17 @@ static const struct gpio_led_platform_data mx53loco_leds_data __initconst = {
+ 	.num_leds	= ARRAY_SIZE(mx53loco_leds),
+ };
+ 
++void __init imx53_qsb_common_init(void)
++{
++	mxc_iomux_v3_setup_multiple_pads(mx53_loco_pads,
++					 ARRAY_SIZE(mx53_loco_pads));
++}
++
+ static void __init mx53_loco_board_init(void)
+ {
+ 	imx53_soc_init();
++	imx53_qsb_common_init();
+ 
+-	mxc_iomux_v3_setup_multiple_pads(mx53_loco_pads,
+-					ARRAY_SIZE(mx53_loco_pads));
+ 	imx53_add_imx_uart(0, NULL);
+ 	mx53_loco_fec_reset();
+ 	imx53_add_fec(&mx53_loco_fec_data);
+diff --git a/arch/arm/mach-mx5/board-mx53_smd.c b/arch/arm/mach-mx5/board-mx53_smd.c
+index bc02894..b10c899 100644
+--- a/arch/arm/mach-mx5/board-mx53_smd.c
++++ b/arch/arm/mach-mx5/board-mx53_smd.c
+@@ -111,12 +111,17 @@ static const struct imxi2c_platform_data mx53_smd_i2c_data __initconst = {
+ 	.bitrate = 100000,
+ };
+ 
++void __init imx53_smd_common_init(void)
++{
++	mxc_iomux_v3_setup_multiple_pads(mx53_smd_pads,
++					 ARRAY_SIZE(mx53_smd_pads));
++}
++
+ static void __init mx53_smd_board_init(void)
+ {
+ 	imx53_soc_init();
++	imx53_smd_common_init();
+ 
+-	mxc_iomux_v3_setup_multiple_pads(mx53_smd_pads,
+-					ARRAY_SIZE(mx53_smd_pads));
+ 	mx53_smd_init_uart();
+ 	mx53_smd_fec_reset();
+ 	imx53_add_fec(&mx53_smd_fec_data);
+diff --git a/arch/arm/mach-mx5/imx53-dt.c b/arch/arm/mach-mx5/imx53-dt.c
 new file mode 100644
-index 0000000..9267ce8
+index 0000000..7a09af2
 --- /dev/null
-+++ b/arch/arm/mach-mx5/imx51-dt.c
-@@ -0,0 +1,111 @@
++++ b/arch/arm/mach-mx5/imx53-dt.c
+@@ -0,0 +1,127 @@
 +/*
 + * Copyright 2011 Freescale Semiconductor, Inc. All Rights Reserved.
 + * Copyright 2011 Linaro Ltd.
@@ -470,13 +1114,14 @@ index 0000000..9267ce8
 + * http://www.gnu.org/copyleft/gpl.html
 + */
 +
++#include <linux/io.h>
 +#include <linux/irq.h>
 +#include <linux/irqdomain.h>
 +#include <linux/of_platform.h>
 +#include <asm/mach/arch.h>
 +#include <asm/mach/time.h>
 +#include <mach/common.h>
-+#include <mach/mx51.h>
++#include <mach/mx53.h>
 +
 +/*
 + * Lookup table for attaching a specific name and platform_data pointer to
@@ -484,102 +1129,119 @@ index 0000000..9267ce8
 + * would not exist, but the current clock implementation depends on some devices
 + * having a specific name.
 + */
-+static const struct of_dev_auxdata imx51_auxdata_lookup[] __initconst = {
-+	OF_DEV_AUXDATA("fsl,imx51-uart", MX51_UART1_BASE_ADDR, "imx21-uart.0", NULL),
-+	OF_DEV_AUXDATA("fsl,imx51-uart", MX51_UART2_BASE_ADDR, "imx21-uart.1", NULL),
-+	OF_DEV_AUXDATA("fsl,imx51-uart", MX51_UART3_BASE_ADDR, "imx21-uart.2", NULL),
-+	OF_DEV_AUXDATA("fsl,imx51-fec", MX51_FEC_BASE_ADDR, "imx27-fec.0", NULL),
-+	OF_DEV_AUXDATA("fsl,imx51-esdhc", MX51_ESDHC1_BASE_ADDR, "sdhci-esdhc-imx51.0", NULL),
-+	OF_DEV_AUXDATA("fsl,imx51-esdhc", MX51_ESDHC2_BASE_ADDR, "sdhci-esdhc-imx51.1", NULL),
-+	OF_DEV_AUXDATA("fsl,imx51-esdhc", MX51_ESDHC3_BASE_ADDR, "sdhci-esdhc-imx51.2", NULL),
-+	OF_DEV_AUXDATA("fsl,imx51-esdhc", MX51_ESDHC4_BASE_ADDR, "sdhci-esdhc-imx51.3", NULL),
-+	OF_DEV_AUXDATA("fsl,imx51-ecspi", MX51_ECSPI1_BASE_ADDR, "imx51-ecspi.0", NULL),
-+	OF_DEV_AUXDATA("fsl,imx51-ecspi", MX51_ECSPI2_BASE_ADDR, "imx51-ecspi.1", NULL),
-+	OF_DEV_AUXDATA("fsl,imx51-cspi", MX51_CSPI_BASE_ADDR, "imx35-cspi.0", NULL),
-+	OF_DEV_AUXDATA("fsl,imx51-i2c", MX51_I2C1_BASE_ADDR, "imx-i2c.0", NULL),
-+	OF_DEV_AUXDATA("fsl,imx51-i2c", MX51_I2C2_BASE_ADDR, "imx-i2c.1", NULL),
-+	OF_DEV_AUXDATA("fsl,imx51-sdma", MX51_SDMA_BASE_ADDR, "imx35-sdma", NULL),
-+	OF_DEV_AUXDATA("fsl,imx51-wdt", MX51_WDOG1_BASE_ADDR, "imx2-wdt.0", NULL),
++static const struct of_dev_auxdata imx53_auxdata_lookup[] __initconst = {
++	OF_DEV_AUXDATA("fsl,imx53-uart", MX53_UART1_BASE_ADDR, "imx21-uart.0", NULL),
++	OF_DEV_AUXDATA("fsl,imx53-uart", MX53_UART2_BASE_ADDR, "imx21-uart.1", NULL),
++	OF_DEV_AUXDATA("fsl,imx53-uart", MX53_UART3_BASE_ADDR, "imx21-uart.2", NULL),
++	OF_DEV_AUXDATA("fsl,imx53-uart", MX53_UART4_BASE_ADDR, "imx21-uart.3", NULL),
++	OF_DEV_AUXDATA("fsl,imx53-uart", MX53_UART5_BASE_ADDR, "imx21-uart.4", NULL),
++	OF_DEV_AUXDATA("fsl,imx53-fec", MX53_FEC_BASE_ADDR, "imx25-fec.0", NULL),
++	OF_DEV_AUXDATA("fsl,imx53-esdhc", MX53_ESDHC1_BASE_ADDR, "sdhci-esdhc-imx53.0", NULL),
++	OF_DEV_AUXDATA("fsl,imx53-esdhc", MX53_ESDHC2_BASE_ADDR, "sdhci-esdhc-imx53.1", NULL),
++	OF_DEV_AUXDATA("fsl,imx53-esdhc", MX53_ESDHC3_BASE_ADDR, "sdhci-esdhc-imx53.2", NULL),
++	OF_DEV_AUXDATA("fsl,imx53-esdhc", MX53_ESDHC4_BASE_ADDR, "sdhci-esdhc-imx53.3", NULL),
++	OF_DEV_AUXDATA("fsl,imx53-ecspi", MX53_ECSPI1_BASE_ADDR, "imx51-ecspi.0", NULL),
++	OF_DEV_AUXDATA("fsl,imx53-ecspi", MX53_ECSPI2_BASE_ADDR, "imx51-ecspi.1", NULL),
++	OF_DEV_AUXDATA("fsl,imx53-cspi", MX53_CSPI_BASE_ADDR, "imx35-cspi.0", NULL),
++	OF_DEV_AUXDATA("fsl,imx53-i2c", MX53_I2C1_BASE_ADDR, "imx-i2c.0", NULL),
++	OF_DEV_AUXDATA("fsl,imx53-i2c", MX53_I2C2_BASE_ADDR, "imx-i2c.1", NULL),
++	OF_DEV_AUXDATA("fsl,imx53-i2c", MX53_I2C3_BASE_ADDR, "imx-i2c.2", NULL),
++	OF_DEV_AUXDATA("fsl,imx53-sdma", MX53_SDMA_BASE_ADDR, "imx35-sdma", NULL),
++	OF_DEV_AUXDATA("fsl,imx53-wdt", MX53_WDOG1_BASE_ADDR, "imx2-wdt.0", NULL),
 +	{ /* sentinel */ }
 +};
 +
-+static const struct of_device_id imx51_tzic_of_match[] __initconst = {
-+	{ .compatible = "fsl,imx51-tzic", },
++static const struct of_device_id imx53_tzic_of_match[] __initconst = {
++	{ .compatible = "fsl,imx53-tzic", },
 +	{ /* sentinel */ }
 +};
 +
-+static const struct of_device_id imx51_gpio_of_match[] __initconst = {
-+	{ .compatible = "fsl,imx51-gpio", },
++static const struct of_device_id imx53_gpio_of_match[] __initconst = {
++	{ .compatible = "fsl,imx53-gpio", },
 +	{ /* sentinel */ }
 +};
 +
-+static const struct of_device_id imx51_iomuxc_of_match[] __initconst = {
-+	{ .compatible = "fsl,imx51-iomuxc-babbage", .data = imx51_babbage_common_init, },
++static const struct of_device_id imx53_iomuxc_of_match[] __initconst = {
++	{ .compatible = "fsl,imx53-iomuxc-ard", .data = imx53_ard_common_init, },
++	{ .compatible = "fsl,imx53-iomuxc-evk", .data = imx53_evk_common_init, },
++	{ .compatible = "fsl,imx53-iomuxc-qsb", .data = imx53_qsb_common_init, },
++	{ .compatible = "fsl,imx53-iomuxc-smd", .data = imx53_smd_common_init, },
 +	{ /* sentinel */ }
 +};
 +
-+static void __init imx51_dt_init(void)
++static void __init imx53_dt_init(void)
 +{
 +	struct device_node *node;
 +	const struct of_device_id *of_id;
 +	void (*func)(void);
 +	int gpio_irq = MXC_INTERNAL_IRQS + ARCH_NR_GPIOS;
 +
-+	node = of_find_matching_node(NULL, imx51_iomuxc_of_match);
++	node = of_find_matching_node(NULL, imx53_iomuxc_of_match);
 +	if (node) {
-+		of_id = of_match_node(imx51_iomuxc_of_match, node);
++		of_id = of_match_node(imx53_iomuxc_of_match, node);
 +		func = of_id->data;
 +		func();
 +		of_node_put(node);
 +	}
 +
-+	irq_domain_generate_simple(imx51_tzic_of_match, MX51_TZIC_BASE_ADDR, 0);
++	irq_domain_generate_simple(imx53_tzic_of_match, MX53_TZIC_BASE_ADDR, 0);
 +	gpio_irq -= 32;
-+	irq_domain_generate_simple(imx51_gpio_of_match, MX51_GPIO1_BASE_ADDR, gpio_irq);
++	irq_domain_generate_simple(imx53_gpio_of_match, MX53_GPIO1_BASE_ADDR, gpio_irq);
 +	gpio_irq -= 32;
-+	irq_domain_generate_simple(imx51_gpio_of_match, MX51_GPIO2_BASE_ADDR, gpio_irq);
++	irq_domain_generate_simple(imx53_gpio_of_match, MX53_GPIO2_BASE_ADDR, gpio_irq);
 +	gpio_irq -= 32;
-+	irq_domain_generate_simple(imx51_gpio_of_match, MX51_GPIO3_BASE_ADDR, gpio_irq);
++	irq_domain_generate_simple(imx53_gpio_of_match, MX53_GPIO3_BASE_ADDR, gpio_irq);
 +	gpio_irq -= 32;
-+	irq_domain_generate_simple(imx51_gpio_of_match, MX51_GPIO4_BASE_ADDR, gpio_irq);
++	irq_domain_generate_simple(imx53_gpio_of_match, MX53_GPIO4_BASE_ADDR, gpio_irq);
++	gpio_irq -= 32;
++	irq_domain_generate_simple(imx53_gpio_of_match, MX53_GPIO5_BASE_ADDR, gpio_irq);
++	gpio_irq -= 32;
++	irq_domain_generate_simple(imx53_gpio_of_match, MX53_GPIO6_BASE_ADDR, gpio_irq);
++	gpio_irq -= 32;
++	irq_domain_generate_simple(imx53_gpio_of_match, MX53_GPIO7_BASE_ADDR, gpio_irq);
 +
 +	of_platform_populate(NULL, of_default_bus_match_table,
-+			     imx51_auxdata_lookup, NULL);
++			     imx53_auxdata_lookup, NULL);
 +}
 +
-+static void __init imx51_timer_init(void)
++static void __init imx53_timer_init(void)
 +{
-+	mx51_clocks_init(32768, 24000000, 22579200, 0);
++	mx53_clocks_init(32768, 24000000, 22579200, 0);
 +}
 +
-+static struct sys_timer imx51_timer = {
-+	.init = imx51_timer_init,
++static struct sys_timer imx53_timer = {
++	.init = imx53_timer_init,
 +};
 +
-+static const char *imx51_dt_board_compat[] __initdata = {
-+	"fsl,imx51-babbage",
++static const char *imx53_dt_board_compat[] __initdata = {
++	"fsl,imx53-ard",
++	"fsl,imx53-evk",
++	"fsl,imx53-qsb",
++	"fsl,imx53-smd",
 +	NULL
 +};
 +
-+DT_MACHINE_START(IMX51_DT, "Freescale i.MX51 (Device Tree Support)")
-+	.map_io		= mx51_map_io,
-+	.init_early	= imx51_init_early,
-+	.init_irq	= mx51_init_irq,
-+	.timer		= &imx51_timer,
-+	.init_machine	= imx51_dt_init,
-+	.dt_compat	= imx51_dt_board_compat,
++DT_MACHINE_START(IMX53_DT, "Freescale i.MX53 (Device Tree Support)")
++	.map_io		= mx53_map_io,
++	.init_early	= imx53_init_early,
++	.init_irq	= mx53_init_irq,
++	.timer		= &imx53_timer,
++	.init_machine	= imx53_dt_init,
++	.dt_compat	= imx53_dt_board_compat,
 +MACHINE_END
 diff --git a/arch/arm/plat-mxc/include/mach/common.h b/arch/arm/plat-mxc/include/mach/common.h
-index 96fc04d..125a3ea 100644
+index 4e3d978..96fc04d 100644
 --- a/arch/arm/plat-mxc/include/mach/common.h
 +++ b/arch/arm/plat-mxc/include/mach/common.h
-@@ -72,6 +72,7 @@ extern void mxc_arch_reset_init(void __iomem *);
+@@ -72,4 +72,9 @@ extern void mxc_arch_reset_init(void __iomem *);
  extern void mx51_efikamx_reset(void);
  extern int mx53_revision(void);
  extern int mx53_display_revision(void);
-+extern void imx51_babbage_common_init(void);
- extern void imx53_ard_common_init(void);
- extern void imx53_evk_common_init(void);
- extern void imx53_qsb_common_init(void);
++extern void imx53_ard_common_init(void);
++extern void imx53_evk_common_init(void);
++extern void imx53_qsb_common_init(void);
++extern void imx53_smd_common_init(void);
++
+ #endif
 -- 
 1.7.4.1
