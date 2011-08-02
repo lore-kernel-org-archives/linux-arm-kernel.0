@@ -1,218 +1,264 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Tue, 2 Aug 2011 16:49:06 +0800
+From: koen.beel.barco@gmail.com (Koen Beel)
+Date: Tue, 2 Aug 2011 10:55:16 +0200
 Subject: [PATCH v8 0/3] add the GPMI controller driver for IMX23/IMX28
-In-Reply-To: <CAHMSPgM4K5o_aGK31yyFcGK-hH4WBeqVkA5dZU=FvAiKGmHA9A@mail.gmail.com>
-References: <1311230846-26437-1-git-send-email-b32955@freescale.com>	<20018.43621.688990.319528@ipc1.ka-ro>	<CAHMSPgPXnDVO630P9fnogQ0XvPSrwz0MYzXfXZLJoJNRf1gifA@mail.gmail.com>	<201107311551.48223.marek.vasut@gmail.com>	<CAHMSPgMK_zM17NXgsbrzs8Zw0VXtDoP12_1V7oeROSF=aBDuYg@mail.gmail.com>	<4E379B28.7090902@freescale.com>
+In-Reply-To: <4E37AAF6.7020604@freescale.com>
+References: <1311230846-26437-1-git-send-email-b32955@freescale.com>
+	<20018.43621.688990.319528@ipc1.ka-ro>
+	<CAHMSPgPXnDVO630P9fnogQ0XvPSrwz0MYzXfXZLJoJNRf1gifA@mail.gmail.com>
+	<201107311551.48223.marek.vasut@gmail.com>
+	<CAHMSPgMK_zM17NXgsbrzs8Zw0VXtDoP12_1V7oeROSF=aBDuYg@mail.gmail.com>
+	<4E379B28.7090902@freescale.com>
 	<CAHMSPgM4K5o_aGK31yyFcGK-hH4WBeqVkA5dZU=FvAiKGmHA9A@mail.gmail.com>
-Message-ID: <4E37BA02.5030400@freescale.com>
+	<4E37AAF6.7020604@freescale.com>
+Message-ID: <CAHMSPgN9+QdhCigSRj3ePybDTx6QajbjGVmUCakxpmtjkbQvdg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Koen:
+Hi,
 
-I tested the driver in mx23evk board, and I do not find the DMA-timeout 
-error.
-
-The following is my test environment:
-[0] Hardware:
-        MX23EVK PCB REV C
-[1] SW:
-     kernel:git://git.linaro.org/people/shawnguo/linux-2.6.git mxs-gpmi
-     .config: my_config , you can find it in my previous email.
-     cmdline: console=ttyAMA0,115200 root=/dev/mmcblk0p1 rw rootwait 
-gpmi_debug_init mtdparts=gpmi-nand:20m(boot),-(user)
-
-[2] test shell script:
-================================
-
-echo 0x20 > /sys/module/gpmi_nand/parameters/gpmi_debug
-flash_eraseall /dev/mtd1
-ubiformat /dev/mtd1
-flash_eraseall /dev/mtd1
-ubiattach /dev/ubi_ctrl -m 1
-ubimkvol /dev/ubi0 -N test -m
-mount -t ubifs ubi0:test tmp
-bonnie++ -d tmp -u 0 -s 2 -r 1
-bonnie++ -d tmp -u 0 -s 2 -r 1
-bonnie++ -d tmp -u 0 -s 2 -r 1
-umount tmp
-ubidetach /dev/ubi_ctrl -m 1
-
-================================
-
-[3] conclusion
-    It runs well in my mx23 board, and no DMA-TIMEOUT occur.
-I think there is some conflict in your board.
-
-BTW:
-    I split the MTD to 20M and (the rest size).
-The flash_eraseall works well.
-If i do not split the MTD, the flash_eraseall will not work.
-I guest overflow occurs in some place.
-
-Best Regards
-Huang Shijie
-
-
-> On Tue, Aug 2, 2011 at 8:37 AM, Huang Shijie<b32955@freescale.com>  wrote:
+On Tue, Aug 2, 2011 at 9:44 AM, Huang Shijie <b32955@freescale.com> wrote:
+> Hi,
+>>
 >> Hi,
+>>
+>> On Tue, Aug 2, 2011 at 8:37 AM, Huang Shijie<b32955@freescale.com> ?wrote:
+>>>
 >>> Hi,
+>>>>
+>>>> Hi,
+>>>>
+>>>> Don't think it's a hardware issue. After all it is working on the
+>>>> mx23evk using the Freescale BSP based on 2.6.35.3.
 >>>
->>> Don't think it's a hardware issue. After all it is working on the
->>> mx23evk using the Freescale BSP based on 2.6.35.3.
->> I doubt the Freescale BSP has fix the conflict, while the community kernel
->> does not
->> fix it.
->> Anyway, I will do more test on the mx23 board myself.
-> Strange indeed. I suspect that the BSP used another way to mark bad blocks.
->
+>>> I doubt the Freescale BSP has fix the conflict, while the community
+>>> kernel
+>>> does not
+>>> fix it.
+>>> Anyway, I will do more test on the mx23 board myself.
 >>
+>> Strange indeed. I suspect that the BSP used another way to mark bad
+>> blocks.
 >>
->>> Now I tested using this kernel command line:
->>> mtdparts=gpmi-nand:20m(boot),-(user) gpmi_debug_init
->>> (So I removed the ubi rootfs stuff, see previous mails).
 >>>
->>> Its booting fine now without complaining about dma timeouts.
->> ok.
-> That's mainly because the ubi stuff is not done at startup.
->
->>> Have tried flash_eraseall /dev/mtd1. Now it's complaining and thinking
->>> all blocks are bad. So a "flash_erase: Skipping bad block at 1db00000"
->>> message for every erase block.
->>> Writing 1 to /sys/devices/platform/imx23-gpmi-nand/ignorebad, makes to
->> This is a very dangerous interface.
-> I know but it solved an issue here. Now flash_eraseall seems to be
-> working again without that ignorebad turned on (only finds one bad
-> erase blcok).
-> Again: I suspect that the BSP used another way to mark bad blocks.
->
->>> go a little further giving 'only one' error but I doubt it's working
->>> at all. See attached log file.
 >>>
->>> When the trying ubiformat /dev/mtd1 its stopping with a dma timeout.
->> echo 0x20>  /sys/devices/platform/imx23-gpmi-nand/gpmi_debug
+>>>> Now I tested using this kernel command line:
+>>>> mtdparts=gpmi-nand:20m(boot),-(user) gpmi_debug_init
+>>>> (So I removed the ubi rootfs stuff, see previous mails).
+>>>>
+>>>> Its booting fine now without complaining about dma timeouts.
+>>>
+>>> ok.
 >>
->> to show the GPMI register when the DMA timeout occurs.
-> Don't have this sysfs interface here. I also don't see where it is
-> registered in the driver code.
-> Anyway I have hardcoded GPMI_DEBUG_CRAZY in gpmi_debug_setup.
->
-> log file attached.
->
-> Regards,
-> Koen
->
+>> That's mainly because the ubi stuff is not done at startup.
 >>
->> Best Regards
->> Huang Shijie
->>> Every subsequent action (e.g. using ubiformat or flash_eraseall) using
->>> that dma channel is failing.
->>> I have put a printk in mxs-dma.c around line 387:
+>>>> Have tried flash_eraseall /dev/mtd1. Now it's complaining and thinking
+>>>> all blocks are bad. So a "flash_erase: Skipping bad block at 1db00000"
+>>>> message for every erase block.
+>>>> Writing 1 to /sys/devices/platform/imx23-gpmi-nand/ignorebad, makes to
 >>>
->>>      if (mxs_chan->status == DMA_IN_PROGRESS&&    !append)
->>>      {
->>>          pr_err("dma already in progess!\n");
->>>          return NULL;
->>>      }
+>>> This is a very dangerous interface.
+>>
+>> I know but it solved an issue here. Now flash_eraseall seems to be
+>> working again without that ignorebad turned on (only finds one bad
+>> erase blcok).
+>
+> Could you mail me your flash_eraseall?
+> Mine ?does not work.
+
+You want my flash_eraseall binary?
+
+I build all userspace, kernel, bootloader and toolchain using
+buildroot ( http://buildroot.uclibc.org/download.html ), which also
+includes all flash tools like flash_eraseall and ubiformat. In the
+buildroot menuconfig check the packages under 'Package Selection for
+the target > Hardware handling > mtd/jffs2 utilities'
+Buildroot will build everything needed to get a working system,
+including toolchain, uclibc, ... I really recommend that.
+
+Right now I use a kernel with the full rootfs as initramfs (standard
+option in buildroot). I just load the uImage (contains kernel and
+initramfs) using tftp in uboot. This way I'm not dependent on
+mmc/nfs/nand (no eth or mmc on my actual target and nand/ubi not yet
+working). Only downside is that I use some memory for it and I don't
+have any persistent storage on the rootfs right now.
+
+I have adapted buildroot a little to build the kernel out of tree.
+
+Anyway, if you want my flash_eraseall binary, see attachment.
+
+Regards,
+Koen
+
+>
+> so I can test your flash_eraseall first.
+>
+> Best Regards
+> Huang Shijie
+>>
+>> Again: I suspect that the BSP used another way to mark bad blocks.
+>>
+>>>> go a little further giving 'only one' error but I doubt it's working
+>>>> at all. See attached log file.
+>>>>
+>>>> When the trying ubiformat /dev/mtd1 its stopping with a dma timeout.
 >>>
->>> I see that printk also in the log file in attach. Seems like the
->>> mxs-dma is failing at some point and for the rest of the time always
->>> keeps it's status at DMA_IN_PROGRESS
+>>> echo 0x20> ?/sys/devices/platform/imx23-gpmi-nand/gpmi_debug
 >>>
->>> Any input or feedback is welcome.
+>>> to show the GPMI register when the DMA timeout occurs.
+>>
+>> Don't have this sysfs interface here. I also don't see where it is
+>> registered in the driver code.
+>> Anyway I have hardcoded GPMI_DEBUG_CRAZY in gpmi_debug_setup.
+>>
+>> log file attached.
+>>
+>> Regards,
+>> Koen
+>>
 >>>
->>> Regards,
->>> Koen
->>>
->>>
->>> On Sun, Jul 31, 2011 at 3:51 PM, Marek Vasut<marek.vasut@gmail.com>
->>>   wrote:
->>>> On Friday, July 29, 2011 05:00:48 PM Koen Beel wrote:
->>>>> On Fri, Jul 29, 2011 at 2:41 PM, Lothar Wa?mann<LW@karo-electronics.de>
->>>> wrote:
->>>>>> Hi,
+>>> Best Regards
+>>> Huang Shijie
+>>>>
+>>>> Every subsequent action (e.g. using ubiformat or flash_eraseall) using
+>>>> that dma channel is failing.
+>>>> I have put a printk in mxs-dma.c around line 387:
+>>>>
+>>>> ? ? if (mxs_chan->status == DMA_IN_PROGRESS&& ? ?!append)
+>>>> ? ? {
+>>>> ? ? ? ? pr_err("dma already in progess!\n");
+>>>> ? ? ? ? return NULL;
+>>>> ? ? }
+>>>>
+>>>> I see that printk also in the log file in attach. Seems like the
+>>>> mxs-dma is failing at some point and for the rest of the time always
+>>>> keeps it's status at DMA_IN_PROGRESS
+>>>>
+>>>> Any input or feedback is welcome.
+>>>>
+>>>> Regards,
+>>>> Koen
+>>>>
+>>>>
+>>>> On Sun, Jul 31, 2011 at 3:51 PM, Marek Vasut<marek.vasut@gmail.com>
+>>>> ?wrote:
+>>>>>
+>>>>> On Friday, July 29, 2011 05:00:48 PM Koen Beel wrote:
 >>>>>>
->>>>>> Koen Beel writes:
+>>>>>> On Fri, Jul 29, 2011 at 2:41 PM, Lothar
+>>>>>> Wa?mann<LW@karo-electronics.de>
+>>>>>
+>>>>> wrote:
+>>>>>>>
 >>>>>>> Hi,
 >>>>>>>
->>>>>>> On Fri, Jul 29, 2011 at 9:20 AM, Lothar
->>>>>>> Wa?mann<LW@karo-electronics.de>
->>>> wrote:
+>>>>>>> Koen Beel writes:
+>>>>>>>>
 >>>>>>>> Hi,
 >>>>>>>>
->>>>>>>> Koen Beel writes:
+>>>>>>>> On Fri, Jul 29, 2011 at 9:20 AM, Lothar
+>>>>>>>> Wa?mann<LW@karo-electronics.de>
+>>>>>
+>>>>> wrote:
+>>>>>>>>>
 >>>>>>>>> Hi,
 >>>>>>>>>
->>>>>>>>> I have test on mx23evk board. Still see the same issues.
->>>>>>>>>
->>>>>>>>> On Wed, Jul 27, 2011 at 3:53 AM, Huang Shijie<b32955@freescale.com>
->>>> wrote:
+>>>>>>>>> Koen Beel writes:
+>>>>>>>>>>
 >>>>>>>>>> Hi,
 >>>>>>>>>>
->>>>>>>>>> Thanks for your test.
+>>>>>>>>>> I have test on mx23evk board. Still see the same issues.
 >>>>>>>>>>
+>>>>>>>>>> On Wed, Jul 27, 2011 at 3:53 AM, Huang
+>>>>>>>>>> Shijie<b32955@freescale.com>
+>>>>>
+>>>>> wrote:
+>>>>>>>>>>>
 >>>>>>>>>>> Hi,
 >>>>>>>>>>>
->>>>>>>>>>> It's not really working for me.
->>>>>>>>>>> I've applied all gpmi-nand driver patches and the dma driver
->>>>>>>>>>> patches.
+>>>>>>>>>>> Thanks for your test.
 >>>>>>>>>>>
->>>>>>>>>>> I have added following kernel parameters:
->>>>>>>>>>> mtdparts=gpmi-nand:20m(boot),-(user) ubi.mtd=1 root=ubi0:rootfs0
->>>>>>>>>>> rootfstype=ubifs gpmi_debug_init
->>>>>>>>>>>
->>>>>>>>>>> During boot I get already get DMA timeout:
->>>>>>>>>>> [    2.560000] [ start_dma_without_bch_irq : 392 ] DMA timeout,
->>>>>>>>>>> last DMA
->>>>>>>>>>>
->>>>>>>>>>> :1
->>>>>>>>>>>
->>>>>>>>>>> [    3.560000] [ start_dma_with_bch_irq : 427 ] bch timeout!!!
->>>>>>>>>>> ...
->>>>>>>>>>> (see log file in attach line 89)
->>>>>>>>> I still see this DMA timeout when booting.
->>>>>>>>> What kernel parameters do you use? I still use same as above.
->>>>>>>> Do you have an SD card in the system? I'm getting the same error when
->>>>>>>> accessing an SD card. Without SD card I can use the flash without any
->>>>>>>> errors.
->>>>>>> No SD card in the system. At least not on my mx23evk board.
->>>>>>> My real target hardware has a SDIO wifi chip.
+>>>>>>>>>>>> Hi,
+>>>>>>>>>>>>
+>>>>>>>>>>>> It's not really working for me.
+>>>>>>>>>>>> I've applied all gpmi-nand driver patches and the dma driver
+>>>>>>>>>>>> patches.
+>>>>>>>>>>>>
+>>>>>>>>>>>> I have added following kernel parameters:
+>>>>>>>>>>>> mtdparts=gpmi-nand:20m(boot),-(user) ubi.mtd=1 root=ubi0:rootfs0
+>>>>>>>>>>>> rootfstype=ubifs gpmi_debug_init
+>>>>>>>>>>>>
+>>>>>>>>>>>> During boot I get already get DMA timeout:
+>>>>>>>>>>>> [ ? ?2.560000] [ start_dma_without_bch_irq : 392 ] DMA timeout,
+>>>>>>>>>>>> last DMA
+>>>>>>>>>>>>
+>>>>>>>>>>>> :1
+>>>>>>>>>>>>
+>>>>>>>>>>>> [ ? ?3.560000] [ start_dma_with_bch_irq : 427 ] bch timeout!!!
+>>>>>>>>>>>> ...
+>>>>>>>>>>>> (see log file in attach line 89)
+>>>>>>>>>>
+>>>>>>>>>> I still see this DMA timeout when booting.
+>>>>>>>>>> What kernel parameters do you use? I still use same as above.
+>>>>>>>>>
+>>>>>>>>> Do you have an SD card in the system? I'm getting the same error
+>>>>>>>>> when
+>>>>>>>>> accessing an SD card. Without SD card I can use the flash without
+>>>>>>>>> any
+>>>>>>>>> errors.
+>>>>>>>>
+>>>>>>>> No SD card in the system. At least not on my mx23evk board.
+>>>>>>>> My real target hardware has a SDIO wifi chip.
+>>>>>>>>
+>>>>>>>> Are you also testing on the mx23evk board? Really strange it is not
+>>>>>>>> reproducible here then.
+>>>>>>>> Anyone using mx23evk please give:
+>>>>>>>> - revision number of board (I have tested on rev C1)
+>>>>>>>> - kernel parameter used (see previous mail for mine)
 >>>>>>>
->>>>>>> Are you also testing on the mx23evk board? Really strange it is not
->>>>>>> reproducible here then.
->>>>>>> Anyone using mx23evk please give:
->>>>>>> - revision number of board (I have tested on rev C1)
->>>>>>> - kernel parameter used (see previous mail for mine)
->>>>>> It's getting ever more strange. I only have problems with concurrent
->>>>>> access to the flash and SD-card when I do file system based accessed
->>>>>> to the SD card.
->>>>>> A 'dd if=/dev/mmcblk0 of=/dev/null' while excessively using the flash
->>>>>> works well, while mounting the SD card and doing an 'ls' produces
->>>>>> immediate BCH DMA timeouts.
+>>>>>>> It's getting ever more strange. I only have problems with concurrent
+>>>>>>> access to the flash and SD-card when I do file system based accessed
+>>>>>>> to the SD card.
+>>>>>>> A 'dd if=/dev/mmcblk0 of=/dev/null' while excessively using the flash
+>>>>>>> works well, while mounting the SD card and doing an 'ls' produces
+>>>>>>> immediate BCH DMA timeouts.
+>>>>>>>
+>>>>>>> Perhaps someone can make anything out of that.
 >>>>>>
->>>>>> Perhaps someone can make anything out of that.
->>>>> I have checked and the function dma_irq_callback is never called
->>>>> during my tests. This means the DMA transfer does not even works once.
+>>>>>> I have checked and the function dma_irq_callback is never called
+>>>>>> during my tests. This means the DMA transfer does not even works once.
+>>>>>>
+>>>>>> Also no clue here ...
 >>>>>
->>>>> Also no clue here ...
->>>> Aren't you getting some undervolt on the powerrail for example ? btw the
->>>> driver
->>>> looks a bit crappy to me, but let's believe it works ;-)
->>>>
->>>>>> Lothar Wa?mann
->>>>>> --
->>>>>> ___________________________________________________________
+>>>>> Aren't you getting some undervolt on the powerrail for example ? btw
+>>>>> the
+>>>>> driver
+>>>>> looks a bit crappy to me, but let's believe it works ;-)
+>>>>>
+>>>>>>> Lothar Wa?mann
+>>>>>>> --
+>>>>>>> ___________________________________________________________
+>>>>>>>
+>>>>>>> Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+>>>>>>> Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+>>>>>>> Gesch?ftsf?hrer: Matthias Kaussen
+>>>>>>> Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+>>>>>>>
+>>>>>>> www.karo-electronics.de | info at karo-electronics.de
+>>>>>>> ___________________________________________________________
 >>>>>>
->>>>>> Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
->>>>>> Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
->>>>>> Gesch?ftsf?hrer: Matthias Kaussen
->>>>>> Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
->>>>>>
->>>>>> www.karo-electronics.de | info at karo-electronics.de
->>>>>> ___________________________________________________________
->>>>> _______________________________________________
->>>>> linux-arm-kernel mailing list
->>>>> linux-arm-kernel at lists.infradead.org
->>>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
->>
+>>>>>> _______________________________________________
+>>>>>> linux-arm-kernel mailing list
+>>>>>> linux-arm-kernel at lists.infradead.org
+>>>>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>>
+>>>
+>
+>
+>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: flash_eraseall
+Type: application/octet-stream
+Size: 149 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110802/83a12a4e/attachment.obj>
