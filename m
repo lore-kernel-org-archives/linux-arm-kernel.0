@@ -1,105 +1,128 @@
-From: mtittinge@hotmail.com (Marc Titinger)
-Date: Tue, 2 Aug 2011 11:32:34 +0200
-Subject: kernel debugging (KGDB or JTAG)
-In-Reply-To: <op.vzkug7a5yxxkfz@localhost.localdomain>
-References: <op.vzkug7a5yxxkfz@localhost.localdomain>
-Message-ID: <DUB104-W248D7326D53A542D254154BA3B0@phx.gbl>
+From: B29396@freescale.com (Dong Aisheng-B29396)
+Date: Tue, 2 Aug 2011 09:41:22 +0000
+Subject: [PATCH 1/1] ASoC: core: cache index fix
+In-Reply-To: <20110802083850.GB9553@opensource.wolfsonmicro.com>
+References: <1312198690-13237-1-git-send-email-b29396@freescale.com>
+	<20110801115150.GB16629@opensource.wolfsonmicro.com>
+	<65EE16ACC360FA4D99C96DC085B3F7721F410B@039-SN1MPN1-002.039d.mgd.msft.net>
+	<20110802083850.GB9553@opensource.wolfsonmicro.com>
+Message-ID: <65EE16ACC360FA4D99C96DC085B3F7721F427D@039-SN1MPN1-002.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+> -----Original Message-----
+> From: Mark Brown [mailto:broonie at opensource.wolfsonmicro.com]
+> Sent: Tuesday, August 02, 2011 4:39 PM
+> To: Dong Aisheng-B29396
+> Cc: alsa-devel at alsa-project.org; linux-arm-kernel at lists.infradead.org;
+> lrg at ti.com; s.hauer at pengutronix.de; w.sang at pengutronix.de
+> Subject: Re: [PATCH 1/1] ASoC: core: cache index fix
+> 
+> On Tue, Aug 02, 2011 at 08:03:23AM +0000, Dong Aisheng-B29396 wrote:
+> 
+> 
+> > > ...hw_read() shouldn't need to know about this stuff
+> > Here the reg_cache_size is the maximum cache index in the register
+> cache array.
+> > Therefore, the original code using reg to compare with reg_cache_size
+> > is not correct when the reg_cache_step is not 1.
+> > e.g. the reg to read is 0x30 and reg_cache_size maybe only 0x16.
+> > So we use idx to check if it exceeds the cache size.
+> 
+> I see what you're doing, but like I say this is just legacy code that
+> shouldn't be peering at the cache size any more and layering additional
+> stuff in is just going to make the situation worse.
+> 
+> > BTW, do you mean the soc_io layer does not need to know the details of
+> > idx&reg Conversion?
+> 
+> Yes.
+> 
+> > Do I need to implement a help function like reg_is_cachable(reg) to be
+> used here?
+> 
+> No, I think we should hide these decisions completely within the cache
+> code.
+
+Yes, but the issue is that hw_read will check if reg is in cache array
+And checking like " if (reg >= codec->driver->reg_cache_size ||" is wrong
+when the step is not 1 that will cause registers with their index are greater
+than cache index will not be able to fetch data from cache.
+
+If we high this in cache code, do you mean hide it in snd_soc_cache_read?
+If that, the hw_read may fail and it looks not as we expected.
+
+@@ -62,8 +65,11 @@ static unsigned int hw_read(struct snd_soc_codec *codec, unsigned int reg)  {
+ 	int ret;
+ 	unsigned int val;
++	unsigned int idx;
++
++	idx = snd_soc_cache_reg_to_idx(codec, reg);
+ 
+-	if (reg >= codec->driver->reg_cache_size ||
++	if (idx >= codec->driver->reg_cache_size ||
+ 	    snd_soc_codec_volatile_register(codec, reg) ||
+ 	    codec->cache_bypass) {
+ 		if (codec->cache_only)
 
 
+> > The cache block in each rbnode is still using cache index to fetch
+> > value which is similar like flat cache.
+> > (see snd_soc_rbtree_get_register & snd_soc_rbtree_set_register).
+> > Additionally, the snd_soc_rbtree_cache_init using cache index to do
+> > init by default. However, the rbtree_cache_read/write still use reg to
+> index.
+> 
+> This doesn't mean it's a good idea to add extra complexity here!  
+I agree.
 
-----------------------------------------
-> Subject: kernel debugging (KGDB or JTAG)
-> To: linux-arm-kernel at lists.infradead.org
-> From: xhpohanka at gmail.com
-> Date: Tue, 2 Aug 2011 10:13:45 +0200
->
-> Dear all,
+> A
+> register map with step size greater than one should never have more than
+> one register in a block anyway with the current code so the step size
+> should never be perceptible.
+The question is that rbtree uses reg index to index as follows:
+        if (rbnode) {
+                snd_soc_rbtree_get_base_top_reg(rbnode, &base_reg, &top_reg);
+                if (reg >= base_reg && reg <= top_reg) {
+                        reg_tmp = reg - base_reg;
+                        *value = snd_soc_rbtree_get_register(rbnode, reg_tmp);
+                        return 0;
+                }
+        }
+So the block may be reg0, reg2, reg4.....
+And the block is flat, the value is get/set by rbnode->block[reg_tmp]:
+I understand right, there may be hole in the block, right?
 
-Hi Jan, 
+> > The main problem is that the default cache array is indexed by cache
+> > index like cache[idx] while all io function using reg to fetch data.
+> > Many places in cache core miss used cache index and reg index.
+> 
+> > The purpose of this patch is to use both of them in correct places.
+> > The simple rule is converted to cache index to fetch data from cache
+> > when do Register io.
+> 
+> We need to deal with this sanely, dancing around with step sizes in every
+> place where we access registers is just not going to be maintainable.
+> Essentially no modern hardware uses step sizes other than one so they'll
+> get very little testing, especially with the advanced cache mechanisms
+> which aren't really useful on older CODECs, and the additional complexity
+> really hurts legibility.
+Yes, I agree that we should not introduce too much additional complexity.
+The better case may be that only change the rbtree init code to get correct
+Register value for the registers. Then the rbtree_cache_read/write can index
+the register correctly.
+(I also think the rbtree cache should not know step)
 
->
-> I'd like to ask if anyone has working setup for kernel debugging on arm
-> target. I have tried two boards (one with at91sam9g20, second with
-> freescale i.mx27) with Segger j-link and kgdb with similar and not very
-> useful results. I have Ubuntu 11.04 as development host and latest
-> codesourcery arm-none-(linux-gnu)eabi toolchain.
->
-> Using 2.6.39 I was able to compile the sources with KGDB enabled. I'm also
-> able to enter kdb terminal and connect with arm-none-eabi-gdb. Setting and
-> triggering breakpoints works well, but single stepping (which is essential
-> to me) does not. Here is the example
+Then the only complexity is checking reg index for flat cache read/write
+But that is really needed for different cache step of flat cache.
 
-did you select "compile with debug info" in the kernel hacking menu ? 
+> It occurs to me that what we want to do here may be to make a new
+> register cache type for step sizes then hide all the complexity for these
+> devices in there.  That keeps everything together and ensures that newer
+> devices don't pay a complexity cost.
+If we add new cache type, does it have any big difference with FLAT?
+Maybe if we can fix the cache step issue, the FLAT cache can be reuse.
 
->
-> Breakpoint 1, 0xc00e40d4 in sys_sync () at
-> /home/honza/_dev/kernel/linux-2.6.39.y/fs/sync.c:190
-> 190 }
-> (gdb) list
-> 185 ret = err;
-> 186 mutex_unlock(&mapping->host->i_mutex);
-> 187
-> 188 out:
-> 189 return ret;
-> 190 }
-> 191 EXPORT_SYMBOL(vfs_fsync_range);
-> 192
-> 193 /**
-> 194 * vfs_fsync - perform a fsync or fdatasync on a file
-> (gdb) s
-> Sending packet: $Hc148#48...Ack
-> Packet received: OK
-> Sending packet: $s#73...Ack
-> Packet received:
-> warning: Invalid remote reply:
->
-> ... now gdb hangs forever
->
-> Using j-ling JTAG probe from segger I can't start debug session at all.
-> When JLinkGDBServer connects it resets the board and I'm not able to
-> resume the execution. I have found e.g. this howto
-
-you must probably pass some option to tell the jtag interface not to issue the TRST signal and any init "pokes" it might do,? if you to attach to a running kernel instead of booting it through jtag. 
-
-
-Cheers,
-Marc. 
-
-
-> http://www.timesys.com/embedded-linux/docs/Debug_Linux_kernel_with_a_JTAG_from_Segger
-> but as I said it is not working for me.
->
-> Here is the log from JLinkGDBServer
->
-> J-Link connected
-> Firmware: J-Link ARM V8 compiled Jul 5 2011 20:48:23
-> Hardware: V8.00
-> S/N: 58004787
->
-> J-Link found 2 JTAG devices, Total IRLen = 8
-> JTAG ID: 0x07926121 (ARM9)
->
-> Connected to 127.0.0.1
-> Reading all registers
-> WARNING: Failed to read cacheable memory @ address 0x00000000
-> Read 4 bytes @ address 0x00000000 (Data = 0x00000000)
-> Starting target CPU...
->
->
-> Any advice will be greatly appreciated...
->
-> with best regards
-> Jan
->
-> --
-> Tato zpr?va byla vytvo?ena p?evratn?m po?tovn?m klientem Opery:
-> http://www.opera.com/mail/
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
- 		 	   		  
+> For the register default tables it's probably sensible to just pad them
+> out with the zero registers; it'll cost a little space but not too much.
+Yes, it's the most easy way now.
