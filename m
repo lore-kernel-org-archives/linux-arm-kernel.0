@@ -1,37 +1,75 @@
-From: tiwai@suse.de (Takashi Iwai)
-Date: Tue, 02 Aug 2011 12:38:59 +0200
+From: B29396@freescale.com (Dong Aisheng-B29396)
+Date: Tue, 2 Aug 2011 10:55:25 +0000
 Subject: [alsa-devel] [PATCH 1/1] ASoC: core: cache index fix
-In-Reply-To: <20110802095141.GA2095@pengutronix.de>
+In-Reply-To: <s5hy5zcnlu8.wl%tiwai@suse.de>
 References: <1312198690-13237-1-git-send-email-b29396@freescale.com>
 	<20110801115150.GB16629@opensource.wolfsonmicro.com>
 	<65EE16ACC360FA4D99C96DC085B3F7721F410B@039-SN1MPN1-002.039d.mgd.msft.net>
 	<20110802083850.GB9553@opensource.wolfsonmicro.com>
-	<20110802095141.GA2095@pengutronix.de>
-Message-ID: <s5hvcugnlmk.wl%tiwai@suse.de>
+	<65EE16ACC360FA4D99C96DC085B3F7721F427D@039-SN1MPN1-002.039d.mgd.msft.net>
+	<s5hy5zcnlu8.wl%tiwai@suse.de>
+Message-ID: <65EE16ACC360FA4D99C96DC085B3F7721F43AA@039-SN1MPN1-002.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At Tue, 2 Aug 2011 11:51:41 +0200,
-Wolfram Sang wrote:
+> -----Original Message-----
+> From: Takashi Iwai [mailto:tiwai at suse.de]
+> Sent: Tuesday, August 02, 2011 6:34 PM
+> To: Dong Aisheng-B29396
+> Cc: Mark Brown; alsa-devel at alsa-project.org; s.hauer at pengutronix.de;
+> lrg at ti.com; linux-arm-kernel at lists.infradead.org; w.sang at pengutronix.de
+> Subject: Re: [alsa-devel] [PATCH 1/1] ASoC: core: cache index fix
 > 
-> @@ -1023,12 +981,10 @@ static int sgtl5000_suspend(struct snd_soc_codec *codec, pm_message_t state)
->  static int sgtl5000_restore_regs(struct snd_soc_codec *codec)
->  {
->  	u16 *cache = codec->reg_cache;
-> -	int i;
-> -	int regular_regs = SGTL5000_CHIP_SHORT_CTRL >> 1;
-> +	u16 reg;
->  
->  	/* restore regular registers */
-> -	for (i = 0; i < regular_regs; i++) {
-> -		int reg = i << 1;
-> +	for (reg = 0; reg <= SGTL5000_CHIP_SHORT_CTRL; reg += 2) {
-
-Heh, this exposed another bug in the original code :)
-It should have been
-	for (i = 0; i <= regular_regs; i++) {
-
-
-thanks,
-
-Takashi
+> At Tue, 2 Aug 2011 09:41:22 +0000,
+> Dong Aisheng-B29396 wrote:
+> >
+> > > -----Original Message-----
+> > > From: Mark Brown [mailto:broonie at opensource.wolfsonmicro.com]
+> > > Sent: Tuesday, August 02, 2011 4:39 PM
+> > > To: Dong Aisheng-B29396
+> > > Cc: alsa-devel at alsa-project.org;
+> > > linux-arm-kernel at lists.infradead.org;
+> > > lrg at ti.com; s.hauer at pengutronix.de; w.sang at pengutronix.de
+> > > Subject: Re: [PATCH 1/1] ASoC: core: cache index fix
+> > >
+> > > On Tue, Aug 02, 2011 at 08:03:23AM +0000, Dong Aisheng-B29396 wrote:
+> > >
+> > >
+> > > > > ...hw_read() shouldn't need to know about this stuff
+> > > > Here the reg_cache_size is the maximum cache index in the register
+> > > cache array.
+> > > > Therefore, the original code using reg to compare with
+> > > > reg_cache_size is not correct when the reg_cache_step is not 1.
+> > > > e.g. the reg to read is 0x30 and reg_cache_size maybe only 0x16.
+> > > > So we use idx to check if it exceeds the cache size.
+> > >
+> > > I see what you're doing, but like I say this is just legacy code
+> > > that shouldn't be peering at the cache size any more and layering
+> > > additional stuff in is just going to make the situation worse.
+> > >
+> > > > BTW, do you mean the soc_io layer does not need to know the
+> > > > details of idx&reg Conversion?
+> > >
+> > > Yes.
+> > >
+> > > > Do I need to implement a help function like reg_is_cachable(reg)
+> > > > to be
+> > > used here?
+> > >
+> > > No, I think we should hide these decisions completely within the
+> > > cache code.
+> >
+> > Yes, but the issue is that hw_read will check if reg is in cache array
+> > And checking like " if (reg >= codec->driver->reg_cache_size ||" is
+> > wrong when the step is not 1 that will cause registers with their
+> > index are greater than cache index will not be able to fetch data from
+> cache.
+> 
+> reg_cache_size is supposed to be the real size of the cache table.
+> This isn't influenced by reg_cache_step value.  So, the behavior in soc-
+> io.c (and other ASoC core) is correct.
+But the reg is related to step.
+So reg and reg_cache_size are un-match when step > 1, right?
+ 
+> That is, the codec drivers setting ARRAY_SIZE() to reg_cache_size with
+> reg_cache_step > 1 are buggy and should be fixed.
