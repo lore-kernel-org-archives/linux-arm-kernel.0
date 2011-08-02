@@ -1,114 +1,106 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 2 Aug 2011 09:22:11 +0800
-Subject: [PATCH v3 1/2] arm/mx5: add device tree support for imx53 boards
-In-Reply-To: <20110802065814.GM31404@pengutronix.de>
-References: <1312226252-8566-1-git-send-email-shawn.guo@linaro.org>
-	<1312226252-8566-2-git-send-email-shawn.guo@linaro.org>
-	<20110802065814.GM31404@pengutronix.de>
-Message-ID: <20110802012209.GA23413@freescale.com>
+From: tony.lin@freescale.com (Tony Lin)
+Date: Tue, 2 Aug 2011 16:39:40 +0800
+Subject: [PATCH v4 1/7] ARM: mxs: ehci: consolidate definitions and structures
+	to share among platforms
+In-Reply-To: <1312274386-6833-1-git-send-email-tony.lin@freescale.com>
+References: <1312274386-6833-1-git-send-email-tony.lin@freescale.com>
+Message-ID: <1312274386-6833-2-git-send-email-tony.lin@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 02, 2011 at 08:58:14AM +0200, Sascha Hauer wrote:
-> On Tue, Aug 02, 2011 at 03:17:31AM +0800, Shawn Guo wrote:
-> > From: Shawn Guo <shawn.guo@freescale.com>
-> > 
-> > It adds device tree support for imx53 boards.
-> > 
-> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > Cc: Grant Likely <grant.likely@secretlab.ca>
-> > Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> > ---
-> >  .../devicetree/bindings/arm/fsl/boards.txt         |   15 ++
-> >  arch/arm/boot/dts/imx53-ard.dts                    |  158 +++++++++++++
-> >  arch/arm/boot/dts/imx53-evk.dts                    |  144 ++++++++++++
-> >  arch/arm/boot/dts/imx53-qsb.dts                    |  148 ++++++++++++
-> >  arch/arm/boot/dts/imx53-smd.dts                    |  169 ++++++++++++++
-> >  arch/arm/boot/dts/imx53.dtsi                       |  244 ++++++++++++++++++++
-> >  arch/arm/mach-mx5/Kconfig                          |   12 +
-> >  arch/arm/mach-mx5/Makefile                         |    2 +
-> >  arch/arm/mach-mx5/board-mx53_ard.c                 |    9 +-
-> >  arch/arm/mach-mx5/board-mx53_evk.c                 |    5 +
-> >  arch/arm/mach-mx5/board-mx53_loco.c                |    5 +
-> >  arch/arm/mach-mx5/board-mx53_smd.c                 |    5 +
-> >  arch/arm/mach-mx5/imx53-dt.c                       |  143 ++++++++++++
-> >  arch/arm/plat-mxc/include/mach/common.h            |    2 +
-> >  arch/arm/plat-mxc/include/mach/iomux-mx53.h        |    5 +
-> >  arch/arm/plat-mxc/include/mach/iomux-v3.h          |    5 +
-> >  16 files changed, 1069 insertions(+), 2 deletions(-)
-> >  create mode 100644 Documentation/devicetree/bindings/arm/fsl/boards.txt
-> >  create mode 100644 arch/arm/boot/dts/imx53-ard.dts
-> >  create mode 100644 arch/arm/boot/dts/imx53-evk.dts
-> >  create mode 100644 arch/arm/boot/dts/imx53-qsb.dts
-> >  create mode 100644 arch/arm/boot/dts/imx53-smd.dts
-> >  create mode 100644 arch/arm/boot/dts/imx53.dtsi
-> >  create mode 100644 arch/arm/mach-mx5/imx53-dt.c
-> 
-> I noticed that the iomux setup is gone for now which makes me very
-> happy :) I didn't have a good feeling about this.
-> 
-But it's just for now :)  We anyway need to set it up from device tree
-sooner or later.
+move common definitions and data structures used for mxs and mxc
+platforms to fsl_device.h from mxc_ehci.h
+so that these definitions and structures could be shared without
+duplicated copies.
 
-> > 
-> > diff --git a/arch/arm/boot/dts/imx53-ard.dts b/arch/arm/boot/dts/imx53-ard.dts
-> > new file mode 100644
-> > index 0000000..fd0cf2c
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/imx53-ard.dts
-> > @@ -0,0 +1,158 @@
-> > +/*
-> > + * Copyright 2011 Freescale Semiconductor, Inc.
-> > + * Copyright 2011 Linaro Ltd.
-> > + *
-> > + * The code contained herein is licensed under the GNU General Public
-> > + * License. You may obtain a copy of the GNU General Public License
-> > + * Version 2 or later at the following locations:
-> > + *
-> > + * http://www.opensource.org/licenses/gpl-license.html
-> > + * http://www.gnu.org/copyleft/gpl.html
-> > + */
-> > +
-> > +/dts-v1/;
-> > +/include/ "imx53.dtsi"
-> > +
-> > +/ {
-> > +	model = "Freescale i.MX53 Automotive Reference Design Board";
-> > +	compatible = "fsl,imx53-ard", "fsl,imx53";
-> > +
-> > +	chosen {
-> > +		bootargs = "console=ttymxc0,115200 root=/dev/mmcblk0p3 rootwait";
-> > +	};
-> > +
-> > +	memory {
-> > +		reg = <0x70000000 0x40000000>;
-> > +	};
-> > +
-> > +	aips at 50000000 { /* AIPS1 */
-> > +		spba at 50000000 {
-> > +			esdhc at 50004000 { /* ESDHC1 */
-> > +				cd-gpios = <&gpio0 1 0>; /* GPIO1_1 */
-> > +				wp-gpios = <&gpio0 9 0>; /* GPIO1_9 */
-> > +			};
-> > +
-> > +			esdhc at 50008000 { /* ESDHC2 */
-> > +				status = "disabled";
-> > +			};
-> 
-> I know the decision is that all devices are enabled by default and must
-> be explicitely disabled like this. I really hope we can change this in
-> the future for the following reasons:
-> 
-> - The imx53 device tree is not complete, several devices like nand, ipu
->   and rtc are missing. Now when imx53.dtsi gets the nand device, all
->   board devicetrees have to be changed to keep the old behaviour.
-> - Most enabled device entries like the esdhc1 above have additional
->   nodes like cd-gpios anyway, so they must appear in the board tree
->   whereas the disabled devices just add additional churn.
-> 
-I fully have your back on this point.  Let's try one more time to
-change Grant's mind.
+Signed-off-by: Tony Lin <tony.lin@freescale.com>
+---
+ arch/arm/plat-mxc/include/mach/mxc_ehci.h |   19 -------------------
+ drivers/usb/host/ehci-mxc.c               |    4 +---
+ include/linux/fsl_devices.h               |   19 +++++++++++++++++++
+ 3 files changed, 20 insertions(+), 22 deletions(-)
 
+diff --git a/arch/arm/plat-mxc/include/mach/mxc_ehci.h b/arch/arm/plat-mxc/include/mach/mxc_ehci.h
+index 2c159dc..8775807 100644
+--- a/arch/arm/plat-mxc/include/mach/mxc_ehci.h
++++ b/arch/arm/plat-mxc/include/mach/mxc_ehci.h
+@@ -1,17 +1,6 @@
+ #ifndef __INCLUDE_ASM_ARCH_MXC_EHCI_H
+ #define __INCLUDE_ASM_ARCH_MXC_EHCI_H
+ 
+-/* values for portsc field */
+-#define MXC_EHCI_PHY_LOW_POWER_SUSPEND	(1 << 23)
+-#define MXC_EHCI_FORCE_FS		(1 << 24)
+-#define MXC_EHCI_UTMI_8BIT		(0 << 28)
+-#define MXC_EHCI_UTMI_16BIT		(1 << 28)
+-#define MXC_EHCI_SERIAL			(1 << 29)
+-#define MXC_EHCI_MODE_UTMI		(0 << 30)
+-#define MXC_EHCI_MODE_PHILIPS		(1 << 30)
+-#define MXC_EHCI_MODE_ULPI		(2 << 30)
+-#define MXC_EHCI_MODE_SERIAL		(3 << 30)
+-
+ /* values for flags field */
+ #define MXC_EHCI_INTERFACE_DIFF_UNI	(0 << 0)
+ #define MXC_EHCI_INTERFACE_DIFF_BI	(1 << 0)
+@@ -39,14 +28,6 @@
+ #define MX5_USB_UTMI_PHYCTRL1_PLLDIV_MASK		0x3
+ #define MX5_USB_UTMI_PHYCTRL1_PLLDIV_SHIFT		0
+ 
+-struct mxc_usbh_platform_data {
+-	int (*init)(struct platform_device *pdev);
+-	int (*exit)(struct platform_device *pdev);
+-
+-	unsigned int		 portsc;
+-	struct otg_transceiver	*otg;
+-};
+-
+ int mx51_initialize_usb_hw(int port, unsigned int flags);
+ int mx25_initialize_usb_hw(int port, unsigned int flags);
+ int mx31_initialize_usb_hw(int port, unsigned int flags);
+diff --git a/drivers/usb/host/ehci-mxc.c b/drivers/usb/host/ehci-mxc.c
+index 0c058be..cbf60a6 100644
+--- a/drivers/usb/host/ehci-mxc.c
++++ b/drivers/usb/host/ehci-mxc.c
+@@ -23,9 +23,7 @@
+ #include <linux/usb/otg.h>
+ #include <linux/usb/ulpi.h>
+ #include <linux/slab.h>
+-
+-#include <mach/mxc_ehci.h>
+-
++#include <linux/fsl_devices.h>
+ #include <asm/mach-types.h>
+ 
+ #define ULPI_VIEWPORT_OFFSET	0x170
+diff --git a/include/linux/fsl_devices.h b/include/linux/fsl_devices.h
+index fffdf00..cb19260 100644
+--- a/include/linux/fsl_devices.h
++++ b/include/linux/fsl_devices.h
+@@ -103,6 +103,25 @@ struct fsl_usb2_platform_data {
+ 
+ #define FLS_USB2_WORKAROUND_ENGCM09152	(1 << 0)
+ 
++/* values for portsc field */
++#define MXC_EHCI_PHY_LOW_POWER_SUSPEND	(1 << 23)
++#define MXC_EHCI_FORCE_FS		(1 << 24)
++#define MXC_EHCI_UTMI_8BIT		(0 << 28)
++#define MXC_EHCI_UTMI_16BIT		(1 << 28)
++#define MXC_EHCI_SERIAL			(1 << 29)
++#define MXC_EHCI_MODE_UTMI		(0 << 30)
++#define MXC_EHCI_MODE_PHILIPS		(1 << 30)
++#define MXC_EHCI_MODE_ULPI		(2 << 30)
++#define MXC_EHCI_MODE_SERIAL		(3 << 30)
++
++struct mxc_usbh_platform_data {
++	int (*init)(struct platform_device *pdev);
++	int (*exit)(struct platform_device *pdev);
++
++	unsigned int		portsc;
++	struct otg_transceiver	*otg;
++};
++
+ struct spi_device;
+ 
+ struct fsl_spi_platform_data {
 -- 
-Regards,
-Shawn
+1.7.0.4
