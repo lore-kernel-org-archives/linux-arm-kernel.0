@@ -1,68 +1,27 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 2 Aug 2011 14:40:26 +0200
-Subject: [PULL] at91 init factorize
-In-Reply-To: <4E35CC42.8050403@atmel.com>
-References: <20110727121156.GK10037@game.jcrosoft.org>
-	<201107271647.44015.arnd@arndb.de>
-	<20110727233452.GN10037@game.jcrosoft.org>
-	<201107281758.27738.arnd@arndb.de>
-	<20110730074623.GG25658@game.jcrosoft.org>
-	<alpine.LFD.2.00.1107301434160.12766@xanadu.home>
-	<20110731034417.GA6255@game.jcrosoft.org>
-	<4E35CC42.8050403@atmel.com>
-Message-ID: <20110802124026.GO6255@game.jcrosoft.org>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 2 Aug 2011 21:58:21 +0900
+Subject: [alsa-devel] [PATCH 1/1] ASoC: core: cache index fix
+In-Reply-To: <s5hy5zcnlu8.wl%tiwai@suse.de>
+References: <1312198690-13237-1-git-send-email-b29396@freescale.com>
+	<20110801115150.GB16629@opensource.wolfsonmicro.com>
+	<65EE16ACC360FA4D99C96DC085B3F7721F410B@039-SN1MPN1-002.039d.mgd.msft.net>
+	<20110802083850.GB9553@opensource.wolfsonmicro.com>
+	<65EE16ACC360FA4D99C96DC085B3F7721F427D@039-SN1MPN1-002.039d.mgd.msft.net>
+	<s5hy5zcnlu8.wl%tiwai@suse.de>
+Message-ID: <20110802125819.GA25884@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23:42 Sun 31 Jul     , Nicolas Ferre wrote:
-> On 07/31/2011 05:44 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> >On 14:39 Sat 30 Jul     , Nicolas Pitre wrote:
-> >>On Sat, 30 Jul 2011, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> >>
-> >>>On 17:58 Thu 28 Jul     , Arnd Bergmann wrote:
-> >>>>On Thursday 28 July 2011, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> >>>>>>The patches look good, but come at an inconvenient time. We're still
-> >>>>>>in the merge window, so I don't want to add stuff to linux-next yet
-> >>>>>>that is destined for 3.2, and I have already sent out all the arm-soc
-> >>>>>>patches for the 3.1 merge window, so I don't really want to send another
-> >>>>>>round of patches at the last minute.
-> >>>>>this are waiting ofr 2 release already
-> >>>>>
-> >>>>>and was inthe next last release for more than 1 month
-> >>>>>
-> >>>>>can we have them merge this time
-> >>>>
-> >>>>What I don't understand at all is why you are waiting instead of sending
-> >>>>a pull request for all that time then. I've repeatedly given announcements
-> >>>>about the state of the arm-soc tree and asked people to send patches
-> >>>>they want in 3.1, and you actually sent bug fixes that way earlier
-> >>>>
-> >>>>You've had more than enough time before the merge window, and would even
-> >>>>have made an exception if you had sent your stuff a few hours earlier,
-> >>>>before I sent everything to Linus.
-> >>>>Also, the branch you sent me was created on the same day, meaning that
-> >>>>it can't possibly have had a lot of testing (though it looks harmless
-> >>>>enough). When you send a pull request, the patches should always be
-> >>>>based on an -rc or main release to simplify the merge history, and
-> >>>>it's better not to rebase to the latest one if you already have the
-> >>>>patches.
-> >>>sorry but those patch are 4 motnhs old and yes I rebase the branch to the
-> >>>current linus tree before send the pull request.
-> >>
-> >>Please don't do that.  It is best if you keep the same branch content
-> >>identical to what has been tested and validated for a while.
-> >except I send time to retest it
-> 
-> Jean-Christophe,
-> 
-> There is nothing to say in addition:
-> 1/ Arnd has been kind enough to pull those changes in his tree (even
-> correcting little things)
-> 2/ Arnd has been kind enough to send a late pull request to Linus
-didn't see it
-busy on the device cleanup to switch to the DT after
+On Tue, Aug 02, 2011 at 12:34:23PM +0200, Takashi Iwai wrote:
 
-Arnd tks a lat
+> reg_cache_size is supposed to be the real size of the cache table.
+> This isn't influenced by reg_cache_step value.  So, the behavior in
+> soc-io.c (and other ASoC core) is correct.
 
-Best Regards,
-J.
+> That is, the codec drivers setting ARRAY_SIZE() to reg_cache_size
+> with reg_cache_step > 1 are buggy and should be fixed.
+
+Yes, that's probably the best spot fix - I think it should work.  But
+of course really all this code is bit rotten and should be refactored to
+be more comprehensible so nobody has to worry if it's doing the right
+thing.
