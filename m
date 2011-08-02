@@ -1,51 +1,48 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 2 Aug 2011 01:00:19 +0100
-Subject: [RFC/PATCH 7/7] WIP: HACK/RFC: omap_device: begin to decouple
-	platform_device from omap_device
-In-Reply-To: <20110801230945.GB21535@n2100.arm.linux.org.uk>
-References: <20110730120332.GA15539@n2100.arm.linux.org.uk>
-	<20110731025807.GA24334@ponder.secretlab.ca>
-	<20110731150540.GA3019@n2100.arm.linux.org.uk>
-	<871ux5nnop.fsf@ti.com>
-	<CACxGe6t4tNeD-Pn6WFt1XOMC=_Q0cf4uD3kRkOckKH+S1JUJDA@mail.gmail.com>
-	<20110801185009.GA5217@legolas.emea.dhcp.ti.com>
-	<20110801200743.GA21535@n2100.arm.linux.org.uk>
-	<87pqkon5n6.fsf@ti.com>
-	<20110801225554.GC6244@legolas.emea.dhcp.ti.com>
-	<20110801230945.GB21535@n2100.arm.linux.org.uk>
-Message-ID: <20110802000019.GA8719@ponder.secretlab.ca>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 1 Aug 2011 18:33:18 -0600 (MDT)
+Subject: [PATCH v2 1/4] OMAP4: hwmod data: Add GPMC
+In-Reply-To: <1309557267-27165-2-git-send-email-b-cousson@ti.com>
+References: <1309557267-27165-1-git-send-email-b-cousson@ti.com>
+	<1309557267-27165-2-git-send-email-b-cousson@ti.com>
+Message-ID: <alpine.DEB.2.00.1108011831220.28427@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 02, 2011 at 12:09:45AM +0100, Russell King - ARM Linux wrote:
-> On Tue, Aug 02, 2011 at 01:55:55AM +0300, Felipe Balbi wrote:
-> > Hi,
-> > 
-> > On Mon, Aug 01, 2011 at 03:11:57PM -0700, Kevin Hilman wrote:
-> > > Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
-> > > 
-> > > > Help the typechecker do its job.  As we have only one (at the moment...)
-> > > > And make it:
-> > > >
-> > > > +struct omap_device;
-> > > >
-> > > >  struct pdev_archdata {
-> > > > +#ifdef CONFIG_ARCH_OMAP
-> > > > +	struct omap_device *omap;
-> > > > +#endif
-> > > >  };
-> > > >
-> > > > for bonus points, so we only get the additional pointer for OMAP.
-> > > 
-> > > OK, will do it this way.
-> > 
-> > this has the tendency to grow larger, no ? What if all other ARMs decide
-> > to add their own pointers there too ?
+Hi
+
+On Fri, 1 Jul 2011, Benoit Cousson wrote:
+
+> Add the GPMC hwmod data.
 > 
-> Their pointers for what?  It's only OMAP which has this special omap_device
-> thing.  Should that spread, instead of adding more pointers here, the work
-> should be to consolidate between those various implementations.
+> The GPMC hwmod does need the flags HWMOD_INIT_NO_IDLE and
+> HWMOD_INIT_NO_RESET due to a bug described in the previous commit:
+> 
+>  OMAP4: clock: Keep GPMC clocks always enabled and hardware managed
+> 
+>  On OMAP4, CPU accesses on unmapped addresses are redirected to GPMC by
+>  L3 interconnect. Because of CPU speculative nature, such accesses are
+>  possible which can lead to indirect access to GPMC and if it's clock is
+>  not running, it can result in hang/abort on the platform.
+> 
+>  Above makes access to GPMC unpredictable during the execution, so it's
+>  module mode needs to be kept under hardware control instead of software
+>  control.
+>  Since the auto gating is supported for GPMC, there isn't any power impact
+>  because of this change.
+> 
+>  The issue was un-covered with security middleware running along with HLOS.
+>  In this case GPMC had a valid MMU descriptor on secure side where as HLOS
+>  didn't map the GMPC because it isn't being used.
+> 
+> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+> Cc: Kevin Hilman <khilman@ti.com>
+> Cc: Paul Walmsley <paul@pwsan.com>
+> Cc: Rajendra Nayak <rnayak@ti.com>
 
-+1
+Looks to me like this patch would need to be accompanied by one that 
+cleans up arch/arm/mach-omap2/gpmc.c.  The init code in that file messes 
+around with the OCP_SYSCONFIG bits.  It also hardcodes a bunch of stuff 
+that should be supplied by dynamic data.
 
-g.
+
+- Paul
