@@ -1,182 +1,78 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Tue, 2 Aug 2011 15:44:54 +0800
-Subject: [PATCH v8 0/3] add the GPMI controller driver for IMX23/IMX28
-In-Reply-To: <CAHMSPgM4K5o_aGK31yyFcGK-hH4WBeqVkA5dZU=FvAiKGmHA9A@mail.gmail.com>
-References: <1311230846-26437-1-git-send-email-b32955@freescale.com>	<20018.43621.688990.319528@ipc1.ka-ro>	<CAHMSPgPXnDVO630P9fnogQ0XvPSrwz0MYzXfXZLJoJNRf1gifA@mail.gmail.com>	<201107311551.48223.marek.vasut@gmail.com>	<CAHMSPgMK_zM17NXgsbrzs8Zw0VXtDoP12_1V7oeROSF=aBDuYg@mail.gmail.com>	<4E379B28.7090902@freescale.com>
-	<CAHMSPgM4K5o_aGK31yyFcGK-hH4WBeqVkA5dZU=FvAiKGmHA9A@mail.gmail.com>
-Message-ID: <4E37AAF6.7020604@freescale.com>
+From: B29396@freescale.com (Dong Aisheng-B29396)
+Date: Tue, 2 Aug 2011 08:03:23 +0000
+Subject: [PATCH 1/1] ASoC: core: cache index fix
+In-Reply-To: <20110801115150.GB16629@opensource.wolfsonmicro.com>
+References: <1312198690-13237-1-git-send-email-b29396@freescale.com>
+	<20110801115150.GB16629@opensource.wolfsonmicro.com>
+Message-ID: <65EE16ACC360FA4D99C96DC085B3F7721F410B@039-SN1MPN1-002.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-> Hi,
->
-> On Tue, Aug 2, 2011 at 8:37 AM, Huang Shijie<b32955@freescale.com>  wrote:
->> Hi,
->>> Hi,
->>>
->>> Don't think it's a hardware issue. After all it is working on the
->>> mx23evk using the Freescale BSP based on 2.6.35.3.
->> I doubt the Freescale BSP has fix the conflict, while the community kernel
->> does not
->> fix it.
->> Anyway, I will do more test on the mx23 board myself.
-> Strange indeed. I suspect that the BSP used another way to mark bad blocks.
->
->>
->>
->>> Now I tested using this kernel command line:
->>> mtdparts=gpmi-nand:20m(boot),-(user) gpmi_debug_init
->>> (So I removed the ubi rootfs stuff, see previous mails).
->>>
->>> Its booting fine now without complaining about dma timeouts.
->> ok.
-> That's mainly because the ubi stuff is not done at startup.
->
->>> Have tried flash_eraseall /dev/mtd1. Now it's complaining and thinking
->>> all blocks are bad. So a "flash_erase: Skipping bad block at 1db00000"
->>> message for every erase block.
->>> Writing 1 to /sys/devices/platform/imx23-gpmi-nand/ignorebad, makes to
->> This is a very dangerous interface.
-> I know but it solved an issue here. Now flash_eraseall seems to be
-> working again without that ignorebad turned on (only finds one bad
-> erase blcok).
-Could you mail me your flash_eraseall?
-Mine  does not work.
+> -----Original Message-----
+> From: Mark Brown [mailto:broonie at opensource.wolfsonmicro.com]
+> Sent: Monday, August 01, 2011 7:52 PM
+> To: Dong Aisheng-B29396
+> Cc: alsa-devel at alsa-project.org; linux-arm-kernel at lists.infradead.org;
+> lrg at ti.com; s.hauer at pengutronix.de; w.sang at pengutronix.de
+> Subject: Re: [PATCH 1/1] ASoC: core: cache index fix
+> 
+> On Mon, Aug 01, 2011 at 07:38:10PM +0800, Dong Aisheng wrote:
+> 
+> You've done this at the wrong abstraction level...
+> 
+> > @@ -62,8 +65,11 @@ static unsigned int hw_read(struct snd_soc_codec
+> > *codec, unsigned int reg)  {
+> >  	int ret;
+> >  	unsigned int val;
+> > +	unsigned int idx;
+> > +
+> > +	idx = snd_soc_cache_reg_to_idx(codec, reg);
+> >
+> > -	if (reg >= codec->driver->reg_cache_size ||
+> > +	if (idx >= codec->driver->reg_cache_size ||
+> >  	    snd_soc_codec_volatile_register(codec, reg) ||
+> >  	    codec->cache_bypass) {
+> >  		if (codec->cache_only)
+> 
+> ...hw_read() shouldn't need to know about this stuff
+Here the reg_cache_size is the maximum cache index in the register cache array.
+Therefore, the original code using reg to compare with reg_cache_size
+is not correct when the reg_cache_step is not 1.
+e.g. the reg to read is 0x30 and reg_cache_size maybe only 0x16.
+So we use idx to check if it exceeds the cache size.
 
-so I can test your flash_eraseall first.
+BTW, do you mean the soc_io layer does not need to know the details of idx&reg
+Conversion?
+Do I need to implement a help function like reg_is_cachable(reg) to be used here?
 
-Best Regards
-Huang Shijie
-> Again: I suspect that the BSP used another way to mark bad blocks.
+> and there's no way
+> the rbtree cache should be using step sizes (which you did in the text I
+> deleted) as it will naturally not create the cache entries for registers
+> that don't exist.
+> Whatever we do should be hidden in the flat (and
+> possibly LZO, though I'd be tempted not to bother) cache, plus having a
+> defualt readable_register() would be sensible.
+The cache block in each rbnode is still using cache index to fetch value
+which is similar like flat cache.
+(see snd_soc_rbtree_get_register & snd_soc_rbtree_set_register).
+Additionally, the snd_soc_rbtree_cache_init using cache index to do init
+by default. However, the rbtree_cache_read/write still use reg to index.
+
+If not change it, my test will fail (MX28EVK + sgtl5000).
+(LZO showed the same result.)
+
+The main problem is that the default cache array is indexed by cache index
+like cache[idx] while all io function using reg to fetch data.
+Many places in cache core miss used cache index and reg index.
+
+The purpose of this patch is to use both of them in correct places.
+The simple rule is converted to cache index to fetch data from cache when do
+Register io.
+
+> This may mean starting off with some factoring out of legacy code which
+> still assumes flat caches, replacing them with a check that the register
+> is cachable.
 >
->>> go a little further giving 'only one' error but I doubt it's working
->>> at all. See attached log file.
->>>
->>> When the trying ubiformat /dev/mtd1 its stopping with a dma timeout.
->> echo 0x20>  /sys/devices/platform/imx23-gpmi-nand/gpmi_debug
->>
->> to show the GPMI register when the DMA timeout occurs.
-> Don't have this sysfs interface here. I also don't see where it is
-> registered in the driver code.
-> Anyway I have hardcoded GPMI_DEBUG_CRAZY in gpmi_debug_setup.
->
-> log file attached.
->
-> Regards,
-> Koen
->
->>
->> Best Regards
->> Huang Shijie
->>> Every subsequent action (e.g. using ubiformat or flash_eraseall) using
->>> that dma channel is failing.
->>> I have put a printk in mxs-dma.c around line 387:
->>>
->>>      if (mxs_chan->status == DMA_IN_PROGRESS&&    !append)
->>>      {
->>>          pr_err("dma already in progess!\n");
->>>          return NULL;
->>>      }
->>>
->>> I see that printk also in the log file in attach. Seems like the
->>> mxs-dma is failing at some point and for the rest of the time always
->>> keeps it's status at DMA_IN_PROGRESS
->>>
->>> Any input or feedback is welcome.
->>>
->>> Regards,
->>> Koen
->>>
->>>
->>> On Sun, Jul 31, 2011 at 3:51 PM, Marek Vasut<marek.vasut@gmail.com>
->>>   wrote:
->>>> On Friday, July 29, 2011 05:00:48 PM Koen Beel wrote:
->>>>> On Fri, Jul 29, 2011 at 2:41 PM, Lothar Wa?mann<LW@karo-electronics.de>
->>>> wrote:
->>>>>> Hi,
->>>>>>
->>>>>> Koen Beel writes:
->>>>>>> Hi,
->>>>>>>
->>>>>>> On Fri, Jul 29, 2011 at 9:20 AM, Lothar
->>>>>>> Wa?mann<LW@karo-electronics.de>
->>>> wrote:
->>>>>>>> Hi,
->>>>>>>>
->>>>>>>> Koen Beel writes:
->>>>>>>>> Hi,
->>>>>>>>>
->>>>>>>>> I have test on mx23evk board. Still see the same issues.
->>>>>>>>>
->>>>>>>>> On Wed, Jul 27, 2011 at 3:53 AM, Huang Shijie<b32955@freescale.com>
->>>> wrote:
->>>>>>>>>> Hi,
->>>>>>>>>>
->>>>>>>>>> Thanks for your test.
->>>>>>>>>>
->>>>>>>>>>> Hi,
->>>>>>>>>>>
->>>>>>>>>>> It's not really working for me.
->>>>>>>>>>> I've applied all gpmi-nand driver patches and the dma driver
->>>>>>>>>>> patches.
->>>>>>>>>>>
->>>>>>>>>>> I have added following kernel parameters:
->>>>>>>>>>> mtdparts=gpmi-nand:20m(boot),-(user) ubi.mtd=1 root=ubi0:rootfs0
->>>>>>>>>>> rootfstype=ubifs gpmi_debug_init
->>>>>>>>>>>
->>>>>>>>>>> During boot I get already get DMA timeout:
->>>>>>>>>>> [    2.560000] [ start_dma_without_bch_irq : 392 ] DMA timeout,
->>>>>>>>>>> last DMA
->>>>>>>>>>>
->>>>>>>>>>> :1
->>>>>>>>>>>
->>>>>>>>>>> [    3.560000] [ start_dma_with_bch_irq : 427 ] bch timeout!!!
->>>>>>>>>>> ...
->>>>>>>>>>> (see log file in attach line 89)
->>>>>>>>> I still see this DMA timeout when booting.
->>>>>>>>> What kernel parameters do you use? I still use same as above.
->>>>>>>> Do you have an SD card in the system? I'm getting the same error when
->>>>>>>> accessing an SD card. Without SD card I can use the flash without any
->>>>>>>> errors.
->>>>>>> No SD card in the system. At least not on my mx23evk board.
->>>>>>> My real target hardware has a SDIO wifi chip.
->>>>>>>
->>>>>>> Are you also testing on the mx23evk board? Really strange it is not
->>>>>>> reproducible here then.
->>>>>>> Anyone using mx23evk please give:
->>>>>>> - revision number of board (I have tested on rev C1)
->>>>>>> - kernel parameter used (see previous mail for mine)
->>>>>> It's getting ever more strange. I only have problems with concurrent
->>>>>> access to the flash and SD-card when I do file system based accessed
->>>>>> to the SD card.
->>>>>> A 'dd if=/dev/mmcblk0 of=/dev/null' while excessively using the flash
->>>>>> works well, while mounting the SD card and doing an 'ls' produces
->>>>>> immediate BCH DMA timeouts.
->>>>>>
->>>>>> Perhaps someone can make anything out of that.
->>>>> I have checked and the function dma_irq_callback is never called
->>>>> during my tests. This means the DMA transfer does not even works once.
->>>>>
->>>>> Also no clue here ...
->>>> Aren't you getting some undervolt on the powerrail for example ? btw the
->>>> driver
->>>> looks a bit crappy to me, but let's believe it works ;-)
->>>>
->>>>>> Lothar Wa?mann
->>>>>> --
->>>>>> ___________________________________________________________
->>>>>>
->>>>>> Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
->>>>>> Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
->>>>>> Gesch?ftsf?hrer: Matthias Kaussen
->>>>>> Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
->>>>>>
->>>>>> www.karo-electronics.de | info at karo-electronics.de
->>>>>> ___________________________________________________________
->>>>> _______________________________________________
->>>>> linux-arm-kernel mailing list
->>>>> linux-arm-kernel at lists.infradead.org
->>>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
->>
+> The purpose of the step size is to save space in the register cache.
+Yes.
+	
