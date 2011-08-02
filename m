@@ -1,78 +1,74 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 2 Aug 2011 16:12:54 +0800
-Subject: [PATCH v8 0/3] add the GPMI controller driver for IMX23/IMX28
-In-Reply-To: <4E37970C.4070903@freescale.com>
-References: <20110722055731.GI26837@S2100-06.ap.freescale.net>
-	<4E292FCF.6010608@freescale.com>
-	<CAHMSPgMHrqWcJ=BThDLgQ=XyTBDCMvNS4SVjQWfk=Jf682TEig@mail.gmail.com>
-	<4E2F6F90.7030207@freescale.com>
-	<CAHMSPgPC4whyskfuFGeFd7WHx-=5htezWajm_rNi9Xa+03PV0A@mail.gmail.com>
-	<20018.24364.787244.956361@ipc1.ka-ro>
-	<CAHMSPgM5W8=mE4sRDGMMfo39fvThBo_jrdG8hyhJNQ_ceV=_pA@mail.gmail.com>
-	<4E32823C.3060007@freescale.com>
-	<CAHMSPgMTf1UnMyvsSZM1in-FEAoWyS5VSdczsxfHgujGJ0DFtw@mail.gmail.com>
-	<4E37970C.4070903@freescale.com>
-Message-ID: <20110802081253.GA23380@freescale.com>
+From: xhpohanka@gmail.com (Jan Pohanka)
+Date: Tue, 02 Aug 2011 10:13:45 +0200
+Subject: kernel debugging (KGDB or JTAG)
+Message-ID: <op.vzkug7a5yxxkfz@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 02, 2011 at 02:19:56PM +0800, Huang Shijie wrote:
-> Hi,
-> >On Fri, Jul 29, 2011 at 11:49 AM, Huang Shijie<b32955@freescale.com>  wrote:
-> >>? 2011?07?29? 15:40, Koen Beel ??:
-> >>>Hi,
-> >>>
-> >>>On Fri, Jul 29, 2011 at 9:20 AM, Lothar Wa?mann<LW@karo-electronics.de>
-> >>>  wrote:
-> >>>>Hi,
-> >>>>
-> >>>>Koen Beel writes:
-> >>>>>Hi,
-> >>>>>
-> >>>>>I have test on mx23evk board. Still see the same issues.
-> >>>>>
-> >>>>>On Wed, Jul 27, 2011 at 3:53 AM, Huang Shijie<b32955@freescale.com>
-> >>>>>  wrote:
-> >>>>>>Hi,
-> >>>>>>
-> >>>>>>Thanks for your test.
-> >>>>>>
-> >>>>>>>Hi,
-> >>>>>>>
-> >>>>>>>It's not really working for me.
-> >>>>>>>I've applied all gpmi-nand driver patches and the dma driver patches.
-> >>>>>>>
-> >>>>>>>I have added following kernel parameters:
-> >>>>>>>mtdparts=gpmi-nand:20m(boot),-(user) ubi.mtd=1 root=ubi0:rootfs0
-> >>>>>>>rootfstype=ubifs gpmi_debug_init
-> >>>>>>>
-> >>>>>>>During boot I get already get DMA timeout:
-> >>>>>>>[    2.560000] [ start_dma_without_bch_irq : 392 ] DMA timeout, last
-> >>>>>>>DMA
-> >>>>>>>:1
-> >>>>>>>[    3.560000] [ start_dma_with_bch_irq : 427 ] bch timeout!!!
-> >>>>>>>...
-> >>>>>>>(see log file in attach line 89)
-> >>>>>I still see this DMA timeout when booting.
-> >>>>>What kernel parameters do you use? I still use same as above.
-> >>>>>
-> >>>>Do you have an SD card in the system? I'm getting the same error when
-> >>>>accessing an SD card. Without SD card I can use the flash without any
-> >>>>errors.
-> >>>No SD card in the system. At least not on my mx23evk board.
-> >>>My real target hardware has a SDIO wifi chip.
-> >>Does it conflict with the GPMI?
-> >Well I don't know if it conflicts. From what Lothar says I assume
-> >there might be a conflict between gpmi and sdio.
-> Yes, the conflict between gpmi and other module(such as SD in MX6Q)
-> is THE prime reason
-> which caused the DMA timeout.
-> 
-> I am debuging the IMX6Q now, and meet the same problem.
-> 
-I do not follow on this.  SD on i.mx6q does not use apbh-dma at all.
-How will it conflict with gpmi regarding to dma timeout?
+Dear all,
+
+I'd like to ask if anyone has working setup for kernel debugging on arm
+target. I have tried two boards (one with at91sam9g20, second with
+freescale i.mx27) with Segger j-link and kgdb with similar and not very
+useful results. I have Ubuntu 11.04 as development host and latest
+codesourcery arm-none-(linux-gnu)eabi toolchain.
+
+Using 2.6.39 I was able to compile the sources with KGDB enabled. I'm also
+able to enter kdb terminal and connect with arm-none-eabi-gdb. Setting and
+triggering breakpoints works well, but single stepping (which is essential
+to me) does not. Here is the example
+
+Breakpoint 1, 0xc00e40d4 in sys_sync () at
+/home/honza/_dev/kernel/linux-2.6.39.y/fs/sync.c:190
+190	}
+(gdb) list
+185			ret = err;
+186		mutex_unlock(&mapping->host->i_mutex);
+187	
+188	out:
+189		return ret;
+190	}
+191	EXPORT_SYMBOL(vfs_fsync_range);
+192	
+193	/**
+194	 * vfs_fsync - perform a fsync or fdatasync on a file
+(gdb) s
+Sending packet: $Hc148#48...Ack
+Packet received: OK
+Sending packet: $s#73...Ack
+Packet received:
+warning: Invalid remote reply:
+
+... now gdb hangs forever
+
+Using j-ling JTAG probe from segger I can't start debug session at all.
+When JLinkGDBServer connects it resets the board and I'm not able to
+resume the execution. I have found e.g. this howto
+http://www.timesys.com/embedded-linux/docs/Debug_Linux_kernel_with_a_JTAG_from_Segger
+but as I said it is not working for me.
+
+Here is the log from JLinkGDBServer
+
+J-Link connected
+Firmware: J-Link ARM V8 compiled Jul  5 2011 20:48:23
+Hardware: V8.00
+S/N: 58004787
+
+J-Link found 2 JTAG devices, Total IRLen = 8
+JTAG ID: 0x07926121 (ARM9)
+
+Connected to 127.0.0.1
+Reading all registers
+WARNING: Failed to read cacheable memory @ address 0x00000000
+Read 4 bytes @ address 0x00000000 (Data = 0x00000000)
+Starting target CPU...
+
+
+Any advice will be greatly appreciated...
+
+with best regards
+Jan
 
 -- 
-Regards,
-Shawn
+Tato zpr?va byla vytvo?ena p?evratn?m po?tovn?m klientem Opery:
+http://www.opera.com/mail/
