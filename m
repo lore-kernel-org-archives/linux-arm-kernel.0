@@ -1,186 +1,229 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 02 Aug 2011 16:27:42 -0700
-Subject: [PATCHv5 2/3] OMAP: I2C: Remove the reset in the init path
-In-Reply-To: <1311935813-8481-3-git-send-email-shubhrajyoti@ti.com>
-	(Shubhrajyoti D.'s message of "Fri, 29 Jul 2011 16:06:52 +0530")
-References: <1311935813-8481-1-git-send-email-shubhrajyoti@ti.com>
-	<1311935813-8481-3-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <87d3gn75sh.fsf@ti.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Tue, 2 Aug 2011 16:29:05 -0700
+Subject: [PATCH] ep93xx: use DEFINE_RES_* helpers
+Message-ID: <201108021629.05478.hartleys@visionengravers.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shubhrajyoti D <shubhrajyoti@ti.com> writes:
+Use the DEFINE_RES_* helpers defined in ioport.h to define the peripheral
+memory and irq resources.
 
-> -  The reset in the driver at init is not needed anymore as the
->    hwmod framework takes care of reseting it.
-> -  Reset is removed from omap_i2c_init, which was called
->    not only during probe, but also after time out and error handling.
->    device_reset were added in those places to effect the reset.
+Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+Cc: Ryan Mallon <rmallon@gmail.com> (maintainer:ARM/CIRRUS LOGIC...)
+Cc: Russell King <linux@arm.linux.org.uk> (maintainer:ARM PORT)
 
-Not specifically related to this patch, as the reset behavior was
-already there, but do you know why the reset is needed after timeout and
-error handling?
+---
 
-IOW, was the reset truly required in those cases, or was just the
-re-init necessary?
-
-To me doing a full reset of the IP in those cases sounds like a hack for
-a buggy driver.
-
-> -  Earlier the hwmod SYSC settings were over-written in the driver.
->    Removing the same and letting the hwmod take care of the settings.
-> -  Clean up the SYSS_RESETDONE_MASK macro as it is no longer needed.
-> -  Clean up the SYSCONFIG SYSC bit defination macros.
-> -  Fix the typos in wakeup.
->
-> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
-> ---
->  drivers/i2c/busses/i2c-omap.c |   83 +++++++++++------------------------------
->  1 files changed, 22 insertions(+), 61 deletions(-)
->
-> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-> index 4e3256f..d8f4470 100644
-> --- a/drivers/i2c/busses/i2c-omap.c
-> +++ b/drivers/i2c/busses/i2c-omap.c
-> @@ -155,19 +155,6 @@ enum {
->  #define OMAP_I2C_SYSTEST_SDA_O		(1 << 0)	/* SDA line drive out */
->  #endif
->  
-> -/* OCP_SYSSTATUS bit definitions */
-> -#define SYSS_RESETDONE_MASK		(1 << 0)
-> -
-> -/* OCP_SYSCONFIG bit definitions */
-> -#define SYSC_CLOCKACTIVITY_MASK		(0x3 << 8)
-> -#define SYSC_SIDLEMODE_MASK		(0x3 << 3)
-> -#define SYSC_ENAWAKEUP_MASK		(1 << 2)
-> -#define SYSC_SOFTRESET_MASK		(1 << 1)
-> -#define SYSC_AUTOIDLE_MASK		(1 << 0)
-> -
-> -#define SYSC_IDLEMODE_SMART		0x2
-> -#define SYSC_CLOCKACTIVITY_FCLK		0x2
-> -
->  /* Errata definitions */
->  #define I2C_OMAP_ERRATA_I207		(1 << 0)
->  #define I2C_OMAP3_1P153			(1 << 1)
-> @@ -182,6 +169,7 @@ struct omap_i2c_dev {
->  	u32			latency;	/* maximum mpu wkup latency */
->  	void			(*set_mpu_wkup_lat)(struct device *dev,
->  						    long latency);
-> +	int			(*device_reset)(struct device *dev);
->  	u32			speed;		/* Speed of bus in Khz */
->  	u16			cmd_err;
->  	u8			*buf;
-> @@ -317,60 +305,22 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
->  	u16 psc = 0, scll = 0, sclh = 0, buf = 0;
->  	u16 fsscll = 0, fssclh = 0, hsscll = 0, hssclh = 0;
->  	unsigned long fclk_rate = 12000000;
-> -	unsigned long timeout;
->  	unsigned long internal_clk = 0;
->  	struct clk *fclk;
->  	struct omap_i2c_bus_platform_data *pdata;
->  
->  	pdata = dev->dev->platform_data;
->  
-> -	if (dev->rev >= OMAP_I2C_OMAP1_REV_2) {
-> -		/* Disable I2C controller before soft reset */
-> -		omap_i2c_write_reg(dev, OMAP_I2C_CON_REG,
-> -			omap_i2c_read_reg(dev, OMAP_I2C_CON_REG) &
-> -				~(OMAP_I2C_CON_EN));
-> -
-> -		omap_i2c_write_reg(dev, OMAP_I2C_SYSC_REG, SYSC_SOFTRESET_MASK);
-> -		/* For some reason we need to set the EN bit before the
-> -		 * reset done bit gets set. */
-> -		timeout = jiffies + OMAP_I2C_TIMEOUT;
-> -		omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, OMAP_I2C_CON_EN);
-> -		while (!(omap_i2c_read_reg(dev, OMAP_I2C_SYSS_REG) &
-> -			 SYSS_RESETDONE_MASK)) {
-> -			if (time_after(jiffies, timeout)) {
-> -				dev_warn(dev->dev, "timeout waiting "
-> -						"for controller reset\n");
-> -				return -ETIMEDOUT;
-> -			}
-> -			msleep(1);
-> -		}
-> -
-> -		/* SYSC register is cleared by the reset; rewrite it */
-> -		if (dev->rev == OMAP_I2C_REV_ON_2430) {
-> -
-> -			omap_i2c_write_reg(dev, OMAP_I2C_SYSC_REG,
-> -					   SYSC_AUTOIDLE_MASK);
-> -
-> -		} else if (dev->rev >= OMAP_I2C_REV_ON_3430) {
-> -			dev->syscstate = SYSC_AUTOIDLE_MASK;
-> -			dev->syscstate |= SYSC_ENAWAKEUP_MASK;
-> -			dev->syscstate |= (SYSC_IDLEMODE_SMART <<
-> -			      __ffs(SYSC_SIDLEMODE_MASK));
-> -			dev->syscstate |= (SYSC_CLOCKACTIVITY_FCLK <<
-> -			      __ffs(SYSC_CLOCKACTIVITY_MASK));
-> -
-> -			omap_i2c_write_reg(dev, OMAP_I2C_SYSC_REG,
-> -							dev->syscstate);
-> -			/*
-> -			 * Enabling all wakup sources to stop I2C freezing on
-> -			 * WFI instruction.
-> -			 * REVISIT: Some wkup sources might not be needed.
-> -			 */
-> -			dev->westate = OMAP_I2C_WE_ALL;
-> -			if (dev->rev < OMAP_I2C_REV_ON_3530_4430)
-> -				omap_i2c_write_reg(dev, OMAP_I2C_WE_REG,
-> -								dev->westate);
-> -		}
-> +	if (dev->rev >= OMAP_I2C_REV_ON_3430) {
-> +		/*
-> +		 * Enabling all wakeup sources to stop I2C freezing on
-> +		 * WFI instruction.
-> +		 * REVISIT: Some wakeup sources might not be needed.
-> +		 */
-> +		dev->westate = OMAP_I2C_WE_ALL;
-> +		if (dev->rev < OMAP_I2C_REV_ON_3530_4430)
-> +			omap_i2c_write_reg(dev, OMAP_I2C_WE_REG,
-> +							dev->westate);
->  	}
->  	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
->  
-> @@ -595,6 +545,11 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
->  		return r;
->  	if (r == 0) {
->  		dev_err(dev->dev, "controller timed out\n");
-> +		if (dev->device_reset != NULL) {
-
-No need for the '!= NULL'
-
-                if (dev->device_reset)
-
-is more typical.  
-
-And based on my comments in 1/3, this would become device_shutdown.
-
-> +			r = dev->device_reset(dev->dev);
-> +			if (r < 0)
-> +				dev_err(dev->dev, "reset failed\n");
-> +		}
->  		omap_i2c_init(dev);
->  		return -ETIMEDOUT;
->  	}
-> @@ -605,6 +560,11 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
->  	/* We have an error */
->  	if (dev->cmd_err & (OMAP_I2C_STAT_AL | OMAP_I2C_STAT_ROVR |
->  			    OMAP_I2C_STAT_XUDF)) {
-> +		if (dev->device_reset != NULL) {
-> +			r = dev->device_reset(dev->dev);
-> +			if (r < 0)
-> +				dev_err(dev->dev, "reset failed\n");
-> +		}
->  		omap_i2c_init(dev);
->  		return -EIO;
->  	}
-> @@ -1005,6 +965,7 @@ omap_i2c_probe(struct platform_device *pdev)
->  	if (pdata != NULL) {
->  		speed = pdata->clkrate;
->  		dev->set_mpu_wkup_lat = pdata->set_mpu_wkup_lat;
-> +		dev->device_reset = pdata->device_reset;
->  	} else {
->  		speed = 100;	/* Default speed */
->  		dev->set_mpu_wkup_lat = NULL;
-
-Kevin
+diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
+index a82265b..36b3ead 100644
+--- a/arch/arm/mach-ep93xx/core.c
++++ b/arch/arm/mach-ep93xx/core.c
+@@ -241,11 +241,7 @@ unsigned int ep93xx_chip_revision(void)
+  * EP93xx GPIO
+  *************************************************************************/
+ static struct resource ep93xx_gpio_resource[] = {
+-	{
+-		.start		= EP93XX_GPIO_PHYS_BASE,
+-		.end		= EP93XX_GPIO_PHYS_BASE + 0xcc - 1,
+-		.flags		= IORESOURCE_MEM,
+-	},
++	DEFINE_RES_MEM(EP93XX_GPIO_PHYS_BASE, 0xcc),
+ };
+ 
+ static struct platform_device ep93xx_gpio_device = {
+@@ -283,11 +279,7 @@ static struct amba_device uart1_device = {
+ 		.init_name	= "apb:uart1",
+ 		.platform_data	= &ep93xx_uart_data,
+ 	},
+-	.res		= {
+-		.start	= EP93XX_UART1_PHYS_BASE,
+-		.end	= EP93XX_UART1_PHYS_BASE + 0x0fff,
+-		.flags	= IORESOURCE_MEM,
+-	},
++	.res		= DEFINE_RES_MEM(EP93XX_UART1_PHYS_BASE, 0x1000),
+ 	.irq		= { IRQ_EP93XX_UART1, NO_IRQ },
+ 	.periphid	= 0x00041010,
+ };
+@@ -297,11 +289,7 @@ static struct amba_device uart2_device = {
+ 		.init_name	= "apb:uart2",
+ 		.platform_data	= &ep93xx_uart_data,
+ 	},
+-	.res		= {
+-		.start	= EP93XX_UART2_PHYS_BASE,
+-		.end	= EP93XX_UART2_PHYS_BASE + 0x0fff,
+-		.flags	= IORESOURCE_MEM,
+-	},
++	.res		= DEFINE_RES_MEM(EP93XX_UART2_PHYS_BASE, 0x1000),
+ 	.irq		= { IRQ_EP93XX_UART2, NO_IRQ },
+ 	.periphid	= 0x00041010,
+ };
+@@ -311,22 +299,14 @@ static struct amba_device uart3_device = {
+ 		.init_name	= "apb:uart3",
+ 		.platform_data	= &ep93xx_uart_data,
+ 	},
+-	.res		= {
+-		.start	= EP93XX_UART3_PHYS_BASE,
+-		.end	= EP93XX_UART3_PHYS_BASE + 0x0fff,
+-		.flags	= IORESOURCE_MEM,
+-	},
++	.res		= DEFINE_RES_MEM(EP93XX_UART3_PHYS_BASE, 0x1000),
+ 	.irq		= { IRQ_EP93XX_UART3, NO_IRQ },
+ 	.periphid	= 0x00041010,
+ };
+ 
+ 
+ static struct resource ep93xx_rtc_resource[] = {
+-	{
+-		.start		= EP93XX_RTC_PHYS_BASE,
+-		.end		= EP93XX_RTC_PHYS_BASE + 0x10c - 1,
+-		.flags		= IORESOURCE_MEM,
+-	},
++	DEFINE_RES_MEM(EP93XX_RTC_PHYS_BASE, 0x10c),
+ };
+ 
+ static struct platform_device ep93xx_rtc_device = {
+@@ -338,16 +318,8 @@ static struct platform_device ep93xx_rtc_device = {
+ 
+ 
+ static struct resource ep93xx_ohci_resources[] = {
+-	[0] = {
+-		.start	= EP93XX_USB_PHYS_BASE,
+-		.end	= EP93XX_USB_PHYS_BASE + 0x0fff,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	[1] = {
+-		.start	= IRQ_EP93XX_USB,
+-		.end	= IRQ_EP93XX_USB,
+-		.flags	= IORESOURCE_IRQ,
+-	},
++	DEFINE_RES_MEM(EP93XX_USB_PHYS_BASE, 0x1000),
++	DEFINE_RES_IRQ(IRQ_EP93XX_USB),
+ };
+ 
+ 
+@@ -406,15 +378,8 @@ void __init ep93xx_register_flash(unsigned int width,
+ static struct ep93xx_eth_data ep93xx_eth_data;
+ 
+ static struct resource ep93xx_eth_resource[] = {
+-	{
+-		.start	= EP93XX_ETHERNET_PHYS_BASE,
+-		.end	= EP93XX_ETHERNET_PHYS_BASE + 0xffff,
+-		.flags	= IORESOURCE_MEM,
+-	}, {
+-		.start	= IRQ_EP93XX_ETHERNET,
+-		.end	= IRQ_EP93XX_ETHERNET,
+-		.flags	= IORESOURCE_IRQ,
+-	}
++	DEFINE_RES_MEM(EP93XX_ETHERNET_PHYS_BASE, 0x10000),
++	DEFINE_RES_IRQ(IRQ_EP93XX_ETHERNET),
+ };
+ 
+ static u64 ep93xx_eth_dma_mask = DMA_BIT_MASK(32);
+@@ -495,16 +460,8 @@ void __init ep93xx_register_i2c(struct i2c_gpio_platform_data *data,
+ static struct ep93xx_spi_info ep93xx_spi_master_data;
+ 
+ static struct resource ep93xx_spi_resources[] = {
+-	{
+-		.start	= EP93XX_SPI_PHYS_BASE,
+-		.end	= EP93XX_SPI_PHYS_BASE + 0x18 - 1,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	{
+-		.start	= IRQ_EP93XX_SSP,
+-		.end	= IRQ_EP93XX_SSP,
+-		.flags	= IORESOURCE_IRQ,
+-	},
++	DEFINE_RES_MEM(EP93XX_SPI_PHYS_BASE, 0x18),
++	DEFINE_RES_IRQ(IRQ_EP93XX_SSP),
+ };
+ 
+ static u64 ep93xx_spi_dma_mask = DMA_BIT_MASK(32);
+@@ -575,11 +532,7 @@ static struct platform_device ep93xx_leds = {
+  * EP93xx pwm peripheral handling
+  *************************************************************************/
+ static struct resource ep93xx_pwm0_resource[] = {
+-	{
+-		.start	= EP93XX_PWM_PHYS_BASE,
+-		.end	= EP93XX_PWM_PHYS_BASE + 0x10 - 1,
+-		.flags	= IORESOURCE_MEM,
+-	},
++	DEFINE_RES_MEM(EP93XX_PWM_PHYS_BASE, 0x10),
+ };
+ 
+ static struct platform_device ep93xx_pwm0_device = {
+@@ -590,11 +543,7 @@ static struct platform_device ep93xx_pwm0_device = {
+ };
+ 
+ static struct resource ep93xx_pwm1_resource[] = {
+-	{
+-		.start	= EP93XX_PWM_PHYS_BASE + 0x20,
+-		.end	= EP93XX_PWM_PHYS_BASE + 0x30 - 1,
+-		.flags	= IORESOURCE_MEM,
+-	},
++	DEFINE_RES_MEM(EP93XX_PWM_PHYS_BASE + 0x10, 0x10),
+ };
+ 
+ static struct platform_device ep93xx_pwm1_device = {
+@@ -662,11 +611,7 @@ EXPORT_SYMBOL(ep93xx_pwm_release_gpio);
+ static struct ep93xxfb_mach_info ep93xxfb_data;
+ 
+ static struct resource ep93xx_fb_resource[] = {
+-	{
+-		.start		= EP93XX_RASTER_PHYS_BASE,
+-		.end		= EP93XX_RASTER_PHYS_BASE + 0x800 - 1,
+-		.flags		= IORESOURCE_MEM,
+-	},
++	DEFINE_RES_MEM(EP93XX_RASTER_PHYS_BASE, 0x800),
+ };
+ 
+ static struct platform_device ep93xx_fb_device = {
+@@ -704,15 +649,8 @@ void __init ep93xx_register_fb(struct ep93xxfb_mach_info *data)
+ static struct ep93xx_keypad_platform_data ep93xx_keypad_data;
+ 
+ static struct resource ep93xx_keypad_resource[] = {
+-	{
+-		.start	= EP93XX_KEY_MATRIX_PHYS_BASE,
+-		.end	= EP93XX_KEY_MATRIX_PHYS_BASE + 0x0c - 1,
+-		.flags	= IORESOURCE_MEM,
+-	}, {
+-		.start	= IRQ_EP93XX_KEY,
+-		.end	= IRQ_EP93XX_KEY,
+-		.flags	= IORESOURCE_IRQ,
+-	},
++	DEFINE_RES_MEM(EP93XX_KEY_MATRIX_PHYS_BASE, 0x0c),
++	DEFINE_RES_IRQ(IRQ_EP93XX_KEY),
+ };
+ 
+ static struct platform_device ep93xx_keypad_device = {
+@@ -785,11 +723,7 @@ EXPORT_SYMBOL(ep93xx_keypad_release_gpio);
+  * EP93xx I2S audio peripheral handling
+  *************************************************************************/
+ static struct resource ep93xx_i2s_resource[] = {
+-	{
+-		.start	= EP93XX_I2S_PHYS_BASE,
+-		.end	= EP93XX_I2S_PHYS_BASE + 0x100 - 1,
+-		.flags	= IORESOURCE_MEM,
+-	},
++	DEFINE_RES_MEM(EP93XX_I2S_PHYS_BASE, 0x100),
+ };
+ 
+ static struct platform_device ep93xx_i2s_device = {
+@@ -859,16 +793,8 @@ EXPORT_SYMBOL(ep93xx_i2s_release);
+  * EP93xx AC97 audio peripheral handling
+  *************************************************************************/
+ static struct resource ep93xx_ac97_resources[] = {
+-	{
+-		.start	= EP93XX_AAC_PHYS_BASE,
+-		.end	= EP93XX_AAC_PHYS_BASE + 0xac - 1,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	{
+-		.start	= IRQ_EP93XX_AACINTR,
+-		.end	= IRQ_EP93XX_AACINTR,
+-		.flags	= IORESOURCE_IRQ,
+-	},
++	DEFINE_RES_MEM(EP93XX_AAC_PHYS_BASE, 0xac),
++	DEFINE_RES_IRQ(IRQ_EP93XX_AACINTR),
+ };
+ 
+ static struct platform_device ep93xx_ac97_device = {
