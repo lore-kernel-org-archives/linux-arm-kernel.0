@@ -1,74 +1,60 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 2 Aug 2011 15:03:44 +0100
-Subject: at91sam9g45: MMC: Issues with MMC driver
-In-Reply-To: <CAA2DH4v+v2Vvv_2MzD1dGqbc5a4W1h+30FqwwpsqKmYk6nvZxQ@mail.gmail.com>
-References: <CAA2DH4v+v2Vvv_2MzD1dGqbc5a4W1h+30FqwwpsqKmYk6nvZxQ@mail.gmail.com>
-Message-ID: <20110802140344.GF19079@n2100.arm.linux.org.uk>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Tue, 2 Aug 2011 15:06:10 +0100
+Subject: [PATCH v4 0/2] Add device tree support for i.mx51/53 boards
+In-Reply-To: <1312267943-25551-1-git-send-email-shawn.guo@linaro.org>
+References: <1312267943-25551-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20110802140610.GC20071@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 02, 2011 at 04:35:58PM +0530, Prasant J wrote:
-> Hi,
+On Tue, Aug 02, 2011 at 02:52:21PM +0800, Shawn Guo wrote:
+> Changes since v3:
+>  * Fix machine_desc table for ARD matching
+>  * Turn the board setup that dt needs into callback
 > 
-> I'm using Linux 3.0.0 on a custom board design based on AT91SAM9G45-EKES
+> Changes since v2:
+>  * Drop iomuxc device tree support patch
 > 
-> I'm getting this kernel dump while booting:
+> Changes since v1:
+>  * Address comments on v1 given by Grant and Sascha
+>  * Add i.mx51 Babbage support
 > 
+> Shawn Guo (2):
+>       arm/mx5: add device tree support for imx53 boards
+>       arm/mx5: add device tree support for imx51 babbage
+
+Looks good.
+
+Sascha, assuming you're okay with it, I'd *really* like to ask Arnd to
+send this out to Linus immediately.  It may not be perfect, and we may
+change the device disable/enable policy, but it is useful enough that
+having it in mainline will help developers who want to start hacking
+on DT support.
+
+g.
+
 > 
-> Waiting 3sec before mounting root device...
-> mmc0: host does not support reading read-only switch. assuming write-enable.
-> mmc0: new SD card at address 0007
-> mmcblk0: mmc0:0007 SU02G 1.83 GiB
->  mmcblk0: p1 p2
-> eth0: link up (100/Full)
-> EXT3-fs: barriers not enabled
-> kjournald starting.  Commit interval 5 seconds
-> EXT3-fs (mmcblk0p2): using internal journal
-> EXT3-fs (mmcblk0p2): mounted filesystem with writeback data mode
-> VFS: Mounted root (ext3 filesystem) on device 179:2.
-> Freeing init memory: 116K
-> ------------[ cut here ]------------
-> WARNING: at kernel/irq/handle.c:130 handle_irq_event_percpu+0x6c/0x18c()
+>  .../devicetree/bindings/arm/fsl/boards.txt         |   19 ++
+>  arch/arm/boot/dts/imx51-babbage.dts                |  141 +++++++++++
+>  arch/arm/boot/dts/imx51.dtsi                       |  203 ++++++++++++++++
+>  arch/arm/boot/dts/imx53-ard.dts                    |  158 +++++++++++++
+>  arch/arm/boot/dts/imx53-evk.dts                    |  144 ++++++++++++
+>  arch/arm/boot/dts/imx53-qsb.dts                    |  148 ++++++++++++
+>  arch/arm/boot/dts/imx53-smd.dts                    |  169 ++++++++++++++
+>  arch/arm/boot/dts/imx53.dtsi                       |  244 ++++++++++++++++++++
+>  arch/arm/mach-mx5/Kconfig                          |   21 ++
+>  arch/arm/mach-mx5/Makefile                         |    3 +
+>  arch/arm/mach-mx5/board-mx51_babbage.c             |    9 +-
+>  arch/arm/mach-mx5/board-mx53_ard.c                 |   12 +-
+>  arch/arm/mach-mx5/board-mx53_evk.c                 |    9 +-
+>  arch/arm/mach-mx5/board-mx53_loco.c                |    9 +-
+>  arch/arm/mach-mx5/board-mx53_smd.c                 |    9 +-
+>  arch/arm/mach-mx5/imx51-dt.c                       |  111 +++++++++
+>  arch/arm/mach-mx5/imx53-dt.c                       |  127 ++++++++++
+>  arch/arm/plat-mxc/include/mach/common.h            |    6 +
+>  18 files changed, 1530 insertions(+), 12 deletions(-)
 > 
-> Can someone tell me what is possibly wrong in the mmc driver's
-> interrupt handler?
-
-This is what I said to someone who asked about this a week ago.  It
-desperately needs fixing properly.
-
-Subject: at91sam9g45: Issues while working with RAM that is separated
-        on physical address space
-
-On Tue, Jul 26, 2011 at 03:37:02PM +0200, Christian Glindkamp wrote:
-> The only problem that still exits with highmem for me is the following:
-> Even on non-highmem/non-sparsemem systems I get the following warning
-> when using an mmc as the rootfs:
-> 
-> ------------[ cut here ]------------
-> WARNING: at kernel/irq/handle.c:130 handle_irq_event_percpu+0x70/0x194()
-
-That'll be because the driver is still using flush_dcache_page(), whereas
-it should be using flush_kernel_dcache_page().  flush_dcache_page()
-unfortunately results in IRQs being enabled due to the
-flush_dcache_mmap_lock().
-
-> The system is still stable, but if switch to highmem, the kernel crashes
-> completely when doing this (using and USB drive as rootfs still works
-> flawlessly):
-
-That's because the driver is basically broken:
-
-        void                    *buf = sg_virt(sg);
-        unsigned int            offset = host->pio_offset;
-
-                        memcpy(buf + offset, &value, remaining);
-
-Highmem pages have a NULL sg_virt(sg) because they're by definition not
-mapped.  Drivers really should not be using sg_virt() directly - who
-knows how this got through the review process...
-
-There's a well defined API for walking scatterlists in drivers - see
-the sg_miter_* API in linux/scatterlist.h.  This takes care of the
-highmem issues automatically, as well as using flush_kernel_dcache_page().
-
-In short: the Atmel MCI driver is buggy and needs fixing.
+> _______________________________________________
+> devicetree-discuss mailing list
+> devicetree-discuss at lists.ozlabs.org
+> https://lists.ozlabs.org/listinfo/devicetree-discuss
