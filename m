@@ -1,60 +1,60 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 2 Aug 2011 15:06:10 +0100
-Subject: [PATCH v4 0/2] Add device tree support for i.mx51/53 boards
-In-Reply-To: <1312267943-25551-1-git-send-email-shawn.guo@linaro.org>
-References: <1312267943-25551-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20110802140610.GC20071@ponder.secretlab.ca>
+Date: Tue, 02 Aug 2011 15:31:48 +0100
+Subject: [PATCH] Build a uImage with dtb already appended
+Message-ID: <20110802143148.21599.22870.stgit@ponder>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 02, 2011 at 02:52:21PM +0800, Shawn Guo wrote:
-> Changes since v3:
->  * Fix machine_desc table for ARD matching
->  * Turn the board setup that dt needs into callback
-> 
-> Changes since v2:
->  * Drop iomuxc device tree support patch
-> 
-> Changes since v1:
->  * Address comments on v1 given by Grant and Sascha
->  * Add i.mx51 Babbage support
-> 
-> Shawn Guo (2):
->       arm/mx5: add device tree support for imx53 boards
->       arm/mx5: add device tree support for imx51 babbage
+Do not commit to mainline; this is a useful hack only for now.
 
-Looks good.
+Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
+---
+ arch/arm/Makefile      |    3 +++
+ arch/arm/boot/Makefile |    8 ++++++++
+ 2 files changed, 11 insertions(+), 0 deletions(-)
 
-Sascha, assuming you're okay with it, I'd *really* like to ask Arnd to
-send this out to Linus immediately.  It may not be perfect, and we may
-change the device disable/enable policy, but it is useful enough that
-having it in mainline will help developers who want to start hacking
-on DT support.
-
-g.
-
-> 
->  .../devicetree/bindings/arm/fsl/boards.txt         |   19 ++
->  arch/arm/boot/dts/imx51-babbage.dts                |  141 +++++++++++
->  arch/arm/boot/dts/imx51.dtsi                       |  203 ++++++++++++++++
->  arch/arm/boot/dts/imx53-ard.dts                    |  158 +++++++++++++
->  arch/arm/boot/dts/imx53-evk.dts                    |  144 ++++++++++++
->  arch/arm/boot/dts/imx53-qsb.dts                    |  148 ++++++++++++
->  arch/arm/boot/dts/imx53-smd.dts                    |  169 ++++++++++++++
->  arch/arm/boot/dts/imx53.dtsi                       |  244 ++++++++++++++++++++
->  arch/arm/mach-mx5/Kconfig                          |   21 ++
->  arch/arm/mach-mx5/Makefile                         |    3 +
->  arch/arm/mach-mx5/board-mx51_babbage.c             |    9 +-
->  arch/arm/mach-mx5/board-mx53_ard.c                 |   12 +-
->  arch/arm/mach-mx5/board-mx53_evk.c                 |    9 +-
->  arch/arm/mach-mx5/board-mx53_loco.c                |    9 +-
->  arch/arm/mach-mx5/board-mx53_smd.c                 |    9 +-
->  arch/arm/mach-mx5/imx51-dt.c                       |  111 +++++++++
->  arch/arm/mach-mx5/imx53-dt.c                       |  127 ++++++++++
->  arch/arm/plat-mxc/include/mach/common.h            |    6 +
->  18 files changed, 1530 insertions(+), 12 deletions(-)
-> 
-> _______________________________________________
-> devicetree-discuss mailing list
-> devicetree-discuss at lists.ozlabs.org
-> https://lists.ozlabs.org/listinfo/devicetree-discuss
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index 70c424e..0677b86 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -282,6 +282,9 @@ zImage Image xipImage bootpImage uImage: vmlinux
+ zinstall uinstall install: vmlinux
+ 	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $@
+ 
++uImage-dtb.%:
++	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $(boot)/$@
++
+ %.dtb:
+ 	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $(boot)/$@
+ 
+diff --git a/arch/arm/boot/Makefile b/arch/arm/boot/Makefile
+index a1edfd5..a64493b 100644
+--- a/arch/arm/boot/Makefile
++++ b/arch/arm/boot/Makefile
+@@ -57,6 +57,9 @@ $(obj)/zImage:	$(obj)/compressed/vmlinux FORCE
+ 	$(call if_changed,objcopy)
+ 	@echo '  Kernel: $@ is ready'
+ 
++$(obj)/zImage-dtb.%:	$(obj)/%.dtb $(obj)/zImage
++	cat $(obj)/zImage $< > $@
++
+ endif
+ 
+ # Rule to build device tree blobs
+@@ -77,11 +80,16 @@ $(obj)/uImage: LOADADDR=$(ZRELADDR)
+ endif
+ 
+ $(obj)/uImage: STARTADDR=$(LOADADDR)
++$(obj)/uImage-dtb.%: STARTADDR=$(LOADADDR)
+ 
+ $(obj)/uImage:	$(obj)/zImage FORCE
+ 	$(call if_changed,uimage)
+ 	@echo '  Image $@ is ready'
+ 
++$(obj)/uImage-dtb.%:	$(obj)/zImage-dtb.% FORCE
++	$(call if_changed,uimage)
++	@echo '  Image $@ is ready'
++
+ $(obj)/bootp/bootp: $(obj)/zImage initrd FORCE
+ 	$(Q)$(MAKE) $(build)=$(obj)/bootp $@
+ 	@:
