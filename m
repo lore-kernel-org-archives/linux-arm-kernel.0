@@ -1,30 +1,30 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue,  2 Aug 2011 16:33:27 +0100
-Subject: [PATCH] fix for: Build a uImage with dtb already appended
-In-Reply-To: <20110802143148.21599.22870.stgit@ponder>
-References: <20110802143148.21599.22870.stgit@ponder>
-Message-ID: <1312299207-12735-1-git-send-email-nicolas.ferre@atmel.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 3 Aug 2011 00:48:16 +0900
+Subject: [alsa-devel] [PATCH 1/1] ASoC: core: cache index fix
+In-Reply-To: <s5haabsnfg2.wl%tiwai@suse.de>
+References: <65EE16ACC360FA4D99C96DC085B3F7721F410B@039-SN1MPN1-002.039d.mgd.msft.net>
+	<20110802083850.GB9553@opensource.wolfsonmicro.com>
+	<65EE16ACC360FA4D99C96DC085B3F7721F427D@039-SN1MPN1-002.039d.mgd.msft.net>
+	<s5hy5zcnlu8.wl%tiwai@suse.de>
+	<65EE16ACC360FA4D99C96DC085B3F7721F43AA@039-SN1MPN1-002.039d.mgd.msft.net>
+	<s5hoc08nk7t.wl%tiwai@suse.de>
+	<65EE16ACC360FA4D99C96DC085B3F7721F443D@039-SN1MPN1-002.039d.mgd.msft.net>
+	<s5hlivcnhe2.wl%tiwai@suse.de>
+	<65EE16ACC360FA4D99C96DC085B3F7721F45A8@039-SN1MPN1-002.039d.mgd.msft.net>
+	<s5haabsnfg2.wl%tiwai@suse.de>
+Message-ID: <20110802154815.GE25884@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
----
- arch/arm/boot/Makefile |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+On Tue, Aug 02, 2011 at 02:52:29PM +0200, Takashi Iwai wrote:
 
-diff --git a/arch/arm/boot/Makefile b/arch/arm/boot/Makefile
-index a64493b..68d6f23 100644
---- a/arch/arm/boot/Makefile
-+++ b/arch/arm/boot/Makefile
-@@ -75,8 +75,10 @@ quiet_cmd_uimage = UIMAGE  $@
- 
- ifeq ($(CONFIG_ZBOOT_ROM),y)
- $(obj)/uImage: LOADADDR=$(CONFIG_ZBOOT_ROM_TEXT)
-+$(obj)/uImage-dtb.%: LOADADDR=$(CONFIG_ZBOOT_ROM_TEXT)
- else
- $(obj)/uImage: LOADADDR=$(ZRELADDR)
-+$(obj)/uImage-dtb.%: LOADADDR=$(ZRELADDR)
- endif
- 
- $(obj)/uImage: STARTADDR=$(LOADADDR)
--- 
-1.7.4.1
+> Mark, Liam, could you guys take a deeper look and clean these messes
+> up?
+
+Like I've indicated several times now we should just get rid of the code
+or hide it from the rest of the subsystem, it's being too cute for
+vanishingly little value.  The register maps for these devices are
+usually at most 255 registers so the memory savings are really not
+meaningful.  I'm hoping the guys working with this device will find time
+to look at fixing things, but if not I'd imagine we'll get to it at some
+point in the release cycle.
