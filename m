@@ -1,7 +1,7 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 2 Aug 2011 14:38:15 +0200
+Date: Tue, 2 Aug 2011 14:40:26 +0200
 Subject: [PULL] at91 init factorize
-In-Reply-To: <20110731151205.GB2975@n2100.arm.linux.org.uk>
+In-Reply-To: <4E35CC42.8050403@atmel.com>
 References: <20110727121156.GK10037@game.jcrosoft.org>
 	<201107271647.44015.arnd@arndb.de>
 	<20110727233452.GN10037@game.jcrosoft.org>
@@ -9,38 +9,60 @@ References: <20110727121156.GK10037@game.jcrosoft.org>
 	<20110730074623.GG25658@game.jcrosoft.org>
 	<alpine.LFD.2.00.1107301434160.12766@xanadu.home>
 	<20110731034417.GA6255@game.jcrosoft.org>
-	<20110731151205.GB2975@n2100.arm.linux.org.uk>
-Message-ID: <20110802123815.GN6255@game.jcrosoft.org>
+	<4E35CC42.8050403@atmel.com>
+Message-ID: <20110802124026.GO6255@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16:12 Sun 31 Jul     , Russell King - ARM Linux wrote:
-> On Sun, Jul 31, 2011 at 05:44:17AM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > let this pull go and theere was no announch that we can not send pull during
-> > the merge windows so if there is such rule we must write a patch and put it
-> > in the ARM tree to specified the ARM merge window otherwise the merge normal
-> > merge window prime
+On 23:42 Sun 31 Jul     , Nicolas Ferre wrote:
+> On 07/31/2011 05:44 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> >On 14:39 Sat 30 Jul     , Nicolas Pitre wrote:
+> >>On Sat, 30 Jul 2011, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> >>
+> >>>On 17:58 Thu 28 Jul     , Arnd Bergmann wrote:
+> >>>>On Thursday 28 July 2011, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> >>>>>>The patches look good, but come at an inconvenient time. We're still
+> >>>>>>in the merge window, so I don't want to add stuff to linux-next yet
+> >>>>>>that is destined for 3.2, and I have already sent out all the arm-soc
+> >>>>>>patches for the 3.1 merge window, so I don't really want to send another
+> >>>>>>round of patches at the last minute.
+> >>>>>this are waiting ofr 2 release already
+> >>>>>
+> >>>>>and was inthe next last release for more than 1 month
+> >>>>>
+> >>>>>can we have them merge this time
+> >>>>
+> >>>>What I don't understand at all is why you are waiting instead of sending
+> >>>>a pull request for all that time then. I've repeatedly given announcements
+> >>>>about the state of the arm-soc tree and asked people to send patches
+> >>>>they want in 3.1, and you actually sent bug fixes that way earlier
+> >>>>
+> >>>>You've had more than enough time before the merge window, and would even
+> >>>>have made an exception if you had sent your stuff a few hours earlier,
+> >>>>before I sent everything to Linus.
+> >>>>Also, the branch you sent me was created on the same day, meaning that
+> >>>>it can't possibly have had a lot of testing (though it looks harmless
+> >>>>enough). When you send a pull request, the patches should always be
+> >>>>based on an -rc or main release to simplify the merge history, and
+> >>>>it's better not to rebase to the latest one if you already have the
+> >>>>patches.
+> >>>sorry but those patch are 4 motnhs old and yes I rebase the branch to the
+> >>>current linus tree before send the pull request.
+> >>
+> >>Please don't do that.  It is best if you keep the same branch content
+> >>identical to what has been tested and validated for a while.
+> >except I send time to retest it
 > 
-> Err, what?  That doesn't parse.
+> Jean-Christophe,
 > 
-> Look - it's a requirement that code for the merge window is in linux-next
-> prior to the merge window opening.
-> 
-> What that means is that if code has not been in the linux-next tree prior
-> to the merge window opening, it doesn't get merged during the window, and
-> has to wait until the end of the merge window.
-> 
-> Moreover, new code must not be added to linux-next _during_ the merge
-> window by anyone (apart from bug fixes) as that can disrupt sorting out
-> how trees are merged into Linus' tree.
-> 
-> So, the rule has been for years: code not in linux-next does not get
-> merged during the merge window.
-> 
-> There's nothing new there.
-Agreed 
-this patch series was in the next before for sometimes so I did not see the
-issue to merge it
+> There is nothing to say in addition:
+> 1/ Arnd has been kind enough to pull those changes in his tree (even
+> correcting little things)
+> 2/ Arnd has been kind enough to send a late pull request to Linus
+didn't see it
+busy on the device cleanup to switch to the DT after
+
+Arnd tks a lat
 
 Best Regards,
 J.
