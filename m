@@ -1,75 +1,60 @@
-From: B29396@freescale.com (Dong Aisheng-B29396)
-Date: Tue, 2 Aug 2011 10:55:25 +0000
-Subject: [alsa-devel] [PATCH 1/1] ASoC: core: cache index fix
-In-Reply-To: <s5hy5zcnlu8.wl%tiwai@suse.de>
-References: <1312198690-13237-1-git-send-email-b29396@freescale.com>
-	<20110801115150.GB16629@opensource.wolfsonmicro.com>
-	<65EE16ACC360FA4D99C96DC085B3F7721F410B@039-SN1MPN1-002.039d.mgd.msft.net>
-	<20110802083850.GB9553@opensource.wolfsonmicro.com>
-	<65EE16ACC360FA4D99C96DC085B3F7721F427D@039-SN1MPN1-002.039d.mgd.msft.net>
-	<s5hy5zcnlu8.wl%tiwai@suse.de>
-Message-ID: <65EE16ACC360FA4D99C96DC085B3F7721F43AA@039-SN1MPN1-002.039d.mgd.msft.net>
+From: pj0585@gmail.com (Prasant J)
+Date: Tue, 2 Aug 2011 16:35:58 +0530
+Subject: at91sam9g45: MMC: Issues with MMC driver
+Message-ID: <CAA2DH4v+v2Vvv_2MzD1dGqbc5a4W1h+30FqwwpsqKmYk6nvZxQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Takashi Iwai [mailto:tiwai at suse.de]
-> Sent: Tuesday, August 02, 2011 6:34 PM
-> To: Dong Aisheng-B29396
-> Cc: Mark Brown; alsa-devel at alsa-project.org; s.hauer at pengutronix.de;
-> lrg at ti.com; linux-arm-kernel at lists.infradead.org; w.sang at pengutronix.de
-> Subject: Re: [alsa-devel] [PATCH 1/1] ASoC: core: cache index fix
-> 
-> At Tue, 2 Aug 2011 09:41:22 +0000,
-> Dong Aisheng-B29396 wrote:
-> >
-> > > -----Original Message-----
-> > > From: Mark Brown [mailto:broonie at opensource.wolfsonmicro.com]
-> > > Sent: Tuesday, August 02, 2011 4:39 PM
-> > > To: Dong Aisheng-B29396
-> > > Cc: alsa-devel at alsa-project.org;
-> > > linux-arm-kernel at lists.infradead.org;
-> > > lrg at ti.com; s.hauer at pengutronix.de; w.sang at pengutronix.de
-> > > Subject: Re: [PATCH 1/1] ASoC: core: cache index fix
-> > >
-> > > On Tue, Aug 02, 2011 at 08:03:23AM +0000, Dong Aisheng-B29396 wrote:
-> > >
-> > >
-> > > > > ...hw_read() shouldn't need to know about this stuff
-> > > > Here the reg_cache_size is the maximum cache index in the register
-> > > cache array.
-> > > > Therefore, the original code using reg to compare with
-> > > > reg_cache_size is not correct when the reg_cache_step is not 1.
-> > > > e.g. the reg to read is 0x30 and reg_cache_size maybe only 0x16.
-> > > > So we use idx to check if it exceeds the cache size.
-> > >
-> > > I see what you're doing, but like I say this is just legacy code
-> > > that shouldn't be peering at the cache size any more and layering
-> > > additional stuff in is just going to make the situation worse.
-> > >
-> > > > BTW, do you mean the soc_io layer does not need to know the
-> > > > details of idx&reg Conversion?
-> > >
-> > > Yes.
-> > >
-> > > > Do I need to implement a help function like reg_is_cachable(reg)
-> > > > to be
-> > > used here?
-> > >
-> > > No, I think we should hide these decisions completely within the
-> > > cache code.
-> >
-> > Yes, but the issue is that hw_read will check if reg is in cache array
-> > And checking like " if (reg >= codec->driver->reg_cache_size ||" is
-> > wrong when the step is not 1 that will cause registers with their
-> > index are greater than cache index will not be able to fetch data from
-> cache.
-> 
-> reg_cache_size is supposed to be the real size of the cache table.
-> This isn't influenced by reg_cache_step value.  So, the behavior in soc-
-> io.c (and other ASoC core) is correct.
-But the reg is related to step.
-So reg and reg_cache_size are un-match when step > 1, right?
- 
-> That is, the codec drivers setting ARRAY_SIZE() to reg_cache_size with
-> reg_cache_step > 1 are buggy and should be fixed.
+Hi,
+
+I'm using Linux 3.0.0 on a custom board design based on AT91SAM9G45-EKES
+
+I'm getting this kernel dump while booting:
+
+
+Waiting 3sec before mounting root device...
+mmc0: host does not support reading read-only switch. assuming write-enable.
+mmc0: new SD card at address 0007
+mmcblk0: mmc0:0007 SU02G 1.83 GiB
+ mmcblk0: p1 p2
+eth0: link up (100/Full)
+EXT3-fs: barriers not enabled
+kjournald starting.  Commit interval 5 seconds
+EXT3-fs (mmcblk0p2): using internal journal
+EXT3-fs (mmcblk0p2): mounted filesystem with writeback data mode
+VFS: Mounted root (ext3 filesystem) on device 179:2.
+Freeing init memory: 116K
+------------[ cut here ]------------
+WARNING: at kernel/irq/handle.c:130 handle_irq_event_percpu+0x6c/0x18c()
+irq 11 handler atmci_interrupt+0x0/0x6e4 enabled interrupts
+Modules linked in:
+[<c00307a4>] (unwind_backtrace+0x0/0xec) from [<c003af7c>]
+(warn_slowpath_common+0x4c/0x64)
+[<c003af7c>] (warn_slowpath_common+0x4c/0x64) from [<c003b028>]
+(warn_slowpath_fmt+0x30/0x40)
+[<c003b028>] (warn_slowpath_fmt+0x30/0x40) from [<c006530c>]
+(handle_irq_event_percpu+0x6c/0x18c)
+[<c006530c>] (handle_irq_event_percpu+0x6c/0x18c) from [<c0065454>]
+(handle_irq_event+0x28/0x38)
+[<c0065454>] (handle_irq_event+0x28/0x38) from [<c0067594>]
+(handle_level_irq+0xc8/0xdc)
+[<c0067594>] (handle_level_irq+0xc8/0xdc) from [<c0065058>]
+(generic_handle_irq+0x28/0x30)
+[<c0065058>] (generic_handle_irq+0x28/0x30) from [<c0025064>]
+(asm_do_IRQ+0x64/0x98)
+[<c0025064>] (asm_do_IRQ+0x64/0x98) from [<c002b374>] (__irq_svc+0x34/0x60)
+Exception stack(0xc02b7f68 to 0xc02b7fb0)
+7f60:                   00000000 0005317f 0005217f 60000013 c02b6000 c02bab9c
+7f80: c02baa18 c02d18e4 70004000 41069265 700203d0 00000000 600000d3 c02b7fb0
+7fa0: c002cc5c c002cc68 60000013 ffffffff
+[<c002b374>] (__irq_svc+0x34/0x60) from [<c002cc68>] (default_idle+0x38/0x40)
+[<c002cc68>] (default_idle+0x38/0x40) from [<c002ca90>] (cpu_idle+0x68/0xbc)
+[<c002ca90>] (cpu_idle+0x68/0xbc) from [<c00089fc>] (start_kernel+0x284/0x2e4)
+[<c00089fc>] (start_kernel+0x284/0x2e4) from [<70008040>] (0x70008040)
+---[ end trace 6f60efeaa497bae3 ]---
+
+
+Can someone tell me what is possibly wrong in the mmc driver's
+interrupt handler?
+
+-Prasant
