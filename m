@@ -1,164 +1,111 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 2 Aug 2011 09:35:59 +0100
-Subject: [PATCH v2 2/2] i2c/imx: add device tree probe support
-In-Reply-To: <20110801212516.GA22243@freya.fluff.org>
-References: <1312050087-15701-1-git-send-email-shawn.guo@linaro.org>
-	<1312050087-15701-3-git-send-email-shawn.guo@linaro.org>
-	<20110801212516.GA22243@freya.fluff.org>
-Message-ID: <CAAQ0ZWT+HK35ak8yKqB5gNPyU8r+9Rr46hX+5Q27Y9W9D1ZMvA@mail.gmail.com>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Tue, 2 Aug 2011 09:36:09 +0100
+Subject: [PATCH] CSR: add missing sentinels to of_device_id tables
+In-Reply-To: <20023.40012.119095.724255@ipc1.ka-ro>
+References: <1312229376-5982-1-git-send-email-jamie@jamieiles.com>
+	<20023.40012.119095.724255@ipc1.ka-ro>
+Message-ID: <20110802083609.GA5063@pulham.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 August 2011 22:25, Ben Dooks <ben-i2c@fluff.org> wrote:
-> On Sun, Jul 31, 2011 at 02:21:27AM +0800, Shawn Guo wrote:
->> It adds device tree probe support for i2c-imx driver.
->>
->> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
->> Cc: Grant Likely <grant.likely@secretlab.ca>
->> Cc: Darius Augulis <augulis.darius@gmail.com>
->> Cc: Ben Dooks <ben-linux@fluff.org>
->> Acked-by: Grant Likely <grant.likely@secretlab.ca>
->> ---
->> ?.../devicetree/bindings/i2c/fsl-imx-i2c.txt ? ? ? ?| ? 25 ++++++++++++++++++++
->> ?drivers/i2c/busses/i2c-imx.c ? ? ? ? ? ? ? ? ? ? ? | ? 25 +++++++++++++++----
->> ?2 files changed, 44 insertions(+), 6 deletions(-)
->> ?create mode 100644 Documentation/devicetree/bindings/i2c/fsl-imx-i2c.txt
->>
->> diff --git a/Documentation/devicetree/bindings/i2c/fsl-imx-i2c.txt b/Documentation/devicetree/bindings/i2c/fsl-imx-i2c.txt
->> new file mode 100644
->> index 0000000..f3cf43b
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/i2c/fsl-imx-i2c.txt
->> @@ -0,0 +1,25 @@
->> +* Freescale Inter IC (I2C) and High Speed Inter IC (HS-I2C) for i.MX
->> +
->> +Required properties:
->> +- compatible : Should be "fsl,<chip>-i2c"
->> +- reg : Should contain I2C/HS-I2C registers location and length
->> +- interrupts : Should contain I2C/HS-I2C interrupt
->> +
->> +Optional properties:
->> +- clock-frequency : Constains desired I2C/HS-I2C bus clock frequency in Hz.
->> + ?The absence of the propoerty indicates the default frequency 100 kHz.
->> +
->> +Examples:
->> +
->> +i2c at 83fc4000 { /* I2C2 on i.MX51 */
->> + ? ? compatible = "fsl,imx51-i2c", "fsl,imx1-i2c";
->> + ? ? reg = <0x83fc4000 0x4000>;
->> + ? ? interrupts = <63>;
->> +};
->> +
->> +i2c at 70038000 { /* HS-I2C on i.MX51 */
->> + ? ? compatible = "fsl,imx51-i2c", "fsl,imx1-i2c";
->> + ? ? reg = <0x70038000 0x4000>;
->> + ? ? interrupts = <64>;
->> + ? ? clock-frequency = <400000>;
->> +};
->
-> It occurs to me that the clock-frequency field should be a standard
-> used by all of-i2c drivers? could we have a standardised set of
-> properties and a standard chunk of code that reads them?
->
-Yes, "clock-frequency" is a common property for all clock frequency
-binding, not only for of-i2c but all drivers that need to get clock
-frequency from device tree.  And it's a u32 and being read by the
-common OF API of_property_read_u32().  So to answer your question,
-both the binding and code have already been standard.
+On Tue, Aug 02, 2011 at 08:42:20AM +0200, Lothar Wa?mann wrote:
+> Hi,
+> 
+> Jamie Iles writes:
+> > The of_device_id tables used for matching should be terminated with
+> > empty sentinel values.
+> > 
+> > Cc: Barry Song <baohua.song@csr.com>
+> > Signed-off-by: Jamie Iles <jamie@jamieiles.com>
+> > ---
+> >  arch/arm/mach-prima2/clock.c |    1 +
+> >  arch/arm/mach-prima2/irq.c   |    1 +
+> >  arch/arm/mach-prima2/rstc.c  |    1 +
+> >  arch/arm/mach-prima2/timer.c |    1 +
+> >  4 files changed, 4 insertions(+), 0 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-prima2/clock.c b/arch/arm/mach-prima2/clock.c
+> > index f9a2aaf..615a4e7 100644
+> > --- a/arch/arm/mach-prima2/clock.c
+> > +++ b/arch/arm/mach-prima2/clock.c
+> > @@ -481,6 +481,7 @@ static void __init sirfsoc_clk_init(void)
+> >  
+> >  static struct of_device_id clkc_ids[] = {
+> >  	{ .compatible = "sirf,prima2-clkc" },
+> > +	{},
+> I would add a comment like '/* end of list sentinel */' inside the
+> '{}' to make it crystal clear that the empty braces are intentional.
+> I also would omit the comma since it would be an error adding more
+> entries after this one.
 
-Regards,
-Shawn
+OK.  Revised patch below.
 
->> diff --git a/drivers/i2c/busses/i2c-imx.c b/drivers/i2c/busses/i2c-imx.c
->> index 54d809e..58832e5 100644
->> --- a/drivers/i2c/busses/i2c-imx.c
->> +++ b/drivers/i2c/busses/i2c-imx.c
->> @@ -48,6 +48,9 @@
->> ?#include <linux/platform_device.h>
->> ?#include <linux/clk.h>
->> ?#include <linux/slab.h>
->> +#include <linux/of.h>
->> +#include <linux/of_device.h>
->> +#include <linux/of_i2c.h>
->>
->> ?#include <mach/irqs.h>
->> ?#include <mach/hardware.h>
->> @@ -125,6 +128,11 @@ struct imx_i2c_struct {
->> ? ? ? unsigned int ? ? ? ? ? ?ifdr; /* IMX_I2C_IFDR */
->> ?};
->>
->> +static const struct of_device_id i2c_imx_dt_ids[] = {
->> + ? ? { .compatible = "fsl,imx1-i2c", },
->> + ? ? { /* sentinel */ }
->> +};
->> +
->> ?/** Functions for IMX I2C adapter driver ***************************************
->> ?*******************************************************************************/
->>
->> @@ -469,7 +477,7 @@ static int __init i2c_imx_probe(struct platform_device *pdev)
->> ? ? ? struct imxi2c_platform_data *pdata = pdev->dev.platform_data;
->> ? ? ? void __iomem *base;
->> ? ? ? resource_size_t res_size;
->> - ? ? int irq;
->> + ? ? int irq, bitrate;
->> ? ? ? int ret;
->>
->> ? ? ? dev_dbg(&pdev->dev, "<%s>\n", __func__);
->> @@ -512,6 +520,7 @@ static int __init i2c_imx_probe(struct platform_device *pdev)
->> ? ? ? i2c_imx->adapter.algo ? ? ? ? ? = &i2c_imx_algo;
->> ? ? ? i2c_imx->adapter.dev.parent ? ? = &pdev->dev;
->> ? ? ? i2c_imx->adapter.nr ? ? ? ? ? ? = pdev->id;
->> + ? ? i2c_imx->adapter.dev.of_node ? ?= pdev->dev.of_node;
->> ? ? ? i2c_imx->irq ? ? ? ? ? ? ? ? ? ?= irq;
->> ? ? ? i2c_imx->base ? ? ? ? ? ? ? ? ? = base;
->> ? ? ? i2c_imx->res ? ? ? ? ? ? ? ? ? ?= res;
->> @@ -538,10 +547,12 @@ static int __init i2c_imx_probe(struct platform_device *pdev)
->> ? ? ? i2c_set_adapdata(&i2c_imx->adapter, i2c_imx);
->>
->> ? ? ? /* Set up clock divider */
->> - ? ? if (pdata && pdata->bitrate)
->> - ? ? ? ? ? ? i2c_imx_set_clk(i2c_imx, pdata->bitrate);
->> - ? ? else
->> - ? ? ? ? ? ? i2c_imx_set_clk(i2c_imx, IMX_I2C_BIT_RATE);
->> + ? ? bitrate = IMX_I2C_BIT_RATE;
->> + ? ? ret = of_property_read_u32(pdev->dev.of_node,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?"clock-frequency", &bitrate);
->> + ? ? if (ret < 0 && pdata && pdata->bitrate)
->> + ? ? ? ? ? ? bitrate = pdata->bitrate;
->> + ? ? i2c_imx_set_clk(i2c_imx, bitrate);
->>
->> ? ? ? /* Set up chip registers to defaults */
->> ? ? ? writeb(0, i2c_imx->base + IMX_I2C_I2CR);
->> @@ -554,6 +565,8 @@ static int __init i2c_imx_probe(struct platform_device *pdev)
->> ? ? ? ? ? ? ? goto fail5;
->> ? ? ? }
->>
->> + ? ? of_i2c_register_devices(&i2c_imx->adapter);
->> +
->> ? ? ? /* Set up platform driver data */
->> ? ? ? platform_set_drvdata(pdev, i2c_imx);
->>
->> @@ -584,7 +597,6 @@ fail1:
->> ?static int __exit i2c_imx_remove(struct platform_device *pdev)
->> ?{
->> ? ? ? struct imx_i2c_struct *i2c_imx = platform_get_drvdata(pdev);
->> - ? ? struct imxi2c_platform_data *pdata = pdev->dev.platform_data;
->>
->> ? ? ? /* remove adapter */
->> ? ? ? dev_dbg(&i2c_imx->adapter.dev, "adapter removed\n");
->> @@ -613,6 +625,7 @@ static struct platform_driver i2c_imx_driver = {
->> ? ? ? .driver = {
->> ? ? ? ? ? ? ? .name ? = DRIVER_NAME,
->> ? ? ? ? ? ? ? .owner ?= THIS_MODULE,
->> + ? ? ? ? ? ? .of_match_table = i2c_imx_dt_ids,
->> ? ? ? }
->> ?};
->>
->> --
->> 1.7.4.1
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-i2c" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+Thanks Lothar!
+
+8<----
+
+Date: Mon, 1 Aug 2011 21:09:36 +0100
+Subject: [PATCH] CSR: add missing sentinels to of_device_id tables
+
+The of_device_id tables used for matching should be terminated with
+empty sentinel values.
+
+Cc: Barry Song <baohua.song@csr.com>
+Signed-off-by: Jamie Iles <jamie@jamieiles.com>
+---
+ arch/arm/mach-prima2/clock.c |    1 +
+ arch/arm/mach-prima2/irq.c   |    1 +
+ arch/arm/mach-prima2/rstc.c  |    1 +
+ arch/arm/mach-prima2/timer.c |    1 +
+ 4 files changed, 4 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-prima2/clock.c b/arch/arm/mach-prima2/clock.c
+index f9a2aaf..7c56320 100644
+--- a/arch/arm/mach-prima2/clock.c
++++ b/arch/arm/mach-prima2/clock.c
+@@ -481,6 +481,7 @@ static void __init sirfsoc_clk_init(void)
+ 
+ static struct of_device_id clkc_ids[] = {
+ 	{ .compatible = "sirf,prima2-clkc" },
++	{ /* Sentinel */ }
+ };
+ 
+ void __init sirfsoc_of_clk_init(void)
+diff --git a/arch/arm/mach-prima2/irq.c b/arch/arm/mach-prima2/irq.c
+index c3404cb..0f3ddb7 100644
+--- a/arch/arm/mach-prima2/irq.c
++++ b/arch/arm/mach-prima2/irq.c
+@@ -51,6 +51,7 @@ static __init void sirfsoc_irq_init(void)
+ 
+ static struct of_device_id intc_ids[]  = {
+ 	{ .compatible = "sirf,prima2-intc" },
++	{ /* Sentinel */ }
+ };
+ 
+ void __init sirfsoc_of_irq_init(void)
+diff --git a/arch/arm/mach-prima2/rstc.c b/arch/arm/mach-prima2/rstc.c
+index d074786..b0b5fa1 100644
+--- a/arch/arm/mach-prima2/rstc.c
++++ b/arch/arm/mach-prima2/rstc.c
+@@ -19,6 +19,7 @@ static DEFINE_MUTEX(rstc_lock);
+ 
+ static struct of_device_id rstc_ids[]  = {
+ 	{ .compatible = "sirf,prima2-rstc" },
++	{ /* Sentinel */ }
+ };
+ 
+ static int __init sirfsoc_of_rstc_init(void)
+diff --git a/arch/arm/mach-prima2/timer.c b/arch/arm/mach-prima2/timer.c
+index 44027f3..366a9aa 100644
+--- a/arch/arm/mach-prima2/timer.c
++++ b/arch/arm/mach-prima2/timer.c
+@@ -190,6 +190,7 @@ static void __init sirfsoc_timer_init(void)
+ 
+ static struct of_device_id timer_ids[] = {
+ 	{ .compatible = "sirf,prima2-tick" },
++	{ /* Sentinel */ }
+ };
+ 
+ static void __init sirfsoc_of_timer_map(void)
+-- 
+1.7.4.1
