@@ -1,106 +1,81 @@
 From: tony.lin@freescale.com (Tony Lin)
-Date: Tue, 2 Aug 2011 16:39:40 +0800
-Subject: [PATCH v4 1/7] ARM: mxs: ehci: consolidate definitions and structures
-	to share among platforms
+Date: Tue, 2 Aug 2011 16:39:41 +0800
+Subject: [PATCH v4 2/7] ARM: mxs: make ehci-mxc more flexible to be used on
+	different platforms
 In-Reply-To: <1312274386-6833-1-git-send-email-tony.lin@freescale.com>
 References: <1312274386-6833-1-git-send-email-tony.lin@freescale.com>
-Message-ID: <1312274386-6833-2-git-send-email-tony.lin@freescale.com>
+Message-ID: <1312274386-6833-3-git-send-email-tony.lin@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-move common definitions and data structures used for mxs and mxc
-platforms to fsl_device.h from mxc_ehci.h
-so that these definitions and structures could be shared without
-duplicated copies.
+change ehci_irq to mxc_ehci_irq to give chance do some platform specific
+actions in irq handler for different platforms.
+add void pointer in the last of mxc_usbh_platform_data structure so that
+additional information could be added to that field if needed.
 
 Signed-off-by: Tony Lin <tony.lin@freescale.com>
 ---
- arch/arm/plat-mxc/include/mach/mxc_ehci.h |   19 -------------------
- drivers/usb/host/ehci-mxc.c               |    4 +---
- include/linux/fsl_devices.h               |   19 +++++++++++++++++++
- 3 files changed, 20 insertions(+), 22 deletions(-)
+ drivers/usb/host/Kconfig    |    2 +-
+ drivers/usb/host/ehci-mxc.c |   13 ++++++++++++-
+ include/linux/fsl_devices.h |    2 ++
+ 3 files changed, 15 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/plat-mxc/include/mach/mxc_ehci.h b/arch/arm/plat-mxc/include/mach/mxc_ehci.h
-index 2c159dc..8775807 100644
---- a/arch/arm/plat-mxc/include/mach/mxc_ehci.h
-+++ b/arch/arm/plat-mxc/include/mach/mxc_ehci.h
-@@ -1,17 +1,6 @@
- #ifndef __INCLUDE_ASM_ARCH_MXC_EHCI_H
- #define __INCLUDE_ASM_ARCH_MXC_EHCI_H
+diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
+index ab085f1..6a5905b 100644
+--- a/drivers/usb/host/Kconfig
++++ b/drivers/usb/host/Kconfig
+@@ -139,7 +139,7 @@ config USB_EHCI_FSL
  
--/* values for portsc field */
--#define MXC_EHCI_PHY_LOW_POWER_SUSPEND	(1 << 23)
--#define MXC_EHCI_FORCE_FS		(1 << 24)
--#define MXC_EHCI_UTMI_8BIT		(0 << 28)
--#define MXC_EHCI_UTMI_16BIT		(1 << 28)
--#define MXC_EHCI_SERIAL			(1 << 29)
--#define MXC_EHCI_MODE_UTMI		(0 << 30)
--#define MXC_EHCI_MODE_PHILIPS		(1 << 30)
--#define MXC_EHCI_MODE_ULPI		(2 << 30)
--#define MXC_EHCI_MODE_SERIAL		(3 << 30)
--
- /* values for flags field */
- #define MXC_EHCI_INTERFACE_DIFF_UNI	(0 << 0)
- #define MXC_EHCI_INTERFACE_DIFF_BI	(1 << 0)
-@@ -39,14 +28,6 @@
- #define MX5_USB_UTMI_PHYCTRL1_PLLDIV_MASK		0x3
- #define MX5_USB_UTMI_PHYCTRL1_PLLDIV_SHIFT		0
- 
--struct mxc_usbh_platform_data {
--	int (*init)(struct platform_device *pdev);
--	int (*exit)(struct platform_device *pdev);
--
--	unsigned int		 portsc;
--	struct otg_transceiver	*otg;
--};
--
- int mx51_initialize_usb_hw(int port, unsigned int flags);
- int mx25_initialize_usb_hw(int port, unsigned int flags);
- int mx31_initialize_usb_hw(int port, unsigned int flags);
+ config USB_EHCI_MXC
+ 	bool "Support for Freescale on-chip EHCI USB controller"
+-	depends on USB_EHCI_HCD && ARCH_MXC
++	depends on USB_EHCI_HCD && (ARCH_MXC || ARCH_MXS)
+ 	select USB_EHCI_ROOT_HUB_TT
+ 	---help---
+ 	  Variation of ARC USB block used in some Freescale chips.
 diff --git a/drivers/usb/host/ehci-mxc.c b/drivers/usb/host/ehci-mxc.c
-index 0c058be..cbf60a6 100644
+index cbf60a6..6d3c53c 100644
 --- a/drivers/usb/host/ehci-mxc.c
 +++ b/drivers/usb/host/ehci-mxc.c
-@@ -23,9 +23,7 @@
- #include <linux/usb/otg.h>
- #include <linux/usb/ulpi.h>
- #include <linux/slab.h>
--
--#include <mach/mxc_ehci.h>
--
-+#include <linux/fsl_devices.h>
- #include <asm/mach-types.h>
+@@ -64,6 +64,17 @@ static int ehci_mxc_setup(struct usb_hcd *hcd)
+ 	return 0;
+ }
  
- #define ULPI_VIEWPORT_OFFSET	0x170
++static irqreturn_t mxc_ehci_irq(struct usb_hcd *hcd)
++{
++	struct mxc_usbh_platform_data *pdata;
++
++	pdata = hcd->self.controller->platform_data;
++	if (pdata->plt_irq_handler)
++		pdata->plt_irq_handler(pdata);
++
++	return ehci_irq(hcd);
++}
++
+ static const struct hc_driver ehci_mxc_hc_driver = {
+ 	.description = hcd_name,
+ 	.product_desc = "Freescale On-Chip EHCI Host Controller",
+@@ -72,7 +83,7 @@ static const struct hc_driver ehci_mxc_hc_driver = {
+ 	/*
+ 	 * generic hardware linkage
+ 	 */
+-	.irq = ehci_irq,
++	.irq = mxc_ehci_irq,
+ 	.flags = HCD_USB2 | HCD_MEMORY,
+ 
+ 	/*
 diff --git a/include/linux/fsl_devices.h b/include/linux/fsl_devices.h
-index fffdf00..cb19260 100644
+index cb19260..d94e9e5 100644
 --- a/include/linux/fsl_devices.h
 +++ b/include/linux/fsl_devices.h
-@@ -103,6 +103,25 @@ struct fsl_usb2_platform_data {
+@@ -120,6 +120,8 @@ struct mxc_usbh_platform_data {
  
- #define FLS_USB2_WORKAROUND_ENGCM09152	(1 << 0)
+ 	unsigned int		portsc;
+ 	struct otg_transceiver	*otg;
++	void (*plt_irq_handler)(struct mxc_usbh_platform_data *pdata);
++	void		*priv;
+ };
  
-+/* values for portsc field */
-+#define MXC_EHCI_PHY_LOW_POWER_SUSPEND	(1 << 23)
-+#define MXC_EHCI_FORCE_FS		(1 << 24)
-+#define MXC_EHCI_UTMI_8BIT		(0 << 28)
-+#define MXC_EHCI_UTMI_16BIT		(1 << 28)
-+#define MXC_EHCI_SERIAL			(1 << 29)
-+#define MXC_EHCI_MODE_UTMI		(0 << 30)
-+#define MXC_EHCI_MODE_PHILIPS		(1 << 30)
-+#define MXC_EHCI_MODE_ULPI		(2 << 30)
-+#define MXC_EHCI_MODE_SERIAL		(3 << 30)
-+
-+struct mxc_usbh_platform_data {
-+	int (*init)(struct platform_device *pdev);
-+	int (*exit)(struct platform_device *pdev);
-+
-+	unsigned int		portsc;
-+	struct otg_transceiver	*otg;
-+};
-+
  struct spi_device;
- 
- struct fsl_spi_platform_data {
 -- 
 1.7.0.4
