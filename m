@@ -1,82 +1,122 @@
-From: B29396@freescale.com (Dong Aisheng-B29396)
-Date: Tue, 2 Aug 2011 12:29:48 +0000
-Subject: [alsa-devel] [PATCH 1/1] ASoC: core: cache index fix
-In-Reply-To: <s5hlivcnhe2.wl%tiwai@suse.de>
-References: <1312198690-13237-1-git-send-email-b29396@freescale.com>
-	<20110801115150.GB16629@opensource.wolfsonmicro.com>
-	<65EE16ACC360FA4D99C96DC085B3F7721F410B@039-SN1MPN1-002.039d.mgd.msft.net>
-	<20110802083850.GB9553@opensource.wolfsonmicro.com>
-	<65EE16ACC360FA4D99C96DC085B3F7721F427D@039-SN1MPN1-002.039d.mgd.msft.net>
-	<s5hy5zcnlu8.wl%tiwai@suse.de>
-	<65EE16ACC360FA4D99C96DC085B3F7721F43AA@039-SN1MPN1-002.039d.mgd.msft.net>
-	<s5hoc08nk7t.wl%tiwai@suse.de>
-	<65EE16ACC360FA4D99C96DC085B3F7721F443D@039-SN1MPN1-002.039d.mgd.msft.net>
-	<s5hlivcnhe2.wl%tiwai@suse.de>
-Message-ID: <65EE16ACC360FA4D99C96DC085B3F7721F45A8@039-SN1MPN1-002.039d.mgd.msft.net>
+From: koen.beel.barco@gmail.com (Koen Beel)
+Date: Tue, 2 Aug 2011 14:32:17 +0200
+Subject: [PATCH v8 0/3] add the GPMI controller driver for IMX23/IMX28
+In-Reply-To: <4E37D375.7000400@freescale.com>
+References: <1311230846-26437-1-git-send-email-b32955@freescale.com>
+	<20018.43621.688990.319528@ipc1.ka-ro>
+	<CAHMSPgPXnDVO630P9fnogQ0XvPSrwz0MYzXfXZLJoJNRf1gifA@mail.gmail.com>
+	<201107311551.48223.marek.vasut@gmail.com>
+	<CAHMSPgMK_zM17NXgsbrzs8Zw0VXtDoP12_1V7oeROSF=aBDuYg@mail.gmail.com>
+	<4E379B28.7090902@freescale.com>
+	<CAHMSPgM4K5o_aGK31yyFcGK-hH4WBeqVkA5dZU=FvAiKGmHA9A@mail.gmail.com>
+	<4E37BA02.5030400@freescale.com>
+	<CAHMSPgOBhZVgjXZTWWPtwBxrF4g1tFa2E5N+Yjs+ku-0BwKPVA@mail.gmail.com>
+	<4E37D375.7000400@freescale.com>
+Message-ID: <CAHMSPgPnjKE49jn3HPjkztKroRrjRjLMyDWnkOb78KjecbQK3Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Takashi Iwai [mailto:tiwai at suse.de]
-> Sent: Tuesday, August 02, 2011 8:10 PM
-> To: Dong Aisheng-B29396
-> Cc: Mark Brown; alsa-devel at alsa-project.org; s.hauer at pengutronix.de;
-> lrg at ti.com; linux-arm-kernel at lists.infradead.org; w.sang at pengutronix.de
-> Subject: Re: [alsa-devel] [PATCH 1/1] ASoC: core: cache index fix
-> 
-> At Tue, 2 Aug 2011 11:15:28 +0000,
-> Dong Aisheng-B29396 wrote:
-> >
-> > > -----Original Message-----
-> > > From: Takashi Iwai [mailto:tiwai at suse.de]
-> > > Sent: Tuesday, August 02, 2011 7:09 PM
-> > > To: Dong Aisheng-B29396
-> > > Cc: Mark Brown; alsa-devel at alsa-project.org; s.hauer at pengutronix.de;
-> > > lrg at ti.com; linux-arm-kernel at lists.infradead.org;
-> > > w.sang at pengutronix.de
-> > > Subject: Re: [alsa-devel] [PATCH 1/1] ASoC: core: cache index fix
-> > >
-> > > > > reg_cache_size is supposed to be the real size of the cache table.
-> > > > > This isn't influenced by reg_cache_step value.  So, the behavior
-> > > > > in
-> > > > > soc- io.c (and other ASoC core) is correct.
-> > > > But the reg is related to step.
-> > > > So reg and reg_cache_size are un-match when step > 1, right?
-> > >
-> > > I'm not sure what is referred here as reg, but the argument passed
-> > > to
-> > > snd_soc_{read|write}() is the raw register index.  reg = 2 is 2 no
-> > > matter whether reg_cache_step is 1 or 2.  This is passed down to
-> > > hw_read(), thus reg and reg_cache_size do match even when step > 1.
-> > >
-> > Yes, it is raw register index here.
-> > The case is that cache array is [reg0, reg1, reg2, reg3], So the size
-> > is 4.
-> > But when step is 2, reg0 is 0x0, reg1 is 0x2, reg3 is 0x6.
-> > So check if reg3 > reg_cache_size is not correct.
-> > I mean this mismatch. Am I correct?
-> 
-> No, the (flat) cache array held in codec instance contains padding, e.g.
-> [reg0, 0, reg1, 0, reg2, 0, reg3, 0] in the case above.
-> cache_reg_step is there just for avoiding the access to invalid registers
-> in the table-lookup code in soc-*.c.
-I saw most codec drivers with cache_reg_step of 2 do not have padding such
-as wm9705, wm9712 driver(you can check the code).
-So It looks the cache_reg_step here causes some misleading.
+Hi,
 
-> Thus it's a bug of the driver if it passes reg_cache_default with a
-> packed array with reg_cache_step > 1.  If the size matters, we may fix it
-> in soc-core.c to accept packed arrays, but I'm not sure whether it's
-> worth alone.
-> 
-> (For the sparse data like wm8995, it's a different question; Obviously
-> it can be better packed in a form of {index,data} pairs instead of  the
-> whole sparse array as initial data.  Then we'd need to introduce  another
-> type of default-data copier in soc-core.c.)
-> 
-> And, in principle, the driver shouldn't access codec->reg_cache contents
-> directly but use helper functions.  Then the most of inconsistency issue
-> should go away.
-Yes.
-The problem is that if the cache array is not padded, the snd_soc_read/write
-may work incorrectly.
+On Tue, Aug 2, 2011 at 12:37 PM, Huang Shijie <b32955@freescale.com> wrote:
+> hi:
+>>
+>>> The following is my test environment:
+>>> [0] Hardware:
+>>> ? ? ? MX23EVK PCB REV C
+>>
+>> I have the same hardware. But also on our own hardware (mx23, but
+>> different dram and different nand) it's failing with the same output
+>> as on the evk (see log file in previous mail).
+>
+> I will check the schematic of mx23 tomorrow, and find what will cause
+> conflict with GPMI.
+>>>
+>>> [1] SW:
+>>> ? ?kernel:git://git.linaro.org/people/shawnguo/linux-2.6.git mxs-gpmi
+>>> ? ?.config: my_config , you can find it in my previous email.
+>>> ? ?cmdline: console=ttyAMA0,115200 root=/dev/mmcblk0p1 rw rootwait
+>>> gpmi_debug_init mtdparts=gpmi-nand:20m(boot),-(user)
+>>
+>> I use that git and your config file. Only thing i have changed to the
+>> config is to integrate the initramfs rootfs.
+>> Would it be possible for you to test using rootfs in initramfs? Now
+>
+> could you tell me how can i test the rootfs in initramfs?
+> I have no idea about how to test it.
+
+Via the linux menuconfig:
+- Check the option "General setup > Initial RAM filesystem and RAM
+disk (initramfs/initrd) support"
+- Fill in "General setup > Initramfs source file(s)" (e.g. the path to
+a cpio archive of the rootfs, or just the directory containing the
+extracted rootfs).
+
+>
+>
+>> you are using the mmc card as rootfs which is on the dma engine and
+>> bus.
+>>
+>>
+>>> [2] test shell script:
+>>> ================================
+>>>
+>>> echo 0x20> ?/sys/module/gpmi_nand/parameters/gpmi_debug
+>>
+>> As said, don't have that gpmi_debug sysfs entry. Sure you don't have
+>> any other modification done which are not in that git branch?
+>
+> The sysfs entry does exit.
+> Please check carefully.
+> The code in gpmi-nand.c defines it.
+
+Ok, I see the module_param entry at the beginning of gpmi-nand.c.
+Must have overlooked it as in previous mail you mentioned the path was
+/sys/devices/platform/imx23-gpmi-nand/gpmi_debug
+But no problem, it's working now.
+
+>
+>
+>>> flash_eraseall /dev/mtd1
+>>> ubiformat /dev/mtd1
+>>> flash_eraseall /dev/mtd1
+>>> ubiattach /dev/ubi_ctrl -m 1
+>>> ubimkvol /dev/ubi0 -N test -m
+>>> mount -t ubifs ubi0:test tmp
+>>> bonnie++ -d tmp -u 0 -s 2 -r 1
+>>> bonnie++ -d tmp -u 0 -s 2 -r 1
+>>> bonnie++ -d tmp -u 0 -s 2 -r 1
+>>> umount tmp
+>>> ubidetach /dev/ubi_ctrl -m 1
+>>>
+>>> ================================
+>>>
+>>> [3] conclusion
+>>> ? It runs well in my mx23 board, and no DMA-TIMEOUT occur.
+>>> I think there is some conflict in your board.
+>>
+>> Don't know what conflict I would have with my board. I just use the
+>> board without anything (mmc, lcd, ...) attached to it.
+>>
+>>> BTW:
+>>> ? I split the MTD to 20M and (the rest size).
+>>
+>> So do I.
+>>
+>>> The flash_eraseall works well.
+>>> If i do not split the MTD, the flash_eraseall will not work.
+>>
+>> That's strange because I use flash_eraseall on my mtd1 which is 108 MB.
+>> I don't know how you boot but my uboot is in mtd0, so don't use that
+>
+> I boot the kernel by the USB with sb_loader.
+>
+> Best Regards
+> Huang Shijie
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
