@@ -1,139 +1,163 @@
 From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Wed,  3 Aug 2011 00:08:27 +0100
-Subject: [PATCH 2/4] serial: s5pv210: Add device tree support
+Date: Wed,  3 Aug 2011 00:08:28 +0100
+Subject: [PATCH 3/4] arm: exynos4: Add a new Exynos4 device tree enabled
+	machine
 In-Reply-To: <1312326509-2723-1-git-send-email-thomas.abraham@linaro.org>
 References: <1312326509-2723-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <1312326509-2723-3-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <1312326509-2723-4-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For device tree based probe, the dependecy on pdev->id to attach a
-corresponding default port info to the driver's private data is
-removed. The fifosize parameter is obtained from the device tree
-node and the next available instance of port info is updated
-with the fifosize value and attached to the driver's private data.
-The default platform data is selected based on the compatible property.
+Add a new basic Exynos4 machine with device tree support that can boot
+on a Exynos4 processor based board and bring up the console. This acts
+as a stating point to add device tree support for Exynos4 architecture.
 
-CC: Ben Dooks <ben-linux@fluff.org>
 Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
 ---
- .../devicetree/bindings/serial/samsung_uart.txt    |   16 +++++++
- drivers/tty/serial/s5pv210.c                       |   43 +++++++++++++++++++-
- drivers/tty/serial/samsung.c                       |    5 ++-
- 3 files changed, 62 insertions(+), 2 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/serial/samsung_uart.txt
+ Documentation/devicetree/bindings/arm/samsung.txt |    8 ++
+ arch/arm/mach-exynos4/Kconfig                     |   10 +++
+ arch/arm/mach-exynos4/Makefile                    |    1 +
+ arch/arm/mach-exynos4/mach-exynos4-dt.c           |   84 +++++++++++++++++++++
+ 4 files changed, 103 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/samsung.txt
+ create mode 100644 arch/arm/mach-exynos4/mach-exynos4-dt.c
 
-diff --git a/Documentation/devicetree/bindings/serial/samsung_uart.txt b/Documentation/devicetree/bindings/serial/samsung_uart.txt
+diff --git a/Documentation/devicetree/bindings/arm/samsung.txt b/Documentation/devicetree/bindings/arm/samsung.txt
 new file mode 100644
-index 0000000..9174499
+index 0000000..ce4a1aa
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/serial/samsung_uart.txt
-@@ -0,0 +1,16 @@
-+* Samsung's UART Controller
++++ b/Documentation/devicetree/bindings/arm/samsung.txt
+@@ -0,0 +1,8 @@
++Samsung Exynos4 based SMDKV310 eval board
 +
-+The Samsung's UART controller is used for serial communications on all of
-+Samsung's s3c24xx, s3c64xx and s5p series application processors.
++    SMDKV310 eval board is based on Samsung's Exynos4 processor architecture.
 +
-+Required properties:
-+- compatible: should be specific to the application processor
-+    - "samsung,s5pv310-uart" , for Exynos4 processors.
-+
-+- reg: base physical address of the controller and length of memory mapped
-+  region.
-+
-+- interrupts : Three interrupt numbers should be specified in the following
-+  order - Rx interrupt, Tx interrupt, Error Interrupt.
-+
-+- samsung,uart-fifosize: Size of the tx/rx fifo used in the controller.
-diff --git a/drivers/tty/serial/s5pv210.c b/drivers/tty/serial/s5pv210.c
-index fb0806c..a44b599 100644
---- a/drivers/tty/serial/s5pv210.c
-+++ b/drivers/tty/serial/s5pv210.c
-@@ -19,6 +19,7 @@
- #include <linux/serial_core.h>
- #include <linux/serial.h>
- #include <linux/delay.h>
-+#include <linux/of.h>
++Required root node properties:
++    - compatible = "samsung,smdkv310","samsung,exynos4"
++        (a) "samsung,smdkv310" - for Samsung's SMDKV310 eval board.
++        (b) "samsung,exynos4"  - for boards based on Exynos4 architecture.
+diff --git a/arch/arm/mach-exynos4/Kconfig b/arch/arm/mach-exynos4/Kconfig
+index 0c77ab9..c29de4e 100644
+--- a/arch/arm/mach-exynos4/Kconfig
++++ b/arch/arm/mach-exynos4/Kconfig
+@@ -218,6 +218,16 @@ config MACH_NURI
+ 	help
+ 	  Machine support for Samsung Mobile NURI Board.
  
- #include <asm/irq.h>
- #include <mach/hardware.h>
-@@ -132,10 +133,49 @@ static struct s3c24xx_uart_info *s5p_uart_inf[] = {
- 	[3] = &s5p_port_fifo16,
- };
- 
-+#ifdef CONFIG_OF
-+static struct s3c2410_uartcfg s5pv310_uart_defcfg = {
-+	.ucon	= 0x3c5,
-+	.ufcon	= 0x111,
-+	.flags	= NO_NEED_CHECK_CLKSRC,
-+	.has_fracval = 1,
-+};
++config MACH_EXYNOS4_DT
++	bool "Samsung Exynos4 Machine using device tree"
++	select CPU_EXYNOS4210
++	select USE_OF
++	select S3C_DEV_HSMMC
++	select S3C_DEV_HSMMC2
++	select EXYNOS4_SETUP_SDHCI
++	help
++	  Machine support for Samsung Exynos4 machine with device tree enabled.
 +
-+static const struct of_device_id s5pv210_uart_dt_match[] = {
-+	{ .compatible = "samsung,s5pv310-uart", .data = &s5pv310_uart_defcfg },
+ endmenu
+ 
+ comment "Configuration for HSMMC bus width"
+diff --git a/arch/arm/mach-exynos4/Makefile b/arch/arm/mach-exynos4/Makefile
+index b7fe1d7..d2bf5bf 100644
+--- a/arch/arm/mach-exynos4/Makefile
++++ b/arch/arm/mach-exynos4/Makefile
+@@ -30,6 +30,7 @@ obj-$(CONFIG_MACH_SMDKV310)		+= mach-smdkv310.o
+ obj-$(CONFIG_MACH_ARMLEX4210)		+= mach-armlex4210.o
+ obj-$(CONFIG_MACH_UNIVERSAL_C210)	+= mach-universal_c210.o
+ obj-$(CONFIG_MACH_NURI)			+= mach-nuri.o
++obj-$(CONFIG_MACH_EXYNOS4_DT)		+= mach-exynos4-dt.o
+ 
+ # device support
+ 
+diff --git a/arch/arm/mach-exynos4/mach-exynos4-dt.c b/arch/arm/mach-exynos4/mach-exynos4-dt.c
+new file mode 100644
+index 0000000..47c3892
+--- /dev/null
++++ b/arch/arm/mach-exynos4/mach-exynos4-dt.c
+@@ -0,0 +1,84 @@
++/*
++ * Samsung's Exynos4 device tree enabled machine.
++ *
++ * Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com
++ * Copyright (c) 2010-2011 Linaro Ltd.
++ *		www.linaro.org
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
++
++#include <linux/io.h>
++#include <linux/of_platform.h>
++#include <linux/irq.h>
++#include <linux/irqdomain.h>
++#include <linux/serial_core.h>
++
++#include <asm/mach/arch.h>
++#include <asm/mach-types.h>
++
++#include <plat/regs-serial.h>
++#include <plat/exynos4.h>
++#include <plat/cpu.h>
++
++#include <mach/map.h>
++
++/*
++ * The following lookup table is used to override device names when devices
++ * are registered from device tree. This is temporarily added to enable
++ * device tree support addition for the Exynos4 architecture.
++ *
++ * For drivers that require platform data to be provided from the machine
++ * file, a platform data pointer can also be supplied along with the
++ * devices names. Usually, the platform data elements that cannot be parsed
++ * from the device tree by the drivers (example: function pointers) are
++ * supplied. But it should be noted that this is a temporary mechanism and
++ * at some point, the drivers should be capable of parsing all the platform
++ * data from the device tree.
++ */
++static const struct of_dev_auxdata exynos4_auxdata_lookup[] __initconst = {
++	OF_DEV_AUXDATA("samsung,s5pv310-uart", S5P_PA_UART0,
++				"s5pv210-uart.0", NULL),
++	OF_DEV_AUXDATA("samsung,s5pv310-uart", S5P_PA_UART1,
++				"s5pv210-uart.1", NULL),
++	OF_DEV_AUXDATA("samsung,s5pv310-uart", S5P_PA_UART2,
++				"s5pv210-uart.2", NULL),
++	OF_DEV_AUXDATA("samsung,s5pv310-uart", S5P_PA_UART3,
++				"s5pv210-uart.3", NULL),
 +	{},
 +};
-+MODULE_DEVICE_TABLE(of, s5pv210_uart_match);
-+#else
-+#define s5pv210_uart_match NULL
-+#endif
 +
- /* device management */
- static int s5p_serial_probe(struct platform_device *pdev)
- {
--	return s3c24xx_serial_probe(pdev, s5p_uart_inf[pdev->id]);
-+	static unsigned int probe_index;
-+	unsigned int port = pdev->id;
-+	const struct of_device_id *match;
-+	struct s3c2410_uartcfg *cfg;
++static void __init exynos4_dt_map_io(void)
++{
++	s5p_init_io(NULL, 0, S5P_VA_CHIPID);
++	s3c24xx_init_clocks(24000000);
++}
 +
-+	if (pdev->dev.of_node) {
-+		if (of_property_read_u32(pdev->dev.of_node,
-+				"samsung,uart-fifosize",
-+				&s5p_uart_inf[probe_index]->fifosize))
-+			return -EINVAL;
++static const struct of_device_id intc_of_match[] __initconst = {
++	{ .compatible = "samsung,exynos4-gic", },
++	{},
++};
 +
-+		cfg = devm_kzalloc(&pdev->dev, sizeof(*cfg), GFP_KERNEL);
-+		if (!cfg)
-+			return -ENOMEM;
++static void __init exynos4_dt_machine_init(void)
++{
++	irq_domain_generate_simple(intc_of_match, EXYNOS4_PA_GIC_DIST, 0);
++	of_platform_populate(NULL, of_default_bus_match_table,
++				exynos4_auxdata_lookup, NULL);
++}
 +
-+		match = of_match_node(s5pv210_uart_dt_match, pdev->dev.of_node);
-+		*cfg = *((struct s3c2410_uartcfg *)match->data);
-+		s5p_uart_inf[probe_index]->cfg = cfg;
-+		cfg->hwport = probe_index;
-+		port = probe_index++;
-+	}
++static char const *exynos4_dt_compat[] __initdata = {
++	"samsung,exynos4",
++	NULL
++};
 +
-+	return s3c24xx_serial_probe(pdev, s5p_uart_inf[port]);
- }
- 
- static struct platform_driver s5p_serial_driver = {
-@@ -144,6 +184,7 @@ static struct platform_driver s5p_serial_driver = {
- 	.driver		= {
- 		.name	= "s5pv210-uart",
- 		.owner	= THIS_MODULE,
-+		.of_match_table	= s5pv210_uart_dt_match,
- 	},
- };
- 
-diff --git a/drivers/tty/serial/samsung.c b/drivers/tty/serial/samsung.c
-index 47fee73..49ba4a5a 100644
---- a/drivers/tty/serial/samsung.c
-+++ b/drivers/tty/serial/samsung.c
-@@ -1070,10 +1070,13 @@ static int s3c24xx_serial_init_port(struct s3c24xx_uart_port *ourport,
- 
- 	/*
- 	 * If platform data is supplied, keep a copy of the location of
--	 * platform data in the driver's private data.
-+	 * platform data in the driver's private data. In case of device tree
-+	 * based probe, the location of platform data is already set.
- 	 */
- 	if (cfg)
- 		info->cfg = cfg;
-+	else
-+		cfg = info->cfg;
- 
- 	if (cfg->hwport > CONFIG_SERIAL_SAMSUNG_UARTS) {
- 		printk(KERN_ERR "%s: port %d bigger than %d\n", __func__,
++DT_MACHINE_START(SMDKV310, "Samsung Exynos4 DT")
++	/* Maintainer: Kukjin Kim <kgene.kim@samsung.com> */
++	.init_irq	= exynos4_init_irq,
++	.map_io		= exynos4_dt_map_io,
++	.init_machine	= exynos4_dt_machine_init,
++	.timer		= &exynos4_timer,
++	.dt_compat	= exynos4_dt_compat,
++MACHINE_END
 -- 
 1.7.4.1
