@@ -1,53 +1,85 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 02 Aug 2011 16:14:54 -0700
-Subject: Remaining omap pull requests
-In-Reply-To: <20110713061634.GG5783@atomide.com>
-References: <20110711114736.GX5783@atomide.com>
-	<201107120016.12366.arnd@arndb.de>
-	<20110713061634.GG5783@atomide.com>
-Message-ID: <4E3884EE.3070507@ti.com>
+Date: Tue, 02 Aug 2011 16:23:57 -0700
+Subject: [PATCHv5 1/3] OMAP: I2C: Reset support
+In-Reply-To: <1311935813-8481-2-git-send-email-shubhrajyoti@ti.com>
+	(Shubhrajyoti D.'s message of "Fri, 29 Jul 2011 16:06:51 +0530")
+References: <1311935813-8481-1-git-send-email-shubhrajyoti@ti.com>
+	<1311935813-8481-2-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <87sjpj75yq.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Shubhrajyoti D <shubhrajyoti@ti.com> writes:
 
-On 07/12/2011 11:16 PM, Tony Lindgren wrote:
-> * Arnd Bergmann<arnd@arndb.de>  [110711 15:11]:
->> On Monday 11 July 2011, Tony Lindgren wrote:
->>> Hi Arnd,
->>>
->>> Below is a summary of the pending omap pull requests as there are still
->>> few branches pending.
->>>
->>> Can you please take a look and see what you can take of these for v3.1
->>> merge window?
->>>
->>> There's still quite a bit more code shrinkage, and the new code for 4460
->>> and PRCM related changes are badly needed.
->>
->> I've pulled everything now, please check if it looks ok to you.
->
-> Thanks looks good to me.
->
->> I haven't really looked at the patches much, I hope that I have time
->> to at least do some test builds and take a very rough look at the
->> contents tomorrow.
->
-> OK thanks.
->
->> Thanks for the detailed descriptions, and for splitting it
->> into good-sized series.
->
-> Looks like I forgot the i2c driver changes that also should be
-> merged by us. Those are acked by Ben Dooks, Kevin's pull request
-> for that is at:
->
-> http://marc.info/?l=linux-omap&m=131014213007667&w=2
->
+>  Under some error conditions the i2c  driver may do a reset.
+  ^                                    ^
+minor: extra whitespace
 
-I thought this was already pulled, but looking now I see that this was 
-never pulled into the arm-soc tree.
+>  Adding a reset field and support in the platform.
 
-Can you pull this for v3.1 please?
+s/platform/device-specific code/
+
+> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+
+That being said, omap_device_shutdown() should already do a clean
+shutdown + reset for you, and i2c-omap.h already has a pointer for
+->device_shutdown() so a new device_reset() should not be needed.
+
+IOW, simply adding pdata->device_shutdown = omap_device_shutdown()
+should work.
 
 Kevin
+
+> ---
+>  arch/arm/plat-omap/i2c.c |   18 ++++++++++++++++++
+>  include/linux/i2c-omap.h |    1 +
+>  2 files changed, 19 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/plat-omap/i2c.c b/arch/arm/plat-omap/i2c.c
+> index 2388b8e..be36cac 100644
+> --- a/arch/arm/plat-omap/i2c.c
+> +++ b/arch/arm/plat-omap/i2c.c
+> @@ -146,6 +146,22 @@ static struct omap_device_pm_latency omap_i2c_latency[] = {
+>  		.flags			= OMAP_DEVICE_LATENCY_AUTO_ADJUST,
+>  	},
+>  };
+> +/**
+> + * omap2_i2c_reset - reset the omap i2c module.
+> + * @dev: struct device*
+> + */
+> +
+> +static int omap2_i2c_reset(struct device *dev)
+> +{
+> +	int r = 0;
+> +	struct platform_device *pdev = to_platform_device(dev);
+> +	struct omap_device *odev = to_omap_device(pdev);
+> +	struct omap_hwmod *oh;
+> +
+> +	oh = odev->hwmods[0];
+> +	r = omap_hwmod_reset(oh);
+> +	return r;
+> +}
+>
+>  static inline int omap2_i2c_add_bus(int bus_id)
+>  {
+> @@ -187,6 +203,8 @@ static inline int omap2_i2c_add_bus(int bus_id)
+>  	 */
+>  	if (cpu_is_omap34xx())
+>  		pdata->set_mpu_wkup_lat = omap_pm_set_max_mpu_wakeup_lat_compat;
+> +
+> +	pdata->device_reset = omap2_i2c_reset;
+>  	od = omap_device_build(name, bus_id, oh, pdata,
+>  			sizeof(struct omap_i2c_bus_platform_data),
+>  			omap_i2c_latency, ARRAY_SIZE(omap_i2c_latency), 0);
+> diff --git a/include/linux/i2c-omap.h b/include/linux/i2c-omap.h
+> index 98ae49b..8aa91b6 100644
+> --- a/include/linux/i2c-omap.h
+> +++ b/include/linux/i2c-omap.h
+> @@ -38,6 +38,7 @@ struct omap_i2c_bus_platform_data {
+>  	int		(*device_enable) (struct platform_device *pdev);
+>  	int		(*device_shutdown) (struct platform_device *pdev);
+>  	int		(*device_idle) (struct platform_device *pdev);
+> +	int		(*device_reset) (struct device *dev);
+>  };
+>  
+>  #endif
