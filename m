@@ -1,52 +1,78 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 3 Aug 2011 01:40:06 +0900
-Subject: [alsa-devel] [PATCH 1/1] ASoC: core: cache index fix
-In-Reply-To: <s5hipqfn65k.wl%tiwai@suse.de>
-References: <65EE16ACC360FA4D99C96DC085B3F7721F427D@039-SN1MPN1-002.039d.mgd.msft.net>
-	<s5hy5zcnlu8.wl%tiwai@suse.de>
-	<65EE16ACC360FA4D99C96DC085B3F7721F43AA@039-SN1MPN1-002.039d.mgd.msft.net>
-	<s5hoc08nk7t.wl%tiwai@suse.de>
-	<65EE16ACC360FA4D99C96DC085B3F7721F443D@039-SN1MPN1-002.039d.mgd.msft.net>
-	<s5hlivcnhe2.wl%tiwai@suse.de>
-	<65EE16ACC360FA4D99C96DC085B3F7721F45A8@039-SN1MPN1-002.039d.mgd.msft.net>
-	<s5haabsnfg2.wl%tiwai@suse.de>
-	<20110802154815.GE25884@opensource.wolfsonmicro.com>
-	<s5hipqfn65k.wl%tiwai@suse.de>
-Message-ID: <20110802164005.GI25884@opensource.wolfsonmicro.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 2 Aug 2011 16:11:15 +0800
+Subject: [PATCH v8 0/3] add the GPMI controller driver for IMX23/IMX28
+In-Reply-To: <4E37970C.4070903@freescale.com>
+References: <20110722055731.GI26837@S2100-06.ap.freescale.net>
+	<4E292FCF.6010608@freescale.com>
+	<CAHMSPgMHrqWcJ=BThDLgQ=XyTBDCMvNS4SVjQWfk=Jf682TEig@mail.gmail.com>
+	<4E2F6F90.7030207@freescale.com>
+	<CAHMSPgPC4whyskfuFGeFd7WHx-=5htezWajm_rNi9Xa+03PV0A@mail.gmail.com>
+	<20018.24364.787244.956361@ipc1.ka-ro>
+	<CAHMSPgM5W8=mE4sRDGMMfo39fvThBo_jrdG8hyhJNQ_ceV=_pA@mail.gmail.com>
+	<4E32823C.3060007@freescale.com>
+	<CAHMSPgMTf1UnMyvsSZM1in-FEAoWyS5VSdczsxfHgujGJ0DFtw@mail.gmail.com>
+	<4E37970C.4070903@freescale.com>
+Message-ID: <20110802081115.GC17297@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 02, 2011 at 06:13:11PM +0200, Takashi Iwai wrote:
-> Mark Brown wrote:
+On Tue, Aug 02, 2011 at 02:19:56PM +0800, Huang Shijie wrote:
+> Hi,
+> >On Fri, Jul 29, 2011 at 11:49 AM, Huang Shijie<b32955@freescale.com>  wrote:
+> >>? 2011?07?29? 15:40, Koen Beel ??:
+> >>>Hi,
+> >>>
+> >>>On Fri, Jul 29, 2011 at 9:20 AM, Lothar Wa?mann<LW@karo-electronics.de>
+> >>>  wrote:
+> >>>>Hi,
+> >>>>
+> >>>>Koen Beel writes:
+> >>>>>Hi,
+> >>>>>
+> >>>>>I have test on mx23evk board. Still see the same issues.
+> >>>>>
+> >>>>>On Wed, Jul 27, 2011 at 3:53 AM, Huang Shijie<b32955@freescale.com>
+> >>>>>  wrote:
+> >>>>>>Hi,
+> >>>>>>
+> >>>>>>Thanks for your test.
+> >>>>>>
+> >>>>>>>Hi,
+> >>>>>>>
+> >>>>>>>It's not really working for me.
+> >>>>>>>I've applied all gpmi-nand driver patches and the dma driver patches.
+> >>>>>>>
+> >>>>>>>I have added following kernel parameters:
+> >>>>>>>mtdparts=gpmi-nand:20m(boot),-(user) ubi.mtd=1 root=ubi0:rootfs0
+> >>>>>>>rootfstype=ubifs gpmi_debug_init
+> >>>>>>>
+> >>>>>>>During boot I get already get DMA timeout:
+> >>>>>>>[    2.560000] [ start_dma_without_bch_irq : 392 ] DMA timeout, last
+> >>>>>>>DMA
+> >>>>>>>:1
+> >>>>>>>[    3.560000] [ start_dma_with_bch_irq : 427 ] bch timeout!!!
+> >>>>>>>...
+> >>>>>>>(see log file in attach line 89)
+> >>>>>I still see this DMA timeout when booting.
+> >>>>>What kernel parameters do you use? I still use same as above.
+> >>>>>
+> >>>>Do you have an SD card in the system? I'm getting the same error when
+> >>>>accessing an SD card. Without SD card I can use the flash without any
+> >>>>errors.
+> >>>No SD card in the system. At least not on my mx23evk board.
+> >>>My real target hardware has a SDIO wifi chip.
+> >>Does it conflict with the GPMI?
+> >Well I don't know if it conflicts. From what Lothar says I assume
+> >there might be a conflict between gpmi and sdio.
+> Yes, the conflict between gpmi and other module(such as SD in MX6Q)
+> is THE prime reason
+> which caused the DMA timeout.
+> 
+> I am debuging the IMX6Q now, and meet the same problem.
+> 
+I do not follow on this.  SD on i.mx6q does not use apbh-dma at all.
+How will it conflict with gpmi regarding to dma timeout?
 
-> > Like I've indicated several times now we should just get rid of the code
-> > or hide it from the rest of the subsystem, it's being too cute for
-> > vanishingly little value.  The register maps for these devices are
-> > usually at most 255 registers so the memory savings are really not
-> > meaningful.  I'm hoping the guys working with this device will find time
-> > to look at fixing things, but if not I'd imagine we'll get to it at some
-> > point in the release cycle.
-
-> Well, there aren't so many drivers suffering from this bug, so a
-> temporary fix would be easy like below (totally untested).
-
-If we're going to do something like this I'd preserve the driver
-interface that's there rather than fiddling with their reg_cache_sizes -
-half the trouble here is that the meaning of that has become a bit
-slippery, the current code used to be correct.
-
-> @@ -421,7 +422,9 @@ static int snd_soc_rbtree_cache_init(struct snd_soc_codec *codec)
->  		return 0;
->  
->  	word_size = codec->driver->reg_word_size;
-> -	for (i = 0; i < codec->driver->reg_cache_size; ++i) {
-> +	if (codec->driver->reg_cache_step)
-> +		step = codec->driver->reg_cache_step;
-> +	for (i = 0; i < codec->driver->reg_cache_size; i += step) {
->  		val = snd_soc_get_cache_val(codec->reg_def_copy, i,
->  					    word_size);
->  		if (!val)
-
-I'm also really unhappy with handling this in the complex caches, I'd be
-much more inclined to just disallow their use with devices with step
-sizes than to add any complexity to them.
+-- 
+Regards,
+Shawn
