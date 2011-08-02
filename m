@@ -1,51 +1,108 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Tue, 2 Aug 2011 08:42:20 +0200
-Subject: [PATCH] CSR: add missing sentinels to of_device_id tables
-In-Reply-To: <1312229376-5982-1-git-send-email-jamie@jamieiles.com>
-References: <1312229376-5982-1-git-send-email-jamie@jamieiles.com>
-Message-ID: <20023.40012.119095.724255@ipc1.ka-ro>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 2 Aug 2011 08:58:14 +0200
+Subject: [PATCH v3 1/2] arm/mx5: add device tree support for imx53 boards
+In-Reply-To: <1312226252-8566-2-git-send-email-shawn.guo@linaro.org>
+References: <1312226252-8566-1-git-send-email-shawn.guo@linaro.org>
+	<1312226252-8566-2-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20110802065814.GM31404@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Jamie Iles writes:
-> The of_device_id tables used for matching should be terminated with
-> empty sentinel values.
+On Tue, Aug 02, 2011 at 03:17:31AM +0800, Shawn Guo wrote:
+> From: Shawn Guo <shawn.guo@freescale.com>
 > 
-> Cc: Barry Song <baohua.song@csr.com>
-> Signed-off-by: Jamie Iles <jamie@jamieiles.com>
+> It adds device tree support for imx53 boards.
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
 > ---
->  arch/arm/mach-prima2/clock.c |    1 +
->  arch/arm/mach-prima2/irq.c   |    1 +
->  arch/arm/mach-prima2/rstc.c  |    1 +
->  arch/arm/mach-prima2/timer.c |    1 +
->  4 files changed, 4 insertions(+), 0 deletions(-)
+>  .../devicetree/bindings/arm/fsl/boards.txt         |   15 ++
+>  arch/arm/boot/dts/imx53-ard.dts                    |  158 +++++++++++++
+>  arch/arm/boot/dts/imx53-evk.dts                    |  144 ++++++++++++
+>  arch/arm/boot/dts/imx53-qsb.dts                    |  148 ++++++++++++
+>  arch/arm/boot/dts/imx53-smd.dts                    |  169 ++++++++++++++
+>  arch/arm/boot/dts/imx53.dtsi                       |  244 ++++++++++++++++++++
+>  arch/arm/mach-mx5/Kconfig                          |   12 +
+>  arch/arm/mach-mx5/Makefile                         |    2 +
+>  arch/arm/mach-mx5/board-mx53_ard.c                 |    9 +-
+>  arch/arm/mach-mx5/board-mx53_evk.c                 |    5 +
+>  arch/arm/mach-mx5/board-mx53_loco.c                |    5 +
+>  arch/arm/mach-mx5/board-mx53_smd.c                 |    5 +
+>  arch/arm/mach-mx5/imx53-dt.c                       |  143 ++++++++++++
+>  arch/arm/plat-mxc/include/mach/common.h            |    2 +
+>  arch/arm/plat-mxc/include/mach/iomux-mx53.h        |    5 +
+>  arch/arm/plat-mxc/include/mach/iomux-v3.h          |    5 +
+>  16 files changed, 1069 insertions(+), 2 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/arm/fsl/boards.txt
+>  create mode 100644 arch/arm/boot/dts/imx53-ard.dts
+>  create mode 100644 arch/arm/boot/dts/imx53-evk.dts
+>  create mode 100644 arch/arm/boot/dts/imx53-qsb.dts
+>  create mode 100644 arch/arm/boot/dts/imx53-smd.dts
+>  create mode 100644 arch/arm/boot/dts/imx53.dtsi
+>  create mode 100644 arch/arm/mach-mx5/imx53-dt.c
+
+I noticed that the iomux setup is gone for now which makes me very
+happy :) I didn't have a good feeling about this.
+
 > 
-> diff --git a/arch/arm/mach-prima2/clock.c b/arch/arm/mach-prima2/clock.c
-> index f9a2aaf..615a4e7 100644
-> --- a/arch/arm/mach-prima2/clock.c
-> +++ b/arch/arm/mach-prima2/clock.c
-> @@ -481,6 +481,7 @@ static void __init sirfsoc_clk_init(void)
->  
->  static struct of_device_id clkc_ids[] = {
->  	{ .compatible = "sirf,prima2-clkc" },
-> +	{},
-I would add a comment like '/* end of list sentinel */' inside the
-'{}' to make it crystal clear that the empty braces are intentional.
-I also would omit the comma since it would be an error adding more
-entries after this one.
+> diff --git a/arch/arm/boot/dts/imx53-ard.dts b/arch/arm/boot/dts/imx53-ard.dts
+> new file mode 100644
+> index 0000000..fd0cf2c
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/imx53-ard.dts
+> @@ -0,0 +1,158 @@
+> +/*
+> + * Copyright 2011 Freescale Semiconductor, Inc.
+> + * Copyright 2011 Linaro Ltd.
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
+> +
+> +/dts-v1/;
+> +/include/ "imx53.dtsi"
+> +
+> +/ {
+> +	model = "Freescale i.MX53 Automotive Reference Design Board";
+> +	compatible = "fsl,imx53-ard", "fsl,imx53";
+> +
+> +	chosen {
+> +		bootargs = "console=ttymxc0,115200 root=/dev/mmcblk0p3 rootwait";
+> +	};
+> +
+> +	memory {
+> +		reg = <0x70000000 0x40000000>;
+> +	};
+> +
+> +	aips at 50000000 { /* AIPS1 */
+> +		spba at 50000000 {
+> +			esdhc at 50004000 { /* ESDHC1 */
+> +				cd-gpios = <&gpio0 1 0>; /* GPIO1_1 */
+> +				wp-gpios = <&gpio0 9 0>; /* GPIO1_9 */
+> +			};
+> +
+> +			esdhc at 50008000 { /* ESDHC2 */
+> +				status = "disabled";
+> +			};
 
+I know the decision is that all devices are enabled by default and must
+be explicitely disabled like this. I really hope we can change this in
+the future for the following reasons:
 
+- The imx53 device tree is not complete, several devices like nand, ipu
+  and rtc are missing. Now when imx53.dtsi gets the nand device, all
+  board devicetrees have to be changed to keep the old behaviour.
+- Most enabled device entries like the esdhc1 above have additional
+  nodes like cd-gpios anyway, so they must appear in the board tree
+  whereas the disabled devices just add additional churn.
 
-Lothar Wa?mann
 -- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
