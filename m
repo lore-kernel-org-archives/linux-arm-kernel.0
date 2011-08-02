@@ -1,37 +1,60 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 2 Aug 2011 17:02:34 +0100
-Subject: [PATCH] mach-davinci: fix cache flush build error
-In-Reply-To: <1312300118-9088-1-git-send-email-linus.walleij@stericsson.com>
-References: <1312300118-9088-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <20110802160234.GH19079@n2100.arm.linux.org.uk>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 3 Aug 2011 01:05:39 +0900
+Subject: [PATCH 1/1] ASoC: core: cache index fix
+In-Reply-To: <65EE16ACC360FA4D99C96DC085B3F7721F427D@039-SN1MPN1-002.039d.mgd.msft.net>
+References: <1312198690-13237-1-git-send-email-b29396@freescale.com>
+	<20110801115150.GB16629@opensource.wolfsonmicro.com>
+	<65EE16ACC360FA4D99C96DC085B3F7721F410B@039-SN1MPN1-002.039d.mgd.msft.net>
+	<20110802083850.GB9553@opensource.wolfsonmicro.com>
+	<65EE16ACC360FA4D99C96DC085B3F7721F427D@039-SN1MPN1-002.039d.mgd.msft.net>
+Message-ID: <20110802160538.GG25884@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 02, 2011 at 05:48:38PM +0200, Linus Walleij wrote:
-> From: Linus Walleij <linus.walleij@linaro.org>
-> 
-> The TNET variant of DaVinci compiles some code that it shares
-> with other DaVinci variants, however it has a V6 CPU rather than
-> an ARM926T, thus the hardcoded call to arm926_flush_kern_cache_all()
-> in sleep.S will obviously fail, and we need to build with the
-> v6_flush_kern_cache_all() call instead. This was triggered by
-> manually altering the DaVinci config to build the TNET version.
-> 
-> Cc: Dave Martin <dave.martin@linaro.org>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> This is just an ifdef to get the DaVinci TNET variant to compile,
-> if there is a way to call out to some abstract flush function in a
-> MULTI CPU/cache configuration from _assembler_ code, please tell me,
-> 
-> I'm not all that happy about this since it blocks proper multiboard
-> support for DaVinci, would be nice to find a better solution.
+On Tue, Aug 02, 2011 at 09:41:22AM +0000, Dong Aisheng-B29396 wrote:
 
-Davinci seems to be a special case where it somehow preserves all state
-even in deep sleep, which makes the generic cpu_suspend() not ideal for
-it.
+> > No, I think we should hide these decisions completely within the cache
+> > code.
 
-Or maybe that's just an oversight in the existing code - I don't know
-so I haven't touched it.  I've been hoping that Davinci people can sort
-it out...
+> Yes, but the issue is that hw_read will check if reg is in cache array
+> And checking like " if (reg >= codec->driver->reg_cache_size ||" is wrong
+> when the step is not 1 that will cause registers with their index are greater
+> than cache index will not be able to fetch data from cache.
+
+This is in no way inconsistent with what I'm saying above.
+
+> > A
+> > register map with step size greater than one should never have more than
+> > one register in a block anyway with the current code so the step size
+> > should never be perceptible.
+
+> The question is that rbtree uses reg index to index as follows:
+
+The rbtree should only see registers meaning registers.
+
+>         if (rbnode) {
+>                 snd_soc_rbtree_get_base_top_reg(rbnode, &base_reg, &top_reg);
+>                 if (reg >= base_reg && reg <= top_reg) {
+>                         reg_tmp = reg - base_reg;
+>                         *value = snd_soc_rbtree_get_register(rbnode, reg_tmp);
+>                         return 0;
+>                 }
+>         }
+
+> So the block may be reg0, reg2, reg4.....
+> And the block is flat, the value is get/set by rbnode->block[reg_tmp]:
+> I understand right, there may be hole in the block, right?
+
+No.  The rbtree is dealing with registers only.  The rbtree has no idea
+about steps, and nor should it.
+
+> > It occurs to me that what we want to do here may be to make a new
+> > register cache type for step sizes then hide all the complexity for these
+> > devices in there.  That keeps everything together and ensures that newer
+> > devices don't pay a complexity cost.
+
+> If we add new cache type, does it have any big difference with FLAT?
+> Maybe if we can fix the cache step issue, the FLAT cache can be reuse.
+
+Step size and if you want to keep the defaults also compressed then the
+defaults size.
