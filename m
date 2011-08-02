@@ -1,60 +1,27 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 02 Aug 2011 15:31:48 +0100
-Subject: [PATCH] Build a uImage with dtb already appended
-Message-ID: <20110802143148.21599.22870.stgit@ponder>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 3 Aug 2011 00:27:13 +0900
+Subject: [PATCH 1/1] ASoC: core: cache index fix
+In-Reply-To: <65EE16ACC360FA4D99C96DC085B3F7721F4616@039-SN1MPN1-002.039d.mgd.msft.net>
+References: <1312198690-13237-1-git-send-email-b29396@freescale.com>
+	<20110801115150.GB16629@opensource.wolfsonmicro.com>
+	<65EE16ACC360FA4D99C96DC085B3F7721F410B@039-SN1MPN1-002.039d.mgd.msft.net>
+	<20110802083850.GB9553@opensource.wolfsonmicro.com>
+	<65EE16ACC360FA4D99C96DC085B3F7721F427D@039-SN1MPN1-002.039d.mgd.msft.net>
+	<65EE16ACC360FA4D99C96DC085B3F7721F4616@039-SN1MPN1-002.039d.mgd.msft.net>
+Message-ID: <20110802152712.GC25884@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Do not commit to mainline; this is a useful hack only for now.
+On Tue, Aug 02, 2011 at 01:17:12PM +0000, Dong Aisheng-B29396 wrote:
 
-Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
----
- arch/arm/Makefile      |    3 +++
- arch/arm/boot/Makefile |    8 ++++++++
- 2 files changed, 11 insertions(+), 0 deletions(-)
+> For rbtree, i tried that only changed snd_soc_rbtree_cache_init as follows
+> Could work. Then rbtree_cache_read/write do not need to care about step.
+> This could reduce many code changes and complexity.
+> But the disadvantage is that the rbtree cache may not be able to find a
+> adjacent register in the same block if the reg step is 2.
+> However it works.
+> Do you think this is acceptable?
 
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 70c424e..0677b86 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -282,6 +282,9 @@ zImage Image xipImage bootpImage uImage: vmlinux
- zinstall uinstall install: vmlinux
- 	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $@
- 
-+uImage-dtb.%:
-+	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $(boot)/$@
-+
- %.dtb:
- 	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $(boot)/$@
- 
-diff --git a/arch/arm/boot/Makefile b/arch/arm/boot/Makefile
-index a1edfd5..a64493b 100644
---- a/arch/arm/boot/Makefile
-+++ b/arch/arm/boot/Makefile
-@@ -57,6 +57,9 @@ $(obj)/zImage:	$(obj)/compressed/vmlinux FORCE
- 	$(call if_changed,objcopy)
- 	@echo '  Kernel: $@ is ready'
- 
-+$(obj)/zImage-dtb.%:	$(obj)/%.dtb $(obj)/zImage
-+	cat $(obj)/zImage $< > $@
-+
- endif
- 
- # Rule to build device tree blobs
-@@ -77,11 +80,16 @@ $(obj)/uImage: LOADADDR=$(ZRELADDR)
- endif
- 
- $(obj)/uImage: STARTADDR=$(LOADADDR)
-+$(obj)/uImage-dtb.%: STARTADDR=$(LOADADDR)
- 
- $(obj)/uImage:	$(obj)/zImage FORCE
- 	$(call if_changed,uimage)
- 	@echo '  Image $@ is ready'
- 
-+$(obj)/uImage-dtb.%:	$(obj)/zImage-dtb.% FORCE
-+	$(call if_changed,uimage)
-+	@echo '  Image $@ is ready'
-+
- $(obj)/bootp/bootp: $(obj)/zImage initrd FORCE
- 	$(Q)$(MAKE) $(build)=$(obj)/bootp $@
- 	@:
+No, like I've been saying the rbtree should have *no* visibility of step
+sizes.  This is exactly the sort of complexity and fragility that I've
+been raising as an issue.
