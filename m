@@ -1,5 +1,5 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 2 Aug 2011 16:11:15 +0800
+Date: Tue, 2 Aug 2011 15:16:08 +0800
 Subject: [PATCH v8 0/3] add the GPMI controller driver for IMX23/IMX28
 In-Reply-To: <4E37970C.4070903@freescale.com>
 References: <20110722055731.GI26837@S2100-06.ap.freescale.net>
@@ -12,7 +12,7 @@ References: <20110722055731.GI26837@S2100-06.ap.freescale.net>
 	<4E32823C.3060007@freescale.com>
 	<CAHMSPgMTf1UnMyvsSZM1in-FEAoWyS5VSdczsxfHgujGJ0DFtw@mail.gmail.com>
 	<4E37970C.4070903@freescale.com>
-Message-ID: <20110802081115.GC17297@freescale.com>
+Message-ID: <20110802071607.GA17297@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
