@@ -1,64 +1,41 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 2 Aug 2011 14:54:22 +0100
-Subject: [PATCH] spi/pl022: remove function cannot exit
-In-Reply-To: <1312277364-12945-1-git-send-email-linus.walleij@stericsson.com>
-References: <1312277364-12945-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <20110802135422.GB20071@ponder.secretlab.ca>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 2 Aug 2011 14:52:21 +0800
+Subject: [PATCH v4 0/2] Add device tree support for i.mx51/53 boards
+Message-ID: <1312267943-25551-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 02, 2011 at 11:29:24AM +0200, Linus Walleij wrote:
-> From: Linus Walleij <linus.walleij@linaro.org>
-> 
-> The remove function in the PL022 driver cannot abort the remove
-> function any way, so restructure the code so as not to make that
-> assumption. Remove will now proceed no matter whether it can
-> stop the transfer queue or not.
-> 
-> Reported-by: Russell King <linux@arm.linux.org.uk>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Changes since v3:
+ * Fix machine_desc table for ARD matching
+ * Turn the board setup that dt needs into callback
 
-Applied, thanks.
+Changes since v2:
+ * Drop iomuxc device tree support patch
 
-g.
+Changes since v1:
+ * Address comments on v1 given by Grant and Sascha
+ * Add i.mx51 Babbage support
 
-> ---
->  drivers/spi/spi-pl022.c |   11 +++--------
->  1 files changed, 3 insertions(+), 8 deletions(-)
-> 
-> diff --git a/drivers/spi/spi-pl022.c b/drivers/spi/spi-pl022.c
-> index eba88c7..730b4a3 100644
-> --- a/drivers/spi/spi-pl022.c
-> +++ b/drivers/spi/spi-pl022.c
-> @@ -2267,17 +2267,13 @@ static int __devexit
->  pl022_remove(struct amba_device *adev)
->  {
->  	struct pl022 *pl022 = amba_get_drvdata(adev);
-> -	int status = 0;
-> +
->  	if (!pl022)
->  		return 0;
->  
->  	/* Remove the queue */
-> -	status = destroy_queue(pl022);
-> -	if (status != 0) {
-> -		dev_err(&adev->dev,
-> -			"queue remove failed (%d)\n", status);
-> -		return status;
-> -	}
-> +	if (destroy_queue(pl022) != 0)
-> +		dev_err(&adev->dev, "queue remove failed\n");
->  	load_ssp_default_config(pl022);
->  	pl022_dma_remove(pl022);
->  	free_irq(adev->irq[0], pl022);
-> @@ -2289,7 +2285,6 @@ pl022_remove(struct amba_device *adev)
->  	spi_unregister_master(pl022->master);
->  	spi_master_put(pl022->master);
->  	amba_set_drvdata(adev, NULL);
-> -	dev_dbg(&adev->dev, "remove succeeded\n");
->  	return 0;
->  }
->  
-> -- 
-> 1.7.6
-> 
+Shawn Guo (2):
+      arm/mx5: add device tree support for imx53 boards
+      arm/mx5: add device tree support for imx51 babbage
+
+ .../devicetree/bindings/arm/fsl/boards.txt         |   19 ++
+ arch/arm/boot/dts/imx51-babbage.dts                |  141 +++++++++++
+ arch/arm/boot/dts/imx51.dtsi                       |  203 ++++++++++++++++
+ arch/arm/boot/dts/imx53-ard.dts                    |  158 +++++++++++++
+ arch/arm/boot/dts/imx53-evk.dts                    |  144 ++++++++++++
+ arch/arm/boot/dts/imx53-qsb.dts                    |  148 ++++++++++++
+ arch/arm/boot/dts/imx53-smd.dts                    |  169 ++++++++++++++
+ arch/arm/boot/dts/imx53.dtsi                       |  244 ++++++++++++++++++++
+ arch/arm/mach-mx5/Kconfig                          |   21 ++
+ arch/arm/mach-mx5/Makefile                         |    3 +
+ arch/arm/mach-mx5/board-mx51_babbage.c             |    9 +-
+ arch/arm/mach-mx5/board-mx53_ard.c                 |   12 +-
+ arch/arm/mach-mx5/board-mx53_evk.c                 |    9 +-
+ arch/arm/mach-mx5/board-mx53_loco.c                |    9 +-
+ arch/arm/mach-mx5/board-mx53_smd.c                 |    9 +-
+ arch/arm/mach-mx5/imx51-dt.c                       |  111 +++++++++
+ arch/arm/mach-mx5/imx53-dt.c                       |  127 ++++++++++
+ arch/arm/plat-mxc/include/mach/common.h            |    6 +
+ 18 files changed, 1530 insertions(+), 12 deletions(-)
