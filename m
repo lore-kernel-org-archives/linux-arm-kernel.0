@@ -1,51 +1,70 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Tue, 02 Aug 2011 20:04:27 +0200
-Subject: kernel debugging (KGDB or JTAG)
-In-Reply-To: <op.vzkug7a5yxxkfz@localhost.localdomain>
-References: <op.vzkug7a5yxxkfz@localhost.localdomain>
-Message-ID: <1543460.s0MdrL8kip@easynote>
+From: tiwai@suse.de (Takashi Iwai)
+Date: Tue, 02 Aug 2011 20:06:23 +0200
+Subject: [alsa-devel] [PATCH 1/1] ASoC: core: cache index fix
+In-Reply-To: <20110802164005.GI25884@opensource.wolfsonmicro.com>
+References: <65EE16ACC360FA4D99C96DC085B3F7721F427D@039-SN1MPN1-002.039d.mgd.msft.net>
+	<s5hy5zcnlu8.wl%tiwai@suse.de>
+	<65EE16ACC360FA4D99C96DC085B3F7721F43AA@039-SN1MPN1-002.039d.mgd.msft.net>
+	<s5hoc08nk7t.wl%tiwai@suse.de>
+	<65EE16ACC360FA4D99C96DC085B3F7721F443D@039-SN1MPN1-002.039d.mgd.msft.net>
+	<s5hlivcnhe2.wl%tiwai@suse.de>
+	<65EE16ACC360FA4D99C96DC085B3F7721F45A8@039-SN1MPN1-002.039d.mgd.msft.net>
+	<s5haabsnfg2.wl%tiwai@suse.de>
+	<20110802154815.GE25884@opensource.wolfsonmicro.com>
+	<s5hipqfn65k.wl%tiwai@suse.de>
+	<20110802164005.GI25884@opensource.wolfsonmicro.com>
+Message-ID: <s5h4o1zsn6o.wl%tiwai@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jan,
-
-On Tuesday 02 of August 2011 at 10:13:45, Jan Pohanka wrote:
-> Using j-ling JTAG probe from segger I can't start debug session at all.
-> When JLinkGDBServer connects it resets the board and I'm not able to
-> resume the execution. I have found e.g. this howto
-> http://www.timesys.com/embedded-linux/docs/Debug_Linux_kernel_with_a_JTAG_fr
-> om_Segger but as I said it is not working for me.
+At Wed, 3 Aug 2011 01:40:06 +0900,
+Mark Brown wrote:
 > 
-> Here is the log from JLinkGDBServer
+> On Tue, Aug 02, 2011 at 06:13:11PM +0200, Takashi Iwai wrote:
+> > Mark Brown wrote:
 > 
-> J-Link connected
-> Firmware: J-Link ARM V8 compiled Jul  5 2011 20:48:23
-> Hardware: V8.00
-> S/N: [...]
+> > > Like I've indicated several times now we should just get rid of the code
+> > > or hide it from the rest of the subsystem, it's being too cute for
+> > > vanishingly little value.  The register maps for these devices are
+> > > usually at most 255 registers so the memory savings are really not
+> > > meaningful.  I'm hoping the guys working with this device will find time
+> > > to look at fixing things, but if not I'd imagine we'll get to it at some
+> > > point in the release cycle.
 > 
-> J-Link found 2 JTAG devices, Total IRLen = 8
-> JTAG ID: 0x07926121 (ARM9)
+> > Well, there aren't so many drivers suffering from this bug, so a
+> > temporary fix would be easy like below (totally untested).
 > 
-> Connected to 127.0.0.1
-> Reading all registers
-> WARNING: Failed to read cacheable memory @ address 0x00000000
-> Read 4 bytes @ address 0x00000000 (Data = 0x00000000)
-> Starting target CPU...
+> If we're going to do something like this I'd preserve the driver
+> interface that's there rather than fiddling with their reg_cache_sizes -
+> half the trouble here is that the meaning of that has become a bit
+> slippery, the current code used to be correct.
 
-It might be irrelevant, but I have successfully used J-Link to debug Linux 
-kernel on S3C6410 SoC, containing an ARM1176JZF-s core, using latest beta 
-firmware and their GDB server for windows.
+I don't mind either way as long as it gets fixed in way applicable
+to stable kernel tree.
 
-The sequence of operations might be important here. I've been doing it in 
-following order:
-- started GDB server
-- powered the board on
-- attached GDB client
-- issued 'cont' command to proceed to u-boot and continue normal execution
+> > @@ -421,7 +422,9 @@ static int snd_soc_rbtree_cache_init(struct snd_soc_codec *codec)
+> >  		return 0;
+> >  
+> >  	word_size = codec->driver->reg_word_size;
+> > -	for (i = 0; i < codec->driver->reg_cache_size; ++i) {
+> > +	if (codec->driver->reg_cache_step)
+> > +		step = codec->driver->reg_cache_step;
+> > +	for (i = 0; i < codec->driver->reg_cache_size; i += step) {
+> >  		val = snd_soc_get_cache_val(codec->reg_def_copy, i,
+> >  					    word_size);
+> >  		if (!val)
+> 
+> I'm also really unhappy with handling this in the complex caches, I'd be
+> much more inclined to just disallow their use with devices with step
+> sizes than to add any complexity to them.
 
-What might be also helpful is to disable all hang checks in kernel debugging 
-section, because the kernel would panic with a false positive after pausing 
-the operation for some time.
+Yeah, I find it's ugly, too.  OTOH, reg_cache_step defines the
+validity of the register access, so we can't drop it completely.
+Accessing the odd number of register index is invalid when step=2, for
+example.  So, alternatively, we can put the condition in some generic
+filter function like readable/writeble things.
 
-Best regards,
-Tom
+
+thanks,
+
+Takashi
