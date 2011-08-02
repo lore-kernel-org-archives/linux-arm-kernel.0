@@ -1,62 +1,52 @@
-From: pmarques@grupopie.com (Paulo Marques)
-Date: Tue, 02 Aug 2011 17:29:54 +0100
-Subject: Question about "Inconsistent kallsyms data"
-In-Reply-To: <1514384.7oMe1aulyC@flatron>
-References: <02ae01cc4d91$aed71670$0c854350$%kim@samsung.com>
-	<20110729100241.GB25640@n2100.arm.linux.org.uk>
-	<2563791.8cBqodrk1o@flatron> <1514384.7oMe1aulyC@flatron>
-Message-ID: <4E382602.6050308@grupopie.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 3 Aug 2011 01:40:06 +0900
+Subject: [alsa-devel] [PATCH 1/1] ASoC: core: cache index fix
+In-Reply-To: <s5hipqfn65k.wl%tiwai@suse.de>
+References: <65EE16ACC360FA4D99C96DC085B3F7721F427D@039-SN1MPN1-002.039d.mgd.msft.net>
+	<s5hy5zcnlu8.wl%tiwai@suse.de>
+	<65EE16ACC360FA4D99C96DC085B3F7721F43AA@039-SN1MPN1-002.039d.mgd.msft.net>
+	<s5hoc08nk7t.wl%tiwai@suse.de>
+	<65EE16ACC360FA4D99C96DC085B3F7721F443D@039-SN1MPN1-002.039d.mgd.msft.net>
+	<s5hlivcnhe2.wl%tiwai@suse.de>
+	<65EE16ACC360FA4D99C96DC085B3F7721F45A8@039-SN1MPN1-002.039d.mgd.msft.net>
+	<s5haabsnfg2.wl%tiwai@suse.de>
+	<20110802154815.GE25884@opensource.wolfsonmicro.com>
+	<s5hipqfn65k.wl%tiwai@suse.de>
+Message-ID: <20110802164005.GI25884@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tomasz Figa wrote:
-> On Friday 29 of July 2011 at 12:58:32, Tomasz Figa wrote:
->>[...]
->> I will try to bisect the case with s3c6400 defconfig.
-> 
-> I have no idea why, but I cannot reproduce the issue anymore, even after make 
-> distclean or starting with a clean tree. A build system bug?
-> 
-> I do not know much technical details about the kernel build system, but might 
-> it be a concurrency issue (I use make -j5 for building with 5 jobs)?
+On Tue, Aug 02, 2011 at 06:13:11PM +0200, Takashi Iwai wrote:
+> Mark Brown wrote:
 
-Usually this is caused by symbols moving slightly between kernel compiles.
+> > Like I've indicated several times now we should just get rid of the code
+> > or hide it from the rest of the subsystem, it's being too cute for
+> > vanishingly little value.  The register maps for these devices are
+> > usually at most 255 registers so the memory savings are really not
+> > meaningful.  I'm hoping the guys working with this device will find time
+> > to look at fixing things, but if not I'd imagine we'll get to it at some
+> > point in the release cycle.
 
-This is an explanation of the process I wrote a while ago in a different
-thread at LKML:
+> Well, there aren't so many drivers suffering from this bug, so a
+> temporary fix would be easy like below (totally untested).
 
-> Now as for CONFIG_KALLSYMS_EXTRA_PASS: to build the kallsyms table, the
-> build process first links a kernel image with an empty kallsyms table
-> and use that to fetch information for all the symbols.
-> 
-> It then uses that information to build the table with the right size,
-> and links it again. If everything goes ok, this new version as all the
-> symbols in the correct places and the final table can be built with the
-> correct addresses.
-> 
-> The final linking should produce the same result as only the data on the
-> kallsyms table changed, but not its size.
-> 
-> However, there have been bugs in the past with section alignments and
-> symbol reordering for symbols with the same address, etc., etc. that
-> make this final table not have the exact same size, and the build fails
-> with an inconsistent kallsyms data message. At this point, the user can
-> turn on the CONFIG_KALLSYMS_EXTRA_PASS and temporarily solve the problem
-> while the developers find the correct fix. Without this option, in this
-> situation the kernel would simply fail the compilation.
-> 
-> All this has been stable for a while and this option hasn't been needed
-> recently (AFAIK), but if there is some bug in some new binutils or
-> something, the option might be needed again.
+If we're going to do something like this I'd preserve the driver
+interface that's there rather than fiddling with their reg_cache_sizes -
+half the trouble here is that the meaning of that has become a bit
+slippery, the current code used to be correct.
 
-To check inconsistencies, the Makefile compares ".tmp_System.map" and
-"System.map" for differences.
+> @@ -421,7 +422,9 @@ static int snd_soc_rbtree_cache_init(struct snd_soc_codec *codec)
+>  		return 0;
+>  
+>  	word_size = codec->driver->reg_word_size;
+> -	for (i = 0; i < codec->driver->reg_cache_size; ++i) {
+> +	if (codec->driver->reg_cache_step)
+> +		step = codec->driver->reg_cache_step;
+> +	for (i = 0; i < codec->driver->reg_cache_size; i += step) {
+>  		val = snd_soc_get_cache_val(codec->reg_def_copy, i,
+>  					    word_size);
+>  		if (!val)
 
-On a normal build they should be identical, but if this fails with
-"Inconsistent kallsyms data" you could try comparing the two files to
-check which symbols are causing trouble.
-
--- 
-Paulo Marques - www.grupopie.com
-
-"All generalizations are false."
+I'm also really unhappy with handling this in the complex caches, I'd be
+much more inclined to just disallow their use with devices with step
+sizes than to add any complexity to them.
