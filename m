@@ -1,68 +1,69 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Wed, 3 Aug 2011 22:49:21 +0530
-Subject: [PATCH] mach-davinci: fix cache flush build error
-In-Reply-To: <20110802160234.GH19079@n2100.arm.linux.org.uk>
-References: <1312300118-9088-1-git-send-email-linus.walleij@stericsson.com>
-	<20110802160234.GH19079@n2100.arm.linux.org.uk>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024DF05E85@dbde02.ent.ti.com>
+From: lbassel@codeaurora.org (Larry Bassel)
+Date: Wed, 3 Aug 2011 10:23:13 -0700
+Subject: questions about memory hotplug
+In-Reply-To: <1312358106.15392.466.camel@sli10-conroe>
+References: <20110729221230.GA3466@labbmf-linux.qualcomm.com>
+	<20110730093055.GA10672@sli10-conroe.sh.intel.com>
+	<20110801170850.GB3466@labbmf-linux.qualcomm.com>
+	<1312247376.15392.454.camel@sli10-conroe>
+	<1312358106.15392.466.camel@sli10-conroe>
+Message-ID: <20110803172313.GD3466@labbmf-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 02, 2011 at 21:32:34, Russell King - ARM Linux wrote:
-> On Tue, Aug 02, 2011 at 05:48:38PM +0200, Linus Walleij wrote:
-> > From: Linus Walleij <linus.walleij@linaro.org>
-> > 
-> > The TNET variant of DaVinci compiles some code that it shares
-> > with other DaVinci variants, however it has a V6 CPU rather than
-> > an ARM926T, thus the hardcoded call to arm926_flush_kern_cache_all()
-> > in sleep.S will obviously fail, and we need to build with the
-> > v6_flush_kern_cache_all() call instead. This was triggered by
-> > manually altering the DaVinci config to build the TNET version.
-> > 
-> > Cc: Dave Martin <dave.martin@linaro.org>
-> > Cc: Arnd Bergmann <arnd@arndb.de>
-> > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> > ---
-> > This is just an ifdef to get the DaVinci TNET variant to compile,
-> > if there is a way to call out to some abstract flush function in a
-> > MULTI CPU/cache configuration from _assembler_ code, please tell me,
-> > 
-> > I'm not all that happy about this since it blocks proper multiboard
-> > support for DaVinci, would be nice to find a better solution.
+On 03 Aug 11 15:55, Shaohua Li wrote:
+> On Tue, 2011-08-02 at 09:09 +0800, Shaohua Li wrote:
+> > On Tue, 2011-08-02 at 01:08 +0800, Larry Bassel wrote:
+> > > 
+> > > In use case #1 yes, maybe not in #2 (we can arrange it to be
+> > > at the end of memory, but then might waste memory as it may
+> > > not be aligned on a SPARSEMEM section boundary and so would
+> > > need to be padded).
+> > then maybe the new migrate type I suggested can help here for the
+> > non-aligned memory. Anyway, let me do an experiment.
+> so your problem is to offline memory in arbitrary address and size (eg,
+> might not be at the end, and maybe smaller than a section)
 
-This isn't the only thing that prevents building the TNET variant
-with the rest of the DaVinci variants.
+Yes (and online it again). Also the decision to (attempt to)
+on/offline must be done from userspace (as memory hotplug does already).
 
-If you enable DM365 and TNETV107x together, you get errors:
-
-  AS      arch/arm/kernel/entry-armv.o
-arch/arm/kernel/entry-armv.S: Assembler messages:
-arch/arm/kernel/entry-armv.S:196: Error: selected processor does not support `strex r1,r2,[sp]'
-arch/arm/kernel/entry-armv.S:228: Error: selected processor does not support `strex r1,r2,[sp]'
-arch/arm/kernel/entry-armv.S:286: Error: selected processor does not support `strex r1,r2,[sp]'
-arch/arm/kernel/entry-armv.S:323: Error: selected processor does not support `strex r1,r2,[sp]'
-
-And from what I read[1], it is futile to try and make v5 and v6 architectures
-build together.
-
-> Davinci seems to be a special case where it somehow preserves all state
-> even in deep sleep, which makes the generic cpu_suspend() not ideal for
-> it.
 > 
-> Or maybe that's just an oversight in the existing code - I don't know
-> so I haven't touched it.  I've been hoping that Davinci people can sort
-> it out...
+> I had a hack. In my machine, I have DMA, DMA32, and NORMAL zone.
+> At boot time, I mark 500M~600M ranges as MOVABLE_NOFB. the range is in
+> DMA32 and not section size aligned.
 
-It is true that DaVinci does not lose state even in its lowest power
-mode. There are no power domains to switch off in DaVinci. The deep
-sleep mode just stops device clocks and on-chip oscillator is shutdown.
+A few questions:
 
-Considering this, Linus's patch looks fair to me. If there are no
-objections, I will queue for v3.1-rc
+* You still use SPARSEMEM though, correct?
+* Would there be any problem using NORMAL memory as MOVABLE_NOFB?
+* So you don't use ZONE_MOVABLE or kernelcore= or movablecore=
+at all?
+* Do you online/offline using the /sys/devices/system/memory files?
+If so, does the kernel still attempt to on/offline the entire
+section (as it does now) or only the MOVABLE_NOFB part?
+If not, how do you on/offline memory?
 
-Linus, in future can you please CC me and/or Kevin on DaVinci patches?
+> MOVABLE_NOFB is a new migrate type I
+> added. That range memory is movable, but other type of allocation can't
+> fallback into such ranges. so such range memory can only be used by
+> userspace.
 
-Thanks,
-Sekhar
+And the kernel will not reserve memory from it either (I had to put a
+hack in an earlier version of what I'm doing to not allow reserving
+from the movable zone because otherwise the existence of these
+reserved pages would block logical hotremove), correct?
 
-[1] http://www.mail-archive.com/linux-omap at vger.kernel.org/msg43834.html
+> I then run a memory stress test and do memory online/offline for the
+> range at runtime, the offline always success.
+> Does this meet your usage? If yes, I'll cook it up a little bit.
+
+Yes, this looks very promising.
+Do you see any reason this can't be backported to 2.6.38?
+
+Thank you very much for your help here.
+
+Larry
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
