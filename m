@@ -1,29 +1,29 @@
 From: bryan.wu@canonical.com (Bryan Wu)
-Date: Wed,  3 Aug 2011 17:34:45 +0800
-Subject: [PATCH 13/17] plat-samsung: remove including old leds event API
+Date: Wed,  3 Aug 2011 17:34:46 +0800
+Subject: [PATCH 14/17] mach-pnx4008: remove including old leds event API
 	header file
 In-Reply-To: <1312364089-32380-1-git-send-email-bryan.wu@canonical.com>
 References: <1312364089-32380-1-git-send-email-bryan.wu@canonical.com>
-Message-ID: <1312364089-32380-14-git-send-email-bryan.wu@canonical.com>
+Message-ID: <1312364089-32380-15-git-send-email-bryan.wu@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Bryan Wu <bryan.wu@canonical.com>
 ---
- arch/arm/plat-samsung/time.c |    1 -
+ arch/arm/mach-pnx4008/time.c |    1 -
  1 files changed, 0 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/plat-samsung/time.c b/arch/arm/plat-samsung/time.c
-index e3bb806..a65ef40 100644
---- a/arch/arm/plat-samsung/time.c
-+++ b/arch/arm/plat-samsung/time.c
-@@ -29,7 +29,6 @@
- #include <linux/platform_device.h>
+diff --git a/arch/arm/mach-pnx4008/time.c b/arch/arm/mach-pnx4008/time.c
+index 0c8aad4..4385793 100644
+--- a/arch/arm/mach-pnx4008/time.c
++++ b/arch/arm/mach-pnx4008/time.c
+@@ -26,7 +26,6 @@
  
  #include <asm/system.h>
+ #include <mach/hardware.h>
 -#include <asm/leds.h>
- #include <asm/mach-types.h>
+ #include <asm/mach/time.h>
+ #include <asm/errno.h>
  
- #include <asm/irq.h>
 -- 
 1.7.5
