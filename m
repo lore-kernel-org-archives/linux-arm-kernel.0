@@ -1,55 +1,49 @@
-From: mgorman@suse.de (Mel Gorman)
-Date: Wed, 3 Aug 2011 12:05:55 +0100
-Subject: [PATCH] ARM: sparsemem: Enable CONFIG_HOLES_IN_ZONE config
-	option for SparseMem and HAS_HOLES_MEMORYMODEL for linux-3.0.
-In-Reply-To: <CAFPAmTQByL0YJT8Lvar1Oe+3Q1EREvqPA_GP=hHApJDz5dSOzQ@mail.gmail.com>
-References: <CAFPAmTQByL0YJT8Lvar1Oe+3Q1EREvqPA_GP=hHApJDz5dSOzQ@mail.gmail.com>
-Message-ID: <20110803110555.GD19099@suse.de>
+From: B29396@freescale.com (Dong Aisheng-B29396)
+Date: Wed, 3 Aug 2011 11:11:18 +0000
+Subject: [alsa-devel] [PATCH 1/1] ASoC: core: cache index fix
+In-Reply-To: <20110803093140.GB30782@opensource.wolfsonmicro.com>
+References: <65EE16ACC360FA4D99C96DC085B3F7721F43AA@039-SN1MPN1-002.039d.mgd.msft.net>
+	<s5hoc08nk7t.wl%tiwai@suse.de>
+	<65EE16ACC360FA4D99C96DC085B3F7721F443D@039-SN1MPN1-002.039d.mgd.msft.net>
+	<s5hlivcnhe2.wl%tiwai@suse.de>
+	<65EE16ACC360FA4D99C96DC085B3F7721F45A8@039-SN1MPN1-002.039d.mgd.msft.net>
+	<s5haabsnfg2.wl%tiwai@suse.de>
+	<20110802154815.GE25884@opensource.wolfsonmicro.com>
+	<s5hipqfn65k.wl%tiwai@suse.de>
+	<20110802164005.GI25884@opensource.wolfsonmicro.com>
+	<65EE16ACC360FA4D99C96DC085B3F7721F4F43@039-SN1MPN1-002.039d.mgd.msft.net>
+	<20110803093140.GB30782@opensource.wolfsonmicro.com>
+Message-ID: <65EE16ACC360FA4D99C96DC085B3F7721F5223@039-SN1MPN1-002.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 02, 2011 at 05:38:31PM +0530, Kautuk Consul wrote:
-> Hi,
+> -----Original Message-----
+> From: Mark Brown [mailto:broonie at opensource.wolfsonmicro.com]
+> Sent: Wednesday, August 03, 2011 5:32 PM
+> To: Dong Aisheng-B29396
+> Cc: Takashi Iwai; alsa-devel at alsa-project.org; s.hauer at pengutronix.de;
+> lrg at ti.com; linux-arm-kernel at lists.infradead.org; w.sang at pengutronix.de
+> Subject: Re: [alsa-devel] [PATCH 1/1] ASoC: core: cache index fix
 > 
-> In the case where the total kernel memory is not aligned to the
-> SECTION_SIZE_BITS I see a kernel crash.
+> On Wed, Aug 03, 2011 at 07:39:27AM +0000, Dong Aisheng-B29396 wrote:
 > 
-> When I copy a huge file, then the kernel crashes at the following callstack:
+> > Can we fix FLAT first since it is most used and let rbtree and LZO as
+> before?
 > 
+> Leaving rbtree and LZO alone is exactly what I've been saying!
 
-The callstack should not be 80-column formatted as this is completely
-manged and unreadable without manual editting. Also, why did you not
-include the full error message? With it, I'd have a better idea of
-which bug check you hit.
+Sorry for not catch your point before.
 
-> Backtrace:
-> <SNIP>
-> 
-> The reason for this is that the CONFIG_HOLES_IN_ZONE configuration
-> option is not automatically enabled when SPARSEMEM or
-> ARCH_HAS_HOLES_MEMORYMODEL are enabled. Due to this, the
-> pfn_valid_within() macro always returns 1 due to which the BUG_ON is
-> encountered.
-> This patch enables the CONFIG_HOLES_IN_ZONE config option if either
-> ARCH_HAS_HOLES_MEMORYMODEL or SPARSEMEM is enabled.
-> 
-> Although I tested this on an older kernel, i.e., 2.6.35.13, I see that
-> this option has not been enabled as yet in linux-3.0 and this appears
-> to be a
-> logically correct change anyways with respect to pfn_valid_within()
-> functionality.
-> 
+Do you think the my patch that provides a register and cache index conversion
+helper function behind for FLAT could be a way to try?
 
-There is a performance cost associated with HOLES_IN_ZONE which may be
-offset by memory savings but not necessarily.
+If yes, I can clean my patch to only include FLAT fix and send it out for
+You to take a look.
 
-If the BUG_ON you are hitting is this one
-BUG_ON(page_zone(start_page) != page_zone(end_page)) then I'd be
-wondering why the check in move_freepages_block() was insufficient.
-
-If it's because holes are punched in the memmap then the option does
-need to be set.
-
--- 
-Mel Gorman
-SUSE Labs
+Using this method, codec driver does not need to pad the default cache array.
+During the cache read, the register will be automatically converted to cache
+index to fetch value.
+This can also fix the soc_codec_reg_show for codecs who are using packed
+(FLAT) Cache while step = 2.
+(Here I assume the packed cache only has a different step with FLAT cache.
+FIXME if wrong)
