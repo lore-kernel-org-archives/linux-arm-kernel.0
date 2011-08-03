@@ -1,78 +1,36 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 3 Aug 2011 18:12:28 +0200
-Subject: [PATCH 01/17] leds: create a trigger for CPU activity
-In-Reply-To: <20110803153035.GL2607@pulham.picochip.com>
-References: <1312364089-32380-1-git-send-email-bryan.wu@canonical.com>
-	<1312364089-32380-2-git-send-email-bryan.wu@canonical.com>
-	<20110803102829.GC2607@pulham.picochip.com>
-	<CACRpkdZRh=gcedJQh6V3aUCfi2arn2V_P67MgZE2mB_hYZ-OnQ@mail.gmail.com>
-	<20110803153035.GL2607@pulham.picochip.com>
-Message-ID: <CACRpkdaxiBa=aBAxvE+k7WFgZ-zY_YgCsV4-JVv3SRcm_pX5hA@mail.gmail.com>
+From: manjugk@ti.com (G, Manjunath Kondaiah)
+Date: Wed, 3 Aug 2011 21:47:17 +0530
+Subject: Shouldn't DT preserve pdev name and id to allow platform_match to
+	work?
+In-Reply-To: <4E396361.3060307@ti.com>
+References: <4E396361.3060307@ti.com>
+Message-ID: <CAC63_iRa1qc7pO9Eub1A+cC+R=tSkwzigVPDHqcbvOngACYWqQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 3, 2011 at 5:30 PM, Jamie Iles <jamie@jamieiles.com> wrote:
->> > So shouldn't this be doing a
->> > __get_cpu_var(ledtrig_cpu_triggers) and a kfree() on that (and setting
->> > to NULL)?
->>
->> You could do that but why? There is no way the pointer value
->> can make any harm. If activate() is called again it will be overwritten
->> with the new pointer.
+Hi Benoit,
+
+On Wed, Aug 3, 2011 at 8:34 PM, Cousson, Benoit <b-cousson@ti.com> wrote:
+> Hi Grant,
 >
-> Yes, but can't ledtrig_cpu() potentially still be called after
-> deactivation, then the:
+> Going further with the usage of OF_DEV_AUXDATA_ID, I realized that this is is not doing what I was expecting. My expectation might be silly, but in order to make platform_match to work without DT matching mechanism, you need to have the driver name in the pdev->name field:
 >
-> ? ? ? ?if (!trigdata)
-> ? ? ? ? ? ? ? ?return;
+> ? ? ? ?/* fall-back to driver name match */
+> ? ? ? ?return (strcmp(pdev->name, drv->name) == 0);
 >
-> would be incorrect? ?My main point though was that it looks like
-> led->trigger_data is the processor id and kfree() is being called on
-> that.
+> Except that the of_device_add function is doing that:
+> ? ? ? ?pdev->name = dev_name(&ofdev->dev);
+> ? ? ? ?pdev->id = -1;
 
-You're right, it just works fine because trigdata is always NULL...
+This is taken here:
+http://git.secretlab.ca/?p=linux-2.6.git;a=commitdiff;h=04f51955dc690666467252015a931d71d5c56696
 
->> > Also, where does led->trigger_data get assigned with the cpu id?
->>
->> The activate() function is called on every core and if the CPU ID
->> is not equal to the assigned CPU it just exits, here:
->>
->> + ? ? int my_cpu = smp_processor_id();
->> + ? ? unsigned long target_cpu = (unsigned long) led->trigger_data;
->> +
->> + ? ? if (target_cpu != my_cpu)
->> + ? ? ? ? ? ? return;
->
-> I understand that bit, but I can't see anything that actually assigns
-> led->trigger_data in the first place.
+and it is pending for upstream.
 
-You're right, it's because nothing really does. And since
-kfree(NULL); is fine this works, and makes the above thing work
-fine as well.
+With the above patch, both pdev->name and pdev->id can be set as per
+hwmod requirement through aux_data
+lookup table. we might have to append pdev->id to pdev->name so that
+it can used for device look up in the hwmod
+device list.
 
-Since led->trigger_data is never used we shouldn't touch it in
-I believe, Bryan can you just take it out and replace with something
-like this (totally untested):
-
-static void ledtrig_cpu_deactivate_cpu(struct led_classdev *led)
-{
-       struct ledtrig_cpu_data *cpu_data = __get_cpu_var(ledtrig_cpu_triggers);
-       int my_cpu = smp_processor_id();
-       unsigned long target_cpu = (unsigned long) led->trigger_data;
-
-       if (target_cpu != my_cpu)
-               return;
-
-       kfree(cpu_data);
-       __get_cpu_var(ledtrig_cpu_triggers) = NULL;
-}
-
-static void ledtrig_cpu_activate(struct led_classdev *led)
-{
-       on_each_cpu(ledtrig_cpu_deactivate_cpu, led, 1);
-}
-
-Bryan can you test this change?
-
-Thanks!
-Linus Walleij
+-Manjunath
