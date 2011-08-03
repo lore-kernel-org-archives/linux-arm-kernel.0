@@ -1,58 +1,244 @@
 From: bryan.wu@canonical.com (Bryan Wu)
-Date: Wed,  3 Aug 2011 17:34:39 +0800
-Subject: [PATCH 07/17] mach-integrator: introduce cm_read function helper to
-	read CM_CTRL register
+Date: Wed,  3 Aug 2011 17:34:40 +0800
+Subject: [PATCH 08/17] mach-integrator: retire custom LED code
 In-Reply-To: <1312364089-32380-1-git-send-email-bryan.wu@canonical.com>
 References: <1312364089-32380-1-git-send-email-bryan.wu@canonical.com>
-Message-ID: <1312364089-32380-8-git-send-email-bryan.wu@canonical.com>
+Message-ID: <1312364089-32380-9-git-send-email-bryan.wu@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Use the LED in core module for CPU activity and also enable 4
+debugging LEDs in baseboard.
+
+The CPU activity LED is now handled by the trigger in the leds
+subsystem, retire this old CONFIG_LEDS-based code.
+
 Signed-off-by: Bryan Wu <bryan.wu@canonical.com>
 ---
- arch/arm/mach-integrator/core.c            |   17 +++++++++++++++++
- arch/arm/mach-integrator/include/mach/cm.h |    1 +
- 2 files changed, 18 insertions(+), 0 deletions(-)
+ arch/arm/mach-integrator/Makefile |    3 +-
+ arch/arm/mach-integrator/core.c   |    1 -
+ arch/arm/mach-integrator/leds.c   |  159 ++++++++++++++++++++++---------------
+ 3 files changed, 96 insertions(+), 67 deletions(-)
 
+diff --git a/arch/arm/mach-integrator/Makefile b/arch/arm/mach-integrator/Makefile
+index ebeef96..5521d18 100644
+--- a/arch/arm/mach-integrator/Makefile
++++ b/arch/arm/mach-integrator/Makefile
+@@ -4,11 +4,10 @@
+ 
+ # Object file lists.
+ 
+-obj-y					:= core.o lm.o
++obj-y					:= core.o lm.o leds.o
+ obj-$(CONFIG_ARCH_INTEGRATOR_AP)	+= integrator_ap.o
+ obj-$(CONFIG_ARCH_INTEGRATOR_CP)	+= integrator_cp.o
+ 
+-obj-$(CONFIG_LEDS)			+= leds.o
+ obj-$(CONFIG_PCI)			+= pci_v3.o pci.o
+ obj-$(CONFIG_CPU_FREQ_INTEGRATOR)	+= cpu.o
+ obj-$(CONFIG_INTEGRATOR_IMPD1)		+= impd1.o
 diff --git a/arch/arm/mach-integrator/core.c b/arch/arm/mach-integrator/core.c
-index 77315b9..0ee6af6 100644
+index 0ee6af6..bba9fe2 100644
 --- a/arch/arm/mach-integrator/core.c
 +++ b/arch/arm/mach-integrator/core.c
-@@ -225,6 +225,23 @@ void cm_control(u32 mask, u32 set)
+@@ -28,7 +28,6 @@
+ #include <asm/irq.h>
+ #include <mach/cm.h>
+ #include <asm/system.h>
+-#include <asm/leds.h>
+ #include <asm/mach/time.h>
+ #include <asm/pgtable.h>
  
- EXPORT_SYMBOL(cm_control);
- 
-+/**
-+ * cm_read - read the CM_CTRL register.
-+ */
-+u32 cm_read(void)
-+{
-+	unsigned long flags;
-+	u32 val = 0;
-+
-+	spin_lock_irqsave(&cm_lock, flags);
-+	val = readl(CM_CTRL);
-+	spin_unlock_irqrestore(&cm_lock, flags);
-+
-+	return val;
-+}
-+
-+EXPORT_SYMBOL(cm_read);
-+
+diff --git a/arch/arm/mach-integrator/leds.c b/arch/arm/mach-integrator/leds.c
+index 28be186..8b1a188 100644
+--- a/arch/arm/mach-integrator/leds.c
++++ b/arch/arm/mach-integrator/leds.c
+@@ -1,91 +1,122 @@
  /*
-  * We need to stop things allocating the low memory; ideally we need a
-  * better implementation of GFP_DMA which does not assume that DMA-able
-diff --git a/arch/arm/mach-integrator/include/mach/cm.h b/arch/arm/mach-integrator/include/mach/cm.h
-index 445d57a..3731508 100644
---- a/arch/arm/mach-integrator/include/mach/cm.h
-+++ b/arch/arm/mach-integrator/include/mach/cm.h
-@@ -2,6 +2,7 @@
-  * update the core module control register.
+- *  linux/arch/arm/mach-integrator/leds.c
++ * Driver for the 4 user LEDs found on the Integrator AP/CP baseboard
++ * Based on Versatile and RealView machine LED code
+  *
+- *  Integrator/AP and Integrator/CP LED control routines
+- *
+- *  Copyright (C) 1999 ARM Limited
+- *  Copyright (C) 2000 Deep Blue Solutions Ltd
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ * License terms: GNU General Public License (GPL) version 2
++ * Author: Bryan Wu <bryan.wu@canonical.com>
   */
- void cm_control(u32, u32);
-+u32 cm_read(void);
+ #include <linux/kernel.h>
+ #include <linux/init.h>
+-#include <linux/smp.h>
+-#include <linux/spinlock.h>
+ #include <linux/io.h>
++#include <linux/slab.h>
++#include <linux/leds.h>
  
- #define CM_CTRL_LED			(1 << 0)
- #define CM_CTRL_nMBDET			(1 << 1)
++#include <mach/cm.h>
+ #include <mach/hardware.h>
+ #include <mach/platform.h>
+-#include <asm/leds.h>
+-#include <asm/system.h>
+-#include <asm/mach-types.h>
+-#include <mach/cm.h>
+ 
+-static int saved_leds;
++#define ALPHA_REG __io_address(INTEGRATOR_DBG_BASE)
++#define LEDREG	(__io_address(INTEGRATOR_DBG_BASE) + INTEGRATOR_DBG_LEDS_OFFSET)
++
++struct integrator_led {
++	struct led_classdev	cdev;
++	u8			mask;
++};
++
++/*
++ * The triggers lines up below will only be used if the
++ * LED triggers are compiled in.
++ */
++static const struct {
++	const char *name;
++	const char *trigger;
++} integrator_leds[] = {
++	{ "integrator:green0", "heartbeat", },
++	{ "integrator:yellow", },
++	{ "integrator:red", },
++	{ "integrator:green1", },
++	{ "integrator:core_module", "cpu", },
++};
+ 
+-static void integrator_leds_event(led_event_t ledevt)
++static void integrator_led_set(struct led_classdev *cdev,
++			      enum led_brightness b)
+ {
+-	unsigned long flags;
+-	const unsigned int dbg_base = IO_ADDRESS(INTEGRATOR_DBG_BASE);
+-	unsigned int update_alpha_leds;
++	struct integrator_led *led = container_of(cdev,
++						 struct integrator_led, cdev);
++	u32 reg = __raw_readl(LEDREG);
+ 
+-	// yup, change the LEDs
+-	local_irq_save(flags);
+-	update_alpha_leds = 0;
++	if (b != LED_OFF)
++		reg |= led->mask;
++	else
++		reg &= ~led->mask;
+ 
+-	switch(ledevt) {
+-	case led_idle_start:
+-		cm_control(CM_CTRL_LED, 0);
+-		break;
++	while (__raw_readl(ALPHA_REG) & 1)
++		cpu_relax();
+ 
+-	case led_idle_end:
+-		cm_control(CM_CTRL_LED, CM_CTRL_LED);
+-		break;
++	__raw_writel(reg, LEDREG);
++}
+ 
+-	case led_timer:
+-		saved_leds ^= GREEN_LED;
+-		update_alpha_leds = 1;
+-		break;
++static enum led_brightness integrator_led_get(struct led_classdev *cdev)
++{
++	struct integrator_led *led = container_of(cdev,
++						 struct integrator_led, cdev);
++	u32 reg = __raw_readl(LEDREG);
+ 
+-	case led_red_on:
+-		saved_leds |= RED_LED;
+-		update_alpha_leds = 1;
+-		break;
++	return (reg & led->mask) ? LED_FULL : LED_OFF;
++}
+ 
+-	case led_red_off:
+-		saved_leds &= ~RED_LED;
+-		update_alpha_leds = 1;
+-		break;
++static void cm_led_set(struct led_classdev *cdev,
++			      enum led_brightness b)
++{
++	if (b != LED_OFF)
++		cm_control(CM_CTRL_LED, CM_CTRL_LED);
++	else
++		cm_control(CM_CTRL_LED, 0);
++}
+ 
+-	default:
+-		break;
+-	}
++static enum led_brightness cm_led_get(struct led_classdev *cdev)
++{
++	u32 reg = cm_read();
+ 
+-	if (update_alpha_leds) {
+-		while (__raw_readl(dbg_base + INTEGRATOR_DBG_ALPHA_OFFSET) & 1);
+-		__raw_writel(saved_leds, dbg_base + INTEGRATOR_DBG_LEDS_OFFSET);
+-	}
+-	local_irq_restore(flags);
++	return (reg & CM_CTRL_LED) ? LED_FULL : LED_OFF;
+ }
+ 
+-static int __init leds_init(void)
++static int __init integrator_leds_init(void)
+ {
+-	if (machine_is_integrator() || machine_is_cintegrator())
+-		leds_event = integrator_leds_event;
++	int i;
++
++	for (i = 0; i < ARRAY_SIZE(integrator_leds); i++) {
++		struct integrator_led *led;
++
++		led = kzalloc(sizeof(*led), GFP_KERNEL);
++		if (!led)
++			break;
++
++
++		led->cdev.name = integrator_leds[i].name;
++
++		if (i == 4) { /* Setting for LED in core module */
++			led->cdev.brightness_set = cm_led_set;
++			led->cdev.brightness_get = cm_led_get;
++		} else {
++			led->cdev.brightness_set = integrator_led_set;
++			led->cdev.brightness_get = integrator_led_get;
++		}
++
++		led->cdev.default_trigger = integrator_leds[i].trigger;
++		led->mask = BIT(i);
++
++		if (led_classdev_register(NULL, &led->cdev) < 0) {
++			kfree(led);
++			break;
++		}
++	}
+ 
+ 	return 0;
+ }
+ 
+-core_initcall(leds_init);
++/*
++ * Since we may have triggers on any subsystem, defer registration
++ * until after subsystem_init.
++ */
++fs_initcall(integrator_leds_init);
 -- 
 1.7.5
