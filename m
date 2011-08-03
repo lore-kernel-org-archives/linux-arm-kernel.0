@@ -1,21 +1,55 @@
-From: jochen@scram.de (Jochen Friedrich)
-Date: Wed, 03 Aug 2011 12:40:05 +0200
-Subject: [PATCH 3.1 0/4] ARM: simpad: Add support for GPIO attached
-	hardware
-In-Reply-To: <CAK5ve-+mT4EOU0p6=A-XSg24u43Y2+nJuCqVBB6CT5Bdi0TjAQ@mail.gmail.com>
-References: <1310453186-22518-1-git-send-email-jochen@scram.de>
-	<CAK5ve-+mT4EOU0p6=A-XSg24u43Y2+nJuCqVBB6CT5Bdi0TjAQ@mail.gmail.com>
-Message-ID: <4E392585.2070007@scram.de>
+From: mgorman@suse.de (Mel Gorman)
+Date: Wed, 3 Aug 2011 12:05:55 +0100
+Subject: [PATCH] ARM: sparsemem: Enable CONFIG_HOLES_IN_ZONE config
+	option for SparseMem and HAS_HOLES_MEMORYMODEL for linux-3.0.
+In-Reply-To: <CAFPAmTQByL0YJT8Lvar1Oe+3Q1EREvqPA_GP=hHApJDz5dSOzQ@mail.gmail.com>
+References: <CAFPAmTQByL0YJT8Lvar1Oe+3Q1EREvqPA_GP=hHApJDz5dSOzQ@mail.gmail.com>
+Message-ID: <20110803110555.GD19099@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bryan,
+On Tue, Aug 02, 2011 at 05:38:31PM +0530, Kautuk Consul wrote:
+> Hi,
+> 
+> In the case where the total kernel memory is not aligned to the
+> SECTION_SIZE_BITS I see a kernel crash.
+> 
+> When I copy a huge file, then the kernel crashes at the following callstack:
+> 
 
-> Is there any news about this patchset? Merged already? I'm going to
-> post an updated Led patchset based on this.
+The callstack should not be 80-column formatted as this is completely
+manged and unreadable without manual editting. Also, why did you not
+include the full error message? With it, I'd have a better idea of
+which bug check you hit.
 
-Not yet. I'm currently waiting for the end of the merge window prior to 
-submitting this patch against 3.1-rc1 again.
+> Backtrace:
+> <SNIP>
+> 
+> The reason for this is that the CONFIG_HOLES_IN_ZONE configuration
+> option is not automatically enabled when SPARSEMEM or
+> ARCH_HAS_HOLES_MEMORYMODEL are enabled. Due to this, the
+> pfn_valid_within() macro always returns 1 due to which the BUG_ON is
+> encountered.
+> This patch enables the CONFIG_HOLES_IN_ZONE config option if either
+> ARCH_HAS_HOLES_MEMORYMODEL or SPARSEMEM is enabled.
+> 
+> Although I tested this on an older kernel, i.e., 2.6.35.13, I see that
+> this option has not been enabled as yet in linux-3.0 and this appears
+> to be a
+> logically correct change anyways with respect to pfn_valid_within()
+> functionality.
+> 
 
-Thanks,
-Jochen
+There is a performance cost associated with HOLES_IN_ZONE which may be
+offset by memory savings but not necessarily.
+
+If the BUG_ON you are hitting is this one
+BUG_ON(page_zone(start_page) != page_zone(end_page)) then I'd be
+wondering why the check in move_freepages_block() was insufficient.
+
+If it's because holes are punched in the memmap then the option does
+need to be set.
+
+-- 
+Mel Gorman
+SUSE Labs
