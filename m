@@ -1,69 +1,38 @@
-From: lbassel@codeaurora.org (Larry Bassel)
-Date: Wed, 3 Aug 2011 10:23:13 -0700
-Subject: questions about memory hotplug
-In-Reply-To: <1312358106.15392.466.camel@sli10-conroe>
-References: <20110729221230.GA3466@labbmf-linux.qualcomm.com>
-	<20110730093055.GA10672@sli10-conroe.sh.intel.com>
-	<20110801170850.GB3466@labbmf-linux.qualcomm.com>
-	<1312247376.15392.454.camel@sli10-conroe>
-	<1312358106.15392.466.camel@sli10-conroe>
-Message-ID: <20110803172313.GD3466@labbmf-linux.qualcomm.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Wed, 03 Aug 2011 10:34:36 -0700
+Subject: [PATCH RESEND] omap1: select GENERIC_IRQ_CHIP for TI OMAP1
+In-Reply-To: <1312355897.14329.5.camel@phoenix> (Axel Lin's message of "Wed,
+	03 Aug 2011 15:18:17 +0800")
+References: <1312355897.14329.5.camel@phoenix>
+Message-ID: <8762me761f.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03 Aug 11 15:55, Shaohua Li wrote:
-> On Tue, 2011-08-02 at 09:09 +0800, Shaohua Li wrote:
-> > On Tue, 2011-08-02 at 01:08 +0800, Larry Bassel wrote:
-> > > 
-> > > In use case #1 yes, maybe not in #2 (we can arrange it to be
-> > > at the end of memory, but then might waste memory as it may
-> > > not be aligned on a SPARSEMEM section boundary and so would
-> > > need to be padded).
-> > then maybe the new migrate type I suggested can help here for the
-> > non-aligned memory. Anyway, let me do an experiment.
-> so your problem is to offline memory in arbitrary address and size (eg,
-> might not be at the end, and maybe smaller than a section)
+Hi Axel,
 
-Yes (and online it again). Also the decision to (attempt to)
-on/offline must be done from userspace (as memory hotplug does already).
+Axel Lin <axel.lin@gmail.com> writes:
 
-> 
-> I had a hack. In my machine, I have DMA, DMA32, and NORMAL zone.
-> At boot time, I mark 500M~600M ranges as MOVABLE_NOFB. the range is in
-> DMA32 and not section size aligned.
+> The gpio-omap driver has been converted to use generic IRQ chip.
+> Thus select GENERIC_IRQ_CHIP for TI OMAP1 to fix below build error.
+>
+>  LD      vmlinux
+> drivers/built-in.o: In function `omap_mpuio_alloc_gc':
+> drivers/gpio/gpio-omap.c:1087: undefined reference to `irq_alloc_generic_chip'
+> drivers/gpio/gpio-omap.c:1100: undefined reference to `irq_setup_generic_chip'
+> drivers/built-in.o: In function `omap_gpio_show_rev':
+> drivers/gpio/gpio-omap.c:998: undefined reference to `irq_gc_mask_clr_bit'
+> drivers/gpio/gpio-omap.c:998: undefined reference to `irq_gc_mask_set_bit'
+> make: *** [vmlinux] Error 1
+>
+> Signed-off-by: Axel Lin <axel.lin@gmail.com>
+> ---
+> Kevin already sent a similar patch.  http://marc.info/?l=linux-omap&m=130749135312468&w=2
+> But I still have the build error with make omap1_defconfig in today's linux-next tree.
+> So here is a resend.
 
-A few questions:
+Tony didn't pick this up for v3.1, so I now have the original in my
+fixies queue for v3.1-rc, which will be posted shortly.
 
-* You still use SPARSEMEM though, correct?
-* Would there be any problem using NORMAL memory as MOVABLE_NOFB?
-* So you don't use ZONE_MOVABLE or kernelcore= or movablecore=
-at all?
-* Do you online/offline using the /sys/devices/system/memory files?
-If so, does the kernel still attempt to on/offline the entire
-section (as it does now) or only the MOVABLE_NOFB part?
-If not, how do you on/offline memory?
+Sorry this has slipped through the cracks.
 
-> MOVABLE_NOFB is a new migrate type I
-> added. That range memory is movable, but other type of allocation can't
-> fallback into such ranges. so such range memory can only be used by
-> userspace.
-
-And the kernel will not reserve memory from it either (I had to put a
-hack in an earlier version of what I'm doing to not allow reserving
-from the movable zone because otherwise the existence of these
-reserved pages would block logical hotremove), correct?
-
-> I then run a memory stress test and do memory online/offline for the
-> range at runtime, the offline always success.
-> Does this meet your usage? If yes, I'll cook it up a little bit.
-
-Yes, this looks very promising.
-Do you see any reason this can't be backported to 2.6.38?
-
-Thank you very much for your help here.
-
-Larry
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Kevin
