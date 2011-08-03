@@ -1,46 +1,49 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Wed, 3 Aug 2011 18:27:04 +0200
-Subject: Shouldn't DT preserve pdev name and id to allow platform_match
-	to work?
-In-Reply-To: <CAC63_iRa1qc7pO9Eub1A+cC+R=tSkwzigVPDHqcbvOngACYWqQ@mail.gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 3 Aug 2011 17:43:55 +0100
+Subject: Shouldn't DT preserve pdev name and id to allow platform_match to
+	work?
+In-Reply-To: <4E396361.3060307@ti.com>
 References: <4E396361.3060307@ti.com>
-	<CAC63_iRa1qc7pO9Eub1A+cC+R=tSkwzigVPDHqcbvOngACYWqQ@mail.gmail.com>
-Message-ID: <4E3976D8.20602@ti.com>
+Message-ID: <CACxGe6vg5NTyiDZqqztjtFEfb7si+-=Y7nEy1Y+YMgA5PVXScw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Manju,
-
-On 8/3/2011 6:17 PM, G, Manjunath Kondaiah wrote:
-> Hi Benoit,
+On Wed, Aug 3, 2011 at 4:04 PM, Cousson, Benoit <b-cousson@ti.com> wrote:
+> Hi Grant,
 >
-> On Wed, Aug 3, 2011 at 8:34 PM, Cousson, Benoit<b-cousson@ti.com>  wrote:
->> Hi Grant,
->>
->> Going further with the usage of OF_DEV_AUXDATA_ID, I realized that this is is not doing what I was expecting. My expectation might be silly, but in order to make platform_match to work without DT matching mechanism, you need to have the driver name in the pdev->name field:
->>
->>         /* fall-back to driver name match */
->>         return (strcmp(pdev->name, drv->name) == 0);
->>
->> Except that the of_device_add function is doing that:
->>         pdev->name = dev_name(&ofdev->dev);
->>         pdev->id = -1;
+> Going further with the usage of OF_DEV_AUXDATA_ID, I realized that this is is not doing what I was expecting. My expectation might be silly, but in order to make platform_match to work without DT matching mechanism, you need to have the driver name in the pdev->name field:
 >
-> This is taken here:
-> http://git.secretlab.ca/?p=linux-2.6.git;a=commitdiff;h=04f51955dc690666467252015a931d71d5c56696
+> ? ? ? ?/* fall-back to driver name match */
+> ? ? ? ?return (strcmp(pdev->name, drv->name) == 0);
 >
-> and it is pending for upstream.
->
-> With the above patch, both pdev->name and pdev->id can be set as per
-> hwmod requirement through aux_data lookup table.
+> Except that the of_device_add function is doing that:
+> ? ? ? ?pdev->name = dev_name(&ofdev->dev);
+> ? ? ? ?pdev->id = -1;
 
-Mmm, but I'm already using that patch, and it is only taking care of the 
-pdev->id, hence my email. Did I miss something?
+Yes, I know.  It is written that way on purpose so that it doesn't get
+used to avoid adding a match table to the device driver because
+auxdata is a stop-gap solution.  It is *not* intended to be used long
+term (with one exception for passing platform callbacks when there is
+no other solution).
 
-> we might have to append pdev->id to pdev->name so that
-> it can used for device look up in the hwmod
-> device list.
+auxdata passes platform_data and overrides the device name when there
+is no way easy way to make the driver work without it.  It handles the
+the current implementation of clocks and regulators which aren't yet
+populated from the device tree.  It will go away when clock &
+regulator bindings are implemented.
 
-I'm not sure to get your point here.
+By implementing it the way it is, it ensures that no drivers
+inadvertently depends on auxdata, and will thus break when the auxdata
+entries are removed.  Manjunath mentioned that there is a patch that
+allows the id to be set, but it still doesn't set the driver name in a
+way that will allow existing drivers to bind using the old method, and
+that is by design.
 
-Benoit
+I understand what you are asking for, but the DT matching mechanism is
+absolutely required.  Adding it to drivers is certainly not any more
+onerous that maintaining a bunch of auxdata tables for boards.
+Besides, part of the point of the move to DT is to eliminate device
+and device data tables at the board file level, which is another
+reason why auxdata is a temporary solution.
+
+g.
