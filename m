@@ -1,86 +1,25 @@
-From: pj0585@gmail.com (Prasant J)
-Date: Wed, 3 Aug 2011 10:22:30 +0530
-Subject: at91sam9g45: MMC: Issues with MMC driver
-In-Reply-To: <20110802140344.GF19079@n2100.arm.linux.org.uk>
-References: <CAA2DH4v+v2Vvv_2MzD1dGqbc5a4W1h+30FqwwpsqKmYk6nvZxQ@mail.gmail.com>
-	<20110802140344.GF19079@n2100.arm.linux.org.uk>
-Message-ID: <CAA2DH4tZEQ8Jvy4aqJVoj4CU0diKn9K6p4v+9NujQ8oLnX26Qw@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 3 Aug 2011 14:23:35 +0900
+Subject: [alsa-devel] [PATCH 1/1] ASoC: core: cache index fix
+In-Reply-To: <s5h4o1zsn6o.wl%tiwai@suse.de>
+References: <65EE16ACC360FA4D99C96DC085B3F7721F43AA@039-SN1MPN1-002.039d.mgd.msft.net>
+	<s5hoc08nk7t.wl%tiwai@suse.de>
+	<65EE16ACC360FA4D99C96DC085B3F7721F443D@039-SN1MPN1-002.039d.mgd.msft.net>
+	<s5hlivcnhe2.wl%tiwai@suse.de>
+	<65EE16ACC360FA4D99C96DC085B3F7721F45A8@039-SN1MPN1-002.039d.mgd.msft.net>
+	<s5haabsnfg2.wl%tiwai@suse.de>
+	<20110802154815.GE25884@opensource.wolfsonmicro.com>
+	<s5hipqfn65k.wl%tiwai@suse.de>
+	<20110802164005.GI25884@opensource.wolfsonmicro.com>
+	<s5h4o1zsn6o.wl%tiwai@suse.de>
+Message-ID: <20110803052333.GA16141@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 2, 2011 at 7:33 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Aug 02, 2011 at 04:35:58PM +0530, Prasant J wrote:
->> Hi,
->>
->> I'm using Linux 3.0.0 on a custom board design based on AT91SAM9G45-EKES
->>
->> I'm getting this kernel dump while booting:
->>
->>
->> Waiting 3sec before mounting root device...
->> mmc0: host does not support reading read-only switch. assuming write-enable.
->> mmc0: new SD card at address 0007
->> mmcblk0: mmc0:0007 SU02G 1.83 GiB
->> ?mmcblk0: p1 p2
->> eth0: link up (100/Full)
->> EXT3-fs: barriers not enabled
->> kjournald starting. ?Commit interval 5 seconds
->> EXT3-fs (mmcblk0p2): using internal journal
->> EXT3-fs (mmcblk0p2): mounted filesystem with writeback data mode
->> VFS: Mounted root (ext3 filesystem) on device 179:2.
->> Freeing init memory: 116K
->> ------------[ cut here ]------------
->> WARNING: at kernel/irq/handle.c:130 handle_irq_event_percpu+0x6c/0x18c()
->>
->> Can someone tell me what is possibly wrong in the mmc driver's
->> interrupt handler?
->
-> This is what I said to someone who asked about this a week ago. ?It
-> desperately needs fixing properly.
->
-> Subject: at91sam9g45: Issues while working with RAM that is separated
-> ? ? ? ?on physical address space
->
-> On Tue, Jul 26, 2011 at 03:37:02PM +0200, Christian Glindkamp wrote:
->> The only problem that still exits with highmem for me is the following:
->> Even on non-highmem/non-sparsemem systems I get the following warning
->> when using an mmc as the rootfs:
->>
->> ------------[ cut here ]------------
->> WARNING: at kernel/irq/handle.c:130 handle_irq_event_percpu+0x70/0x194()
->
-> That'll be because the driver is still using flush_dcache_page(), whereas
-> it should be using flush_kernel_dcache_page(). ?flush_dcache_page()
-> unfortunately results in IRQs being enabled due to the
-> flush_dcache_mmap_lock().
->
->> The system is still stable, but if switch to highmem, the kernel crashes
->> completely when doing this (using and USB drive as rootfs still works
->> flawlessly):
->
-> That's because the driver is basically broken:
->
-> ? ? ? ?void ? ? ? ? ? ? ? ? ? ?*buf = sg_virt(sg);
-> ? ? ? ?unsigned int ? ? ? ? ? ?offset = host->pio_offset;
->
-> ? ? ? ? ? ? ? ? ? ? ? ?memcpy(buf + offset, &value, remaining);
->
-> Highmem pages have a NULL sg_virt(sg) because they're by definition not
-> mapped. ?Drivers really should not be using sg_virt() directly - who
-> knows how this got through the review process...
->
-> There's a well defined API for walking scatterlists in drivers - see
-> the sg_miter_* API in linux/scatterlist.h. ?This takes care of the
-> highmem issues automatically, as well as using flush_kernel_dcache_page().
->
-> In short: the Atmel MCI driver is buggy and needs fixing.
->
->
+On Tue, Aug 02, 2011 at 08:06:23PM +0200, Takashi Iwai wrote:
 
-I did read that later on (that thread was started by me). I followed
-what you said and changed the function names. After changing the
-function names this warning does go off for me. I'm not using Highmem.
+> example.  So, alternatively, we can put the condition in some generic
+> filter function like readable/writeble things.
 
-Sometimes my filesystem on mmc card does get corrupt. Till now this is
-a random observation.
+Yes, I suggested that already, these are just unreadable and unwritable
+registers :/
