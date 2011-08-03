@@ -1,33 +1,62 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 3 Aug 2011 13:43:05 +0200
-Subject: [PATCH v2] mfd:fix section mismatch warning in ab3550-core
-In-Reply-To: <CACRpkdau6sv2T_TKx-GoVLU_AagaJDyiji11F8+wieVAOezkAw@mail.gmail.com>
-References: <20110803083255.GJ9250@pengutronix.de>
-	<1312361856-26127-1-git-send-email-gaowanlong@cn.fujitsu.com>
-	<CACRpkdau6sv2T_TKx-GoVLU_AagaJDyiji11F8+wieVAOezkAw@mail.gmail.com>
-Message-ID: <20110803114305.GD31521@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 3 Aug 2011 12:59:18 +0100
+Subject: [PATCH 03/17] mach-realview and mach-versatile: retire custom
+	LED code
+In-Reply-To: <1312364089-32380-4-git-send-email-bryan.wu@canonical.com>
+References: <1312364089-32380-1-git-send-email-bryan.wu@canonical.com>
+	<1312364089-32380-4-git-send-email-bryan.wu@canonical.com>
+Message-ID: <20110803115918.GA23953@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 03, 2011 at 12:19:06PM +0200, Linus Walleij wrote:
-> On Wed, Aug 3, 2011 at 10:57 AM, Wanlong Gao <gaowanlong@cn.fujitsu.com> wrote:
+On Wed, Aug 03, 2011 at 05:34:35PM +0800, Bryan Wu wrote:
+> From: Linus Walleij <linus.walleij@linaro.org>
 > 
-Maybe add "This patch fixes:" before the actual warning?
-
-> > WARNING: drivers/mfd/built-in.o(.data+0x9998): Section mismatch in reference from the variable ab3550_driver to the function .init.text:ab3550_probe()
-> > The variable ab3550_driver references
-> > the function __init ab3550_probe()
-> > If the reference is valid then annotate the
-> > variable with __init* or __refdata (see linux/init.h) or name the variable:
-> > *_template, *_timer, *_sht, *_ops, *_probe, *_probe_one, *_console
-> >
-> > Signed-off-by: Wanlong Gao <gaowanlong@cn.fujitsu.com>
+> This replaces the custom LED trigger code in mach-realview with
+> some overarching platform code for the plat-versatile family that
+> will lock down LEDs 2 thru 5 for CPU activity indication. The
+> day we have 8 core ARM systems the plat-versatile code will have
+> to become more elaborate.
 > 
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-other than that, aol:
+> Tested on RealView PB11MPCore by invoking four different CPU
+> hogs (yes > /dev/null&) and see the LEDs go on one at a time.
+> They all go off as the hogs are killed. Tested on the PB1176
+> as well - just one activity led (led 2) goes on and off with
+> CPU activity.
+> 
+> (bryan.wu at canonical.com: use ledtrig-cpu instead of ledtrig-arm-cpu)
 
-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+This is broken.  More than that, this LEDS stuff is broken.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+With CONFIG_NEW_LEDS=y and CONFIG_LEDS_CLASS=n,
+
+  CC      arch/arm/plat-versatile/leds.o
+arch/arm/plat-versatile/leds.c: In function 'versatile_leds_init':
+arch/arm/plat-versatile/leds.c:91: error: 'struct led_classdev' has no member named 'trigger_data'
+
+I wasn't offered LEDS_TRIGGERS to select.  It looks like this leds
+stuff really is broken:
+
+config LEDS_CLASS
+        bool "LED Class Support"
+        help
+          This option enables the led sysfs class in /sys/class/leds.  You'll
+          need this to do anything useful with LEDs.  If unsure, say N.
+
+Okay, this says its for sysfs support.  But then:
+
+config LEDS_TRIGGERS
+        bool "LED Trigger support"
+        depends on LEDS_CLASS
+        help
+          This option enables trigger support for the leds class.
+          These triggers allow kernel events to drive the LEDs and can
+          be configured via sysfs. If unsure, say Y.
+
+you can only have LED triggers if you have LED class support.  So what's
+the point of NEW_LEDS=y and LEDS_CLASS=n?  From those descriptions,
+LEDS_CLASS should control the sysfs interfaces, and LEDS_TRIGGERS should
+control the kernel internal interfaces _independently_.
+
+As things stand, this looks completely crazy.  So no, I'm not acking these
+patches until the LEDs layer gets a modicum of sanity.
