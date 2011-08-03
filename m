@@ -1,39 +1,52 @@
-From: B19295@freescale.com (Lin Tony-B19295)
-Date: Wed, 3 Aug 2011 02:06:04 +0000
-Subject: [PATCH v2 1/1] ARM: mxc: fix card interrupt losing issue on
-	freescale eSDHC
-In-Reply-To: <m2ty9z73j6.fsf@bob.laptop.org>
-References: <1311837360-16179-1-git-send-email-tony.lin@freescale.com>
-	<1311837360-16179-2-git-send-email-tony.lin@freescale.com>
-	<m2ty9z73j6.fsf@bob.laptop.org>
-Message-ID: <97D3A72708D04647A5AC84A04996E5B5169802@039-SN1MPN1-006.039d.mgd.msft.net>
+From: bryan.wu@canonical.com (Bryan Wu)
+Date: Wed, 3 Aug 2011 11:47:52 +0800
+Subject: [PATCH 3.1 0/4] ARM: simpad: Add support for GPIO attached
+	hardware
+In-Reply-To: <1310453186-22518-1-git-send-email-jochen@scram.de>
+References: <1310453186-22518-1-git-send-email-jochen@scram.de>
+Message-ID: <CAK5ve-+mT4EOU0p6=A-XSg24u43Y2+nJuCqVBB6CT5Bdi0TjAQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks, Chris!
+Jochen,
 
-BR
-Tony
+Is there any news about this patchset? Merged already? I'm going to
+post an updated Led patchset based on this.
 
-> -----Original Message-----
-> From: Chris Ball [mailto:cjb at laptop.org]
-> Sent: Wednesday, August 03, 2011 8:16 AM
-> To: Lin Tony-B19295
-> Cc: linux-mmc at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH v2 1/1] ARM: mxc: fix card interrupt losing issue on
-> freescale eSDHC
-> 
-> Hi Tony,
-> 
-> On Thu, Jul 28 2011, Tony Lin wrote:
-> > apply workaround for imx eSDHC controller to avoid missing the card
-> > interrupt so that SDIO function is workable
-> >
-> > Signed-off-by: Tony Lin <tony.lin@freescale.com>
-> 
-> Thanks, pushed to mmc-next for 3.1.
-> 
-> - Chris.
-> --
-> Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-> One Laptop Per Child
+Thanks,
+-Bryan
+
+On Tue, Jul 12, 2011 at 2:46 PM, Jochen Friedrich <jochen@scram.de> wrote:
+> Resend as this might got lost in the develtech.com disaster.
+> Bryan Wu <bryan.wu@canonical.com> intends to base his patch set to
+> get rid of the custom LED code on this series.
+>
+> This series enables GPIO API on UCB1x00 and implements the GPIO
+> API on the CS3 latch. The third patch finally registers platform
+> devices for the GPIO attached LED, buttons and I2C bus.
+>
+> ARM: simpad: Add ucb1x00 GPIO definitions and register GPIO
+> ARM: simpad: Cleanup CS3 accessors and add GPIO API
+> ARM: simpad: add GPIO based device definitions
+> ARM: simpad: replace ARM specific LED code
+>
+> Overall diffstat:
+>
+> ?arch/arm/mach-sa1100/Makefile ? ? ? ? ? ? ?| ? ?1 -
+> ?arch/arm/mach-sa1100/include/mach/simpad.h | ? 94 ++++++++++---
+> ?arch/arm/mach-sa1100/leds-simpad.c ? ? ? ? | ?100 -------------
+> ?arch/arm/mach-sa1100/leds.c ? ? ? ? ? ? ? ?| ? ?2 -
+> ?arch/arm/mach-sa1100/leds.h ? ? ? ? ? ? ? ?| ? ?1 -
+> ?arch/arm/mach-sa1100/simpad.c ? ? ? ? ? ? ?| ?211 ++++++++++++++++++++++++---
+> ?drivers/pcmcia/sa1100_simpad.c ? ? ? ? ? ? | ? 35 ++---
+> ?7 files changed, 274 insertions(+), 170 deletions(-)
+>
+
+
+
+-- 
+Bryan Wu <bryan.wu@canonical.com>
+Kernel Developer ? ?+86.138-1617-6545 Mobile
+Ubuntu Kernel Team
+Canonical Ltd. ? ? ?www.canonical.com
+Ubuntu - Linux for human beings | www.ubuntu.com
