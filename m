@@ -1,11 +1,11 @@
 From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Wed, 03 Aug 2011 15:29:44 +0400
+Date: Wed, 03 Aug 2011 15:30:43 +0400
 Subject: [PATCH 07/17] mach-integrator: introduce cm_read function helper
 	to read CM_CTRL register
 In-Reply-To: <1312364089-32380-8-git-send-email-bryan.wu@canonical.com>
 References: <1312364089-32380-1-git-send-email-bryan.wu@canonical.com>
 	<1312364089-32380-8-git-send-email-bryan.wu@canonical.com>
-Message-ID: <4E393128.3040602@ru.mvista.com>
+Message-ID: <4E393163.1050800@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -34,11 +34,21 @@ On 03-08-2011 13:34, Bryan Wu wrote:
 > +{
 > +	unsigned long flags;
 > +	u32 val = 0;
+
+    Intialization not needed.
+
 > +
 > +	spin_lock_irqsave(&cm_lock, flags);
 > +	val = readl(CM_CTRL);
 > +	spin_unlock_irqrestore(&cm_lock, flags);
-
-    What's the point of locking around already atomic read?
+> +
+> +	return val;
+> +}
+> +
+> +EXPORT_SYMBOL(cm_read);
+> +
+>   /*
+>    * We need to stop things allocating the low memory; ideally we need a
+>    * better implementation of GFP_DMA which does not assume that DMA-able
 
 WBR, Sergei
