@@ -1,170 +1,58 @@
 From: bryan.wu@canonical.com (Bryan Wu)
-Date: Wed,  3 Aug 2011 17:34:38 +0800
-Subject: [PATCH 06/17] mach-orion5x: convert custom LED code to gpio_led and
-	LED CPU trigger
+Date: Wed,  3 Aug 2011 17:34:39 +0800
+Subject: [PATCH 07/17] mach-integrator: introduce cm_read function helper to
+	read CM_CTRL register
 In-Reply-To: <1312364089-32380-1-git-send-email-bryan.wu@canonical.com>
 References: <1312364089-32380-1-git-send-email-bryan.wu@canonical.com>
-Message-ID: <1312364089-32380-7-git-send-email-bryan.wu@canonical.com>
+Message-ID: <1312364089-32380-8-git-send-email-bryan.wu@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Bryan Wu <bryan.wu@canonical.com>
-Acked-by: Nicolas Pitre <nico@fluxnic.net>
 ---
- arch/arm/mach-orion5x/rd88f5181l-fxo-setup.c |    1 -
- arch/arm/mach-orion5x/rd88f5181l-ge-setup.c  |    1 -
- arch/arm/mach-orion5x/rd88f5182-setup.c      |   74 ++++++++------------------
- arch/arm/mach-orion5x/rd88f6183ap-ge-setup.c |    1 -
- 4 files changed, 23 insertions(+), 54 deletions(-)
+ arch/arm/mach-integrator/core.c            |   17 +++++++++++++++++
+ arch/arm/mach-integrator/include/mach/cm.h |    1 +
+ 2 files changed, 18 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-orion5x/rd88f5181l-fxo-setup.c b/arch/arm/mach-orion5x/rd88f5181l-fxo-setup.c
-index 291d22b..fb9c635 100644
---- a/arch/arm/mach-orion5x/rd88f5181l-fxo-setup.c
-+++ b/arch/arm/mach-orion5x/rd88f5181l-fxo-setup.c
-@@ -19,7 +19,6 @@
- #include <net/dsa.h>
- #include <asm/mach-types.h>
- #include <asm/gpio.h>
--#include <asm/leds.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/pci.h>
- #include <mach/orion5x.h>
-diff --git a/arch/arm/mach-orion5x/rd88f5181l-ge-setup.c b/arch/arm/mach-orion5x/rd88f5181l-ge-setup.c
-index 3f02362..f4d64e6 100644
---- a/arch/arm/mach-orion5x/rd88f5181l-ge-setup.c
-+++ b/arch/arm/mach-orion5x/rd88f5181l-ge-setup.c
-@@ -20,7 +20,6 @@
- #include <net/dsa.h>
- #include <asm/mach-types.h>
- #include <asm/gpio.h>
--#include <asm/leds.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/pci.h>
- #include <mach/orion5x.h>
-diff --git a/arch/arm/mach-orion5x/rd88f5182-setup.c b/arch/arm/mach-orion5x/rd88f5182-setup.c
-index 27fd38e..de40f23 100644
---- a/arch/arm/mach-orion5x/rd88f5182-setup.c
-+++ b/arch/arm/mach-orion5x/rd88f5182-setup.c
-@@ -19,9 +19,9 @@
- #include <linux/mv643xx_eth.h>
- #include <linux/ata_platform.h>
- #include <linux/i2c.h>
-+#include <linux/gpio.h>
-+#include <linux/leds.h>
- #include <asm/mach-types.h>
--#include <asm/gpio.h>
--#include <asm/leds.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/pci.h>
- #include <mach/orion5x.h>
-@@ -54,12 +54,6 @@
- #define RD88F5182_PCI_SLOT0_IRQ_A_PIN	7
- #define RD88F5182_PCI_SLOT0_IRQ_B_PIN	6
+diff --git a/arch/arm/mach-integrator/core.c b/arch/arm/mach-integrator/core.c
+index 77315b9..0ee6af6 100644
+--- a/arch/arm/mach-integrator/core.c
++++ b/arch/arm/mach-integrator/core.c
+@@ -225,6 +225,23 @@ void cm_control(u32 mask, u32 set)
  
--/*
-- * GPIO Debug LED
-- */
--
--#define RD88F5182_GPIO_DBG_LED		0
--
- /*****************************************************************************
-  * 16M NOR Flash on Device bus CS1
-  ****************************************************************************/
-@@ -84,55 +78,32 @@ static struct platform_device rd88f5182_nor_flash = {
- 	.resource		= &rd88f5182_nor_flash_resource,
- };
+ EXPORT_SYMBOL(cm_control);
  
--#ifdef CONFIG_LEDS
--
- /*****************************************************************************
-- * Use GPIO debug led as CPU active indication
-+ * Use GPIO LED as CPU active indication
-  ****************************************************************************/
++/**
++ * cm_read - read the CM_CTRL register.
++ */
++u32 cm_read(void)
++{
++	unsigned long flags;
++	u32 val = 0;
++
++	spin_lock_irqsave(&cm_lock, flags);
++	val = readl(CM_CTRL);
++	spin_unlock_irqrestore(&cm_lock, flags);
++
++	return val;
++}
++
++EXPORT_SYMBOL(cm_read);
++
+ /*
+  * We need to stop things allocating the low memory; ideally we need a
+  * better implementation of GFP_DMA which does not assume that DMA-able
+diff --git a/arch/arm/mach-integrator/include/mach/cm.h b/arch/arm/mach-integrator/include/mach/cm.h
+index 445d57a..3731508 100644
+--- a/arch/arm/mach-integrator/include/mach/cm.h
++++ b/arch/arm/mach-integrator/include/mach/cm.h
+@@ -2,6 +2,7 @@
+  * update the core module control register.
+  */
+ void cm_control(u32, u32);
++u32 cm_read(void);
  
--static void rd88f5182_dbgled_event(led_event_t evt)
--{
--	int val;
--
--	if (evt == led_idle_end)
--		val = 1;
--	else if (evt == led_idle_start)
--		val = 0;
--	else
--		return;
--
--	gpio_set_value(RD88F5182_GPIO_DBG_LED, val);
--}
--
--static int __init rd88f5182_dbgled_init(void)
--{
--	int pin;
--
--	if (machine_is_rd88f5182()) {
--		pin = RD88F5182_GPIO_DBG_LED;
-+#define RD88F5182_GPIO_LED		0
- 
--		if (gpio_request(pin, "DBGLED") == 0) {
--			if (gpio_direction_output(pin, 0) != 0) {
--				printk(KERN_ERR "rd88f5182_dbgled_init failed "
--						"to set output pin %d\n", pin);
--				gpio_free(pin);
--				return 0;
--			}
--		} else {
--			printk(KERN_ERR "rd88f5182_dbgled_init failed "
--					"to request gpio %d\n", pin);
--			return 0;
--		}
--
--		leds_event = rd88f5182_dbgled_event;
--	}
--
--	return 0;
--}
-+static struct gpio_led rd88f5182_gpio_led_pins[] = {
-+	{
-+		.name		= "rd88f5182:cpu",
-+		.default_trigger = "cpu",
-+		.gpio		= RD88F5182_GPIO_LED,
-+	},
-+};
- 
--__initcall(rd88f5182_dbgled_init);
-+static struct gpio_led_platform_data rd88f5182_gpio_led_data = {
-+	.leds		= rd88f5182_gpio_led_pins,
-+	.num_leds	= ARRAY_SIZE(rd88f5182_gpio_led_pins),
-+};
- 
--#endif
-+static struct platform_device rd88f5182_gpio_leds = {
-+	.name	= "leds-gpio",
-+	.id	= -1,
-+	.dev	= {
-+		.platform_data = &rd88f5182_gpio_led_data,
-+	},
-+};
- 
- /*****************************************************************************
-  * PCI
-@@ -300,6 +271,7 @@ static void __init rd88f5182_init(void)
- 
- 	orion5x_setup_dev1_win(RD88F5182_NOR_BASE, RD88F5182_NOR_SIZE);
- 	platform_device_register(&rd88f5182_nor_flash);
-+	platform_device_register(&rd88f5182_gpio_leds);
- 
- 	i2c_register_board_info(0, &rd88f5182_i2c_rtc, 1);
- }
-diff --git a/arch/arm/mach-orion5x/rd88f6183ap-ge-setup.c b/arch/arm/mach-orion5x/rd88f6183ap-ge-setup.c
-index ad2eba9..0c5d1d2 100644
---- a/arch/arm/mach-orion5x/rd88f6183ap-ge-setup.c
-+++ b/arch/arm/mach-orion5x/rd88f6183ap-ge-setup.c
-@@ -22,7 +22,6 @@
- #include <net/dsa.h>
- #include <asm/mach-types.h>
- #include <asm/gpio.h>
--#include <asm/leds.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/pci.h>
- #include <mach/orion5x.h>
+ #define CM_CTRL_LED			(1 << 0)
+ #define CM_CTRL_nMBDET			(1 << 1)
 -- 
 1.7.5
