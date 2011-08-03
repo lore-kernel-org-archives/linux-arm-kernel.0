@@ -1,51 +1,119 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 3 Aug 2011 18:00:51 +0900
-Subject: [alsa-devel] [PATCH 1/1] ASoC: core: cache index fix
-In-Reply-To: <s5hvcufqalz.wl%tiwai@suse.de>
-References: <65EE16ACC360FA4D99C96DC085B3F7721F443D@039-SN1MPN1-002.039d.mgd.msft.net>
-	<s5hlivcnhe2.wl%tiwai@suse.de>
-	<65EE16ACC360FA4D99C96DC085B3F7721F45A8@039-SN1MPN1-002.039d.mgd.msft.net>
-	<s5haabsnfg2.wl%tiwai@suse.de>
-	<20110802154815.GE25884@opensource.wolfsonmicro.com>
-	<s5hipqfn65k.wl%tiwai@suse.de>
-	<20110802164005.GI25884@opensource.wolfsonmicro.com>
-	<s5h4o1zsn6o.wl%tiwai@suse.de>
-	<20110803052333.GA16141@opensource.wolfsonmicro.com>
-	<s5hvcufqalz.wl%tiwai@suse.de>
-Message-ID: <20110803090049.GA30782@opensource.wolfsonmicro.com>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Wed, 3 Aug 2011 10:12:49 +0100
+Subject: [PATCH 2/4] serial: s5pv210: Add device tree support
+In-Reply-To: <1312326509-2723-3-git-send-email-thomas.abraham@linaro.org>
+References: <1312326509-2723-1-git-send-email-thomas.abraham@linaro.org>
+	<1312326509-2723-3-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <20110803091249.GB28651@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 03, 2011 at 08:20:56AM +0200, Takashi Iwai wrote:
+On Wed, Aug 03, 2011 at 12:08:27AM +0100, Thomas Abraham wrote:
+> For device tree based probe, the dependecy on pdev->id to attach a
+> corresponding default port info to the driver's private data is
+> removed. The fifosize parameter is obtained from the device tree
+> node and the next available instance of port info is updated
+> with the fifosize value and attached to the driver's private data.
+> The default platform data is selected based on the compatible property.
+> 
+> CC: Ben Dooks <ben-linux@fluff.org>
+> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+> ---
+>  .../devicetree/bindings/serial/samsung_uart.txt    |   16 +++++++
+>  drivers/tty/serial/s5pv210.c                       |   43 +++++++++++++++++++-
+>  drivers/tty/serial/samsung.c                       |    5 ++-
+>  3 files changed, 62 insertions(+), 2 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/serial/samsung_uart.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/serial/samsung_uart.txt b/Documentation/devicetree/bindings/serial/samsung_uart.txt
+> new file mode 100644
+> index 0000000..9174499
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/serial/samsung_uart.txt
+> @@ -0,0 +1,16 @@
+> +* Samsung's UART Controller
+> +
+> +The Samsung's UART controller is used for serial communications on all of
+> +Samsung's s3c24xx, s3c64xx and s5p series application processors.
+> +
+> +Required properties:
+> +- compatible: should be specific to the application processor
+> +    - "samsung,s5pv310-uart" , for Exynos4 processors.
+> +
+> +- reg: base physical address of the controller and length of memory mapped
+> +  region.
+> +
+> +- interrupts : Three interrupt numbers should be specified in the following
+> +  order - Rx interrupt, Tx interrupt, Error Interrupt.
+> +
+> +- samsung,uart-fifosize: Size of the tx/rx fifo used in the controller.
+> diff --git a/drivers/tty/serial/s5pv210.c b/drivers/tty/serial/s5pv210.c
+> index fb0806c..a44b599 100644
+> --- a/drivers/tty/serial/s5pv210.c
+> +++ b/drivers/tty/serial/s5pv210.c
+> @@ -19,6 +19,7 @@
+>  #include <linux/serial_core.h>
+>  #include <linux/serial.h>
+>  #include <linux/delay.h>
+> +#include <linux/of.h>
+>  
+>  #include <asm/irq.h>
+>  #include <mach/hardware.h>
+> @@ -132,10 +133,49 @@ static struct s3c24xx_uart_info *s5p_uart_inf[] = {
+>  	[3] = &s5p_port_fifo16,
+>  };
+>  
+> +#ifdef CONFIG_OF
+> +static struct s3c2410_uartcfg s5pv310_uart_defcfg = {
+> +	.ucon	= 0x3c5,
+> +	.ufcon	= 0x111,
+> +	.flags	= NO_NEED_CHECK_CLKSRC,
+> +	.has_fracval = 1,
+> +};
+> +
+> +static const struct of_device_id s5pv210_uart_dt_match[] = {
+> +	{ .compatible = "samsung,s5pv310-uart", .data = &s5pv310_uart_defcfg },
+> +	{},
+> +};
+> +MODULE_DEVICE_TABLE(of, s5pv210_uart_match);
+> +#else
+> +#define s5pv210_uart_match NULL
+> +#endif
+> +
+>  /* device management */
+>  static int s5p_serial_probe(struct platform_device *pdev)
+>  {
+> -	return s3c24xx_serial_probe(pdev, s5p_uart_inf[pdev->id]);
+> +	static unsigned int probe_index;
+> +	unsigned int port = pdev->id;
+> +	const struct of_device_id *match;
+> +	struct s3c2410_uartcfg *cfg;
+> +
+> +	if (pdev->dev.of_node) {
+> +		if (of_property_read_u32(pdev->dev.of_node,
+> +				"samsung,uart-fifosize",
+> +				&s5p_uart_inf[probe_index]->fifosize))
+> +			return -EINVAL;
 
-> BTW, looking through snd_soc_get_reg_access_index() for *_readable() & 
-> co , I wonder what would be the merit of using rbtree if this kind of
-> indexed array is present. If the actual value is also kept in that
-> array, we can drop the whole complex stuff like rbtree and lzo.
+I'd rather see the fifo size either being a property of the soc itself
+or being inferred by the compatible field. 
 
-I agree, you may have seen me mentioning that we should just disallow
-the use of advanced caches for the register maps with non-zero steps.
-There's really very little benefit from them.
+>  	.driver		= {
+>  		.name	= "s5pv210-uart",
+>  		.owner	= THIS_MODULE,
+> +		.of_match_table	= s5pv210_uart_dt_match,
 
-> In addition, the default values aren't necessary to be in a flat array
-> form at all.  What we need is a copy function to expand the data
-> appropriately to reg_def_copy.
+I think maybe doing something like
 
-Yes, we can do better here.  We do need something that's reasonably easy
-to write in source code, though.  I was thinking something like an array
-of:
+		.of_match_table = of_match_ptr(5pv210_uart_dt_match),
 
-    { reg, value }
+so we can avoid having the #else and #define 5pv210_uart_dt_match NULL
+in a number of places.
 
-might do the trick for the sparse devices.   Ideally all this code is
-going to get pushed out into regmap too so other subsystems can use it.
+>  	},
+>  };
 
-> Or, we can consider dropping the flat reg_def_copy since it's just
-> wasteful to keep the flat array for all types unconditionally, but let
-> the codec driver provide an iterator and an look-up or such.
+-- 
+Ben Dooks, ben at fluff.org, http://www.fluff.org/ben/
 
-The purpose of that is slightly different, the idea is to let us discard
-initdata while still being able to reference the defaults at runtime for
-CODECs that didn't get instantiated in the system.  In order to allow
-the discard to happen we need to take a copy of the defaults table when
-we probe the device.
+Large Hadron Colada: A large Pina Colada that makes the universe disappear.
