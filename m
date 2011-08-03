@@ -1,81 +1,38 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Wed, 3 Aug 2011 11:28:29 +0100
-Subject: [PATCH 01/17] leds: create a trigger for CPU activity
-In-Reply-To: <1312364089-32380-2-git-send-email-bryan.wu@canonical.com>
-References: <1312364089-32380-1-git-send-email-bryan.wu@canonical.com>
-	<1312364089-32380-2-git-send-email-bryan.wu@canonical.com>
-Message-ID: <20110803102829.GC2607@pulham.picochip.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Wed, 3 Aug 2011 12:37:10 +0200
+Subject: [PATCH v8 0/3] add the GPMI controller driver for IMX23/IMX28
+In-Reply-To: <CAHMSPgM5W8=mE4sRDGMMfo39fvThBo_jrdG8hyhJNQ_ceV=_pA@mail.gmail.com>
+References: <1311230846-26437-1-git-send-email-b32955@freescale.com>
+	<20110721215020.GA25344@pengutronix.de>
+	<4E28EEE1.2050008@freescale.com>
+	<20110722055731.GI26837@S2100-06.ap.freescale.net>
+	<4E292FCF.6010608@freescale.com>
+	<CAHMSPgMHrqWcJ=BThDLgQ=XyTBDCMvNS4SVjQWfk=Jf682TEig@mail.gmail.com>
+	<4E2F6F90.7030207@freescale.com>
+	<CAHMSPgPC4whyskfuFGeFd7WHx-=5htezWajm_rNi9Xa+03PV0A@mail.gmail.com>
+	<20018.24364.787244.956361@ipc1.ka-ro>
+	<CAHMSPgM5W8=mE4sRDGMMfo39fvThBo_jrdG8hyhJNQ_ceV=_pA@mail.gmail.com>
+Message-ID: <20110803103710.GA1948@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bryan,
-
-On Wed, Aug 03, 2011 at 05:34:33PM +0800, Bryan Wu wrote:
-> Attempting to consolidate the ARM LED code, this removes the
-> custom RealView LED trigger code to turn LEDs on and off in
-> response to CPU activity and replace it with a standard trigger.
+> > Do you have an SD card in the system? I'm getting the same error when
+> > accessing an SD card. Without SD card I can use the flash without any
+> > errors.
 > 
-> (bryan.wu at canonical.com:
-> It moves arch/arm/kernel/leds.c syscore stubs into this trigger.
-> It also provides ledtrig_cpu trigger event stub in <linux/leds.h>.
-> Although it was inspired by ARM work, it can be used in other arch.)
-> 
-> Cc: Richard Purdie <rpurdie@rpsys.net>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> Signed-off-by: Bryan Wu <bryan.wu@canonical.com>
-> ---
->  drivers/leds/Kconfig       |   10 +++
->  drivers/leds/Makefile      |    1 +
->  drivers/leds/ledtrig-cpu.c |  144 ++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/leds.h       |   15 +++++
->  4 files changed, 170 insertions(+), 0 deletions(-)
->  create mode 100644 drivers/leds/ledtrig-cpu.c
-> 
-> diff --git a/drivers/leds/ledtrig-cpu.c b/drivers/leds/ledtrig-cpu.c
-> new file mode 100644
-> index 0000000..0537c3b
-[...]
-> +static DEFINE_PER_CPU(struct ledtrig_cpu_data *, ledtrig_cpu_triggers);
-[...]
-> +static void ledtrig_cpu_activate_cpu(void *data)
-> +{
-> +	struct ledtrig_cpu_data *cpu_data;
-> +	struct led_classdev *led = data;
-> +	int my_cpu = smp_processor_id();
-> +	unsigned long target_cpu = (unsigned long) led->trigger_data;
-> +
-> +	if (target_cpu != my_cpu)
-> +		return;
-> +
-> +	cpu_data = kzalloc(sizeof(*cpu_data), GFP_KERNEL);
-> +	if (!cpu_data)
-> +		return;
-> +
-> +	dev_info(led->dev, "led %s indicate activity on CPU %d\n",
-> +		 led->name, my_cpu);
-> +
-> +	cpu_data->led = led;
-> +	__get_cpu_var(ledtrig_cpu_triggers) = cpu_data;
-> +}
-> +
-> +static void ledtrig_cpu_activate(struct led_classdev *led)
-> +{
-> +	on_each_cpu(ledtrig_cpu_activate_cpu, led, 1);
-> +}
-> +
-> +static void ledtrig_cpu_deactivate(struct led_classdev *led)
-> +{
-> +	struct ledtrig_cpu_data *cpu_data = led->trigger_data;
-> +
-> +	kfree(cpu_data);
-> +}
+> No SD card in the system. At least not on my mx23evk board.
+> My real target hardware has a SDIO wifi chip.
 
-Is this deactivation correct?  My (limited) understanding of the smp api 
-is that we'll allocate the ledtrig_cpu_data for each CPU and store it in 
-the ledtrig_cpu_triggers pointers.  So shouldn't this be doing a 
-__get_cpu_var(ledtrig_cpu_triggers) and a kfree() on that (and setting 
-to NULL)?
+Removing the SD didn't help here as well. Koen, which bootloader do you
+use?
 
-Also, where does led->trigger_data get assigned with the cpu id?
-
-Jamie
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110803/2c19e95c/attachment.sig>
