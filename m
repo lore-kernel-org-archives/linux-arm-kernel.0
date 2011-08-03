@@ -1,48 +1,47 @@
-From: B29396@freescale.com (Dong Aisheng-B29396)
-Date: Wed, 3 Aug 2011 07:39:27 +0000
-Subject: [alsa-devel] [PATCH 1/1] ASoC: core: cache index fix
-In-Reply-To: <20110802164005.GI25884@opensource.wolfsonmicro.com>
-References: <65EE16ACC360FA4D99C96DC085B3F7721F427D@039-SN1MPN1-002.039d.mgd.msft.net>
-	<s5hy5zcnlu8.wl%tiwai@suse.de>
-	<65EE16ACC360FA4D99C96DC085B3F7721F43AA@039-SN1MPN1-002.039d.mgd.msft.net>
-	<s5hoc08nk7t.wl%tiwai@suse.de>
-	<65EE16ACC360FA4D99C96DC085B3F7721F443D@039-SN1MPN1-002.039d.mgd.msft.net>
-	<s5hlivcnhe2.wl%tiwai@suse.de>
-	<65EE16ACC360FA4D99C96DC085B3F7721F45A8@039-SN1MPN1-002.039d.mgd.msft.net>
-	<s5haabsnfg2.wl%tiwai@suse.de>
-	<20110802154815.GE25884@opensource.wolfsonmicro.com>
-	<s5hipqfn65k.wl%tiwai@suse.de>
-	<20110802164005.GI25884@opensource.wolfsonmicro.com>
-Message-ID: <65EE16ACC360FA4D99C96DC085B3F7721F4F43@039-SN1MPN1-002.039d.mgd.msft.net>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 3 Aug 2011 09:45:36 +0200
+Subject: [PATCH v4 0/2] Add device tree support for i.mx51/53 boards
+In-Reply-To: <20110802140610.GC20071@ponder.secretlab.ca>
+References: <1312267943-25551-1-git-send-email-shawn.guo@linaro.org>
+	<20110802140610.GC20071@ponder.secretlab.ca>
+Message-ID: <20110803074536.GA17990@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Mark Brown [mailto:broonie at opensource.wolfsonmicro.com]
-> Sent: Wednesday, August 03, 2011 12:40 AM
-> To: Takashi Iwai
-> Cc: Dong Aisheng-B29396; alsa-devel at alsa-project.org;
-> s.hauer at pengutronix.de; lrg at ti.com; linux-arm-kernel at lists.infradead.org;
-> w.sang at pengutronix.de
-> Subject: Re: [alsa-devel] [PATCH 1/1] ASoC: core: cache index fix
+On Tue, Aug 02, 2011 at 03:06:10PM +0100, Grant Likely wrote:
+> On Tue, Aug 02, 2011 at 02:52:21PM +0800, Shawn Guo wrote:
+> > Changes since v3:
+> >  * Fix machine_desc table for ARD matching
+> >  * Turn the board setup that dt needs into callback
+> > 
+> > Changes since v2:
+> >  * Drop iomuxc device tree support patch
+> > 
+> > Changes since v1:
+> >  * Address comments on v1 given by Grant and Sascha
+> >  * Add i.mx51 Babbage support
+> > 
+> > Shawn Guo (2):
+> >       arm/mx5: add device tree support for imx53 boards
+> >       arm/mx5: add device tree support for imx51 babbage
 > 
-> On Tue, Aug 02, 2011 at 06:13:11PM +0200, Takashi Iwai wrote:
-> > Mark Brown wrote:
+> Looks good.
 > 
-> > > Like I've indicated several times now we should just get rid of the
-> > > code or hide it from the rest of the subsystem, it's being too cute
-> > > for vanishingly little value.  The register maps for these devices
-> > > are usually at most 255 registers so the memory savings are really
-> > > not meaningful.  I'm hoping the guys working with this device will
-> > > find time to look at fixing things, but if not I'd imagine we'll get
-> > > to it at some point in the release cycle.
-> 
-> > Well, there aren't so many drivers suffering from this bug, so a
-> > temporary fix would be easy like below (totally untested).
-> 
-> If we're going to do something like this I'd preserve the driver
-> interface that's there rather than fiddling with their reg_cache_sizes -
-> half the trouble here is that the meaning of that has become a bit
-> slippery, the current code used to be correct.
-> 
-Can we fix FLAT first since it is most used and let rbtree and LZO as before?
+> Sascha, assuming you're okay with it, I'd *really* like to ask Arnd to
+> send this out to Linus immediately.  It may not be perfect, and we may
+> change the device disable/enable policy, but it is useful enough that
+> having it in mainline will help developers who want to start hacking
+> on DT support.
+
+ups, /me is missing on Cc.
+
+Go ahead, I'm fine with it.
+
+Sascha
+
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
