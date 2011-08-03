@@ -1,72 +1,51 @@
-From: gaowanlong@cn.fujitsu.com (Wanlong Gao)
-Date: Wed, 3 Aug 2011 16:57:36 +0800
-Subject: [PATCH v2] mfd:fix section mismatch warning in ab3550-core
-In-Reply-To: <20110803083255.GJ9250@pengutronix.de>
-References: <20110803083255.GJ9250@pengutronix.de>
-Message-ID: <1312361856-26127-1-git-send-email-gaowanlong@cn.fujitsu.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 3 Aug 2011 18:00:51 +0900
+Subject: [alsa-devel] [PATCH 1/1] ASoC: core: cache index fix
+In-Reply-To: <s5hvcufqalz.wl%tiwai@suse.de>
+References: <65EE16ACC360FA4D99C96DC085B3F7721F443D@039-SN1MPN1-002.039d.mgd.msft.net>
+	<s5hlivcnhe2.wl%tiwai@suse.de>
+	<65EE16ACC360FA4D99C96DC085B3F7721F45A8@039-SN1MPN1-002.039d.mgd.msft.net>
+	<s5haabsnfg2.wl%tiwai@suse.de>
+	<20110802154815.GE25884@opensource.wolfsonmicro.com>
+	<s5hipqfn65k.wl%tiwai@suse.de>
+	<20110802164005.GI25884@opensource.wolfsonmicro.com>
+	<s5h4o1zsn6o.wl%tiwai@suse.de>
+	<20110803052333.GA16141@opensource.wolfsonmicro.com>
+	<s5hvcufqalz.wl%tiwai@suse.de>
+Message-ID: <20110803090049.GA30782@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-WARNING: drivers/mfd/built-in.o(.data+0x9998): Section mismatch in reference from the variable ab3550_driver to the function .init.text:ab3550_probe()
-The variable ab3550_driver references
-the function __init ab3550_probe()
-If the reference is valid then annotate the
-variable with __init* or __refdata (see linux/init.h) or name the variable:
-*_template, *_timer, *_sht, *_ops, *_probe, *_probe_one, *_console
+On Wed, Aug 03, 2011 at 08:20:56AM +0200, Takashi Iwai wrote:
 
-Signed-off-by: Wanlong Gao <gaowanlong@cn.fujitsu.com>
----
- drivers/mfd/ab3550-core.c |   10 +++++-----
- 1 files changed, 5 insertions(+), 5 deletions(-)
+> BTW, looking through snd_soc_get_reg_access_index() for *_readable() & 
+> co , I wonder what would be the merit of using rbtree if this kind of
+> indexed array is present. If the actual value is also kept in that
+> array, we can drop the whole complex stuff like rbtree and lzo.
 
-diff --git a/drivers/mfd/ab3550-core.c b/drivers/mfd/ab3550-core.c
-index 56ba194..882ea71 100644
---- a/drivers/mfd/ab3550-core.c
-+++ b/drivers/mfd/ab3550-core.c
-@@ -1086,7 +1086,7 @@ static inline void ab3550_remove_debugfs(void)
-  * This sets up a default config in the AB3550 chip so that it
-  * will work as expected.
-  */
--static int __init ab3550_setup(struct ab3550 *ab)
-+static int __devinit ab3550_setup(struct ab3550 *ab)
- {
- 	int err = 0;
- 	int i;
-@@ -1193,7 +1193,7 @@ struct ab_family_id {
- 	char	*name;
- };
- 
--static const struct ab_family_id ids[] __initdata = {
-+static const struct ab_family_id ids[] __devinitconst = {
- 	/* AB3550 */
- 	{
- 		.id = AB3550_P1A,
-@@ -1205,7 +1205,7 @@ static const struct ab_family_id ids[] __initdata = {
- 	}
- };
- 
--static int __init ab3550_probe(struct i2c_client *client,
-+static int __devinit ab3550_probe(struct i2c_client *client,
- 	const struct i2c_device_id *id)
- {
- 	struct ab3550 *ab;
-@@ -1326,7 +1326,7 @@ exit_no_detect:
- 	return err;
- }
- 
--static int __exit ab3550_remove(struct i2c_client *client)
-+static int __devexit ab3550_remove(struct i2c_client *client)
- {
- 	struct ab3550 *ab = i2c_get_clientdata(client);
- 	int num_i2c_clients = AB3550_NUM_BANKS;
-@@ -1359,7 +1359,7 @@ static struct i2c_driver ab3550_driver = {
- 	},
- 	.id_table	= ab3550_id,
- 	.probe		= ab3550_probe,
--	.remove		= __exit_p(ab3550_remove),
-+	.remove		= __devexit_p(ab3550_remove),
- };
- 
- static int __init ab3550_i2c_init(void)
--- 
-1.7.6
+I agree, you may have seen me mentioning that we should just disallow
+the use of advanced caches for the register maps with non-zero steps.
+There's really very little benefit from them.
+
+> In addition, the default values aren't necessary to be in a flat array
+> form at all.  What we need is a copy function to expand the data
+> appropriately to reg_def_copy.
+
+Yes, we can do better here.  We do need something that's reasonably easy
+to write in source code, though.  I was thinking something like an array
+of:
+
+    { reg, value }
+
+might do the trick for the sparse devices.   Ideally all this code is
+going to get pushed out into regmap too so other subsystems can use it.
+
+> Or, we can consider dropping the flat reg_def_copy since it's just
+> wasteful to keep the flat array for all types unconditionally, but let
+> the codec driver provide an iterator and an look-up or such.
+
+The purpose of that is slightly different, the idea is to let us discard
+initdata while still being able to reference the defaults at runtime for
+CODECs that didn't get instantiated in the system.  In order to allow
+the discard to happen we need to take a copy of the defaults table when
+we probe the device.
