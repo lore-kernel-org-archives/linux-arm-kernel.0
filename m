@@ -1,119 +1,23 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Wed, 3 Aug 2011 10:12:49 +0100
-Subject: [PATCH 2/4] serial: s5pv210: Add device tree support
-In-Reply-To: <1312326509-2723-3-git-send-email-thomas.abraham@linaro.org>
-References: <1312326509-2723-1-git-send-email-thomas.abraham@linaro.org>
-	<1312326509-2723-3-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <20110803091249.GB28651@trinity.fluff.org>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 3 Aug 2011 18:31:43 +0900
+Subject: [alsa-devel] [PATCH 1/1] ASoC: core: cache index fix
+In-Reply-To: <65EE16ACC360FA4D99C96DC085B3F7721F4F43@039-SN1MPN1-002.039d.mgd.msft.net>
+References: <65EE16ACC360FA4D99C96DC085B3F7721F43AA@039-SN1MPN1-002.039d.mgd.msft.net>
+	<s5hoc08nk7t.wl%tiwai@suse.de>
+	<65EE16ACC360FA4D99C96DC085B3F7721F443D@039-SN1MPN1-002.039d.mgd.msft.net>
+	<s5hlivcnhe2.wl%tiwai@suse.de>
+	<65EE16ACC360FA4D99C96DC085B3F7721F45A8@039-SN1MPN1-002.039d.mgd.msft.net>
+	<s5haabsnfg2.wl%tiwai@suse.de>
+	<20110802154815.GE25884@opensource.wolfsonmicro.com>
+	<s5hipqfn65k.wl%tiwai@suse.de>
+	<20110802164005.GI25884@opensource.wolfsonmicro.com>
+	<65EE16ACC360FA4D99C96DC085B3F7721F4F43@039-SN1MPN1-002.039d.mgd.msft.net>
+Message-ID: <20110803093140.GB30782@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 03, 2011 at 12:08:27AM +0100, Thomas Abraham wrote:
-> For device tree based probe, the dependecy on pdev->id to attach a
-> corresponding default port info to the driver's private data is
-> removed. The fifosize parameter is obtained from the device tree
-> node and the next available instance of port info is updated
-> with the fifosize value and attached to the driver's private data.
-> The default platform data is selected based on the compatible property.
-> 
-> CC: Ben Dooks <ben-linux@fluff.org>
-> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
-> ---
->  .../devicetree/bindings/serial/samsung_uart.txt    |   16 +++++++
->  drivers/tty/serial/s5pv210.c                       |   43 +++++++++++++++++++-
->  drivers/tty/serial/samsung.c                       |    5 ++-
->  3 files changed, 62 insertions(+), 2 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/serial/samsung_uart.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/serial/samsung_uart.txt b/Documentation/devicetree/bindings/serial/samsung_uart.txt
-> new file mode 100644
-> index 0000000..9174499
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/serial/samsung_uart.txt
-> @@ -0,0 +1,16 @@
-> +* Samsung's UART Controller
-> +
-> +The Samsung's UART controller is used for serial communications on all of
-> +Samsung's s3c24xx, s3c64xx and s5p series application processors.
-> +
-> +Required properties:
-> +- compatible: should be specific to the application processor
-> +    - "samsung,s5pv310-uart" , for Exynos4 processors.
-> +
-> +- reg: base physical address of the controller and length of memory mapped
-> +  region.
-> +
-> +- interrupts : Three interrupt numbers should be specified in the following
-> +  order - Rx interrupt, Tx interrupt, Error Interrupt.
-> +
-> +- samsung,uart-fifosize: Size of the tx/rx fifo used in the controller.
-> diff --git a/drivers/tty/serial/s5pv210.c b/drivers/tty/serial/s5pv210.c
-> index fb0806c..a44b599 100644
-> --- a/drivers/tty/serial/s5pv210.c
-> +++ b/drivers/tty/serial/s5pv210.c
-> @@ -19,6 +19,7 @@
->  #include <linux/serial_core.h>
->  #include <linux/serial.h>
->  #include <linux/delay.h>
-> +#include <linux/of.h>
->  
->  #include <asm/irq.h>
->  #include <mach/hardware.h>
-> @@ -132,10 +133,49 @@ static struct s3c24xx_uart_info *s5p_uart_inf[] = {
->  	[3] = &s5p_port_fifo16,
->  };
->  
-> +#ifdef CONFIG_OF
-> +static struct s3c2410_uartcfg s5pv310_uart_defcfg = {
-> +	.ucon	= 0x3c5,
-> +	.ufcon	= 0x111,
-> +	.flags	= NO_NEED_CHECK_CLKSRC,
-> +	.has_fracval = 1,
-> +};
-> +
-> +static const struct of_device_id s5pv210_uart_dt_match[] = {
-> +	{ .compatible = "samsung,s5pv310-uart", .data = &s5pv310_uart_defcfg },
-> +	{},
-> +};
-> +MODULE_DEVICE_TABLE(of, s5pv210_uart_match);
-> +#else
-> +#define s5pv210_uart_match NULL
-> +#endif
-> +
->  /* device management */
->  static int s5p_serial_probe(struct platform_device *pdev)
->  {
-> -	return s3c24xx_serial_probe(pdev, s5p_uart_inf[pdev->id]);
-> +	static unsigned int probe_index;
-> +	unsigned int port = pdev->id;
-> +	const struct of_device_id *match;
-> +	struct s3c2410_uartcfg *cfg;
-> +
-> +	if (pdev->dev.of_node) {
-> +		if (of_property_read_u32(pdev->dev.of_node,
-> +				"samsung,uart-fifosize",
-> +				&s5p_uart_inf[probe_index]->fifosize))
-> +			return -EINVAL;
+On Wed, Aug 03, 2011 at 07:39:27AM +0000, Dong Aisheng-B29396 wrote:
 
-I'd rather see the fifo size either being a property of the soc itself
-or being inferred by the compatible field. 
+> Can we fix FLAT first since it is most used and let rbtree and LZO as before?
 
->  	.driver		= {
->  		.name	= "s5pv210-uart",
->  		.owner	= THIS_MODULE,
-> +		.of_match_table	= s5pv210_uart_dt_match,
-
-I think maybe doing something like
-
-		.of_match_table = of_match_ptr(5pv210_uart_dt_match),
-
-so we can avoid having the #else and #define 5pv210_uart_dt_match NULL
-in a number of places.
-
->  	},
->  };
-
--- 
-Ben Dooks, ben at fluff.org, http://www.fluff.org/ben/
-
-Large Hadron Colada: A large Pina Colada that makes the universe disappear.
+Leaving rbtree and LZO alone is exactly what I've been saying!
