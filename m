@@ -1,74 +1,25 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Wed, 3 Aug 2011 11:09:23 +0100
-Subject: [PATCH 2/4] serial: s5pv210: Add device tree support
-In-Reply-To: <20110803091249.GB28651@trinity.fluff.org>
-References: <1312326509-2723-1-git-send-email-thomas.abraham@linaro.org>
-	<1312326509-2723-3-git-send-email-thomas.abraham@linaro.org>
-	<20110803091249.GB28651@trinity.fluff.org>
-Message-ID: <CAJuYYwSg8XcdRqD1VHzsL4oGtJkCdhAM9mpSX_jQnGr0BKz2PQ@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 3 Aug 2011 12:19:06 +0200
+Subject: [PATCH v2] mfd:fix section mismatch warning in ab3550-core
+In-Reply-To: <1312361856-26127-1-git-send-email-gaowanlong@cn.fujitsu.com>
+References: <20110803083255.GJ9250@pengutronix.de>
+	<1312361856-26127-1-git-send-email-gaowanlong@cn.fujitsu.com>
+Message-ID: <CACRpkdau6sv2T_TKx-GoVLU_AagaJDyiji11F8+wieVAOezkAw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ben,
+On Wed, Aug 3, 2011 at 10:57 AM, Wanlong Gao <gaowanlong@cn.fujitsu.com> wrote:
 
-On 3 August 2011 10:12, Ben Dooks <ben-linux@fluff.org> wrote:
-> On Wed, Aug 03, 2011 at 12:08:27AM +0100, Thomas Abraham wrote:
->> For device tree based probe, the dependecy on pdev->id to attach a
->> corresponding default port info to the driver's private data is
->> removed. The fifosize parameter is obtained from the device tree
->> node and the next available instance of port info is updated
->> with the fifosize value and attached to the driver's private data.
->> The default platform data is selected based on the compatible property.
->>
->> CC: Ben Dooks <ben-linux@fluff.org>
->> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
->> ---
->> ?.../devicetree/bindings/serial/samsung_uart.txt ? ?| ? 16 +++++++
->> ?drivers/tty/serial/s5pv210.c ? ? ? ? ? ? ? ? ? ? ? | ? 43 +++++++++++++++++++-
->> ?drivers/tty/serial/samsung.c ? ? ? ? ? ? ? ? ? ? ? | ? ?5 ++-
->> ?3 files changed, 62 insertions(+), 2 deletions(-)
->> ?create mode 100644 Documentation/devicetree/bindings/serial/samsung_uart.txt
+> WARNING: drivers/mfd/built-in.o(.data+0x9998): Section mismatch in reference from the variable ab3550_driver to the function .init.text:ab3550_probe()
+> The variable ab3550_driver references
+> the function __init ab3550_probe()
+> If the reference is valid then annotate the
+> variable with __init* or __refdata (see linux/init.h) or name the variable:
+> *_template, *_timer, *_sht, *_ops, *_probe, *_probe_one, *_console
+>
+> Signed-off-by: Wanlong Gao <gaowanlong@cn.fujitsu.com>
 
-[...]
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
->>
->> +
->> + ? ? if (pdev->dev.of_node) {
->> + ? ? ? ? ? ? if (of_property_read_u32(pdev->dev.of_node,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? "samsung,uart-fifosize",
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? &s5p_uart_inf[probe_index]->fifosize))
->> + ? ? ? ? ? ? ? ? ? ? return -EINVAL;
->
-> I'd rather see the fifo size either being a property of the soc itself
-> or being inferred by the compatible field.
-
-Ok. I missed that. I will make it part of the SoC data.
-
->
->> ? ? ? .driver ? ? ? ? = {
->> ? ? ? ? ? ? ? .name ? = "s5pv210-uart",
->> ? ? ? ? ? ? ? .owner ?= THIS_MODULE,
->> + ? ? ? ? ? ? .of_match_table = s5pv210_uart_dt_match,
->
-> I think maybe doing something like
->
-> ? ? ? ? ? ? ? ?.of_match_table = of_match_ptr(5pv210_uart_dt_match),
->
-> so we can avoid having the #else and #define 5pv210_uart_dt_match NULL
-> in a number of places.
-
-Ok. I will change it.
-
-Thanks,
-Thomas.
-
->
->> ? ? ? },
->> ?};
->
-> --
-> Ben Dooks, ben at fluff.org, http://www.fluff.org/ben/
->
-> Large Hadron Colada: A large Pina Colada that makes the universe disappear.
->
->
+Thanks!
+Linus Walleij
