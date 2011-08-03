@@ -1,98 +1,39 @@
 From: jamie@jamieiles.com (Jamie Iles)
-Date: Wed, 3 Aug 2011 16:30:35 +0100
-Subject: [PATCH 01/17] leds: create a trigger for CPU activity
-In-Reply-To: <CACRpkdZRh=gcedJQh6V3aUCfi2arn2V_P67MgZE2mB_hYZ-OnQ@mail.gmail.com>
-References: <1312364089-32380-1-git-send-email-bryan.wu@canonical.com>
-	<1312364089-32380-2-git-send-email-bryan.wu@canonical.com>
-	<20110803102829.GC2607@pulham.picochip.com>
-	<CACRpkdZRh=gcedJQh6V3aUCfi2arn2V_P67MgZE2mB_hYZ-OnQ@mail.gmail.com>
-Message-ID: <20110803153035.GL2607@pulham.picochip.com>
+Date: Wed,  3 Aug 2011 16:35:28 +0100
+Subject: [PATCH] mm: fix invalid loop for poison_init_mem
+Message-ID: <1312385728-27311-1-git-send-email-jamie@jamieiles.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+poison_init_mem() used a loop of:
 
-On Wed, Aug 03, 2011 at 05:22:02PM +0200, Linus Walleij wrote:
-> On Wed, Aug 3, 2011 at 12:28 PM, Jamie Iles <jamie@jamieiles.com> wrote:
-> > Hi Bryan,
-> > [...]
-> >> +static DEFINE_PER_CPU(struct ledtrig_cpu_data *, ledtrig_cpu_triggers);
-> > [...]
-> >> +static void ledtrig_cpu_activate_cpu(void *data)
-> >> +{
-> >> + ? ? struct ledtrig_cpu_data *cpu_data;
-> >> + ? ? struct led_classdev *led = data;
-> >> + ? ? int my_cpu = smp_processor_id();
-> >> + ? ? unsigned long target_cpu = (unsigned long) led->trigger_data;
-> >> +
-> >> + ? ? if (target_cpu != my_cpu)
-> >> + ? ? ? ? ? ? return;
-> >> +
-> >> + ? ? cpu_data = kzalloc(sizeof(*cpu_data), GFP_KERNEL);
-> >> + ? ? if (!cpu_data)
-> >> + ? ? ? ? ? ? return;
-> >> +
-> >> + ? ? dev_info(led->dev, "led %s indicate activity on CPU %d\n",
-> >> + ? ? ? ? ? ? ?led->name, my_cpu);
-> >> +
-> >> + ? ? cpu_data->led = led;
-> >> + ? ? __get_cpu_var(ledtrig_cpu_triggers) = cpu_data;
-> >> +}
-> >> +
-> >> +static void ledtrig_cpu_activate(struct led_classdev *led)
-> >> +{
-> >> + ? ? on_each_cpu(ledtrig_cpu_activate_cpu, led, 1);
-> >> +}
-> >> +
-> >> +static void ledtrig_cpu_deactivate(struct led_classdev *led)
-> >> +{
-> >> + ? ? struct ledtrig_cpu_data *cpu_data = led->trigger_data;
-> >> +
-> >> + ? ? kfree(cpu_data);
-> >> +}
-> >
-> > Is this deactivation correct? ?My (limited) understanding of the smp api
-> > is that we'll allocate the ledtrig_cpu_data for each CPU and store it in
-> > the ledtrig_cpu_triggers pointers.
-> 
-> At this point you have a handle to a specific LED and that one is tied
-> to a certain CPU aldready, since it is a member of
-> struct ledtrig_cpu_data. The LED is CPU-local by nature already since
-> it is looked up in the code being called from the ARM kernel,
-> i.e. the activate/deactivate pairs get called once per CPU.
+	while ((count = count - 4))
 
-OK, I'm fine with that.
-> 
-> > So shouldn't this be doing a
-> > __get_cpu_var(ledtrig_cpu_triggers) and a kfree() on that (and setting
-> > to NULL)?
-> 
-> You could do that but why? There is no way the pointer value
-> can make any harm. If activate() is called again it will be overwritten
-> with the new pointer.
+which has 2 problems - an off by one error so that we do one less word
+than we should, and the other is that if count == 0 then we loop forever
+and poison too much.  On a platform with HAVE_TCM=y but nothing in the
+TCM's, this caused corruption and the platform failed to boot.
 
-Yes, but can't ledtrig_cpu() potentially still be called after 
-deactivation, then the:
+Cc: Stephen Boyd <sboyd@codeaurora.org>
+Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: Jamie Iles <jamie@jamieiles.com>
+---
+ arch/arm/mm/init.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-	if (!trigdata)
-		return;
-
-would be incorrect?  My main point though was that it looks like 
-led->trigger_data is the processor id and kfree() is being called on 
-that.
-
-> > Also, where does led->trigger_data get assigned with the cpu id?
-> 
-> The activate() function is called on every core and if the CPU ID
-> is not equal to the assigned CPU it just exits, here:
-> 
-> +     int my_cpu = smp_processor_id();
-> +     unsigned long target_cpu = (unsigned long) led->trigger_data;
-> +
-> +     if (target_cpu != my_cpu)
-> +             return;
-
-I understand that bit, but I can't see anything that actually assigns 
-led->trigger_data in the first place.
-
-Jamie
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index 2fee782..91bca35 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -441,7 +441,7 @@ static inline int free_area(unsigned long pfn, unsigned long end, char *s)
+ static inline void poison_init_mem(void *s, size_t count)
+ {
+ 	u32 *p = (u32 *)s;
+-	while ((count = count - 4))
++	for (; count != 0; count -= 4)
+ 		*p++ = 0xe7fddef0;
+ }
+ 
+-- 
+1.7.4.1
