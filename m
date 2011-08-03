@@ -1,52 +1,86 @@
-From: bryan.wu@canonical.com (Bryan Wu)
-Date: Wed, 3 Aug 2011 11:47:52 +0800
-Subject: [PATCH 3.1 0/4] ARM: simpad: Add support for GPIO attached
-	hardware
-In-Reply-To: <1310453186-22518-1-git-send-email-jochen@scram.de>
-References: <1310453186-22518-1-git-send-email-jochen@scram.de>
-Message-ID: <CAK5ve-+mT4EOU0p6=A-XSg24u43Y2+nJuCqVBB6CT5Bdi0TjAQ@mail.gmail.com>
+From: pj0585@gmail.com (Prasant J)
+Date: Wed, 3 Aug 2011 10:22:30 +0530
+Subject: at91sam9g45: MMC: Issues with MMC driver
+In-Reply-To: <20110802140344.GF19079@n2100.arm.linux.org.uk>
+References: <CAA2DH4v+v2Vvv_2MzD1dGqbc5a4W1h+30FqwwpsqKmYk6nvZxQ@mail.gmail.com>
+	<20110802140344.GF19079@n2100.arm.linux.org.uk>
+Message-ID: <CAA2DH4tZEQ8Jvy4aqJVoj4CU0diKn9K6p4v+9NujQ8oLnX26Qw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jochen,
-
-Is there any news about this patchset? Merged already? I'm going to
-post an updated Led patchset based on this.
-
-Thanks,
--Bryan
-
-On Tue, Jul 12, 2011 at 2:46 PM, Jochen Friedrich <jochen@scram.de> wrote:
-> Resend as this might got lost in the develtech.com disaster.
-> Bryan Wu <bryan.wu@canonical.com> intends to base his patch set to
-> get rid of the custom LED code on this series.
+On Tue, Aug 2, 2011 at 7:33 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Aug 02, 2011 at 04:35:58PM +0530, Prasant J wrote:
+>> Hi,
+>>
+>> I'm using Linux 3.0.0 on a custom board design based on AT91SAM9G45-EKES
+>>
+>> I'm getting this kernel dump while booting:
+>>
+>>
+>> Waiting 3sec before mounting root device...
+>> mmc0: host does not support reading read-only switch. assuming write-enable.
+>> mmc0: new SD card at address 0007
+>> mmcblk0: mmc0:0007 SU02G 1.83 GiB
+>> ?mmcblk0: p1 p2
+>> eth0: link up (100/Full)
+>> EXT3-fs: barriers not enabled
+>> kjournald starting. ?Commit interval 5 seconds
+>> EXT3-fs (mmcblk0p2): using internal journal
+>> EXT3-fs (mmcblk0p2): mounted filesystem with writeback data mode
+>> VFS: Mounted root (ext3 filesystem) on device 179:2.
+>> Freeing init memory: 116K
+>> ------------[ cut here ]------------
+>> WARNING: at kernel/irq/handle.c:130 handle_irq_event_percpu+0x6c/0x18c()
+>>
+>> Can someone tell me what is possibly wrong in the mmc driver's
+>> interrupt handler?
 >
-> This series enables GPIO API on UCB1x00 and implements the GPIO
-> API on the CS3 latch. The third patch finally registers platform
-> devices for the GPIO attached LED, buttons and I2C bus.
+> This is what I said to someone who asked about this a week ago. ?It
+> desperately needs fixing properly.
 >
-> ARM: simpad: Add ucb1x00 GPIO definitions and register GPIO
-> ARM: simpad: Cleanup CS3 accessors and add GPIO API
-> ARM: simpad: add GPIO based device definitions
-> ARM: simpad: replace ARM specific LED code
+> Subject: at91sam9g45: Issues while working with RAM that is separated
+> ? ? ? ?on physical address space
 >
-> Overall diffstat:
+> On Tue, Jul 26, 2011 at 03:37:02PM +0200, Christian Glindkamp wrote:
+>> The only problem that still exits with highmem for me is the following:
+>> Even on non-highmem/non-sparsemem systems I get the following warning
+>> when using an mmc as the rootfs:
+>>
+>> ------------[ cut here ]------------
+>> WARNING: at kernel/irq/handle.c:130 handle_irq_event_percpu+0x70/0x194()
 >
-> ?arch/arm/mach-sa1100/Makefile ? ? ? ? ? ? ?| ? ?1 -
-> ?arch/arm/mach-sa1100/include/mach/simpad.h | ? 94 ++++++++++---
-> ?arch/arm/mach-sa1100/leds-simpad.c ? ? ? ? | ?100 -------------
-> ?arch/arm/mach-sa1100/leds.c ? ? ? ? ? ? ? ?| ? ?2 -
-> ?arch/arm/mach-sa1100/leds.h ? ? ? ? ? ? ? ?| ? ?1 -
-> ?arch/arm/mach-sa1100/simpad.c ? ? ? ? ? ? ?| ?211 ++++++++++++++++++++++++---
-> ?drivers/pcmcia/sa1100_simpad.c ? ? ? ? ? ? | ? 35 ++---
-> ?7 files changed, 274 insertions(+), 170 deletions(-)
+> That'll be because the driver is still using flush_dcache_page(), whereas
+> it should be using flush_kernel_dcache_page(). ?flush_dcache_page()
+> unfortunately results in IRQs being enabled due to the
+> flush_dcache_mmap_lock().
+>
+>> The system is still stable, but if switch to highmem, the kernel crashes
+>> completely when doing this (using and USB drive as rootfs still works
+>> flawlessly):
+>
+> That's because the driver is basically broken:
+>
+> ? ? ? ?void ? ? ? ? ? ? ? ? ? ?*buf = sg_virt(sg);
+> ? ? ? ?unsigned int ? ? ? ? ? ?offset = host->pio_offset;
+>
+> ? ? ? ? ? ? ? ? ? ? ? ?memcpy(buf + offset, &value, remaining);
+>
+> Highmem pages have a NULL sg_virt(sg) because they're by definition not
+> mapped. ?Drivers really should not be using sg_virt() directly - who
+> knows how this got through the review process...
+>
+> There's a well defined API for walking scatterlists in drivers - see
+> the sg_miter_* API in linux/scatterlist.h. ?This takes care of the
+> highmem issues automatically, as well as using flush_kernel_dcache_page().
+>
+> In short: the Atmel MCI driver is buggy and needs fixing.
+>
 >
 
+I did read that later on (that thread was started by me). I followed
+what you said and changed the function names. After changing the
+function names this warning does go off for me. I'm not using Highmem.
 
-
--- 
-Bryan Wu <bryan.wu@canonical.com>
-Kernel Developer ? ?+86.138-1617-6545 Mobile
-Ubuntu Kernel Team
-Canonical Ltd. ? ? ?www.canonical.com
-Ubuntu - Linux for human beings | www.ubuntu.com
+Sometimes my filesystem on mmc card does get corrupt. Till now this is
+a random observation.
