@@ -1,25 +1,46 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 3 Aug 2011 12:19:06 +0200
-Subject: [PATCH v2] mfd:fix section mismatch warning in ab3550-core
-In-Reply-To: <1312361856-26127-1-git-send-email-gaowanlong@cn.fujitsu.com>
-References: <20110803083255.GJ9250@pengutronix.de>
-	<1312361856-26127-1-git-send-email-gaowanlong@cn.fujitsu.com>
-Message-ID: <CACRpkdau6sv2T_TKx-GoVLU_AagaJDyiji11F8+wieVAOezkAw@mail.gmail.com>
+From: mirqus@gmail.com (=?ISO-8859-2?Q?Micha=B3_Miros=B3aw?=)
+Date: Wed, 3 Aug 2011 12:23:12 +0200
+Subject: [PATCH 01/17] leds: create a trigger for CPU activity
+In-Reply-To: <1312364089-32380-2-git-send-email-bryan.wu@canonical.com>
+References: <1312364089-32380-1-git-send-email-bryan.wu@canonical.com>
+	<1312364089-32380-2-git-send-email-bryan.wu@canonical.com>
+Message-ID: <CAHXqBF+8i7P9WhR0pjUPaew0bkzwE26Pr1u2V09PSZwhkdmCUQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 3, 2011 at 10:57 AM, Wanlong Gao <gaowanlong@cn.fujitsu.com> wrote:
+2011/8/3 Bryan Wu <bryan.wu@canonical.com>:
+> Attempting to consolidate the ARM LED code, this removes the
+> custom RealView LED trigger code to turn LEDs on and off in
+> response to CPU activity and replace it with a standard trigger.
+[...]
+> +void ledtrig_cpu(enum cpu_led_event ledevt)
+> +{
+> +       struct ledtrig_cpu_data *trigdata = __get_cpu_var(ledtrig_cpu_triggers);
+> +
+> +       if (!trigdata)
+> +               return;
+> +
+> +       /* Locate the correct CPU LED */
+> +
+> +       switch (ledevt) {
+> +       case CPU_LED_IDLE_START:
+> +       case CPU_LED_START:
+> +               /* Will turn the LED on, max brightness */
+> +               if (trigdata->led)
+> +                       led_set_brightness(trigdata->led,
+> +                                          trigdata->led->max_brightness);
+> +               break;
+> +
+> +       case CPU_LED_IDLE_END:
+> +       case CPU_LED_STOP:
+> +       case CPU_LED_HALTED:
+> +               /* Will turn the LED off */
+> +               if (trigdata->led)
+> +                       led_set_brightness(trigdata->led, LED_OFF);
+> +               break;
 
-> WARNING: drivers/mfd/built-in.o(.data+0x9998): Section mismatch in reference from the variable ab3550_driver to the function .init.text:ab3550_probe()
-> The variable ab3550_driver references
-> the function __init ab3550_probe()
-> If the reference is valid then annotate the
-> variable with __init* or __refdata (see linux/init.h) or name the variable:
-> *_template, *_timer, *_sht, *_ops, *_probe, *_probe_one, *_console
->
-> Signed-off-by: Wanlong Gao <gaowanlong@cn.fujitsu.com>
+Might be better to swap CPU_LED_IDLE_START with CPU_LED_IDLE_END here
+so that when entering idle state the leds turn off.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-Thanks!
-Linus Walleij
+Best Regards,
+Micha? Miros?aw
