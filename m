@@ -1,44 +1,48 @@
-From: axel.lin@gmail.com (Axel Lin)
-Date: Wed, 03 Aug 2011 15:18:17 +0800
-Subject: [PATCH RESEND] omap1: select GENERIC_IRQ_CHIP for TI OMAP1
-Message-ID: <1312355897.14329.5.camel@phoenix>
+From: B29396@freescale.com (Dong Aisheng-B29396)
+Date: Wed, 3 Aug 2011 07:39:27 +0000
+Subject: [alsa-devel] [PATCH 1/1] ASoC: core: cache index fix
+In-Reply-To: <20110802164005.GI25884@opensource.wolfsonmicro.com>
+References: <65EE16ACC360FA4D99C96DC085B3F7721F427D@039-SN1MPN1-002.039d.mgd.msft.net>
+	<s5hy5zcnlu8.wl%tiwai@suse.de>
+	<65EE16ACC360FA4D99C96DC085B3F7721F43AA@039-SN1MPN1-002.039d.mgd.msft.net>
+	<s5hoc08nk7t.wl%tiwai@suse.de>
+	<65EE16ACC360FA4D99C96DC085B3F7721F443D@039-SN1MPN1-002.039d.mgd.msft.net>
+	<s5hlivcnhe2.wl%tiwai@suse.de>
+	<65EE16ACC360FA4D99C96DC085B3F7721F45A8@039-SN1MPN1-002.039d.mgd.msft.net>
+	<s5haabsnfg2.wl%tiwai@suse.de>
+	<20110802154815.GE25884@opensource.wolfsonmicro.com>
+	<s5hipqfn65k.wl%tiwai@suse.de>
+	<20110802164005.GI25884@opensource.wolfsonmicro.com>
+Message-ID: <65EE16ACC360FA4D99C96DC085B3F7721F4F43@039-SN1MPN1-002.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The gpio-omap driver has been converted to use generic IRQ chip.
-Thus select GENERIC_IRQ_CHIP for TI OMAP1 to fix below build error.
-
- LD      vmlinux
-drivers/built-in.o: In function `omap_mpuio_alloc_gc':
-drivers/gpio/gpio-omap.c:1087: undefined reference to `irq_alloc_generic_chip'
-drivers/gpio/gpio-omap.c:1100: undefined reference to `irq_setup_generic_chip'
-drivers/built-in.o: In function `omap_gpio_show_rev':
-drivers/gpio/gpio-omap.c:998: undefined reference to `irq_gc_mask_clr_bit'
-drivers/gpio/gpio-omap.c:998: undefined reference to `irq_gc_mask_set_bit'
-make: *** [vmlinux] Error 1
-
-Signed-off-by: Axel Lin <axel.lin@gmail.com>
----
-Kevin already sent a similar patch.  http://marc.info/?l=linux-omap&m=130749135312468&w=2
-But I still have the build error with make omap1_defconfig in today's linux-next tree.
-So here is a resend.
-
-Regards,
-Axel
- arch/arm/plat-omap/Kconfig |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/plat-omap/Kconfig b/arch/arm/plat-omap/Kconfig
-index 6e6735f..bb8f4a6 100644
---- a/arch/arm/plat-omap/Kconfig
-+++ b/arch/arm/plat-omap/Kconfig
-@@ -13,6 +13,7 @@ config ARCH_OMAP1
- 	bool "TI OMAP1"
- 	select CLKDEV_LOOKUP
- 	select CLKSRC_MMIO
-+	select GENERIC_IRQ_CHIP
- 	help
- 	  "Systems based on omap7xx, omap15xx or omap16xx"
- 
--- 
-1.7.4.1
+> -----Original Message-----
+> From: Mark Brown [mailto:broonie at opensource.wolfsonmicro.com]
+> Sent: Wednesday, August 03, 2011 12:40 AM
+> To: Takashi Iwai
+> Cc: Dong Aisheng-B29396; alsa-devel at alsa-project.org;
+> s.hauer at pengutronix.de; lrg at ti.com; linux-arm-kernel at lists.infradead.org;
+> w.sang at pengutronix.de
+> Subject: Re: [alsa-devel] [PATCH 1/1] ASoC: core: cache index fix
+> 
+> On Tue, Aug 02, 2011 at 06:13:11PM +0200, Takashi Iwai wrote:
+> > Mark Brown wrote:
+> 
+> > > Like I've indicated several times now we should just get rid of the
+> > > code or hide it from the rest of the subsystem, it's being too cute
+> > > for vanishingly little value.  The register maps for these devices
+> > > are usually at most 255 registers so the memory savings are really
+> > > not meaningful.  I'm hoping the guys working with this device will
+> > > find time to look at fixing things, but if not I'd imagine we'll get
+> > > to it at some point in the release cycle.
+> 
+> > Well, there aren't so many drivers suffering from this bug, so a
+> > temporary fix would be easy like below (totally untested).
+> 
+> If we're going to do something like this I'd preserve the driver
+> interface that's there rather than fiddling with their reg_cache_sizes -
+> half the trouble here is that the meaning of that has become a bit
+> slippery, the current code used to be correct.
+> 
+Can we fix FLAT first since it is most used and let rbtree and LZO as before?
