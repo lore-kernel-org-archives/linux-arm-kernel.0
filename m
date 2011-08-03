@@ -1,28 +1,36 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 3 Aug 2011 15:23:05 +0200
-Subject: [PATCH] mach-davinci: fix cache flush build error
-In-Reply-To: <1312300118-9088-1-git-send-email-linus.walleij@stericsson.com>
-References: <1312300118-9088-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <CACRpkdYhrTt9N1coaYvsv7KNiRySRzTmRPPL2qAWU0bjFwgjCw@mail.gmail.com>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Wed, 3 Aug 2011 18:57:37 +0530
+Subject: [PATCH v3] davinci: Add wl1271/wlan support for AM18x
+In-Reply-To: <1311886373-3060-1-git-send-email-ido@wizery.com>
+References: <B85A65D85D7EB246BE421B3FB0FBB593024DD2CEC2@dbde02.ent.ti.com>
+	<1311886373-3060-1-git-send-email-ido@wizery.com>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024DF05D8E@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 2, 2011 at 5:48 PM, Linus Walleij
-<linus.walleij@stericsson.com> wrote:
+Hi Ido,
 
-> The TNET variant of DaVinci compiles some code that it shares
-> with other DaVinci variants, however it has a V6 CPU rather than
-> an ARM926T, thus the hardcoded call to arm926_flush_kern_cache_all()
-> in sleep.S will obviously fail, and we need to build with the
-> v6_flush_kern_cache_all() call instead. This was triggered by
-> manually altering the DaVinci config to build the TNET version.
->
-> Cc: Dave Martin <dave.martin@linaro.org>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+On Fri, Jul 29, 2011 at 02:22:53, Ido Yariv wrote:
+> The wl1271 daughter card for AM18x EVMs is a combo wireless connectivity
+> add-on card, based on the LS Research TiWi module with Texas
+> Instruments' wl1271 solution.
+> It is a 4-wire, 1.8V, embedded SDIO WLAN device with an external IRQ
+> line and is power-controlled by a GPIO-based fixed regulator.
+> 
+> Add support for the WLAN capabilities of this expansion board.
+> 
+> Signed-off-by: Ido Yariv <ido@wizery.com>
 
-Arnd can you pick this patch to some suitable arm-soc branch like fixes?
-Atleast it makes the DaVinci variants compile one by one.
+Can you please rebase this patch to master branch of my
+tree[1] and repost. It doesn't apply at the moment.
+
+Also, when you repost, please change the subject to
+
+"ARM: davinci: AM18x: Add wl1271/wlan support"
+
+so that it is consistent with other patches.
 
 Thanks,
-Linus Walleij
+Sekhar
+
+[1] git://gitorious.org/linux-davinci/linux-davinci.git
