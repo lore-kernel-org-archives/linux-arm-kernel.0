@@ -1,49 +1,44 @@
-From: B29396@freescale.com (Dong Aisheng-B29396)
-Date: Wed, 3 Aug 2011 11:11:18 +0000
-Subject: [alsa-devel] [PATCH 1/1] ASoC: core: cache index fix
-In-Reply-To: <20110803093140.GB30782@opensource.wolfsonmicro.com>
-References: <65EE16ACC360FA4D99C96DC085B3F7721F43AA@039-SN1MPN1-002.039d.mgd.msft.net>
-	<s5hoc08nk7t.wl%tiwai@suse.de>
-	<65EE16ACC360FA4D99C96DC085B3F7721F443D@039-SN1MPN1-002.039d.mgd.msft.net>
-	<s5hlivcnhe2.wl%tiwai@suse.de>
-	<65EE16ACC360FA4D99C96DC085B3F7721F45A8@039-SN1MPN1-002.039d.mgd.msft.net>
-	<s5haabsnfg2.wl%tiwai@suse.de>
-	<20110802154815.GE25884@opensource.wolfsonmicro.com>
-	<s5hipqfn65k.wl%tiwai@suse.de>
-	<20110802164005.GI25884@opensource.wolfsonmicro.com>
-	<65EE16ACC360FA4D99C96DC085B3F7721F4F43@039-SN1MPN1-002.039d.mgd.msft.net>
-	<20110803093140.GB30782@opensource.wolfsonmicro.com>
-Message-ID: <65EE16ACC360FA4D99C96DC085B3F7721F5223@039-SN1MPN1-002.039d.mgd.msft.net>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Wed, 03 Aug 2011 15:29:44 +0400
+Subject: [PATCH 07/17] mach-integrator: introduce cm_read function helper
+	to read CM_CTRL register
+In-Reply-To: <1312364089-32380-8-git-send-email-bryan.wu@canonical.com>
+References: <1312364089-32380-1-git-send-email-bryan.wu@canonical.com>
+	<1312364089-32380-8-git-send-email-bryan.wu@canonical.com>
+Message-ID: <4E393128.3040602@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Mark Brown [mailto:broonie at opensource.wolfsonmicro.com]
-> Sent: Wednesday, August 03, 2011 5:32 PM
-> To: Dong Aisheng-B29396
-> Cc: Takashi Iwai; alsa-devel at alsa-project.org; s.hauer at pengutronix.de;
-> lrg at ti.com; linux-arm-kernel at lists.infradead.org; w.sang at pengutronix.de
-> Subject: Re: [alsa-devel] [PATCH 1/1] ASoC: core: cache index fix
-> 
-> On Wed, Aug 03, 2011 at 07:39:27AM +0000, Dong Aisheng-B29396 wrote:
-> 
-> > Can we fix FLAT first since it is most used and let rbtree and LZO as
-> before?
-> 
-> Leaving rbtree and LZO alone is exactly what I've been saying!
+Hello.
 
-Sorry for not catch your point before.
+On 03-08-2011 13:34, Bryan Wu wrote:
 
-Do you think the my patch that provides a register and cache index conversion
-helper function behind for FLAT could be a way to try?
+> Signed-off-by: Bryan Wu<bryan.wu@canonical.com>
+> ---
+>   arch/arm/mach-integrator/core.c            |   17 +++++++++++++++++
+>   arch/arm/mach-integrator/include/mach/cm.h |    1 +
+>   2 files changed, 18 insertions(+), 0 deletions(-)
 
-If yes, I can clean my patch to only include FLAT fix and send it out for
-You to take a look.
+> diff --git a/arch/arm/mach-integrator/core.c b/arch/arm/mach-integrator/core.c
+> index 77315b9..0ee6af6 100644
+> --- a/arch/arm/mach-integrator/core.c
+> +++ b/arch/arm/mach-integrator/core.c
+> @@ -225,6 +225,23 @@ void cm_control(u32 mask, u32 set)
+>
+>   EXPORT_SYMBOL(cm_control);
+>
+> +/**
+> + * cm_read - read the CM_CTRL register.
+> + */
+> +u32 cm_read(void)
+> +{
+> +	unsigned long flags;
+> +	u32 val = 0;
+> +
+> +	spin_lock_irqsave(&cm_lock, flags);
+> +	val = readl(CM_CTRL);
+> +	spin_unlock_irqrestore(&cm_lock, flags);
 
-Using this method, codec driver does not need to pad the default cache array.
-During the cache read, the register will be automatically converted to cache
-index to fetch value.
-This can also fix the soc_codec_reg_show for codecs who are using packed
-(FLAT) Cache while step = 2.
-(Here I assume the packed cache only has a different step with FLAT cache.
-FIXME if wrong)
+    What's the point of locking around already atomic read?
+
+WBR, Sergei
