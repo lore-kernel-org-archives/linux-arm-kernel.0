@@ -1,49 +1,68 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 03 Aug 2011 09:44:41 -0700
-Subject: [PATCH] mm: fix invalid loop for poison_init_mem
-In-Reply-To: <1312385728-27311-1-git-send-email-jamie@jamieiles.com>
-References: <1312385728-27311-1-git-send-email-jamie@jamieiles.com>
-Message-ID: <4E397AF9.8070702@codeaurora.org>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Wed, 3 Aug 2011 22:49:21 +0530
+Subject: [PATCH] mach-davinci: fix cache flush build error
+In-Reply-To: <20110802160234.GH19079@n2100.arm.linux.org.uk>
+References: <1312300118-9088-1-git-send-email-linus.walleij@stericsson.com>
+	<20110802160234.GH19079@n2100.arm.linux.org.uk>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024DF05E85@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/03/2011 08:35 AM, Jamie Iles wrote:
-> poison_init_mem() used a loop of:
->
-> 	while ((count = count - 4))
->
-> which has 2 problems - an off by one error so that we do one less word
-> than we should, and the other is that if count == 0 then we loop forever
-> and poison too much.  On a platform with HAVE_TCM=y but nothing in the
-> TCM's, this caused corruption and the platform failed to boot.
->
+On Tue, Aug 02, 2011 at 21:32:34, Russell King - ARM Linux wrote:
+> On Tue, Aug 02, 2011 at 05:48:38PM +0200, Linus Walleij wrote:
+> > From: Linus Walleij <linus.walleij@linaro.org>
+> > 
+> > The TNET variant of DaVinci compiles some code that it shares
+> > with other DaVinci variants, however it has a V6 CPU rather than
+> > an ARM926T, thus the hardcoded call to arm926_flush_kern_cache_all()
+> > in sleep.S will obviously fail, and we need to build with the
+> > v6_flush_kern_cache_all() call instead. This was triggered by
+> > manually altering the DaVinci config to build the TNET version.
+> > 
+> > Cc: Dave Martin <dave.martin@linaro.org>
+> > Cc: Arnd Bergmann <arnd@arndb.de>
+> > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> > ---
+> > This is just an ifdef to get the DaVinci TNET variant to compile,
+> > if there is a way to call out to some abstract flush function in a
+> > MULTI CPU/cache configuration from _assembler_ code, please tell me,
+> > 
+> > I'm not all that happy about this since it blocks proper multiboard
+> > support for DaVinci, would be nice to find a better solution.
 
-Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+This isn't the only thing that prevents building the TNET variant
+with the rest of the DaVinci variants.
 
->
-> Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
-> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-> Signed-off-by: Jamie Iles <jamie@jamieiles.com>
-> ---
->  arch/arm/mm/init.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-> index 2fee782..91bca35 100644
-> --- a/arch/arm/mm/init.c
-> +++ b/arch/arm/mm/init.c
-> @@ -441,7 +441,7 @@ static inline int free_area(unsigned long pfn, unsigned long end, char *s)
->  static inline void poison_init_mem(void *s, size_t count)
->  {
->  	u32 *p = (u32 *)s;
-> -	while ((count = count - 4))
-> +	for (; count != 0; count -= 4)
->  		*p++ = 0xe7fddef0;
->  }
->  
+If you enable DM365 and TNETV107x together, you get errors:
 
-Now where's that bag...
+  AS      arch/arm/kernel/entry-armv.o
+arch/arm/kernel/entry-armv.S: Assembler messages:
+arch/arm/kernel/entry-armv.S:196: Error: selected processor does not support `strex r1,r2,[sp]'
+arch/arm/kernel/entry-armv.S:228: Error: selected processor does not support `strex r1,r2,[sp]'
+arch/arm/kernel/entry-armv.S:286: Error: selected processor does not support `strex r1,r2,[sp]'
+arch/arm/kernel/entry-armv.S:323: Error: selected processor does not support `strex r1,r2,[sp]'
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+And from what I read[1], it is futile to try and make v5 and v6 architectures
+build together.
+
+> Davinci seems to be a special case where it somehow preserves all state
+> even in deep sleep, which makes the generic cpu_suspend() not ideal for
+> it.
+> 
+> Or maybe that's just an oversight in the existing code - I don't know
+> so I haven't touched it.  I've been hoping that Davinci people can sort
+> it out...
+
+It is true that DaVinci does not lose state even in its lowest power
+mode. There are no power domains to switch off in DaVinci. The deep
+sleep mode just stops device clocks and on-chip oscillator is shutdown.
+
+Considering this, Linus's patch looks fair to me. If there are no
+objections, I will queue for v3.1-rc
+
+Linus, in future can you please CC me and/or Kevin on DaVinci patches?
+
+Thanks,
+Sekhar
+
+[1] http://www.mail-archive.com/linux-omap at vger.kernel.org/msg43834.html
