@@ -1,24 +1,44 @@
-From: philippe.retornaz@epfl.ch (Philippe =?iso-8859-1?q?R=E9tornaz?=)
-Date: Wed, 3 Aug 2011 09:17:55 +0200
-Subject: [PATCH v6 0/6] mc13783: add pwr button support
-In-Reply-To: <20110727103403.GF26275@sortiz-mobl>
-References: <1311344232-29902-1-git-send-email-philippe.retornaz@epfl.ch>
-	<20110727103403.GF26275@sortiz-mobl>
-Message-ID: <201108030917.56526.philippe.retornaz@epfl.ch>
+From: axel.lin@gmail.com (Axel Lin)
+Date: Wed, 03 Aug 2011 15:18:17 +0800
+Subject: [PATCH RESEND] omap1: select GENERIC_IRQ_CHIP for TI OMAP1
+Message-ID: <1312355897.14329.5.camel@phoenix>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le mercredi 27 juillet 2011 12:34:03, Samuel Ortiz a ?crit : 
-> On Fri, Jul 22, 2011 at 04:17:06PM +0200, Philippe R?tornaz wrote:
-> > Hello
-> > 
-> > This add button handling for the MC13783 PMIC.
-> 
-> I suppose I should take this one. Sascha, are you ok with me doing so ?
-> Also, are you fine with the imx changes ?
+The gpio-omap driver has been converted to use generic IRQ chip.
+Thus select GENERIC_IRQ_CHIP for TI OMAP1 to fix below build error.
 
-Ping ? 
+ LD      vmlinux
+drivers/built-in.o: In function `omap_mpuio_alloc_gc':
+drivers/gpio/gpio-omap.c:1087: undefined reference to `irq_alloc_generic_chip'
+drivers/gpio/gpio-omap.c:1100: undefined reference to `irq_setup_generic_chip'
+drivers/built-in.o: In function `omap_gpio_show_rev':
+drivers/gpio/gpio-omap.c:998: undefined reference to `irq_gc_mask_clr_bit'
+drivers/gpio/gpio-omap.c:998: undefined reference to `irq_gc_mask_set_bit'
+make: *** [vmlinux] Error 1
 
-Thanks ! 
+Signed-off-by: Axel Lin <axel.lin@gmail.com>
+---
+Kevin already sent a similar patch.  http://marc.info/?l=linux-omap&m=130749135312468&w=2
+But I still have the build error with make omap1_defconfig in today's linux-next tree.
+So here is a resend.
 
-Philippe
+Regards,
+Axel
+ arch/arm/plat-omap/Kconfig |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/plat-omap/Kconfig b/arch/arm/plat-omap/Kconfig
+index 6e6735f..bb8f4a6 100644
+--- a/arch/arm/plat-omap/Kconfig
++++ b/arch/arm/plat-omap/Kconfig
+@@ -13,6 +13,7 @@ config ARCH_OMAP1
+ 	bool "TI OMAP1"
+ 	select CLKDEV_LOOKUP
+ 	select CLKSRC_MMIO
++	select GENERIC_IRQ_CHIP
+ 	help
+ 	  "Systems based on omap7xx, omap15xx or omap16xx"
+ 
+-- 
+1.7.4.1
