@@ -1,24 +1,56 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 4 Aug 2011 11:17:50 +0200
-Subject: No mach-type for SHEEVAD?
-Message-ID: <CACRpkdYi-EfCC0Lnx9bdYXyChzOhosO1C5gmggEnnBsDnzBukA@mail.gmail.com>
+From: bryan.wu@canonical.com (Bryan Wu)
+Date: Thu, 4 Aug 2011 17:18:08 +0800
+Subject: [PATCH 01/17] leds: create a trigger for CPU activity
+In-Reply-To: <CAHXqBF+8i7P9WhR0pjUPaew0bkzwE26Pr1u2V09PSZwhkdmCUQ@mail.gmail.com>
+References: <1312364089-32380-1-git-send-email-bryan.wu@canonical.com>
+	<1312364089-32380-2-git-send-email-bryan.wu@canonical.com>
+	<CAHXqBF+8i7P9WhR0pjUPaew0bkzwE26Pr1u2V09PSZwhkdmCUQ@mail.gmail.com>
+Message-ID: <CAK5ve-KYfa1Tvd4mwUs8uyY2jX=eDgxG4=rWevHsXfTariffJA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I tried to configure the mmp2 to build the "gplugd" variant
-found in the arch/arm/mach-mmp2/gplugd.c source file,
-however it fails miserably:
+2011/8/3 Micha? Miros?aw <mirqus@gmail.com>:
+> 2011/8/3 Bryan Wu <bryan.wu@canonical.com>:
+>> Attempting to consolidate the ARM LED code, this removes the
+>> custom RealView LED trigger code to turn LEDs on and off in
+>> response to CPU activity and replace it with a standard trigger.
+> [...]
+>> +void ledtrig_cpu(enum cpu_led_event ledevt)
+>> +{
+>> + ? ? ? struct ledtrig_cpu_data *trigdata = __get_cpu_var(ledtrig_cpu_triggers);
+>> +
+>> + ? ? ? if (!trigdata)
+>> + ? ? ? ? ? ? ? return;
+>> +
+>> + ? ? ? /* Locate the correct CPU LED */
+>> +
+>> + ? ? ? switch (ledevt) {
+>> + ? ? ? case CPU_LED_IDLE_START:
+>> + ? ? ? case CPU_LED_START:
+>> + ? ? ? ? ? ? ? /* Will turn the LED on, max brightness */
+>> + ? ? ? ? ? ? ? if (trigdata->led)
+>> + ? ? ? ? ? ? ? ? ? ? ? led_set_brightness(trigdata->led,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?trigdata->led->max_brightness);
+>> + ? ? ? ? ? ? ? break;
+>> +
+>> + ? ? ? case CPU_LED_IDLE_END:
+>> + ? ? ? case CPU_LED_STOP:
+>> + ? ? ? case CPU_LED_HALTED:
+>> + ? ? ? ? ? ? ? /* Will turn the LED off */
+>> + ? ? ? ? ? ? ? if (trigdata->led)
+>> + ? ? ? ? ? ? ? ? ? ? ? led_set_brightness(trigdata->led, LED_OFF);
+>> + ? ? ? ? ? ? ? break;
+>
+> Might be better to swap CPU_LED_IDLE_START with CPU_LED_IDLE_END here
+> so that when entering idle state the leds turn off.
+>
 
-arch/arm/mach-mmp/gplugd.c:183: error: 'MACH_TYPE_SHEEVAD' undeclared
-here (not in a function)
-make[3]: *** [arch/arm/mach-mmp/gplugd.o] Error 1
-
-Which is not strange given that it's not in mach-types.
-Nor does it appear to ever have been there, and I wonder
-if it was ever submitted to Russells machine registry.
-
-Can the subarch maintainers tell us how to deal with this,
-say like delete the boardfile or add the machine type?
+Good point, I will change that.
 
 Thanks,
-Linus Walleij
+-- 
+Bryan Wu <bryan.wu@canonical.com>
+Kernel Developer ? ?+86.138-1617-6545 Mobile
+Ubuntu Kernel Team
+Canonical Ltd. ? ? ?www.canonical.com
+Ubuntu - Linux for human beings | www.ubuntu.com
