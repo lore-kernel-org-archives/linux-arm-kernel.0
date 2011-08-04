@@ -1,60 +1,50 @@
-From: bryan.wu@canonical.com (Bryan Wu)
-Date: Thu, 4 Aug 2011 16:54:32 +0800
-Subject: [PATCH 07/17] mach-integrator: introduce cm_read function helper
-	to read CM_CTRL register
-In-Reply-To: <4E393128.3040602@ru.mvista.com>
-References: <1312364089-32380-1-git-send-email-bryan.wu@canonical.com>
-	<1312364089-32380-8-git-send-email-bryan.wu@canonical.com>
-	<4E393128.3040602@ru.mvista.com>
-Message-ID: <CAK5ve-+iVNSen+agOTM9BjyRre0oBEeQZg7Fa=1nswVJJhKKcA@mail.gmail.com>
+From: vinod.koul@intel.com (Koul, Vinod)
+Date: Thu, 04 Aug 2011 13:58:47 +0530
+Subject: [PATCH V2 07/20] dmaengine/amba-pl08x: Changing few prints to
+	dev_dbg from dev_info
+In-Reply-To: <5752f0202ff197d548999395d68131053693e4b3.1312190881.git.viresh.kumar@st.com>
+References: <cover.1312190881.git.viresh.kumar@st.com>
+	<5752f0202ff197d548999395d68131053693e4b3.1312190881.git.viresh.kumar@st.com>
+Message-ID: <1312446527.1539.2.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 3, 2011 at 7:29 PM, Sergei Shtylyov <sshtylyov@mvista.com> wrote:
-> Hello.
->
-> On 03-08-2011 13:34, Bryan Wu wrote:
->
->> Signed-off-by: Bryan Wu<bryan.wu@canonical.com>
->> ---
->> ?arch/arm/mach-integrator/core.c ? ? ? ? ? ?| ? 17 +++++++++++++++++
->> ?arch/arm/mach-integrator/include/mach/cm.h | ? ?1 +
->> ?2 files changed, 18 insertions(+), 0 deletions(-)
->
->> diff --git a/arch/arm/mach-integrator/core.c
->> b/arch/arm/mach-integrator/core.c
->> index 77315b9..0ee6af6 100644
->> --- a/arch/arm/mach-integrator/core.c
->> +++ b/arch/arm/mach-integrator/core.c
->> @@ -225,6 +225,23 @@ void cm_control(u32 mask, u32 set)
->>
->> ?EXPORT_SYMBOL(cm_control);
->>
->> +/**
->> + * cm_read - read the CM_CTRL register.
->> + */
->> +u32 cm_read(void)
->> +{
->> + ? ? ? unsigned long flags;
->> + ? ? ? u32 val = 0;
->> +
->> + ? ? ? spin_lock_irqsave(&cm_lock, flags);
->> + ? ? ? val = readl(CM_CTRL);
->> + ? ? ? spin_unlock_irqrestore(&cm_lock, flags);
->
-> ? What's the point of locking around already atomic read?
->
+On Mon, 2011-08-01 at 15:07 +0530, Viresh Kumar wrote:
+> For 8 memory and 16 slave channels 35 boot print lines are printed. And that is
+> too much. Most of this would be more useful for debugging. So moving few of them
+> to dev_dbg instead of dev_info. Now only 3 prints will be printed.
+> 
+> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+>  drivers/dma/amba-pl08x.c |    4 ++--
+>  1 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
+> index 6c52959..3fbaf0e 100644
+> --- a/drivers/dma/amba-pl08x.c
+> +++ b/drivers/dma/amba-pl08x.c
+> @@ -1717,7 +1717,7 @@ static int pl08x_dma_init_virtual_channels(struct pl08x_driver_data *pl08x,
+>  			kfree(chan);
+>  			continue;
+>  		}
+> -		dev_info(&pl08x->adev->dev,
+> +		dev_dbg(&pl08x->adev->dev,
+>  			 "initialize virtual channel \"%s\"\n",
+>  			 chan->name);
+>  
+> @@ -1945,7 +1945,7 @@ static int pl08x_probe(struct amba_device *adev, const struct amba_id *id)
+>  		spin_lock_init(&ch->lock);
+>  		ch->serving = NULL;
+>  		ch->signal = -1;
+> -		dev_info(&adev->dev,
+> +		dev_dbg(&adev->dev,
+>  			 "physical channel %d is %s\n", i,
+>  			 pl08x_phy_channel_busy(ch) ? "BUSY" : "FREE");
+>  	}
+ahh, this looks ugly, can you pls fix the print to make them look
+better. Single line or fmt string is one line should be ok, arg can be
+moved to second.
 
-Actually, I'm not sure about whether we need special operation on
-CM_CTRL register. So I followed the cm_control() function style.
-
-Yeah, if it is just a common register, it's quite convenient for me to
-read it in leds drivers.
-
-Thanks a lot,
 -- 
-Bryan Wu <bryan.wu@canonical.com>
-Kernel Developer ? ?+86.138-1617-6545 Mobile
-Ubuntu Kernel Team
-Canonical Ltd. ? ? ?www.canonical.com
-Ubuntu - Linux for human beings | www.ubuntu.com
+~Vinod
