@@ -1,45 +1,75 @@
-From: viresh.kumar@st.com (viresh kumar)
-Date: Thu, 4 Aug 2011 15:57:28 +0530
-Subject: [PATCH V2 18/20] dmaengine/amba-pl08x: Add support for sg len
-	greater than one for slave transfers
-In-Reply-To: <e404b8f659f6f06709d1adb0bdbe3624bd9a885a.1312190882.git.viresh.kumar@st.com>
-References: <cover.1312190881.git.viresh.kumar@st.com>
-	<e404b8f659f6f06709d1adb0bdbe3624bd9a885a.1312190882.git.viresh.kumar@st.com>
-Message-ID: <4E3A7410.6090108@st.com>
+From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
+Date: Thu, 4 Aug 2011 16:34:40 +0530
+Subject: [PATCH v5 09/22] gpio/omap: cleanup omap1 related macros
+In-Reply-To: <1312455893-14922-1-git-send-email-tarun.kanti@ti.com>
+References: <1312455893-14922-1-git-send-email-tarun.kanti@ti.com>
+Message-ID: <1312455893-14922-10-git-send-email-tarun.kanti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/01/2011 03:07 PM, Viresh KUMAR wrote:
-> @@ -563,6 +565,7 @@ static int pl08x_fill_llis_for_desc(struct pl08x_driver_data *pl08x,
->         u32 cctl, early_bytes = 0;
->         size_t max_bytes_per_lli, total_bytes = 0;
+From: Charulatha V <charu@ti.com>
 
-> +       list_for_each_entry(dsg, &txd->dsg_list, node) {
-> +               cctl = txd->cctl;
-> 
-> -       /* We need to count this down to zero */
-> -       bd.remainder = txd->len;
-> +               bd.srcbus.addr = dsg->src_addr;
-> +               bd.dstbus.addr = dsg->dst_addr;
-> +               bd.remainder = dsg->len;
-> +               bd.srcbus.buswidth = bd.srcbus.maxwidth;
-> +               bd.dstbus.buswidth = bd.dstbus.maxwidth;
-> 
+mpuio_init() function is defined under #ifdefs. It is required only in case
+of MPUIO bank type and only when PM operations are supported by it.
+This is applicable only in case of OMAP16xx SoC's MPUIO GPIO bank type.
+For all the other cases it is a dummy function. Hence clean up the same
+and remove all the OMAP SoC specific #ifdefs.
 
-> +               if (total_bytes != dsg->len) {
-> +                       dev_err(&pl08x->adev->dev,
-> +                               "%s size of encoded lli:s don't match total txd, transferred 0x%08zx from size 0x%08zx\n",
-> +                               __func__, total_bytes, dsg->len);
-> +                       return 0;
-> +               }
->         }
+bank_is_mpuio() is defined as a check to identify if the bank type is MPUIO.
+It is not required to define it separately as zero for OMAP2PLUS. Remove this.
 
-Correction:
+Signed-off-by: Charulatha V <charu@ti.com>
+---
+ drivers/gpio/gpio-omap.c |   19 -------------------
+ 1 files changed, 0 insertions(+), 19 deletions(-)
 
-total_bytes must be reinitialized to zero inside list_for_each_entry loop.
-As we are comparing it to dsg->len for every dsg.
-
-Will fix this and send with V3.
-
+diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+index 996e54b..e841ac1 100644
+--- a/drivers/gpio/gpio-omap.c
++++ b/drivers/gpio/gpio-omap.c
+@@ -778,14 +778,8 @@ static struct irq_chip gpio_irq_chip = {
+ 
+ /*---------------------------------------------------------------------*/
+ 
+-#ifdef CONFIG_ARCH_OMAP1
+-
+ #define bank_is_mpuio(bank)	((bank)->method == METHOD_MPUIO)
+ 
+-#ifdef CONFIG_ARCH_OMAP16XX
+-
+-#include <linux/platform_device.h>
+-
+ static int omap_mpuio_suspend_noirq(struct device *dev)
+ {
+ 	struct platform_device *pdev = to_platform_device(dev);
+@@ -847,17 +841,6 @@ static inline void mpuio_init(struct gpio_bank *bank)
+ 		(void) platform_device_register(&omap_mpuio_device);
+ }
+ 
+-#else
+-static inline void mpuio_init(struct gpio_bank *bank) {}
+-#endif	/* 16xx */
+-
+-#else
+-
+-#define bank_is_mpuio(bank)	0
+-static inline void mpuio_init(struct gpio_bank *bank) {}
+-
+-#endif
+-
+ /*---------------------------------------------------------------------*/
+ 
+ /* REVISIT these are stupid implementations!  replace by ones that
+@@ -1078,10 +1061,8 @@ static void __devinit omap_gpio_chip_init(struct gpio_bank *bank)
+ 	bank->chip.to_irq = gpio_2irq;
+ 	if (bank_is_mpuio(bank)) {
+ 		bank->chip.label = "mpuio";
+-#ifdef CONFIG_ARCH_OMAP16XX
+ 		if (bank->regs->wkup_status)
+ 			bank->chip.dev = &omap_mpuio_device.dev;
+-#endif
+ 		bank->chip.base = OMAP_MPUIO(0);
+ 	} else {
+ 		bank->chip.label = "gpio";
 -- 
-viresh
+1.7.0.4
