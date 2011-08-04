@@ -1,44 +1,30 @@
 From: vinod.koul@intel.com (Koul, Vinod)
-Date: Thu, 04 Aug 2011 09:55:18 +0530
-Subject: [PATCH 09/18] dmaengine/amba-pl08x: Schedule tasklet in case
-	of error interrupt
-In-Reply-To: <CAOh2x==_g+JQzTizgVTdH8Dyg_5+KpyYm+G_Ddu5mO15N6n-tw@mail.gmail.com>
-References: <cover.1311936523.git.viresh.kumar@st.com>
-	<9c81beb9cd84f84b58abbd24ebfae85dfe8d8ee1.1311936524.git.viresh.kumar@st.com>
-	<1311941799.1536.532.camel@vkoul-udesk3>
-	<CAOh2x==_g+JQzTizgVTdH8Dyg_5+KpyYm+G_Ddu5mO15N6n-tw@mail.gmail.com>
-Message-ID: <1312431918.1536.559.camel@vkoul-udesk3>
+Date: Thu, 04 Aug 2011 09:57:58 +0530
+Subject: [PATCH] dmaengine: add helper function for slave_single
+In-Reply-To: <20110725154739.GD14955@n2100.arm.linux.org.uk>
+References: <1311608235.8206.24.camel@vkoul-mobl4>
+	<20110725154739.GD14955@n2100.arm.linux.org.uk>
+Message-ID: <1312432078.1536.561.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2011-07-29 at 08:30 -0700, viresh kumar wrote:
-> On 7/29/11, Koul, Vinod <vinod.koul@intel.com> wrote:
-> > On Fri, 2011-07-29 at 16:19 +0530, Viresh Kumar wrote:
-> >> +		dev_err(&pl08x->adev->dev, "%s error interrupt, register value"
-> >> +				"0x%08x\n", __func__, err);
-> > again this looks convoluted, and the stuff is quotes can be in single
-> > line :)
+On Mon, 2011-07-25 at 16:47 +0100, Russell King - ARM Linux wrote:
+> On Mon, Jul 25, 2011 at 09:07:15PM +0530, Vinod Koul wrote:
+> > >From af9afd16e9954edb45f0cf71834653133d75e79c Mon Sep 17 00:00:00 2001
+> > From: Vinod Koul <vinod.koul@intel.com>
+> > Date: Mon, 25 Jul 2011 19:57:52 +0530
+> > Subject: [PATCH] dmaengine: add helper function for slave_single
+> > 
+> > For clients which require a single slave transfer and dont want to be bothered
+> > about the scatterlist api, this helper gives simple API for this transfer and
+> > creates single scatterlist for DMA API
+> > 
+> > Idea from Russel King
 > 
-> Will take care of this in all patches.
-> 
-> > but in tasklet you will call the client callback, so how does the client
-> > know if this was success or error? Did I miss anything?
-> 
-> No you didn't. I couldn't find a way in framework to report back to
-> client success or failure.
-> Is there any way? For now i have only kept error prints.
-Sorry for not responding earlier.
+> Please correct this, thanks.
+Your wish, I recall you posting similar code in some other thread
 
-Yes that's the whole point, today callback mechanism doesn't tell the
-_status_ of the transfer (which if we need change can be discussed as
-well), but to counter argue I have never been able to generate the error
-interrupt, are you able to do on your controller?
-
-One more point wrt this patch, what do we gain here from calling
-tasklet, are you cleaning up your queue for the error descriptor or
-something, I think not. so just calling to print doesn't make sense to
-me, comments?
-
+I will apply this so that ppl can start using it
 
 -- 
 ~Vinod
