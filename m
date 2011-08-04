@@ -1,87 +1,30 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Thu, 4 Aug 2011 13:14:35 -0500
-Subject: [PATCH 12/12] ARM: Remove mach-*/include/mach/timex.h
-In-Reply-To: <ADE657CA350FB648AAC2C43247A983F001F3882B8C28@AUSP01VMBX24.collaborationhost.net>
-References: <cover.1312455035.git.dsaxena@linaro.org>
-	<20110804135445.GJ1019@plexity.net>
-	<ADE657CA350FB648AAC2C43247A983F001F3882B8C28@AUSP01VMBX24.collaborationhost.net>
-Message-ID: <ADE657CA350FB648AAC2C43247A983F001F3882B8C37@AUSP01VMBX24.collaborationhost.net>
+From: mika.westerberg@iki.fi (Mika Westerberg)
+Date: Thu, 4 Aug 2011 21:22:48 +0300
+Subject: [PATCH] ep93xx: use DEFINE_RES_* helpers
+In-Reply-To: <201108021629.05478.hartleys@visionengravers.com>
+References: <201108021629.05478.hartleys@visionengravers.com>
+Message-ID: <20110804182248.GB2445@mwesterb-mobl.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, August 04, 2011 10:53 AM, H Hartley Sweeten wrote:
-> On Thursday, August 04, 2011 6:55 AM, Deepak Saxena wrote:
->> 
->> We no longer use the global LATCH definition to drive
->> any platform-specific timers so we can remove the
->> timex.h files from all sub-arch include directories.
->> 
->> We still need to keep an ARM CLOCK_TICK_RATE due to
->> jiffies.h depending on it to build but that will be
->> removed in the future once all non-ARM references to
->> LATCH are also removed.
->> 
->> Signed-off-by: Deepak Saxena <dsaxena@linaro.org>
->> ---
->
-> [snip]
->
->> diff --git a/arch/arm/include/asm/timex.h b/arch/arm/include/asm/timex.h
->> index 3be8de3..c4f4dac 100644
->> --- a/arch/arm/include/asm/timex.h
->> +++ b/arch/arm/include/asm/timex.h
->> @@ -12,7 +12,10 @@
->>  #ifndef _ASMARM_TIMEX_H
->>  #define _ASMARM_TIMEX_H
->>  
->> -#include <mach/timex.h>
->> +/* 
->> + * Bogus value used to allow kernel to build
->> + */
->> +#define	CLOCK_TICK_RATE	1000000
->>  
->>  typedef unsigned long cycles_t;
->>  
->
-> [snip]
->
->> diff --git a/arch/arm/mach-ep93xx/include/mach/timex.h b/arch/arm/mach-ep93xx/include/mach/timex.h
->> deleted file mode 100644
->> index 6b3503b..0000000
->> --- a/arch/arm/mach-ep93xx/include/mach/timex.h
->> +++ /dev/null
->> @@ -1,5 +0,0 @@
->> -/*
->> - * arch/arm/mach-ep93xx/include/mach/timex.h
->> - */
->> -
->> -#define CLOCK_TICK_RATE		983040
->
-> Confused...
->
-> mach-ep93xx/core.c uses the CLOCK_TICK_RATE to determine TIMER4_TICKS_PER_JIFFY.
-> Timer 4 runs at 983.04 kHz, this patch changes this rate to 1 MHz.  Won't that
-> effect the sys_timer?
+On Tue, Aug 02, 2011 at 04:29:05PM -0700, H Hartley Sweeten wrote:
 
-BTW, it looks like Lennert's patch correctly handled this.
+> @@ -590,11 +543,7 @@ static struct platform_device ep93xx_pwm0_device = {
+>  };
+>  
+>  static struct resource ep93xx_pwm1_resource[] = {
+> -	{
+> -		.start	= EP93XX_PWM_PHYS_BASE + 0x20,
+> -		.end	= EP93XX_PWM_PHYS_BASE + 0x30 - 1,
+> -		.flags	= IORESOURCE_MEM,
+> -	},
+> +	DEFINE_RES_MEM(EP93XX_PWM_PHYS_BASE + 0x10, 0x10),
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2010-October/029452.html
+Should this be
 
-Here's the relevant piece.
+	DEFINE_RES_MEM(EP93XX_PWM_PHYS_BASE + 0x20, 0x10),
 
-diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
-index 4cb55d3..3d6d015 100644
---- a/arch/arm/mach-ep93xx/core.c
-+++ b/arch/arm/mach-ep93xx/core.c
-@@ -111,7 +111,8 @@ void __init ep93xx_map_io(void)
- #define EP93XX_TIMER4_CLOCK		983040
- 
- #define TIMER1_RELOAD			((EP93XX_TIMER123_CLOCK / HZ) - 1)
--#define TIMER4_TICKS_PER_JIFFY		DIV_ROUND_CLOSEST(CLOCK_TICK_RATE, HZ)
-+#define TIMER4_TICKS_PER_JIFFY		\
-+		DIV_ROUND_CLOSEST(EP93XX_TIMER4_CLOCK, HZ)
- 
- static unsigned int last_jiffy_time;
 
-Regards,
-Hartley
+Otherwise
+
+Reviewed-by: Mika Westerberg <mika.westerberg@iki.fi>
