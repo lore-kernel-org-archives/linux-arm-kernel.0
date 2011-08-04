@@ -1,47 +1,44 @@
 From: dsaxena@linaro.org (Deepak Saxena)
-Date: Thu, 4 Aug 2011 06:50:27 -0700
-Subject: [PATCH 07/12] ARM: IXP4x: Remove LATCH and CLOCK_TICK_RATE dependency
+Date: Thu, 4 Aug 2011 06:52:02 -0700
+Subject: [PATCH 08/12] ARM: ks8695: Remove LATCH and CLOCK_TICK_RATE dependency
 In-Reply-To: <cover.1312455035.git.dsaxena@linaro.org>
 References: <cover.1312455035.git.dsaxena@linaro.org>
-Message-ID: <20110804135027.GE1019@plexity.net>
+Message-ID: <20110804135202.GF1019@plexity.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 As part of work to remove the global CLOCK_TICK_RATE symbol,
 this patch defines a sub-arch local value for use by the
-ixp4xx code.  Once all LATCH and CLOCK_TICK_RATE references
+ks8695 code.  Once all LATCH and CLOCK_TICK_RATE references
 are removed, we will remove all the definitions across
 sub-arches.
 
 Signed-off-by: Deepak Saxena <dsaxena@linaro.org>
 ---
- arch/arm/mach-ixp4xx/common.c |    7 ++++++-
- 1 files changed, 6 insertions(+), 1 deletions(-)
+ arch/arm/mach-ks8695/time.c |    4 +++-
+ 1 files changed, 3 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-ixp4xx/common.c b/arch/arm/mach-ixp4xx/common.c
-index 0777257..fe8b98a 100644
---- a/arch/arm/mach-ixp4xx/common.c
-+++ b/arch/arm/mach-ixp4xx/common.c
-@@ -448,6 +448,11 @@ static int ixp4xx_set_next_event(unsigned long evt,
- 	return 0;
+diff --git a/arch/arm/mach-ks8695/time.c b/arch/arm/mach-ks8695/time.c
+index 69c072c..cf63499 100644
+--- a/arch/arm/mach-ks8695/time.c
++++ b/arch/arm/mach-ks8695/time.c
+@@ -33,6 +33,8 @@
+ 
+ #include "generic.h"
+ 
++#define	KS8695_TIMER_LATCH	((KS8695_TICK_RATE + HZ/2) / HZ)
++
+ /*
+  * Returns number of ms since last clock interrupt.  Note that interrupts
+  * will have been disabled by do_gettimeoffset()
+@@ -62,7 +64,7 @@ static unsigned long ks8695_gettimeoffset (void)
+ 		elapsed += (CLOCK_TICK_RATE / HZ);
+ 
+ 	/* Convert ticks to usecs */
+-	return (unsigned long)(elapsed * (tick_nsec / 1000)) / LATCH;
++	return (unsigned long)(elapsed * (tick_nsec / 1000)) / KS8695_TIMER_LATCH;
  }
  
-+
-+#define IXP4XX_TIMER_FREQ 	66666000
-+#define IXP4XX_TICK_RATE	(((IXP4XX_TIMER_FREQ / HZ & ~IXP4XX_OST_RELOAD_MASK) + 1) * HZ)
-+#define IXP4XX_TIMER_LATCH  	((CLOCK_TICK_RATE + HZ/2) / HZ)
-+
- static void ixp4xx_set_mode(enum clock_event_mode mode,
- 			    struct clock_event_device *evt)
- {
-@@ -456,7 +461,7 @@ static void ixp4xx_set_mode(enum clock_event_mode mode,
- 
- 	switch (mode) {
- 	case CLOCK_EVT_MODE_PERIODIC:
--		osrt = LATCH & ~IXP4XX_OST_RELOAD_MASK;
-+		osrt = IXP4XX_TIMER_LATCH & ~IXP4XX_OST_RELOAD_MASK;
-  		opts = IXP4XX_OST_ENABLE;
- 		break;
- 	case CLOCK_EVT_MODE_ONESHOT:
+ /*
 -- 
 1.7.4.1
