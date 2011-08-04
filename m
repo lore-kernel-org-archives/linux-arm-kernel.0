@@ -1,47 +1,44 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 04 Aug 2011 16:29:57 -0700
-Subject: [linux-pm] [RFC/PATCH v2] PM / Runtime: allow _put_sync() from
-	interrupts-disabled context
-In-Reply-To: <201107240102.09698.rjw@sisk.pl> (Rafael J. Wysocki's message of
-	"Sun, 24 Jul 2011 01:02:09 +0200")
-References: <1311371188-28879-1-git-send-email-khilman@ti.com>
-	<201107240102.09698.rjw@sisk.pl>
-Message-ID: <87vcuczrey.fsf@ti.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Fri, 5 Aug 2011 00:32:06 +0100
+Subject: [PATCH RFC v1] ARM: olpc: Add support for calling into the
+	XO-1.75's OpenFirmware (OFW)
+In-Reply-To: <20110804162551.2b92b2cf@debxo>
+References: <20110804162551.2b92b2cf@debxo>
+Message-ID: <CAMPhdO_gC1vQEA6aMhS=4RaM2dNo9WYPPia1+juRH7q1T=E0Og@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Rafael J. Wysocki" <rjw@sisk.pl> writes:
-
-> On Friday, July 22, 2011, Kevin Hilman wrote:
->> Currently the use of pm_runtime_put_sync() is not safe from
->> interrupts-disabled context because rpm_idle() will release the
->> spinlock and enable interrupts for the idle callbacks.  This enables
->> interrupts during a time where interrupts were expected to be
->> disabled, and can have strange side effects on drivers that expected
->> interrupts to be disabled.
->> 
->> This is not a bug since the documentation clearly states that only
->> _put_sync_suspend() is safe in IRQ-safe mode.
->> 
->> However, pm_runtime_put_sync() could be made safe when in IRQ-safe
->> mode by releasing the spinlock but not re-enabling interrupts, which
->> is what this patch aims to do.
->> 
->> Problem was found when using some buggy drivers that set
->> pm_runtime_irq_safe() and used _put_sync() in interrupts-disabled
->> context.
->> 
->> The offending drivers have been fixed to use _put_sync_suspend(),
->> But this patch is an RFC to see if it might make sense to allow
->> using _put_sync() from interrupts-disabled context.
+On Fri, Aug 5, 2011 at 12:25 AM, Andres Salomon <dilinger@queued.net> wrote:
+> Add support for saving OFW's cif, and later calling into it to run OFW
+> commands from the kernel. ?OFW remains resident in memory after boot,
+> and the physical/virtual addresses are passed in a boot tag. ?We parse
+> that, and map the addresses.
 >
-> OK, I'm going to take this for 3.2.
+> This is currently only used by the OLPC XO-1.75, so it's named olpc_ofw().
+>
+> Signed-off-by: Andres Salomon <dilinger@queued.net>
+> ---
+> ?Documentation/arm/Setup ? ? ? ? ? ? ? ? ?| ? ?2 +
+> ?arch/arm/Kconfig ? ? ? ? ? ? ? ? ? ? ? ? | ? ?8 ++
+> ?arch/arm/include/asm/olpc_ofw.h ? ? ? ? ?| ? 23 ++++++
+> ?arch/arm/include/asm/setup.h ? ? ? ? ? ? | ? 24 ++++++
+> ?arch/arm/mach-mmp/Makefile ? ? ? ? ? ? ? | ? ?1 +
+> ?arch/arm/mach-mmp/include/mach/vmalloc.h | ? ?2 +-
+> ?arch/arm/mach-mmp/olpc-xo-1-75.c ? ? ? ? | ? ?7 ++
+> ?arch/arm/mach-mmp/olpc_ofw.c ? ? ? ? ? ? | ?118 ++++++++++++++++++++++++++++++
+> ?8 files changed, 184 insertions(+), 1 deletions(-)
+> ?create mode 100644 arch/arm/include/asm/olpc_ofw.h
+> ?create mode 100644 arch/arm/mach-mmp/olpc_ofw.c
+>
+>
+> I'm looking for input on our mechanism for calling into OLPC's openfirmware
+> on arm. ?Some of the x86 folks are cc'd
+> as they had lots of comment when we did this for x86 OLPC machines.
+>
+> There's a device tree patch on top of this that can be seen here:
+> http://dev.laptop.org/git/olpc-3.0/patch/?id=12377851f9a64a9e2098adf09f858bed7d3eae7c
+>
+> Unlike the XO-1, I'd like to get this OFW communication mechanism ACKed prior to
+> OLPC's mass production of these units.
 
-Rafael, 
-
-Since you're planning to merge this, maybe we should consider merging
-this as a fix for v3.1, and possibly even for v3.0 stable.  That way,
-any current drivers using irq_safe and the normal _put_sync() will not
-have this problem.
-
-Kevin
+Not really sure if it's the standard way of calling back into GFW, Grant?
