@@ -1,30 +1,71 @@
-From: viresh.kumar@st.com (viresh kumar)
-Date: Thu, 4 Aug 2011 14:55:46 +0530
-Subject: [PATCH V2 07/20] dmaengine/amba-pl08x: Changing few prints to
-	dev_dbg from dev_info
-In-Reply-To: <1312446527.1539.2.camel@vkoul-udesk3>
-References: <cover.1312190881.git.viresh.kumar@st.com>	
-	<5752f0202ff197d548999395d68131053693e4b3.1312190881.git.viresh.kumar@st.com>
-	<1312446527.1539.2.camel@vkoul-udesk3>
-Message-ID: <4E3A659A.6080107@st.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Thu, 4 Aug 2011 10:28:22 +0100
+Subject: [PATCH] ARM: pxa: fix logic error in PJ4 iWMMXt handling
+In-Reply-To: <20110803162637.GB919@wantstofly.org>
+References: <20110803162637.GB919@wantstofly.org>
+Message-ID: <CAMPhdO_gS7-_V3hXV=R1PV++rO3_pgfgovFHDoUJy_NgggDOGg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/04/2011 01:58 PM, Koul, Vinod wrote:
->> > +		dev_dbg(&adev->dev,
->> >  			 "physical channel %d is %s\n", i,
->> >  			 pl08x_phy_channel_busy(ch) ? "BUSY" : "FREE");
->> >  	}
-> ahh, this looks ugly, can you pls fix the print to make them look
-> better. Single line or fmt string is one line should be ok, arg can be
-> moved to second.
+On Wed, Aug 3, 2011 at 5:26 PM, Lennert Buytenhek
+<buytenh@wantstofly.org> wrote:
+> This got added in:
+>
+> ? ? ? ?commit ef6c84454f8567d4968c210d7d194fb711ed3739
+> ? ? ? ?Author: Haojian Zhuang <haojian.zhuang@marvell.com>
+> ? ? ? ?Date: ? Wed Nov 24 11:54:25 2010 +0800
+>
+> ? ? ? ? ? ?ARM: pxa: add iwmmx support for PJ4
 
-Just to check if I understood your suggestion correctly, you want this:
+This looks correct to me. Haojian, you have any comments?
 
-		dev_dbg(&adev->dev, "physical channel %d is %s\n",
-			i, pl08x_phy_channel_busy(ch) ? "BUSY" : "FREE");
-
-Surely that will be done.
-
--- 
-viresh
+>
+> which does:
+>
+> - ? ? ? mrc ? ? p15, 0, r2, c15, c1, 0
+> - ? ? ? orr ? ? r2, r2, #0x3 ? ? ? ? ? ? ? ? ? ?@ enable access to CP0 and CP1
+> - ? ? ? mcr ? ? p15, 0, r2, c15, c1, 0
+> + ? ? ? @ enable access to CP0 and CP1
+> + ? ? ? XSC(mrc p15, 0, r2, c15, c1, 0)
+> + ? ? ? XSC(orr r2, r2, #0x3)
+> + ? ? ? XSC(mcr p15, 0, r2, c15, c1, 0)
+>
+> but then later does:
+>
+> - ? ? ? mrc ? ? p15, 0, r4, c15, c1, 0
+> - ? ? ? orr ? ? r4, r4, #0x3 ? ? ? ? ? ? ? ? ? ?@ enable access to CP0 and CP1
+> - ? ? ? mcr ? ? p15, 0, r4, c15, c1, 0
+> + ? ? ? @ enable access to CP0 and CP1
+> + ? ? ? XSC(mrc p15, 0, r4, c15, c1, 0)
+> + ? ? ? XSC(orr r4, r4, #0xf)
+> + ? ? ? XSC(mcr p15, 0, r4, c15, c1, 0)
+>
+> Signed-off-by: Lennert Buytenhek <buytenh@laptop.org>
+>
+> diff --git a/arch/arm/kernel/iwmmxt.S b/arch/arm/kernel/iwmmxt.S
+> index 7fa3bb0..194a767 100644
+> --- a/arch/arm/kernel/iwmmxt.S
+> +++ b/arch/arm/kernel/iwmmxt.S
+> @@ -195,10 +195,10 @@ ENTRY(iwmmxt_task_disable)
+>
+> ? ? ? ?@ enable access to CP0 and CP1
+> ? ? ? ?XSC(mrc p15, 0, r4, c15, c1, 0)
+> - ? ? ? XSC(orr r4, r4, #0xf)
+> + ? ? ? XSC(orr r4, r4, #0x3)
+> ? ? ? ?XSC(mcr p15, 0, r4, c15, c1, 0)
+> ? ? ? ?PJ4(mrc p15, 0, r4, c1, c0, 2)
+> - ? ? ? PJ4(orr r4, r4, #0x3)
+> + ? ? ? PJ4(orr r4, r4, #0xf)
+> ? ? ? ?PJ4(mcr p15, 0, r4, c1, c0, 2)
+>
+> ? ? ? ?mov ? ? r0, #0 ? ? ? ? ? ? ? ? ? ? ? ? ?@ nothing to load
+> @@ -313,7 +313,7 @@ ENTRY(iwmmxt_task_switch)
+> ? ? ? ?teq ? ? r2, r3 ? ? ? ? ? ? ? ? ? ? ? ? ?@ next task owns it?
+> ? ? ? ?movne ? pc, lr ? ? ? ? ? ? ? ? ? ? ? ? ?@ no: leave Concan disabled
+>
+> -1: ? ? @ flip Conan access
+> +1: ? ? @ flip Concan access
+> ? ? ? ?XSC(eor r1, r1, #0x3)
+> ? ? ? ?XSC(mcr p15, 0, r1, c15, c1, 0)
+> ? ? ? ?PJ4(eor r1, r1, #0xf)
+>
