@@ -1,99 +1,46 @@
-From: shubhrajyoti@ti.com (Shubhrajyoti)
-Date: Thu, 04 Aug 2011 11:55:12 +0530
-Subject: [PATCHv5 1/3] OMAP: I2C: Reset support
-In-Reply-To: <87sjpj75yq.fsf@ti.com>
-References: <1311935813-8481-1-git-send-email-shubhrajyoti@ti.com>	<1311935813-8481-2-git-send-email-shubhrajyoti@ti.com>
-	<87sjpj75yq.fsf@ti.com>
-Message-ID: <4E3A3B48.2050108@ti.com>
+From: viresh.kumar@st.com (viresh kumar)
+Date: Thu, 4 Aug 2011 12:01:19 +0530
+Subject: [PATCH V2 08/20] dmaengine/amba-pl08x: support runtime PM
+In-Reply-To: <1312436185.1536.570.camel@vkoul-udesk3>
+References: <cover.1312190881.git.viresh.kumar@st.com>	
+	<bc59bbd3709a7af1723d37ab846bf44c6867c00e.1312190881.git.viresh.kumar@st.com>	
+	<20110803123953.GB23953@n2100.arm.linux.org.uk>
+	<4E3A2BFC.3070907@st.com> <1312436185.1536.570.camel@vkoul-udesk3>
+Message-ID: <4E3A3CB7.8040505@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 03 August 2011 04:53 AM, Kevin Hilman wrote:
-> Shubhrajyoti D<shubhrajyoti@ti.com>  writes:
->
->>   Under some error conditions the i2c  driver may do a reset.
->    ^                                    ^
-> minor: extra whitespace
->
->>   Adding a reset field and support in the platform.
-> s/platform/device-specific code/
->
-Yes will fix these.
->> Signed-off-by: Shubhrajyoti D<shubhrajyoti@ti.com>
-> That being said, omap_device_shutdown() should already do a clean
-> shutdown + reset for you, and i2c-omap.h already has a pointer for
-> ->device_shutdown() so a new device_reset() should not be needed.
->
-> IOW, simply adding pdata->device_shutdown = omap_device_shutdown()
-> should work.
-i2C has a special reset sequence ie Disable -> reset -> enable -> Poll 
-on reset done.
-This function is implemented in omap_i2c_reset. The
+On 08/04/2011 11:06 AM, Koul, Vinod wrote:
+> On Thu, 2011-08-04 at 10:49 +0530, viresh kumar wrote:
+>> On 08/03/2011 06:09 PM, Russell King - ARM Linux wrote:
+>>> On Mon, Aug 01, 2011 at 03:07:18PM +0530, Viresh Kumar wrote:
+>> @@ -405,6 +406,7 @@ pl08x_get_phy_channel(struct pl08x_driver_data *pl08x,
+>>  		return NULL;
+>>  	}
+>>  
+>> +	pm_runtime_get_sync(&pl08x->adev->dev);
+> this should be ideally one of the first things you would do not last.
+> get_sync will ensure your .runtime_resume callback is called before it
+> returns (if its suspended)
+>>  	return ch;
+>>  }
 
-omap_hwmod_reset calls ->  _reset
+Until this point we are not touching the registers at all. And they will
+accessed after this point only.
 
-which calls ocp_softrest  or custom reset if it is present.The latter is 
-true for I2C.
+>> +	pm_runtime_put(&adev->dev);
+> _put is probe looks suspect, why do you need this here 
 
-However I see that
+To save power.
 
-omap_device_shutdown ->  _assert_hardreset However for I2c there doesnt seem to be a HW reset line.
+> as you are already setting the status as active, this _put will decrement your
+> usage count and possibly call your runtime_suspend
 
+We set status as active, as amba/bus layer has enabled it before calling
+probe and it doesn't put it.
 
-Am I missing something?
+As DMA will not be used until get_phy_channel() is called, so we can save
+some energy here too. So i put it here.
 
-> Kevin
->
->> ---
->>   arch/arm/plat-omap/i2c.c |   18 ++++++++++++++++++
->>   include/linux/i2c-omap.h |    1 +
->>   2 files changed, 19 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/plat-omap/i2c.c b/arch/arm/plat-omap/i2c.c
->> index 2388b8e..be36cac 100644
->> --- a/arch/arm/plat-omap/i2c.c
->> +++ b/arch/arm/plat-omap/i2c.c
->> @@ -146,6 +146,22 @@ static struct omap_device_pm_latency omap_i2c_latency[] = {
->>   		.flags			= OMAP_DEVICE_LATENCY_AUTO_ADJUST,
->>   	},
->>   };
->> +/**
->> + * omap2_i2c_reset - reset the omap i2c module.
->> + * @dev: struct device*
->> + */
->> +
->> +static int omap2_i2c_reset(struct device *dev)
->> +{
->> +	int r = 0;
->> +	struct platform_device *pdev = to_platform_device(dev);
->> +	struct omap_device *odev = to_omap_device(pdev);
->> +	struct omap_hwmod *oh;
->> +
->> +	oh = odev->hwmods[0];
->> +	r = omap_hwmod_reset(oh);
->> +	return r;
->> +}
->>
->>   static inline int omap2_i2c_add_bus(int bus_id)
->>   {
->> @@ -187,6 +203,8 @@ static inline int omap2_i2c_add_bus(int bus_id)
->>   	 */
->>   	if (cpu_is_omap34xx())
->>   		pdata->set_mpu_wkup_lat = omap_pm_set_max_mpu_wakeup_lat_compat;
->> +
->> +	pdata->device_reset = omap2_i2c_reset;
->>   	od = omap_device_build(name, bus_id, oh, pdata,
->>   			sizeof(struct omap_i2c_bus_platform_data),
->>   			omap_i2c_latency, ARRAY_SIZE(omap_i2c_latency), 0);
->> diff --git a/include/linux/i2c-omap.h b/include/linux/i2c-omap.h
->> index 98ae49b..8aa91b6 100644
->> --- a/include/linux/i2c-omap.h
->> +++ b/include/linux/i2c-omap.h
->> @@ -38,6 +38,7 @@ struct omap_i2c_bus_platform_data {
->>   	int		(*device_enable) (struct platform_device *pdev);
->>   	int		(*device_shutdown) (struct platform_device *pdev);
->>   	int		(*device_idle) (struct platform_device *pdev);
->> +	int		(*device_reset) (struct device *dev);
->>   };
->>
->>   #endif
+-- 
+viresh
