@@ -1,38 +1,30 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu,  4 Aug 2011 16:49:03 +0100
-Subject: [RFC PATCH] mmc: at91_mci: remove the use of irq_to_gpio
-Message-ID: <1312472943-13839-1-git-send-email-nicolas.ferre@atmel.com>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Thu,  4 Aug 2011 16:47:35 +0100
+Subject: [PATCH] ARM: mx5: board-cpuimx51.c fixup irq_to_gpio() usage
+Message-ID: <1312472855-15778-1-git-send-email-ben-linux@fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the use of irq_to_gpio() in the card detection interrupt
-handler. The information is available in the board structure and
-we can avoid using a function that has little meaning.
+irq_to_gpio() is being called on a GPIO so change to using
+gpio_to_irq() instead.
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Signed-off-by: Ben Dooks <ben-linux@fluff.org>
 ---
-Ben, Arnd,
+ arch/arm/mach-mx5/board-cpuimx51.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-I have identified this use of irq_to_gpio() which can be remove immediatly.
-
- drivers/mmc/host/at91_mci.c |    5 ++++-
- 1 files changed, 4 insertions(+), 1 deletions(-)
-
-diff --git a/drivers/mmc/host/at91_mci.c b/drivers/mmc/host/at91_mci.c
-index a4aa3af..351951c 100644
---- a/drivers/mmc/host/at91_mci.c
-+++ b/drivers/mmc/host/at91_mci.c
-@@ -869,7 +869,10 @@ static irqreturn_t at91_mci_irq(int irq, void *devid)
- static irqreturn_t at91_mmc_det_irq(int irq, void *_host)
- {
- 	struct at91mci_host *host = _host;
--	int present = !gpio_get_value(irq_to_gpio(irq));
-+	int present;
-+
-+	/* if we are here is that the det_pin exists */
-+	present = !gpio_get_value(host->board->det_pin);
- 
- 	/*
- 	 * we expect this irq on both insert and remove,
+diff --git a/arch/arm/mach-mx5/board-cpuimx51.c b/arch/arm/mach-mx5/board-cpuimx51.c
+index 7c893fa..68934ea 100644
+--- a/arch/arm/mach-mx5/board-cpuimx51.c
++++ b/arch/arm/mach-mx5/board-cpuimx51.c
+@@ -81,7 +81,7 @@ static struct plat_serial8250_port serial_platform_data[] = {
+ 		.flags = UPF_BOOT_AUTOCONF | UPF_SKIP_TEST | UPF_IOREMAP,
+ 	}, {
+ 		.mapbase = (unsigned long)(MX51_CS1_BASE_ADDR + 0x2000000),
+-		.irq = irq_to_gpio(CPUIMX51_QUARTD_GPIO),
++		.irq = gpio_to_irq(CPUIMX51_QUARTD_GPIO),
+ 		.irqflags = IRQF_TRIGGER_HIGH,
+ 		.uartclk = CPUIMX51_QUART_XTAL,
+ 		.regshift = CPUIMX51_QUART_REGSHIFT,
 -- 
-1.7.4.1
+1.7.1
