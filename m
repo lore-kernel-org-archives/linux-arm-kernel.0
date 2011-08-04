@@ -1,76 +1,34 @@
 From: vinod.koul@intel.com (Koul, Vinod)
-Date: Thu, 04 Aug 2011 10:58:47 +0530
-Subject: [PATCH v2 0/3] Add device tree probe for imx-sdma driver
-In-Reply-To: <20110804053504.GA3311@freescale.com>
-References: <1310723066-567-1-git-send-email-shawn.guo@linaro.org>
-	<1312430372.1536.554.camel@vkoul-udesk3>
-	<20110804053504.GA3311@freescale.com>
-Message-ID: <1312435727.1536.562.camel@vkoul-udesk3>
+Date: Thu, 04 Aug 2011 11:02:42 +0530
+Subject: [PATCH 09/18] dmaengine/amba-pl08x: Schedule tasklet in case
+	of error interrupt
+In-Reply-To: <4E3A342E.5080503@st.com>
+References: <cover.1311936523.git.viresh.kumar@st.com>
+	<9c81beb9cd84f84b58abbd24ebfae85dfe8d8ee1.1311936524.git.viresh.kumar@st.com>
+	<1311941799.1536.532.camel@vkoul-udesk3>
+	<CAOh2x==_g+JQzTizgVTdH8Dyg_5+KpyYm+G_Ddu5mO15N6n-tw@mail.gmail.com>
+	<1312431918.1536.559.camel@vkoul-udesk3>  <4E3A342E.5080503@st.com>
+Message-ID: <1312435962.1536.566.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-08-04 at 13:35 +0800, Shawn Guo wrote:
-> On Thu, Aug 04, 2011 at 09:29:32AM +0530, Koul, Vinod wrote:
-> > On Fri, 2011-07-15 at 17:44 +0800, Shawn Guo wrote:
-> > > The first patch remove the use of software defined sdma version, and
-> > > instead uses platform_device_id to handle the sdma differences from
-> > > one soc to another.  The second one makes a small cleanup on function
-> > > sdma_get_firmware(), and the third patch adds the actual device tree
-> > > probe support.
-> > > 
-> > > Changes since v1:
-> > >  * Do not encode ROM script address in device tree
-> > >  * Add one more small cleanup on function sdma_get_firmware()
-> > > 
-> > > ShawnsGuo (3):
-> > >       dmaengine: imx-sdma: use platform_device_id to identify sdma version
-> > >       dmaengine: imx-sdma: sdma_get_firmware does not need to copy fw_name
-> > >       dmaengine: imx-sdma: add device tree probe support
-> > > 
-> > Sacha are you okay if this go via my tree, would need your ack before I
-> > take this one
-> > 
-> Hi Vinod,
+On Thu, 2011-08-04 at 11:24 +0530, viresh kumar wrote:
+> On 08/04/2011 09:55 AM, Koul, Vinod wrote:
+> > Yes that's the whole point, today callback mechanism doesn't tell the
+> > _status_ of the transfer (which if we need change can be discussed as
+> > well), but to counter argue I have never been able to generate the error
+> > interrupt, are you able to do on your controller?
 > 
-> Sorry if I have misunderstood your reply below, but the series has
-> gone into mainline through arm tree.
+> Yes, if we supply unaligned address, with access width as word, then it gives
+> error interrupt.
 > 
-Okay i thought this was still pending from me.
-
-> Regards,
-> Shawn
-> 
-> ---- Quote ---
-> On Mon, Jul 25, 2011 at 05:11:55PM +0530, Vinod Koul wrote:
-> > On Fri, 2011-07-22 at 11:54 +0800, Shawn Guo wrote:
-> > > Hi Vinod,
-> > >
-> > > Can I have your ack on this series, please?  I attempt to get it
-> > > merged through Sascha's tree after his tree and devicetree/next get
-> > > merged in the coming window.
-> > >
-> > > Regards,
-> > > Shawn
-> > >
-> > > On Fri, Jul 15, 2011 at 05:44:23PM +0800, Shawn Guo wrote:
-> > > >
-> > > > ShawnsGuo (3):
-> > > >       dmaengine: imx-sdma: use platform_device_id to identify sdma version
-> > > >       dmaengine: imx-sdma: sdma_get_firmware does not need to copy fw_name
-> > > >       dmaengine: imx-sdma: add device tree probe support
-> > > >
-> > Acked-by: Vinod Koul <vinod.koul@intel.com>
-> >
-> > I had queued this up for my tree, i am okay if it gets merged thru
-> > Sascha
-> >
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
+> Regarding your point of updating callback for reporting errors,
+> I think it is required and should be a common issue.
+Okay till now no one has asked for it. We can add to callback arguments
+either a bool to indicate what is the transfer status or usual error
+code to also indicate what type of failure.
+I would prefer latter, if there is consensus on this, we can go thru
+with this approach, Dan your comments?
 
 -- 
 ~Vinod
