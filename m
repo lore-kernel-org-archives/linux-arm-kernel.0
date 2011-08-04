@@ -1,46 +1,43 @@
 From: vinod.koul@intel.com (Koul, Vinod)
-Date: Thu, 04 Aug 2011 09:29:32 +0530
-Subject: [PATCH v2 0/3] Add device tree probe for imx-sdma driver
-In-Reply-To: <1310723066-567-1-git-send-email-shawn.guo@linaro.org>
-References: <1310723066-567-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1312430372.1536.554.camel@vkoul-udesk3>
+Date: Thu, 04 Aug 2011 09:55:18 +0530
+Subject: [PATCH 09/18] dmaengine/amba-pl08x: Schedule tasklet in case
+	of error interrupt
+In-Reply-To: <CAOh2x==_g+JQzTizgVTdH8Dyg_5+KpyYm+G_Ddu5mO15N6n-tw@mail.gmail.com>
+References: <cover.1311936523.git.viresh.kumar@st.com>
+	<9c81beb9cd84f84b58abbd24ebfae85dfe8d8ee1.1311936524.git.viresh.kumar@st.com>
+	<1311941799.1536.532.camel@vkoul-udesk3>
+	<CAOh2x==_g+JQzTizgVTdH8Dyg_5+KpyYm+G_Ddu5mO15N6n-tw@mail.gmail.com>
+Message-ID: <1312431918.1536.559.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2011-07-15 at 17:44 +0800, Shawn Guo wrote:
-> The first patch remove the use of software defined sdma version, and
-> instead uses platform_device_id to handle the sdma differences from
-> one soc to another.  The second one makes a small cleanup on function
-> sdma_get_firmware(), and the third patch adds the actual device tree
-> probe support.
+On Fri, 2011-07-29 at 08:30 -0700, viresh kumar wrote:
+> On 7/29/11, Koul, Vinod <vinod.koul@intel.com> wrote:
+> > On Fri, 2011-07-29 at 16:19 +0530, Viresh Kumar wrote:
+> >> +		dev_err(&pl08x->adev->dev, "%s error interrupt, register value"
+> >> +				"0x%08x\n", __func__, err);
+> > again this looks convoluted, and the stuff is quotes can be in single
+> > line :)
 > 
-> Changes since v1:
->  * Do not encode ROM script address in device tree
->  * Add one more small cleanup on function sdma_get_firmware()
+> Will take care of this in all patches.
 > 
-> ShawnsGuo (3):
->       dmaengine: imx-sdma: use platform_device_id to identify sdma version
->       dmaengine: imx-sdma: sdma_get_firmware does not need to copy fw_name
->       dmaengine: imx-sdma: add device tree probe support
+> > but in tasklet you will call the client callback, so how does the client
+> > know if this was success or error? Did I miss anything?
 > 
-Sacha are you okay if this go via my tree, would need your ack before I
-take this one
+> No you didn't. I couldn't find a way in framework to report back to
+> client success or failure.
+> Is there any way? For now i have only kept error prints.
+Sorry for not responding earlier.
 
->  .../devicetree/bindings/dma/fsl-imx-sdma.txt       |   17 ++++
->  arch/arm/mach-imx/clock-imx25.c                    |    3 +-
->  arch/arm/mach-imx/clock-imx31.c                    |    2 +-
->  arch/arm/mach-imx/clock-imx35.c                    |    2 +-
->  arch/arm/mach-imx/mm-imx25.c                       |    4 +-
->  arch/arm/mach-imx/mm-imx31.c                       |    3 +-
->  arch/arm/mach-imx/mm-imx35.c                       |    3 +-
->  arch/arm/mach-mx5/clock-mx51-mx53.c                |    6 +-
->  arch/arm/mach-mx5/mm.c                             |    8 +-
->  arch/arm/plat-mxc/devices/platform-imx-dma.c       |    4 +-
->  arch/arm/plat-mxc/include/mach/devices-common.h    |    2 +-
->  arch/arm/plat-mxc/include/mach/dma.h               |    3 +-
->  arch/arm/plat-mxc/include/mach/sdma.h              |    2 -
->  drivers/dma/imx-sdma.c                             |   92 +++++++++++++++-----
->  14 files changed, 107 insertions(+), 44 deletions(-)
+Yes that's the whole point, today callback mechanism doesn't tell the
+_status_ of the transfer (which if we need change can be discussed as
+well), but to counter argue I have never been able to generate the error
+interrupt, are you able to do on your controller?
+
+One more point wrt this patch, what do we gain here from calling
+tasklet, are you cleaning up your queue for the error descriptor or
+something, I think not. so just calling to print doesn't make sense to
+me, comments?
 
 
 -- 
