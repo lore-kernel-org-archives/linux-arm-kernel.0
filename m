@@ -1,27 +1,27 @@
-From: buytenh@wantstofly.org (Lennert Buytenhek)
-Date: Thu, 4 Aug 2011 16:03:14 +0200
-Subject: [PATCH 06/12] ARM: IXP23xx: Remove LATCH and CLOCK_TICK_RATE
-	dependency
-In-Reply-To: <20110804135014.GD1019@plexity.net>
-References: <cover.1312455035.git.dsaxena@linaro.org>
-	<20110804135014.GD1019@plexity.net>
-Message-ID: <20110804140314.GL919@wantstofly.org>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Thu, 4 Aug 2011 20:00:14 +0530
+Subject: [PATCH] mach-davinci: fix cache flush build error
+In-Reply-To: <CACRpkdZ12S8qC_5VbV2d3BpCtZQpR5U9OHyxMR61bo92L83WLw@mail.gmail.com>
+References: <1312300118-9088-1-git-send-email-linus.walleij@stericsson.com>
+	<20110802160234.GH19079@n2100.arm.linux.org.uk>
+	<B85A65D85D7EB246BE421B3FB0FBB593024DF05E85@dbde02.ent.ti.com>
+	<CACRpkdZ12S8qC_5VbV2d3BpCtZQpR5U9OHyxMR61bo92L83WLw@mail.gmail.com>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024DF06447@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 04, 2011 at 06:50:14AM -0700, Deepak Saxena wrote:
+On Thu, Aug 04, 2011 at 04:18:49, Linus Walleij wrote:
+> On Wed, Aug 3, 2011 at 7:19 PM, Nori, Sekhar <nsekhar@ti.com> wrote:
+> 
+> > This isn't the only thing that prevents building the TNET variant
+> > with the rest of the DaVinci variants.
+> >
+> > If you enable DM365 and TNETV107x together, you get errors:
+> 
+> Looks like it needs some KConfig patch to disallow such combinations
+> then?
 
-> As part of work to remove the global CLOCK_TICK_RATE symbol,
-> this patch defines a sub-arch local value for use by the
-> ixp23xx code.  Once all LATCH and CLOCK_TICK_RATE references
-> are removed, we will remove all the definitions across
-> sub-arches.
+Yes, need to work on this. Build breakage is bad.
 
-I posted a patchset back in Oct 2010 that does this:
-
-http://lists.infradead.org/pipermail/linux-arm-kernel/2010-October/029451.html
-http://lists.infradead.org/pipermail/linux-arm-kernel/2010-October/029452.html
-http://lists.infradead.org/pipermail/linux-arm-kernel/2010-October/029453.html
-http://lists.infradead.org/pipermail/linux-arm-kernel/2010-October/029454.html
-http://lists.infradead.org/pipermail/linux-arm-kernel/2010-October/029455.html
-http://lists.infradead.org/pipermail/linux-arm-kernel/2010-October/029456.html
+Thanks,
+Sekhar
