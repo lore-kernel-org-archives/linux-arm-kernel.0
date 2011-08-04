@@ -1,62 +1,45 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 4 Aug 2011 13:35:04 +0800
-Subject: [PATCH v2 0/3] Add device tree probe for imx-sdma driver
-In-Reply-To: <1312430372.1536.554.camel@vkoul-udesk3>
-References: <1310723066-567-1-git-send-email-shawn.guo@linaro.org>
-	<1312430372.1536.554.camel@vkoul-udesk3>
-Message-ID: <20110804053504.GA3311@freescale.com>
+From: viresh.kumar@st.com (viresh kumar)
+Date: Thu, 4 Aug 2011 11:24:54 +0530
+Subject: [PATCH 09/18] dmaengine/amba-pl08x: Schedule tasklet in case
+	of error interrupt
+In-Reply-To: <1312431918.1536.559.camel@vkoul-udesk3>
+References: <cover.1311936523.git.viresh.kumar@st.com>	
+	<9c81beb9cd84f84b58abbd24ebfae85dfe8d8ee1.1311936524.git.viresh.kumar@st.com>	
+	<1311941799.1536.532.camel@vkoul-udesk3>	
+	<CAOh2x==_g+JQzTizgVTdH8Dyg_5+KpyYm+G_Ddu5mO15N6n-tw@mail.gmail.com>
+	<1312431918.1536.559.camel@vkoul-udesk3>
+Message-ID: <4E3A342E.5080503@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 04, 2011 at 09:29:32AM +0530, Koul, Vinod wrote:
-> On Fri, 2011-07-15 at 17:44 +0800, Shawn Guo wrote:
-> > The first patch remove the use of software defined sdma version, and
-> > instead uses platform_device_id to handle the sdma differences from
-> > one soc to another.  The second one makes a small cleanup on function
-> > sdma_get_firmware(), and the third patch adds the actual device tree
-> > probe support.
-> > 
-> > Changes since v1:
-> >  * Do not encode ROM script address in device tree
-> >  * Add one more small cleanup on function sdma_get_firmware()
-> > 
-> > ShawnsGuo (3):
-> >       dmaengine: imx-sdma: use platform_device_id to identify sdma version
-> >       dmaengine: imx-sdma: sdma_get_firmware does not need to copy fw_name
-> >       dmaengine: imx-sdma: add device tree probe support
-> > 
-> Sacha are you okay if this go via my tree, would need your ack before I
-> take this one
+On 08/04/2011 09:55 AM, Koul, Vinod wrote:
+> Yes that's the whole point, today callback mechanism doesn't tell the
+> _status_ of the transfer (which if we need change can be discussed as
+> well), but to counter argue I have never been able to generate the error
+> interrupt, are you able to do on your controller?
+
+Yes, if we supply unaligned address, with access width as word, then it gives
+error interrupt.
+
+Regarding your point of updating callback for reporting errors,
+I think it is required and should be a common issue.
+
 > 
-Hi Vinod,
+> One more point wrt this patch, what do we gain here from calling
+> tasklet, are you cleaning up your queue for the error descriptor or
+> something, I think not. so just calling to print doesn't make sense to
+> me, comments?
 
-Sorry if I have misunderstood your reply below, but the series has
-gone into mainline through arm tree.
+Tasklet does following:
+- If any other transfer request is queued up, then it is started
+- else, it releases physical channel, by clearing it completely.
 
-Regards,
-Shawn
+Finally it unmap buffers, frees txd, and call callback.
 
----- Quote ---
-On Mon, Jul 25, 2011 at 05:11:55PM +0530, Vinod Koul wrote:
-> On Fri, 2011-07-22 at 11:54 +0800, Shawn Guo wrote:
-> > Hi Vinod,
-> >
-> > Can I have your ack on this series, please?  I attempt to get it
-> > merged through Sascha's tree after his tree and devicetree/next get
-> > merged in the coming window.
-> >
-> > Regards,
-> > Shawn
-> >
-> > On Fri, Jul 15, 2011 at 05:44:23PM +0800, Shawn Guo wrote:
-> > >
-> > > ShawnsGuo (3):
-> > >       dmaengine: imx-sdma: use platform_device_id to identify sdma version
-> > >       dmaengine: imx-sdma: sdma_get_firmware does not need to copy fw_name
-> > >       dmaengine: imx-sdma: add device tree probe support
-> > >
-> Acked-by: Vinod Koul <vinod.koul@intel.com>
->
-> I had queued this up for my tree, i am okay if it gets merged thru
-> Sascha
->
+This probably is enough to end transfer for which user was waiting.
+If user hasn't used any timeout mechanisms then he will never come
+to know that an error occurred. So its better to call its callback,
+to tell him, transfer has completed, successfully or unsuccessfully.
+
+-- 
+viresh
