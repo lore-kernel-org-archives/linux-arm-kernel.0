@@ -1,32 +1,37 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 04 Aug 2011 10:24:55 -0700
-Subject: [PATCH] cpuidle: Consistent spelling of cpuidle_idle_call()
-In-Reply-To: <1312475071-22973-1-git-send-email-davidb@codeaurora.org>
-References: <1312475071-22973-1-git-send-email-davidb@codeaurora.org>
-Message-ID: <4E3AD5E7.6040105@codeaurora.org>
+From: hemantp@ti.com (Pedanekar, Hemant)
+Date: Thu, 4 Aug 2011 22:58:22 +0530
+Subject: [PATCH 3/4] TI816X: clock: Add clockdomains and powerdomains data
+In-Reply-To: <alpine.DEB.2.00.1107160154080.25013@utopia.booyaka.com>
+References: <1301070022-8405-1-git-send-email-hemantp@ti.com>
+	<alpine.DEB.2.00.1107160154080.25013@utopia.booyaka.com>
+Message-ID: <2A3DCF3DA181AD40BDE86A3150B27B6B03ABA7E9FB@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/04/2011 09:24 AM, David Brown wrote:
-> Commit a0bfa1373859e9d11dc92561a8667588803e42d8 mispells
-> cpuidle_idle_call() on ARM and SH code.  Fix this to be consistent.
->
-> Cc: Kevin Hilman <khilman@deeprootsystems.com>
-> Cc: Paul Mundt <lethal@linux-sh.org>
-> Cc: x86 at kernel.org
-> Cc: Len Brown <len.brown@intel.com>
-> Signed-off-by: David Brown <davidb@codeaurora.org>
-> ---
-> The referenced commit breaks compilation on ARM, and appears it would
-> do so on SH as well.
+Paul Walmsley wrote on Saturday, July 16, 2011 1:25 PM:
 
-Mark Brown sent this patch[1] months ago when this build breakage was
-noticed in linux-next. What happened to that patch? It looks like the
-patch that introduced the breakage was pulled from linux-next shortly
-after and then reintroduced today.
+> On Fri, 25 Mar 2011, Hemant Pedanekar wrote:
+> 
+>> This patch adds data for various clock domains and power domains in TI816X.
+>> 
+>> Note that at present this is not exhaustive and need to add missing
+>> domains. 
+>> 
+>> Signed-off-by: Hemant Pedanekar <hemantp@ti.com>
+>> ---
+>>  arch/arm/mach-omap2/clockdomains816x.h |  167
+> ++++++++++++++++++++++++++++++++
+>>  arch/arm/mach-omap2/powerdomains816x.h |   74 ++++++++++++++
+>>  2 files changed, 241 insertions(+), 0 deletions(-)
+>>  create mode 100644 arch/arm/mach-omap2/clockdomains816x.h
+>>  create mode 100644 arch/arm/mach-omap2/powerdomains816x.h
+> 
+> Static data shouldn't be declared in .h files; it should be declared in
+> *domains81*_data.c files, as is the practice with the rest of the
+> powerdomains/clockdomains data here.
+> 
+Will take care of this in next version.
 
-[1]https://lkml.org/lkml/2011/4/4/109
+Thanks.
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+   Hemant
