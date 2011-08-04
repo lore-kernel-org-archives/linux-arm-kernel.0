@@ -1,38 +1,38 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu,  4 Aug 2011 08:45:10 -0700
-Subject: [PATCH 6/6] OMAP: McBSP: use existing macros for converting between
-	devices
-In-Reply-To: <1312472710-31758-1-git-send-email-khilman@ti.com>
-References: <1312472710-31758-1-git-send-email-khilman@ti.com>
-Message-ID: <1312472710-31758-7-git-send-email-khilman@ti.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu,  4 Aug 2011 16:49:03 +0100
+Subject: [RFC PATCH] mmc: at91_mci: remove the use of irq_to_gpio
+Message-ID: <1312472943-13839-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For converting from struct device to platform_device, and from
-platform_device to struct omap_device, there are existing macros.  Use
-them instead of manual use of container_of().
+Remove the use of irq_to_gpio() in the card detection interrupt
+handler. The information is available in the board structure and
+we can avoid using a function that has little meaning.
 
-Signed-off-by: Kevin Hilman <khilman@ti.com>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- arch/arm/plat-omap/mcbsp.c |    6 +++---
- 1 files changed, 3 insertions(+), 3 deletions(-)
+Ben, Arnd,
 
-diff --git a/arch/arm/plat-omap/mcbsp.c b/arch/arm/plat-omap/mcbsp.c
-index 3c1fbdc..47016f7 100644
---- a/arch/arm/plat-omap/mcbsp.c
-+++ b/arch/arm/plat-omap/mcbsp.c
-@@ -260,9 +260,9 @@ EXPORT_SYMBOL(omap_mcbsp_dma_reg_params);
- #ifdef CONFIG_ARCH_OMAP3
- static struct omap_device *find_omap_device_by_dev(struct device *dev)
+I have identified this use of irq_to_gpio() which can be remove immediatly.
+
+ drivers/mmc/host/at91_mci.c |    5 ++++-
+ 1 files changed, 4 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/mmc/host/at91_mci.c b/drivers/mmc/host/at91_mci.c
+index a4aa3af..351951c 100644
+--- a/drivers/mmc/host/at91_mci.c
++++ b/drivers/mmc/host/at91_mci.c
+@@ -869,7 +869,10 @@ static irqreturn_t at91_mci_irq(int irq, void *devid)
+ static irqreturn_t at91_mmc_det_irq(int irq, void *_host)
  {
--	struct platform_device *pdev = container_of(dev,
--					struct platform_device, dev);
--	return container_of(pdev, struct omap_device, pdev);
-+	struct platform_device *pdev = to_platform_device(dev);
+ 	struct at91mci_host *host = _host;
+-	int present = !gpio_get_value(irq_to_gpio(irq));
++	int present;
 +
-+	return to_omap_device(pdev);
- }
++	/* if we are here is that the det_pin exists */
++	present = !gpio_get_value(host->board->det_pin);
  
- static void omap_st_on(struct omap_mcbsp *mcbsp)
+ 	/*
+ 	 * we expect this irq on both insert and remove,
 -- 
-1.7.6
+1.7.4.1
