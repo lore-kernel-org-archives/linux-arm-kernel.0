@@ -1,125 +1,35 @@
 From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
-Date: Thu, 4 Aug 2011 16:34:42 +0530
-Subject: [PATCH v5 11/22] gpio/omap: remove hardcoded offsets in ctxt
-	save/restore
+Date: Thu, 4 Aug 2011 16:34:48 +0530
+Subject: [PATCH v5 17/22] gpio/omap: fix bankwidth for OMAP7xx MPUIO
 In-Reply-To: <1312455893-14922-1-git-send-email-tarun.kanti@ti.com>
 References: <1312455893-14922-1-git-send-email-tarun.kanti@ti.com>
-Message-ID: <1312455893-14922-12-git-send-email-tarun.kanti@ti.com>
+Message-ID: <1312455893-14922-18-git-send-email-tarun.kanti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is not required to use hard-coded offsets any more in context save and
-restore functions and instead use the generic offsets which have been correctly
-initialized during device registration.
+From: Charulatha V <charu@ti.com>
 
-Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+In all OMAP1 SoCs, the MPUIO bank width is 16 bits. But, in OMAP7xx,
+it is wrongly initialised to 32. Fix this.
+
 Signed-off-by: Charulatha V <charu@ti.com>
 ---
- arch/arm/mach-omap2/gpio.c             |    2 +
- arch/arm/plat-omap/include/plat/gpio.h |    1 +
- drivers/gpio/gpio-omap.c               |   41 ++++++++++++++-----------------
- 3 files changed, 22 insertions(+), 22 deletions(-)
+ arch/arm/mach-omap1/gpio7xx.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/gpio.c b/arch/arm/mach-omap2/gpio.c
-index 8745c3a..0ee9a55 100644
---- a/arch/arm/mach-omap2/gpio.c
-+++ b/arch/arm/mach-omap2/gpio.c
-@@ -103,6 +103,7 @@ static int omap2_gpio_dev_init(struct omap_hwmod *oh, void *unused)
- 		pdata->regs->irqstatus = OMAP24XX_GPIO_IRQSTATUS1;
- 		pdata->regs->irqstatus2 = OMAP24XX_GPIO_IRQSTATUS2;
- 		pdata->regs->irqenable = OMAP24XX_GPIO_IRQENABLE1;
-+		pdata->regs->irqenable2 = OMAP24XX_GPIO_IRQENABLE2;
- 		pdata->regs->set_irqenable = OMAP24XX_GPIO_SETIRQENABLE1;
- 		pdata->regs->clr_irqenable = OMAP24XX_GPIO_CLEARIRQENABLE1;
- 		pdata->regs->debounce = OMAP24XX_GPIO_DEBOUNCE_VAL;
-@@ -125,6 +126,7 @@ static int omap2_gpio_dev_init(struct omap_hwmod *oh, void *unused)
- 		pdata->regs->irqstatus = OMAP4_GPIO_IRQSTATUS0;
- 		pdata->regs->irqstatus2 = OMAP4_GPIO_IRQSTATUS1;
- 		pdata->regs->irqenable = OMAP4_GPIO_IRQSTATUSSET0;
-+		pdata->regs->irqenable2 = OMAP4_GPIO_IRQSTATUSSET1;
- 		pdata->regs->set_irqenable = OMAP4_GPIO_IRQSTATUSSET0;
- 		pdata->regs->clr_irqenable = OMAP4_GPIO_IRQSTATUSCLR0;
- 		pdata->regs->debounce = OMAP4_GPIO_DEBOUNCINGTIME;
-diff --git a/arch/arm/plat-omap/include/plat/gpio.h b/arch/arm/plat-omap/include/plat/gpio.h
-index 7d12fe8..0ad4f49 100644
---- a/arch/arm/plat-omap/include/plat/gpio.h
-+++ b/arch/arm/plat-omap/include/plat/gpio.h
-@@ -184,6 +184,7 @@ struct omap_gpio_reg_offs {
- 	u16 irqstatus;
- 	u16 irqstatus2;
- 	u16 irqenable;
-+	u16 irqenable2;
- 	u16 set_irqenable;
- 	u16 clr_irqenable;
- 	u16 debounce;
-diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-index be561be..e7c9fe5 100644
---- a/drivers/gpio/gpio-omap.c
-+++ b/drivers/gpio/gpio-omap.c
-@@ -1348,45 +1348,42 @@ void omap2_gpio_resume_after_idle(void)
- static void omap_gpio_save_context(struct gpio_bank *bank)
- {
- 	bank->context.irqenable1 =
--		__raw_readl(bank->base + OMAP24XX_GPIO_IRQENABLE1);
-+			__raw_readl(bank->base + bank->regs->irqenable);
- 	bank->context.irqenable2 =
--		__raw_readl(bank->base + OMAP24XX_GPIO_IRQENABLE2);
-+			__raw_readl(bank->base + bank->regs->irqenable2);
- 	bank->context.wake_en =
--		__raw_readl(bank->base + OMAP24XX_GPIO_WAKE_EN);
--	bank->context.ctrl = __raw_readl(bank->base + OMAP24XX_GPIO_CTRL);
--	bank->context.oe = __raw_readl(bank->base + OMAP24XX_GPIO_OE);
-+			__raw_readl(bank->base + bank->regs->wkup_status);
-+	bank->context.ctrl = __raw_readl(bank->base + bank->regs->ctrl);
-+	bank->context.oe = __raw_readl(bank->base + bank->regs->direction);
- 	bank->context.leveldetect0 =
--		__raw_readl(bank->base + OMAP24XX_GPIO_LEVELDETECT0);
-+			__raw_readl(bank->base + bank->regs->leveldetect0);
- 	bank->context.leveldetect1 =
--		__raw_readl(bank->base + OMAP24XX_GPIO_LEVELDETECT1);
-+			__raw_readl(bank->base + bank->regs->leveldetect1);
- 	bank->context.risingdetect =
--		__raw_readl(bank->base + OMAP24XX_GPIO_RISINGDETECT);
-+			__raw_readl(bank->base + bank->regs->risingdetect);
- 	bank->context.fallingdetect =
--		__raw_readl(bank->base + OMAP24XX_GPIO_FALLINGDETECT);
--	bank->context.dataout =
--		__raw_readl(bank->base + OMAP24XX_GPIO_DATAOUT);
-+	bank->context.dataout = __raw_readl(bank->base + bank->regs->dataout);
- }
+diff --git a/arch/arm/mach-omap1/gpio7xx.c b/arch/arm/mach-omap1/gpio7xx.c
+index 8d25052..3ca9600 100644
+--- a/arch/arm/mach-omap1/gpio7xx.c
++++ b/arch/arm/mach-omap1/gpio7xx.c
+@@ -52,8 +52,8 @@ static struct omap_gpio_reg_offs omap7xx_mpuio_regs = {
  
- static void omap_gpio_restore_context(struct gpio_bank *bank)
- {
- 	__raw_writel(bank->context.irqenable1,
--			bank->base + OMAP24XX_GPIO_IRQENABLE1);
-+				bank->base + bank->regs->irqenable);
- 	__raw_writel(bank->context.irqenable2,
--			bank->base + OMAP24XX_GPIO_IRQENABLE2);
-+				bank->base + bank->regs->irqenable2);
- 	__raw_writel(bank->context.wake_en,
--			bank->base + OMAP24XX_GPIO_WAKE_EN);
--	__raw_writel(bank->context.ctrl, bank->base + OMAP24XX_GPIO_CTRL);
--	__raw_writel(bank->context.oe, bank->base + OMAP24XX_GPIO_OE);
-+				bank->base + bank->regs->wkup_status);
-+	__raw_writel(bank->context.ctrl, bank->base + bank->regs->ctrl);
-+	__raw_writel(bank->context.oe, bank->base + bank->regs->direction);
- 	__raw_writel(bank->context.leveldetect0,
--			bank->base + OMAP24XX_GPIO_LEVELDETECT0);
-+				bank->base + bank->regs->leveldetect0);
- 	__raw_writel(bank->context.leveldetect1,
--			bank->base + OMAP24XX_GPIO_LEVELDETECT1);
-+				bank->base + bank->regs->leveldetect1);
- 	__raw_writel(bank->context.risingdetect,
--			bank->base + OMAP24XX_GPIO_RISINGDETECT);
-+				bank->base + bank->regs->risingdetect);
- 	__raw_writel(bank->context.fallingdetect,
--			bank->base + OMAP24XX_GPIO_FALLINGDETECT);
--	__raw_writel(bank->context.dataout,
--			bank->base + OMAP24XX_GPIO_DATAOUT);
-+				bank->base + bank->regs->fallingdetect);
-+	__raw_writel(bank->context.dataout, bank->base + bank->regs->dataout);
- }
- #endif
- 
+ static struct __initdata omap_gpio_platform_data omap7xx_mpu_gpio_config = {
+ 	.virtual_irq_start	= IH_MPUIO_BASE,
+-	.bank_width		= 32,
+ 	.is_mpuio		= true,
++	.bank_width		= 16,
+ 	.bank_stride		= 2,
+ 	.regs                   = &omap7xx_mpuio_regs,
+ };
 -- 
 1.7.0.4
