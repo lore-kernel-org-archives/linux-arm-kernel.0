@@ -1,173 +1,224 @@
 From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
-Date: Thu, 4 Aug 2011 16:34:44 +0530
-Subject: [PATCH v5 13/22] gpio/omap: cleanup omap_gpio_mod_init function
+Date: Thu, 4 Aug 2011 16:34:49 +0530
+Subject: [PATCH v5 18/22] gpio/omap: use pm-runtime framework
 In-Reply-To: <1312455893-14922-1-git-send-email-tarun.kanti@ti.com>
 References: <1312455893-14922-1-git-send-email-tarun.kanti@ti.com>
-Message-ID: <1312455893-14922-14-git-send-email-tarun.kanti@ti.com>
+Message-ID: <1312455893-14922-19-git-send-email-tarun.kanti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With register offsets now defined for respective OMAP versions we can get rid
-of cpu_class_* checks. This function now has common initialization code for
-all OMAP versions. Initialization specific to OMAP16xx has been moved within
-omap16xx_gpio_init().
+Call runtime pm APIs pm_runtime_get_sync() and pm_runtime_put_sync()
+for enabling/disabling clocks appropriately. Remove syscore_ops and
+instead use dev_pm_ops now.
 
-Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
 Signed-off-by: Charulatha V <charu@ti.com>
+Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
 ---
- arch/arm/mach-omap1/gpio16xx.c |   34 ++++++++++++++++++-
- drivers/gpio/gpio-omap.c       |   71 +++++++++++-----------------------------
- 2 files changed, 52 insertions(+), 53 deletions(-)
+ drivers/gpio/gpio-omap.c |   89 ++++++++++++++++++++++++++++++++++-----------
+ 1 files changed, 67 insertions(+), 22 deletions(-)
 
-diff --git a/arch/arm/mach-omap1/gpio16xx.c b/arch/arm/mach-omap1/gpio16xx.c
-index f619805..61b1998 100644
---- a/arch/arm/mach-omap1/gpio16xx.c
-+++ b/arch/arm/mach-omap1/gpio16xx.c
-@@ -24,6 +24,8 @@
- #define OMAP1610_GPIO4_BASE		0xfffbbc00
- #define OMAP1_MPUIO_VBASE		OMAP1_MPUIO_BASE
+diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+index 0545d8f..bca6dcd 100644
+--- a/drivers/gpio/gpio-omap.c
++++ b/drivers/gpio/gpio-omap.c
+@@ -79,6 +79,8 @@ struct gpio_bank {
+ 	struct omap_gpio_reg_offs *regs;
+ };
  
-+#define SYSCONFIG_WORD			0x14 /* smart idle, enable wakeup */
++static void omap_gpio_mod_init(struct gpio_bank *bank);
 +
- /* mpu gpio */
- static struct __initdata resource omap16xx_mpu_gpio_resources[] = {
- 	{
-@@ -218,12 +220,42 @@ static struct __initdata platform_device * omap16xx_gpio_dev[] = {
- static int __init omap16xx_gpio_init(void)
- {
- 	int i;
-+	void __iomem *base;
-+	struct resource *res;
-+	struct platform_device *pdev;
-+	struct omap_gpio_platform_data *pdata;
+ #define GPIO_INDEX(bank, gpio) (gpio % bank->width)
+ #define GPIO_BIT(bank, gpio) (1 << GPIO_INDEX(bank, gpio))
+ #define GPIO_MOD_CTRL_BIT	BIT(0)
+@@ -481,6 +483,19 @@ static int omap_gpio_request(struct gpio_chip *chip, unsigned offset)
  
- 	if (!cpu_is_omap16xx())
- 		return -EINVAL;
+ 	spin_lock_irqsave(&bank->lock, flags);
  
--	for (i = 0; i < ARRAY_SIZE(omap16xx_gpio_dev); i++)
-+	for (i = 0; i < ARRAY_SIZE(omap16xx_gpio_dev); i++) {
-+		pdev = omap16xx_gpio_dev[i];
-+		pdata = pdev->dev.platform_data;
-+
-+		res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+		if (unlikely(!res)) {
-+			dev_err(&pdev->dev, "Invalid mem resource.\n");
-+			return -ENODEV;
++	/*
++	 * If this is the first gpio_request for the bank,
++	 * enable the bank module.
++	 */
++	if (!bank->mod_usage)
++		if (IS_ERR_VALUE(pm_runtime_get_sync(bank->dev) < 0)) {
++			dev_err(bank->dev, "%s: GPIO bank %d "
++					"pm_runtime_get_sync failed\n",
++					__func__, bank->id);
++			spin_unlock_irqrestore(&bank->lock, flags);
++			return -EINVAL;
 +		}
 +
-+		base = ioremap(res->start, resource_size(res));
-+		if (unlikely(!base)) {
-+			dev_err(&pdev->dev, "ioremap failed.\n");
-+			return -ENOMEM;
+ 	/* Set trigger to none. You need to enable the desired trigger with
+ 	 * request_irq() or set_irq_type().
+ 	 */
+@@ -535,6 +550,19 @@ static void omap_gpio_free(struct gpio_chip *chip, unsigned offset)
+ 	}
+ 
+ 	_reset_gpio(bank, bank->chip.base + offset);
++
++	/*
++	 * If this is the last gpio to be freed in the bank,
++	 * disable the bank module.
++	 */
++	if (!bank->mod_usage) {
++		if (IS_ERR_VALUE(pm_runtime_put_sync(bank->dev) < 0)) {
++			dev_err(bank->dev, "%s: GPIO bank %d "
++					"pm_runtime_put_sync failed\n",
++					__func__, bank->id);
 +		}
-+
-+		__raw_writel(SYSCONFIG_WORD, base + OMAP1610_GPIO_SYSCONFIG);
-+		iounmap(base);
-+
-+		/*
-+		 * Enable system clock for GPIO module.
-+		 * The CAM_CLK_CTRL *is* really the right place.
-+		 */
-+		omap_writel(omap_readl(ULPD_CAM_CLK_CTRL) | 0x04,
-+					ULPD_CAM_CLK_CTRL);
-+
- 		platform_device_register(omap16xx_gpio_dev[i]);
 +	}
++
+ 	spin_unlock_irqrestore(&bank->lock, flags);
+ }
+ 
+@@ -561,6 +589,7 @@ static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
+ 
+ 	bank = irq_get_handler_data(irq);
+ 	isr_reg = bank->base + bank->regs->irqstatus;
++	pm_runtime_get_sync(bank->dev);
+ 
+ 	if (WARN_ON(!isr_reg))
+ 		goto exit;
+@@ -622,6 +651,7 @@ static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
+ exit:
+ 	if (!unmasked)
+ 		chained_irq_exit(chip, desc);
++	pm_runtime_put_sync_suspend(bank->dev);
+ }
+ 
+ static void gpio_irq_shutdown(struct irq_data *d)
+@@ -1023,7 +1053,13 @@ static int __devinit omap_gpio_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	pm_runtime_enable(bank->dev);
+-	pm_runtime_get_sync(bank->dev);
++	pm_runtime_irq_safe(bank->dev);
++	if (IS_ERR_VALUE(pm_runtime_get_sync(bank->dev) < 0)) {
++		dev_err(bank->dev, "%s: GPIO bank %d pm_runtime_get_sync "
++				"failed\n", __func__, bank->id);
++		iounmap(bank->base);
++		return -EINVAL;
++	}
+ 
+ 	if (bank->is_mpuio) {
+ 		if (bank->regs->wkup_status)
+@@ -1034,6 +1070,13 @@ static int __devinit omap_gpio_probe(struct platform_device *pdev)
+ 	omap_gpio_chip_init(bank);
+ 	omap_gpio_show_rev(bank);
+ 
++	if (IS_ERR_VALUE(pm_runtime_put_sync(bank->dev) < 0)) {
++		dev_err(bank->dev, "%s: GPIO bank %d pm_runtime_put_sync "
++				"failed\n", __func__, bank->id);
++		iounmap(bank->base);
++		return -EINVAL;
++	}
++
+ 	list_add_tail(&bank->node, &omap_gpio_list);
+ 
+ 	return ret;
+@@ -1044,7 +1087,7 @@ err_exit:
+ 	return ret;
+ }
+ 
+-static int omap_gpio_suspend(void)
++static int omap_gpio_suspend(struct device *dev)
+ {
+ 	struct gpio_bank *bank;
+ 
+@@ -1063,12 +1106,13 @@ static int omap_gpio_suspend(void)
+ 		_gpio_rmw(base, bank->regs->wkup_status,
+ 					bank->suspend_wakeup, 1);
+ 		spin_unlock_irqrestore(&bank->lock, flags);
++		pm_runtime_put_sync(dev);
+ 	}
  
  	return 0;
  }
-diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-index 21cb0d4..f6855e5 100644
---- a/drivers/gpio/gpio-omap.c
-+++ b/drivers/gpio/gpio-omap.c
-@@ -875,62 +875,24 @@ static void __init omap_gpio_show_rev(struct gpio_bank *bank)
-  */
- static struct lock_class_key gpio_lock_class;
  
--/* TODO: Cleanup cpu_is_* checks */
- static void omap_gpio_mod_init(struct gpio_bank *bank)
+-static void omap_gpio_resume(void)
++static int omap_gpio_resume(struct device *dev)
  {
--	if (cpu_class_is_omap2()) {
--		if (cpu_is_omap44xx()) {
--			__raw_writel(0xffffffff, bank->base +
--					OMAP4_GPIO_IRQSTATUSCLR0);
--			__raw_writel(0x00000000, bank->base +
--					 OMAP4_GPIO_DEBOUNCENABLE);
--			/* Initialize interface clk ungated, module enabled */
--			__raw_writel(0, bank->base + OMAP4_GPIO_CTRL);
--		} else if (cpu_is_omap34xx()) {
--			__raw_writel(0x00000000, bank->base +
--					OMAP24XX_GPIO_IRQENABLE1);
--			__raw_writel(0xffffffff, bank->base +
--					OMAP24XX_GPIO_IRQSTATUS1);
--			__raw_writel(0x00000000, bank->base +
--					OMAP24XX_GPIO_DEBOUNCE_EN);
--
--			/* Initialize interface clk ungated, module enabled */
--			__raw_writel(0, bank->base + OMAP24XX_GPIO_CTRL);
--		}
--	} else if (cpu_class_is_omap1()) {
--		if (bank_is_mpuio(bank)) {
--			__raw_writew(0xffff, bank->base +
--				OMAP_MPUIO_GPIO_MASKIT / bank->stride);
--			mpuio_init(bank);
--		}
--		if (cpu_is_omap15xx() && bank->method == METHOD_GPIO_1510) {
--			__raw_writew(0xffff, bank->base
--						+ OMAP1510_GPIO_INT_MASK);
--			__raw_writew(0x0000, bank->base
--						+ OMAP1510_GPIO_INT_STATUS);
--		}
--		if (cpu_is_omap16xx() && bank->method == METHOD_GPIO_1610) {
--			__raw_writew(0x0000, bank->base
--						+ OMAP1610_GPIO_IRQENABLE1);
--			__raw_writew(0xffff, bank->base
--						+ OMAP1610_GPIO_IRQSTATUS1);
--			__raw_writew(0x0014, bank->base
--						+ OMAP1610_GPIO_SYSCONFIG);
-+	void __iomem *base = bank->base;
-+	u32 l = 0xffffffff;
+ 	struct gpio_bank *bank;
  
--			/*
--			 * Enable system clock for GPIO module.
--			 * The CAM_CLK_CTRL *is* really the right place.
--			 */
--			omap_writel(omap_readl(ULPD_CAM_CLK_CTRL) | 0x04,
--						ULPD_CAM_CLK_CTRL);
--		}
--		if (cpu_is_omap7xx() && bank->method == METHOD_GPIO_7XX) {
--			__raw_writel(0xffffffff, bank->base
--						+ OMAP7XX_GPIO_INT_MASK);
--			__raw_writel(0x00000000, bank->base
--						+ OMAP7XX_GPIO_INT_STATUS);
--		}
-+	if (bank->width == 16)
-+		l = 0xffff;
-+
-+	if (bank_is_mpuio(bank)) {
-+		__raw_writel(l, bank->base + bank->regs->irqenable);
-+		return;
+@@ -1077,18 +1121,16 @@ static void omap_gpio_resume(void)
+ 		unsigned long flags;
+ 
+ 		if (!bank->regs->wkup_status)
+-			return;
++			return 0;
+ 
++		pm_runtime_get_sync(dev);
+ 		spin_lock_irqsave(&bank->lock, flags);
+ 		_gpio_rmw(base, bank->regs->wkup_status, bank->saved_wakeup, 1);
+ 		spin_unlock_irqrestore(&bank->lock, flags);
  	}
+-}
+ 
+-static struct syscore_ops omap_gpio_syscore_ops = {
+-	.suspend	= omap_gpio_suspend,
+-	.resume		= omap_gpio_resume,
+-};
++	return 0;
++}
+ 
+ #ifdef CONFIG_ARCH_OMAP2PLUS
+ 
+@@ -1112,6 +1154,11 @@ void omap2_gpio_prepare_for_idle(int off_mode)
+ 		if (!off_mode)
+ 			continue;
+ 
++		if (IS_ERR_VALUE(pm_runtime_put_sync(bank->dev) < 0))
++			dev_err(bank->dev, "%s: GPIO bank %d "
++					"pm_runtime_put_sync failed\n",
++					__func__, bank->id);
 +
-+	_gpio_rmw(base, bank->regs->irqenable, l, bank->regs->irqenable_inv);
-+	_gpio_rmw(base, bank->regs->irqstatus, l,
-+					bank->regs->irqenable_inv == false);
-+	_gpio_rmw(base, bank->regs->irqenable, l, bank->regs->debounce_en != 0);
-+	_gpio_rmw(base, bank->regs->irqenable, l, bank->regs->ctrl != 0);
+ 		/* If going to OFF, remove triggering for all
+ 		 * non-wakeup GPIOs.  Otherwise spurious IRQs will be
+ 		 * generated.  See OMAP2420 Errata item 1.101. */
+@@ -1152,6 +1199,11 @@ void omap2_gpio_resume_after_idle(void)
+ 		if (!bank->loses_context)
+ 			continue;
+ 
++		if (IS_ERR_VALUE(pm_runtime_get_sync(bank->dev) < 0))
++			dev_err(bank->dev, "%s: GPIO bank %d "
++					"pm_runtime_get_sync failed\n",
++					__func__, bank->id);
++
+ 		for (j = 0; j < hweight_long(bank->dbck_enable_mask); j++)
+ 			clk_enable(bank->dbck);
+ 
+@@ -1266,10 +1318,16 @@ static void omap_gpio_restore_context(struct gpio_bank *bank)
  }
+ #endif
  
- static __init void
-@@ -1074,6 +1036,11 @@ static int __devinit omap_gpio_probe(struct platform_device *pdev)
- 	pm_runtime_enable(bank->dev);
- 	pm_runtime_get_sync(bank->dev);
- 
-+	if (bank_is_mpuio(bank)) {
-+		if (bank->regs->wkup_status)
-+			mpuio_init(bank);
-+	}
++static const struct dev_pm_ops gpio_pm_ops = {
++	.suspend		= omap_gpio_suspend,
++	.resume			= omap_gpio_resume,
++};
 +
- 	omap_gpio_mod_init(bank);
- 	omap_gpio_chip_init(bank);
- 	omap_gpio_show_rev(bank);
+ static struct platform_driver omap_gpio_driver = {
+ 	.probe		= omap_gpio_probe,
+ 	.driver		= {
+ 		.name	= "omap_gpio",
++		.pm	= &gpio_pm_ops,
+ 	},
+ };
+ 
+@@ -1283,16 +1341,3 @@ static int __init omap_gpio_drv_reg(void)
+ 	return platform_driver_register(&omap_gpio_driver);
+ }
+ postcore_initcall(omap_gpio_drv_reg);
+-
+-static int __init omap_gpio_sysinit(void)
+-{
+-
+-#if defined(CONFIG_ARCH_OMAP16XX) || defined(CONFIG_ARCH_OMAP2PLUS)
+-	if (cpu_is_omap16xx() || cpu_class_is_omap2())
+-		register_syscore_ops(&omap_gpio_syscore_ops);
+-#endif
+-
+-	return 0;
+-}
+-
+-arch_initcall(omap_gpio_sysinit);
 -- 
 1.7.0.4
