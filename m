@@ -1,35 +1,58 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu,  4 Aug 2011 08:10:22 -0700
-Subject: [PATCH 3/2] I2C: OMAP: remove unused function pointers from pdata
-In-Reply-To: <1312469856-13276-1-git-send-email-khilman@ti.com>
-References: <1312469856-13276-1-git-send-email-khilman@ti.com>
-Message-ID: <1312470622-30534-1-git-send-email-khilman@ti.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 4 Aug 2011 18:09:51 +0300
+Subject: [PATCH 2/2] I2C: OMAP: remove dev->idle, use usage counting
+	provided by runtime PM
+In-Reply-To: <87ipqd449a.fsf@ti.com>
+References: <1312394960-21689-1-git-send-email-khilman@ti.com>
+	<1312394960-21689-3-git-send-email-khilman@ti.com>
+	<20110803223604.GB4036@legolas.emea.dhcp.ti.com>
+	<87ipqd449a.fsf@ti.com>
+Message-ID: <20110804150951.GU17540@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that this driver is using runtime PM, there is no longer a need
-for the idle/enable/shutdown function pointers in pdata.
+Hi,
 
-Signed-off-by: Kevin Hilman <khilman@ti.com>
----
-Here's one more for the i2c-cleanup series
+On Thu, Aug 04, 2011 at 07:53:37AM -0700, Kevin Hilman wrote:
+> >> @@ -1140,6 +1128,36 @@ omap_i2c_remove(struct platform_device *pdev)
+> >>  	return 0;
+> >>  }
+> >>  
+> >> +#ifdef CONFIG_PM_RUNTIME
+> >> +static int omap_i2c_runtime_suspend(struct device *dev)
+> >> +{
+> >> +	struct platform_device *pdev = to_platform_device(dev);
+> >> +	struct omap_i2c_dev *_dev = platform_get_drvdata(pdev);
+> >
+> > what happened to dev_get_drvdata(dev) ??
+> >
+> 
+> Yes, that would work too since:
+> 
+> static inline void *platform_get_drvdata(const struct platform_device *pdev)
+> {
+> 	return dev_get_drvdata(&pdev->dev);
+> }
+> 
+> but IMO, readability is better if the driver does platform_set_drvdata()
+> and then the corresponding platform_get_drvdata()
 
- include/linux/i2c-omap.h |    3 ---
- 1 files changed, 0 insertions(+), 3 deletions(-)
+fair enough, but if you already have the dev pointer, what's the gain in
+doing a container_of() just to go back to the dev pointer again ?
 
-diff --git a/include/linux/i2c-omap.h b/include/linux/i2c-omap.h
-index 56a9924..92a0dc7 100644
---- a/include/linux/i2c-omap.h
-+++ b/include/linux/i2c-omap.h
-@@ -35,9 +35,6 @@ struct omap_i2c_bus_platform_data {
- 	u32		rev;
- 	u32		flags;
- 	void		(*set_mpu_wkup_lat)(struct device *dev, long set);
--	int		(*device_enable) (struct platform_device *pdev);
--	int		(*device_shutdown) (struct platform_device *pdev);
--	int		(*device_idle) (struct platform_device *pdev);
- };
- 
- #endif
+IMHO, there's really no need for that and just calling dev_get_drvdata()
+straight is enough. All in all, platform_get_[sg]et_drvdata() are just
+wrappers for dev_[sg]et_drvdata(). The whole point, was to avoid
+dev_[sg]et_drvdata(&pdev->dev). It's the same with <drivername>_writel()
+calls we see on all drivers. Just a wrapper, but you can use
+__raw_writel() directly if you wish.
+
 -- 
-1.7.6
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 490 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110804/91a06100/attachment.sig>
