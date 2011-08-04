@@ -1,44 +1,54 @@
-From: amit.kucheria@canonical.com (Amit Kucheria)
-Date: Thu, 4 Aug 2011 17:19:27 +0100
-Subject: [PATCH] ARM: mx5: board-cpuimx51.c fixup irq_to_gpio() usage
-In-Reply-To: <1312472855-15778-1-git-send-email-ben-linux@fluff.org>
-Message-ID: <20110804161927.GD8408@avalanche>
+From: davidb@codeaurora.org (David Brown)
+Date: Thu,  4 Aug 2011 09:24:31 -0700
+Subject: [PATCH] cpuidle: Consistent spelling of cpuidle_idle_call()
+Message-ID: <1312475071-22973-1-git-send-email-davidb@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 Aug 04, Ben Dooks wrote:
-> irq_to_gpio() is being called on a GPIO so change to using
-> gpio_to_irq() instead.
-> 
-> Signed-off-by: Ben Dooks <ben-linux@fluff.org>
+Commit a0bfa1373859e9d11dc92561a8667588803e42d8 mispells
+cpuidle_idle_call() on ARM and SH code.  Fix this to be consistent.
 
-cc'ing board maintainer.
+Cc: Kevin Hilman <khilman@deeprootsystems.com>
+Cc: Paul Mundt <lethal@linux-sh.org>
+Cc: x86 at kernel.org
+Cc: Len Brown <len.brown@intel.com>
+Signed-off-by: David Brown <davidb@codeaurora.org>
+---
+The referenced commit breaks compilation on ARM, and appears it would
+do so on SH as well.
 
-Acked-by: Amit Kucheria <amit.kucheria@canonical.com>
+David
 
+ arch/arm/kernel/process.c |    2 +-
+ arch/sh/kernel/idle.c     |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-> ---
->  arch/arm/mach-mx5/board-cpuimx51.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mx5/board-cpuimx51.c b/arch/arm/mach-mx5/board-cpuimx51.c
-> index 7c893fa..68934ea 100644
-> --- a/arch/arm/mach-mx5/board-cpuimx51.c
-> +++ b/arch/arm/mach-mx5/board-cpuimx51.c
-> @@ -81,7 +81,7 @@ static struct plat_serial8250_port serial_platform_data[] = {
->  		.flags = UPF_BOOT_AUTOCONF | UPF_SKIP_TEST | UPF_IOREMAP,
->  	}, {
->  		.mapbase = (unsigned long)(MX51_CS1_BASE_ADDR + 0x2000000),
-> -		.irq = irq_to_gpio(CPUIMX51_QUARTD_GPIO),
-> +		.irq = gpio_to_irq(CPUIMX51_QUARTD_GPIO),
->  		.irqflags = IRQF_TRIGGER_HIGH,
->  		.uartclk = CPUIMX51_QUART_XTAL,
->  		.regshift = CPUIMX51_QUART_REGSHIFT,
-> -- 
-> 1.7.1
-> 
-
+diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+index d7ee0d4..1a347f4 100644
+--- a/arch/arm/kernel/process.c
++++ b/arch/arm/kernel/process.c
+@@ -197,7 +197,7 @@ void cpu_idle(void)
+ 				cpu_relax();
+ 			} else {
+ 				stop_critical_timings();
+-				if (cpuidle_call_idle())
++				if (cpuidle_idle_call())
+ 					pm_idle();
+ 				start_critical_timings();
+ 				/*
+diff --git a/arch/sh/kernel/idle.c b/arch/sh/kernel/idle.c
+index 3c45de1..32114e0 100644
+--- a/arch/sh/kernel/idle.c
++++ b/arch/sh/kernel/idle.c
+@@ -101,7 +101,7 @@ void cpu_idle(void)
+ 			local_irq_disable();
+ 			/* Don't trace irqs off for idle */
+ 			stop_critical_timings();
+-			if (cpuidle_call_idle())
++			if (cpuidle_idle_call())
+ 				pm_idle();
+ 			/*
+ 			 * Sanity check to ensure that pm_idle() returns
 -- 
-----------------------------------------------------------------------
-Amit Kucheria, Kernel Engineer || amit.kucheria at canonical.com
-----------------------------------------------------------------------
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
