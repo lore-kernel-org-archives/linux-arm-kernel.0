@@ -1,30 +1,35 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 4 Aug 2011 17:57:03 +0200
-Subject: [PATCH 12/12] ARM: Remove mach-*/include/mach/timex.h
-In-Reply-To: <20110804135445.GJ1019@plexity.net>
-References: <cover.1312455035.git.dsaxena@linaro.org>
-	<20110804135445.GJ1019@plexity.net>
-Message-ID: <CACRpkdYepxshZr-UuA9UU_d--rsYFV648FbdO5nM36gZYZMMkw@mail.gmail.com>
+From: abhilash.kv@ti.com (Abhilash K V)
+Date: Thu, 4 Aug 2011 21:29:07 +0530
+Subject: [PATCH 0/2] AM3517: Booting up
+Message-ID: <1312473547-1147-1-git-send-email-abhilash.kv@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 4, 2011 at 3:54 PM, Deepak Saxena <dsaxena@linaro.org> wrote:
+This patch-set gets the kernel booting up on a AM3517 EVM.
+The board is able to boot with ramdisk after this,but the MMC and Ethernet
+drivers are not up yet. Lots of warnings remain which will be addressed in
+subsequent patches.
 
-> We no longer use the global LATCH definition to drive
-> any platform-specific timers so we can remove the
-> timex.h files from all sub-arch include directories.
->
-> We still need to keep an ARM CLOCK_TICK_RATE due to
-> jiffies.h depending on it to build but that will be
-> removed in the future once all non-ARM references to
-> LATCH are also removed.
->
-> Signed-off-by: Deepak Saxena <dsaxena@linaro.org>
+The patches are tested on master of tmlind/linux-omap-2.6.git.
+Kernel version is 3.0.0-rc7 and last commit on top of which these patches
+were added is:
 
-This confusing define has bitten me in the past so I'm very happy
-to get rid of it. So for ux500, u300 and nomadik:
+	885cf6ff7d3dad4cc44be74b0577d3a554d3ab71: Linux-omap rebuilt:
+	Updated to -rc7, added new boards
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Cc: Sanjeev Premi <premi@ti.com>
+Cc: Vaibhav Hiremath <hvaibhav@ti.com>
+---
 
-Thanks,
-Linus Walleij
+Abhilash K V (1):
+  AM35x: Using OMAP3 generic hwmods
+
+Vaibhav Hiremath (1):
+  omap_twl: Prevent SR to enable for am3517/am3505 devices
+
+ arch/arm/mach-omap2/board-am3517evm.c        |   11 +++++++++++
+ arch/arm/mach-omap2/omap_hwmod.c             |    3 ++-
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c   |   18 ++++++++++++++++++
+ arch/arm/mach-omap2/omap_twl.c               |    8 ++++++++
+ arch/arm/plat-omap/include/plat/omap_hwmod.h |    3 +++
+ 5 files changed, 42 insertions(+), 1 deletions(-)
