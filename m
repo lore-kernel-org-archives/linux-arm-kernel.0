@@ -1,92 +1,71 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Thu,  4 Aug 2011 17:00:18 -0600
-Subject: [PATCH 1/3] irq: If an IRQ is a GPIO, request and configure it
-In-Reply-To: <1312498820-2275-1-git-send-email-swarren@nvidia.com>
-References: <1312498820-2275-1-git-send-email-swarren@nvidia.com>
-Message-ID: <1312498820-2275-2-git-send-email-swarren@nvidia.com>
+From: matt@genesi-usa.com (Matt Sealey)
+Date: Thu, 4 Aug 2011 18:07:15 -0500
+Subject: [PATCH 1/2] arm/mx5: parse iomuxc pad configuratoin from device
+	tree
+In-Reply-To: <20110725204630.GD26735@ponder.secretlab.ca>
+References: <1311606467-28985-1-git-send-email-shawn.guo@linaro.org>
+	<1311606467-28985-2-git-send-email-shawn.guo@linaro.org>
+	<20110725204630.GD26735@ponder.secretlab.ca>
+Message-ID: <CAKGA1bmbWUeyhUtDwHZjB8V4e2wJ0NHX2qWhqaqx6HoBm7uMnQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Many IRQs are associated with GPIO pins. When the pin is used as an IRQ,
-it can't be used as anything else; it should be requested. Enhance the
-core interrupt code to call gpio_request() and gpio_direction_input() for
-any IRQ that is also a GPIO. This prevents duplication of these calls in
-each driver that uses an IRQ.
+Hi Grant, Shawn,
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
- kernel/irq/manage.c |   23 +++++++++++++++++++++--
- 1 files changed, 21 insertions(+), 2 deletions(-)
 
-diff --git a/kernel/irq/manage.c b/kernel/irq/manage.c
-index 0a7840a..6e2db72 100644
---- a/kernel/irq/manage.c
-+++ b/kernel/irq/manage.c
-@@ -7,6 +7,7 @@
-  * This file contains driver APIs to the irq subsystem.
-  */
- 
-+#include <linux/gpio.h>
- #include <linux/irq.h>
- #include <linux/kthread.h>
- #include <linux/module.h>
-@@ -875,7 +876,7 @@ __setup_irq(unsigned int irq, struct irq_desc *desc, struct irqaction *new)
- 	struct irqaction *old, **old_ptr;
- 	const char *old_name = NULL;
- 	unsigned long flags, thread_mask = 0;
--	int ret, nested, shared = 0;
-+	int ret, nested, shared = 0, gpio = -1;
- 	cpumask_var_t mask;
- 
- 	if (!desc)
-@@ -978,6 +979,16 @@ __setup_irq(unsigned int irq, struct irq_desc *desc, struct irqaction *new)
- 			old = *old_ptr;
- 		} while (old);
- 		shared = 1;
-+	} else {
-+		gpio = irq_to_gpio(irq);
-+		if (gpio_is_valid(gpio)) {
-+			ret = gpio_request(gpio, new->name);
-+			if (ret < 0)
-+				goto out_mask;
-+			ret = gpio_direction_input(gpio);
-+			if (ret < 0)
-+				goto out_mask;
-+		}
- 	}
- 
- 	/*
-@@ -1083,6 +1094,8 @@ mismatch:
- 	ret = -EBUSY;
- 
- out_mask:
-+	if (gpio_is_valid(gpio))
-+		gpio_free(gpio);
- 	raw_spin_unlock_irqrestore(&desc->lock, flags);
- 	free_cpumask_var(mask);
- 
-@@ -1127,6 +1140,7 @@ static struct irqaction *__free_irq(unsigned int irq, void *dev_id)
- 	struct irq_desc *desc = irq_to_desc(irq);
- 	struct irqaction *action, **action_ptr;
- 	unsigned long flags;
-+	int gpio;
- 
- 	WARN(in_interrupt(), "Trying to free IRQ %d from IRQ context!\n", irq);
- 
-@@ -1165,8 +1179,13 @@ static struct irqaction *__free_irq(unsigned int irq, void *dev_id)
- #endif
- 
- 	/* If this was the last handler, shut down the IRQ line: */
--	if (!desc->action)
-+	if (!desc->action) {
- 		irq_shutdown(desc);
-+		/* If the IRQ line is a GPIO, it's no longer in use */
-+		gpio = irq_to_gpio(irq);
-+		if (gpio_is_valid(gpio))
-+			gpio_free(gpio);
-+	}
- 
- #ifdef CONFIG_SMP
- 	/* make sure affinity_hint is cleaned up */
+
+On Mon, Jul 25, 2011 at 3:46 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
+> This could get really verbose in a really big hurry. ?Fortunately the
+> dtb format is sophisticated enough to only store each unique property
+> name once, so the data shouldn't be huge, but it is still going to
+> make for huge source files. ?Can you think of a more concise
+> representation?
+
+Yes: no representation at all. The correct place for IOMUX setup being
+done is *inside the boot firmware as soon as physically possible* and
+not seconds into boot after U-Boot has made a console, done a boot
+timeout, loaded scripts, kernels and ramdisks from media and then
+uncompressed and entered a Linux kernel.
+
+The only beneficial place for setting up IOMUX inside Linux is when
+you really need to modify the behavior of an SoC unit that is acting
+weird, the only real example I can think of being the situation with
+eCSPI errata on the MX51 (ENGcm09397 whereby slave select stays
+asserted at  the end of a transfer when SSB_POL = 1). That in itself
+was only needed for Freescale's solution (which was kind of funky and
+hoped the chip would do the right thing at the start and give control
+back at the end). The current mainline solution is to handle slave
+select as GPIO and twiddle it as needed for correct operation. I can't
+think of - or find - a single example after that where IOMUX settings
+are configured at runtime, and the method currently used in
+Freescale's BSP and in mainline is just fundamentally wrong.
+
+If you think the solution is not so great due to the complexity of
+describing the IOMUX settings, including the pad definitions as binary
+blobs or so such that Linux can read them out, please feel free to
+take the hint and go nag the U-Boot developers at Linaro to go put
+this in the right place - in U-Boot. The device tree is absolutely not
+the place to define pin multiplexing settings for later parsing and
+configuration by the Kernel. They should have been set up correctly
+already, and they should not be being *changed* based on an arbitrary
+configuration file. Consider that the i2c pin definitions you used in
+your example *absolutely will not change* for the lifetime of the
+board, and in most cases, will have been set up by U-Boot anyway.
+There is no point telling Linux to copy in identical settings again.
+What's missing from U-Boot and set up by Linux, should be moved out of
+Linux back into U-Boot.
+
+That said, as a reference to be able to view the settings of the IOMUX
+pads, it is useful. In theory, once you set up your controller in
+U-Boot, you may want to use sysfs or so to read out the configuration
+of that pin in userspace to confirm the board settings, or other debug
+processes. By naming it and providing the offsets and mode definitions
+somewhere other than a reference manual you are enabling this to get
+done.. but please, please, please don't make the mistake of
+considering that just because every board right now does this at Linux
+init, that it therefore it must be the correct solution and maintained
+:(
+
 -- 
-1.7.0.4
+Matt Sealey <matt@genesi-usa.com>
+Product Development Analyst, Genesi USA, Inc.
