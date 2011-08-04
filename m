@@ -1,58 +1,42 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 4 Aug 2011 18:09:51 +0300
-Subject: [PATCH 2/2] I2C: OMAP: remove dev->idle, use usage counting
-	provided by runtime PM
-In-Reply-To: <87ipqd449a.fsf@ti.com>
-References: <1312394960-21689-1-git-send-email-khilman@ti.com>
-	<1312394960-21689-3-git-send-email-khilman@ti.com>
-	<20110803223604.GB4036@legolas.emea.dhcp.ti.com>
-	<87ipqd449a.fsf@ti.com>
-Message-ID: <20110804150951.GU17540@legolas.emea.dhcp.ti.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu,  4 Aug 2011 08:45:04 -0700
+Subject: [PATCH 0/6] OMAP: misc. PM-related fixes for v3.1-rc
+Message-ID: <1312472710-31758-1-git-send-email-khilman@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Tony,
 
-On Thu, Aug 04, 2011 at 07:53:37AM -0700, Kevin Hilman wrote:
-> >> @@ -1140,6 +1128,36 @@ omap_i2c_remove(struct platform_device *pdev)
-> >>  	return 0;
-> >>  }
-> >>  
-> >> +#ifdef CONFIG_PM_RUNTIME
-> >> +static int omap_i2c_runtime_suspend(struct device *dev)
-> >> +{
-> >> +	struct platform_device *pdev = to_platform_device(dev);
-> >> +	struct omap_i2c_dev *_dev = platform_get_drvdata(pdev);
-> >
-> > what happened to dev_get_drvdata(dev) ??
-> >
-> 
-> Yes, that would work too since:
-> 
-> static inline void *platform_get_drvdata(const struct platform_device *pdev)
-> {
-> 	return dev_get_drvdata(&pdev->dev);
-> }
-> 
-> but IMO, readability is better if the driver does platform_set_drvdata()
-> and then the corresponding platform_get_drvdata()
+Here's my current collection of PM-related fixes for the -rc cycle.
 
-fair enough, but if you already have the dev pointer, what's the gain in
-doing a container_of() just to go back to the dev pointer again ?
+They are based on the next/board branch of Arnd's arm-soc tree (which
+has already been merged by Linus) and are also available in the
+for_3.1/pm-fixes branch of my tree:
+git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git
 
-IMHO, there's really no need for that and just calling dev_get_drvdata()
-straight is enough. All in all, platform_get_[sg]et_drvdata() are just
-wrappers for dev_[sg]et_drvdata(). The whole point, was to avoid
-dev_[sg]et_drvdata(&pdev->dev). It's the same with <drivername>_writel()
-calls we see on all drivers. Just a wrapper, but you can use
-__raw_writel() directly if you wish.
+Kevin
+
+
+
+Colin Cross (1):
+  OMAP2+: PM: SmartReflex: use put_sync_suspend for IRQ-safe disabling
+
+Kevin Hilman (4):
+  OMAP2+: Kconfig: don't select PM in OMAP2PLUS_TYPICAL
+  OMAP1: enable GENERIC_IRQ_CHIP
+  OMAP3: beagle: don't touch omap_device internals
+  OMAP: McBSP: use existing macros for converting between devices
+
+Nishanth Menon (1):
+  OMAP3+: SR: ensure pm-runtime callbacks can be invoked with IRQs
+    disabled
+
+ arch/arm/mach-omap2/Kconfig             |    1 -
+ arch/arm/mach-omap2/board-omap3beagle.c |   23 ++++++++++-------------
+ arch/arm/mach-omap2/smartreflex.c       |    3 ++-
+ arch/arm/plat-omap/Kconfig              |    1 +
+ arch/arm/plat-omap/mcbsp.c              |    6 +++---
+ 5 files changed, 16 insertions(+), 18 deletions(-)
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 490 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110804/91a06100/attachment.sig>
+1.7.6
