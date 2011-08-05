@@ -1,49 +1,89 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Fri, 5 Aug 2011 15:32:32 +0530
-Subject: [PATCH V3 07/20] dmaengine/amba-pl08x: Changing few prints to dev_dbg
-	from dev_info
-In-Reply-To: <cover.1312538034.git.viresh.kumar@st.com>
-References: <cover.1312538034.git.viresh.kumar@st.com>
-Message-ID: <49528b8e03fdb19f458b979da32c092ee0aa7dc0.1312538034.git.viresh.kumar@st.com>
+Date: Fri, 5 Aug 2011 15:32:25 +0530
+Subject: [PATCH V3 00/20] dmaengine/amba-pl08x updates
+Message-ID: <cover.1312538034.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For 8 memory and 16 slave channels 35 boot print lines are printed. And that is
-too much. Most of this would be more useful for debugging. So moving few of them
-to dev_dbg instead of dev_info. Now only 3 prints will be printed.
+This patchset contains patches for ARM's pl08x DMA controller driver.
+Main changes introduced by this patchset are:
+- Formatting fixes
+- Logical Fixes
+- Support for Peripheral as flow controller
+- Support for sg_len to be greater than 1 for slave transfers
+- Schedule tasklet for error interrupts
+- remove pl08x_pre_boundary() routine
+- support for runtime PM
+- etc
 
-This also rearrange one of the debug message to fit into two lines.
+This patchset is tested on SPEAr600 for following tests:
+- memory to memory copy (using drivers/dma/dmatest, upto 16 threads per channel)
+- peripheral to memory and vice versa (Peripheral: JPEG)
 
-Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/dma/amba-pl08x.c |    7 +++----
- 1 files changed, 3 insertions(+), 4 deletions(-)
+This was rebased on Vinod's slave-dma.git/next, over following patch:
 
-diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
-index 6c52959..ead88c9 100644
---- a/drivers/dma/amba-pl08x.c
-+++ b/drivers/dma/amba-pl08x.c
-@@ -1717,7 +1717,7 @@ static int pl08x_dma_init_virtual_channels(struct pl08x_driver_data *pl08x,
- 			kfree(chan);
- 			continue;
- 		}
--		dev_info(&pl08x->adev->dev,
-+		dev_dbg(&pl08x->adev->dev,
- 			 "initialize virtual channel \"%s\"\n",
- 			 chan->name);
- 
-@@ -1945,9 +1945,8 @@ static int pl08x_probe(struct amba_device *adev, const struct amba_id *id)
- 		spin_lock_init(&ch->lock);
- 		ch->serving = NULL;
- 		ch->signal = -1;
--		dev_info(&adev->dev,
--			 "physical channel %d is %s\n", i,
--			 pl08x_phy_channel_busy(ch) ? "BUSY" : "FREE");
-+		dev_dbg(&adev->dev, "physical channel %d is %s\n",
-+			i, pl08x_phy_channel_busy(ch) ? "BUSY" : "FREE");
- 	}
- 
- 	/* Register as many memcpy channels as there are physical channels */
+commit 1ae105aa7416087f2920c35c3cd16831d0d09c9c
+Merge: 02f8c6a 5a42fb9
+Author: Vinod Koul <vinod.koul@intel.com>
+Date:   Wed Jul 27 20:43:21 2011 +0530
+
+    Merge branch 'next' into for-linus-3.0
+
+
+Hope i haven't missed any review comments.
+
+Changes Since V2:
+- Fix issues in "support runtime PM" patch, and move runtime_get and put
+  routines to more suitable positions.
+- Reformat debug message in "Changing few prints to dev_dbg from dev_info"
+- set total_len = 0, for each dsg
+
+Changes Since V1:
+- Dropped many formatting fixes which were added earlier, as they made things
+  look even bad.
+- Fixed tabbing issues in PATCH "Add prep_single_byte_llis() routine"
+- Many comments are updated throughout the patchset.
+- Fixed interrupt handler to report spurious interrupt for channels which are
+  not used.
+- Clk enabling/disabling done via runtime PM
+- Complete mask of flow controller is not passed from platform data now,
+  direction is decided at runtime.
+- pl08x_free_txd() called with locks.
+- Two new patches are added:
+  - Rearrange inclusion of header files in ascending order
+  - pass (*ptr) to sizeof() instead of (struct xyz)
+
+Viresh Kumar (20):
+  ARM: asm/pl080.h: Protect against multiple inclusion of header file
+  dmaengine/amba-pl08x: Resolve formatting issues
+  dmaengine/amba-pl08x: Rearrange inclusion of header files in
+    ascending order
+  dmaengine/amba-pl08x: pass (*ptr) to sizeof() instead of (struct xyz)
+  dmaengine/amba-pl08x: Complete doc comment for struct pl08x_txd
+  dmaengine/amba-pl08x: Remove redundant comment and rewrite original
+  dmaengine/amba-pl08x: Changing few prints to dev_dbg from dev_info
+  dmaengine/amba-pl08x: support runtime PM
+  dmaengine/amba-pl08x: Simplify pl08x_ensure_on()
+  dmaengine/amba-pl08x: No need to check "ch->signal < 0"
+  dmaengine/amba-pl08x: Schedule tasklet in case of error interrupt
+  dmaengine/amba-pl08x: Get rid of pl08x_pre_boundary()
+  dmaengine/amba-pl08x: max_bytes_per_lli is TRANSFER_SIZE * src_width
+    (not MIN(width))
+  dmaengine/amba-pl08x: Add prep_single_byte_llis() routine
+  dmaengine/amba-pl08x: Align lli_len to max(src.width, dst.width)
+  dmaengine/amba-pl08x: Choose peripheral bus as master bus
+  dmaengine/amba-pl08x: Pass flow controller information with slave
+    channel data
+  dmaengine/amba-pl08x: Add support for sg len greater than one for
+    slave transfers
+  dmaengine/amba-pl08x: Check txd->llis_va before freeing dma_pool
+  dmaengine/amba-pl08x: Call pl08x_free_txd() instead of calling
+    kfree() directly
+
+ arch/arm/include/asm/hardware/pl080.h |    4 +
+ drivers/dma/amba-pl08x.c              |  628 ++++++++++++++++-----------------
+ include/linux/amba/pl08x.h            |   30 ++-
+ 3 files changed, 335 insertions(+), 327 deletions(-)
+
 -- 
 1.7.2.2
