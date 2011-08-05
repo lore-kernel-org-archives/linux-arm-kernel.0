@@ -1,179 +1,283 @@
-From: mgorman@suse.de (Mel Gorman)
-Date: Fri, 5 Aug 2011 09:47:42 +0100
-Subject: [PATCH] ARM: sparsemem: Enable CONFIG_HOLES_IN_ZONE config
-	option for SparseMem and HAS_HOLES_MEMORYMODEL for linux-3.0.
-In-Reply-To: <CAFPAmTQir8HnP2=WwPGSaWFu=hBS9=xT88f+XFFx5Hdf6zvGTA@mail.gmail.com>
-References: <CAFPAmTQByL0YJT8Lvar1Oe+3Q1EREvqPA_GP=hHApJDz5dSOzQ@mail.gmail.com>
-	<20110803110555.GD19099@suse.de>
-	<CAFPAmTR79S3AVXrAFL5bMkhs2droL8THUCCPY23Ar5x_oftheQ@mail.gmail.com>
-	<20110803132839.GG19099@suse.de>
-	<CAFPAmTS2JEVk3tWhJN034dUmaxLujswmmsqGABGYEV=N3v0Ehw@mail.gmail.com>
-	<20110804100928.GN19099@suse.de>
-	<CAFPAmTQir8HnP2=WwPGSaWFu=hBS9=xT88f+XFFx5Hdf6zvGTA@mail.gmail.com>
-Message-ID: <20110805084742.GU19099@suse.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 5 Aug 2011 10:48:18 +0200
+Subject: [RFC] using amba_pl08x driver for s3c64xx SoCs
+In-Reply-To: <CAGOxZ50Rz3ynmkuoJb9Pgc0b1pG++-CB9kUtU92zKYtfP3jtRg@mail.gmail.com>
+References: <CAGOxZ50Rz3ynmkuoJb9Pgc0b1pG++-CB9kUtU92zKYtfP3jtRg@mail.gmail.com>
+Message-ID: <CACRpkdasYKx8C7fR1heiQDnJgJMvLa1VuQNhQ+gu5F6ea7d3oA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 05, 2011 at 11:27:21AM +0530, Kautuk Consul wrote:
-> Hi Mel,
-> 
-> Please find my comments inline to the email below.
-> 
-> 2 general questions:
-> i)    If an email chain such as this leads to another kernel patch for
-> the same problem, do I need to
->       create a new email chain for that ?
+On Fri, Aug 5, 2011 at 7:47 AM, Alim Akhtar <alim.akhtar@gmail.com> wrote:
 
-Yes. I believe it's easier on the maintainer if a new thread is started
-with the new patch leader summarising relevant information from the
-discussion. A happy maintainer makes the day easier.
+> Samsung's S3C64XX SoCs uses a modified version of standard PrimeCell PL080 DMAC,
+> which has extra control register and config register. Hence the
+> current mailline amba_pl08x driver can not be used as it is.
+> I have made the requisite changes to the amba_pl08x driver to
+> accommodate the S3C64XX DMAC.
 
-> ii)  Sorry about my formatting problems. However, text such as
-> backtraces and logs tend to wrap
->       irrespective of whatever gmail settings/browser I try. Any
-> pointers here ?
-> 
+Great!
 
-I don't use gmail so I do not have any suggestions other than using a
-different mailer. There are no suggestions in
-Documentation/email-clients.txt on how to deal with gmail.
+Make sure you are following and rebasing and testing the latest changes from
+Russell King and Viresh Kumar to the same driver, especially Vireshs
+code removing the 0x400 (1K) limit to chunk size.
 
-> On Thu, Aug 4, 2011 at 3:39 PM, Mel Gorman <mgorman@suse.de> wrote:
-> > On Thu, Aug 04, 2011 at 03:06:39PM +0530, Kautuk Consul wrote:
-> >> Hi Mel,
-> >>
-> >> My ARM system has 2 memory banks which have the following 2 PFN ranges:
-> >> 60000-62000 and 70000-7ce00.
-> >>
-> >> My SECTION_SIZE_BITS is #defined to 23.
-> >>
-> >
-> > So bank 0 is 4 sections and bank 1 is 26 sections with the last section
-> > incomplete.
-> >
-> >> I am altering the ranges via the following kind of pseudo-code in the
-> >> arch/arm/mach-*/mach-*.c file:
-> >> meminfo->bank[0].size -= (1 << 20)
-> >> meminfo->bank[1].size -= (1 << 20)
-> >>
-> >
-> > Why are you taking 1M off each bank? I could understand aligning the
-> > banks to a section size at least.
-> 
-> The reason I am doing this is that one of our embedded boards actually
-> has this problem, due
-> to which we see this kernel crash. I am merely reproducing this
-> problem by performing this step.
-> 
+> Below is the modification, if you think it is ok I can submit the same
+> as a patch.
 
-Ah, that makes sense.
+Yes, generate a common patch from GIT with git format-patch then submit this to
+linux-kernel, linux-arm-kernel and explicitly to the DMA engine maintainer
+Vinod Koul.
 
-> >> <SNIP>
-> >> The reason why we cannot expect the 0x61fff end_page->flags to contain
-> >> a valid zone number is:
-> >> memmap_init_zone() initializes the zone number of all pages for a zone
-> >> via the set_page_links() inline function.
-> >> For the end_page (whose PFN is 0x61fff), set_page_links() cannot be
-> >> possibly called, as the zones are simply not aware of of PFNs above
-> >> 0x61f00 and below 0x70000.
-> >>
-> >
-> > Can you ensure that the ranges passed into free_area_init_node()
-> > are MAX_ORDER aligned as this would initialise the struct pages. You
-> > may have already seen that care is taken when freeing memmap that it
-> > is aligned to MAX_ORDER in free_unused_memmap() in ARM.
-> >
-> 
-> Will this work ? My doubt arises from the fact that there is only one
-> zone on the entire
-> system which contains both memory banks.
+I have some quick review comments below, also make sure you have run
+checkpatch (you probably have, just checking) on it.
 
-That is a common situation. It's why present_pages and spanned_pages
-in a zone can differ. As long as valid memmap is MAX_ORDER-aligned, it's
-fine.
+> + * Samsung S3C64xx SoCs uses a variant of PL080 DMAC. It contains an extra
+> + * control register to hold the TransferSize. Below is the LLI structure
+> + * and offsets of S3C64xx DMAC.
+> + * ? ? -----------------------------------------------------------------
+> + * ? ? | ? ? ? Offset ? ? ? ? ?| ? ? ? Contents ? ? ? ? ? ? ? ? ? ? ? ?|
+> + * ? ? -----------------------------------------------------------------
+> + * ? ? | Next LLI Address ? ? ?| Source Address for Next xfer ? ? ? ? ?|
+> + * ? ? -----------------------------------------------------------------
+> + * ? ? | Next LLI Address+0x04 | Destination Address for Next xfer ? ? |
+> + * ? ? -----------------------------------------------------------------
+> + * ? ? | Next LLI Address+0x08 | Next LLI address for next xfer ? ? ? ?|
+> + * ? ? -----------------------------------------------------------------
+> + * ? ? | Next LLI Address+0x0c | DMACCxControl0 data for next xfer ? ? |
+> + * ? ? -----------------------------------------------------------------
+> + * ? ? | Next LLI Address+0x10 | DMACCxControl1 xfer size for next xfer|
+> + * ? ? -----------------------------------------------------------------
+> + * Also S3C64XX has a config register at offset 0x14
+> + * Have a look at arch/arm/include/asm/hardware/pl080.h for complete register
+> + * details.
+> ?*/
 
-> The crash arises at the PFN 0x61fff, which will not be covered by such
-> a check, as this function
+Good!
 
-No, it won't be covered by the range check. However, the memmap will be
-initialised so even though the page is outside a valid bank of memory,
-it'll still resolve to the correct zone. The struct page will be marked
-Reserved so it'll never be used.
+Probably we should name the Samsung-specific registers in a special way,
+but we can leave that for later.
 
-> will try to act on the entire zone, which is the PFN range:
-> 60000-7cd00, including the holes within as
-> all of this RAM falls into the same node and zone.
-> ( Please correct me if I am wrong about this. )
-> 
-> I tried aligning the end parameter in the memory_present() function
-> which is called separately
-> for each memory bank.
-> I tried the following change in memory_present() as well as
-> mminit_validate_memodel_limits():
-> end &= ~(pageblock_nr_pages-1);
-> But, in this case, the board simply does not boot up. I think that
-> will then require some change in the
-> arch/arm code which I think would be an arch-specific solution to a
-> possibly generic problem.
-> 
+> ?#include <linux/device.h>
+> ?#include <linux/init.h>
+> ?#include <linux/module.h>
+> @@ -99,6 +117,8 @@
+> ?struct vendor_data {
+> ? ? ? ?u8 channels;
+> ? ? ? ?bool dualmaster;
+> + ? ? ? /* To identify samsung DMAC */
+> + ? ? ? bool is_pl080s;
 
-I do not believe this is a generic problem. Machines have
-holes in the zone all the time and this bug does not trigger.
-mminit_validate_memodel_limits() is the wrong place to make a change.
-Look more towards where free_area_init_node() gets called to initialise
-memmap.
+I would name it more explicitly like
+is_pl080_s3c
 
-> >> The (end >= zone->zone_start_pfn + zone->spanned_pages) in
-> >> move_freepages_block() does not stop this crash from happening as both
-> >> our memory banks are in the same zone and the empty space within them
-> >> is accomodated into this zone via the CONFIG_SPARSEMEM
-> >> config option.
-> >>
-> >> When we enable CONFIG_HOLES_IN_ZONE we survive this BUG_ON as well as
-> >> any other BUG_ONs in the loop in move_freepages() as then the
-> >> pfn_valid_within()/pfn_valid() function takes care of this
-> >> functionality, especially in the case where the newly introduced
-> >> CONFIG_HAVE_ARCH_PFN_VALID is
-> >> enabled.
-> >>
-> >
-> > This is an expensive option in terms of performance. If Russell
-> > wants to pick it up, I won't object but I would strongly suggest that
-> > you solve this problem by ensuring that memmap is initialised on a
-> > MAX_ORDER-aligned boundaries as it'll perform better.
-> >
-> 
-> I couldn't really locate a method in the kernel wherein we can
-> validate a pageblock(1024 pages for my
-> platform) with respect to the memory banks on that system.
-> 
+> @@ -112,6 +132,9 @@ struct pl08x_lli {
+> ? ? ? ?u32 dst;
+> ? ? ? ?u32 lli;
+> ? ? ? ?u32 cctl;
+> + ? ? ? /* Samsung pl080 DMAC has one exrta control register
+> + ? ? ? ?* which is used to hold the transfer_size */
+> + ? ? ? u32 cctl1;
+> ?};
 
-I suspect what you're looking for is somewhere in arch/arm/mm/init.c .
-I'm afraid I didn't dig through the ARM memory initialisation
-code to see where it could be done but if it was me, I'd be looking at
-how free_area_init_node() is called.
+Comment style
 
-> How about this :
-> We implement an arch_is_valid_pageblock() function, controlled by a
-> new config option
-> CONFIG_ARCH_HAVE IS_VALID_PAGEBLOCK.
-> This arch function will simply check whether this pageblock is valid
-> or not, in terms of arch-specific
-> memory banks or by using the memblock APIs depending on CONFIG_HAVE_MEMBLOCK.
-> We can modify the memmap_init_zone() function so that an outer loop
-> works in measures of
-> pageblocks thus enabling us to avoid invalid pageblocks.
+/*
+ * Foo
+ * Bar
+ */
 
-That seems like massive overkill for what should be an alignment problem
-when initialisating memmap. It's adding complexity that is similar to
-HOLES_IN_ZONE with very little gain.
+> @@ -452,7 +513,6 @@ static inline u32 pl08x_cctl_bits(u32 cctl, u8
+> srcwidth, u8 dstwidth,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?size_t tsize)
+> ?{
+> ? ? ? ?u32 retbits = cctl;
+> -
 
-When it gets down to it, I'd even prefer deleting the BUG_ON as
-the PageBuddy check over such a solution. However, the BUG_ON is
-there because alignment to MAX_ORDER is expected so it is a valid
-sanity check. There would need to be good evidence that initialising
-memmap to MAX_ORDER alignment was somehow impossible.
+Refrain from removing whitespace here.
+(No big deal)
 
--- 
-Mel Gorman
-SUSE Labs
+> @@ -591,6 +650,7 @@ static int pl08x_fill_llis_for_desc(struct
+> pl08x_driver_data *pl08x,
+> ? ? ? ?size_t max_bytes_per_lli;
+> ? ? ? ?size_t total_bytes = 0;
+> ? ? ? ?struct pl08x_lli *llis_va;
+> + ? ? ? size_t lli_len = 0, target_len, tsize, odd_bytes;
+>
+> ? ? ? ?txd->llis_va = dma_pool_alloc(pl08x->pool, GFP_NOWAIT,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?&txd->llis_bus);
+> @@ -657,7 +717,12 @@ static int pl08x_fill_llis_for_desc(struct
+> pl08x_driver_data *pl08x,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "less than a bus width (remain 0x%08x)\n",
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? __func__, bd.remainder);
+> ? ? ? ? ? ? ? ? ? ? ? ?cctl = pl08x_cctl_bits(cctl, 1, 1, 1);
+> - ? ? ? ? ? ? ? ? ? ? ? pl08x_fill_lli_for_desc(&bd, num_llis++, 1, cctl);
+> + ? ? ? ? ? ? ? ? ? ? ? if (pl08x->vd->is_pl080s)
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? pl08x_fill_lli_for_desc(&bd, num_llis++, 1, cctl);
+> + ? ? ? ? ? ? ? ? ? ? ? else {
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? cctl |= 1 << PL080_CONTROL_TRANSFER_SIZE_SHIFT;
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? pl08x_fill_lli_for_desc(&bd, num_llis++, 1, cctl);
+> + ? ? ? ? ? ? ? ? ? ? ? }
+
+Hm! What is happening here? That is not a S3C-specific register
+in control transfer?
+
+Please insert a comment explaining why you do this cctl |= ...
+
+Also since the second statement is the same in both cases just:
+
+if (pl08x->vd->is_pl080s)
+    /* Here is a detailed description of why we need to do this on S3C */
+    cctl |= 1 << PL080_CONTROL_TRANSFER_SIZE_SHIFT;
+pl08x_fill_lli_for_desc(&bd, num_llis++, 1, cctl);
+
+
+> @@ -668,7 +733,12 @@ static int pl08x_fill_llis_for_desc(struct
+> pl08x_driver_data *pl08x,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "(remain 0x%08x)\n",
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? __func__, bd.remainder);
+> ? ? ? ? ? ? ? ? ? ? ? ?cctl = pl08x_cctl_bits(cctl, 1, 1, 1);
+> - ? ? ? ? ? ? ? ? ? ? ? pl08x_fill_lli_for_desc(&bd, num_llis++, 1, cctl);
+> + ? ? ? ? ? ? ? ? ? ? ? if (pl08x->vd->is_pl080s)
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? pl08x_fill_lli_for_desc(&bd, num_llis++, 1, cctl);
+> + ? ? ? ? ? ? ? ? ? ? ? else {
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? cctl |= 1 << PL080_CONTROL_TRANSFER_SIZE_SHIFT;
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? pl08x_fill_lli_for_desc(&bd, num_llis++, 1, cctl);
+> + ? ? ? ? ? ? ? ? ? ? ? }
+> ? ? ? ? ? ? ? ? ? ? ? ?total_bytes++;
+> ? ? ? ? ? ? ? ?}
+
+Same here.
+
+> @@ -779,8 +847,14 @@ static int pl08x_fill_llis_for_desc(struct
+> pl08x_driver_data *pl08x,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?dev_vdbg(&pl08x->adev->dev,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?"%s fill lli with single lli chunk of size 0x%08zx (remainder 0x%08zx)\n",
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?__func__, lli_len, bd.remainder);
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? pl08x_fill_lli_for_desc(&bd, num_llis++,
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? lli_len, cctl);
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? if (pl08x->vd->is_pl080s)
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? pl08x_fill_lli_for_desc(&bd, num_llis++,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? lli_len, cctl);
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? else {
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? cctl |= tsize << PL080_CONTROL_TRANSFER_SIZE_SHIFT;
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? pl08x_fill_lli_for_desc(&bd, num_llis++,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? lli_len, cctl);
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? }
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?total_bytes += lli_len;
+> ? ? ? ? ? ? ? ? ? ? ? ?}
+
+Same here.
+
+> @@ -797,8 +871,14 @@ static int pl08x_fill_llis_for_desc(struct
+> pl08x_driver_data *pl08x,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?dev_vdbg(&pl08x->adev->dev,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?"%s align with boundary, single byte (remain 0x%08zx)\n",
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?__func__, bd.remainder);
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? pl08x_fill_lli_for_desc(&bd,
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? num_llis++, 1, cctl);
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? if (pl08x->vd->is_pl080s)
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? pl08x_fill_lli_for_desc(&bd,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? num_llis++, 1, cctl);
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? else {
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? cctl |= 1 << PL080_CONTROL_TRANSFER_SIZE_SHIFT;
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? pl08x_fill_lli_for_desc(&bd,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? num_llis++, 1, cctl);
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? }
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?total_bytes++;
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?}
+> ? ? ? ? ? ? ? ? ? ? ? ?}
+
+And here again.
+
+> @@ -812,7 +892,12 @@ static int pl08x_fill_llis_for_desc(struct
+> pl08x_driver_data *pl08x,
+> ? ? ? ? ? ? ? ? ? ? ? ?dev_vdbg(&pl08x->adev->dev,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?"%s align with boundary, single odd byte (remain %zu)\n",
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?__func__, bd.remainder);
+> - ? ? ? ? ? ? ? ? ? ? ? pl08x_fill_lli_for_desc(&bd, num_llis++, 1, cctl);
+> + ? ? ? ? ? ? ? ? ? ? ? if (pl08x->vd->is_pl080s)
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? pl08x_fill_lli_for_desc(&bd, num_llis++, 1, cctl);
+> + ? ? ? ? ? ? ? ? ? ? ? else {
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? cctl |= 1 << PL080_CONTROL_TRANSFER_SIZE_SHIFT;
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? pl08x_fill_lli_for_desc(&bd, num_llis++, 1, cctl);
+> + ? ? ? ? ? ? ? ? ? ? ? }
+> ? ? ? ? ? ? ? ? ? ? ? ?total_bytes++;
+> ? ? ? ? ? ? ? ?}
+> ? ? ? ?}
+
+And here.
+
+> @@ -829,13 +914,15 @@ static int pl08x_fill_llis_for_desc(struct
+> pl08x_driver_data *pl08x,
+> ? ? ? ? ? ? ? ? ? ? ? ?__func__, (u32) MAX_NUM_TSFR_LLIS);
+> ? ? ? ? ? ? ? ?return 0;
+> ? ? ? ?}
+> -
+> ? ? ? ?llis_va = txd->llis_va;
+> ? ? ? ?/* The final LLI terminates the LLI. */
+> ? ? ? ?llis_va[num_llis - 1].lli = 0;
+> ? ? ? ?/* The final LLI element shall also fire an interrupt. */
+> ? ? ? ?llis_va[num_llis - 1].cctl |= PL080_CONTROL_TC_IRQ_EN;
+>
+> + ? ? ? if(pl08x->vd->is_pl080s)
+> + ? ? ? ? ? ? ? llis_va[num_llis - 1].cctl1 |= lli_len;
+> +
+
+Explanation here, again I think is needed.
+
+> @@ -1920,6 +2008,13 @@ static int pl08x_probe(struct amba_device
+> *adev, const struct amba_id *id)
+> ? ? ? ? ? ? ? ?goto out_no_ioremap;
+> ? ? ? ?}
+>
+> + ? ? ? clk = clk_get(&pl08x->adev->dev, "dma");
+> + ? ? ? if (IS_ERR(clk)) {
+> + ? ? ? ? ? ? ? dev_err(&pl08x->adev->dev, "Cannot get operation clock.\n");
+> + ? ? ? ? ? ? ? ret = -EINVAL;
+> + ? ? ? }
+> + ? ? ? clk_enable(clk);
+
+I suspect this is wrong. Since this is an AMBA device, you probably
+can rely on the
+code already present in drivers/amba/bus.c.
+
+Just rename the clock from "dma" to "pclk" in the S3C platform.
+
+> @@ -1953,7 +2048,7 @@ static int pl08x_probe(struct amba_device *adev,
+> const struct amba_id *id)
+> ? ? ? ? ? ? ? ?spin_lock_init(&ch->lock);
+> ? ? ? ? ? ? ? ?ch->serving = NULL;
+> ? ? ? ? ? ? ? ?ch->signal = -1;
+> - ? ? ? ? ? ? ? dev_info(&adev->dev,
+> + ? ? ? ? ? ? ? dev_dbg(&adev->dev,
+> ? ? ? ? ? ? ? ? ? ? ? ? "physical channel %d is %s\n", i,
+> ? ? ? ? ? ? ? ? ? ? ? ? pl08x_phy_channel_busy(ch) ? "BUSY" : "FREE");
+> ? ? ? ?}
+
+Check Russells and Vireshs recent patches, I think they have already
+fixed up a lot of debug prints.
+
+> @@ -2030,13 +2125,21 @@ out_no_pl08x:
+> ?static struct vendor_data vendor_pl080 = {
+> ? ? ? ?.channels = 8,
+> ? ? ? ?.dualmaster = true,
+> + ? ? ? .is_pl080s = false,
+> ?};
+
+Don't assign false, it is initialized to zero i.e. fals by default.
+
+>
+> ?static struct vendor_data vendor_pl081 = {
+> ? ? ? ?.channels = 2,
+> ? ? ? ?.dualmaster = false,
+> + ? ? ? .is_pl080s = false,
+> ?};
+
+Dito.
+
+The rest looks good to me!
+
+Looking forward to version 2, thanks!
+
+Yours,
+Linus Walleij
