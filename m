@@ -1,79 +1,53 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri,  5 Aug 2011 17:24:52 +0100
-Subject: [RFC PATCH 1/2] AT91: dt: at91sam9g45 family and board device tree
-	files
-In-Reply-To: <1312561493-7849-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1312561493-7849-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <56092075210001f40db485e0b126fe7c0c7b75ac.1312560476.git.nicolas.ferre@atmel.com>
+From: s.hauer@pengutronix.de (s.hauer at pengutronix.de)
+Date: Fri, 5 Aug 2011 18:52:51 +0200
+Subject: [PATCH v4 0/7] ARM: mx28: add usb host function
+In-Reply-To: <20110805142252.GA12405@nchen-desktop>
+References: <1312274386-6833-1-git-send-email-tony.lin@freescale.com>
+	<97D3A72708D04647A5AC84A04996E5B516A392@039-SN1MPN1-006.039d.mgd.msft.net>
+	<20110805130301.GG31404@pengutronix.de>
+	<20110805142252.GA12405@nchen-desktop>
+Message-ID: <20110805165250.GJ31404@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Create a new device tree source file for Atmel at91sam9g45 SoC family.
-The Evaluation Kit at91sam9m10g45ek includes it.
-This first basic support will be populated as drivers and boards will be
-converted to device tree.
+On Fri, Aug 05, 2011 at 10:22:54PM +0800, Peter Chen wrote:
+> On Fri, Aug 05, 2011 at 03:03:01PM +0200, s.hauer at pengutronix.de wrote:
+> > On Fri, Aug 05, 2011 at 07:53:21AM +0000, Lin Tony-B19295 wrote:
+> > > Any comments for the patch series?
+> > 
+> > Yes. The way you handle the USB phys is totally inacceptable. Please
+> > understand that there are *two* devices, one is the ehci core and the
+> > other is the associated phy.
+> > 
+> > You need to register the phy as a platform device, the corresponding
+> > driver then has to register the phy using some kind of usb_transceiver_register().
+> > On the ehci side the mxc-ehci driver has to find its phy using
+> > usb_get_transceiver().
+> > 
+> > Note that the infrastructure needed for this is not in the kernel, but
+> > there are patches recently posted on linux-usb:
+> > 
+> > http://www.spinics.net/lists/linux-usb/msg50148.html
+> > 
+> > Sascha
+> > 
+> I have discussed with Heikki, his framework is good, it saperates phys from
+> otg driver, so phy's utilities can be called at both otg and
+> device only mode, besides it can support usb charger better.
+> 
+> So, do we pause i.mx28 usb's upstream until Heikki's otg modification in
+> master, or just do thing like ulpi.c?
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- arch/arm/boot/dts/at91sam9g45.dtsi     |   27 +++++++++++++++++++++++++++
- arch/arm/boot/dts/at91sam9m10g45ek.dts |   15 +++++++++++++++
- 2 files changed, 42 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/boot/dts/at91sam9g45.dtsi
- create mode 100644 arch/arm/boot/dts/at91sam9m10g45ek.dts
+I think you can use Heikkis patches as a base. They will get updates
+before hitting mainline, but the changes to the (phy-) driver side
+should be trivial. This way we can also detect possible problems with
+Heikkis patches. There's plenty of time before the next merge window to
+get the patches into shape.
 
-diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
-new file mode 100644
-index 0000000..3d85f96
---- /dev/null
-+++ b/arch/arm/boot/dts/at91sam9g45.dtsi
-@@ -0,0 +1,27 @@
-+/include/ "skeleton.dtsi"
-+
-+/ {
-+	model = "Atmel AT91SAM9G45 family SoC";
-+	compatible = "atmel,at91sam9g45", "atmel,at91sam9m10", "atmel,at91sam9g46", "atmel,at91sam9m11";
-+	interrupt-parent = <&aic>;
-+
-+	memory {
-+		reg = <0x70000000 0x10000000>;
-+	};
-+
-+	aic: interrupt-controller at fffff000 {
-+		#interrupt-cells = <1>;
-+		compatible = "atmel,aic";
-+		interrupt-controller;
-+		reg = <0xfffff000 0x200>;
-+	};
-+
-+	dma at ffffec00 {
-+		compatible = "atmel,at91sam9g45-hdmac";
-+		reg = <0xffffec00 0x200>;
-+		interrupts = <21>;
-+		atmel,hdmac-nr-channels = <8>;
-+		atmel,hdmac-cap-memcpy;
-+		atmel,hdmac-cap-slave;
-+	};
-+};
-diff --git a/arch/arm/boot/dts/at91sam9m10g45ek.dts b/arch/arm/boot/dts/at91sam9m10g45ek.dts
-new file mode 100644
-index 0000000..48252c9
---- /dev/null
-+++ b/arch/arm/boot/dts/at91sam9m10g45ek.dts
-@@ -0,0 +1,15 @@
-+/dts-v1/;
-+/include/ "at91sam9g45.dtsi"
-+
-+/ {
-+	model = "Atmel AT91SAM9M10G45-EK";
-+	compatible = "atmel,at91sam9m10g45ek", "atmel,at91sam9g45ekes", "atmel,at91sam9m10ekes", "atmel,at91sam9g45", "atmel,at91sam9m10", "atmel,at91sam9g46", "atmel,at91sam9m11", "atmel,at91";
-+
-+	chosen {
-+		bootargs = "mem=64M console=ttyS0,115200 mtdparts=atmel_nand:4M(bootstrap/uboot/kernel)ro,60M(rootfs),-(data) root=/dev/mtdblock1 rw rootfstype=jffs2";
-+	};
-+
-+	memory {
-+		reg = <0x70000000 0x4000000>;
-+	};
-+};
+Sascha
+
 -- 
-1.7.4.1
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
