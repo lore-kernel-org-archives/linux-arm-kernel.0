@@ -1,42 +1,88 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Fri, 5 Aug 2011 15:32:34 +0530
-Subject: [PATCH V3 09/20] dmaengine/amba-pl08x: Simplify pl08x_ensure_on()
+Date: Fri, 5 Aug 2011 15:32:40 +0530
+Subject: [PATCH V3 15/20] dmaengine/amba-pl08x: Align lli_len to max(src.width,
+	dst.width)
 In-Reply-To: <cover.1312538034.git.viresh.kumar@st.com>
 References: <cover.1312538034.git.viresh.kumar@st.com>
-Message-ID: <ec14b777562eaa2a1825e10546d1c737e7f20f20.1312538034.git.viresh.kumar@st.com>
+Message-ID: <8967f2741aae7a7a76afb0c5b3658b91b9259f4f.1312538034.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Simply writing 1 on bit 0 is sufficient instead of reading and clearing bits.
-Also as per manual, for bit 3-31 of DMACConfiguration register:
-"read undefined, write as 0"
+Currently lli_len is aligned to min of two widths, which looks to be incorrect.
+Instead it should be aligned to max of both widths.
 
-So, we must not rely on values read from this registers bit 3-31.
+Lets say, total_size = 441 bytes
+
+MIN: lets check if min() suits or not:
+
+CASE 1: srcwidth = 1, dstwidth = 4
+min(src, dst) = 1
+
+i.e. We program transfer size in control reg to 441.
+Now, till 440 bytes everything is fine, but on the last byte DMAC can't transfer
+1 byte to dst, as its width is 4.
+
+CASE 2: srcwidth = 4, dstwidth = 1
+min(src, dst) = 1
+
+i.e. we program transfer size in control reg to 110 (data transferred = 110 * srcwidth).
+So, here too 1 byte is left, but on the source side.
+
+MAX: Lets check if max() suits or not:
+
+CASE 3: srcwidth = 1, dstwidth = 4
+max(src, dst) = 4
+
+Aligned size is 440
+
+i.e. We program transfer size in control reg to 440.
+Now, all 440 bytes will be transferred without any issues.
+
+CASE 4: srcwidth = 4, dstwidth = 1
+max(src, dst) = 4
+
+Aligned size is 440
+
+i.e. We program transfer size in control reg to 110 (data transferred = 110 * srcwidth).
+Now, also all 440 bytes will be transferred without any issues.
 
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/dma/amba-pl08x.c |    8 +-------
- 1 files changed, 1 insertions(+), 7 deletions(-)
+ drivers/dma/amba-pl08x.c |   12 +++++++-----
+ 1 files changed, 7 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
-index 5dd97f4..d79688d 100644
+index 45d8a5d..4bcf603 100644
 --- a/drivers/dma/amba-pl08x.c
 +++ b/drivers/dma/amba-pl08x.c
-@@ -1502,13 +1502,7 @@ bool pl08x_filter_id(struct dma_chan *chan, void *chan_id)
-  */
- static void pl08x_ensure_on(struct pl08x_driver_data *pl08x)
- {
--	u32 val;
--
--	val = readl(pl08x->base + PL080_CONFIG);
--	val &= ~(PL080_CONFIG_M2_BE | PL080_CONFIG_M1_BE | PL080_CONFIG_ENABLE);
--	/* We implicitly clear bit 1 and that means little-endian mode */
--	val |= PL080_CONFIG_ENABLE;
--	writel(val, pl08x->base + PL080_CONFIG);
-+	writel(PL080_CONFIG_ENABLE, pl08x->base + PL080_CONFIG);
- }
+@@ -669,20 +669,22 @@ static int pl08x_fill_llis_for_desc(struct pl08x_driver_data *pl08x,
+ 		 * width left
+ 		 */
+ 		while (bd.remainder > (mbus->buswidth - 1)) {
+-			size_t lli_len, tsize;
++			size_t lli_len, tsize, width;
  
- static void pl08x_unmap_buffers(struct pl08x_txd *txd)
+ 			/*
+ 			 * If enough left try to send max possible,
+ 			 * otherwise try to send the remainder
+ 			 */
+ 			lli_len = min(bd.remainder, max_bytes_per_lli);
++
+ 			/*
+-			 * Check against minimum bus alignment: Calculate actual
++			 * Check against maximum bus alignment: Calculate actual
+ 			 * transfer size in relation to bus width and get a
+-			 * maximum remainder of the smallest bus width - 1
++			 * maximum remainder of the highest bus width - 1
+ 			 */
+-			tsize = lli_len / min(mbus->buswidth, sbus->buswidth);
+-			lli_len	= tsize * min(mbus->buswidth, sbus->buswidth);
++			width = max(mbus->buswidth, sbus->buswidth);
++			lli_len = (lli_len / width) * width;
++			tsize = lli_len / bd.srcbus.buswidth;
+ 
+ 			dev_vdbg(&pl08x->adev->dev,
+ 				"%s fill lli with single lli chunk of "
 -- 
 1.7.2.2
