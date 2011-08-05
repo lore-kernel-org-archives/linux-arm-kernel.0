@@ -1,53 +1,32 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Fri, 5 Aug 2011 22:22:54 +0800
-Subject: [PATCH v4 0/7] ARM: mx28: add usb host function
-In-Reply-To: <20110805130301.GG31404@pengutronix.de>
-References: <1312274386-6833-1-git-send-email-tony.lin@freescale.com>
-	<97D3A72708D04647A5AC84A04996E5B516A392@039-SN1MPN1-006.039d.mgd.msft.net>
-	<20110805130301.GG31404@pengutronix.de>
-Message-ID: <20110805142252.GA12405@nchen-desktop>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri, 05 Aug 2011 07:52:44 -0700
+Subject: [PATCH] OMAP: omap_device: make latency autoadjust messages debug
+In-Reply-To: <1311599904-5981-1-git-send-email-notasas@gmail.com> (Grazvydas
+	Ignotas's message of "Mon, 25 Jul 2011 16:18:24 +0300")
+References: <1311599904-5981-1-git-send-email-notasas@gmail.com>
+Message-ID: <874o1vvrk3.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 05, 2011 at 03:03:01PM +0200, s.hauer at pengutronix.de wrote:
-> On Fri, Aug 05, 2011 at 07:53:21AM +0000, Lin Tony-B19295 wrote:
-> > Any comments for the patch series?
-> 
-> Yes. The way you handle the USB phys is totally inacceptable. Please
-> understand that there are *two* devices, one is the ehci core and the
-> other is the associated phy.
-> 
-> You need to register the phy as a platform device, the corresponding
-> driver then has to register the phy using some kind of usb_transceiver_register().
-> On the ehci side the mxc-ehci driver has to find its phy using
-> usb_get_transceiver().
-> 
-> Note that the infrastructure needed for this is not in the kernel, but
-> there are patches recently posted on linux-usb:
-> 
-> http://www.spinics.net/lists/linux-usb/msg50148.html
-> 
-> Sascha
-> 
-I have discussed with Heikki, his framework is good, it saperates phys from
-otg driver, so phy's utilities can be called at both otg and
-device only mode, besides it can support usb charger better.
+Grazvydas Ignotas <notasas@gmail.com> writes:
 
-So, do we pause i.mx28 usb's upstream until Heikki's otg modification in
-master, or just do thing like ulpi.c?
+> During normal system operation warning messages similar to this
+> are appearing quite often:
+> omap_device: omap4-keypad.-1: new worst case activate latency 0: 61035
+>
+> This doesn't seem to be reporting a problem, nor is it very useful for
+> non-developers, so reduce it to debug level.
 
-> -- 
-> Pengutronix e.K.                           |                             |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+Yeah, this is really only useful for PM developers, so making it debug
+is fine.
 
--- 
+> Cc: Steve Sakoman <steve@sakoman.com>
+> Signed-off-by: Grazvydas Ignotas <notasas@gmail.com>
+> ---
+> Applies on top of git://git.pwsan.com/linux-2.6 prcm-devel-3.1
+> + Kevin's "OMAP: omap_device: replace pr_* prints with dev_*".
 
-Best Regards,
-Peter Chen
+Adding it to my omap_device queue for v3.2:
+git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git for_3.2/omap_device
+
+Kevin
