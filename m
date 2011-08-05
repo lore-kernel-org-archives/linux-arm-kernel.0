@@ -1,90 +1,40 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Fri, 5 Aug 2011 15:32:36 +0530
-Subject: [PATCH V3 11/20] dmaengine/amba-pl08x: Schedule tasklet in case of
-	error interrupt
+Date: Fri, 5 Aug 2011 15:32:30 +0530
+Subject: [PATCH V3 05/20] dmaengine/amba-pl08x: Complete doc comment for
+	struct pl08x_txd
 In-Reply-To: <cover.1312538034.git.viresh.kumar@st.com>
 References: <cover.1312538034.git.viresh.kumar@st.com>
-Message-ID: <671c46fe3869e9339070b0a64a01eca3dd5c79b2.1312538034.git.viresh.kumar@st.com>
+Message-ID: <22f3ef37fd399c8424b393c5fb63d51bd0b8c5ce.1312538034.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, if error interrupt occurs, nothing is done in interrupt handler (just
-clearing the interrupts). We must somehow indicate this to the user that DMA is
-over, due to ERR interrupt or TC interrupt.
-
-So, this patch just schedules existing tasklet, with a print showing error
-interrupt has occurred on which channels.
+Doc comment for struct pl08x_txd was incomplete. Complete that.
 
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
- drivers/dma/amba-pl08x.c |   44 +++++++++++++++++++++++---------------------
- 1 files changed, 23 insertions(+), 21 deletions(-)
+ include/linux/amba/pl08x.h |    8 ++++++++
+ 1 files changed, 8 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
-index 3653961..6bba32e 100644
---- a/drivers/dma/amba-pl08x.c
-+++ b/drivers/dma/amba-pl08x.c
-@@ -1619,38 +1619,40 @@ static void pl08x_tasklet(unsigned long data)
- static irqreturn_t pl08x_irq(int irq, void *dev)
- {
- 	struct pl08x_driver_data *pl08x = dev;
--	u32 mask = 0;
--	u32 val;
--	int i;
--
--	val = readl(pl08x->base + PL080_ERR_STATUS);
--	if (val) {
--		/* An error interrupt (on one or more channels) */
--		dev_err(&pl08x->adev->dev,
--			"%s error interrupt, register value 0x%08x\n",
--				__func__, val);
--		/*
--		 * Simply clear ALL PL08X error interrupts,
--		 * regardless of channel and cause
--		 * FIXME: should be 0x00000003 on PL081 really.
--		 */
--		writel(0x000000FF, pl08x->base + PL080_ERR_CLEAR);
-+	u32 mask = 0, err, tc, i;
-+
-+	/* check & clear - ERR & TC interrupts */
-+	err = readl(pl08x->base + PL080_ERR_STATUS);
-+	if (err) {
-+		dev_err(&pl08x->adev->dev, "%s error interrupt, register value 0x%08x\n",
-+			__func__, err);
-+		writel(err, pl08x->base + PL080_ERR_CLEAR);
- 	}
--	val = readl(pl08x->base + PL080_INT_STATUS);
-+	tc = readl(pl08x->base + PL080_INT_STATUS);
-+	if (tc)
-+		writel(tc, pl08x->base + PL080_TC_CLEAR);
-+
-+	if (!err && !tc)
-+		return IRQ_NONE;
-+
- 	for (i = 0; i < pl08x->vd->channels; i++) {
--		if ((1 << i) & val) {
-+		if (((1 << i) & err) || ((1 << i) & tc)) {
- 			/* Locate physical channel */
- 			struct pl08x_phy_chan *phychan = &pl08x->phy_chans[i];
- 			struct pl08x_dma_chan *plchan = phychan->serving;
+diff --git a/include/linux/amba/pl08x.h b/include/linux/amba/pl08x.h
+index e6e28f3..cd8f629 100644
+--- a/include/linux/amba/pl08x.h
++++ b/include/linux/amba/pl08x.h
+@@ -105,8 +105,16 @@ struct pl08x_phy_chan {
  
-+			if (!plchan) {
-+				dev_err(&pl08x->adev->dev,
-+					"%s Error TC interrupt on unused channel: 0x%08x\n",
-+					__func__, i);
-+				continue;
-+			}
-+
- 			/* Schedule tasklet on this channel */
- 			tasklet_schedule(&plchan->tasklet);
--
- 			mask |= (1 << i);
- 		}
- 	}
--	/* Clear only the terminal interrupts on channels we processed */
--	writel(mask, pl08x->base + PL080_TC_CLEAR);
- 
- 	return mask ? IRQ_HANDLED : IRQ_NONE;
- }
+ /**
+  * struct pl08x_txd - wrapper for struct dma_async_tx_descriptor
++ * @tx: async tx descriptor
++ * @node: node for txd list for channels
++ * @src_addr: src address of txd
++ * @dst_addr: dst address of txd
++ * @len: transfer len in bytes
++ * @direction: direction of transfer
+  * @llis_bus: DMA memory address (physical) start for the LLIs
+  * @llis_va: virtual memory address start for the LLIs
++ * @cctl: control reg values for current txd
++ * @ccfg: config reg values for current txd
+  */
+ struct pl08x_txd {
+ 	struct dma_async_tx_descriptor tx;
 -- 
 1.7.2.2
