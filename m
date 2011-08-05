@@ -1,54 +1,37 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Fri, 5 Aug 2011 08:29:38 -0700
-Subject: [PATCH 1/3] irq: If an IRQ is a GPIO, request and configure it
-In-Reply-To: <20110805053510.GA16956@opensource.wolfsonmicro.com>
-References: <1312498820-2275-1-git-send-email-swarren@nvidia.com>
-	<1312498820-2275-2-git-send-email-swarren@nvidia.com>
-	<20110805000148.GB13321@opensource.wolfsonmicro.com>
-	<74CDBE0F657A3D45AFBB94109FB122FF049F171EC1@HQMAIL01.nvidia.com>
-	<20110805053510.GA16956@opensource.wolfsonmicro.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF049F171EF4@HQMAIL01.nvidia.com>
+From: jason.hui@linaro.org (Jason Liu)
+Date: Fri,  5 Aug 2011 23:34:32 +0800
+Subject: [PATCH] ARM: iMX5: Don't enable DPLL if it already enabled
+Message-ID: <1312558472-30590-1-git-send-email-jason.hui@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown wrote at Thursday, August 04, 2011 11:35 PM:
-> On Thu, Aug 04, 2011 at 08:53:34PM -0700, Stephen Warren wrote:
-> 
-> > Well, things break. This is essentially the problem I was describing in
-> > the PATCH 0 email, just with a slightly different motivation.
-> 
-> There's a bunch of existing code using that idiom.
+If the DPLL is already enabled, don't try to enable it again.
+Since write to the DPLL control register will make the DPLL
+reset and which will cause some issues when some child module
+are sourced from this DPLL.
 
-Certainly.
+Signed-off-by: Jason Liu <jason.hui@linaro.org>
+Cc: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ arch/arm/mach-mx5/clock-mx51-mx53.c |    6 +++++-
+ 1 files changed, 5 insertions(+), 1 deletions(-)
 
-> > I suppose that an alternative here would be to simply ignore any errors
-> > from gpio_request. This might have the benefit of removing the need for
-> > the other two patches I posted in the series. However, it seems a little
-> > dirty; one benefit of the IRQ code calling gpio_request and honoring
-> > errors would be to detect when some completely unrelated code had a bug
-> > and had called gpio_request on the GPIO before. Such detection would be
-> > non-existent if we don't error out on gpio_request. Perhaps some mechanism
-> > is needed to indicate that the driver has explicitly already called
-> > gpio_request for a legitimate shared purpose, and only then ignore
-> > errors?
-> 
-> But it's not a bug to use a GPIO as an IRQ source, otherwise we wouldn't
-> have gpio_to_irq() in the first place.
-
-True, but I think there are two cases:
-
-1) Some code legitimately uses a pin as both a GPIO and IRQ, and is fully
-cognizant of the fact, just like in your example -> no bug.
-
-2) Two pieces of unrelated code somehow accidentally get a GPIO and IRQ
-number that map to the same resource, e.g. due to incorrect board files or
-Device Tree content. This is probably a bug, but ends up looking exactly
-the same as far as the IRQ code's gpio_request call failing in the patch I
-posted.
-
-> Feels like we need a backchannel
-> between gpiolib and the IRQ code to do this.  Or perhaps the drivers
-> that implement this should be taking care of setting up the GPIO mode?
-
+diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
+index 7f20308..f7bf996 100644
+--- a/arch/arm/mach-mx5/clock-mx51-mx53.c
++++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
+@@ -271,7 +271,11 @@ static int _clk_pll_enable(struct clk *clk)
+ 	int i = 0;
+ 
+ 	pllbase = _get_pll_base(clk);
+-	reg = __raw_readl(pllbase + MXC_PLL_DP_CTL) | MXC_PLL_DP_CTL_UPEN;
++	reg = __raw_readl(pllbase + MXC_PLL_DP_CTL);
++	if (reg & MXC_PLL_DP_CTL_UPEN)
++		return 0;
++
++	reg |= MXC_PLL_DP_CTL_UPEN;
+ 	__raw_writel(reg, pllbase + MXC_PLL_DP_CTL);
+ 
+ 	/* Wait for lock */
 -- 
-nvpublic
+1.7.0.4
