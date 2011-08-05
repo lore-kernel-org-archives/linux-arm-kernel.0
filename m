@@ -1,39 +1,24 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 5 Aug 2011 10:53:18 +0100
-Subject: [PATCH] ARM: GIC: Add device tree interrupt specifier
-	translation support
-In-Reply-To: <1312532353-8772-1-git-send-email-thomas.abraham@linaro.org>
-References: <1312532353-8772-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <20110805105318.5550e4b5@taxman.wild-wind.fr.eu.org>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Fri, 5 Aug 2011 18:02:30 +0800
+Subject: Shouldn't DT preserve pdev name and id to allow platform_match to
+	work?
+In-Reply-To: <CACxGe6vg5NTyiDZqqztjtFEfb7si+-=Y7nEy1Y+YMgA5PVXScw@mail.gmail.com>
+References: <4E396361.3060307@ti.com>
+	<CACxGe6vg5NTyiDZqqztjtFEfb7si+-=Y7nEy1Y+YMgA5PVXScw@mail.gmail.com>
+Message-ID: <CAGsJ_4x7LWRGWXsWzMG1FxZPaFYiKSUpSac2PdwH=d6vqFWRfw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri,  5 Aug 2011 09:19:13 +0100
-Thomas Abraham <thomas.abraham@linaro.org> wrote:
+> auxdata passes platform_data and overrides the device name when there
+> is no way easy way to make the driver work without it. ?It handles the
+> the current implementation of clocks and regulators which aren't yet
+> populated from the device tree. ?It will go away when clock &
+> regulator bindings are implemented.
+Yes. As OF_DEV_AUXDATA_ID still requires hardware information like
+0x48000100 as below, it seems it is not
+consistent with the origin purpose of ARM DT.
+OF_DEV_AUXDATA_ID("ti,omap-i2c", 0x48000100, "omap-i2c.1", 1, &i2c_pdata)
+And the information 0x48000100 is something that doesn't want to be in
+kernel codes.it should be only in dts.
 
-> Add support for translation of hardware interrupt numbers specified in device
-> tree nodes to linux irq number.
-> 
-> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
-> ---
-> Notes:
-> 1. The translation of SGI/PPI interrupts is supported only for CPU0.
-
-This is a major problem. PPIs could be used differently on different
-CPUs, as each CPU basically has its own PPI controller. I don't know if
-this "feature" is used in the wild, but there is reason why it couldn't
-be used one of these days.
-
-I did have a go at this problem a while ago, as part of a much complex
-patch set:
-
-https://patchwork.kernel.org/patch/916362/
-
-Also note that at the moment, PPIs are not really usable as standard
-interrupts (because of the whole banking scheme).
-
-Cheers,
-
-	M.
--- 
-I'm the slime oozin' out from your TV set...
+-barry
