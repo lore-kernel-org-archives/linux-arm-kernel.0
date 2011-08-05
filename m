@@ -1,122 +1,37 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Fri, 5 Aug 2011 20:19:27 +0800
-Subject: [RFC PATCH 1/2] ARM: CSR: add rtc i/o bridge interface for
-	SiRFprimaII
-In-Reply-To: <20110805113255.GR2899@pulham.picochip.com>
-References: <1312512888-25070-1-git-send-email-bs14@csr.com>
-	<1312512888-25070-2-git-send-email-bs14@csr.com>
-	<20110805100938.GP2899@pulham.picochip.com>
-	<CAGsJ_4wy=6DHeyqi1ZpkfDxDFsJpGvhvbzz1K=12soC29MZUAg@mail.gmail.com>
-	<20110805113255.GR2899@pulham.picochip.com>
-Message-ID: <CAGsJ_4yQsS=hU-O3vDKn8nTTA3oX-VwbH5i70jg24swzdYJYyQ@mail.gmail.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Fri, 5 Aug 2011 14:31:16 +0200
+Subject: Shouldn't DT preserve pdev name and id to allow platform_match
+	to work?
+In-Reply-To: <CAGsJ_4x7LWRGWXsWzMG1FxZPaFYiKSUpSac2PdwH=d6vqFWRfw@mail.gmail.com>
+References: <4E396361.3060307@ti.com>
+	<CACxGe6vg5NTyiDZqqztjtFEfb7si+-=Y7nEy1Y+YMgA5PVXScw@mail.gmail.com>
+	<CAGsJ_4x7LWRGWXsWzMG1FxZPaFYiKSUpSac2PdwH=d6vqFWRfw@mail.gmail.com>
+Message-ID: <4E3BE294.2020404@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/8/5 Jamie Iles <jamie@jamieiles.com>:
-> On Fri, Aug 05, 2011 at 07:28:05PM +0800, Barry Song wrote:
->> Hi Jamie,
->> Thanks.
->>
->> 2011/8/5 Jamie Iles <jamie@jamieiles.com>:
->> > Hi Barry, Zhiwu,
->> >
->> > A couple of minor comments inline.
->> >
->> > Jamie
->> >
->> > On Thu, Aug 04, 2011 at 07:54:47PM -0700, Barry Song wrote:
->> >> From: Zhiwu Song <zhiwu.song@csr.com>
->> >>
->> >> The module is a bridge between the RTC clock domain and the CPU interface
->> >> clock domain. ARM access the register of SYSRTC, GPSRTC and PWRC through
->> >> this module.
->> >>
->> >> Signed-off-by: Zhiwu Song <zhiwu.song@csr.com>
->> >> Signed-off-by: Barry Song <baohua.song@csr.com>
->> >> ---
->> >> ?arch/arm/mach-prima2/Makefile ? ? ? ?| ? ?1 +
->> >> ?arch/arm/mach-prima2/rtciobrg.c ? ? ?| ?118 ++++++++++++++++++++++++++++++++++
->> >> ?include/linux/rtc/sirfsoc_rtciobrg.h | ? 18 +++++
->> >> ?3 files changed, 137 insertions(+), 0 deletions(-)
->> >> ?create mode 100644 arch/arm/mach-prima2/rtciobrg.c
->> >> ?create mode 100644 include/linux/rtc/sirfsoc_rtciobrg.h
->> >>
->> >> diff --git a/arch/arm/mach-prima2/Makefile b/arch/arm/mach-prima2/Makefile
->> >> index 7af7fc0..f49d70b 100644
->> >> --- a/arch/arm/mach-prima2/Makefile
->> >> +++ b/arch/arm/mach-prima2/Makefile
->> >> @@ -3,5 +3,6 @@ obj-y += irq.o
->> >> ?obj-y += clock.o
->> >> ?obj-y += rstc.o
->> >> ?obj-y += prima2.o
->> >> +obj-y += rtciobrg.o
->> >> ?obj-$(CONFIG_DEBUG_LL) += lluart.o
->> >> ?obj-$(CONFIG_CACHE_L2X0) += l2x0.o
->> >> diff --git a/arch/arm/mach-prima2/rtciobrg.c b/arch/arm/mach-prima2/rtciobrg.c
->> >> new file mode 100644
->> >> index 0000000..0dc29f8
->> >> --- /dev/null
->> >> +++ b/arch/arm/mach-prima2/rtciobrg.c
->> >> @@ -0,0 +1,118 @@
->> >> +/*
->> >> + * RTC I/O Bridge interfaces for CSR SiRFprimaII
->> >> + * ARM access the registers of SYSRTC, GPSRTC and PWRC through this module
->> >> + *
->> >> + * Copyright (c) 2011 Cambridge Silicon Radio Limited, a CSR plc group company.
->> >> + *
->> >> + * Licensed under GPLv2 or later.
->> >> + */
->> >> +
->> >> +#include <linux/kernel.h>
->> >> +#include <linux/module.h>
->> >> +#include <linux/io.h>
->> >> +#include <linux/of.h>
->> >> +#include <linux/of_address.h>
->> >> +
->> >> +#define SIRFSOC_CPUIOBRG_CTRL ? ? ? ? ? 0x00
->> >> +#define SIRFSOC_CPUIOBRG_WRBE ? ? ? ? ? 0x04
->> >> +#define SIRFSOC_CPUIOBRG_ADDR ? ? ? ? ? 0x08
->> >> +#define SIRFSOC_CPUIOBRG_DATA ? ? ? ? ? 0x0c
->> >> +
->> >> +void __iomem *sirfsoc_rtciobrg_base;
->> >
->> > static void __iomem?
->>
->> this var will be accessed by sleep.S in patch 2/2.
->
-> OK, but then shouldn't these be in a header file somewhere? ?I think
-> sparse will warn about this otherwise saying it could be declared as
-> static.
+On 8/5/2011 12:02 PM, Barry Song wrote:
+>> auxdata passes platform_data and overrides the device name when there
+>> is no way easy way to make the driver work without it.  It handles the
+>> the current implementation of clocks and regulators which aren't yet
+>> populated from the device tree.  It will go away when clock&
+>> regulator bindings are implemented.
+> Yes. As OF_DEV_AUXDATA_ID still requires hardware information like
+> 0x48000100 as below, it seems it is not
+> consistent with the origin purpose of ARM DT.
+> OF_DEV_AUXDATA_ID("ti,omap-i2c", 0x48000100, "omap-i2c.1", 1,&i2c_pdata)
+> And the information 0x48000100 is something that doesn't want to be in
+> kernel codes.it should be only in dts.
 
-yes.these are APIs and sparse will warn if we don't place them in head
-file. the problem is that sleep.S is the only user of those functions.
-the asm does't need and can't refer the c function declare.
+FWIW, I do not care about the physical address at all. This is just used 
+by the of_dev_lookup function to get the proper instance for a device 
+compatible type.
+That's the only way for the OF_DEV_AUXDATA to work, but in theory you 
+could do the same as soon as you provide the id. So OF_DEV_AUXDATA_ID 
+could avoid it.
 
-we have other 3 functions in head file since they will be referred by
-rtc drivers.
+Since OF_DEV_AUXDATA_ID seems to be already dead before it even reaches 
+the mainline, let's forget about that.
 
-rtciobrg connect PM, rtc and gps rtc. only sleep.S of PM refer these
-low level functions not in head file. it is really a special case.
-
-
->
-> [...]
->> >> +u32 __sirfsoc_rtc_iobrg_readl(u32 addr)
->> >> +{
->> >
->> > Maybe for clarity have offset rather than address for these accessors to
->> > indicate the nature of their use?
->>
->> it should be an address not an offset. the address is local address
->> againest rtciobrg. it is not an address in memory bus againest CPU
->> core.
->> if it is an offset, than its memory address is:
->> MEMORY_BASE + addr.
->>
->> but here its address is addr in local bus.
->
-> OK, I guess it's a terminology thing, but I don't particularly mind
-> either way.
->
-> Jamie
->
+Regards,
+Benoit
