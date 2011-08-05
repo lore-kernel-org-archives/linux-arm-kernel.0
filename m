@@ -1,27 +1,54 @@
-From: dsaxena@plexity.net (Deepak Saxena)
-Date: Fri, 5 Aug 2011 07:59:45 -0700
-Subject: [PATCH 01/12] ARM: Remove LATCH reference for time-acorn.c
-In-Reply-To: <20110805092323.GB20575@n2100.arm.linux.org.uk>
-References: <cover.1312455035.git.dsaxena@linaro.org>
-	<20110804134437.GB919@plexity.net>
-	<20110805092323.GB20575@n2100.arm.linux.org.uk>
-Message-ID: <20110805145945.GA12779@plexity.net>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Fri, 5 Aug 2011 08:29:38 -0700
+Subject: [PATCH 1/3] irq: If an IRQ is a GPIO, request and configure it
+In-Reply-To: <20110805053510.GA16956@opensource.wolfsonmicro.com>
+References: <1312498820-2275-1-git-send-email-swarren@nvidia.com>
+	<1312498820-2275-2-git-send-email-swarren@nvidia.com>
+	<20110805000148.GB13321@opensource.wolfsonmicro.com>
+	<74CDBE0F657A3D45AFBB94109FB122FF049F171EC1@HQMAIL01.nvidia.com>
+	<20110805053510.GA16956@opensource.wolfsonmicro.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF049F171EF4@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Aug 05 2011, at 10:23, Russell King - ARM Linux was caught saying:
-> On Thu, Aug 04, 2011 at 06:44:37AM -0700, Deepak Saxena wrote:
-> > +#define ACORN_TICK_RATE         2000000
-> > +#define ACORN_TIMER_LATCH	((CLOCK_TICK_RATE + HZ/2) / HZ)
+Mark Brown wrote at Thursday, August 04, 2011 11:35 PM:
+> On Thu, Aug 04, 2011 at 08:53:34PM -0700, Stephen Warren wrote:
 > 
-> And also these should all be DIV_ROUND_CLOSEST(xxx_TICK_RATE, HZ)
+> > Well, things break. This is essentially the problem I was describing in
+> > the PATCH 0 email, just with a slightly different motivation.
+> 
+> There's a bunch of existing code using that idiom.
 
-Ack. Will update all patches and post an updated version with
-some other fixes.
+Certainly.
 
-~Deepak
+> > I suppose that an alternative here would be to simply ignore any errors
+> > from gpio_request. This might have the benefit of removing the need for
+> > the other two patches I posted in the series. However, it seems a little
+> > dirty; one benefit of the IRQ code calling gpio_request and honoring
+> > errors would be to detect when some completely unrelated code had a bug
+> > and had called gpio_request on the GPIO before. Such detection would be
+> > non-existent if we don't error out on gpio_request. Perhaps some mechanism
+> > is needed to indicate that the driver has explicitly already called
+> > gpio_request for a legitimate shared purpose, and only then ignore
+> > errors?
+> 
+> But it's not a bug to use a GPIO as an IRQ source, otherwise we wouldn't
+> have gpio_to_irq() in the first place.
+
+True, but I think there are two cases:
+
+1) Some code legitimately uses a pin as both a GPIO and IRQ, and is fully
+cognizant of the fact, just like in your example -> no bug.
+
+2) Two pieces of unrelated code somehow accidentally get a GPIO and IRQ
+number that map to the same resource, e.g. due to incorrect board files or
+Device Tree content. This is probably a bug, but ends up looking exactly
+the same as far as the IRQ code's gpio_request call failing in the patch I
+posted.
+
+> Feels like we need a backchannel
+> between gpiolib and the IRQ code to do this.  Or perhaps the drivers
+> that implement this should be taking care of setting up the GPIO mode?
 
 -- 
-"People think all we need to fix our predicament is a free source of
-energy, but I think we need to change out behaviour. More energy would
-just deplete the Earth's lifeblood faster." - Janine Benyius
+nvpublic
