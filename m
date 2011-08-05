@@ -1,42 +1,72 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri,  5 Aug 2011 12:43:44 +0100
-Subject: [PATCH] dmaengine: at_hdmac: fix way to specify cyclic capability
-Message-ID: <1312544624-8793-1-git-send-email-nicolas.ferre@atmel.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Fri, 5 Aug 2011 14:19:11 +0200
+Subject: Shouldn't DT preserve pdev name and id to allow platform_match
+	to work?
+In-Reply-To: <CACxGe6vg5NTyiDZqqztjtFEfb7si+-=Y7nEy1Y+YMgA5PVXScw@mail.gmail.com>
+References: <4E396361.3060307@ti.com>
+	<CACxGe6vg5NTyiDZqqztjtFEfb7si+-=Y7nEy1Y+YMgA5PVXScw@mail.gmail.com>
+Message-ID: <4E3BDFBF.10903@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In this driver, we can trigger cyclic transfer on peripherals-DMA interfaces.
-It is dependent on driver implementation but cannot depend on a platform
-property: we remove the dma_has_cap(DMA_CYCLIC, ) test which has no meaning.
+On 8/3/2011 6:43 PM, Grant Likely wrote:
+> On Wed, Aug 3, 2011 at 4:04 PM, Cousson, Benoit<b-cousson@ti.com>  wrote:
+>> Hi Grant,
+>>
+>> Going further with the usage of OF_DEV_AUXDATA_ID, I realized that this is is not doing what I was expecting. My expectation might be silly, but in order to make platform_match to work without DT matching mechanism, you need to have the driver name in the pdev->name field:
+>>
+>>         /* fall-back to driver name match */
+>>         return (strcmp(pdev->name, drv->name) == 0);
+>>
+>> Except that the of_device_add function is doing that:
+>>         pdev->name = dev_name(&ofdev->dev);
+>>         pdev->id = -1;
+>
+> Yes, I know.  It is written that way on purpose so that it doesn't get
+> used to avoid adding a match table to the device driver because
+> auxdata is a stop-gap solution.  It is *not* intended to be used long
+> term (with one exception for passing platform callbacks when there is
+> no other solution).
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- drivers/dma/at_hdmac.c |   10 ++++------
- 1 files changed, 4 insertions(+), 6 deletions(-)
+Outch... You guys are doing your best to make our life harder :-)
 
-diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
-index 6a483ea..e2a5f3e 100644
---- a/drivers/dma/at_hdmac.c
-+++ b/drivers/dma/at_hdmac.c
-@@ -1293,15 +1293,13 @@ static int __init at_dma_probe(struct platform_device *pdev)
- 	if (dma_has_cap(DMA_MEMCPY, atdma->dma_common.cap_mask))
- 		atdma->dma_common.device_prep_dma_memcpy = atc_prep_dma_memcpy;
- 
--	if (dma_has_cap(DMA_SLAVE, atdma->dma_common.cap_mask))
-+	if (dma_has_cap(DMA_SLAVE, atdma->dma_common.cap_mask)) {
- 		atdma->dma_common.device_prep_slave_sg = atc_prep_slave_sg;
--
--	if (dma_has_cap(DMA_CYCLIC, atdma->dma_common.cap_mask))
-+		/* controller can do slave DMA: can trigger cyclic transfers */
-+		dma_cap_set(DMA_CYCLIC, atdma->dma_common.cap_mask);
- 		atdma->dma_common.device_prep_dma_cyclic = atc_prep_dma_cyclic;
--
--	if (dma_has_cap(DMA_SLAVE, atdma->dma_common.cap_mask) ||
--	    dma_has_cap(DMA_CYCLIC, atdma->dma_common.cap_mask))
- 		atdma->dma_common.device_control = atc_control;
-+	}
- 
- 	dma_writel(atdma, EN, AT_DMA_ENABLE);
- 
--- 
-1.7.4.1
+> auxdata passes platform_data and overrides the device name when there
+> is no way easy way to make the driver work without it.  It handles the
+> the current implementation of clocks and regulators which aren't yet
+> populated from the device tree.  It will go away when clock&
+> regulator bindings are implemented.
+>
+> By implementing it the way it is, it ensures that no drivers
+> inadvertently depends on auxdata, and will thus break when the auxdata
+> entries are removed.  Manjunath mentioned that there is a patch that
+> allows the id to be set, but it still doesn't set the driver name in a
+> way that will allow existing drivers to bind using the old method, and
+> that is by design.
+>
+> I understand what you are asking for, but the DT matching mechanism is
+> absolutely required.  Adding it to drivers is certainly not any more
+> onerous that maintaining a bunch of auxdata tables for boards.
+
+Fair enough.
+Bottom line is that DT is a all inclusive pack, you cannot skip one part 
+even if it is not necessarily needed right now :-(
+
+I understand very well the final goal, I was just trying to spread the 
+huge effort that DT migration will require to focus first on the stuff 
+located in mach-omap, meaning all the board and devices init part.
+
+I was hoping to let the drivers for the moment until the first phase is 
+done. Since auxdata was already there to help the migration, I was just 
+expecting it to be even more helpful.
+
+> Besides, part of the point of the move to DT is to eliminate device
+> and device data tables at the board file level, which is another
+> reason why auxdata is a temporary solution.
+
+Again, I got that point, it was not our intent to use that as a final 
+solution.
+
+Let's start hacking the OMAP drivers then...
+
+Regards,
+Benoit
