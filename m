@@ -1,55 +1,56 @@
-From: wmb@firmworks.com (Mitch Bradley)
-Date: Fri, 05 Aug 2011 13:31:10 -1000
-Subject: [PATCH 1/2] arm/mx5: parse iomuxc pad configuratoin from device
-	tree
-In-Reply-To: <20110805225845.GC6404@ponder.secretlab.ca>
-References: <1311606467-28985-1-git-send-email-shawn.guo@linaro.org>
-	<1311606467-28985-2-git-send-email-shawn.guo@linaro.org>
-	<20110725204630.GD26735@ponder.secretlab.ca>
-	<CAKGA1bmbWUeyhUtDwHZjB8V4e2wJ0NHX2qWhqaqx6HoBm7uMnQ@mail.gmail.com>
-	<20110805225845.GC6404@ponder.secretlab.ca>
-Message-ID: <4E3C7D3E.7040502@firmworks.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri, 05 Aug 2011 16:40:19 -0700
+Subject: [linux-pm] [RFC/PATCH v2] PM / Runtime: allow _put_sync() from
+	interrupts-disabled context
+In-Reply-To: <201108052122.06949.rjw@sisk.pl> (Rafael J. Wysocki's message of
+	"Fri, 5 Aug 2011 21:22:06 +0200")
+References: <1311371188-28879-1-git-send-email-khilman@ti.com>
+	<201107240102.09698.rjw@sisk.pl> <87vcuczrey.fsf@ti.com>
+	<201108052122.06949.rjw@sisk.pl>
+Message-ID: <87ipqbo2ak.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/5/2011 12:58 PM, Grant Likely wrote:
-> On Thu, Aug 04, 2011 at 06:07:15PM -0500, Matt Sealey wrote:
->> Hi Grant, Shawn,
->>
->>
->>
->> On Mon, Jul 25, 2011 at 3:46 PM, Grant Likely<grant.likely@secretlab.ca>  wrote:
->>> This could get really verbose in a really big hurry.  Fortunately the
->>> dtb format is sophisticated enough to only store each unique property
->>> name once, so the data shouldn't be huge, but it is still going to
->>> make for huge source files.  Can you think of a more concise
->>> representation?
->>
->> Yes: no representation at all. The correct place for IOMUX setup being
->> done is *inside the boot firmware as soon as physically possible* and
->> not seconds into boot after U-Boot has made a console, done a boot
->> timeout, loaded scripts, kernels and ramdisks from media and then
->> uncompressed and entered a Linux kernel.
->
-> We've had this argument before.  There are many use cases where the
-> firmware simply cannot be relied upon to do the right thing.
+"Rafael J. Wysocki" <rjw@sisk.pl> writes:
 
-I am a firmware engineer who tries very hard to deliver quality firmware 
-that does the right thing.  It often seems to me that the Linux kernel 
-community's general distrust of firmware is a self-fulfilling prophecy. 
-  People often "live down to expectations"; if Linux expects the 
-firmware to be worthless, worthless is often what you get.
+> On Friday, August 05, 2011, Kevin Hilman wrote:
+>> "Rafael J. Wysocki" <rjw@sisk.pl> writes:
+>> 
+>> > On Friday, July 22, 2011, Kevin Hilman wrote:
+>> >> Currently the use of pm_runtime_put_sync() is not safe from
+>> >> interrupts-disabled context because rpm_idle() will release the
+>> >> spinlock and enable interrupts for the idle callbacks.  This enables
+>> >> interrupts during a time where interrupts were expected to be
+>> >> disabled, and can have strange side effects on drivers that expected
+>> >> interrupts to be disabled.
+>> >> 
+>> >> This is not a bug since the documentation clearly states that only
+>> >> _put_sync_suspend() is safe in IRQ-safe mode.
+>> >> 
+>> >> However, pm_runtime_put_sync() could be made safe when in IRQ-safe
+>> >> mode by releasing the spinlock but not re-enabling interrupts, which
+>> >> is what this patch aims to do.
+>> >> 
+>> >> Problem was found when using some buggy drivers that set
+>> >> pm_runtime_irq_safe() and used _put_sync() in interrupts-disabled
+>> >> context.
+>> >> 
+>> >> The offending drivers have been fixed to use _put_sync_suspend(),
+>> >> But this patch is an RFC to see if it might make sense to allow
+>> >> using _put_sync() from interrupts-disabled context.
+>> >
+>> > OK, I'm going to take this for 3.2.
+>> 
+>> Rafael, 
+>> 
+>> Since you're planning to merge this, maybe we should consider merging
+>> this as a fix for v3.1, and possibly even for v3.0 stable.  That way,
+>> any current drivers using irq_safe and the normal _put_sync() will not
+>> have this problem.
+>
+> I think I can push it for 3.1, but I don't think it's stable material.
+>
 
-In the PC BIOS world, the quality of BIOSes went up dramatically when 
-Microsoft began insisting that the BIOS must meet stringent standards, 
-enforced via an exhaustive suite of compatibility tests.
+OK, fair enough.
 
->
-> g.
->
-> _______________________________________________
-> devicetree-discuss mailing list
-> devicetree-discuss at lists.ozlabs.org
-> https://lists.ozlabs.org/listinfo/devicetree-discuss
->
->
+Kevin
