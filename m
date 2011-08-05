@@ -1,37 +1,46 @@
-From: bs14@csr.com (Barry Song)
-Date: Thu, 4 Aug 2011 19:54:46 -0700
-Subject: [RFC PATCH 0/2] ARM: CSR: add rtciobrg and PM sleep entry
-Message-ID: <1312512888-25070-1-git-send-email-bs14@csr.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Thu, 4 Aug 2011 20:53:34 -0700
+Subject: [PATCH 1/3] irq: If an IRQ is a GPIO, request and configure it
+In-Reply-To: <20110805000148.GB13321@opensource.wolfsonmicro.com>
+References: <1312498820-2275-1-git-send-email-swarren@nvidia.com>
+	<1312498820-2275-2-git-send-email-swarren@nvidia.com>
+	<20110805000148.GB13321@opensource.wolfsonmicro.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF049F171EC1@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-rtciobrg is the bridge between the RTC clock domain and the CPU interface
-clock domain. ARM access the register of SYSRTC, GPSRTC and PWRC through
-this module.
-Then PM controller depends on rtciobrg, we access PM through rtciobrg.
+Mark Brown wrote at Thursday, August 04, 2011 6:02 PM:
+> On Thu, Aug 04, 2011 at 05:00:18PM -0600, Stephen Warren wrote:
+> 
+> > +	} else {
+> > +		gpio = irq_to_gpio(irq);
+> > +		if (gpio_is_valid(gpio)) {
+> > +			ret = gpio_request(gpio, new->name);
+> > +			if (ret < 0)
+> > +				goto out_mask;
+> > +			ret = gpio_direction_input(gpio);
+> > +			if (ret < 0)
+> > +				goto out_mask;
+> > +		}
+> 
+> If you treat failures as an error what happens when a driver is using a
+> GPIO as both an interrupt and a GPIO?  For example a driver which
+> monitors the level on a GPIO and uses edge triggered IRQs to be notified
+> of state changes.
 
-Rongjun Ying (1):
-  ARM: CSR: add PM sleep entry for SiRFprimaII
+Well, things break. This is essentially the problem I was describing in
+the PATCH 0 email, just with a slightly different motivation.
 
-Zhiwu Song (1):
-  ARM: CSR: add rtc i/o bridge interface for SiRFprimaII
+I suppose that an alternative here would be to simply ignore any errors
+from gpio_request. This might have the benefit of removing the need for
+the other two patches I posted in the series. However, it seems a little
+dirty; one benefit of the IRQ code calling gpio_request and honoring
+errors would be to detect when some completely unrelated code had a bug
+and had called gpio_request on the GPIO before. Such detection would be
+non-existent if we don't error out on gpio_request. Perhaps some mechanism
+is needed to indicate that the driver has explicitly already called
+gpio_request for a legitimate shared purpose, and only then ignore
+errors?
 
- arch/arm/mach-prima2/Makefile        |    2 +
- arch/arm/mach-prima2/common.h        |    1 +
- arch/arm/mach-prima2/l2x0.c          |   34 +++--
- arch/arm/mach-prima2/pm.c            |  139 ++++++++++++++++++++
- arch/arm/mach-prima2/pm.h            |   32 +++++
- arch/arm/mach-prima2/rtciobrg.c      |  118 +++++++++++++++++
- arch/arm/mach-prima2/sleep.S         |  238 ++++++++++++++++++++++++++++++++++
- include/linux/rtc/sirfsoc_rtciobrg.h |   20 +++
- 8 files changed, 570 insertions(+), 14 deletions(-)
- create mode 100644 arch/arm/mach-prima2/pm.c
- create mode 100644 arch/arm/mach-prima2/pm.h
- create mode 100644 arch/arm/mach-prima2/rtciobrg.c
- create mode 100644 arch/arm/mach-prima2/sleep.S
- create mode 100644 include/linux/rtc/sirfsoc_rtciobrg.h
-
-
-
-Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
-More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
+--
+nvpublic
