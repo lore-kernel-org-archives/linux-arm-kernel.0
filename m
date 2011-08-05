@@ -1,61 +1,94 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 5 Aug 2011 10:40:17 +0100
-Subject: [RFC PATCH 0/3] If an IRQ is a GPIO, request and configure it
-In-Reply-To: <1312498820-2275-1-git-send-email-swarren@nvidia.com>
-References: <1312498820-2275-1-git-send-email-swarren@nvidia.com>
-Message-ID: <20110805094017.GC20575@n2100.arm.linux.org.uk>
+From: bryan.wu@canonical.com (Bryan Wu)
+Date: Fri, 5 Aug 2011 17:48:08 +0800
+Subject: [PATCH 01/17] leds: create a trigger for CPU activity
+In-Reply-To: <CACRpkdaxiBa=aBAxvE+k7WFgZ-zY_YgCsV4-JVv3SRcm_pX5hA@mail.gmail.com>
+References: <1312364089-32380-1-git-send-email-bryan.wu@canonical.com>
+	<1312364089-32380-2-git-send-email-bryan.wu@canonical.com>
+	<20110803102829.GC2607@pulham.picochip.com>
+	<CACRpkdZRh=gcedJQh6V3aUCfi2arn2V_P67MgZE2mB_hYZ-OnQ@mail.gmail.com>
+	<20110803153035.GL2607@pulham.picochip.com>
+	<CACRpkdaxiBa=aBAxvE+k7WFgZ-zY_YgCsV4-JVv3SRcm_pX5hA@mail.gmail.com>
+Message-ID: <CAK5ve-L9wRT012EYQ+6uaup659qFqDWUXYLiYZYttLoxzP-QTQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 04, 2011 at 05:00:17PM -0600, Stephen Warren wrote:
-> In http://www.spinics.net/lists/linux-tegra/msg01731.html, Mark Brown
-> pointed out that it was a little silly forcing every board or driver
-> to gpio_request() a GPIO that is later converted to an IRQ, and passed
-> to request_irq. The first patch in this series instead makes the core
-> IRQ code perform these calls when appropriate, to avoid duplicating it
-> everywhere.
+On Thu, Aug 4, 2011 at 12:12 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Wed, Aug 3, 2011 at 5:30 PM, Jamie Iles <jamie@jamieiles.com> wrote:
+>>> > So shouldn't this be doing a
+>>> > __get_cpu_var(ledtrig_cpu_triggers) and a kfree() on that (and setting
+>>> > to NULL)?
+>>>
+>>> You could do that but why? There is no way the pointer value
+>>> can make any harm. If activate() is called again it will be overwritten
+>>> with the new pointer.
+>>
+>> Yes, but can't ledtrig_cpu() potentially still be called after
+>> deactivation, then the:
+>>
+>> ? ? ? ?if (!trigdata)
+>> ? ? ? ? ? ? ? ?return;
+>>
+>> would be incorrect? ?My main point though was that it looks like
+>> led->trigger_data is the processor id and kfree() is being called on
+>> that.
+>
+> You're right, it just works fine because trigdata is always NULL...
+>
+>>> > Also, where does led->trigger_data get assigned with the cpu id?
+>>>
+>>> The activate() function is called on every core and if the CPU ID
+>>> is not equal to the assigned CPU it just exits, here:
+>>>
+>>> + ? ? int my_cpu = smp_processor_id();
+>>> + ? ? unsigned long target_cpu = (unsigned long) led->trigger_data;
+>>> +
+>>> + ? ? if (target_cpu != my_cpu)
+>>> + ? ? ? ? ? ? return;
+>>
+>> I understand that bit, but I can't see anything that actually assigns
+>> led->trigger_data in the first place.
+>
+> You're right, it's because nothing really does. And since
+> kfree(NULL); is fine this works, and makes the above thing work
+> fine as well.
+>
+> Since led->trigger_data is never used we shouldn't touch it in
+> I believe, Bryan can you just take it out and replace with something
+> like this (totally untested):
+>
+> static void ledtrig_cpu_deactivate_cpu(struct led_classdev *led)
+> {
+> ? ? ? struct ledtrig_cpu_data *cpu_data = __get_cpu_var(ledtrig_cpu_triggers);
+> ? ? ? int my_cpu = smp_processor_id();
+> ? ? ? unsigned long target_cpu = (unsigned long) led->trigger_data;
+>
+> ? ? ? if (target_cpu != my_cpu)
+> ? ? ? ? ? ? ? return;
+>
+> ? ? ? kfree(cpu_data);
+> ? ? ? __get_cpu_var(ledtrig_cpu_triggers) = NULL;
+> }
+>
+> static void ledtrig_cpu_activate(struct led_classdev *led)
+> {
+> ? ? ? on_each_cpu(ledtrig_cpu_deactivate_cpu, led, 1);
+> }
+>
+> Bryan can you test this change?
+>
 
-Trying to go from IRQ to GPIO is not a good idea - most of the
-IRQ <-> GPIO macros we have today are just plain broken.  Many of them
-just add or subtract a constant, which means non-GPIO IRQs have an
-apparant GPIO number too.  Couple this with the fact that all positive
-GPIO numbers are valid, and this is a recipe for wrong GPIOs getting
-used and GPIOs being requested for non-GPIO IRQs.
+No problem, I've reworked this patchset and included this updates.
+Please find patches here:
 
-I think this was also discussed in the past, and the conclusion was that
-IRQs should be kept separate from GPIOs.  Maybe views have changed since
-then...
+git://kernel.ubuntu.com/roc/linux-2.6 leds
+gitweb: http://kernel.ubuntu.com/git?p=roc/linux-2.6/.git;a=shortlog;h=refs/heads/leds
 
-However, if we do want to do this, then it would be much better to provide
-a new API for requesting GPIO IRQs, eg:
+Please help to test on your hardware.
 
-gpio_request_irq()
-
-which would wrap around request_threaded_irq(), takes a GPIO number,
-does the GPIO->IRQ conversion internally, and whatever GPIO setup is
-required.  Something like this:
-
-int gpio_request_threaded_irq(int gpio, irq_handler_t handler,
-	irq_handler_t thread_fn, unsigned long flags, const char *name,
-	void *dev)
-{
-	int ret;
-
-	if (!gpio_valid(gpio))
-		return -EINVAL;
-
-	ret = gpio_request_one(gpio, GPIOF_IN, name);
-	if (ret)
-		return ret;
-
-	ret = request_threaded_irq(gpio_to_irq(gpio), handler, thread_fn,
-				flags, name, dev);
-	if (ret)
-		gpio_free(gpio);
-
-	return ret;
-}
-
-This then limits the exposure of the GPIO<->IRQ conversion macros to just
-GPIOs, where the buggy nature of the existing conversions won't impact on
-non-GPIO IRQs.
+Thanks,
+-- 
+Bryan Wu <bryan.wu@canonical.com>
+Kernel Developer ? ?+86.138-1617-6545 Mobile
+Ubuntu Kernel Team
+Canonical Ltd. ? ? ?www.canonical.com
+Ubuntu - Linux for human beings | www.ubuntu.com
