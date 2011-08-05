@@ -1,46 +1,63 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 5 Aug 2011 09:54:45 +0200
-Subject: [patch 1/1] iMX: Fix build for iMX53
-In-Reply-To: <20110805073253.599604130@rtp-net.org>
-References: <20110805073240.162681115@rtp-net.org>
-	<20110805073253.599604130@rtp-net.org>
-Message-ID: <20110805075445.GO31521@pengutronix.de>
+From: ben@trinity.fluff.org (Ben Dooks)
+Date: Fri, 5 Aug 2011 08:55:00 +0100
+Subject: [RFC PATCH 0/3] If an IRQ is a GPIO, request and configure it
+In-Reply-To: <1312498820-2275-1-git-send-email-swarren@nvidia.com>
+References: <1312498820-2275-1-git-send-email-swarren@nvidia.com>
+Message-ID: <20110805075500.GC28651@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 05, 2011 at 09:32:41AM +0200, Arnaud Patard wrote:
-> Commit fad107086d5a869c1c07e5bb35b7b57a10ecf578 fixed the wrong test for MX51
-> as the MX51 addresses are wrong for MX50 and MX53 but now it's MX51 only, 
-> UART_PADDR is not defined anymore when building for MX50/MX53.
+On Thu, Aug 04, 2011 at 05:00:17PM -0600, Stephen Warren wrote:
+> In http://www.spinics.net/lists/linux-tegra/msg01731.html, Mark Brown
+> pointed out that it was a little silly forcing every board or driver
+> to gpio_request() a GPIO that is later converted to an IRQ, and passed
+> to request_irq. The first patch in this series instead makes the core
+> IRQ code perform these calls when appropriate, to avoid duplicating it
+> everywhere.
+
+Interesting, as this is not the case across all the ARM systems, as
+I believe that many of the s3c24xx do not bother to request the GPIOs
+before using them as interrupts.
+ 
+> However, this change has the potential for significant regressions; at
+> least some drivers are already calling gpio_request for GPIOs that are
+> also used as IRQs. This then causes the gpio_request inside the core IRQ
+> code to fail, which causes functional regressions. I'm not sure how wide-
+> spread this issue is, but in testing on NVIDIA Tegra, I found two
+> instances that needed to be fixed. Perhaps  a failure of gpio_request
+> in the core IRQ code should trigger a WARN rather than returning an
+> error, to give a grace period for conversion of other code?
+
+Do we really need to request the GPIO? I suppose it is useful to stop
+someone else trying to play with it...
+
+Another interesting problem is to do with using an GPIO that has been
+assigned to an interrupt as a readable resource in the driver, since
+the 
+
+I would also consider that the implementor of the IRQs set_type configure
+the specific GPIO to the correct mode for operating as an interrupt when
+it is called... this would reduce any problems of passing GPIOs to drivers
+(especially if device tree is being used) to avoid having to do any
+arch-specific mode calls.
+ 
+> Stephen Warren (3):
+>   irq: If an IRQ is a GPIO, request and configure it
+>   mmc: tegra: Don't gpio_request GPIOs used as IRQs.
+>   ASoC: jack_add_gpios: Don't gpio_request GPIOs used as IRQs.
 > 
-> Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
-> Tested-by: Steev Klimaszewski <steev@genesi-usa.com>
-> Index: linux-2.6/arch/arm/plat-mxc/include/mach/debug-macro.S
-> ===================================================================
-> --- linux-2.6.orig/arch/arm/plat-mxc/include/mach/debug-macro.S	2011-08-05 00:38:15.000000000 +0200
-> +++ linux-2.6/arch/arm/plat-mxc/include/mach/debug-macro.S	2011-08-05 09:32:32.000000000 +0200
-> @@ -44,6 +44,14 @@
->  #define UART_PADDR	MX51_UART1_BASE_ADDR
->  #endif
->  
-> +/* iMX50/53 have same addresses, but not iMX51 */
-> +#if defined(CONFIG_SOC_IMX50) || defined(CONFIG_SOC_IMX53)
-> +#ifdef UART_PADDR
-> +#error "CONFIG_DEBUG_LL is incompatible with multiple archs"
-> +#endif
-> +#define UART_PADDR	MX53_UART1_BASE_ADDR
-> +#endif
-> +
->  #define UART_VADDR	IMX_IO_ADDRESS(UART_PADDR)
->  
->  		.macro	addruart, rp, rv
-Looks good
-
-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-
-Best regards
-Uwe
+>  drivers/mmc/host/sdhci-tegra.c |    8 --------
+>  kernel/irq/manage.c            |   25 +++++++++++++++++++++++--
+>  sound/soc/soc-jack.c           |   13 +------------
+>  3 files changed, 24 insertions(+), 22 deletions(-)
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Ben Dooks, ben at fluff.org, http://www.fluff.org/ben/
+
+Large Hadron Colada: A large Pina Colada that makes the universe disappear.
