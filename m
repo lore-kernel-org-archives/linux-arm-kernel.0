@@ -1,50 +1,34 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Fri, 5 Aug 2011 13:25:32 +0800
-Subject: [PATCH] CPUIDLE: fix compiling error for ARM and SH
-In-Reply-To: <1312521517-31716-1-git-send-email-bs14@csr.com>
-References: <1312521517-31716-1-git-send-email-bs14@csr.com>
-Message-ID: <CAGsJ_4zC8xk-9wpgstN82eghhXmuLW6SZSMN=bCufN=zrYYQ=Q@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 5 Aug 2011 06:35:11 +0100
+Subject: [PATCH 1/3] irq: If an IRQ is a GPIO, request and configure it
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF049F171EC1@HQMAIL01.nvidia.com>
+References: <1312498820-2275-1-git-send-email-swarren@nvidia.com>
+	<1312498820-2275-2-git-send-email-swarren@nvidia.com>
+	<20110805000148.GB13321@opensource.wolfsonmicro.com>
+	<74CDBE0F657A3D45AFBB94109FB122FF049F171EC1@HQMAIL01.nvidia.com>
+Message-ID: <20110805053510.GA16956@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry for missing Mark and David's patch "[PATCH] cpuidle: Consistent
-spelling of cpuidle_idle_call()", pls ignore mine.
+On Thu, Aug 04, 2011 at 08:53:34PM -0700, Stephen Warren wrote:
 
-2011/8/5 Barry Song <bs14@csr.com>:
-> commit a0bfa1373859e9d11dc92561a8667588803e42d8 cause compiling errors for ARM and SH
->
-> Cc: Len Brown <len.brown@intel.com>
-> Signed-off-by: Barry Song <baohua.song@csr.com>
-> ---
-> ?arch/arm/kernel/process.c | ? ?2 +-
-> ?arch/sh/kernel/idle.c ? ? | ? ?2 +-
-> ?2 files changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-> index d7ee0d4..1a347f4 100644
-> --- a/arch/arm/kernel/process.c
-> +++ b/arch/arm/kernel/process.c
-> @@ -197,7 +197,7 @@ void cpu_idle(void)
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?cpu_relax();
-> ? ? ? ? ? ? ? ? ? ? ? ?} else {
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?stop_critical_timings();
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? if (cpuidle_call_idle())
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? if (cpuidle_idle_call())
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?pm_idle();
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?start_critical_timings();
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?/*
-> diff --git a/arch/sh/kernel/idle.c b/arch/sh/kernel/idle.c
-> index 3c45de1..32114e0 100644
-> --- a/arch/sh/kernel/idle.c
-> +++ b/arch/sh/kernel/idle.c
-> @@ -101,7 +101,7 @@ void cpu_idle(void)
-> ? ? ? ? ? ? ? ? ? ? ? ?local_irq_disable();
-> ? ? ? ? ? ? ? ? ? ? ? ?/* Don't trace irqs off for idle */
-> ? ? ? ? ? ? ? ? ? ? ? ?stop_critical_timings();
-> - ? ? ? ? ? ? ? ? ? ? ? if (cpuidle_call_idle())
-> + ? ? ? ? ? ? ? ? ? ? ? if (cpuidle_idle_call())
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?pm_idle();
-> ? ? ? ? ? ? ? ? ? ? ? ?/*
-> ? ? ? ? ? ? ? ? ? ? ? ? * Sanity check to ensure that pm_idle() returns
-> --
-> 1.7.1
+> Well, things break. This is essentially the problem I was describing in
+> the PATCH 0 email, just with a slightly different motivation.
+
+There's a bunch of existing code using that idiom.
+
+> I suppose that an alternative here would be to simply ignore any errors
+> from gpio_request. This might have the benefit of removing the need for
+> the other two patches I posted in the series. However, it seems a little
+> dirty; one benefit of the IRQ code calling gpio_request and honoring
+> errors would be to detect when some completely unrelated code had a bug
+> and had called gpio_request on the GPIO before. Such detection would be
+> non-existent if we don't error out on gpio_request. Perhaps some mechanism
+> is needed to indicate that the driver has explicitly already called
+> gpio_request for a legitimate shared purpose, and only then ignore
+> errors?
+
+But it's not a bug to use a GPIO as an IRQ source, otherwise we wouldn't
+have gpio_to_irq() in the first place.  Feels like we need a backchannel
+between gpiolib and the IRQ code to do this.  Or perhaps the drivers
+that implement this should be taking care of setting up the GPIO mode?
