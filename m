@@ -1,37 +1,19 @@
-From: jason.hui@linaro.org (Jason Liu)
-Date: Fri,  5 Aug 2011 23:34:32 +0800
-Subject: [PATCH] ARM: iMX5: Don't enable DPLL if it already enabled
-Message-ID: <1312558472-30590-1-git-send-email-jason.hui@linaro.org>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 5 Aug 2011 17:18:37 +0200
+Subject: [RFC PATCH] mmc: at91_mci: remove the use of irq_to_gpio
+In-Reply-To: <1312472943-13839-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1312472943-13839-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <20110805151837.GA19633@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the DPLL is already enabled, don't try to enable it again.
-Since write to the DPLL control register will make the DPLL
-reset and which will cause some issues when some child module
-are sourced from this DPLL.
+On 16:49 Thu 04 Aug     , Nicolas Ferre wrote:
+> Remove the use of irq_to_gpio() in the card detection interrupt
+> handler. The information is available in the board structure and
+> we can avoid using a function that has little meaning.
+> 
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 
-Signed-off-by: Jason Liu <jason.hui@linaro.org>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
----
- arch/arm/mach-mx5/clock-mx51-mx53.c |    6 +++++-
- 1 files changed, 5 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
-index 7f20308..f7bf996 100644
---- a/arch/arm/mach-mx5/clock-mx51-mx53.c
-+++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
-@@ -271,7 +271,11 @@ static int _clk_pll_enable(struct clk *clk)
- 	int i = 0;
- 
- 	pllbase = _get_pll_base(clk);
--	reg = __raw_readl(pllbase + MXC_PLL_DP_CTL) | MXC_PLL_DP_CTL_UPEN;
-+	reg = __raw_readl(pllbase + MXC_PLL_DP_CTL);
-+	if (reg & MXC_PLL_DP_CTL_UPEN)
-+		return 0;
-+
-+	reg |= MXC_PLL_DP_CTL_UPEN;
- 	__raw_writel(reg, pllbase + MXC_PLL_DP_CTL);
- 
- 	/* Wait for lock */
--- 
-1.7.0.4
+Best Regards,
+J.
