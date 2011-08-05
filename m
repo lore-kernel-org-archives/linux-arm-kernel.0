@@ -1,65 +1,51 @@
-From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Fri, 5 Aug 2011 11:30:35 +0530
-Subject: [PATCHv6 3/3] OMAP: I2C: Remove the SYSC register definition
-In-Reply-To: <1312524035-5549-1-git-send-email-shubhrajyoti@ti.com>
-References: <1312524035-5549-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1312524035-5549-3-git-send-email-shubhrajyoti@ti.com>
+From: jhnikula@gmail.com (Jarkko Nikula)
+Date: Fri, 5 Aug 2011 09:02:44 +0300
+Subject: [PATCH 6/6] OMAP: McBSP: use existing macros for converting
+	between devices
+In-Reply-To: <1312472710-31758-7-git-send-email-khilman@ti.com>
+References: <1312472710-31758-1-git-send-email-khilman@ti.com>
+	<1312472710-31758-7-git-send-email-khilman@ti.com>
+Message-ID: <20110805090244.f6e5f65a6829138d929bd4a9@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SYSC register should not accessed in the driver removing the
-define from the driver.
-Also clean up the syscstate from the omap_i2c_dev struct.
+Hi Kevin
 
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
----
- drivers/i2c/busses/i2c-omap.c |    5 -----
- 1 files changed, 0 insertions(+), 5 deletions(-)
+On Thu,  4 Aug 2011 08:45:10 -0700
+Kevin Hilman <khilman@ti.com> wrote:
 
-diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index d8f4470..d05efe7 100644
---- a/drivers/i2c/busses/i2c-omap.c
-+++ b/drivers/i2c/busses/i2c-omap.c
-@@ -63,7 +63,6 @@ enum {
- 	OMAP_I2C_BUF_REG,
- 	OMAP_I2C_CNT_REG,
- 	OMAP_I2C_DATA_REG,
--	OMAP_I2C_SYSC_REG,
- 	OMAP_I2C_CON_REG,
- 	OMAP_I2C_OA_REG,
- 	OMAP_I2C_SA_REG,
-@@ -187,7 +186,6 @@ struct omap_i2c_dev {
- 	u16			scllstate;
- 	u16			sclhstate;
- 	u16			bufstate;
--	u16			syscstate;
- 	u16			westate;
- 	u16			errata;
- };
-@@ -202,7 +200,6 @@ const static u8 reg_map_ip_v1[] = {
- 	[OMAP_I2C_BUF_REG] = 0x05,
- 	[OMAP_I2C_CNT_REG] = 0x06,
- 	[OMAP_I2C_DATA_REG] = 0x07,
--	[OMAP_I2C_SYSC_REG] = 0x08,
- 	[OMAP_I2C_CON_REG] = 0x09,
- 	[OMAP_I2C_OA_REG] = 0x0a,
- 	[OMAP_I2C_SA_REG] = 0x0b,
-@@ -223,7 +220,6 @@ const static u8 reg_map_ip_v2[] = {
- 	[OMAP_I2C_BUF_REG] = 0x94,
- 	[OMAP_I2C_CNT_REG] = 0x98,
- 	[OMAP_I2C_DATA_REG] = 0x9c,
--	[OMAP_I2C_SYSC_REG] = 0x20,
- 	[OMAP_I2C_CON_REG] = 0xa4,
- 	[OMAP_I2C_OA_REG] = 0xa8,
- 	[OMAP_I2C_SA_REG] = 0xac,
-@@ -264,7 +260,6 @@ static void omap_i2c_unidle(struct omap_i2c_dev *dev)
- 		omap_i2c_write_reg(dev, OMAP_I2C_SCLL_REG, dev->scllstate);
- 		omap_i2c_write_reg(dev, OMAP_I2C_SCLH_REG, dev->sclhstate);
- 		omap_i2c_write_reg(dev, OMAP_I2C_BUF_REG, dev->bufstate);
--		omap_i2c_write_reg(dev, OMAP_I2C_SYSC_REG, dev->syscstate);
- 		omap_i2c_write_reg(dev, OMAP_I2C_WE_REG, dev->westate);
- 		omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, OMAP_I2C_CON_EN);
- 	}
+> For converting from struct device to platform_device, and from
+> platform_device to struct omap_device, there are existing macros.  Use
+> them instead of manual use of container_of().
+> 
+> Signed-off-by: Kevin Hilman <khilman@ti.com>
+> ---
+>  arch/arm/plat-omap/mcbsp.c |    6 +++---
+>  1 files changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/plat-omap/mcbsp.c b/arch/arm/plat-omap/mcbsp.c
+> index 3c1fbdc..47016f7 100644
+> --- a/arch/arm/plat-omap/mcbsp.c
+> +++ b/arch/arm/plat-omap/mcbsp.c
+> @@ -260,9 +260,9 @@ EXPORT_SYMBOL(omap_mcbsp_dma_reg_params);
+>  #ifdef CONFIG_ARCH_OMAP3
+>  static struct omap_device *find_omap_device_by_dev(struct device *dev)
+>  {
+> -	struct platform_device *pdev = container_of(dev,
+> -					struct platform_device, dev);
+> -	return container_of(pdev, struct omap_device, pdev);
+> +	struct platform_device *pdev = to_platform_device(dev);
+> +
+> +	return to_omap_device(pdev);
+>  }
+>  
+I have a better alternative (that removes these unused lines) here:
+
+http://marc.info/?l=linux-omap&m=130951039226392&w=2
+
+I'm fine if you need to take my patch if there's urgent need to modify
+these lines or otherwise I can carry it when sending an updated version
+of my earlier McBSP cleanup set.
+
 -- 
-1.7.1
+Jarkko
