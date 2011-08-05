@@ -1,25 +1,333 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Fri, 05 Aug 2011 15:04:49 +0400
-Subject: [patch 1/1] iMX: Fix build for iMX53
-In-Reply-To: <20110805073253.599604130@rtp-net.org>
-References: <20110805073240.162681115@rtp-net.org>
-	<20110805073253.599604130@rtp-net.org>
-Message-ID: <4E3BCE51.9010405@ru.mvista.com>
+From: alim.akhtar@gmail.com (Alim Akhtar)
+Date: Fri, 5 Aug 2011 16:40:18 +0530
+Subject: [RFC] using amba_pl08x driver for s3c64xx SoCs
+In-Reply-To: <CACRpkdasYKx8C7fR1heiQDnJgJMvLa1VuQNhQ+gu5F6ea7d3oA@mail.gmail.com>
+References: <CAGOxZ50Rz3ynmkuoJb9Pgc0b1pG++-CB9kUtU92zKYtfP3jtRg@mail.gmail.com>
+	<CACRpkdasYKx8C7fR1heiQDnJgJMvLa1VuQNhQ+gu5F6ea7d3oA@mail.gmail.com>
+Message-ID: <CAGOxZ53edhKA=VbhJJKG--LoG6P8Y+ubKdH5-4woDgBEbTdtVQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Fri, Aug 5, 2011 at 2:18 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Fri, Aug 5, 2011 at 7:47 AM, Alim Akhtar <alim.akhtar@gmail.com> wrote:
+>
+>> Samsung's S3C64XX SoCs uses a modified version of standard PrimeCell PL080 DMAC,
+>> which has extra control register and config register. Hence the
+>> current mailline amba_pl08x driver can not be used as it is.
+>> I have made the requisite changes to the amba_pl08x driver to
+>> accommodate the S3C64XX DMAC.
+>
+> Great!
+>
+> Make sure you are following and rebasing and testing the latest changes from
+> Russell King and Viresh Kumar to the same driver, especially Vireshs
+> code removing the 0x400 (1K) limit to chunk size.
+>
+Ok, I will rebase and test against latest changes by Russell King and
+Viresh Kumar.
+>> Below is the modification, if you think it is ok I can submit the same
+>> as a patch.
+>
+> Yes, generate a common patch from GIT with git format-patch then submit this to
+> linux-kernel, linux-arm-kernel and explicitly to the DMA engine maintainer
+> Vinod Koul.
+>
+Ok, I will do that.
+> I have some quick review comments below, also make sure you have run
+> checkpatch (you probably have, just checking) on it.
+>
+Ok, I will recheck and run checkpatch before sending.
+>> + * Samsung S3C64xx SoCs uses a variant of PL080 DMAC. It contains an extra
+>> + * control register to hold the TransferSize. Below is the LLI structure
+>> + * and offsets of S3C64xx DMAC.
+>> + * ? ? -----------------------------------------------------------------
+>> + * ? ? | ? ? ? Offset ? ? ? ? ?| ? ? ? Contents ? ? ? ? ? ? ? ? ? ? ? ?|
+>> + * ? ? -----------------------------------------------------------------
+>> + * ? ? | Next LLI Address ? ? ?| Source Address for Next xfer ? ? ? ? ?|
+>> + * ? ? -----------------------------------------------------------------
+>> + * ? ? | Next LLI Address+0x04 | Destination Address for Next xfer ? ? |
+>> + * ? ? -----------------------------------------------------------------
+>> + * ? ? | Next LLI Address+0x08 | Next LLI address for next xfer ? ? ? ?|
+>> + * ? ? -----------------------------------------------------------------
+>> + * ? ? | Next LLI Address+0x0c | DMACCxControl0 data for next xfer ? ? |
+>> + * ? ? -----------------------------------------------------------------
+>> + * ? ? | Next LLI Address+0x10 | DMACCxControl1 xfer size for next xfer|
+>> + * ? ? -----------------------------------------------------------------
+>> + * Also S3C64XX has a config register at offset 0x14
+>> + * Have a look at arch/arm/include/asm/hardware/pl080.h for complete register
+>> + * details.
+>> ?*/
+>
+> Good!
+>
+Thanks.
+> Probably we should name the Samsung-specific registers in a special way,
+> but we can leave that for later.
+>
+Do you have anything in mind currently?
+may be something like PL080_S3C_CH_CONFIG?
+>> ?#include <linux/device.h>
+>> ?#include <linux/init.h>
+>> ?#include <linux/module.h>
+>> @@ -99,6 +117,8 @@
+>> ?struct vendor_data {
+>> ? ? ? ?u8 channels;
+>> ? ? ? ?bool dualmaster;
+>> + ? ? ? /* To identify samsung DMAC */
+>> + ? ? ? bool is_pl080s;
+>
+> I would name it more explicitly like
+> is_pl080_s3c
+>
+Ok, i will us this.
+>> @@ -112,6 +132,9 @@ struct pl08x_lli {
+>> ? ? ? ?u32 dst;
+>> ? ? ? ?u32 lli;
+>> ? ? ? ?u32 cctl;
+>> + ? ? ? /* Samsung pl080 DMAC has one exrta control register
+>> + ? ? ? ?* which is used to hold the transfer_size */
+>> + ? ? ? u32 cctl1;
+>> ?};
+>
+> Comment style
+>
+> /*
+> ?* Foo
+> ?* Bar
+> ?*/
+>
+Ok, I will follow this.
+>> @@ -452,7 +513,6 @@ static inline u32 pl08x_cctl_bits(u32 cctl, u8
+>> srcwidth, u8 dstwidth,
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?size_t tsize)
+>> ?{
+>> ? ? ? ?u32 retbits = cctl;
+>> -
+>
+> Refrain from removing whitespace here.
+> (No big deal)
+>
+actually one line is missed here from the patch (dont know how, may be
+the editor problem)
+which looks like
+@@ -489,7 +549,6 @@ static inline u32 pl08x_cctl_bits(u32 cctl, u8
+srcwidth, u8 dstwidth,
+ 		break;
+ 	}
 
-On 05-08-2011 11:32, Arnaud Patard (Rtp) wrote:
+-	retbits |= tsize << PL080_CONTROL_TRANSFER_SIZE_SHIFT;
+ 	return retbits;
+since S3C64XX has a separate register for transfer size, I am making
+pl08x_cctl_bits() to return only the control bits.
+While calling pl08x_fill_lli_for_desc() i am doing cctl |= tsize <<
+PL080_CONTROL_TRANSFER_SIZE_SHIFT for the other SoCs
+except S3C64XX.
 
-> Commit fad107086d5a869c1c07e5bb35b7b57a10ecf578 fixed the wrong test for MX51
+>> @@ -591,6 +650,7 @@ static int pl08x_fill_llis_for_desc(struct
+>> pl08x_driver_data *pl08x,
+>> ? ? ? ?size_t max_bytes_per_lli;
+>> ? ? ? ?size_t total_bytes = 0;
+>> ? ? ? ?struct pl08x_lli *llis_va;
+>> + ? ? ? size_t lli_len = 0, target_len, tsize, odd_bytes;
+>>
+>> ? ? ? ?txd->llis_va = dma_pool_alloc(pl08x->pool, GFP_NOWAIT,
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?&txd->llis_bus);
+>> @@ -657,7 +717,12 @@ static int pl08x_fill_llis_for_desc(struct
+>> pl08x_driver_data *pl08x,
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "less than a bus width (remain 0x%08x)\n",
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? __func__, bd.remainder);
+>> ? ? ? ? ? ? ? ? ? ? ? ?cctl = pl08x_cctl_bits(cctl, 1, 1, 1);
+>> - ? ? ? ? ? ? ? ? ? ? ? pl08x_fill_lli_for_desc(&bd, num_llis++, 1, cctl);
+>> + ? ? ? ? ? ? ? ? ? ? ? if (pl08x->vd->is_pl080s)
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? pl08x_fill_lli_for_desc(&bd, num_llis++, 1, cctl);
+>> + ? ? ? ? ? ? ? ? ? ? ? else {
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? cctl |= 1 << PL080_CONTROL_TRANSFER_SIZE_SHIFT;
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? pl08x_fill_lli_for_desc(&bd, num_llis++, 1, cctl);
+>> + ? ? ? ? ? ? ? ? ? ? ? }
+>
+> Hm! What is happening here? That is not a S3C-specific register
+> in control transfer?
+>
+> Please insert a comment explaining why you do this cctl |= ...
+>
+As explained above.
+I will put the comments in the patch.
+> Also since the second statement is the same in both cases just:
+>
+> if (pl08x->vd->is_pl080s)
+> ? ?/* Here is a detailed description of why we need to do this on S3C */
+> ? ?cctl |= 1 << PL080_CONTROL_TRANSFER_SIZE_SHIFT;
+> pl08x_fill_lli_for_desc(&bd, num_llis++, 1, cctl);
+>
+>
+OK. I will rearrange this.
+>> @@ -668,7 +733,12 @@ static int pl08x_fill_llis_for_desc(struct
+>> pl08x_driver_data *pl08x,
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "(remain 0x%08x)\n",
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? __func__, bd.remainder);
+>> ? ? ? ? ? ? ? ? ? ? ? ?cctl = pl08x_cctl_bits(cctl, 1, 1, 1);
+>> - ? ? ? ? ? ? ? ? ? ? ? pl08x_fill_lli_for_desc(&bd, num_llis++, 1, cctl);
+>> + ? ? ? ? ? ? ? ? ? ? ? if (pl08x->vd->is_pl080s)
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? pl08x_fill_lli_for_desc(&bd, num_llis++, 1, cctl);
+>> + ? ? ? ? ? ? ? ? ? ? ? else {
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? cctl |= 1 << PL080_CONTROL_TRANSFER_SIZE_SHIFT;
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? pl08x_fill_lli_for_desc(&bd, num_llis++, 1, cctl);
+>> + ? ? ? ? ? ? ? ? ? ? ? }
+>> ? ? ? ? ? ? ? ? ? ? ? ?total_bytes++;
+>> ? ? ? ? ? ? ? ?}
+>
+> Same here.
+>
+OK. I will rearrange this
+>> @@ -779,8 +847,14 @@ static int pl08x_fill_llis_for_desc(struct
+>> pl08x_driver_data *pl08x,
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?dev_vdbg(&pl08x->adev->dev,
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?"%s fill lli with single lli chunk of size 0x%08zx (remainder 0x%08zx)\n",
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?__func__, lli_len, bd.remainder);
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? pl08x_fill_lli_for_desc(&bd, num_llis++,
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? lli_len, cctl);
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? if (pl08x->vd->is_pl080s)
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? pl08x_fill_lli_for_desc(&bd, num_llis++,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? lli_len, cctl);
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? else {
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? cctl |= tsize << PL080_CONTROL_TRANSFER_SIZE_SHIFT;
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? pl08x_fill_lli_for_desc(&bd, num_llis++,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? lli_len, cctl);
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? }
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?total_bytes += lli_len;
+>> ? ? ? ? ? ? ? ? ? ? ? ?}
+>
+> Same here.
+>
+OK. I will rearrange this
+>> @@ -797,8 +871,14 @@ static int pl08x_fill_llis_for_desc(struct
+>> pl08x_driver_data *pl08x,
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?dev_vdbg(&pl08x->adev->dev,
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?"%s align with boundary, single byte (remain 0x%08zx)\n",
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?__func__, bd.remainder);
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? pl08x_fill_lli_for_desc(&bd,
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? num_llis++, 1, cctl);
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? if (pl08x->vd->is_pl080s)
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? pl08x_fill_lli_for_desc(&bd,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? num_llis++, 1, cctl);
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? else {
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? cctl |= 1 << PL080_CONTROL_TRANSFER_SIZE_SHIFT;
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? pl08x_fill_lli_for_desc(&bd,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? num_llis++, 1, cctl);
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? }
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?total_bytes++;
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?}
+>> ? ? ? ? ? ? ? ? ? ? ? ?}
+>
+> And here again.
+>
+OK. I will rearrange this
+>> @@ -812,7 +892,12 @@ static int pl08x_fill_llis_for_desc(struct
+>> pl08x_driver_data *pl08x,
+>> ? ? ? ? ? ? ? ? ? ? ? ?dev_vdbg(&pl08x->adev->dev,
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?"%s align with boundary, single odd byte (remain %zu)\n",
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?__func__, bd.remainder);
+>> - ? ? ? ? ? ? ? ? ? ? ? pl08x_fill_lli_for_desc(&bd, num_llis++, 1, cctl);
+>> + ? ? ? ? ? ? ? ? ? ? ? if (pl08x->vd->is_pl080s)
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? pl08x_fill_lli_for_desc(&bd, num_llis++, 1, cctl);
+>> + ? ? ? ? ? ? ? ? ? ? ? else {
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? cctl |= 1 << PL080_CONTROL_TRANSFER_SIZE_SHIFT;
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? pl08x_fill_lli_for_desc(&bd, num_llis++, 1, cctl);
+>> + ? ? ? ? ? ? ? ? ? ? ? }
+>> ? ? ? ? ? ? ? ? ? ? ? ?total_bytes++;
+>> ? ? ? ? ? ? ? ?}
+>> ? ? ? ?}
+>
+> And here.
+>
+OK. I will rearrange this
+>> @@ -829,13 +914,15 @@ static int pl08x_fill_llis_for_desc(struct
+>> pl08x_driver_data *pl08x,
+>> ? ? ? ? ? ? ? ? ? ? ? ?__func__, (u32) MAX_NUM_TSFR_LLIS);
+>> ? ? ? ? ? ? ? ?return 0;
+>> ? ? ? ?}
+>> -
+>> ? ? ? ?llis_va = txd->llis_va;
+>> ? ? ? ?/* The final LLI terminates the LLI. */
+>> ? ? ? ?llis_va[num_llis - 1].lli = 0;
+>> ? ? ? ?/* The final LLI element shall also fire an interrupt. */
+>> ? ? ? ?llis_va[num_llis - 1].cctl |= PL080_CONTROL_TC_IRQ_EN;
+>>
+>> + ? ? ? if(pl08x->vd->is_pl080s)
+>> + ? ? ? ? ? ? ? llis_va[num_llis - 1].cctl1 |= lli_len;
+>> +
+>
+> Explanation here, again I think is needed.
+>
+I will write the explanation here.
+>> @@ -1920,6 +2008,13 @@ static int pl08x_probe(struct amba_device
+>> *adev, const struct amba_id *id)
+>> ? ? ? ? ? ? ? ?goto out_no_ioremap;
+>> ? ? ? ?}
+>>
+>> + ? ? ? clk = clk_get(&pl08x->adev->dev, "dma");
+>> + ? ? ? if (IS_ERR(clk)) {
+>> + ? ? ? ? ? ? ? dev_err(&pl08x->adev->dev, "Cannot get operation clock.\n");
+>> + ? ? ? ? ? ? ? ret = -EINVAL;
+>> + ? ? ? }
+>> + ? ? ? clk_enable(clk);
+>
+> I suspect this is wrong. Since this is an AMBA device, you probably
+> can rely on the
+> code already present in drivers/amba/bus.c.
+>
+> Just rename the clock from "dma" to "pclk" in the S3C platform.
+>
+Ok. I will modify this.
+>> @@ -1953,7 +2048,7 @@ static int pl08x_probe(struct amba_device *adev,
+>> const struct amba_id *id)
+>> ? ? ? ? ? ? ? ?spin_lock_init(&ch->lock);
+>> ? ? ? ? ? ? ? ?ch->serving = NULL;
+>> ? ? ? ? ? ? ? ?ch->signal = -1;
+>> - ? ? ? ? ? ? ? dev_info(&adev->dev,
+>> + ? ? ? ? ? ? ? dev_dbg(&adev->dev,
+>> ? ? ? ? ? ? ? ? ? ? ? ? "physical channel %d is %s\n", i,
+>> ? ? ? ? ? ? ? ? ? ? ? ? pl08x_phy_channel_busy(ch) ? "BUSY" : "FREE");
+>> ? ? ? ?}
+>
+> Check Russells and Vireshs recent patches, I think they have already
+> fixed up a lot of debug prints.
+>
+I have a concern here, let say if the dev_dbg is enabled, first call
+to pl08x_phy_channel_busy() with ch->serving=NULL will give me NULL
+pointer dereferencing crash.
+please see pl08x_phy_channel_busy() definition.
+Does this dbg really needed (or we can remove this), if yes, then how
+to handle this case?
+Please suggest.
+>> @@ -2030,13 +2125,21 @@ out_no_pl08x:
+>> ?static struct vendor_data vendor_pl080 = {
+>> ? ? ? ?.channels = 8,
+>> ? ? ? ?.dualmaster = true,
+>> + ? ? ? .is_pl080s = false,
+>> ?};
+>
+> Don't assign false, it is initialized to zero i.e. fals by default.
+>
+Ok. I will remove this.
+>>
+>> ?static struct vendor_data vendor_pl081 = {
+>> ? ? ? ?.channels = 2,
+>> ? ? ? ?.dualmaster = false,
+>> + ? ? ? .is_pl080s = false,
+>> ?};
+>
+> Dito.
+>
+This as well
+> The rest looks good to me!
+>
+> Looking forward to version 2, thanks!
+>
+I will send V2 soon
+> Yours,
+> Linus Walleij
+>
 
-    Please specify that commit's summary in parens.
-
-> as the MX51 addresses are wrong for MX50 and MX53 but now it's MX51 only,
-> UART_PADDR is not defined anymore when building for MX50/MX53.
-
-> Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
-> Tested-by: Steev Klimaszewski <steev@genesi-usa.com>
-
-WBR, Sergei
+Regards,
+Alim
