@@ -1,32 +1,69 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 05 Aug 2011 07:52:44 -0700
-Subject: [PATCH] OMAP: omap_device: make latency autoadjust messages debug
-In-Reply-To: <1311599904-5981-1-git-send-email-notasas@gmail.com> (Grazvydas
-	Ignotas's message of "Mon, 25 Jul 2011 16:18:24 +0300")
-References: <1311599904-5981-1-git-send-email-notasas@gmail.com>
-Message-ID: <874o1vvrk3.fsf@ti.com>
+Date: Fri, 05 Aug 2011 07:57:54 -0700
+Subject: [PATCH 6/6] OMAP: McBSP: use existing macros for converting
+	between devices
+In-Reply-To: <20110805090244.f6e5f65a6829138d929bd4a9@gmail.com> (Jarkko
+	Nikula's message of "Fri, 5 Aug 2011 09:02:44 +0300")
+References: <1312472710-31758-1-git-send-email-khilman@ti.com>
+	<1312472710-31758-7-git-send-email-khilman@ti.com>
+	<20110805090244.f6e5f65a6829138d929bd4a9@gmail.com>
+Message-ID: <87mxfnucr1.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Grazvydas Ignotas <notasas@gmail.com> writes:
+Jarkko Nikula <jhnikula@gmail.com> writes:
 
-> During normal system operation warning messages similar to this
-> are appearing quite often:
-> omap_device: omap4-keypad.-1: new worst case activate latency 0: 61035
+> Hi Kevin
 >
-> This doesn't seem to be reporting a problem, nor is it very useful for
-> non-developers, so reduce it to debug level.
+> On Thu,  4 Aug 2011 08:45:10 -0700
+> Kevin Hilman <khilman@ti.com> wrote:
+>
+>> For converting from struct device to platform_device, and from
+>> platform_device to struct omap_device, there are existing macros.  Use
+>> them instead of manual use of container_of().
+>> 
+>> Signed-off-by: Kevin Hilman <khilman@ti.com>
+>> ---
+>>  arch/arm/plat-omap/mcbsp.c |    6 +++---
+>>  1 files changed, 3 insertions(+), 3 deletions(-)
+>> 
+>> diff --git a/arch/arm/plat-omap/mcbsp.c b/arch/arm/plat-omap/mcbsp.c
+>> index 3c1fbdc..47016f7 100644
+>> --- a/arch/arm/plat-omap/mcbsp.c
+>> +++ b/arch/arm/plat-omap/mcbsp.c
+>> @@ -260,9 +260,9 @@ EXPORT_SYMBOL(omap_mcbsp_dma_reg_params);
+>>  #ifdef CONFIG_ARCH_OMAP3
+>>  static struct omap_device *find_omap_device_by_dev(struct device *dev)
+>>  {
+>> -	struct platform_device *pdev = container_of(dev,
+>> -					struct platform_device, dev);
+>> -	return container_of(pdev, struct omap_device, pdev);
+>> +	struct platform_device *pdev = to_platform_device(dev);
+>> +
+>> +	return to_omap_device(pdev);
+>>  }
+>>  
+> I have a better alternative (that removes these unused lines) here:
+>
+> http://marc.info/?l=linux-omap&m=130951039226392&w=2
 
-Yeah, this is really only useful for PM developers, so making it debug
-is fine.
+Indeed, that's a much better alternative.  I didn't bother to check if
+th resulting omap_device pointer was actually used.
 
-> Cc: Steve Sakoman <steve@sakoman.com>
-> Signed-off-by: Grazvydas Ignotas <notasas@gmail.com>
-> ---
-> Applies on top of git://git.pwsan.com/linux-2.6 prcm-devel-3.1
-> + Kevin's "OMAP: omap_device: replace pr_* prints with dev_*".
+> I'm fine if you need to take my patch if there's urgent need to modify
+> these lines or otherwise I can carry it when sending an updated version
+> of my earlier McBSP cleanup set.
 
-Adding it to my omap_device queue for v3.2:
-git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git for_3.2/omap_device
+Yeah, yours is a better patch and we should take that one.  Feel free to
+add 
+
+Acked-by: Kevin Hilman <khilman@ti.com>
+
+I'll include it in my series for reference also (because I need it due
+to modifying how platform_device is contained within an omap_device) but
+yours will probably make it upstream first since I'm about to go offline
+for ~2 weeks.
+
+Thanks,
 
 Kevin
