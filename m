@@ -1,64 +1,56 @@
-From: scottwood@freescale.com (Scott Wood)
-Date: Fri, 5 Aug 2011 16:48:39 -0500
-Subject: [PATCH 1/2] arm/mx5: parse iomuxc pad configuratoin from device
-	tree
-In-Reply-To: <CAKGA1b=CFVwjHT7eobd1-UMrSBNsQ2N+96OuCu1QbjGgo9RScQ@mail.gmail.com>
-References: <1311606467-28985-1-git-send-email-shawn.guo@linaro.org>
-	<1311606467-28985-2-git-send-email-shawn.guo@linaro.org>
-	<20110725204630.GD26735@ponder.secretlab.ca>
-	<CAKGA1bmbWUeyhUtDwHZjB8V4e2wJ0NHX2qWhqaqx6HoBm7uMnQ@mail.gmail.com>
-	<4E3C51F5.50707@freescale.com>
-	<20110805203629.GB6991@huya.qualcomm.com>
-	<CAKGA1b=CFVwjHT7eobd1-UMrSBNsQ2N+96OuCu1QbjGgo9RScQ@mail.gmail.com>
-Message-ID: <4E3C6537.2080602@freescale.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Fri,  5 Aug 2011 16:15:33 -0600
+Subject: [PATCH 1/2] gpio/tegra: Remove use of irq_to_gpio
+Message-ID: <1312582534-10871-1-git-send-email-swarren@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/05/2011 04:29 PM, Matt Sealey wrote:
-> On Fri, Aug 5, 2011 at 3:36 PM, David Brown <davidb@codeaurora.org> wrote:
->> On Fri, Aug 05, 2011 at 03:26:29PM -0500, Scott Wood wrote:
->>
->>>> Yes, it puts the onus of the work on the firmware guys, but they're
->>>> the ones writing the device trees for their hardware anyway.
->>>
->>> Sometimes.
->>
->> I'm not even sure that is going to be common.  At least our setup is
->> going to have the device tree living in flash somewhere.  The
->> bootloader only knows enough about the FDT to insert arguments and
->> memory information into it.  They certainly aren't the appropriate
->> team to be defining the device tree.
->>
->> David
-> 
-> In any company through some kind of collaborative process of firmware
-> and Linux development, someone sits down and defines this device tree.
-> They will have an intimate knowledge of the hardware.. 
+irq_to_gpio is being removed. Replace the only use of that API by
+the ARM Tegra sub-architecture.
 
-That doesn't mean they have intimate knowledge of what will be accepted
-upstream, or that they involve upstream early enough.  Even within the
-company, those who work with upstream may have little influence over
-what gets flashed on the boards during manufacturing, or when hardware
-details can be disclosed in the form of submitting patches.  Or they
-might have just been rushed by schedule to get some firmware done that
-can load a kernel so boards can be shipped, and enabling certain
-peripherals gets dealt with later.
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+This patch depends on changes in Grant's gpio/next tree: at least the
+move from arch/arm/mach-tegra/gpio.c to drivers/gpio/gpio-tegra.c.
 
-> if you have to
-> flash the device tree to NOR or NAND or EEPROM or something anyway,
-> then flashing a new firmware binary at the same time is not really any
-> more complex.
+ drivers/gpio/gpio-tegra.c |   16 ++++++++++------
+ 1 files changed, 10 insertions(+), 6 deletions(-)
 
-If the firmware doesn't depend on the device tree to boot, you don't
-need to worry about bricking the board by reflashing the device tree.
-
-> So why not take the complexity and choice out of it, and do it in the
-> firmware,, one list, all configured at boot time, before Linux is even
-> in the picture, and make sure this is a requirement for booting Linux
-> that these pins are set up already?
-
-I fully agree that that's the nicer approach -- if you're not yet in a
-position where you need to support existing firmware.  Is that the case
-here?
-
--Scott
+diff --git a/drivers/gpio/gpio-tegra.c b/drivers/gpio/gpio-tegra.c
+index 747eb40..7b9663b 100644
+--- a/drivers/gpio/gpio-tegra.c
++++ b/drivers/gpio/gpio-tegra.c
+@@ -331,6 +331,7 @@ static struct lock_class_key gpio_lock_class;
+ static int __init tegra_gpio_init(void)
+ {
+ 	struct tegra_gpio_bank *bank;
++	int gpio;
+ 	int i;
+ 	int j;
+ 
+@@ -352,14 +353,17 @@ static int __init tegra_gpio_init(void)
+ 
+ 	gpiochip_add(&tegra_gpio_chip);
+ 
+-	for (i = INT_GPIO_BASE; i < (INT_GPIO_BASE + TEGRA_NR_GPIOS); i++) {
+-		bank = &tegra_gpio_banks[GPIO_BANK(irq_to_gpio(i))];
++	for (gpio = 0; gpio < TEGRA_NR_GPIOS; gpio++) {
++		int irq = gpio_to_irq(gpio);
++		/* No validity check; all Tegra GPIOs are valid IRQs */
+ 
+-		irq_set_lockdep_class(i, &gpio_lock_class);
+-		irq_set_chip_data(i, bank);
+-		irq_set_chip_and_handler(i, &tegra_gpio_irq_chip,
++		bank = &tegra_gpio_banks[GPIO_BANK(gpio)];
++
++		irq_set_lockdep_class(irq, &gpio_lock_class);
++		irq_set_chip_data(irq, bank);
++		irq_set_chip_and_handler(irq, &tegra_gpio_irq_chip,
+ 					 handle_simple_irq);
+-		set_irq_flags(i, IRQF_VALID);
++		set_irq_flags(irq, IRQF_VALID);
+ 	}
+ 
+ 	for (i = 0; i < ARRAY_SIZE(tegra_gpio_banks); i++) {
+-- 
+1.7.0.4
