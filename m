@@ -1,51 +1,37 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 5 Aug 2011 09:04:59 +0200
-Subject: [PATCH] ARM: mx5: board-cpuimx51.c fixup irq_to_gpio() usage
-In-Reply-To: <1312472855-15778-1-git-send-email-ben-linux@fluff.org>
-References: <1312472855-15778-1-git-send-email-ben-linux@fluff.org>
-Message-ID: <20110805070459.GB17990@pengutronix.de>
+From: davidb@codeaurora.org (David Brown)
+Date: Fri, 5 Aug 2011 00:07:29 -0700
+Subject: [PATCH 1/2] arm/mx5: parse iomuxc pad configuratoin from device
+	tree
+In-Reply-To: <CAKGA1bmbWUeyhUtDwHZjB8V4e2wJ0NHX2qWhqaqx6HoBm7uMnQ@mail.gmail.com>
+References: <1311606467-28985-1-git-send-email-shawn.guo@linaro.org>
+	<1311606467-28985-2-git-send-email-shawn.guo@linaro.org>
+	<20110725204630.GD26735@ponder.secretlab.ca>
+	<CAKGA1bmbWUeyhUtDwHZjB8V4e2wJ0NHX2qWhqaqx6HoBm7uMnQ@mail.gmail.com>
+Message-ID: <20110805070729.GA26563@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 04, 2011 at 04:47:35PM +0100, Ben Dooks wrote:
-> irq_to_gpio() is being called on a GPIO so change to using
-> gpio_to_irq() instead.
+On Thu, Aug 04, 2011 at 06:07:15PM -0500, Matt Sealey wrote:
+> Hi Grant, Shawn,
 > 
-> Signed-off-by: Ben Dooks <ben-linux@fluff.org>
+> On Mon, Jul 25, 2011 at 3:46 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
+> > This could get really verbose in a really big hurry. ?Fortunately the
+> > dtb format is sophisticated enough to only store each unique property
+> > name once, so the data shouldn't be huge, but it is still going to
+> > make for huge source files. ?Can you think of a more concise
+> > representation?
+> 
+> Yes: no representation at all. The correct place for IOMUX setup being
+> done is *inside the boot firmware as soon as physically possible* and
+> not seconds into boot after U-Boot has made a console, done a boot
+> timeout, loaded scripts, kernels and ramdisks from media and then
+> uncompressed and entered a Linux kernel.
 
-Applied, thanks
+This is true in situations where we have control over the bootloader,
+but that isn't always the case.
 
-Sascha
-
-> ---
->  arch/arm/mach-mx5/board-cpuimx51.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mx5/board-cpuimx51.c b/arch/arm/mach-mx5/board-cpuimx51.c
-> index 7c893fa..68934ea 100644
-> --- a/arch/arm/mach-mx5/board-cpuimx51.c
-> +++ b/arch/arm/mach-mx5/board-cpuimx51.c
-> @@ -81,7 +81,7 @@ static struct plat_serial8250_port serial_platform_data[] = {
->  		.flags = UPF_BOOT_AUTOCONF | UPF_SKIP_TEST | UPF_IOREMAP,
->  	}, {
->  		.mapbase = (unsigned long)(MX51_CS1_BASE_ADDR + 0x2000000),
-> -		.irq = irq_to_gpio(CPUIMX51_QUARTD_GPIO),
-> +		.irq = gpio_to_irq(CPUIMX51_QUARTD_GPIO),
->  		.irqflags = IRQF_TRIGGER_HIGH,
->  		.uartclk = CPUIMX51_QUART_XTAL,
->  		.regshift = CPUIMX51_QUART_REGSHIFT,
-> -- 
-> 1.7.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+David
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
