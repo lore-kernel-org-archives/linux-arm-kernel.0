@@ -1,144 +1,51 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Thu, 04 Aug 2011 15:18:59 +0300
-Subject: [PATCH] ARM: OMAP2+ Add Primview dispalys to panel-generic
-In-Reply-To: <1310122034-6561-1-git-send-email-j.weitzel@phytec.de>
-References: <1310122034-6561-1-git-send-email-j.weitzel@phytec.de>
-Message-ID: <1312460339.2143.23.camel@deskari>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 5 Aug 2011 09:04:59 +0200
+Subject: [PATCH] ARM: mx5: board-cpuimx51.c fixup irq_to_gpio() usage
+In-Reply-To: <1312472855-15778-1-git-send-email-ben-linux@fluff.org>
+References: <1312472855-15778-1-git-send-email-ben-linux@fluff.org>
+Message-ID: <20110805070459.GB17990@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Fri, 2011-07-08 at 12:47 +0200, Jan Weitzel wrote:
-> Add displays to panel-generic-dpi.c
-> Prime View PD035VL1 (640 x 480)
-> Prime View PD050VL1 (640 x 480)
-> Prime View PD104SLF (800 x 600)
-> Prime View PM070WL4 (800 x 480)
-
-Did you copy the acb and power_on/off_delay values from the sharp panel?
-acbi and acb are not needed at all, and you should check if
-power_on/off_delay are needed and if they are, what they should be.
-
-Also, the first two panels look identical. While there's nothing wrong
-with that, I wonder if could be a more generic "family" name for the
-panels, and there would be need to define the timings only once.
-
- Tomi
-
-> Signed-off-by: Jan Weitzel <j.weitzel@phytec.de>
-> ---
->  drivers/video/omap2/displays/panel-generic-dpi.c |  100 ++++++++++++++++++++++
->  1 files changed, 100 insertions(+), 0 deletions(-)
+On Thu, Aug 04, 2011 at 04:47:35PM +0100, Ben Dooks wrote:
+> irq_to_gpio() is being called on a GPIO so change to using
+> gpio_to_irq() instead.
 > 
-> diff --git a/drivers/video/omap2/displays/panel-generic-dpi.c b/drivers/video/omap2/displays/panel-generic-dpi.c
-> index 9c90f75..87d9ba1 100644
-> --- a/drivers/video/omap2/displays/panel-generic-dpi.c
-> +++ b/drivers/video/omap2/displays/panel-generic-dpi.c
-> @@ -232,6 +232,106 @@ static struct panel_config generic_dpi_panels[] = {
->  		.power_off_delay	= 0,
->  		.name			= "powertip_ph480272t",
->  	},
-> +
-> +	/* Prime-View PD035VL1 */
-> +	{
-> +		{
-> +			.x_res		= 640,
-> +			.y_res		= 480,
-> +
-> +			.pixel_clock	= 25000,
-> +
-> +			.hsw		= 96,
-> +			.hfp		= 18,
-> +			.hbp		= 46,
-> +
-> +			.vsw		= 2,
-> +			.vfp		= 10,
-> +			.vbp		= 33,
-> +		},
-> +		.acbi			= 0x0,
-> +		.acb			= 0x28,
-> +		.config			= OMAP_DSS_LCD_TFT | OMAP_DSS_LCD_IVS |
-> +					  OMAP_DSS_LCD_IHS | OMAP_DSS_LCD_IPC,
-> +		.power_on_delay		= 50,
-> +		.power_off_delay	= 100,
-> +		.name			= "pd035vl1",
-> +	},
-> +
-> +	/* Prime-View PD050VL1 */
-> +	{
-> +		{
-> +			.x_res		= 640,
-> +			.y_res		= 480,
-> +
-> +			.pixel_clock	= 25000,
-> +
-> +			.hsw		= 96,
-> +			.hfp		= 18,
-> +			.hbp		= 46,
-> +
-> +			.vsw		= 2,
-> +			.vfp		= 10,
-> +			.vbp		= 33,
-> +		},
-> +		.acbi			= 0x0,
-> +		.acb			= 0x28,
-> +		.config			= OMAP_DSS_LCD_TFT | OMAP_DSS_LCD_IVS |
-> +					  OMAP_DSS_LCD_IHS | OMAP_DSS_LCD_IPC,
-> +		.power_on_delay		= 50,
-> +		.power_off_delay	= 100,
-> +		.name			= "pd050vl1",
-> +	},
-> +
-> +	/* Prime-View PM070WL4 */
-> +	{
-> +		{
-> +			.x_res		= 800,
-> +			.y_res		= 480,
-> +
-> +			.pixel_clock	= 32000,
-> +
-> +			.hsw		= 128,
-> +			.hfp		= 42,
-> +			.hbp		= 86,
-> +
-> +			.vsw		= 2,
-> +			.vfp		= 10,
-> +			.vbp		= 33,
-> +		},
-> +		.acbi			= 0x0,
-> +		.acb			= 0x28,
-> +		.config			= OMAP_DSS_LCD_TFT | OMAP_DSS_LCD_IVS |
-> +					  OMAP_DSS_LCD_IHS | OMAP_DSS_LCD_IPC,
-> +		.power_on_delay		= 50,
-> +		.power_off_delay	= 100,
-> +		.name			= "pm070wl4",
-> +	},
-> +
-> +	/* Prime-View PD104SLF */
-> +	{
-> +		{
-> +			.x_res		= 800,
-> +			.y_res		= 600,
-> +
-> +			.pixel_clock	= 40000,
-> +
-> +			.hsw		= 128,
-> +			.hfp		= 42,
-> +			.hbp		= 86,
-> +
-> +			.vsw		= 4,
-> +			.vfp		= 1,
-> +			.vbp		= 23,
-> +		},
-> +		.acbi			= 0x0,
-> +		.acb			= 0x28,
-> +		.config			= OMAP_DSS_LCD_TFT | OMAP_DSS_LCD_IVS |
-> +					  OMAP_DSS_LCD_IHS | OMAP_DSS_LCD_IPC,
-> +		.power_on_delay		= 50,
-> +		.power_off_delay	= 100,
-> +		.name			= "pd104slf",
-> +	},
->  };
->  
->  struct panel_drv_data {
+> Signed-off-by: Ben Dooks <ben-linux@fluff.org>
+
+Applied, thanks
+
+Sascha
+
+> ---
+>  arch/arm/mach-mx5/board-cpuimx51.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mx5/board-cpuimx51.c b/arch/arm/mach-mx5/board-cpuimx51.c
+> index 7c893fa..68934ea 100644
+> --- a/arch/arm/mach-mx5/board-cpuimx51.c
+> +++ b/arch/arm/mach-mx5/board-cpuimx51.c
+> @@ -81,7 +81,7 @@ static struct plat_serial8250_port serial_platform_data[] = {
+>  		.flags = UPF_BOOT_AUTOCONF | UPF_SKIP_TEST | UPF_IOREMAP,
+>  	}, {
+>  		.mapbase = (unsigned long)(MX51_CS1_BASE_ADDR + 0x2000000),
+> -		.irq = irq_to_gpio(CPUIMX51_QUARTD_GPIO),
+> +		.irq = gpio_to_irq(CPUIMX51_QUARTD_GPIO),
+>  		.irqflags = IRQF_TRIGGER_HIGH,
+>  		.uartclk = CPUIMX51_QUART_XTAL,
+>  		.regshift = CPUIMX51_QUART_REGSHIFT,
+> -- 
+> 1.7.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
