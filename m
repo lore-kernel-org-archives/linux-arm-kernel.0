@@ -1,136 +1,95 @@
-From: dilinger@queued.net (Andres Salomon)
-Date: Fri, 5 Aug 2011 06:44:47 -0700
-Subject: [PATCH RFC v1] ARM: olpc: Add support for calling into the
-	XO-1.75's OpenFirmware (OFW)
-In-Reply-To: <20110805081143.GF28651@trinity.fluff.org>
-References: <20110804162551.2b92b2cf@debxo>
-	<20110805081143.GF28651@trinity.fluff.org>
-Message-ID: <20110805064447.6900cac2@debxo>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Fri, 5 Aug 2011 15:51:33 +0200
+Subject: GPMI-NAND Status?
+Message-ID: <20110805135133.GA26981@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 5 Aug 2011 09:11:44 +0100
-Ben Dooks <ben-linux@fluff.org> wrote:
+Hi,
 
-> On Thu, Aug 04, 2011 at 04:25:51PM -0700, Andres Salomon wrote:
-> > Add support for saving OFW's cif, and later calling into it to run
-> > OFW commands from the kernel.  OFW remains resident in memory after
-> > boot, and the physical/virtual addresses are passed in a boot tag.
-> > We parse that, and map the addresses.
-> > 
-> > This is currently only used by the OLPC XO-1.75, so it's named
-> > olpc_ofw().
-> > 
-> > Signed-off-by: Andres Salomon <dilinger@queued.net>
-> > ---
-> >  Documentation/arm/Setup                  |    2 +
-> >  arch/arm/Kconfig                         |    8 ++
-> >  arch/arm/include/asm/olpc_ofw.h          |   23 ++++++
-> >  arch/arm/include/asm/setup.h             |   24 ++++++
-> >  arch/arm/mach-mmp/Makefile               |    1 +
-> >  arch/arm/mach-mmp/include/mach/vmalloc.h |    2 +-
-> >  arch/arm/mach-mmp/olpc-xo-1-75.c         |    7 ++
-> >  arch/arm/mach-mmp/olpc_ofw.c             |  118
-> > ++++++++++++++++++++++++++++++ 8 files changed, 184 insertions(+),
-> > 1 deletions(-) create mode 100644 arch/arm/include/asm/olpc_ofw.h
-> >  create mode 100644 arch/arm/mach-mmp/olpc_ofw.c
-> > 
-> > 
-> > I'm looking for input on our mechanism for calling into OLPC's
-> > openfirmware on arm.  Some of the x86 folks are cc'd
-> > as they had lots of comment when we did this for x86 OLPC machines.
-> > 
-> > There's a device tree patch on top of this that can be seen here:
-> > http://dev.laptop.org/git/olpc-3.0/patch/?id=12377851f9a64a9e2098adf09f858bed7d3eae7c
-> > 
-> > Unlike the XO-1, I'd like to get this OFW communication mechanism
-> > ACKed prior to OLPC's mass production of these units.
-> > 
-[...]
-> >  
-> >  source "drivers/Kconfig"
-> > diff --git a/arch/arm/include/asm/olpc_ofw.h
-> > b/arch/arm/include/asm/olpc_ofw.h new file mode 100644
-> > index 0000000..5346e9f
-> > --- /dev/null
-> > +++ b/arch/arm/include/asm/olpc_ofw.h
-> > @@ -0,0 +1,23 @@
-> > +#ifndef _ASM_ARM_OLPC_OFW_H
-> > +#define _ASM_ARM_OLPC_OFW_H
-> > +
-> > +#ifdef CONFIG_OLPC
-> > +
-> > +/* run an OFW command by calling into the firmware */
-> > +#define olpc_ofw(name, args, res) \
-> > +	__olpc_ofw((name), ARRAY_SIZE(args), args,
-> > ARRAY_SIZE(res), res) +
-> > +extern int __olpc_ofw(const char *name, int nr_args, const void
-> > **args,
-> > +		int nr_res, void **res);
-> > +
-> > +/* map OFW's page tables into kernel memory */
-> > +extern void setup_olpc_ofw_mapping(void);
-> > +
-> > +/* check if OFW was detected during boot */
-> > +extern bool olpc_ofw_present(void);
-> > +
-> > +#else /* !CONFIG_OLPC */
-> > +static inline void setup_olpc_ofw_mapping(void) { }
-> > +#endif /* !CONFIG_OLPC */
-> > +
-> > +#endif /* _ASM_ARM_OLPC_OFW_H */
-> > diff --git a/arch/arm/include/asm/setup.h
-> > b/arch/arm/include/asm/setup.h index ee2ad8a..c75889e 100644
-> > --- a/arch/arm/include/asm/setup.h
-> > +++ b/arch/arm/include/asm/setup.h
-> > @@ -143,6 +143,25 @@ struct tag_memclk {
-> >  	__u32 fmemclk;
-> >  };
-> >  
-> > +/* OLPC OpenFirmware callback parameters: see
-> > arch/arm/mach-mmp/olpc_ofw.c */ +#define ATAG_OLPC_OFW
-> > 0x41000502 +
-> > +struct tag_olpc_ofw {
-> > +	__u32 cif_handler;	/* callback into OFW */
-> > +
-> > +	/* map_desc one - OFW's main memory */
-> > +	__u32 ofw_va;
-> > +	__u32 ofw_pfn;		/* physical address's PFN */
-> > +	__u32 ofw_length;
-> > +	__u32 ofw_mem_type;	/* MT_ */
-> > +
-> > +	/* map_desc two - OFW's frame buffer */
-> > +	__u32 fb_va;
-> > +	__u32 fb_pfn;		/* physical address's PFN */
-> > +	__u32 fb_length;
-> > +	__u32 fb_mem_type;	/* MT_ */
-> > +};
-> > +
-> 
-> The new booting method for OF on ARM is pass a pointer to the dtb
-> via r2 instead of the ATAGs. You can get rid of ATAGs completely
-> at this point.
-> 
+I am a bit uncertain how the state of the GPMI-NAND driver currently is, so
+I'll try to sum it up here. There is without doubt interest in getting the
+driver into mainline from at least Huang, Shawn, Lothar, Koen and me, so I
+wonder if we can join forces more effectively. First of all, I want to thank
+Huang Shijie for all his work so far which was already quite some effort; this
+sum-up is by no means meant as bashing, just trying to understand the status
+quo (Sidenote: I am more or less on holiday until Monday, so no time for real
+debugging myself. I write this mail so we hopefully gain a common
+understanding. When I am back to full strength, I can then start working on
+what seems apropriate)
 
-This is not (only) about the device tree.  It's about calling into
-OFW.  For example, one could break into OFW to debug crashed hardware
-(or software, I support) by hooking up a sysrq to call
-olpc_ofw("enter").  Building the device tree is just one of the things
-that we do.
+Issues with the current driver I am aware of:
 
-> >  struct tag {
-> >  	struct tag_header hdr;
-> >  	union {
-> > @@ -165,6 +184,11 @@ struct tag {
-> >  		 * DC21285 specific
-> >  		 */
-> >  		struct tag_memclk	memclk;
-> > +
-> > +		/*
-> > +		 * OLPC specific - for OLPC's OpenFirmware
-> > implementation
-> > +		 */
-> > +		struct tag_olpc_ofw	olpc_ofw;
-> >  	} u;
-> >  };
-> >  
+DMA timeouts [1]
+================
+
+[    2.560000] [ start_dma_without_bch_irq : 392 ] DMA timeout, last DMA :1
+[    3.560000] [ start_dma_with_bch_irq : 427 ] bch timeout!!!
+
+Always reproducible by me when trying to format mtd0. Sometimes(always?) seen
+by Koen during boot (on read?). Never seen by Huang? It is currently unclear if
+the bug is in the GPMI driver, or in the MXS-DMA driver. Still, I'd say the
+issue is a show-stopper. We can't put a driver into mainline which leads to the
+above failure. The fact that there is _some_ configuration which works for
+someone does not help, it doesn't work for Koen and me at least. We need
+reliable drivers in mainline, so the issue needs to be resolved, regardless
+where the bug resides.
+
+
+problem overwriting all-0xff data in NAND [2]
+=============================================
+
+Although it occured only when writing JFFS2 images so far, this is a generic
+issue and needs to be fixed, right?
+
+
+ecclayout needs to be used to show that OOB is fully in use [1]
+===============================================================
+
+Needed to make it work for JFFS2 and to pass the mtd-testsuite. A driver only
+working with UBIFS is surely not ready for mainline.
+
+
+Pecularities
+============
+
+There are a few issues which are odd. I don't know if some are mainly intended
+for debugging, yet they shouldn't be in a mainline driver. At least:
+
+* custom sysfs-entries
+* custom kernel command line parameters
+* namespacing (some functions have no prefix, some have "mil_", some have mx23)
+  (I think 'mil' means 'mtd interface layer', but why is that needed?)
+
+Complexity
+==========
+
+The driver is not easy to review. I wonder if it makes sense to use incremental
+patches for it? maybe making it a staging driver could be a solution for that?
+Huang, are you interested in accepting patches or do you prefer we just point
+at certain code and you then fix it? Starting with a simpler driver and then
+adding stuff might be another option if we can't chase all the bugs in the
+current driver.
+
+That being said, I'd think fixing the DMA issue has prio #1 and maybe we can
+meet in IRC or something to work that out? Is there interest in that?
+
+Ok, those were my two cents. Your mileages may vary, please give your thoughts,
+then. I mainly don't want the driver development to get stalled.
+
+Regards,
+
+   Wolfram
+
+[1] http://lists.infradead.org/pipermail/linux-mtd/2011-July/037200.html
+[2] http://lists.infradead.org/pipermail/linux-mtd/2011-July/037104.html
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110805/e0d99aab/attachment-0001.sig>
