@@ -1,56 +1,54 @@
 From: swarren@nvidia.com (Stephen Warren)
-Date: Fri,  5 Aug 2011 16:15:33 -0600
-Subject: [PATCH 1/2] gpio/tegra: Remove use of irq_to_gpio
-Message-ID: <1312582534-10871-1-git-send-email-swarren@nvidia.com>
+Date: Fri,  5 Aug 2011 16:15:34 -0600
+Subject: [PATCH 2/2] arm/tegra: Delete irq_to_gpio
+In-Reply-To: <1312582534-10871-1-git-send-email-swarren@nvidia.com>
+References: <1312582534-10871-1-git-send-email-swarren@nvidia.com>
+Message-ID: <1312582534-10871-2-git-send-email-swarren@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-irq_to_gpio is being removed. Replace the only use of that API by
-the ARM Tegra sub-architecture.
+irq_to_gpio is deprecated and in the process of being removed. Make that
+happen now for ARM Tegra.
 
 Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
-This patch depends on changes in Grant's gpio/next tree: at least the
-move from arch/arm/mach-tegra/gpio.c to drivers/gpio/gpio-tegra.c.
+I assume this will go into one of arm-soc.git's branches, but it depends
+on the previous patch in this series to compile. Arnd, I see you already
+have Grant's gpio/next tree in your repo as depends/gpio, so I assume
+you'll just pick up and merge the latest version of Grant's tree before
+applying this patch?
 
- drivers/gpio/gpio-tegra.c |   16 ++++++++++------
- 1 files changed, 10 insertions(+), 6 deletions(-)
+Both patches compiled with a number of Tegra boards enable and tested on
+Harmony. All without Device Tree support.
 
-diff --git a/drivers/gpio/gpio-tegra.c b/drivers/gpio/gpio-tegra.c
-index 747eb40..7b9663b 100644
---- a/drivers/gpio/gpio-tegra.c
-+++ b/drivers/gpio/gpio-tegra.c
-@@ -331,6 +331,7 @@ static struct lock_class_key gpio_lock_class;
- static int __init tegra_gpio_init(void)
+ arch/arm/mach-tegra/include/mach/gpio.h |    8 --------
+ 1 files changed, 0 insertions(+), 8 deletions(-)
+
+diff --git a/arch/arm/mach-tegra/include/mach/gpio.h b/arch/arm/mach-tegra/include/mach/gpio.h
+index 196f114..b357808 100644
+--- a/arch/arm/mach-tegra/include/mach/gpio.h
++++ b/arch/arm/mach-tegra/include/mach/gpio.h
+@@ -32,7 +32,6 @@
+ #define gpio_cansleep		__gpio_cansleep
+ 
+ #define TEGRA_GPIO_TO_IRQ(gpio) (INT_GPIO_BASE + (gpio))
+-#define TEGRA_IRQ_TO_GPIO(irq) ((irq) - INT_GPIO_BASE)
+ 
+ static inline int gpio_to_irq(unsigned int gpio)
  {
- 	struct tegra_gpio_bank *bank;
-+	int gpio;
- 	int i;
- 	int j;
+@@ -41,13 +40,6 @@ static inline int gpio_to_irq(unsigned int gpio)
+ 	return -EINVAL;
+ }
  
-@@ -352,14 +353,17 @@ static int __init tegra_gpio_init(void)
- 
- 	gpiochip_add(&tegra_gpio_chip);
- 
--	for (i = INT_GPIO_BASE; i < (INT_GPIO_BASE + TEGRA_NR_GPIOS); i++) {
--		bank = &tegra_gpio_banks[GPIO_BANK(irq_to_gpio(i))];
-+	for (gpio = 0; gpio < TEGRA_NR_GPIOS; gpio++) {
-+		int irq = gpio_to_irq(gpio);
-+		/* No validity check; all Tegra GPIOs are valid IRQs */
- 
--		irq_set_lockdep_class(i, &gpio_lock_class);
--		irq_set_chip_data(i, bank);
--		irq_set_chip_and_handler(i, &tegra_gpio_irq_chip,
-+		bank = &tegra_gpio_banks[GPIO_BANK(gpio)];
-+
-+		irq_set_lockdep_class(irq, &gpio_lock_class);
-+		irq_set_chip_data(irq, bank);
-+		irq_set_chip_and_handler(irq, &tegra_gpio_irq_chip,
- 					 handle_simple_irq);
--		set_irq_flags(i, IRQF_VALID);
-+		set_irq_flags(irq, IRQF_VALID);
- 	}
- 
- 	for (i = 0; i < ARRAY_SIZE(tegra_gpio_banks); i++) {
+-static inline int irq_to_gpio(unsigned int irq)
+-{
+-	if ((irq >= INT_GPIO_BASE) && (irq < INT_GPIO_BASE + INT_GPIO_NR))
+-		return irq - INT_GPIO_BASE;
+-	return -EINVAL;
+-}
+-
+ struct tegra_gpio_table {
+ 	int	gpio;	/* GPIO number */
+ 	bool	enable;	/* Enable for GPIO@init? */
 -- 
 1.7.0.4
