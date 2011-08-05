@@ -1,54 +1,49 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Thu, 4 Aug 2011 21:05:01 -0700
-Subject: [PATCH 1/3] irq: If an IRQ is a GPIO, request and configure it
-In-Reply-To: <4E3B4D73.9030505@gmail.com>
-References: <1312498820-2275-1-git-send-email-swarren@nvidia.com>
-	<1312498820-2275-2-git-send-email-swarren@nvidia.com>
-	<4E3B4D73.9030505@gmail.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF049F171EC4@HQMAIL01.nvidia.com>
+From: bs14@csr.com (Barry Song)
+Date: Thu, 4 Aug 2011 22:18:37 -0700
+Subject: [PATCH] CPUIDLE: fix compiling error for ARM and SH
+Message-ID: <1312521517-31716-1-git-send-email-bs14@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rob Herring wrote at Thursday, August 04, 2011 7:55 PM:
-> On 08/04/2011 06:00 PM, Stephen Warren wrote:
-> > Many IRQs are associated with GPIO pins. When the pin is used as an IRQ,
-> > it can't be used as anything else; it should be requested. Enhance the
-> > core interrupt code to call gpio_request() and gpio_direction_input() for
-> > any IRQ that is also a GPIO. This prevents duplication of these calls in
-> > each driver that uses an IRQ.
-...
-> > diff --git a/kernel/irq/manage.c b/kernel/irq/manage.c
-...
-> > @@ -978,6 +979,16 @@ __setup_irq(unsigned int irq, struct irq_desc *desc, struct irqaction *new)
-> >  			old = *old_ptr;
-> >  		} while (old);
-> >  		shared = 1;
-> > +	} else {
-> > +		gpio = irq_to_gpio(irq);
-> 
-> If you read the documentation for gpio, it is not recommended to use
-> irq_to_gpio. There's only a handful of users. Part of the problem is it
-> is platform specific and the gpio core cannot convert irq to gpio
-> number
+commit a0bfa1373859e9d11dc92561a8667588803e42d8 cause compiling errors for ARM and SH
 
-It seems like that's a soluble problem though?
+Cc: Len Brown <len.brown@intel.com>
+Signed-off-by: Barry Song <baohua.song@csr.com>
+---
+ arch/arm/kernel/process.c |    2 +-
+ arch/sh/kernel/idle.c     |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-I was thinking about adding a to_gpio function to struct irq_chip, as
-the inverse of struct gpio_chip's to_irq. Then, presumably any platform
-would be able to convert back from IRQ to GPIO, provided the platform
-called a new __irq_to_gpio from the platform-specific gpio_to_irq, just
-like most gpio_to_irq implementations defer to __gpio_to_irq.
-
-I ended up not doing that in this patchset, since Tegra's gpio_to_irq
-function already works for the IRQs/GPIOs that were relevant for my
-testing, and I wanted to post a simple patch first to driver discussion.
-
-> Here is the relevant section:
-> 
-> Non-error values returned from irq_to_gpio() would most commonly be used
-> with gpio_get_value(), for example to initialize or update driver state
-> when the IRQ is edge-triggered.  Note that some platforms don't support
-> this reverse mapping, so you should avoid using it.
-
+diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+index d7ee0d4..1a347f4 100644
+--- a/arch/arm/kernel/process.c
++++ b/arch/arm/kernel/process.c
+@@ -197,7 +197,7 @@ void cpu_idle(void)
+ 				cpu_relax();
+ 			} else {
+ 				stop_critical_timings();
+-				if (cpuidle_call_idle())
++				if (cpuidle_idle_call())
+ 					pm_idle();
+ 				start_critical_timings();
+ 				/*
+diff --git a/arch/sh/kernel/idle.c b/arch/sh/kernel/idle.c
+index 3c45de1..32114e0 100644
+--- a/arch/sh/kernel/idle.c
++++ b/arch/sh/kernel/idle.c
+@@ -101,7 +101,7 @@ void cpu_idle(void)
+ 			local_irq_disable();
+ 			/* Don't trace irqs off for idle */
+ 			stop_critical_timings();
+-			if (cpuidle_call_idle())
++			if (cpuidle_idle_call())
+ 				pm_idle();
+ 			/*
+ 			 * Sanity check to ensure that pm_idle() returns
 -- 
-nvpublic
+1.7.1
+
+
+
+Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
+More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
