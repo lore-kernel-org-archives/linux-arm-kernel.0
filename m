@@ -1,72 +1,122 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Fri, 5 Aug 2011 14:19:11 +0200
-Subject: Shouldn't DT preserve pdev name and id to allow platform_match
-	to work?
-In-Reply-To: <CACxGe6vg5NTyiDZqqztjtFEfb7si+-=Y7nEy1Y+YMgA5PVXScw@mail.gmail.com>
-References: <4E396361.3060307@ti.com>
-	<CACxGe6vg5NTyiDZqqztjtFEfb7si+-=Y7nEy1Y+YMgA5PVXScw@mail.gmail.com>
-Message-ID: <4E3BDFBF.10903@ti.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Fri, 5 Aug 2011 20:19:27 +0800
+Subject: [RFC PATCH 1/2] ARM: CSR: add rtc i/o bridge interface for
+	SiRFprimaII
+In-Reply-To: <20110805113255.GR2899@pulham.picochip.com>
+References: <1312512888-25070-1-git-send-email-bs14@csr.com>
+	<1312512888-25070-2-git-send-email-bs14@csr.com>
+	<20110805100938.GP2899@pulham.picochip.com>
+	<CAGsJ_4wy=6DHeyqi1ZpkfDxDFsJpGvhvbzz1K=12soC29MZUAg@mail.gmail.com>
+	<20110805113255.GR2899@pulham.picochip.com>
+Message-ID: <CAGsJ_4yQsS=hU-O3vDKn8nTTA3oX-VwbH5i70jg24swzdYJYyQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/3/2011 6:43 PM, Grant Likely wrote:
-> On Wed, Aug 3, 2011 at 4:04 PM, Cousson, Benoit<b-cousson@ti.com>  wrote:
->> Hi Grant,
+2011/8/5 Jamie Iles <jamie@jamieiles.com>:
+> On Fri, Aug 05, 2011 at 07:28:05PM +0800, Barry Song wrote:
+>> Hi Jamie,
+>> Thanks.
 >>
->> Going further with the usage of OF_DEV_AUXDATA_ID, I realized that this is is not doing what I was expecting. My expectation might be silly, but in order to make platform_match to work without DT matching mechanism, you need to have the driver name in the pdev->name field:
+>> 2011/8/5 Jamie Iles <jamie@jamieiles.com>:
+>> > Hi Barry, Zhiwu,
+>> >
+>> > A couple of minor comments inline.
+>> >
+>> > Jamie
+>> >
+>> > On Thu, Aug 04, 2011 at 07:54:47PM -0700, Barry Song wrote:
+>> >> From: Zhiwu Song <zhiwu.song@csr.com>
+>> >>
+>> >> The module is a bridge between the RTC clock domain and the CPU interface
+>> >> clock domain. ARM access the register of SYSRTC, GPSRTC and PWRC through
+>> >> this module.
+>> >>
+>> >> Signed-off-by: Zhiwu Song <zhiwu.song@csr.com>
+>> >> Signed-off-by: Barry Song <baohua.song@csr.com>
+>> >> ---
+>> >> ?arch/arm/mach-prima2/Makefile ? ? ? ?| ? ?1 +
+>> >> ?arch/arm/mach-prima2/rtciobrg.c ? ? ?| ?118 ++++++++++++++++++++++++++++++++++
+>> >> ?include/linux/rtc/sirfsoc_rtciobrg.h | ? 18 +++++
+>> >> ?3 files changed, 137 insertions(+), 0 deletions(-)
+>> >> ?create mode 100644 arch/arm/mach-prima2/rtciobrg.c
+>> >> ?create mode 100644 include/linux/rtc/sirfsoc_rtciobrg.h
+>> >>
+>> >> diff --git a/arch/arm/mach-prima2/Makefile b/arch/arm/mach-prima2/Makefile
+>> >> index 7af7fc0..f49d70b 100644
+>> >> --- a/arch/arm/mach-prima2/Makefile
+>> >> +++ b/arch/arm/mach-prima2/Makefile
+>> >> @@ -3,5 +3,6 @@ obj-y += irq.o
+>> >> ?obj-y += clock.o
+>> >> ?obj-y += rstc.o
+>> >> ?obj-y += prima2.o
+>> >> +obj-y += rtciobrg.o
+>> >> ?obj-$(CONFIG_DEBUG_LL) += lluart.o
+>> >> ?obj-$(CONFIG_CACHE_L2X0) += l2x0.o
+>> >> diff --git a/arch/arm/mach-prima2/rtciobrg.c b/arch/arm/mach-prima2/rtciobrg.c
+>> >> new file mode 100644
+>> >> index 0000000..0dc29f8
+>> >> --- /dev/null
+>> >> +++ b/arch/arm/mach-prima2/rtciobrg.c
+>> >> @@ -0,0 +1,118 @@
+>> >> +/*
+>> >> + * RTC I/O Bridge interfaces for CSR SiRFprimaII
+>> >> + * ARM access the registers of SYSRTC, GPSRTC and PWRC through this module
+>> >> + *
+>> >> + * Copyright (c) 2011 Cambridge Silicon Radio Limited, a CSR plc group company.
+>> >> + *
+>> >> + * Licensed under GPLv2 or later.
+>> >> + */
+>> >> +
+>> >> +#include <linux/kernel.h>
+>> >> +#include <linux/module.h>
+>> >> +#include <linux/io.h>
+>> >> +#include <linux/of.h>
+>> >> +#include <linux/of_address.h>
+>> >> +
+>> >> +#define SIRFSOC_CPUIOBRG_CTRL ? ? ? ? ? 0x00
+>> >> +#define SIRFSOC_CPUIOBRG_WRBE ? ? ? ? ? 0x04
+>> >> +#define SIRFSOC_CPUIOBRG_ADDR ? ? ? ? ? 0x08
+>> >> +#define SIRFSOC_CPUIOBRG_DATA ? ? ? ? ? 0x0c
+>> >> +
+>> >> +void __iomem *sirfsoc_rtciobrg_base;
+>> >
+>> > static void __iomem?
 >>
->>         /* fall-back to driver name match */
->>         return (strcmp(pdev->name, drv->name) == 0);
+>> this var will be accessed by sleep.S in patch 2/2.
+>
+> OK, but then shouldn't these be in a header file somewhere? ?I think
+> sparse will warn about this otherwise saying it could be declared as
+> static.
+
+yes.these are APIs and sparse will warn if we don't place them in head
+file. the problem is that sleep.S is the only user of those functions.
+the asm does't need and can't refer the c function declare.
+
+we have other 3 functions in head file since they will be referred by
+rtc drivers.
+
+rtciobrg connect PM, rtc and gps rtc. only sleep.S of PM refer these
+low level functions not in head file. it is really a special case.
+
+
+>
+> [...]
+>> >> +u32 __sirfsoc_rtc_iobrg_readl(u32 addr)
+>> >> +{
+>> >
+>> > Maybe for clarity have offset rather than address for these accessors to
+>> > indicate the nature of their use?
 >>
->> Except that the of_device_add function is doing that:
->>         pdev->name = dev_name(&ofdev->dev);
->>         pdev->id = -1;
+>> it should be an address not an offset. the address is local address
+>> againest rtciobrg. it is not an address in memory bus againest CPU
+>> core.
+>> if it is an offset, than its memory address is:
+>> MEMORY_BASE + addr.
+>>
+>> but here its address is addr in local bus.
 >
-> Yes, I know.  It is written that way on purpose so that it doesn't get
-> used to avoid adding a match table to the device driver because
-> auxdata is a stop-gap solution.  It is *not* intended to be used long
-> term (with one exception for passing platform callbacks when there is
-> no other solution).
-
-Outch... You guys are doing your best to make our life harder :-)
-
-> auxdata passes platform_data and overrides the device name when there
-> is no way easy way to make the driver work without it.  It handles the
-> the current implementation of clocks and regulators which aren't yet
-> populated from the device tree.  It will go away when clock&
-> regulator bindings are implemented.
+> OK, I guess it's a terminology thing, but I don't particularly mind
+> either way.
 >
-> By implementing it the way it is, it ensures that no drivers
-> inadvertently depends on auxdata, and will thus break when the auxdata
-> entries are removed.  Manjunath mentioned that there is a patch that
-> allows the id to be set, but it still doesn't set the driver name in a
-> way that will allow existing drivers to bind using the old method, and
-> that is by design.
+> Jamie
 >
-> I understand what you are asking for, but the DT matching mechanism is
-> absolutely required.  Adding it to drivers is certainly not any more
-> onerous that maintaining a bunch of auxdata tables for boards.
-
-Fair enough.
-Bottom line is that DT is a all inclusive pack, you cannot skip one part 
-even if it is not necessarily needed right now :-(
-
-I understand very well the final goal, I was just trying to spread the 
-huge effort that DT migration will require to focus first on the stuff 
-located in mach-omap, meaning all the board and devices init part.
-
-I was hoping to let the drivers for the moment until the first phase is 
-done. Since auxdata was already there to help the migration, I was just 
-expecting it to be even more helpful.
-
-> Besides, part of the point of the move to DT is to eliminate device
-> and device data tables at the board file level, which is another
-> reason why auxdata is a temporary solution.
-
-Again, I got that point, it was not our intent to use that as a final 
-solution.
-
-Let's start hacking the OMAP drivers then...
-
-Regards,
-Benoit
