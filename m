@@ -1,53 +1,90 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Fri, 5 Aug 2011 15:32:31 +0530
-Subject: [PATCH V3 06/20] dmaengine/amba-pl08x: Remove redundant comment and
-	rewrite original
+Date: Fri, 5 Aug 2011 15:32:36 +0530
+Subject: [PATCH V3 11/20] dmaengine/amba-pl08x: Schedule tasklet in case of
+	error interrupt
 In-Reply-To: <cover.1312538034.git.viresh.kumar@st.com>
 References: <cover.1312538034.git.viresh.kumar@st.com>
-Message-ID: <182e51a0dac3661a7095daaa310d2302818ecbf4.1312538034.git.viresh.kumar@st.com>
+Message-ID: <671c46fe3869e9339070b0a64a01eca3dd5c79b2.1312538034.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Similar comment is present over routine also pl08x_choose_master_bus(). Keeping
-one of them. Also rewrite that comment to convey message clearly.
+Currently, if error interrupt occurs, nothing is done in interrupt handler (just
+clearing the interrupts). We must somehow indicate this to the user that DMA is
+over, due to ERR interrupt or TC interrupt.
+
+So, this patch just schedules existing tasklet, with a print showing error
+interrupt has occurred on which channels.
 
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
- drivers/dma/amba-pl08x.c |   15 +++++++--------
- 1 files changed, 7 insertions(+), 8 deletions(-)
+ drivers/dma/amba-pl08x.c |   44 +++++++++++++++++++++++---------------------
+ 1 files changed, 23 insertions(+), 21 deletions(-)
 
 diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
-index 01c2f50..6c52959 100644
+index 3653961..6bba32e 100644
 --- a/drivers/dma/amba-pl08x.c
 +++ b/drivers/dma/amba-pl08x.c
-@@ -497,9 +497,13 @@ struct pl08x_lli_build_data {
- };
+@@ -1619,38 +1619,40 @@ static void pl08x_tasklet(unsigned long data)
+ static irqreturn_t pl08x_irq(int irq, void *dev)
+ {
+ 	struct pl08x_driver_data *pl08x = dev;
+-	u32 mask = 0;
+-	u32 val;
+-	int i;
+-
+-	val = readl(pl08x->base + PL080_ERR_STATUS);
+-	if (val) {
+-		/* An error interrupt (on one or more channels) */
+-		dev_err(&pl08x->adev->dev,
+-			"%s error interrupt, register value 0x%08x\n",
+-				__func__, val);
+-		/*
+-		 * Simply clear ALL PL08X error interrupts,
+-		 * regardless of channel and cause
+-		 * FIXME: should be 0x00000003 on PL081 really.
+-		 */
+-		writel(0x000000FF, pl08x->base + PL080_ERR_CLEAR);
++	u32 mask = 0, err, tc, i;
++
++	/* check & clear - ERR & TC interrupts */
++	err = readl(pl08x->base + PL080_ERR_STATUS);
++	if (err) {
++		dev_err(&pl08x->adev->dev, "%s error interrupt, register value 0x%08x\n",
++			__func__, err);
++		writel(err, pl08x->base + PL080_ERR_CLEAR);
+ 	}
+-	val = readl(pl08x->base + PL080_INT_STATUS);
++	tc = readl(pl08x->base + PL080_INT_STATUS);
++	if (tc)
++		writel(tc, pl08x->base + PL080_TC_CLEAR);
++
++	if (!err && !tc)
++		return IRQ_NONE;
++
+ 	for (i = 0; i < pl08x->vd->channels; i++) {
+-		if ((1 << i) & val) {
++		if (((1 << i) & err) || ((1 << i) & tc)) {
+ 			/* Locate physical channel */
+ 			struct pl08x_phy_chan *phychan = &pl08x->phy_chans[i];
+ 			struct pl08x_dma_chan *plchan = phychan->serving;
  
- /*
-- * Autoselect a master bus to use for the transfer this prefers the
-- * destination bus if both available if fixed address on one bus the
-- * other will be chosen
-+ * Autoselect a master bus to use for the transfer. Slave will be the chosen as
-+ * victim in case src & dest are not similarly aligned. i.e. If after aligning
-+ * masters address with width requirements of transfer (by sending few byte by
-+ * byte data), slave is still not aligned, then its width will be reduced to
-+ * BYTE.
-+ * - prefers the destination bus if both available
-+ * - if fixed address on one bus the other will be chosen
-  */
- static void pl08x_choose_master_bus(struct pl08x_lli_build_data *bd,
- 	struct pl08x_bus_data **mbus, struct pl08x_bus_data **sbus, u32 cctl)
-@@ -625,11 +629,6 @@ static int pl08x_fill_llis_for_desc(struct pl08x_driver_data *pl08x,
- 	/* We need to count this down to zero */
- 	bd.remainder = txd->len;
++			if (!plchan) {
++				dev_err(&pl08x->adev->dev,
++					"%s Error TC interrupt on unused channel: 0x%08x\n",
++					__func__, i);
++				continue;
++			}
++
+ 			/* Schedule tasklet on this channel */
+ 			tasklet_schedule(&plchan->tasklet);
+-
+ 			mask |= (1 << i);
+ 		}
+ 	}
+-	/* Clear only the terminal interrupts on channels we processed */
+-	writel(mask, pl08x->base + PL080_TC_CLEAR);
  
--	/*
--	 * Choose bus to align to
--	 * - prefers destination bus if both available
--	 * - if fixed address on one bus chooses other
--	 */
- 	pl08x_choose_master_bus(&bd, &mbus, &sbus, cctl);
- 
- 	dev_vdbg(&pl08x->adev->dev, "src=0x%08x%s/%u dst=0x%08x%s/%u len=%zu llimax=%zu\n",
+ 	return mask ? IRQ_HANDLED : IRQ_NONE;
+ }
 -- 
 1.7.2.2
