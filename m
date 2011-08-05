@@ -1,28 +1,27 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Sat, 6 Aug 2011 01:15:13 +0900
-Subject: [PATCH 1/3] irq: If an IRQ is a GPIO, request and configure it
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF049F171EF4@HQMAIL01.nvidia.com>
-References: <1312498820-2275-1-git-send-email-swarren@nvidia.com>
-	<1312498820-2275-2-git-send-email-swarren@nvidia.com>
-	<20110805000148.GB13321@opensource.wolfsonmicro.com>
-	<74CDBE0F657A3D45AFBB94109FB122FF049F171EC1@HQMAIL01.nvidia.com>
-	<20110805053510.GA16956@opensource.wolfsonmicro.com>
-	<74CDBE0F657A3D45AFBB94109FB122FF049F171EF4@HQMAIL01.nvidia.com>
-Message-ID: <20110805161511.GB3438@opensource.wolfsonmicro.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri,  5 Aug 2011 17:24:51 +0100
+Subject: AT91: dt: basic device tree showcase
+Message-ID: <1312561493-7849-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 05, 2011 at 08:29:38AM -0700, Stephen Warren wrote:
-> Mark Brown wrote at Thursday, August 04, 2011 11:35 PM:
+Hi,
 
-> > But it's not a bug to use a GPIO as an IRQ source, otherwise we wouldn't
-> > have gpio_to_irq() in the first place.
+As a showcase, this is a basic device tree support for at91 SoC.
+It add at91sam9g45 SoC with its Evaluation Kit board descriptions.
+Only the dmaengine driver is converted at the moment so the support
+is fairly simple.
 
-> 2) Two pieces of unrelated code somehow accidentally get a GPIO and IRQ
-> number that map to the same resource, e.g. due to incorrect board files or
-> Device Tree content. This is probably a bug, but ends up looking exactly
-> the same as far as the IRQ code's gpio_request call failing in the patch I
-> posted.
+Nicolas Ferre (2):
+      AT91: dt: at91sam9g45 family and board device tree files
+      AT91: dt: simple device tree support for at91sam9g45 family
 
-Right, but this doesn't mean we can break the legitimate users to catch
-the buggy ones.
+ arch/arm/boot/dts/at91sam9g45.dtsi       |   27 ++++++++++++++++++++++
+ arch/arm/boot/dts/at91sam9m10g45ek.dts   |   15 ++++++++++++
+ arch/arm/mach-at91/Kconfig               |    8 ++++++
+ arch/arm/mach-at91/Makefile.boot         |    2 +
+ arch/arm/mach-at91/at91sam9g45_devices.c |    3 +-
+ arch/arm/mach-at91/board-sam9m10g45ek.c  |   36 ++++++++++++++++++++++++++++++
+ 6 files changed, 90 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/boot/dts/at91sam9g45.dtsi
+ create mode 100644 arch/arm/boot/dts/at91sam9m10g45ek.dts
