@@ -1,94 +1,39 @@
-From: bryan.wu@canonical.com (Bryan Wu)
-Date: Fri, 5 Aug 2011 17:48:08 +0800
-Subject: [PATCH 01/17] leds: create a trigger for CPU activity
-In-Reply-To: <CACRpkdaxiBa=aBAxvE+k7WFgZ-zY_YgCsV4-JVv3SRcm_pX5hA@mail.gmail.com>
-References: <1312364089-32380-1-git-send-email-bryan.wu@canonical.com>
-	<1312364089-32380-2-git-send-email-bryan.wu@canonical.com>
-	<20110803102829.GC2607@pulham.picochip.com>
-	<CACRpkdZRh=gcedJQh6V3aUCfi2arn2V_P67MgZE2mB_hYZ-OnQ@mail.gmail.com>
-	<20110803153035.GL2607@pulham.picochip.com>
-	<CACRpkdaxiBa=aBAxvE+k7WFgZ-zY_YgCsV4-JVv3SRcm_pX5hA@mail.gmail.com>
-Message-ID: <CAK5ve-L9wRT012EYQ+6uaup659qFqDWUXYLiYZYttLoxzP-QTQ@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 5 Aug 2011 10:53:18 +0100
+Subject: [PATCH] ARM: GIC: Add device tree interrupt specifier
+	translation support
+In-Reply-To: <1312532353-8772-1-git-send-email-thomas.abraham@linaro.org>
+References: <1312532353-8772-1-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <20110805105318.5550e4b5@taxman.wild-wind.fr.eu.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 4, 2011 at 12:12 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Wed, Aug 3, 2011 at 5:30 PM, Jamie Iles <jamie@jamieiles.com> wrote:
->>> > So shouldn't this be doing a
->>> > __get_cpu_var(ledtrig_cpu_triggers) and a kfree() on that (and setting
->>> > to NULL)?
->>>
->>> You could do that but why? There is no way the pointer value
->>> can make any harm. If activate() is called again it will be overwritten
->>> with the new pointer.
->>
->> Yes, but can't ledtrig_cpu() potentially still be called after
->> deactivation, then the:
->>
->> ? ? ? ?if (!trigdata)
->> ? ? ? ? ? ? ? ?return;
->>
->> would be incorrect? ?My main point though was that it looks like
->> led->trigger_data is the processor id and kfree() is being called on
->> that.
->
-> You're right, it just works fine because trigdata is always NULL...
->
->>> > Also, where does led->trigger_data get assigned with the cpu id?
->>>
->>> The activate() function is called on every core and if the CPU ID
->>> is not equal to the assigned CPU it just exits, here:
->>>
->>> + ? ? int my_cpu = smp_processor_id();
->>> + ? ? unsigned long target_cpu = (unsigned long) led->trigger_data;
->>> +
->>> + ? ? if (target_cpu != my_cpu)
->>> + ? ? ? ? ? ? return;
->>
->> I understand that bit, but I can't see anything that actually assigns
->> led->trigger_data in the first place.
->
-> You're right, it's because nothing really does. And since
-> kfree(NULL); is fine this works, and makes the above thing work
-> fine as well.
->
-> Since led->trigger_data is never used we shouldn't touch it in
-> I believe, Bryan can you just take it out and replace with something
-> like this (totally untested):
->
-> static void ledtrig_cpu_deactivate_cpu(struct led_classdev *led)
-> {
-> ? ? ? struct ledtrig_cpu_data *cpu_data = __get_cpu_var(ledtrig_cpu_triggers);
-> ? ? ? int my_cpu = smp_processor_id();
-> ? ? ? unsigned long target_cpu = (unsigned long) led->trigger_data;
->
-> ? ? ? if (target_cpu != my_cpu)
-> ? ? ? ? ? ? ? return;
->
-> ? ? ? kfree(cpu_data);
-> ? ? ? __get_cpu_var(ledtrig_cpu_triggers) = NULL;
-> }
->
-> static void ledtrig_cpu_activate(struct led_classdev *led)
-> {
-> ? ? ? on_each_cpu(ledtrig_cpu_deactivate_cpu, led, 1);
-> }
->
-> Bryan can you test this change?
->
+On Fri,  5 Aug 2011 09:19:13 +0100
+Thomas Abraham <thomas.abraham@linaro.org> wrote:
 
-No problem, I've reworked this patchset and included this updates.
-Please find patches here:
+> Add support for translation of hardware interrupt numbers specified in device
+> tree nodes to linux irq number.
+> 
+> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+> ---
+> Notes:
+> 1. The translation of SGI/PPI interrupts is supported only for CPU0.
 
-git://kernel.ubuntu.com/roc/linux-2.6 leds
-gitweb: http://kernel.ubuntu.com/git?p=roc/linux-2.6/.git;a=shortlog;h=refs/heads/leds
+This is a major problem. PPIs could be used differently on different
+CPUs, as each CPU basically has its own PPI controller. I don't know if
+this "feature" is used in the wild, but there is reason why it couldn't
+be used one of these days.
 
-Please help to test on your hardware.
+I did have a go at this problem a while ago, as part of a much complex
+patch set:
 
-Thanks,
+https://patchwork.kernel.org/patch/916362/
+
+Also note that at the moment, PPIs are not really usable as standard
+interrupts (because of the whole banking scheme).
+
+Cheers,
+
+	M.
 -- 
-Bryan Wu <bryan.wu@canonical.com>
-Kernel Developer ? ?+86.138-1617-6545 Mobile
-Ubuntu Kernel Team
-Canonical Ltd. ? ? ?www.canonical.com
-Ubuntu - Linux for human beings | www.ubuntu.com
+I'm the slime oozin' out from your TV set...
