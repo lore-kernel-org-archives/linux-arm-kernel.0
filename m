@@ -1,34 +1,223 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 5 Aug 2011 06:35:11 +0100
-Subject: [PATCH 1/3] irq: If an IRQ is a GPIO, request and configure it
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF049F171EC1@HQMAIL01.nvidia.com>
-References: <1312498820-2275-1-git-send-email-swarren@nvidia.com>
-	<1312498820-2275-2-git-send-email-swarren@nvidia.com>
-	<20110805000148.GB13321@opensource.wolfsonmicro.com>
-	<74CDBE0F657A3D45AFBB94109FB122FF049F171EC1@HQMAIL01.nvidia.com>
-Message-ID: <20110805053510.GA16956@opensource.wolfsonmicro.com>
+From: consul.kautuk@gmail.com (Kautuk Consul)
+Date: Fri, 5 Aug 2011 11:27:21 +0530
+Subject: [PATCH] ARM: sparsemem: Enable CONFIG_HOLES_IN_ZONE config option
+	for SparseMem and HAS_HOLES_MEMORYMODEL for linux-3.0.
+In-Reply-To: <20110804100928.GN19099@suse.de>
+References: <CAFPAmTQByL0YJT8Lvar1Oe+3Q1EREvqPA_GP=hHApJDz5dSOzQ@mail.gmail.com>
+	<20110803110555.GD19099@suse.de>
+	<CAFPAmTR79S3AVXrAFL5bMkhs2droL8THUCCPY23Ar5x_oftheQ@mail.gmail.com>
+	<20110803132839.GG19099@suse.de>
+	<CAFPAmTS2JEVk3tWhJN034dUmaxLujswmmsqGABGYEV=N3v0Ehw@mail.gmail.com>
+	<20110804100928.GN19099@suse.de>
+Message-ID: <CAFPAmTQir8HnP2=WwPGSaWFu=hBS9=xT88f+XFFx5Hdf6zvGTA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 04, 2011 at 08:53:34PM -0700, Stephen Warren wrote:
+Hi Mel,
 
-> Well, things break. This is essentially the problem I was describing in
-> the PATCH 0 email, just with a slightly different motivation.
+Please find my comments inline to the email below.
 
-There's a bunch of existing code using that idiom.
+2 general questions:
+i)    If an email chain such as this leads to another kernel patch for
+the same problem, do I need to
+      create a new email chain for that ?
+ii)  Sorry about my formatting problems. However, text such as
+backtraces and logs tend to wrap
+      irrespective of whatever gmail settings/browser I try. Any
+pointers here ?
 
-> I suppose that an alternative here would be to simply ignore any errors
-> from gpio_request. This might have the benefit of removing the need for
-> the other two patches I posted in the series. However, it seems a little
-> dirty; one benefit of the IRQ code calling gpio_request and honoring
-> errors would be to detect when some completely unrelated code had a bug
-> and had called gpio_request on the GPIO before. Such detection would be
-> non-existent if we don't error out on gpio_request. Perhaps some mechanism
-> is needed to indicate that the driver has explicitly already called
-> gpio_request for a legitimate shared purpose, and only then ignore
-> errors?
+Thanks,
+Kautuk.
 
-But it's not a bug to use a GPIO as an IRQ source, otherwise we wouldn't
-have gpio_to_irq() in the first place.  Feels like we need a backchannel
-between gpiolib and the IRQ code to do this.  Or perhaps the drivers
-that implement this should be taking care of setting up the GPIO mode?
+On Thu, Aug 4, 2011 at 3:39 PM, Mel Gorman <mgorman@suse.de> wrote:
+> On Thu, Aug 04, 2011 at 03:06:39PM +0530, Kautuk Consul wrote:
+>> Hi Mel,
+>>
+>> My ARM system has 2 memory banks which have the following 2 PFN ranges:
+>> 60000-62000 and 70000-7ce00.
+>>
+>> My SECTION_SIZE_BITS is #defined to 23.
+>>
+>
+> So bank 0 is 4 sections and bank 1 is 26 sections with the last section
+> incomplete.
+>
+>> I am altering the ranges via the following kind of pseudo-code in the
+>> arch/arm/mach-*/mach-*.c file:
+>> meminfo->bank[0].size -= (1 << 20)
+>> meminfo->bank[1].size -= (1 << 20)
+>>
+>
+> Why are you taking 1M off each bank? I could understand aligning the
+> banks to a section size at least.
+
+The reason I am doing this is that one of our embedded boards actually
+has this problem, due
+to which we see this kernel crash. I am merely reproducing this
+problem by performing this step.
+
+>
+> That said, there is an assumption that pages within a MAX_ORDER-aligned
+> block. If you are taking 1M off the end of bank 0, it is no longer
+> MAX_ORDER aligned. This is the assumption move_freepages_block()
+> is falling foul of. The problem can be avoided by ensuring that memmap
+> is valid within MAX_ORDER-aligned ranges.
+>
+>> After altering the size of both memory banks, the PFN ranges now
+>> visible to the kernel are:
+>> 60000-61f00 and 70000-7cd00.
+>>
+>> There is only one node and one ZONE_NORMAL zone on the system and this
+>> zone accounts for both memory banks as CONFIG_SPARSEMEM
+>> is enabled in the kernel.
+>>
+>
+> Ok.
+>
+>> I put some printks in the move_freeblockpages() function, compiled the
+>> kernel and then ran the following commands:
+>> ifconfig eth0 107.109.39.102 up
+>> mount /dev/sda1 /mnt ? # Mounted the USB pen drive
+>> mount -t nfs -o nolock 107.109.39.103:/home/kautuk nfsmnt ? # NFS
+>> mounted an NFS share
+>> cp test_huge_file nfsmnt/
+>>
+>> I got the following output:
+>> #> cp test_huge nfsmnt/
+>> ------------------------------------------------------------move_freepages_block_start----------------------------------------
+>> kc: The page=c068a000 start_pfn=7c400 start_page=c0686000
+>> end_page=c068dfe0 end_pfn=7c7ff
+>> page_zone(start_page)=c048107c page_zone(end_page)=c048107c
+>> page_zonenum(end_page) = 0
+>> ------------------------------------------------------------move_freepages_block_end----------------------------------------
+>> ------------------------------------------------------------move_freepages_block_start----------------------------------------
+>> kc: The page=c0652000 start_pfn=7a800 start_page=c064e000
+>> end_page=c0655fe0 end_pfn=7abff
+>> page_zone(start_page)=c048107c page_zone(end_page)=c048107c
+>> page_zonenum(end_page) = 0
+>> ------------------------------------------------------------move_freepages_block_end----------------------------------------
+>> ------------------------------------------------------------move_freepages_block_start----------------------------------------
+>> kc: The page=c065a000 start_pfn=7ac00 start_page=c0656000
+>> end_page=c065dfe0 end_pfn=7afff
+>> page_zone(start_page)=c048107c page_zone(end_page)=c048107c
+>> page_zonenum(end_page) = 0
+>> ------------------------------------------------------------move_freepages_block_end----------------------------------------
+>> ------------------------------------------------------------move_freepages_block_start----------------------------------------
+>> kc: The page=c0695000 start_pfn=7c800 start_page=c068e000
+>> end_page=c0695fe0 end_pfn=7cbff
+>> page_zone(start_page)=c048107c page_zone(end_page)=c048107c
+>> page_zonenum(end_page) = 0
+>> ------------------------------------------------------------move_freepages_block_end----------------------------------------
+>> ------------------------------------------------------------move_freepages_block_start----------------------------------------
+>> kc: The page=c04f7c00 start_pfn=61c00 start_page=c04f6000
+>> end_page=c04fdfe0 end_pfn=61fff
+>> page_zone(start_page)=c048107c page_zone(end_page)=c0481358
+>> page_zonenum(end_page) = 1
+>> ------------------------------------------------------------move_freepages_block_end----------------------------------------
+>> kernel BUG at mm/page_alloc.c:849!
+>> Unable to handle kernel NULL pointer dereference at virtual address 00000000
+>> pgd = ce9fc000
+>> [00000000] *pgd=7ca5a031, *pte=00000000, *ppte=00000000
+>>
+>> As per the last line, we can clearly see that the
+>> page_zone(start_page)=c048107c and page_zone(end_page)=c0481358,
+>> which are not equal to each other.
+>> Since they do not match, the code in move_freepages() bugchecks
+>> because of the following BUG_ON() check:
+>> page_zone(start_page) != page_zone(end_page)
+>
+>> The reason for this that the page_zonenum(end_page) is equal to 1 and
+>> this is different from the page_zonenum(start_page) which is 0.
+>>
+>
+> Because the MAX_ORDER alignment is gone.
+>
+>> On checking the code within page_zonenum(), I see that this code tries
+>> to retrieve the zone number from the end_page->flags.
+>>
+>
+> Yes. In the majority of cases a pages node and zone is stored in the
+> page->flags.
+>
+>> The reason why we cannot expect the 0x61fff end_page->flags to contain
+>> a valid zone number is:
+>> memmap_init_zone() initializes the zone number of all pages for a zone
+>> via the set_page_links() inline function.
+>> For the end_page (whose PFN is 0x61fff), set_page_links() cannot be
+>> possibly called, as the zones are simply not aware of of PFNs above
+>> 0x61f00 and below 0x70000.
+>>
+>
+> Can you ensure that the ranges passed into free_area_init_node()
+> are MAX_ORDER aligned as this would initialise the struct pages. You
+> may have already seen that care is taken when freeing memmap that it
+> is aligned to MAX_ORDER in free_unused_memmap() in ARM.
+>
+
+Will this work ? My doubt arises from the fact that there is only one
+zone on the entire
+system which contains both memory banks.
+The crash arises at the PFN 0x61fff, which will not be covered by such
+a check, as this function
+will try to act on the entire zone, which is the PFN range:
+60000-7cd00, including the holes within as
+all of this RAM falls into the same node and zone.
+( Please correct me if I am wrong about this. )
+
+I tried aligning the end parameter in the memory_present() function
+which is called separately
+for each memory bank.
+I tried the following change in memory_present() as well as
+mminit_validate_memodel_limits():
+end &= ~(pageblock_nr_pages-1);
+But, in this case, the board simply does not boot up. I think that
+will then require some change in the
+arch/arm code which I think would be an arch-specific solution to a
+possibly generic problem.
+
+>> The (end >= zone->zone_start_pfn + zone->spanned_pages) in
+>> move_freepages_block() does not stop this crash from happening as both
+>> our memory banks are in the same zone and the empty space within them
+>> is accomodated into this zone via the CONFIG_SPARSEMEM
+>> config option.
+>>
+>> When we enable CONFIG_HOLES_IN_ZONE we survive this BUG_ON as well as
+>> any other BUG_ONs in the loop in move_freepages() as then the
+>> pfn_valid_within()/pfn_valid() function takes care of this
+>> functionality, especially in the case where the newly introduced
+>> CONFIG_HAVE_ARCH_PFN_VALID is
+>> enabled.
+>>
+>
+> This is an expensive option in terms of performance. If Russell
+> wants to pick it up, I won't object but I would strongly suggest that
+> you solve this problem by ensuring that memmap is initialised on a
+> MAX_ORDER-aligned boundaries as it'll perform better.
+>
+
+I couldn't really locate a method in the kernel wherein we can
+validate a pageblock(1024 pages for my
+platform) with respect to the memory banks on that system.
+
+How about this :
+We implement an arch_is_valid_pageblock() function, controlled by a
+new config option
+CONFIG_ARCH_HAVE IS_VALID_PAGEBLOCK.
+This arch function will simply check whether this pageblock is valid
+or not, in terms of arch-specific
+memory banks or by using the memblock APIs depending on CONFIG_HAVE_MEMBLOCK.
+We can modify the memmap_init_zone() function so that an outer loop
+works in measures of
+pageblocks thus enabling us to avoid invalid pageblocks.
+We then wouldn't need to go for the HOLES_IN_ZONE option as all PFN
+ranges will be aligned to the
+pageblock_nr_pages thus removing the possibility of this crash in
+move_freepages().
+
+
+> Thanks.
+>
+> --
+> Mel Gorman
+> SUSE Labs
+>
