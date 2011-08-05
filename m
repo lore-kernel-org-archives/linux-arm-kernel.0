@@ -1,54 +1,35 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Fri,  5 Aug 2011 16:15:34 -0600
-Subject: [PATCH 2/2] arm/tegra: Delete irq_to_gpio
-In-Reply-To: <1312582534-10871-1-git-send-email-swarren@nvidia.com>
-References: <1312582534-10871-1-git-send-email-swarren@nvidia.com>
-Message-ID: <1312582534-10871-2-git-send-email-swarren@nvidia.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Fri, 5 Aug 2011 23:58:45 +0100
+Subject: [PATCH 1/2] arm/mx5: parse iomuxc pad configuratoin from device
+	tree
+In-Reply-To: <CAKGA1bmbWUeyhUtDwHZjB8V4e2wJ0NHX2qWhqaqx6HoBm7uMnQ@mail.gmail.com>
+References: <1311606467-28985-1-git-send-email-shawn.guo@linaro.org>
+	<1311606467-28985-2-git-send-email-shawn.guo@linaro.org>
+	<20110725204630.GD26735@ponder.secretlab.ca>
+	<CAKGA1bmbWUeyhUtDwHZjB8V4e2wJ0NHX2qWhqaqx6HoBm7uMnQ@mail.gmail.com>
+Message-ID: <20110805225845.GC6404@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-irq_to_gpio is deprecated and in the process of being removed. Make that
-happen now for ARM Tegra.
+On Thu, Aug 04, 2011 at 06:07:15PM -0500, Matt Sealey wrote:
+> Hi Grant, Shawn,
+> 
+> 
+> 
+> On Mon, Jul 25, 2011 at 3:46 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
+> > This could get really verbose in a really big hurry. ?Fortunately the
+> > dtb format is sophisticated enough to only store each unique property
+> > name once, so the data shouldn't be huge, but it is still going to
+> > make for huge source files. ?Can you think of a more concise
+> > representation?
+> 
+> Yes: no representation at all. The correct place for IOMUX setup being
+> done is *inside the boot firmware as soon as physically possible* and
+> not seconds into boot after U-Boot has made a console, done a boot
+> timeout, loaded scripts, kernels and ramdisks from media and then
+> uncompressed and entered a Linux kernel.
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
-I assume this will go into one of arm-soc.git's branches, but it depends
-on the previous patch in this series to compile. Arnd, I see you already
-have Grant's gpio/next tree in your repo as depends/gpio, so I assume
-you'll just pick up and merge the latest version of Grant's tree before
-applying this patch?
+We've had this argument before.  There are many use cases where the
+firmware simply cannot be relied upon to do the right thing.
 
-Both patches compiled with a number of Tegra boards enable and tested on
-Harmony. All without Device Tree support.
-
- arch/arm/mach-tegra/include/mach/gpio.h |    8 --------
- 1 files changed, 0 insertions(+), 8 deletions(-)
-
-diff --git a/arch/arm/mach-tegra/include/mach/gpio.h b/arch/arm/mach-tegra/include/mach/gpio.h
-index 196f114..b357808 100644
---- a/arch/arm/mach-tegra/include/mach/gpio.h
-+++ b/arch/arm/mach-tegra/include/mach/gpio.h
-@@ -32,7 +32,6 @@
- #define gpio_cansleep		__gpio_cansleep
- 
- #define TEGRA_GPIO_TO_IRQ(gpio) (INT_GPIO_BASE + (gpio))
--#define TEGRA_IRQ_TO_GPIO(irq) ((irq) - INT_GPIO_BASE)
- 
- static inline int gpio_to_irq(unsigned int gpio)
- {
-@@ -41,13 +40,6 @@ static inline int gpio_to_irq(unsigned int gpio)
- 	return -EINVAL;
- }
- 
--static inline int irq_to_gpio(unsigned int irq)
--{
--	if ((irq >= INT_GPIO_BASE) && (irq < INT_GPIO_BASE + INT_GPIO_NR))
--		return irq - INT_GPIO_BASE;
--	return -EINVAL;
--}
--
- struct tegra_gpio_table {
- 	int	gpio;	/* GPIO number */
- 	bool	enable;	/* Enable for GPIO@init? */
--- 
-1.7.0.4
+g.
