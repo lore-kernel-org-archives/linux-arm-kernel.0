@@ -1,23 +1,30 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 5 Aug 2011 09:29:21 +0100
-Subject: [PATCH 1/3] irq: If an IRQ is a GPIO, request and configure it
-In-Reply-To: <20110805080620.GE28651@trinity.fluff.org>
-References: <1312498820-2275-1-git-send-email-swarren@nvidia.com>
-	<1312498820-2275-2-git-send-email-swarren@nvidia.com>
-	<20110805000148.GB13321@opensource.wolfsonmicro.com>
-	<74CDBE0F657A3D45AFBB94109FB122FF049F171EC1@HQMAIL01.nvidia.com>
-	<20110805053510.GA16956@opensource.wolfsonmicro.com>
-	<20110805080620.GE28651@trinity.fluff.org>
-Message-ID: <20110805082921.GA4977@opensource.wolfsonmicro.com>
+From: alex.bluesman.smirnov@gmail.com (Alexander Smirnov)
+Date: Fri,  5 Aug 2011 12:31:51 +0400
+Subject: [PATCH] fix cpuidle_xxx functions name mismatch
+Message-ID: <1312533111-22231-1-git-send-email-alex.bluesman.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 05, 2011 at 09:06:20AM +0100, Ben Dooks wrote:
+In header there is defined 'cpuidle_idle_call' function,
+in arm/kernel/process.c file it's used 'cpuidle_call_idle'
 
-> I would say that setting the interrupt should deal with all the necessary
-> configuration to get that interrupt working. In the case of pretty much all
-> of the SoCs I have been involved with have always set the GPIO's function
-> to allow the interrupt to pass through.
+Signed-off-by: Alexander Smirnov <alex.bluesman.smirnov@gmail.com>
+---
+ arch/arm/kernel/process.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-That's what Stephen is trying to do, essentially.  It's looking like
-it's more sensible to fix it in the Tegra interrupt drivers, though.
+diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+index d7ee0d4..1a347f4 100644
+--- a/arch/arm/kernel/process.c
++++ b/arch/arm/kernel/process.c
+@@ -197,7 +197,7 @@ void cpu_idle(void)
+ 				cpu_relax();
+ 			} else {
+ 				stop_critical_timings();
+-				if (cpuidle_call_idle())
++				if (cpuidle_idle_call())
+ 					pm_idle();
+ 				start_critical_timings();
+ 				/*
+-- 
+1.7.2.3
