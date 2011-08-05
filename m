@@ -1,58 +1,50 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Fri, 5 Aug 2011 12:33:31 -0700
-Subject: [RFC PATCH 0/3] If an IRQ is a GPIO, request and configure it
-In-Reply-To: <20110805191504.GB28958@n2100.arm.linux.org.uk>
-References: <1312498820-2275-1-git-send-email-swarren@nvidia.com>
-	<20110805094017.GC20575@n2100.arm.linux.org.uk>
-	<74CDBE0F657A3D45AFBB94109FB122FF049F171EFC@HQMAIL01.nvidia.com>
-	<20110805191504.GB28958@n2100.arm.linux.org.uk>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF049F171FD3@HQMAIL01.nvidia.com>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Fri, 5 Aug 2011 21:22:06 +0200
+Subject: [linux-pm] [RFC/PATCH v2] PM / Runtime: allow _put_sync() from
+	interrupts-disabled context
+In-Reply-To: <87vcuczrey.fsf@ti.com>
+References: <1311371188-28879-1-git-send-email-khilman@ti.com>
+	<201107240102.09698.rjw@sisk.pl> <87vcuczrey.fsf@ti.com>
+Message-ID: <201108052122.06949.rjw@sisk.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote at Friday, August 05, 2011 1:15 PM:
-> On Fri, Aug 05, 2011 at 08:43:20AM -0700, Stephen Warren wrote:
-> > Russell King - ARM Linux wrote at Friday, August 05, 2011 3:40 AM:
-> > > On Thu, Aug 04, 2011 at 05:00:17PM -0600, Stephen Warren wrote:
-> > > > In http://www.spinics.net/lists/linux-tegra/msg01731.html, Mark Brown
-> > > > pointed out that it was a little silly forcing every board or driver
-> > > > to gpio_request() a GPIO that is later converted to an IRQ, and passed
-> > > > to request_irq. The first patch in this series instead makes the core
-> > > > IRQ code perform these calls when appropriate, to avoid duplicating it
-> > > > everywhere.
-> > >
-> > > Trying to go from IRQ to GPIO is not a good idea - most of the
-> > > IRQ <-> GPIO macros we have today are just plain broken.  Many of them
-> > > just add or subtract a constant, which means non-GPIO IRQs have an
-> > > apparant GPIO number too.  Couple this with the fact that all positive
-> > > GPIO numbers are valid, and this is a recipe for wrong GPIOs getting
-> > > used and GPIOs being requested for non-GPIO IRQs.
-> > >
-> > > I think this was also discussed in the past, and the conclusion was that
-> > > IRQs should be kept separate from GPIOs.  Maybe views have changed since
-> > > then...
-> > >
-> > > However, if we do want to do this, then it would be much better to provide
-> > > a new API for requesting GPIO IRQs, eg:
-> > >
-> > > gpio_request_irq()
-> > >
-> > > which would wrap around request_threaded_irq(), takes a GPIO number,
-> > > does the GPIO->IRQ conversion internally, and whatever GPIO setup is
-> > > required.  Something like this:
-> >
-> > With that approach, drivers need to explicitly know whether they're
-> > passed a GPIO or an IRQ, and do something different, or they need to
-> > choose to only accept a GPIO or IRQ.
+On Friday, August 05, 2011, Kevin Hilman wrote:
+> "Rafael J. Wysocki" <rjw@sisk.pl> writes:
 > 
-> You completely missed the biggest reason why your approach is broken.
+> > On Friday, July 22, 2011, Kevin Hilman wrote:
+> >> Currently the use of pm_runtime_put_sync() is not safe from
+> >> interrupts-disabled context because rpm_idle() will release the
+> >> spinlock and enable interrupts for the idle callbacks.  This enables
+> >> interrupts during a time where interrupts were expected to be
+> >> disabled, and can have strange side effects on drivers that expected
+> >> interrupts to be disabled.
+> >> 
+> >> This is not a bug since the documentation clearly states that only
+> >> _put_sync_suspend() is safe in IRQ-safe mode.
+> >> 
+> >> However, pm_runtime_put_sync() could be made safe when in IRQ-safe
+> >> mode by releasing the spinlock but not re-enabling interrupts, which
+> >> is what this patch aims to do.
+> >> 
+> >> Problem was found when using some buggy drivers that set
+> >> pm_runtime_irq_safe() and used _put_sync() in interrupts-disabled
+> >> context.
+> >> 
+> >> The offending drivers have been fixed to use _put_sync_suspend(),
+> >> But this patch is an RFC to see if it might make sense to allow
+> >> using _put_sync() from interrupts-disabled context.
+> >
+> > OK, I'm going to take this for 3.2.
+> 
+> Rafael, 
+> 
+> Since you're planning to merge this, maybe we should consider merging
+> this as a fix for v3.1, and possibly even for v3.0 stable.  That way,
+> any current drivers using irq_safe and the normal _put_sync() will not
+> have this problem.
 
-No, I didn't.
+I think I can push it for 3.1, but I don't think it's stable material.
 
-I was discussing whether an alternative API for IRQ registration
-would work, and I was pointing out some problems with it.
-
-That has nothing to do with whether my original proposal is workable.
-
--- 
-nvpublic
+Thanks,
+Rafael
