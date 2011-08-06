@@ -1,35 +1,37 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 06 Aug 2011 09:40:23 +0100
-Subject: [PATCH] ARM: Fix build error for SMP=n builds
-Message-ID: <E1QpcQh-00013p-N1@rmk-PC.arm.linux.org.uk>
+Date: Sat, 06 Aug 2011 09:40:43 +0100
+Subject: [PATCH] dmaengine: PL08x: Fix trivial build error
+Message-ID: <E1QpcR1-00013t-Sj@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Unfortunately, the module fixups cause the kernel to fail to build
-when SMP is not enabled.  Fix this by removing the reference to
-fixup_smp on non-SMP fixup kernels, but ensuring that if we do have
-the SMP fixup section, we refuse to load the module.
+Something changed during the 3.1 merge window in the include files
+which now causes the pl08x DMA engine driver to fail to build.  Fix
+this by adding the now necessary dma-mapping.h include:
+
+drivers/dma/amba-pl08x.c: In function ?pl08x_unmap_buffers?:
+drivers/dma/amba-pl08x.c:1524: error: implicit declaration of function ?dma_unmap_single?
+drivers/dma/amba-pl08x.c:1527: error: implicit declaration of function ?dma_unmap_page?
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/kernel/module.c |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+If you can provide an ack, and I'll push this through my pending
+'fixes' merge.
 
-diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
-index 05b3776..cc2020c 100644
---- a/arch/arm/kernel/module.c
-+++ b/arch/arm/kernel/module.c
-@@ -323,7 +323,11 @@ int module_finalize(const Elf32_Ehdr *hdr, const Elf_Shdr *sechdrs,
- #endif
- 	s = find_mod_section(hdr, sechdrs, ".alt.smp.init");
- 	if (s && !is_smp())
-+#ifdef CONFIG_SMP_ON_UP
- 		fixup_smp((void *)s->sh_addr, s->sh_size);
-+#else
-+		return -EINVAL;
-+#endif
- 	return 0;
- }
- 
+ drivers/dma/amba-pl08x.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
+index 196a737..be21e3f 100644
+--- a/drivers/dma/amba-pl08x.c
++++ b/drivers/dma/amba-pl08x.c
+@@ -80,6 +80,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/slab.h>
+ #include <linux/delay.h>
++#include <linux/dma-mapping.h>
+ #include <linux/dmapool.h>
+ #include <linux/dmaengine.h>
+ #include <linux/amba/bus.h>
 -- 
 1.7.4.4
