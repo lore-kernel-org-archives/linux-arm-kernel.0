@@ -1,41 +1,35 @@
-From: thomas@m3y3r.de (Thomas Meyer)
-Date: Sat, 06 Aug 2011 13:26:13 +0200
-Subject: [PATCH] arm: mach-davinci: use kzalloc()
-Message-ID: <1312629976.5589.128.camel@localhost.localdomain>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat, 6 Aug 2011 06:59:00 -0700
+Subject: [Ksummit-2011-discuss] ARM Maintainers workshop at Kernel Summit
+	2011
+In-Reply-To: <CACxGe6u3jrhnmL=QwCevm5ybgtGqdOzmGZpfve02M12e9v6pNQ@mail.gmail.com>
+References: <CACxGe6u3jrhnmL=QwCevm5ybgtGqdOzmGZpfve02M12e9v6pNQ@mail.gmail.com>
+Message-ID: <CAOesGMhgd9Grs7JErJ1pTY4fD_taX_YSpeKx_QS21dp2UN=vMQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thomas Meyer <thomas@m3y3r.de>
+On Fri, Aug 5, 2011 at 11:44 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
 
- Use kzalloc rather than kmalloc followed by memset with 0
+> However, for it to be successful we need to put together a draft
+> agenda quickly. ?Kernel summit is only 80 days away, and people need
+> time to get approval and organise travel. ?So, if you're interested in
+> attending, then we need to know ASAP. ?Reply to this email if you're
+> interested.
 
- This considers some simple cases that are common and easy to validate
- Note in particular that there are no ...s in the rule, so all of the
- matched code has to be contiguous
+With 99% certainty I will be there (but I haven't been invited to the
+closed KS day).
 
- The semantic patch that makes this output is available
- in scripts/coccinelle/api/alloc/kzalloc-simple.cocci.
+Do we want to cover technical topics, or keep it process-oriented like
+the rest of KS? Many technical topics seem to be covered within Linaro
+these days, so some of those topics would only make sense if there's
+enough non-Linaro people there that would care about whatever is
+discussed.
 
- More information about semantic patching is available at
- http://coccinelle.lip6.fr/
+I'd like to hear from Arnd what his experiences from this first merge
+window were -- what worked well and where's room for improvement? Any
+particular SoC workflow that should be tuned to make his life easier?
+Where are the gaps where he needs help right now? And how did it work
+out for the SoC maintainers?
 
-Signed-off-by: Thomas Meyer <thomas@m3y3r.de>
----
 
-diff -u -p a/arch/arm/mach-davinci/dma.c b/arch/arm/mach-davinci/dma.c
---- a/arch/arm/mach-davinci/dma.c 2010-10-26 18:50:12.713889353 +0200
-+++ b/arch/arm/mach-davinci/dma.c 2011-08-01 20:40:38.326583216 +0200
-@@ -1435,12 +1435,11 @@ static int __init edma_probe(struct plat
- 			goto fail1;
- 		}
- 
--		edma_cc[j] = kmalloc(sizeof(struct edma), GFP_KERNEL);
-+		edma_cc[j] = kzalloc(sizeof(struct edma), GFP_KERNEL);
- 		if (!edma_cc[j]) {
- 			status = -ENOMEM;
- 			goto fail1;
- 		}
--		memset(edma_cc[j], 0, sizeof(struct edma));
- 
- 		edma_cc[j]->num_channels = min_t(unsigned, info[j]->n_channel,
- 							EDMA_MAX_DMACH);
+-Olof
