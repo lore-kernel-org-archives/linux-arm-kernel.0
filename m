@@ -1,41 +1,43 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Sat, 6 Aug 2011 04:47:19 +0100
-Subject: [PATCH 1/2] arm/mx5: parse iomuxc pad configuratoin from
-	device tree
-In-Reply-To: <4E3C7D3E.7040502@firmworks.com>
-References: <1311606467-28985-1-git-send-email-shawn.guo@linaro.org>
-	<1311606467-28985-2-git-send-email-shawn.guo@linaro.org>
-	<20110725204630.GD26735@ponder.secretlab.ca>
-	<CAKGA1bmbWUeyhUtDwHZjB8V4e2wJ0NHX2qWhqaqx6HoBm7uMnQ@mail.gmail.com>
-	<20110805225845.GC6404@ponder.secretlab.ca>
-	<4E3C7D3E.7040502@firmworks.com>
-Message-ID: <20110806034718.GA10078@sirena.org.uk>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Sat, 6 Aug 2011 07:44:08 +0100
+Subject: ARM Maintainers workshop at Kernel Summit 2011
+Message-ID: <CACxGe6u3jrhnmL=QwCevm5ybgtGqdOzmGZpfve02M12e9v6pNQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 05, 2011 at 01:31:10PM -1000, Mitch Bradley wrote:
-> On 8/5/2011 12:58 PM, Grant Likely wrote:
+As many of you know, Kernel Summit this year will be a three day
+event, with the first day dedicated to kernel subsystem workshops[1].
+Since Kernel Summit will be co-located with ELC-E which my arm
+developers will be attending, it is the perfect opportunity to have an
+ARM maintainers meeting.  Arnd Bergmann, Nicolas Pitre and I talked
+about it at Linaro Connect this past week and we're going to work on
+organising something.
 
-> >We've had this argument before.  There are many use cases where the
-> >firmware simply cannot be relied upon to do the right thing.
+However, for it to be successful we need to put together a draft
+agenda quickly.  Kernel summit is only 80 days away, and people need
+time to get approval and organise travel.  So, if you're interested in
+attending, then we need to know ASAP.  Reply to this email if you're
+interested.
 
-> I am a firmware engineer who tries very hard to deliver quality
-> firmware that does the right thing.  It often seems to me that the
-> Linux kernel community's general distrust of firmware is a
-> self-fulfilling prophecy.  People often "live down to expectations";
-> if Linux expects the firmware to be worthless, worthless is often
-> what you get.
+We also need proposals for discussion topics relevant to ARM,
+particularly if it relates to all arm sub-architectures or the
+maintainership process.  I'll collate the list of proposals that I
+receive and try to put together an agenda.
 
-> In the PC BIOS world, the quality of BIOSes went up dramatically
-> when Microsoft began insisting that the BIOS must meet stringent
-> standards, enforced via an exhaustive suite of compatibility tests.
+As already mentioned, the first day (Sunday Oct 23) is dedicated to
+workshops, and I think that most of the discussion topics will be
+covered on that day.  The invite-only core developers meeting is on
+the second day (Oct 24) which a few people will be involved with.  For
+the rest of the group I'm considering organizing it as a hacking day
+to start sorting out problems identified/discussed on the first day.
+The third and final day will be plenary sessions open to participants
+of all workshops.
 
-It's not just quality concerns, although obviously that is a serious
-issue, it's also a totally different way of designing and building
-systems.  A bootloader update will tend to brick the board if it goes
-wrong so you want to minimize the amount of code in it, and you're going
-to be doing updates to things like pin configuration throughout the
-development cycle which often need to be done in lock step with the
-drivers using them.  Even if the bootloader works perfectly and is of
-excellent quality it's just more effort and risk to put functionality in
-there.
+[1] https://sites.google.com/site/kernelsummit2011/announcements/kickoff
+
+Cheers,
+g.
+
+-- 
+Grant Likely, B.Sc., P.Eng.
+Secret Lab Technologies Ltd.
