@@ -1,78 +1,60 @@
-From: mirqus@gmail.com (=?ISO-8859-2?Q?Micha=B3_Miros=B3aw?=)
-Date: Sun, 7 Aug 2011 00:13:48 +0200
-Subject: experience with the new arm-soc workflow (Was: Re:
-	[Ksummit-2011-discuss] ARM Maintainers workshop at Kernel Summit) 2011
-In-Reply-To: <alpine.LFD.2.00.1108061742490.20358@xanadu.home>
-References: <CACxGe6u3jrhnmL=QwCevm5ybgtGqdOzmGZpfve02M12e9v6pNQ@mail.gmail.com>
-	<CAOesGMhgd9Grs7JErJ1pTY4fD_taX_YSpeKx_QS21dp2UN=vMQ@mail.gmail.com>
-	<20110806212932.GT31521@pengutronix.de>
-	<alpine.LFD.2.00.1108061742490.20358@xanadu.home>
-Message-ID: <CAHXqBF+BAdNo3NB9gk0o_aTHUxyQRHw_AvM5ok9zn2yk4NsRZw@mail.gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Sat, 6 Aug 2011 18:41:48 +0100
+Subject: [PATCH 1/2] arm/mx5: parse iomuxc pad configuratoin from device
+	tree
+In-Reply-To: <CAKGA1bkM6X533w20hDV7GCPwzzj2nrjGdN6zkXsS+hCvUD_s2A@mail.gmail.com>
+References: <1311606467-28985-1-git-send-email-shawn.guo@linaro.org>
+	<1311606467-28985-2-git-send-email-shawn.guo@linaro.org>
+	<20110725204630.GD26735@ponder.secretlab.ca>
+	<CAKGA1bmbWUeyhUtDwHZjB8V4e2wJ0NHX2qWhqaqx6HoBm7uMnQ@mail.gmail.com>
+	<20110805070729.GA26563@huya.qualcomm.com>
+	<CAKGA1bkM6X533w20hDV7GCPwzzj2nrjGdN6zkXsS+hCvUD_s2A@mail.gmail.com>
+Message-ID: <20110806174148.GA31966@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/8/6 Nicolas Pitre <nicolas.pitre@linaro.org>:
-> On Sat, 6 Aug 2011, Uwe Kleine-K?nig wrote:
->
->> My thoughts about the fixes-cleanups-newfeatures separation is that it
->> makes contributing harder than before.
->>
->> Consider I want to contribute a series consisting of a cleanup and a new
->> feature (that depends on the cleanup). And I want (or even need) to base
->> this on (say) Sascha's imx tree that already has some other features.
->> Now the cleanup patch should go on Sascha's (eventually empty) cleanup
->> branch. But for the feature patch to go on top of both Sascha's feature
->> branch and his new cleanup branch, he either needs so rebase his feature
->> branch (which is (at least considered) bad) or he has to merge. I'd say
->> merging is the correct approach, but the history tends to be more ugly
->> than without the separation between cleanups and new features.
->> And if Sascha wants to pull from me (opposed to apply the patches
->> himself) he needs two merges.
->> (So it results in one merge more than before for both cases.)
->>
->> I'm not sure how welcomed these additional merges are by Linus.
->>
->> The obvious (to me) ways out are:
->> ?a) Linus can live with these merges; or
->> ?b) drop the separation between cleanup and features; or
->> ?c) Sascha doesn't publish a (fast-forward-only) tree but works with
->> ? ? a patch queue or git-rebase; or
->> ?d) Sascha keeps my series separate from his other stuff and requests
->> ? ? Arnd to pull two (or more) cleanup branches and two (or more)
->> ? ? feature branches; or
->> ?e) Sascha needs something like topgit;
->>
->> As this problem didn't occur yet in real life, there might be
->>
->> ?f) there is no real problem.
->
-> Don't forget:
->
-> g) There are no hard rules.
->
->> I fear a) and f) don't apply, I don't like c) and d) and I know
->> Sascha won't like e).
->> So there might only be b) left unless there is some g) I don't see.
->
-> Good judgment always prevails. ?If you need to merge something in your
-> branch, there is no problem with you asking Sascha to merge the result
-> of that merge, and in turn Sascha asking the result to be merged by
-> Arnd, etc. ?Suffice that you justify why you want that merge, how it
-> makes your contribution for the added feature on top easier, etc. ?If
-> the upstream maintainer asks otherwise then just try to convince that
-> maintainer. ?If you are right then you shouldn't have too many problem
-> convincing people.
->
-> But at least always considering the fix/cleanup/feature split initially
-> is certainly a good practice since that works well in most cases, and
-> when that works, this makes your upstream maintainer's life a bit
-> easier.
+On Fri, Aug 05, 2011 at 01:36:56PM -0500, Matt Sealey wrote:
+> On Fri, Aug 5, 2011 at 2:07 AM, David Brown <davidb@codeaurora.org> wrote:
+> > On Thu, Aug 04, 2011 at 06:07:15PM -0500, Matt Sealey wrote:
+> >> Hi Grant, Shawn,
+> >>
+> >> On Mon, Jul 25, 2011 at 3:46 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
+> >> > This could get really verbose in a really big hurry. ?Fortunately the
+> >> > dtb format is sophisticated enough to only store each unique property
+> >> > name once, so the data shouldn't be huge, but it is still going to
+> >> > make for huge source files. ?Can you think of a more concise
+> >> > representation?
+> >>
+> >> Yes: no representation at all. The correct place for IOMUX setup being
+> >> done is *inside the boot firmware as soon as physically possible* and
+> >> not seconds into boot after U-Boot has made a console, done a boot
+> >> timeout, loaded scripts, kernels and ramdisks from media and then
+> >> uncompressed and entered a Linux kernel.
+> >
+> > This is true in situations where we have control over the bootloader,
+> > but that isn't always the case.
+> 
+> Indeed it is not, but then it is "their" fault the board won't boot
+> Linux, and not yours, right? :)
+> 
+> I think it is a given that when designing hardware (and we do that)
+> and proprietary firmware that the Linux kernel guys can't "control",
+> you have to keep up with the changes when reasonable. While sometimes
+> that is very difficult, this is not one of those "sometimes" -
+> providing a setup that can boot Linux implies that you configured the
+> chip correctly such that Linux is supplementing that configuration,
+> not reimplementing it from scratch.
 
-I, as another contributor, share Uwe's point of view. The problem with
-cleanups vs features is that either usually depends on the other.
-Fixes are a different beasts and they usually go in asynchronously
-(and quicker) to development changes. The split fixes/development
-works well in networking area (net and net-next trees).
+This whole argument is ridiculous.  Assume for a moment that I agree
+and that the firmware (in the embedded context) can be relied upon to
+leave the hardware in a sane state.  Even then, an initialization
+sequence binding is completely appropriate.  Hardware not required to
+boot doesn't need to be initialized, and there are some real reasons
+(power consumption for instance) for leaving some pin io left
+unconfigured.
 
-Best Regards,
-Micha? Miros?aw
+Besides, trusting a pin mux init sequence passed in the device tree
+inherently means you're trusting firmware has passed accurate data
+*and* that the initial state is also sane.
+
+g.
