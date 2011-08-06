@@ -1,56 +1,71 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 05 Aug 2011 16:40:19 -0700
-Subject: [linux-pm] [RFC/PATCH v2] PM / Runtime: allow _put_sync() from
-	interrupts-disabled context
-In-Reply-To: <201108052122.06949.rjw@sisk.pl> (Rafael J. Wysocki's message of
-	"Fri, 5 Aug 2011 21:22:06 +0200")
-References: <1311371188-28879-1-git-send-email-khilman@ti.com>
-	<201107240102.09698.rjw@sisk.pl> <87vcuczrey.fsf@ti.com>
-	<201108052122.06949.rjw@sisk.pl>
-Message-ID: <87ipqbo2ak.fsf@ti.com>
+Date: Fri,  5 Aug 2011 17:19:16 -0700
+Subject: [PATCH 0/9] OMAP: omap_device cleanups,
+	decouple platform_device for v3.2
+Message-ID: <1312589965-19416-1-git-send-email-khilman@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Rafael J. Wysocki" <rjw@sisk.pl> writes:
+Here's a series of omap_device cleanups and updates targetted for v3.2.
 
-> On Friday, August 05, 2011, Kevin Hilman wrote:
->> "Rafael J. Wysocki" <rjw@sisk.pl> writes:
->> 
->> > On Friday, July 22, 2011, Kevin Hilman wrote:
->> >> Currently the use of pm_runtime_put_sync() is not safe from
->> >> interrupts-disabled context because rpm_idle() will release the
->> >> spinlock and enable interrupts for the idle callbacks.  This enables
->> >> interrupts during a time where interrupts were expected to be
->> >> disabled, and can have strange side effects on drivers that expected
->> >> interrupts to be disabled.
->> >> 
->> >> This is not a bug since the documentation clearly states that only
->> >> _put_sync_suspend() is safe in IRQ-safe mode.
->> >> 
->> >> However, pm_runtime_put_sync() could be made safe when in IRQ-safe
->> >> mode by releasing the spinlock but not re-enabling interrupts, which
->> >> is what this patch aims to do.
->> >> 
->> >> Problem was found when using some buggy drivers that set
->> >> pm_runtime_irq_safe() and used _put_sync() in interrupts-disabled
->> >> context.
->> >> 
->> >> The offending drivers have been fixed to use _put_sync_suspend(),
->> >> But this patch is an RFC to see if it might make sense to allow
->> >> using _put_sync() from interrupts-disabled context.
->> >
->> > OK, I'm going to take this for 3.2.
->> 
->> Rafael, 
->> 
->> Since you're planning to merge this, maybe we should consider merging
->> this as a fix for v3.1, and possibly even for v3.0 stable.  That way,
->> any current drivers using irq_safe and the normal _put_sync() will not
->> have this problem.
->
-> I think I can push it for 3.1, but I don't think it's stable material.
->
+Most are just minor cleanups in preparation for the last one which
+attempts to decouple the platform_device from an omap_device.  This
+version uses pdev_archdata instead of using devres as was proposed in
+the earlier RFC.
 
-OK, fair enough.
+The "decouple" patch should also be considered a pre-requisite for
+broader device-tree support where the omap_device can be "attached"
+later.
 
-Kevin
+This series is also available in the for_3.2/omap_device branch of my
+git tree[1], and is based on Linus' master branch (as of today.)
+
+NOTE: This series has a dependency on my PM fixes queue posted
+      for v3.1 (branch: for_3.1/pm-fixes), specifically the beagle board
+      change which cleans up omap_device usage.
+
+P.S.  I'll also be offline for a couple weeks, so won't be responding
+      to this until I get back.  My plan however is to queue this stuff
+      for v3.2, unless there are major objections.
+
+[1] git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git
+
+Grazvydas Ignotas (1):
+  OMAP: omap_device: make latency autoadjust messages debug
+
+Jarkko Nikula (1):
+  omap: mcbsp: Remove omap device API
+
+Kevin Hilman (7):
+  OMAP: omap_device: replace debug/warning/error prints with dev_*
+    macros
+  OMAP: omap_device: remove internal functions from omap_device.h
+  OMAP: omap_device: when building return platform_device instead of
+    omap_device
+  OMAP: omap_device: device register functions now take platform_device
+    pointer
+  OMAP: omap_device: _disable_idle_on_suspend() takes platform_device
+    pointer
+  ARM: platform_device: pdev_archdata: add omap_device pointer
+  OMAP: omap_device: decouple platform_device from omap_device
+
+ arch/arm/include/asm/device.h                 |    5 +
+ arch/arm/mach-omap2/devices.c                 |   44 +++---
+ arch/arm/mach-omap2/display.c                 |    6 +-
+ arch/arm/mach-omap2/dma.c                     |   16 +-
+ arch/arm/mach-omap2/gpio.c                    |   10 +-
+ arch/arm/mach-omap2/hsmmc.c                   |    8 +-
+ arch/arm/mach-omap2/hwspinlock.c              |    8 +-
+ arch/arm/mach-omap2/mcbsp.c                   |    8 +-
+ arch/arm/mach-omap2/opp.c                     |    2 +-
+ arch/arm/mach-omap2/pm.c                      |    8 +-
+ arch/arm/mach-omap2/serial.c                  |   14 +-
+ arch/arm/mach-omap2/sr_device.c               |    6 +-
+ arch/arm/plat-omap/i2c.c                      |    8 +-
+ arch/arm/plat-omap/include/plat/omap_device.h |   30 ++--
+ arch/arm/plat-omap/mcbsp.c                    |   27 ----
+ arch/arm/plat-omap/omap_device.c              |  185 +++++++++++++------------
+ 16 files changed, 185 insertions(+), 200 deletions(-)
+
+-- 
+1.7.6
