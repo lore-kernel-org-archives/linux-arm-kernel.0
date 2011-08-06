@@ -1,81 +1,78 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Fri,  5 Aug 2011 17:19:22 -0700
-Subject: [PATCH 6/9] OMAP: omap_device: device register functions now take
+Date: Fri,  5 Aug 2011 17:19:23 -0700
+Subject: [PATCH 7/9] OMAP: omap_device: _disable_idle_on_suspend() takes
 	platform_device pointer
 In-Reply-To: <1312589965-19416-1-git-send-email-khilman@ti.com>
 References: <1312589965-19416-1-git-send-email-khilman@ti.com>
-Message-ID: <1312589965-19416-7-git-send-email-khilman@ti.com>
+Message-ID: <1312589965-19416-8-git-send-email-khilman@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The internal device register functions do not need or use any omap_device
-internals, so pass in a platform_device pointer instead of an omap_device
-pointer.
+Public omap_device functions need to take platform_device pointers,
+conversion to omap_device pointers is done internal to the omap_device
+layer.
 
 Signed-off-by: Kevin Hilman <khilman@ti.com>
 ---
- arch/arm/plat-omap/omap_device.c |   22 +++++++++++-----------
- 1 files changed, 11 insertions(+), 11 deletions(-)
+ arch/arm/mach-omap2/gpio.c                    |    2 +-
+ arch/arm/mach-omap2/serial.c                  |    2 +-
+ arch/arm/plat-omap/include/plat/omap_device.h |   13 ++++++++-----
+ 3 files changed, 10 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
-index ea618b8..351df31 100644
---- a/arch/arm/plat-omap/omap_device.c
-+++ b/arch/arm/plat-omap/omap_device.c
-@@ -94,8 +94,8 @@
- #define USE_WAKEUP_LAT			0
- #define IGNORE_WAKEUP_LAT		1
+diff --git a/arch/arm/mach-omap2/gpio.c b/arch/arm/mach-omap2/gpio.c
+index 76abdcb..652ccc5 100644
+--- a/arch/arm/mach-omap2/gpio.c
++++ b/arch/arm/mach-omap2/gpio.c
+@@ -119,7 +119,7 @@ static int omap2_gpio_dev_init(struct omap_hwmod *oh, void *unused)
+ 		return PTR_ERR(pdev);
+ 	}
  
--static int omap_device_register(struct omap_device *od);
--static int omap_early_device_register(struct omap_device *od);
-+static int omap_device_register(struct platform_device *pdev);
-+static int omap_early_device_register(struct platform_device *pdev);
+-	omap_device_disable_idle_on_suspend(od);
++	omap_device_disable_idle_on_suspend(pdev);
  
- /* Private functions */
- 
-@@ -501,9 +501,9 @@ struct platform_device *omap_device_build_ss(const char *pdev_name, int pdev_id,
- 	od->pm_lats_cnt = pm_lats_cnt;
- 
- 	if (is_early_device)
--		ret = omap_early_device_register(od);
-+		ret = omap_early_device_register(&od->pdev);
- 	else
--		ret = omap_device_register(od);
-+		ret = omap_device_register(&od->pdev);
- 
- 	for (i = 0; i < oh_cnt; i++) {
- 		hwmods[i]->od = od;
-@@ -538,11 +538,11 @@ odbs_exit1:
-  * platform_early_add_device() on the underlying platform_device.
-  * Returns 0 by default.
-  */
--static int omap_early_device_register(struct omap_device *od)
-+static int omap_early_device_register(struct platform_device *pdev)
- {
- 	struct platform_device *devices[1];
- 
--	devices[0] = &(od->pdev);
-+	devices[0] = pdev;
- 	early_platform_add_devices(devices, 1);
+ 	gpio_bank_count++;
  	return 0;
- }
-@@ -634,13 +634,13 @@ static struct dev_pm_domain omap_device_pm_domain = {
-  * platform_device_register() on the underlying platform_device.
-  * Returns the return value of platform_device_register().
-  */
--static int omap_device_register(struct omap_device *od)
-+static int omap_device_register(struct platform_device *pdev)
- {
--	pr_debug("omap_device: %s: registering\n", od->pdev.name);
-+	pr_debug("omap_device: %s: registering\n", pdev->name);
+diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
+index 53b6808..3d1c1d3 100644
+--- a/arch/arm/mach-omap2/serial.c
++++ b/arch/arm/mach-omap2/serial.c
+@@ -805,7 +805,7 @@ void __init omap_serial_init_port(struct omap_board_data *bdata)
+ 	WARN(IS_ERR(pdev), "Could not build omap_device for %s: %s.\n",
+ 	     name, oh->name);
  
--	od->pdev.dev.parent = &omap_device_parent;
--	od->pdev.dev.pm_domain = &omap_device_pm_domain;
--	return platform_device_register(&od->pdev);
-+	pdev->dev.parent = &omap_device_parent;
-+	pdev->dev.pm_domain = &omap_device_pm_domain;
-+	return platform_device_register(pdev);
- }
+-	omap_device_disable_idle_on_suspend(od);
++	omap_device_disable_idle_on_suspend(pdev);
+ 	oh->mux = omap_hwmod_mux_init(bdata->pads, bdata->pads_cnt);
  
+ 	uart->irq = oh->mpu_irqs[0].irq;
+diff --git a/arch/arm/plat-omap/include/plat/omap_device.h b/arch/arm/plat-omap/include/plat/omap_device.h
+index 750f401..4f98770 100644
+--- a/arch/arm/plat-omap/include/plat/omap_device.h
++++ b/arch/arm/plat-omap/include/plat/omap_device.h
+@@ -116,11 +116,6 @@ int omap_device_enable_hwmods(struct omap_device *od);
+ int omap_device_disable_clocks(struct omap_device *od);
+ int omap_device_enable_clocks(struct omap_device *od);
  
+-static inline void omap_device_disable_idle_on_suspend(struct omap_device *od)
+-{
+-	od->flags |= OMAP_DEVICE_NO_IDLE_ON_SUSPEND;
+-}
+-
+ /*
+  * Entries should be kept in latency order ascending
+  *
+@@ -153,4 +148,12 @@ struct omap_device_pm_latency {
+ /* Get omap_device pointer from platform_device pointer */
+ #define to_omap_device(x) container_of((x), struct omap_device, pdev)
+ 
++static inline
++void omap_device_disable_idle_on_suspend(struct platform_device *pdev)
++{
++	struct omap_device *od = to_omap_device(pdev);
++
++	od->flags |= OMAP_DEVICE_NO_IDLE_ON_SUSPEND;
++}
++
+ #endif
 -- 
 1.7.6
