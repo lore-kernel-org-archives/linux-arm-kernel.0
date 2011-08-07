@@ -1,62 +1,36 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Sat, 6 Aug 2011 18:45:19 +0100
-Subject: [PATCH 2/2] arm/tegra: Delete irq_to_gpio
-In-Reply-To: <1312582534-10871-2-git-send-email-swarren@nvidia.com>
-References: <1312582534-10871-1-git-send-email-swarren@nvidia.com>
-	<1312582534-10871-2-git-send-email-swarren@nvidia.com>
-Message-ID: <20110806174519.GB31966@ponder.secretlab.ca>
+From: davidb@codeaurora.org (David Brown)
+Date: Sat, 6 Aug 2011 21:11:24 -0700
+Subject: experience with the new arm-soc workflow (Was: Re:
+	[Ksummit-2011-discuss] ARM Maintainers workshop at Kernel Summit) 2011
+In-Reply-To: <CAHXqBF+BAdNo3NB9gk0o_aTHUxyQRHw_AvM5ok9zn2yk4NsRZw@mail.gmail.com>
+References: <CACxGe6u3jrhnmL=QwCevm5ybgtGqdOzmGZpfve02M12e9v6pNQ@mail.gmail.com>
+	<CAOesGMhgd9Grs7JErJ1pTY4fD_taX_YSpeKx_QS21dp2UN=vMQ@mail.gmail.com>
+	<20110806212932.GT31521@pengutronix.de>
+	<alpine.LFD.2.00.1108061742490.20358@xanadu.home>
+	<CAHXqBF+BAdNo3NB9gk0o_aTHUxyQRHw_AvM5ok9zn2yk4NsRZw@mail.gmail.com>
+Message-ID: <20110807041124.GA6410@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 05, 2011 at 04:15:34PM -0600, Stephen Warren wrote:
-> irq_to_gpio is deprecated and in the process of being removed. Make that
-> happen now for ARM Tegra.
-> 
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+On Sun, Aug 07, 2011 at 12:13:48AM +0200, Micha? Miros?aw wrote:
 
-Applied both.  Thanks.
+> I, as another contributor, share Uwe's point of view. The problem with
+> cleanups vs features is that either usually depends on the other.
+> Fixes are a different beasts and they usually go in asynchronously
+> (and quicker) to development changes. The split fixes/development
+> works well in networking area (net and net-next trees).
 
-g.
+Maybe we are thinking about two different kinds of cleanups.  Cleanups
+that would be closely associated with a new feature do make sense to
+me to keep together.  This is the kind of thing where code is cleaned
+up in order to make it easier/cleaner to add the new code.  I don't
+think this makes sense to have in another branch.
 
-> ---
-> I assume this will go into one of arm-soc.git's branches, but it depends
-> on the previous patch in this series to compile. Arnd, I see you already
-> have Grant's gpio/next tree in your repo as depends/gpio, so I assume
-> you'll just pick up and merge the latest version of Grant's tree before
-> applying this patch?
-> 
-> Both patches compiled with a number of Tegra boards enable and tested on
-> Harmony. All without Device Tree support.
-> 
->  arch/arm/mach-tegra/include/mach/gpio.h |    8 --------
->  1 files changed, 0 insertions(+), 8 deletions(-)
-> 
-> diff --git a/arch/arm/mach-tegra/include/mach/gpio.h b/arch/arm/mach-tegra/include/mach/gpio.h
-> index 196f114..b357808 100644
-> --- a/arch/arm/mach-tegra/include/mach/gpio.h
-> +++ b/arch/arm/mach-tegra/include/mach/gpio.h
-> @@ -32,7 +32,6 @@
->  #define gpio_cansleep		__gpio_cansleep
->  
->  #define TEGRA_GPIO_TO_IRQ(gpio) (INT_GPIO_BASE + (gpio))
-> -#define TEGRA_IRQ_TO_GPIO(irq) ((irq) - INT_GPIO_BASE)
->  
->  static inline int gpio_to_irq(unsigned int gpio)
->  {
-> @@ -41,13 +40,6 @@ static inline int gpio_to_irq(unsigned int gpio)
->  	return -EINVAL;
->  }
->  
-> -static inline int irq_to_gpio(unsigned int irq)
-> -{
-> -	if ((irq >= INT_GPIO_BASE) && (irq < INT_GPIO_BASE + INT_GPIO_NR))
-> -		return irq - INT_GPIO_BASE;
-> -	return -EINVAL;
-> -}
-> -
->  struct tegra_gpio_table {
->  	int	gpio;	/* GPIO number */
->  	bool	enable;	/* Enable for GPIO at init? */
-> -- 
-> 1.7.0.4
-> 
+But, there is also a lot of code going on now that is just cleaning
+things up, and it makes sense for this to be in a separate branch.
+
+David
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
