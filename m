@@ -1,34 +1,30 @@
-From: marvin24@gmx.de (Marc Dietrich)
-Date: Sun,  7 Aug 2011 21:00:55 +0200
-Subject: [PATCH 5/5] ARM: tegra: paz00: reorder the SDHCI channel init
-In-Reply-To: <cover.1312735430.git.marvin24@gmx.de>
-References: <cover.1312735430.git.marvin24@gmx.de>
-Message-ID: <661bd93853be4f54ec0aadde114b31c524cc22f4.1312742856.git.marvin24@gmx.de>
+From: kristoffer.ericson@gmail.com (Kristoffer Ericson)
+Date: Sun, 7 Aug 2011 22:05:00 +0200
+Subject: [PATCH 3.1 0/4] ARM: simpad: Add support for GPIO attached
+	hardware
+In-Reply-To: <4E392585.2070007@scram.de>
+References: <1310453186-22518-1-git-send-email-jochen@scram.de>
+	<CAK5ve-+mT4EOU0p6=A-XSg24u43Y2+nJuCqVBB6CT5Bdi0TjAQ@mail.gmail.com>
+	<4E392585.2070007@scram.de>
+Message-ID: <20110807200500.GC2588@Boggieman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This reorders the SDHCI channel init order. With this patch, the
-internal emmc gets the mmcblk0 device while the external sdmmc port
-gets mmcblk1. This change is only for convenience.
+n Wed, Aug 03, 2011 at 12:40:05PM +0200, Jochen Friedrich wrote:
+> Hi Bryan,
+> 
+> >Is there any news about this patchset? Merged already? I'm going to
+> >post an updated Led patchset based on this.
+> 
+> Not yet. I'm currently waiting for the end of the merge window prior
+> to submitting this patch against 3.1-rc1 again.
 
-Signed-off-by: Marc Dietrich <marvin24@gmx.de>
----
- arch/arm/mach-tegra/board-paz00.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+You still havent gotten any reply about those patches? I know Ive been
+occupied lately but I could give them a look/apply if that helps.
 
-diff --git a/arch/arm/mach-tegra/board-paz00.c b/arch/arm/mach-tegra/board-paz00.c
-index 8a2d1ce..bcfcacc 100644
---- a/arch/arm/mach-tegra/board-paz00.c
-+++ b/arch/arm/mach-tegra/board-paz00.c
-@@ -114,8 +114,8 @@ static struct platform_device leds_gpio = {
- 
- static struct platform_device *paz00_devices[] __initdata = {
- 	&debug_uart,
--	&tegra_sdhci_device1,
- 	&tegra_sdhci_device4,
-+	&tegra_sdhci_device1,
- 	&wifi_rfkill_device,
- 	&leds_gpio,
- };
--- 
-1.7.4.1
+Best wishes
+Kristoffer
+
+> 
+> Thanks,
+> Jochen
