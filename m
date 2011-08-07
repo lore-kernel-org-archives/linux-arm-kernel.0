@@ -1,178 +1,45 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Sat, 6 Aug 2011 22:09:33 -0600
-Subject: [PATCH] dmaengine: at_hdmac: add device tree probe
-In-Reply-To: <1312549120-22266-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1312549120-22266-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <20110807040932.GF7667@ponder.secretlab.ca>
+Date: Sat, 6 Aug 2011 22:13:30 -0600
+Subject: Shouldn't DT preserve pdev name and id to allow platform_match
+	to work?
+In-Reply-To: <4E3BE294.2020404@ti.com>
+References: <4E396361.3060307@ti.com>
+	<CACxGe6vg5NTyiDZqqztjtFEfb7si+-=Y7nEy1Y+YMgA5PVXScw@mail.gmail.com>
+	<CAGsJ_4x7LWRGWXsWzMG1FxZPaFYiKSUpSac2PdwH=d6vqFWRfw@mail.gmail.com>
+	<4E3BE294.2020404@ti.com>
+Message-ID: <20110807041330.GG7667@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 05, 2011 at 01:58:40PM +0100, Nicolas Ferre wrote:
-> Add device tree probe support for atmel at_hdmac DMA driver.
-> Bindings are added to specify the number of channels that the implementation of
-> the controller actually has. They also allow to tell if the peripherals/DMA
-> transfer is supported by the IP.
+On Fri, Aug 05, 2011 at 02:31:16PM +0200, Cousson, Benoit wrote:
+> On 8/5/2011 12:02 PM, Barry Song wrote:
+> >>auxdata passes platform_data and overrides the device name when there
+> >>is no way easy way to make the driver work without it.  It handles the
+> >>the current implementation of clocks and regulators which aren't yet
+> >>populated from the device tree.  It will go away when clock&
+> >>regulator bindings are implemented.
+> >Yes. As OF_DEV_AUXDATA_ID still requires hardware information like
+> >0x48000100 as below, it seems it is not
+> >consistent with the origin purpose of ARM DT.
+> >OF_DEV_AUXDATA_ID("ti,omap-i2c", 0x48000100, "omap-i2c.1", 1,&i2c_pdata)
+> >And the information 0x48000100 is something that doesn't want to be in
+> >kernel codes.it should be only in dts.
 > 
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> ---
->  .../devicetree/bindings/dma/atmel-hdmac.txt        |   23 +++++++++
->  drivers/dma/at_hdmac.c                             |   51 ++++++++++++++++----
->  2 files changed, 65 insertions(+), 9 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/dma/atmel-hdmac.txt
+> FWIW, I do not care about the physical address at all. This is just
+> used by the of_dev_lookup function to get the proper instance for a
+> device compatible type.
+> That's the only way for the OF_DEV_AUXDATA to work, but in theory
+> you could do the same as soon as you provide the id. So
+> OF_DEV_AUXDATA_ID could avoid it.
 > 
-> diff --git a/Documentation/devicetree/bindings/dma/atmel-hdmac.txt b/Documentation/devicetree/bindings/dma/atmel-hdmac.txt
-> new file mode 100644
-> index 0000000..0e48553
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/dma/atmel-hdmac.txt
-> @@ -0,0 +1,23 @@
-> +* Atmel Direct Memory Access Controller
-> +
-> +Required properties:
-> +- compatible: Should be "atmel,<chip>-hdmac"
-> +- reg: Should contain DMA registers location and length
-> +- interrupts: Should contain DMA interrupt
-> +- atmel,hdmac-nr-channels: Should contain number of channels
-> +  available in the controller
-> +
-> +Optional properties:
-> +- atmel,hdmac-cap-memcpy: Chip can do memory to memory transfers
-> +- atmel,hdmac-cap-slave: Chip can do peripherals/memory transfers
+> Since OF_DEV_AUXDATA_ID seems to be already dead before it even
+> reaches the mainline, let's forget about that.
 
-Heh, ignore my comments on the other patch about missing documentation
-for the dma engine.  :-)
+Actually, I'm planning to merge OF_DEV_AUXDATA_ID().  I was hoping to
+avoid it but there was enough hard-to-solve-quickly problems that I've
+relented.
 
-Otherwise the patch looks pretty good.  I suspect there is a thing or
-two that won't compile correctly when !CONFIG_OF, but I haven't
-checked closely.  Just make sure !CONFIG_OF is tested.  :-)
+Adding the match table is not hard-to-solve though, so I'm not
+relenting on that point.  :-)
 
 g.
-
-
-> +
-> +Examples:
-> +
-> +dma at ffffec00 {
-> +	compatible = "atmel,at91sam9g45-hdmac";
-> +	reg = <0xffffec00 0x200>;
-> +	interrupts = <21>;
-> +	atmel,hdmac-nr-channels = <8>;
-> +	atmel,hdmac-cap-memcpy;
-> +	atmel,hdmac-cap-slave;
-> +};
-> diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
-> index 8f1d2ee..4a0cefe 100644
-> --- a/drivers/dma/at_hdmac.c
-> +++ b/drivers/dma/at_hdmac.c
-> @@ -23,6 +23,8 @@
->  #include <linux/module.h>
->  #include <linux/platform_device.h>
->  #include <linux/slab.h>
-> +#include <linux/of.h>
-> +#include <linux/of_device.h>
->  
->  #include "at_hdmac_regs.h"
->  
-> @@ -1167,6 +1169,18 @@ static void atc_free_chan_resources(struct dma_chan *chan)
->  
->  /*--  Module Management  -----------------------------------------------*/
->  
-> +#if defined(CONFIG_OF)
-> +static const struct of_device_id atmel_dma_dt_ids[] = {
-> +	{ .compatible = "atmel,at91sam9rl-hdmac" },
-> +	{ .compatible = "atmel,at91sam9g45-hdmac" },
-> +	{ /* sentinel */ }
-> +};
-> +
-> +MODULE_DEVICE_TABLE(of, atmel_dma_dt_ids);
-> +#else
-> +#define atmel_dma_dt_ids NULL
-> +#endif
-> +
->  /**
->   * at_dma_off - disable DMA controller
->   * @atdma: the Atmel HDAMC device
-> @@ -1185,17 +1199,36 @@ static void at_dma_off(struct at_dma *atdma)
->  
->  static int __init at_dma_probe(struct platform_device *pdev)
->  {
-> -	struct at_dma_platform_data *pdata;
-> +	const struct of_device_id *of_id =
-> +			of_match_device(atmel_dma_dt_ids, &pdev->dev);
-> +	struct device_node	*np = pdev->dev.of_node;
-> +	struct at_dma_platform_data *pdata = pdev->dev.platform_data;
->  	struct resource		*io;
->  	struct at_dma		*atdma;
->  	size_t			size;
->  	int			irq;
->  	int			err;
->  	int			i;
-> +	u32			nr_channels;
-> +	dma_cap_mask_t		cap_mask = {};
-> +
-> +	/* get DMA Controller parameters */
-> +	if (of_id) {
-> +		if (of_property_read_u32(np, "atmel,hdmac-nr-channels",
-> +					&nr_channels))
-> +			return -EINVAL;
-> +		if (of_find_property(np, "atmel,hdmac-cap-memcpy", NULL))
-> +			dma_cap_set(DMA_MEMCPY, cap_mask);
-> +		if (of_find_property(np, "atmel,hdmac-cap-slave", NULL))
-> +			dma_cap_set(DMA_SLAVE, cap_mask);
-> +	} else if (pdata) {
-> +		nr_channels = pdata->nr_channels;
-> +		cap_mask = pdata->cap_mask;
-> +	} else {
-> +		return -EINVAL;
-> +	}
->  
-> -	/* get DMA Controller parameters from platform */
-> -	pdata = pdev->dev.platform_data;
-> -	if (!pdata || pdata->nr_channels > AT_DMA_MAX_NR_CHANNELS)
-> +	if (!nr_channels || nr_channels > AT_DMA_MAX_NR_CHANNELS)
->  		return -EINVAL;
->  
->  	io = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> @@ -1207,14 +1240,13 @@ static int __init at_dma_probe(struct platform_device *pdev)
->  		return irq;
->  
->  	size = sizeof(struct at_dma);
-> -	size += pdata->nr_channels * sizeof(struct at_dma_chan);
-> +	size += nr_channels * sizeof(struct at_dma_chan);
->  	atdma = kzalloc(size, GFP_KERNEL);
->  	if (!atdma)
->  		return -ENOMEM;
->  
-> -	/* discover transaction capabilites from the platform data */
-> -	atdma->dma_common.cap_mask = pdata->cap_mask;
-> -	atdma->all_chan_mask = (1 << pdata->nr_channels) - 1;
-> +	atdma->dma_common.cap_mask = cap_mask;
-> +	atdma->all_chan_mask = (1 << nr_channels) - 1;
->  
->  	size = io->end - io->start + 1;
->  	if (!request_mem_region(io->start, size, pdev->dev.driver->name)) {
-> @@ -1260,7 +1292,7 @@ static int __init at_dma_probe(struct platform_device *pdev)
->  
->  	/* initialize channels related values */
->  	INIT_LIST_HEAD(&atdma->dma_common.channels);
-> -	for (i = 0; i < pdata->nr_channels; i++, atdma->dma_common.chancnt++) {
-> +	for (i = 0; i < nr_channels; i++, atdma->dma_common.chancnt++) {
->  		struct at_dma_chan	*atchan = &atdma->chan[i];
->  
->  		atchan->chan_common.device = &atdma->dma_common;
-> @@ -1406,6 +1438,7 @@ static struct platform_driver at_dma_driver = {
->  	.driver = {
->  		.name	= "at_hdmac",
->  		.pm	= &at_dma_dev_pm_ops,
-> +		.of_match_table	= atmel_dma_dt_ids,
->  	},
->  };
->  
-> -- 
-> 1.7.4.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
