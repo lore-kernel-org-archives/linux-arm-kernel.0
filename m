@@ -1,36 +1,101 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Sat, 6 Aug 2011 21:11:24 -0700
-Subject: experience with the new arm-soc workflow (Was: Re:
-	[Ksummit-2011-discuss] ARM Maintainers workshop at Kernel Summit) 2011
-In-Reply-To: <CAHXqBF+BAdNo3NB9gk0o_aTHUxyQRHw_AvM5ok9zn2yk4NsRZw@mail.gmail.com>
-References: <CACxGe6u3jrhnmL=QwCevm5ybgtGqdOzmGZpfve02M12e9v6pNQ@mail.gmail.com>
-	<CAOesGMhgd9Grs7JErJ1pTY4fD_taX_YSpeKx_QS21dp2UN=vMQ@mail.gmail.com>
-	<20110806212932.GT31521@pengutronix.de>
-	<alpine.LFD.2.00.1108061742490.20358@xanadu.home>
-	<CAHXqBF+BAdNo3NB9gk0o_aTHUxyQRHw_AvM5ok9zn2yk4NsRZw@mail.gmail.com>
-Message-ID: <20110807041124.GA6410@huya.qualcomm.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Sat, 6 Aug 2011 21:44:33 -0600
+Subject: [RFC PATCH 1/2] AT91: dt: at91sam9g45 family and board device
+	tree files
+In-Reply-To: <56092075210001f40db485e0b126fe7c0c7b75ac.1312560476.git.nicolas.ferre@atmel.com>
+References: <1312561493-7849-1-git-send-email-nicolas.ferre@atmel.com>
+	<56092075210001f40db485e0b126fe7c0c7b75ac.1312560476.git.nicolas.ferre@atmel.com>
+Message-ID: <20110807034433.GB7667@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 07, 2011 at 12:13:48AM +0200, Micha? Miros?aw wrote:
+On Fri, Aug 05, 2011 at 05:24:52PM +0100, Nicolas Ferre wrote:
+> Create a new device tree source file for Atmel at91sam9g45 SoC family.
+> The Evaluation Kit at91sam9m10g45ek includes it.
+> This first basic support will be populated as drivers and boards will be
+> converted to device tree.
+> 
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> ---
+>  arch/arm/boot/dts/at91sam9g45.dtsi     |   27 +++++++++++++++++++++++++++
+>  arch/arm/boot/dts/at91sam9m10g45ek.dts |   15 +++++++++++++++
+>  2 files changed, 42 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/at91sam9g45.dtsi
+>  create mode 100644 arch/arm/boot/dts/at91sam9m10g45ek.dts
+> 
+> diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
+> new file mode 100644
+> index 0000000..3d85f96
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/at91sam9g45.dtsi
+> @@ -0,0 +1,27 @@
+> +/include/ "skeleton.dtsi"
+> +
+> +/ {
+> +	model = "Atmel AT91SAM9G45 family SoC";
+> +	compatible = "atmel,at91sam9g45", "atmel,at91sam9m10", "atmel,at91sam9g46", "atmel,at91sam9m11";
 
-> I, as another contributor, share Uwe's point of view. The problem with
-> cleanups vs features is that either usually depends on the other.
-> Fixes are a different beasts and they usually go in asynchronously
-> (and quicker) to development changes. The split fixes/development
-> works well in networking area (net and net-next trees).
+You'll need documentation for these new compatible values in
+Documentation/devicetree/bindings.
 
-Maybe we are thinking about two different kinds of cleanups.  Cleanups
-that would be closely associated with a new feature do make sense to
-me to keep together.  This is the kind of thing where code is cleaned
-up in order to make it easier/cleaner to add the new code.  I don't
-think this makes sense to have in another branch.
+> +	interrupt-parent = <&aic>;
+> +
+> +	memory {
+> +		reg = <0x70000000 0x10000000>;
+> +	};
+> +
+> +	aic: interrupt-controller at fffff000 {
+> +		#interrupt-cells = <1>;
+> +		compatible = "atmel,aic";
 
-But, there is also a lot of code going on now that is just cleaning
-things up, and it makes sense for this to be in a separate branch.
+'atmel,aic' is pretty generic and it assumes that the interrupt
+controller doesn't change between SoC versions.  Either specify the
+SoC name in the compatible property, or if it is well documented, the
+name + version of the IP block.
 
-David
+> +		interrupt-controller;
+> +		reg = <0xfffff000 0x200>;
+> +	};
+> +
+> +	dma at ffffec00 {
+> +		compatible = "atmel,at91sam9g45-hdmac";
+> +		reg = <0xffffec00 0x200>;
+> +		interrupts = <21>;
+> +		atmel,hdmac-nr-channels = <8>;
+> +		atmel,hdmac-cap-memcpy;
+> +		atmel,hdmac-cap-slave;
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+You can probably drop the "hdmac-" bit here, but that's just
+nitpicking.  Regardless, make sure you document the properties.
+
+> +	};
+> +};
+> diff --git a/arch/arm/boot/dts/at91sam9m10g45ek.dts b/arch/arm/boot/dts/at91sam9m10g45ek.dts
+> new file mode 100644
+> index 0000000..48252c9
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/at91sam9m10g45ek.dts
+> @@ -0,0 +1,15 @@
+> +/dts-v1/;
+> +/include/ "at91sam9g45.dtsi"
+> +
+> +/ {
+> +	model = "Atmel AT91SAM9M10G45-EK";
+> +	compatible = "atmel,at91sam9m10g45ek", "atmel,at91sam9g45ekes", "atmel,at91sam9m10ekes", "atmel,at91sam9g45", "atmel,at91sam9m10", "atmel,at91sam9g46", "atmel,at91sam9m11", "atmel,at91";
+
+This list has gotten rather long.  What do all these values mean?
+Also, "atmel,at91" looks rather too generic and is probably not the
+right thing to do.
+
+> +
+> +	chosen {
+> +		bootargs = "mem=64M console=ttyS0,115200 mtdparts=atmel_nand:4M(bootstrap/uboot/kernel)ro,60M(rootfs),-(data) root=/dev/mtdblock1 rw rootfstype=jffs2";
+> +	};
+> +
+> +	memory {
+> +		reg = <0x70000000 0x4000000>;
+> +	};
+> +};
+> -- 
+> 1.7.4.1
+> 
