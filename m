@@ -1,44 +1,51 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Sun, 7 Aug 2011 13:15:33 +0200
-Subject: [PATCH 1/2] arm/mx5: parse iomuxc pad configuratoin from device
-	tree
-In-Reply-To: <CAKGA1bmbWUeyhUtDwHZjB8V4e2wJ0NHX2qWhqaqx6HoBm7uMnQ@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 7 Aug 2011 17:23:49 +0100
+Subject: [PATCH 1/2] arm/mx5: parse iomuxc pad configuratoin from
+	device tree
+In-Reply-To: <CAKGA1bkM6X533w20hDV7GCPwzzj2nrjGdN6zkXsS+hCvUD_s2A@mail.gmail.com>
 References: <1311606467-28985-1-git-send-email-shawn.guo@linaro.org>
 	<1311606467-28985-2-git-send-email-shawn.guo@linaro.org>
 	<20110725204630.GD26735@ponder.secretlab.ca>
 	<CAKGA1bmbWUeyhUtDwHZjB8V4e2wJ0NHX2qWhqaqx6HoBm7uMnQ@mail.gmail.com>
-Message-ID: <20110807111533.GK31404@pengutronix.de>
+	<20110805070729.GA26563@huya.qualcomm.com>
+	<CAKGA1bkM6X533w20hDV7GCPwzzj2nrjGdN6zkXsS+hCvUD_s2A@mail.gmail.com>
+Message-ID: <20110807162348.GA2101@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 04, 2011 at 06:07:15PM -0500, Matt Sealey wrote:
+On Fri, Aug 05, 2011 at 01:36:56PM -0500, Matt Sealey wrote:
+> On Fri, Aug 5, 2011 at 2:07 AM, David Brown <davidb@codeaurora.org> wrote:
+> > On Thu, Aug 04, 2011 at 06:07:15PM -0500, Matt Sealey wrote:
+> >> Hi Grant, Shawn,
+> >>
+> >> On Mon, Jul 25, 2011 at 3:46 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
+> >> > This could get really verbose in a really big hurry. ?Fortunately the
+> >> > dtb format is sophisticated enough to only store each unique property
+> >> > name once, so the data shouldn't be huge, but it is still going to
+> >> > make for huge source files. ?Can you think of a more concise
+> >> > representation?
+> >>
+> >> Yes: no representation at all. The correct place for IOMUX setup being
+> >> done is *inside the boot firmware as soon as physically possible* and
+> >> not seconds into boot after U-Boot has made a console, done a boot
+> >> timeout, loaded scripts, kernels and ramdisks from media and then
+> >> uncompressed and entered a Linux kernel.
+> >
+> > This is true in situations where we have control over the bootloader,
+> > but that isn't always the case.
 > 
-> If you think the solution is not so great due to the complexity of
-> describing the IOMUX settings, including the pad definitions as binary
-> blobs or so such that Linux can read them out, please feel free to
-> take the hint and go nag the U-Boot developers at Linaro to go put
-> this in the right place - in U-Boot. The device tree is absolutely not
-> the place to define pin multiplexing settings for later parsing and
-> configuration by the Kernel. They should have been set up correctly
-> already, and they should not be being *changed* based on an arbitrary
-> configuration file. Consider that the i2c pin definitions you used in
-> your example *absolutely will not change* for the lifetime of the
-> board, and in most cases, will have been set up by U-Boot anyway.
-> There is no point telling Linux to copy in identical settings again.
-> What's missing from U-Boot and set up by Linux, should be moved out of
-> Linux back into U-Boot.
+> Indeed it is not, but then it is "their" fault the board won't boot
+> Linux, and not yours, right? :)
 
-System on module vendors have quite a different point of view here.
-On these systems the functionality of a pin differs depending on the
-baseboard they are attached to. Still you want to be able to use the
-same bootloader for all usecases. Putting the pinmux into the bootloader
-would mean that each user of these systems has to flash and maintain
-a custom bootloader.
+Not normally.  What happens is that you're provided with the boot loader.
+You're told to get Linux working on the board.  Anything which the boot
+loader doesn't do ends up being hacked around in the kernel.
 
-Sascha
+Don't say that isn't what happens, because that comment is made with a
+substantial body experience in dealing with patches from multiple
+different sources containing crap to work around boot loader bugs.  Most
+boot loader bugs go _unfixed_ on hardware even after being reported.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+So please, don't tell us that boot loaders should do things right.  We
+know, and we know (again from a vast body of experience) that relying on
+boot loaders is plain idiotic and totally unworkable.
