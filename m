@@ -1,101 +1,133 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Sat, 6 Aug 2011 21:44:33 -0600
-Subject: [RFC PATCH 1/2] AT91: dt: at91sam9g45 family and board device
-	tree files
-In-Reply-To: <56092075210001f40db485e0b126fe7c0c7b75ac.1312560476.git.nicolas.ferre@atmel.com>
-References: <1312561493-7849-1-git-send-email-nicolas.ferre@atmel.com>
-	<56092075210001f40db485e0b126fe7c0c7b75ac.1312560476.git.nicolas.ferre@atmel.com>
-Message-ID: <20110807034433.GB7667@ponder.secretlab.ca>
+Date: Sat, 6 Aug 2011 21:57:51 -0600
+Subject: [RFC PATCH 2/2] AT91: dt: simple device tree support for
+	at91sam9g45 family
+In-Reply-To: <bdd7c02a561bc0655e9dfd4586f42774f2347ca1.1312560476.git.nicolas.ferre@atmel.com>
+References: <56092075210001f40db485e0b126fe7c0c7b75ac.1312560476.git.nicolas.ferre@atmel.com>
+	<bdd7c02a561bc0655e9dfd4586f42774f2347ca1.1312560476.git.nicolas.ferre@atmel.com>
+Message-ID: <20110807035751.GC7667@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 05, 2011 at 05:24:52PM +0100, Nicolas Ferre wrote:
-> Create a new device tree source file for Atmel at91sam9g45 SoC family.
-> The Evaluation Kit at91sam9m10g45ek includes it.
-> This first basic support will be populated as drivers and boards will be
-> converted to device tree.
+On Fri, Aug 05, 2011 at 05:24:53PM +0100, Nicolas Ferre wrote:
+> Add basic device tree support for at91sam9g45 SoC family and the
+> at91sam9m10g45ek board.
+> DT is been used to describe the at91sam9g45 SoC memory and AIC. It also
+> adds the dmaengine driver.
 > 
 > Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+Hi Nicolas,
+
+Looks like a great start.  I was glad we could work on this last week.
+Some comments below.
+
 > ---
->  arch/arm/boot/dts/at91sam9g45.dtsi     |   27 +++++++++++++++++++++++++++
->  arch/arm/boot/dts/at91sam9m10g45ek.dts |   15 +++++++++++++++
->  2 files changed, 42 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/boot/dts/at91sam9g45.dtsi
->  create mode 100644 arch/arm/boot/dts/at91sam9m10g45ek.dts
+>  arch/arm/mach-at91/Kconfig               |    8 ++++++
+>  arch/arm/mach-at91/Makefile.boot         |    2 +
+>  arch/arm/mach-at91/at91sam9g45_devices.c |    3 +-
+>  arch/arm/mach-at91/board-sam9m10g45ek.c  |   36 ++++++++++++++++++++++++++++++
+>  4 files changed, 48 insertions(+), 1 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
-> new file mode 100644
-> index 0000000..3d85f96
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/at91sam9g45.dtsi
-> @@ -0,0 +1,27 @@
-> +/include/ "skeleton.dtsi"
+> diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+> index 2248467..973c725 100644
+> --- a/arch/arm/mach-at91/Kconfig
+> +++ b/arch/arm/mach-at91/Kconfig
+> @@ -407,6 +407,14 @@ config MACH_AT91SAM9M10G45EK
+>  	  "ES" at the end of the name means that this board is an
+>  	  Engineering Sample.
+>  
+> +config MACH_AT91SAM9M10G45EK_DT
+> +	bool "Atmel AT91SAM9M10G45-EK Evaluation Kits with device-tree support"
+> +	select USE_OF
+> +	select MACH_AT91SAM9M10G45EK
+> +	help
+> +	  Select this if you want to experiment device-tree with
+> +	  Atmel's AT91SAM9M10G45-EK Evaluation Kit.
 > +
-> +/ {
-> +	model = "Atmel AT91SAM9G45 family SoC";
-> +	compatible = "atmel,at91sam9g45", "atmel,at91sam9m10", "atmel,at91sam9g46", "atmel,at91sam9m11";
 
-You'll need documentation for these new compatible values in
-Documentation/devicetree/bindings.
+Now, while I push strongly for .dts files to avoid 'generic'
+specification, the actual board support code should try to be as
+generic as possible.  You may want to consider naming this
+"MACH_AT91_DT" here.  (more below)
 
-> +	interrupt-parent = <&aic>;
+>  endif
+>  
+>  # ----------------------------------------------------------
+> diff --git a/arch/arm/mach-at91/Makefile.boot b/arch/arm/mach-at91/Makefile.boot
+> index 3462b81..78d384f 100644
+> --- a/arch/arm/mach-at91/Makefile.boot
+> +++ b/arch/arm/mach-at91/Makefile.boot
+> @@ -16,3 +16,5 @@ else
+>  params_phys-y	:= 0x20000100
+>  initrd_phys-y	:= 0x20410000
+>  endif
 > +
-> +	memory {
-> +		reg = <0x70000000 0x10000000>;
-> +	};
+> +dtb-$(CONFIG_MACH_AT91SAM9M10G45EK_DT) += at91sam9m10g45ek.dtb
+> diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
+> index 600bffb..ff3b7fc 100644
+> --- a/arch/arm/mach-at91/at91sam9g45_devices.c
+> +++ b/arch/arm/mach-at91/at91sam9g45_devices.c
+> @@ -35,7 +35,8 @@
+>   *  HDMAC - AHB DMA Controller
+>   * -------------------------------------------------------------------- */
+>  
+> -#if defined(CONFIG_AT_HDMAC) || defined(CONFIG_AT_HDMAC_MODULE)
+> +#if (defined(CONFIG_AT_HDMAC) || defined(CONFIG_AT_HDMAC_MODULE)) \
+> +	&& !defined(CONFIG_OF)
+
+You'll need to rework this.  Turning on CONFIG_OF should not
+disable booting using the old method.
+
+>  static u64 hdmac_dmamask = DMA_BIT_MASK(32);
+>  
+>  static struct at_dma_platform_data atdma_pdata = {
+> diff --git a/arch/arm/mach-at91/board-sam9m10g45ek.c b/arch/arm/mach-at91/board-sam9m10g45ek.c
+> index ad234cc..99e8617 100644
+> --- a/arch/arm/mach-at91/board-sam9m10g45ek.c
+> +++ b/arch/arm/mach-at91/board-sam9m10g45ek.c
+> @@ -26,6 +26,10 @@
+>  #include <linux/clk.h>
+>  #include <linux/atmel-mci.h>
+>  
+> +#include <linux/irqdomain.h>
+> +#include <linux/of_irq.h>
+> +#include <linux/of_platform.h>
+
+device tree #includes are no different from other includes, You can
+mis them in with the rest of the linux/ #include statements.
+
 > +
-> +	aic: interrupt-controller at fffff000 {
-> +		#interrupt-cells = <1>;
-> +		compatible = "atmel,aic";
-
-'atmel,aic' is pretty generic and it assumes that the interrupt
-controller doesn't change between SoC versions.  Either specify the
-SoC name in the compatible property, or if it is well documented, the
-name + version of the IP block.
-
-> +		interrupt-controller;
-> +		reg = <0xfffff000 0x200>;
-> +	};
-> +
-> +	dma at ffffec00 {
-> +		compatible = "atmel,at91sam9g45-hdmac";
-> +		reg = <0xffffec00 0x200>;
-> +		interrupts = <21>;
-> +		atmel,hdmac-nr-channels = <8>;
-> +		atmel,hdmac-cap-memcpy;
-> +		atmel,hdmac-cap-slave;
-
-You can probably drop the "hdmac-" bit here, but that's just
-nitpicking.  Regardless, make sure you document the properties.
-
-> +	};
+>  #include <mach/hardware.h>
+>  #include <video/atmel_lcdc.h>
+>  
+> @@ -413,6 +417,38 @@ static void __init ek_board_init(void)
+>  	at91_pwm_leds(ek_pwm_led, ARRAY_SIZE(ek_pwm_led));
+>  }
+>  
+> +#if defined(CONFIG_OF)
+> +static const struct of_device_id aic_of_match[] __initconst = {
+> +	{ .compatible = "atmel,aic", },
+> +	{},
 > +};
-> diff --git a/arch/arm/boot/dts/at91sam9m10g45ek.dts b/arch/arm/boot/dts/at91sam9m10g45ek.dts
-> new file mode 100644
-> index 0000000..48252c9
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/at91sam9m10g45ek.dts
-> @@ -0,0 +1,15 @@
-> +/dts-v1/;
-> +/include/ "at91sam9g45.dtsi"
 > +
-> +/ {
-> +	model = "Atmel AT91SAM9M10G45-EK";
-> +	compatible = "atmel,at91sam9m10g45ek", "atmel,at91sam9g45ekes", "atmel,at91sam9m10ekes", "atmel,at91sam9g45", "atmel,at91sam9m10", "atmel,at91sam9g46", "atmel,at91sam9m11", "atmel,at91";
+> +static void __init at91sam9g45_dt_device_init(void)
+> +{
+> +	irq_domain_generate_simple(aic_of_match, 0xfffff000, 0);
+> +
+> +	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+> +
+> +	/* remaining initialization */
+> +	ek_board_init(void)
+> +}
 
-This list has gotten rather long.  What do all these values mean?
-Also, "atmel,at91" looks rather too generic and is probably not the
-right thing to do.
+Following from my comment earlier, this is fine for the proof of
+concept, but it isn't ready for mainline.  For mainline you'll need to
+get enough devices working with DT to boot the board without calling
+(ek_board_init()), and then add a new board file which only calls
+of_platform_populate().  To get started, you'll probably only need
+serial working.  Other driver can be fixed up one at a time until the
+DT support is at the same level as the old board files.  At that point
+the old method can be removed from the tree without any regressions.
 
-> +
-> +	chosen {
-> +		bootargs = "mem=64M console=ttyS0,115200 mtdparts=atmel_nand:4M(bootstrap/uboot/kernel)ro,60M(rootfs),-(data) root=/dev/mtdblock1 rw rootfstype=jffs2";
-> +	};
-> +
-> +	memory {
-> +		reg = <0x70000000 0x4000000>;
-> +	};
-> +};
-> -- 
-> 1.7.4.1
-> 
+g.
