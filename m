@@ -1,88 +1,40 @@
-From: omar.ramirez@ti.com (Ramirez Luna, Omar)
-Date: Mon, 8 Aug 2011 10:04:58 -0500
-Subject: [RFC] ARM: dma_map|unmap_sg plus iommu
-In-Reply-To: <000301cc4dc4$31b53630$951fa290$%szyprowski@samsung.com>
-References: <CAB-zwWjb+2ExjNDB3OtHmRmgaHMnO-VgEe9VZk_wU=ryrq_AGw@mail.gmail.com>
-	<000301cc4dc4$31b53630$951fa290$%szyprowski@samsung.com>
-Message-ID: <CAB-zwWhh=ZTvheTebKhz55rr1=WFD8R=+BWZ8mwYiO_25mjpYA@mail.gmail.com>
+From: n.voss@weinmann.de (Nikolaus Voss)
+Date: Mon, 8 Aug 2011 15:10:01 +0000 (UTC)
+Subject: [PATCH] =?utf-8?b?YXRtZWxfc2VyaWFsOg==?= fix
+	=?utf-8?b?YXRtZWxfZGVmYXVsdF9jb25zb2xlX2RldmljZQ==?=
+References: <1307541740.10626.15.camel@hcegtvedt.norway.atmel.com>
+	<1308666679-12111-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <loom.20110808T170457-559@post.gmane.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+reflect new static uart platform ids introduced by patch
+http://article.gmane.org/gmane.linux.kernel/1126105
 
-On Fri, Jul 29, 2011 at 2:50 AM, Marek Szyprowski
-<m.szyprowski@samsung.com> wrote:
->> 1. There is no way to keep track of what virtual address are being mapped
->> in the scatterlist, which we need to propagate to the dsp, in order that it
->> knows where does the buffers start and end on its virtual address space.
->> I ended up adding an iov_address to scatterlist which if accepted should be
->> toggled/affected by the selection of CONFIG_IOMMU_API.
->
-> Sorry, but your patch is completely wrong. You should not add any additional
-> entries to scatterlist.
+Signed-off-by: Nikolaus Voss <n.voss@weinmannn.de>
+ 
+---
+ drivers/tty/serial/atmel_serial.c |    7 ++++---
+ 1 files changed, 4 insertions(+), 3 deletions(-)
 
-At the time it was the easiest way for me to keep track of both
-virtual and physical addresses, without doing a page_to_phys every
-time on unmap. I understand that it might fall out of the scope of the
-scatterlist struct.
-
-> dma_addr IS the virtual address in the device's io
-> address space, so the dma_addr is a value that your device should put into
-> it's own registers to start dma transfer to provided memory pages.
-
-I also wanted to keep the same part as the original arm_dma_map_sg:
-
-s->dma_address = __dma_map_page...
-
-Where the dma_address was the "clean" (from cache) physical address.
-But if desired, I guess this value can be replaced for the iommu va.
-
->> 2. tidspbridge driver sometimes needs to map a physical address into a
->> fixed virtual address (i.e. the start of a firmware section is expected to
->> be at dsp va 0x20000000), there is no straight forward way to do this with
->> the dma api given that it only expects to receive a cpu_addr, a sg or a
->> page, by adding iov_address I could pass phys and iov addresses in a sg
->> and overcome this limitation, but, these addresses belong to:
->
-> We also encountered the problem of fixed firmware address. We addressed is by
-> setting io address space start to this address and letting device driver to
-> rely on the fact that the first call to dma_alloc() will match this address.
-
-Indeed, however in my case, I need sections at (I might have
-approximated the numbers to the real ones):
-
-0x11000000 for dsp shared memory
-0x11800000 for peripherals
-0x20000000 for dsp external code
-0x21000000 for mapped buffers
-
-The end of a section and start of the other usually have a gap, so the
-exact address needs to be specified by the firmware. So, this won't
-work with just letting the pool manager to provide the virtual
-address.
-
->> ? 2a. Shared memory between ARM and DSP: this memory is allocated through
->> ? ? ? memblock API which takes it out of kernel control to be later
->> ? ? ? ioremap'd and iommu map'd to the dsp (this because a non-cacheable
->> ? ? ? requirement), so, these physical addresses doesn't have a linear
->> ? ? ? virtual address translation, which is what dma api expects.
->
-> I hope that the issue with page cache attributes can be resolved if we always
-> allocate memory from CMA (see the latest CMAv12 patches:
-> http://www.spinics.net/lists/linux-media/msg35674.html )
-
-I'll take a look more closely and will be trying them if possible.
-
->> ? 2b. Bus addresses: of dsp peripherals which are also ioremap'd and
->> ? ? ? affected by the same thing.
->
-> Right now I have no idea how to handle ioremapped areas in dma-mapping
-> framework, but do we really need to support them?
-
-It would be good to know if this is expected to be handled by
-dma-mapping, otherwise it can be dealt by iommu api as Joerg pointed
-out.
-
-Thanks for your comments,
-
-Omar
+diff --git a/drivers/tty/serial/atmel_serial.c \
+	b/drivers/tty/serial/atmel_serial.c
+index af9b781..29c7857 100644
+--- a/drivers/tty/serial/atmel_serial.c
++++ b/drivers/tty/serial/atmel_serial.c
+@@ -1609,9 +1609,10 @@ static struct console atmel_console = {
+ static int __init atmel_console_init(void)
+ {
+ 	if (atmel_default_console_device) {
+-		add_preferred_console(ATMEL_DEVICENAME,
+-				      atmel_default_console_device->id, NULL);
+-		atmel_init_port(&atmel_ports[atmel_default_console_device->id],
++		struct atmel_uart_data *pdata =
++			atmel_default_console_device->dev.platform_data;
++		add_preferred_console(ATMEL_DEVICENAME, pdata->num, NULL);
++		atmel_init_port(&atmel_ports[pdata->num],
+ 				atmel_default_console_device);
+ 		register_console(&atmel_console);
+ 	}
+-- 
+1.7.4.1
