@@ -1,186 +1,187 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Mon, 08 Aug 2011 12:21:45 +0200
-Subject: RFC[PATCH 6/6] ARM: S5P64X0: Add clkdev bus lookup support
-In-Reply-To: <1312793277-18689-7-git-send-email-rajeshwari.s@samsung.com>
-References: <1312793277-18689-1-git-send-email-rajeshwari.s@samsung.com>
-	<1312793277-18689-7-git-send-email-rajeshwari.s@samsung.com>
-Message-ID: <4E3FB8B9.7050803@samsung.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Mon, 8 Aug 2011 18:37:41 +0800
+Subject: GPMI-NAND Status?
+In-Reply-To: <CAHMSPgMYP+5Hpa5sC-yt=1H-S=tEER8uNzj6uMSK403_DGYJ9Q@mail.gmail.com>
+References: <20110805135133.GA26981@pengutronix.de>	<4E3F8087.6070206@freescale.com>
+	<CAHMSPgMYP+5Hpa5sC-yt=1H-S=tEER8uNzj6uMSK403_DGYJ9Q@mail.gmail.com>
+Message-ID: <4E3FBC75.7010703@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi,
+> Hi Wolfram,
+>
+> Thanks for taking the initiative to summarize the current status.
+> Also thanks to Huang Shijie for all the work done so far.
+>
+>
+> On Mon, Aug 8, 2011 at 8:21 AM, Huang Shijie<b32955@freescale.com>  wrote:
+>> Hi Wolfram:
+>>> Hi,
+>>>
+>>> I am a bit uncertain how the state of the GPMI-NAND driver currently is,
+>>> so
+>>> I'll try to sum it up here. There is without doubt interest in getting the
+>>> driver into mainline from at least Huang, Shawn, Lothar, Koen and me, so I
+>>> wonder if we can join forces more effectively. First of all, I want to
+>>> thank
+>>> Huang Shijie for all his work so far which was already quite some effort;
+>>> this
+>>> sum-up is by no means meant as bashing, just trying to understand the
+>>> status
+>>> quo (Sidenote: I am more or less on holiday until Monday, so no time for
+>>> real
+>>> debugging myself. I write this mail so we hopefully gain a common
+>>> understanding. When I am back to full strength, I can then start working
+>>> on
+>>> what seems apropriate)
+>>>
+>>> Issues with the current driver I am aware of:
+>>>
+>>> DMA timeouts [1]
+>>> ================
+>>>
+>>> [    2.560000] [ start_dma_without_bch_irq : 392 ] DMA timeout, last DMA
+>>> :1
+>>> [    3.560000] [ start_dma_with_bch_irq : 427 ] bch timeout!!!
+>>>
+>>> Always reproducible by me when trying to format mtd0. Sometimes(always?)
+>>> seen
+>>> by Koen during boot (on read?). Never seen by Huang? It is currently
+>>> unclear if
+>> After I used a different .config, it never appears in my side.
+> flash_eraseall of mtd1 works for me.
+> ubi_format of mtd1 always gives the dma timeout
+> reading/writing of mtd0/1 always gives the dma timeout
+> I have seen dma timeout during boot if i try to enable ubi rootfs (so
+> that's the same issue as dma time during read/write).
+>
+> I don't use mtd0 for testing as this contains my uboot.
+>
+> I tested using Huang's .config and the Linaro git but still see
+> exactly the same issue.
+>
+strange.
+>>> the bug is in the GPMI driver, or in the MXS-DMA driver. Still, I'd say
+>>> the
+>>> issue is a show-stopper. We can't put a driver into mainline which leads
+>>> to the
+>>> above failure. The fact that there is _some_ configuration which works for
+>>> someone does not help, it doesn't work for Koen and me at least. We need
+> On my target, the mxs-dma is working for sdio until the gpmi-nand
+> gives a timeout. After that the dma for sdio is *not fully* working
+> anymore.
+>
+We need more log in following aspects:
+[1] apbh-dma registers
+[2] clk registers
+[3] gpmi registers
 
-On 08/08/2011 10:47 AM, Rajeshwari Shinde wrote:
-> Bus clock alias names created and added to clkdev which will be used
-> by HSMMC driver.
-> 
-> Signed-off-by: Rajeshwari Shinde <rajeshwari.s@samsung.com>
-> ---
->  .../include/mach/s5p64x0-common-sdhci.h            |    2 +
->  arch/arm/mach-s5p64x0/mach-smdk6440.c              |    5 ++
->  arch/arm/mach-s5p64x0/mach-smdk6450.c              |    5 ++
->  arch/arm/mach-s5p64x0/s5p64x0-common-sdhci.c       |    7 +++
->  arch/arm/plat-samsung/Makefile                     |    1 +
->  arch/arm/plat-samsung/clkdev-busalias.c            |   44 ++++++++++++++++++++
->  arch/arm/plat-samsung/include/plat/sdhci.h         |    8 ++++
->  7 files changed, 72 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/plat-samsung/clkdev-busalias.c
-> 
-> diff --git a/arch/arm/mach-s5p64x0/include/mach/s5p64x0-common-sdhci.h b/arch/arm/mach-s5p64x0/include/mach/s5p64x0-common-sdhci.h
-> index a3381f0..b81e6dd 100644
-> --- a/arch/arm/mach-s5p64x0/include/mach/s5p64x0-common-sdhci.h
-> +++ b/arch/arm/mach-s5p64x0/include/mach/s5p64x0-common-sdhci.h
-> @@ -10,6 +10,8 @@
->  
->  #include <plat/sdhci.h>
->  
-> +extern char *hsmmc_busclksrcs[4];
-> +
->  extern struct s3c_sdhci_platdata smdk64x0_hsmmc0_pdata;
->  extern struct s3c_sdhci_platdata smdk64x0_hsmmc1_pdata;
->  extern struct s3c_sdhci_platdata smdk64x0_hsmmc2_pdata;
-> diff --git a/arch/arm/mach-s5p64x0/mach-smdk6440.c b/arch/arm/mach-s5p64x0/mach-smdk6440.c
-> index 065977f..ad1b49d 100644
-> --- a/arch/arm/mach-s5p64x0/mach-smdk6440.c
-> +++ b/arch/arm/mach-s5p64x0/mach-smdk6440.c
-> @@ -177,6 +177,11 @@ static void __init smdk6440_machine_init(void)
->  	s3c_sdhci2_set_platdata(&smdk64x0_hsmmc2_pdata);
->  
->  	platform_add_devices(smdk6440_devices, ARRAY_SIZE(smdk6440_devices));
-> +
-> +	/* create alias for clocks required by SDHCI */
-> +	s3c_sdhci_add_busclk_alias(&s3c_device_hsmmc0, hsmmc_busclksrcs);
-> +	s3c_sdhci_add_busclk_alias(&s3c_device_hsmmc1, hsmmc_busclksrcs);
-> +	s3c_sdhci_add_busclk_alias(&s3c_device_hsmmc2, hsmmc_busclksrcs);
->  }
->  
->  MACHINE_START(SMDK6440, "SMDK6440")
-> diff --git a/arch/arm/mach-s5p64x0/mach-smdk6450.c b/arch/arm/mach-s5p64x0/mach-smdk6450.c
-> index 9e6fcef..f3f656e 100644
-> --- a/arch/arm/mach-s5p64x0/mach-smdk6450.c
-> +++ b/arch/arm/mach-s5p64x0/mach-smdk6450.c
-> @@ -196,6 +196,11 @@ static void __init smdk6450_machine_init(void)
->  	s3c_sdhci2_set_platdata(&smdk64x0_hsmmc2_pdata);
->  
->  	platform_add_devices(smdk6450_devices, ARRAY_SIZE(smdk6450_devices));
-> +
-> +	/* create alias for clocks required by SDHCI */
-> +	s3c_sdhci_add_busclk_alias(&s3c_device_hsmmc0, hsmmc_busclksrcs);
-> +	s3c_sdhci_add_busclk_alias(&s3c_device_hsmmc1, hsmmc_busclksrcs);
-> +	s3c_sdhci_add_busclk_alias(&s3c_device_hsmmc2, hsmmc_busclksrcs);
->  }
->  
->  MACHINE_START(SMDK6450, "SMDK6450")
-> diff --git a/arch/arm/mach-s5p64x0/s5p64x0-common-sdhci.c b/arch/arm/mach-s5p64x0/s5p64x0-common-sdhci.c
-> index 03d89f6..9721b2d 100644
-> --- a/arch/arm/mach-s5p64x0/s5p64x0-common-sdhci.c
-> +++ b/arch/arm/mach-s5p64x0/s5p64x0-common-sdhci.c
-> @@ -14,6 +14,13 @@
->  
->  #include <mach/s5p64x0-common-sdhci.h>
->  
-> +char *hsmmc_busclksrcs[4] = {
-> +	[0] = NULL,
-> +	[1] = NULL,
-> +	[2] = "sclk_mmc", /* mmc bus clock */
-> +	[3] = NULL,
-> +};
-> +
->  struct s3c_sdhci_platdata smdk64x0_hsmmc0_pdata __initdata = {
->  	.cd_type        = S3C_SDHCI_CD_NONE,
->  	.clk_type       = S3C_SDHCI_CLK_DIV_EXTERNAL,
-> diff --git a/arch/arm/plat-samsung/Makefile b/arch/arm/plat-samsung/Makefile
-> index 853764b..0aae4fa 100644
-> --- a/arch/arm/plat-samsung/Makefile
-> +++ b/arch/arm/plat-samsung/Makefile
-> @@ -31,6 +31,7 @@ obj-$(CONFIG_S3C_ADC)	+= adc.o
->  # devices
->  
->  obj-y				+= platformdata.o
-> +obj-y				+= clkdev-busalias.o
->  
->  obj-$(CONFIG_S3C_DEV_HSMMC)	+= dev-hsmmc.o
->  obj-$(CONFIG_S3C_DEV_HSMMC1)	+= dev-hsmmc1.o
-> diff --git a/arch/arm/plat-samsung/clkdev-busalias.c b/arch/arm/plat-samsung/clkdev-busalias.c
-> new file mode 100644
-> index 0000000..3e085a2
-> --- /dev/null
-> +++ b/arch/arm/plat-samsung/clkdev-busalias.c
-> @@ -0,0 +1,44 @@
-> +/* linux/arch/arm/plat-samsung/clkdev_busalias.c
-> + *
-> + * Copyright (c) 2011 Simtec Electronics
-> + *	http://www.samsung.com
+Please git-apply the patch in the attachment.
+It will print out more DMA information WHEN dma-timeout occur.
+>> Hi Koen, do you test my uImage?
+>> Does the timeout occur?
+> I was not able to test you uImage. It ended with a "Kernel panic - not
+> syncing: read error". See (off list) mail from last week.
+>
+ok.
+>>> reliable drivers in mainline, so the issue needs to be resolved,
+>>> regardless
+>>> where the bug resides.
+>> ok. I will debug it too.
+>>
+>>
+>> Please test the driver again when you back to office.
+>> Pay attention to your version of /arch/arm/configs/mxs_defconfig.
+>> Your mxs_defconfig may miss Shawn Guo's patches.
+>>
+>> thanks.
+>>
+>>
+>>> problem overwriting all-0xff data in NAND [2]
+>>> =============================================
+>>>
+>>> Although it occured only when writing JFFS2 images so far, this is a
+>>> generic
+>>> issue and needs to be fixed, right?
+>>>
+>> Artem said it should not change the driver, but the upper layer(jffs2).
+>>
+>> So I think i do not need to change the driver.
+>>> ecclayout needs to be used to show that OOB is fully in use [1]
+>>> ===============================================================
+>>>
+>>> Needed to make it work for JFFS2 and to pass the mtd-testsuite. A driver
+>>> only
+>>> working with UBIFS is surely not ready for mainline.
+>>>
+>> I programmed for mx6q in the recent days. I have no time to fix it. The mx6q
+>> can runs well now.
+>>
+>> So I will fix the issue in the following days.
+>>
+>>> Pecularities
+>>> ============
+>>>
+>>> There are a few issues which are odd. I don't know if some are mainly
+>>> intended
+>>> for debugging, yet they shouldn't be in a mainline driver. At least:
+>>>
+>>> * custom sysfs-entries
+>> My sysfs-entries is in the GPMI-NAND directory.
+>> Does be a mainline driver means I should not have any sysfs-entries?
+>> If it does, i can remove it.
+>>
+>>> * custom kernel command line parameters
+>> The kernel command line 'gpmi_nand' is to avoid the conflict with other
+>> modules such as
+>> SD.
+>>
+>> If it's be removed, I have to use different config to resolve the issue
+>> which is not better either. :(
+>>
+>>> * namespacing (some functions have no prefix, some have "mil_", some have
+>>> mx23)
+>>>    (I think 'mil' means 'mtd interface layer', but why is that needed?)
+>> The mil is used to make the gpmi_nand_data{} simple.
+>> Without it, the gpmi_nand_data{} will very big.
+>>
+>> The functions which have mx23 prefix are only used in mx23.
+>> The functions which have no prefix can used in both mx28 and mx23.
+>>
+>>> Complexity
+>>> ==========
+>>>
+>>> The driver is not easy to review. I wonder if it makes sense to use
+>>> incremental
+>>> patches for it? maybe making it a staging driver could be a solution for
+>>> that?
+>> Frankly speaking, the current driver is maybe the smallest version now.
+>>
+>> I even do not add the on-chip BBT feature now.
+>>> Huang, are you interested in accepting patches or do you prefer we just
+>>> point
+>>> at certain code and you then fix it? Starting with a simpler driver and
+>>> then
+>> Feel free to mail me the patch. it's welcome.
+>>
+>>
+>>> adding stuff might be another option if we can't chase all the bugs in the
+>>> current driver.
+>>>
+>>> That being said, I'd think fixing the DMA issue has prio #1 and maybe we
+>>> can
+>>> meet in IRC or something to work that out? Is there interest in that?
+>> What about gtalk?
+> Anything is good for me.
+> Could also be useful to make sure we test on the same HW as much as
+> possible and are using the same source tree.
+> HW I have:
+> - mx23evk rev C1
+> - mx23evk rev B2
+> - own target hw using mx23 lqfp-128 chip and different type of ddr and nand.
+>
+I have mx23evk rev C.
 
-Is this a correct copyright notice?
-
-> + *
-> + * Helper function to add clkdev bus clocks alias names.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> +*/
-> +
-> +#include <linux/clk.h>
-> +#include <linux/device.h>
-> +#include <linux/types.h>
-> +#include <linux/platform_device.h>
-> +
-> +#include <plat/sdhci.h>
-> +
-> +#define MAX_BUS_CLK (4)
-> +
-> +void s3c_sdhci_add_busclk_alias(struct platform_device *pdev,
-> +				char **mmc_busclks)
-> +{
-> +	int clk_cnt = 0, ptr;
-> +	char devname[14];
-> +
-> +	sprintf(devname, "s3c-sdhci.%d", pdev->id);
-> +
-> +	for (ptr = 0; ptr < MAX_BUS_CLK; ptr++) {
-> +		char *bus_name = mmc_busclks[ptr];
-> +
-> +		if (bus_name != NULL) {
-> +			char name[14];
-> +			sprintf(name, "mmc_busclk.%d", ptr);
-> +			clk_add_alias(name, devname, bus_name,
-> +					&pdev->dev);
-> +			clk_cnt++;
-> +		}
-> +	}
-> +
-> +	if (clk_cnt == 0)
-> +		dev_err(&pdev->dev, "No MMC bus clocks!");
-> +}
-
-
-Can you explain why these aliases are needed ?
-That seems redundant to me, as the clock 'con_id's could be properly created
-right away when registering the clock with clkdev.
-
-
-> diff --git a/arch/arm/plat-samsung/include/plat/sdhci.h b/arch/arm/plat-samsung/include/plat/sdhci.h
-> index dde13aa..4933b6a 100644
-> --- a/arch/arm/plat-samsung/include/plat/sdhci.h
-> +++ b/arch/arm/plat-samsung/include/plat/sdhci.h
-> @@ -131,6 +131,14 @@ extern void s5p64x0_setup_sdhci1_cfg_gpio(struct platform_device *, int w);
->  extern void s5p6440_setup_sdhci2_cfg_gpio(struct platform_device *, int w);
->  extern void s5p6450_setup_sdhci2_cfg_gpio(struct platform_device *, int w);
->  
-> +/*
-> + * s3c_sdhci_set_busclk - Add alias to bus clocks supported, for clkdev support.
-> + * @pdev: platform device to which the busclks are to be initialised.
-> + * @mmc_busclks: Bus clocks suppored by SDHCI
-> +*/
-> +extern void s3c_sdhci_add_busclk_alias(struct platform_device *pdev,
-> +					char **mmc_busclks);
-> +
->  /* S3C2416 SDHCI setup */
->  
->  #ifdef CONFIG_S3C2416_SETUP_SDHCI
-
--- 
-Sylwester Nawrocki
-Samsung Poland R&D Center
+Best Regards
+Huang Shijie
