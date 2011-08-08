@@ -1,15 +1,18 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon,  8 Aug 2011 18:16:06 +0100
-Subject: [PATCH 05/10] ARM: perf: use integers for ARMv7 event indices
+Date: Mon,  8 Aug 2011 18:16:05 +0100
+Subject: [PATCH 04/10] ARM: perf: use u32 instead of unsigned long for PMNC
+	register
 In-Reply-To: <1312823771-9952-1-git-send-email-will.deacon@arm.com>
 References: <1312823771-9952-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1312823771-9952-6-git-send-email-will.deacon@arm.com>
+Message-ID: <1312823771-9952-5-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch ensures that integers are used to represent event indices in
-the ARMv7 PMU backend. This ensures consistency between functions and
-also with the arm_pmu structure.
+The ARMv7 perf backend mixes up u32 and unsigned long, which is rather
+ugly.
+
+This patch makes the ARMv7 PMU code consistently use the u32 type
+instead.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
@@ -17,62 +20,57 @@ Signed-off-by: Will Deacon <will.deacon@arm.com>
  1 files changed, 6 insertions(+), 6 deletions(-)
 
 diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
-index f4f260d..e39bc89 100644
+index 74f9119..f4f260d 100644
 --- a/arch/arm/kernel/perf_event_v7.c
 +++ b/arch/arm/kernel/perf_event_v7.c
-@@ -793,7 +793,7 @@ static inline int armv7_pmnc_counter_has_overflowed(u32 pmnc,
- 	return ret;
- }
+@@ -758,26 +758,26 @@ enum armv7_counters {
+ #define	ARMV7_FLAG_MASK		0xffffffff	/* Mask for writable bits */
+ #define	ARMV7_OVERFLOWED_MASK	ARMV7_FLAG_MASK
  
--static inline int armv7_pmnc_select_counter(unsigned int idx)
-+static inline int armv7_pmnc_select_counter(int idx)
+-static inline unsigned long armv7_pmnc_read(void)
++static inline u32 armv7_pmnc_read(void)
  {
  	u32 val;
- 
-@@ -840,7 +840,7 @@ static inline void armv7pmu_write_counter(int idx, u32 value)
- 			smp_processor_id(), idx);
+ 	asm volatile("mrc p15, 0, %0, c9, c12, 0" : "=r"(val));
+ 	return val;
  }
  
--static inline void armv7_pmnc_write_evtsel(unsigned int idx, u32 val)
-+static inline void armv7_pmnc_write_evtsel(int idx, u32 val)
+-static inline void armv7_pmnc_write(unsigned long val)
++static inline void armv7_pmnc_write(u32 val)
  {
- 	if (armv7_pmnc_select_counter(idx) == idx) {
- 		val &= ARMV7_EVTSEL_MASK;
-@@ -848,7 +848,7 @@ static inline void armv7_pmnc_write_evtsel(unsigned int idx, u32 val)
- 	}
+ 	val &= ARMV7_PMNC_MASK;
+ 	isb();
+ 	asm volatile("mcr p15, 0, %0, c9, c12, 0" : : "r"(val));
  }
  
--static inline u32 armv7_pmnc_enable_counter(unsigned int idx)
-+static inline int armv7_pmnc_enable_counter(int idx)
+-static inline int armv7_pmnc_has_overflowed(unsigned long pmnc)
++static inline int armv7_pmnc_has_overflowed(u32 pmnc)
  {
- 	u32 val;
- 
-@@ -869,7 +869,7 @@ static inline u32 armv7_pmnc_enable_counter(unsigned int idx)
- 	return idx;
+ 	return pmnc & ARMV7_OVERFLOWED_MASK;
  }
  
--static inline u32 armv7_pmnc_disable_counter(unsigned int idx)
-+static inline int armv7_pmnc_disable_counter(int idx)
+-static inline int armv7_pmnc_counter_has_overflowed(unsigned long pmnc,
++static inline int armv7_pmnc_counter_has_overflowed(u32 pmnc,
+ 					enum armv7_counters counter)
  {
- 	u32 val;
+ 	int ret = 0;
+@@ -812,7 +812,7 @@ static inline int armv7_pmnc_select_counter(unsigned int idx)
  
-@@ -891,7 +891,7 @@ static inline u32 armv7_pmnc_disable_counter(unsigned int idx)
- 	return idx;
- }
- 
--static inline u32 armv7_pmnc_enable_intens(unsigned int idx)
-+static inline int armv7_pmnc_enable_intens(int idx)
+ static inline u32 armv7pmu_read_counter(int idx)
  {
- 	u32 val;
+-	unsigned long value = 0;
++	u32 value = 0;
  
-@@ -912,7 +912,7 @@ static inline u32 armv7_pmnc_enable_intens(unsigned int idx)
- 	return idx;
- }
+ 	if (idx == ARMV7_CYCLE_COUNTER)
+ 		asm volatile("mrc p15, 0, %0, c9, c13, 0" : "=r" (value));
+@@ -1044,7 +1044,7 @@ static void armv7pmu_disable_event(struct hw_perf_event *hwc, int idx)
  
--static inline u32 armv7_pmnc_disable_intens(unsigned int idx)
-+static inline int armv7_pmnc_disable_intens(int idx)
+ static irqreturn_t armv7pmu_handle_irq(int irq_num, void *dev)
  {
- 	u32 val;
- 
+-	unsigned long pmnc;
++	u32 pmnc;
+ 	struct perf_sample_data data;
+ 	struct cpu_hw_events *cpuc;
+ 	struct pt_regs *regs;
 -- 
 1.7.0.4
