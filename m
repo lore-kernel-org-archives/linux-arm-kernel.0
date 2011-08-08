@@ -1,18 +1,28 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Mon, 8 Aug 2011 12:34:33 +0100
-Subject: [PATCH v5] Add ARM cpu topology definition
-In-Reply-To: <20110808110919.GA15018@n2100.arm.linux.org.uk>
-References: <1309798185-1984-1-git-send-email-vincent.guittot@linaro.org>
-	<20110705131623.GF8286@n2100.arm.linux.org.uk>
-	<20110808110919.GA15018@n2100.arm.linux.org.uk>
-Message-ID: <CAKfTPtBJXxcJLX_y10Ae6M+3emTwiU1D15DMjq7yxjYTfGdS7Q@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 8 Aug 2011 13:42:45 +0200
+Subject: [PATCH] dmaengine: PL08x: Fix trivial build error
+In-Reply-To: <E1QpcR1-00013t-Sj@rmk-PC.arm.linux.org.uk>
+References: <E1QpcR1-00013t-Sj@rmk-PC.arm.linux.org.uk>
+Message-ID: <CAKnu2MoWEcY_fkD7pt1Be9-6TSiZQben3qZv-uoQF3SG-xmyzw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 August 2011 12:09, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> On Tue, Jul 05, 2011 at 02:16:23PM +0100, Russell King - ARM Linux wrote:
->> Looks fine now, and so can go to my patch system. ?Many thanks.
+2011/8/6 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+
+> Something changed during the 3.1 merge window in the include files
+> which now causes the pl08x DMA engine driver to fail to build. ?Fix
+> this by adding the now necessary dma-mapping.h include:
 >
-> Ping.
+> drivers/dma/amba-pl08x.c: In function ?pl08x_unmap_buffers?:
+> drivers/dma/amba-pl08x.c:1524: error: implicit declaration of function ?dma_unmap_single?
+> drivers/dma/amba-pl08x.c:1527: error: implicit declaration of function ?dma_unmap_page?
 >
-Yes. Do you have additional comments to the patch ?
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+> If you can provide an ack, and I'll push this through my pending
+> 'fixes' merge.
+
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+
+Thanks,
+Linus Walleij
