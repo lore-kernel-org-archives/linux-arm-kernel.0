@@ -1,49 +1,51 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Mon, 8 Aug 2011 10:28:49 +0800
-Subject: [PATCH 1/2] drivers: create a pinmux subsystem v3
-In-Reply-To: <CAGsJ_4yKHQGrY4kbwd+VPsg1ggj3wQqoN+uPLmh31RnhbroysQ@mail.gmail.com>
-References: <1307984291-9774-1-git-send-email-linus.walleij@stericsson.com>
-	<CAGsJ_4yKHQGrY4kbwd+VPsg1ggj3wQqoN+uPLmh31RnhbroysQ@mail.gmail.com>
-Message-ID: <CAGsJ_4yb4DNt4nSJHJcGMaL+U6KDRNj4sqkULu3jhwN2t_G6Fw@mail.gmail.com>
+From: viresh.kumar@st.com (viresh kumar)
+Date: Mon, 8 Aug 2011 09:39:35 +0530
+Subject: [RFC] using amba_pl08x driver for s3c64xx SoCs
+In-Reply-To: <CAGOxZ53edhKA=VbhJJKG--LoG6P8Y+ubKdH5-4woDgBEbTdtVQ@mail.gmail.com>
+References: <CAGOxZ50Rz3ynmkuoJb9Pgc0b1pG++-CB9kUtU92zKYtfP3jtRg@mail.gmail.com>
+	<CACRpkdasYKx8C7fR1heiQDnJgJMvLa1VuQNhQ+gu5F6ea7d3oA@mail.gmail.com>
+	<CAGOxZ53edhKA=VbhJJKG--LoG6P8Y+ubKdH5-4woDgBEbTdtVQ@mail.gmail.com>
+Message-ID: <4E3F617F.3070508@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On 08/05/2011 04:40 PM, Alim Akhtar wrote:
+>>> >> @@ -1953,7 +2048,7 @@ static int pl08x_probe(struct amba_device *adev,
+>>> >> const struct amba_id *id)
+>>> >>                spin_lock_init(&ch->lock);
+>>> >>                ch->serving = NULL;
+>>> >>                ch->signal = -1;
+>>> >> -               dev_info(&adev->dev,
+>>> >> +               dev_dbg(&adev->dev,
+>>> >>                         "physical channel %d is %s\n", i,
+>>> >>                         pl08x_phy_channel_busy(ch) ? "BUSY" : "FREE");
+>>> >>        }
+>> >
+>> > Check Russells and Vireshs recent patches, I think they have already
+>> > fixed up a lot of debug prints.
 
->> diff --git a/Documentation/ABI/testing/sysfs-class-pinmux b/Documentation/ABI/testing/sysfs-class-pinmux
->> new file mode 100644
->> index 0000000..c2ea843
->> --- /dev/null
->> +++ b/Documentation/ABI/testing/sysfs-class-pinmux
->> @@ -0,0 +1,11 @@
->> +What:          /sys/class/pinmux/.../name
->> +Date:          May 2011
->> +KernelVersion: 3.1
->
-> has this been ready for 3.1? we have been planning to write pinmux
-> driver based on this framework.
+Yes I already updated this to dev_dbg in my patchset.
 
-What is the status of pincfg subsystem? what's the plan about merging
-this subsystem?
+> I have a concern here, let say if the dev_dbg is enabled, first call
+> to pl08x_phy_channel_busy() with ch->serving=NULL will give me NULL
+> pointer dereferencing crash.
+> please see pl08x_phy_channel_busy() definition.
 
->
->> +Contact:       Linus Walleij <linus.walleij@linaro.org>
->> +Description:
->> +               Each pinmux directory will contain a field called
->> +               name. This holds a string identifying the pinmux for
->> +               display purposes.
->> +
->> +               NOTE: this will be empty if no suitable name is provided
->> +               by platform or pinmux drivers.
->> diff --git a/Documentation/pinctrl.txt b/Documentation/pinctrl.txt
->> new file mode 100644
->> index 0000000..c4b6f48
->> --- /dev/null
->> +++ b/Documentation/pinctrl.txt
->> @@ -0,0 +1,397 @@
->> +PINCTRL (PIN CONTROL) subsystem
->> +This document outlines the pin control subsystem in Linux
->> +
->> +This subsystem deals with:
->> +
--barry
+Sorry, but i couldn't get why will we get a crash here.
+
+pl08x_phy_channel_busy() looks like this:
+
+static int pl08x_phy_channel_busy(struct pl08x_phy_chan *ch)
+{
+	unsigned int val;
+
+	val = readl(ch->base + PL080_CH_CONFIG);
+	return val & PL080_CONFIG_ACTIVE;
+}
+
+ch->base is already initialized and clock is enabled by amba layer.
+
+Sorry if I am missing something Obvious.
+
+-- 
+viresh
