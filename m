@@ -1,75 +1,69 @@
-From: siarhei.siamashka@gmail.com (Siarhei Siamashka)
-Date: Mon,  8 Aug 2011 09:32:28 +0300
-Subject: [PATCH] ARM errata: Possible cache data corruption with
-	hit-under-miss enabled
-Message-ID: <1312785148-32531-1-git-send-email-siarhei.siamashka@gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 8 Aug 2011 08:35:49 +0200
+Subject: [GIT PULL] imx-fixes
+Message-ID: <20110808063549.GL31404@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Catalin Marinas <catalin.marinas@arm.com>
 
-This patch is a workaround for the 364296 ARM1136 r0pX erratum (possible
-cache data corruption with hit-under-miss enabled). It sets the
-undocumented bit 31 in the auxiliary control register and the FI bit in
-the control register, thus disabling hit-under-miss without putting the
-processor into full low interrupt latency mode.
+Hi Arnd,
 
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-Tested-by: Siarhei Siamashka <siarhei.siamashka@gmail.com>
----
- arch/arm/Kconfig      |   12 ++++++++++++
- arch/arm/mm/proc-v6.S |   16 ++++++++++++++++
- 2 files changed, 28 insertions(+), 0 deletions(-)
+Please pull the following fixes for i.MX.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 9c26ba7..0c3a56c 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1115,6 +1115,18 @@ config ARM_ERRATA_743622
- 	  visible impact on the overall performance or power consumption of the
- 	  processor.
- 
-+config ARM_ERRATA_364296
-+	bool "ARM errata: Possible cache data corruption with hit-under-miss enabled"
-+	depends on CPU_V6 && !SMP
-+	help
-+	  This options enables the workaround for the 364296 ARM1136
-+	  r0pX erratum (possible cache data corruption with
-+	  hit-under-miss enabled). It sets the undocumented bit 31 in
-+	  the auxiliary control register and the FI bit in the control
-+	  register, thus disabling hit-under-miss without putting the
-+	  processor into full low interrupt latency mode. ARM11MPCore
-+	  is not affected.
-+
- endmenu
- 
- source "arch/arm/common/Kconfig"
-diff --git a/arch/arm/mm/proc-v6.S b/arch/arm/mm/proc-v6.S
-index 22aac85..1b675b1 100644
---- a/arch/arm/mm/proc-v6.S
-+++ b/arch/arm/mm/proc-v6.S
-@@ -180,6 +180,22 @@ __v6_setup:
- 	mrc	p15, 0, r0, c1, c0, 0		@ read control register
- 	bic	r0, r0, r5			@ clear bits them
- 	orr	r0, r0, r6			@ set them
-+#ifdef CONFIG_ARM_ERRATA_364296
-+	/* Workaround for the 364296 ARM1136 r0pX erratum (possible cache data
-+	 * corruption with hit-under-miss enabled). The conditional code below
-+	 * (setting the undocumented bit 31 in the auxiliary control register
-+	 * and the FI bit in the control register) disables hit-under-miss
-+	 * without putting the processor into full low interrupt latency mode.
-+	 */
-+	ldr	r6, =0x4107b360			@ id for ARM1136 r0pX
-+	mrc	p15, 0, r5, c0, c0, 0		@ get processor id
-+	bic	r5, r5, #0xf			@ mask out part bits [3:0]
-+	teq	r5, r6				@ check for the faulty core
-+	mrceq	p15, 0, r5, c1, c0, 1		@ load aux control reg
-+	orreq	r5, r5, #(1 << 31)		@ set the undocumented bit 31
-+	mcreq	p15, 0, r5, c1, c0, 1		@ write aux control reg
-+	orreq	r0, r0, #(1 << 21)		@ low interrupt latency configuration
-+#endif
- 	mov	pc, lr				@ return to head.S:__ret
- 
- 	/*
+Sascha
+
+PS: The branch is not based on -rc1, I just had to merge it in to apply
+the patch from Ben Dooks.
+
+The following changes since commit 322a8b034003c0d46d39af85bf24fee27b902f48:
+
+  Linux 3.1-rc1 (2011-08-07 18:23:30 -0700)
+
+are available in the git repository at:
+  git://git.pengutronix.de/git/imx/linux-2.6.git imx-fixes-for-arnd
+
+Arnaud Patard (3):
+      efikasb/mx: fix usbh1 initialisation
+      efikasb: fix gpio keys.
+      efika: Fix board id detection
+
+Ben Dooks (1):
+      ARM: mx5: board-cpuimx51.c fixup irq_to_gpio() usage
+
+Eric Miao (1):
+      ARM: mx53: add pad configuration for I2C signals
+
+Fabio Estevam (3):
+      ARM: mach-imx/mx31ads: Fix section mismatches
+      ARM: mach-imx/mx31lilly: Fix section mismatches
+      ARM: board-mx51_babbage: Fix UART2 registration
+
+Jason Liu (1):
+      ARM: iMX5: Don't enable DPLL if it already enabled
+
+Javier Martin (1):
+      Add tlv320aic32x4 platform data to Visstrim_M10.
+
+Mehnert, Torsten (1):
+      i.MX25 GPT clock fix: ensure correct the clock source
+
+Sascha Hauer (1):
+      Merge commit 'v3.1-rc1' into imx-fixes
+
+ arch/arm/mach-imx/clock-imx25.c             |    3 ++
+ arch/arm/mach-imx/mach-imx27_visstrim_m10.c |   13 +++++++++++
+ arch/arm/mach-imx/mach-mx31ads.c            |    4 +-
+ arch/arm/mach-imx/mach-mx31lilly.c          |    2 +-
+ arch/arm/mach-mx5/board-cpuimx51.c          |    2 +-
+ arch/arm/mach-mx5/board-mx51_babbage.c      |    2 +-
+ arch/arm/mach-mx5/board-mx51_efikamx.c      |    6 ++--
+ arch/arm/mach-mx5/board-mx51_efikasb.c      |   15 +++++++------
+ arch/arm/mach-mx5/clock-mx51-mx53.c         |    6 ++++-
+ arch/arm/mach-mx5/mx51_efika.c              |    2 +-
+ arch/arm/plat-mxc/include/mach/iomux-mx53.h |   31 ++++++++++++++------------
+ 11 files changed, 55 insertions(+), 31 deletions(-)
 -- 
-1.7.2.5
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
