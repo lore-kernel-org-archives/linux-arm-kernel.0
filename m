@@ -1,61 +1,151 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 08 Aug 2011 20:52:55 +0100
-Subject: [PATCH 09/12] ARM: mach-at91: Setup consistent dma size at boot
-	time
-In-Reply-To: <1312813712-22808-10-git-send-email-tixy@yxit.co.uk>
-References: <1312813712-22808-1-git-send-email-tixy@yxit.co.uk>
-	<1312813712-22808-10-git-send-email-tixy@yxit.co.uk>
-Message-ID: <4E403E97.2050500@atmel.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 8 Aug 2011 20:58:05 +0100
+Subject: 3.1-rc1 link failure
+In-Reply-To: <4E402FBB.2070401@gmail.com>
+References: <4E402FBB.2070401@gmail.com>
+Message-ID: <20110808195804.GD19367@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/08/2011 03:28 PM, Jon Medhurst wrote:
-> Signed-off-by: Jon Medhurst<tixy@yxit.co.uk>
-> CC: Nicolas Ferre<nicolas.ferre@atmel.com>
+On Mon, Aug 08, 2011 at 01:49:31PM -0500, Rob Herring wrote:
+> Russell,
+> 
+> This commit is causing some link failures:
+> 
+>     ARM: vmlinux.lds: move discarded sections to beginning
+> 
+>     Rather than scattering the discarded sections throughout the linker
+>     file, move them to the start.
+> 
+>     Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+>     Tested-by: Stephen Boyd <sboyd@codeaurora.org>
+>     Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> 
+> The error is this:
+> 
+> `.exit.text' referenced in section `.alt.smp.init' of
+> drivers/built-in.o: defined in discarded section `.exit.text' of
+> drivers/built
+> -in.o
+> `.exit.text' referenced in section `.alt.smp.init' of net/built-in.o:
+> defined in discarded section `.exit.text' of net/built-in.o
+> 
+> I traced the one in net/ to CONFIG_SMP_ON_UP=y and CONFIG_DCB=y.
+> dcbnl_exit calls dcb_flushapp which contains a spinlock. dcb_flushapp is
+> getting inlined into dcbnl_exit.
 
-Thanks,
+Argh.  This is going to be an absolute _pig_ to fix.
 
-Acked-by: Nicolas Ferre<nicolas.ferre@atmel.com>
+This is the relevent part of the linker script (reformatted to make it
+clearer):
 
-> ---
->   arch/arm/mach-at91/include/mach/at91sam9g45.h |    2 --
->   arch/arm/mach-at91/at91sam9g45.c              |    2 ++
->   2 files changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/mach-at91/include/mach/at91sam9g45.h b/arch/arm/mach-at91/include/mach/at91sam9g45.h
-> index 2c611b9..406bb64 100644
-> --- a/arch/arm/mach-at91/include/mach/at91sam9g45.h
-> +++ b/arch/arm/mach-at91/include/mach/at91sam9g45.h
-> @@ -128,8 +128,6 @@
->   #define AT91SAM9G45_EHCI_BASE	0x00800000	/* USB Host controller (EHCI) */
->   #define AT91SAM9G45_VDEC_BASE	0x00900000	/* Video Decoder Controller */
->
-> -#define CONSISTENT_DMA_SIZE	SZ_4M
-> -
->   /*
->    * DMA peripheral identifiers
->    * for hardware handshaking interface
-> diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
-> index e04c5fb..1532b50 100644
-> --- a/arch/arm/mach-at91/at91sam9g45.c
-> +++ b/arch/arm/mach-at91/at91sam9g45.c
-> @@ -12,6 +12,7 @@
->
->   #include<linux/module.h>
->   #include<linux/pm.h>
-> +#include<linux/dma-mapping.h>
->
->   #include<asm/irq.h>
->   #include<asm/mach/arch.h>
-> @@ -319,6 +320,7 @@ static void at91sam9g45_poweroff(void)
->   static void __init at91sam9g45_map_io(void)
->   {
->   	at91_init_sram(0, AT91SAM9G45_SRAM_BASE, AT91SAM9G45_SRAM_SIZE);
-> +	init_consistent_dma_size(SZ_4M);
->   }
->
->   static void __init at91sam9g45_initialize(void)
+| SECTIONS
+| {
+|  /*
+|   * unwind exit sections must be discarded before the rest of the
+|   * unwind sections get included.
+|   */
+|  /DISCARD/ : {
+|   *(.ARM.exidx.exit.text)
+|   *(.ARM.extab.exit.text)
+|  }
+| ...
+|  .exit.text : {
+|   *(.exit.text)
+|   *(.memexit.text)
+|  }
+| ...
+|  /DISCARD/ : {
+|   *(.exit.text)
+|   *(.memexit.text)
+|   *(.exit.data)
+|   *(.memexit.data)
+|   *(.memexit.rodata)
+|   *(.exitcall.exit)
+|   *(.discard)
+|   *(.discard.*)
+|   }
+| }
 
+Now, this is what the linker manual says about discarded output sections:
 
--- 
-Nicolas Ferre
+|    The special output section name `/DISCARD/' may be used to discard
+| input sections.  Any input sections which are assigned to an output
+| section named `/DISCARD/' are not included in the output file.
+
+No questions, no exceptions.  It doesn't say "unless they are listed
+before the /DISCARD/ section."  Now, this is what asn-generic/vmlinux.lds.S
+says:
+
+| /*
+|  * Default discarded sections.
+|  *
+|  * Some archs want to discard exit text/data at runtime rather than
+|  * link time due to cross-section references such as alt instructions,
+|  * bug table, eh_frame, etc.  DISCARDS must be the last of output
+|  * section definitions so that such archs put those in earlier section
+|  * definitions.
+|  */
+
+And guess what - the list _always_ includes .exit.text etc.
+
+Now, what's actually happening is that the linker is reading the script,
+and it finds the first /DISCARD/ output section at the beginning of the
+script.  It continues reading the script, and finds the 'DISCARD' macro
+at the end, which having been postprocessed results in another
+/DISCARD/ output section.  As the linker already contains the earlier
+/DISCARD/ output section, it adds it to that existing section, so it
+effectively is placed at the start.  This can be seen by using the -M
+option to ld:
+
+| Linker script and memory map
+| 
+|                 0xc037c080                jiffies = jiffies_64
+| 
+| /DISCARD/
+|  *(.ARM.exidx.exit.text)
+|  *(.ARM.extab.exit.text)
+|  *(.exit.text)
+|  *(.memexit.text)
+|  *(.exit.data)
+|  *(.memexit.data)
+|  *(.memexit.rodata)
+|  *(.exitcall.exit)
+|  *(.discard)
+|  *(.discard.*)
+| 
+|                 0xc0008000                . = 0xc0008000
+| 
+| .head.text      0xc0008000      0x1d0
+|                 0xc0008000                _text = .
+|  *(.head.text)
+|  .head.text     0xc0008000      0x1d0 arch/arm/kernel/head.o
+|                 0xc0008000                stext
+| 
+| .text           0xc0008200   0x2d78d0
+|                 0xc0008200                _stext = .
+|                 0xc0008200                __exception_text_start = .
+|  *(.exception.text)
+|  .exception.text
+| ...
+
+As you can see, all the discarded sections are grouped together - and
+as a result of it being the first output section, they all appear before
+any other section.
+
+The result is that not only is the unwind information discarded (as
+intended), but also the .exit.text, despite us wanting to have the
+.exit.text preserved.
+
+We can't move the unwind information elsewhere, because it'll then be
+included even when we do actually discard the .exit.text (and similar)
+sections.
+
+The only solution that I can think of is to stop using this
+asm-generic/vmlinux.lds.S and write our own fully conditionalized
+linker script, ensuring that no input section is mentioned more than
+once in the output sections.
+
+Or someone sorts out the asm-generic/vmlinux.lds.S stuff to actually
+conform to the linker manual, and stop relying on implementation defined
+behaviour of the linker - again by having it fully conditionalized.
