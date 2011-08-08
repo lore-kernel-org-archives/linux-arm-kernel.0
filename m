@@ -1,30 +1,37 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 08 Aug 2011 19:19:28 +0100
-Subject: [PATCH 3/6] ARM: twd: register clockevents device before enabling
-	PPI
-In-Reply-To: <1312823424-9654-4-git-send-email-will.deacon@arm.com>
-References: <1312823424-9654-1-git-send-email-will.deacon@arm.com>
-	<1312823424-9654-4-git-send-email-will.deacon@arm.com>
-Message-ID: <4E4028B0.1040104@arm.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Mon, 8 Aug 2011 12:24:50 -0600
+Subject: [PATCH] GPIOLIB: add generic gpio_set_pull API
+In-Reply-To: <20110808081552.GI32513@linux-sh.org>
+References: <1312780773-23142-1-git-send-email-Baohua.Song@csr.com>
+	<20110808081552.GI32513@linux-sh.org>
+Message-ID: <CACxGe6ssT4=kxApaKhv+=7nDcEFVW+oyByFQ_hzcfyZ4gw2C3g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/08/11 18:10, Will Deacon wrote:
-> The smp_twd clockevents driver currently enables the local timer PPI
-> before the clockevents device is registered. This can lead to a kernel
-> panic if a spurious timer interrupt is generated before registration
-> has completed since the kernel will treat it as an IPI timer.
-> 
-> This patch moves the clockevents device registration before the IRQ
-> unmasking so that we can always handle timer interrupts once they can
-> occur.
-> 
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+On Mon, Aug 8, 2011 at 2:15 AM, Paul Mundt <lethal@linux-sh.org> wrote:
+> On Sun, Aug 07, 2011 at 10:19:33PM -0700, Barry Song wrote:
+>> Now there are many different implementations for GPIO pull configuration, for
+>> example:
+>> s3c_gpio_setpull()
+>> tegra_pinmux_set_pullupdown()
+>> chipcHw_setPinPullup()
+>> gpio_pullup()
+>> s3c2410_gpio_pullup()
+>>
+>> This patch adds a new generic gpio_set_pull API so that all SoCs can have unified
+>> codes.
+>>
+>> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+>
+> For arch/arm/mach-shmobile we also have gpio_pull_up() for board-g4evm.c
+> and gpio_pull_down() for board-mackerel.c. Both of these would benefit
+> from this sort of an API addition.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+I think I'm okay with this API change.  Linus, what say you?  How does
+this interact with your plans for pinctrl?
 
-I'll rebase my timer patches on top of this one.
+g.
 
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Grant Likely, B.Sc., P.Eng.
+Secret Lab Technologies Ltd.
