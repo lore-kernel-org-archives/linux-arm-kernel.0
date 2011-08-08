@@ -1,34 +1,37 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 08 Aug 2011 13:49:31 -0500
-Subject: 3.1-rc1 link failure
-Message-ID: <4E402FBB.2070401@gmail.com>
+Date: Mon,  8 Aug 2011 14:14:26 -0500
+Subject: [PATCH] dmaengine: pl330: add missing include of scatterlist.h
+Message-ID: <1312830866-2932-1-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
+From: Rob Herring <rob.herring@calxeda.com>
 
-This commit is causing some link failures:
+scatterlist.h was getting implicitly included and now is not which
+causes this compile error:
 
-    ARM: vmlinux.lds: move discarded sections to beginning
+drivers/dma/pl330.c: In function ?pl330_prep_slave_sg?:
+drivers/dma/pl330.c:603:2: error: implicit declaration of function
+?for_each_sg?
 
-    Rather than scattering the discarded sections throughout the linker
-    file, move them to the start.
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+Cc: Jassi Brar <jassisinghbrar@gmail.com>
+Cc: Vinod Koul <vkoul@infradead.org>
+---
+ drivers/dma/pl330.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-    Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-    Tested-by: Stephen Boyd <sboyd@codeaurora.org>
-    Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-
-The error is this:
-
-`.exit.text' referenced in section `.alt.smp.init' of
-drivers/built-in.o: defined in discarded section `.exit.text' of
-drivers/built
--in.o
-`.exit.text' referenced in section `.alt.smp.init' of net/built-in.o:
-defined in discarded section `.exit.text' of net/built-in.o
-
-I traced the one in net/ to CONFIG_SMP_ON_UP=y and CONFIG_DCB=y.
-dcbnl_exit calls dcb_flushapp which contains a spinlock. dcb_flushapp is
-getting inlined into dcbnl_exit.
-
-Rob
+diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+index 00eee59..4e2ccde 100644
+--- a/drivers/dma/pl330.c
++++ b/drivers/dma/pl330.c
+@@ -15,6 +15,7 @@
+ #include <linux/module.h>
+ #include <linux/dmaengine.h>
+ #include <linux/interrupt.h>
++#include <linux/scatterlist.h>
+ #include <linux/amba/bus.h>
+ #include <linux/amba/pl330.h>
+ 
+-- 
+1.7.4.1
