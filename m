@@ -1,31 +1,88 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 8 Aug 2011 07:51:14 -0700
-Subject: [PATCH 2/2] arm/tegra: Delete irq_to_gpio
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF049F172168@HQMAIL01.nvidia.com>
-References: <1312582534-10871-1-git-send-email-swarren@nvidia.com>
-	<1312582534-10871-2-git-send-email-swarren@nvidia.com>
-	<20110806174519.GB31966@ponder.secretlab.ca>
-	<74CDBE0F657A3D45AFBB94109FB122FF049F172168@HQMAIL01.nvidia.com>
-Message-ID: <CAOesGMi2CXyAoy56-SdaD5YFzXW6W4wP6mnH+bVvRR3i_Mhk2A@mail.gmail.com>
+From: omar.ramirez@ti.com (Ramirez Luna, Omar)
+Date: Mon, 8 Aug 2011 10:04:58 -0500
+Subject: [RFC] ARM: dma_map|unmap_sg plus iommu
+In-Reply-To: <000301cc4dc4$31b53630$951fa290$%szyprowski@samsung.com>
+References: <CAB-zwWjb+2ExjNDB3OtHmRmgaHMnO-VgEe9VZk_wU=ryrq_AGw@mail.gmail.com>
+	<000301cc4dc4$31b53630$951fa290$%szyprowski@samsung.com>
+Message-ID: <CAB-zwWhh=ZTvheTebKhz55rr1=WFD8R=+BWZ8mwYiO_25mjpYA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 8, 2011 at 7:26 AM, Stephen Warren <swarren@nvidia.com> wrote:
-> Grant Likely wrote at Saturday, August 06, 2011 11:45 AM:
->> On Fri, Aug 05, 2011 at 04:15:34PM -0600, Stephen Warren wrote:
->> > irq_to_gpio is deprecated and in the process of being removed. Make that
->> > happen now for ARM Tegra.
->> >
->> > Signed-off-by: Stephen Warren <swarren@nvidia.com>
->>
->> Applied both. ?Thanks.
+Hi,
+
+On Fri, Jul 29, 2011 at 2:50 AM, Marek Szyprowski
+<m.szyprowski@samsung.com> wrote:
+>> 1. There is no way to keep track of what virtual address are being mapped
+>> in the scatterlist, which we need to propagate to the dsp, in order that it
+>> knows where does the buffers start and end on its virtual address space.
+>> I ended up adding an iov_address to scatterlist which if accepted should be
+>> toggled/affected by the selection of CONFIG_IOMMU_API.
 >
-> Didn't you want an Ack by a Tegra maintainer first?
+> Sorry, but your patch is completely wrong. You should not add any additional
+> entries to scatterlist.
 
-Acked-by: Olof Johansson <olof@lixom.net>
+At the time it was the easiest way for me to keep track of both
+virtual and physical addresses, without doing a page_to_phys every
+time on unmap. I understand that it might fall out of the scope of the
+scatterlist struct.
 
-But either way is OK. No need to rebase to add an acked-by, as far as
-I am concerned.
+> dma_addr IS the virtual address in the device's io
+> address space, so the dma_addr is a value that your device should put into
+> it's own registers to start dma transfer to provided memory pages.
 
+I also wanted to keep the same part as the original arm_dma_map_sg:
 
--Olof
+s->dma_address = __dma_map_page...
+
+Where the dma_address was the "clean" (from cache) physical address.
+But if desired, I guess this value can be replaced for the iommu va.
+
+>> 2. tidspbridge driver sometimes needs to map a physical address into a
+>> fixed virtual address (i.e. the start of a firmware section is expected to
+>> be at dsp va 0x20000000), there is no straight forward way to do this with
+>> the dma api given that it only expects to receive a cpu_addr, a sg or a
+>> page, by adding iov_address I could pass phys and iov addresses in a sg
+>> and overcome this limitation, but, these addresses belong to:
+>
+> We also encountered the problem of fixed firmware address. We addressed is by
+> setting io address space start to this address and letting device driver to
+> rely on the fact that the first call to dma_alloc() will match this address.
+
+Indeed, however in my case, I need sections at (I might have
+approximated the numbers to the real ones):
+
+0x11000000 for dsp shared memory
+0x11800000 for peripherals
+0x20000000 for dsp external code
+0x21000000 for mapped buffers
+
+The end of a section and start of the other usually have a gap, so the
+exact address needs to be specified by the firmware. So, this won't
+work with just letting the pool manager to provide the virtual
+address.
+
+>> ? 2a. Shared memory between ARM and DSP: this memory is allocated through
+>> ? ? ? memblock API which takes it out of kernel control to be later
+>> ? ? ? ioremap'd and iommu map'd to the dsp (this because a non-cacheable
+>> ? ? ? requirement), so, these physical addresses doesn't have a linear
+>> ? ? ? virtual address translation, which is what dma api expects.
+>
+> I hope that the issue with page cache attributes can be resolved if we always
+> allocate memory from CMA (see the latest CMAv12 patches:
+> http://www.spinics.net/lists/linux-media/msg35674.html )
+
+I'll take a look more closely and will be trying them if possible.
+
+>> ? 2b. Bus addresses: of dsp peripherals which are also ioremap'd and
+>> ? ? ? affected by the same thing.
+>
+> Right now I have no idea how to handle ioremapped areas in dma-mapping
+> framework, but do we really need to support them?
+
+It would be good to know if this is expected to be handled by
+dma-mapping, otherwise it can be dealt by iommu api as Joerg pointed
+out.
+
+Thanks for your comments,
+
+Omar
