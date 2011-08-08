@@ -1,14 +1,26 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 8 Aug 2011 12:09:19 +0100
-Subject: [PATCH v5] Add ARM cpu topology definition
-In-Reply-To: <20110705131623.GF8286@n2100.arm.linux.org.uk>
-References: <1309798185-1984-1-git-send-email-vincent.guittot@linaro.org>
-	<20110705131623.GF8286@n2100.arm.linux.org.uk>
-Message-ID: <20110808110919.GA15018@n2100.arm.linux.org.uk>
+From: santosh.shilimkar@ti.com (Santosh)
+Date: Mon, 08 Aug 2011 16:39:32 +0530
+Subject: OMAP3 kernels fail to build
+In-Reply-To: <20110808110056.GA15134@n2100.arm.linux.org.uk>
+References: <20110808110056.GA15134@n2100.arm.linux.org.uk>
+Message-ID: <4E3FC3EC.2010909@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 05, 2011 at 02:16:23PM +0100, Russell King - ARM Linux wrote:
-> Looks fine now, and so can go to my patch system.  Many thanks.
++ Felipe,
 
-Ping.
+On Monday 08 August 2011 04:30 PM, Russell King - ARM Linux wrote:
+> With CONFIG_ARCH_OMAP3=y and CONFIG_ARCH_OMAP4=n, I'm getting this:
+>
+> arch/arm/mach-omap2/built-in.o:(.data+0xf99c): undefined reference to `omap4430_phy_init'
+> arch/arm/mach-omap2/built-in.o:(.data+0xf9a0): undefined reference to `omap4430_phy_exit'
+> arch/arm/mach-omap2/built-in.o:(.data+0xf9a4): undefined reference to `omap4430_phy_power'
+> arch/arm/mach-omap2/built-in.o:(.data+0xf9a8): undefined reference to `omap4430_phy_set_clk'
+> arch/arm/mach-omap2/built-in.o:(.data+0xf9ac): undefined reference to `omap4430_phy_suspend'
+>
+I thought below patch was suppose to fix it.
+https://patchwork.kernel.org/patch/963462/
+
+
+Regards
+Santosh
