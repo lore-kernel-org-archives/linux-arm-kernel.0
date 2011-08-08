@@ -1,242 +1,39 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Mon, 8 Aug 2011 23:17:58 +0530
-Subject: [PATCH 12/15] spi/s3c64xx: Add support DMA engine API
-In-Reply-To: <1311744697-10264-13-git-send-email-boojin.kim@samsung.com>
-References: <1311744697-10264-1-git-send-email-boojin.kim@samsung.com>
-	<1311744697-10264-13-git-send-email-boojin.kim@samsung.com>
-Message-ID: <CABb+yY3-d0xTO+s0cCPXPW8qGpTH5G2U+bp-0z4Se47eVvJ__w@mail.gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Mon, 8 Aug 2011 11:50:47 -0600
+Subject: [PATCH 2/2] arm/tegra: Delete irq_to_gpio
+In-Reply-To: <CAOesGMi2CXyAoy56-SdaD5YFzXW6W4wP6mnH+bVvRR3i_Mhk2A@mail.gmail.com>
+References: <1312582534-10871-1-git-send-email-swarren@nvidia.com>
+	<1312582534-10871-2-git-send-email-swarren@nvidia.com>
+	<20110806174519.GB31966@ponder.secretlab.ca>
+	<74CDBE0F657A3D45AFBB94109FB122FF049F172168@HQMAIL01.nvidia.com>
+	<CAOesGMi2CXyAoy56-SdaD5YFzXW6W4wP6mnH+bVvRR3i_Mhk2A@mail.gmail.com>
+Message-ID: <CACxGe6ubndfYNxgRfrLtCZ8cP0FddwTpG_FBZKXVZb0OHJVt6w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 27, 2011 at 11:01 AM, Boojin Kim <boojin.kim@samsung.com> wrote:
-> This patch adds to support DMA generic API to transfer raw
-> SPI data. Basiclly the spi driver uses DMA generic API if
-> architecture supports it. Otherwise, uses Samsung specific
-> S3C-PL330 APIs.
+On Aug 8, 2011 8:26 AM, "Stephen Warren" <swarren@nvidia.com> wrote:
 >
-> Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
-> Acked-by: Grant Likely <grant.likely@secretlab.ca>
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> ---
-> ?drivers/spi/spi_s3c64xx.c | ?141 ++++++++++++++++++++++-----------------------
-> ?1 files changed, 69 insertions(+), 72 deletions(-)
+> Grant Likely wrote at Saturday, August 06, 2011 11:45 AM:
+> > On Fri, Aug 05, 2011 at 04:15:34PM -0600, Stephen Warren wrote:
+> > > irq_to_gpio is deprecated and in the process of being removed. Make that
+> > > happen now for ARM Tegra.
+> > >
+> > > Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> >
+> > Applied both. ?Thanks.
 >
-> diff --git a/drivers/spi/spi_s3c64xx.c b/drivers/spi/spi_s3c64xx.c
-> index 8945e20..a4cf76a 100644
-> --- a/drivers/spi/spi_s3c64xx.c
-> +++ b/drivers/spi/spi_s3c64xx.c
-> @@ -172,6 +172,9 @@ struct s3c64xx_spi_driver_data {
-> ? ? ? ?unsigned ? ? ? ? ? ? ? ? ? ? ? ?state;
-> ? ? ? ?unsigned ? ? ? ? ? ? ? ? ? ? ? ?cur_mode, cur_bpw;
-> ? ? ? ?unsigned ? ? ? ? ? ? ? ? ? ? ? ?cur_speed;
-> + ? ? ? unsigned ? ? ? ? ? ? ? ? ? ? ? ?rx_ch;
-> + ? ? ? unsigned ? ? ? ? ? ? ? ? ? ? ? ?tx_ch;
-> + ? ? ? struct samsung_dma_ops ? ? ? ? ?*ops;
-> ?};
->
-> ?static struct s3c2410_dma_client s3c64xx_spi_dma_client = {
-> @@ -227,6 +230,38 @@ static void flush_fifo(struct s3c64xx_spi_driver_data *sdd)
-> ? ? ? ?writel(val, regs + S3C64XX_SPI_CH_CFG);
-> ?}
->
-> +static void s3c64xx_spi_dma_rxcb(void *data)
-> +{
-> + ? ? ? struct s3c64xx_spi_driver_data *sdd
-> + ? ? ? ? ? ? ? = (struct s3c64xx_spi_driver_data *)data;
-void* doesn't need typecasting (same for all such occurances)
-IIRC someone already pointed it out?
+> Didn't you want an Ack by a Tegra maintainer first?
 
+It looks like a pretty low risk change.? I didn't see much risk in
+picking it up and getting it off my plate.? I can always pull things
+back out of my tree if someone complains.  I'll add Olof's ack before
+it gets into linux-next.
 
-> + ? ? ? unsigned long flags;
-> +
-> + ? ? ? spin_lock_irqsave(&sdd->lock, flags);
-> +
-> + ? ? ? sdd->state &= ~RXBUSY;
-> + ? ? ? /* If the other done */
-> + ? ? ? if (!(sdd->state & TXBUSY))
-> + ? ? ? ? ? ? ? complete(&sdd->xfer_completion);
-> +
-> + ? ? ? spin_unlock_irqrestore(&sdd->lock, flags);
-> +}
-> +
-> +static void s3c64xx_spi_dma_txcb(void *data)
-> +{
-> + ? ? ? struct s3c64xx_spi_driver_data *sdd
-> + ? ? ? ? ? ? ? = (struct s3c64xx_spi_driver_data *)data;
-> + ? ? ? unsigned long flags;
-> +
-> + ? ? ? spin_lock_irqsave(&sdd->lock, flags);
-> +
-> + ? ? ? sdd->state &= ~TXBUSY;
-> + ? ? ? /* If the other done */
-> + ? ? ? if (!(sdd->state & RXBUSY))
-> + ? ? ? ? ? ? ? complete(&sdd->xfer_completion);
-> +
-> + ? ? ? spin_unlock_irqrestore(&sdd->lock, flags);
-> +}
-> +
-> ?static void enable_datapath(struct s3c64xx_spi_driver_data *sdd,
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct spi_device *spi,
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct spi_transfer *xfer, int dma_mode)
-> @@ -234,6 +269,7 @@ static void enable_datapath(struct s3c64xx_spi_driver_data *sdd,
-> ? ? ? ?struct s3c64xx_spi_info *sci = sdd->cntrlr_info;
-> ? ? ? ?void __iomem *regs = sdd->regs;
-> ? ? ? ?u32 modecfg, chcfg;
-> + ? ? ? struct samsung_dma_prep_info info;
 >
-> ? ? ? ?modecfg = readl(regs + S3C64XX_SPI_MODE_CFG);
-> ? ? ? ?modecfg &= ~(S3C64XX_SPI_MODE_TXDMA_ON | S3C64XX_SPI_MODE_RXDMA_ON);
-> @@ -259,10 +295,14 @@ static void enable_datapath(struct s3c64xx_spi_driver_data *sdd,
-> ? ? ? ? ? ? ? ?chcfg |= S3C64XX_SPI_CH_TXCH_ON;
-> ? ? ? ? ? ? ? ?if (dma_mode) {
-> ? ? ? ? ? ? ? ? ? ? ? ?modecfg |= S3C64XX_SPI_MODE_TXDMA_ON;
-> - ? ? ? ? ? ? ? ? ? ? ? s3c2410_dma_config(sdd->tx_dmach, sdd->cur_bpw / 8);
-> - ? ? ? ? ? ? ? ? ? ? ? s3c2410_dma_enqueue(sdd->tx_dmach, (void *)sdd,
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? xfer->tx_dma, xfer->len);
-> - ? ? ? ? ? ? ? ? ? ? ? s3c2410_dma_ctrl(sdd->tx_dmach, S3C2410_DMAOP_START);
-> + ? ? ? ? ? ? ? ? ? ? ? info.cap = DMA_SLAVE;
-> + ? ? ? ? ? ? ? ? ? ? ? info.direction = DMA_TO_DEVICE;
-> + ? ? ? ? ? ? ? ? ? ? ? info.buf = xfer->tx_dma;
-> + ? ? ? ? ? ? ? ? ? ? ? info.len = xfer->len;
-> + ? ? ? ? ? ? ? ? ? ? ? info.fp = s3c64xx_spi_dma_txcb;
-> + ? ? ? ? ? ? ? ? ? ? ? info.fp_param = sdd;
-> + ? ? ? ? ? ? ? ? ? ? ? sdd->ops->prepare(sdd->tx_ch, &info);
-> + ? ? ? ? ? ? ? ? ? ? ? sdd->ops->trigger(sdd->tx_ch);
-> ? ? ? ? ? ? ? ?} else {
-> ? ? ? ? ? ? ? ? ? ? ? ?switch (sdd->cur_bpw) {
-> ? ? ? ? ? ? ? ? ? ? ? ?case 32:
-> @@ -294,10 +334,14 @@ static void enable_datapath(struct s3c64xx_spi_driver_data *sdd,
-> ? ? ? ? ? ? ? ? ? ? ? ?writel(((xfer->len * 8 / sdd->cur_bpw) & 0xffff)
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| S3C64XX_SPI_PACKET_CNT_EN,
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?regs + S3C64XX_SPI_PACKET_CNT);
-> - ? ? ? ? ? ? ? ? ? ? ? s3c2410_dma_config(sdd->rx_dmach, sdd->cur_bpw / 8);
-> - ? ? ? ? ? ? ? ? ? ? ? s3c2410_dma_enqueue(sdd->rx_dmach, (void *)sdd,
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? xfer->rx_dma, xfer->len);
-> - ? ? ? ? ? ? ? ? ? ? ? s3c2410_dma_ctrl(sdd->rx_dmach, S3C2410_DMAOP_START);
-> + ? ? ? ? ? ? ? ? ? ? ? info.cap = DMA_SLAVE;
-> + ? ? ? ? ? ? ? ? ? ? ? info.direction = DMA_FROM_DEVICE;
-> + ? ? ? ? ? ? ? ? ? ? ? info.buf = xfer->rx_dma;
-> + ? ? ? ? ? ? ? ? ? ? ? info.len = xfer->len;
-> + ? ? ? ? ? ? ? ? ? ? ? info.fp = s3c64xx_spi_dma_rxcb;
-> + ? ? ? ? ? ? ? ? ? ? ? info.fp_param = sdd;
-> + ? ? ? ? ? ? ? ? ? ? ? sdd->ops->prepare(sdd->rx_ch, &info);
-> + ? ? ? ? ? ? ? ? ? ? ? sdd->ops->trigger(sdd->rx_ch);
-> ? ? ? ? ? ? ? ?}
-> ? ? ? ?}
->
-> @@ -483,46 +527,6 @@ static void s3c64xx_spi_config(struct s3c64xx_spi_driver_data *sdd)
-> ? ? ? ?}
-> ?}
->
-> -static void s3c64xx_spi_dma_rxcb(struct s3c2410_dma_chan *chan, void *buf_id,
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?int size, enum s3c2410_dma_buffresult res)
-> -{
-> - ? ? ? struct s3c64xx_spi_driver_data *sdd = buf_id;
-> - ? ? ? unsigned long flags;
-> -
-> - ? ? ? spin_lock_irqsave(&sdd->lock, flags);
-> -
-> - ? ? ? if (res == S3C2410_RES_OK)
-> - ? ? ? ? ? ? ? sdd->state &= ~RXBUSY;
-> - ? ? ? else
-> - ? ? ? ? ? ? ? dev_err(&sdd->pdev->dev, "DmaAbrtRx-%d\n", size);
-> -
-> - ? ? ? /* If the other done */
-> - ? ? ? if (!(sdd->state & TXBUSY))
-> - ? ? ? ? ? ? ? complete(&sdd->xfer_completion);
-> -
-> - ? ? ? spin_unlock_irqrestore(&sdd->lock, flags);
-> -}
-> -
-> -static void s3c64xx_spi_dma_txcb(struct s3c2410_dma_chan *chan, void *buf_id,
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?int size, enum s3c2410_dma_buffresult res)
-> -{
-> - ? ? ? struct s3c64xx_spi_driver_data *sdd = buf_id;
-> - ? ? ? unsigned long flags;
-> -
-> - ? ? ? spin_lock_irqsave(&sdd->lock, flags);
-> -
-> - ? ? ? if (res == S3C2410_RES_OK)
-> - ? ? ? ? ? ? ? sdd->state &= ~TXBUSY;
-> - ? ? ? else
-> - ? ? ? ? ? ? ? dev_err(&sdd->pdev->dev, "DmaAbrtTx-%d \n", size);
-> -
-> - ? ? ? /* If the other done */
-> - ? ? ? if (!(sdd->state & RXBUSY))
-> - ? ? ? ? ? ? ? complete(&sdd->xfer_completion);
-> -
-> - ? ? ? spin_unlock_irqrestore(&sdd->lock, flags);
-> -}
-> -
-> ?#define XFER_DMAADDR_INVALID DMA_BIT_MASK(32)
->
-> ?static int s3c64xx_spi_map_mssg(struct s3c64xx_spi_driver_data *sdd,
-> @@ -697,12 +701,10 @@ static void handle_msg(struct s3c64xx_spi_driver_data *sdd,
-> ? ? ? ? ? ? ? ? ? ? ? ?if (use_dma) {
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?if (xfer->tx_buf != NULL
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?&& (sdd->state & TXBUSY))
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? s3c2410_dma_ctrl(sdd->tx_dmach,
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? S3C2410_DMAOP_FLUSH);
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? sdd->ops->stop(sdd->tx_ch);
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?if (xfer->rx_buf != NULL
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?&& (sdd->state & RXBUSY))
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? s3c2410_dma_ctrl(sdd->rx_dmach,
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? S3C2410_DMAOP_FLUSH);
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? sdd->ops->stop(sdd->rx_ch);
-> ? ? ? ? ? ? ? ? ? ? ? ?}
->
-> ? ? ? ? ? ? ? ? ? ? ? ?goto out;
-> @@ -742,24 +744,19 @@ out:
->
-> ?static int acquire_dma(struct s3c64xx_spi_driver_data *sdd)
-> ?{
-> - ? ? ? if (s3c2410_dma_request(sdd->rx_dmach,
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? &s3c64xx_spi_dma_client, NULL) < 0) {
-> - ? ? ? ? ? ? ? dev_err(&sdd->pdev->dev, "cannot get RxDMA\n");
-> - ? ? ? ? ? ? ? return 0;
-> - ? ? ? }
-> - ? ? ? s3c2410_dma_set_buffdone_fn(sdd->rx_dmach, s3c64xx_spi_dma_rxcb);
-> - ? ? ? s3c2410_dma_devconfig(sdd->rx_dmach, S3C2410_DMASRC_HW,
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? sdd->sfr_start + S3C64XX_SPI_RX_DATA);
-> -
-> - ? ? ? if (s3c2410_dma_request(sdd->tx_dmach,
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? &s3c64xx_spi_dma_client, NULL) < 0) {
-> - ? ? ? ? ? ? ? dev_err(&sdd->pdev->dev, "cannot get TxDMA\n");
-> - ? ? ? ? ? ? ? s3c2410_dma_free(sdd->rx_dmach, &s3c64xx_spi_dma_client);
-> - ? ? ? ? ? ? ? return 0;
-> - ? ? ? }
-> - ? ? ? s3c2410_dma_set_buffdone_fn(sdd->tx_dmach, s3c64xx_spi_dma_txcb);
-> - ? ? ? s3c2410_dma_devconfig(sdd->tx_dmach, S3C2410_DMASRC_MEM,
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? sdd->sfr_start + S3C64XX_SPI_TX_DATA);
-> +
-> + ? ? ? struct samsung_dma_info info;
-> + ? ? ? sdd->ops = samsung_dma_get_ops();
-> +
-> + ? ? ? info.cap = DMA_SLAVE;
-> + ? ? ? info.client = &s3c64xx_spi_dma_client;
-> + ? ? ? info.direction = DMA_FROM_DEVICE;
-> + ? ? ? info.fifo = sdd->sfr_start + S3C64XX_SPI_RX_DATA;
-> + ? ? ? info.width = sdd->cur_bpw / 8;
-> + ? ? ? sdd->rx_ch = sdd->ops->request(sdd->rx_dmach, &info);
-> + ? ? ? info.direction = DMA_TO_DEVICE;
-> + ? ? ? info.fifo = sdd->sfr_start + S3C64XX_SPI_TX_DATA;
-> + ? ? ? sdd->tx_ch = sdd->ops->request(sdd->tx_dmach, &info);
->
-> ? ? ? ?return 1;
-> ?}
-> @@ -800,8 +797,8 @@ static void s3c64xx_spi_work(struct work_struct *work)
-> ? ? ? ?spin_unlock_irqrestore(&sdd->lock, flags);
->
-> ? ? ? ?/* Free DMA channels */
-> - ? ? ? s3c2410_dma_free(sdd->tx_dmach, &s3c64xx_spi_dma_client);
-> - ? ? ? s3c2410_dma_free(sdd->rx_dmach, &s3c64xx_spi_dma_client);
-> + ? ? ? sdd->ops->release(sdd->rx_ch, &s3c64xx_spi_dma_client);
-> + ? ? ? sdd->ops->release(sdd->tx_ch, &s3c64xx_spi_dma_client);
-> ?}
+> I assume they were both applied to gpio-next (although a fresh fetch ?of that
+> doesn't show the commits)
 
-Btw, this spi driver is for S3C64xx(with pl080) and S5P(with pl330)
-series, both of which
-have DMAENGINE drivers. May be it could be directly switched to using
-those, rather than
-via Samsung's wrapper driver.
-Or am I overlooking something ?
+I can't push it out until after 3.1-rc1 is released because it is
+targeted at 3.2 now.
+
+g.
