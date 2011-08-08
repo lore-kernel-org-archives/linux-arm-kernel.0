@@ -1,141 +1,101 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon,  8 Aug 2011 18:16:11 +0100
-Subject: [PATCH 10/10] ARM: perf: add mode exclusion for Cortex-A15 PMU
+Date: Mon,  8 Aug 2011 18:16:10 +0100
+Subject: [PATCH 09/10] ARM: perf: allow armpmu to implement mode exclusion
 In-Reply-To: <1312823771-9952-1-git-send-email-will.deacon@arm.com>
 References: <1312823771-9952-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1312823771-9952-11-git-send-email-will.deacon@arm.com>
+Message-ID: <1312823771-9952-10-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Cortex-A15 PMU implements the PMUv2 specification and therefore
-has support for some mode exclusion.
+Modern PMUs allow for mode exclusion, so we no longer wish to return
+-EPERM if it is requested.
 
-This patch adds support for excluding user, kernel and hypervisor counts
-from a given event.
+This patch provides a hook in the armpmu structure for implementing
+mode exclusion. The hw_perf_event initialisation is slightly delayed so
+that the backend code can update the structure if required.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/kernel/perf_event_v7.c |   58 +++++++++++++++++++++++++++++++++------
- 1 files changed, 49 insertions(+), 9 deletions(-)
+ arch/arm/kernel/perf_event.c |   44 +++++++++++++++++++++++------------------
+ 1 files changed, 25 insertions(+), 19 deletions(-)
 
-diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
-index 0934c82..fe6c931 100644
---- a/arch/arm/kernel/perf_event_v7.c
-+++ b/arch/arm/kernel/perf_event_v7.c
-@@ -17,6 +17,9 @@
-  */
- 
- #ifdef CONFIG_CPU_V7
-+
-+static struct arm_pmu armv7pmu;
-+
- /*
-  * Common ARMv7 event types
-  *
-@@ -709,16 +712,24 @@ static const unsigned armv7_a15_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
- #define	ARMV7_PMNC_MASK		0x3f	 /* Mask for writable bits */
- 
- /*
-- * EVTSEL: Event selection reg
-- */
--#define	ARMV7_EVTSEL_MASK	0xff		/* Mask for writable bits */
--
--/*
-  * FLAG: counters overflow flag status reg
-  */
- #define	ARMV7_FLAG_MASK		0xffffffff	/* Mask for writable bits */
- #define	ARMV7_OVERFLOWED_MASK	ARMV7_FLAG_MASK
- 
-+/*
-+ * PMXEVTYPER: Event selection reg
-+ */
-+#define	ARMV7_EVTYPE_MASK	0xc00000ff	/* Mask for writable bits */
-+#define	ARMV7_EVTYPE_EVENT	0xff		/* Mask for EVENT bits */
-+
-+/*
-+ * Event filters for PMUv2
-+ */
-+#define	ARMV7_EXCLUDE_PL1	(1 << 31)
-+#define	ARMV7_EXCLUDE_USER	(1 << 30)
-+#define	ARMV7_INCLUDE_HYP	(1 << 27)
-+
- static inline u32 armv7_pmnc_read(void)
- {
- 	u32 val;
-@@ -805,7 +816,7 @@ static inline void armv7pmu_write_counter(int idx, u32 value)
- static inline void armv7_pmnc_write_evtsel(int idx, u32 val)
- {
- 	if (armv7_pmnc_select_counter(idx) == idx) {
--		val &= ARMV7_EVTSEL_MASK;
-+		val &= ARMV7_EVTYPE_MASK;
- 		asm volatile("mcr p15, 0, %0, c9, c13, 1" : : "r" (val));
- 	}
- }
-@@ -939,9 +950,10 @@ static void armv7pmu_enable_event(struct hw_perf_event *hwc, int idx)
- 
- 	/*
- 	 * Set event (if destined for PMNx counters)
--	 * We don't need to set the event if it's a cycle count
-+	 * We only need to set the event for the cycle counter if we
-+	 * have the ability to perform event filtering.
- 	 */
--	if (idx != ARMV7_IDX_CYCLE_COUNTER)
-+	if (armv7pmu.set_event_filter || idx != ARMV7_IDX_CYCLE_COUNTER)
- 		armv7_pmnc_write_evtsel(idx, hwc->config_base);
- 
- 	/*
-@@ -1066,9 +1078,10 @@ static int armv7pmu_get_event_idx(struct cpu_hw_events *cpuc,
- 				  struct hw_perf_event *event)
- {
- 	int idx;
-+	unsigned long evtype = event->config_base & ARMV7_EVTYPE_EVENT;
- 
- 	/* Always place a cycle counter into the cycle counter. */
--	if (event->config_base == ARMV7_PERFCTR_CPU_CYCLES) {
-+	if (evtype == ARMV7_PERFCTR_CPU_CYCLES) {
- 		if (test_and_set_bit(ARMV7_IDX_CYCLE_COUNTER, cpuc->used_mask))
- 			return -EAGAIN;
- 
-@@ -1088,6 +1101,32 @@ static int armv7pmu_get_event_idx(struct cpu_hw_events *cpuc,
- 	return -EAGAIN;
+diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
+index 00e57f1..8a5e2ac 100644
+--- a/arch/arm/kernel/perf_event.c
++++ b/arch/arm/kernel/perf_event.c
+@@ -76,6 +76,8 @@ struct arm_pmu {
+ 	void		(*disable)(struct hw_perf_event *evt, int idx);
+ 	int		(*get_event_idx)(struct cpu_hw_events *cpuc,
+ 					 struct hw_perf_event *hwc);
++	int		(*set_event_filter)(struct hw_perf_event *evt,
++					    struct perf_event_attr *attr);
+ 	u32		(*read_counter)(int idx);
+ 	void		(*write_counter)(int idx, u32 val);
+ 	void		(*start)(void);
+@@ -479,6 +481,13 @@ hw_perf_event_destroy(struct perf_event *event)
  }
  
-+/*
-+ * Add an event filter to a given event. This will only work for PMUv2 PMUs.
-+ */
-+static int armv7pmu_set_event_filter(struct hw_perf_event *event,
-+				     struct perf_event_attr *attr)
+ static int
++event_requires_mode_exclusion(struct perf_event_attr *attr)
 +{
-+	unsigned long config_base = 0;
-+
-+	if (attr->exclude_idle)
-+		return -EPERM;
-+	if (attr->exclude_user)
-+		config_base |= ARMV7_EXCLUDE_USER;
-+	if (attr->exclude_kernel)
-+		config_base |= ARMV7_EXCLUDE_PL1;
-+	if (!attr->exclude_hv)
-+		config_base |= ARMV7_INCLUDE_HYP;
-+
-+	/*
-+	 * Install the filter into config_base as this is used to
-+	 * construct the event type.
-+	 */
-+	event->config_base = config_base;
-+
-+	return 0;
++	return attr->exclude_idle || attr->exclude_user ||
++	       attr->exclude_kernel || attr->exclude_hv;
 +}
 +
- static void armv7pmu_reset(void *info)
++static int
+ __hw_perf_event_init(struct perf_event *event)
  {
- 	u32 idx, nb_cnt = armpmu->num_events;
-@@ -1162,6 +1201,7 @@ static struct arm_pmu *__init armv7_a15_pmu_init(void)
- 	armv7pmu.cache_map	= &armv7_a15_perf_cache_map;
- 	armv7pmu.event_map	= &armv7_a15_perf_map;
- 	armv7pmu.num_events	= armv7_read_num_pmnc_events();
-+	armv7pmu.set_event_filter = armv7pmu_set_event_filter;
- 	return &armv7pmu;
- }
- #else
+ 	struct hw_perf_event *hwc = &event->hw;
+@@ -503,34 +512,31 @@ __hw_perf_event_init(struct perf_event *event)
+ 	}
+ 
+ 	/*
++	 * We don't assign an index until we actually place the event onto
++	 * hardware. Use -1 to signify that we haven't decided where to put it
++	 * yet. For SMP systems, each core has it's own PMU so we can't do any
++	 * clever allocation or constraints checking at this point.
++	 */
++	hwc->idx		= -1;
++	hwc->config_base	= 0;
++	hwc->config		= 0;
++	hwc->event_base		= 0;
++
++	/*
+ 	 * Check whether we need to exclude the counter from certain modes.
+-	 * The ARM performance counters are on all of the time so if someone
+-	 * has asked us for some excludes then we have to fail.
+ 	 */
+-	if (event->attr.exclude_kernel || event->attr.exclude_user ||
+-	    event->attr.exclude_hv || event->attr.exclude_idle) {
++	if ((!armpmu->set_event_filter ||
++	     armpmu->set_event_filter(hwc, &event->attr)) &&
++	     event_requires_mode_exclusion(&event->attr)) {
+ 		pr_debug("ARM performance counters do not support "
+ 			 "mode exclusion\n");
+ 		return -EPERM;
+ 	}
+ 
+ 	/*
+-	 * We don't assign an index until we actually place the event onto
+-	 * hardware. Use -1 to signify that we haven't decided where to put it
+-	 * yet. For SMP systems, each core has it's own PMU so we can't do any
+-	 * clever allocation or constraints checking at this point.
+-	 */
+-	hwc->idx = -1;
+-
+-	/*
+-	 * Store the event encoding into the config_base field. config and
+-	 * event_base are unused as the only 2 things we need to know are
+-	 * the event mapping and the counter to use. The counter to use is
+-	 * also the indx and the config_base is the event type.
++	 * Store the event encoding into the config_base field.
+ 	 */
+-	hwc->config_base	    = (unsigned long)mapping;
+-	hwc->config		    = 0;
+-	hwc->event_base		    = 0;
++	hwc->config_base	    |= (unsigned long)mapping;
+ 
+ 	if (!hwc->sample_period) {
+ 		hwc->sample_period  = armpmu->max_period;
 -- 
 1.7.0.4
