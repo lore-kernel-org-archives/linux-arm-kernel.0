@@ -1,26 +1,34 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Tue, 9 Aug 2011 00:02:37 +0530
-Subject: [PATCH 13/15] spi/s3c64xx: Merge dma control code
-In-Reply-To: <1311744697-10264-14-git-send-email-boojin.kim@samsung.com>
-References: <1311744697-10264-1-git-send-email-boojin.kim@samsung.com>
-	<1311744697-10264-14-git-send-email-boojin.kim@samsung.com>
-Message-ID: <CABb+yY0ZRNnkrTNWhYShBRpLFr8RB=eL6NqQHuv1aW=o2KfoSA@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 08 Aug 2011 13:49:31 -0500
+Subject: 3.1-rc1 link failure
+Message-ID: <4E402FBB.2070401@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 27, 2011 at 11:01 AM, Boojin Kim <boojin.kim@samsung.com> wrote:
-> This patch modifies to merge the dma control code.
-> Original s3c64xx spi driver has each dma control code for rx and tx channel.
-> This patch merges these dma control codes into one.
-> With this patch, a dma setup function and callback function handle
-> for both rx and tx channel.
+Russell,
 
-This is nothing really to do with underlying DMAENGINE API.
-And, apparently it actually bloats the driver ?   76 insertions(+), 64
-deletions(-)
-Yet, I am not very against the idea.
+This commit is causing some link failures:
 
-If you must do it, maybe It would have been better to move it early in
-the patchset,
-which would have resulted in a smaller and cleaner  "spi/s3c64xx: Add
-support DMA engine API"
+    ARM: vmlinux.lds: move discarded sections to beginning
+
+    Rather than scattering the discarded sections throughout the linker
+    file, move them to the start.
+
+    Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+    Tested-by: Stephen Boyd <sboyd@codeaurora.org>
+    Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+
+The error is this:
+
+`.exit.text' referenced in section `.alt.smp.init' of
+drivers/built-in.o: defined in discarded section `.exit.text' of
+drivers/built
+-in.o
+`.exit.text' referenced in section `.alt.smp.init' of net/built-in.o:
+defined in discarded section `.exit.text' of net/built-in.o
+
+I traced the one in net/ to CONFIG_SMP_ON_UP=y and CONFIG_DCB=y.
+dcbnl_exit calls dcb_flushapp which contains a spinlock. dcb_flushapp is
+getting inlined into dcbnl_exit.
+
+Rob
