@@ -1,44 +1,65 @@
-From: koen.beel.barco@gmail.com (Koen Beel)
-Date: Mon, 8 Aug 2011 14:42:12 +0200
-Subject: GPMI-NAND Status?
-In-Reply-To: <4E3FBC75.7010703@freescale.com>
-References: <20110805135133.GA26981@pengutronix.de>
-	<4E3F8087.6070206@freescale.com>
-	<CAHMSPgMYP+5Hpa5sC-yt=1H-S=tEER8uNzj6uMSK403_DGYJ9Q@mail.gmail.com>
-	<4E3FBC75.7010703@freescale.com>
-Message-ID: <CAHMSPgMdBmmNG41_QgGivSb+M1rG5nqJjtveyZueKHHJrA8vzA@mail.gmail.com>
+From: abhilash.kv@ti.com (Koyamangalath, Abhilash)
+Date: Mon, 8 Aug 2011 18:18:40 +0530
+Subject: [PATCH 2/2] omap_twl: Prevent SR to enable for am3517/am3505
+	devices
+In-Reply-To: <87hb5w3kq0.fsf@ti.com>
+References: <1312473569-1212-1-git-send-email-abhilash.kv@ti.com>,
+	<87hb5w3kq0.fsf@ti.com>
+Message-ID: <FCCFB4CDC6E5564B9182F639FC3560870370A4D96E@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Kevin Hilman wrote:
+>Abhilash K V <abhilash.kv@ti.com> writes:
+> 
+> > From: Vaibhav Hiremath <hvaibhav@ti.com>
+> >
+> > In case of AM3517 & AM3505, Smart Reflex is not applicable so
+> > we must not enable it. So add check for am3517/05 cpu revision
+> > in omap3_twl_init() and return -ENODEV if true, else continue.
+> >
+> > Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+> > Signed-off-by: Abhilash K V <abhilash.kv@ti.com>
+> > ---
+> >  arch/arm/mach-omap2/omap_twl.c |    8 ++++++++
+> >  1 files changed, 8 insertions(+), 0 deletions(-)
+> >
+> > diff --git a/arch/arm/mach-omap2/omap_twl.c
+> b/arch/arm/mach-omap2/omap_twl.c
+> > index 07d6140..92fadcb 100644
+> > --- a/arch/arm/mach-omap2/omap_twl.c
+> > +++ b/arch/arm/mach-omap2/omap_twl.c
+> > @@ -269,6 +269,14 @@ int __init omap3_twl_init(void)
+> >        if (!cpu_is_omap34xx())
+> >                return -ENODEV;
+> > 
+> > +     /*
+> > +      * In case of AM3517/AM3505 we should not be going down
+> > +      * further, since SR is not applicable there.
+> > +      */
+> > +     if (cpu_is_omap3505() || cpu_is_omap3517()) {
+> > +             return -ENODEV;
+> > +     }
+> > +
+> 
+> Rather than using cpu_is_*, you should add a new "feature" flag for
+> SmartReflex.  We already have this for things like SGX, IVA, NEON, etc.
+> See <plat/feature.h>
+I did not find a feature.h; did you mean OMAP3_CHECK_FEATURE macro which is used by
+omap3_check_features(), which gleans for presence of L2CACHE, IVA, SGX, NEON, ISP features
+from the Control Device Status Register (0x4800 244C) ?
+There is no such bit-field to indicate the presence of smart-reflex feature in this register.
+AFAIK, there is no such global register as well which could indicate this.
 
-On Mon, Aug 8, 2011 at 12:37 PM, Huang Shijie <b32955@freescale.com> wrote:
-> Hi,
->>
->> On my target, the mxs-dma is working for sdio until the gpmi-nand
->> gives a timeout. After that the dma for sdio is *not fully* working
->> anymore.
->>
-> We need more log in following aspects:
-> [1] apbh-dma registers
-> [2] clk registers
-> [3] gpmi registers
->
-> Please git-apply the patch in the attachment.
-> It will print out more DMA information WHEN dma-timeout occur.
+- Abhilash
 
-Don't get it. What exactly are you trying to dump?
-This patch dumps CTRL0, CTRL1, CTRL2, DEVSEL but also some registers
-of APBH channel0 which is reserved....
-Then it prints some debug info on channel 1 (ssp1) and then alle
-channel 2 register except the debug register (ssp2 = not used here).
-
-What info do you need?
-
-Br,
-Koen
-
->
-> Best Regards
-> Huang Shijie
->
+> Kevin
+> 
+> 
+> >        if (cpu_is_omap3630()) {
+> >                omap3_mpu_volt_info.vp_vddmin =
+> OMAP3630_VP1_VLIMITTO_VDDMIN;
+> >                omap3_mpu_volt_info.vp_vddmax =
+> OMAP3630_VP1_VLIMITTO_VDDMAX; 
+> 
+> 
