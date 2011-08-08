@@ -1,53 +1,51 @@
 From: tixy@yxit.co.uk (Jon Medhurst)
-Date: Mon,  8 Aug 2011 15:28:30 +0100
-Subject: [PATCH 10/12] ARM: mach-bcmring: Setup consistent dma size at boot
-	time
+Date: Mon,  8 Aug 2011 15:28:29 +0100
+Subject: [PATCH 09/12] ARM: mach-at91: Setup consistent dma size at boot time
 In-Reply-To: <1312813712-22808-1-git-send-email-tixy@yxit.co.uk>
 References: <1312813712-22808-1-git-send-email-tixy@yxit.co.uk>
-Message-ID: <1312813712-22808-11-git-send-email-tixy@yxit.co.uk>
+Message-ID: <1312813712-22808-10-git-send-email-tixy@yxit.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Jon Medhurst <tixy@yxit.co.uk>
-CC: Jiandong Zheng <jdzheng@broadcom.com>
-CC: Scott Branden <sbranden@broadcom.com>
+CC: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- arch/arm/mach-bcmring/include/mach/memory.h |    5 -----
- arch/arm/mach-bcmring/mm.c                  |    3 +++
- 2 files changed, 3 insertions(+), 5 deletions(-)
+ arch/arm/mach-at91/include/mach/at91sam9g45.h |    2 --
+ arch/arm/mach-at91/at91sam9g45.c              |    2 ++
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-bcmring/include/mach/memory.h b/arch/arm/mach-bcmring/include/mach/memory.h
-index 15162e4..8848a5b 100644
---- a/arch/arm/mach-bcmring/include/mach/memory.h
-+++ b/arch/arm/mach-bcmring/include/mach/memory.h
-@@ -25,9 +25,4 @@
+diff --git a/arch/arm/mach-at91/include/mach/at91sam9g45.h b/arch/arm/mach-at91/include/mach/at91sam9g45.h
+index 2c611b9..406bb64 100644
+--- a/arch/arm/mach-at91/include/mach/at91sam9g45.h
++++ b/arch/arm/mach-at91/include/mach/at91sam9g45.h
+@@ -128,8 +128,6 @@
+ #define AT91SAM9G45_EHCI_BASE	0x00800000	/* USB Host controller (EHCI) */
+ #define AT91SAM9G45_VDEC_BASE	0x00900000	/* Video Decoder Controller */
  
- #define PLAT_PHYS_OFFSET CFG_GLOBAL_RAM_BASE
- 
--/*
-- * Maximum DMA memory allowed is 14M
-- */
--#define CONSISTENT_DMA_SIZE (SZ_16M - SZ_2M)
+-#define CONSISTENT_DMA_SIZE	SZ_4M
 -
- #endif
-diff --git a/arch/arm/mach-bcmring/mm.c b/arch/arm/mach-bcmring/mm.c
-index 0f1c37e..8616876 100644
---- a/arch/arm/mach-bcmring/mm.c
-+++ b/arch/arm/mach-bcmring/mm.c
-@@ -13,6 +13,7 @@
- *****************************************************************************/
+ /*
+  * DMA peripheral identifiers
+  * for hardware handshaking interface
+diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
+index e04c5fb..1532b50 100644
+--- a/arch/arm/mach-at91/at91sam9g45.c
++++ b/arch/arm/mach-at91/at91sam9g45.c
+@@ -12,6 +12,7 @@
  
- #include <linux/platform_device.h>
+ #include <linux/module.h>
+ #include <linux/pm.h>
 +#include <linux/dma-mapping.h>
- #include <asm/mach/map.h>
  
- #include <mach/hardware.h>
-@@ -53,4 +54,6 @@ void __init bcmring_map_io(void)
+ #include <asm/irq.h>
+ #include <asm/mach/arch.h>
+@@ -319,6 +320,7 @@ static void at91sam9g45_poweroff(void)
+ static void __init at91sam9g45_map_io(void)
  {
- 
- 	iotable_init(bcmring_io_desc, ARRAY_SIZE(bcmring_io_desc));
-+	/* Maximum DMA memory allowed is 14M */
-+	init_consistent_dma_size(14 << 20);
+ 	at91_init_sram(0, AT91SAM9G45_SRAM_BASE, AT91SAM9G45_SRAM_SIZE);
++	init_consistent_dma_size(SZ_4M);
  }
+ 
+ static void __init at91sam9g45_initialize(void)
 -- 
 1.7.2.5
