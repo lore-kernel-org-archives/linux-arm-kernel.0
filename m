@@ -1,40 +1,45 @@
-From: n.voss@weinmann.de (Nikolaus Voss)
-Date: Mon, 8 Aug 2011 15:10:01 +0000 (UTC)
-Subject: [PATCH] =?utf-8?b?YXRtZWxfc2VyaWFsOg==?= fix
-	=?utf-8?b?YXRtZWxfZGVmYXVsdF9jb25zb2xlX2RldmljZQ==?=
-References: <1307541740.10626.15.camel@hcegtvedt.norway.atmel.com>
-	<1308666679-12111-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <loom.20110808T170457-559@post.gmane.org>
+From: omar.ramirez@ti.com (Ramirez Luna, Omar)
+Date: Mon, 8 Aug 2011 10:21:46 -0500
+Subject: [RFC] ARM: dma_map|unmap_sg plus iommu
+In-Reply-To: <CAHQjnOM58AReFuDpcSjHvNP2UZX1ZUeuWyfWCG6Ayxdfj4QE7w@mail.gmail.com>
+References: <CAB-zwWjb+2ExjNDB3OtHmRmgaHMnO-VgEe9VZk_wU=ryrq_AGw@mail.gmail.com>
+	<000301cc4dc4$31b53630$951fa290$%szyprowski@samsung.com>
+	<20110729093555.GA13522@8bytes.org>
+	<001901cc4dd8$4afb4e40$e0f1eac0$%szyprowski@samsung.com>
+	<20110729105422.GB13522@8bytes.org>
+	<004201cc4dfb$47ee4770$d7cad650$%szyprowski@samsung.com>
+	<CAHQjnOM58AReFuDpcSjHvNP2UZX1ZUeuWyfWCG6Ayxdfj4QE7w@mail.gmail.com>
+Message-ID: <CAB-zwWj-VCWQ6h8wjv7owG7n7p59Ep4qXiQY3LruT64sikuSKg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-reflect new static uart platform ids introduced by patch
-http://article.gmane.org/gmane.linux.kernel/1126105
+Hi,
 
-Signed-off-by: Nikolaus Voss <n.voss@weinmannn.de>
- 
----
- drivers/tty/serial/atmel_serial.c |    7 ++++---
- 1 files changed, 4 insertions(+), 3 deletions(-)
+On Sun, Jul 31, 2011 at 7:57 PM, KyongHo Cho <pullip.cho@samsung.com> wrote:
+> On Fri, Jul 29, 2011 at 11:24 PM, Marek Szyprowski
+...
+>> Right now I have no idea how to handle this better. Perhaps with should be
+>> possible
+>> to specify somehow the target dma_address when doing memory allocation, but I'm
+>> not
+>> really convinced yet if this is really required.
+>>
+> What about using 'dma_handle' argument of alloc_coherent callback of
+> dma_map_ops?
+> Although it is an output argument, I think we can convey a hint or
+> start address to map
+> to the IO memory manager that resides behind dma API.
 
-diff --git a/drivers/tty/serial/atmel_serial.c \
-	b/drivers/tty/serial/atmel_serial.c
-index af9b781..29c7857 100644
---- a/drivers/tty/serial/atmel_serial.c
-+++ b/drivers/tty/serial/atmel_serial.c
-@@ -1609,9 +1609,10 @@ static struct console atmel_console = {
- static int __init atmel_console_init(void)
- {
- 	if (atmel_default_console_device) {
--		add_preferred_console(ATMEL_DEVICENAME,
--				      atmel_default_console_device->id, NULL);
--		atmel_init_port(&atmel_ports[atmel_default_console_device->id],
-+		struct atmel_uart_data *pdata =
-+			atmel_default_console_device->dev.platform_data;
-+		add_preferred_console(ATMEL_DEVICENAME, pdata->num, NULL);
-+		atmel_init_port(&atmel_ports[pdata->num],
- 				atmel_default_console_device);
- 		register_console(&atmel_console);
- 	}
--- 
-1.7.4.1
+I also thought on this one, even dma_map_single receives a void *ptr
+which could be casted into a struct with both physical and virtual
+addresses to be mapped, but IMHO, this starts to add twists into the
+dma map parameters which might create confusion.
+
+> DMA API is so abstract that it cannot cover all requirements by
+> various device drivers;;
+
+Agree.
+
+Regards,
+
+Omar
