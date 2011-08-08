@@ -1,147 +1,213 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon,  8 Aug 2011 18:16:04 +0100
-Subject: [PATCH 03/10] ARM: perf: use cpumask_t to record active IRQs
+Date: Mon,  8 Aug 2011 18:16:02 +0100
+Subject: [PATCH 01/10] ARM: perf: de-const struct arm_pmu
 In-Reply-To: <1312823771-9952-1-git-send-email-will.deacon@arm.com>
 References: <1312823771-9952-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1312823771-9952-4-git-send-email-will.deacon@arm.com>
+Message-ID: <1312823771-9952-2-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 5dfc54e0 ("ARM: GIC: avoid routing interrupts to offline CPUs")
-prevents the GIC from setting the affinity of an IRQ to a CPU with
-id >= nr_cpu_ids. This was previously abused by perf on some platforms
-where more IRQs were registered than possible CPUs.
+From: Mark Rutland <mark.rutland@arm.com>
 
-This patch fixes the problem by using a cpumask_t to keep track of the
-active (requested) interrupts in perf. The same effect could be achieved
-by limiting the number of IRQs to the number of CPUs, but using a mask
-instead will be useful for adding extended CPU hotplug support in the
-future.
+This patch removes const qualifiers from instances of struct arm_pmu,
+and functions initialising them, in preparation for generalising
+arm_pmu usage to system (AKA uncore) PMUs.
 
+This will allow for dynamically modifiable structures (locks,
+struct pmu) to be added as members of struct arm_pmu.
+
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/kernel/perf_event.c |   64 ++++++++++++++++++++---------------------
- 1 files changed, 31 insertions(+), 33 deletions(-)
+ arch/arm/kernel/perf_event.c        |    2 +-
+ arch/arm/kernel/perf_event_v6.c     |   12 ++++++------
+ arch/arm/kernel/perf_event_v7.c     |   16 ++++++++--------
+ arch/arm/kernel/perf_event_xscale.c |   12 ++++++------
+ 4 files changed, 21 insertions(+), 21 deletions(-)
 
 diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
-index 8514855..d507fe1 100644
+index 53c9c26..7304996 100644
 --- a/arch/arm/kernel/perf_event.c
 +++ b/arch/arm/kernel/perf_event.c
-@@ -69,6 +69,7 @@ static DEFINE_PER_CPU(struct cpu_hw_events, cpu_hw_events);
+@@ -90,7 +90,7 @@ struct arm_pmu {
+ };
  
- struct arm_pmu {
- 	enum arm_perf_pmu_ids id;
-+	cpumask_t	active_irqs;
- 	const char	*name;
- 	irqreturn_t	(*handle_irq)(int irq_num, void *dev);
- 	void		(*enable)(struct hw_perf_event *evt, int idx);
-@@ -388,6 +389,25 @@ static irqreturn_t armpmu_platform_irq(int irq, void *dev)
- 	return plat->handle_irq(irq, dev, armpmu->handle_irq);
+ /* Set at runtime when we know what CPU type we are. */
+-static const struct arm_pmu *armpmu;
++static struct arm_pmu *armpmu;
+ 
+ enum arm_perf_pmu_ids
+ armpmu_get_pmu_id(void)
+diff --git a/arch/arm/kernel/perf_event_v6.c b/arch/arm/kernel/perf_event_v6.c
+index dd7f3b9..d1abe97 100644
+--- a/arch/arm/kernel/perf_event_v6.c
++++ b/arch/arm/kernel/perf_event_v6.c
+@@ -635,7 +635,7 @@ armv6mpcore_pmu_disable_event(struct hw_perf_event *hwc,
+ 	raw_spin_unlock_irqrestore(&pmu_lock, flags);
  }
  
-+static void
-+armpmu_release_hardware(void)
-+{
-+	int i, irq, irqs;
-+
-+	irqs = min(pmu_device->num_resources, num_possible_cpus());
-+
-+	for (i = 0; i < irqs; ++i) {
-+		if (!cpumask_test_and_clear_cpu(i, &armpmu->active_irqs))
-+			continue;
-+		irq = platform_get_irq(pmu_device, i);
-+		if (irq >= 0)
-+			free_irq(irq, NULL);
-+	}
-+
-+	armpmu->stop();
-+	release_pmu(ARM_PMU_DEVICE_CPU);
-+}
-+
- static int
- armpmu_reserve_hardware(void)
+-static const struct arm_pmu armv6pmu = {
++static struct arm_pmu armv6pmu = {
+ 	.id			= ARM_PERF_PMU_ID_V6,
+ 	.name			= "v6",
+ 	.handle_irq		= armv6pmu_handle_irq,
+@@ -653,7 +653,7 @@ static const struct arm_pmu armv6pmu = {
+ 	.max_period		= (1LLU << 32) - 1,
+ };
+ 
+-static const struct arm_pmu *__init armv6pmu_init(void)
++static struct arm_pmu *__init armv6pmu_init(void)
  {
-@@ -401,20 +421,20 @@ armpmu_reserve_hardware(void)
- 		return err;
- 	}
+ 	return &armv6pmu;
+ }
+@@ -665,7 +665,7 @@ static const struct arm_pmu *__init armv6pmu_init(void)
+  * disable the interrupt reporting and update the event. When unthrottling we
+  * reset the period and enable the interrupt reporting.
+  */
+-static const struct arm_pmu armv6mpcore_pmu = {
++static struct arm_pmu armv6mpcore_pmu = {
+ 	.id			= ARM_PERF_PMU_ID_V6MP,
+ 	.name			= "v6mpcore",
+ 	.handle_irq		= armv6pmu_handle_irq,
+@@ -683,17 +683,17 @@ static const struct arm_pmu armv6mpcore_pmu = {
+ 	.max_period		= (1LLU << 32) - 1,
+ };
  
--	irqs = pmu_device->num_resources;
--
- 	plat = dev_get_platdata(&pmu_device->dev);
- 	if (plat && plat->handle_irq)
- 		handle_irq = armpmu_platform_irq;
- 	else
- 		handle_irq = armpmu->handle_irq;
- 
-+	irqs = min(pmu_device->num_resources, num_possible_cpus());
- 	if (irqs < 1) {
- 		pr_err("no irqs for PMUs defined\n");
- 		return -ENODEV;
- 	}
- 
- 	for (i = 0; i < irqs; ++i) {
-+		err = 0;
- 		irq = platform_get_irq(pmu_device, i);
- 		if (irq < 0)
- 			continue;
-@@ -422,13 +442,12 @@ armpmu_reserve_hardware(void)
- 		/*
- 		 * If we have a single PMU interrupt that we can't shift,
- 		 * assume that we're running on a uniprocessor machine and
--		 * continue.
-+		 * continue. Otherwise, continue without this interrupt.
- 		 */
--		err = irq_set_affinity(irq, cpumask_of(i));
--		if (err && irqs > 1) {
--			pr_err("unable to set irq affinity (irq=%d, cpu=%u)\n",
--				irq, i);
--			break;
-+		if (irq_set_affinity(irq, cpumask_of(i)) && irqs > 1) {
-+			pr_warning("unable to set irq affinity (irq=%d, cpu=%u)\n",
-+				    irq, i);
-+			continue;
- 		}
- 
- 		err = request_irq(irq, handle_irq,
-@@ -437,35 +456,14 @@ armpmu_reserve_hardware(void)
- 		if (err) {
- 			pr_err("unable to request IRQ%d for ARM PMU counters\n",
- 				irq);
--			break;
-+			armpmu_release_hardware();
-+			return err;
- 		}
--	}
- 
--	if (err) {
--		for (i = i - 1; i >= 0; --i) {
--			irq = platform_get_irq(pmu_device, i);
--			if (irq >= 0)
--				free_irq(irq, NULL);
--		}
--		release_pmu(ARM_PMU_DEVICE_CPU);
-+		cpumask_set_cpu(i, &armpmu->active_irqs);
- 	}
- 
--	return err;
--}
--
--static void
--armpmu_release_hardware(void)
--{
--	int i, irq;
--
--	for (i = pmu_device->num_resources - 1; i >= 0; --i) {
--		irq = platform_get_irq(pmu_device, i);
--		if (irq >= 0)
--			free_irq(irq, NULL);
--	}
--	armpmu->stop();
--
--	release_pmu(ARM_PMU_DEVICE_CPU);
-+	return 0;
+-static const struct arm_pmu *__init armv6mpcore_pmu_init(void)
++static struct arm_pmu *__init armv6mpcore_pmu_init(void)
+ {
+ 	return &armv6mpcore_pmu;
+ }
+ #else
+-static const struct arm_pmu *__init armv6pmu_init(void)
++static struct arm_pmu *__init armv6pmu_init(void)
+ {
+ 	return NULL;
  }
  
- static atomic_t active_events = ATOMIC_INIT(0);
+-static const struct arm_pmu *__init armv6mpcore_pmu_init(void)
++static struct arm_pmu *__init armv6mpcore_pmu_init(void)
+ {
+ 	return NULL;
+ }
+diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
+index 4c85183..74f9119 100644
+--- a/arch/arm/kernel/perf_event_v7.c
++++ b/arch/arm/kernel/perf_event_v7.c
+@@ -1188,7 +1188,7 @@ static u32 __init armv7_read_num_pmnc_events(void)
+ 	return nb_cnt + 1;
+ }
+ 
+-static const struct arm_pmu *__init armv7_a8_pmu_init(void)
++static struct arm_pmu *__init armv7_a8_pmu_init(void)
+ {
+ 	armv7pmu.id		= ARM_PERF_PMU_ID_CA8;
+ 	armv7pmu.name		= "ARMv7 Cortex-A8";
+@@ -1198,7 +1198,7 @@ static const struct arm_pmu *__init armv7_a8_pmu_init(void)
+ 	return &armv7pmu;
+ }
+ 
+-static const struct arm_pmu *__init armv7_a9_pmu_init(void)
++static struct arm_pmu *__init armv7_a9_pmu_init(void)
+ {
+ 	armv7pmu.id		= ARM_PERF_PMU_ID_CA9;
+ 	armv7pmu.name		= "ARMv7 Cortex-A9";
+@@ -1208,7 +1208,7 @@ static const struct arm_pmu *__init armv7_a9_pmu_init(void)
+ 	return &armv7pmu;
+ }
+ 
+-static const struct arm_pmu *__init armv7_a5_pmu_init(void)
++static struct arm_pmu *__init armv7_a5_pmu_init(void)
+ {
+ 	armv7pmu.id		= ARM_PERF_PMU_ID_CA5;
+ 	armv7pmu.name		= "ARMv7 Cortex-A5";
+@@ -1218,7 +1218,7 @@ static const struct arm_pmu *__init armv7_a5_pmu_init(void)
+ 	return &armv7pmu;
+ }
+ 
+-static const struct arm_pmu *__init armv7_a15_pmu_init(void)
++static struct arm_pmu *__init armv7_a15_pmu_init(void)
+ {
+ 	armv7pmu.id		= ARM_PERF_PMU_ID_CA15;
+ 	armv7pmu.name		= "ARMv7 Cortex-A15";
+@@ -1228,22 +1228,22 @@ static const struct arm_pmu *__init armv7_a15_pmu_init(void)
+ 	return &armv7pmu;
+ }
+ #else
+-static const struct arm_pmu *__init armv7_a8_pmu_init(void)
++static struct arm_pmu *__init armv7_a8_pmu_init(void)
+ {
+ 	return NULL;
+ }
+ 
+-static const struct arm_pmu *__init armv7_a9_pmu_init(void)
++static struct arm_pmu *__init armv7_a9_pmu_init(void)
+ {
+ 	return NULL;
+ }
+ 
+-static const struct arm_pmu *__init armv7_a5_pmu_init(void)
++static struct arm_pmu *__init armv7_a5_pmu_init(void)
+ {
+ 	return NULL;
+ }
+ 
+-static const struct arm_pmu *__init armv7_a15_pmu_init(void)
++static struct arm_pmu *__init armv7_a15_pmu_init(void)
+ {
+ 	return NULL;
+ }
+diff --git a/arch/arm/kernel/perf_event_xscale.c b/arch/arm/kernel/perf_event_xscale.c
+index 3c43974..730b1c2 100644
+--- a/arch/arm/kernel/perf_event_xscale.c
++++ b/arch/arm/kernel/perf_event_xscale.c
+@@ -424,7 +424,7 @@ xscale1pmu_write_counter(int counter, u32 val)
+ 	}
+ }
+ 
+-static const struct arm_pmu xscale1pmu = {
++static struct arm_pmu xscale1pmu = {
+ 	.id		= ARM_PERF_PMU_ID_XSCALE1,
+ 	.name		= "xscale1",
+ 	.handle_irq	= xscale1pmu_handle_irq,
+@@ -442,7 +442,7 @@ static const struct arm_pmu xscale1pmu = {
+ 	.max_period	= (1LLU << 32) - 1,
+ };
+ 
+-static const struct arm_pmu *__init xscale1pmu_init(void)
++static struct arm_pmu *__init xscale1pmu_init(void)
+ {
+ 	return &xscale1pmu;
+ }
+@@ -786,7 +786,7 @@ xscale2pmu_write_counter(int counter, u32 val)
+ 	}
+ }
+ 
+-static const struct arm_pmu xscale2pmu = {
++static struct arm_pmu xscale2pmu = {
+ 	.id		= ARM_PERF_PMU_ID_XSCALE2,
+ 	.name		= "xscale2",
+ 	.handle_irq	= xscale2pmu_handle_irq,
+@@ -804,17 +804,17 @@ static const struct arm_pmu xscale2pmu = {
+ 	.max_period	= (1LLU << 32) - 1,
+ };
+ 
+-static const struct arm_pmu *__init xscale2pmu_init(void)
++static struct arm_pmu *__init xscale2pmu_init(void)
+ {
+ 	return &xscale2pmu;
+ }
+ #else
+-static const struct arm_pmu *__init xscale1pmu_init(void)
++static struct arm_pmu *__init xscale1pmu_init(void)
+ {
+ 	return NULL;
+ }
+ 
+-static const struct arm_pmu *__init xscale2pmu_init(void)
++static struct arm_pmu *__init xscale2pmu_init(void)
+ {
+ 	return NULL;
+ }
 -- 
 1.7.0.4
