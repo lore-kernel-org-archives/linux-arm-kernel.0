@@ -1,49 +1,54 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 9 Aug 2011 05:59:15 +0800
-Subject: [GIT PULL] imx-fixes
-In-Reply-To: <20110808064157.GC17990@pengutronix.de>
-References: <20110808063549.GL31404@pengutronix.de>
-	<20110808064157.GC17990@pengutronix.de>
-Message-ID: <20110808215914.GA2837@freescale.com>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Tue, 9 Aug 2011 07:57:24 +0900
+Subject: [PATCH] GPIOLIB: add generic gpio_set_pull API
+In-Reply-To: <CACxGe6ssT4=kxApaKhv+=7nDcEFVW+oyByFQ_hzcfyZ4gw2C3g@mail.gmail.com>
+References: <1312780773-23142-1-git-send-email-Baohua.Song@csr.com>
+	<20110808081552.GI32513@linux-sh.org>
+	<CACxGe6ssT4=kxApaKhv+=7nDcEFVW+oyByFQ_hzcfyZ4gw2C3g@mail.gmail.com>
+Message-ID: <CAH9JG2V-66Wn7nwJz6tOkESoQAUJzAg-47YeMY0vzwu6T9O=Rg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+On Tue, Aug 9, 2011 at 3:24 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
+> On Mon, Aug 8, 2011 at 2:15 AM, Paul Mundt <lethal@linux-sh.org> wrote:
+>> On Sun, Aug 07, 2011 at 10:19:33PM -0700, Barry Song wrote:
+>>> Now there are many different implementations for GPIO pull configuration, for
+>>> example:
+>>> s3c_gpio_setpull()
+>>> tegra_pinmux_set_pullupdown()
+>>> chipcHw_setPinPullup()
+>>> gpio_pullup()
+>>> s3c2410_gpio_pullup()
+>>>
+>>> This patch adds a new generic gpio_set_pull API so that all SoCs can have unified
+>>> codes.
+>>>
+>>> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+>>
+>> For arch/arm/mach-shmobile we also have gpio_pull_up() for board-g4evm.c
+>> and gpio_pull_down() for board-mackerel.c. Both of these would benefit
+>> from this sort of an API addition.
+>
+> I think I'm okay with this API change. ?Linus, what say you? ?How does
+> this interact with your plans for pinctrl?
 
-On Mon, Aug 08, 2011 at 08:41:57AM +0200, Sascha Hauer wrote:
-> On Mon, Aug 08, 2011 at 08:35:49AM +0200, Sascha Hauer wrote:
-> > 
-> > Hi Arnd,
-> > 
-> > Please pull the following fixes for i.MX.
-> 
-> Added one patch from Arnaud Patard to this series:
-> 
-> commit d9c927833a42b4eaae4addd031f780f4530f7a2d
-> Author: Arnaud Patard (Rtp) <arnaud.patard@rtp-net.org>
-> Date:   Fri Aug 5 09:32:41 2011 +0200
-> 
->     iMX: Fix build for iMX53
-> 
-I'm fine with the fact that you picked this over mine which I posted
-below, as long as we fix the issue.  But it seems that I need to ping
-you harder to pick my patch in the future, if somehow you will easily
-forget/overlook my patches :)
+If gpiolib accept the pullup control. gpiolib is better place to
+control gpio config.
+then remains are the gpio driver strength, and power down mode
+control. powerdown pull-up/down, powerdown in/out at samsung gpios.
 
-http://article.gmane.org/gmane.linux.ports.arm.kernel/125945
+Thank you,
+Kyungmin Park
 
-commit 8065dff7367b6efd9859b223e06e57465a1d3cee
-Author: Shawn Guo <shawn.guo@linaro.org>
-Date:   Wed Jul 20 20:48:32 2011 +0800
-
-    arm/mxc: add the missing UART_PADDR for i.mx53
-
-    The UART_PADDR definition for i.mx53 and i.mx50 is missing in
-    debug-macro.S.  It causes the build of i.mx53/50 fail.
-
-    Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-    Reported-by: Troy Kisky <troy.kisky@boundarydevices.com>
-
--- 
-Regards,
-Shawn
+>
+> g.
+>
+> --
+> Grant Likely, B.Sc., P.Eng.
+> Secret Lab Technologies Ltd.
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
