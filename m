@@ -1,42 +1,39 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 08 Aug 2011 10:33:38 -0700
-Subject: [PATCH 4/6] ARM: smp: set thread_info->cpu to hardware CPU number
-	for boot thread
-In-Reply-To: <1312823424-9654-5-git-send-email-will.deacon@arm.com>
-References: <1312823424-9654-1-git-send-email-will.deacon@arm.com>
-	<1312823424-9654-5-git-send-email-will.deacon@arm.com>
-Message-ID: <4E401DF2.10801@codeaurora.org>
+Date: Mon, 08 Aug 2011 10:38:15 -0700
+Subject: [PATCH 1/5] ARM: hw_breakpoint: add initial Cortex-A15 (debug
+	v7.1) support
+In-Reply-To: <1312823572-9807-2-git-send-email-will.deacon@arm.com>
+References: <1312823572-9807-1-git-send-email-will.deacon@arm.com>
+	<1312823572-9807-2-git-send-email-will.deacon@arm.com>
+Message-ID: <4E401F07.6060202@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/08/2011 10:10 AM, Will Deacon wrote:
->
+On 08/08/2011 10:12 AM, Will Deacon wrote:
+> diff --git a/arch/arm/include/asm/hw_breakpoint.h b/arch/arm/include/asm/hw_breakpoint.h
+> index f389b27..0ac141a 100644
+> --- a/arch/arm/include/asm/hw_breakpoint.h
+> +++ b/arch/arm/include/asm/hw_breakpoint.h
+> @@ -50,6 +50,7 @@ static inline void decode_ctrl_reg(u32 reg,
+>  #define ARM_DEBUG_ARCH_V6_1	2
+>  #define ARM_DEBUG_ARCH_V7_ECP14	3
+>  #define ARM_DEBUG_ARCH_V7_MM	4
+> +#define ARM_DEBUG_ARCH_V7_1	5
 >  
-> +void __init smp_setup_processor_id(void)
-> +{
-> +	u32 mpidr;
-> +
-> +	/* Read the MPIDR to find the hardware ID of the current CPU. */
-> +	asm("1:		mrc	p15, 0, %0, c0, c0, 5\n"
-> +	    "		.pushsection \".alt.smp.init\", \"a\"\n"
-> +	    "		.long	1b\n"
-> +	    "		mov	%0, #0\n"
-> +	    "		.popsection"
-> +	    : "=r" (mpidr));
+>  /* Breakpoint */
+>  #define ARM_BREAKPOINT_EXECUTE	0
+> diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
+> index a927ca1..9848157 100644
+> --- a/arch/arm/kernel/hw_breakpoint.c
+> +++ b/arch/arm/kernel/hw_breakpoint.c
+> @@ -154,7 +154,7 @@ u8 arch_get_debug_arch(void)
+>  static int debug_arch_supported(void)
+>  {
+>  	u8 arch = get_debug_arch();
+> -	return arch >= ARM_DEBUG_ARCH_V6 && arch <= ARM_DEBUG_ARCH_V7_ECP14;
+> +	return arch >= ARM_DEBUG_ARCH_V6 && arch <= ARM_DEBUG_ARCH_V7_1;
 
-Would it be a good idea to put this into asm/cputype.h? I suppose the
-smp alternatives part would need to be written in C.
-
-    mpidr = is_smp() ? read_cpuid_mpidr() : 0;
-
->
-> +
-> +	current_thread_info()->cpu = mpidr & 0xff;
-> +	printk("Booting Linux on CPU %d\n", current_thread_info()->cpu);
-> +}
-> +
-
-Should there be a KERN_INFO there?
+Is ARM_DEBUG_ARCH_V7_MM supported now too?
 
 -- 
 Sent by an employee of the Qualcomm Innovation Center, Inc.
