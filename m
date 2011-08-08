@@ -1,35 +1,58 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Mon, 08 Aug 2011 15:11:58 +0200
-Subject: [PATCH] ARM: EXYNOS4: Fix the IRQ definitions for MIPI CSIS device
-Message-ID: <1312809118-6181-1-git-send-email-s.nawrocki@samsung.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 8 Aug 2011 14:26:31 +0100
+Subject: [PATCH] ARM errata: Possible cache data corruption with
+	hit-under-miss enabled
+In-Reply-To: <CACY+gR2_Rf7dh91vagJfEB=qgALJf4nigJbFQJz--DweQkZ+Qw@mail.gmail.com>
+References: <1312785148-32531-1-git-send-email-siarhei.siamashka@gmail.com>
+	<20110808100233.GG29226@e102109-lin.cambridge.arm.com>
+	<CACY+gR2_Rf7dh91vagJfEB=qgALJf4nigJbFQJz--DweQkZ+Qw@mail.gmail.com>
+Message-ID: <20110808132631.GA670@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a regression fix after migration to the external GIC.
-The breakage has been introduced in commit:
-"ARM: EXYNOS4: modify interrupt mappings for external GIC"
+On Mon, Aug 08, 2011 at 12:43:00PM +0100, Siarhei Siamashka wrote:
+> On Mon, Aug 8, 2011 at 1:02 PM, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > On Mon, Aug 08, 2011 at 07:32:28AM +0100, Siarhei Siamashka wrote:
+> >> From: Catalin Marinas <catalin.marinas@arm.com>
+> >>
+> >> This patch is a workaround for the 364296 ARM1136 r0pX erratum (possible
+> >> cache data corruption with hit-under-miss enabled). It sets the
+> >> undocumented bit 31 in the auxiliary control register and the FI bit in
+> >> the control register, thus disabling hit-under-miss without putting the
+> >> processor into full low interrupt latency mode.
+> >>
+> >> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> >> Tested-by: Siarhei Siamashka <siarhei.siamashka@gmail.com>
+> >
+> > I haven't pushed this workaround in the past as I wasn't sure there is
+> > production hardware affected. I recall you mentioned Nokia N800, do you
+> > know which CPU revision does this have?
+> 
+> [    0.000000] CPU: ARMv6-compatible processor [4107b362] revision 2
+> (ARMv6TEJ), cr=00e5387f
+> [    0.000000] CPU: VIPT aliasing data cache, unknown instruction
+> cache
+> [    0.000000] Machine: Nokia N810
+> [    0.000000] Memory policy: ECC disabled, Data cache writeback
+> [    0.000000] OMAP2420
+> 
+> # cat /proc/cpuinfo
+> Processor       : ARMv6-compatible processor rev 2 (v6l)
+> BogoMIPS        : 213.72
+> Features        : swp half thumb fastmult vfp edsp java
+> CPU implementer : 0x41
+> CPU architecture: 6TEJ
+> CPU variant     : 0x0
+> CPU part        : 0xb36
+> CPU revision    : 2
+> 
+> Hardware        : Nokia N810
+> Revision        : 0000
+> Serial          : 0000000000000000
+...
+> Would you be so kind to update the patch?
 
-Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- arch/arm/mach-exynos4/include/mach/irqs.h |    5 ++---
- 1 files changed, 2 insertions(+), 3 deletions(-)
+OK, I'll update it and post the patch in the next day or so.
 
-diff --git a/arch/arm/mach-exynos4/include/mach/irqs.h b/arch/arm/mach-exynos4/include/mach/irqs.h
-index 934d2a4..f8952f8 100644
---- a/arch/arm/mach-exynos4/include/mach/irqs.h
-+++ b/arch/arm/mach-exynos4/include/mach/irqs.h
-@@ -80,9 +80,8 @@
- #define IRQ_HSMMC3		IRQ_SPI(76)
- #define IRQ_DWMCI		IRQ_SPI(77)
- 
--#define IRQ_MIPICSI0		IRQ_SPI(78)
--
--#define IRQ_MIPICSI1		IRQ_SPI(80)
-+#define IRQ_MIPI_CSIS0		IRQ_SPI(78)
-+#define IRQ_MIPI_CSIS1		IRQ_SPI(80)
- 
- #define IRQ_ONENAND_AUDI	IRQ_SPI(82)
- #define IRQ_ROTATOR		IRQ_SPI(83)
 -- 
-1.7.5.4
+Catalin
