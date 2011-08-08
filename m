@@ -1,38 +1,38 @@
-From: Marc.Dietrich@ap.physik.uni-giessen.de (Marc Dietrich)
-Date: Mon, 8 Aug 2011 23:15:15 +0200
-Subject: [PATCH 4/5] ARM: tegra: paz00: add clocks required forusboperation
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF049F1721DE@HQMAIL01.nvidia.com>
-References: <cover.1312742856.git.marvin24@gmx.de>
-	<201108081919.07647.marc.dietrich@ap.physik.uni-giessen.de>
-	<74CDBE0F657A3D45AFBB94109FB122FF049F1721DE@HQMAIL01.nvidia.com>
-Message-ID: <201108082315.16974.marc.dietrich@ap.physik.uni-giessen.de>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 08 Aug 2011 16:16:17 -0500
+Subject: [PATCH 2/6] ARM: realview: ensure visibility of writes during
+	reset
+In-Reply-To: <1312823424-9654-3-git-send-email-will.deacon@arm.com>
+References: <1312823424-9654-1-git-send-email-will.deacon@arm.com>
+	<1312823424-9654-3-git-send-email-will.deacon@arm.com>
+Message-ID: <4E405221.7050800@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag 08 August 2011, 19:38:25 schrieb Stephen Warren:
-> Marc Dietrich wrote at Monday, August 08, 2011 11:19 AM:
-> > On Monday 08 August 2011 18:57:52 Stephen Warren wrote:
+On 08/08/2011 12:10 PM, Will Deacon wrote:
+> The various reset routines in mach-realview rely on an FPGA to
+> power-cycle the board after writing some magic runes to memory-mapped
+> registers.
 > 
-> +	{ "pll_p_out4", "pll_p",        24000000,       true },
+> This patch adds a dsb() following the writes, so that they become
+> visible before we mdelay(1000) in the arch_reset code. Without this
+> patch, the timeout would expire sporadically, causing the reset to fail.
 > 
-> Oh, and looking at the patches I recently posted to add USB support to
-> Harmony and Seaboard, which have been in the ChromeOS kernel for a while,
-> the USB clocks entries are typically e.g.:
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm/mach-realview/include/mach/system.h |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
 > 
->         { "usbd",       "clk_m",        12000000,       true},
->         { "usb3",       "clk_m",        12000000,       true},
-> 
-> Our internal Android kernel uses the same parent/rate setup for Harmony
-> too.
-> 
-> (there's a "usb2" too if you need; one per controller, so it depends which
-> are used on the AC100)
+> diff --git a/arch/arm/mach-realview/include/mach/system.h b/arch/arm/mach-realview/include/mach/system.h
+> index a30f2e3..6657ff2 100644
+> --- a/arch/arm/mach-realview/include/mach/system.h
+> +++ b/arch/arm/mach-realview/include/mach/system.h
+> @@ -44,6 +44,7 @@ static inline void arch_reset(char mode, const char *cmd)
+>  	 */
+>  	if (realview_reset)
+>  		realview_reset(mode);
+> +	dsb();
 
-Seems we are using all three ports (including fsl_udc for debugging). I left 
-them out because they seem to be switched on automaticly (either via the 
-bootloader or via the tegra-ehci driver).
+Wouldn't it be better to do this globally.
 
-On the other hand, we want to move to u-boot sooner or later so I think it's 
-better to enable them now.
-
-Marc
+Rob
