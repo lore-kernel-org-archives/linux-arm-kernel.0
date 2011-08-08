@@ -1,55 +1,78 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon,  8 Aug 2011 18:16:09 +0100
-Subject: [PATCH 08/10] ARM: perf: index PMU registers from zero
+Date: Mon,  8 Aug 2011 18:16:06 +0100
+Subject: [PATCH 05/10] ARM: perf: use integers for ARMv7 event indices
 In-Reply-To: <1312823771-9952-1-git-send-email-will.deacon@arm.com>
 References: <1312823771-9952-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1312823771-9952-9-git-send-email-will.deacon@arm.com>
+Message-ID: <1312823771-9952-6-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM PMU code used to use 1-based indices for PMU registers. This caused
-several data structures (pmu_hw_events::{active_events, used_mask, events})
-to have an unused element at index zero. ARMPMU_MAX_HWEVENTS still takes
-this indexing into account, and currently equates to 33.
+This patch ensures that integers are used to represent event indices in
+the ARMv7 PMU backend. This ensures consistency between functions and
+also with the arm_pmu structure.
 
-This patch updates the core ARM perf code to use the 0th index again.
-
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/kernel/perf_event.c |    6 +++---
- 1 files changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/kernel/perf_event_v7.c |   12 ++++++------
+ 1 files changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
-index d507fe1..00e57f1 100644
---- a/arch/arm/kernel/perf_event.c
-+++ b/arch/arm/kernel/perf_event.c
-@@ -35,7 +35,7 @@ static struct platform_device *pmu_device;
- static DEFINE_RAW_SPINLOCK(pmu_lock);
+diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
+index f4f260d..e39bc89 100644
+--- a/arch/arm/kernel/perf_event_v7.c
++++ b/arch/arm/kernel/perf_event_v7.c
+@@ -793,7 +793,7 @@ static inline int armv7_pmnc_counter_has_overflowed(u32 pmnc,
+ 	return ret;
+ }
  
- /*
-- * ARMv6 supports a maximum of 3 events, starting from index 1. If we add
-+ * ARMv6 supports a maximum of 3 events, starting from index 0. If we add
-  * another platform that supports more, we need to increase this to be the
-  * largest of all platforms.
-  *
-@@ -43,7 +43,7 @@ static DEFINE_RAW_SPINLOCK(pmu_lock);
-  *  cycle counter CCNT + 31 events counters CNT0..30.
-  *  Cortex-A8 has 1+4 counters, Cortex-A9 has 1+6 counters.
-  */
--#define ARMPMU_MAX_HWEVENTS		33
-+#define ARMPMU_MAX_HWEVENTS		32
+-static inline int armv7_pmnc_select_counter(unsigned int idx)
++static inline int armv7_pmnc_select_counter(int idx)
+ {
+ 	u32 val;
  
- /* The events for a given CPU. */
- struct cpu_hw_events {
-@@ -597,7 +597,7 @@ static void armpmu_enable(struct pmu *pmu)
- 	if (!armpmu)
- 		return;
+@@ -840,7 +840,7 @@ static inline void armv7pmu_write_counter(int idx, u32 value)
+ 			smp_processor_id(), idx);
+ }
  
--	for (idx = 0; idx <= armpmu->num_events; ++idx) {
-+	for (idx = 0; idx < armpmu->num_events; ++idx) {
- 		struct perf_event *event = cpuc->events[idx];
+-static inline void armv7_pmnc_write_evtsel(unsigned int idx, u32 val)
++static inline void armv7_pmnc_write_evtsel(int idx, u32 val)
+ {
+ 	if (armv7_pmnc_select_counter(idx) == idx) {
+ 		val &= ARMV7_EVTSEL_MASK;
+@@ -848,7 +848,7 @@ static inline void armv7_pmnc_write_evtsel(unsigned int idx, u32 val)
+ 	}
+ }
  
- 		if (!event)
+-static inline u32 armv7_pmnc_enable_counter(unsigned int idx)
++static inline int armv7_pmnc_enable_counter(int idx)
+ {
+ 	u32 val;
+ 
+@@ -869,7 +869,7 @@ static inline u32 armv7_pmnc_enable_counter(unsigned int idx)
+ 	return idx;
+ }
+ 
+-static inline u32 armv7_pmnc_disable_counter(unsigned int idx)
++static inline int armv7_pmnc_disable_counter(int idx)
+ {
+ 	u32 val;
+ 
+@@ -891,7 +891,7 @@ static inline u32 armv7_pmnc_disable_counter(unsigned int idx)
+ 	return idx;
+ }
+ 
+-static inline u32 armv7_pmnc_enable_intens(unsigned int idx)
++static inline int armv7_pmnc_enable_intens(int idx)
+ {
+ 	u32 val;
+ 
+@@ -912,7 +912,7 @@ static inline u32 armv7_pmnc_enable_intens(unsigned int idx)
+ 	return idx;
+ }
+ 
+-static inline u32 armv7_pmnc_disable_intens(unsigned int idx)
++static inline int armv7_pmnc_disable_intens(int idx)
+ {
+ 	u32 val;
+ 
 -- 
 1.7.0.4
