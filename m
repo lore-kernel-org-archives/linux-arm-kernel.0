@@ -1,133 +1,75 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Mon, 8 Aug 2011 14:21:59 +0800
-Subject: GPMI-NAND Status?
-In-Reply-To: <20110805135133.GA26981@pengutronix.de>
-References: <20110805135133.GA26981@pengutronix.de>
-Message-ID: <4E3F8087.6070206@freescale.com>
+From: siarhei.siamashka@gmail.com (Siarhei Siamashka)
+Date: Mon,  8 Aug 2011 09:32:28 +0300
+Subject: [PATCH] ARM errata: Possible cache data corruption with
+	hit-under-miss enabled
+Message-ID: <1312785148-32531-1-git-send-email-siarhei.siamashka@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolfram:
-> Hi,
->
-> I am a bit uncertain how the state of the GPMI-NAND driver currently is, so
-> I'll try to sum it up here. There is without doubt interest in getting the
-> driver into mainline from at least Huang, Shawn, Lothar, Koen and me, so I
-> wonder if we can join forces more effectively. First of all, I want to thank
-> Huang Shijie for all his work so far which was already quite some effort; this
-> sum-up is by no means meant as bashing, just trying to understand the status
-> quo (Sidenote: I am more or less on holiday until Monday, so no time for real
-> debugging myself. I write this mail so we hopefully gain a common
-> understanding. When I am back to full strength, I can then start working on
-> what seems apropriate)
->
-> Issues with the current driver I am aware of:
->
-> DMA timeouts [1]
-> ================
->
-> [    2.560000] [ start_dma_without_bch_irq : 392 ] DMA timeout, last DMA :1
-> [    3.560000] [ start_dma_with_bch_irq : 427 ] bch timeout!!!
->
-> Always reproducible by me when trying to format mtd0. Sometimes(always?) seen
-> by Koen during boot (on read?). Never seen by Huang? It is currently unclear if
-After I used a different .config, it never appears in my side.
+From: Catalin Marinas <catalin.marinas@arm.com>
 
-> the bug is in the GPMI driver, or in the MXS-DMA driver. Still, I'd say the
-> issue is a show-stopper. We can't put a driver into mainline which leads to the
-> above failure. The fact that there is _some_ configuration which works for
-> someone does not help, it doesn't work for Koen and me at least. We need
-Hi Koen, do you test my uImage?
-Does the timeout occur?
-> reliable drivers in mainline, so the issue needs to be resolved, regardless
-> where the bug resides.
-ok. I will debug it too.
+This patch is a workaround for the 364296 ARM1136 r0pX erratum (possible
+cache data corruption with hit-under-miss enabled). It sets the
+undocumented bit 31 in the auxiliary control register and the FI bit in
+the control register, thus disabling hit-under-miss without putting the
+processor into full low interrupt latency mode.
 
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Tested-by: Siarhei Siamashka <siarhei.siamashka@gmail.com>
+---
+ arch/arm/Kconfig      |   12 ++++++++++++
+ arch/arm/mm/proc-v6.S |   16 ++++++++++++++++
+ 2 files changed, 28 insertions(+), 0 deletions(-)
 
-Please test the driver again when you back to office.
-Pay attention to your version of /arch/arm/configs/mxs_defconfig.
-Your mxs_defconfig may miss Shawn Guo's patches.
-
-thanks.
-
-
->
-> problem overwriting all-0xff data in NAND [2]
-> =============================================
->
-> Although it occured only when writing JFFS2 images so far, this is a generic
-> issue and needs to be fixed, right?
->
-Artem said it should not change the driver, but the upper layer(jffs2).
-
-So I think i do not need to change the driver.
-> ecclayout needs to be used to show that OOB is fully in use [1]
-> ===============================================================
->
-> Needed to make it work for JFFS2 and to pass the mtd-testsuite. A driver only
-> working with UBIFS is surely not ready for mainline.
->
-I programmed for mx6q in the recent days. I have no time to fix it. The 
-mx6q can runs well now.
-
-So I will fix the issue in the following days.
-
-> Pecularities
-> ============
->
-> There are a few issues which are odd. I don't know if some are mainly intended
-> for debugging, yet they shouldn't be in a mainline driver. At least:
->
-> * custom sysfs-entries
-My sysfs-entries is in the GPMI-NAND directory.
-Does be a mainline driver means I should not have any sysfs-entries?
-If it does, i can remove it.
-
-> * custom kernel command line parameters
-The kernel command line 'gpmi_nand' is to avoid the conflict with other 
-modules such as
-SD.
-
-If it's be removed, I have to use different config to resolve the issue 
-which is not better either. :(
-
-> * namespacing (some functions have no prefix, some have "mil_", some have mx23)
->    (I think 'mil' means 'mtd interface layer', but why is that needed?)
-The mil is used to make the gpmi_nand_data{} simple.
-Without it, the gpmi_nand_data{} will very big.
-
-The functions which have mx23 prefix are only used in mx23.
-The functions which have no prefix can used in both mx28 and mx23.
-
-> Complexity
-> ==========
->
-> The driver is not easy to review. I wonder if it makes sense to use incremental
-> patches for it? maybe making it a staging driver could be a solution for that?
-Frankly speaking, the current driver is maybe the smallest version now.
-
-I even do not add the on-chip BBT feature now.
-> Huang, are you interested in accepting patches or do you prefer we just point
-> at certain code and you then fix it? Starting with a simpler driver and then
-Feel free to mail me the patch. it's welcome.
-
-
-> adding stuff might be another option if we can't chase all the bugs in the
-> current driver.
->
-> That being said, I'd think fixing the DMA issue has prio #1 and maybe we can
-> meet in IRC or something to work that out? Is there interest in that?
-What about gtalk?
-
-Best Regards
-Huang Shijie
-
-> Ok, those were my two cents. Your mileages may vary, please give your thoughts,
-> then. I mainly don't want the driver development to get stalled.
->
-> Regards,
->
->     Wolfram
->
-> [1] http://lists.infradead.org/pipermail/linux-mtd/2011-July/037200.html
-> [2] http://lists.infradead.org/pipermail/linux-mtd/2011-July/037104.html
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 9c26ba7..0c3a56c 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1115,6 +1115,18 @@ config ARM_ERRATA_743622
+ 	  visible impact on the overall performance or power consumption of the
+ 	  processor.
+ 
++config ARM_ERRATA_364296
++	bool "ARM errata: Possible cache data corruption with hit-under-miss enabled"
++	depends on CPU_V6 && !SMP
++	help
++	  This options enables the workaround for the 364296 ARM1136
++	  r0pX erratum (possible cache data corruption with
++	  hit-under-miss enabled). It sets the undocumented bit 31 in
++	  the auxiliary control register and the FI bit in the control
++	  register, thus disabling hit-under-miss without putting the
++	  processor into full low interrupt latency mode. ARM11MPCore
++	  is not affected.
++
+ endmenu
+ 
+ source "arch/arm/common/Kconfig"
+diff --git a/arch/arm/mm/proc-v6.S b/arch/arm/mm/proc-v6.S
+index 22aac85..1b675b1 100644
+--- a/arch/arm/mm/proc-v6.S
++++ b/arch/arm/mm/proc-v6.S
+@@ -180,6 +180,22 @@ __v6_setup:
+ 	mrc	p15, 0, r0, c1, c0, 0		@ read control register
+ 	bic	r0, r0, r5			@ clear bits them
+ 	orr	r0, r0, r6			@ set them
++#ifdef CONFIG_ARM_ERRATA_364296
++	/* Workaround for the 364296 ARM1136 r0pX erratum (possible cache data
++	 * corruption with hit-under-miss enabled). The conditional code below
++	 * (setting the undocumented bit 31 in the auxiliary control register
++	 * and the FI bit in the control register) disables hit-under-miss
++	 * without putting the processor into full low interrupt latency mode.
++	 */
++	ldr	r6, =0x4107b360			@ id for ARM1136 r0pX
++	mrc	p15, 0, r5, c0, c0, 0		@ get processor id
++	bic	r5, r5, #0xf			@ mask out part bits [3:0]
++	teq	r5, r6				@ check for the faulty core
++	mrceq	p15, 0, r5, c1, c0, 1		@ load aux control reg
++	orreq	r5, r5, #(1 << 31)		@ set the undocumented bit 31
++	mcreq	p15, 0, r5, c1, c0, 1		@ write aux control reg
++	orreq	r0, r0, #(1 << 21)		@ low interrupt latency configuration
++#endif
+ 	mov	pc, lr				@ return to head.S:__ret
+ 
+ 	/*
+-- 
+1.7.2.5
