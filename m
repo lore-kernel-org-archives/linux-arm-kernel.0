@@ -1,55 +1,43 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Mon, 8 Aug 2011 19:00:46 +0200
-Subject: AT91SAM9261EK kit is broken, commit bd60299 has broken it
-In-Reply-To: <CANqCtQKpAydgXEzs6OzsDDBM_9yVBaGjT++DBq-NKOUH+ssLGA@mail.gmail.com>
-References: <CANqCtQKpAydgXEzs6OzsDDBM_9yVBaGjT++DBq-NKOUH+ssLGA@mail.gmail.com>
-Message-ID: <20110808170046.GA22213@game.jcrosoft.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 08 Aug 2011 10:33:38 -0700
+Subject: [PATCH 4/6] ARM: smp: set thread_info->cpu to hardware CPU number
+	for boot thread
+In-Reply-To: <1312823424-9654-5-git-send-email-will.deacon@arm.com>
+References: <1312823424-9654-1-git-send-email-will.deacon@arm.com>
+	<1312823424-9654-5-git-send-email-will.deacon@arm.com>
+Message-ID: <4E401DF2.10801@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi.
+On 08/08/2011 10:10 AM, Will Deacon wrote:
+>
+>  
+> +void __init smp_setup_processor_id(void)
+> +{
+> +	u32 mpidr;
+> +
+> +	/* Read the MPIDR to find the hardware ID of the current CPU. */
+> +	asm("1:		mrc	p15, 0, %0, c0, c0, 5\n"
+> +	    "		.pushsection \".alt.smp.init\", \"a\"\n"
+> +	    "		.long	1b\n"
+> +	    "		mov	%0, #0\n"
+> +	    "		.popsection"
+> +	    : "=r" (mpidr));
 
-	I'm taking a look on it
+Would it be a good idea to put this into asm/cputype.h? I suppose the
+smp alternatives part would need to be written in C.
 
-Best Regads,
-J.
-On 23:27 Sat 06 Aug     , Remy Bohmer wrote:
-> Hi Jean-Christophe,
-> 
-> Currently the Atmel AT91SAM9261-EK kit is broken within Linux 3.0,
-> 3.01 and latest git.
-> 
-> These are the symptoms:
-> * Booting stops if LCD driver is enabled in the kernel. It stops
-> within the probe of the LCD driver. (at a msleep(10))
-> * schedule_timeout is broken.
-> * The jiffies based sched_clock does not run properly and stalls
-> during boot, before the LCD driver is being initialised. (You can see
-> this with printk-timestamps enabled)
-> * When LCD driver disabled, boards boots up to a prompt, but every
-> tool (e.g. 'top') that does a nanosleep syscall stays blocked in the
-> kernel.
-> 
-> After bisecting the tree searching for the offending commit, I came to
-> the following patch, after reverting it in mainline, everything works
-> again as normal. I do not see immediately what is wrong with this
-> commit, do you have an idea? Otherwise I will dig deeper in this
-> commit...
-> 
-> bd60299594fb1d28ae66563c9e76a0b89b0412cf is the first bad commit
-> commit bd60299594fb1d28ae66563c9e76a0b89b0412cf
-> Author: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Date:   Wed Feb 2 07:27:07 2011 +0100
-> 
->     at91: switch to CLKDEV_LOOKUP
-> 
->     we do not change the clock naming convention so does not need to switch
->     the AVR32 yet
-> 
->     Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
->     Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->     Cc: Patrice Vilchez <patrice.vilchez@atmel.com>
-> 
-> Kind regards,
-> 
-> Remy
+    mpidr = is_smp() ? read_cpuid_mpidr() : 0;
+
+>
+> +
+> +	current_thread_info()->cpu = mpidr & 0xff;
+> +	printk("Booting Linux on CPU %d\n", current_thread_info()->cpu);
+> +}
+> +
+
+Should there be a KERN_INFO there?
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
