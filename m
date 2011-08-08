@@ -1,66 +1,220 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Mon, 8 Aug 2011 17:09:04 +0800
-Subject: [RFC PATCH 2/2] GPIO: add gpiolib and irqchip for CSR SiRFprimaII
-	GPIO controller
-In-Reply-To: <20110726100928.GO9653@n2100.arm.linux.org.uk>
-References: <1311667993-27189-1-git-send-email-bs14@csr.com>
-	<1311667993-27189-3-git-send-email-bs14@csr.com>
-	<20110726100928.GO9653@n2100.arm.linux.org.uk>
-Message-ID: <CAGsJ_4z32ETjAc2DFZMLPx5_qSwSffGqME2S36YEsnX9JGTw4A@mail.gmail.com>
+From: koen.beel.barco@gmail.com (Koen Beel)
+Date: Mon, 8 Aug 2011 11:19:16 +0200
+Subject: GPMI-NAND Status?
+In-Reply-To: <4E3F8087.6070206@freescale.com>
+References: <20110805135133.GA26981@pengutronix.de>
+	<4E3F8087.6070206@freescale.com>
+Message-ID: <CAHMSPgMYP+5Hpa5sC-yt=1H-S=tEER8uNzj6uMSK403_DGYJ9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/7/26 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Tue, Jul 26, 2011 at 01:13:13AM -0700, Barry Song wrote:
->> diff --git a/arch/arm/mach-prima2/include/mach/gpio.h b/arch/arm/mach-prima2/include/mach/gpio.h
->> new file mode 100644
->> index 0000000..25673b1
->> --- /dev/null
->> +++ b/arch/arm/mach-prima2/include/mach/gpio.h
->> @@ -0,0 +1,34 @@
->> +/*
->> + * arch/arm/mach-prima2/include/mach/gpio.h
->> + *
->> + * Copyright (c) 2011 Cambridge Silicon Radio Limited, a CSR plc group company.
->> + *
->> + * Licensed under GPLv2 or later.
->> + */
->> +
->> +#ifndef __MACH_GPIO_H
->> +#define __MACH_GPIO_H
->> +
->> +#include <mach/irqs.h>
->> +
->> +#ifndef CONFIG_GPIO_SIRFCPLD
->> +#define ARCH_NR_GPIOS ? ? ? ?(SIRFSOC_GPIO_BANK_SIZE * SIRFSOC_GPIO_NO_OF_BANKS)
->> +#else
->> +#define ARCH_NR_GPIOS ? ? ? ?(SIRFSOC_GPIO_BANK_SIZE * SIRFSOC_GPIO_NO_OF_BANKS + \
->> + ? ? SIRFSOC_GPIO_CPLD_SIZE + SIRFSOC_GPIO_IO_CPLD_SIZE + \
->> + ? ? SIRFSOC_GPIO_HS_CPLD_SIZE)
->> +#endif
->> +
->> +#include <linux/errno.h>
->
-> Why do you need linux/errno.h? ?asm-generic/gpio.h already includes this.
->
->> +#include <asm-generic/gpio.h>
->> +
->> +#define gpio_get_value ? ? ? __gpio_get_value
->> +#define gpio_set_value ? ? ? __gpio_set_value
->> +#define gpio_cansleep ? ? ? ?__gpio_cansleep
->
-> Hmm, yet another trivial gpio implementation. ?We have 24 others just like
-> this. ?Well, mainline does... I have just one.
+Hi Wolfram,
 
-Ok.
-this gpio driver includes two parts: gpio chip and irq chip.  For gpio
-chip, we could import gpio-generic and delete
-sirfsoc_gpio_direction_input, sirfsoc_gpio_get_value,
-sirfsoc_gpio_direction_output and so on.
-For the part of irq chip, i don't see much benefit from generic-irq.
-all of sirfsoc_gpio_irq_ack, sirfsoc_gpio_irq_mask and
-sirfsoc_gpio_irq_unmask are CSR-specific.  irq_gc_ack_set_bit,
-irq_gc_mask_clr_bit and irq_gc_mask_set_bit are not practicable to
-this chip.
+Thanks for taking the initiative to summarize the current status.
+Also thanks to Huang Shijie for all the work done so far.
 
--barry
+
+On Mon, Aug 8, 2011 at 8:21 AM, Huang Shijie <b32955@freescale.com> wrote:
+> Hi Wolfram:
+>>
+>> Hi,
+>>
+>> I am a bit uncertain how the state of the GPMI-NAND driver currently is,
+>> so
+>> I'll try to sum it up here. There is without doubt interest in getting the
+>> driver into mainline from at least Huang, Shawn, Lothar, Koen and me, so I
+>> wonder if we can join forces more effectively. First of all, I want to
+>> thank
+>> Huang Shijie for all his work so far which was already quite some effort;
+>> this
+>> sum-up is by no means meant as bashing, just trying to understand the
+>> status
+>> quo (Sidenote: I am more or less on holiday until Monday, so no time for
+>> real
+>> debugging myself. I write this mail so we hopefully gain a common
+>> understanding. When I am back to full strength, I can then start working
+>> on
+>> what seems apropriate)
+>>
+>> Issues with the current driver I am aware of:
+>>
+>> DMA timeouts [1]
+>> ================
+>>
+>> [ ? ?2.560000] [ start_dma_without_bch_irq : 392 ] DMA timeout, last DMA
+>> :1
+>> [ ? ?3.560000] [ start_dma_with_bch_irq : 427 ] bch timeout!!!
+>>
+>> Always reproducible by me when trying to format mtd0. Sometimes(always?)
+>> seen
+>> by Koen during boot (on read?). Never seen by Huang? It is currently
+>> unclear if
+>
+> After I used a different .config, it never appears in my side.
+
+flash_eraseall of mtd1 works for me.
+ubi_format of mtd1 always gives the dma timeout
+reading/writing of mtd0/1 always gives the dma timeout
+I have seen dma timeout during boot if i try to enable ubi rootfs (so
+that's the same issue as dma time during read/write).
+
+I don't use mtd0 for testing as this contains my uboot.
+
+I tested using Huang's .config and the Linaro git but still see
+exactly the same issue.
+
+>
+>> the bug is in the GPMI driver, or in the MXS-DMA driver. Still, I'd say
+>> the
+>> issue is a show-stopper. We can't put a driver into mainline which leads
+>> to the
+>> above failure. The fact that there is _some_ configuration which works for
+>> someone does not help, it doesn't work for Koen and me at least. We need
+
+On my target, the mxs-dma is working for sdio until the gpmi-nand
+gives a timeout. After that the dma for sdio is *not fully* working
+anymore.
+
+>
+> Hi Koen, do you test my uImage?
+> Does the timeout occur?
+
+I was not able to test you uImage. It ended with a "Kernel panic - not
+syncing: read error". See (off list) mail from last week.
+
+
+>>
+>> reliable drivers in mainline, so the issue needs to be resolved,
+>> regardless
+>> where the bug resides.
+>
+> ok. I will debug it too.
+>
+>
+> Please test the driver again when you back to office.
+> Pay attention to your version of /arch/arm/configs/mxs_defconfig.
+> Your mxs_defconfig may miss Shawn Guo's patches.
+>
+> thanks.
+>
+>
+>>
+>> problem overwriting all-0xff data in NAND [2]
+>> =============================================
+>>
+>> Although it occured only when writing JFFS2 images so far, this is a
+>> generic
+>> issue and needs to be fixed, right?
+>>
+> Artem said it should not change the driver, but the upper layer(jffs2).
+>
+> So I think i do not need to change the driver.
+>>
+>> ecclayout needs to be used to show that OOB is fully in use [1]
+>> ===============================================================
+>>
+>> Needed to make it work for JFFS2 and to pass the mtd-testsuite. A driver
+>> only
+>> working with UBIFS is surely not ready for mainline.
+>>
+> I programmed for mx6q in the recent days. I have no time to fix it. The mx6q
+> can runs well now.
+>
+> So I will fix the issue in the following days.
+>
+>> Pecularities
+>> ============
+>>
+>> There are a few issues which are odd. I don't know if some are mainly
+>> intended
+>> for debugging, yet they shouldn't be in a mainline driver. At least:
+>>
+>> * custom sysfs-entries
+>
+> My sysfs-entries is in the GPMI-NAND directory.
+> Does be a mainline driver means I should not have any sysfs-entries?
+> If it does, i can remove it.
+>
+>> * custom kernel command line parameters
+>
+> The kernel command line 'gpmi_nand' is to avoid the conflict with other
+> modules such as
+> SD.
+>
+> If it's be removed, I have to use different config to resolve the issue
+> which is not better either. :(
+>
+>> * namespacing (some functions have no prefix, some have "mil_", some have
+>> mx23)
+>> ? (I think 'mil' means 'mtd interface layer', but why is that needed?)
+>
+> The mil is used to make the gpmi_nand_data{} simple.
+> Without it, the gpmi_nand_data{} will very big.
+>
+> The functions which have mx23 prefix are only used in mx23.
+> The functions which have no prefix can used in both mx28 and mx23.
+>
+>> Complexity
+>> ==========
+>>
+>> The driver is not easy to review. I wonder if it makes sense to use
+>> incremental
+>> patches for it? maybe making it a staging driver could be a solution for
+>> that?
+>
+> Frankly speaking, the current driver is maybe the smallest version now.
+>
+> I even do not add the on-chip BBT feature now.
+>>
+>> Huang, are you interested in accepting patches or do you prefer we just
+>> point
+>> at certain code and you then fix it? Starting with a simpler driver and
+>> then
+>
+> Feel free to mail me the patch. it's welcome.
+>
+>
+>> adding stuff might be another option if we can't chase all the bugs in the
+>> current driver.
+>>
+>> That being said, I'd think fixing the DMA issue has prio #1 and maybe we
+>> can
+>> meet in IRC or something to work that out? Is there interest in that?
+>
+> What about gtalk?
+
+Anything is good for me.
+Could also be useful to make sure we test on the same HW as much as
+possible and are using the same source tree.
+HW I have:
+- mx23evk rev C1
+- mx23evk rev B2
+- own target hw using mx23 lqfp-128 chip and different type of ddr and nand.
+
+>
+> Best Regards
+> Huang Shijie
+>
+>> Ok, those were my two cents. Your mileages may vary, please give your
+>> thoughts,
+>> then. I mainly don't want the driver development to get stalled.
++1
+
+Br,
+Koen
+
+>>
+>> Regards,
+>>
+>> ? ?Wolfram
+>>
+>> [1] http://lists.infradead.org/pipermail/linux-mtd/2011-July/037200.html
+>> [2] http://lists.infradead.org/pipermail/linux-mtd/2011-July/037104.html
+>
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
