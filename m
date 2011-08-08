@@ -1,90 +1,90 @@
 From: swarren@nvidia.com (Stephen Warren)
-Date: Mon,  8 Aug 2011 14:35:15 -0600
-Subject: [PATCH v2 3/3] ARM: Tegra: Seaboard: Add USB devices
-In-Reply-To: <1312835715-893-1-git-send-email-swarren@nvidia.com>
-References: <1312835715-893-1-git-send-email-swarren@nvidia.com>
-Message-ID: <1312835715-893-4-git-send-email-swarren@nvidia.com>
+Date: Mon,  8 Aug 2011 15:01:05 -0600
+Subject: [PATCH] ARM: Tegra: Force PORT_TEGRA as the UART type
+Message-ID: <1312837265-11984-1-git-send-email-swarren@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Seaboard has a couple of external USB ports. Add the platform devices and
-GPIO infra-structure to enable these.
-
-I tested both ports with a mouse on Seaboard non-clamshell.
-
-This change is extracted from code in the ChromeOS 2.6.38 kernel.
+8250.c recently gained an explicit PORT_TEGRA port type. Specifically
+request this in all Tegra boards' UART platform data.
 
 Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
-v2: No change
+NOTE: This depends on "[PATCH 1/5] ARM: tegra: paz00: add support serial
+port on JP1", which was recently posted by Marc Dietrich, since that added
+one of the platform data array entries being modified by this patch.
 
- arch/arm/mach-tegra/board-seaboard-pinmux.c |    1 +
- arch/arm/mach-tegra/board-seaboard.c        |   27 +++++++++++++++++++++++++++
- 2 files changed, 28 insertions(+), 0 deletions(-)
+ arch/arm/mach-tegra/board-harmony.c   |    3 ++-
+ arch/arm/mach-tegra/board-paz00.c     |    6 ++++--
+ arch/arm/mach-tegra/board-seaboard.c  |    3 ++-
+ arch/arm/mach-tegra/board-trimslice.c |    3 ++-
+ 4 files changed, 10 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-tegra/board-seaboard-pinmux.c b/arch/arm/mach-tegra/board-seaboard-pinmux.c
-index 7879750..74f78b7 100644
---- a/arch/arm/mach-tegra/board-seaboard-pinmux.c
-+++ b/arch/arm/mach-tegra/board-seaboard-pinmux.c
-@@ -168,6 +168,7 @@ static struct tegra_gpio_table gpio_table[] = {
- 	{ .gpio = TEGRA_GPIO_POWERKEY,		.enable = true },
- 	{ .gpio = TEGRA_GPIO_ISL29018_IRQ,	.enable = true },
- 	{ .gpio = TEGRA_GPIO_CDC_IRQ,		.enable = true },
-+	{ .gpio = TEGRA_GPIO_USB1,		.enable = true },
- };
- 
- void __init seaboard_pinmux_init(void)
+diff --git a/arch/arm/mach-tegra/board-harmony.c b/arch/arm/mach-tegra/board-harmony.c
+index f528a5a..987dab5 100644
+--- a/arch/arm/mach-tegra/board-harmony.c
++++ b/arch/arm/mach-tegra/board-harmony.c
+@@ -49,7 +49,8 @@ static struct plat_serial8250_port debug_uart_platform_data[] = {
+ 		.membase	= IO_ADDRESS(TEGRA_UARTD_BASE),
+ 		.mapbase	= TEGRA_UARTD_BASE,
+ 		.irq		= INT_UARTD,
+-		.flags		= UPF_BOOT_AUTOCONF,
++		.flags		= UPF_BOOT_AUTOCONF | UPF_FIXED_TYPE,
++		.type		= PORT_TEGRA,
+ 		.iotype		= UPIO_MEM,
+ 		.regshift	= 2,
+ 		.uartclk	= 216000000,
+diff --git a/arch/arm/mach-tegra/board-paz00.c b/arch/arm/mach-tegra/board-paz00.c
+index b7494c2..c6a6d82 100644
+--- a/arch/arm/mach-tegra/board-paz00.c
++++ b/arch/arm/mach-tegra/board-paz00.c
+@@ -49,7 +49,8 @@ static struct plat_serial8250_port debug_uart_platform_data[] = {
+ 		.membase	= IO_ADDRESS(TEGRA_UARTA_BASE),
+ 		.mapbase	= TEGRA_UARTA_BASE,
+ 		.irq		= INT_UARTA,
+-		.flags		= UPF_BOOT_AUTOCONF,
++		.flags		= UPF_BOOT_AUTOCONF | UPF_FIXED_TYPE,
++		.type		= PORT_TEGRA,
+ 		.iotype		= UPIO_MEM,
+ 		.regshift	= 2,
+ 		.uartclk	= 216000000,
+@@ -58,7 +59,8 @@ static struct plat_serial8250_port debug_uart_platform_data[] = {
+ 		.membase	= IO_ADDRESS(TEGRA_UARTD_BASE),
+ 		.mapbase	= TEGRA_UARTD_BASE,
+ 		.irq		= INT_UARTD,
+-		.flags		= UPF_BOOT_AUTOCONF,
++		.flags		= UPF_BOOT_AUTOCONF | UPF_FIXED_TYPE,
++		.type		= PORT_TEGRA,
+ 		.iotype		= UPIO_MEM,
+ 		.regshift	= 2,
+ 		.uartclk	= 216000000,
 diff --git a/arch/arm/mach-tegra/board-seaboard.c b/arch/arm/mach-tegra/board-seaboard.c
-index 07cd8e4..237a94a 100644
+index 237a94a..25446df 100644
 --- a/arch/arm/mach-tegra/board-seaboard.c
 +++ b/arch/arm/mach-tegra/board-seaboard.c
-@@ -69,6 +69,8 @@ static __initdata struct tegra_clk_init_table seaboard_clk_init_table[] = {
- 	{ "pll_a_out0",	"pll_a",	11289600,	true },
- 	{ "cdev1",	NULL,		0,		true },
- 	{ "i2s1",	"pll_a_out0",	11289600,	false},
-+	{ "usbd",	"clk_m",	12000000,	true},
-+	{ "usb3",	"clk_m",	12000000,	true},
- 	{ NULL,		NULL,		0,		0},
- };
- 
-@@ -182,6 +184,29 @@ static struct i2c_board_info __initdata wm8903_device = {
- 	.irq = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_CDC_IRQ),
- };
- 
-+static int seaboard_ehci_init(void)
-+{
-+	int gpio_status;
-+
-+	gpio_status = gpio_request(TEGRA_GPIO_USB1, "VBUS_USB1");
-+	if (gpio_status < 0) {
-+		pr_err("VBUS_USB1 request GPIO FAILED\n");
-+		WARN_ON(1);
-+	}
-+
-+	gpio_status = gpio_direction_output(TEGRA_GPIO_USB1, 1);
-+	if (gpio_status < 0) {
-+		pr_err("VBUS_USB1 request GPIO DIRECTION FAILED\n");
-+		WARN_ON(1);
-+	}
-+	gpio_set_value(TEGRA_GPIO_USB1, 1);
-+
-+	platform_device_register(&tegra_ehci1_device);
-+	platform_device_register(&tegra_ehci3_device);
-+
-+	return 0;
-+}
-+
- static void __init seaboard_i2c_init(void)
- {
- 	gpio_request(TEGRA_GPIO_ISL29018_IRQ, "isl29018");
-@@ -209,6 +234,8 @@ static void __init seaboard_common_init(void)
- 	tegra_sdhci_device4.dev.platform_data = &sdhci_pdata4;
- 
- 	platform_add_devices(seaboard_devices, ARRAY_SIZE(seaboard_devices));
-+
-+	seaboard_ehci_init();
- }
- 
- static void __init tegra_seaboard_init(void)
+@@ -44,7 +44,8 @@
+ static struct plat_serial8250_port debug_uart_platform_data[] = {
+ 	{
+ 		/* Memory and IRQ filled in before registration */
+-		.flags		= UPF_BOOT_AUTOCONF,
++		.flags		= UPF_BOOT_AUTOCONF | UPF_FIXED_TYPE,
++		.type		= PORT_TEGRA,
+ 		.iotype		= UPIO_MEM,
+ 		.regshift	= 2,
+ 		.uartclk	= 216000000,
+diff --git a/arch/arm/mach-tegra/board-trimslice.c b/arch/arm/mach-tegra/board-trimslice.c
+index 89a6d2a..91875b9 100644
+--- a/arch/arm/mach-tegra/board-trimslice.c
++++ b/arch/arm/mach-tegra/board-trimslice.c
+@@ -46,7 +46,8 @@ static struct plat_serial8250_port debug_uart_platform_data[] = {
+ 		.membase	= IO_ADDRESS(TEGRA_UARTA_BASE),
+ 		.mapbase	= TEGRA_UARTA_BASE,
+ 		.irq		= INT_UARTA,
+-		.flags		= UPF_BOOT_AUTOCONF,
++		.flags		= UPF_BOOT_AUTOCONF | UPF_FIXED_TYPE,
++		.type		= PORT_TEGRA,
+ 		.iotype		= UPIO_MEM,
+ 		.regshift	= 2,
+ 		.uartclk	= 216000000,
 -- 
 1.7.0.4
