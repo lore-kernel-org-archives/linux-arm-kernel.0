@@ -1,26 +1,61 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Tue, 9 Aug 2011 00:59:01 +0530
-Subject: [PATCH] dmaengine: pl330: add missing include of scatterlist.h
-In-Reply-To: <1312830866-2932-1-git-send-email-robherring2@gmail.com>
-References: <1312830866-2932-1-git-send-email-robherring2@gmail.com>
-Message-ID: <CABb+yY2bt0M0X0o-2578eBcP7vwvjykCykKv6e0+HZ17Qset_w@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 08 Aug 2011 20:52:55 +0100
+Subject: [PATCH 09/12] ARM: mach-at91: Setup consistent dma size at boot
+	time
+In-Reply-To: <1312813712-22808-10-git-send-email-tixy@yxit.co.uk>
+References: <1312813712-22808-1-git-send-email-tixy@yxit.co.uk>
+	<1312813712-22808-10-git-send-email-tixy@yxit.co.uk>
+Message-ID: <4E403E97.2050500@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 9, 2011 at 12:44 AM, Rob Herring <robherring2@gmail.com> wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
->
-> scatterlist.h was getting implicitly included and now is not which
-> causes this compile error:
->
-> drivers/dma/pl330.c: In function ?pl330_prep_slave_sg?:
-> drivers/dma/pl330.c:603:2: error: implicit declaration of function
-> ?for_each_sg?
->
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> Cc: Jassi Brar <jassisinghbrar@gmail.com>
-> Cc: Vinod Koul <vkoul@infradead.org>
+On 08/08/2011 03:28 PM, Jon Medhurst wrote:
+> Signed-off-by: Jon Medhurst<tixy@yxit.co.uk>
+> CC: Nicolas Ferre<nicolas.ferre@atmel.com>
 
-Acked-by: Jassi Brar <jassisinghbrar@gmail.com>
+Thanks,
 
-thnx
+Acked-by: Nicolas Ferre<nicolas.ferre@atmel.com>
+
+> ---
+>   arch/arm/mach-at91/include/mach/at91sam9g45.h |    2 --
+>   arch/arm/mach-at91/at91sam9g45.c              |    2 ++
+>   2 files changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/mach-at91/include/mach/at91sam9g45.h b/arch/arm/mach-at91/include/mach/at91sam9g45.h
+> index 2c611b9..406bb64 100644
+> --- a/arch/arm/mach-at91/include/mach/at91sam9g45.h
+> +++ b/arch/arm/mach-at91/include/mach/at91sam9g45.h
+> @@ -128,8 +128,6 @@
+>   #define AT91SAM9G45_EHCI_BASE	0x00800000	/* USB Host controller (EHCI) */
+>   #define AT91SAM9G45_VDEC_BASE	0x00900000	/* Video Decoder Controller */
+>
+> -#define CONSISTENT_DMA_SIZE	SZ_4M
+> -
+>   /*
+>    * DMA peripheral identifiers
+>    * for hardware handshaking interface
+> diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
+> index e04c5fb..1532b50 100644
+> --- a/arch/arm/mach-at91/at91sam9g45.c
+> +++ b/arch/arm/mach-at91/at91sam9g45.c
+> @@ -12,6 +12,7 @@
+>
+>   #include<linux/module.h>
+>   #include<linux/pm.h>
+> +#include<linux/dma-mapping.h>
+>
+>   #include<asm/irq.h>
+>   #include<asm/mach/arch.h>
+> @@ -319,6 +320,7 @@ static void at91sam9g45_poweroff(void)
+>   static void __init at91sam9g45_map_io(void)
+>   {
+>   	at91_init_sram(0, AT91SAM9G45_SRAM_BASE, AT91SAM9G45_SRAM_SIZE);
+> +	init_consistent_dma_size(SZ_4M);
+>   }
+>
+>   static void __init at91sam9g45_initialize(void)
+
+
+-- 
+Nicolas Ferre
