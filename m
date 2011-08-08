@@ -1,101 +1,59 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon,  8 Aug 2011 18:16:10 +0100
-Subject: [PATCH 09/10] ARM: perf: allow armpmu to implement mode exclusion
-In-Reply-To: <1312823771-9952-1-git-send-email-will.deacon@arm.com>
-References: <1312823771-9952-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1312823771-9952-10-git-send-email-will.deacon@arm.com>
+Date: Mon,  8 Aug 2011 18:16:01 +0100
+Subject: [PATCH 00/10] ARM: perf: updates for 3.2
+Message-ID: <1312823771-9952-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Modern PMUs allow for mode exclusion, so we no longer wish to return
--EPERM if it is requested.
+Hello,
 
-This patch provides a hook in the armpmu structure for implementing
-mode exclusion. The hw_perf_event initialisation is slightly delayed so
-that the backend code can update the structure if required.
+This patch series contains a number of updates to the ARM PMU and perf
+code so that we can support mode exclusion, which is new in debug
+architecture 7.1 (as implemented by the Cortex-A15). Some of these
+updates also coincide with work to support System PMUs (PMUs that are
+not affine to a single CPU) but that is a larger body of work which will
+be posted separately at a later date.
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/kernel/perf_event.c |   44 +++++++++++++++++++++++------------------
- 1 files changed, 25 insertions(+), 19 deletions(-)
+The patches do the following:
 
-diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
-index 00e57f1..8a5e2ac 100644
---- a/arch/arm/kernel/perf_event.c
-+++ b/arch/arm/kernel/perf_event.c
-@@ -76,6 +76,8 @@ struct arm_pmu {
- 	void		(*disable)(struct hw_perf_event *evt, int idx);
- 	int		(*get_event_idx)(struct cpu_hw_events *cpuc,
- 					 struct hw_perf_event *hwc);
-+	int		(*set_event_filter)(struct hw_perf_event *evt,
-+					    struct perf_event_attr *attr);
- 	u32		(*read_counter)(int idx);
- 	void		(*write_counter)(int idx, u32 val);
- 	void		(*start)(void);
-@@ -479,6 +481,13 @@ hw_perf_event_destroy(struct perf_event *event)
- }
- 
- static int
-+event_requires_mode_exclusion(struct perf_event_attr *attr)
-+{
-+	return attr->exclude_idle || attr->exclude_user ||
-+	       attr->exclude_kernel || attr->exclude_hv;
-+}
-+
-+static int
- __hw_perf_event_init(struct perf_event *event)
- {
- 	struct hw_perf_event *hwc = &event->hw;
-@@ -503,34 +512,31 @@ __hw_perf_event_init(struct perf_event *event)
- 	}
- 
- 	/*
-+	 * We don't assign an index until we actually place the event onto
-+	 * hardware. Use -1 to signify that we haven't decided where to put it
-+	 * yet. For SMP systems, each core has it's own PMU so we can't do any
-+	 * clever allocation or constraints checking at this point.
-+	 */
-+	hwc->idx		= -1;
-+	hwc->config_base	= 0;
-+	hwc->config		= 0;
-+	hwc->event_base		= 0;
-+
-+	/*
- 	 * Check whether we need to exclude the counter from certain modes.
--	 * The ARM performance counters are on all of the time so if someone
--	 * has asked us for some excludes then we have to fail.
- 	 */
--	if (event->attr.exclude_kernel || event->attr.exclude_user ||
--	    event->attr.exclude_hv || event->attr.exclude_idle) {
-+	if ((!armpmu->set_event_filter ||
-+	     armpmu->set_event_filter(hwc, &event->attr)) &&
-+	     event_requires_mode_exclusion(&event->attr)) {
- 		pr_debug("ARM performance counters do not support "
- 			 "mode exclusion\n");
- 		return -EPERM;
- 	}
- 
- 	/*
--	 * We don't assign an index until we actually place the event onto
--	 * hardware. Use -1 to signify that we haven't decided where to put it
--	 * yet. For SMP systems, each core has it's own PMU so we can't do any
--	 * clever allocation or constraints checking at this point.
--	 */
--	hwc->idx = -1;
--
--	/*
--	 * Store the event encoding into the config_base field. config and
--	 * event_base are unused as the only 2 things we need to know are
--	 * the event mapping and the counter to use. The counter to use is
--	 * also the indx and the config_base is the event type.
-+	 * Store the event encoding into the config_base field.
- 	 */
--	hwc->config_base	    = (unsigned long)mapping;
--	hwc->config		    = 0;
--	hwc->event_base		    = 0;
-+	hwc->config_base	    |= (unsigned long)mapping;
- 
- 	if (!hwc->sample_period) {
- 		hwc->sample_period  = armpmu->max_period;
--- 
-1.7.0.4
+  1.) Greatly simplify the PMU reservation mechanism so that the
+      handling of platform_devices is moved into perf.
+  2.) Cleans up the interrupt registration and some of the types used
+      to represent events and registers.
+  3.) Moves event indexing to start from zero rather than one, making
+      the code more readable and also easier to extend for mode
+      exclusion.
+  4.) Adds support for mode exclusion (user / kernel / hyp) and
+      implements this for Cortex-A15.
+
+I've been running these patches since 3.0, so they've been tested on
+1176, 11MPCore, Cortex-A5, Cortex-A9 and Cortex-A15 platforms.
+
+Once again, all feedback is welcome.
+
+Will
+
+Cc: Jean Pihet <j-pihet@ti.com>
+Cc: Jamie Iles <jamie@jamieiles.com>
+
+Mark Rutland (1):
+  ARM: perf: de-const struct arm_pmu
+
+Will Deacon (9):
+  ARM: PMU: move CPU PMU platform device handling and init into perf
+  ARM: perf: use cpumask_t to record active IRQs
+  ARM: perf: use u32 instead of unsigned long for PMNC register
+  ARM: perf: use integers for ARMv7 event indices
+  ARM: perf: index ARMv7 event counters starting from zero
+  ARM: perf: index Xscale and ARMv6 event counters starting from zero
+  ARM: perf: index PMU registers from zero
+  ARM: perf: allow armpmu to implement mode exclusion
+  ARM: perf: add mode exclusion for Cortex-A15 PMU
+
+ arch/arm/include/asm/pmu.h          |   39 +---
+ arch/arm/kernel/perf_event.c        |  176 ++++++++++++-------
+ arch/arm/kernel/perf_event_v6.c     |   16 +-
+ arch/arm/kernel/perf_event_v7.c     |  327 ++++++++++++++++-------------------
+ arch/arm/kernel/perf_event_xscale.c |   18 +-
+ arch/arm/kernel/pmu.c               |  181 +------------------
+ 6 files changed, 302 insertions(+), 455 deletions(-)
