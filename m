@@ -1,58 +1,39 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 8 Aug 2011 14:26:31 +0100
-Subject: [PATCH] ARM errata: Possible cache data corruption with
-	hit-under-miss enabled
-In-Reply-To: <CACY+gR2_Rf7dh91vagJfEB=qgALJf4nigJbFQJz--DweQkZ+Qw@mail.gmail.com>
-References: <1312785148-32531-1-git-send-email-siarhei.siamashka@gmail.com>
-	<20110808100233.GG29226@e102109-lin.cambridge.arm.com>
-	<CACY+gR2_Rf7dh91vagJfEB=qgALJf4nigJbFQJz--DweQkZ+Qw@mail.gmail.com>
-Message-ID: <20110808132631.GA670@e102109-lin.cambridge.arm.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Mon, 8 Aug 2011 07:26:00 -0700
+Subject: [PATCH 2/2] arm/tegra: Delete irq_to_gpio
+In-Reply-To: <20110806174519.GB31966@ponder.secretlab.ca>
+References: <1312582534-10871-1-git-send-email-swarren@nvidia.com>
+	<1312582534-10871-2-git-send-email-swarren@nvidia.com>
+	<20110806174519.GB31966@ponder.secretlab.ca>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF049F172168@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 08, 2011 at 12:43:00PM +0100, Siarhei Siamashka wrote:
-> On Mon, Aug 8, 2011 at 1:02 PM, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > On Mon, Aug 08, 2011 at 07:32:28AM +0100, Siarhei Siamashka wrote:
-> >> From: Catalin Marinas <catalin.marinas@arm.com>
-> >>
-> >> This patch is a workaround for the 364296 ARM1136 r0pX erratum (possible
-> >> cache data corruption with hit-under-miss enabled). It sets the
-> >> undocumented bit 31 in the auxiliary control register and the FI bit in
-> >> the control register, thus disabling hit-under-miss without putting the
-> >> processor into full low interrupt latency mode.
-> >>
-> >> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-> >> Tested-by: Siarhei Siamashka <siarhei.siamashka@gmail.com>
+Grant Likely wrote at Saturday, August 06, 2011 11:45 AM:
+> On Fri, Aug 05, 2011 at 04:15:34PM -0600, Stephen Warren wrote:
+> > irq_to_gpio is deprecated and in the process of being removed. Make that
+> > happen now for ARM Tegra.
 > >
-> > I haven't pushed this workaround in the past as I wasn't sure there is
-> > production hardware affected. I recall you mentioned Nokia N800, do you
-> > know which CPU revision does this have?
+> > Signed-off-by: Stephen Warren <swarren@nvidia.com>
 > 
-> [    0.000000] CPU: ARMv6-compatible processor [4107b362] revision 2
-> (ARMv6TEJ), cr=00e5387f
-> [    0.000000] CPU: VIPT aliasing data cache, unknown instruction
-> cache
-> [    0.000000] Machine: Nokia N810
-> [    0.000000] Memory policy: ECC disabled, Data cache writeback
-> [    0.000000] OMAP2420
-> 
-> # cat /proc/cpuinfo
-> Processor       : ARMv6-compatible processor rev 2 (v6l)
-> BogoMIPS        : 213.72
-> Features        : swp half thumb fastmult vfp edsp java
-> CPU implementer : 0x41
-> CPU architecture: 6TEJ
-> CPU variant     : 0x0
-> CPU part        : 0xb36
-> CPU revision    : 2
-> 
-> Hardware        : Nokia N810
-> Revision        : 0000
-> Serial          : 0000000000000000
-...
-> Would you be so kind to update the patch?
+> Applied both.  Thanks.
 
-OK, I'll update it and post the patch in the next day or so.
+Didn't you want an Ack by a Tegra maintainer first?
+
+I assume they were both applied to gpio-next (although a fresh fetch  of that
+doesn't show the commits)
+
+> > I assume this will go into one of arm-soc.git's branches, but it depends
+> > on the previous patch in this series to compile. Arnd, I see you already
+> > have Grant's gpio/next tree in your repo as depends/gpio, so I assume
+> > you'll just pick up and merge the latest version of Grant's tree before
+> > applying this patch?
+> >
+> > Both patches compiled with a number of Tegra boards enable and tested on
+> > Harmony. All without Device Tree support.
+> >
+> >  arch/arm/mach-tegra/include/mach/gpio.h |    8 --------
+> >  1 files changed, 0 insertions(+), 8 deletions(-)
 
 -- 
-Catalin
+nvpublic
