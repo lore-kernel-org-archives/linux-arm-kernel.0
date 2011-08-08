@@ -1,44 +1,47 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 8 Aug 2011 19:05:41 +0100
-Subject: [PATCH 2/2] arm/tegra: Delete irq_to_gpio
-In-Reply-To: <CACxGe6ubndfYNxgRfrLtCZ8cP0FddwTpG_FBZKXVZb0OHJVt6w@mail.gmail.com>
-References: <1312582534-10871-1-git-send-email-swarren@nvidia.com>
-	<1312582534-10871-2-git-send-email-swarren@nvidia.com>
-	<20110806174519.GB31966@ponder.secretlab.ca>
-	<74CDBE0F657A3D45AFBB94109FB122FF049F172168@HQMAIL01.nvidia.com>
-	<CAOesGMi2CXyAoy56-SdaD5YFzXW6W4wP6mnH+bVvRR3i_Mhk2A@mail.gmail.com>
-	<CACxGe6ubndfYNxgRfrLtCZ8cP0FddwTpG_FBZKXVZb0OHJVt6w@mail.gmail.com>
-Message-ID: <20110808180540.GC19367@n2100.arm.linux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 8 Aug 2011 19:10:33 +0100
+Subject: [PATCH 1/5] ARM: hw_breakpoint: add initial Cortex-A15 (debug
+	v7.1) support
+In-Reply-To: <4E401F07.6060202@codeaurora.org>
+References: <1312823572-9807-1-git-send-email-will.deacon@arm.com>
+	<1312823572-9807-2-git-send-email-will.deacon@arm.com>
+	<4E401F07.6060202@codeaurora.org>
+Message-ID: <20110808181032.GA10072@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 08, 2011 at 11:50:47AM -0600, Grant Likely wrote:
-> On Aug 8, 2011 8:26 AM, "Stephen Warren" <swarren@nvidia.com> wrote:
-> >
-> > Grant Likely wrote at Saturday, August 06, 2011 11:45 AM:
-> > > On Fri, Aug 05, 2011 at 04:15:34PM -0600, Stephen Warren wrote:
-> > > > irq_to_gpio is deprecated and in the process of being removed. Make that
-> > > > happen now for ARM Tegra.
-> > > >
-> > > > Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> > >
-> > > Applied both. ?Thanks.
-> >
-> > Didn't you want an Ack by a Tegra maintainer first?
-> 
-> It looks like a pretty low risk change.? I didn't see much risk in
-> picking it up and getting it off my plate.? I can always pull things
-> back out of my tree if someone complains.  I'll add Olof's ack before
-> it gets into linux-next.
-> 
-> >
-> > I assume they were both applied to gpio-next (although a fresh fetch ?of that
-> > doesn't show the commits)
-> 
-> I can't push it out until after 3.1-rc1 is released because it is
-> targeted at 3.2 now.
+Hi Stephen,
 
-It'd probably make sense for it to be merged into my tree along with
-the rest of my gpio changes, otherwise we're going to head for merge
-conflicts.  I'll be publishing those gpio.h changes in the next few
-days.
+On Mon, Aug 08, 2011 at 06:38:15PM +0100, Stephen Boyd wrote:
+> On 08/08/2011 10:12 AM, Will Deacon wrote:
+> > diff --git a/arch/arm/include/asm/hw_breakpoint.h b/arch/arm/include/asm/hw_breakpoint.h
+> > index f389b27..0ac141a 100644
+> > --- a/arch/arm/include/asm/hw_breakpoint.h
+> > +++ b/arch/arm/include/asm/hw_breakpoint.h
+> > @@ -50,6 +50,7 @@ static inline void decode_ctrl_reg(u32 reg,
+> >  #define ARM_DEBUG_ARCH_V6_1	2
+> >  #define ARM_DEBUG_ARCH_V7_ECP14	3
+> >  #define ARM_DEBUG_ARCH_V7_MM	4
+> > +#define ARM_DEBUG_ARCH_V7_1	5
+> >  
+> >  /* Breakpoint */
+> >  #define ARM_BREAKPOINT_EXECUTE	0
+> > diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
+> > index a927ca1..9848157 100644
+> > --- a/arch/arm/kernel/hw_breakpoint.c
+> > +++ b/arch/arm/kernel/hw_breakpoint.c
+> > @@ -154,7 +154,7 @@ u8 arch_get_debug_arch(void)
+> >  static int debug_arch_supported(void)
+> >  {
+> >  	u8 arch = get_debug_arch();
+> > -	return arch >= ARM_DEBUG_ARCH_V6 && arch <= ARM_DEBUG_ARCH_V7_ECP14;
+> > +	return arch >= ARM_DEBUG_ARCH_V6 && arch <= ARM_DEBUG_ARCH_V7_1;
+> 
+> Is ARM_DEBUG_ARCH_V7_MM supported now too?
+
+Ah, well spotted. I'd better fix that check before somebody thinks I'm
+committing to supporting the memory-mapped interface!
+
+Thanks,
+
+Will
