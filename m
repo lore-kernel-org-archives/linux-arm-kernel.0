@@ -1,49 +1,86 @@
 From: rajeshwari.s@samsung.com (Rajeshwari Shinde)
-Date: Mon, 08 Aug 2011 14:17:50 +0530
-Subject: RFC[PATCH 0/6] ARM: S5P64X0: Add SDHCI support using clkdev
-Message-ID: <1312793277-18689-1-git-send-email-rajeshwari.s@samsung.com>
+Date: Mon, 08 Aug 2011 14:17:52 +0530
+Subject: RFC[PATCH 2/6] ARM: S5P64X0: Enable SDHCI device
+In-Reply-To: <1312793277-18689-1-git-send-email-rajeshwari.s@samsung.com>
+References: <1312793277-18689-1-git-send-email-rajeshwari.s@samsung.com>
+Message-ID: <1312793277-18689-3-git-send-email-rajeshwari.s@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-S5P64X0 supports 3 Channel MMC/SDHCI/SDIO.
-This patchset adds the pin-mux setup and enables the HSMMC device
-for S5P64X0 using clkdev support.
+Select HSMMC device for S5P6440 and S5P6450.
 
-This patch series is based on the latest
-git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git for-next
-Tested on SMDK6440 and SMDK6450.
+Signed-off-by: Rajeshwari Shinde <rajeshwari.s@samsung.com>
+---
+ arch/arm/mach-s5p64x0/Kconfig |   30 ++++++++++++++++++++++++++++++
+ 1 files changed, 30 insertions(+), 0 deletions(-)
 
-Rajeshwari Shinde (6):
-
-o To Ben Dooks, Chris Ball 
-  SDHCI: S3C: Use bus clocks created using clkdev
-
-o To Kukjin Kim
-  ARM: S5P64X0: Enable SDHCI device
-  ARM: S5P64X0: Add support for pin-mux setup for SDHCI controllers
-  ARM: S5P64X0: Populate default platform data for SDHCI devices
-  ARM: S5P64X0: Enable SDHCI support
-  ARM: S5P64X0: Add clkdev bus lookup support
-
- arch/arm/mach-s5p64x0/Kconfig                      |   30 ++++++
- arch/arm/mach-s5p64x0/Makefile                     |    2 +
- arch/arm/mach-s5p64x0/cpu.c                        |    9 ++
- .../include/mach/s5p64x0-common-sdhci.h            |   17 +++
- arch/arm/mach-s5p64x0/mach-smdk6440.c              |   15 +++
- arch/arm/mach-s5p64x0/mach-smdk6450.c              |   15 +++
- arch/arm/mach-s5p64x0/s5p64x0-common-sdhci.c       |   41 ++++++++
- arch/arm/mach-s5p64x0/setup-sdhci-gpio.c           |  109 ++++++++++++++++++++
- arch/arm/mach-s5p64x0/setup-sdhci.c                |   46 ++++++++
- arch/arm/plat-samsung/Makefile                     |    1 +
- arch/arm/plat-samsung/clkdev-busalias.c            |   44 ++++++++
- arch/arm/plat-samsung/include/plat/sdhci.h         |   58 +++++++++++
- drivers/mmc/host/sdhci-s3c.c                       |    6 +-
- 13 files changed, 389 insertions(+), 4 deletions(-)
- create mode 100644 arch/arm/mach-s5p64x0/include/mach/s5p64x0-common-sdhci.h
- create mode 100644 arch/arm/mach-s5p64x0/s5p64x0-common-sdhci.c
- create mode 100644 arch/arm/mach-s5p64x0/setup-sdhci-gpio.c
- create mode 100644 arch/arm/mach-s5p64x0/setup-sdhci.c
- create mode 100644 arch/arm/plat-samsung/clkdev-busalias.c
-
+diff --git a/arch/arm/mach-s5p64x0/Kconfig b/arch/arm/mach-s5p64x0/Kconfig
+index 65c7518..bbc533e 100644
+--- a/arch/arm/mach-s5p64x0/Kconfig
++++ b/arch/arm/mach-s5p64x0/Kconfig
+@@ -26,6 +26,18 @@ config S5P64X0_SETUP_I2C1
+ 	help
+ 	  Common setup code for i2c bus 1.
+ 
++config S5P64X0_SETUP_SDHCI
++	bool
++	select S5P64X0_SETUP_SDHCI_GPIO
++	help
++	  Internal helper functions for S5P64X0 based SDHCI systems
++
++config S5P64X0_SETUP_SDHCI_GPIO
++	bool
++	help
++	  Common setup code for SDHCI gpio.
++	  Gpio values are machine specific.
++
+ # machine support
+ 
+ config MACH_SMDK6440
+@@ -34,12 +46,16 @@ config MACH_SMDK6440
+ 	select S3C_DEV_I2C1
+ 	select S3C_DEV_RTC
+ 	select S3C_DEV_WDT
++	select S3C_DEV_HSMMC
++	select S3C_DEV_HSMMC1
++	select S3C_DEV_HSMMC2
+ 	select S3C64XX_DEV_SPI
+ 	select SAMSUNG_DEV_ADC
+ 	select SAMSUNG_DEV_BACKLIGHT
+ 	select SAMSUNG_DEV_PWM
+ 	select SAMSUNG_DEV_TS
+ 	select S5P64X0_SETUP_I2C1
++	select S5P64X0_SETUP_SDHCI
+ 	help
+ 	  Machine support for the Samsung SMDK6440
+ 
+@@ -49,13 +65,27 @@ config MACH_SMDK6450
+ 	select S3C_DEV_I2C1
+ 	select S3C_DEV_RTC
+ 	select S3C_DEV_WDT
++	select S3C_DEV_HSMMC
++	select S3C_DEV_HSMMC1
++	select S3C_DEV_HSMMC2
+ 	select S3C64XX_DEV_SPI
+ 	select SAMSUNG_DEV_ADC
+ 	select SAMSUNG_DEV_BACKLIGHT
+ 	select SAMSUNG_DEV_PWM
+ 	select SAMSUNG_DEV_TS
+ 	select S5P64X0_SETUP_I2C1
++	select S5P64X0_SETUP_SDHCI
+ 	help
+ 	  Machine support for the Samsung SMDK6450
+ 
++menu "Use 8-bit SDHCI bus width"
++
++config S5P64X0_SD_CH1_8BIT
++	bool "SDHCI Channel 1 (Slot 1)"
++	depends on MACH_SMDK6450 || MACH_SMDK6440
++	help
++	  Support SDHCI Channel 1 8-bit bus.
++
++endmenu
++
+ endif
 -- 
 1.7.4.4
