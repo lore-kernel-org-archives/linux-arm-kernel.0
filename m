@@ -1,34 +1,53 @@
 From: tixy@yxit.co.uk (Jon Medhurst)
-Date: Mon,  8 Aug 2011 15:28:32 +0100
-Subject: [PATCH 12/12] ARM: Remove support for macro CONSISTENT_DMA_SIZE
+Date: Mon,  8 Aug 2011 15:28:30 +0100
+Subject: [PATCH 10/12] ARM: mach-bcmring: Setup consistent dma size at boot
+	time
 In-Reply-To: <1312813712-22808-1-git-send-email-tixy@yxit.co.uk>
 References: <1312813712-22808-1-git-send-email-tixy@yxit.co.uk>
-Message-ID: <1312813712-22808-13-git-send-email-tixy@yxit.co.uk>
+Message-ID: <1312813712-22808-11-git-send-email-tixy@yxit.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are now no platforms which set this macro.
-
 Signed-off-by: Jon Medhurst <tixy@yxit.co.uk>
+CC: Jiandong Zheng <jdzheng@broadcom.com>
+CC: Scott Branden <sbranden@broadcom.com>
 ---
- arch/arm/mm/dma-mapping.c |    4 ----
- 1 files changed, 0 insertions(+), 4 deletions(-)
+ arch/arm/mach-bcmring/include/mach/memory.h |    5 -----
+ arch/arm/mach-bcmring/mm.c                  |    3 +++
+ 2 files changed, 3 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index 5b59ce5..50be842 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -129,11 +129,7 @@ static void __dma_free_buffer(struct page *page, size_t size)
-  */
- static pte_t **consistent_pte;
+diff --git a/arch/arm/mach-bcmring/include/mach/memory.h b/arch/arm/mach-bcmring/include/mach/memory.h
+index 15162e4..8848a5b 100644
+--- a/arch/arm/mach-bcmring/include/mach/memory.h
++++ b/arch/arm/mach-bcmring/include/mach/memory.h
+@@ -25,9 +25,4 @@
  
--#ifdef CONSISTENT_DMA_SIZE
--#define DEFAULT_CONSISTENT_DMA_SIZE CONSISTENT_DMA_SIZE
--#else
- #define DEFAULT_CONSISTENT_DMA_SIZE SZ_2M
--#endif
+ #define PLAT_PHYS_OFFSET CFG_GLOBAL_RAM_BASE
  
- unsigned long consistent_base = CONSISTENT_END - DEFAULT_CONSISTENT_DMA_SIZE;
+-/*
+- * Maximum DMA memory allowed is 14M
+- */
+-#define CONSISTENT_DMA_SIZE (SZ_16M - SZ_2M)
+-
+ #endif
+diff --git a/arch/arm/mach-bcmring/mm.c b/arch/arm/mach-bcmring/mm.c
+index 0f1c37e..8616876 100644
+--- a/arch/arm/mach-bcmring/mm.c
++++ b/arch/arm/mach-bcmring/mm.c
+@@ -13,6 +13,7 @@
+ *****************************************************************************/
  
+ #include <linux/platform_device.h>
++#include <linux/dma-mapping.h>
+ #include <asm/mach/map.h>
+ 
+ #include <mach/hardware.h>
+@@ -53,4 +54,6 @@ void __init bcmring_map_io(void)
+ {
+ 
+ 	iotable_init(bcmring_io_desc, ARRAY_SIZE(bcmring_io_desc));
++	/* Maximum DMA memory allowed is 14M */
++	init_consistent_dma_size(14 << 20);
+ }
 -- 
 1.7.2.5
