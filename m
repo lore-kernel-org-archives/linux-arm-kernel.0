@@ -1,44 +1,62 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 08 Aug 2011 20:59:27 +0100
-Subject: [RFC PATCH 2/2] AT91: dt: simple device tree support for
-	at91sam9g45 family
-In-Reply-To: <20110807035751.GC7667@ponder.secretlab.ca>
-References: <56092075210001f40db485e0b126fe7c0c7b75ac.1312560476.git.nicolas.ferre@atmel.com>
-	<bdd7c02a561bc0655e9dfd4586f42774f2347ca1.1312560476.git.nicolas.ferre@atmel.com>
-	<20110807035751.GC7667@ponder.secretlab.ca>
-Message-ID: <4E40401F.4030309@atmel.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 8 Aug 2011 21:02:56 +0100
+Subject: [PATCH 4/6] ARM: smp: set thread_info->cpu to hardware CPU
+	number for boot thread
+In-Reply-To: <20110808181459.GB10072@e102144-lin.cambridge.arm.com>
+References: <1312823424-9654-1-git-send-email-will.deacon@arm.com>
+	<1312823424-9654-5-git-send-email-will.deacon@arm.com>
+	<4E401DF2.10801@codeaurora.org>
+	<20110808181459.GB10072@e102144-lin.cambridge.arm.com>
+Message-ID: <20110808200256.GE19367@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/07/2011 04:57 AM, Grant Likely wrote:
-> On Fri, Aug 05, 2011 at 05:24:53PM +0100, Nicolas Ferre wrote:
->> Add basic device tree support for at91sam9g45 SoC family and the
->> at91sam9m10g45ek board.
->> DT is been used to describe the at91sam9g45 SoC memory and AIC. It also
->> adds the dmaengine driver.
->>
->> Signed-off-by: Nicolas Ferre<nicolas.ferre@atmel.com>
->
-> Hi Nicolas,
->
-> Looks like a great start.  I was glad we could work on this last week.
+On Mon, Aug 08, 2011 at 07:14:59PM +0100, Will Deacon wrote:
+> On Mon, Aug 08, 2011 at 06:33:38PM +0100, Stephen Boyd wrote:
+> > On 08/08/2011 10:10 AM, Will Deacon wrote:
+> > >
+> > >  
+> > > +void __init smp_setup_processor_id(void)
+> > > +{
+> > > +	u32 mpidr;
+> > > +
+> > > +	/* Read the MPIDR to find the hardware ID of the current CPU. */
+> > > +	asm("1:		mrc	p15, 0, %0, c0, c0, 5\n"
+> > > +	    "		.pushsection \".alt.smp.init\", \"a\"\n"
+> > > +	    "		.long	1b\n"
+> > > +	    "		mov	%0, #0\n"
+> > > +	    "		.popsection"
+> > > +	    : "=r" (mpidr));
+> > 
+> > Would it be a good idea to put this into asm/cputype.h? I suppose the
+> > smp alternatives part would need to be written in C.
+> > 
+> >     mpidr = is_smp() ? read_cpuid_mpidr() : 0;
+> 
+> Yes, that's much better. We used to have asm/smp_mpidr.h which did this, so I
+> lifted the code from there but doing it in C is easier to read.
+> 
+> > >
+> > > +
+> > > +	current_thread_info()->cpu = mpidr & 0xff;
+> > > +	printk("Booting Linux on CPU %d\n", current_thread_info()->cpu);
+> > > +}
+> > > +
+> > 
+> > Should there be a KERN_INFO there?
+> 
+> Can be. I just followed suit with secondary_start_kernel, but smp.c doesn't
+> seem to be consistent anyway so I'll add the specifier.
 
-Yes, that was enriching.
+Actually, it's probably much better to keep logical CPU0 as the boot CPU.
+The hotplug code makes the assumption that the lowest online CPU number
+is the boot CPU.
 
-> Some comments below.
+So unless we want even more pain, I suggest we just ensure logical CPU0
+is the boot CPU.
 
-I will have to rework this series for sure but I have limited access to 
-my git tree/emails this week... I plan to come back to this next week.
-
->> ---
->>   arch/arm/mach-at91/Kconfig               |    8 ++++++
->>   arch/arm/mach-at91/Makefile.boot         |    2 +
->>   arch/arm/mach-at91/at91sam9g45_devices.c |    3 +-
->>   arch/arm/mach-at91/board-sam9m10g45ek.c  |   36 ++++++++++++++++++++++++++++++
->>   4 files changed, 48 insertions(+), 1 deletions(-)
-
-[..]
-
-Best regards,
--- 
-Nicolas Ferre
+We're already fairly clean on our interactions between CPU numbering and
+the hardware CPU numbering - there's only a limited number of places where
+the two interact.  Those are the GIC, IPI, secondary CPU bringup, and
+hotplug code.  I suggest that we preserve the independence, and introduce
+a mapping between logical CPU numbering and hardware CPU numbering.
