@@ -1,56 +1,66 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Tue, 9 Aug 2011 18:57:20 +0200
-Subject: How to handle named resources with DT?
-In-Reply-To: <20110809162907.GA630@manju-WNB7PBC4801-0006>
-References: <4E40FC88.5090403@ti.com>
-	<20110809162907.GA630@manju-WNB7PBC4801-0006>
-Message-ID: <4E4166F0.9050401@ti.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Tue, 9 Aug 2011 12:02:40 -0500
+Subject: [PATCH 11/13] ARM: gpio: consolidate trivial gpiolib
+	implementations
+In-Reply-To: <E1QqhM1-0003af-U5@rmk-PC.arm.linux.org.uk>
+References: <20110809080411.GA1831@n2100.arm.linux.org.uk>
+	<E1QqhM1-0003af-U5@rmk-PC.arm.linux.org.uk>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F001F388389375@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Manju,
-
-On 8/9/2011 6:29 PM, G, Manjunath Kondaiah wrote:
-> Hi Benoit,
+On Tuesday, August 09, 2011 1:08 AM, Russell King wrote:
 >
-> On Tue, Aug 09, 2011 at 11:23:20AM +0200, Cousson, Benoit wrote:
->> Hi Grant,
->>
->> Trying to bind hwmod informations with DT, I'm facing a little limitation.
->> A bunch of drivers are using the platform_get_resource_byname, so
->> the name for the resource is needed.
->>
->> The name is used so far for IORESOURCE_MEM, IORESOURCE_IRQ and
->> IORESOURCE_DMA types of resources.
+> Consolidate 24 trivial gpiolib implementions out of mach/gpio.h
+> into asm/gpio.h.  This is basically the include of asm-generic/gpio.h
+> and the definition of gpio_get_value, gpio_set_value, and gpio_cansleep
+> as described in Documentation/gpio.txt
 >
-> IORESOURCE_MEM and IORESOURCE_IRQ's are fetched from dt blob and
-> it will be part of pdev.
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>  arch/arm/include/asm/gpio.h                 |   10 ++++++++++
+>  arch/arm/mach-ep93xx/include/mach/gpio.h    |    7 +------
+>
+> diff --git a/arch/arm/include/asm/gpio.h b/arch/arm/include/asm/gpio.h
+> index 166a7a3..15e8970 100644
+> --- a/arch/arm/include/asm/gpio.h
+> +++ b/arch/arm/include/asm/gpio.h
+> @@ -4,4 +4,14 @@
+>  /* not all ARM platforms necessarily support this API ... */
+>  #include <mach/gpio.h>
+>  
+> +#ifdef __ARM_GPIOLIB_TRIVIAL
+> +/* Note: this may rely upon the value of ARCH_NR_GPIOS set in mach/gpio.h */
+> +#include <asm-generic/gpio.h>
+> +
+> +/* The trivial gpiolib dispatchers */
+> +#define gpio_get_value  __gpio_get_value
+> +#define gpio_set_value  __gpio_set_value
+> +#define gpio_cansleep   __gpio_cansleep
+> +#endif
+> +
+>  #endif /* _ARCH_ARM_GPIO_H */
+> diff --git a/arch/arm/mach-ep93xx/include/mach/gpio.h b/arch/arm/mach-ep93xx/include/mach/gpio.h
+> index c57152c..fbc770e 100644
+> --- a/arch/arm/mach-ep93xx/include/mach/gpio.h
+> +++ b/arch/arm/mach-ep93xx/include/mach/gpio.h
+> @@ -100,12 +100,7 @@
+>  #define EP93XX_GPIO_LINE_MAX_IRQ	EP93XX_GPIO_LINE_F(7)
+>  
+>  /* new generic GPIO API - see Documentation/gpio.txt */
+> -
+> -#include <asm-generic/gpio.h>
+> -
+> -#define gpio_get_value	__gpio_get_value
+> -#define gpio_set_value	__gpio_set_value
+> -#define gpio_cansleep	__gpio_cansleep
+> +#define __ARM_GPIOLIB_TRIVIAL
+>  
+>  /*
+>   * Map GPIO A0..A7  (0..7)  to irq 64..71,
 
-Yes, but without the proper name in the resource structure. It will be 
-then impossible to use the platform_get_resource_byname function that is 
-currently used by a bunch of drivers.
+For ep93xx:
 
-> For IORESOURCE_DMA, you can have property
-> "dma-channel" in dtsi file and fetch dma-channel in driver probe
-> through "of_property_read_u32()" api.
+Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
 
-That will not be enough to get the name. So maybe something like:
-	dmas = <12>, "rx_req", <13>, "tx_req";
-will be doable.
-The issue is that the name is optional so managing the multiple entries 
-might be tricky.
-
-BTW, it's strange that a default support does not exist for dma request 
-(and not channel).
-The mechanism is similar to irq line, and quite standard to many SoC 
-AFAIK. Or maybe I missed it.
-
-> BTW, this is not required for omap since dt-hwmod binding will fetch
-> pdev pointer from hwmod database and it will be used "as is" without
-> any modification which inturn does not break any existing pm
-> functionality.
-
-Well for the moment... but I have some long term plan as well:-)
-
-Thanks,
-Benoit
+Thanks!
