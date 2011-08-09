@@ -1,225 +1,150 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Tue, 9 Aug 2011 16:35:18 +0530
-Subject: [PATCH 1/6] spi/spi-pl022: Resolve formatting issues
+Date: Tue, 9 Aug 2011 16:35:21 +0530
+Subject: [PATCH 4/6] spi/spi-pl022: calculate_effective_freq() must set rate
+	<= requested rate
 In-Reply-To: <cover.1312887860.git.viresh.kumar@st.com>
 References: <cover.1312887860.git.viresh.kumar@st.com>
-Message-ID: <a72e7189be95278b97614fe9ab7d307d422d54e4.1312887860.git.viresh.kumar@st.com>
+Message-ID: <abd4dbaedf226ad29461775bcd969810c87c305d.1312887860.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There were few formatting related issues in code. This patch fixes them.
-Fixes include:
-- Remove extra blank lines
-- align code to 80 cols
-- combine several lines to one line
-- Replace multiple spaces with tabs
-- Remove spaces before labels
+There were few issues with calculate_effective_freq() routine:
+- It was returning first rate found >= requested rate. Now, if system have spi's
+  rate as 83 MHz, with possible prescaled rates as 83, 41.5, 20.75, 13.83 (as we
+  can prescale with multiples of 2). If user has given rate to be programmed as
+  22 MHz, then driver programmes it to 41.5 MHz. This looks to be incorrect, as
+  user might have given the upper limit of the device, and we are programming it
+  above it.
+- Driver finds the first satisfying rate and programmes it, but with other
+  values of scr & cpsdvsr, it is possible to get more closer rate.
+
+This patch fixes these two issues, with some reformatting inside the code.
+This also creates a macro to calculate prescaled rate based on spi's rate,
+cpsdvsr and scr.
 
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
- drivers/spi/spi-pl022.c |   54 +++++++++++++++++-----------------------------
- 1 files changed, 20 insertions(+), 34 deletions(-)
+ drivers/spi/spi-pl022.c |   98 ++++++++++++++++++++++------------------------
+ 1 files changed, 47 insertions(+), 51 deletions(-)
 
 diff --git a/drivers/spi/spi-pl022.c b/drivers/spi/spi-pl022.c
-index 730b4a3..f600d00 100644
+index 452952b..e0cfb8c 100644
 --- a/drivers/spi/spi-pl022.c
 +++ b/drivers/spi/spi-pl022.c
-@@ -113,7 +113,6 @@
- #define SSP_CR0_MASK_CSS_ST	(0x1FUL << 16)
- #define SSP_CR0_MASK_FRF_ST	(0x3UL << 21)
- 
--
- /*
-  * SSP Control Register 0  - SSP_CR1
-  */
-@@ -283,7 +282,6 @@
- 
- #define SPI_POLLING_TIMEOUT 1000
- 
--
- /*
-  * The type of reading going on on this chip
-  */
-@@ -752,7 +750,6 @@ static void readwriter(struct pl022 *pl022)
- 	 */
- }
- 
--
- /**
-  * next_transfer - Move to the Next transfer in the current spi message
-  * @pl022: SSP driver private data structure
-@@ -1534,8 +1531,7 @@ static void pump_messages(struct work_struct *work)
- 	/* Initial message state */
- 	pl022->cur_msg->state = STATE_START;
- 	pl022->cur_transfer = list_entry(pl022->cur_msg->transfers.next,
--					    struct spi_transfer,
--					    transfer_list);
-+					    struct spi_transfer, transfer_list);
- 
- 	/* Setup the SPI using the per chip configuration */
- 	pl022->cur_chip = spi_get_ctldata(pl022->cur_msg->spi);
-@@ -1557,7 +1553,6 @@ static void pump_messages(struct work_struct *work)
- 		do_interrupt_dma_transfer(pl022);
- }
- 
--
- static int __init init_queue(struct pl022 *pl022)
- {
- 	INIT_LIST_HEAD(&pl022->queue);
-@@ -1566,8 +1561,8 @@ static int __init init_queue(struct pl022 *pl022)
- 	pl022->running = false;
- 	pl022->busy = false;
- 
--	tasklet_init(&pl022->pump_transfers,
--			pump_transfers,	(unsigned long)pl022);
-+	tasklet_init(&pl022->pump_transfers, pump_transfers,
-+			(unsigned long)pl022);
- 
- 	INIT_WORK(&pl022->pump_messages, pump_messages);
- 	pl022->workqueue = create_singlethread_workqueue(
-@@ -1578,7 +1573,6 @@ static int __init init_queue(struct pl022 *pl022)
+@@ -1791,67 +1791,63 @@ static int pl022_transfer(struct spi_device *spi, struct spi_message *msg)
  	return 0;
  }
  
--
- static int start_queue(struct pl022 *pl022)
+-static int calculate_effective_freq(struct pl022 *pl022,
+-				    int freq,
+-				    struct ssp_clock_params *clk_freq)
++#define SPI_RATE(rate, cpsdvsr, scr)	(rate / (cpsdvsr * (1 + scr)))
++static int calculate_effective_freq(struct pl022 *pl022, int freq, struct
++				    ssp_clock_params * clk_freq)
  {
- 	unsigned long flags;
-@@ -1601,7 +1595,6 @@ static int start_queue(struct pl022 *pl022)
- 	return 0;
- }
+ 	/* Lets calculate the frequency parameters */
+-	u16 cpsdvsr = 2;
+-	u16 scr = 0;
+-	bool freq_found = false;
+-	u32 rate;
+-	u32 max_tclk;
+-	u32 min_tclk;
++	u16 cpsdvsr = CPSDVR_MIN, scr = SCR_MIN;
++	u32 rate, max_tclk, min_tclk, best_freq = 0, best_cpsdvsr = 0,
++		best_scr = 0, tmp, found = 0;
  
+ 	rate = clk_get_rate(pl022->clk);
+ 	/* cpsdvscr = 2 & scr 0 */
+-	max_tclk = (rate / (CPSDVR_MIN * (1 + SCR_MIN)));
++	max_tclk = SPI_RATE(rate, CPSDVR_MIN, SCR_MIN);
+ 	/* cpsdvsr = 254 & scr = 255 */
+-	min_tclk = (rate / (CPSDVR_MAX * (1 + SCR_MAX)));
 -
- static int stop_queue(struct pl022 *pl022)
- {
- 	unsigned long flags;
-@@ -1861,7 +1854,6 @@ static int calculate_effective_freq(struct pl022 *pl022,
- 	return 0;
- }
- 
--
- /*
-  * A piece of default chip info unless the platform
-  * supplies it.
-@@ -1879,7 +1871,6 @@ static const struct pl022_config_chip pl022_default_chip_info = {
- 	.cs_control = null_cs_control,
- };
- 
--
- /**
-  * pl022_setup - setup function registered to SPI master framework
-  * @spi: spi device which is requesting setup
-@@ -1956,7 +1947,6 @@ static int pl022_setup(struct spi_device *spi)
- 		goto err_config_params;
+-	if ((freq <= max_tclk) && (freq >= min_tclk)) {
+-		while (cpsdvsr <= CPSDVR_MAX && !freq_found) {
+-			while (scr <= SCR_MAX && !freq_found) {
+-				if ((rate /
+-				     (cpsdvsr * (1 + scr))) > freq)
+-					scr += 1;
+-				else {
+-					/*
+-					 * This bool is made true when
+-					 * effective frequency >=
+-					 * target frequency is found
+-					 */
+-					freq_found = true;
+-					if ((rate /
+-					     (cpsdvsr * (1 + scr))) != freq) {
+-						if (scr == SCR_MIN) {
+-							cpsdvsr -= 2;
+-							scr = SCR_MAX;
+-						} else
+-							scr -= 1;
+-					}
+-				}
+-			}
+-			if (!freq_found) {
+-				cpsdvsr += 2;
+-				scr = SCR_MIN;
+-			}
+-		}
+-		if (cpsdvsr != 0) {
+-			dev_dbg(&pl022->adev->dev,
+-				"SSP Effective Frequency is %u\n",
+-				(rate / (cpsdvsr * (1 + scr))));
+-			clk_freq->cpsdvsr = (u8) (cpsdvsr & 0xFF);
+-			clk_freq->scr = (u8) (scr & 0xFF);
+-			dev_dbg(&pl022->adev->dev,
+-				"SSP cpsdvsr = %d, scr = %d\n",
+-				clk_freq->cpsdvsr, clk_freq->scr);
+-		}
+-	} else {
++	min_tclk = SPI_RATE(rate, CPSDVR_MAX, SCR_MAX);
++
++	if (!((freq <= max_tclk) && (freq >= min_tclk))) {
+ 		dev_err(&pl022->adev->dev,
+ 			"controller data is incorrect: out of range frequency");
+ 		return -EINVAL;
  	}
- 
--
- 	status = verify_controller_parameters(pl022, chip_info);
- 	if (status) {
- 		dev_err(&spi->dev, "controller data is incorrect");
-@@ -2096,12 +2086,13 @@ static int pl022_setup(struct spi_device *spi)
- 	}
- 	SSP_WRITE_BITS(chip->cr1, SSP_DISABLED, SSP_CR1_MASK_SSE, 1);
- 	SSP_WRITE_BITS(chip->cr1, chip_info->hierarchy, SSP_CR1_MASK_MS, 2);
--	SSP_WRITE_BITS(chip->cr1, chip_info->slave_tx_disable, SSP_CR1_MASK_SOD, 3);
-+	SSP_WRITE_BITS(chip->cr1, chip_info->slave_tx_disable, SSP_CR1_MASK_SOD,
-+		3);
- 
- 	/* Save controller_state */
- 	spi_set_ctldata(spi, chip);
- 	return status;
-- err_config_params:
-+err_config_params:
- 	spi_set_ctldata(spi, NULL);
- 	kfree(chip);
- 	return status;
-@@ -2122,7 +2113,6 @@ static void pl022_cleanup(struct spi_device *spi)
- 	kfree(chip);
- }
- 
--
- static int __devinit
- pl022_probe(struct amba_device *adev, const struct amba_id *id)
- {
-@@ -2243,23 +2233,23 @@ pl022_probe(struct amba_device *adev, const struct amba_id *id)
- 	amba_vcore_disable(adev);
++
++	/*
++	 * best_freq will give closest possible available rate (<= requested
++	 * freq) for all values of scr & cpsdvsr.
++	 */
++	while ((cpsdvsr <= CPSDVR_MAX) && !found) {
++		while (scr <= SCR_MAX) {
++			tmp = SPI_RATE(rate, cpsdvsr, scr);
++
++			if (tmp > freq)
++				scr++;
++			/*
++			 * If found exact value, update and break.
++			 * If found more closer value, update and continue.
++			 */
++			else if ((tmp == freq) || (tmp > best_freq)) {
++				best_freq = tmp;
++				best_cpsdvsr = cpsdvsr;
++				best_scr = scr;
++
++				if (tmp == freq)
++					break;
++			}
++			scr++;
++		}
++		cpsdvsr += 2;
++		scr = SCR_MIN;
++	}
++
++	clk_freq->cpsdvsr = (u8) (best_cpsdvsr & 0xFF);
++	clk_freq->scr = (u8) (best_scr & 0xFF);
++	dev_dbg(&pl022->adev->dev,
++		"SSP Target Frequency is: %u, Effective Frequency is %u\n",
++		freq, best_freq);
++	dev_dbg(&pl022->adev->dev, "SSP cpsdvsr = %d, scr = %d\n",
++		clk_freq->cpsdvsr, clk_freq->scr);
++
  	return 0;
- 
-- err_spi_register:
-- err_start_queue:
-- err_init_queue:
-+err_spi_register:
-+err_start_queue:
-+err_init_queue:
- 	destroy_queue(pl022);
- 	pl022_dma_remove(pl022);
- 	free_irq(adev->irq[0], pl022);
- 	pm_runtime_disable(&adev->dev);
-- err_no_irq:
-+err_no_irq:
- 	clk_put(pl022->clk);
-- err_no_clk:
-+err_no_clk:
- 	iounmap(pl022->virtbase);
-- err_no_ioremap:
-+err_no_ioremap:
- 	amba_release_regions(adev);
-- err_no_ioregion:
-+err_no_ioregion:
- 	spi_master_put(master);
-- err_no_master:
-- err_no_pdata:
-+err_no_master:
-+err_no_pdata:
- 	return status;
  }
  
-@@ -2337,7 +2327,6 @@ static struct vendor_data vendor_arm = {
- 	.loopback = true,
- };
- 
--
- static struct vendor_data vendor_st = {
- 	.fifodepth = 32,
- 	.max_bpw = 32,
-@@ -2392,9 +2381,9 @@ static struct amba_id pl022_ids[] = {
- 		 * and 32 locations deep TX/RX FIFO but no extended
- 		 * CR0/CR1 register
- 		 */
--		.id     = 0x00080023,
--		.mask   = 0xffffffff,
--		.data   = &vendor_st_pl023,
-+		.id	= 0x00080023,
-+		.mask	= 0xffffffff,
-+		.data	= &vendor_st_pl023,
- 	},
- 	{
- 		.id	= 0x10080023,
-@@ -2411,23 +2400,20 @@ static struct amba_driver pl022_driver = {
- 	.id_table	= pl022_ids,
- 	.probe		= pl022_probe,
- 	.remove		= __devexit_p(pl022_remove),
--	.suspend        = pl022_suspend,
--	.resume         = pl022_resume,
-+	.suspend	= pl022_suspend,
-+	.resume		= pl022_resume,
- };
- 
--
- static int __init pl022_init(void)
- {
- 	return amba_driver_register(&pl022_driver);
- }
--
- subsys_initcall(pl022_init);
- 
- static void __exit pl022_exit(void)
- {
- 	amba_driver_unregister(&pl022_driver);
- }
--
- module_exit(pl022_exit);
- 
- MODULE_AUTHOR("Linus Walleij <linus.walleij@stericsson.com>");
 -- 
 1.7.2.2
