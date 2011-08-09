@@ -1,48 +1,56 @@
-From: koen.beel.barco@gmail.com (Koen Beel)
-Date: Tue, 9 Aug 2011 08:25:17 +0200
+From: b32955@freescale.com (Huang Shijie)
+Date: Tue, 9 Aug 2011 14:36:19 +0800
 Subject: GPMI-NAND Status?
-In-Reply-To: <4E40C18B.7040609@freescale.com>
-References: <20110805135133.GA26981@pengutronix.de>
-	<4E3F8087.6070206@freescale.com>
-	<CAHMSPgMYP+5Hpa5sC-yt=1H-S=tEER8uNzj6uMSK403_DGYJ9Q@mail.gmail.com>
-	<4E40C18B.7040609@freescale.com>
-Message-ID: <CAHMSPgNf6V8jYLdxFtznNkvLK-R+YN7gUkfbjrxv0WLTDdJmwg@mail.gmail.com>
+In-Reply-To: <CAHMSPgMdBmmNG41_QgGivSb+M1rG5nqJjtveyZueKHHJrA8vzA@mail.gmail.com>
+References: <20110805135133.GA26981@pengutronix.de>	<4E3F8087.6070206@freescale.com>	<CAHMSPgMYP+5Hpa5sC-yt=1H-S=tEER8uNzj6uMSK403_DGYJ9Q@mail.gmail.com>	<4E3FBC75.7010703@freescale.com>
+	<CAHMSPgMdBmmNG41_QgGivSb+M1rG5nqJjtveyZueKHHJrA8vzA@mail.gmail.com>
+Message-ID: <4E40D563.2090202@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tue, Aug 9, 2011 at 7:11 AM, Huang Shijie <b32955@freescale.com> wrote:
-> Hi Koen:
->> Anything is good for me.
->> Could also be useful to make sure we test on the same HW as much as
->> possible and are using the same source tree.
->> HW I have:
->> - mx23evk rev C1
->> - mx23evk rev B2
->> - own target hw using mx23 lqfp-128 chip and different type of ddr and
->> nand.
+Hi Koen:
+> Hi,
+>
+> On Mon, Aug 8, 2011 at 12:37 PM, Huang Shijie<b32955@freescale.com>  wrote:
+>> Hi,
+>>> On my target, the mxs-dma is working for sdio until the gpmi-nand
+>>> gives a timeout. After that the dma for sdio is *not fully* working
+>>> anymore.
+>>>
+>> We need more log in following aspects:
+>> [1] apbh-dma registers
+>> [2] clk registers
+>> [3] gpmi registers
 >>
-> My test mx23 board is 169BGA package which is different from yours.
->
-> Could you get the 169BGA package board?
->
-> I think the DMA timeout is caused by the different package type.
+>> Please git-apply the patch in the attachment.
+>> It will print out more DMA information WHEN dma-timeout occur.
+> Don't get it. What exactly are you trying to dump?
+> This patch dumps CTRL0, CTRL1, CTRL2, DEVSEL but also some registers
+> of APBH channel0 which is reserved....
+sorry, I intended to print out the channel 4(NAND_DEVICE0).
 
-I suppose my mx23evk is right the same as you have (same revision) and
-this has the bga169 package. My actual target has lqfp128. But on both
-boards I get the same issues.
-So I don't think the package type has something to do with the dma
-timeout issue. After all the silicon inside is the same thing.
+I want to know that:
+  When the dma timeout occurs, whether it caused by the GPMI or by the 
+DMA itself.
 
-I'm trying to debug a little further.
 
-Regards,
-Koen
+Please try the new patch.
 
+Best Regards
+Huang Shijie
+> Then it prints some debug info on channel 1 (ssp1) and then alle
+> channel 2 register except the debug register (ssp2 = not used here).
 >
-> Best Regards
-> Huang Shijie
+> What info do you need?
 >
+> Br,
+> Koen
 >
+>> Best Regards
+>> Huang Shijie
+>>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 >
