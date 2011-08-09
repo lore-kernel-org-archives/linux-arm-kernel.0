@@ -1,24 +1,26 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 9 Aug 2011 12:34:05 -0700
-Subject: [PATCH v2 0/3] ARM: Tegra: Harmony & Seaboard USB and audio
-In-Reply-To: <1312835715-893-1-git-send-email-swarren@nvidia.com>
-References: <1312835715-893-1-git-send-email-swarren@nvidia.com>
-Message-ID: <20110809193405.GA4224@quad.lixom.net>
+Date: Tue, 9 Aug 2011 12:35:29 -0700
+Subject: [PATCH 0/5] ARM: tegra: paz00: updates for "for-next"
+In-Reply-To: <cover.1312735430.git.marvin24@gmx.de>
+References: <cover.1312735430.git.marvin24@gmx.de>
+Message-ID: <20110809193529.GA4278@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 08, 2011 at 02:35:12PM -0600, Stephen Warren wrote:
-> This is a slight rev of some patches I posted a little while ago, now
-> in a single series. The second patch has a minor revision that simplifies
-> board-seaboard-pinmux.c.
+On Sun, Aug 07, 2011 at 09:00:50PM +0200, Marc Dietrich wrote:
+> Colin,
 > 
-> The (previous version of the) patches were previously Ack'd by Tegra
-> maintainers, and Colin asked Arnd to pick them up in arm-soc.git,
-> although I'm not sure if that request still holds given the merge
-> window is over?
+> this is an update to the patches I send on July 15th. There are now five patches
+> which add the second serial port (some solder points on the mainboard) and Wifi
+> support (rfkill and LED) to PAZ00. Additionally, usb support is improved and
+> the SDHCI init order is changed.
+> 
+> Please queue them up for "for-next" after positive review of course.
 
-Thanks, I've picked them up in boards-for-3.2, which will be merged in
-through Arnd for 3.2.
+I've applied 1-3 and 5 to boards-for-3.2. Repost patch 4 standalone on next
+spin. :)
 
+
+Thanks,
 
 -Olof
