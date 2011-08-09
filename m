@@ -1,40 +1,27 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Tue, 09 Aug 2011 16:06:14 +0400
-Subject: [PATCH 06/13] ARM: gpio: davinci: convert drivers to use
-	asm/gpio.h rather than mach/gpio.h
-In-Reply-To: <E1QqhKP-0003aK-9R@rmk-PC.arm.linux.org.uk>
-References: <20110809080411.GA1831@n2100.arm.linux.org.uk>
-	<E1QqhKP-0003aK-9R@rmk-PC.arm.linux.org.uk>
-Message-ID: <4E4122B6.2070706@ru.mvista.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Tue, 9 Aug 2011 14:12:13 +0200
+Subject: [RFC PATCH 08/12] ARM: local timers: switch ux500 to standalone
+	smp_twd
+In-Reply-To: <1312886814-15627-9-git-send-email-marc.zyngier@arm.com>
+References: <1312886814-15627-1-git-send-email-marc.zyngier@arm.com>
+	<1312886814-15627-9-git-send-email-marc.zyngier@arm.com>
+Message-ID: <4E41241D.7020907@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
-
-On 09-08-2011 12:06, Russell King - ARM Linux wrote:
-
-    CCing linux-usb and Felipe...
-
-> Signed-off-by: Russell King<rmk+kernel@arm.linux.org.uk>
-> ---
->   drivers/usb/musb/davinci.c |    2 +-
->   1 files changed, 1 insertions(+), 1 deletions(-)
-
-> diff --git a/drivers/usb/musb/davinci.c b/drivers/usb/musb/davinci.c
-> index 8bdf25a..f9a3f62 100644
-> --- a/drivers/usb/musb/davinci.c
-> +++ b/drivers/usb/musb/davinci.c
-> @@ -35,7 +35,7 @@
+On 08/09/2011 12:46 PM, Marc Zyngier wrote:
+> Convert the ux500 platforms to the standalone version of smp_twd.c.
+> Since the timer calibration code requires another timer to be up
+> and running, the actual initialisation is left to the late_timer_init
+> hook.
 >
->   #include<mach/hardware.h>
->   #include<mach/memory.h>
-> -#include<mach/gpio.h>
-> +#include<asm/gpio.h>
+> Cc: Linus Walleij<linus.walleij@stericsson.com>
+> Signed-off-by: Marc Zyngier<marc.zyngier@arm.com>
+>    
 
-    Shouldn't this now be moved to the below #include group?
+So it switch to ioremap():ing the TWD too.
+Seems like a pretty good idea.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
->   #include<mach/cputype.h>
->
->   #include<asm/mach-types.h>
-
-WBR, Sergei
+Yours,
+Linus Walleij
