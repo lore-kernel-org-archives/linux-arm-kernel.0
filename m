@@ -1,48 +1,91 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 9 Aug 2011 09:32:17 +0100
-Subject: [PATCH 2/6] ARM: realview: ensure visibility of writes during
-	reset
-In-Reply-To: <4E405221.7050800@gmail.com>
-References: <1312823424-9654-1-git-send-email-will.deacon@arm.com>
-	<1312823424-9654-3-git-send-email-will.deacon@arm.com>
-	<4E405221.7050800@gmail.com>
-Message-ID: <20110809083216.GA2991@e102144-lin.cambridge.arm.com>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Tue,  9 Aug 2011 10:16:42 +0100
+Subject: [PATCHv3 0/9] macb: add support for Cadence GEM
+Message-ID: <1312881411-2376-1-git-send-email-jamie@jamieiles.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+This is largely a repost of the series I posted back in March.  The only changes
+since then are rebasing onto 3.1-rc1 and changing the gem conditionals from a
+boolean in the macb structure to an inline helper as requested by
+Jean-Christophe.
 
-On Mon, Aug 08, 2011 at 10:16:17PM +0100, Rob Herring wrote:
-> On 08/08/2011 12:10 PM, Will Deacon wrote:
-> > The various reset routines in mach-realview rely on an FPGA to
-> > power-cycle the board after writing some magic runes to memory-mapped
-> > registers.
-> > 
-> > This patch adds a dsb() following the writes, so that they become
-> > visible before we mdelay(1000) in the arch_reset code. Without this
-> > patch, the timeout would expire sporadically, causing the reset to fail.
-> > 
-> > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> > ---
-> >  arch/arm/mach-realview/include/mach/system.h |    1 +
-> >  1 files changed, 1 insertions(+), 0 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-realview/include/mach/system.h b/arch/arm/mach-realview/include/mach/system.h
-> > index a30f2e3..6657ff2 100644
-> > --- a/arch/arm/mach-realview/include/mach/system.h
-> > +++ b/arch/arm/mach-realview/include/mach/system.h
-> > @@ -44,6 +44,7 @@ static inline void arch_reset(char mode, const char *cmd)
-> >  	 */
-> >  	if (realview_reset)
-> >  		realview_reset(mode);
-> > +	dsb();
-> 
-> Wouldn't it be better to do this globally.
+This has been run-tested on picoxcell and compile tested for all AT91 platforms
+but I couldn't get a working cross compiler for avr32.
 
-I'd rather leave it in the arch-specific code since otherwise it feels like
-we're leaking the actual reset implementation into the caller. Plus it's not
-entirely clear that there's a one-size-fits-all solution here.
+All patches are available in a git branch at
 
-Cheers,
+	git://github.com/jamieiles/linux-2.6-ji.git macb-gem
 
-Will
+Jamie Iles (9):
+  at91: provide macb clks with "pclk" and "hclk" name
+  macb: remove conditional clk handling
+  macb: unify at91 and avr32 platform data
+  macb: convert printk to netdev_ and friends
+  macb: initial support for Cadence GEM
+  macb: support higher rate GEM MDIO clock divisors
+  macb: support statistics for GEM devices
+  macb: support DMA bus widths > 32 bits
+  macb: allow GEM to have configurable receive buffer size
+
+ arch/arm/mach-at91/at91cap9.c               |    8 +-
+ arch/arm/mach-at91/at91cap9_devices.c       |    6 +-
+ arch/arm/mach-at91/at91rm9200_devices.c     |    6 +-
+ arch/arm/mach-at91/at91sam9260.c            |    8 +-
+ arch/arm/mach-at91/at91sam9260_devices.c    |    6 +-
+ arch/arm/mach-at91/at91sam9263.c            |    8 +-
+ arch/arm/mach-at91/at91sam9263_devices.c    |    6 +-
+ arch/arm/mach-at91/at91sam9g45.c            |    8 +-
+ arch/arm/mach-at91/at91sam9g45_devices.c    |    6 +-
+ arch/arm/mach-at91/board-1arm.c             |    2 +-
+ arch/arm/mach-at91/board-afeb-9260v1.c      |    2 +-
+ arch/arm/mach-at91/board-cam60.c            |    2 +-
+ arch/arm/mach-at91/board-cap9adk.c          |    2 +-
+ arch/arm/mach-at91/board-carmeva.c          |    2 +-
+ arch/arm/mach-at91/board-cpu9krea.c         |    2 +-
+ arch/arm/mach-at91/board-cpuat91.c          |    2 +-
+ arch/arm/mach-at91/board-csb337.c           |    2 +-
+ arch/arm/mach-at91/board-csb637.c           |    2 +-
+ arch/arm/mach-at91/board-eb9200.c           |    2 +-
+ arch/arm/mach-at91/board-ecbat91.c          |    2 +-
+ arch/arm/mach-at91/board-eco920.c           |    2 +-
+ arch/arm/mach-at91/board-foxg20.c           |    2 +-
+ arch/arm/mach-at91/board-gsia18s.c          |    2 +-
+ arch/arm/mach-at91/board-kafa.c             |    2 +-
+ arch/arm/mach-at91/board-kb9202.c           |    2 +-
+ arch/arm/mach-at91/board-neocore926.c       |    2 +-
+ arch/arm/mach-at91/board-pcontrol-g20.c     |    2 +-
+ arch/arm/mach-at91/board-picotux200.c       |    2 +-
+ arch/arm/mach-at91/board-qil-a9260.c        |    2 +-
+ arch/arm/mach-at91/board-rm9200dk.c         |    2 +-
+ arch/arm/mach-at91/board-rm9200ek.c         |    2 +-
+ arch/arm/mach-at91/board-sam9-l9260.c       |    2 +-
+ arch/arm/mach-at91/board-sam9260ek.c        |    2 +-
+ arch/arm/mach-at91/board-sam9263ek.c        |    2 +-
+ arch/arm/mach-at91/board-sam9g20ek.c        |    2 +-
+ arch/arm/mach-at91/board-sam9m10g45ek.c     |    2 +-
+ arch/arm/mach-at91/board-snapper9260.c      |    2 +-
+ arch/arm/mach-at91/board-stamp9g20.c        |    2 +-
+ arch/arm/mach-at91/board-usb-a9260.c        |    2 +-
+ arch/arm/mach-at91/board-usb-a9263.c        |    2 +-
+ arch/arm/mach-at91/board-yl-9200.c          |    2 +-
+ arch/arm/mach-at91/include/mach/board.h     |   14 +-
+ arch/avr32/boards/atngw100/setup.c          |    2 +-
+ arch/avr32/boards/atstk1000/atstk1002.c     |    2 +-
+ arch/avr32/boards/favr-32/setup.c           |    2 +-
+ arch/avr32/boards/hammerhead/setup.c        |    2 +-
+ arch/avr32/boards/merisc/setup.c            |    2 +-
+ arch/avr32/boards/mimc200/setup.c           |    2 +-
+ arch/avr32/mach-at32ap/at32ap700x.c         |    8 +-
+ arch/avr32/mach-at32ap/include/mach/board.h |    7 +-
+ drivers/net/Kconfig                         |    8 +-
+ drivers/net/arm/at91_ether.c                |    3 +-
+ drivers/net/arm/at91_ether.h                |    4 +-
+ drivers/net/macb.c                          |  340 +++++++++++++++++----------
+ drivers/net/macb.h                          |  150 ++++++++++++-
+ include/linux/platform_data/macb.h          |   17 ++
+ 56 files changed, 486 insertions(+), 203 deletions(-)
+ create mode 100644 include/linux/platform_data/macb.h
+
+-- 
+1.7.4.1
