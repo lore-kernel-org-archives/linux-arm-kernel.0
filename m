@@ -1,30 +1,54 @@
-From: joe@perches.com (Joe Perches)
-Date: Tue, 09 Aug 2011 13:20:27 -0700
-Subject: [PATCHv3 4/9] macb: convert printk to netdev_ and friends
-In-Reply-To: <1312881411-2376-5-git-send-email-jamie@jamieiles.com>
-References: <1312881411-2376-1-git-send-email-jamie@jamieiles.com>
-	<1312881411-2376-5-git-send-email-jamie@jamieiles.com>
-Message-ID: <1312921227.11924.35.camel@Joe-Laptop>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 9 Aug 2011 22:54:02 +0200
+Subject: [RFC PATCH] ARM: sched_clock: allow sched_clock to be selected at
+	runtime
+In-Reply-To: <1312910015-20043-1-git-send-email-marc.zyngier@arm.com>
+References: <1312910015-20043-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <CACRpkdYfr_Rbzc1Xa3mSk41dYVZBGH+E_Pj9NfnSuSOsHcjmYQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2011-08-09 at 10:16 +0100, Jamie Iles wrote:
-> macb is already using the dev_dbg() and friends helpers so use netdev_()
-> along with a pr_fmt() definition to make the printing a little cleaner.
-[]
-> diff --git a/drivers/net/macb.c b/drivers/net/macb.c
-[]
-> @@ -8,6 +8,7 @@
-[]
-> +#define pr_fmt(fmt) "macb: " fmt
+On Tue, Aug 9, 2011 at 7:13 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
 
-Hi Jamie.
+> sched_clock() is yet another blocker on the road to the single
+> image. This patch implements an idea by Russell King:
+>
+> http://www.spinics.net/lists/linux-omap/msg49561.html
+>
+> Instead of asking the platform to implement both sched_clock()
+> itself and the rollover callback, simply register a read()
+> function, and let the ARM code care about sched_clock() itself,
+> the conversion to ns and the rollover. sched_clock() uses
+> this read() function as an indirection to the platform code.
+>
+> This allow some simplifications and possibly some footprint gain
+> when multiple platforms are compiled in. Among the drawbacks,
+> the removal of the *_fixed_sched_clock optimization which could
+> negatively impact some platforms (sa1100, tegra, versatile
+> and omap).
+>
+> Tested on 11MPCore, OMAP4 and Tegra.
+>
+> Cc: Imre Kaloz <kaloz@openwrt.org>
+> Cc: Krzysztof Halasa <khc@pm.waw.pl>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Eric Miao <eric.y.miao@gmail.com>
+> Cc: Colin Cross <ccross@android.com>
+> Cc: Erik Gilling <konkers@android.com>
+> Cc: Olof Johansson <olof@lixom.net>
+> Cc: Linus Walleij <linus.walleij@stericsson.com>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: Alessandro Rubini <rubini@unipv.it>
+> Cc: STEricsson <STEricsson_nomadik_linux@list.st.com>
+> Cc: Lennert Buytenhek <kernel@wantstofly.org>
+> Cc: Nicolas Pitre <nico@fluxnic.net>
+> Cc: Ben Dooks <ben-linux@fluff.org>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Just trivia.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-Please use #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt 
-instead.  There would be no output difference.
+For Nomadik, U300.
 
-That'll make it easier to remove later when all of
-of these #defines pr_fmt that use just KBUILD_MODNAME
-can be removed.
+Thanks!
+Linus Walleij
