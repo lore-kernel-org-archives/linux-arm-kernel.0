@@ -1,51 +1,473 @@
-From: marvin24@gmx.de (Marc Dietrich)
-Date: Tue, 9 Aug 2011 21:18:43 +0200
-Subject: [PATCH 4/5 V2] ARM: tegra: paz00: add clocks required for usb
-	operation
-In-Reply-To: <CAOesGMiV-jrcGFUXBf=5H__-gXvwgxUias7WGouYTvAy+k=oMg@mail.gmail.com>
-References: <cover.1312735430.git.marvin24@gmx.de>
-	<201108092029.17546.marvin24@gmx.de>
-	<CAOesGMiV-jrcGFUXBf=5H__-gXvwgxUias7WGouYTvAy+k=oMg@mail.gmail.com>
-Message-ID: <201108092118.43724.marvin24@gmx.de>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Wed, 10 Aug 2011 03:20:59 +0800
+Subject: [PATCH] pxa/hx4700: Add Synaptics NavPoint (PXA27x SSP/SPI) driver
+In-Reply-To: <E1Qqp5O-0000OF-0x@outmx06.plus.net>
+References: <E1Qqp5O-0000OF-0x@outmx06.plus.net>
+Message-ID: <CAMPhdO9f2jnhALd3Qxk0Sgt8G_4rDVK+rNN5Ja3G9aqzoQfo4w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+Hi Paul,
 
-On Tuesday 09 August 2011 20:30:47 Olof Johansson wrote:
-> On Tue, Aug 9, 2011 at 11:29 AM, Marc Dietrich <marvin24@gmx.de> wrote:
-> >
-> > These clocks are required for usb operation.
-> > ---
-> >  arch/arm/mach-tegra/board-paz00.c |    6 ++++++
-> >  1 files changed, 6 insertions(+), 0 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-tegra/board-paz00.c b/arch/arm/mach-tegra/board-
-paz00.c
-> > index 45111f6..89a3dda 100644
-> > --- a/arch/arm/mach-tegra/board-paz00.c
-> > +++ b/arch/arm/mach-tegra/board-paz00.c
-> > @@ -145,6 +145,12 @@ static __initdata struct tegra_clk_init_table 
-paz00_clk_init_table[] = {
-> >        /* name         parent          rate            enabled */
-> >        { "uarta",      "pll_p",        216000000,      true },
-> >        { "uartd",      "pll_p",        216000000,      true },
-> > +
-> > +       { "pll_p_out4", "pll_p",        24000000,       true },
-> > +       { "usbd",       "clk_m",        12000000,       true },
-> > +       { "usb2",       "clk_m",        12000000,       true },
-> > +       { "usb3",       "clk_m",        12000000,       true },
-> 
-> Do they all have to be enabled here? Setting the parent and rate makes
-> sense, but you shouldn't have to enable them.
+Glad to see someone's working on hx4700, a few comments, pls see below.
 
-usb also works with all three usb* clocks set to disabled (they are even not 
-required to be listed there at all). Honestly, the whole clock setup is a little 
-obscure to me. 
+On Wed, Aug 10, 2011 at 12:23 AM, Paul Parsons <lost.distance@yahoo.com> wrote:
+> Add support for the Synaptics NavPoint connected to a PXA27x SSP port in SPI
+> slave mode. The driver implements a simple navigation pad. The four raised dots
+> are mapped to UP/DOWN/LEFT/RIGHT buttons and the centre of the touchpad is
+> mapped to the ENTER button. An example configuration is provided by the
+> pxa/hx4700 platform.
+>
+> Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
+> ---
+>
+> diff -uprN clean-3.0.1/arch/arm/mach-pxa/hx4700.c linux-3.0.1/arch/arm/mach-pxa/hx4700.c
+> --- clean-3.0.1/arch/arm/mach-pxa/hx4700.c ? ? ?2011-08-05 05:59:21.000000000 +0100
+> +++ linux-3.0.1/arch/arm/mach-pxa/hx4700.c ? ? ?2011-08-07 20:41:45.731542739 +0100
+> @@ -22,6 +22,7 @@
+> ?#include <linux/gpio.h>
+> ?#include <linux/gpio_keys.h>
+> ?#include <linux/input.h>
+> +#include <linux/input/navpoint.h>
+> ?#include <linux/lcd.h>
+> ?#include <linux/mfd/htc-egpio.h>
+> ?#include <linux/mfd/asic3.h>
+> @@ -111,10 +112,11 @@ static unsigned long hx4700_pin_config[]
+> ? ? ? ?GPIO113_I2S_SYSCLK,
+>
+> ? ? ? ?/* SSP 1 (NavPoint) */
+> - ? ? ? GPIO23_SSP1_SCLK,
+> + ? ? ? MFP_CFG_IN(GPIO23, AF2), ? ? ? ? ? ? ? ?/* SSPSCLK */
+> ? ? ? ?GPIO24_SSP1_SFRM,
+> ? ? ? ?GPIO25_SSP1_TXD,
+> ? ? ? ?GPIO26_SSP1_RXD,
+> + ? ? ? MFP_CFG_OUT(GPIO102, AF0, KEEP_OUTPUT), /* SYNAPTICS_POWER_ON */
 
-Can these clocks be safly disabled in the clock table and hope that the ehci 
-host driver will enable them if required? Also independent to what the 
-bootloader does, which I don't know? I'm asking because we may switch from the 
-proprietary bootloader (fastboot?) to u-boot in the near future.
+Setting low power mode state can be OR'ed with MFP_LPM_*, what makes
+the original pin mux configuration not usable here?
 
-Marc
+>
+> ? ? ? ?/* SSP 2 (TSC2046) */
+> ? ? ? ?GPIO19_SSP2_SCLK,
+> @@ -217,6 +219,28 @@ static struct platform_device gpio_keys
+> ?};
+>
+> ?/*
+> + * Synaptics NavPoint connected to SSP1
+> + */
+> +
+> +static void navpoint_power(int onoff)
+> +{
+> + ? ? ? gpio_set_value(GPIO102_HX4700_SYNAPTICS_POWER_ON, onoff);
+> +}
+> +
+> +static struct navpoint_platform_data navpoint_platform_data = {
+> + ? ? ? .port ? = 1,
+> + ? ? ? .power ?= navpoint_power,
+> +};
+> +
+> +static struct platform_device navpoint = {
+> + ? ? ? .name ? = "navpoint",
+> + ? ? ? .id ? ? = -1,
+> + ? ? ? .dev = {
+> + ? ? ? ? ? ? ? .platform_data = &navpoint_platform_data,
+> + ? ? ? },
+> +};
+> +
+> +/*
+> ?* ASIC3
+> ?*/
+>
+> @@ -818,6 +842,7 @@ static struct platform_device pcmcia = {
+> ?static struct platform_device *devices[] __initdata = {
+> ? ? ? ?&asic3,
+> ? ? ? ?&gpio_keys,
+> + ? ? ? &navpoint,
+> ? ? ? ?&backlight,
+> ? ? ? ?&w3220,
+> ? ? ? ?&hx4700_lcd,
+> diff -uprN clean-3.0.1/drivers/input/mouse/Kconfig linux-3.0.1/drivers/input/mouse/Kconfig
+> --- clean-3.0.1/drivers/input/mouse/Kconfig ? ? 2011-08-05 05:59:21.000000000 +0100
+> +++ linux-3.0.1/drivers/input/mouse/Kconfig ? ? 2011-08-07 20:50:48.035137896 +0100
+
+For cleanness, you may want to separate this patch into two:
+
+1. the navpoint driver itself
+2. the support of this driver for hx4700 (board specific code)
+
+> @@ -322,4 +322,14 @@ config MOUSE_SYNAPTICS_I2C
+> ? ? ? ? ?To compile this driver as a module, choose M here: the
+> ? ? ? ? ?module will be called synaptics_i2c.
+>
+> +config MOUSE_NAVPOINT_PXA27x
+> + ? ? ? bool "Synaptics NavPoint (PXA27x SSP/SPI)"
+> + ? ? ? depends on PXA27x && PXA_SSP
+> + ? ? ? help
+> + ? ? ? ? This option enables support for the Synaptics NavPoint connected to
+> + ? ? ? ? a PXA27x SSP port in SPI slave mode. The driver implements a simple
+> + ? ? ? ? navigation pad. The four raised dots are mapped to UP/DOWN/LEFT/RIGHT
+> + ? ? ? ? buttons and the centre of the touchpad is mapped to the ENTER button.
+> + ? ? ? ? Say Y to enable the Synaptics NavPoint on the HP iPAQ hx4700.
+> +
+> ?endif
+> diff -uprN clean-3.0.1/drivers/input/mouse/Makefile linux-3.0.1/drivers/input/mouse/Makefile
+> --- clean-3.0.1/drivers/input/mouse/Makefile ? ?2011-08-05 05:59:21.000000000 +0100
+> +++ linux-3.0.1/drivers/input/mouse/Makefile ? ?2011-08-07 20:41:45.775543031 +0100
+> @@ -19,6 +19,7 @@ obj-$(CONFIG_MOUSE_RISCPC) ? ? ? ? ? ?+= rpcmouse.
+> ?obj-$(CONFIG_MOUSE_SERIAL) ? ? ? ? ? ? += sermouse.o
+> ?obj-$(CONFIG_MOUSE_SYNAPTICS_I2C) ? ? ?+= synaptics_i2c.o
+> ?obj-$(CONFIG_MOUSE_VSXXXAA) ? ? ? ? ? ?+= vsxxxaa.o
+> +obj-$(CONFIG_MOUSE_NAVPOINT_PXA27x) ? ?+= navpoint.o
+>
+> ?psmouse-objs := psmouse-base.o synaptics.o
+>
+> diff -uprN clean-3.0.1/drivers/input/mouse/navpoint.c linux-3.0.1/drivers/input/mouse/navpoint.c
+> --- clean-3.0.1/drivers/input/mouse/navpoint.c ?1970-01-01 01:00:00.000000000 +0100
+> +++ linux-3.0.1/drivers/input/mouse/navpoint.c ?2011-08-07 20:41:45.775543031 +0100
+> @@ -0,0 +1,316 @@
+> +/*
+> + * ?Copyright (C) 2011 Paul Parsons <lost.distance@yahoo.com>
+> + *
+> + * ?This program is free software; you can redistribute it and/or modify
+> + * ?it under the terms of the GNU General Public License version 2 as
+> + * ?published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/init.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/clk.h>
+> +#include <linux/gpio.h>
+> +#include <linux/input.h>
+> +#include <linux/input/navpoint.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/pxa2xx_ssp.h>
+> +#include <linux/slab.h>
+> +
+> +/*
+> + * ? ? Synaptics NavPoint (PXA27x SSP/SPI) driver.
+> + */
+> +
+> +struct driver_data {
+> + ? ? ? struct ssp_device *ssp;
+> + ? ? ? void ? ? ? ? ? ?(*power)(int onoff);
+> + ? ? ? struct input_dev *input;
+> + ? ? ? int ? ? ? ? ? ? index;
+> + ? ? ? uint8_t ? ? ? ? data[8];
+> + ? ? ? int ? ? ? ? ? ? pressed; ? ? ? ?/* 1 = pressed, 0 = released */
+> + ? ? ? unsigned ? ? ? ?code; ? ? ? ? ? /* Key code of the last key pressed */
+> +};
+> +
+> +static const u32 sscr0 = 0
+> + ? ? ? | SSCR0_TUM ? ? ? ? ? ? /* TIM = 1; No TUR interrupts */
+> + ? ? ? | SSCR0_RIM ? ? ? ? ? ? /* RIM = 1; No ROR interrupts */
+> + ? ? ? | SSCR0_SSE ? ? ? ? ? ? /* SSE = 1; SSP enabled */
+> + ? ? ? | SSCR0_Motorola ? ? ? ?/* FRF = 0; Motorola SPI */
+> + ? ? ? | SSCR0_DataSize(16) ? ?/* DSS = 15; Data size = 16-bit */
+> + ? ? ? ;
+> +static const u32 sscr1 = 0
+> + ? ? ? | SSCR1_SCFR ? ? ? ? ? ?/* SCFR = 1; SSPSCLK only during transfers */
+> + ? ? ? | SSCR1_SCLKDIR ? ? ? ? /* SCLKDIR = 1; Slave mode */
+> + ? ? ? | SSCR1_SFRMDIR ? ? ? ? /* SFRMDIR = 1; Slave mode */
+> + ? ? ? | SSCR1_RWOT ? ? ? ? ? ?/* RWOT = 1; Receive without transmit mode */
+> + ? ? ? | SSCR1_RxTresh(1) ? ? ?/* RFT = 0; Receive FIFO threshold = 1 */
+> + ? ? ? | SSCR1_SPH ? ? ? ? ? ? /* SPH = 1; SSPSCLK inactive 0.5 + 1 cycles */
+> + ? ? ? | SSCR1_RIE ? ? ? ? ? ? /* RIE = 1; Receive FIFO interrupt enabled */
+> + ? ? ? ;
+> +static const u32 sssr = 0
+> + ? ? ? | SSSR_BCE ? ? ? ? ? ? ?/* BCE = 1; Clear BCE */
+> + ? ? ? | SSSR_TUR ? ? ? ? ? ? ?/* TUR = 1; Clear TUR */
+> + ? ? ? | SSSR_EOC ? ? ? ? ? ? ?/* EOC = 1; Clear EOC */
+> + ? ? ? | SSSR_TINT ? ? ? ? ? ? /* TINT = 1; Clear TINT */
+> + ? ? ? | SSSR_PINT ? ? ? ? ? ? /* PINT = 1; Clear PINT */
+> + ? ? ? | SSSR_ROR ? ? ? ? ? ? ?/* ROR = 1; Clear ROR */
+> + ? ? ? ;
+> +
+> +/*
+> + * ? ? MEP Query $22: Touchpad Coordinate Range Query is not supported by
+> + * ? ? the NavPoint module, so sampled values provide the N/S/E/W limits.
+> + */
+> +
+> +#define WEST ? 2416 ? ? ? ? ? ?/* 1/3 width */
+> +#define EAST ? 3904 ? ? ? ? ? ?/* 2/3 width */
+> +#define SOUTH ?2480 ? ? ? ? ? ?/* 1/3 height */
+> +#define NORTH ?3424 ? ? ? ? ? ?/* 2/3 height */
+> +
+> +static void navpoint_packet(void *dev)
+> +{
+> + ? ? ? struct driver_data *drv_data;
+> + ? ? ? int pressed;
+> + ? ? ? unsigned x, y;
+> + ? ? ? unsigned code;
+> +
+> + ? ? ? drv_data = dev;
+> +
+> + ? ? ? switch (drv_data->data[0]) {
+> + ? ? ? case 0xff: ? ? ?/* Garbage (packet?) between reset and Hello packet */
+> + ? ? ? case 0x00: ? ? ?/* Module 0, NULL packet */
+> + ? ? ? ? ? ? ? break;
+> + ? ? ? case 0x0e: ? ? ?/* Module 0, Absolute packet */
+> + ? ? ? ? ? ? ? pressed = (drv_data->data[1] & 0x01);
+> + ? ? ? ? ? ? ? if ((drv_data->pressed ^ pressed) == 0) /* No change */
+> + ? ? ? ? ? ? ? ? ? ? ? break;
+> + ? ? ? ? ? ? ? drv_data->pressed = pressed;
+> + ? ? ? ? ? ? ? x = ((drv_data->data[2] & 0x1f) << 8) | drv_data->data[3];
+> + ? ? ? ? ? ? ? y = ((drv_data->data[4] & 0x1f) << 8) | drv_data->data[5];
+> + ? ? ? ? ? ? ? if (x < WEST)
+> + ? ? ? ? ? ? ? ? ? ? ? code = KEY_LEFT;
+> + ? ? ? ? ? ? ? else if (x > EAST)
+> + ? ? ? ? ? ? ? ? ? ? ? code = KEY_RIGHT;
+> + ? ? ? ? ? ? ? else if (y < SOUTH)
+> + ? ? ? ? ? ? ? ? ? ? ? code = KEY_DOWN;
+> + ? ? ? ? ? ? ? else if (y > NORTH)
+> + ? ? ? ? ? ? ? ? ? ? ? code = KEY_UP;
+> + ? ? ? ? ? ? ? else
+> + ? ? ? ? ? ? ? ? ? ? ? code = KEY_ENTER;
+> + ? ? ? ? ? ? ? if (pressed)
+> + ? ? ? ? ? ? ? ? ? ? ? drv_data->code = code;
+> + ? ? ? ? ? ? ? input_report_key(drv_data->input, drv_data->code, pressed);
+> + ? ? ? ? ? ? ? input_sync(drv_data->input);
+> + ? ? ? ? ? ? ? break;
+> + ? ? ? case 0x19: ? ? ?/* Module 0, Hello packet */
+> + ? ? ? ? ? ? ? if ((drv_data->data[1] & 0xf0) == 0x10)
+> + ? ? ? ? ? ? ? ? ? ? ? break;
+> + ? ? ? ? ? ? ? /* FALLTHROUGH */
+> + ? ? ? default:
+> + ? ? ? ? ? ? ? dev_warn(dev, "spurious packet: 0x%02x,0x%02x,...\n",
+> + ? ? ? ? ? ? ? ? ? ? ? drv_data->data[0],
+> + ? ? ? ? ? ? ? ? ? ? ? drv_data->data[1]);
+> + ? ? ? ? ? ? ? break;
+> + ? ? ? }
+> +
+> + ? ? ? drv_data->index = 0;
+> +}
+> +
+> +static irqreturn_t navpoint_int(int irq, void *dev)
+> +{
+> + ? ? ? struct driver_data *drv_data;
+> + ? ? ? struct ssp_device *ssp;
+> + ? ? ? u32 status;
+> + ? ? ? irqreturn_t ret;
+> +
+> + ? ? ? drv_data = dev;
+> + ? ? ? ssp = drv_data->ssp;
+> +
+> + ? ? ? status = pxa_ssp_read_reg(ssp, SSSR);
+> + ? ? ? ret = (status & (sssr | SSSR_RFS)) ? IRQ_HANDLED : IRQ_NONE;
+> +
+> + ? ? ? if (status & sssr) {
+> + ? ? ? ? ? ? ? dev_warn(dev, "spurious interrupt: 0x%02x\n", status);
+> + ? ? ? ? ? ? ? pxa_ssp_write_reg(ssp, SSSR, (status & sssr));
+> + ? ? ? }
+> +
+> + ? ? ? while (status & SSSR_RNE) {
+> + ? ? ? ? ? ? ? u32 data;
+> +
+> + ? ? ? ? ? ? ? data = pxa_ssp_read_reg(ssp, SSDR);
+> + ? ? ? ? ? ? ? drv_data->data[drv_data->index + 0] = (data >> 8);
+> + ? ? ? ? ? ? ? drv_data->data[drv_data->index + 1] = data;
+> + ? ? ? ? ? ? ? drv_data->index += 2;
+> + ? ? ? ? ? ? ? if ((drv_data->data[0] & 0x07) < drv_data->index)
+> + ? ? ? ? ? ? ? ? ? ? ? navpoint_packet(dev);
+> + ? ? ? ? ? ? ? status = pxa_ssp_read_reg(ssp, SSSR);
+> + ? ? ? }
+> +
+> + ? ? ? return ret;
+> +}
+> +
+> +#ifdef CONFIG_SUSPEND
+> +int navpoint_suspend(struct device *dev)
+> +{
+> + ? ? ? struct driver_data *drv_data;
+> + ? ? ? struct ssp_device *ssp;
+> +
+> + ? ? ? drv_data = dev_get_drvdata(dev);
+> + ? ? ? ssp = drv_data->ssp;
+> +
+> + ? ? ? if (drv_data->power)
+> + ? ? ? ? ? ? ? (*drv_data->power)(0);
+> +
+> + ? ? ? pxa_ssp_write_reg(ssp, SSCR0, 0);
+> +
+> + ? ? ? clk_disable(ssp->clk);
+> +
+> + ? ? ? return 0;
+> +}
+> +
+> +int navpoint_resume(struct device *dev)
+> +{
+> + ? ? ? struct driver_data *drv_data;
+> + ? ? ? struct ssp_device *ssp;
+> +
+> + ? ? ? drv_data = dev_get_drvdata(dev);
+> + ? ? ? ssp = drv_data->ssp;
+> +
+> + ? ? ? clk_enable(ssp->clk);
+> +
+> + ? ? ? pxa_ssp_write_reg(ssp, SSCR1, sscr1);
+> + ? ? ? pxa_ssp_write_reg(ssp, SSSR, sssr);
+> + ? ? ? pxa_ssp_write_reg(ssp, SSTO, 0);
+> + ? ? ? pxa_ssp_write_reg(ssp, SSCR0, sscr0); ? /* SSCR0_SSE written last */
+> +
+> + ? ? ? if (drv_data->power)
+> + ? ? ? ? ? ? ? (*drv_data->power)(1);
+> +
+> + ? ? ? /* Wait until SSP port is ready for slave clock operations */
+> + ? ? ? while (pxa_ssp_read_reg(ssp, SSSR) & SSSR_CSS)
+> + ? ? ? ? ? ? ? ;
+> +
+> + ? ? ? return 0;
+> +}
+> +
+> +static const struct dev_pm_ops navpoint_pm_ops = {
+> + ? ? ? .suspend ? ? ? ?= navpoint_suspend,
+> + ? ? ? .resume ? ? ? ? = navpoint_resume,
+> +};
+> +#endif
+> +
+> +static int __devinit navpoint_probe(struct platform_device *pdev)
+> +{
+> + ? ? ? struct navpoint_platform_data *pdata = pdev->dev.platform_data;
+> + ? ? ? int ret;
+> + ? ? ? struct driver_data *drv_data;
+> + ? ? ? struct ssp_device *ssp;
+> + ? ? ? struct input_dev *input;
+> +
+> + ? ? ? drv_data = kzalloc(sizeof(struct driver_data), GFP_KERNEL);
+> + ? ? ? if (!drv_data) {
+> + ? ? ? ? ? ? ? ret = -ENOMEM;
+> + ? ? ? ? ? ? ? goto ret0;
+> + ? ? ? }
+> +
+> + ? ? ? ssp = pxa_ssp_request(pdata->port, pdev->name);
+> + ? ? ? if (!ssp) {
+> + ? ? ? ? ? ? ? ret = -ENODEV;
+> + ? ? ? ? ? ? ? goto ret1;
+> + ? ? ? }
+> +
+> + ? ? ? ret = request_irq(ssp->irq, navpoint_int, 0, pdev->name, drv_data);
+> + ? ? ? if (ret)
+> + ? ? ? ? ? ? ? goto ret2;
+> +
+> + ? ? ? input = input_allocate_device();
+> + ? ? ? if (!input) {
+> + ? ? ? ? ? ? ? ret = -ENOMEM;
+> + ? ? ? ? ? ? ? goto ret3;
+> + ? ? ? }
+> + ? ? ? input->name = pdev->name;
+> + ? ? ? __set_bit(EV_KEY, input->evbit);
+> + ? ? ? __set_bit(KEY_ENTER, input->keybit);
+> + ? ? ? __set_bit(KEY_UP, input->keybit);
+> + ? ? ? __set_bit(KEY_LEFT, input->keybit);
+> + ? ? ? __set_bit(KEY_RIGHT, input->keybit);
+> + ? ? ? __set_bit(KEY_DOWN, input->keybit);
+> + ? ? ? input->dev.parent = &pdev->dev;
+> + ? ? ? ret = input_register_device(input);
+> + ? ? ? if (ret)
+> + ? ? ? ? ? ? ? goto ret4;
+> +
+> + ? ? ? drv_data->ssp = ssp;
+> + ? ? ? drv_data->power = pdata->power;
+> + ? ? ? drv_data->input = input;
+> +
+> + ? ? ? platform_set_drvdata(pdev, drv_data);
+> +
+> + ? ? ? (void) navpoint_resume(&pdev->dev);
+> +
+> + ? ? ? dev_info(&pdev->dev, "ssp%d, irq %d\n", pdata->port, ssp->irq);
+> +
+> + ? ? ? return 0;
+> +
+> +ret4:
+> + ? ? ? input_free_device(input);
+> +ret3:
+> + ? ? ? free_irq(ssp->irq, drv_data);
+> +ret2:
+> + ? ? ? pxa_ssp_free(ssp);
+> +ret1:
+> + ? ? ? kfree(drv_data);
+> +ret0:
+> + ? ? ? return ret;
+> +}
+> +
+> +static int __devexit navpoint_remove(struct platform_device *pdev)
+> +{
+> + ? ? ? struct driver_data *drv_data;
+> + ? ? ? struct ssp_device *ssp;
+> + ? ? ? struct input_dev *input;
+> +
+> + ? ? ? drv_data = platform_get_drvdata(pdev);
+> + ? ? ? ssp = drv_data->ssp;
+> + ? ? ? input = drv_data->input;
+> +
+> + ? ? ? (void) navpoint_suspend(&pdev->dev);
+> +
+> + ? ? ? input_unregister_device(input);
+> +
+> + ? ? ? free_irq(ssp->irq, drv_data);
+> +
+> + ? ? ? pxa_ssp_free(ssp);
+> +
+> + ? ? ? kfree(drv_data);
+> +
+> + ? ? ? return 0;
+> +}
+> +
+> +static struct platform_driver navpoint_driver = {
+> + ? ? ? .probe ? ? ? ? ?= navpoint_probe,
+> + ? ? ? .remove ? ? ? ? = __devexit_p(navpoint_remove),
+> + ? ? ? .driver = {
+> + ? ? ? ? ? ? ? .name ? = "navpoint",
+> + ? ? ? ? ? ? ? .owner ?= THIS_MODULE,
+> +#ifdef CONFIG_SUSPEND
+> + ? ? ? ? ? ? ? .pm ? ? = &navpoint_pm_ops,
+> +#endif
+> + ? ? ? },
+> +};
+> +
+> +static int __init navpoint_init(void)
+> +{
+> + ? ? ? return platform_driver_register(&navpoint_driver);
+> +}
+> +
+> +static void __exit navpoint_exit(void)
+> +{
+> + ? ? ? platform_driver_unregister(&navpoint_driver);
+> +}
+> +
+> +module_init(navpoint_init);
+> +module_exit(navpoint_exit);
+> +
+
+Can we avoid using pxa_ssp_*() calls directly? As those are for internal
+usage purpose of the on-top drivers, e.g. SPI or audio. If communication
+with this device follows SPI protocol, please try hard to make use of the
+spi_*() API, and make it an spi_driver instead of a platform_driver.
+
+
+> +MODULE_AUTHOR("Paul Parsons <lost.distance@yahoo.com>");
+> +MODULE_DESCRIPTION("Synaptics NavPoint (PXA27x SSP/SPI) driver");
+> +MODULE_LICENSE("GPL");
+> diff -uprN clean-3.0.1/include/linux/input/navpoint.h linux-3.0.1/include/linux/input/navpoint.h
+> --- clean-3.0.1/include/linux/input/navpoint.h ?1970-01-01 01:00:00.000000000 +0100
+> +++ linux-3.0.1/include/linux/input/navpoint.h ?2011-08-07 20:41:45.755542898 +0100
+> @@ -0,0 +1,12 @@
+> +/*
+> + * ?Copyright (C) 2011 Paul Parsons <lost.distance@yahoo.com>
+> + *
+> + * ?This program is free software; you can redistribute it and/or modify
+> + * ?it under the terms of the GNU General Public License version 2 as
+> + * ?published by the Free Software Foundation.
+> + */
+> +
+> +struct navpoint_platform_data {
+> + ? ? ? int ? ? ? ? ? ? port; ? ? ? ? ? /* PXA SSP port for pxa_ssp_request() */
+> + ? ? ? void ? ? ? ? ? ?(*power)(int onoff);
+> +};
+
+port doesn't need to be here if it's a SPI driver. And if the existing
+implementation of this (*power)() callback uses only the GPIO, you
+could specify gpio number directly here as device data.
+
+>
+>
