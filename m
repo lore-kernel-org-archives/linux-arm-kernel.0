@@ -1,80 +1,42 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Tue,  9 Aug 2011 10:16:51 +0100
-Subject: [PATCHv3 9/9] macb: allow GEM to have configurable receive buffer size
-In-Reply-To: <1312881411-2376-1-git-send-email-jamie@jamieiles.com>
-References: <1312881411-2376-1-git-send-email-jamie@jamieiles.com>
-Message-ID: <1312881411-2376-10-git-send-email-jamie@jamieiles.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Tue, 9 Aug 2011 11:19:06 +0200
+Subject: GPMI-NAND Status?
+In-Reply-To: <4E3FA88E.4070804@freescale.com>
+References: <20110805135133.GA26981@pengutronix.de>
+	<4E3FA88E.4070804@freescale.com>
+Message-ID: <20110809091906.GA1923@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-GEM has configurable receive buffer sizes so requires this to be
-programmed up.  Any size < 2048 and a multiple of 64 bytes is permitted.
+Hi,
 
-Signed-off-by: Jamie Iles <jamie@jamieiles.com>
-Acked-by: David S. Miller <davem@davemloft.net>
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- drivers/net/macb.c |   17 +++++++++++++++++
- drivers/net/macb.h |    5 +++++
- 2 files changed, 22 insertions(+), 0 deletions(-)
+> >
+> >ecclayout needs to be used to show that OOB is fully in use [1]
+> >===============================================================
+> >
+> >Needed to make it work for JFFS2 and to pass the mtd-testsuite. A driver only
+> >working with UBIFS is surely not ready for mainline.
+> >
+> It seems just modifying the ecclayout of GPMI-NAND can not fix the problem.
+> It should also change the code of JFFS2 and mtd.
+> 
+> Some one ever posted a patch about this:
+> http://lists.infradead.org/pipermail/linux-mtd/2007-December/020047.html
 
-diff --git a/drivers/net/macb.c b/drivers/net/macb.c
-index a8a9b4b..69c9808 100644
---- a/drivers/net/macb.c
-+++ b/drivers/net/macb.c
-@@ -857,6 +857,21 @@ static u32 macb_dbw(struct macb *bp)
- 	}
- }
- 
-+/*
-+ * Configure the receive DMA engine to use the correct receive buffer size.
-+ * This is a configurable parameter for GEM.
-+ */
-+static void macb_configure_dma(struct macb *bp)
-+{
-+	u32 dmacfg;
-+
-+	if (macb_is_gem(bp)) {
-+		dmacfg = gem_readl(bp, DMACFG) & ~GEM_BF(RXBS, -1L);
-+		dmacfg |= GEM_BF(RXBS, RX_BUFFER_SIZE / 64);
-+		gem_writel(bp, DMACFG, dmacfg);
-+	}
-+}
-+
- static void macb_init_hw(struct macb *bp)
- {
- 	u32 config;
-@@ -875,6 +890,8 @@ static void macb_init_hw(struct macb *bp)
- 	config |= macb_dbw(bp);
- 	macb_writel(bp, NCFGR, config);
- 
-+	macb_configure_dma(bp);
-+
- 	/* Initialize TX and RX buffers */
- 	macb_writel(bp, RBQP, bp->rx_ring_dma);
- 	macb_writel(bp, TBQP, bp->tx_ring_dma);
-diff --git a/drivers/net/macb.h b/drivers/net/macb.h
-index 71424aa..1931078 100644
---- a/drivers/net/macb.h
-+++ b/drivers/net/macb.h
-@@ -64,6 +64,7 @@
- /* GEM register offsets. */
- #define GEM_NCFGR				0x0004
- #define GEM_USRIO				0x000c
-+#define GEM_DMACFG				0x0010
- #define GEM_HRB					0x0080
- #define GEM_HRT					0x0084
- #define GEM_SA1B				0x0088
-@@ -154,6 +155,10 @@
- #define GEM_DBW64				1
- #define GEM_DBW128				2
- 
-+/* Bitfields in DMACFG. */
-+#define GEM_RXBS_OFFSET				16
-+#define GEM_RXBS_SIZE				8
-+
- /* Bitfields in NSR */
- #define MACB_NSR_LINK_OFFSET			0
- #define MACB_NSR_LINK_SIZE			1
+This mail is about MLC. That's another issue. For SLC, ecclayout should
+work, no?
+
+Regards,
+
+   Wolfram
+
 -- 
-1.7.4.1
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110809/c327d9b1/attachment.sig>
