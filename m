@@ -1,33 +1,29 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Tue, 9 Aug 2011 10:58:56 +0100
-Subject: [PATCH 00/13] Clean up mach/gpio.h headers
-In-Reply-To: <20110809080411.GA1831@n2100.arm.linux.org.uk>
-References: <20110809080411.GA1831@n2100.arm.linux.org.uk>
-Message-ID: <20110809095856.GF3210@pulham.picochip.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 9 Aug 2011 11:01:23 +0100
+Subject: [PATCH 00/10] ARM: perf: updates for 3.2
+In-Reply-To: <20110809095434.GE3210@pulham.picochip.com>
+References: <1312823771-9952-1-git-send-email-will.deacon@arm.com>
+	<20110809093505.GD3210@pulham.picochip.com>
+	<20110809094234.GA3242@e102144-lin.cambridge.arm.com>
+	<20110809095434.GE3210@pulham.picochip.com>
+Message-ID: <20110809100123.GB3242@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
-
-On Tue, Aug 09, 2011 at 09:04:12AM +0100, Russell King - ARM Linux wrote:
-> This is a preliminary posting of my gpio patch set.
+On Tue, Aug 09, 2011 at 10:54:34AM +0100, Jamie Iles wrote:
+> On Tue, Aug 09, 2011 at 10:42:34AM +0100, Will Deacon wrote:
+> > Thanks for taking a look. The patches should just apply against -rc1:
+> > 
+> > http://www.linux-arm.org/git?p=linux-2.6-wd.git;a=shortlog;h=refs/heads/perf-updates
 > 
-> This patch series moves the trivial gpiolib implementations out of
-> mach/gpio.h and into asm/gpio.h.
+> Yes, you're quite right.  I seem to have lost patches 1 and 4.  Probably 
+> finger trouble on my part!
 > 
-> As a side effect of that, most of this patch series is about fixing up
-> direct includes of mach/gpio.h - this is something I've been on at
-> people over the last year or more about ensuring that they use
-> linux/gpio.h in preference.  While I've blindly converted all arch/arm
-> to use linux/gpio.h (with the exception of mach/ includes which are
-> converted to asm/gpio.h), drivers were only converted to asm/gpio.h.
-> These should be reviewed and changed to linux/gpio.h.
+> Anyhow, I've pulled from your git tree and they appear to work nicely, 
+> so:
 > 
-> As a result of this patch series, several mach/gpio.h end up being
-> empty.
+> Acked-by: Jamie Iles <jamie@jamieiles.com>
 
-Nice series!  This gives me an empty gpio.h for picoxcell.
+Thanks a lot Jamie, I'll update that branch with your acks.
 
-Tested-by: Jamie Iles <jamie@jamieiles.com>
-
-Jamie
+Will
