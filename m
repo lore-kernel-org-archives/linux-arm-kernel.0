@@ -1,36 +1,47 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Tue,  9 Aug 2011 15:16:59 -0500
-Subject: [RFC PATCH 2/3] ARM: gic: allow irq_start to be 0
-In-Reply-To: <1312921020-6820-1-git-send-email-robherring2@gmail.com>
-References: <1312921020-6820-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1312921020-6820-3-git-send-email-robherring2@gmail.com>
+Date: Tue,  9 Aug 2011 15:16:57 -0500
+Subject: [RFC PATCH 0/3] Yet another GIC OF binding series
+Message-ID: <1312921020-6820-1-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-There's really no need to set irq_start per platform for the primary gic.
-The SGIs and PPIs are not handled as normal irqs, so how irqs 0-31 are
-setup doesn't really matter. So allow irq_start to be set to 0 to match
-the linux irq numbering.
+Grant,
 
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
----
- arch/arm/common/gic.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+Here's yet another patch series for GIC binding and init. 
 
-diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
-index 3227ca9..f13298e 100644
---- a/arch/arm/common/gic.c
-+++ b/arch/arm/common/gic.c
-@@ -353,7 +353,7 @@ void __init gic_init(unsigned int gic_nr, unsigned int irq_start,
- 	gic = &gic_data[gic_nr];
- 	gic->dist_base = dist_base;
- 	gic->cpu_base = cpu_base;
--	gic->irq_offset = (irq_start - 1) & ~31;
-+	gic->irq_offset = irq_start ? (irq_start - 1) & ~31 : 0;
- 
- 	if (gic_nr == 0)
- 		gic_cpu_base_addr = cpu_base;
+You keep saying we should have a common DT function scanning for interrupt
+controller nodes and calling their initialization functions. But that will
+not work until we have dynamic assignment of linux irq numbers. So either
+everyone should just stop trying to do DT bindings for GIC/VIC until that
+is in place, or we need an interim solution. This is another attempt at
+the latter. I reworked gic_of_init intending for it to be the interrupt
+controller specific initialization function that DT interrupt controller
+scanning code would call. For now, it is just called by the platform code.
+The platform initialization looks something like this:
+
+struct of_intc_desc desc;
+memset(&desc, 0, sizeof(desc));
+desc.controller = of_find_compatible_node(NULL, NULL, "arm,cortex-a9-gic");
+gic_of_init(&desc);
+
+I've addressed your previous comments and in particular initializing more
+than 1 GIC is supported now.
+
+Rob
+
+Rob Herring (3):
+  dt: irq: add interrupt controller descriptor struct
+  ARM: gic: allow irq_start to be 0
+  ARM: gic: add OF based initialization
+
+ Documentation/devicetree/bindings/arm/gic.txt |   28 +++++++++++++++++++
+ arch/arm/common/gic.c                         |   36 ++++++++++++++++++++++++-
+ arch/arm/include/asm/hardware/gic.h           |    2 +
+ include/linux/of_irq.h                        |    6 ++++
+ 4 files changed, 71 insertions(+), 1 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/gic.txt
+
 -- 
 1.7.4.1
