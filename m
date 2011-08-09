@@ -1,48 +1,41 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Tue, 9 Aug 2011 18:13:18 +0530
-Subject: [RFC][PATCH 2/2] spi: s3c64xx: Use clkdev for bus clock lookup
-In-Reply-To: <1312898301-7229-1-git-send-email-padma.v@samsung.com>
-References: <1312898301-7229-1-git-send-email-padma.v@samsung.com>
-Message-ID: <CABb+yY1Be3q+5QVaLYnonOUq1VtjyCZMKp0S1yryjF2HRyqoSw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 9 Aug 2011 15:15:47 +0200
+Subject: PLEA: Please fix mach/gpio.h includes (was: Re: [RFC PATCH 2/2]
+	GPIO: add gpiolib and irqchip for CSR SiRFprimaII GPIO controller)
+In-Reply-To: <CAGsJ_4yb9vvKYzyXwQSwaBw1VnZWbv4jGBC4qe7uD032DL0y9A@mail.gmail.com>
+References: <1311667993-27189-1-git-send-email-bs14@csr.com>
+	<CAKnu2MpjOT8y5DfeAtrgBAKh0asqNouyhuin=z+ScAwx0Fa5rA@mail.gmail.com>
+	<CAGsJ_4yb9vvKYzyXwQSwaBw1VnZWbv4jGBC4qe7uD032DL0y9A@mail.gmail.com>
+Message-ID: <201108091515.47961.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 9, 2011 at 7:28 PM, Padmavathi Venna <padma.v@samsung.com> wrote:
-> SPI driver is modified to lookup the bus clock using the
-> alias name instead of getting clock name and clock
-> number from platform data.
-Cool.
+On Tuesday 09 August 2011, Barry Song wrote:
+> I guess same issues exist for other hardwares except GPIO. For
+> example, almost every different SoC has different DMA API, for
+> example:
+> mach-bcmring/dma.c:EXPORT_SYMBOL(dma_alloc_descriptor_ring);
+> mach-davinci/dma.c:EXPORT_SYMBOL(edma_alloc_channel);
+> mach-davinci/dma.c:EXPORT_SYMBOL(edma_clear_event);
+> mach-imx/dma-v1.c:EXPORT_SYMBOL(imx_dma_setup_single);
+> mach-s3c64xx/dma.c:EXPORT_SYMBOL(s3c2410_dma_enqueue);
+> 
+> Do we also want to delete all arch/arm/mach-xxx/include/mach/dma.h?
 
-> Driver is modified to get the best source clock among the
-> available source clocks for the required frequency.
-I am not sure if this driver should be deciding which clock is 'best' for it.
-Because ...
-1) Usually it's the board designer who decides which clock to run at
- what speed based upon target device. So ideally, based upon use-case
-the driver should simply get the 'best' clock from board via platform in a
-format that is compliant to the 'generic clock api'.
-2) We are not changing source clock rates(and we should not).
- So the 'best' clock found, might still be way off in accuracy. And when we
-can't anyway guarantee accuracy, why not leave the decision to
-the board designer who might, say, select the source clock good enough
-to be useful to more than one controller yet not absolutely accurate for any ?
-3) It keeps enabled 3 unused clocks all the time.
+We need to eliminate all header files that have conflicting names
+and that are used by drivers or other header files outside of mach-*.
+How we get there is very different for each of these headers.
 
+> Or do we want to delete the whole arch/arm/mach-xxx/include/mach directory?
 
-> diff --git a/drivers/spi/spi_s3c64xx.c b/drivers/spi/spi_s3c64xx.c
-> index 8945e20..d7c979d 100644
-> --- a/drivers/spi/spi_s3c64xx.c
-> +++ b/drivers/spi/spi_s3c64xx.c
-> @@ -132,6 +132,9 @@
-> ?#define RXBUSY ? ?(1<<2)
-> ?#define TXBUSY ? ?(1<<3)
->
-> +#define MAX_SPI_BUS_CLK (4)
-> +#define MAX_PSR (256)
+Ideally, yes. However, that will take a lot of time. Meanwhile, we should
+rename the individual header files to have unique names for each API,
+and ensure that the symbols don't clash.
 
-Btw,
+> If not, it is probably that SoC can still hold some chip-specific APIs
+> in arch/arm/mach-xxx/include/mach/yyy.h.
 
- #define MAX_SPI_BUS_CLK 4
- #define MAX_PSR 256
+Can you name an example? Most of the ones I can think of will not work
+in a multiplatform kernel.
 
-is safe ... even safer than with two on!
+	Arnd
