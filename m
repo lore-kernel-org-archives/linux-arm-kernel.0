@@ -1,40 +1,36 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 9 Aug 2011 22:10:35 +0200
-Subject: [PATCH 0/6] spi/spi-pl022 fixes
-In-Reply-To: <cover.1312887860.git.viresh.kumar@st.com>
-References: <cover.1312887860.git.viresh.kumar@st.com>
-Message-ID: <CACRpkdatTqnSMxKzhYo=EYpP21buN0tosx1Y1aVc7RLe58wfgg@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue,  9 Aug 2011 15:16:59 -0500
+Subject: [RFC PATCH 2/3] ARM: gic: allow irq_start to be 0
+In-Reply-To: <1312921020-6820-1-git-send-email-robherring2@gmail.com>
+References: <1312921020-6820-1-git-send-email-robherring2@gmail.com>
+Message-ID: <1312921020-6820-3-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 9, 2011 at 1:05 PM, Viresh Kumar <viresh.kumar@st.com> wrote:
+From: Rob Herring <rob.herring@calxeda.com>
 
-> This patchset mainly covers following fixes:
-> - formatting related issues
-> - Passing GFP_NOWAIT for sg allocation from tasklet
-> - Fixing calculate_effective_freq() routine
-> - Allocate/free DMA channels as and when required.
+There's really no need to set irq_start per platform for the primary gic.
+The SGIs and PPIs are not handled as normal irqs, so how irqs 0-31 are
+setup doesn't really matter. So allow irq_start to be set to 0 to match
+the linux irq numbering.
 
-Excellent work Viresh, apart from the small comment on 4/6
-they all look good.
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+---
+ arch/arm/common/gic.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-I also tested them all on the U300, works perfectly.
-
-Please fixup 4/6 and respin with my:
-Tested-by: Linus Walleij <linus.walleij@linaro.org>
-
-So that Grant can pick them up.
-
-> I have rebased them on linux-next/master over following patch:
->
-> commit 9be355da3bae9feb09cdaf80c3ab560f1f0172cb
-> Author: Stephen Rothwell <sfr@canb.auug.org.au>
-> Date: ? Tue Aug 9 13:30:19 2011 +1000
->
-> ? ?Add linux-next specific files for 20110809
-
-They all work perfectly well on top of v3.1-rc1, please use
-mainline kernel tags as patch base if you can.
-
-Yours,
-Linus Walleij
+diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+index 3227ca9..f13298e 100644
+--- a/arch/arm/common/gic.c
++++ b/arch/arm/common/gic.c
+@@ -353,7 +353,7 @@ void __init gic_init(unsigned int gic_nr, unsigned int irq_start,
+ 	gic = &gic_data[gic_nr];
+ 	gic->dist_base = dist_base;
+ 	gic->cpu_base = cpu_base;
+-	gic->irq_offset = (irq_start - 1) & ~31;
++	gic->irq_offset = irq_start ? (irq_start - 1) & ~31 : 0;
+ 
+ 	if (gic_nr == 0)
+ 		gic_cpu_base_addr = cpu_base;
+-- 
+1.7.4.1
