@@ -1,39 +1,28 @@
-From: manjugk@ti.com (G, Manjunath Kondaiah)
-Date: Tue, 9 Aug 2011 21:59:45 +0530
-Subject: How to handle named resources with DT?
-In-Reply-To: <4E40FC88.5090403@ti.com>
-References: <4E40FC88.5090403@ti.com>
-Message-ID: <20110809162907.GA630@manju-WNB7PBC4801-0006>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue,  9 Aug 2011 16:47:31 +0000
+Subject: [PATCH 1/3 v2] RFC: arm/kirkwood: TEMP hack till mach-types is
+	updated.
+In-Reply-To: <cover.1312906908.git.jason@lakedaemon.net>
+References: <cover.1312906908.git.jason@lakedaemon.net>
+Message-ID: <5aff1d2c93408c44fdd3671f16f9643811945d1d.1312906908.git.jason@lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benoit,
+	DO NOT SUBMIT!
 
-On Tue, Aug 09, 2011 at 11:23:20AM +0200, Cousson, Benoit wrote:
-> Hi Grant,
-> 
-> Trying to bind hwmod informations with DT, I'm facing a little limitation.
-> A bunch of drivers are using the platform_get_resource_byname, so
-> the name for the resource is needed.
-> 
-> The name is used so far for IORESOURCE_MEM, IORESOURCE_IRQ and
-> IORESOURCE_DMA types of resources.
+Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+---
+ arch/arm/tools/mach-types |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-IORESOURCE_MEM and IORESOURCE_IRQ's are fetched from dt blob and 
-it will be part of pdev. For IORESOURCE_DMA, you can have property
-"dma-channel" in dtsi file and fetch dma-channel in driver probe
-through "of_property_read_u32()" api.
-
-BTW, this is not required for omap since dt-hwmod binding will fetch
-pdev pointer from hwmod database and it will be used "as is" without 
-any modification which inturn does not break any existing pm 
-functionality.
-
--M
-
-> 
-> Do you have any plan to add that, or do you have any clean way to
-> avoid that without having to use the resource index?
-> 
-> Thanks,
-> Benoit
+diff --git a/arch/arm/tools/mach-types b/arch/arm/tools/mach-types
+index 3b3776d..d5c5779 100644
+--- a/arch/arm/tools/mach-types
++++ b/arch/arm/tools/mach-types
+@@ -1113,3 +1113,4 @@ blissc			MACH_BLISSC		BLISSC			3491
+ thales_adc		MACH_THALES_ADC		THALES_ADC		3492
+ ubisys_p9d_evp		MACH_UBISYS_P9D_EVP	UBISYS_P9D_EVP		3493
+ atdgp318		MACH_ATDGP318		ATDGP318		3494
++dreamplug		MACH_DREAMPLUG		DREAMPLUG		3550
+-- 
+1.7.0.4
