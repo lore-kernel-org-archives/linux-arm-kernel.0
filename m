@@ -1,35 +1,39 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 9 Aug 2011 16:15:48 +0200
-Subject: ARM Maintainers workshop at Kernel Summit 2011
-In-Reply-To: <CACxGe6u3jrhnmL=QwCevm5ybgtGqdOzmGZpfve02M12e9v6pNQ@mail.gmail.com>
-References: <CACxGe6u3jrhnmL=QwCevm5ybgtGqdOzmGZpfve02M12e9v6pNQ@mail.gmail.com>
-Message-ID: <20110809141548.GD17990@pengutronix.de>
+From: N.Voss@weinmann.de (Voss, Nikolaus)
+Date: Tue, 9 Aug 2011 16:16:24 +0200
+Subject: [PATCH] atmel_serial: fix atmel_default_console_device
+In-Reply-To: <4E411CEF.10004@ru.mvista.com>
+References: <1307541740.10626.15.camel@hcegtvedt.norway.atmel.com>
+	<1308666679-12111-1-git-send-email-plagnioj@jcrosoft.com>
+	<loom.20110808T170457-559@post.gmane.org>
+	<4E411CEF.10004@ru.mvista.com>
+Message-ID: <EF2E73589CA71846A15D0B2CDF79505D087B0192D4@wm021.weinmann.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 06, 2011 at 07:44:08AM +0100, Grant Likely wrote:
-> As many of you know, Kernel Summit this year will be a three day
-> event, with the first day dedicated to kernel subsystem workshops[1].
-> Since Kernel Summit will be co-located with ELC-E which my arm
-> developers will be attending, it is the perfect opportunity to have an
-> ARM maintainers meeting.  Arnd Bergmann, Nicolas Pitre and I talked
-> about it at Linaro Connect this past week and we're going to work on
-> organising something.
-> 
-> However, for it to be successful we need to put together a draft
-> agenda quickly.  Kernel summit is only 80 days away, and people need
-> time to get approval and organise travel.  So, if you're interested in
-> attending, then we need to know ASAP.  Reply to this email if you're
-> interested.
+reflect new static uart platform ids introduced by patch
+http://article.gmane.org/gmane.linux.kernel/1126105
+---
+ drivers/tty/serial/atmel_serial.c |    8 +++++---
+ 1 files changed, 5 insertions(+), 3 deletions(-)
 
-Since I'm at the ELC-E anyway and I have the ok from Robert, yes, I am
-interested.
-
-Sascha
-
-
+diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+index af9b781..b922f5d 100644
+--- a/drivers/tty/serial/atmel_serial.c
++++ b/drivers/tty/serial/atmel_serial.c
+@@ -1609,9 +1609,11 @@ static struct console atmel_console = {
+ static int __init atmel_console_init(void)
+ {
+ 	if (atmel_default_console_device) {
+-		add_preferred_console(ATMEL_DEVICENAME,
+-				      atmel_default_console_device->id, NULL);
+-		atmel_init_port(&atmel_ports[atmel_default_console_device->id],
++		struct atmel_uart_data *pdata =
++			atmel_default_console_device->dev.platform_data;
++
++		add_preferred_console(ATMEL_DEVICENAME, pdata->num, NULL);
++		atmel_init_port(&atmel_ports[pdata->num],
+ 				atmel_default_console_device);
+ 		register_console(&atmel_console);
+ 	}
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.4.1
