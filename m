@@ -1,183 +1,220 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Tue, 9 Aug 2011 13:11:39 +0800
-Subject: GPMI-NAND Status?
-In-Reply-To: <CAHMSPgMYP+5Hpa5sC-yt=1H-S=tEER8uNzj6uMSK403_DGYJ9Q@mail.gmail.com>
-References: <20110805135133.GA26981@pengutronix.de>	<4E3F8087.6070206@freescale.com>
-	<CAHMSPgMYP+5Hpa5sC-yt=1H-S=tEER8uNzj6uMSK403_DGYJ9Q@mail.gmail.com>
-Message-ID: <4E40C18B.7040609@freescale.com>
+From: subashrp@gmail.com (Subash Patel)
+Date: Tue, 09 Aug 2011 11:32:59 +0530
+Subject: RFC[PATCH 3/6] ARM: S5P64X0: Add pin-mux setup support for SDHCI
+In-Reply-To: <1312793277-18689-4-git-send-email-rajeshwari.s@samsung.com>
+References: <1312793277-18689-1-git-send-email-rajeshwari.s@samsung.com>
+	<1312793277-18689-4-git-send-email-rajeshwari.s@samsung.com>
+Message-ID: <4E40CD93.70600@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Koen:
-> Hi Wolfram,
->
-> Thanks for taking the initiative to summarize the current status.
-> Also thanks to Huang Shijie for all the work done so far.
->
->
-> On Mon, Aug 8, 2011 at 8:21 AM, Huang Shijie<b32955@freescale.com>  wrote:
->> Hi Wolfram:
->>> Hi,
->>>
->>> I am a bit uncertain how the state of the GPMI-NAND driver currently is,
->>> so
->>> I'll try to sum it up here. There is without doubt interest in getting the
->>> driver into mainline from at least Huang, Shawn, Lothar, Koen and me, so I
->>> wonder if we can join forces more effectively. First of all, I want to
->>> thank
->>> Huang Shijie for all his work so far which was already quite some effort;
->>> this
->>> sum-up is by no means meant as bashing, just trying to understand the
->>> status
->>> quo (Sidenote: I am more or less on holiday until Monday, so no time for
->>> real
->>> debugging myself. I write this mail so we hopefully gain a common
->>> understanding. When I am back to full strength, I can then start working
->>> on
->>> what seems apropriate)
->>>
->>> Issues with the current driver I am aware of:
->>>
->>> DMA timeouts [1]
->>> ================
->>>
->>> [    2.560000] [ start_dma_without_bch_irq : 392 ] DMA timeout, last DMA
->>> :1
->>> [    3.560000] [ start_dma_with_bch_irq : 427 ] bch timeout!!!
->>>
->>> Always reproducible by me when trying to format mtd0. Sometimes(always?)
->>> seen
->>> by Koen during boot (on read?). Never seen by Huang? It is currently
->>> unclear if
->> After I used a different .config, it never appears in my side.
-> flash_eraseall of mtd1 works for me.
-> ubi_format of mtd1 always gives the dma timeout
-> reading/writing of mtd0/1 always gives the dma timeout
-> I have seen dma timeout during boot if i try to enable ubi rootfs (so
-> that's the same issue as dma time during read/write).
->
-> I don't use mtd0 for testing as this contains my uboot.
->
-> I tested using Huang's .config and the Linaro git but still see
-> exactly the same issue.
->
->>> the bug is in the GPMI driver, or in the MXS-DMA driver. Still, I'd say
->>> the
->>> issue is a show-stopper. We can't put a driver into mainline which leads
->>> to the
->>> above failure. The fact that there is _some_ configuration which works for
->>> someone does not help, it doesn't work for Koen and me at least. We need
-> On my target, the mxs-dma is working for sdio until the gpmi-nand
-> gives a timeout. After that the dma for sdio is *not fully* working
-> anymore.
->
->> Hi Koen, do you test my uImage?
->> Does the timeout occur?
-> I was not able to test you uImage. It ended with a "Kernel panic - not
-> syncing: read error". See (off list) mail from last week.
->
->
->>> reliable drivers in mainline, so the issue needs to be resolved,
->>> regardless
->>> where the bug resides.
->> ok. I will debug it too.
->>
->>
->> Please test the driver again when you back to office.
->> Pay attention to your version of /arch/arm/configs/mxs_defconfig.
->> Your mxs_defconfig may miss Shawn Guo's patches.
->>
->> thanks.
->>
->>
->>> problem overwriting all-0xff data in NAND [2]
->>> =============================================
->>>
->>> Although it occured only when writing JFFS2 images so far, this is a
->>> generic
->>> issue and needs to be fixed, right?
->>>
->> Artem said it should not change the driver, but the upper layer(jffs2).
->>
->> So I think i do not need to change the driver.
->>> ecclayout needs to be used to show that OOB is fully in use [1]
->>> ===============================================================
->>>
->>> Needed to make it work for JFFS2 and to pass the mtd-testsuite. A driver
->>> only
->>> working with UBIFS is surely not ready for mainline.
->>>
->> I programmed for mx6q in the recent days. I have no time to fix it. The mx6q
->> can runs well now.
->>
->> So I will fix the issue in the following days.
->>
->>> Pecularities
->>> ============
->>>
->>> There are a few issues which are odd. I don't know if some are mainly
->>> intended
->>> for debugging, yet they shouldn't be in a mainline driver. At least:
->>>
->>> * custom sysfs-entries
->> My sysfs-entries is in the GPMI-NAND directory.
->> Does be a mainline driver means I should not have any sysfs-entries?
->> If it does, i can remove it.
->>
->>> * custom kernel command line parameters
->> The kernel command line 'gpmi_nand' is to avoid the conflict with other
->> modules such as
->> SD.
->>
->> If it's be removed, I have to use different config to resolve the issue
->> which is not better either. :(
->>
->>> * namespacing (some functions have no prefix, some have "mil_", some have
->>> mx23)
->>>    (I think 'mil' means 'mtd interface layer', but why is that needed?)
->> The mil is used to make the gpmi_nand_data{} simple.
->> Without it, the gpmi_nand_data{} will very big.
->>
->> The functions which have mx23 prefix are only used in mx23.
->> The functions which have no prefix can used in both mx28 and mx23.
->>
->>> Complexity
->>> ==========
->>>
->>> The driver is not easy to review. I wonder if it makes sense to use
->>> incremental
->>> patches for it? maybe making it a staging driver could be a solution for
->>> that?
->> Frankly speaking, the current driver is maybe the smallest version now.
->>
->> I even do not add the on-chip BBT feature now.
->>> Huang, are you interested in accepting patches or do you prefer we just
->>> point
->>> at certain code and you then fix it? Starting with a simpler driver and
->>> then
->> Feel free to mail me the patch. it's welcome.
->>
->>
->>> adding stuff might be another option if we can't chase all the bugs in the
->>> current driver.
->>>
->>> That being said, I'd think fixing the DMA issue has prio #1 and maybe we
->>> can
->>> meet in IRC or something to work that out? Is there interest in that?
->> What about gtalk?
-> Anything is good for me.
-> Could also be useful to make sure we test on the same HW as much as
-> possible and are using the same source tree.
-> HW I have:
-> - mx23evk rev C1
-> - mx23evk rev B2
-> - own target hw using mx23 lqfp-128 chip and different type of ddr and nand.
->
-My test mx23 board is 169BGA package which is different from yours.
+Hi Rajeshwari,
 
-Could you get the 169BGA package board?
+Please find my comments below:
 
-I think the DMA timeout is caused by the different package type.
+On 08/08/2011 02:17 PM, Rajeshwari Shinde wrote:
+> This patch provides pin-mux setup files for HSMMC support on
+> S5P6440 and S5P6450 platforms.
+>
+> Signed-off-by: Rajeshwari Shinde<rajeshwari.s@samsung.com>
+> ---
+>   arch/arm/mach-s5p64x0/Makefile           |    2 +
+>   arch/arm/mach-s5p64x0/setup-sdhci-gpio.c |  109 ++++++++++++++++++++++++++++++
+>   arch/arm/mach-s5p64x0/setup-sdhci.c      |   46 +++++++++++++
+>   3 files changed, 157 insertions(+), 0 deletions(-)
+>   create mode 100644 arch/arm/mach-s5p64x0/setup-sdhci-gpio.c
+>   create mode 100644 arch/arm/mach-s5p64x0/setup-sdhci.c
+>
+> diff --git a/arch/arm/mach-s5p64x0/Makefile b/arch/arm/mach-s5p64x0/Makefile
+> index 5f6afdf..6642448 100644
+> --- a/arch/arm/mach-s5p64x0/Makefile
+> +++ b/arch/arm/mach-s5p64x0/Makefile
+> @@ -28,3 +28,5 @@ obj-y				+= dev-audio.o
+>   obj-$(CONFIG_S3C64XX_DEV_SPI)	+= dev-spi.o
+>
+>   obj-$(CONFIG_S5P64X0_SETUP_I2C1)	+= setup-i2c1.o
+> +obj-$(CONFIG_S5P64X0_SETUP_SDHCI)	+= setup-sdhci.o
+> +obj-$(CONFIG_S5P64X0_SETUP_SDHCI_GPIO)	+= setup-sdhci-gpio.o
+> diff --git a/arch/arm/mach-s5p64x0/setup-sdhci-gpio.c b/arch/arm/mach-s5p64x0/setup-sdhci-gpio.c
+> new file mode 100644
+> index 0000000..616b277
+> --- /dev/null
+> +++ b/arch/arm/mach-s5p64x0/setup-sdhci-gpio.c
+> @@ -0,0 +1,109 @@
+> +/* linux/arch/arm/mach-s5p64x0/setup-sdhci-gpio.c
+> + *
+> + * Copyright (c) 2011 Samsung Electronics Co., Ltd.
+> + *		http://www.samsung.com/
+> + *
+> + * S5P64X0 - Helper functions for setting up SDHCI device(s) GPIO (HSMMC)
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> +*/
+> +
+> +#include<linux/platform_device.h>
+> +#include<linux/io.h>
+> +#include<linux/gpio.h>
+> +
+> +#include<mach/regs-gpio.h>
+> +#include<mach/regs-clock.h>
+> +
+> +#include<plat/gpio-cfg.h>
+> +#include<plat/sdhci.h>
+> +
+> +#define S5P6450_ID (0x50000)
+> +
+> +void s5p64x0_setup_sdhci0_cfg_gpio(struct platform_device *dev, int width)
+> +{
+> +	struct s3c_sdhci_platdata *pdata = dev->dev.platform_data;
 
-Best Regards
-Huang Shijie
+You have used struct platform_device *pdev and struct platform_device 
+*dev alternatively in this patch series. Its better to maintain 
+consistency. As a practice pdev is used for struct platform_device and 
+dev is used for struct device for keeping code readable (else it is 
+confusing as one above)
+
+> +	unsigned int id = __raw_readl(S5P64X0_SYS_ID)&  0xFF000;
+> +
+proper indentation of code required.
+
+> +	/* Set all the necessary GPG pins to special-function 2 -
+> +	 * CLK, CMD and Data pins
+> +	*/
+> +	if (id == S5P6450_ID)
+> +		s3c_gpio_cfgrange_nopull(S5P6450_GPG(0), 2 + width,
+> +					 S3C_GPIO_SFN(2));
+> +	else
+> +		s3c_gpio_cfgrange_nopull(S5P6440_GPG(0), 2 + width,
+> +					 S3C_GPIO_SFN(2));
+> +
+> +	/* Set GPG[6] pin to special-function 2 - MMC0 CDn */
+> +	if (pdata->cd_type == S3C_SDHCI_CD_INTERNAL) {
+> +		if (id == S5P6450_ID) {
+> +			s3c_gpio_setpull(S5P6450_GPG(6), S3C_GPIO_PULL_UP);
+> +			s3c_gpio_cfgpin(S5P6450_GPG(6), S3C_GPIO_SFN(2));
+> +		} else {
+> +			s3c_gpio_setpull(S5P6440_GPG(6), S3C_GPIO_PULL_UP);
+> +			s3c_gpio_cfgpin(S5P6440_GPG(6), S3C_GPIO_SFN(2));
+> +		}
+> +	}
+> +}
+> +
+> +void s5p64x0_setup_sdhci1_cfg_gpio(struct platform_device *dev, int width)
+> +{
+> +	struct s3c_sdhci_platdata *pdata = dev->dev.platform_data;
+> +	unsigned int id = __raw_readl(S5P64X0_SYS_ID)&  0xFF000;
+indentation between &
+> +
+> +	/* Set GPH[0:1] pins to special-function 2 - CLK and CMD */
+> +	if (id == S5P6450_ID)
+> +		s3c_gpio_cfgrange_nopull(S5P6450_GPH(0), 2, S3C_GPIO_SFN(2));
+> +	else
+> +		s3c_gpio_cfgrange_nopull(S5P6440_GPH(0), 2 , S3C_GPIO_SFN(2));
+> +
+> +	switch (width) {
+> +	case 8:
+> +		/* Set data pins GPH[6:9] special-function 2 */
+> +		if (id == S5P6450_ID)
+> +			s3c_gpio_cfgrange_nopull(S5P6450_GPH(6), 4,
+> +						 S3C_GPIO_SFN(2));
+> +		else
+> +			s3c_gpio_cfgrange_nopull(S5P6440_GPH(6), 4,
+> +						 S3C_GPIO_SFN(2));
+> +	case 4:
+> +		/* set data pins GPH[2:5] special-function 2 */
+> +		if (id == S5P6450_ID)
+> +			s3c_gpio_cfgrange_nopull(S5P6450_GPH(2), 4,
+> +						 S3C_GPIO_SFN(2));
+> +		else
+> +			s3c_gpio_cfgrange_nopull(S5P6440_GPH(2), 4,
+> +						 S3C_GPIO_SFN(2));
+> +	default:
+> +		break;
+> +	}
+> +
+> +	/* Set GPG[6] pin to special-funtion 3 : MMC1 CDn */
+> +	if (pdata->cd_type == S3C_SDHCI_CD_INTERNAL) {
+> +		if (id == S5P6450_ID) {
+> +			s3c_gpio_setpull(S5P6450_GPG(6), S3C_GPIO_PULL_UP);
+> +			s3c_gpio_cfgpin(S5P6450_GPG(6), S3C_GPIO_SFN(3));
+> +		} else {
+> +			s3c_gpio_setpull(S5P6440_GPG(6), S3C_GPIO_PULL_UP);
+> +			s3c_gpio_cfgpin(S5P6440_GPG(6), S3C_GPIO_SFN(3));
+> +		}
+> +	}
+> +}
+> +
+> +void s5p6440_setup_sdhci2_cfg_gpio(struct platform_device *dev, int width)
+> +{
+> +	/* Set GPC[4:5] pins to special-function 3 - CLK and CMD */
+> +	s3c_gpio_cfgrange_nopull(S5P6440_GPC(4), 2, S3C_GPIO_SFN(3));
+> +
+> +	/* Set data pins GPH[6:9] pins to special-function 3 */
+> +	s3c_gpio_cfgrange_nopull(S5P6440_GPH(6), 4, S3C_GPIO_SFN(3));
+> +}
+> +
+> +void s5p6450_setup_sdhci2_cfg_gpio(struct platform_device *dev, int width)
+> +{
+> +	/* Set all the necessary GPG pins to special-function 3 */
+> +	s3c_gpio_cfgrange_nopull(S5P6450_GPG(7), 2 + width, S3C_GPIO_SFN(3));
+> +}
+> diff --git a/arch/arm/mach-s5p64x0/setup-sdhci.c b/arch/arm/mach-s5p64x0/setup-sdhci.c
+> new file mode 100644
+> index 0000000..4c64db6
+> --- /dev/null
+> +++ b/arch/arm/mach-s5p64x0/setup-sdhci.c
+> @@ -0,0 +1,46 @@
+> +/* linux/arch/arm/mach-s5p64x0/setup-sdhci.c
+> + *
+> + * Copyright (c) 2011 Samsung Electronics Co., Ltd.
+> + *		http://www.samsung.com/
+> + *
+> + * S5P64X0 - Helper functions for setting up SDHCI device(s) (HSMMC)
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> +*/
+> +
+> +#include<linux/kernel.h>
+> +#include<linux/types.h>
+> +#include<linux/interrupt.h>
+> +#include<linux/platform_device.h>
+> +#include<linux/io.h>
+> +
+> +#include<linux/mmc/card.h>
+> +#include<linux/mmc/host.h>
+> +
+> +#include<plat/regs-sdhci.h>
+> +#include<plat/sdhci.h>
+> +
+> +void s5p64x0_setup_sdhci_cfg_card(struct platform_device *dev,
+> +				    void __iomem *r,
+> +				    struct mmc_ios *ios,
+> +				    struct mmc_card *card)
+> +{
+> +	u32 ctrl2;
+> +
+> +	/* don't need to alter anything acording to card-type */
+Should the comment be -> "no need to alter anything according to card 
+type" instead?
+> +	__raw_writel(S3C64XX_SDHCI_CONTROL4_DRIVE_9mA,
+> +			r + S3C64XX_SDHCI_CONTROL4);
+> +
+> +	ctrl2 = __raw_readl(r + S3C_SDHCI_CONTROL2);
+> +	ctrl2&= S3C_SDHCI_CTRL2_SELBASECLK_MASK;
+ctrl &= S3C_SDHCI_CTRL2_SELBASECLK_MASK;
+> +
+> +	ctrl2 |= (S3C64XX_SDHCI_CTRL2_ENSTAASYNCCLR |
+> +		  S3C64XX_SDHCI_CTRL2_ENCMDCNFMSK |
+> +		  S3C_SDHCI_CTRL2_DFCNT_NONE |
+> +		  S3C_SDHCI_CTRL2_ENCLKOUTHOLD);
+> +
+> +	__raw_writel(ctrl2, r + S3C_SDHCI_CONTROL2);
+> +	__raw_writel(0, r + S3C_SDHCI_CONTROL3);
+> +}
+
+Regards,
+Subash
