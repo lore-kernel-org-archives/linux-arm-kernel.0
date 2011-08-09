@@ -1,19 +1,42 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Tue, 9 Aug 2011 11:31:44 +0200
-Subject: [PATCH 08/12] ARM: mach-u300: Setup consistent dma size at boot
-	time
-In-Reply-To: <1312813712-22808-9-git-send-email-tixy@yxit.co.uk>
-References: <1312813712-22808-1-git-send-email-tixy@yxit.co.uk>
-	<1312813712-22808-9-git-send-email-tixy@yxit.co.uk>
-Message-ID: <4E40FE80.7030303@stericsson.com>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Tue, 9 Aug 2011 10:35:05 +0100
+Subject: [PATCH 00/10] ARM: perf: updates for 3.2
+In-Reply-To: <1312823771-9952-1-git-send-email-will.deacon@arm.com>
+References: <1312823771-9952-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20110809093505.GD3210@pulham.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/08/2011 04:28 PM, Jon Medhurst wrote:
-> Signed-off-by: Jon Medhurst<tixy@yxit.co.uk>
-> CC: Linus Walleij<linus.walleij@stericsson.com>
->    
-Acked-by: Linus Walleij <linus.walleij@stericsson.com>
+Hi Will,
 
-Thanks!
-Linus Walleij
+On Mon, Aug 08, 2011 at 06:16:01PM +0100, Will Deacon wrote:
+> Hello,
+> 
+> This patch series contains a number of updates to the ARM PMU and perf
+> code so that we can support mode exclusion, which is new in debug
+> architecture 7.1 (as implemented by the Cortex-A15). Some of these
+> updates also coincide with work to support System PMUs (PMUs that are
+> not affine to a single CPU) but that is a larger body of work which will
+> be posted separately at a later date.
+> 
+> The patches do the following:
+> 
+>   1.) Greatly simplify the PMU reservation mechanism so that the
+>       handling of platform_devices is moved into perf.
+>   2.) Cleans up the interrupt registration and some of the types used
+>       to represent events and registers.
+>   3.) Moves event indexing to start from zero rather than one, making
+>       the code more readable and also easier to extend for mode
+>       exclusion.
+>   4.) Adds support for mode exclusion (user / kernel / hyp) and
+>       implements this for Cortex-A15.
+> 
+> I've been running these patches since 3.0, so they've been tested on
+> 1176, 11MPCore, Cortex-A5, Cortex-A9 and Cortex-A15 platforms.
+
+A quick glance through them and they all look nice to me, but I can't 
+get them to apply to any tree (next and master).  It looks like they're 
+based on a tree with changes to the v7 perf support so I'm guessing it's 
+your patches with A15 support.
+
+Jamie
