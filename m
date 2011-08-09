@@ -1,10 +1,10 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue,  9 Aug 2011 22:42:41 +0100
-Subject: [RFC PATCH 7/8] ARM: ux500: convert logical CPU numbers to physical
+Date: Tue,  9 Aug 2011 22:42:38 +0100
+Subject: [RFC PATCH 4/8] ARM: exynos4: convert logical CPU numbers to physical
 	numbers
 In-Reply-To: <1312926162-22469-1-git-send-email-will.deacon@arm.com>
 References: <1312926162-22469-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1312926162-22469-8-git-send-email-will.deacon@arm.com>
+Message-ID: <1312926162-22469-5-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,38 +12,38 @@ This patch uses the new cpu_logical_map() macro for converting logical
 CPU numbers into physical numbers when dealing with the pen_release
 variable in the SMP boot and CPU hotplug paths.
 
-Cc: Linus Walleij <linus.walleij@stericsson.com>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/mach-ux500/hotplug.c |    2 +-
- arch/arm/mach-ux500/platsmp.c |    2 +-
+ arch/arm/mach-exynos4/hotplug.c |    2 +-
+ arch/arm/mach-exynos4/platsmp.c |    2 +-
  2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-ux500/hotplug.c b/arch/arm/mach-ux500/hotplug.c
-index dd8037e..572015e 100644
---- a/arch/arm/mach-ux500/hotplug.c
-+++ b/arch/arm/mach-ux500/hotplug.c
-@@ -24,7 +24,7 @@ static inline void platform_do_lowpower(unsigned int cpu)
- 	for (;;) {
- 		__asm__ __volatile__("dsb\n\t" "wfi\n\t"
- 				: : : "memory");
+diff --git a/arch/arm/mach-exynos4/hotplug.c b/arch/arm/mach-exynos4/hotplug.c
+index 7490789..da70e7e 100644
+--- a/arch/arm/mach-exynos4/hotplug.c
++++ b/arch/arm/mach-exynos4/hotplug.c
+@@ -75,7 +75,7 @@ static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
+ 		    :
+ 		    : "memory", "cc");
+ 
 -		if (pen_release == cpu) {
 +		if (pen_release == cpu_logical_map(cpu)) {
  			/*
  			 * OK, proper wakeup, we're done
  			 */
-diff --git a/arch/arm/mach-ux500/platsmp.c b/arch/arm/mach-ux500/platsmp.c
-index a33df5f..27e5281 100644
---- a/arch/arm/mach-ux500/platsmp.c
-+++ b/arch/arm/mach-ux500/platsmp.c
-@@ -96,7 +96,7 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
- 	 * the holding pen - release it, then wait for it to flag
- 	 * that it has been released by resetting pen_release.
+diff --git a/arch/arm/mach-exynos4/platsmp.c b/arch/arm/mach-exynos4/platsmp.c
+index 7c2282c..0733814 100644
+--- a/arch/arm/mach-exynos4/platsmp.c
++++ b/arch/arm/mach-exynos4/platsmp.c
+@@ -126,7 +126,7 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 	 * Note that "pen_release" is the hardware CPU ID, whereas
+ 	 * "cpu" is Linux's internal ID.
  	 */
 -	write_pen_release(cpu);
 +	write_pen_release(cpu_logical_map(cpu));
  
- 	gic_raise_softirq(cpumask_of(cpu), 1);
- 
+ 	if (!(__raw_readl(S5P_ARM_CORE1_STATUS) & S5P_CORE_LOCAL_PWR_EN)) {
+ 		__raw_writel(S5P_CORE_LOCAL_PWR_EN,
 -- 
 1.7.0.4
