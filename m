@@ -1,35 +1,53 @@
-From: marvin24@gmx.de (Marc Dietrich)
-Date: Tue, 9 Aug 2011 23:08:11 +0200
-Subject: [PATCH V3] ARM: tegra: paz00: add clocks required for usb operation
-Message-ID: <201108092308.11580.marvin24@gmx.de>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Tue, 9 Aug 2011 23:08:09 +0200
+Subject: How to handle named resources with DT?
+In-Reply-To: <20110809205723.GE11568@ponder.secretlab.ca>
+References: <4E40FC88.5090403@ti.com>
+	<20110809162907.GA630@manju-WNB7PBC4801-0006>
+	<4E4166F0.9050401@ti.com>
+	<CACxGe6tbEW1EZhqXy78EZVM_sQLH0Qbr7QOzbgbsKBRn1FtVrg@mail.gmail.com>
+	<4E4172A8.3030101@ti.com> <4E417BD5.8080409@freescale.com>
+	<20110809205723.GE11568@ponder.secretlab.ca>
+Message-ID: <4E41A1B9.1060400@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 8/9/2011 10:57 PM, Grant Likely wrote:
+> On Tue, Aug 09, 2011 at 01:26:29PM -0500, Scott Wood wrote:
+>> On 08/09/2011 12:47 PM, Cousson, Benoit wrote:
+>>> On 8/9/2011 7:23 PM, Grant Likely wrote:
+>>>> There is no analogous mechanism for _byname in the device tree.  The
+>>>> DT binding for a device must explicitly state what order the register
+>>>> ranges are in.  The driver will need to be adapted.
+>>>
+>>> That seems to be a small regression for my point of view. Relying on the
+>>> order is not super safe. This is not very readable either. That's for
+>>> that exact reason that we changed our drivers to use
+>>> platform_get_resource_byname. That's probably the reason why that API is
+>>> there as well.
+>>> For the same IP, the number of entries can vary depending of the SoC
+>>> revision.
+>>> By using the _byname, we can check if the resource is there or not
+>>> without having to care about the position.
+>>
+>> You could have a named u32 property that contains the reg index, e.g.:
+>>
+>> dev {
+>> 	reg =<0x20000 0x200 0x24000 0x200>;
+>> 	foo-reg =<0>;
+>> 	bar-reg =<1>;
+>> };
+>
+> That's a little nasty.  A reg-names = "foo", "bar"; would probably be
+> better.
 
-These clocks are required for usb operation. pll_p_out4 needs to be set
-to 24 MHz. The other clocks default to "off" in order to safe some energy.
----
- arch/arm/mach-tegra/board-paz00.c |    6 ++++++
- 1 files changed, 6 insertions(+), 0 deletions(-)
+Yep, I agree.
 
-diff --git a/arch/arm/mach-tegra/board-paz00.c b/arch/arm/mach-tegra/board-
-paz00.c
-index 45111f6..cde36dc 100644
---- a/arch/arm/mach-tegra/board-paz00.c
-+++ b/arch/arm/mach-tegra/board-paz00.c
-@@ -145,6 +145,12 @@ static __initdata struct tegra_clk_init_table 
-paz00_clk_init_table[] = {
- 	/* name		parent		rate		enabled */
- 	{ "uarta",	"pll_p",	216000000,	true },
- 	{ "uartd",	"pll_p",	216000000,	true },
-+
-+	{ "pll_p_out4",	"pll_p",	24000000,	true },
-+	{ "usbd",	"clk_m",	12000000,	false },
-+	{ "usb2",	"clk_m",	12000000,	false },
-+	{ "usb3",	"clk_m",	12000000,	false },
-+
- 	{ NULL,		NULL,		0,		0},
- };
- 
--- 
-1.7.4.1
+And what about something like that?
+   reg = <0x20000 0x200>, "foo",
+	<0x20000 0x200>, "bar" ;
+
+It is doable?
+
+Regards,
+Benoit
