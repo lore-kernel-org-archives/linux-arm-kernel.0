@@ -1,33 +1,26 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 10 Aug 2011 00:57:13 +0900
-Subject: [Ksummit-2011-discuss] experience with the new arm-soc workflow
-	(Was: Re: ARM Maintainers workshop at Kernel Summit) 2011
-In-Reply-To: <1312904500.18583.256.camel@gandalf.stny.rr.com>
-References: <CACxGe6u3jrhnmL=QwCevm5ybgtGqdOzmGZpfve02M12e9v6pNQ@mail.gmail.com>
-	<CAOesGMhgd9Grs7JErJ1pTY4fD_taX_YSpeKx_QS21dp2UN=vMQ@mail.gmail.com>
-	<20110806212932.GT31521@pengutronix.de>
-	<alpine.LFD.2.00.1108061742490.20358@xanadu.home>
-	<CAHXqBF+BAdNo3NB9gk0o_aTHUxyQRHw_AvM5ok9zn2yk4NsRZw@mail.gmail.com>
-	<20110807041124.GA6410@huya.qualcomm.com>
-	<1312902462.18583.254.camel@gandalf.stny.rr.com>
-	<20110809153418.GC3429@sirena.org.uk>
-	<1312904500.18583.256.camel@gandalf.stny.rr.com>
-Message-ID: <20110809155712.GK15861@opensource.wolfsonmicro.com>
+From: eric.miao@linaro.org (Eric Miao)
+Date: Tue, 9 Aug 2011 23:58:05 +0800
+Subject: Building failure of 3.1-rc1 of drivers/usb/host/ehci-mxc.c
+Message-ID: <CAMPhdO_yMC5w43A9xC7AsKO2razX1d2VVPtMp5Pm=wb6eFUYRw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 09, 2011 at 11:41:40AM -0400, Steven Rostedt wrote:
-> On Tue, 2011-08-09 at 16:34 +0100, Mark Brown wrote:
+Hi Sascha,
 
-> > Though one of the frequent consequences of any widespread cleanup is
-> > that it ends up touching lots of places and consequently colliding with
-> > other work.
+Found the error below when trying to build 3.1-rc1 for imx51/53:
 
-> Yeah, but Linus himself said he's good at merges. Normal cleanups should
-> not be too difficult to figure out conflicts of this nature.
-
-The problem from the submitter point of view is that it makes it much
-more complicated to work out what to base your patches on when doing new
-work, particularly if the cleanups are actually useful or relevant for
-stuff you're doing.  It raises the overhead for upstreaming that little
-bit more for limited practical gain.
+In file included from
+/home/ycmiao/linaro/linux-2.6/drivers/usb/host/ehci-hcd.c:1190:0:
+/home/ycmiao/linaro/linux-2.6/drivers/usb/host/ehci-mxc.c: In function
+?ehci_mxc_drv_probe?:
+/home/ycmiao/linaro/linux-2.6/drivers/usb/host/ehci-mxc.c:175:2:
+error: implicit declaration of function ?cpu_is_mx35?
+/home/ycmiao/linaro/linux-2.6/drivers/usb/host/ehci-mxc.c:175:2:
+error: implicit declaration of function ?cpu_is_mx25?
+/home/ycmiao/linaro/linux-2.6/drivers/usb/host/ehci-mxc.c:185:2:
+error: implicit declaration of function ?cpu_is_mx51?
+make[4]: *** [drivers/usb/host/ehci-hcd.o] Error 1
+make[3]: *** [drivers/usb/host] Error 2
+make[2]: *** [drivers/usb] Error 2
+make[1]: *** [drivers] Error 2
+make[1]: *** Waiting for unfinished jobs....
