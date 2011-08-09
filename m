@@ -1,81 +1,200 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  9 Aug 2011 11:46:42 +0100
-Subject: [RFC PATCH 00/12] Make SMP timers standalone
-Message-ID: <1312886814-15627-1-git-send-email-marc.zyngier@arm.com>
+Date: Tue,  9 Aug 2011 11:46:53 +0100
+Subject: [RFC PATCH 11/12] ARM: local timers: make MCT timer standalone
+In-Reply-To: <1312886814-15627-1-git-send-email-marc.zyngier@arm.com>
+References: <1312886814-15627-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1312886814-15627-12-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The LOCAL_TIMERS infrastructure has a few limitations:
-- It only allows one implementation to be compiled in, hence
-  preventing a single kernel image to be booted hardware with
-  different requirements (Tegra and MSM, for example).
-- It is only supported on SMP, which is a problem on platforms where
-  the local timer can be used on UP platforms (Cortex A15 being one).
+Following the same pattern used for smp_twd, allow the MCT timers
+to be built in standalone, without relying on the CONFIG_LOCAL_TIMER
+infrastructure and use a CPU notifier block to stop or start
+the timer on the right CPU.
 
-The proposal is to convert local timer drivers to be "standalone" (not
-relying on the local timer infrastructure) and to use a CPU notifier
-to have the timer brought up or down on non-boot CPUs.
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/Kconfig            |    2 +-
+ arch/arm/mach-exynos4/mct.c |   75 ++++++++++++++++++++++++++++++++----------
+ 2 files changed, 58 insertions(+), 19 deletions(-)
 
-The SMP support code can then be simplified to only manage the
-boadcast timer, which is always installed, and leave the generic
-kernel code to pick the highest priority timer. CONFIG_LOCAL_TIMERS
-disappears in the process.
-
-This patch series is based on my earlier series ("Consolidating GIC
-per-cpu interrupts"). Tested on EB11MP, VE A15, OMAP4 and Tegra.
-
-Marc Zyngier (12):
-  ARM: local timers: allow smp_twd to be used standalone
-  ARM: local timers: switch realview to standalone smp_twd
-  ARM: local timers: switch vexpress to standalone smp_twd
-  ARM: local timers: remove localtimer.c from plat-versatile
-  ARM: local timers: switch tegra to standalone smp_twd
-  ARM: local timers: switch omap4 to standalone smp_twd
-  ARM: local timers: switch shmobile to standalone smp_twd
-  ARM: local timers: switch ux500 to standalone smp_twd
-  ARM: smp_twd: remove support for non-standalone version
-  ARM: local timers: make MSM timers standalone
-  ARM: local timers: make MCT timer standalone
-  ARM: local timers: Remove CONFIG_LOCAL_TIMERS support
-
- arch/arm/Kconfig                             |   15 +----
- arch/arm/include/asm/localtimer.h            |   56 -----------------
- arch/arm/include/asm/smp_twd.h               |   14 +++--
- arch/arm/kernel/smp.c                        |   56 +++++-------------
- arch/arm/kernel/smp_twd.c                    |   82 ++++++++++++++++++++++++--
- arch/arm/mach-exynos4/mct.c                  |   75 ++++++++++++++++++------
- arch/arm/mach-msm/timer.c                    |   64 +++++++++++++++-----
- arch/arm/mach-omap2/Kconfig                  |    2 +-
- arch/arm/mach-omap2/Makefile                 |    1 -
- arch/arm/mach-omap2/timer-mpu.c              |   39 ------------
- arch/arm/mach-omap2/timer.c                  |   38 ++++++++++--
- arch/arm/mach-realview/Kconfig               |    3 +
- arch/arm/mach-realview/realview_eb.c         |   33 +++++++++-
- arch/arm/mach-realview/realview_pb11mp.c     |   31 +++++++++-
- arch/arm/mach-realview/realview_pbx.c        |   30 +++++++++-
- arch/arm/mach-shmobile/Kconfig               |    1 +
- arch/arm/mach-shmobile/Makefile              |    1 -
- arch/arm/mach-shmobile/include/mach/common.h |    3 +
- arch/arm/mach-shmobile/localtimer.c          |   26 --------
- arch/arm/mach-shmobile/platsmp.c             |    1 -
- arch/arm/mach-shmobile/smp-sh73a0.c          |   32 +++++++++-
- arch/arm/mach-shmobile/timer.c               |   10 +++
- arch/arm/mach-tegra/Kconfig                  |    1 +
- arch/arm/mach-tegra/Makefile                 |    2 +-
- arch/arm/mach-tegra/localtimer.c             |   26 --------
- arch/arm/mach-tegra/timer.c                  |   34 +++++++++--
- arch/arm/mach-ux500/Kconfig                  |    1 +
- arch/arm/mach-ux500/Makefile                 |    1 -
- arch/arm/mach-ux500/cpu.c                    |   40 ++++++++++--
- arch/arm/mach-ux500/localtimer.c             |   29 ---------
- arch/arm/mach-vexpress/Kconfig               |    1 +
- arch/arm/mach-vexpress/ct-ca9x4.c            |   29 ++++++++-
- arch/arm/plat-versatile/Makefile             |    1 -
- arch/arm/plat-versatile/localtimer.c         |   27 ---------
- 34 files changed, 462 insertions(+), 343 deletions(-)
- delete mode 100644 arch/arm/include/asm/localtimer.h
- delete mode 100644 arch/arm/mach-omap2/timer-mpu.c
- delete mode 100644 arch/arm/mach-shmobile/localtimer.c
- delete mode 100644 arch/arm/mach-tegra/localtimer.c
- delete mode 100644 arch/arm/mach-ux500/localtimer.c
- delete mode 100644 arch/arm/plat-versatile/localtimer.c
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 13cdba4..ef67b64 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1436,7 +1436,7 @@ config HOTPLUG_CPU
+ 
+ config LOCAL_TIMERS
+ 	bool "Use local timer interrupts"
+-	depends on SMP && !ARM_SMP_TWD && !ARCH_MSM
++	depends on SMP && !ARM_SMP_TWD && !ARCH_MSM && !EXYNOS4_MCT
+ 	default y
+ 	help
+ 	  Enable support for local timers on SMP platforms, rather then the
+diff --git a/arch/arm/mach-exynos4/mct.c b/arch/arm/mach-exynos4/mct.c
+index 194fc6d..abe92cf 100644
+--- a/arch/arm/mach-exynos4/mct.c
++++ b/arch/arm/mach-exynos4/mct.c
+@@ -19,6 +19,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/delay.h>
+ #include <linux/percpu.h>
++#include <linux/cpu.h>
+ 
+ #include <mach/map.h>
+ #include <mach/regs-mct.h>
+@@ -28,11 +29,11 @@ static unsigned long clk_cnt_per_tick;
+ static unsigned long clk_rate;
+ 
+ struct mct_clock_event_device {
+-	struct clock_event_device *evt;
++	struct clock_event_device evt;
+ 	void __iomem *base;
+ };
+ 
+-struct mct_clock_event_device mct_tick[2];
++static struct mct_clock_event_device __percpu *mct_tick;
+ 
+ static void exynos4_mct_write(unsigned int value, void *addr)
+ {
+@@ -249,10 +250,10 @@ static void exynos4_clockevent_init(void)
+ 	setup_irq(IRQ_MCT_G0, &mct_comp_event_irq);
+ }
+ 
+-#ifdef CONFIG_LOCAL_TIMERS
+ /* Clock event handling */
+-static void exynos4_mct_tick_stop(struct mct_clock_event_device *mevt)
++static void exynos4_mct_tick_stop(void *data)
+ {
++	struct mct_clock_event_device *mevt = data;
+ 	unsigned long tmp;
+ 	unsigned long mask = MCT_L_TCON_INT_START | MCT_L_TCON_TIMER_START;
+ 	void __iomem *addr = mevt->base + MCT_L_TCON_OFFSET;
+@@ -288,8 +289,9 @@ static void exynos4_mct_tick_start(unsigned long cycles,
+ static int exynos4_tick_set_next_event(unsigned long cycles,
+ 				       struct clock_event_device *evt)
+ {
+-	struct mct_clock_event_device *mevt = &mct_tick[smp_processor_id()];
++	struct mct_clock_event_device *mevt;
+ 
++	mevt = container_of(evt, struct mct_clock_event_device, evt);
+ 	exynos4_mct_tick_start(cycles, mevt);
+ 
+ 	return 0;
+@@ -298,8 +300,9 @@ static int exynos4_tick_set_next_event(unsigned long cycles,
+ static inline void exynos4_tick_set_mode(enum clock_event_mode mode,
+ 					 struct clock_event_device *evt)
+ {
+-	struct mct_clock_event_device *mevt = &mct_tick[smp_processor_id()];
++	struct mct_clock_event_device *mevt;
+ 
++	mevt = container_of(evt, struct mct_clock_event_device, evt);
+ 	exynos4_mct_tick_stop(mevt);
+ 
+ 	switch (mode) {
+@@ -318,7 +321,7 @@ static inline void exynos4_tick_set_mode(enum clock_event_mode mode,
+ static irqreturn_t exynos4_mct_tick_isr(int irq, void *dev_id)
+ {
+ 	struct mct_clock_event_device *mevt = dev_id;
+-	struct clock_event_device *evt = mevt->evt;
++	struct clock_event_device *evt = &mevt->evt;
+ 
+ 	/*
+ 	 * This is for supporting oneshot mode.
+@@ -348,17 +351,17 @@ static struct irqaction mct_tick1_event_irq = {
+ 	.handler	= exynos4_mct_tick_isr,
+ };
+ 
+-static void exynos4_mct_tick_init(struct clock_event_device *evt)
++static void __cpuinit exynos4_mct_tick_init(void *data)
+ {
++	struct mct_clock_event_device *mevt = data;
++	struct clock_event_device *evt = &mevt->evt;
+ 	unsigned int cpu = smp_processor_id();
+ 
+-	mct_tick[cpu].evt = evt;
+-
+ 	if (cpu == 0) {
+-		mct_tick[cpu].base = EXYNOS4_MCT_L0_BASE;
++		mct_tick->base = EXYNOS4_MCT_L0_BASE;
+ 		evt->name = "mct_tick0";
+ 	} else {
+-		mct_tick[cpu].base = EXYNOS4_MCT_L1_BASE;
++		mct_tick->base = EXYNOS4_MCT_L1_BASE;
+ 		evt->name = "mct_tick1";
+ 	}
+ 
+@@ -379,21 +382,56 @@ static void exynos4_mct_tick_init(struct clock_event_device *evt)
+ 	exynos4_mct_write(0x1, mct_tick[cpu].base + MCT_L_TCNTB_OFFSET);
+ 
+ 	if (cpu == 0) {
+-		mct_tick0_event_irq.dev_id = &mct_tick[cpu];
++		mct_tick0_event_irq.dev_id = mevt;
+ 		setup_irq(IRQ_MCT_L0, &mct_tick0_event_irq);
+ 	} else {
+-		mct_tick1_event_irq.dev_id = &mct_tick[cpu];
++		mct_tick1_event_irq.dev_id = mevt;
+ 		setup_irq(IRQ_MCT_L1, &mct_tick1_event_irq);
+ 		irq_set_affinity(IRQ_MCT_L1, cpumask_of(1));
+ 	}
+ }
+ 
+-/* Setup the local clock events for a CPU */
+-void __cpuinit local_timer_setup(struct clock_event_device *evt)
++static int __cpuinit exynos4_mct_cpu_notify(struct notifier_block *self,
++					    unsigned long action, void *data)
+ {
+-	exynos4_mct_tick_init(evt);
++	int cpu = (int)data;
++	struct mct_clock_event_device *mevt = per_cpu_ptr(mct_tick, cpu);
++
++	switch (action) {
++	case CPU_STARTING:
++	case CPU_STARTING_FROZEN:
++		smp_call_function_single(cpu, exynos4_mct_tick_init, mevt, 1);
++		break;
++
++	case CPU_DOWN_PREPARE:
++	case CPU_DOWN_PREPARE_FROZEN:
++		smp_call_function_single(cpu, exynos4_mct_tick_stop, mevt, 1);
++		break;
++	}
++
++	return NOTIFY_OK;
++}
++
++static struct notifier_block __cpuinitdata exynos4_mct_cpu_nb = {
++	.notifier_call = exynos4_mct_cpu_notify,
++};
++
++static void __init exynos4_mct_init(void)
++{
++	struct mct_clock_event_device *mevt;
++
++	mct_tick = alloc_percpu(struct mct_clock_event_device);
++	if (!mct_tick) {
++		pr_err("exynos4_mct_init: can't allocate memory\n");
++		return;
++	}
++
++	/* Immediately configure the timer on the boot CPU */
++	mevt = per_cpu_ptr(mct_tick, smp_processor_id());
++	exynos4_mct_tick_init(mevt);
++
++	register_cpu_notifier(&exynos4_mct_cpu_nb);
+ }
+-#endif /* CONFIG_LOCAL_TIMERS */
+ 
+ static void __init exynos4_timer_resources(void)
+ {
+@@ -408,6 +446,7 @@ static void __init exynos4_timer_init(void)
+ 	exynos4_timer_resources();
+ 	exynos4_clocksource_init();
+ 	exynos4_clockevent_init();
++	exynos4_mct_init();
+ }
+ 
+ struct sys_timer exynos4_timer = {
+-- 
+1.7.0.4
