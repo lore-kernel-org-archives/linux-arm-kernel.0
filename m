@@ -1,42 +1,52 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Tue, 9 Aug 2011 11:19:06 +0200
-Subject: GPMI-NAND Status?
-In-Reply-To: <4E3FA88E.4070804@freescale.com>
-References: <20110805135133.GA26981@pengutronix.de>
-	<4E3FA88E.4070804@freescale.com>
-Message-ID: <20110809091906.GA1923@pengutronix.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue,  9 Aug 2011 10:19:03 +0100
+Subject: [PATCH] ARM: tegra: fix i2c-tegra compilation when !CONFIG_OF
+Message-ID: <1312881543-3467-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Commit 5c470f39ee (i2c: Tegra: Add DeviceTree support) broke
+the non-DT case.
 
-> >
-> >ecclayout needs to be used to show that OOB is fully in use [1]
-> >===============================================================
-> >
-> >Needed to make it work for JFFS2 and to pass the mtd-testsuite. A driver only
-> >working with UBIFS is surely not ready for mainline.
-> >
-> It seems just modifying the ecclayout of GPMI-NAND can not fix the problem.
-> It should also change the code of JFFS2 and mtd.
-> 
-> Some one ever posted a patch about this:
-> http://lists.infradead.org/pipermail/linux-mtd/2007-December/020047.html
+Fix it by using of_property_read_u32() instead of of_get_property(),
+as this is defined in all cases.
 
-This mail is about MLC. That's another issue. For SLC, ecclayout should
-work, no?
+Cc: John Bonesio <bones@secretlab.ca>
+Cc: Grant Likely <grant.likely@secretlab.ca>
+Cc: OIof Johansson <olof@lixom.net>
+Cc: Ben Dooks <ben-linux@fluff.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ drivers/i2c/busses/i2c-tegra.c |   10 +++-------
+ 1 files changed, 3 insertions(+), 7 deletions(-)
 
-Regards,
-
-   Wolfram
-
+diff --git a/drivers/i2c/busses/i2c-tegra.c b/drivers/i2c/busses/i2c-tegra.c
+index 2440b74..34c9951 100644
+--- a/drivers/i2c/busses/i2c-tegra.c
++++ b/drivers/i2c/busses/i2c-tegra.c
+@@ -547,7 +547,6 @@ static int tegra_i2c_probe(struct platform_device *pdev)
+ 	struct resource *iomem;
+ 	struct clk *clk;
+ 	struct clk *i2c_clk;
+-	const unsigned int *prop;
+ 	void *base;
+ 	int irq;
+ 	int ret = 0;
+@@ -610,12 +609,9 @@ static int tegra_i2c_probe(struct platform_device *pdev)
+ 	if (pdata) {
+ 		i2c_dev->bus_clk_rate = pdata->bus_clk_rate;
+ 
+-	} else if (i2c_dev->dev->of_node) {    /* if there is a device tree node ... */
+-		prop = of_get_property(i2c_dev->dev->of_node,
+-				"clock-frequency", NULL);
+-		if (prop)
+-			i2c_dev->bus_clk_rate = be32_to_cpup(prop);
+-	}
++	} else if (i2c_dev->dev->of_node) /* if there is a device tree node ... */
++		of_property_read_u32(i2c_dev->dev->of_node, "clock-frequency",
++				     (u32 *)&i2c_dev->bus_clk_rate);
+ 
+ 	if (pdev->id == 3)
+ 		i2c_dev->is_dvc = 1;
 -- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110809/c327d9b1/attachment.sig>
+1.7.0.4
