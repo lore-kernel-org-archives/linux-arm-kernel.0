@@ -1,121 +1,61 @@
 From: b-cousson@ti.com (Benoit Cousson)
-Date: Mon, 22 Aug 2011 11:10:38 +0200
-Subject: [PATCH] OMAP2+: Add a common method to init globals using DT compatible
-Message-ID: <mailman.116.1314963838.20020.linux-arm-kernel@lists.infradead.org>
+Date: Tue, 9 Aug 2011 16:54:19 +0200
+Subject: [PATCH v3 5/6] OMAP: omap_device: Create a default omap_device_pm_latency
+Message-ID: <mailman.138.1316173955.20020.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks to the DT root node compatible information, we can extract
-the compatible SoC and use it to select the proper globals.
-Create a common omap2_set_globals API that can be used by every
-OMAP2+ platforms.
+Most devices are using the same default omap_device_pm_latency structure
+during device built. In order to avoid the duplication of the same
+structure everywhere, add a default structure that will be used if
+the device does not have an explicit one.
+
+Next patches will clean the duplicated structures.
 
 Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-Cc: Tony Lindgren <tony@atomide.com>
+Cc: Kevin Hilman <khilman@ti.com>
+Cc: Paul Walmsley <paul@pwsan.com>
 ---
- arch/arm/mach-omap2/common.c             |   73 ++++++++++++++++++++++++++++++
- arch/arm/plat-omap/include/plat/common.h |    1 +
- 2 files changed, 74 insertions(+), 0 deletions(-)
+ arch/arm/plat-omap/omap_device.c |   19 ++++++++++++++++++-
+ 1 files changed, 18 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/common.c b/arch/arm/mach-omap2/common.c
-index 3f20cbb..ee5a225 100644
---- a/arch/arm/mach-omap2/common.c
-+++ b/arch/arm/mach-omap2/common.c
-@@ -16,6 +16,7 @@
- #include <linux/init.h>
- #include <linux/clk.h>
- #include <linux/io.h>
-+#include <linux/of_fdt.h>
+diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
+index 7b2cf62..54bbe7b 100644
+--- a/arch/arm/plat-omap/omap_device.c
++++ b/arch/arm/plat-omap/omap_device.c
+@@ -97,6 +97,14 @@
+ static int omap_device_register(struct platform_device *pdev);
+ static int omap_early_device_register(struct platform_device *pdev);
  
- #include <plat/common.h>
- #include <plat/board.h>
-@@ -140,3 +141,75 @@ void __init omap2_set_globals_443x(void)
- }
- #endif
- 
-+#ifdef CONFIG_OF
-+/*
-+ * DT method to get the proper globals configuration
-+ */
-+static const struct of_device_id omap_soc_match[] = {
-+#if defined(CONFIG_ARCH_OMAP4)
-+        {
-+                .compatible = "ti,omap4",
-+                .data = &omap4_globals,
-+        },
-+#endif
-+#if defined(CONFIG_ARCH_OMAP3)
-+        {
-+                .compatible = "ti,omap3",
-+                .data = &omap3_globals,
-+        },
-+#endif
-+#if defined(CONFIG_SOC_OMAP2430)
-+        {
-+                .compatible = "ti,omap2430",
-+                .data = &omap243x_globals,
-+        },
-+#endif
-+#if defined(CONFIG_SOC_OMAP2420)
-+        {
-+                .compatible = "ti,omap2420",
-+                .data = &omap242x_globals,
-+        },
-+#endif
-+	{},
++static struct omap_device_pm_latency omap_default_latency[] = {
++	{
++		.deactivate_func = omap_device_idle_hwmods,
++		.activate_func   = omap_device_enable_hwmods,
++		.flags = OMAP_DEVICE_LATENCY_AUTO_ADJUST,
++	}
 +};
 +
-+/* Helper to find the proper of_device_id from a FDT */
-+static __init const struct of_device_id *_fdt_match_node(
-+					const struct of_device_id *matches,
-+					int fdt_node)
-+{
-+	unsigned int score = 0;
-+
-+	if (!matches)
-+		return NULL;
-+
-+	while (matches->compatible[0]) {
-+		score = of_flat_dt_is_compatible(fdt_node, matches->compatible);
-+		if (score > 0)
-+			return matches;
-+		matches++;
-+	}
-+	return NULL;
-+}
-+
-+void __init omap2_set_globals(void)
-+{
-+        unsigned long fdt_root;
-+	const struct of_device_id *match;
-+
-+	/* the DT is still flat at map_io time... */
-+        fdt_root = of_get_flat_dt_root();
-+	match = _fdt_match_node(omap_soc_match, fdt_root);
-+	if (!match) {
-+		pr_err("%s(): Cannot initialize the platform globals data\n",
-+		       __func__);
-+	}
-+
-+	pr_info("%s(): %s\n", __func__, match->compatible);
-+
-+	omap2_set_globals_tap(match->data);
-+	omap2_set_globals_sdrc(match->data);
-+	omap2_set_globals_control(match->data);
-+	omap2_set_globals_prcm(match->data);
-+}
-+#endif
-diff --git a/arch/arm/plat-omap/include/plat/common.h b/arch/arm/plat-omap/include/plat/common.h
-index 4564cc6..fb79269 100644
---- a/arch/arm/plat-omap/include/plat/common.h
-+++ b/arch/arm/plat-omap/include/plat/common.h
-@@ -67,6 +67,7 @@ void omap2_set_globals_243x(void);
- void omap2_set_globals_3xxx(void);
- void omap2_set_globals_443x(void);
- void omap2_set_globals_ti816x(void);
-+void omap2_set_globals(void);
+ /* Private functions */
  
- /* These get called from omap2_set_globals_xxxx(), do not call these */
- void omap2_set_globals_tap(struct omap_globals *);
+ /**
+@@ -510,8 +518,17 @@ struct platform_device *omap_device_build_ss(const char *pdev_name, int pdev_id,
+ 	if (ret)
+ 		goto odbs_exit3;
+ 
+-	od->pm_lats = pm_lats;
++	if (!pm_lats) {
++		pm_lats = omap_default_latency;
++		pm_lats_cnt = ARRAY_SIZE(omap_default_latency);
++	}
++
+ 	od->pm_lats_cnt = pm_lats_cnt;
++	od->pm_lats = kmemdup(pm_lats,
++			sizeof(struct omap_device_pm_latency) * pm_lats_cnt,
++			GFP_KERNEL);
++	if (!od->pm_lats)
++		goto odbs_exit3;
+ 
+ 	for (i = 0; i < oh_cnt; i++) {
+ 		hwmods[i]->od = od;
 -- 
 1.7.0.4
