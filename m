@@ -1,45 +1,122 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Tue, 09 Aug 2011 11:07:42 -0400
-Subject: [Ksummit-2011-discuss] experience with the new arm-soc
-	workflow (Was: Re: ARM Maintainers workshop at Kernel Summit) 2011
-In-Reply-To: <20110807041124.GA6410@huya.qualcomm.com>
-References: <CACxGe6u3jrhnmL=QwCevm5ybgtGqdOzmGZpfve02M12e9v6pNQ@mail.gmail.com>
-	<CAOesGMhgd9Grs7JErJ1pTY4fD_taX_YSpeKx_QS21dp2UN=vMQ@mail.gmail.com>
-	<20110806212932.GT31521@pengutronix.de>
-	<alpine.LFD.2.00.1108061742490.20358@xanadu.home>
-	<CAHXqBF+BAdNo3NB9gk0o_aTHUxyQRHw_AvM5ok9zn2yk4NsRZw@mail.gmail.com>
-	<20110807041124.GA6410@huya.qualcomm.com>
-Message-ID: <1312902462.18583.254.camel@gandalf.stny.rr.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Tue,  9 Aug 2011 16:51:11 +0200
+Subject: [PATCH 1/9 v4] at91: provide macb clks with "pclk" and "hclk" name
+In-Reply-To: <1312881411-2376-2-git-send-email-jamie@jamieiles.com>
+References: <1312881411-2376-2-git-send-email-jamie@jamieiles.com>
+Message-ID: <1312901471-6635-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2011-08-06 at 21:11 -0700, David Brown wrote:
-> On Sun, Aug 07, 2011 at 12:13:48AM +0200, Micha? Miros?aw wrote:
-> 
-> > I, as another contributor, share Uwe's point of view. The problem with
-> > cleanups vs features is that either usually depends on the other.
-> > Fixes are a different beasts and they usually go in asynchronously
-> > (and quicker) to development changes. The split fixes/development
-> > works well in networking area (net and net-next trees).
-> 
-> Maybe we are thinking about two different kinds of cleanups.  Cleanups
-> that would be closely associated with a new feature do make sense to
-> me to keep together.  This is the kind of thing where code is cleaned
-> up in order to make it easier/cleaner to add the new code.  I don't
-> think this makes sense to have in another branch.
-> 
-> But, there is also a lot of code going on now that is just cleaning
-> things up, and it makes sense for this to be in a separate branch.
-> 
+From: Jamie Iles <jamie@jamieiles.com>
 
-This isn't too different than what the RT patch does (or did). There was
-lots of clean ups that went into mainline that had and ulterior motive
-(pave the way for -rt).
+The macb driver expects clocks with the names "pclk" and "hclk".  We
+currently provide "macb_clk" but to fit in line with other
+architectures (namely AVR32), provide "pclk" and a fake "hclk".
 
-Where a clean up goes should be more about why the clean up is
-happening. If it is just a clean up for the sake of cleaning up, then a
-separate branch is suitable. But if a clean up is there to pave the way
-for new features, then that clean up should be with the features it
-allows to provide.
+Cc: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Signed-off-by: Jamie Iles <jamie@jamieiles.com>
+Acked-by: David S. Miller <davem@davemloft.net>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+---
+v4:
+use clkdev
 
--- Steve
+Best Regards,
+J.
+ arch/arm/mach-at91/at91cap9.c    |    4 +++-
+ arch/arm/mach-at91/at91sam9260.c |    4 +++-
+ arch/arm/mach-at91/at91sam9263.c |    4 +++-
+ arch/arm/mach-at91/at91sam9g45.c |    4 +++-
+ 4 files changed, 12 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/mach-at91/at91cap9.c b/arch/arm/mach-at91/at91cap9.c
+index bfc6844..a229c5c 100644
+--- a/arch/arm/mach-at91/at91cap9.c
++++ b/arch/arm/mach-at91/at91cap9.c
+@@ -137,7 +137,7 @@ static struct clk pwm_clk = {
+ 	.type		= CLK_TYPE_PERIPHERAL,
+ };
+ static struct clk macb_clk = {
+-	.name		= "macb_clk",
++	.name		= "pclk",
+ 	.pmc_mask	= 1 << AT91CAP9_ID_EMAC,
+ 	.type		= CLK_TYPE_PERIPHERAL,
+ };
+@@ -210,6 +210,8 @@ static struct clk *periph_clocks[] __initdata = {
+ };
+ 
+ static struct clk_lookup periph_clocks_lookups[] = {
++	/* One additional fake clock for macb_hclk */
++	CLKDEV_CON_ID("hclk", &macb_clk),
+ 	CLKDEV_CON_DEV_ID("hclk", "atmel_usba_udc", &utmi_clk),
+ 	CLKDEV_CON_DEV_ID("pclk", "atmel_usba_udc", &udphs_clk),
+ 	CLKDEV_CON_DEV_ID("mci_clk", "at91_mci.0", &mmc0_clk),
+diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
+index cb397be..dc36479 100644
+--- a/arch/arm/mach-at91/at91sam9260.c
++++ b/arch/arm/mach-at91/at91sam9260.c
+@@ -120,7 +120,7 @@ static struct clk ohci_clk = {
+ 	.type		= CLK_TYPE_PERIPHERAL,
+ };
+ static struct clk macb_clk = {
+-	.name		= "macb_clk",
++	.name		= "pclk",
+ 	.pmc_mask	= 1 << AT91SAM9260_ID_EMAC,
+ 	.type		= CLK_TYPE_PERIPHERAL,
+ };
+@@ -190,6 +190,8 @@ static struct clk *periph_clocks[] __initdata = {
+ };
+ 
+ static struct clk_lookup periph_clocks_lookups[] = {
++	/* One additional fake clock for macb_hclk */
++	CLKDEV_CON_ID("hclk", &macb_clk),
+ 	CLKDEV_CON_DEV_ID("spi_clk", "atmel_spi.0", &spi0_clk),
+ 	CLKDEV_CON_DEV_ID("spi_clk", "atmel_spi.1", &spi1_clk),
+ 	CLKDEV_CON_DEV_ID("t0_clk", "atmel_tcb.0", &tc0_clk),
+diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
+index 044f3c9..43c144c 100644
+--- a/arch/arm/mach-at91/at91sam9263.c
++++ b/arch/arm/mach-at91/at91sam9263.c
+@@ -118,7 +118,7 @@ static struct clk pwm_clk = {
+ 	.type		= CLK_TYPE_PERIPHERAL,
+ };
+ static struct clk macb_clk = {
+-	.name		= "macb_clk",
++	.name		= "pclk",
+ 	.pmc_mask	= 1 << AT91SAM9263_ID_EMAC,
+ 	.type		= CLK_TYPE_PERIPHERAL,
+ };
+@@ -182,6 +182,8 @@ static struct clk *periph_clocks[] __initdata = {
+ };
+ 
+ static struct clk_lookup periph_clocks_lookups[] = {
++	/* One additional fake clock for macb_hclk */
++	CLKDEV_CON_ID("hclk", &macb_clk),
+ 	CLKDEV_CON_DEV_ID("pclk", "ssc.0", &ssc0_clk),
+ 	CLKDEV_CON_DEV_ID("pclk", "ssc.1", &ssc1_clk),
+ 	CLKDEV_CON_DEV_ID("mci_clk", "at91_mci.0", &mmc0_clk),
+diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
+index e04c5fb..8abac30 100644
+--- a/arch/arm/mach-at91/at91sam9g45.c
++++ b/arch/arm/mach-at91/at91sam9g45.c
+@@ -144,7 +144,7 @@ static struct clk ac97_clk = {
+ 	.type		= CLK_TYPE_PERIPHERAL,
+ };
+ static struct clk macb_clk = {
+-	.name		= "macb_clk",
++	.name		= "pclk",
+ 	.pmc_mask	= 1 << AT91SAM9G45_ID_EMAC,
+ 	.type		= CLK_TYPE_PERIPHERAL,
+ };
+@@ -202,6 +202,8 @@ static struct clk *periph_clocks[] __initdata = {
+ };
+ 
+ static struct clk_lookup periph_clocks_lookups[] = {
++	/* One additional fake clock for macb_hclk */
++	CLKDEV_CON_ID("hclk", &macb_clk),
+ 	/* One additional fake clock for ohci */
+ 	CLKDEV_CON_ID("ohci_clk", &uhphs_clk),
+ 	CLKDEV_CON_DEV_ID("ehci_clk", "atmel-ehci", &uhphs_clk),
+-- 
+1.7.5.4
