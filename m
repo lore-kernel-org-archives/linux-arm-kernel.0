@@ -1,28 +1,50 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 9 Aug 2011 16:53:34 +0200
-Subject: [PATCHv3 3/9] macb: unify at91 and avr32 platform data
-In-Reply-To: <1312881411-2376-4-git-send-email-jamie@jamieiles.com>
-References: <1312881411-2376-1-git-send-email-jamie@jamieiles.com>
-	<1312881411-2376-4-git-send-email-jamie@jamieiles.com>
-Message-ID: <20110809145334.GJ22213@game.jcrosoft.org>
+From: m.grzeschik@pengutronix.de (Michael Grzeschik)
+Date: Tue,  9 Aug 2011 17:12:43 +0200
+Subject: [PATCH] iomux-mx53: fix PAD_CTRL for I2C1_SDA and I2C1_SCL
+Message-ID: <1312902763-15817-1-git-send-email-m.grzeschik@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10:16 Tue 09 Aug     , Jamie Iles wrote:
-> Both at91 and avr32 defines its own platform data structure for
-> the macb driver and both share common structures though at91
-> includes a currently unused phy_irq_pin.  Create a common
-> macb_platform_data for macb that both at91 and avr32 can use.  In
-> future we can use this to support other architectures that use the
-> same IP block with the macb driver.
-> 
-> v2: rename eth_platform_data to macb_platform_data and allow at91_ether
-> to share the platform data with macb.
-not sure we need to keep this in the commit
-> 
-> Signed-off-by: Jamie Iles <jamie@jamieiles.com>
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Derived from the fsl kernel, this is needed to make connection work on
+the mx53 loco with devices connected to i2c1.
 
-Best Regards,
-J.
+Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
+---
+ arch/arm/plat-mxc/include/mach/iomux-mx53.h |    8 ++++++--
+ 1 files changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx53.h b/arch/arm/plat-mxc/include/mach/iomux-mx53.h
+index 9440b9e..281cc9c 100644
+--- a/arch/arm/plat-mxc/include/mach/iomux-mx53.h
++++ b/arch/arm/plat-mxc/include/mach/iomux-mx53.h
+@@ -30,6 +30,10 @@
+ #define MX53_SDHC_PAD_CTRL 	(PAD_CTL_HYS | PAD_CTL_PKE | PAD_CTL_PUE | \
+ 				PAD_CTL_PUS_47K_UP | PAD_CTL_DSE_HIGH | \
+ 				PAD_CTL_SRE_FAST)
++#define MX53_I2C_PAD_CTRL_2	(PAD_CTL_SRE_FAST | PAD_CTL_ODE | \
++				PAD_CTL_PKE | PAD_CTL_PUE | \
++				PAD_CTL_DSE_HIGH | PAD_CTL_PUS_100K_UP | \
++				PAD_CTL_HYS)
+ 
+ #define _MX53_PAD_GPIO_19__KPP_COL_5		IOMUX_PAD(0x348, 0x20, 0, 0x840, 0, 0)
+ #define _MX53_PAD_GPIO_19__GPIO4_5		IOMUX_PAD(0x348, 0x20, 1, 0x0, 0, 0)
+@@ -1536,7 +1540,7 @@
+ #define MX53_PAD_CSI0_DAT8__KPP_COL_7		(_MX53_PAD_CSI0_DAT8__KPP_COL_7 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_CSI0_DAT8__ECSPI2_SCLK		(_MX53_PAD_CSI0_DAT8__ECSPI2_SCLK | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_CSI0_DAT8__USBOH3_USBH3_OC		(_MX53_PAD_CSI0_DAT8__USBOH3_USBH3_OC | MUX_PAD_CTRL(NO_PAD_CTRL))
+-#define MX53_PAD_CSI0_DAT8__I2C1_SDA		(_MX53_PAD_CSI0_DAT8__I2C1_SDA | MUX_PAD_CTRL(NO_PAD_CTRL))
++#define MX53_PAD_CSI0_DAT8__I2C1_SDA		(_MX53_PAD_CSI0_DAT8__I2C1_SDA | MUX_PAD_CTRL(MX53_I2C_PAD_CTRL_2))
+ #define MX53_PAD_CSI0_DAT8__EMI_EMI_DEBUG_37		(_MX53_PAD_CSI0_DAT8__EMI_EMI_DEBUG_37 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_CSI0_DAT8__TPIU_TRACE_5		(_MX53_PAD_CSI0_DAT8__TPIU_TRACE_5 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_CSI0_DAT9__IPU_CSI0_D_9		(_MX53_PAD_CSI0_DAT9__IPU_CSI0_D_9 | MUX_PAD_CTRL(NO_PAD_CTRL))
+@@ -1544,7 +1548,7 @@
+ #define MX53_PAD_CSI0_DAT9__KPP_ROW_7		(_MX53_PAD_CSI0_DAT9__KPP_ROW_7 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_CSI0_DAT9__ECSPI2_MOSI		(_MX53_PAD_CSI0_DAT9__ECSPI2_MOSI | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_CSI0_DAT9__USBOH3_USBH3_PWR		(_MX53_PAD_CSI0_DAT9__USBOH3_USBH3_PWR | MUX_PAD_CTRL(NO_PAD_CTRL))
+-#define MX53_PAD_CSI0_DAT9__I2C1_SCL		(_MX53_PAD_CSI0_DAT9__I2C1_SCL | MUX_PAD_CTRL(NO_PAD_CTRL))
++#define MX53_PAD_CSI0_DAT9__I2C1_SCL		(_MX53_PAD_CSI0_DAT9__I2C1_SCL | MUX_PAD_CTRL(MX53_I2C_PAD_CTRL_2))
+ #define MX53_PAD_CSI0_DAT9__EMI_EMI_DEBUG_38		(_MX53_PAD_CSI0_DAT9__EMI_EMI_DEBUG_38 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_CSI0_DAT9__TPIU_TRACE_6		(_MX53_PAD_CSI0_DAT9__TPIU_TRACE_6 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_CSI0_DAT10__IPU_CSI0_D_10		(_MX53_PAD_CSI0_DAT10__IPU_CSI0_D_10 | MUX_PAD_CTRL(NO_PAD_CTRL))
+-- 
+1.7.5.4
