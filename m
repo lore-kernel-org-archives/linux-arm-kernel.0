@@ -1,48 +1,53 @@
 From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Tue, 09 Aug 2011 15:41:35 +0400
-Subject: [PATCH] atmel_serial: fix atmel_default_console_device
-In-Reply-To: <loom.20110808T170457-559@post.gmane.org>
-References: <1307541740.10626.15.camel@hcegtvedt.norway.atmel.com>
-	<1308666679-12111-1-git-send-email-plagnioj@jcrosoft.com>
-	<loom.20110808T170457-559@post.gmane.org>
-Message-ID: <4E411CEF.10004@ru.mvista.com>
+Date: Tue, 09 Aug 2011 15:48:05 +0400
+Subject: [PATCH 4/6] ARM: smp: set thread_info->cpu to hardware CPU number
+	for boot thread
+In-Reply-To: <1312823424-9654-5-git-send-email-will.deacon@arm.com>
+References: <1312823424-9654-1-git-send-email-will.deacon@arm.com>
+	<1312823424-9654-5-git-send-email-will.deacon@arm.com>
+Message-ID: <4E411E75.90402@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello.
 
-On 08-08-2011 19:10, Nikolaus Voss wrote:
+On 08-08-2011 21:10, Will Deacon wrote:
 
-> reflect new static uart platform ids introduced by patch
-> http://article.gmane.org/gmane.linux.kernel/1126105
+> On ARM, Linux assumes that the boot CPU has ID 0. If this ends up being
+> out of sync with the hardware CPU number, we will configure the GIC
+> incorrectly and route interrupts to the CPU with hardware ID 0.
 
-> Signed-off-by: Nikolaus Voss<n.voss@weinmannn.de>
+> This patch implements smp_setup_processor_id for ARM, using the MPIDR to
+> set the CPU of the boot thread.
 
+> Signed-off-by: Will Deacon<will.deacon@arm.com>
 > ---
->   drivers/tty/serial/atmel_serial.c |    7 ++++---
->   1 files changed, 4 insertions(+), 3 deletions(-)
+>   arch/arm/kernel/smp.c |   16 ++++++++++++++++
+>   1 files changed, 16 insertions(+), 0 deletions(-)
 
-> diff --git a/drivers/tty/serial/atmel_serial.c \
-> 	b/drivers/tty/serial/atmel_serial.c
-> index af9b781..29c7857 100644
-> --- a/drivers/tty/serial/atmel_serial.c
-> +++ b/drivers/tty/serial/atmel_serial.c
-> @@ -1609,9 +1609,10 @@ static struct console atmel_console = {
->   static int __init atmel_console_init(void)
->   {
->   	if (atmel_default_console_device) {
-> -		add_preferred_console(ATMEL_DEVICENAME,
-> -				      atmel_default_console_device->id, NULL);
-> -		atmel_init_port(&atmel_ports[atmel_default_console_device->id],
-> +		struct atmel_uart_data *pdata =
-> +			atmel_default_console_device->dev.platform_data;
+> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+> index d88ff02..8e60a4f 100644
+> --- a/arch/arm/kernel/smp.c
+> +++ b/arch/arm/kernel/smp.c
+> @@ -259,6 +259,22 @@ void __ref cpu_die(void)
+>   }
+>   #endif /* CONFIG_HOTPLUG_CPU */
+>
+> +void __init smp_setup_processor_id(void)
+> +{
+> +	u32 mpidr;
+> +
+> +	/* Read the MPIDR to find the hardware ID of the current CPU. */
+> +	asm("1:		mrc	p15, 0, %0, c0, c0, 5\n"
+> +	    "		.pushsection \".alt.smp.init\", \"a\"\n"
+> +	    "		.long	1b\n"
+> +	    "		mov	%0, #0\n"
+> +	    "		.popsection"
+> +	    : "=r" (mpidr));
+> +
+> +	current_thread_info()->cpu = mpidr&  0xff;
+> +	printk("Booting Linux on CPU %d\n", current_thread_info()->cpu);
 
-    Would be good to have empty line after the declaration...
-
-> +		add_preferred_console(ATMEL_DEVICENAME, pdata->num, NULL);
-> +		atmel_init_port(&atmel_ports[pdata->num],
->   				atmel_default_console_device);
->   		register_console(&atmel_console);
->   	}
+    printk() should have the KERN_* logging facility.
 
 WBR, Sergei
