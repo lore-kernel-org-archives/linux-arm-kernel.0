@@ -1,55 +1,56 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 9 Aug 2011 15:50:22 -0600
-Subject: [PATCH 00/13] Clean up mach/gpio.h headers
-In-Reply-To: <20110809213230.GC14281@n2100.arm.linux.org.uk>
-References: <20110809080411.GA1831@n2100.arm.linux.org.uk>
-	<20110809210055.GF11568@ponder.secretlab.ca>
-	<20110809213230.GC14281@n2100.arm.linux.org.uk>
-Message-ID: <20110809215022.GL11568@ponder.secretlab.ca>
+From: scottwood@freescale.com (Scott Wood)
+Date: Tue, 9 Aug 2011 16:52:27 -0500
+Subject: How to handle named resources with DT?
+In-Reply-To: <4E41AA43.1000506@ti.com>
+References: <4E40FC88.5090403@ti.com>
+	<20110809162907.GA630@manju-WNB7PBC4801-0006>
+	<4E4166F0.9050401@ti.com>
+	<CACxGe6tbEW1EZhqXy78EZVM_sQLH0Qbr7QOzbgbsKBRn1FtVrg@mail.gmail.com>
+	<4E4172A8.3030101@ti.com> <4E417BD5.8080409@freescale.com>
+	<20110809205723.GE11568@ponder.secretlab.ca>
+	<4E41A1B9.1060400@ti.com>
+	<20110809211747.GJ11568@ponder.secretlab.ca>
+	<4E41AA43.1000506@ti.com>
+Message-ID: <4E41AC1B.5040002@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 09, 2011 at 10:32:30PM +0100, Russell King - ARM Linux wrote:
-> On Tue, Aug 09, 2011 at 03:00:55PM -0600, Grant Likely wrote:
-> > On Tue, Aug 09, 2011 at 09:04:12AM +0100, Russell King - ARM Linux wrote:
-> > > This is a preliminary posting of my gpio patch set.
-> > > 
-> > > This patch series moves the trivial gpiolib implementations out of
-> > > mach/gpio.h and into asm/gpio.h.
-> > > 
-> > > As a side effect of that, most of this patch series is about fixing up
-> > > direct includes of mach/gpio.h - this is something I've been on at
-> > > people over the last year or more about ensuring that they use
-> > > linux/gpio.h in preference.  While I've blindly converted all arch/arm
-> > > to use linux/gpio.h (with the exception of mach/ includes which are
-> > > converted to asm/gpio.h), drivers were only converted to asm/gpio.h.
-> > > These should be reviewed and changed to linux/gpio.h.
-> > > 
-> > > As a result of this patch series, several mach/gpio.h end up being
-> > > empty.
-> > > 
-> > > Many others just contain platform private GPIO APIs and definitions.
-> > > 
-> > > The last thing which mach/gpio.h is used for is to provide a definition
-> > > for ARCH_GPIO_NR to asm-generic/gpio.h.  I've not attempted to solve
-> > > that issue yet.
-> > > 
-> > > A small number of platforms optimize the gpio accessors for on-SoC
-> > > GPIOs.  In the interests of consolidation, these will have to be killed
-> > > but this patch set does not do that yet.
-> > > 
-> > > Lastly, several {mach,plat}/gpio.h needs to be looked at with a view to
-> > > deleting the direct include of asm-generic/gpio.h.
-> > 
-> > Looks good to me, though I haven't looked closely.  I imagine this
-> > should get merged via a branch in the arm-soc tree?
+On 08/09/2011 04:44 PM, Cousson, Benoit wrote:
+> OK, so what about extending the reg attribute to be a reg node?
 > 
-> And this is where the existence of the arm-soc tree makes things more
-> difficult for me.  I'd normally just keep it as a separate branch in
-> my own tree.  What I do now, I've no idea.
+> dev {
+>     reg {
+>         name = "foo_wrapper";
+>         start = <0x10000>;
+>         end = <0x200>;
+>     }
+>     reg {
+>         name = "foo";
+>         start = <0x20000>;
+>         end = <0x200>;
+>     }
+> }
+> 
+> A little bit more verbose, but at least we can add any attribute we want.
 
-A separate branch in your tree works too.  It could even get pulled
-into the arm-soc tree so that it gets picked up by the daily
-integration test before going on to linux-next.
+A more standard way to do that would be something like:
 
-g.
+dev {
+	#address-cells = <1>;
+	#size-cells = <1>;
+	ranges;
+
+	foo {
+		reg = <0x10000 0x200>;
+	};
+	bar {
+		reg = <0x20000 0x200>;
+	};
+};
+
+...which is OK if you need the expressiveness of a full hierarchy (and
+don't have some other meaning for child nodes of "dev"), but it seems
+like it would be overkill for some places where named resources would be
+useful.
+
+-Scott
