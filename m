@@ -1,111 +1,17 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Tue, 9 Aug 2011 23:37:10 +0200
-Subject: How to handle named resources with DT?
-In-Reply-To: <20110809211657.GI11568@ponder.secretlab.ca>
-References: <4E40FC88.5090403@ti.com>
-	<20110809162907.GA630@manju-WNB7PBC4801-0006>
-	<4E4166F0.9050401@ti.com>
-	<CACxGe6tbEW1EZhqXy78EZVM_sQLH0Qbr7QOzbgbsKBRn1FtVrg@mail.gmail.com>
-	<4E4172A8.3030101@ti.com>
-	<20110809205542.GD11568@ponder.secretlab.ca>
-	<4E41A156.3030407@ti.com>
-	<20110809211657.GI11568@ponder.secretlab.ca>
-Message-ID: <4E41A886.30205@ti.com>
+From: twrice@blumail.org (SGT Tamara W. Rice)
+Date: Wed, 10 Aug 2011 09:38:46 +1200
+Subject: U.S. ARMY USARPAC Medical Team
+Message-ID: <E1Qqu0c-0000HP-K9@server.sparx.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/9/2011 11:16 PM, Grant Likely wrote:
-> On Tue, Aug 09, 2011 at 11:06:30PM +0200, Cousson, Benoit wrote:
->> On 8/9/2011 10:55 PM, Grant Likely wrote:
->>> On Tue, Aug 09, 2011 at 07:47:20PM +0200, Cousson, Benoit wrote:
->>>> On 8/9/2011 7:23 PM, Grant Likely wrote:
->>>>> On Tue, Aug 9, 2011 at 10:57 AM, Cousson, Benoit<b-cousson@ti.com>    wrote:
->>>>>> Hi Manju,
->>>>>>
->>>>>> On 8/9/2011 6:29 PM, G, Manjunath Kondaiah wrote:
->>>>>>>
->>>>>>> Hi Benoit,
->>>>>>>
->>>>>>> On Tue, Aug 09, 2011 at 11:23:20AM +0200, Cousson, Benoit wrote:
->>>>>>>>
->>>>>>>> Hi Grant,
->>>>>>>>
->>>>>>>> Trying to bind hwmod informations with DT, I'm facing a little
->>>>>>>> limitation.
->>>>>>>> A bunch of drivers are using the platform_get_resource_byname, so
->>>>>>>> the name for the resource is needed.
->>>>>>>>
->>>>>>>> The name is used so far for IORESOURCE_MEM, IORESOURCE_IRQ and
->>>>>>>> IORESOURCE_DMA types of resources.
->>>>>>>
->>>>>>> IORESOURCE_MEM and IORESOURCE_IRQ's are fetched from dt blob and
->>>>>>> it will be part of pdev.
->>>>>>
->>>>>> Yes, but without the proper name in the resource structure. It will be then
->>>>>> impossible to use the platform_get_resource_byname function that is
->>>>>> currently used by a bunch of drivers.
->>>>>
->>>>> There is no analogous mechanism for _byname in the device tree.  The
->>>>> DT binding for a device must explicitly state what order the register
->>>>> ranges are in.  The driver will need to be adapted.
->>>>
->>>> That seems to be a small regression for my point of view. Relying on
->>>> the order is not super safe. This is not very readable either.
->>>> That's for that exact reason that we changed our drivers to use
->>>> platform_get_resource_byname. That's probably the reason why that
->>>> API is there as well.
->>>> For the same IP, the number of entries can vary depending of the SoC
->>>> revision.
->>>> By using the _byname, we can check if the resource is there or not
->>>> without having to care about the position.
->>>
->>> We've done it that way for a very long time with the device tree.  If
->>> you want to do something by name, then propose a binding that will
->>> make it work alongside the existing scheme.
->>>
->>>>
->>>>>>> For IORESOURCE_DMA, you can have property
->>>>>>> "dma-channel" in dtsi file and fetch dma-channel in driver probe
->>>>>>> through "of_property_read_u32()" api.
->>>>>>
->>>>>> That will not be enough to get the name. So maybe something like:
->>>>>>         dmas =<12>, "rx_req",<13>, "tx_req";
->>>>>> will be doable.
->>>>>> The issue is that the name is optional so managing the multiple entries
->>>>>> might be tricky.
->>>>>
->>>>> DMA channels will never show up in the resource structure anyway.
->>>>
->>>> Can you elaborate on that point? AFAIK, IORESOURCE_DMA is already
->>>> used today.
->>>
->>> IORESOURCE_DMA is a Linux construct, as is IORESOURCE_IRQ and
->>> IORESOURCE_MEM.  However, IRQ and MEM can be directly mapped from the
->>> common 'reg' and 'interrupts' bindings used by pretty much all device
->>> tree nodes.  Therefore common code can be written to translate MEM and
->>> IRQ that will always work.  There is no such common binding in place
->>> for DMA regions, so common setup code cannot do it transparently for
->>> the device driver.
->>
->> OK, sure, I get your point now. I was thinking about a "potential"
->> dma support from the core DT, since this is very similar to IRQ.
->>
->> Otherwise, we can do it OMAP specific if nobody else care about
->> that. But I still think it should be useful for other platforms.
->
-> I think people care, and it will be a net win, but it does mean you
-> need do the work of crafting a binding that will work for a large
-> proportion of SoCs.
+Hello...............
 
-The devil is in the details, but the way the DMA lines are connected in 
-OMAP is similar to IRQ lines, and maybe a little bit simpler.
+My name is SGT Tamara W. Rice I need assistance: I am of one of US Military forces, and one of the few thousands still stationed in Iraq, I need to discuss some personal matter with you. I know that it would be difficult to trust someone you hardly know because of the numerous scams transmitted via the Internet, but I am willing to send to you adequate proof of my identity as soon as we agree to work together, and of course if I can be assured that you will not use that and any other information I would be sharing with you against me in anyway, if my intentions are genuine, and for our mutual benefit.
 
-So starting with a copy/paste of the of_irq file should be a good start.
-And then the issues will start:-)
+As you may be aware, the US government, the Treasury department, and the Federal reserve Board have concluded plans to change the face of the US dollar bills because of counterfeiting as they claim, and the 100 bill made its debut since Wednesday, April 21st, 2010.
 
-Benoit
+I will be in some kind of mess if I cannot find a solution to take care of some very large amount of money in USdollar bills that I have concealed here for 9 months. I will require someone outside Iraq to take care of the pickup, and that is what I want us to discuss. And to know what you will be willing to get as your share for the role you will play if we agree to work together. Please contact me so we can discuss the details, and should you have any reasons to reject this offer, please delete this mail and I will never bother you again. I appreciate your understanding.
 
-
->
-> g.
->
+Respectfully,
+SGT Tamara W. Rice
