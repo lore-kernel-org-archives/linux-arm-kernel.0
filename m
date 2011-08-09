@@ -1,55 +1,58 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 9 Aug 2011 21:50:40 +0200
-Subject: [PATCH 07/18] dmaengine/amba-pl08x: Enable/Disable amba_pclk with
-	channel requests
-In-Reply-To: <20110803125524.GC23953@n2100.arm.linux.org.uk>
-References: <cover.1311936523.git.viresh.kumar@st.com>
-	<96781d46e41fa6ffc04b88527a25d73f5a59eda8.1311936524.git.viresh.kumar@st.com>
-	<20110730120740.GA15791@n2100.arm.linux.org.uk>
-	<20110730130537.GB15791@n2100.arm.linux.org.uk>
-	<CAKnu2MqTYF43wW3axM--jXdtvsCyRBTLEHDc3hPoJYAmTAL5UA@mail.gmail.com>
-	<CAKnu2MppEKxZD2Z77tfShMfG80d-Xx26yBGhZtJkJ2C6SjE=1w@mail.gmail.com>
-	<20110731170451.GC2975@n2100.arm.linux.org.uk>
-	<CACRpkdZTsD=7woN1qV-sFpsJTyT0LQBq+q=xTOwuewAk=ijBjQ@mail.gmail.com>
-	<20110803125524.GC23953@n2100.arm.linux.org.uk>
-Message-ID: <CACRpkdYasq+Ha1K4Guma9XqJub348QgXDK9=Jnr6CzAj0Zf9pA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 9 Aug 2011 20:51:14 +0100
+Subject: How to handle named resources with DT?
+In-Reply-To: <4E40FC88.5090403@ti.com>
+References: <4E40FC88.5090403@ti.com>
+Message-ID: <20110809195114.GB14281@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 3, 2011 at 2:55 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Aug 02, 2011 at 11:05:38AM +0200, Linus Walleij wrote:
->> On Sun, Jul 31, 2011 at 7:04 PM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->> > On Sun, Jul 31, 2011 at 02:04:47AM +0200, Linus Walleij wrote:
->> >>
->> >> ..and while it will just cause some double refcounts on the clock,
->> >> it makes sense to delete the pclk manipulation from the PL022
->> >> driver code as part of the patch, like this:
->> >
->> > Yes, this looks fine. ?Shall I wrap it up as part of my patch?
->>
->> Yes please.
->> Acked-by.
+On Tue, Aug 09, 2011 at 11:23:20AM +0200, Cousson, Benoit wrote:
+> Hi Grant,
 >
-> Can you give this a try - this adds runtime PM to the primecell core,
-> updates the SPI driver for those changes, and adds runtime PM to the
-> MMCI driver. ?I've briefly tested this on Versatile PB926, though
-> obviously not the SPI stuff very much because Versatile has no SPI
-> peripherals.
+> Trying to bind hwmod informations with DT, I'm facing a little limitation.
+> A bunch of drivers are using the platform_get_resource_byname, so the  
+> name for the resource is needed.
 >
-> I chose the PCI methodology to this - rather than having every driver
-> fiddle about with enabling runtime PM, that's dealt with in the core
-> and instead, drivers just do a put() in their probe and a balancing
-> get() in their remove function to activate runtime PM for the device.
+> The name is used so far for IORESOURCE_MEM, IORESOURCE_IRQ and  
+> IORESOURCE_DMA types of resources.
+>
+> Do you have any plan to add that, or do you have any clean way to avoid  
+> that without having to use the resource index?
 
-Sorry for the delay.
+Named resources are evil.  You only have to look at /proc/iomem to see
+why that's the case.  Here's an example:
 
-It works like a charm. I've tested it on U300 with a loopback test
-and MMC and for both it works perfectly and the reference
-counter goes to zero when unused.
+b7a01000-b7a01003 : set
+  b7a01000-b7a01003 : set
+b7a01004-b7a01007 : dat
+  b7a01004-b7a01007 : dat
+b7a01008-b7a0100b : dirout
+  b7a01008-b7a0100b : dirout
+b7a01020-b7a01023 : set
+  b7a01020-b7a01023 : set
+b7a01024-b7a01027 : dat
+  b7a01024-b7a01027 : dat
+b7a01028-b7a0102b : dirout
+  b7a01028-b7a0102b : dirout
+b7a01040-b7a01043 : set
+  b7a01040-b7a01043 : set
+b7a01044-b7a01047 : dat
+  b7a01044-b7a01047 : dat
+b7a01048-b7a0104b : dirout
+  b7a01048-b7a0104b : dirout
+b7a01060-b7a01063 : set
+  b7a01060-b7a01063 : set
+b7a01064-b7a01067 : dat
+  b7a01064-b7a01067 : dat
+b7a01068-b7a0106b : dirout
+  b7a01068-b7a0106b : dirout
+b7a01080-b7a01083 : set
+  b7a01080-b7a01083 : set
+b7a01084-b7a01087 : dat
+  b7a01084-b7a01087 : dat
+b7a01088-b7a0108b : dirout
+  b7a01088-b7a0108b : dirout
 
-Tested-by: Linus Walleij <linus.walleij@linaro.org>
-
-Yours,
-Linus Walleij
+How very informative.  Not.  So what device owns those?  Who knows,
+that's lost by the crappy named resource stuff.
