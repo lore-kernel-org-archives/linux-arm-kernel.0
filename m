@@ -1,41 +1,94 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 9 Aug 2011 10:44:29 -0700
-Subject: Tegra pinmux Device Tree support
-In-Reply-To: <20110809173428.GB32195@ponder.secretlab.ca>
-References: <74CDBE0F657A3D45AFBB94109FB122FF049F17229E@HQMAIL01.nvidia.com>
-	<20110809173428.GB32195@ponder.secretlab.ca>
-Message-ID: <CAOesGMjH8hZSAXvDZ6ADO-dtFNecRYC5GsfRiAeV8KMRG=JTkQ@mail.gmail.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Tue, 9 Aug 2011 19:47:20 +0200
+Subject: How to handle named resources with DT?
+In-Reply-To: <CACxGe6tbEW1EZhqXy78EZVM_sQLH0Qbr7QOzbgbsKBRn1FtVrg@mail.gmail.com>
+References: <4E40FC88.5090403@ti.com>
+	<20110809162907.GA630@manju-WNB7PBC4801-0006>
+	<4E4166F0.9050401@ti.com>
+	<CACxGe6tbEW1EZhqXy78EZVM_sQLH0Qbr7QOzbgbsKBRn1FtVrg@mail.gmail.com>
+Message-ID: <4E4172A8.3030101@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 9, 2011 at 10:34 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
-
-> We talked about this a bit at Linaro connect. ?Outside of the more
-> complex runtime-reconfiguration of pin mux, there is a general need
-> for arbitrary initialization sequences to registers. ?Also, pretty
-> much exactly what you need for tegra is needed for imx, omap and many
-> others. ?The though was, rather than trying to come up with some kind
-> of pinmux-specific binding for pin states, which could end up being
-> very verbose if everything was split out into properties, we could
-> instead have a binding for register initialization sequences.
-> Something like this:
+On 8/9/2011 7:23 PM, Grant Likely wrote:
+> On Tue, Aug 9, 2011 at 10:57 AM, Cousson, Benoit<b-cousson@ti.com>  wrote:
+>> Hi Manju,
+>>
+>> On 8/9/2011 6:29 PM, G, Manjunath Kondaiah wrote:
+>>>
+>>> Hi Benoit,
+>>>
+>>> On Tue, Aug 09, 2011 at 11:23:20AM +0200, Cousson, Benoit wrote:
+>>>>
+>>>> Hi Grant,
+>>>>
+>>>> Trying to bind hwmod informations with DT, I'm facing a little
+>>>> limitation.
+>>>> A bunch of drivers are using the platform_get_resource_byname, so
+>>>> the name for the resource is needed.
+>>>>
+>>>> The name is used so far for IORESOURCE_MEM, IORESOURCE_IRQ and
+>>>> IORESOURCE_DMA types of resources.
+>>>
+>>> IORESOURCE_MEM and IORESOURCE_IRQ's are fetched from dt blob and
+>>> it will be part of pdev.
+>>
+>> Yes, but without the proper name in the resource structure. It will be then
+>> impossible to use the platform_get_resource_byname function that is
+>> currently used by a bunch of drivers.
 >
-> ? ? ? ?pinmux-initseq = <reg1 value1> <reg1 value2> ...;
+> There is no analogous mechanism for _byname in the device tree.  The
+> DT binding for a device must explicitly state what order the register
+> ranges are in.  The driver will need to be adapted.
+
+That seems to be a small regression for my point of view. Relying on the 
+order is not super safe. This is not very readable either. That's for 
+that exact reason that we changed our drivers to use 
+platform_get_resource_byname. That's probably the reason why that API is 
+there as well.
+For the same IP, the number of entries can vary depending of the SoC 
+revision.
+By using the _byname, we can check if the resource is there or not 
+without having to care about the position.
+
+>>> For IORESOURCE_DMA, you can have property
+>>> "dma-channel" in dtsi file and fetch dma-channel in driver probe
+>>> through "of_property_read_u32()" api.
+>>
+>> That will not be enough to get the name. So maybe something like:
+>>         dmas =<12>, "rx_req",<13>, "tx_req";
+>> will be doable.
+>> The issue is that the name is optional so managing the multiple entries
+>> might be tricky.
 >
-> And then add some macros for DTC to make it easier to define things
-> like pinmux setup tables. ?Although the binding above is probably too
-> simple and naive.
+> DMA channels will never show up in the resource structure anyway.
 
-This seems to break the philosophy of what the device tree should do
--- it should describe the hardware so that the driver will know how to
-program it, not include the code itself?
+Can you elaborate on that point? AFAIK, IORESOURCE_DMA is already used 
+today.
 
-I know it's a hairy problem to deal with one compact pinmux
-representation that fits all needs. Maybe making it overly generic is
-the wrong way to go about it, and let each implementation define what
-it needs? That way the simpler implementations can do something
-reasonably simple without having to deal with the overly complex
-options of the (over?) generalized platforms out there.
+> The
+> common code only takes care of translating IRQ and register ranges.
+> For DMA you'll need a binding for the dma channels.  You can either
+> make them explicitly ordered, or use different property names for each
+> of the dma channels.
 
+FWIW, DMA channel != DMA request. The DMA request is a physical line 
+that is connected to a DMA controller. It is similar to an IRQ connected 
+to an interrupt controller. It is a HW resource like an IRQ.
+The DMA channel is a logical entry in the DMA controller that will be 
+used by the driver.
 
--Olof
+>> BTW, it's strange that a default support does not exist for dma request (and
+>> not channel).
+>> The mechanism is similar to irq line, and quite standard to many SoC AFAIK.
+>> Or maybe I missed it.
+>
+> DMA channels haven't historically had the same global scope that irq
+> numbers have.  There hasn't been a pressing need up to now to have
+> common infrastructure, though it is probably a good idea to define a
+> common binding.
+
+Cool, I think so as well.
+
+Regards,
+Benoit
