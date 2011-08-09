@@ -1,17 +1,86 @@
-From: twrice@blumail.org (SGT Tamara W. Rice)
-Date: Wed, 10 Aug 2011 09:38:46 +1200
-Subject: U.S. ARMY USARPAC Medical Team
-Message-ID: <E1Qqu0c-0000HP-K9@server.sparx.co.nz>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Tue, 9 Aug 2011 14:40:05 -0700
+Subject: [PATCH 4/5 V2] ARM: tegra: paz00: add clocks required for
+	usboperation
+In-Reply-To: <201108092126.28521.marvin24@gmx.de>
+References: <201108092126.28521.marvin24@gmx.de>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF04A06873BB@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello...............
+Marc Dietrich wrote at Tuesday, August 09, 2011 1:26 PM:
+> On Tuesday 09 August 2011 20:35:45 you wrote:
+> > Marc Dietrich wrote at Tuesday, August 09, 2011 12:29 PM:
+> > > These clocks are required for usb operation.
+> > > ---
+> > >
+> > >  arch/arm/mach-tegra/board-paz00.c |    6 ++++++
+> > >  1 files changed, 6 insertions(+), 0 deletions(-)
+> > >
+> > > diff --git a/arch/arm/mach-tegra/board-paz00.c
+> > > b/arch/arm/mach-tegra/board-paz00.c index 45111f6..89a3dda 100644
+> > > --- a/arch/arm/mach-tegra/board-paz00.c
+> > > +++ b/arch/arm/mach-tegra/board-paz00.c
+> > > @@ -145,6 +145,12 @@ static __initdata struct tegra_clk_init_table
+> > > paz00_clk_init_table[] = {
+> > >
+> > >  	/* name		parent		rate		enabled */
+> > >  	{ "uarta",	"pll_p",	216000000,	true },
+> > >  	{ "uartd",	"pll_p",	216000000,	true },
+> > >
+> > > +
+> > > +	{ "pll_p_out4",	"pll_p",	24000000,	true },
+> >
+> > Do you need the pll_p_out4 entry? What's that driving? Check in
+> > /sys/kernel/debug/clock/clock_tree (/sys/kernel/debug is debugfs).
+> 
+> I think it is only required to setup the correct (non-standard?) frequency.
+> Seems all other boards use 108 MHz which cause one of the ports to fail. Don't
+> ask me for details ...
+...
+> root at ac100:~# cat /sys/kernel/debug/clock/clock_tree
+>    clock                          state  ref div      rate
+> --------------------------------------------------------------
+>    clk_m                          on     9            12000000
+...
+>       pll_p                       on     10  x18      216000000
+...
+>          pll_p_out4               on     3   9        24000000
+>             sclk                  on     2            24000000
+>                avp.sclk           off    0            24000000
+>                cop                on     1            24000000
+>                hclk               on     2   1        24000000
+>                   pclk            on     2   2        12000000
+>                      apbdma       on     1   1        12000000
 
-My name is SGT Tamara W. Rice I need assistance: I am of one of US Military forces, and one of the few thousands still stationed in Iraq, I need to discuss some personal matter with you. I know that it would be difficult to trust someone you hardly know because of the numerous scams transmitted via the Internet, but I am willing to send to you adequate proof of my identity as soon as we agree to work together, and of course if I can be assured that you will not use that and any other information I would be sharing with you against me in anyway, if my intentions are genuine, and for our mutual benefit.
+Hmm. That's pretty odd.
 
-As you may be aware, the US government, the Treasury department, and the Federal reserve Board have concluded plans to change the face of the US dollar bills because of counterfeiting as they claim, and the 100 bill made its debut since Wednesday, April 21st, 2010.
+With the standard kernel the device ships with, what does the clock tree
+under pll_p_out4 look like? It'd be very interesting to compare that. If
+that setup is the same as what this patch sets up, the patch seems fine.
 
-I will be in some kind of mess if I cannot find a solution to take care of some very large amount of money in USdollar bills that I have concealed here for 9 months. I will require someone outside Iraq to take care of the pickup, and that is what I want us to discuss. And to know what you will be willing to get as your share for the role you will play if we agree to work together. Please contact me so we can discuss the details, and should you have any reasons to reject this offer, please delete this mail and I will never bother you again. I appreciate your understanding.
+As far as I know all the clocks there are both unrelated to USB, and
+internal to the device, so the board shouldn't have any effect. In
+particular, avp.sclk/cop are for the internal media CPU/DSP, hclk/pclk
+are the internal AHB/APB bus clocks, and apbdma is for an internal DMA
+engine, currently only used for audio in the mainline kernel at least.
 
-Respectfully,
-SGT Tamara W. Rice
+I guess I'll ask a few people internally to see if they have a clue why
+your change might be necessary.
+
+For reference, here's Harmony on something roughly like linux-next:
+
+   clk_m                          on     7            12000000  
+...
+      pll_p                       on     9   x18      216000000 
+...
+         pll_p_out4               on     2   2        108000000 
+            sclk                  on     2            108000000 
+               avp.sclk           off    0            108000000 
+               cop                on     1            108000000 
+               hclk               on     2   1        108000000 
+                  pclk            on     2   2        54000000  
+                     apbdma       on     1   1        54000000
+
+-- 
+nvpublic
