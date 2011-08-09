@@ -1,53 +1,40 @@
 From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Tue, 09 Aug 2011 15:48:05 +0400
-Subject: [PATCH 4/6] ARM: smp: set thread_info->cpu to hardware CPU number
-	for boot thread
-In-Reply-To: <1312823424-9654-5-git-send-email-will.deacon@arm.com>
-References: <1312823424-9654-1-git-send-email-will.deacon@arm.com>
-	<1312823424-9654-5-git-send-email-will.deacon@arm.com>
-Message-ID: <4E411E75.90402@ru.mvista.com>
+Date: Tue, 09 Aug 2011 16:06:14 +0400
+Subject: [PATCH 06/13] ARM: gpio: davinci: convert drivers to use
+	asm/gpio.h rather than mach/gpio.h
+In-Reply-To: <E1QqhKP-0003aK-9R@rmk-PC.arm.linux.org.uk>
+References: <20110809080411.GA1831@n2100.arm.linux.org.uk>
+	<E1QqhKP-0003aK-9R@rmk-PC.arm.linux.org.uk>
+Message-ID: <4E4122B6.2070706@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello.
 
-On 08-08-2011 21:10, Will Deacon wrote:
+On 09-08-2011 12:06, Russell King - ARM Linux wrote:
 
-> On ARM, Linux assumes that the boot CPU has ID 0. If this ends up being
-> out of sync with the hardware CPU number, we will configure the GIC
-> incorrectly and route interrupts to the CPU with hardware ID 0.
+    CCing linux-usb and Felipe...
 
-> This patch implements smp_setup_processor_id for ARM, using the MPIDR to
-> set the CPU of the boot thread.
-
-> Signed-off-by: Will Deacon<will.deacon@arm.com>
+> Signed-off-by: Russell King<rmk+kernel@arm.linux.org.uk>
 > ---
->   arch/arm/kernel/smp.c |   16 ++++++++++++++++
->   1 files changed, 16 insertions(+), 0 deletions(-)
+>   drivers/usb/musb/davinci.c |    2 +-
+>   1 files changed, 1 insertions(+), 1 deletions(-)
 
-> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-> index d88ff02..8e60a4f 100644
-> --- a/arch/arm/kernel/smp.c
-> +++ b/arch/arm/kernel/smp.c
-> @@ -259,6 +259,22 @@ void __ref cpu_die(void)
->   }
->   #endif /* CONFIG_HOTPLUG_CPU */
+> diff --git a/drivers/usb/musb/davinci.c b/drivers/usb/musb/davinci.c
+> index 8bdf25a..f9a3f62 100644
+> --- a/drivers/usb/musb/davinci.c
+> +++ b/drivers/usb/musb/davinci.c
+> @@ -35,7 +35,7 @@
 >
-> +void __init smp_setup_processor_id(void)
-> +{
-> +	u32 mpidr;
-> +
-> +	/* Read the MPIDR to find the hardware ID of the current CPU. */
-> +	asm("1:		mrc	p15, 0, %0, c0, c0, 5\n"
-> +	    "		.pushsection \".alt.smp.init\", \"a\"\n"
-> +	    "		.long	1b\n"
-> +	    "		mov	%0, #0\n"
-> +	    "		.popsection"
-> +	    : "=r" (mpidr));
-> +
-> +	current_thread_info()->cpu = mpidr&  0xff;
-> +	printk("Booting Linux on CPU %d\n", current_thread_info()->cpu);
+>   #include<mach/hardware.h>
+>   #include<mach/memory.h>
+> -#include<mach/gpio.h>
+> +#include<asm/gpio.h>
 
-    printk() should have the KERN_* logging facility.
+    Shouldn't this now be moved to the below #include group?
+
+>   #include<mach/cputype.h>
+>
+>   #include<asm/mach-types.h>
 
 WBR, Sergei
