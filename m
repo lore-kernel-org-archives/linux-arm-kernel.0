@@ -1,28 +1,54 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue,  9 Aug 2011 16:47:31 +0000
-Subject: [PATCH 1/3 v2] RFC: arm/kirkwood: TEMP hack till mach-types is
-	updated.
-In-Reply-To: <cover.1312906908.git.jason@lakedaemon.net>
-References: <cover.1312906908.git.jason@lakedaemon.net>
-Message-ID: <5aff1d2c93408c44fdd3671f16f9643811945d1d.1312906908.git.jason@lakedaemon.net>
+Date: Tue,  9 Aug 2011 16:47:30 +0000
+Subject: [PATCH 0/3 v2] RFC: marvell dreamplug dft support
+Message-ID: <cover.1312906908.git.jason@lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-	DO NOT SUBMIT!
+All,
 
-Signed-off-by: Jason Cooper <jason@lakedaemon.net>
----
- arch/arm/tools/mach-types |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+First, a warning.  Do not apply the last patch in the series!  It has
+no hope of compiling.  I'm trying to learn how to add board support to
+the Linux kernel _and_ now trying to learn how to do it using devicetree.
 
-diff --git a/arch/arm/tools/mach-types b/arch/arm/tools/mach-types
-index 3b3776d..d5c5779 100644
---- a/arch/arm/tools/mach-types
-+++ b/arch/arm/tools/mach-types
-@@ -1113,3 +1113,4 @@ blissc			MACH_BLISSC		BLISSC			3491
- thales_adc		MACH_THALES_ADC		THALES_ADC		3492
- ubisys_p9d_evp		MACH_UBISYS_P9D_EVP	UBISYS_P9D_EVP		3493
- atdgp318		MACH_ATDGP318		ATDGP318		3494
-+dreamplug		MACH_DREAMPLUG		DREAMPLUG		3550
--- 
-1.7.0.4
+In short, I'm lost.  ;-)  Any and all help appreciated.
+
+In my sad attempt to add devicetree support, I used
+arch/arm/mach-kirkwood/include/mach/kirkwood.h to stub out the addresses.
+It's my understanding that most peripherals on this SoC are register-based.
+So, I haven't added external-bus{...}; yet.
+
+Based on kirkwood.h, there doesn't seem to be any obvious register size
+definition, should I omit that all around in my devicetree?
+
+I'm guessing at a lot of the compatible="" properties, I simply chose the
+.name string I found in the respective code.  Is this correct?
+
+I see nothing obvious to indicate an irq handler similar to that mentioned
+in [1].  Any thoughts?  I found the irq table, just no way to use it.
+
+Also, I'll rename dreamplug-setup.c -> dreamplug-dt.c once I have something
+working.
+
+[1] has been a great help, thanks Grant!
+
+thx,
+
+Jason.
+
+[1] http://devicetree.org/Device_Tree_Usage
+
+Jason Cooper (3):
+  arm/kirkwood: TEMP hack till mach-types is updated.
+  arm/kirkwood: add dreamplug support.
+  arm: kirkwood: dreamplug fdt support
+
+ arch/arm/boot/dts/kirkwood-dreamplug.dts |   64 +++++++++++++
+ arch/arm/mach-kirkwood/Kconfig           |    8 ++
+ arch/arm/mach-kirkwood/Makefile          |    1 +
+ arch/arm/mach-kirkwood/Makefile.boot     |    2 +
+ arch/arm/mach-kirkwood/dreamplug-setup.c |  151 ++++++++++++++++++++++++++++++
+ arch/arm/tools/mach-types                |    1 +
+ 6 files changed, 227 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/boot/dts/kirkwood-dreamplug.dts
+ create mode 100644 arch/arm/mach-kirkwood/dreamplug-setup.c
