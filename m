@@ -1,37 +1,27 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Tue, 9 Aug 2011 17:16:43 -0500
-Subject: [PATCH] ep93xx: clock.c: fix all checkpatch.pl issues
-In-Reply-To: <4E41AAE1.7010008@gmail.com>
-References: <201108091411.32479.hartleys@visionengravers.com>
-	<4E41AAE1.7010008@gmail.com>
-Message-ID: <ADE657CA350FB648AAC2C43247A983F001F3883894B0@AUSP01VMBX24.collaborationhost.net>
+From: davidb@codeaurora.org (David Brown)
+Date: Tue, 9 Aug 2011 15:26:04 -0700
+Subject: [RFC PATCH 5/8] ARM: msm: convert logical CPU numbers to
+	physical numbers
+In-Reply-To: <1312926162-22469-6-git-send-email-will.deacon@arm.com>
+References: <1312926162-22469-1-git-send-email-will.deacon@arm.com>
+	<1312926162-22469-6-git-send-email-will.deacon@arm.com>
+Message-ID: <20110809222604.GA15160@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, August 09, 2011 2:47 PM, Ryan Mallon wrote:
-> On 10/08/11 07:11, H Hartley Sweeten wrote:
->> This fixes all the checkpatch.pl errors and warnings found in this file.
+On Tue, Aug 09, 2011 at 10:42:39PM +0100, Will Deacon wrote:
+> This patch uses the new cpu_logical_map() macro for converting logical
+> CPU numbers into physical numbers when dealing with the pen_release
+> variable in the SMP boot and CPU hotplug paths.
+> 
+> Cc: David Brown <davidb@codeaurora.org>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-[snip]
+For MSM8660:
 
->> @@ -358,7 +360,7 @@ static int calc_clk_div(struct clk *clk, unsigned long rate,
->>  	int i, found = 0, __div = 0, __pdiv = 0;
->>  
->>  	/* Don't exceed the maximum rate */
->> -	max_rate = max3(clk_pll1.rate / 4, clk_pll2.rate / 4, clk_xtali.rate / 4);
->> +	max_rate = max3(clk_pll1.rate/4, clk_pll2.rate/4, clk_xtali.rate/4);
->
-> Don't delete the spaces around the operators. Again, this line is only
-> just over 80 characters. I think its okay as is. If you must fix it,
-> break on one of the commas instead.
+Tested-by: David Brown <davidb@codeaurora.org>
+Acked-by: David Brown <davidb@codeaurora.org>
 
-Ryan,
-
-How about fixing the one above like this:
-
--	max_rate = max3(clk_pll1.rate / 4, clk_pll2.rate / 4, clk_xtali.rate / 4);
-+	max_rate = max3(clk_pll1.rate, clk_pll2.rate, clk_xtali.rate);
-+	max_rate /= 4;
-
-Regards,
-Hartley
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
