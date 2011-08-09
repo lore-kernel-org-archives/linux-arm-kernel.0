@@ -1,138 +1,82 @@
-From: rmallon@gmail.com (Ryan Mallon)
-Date: Wed, 10 Aug 2011 07:47:13 +1000
-Subject: [PATCH] ep93xx: clock.c: fix all checkpatch.pl issues
-In-Reply-To: <201108091411.32479.hartleys@visionengravers.com>
-References: <201108091411.32479.hartleys@visionengravers.com>
-Message-ID: <4E41AAE1.7010008@gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Tue, 9 Aug 2011 15:49:05 -0600
+Subject: How to handle named resources with DT?
+In-Reply-To: <4E41AA43.1000506@ti.com>
+References: <4E40FC88.5090403@ti.com>
+	<20110809162907.GA630@manju-WNB7PBC4801-0006>
+	<4E4166F0.9050401@ti.com>
+	<CACxGe6tbEW1EZhqXy78EZVM_sQLH0Qbr7QOzbgbsKBRn1FtVrg@mail.gmail.com>
+	<4E4172A8.3030101@ti.com> <4E417BD5.8080409@freescale.com>
+	<20110809205723.GE11568@ponder.secretlab.ca>
+	<4E41A1B9.1060400@ti.com>
+	<20110809211747.GJ11568@ponder.secretlab.ca>
+	<4E41AA43.1000506@ti.com>
+Message-ID: <20110809214905.GK11568@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/08/11 07:11, H Hartley Sweeten wrote:
-> This fixes all the checkpatch.pl errors and warnings found in this file.
->
->   #201: ERROR: space required after that ',' (ctx:VxV)
->   #201: ERROR: space required after that ',' (ctx:VxV)
->   #250: WARNING: line over 80 characters
->   #281: WARNING: line over 80 characters
->   #361: WARNING: line over 80 characters
->   #435: ERROR: trailing whitespace
->   #438: ERROR: trailing whitespace
->   #449: ERROR: trailing whitespace
->   #451: ERROR: trailing whitespace
->
->   total: 6 errors, 3 warnings, 562 lines checked
->
-> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-> Cc: Ryan Mallon <rmallon@gmail.com>
->
-> ---
->
-> diff --git a/arch/arm/mach-ep93xx/clock.c b/arch/arm/mach-ep93xx/clock.c
-> index ca4de71..14dba95 100644
-> --- a/arch/arm/mach-ep93xx/clock.c
-> +++ b/arch/arm/mach-ep93xx/clock.c
-> @@ -198,7 +198,7 @@ static struct clk clk_m2m1 = {
->  	.enable_mask	= EP93XX_SYSCON_PWRCNT_DMA_M2M1,
->  };
->  
-> -#define INIT_CK(dev,con,ck)					\
-> +#define INIT_CK(dev, con, ck)					\
->  	{ .dev_id = dev, .con_id = con, .clk = ck }
+On Tue, Aug 09, 2011 at 11:44:35PM +0200, Cousson, Benoit wrote:
+> On 8/9/2011 11:17 PM, Grant Likely wrote:
+> >On Tue, Aug 09, 2011 at 11:08:09PM +0200, Cousson, Benoit wrote:
+> >>On 8/9/2011 10:57 PM, Grant Likely wrote:
+> >>>On Tue, Aug 09, 2011 at 01:26:29PM -0500, Scott Wood wrote:
+> >>>>On 08/09/2011 12:47 PM, Cousson, Benoit wrote:
+> >>>>>On 8/9/2011 7:23 PM, Grant Likely wrote:
+> >>>>>>There is no analogous mechanism for _byname in the device tree.  The
+> >>>>>>DT binding for a device must explicitly state what order the register
+> >>>>>>ranges are in.  The driver will need to be adapted.
+> >>>>>
+> >>>>>That seems to be a small regression for my point of view. Relying on the
+> >>>>>order is not super safe. This is not very readable either. That's for
+> >>>>>that exact reason that we changed our drivers to use
+> >>>>>platform_get_resource_byname. That's probably the reason why that API is
+> >>>>>there as well.
+> >>>>>For the same IP, the number of entries can vary depending of the SoC
+> >>>>>revision.
+> >>>>>By using the _byname, we can check if the resource is there or not
+> >>>>>without having to care about the position.
+> >>>>
+> >>>>You could have a named u32 property that contains the reg index, e.g.:
+> >>>>
+> >>>>dev {
+> >>>>	reg =<0x20000 0x200 0x24000 0x200>;
+> >>>>	foo-reg =<0>;
+> >>>>	bar-reg =<1>;
+> >>>>};
+> >>>
+> >>>That's a little nasty.  A reg-names = "foo", "bar"; would probably be
+> >>>better.
+> >>
+> >>Yep, I agree.
+> >>
+> >>And what about something like that?
+> >>   reg =<0x20000 0x200>, "foo",
+> >>	<0x20000 0x200>, "bar" ;
+> >>
+> >>It is doable?
+> >
+> >Definitely not.  It would break all existing 'reg' parsing
+> >implementations quite badly.
+> 
+> OK, so what about extending the reg attribute to be a reg node?
+> 
+> dev {
+> 	reg {
+> 		name = "foo_wrapper";
+> 		start = <0x10000>;
+> 		end = <0x200>;
+> 	}
+> 	reg {
+> 		name = "foo";
+> 		start = <0x20000>;
+> 		end = <0x200>;
+> 	}
+> }
+> 
+> A little bit more verbose, but at least we can add any attribute we want.
 
-Okay.
+That won't work either because that also breaks the existing 'reg'
+binding.  Anything you do will need to supplement the existing
+binding without changing it in an incompatible way.
 
->  
->  static struct clk_lookup clocks[] = {
-> @@ -247,7 +247,8 @@ static void __clk_enable(struct clk *clk)
->  			v = __raw_readl(clk->enable_reg);
->  			v |= clk->enable_mask;
->  			if (clk->sw_locked)
-> -				ep93xx_syscon_swlocked_write(v, clk->enable_reg);
-> +				ep93xx_syscon_swlocked_write(v,
-> +
-
-I think this makes the code arguably less readable. The line only just
-extends over 80 characters.
-
-> 						clk->enable_reg);
->  			else
->  				__raw_writel(v, clk->enable_reg);
->  		}
-> @@ -278,7 +279,8 @@ static void __clk_disable(struct clk *clk)
->  			v = __raw_readl(clk->enable_reg);
->  			v &= ~clk->enable_mask;
->  			if (clk->sw_locked)
-> -				ep93xx_syscon_swlocked_write(v, clk->enable_reg);
-> +				ep93xx_syscon_swlocked_write(v,
-> +						clk->enable_reg);
-
-Same here.
-
->  			else
->  				__raw_writel(v, clk->enable_reg);
->  		}
-> @@ -358,7 +360,7 @@ static int calc_clk_div(struct clk *clk, unsigned long rate,
->  	int i, found = 0, __div = 0, __pdiv = 0;
->  
->  	/* Don't exceed the maximum rate */
-> -	max_rate = max3(clk_pll1.rate / 4, clk_pll2.rate / 4, clk_xtali.rate / 4);
-> +	max_rate = max3(clk_pll1.rate/4, clk_pll2.rate/4, clk_xtali.rate/4);
-
-Don't delete the spaces around the operators. Again, this line is only
-just over 80 characters. I think its okay as is. If you must fix it,
-break on one of the commas instead.
-
->  	rate = min(rate, max_rate);
->  
->  	/*
-> @@ -432,35 +434,32 @@ static int set_i2s_sclk_rate(struct clk *clk, unsigned long rate)
->  	unsigned val = __raw_readl(clk->enable_reg);
->  
->  	if (rate == clk_i2s_mclk.rate / 2)
-> -		ep93xx_syscon_swlocked_write(val & ~EP93XX_I2SCLKDIV_SDIV, 
-> -					     clk->enable_reg);
-> +		val &= ~EP93XX_I2SCLKDIV_SDIV;
->  	else if (rate == clk_i2s_mclk.rate / 4)
-> -		ep93xx_syscon_swlocked_write(val | EP93XX_I2SCLKDIV_SDIV, 
-> -					     clk->enable_reg);
-> +		val |= EP93XX_I2SCLKDIV_SDIV;
->  	else
->  		return -EINVAL;
->  
-> +	ep93xx_syscon_swlocked_write(val, clk->enable_reg);
->  	clk_i2s_sclk.rate = rate;
->  	return 0;
-
-This change is good.
-
->  }
->  
->  static int set_i2s_lrclk_rate(struct clk *clk, unsigned long rate)
->  {
-> -	unsigned val = __raw_readl(clk->enable_reg) & 
-> +	unsigned val = __raw_readl(clk->enable_reg) &
->  		~EP93XX_I2SCLKDIV_LRDIV_MASK;
-> -	
-> +
->  	if (rate == clk_i2s_sclk.rate / 32)
-> -		ep93xx_syscon_swlocked_write(val | EP93XX_I2SCLKDIV_LRDIV32,
-> -					     clk->enable_reg);
-> +		val |= EP93XX_I2SCLKDIV_LRDIV32;
->  	else if (rate == clk_i2s_sclk.rate / 64)
-> -		ep93xx_syscon_swlocked_write(val | EP93XX_I2SCLKDIV_LRDIV64,
-> -					     clk->enable_reg);
-> +		val |= EP93XX_I2SCLKDIV_LRDIV64;
->  	else if (rate == clk_i2s_sclk.rate / 128)
-> -		ep93xx_syscon_swlocked_write(val | EP93XX_I2SCLKDIV_LRDIV128,
-> -					     clk->enable_reg);
-> +		val |= EP93XX_I2SCLKDIV_LRDIV128;
->  	else
->  		return -EINVAL;
->  
-> +	ep93xx_syscon_swlocked_write(val, clk->enable_reg);
->  	clk_i2s_lrclk.rate = rate;
->  	return 0;
->  }
-This is good too.
-
-~Ryan
+g.
