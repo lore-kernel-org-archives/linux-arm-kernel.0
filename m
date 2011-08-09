@@ -1,52 +1,43 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 9 Aug 2011 10:42:34 +0100
-Subject: [PATCH 00/10] ARM: perf: updates for 3.2
-In-Reply-To: <20110809093505.GD3210@pulham.picochip.com>
-References: <1312823771-9952-1-git-send-email-will.deacon@arm.com>
-	<20110809093505.GD3210@pulham.picochip.com>
-Message-ID: <20110809094234.GA3242@e102144-lin.cambridge.arm.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Tue, 9 Aug 2011 11:45:09 +0200
+Subject: GPMI-NAND Status?
+In-Reply-To: <CAHMSPgMYP+5Hpa5sC-yt=1H-S=tEER8uNzj6uMSK403_DGYJ9Q@mail.gmail.com>
+References: <20110805135133.GA26981@pengutronix.de>
+	<4E3F8087.6070206@freescale.com>
+	<CAHMSPgMYP+5Hpa5sC-yt=1H-S=tEER8uNzj6uMSK403_DGYJ9Q@mail.gmail.com>
+Message-ID: <20110809094509.GC1923@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 09, 2011 at 10:35:05AM +0100, Jamie Iles wrote:
-> Hi Will,
 
-Hi Jamie,
+> Could also be useful to make sure we test on the same HW as much as
+> possible and are using the same source tree.
+> HW I have:
+> - mx23evk rev C1
+> - mx23evk rev B2
+> - own target hw using mx23 lqfp-128 chip and different type of ddr and nand.
 
-> On Mon, Aug 08, 2011 at 06:16:01PM +0100, Will Deacon wrote:
-> > Hello,
-> > 
-> > This patch series contains a number of updates to the ARM PMU and perf
-> > code so that we can support mode exclusion, which is new in debug
-> > architecture 7.1 (as implemented by the Cortex-A15). Some of these
-> > updates also coincide with work to support System PMUs (PMUs that are
-> > not affine to a single CPU) but that is a larger body of work which will
-> > be posted separately at a later date.
-> > 
-> > The patches do the following:
-> > 
-> >   1.) Greatly simplify the PMU reservation mechanism so that the
-> >       handling of platform_devices is moved into perf.
-> >   2.) Cleans up the interrupt registration and some of the types used
-> >       to represent events and registers.
-> >   3.) Moves event indexing to start from zero rather than one, making
-> >       the code more readable and also easier to extend for mode
-> >       exclusion.
-> >   4.) Adds support for mode exclusion (user / kernel / hyp) and
-> >       implements this for Cortex-A15.
-> > 
-> > I've been running these patches since 3.0, so they've been tested on
-> > 1176, 11MPCore, Cortex-A5, Cortex-A9 and Cortex-A15 platforms.
-> 
-> A quick glance through them and they all look nice to me, but I can't 
-> get them to apply to any tree (next and master).  It looks like they're 
-> based on a tree with changes to the v7 perf support so I'm guessing it's 
-> your patches with A15 support.
+Actively used:
 
-Thanks for taking a look. The patches should just apply against -rc1:
+FSL MX28EVK Rev. D
+Karo TX28-4020 with STK5
 
-http://www.linux-arm.org/git?p=linux-2.6-wd.git;a=shortlog;h=refs/heads/perf-updates
+Could get:
 
-Cheers,
+two custom MX23 boards (though I don't think this will make a
+difference)
 
-Will
+Regards,
+
+   Wolfram
+
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110809/7b5b62cb/attachment-0001.sig>
