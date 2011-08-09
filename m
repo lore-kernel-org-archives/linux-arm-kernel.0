@@ -1,60 +1,35 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Tue, 9 Aug 2011 10:54:34 +0100
-Subject: [PATCH 00/10] ARM: perf: updates for 3.2
-In-Reply-To: <20110809094234.GA3242@e102144-lin.cambridge.arm.com>
-References: <1312823771-9952-1-git-send-email-will.deacon@arm.com>
-	<20110809093505.GD3210@pulham.picochip.com>
-	<20110809094234.GA3242@e102144-lin.cambridge.arm.com>
-Message-ID: <20110809095434.GE3210@pulham.picochip.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue,  9 Aug 2011 10:56:38 +0100
+Subject: [PATCH v11 0/4] Consolidating GIC per-cpu interrupts
+Message-ID: <1312883802-15022-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 09, 2011 at 10:42:34AM +0100, Will Deacon wrote:
-> On Tue, Aug 09, 2011 at 10:35:05AM +0100, Jamie Iles wrote:
-> > Hi Will,
-> 
-> Hi Jamie,
-> 
-> > On Mon, Aug 08, 2011 at 06:16:01PM +0100, Will Deacon wrote:
-> > > Hello,
-> > > 
-> > > This patch series contains a number of updates to the ARM PMU and perf
-> > > code so that we can support mode exclusion, which is new in debug
-> > > architecture 7.1 (as implemented by the Cortex-A15). Some of these
-> > > updates also coincide with work to support System PMUs (PMUs that are
-> > > not affine to a single CPU) but that is a larger body of work which will
-> > > be posted separately at a later date.
-> > > 
-> > > The patches do the following:
-> > > 
-> > >   1.) Greatly simplify the PMU reservation mechanism so that the
-> > >       handling of platform_devices is moved into perf.
-> > >   2.) Cleans up the interrupt registration and some of the types used
-> > >       to represent events and registers.
-> > >   3.) Moves event indexing to start from zero rather than one, making
-> > >       the code more readable and also easier to extend for mode
-> > >       exclusion.
-> > >   4.) Adds support for mode exclusion (user / kernel / hyp) and
-> > >       implements this for Cortex-A15.
-> > > 
-> > > I've been running these patches since 3.0, so they've been tested on
-> > > 1176, 11MPCore, Cortex-A5, Cortex-A9 and Cortex-A15 platforms.
-> > 
-> > A quick glance through them and they all look nice to me, but I can't 
-> > get them to apply to any tree (next and master).  It looks like they're 
-> > based on a tree with changes to the v7 perf support so I'm guessing it's 
-> > your patches with A15 support.
-> 
-> Thanks for taking a look. The patches should just apply against -rc1:
-> 
-> http://www.linux-arm.org/git?p=linux-2.6-wd.git;a=shortlog;h=refs/heads/perf-updates
+The current GIC per-cpu interrupts (aka PPIs) suffer from a number of
+problems:
 
-Yes, you're quite right.  I seem to have lost patches 1 and 4.  Probably 
-finger trouble on my part!
+- They use a completely separate scheme to handle the interrupts,
+  mostly because the PPI concept doesn't really match the kernel view
+  of an interrupt.
+- PPIs can only be used by the timer code, unless we add more low-level
+  assembly code.
+- The local timer code can only be used by devices generating PPIs,
+  and not SPIs.
+- At least one platform (msm) has started implementing its own
+  alternative scheme.
+- Some low-level code gets duplicated, as usual...
 
-Anyhow, I've pulled from your git tree and they appear to work nicely, 
-so:
+As the previous solution which tried to map PPIs to normal interrupts
+has been proved to be buggy, I've opted to a much simpler scheme
+(based on Russell's input).
 
-Acked-by: Jamie Iles <jamie@jamieiles.com>
+The proposed solution is to handle the interrupt using the same path
+as SPIs, with a common handler for all PPIs. Each PPI can be requested
+using gic_request_ppi(), similar to request_irq(). The local timer
+code is updated to reflect these changes.
 
-Jamie
+Patches against v3.1-rc1 + Will Deacon's TWD patch ("ARM: twd:
+register clockevents device before enabling PPI"). Tested on PB11MP,
+VE, OMAP4 (Panda) and Tegra (Harmony). As this patch series is quite
+different from the previous one, I've dropped all previous acks from
+platform maintainers.
