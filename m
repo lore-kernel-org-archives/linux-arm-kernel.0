@@ -1,56 +1,60 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue,  9 Aug 2011 22:42:34 +0100
-Subject: [RFC PATCH 0/8] Introduce logical CPU mapping
-Message-ID: <1312926162-22469-1-git-send-email-will.deacon@arm.com>
+Date: Tue,  9 Aug 2011 22:42:37 +0100
+Subject: [RFC PATCH 3/8] ARM: gic: convert logical CPU numbers into physical
+	numbers
+In-Reply-To: <1312926162-22469-1-git-send-email-will.deacon@arm.com>
+References: <1312926162-22469-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1312926162-22469-4-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+The GIC driver must convert logical CPU numbers passed in from Linux
+into physical CPU numbers that are understood by the hardware.
 
-This patch series is an RFC following a discussion I had with Russell
-the other day:
+This patch uses the new cpu_logical_map macro for performing the
+conversion inside the GIC driver.
 
- http://lists.infradead.org/pipermail/linux-arm-kernel/2011-August/060370.html
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/common/gic.c |   12 +++++++++---
+ 1 files changed, 9 insertions(+), 3 deletions(-)
 
-The approach I've taken is fairly simple but is enough for booting on a
-CPU with physical ID != 0 on platforms which can handle it.
-
-Note that I haven't touched the OMAP4 or Tegra platforms since it's not
-clear from the code how they would be adapted to make use of the
-physical CPU number.
-
-I've tested this with a Cortex-A9 on the vexpress platform but other
-platforms have been compile-tested only.
-
-This is an RFC, so I'd value any feedback or comments.
-
-Thanks,
-
-Will
-
-
-Will Deacon (8):
-  ARM: cpuid: add support for reading MPIDR
-  ARM: smp: populate logical CPU mapping during boot
-  ARM: gic: convert logical CPU numbers into physical numbers
-  ARM: exynos4: convert logical CPU numbers to physical numbers
-  ARM: msm: convert logical CPU numbers to physical numbers
-  ARM: shmobile: convert logical CPU numbers to physical numbers
-  ARM: ux500: convert logical CPU numbers to physical numbers
-  ARM: versatile: convert logical CPU numbers to physical numbers
-
- arch/arm/common/gic.c               |   12 +++++++++---
- arch/arm/include/asm/cputype.h      |    6 ++++++
- arch/arm/include/asm/smp.h          |    6 ++++++
- arch/arm/kernel/smp.c               |   15 +++++++++++++++
- arch/arm/mach-exynos4/hotplug.c     |    2 +-
- arch/arm/mach-exynos4/platsmp.c     |    2 +-
- arch/arm/mach-msm/hotplug.c         |    2 +-
- arch/arm/mach-msm/platsmp.c         |    2 +-
- arch/arm/mach-realview/hotplug.c    |    2 +-
- arch/arm/mach-shmobile/smp-sh73a0.c |    6 +++++-
- arch/arm/mach-ux500/hotplug.c       |    2 +-
- arch/arm/mach-ux500/platsmp.c       |    2 +-
- arch/arm/mach-vexpress/hotplug.c    |    2 +-
- arch/arm/plat-versatile/platsmp.c   |    2 +-
- 14 files changed, 50 insertions(+), 13 deletions(-)
+diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+index 3227ca9..6822c10 100644
+--- a/arch/arm/common/gic.c
++++ b/arch/arm/common/gic.c
+@@ -180,7 +180,7 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
+ 		return -EINVAL;
+ 
+ 	mask = 0xff << shift;
+-	bit = 1 << (cpu + shift);
++	bit = 1 << (cpu_logical_map(cpu) + shift);
+ 
+ 	spin_lock(&irq_controller_lock);
+ 	val = readl_relaxed(reg) & ~mask;
+@@ -260,7 +260,8 @@ static void __init gic_dist_init(struct gic_chip_data *gic,
+ {
+ 	unsigned int gic_irqs, irq_limit, i;
+ 	void __iomem *base = gic->dist_base;
+-	u32 cpumask = 1 << smp_processor_id();
++	u32 cpu = cpu_logical_map(smp_processor_id());
++	u32 cpumask = 1 << cpu;
+ 
+ 	cpumask |= cpumask << 8;
+ 	cpumask |= cpumask << 16;
+@@ -382,7 +383,12 @@ void __cpuinit gic_enable_ppi(unsigned int irq)
+ #ifdef CONFIG_SMP
+ void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+ {
+-	unsigned long map = *cpus_addr(*mask);
++	int cpu;
++	unsigned long map = 0;
++
++	/* Convert our logical CPU mask into a physical one. */
++	for_each_cpu(cpu, mask)
++		map |= 1 << cpu_logical_map(cpu);
+ 
+ 	/*
+ 	 * Ensure that stores to Normal memory are visible to the
+-- 
+1.7.0.4
