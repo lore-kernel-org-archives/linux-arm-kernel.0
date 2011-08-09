@@ -1,47 +1,42 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Tue, 9 Aug 2011 16:35:22 +0530
-Subject: [PATCH 5/6] spi/spi-pl022: Call pl022_dma_remove(pl022) only if
-	enable_dma is true
-In-Reply-To: <cover.1312887860.git.viresh.kumar@st.com>
-References: <cover.1312887860.git.viresh.kumar@st.com>
-Message-ID: <2d178d5821cd51a14ccd097b0738c1745c6dc64c.1312887860.git.viresh.kumar@st.com>
+Date: Tue, 9 Aug 2011 16:35:17 +0530
+Subject: [PATCH 0/6] spi/spi-pl022 fixes
+Message-ID: <cover.1312887860.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pl022_dma_remove() should be called only if enable_dma is true. There is no
-point calling it when pl022_dma_probe() is not called, which again depends on
-enable_dma.
+Hi Linus,
 
-Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
----
- drivers/spi/spi-pl022.c |    8 ++++++--
- 1 files changed, 6 insertions(+), 2 deletions(-)
+This patchset mainly covers following fixes:
+- formatting related issues
+- Passing GFP_NOWAIT for sg allocation from tasklet
+- Fixing calculate_effective_freq() routine
+- Allocate/free DMA channels as and when required.
 
-diff --git a/drivers/spi/spi-pl022.c b/drivers/spi/spi-pl022.c
-index e0cfb8c..e2333e7 100644
---- a/drivers/spi/spi-pl022.c
-+++ b/drivers/spi/spi-pl022.c
-@@ -2234,7 +2234,9 @@ err_spi_register:
- err_start_queue:
- err_init_queue:
- 	destroy_queue(pl022);
--	pl022_dma_remove(pl022);
-+	if (platform_info->enable_dma)
-+		pl022_dma_remove(pl022);
-+
- 	free_irq(adev->irq[0], pl022);
- 	pm_runtime_disable(&adev->dev);
- err_no_irq:
-@@ -2262,7 +2264,9 @@ pl022_remove(struct amba_device *adev)
- 	if (destroy_queue(pl022) != 0)
- 		dev_err(&adev->dev, "queue remove failed\n");
- 	load_ssp_default_config(pl022);
--	pl022_dma_remove(pl022);
-+	if (pl022->master_info->enable_dma)
-+		pl022_dma_remove(pl022);
-+
- 	free_irq(adev->irq[0], pl022);
- 	clk_disable(pl022->clk);
- 	clk_put(pl022->clk);
+I have rebased them on linux-next/master over following patch:
+
+commit 9be355da3bae9feb09cdaf80c3ab560f1f0172cb
+Author: Stephen Rothwell <sfr@canb.auug.org.au>
+Date:   Tue Aug 9 13:30:19 2011 +1000
+
+    Add linux-next specific files for 20110809
+    
+    Signed-off-by: Stephen Rothwell <sfr@canb.auug.org.au>
+
+Looking forward to see your view on the patchset.
+
+Viresh Kumar (6):
+  spi/spi-pl022: Resolve formatting issues
+  spi/spi-pl022: Use GFP_NOWAIT for allocation from tasklet
+  spi/spi-pl022: Don't allocate more sg than required.
+  spi/spi-pl022: calculate_effective_freq() must set rate <= requested
+    rate
+  spi/spi-pl022: Call pl022_dma_remove(pl022) only if enable_dma is
+    true
+  spi/spi-pl022: Request/free DMA channels as and when required.
+
+ drivers/spi/spi-pl022.c |  265 ++++++++++++++++++++++++++---------------------
+ 1 files changed, 147 insertions(+), 118 deletions(-)
+
 -- 
 1.7.2.2
