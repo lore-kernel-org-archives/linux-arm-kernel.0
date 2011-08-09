@@ -1,70 +1,72 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 10 Aug 2011 03:23:45 +0800
-Subject: [PATCH] pxa/hx4700: Set DS1WM clock_rate
-In-Reply-To: <E1Qqp5V-0000FE-DF@outmx01.plus.net>
-References: <E1Qqp5V-0000FE-DF@outmx01.plus.net>
-Message-ID: <CAMPhdO_xL_sUui-22p27oAw52YHnBhm90cn12t5eJsdRLnUfNA@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 9 Aug 2011 12:24:35 -0700
+Subject: [PATCH 4/5 V2] ARM: tegra: paz00: add clocks required for usb
+	operation
+In-Reply-To: <201108092118.43724.marvin24@gmx.de>
+References: <cover.1312735430.git.marvin24@gmx.de>
+	<201108092029.17546.marvin24@gmx.de>
+	<CAOesGMiV-jrcGFUXBf=5H__-gXvwgxUias7WGouYTvAy+k=oMg@mail.gmail.com>
+	<201108092118.43724.marvin24@gmx.de>
+Message-ID: <CAOesGMgGJM5v5dOruOAJLqNg8Geu-BtvSoyBSdgnZU-nu94aDQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 10, 2011 at 12:23 AM, Paul Parsons <lost.distance@yahoo.com> wrote:
-> The mfd/asic3 driver did not set the ds1wm_driver_data.clock_rate field before
-> passing the structure to the ds1wm cell driver. By chance, ds1wm_find_divisor()
-> returned the correct divisor when this zero clock_rate was passed in. However
-> a recent change to ds1wm_find_divisor() removed this unintended behaviour. This
-> patch explicitly sets the ds1wm_driver_data.clock_rate field.
+On Tue, Aug 9, 2011 at 12:18 PM, Marc Dietrich <marvin24@gmx.de> wrote:
+> Hi Olof,
 >
-> Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
-> ---
+> On Tuesday 09 August 2011 20:30:47 Olof Johansson wrote:
+>> On Tue, Aug 9, 2011 at 11:29 AM, Marc Dietrich <marvin24@gmx.de> wrote:
+>> >
+>> > These clocks are required for usb operation.
+>> > ---
+>> > ?arch/arm/mach-tegra/board-paz00.c | ? ?6 ++++++
+>> > ?1 files changed, 6 insertions(+), 0 deletions(-)
+>> >
+>> > diff --git a/arch/arm/mach-tegra/board-paz00.c b/arch/arm/mach-tegra/board-
+> paz00.c
+>> > index 45111f6..89a3dda 100644
+>> > --- a/arch/arm/mach-tegra/board-paz00.c
+>> > +++ b/arch/arm/mach-tegra/board-paz00.c
+>> > @@ -145,6 +145,12 @@ static __initdata struct tegra_clk_init_table
+> paz00_clk_init_table[] = {
+>> > ? ? ? ?/* name ? ? ? ? parent ? ? ? ? ?rate ? ? ? ? ? ?enabled */
+>> > ? ? ? ?{ "uarta", ? ? ?"pll_p", ? ? ? ?216000000, ? ? ?true },
+>> > ? ? ? ?{ "uartd", ? ? ?"pll_p", ? ? ? ?216000000, ? ? ?true },
+>> > +
+>> > + ? ? ? { "pll_p_out4", "pll_p", ? ? ? ?24000000, ? ? ? true },
+>> > + ? ? ? { "usbd", ? ? ? "clk_m", ? ? ? ?12000000, ? ? ? true },
+>> > + ? ? ? { "usb2", ? ? ? "clk_m", ? ? ? ?12000000, ? ? ? true },
+>> > + ? ? ? { "usb3", ? ? ? "clk_m", ? ? ? ?12000000, ? ? ? true },
+>>
+>> Do they all have to be enabled here? Setting the parent and rate makes
+>> sense, but you shouldn't have to enable them.
 >
-> diff -uprN clean-3.0.1/arch/arm/mach-pxa/hx4700.c linux-3.0.1/arch/arm/mach-pxa/hx4700.c
-> --- clean-3.0.1/arch/arm/mach-pxa/hx4700.c ? ? ?2011-08-05 05:59:21.000000000 +0100
-> +++ linux-3.0.1/arch/arm/mach-pxa/hx4700.c ? ? ?2011-08-07 23:02:18.653447085 +0100
-> @@ -310,6 +310,7 @@ static struct asic3_platform_data asic3_
-> ? ? ? ?.gpio_config_num = ARRAY_SIZE(asic3_gpio_config),
-> ? ? ? ?.irq_base ? ? ? ?= IRQ_BOARD_START,
-> ? ? ? ?.gpio_base ? ? ? = HX4700_ASIC3_GPIO_BASE,
-> + ? ? ? .clock_rate ? ? ?= 4000000,
-> ?};
+> usb also works with all three usb* clocks set to disabled (they are even not
+> required to be listed there at all). Honestly, the whole clock setup is a little
+> obscure to me.
 >
-> ?static struct platform_device asic3 = {
-> diff -uprN clean-3.0.1/drivers/mfd/asic3.c linux-3.0.1/drivers/mfd/asic3.c
-> --- clean-3.0.1/drivers/mfd/asic3.c ? ? 2011-08-05 05:59:21.000000000 +0100
-> +++ linux-3.0.1/drivers/mfd/asic3.c ? ? 2011-08-07 23:02:18.653447085 +0100
-> @@ -867,10 +867,13 @@ static int __init asic3_mfd_probe(struct
-> ? ? ? ?asic3_mmc_resources[0].start >>= asic->bus_shift;
-> ? ? ? ?asic3_mmc_resources[0].end ? >>= asic->bus_shift;
->
-> - ? ? ? ret = mfd_add_devices(&pdev->dev, pdev->id,
-> + ? ? ? if (pdata->clock_rate) {
-> + ? ? ? ? ? ? ? ds1wm_pdata.clock_rate = pdata->clock_rate;
-> + ? ? ? ? ? ? ? ret = mfd_add_devices(&pdev->dev, pdev->id,
-> ? ? ? ? ? ? ? ? ? ? ? ?&asic3_cell_ds1wm, 1, mem, asic->irq_base);
-> - ? ? ? if (ret < 0)
-> - ? ? ? ? ? ? ? goto out;
-> + ? ? ? ? ? ? ? if (ret < 0)
-> + ? ? ? ? ? ? ? ? ? ? ? goto out;
-> + ? ? ? }
+> Can these clocks be safly disabled in the clock table and hope that the ehci
+> host driver will enable them if required? Also independent to what the
+> bootloader does, which I don't know? I'm asking because we may switch from the
+> proprietary bootloader (fastboot?) to u-boot in the near future.
 
-Or this parent driver can silently pass the clock_rate to ds1wm sub-driver
-without the if () condition, as it leaves to the sub-driver to decide whether
-it's a valid value, unless you want to use 'clock_rate' to explicitly control
-the registration of the sub-device.
 
->
-> ? ? ? ?if (mem_sdio && (irq >= 0)) {
-> ? ? ? ? ? ? ? ?ret = mfd_add_devices(&pdev->dev, pdev->id,
-> diff -uprN clean-3.0.1/include/linux/mfd/asic3.h linux-3.0.1/include/linux/mfd/asic3.h
-> --- clean-3.0.1/include/linux/mfd/asic3.h ? ? ? 2011-08-05 05:59:21.000000000 +0100
-> +++ linux-3.0.1/include/linux/mfd/asic3.h ? ? ? 2011-08-07 23:02:18.653447085 +0100
-> @@ -31,6 +31,8 @@ struct asic3_platform_data {
->
-> ? ? ? ?unsigned int gpio_base;
->
-> + ? ? ? unsigned int clock_rate;
-> +
-> ? ? ? ?struct asic3_led *leds;
-> ?};
->
->
->
+In general, the platform code needs to setup the parent/child
+relationships, and in most cases the clock rates. But the individual
+drivers will disable and enable clocks as needed. If you set them to
+'true' in the table, that last enable will never be disabled, so the
+clock will never be off. That might be suboptimal from a power
+consumption point of view for your platform.
+
+Unfortunately, u-boot does very little clock setup so the kernel has
+to be able to do most of it. Fastboot is better at it, in some sense
+of the word. We used to have some very large clock setup tables in the
+chromeos board files, but we have recently pruned out most of it and
+cut back to the bare minimum.
+
+Note that you might have some issues with autosuspend and detecting
+hotplugs, we have a chromeos patch for it that I should post sometime
+soon.
+
+
+-Olof
