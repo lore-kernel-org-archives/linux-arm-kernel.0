@@ -1,70 +1,37 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 09 Aug 2011 15:15:56 -0700
-Subject: [PATCH v5] ARM: Use generic BUG() handler
-In-Reply-To: <1311926200-24806-1-git-send-email-sjg@chromium.org>
-References: <1311926200-24806-1-git-send-email-sjg@chromium.org>
-Message-ID: <4E41B19C.3040209@codeaurora.org>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Tue, 9 Aug 2011 17:16:43 -0500
+Subject: [PATCH] ep93xx: clock.c: fix all checkpatch.pl issues
+In-Reply-To: <4E41AAE1.7010008@gmail.com>
+References: <201108091411.32479.hartleys@visionengravers.com>
+	<4E41AAE1.7010008@gmail.com>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F001F3883894B0@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/29/2011 12:56 AM, Simon Glass wrote:
-> From: Simon Glass <sjg@google.com>
->
-> ARM uses its own BUG() handler which makes its output slightly different
-> from other archtectures.
->
-> One of the problems is that the ARM implementation doesn't report the function
-> with the BUG() in it, but always reports the PC being in __bug(). The generic
-> implementation doesn't have this problem.
->
-> Currently we get something like:
->
-> kernel BUG at fs/proc/breakme.c:35!
-> Unable to handle kernel NULL pointer dereference at virtual address 00000000
-> ...
-> PC is at __bug+0x20/0x2c
->
-> With this patch it displays:
->
-> kernel BUG at fs/proc/breakme.c:35!
-> Internal error: Oops - undefined instruction: 0 [#1] PREEMPT SMP
-> ...
-> PC is at write_breakme+0xd0/0x1b4
->
-> This implementation uses an undefined instruction to implement BUG, and sets up
-> a bug table containing the relevant information. Many versions of gcc do not
-> support %c properly for ARM (inserting a # when they shouldn't) so we work
-> around this using distasteful macro magic.
->
-> v1: Initial version to replace existing ARM BUG() implementation with something
-> more similar to other architectures.
->
-> v2: Add Thumb support, remove backtrace whitespace output changes. Change to
-> use macros instead of requiring the asm %d flag to work (thanks to
-> Dave Martin <dave.martin@linaro.org>)
->
-> v3: Remove old BUG() implementation in favor of this one.
-> Remove the Backtrace: message (will submit this separately).
-> Use ARM_EXIT_KEEP() so that some architectures can dump exit text at link time
-> thanks to Stephen Boyd <sboyd@codeaurora.org> (although since we always
-> define GENERIC_BUG this might be academic.)
-> Rebase to linux-2.6.git master.
->
-> v4: Allow BUGS in modules (these were not reported correctly in v3)
-> (thanks to Stephen Boyd <sboyd@codeaurora.org> for suggesting that.)
-> Remove __bug() as this is no longer needed.
->
-> v5: Add %progbits as the section flags.
+On Tuesday, August 09, 2011 2:47 PM, Ryan Mallon wrote:
+> On 10/08/11 07:11, H Hartley Sweeten wrote:
+>> This fixes all the checkpatch.pl errors and warnings found in this file.
 
-Tested-by: Stephen Boyd <sboyd@codeaurora.org>
+[snip]
 
-> Signed-off-by: Simon Glass <sjg@chromium.org>
-> ---
+>> @@ -358,7 +360,7 @@ static int calc_clk_div(struct clk *clk, unsigned long rate,
+>>  	int i, found = 0, __div = 0, __pdiv = 0;
+>>  
+>>  	/* Don't exceed the maximum rate */
+>> -	max_rate = max3(clk_pll1.rate / 4, clk_pll2.rate / 4, clk_xtali.rate / 4);
+>> +	max_rate = max3(clk_pll1.rate/4, clk_pll2.rate/4, clk_xtali.rate/4);
 >
+> Don't delete the spaces around the operators. Again, this line is only
+> just over 80 characters. I think its okay as is. If you must fix it,
+> break on one of the commas instead.
 
-Can you update the patch in the patch tracker? It would be great to see
-this in the next merge window.
+Ryan,
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+How about fixing the one above like this:
+
+-	max_rate = max3(clk_pll1.rate / 4, clk_pll2.rate / 4, clk_xtali.rate / 4);
++	max_rate = max3(clk_pll1.rate, clk_pll2.rate, clk_xtali.rate);
++	max_rate /= 4;
+
+Regards,
+Hartley
