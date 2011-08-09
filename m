@@ -1,80 +1,68 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  9 Aug 2011 11:46:49 +0100
-Subject: [RFC PATCH 07/12] ARM: local timers: switch shmobile to standalone
+Date: Tue,  9 Aug 2011 11:46:47 +0100
+Subject: [RFC PATCH 05/12] ARM: local timers: switch tegra to standalone
 	smp_twd
 In-Reply-To: <1312886814-15627-1-git-send-email-marc.zyngier@arm.com>
 References: <1312886814-15627-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1312886814-15627-8-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1312886814-15627-6-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert the SMP shmobile platforms to the standalone version
-of smp_twd.c. As shmobile is already using the late_time_init
-hook, a private hook is added to initialise the TWD driver
-once the platform timer is up and running.
+Convert the Tegra-2 platforms to the standalone version
+of smp_twd.c. Since the timer calibration code requires another
+timer to be up and running, the actual initialisation is left
+to the late_timer_init hook.
 
-Cc: Paul Mundt <lethal@linux-sh.org>
-Cc: Magnus Damm <magnus.damm@gmail.com>
+Tested on Harmony.
+
+Cc: Colin Cross <ccross@android.com>
+Cc: Erik Gilling <konkers@android.com>
+Cc: Olof Johansson <olof@lixom.net>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/mach-shmobile/Kconfig               |    1 +
- arch/arm/mach-shmobile/Makefile              |    1 -
- arch/arm/mach-shmobile/include/mach/common.h |    3 ++
- arch/arm/mach-shmobile/localtimer.c          |   26 ---------------------
- arch/arm/mach-shmobile/platsmp.c             |    1 -
- arch/arm/mach-shmobile/smp-sh73a0.c          |   32 +++++++++++++++++++++++--
- arch/arm/mach-shmobile/timer.c               |   10 ++++++++
- 7 files changed, 43 insertions(+), 31 deletions(-)
- delete mode 100644 arch/arm/mach-shmobile/localtimer.c
+ arch/arm/mach-tegra/Kconfig      |    1 +
+ arch/arm/mach-tegra/Makefile     |    2 +-
+ arch/arm/mach-tegra/localtimer.c |   26 --------------------------
+ arch/arm/mach-tegra/timer.c      |   34 +++++++++++++++++++++++++++++-----
+ 4 files changed, 31 insertions(+), 32 deletions(-)
+ delete mode 100644 arch/arm/mach-tegra/localtimer.c
 
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index 0c8f6cf..c2999b6 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -23,6 +23,7 @@ config ARCH_SH7372
- config ARCH_SH73A0
- 	bool "SH-Mobile AG5 (R8A73A00)"
+diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
+index d82ebab..6d6c396 100644
+--- a/arch/arm/mach-tegra/Kconfig
++++ b/arch/arm/mach-tegra/Kconfig
+@@ -9,6 +9,7 @@ config ARCH_TEGRA_2x_SOC
+ 	bool "Tegra 2 family"
  	select CPU_V7
-+	select ARM_SMP_TWD
- 	select SH_CLK_CPG
- 	select ARCH_WANT_OPTIONAL_GPIOLIB
  	select ARM_GIC
-diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
-index 612b270..82ec6e9 100644
---- a/arch/arm/mach-shmobile/Makefile
-+++ b/arch/arm/mach-shmobile/Makefile
-@@ -14,7 +14,6 @@ obj-$(CONFIG_ARCH_SH73A0)	+= setup-sh73a0.o clock-sh73a0.o intc-sh73a0.o
- # SMP objects
- smp-y				:= platsmp.o headsmp.o
- smp-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
--smp-$(CONFIG_LOCAL_TIMERS)	+= localtimer.o
- smp-$(CONFIG_ARCH_SH73A0)	+= smp-sh73a0.o
- 
- # Pinmux setup
-diff --git a/arch/arm/mach-shmobile/include/mach/common.h b/arch/arm/mach-shmobile/include/mach/common.h
-index 06aecb3..39a2637 100644
---- a/arch/arm/mach-shmobile/include/mach/common.h
-+++ b/arch/arm/mach-shmobile/include/mach/common.h
-@@ -53,4 +53,7 @@ extern void sh73a0_secondary_init(unsigned int cpu);
- extern int sh73a0_boot_secondary(unsigned int cpu);
- extern void sh73a0_smp_prepare_cpus(void);
- 
-+struct resource;
-+extern void shmobile_local_timer_register(void (*)(void));
-+
- #endif /* __ARCH_MACH_COMMON_H */
-diff --git a/arch/arm/mach-shmobile/localtimer.c b/arch/arm/mach-shmobile/localtimer.c
++	select ARM_SMP_TWD
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select USB_ARCH_HAS_EHCI if USB_SUPPORT
+ 	select USB_ULPI if USB_SUPPORT
+diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
+index f11b910..c6b305f 100644
+--- a/arch/arm/mach-tegra/Makefile
++++ b/arch/arm/mach-tegra/Makefile
+@@ -11,7 +11,7 @@ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += clock.o
+ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += tegra2_clocks.o
+ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= tegra2_emc.o
+ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= pinmux-t2-tables.o
+-obj-$(CONFIG_SMP)                       += platsmp.o localtimer.o headsmp.o
++obj-$(CONFIG_SMP)                       += platsmp.o headsmp.o
+ obj-$(CONFIG_HOTPLUG_CPU)               += hotplug.o
+ obj-$(CONFIG_TEGRA_SYSTEM_DMA)		+= dma.o
+ obj-$(CONFIG_CPU_FREQ)                  += cpu-tegra.o
+diff --git a/arch/arm/mach-tegra/localtimer.c b/arch/arm/mach-tegra/localtimer.c
 deleted file mode 100644
-index ad9ccc9..0000000
---- a/arch/arm/mach-shmobile/localtimer.c
+index e91d681..0000000
+--- a/arch/arm/mach-tegra/localtimer.c
 +++ /dev/null
 @@ -1,26 +0,0 @@
 -/*
-- * SMP support for R-Mobile / SH-Mobile - local timer portion
+- *  arch/arm/mach-tegra/localtimer.c
 - *
-- * Copyright (C) 2010  Magnus Damm
-- *
-- * Based on vexpress, Copyright (C) 2002 ARM Ltd, All Rights Reserved
+- *  Copyright (C) 2002 ARM Ltd.
+- *  All Rights Reserved
 - *
 - * This program is free software; you can redistribute it and/or modify
 - * it under the terms of the GNU General Public License version 2 as
@@ -83,6 +71,7 @@ index ad9ccc9..0000000
 -#include <linux/init.h>
 -#include <linux/smp.h>
 -#include <linux/clockchips.h>
+-#include <asm/irq.h>
 -#include <asm/smp_twd.h>
 -#include <asm/localtimer.h>
 -
@@ -91,115 +80,77 @@ index ad9ccc9..0000000
 - */
 -int __cpuinit local_timer_setup(struct clock_event_device *evt)
 -{
--	evt->irq = 29;
+-	evt->irq = IRQ_LOCALTIMER;
 -	twd_timer_setup(evt);
 -	return 0;
 -}
-diff --git a/arch/arm/mach-shmobile/platsmp.c b/arch/arm/mach-shmobile/platsmp.c
-index 66f9806..b5dcc57 100644
---- a/arch/arm/mach-shmobile/platsmp.c
-+++ b/arch/arm/mach-shmobile/platsmp.c
-@@ -17,7 +17,6 @@
- #include <linux/smp.h>
- #include <linux/io.h>
- #include <asm/hardware/gic.h>
--#include <asm/localtimer.h>
- #include <asm/mach-types.h>
- #include <mach/common.h>
- 
-diff --git a/arch/arm/mach-shmobile/smp-sh73a0.c b/arch/arm/mach-shmobile/smp-sh73a0.c
-index 3ffdbc9..8506437 100644
---- a/arch/arm/mach-shmobile/smp-sh73a0.c
-+++ b/arch/arm/mach-shmobile/smp-sh73a0.c
-@@ -22,6 +22,7 @@
- #include <linux/smp.h>
- #include <linux/spinlock.h>
+diff --git a/arch/arm/mach-tegra/timer.c b/arch/arm/mach-tegra/timer.c
+index 9035042..d8e26c4 100644
+--- a/arch/arm/mach-tegra/timer.c
++++ b/arch/arm/mach-tegra/timer.c
+@@ -27,9 +27,10 @@
+ #include <linux/clocksource.h>
+ #include <linux/clk.h>
  #include <linux/io.h>
 +#include <linux/ioport.h>
- #include <mach/common.h>
- #include <asm/smp_scu.h>
- #include <asm/smp_twd.h>
-@@ -41,6 +42,31 @@ static void __iomem *scu_base_addr(void)
- static DEFINE_SPINLOCK(scu_lock);
- static unsigned long tmp;
+ 
+ #include <asm/mach/time.h>
+-#include <asm/localtimer.h>
++#include <asm/smp_twd.h>
+ #include <asm/sched_clock.h>
+ 
+ #include <mach/iomap.h>
+@@ -179,6 +180,31 @@ static struct irqaction tegra_timer_irq = {
+ 	.irq		= INT_TMR3,
+ };
  
 +#ifdef CONFIG_ARM_SMP_TWD
-+static struct resource sh73a0_twd_resources[] __initdata = {
++static struct resource tegra_twd_resources[] __initdata = {
 +	{
-+		.start	= 0xf0000600,
-+		.end	= 0xf0000600 + 0x10,
++		.start	= TEGRA_ARM_PERIF_BASE + 0x600,
++		.end	= TEGRA_ARM_PERIF_BASE + 0x610,
 +		.flags	= IORESOURCE_MEM,
 +	},
 +	{
-+		.start	= 29,
-+		.end	= 29,
++		.start	= IRQ_LOCALTIMER,
++		.end	= IRQ_LOCALTIMER,
 +		.flags	= IORESOURCE_IRQ,
 +	},
 +};
 +
-+static void __init sh73a0_twd_init(void)
++static void __init tegra_twd_init(void)
 +{
-+	int err = twd_timer_register(sh73a0_twd_resources,
-+				     ARRAY_SIZE(sh73a0_twd_resources));
++	int err = twd_timer_register(tegra_twd_resources,
++				     ARRAY_SIZE(tegra_twd_resources));
 +	if (err)
 +		pr_err("twd_timer_register failed %d\n", err);
 +}
 +#else
-+#define sh73a0_twd_init	NULL
++#define tegra_twd_init	NULL
 +#endif
 +
- static void modify_scu_cpu_psr(unsigned long set, unsigned long clr)
+ static void __init tegra_init_timer(void)
  {
- 	void __iomem *scu_base = scu_base_addr();
-@@ -59,9 +85,9 @@ unsigned int __init sh73a0_get_core_count(void)
- {
- 	void __iomem *scu_base = scu_base_addr();
+ 	struct clk *clk;
+@@ -197,10 +223,6 @@ static void __init tegra_init_timer(void)
+ 	BUG_ON(IS_ERR(clk));
+ 	clk_enable(clk);
  
 -#ifdef CONFIG_HAVE_ARM_TWD
--	/* twd_base needs to be initialized before percpu_timer_setup() */
--	twd_base = (void __iomem *)0xf0000600;
+-	twd_base = IO_ADDRESS(TEGRA_ARM_PERIF_BASE + 0x600);
+-#endif
+-
+ 	switch (rate) {
+ 	case 12000000:
+ 		timer_writel(0x000b, TIMERUS_USEC_CFG);
+@@ -241,6 +263,8 @@ static void __init tegra_init_timer(void)
+ 	tegra_clockevent.cpumask = cpu_all_mask;
+ 	tegra_clockevent.irq = tegra_timer_irq.irq;
+ 	clockevents_register_device(&tegra_clockevent);
 +
-+#ifdef CONFIG_ARM_SMP_TWD
-+	shmobile_local_timer_register(sh73a0_twd_init);
- #endif
- 
- 	return scu_get_core_count(scu_base);
-diff --git a/arch/arm/mach-shmobile/timer.c b/arch/arm/mach-shmobile/timer.c
-index 895794b..fad385d 100644
---- a/arch/arm/mach-shmobile/timer.c
-+++ b/arch/arm/mach-shmobile/timer.c
-@@ -19,8 +19,11 @@
-  *
-  */
- #include <linux/platform_device.h>
-+#include <mach/common.h>
- #include <asm/mach/time.h>
- 
-+static void (*local_timer_hook)(void) __initdata;
-+
- static void __init shmobile_late_time_init(void)
- {
- 	/*
-@@ -34,6 +37,8 @@ static void __init shmobile_late_time_init(void)
- 	 */
- 	early_platform_driver_register_all("earlytimer");
- 	early_platform_driver_probe("earlytimer", 2, 0);
-+	if (local_timer_hook)
-+		local_timer_hook();
++	late_time_init = tegra_twd_init;
  }
  
- static void __init shmobile_timer_init(void)
-@@ -41,6 +46,11 @@ static void __init shmobile_timer_init(void)
- 	late_time_init = shmobile_late_time_init;
- }
- 
-+void __init shmobile_local_timer_register(void (*hook)(void))
-+{
-+	local_timer_hook = hook;
-+}
-+
- struct sys_timer shmobile_timer = {
- 	.init		= shmobile_timer_init,
- };
+ struct sys_timer tegra_timer = {
 -- 
 1.7.0.4
