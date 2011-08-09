@@ -1,172 +1,160 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  9 Aug 2011 11:46:43 +0100
-Subject: [RFC PATCH 01/12] ARM: local timers: allow smp_twd to be used
-	standalone
+Date: Tue,  9 Aug 2011 11:46:48 +0100
+Subject: [RFC PATCH 06/12] ARM: local timers: switch omap4 to standalone
+	smp_twd
 In-Reply-To: <1312886814-15627-1-git-send-email-marc.zyngier@arm.com>
 References: <1312886814-15627-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1312886814-15627-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1312886814-15627-7-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow smp_twd to be built in a "standalone" version,
-without relying on the CONFIG_LOCAL_TIMER infrastructure.
-It mainly relies on a CPU notifier block to stop or start
-the timer on the right CPU.
+Convert the OMAP4 platforms to the standalone version
+of smp_twd.c. Since the timer calibration code requires another
+timer to be up and running, the actual initialisation is left
+to the late_timer_init hook.
 
-The CONFIG_ARM_SMP_TWD option selects the new behaviour.
+Tested on a Pandaboard.
 
+Cc: Tony Lindgren <tony@atomide.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/Kconfig               |    6 +++-
- arch/arm/include/asm/smp_twd.h |    9 +++++
- arch/arm/kernel/smp_twd.c      |   76 +++++++++++++++++++++++++++++++++++++++-
- 3 files changed, 89 insertions(+), 2 deletions(-)
+ arch/arm/mach-omap2/Kconfig     |    2 +-
+ arch/arm/mach-omap2/Makefile    |    1 -
+ arch/arm/mach-omap2/timer-mpu.c |   39 ---------------------------------------
+ arch/arm/mach-omap2/timer.c     |   38 +++++++++++++++++++++++++++++++++-----
+ 4 files changed, 34 insertions(+), 46 deletions(-)
+ delete mode 100644 arch/arm/mach-omap2/timer-mpu.c
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 2c71a8f..7ac28a3 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1394,6 +1394,10 @@ config HAVE_ARM_TWD
- 	help
- 	  This options enables support for the ARM timer and watchdog unit
+diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+index 4ae6257..f8c0eb7 100644
+--- a/arch/arm/mach-omap2/Kconfig
++++ b/arch/arm/mach-omap2/Kconfig
+@@ -44,7 +44,7 @@ config ARCH_OMAP4
+ 	depends on ARCH_OMAP2PLUS
+ 	select CPU_V7
+ 	select ARM_GIC
+-	select LOCAL_TIMERS if SMP
++	select ARM_SMP_TWD
+ 	select PL310_ERRATA_588369
+ 	select PL310_ERRATA_727915
+ 	select ARM_ERRATA_720789
+diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+index f343365..40ea7e2 100644
+--- a/arch/arm/mach-omap2/Makefile
++++ b/arch/arm/mach-omap2/Makefile
+@@ -22,7 +22,6 @@ obj-$(CONFIG_TWL4030_CORE) += omap_twl.o
  
-+config ARM_SMP_TWD
-+	bool
-+	select HAVE_ARM_TWD if SMP
-+
- choice
- 	prompt "Memory split"
- 	default VMSPLIT_3G
-@@ -1432,7 +1436,7 @@ config HOTPLUG_CPU
+ # SMP support ONLY available for OMAP4
+ obj-$(CONFIG_SMP)			+= omap-smp.o omap-headsmp.o
+-obj-$(CONFIG_LOCAL_TIMERS)		+= timer-mpu.o
+ obj-$(CONFIG_HOTPLUG_CPU)		+= omap-hotplug.o
+ obj-$(CONFIG_ARCH_OMAP4)		+= omap44xx-smc.o omap4-common.o
  
- config LOCAL_TIMERS
- 	bool "Use local timer interrupts"
--	depends on SMP
-+	depends on SMP && !ARM_SMP_TWD
- 	default y
- 	select HAVE_ARM_TWD if (!ARCH_MSM_SCORPIONMP && !EXYNOS4_MCT)
- 	help
-diff --git a/arch/arm/include/asm/smp_twd.h b/arch/arm/include/asm/smp_twd.h
-index ef9ffba..934f1bc 100644
---- a/arch/arm/include/asm/smp_twd.h
-+++ b/arch/arm/include/asm/smp_twd.h
-@@ -19,10 +19,19 @@
- #define TWD_TIMER_CONTROL_IT_ENABLE	(1 << 2)
+diff --git a/arch/arm/mach-omap2/timer-mpu.c b/arch/arm/mach-omap2/timer-mpu.c
+deleted file mode 100644
+index 31c0ac4..0000000
+--- a/arch/arm/mach-omap2/timer-mpu.c
++++ /dev/null
+@@ -1,39 +0,0 @@
+-/*
+- * The MPU local timer source file. In OMAP4, both cortex-a9 cores have
+- * own timer in it's MPU domain. These timers will be driving the
+- * linux kernel SMP tick framework when active. These timers are not
+- * part of the wake up domain.
+- *
+- * Copyright (C) 2009 Texas Instruments, Inc.
+- *
+- * Author:
+- *      Santosh Shilimkar <santosh.shilimkar@ti.com>
+- *
+- * This file is based on arm realview smp platform file.
+- * Copyright (C) 2002 ARM Ltd.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
+-#include <linux/init.h>
+-#include <linux/smp.h>
+-#include <linux/clockchips.h>
+-#include <asm/irq.h>
+-#include <asm/smp_twd.h>
+-#include <asm/localtimer.h>
+-
+-/*
+- * Setup the local clock events for a CPU.
+- */
+-int __cpuinit local_timer_setup(struct clock_event_device *evt)
+-{
+-	/* Local timers are not supprted on OMAP4430 ES1.0 */
+-	if (omap_rev() == OMAP4430_REV_ES1_0)
+-		return -ENXIO;
+-
+-	evt->irq = OMAP44XX_IRQ_LOCALTIMER;
+-	twd_timer_setup(evt);
+-	return 0;
+-}
+-
+diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+index e964072..5a4ce50 100644
+--- a/arch/arm/mach-omap2/timer.c
++++ b/arch/arm/mach-omap2/timer.c
+@@ -38,7 +38,7 @@
  
- struct clock_event_device;
-+struct resource;
- 
- extern void __iomem *twd_base;
- 
- void twd_timer_setup(struct clock_event_device *);
- void twd_timer_stop(struct clock_event_device *);
-+#ifdef CONFIG_HAVE_ARM_TWD
-+int twd_timer_register(struct resource *res, int res_nr);
-+#else
-+static inline int twd_timer_register(struct resource *res, int res_nr)
-+{
-+	return 0;
-+}
-+#endif
- 
+ #include <asm/mach/time.h>
+ #include <plat/dmtimer.h>
+-#include <asm/localtimer.h>
++#include <asm/smp_twd.h>
+ #include <asm/sched_clock.h>
+ #include <plat/common.h>
+ #include <plat/omap_hwmod.h>
+@@ -328,15 +328,43 @@ OMAP_SYS_TIMER_INIT(3_secure, OMAP3_SECURE_TIMER, OMAP3_CLKEV_SOURCE,
+ OMAP_SYS_TIMER(3_secure)
  #endif
-diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-index 7156f09..5b6d99b 100644
---- a/arch/arm/kernel/smp_twd.c
-+++ b/arch/arm/kernel/smp_twd.c
-@@ -13,6 +13,7 @@
- #include <linux/delay.h>
- #include <linux/device.h>
- #include <linux/smp.h>
-+#include <linux/cpu.h>
- #include <linux/jiffies.h>
- #include <linux/clockchips.h>
- #include <linux/irq.h>
-@@ -135,7 +136,7 @@ void __cpuinit twd_timer_setup(struct clock_event_device *clk)
- 	clk->name = "local_timer";
- 	clk->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT |
- 			CLOCK_EVT_FEAT_C3STOP;
--	clk->rating = 350;
-+	clk->rating = 450;	/* Make sure this is higher than broadcast */
- 	clk->set_mode = twd_set_mode;
- 	clk->set_next_event = twd_set_next_event;
- 	clk->shift = 20;
-@@ -150,3 +151,76 @@ void __cpuinit twd_timer_setup(struct clock_event_device *clk)
- 		pr_err("%s: can't register interrupt %d on cpu %d (%d)\n",
- 		       clk->name, clk->irq, smp_processor_id(), err);
- }
-+
+ 
 +#ifdef CONFIG_ARM_SMP_TWD
-+static struct clock_event_device __percpu *twd_evt;
-+static int twd_ppi;
-+
-+static void __cpuinit twd_setup(void *data)
-+{
-+	struct clock_event_device *clk = data;
-+	clk->cpumask = cpumask_of(smp_processor_id());
-+	clk->irq = twd_ppi;
-+	twd_timer_setup(clk);
-+}
-+
-+static void __cpuinit twd_teardown(void *data)
-+{
-+	struct clock_event_device *clk = data;
-+	twd_timer_stop(clk);
-+}
-+
-+static int __cpuinit twd_cpu_notify(struct notifier_block *self,
-+				    unsigned long action, void *data)
-+{
-+	int cpu = (int)data;
-+	struct clock_event_device *clk = per_cpu_ptr(twd_evt, cpu);
-+
-+	switch (action) {
-+	case CPU_STARTING:
-+	case CPU_STARTING_FROZEN:
-+		smp_call_function_single(cpu, twd_setup, clk, 1);
-+		break;
-+
-+	case CPU_DOWN_PREPARE:
-+	case CPU_DOWN_PREPARE_FROZEN:
-+		smp_call_function_single(cpu, twd_teardown, clk, 1);
-+		break;
-+	}
-+
-+	return NOTIFY_OK;
-+}
-+
-+static struct notifier_block __cpuinitdata twd_cpu_nb = {
-+	.notifier_call = twd_cpu_notify,
++static struct resource omap4_twd_resources[] __initdata = {
++	{
++		.start	= OMAP44XX_LOCAL_TWD_BASE,
++		.end	= OMAP44XX_LOCAL_TWD_BASE + 0x10,
++		.flags	= IORESOURCE_MEM,
++	},
++	{
++		.start	= OMAP44XX_IRQ_LOCALTIMER,
++		.end	= OMAP44XX_IRQ_LOCALTIMER,
++		.flags	= IORESOURCE_IRQ,
++	},
 +};
 +
-+int twd_timer_register(struct resource *res, int res_nr)
++static void __init omap4_twd_init(void)
 +{
-+	struct clock_event_device *clk;
++	int err;
 +
-+	if (res_nr != 2 || res[1].start < 0)
-+		return -EINVAL;
++	/* Local timers are not supprted on OMAP4430 ES1.0 */
++	if (omap_rev() == OMAP4430_REV_ES1_0)
++		return;
 +
-+	if (twd_base)
-+		return -EBUSY;
-+
-+	twd_ppi		= res[1].start;
-+	twd_base	= ioremap(res[0].start, resource_size(&res[0]));
-+	twd_evt		= alloc_percpu(struct clock_event_device);
-+	if (!twd_base || !twd_evt) {
-+		iounmap(twd_base);
-+		twd_base = NULL;
-+		free_percpu(twd_evt);
-+		return -ENOMEM;
-+	}
-+
-+	/* Immediately configure the timer on the boot CPU */
-+	clk = per_cpu_ptr(twd_evt, smp_processor_id());
-+	twd_setup(clk);
-+
-+	register_cpu_notifier(&twd_cpu_nb);
-+
-+	return 0;
++	err = twd_timer_register(omap4_twd_resources,
++				 ARRAY_SIZE(omap4_twd_resources));
++	if (err)
++		pr_err("twd_timer_register failed %d\n", err);
 +}
++#else
++#define omap4_twd_init	NULL
 +#endif
++
+ #ifdef CONFIG_ARCH_OMAP4
+ static void __init omap4_timer_init(void)
+ {
+-#ifdef CONFIG_LOCAL_TIMERS
+-	twd_base = ioremap(OMAP44XX_LOCAL_TWD_BASE, SZ_256);
+-	BUG_ON(!twd_base);
+-#endif
+ 	omap2_gp_clockevent_init(1, OMAP4_CLKEV_SOURCE);
+ 	omap2_gp_clocksource_init(2, OMAP4_MPU_SOURCE);
++	late_time_init = omap4_twd_init;
+ }
+ OMAP_SYS_TIMER(4)
+ #endif
 -- 
 1.7.0.4
