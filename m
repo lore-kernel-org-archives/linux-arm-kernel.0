@@ -1,42 +1,121 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Tue, 9 Aug 2011 10:35:05 +0100
-Subject: [PATCH 00/10] ARM: perf: updates for 3.2
-In-Reply-To: <1312823771-9952-1-git-send-email-will.deacon@arm.com>
-References: <1312823771-9952-1-git-send-email-will.deacon@arm.com>
-Message-ID: <20110809093505.GD3210@pulham.picochip.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Tue, 9 Aug 2011 11:35:46 +0200
+Subject: GPMI-NAND Status?
+In-Reply-To: <4E3F8087.6070206@freescale.com>
+References: <20110805135133.GA26981@pengutronix.de>
+	<4E3F8087.6070206@freescale.com>
+Message-ID: <20110809093546.GB1923@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
 
-On Mon, Aug 08, 2011 at 06:16:01PM +0100, Will Deacon wrote:
-> Hello,
-> 
-> This patch series contains a number of updates to the ARM PMU and perf
-> code so that we can support mode exclusion, which is new in debug
-> architecture 7.1 (as implemented by the Cortex-A15). Some of these
-> updates also coincide with work to support System PMUs (PMUs that are
-> not affine to a single CPU) but that is a larger body of work which will
-> be posted separately at a later date.
-> 
-> The patches do the following:
-> 
->   1.) Greatly simplify the PMU reservation mechanism so that the
->       handling of platform_devices is moved into perf.
->   2.) Cleans up the interrupt registration and some of the types used
->       to represent events and registers.
->   3.) Moves event indexing to start from zero rather than one, making
->       the code more readable and also easier to extend for mode
->       exclusion.
->   4.) Adds support for mode exclusion (user / kernel / hyp) and
->       implements this for Cortex-A15.
-> 
-> I've been running these patches since 3.0, so they've been tested on
-> 1176, 11MPCore, Cortex-A5, Cortex-A9 and Cortex-A15 platforms.
+> >DMA timeouts [1]
+> >================
+> >
+> >[    2.560000] [ start_dma_without_bch_irq : 392 ] DMA timeout, last DMA :1
+> >[    3.560000] [ start_dma_with_bch_irq : 427 ] bch timeout!!!
+> >
+> >Always reproducible by me when trying to format mtd0. Sometimes(always?) seen
+> >by Koen during boot (on read?). Never seen by Huang? It is currently unclear if
+> After I used a different .config, it never appears in my side.
 
-A quick glance through them and they all look nice to me, but I can't 
-get them to apply to any tree (next and master).  It looks like they're 
-based on a tree with changes to the v7 perf support so I'm guessing it's 
-your patches with A15 support.
+So, you have a config which triggers this? That should be useful for
+debugging. What do you need to enable to see this?
 
-Jamie
+> Please test the driver again when you back to office.
+> Pay attention to your version of /arch/arm/configs/mxs_defconfig.
+> Your mxs_defconfig may miss Shawn Guo's patches.
+
+I have all the correct patches, I triple-checked that. Regarding the
+config, I am not looking for a config that works, I want my config to
+work. I meanwhile have the feeling this is a bug in the DMA driver
+(because Aisheng Dong has DMA problems, too, in the audio path), still
+we need to be sure.
+
+> >problem overwriting all-0xff data in NAND [2]
+> >=============================================
+> >
+> >Although it occured only when writing JFFS2 images so far, this is a generic
+> >issue and needs to be fixed, right?
+> >
+> Artem said it should not change the driver, but the upper layer(jffs2).
+> 
+> So I think i do not need to change the driver.
+
+OK, read it again, got it now. Agreed.
+
+
+> >* custom sysfs-entries
+> My sysfs-entries is in the GPMI-NAND directory.
+> Does be a mainline driver means I should not have any sysfs-entries?
+> If it does, i can remove it.
+
+It is some kund of ABI, so we would have to support them forever. If
+there is no really strong reason to have them, it is better to remove
+them.
+
+> 
+> >* custom kernel command line parameters
+> The kernel command line 'gpmi_nand' is to avoid the conflict with
+> other modules such as
+> SD.
+> 
+> If it's be removed, I have to use different config to resolve the
+> issue which is not better either. :(
+
+This is a board-specific issue, so you should handle this at
+board-level, not at driver level.
+
+> >* namespacing (some functions have no prefix, some have "mil_", some have mx23)
+> >   (I think 'mil' means 'mtd interface layer', but why is that needed?)
+> The mil is used to make the gpmi_nand_data{} simple.
+> Without it, the gpmi_nand_data{} will very big.
+> 
+> The functions which have mx23 prefix are only used in mx23.
+> The functions which have no prefix can used in both mx28 and mx23.
+
+I understood this, but wonder if mx23_* specific stuff has to be in the
+main driver. Will have a closer look to the driver this week, then I can
+say more.
+
+> >Complexity
+> >==========
+> >
+> >The driver is not easy to review. I wonder if it makes sense to use incremental
+> >patches for it? maybe making it a staging driver could be a solution for that?
+> Frankly speaking, the current driver is maybe the smallest version now.
+> 
+> I even do not add the on-chip BBT feature now.
+
+OK.
+
+> >Huang, are you interested in accepting patches or do you prefer we just point
+> >at certain code and you then fix it? Starting with a simpler driver and then
+> Feel free to mail me the patch. it's welcome.
+
+We'd need a branch somewhere for that, so we have a history.
+
+> >adding stuff might be another option if we can't chase all the bugs in the
+> >current driver.
+> >
+> >That being said, I'd think fixing the DMA issue has prio #1 and maybe we can
+> >meet in IRC or something to work that out? Is there interest in that?
+> What about gtalk?
+
+Definately not my favourite, but seems like Koen and you already use it.
+Might try it...
+
+Regards,
+
+    Wolfram
+
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110809/0ed2b8f1/attachment.sig>
