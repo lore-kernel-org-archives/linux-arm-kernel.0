@@ -1,128 +1,231 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  9 Aug 2011 11:46:51 +0100
-Subject: [RFC PATCH 09/12] ARM: smp_twd: remove support for non-standalone
-	version
+Date: Tue,  9 Aug 2011 11:46:54 +0100
+Subject: [RFC PATCH 12/12] ARM: local timers: Remove CONFIG_LOCAL_TIMERS
+	support
 In-Reply-To: <1312886814-15627-1-git-send-email-marc.zyngier@arm.com>
 References: <1312886814-15627-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1312886814-15627-10-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1312886814-15627-13-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no in-tree platform using both CONFIG_LOCAL_TIMERS and
-CONFIG_HAVE_ARM_TWD. As such, some code can be removed and some
-exported function of smp_twd.c can be made static.
+Local timer support in arch/arm is now completely unused, as all
+in-tree platforms are using standalone timers.
+
+It allows us to simplify the code, only preserving the broadcast
+timer. The broadcast timer is always installed, and we leave it up
+to the kernel to pick the more suitable timer (usually the one with
+the highest priority).
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/Kconfig                  |    1 -
- arch/arm/include/asm/localtimer.h |   10 ----------
- arch/arm/include/asm/smp_twd.h    |    5 -----
- arch/arm/kernel/smp_twd.c         |   10 +++-------
- 4 files changed, 3 insertions(+), 23 deletions(-)
+ arch/arm/Kconfig                  |   10 ------
+ arch/arm/include/asm/localtimer.h |   46 ------------------------------
+ arch/arm/kernel/smp.c             |   56 +++++++++---------------------------
+ 3 files changed, 14 insertions(+), 98 deletions(-)
+ delete mode 100644 arch/arm/include/asm/localtimer.h
 
 diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 7ac28a3..12cbeba 100644
+index ef67b64..9aba6c2 100644
 --- a/arch/arm/Kconfig
 +++ b/arch/arm/Kconfig
-@@ -1438,7 +1438,6 @@ config LOCAL_TIMERS
- 	bool "Use local timer interrupts"
- 	depends on SMP && !ARM_SMP_TWD
- 	default y
--	select HAVE_ARM_TWD if (!ARCH_MSM_SCORPIONMP && !EXYNOS4_MCT)
- 	help
- 	  Enable support for local timers on SMP platforms, rather then the
- 	  legacy IPI broadcast method.  Local timers allows the system
+@@ -1434,16 +1434,6 @@ config HOTPLUG_CPU
+ 	  Say Y here to experiment with turning CPUs off and on.  CPUs
+ 	  can be controlled through /sys/devices/system/cpu.
+ 
+-config LOCAL_TIMERS
+-	bool "Use local timer interrupts"
+-	depends on SMP && !ARM_SMP_TWD && !ARCH_MSM && !EXYNOS4_MCT
+-	default y
+-	help
+-	  Enable support for local timers on SMP platforms, rather then the
+-	  legacy IPI broadcast method.  Local timers allows the system
+-	  accounting to be spread across the timer interval, preventing a
+-	  "thundering herd" at every timer tick.
+-
+ source kernel/Kconfig.preempt
+ 
+ config HZ
 diff --git a/arch/arm/include/asm/localtimer.h b/arch/arm/include/asm/localtimer.h
-index f5e1cec..af5c371 100644
+deleted file mode 100644
+index af5c371..0000000
 --- a/arch/arm/include/asm/localtimer.h
-+++ b/arch/arm/include/asm/localtimer.h
-@@ -21,21 +21,11 @@ void percpu_timer_setup(void);
- 
- #ifdef CONFIG_LOCAL_TIMERS
- 
--#ifdef CONFIG_HAVE_ARM_TWD
++++ /dev/null
+@@ -1,46 +0,0 @@
+-/*
+- *  arch/arm/include/asm/localtimer.h
+- *
+- *  Copyright (C) 2004-2005 ARM Ltd.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
+-#ifndef __ASM_ARM_LOCALTIMER_H
+-#define __ASM_ARM_LOCALTIMER_H
 -
--#include "smp_twd.h"
+-#include <linux/interrupt.h>
 -
--#define local_timer_stop(c)	twd_timer_stop((c))
+-struct clock_event_device;
+-
+-/*
+- * Setup a per-cpu timer, whether it be a local timer or dummy broadcast
+- */
+-void percpu_timer_setup(void);
+-
+-#ifdef CONFIG_LOCAL_TIMERS
+-
+-/*
+- * Stop the local timer
+- */
+-void local_timer_stop(struct clock_event_device *);
+-
+-/*
+- * Setup a local timer interrupt for a CPU.
+- */
+-int local_timer_setup(struct clock_event_device *);
 -
 -#else
 -
- /*
-  * Stop the local timer
-  */
- void local_timer_stop(struct clock_event_device *);
- 
+-static inline int local_timer_setup(struct clock_event_device *evt)
+-{
+-	return -ENXIO;
+-}
+-
+-static inline void local_timer_stop(struct clock_event_device *evt)
+-{
+-}
 -#endif
 -
- /*
-  * Setup a local timer interrupt for a CPU.
-  */
-diff --git a/arch/arm/include/asm/smp_twd.h b/arch/arm/include/asm/smp_twd.h
-index 934f1bc..0da6438 100644
---- a/arch/arm/include/asm/smp_twd.h
-+++ b/arch/arm/include/asm/smp_twd.h
-@@ -18,13 +18,8 @@
- #define TWD_TIMER_CONTROL_PERIODIC	(1 << 1)
- #define TWD_TIMER_CONTROL_IT_ENABLE	(1 << 2)
- 
--struct clock_event_device;
- struct resource;
- 
--extern void __iomem *twd_base;
--
--void twd_timer_setup(struct clock_event_device *);
--void twd_timer_stop(struct clock_event_device *);
- #ifdef CONFIG_HAVE_ARM_TWD
- int twd_timer_register(struct resource *res, int res_nr);
- #else
-diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-index 5b6d99b..0a9106d 100644
---- a/arch/arm/kernel/smp_twd.c
-+++ b/arch/arm/kernel/smp_twd.c
-@@ -20,11 +20,9 @@
- #include <linux/io.h>
- 
- #include <asm/smp_twd.h>
+-#endif
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 5d1f2e2..32471ac 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -38,7 +38,6 @@
+ #include <asm/sections.h>
+ #include <asm/tlbflush.h>
+ #include <asm/ptrace.h>
 -#include <asm/localtimer.h>
- #include <asm/hardware/gic.h>
  
--/* set up by the platform code */
--void __iomem *twd_base;
-+static void __iomem *twd_base;
- 
- static unsigned long twd_timer_rate;
- 
-@@ -79,7 +77,7 @@ static irqreturn_t twd_timer_handler(int irq, void *dev_id)
- 	return IRQ_NONE;
- }
- 
--void twd_timer_stop(struct clock_event_device *clk)
-+static void twd_timer_stop(struct clock_event_device *clk)
- {
- 	twd_set_mode(CLOCK_EVT_MODE_UNUSED, clk);
- 	gic_free_ppi(clk->irq, clk);
-@@ -127,7 +125,7 @@ static void __cpuinit twd_calibrate_rate(void)
  /*
-  * Setup the local clock events for a CPU.
+  * as from 2.5, kernels no longer have an init_tasks structure
+@@ -154,8 +153,6 @@ int __cpuinit __cpu_up(unsigned int cpu)
+ }
+ 
+ #ifdef CONFIG_HOTPLUG_CPU
+-static void percpu_timer_stop(void);
+-
+ /*
+  * __cpu_disable runs on the processor to be shutdown.
   */
--void __cpuinit twd_timer_setup(struct clock_event_device *clk)
-+static void __cpuinit twd_timer_setup(struct clock_event_device *clk)
+@@ -181,11 +178,6 @@ int __cpu_disable(void)
+ 	migrate_irqs();
+ 
+ 	/*
+-	 * Stop the local timer for this CPU.
+-	 */
+-	percpu_timer_stop();
+-
+-	/*
+ 	 * Flush user cache and TLB mappings, and then remove this CPU
+ 	 * from the vm mask set of all processes.
+ 	 */
+@@ -286,6 +278,8 @@ static void __cpuinit smp_store_cpu_info(unsigned int cpuid)
+ 	cpu_info->loops_per_jiffy = loops_per_jiffy;
+ }
+ 
++static void broadcast_timer_setup(void);
++
+ /*
+  * This is the secondary CPU boot entry.  We're using this CPUs
+  * idle thread stack, but a set of temporary page tables.
+@@ -325,9 +319,9 @@ asmlinkage void __cpuinit secondary_start_kernel(void)
+ 	local_fiq_enable();
+ 
+ 	/*
+-	 * Setup the percpu timer for this CPU.
++	 * Setup the broadcast timer for this CPU.
+ 	 */
+-	percpu_timer_setup();
++	broadcast_timer_setup();
+ 
+ 	calibrate_delay();
+ 
+@@ -383,10 +377,10 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
+ 		max_cpus = ncores;
+ 	if (ncores > 1 && max_cpus) {
+ 		/*
+-		 * Enable the local timer or broadcast device for the
+-		 * boot CPU, but only if we have more than one CPU.
++		 * Enable the broadcast device for the boot CPU, but
++		 * only if we have more than one CPU.
+ 		 */
+-		percpu_timer_setup();
++		broadcast_timer_setup();
+ 
+ 		/*
+ 		 * Initialise the present map, which describes the set of CPUs
+@@ -457,7 +451,7 @@ u64 smp_irq_stat_cpu(unsigned int cpu)
+ }
+ 
+ /*
+- * Timer (local or broadcast) support
++ * Broadcast timer support
+  */
+ static DEFINE_PER_CPU(struct clock_event_device, percpu_clockevent);
+ 
+@@ -483,8 +477,11 @@ static void broadcast_timer_set_mode(enum clock_event_mode mode,
  {
- 	int err;
- 
-@@ -152,7 +150,6 @@ void __cpuinit twd_timer_setup(struct clock_event_device *clk)
- 		       clk->name, clk->irq, smp_processor_id(), err);
  }
  
--#ifdef CONFIG_ARM_SMP_TWD
- static struct clock_event_device __percpu *twd_evt;
- static int twd_ppi;
+-static void __cpuinit broadcast_timer_setup(struct clock_event_device *evt)
++static void __cpuinit broadcast_timer_setup(void)
+ {
++	unsigned int cpu = smp_processor_id();
++	struct clock_event_device *evt = &per_cpu(percpu_clockevent, cpu);
++
+ 	evt->name	= "dummy_timer";
+ 	evt->features	= CLOCK_EVT_FEAT_ONESHOT |
+ 			  CLOCK_EVT_FEAT_PERIODIC |
+@@ -492,37 +489,12 @@ static void __cpuinit broadcast_timer_setup(struct clock_event_device *evt)
+ 	evt->rating	= 400;
+ 	evt->mult	= 1;
+ 	evt->set_mode	= broadcast_timer_set_mode;
++	evt->cpumask	= cpumask_of(cpu);
++	evt->broadcast	= smp_timer_broadcast;
  
-@@ -223,4 +220,3 @@ int twd_timer_register(struct resource *res, int res_nr)
- 
- 	return 0;
+ 	clockevents_register_device(evt);
  }
+ 
+-void __cpuinit percpu_timer_setup(void)
+-{
+-	unsigned int cpu = smp_processor_id();
+-	struct clock_event_device *evt = &per_cpu(percpu_clockevent, cpu);
+-
+-	evt->cpumask = cpumask_of(cpu);
+-	evt->broadcast = smp_timer_broadcast;
+-
+-	if (local_timer_setup(evt))
+-		broadcast_timer_setup(evt);
+-}
+-
+-#ifdef CONFIG_HOTPLUG_CPU
+-/*
+- * The generic clock events code purposely does not stop the local timer
+- * on CPU_DEAD/CPU_DEAD_FROZEN hotplug events, so we have to do it
+- * manually here.
+- */
+-static void percpu_timer_stop(void)
+-{
+-	unsigned int cpu = smp_processor_id();
+-	struct clock_event_device *evt = &per_cpu(percpu_clockevent, cpu);
+-
+-	local_timer_stop(evt);
+-}
 -#endif
+-
+ static DEFINE_SPINLOCK(stop_lock);
+ 
+ /*
 -- 
 1.7.0.4
