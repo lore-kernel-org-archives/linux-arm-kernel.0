@@ -1,76 +1,57 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Tue, 9 Aug 2011 22:42:23 +0200
-Subject: GPMI-NAND Status?
-In-Reply-To: <4E4111F3.5070409@freescale.com>
-References: <20110805135133.GA26981@pengutronix.de>
-	<4E3F8087.6070206@freescale.com>
-	<20110809093546.GB1923@pengutronix.de>
-	<4E4111F3.5070409@freescale.com>
-Message-ID: <20110809204223.GA5858@pengutronix.de>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Tue, 9 Aug 2011 14:43:43 -0600
+Subject: Tegra pinmux Device Tree support
+In-Reply-To: <20110809201815.GA21684@pulham.picochip.com>
+References: <74CDBE0F657A3D45AFBB94109FB122FF049F17229E@HQMAIL01.nvidia.com>
+	<20110809173428.GB32195@ponder.secretlab.ca>
+	<20110809201815.GA21684@pulham.picochip.com>
+Message-ID: <20110809204343.GA11568@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> >>>Always reproducible by me when trying to format mtd0. Sometimes(always?) seen
-> >>>by Koen during boot (on read?). Never seen by Huang? It is currently unclear if
-> >>After I used a different .config, it never appears in my side.
-> >So, you have a config which triggers this? That should be useful for
-> >debugging. What do you need to enable to see this?
-> >
-> My old config is made by myself. I think it was a wrong config,
-
-Let's see what the bug is in the end, but I don't think a config could be
-"wrong" in a way to trigger such a bug. Even misconfiguration can be handled
-gracefully with code.
-
-> it's not a DMA bug, I discuss with Koen, and make sure that the bug is
-> caused by the GPMI or BCH.
-
-Did you get any further during this day?
-
-> it's a different bug from  Aisheng Dong's bug.
-
-Okay, I had a look at this one today.
-
-> >>>* custom kernel command line parameters
-> >>The kernel command line 'gpmi_nand' is to avoid the conflict with
-> >>other modules such as
-> >>SD.
-> >>
-> >>If it's be removed, I have to use different config to resolve the
-> >>issue which is not better either. :(
-> >This is a board-specific issue, so you should handle this at
-> >board-level, not at driver level.
-> >
-> I wish to handle it at the board level.
+On Tue, Aug 09, 2011 at 09:18:15PM +0100, Jamie Iles wrote:
+> Hi Grant,
 > 
-> But I have no idea how to solve the conflict between GPMI and SD.  :(
+> On Tue, Aug 09, 2011 at 11:34:28AM -0600, Grant Likely wrote:
+> > We talked about this a bit at Linaro connect.  Outside of the more
+> > complex runtime-reconfiguration of pin mux, there is a general need
+> > for arbitrary initialization sequences to registers.  Also, pretty
+> > much exactly what you need for tegra is needed for imx, omap and many
+> > others.  The though was, rather than trying to come up with some kind
+> > of pinmux-specific binding for pin states, which could end up being
+> > very verbose if everything was split out into properties, we could
+> > instead have a binding for register initialization sequences.
+> > Something like this:
+> > 
+> > 	pinmux-initseq = <reg1 value1> <reg1 value2> ...;
+> > 
+> > And then add some macros for DTC to make it easier to define things
+> > like pinmux setup tables.  Although the binding above is probably too
+> > simple and naive.
 > 
-> Could you give me some hint?
+> Unfortunately we have devices where the pinmux registers aren't directly 
+> memory mapped so I'm not sure that this would work for our devices 
+> (which admittedly don't have a friendly muxing configuration...).  We 
+> don't have a single way of muxing pins so at the moment we have a fairly 
+> hideous set of structures and macros to allow us to create smallish 
+> definitions of pins, but I can't see a nice way to express this in the 
+> DT.
+> 
+> At the moment I have a simple pinmux API that takes the pin name and 
+> setting name as strings, so I was thinking for a simple binding (for 
+> configuration) I could have something like:
+> 
+> 	pinmux {
+> 		pinmux-decode0 = "decode";
+> 		pinmux-decode1 = "gpio";
+> 	};
+> 
+> I remember in another thread you mentioned the possibility of building 
+> some tables and embedding the binary data in the DT, but that has 
+> potential problems with versioning of the structures.
 
-For starters, you could move some kerel-parameter to the board-file and create the
-devices as needed depending on that:
+Structure/binding versioning is easy.  If it really is necessary to
+change the binding in an incompatible way, then change the compatible
+value too.
 
-if (gpmi_nand)
-	mx28_add_gpmi_nand(&mx28evk_gpmi_nand_data);
-else
-	mx28_add_mxs_mmc(1, &mx28evk_mmc_pdata[1]);
-
-or something alike unless I miss something. This is probably not the best
-solution as well, but at least it keeps the driver free from the
-board-configuration.
-
-Regards,
-
-   Wolfram
-
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110809/5fc77cd0/attachment.sig>
+g.
