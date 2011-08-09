@@ -1,231 +1,41 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Tue, 9 Aug 2011 10:41:35 -0700
-Subject: [PATCH v2] ep93xx: use DEFINE_RES_* helpers
-Message-ID: <201108091041.36338.hartleys@visionengravers.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 9 Aug 2011 10:44:29 -0700
+Subject: Tegra pinmux Device Tree support
+In-Reply-To: <20110809173428.GB32195@ponder.secretlab.ca>
+References: <74CDBE0F657A3D45AFBB94109FB122FF049F17229E@HQMAIL01.nvidia.com>
+	<20110809173428.GB32195@ponder.secretlab.ca>
+Message-ID: <CAOesGMjH8hZSAXvDZ6ADO-dtFNecRYC5GsfRiAeV8KMRG=JTkQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the DEFINE_RES_* helpers defined in ioport.h to define the peripheral
-memory and irq resources.
+On Tue, Aug 9, 2011 at 10:34 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
 
-Signed-off-by: Hartley Sweeten <hsweeten@visionengravers.com>
-Reviewed-by: Mika Westerberg <mika.westerberg@iki.fi>
-Cc: Ryan Mallon <rmallon@gmail.com>
+> We talked about this a bit at Linaro connect. ?Outside of the more
+> complex runtime-reconfiguration of pin mux, there is a general need
+> for arbitrary initialization sequences to registers. ?Also, pretty
+> much exactly what you need for tegra is needed for imx, omap and many
+> others. ?The though was, rather than trying to come up with some kind
+> of pinmux-specific binding for pin states, which could end up being
+> very verbose if everything was split out into properties, we could
+> instead have a binding for register initialization sequences.
+> Something like this:
+>
+> ? ? ? ?pinmux-initseq = <reg1 value1> <reg1 value2> ...;
+>
+> And then add some macros for DTC to make it easier to define things
+> like pinmux setup tables. ?Although the binding above is probably too
+> simple and naive.
 
----
+This seems to break the philosophy of what the device tree should do
+-- it should describe the hardware so that the driver will know how to
+program it, not include the code itself?
 
-v2: fix typo for ep93xx_pwm1_resource
+I know it's a hairy problem to deal with one compact pinmux
+representation that fits all needs. Maybe making it overly generic is
+the wrong way to go about it, and let each implementation define what
+it needs? That way the simpler implementations can do something
+reasonably simple without having to deal with the overly complex
+options of the (over?) generalized platforms out there.
 
-diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
-index a82265b..4d32a87 100644
---- a/arch/arm/mach-ep93xx/core.c
-+++ b/arch/arm/mach-ep93xx/core.c
-@@ -241,11 +241,7 @@ unsigned int ep93xx_chip_revision(void)
-  * EP93xx GPIO
-  *************************************************************************/
- static struct resource ep93xx_gpio_resource[] = {
--	{
--		.start		= EP93XX_GPIO_PHYS_BASE,
--		.end		= EP93XX_GPIO_PHYS_BASE + 0xcc - 1,
--		.flags		= IORESOURCE_MEM,
--	},
-+	DEFINE_RES_MEM(EP93XX_GPIO_PHYS_BASE, 0xcc),
- };
- 
- static struct platform_device ep93xx_gpio_device = {
-@@ -283,11 +279,7 @@ static struct amba_device uart1_device = {
- 		.init_name	= "apb:uart1",
- 		.platform_data	= &ep93xx_uart_data,
- 	},
--	.res		= {
--		.start	= EP93XX_UART1_PHYS_BASE,
--		.end	= EP93XX_UART1_PHYS_BASE + 0x0fff,
--		.flags	= IORESOURCE_MEM,
--	},
-+	.res		= DEFINE_RES_MEM(EP93XX_UART1_PHYS_BASE, 0x1000),
- 	.irq		= { IRQ_EP93XX_UART1, NO_IRQ },
- 	.periphid	= 0x00041010,
- };
-@@ -297,11 +289,7 @@ static struct amba_device uart2_device = {
- 		.init_name	= "apb:uart2",
- 		.platform_data	= &ep93xx_uart_data,
- 	},
--	.res		= {
--		.start	= EP93XX_UART2_PHYS_BASE,
--		.end	= EP93XX_UART2_PHYS_BASE + 0x0fff,
--		.flags	= IORESOURCE_MEM,
--	},
-+	.res		= DEFINE_RES_MEM(EP93XX_UART2_PHYS_BASE, 0x1000),
- 	.irq		= { IRQ_EP93XX_UART2, NO_IRQ },
- 	.periphid	= 0x00041010,
- };
-@@ -311,22 +299,14 @@ static struct amba_device uart3_device = {
- 		.init_name	= "apb:uart3",
- 		.platform_data	= &ep93xx_uart_data,
- 	},
--	.res		= {
--		.start	= EP93XX_UART3_PHYS_BASE,
--		.end	= EP93XX_UART3_PHYS_BASE + 0x0fff,
--		.flags	= IORESOURCE_MEM,
--	},
-+	.res		= DEFINE_RES_MEM(EP93XX_UART3_PHYS_BASE, 0x1000),
- 	.irq		= { IRQ_EP93XX_UART3, NO_IRQ },
- 	.periphid	= 0x00041010,
- };
- 
- 
- static struct resource ep93xx_rtc_resource[] = {
--	{
--		.start		= EP93XX_RTC_PHYS_BASE,
--		.end		= EP93XX_RTC_PHYS_BASE + 0x10c - 1,
--		.flags		= IORESOURCE_MEM,
--	},
-+	DEFINE_RES_MEM(EP93XX_RTC_PHYS_BASE, 0x10c),
- };
- 
- static struct platform_device ep93xx_rtc_device = {
-@@ -338,16 +318,8 @@ static struct platform_device ep93xx_rtc_device = {
- 
- 
- static struct resource ep93xx_ohci_resources[] = {
--	[0] = {
--		.start	= EP93XX_USB_PHYS_BASE,
--		.end	= EP93XX_USB_PHYS_BASE + 0x0fff,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= IRQ_EP93XX_USB,
--		.end	= IRQ_EP93XX_USB,
--		.flags	= IORESOURCE_IRQ,
--	},
-+	DEFINE_RES_MEM(EP93XX_USB_PHYS_BASE, 0x1000),
-+	DEFINE_RES_IRQ(IRQ_EP93XX_USB),
- };
- 
- 
-@@ -406,15 +378,8 @@ void __init ep93xx_register_flash(unsigned int width,
- static struct ep93xx_eth_data ep93xx_eth_data;
- 
- static struct resource ep93xx_eth_resource[] = {
--	{
--		.start	= EP93XX_ETHERNET_PHYS_BASE,
--		.end	= EP93XX_ETHERNET_PHYS_BASE + 0xffff,
--		.flags	= IORESOURCE_MEM,
--	}, {
--		.start	= IRQ_EP93XX_ETHERNET,
--		.end	= IRQ_EP93XX_ETHERNET,
--		.flags	= IORESOURCE_IRQ,
--	}
-+	DEFINE_RES_MEM(EP93XX_ETHERNET_PHYS_BASE, 0x10000),
-+	DEFINE_RES_IRQ(IRQ_EP93XX_ETHERNET),
- };
- 
- static u64 ep93xx_eth_dma_mask = DMA_BIT_MASK(32);
-@@ -495,16 +460,8 @@ void __init ep93xx_register_i2c(struct i2c_gpio_platform_data *data,
- static struct ep93xx_spi_info ep93xx_spi_master_data;
- 
- static struct resource ep93xx_spi_resources[] = {
--	{
--		.start	= EP93XX_SPI_PHYS_BASE,
--		.end	= EP93XX_SPI_PHYS_BASE + 0x18 - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	{
--		.start	= IRQ_EP93XX_SSP,
--		.end	= IRQ_EP93XX_SSP,
--		.flags	= IORESOURCE_IRQ,
--	},
-+	DEFINE_RES_MEM(EP93XX_SPI_PHYS_BASE, 0x18),
-+	DEFINE_RES_IRQ(IRQ_EP93XX_SSP),
- };
- 
- static u64 ep93xx_spi_dma_mask = DMA_BIT_MASK(32);
-@@ -575,11 +532,7 @@ static struct platform_device ep93xx_leds = {
-  * EP93xx pwm peripheral handling
-  *************************************************************************/
- static struct resource ep93xx_pwm0_resource[] = {
--	{
--		.start	= EP93XX_PWM_PHYS_BASE,
--		.end	= EP93XX_PWM_PHYS_BASE + 0x10 - 1,
--		.flags	= IORESOURCE_MEM,
--	},
-+	DEFINE_RES_MEM(EP93XX_PWM_PHYS_BASE, 0x10),
- };
- 
- static struct platform_device ep93xx_pwm0_device = {
-@@ -590,11 +543,7 @@ static struct platform_device ep93xx_pwm0_device = {
- };
- 
- static struct resource ep93xx_pwm1_resource[] = {
--	{
--		.start	= EP93XX_PWM_PHYS_BASE + 0x20,
--		.end	= EP93XX_PWM_PHYS_BASE + 0x30 - 1,
--		.flags	= IORESOURCE_MEM,
--	},
-+	DEFINE_RES_MEM(EP93XX_PWM_PHYS_BASE + 0x20, 0x10),
- };
- 
- static struct platform_device ep93xx_pwm1_device = {
-@@ -662,11 +611,7 @@ EXPORT_SYMBOL(ep93xx_pwm_release_gpio);
- static struct ep93xxfb_mach_info ep93xxfb_data;
- 
- static struct resource ep93xx_fb_resource[] = {
--	{
--		.start		= EP93XX_RASTER_PHYS_BASE,
--		.end		= EP93XX_RASTER_PHYS_BASE + 0x800 - 1,
--		.flags		= IORESOURCE_MEM,
--	},
-+	DEFINE_RES_MEM(EP93XX_RASTER_PHYS_BASE, 0x800),
- };
- 
- static struct platform_device ep93xx_fb_device = {
-@@ -704,15 +649,8 @@ void __init ep93xx_register_fb(struct ep93xxfb_mach_info *data)
- static struct ep93xx_keypad_platform_data ep93xx_keypad_data;
- 
- static struct resource ep93xx_keypad_resource[] = {
--	{
--		.start	= EP93XX_KEY_MATRIX_PHYS_BASE,
--		.end	= EP93XX_KEY_MATRIX_PHYS_BASE + 0x0c - 1,
--		.flags	= IORESOURCE_MEM,
--	}, {
--		.start	= IRQ_EP93XX_KEY,
--		.end	= IRQ_EP93XX_KEY,
--		.flags	= IORESOURCE_IRQ,
--	},
-+	DEFINE_RES_MEM(EP93XX_KEY_MATRIX_PHYS_BASE, 0x0c),
-+	DEFINE_RES_IRQ(IRQ_EP93XX_KEY),
- };
- 
- static struct platform_device ep93xx_keypad_device = {
-@@ -785,11 +723,7 @@ EXPORT_SYMBOL(ep93xx_keypad_release_gpio);
-  * EP93xx I2S audio peripheral handling
-  *************************************************************************/
- static struct resource ep93xx_i2s_resource[] = {
--	{
--		.start	= EP93XX_I2S_PHYS_BASE,
--		.end	= EP93XX_I2S_PHYS_BASE + 0x100 - 1,
--		.flags	= IORESOURCE_MEM,
--	},
-+	DEFINE_RES_MEM(EP93XX_I2S_PHYS_BASE, 0x100),
- };
- 
- static struct platform_device ep93xx_i2s_device = {
-@@ -859,16 +793,8 @@ EXPORT_SYMBOL(ep93xx_i2s_release);
-  * EP93xx AC97 audio peripheral handling
-  *************************************************************************/
- static struct resource ep93xx_ac97_resources[] = {
--	{
--		.start	= EP93XX_AAC_PHYS_BASE,
--		.end	= EP93XX_AAC_PHYS_BASE + 0xac - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	{
--		.start	= IRQ_EP93XX_AACINTR,
--		.end	= IRQ_EP93XX_AACINTR,
--		.flags	= IORESOURCE_IRQ,
--	},
-+	DEFINE_RES_MEM(EP93XX_AAC_PHYS_BASE, 0xac),
-+	DEFINE_RES_IRQ(IRQ_EP93XX_AACINTR),
- };
- 
- static struct platform_device ep93xx_ac97_device = {
+
+-Olof
