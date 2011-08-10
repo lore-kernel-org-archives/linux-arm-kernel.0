@@ -1,112 +1,57 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 10 Aug 2011 16:03:23 +0100
-Subject: [PATCH v7 00/16] ARM: Add support for the Large Physical Address
-	Extensions
-Message-ID: <1312988619-16804-1-git-send-email-catalin.marinas@arm.com>
+Date: Wed, 10 Aug 2011 16:03:29 +0100
+Subject: [PATCH v7 06/16] ARM: LPAE: Use a mask for physical addresses in page
+	table entries
+In-Reply-To: <1312988619-16804-1-git-send-email-catalin.marinas@arm.com>
+References: <1312988619-16804-1-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1312988619-16804-7-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+With LPAE, the physical address mask is 40-bit while the page table
+entry is 64-bit. This patch introduces PHYS_MASK for the 2-level page
+table format, defined as ~0UL.
 
-This is version 7 of the set of patches adding support for the Large
-Physical Address Extensions on the ARM architecture (available with the
-Cortex-A15 processor). LPAE comes with a new 3-level page table format
-(compared to 2-level for the classic one), allowing up to 40-bit
-physical address space.
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+---
+ arch/arm/include/asm/pgtable-2level-hwdef.h |    2 ++
+ arch/arm/include/asm/pgtable.h              |    6 +++---
+ 2 files changed, 5 insertions(+), 3 deletions(-)
 
-This set of patches against Linux 3.1-rc1 is available on this branch:
-
-git://git.kernel.org/pub/scm/linux/kernel/git/cmarinas/linux-2.6-cm.git for-next
-
-The full set of patches against Linux 3.0 (LPAE, support for an emulated
-Versatile Express with Cortex-A15 tile and generic timers) is available
-on this branch:
-
-git://git.kernel.org/pub/scm/linux/kernel/git/cmarinas/linux-2.6-cm.git arm-lpae
-
-
-Changelog (from v6):
-
-- Rebased against Linux 3.1-rc1.
-- pteval_t, pmdval_t etc. typedefs reworked for consistency.
-- __phys_to_virt/__virt_to_phys macros typecasting patch removed (an
-  explicit cast to unsigned long has been added to dma_to_virt).
-- Generic dma_addr_t patch removed (already fixed upstream).
-
-Known issues:
-
-- RMK's nopud patch not in mainline yet (compiler warnings) but carried
-  over in the above branches.
-- No decission on using the ISB during MMU enabling (no simple
-  alternative solution).
-- The patch converting PGDIR_* to PMD_* may be further modified
-  depending on the merging of the DMA coherent patches and other changes
-  to prepare_page_tables() proposed by RMK.
-
-
-Catalin Marinas (13):
-  ARM: LPAE: Cast the dma_addr_t argument to unsigned long in
-    dma_to_virt
-  ARM: LPAE: Use PMD_(SHIFT|SIZE|MASK) instead of PGDIR_*
-  ARM: LPAE: Factor out 2-level page table definitions into separate
-    files
-  ARM: LPAE: Add (pte|pmd)val_t type definitions as u32
-  ARM: LPAE: Use a mask for physical addresses in page table entries
-  ARM: LPAE: Introduce the 3-level page table format definitions
-  ARM: LPAE: Page table maintenance for the 3-level format
-  ARM: LPAE: MMU setup for the 3-level page table format
-  ARM: LPAE: Invalidate the TLB before freeing the PMD
-  ARM: LPAE: Add fault handling support
-  ARM: LPAE: Add context switching support
-  ARM: LPAE: Add identity mapping support for the 3-level page table
-    format
-  ARM: LPAE: Add the Kconfig entries
-
-Will Deacon (3):
-  ARM: LPAE: add ISBs around MMU enabling code
-  ARM: LPAE: mark memory banks with start > ULONG_MAX as highmem
-  ARM: LPAE: add support for ATAG_MEM64
-
- arch/arm/Kconfig                            |    2 +-
- arch/arm/boot/compressed/head.S             |    1 +
- arch/arm/include/asm/assembler.h            |   11 +
- arch/arm/include/asm/dma-mapping.h          |    2 +-
- arch/arm/include/asm/page.h                 |   44 +---
- arch/arm/include/asm/pgalloc.h              |   28 ++-
- arch/arm/include/asm/pgtable-2level-hwdef.h |   93 ++++++
- arch/arm/include/asm/pgtable-2level-types.h |   67 +++++
- arch/arm/include/asm/pgtable-2level.h       |  143 +++++++++
- arch/arm/include/asm/pgtable-3level-hwdef.h |   82 ++++++
- arch/arm/include/asm/pgtable-3level-types.h |   70 +++++
- arch/arm/include/asm/pgtable-3level.h       |  107 +++++++
- arch/arm/include/asm/pgtable-hwdef.h        |   81 +-----
- arch/arm/include/asm/pgtable.h              |  211 +++++---------
- arch/arm/include/asm/proc-fns.h             |   21 ++
- arch/arm/include/asm/setup.h                |    8 +
- arch/arm/include/asm/tlb.h                  |   11 +-
- arch/arm/include/asm/tlbflush.h             |    4 +-
- arch/arm/kernel/head.S                      |  119 ++++++---
- arch/arm/kernel/module.c                    |    2 +-
- arch/arm/kernel/setup.c                     |   10 +
- arch/arm/kernel/sleep.S                     |    2 +
- arch/arm/mm/Kconfig                         |   13 +
- arch/arm/mm/Makefile                        |    4 +
- arch/arm/mm/alignment.c                     |    8 +-
- arch/arm/mm/context.c                       |   19 +-
- arch/arm/mm/dma-mapping.c                   |    6 +-
- arch/arm/mm/fault.c                         |   87 ++++++
- arch/arm/mm/idmap.c                         |   36 +++-
- arch/arm/mm/ioremap.c                       |    8 +-
- arch/arm/mm/mm.h                            |    4 +-
- arch/arm/mm/mmu.c                           |   53 +++-
- arch/arm/mm/pgd.c                           |   51 +++-
- arch/arm/mm/proc-macros.S                   |    5 +-
- arch/arm/mm/proc-v7lpae.S                   |  422 +++++++++++++++++++++++++++
- 35 files changed, 1504 insertions(+), 331 deletions(-)
- create mode 100644 arch/arm/include/asm/pgtable-2level-hwdef.h
- create mode 100644 arch/arm/include/asm/pgtable-2level-types.h
- create mode 100644 arch/arm/include/asm/pgtable-2level.h
- create mode 100644 arch/arm/include/asm/pgtable-3level-hwdef.h
- create mode 100644 arch/arm/include/asm/pgtable-3level-types.h
- create mode 100644 arch/arm/include/asm/pgtable-3level.h
- create mode 100644 arch/arm/mm/proc-v7lpae.S
+diff --git a/arch/arm/include/asm/pgtable-2level-hwdef.h b/arch/arm/include/asm/pgtable-2level-hwdef.h
+index 2b52c40..5cfba15 100644
+--- a/arch/arm/include/asm/pgtable-2level-hwdef.h
++++ b/arch/arm/include/asm/pgtable-2level-hwdef.h
+@@ -88,4 +88,6 @@
+ #define PTE_SMALL_AP_URO_SRW	(_AT(pteval_t, 0xaa) << 4)
+ #define PTE_SMALL_AP_URW_SRW	(_AT(pteval_t, 0xff) << 4)
+ 
++#define PHYS_MASK		(~0UL)
++
+ #endif
+diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
+index 9618052..8f9e1dd 100644
+--- a/arch/arm/include/asm/pgtable.h
++++ b/arch/arm/include/asm/pgtable.h
+@@ -199,10 +199,10 @@ static inline pmd_t *pmd_offset(pud_t *pud, unsigned long addr)
+ 
+ static inline pte_t *pmd_page_vaddr(pmd_t pmd)
+ {
+-	return __va(pmd_val(pmd) & PAGE_MASK);
++	return __va(pmd_val(pmd) & PHYS_MASK & (s32)PAGE_MASK);
+ }
+ 
+-#define pmd_page(pmd)		pfn_to_page(__phys_to_pfn(pmd_val(pmd)))
++#define pmd_page(pmd)		pfn_to_page(__phys_to_pfn(pmd_val(pmd) & PHYS_MASK))
+ 
+ /* we don't need complex calculations here as the pmd is folded into the pgd */
+ #define pmd_addr_end(addr,end)	(end)
+@@ -223,7 +223,7 @@ static inline pte_t *pmd_page_vaddr(pmd_t pmd)
+ #define pte_offset_map(pmd,addr)	(__pte_map(pmd) + pte_index(addr))
+ #define pte_unmap(pte)			__pte_unmap(pte)
+ 
+-#define pte_pfn(pte)		(pte_val(pte) >> PAGE_SHIFT)
++#define pte_pfn(pte)		((pte_val(pte) & PHYS_MASK) >> PAGE_SHIFT)
+ #define pfn_pte(pfn,prot)	__pte(__pfn_to_phys(pfn) | pgprot_val(prot))
+ 
+ #define pte_page(pte)		pfn_to_page(pte_pfn(pte))
