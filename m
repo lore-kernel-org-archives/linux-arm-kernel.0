@@ -1,27 +1,33 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Wed, 10 Aug 2011 17:49:45 +0900
-Subject: [RFC PATCH 4/8] ARM: exynos4: convert logical CPU numbers to
-	physical numbers
-In-Reply-To: <20110810084613.GB10121@e102144-lin.cambridge.arm.com>
+From: santosh.shilimkar@ti.com (Santosh)
+Date: Wed, 10 Aug 2011 14:20:08 +0530
+Subject: [RFC PATCH 0/8] Introduce logical CPU mapping
+In-Reply-To: <1312926162-22469-1-git-send-email-will.deacon@arm.com>
 References: <1312926162-22469-1-git-send-email-will.deacon@arm.com>
-	<1312926162-22469-5-git-send-email-will.deacon@arm.com>
-	<CAH9JG2WjHm2mypLR-9=1vNDz-h3PyRGwTP5Z-C1SsktRh+H6eA@mail.gmail.com>
-	<20110810084613.GB10121@e102144-lin.cambridge.arm.com>
-Message-ID: <CAH9JG2WLfk2xECc3vObbVCPqqPE7W-PvvVJdOby7i8U8sXikPQ@mail.gmail.com>
+Message-ID: <4E424640.6040801@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 10, 2011 at 5:46 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On Wed, Aug 10, 2011 at 02:07:46AM +0100, Kyungmin Park wrote:
->> Tested-by: Kyungmin Park <kyungmin.park@samsung.com>
->> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
->
-> Cheers for that. Did you have a go at booting on a CPU other than physical
-> CPU 0?
+Will,
 
-No, how to test it?
+On Wednesday 10 August 2011 03:12 AM, Will Deacon wrote:
+> Hello,
 >
-> Thanks,
+> This patch series is an RFC following a discussion I had with Russell
+> the other day:
 >
-> Will
+>   http://lists.infradead.org/pipermail/linux-arm-kernel/2011-August/060370.html
 >
+> The approach I've taken is fairly simple but is enough for booting on a
+> CPU with physical ID != 0 on platforms which can handle it.
+>
+> Note that I haven't touched the OMAP4 or Tegra platforms since it's not
+> clear from the code how they would be adapted to make use of the
+> physical CPU number.
+>
+On OMAP, we use hardware register hand-shake for boot between a boot CPU
+and non-boot CPU. On OMAP4, boot CPU has to be always CPU0 to ensure
+that security and firewall initialisation is taken care. Other CPU can't
+do those things.
+
+Regards
+Santosh
