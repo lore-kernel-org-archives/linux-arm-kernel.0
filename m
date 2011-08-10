@@ -1,53 +1,39 @@
 From: david@gibson.dropbear.id.au (David Gibson)
-Date: Wed, 10 Aug 2011 11:29:58 +1000
-Subject: How to handle named resources with DT?
-In-Reply-To: <CACxGe6tbEW1EZhqXy78EZVM_sQLH0Qbr7QOzbgbsKBRn1FtVrg@mail.gmail.com>
-References: <4E40FC88.5090403@ti.com>
-	<20110809162907.GA630@manju-WNB7PBC4801-0006>
-	<4E4166F0.9050401@ti.com>
-	<CACxGe6tbEW1EZhqXy78EZVM_sQLH0Qbr7QOzbgbsKBRn1FtVrg@mail.gmail.com>
-Message-ID: <20110810012958.GB23511@yookeroo.fritz.box>
+Date: Wed, 10 Aug 2011 11:23:49 +1000
+Subject: Tegra pinmux Device Tree support
+In-Reply-To: <CAOesGMjH8hZSAXvDZ6ADO-dtFNecRYC5GsfRiAeV8KMRG=JTkQ@mail.gmail.com>
+References: <74CDBE0F657A3D45AFBB94109FB122FF049F17229E@HQMAIL01.nvidia.com>
+	<20110809173428.GB32195@ponder.secretlab.ca>
+	<CAOesGMjH8hZSAXvDZ6ADO-dtFNecRYC5GsfRiAeV8KMRG=JTkQ@mail.gmail.com>
+Message-ID: <20110810012349.GA23511@yookeroo.fritz.box>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 09, 2011 at 11:23:45AM -0600, Grant Likely wrote:
-> On Tue, Aug 9, 2011 at 10:57 AM, Cousson, Benoit <b-cousson@ti.com> wrote:
-> > Hi Manju,
-> >
-> > On 8/9/2011 6:29 PM, G, Manjunath Kondaiah wrote:
-> >>
-> >> Hi Benoit,
-> >>
-> >> On Tue, Aug 09, 2011 at 11:23:20AM +0200, Cousson, Benoit wrote:
-> >>>
-> >>> Hi Grant,
-> >>>
-> >>> Trying to bind hwmod informations with DT, I'm facing a little
-> >>> limitation.
-> >>> A bunch of drivers are using the platform_get_resource_byname, so
-> >>> the name for the resource is needed.
-> >>>
-> >>> The name is used so far for IORESOURCE_MEM, IORESOURCE_IRQ and
-> >>> IORESOURCE_DMA types of resources.
-> >>
-> >> IORESOURCE_MEM and IORESOURCE_IRQ's are fetched from dt blob and
-> >> it will be part of pdev.
-> >
-> > Yes, but without the proper name in the resource structure. It will be then
-> > impossible to use the platform_get_resource_byname function that is
-> > currently used by a bunch of drivers.
+On Tue, Aug 09, 2011 at 10:44:29AM -0700, Olof Johansson wrote:
+> On Tue, Aug 9, 2011 at 10:34 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
 > 
-> There is no analogous mechanism for _byname in the device tree.  The
-> DT binding for a device must explicitly state what order the register
-> ranges are in.  The driver will need to be adapted.
+> > We talked about this a bit at Linaro connect. ?Outside of the more
+> > complex runtime-reconfiguration of pin mux, there is a general need
+> > for arbitrary initialization sequences to registers. ?Also, pretty
+> > much exactly what you need for tegra is needed for imx, omap and many
+> > others. ?The though was, rather than trying to come up with some kind
+> > of pinmux-specific binding for pin states, which could end up being
+> > very verbose if everything was split out into properties, we could
+> > instead have a binding for register initialization sequences.
+> > Something like this:
+> >
+> > ? ? ? ?pinmux-initseq = <reg1 value1> <reg1 value2> ...;
+> >
+> > And then add some macros for DTC to make it easier to define things
+> > like pinmux setup tables. ?Although the binding above is probably too
+> > simple and naive.
+> 
+> This seems to break the philosophy of what the device tree should do
+> -- it should describe the hardware so that the driver will know how to
+> program it, not include the code itself?
 
-Well, the driver proper shouldn't need changing.  It should be
-possible to assign the correct names in the glue which translates the
-DT reg entries into the Linux resource structures.
-
-The difficulty with adding th enames to the DT itself is that it
-exposes the essentially Linux-specific names in what's supposed to be
-an OS neutral data structure.
+Arguably, yes, although it's a barrier that's been frequently broken
+by Apple already.
 
 -- 
 David Gibson			| I'll have my music baroque, and my code
