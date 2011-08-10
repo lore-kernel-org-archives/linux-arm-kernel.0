@@ -1,54 +1,131 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Wed, 10 Aug 2011 16:18:42 +0530
-Subject: [PATCH V2 6/6] spi/spi-pl022: Request/free DMA channels as and
-	when required.
-In-Reply-To: <20110810103052.GI1831@n2100.arm.linux.org.uk>
-References: <cover.1312965741.git.viresh.kumar@st.com>
-	<566c0525199f498f04422d4c3b2ddd7466648c20.1312965742.git.viresh.kumar@st.com>
-	<20110810090042.GE1831@n2100.arm.linux.org.uk>
-	<4E424F7B.2000800@st.com>
-	<CABb+yY0Qvuhrn+FUhWDHMwUjv=nR4MOfLeDfTzG17HXEuu2pmA@mail.gmail.com>
-	<20110810103052.GI1831@n2100.arm.linux.org.uk>
-Message-ID: <CABb+yY2T7qEZNLH1E8U+oiLUDQC+fGfrT82KExmOtV09UcqQeQ@mail.gmail.com>
+From: marvin24@gmx.de (Marc Dietich)
+Date: Wed, 10 Aug 2011 12:50:47 +0200
+Subject: [PATCH 4/5 V2] ARM: tegra: paz00: add clocks
+	requiredforusboperation
+In-Reply-To: <201108101024.57494.marvin24@gmx.de>
+References: <201108092126.28521.marvin24@gmx.de>
+	<74CDBE0F657A3D45AFBB94109FB122FF04A06873BB@HQMAIL01.nvidia.com>
+	<201108101024.57494.marvin24@gmx.de>
+Message-ID: <201108101250.48324.marvin24@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 10, 2011 at 4:00 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, Aug 10, 2011 at 03:39:28PM +0530, Jassi Brar wrote:
->> On Wed, Aug 10, 2011 at 2:59 PM, viresh kumar <viresh.kumar@st.com> wrote:
->> > On 08/10/2011 02:30 PM, Russell King - ARM Linux wrote:
->> >>> > They must be allocated when they are required and must be freed after we are
->> >>> > done with transfers. So that they can be used by other users.
->> >> Which DMA engine driver requires this?
->> >>
->> >
->> > dw_dmac.c
->> >
->> >> Normally, when we have DMA engine drivers with multiple request signals,
->> >> the slave peripheral side publishes several virtual channels which are
->> >> claimed by the peripheral drivers. ?This (amongst other things) allows
->> >> the peripheral drivers to hold claim to one of the virtual channels
->> >> all the time that it's required.
->> >
->> > If users of DMA expect DMA engine drivers to work this way, then we should
->> > have this mentioned clearly in DMA slave documentation.
->>
->> The requirement stems from the fact that most DMACs(esp third party) could be
->> made to reroute req-signals by the platform, it has not much to do with the API.
->> IMO, all dmac drivers should be implemented that way to be on the safer side.
->
-> No it isn't. ?It's to do with how the physical channels are used.
-IMO, a dmac driver developer sees only two aspects - "virtual channel"
-at frontend and
-"ReqSig/PhyChan" management at the backend.  While ReqSig and Physical Channels
-are different h/w entities, the driver developer usually works having
-tied them together.
+> > Marc Dietrich wrote at Tuesday, August 09, 2011 1:26 PM:
+> > > On Tuesday 09 August 2011 20:35:45 you wrote:
+> > > > [...]
+> > > > Do you need the pll_p_out4 entry? What's that driving? Check in
+> > > > /sys/kernel/debug/clock/clock_tree (/sys/kernel/debug is debugfs).
+> > > 
+> > > I think it is only required to setup the correct (non-standard?)
+> > > frequency. Seems all other boards use 108 MHz which cause one of the
+> > > ports to fail. Don't ask me for details ...
+> > 
+> > ...
+> > 
+> > > root at ac100:~# cat /sys/kernel/debug/clock/clock_tree
+> > > 
+> > >    clock                          state  ref div      rate
+> > > 
+> > > --------------------------------------------------------------
+> > > 
+> > >    clk_m                          on     9            12000000
+> > 
+> > ...
+> > 
+> > >       pll_p                       on     10  x18      216000000
+> > 
+> > ...
+> > 
+> > >          pll_p_out4               on     3   9        24000000
+> > >          
+> > >             sclk                  on     2            24000000
+> > >             
+> > >                avp.sclk           off    0            24000000
+> > >                cop                on     1            24000000
+> > >                hclk               on     2   1        24000000
+> > >                
+> > >                   pclk            on     2   2        12000000
+> > >                   
+> > >                      apbdma       on     1   1        12000000
+> > 
+> > Hmm. That's pretty odd.
+> > 
+> > With the standard kernel the device ships with, what does the clock tree
+> > under pll_p_out4 look like? It'd be very interesting to compare that. If
+> > that setup is the same as what this patch sets up, the patch seems fine.
+> 
+> unfortunately, there is no such think in .32 kernel (the kernel deliverd
+> with the device), and I don't think I can port it over.
+> 
+> > As far as I know all the clocks there are both unrelated to USB, and
+> > internal to the device, so the board shouldn't have any effect. In
+> > particular, avp.sclk/cop are for the internal media CPU/DSP, hclk/pclk
+> > are the internal AHB/APB bus clocks, and apbdma is for an internal DMA
+> > engine, currently only used for audio in the mainline kernel at least.
+> 
+> Does this mean that the internal busses you mentioned are also running at
+> low speed? Would this be a hugh performance penality?
 
-For ex, PL330 has 8 physical channels(ARM calls them threads) and 32
-peripheral interfaces(ReqSig),
-where as the dmac driver freely allocates 32 virtual channels and
-keeps in mind that only 8 peripheral
-interfaces can be active at any time.
+maybe this is why in the commit mentioned below sclk is bind to pll_c_out1 and 
+set to 108 MHz again.
 
-So I am unable to see how I said something different that you do.
+But I cannot see this change in the current seaboard clock table (optimized 
+away?). Maybe someone with a seaboard could check this.
+
+Marc
+
+
+> > I guess I'll ask a few people internally to see if they have a clue why
+> > your change might be necessary.
+> 
+> Also take a look at seaboard, it has the same clock setting and especially
+> commit dfb625f934dd40baf29ee6c43e4f130b524411a1 in the chromeos kernel:
+> 
+> commit dfb625f934dd40baf29ee6c43e4f130b524411a1
+> Author: Vincent Palatin <vpalatin@chromium.org>
+> Date:   Wed Apr 13 07:26:08 2011 -0400
+> 
+>     CHROMIUM: tegra: seaboard: fix ULPI transceiver clock
+> 
+>     On our seaboard-based platforms, pll_p_out4 is used to clock
+>     (through DAP_MCLK2) the external USB ULPI transceiver between the USB2
+>     port to mini-PCIe modem. And it needs to be set at 24Mhz for the
+>     tranceiver to work correctly.
+>     Revert the sclk parent to pll_c out1 (as it was before the last change)
+>     since it needs to stay clocked at 108MHz.
+> 
+>     Signed-off-by: Vincent Palatin <vpalatin@chromium.org>
+> 
+>     BUG=chrome-os-partner:3167
+>     TEST=Check that the Gobi modem is appearing in lsusb listing
+>     Use the kaen DVT for browsing and suspending
+> 
+>     Review URL: http://codereview.chromium.org/6825076
+> 
+>     Change-Id: Ia9b1bbc7860da732fb8edbbcf0bce60e82d6d8ed
+> 
+> 
+> Thanks!
+> 
+> Marc
+> 
+> > For reference, here's Harmony on something roughly like linux-next:
+> >    clk_m                          on     7            12000000
+> > 
+> > ...
+> > 
+> >       pll_p                       on     9   x18      216000000
+> > 
+> > ...
+> > 
+> >          pll_p_out4               on     2   2        108000000
+> >          
+> >             sclk                  on     2            108000000
+> >             
+> >                avp.sclk           off    0            108000000
+> >                cop                on     1            108000000
+> >                hclk               on     2   1        108000000
+> >                
+> >                   pclk            on     2   2        54000000
+> >                   
+> >                      apbdma       on     1   1        54000000
