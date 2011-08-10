@@ -1,26 +1,35 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 10 Aug 2011 11:40:04 +0200
-Subject: Enabling runtime P2V by default (Re: [PATCH 3/5] mach-u300: patch
-	physoffset by default)
-In-Reply-To: <20110810091635.GF1831@n2100.arm.linux.org.uk>
-References: <1312918898-11894-1-git-send-email-linus.walleij@stericsson.com>
-	<20110810091635.GF1831@n2100.arm.linux.org.uk>
-Message-ID: <CACRpkdZC=Ny78SuOMVNPedMLERVAFOJTPB79avQ6zyiy-7Kbkg@mail.gmail.com>
+From: cjb@laptop.org (Chris Ball)
+Date: Wed, 10 Aug 2011 05:48:47 -0400
+Subject: [PATCH V4] mmc: Enable the ADMA2 on esdhc imx driver
+In-Reply-To: <CAMPhdO8QiODg6sTKe2N2b4xT8ZHXSh1DvRn57J8JfLx6+QAD4w@mail.gmail.com>
+	(Eric Miao's message of "Wed, 10 Aug 2011 16:08:53 +0800")
+References: <1312792204-7652-1-git-send-email-richard.zhu@linaro.org>
+	<CAMPhdO8QiODg6sTKe2N2b4xT8ZHXSh1DvRn57J8JfLx6+QAD4w@mail.gmail.com>
+Message-ID: <m27h6ltx4w.fsf@bob.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 10, 2011 at 11:16 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Aug 09, 2011 at 09:41:38PM +0200, Linus Walleij wrote:
->> From: Linus Walleij <linus.walleij@linaro.org>
+Hi,
+
+On Wed, Aug 10 2011, Eric Miao wrote:
+> On Mon, Aug 8, 2011 at 4:30 PM, Richard Zhu <richard.zhu@linaro.org> wrote:
+>> Eanble the ADMA2 mode for freescale esdhc imx driver,
+>> tested on MX25 3DS board, MX51 BBG board and MX53 LOCO board.
 >>
->> This works like a charm so I'll just default-select it.
+>> This patch is only used to enable the ADMA2 for MX51/53 platforms.
+>> MX25/35 can't support the ADMA2 mode, set BROKEN_ADMA quirk on
+>> MX25/35 platforms.
+>>
+>> The ADMA mode supported or not can be distinguished by the
+>> bit20 of Capability Register(offset 0x40) in FSL eSDHC module.
+>>
+>> Signed-off-by: Richard Zhu <richard.zhu@linaro.org>
 >
-> Well, we can remove the EXPERIMENTAL status of this option now. ?This
-> raises the question is whether we should now default it to 'y' - I
-> think we should. ?Anyone have any objections?
+> Tested-and-acked-by: Eric Miao <eric.miao@linaro.org>
 
-I agree, no objections. Works flawlessly on all my systems.
+Thanks, pushed to mmc-next for 3.2.
 
-Thanks,
-Linus Walleij
+- Chris.
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
