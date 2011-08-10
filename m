@@ -1,26 +1,110 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 10 Aug 2011 22:41:22 +0800
-Subject: [PATCH] pxa/hx4700: Add Synaptics NavPoint (PXA27x SSP/SPI) driver
-In-Reply-To: <1312972760.78921.YahooMailClassic@web29001.mail.ird.yahoo.com>
-References: <CAMPhdO-PH2M-VyzqOHnUo7j54Ok8D=xuh1cX2F+KVL4fCkFKnw@mail.gmail.com>
-	<1312972760.78921.YahooMailClassic@web29001.mail.ird.yahoo.com>
-Message-ID: <CAMPhdO-6DeY69p3-DzNAbxqXJLRNso4hWji1OFifYYsdytL7mA@mail.gmail.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Wed, 10 Aug 2011 17:01:52 +0200
+Subject: How to handle named resources with DT?
+In-Reply-To: <20110810015214.GD23511@yookeroo.fritz.box>
+References: <4E4166F0.9050401@ti.com>
+	<CACxGe6tbEW1EZhqXy78EZVM_sQLH0Qbr7QOzbgbsKBRn1FtVrg@mail.gmail.com>
+	<4E4172A8.3030101@ti.com> <4E417BD5.8080409@freescale.com>
+	<20110809205723.GE11568@ponder.secretlab.ca>
+	<4E41A1B9.1060400@ti.com>
+	<20110809211747.GJ11568@ponder.secretlab.ca>
+	<4E41AA43.1000506@ti.com>
+	<20110809214905.GK11568@ponder.secretlab.ca>
+	<4E41AC5C.20301@ti.com> <20110810015214.GD23511@yookeroo.fritz.box>
+Message-ID: <4E429D60.2000100@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> Are you implying that the hx4700 is acting as a SPI slave?
+On 8/10/2011 3:52 AM, David Gibson wrote:
+> On Tue, Aug 09, 2011 at 11:53:32PM +0200, Cousson, Benoit wrote:
+>> On 8/9/2011 11:49 PM, Grant Likely wrote:
+>>> On Tue, Aug 09, 2011 at 11:44:35PM +0200, Cousson, Benoit wrote:
+>>>> On 8/9/2011 11:17 PM, Grant Likely wrote:
+>>>>> On Tue, Aug 09, 2011 at 11:08:09PM +0200, Cousson, Benoit wrote:
+>>>>>> On 8/9/2011 10:57 PM, Grant Likely wrote:
+>>>>>>> On Tue, Aug 09, 2011 at 01:26:29PM -0500, Scott Wood wrote:
+>>>>>>>> On 08/09/2011 12:47 PM, Cousson, Benoit wrote:
+>>>>>>>>> On 8/9/2011 7:23 PM, Grant Likely wrote:
+>>>>>>>>>> There is no analogous mechanism for _byname in the device tree.  The
+>>>>>>>>>> DT binding for a device must explicitly state what order the register
+>>>>>>>>>> ranges are in.  The driver will need to be adapted.
+>>>>>>>>>
+>>>>>>>>> That seems to be a small regression for my point of view. Relying on the
+>>>>>>>>> order is not super safe. This is not very readable either. That's for
+>>>>>>>>> that exact reason that we changed our drivers to use
+>>>>>>>>> platform_get_resource_byname. That's probably the reason why that API is
+>>>>>>>>> there as well.
+>>>>>>>>> For the same IP, the number of entries can vary depending of the SoC
+>>>>>>>>> revision.
+>>>>>>>>> By using the _byname, we can check if the resource is there or not
+>>>>>>>>> without having to care about the position.
+>>>>>>>>
+>>>>>>>> You could have a named u32 property that contains the reg index, e.g.:
+>>>>>>>>
+>>>>>>>> dev {
+>>>>>>>> 	reg =<0x20000 0x200 0x24000 0x200>;
+>>>>>>>> 	foo-reg =<0>;
+>>>>>>>> 	bar-reg =<1>;
+>>>>>>>> };
+>>>>>>>
+>>>>>>> That's a little nasty.  A reg-names = "foo", "bar"; would probably be
+>>>>>>> better.
+>>>>>>
+>>>>>> Yep, I agree.
+>>>>>>
+>>>>>> And what about something like that?
+>>>>>>    reg =<0x20000 0x200>, "foo",
+>>>>>> 	<0x20000 0x200>, "bar" ;
+>>>>>>
+>>>>>> It is doable?
+>>>>>
+>>>>> Definitely not.  It would break all existing 'reg' parsing
+>>>>> implementations quite badly.
+>>>>
+>>>> OK, so what about extending the reg attribute to be a reg node?
+>>>>
+>>>> dev {
+>>>> 	reg {
+>>>> 		name = "foo_wrapper";
+>>>> 		start =<0x10000>;
+>>>> 		end =<0x200>;
+>>>> 	}
+>>>> 	reg {
+>>>> 		name = "foo";
+>>>> 		start =<0x20000>;
+>>>> 		end =<0x200>;
+>>>> 	}
+>>>> }
+>>>>
+>>>> A little bit more verbose, but at least we can add any attribute we want.
+>>>
+>>> That won't work either because that also breaks the existing 'reg'
+>>> binding.  Anything you do will need to supplement the existing
+>>> binding without changing it in an incompatible way.
+>>
+>> OK, but can we add a new attribute then? reg2, reg_ng, reg_plusplus,
+>> reg_named...?
 >
-> Yes.
->
->> My original
->> understanding is hx4700 is communicating with an external
->> touchpad
->> controller through SPI? If hx4700 is acting as a SPI slave,
->> then it's true
->> there is no existing framework for that yet.
->
-> That's correct; the NavPoint touchpad controller is the SPI master, Linux is the SPI slave.
+> He already suggested reg-names to be interpreted in parallel with the
+> existing reg property.  The (serious) problem with replacing the reg
+> property is that it will break all existing OSes (including old Linux
+> versions) that don't understand the new property.
 
-That's really interesting. Grant, do you have any idea we have a SPI
-slave API, or that we could actually re-use the existing SPI API for
-that purpose?
+That's why I was proposing a new extended node for that. Legacy tag will 
+still be there for legacy HW.
+
+Adding reg-names is doable easily, but not super nice. And the same 
+trick will be needed for IRQs and then DMAs (not yet in core DT anyway).
+Having a more scalable mechanism to allow further improvement will be good.
+
+> Of course, the problem with reg-names is that it will be ignored by
+> older OSes, and so 'reg' must still be in the correct order.  In which
+> case you could argue it's more sensible to just have a static place to
+> name mapping in the Linux driver.
+>
+> In short, yes, named reg elements in the DT would be nice in theory,
+> but I'm not convinced it's worth a DT flag day to accomplish it.
+
+Sorry, but I'm not sure to understand the meaning of that last sentence.
+
+Benoit
