@@ -1,188 +1,214 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 10 Aug 2011 14:03:41 +0100
-Subject: [PATCH 3/4] mach-ux500: export System-on-Chip information ux500 via
-	sysfs
+Date: Wed, 10 Aug 2011 14:03:42 +0100
+Subject: [PATCH 4/4] Move top level platform devices in sysfs to
+	/sys/devices/soc/X
 In-Reply-To: <1312981422-13294-1-git-send-email-lee.jones@linaro.org>
 References: <1312981422-13294-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1312981422-13294-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <1312981422-13294-4-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here we make use of the new drivers/base/soc driver to export
-vital SoC information out to userspace via sysfs. This patch
-provides a data structure of strings to populate the base
-nodes found in:
-
-/sys/devices/soc/[1|2|3|...]/[family|machine|revision|soc_id].
-
-It also adds one more node as requested by ST-Ericsson.
+At the request of Arnd Bergmann this patch moves all SoC
+platform devices found in sysfs from /sys/devices/platform to
+/sys/devices/soc/<SoCNum>/. It is believed as the devices are
+SoC specific and a /sys/devices/soc node has recently become
+available, that this would be a more appropriate place to
+display the data.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/mach-ux500/Kconfig              |    1 +
- arch/arm/mach-ux500/id.c                 |  115 ++++++++++++++++++++++++++++++
- arch/arm/mach-ux500/include/mach/setup.h |    1 +
- 3 files changed, 117 insertions(+), 0 deletions(-)
+ arch/arm/mach-ux500/board-mop500.c   |   19 +++++++++++++++----
+ arch/arm/mach-ux500/board-u5500.c    |    6 ++++++
+ arch/arm/mach-ux500/cpu-db5500.c     |    6 ++++++
+ arch/arm/mach-ux500/cpu-db8500.c     |   12 +++++++++++-
+ arch/arm/mach-ux500/devices-common.c |   19 +++++++++++++++----
+ arch/arm/mach-ux500/usb.c            |    4 ++++
+ 6 files changed, 57 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/mach-ux500/Kconfig b/arch/arm/mach-ux500/Kconfig
-index 4210cb4..4d2f2c2 100644
---- a/arch/arm/mach-ux500/Kconfig
-+++ b/arch/arm/mach-ux500/Kconfig
-@@ -26,6 +26,7 @@ config MACH_U8500
- 	bool "U8500 Development platform"
- 	depends on UX500_SOC_DB8500
- 	select TPS6105X
-+	select SYS_SOC
- 	help
- 	  Include support for the mop500 development platform.
- 
-diff --git a/arch/arm/mach-ux500/id.c b/arch/arm/mach-ux500/id.c
-index d35122e..917d222 100644
---- a/arch/arm/mach-ux500/id.c
-+++ b/arch/arm/mach-ux500/id.c
-@@ -2,12 +2,17 @@
-  * Copyright (C) ST-Ericsson SA 2010
-  *
-  * Author: Rabin Vincent <rabin.vincent@stericsson.com> for ST-Ericsson
-+ * Author: Lee Jones <lee.jones@linaro.org> for ST-Ericsson
-  * License terms: GNU General Public License (GPL) version 2
-  */
- 
- #include <linux/kernel.h>
- #include <linux/init.h>
- #include <linux/io.h>
-+#include <linux/sys_soc.h>
-+#include <linux/slab.h>
-+#include <linux/stat.h>
-+#include <linux/platform_device.h>
- 
- #include <asm/cputype.h>
- #include <asm/tlbflush.h>
-@@ -105,3 +110,113 @@ void __init ux500_map_io(void)
- 
- 	ux500_print_soc_info(asicid);
- }
-+
-+#define U8500_BB_UID_BASE (U8500_BACKUPRAM1_BASE + 0xFC0)
-+#define U8500_BB_UID_LENGTH 5
-+
-+struct device *soc_parent;
-+
-+static void ux500_get_machine(char *buf)
-+{
-+	sprintf(buf, "DB%4x", dbx500_partnumber());
-+}
-+
-+static void ux500_get_family(char *buf)
-+{
-+	sprintf(buf, "Ux500");
-+}
-+
-+static void ux500_get_soc_id(char *buf)
-+{
-+	void __iomem *uid_base;
+diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
+index 5b43fed..4c3295d 100644
+--- a/arch/arm/mach-ux500/board-mop500.c
++++ b/arch/arm/mach-ux500/board-mop500.c
+@@ -603,6 +603,7 @@ static struct platform_device *snowball_platform_devs[] __initdata = {
+ static void __init mop500_init_machine(void)
+ {
+ 	int i2c0_devs;
 +	int i;
-+	ssize_t sz = 0;
-+
-+	if (dbx500_partnumber() == 0x8500) {
-+		uid_base = __io_address(U8500_BB_UID_BASE);
-+		for (i = 0; i < U8500_BB_UID_LENGTH; i++) {
-+			sz += sprintf(buf + sz, "%08x", readl(uid_base + i * sizeof(u32)));
-+		}
-+		return;
-+	} else {
-+		/* Don't know where it is located for U5500 */
-+		sprintf(buf, "N/A");
-+		return;
-+	}
-+}
-+
-+static void ux500_get_revision(char *buf)
-+{
-+	unsigned int rev = dbx500_revision();
-+
-+	if (rev == 0x01) {
-+		sprintf(buf, "%s", "ED");
-+		return;
-+	}
-+	else if (rev >= 0xA0) {
-+		sprintf(buf, "%d.%d" , (rev >> 4) - 0xA + 1, rev & 0xf);
-+		return;
-+	}
-+
-+	sprintf(buf, "%s", "Unknown");
-+}
-+
-+static ssize_t ux500_get_process(struct device *dev,
-+				struct device_attribute *attr,
-+				char *buf)
-+{
-+	if (dbx500_id.process == 0x00)
-+		return sprintf(buf, "Standard\n");
-+
-+	return sprintf(buf, "%02xnm\n", dbx500_id.process);
-+}
-+
-+static void soc_info_put(struct soc_device *soc_dev)
-+{
-+	char buf[1024];
-+
-+	ux500_get_machine(buf);
-+	soc_dev->machine = kzalloc(strlen(buf), GFP_KERNEL);
-+	strcpy((char *)soc_dev->machine, buf);
-+
-+	ux500_get_family(buf);
-+	soc_dev->family = kzalloc(strlen(buf), GFP_KERNEL);
-+	strcpy((char *)soc_dev->family, buf);
-+
-+	ux500_get_soc_id(buf);
-+	soc_dev->soc_id = kzalloc(strlen(buf), GFP_KERNEL);
-+	strcpy((char *)soc_dev->soc_id, buf);
-+
-+	ux500_get_revision(buf);
-+	soc_dev->revision = kzalloc(strlen(buf), GFP_KERNEL);
-+	strcpy((char *)soc_dev->revision, buf);
-+}
-+
-+struct device_attribute ux500_soc_attrs[] = {
-+	__ATTR(process,  S_IRUGO, ux500_get_process,  NULL),
-+	__ATTR_NULL,
-+};
-+
-+static int __init ux500_soc_sysfs_init(void)
-+{
-+	int ret;
-+	int i = 0;
-+	struct soc_device *soc_dev = kzalloc(sizeof(struct soc_device), GFP_KERNEL);
-+
-+	soc_parent = kzalloc(sizeof(struct device), GFP_KERNEL);
-+
-+	soc_info_put(soc_dev);
-+
-+	ret = soc_device_register(soc_parent, soc_dev);
-+
-+	if (ret >= 0) {
-+		while (ux500_soc_attrs[i].attr.name != NULL) {
-+			ret = device_create_file(soc_parent, &ux500_soc_attrs[i++]);
-+			if (ret)
-+				goto out;
-+		}
-+	}
-+out:
-+	return ret;
-+}
-+postcore_initcall(ux500_soc_sysfs_init);
-diff --git a/arch/arm/mach-ux500/include/mach/setup.h b/arch/arm/mach-ux500/include/mach/setup.h
-index a7d363f..a24093f 100644
---- a/arch/arm/mach-ux500/include/mach/setup.h
-+++ b/arch/arm/mach-ux500/include/mach/setup.h
-@@ -35,6 +35,7 @@ extern void __init amba_add_devices(struct amba_device *devs[], int num);
  
- struct sys_timer;
- extern struct sys_timer ux500_timer;
-+extern struct device *soc_parent;
+ 	/*
+ 	 * The HREFv60 board removed a GPIO expander and routed
+@@ -620,12 +621,22 @@ static void __init mop500_init_machine(void)
  
- #define __IO_DEV_DESC(x, sz)	{		\
- 	.virtual	= IO_ADDRESS(x),	\
+ 	mop500_pins_init();
+ 
+-	if (machine_is_snowball())
++	if (machine_is_snowball()) {
++		if (soc_parent->parent != NULL)
++			for (i=0; i<ARRAY_SIZE(snowball_platform_devs); i++)
++				snowball_platform_devs[i]->dev.parent = soc_parent;
++
+ 		platform_add_devices(snowball_platform_devs,
+-					ARRAY_SIZE(snowball_platform_devs));
+-	else
++				ARRAY_SIZE(snowball_platform_devs));
++	}
++	else {
++		if (soc_parent->parent != NULL)
++			for (i=0; i<ARRAY_SIZE(mop500_platform_devs); i++)
++				mop500_platform_devs[i]->dev.parent = soc_parent;
++
+ 		platform_add_devices(mop500_platform_devs,
+-					ARRAY_SIZE(mop500_platform_devs));
++				ARRAY_SIZE(mop500_platform_devs));
++	}
+ 
+ 	mop500_i2c_init();
+ 	mop500_sdi_init();
+diff --git a/arch/arm/mach-ux500/board-u5500.c b/arch/arm/mach-ux500/board-u5500.c
+index 81e0475..4866436 100644
+--- a/arch/arm/mach-ux500/board-u5500.c
++++ b/arch/arm/mach-ux500/board-u5500.c
+@@ -53,11 +53,17 @@ static void __init u5500_uart_init(void)
+ 
+ static void __init u5500_init_machine(void)
+ {
++	int i;
++
+ 	u5500_init_devices();
+ 
+ 	u5500_sdi_init();
+ 	u5500_uart_init();
+ 
++	if (soc_parent->parent != NULL)
++		for (i=0; i<ARRAY_SIZE(u5500_platform_devices); i++)
++			u5500_platform_devices[i]->dev.parent = soc_parent;
++
+ 	platform_add_devices(u5500_platform_devices,
+ 		ARRAY_SIZE(u5500_platform_devices));
+ }
+diff --git a/arch/arm/mach-ux500/cpu-db5500.c b/arch/arm/mach-ux500/cpu-db5500.c
+index 7d940a8..52cbbd2 100644
+--- a/arch/arm/mach-ux500/cpu-db5500.c
++++ b/arch/arm/mach-ux500/cpu-db5500.c
+@@ -216,11 +216,17 @@ static int usb_db5500_tx_dma_cfg[] = {
+ 
+ void __init u5500_init_devices(void)
+ {
++	int i;
++
+ 	db5500_add_gpios();
+ 	db5500_dma_init();
+ 	db5500_add_rtc();
+ 	db5500_add_usb(usb_db5500_rx_dma_cfg, usb_db5500_tx_dma_cfg);
+ 
++	if (soc_parent->parent != NULL)
++		for (i=0; i<ARRAY_SIZE(db5500_platform_devs); i++)
++			db5500_platform_devs[i]->dev.parent = soc_parent;
++
+ 	platform_add_devices(db5500_platform_devs,
+ 			     ARRAY_SIZE(db5500_platform_devs));
+ }
+diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
+index 07562e8..cd63363 100644
+--- a/arch/arm/mach-ux500/cpu-db8500.c
++++ b/arch/arm/mach-ux500/cpu-db8500.c
+@@ -196,6 +196,8 @@ static int usb_db8500_tx_dma_cfg[] = {
+  */
+ void __init u8500_init_devices(void)
+ {
++	int i;
++
+ 	if (cpu_is_u8500ed())
+ 		dma40_u8500ed_fixup();
+ 
+@@ -203,7 +205,15 @@ void __init u8500_init_devices(void)
+ 	db8500_add_gpios();
+ 	db8500_add_usb(usb_db8500_rx_dma_cfg, usb_db8500_tx_dma_cfg);
+ 
+-	platform_device_register_simple("cpufreq-u8500", -1, NULL, 0);
++
++	platform_device_register_resndata(
++		(soc_parent->parent != NULL) ? soc_parent : NULL,
++		"cpufreq-u8500", -1, NULL, 0, NULL, 0);
++
++	if (soc_parent->parent != NULL)
++		for (i=0; i<ARRAY_SIZE(platform_devs); i++)
++			platform_devs[i]->dev.parent = soc_parent;
++
+ 	platform_add_devices(platform_devs, ARRAY_SIZE(platform_devs));
+ 
+ 	return ;
+diff --git a/arch/arm/mach-ux500/devices-common.c b/arch/arm/mach-ux500/devices-common.c
+index 7418552..c8d1399 100644
+--- a/arch/arm/mach-ux500/devices-common.c
++++ b/arch/arm/mach-ux500/devices-common.c
+@@ -15,7 +15,7 @@
+ #include <linux/gpio/nomadik.h>
+ 
+ #include <mach/hardware.h>
+-
++#include <mach/setup.h>
+ #include "devices-common.h"
+ 
+ struct amba_device *
+@@ -45,6 +45,9 @@ dbx500_add_amba_device(const char *name, resource_size_t base,
+ 
+ 	dev->dev.platform_data = pdata;
+ 
++	if (soc_parent->parent != NULL)
++		dev->dev.parent = soc_parent;
++
+ 	ret = amba_device_register(dev, &iomem_resource);
+ 	if (ret) {
+ 		kfree(dev);
+@@ -74,6 +77,9 @@ dbx500_add_platform_device(const char *name, int id, void *pdata,
+ 
+ 	dev->dev.platform_data = pdata;
+ 
++	if (soc_parent->parent != NULL)
++		dev->dev.parent = soc_parent;
++
+ 	ret = platform_device_add(dev);
+ 	if (ret)
+ 		goto out_free;
+@@ -124,9 +130,14 @@ dbx500_add_gpio(int id, resource_size_t addr, int irq,
+ 		}
+ 	};
+ 
+-	return platform_device_register_resndata(NULL, "gpio", id,
+-				resources, ARRAY_SIZE(resources),
+-				pdata, sizeof(*pdata));
++	return platform_device_register_resndata(
++		(soc_parent->parent != NULL) ? soc_parent : NULL,
++		"gpio",
++		id,
++		resources,
++		ARRAY_SIZE(resources),
++		pdata,
++		sizeof(*pdata));
+ }
+ 
+ void dbx500_add_gpios(resource_size_t *base, int num, int irq,
+diff --git a/arch/arm/mach-ux500/usb.c b/arch/arm/mach-ux500/usb.c
+index 0a01cbd..29cdd3c 100644
+--- a/arch/arm/mach-ux500/usb.c
++++ b/arch/arm/mach-ux500/usb.c
+@@ -9,6 +9,7 @@
+ #include <linux/dma-mapping.h>
+ #include <plat/ste_dma40.h>
+ #include <mach/hardware.h>
++#include <mach/setup.h>
+ #include <mach/usb.h>
+ 
+ #define MUSB_DMA40_RX_CH { \
+@@ -157,5 +158,8 @@ void ux500_add_usb(resource_size_t base, int irq, int *dma_rx_cfg,
+ 	ux500_usb_dma_update_rx_ch_config(dma_rx_cfg);
+ 	ux500_usb_dma_update_tx_ch_config(dma_tx_cfg);
+ 
++	if (soc_parent->parent != NULL)
++		ux500_musb_device.dev.parent = soc_parent;
++
+ 	platform_device_register(&ux500_musb_device);
+ }
 -- 
 1.7.4.1
