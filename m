@@ -1,22 +1,33 @@
-From: lost.distance@yahoo.com (Paul Parsons)
-Date: Wed, 10 Aug 2011 11:04:14 +0100 (BST)
-Subject: [PATCH] pxa/hx4700: Set DS1WM clock_rate
-In-Reply-To: <CAMPhdO_xL_sUui-22p27oAw52YHnBhm90cn12t5eJsdRLnUfNA@mail.gmail.com>
-Message-ID: <1312970654.10843.YahooMailClassic@web29012.mail.ird.yahoo.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Wed, 10 Aug 2011 15:51:18 +0530
+Subject: [PATCH 0/2] Update uart irq handling for s3c64xx and later SoC's
+Message-ID: <1312971680-3898-1-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
+s3c64xx and later SoC's include the uart interrupt mask and pending registers
+in the uart controller, unlike their s3c24xx predecessor. This allows the
+uart irq handling to be moved from the platform code to the driver. This
+patchset does this change and removes all the macros that will not be
+required with this update.
 
-> Or this parent driver can silently pass the clock_rate to
-> ds1wm sub-driver
-> without the if () condition, as it leaves to the sub-driver
-> to decide whether
-> it's a valid value, unless you want to use 'clock_rate' to
-> explicitly control
-> the registration of the sub-device.
+Thomas Abraham (2):
+  serial: samsung: Add unified interrupt handler for s3c64xx and later SoC's
+  ARM: SAMSUNG: Remove uart irq handling from plaform code
 
-I followed the example of the pxa/magician + mfd/htc-pasic3 platform.
-
-Regards,
-Paul
+ arch/arm/Kconfig                                 |    1 -
+ arch/arm/mach-s3c64xx/dev-uart.c                 |   60 ++-----------
+ arch/arm/mach-s3c64xx/include/mach/irqs.h        |   30 ------
+ arch/arm/mach-s3c64xx/irq.c                      |   25 -----
+ arch/arm/plat-s5p/Kconfig                        |    1 -
+ arch/arm/plat-s5p/dev-uart.c                     |   84 +++---------------
+ arch/arm/plat-s5p/include/plat/irqs.h            |   35 -------
+ arch/arm/plat-s5p/irq.c                          |   34 -------
+ arch/arm/plat-samsung/Kconfig                    |    5 -
+ arch/arm/plat-samsung/Makefile                   |    1 -
+ arch/arm/plat-samsung/include/plat/regs-serial.h |    5 +
+ arch/arm/plat-samsung/irq-uart.c                 |   96 -------------------
+ drivers/tty/serial/samsung.c                     |  107 +++++++++++++++++++---
+ drivers/tty/serial/samsung.h                     |    1 +
+ 14 files changed, 121 insertions(+), 364 deletions(-)
+ delete mode 100644 arch/arm/plat-samsung/irq-uart.c
