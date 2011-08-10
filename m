@@ -1,48 +1,53 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Wed, 10 Aug 2011 14:17:04 +0200
-Subject: [PATCH 06/19] mach-ks8695: fix GPIO LEDs
-Message-ID: <1312978624-18273-1-git-send-email-linus.walleij@stericsson.com>
+Date: Wed, 10 Aug 2011 14:17:19 +0200
+Subject: [PATCH 08/19] mach-davinci: move DaVinci TNET GPIO driver to GPIO
+	subsystem
+Message-ID: <1312978639-18339-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Linus Walleij <linus.walleij@linaro.org>
 
-Enabling the LEDs on the ks8695 doesn't even compile, fix it with
-a proper include and also replace a <mach/gpio.h> with the proper
-<linux/gpio.h>.
+As per example from the other ARM boards, push the DaVinci TNET
+GPIO driver down to the GPIO subsystem so it can be consolidated.
 
-Cc: zeal <zealcook@gmail.com>
-Cc: Daniel Silverstone <dsilvers@simtec.co.uk>
-Cc: Ben Dooks <ben-linux@fluff.org>
+Cc: Sekhar Nori <nsekhar@ti.com>
+Cc: Kevin Hilman <khilman@ti.com>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/mach-ks8695/devices.c |    1 +
- arch/arm/mach-ks8695/leds.c    |    1 +
- 2 files changed, 2 insertions(+), 0 deletions(-)
+ arch/arm/mach-davinci/Makefile                     |    1 -
+ drivers/gpio/Makefile                              |    1 +
+ .../mach-davinci => drivers/gpio}/gpio-tnetv107x.c |    0
+ 3 files changed, 1 insertions(+), 1 deletions(-)
+ rename {arch/arm/mach-davinci => drivers/gpio}/gpio-tnetv107x.c (100%)
 
-diff --git a/arch/arm/mach-ks8695/devices.c b/arch/arm/mach-ks8695/devices.c
-index b89fb6d..73bd638 100644
---- a/arch/arm/mach-ks8695/devices.c
-+++ b/arch/arm/mach-ks8695/devices.c
-@@ -20,6 +20,7 @@
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
+diff --git a/arch/arm/mach-davinci/Makefile b/arch/arm/mach-davinci/Makefile
+index 8f3c8ee..495e313 100644
+--- a/arch/arm/mach-davinci/Makefile
++++ b/arch/arm/mach-davinci/Makefile
+@@ -17,7 +17,6 @@ obj-$(CONFIG_ARCH_DAVINCI_DM365)	+= dm365.o devices.o
+ obj-$(CONFIG_ARCH_DAVINCI_DA830)        += da830.o devices-da8xx.o
+ obj-$(CONFIG_ARCH_DAVINCI_DA850)        += da850.o devices-da8xx.o
+ obj-$(CONFIG_ARCH_DAVINCI_TNETV107X)    += tnetv107x.o devices-tnetv107x.o
+-obj-$(CONFIG_ARCH_DAVINCI_TNETV107X)    += gpio-tnetv107x.o
  
-+#include <linux/gpio.h>
- #include <linux/platform_device.h>
- 
- #include <mach/irqs.h>
-diff --git a/arch/arm/mach-ks8695/leds.c b/arch/arm/mach-ks8695/leds.c
-index 4bd7075..d6f6502 100644
---- a/arch/arm/mach-ks8695/leds.c
-+++ b/arch/arm/mach-ks8695/leds.c
-@@ -11,6 +11,7 @@
- #include <linux/kernel.h>
- #include <linux/module.h>
- #include <linux/init.h>
-+#include <linux/gpio.h>
- 
- #include <asm/leds.h>
- #include <mach/devices.h>
+ obj-$(CONFIG_AINTC)			+= irq.o
+ obj-$(CONFIG_CP_INTC)			+= cp_intc.o
+diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
+index a26fffa..2269822 100644
+--- a/drivers/gpio/Makefile
++++ b/drivers/gpio/Makefile
+@@ -51,6 +51,7 @@ obj-$(CONFIG_GPIO_SX150X)	+= gpio-sx150x.o
+ obj-$(CONFIG_GPIO_TC3589X)	+= gpio-tc3589x.o
+ obj-$(CONFIG_ARCH_TEGRA)	+= gpio-tegra.o
+ obj-$(CONFIG_GPIO_TIMBERDALE)	+= gpio-timberdale.o
++obj-$(CONFIG_ARCH_DAVINCI_TNETV107X) += gpio-tnetv107x.o
+ obj-$(CONFIG_GPIO_TPS65910)	+= gpio-tps65910.o
+ obj-$(CONFIG_GPIO_TPS65912)	+= gpio-tps65912.o
+ obj-$(CONFIG_GPIO_TWL4030)	+= gpio-twl4030.o
+diff --git a/arch/arm/mach-davinci/gpio-tnetv107x.c b/drivers/gpio/gpio-tnetv107x.c
+similarity index 100%
+rename from arch/arm/mach-davinci/gpio-tnetv107x.c
+rename to drivers/gpio/gpio-tnetv107x.c
 -- 
 1.7.3.2
