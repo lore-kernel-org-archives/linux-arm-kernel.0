@@ -1,45 +1,42 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 10 Aug 2011 11:29:32 +0100
-Subject: [PATCH V2 6/6] spi/spi-pl022: Request/free DMA channels as and
-	when required.
-In-Reply-To: <438BB0150E931F4B9CE701519A4463010871804A15@bgsmsx502.gar.corp.intel.com>
-References: <cover.1312965741.git.viresh.kumar@st.com>
-	<566c0525199f498f04422d4c3b2ddd7466648c20.1312965742.git.viresh.kumar@st.com>
-	<20110810090042.GE1831@n2100.arm.linux.org.uk>
-	<4E424F7B.2000800@st.com>
-	<438BB0150E931F4B9CE701519A4463010871804A15@bgsmsx502.gar.corp.intel.com>
-Message-ID: <20110810102932.GH1831@n2100.arm.linux.org.uk>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Wed, 10 Aug 2011 12:30:19 +0200
+Subject: [PATCH 2/2] Remove s3c24xx_dma_addr definition
+In-Reply-To: <201108101227.32780.heiko@sntech.de>
+References: <201108101227.32780.heiko@sntech.de>
+Message-ID: <201108101230.19931.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 10, 2011 at 03:31:42PM +0530, Koul, Vinod wrote:
-> I would agree on both counts :)
-> 
-> In some cases it does make sense to hold the channel for the lifetime
-> like uart or where the channel has been tied to an interface by SoC
-> designer.
-> But in some cases like dw_dmac it seems you can assign channels
-> dynamically to each usage, and runtime allocation ensures we have best
-> utilization.
+As all users of s3c24xx_dma_addr are gone now, remove it completely.
 
-If dw_dmac can assign channels dynamically at runtime to request signals,
-it is no different from pl08x, where we have essentially the same
-capability, and we do have the virtual channel support.
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ arch/arm/plat-samsung/include/plat/dma-s3c24xx.h |    6 ------
+ 1 files changed, 0 insertions(+), 6 deletions(-)
 
-The virtual channel support is far more flexible than picking a physical
-channel at allocation time, because it means you can reassign the
-virtual channel at any point when a transfer is not in progress.  Plus
-it means that you don't have to keep doing the channel allocation,
-configuration and freeing on every transfer which would be hugely
-wasteful.  Not to mention that it burdens peripheral drivers with
-unnecessary additional complexity - which means additional bugs.
-
-I would encourage all DMA engine drivers which have this capability to
-switch to a virtual channel setup to ensure maximum interoperability
-between different peripheral drivers.
-
-I'd also suggest that we probably want to make the virtual layer a
-library for DMA engine implementations to use.  We really don't want
-every DMA engine implementation re-creating that support time and time
-again.  I'll look into pulling the virtual channel stuff out of PL08x
-over the next month or so.
+diff --git a/arch/arm/plat-samsung/include/plat/dma-s3c24xx.h b/arch/arm/plat-samsung/include/plat/dma-s3c24xx.h
+index 336d5ac..ab9bce6 100644
+--- a/arch/arm/plat-samsung/include/plat/dma-s3c24xx.h
++++ b/arch/arm/plat-samsung/include/plat/dma-s3c24xx.h
+@@ -18,11 +18,6 @@ extern struct s3c2410_dma_chan s3c2410_chans[S3C_DMA_CHANNELS];
+ #define DMA_CH_VALID		(1<<31)
+ #define DMA_CH_NEVER		(1<<30)
+ 
+-struct s3c24xx_dma_addr {
+-	unsigned long		from;
+-	unsigned long		to;
+-};
+-
+ /* struct s3c24xx_dma_map
+  *
+  * this holds the mapping information for the channel selected
+@@ -31,7 +26,6 @@ struct s3c24xx_dma_addr {
+ 
+ struct s3c24xx_dma_map {
+ 	const char		*name;
+-	struct s3c24xx_dma_addr  hw_addr;
+ 
+ 	unsigned long		 channels[S3C_DMA_CHANNELS];
+ 	unsigned long		 channels_rx[S3C_DMA_CHANNELS];
+-- 
+1.7.5.4
