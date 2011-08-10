@@ -1,40 +1,35 @@
-From: gregkh@suse.de (Greg KH)
-Date: Wed, 10 Aug 2011 08:02:51 -0700
-Subject: [PATCH 2/4] Add documenation for new sysfs devices/soc
-	functionallity
-In-Reply-To: <1312981422-13294-2-git-send-email-lee.jones@linaro.org>
-References: <1312981422-13294-1-git-send-email-lee.jones@linaro.org>
-	<1312981422-13294-2-git-send-email-lee.jones@linaro.org>
-Message-ID: <20110810150251.GD7938@suse.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 10 Aug 2011 16:12:56 +0100
+Subject: Subject: L2x0 OF properties do not include interrupt #
+In-Reply-To: <4E42965A.9010500@calxeda.com>
+References: <000201cc575b$c1229010$4367b030$@rutland@arm.com>
+	<201108101609.56995.arnd@arndb.de> <4E42965A.9010500@calxeda.com>
+Message-ID: <20110810151256.GN10121@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 10, 2011 at 02:03:40PM +0100, Lee Jones wrote:
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  Documentation/ABI/testing/sysfs-devices-soc |   16 ++++++++++++++++
->  1 files changed, 16 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/ABI/testing/sysfs-devices-soc
+On Wed, Aug 10, 2011 at 03:31:54PM +0100, Rob Herring wrote:
+> Here's all the interrupts on the PL310:
 > 
-> diff --git a/Documentation/ABI/testing/sysfs-devices-soc b/Documentation/ABI/testing/sysfs-devices-soc
-> new file mode 100644
-> index 0000000..9156ba0
-> --- /dev/null
-> +++ b/Documentation/ABI/testing/sysfs-devices-soc
-> @@ -0,0 +1,16 @@
-> +What:		/sys/devices/soc
-> +Date:		April 2011
-> +contact:	Lee Jones <lee.jones@linaro.org>
-> +Description:
-> +		The /sys/devices/soc directory contains a sub-directory for each
-> +		System-on-Chip (SoC) device on a running platform. Information
-> +		regarding each SoC can be obtained by reading sysfs files. This
-> +		functionallity is only available if implemented by the platform.
-> +		This directory contains two kinds of attributes:
-> +			- Common attributes:
-> +				* machine: the name of the machine (e.g. Ux500).
-> +				* family: the family name of the SoC (e.g. DB8500).
-> +			- SoC-specific attributes:
-> +				* SoC vendor declared, such as serial and rev numbers.
+> DECERRINTR Decode error received on master ports from L3
+> SLVERRINTR Slave error received on master ports from L3
+> ERRRDINTR Error on L2 data RAM read
+> ERRRTINTR Error on L2 tag RAM read
+> ERRWDINTR Error on L2 data RAM write
+> ERRWTINTR Error on L2 tag RAM write
+> PARRDINTR Parity error on L2 data RAM read
+> PARRTINTR Parity error on L2 tag RAM read
+> ECNTRINTR Event Counter Overflow/Increment
+> L2CCINTR L2CC Combined Interrupt Output
+> 
+> It's likely that you would want to split these to different drivers.
+> EDAC for parity/bus errors and hw-events for event counters, for example.
 
-Spell out these individual files with individual entries please.
+I completely agree with you here. In reality, I expect we'll be lucky if
+even the combined interrupt is wired up so maybe the individual property
+names should only be added on an as-needed basis? For the time being we can
+happily get by with something like combined-interrupt = <...>.
+
+Or would you rather specify everything up front?
+
+Will
