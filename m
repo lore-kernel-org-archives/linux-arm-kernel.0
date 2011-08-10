@@ -1,119 +1,56 @@
-From: marvin24@gmx.de (Marc Dietich)
-Date: Wed, 10 Aug 2011 10:24:57 +0200
-Subject: [PATCH 4/5 V2] ARM: tegra: paz00: add clocks required
-	forusboperation
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF04A06873BB@HQMAIL01.nvidia.com>
-References: <201108092126.28521.marvin24@gmx.de>
-	<74CDBE0F657A3D45AFBB94109FB122FF04A06873BB@HQMAIL01.nvidia.com>
-Message-ID: <201108101024.57494.marvin24@gmx.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 10 Aug 2011 09:28:02 +0100
+Subject: [RFC PATCH] ARM: sched_clock: allow sched_clock to be selected
+	at runtime
+In-Reply-To: <CAMPhdO8qCXrPN7ASo=Fhm+BQJN11NRy=kNPv8ySHMbd24df3Rw@mail.gmail.com>
+References: <1312910015-20043-1-git-send-email-marc.zyngier@arm.com>
+	<4E41A4A4.80000@gmail.com>
+	<CAMPhdO8qCXrPN7ASo=Fhm+BQJN11NRy=kNPv8ySHMbd24df3Rw@mail.gmail.com>
+Message-ID: <4E424112.10804@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
-
-> Marc Dietrich wrote at Tuesday, August 09, 2011 1:26 PM:
-> > On Tuesday 09 August 2011 20:35:45 you wrote:
-> > > [...]
-> > > Do you need the pll_p_out4 entry? What's that driving? Check in
-> > > /sys/kernel/debug/clock/clock_tree (/sys/kernel/debug is debugfs).
-> > 
-> > I think it is only required to setup the correct (non-standard?)
-> > frequency. Seems all other boards use 108 MHz which cause one of the
-> > ports to fail. Don't ask me for details ...
+On 09/08/11 22:28, Eric Miao wrote:
+> On Wed, Aug 10, 2011 at 5:20 AM, Rob Herring <robherring2@gmail.com> wrote:
+>> On 08/09/2011 12:13 PM, Marc Zyngier wrote:
+>>> sched_clock() is yet another blocker on the road to the single
+>>> image. This patch implements an idea by Russell King:
+>>>
+>>> http://www.spinics.net/lists/linux-omap/msg49561.html
+>>>
+>>> Instead of asking the platform to implement both sched_clock()
+>>> itself and the rollover callback, simply register a read()
+>>> function, and let the ARM code care about sched_clock() itself,
+>>> the conversion to ns and the rollover. sched_clock() uses
+>>> this read() function as an indirection to the platform code.
+>>>
+>>> This allow some simplifications and possibly some footprint gain
+>>> when multiple platforms are compiled in. Among the drawbacks,
+>>> the removal of the *_fixed_sched_clock optimization which could
+>>> negatively impact some platforms (sa1100, tegra, versatile
+>>> and omap).
+>>
+>> There are similar patchsets that move sched_clock into clocksource code.
+>> That seems like a cleaner approach to me.
+>>
+>> http://thread.gmane.org/gmane.linux.kernel/844872
+>>
+>> http://www.spinics.net/lists/arm-kernel/msg122716.html
 > 
-> ...
-> 
-> > root at ac100:~# cat /sys/kernel/debug/clock/clock_tree
-> > 
-> >    clock                          state  ref div      rate
-> > 
-> > --------------------------------------------------------------
-> > 
-> >    clk_m                          on     9            12000000
-> 
-> ...
-> 
-> >       pll_p                       on     10  x18      216000000
-> 
-> ...
-> 
-> >          pll_p_out4               on     3   9        24000000
-> >          
-> >             sclk                  on     2            24000000
-> >             
-> >                avp.sclk           off    0            24000000
-> >                cop                on     1            24000000
-> >                hclk               on     2   1        24000000
-> >                
-> >                   pclk            on     2   2        12000000
-> >                   
-> >                      apbdma       on     1   1        12000000
-> 
-> Hmm. That's pretty odd.
-> 
-> With the standard kernel the device ships with, what does the clock tree
-> under pll_p_out4 look like? It'd be very interesting to compare that. If
-> that setup is the same as what this patch sets up, the patch seems fine.
+> +1, yeah would be better for clocksource to handle that if possible.
 
-unfortunately, there is no such think in .32 kernel (the kernel deliverd with 
-the device), and I don't think I can port it over.
+I'd be all for that, and I've waited a long time (April?) before posting
+that patch, hoping that a consensus would emerge on the clocksourse
+patches.
 
-> As far as I know all the clocks there are both unrelated to USB, and
-> internal to the device, so the board shouldn't have any effect. In
-> particular, avp.sclk/cop are for the internal media CPU/DSP, hclk/pclk
-> are the internal AHB/APB bus clocks, and apbdma is for an internal DMA
-> engine, currently only used for audio in the mainline kernel at least.
+So far, nothing.
 
-Does this mean that the internal busses you mentioned are also running at low 
-speed? Would this be a hugh performance penality?
+We need a solution to this problem. I really don't care which patch gets
+merged, so if someone thinks they can get the clocksource patches
+further, then by all mean, please do it.
 
-> 
-> I guess I'll ask a few people internally to see if they have a clue why
-> your change might be necessary.
+Cheers,
 
-Also take a look at seaboard, it has the same clock setting and especially 
-commit dfb625f934dd40baf29ee6c43e4f130b524411a1 in the chromeos kernel:
-
-commit dfb625f934dd40baf29ee6c43e4f130b524411a1
-Author: Vincent Palatin <vpalatin@chromium.org>
-Date:   Wed Apr 13 07:26:08 2011 -0400
-
-    CHROMIUM: tegra: seaboard: fix ULPI transceiver clock
-    
-    On our seaboard-based platforms, pll_p_out4 is used to clock
-    (through DAP_MCLK2) the external USB ULPI transceiver between the USB2
-    port to mini-PCIe modem. And it needs to be set at 24Mhz for the
-    tranceiver to work correctly.
-    Revert the sclk parent to pll_c out1 (as it was before the last change)
-    since it needs to stay clocked at 108MHz.
-    
-    Signed-off-by: Vincent Palatin <vpalatin@chromium.org>
-    
-    BUG=chrome-os-partner:3167
-    TEST=Check that the Gobi modem is appearing in lsusb listing
-    Use the kaen DVT for browsing and suspending
-    
-    Review URL: http://codereview.chromium.org/6825076
-    
-    Change-Id: Ia9b1bbc7860da732fb8edbbcf0bce60e82d6d8ed
-
-
-Thanks!
-
-Marc
-
-
-
-> For reference, here's Harmony on something roughly like linux-next:
-> 
->    clk_m                          on     7            12000000
-> ...
->       pll_p                       on     9   x18      216000000
-> ...
->          pll_p_out4               on     2   2        108000000
->             sclk                  on     2            108000000
->                avp.sclk           off    0            108000000
->                cop                on     1            108000000
->                hclk               on     2   1        108000000
->                   pclk            on     2   2        54000000
->                      apbdma       on     1   1        54000000
+	M.
+-- 
+Jazz is not dead. It just smells funny...
