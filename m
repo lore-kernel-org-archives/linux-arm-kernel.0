@@ -1,40 +1,48 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Wed, 10 Aug 2011 08:51:30 -0700
-Subject: [RFC PATCH 5/8] ARM: msm: convert logical CPU numbers to
-	physical numbers
-In-Reply-To: <20110810084218.GA10121@e102144-lin.cambridge.arm.com>
-References: <1312926162-22469-1-git-send-email-will.deacon@arm.com>
-	<1312926162-22469-6-git-send-email-will.deacon@arm.com>
-	<20110809222604.GA15160@huya.qualcomm.com>
-	<20110810084218.GA10121@e102144-lin.cambridge.arm.com>
-Message-ID: <20110810155130.GB4059@huya.qualcomm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 10 Aug 2011 16:53:54 +0100
+Subject: PB1176 broken in -rc1
+In-Reply-To: <20110810153947.GK2680@pulham.picochip.com>
+References: <20110810152400.GO10121@e102144-lin.cambridge.arm.com>
+	<20110810153947.GK2680@pulham.picochip.com>
+Message-ID: <20110810155354.GP10121@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 10, 2011 at 09:42:19AM +0100, Will Deacon wrote:
-> On Tue, Aug 09, 2011 at 11:26:04PM +0100, David Brown wrote:
-> > On Tue, Aug 09, 2011 at 10:42:39PM +0100, Will Deacon wrote:
-> > > This patch uses the new cpu_logical_map() macro for converting logical
-> > > CPU numbers into physical numbers when dealing with the pen_release
-> > > variable in the SMP boot and CPU hotplug paths.
-> > > 
-> > > Cc: David Brown <davidb@codeaurora.org>
-> > > Signed-off-by: Will Deacon <will.deacon@arm.com>
+On Wed, Aug 10, 2011 at 04:39:47PM +0100, Jamie Iles wrote:
+> Hi Will,
+
+Hi Jamie,
+
+> On Wed, Aug 10, 2011 at 04:24:00PM +0100, Will Deacon wrote:
+> > My PB1176 platform appears to lock up as soon as it hits userspace when
+> > running a 3.1-rc1 kernel. If I revert the commit:
 > > 
-> > For MSM8660:
+> > f022e4e4 ("ARM: 6986/1: mach-realview: add TCM support for PB1176")
 > > 
-> > Tested-by: David Brown <davidb@codeaurora.org>
-> > Acked-by: David Brown <davidb@codeaurora.org>
+> > Then things start working again.
+ 
+> This may be to do with poisoning of the init mem.  The patch below 
+> (which is in next as ARM: 7010/1: mm: fix invalid loop for 
+> poison_init_mem) might resolve the issue.
 > 
-> Thanks David!
+> Jamie
 > 
-> Curious: did you try booting with a CPU other than physical CPU 0 or is
-> that not possible on your platform?
+> 8<------
+> 
+> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+> index 2fee782..91bca35 100644
+> --- a/arch/arm/mm/init.c
+> +++ b/arch/arm/mm/init.c
+> @@ -441,7 +441,7 @@ static inline int free_area(unsigned long pfn, unsigned long end, char *s)
+>  static inline void poison_init_mem(void *s, size_t count)
+>  {
+>  	u32 *p = (u32 *)s;
+> -	while ((count = count - 4))
+> +	for (; count != 0; count -= 4)
+>  		*p++ = 0xe7fddef0;
+>  }
 
-I haven't.  I'll look into whether that is possible.
+Wahey, with this I can get a working system again. Thanks for saving me from
+reaching for the JTAG debugger!
 
-David
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Will
