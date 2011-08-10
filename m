@@ -1,110 +1,92 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Wed, 10 Aug 2011 17:01:52 +0200
-Subject: How to handle named resources with DT?
-In-Reply-To: <20110810015214.GD23511@yookeroo.fritz.box>
-References: <4E4166F0.9050401@ti.com>
-	<CACxGe6tbEW1EZhqXy78EZVM_sQLH0Qbr7QOzbgbsKBRn1FtVrg@mail.gmail.com>
-	<4E4172A8.3030101@ti.com> <4E417BD5.8080409@freescale.com>
-	<20110809205723.GE11568@ponder.secretlab.ca>
-	<4E41A1B9.1060400@ti.com>
-	<20110809211747.GJ11568@ponder.secretlab.ca>
-	<4E41AA43.1000506@ti.com>
-	<20110809214905.GK11568@ponder.secretlab.ca>
-	<4E41AC5C.20301@ti.com> <20110810015214.GD23511@yookeroo.fritz.box>
-Message-ID: <4E429D60.2000100@ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 10 Aug 2011 16:03:24 +0100
+Subject: [PATCH v7 01/16] ARM: LPAE: add ISBs around MMU enabling code
+In-Reply-To: <1312988619-16804-1-git-send-email-catalin.marinas@arm.com>
+References: <1312988619-16804-1-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1312988619-16804-2-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/10/2011 3:52 AM, David Gibson wrote:
-> On Tue, Aug 09, 2011 at 11:53:32PM +0200, Cousson, Benoit wrote:
->> On 8/9/2011 11:49 PM, Grant Likely wrote:
->>> On Tue, Aug 09, 2011 at 11:44:35PM +0200, Cousson, Benoit wrote:
->>>> On 8/9/2011 11:17 PM, Grant Likely wrote:
->>>>> On Tue, Aug 09, 2011 at 11:08:09PM +0200, Cousson, Benoit wrote:
->>>>>> On 8/9/2011 10:57 PM, Grant Likely wrote:
->>>>>>> On Tue, Aug 09, 2011 at 01:26:29PM -0500, Scott Wood wrote:
->>>>>>>> On 08/09/2011 12:47 PM, Cousson, Benoit wrote:
->>>>>>>>> On 8/9/2011 7:23 PM, Grant Likely wrote:
->>>>>>>>>> There is no analogous mechanism for _byname in the device tree.  The
->>>>>>>>>> DT binding for a device must explicitly state what order the register
->>>>>>>>>> ranges are in.  The driver will need to be adapted.
->>>>>>>>>
->>>>>>>>> That seems to be a small regression for my point of view. Relying on the
->>>>>>>>> order is not super safe. This is not very readable either. That's for
->>>>>>>>> that exact reason that we changed our drivers to use
->>>>>>>>> platform_get_resource_byname. That's probably the reason why that API is
->>>>>>>>> there as well.
->>>>>>>>> For the same IP, the number of entries can vary depending of the SoC
->>>>>>>>> revision.
->>>>>>>>> By using the _byname, we can check if the resource is there or not
->>>>>>>>> without having to care about the position.
->>>>>>>>
->>>>>>>> You could have a named u32 property that contains the reg index, e.g.:
->>>>>>>>
->>>>>>>> dev {
->>>>>>>> 	reg =<0x20000 0x200 0x24000 0x200>;
->>>>>>>> 	foo-reg =<0>;
->>>>>>>> 	bar-reg =<1>;
->>>>>>>> };
->>>>>>>
->>>>>>> That's a little nasty.  A reg-names = "foo", "bar"; would probably be
->>>>>>> better.
->>>>>>
->>>>>> Yep, I agree.
->>>>>>
->>>>>> And what about something like that?
->>>>>>    reg =<0x20000 0x200>, "foo",
->>>>>> 	<0x20000 0x200>, "bar" ;
->>>>>>
->>>>>> It is doable?
->>>>>
->>>>> Definitely not.  It would break all existing 'reg' parsing
->>>>> implementations quite badly.
->>>>
->>>> OK, so what about extending the reg attribute to be a reg node?
->>>>
->>>> dev {
->>>> 	reg {
->>>> 		name = "foo_wrapper";
->>>> 		start =<0x10000>;
->>>> 		end =<0x200>;
->>>> 	}
->>>> 	reg {
->>>> 		name = "foo";
->>>> 		start =<0x20000>;
->>>> 		end =<0x200>;
->>>> 	}
->>>> }
->>>>
->>>> A little bit more verbose, but at least we can add any attribute we want.
->>>
->>> That won't work either because that also breaks the existing 'reg'
->>> binding.  Anything you do will need to supplement the existing
->>> binding without changing it in an incompatible way.
->>
->> OK, but can we add a new attribute then? reg2, reg_ng, reg_plusplus,
->> reg_named...?
->
-> He already suggested reg-names to be interpreted in parallel with the
-> existing reg property.  The (serious) problem with replacing the reg
-> property is that it will break all existing OSes (including old Linux
-> versions) that don't understand the new property.
+From: Will Deacon <will.deacon@arm.com>
 
-That's why I was proposing a new extended node for that. Legacy tag will 
-still be there for legacy HW.
+Before we enable the MMU, we must ensure that the TTBR registers contain
+sane values. After the MMU has been enabled, we jump to the *virtual*
+address of the following function, so we also need to ensure that the
+SCTLR write has taken effect.
 
-Adding reg-names is doable easily, but not super nice. And the same 
-trick will be needed for IRQs and then DMAs (not yet in core DT anyway).
-Having a more scalable mechanism to allow further improvement will be good.
+This patch adds ISB instructions around the SCTLR write to ensure the
+visibility of the above.
 
-> Of course, the problem with reg-names is that it will be ignored by
-> older OSes, and so 'reg' must still be in the correct order.  In which
-> case you could argue it's more sensible to just have a static place to
-> name mapping in the Linux driver.
->
-> In short, yes, named reg elements in the DT would be nice in theory,
-> but I'm not convinced it's worth a DT flag day to accomplish it.
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+---
+ arch/arm/boot/compressed/head.S  |    1 +
+ arch/arm/include/asm/assembler.h |   11 +++++++++++
+ arch/arm/kernel/head.S           |    2 ++
+ arch/arm/kernel/sleep.S          |    2 ++
+ 4 files changed, 16 insertions(+), 0 deletions(-)
 
-Sorry, but I'm not sure to understand the meaning of that last sentence.
-
-Benoit
+diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+index e95a598..716c7ba 100644
+--- a/arch/arm/boot/compressed/head.S
++++ b/arch/arm/boot/compressed/head.S
+@@ -551,6 +551,7 @@ __armv7_mmu_cache_on:
+ 		mcrne	p15, 0, r3, c2, c0, 0	@ load page table pointer
+ 		mcrne	p15, 0, r1, c3, c0, 0	@ load domain access control
+ #endif
++		mcr	p15, 0, r0, c7, c5, 4	@ ISB
+ 		mcr	p15, 0, r0, c1, c0, 0	@ load control register
+ 		mrc	p15, 0, r0, c1, c0, 0	@ and read it back
+ 		mov	r0, #0
+diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
+index 29035e8..b6e65de 100644
+--- a/arch/arm/include/asm/assembler.h
++++ b/arch/arm/include/asm/assembler.h
+@@ -187,6 +187,17 @@
+ #endif
+ 
+ /*
++ * Instruction barrier
++ */
++	.macro	instr_sync
++#if __LINUX_ARM_ARCH__ >= 7
++	isb
++#elif __LINUX_ARM_ARCH__ == 6
++	mcr	p15, 0, r0, c7, c5, 4
++#endif
++	.endm
++
++/*
+  * SMP data memory barrier
+  */
+ 	.macro	smp_dmb mode
+diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+index 742b610..d8231b2 100644
+--- a/arch/arm/kernel/head.S
++++ b/arch/arm/kernel/head.S
+@@ -396,8 +396,10 @@ ENDPROC(__enable_mmu)
+ 	.align	5
+ __turn_mmu_on:
+ 	mov	r0, r0
++	instr_sync
+ 	mcr	p15, 0, r0, c1, c0, 0		@ write control reg
+ 	mrc	p15, 0, r3, c0, c0, 0		@ read id reg
++	instr_sync
+ 	mov	r3, r3
+ 	mov	r3, r13
+ 	mov	pc, r3
+diff --git a/arch/arm/kernel/sleep.S b/arch/arm/kernel/sleep.S
+index dc902f2..ecece65 100644
+--- a/arch/arm/kernel/sleep.S
++++ b/arch/arm/kernel/sleep.S
+@@ -85,8 +85,10 @@ ENDPROC(cpu_resume_mmu)
+ 	.ltorg
+ 	.align	5
+ cpu_resume_turn_mmu_on:
++	instr_sync
+ 	mcr	p15, 0, r1, c1, c0, 0	@ turn on MMU, I-cache, etc
+ 	mrc	p15, 0, r1, c0, c0, 0	@ read id reg
++	instr_sync
+ 	mov	r1, r1
+ 	mov	r1, r1
+ 	mov	pc, r3			@ jump to virtual address
