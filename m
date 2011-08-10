@@ -1,34 +1,47 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 10 Aug 2011 09:37:26 -0500
-Subject: Subject: L2x0 OF properties do not include interrupt #
-In-Reply-To: <20110810141048.GK10121@e102144-lin.cambridge.arm.com>
-References: <000201cc575b$c1229010$4367b030$@rutland@arm.com>
-	<4E428EB0.1080204@gmail.com>
-	<20110810141048.GK10121@e102144-lin.cambridge.arm.com>
-Message-ID: <4E4297A6.6050101@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 10 Aug 2011 07:37:32 -0700
+Subject: [PATCH v2] omap: timer: Set dmtimer used as clocksource in
+	autoreload mode
+In-Reply-To: <1312982375-11848-1-git-send-email-hemantp@ti.com>
+References: <1312982375-11848-1-git-send-email-hemantp@ti.com>
+Message-ID: <20110810143732.GN1939@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/10/2011 09:10 AM, Will Deacon wrote:
-> Hi Rob,
+* Hemant Pedanekar <hemantp@ti.com> [110810 06:14]:
+> If CONFIG_OMAP_32K_TIMER is not selected and dmtimer is used as clocksource, the
+> timer stops counting once overflow occurs as it was not set in autoreload mode.
+> This results into timekeeping failure: for example, 'sleep 1' at the shell after
+> the timer counter overflow would hang.
 > 
-> On Wed, Aug 10, 2011 at 02:59:12PM +0100, Rob Herring wrote:
->> I think you should allow for either the single irq or individual irqs.
->> You can specify that the event counter interrupt must be first, then the
->> pmu driver could work either way ignoring the rest. The driver probably
->> needs to mark the handler as shared if there is only the combined
->> interrupt unless you expect all interrupts to be handled by 1 driver.
-> 
-> I much prefer having seperate, individual IRQs with no requirement on
-> ordering.
-> 
-> Now, the L2 binding also doesn't fit too well for the L2CC on Cortex-A15,
-> which is an inner cache like the one on Cortex-A8. Because of this, it
-> doesn't have a base address but it *does* have an IRQ which is how external
-> aborts are raised.
+> This patch sets up autoreload when starting the clocksource timer which fixes
+> the above issue.
 
-This is not a general L2 binding, but an L2x0/PL310 binding. A8/A15 L2
-is a completely different binding and driver though. You would do
-something like the current cpu pmu binding that is just interrupts.
+Thanks for updating this, will apply into fixes.
 
-Rob
+Tony
+
+
+> 
+> Signed-off-by: Hemant Pedanekar <hemantp@ti.com>
+> ---
+>  arch/arm/mach-omap2/timer.c |    3 ++-
+>  1 files changed, 2 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+> index e964072..cf1de7d 100644
+> --- a/arch/arm/mach-omap2/timer.c
+> +++ b/arch/arm/mach-omap2/timer.c
+> @@ -293,7 +293,8 @@ static void __init omap2_gp_clocksource_init(int gptimer_id,
+>  	pr_info("OMAP clocksource: GPTIMER%d at %lu Hz\n",
+>  		gptimer_id, clksrc.rate);
+>  
+> -	__omap_dm_timer_load_start(clksrc.io_base, OMAP_TIMER_CTRL_ST, 0, 1);
+> +	__omap_dm_timer_load_start(clksrc.io_base,
+> +			OMAP_TIMER_CTRL_ST | OMAP_TIMER_CTRL_AR, 0, 1);
+>  	init_sched_clock(&cd, dmtimer_update_sched_clock, 32, clksrc.rate);
+>  
+>  	if (clocksource_register_hz(&clocksource_gpt, clksrc.rate))
+> -- 
+> 1.7.3.5
+> 
