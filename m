@@ -1,32 +1,26 @@
-From: maxin.john@gmail.com (Maxin B John)
-Date: Wed, 10 Aug 2011 14:12:11 +0300
-Subject: [PATCH] arch:arm:plat-omap:iovmm: remove unused variable 'va'
-In-Reply-To: <20110808101546.GA25572@maxin>
-References: <20110808101546.GA25572@maxin>
-Message-ID: <CAMhs6YwHbFknDpOg9e_5XcB-X9qo+DXX3tAaQy5xQopepeKOxw@mail.gmail.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Wed, 10 Aug 2011 15:13:03 +0400
+Subject: [PATCH] atmel_serial: fix atmel_default_console_device
+In-Reply-To: <EF2E73589CA71846A15D0B2CDF79505D087B0192D6@wm021.weinmann.com>
+References: <1307541740.10626.15.camel@hcegtvedt.norway.atmel.com>
+	<1308666679-12111-1-git-send-email-plagnioj@jcrosoft.com>
+	<loom.20110808T170457-559@post.gmane.org>
+	<4E411CEF.10004@ru.mvista.com>
+	<EF2E73589CA71846A15D0B2CDF79505D087B0192D6@wm021.weinmann.com>
+Message-ID: <4E4267BF.5040609@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ping.
+Hello.
 
-On Mon, Aug 8, 2011 at 1:15 PM, Maxin B. John <maxin.john@gmail.com> wrote:
-> The pointer "va" returned from "phys_to_virt(pa)" is never used in
-> "sgtable_fill_kmalloc()".So,it is safe to remove this set-but-unused variable.
->
-> Signed-off-by: Maxin B. John <maxin.john@gmail.com>
-> ---
-> diff --git a/arch/arm/plat-omap/iovmm.c b/arch/arm/plat-omap/iovmm.c
-> index c60737c..79e7fed 100644
-> --- a/arch/arm/plat-omap/iovmm.c
-> +++ b/arch/arm/plat-omap/iovmm.c
-> @@ -423,9 +423,6 @@ static void sgtable_fill_kmalloc(struct sg_table *sgt, u32 pa, u32 da,
-> ?{
-> ? ? ? ?unsigned int i;
-> ? ? ? ?struct scatterlist *sg;
-> - ? ? ? void *va;
-> -
-> - ? ? ? va = phys_to_virt(pa);
->
-> ? ? ? ?for_each_sg(sgt->sgl, sg, sgt->nents, i) {
-> ? ? ? ? ? ? ? ?unsigned bytes;
->
+On 09-08-2011 18:17, Voss, Nikolaus wrote:
+
+> Thanks, patch resent.
+
+    You then should have marked the new version in the subject (like "[PATCH 
+v2]"), and described the changes from the previous version under the --- tear 
+line...
+
+> Niko
+
+WBR, Sergei
