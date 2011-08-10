@@ -1,73 +1,61 @@
-From: rob.herring@calxeda.com (Rob Herring)
-Date: Wed, 10 Aug 2011 09:31:54 -0500
-Subject: Subject: L2x0 OF properties do not include interrupt #
-In-Reply-To: <201108101609.56995.arnd@arndb.de>
-References: <000201cc575b$c1229010$4367b030$@rutland@arm.com>
-	<201108101609.56995.arnd@arndb.de>
-Message-ID: <4E42965A.9010500@calxeda.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Wed, 10 Aug 2011 22:36:19 +0800
+Subject: [PATCH 14/19] plat-pxa: move PXA GPIO driver to GPIO subsystem
+In-Reply-To: <1312978689-18539-1-git-send-email-linus.walleij@stericsson.com>
+References: <1312978689-18539-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <CAMPhdO9qsP4UrpkFzCy2jLey8ZxioMjuLbJAzT29y+RsBpGd-w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd,
+On Wed, Aug 10, 2011 at 8:18 PM, Linus Walleij
+<linus.walleij@stericsson.com> wrote:
+> From: Linus Walleij <linus.walleij@linaro.org>
+>
+> As per example from the other ARM boards, push the PXA
+> GPIO driver down to the GPIO subsystem so it can be consolidated.
+>
+> Cc: Eric Miao <eric.y.miao@gmail.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-On 08/10/2011 09:09 AM, Arnd Bergmann wrote:
-> On Wednesday 10 August 2011, Mark Rutland wrote:
-> 
->> I realise I'm a bit late to the party here, but I'd like to propose adding an
->> optional interrupt parameter to the binding. I'm not aware of any
->> implementations which use separate interrupts, but given the binding
->> seems to be generic across L2CC implementations (and is not limited simply to
->> the L2x0), having a list rather than a single interrupt may be appropriate for
->> someone.
-> 
-> Sounds good, thanks for pointing this out.
-> 
-> How many possible interrupt sources are there? If there is only a small number
-> of those (e.g. at most 4), we might just list all of them and register
-> them from the driver even if they are all the same.
-> 
+This one looks OK.
 
-Here's all the interrupts on the PL310:
-
-DECERRINTR Decode error received on master ports from L3
-SLVERRINTR Slave error received on master ports from L3
-ERRRDINTR Error on L2 data RAM read
-ERRRTINTR Error on L2 tag RAM read
-ERRWDINTR Error on L2 data RAM write
-ERRWTINTR Error on L2 tag RAM write
-PARRDINTR Parity error on L2 data RAM read
-PARRTINTR Parity error on L2 tag RAM read
-ECNTRINTR Event Counter Overflow/Increment
-L2CCINTR L2CC Combined Interrupt Output
-
-It's likely that you would want to split these to different drivers.
-EDAC for parity/bus errors and hw-events for event counters, for example.
-
-Rob
-
->> This would boil down to (for the moment) a Documentation change along the lines of:
->>
->>> diff --git a/Documentation/devicetree/bindings/arm/l2cc.txt b/Documentation/devicetree/bindings/arm/l2cc.txt
->>> index f50e021..d4b387b 100644
->>> --- a/Documentation/devicetree/bindings/arm/l2cc.txt
->>> +++ b/Documentation/devicetree/bindings/arm/l2cc.txt
->>> @@ -28,6 +28,7 @@ Optional properties:
->>>  - arm,filter-ranges : <start length> Starting address and length of window to
->>>    filter. Addresses in the filter window are directed to the M1 port. Other
->>>    addresses will go to the M0 port.
->>> +- interrupt : A combined interrupt.
->>>  
->>>  Example:
->>>  
->>> @@ -39,4 +40,5 @@ L2: cache-controller {
->>>          arm,filter-latency = <0x80000000 0x8000000>;
->>>          cache-unified;
->>>          cache-level = <2>;
->>> +        interrupt = <45>;
->>>  };
->>
->> Any thoughts?
-> 
-> Do we also need to document an interrupt-parent property, or is that implied?
-> 
-> 	Arnd
+> ---
+> ?arch/arm/plat-pxa/Makefile ? ? ? ? ? ? ? ? ? ? ? ? | ? ?1 -
+> ?drivers/gpio/Makefile ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| ? ?1 +
+> ?.../arm/plat-pxa/gpio.c => drivers/gpio/gpio-pxa.c | ? ?0
+> ?3 files changed, 1 insertions(+), 1 deletions(-)
+> ?rename arch/arm/plat-pxa/gpio.c => drivers/gpio/gpio-pxa.c (100%)
+>
+> diff --git a/arch/arm/plat-pxa/Makefile b/arch/arm/plat-pxa/Makefile
+> index 3aca5ba..f302d04 100644
+> --- a/arch/arm/plat-pxa/Makefile
+> +++ b/arch/arm/plat-pxa/Makefile
+> @@ -4,7 +4,6 @@
+>
+> ?obj-y ?:= dma.o
+>
+> -obj-$(CONFIG_GENERIC_GPIO) ? ? += gpio.o
+> ?obj-$(CONFIG_PXA3xx) ? ? ? ? ? += mfp.o
+> ?obj-$(CONFIG_PXA95x) ? ? ? ? ? += mfp.o
+> ?obj-$(CONFIG_ARCH_MMP) ? ? ? ? += mfp.o
+> diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
+> index 33e095bd..6640e1d 100644
+> --- a/drivers/gpio/Makefile
+> +++ b/drivers/gpio/Makefile
+> @@ -40,6 +40,7 @@ obj-$(CONFIG_GPIO_PCA953X) ? ?+= gpio-pca953x.o
+> ?obj-$(CONFIG_GPIO_PCF857X) ? ? += gpio-pcf857x.o
+> ?obj-$(CONFIG_GPIO_PCH) ? ? ? ? += gpio-pch.o
+> ?obj-$(CONFIG_GPIO_PL061) ? ? ? += gpio-pl061.o
+> +obj-$(CONFIG_PLAT_PXA) ? ? ? ? += gpio-pxa.o
+> ?obj-$(CONFIG_GPIO_RDC321X) ? ? += gpio-rdc321x.o
+>
+> ?obj-$(CONFIG_GPIO_PLAT_SAMSUNG) ? ? ? ?+= gpio-plat-samsung.o
+> diff --git a/arch/arm/plat-pxa/gpio.c b/drivers/gpio/gpio-pxa.c
+> similarity index 100%
+> rename from arch/arm/plat-pxa/gpio.c
+> rename to drivers/gpio/gpio-pxa.c
+> --
+> 1.7.3.2
+>
+>
