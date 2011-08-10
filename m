@@ -1,41 +1,44 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 10 Aug 2011 14:44:56 +0200
-Subject: [PATCH 1/3] ARM: Check for multiple zreladdrs
+Date: Wed, 10 Aug 2011 14:44:57 +0200
+Subject: [PATCH 2/3] ARM: Check for multiple load addresses before building a
+	uImage
 In-Reply-To: <1312980298-28035-1-git-send-email-s.hauer@pengutronix.de>
 References: <1312980298-28035-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1312980298-28035-2-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1312980298-28035-3-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Without CONFIG_AUTO_ZRELADDR being set the kernel needs a single
-zreladdr for building zImages. Bail out if we detect multiple
-zreladdrs without CONFIG_AUTO_ZRELADDR.
+uImages need a load address specified. This makes them
+incompatible with multiple zreladdrs. Catch this error
+before building an uImage so that we do not end up with
+broken uImages. The load address can still be specified
+with LOADADDR= on the command line.
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- arch/arm/boot/compressed/Makefile |    8 ++++++++
- 1 files changed, 8 insertions(+), 0 deletions(-)
+ arch/arm/boot/Makefile |    9 +++++++++
+ 1 files changed, 9 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
-index 0c74a6f..a53a333 100644
---- a/arch/arm/boot/compressed/Makefile
-+++ b/arch/arm/boot/compressed/Makefile
-@@ -139,8 +139,16 @@ bad_syms=$$($(CROSS_COMPILE)nm $@ | sed -n 's/^.\{8\} [bc] \(.*\)/\1/p') && \
-   ( echo "following symbols must have non local/private scope:" >&2; \
-     echo "$$bad_syms" >&2; rm -f $@; false )
+diff --git a/arch/arm/boot/Makefile b/arch/arm/boot/Makefile
+index a1edfd5..176062a 100644
+--- a/arch/arm/boot/Makefile
++++ b/arch/arm/boot/Makefile
+@@ -78,7 +78,16 @@ endif
  
-+check_for_multiple_zreladdr = \
-+if [ $(words $(ZRELADDR)) -gt 1 -a "$(CONFIG_AUTO_ZRELADDR)" == "" ]; then \
-+	echo 'multiple zreladdrs: $(ZRELADDR)'; \
-+	echo 'This needs CONFIG_AUTO_ZRELADDR to be set'; \
+ $(obj)/uImage: STARTADDR=$(LOADADDR)
+ 
++check_for_multiple_loadaddr = \
++if [ $(words $(LOADADDR)) -gt 1 ]; then \
++	echo 'multiple load addresses: $(LOADADDR)'; \
++	echo 'This is incompatible with uImages'; \
++	echo 'Specify LOADADDR on the commandline to build an uImage'; \
 +	false; \
 +fi
 +
- $(obj)/vmlinux: $(obj)/vmlinux.lds $(obj)/$(HEAD) $(obj)/piggy.$(suffix_y).o \
- 	 	$(addprefix $(obj)/, $(OBJS)) $(lib1funcs) FORCE
-+	@$(check_for_multiple_zreladdr)
- 	$(call if_changed,ld)
- 	@$(check_for_bad_syms)
+ $(obj)/uImage:	$(obj)/zImage FORCE
++	@$(check_for_multiple_loadaddr)
+ 	$(call if_changed,uimage)
+ 	@echo '  Image $@ is ready'
  
 -- 
 1.7.5.4
