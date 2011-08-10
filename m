@@ -1,110 +1,55 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 10 Aug 2011 16:03:36 +0100
-Subject: [PATCH v7 13/16] ARM: LPAE: Add identity mapping support for the
-	3-level page table format
+Date: Wed, 10 Aug 2011 16:03:39 +0100
+Subject: [PATCH v7 16/16] ARM: LPAE: Add the Kconfig entries
 In-Reply-To: <1312988619-16804-1-git-send-email-catalin.marinas@arm.com>
 References: <1312988619-16804-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1312988619-16804-14-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1312988619-16804-17-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With LPAE, the pgd is a separate page table with entries pointing to the
-pmd. The identity_mapping_add() function needs to ensure that the pgd is
-populated before populating the pmd level. The do..while blocks now loop
-over the pmd in order to have the same implementation for the two page
-table formats. The pmd_addr_end() definition has been removed and the
-generic one used instead. The pmd clean-up is done in the pgd_free()
-function.
+This patch adds the ARM_LPAE and ARCH_PHYS_ADDR_T_64BIT Kconfig entries
+allowing LPAE support to be compiled into the kernel.
 
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm/include/asm/pgtable.h |    4 ----
- arch/arm/mm/idmap.c            |   36 ++++++++++++++++++++++++++++++++++--
- 2 files changed, 34 insertions(+), 6 deletions(-)
+ arch/arm/Kconfig    |    2 +-
+ arch/arm/mm/Kconfig |   13 +++++++++++++
+ 2 files changed, 14 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
-index 1db9ad6..9645e52 100644
---- a/arch/arm/include/asm/pgtable.h
-+++ b/arch/arm/include/asm/pgtable.h
-@@ -263,10 +263,6 @@ static inline pte_t *pmd_page_vaddr(pmd_t pmd)
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 2c71a8f..2a81b90 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1820,7 +1820,7 @@ endchoice
  
- #define pmd_page(pmd)		pfn_to_page(__phys_to_pfn(pmd_val(pmd) & PHYS_MASK))
+ config XIP_KERNEL
+ 	bool "Kernel Execute-In-Place from ROM"
+-	depends on !ZBOOT_ROM
++	depends on !ZBOOT_ROM && !ARM_LPAE
+ 	help
+ 	  Execute-In-Place allows the kernel to run from non-volatile storage
+ 	  directly addressable by the CPU, such as NOR flash. This saves RAM
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index 88633fe..2df5504 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -629,6 +629,19 @@ config IO_36
  
--/* we don't need complex calculations here as the pmd is folded into the pgd */
--#define pmd_addr_end(addr,end)	(end)
--
--
- #ifndef CONFIG_HIGHPTE
- #define __pte_map(pmd)		pmd_page_vaddr(*(pmd))
- #define __pte_unmap(pte)	do { } while (0)
-diff --git a/arch/arm/mm/idmap.c b/arch/arm/mm/idmap.c
-index 2be9139..24e0655 100644
---- a/arch/arm/mm/idmap.c
-+++ b/arch/arm/mm/idmap.c
-@@ -1,9 +1,36 @@
-+#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+ comment "Processor Features"
+ 
++config ARM_LPAE
++	bool "Support for the Large Physical Address Extension"
++	depends on MMU && CPU_V7
++	help
++	  Say Y if you have an ARMv7 processor supporting the LPAE page table
++	  format and you would like to access memory beyond the 4GB limit.
 +
- #include <linux/kernel.h>
- 
- #include <asm/cputype.h>
- #include <asm/pgalloc.h>
- #include <asm/pgtable.h>
- 
-+#ifdef CONFIG_ARM_LPAE
-+static void idmap_add_pmd(pud_t *pud, unsigned long addr, unsigned long end,
-+	unsigned long prot)
-+{
-+	pmd_t *pmd;
-+	unsigned long next;
++config ARCH_PHYS_ADDR_T_64BIT
++	def_bool ARM_LPAE
 +
-+	if (pud_none_or_clear_bad(pud) || (pud_val(*pud) & L_PGD_SWAPPER)) {
-+		pmd = pmd_alloc_one(NULL, addr);
-+		if (!pmd) {
-+			pr_warning("Failed to allocate identity pmd.\n");
-+			return;
-+		}
-+		pud_populate(NULL, pud, pmd);
-+		pmd += pmd_index(addr);
-+	} else
-+		pmd = pmd_offset(pud, addr);
++config ARCH_DMA_ADDR_T_64BIT
++	def_bool ARM_LPAE
 +
-+	do {
-+		next = pmd_addr_end(addr, end);
-+		*pmd = __pmd((addr & PMD_MASK) | prot);
-+		flush_pmd_entry(pmd);
-+	} while (pmd++, addr = next, addr != end);
-+}
-+#else	/* !CONFIG_ARM_LPAE */
- static void idmap_add_pmd(pud_t *pud, unsigned long addr, unsigned long end,
- 	unsigned long prot)
- {
-@@ -15,6 +42,7 @@ static void idmap_add_pmd(pud_t *pud, unsigned long addr, unsigned long end,
- 	pmd[1] = __pmd(addr);
- 	flush_pmd_entry(pmd);
- }
-+#endif	/* CONFIG_ARM_LPAE */
- 
- static void idmap_add_pud(pgd_t *pgd, unsigned long addr, unsigned long end,
- 	unsigned long prot)
-@@ -32,7 +60,7 @@ void identity_mapping_add(pgd_t *pgd, unsigned long addr, unsigned long end)
- {
- 	unsigned long prot, next;
- 
--	prot = PMD_TYPE_SECT | PMD_SECT_AP_WRITE;
-+	prot = PMD_TYPE_SECT | PMD_SECT_AP_WRITE | PMD_SECT_AF;
- 	if (cpu_architecture() <= CPU_ARCH_ARMv5TEJ && !cpu_is_xscale())
- 		prot |= PMD_BIT4;
- 
-@@ -46,7 +74,11 @@ void identity_mapping_add(pgd_t *pgd, unsigned long addr, unsigned long end)
- #ifdef CONFIG_SMP
- static void idmap_del_pmd(pud_t *pud, unsigned long addr, unsigned long end)
- {
--	pmd_t *pmd = pmd_offset(pud, addr);
-+	pmd_t *pmd;
-+
-+	if (pud_none_or_clear_bad(pud))
-+		return;
-+	pmd = pmd_offset(pud, addr);
- 	pmd_clear(pmd);
- }
- 
+ config ARM_THUMB
+ 	bool "Support Thumb user binaries"
+ 	depends on CPU_ARM720T || CPU_ARM740T || CPU_ARM920T || CPU_ARM922T || CPU_ARM925T || CPU_ARM926T || CPU_ARM940T || CPU_ARM946E || CPU_ARM1020 || CPU_ARM1020E || CPU_ARM1022 || CPU_ARM1026 || CPU_XSCALE || CPU_XSC3 || CPU_MOHAWK || CPU_V6 || CPU_V6K || CPU_V7 || CPU_FEROCEON
