@@ -1,41 +1,44 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 10 Aug 2011 09:58:24 +0100
-Subject: [RFC PATCH 0/8] Introduce logical CPU mapping
-In-Reply-To: <4E424640.6040801@ti.com>
-References: <1312926162-22469-1-git-send-email-will.deacon@arm.com>
-	<4E424640.6040801@ti.com>
-Message-ID: <20110810085824.GD10121@e102144-lin.cambridge.arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 10 Aug 2011 09:59:24 +0100
+Subject: [RFC PATCH] ARM: sched_clock: allow sched_clock to be selected
+	at runtime
+In-Reply-To: <20110810085210.GC1831@n2100.arm.linux.org.uk>
+References: <1312910015-20043-1-git-send-email-marc.zyngier@arm.com>
+	<4E41A4A4.80000@gmail.com>
+	<CAMPhdO8qCXrPN7ASo=Fhm+BQJN11NRy=kNPv8ySHMbd24df3Rw@mail.gmail.com>
+	<4E424112.10804@arm.com>
+	<20110810085210.GC1831@n2100.arm.linux.org.uk>
+Message-ID: <4E42486C.5030605@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 10, 2011 at 09:50:08AM +0100, Santosh wrote:
-> Will,
+On 10/08/11 09:52, Russell King - ARM Linux wrote:
+> On Wed, Aug 10, 2011 at 09:28:02AM +0100, Marc Zyngier wrote:
+>> I'd be all for that, and I've waited a long time (April?) before posting
+>> that patch, hoping that a consensus would emerge on the clocksourse
+>> patches.
+>>
+>> So far, nothing.
+>>
+>> We need a solution to this problem. I really don't care which patch gets
+>> merged, so if someone thinks they can get the clocksource patches
+>> further, then by all mean, please do it.
+> 
+> I'll say it again, because you seem to have missed it.  I don't think
+> intimately tying sched_clock and clocksource stuff together is a good
+> idea, especially as there's platforms where sched_clock is higher
+> resolution than the clocksource.  Plus, if it really is the case that
+> any clocksource can be used for sched_clock, then we wouldn't have
+> sched_clock at all.
+> 
+> So no, I don't think tying the two together is a good idea.  Especially
+> when it means that some platforms will end up with a lower resolution
+> and/or slower implementation.
 
-Hi Santosh,
+Fair enough. I'll carry on with my current patch then.
 
-> On Wednesday 10 August 2011 03:12 AM, Will Deacon wrote:
-> > Hello,
-> >
-> > This patch series is an RFC following a discussion I had with Russell
-> > the other day:
-> >
-> >   http://lists.infradead.org/pipermail/linux-arm-kernel/2011-August/060370.html
-> >
-> > The approach I've taken is fairly simple but is enough for booting on a
-> > CPU with physical ID != 0 on platforms which can handle it.
-> >
-> > Note that I haven't touched the OMAP4 or Tegra platforms since it's not
-> > clear from the code how they would be adapted to make use of the
-> > physical CPU number.
-> >
-> On OMAP, we use hardware register hand-shake for boot between a boot CPU
-> and non-boot CPU. On OMAP4, boot CPU has to be always CPU0 to ensure
-> that security and firewall initialisation is taken care. Other CPU can't
-> do those things.
+Thanks,
 
-Understood. We can leave OMAP like it is then and assume that bootloaders
-will always ensure physical CPU0 is used for booting.
-
-Cheers,
-
-Will
+	M.
+-- 
+Jazz is not dead. It just smells funny...
