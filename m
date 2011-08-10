@@ -1,74 +1,45 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Wed, 10 Aug 2011 13:57:49 +0200
-Subject: [RFC/PATCH 10/14] dt: Add pd_size to AUXDATA structure
-In-Reply-To: <1312897232-4792-11-git-send-email-manjugk@ti.com>
-References: <1312897232-4792-1-git-send-email-manjugk@ti.com>
-	<1312897232-4792-11-git-send-email-manjugk@ti.com>
-Message-ID: <4E42723D.1010501@ti.com>
+From: N.Voss@weinmann.de (Voss, Nikolaus)
+Date: Wed, 10 Aug 2011 14:02:29 +0200
+Subject: [PATCH v2] atmel_serial: fix atmel_default_console_device
+In-Reply-To: <4E4267BF.5040609@ru.mvista.com>
+References: <1307541740.10626.15.camel@hcegtvedt.norway.atmel.com>
+	<1308666679-12111-1-git-send-email-plagnioj@jcrosoft.com>
+	<loom.20110808T170457-559@post.gmane.org>
+	<4E411CEF.10004@ru.mvista.com>
+	<EF2E73589CA71846A15D0B2CDF79505D087B0192D6@wm021.weinmann.com>
+	<4E4267BF.5040609@ru.mvista.com>
+Message-ID: <EF2E73589CA71846A15D0B2CDF79505D087B055C3A@wm021.weinmann.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/9/2011 4:10 PM, G, Manjunath Kondaiah wrote:
->
-> Add pd_size in the AUXDATA structure so that device drivers which require
-> platform_data size can pass along with AUXDATA.
+reflect new static uart platform ids introduced by patch
+http://article.gmane.org/gmane.linux.kernel/1126105
 
-It is really needed by device driver? Or is it because omap_device_build 
-is using platform_device_add_data that is doing a copy of the pdata and 
-thus require the size?
+Signed-off-by: Nikolaus Voss <n.voss@weinmann.de>
+---
+Updated with Sergei's comment.
 
-> Signed-off-by: G, Manjunath Kondaiah<manjugk@ti.com>
-> ---
->   drivers/of/platform.c       |    2 ++
->   include/linux/of_platform.h |    5 +++++
->   2 files changed, 7 insertions(+), 0 deletions(-)
->
-> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-> index ebbbf42..4b27286 100644
-> --- a/drivers/of/platform.c
-> +++ b/drivers/of/platform.c
-> @@ -565,6 +565,7 @@ static int of_platform_bus_create(struct device_node *bus,
->   	struct platform_device *dev;
->   	const char *bus_id = NULL;
->   	void *platform_data = NULL;
-> +	int pd_size;
+ drivers/tty/serial/atmel_serial.c |    8 +++++---
+ 1 files changed, 5 insertions(+), 3 deletions(-)
 
-Maybe platform_data_size will be a little bit more consistent?
-
-Regards,
-Benoit
-
->   	int id = -1;
->   	int rc = 0;
->
-> @@ -588,6 +589,7 @@ static int of_platform_bus_create(struct device_node *bus,
->   		bus_id = auxdata->name;
->   		id = auxdata->id;
->   		platform_data = auxdata->platform_data;
-> +		pd_size = auxdata->pd_size;
->   	}
->
->   	if (of_device_is_compatible(bus, "arm,primecell")) {
-> diff --git a/include/linux/of_platform.h b/include/linux/of_platform.h
-> index 252246c..a3be980 100644
-> --- a/include/linux/of_platform.h
-> +++ b/include/linux/of_platform.h
-> @@ -47,6 +47,7 @@ struct of_dev_auxdata {
->   	char *name;
->   	int id;
->   	void *platform_data;
-> +	int pd_size;
->   };
->
->   /* Macro to simplify populating a lookup table */
-> @@ -58,6 +59,10 @@ struct of_dev_auxdata {
->   	{ .compatible = _compat, .phys_addr = _phys, .name = _name, \
->   	  .id = _id, .platform_data = _pdata }
->
-> +#define OF_DEV_AUXDATA_ID_PDSIZE(_compat,_phys,_name,_id,_pdata,_pd_size) \
-> +	{ .compatible = _compat, .phys_addr = _phys, .name = _name, \
-> +	  .id = _id, .platform_data = _pdata, .pd_size = _pd_size }
-> +
->   /**
->    * of_platform_driver - Legacy of-aware driver for platform devices.
->    *
+diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+index af9b781..b922f5d 100644
+--- a/drivers/tty/serial/atmel_serial.c
++++ b/drivers/tty/serial/atmel_serial.c
+@@ -1609,9 +1609,11 @@ static struct console atmel_console = {
+ static int __init atmel_console_init(void)
+ {
+ 	if (atmel_default_console_device) {
+-		add_preferred_console(ATMEL_DEVICENAME,
+-				      atmel_default_console_device->id, NULL);
+-		atmel_init_port(&atmel_ports[atmel_default_console_device->id],
++		struct atmel_uart_data *pdata =
++			atmel_default_console_device->dev.platform_data;
++
++		add_preferred_console(ATMEL_DEVICENAME, pdata->num, NULL);
++		atmel_init_port(&atmel_ports[pdata->num],
+ 				atmel_default_console_device);
+ 		register_console(&atmel_console);
+ 	}
+-- 
+1.7.4.1
