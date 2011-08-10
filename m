@@ -1,41 +1,47 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Wed, 10 Aug 2011 12:49:07 +0100
-Subject: [RFC PATCH] ARM: sched_clock: allow sched_clock to be selected
-	at runtime
-In-Reply-To: <1312910015-20043-1-git-send-email-marc.zyngier@arm.com>
-References: <1312910015-20043-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20110810114907.GA2680@pulham.picochip.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 10 Aug 2011 04:51:22 -0700
+Subject: [PATCH] omap: timer: Set dmtimer used as clocksource in
+	autoreload mode
+In-Reply-To: <1312948323-22823-1-git-send-email-hemantp@ti.com>
+References: <1312948323-22823-1-git-send-email-hemantp@ti.com>
+Message-ID: <20110810115122.GH1939@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
-
-On Tue, Aug 09, 2011 at 06:13:35PM +0100, Marc Zyngier wrote:
-> sched_clock() is yet another blocker on the road to the single
-> image. This patch implements an idea by Russell King:
+* Hemant Pedanekar <hemantp@ti.com> [110809 20:46]:
+> If CONFIG_OMAP_32K_TIMER is not selected and dmtimer is used as clocksource, the
+> timer stops counting once overflow occurs as it was not set in autoreload mode.
+> This results into timekeeping failure: for example, 'sleep 1' at the shell after
+> the timer counter overflow would hang.
 > 
-> http://www.spinics.net/lists/linux-omap/msg49561.html
+> This patch sets up autoreload when starting the clocksource timer which fixes
+> the above issue.
 > 
-> Instead of asking the platform to implement both sched_clock()
-> itself and the rollover callback, simply register a read()
-> function, and let the ARM code care about sched_clock() itself,
-> the conversion to ns and the rollover. sched_clock() uses
-> this read() function as an indirection to the platform code.
+> Signed-off-by: Hemant Pedanekar <hemantp@ti.com>
+> ---
+>  arch/arm/mach-omap2/timer.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
 > 
-> This allow some simplifications and possibly some footprint gain
-> when multiple platforms are compiled in. Among the drawbacks,
-> the removal of the *_fixed_sched_clock optimization which could
-> negatively impact some platforms (sa1100, tegra, versatile
-> and omap).
-> 
-> Tested on 11MPCore, OMAP4 and Tegra.
+> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+> index e964072..796b935 100644
+> --- a/arch/arm/mach-omap2/timer.c
+> +++ b/arch/arm/mach-omap2/timer.c
+> @@ -293,7 +293,7 @@ static void __init omap2_gp_clocksource_init(int gptimer_id,
+>  	pr_info("OMAP clocksource: GPTIMER%d at %lu Hz\n",
+>  		gptimer_id, clksrc.rate);
+>  
+> -	__omap_dm_timer_load_start(clksrc.io_base, OMAP_TIMER_CTRL_ST, 0, 1);
+> +	omap_dm_timer_set_load_start(&clksrc, 1, 0);
+>  	init_sched_clock(&cd, dmtimer_update_sched_clock, 32, clksrc.rate);
+>  
+>  	if (clocksource_register_hz(&clocksource_gpt, clksrc.rate))
 
-Tested on my 1176 platform and works nicely.  However, shouldn't the 
-read functions still be marked notrace so they don't appear in ftrace 
-output?
+You should be able to just set the autoreload mode by changing to use
+OMAP_TIMER_CTRL_POSTED | OMAP_TIMER_CTRL_AR in the __omap_dm_timer_load_start
+above.
 
-On my (out of tree) platform, omitting notrace and having all of the 
-ftrace bootup tests results in a hard lockup.  Annotating the read 
-function resolves this.
+This avoids calling something that might be a loadable module eventually.
 
-Jamie
+Regards,
+
+Tony
