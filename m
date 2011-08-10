@@ -1,33 +1,53 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 10 Aug 2011 11:32:25 +0100
-Subject: [PATCH V2 6/6] spi/spi-pl022: Request/free DMA channels as and
-	when required.
-In-Reply-To: <4E4259F5.8060402@st.com>
-References: <cover.1312965741.git.viresh.kumar@st.com>
-	<566c0525199f498f04422d4c3b2ddd7466648c20.1312965742.git.viresh.kumar@st.com>
-	<20110810090042.GE1831@n2100.arm.linux.org.uk>
-	<4E424F7B.2000800@st.com>
-	<438BB0150E931F4B9CE701519A4463010871804A15@bgsmsx502.gar.corp.intel.com>
-	<4E4259F5.8060402@st.com>
-Message-ID: <20110810103225.GJ1831@n2100.arm.linux.org.uk>
+From: lost.distance@yahoo.com (Paul Parsons)
+Date: Wed, 10 Aug 2011 11:39:20 +0100 (BST)
+Subject: [PATCH] pxa/hx4700: Add Synaptics NavPoint (PXA27x SSP/SPI) driver
+In-Reply-To: <CAMPhdO-PH2M-VyzqOHnUo7j54Ok8D=xuh1cX2F+KVL4fCkFKnw@mail.gmail.com>
+Message-ID: <1312972760.78921.YahooMailClassic@web29001.mail.ird.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 10, 2011 at 03:44:13PM +0530, viresh kumar wrote:
-> On 08/10/2011 03:31 PM, Koul, Vinod wrote:
-> > And on your patch, are you able to dynamically assign the channels for
-> > platform? What is the intended usage? (as Russell articulated it is bad
-> > to dynamically assign channel for something like uart)
+Hi Eric,
+
+> > Not sure I understand. In the case of GPIO23 (SSPSCLK)
+> I switched the direction from output to input; none of the
+> defines in mfp-pxa27x.h were applicable so I used MFP_CFG_IN
+> directly. AFAIK the four wire GPIOs (23-26) aren't used
+> anyway, so that change was really just for documentation.
 > 
-> Are you talking about channels or DMA request lines? For channels yes,
-> we can always allocate channels as they are independent of peripherals.
-> About request lines, they are muxed in our case between several
-> peripherals, but support for that has to be added in dw_dmac.
+> Please check arch/arm/mach-pxa/include/mach/mfp-pxa27x.h
+> 
+> If GPIO23 needs to be configured as input when acting as
+> SSP1_SCLK,
+> please modify that file instead, it's a fix to other
+> platforms as well.
+> 
+> So the general guideline here is: to use the macros in
+> mfp-pxa27x.h
+> as much as possible, since those are the standard
+> definitions across
+> all pxa27x boards.
+> 
+> MFP_CFG_*() are solely used for internal purposes, please
+> do not use
+> them directly.
 
-Right, and when you do, you'll probably have to go to a virtual channel
-implementation, which solves the problem of keeping a channel allocated
-and makes this patch redundant.
+OK, will do.
 
-I assert that any DMA engine implementation where request signals can
-be assigned dynamically to DMA channels should be using a virtual channel
-implementation.
+> > AFAIK Linux doesn't provide an SPI slave side API. So
+> I had little option other than to drive SSP directly.
+> 
+> Are you implying that the hx4700 is acting as a SPI slave?
+
+Yes.
+
+> My original
+> understanding is hx4700 is communicating with an external
+> touchpad
+> controller through SPI? If hx4700 is acting as a SPI slave,
+> then it's true
+> there is no existing framework for that yet.
+
+That's correct; the NavPoint touchpad controller is the SPI master, Linux is the SPI slave.
+
+Regards,
+Paul
