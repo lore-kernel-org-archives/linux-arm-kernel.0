@@ -1,44 +1,33 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 10 Aug 2011 09:59:24 +0100
-Subject: [RFC PATCH] ARM: sched_clock: allow sched_clock to be selected
-	at runtime
-In-Reply-To: <20110810085210.GC1831@n2100.arm.linux.org.uk>
-References: <1312910015-20043-1-git-send-email-marc.zyngier@arm.com>
-	<4E41A4A4.80000@gmail.com>
-	<CAMPhdO8qCXrPN7ASo=Fhm+BQJN11NRy=kNPv8ySHMbd24df3Rw@mail.gmail.com>
-	<4E424112.10804@arm.com>
-	<20110810085210.GC1831@n2100.arm.linux.org.uk>
-Message-ID: <4E42486C.5030605@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 10 Aug 2011 10:00:42 +0100
+Subject: [PATCH V2 6/6] spi/spi-pl022: Request/free DMA channels as and
+	when required.
+In-Reply-To: <566c0525199f498f04422d4c3b2ddd7466648c20.1312965742.git.viresh.kumar@st.com>
+References: <cover.1312965741.git.viresh.kumar@st.com>
+	<566c0525199f498f04422d4c3b2ddd7466648c20.1312965742.git.viresh.kumar@st.com>
+Message-ID: <20110810090042.GE1831@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/08/11 09:52, Russell King - ARM Linux wrote:
-> On Wed, Aug 10, 2011 at 09:28:02AM +0100, Marc Zyngier wrote:
->> I'd be all for that, and I've waited a long time (April?) before posting
->> that patch, hoping that a consensus would emerge on the clocksourse
->> patches.
->>
->> So far, nothing.
->>
->> We need a solution to this problem. I really don't care which patch gets
->> merged, so if someone thinks they can get the clocksource patches
->> further, then by all mean, please do it.
+On Wed, Aug 10, 2011 at 02:20:59PM +0530, Viresh Kumar wrote:
+> Currently we request DMA channels at probe time and free them at remove. They
+> are always occupied, irrespective of their usage.
 > 
-> I'll say it again, because you seem to have missed it.  I don't think
-> intimately tying sched_clock and clocksource stuff together is a good
-> idea, especially as there's platforms where sched_clock is higher
-> resolution than the clocksource.  Plus, if it really is the case that
-> any clocksource can be used for sched_clock, then we wouldn't have
-> sched_clock at all.
-> 
-> So no, I don't think tying the two together is a good idea.  Especially
-> when it means that some platforms will end up with a lower resolution
-> and/or slower implementation.
+> They must be allocated when they are required and must be freed after we are
+> done with transfers. So that they can be used by other users.
 
-Fair enough. I'll carry on with my current patch then.
+Which DMA engine driver requires this?
 
-Thanks,
+Normally, when we have DMA engine drivers with multiple request signals,
+the slave peripheral side publishes several virtual channels which are
+claimed by the peripheral drivers.  This (amongst other things) allows
+the peripheral drivers to hold claim to one of the virtual channels
+all the time that it's required.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+This actually results in better usage of the DMA controller, as the
+virtual channels can be assigned to physical channels dynamically
+according to what the physical channels are doing.
+
+Plus, actually, the idea that DMA channels should be a short-term thing
+is broken as soon as you start considering things like UARTs, where you
+need a channel tied up long-term for the receive side of things.
