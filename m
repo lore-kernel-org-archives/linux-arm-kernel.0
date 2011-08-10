@@ -1,44 +1,121 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Wed, 10 Aug 2011 13:39:58 -0700
-Subject: [PATCH V4] ARM: tegra: paz00: add clocks required for usb
-	operation
-In-Reply-To: <201108101921.58149.marc.dietrich@ap.physik.uni-giessen.de>
-References: <201108101921.58149.marc.dietrich@ap.physik.uni-giessen.de>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF04A068758D@HQMAIL01.nvidia.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 10 Aug 2011 16:31:46 -0500
+Subject: [PATCH v2] gpio: pl061: add DT binding support
+In-Reply-To: <1312397661-3328-1-git-send-email-robherring2@gmail.com>
+References: <1312397661-3328-1-git-send-email-robherring2@gmail.com>
+Message-ID: <1313011906-24161-1-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc Dietrich wrote at Wednesday, August 10, 2011 11:22 AM:
-> These clocks are required for usb operation. pll_p_out4 needs to be set
-> to 24 MHz. The other clocks default to "off" in order to save some energy.
-> 
-> Signed-off-by: Marc Dietrich <marvin24@gmx.de>
+From: Rob Herring <rob.herring@calxeda.com>
 
-Acked-by: Stephen Warren <swarren@nvidia.com>
+This adds devicetree binding support to the ARM pl061 driver removing the
+platform_data dependency. When DT binding is used, the gpio numbering is
+assigned dynamically. For now, interrupts are not supported with DT until
+irqdomains learn dynamic irq assignment.
 
-Given the rest of the thread, this is fine for now. We can address any
-deficiencies in the bus clock and clk_m parenting when it's addressed
-globally for all boards later.
+Rather than add another case of -1, updating the driver to use NO_IRQ.
 
-> diff --git a/arch/arm/mach-tegra/board-paz00.c b/arch/arm/mach-tegra/board-paz00.c
-> index 45111f6..cde36dc 100644
-> --- a/arch/arm/mach-tegra/board-paz00.c
-> +++ b/arch/arm/mach-tegra/board-paz00.c
-> @@ -145,6 +145,12 @@ static __initdata struct tegra_clk_init_table paz00_clk_init_table[] = {
->  	/* name		parent		rate		enabled */
->  	{ "uarta",	"pll_p",	216000000,	true },
->  	{ "uartd",	"pll_p",	216000000,	true },
-> +
-> +	{ "pll_p_out4",	"pll_p",	24000000,	true },
-> +	{ "usbd",	"clk_m",	12000000,	false },
-> +	{ "usb2",	"clk_m",	12000000,	false },
-> +	{ "usb3",	"clk_m",	12000000,	false },
-> +
->  	{ NULL,		NULL,		0,		0},
->  };
-> 
-> --
-> 1.7.4.1
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+Cc: Grant Likely <grant.likely@secretlab.ca>
+---
 
+v2:
+- Add other -1 to NO_IRQ conversions
+- Drop DT irq support for now
+
+ drivers/gpio/gpio-pl061.c  |   31 +++++++++++++++++++++----------
+ include/linux/amba/pl061.h |    3 +--
+ 2 files changed, 22 insertions(+), 12 deletions(-)
+
+diff --git a/drivers/gpio/gpio-pl061.c b/drivers/gpio/gpio-pl061.c
+index 2c5a18f..093c90b 100644
+--- a/drivers/gpio/gpio-pl061.c
++++ b/drivers/gpio/gpio-pl061.c
+@@ -118,7 +118,7 @@ static int pl061_to_irq(struct gpio_chip *gc, unsigned offset)
+ {
+ 	struct pl061_gpio *chip = container_of(gc, struct pl061_gpio, gc);
+ 
+-	if (chip->irq_base == (unsigned) -1)
++	if (chip->irq_base == NO_IRQ)
+ 		return -EINVAL;
+ 
+ 	return chip->irq_base + offset;
+@@ -246,6 +246,18 @@ static int pl061_probe(struct amba_device *dev, const struct amba_id *id)
+ 	if (chip == NULL)
+ 		return -ENOMEM;
+ 
++	pdata = dev->dev.platform_data;
++	if (pdata) {
++		chip->gc.base = pdata->gpio_base;
++		chip->irq_base = pdata->irq_base;
++	} else if (dev->dev.of_node) {
++		chip->gc.base = -1;
++		chip->irq_base = NO_IRQ;
++	} else {
++		ret = -ENODEV;
++		goto free_mem;
++	}
++
+ 	if (!request_mem_region(dev->res.start,
+ 				resource_size(&dev->res), "pl061")) {
+ 		ret = -EBUSY;
+@@ -267,14 +279,11 @@ static int pl061_probe(struct amba_device *dev, const struct amba_id *id)
+ 	chip->gc.get = pl061_get_value;
+ 	chip->gc.set = pl061_set_value;
+ 	chip->gc.to_irq = pl061_to_irq;
+-	chip->gc.base = pdata->gpio_base;
+ 	chip->gc.ngpio = PL061_GPIO_NR;
+ 	chip->gc.label = dev_name(&dev->dev);
+ 	chip->gc.dev = &dev->dev;
+ 	chip->gc.owner = THIS_MODULE;
+ 
+-	chip->irq_base = pdata->irq_base;
+-
+ 	ret = gpiochip_add(&chip->gc);
+ 	if (ret)
+ 		goto iounmap;
+@@ -283,7 +292,7 @@ static int pl061_probe(struct amba_device *dev, const struct amba_id *id)
+ 	 * irq_chip support
+ 	 */
+ 
+-	if (chip->irq_base == (unsigned) -1)
++	if (chip->irq_base == NO_IRQ)
+ 		return 0;
+ 
+ 	writeb(0, chip->base + GPIOIE); /* disable irqs */
+@@ -307,11 +316,13 @@ static int pl061_probe(struct amba_device *dev, const struct amba_id *id)
+ 	list_add(&chip->list, chip_list);
+ 
+ 	for (i = 0; i < PL061_GPIO_NR; i++) {
+-		if (pdata->directions & (1 << i))
+-			pl061_direction_output(&chip->gc, i,
+-					pdata->values & (1 << i));
+-		else
+-			pl061_direction_input(&chip->gc, i);
++		if (pdata) {
++			if (pdata->directions & (1 << i))
++				pl061_direction_output(&chip->gc, i,
++						pdata->values & (1 << i));
++			else
++				pl061_direction_input(&chip->gc, i);
++		}
+ 
+ 		irq_set_chip_and_handler(i + chip->irq_base, &pl061_irqchip,
+ 					 handle_simple_irq);
+diff --git a/include/linux/amba/pl061.h b/include/linux/amba/pl061.h
+index 5ddd9ad..2412af9 100644
+--- a/include/linux/amba/pl061.h
++++ b/include/linux/amba/pl061.h
+@@ -7,8 +7,7 @@ struct pl061_platform_data {
+ 	unsigned	gpio_base;
+ 
+ 	/* number of the first IRQ.
+-	 * If the IRQ functionality in not desired this must be set to
+-	 * (unsigned) -1.
++	 * If the IRQ functionality in not desired this must be set to NO_IRQ.
+ 	 */
+ 	unsigned	irq_base;
+ 
 -- 
-nvpublic
+1.7.4.1
