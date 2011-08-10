@@ -1,307 +1,67 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Wed, 10 Aug 2011 14:17:35 +0200
-Subject: [PATCH 10/19] mach-ep93xx: break out GPIO driver specifics
-Message-ID: <1312978655-18405-1-git-send-email-linus.walleij@stericsson.com>
+Date: Wed, 10 Aug 2011 14:17:43 +0200
+Subject: [PATCH 11/19] mach-ixp2000: rename GPIO header
+Message-ID: <1312978663-18438-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Linus Walleij <linus.walleij@linaro.org>
 
-The <mach/gpio.h> file is included from upper directories
-and deal with generic GPIO and gpiolib stuff. Break out the
-platform and driver specific defines and functions into its own
-header file.
+The ixp2000 abuses the <mach/gpio.h> namespace by not implementing
+any generic GPIO nor gpiolib functions in it - just custom GPIO.
+Rename the header to <mach/gpio-ixp2000.h> for clarity.
 
-Cc: Hartley Sweeten <hsweeten@visionengravers.com>
-Cc: Ryan Mallon <rmallon@gmail.com>
+Cc: Lennert Buytenhek <kernel@wantstofly.org>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/mach-ep93xx/core.c                     |    1 +
- arch/arm/mach-ep93xx/edb93xx.c                  |    1 +
- arch/arm/mach-ep93xx/include/mach/gpio-ep93xx.h |  100 +++++++++++++++++++++++
- arch/arm/mach-ep93xx/include/mach/gpio.h        |   97 ++---------------------
- arch/arm/mach-ep93xx/simone.c                   |    2 +-
- arch/arm/mach-ep93xx/snappercl15.c              |    2 +-
- 6 files changed, 110 insertions(+), 93 deletions(-)
- create mode 100644 arch/arm/mach-ep93xx/include/mach/gpio-ep93xx.h
+ arch/arm/mach-ixp2000/core.c                       |    2 ++
+ .../include/mach/{gpio.h => gpio-ixp2000.h}        |    0
+ arch/arm/mach-ixp2000/ixdp2x00.c                   |    1 +
+ drivers/i2c/busses/i2c-ixp2000.c                   |    2 +-
+ 4 files changed, 4 insertions(+), 1 deletions(-)
+ rename arch/arm/mach-ixp2000/include/mach/{gpio.h => gpio-ixp2000.h} (100%)
 
-diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
-index c60f081..94c78bc 100644
---- a/arch/arm/mach-ep93xx/core.c
-+++ b/arch/arm/mach-ep93xx/core.c
-@@ -38,6 +38,7 @@
- #include <mach/fb.h>
- #include <mach/ep93xx_keypad.h>
- #include <mach/ep93xx_spi.h>
-+#include <mach/gpio-ep93xx.h>
- 
- #include <asm/mach/map.h>
+diff --git a/arch/arm/mach-ixp2000/core.c b/arch/arm/mach-ixp2000/core.c
+index e95c5e7..59a5126 100644
+--- a/arch/arm/mach-ixp2000/core.c
++++ b/arch/arm/mach-ixp2000/core.c
+@@ -39,6 +39,8 @@
  #include <asm/mach/time.h>
-diff --git a/arch/arm/mach-ep93xx/edb93xx.c b/arch/arm/mach-ep93xx/edb93xx.c
-index 9969bb1..3f320c6 100644
---- a/arch/arm/mach-ep93xx/edb93xx.c
-+++ b/arch/arm/mach-ep93xx/edb93xx.c
-@@ -37,6 +37,7 @@
- #include <mach/hardware.h>
- #include <mach/fb.h>
- #include <mach/ep93xx_spi.h>
-+#include <mach/gpio-ep93xx.h>
+ #include <asm/mach/irq.h>
  
- #include <asm/mach-types.h>
++#include <mach/gpio-ixp2000.h>
++
+ static DEFINE_SPINLOCK(ixp2000_slowport_lock);
+ static unsigned long ixp2000_slowport_irq_flags;
+ 
+diff --git a/arch/arm/mach-ixp2000/include/mach/gpio.h b/arch/arm/mach-ixp2000/include/mach/gpio-ixp2000.h
+similarity index 100%
+rename from arch/arm/mach-ixp2000/include/mach/gpio.h
+rename to arch/arm/mach-ixp2000/include/mach/gpio-ixp2000.h
+diff --git a/arch/arm/mach-ixp2000/ixdp2x00.c b/arch/arm/mach-ixp2000/ixdp2x00.c
+index f615068..634b6c8 100644
+--- a/arch/arm/mach-ixp2000/ixdp2x00.c
++++ b/arch/arm/mach-ixp2000/ixdp2x00.c
+@@ -41,6 +41,7 @@
+ #include <asm/mach/flash.h>
  #include <asm/mach/arch.h>
-diff --git a/arch/arm/mach-ep93xx/include/mach/gpio-ep93xx.h b/arch/arm/mach-ep93xx/include/mach/gpio-ep93xx.h
-new file mode 100644
-index 0000000..8aff2ea
---- /dev/null
-+++ b/arch/arm/mach-ep93xx/include/mach/gpio-ep93xx.h
-@@ -0,0 +1,100 @@
-+/* Include file for the EP93XX GPIO controller machine specifics */
-+
-+#ifndef __GPIO_EP93XX_H
-+#define __GPIO_EP93XX_H
-+
-+/* GPIO port A.  */
-+#define EP93XX_GPIO_LINE_A(x)		((x) + 0)
-+#define EP93XX_GPIO_LINE_EGPIO0		EP93XX_GPIO_LINE_A(0)
-+#define EP93XX_GPIO_LINE_EGPIO1		EP93XX_GPIO_LINE_A(1)
-+#define EP93XX_GPIO_LINE_EGPIO2		EP93XX_GPIO_LINE_A(2)
-+#define EP93XX_GPIO_LINE_EGPIO3		EP93XX_GPIO_LINE_A(3)
-+#define EP93XX_GPIO_LINE_EGPIO4		EP93XX_GPIO_LINE_A(4)
-+#define EP93XX_GPIO_LINE_EGPIO5		EP93XX_GPIO_LINE_A(5)
-+#define EP93XX_GPIO_LINE_EGPIO6		EP93XX_GPIO_LINE_A(6)
-+#define EP93XX_GPIO_LINE_EGPIO7		EP93XX_GPIO_LINE_A(7)
-+
-+/* GPIO port B.  */
-+#define EP93XX_GPIO_LINE_B(x)		((x) + 8)
-+#define EP93XX_GPIO_LINE_EGPIO8		EP93XX_GPIO_LINE_B(0)
-+#define EP93XX_GPIO_LINE_EGPIO9		EP93XX_GPIO_LINE_B(1)
-+#define EP93XX_GPIO_LINE_EGPIO10	EP93XX_GPIO_LINE_B(2)
-+#define EP93XX_GPIO_LINE_EGPIO11	EP93XX_GPIO_LINE_B(3)
-+#define EP93XX_GPIO_LINE_EGPIO12	EP93XX_GPIO_LINE_B(4)
-+#define EP93XX_GPIO_LINE_EGPIO13	EP93XX_GPIO_LINE_B(5)
-+#define EP93XX_GPIO_LINE_EGPIO14	EP93XX_GPIO_LINE_B(6)
-+#define EP93XX_GPIO_LINE_EGPIO15	EP93XX_GPIO_LINE_B(7)
-+
-+/* GPIO port C.  */
-+#define EP93XX_GPIO_LINE_C(x)		((x) + 40)
-+#define EP93XX_GPIO_LINE_ROW0		EP93XX_GPIO_LINE_C(0)
-+#define EP93XX_GPIO_LINE_ROW1		EP93XX_GPIO_LINE_C(1)
-+#define EP93XX_GPIO_LINE_ROW2		EP93XX_GPIO_LINE_C(2)
-+#define EP93XX_GPIO_LINE_ROW3		EP93XX_GPIO_LINE_C(3)
-+#define EP93XX_GPIO_LINE_ROW4		EP93XX_GPIO_LINE_C(4)
-+#define EP93XX_GPIO_LINE_ROW5		EP93XX_GPIO_LINE_C(5)
-+#define EP93XX_GPIO_LINE_ROW6		EP93XX_GPIO_LINE_C(6)
-+#define EP93XX_GPIO_LINE_ROW7		EP93XX_GPIO_LINE_C(7)
-+
-+/* GPIO port D.  */
-+#define EP93XX_GPIO_LINE_D(x)		((x) + 24)
-+#define EP93XX_GPIO_LINE_COL0		EP93XX_GPIO_LINE_D(0)
-+#define EP93XX_GPIO_LINE_COL1		EP93XX_GPIO_LINE_D(1)
-+#define EP93XX_GPIO_LINE_COL2		EP93XX_GPIO_LINE_D(2)
-+#define EP93XX_GPIO_LINE_COL3		EP93XX_GPIO_LINE_D(3)
-+#define EP93XX_GPIO_LINE_COL4		EP93XX_GPIO_LINE_D(4)
-+#define EP93XX_GPIO_LINE_COL5		EP93XX_GPIO_LINE_D(5)
-+#define EP93XX_GPIO_LINE_COL6		EP93XX_GPIO_LINE_D(6)
-+#define EP93XX_GPIO_LINE_COL7		EP93XX_GPIO_LINE_D(7)
-+
-+/* GPIO port E.  */
-+#define EP93XX_GPIO_LINE_E(x)		((x) + 32)
-+#define EP93XX_GPIO_LINE_GRLED		EP93XX_GPIO_LINE_E(0)
-+#define EP93XX_GPIO_LINE_RDLED		EP93XX_GPIO_LINE_E(1)
-+#define EP93XX_GPIO_LINE_DIORn		EP93XX_GPIO_LINE_E(2)
-+#define EP93XX_GPIO_LINE_IDECS1n	EP93XX_GPIO_LINE_E(3)
-+#define EP93XX_GPIO_LINE_IDECS2n	EP93XX_GPIO_LINE_E(4)
-+#define EP93XX_GPIO_LINE_IDEDA0		EP93XX_GPIO_LINE_E(5)
-+#define EP93XX_GPIO_LINE_IDEDA1		EP93XX_GPIO_LINE_E(6)
-+#define EP93XX_GPIO_LINE_IDEDA2		EP93XX_GPIO_LINE_E(7)
-+
-+/* GPIO port F.  */
-+#define EP93XX_GPIO_LINE_F(x)		((x) + 16)
-+#define EP93XX_GPIO_LINE_WP		EP93XX_GPIO_LINE_F(0)
-+#define EP93XX_GPIO_LINE_MCCD1		EP93XX_GPIO_LINE_F(1)
-+#define EP93XX_GPIO_LINE_MCCD2		EP93XX_GPIO_LINE_F(2)
-+#define EP93XX_GPIO_LINE_MCBVD1		EP93XX_GPIO_LINE_F(3)
-+#define EP93XX_GPIO_LINE_MCBVD2		EP93XX_GPIO_LINE_F(4)
-+#define EP93XX_GPIO_LINE_VS1		EP93XX_GPIO_LINE_F(5)
-+#define EP93XX_GPIO_LINE_READY		EP93XX_GPIO_LINE_F(6)
-+#define EP93XX_GPIO_LINE_VS2		EP93XX_GPIO_LINE_F(7)
-+
-+/* GPIO port G.  */
-+#define EP93XX_GPIO_LINE_G(x)		((x) + 48)
-+#define EP93XX_GPIO_LINE_EECLK		EP93XX_GPIO_LINE_G(0)
-+#define EP93XX_GPIO_LINE_EEDAT		EP93XX_GPIO_LINE_G(1)
-+#define EP93XX_GPIO_LINE_SLA0		EP93XX_GPIO_LINE_G(2)
-+#define EP93XX_GPIO_LINE_SLA1		EP93XX_GPIO_LINE_G(3)
-+#define EP93XX_GPIO_LINE_DD12		EP93XX_GPIO_LINE_G(4)
-+#define EP93XX_GPIO_LINE_DD13		EP93XX_GPIO_LINE_G(5)
-+#define EP93XX_GPIO_LINE_DD14		EP93XX_GPIO_LINE_G(6)
-+#define EP93XX_GPIO_LINE_DD15		EP93XX_GPIO_LINE_G(7)
-+
-+/* GPIO port H.  */
-+#define EP93XX_GPIO_LINE_H(x)		((x) + 56)
-+#define EP93XX_GPIO_LINE_DD0		EP93XX_GPIO_LINE_H(0)
-+#define EP93XX_GPIO_LINE_DD1		EP93XX_GPIO_LINE_H(1)
-+#define EP93XX_GPIO_LINE_DD2		EP93XX_GPIO_LINE_H(2)
-+#define EP93XX_GPIO_LINE_DD3		EP93XX_GPIO_LINE_H(3)
-+#define EP93XX_GPIO_LINE_DD4		EP93XX_GPIO_LINE_H(4)
-+#define EP93XX_GPIO_LINE_DD5		EP93XX_GPIO_LINE_H(5)
-+#define EP93XX_GPIO_LINE_DD6		EP93XX_GPIO_LINE_H(6)
-+#define EP93XX_GPIO_LINE_DD7		EP93XX_GPIO_LINE_H(7)
-+
-+/* maximum value for gpio line identifiers */
-+#define EP93XX_GPIO_LINE_MAX		EP93XX_GPIO_LINE_H(7)
-+
-+/* maximum value for irq capable line identifiers */
-+#define EP93XX_GPIO_LINE_MAX_IRQ	EP93XX_GPIO_LINE_F(7)
-+
-+#endif /* __GPIO_EP93XX_H */
-diff --git a/arch/arm/mach-ep93xx/include/mach/gpio.h b/arch/arm/mach-ep93xx/include/mach/gpio.h
-index 071f676..acfc113 100644
---- a/arch/arm/mach-ep93xx/include/mach/gpio.h
-+++ b/arch/arm/mach-ep93xx/include/mach/gpio.h
-@@ -5,99 +5,14 @@
- #ifndef __ASM_ARCH_GPIO_H
- #define __ASM_ARCH_GPIO_H
  
--/* GPIO port A.  */
--#define EP93XX_GPIO_LINE_A(x)		((x) + 0)
--#define EP93XX_GPIO_LINE_EGPIO0		EP93XX_GPIO_LINE_A(0)
--#define EP93XX_GPIO_LINE_EGPIO1		EP93XX_GPIO_LINE_A(1)
--#define EP93XX_GPIO_LINE_EGPIO2		EP93XX_GPIO_LINE_A(2)
--#define EP93XX_GPIO_LINE_EGPIO3		EP93XX_GPIO_LINE_A(3)
--#define EP93XX_GPIO_LINE_EGPIO4		EP93XX_GPIO_LINE_A(4)
--#define EP93XX_GPIO_LINE_EGPIO5		EP93XX_GPIO_LINE_A(5)
--#define EP93XX_GPIO_LINE_EGPIO6		EP93XX_GPIO_LINE_A(6)
--#define EP93XX_GPIO_LINE_EGPIO7		EP93XX_GPIO_LINE_A(7)
-+/* new generic GPIO API - see Documentation/gpio.txt */
++#include <mach/gpio-ixp2000.h>
  
--/* GPIO port B.  */
--#define EP93XX_GPIO_LINE_B(x)		((x) + 8)
--#define EP93XX_GPIO_LINE_EGPIO8		EP93XX_GPIO_LINE_B(0)
--#define EP93XX_GPIO_LINE_EGPIO9		EP93XX_GPIO_LINE_B(1)
--#define EP93XX_GPIO_LINE_EGPIO10	EP93XX_GPIO_LINE_B(2)
--#define EP93XX_GPIO_LINE_EGPIO11	EP93XX_GPIO_LINE_B(3)
--#define EP93XX_GPIO_LINE_EGPIO12	EP93XX_GPIO_LINE_B(4)
--#define EP93XX_GPIO_LINE_EGPIO13	EP93XX_GPIO_LINE_B(5)
--#define EP93XX_GPIO_LINE_EGPIO14	EP93XX_GPIO_LINE_B(6)
--#define EP93XX_GPIO_LINE_EGPIO15	EP93XX_GPIO_LINE_B(7)
-+#include <asm-generic/gpio.h>
-+#include "gpio-ep93xx.h"
+ /*************************************************************************
+  * IXDP2x00 IRQ Initialization
+diff --git a/drivers/i2c/busses/i2c-ixp2000.c b/drivers/i2c/busses/i2c-ixp2000.c
+index be9991b..c01e951 100644
+--- a/drivers/i2c/busses/i2c-ixp2000.c
++++ b/drivers/i2c/busses/i2c-ixp2000.c
+@@ -35,7 +35,7 @@
+ #include <linux/slab.h>
  
--/* GPIO port C.  */
--#define EP93XX_GPIO_LINE_C(x)		((x) + 40)
--#define EP93XX_GPIO_LINE_ROW0		EP93XX_GPIO_LINE_C(0)
--#define EP93XX_GPIO_LINE_ROW1		EP93XX_GPIO_LINE_C(1)
--#define EP93XX_GPIO_LINE_ROW2		EP93XX_GPIO_LINE_C(2)
--#define EP93XX_GPIO_LINE_ROW3		EP93XX_GPIO_LINE_C(3)
--#define EP93XX_GPIO_LINE_ROW4		EP93XX_GPIO_LINE_C(4)
--#define EP93XX_GPIO_LINE_ROW5		EP93XX_GPIO_LINE_C(5)
--#define EP93XX_GPIO_LINE_ROW6		EP93XX_GPIO_LINE_C(6)
--#define EP93XX_GPIO_LINE_ROW7		EP93XX_GPIO_LINE_C(7)
--
--/* GPIO port D.  */
--#define EP93XX_GPIO_LINE_D(x)		((x) + 24)
--#define EP93XX_GPIO_LINE_COL0		EP93XX_GPIO_LINE_D(0)
--#define EP93XX_GPIO_LINE_COL1		EP93XX_GPIO_LINE_D(1)
--#define EP93XX_GPIO_LINE_COL2		EP93XX_GPIO_LINE_D(2)
--#define EP93XX_GPIO_LINE_COL3		EP93XX_GPIO_LINE_D(3)
--#define EP93XX_GPIO_LINE_COL4		EP93XX_GPIO_LINE_D(4)
--#define EP93XX_GPIO_LINE_COL5		EP93XX_GPIO_LINE_D(5)
--#define EP93XX_GPIO_LINE_COL6		EP93XX_GPIO_LINE_D(6)
--#define EP93XX_GPIO_LINE_COL7		EP93XX_GPIO_LINE_D(7)
--
--/* GPIO port E.  */
--#define EP93XX_GPIO_LINE_E(x)		((x) + 32)
--#define EP93XX_GPIO_LINE_GRLED		EP93XX_GPIO_LINE_E(0)
--#define EP93XX_GPIO_LINE_RDLED		EP93XX_GPIO_LINE_E(1)
--#define EP93XX_GPIO_LINE_DIORn		EP93XX_GPIO_LINE_E(2)
--#define EP93XX_GPIO_LINE_IDECS1n	EP93XX_GPIO_LINE_E(3)
--#define EP93XX_GPIO_LINE_IDECS2n	EP93XX_GPIO_LINE_E(4)
--#define EP93XX_GPIO_LINE_IDEDA0		EP93XX_GPIO_LINE_E(5)
--#define EP93XX_GPIO_LINE_IDEDA1		EP93XX_GPIO_LINE_E(6)
--#define EP93XX_GPIO_LINE_IDEDA2		EP93XX_GPIO_LINE_E(7)
--
--/* GPIO port F.  */
--#define EP93XX_GPIO_LINE_F(x)		((x) + 16)
--#define EP93XX_GPIO_LINE_WP		EP93XX_GPIO_LINE_F(0)
--#define EP93XX_GPIO_LINE_MCCD1		EP93XX_GPIO_LINE_F(1)
--#define EP93XX_GPIO_LINE_MCCD2		EP93XX_GPIO_LINE_F(2)
--#define EP93XX_GPIO_LINE_MCBVD1		EP93XX_GPIO_LINE_F(3)
--#define EP93XX_GPIO_LINE_MCBVD2		EP93XX_GPIO_LINE_F(4)
--#define EP93XX_GPIO_LINE_VS1		EP93XX_GPIO_LINE_F(5)
--#define EP93XX_GPIO_LINE_READY		EP93XX_GPIO_LINE_F(6)
--#define EP93XX_GPIO_LINE_VS2		EP93XX_GPIO_LINE_F(7)
--
--/* GPIO port G.  */
--#define EP93XX_GPIO_LINE_G(x)		((x) + 48)
--#define EP93XX_GPIO_LINE_EECLK		EP93XX_GPIO_LINE_G(0)
--#define EP93XX_GPIO_LINE_EEDAT		EP93XX_GPIO_LINE_G(1)
--#define EP93XX_GPIO_LINE_SLA0		EP93XX_GPIO_LINE_G(2)
--#define EP93XX_GPIO_LINE_SLA1		EP93XX_GPIO_LINE_G(3)
--#define EP93XX_GPIO_LINE_DD12		EP93XX_GPIO_LINE_G(4)
--#define EP93XX_GPIO_LINE_DD13		EP93XX_GPIO_LINE_G(5)
--#define EP93XX_GPIO_LINE_DD14		EP93XX_GPIO_LINE_G(6)
--#define EP93XX_GPIO_LINE_DD15		EP93XX_GPIO_LINE_G(7)
--
--/* GPIO port H.  */
--#define EP93XX_GPIO_LINE_H(x)		((x) + 56)
--#define EP93XX_GPIO_LINE_DD0		EP93XX_GPIO_LINE_H(0)
--#define EP93XX_GPIO_LINE_DD1		EP93XX_GPIO_LINE_H(1)
--#define EP93XX_GPIO_LINE_DD2		EP93XX_GPIO_LINE_H(2)
--#define EP93XX_GPIO_LINE_DD3		EP93XX_GPIO_LINE_H(3)
--#define EP93XX_GPIO_LINE_DD4		EP93XX_GPIO_LINE_H(4)
--#define EP93XX_GPIO_LINE_DD5		EP93XX_GPIO_LINE_H(5)
--#define EP93XX_GPIO_LINE_DD6		EP93XX_GPIO_LINE_H(6)
--#define EP93XX_GPIO_LINE_DD7		EP93XX_GPIO_LINE_H(7)
--
--/* maximum value for gpio line identifiers */
--#define EP93XX_GPIO_LINE_MAX		EP93XX_GPIO_LINE_H(7)
--
--/* maximum value for irq capable line identifiers */
--#define EP93XX_GPIO_LINE_MAX_IRQ	EP93XX_GPIO_LINE_F(7)
-+#define gpio_get_value	__gpio_get_value
-+#define gpio_set_value	__gpio_set_value
-+#define gpio_cansleep	__gpio_cansleep
+ #include <mach/hardware.h>	/* Pick up IXP2000-specific bits */
+-#include <asm/gpio.h>
++#include <mach/gpio-ixp2000.h>
  
- /*
-  * Map GPIO A0..A7  (0..7)  to irq 64..71,
-diff --git a/arch/arm/mach-ep93xx/simone.c b/arch/arm/mach-ep93xx/simone.c
-index 8392e95..1a472ff 100644
---- a/arch/arm/mach-ep93xx/simone.c
-+++ b/arch/arm/mach-ep93xx/simone.c
-@@ -18,12 +18,12 @@
- #include <linux/kernel.h>
- #include <linux/init.h>
- #include <linux/platform_device.h>
--#include <linux/gpio.h>
- #include <linux/i2c.h>
- #include <linux/i2c-gpio.h>
- 
- #include <mach/hardware.h>
- #include <mach/fb.h>
-+#include <mach/gpio-ep93xx.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-diff --git a/arch/arm/mach-ep93xx/snappercl15.c b/arch/arm/mach-ep93xx/snappercl15.c
-index 2e9c614..4f4b0b2 100644
---- a/arch/arm/mach-ep93xx/snappercl15.c
-+++ b/arch/arm/mach-ep93xx/snappercl15.c
-@@ -20,7 +20,6 @@
- #include <linux/kernel.h>
- #include <linux/init.h>
- #include <linux/io.h>
--#include <linux/gpio.h>
- #include <linux/i2c.h>
- #include <linux/i2c-gpio.h>
- #include <linux/fb.h>
-@@ -30,6 +29,7 @@
- 
- #include <mach/hardware.h>
- #include <mach/fb.h>
-+#include <mach/gpio-ep93xx.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
+ static inline int ixp2000_scl_pin(void *data)
+ {
 -- 
 1.7.3.2
