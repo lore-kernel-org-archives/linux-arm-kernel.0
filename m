@@ -1,29 +1,44 @@
-From: viresh.kumar@st.com (viresh kumar)
-Date: Wed, 10 Aug 2011 15:44:13 +0530
-Subject: [PATCH V2 6/6] spi/spi-pl022: Request/free DMA channels as and
-	when required.
-In-Reply-To: <438BB0150E931F4B9CE701519A4463010871804A15@bgsmsx502.gar.corp.intel.com>
-References: <cover.1312965741.git.viresh.kumar@st.com>
-	<566c0525199f498f04422d4c3b2ddd7466648c20.1312965742.git.viresh.kumar@st.com>
-	<20110810090042.GE1831@n2100.arm.linux.org.uk>
-	<4E424F7B.2000800@st.com>
-	<438BB0150E931F4B9CE701519A4463010871804A15@bgsmsx502.gar.corp.intel.com>
-Message-ID: <4E4259F5.8060402@st.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Wed, 10 Aug 2011 12:15:50 +0200
+Subject: [RFC/PATCH 04/14] OMAP: McBSP: use existing macros for converting
+	between devices
+In-Reply-To: <20110810100704.856fcc5c.jhnikula@gmail.com>
+References: <1312897232-4792-1-git-send-email-manjugk@ti.com>
+	<1312897232-4792-5-git-send-email-manjugk@ti.com>
+	<20110810100704.856fcc5c.jhnikula@gmail.com>
+Message-ID: <4E425A56.4000605@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/10/2011 03:31 PM, Koul, Vinod wrote:
-> And on your patch, are you able to dynamically assign the channels for
-> platform? What is the intended usage? (as Russell articulated it is bad
-> to dynamically assign channel for something like uart)
+Manju,
 
-Are you talking about channels or DMA request lines? For channels yes,
-we can always allocate channels as they are independent of peripherals.
-About request lines, they are muxed in our case between several
-peripherals, but support for that has to be added in dw_dmac.
+On 8/10/2011 9:07 AM, Jarkko Nikula wrote:
+> Hi
+>
+> On Tue, 09 Aug 2011 19:10:22 +0500
+> "G, Manjunath Kondaiah"<manjugk@ti.com>  wrote:
+>
+>> From: Kevin Hilman<khilman@ti.com>
+>>
+>> For converting from struct device to platform_device, and from
+>> platform_device to struct device, there are existing macros.  Use
+>> them instead of manual use of container_of().
+>>
+>> Signed-off-by: Kevin Hilman<khilman@ti.com>
+>> ---
+>>   arch/arm/plat-omap/mcbsp.c |    6 +++---
+>>   1 files changed, 3 insertions(+), 3 deletions(-)
+>>
+> Kevin dropped this patch and used mine that does more cleanups:
+>
+> http://marc.info/?l=linux-omap&m=131255627918065&w=2
+>
+> Worth to check also other patches since Kevin's updated set seems to
+> have other differences too:
+>
+> http://marc.info/?l=linux-omap&m=131258997416300&w=2
 
-SPI is not as much heavily used as uart. So, it might be fine there to
-allocate channels dynamically.
+In fact, you'd better point to the lastest Kevin's tree and not included 
+the patches in this series.
 
--- 
-viresh
+Benoit
