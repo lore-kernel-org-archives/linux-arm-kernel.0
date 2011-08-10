@@ -1,36 +1,48 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Wed, 10 Aug 2011 14:20:56 +0530
-Subject: [PATCH V2 3/6] spi/spi-pl022: Don't allocate more sg than required.
+Date: Wed, 10 Aug 2011 14:20:58 +0530
+Subject: [PATCH V2 5/6] spi/spi-pl022: Call pl022_dma_remove(pl022) only if
+	enable_dma is true
 In-Reply-To: <cover.1312965741.git.viresh.kumar@st.com>
 References: <cover.1312965741.git.viresh.kumar@st.com>
-Message-ID: <94a975df64a78bb533c85774a5bbd052c73fa5ba.1312965741.git.viresh.kumar@st.com>
+Message-ID: <3b94e4c3ce4689a41f4293863cbd9d8e164cd14c.1312965742.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In routine configure_dma(), if transfer->len = PAGE_SIZE, then pages is one more
-than required. While leads to one more sg getting allocated.
-
-This is wrong. Correct this to allocate correct number of sg.
+pl022_dma_remove() should be called only if enable_dma is true. There is no
+point calling it when pl022_dma_probe() is not called, which again depends on
+enable_dma.
 
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 Tested-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/spi/spi-pl022.c |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
+ drivers/spi/spi-pl022.c |    8 ++++++--
+ 1 files changed, 6 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/spi/spi-pl022.c b/drivers/spi/spi-pl022.c
-index 80116be..1c8b9ec 100644
+index d1bcc79..01e84e3 100644
 --- a/drivers/spi/spi-pl022.c
 +++ b/drivers/spi/spi-pl022.c
-@@ -1016,7 +1016,8 @@ static int configure_dma(struct pl022 *pl022)
- 	dmaengine_slave_config(txchan, &tx_conf);
- 
- 	/* Create sglists for the transfers */
--	pages = (pl022->cur_transfer->len >> PAGE_SHIFT) + 1;
-+	pages = ((pl022->cur_transfer->len + (1 << PAGE_SHIFT) - 1)
-+			>> PAGE_SHIFT);
- 	dev_dbg(&pl022->adev->dev, "using %d pages for transfer\n", pages);
- 
- 	ret = sg_alloc_table(&pl022->sgt_rx, pages, GFP_ATOMIC);
+@@ -2238,7 +2238,9 @@ err_spi_register:
+ err_start_queue:
+ err_init_queue:
+ 	destroy_queue(pl022);
+-	pl022_dma_remove(pl022);
++	if (platform_info->enable_dma)
++		pl022_dma_remove(pl022);
++
+ 	free_irq(adev->irq[0], pl022);
+ 	pm_runtime_disable(&adev->dev);
+ err_no_irq:
+@@ -2266,7 +2268,9 @@ pl022_remove(struct amba_device *adev)
+ 	if (destroy_queue(pl022) != 0)
+ 		dev_err(&adev->dev, "queue remove failed\n");
+ 	load_ssp_default_config(pl022);
+-	pl022_dma_remove(pl022);
++	if (pl022->master_info->enable_dma)
++		pl022_dma_remove(pl022);
++
+ 	free_irq(adev->irq[0], pl022);
+ 	clk_disable(pl022->clk);
+ 	clk_put(pl022->clk);
 -- 
 1.7.2.2
