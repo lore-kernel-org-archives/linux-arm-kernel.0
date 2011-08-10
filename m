@@ -1,35 +1,21 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 10 Aug 2011 09:51:16 +0200
-Subject: [PATCH] plat-nomadik: small fixup for gpio.h
-Message-ID: <mailman.60.1312962897.20020.linux-arm-kernel@lists.infradead.org>
+Date: Wed, 10 Aug 2011 09:58:12 +0200
+Subject: [PATCH] mach-sa1100: fix PCI build problem
+In-Reply-To: <1312539884-10631-1-git-send-email-linus.walleij@linaro.org>
+References: <1312539884-10631-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <CAKnu2MoBnHDVht0LPR0ip1iZqojh2ab+wx=6mCj-+M2+yOpA3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Removing the generic gpio.h broke compilation of the Nomadik
-GPIO driver since it implicitly got u32 from it. Explicitly
-include <linux/kernel.h> so we get u32 defined.
+2011/8/5 Linus Walleij <linus.walleij@linaro.org>:
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/plat-nomadik/include/plat/gpio.h |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+> The PCI nanoengine driver in the SA1100 machine probably has not
+> been building for some time. It probably dragged hardware.h
+> in implicitly and now it doesn't anymore. After this an SA1100
+> build selecting all system variants will build successfully.
 
-diff --git a/arch/arm/plat-nomadik/include/plat/gpio.h
-b/arch/arm/plat-nomadik/include/plat/gpio.h
-index cf0b78b..b894a53 100644
---- a/arch/arm/plat-nomadik/include/plat/gpio.h
-+++ b/arch/arm/plat-nomadik/include/plat/gpio.h
-@@ -12,6 +12,8 @@
- #ifndef __ASM_PLAT_GPIO_H
- #define __ASM_PLAT_GPIO_H
-
-+#include <linux/kernel.h>
-+
- /*
-  * "nmk_gpio" and "NMK_GPIO" stand for "Nomadik GPIO", leaving
-  * the "gpio" namespace for generic and cross-machine functions
---=20
-1.7.3.2
+Arnd can you pick this single patch for the -rc series, or do you
+prefer pull requests?
 
 Thanks,
 Linus Walleij
