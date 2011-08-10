@@ -1,32 +1,98 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 10 Aug 2011 16:03:25 +0100
-Subject: [PATCH v7 02/16] ARM: LPAE: Cast the dma_addr_t argument to unsigned
-	long in dma_to_virt
+Date: Wed, 10 Aug 2011 16:03:26 +0100
+Subject: [PATCH v7 03/16] ARM: LPAE: Use PMD_(SHIFT|SIZE|MASK) instead of
+	PGDIR_*
 In-Reply-To: <1312988619-16804-1-git-send-email-catalin.marinas@arm.com>
 References: <1312988619-16804-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1312988619-16804-3-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1312988619-16804-4-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is to avoid a compiler warning when invoking the __bus_to_virt()
-macro. The dma_to_virt() function gets addresses within the 32-bit
-range.
+PGDIR_SHIFT and PMD_SHIFT for the classic 2-level page table format have
+the same value (21). This patch converts the PGDIR_* uses in the kernel
+to the PMD_* equivalent so that LPAE builds can reuse the same code.
 
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm/include/asm/dma-mapping.h |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/kernel/module.c  |    2 +-
+ arch/arm/mm/dma-mapping.c |    6 +++---
+ arch/arm/mm/mmu.c         |   10 +++++-----
+ 3 files changed, 9 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
-index 7a21d0b..28b7ee8 100644
---- a/arch/arm/include/asm/dma-mapping.h
-+++ b/arch/arm/include/asm/dma-mapping.h
-@@ -32,7 +32,7 @@ static inline unsigned long dma_to_pfn(struct device *dev, dma_addr_t addr)
+diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
+index 05b3776..91befcf 100644
+--- a/arch/arm/kernel/module.c
++++ b/arch/arm/kernel/module.c
+@@ -33,7 +33,7 @@
+  * recompiling the whole kernel when CONFIG_XIP_KERNEL is turned on/off.
+  */
+ #undef MODULES_VADDR
+-#define MODULES_VADDR	(((unsigned long)_etext + ~PGDIR_MASK) & PGDIR_MASK)
++#define MODULES_VADDR	(((unsigned long)_etext + ~PMD_MASK) & PMD_MASK)
+ #endif
  
- static inline void *dma_to_virt(struct device *dev, dma_addr_t addr)
- {
--	return (void *)__bus_to_virt(addr);
-+	return (void *)__bus_to_virt((unsigned long)addr);
+ #ifdef CONFIG_MMU
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index 0a0a1e7..b6a867c 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -123,8 +123,8 @@ static void __dma_free_buffer(struct page *page, size_t size)
+ #endif
+ 
+ #define CONSISTENT_OFFSET(x)	(((unsigned long)(x) - CONSISTENT_BASE) >> PAGE_SHIFT)
+-#define CONSISTENT_PTE_INDEX(x) (((unsigned long)(x) - CONSISTENT_BASE) >> PGDIR_SHIFT)
+-#define NUM_CONSISTENT_PTES (CONSISTENT_DMA_SIZE >> PGDIR_SHIFT)
++#define CONSISTENT_PTE_INDEX(x) (((unsigned long)(x) - CONSISTENT_BASE) >> PMD_SHIFT)
++#define NUM_CONSISTENT_PTES (CONSISTENT_DMA_SIZE >> PMD_SHIFT)
+ 
+ /*
+  * These are the page tables (2MB each) covering uncached, DMA consistent allocations
+@@ -183,7 +183,7 @@ static int __init consistent_init(void)
+ 		}
+ 
+ 		consistent_pte[i++] = pte;
+-		base += (1 << PGDIR_SHIFT);
++		base += (1 << PMD_SHIFT);
+ 	} while (base < CONSISTENT_END);
+ 
+ 	return ret;
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 594d677..dc26858 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -863,14 +863,14 @@ static inline void prepare_page_table(void)
+ 	/*
+ 	 * Clear out all the mappings below the kernel image.
+ 	 */
+-	for (addr = 0; addr < MODULES_VADDR; addr += PGDIR_SIZE)
++	for (addr = 0; addr < MODULES_VADDR; addr += PMD_SIZE)
+ 		pmd_clear(pmd_off_k(addr));
+ 
+ #ifdef CONFIG_XIP_KERNEL
+ 	/* The XIP kernel is mapped in the module area -- skip over it */
+-	addr = ((unsigned long)_etext + PGDIR_SIZE - 1) & PGDIR_MASK;
++	addr = ((unsigned long)_etext + PMD_SIZE - 1) & PMD_MASK;
+ #endif
+-	for ( ; addr < PAGE_OFFSET; addr += PGDIR_SIZE)
++	for ( ; addr < PAGE_OFFSET; addr += PMD_SIZE)
+ 		pmd_clear(pmd_off_k(addr));
+ 
+ 	/*
+@@ -885,7 +885,7 @@ static inline void prepare_page_table(void)
+ 	 * memory bank, up to the end of the vmalloc region.
+ 	 */
+ 	for (addr = __phys_to_virt(end);
+-	     addr < VMALLOC_END; addr += PGDIR_SIZE)
++	     addr < VMALLOC_END; addr += PMD_SIZE)
+ 		pmd_clear(pmd_off_k(addr));
  }
  
- static inline dma_addr_t virt_to_dma(struct device *dev, void *addr)
+@@ -926,7 +926,7 @@ static void __init devicemaps_init(struct machine_desc *mdesc)
+ 	 */
+ 	vectors_page = early_alloc(PAGE_SIZE);
+ 
+-	for (addr = VMALLOC_END; addr; addr += PGDIR_SIZE)
++	for (addr = VMALLOC_END; addr; addr += PMD_SIZE)
+ 		pmd_clear(pmd_off_k(addr));
+ 
+ 	/*
