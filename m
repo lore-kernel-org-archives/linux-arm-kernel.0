@@ -1,142 +1,305 @@
-From: padma.v@samsung.com (Padmavathi Venna)
-Date: Wed, 10 Aug 2011 14:03:34 -0400
-Subject: [RFC][PATCH V2 1/2] S5PV210: SPI: Add clkdev support
-Message-ID: <1312999414-14051-1-git-send-email-padma.v@samsung.com>
+From: bryan.wu@canonical.com (Bryan Wu)
+Date: Wed, 10 Aug 2011 20:05:40 +0800
+Subject: [PATCH 06/18] mach-shark: retire custom LED code
+In-Reply-To: <1312977952-2272-1-git-send-email-bryan.wu@canonical.com>
+References: <1312977952-2272-1-git-send-email-bryan.wu@canonical.com>
+Message-ID: <1312977952-2272-7-git-send-email-bryan.wu@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Create a clkdev alias for spi bus clock and modify the spi
-driver to lookup the clock using the alias name instead of
-passing clock name and clock number from SPI platform data.
+The CPU activity LED is now handled by the trigger in the leds
+subsystem, retire this old CONFIG_LEDS-based code.
 
-Board designer has the option to pass the list of bus clocks
-that are going to be used with SPI controller.If that list of
-clocks are null then it uses all the available clocks.
-
-Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+Signed-off-by: Bryan Wu <bryan.wu@canonical.com>
 ---
-This patch is tested for S5PV210 platform and similar
-changes can be adopted for rest of the Samsung's s3c
-and s5p platforms, if this approach is accepted.
+ arch/arm/mach-shark/Makefile |    4 +-
+ arch/arm/mach-shark/core.c   |    1 -
+ arch/arm/mach-shark/leds.c   |  225 ++++++++++++++++--------------------------
+ 3 files changed, 87 insertions(+), 143 deletions(-)
 
- arch/arm/mach-s5pv210/dev-spi.c                  |   38 +++++++++++++++++++---
- arch/arm/plat-samsung/include/plat/s3c64xx-spi.h |    7 +---
- 2 files changed, 34 insertions(+), 11 deletions(-)
-
-diff --git a/arch/arm/mach-s5pv210/dev-spi.c b/arch/arm/mach-s5pv210/dev-spi.c
-index eaf9a7b..503a3f4 100644
---- a/arch/arm/mach-s5pv210/dev-spi.c
-+++ b/arch/arm/mach-s5pv210/dev-spi.c
-@@ -11,6 +11,7 @@
- #include <linux/platform_device.h>
- #include <linux/dma-mapping.h>
- #include <linux/gpio.h>
-+#include <linux/clk.h>
+diff --git a/arch/arm/mach-shark/Makefile b/arch/arm/mach-shark/Makefile
+index 45be9b0..2965718 100644
+--- a/arch/arm/mach-shark/Makefile
++++ b/arch/arm/mach-shark/Makefile
+@@ -4,9 +4,7 @@
  
- #include <mach/dma.h>
- #include <mach/map.h>
-@@ -145,13 +146,16 @@ struct platform_device s5pv210_device_spi1 = {
- 	},
- };
+ # Object file lists.
  
--void __init s5pv210_spi_set_info(int cntrlr, int src_clk_nr, int num_cs)
-+void __init s5pv210_spi_set_info(int cntrlr, int num_cs, char *list[])
- {
- 	struct s3c64xx_spi_info *pd;
-+	struct device *dev;
-+	char devname[16], clk_alias_name[16];
-+	int ret, i;
-+	char **clk_list;
+-obj-y			:= core.o dma.o irq.o pci.o
++obj-y			:= core.o dma.o irq.o pci.o leds.o
+ obj-m			:=
+ obj-n			:=
+ obj-			:=
+-
+-obj-$(CONFIG_LEDS)	+= leds.o
+diff --git a/arch/arm/mach-shark/core.c b/arch/arm/mach-shark/core.c
+index ac2873c..36b6b87 100644
+--- a/arch/arm/mach-shark/core.c
++++ b/arch/arm/mach-shark/core.c
+@@ -13,7 +13,6 @@
  
- 	/* Reject invalid configuration */
--	if (!num_cs || src_clk_nr < 0
--			|| src_clk_nr > S5PV210_SPI_SRCCLK_SCLK) {
-+	if (!num_cs) {
- 		printk(KERN_ERR "%s: Invalid SPI configuration\n", __func__);
- 		return;
- 	}
-@@ -159,9 +163,11 @@ void __init s5pv210_spi_set_info(int cntrlr, int src_clk_nr, int num_cs)
- 	switch (cntrlr) {
- 	case 0:
- 		pd = &s5pv210_spi0_pdata;
-+		dev = &s5pv210_device_spi0.dev;
- 		break;
- 	case 1:
- 		pd = &s5pv210_spi1_pdata;
-+		dev = &s5pv210_device_spi1.dev;
- 		break;
- 	default:
- 		printk(KERN_ERR "%s: Invalid SPI controller(%d)\n",
-@@ -169,7 +175,29 @@ void __init s5pv210_spi_set_info(int cntrlr, int src_clk_nr, int num_cs)
- 		return;
- 	}
+ #include <asm/setup.h>
+ #include <asm/mach-types.h>
+-#include <asm/leds.h>
+ #include <asm/param.h>
  
-+	sprintf(devname, "s3c64xx-spi.%d", cntrlr);
+ #include <asm/mach/map.h>
+diff --git a/arch/arm/mach-shark/leds.c b/arch/arm/mach-shark/leds.c
+index c9e32de..ee3751e 100644
+--- a/arch/arm/mach-shark/leds.c
++++ b/arch/arm/mach-shark/leds.c
+@@ -1,166 +1,113 @@
+ /*
+- * arch/arm/mach-shark/leds.c
+- * by Alexander Schulz
+- *
+- * derived from:
+- * arch/arm/kernel/leds-footbridge.c
+- * Copyright (C) 1998-1999 Russell King
+- *
+  * DIGITAL Shark LED control routines.
+  *
+- * The leds use is as follows:
+- *  - Green front - toggles state every 50 timer interrupts
+- *  - Amber front - Unused, this is a dual color led (Amber/Green)
+- *  - Amber back  - On if system is not idle
++ * Driver for the 3 user LEDs found on the Shark
++ * Based on Versatile and RealView machine LED code
+  *
+- * Changelog:
++ * License terms: GNU General Public License (GPL) version 2
++ * Author: Bryan Wu <bryan.wu@canonical.com>
+  */
+ #include <linux/kernel.h>
+-#include <linux/module.h>
+ #include <linux/init.h>
+-#include <linux/spinlock.h>
+-#include <linux/ioport.h>
+ #include <linux/io.h>
++#include <linux/ioport.h>
++#include <linux/slab.h>
++#include <linux/leds.h>
+ 
+-#include <asm/leds.h>
+-#include <asm/system.h>
++struct shark_led {
++	struct led_classdev cdev;
++	u8 mask;
++};
+ 
+-#define LED_STATE_ENABLED	1
+-#define LED_STATE_CLAIMED	2
++/*
++ * The triggers lines up below will only be used if the
++ * LED triggers are compiled in.
++ */
++static const struct {
++	const char *name;
++	const char *trigger;
++} shark_leds[] = {
++	{ "shark:amber0", "default-on", },	/* Bit 5 */
++	{ "shark:green", "heartbeat", },	/* Bit 6 */
++	{ "shark:amber1", "cpu0" },		/* Bit 7 */
++};
 +
-+	if (list)
-+		clk_list = list;
++static u16 led_reg_read(void)
++{
++	outw(0x09, 0x24);
++	return inw(0x26);
++}
+ 
+-#define SEQUOIA_LED_GREEN       (1<<6)
+-#define SEQUOIA_LED_AMBER       (1<<5)
+-#define SEQUOIA_LED_BACK        (1<<7)
++static void led_reg_write(u16 value)
++{
++	outw(0x09, 0x24);
++	outw(value, 0x26);
++}
+ 
+-static char led_state;
+-static short hw_led_state;
+-static short saved_state;
++static void shark_led_set(struct led_classdev *cdev,
++			      enum led_brightness b)
++{
++	struct shark_led *led = container_of(cdev,
++						 struct shark_led, cdev);
++	u16 reg = led_reg_read();
+ 
+-static DEFINE_SPINLOCK(leds_lock);
++	if (b != LED_OFF)
++		reg |= led->mask;
 +	else
-+		clk_list = spi_src_clks;
++		reg &= ~led->mask;
+ 
+-short sequoia_read(int addr) {
+-  outw(addr,0x24);
+-  return inw(0x26);
++	led_reg_write(reg);
+ }
+ 
+-void sequoia_write(short value,short addr) {
+-  outw(addr,0x24);
+-  outw(value,0x26);
++static enum led_brightness shark_led_get(struct led_classdev *cdev)
++{
++	struct shark_led *led = container_of(cdev,
++						 struct shark_led, cdev);
++	u16 reg = led_reg_read();
 +
-+	for (i = 0; i <= S5PV210_SPI_SRCCLK_SCLK ; i++) {
-+		sprintf(clk_alias_name, "clk_spi_bus%d", i);
++	return (reg & led->mask) ? LED_FULL : LED_OFF;
+ }
+ 
+-static void sequoia_leds_event(led_event_t evt)
++static int __init shark_leds_init(void)
+ {
+-	unsigned long flags;
+-
+-	spin_lock_irqsave(&leds_lock, flags);
+-
+-	hw_led_state = sequoia_read(0x09);
+-
+-	switch (evt) {
+-	case led_start:
+-		hw_led_state |= SEQUOIA_LED_GREEN;
+-		hw_led_state |= SEQUOIA_LED_AMBER;
+-#ifdef CONFIG_LEDS_CPU
+-		hw_led_state |= SEQUOIA_LED_BACK;
+-#else
+-		hw_led_state &= ~SEQUOIA_LED_BACK;
+-#endif
+-		led_state |= LED_STATE_ENABLED;
+-		break;
+-
+-	case led_stop:
+-		hw_led_state &= ~SEQUOIA_LED_BACK;
+-		hw_led_state |= SEQUOIA_LED_GREEN;
+-		hw_led_state |= SEQUOIA_LED_AMBER;
+-		led_state &= ~LED_STATE_ENABLED;
+-		break;
+-
+-	case led_claim:
+-		led_state |= LED_STATE_CLAIMED;
+-		saved_state = hw_led_state;
+-		hw_led_state &= ~SEQUOIA_LED_BACK;
+-		hw_led_state |= SEQUOIA_LED_GREEN;
+-		hw_led_state |= SEQUOIA_LED_AMBER;
+-		break;
+-
+-	case led_release:
+-		led_state &= ~LED_STATE_CLAIMED;
+-		hw_led_state = saved_state;
+-		break;
+-
+-#ifdef CONFIG_LEDS_TIMER
+-	case led_timer:
+-		if (!(led_state & LED_STATE_CLAIMED))
+-			hw_led_state ^= SEQUOIA_LED_GREEN;
+-		break;
+-#endif
+-
+-#ifdef CONFIG_LEDS_CPU
+-	case led_idle_start:
+-		if (!(led_state & LED_STATE_CLAIMED))
+-			hw_led_state &= ~SEQUOIA_LED_BACK;
+-		break;
+-
+-	case led_idle_end:
+-		if (!(led_state & LED_STATE_CLAIMED))
+-			hw_led_state |= SEQUOIA_LED_BACK;
+-		break;
+-#endif
+-
+-	case led_green_on:
+-		if (led_state & LED_STATE_CLAIMED)
+-			hw_led_state &= ~SEQUOIA_LED_GREEN;
+-		break;
+-
+-	case led_green_off:
+-		if (led_state & LED_STATE_CLAIMED)
+-			hw_led_state |= SEQUOIA_LED_GREEN;
+-		break;
+-
+-	case led_amber_on:
+-		if (led_state & LED_STATE_CLAIMED)
+-			hw_led_state &= ~SEQUOIA_LED_AMBER;
+-		break;
+-
+-	case led_amber_off:
+-		if (led_state & LED_STATE_CLAIMED)
+-			hw_led_state |= SEQUOIA_LED_AMBER;
+-		break;
+-
+-	case led_red_on:
+-		if (led_state & LED_STATE_CLAIMED)
+-			hw_led_state |= SEQUOIA_LED_BACK;
+-		break;
+-
+-	case led_red_off:
+-		if (led_state & LED_STATE_CLAIMED)
+-			hw_led_state &= ~SEQUOIA_LED_BACK;
+-		break;
+-
+-	default:
+-		break;
+-	}
++	int i;
++	u16 reg;
+ 
+-	if  (led_state & LED_STATE_ENABLED)
+-		sequoia_write(hw_led_state,0x09);
++	if (!machine_is_shark())
++		return -ENODEV;
+ 
+-	spin_unlock_irqrestore(&leds_lock, flags);
+-}
++	for (i = 0; i < ARRAY_SIZE(shark_leds); i++) {
++		struct shark_led *led;
+ 
+-static int __init leds_init(void)
+-{
+-	extern void (*leds_event)(led_event_t);
+-	short temp;
+-	
+-	leds_event = sequoia_leds_event;
++		led = kzalloc(sizeof(*led), GFP_KERNEL);
++		if (!led)
++			break;
 +
-+		if (clk_list[i]) {
-+			if (!strcmp(clk_list[i], "pclk"))
-+				ret = clk_add_alias(clk_alias_name, devname,
-+							clk_list[i], NULL);
-+			else
-+				ret = clk_add_alias(clk_alias_name, devname,
-+							clk_list[i], dev);
-+			if (ret) {
-+				printk(KERN_ERR "failed to create alias for"
-+					" SPI%d source clock%d\n", cntrlr, i);
-+				continue;
-+			}
++		led->cdev.name = shark_leds[i].name;
++		led->cdev.brightness_set = shark_led_set;
++		led->cdev.brightness_get = shark_led_get;
++		led->cdev.default_trigger = shark_leds[i].trigger;
++
++		/* Count in 5 bits offset */
++		led->mask = BIT(i + 5);
++
++		if (led_classdev_register(NULL, &led->cdev) < 0) {
++			kfree(led);
++			break;
 +		}
 +	}
- 	pd->num_cs = num_cs;
--	pd->src_clk_nr = src_clk_nr;
--	pd->src_clk_name = spi_src_clks[src_clk_nr];
+ 
+ 	/* Make LEDs independent of power-state */
+-	request_region(0x24,4,"sequoia");
+-	temp = sequoia_read(0x09);
+-	temp |= 1<<10;
+-	sequoia_write(temp,0x09);
+-	leds_event(led_start);
++	request_region(0x24, 4, "led_reg");
++	reg = led_reg_read();
++	reg |= 1 << 10;
++	led_reg_write(reg);
++
+ 	return 0;
  }
-diff --git a/arch/arm/plat-samsung/include/plat/s3c64xx-spi.h b/arch/arm/plat-samsung/include/plat/s3c64xx-spi.h
-index 4c16fa3..acdd337 100644
---- a/arch/arm/plat-samsung/include/plat/s3c64xx-spi.h
-+++ b/arch/arm/plat-samsung/include/plat/s3c64xx-spi.h
-@@ -30,8 +30,6 @@ struct s3c64xx_spi_csinfo {
  
- /**
-  * struct s3c64xx_spi_info - SPI Controller defining structure
-- * @src_clk_nr: Clock source index for the CLK_CFG[SPI_CLKSEL] field.
-- * @src_clk_name: Platform name of the corresponding clock.
-  * @clk_from_cmu: If the SPI clock/prescalar control block is present
-  *     by the platform's clock-management-unit and not in SPI controller.
-  * @num_cs: Number of CS this controller emulates.
-@@ -42,8 +40,6 @@ struct s3c64xx_spi_csinfo {
-  * @tx_st_done: Depends on tx fifo_lvl field
-  */
- struct s3c64xx_spi_info {
--	int src_clk_nr;
--	char *src_clk_name;
- 	bool clk_from_cmu;
- 
- 	int num_cs;
-@@ -61,7 +57,6 @@ struct s3c64xx_spi_info {
-  * s3c64xx_spi_set_info - SPI Controller configure callback by the board
-  *				initialization code.
-  * @cntrlr: SPI controller number the configuration is for.
-- * @src_clk_nr: Clock the SPI controller is to use to generate SPI clocks.
-  * @num_cs: Number of elements in the 'cs' array.
-  *
-  * Call this from machine init code for each SPI Controller that
-@@ -69,7 +64,7 @@ struct s3c64xx_spi_info {
-  */
- extern void s3c64xx_spi_set_info(int cntrlr, int src_clk_nr, int num_cs);
- extern void s5pc100_spi_set_info(int cntrlr, int src_clk_nr, int num_cs);
--extern void s5pv210_spi_set_info(int cntrlr, int src_clk_nr, int num_cs);
-+extern void s5pv210_spi_set_info(int cntrlr, int num_cs, char *clk_list[]);
- extern void s5p64x0_spi_set_info(int cntrlr, int src_clk_nr, int num_cs);
- 
- #endif /* __S3C64XX_PLAT_SPI_H */
+-__initcall(leds_init);
++/*
++ * Since we may have triggers on any subsystem, defer registration
++ * until after subsystem_init.
++ */
++fs_initcall(shark_leds_init);
 -- 
-1.7.0.4
+1.7.5
