@@ -1,66 +1,72 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 10 Aug 2011 11:31:39 +0100
-Subject: [PATCH] ARM errata: Possible cache data corruption with
-	hit-under-miss enabled
-In-Reply-To: <CACY+gR2oofw0wLrPTVyLmmFtLOV347tVnfBicfgOYegi1vEzMQ@mail.gmail.com>
-References: <1312785148-32531-1-git-send-email-siarhei.siamashka@gmail.com>
-	<20110808100233.GG29226@e102109-lin.cambridge.arm.com>
-	<CACY+gR2_Rf7dh91vagJfEB=qgALJf4nigJbFQJz--DweQkZ+Qw@mail.gmail.com>
-	<20110808132631.GA670@e102109-lin.cambridge.arm.com>
-	<CACY+gR2oofw0wLrPTVyLmmFtLOV347tVnfBicfgOYegi1vEzMQ@mail.gmail.com>
-Message-ID: <20110810103139.GD7464@e102109-lin.cambridge.arm.com>
+Date: Wed, 10 Aug 2011 11:26:46 +0100
+Subject: [PATCH 1/1] ARM errata: Possible cache data corruption with hit-under-miss enabled
+Message-ID: <mailman.61.1312972314.20020.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 09, 2011 at 11:06:55PM +0100, Siarhei Siamashka wrote:
-> On Mon, Aug 8, 2011 at 4:26 PM, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > On Mon, Aug 08, 2011 at 12:43:00PM +0100, Siarhei Siamashka wrote:
-> >> On Mon, Aug 8, 2011 at 1:02 PM, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> >> > On Mon, Aug 08, 2011 at 07:32:28AM +0100, Siarhei Siamashka wrote:
-> >> >> From: Catalin Marinas <catalin.marinas@arm.com>
-> >> >>
-> >> >> This patch is a workaround for the 364296 ARM1136 r0pX erratum (possible
-> >> >> cache data corruption with hit-under-miss enabled). It sets the
-> >> >> undocumented bit 31 in the auxiliary control register and the FI bit in
-> >> >> the control register, thus disabling hit-under-miss without putting the
-> >> >> processor into full low interrupt latency mode.
-> >> >>
-> >> >> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-> >> >> Tested-by: Siarhei Siamashka <siarhei.siamashka@gmail.com>
-> >> >
-> >> > I haven't pushed this workaround in the past as I wasn't sure there is
-> >> > production hardware affected. I recall you mentioned Nokia N800, do you
-> >> > know which CPU revision does this have?
-> >>
-> >> [ ? ?0.000000] CPU: ARMv6-compatible processor [4107b362] revision 2
-> >> (ARMv6TEJ), cr=00e5387f
-> >> [ ? ?0.000000] CPU: VIPT aliasing data cache, unknown instruction
-> >> cache
-> >> [ ? ?0.000000] Machine: Nokia N810
-> >> [ ? ?0.000000] Memory policy: ECC disabled, Data cache writeback
-> >> [ ? ?0.000000] OMAP2420
-> >>
-> >> # cat /proc/cpuinfo
-> >> Processor ? ? ? : ARMv6-compatible processor rev 2 (v6l)
-> >> BogoMIPS ? ? ? ?: 213.72
-> >> Features ? ? ? ?: swp half thumb fastmult vfp edsp java
-> >> CPU implementer : 0x41
-> >> CPU architecture: 6TEJ
-> >> CPU variant ? ? : 0x0
-> >> CPU part ? ? ? ?: 0xb36
-> >> CPU revision ? ?: 2
-> >>
-> >> Hardware ? ? ? ?: Nokia N810
-> >> Revision ? ? ? ?: 0000
-> >> Serial ? ? ? ? ?: 0000000000000000
-> > ...
-> >> Would you be so kind to update the patch?
-> >
-> > OK, I'll update it and post the patch in the next day or so.
-> 
-> Thanks a lot. I'll be sure to test it and respond to confirm that it
-> works fine (or not).
+This patch is a workaround for the 364296 ARM1136 r0p2 erratum (possible
+cache data corruption with hit-under-miss enabled). It sets the
+undocumented bit 31 in the auxiliary control register and the FI bit in
+the control register, thus disabling hit-under-miss without putting the
+processor into full low interrupt latency mode.
 
-See below. Thanks.
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+---
+ arch/arm/Kconfig      |   12 ++++++++++++
+ arch/arm/mm/proc-v6.S |   16 ++++++++++++++++
+ 2 files changed, 28 insertions(+), 0 deletions(-)
 
-8<------------------------
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 2c71a8f..30335e1 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1272,6 +1272,18 @@ config ARM_ERRATA_754327
+ 	  This workaround defines cpu_relax() as smp_mb(), preventing correctly
+ 	  written polling loops from denying visibility of updates to memory.
+ 
++config ARM_ERRATA_364296
++	bool "ARM errata: Possible cache data corruption with hit-under-miss enabled"
++	depends on CPU_V6 && !SMP
++	help
++	  This options enables the workaround for the 364296 ARM1136
++	  r0p2 erratum (possible cache data corruption with
++	  hit-under-miss enabled). It sets the undocumented bit 31 in
++	  the auxiliary control register and the FI bit in the control
++	  register, thus disabling hit-under-miss without putting the
++	  processor into full low interrupt latency mode. ARM11MPCore
++	  is not affected.
++
+ endmenu
+ 
+ source "arch/arm/common/Kconfig"
+diff --git a/arch/arm/mm/proc-v6.S b/arch/arm/mm/proc-v6.S
+index 219138d..a923aa0 100644
+--- a/arch/arm/mm/proc-v6.S
++++ b/arch/arm/mm/proc-v6.S
+@@ -223,6 +223,22 @@ __v6_setup:
+ 	mrc	p15, 0, r0, c1, c0, 0		@ read control register
+ 	bic	r0, r0, r5			@ clear bits them
+ 	orr	r0, r0, r6			@ set them
++#ifdef CONFIG_ARM_ERRATA_364296
++	/*
++	 * Workaround for the 364296 ARM1136 r0p2 erratum (possible cache data
++	 * corruption with hit-under-miss enabled). The conditional code below
++	 * (setting the undocumented bit 31 in the auxiliary control register
++	 * and the FI bit in the control register) disables hit-under-miss
++	 * without putting the processor into full low interrupt latency mode.
++	 */
++	ldr	r6, =0x4107b362			@ id for ARM1136 r0p2
++	mrc	p15, 0, r5, c0, c0, 0		@ get processor id
++	teq	r5, r6				@ check for the faulty core
++	mrceq	p15, 0, r5, c1, c0, 1		@ load aux control reg
++	orreq	r5, r5, #(1 << 31)		@ set the undocumented bit 31
++	mcreq	p15, 0, r5, c1, c0, 1		@ write aux control reg
++	orreq	r0, r0, #(1 << 21)		@ low interrupt latency configuration
++#endif
+ 	mov	pc, lr				@ return to head.S:__ret
+ 
+ 	/*
+
+-- 
+Catalin
