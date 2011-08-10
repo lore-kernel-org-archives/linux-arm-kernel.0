@@ -1,305 +1,313 @@
-From: bryan.wu@canonical.com (Bryan Wu)
-Date: Wed, 10 Aug 2011 20:05:40 +0800
-Subject: [PATCH 06/18] mach-shark: retire custom LED code
-In-Reply-To: <1312977952-2272-1-git-send-email-bryan.wu@canonical.com>
-References: <1312977952-2272-1-git-send-email-bryan.wu@canonical.com>
-Message-ID: <1312977952-2272-7-git-send-email-bryan.wu@canonical.com>
+From: padma.v@samsung.com (Padmavathi Venna)
+Date: Wed, 10 Aug 2011 14:04:21 -0400
+Subject: [RFC][PATCH V2 2/2] spi: s3c64xx: Use clkdev for bus clock lookup
+Message-ID: <1312999461-15589-1-git-send-email-padma.v@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The CPU activity LED is now handled by the trigger in the leds
-subsystem, retire this old CONFIG_LEDS-based code.
+SPI driver is modified to lookup the bus clock using the
+alias name instead of getting clock name and clock
+number from platform data.
 
-Signed-off-by: Bryan Wu <bryan.wu@canonical.com>
+Driver is modified to get the best source clock among the
+available source clocks for the required frequency.At a time
+it enables only the required clock for the required frequency.
+
+Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
 ---
- arch/arm/mach-shark/Makefile |    4 +-
- arch/arm/mach-shark/core.c   |    1 -
- arch/arm/mach-shark/leds.c   |  225 ++++++++++++++++--------------------------
- 3 files changed, 87 insertions(+), 143 deletions(-)
+ drivers/spi/spi_s3c64xx.c |  164 ++++++++++++++++++++++++++++++---------------
+ 1 files changed, 110 insertions(+), 54 deletions(-)
 
-diff --git a/arch/arm/mach-shark/Makefile b/arch/arm/mach-shark/Makefile
-index 45be9b0..2965718 100644
---- a/arch/arm/mach-shark/Makefile
-+++ b/arch/arm/mach-shark/Makefile
-@@ -4,9 +4,7 @@
+diff --git a/drivers/spi/spi_s3c64xx.c b/drivers/spi/spi_s3c64xx.c
+index 8945e20..6c4fc1b 100644
+--- a/drivers/spi/spi_s3c64xx.c
++++ b/drivers/spi/spi_s3c64xx.c
+@@ -132,6 +132,9 @@
+ #define RXBUSY    (1<<2)
+ #define TXBUSY    (1<<3)
  
- # Object file lists.
- 
--obj-y			:= core.o dma.o irq.o pci.o
-+obj-y			:= core.o dma.o irq.o pci.o leds.o
- obj-m			:=
- obj-n			:=
- obj-			:=
--
--obj-$(CONFIG_LEDS)	+= leds.o
-diff --git a/arch/arm/mach-shark/core.c b/arch/arm/mach-shark/core.c
-index ac2873c..36b6b87 100644
---- a/arch/arm/mach-shark/core.c
-+++ b/arch/arm/mach-shark/core.c
-@@ -13,7 +13,6 @@
- 
- #include <asm/setup.h>
- #include <asm/mach-types.h>
--#include <asm/leds.h>
- #include <asm/param.h>
- 
- #include <asm/mach/map.h>
-diff --git a/arch/arm/mach-shark/leds.c b/arch/arm/mach-shark/leds.c
-index c9e32de..ee3751e 100644
---- a/arch/arm/mach-shark/leds.c
-+++ b/arch/arm/mach-shark/leds.c
-@@ -1,166 +1,113 @@
- /*
-- * arch/arm/mach-shark/leds.c
-- * by Alexander Schulz
-- *
-- * derived from:
-- * arch/arm/kernel/leds-footbridge.c
-- * Copyright (C) 1998-1999 Russell King
-- *
-  * DIGITAL Shark LED control routines.
-  *
-- * The leds use is as follows:
-- *  - Green front - toggles state every 50 timer interrupts
-- *  - Amber front - Unused, this is a dual color led (Amber/Green)
-- *  - Amber back  - On if system is not idle
-+ * Driver for the 3 user LEDs found on the Shark
-+ * Based on Versatile and RealView machine LED code
-  *
-- * Changelog:
-+ * License terms: GNU General Public License (GPL) version 2
-+ * Author: Bryan Wu <bryan.wu@canonical.com>
-  */
- #include <linux/kernel.h>
--#include <linux/module.h>
- #include <linux/init.h>
--#include <linux/spinlock.h>
--#include <linux/ioport.h>
- #include <linux/io.h>
-+#include <linux/ioport.h>
-+#include <linux/slab.h>
-+#include <linux/leds.h>
- 
--#include <asm/leds.h>
--#include <asm/system.h>
-+struct shark_led {
-+	struct led_classdev cdev;
-+	u8 mask;
-+};
- 
--#define LED_STATE_ENABLED	1
--#define LED_STATE_CLAIMED	2
-+/*
-+ * The triggers lines up below will only be used if the
-+ * LED triggers are compiled in.
-+ */
-+static const struct {
-+	const char *name;
-+	const char *trigger;
-+} shark_leds[] = {
-+	{ "shark:amber0", "default-on", },	/* Bit 5 */
-+	{ "shark:green", "heartbeat", },	/* Bit 6 */
-+	{ "shark:amber1", "cpu0" },		/* Bit 7 */
-+};
++#define MAX_SPI_BUS_CLK 4
++#define MAX_PSR 256
 +
-+static u16 led_reg_read(void)
-+{
-+	outw(0x09, 0x24);
-+	return inw(0x26);
-+}
+ /**
+  * struct s3c64xx_spi_driver_data - Runtime info holder for SPI driver.
+  * @clk: Pointer to the spi clock.
+@@ -172,6 +175,9 @@ struct s3c64xx_spi_driver_data {
+ 	unsigned                        state;
+ 	unsigned                        cur_mode, cur_bpw;
+ 	unsigned                        cur_speed;
++	struct clk                      *bus_clk_list[MAX_SPI_BUS_CLK];
++	unsigned                        cur_clk;
++	unsigned                        old_spd;
+ };
  
--#define SEQUOIA_LED_GREEN       (1<<6)
--#define SEQUOIA_LED_AMBER       (1<<5)
--#define SEQUOIA_LED_BACK        (1<<7)
-+static void led_reg_write(u16 value)
-+{
-+	outw(0x09, 0x24);
-+	outw(value, 0x26);
-+}
- 
--static char led_state;
--static short hw_led_state;
--static short saved_state;
-+static void shark_led_set(struct led_classdev *cdev,
-+			      enum led_brightness b)
-+{
-+	struct shark_led *led = container_of(cdev,
-+						 struct shark_led, cdev);
-+	u16 reg = led_reg_read();
- 
--static DEFINE_SPINLOCK(leds_lock);
-+	if (b != LED_OFF)
-+		reg |= led->mask;
-+	else
-+		reg &= ~led->mask;
- 
--short sequoia_read(int addr) {
--  outw(addr,0x24);
--  return inw(0x26);
-+	led_reg_write(reg);
+ static struct s3c2410_dma_client s3c64xx_spi_dma_client = {
+@@ -411,6 +417,65 @@ static inline void disable_cs(struct s3c64xx_spi_driver_data *sdd,
+ 	cs->set_level(cs->line, spi->mode & SPI_CS_HIGH ? 0 : 1);
  }
  
--void sequoia_write(short value,short addr) {
--  outw(addr,0x24);
--  outw(value,0x26);
-+static enum led_brightness shark_led_get(struct led_classdev *cdev)
++static int s3c64xx_spi_best_clk_src(struct spi_device *spi)
 +{
-+	struct shark_led *led = container_of(cdev,
-+						 struct shark_led, cdev);
-+	u16 reg = led_reg_read();
++	struct s3c64xx_spi_driver_data *sdd;
++	struct clk *clksrc;
++	unsigned long rate;
++	unsigned int delta;
++	unsigned int best = UINT_MAX;
++	int psr, div, i, best_div, best_src;
 +
-+	return (reg & led->mask) ? LED_FULL : LED_OFF;
- }
- 
--static void sequoia_leds_event(led_event_t evt)
-+static int __init shark_leds_init(void)
- {
--	unsigned long flags;
--
--	spin_lock_irqsave(&leds_lock, flags);
--
--	hw_led_state = sequoia_read(0x09);
--
--	switch (evt) {
--	case led_start:
--		hw_led_state |= SEQUOIA_LED_GREEN;
--		hw_led_state |= SEQUOIA_LED_AMBER;
--#ifdef CONFIG_LEDS_CPU
--		hw_led_state |= SEQUOIA_LED_BACK;
--#else
--		hw_led_state &= ~SEQUOIA_LED_BACK;
--#endif
--		led_state |= LED_STATE_ENABLED;
--		break;
--
--	case led_stop:
--		hw_led_state &= ~SEQUOIA_LED_BACK;
--		hw_led_state |= SEQUOIA_LED_GREEN;
--		hw_led_state |= SEQUOIA_LED_AMBER;
--		led_state &= ~LED_STATE_ENABLED;
--		break;
--
--	case led_claim:
--		led_state |= LED_STATE_CLAIMED;
--		saved_state = hw_led_state;
--		hw_led_state &= ~SEQUOIA_LED_BACK;
--		hw_led_state |= SEQUOIA_LED_GREEN;
--		hw_led_state |= SEQUOIA_LED_AMBER;
--		break;
--
--	case led_release:
--		led_state &= ~LED_STATE_CLAIMED;
--		hw_led_state = saved_state;
--		break;
--
--#ifdef CONFIG_LEDS_TIMER
--	case led_timer:
--		if (!(led_state & LED_STATE_CLAIMED))
--			hw_led_state ^= SEQUOIA_LED_GREEN;
--		break;
--#endif
--
--#ifdef CONFIG_LEDS_CPU
--	case led_idle_start:
--		if (!(led_state & LED_STATE_CLAIMED))
--			hw_led_state &= ~SEQUOIA_LED_BACK;
--		break;
--
--	case led_idle_end:
--		if (!(led_state & LED_STATE_CLAIMED))
--			hw_led_state |= SEQUOIA_LED_BACK;
--		break;
--#endif
--
--	case led_green_on:
--		if (led_state & LED_STATE_CLAIMED)
--			hw_led_state &= ~SEQUOIA_LED_GREEN;
--		break;
--
--	case led_green_off:
--		if (led_state & LED_STATE_CLAIMED)
--			hw_led_state |= SEQUOIA_LED_GREEN;
--		break;
--
--	case led_amber_on:
--		if (led_state & LED_STATE_CLAIMED)
--			hw_led_state &= ~SEQUOIA_LED_AMBER;
--		break;
--
--	case led_amber_off:
--		if (led_state & LED_STATE_CLAIMED)
--			hw_led_state |= SEQUOIA_LED_AMBER;
--		break;
--
--	case led_red_on:
--		if (led_state & LED_STATE_CLAIMED)
--			hw_led_state |= SEQUOIA_LED_BACK;
--		break;
--
--	case led_red_off:
--		if (led_state & LED_STATE_CLAIMED)
--			hw_led_state &= ~SEQUOIA_LED_BACK;
--		break;
--
--	default:
--		break;
--	}
-+	int i;
-+	u16 reg;
- 
--	if  (led_state & LED_STATE_ENABLED)
--		sequoia_write(hw_led_state,0x09);
-+	if (!machine_is_shark())
-+		return -ENODEV;
- 
--	spin_unlock_irqrestore(&leds_lock, flags);
--}
-+	for (i = 0; i < ARRAY_SIZE(shark_leds); i++) {
-+		struct shark_led *led;
- 
--static int __init leds_init(void)
--{
--	extern void (*leds_event)(led_event_t);
--	short temp;
--	
--	leds_event = sequoia_leds_event;
-+		led = kzalloc(sizeof(*led), GFP_KERNEL);
-+		if (!led)
-+			break;
++	sdd = spi_master_get_devdata(spi->master);
 +
-+		led->cdev.name = shark_leds[i].name;
-+		led->cdev.brightness_set = shark_led_set;
-+		led->cdev.brightness_get = shark_led_get;
-+		led->cdev.default_trigger = shark_leds[i].trigger;
++	for (i = 0; i < MAX_SPI_BUS_CLK; i++) {
++		clksrc = sdd->bus_clk_list[i];
++		if (!clksrc)
++			delta = UINT_MAX;
++		else {
++			rate = clk_get_rate(clksrc);
++			for (psr = 0; psr < MAX_PSR; psr++) {
++				div = (2 * (psr + 1));
++				if ((rate / div) <= spi->max_speed_hz)
++					break;
++			}
 +
-+		/* Count in 5 bits offset */
-+		led->mask = BIT(i + 5);
++			if (psr == MAX_PSR &&
++				((rate / div) > spi->max_speed_hz)) {
++				dev_dbg(&spi->dev, "clock%d can't support"
++					" required frequency\n", i);
++				continue;
++			} else {
++				delta = spi->max_speed_hz - (rate / div);
++				dev_dbg(&spi->dev, "clk %d: rate %lu,"
++					" want %u, got %lu div:%d delta:%u\n",
++					i, rate, spi->max_speed_hz,
++					rate / div, div, delta);
++			}
++		}
 +
-+		if (led_classdev_register(NULL, &led->cdev) < 0) {
-+			kfree(led);
-+			break;
++		if (delta < best) {
++			best = delta;
++			best_src = i;
++			best_div = div;
 +		}
 +	}
- 
- 	/* Make LEDs independent of power-state */
--	request_region(0x24,4,"sequoia");
--	temp = sequoia_read(0x09);
--	temp |= 1<<10;
--	sequoia_write(temp,0x09);
--	leds_event(led_start);
-+	request_region(0x24, 4, "led_reg");
-+	reg = led_reg_read();
-+	reg |= 1 << 10;
-+	led_reg_write(reg);
 +
- 	return 0;
- }
++	if (best == UINT_MAX) {
++		dev_err(&spi->dev, "no clock can support required "
++			"frequency\n");
++		return -EINVAL;
++	}
++
++	if (sdd->cur_clk != best_src) {
++		clk_disable(sdd->src_clk);
++		sdd->cur_clk = best_src;
++		sdd->src_clk = sdd->bus_clk_list[best_src];
++		clk_enable(sdd->src_clk);
++	}
++	return best_div;
++}
++
+ static void s3c64xx_spi_config(struct s3c64xx_spi_driver_data *sdd)
+ {
+ 	struct s3c64xx_spi_info *sci = sdd->cntrlr_info;
+@@ -470,6 +535,9 @@ static void s3c64xx_spi_config(struct s3c64xx_spi_driver_data *sdd)
+ 		clk_enable(sdd->src_clk);
+ 	} else {
+ 		/* Configure Clock */
++		writel(sdd->cur_clk << S3C64XX_SPI_CLKSEL_SRCSHFT,
++			regs + S3C64XX_SPI_CLK_CFG);
++
+ 		val = readl(regs + S3C64XX_SPI_CLK_CFG);
+ 		val &= ~S3C64XX_SPI_PSR_MASK;
+ 		val |= ((clk_get_rate(sdd->src_clk) / sdd->cur_speed / 2 - 1)
+@@ -845,6 +913,7 @@ static int s3c64xx_spi_setup(struct spi_device *spi)
+ 	struct spi_message *msg;
+ 	unsigned long flags;
+ 	int err = 0;
++	int div;
  
--__initcall(leds_init);
-+/*
-+ * Since we may have triggers on any subsystem, defer registration
-+ * until after subsystem_init.
-+ */
-+fs_initcall(shark_leds_init);
+ 	if (cs == NULL || cs->set_level == NULL) {
+ 		dev_err(&spi->dev, "No CS for SPI(%d)\n", spi->chip_select);
+@@ -884,38 +953,18 @@ static int s3c64xx_spi_setup(struct spi_device *spi)
+ 		goto setup_exit;
+ 	}
+ 
+-	/* Check if we can provide the requested rate */
++	/* Get the best clock source for the requested rate */
+ 	if (!sci->clk_from_cmu) {
+-		u32 psr, speed;
+-
+-		/* Max possible */
+-		speed = clk_get_rate(sdd->src_clk) / 2 / (0 + 1);
+-
+-		if (spi->max_speed_hz > speed)
+-			spi->max_speed_hz = speed;
+-
+-		psr = clk_get_rate(sdd->src_clk) / 2 / spi->max_speed_hz - 1;
+-		psr &= S3C64XX_SPI_PSR_MASK;
+-		if (psr == S3C64XX_SPI_PSR_MASK)
+-			psr--;
+-
+-		speed = clk_get_rate(sdd->src_clk) / 2 / (psr + 1);
+-		if (spi->max_speed_hz < speed) {
+-			if (psr+1 < S3C64XX_SPI_PSR_MASK) {
+-				psr++;
+-			} else {
+-				err = -EINVAL;
++		if (sdd->old_spd != spi->max_speed_hz) {
++			div = s3c64xx_spi_best_clk_src(spi);
++			if (div <= 0) {
++				err = div;
+ 				goto setup_exit;
+ 			}
++			spi->max_speed_hz = clk_get_rate(sdd->src_clk) / div;
++			sdd->old_spd = spi->max_speed_hz;
+ 		}
+-
+-		speed = clk_get_rate(sdd->src_clk) / 2 / (psr + 1);
+-		if (spi->max_speed_hz >= speed)
+-			spi->max_speed_hz = speed;
+-		else
+-			err = -EINVAL;
+ 	}
+-
+ setup_exit:
+ 
+ 	/* setup() returns with device de-selected */
+@@ -926,7 +975,6 @@ setup_exit:
+ 
+ static void s3c64xx_spi_hwinit(struct s3c64xx_spi_driver_data *sdd, int channel)
+ {
+-	struct s3c64xx_spi_info *sci = sdd->cntrlr_info;
+ 	void __iomem *regs = sdd->regs;
+ 	unsigned int val;
+ 
+@@ -936,10 +984,6 @@ static void s3c64xx_spi_hwinit(struct s3c64xx_spi_driver_data *sdd, int channel)
+ 
+ 	/* Disable Interrupts - we use Polling if not DMA mode */
+ 	writel(0, regs + S3C64XX_SPI_INT_EN);
+-
+-	if (!sci->clk_from_cmu)
+-		writel(sci->src_clk_nr << S3C64XX_SPI_CLKSEL_SRCSHFT,
+-				regs + S3C64XX_SPI_CLK_CFG);
+ 	writel(0, regs + S3C64XX_SPI_MODE_CFG);
+ 	writel(0, regs + S3C64XX_SPI_PACKET_CNT);
+ 
+@@ -964,7 +1008,10 @@ static int __init s3c64xx_spi_probe(struct platform_device *pdev)
+ 	struct s3c64xx_spi_driver_data *sdd;
+ 	struct s3c64xx_spi_info *sci;
+ 	struct spi_master *master;
+-	int ret;
++	char clk_alias_name[16];
++	int ret, i;
++	int clk_found = 0;
++
+ 
+ 	if (pdev->id < 0) {
+ 		dev_err(&pdev->dev,
+@@ -978,11 +1025,6 @@ static int __init s3c64xx_spi_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	sci = pdev->dev.platform_data;
+-	if (!sci->src_clk_name) {
+-		dev_err(&pdev->dev,
+-			"Board init must call s3c64xx_spi_set_info()\n");
+-		return -EINVAL;
+-	}
+ 
+ 	/* Check for availability of necessary resource */
+ 
+@@ -1065,19 +1107,29 @@ static int __init s3c64xx_spi_probe(struct platform_device *pdev)
+ 		goto err4;
+ 	}
+ 
+-	sdd->src_clk = clk_get(&pdev->dev, sci->src_clk_name);
+-	if (IS_ERR(sdd->src_clk)) {
+-		dev_err(&pdev->dev,
+-			"Unable to acquire clock '%s'\n", sci->src_clk_name);
+-		ret = PTR_ERR(sdd->src_clk);
++	for (i = 0; i < MAX_SPI_BUS_CLK; i++) {
++		struct clk *clk;
++		sprintf(clk_alias_name, "clk_spi_bus%d", i);
++
++		clk = clk_get(&pdev->dev, clk_alias_name);
++		if (IS_ERR(clk)) {
++			sdd->bus_clk_list[i] = NULL;
++			continue;
++		}
++		sdd->bus_clk_list[i] = clk;
++		sdd->src_clk = clk;
++		sdd->cur_clk = i;
++		clk_found++;
++	}
++	if (!clk_found) {
++		dev_err(&pdev->dev, "Unable to acquire SPI bus clocks\n");
+ 		goto err5;
+ 	}
+ 
+-	if (clk_enable(sdd->src_clk)) {
+-		dev_err(&pdev->dev, "Couldn't enable clock '%s'\n",
+-							sci->src_clk_name);
++	if (clk_enable(sdd->src_clk) && sci->clk_from_cmu) {
++		dev_err(&pdev->dev, "Couldn't enable bus clock 'spi'\n");
+ 		ret = -EBUSY;
+-		goto err6;
++		goto err5;
+ 	}
+ 
+ 	sdd->workqueue = create_singlethread_workqueue(
+@@ -1085,7 +1137,7 @@ static int __init s3c64xx_spi_probe(struct platform_device *pdev)
+ 	if (sdd->workqueue == NULL) {
+ 		dev_err(&pdev->dev, "Unable to create workqueue\n");
+ 		ret = -ENOMEM;
+-		goto err7;
++		goto err6;
+ 	}
+ 
+ 	/* Setup Deufult Mode */
+@@ -1099,7 +1151,7 @@ static int __init s3c64xx_spi_probe(struct platform_device *pdev)
+ 	if (spi_register_master(master)) {
+ 		dev_err(&pdev->dev, "cannot register SPI master\n");
+ 		ret = -EBUSY;
+-		goto err8;
++		goto err7;
+ 	}
+ 
+ 	dev_dbg(&pdev->dev, "Samsung SoC SPI Driver loaded for Bus SPI-%d "
+@@ -1111,12 +1163,13 @@ static int __init s3c64xx_spi_probe(struct platform_device *pdev)
+ 
+ 	return 0;
+ 
+-err8:
+-	destroy_workqueue(sdd->workqueue);
+ err7:
+-	clk_disable(sdd->src_clk);
++	destroy_workqueue(sdd->workqueue);
+ err6:
+-	clk_put(sdd->src_clk);
++	clk_disable(sdd->src_clk);
++	for (i = 0; i < MAX_SPI_BUS_CLK; i++)
++		if (sdd->bus_clk_list[i])
++			clk_put(sdd->bus_clk_list[i]);
+ err5:
+ 	clk_disable(sdd->clk);
+ err4:
+@@ -1139,6 +1192,7 @@ static int s3c64xx_spi_remove(struct platform_device *pdev)
+ 	struct s3c64xx_spi_driver_data *sdd = spi_master_get_devdata(master);
+ 	struct resource	*mem_res;
+ 	unsigned long flags;
++	int i;
+ 
+ 	spin_lock_irqsave(&sdd->lock, flags);
+ 	sdd->state |= SUSPND;
+@@ -1152,7 +1206,9 @@ static int s3c64xx_spi_remove(struct platform_device *pdev)
+ 	destroy_workqueue(sdd->workqueue);
+ 
+ 	clk_disable(sdd->src_clk);
+-	clk_put(sdd->src_clk);
++	for (i = 0; i < MAX_SPI_BUS_CLK; i++)
++		if (sdd->bus_clk_list[i])
++			clk_put(sdd->bus_clk_list[i]);
+ 
+ 	clk_disable(sdd->clk);
+ 	clk_put(sdd->clk);
 -- 
-1.7.5
+1.7.0.4
