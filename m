@@ -1,182 +1,142 @@
-From: bryan.wu@canonical.com (Bryan Wu)
-Date: Wed, 10 Aug 2011 20:05:39 +0800
-Subject: [PATCH 05/18] mach-ks8695: remove leds driver, since nobody use it
-In-Reply-To: <1312977952-2272-1-git-send-email-bryan.wu@canonical.com>
-References: <1312977952-2272-1-git-send-email-bryan.wu@canonical.com>
-Message-ID: <1312977952-2272-6-git-send-email-bryan.wu@canonical.com>
+From: padma.v@samsung.com (Padmavathi Venna)
+Date: Wed, 10 Aug 2011 14:03:34 -0400
+Subject: [RFC][PATCH V2 1/2] S5PV210: SPI: Add clkdev support
+Message-ID: <1312999414-14051-1-git-send-email-padma.v@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Bryan Wu <bryan.wu@canonical.com>
-Acked-by: Andrew Victor <linux@maxim.org.za>
----
- arch/arm/mach-ks8695/Makefile               |    3 -
- arch/arm/mach-ks8695/devices.c              |   21 ------
- arch/arm/mach-ks8695/include/mach/devices.h |    5 --
- arch/arm/mach-ks8695/leds.c                 |   93 ---------------------------
- 4 files changed, 0 insertions(+), 122 deletions(-)
- delete mode 100644 arch/arm/mach-ks8695/leds.c
+Create a clkdev alias for spi bus clock and modify the spi
+driver to lookup the clock using the alias name instead of
+passing clock name and clock number from SPI platform data.
 
-diff --git a/arch/arm/mach-ks8695/Makefile b/arch/arm/mach-ks8695/Makefile
-index 7e3e816..39c7d3c 100644
---- a/arch/arm/mach-ks8695/Makefile
-+++ b/arch/arm/mach-ks8695/Makefile
-@@ -11,9 +11,6 @@ obj-				:=
- # PCI support is optional
- obj-$(CONFIG_PCI)		+= pci.o
+Board designer has the option to pass the list of bus clocks
+that are going to be used with SPI controller.If that list of
+clocks are null then it uses all the available clocks.
+
+Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+---
+This patch is tested for S5PV210 platform and similar
+changes can be adopted for rest of the Samsung's s3c
+and s5p platforms, if this approach is accepted.
+
+ arch/arm/mach-s5pv210/dev-spi.c                  |   38 +++++++++++++++++++---
+ arch/arm/plat-samsung/include/plat/s3c64xx-spi.h |    7 +---
+ 2 files changed, 34 insertions(+), 11 deletions(-)
+
+diff --git a/arch/arm/mach-s5pv210/dev-spi.c b/arch/arm/mach-s5pv210/dev-spi.c
+index eaf9a7b..503a3f4 100644
+--- a/arch/arm/mach-s5pv210/dev-spi.c
++++ b/arch/arm/mach-s5pv210/dev-spi.c
+@@ -11,6 +11,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/dma-mapping.h>
+ #include <linux/gpio.h>
++#include <linux/clk.h>
  
--# LEDs
--obj-$(CONFIG_LEDS)		+= leds.o
--
- # Board-specific support
- obj-$(CONFIG_MACH_KS8695)	+= board-micrel.o
- obj-$(CONFIG_MACH_DSM320)	+= board-dsm320.o
-diff --git a/arch/arm/mach-ks8695/devices.c b/arch/arm/mach-ks8695/devices.c
-index b89fb6d..5ebf45d 100644
---- a/arch/arm/mach-ks8695/devices.c
-+++ b/arch/arm/mach-ks8695/devices.c
-@@ -181,27 +181,6 @@ static void __init ks8695_add_device_watchdog(void)
+ #include <mach/dma.h>
+ #include <mach/map.h>
+@@ -145,13 +146,16 @@ struct platform_device s5pv210_device_spi1 = {
+ 	},
+ };
+ 
+-void __init s5pv210_spi_set_info(int cntrlr, int src_clk_nr, int num_cs)
++void __init s5pv210_spi_set_info(int cntrlr, int num_cs, char *list[])
+ {
+ 	struct s3c64xx_spi_info *pd;
++	struct device *dev;
++	char devname[16], clk_alias_name[16];
++	int ret, i;
++	char **clk_list;
+ 
+ 	/* Reject invalid configuration */
+-	if (!num_cs || src_clk_nr < 0
+-			|| src_clk_nr > S5PV210_SPI_SRCCLK_SCLK) {
++	if (!num_cs) {
+ 		printk(KERN_ERR "%s: Invalid SPI configuration\n", __func__);
+ 		return;
+ 	}
+@@ -159,9 +163,11 @@ void __init s5pv210_spi_set_info(int cntrlr, int src_clk_nr, int num_cs)
+ 	switch (cntrlr) {
+ 	case 0:
+ 		pd = &s5pv210_spi0_pdata;
++		dev = &s5pv210_device_spi0.dev;
+ 		break;
+ 	case 1:
+ 		pd = &s5pv210_spi1_pdata;
++		dev = &s5pv210_device_spi1.dev;
+ 		break;
+ 	default:
+ 		printk(KERN_ERR "%s: Invalid SPI controller(%d)\n",
+@@ -169,7 +175,29 @@ void __init s5pv210_spi_set_info(int cntrlr, int src_clk_nr, int num_cs)
+ 		return;
+ 	}
+ 
++	sprintf(devname, "s3c64xx-spi.%d", cntrlr);
++
++	if (list)
++		clk_list = list;
++	else
++		clk_list = spi_src_clks;
++
++	for (i = 0; i <= S5PV210_SPI_SRCCLK_SCLK ; i++) {
++		sprintf(clk_alias_name, "clk_spi_bus%d", i);
++
++		if (clk_list[i]) {
++			if (!strcmp(clk_list[i], "pclk"))
++				ret = clk_add_alias(clk_alias_name, devname,
++							clk_list[i], NULL);
++			else
++				ret = clk_add_alias(clk_alias_name, devname,
++							clk_list[i], dev);
++			if (ret) {
++				printk(KERN_ERR "failed to create alias for"
++					" SPI%d source clock%d\n", cntrlr, i);
++				continue;
++			}
++		}
++	}
+ 	pd->num_cs = num_cs;
+-	pd->src_clk_nr = src_clk_nr;
+-	pd->src_clk_name = spi_src_clks[src_clk_nr];
  }
+diff --git a/arch/arm/plat-samsung/include/plat/s3c64xx-spi.h b/arch/arm/plat-samsung/include/plat/s3c64xx-spi.h
+index 4c16fa3..acdd337 100644
+--- a/arch/arm/plat-samsung/include/plat/s3c64xx-spi.h
++++ b/arch/arm/plat-samsung/include/plat/s3c64xx-spi.h
+@@ -30,8 +30,6 @@ struct s3c64xx_spi_csinfo {
  
+ /**
+  * struct s3c64xx_spi_info - SPI Controller defining structure
+- * @src_clk_nr: Clock source index for the CLK_CFG[SPI_CLKSEL] field.
+- * @src_clk_name: Platform name of the corresponding clock.
+  * @clk_from_cmu: If the SPI clock/prescalar control block is present
+  *     by the platform's clock-management-unit and not in SPI controller.
+  * @num_cs: Number of CS this controller emulates.
+@@ -42,8 +40,6 @@ struct s3c64xx_spi_csinfo {
+  * @tx_st_done: Depends on tx fifo_lvl field
+  */
+ struct s3c64xx_spi_info {
+-	int src_clk_nr;
+-	char *src_clk_name;
+ 	bool clk_from_cmu;
  
--/* --------------------------------------------------------------------
-- *  LEDs
-- * -------------------------------------------------------------------- */
--
--#if defined(CONFIG_LEDS)
--short ks8695_leds_cpu = -1;
--short ks8695_leds_timer = -1;
--
--void __init ks8695_init_leds(u8 cpu_led, u8 timer_led)
--{
--	/* Enable GPIO to access the LEDs */
--	gpio_direction_output(cpu_led, 1);
--	gpio_direction_output(timer_led, 1);
--
--	ks8695_leds_cpu	  = cpu_led;
--	ks8695_leds_timer = timer_led;
--}
--#else
--void __init ks8695_init_leds(u8 cpu_led, u8 timer_led) {}
--#endif
--
- /* -------------------------------------------------------------------- */
+ 	int num_cs;
+@@ -61,7 +57,6 @@ struct s3c64xx_spi_info {
+  * s3c64xx_spi_set_info - SPI Controller configure callback by the board
+  *				initialization code.
+  * @cntrlr: SPI controller number the configuration is for.
+- * @src_clk_nr: Clock the SPI controller is to use to generate SPI clocks.
+  * @num_cs: Number of elements in the 'cs' array.
+  *
+  * Call this from machine init code for each SPI Controller that
+@@ -69,7 +64,7 @@ struct s3c64xx_spi_info {
+  */
+ extern void s3c64xx_spi_set_info(int cntrlr, int src_clk_nr, int num_cs);
+ extern void s5pc100_spi_set_info(int cntrlr, int src_clk_nr, int num_cs);
+-extern void s5pv210_spi_set_info(int cntrlr, int src_clk_nr, int num_cs);
++extern void s5pv210_spi_set_info(int cntrlr, int num_cs, char *clk_list[]);
+ extern void s5p64x0_spi_set_info(int cntrlr, int src_clk_nr, int num_cs);
  
- /*
-diff --git a/arch/arm/mach-ks8695/include/mach/devices.h b/arch/arm/mach-ks8695/include/mach/devices.h
-index 85a3c9a..1e6594a 100644
---- a/arch/arm/mach-ks8695/include/mach/devices.h
-+++ b/arch/arm/mach-ks8695/include/mach/devices.h
-@@ -18,11 +18,6 @@ extern void __init ks8695_add_device_wan(void);
- extern void __init ks8695_add_device_lan(void);
- extern void __init ks8695_add_device_hpna(void);
- 
-- /* LEDs */
--extern short ks8695_leds_cpu;
--extern short ks8695_leds_timer;
--extern void __init ks8695_init_leds(u8 cpu_led, u8 timer_led);
--
-  /* PCI */
- #define KS8695_MODE_PCI		0
- #define KS8695_MODE_MINIPCI	1
-diff --git a/arch/arm/mach-ks8695/leds.c b/arch/arm/mach-ks8695/leds.c
-deleted file mode 100644
-index 184ef74..0000000
---- a/arch/arm/mach-ks8695/leds.c
-+++ /dev/null
-@@ -1,93 +0,0 @@
--/*
-- * LED driver for KS8695-based boards.
-- *
-- * Copyright (C) Andrew Victor
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--
--#include <linux/kernel.h>
--#include <linux/module.h>
--#include <linux/init.h>
--
--#include <asm/leds.h>
--#include <mach/devices.h>
--#include <mach/gpio.h>
--
--
--static inline void ks8695_led_on(unsigned int led)
--{
--	gpio_set_value(led, 0);
--}
--
--static inline void ks8695_led_off(unsigned int led)
--{
--	gpio_set_value(led, 1);
--}
--
--static inline void ks8695_led_toggle(unsigned int led)
--{
--	unsigned long is_off = gpio_get_value(led);
--	if (is_off)
--		ks8695_led_on(led);
--	else
--		ks8695_led_off(led);
--}
--
--
--/*
-- * Handle LED events.
-- */
--static void ks8695_leds_event(led_event_t evt)
--{
--	unsigned long flags;
--
--	local_irq_save(flags);
--
--	switch(evt) {
--	case led_start:		/* System startup */
--		ks8695_led_on(ks8695_leds_cpu);
--		break;
--
--	case led_stop:		/* System stop / suspend */
--		ks8695_led_off(ks8695_leds_cpu);
--		break;
--
--#ifdef CONFIG_LEDS_TIMER
--	case led_timer:		/* Every 50 timer ticks */
--		ks8695_led_toggle(ks8695_leds_timer);
--		break;
--#endif
--
--#ifdef CONFIG_LEDS_CPU
--	case led_idle_start:	/* Entering idle state */
--		ks8695_led_off(ks8695_leds_cpu);
--		break;
--
--	case led_idle_end:	/* Exit idle state */
--		ks8695_led_on(ks8695_leds_cpu);
--		break;
--#endif
--
--	default:
--		break;
--	}
--
--	local_irq_restore(flags);
--}
--
--
--static int __init leds_init(void)
--{
--	if ((ks8695_leds_timer == -1) || (ks8695_leds_cpu == -1))
--		return -ENODEV;
--
--	leds_event = ks8695_leds_event;
--
--	leds_event(led_start);
--	return 0;
--}
--
--__initcall(leds_init);
+ #endif /* __S3C64XX_PLAT_SPI_H */
 -- 
-1.7.5
+1.7.0.4
