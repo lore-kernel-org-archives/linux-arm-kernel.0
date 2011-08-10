@@ -1,44 +1,57 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 10 Aug 2011 09:20:43 +0200
-Subject: [PATCH 0/6] spi/spi-pl022 fixes
-In-Reply-To: <4E420144.4010001@st.com>
-References: <cover.1312887860.git.viresh.kumar@st.com>
-	<CACRpkdatTqnSMxKzhYo=EYpP21buN0tosx1Y1aVc7RLe58wfgg@mail.gmail.com>
-	<4E420144.4010001@st.com>
-Message-ID: <CAKnu2MoTQTYMa4JvWyr7sPMhPyziTtnLeZLySUYxcuQC2Vu-6Q@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 10 Aug 2011 08:27:12 +0100
+Subject: OMAP3 kernels fail to build
+In-Reply-To: <alpine.DEB.2.00.1108092318180.12674@utopia.booyaka.com>
+References: <20110808110056.GA15134@n2100.arm.linux.org.uk>
+	<4E3FC3EC.2010909@ti.com>
+	<20110808113039.GB15134@n2100.arm.linux.org.uk>
+	<alpine.DEB.2.00.1108092318180.12674@utopia.booyaka.com>
+Message-ID: <20110810072712.GD14281@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/8/10 viresh kumar <viresh.kumar@st.com>:
-> On 08/10/2011 01:40 AM, Linus Walleij wrote:
->>
->> They all work perfectly well on top of v3.1-rc1, please use
->> mainline kernel tags as patch base if you can.
->
-> Sure, can take care of this. But i have a doubt here,
-> What if a patch on the same driver is applied after kernel tag.
-> Shouldn't i rebase my patches on the latest commit available.
+On Tue, Aug 09, 2011 at 11:26:16PM -0600, Paul Walmsley wrote:
+> On Mon, 8 Aug 2011, Russell King - ARM Linux wrote:
+> 
+> > On Mon, Aug 08, 2011 at 04:39:32PM +0530, Santosh wrote:
+> > > On Monday 08 August 2011 04:30 PM, Russell King - ARM Linux wrote:
+> > >> With CONFIG_ARCH_OMAP3=y and CONFIG_ARCH_OMAP4=n, I'm getting this:
+> > >>
+> > >> arch/arm/mach-omap2/built-in.o:(.data+0xf99c): undefined reference to `omap4430_phy_init'
+> > >> arch/arm/mach-omap2/built-in.o:(.data+0xf9a0): undefined reference to `omap4430_phy_exit'
+> > >> arch/arm/mach-omap2/built-in.o:(.data+0xf9a4): undefined reference to `omap4430_phy_power'
+> > >> arch/arm/mach-omap2/built-in.o:(.data+0xf9a8): undefined reference to `omap4430_phy_set_clk'
+> > >> arch/arm/mach-omap2/built-in.o:(.data+0xf9ac): undefined reference to `omap4430_phy_suspend'
+> > >>
+> > > I thought below patch was suppose to fix it.
+> > > https://patchwork.kernel.org/patch/963462/
+> > 
+> > So, the problem has been known about for around a month.  Yet the broken
+> > patch still went upstream.
+> 
+> Which known "broken patch still went upstream" ?
+> 
+> The problem commits were 208466dc10083e734a8af71d10f923ee4bff950c ("usb: 
+> otg: OMAP4430: Powerdown the internal PHY when USB is disabled") and 
+> fb91cde49c327ff957c55d91805bc6abda59b311 ("usb: musb: OMAP4430: Power down 
+> the PHY during board init").  The above link makes this clear.  
 
-The basic assumption is that patches are orthogonal and apply
-without conflicts, i.e. patch different parts of the kernel tree or
-different lines in the same file.
+The fact that there are _build_ _errors_ indicate that a patch which
+introduced this crap _was_ _broken_.  The fact that it was _reported_
+as broken well before the merge window and still went in during the
+merge window indicates that the OMAP workflow with regard to patches
+is simply BROKEN.
 
-Second assumption is that if patches do collide, the subsystem
-maintainer can solve most conflicts, and is expected to do
-so. Torvalds sets an example by requesting that subsystem
-maintainers do not fixup conflicts between subsystems so he
-can see them himself.
+And the fact that you can't recognise that makes _you_ part of the
+problem.
 
-Then there are special cases when you get a strong
-coupling between patches.
+There are no excuses for this.
 
-In these special cases, ask the subsystem maintainer what to
-base the patches on. Usually it's some commit on the subsystem
-tree rather than -next.
+And more - wtf those commit IDs you mention have to do with my build
+error with twl-common.c I've no idea.  The breakage was not introduced
+by either of the commits you mention, but b22f954 (OMAP4: Move common
+twl6030 configuration to twl-common).
 
-This is my understanding of how we work, maybe I should
-patch Documentation/development-process/*, Arnd do you have
-anything to add?
+So please, stop this disinformation right now and get more of a clue.
 
-Thanks,
-Linus Walleij
+Thanks.
