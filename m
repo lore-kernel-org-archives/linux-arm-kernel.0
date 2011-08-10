@@ -1,36 +1,49 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 10 Aug 2011 16:12:51 +0200
-Subject: [PATCH 0/6] spi/spi-pl022 fixes
-In-Reply-To: <CAKnu2MoTQTYMa4JvWyr7sPMhPyziTtnLeZLySUYxcuQC2Vu-6Q@mail.gmail.com>
-References: <cover.1312887860.git.viresh.kumar@st.com>
-	<4E420144.4010001@st.com>
-	<CAKnu2MoTQTYMa4JvWyr7sPMhPyziTtnLeZLySUYxcuQC2Vu-6Q@mail.gmail.com>
-Message-ID: <201108101612.51825.arnd@arndb.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 10 Aug 2011 15:16:42 +0100
+Subject: [RFC PATCH] ARM: sched_clock: allow sched_clock to be selected
+	at runtime
+In-Reply-To: <20110810114907.GA2680@pulham.picochip.com>
+References: <1312910015-20043-1-git-send-email-marc.zyngier@arm.com>
+	<20110810114907.GA2680@pulham.picochip.com>
+Message-ID: <4E4292CA.3050704@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 10 August 2011, Linus Walleij wrote:
-> The basic assumption is that patches are orthogonal and apply
-> without conflicts, i.e. patch different parts of the kernel tree or
-> different lines in the same file.
+On 10/08/11 12:49, Jamie Iles wrote:
+> Hi Marc,
 > 
-> Second assumption is that if patches do collide, the subsystem
-> maintainer can solve most conflicts, and is expected to do
-> so. Torvalds sets an example by requesting that subsystem
-> maintainers do not fixup conflicts between subsystems so he
-> can see them himself.
+> On Tue, Aug 09, 2011 at 06:13:35PM +0100, Marc Zyngier wrote:
+>> sched_clock() is yet another blocker on the road to the single
+>> image. This patch implements an idea by Russell King:
+>>
+>> http://www.spinics.net/lists/linux-omap/msg49561.html
+>>
+>> Instead of asking the platform to implement both sched_clock()
+>> itself and the rollover callback, simply register a read()
+>> function, and let the ARM code care about sched_clock() itself,
+>> the conversion to ns and the rollover. sched_clock() uses
+>> this read() function as an indirection to the platform code.
+>>
+>> This allow some simplifications and possibly some footprint gain
+>> when multiple platforms are compiled in. Among the drawbacks,
+>> the removal of the *_fixed_sched_clock optimization which could
+>> negatively impact some platforms (sa1100, tegra, versatile
+>> and omap).
+>>
+>> Tested on 11MPCore, OMAP4 and Tegra.
 > 
-> Then there are special cases when you get a strong
-> coupling between patches.
+> Tested on my 1176 platform and works nicely.  However, shouldn't the 
+> read functions still be marked notrace so they don't appear in ftrace 
+> output?
 > 
-> In these special cases, ask the subsystem maintainer what to
-> base the patches on. Usually it's some commit on the subsystem
-> tree rather than -next.
-> 
-> This is my understanding of how we work, maybe I should
-> patch Documentation/development-process/*, Arnd do you have
-> anything to add?
+> On my (out of tree) platform, omitting notrace and having all of the 
+> ftrace bootup tests results in a hard lockup.  Annotating the read 
+> function resolves this.
 
-No, your explanations are pretty much what I would have said.
+I'll update the patch to reflect this.
 
-	Arnd
+Many thanks for testing.
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
