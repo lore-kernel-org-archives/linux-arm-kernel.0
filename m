@@ -1,28 +1,36 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 10 Aug 2011 15:10:49 +0100
-Subject: Subject: L2x0 OF properties do not include interrupt #
-In-Reply-To: <4E428EB0.1080204@gmail.com>
-References: <000201cc575b$c1229010$4367b030$@rutland@arm.com>
-	<4E428EB0.1080204@gmail.com>
-Message-ID: <20110810141048.GK10121@e102144-lin.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 10 Aug 2011 16:12:51 +0200
+Subject: [PATCH 0/6] spi/spi-pl022 fixes
+In-Reply-To: <CAKnu2MoTQTYMa4JvWyr7sPMhPyziTtnLeZLySUYxcuQC2Vu-6Q@mail.gmail.com>
+References: <cover.1312887860.git.viresh.kumar@st.com>
+	<4E420144.4010001@st.com>
+	<CAKnu2MoTQTYMa4JvWyr7sPMhPyziTtnLeZLySUYxcuQC2Vu-6Q@mail.gmail.com>
+Message-ID: <201108101612.51825.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+On Wednesday 10 August 2011, Linus Walleij wrote:
+> The basic assumption is that patches are orthogonal and apply
+> without conflicts, i.e. patch different parts of the kernel tree or
+> different lines in the same file.
+> 
+> Second assumption is that if patches do collide, the subsystem
+> maintainer can solve most conflicts, and is expected to do
+> so. Torvalds sets an example by requesting that subsystem
+> maintainers do not fixup conflicts between subsystems so he
+> can see them himself.
+> 
+> Then there are special cases when you get a strong
+> coupling between patches.
+> 
+> In these special cases, ask the subsystem maintainer what to
+> base the patches on. Usually it's some commit on the subsystem
+> tree rather than -next.
+> 
+> This is my understanding of how we work, maybe I should
+> patch Documentation/development-process/*, Arnd do you have
+> anything to add?
 
-On Wed, Aug 10, 2011 at 02:59:12PM +0100, Rob Herring wrote:
-> I think you should allow for either the single irq or individual irqs.
-> You can specify that the event counter interrupt must be first, then the
-> pmu driver could work either way ignoring the rest. The driver probably
-> needs to mark the handler as shared if there is only the combined
-> interrupt unless you expect all interrupts to be handled by 1 driver.
+No, your explanations are pretty much what I would have said.
 
-I much prefer having seperate, individual IRQs with no requirement on
-ordering.
-
-Now, the L2 binding also doesn't fit too well for the L2CC on Cortex-A15,
-which is an inner cache like the one on Cortex-A8. Because of this, it
-doesn't have a base address but it *does* have an IRQ which is how external
-aborts are raised.
-
-Will
+	Arnd
