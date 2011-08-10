@@ -1,98 +1,37 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 10 Aug 2011 07:16:30 -0600
-Subject: [RFC/PATCH 10/14] dt: Add pd_size to AUXDATA structure
-In-Reply-To: <4E42723D.1010501@ti.com>
-References: <1312897232-4792-1-git-send-email-manjugk@ti.com>
-	<1312897232-4792-11-git-send-email-manjugk@ti.com>
-	<4E42723D.1010501@ti.com>
-Message-ID: <CACxGe6tq43M6x-pQS4CHTsjiNORLgMzWXL7Hn0GzTFMNCrRzAA@mail.gmail.com>
+From: hemantp@ti.com (Hemant Pedanekar)
+Date: Wed, 10 Aug 2011 18:49:35 +0530
+Subject: [PATCH v2] omap: timer: Set dmtimer used as clocksource in autoreload
+	mode
+Message-ID: <1312982375-11848-1-git-send-email-hemantp@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 10, 2011 at 5:57 AM, Cousson, Benoit <b-cousson@ti.com> wrote:
-> On 8/9/2011 4:10 PM, G, Manjunath Kondaiah wrote:
->>
->> Add pd_size in the AUXDATA structure so that device drivers which require
->> platform_data size can pass along with AUXDATA.
->
-> It is really needed by device driver? Or is it because omap_device_build is
-> using platform_device_add_data that is doing a copy of the pdata and thus
-> require the size?
+If CONFIG_OMAP_32K_TIMER is not selected and dmtimer is used as clocksource, the
+timer stops counting once overflow occurs as it was not set in autoreload mode.
+This results into timekeeping failure: for example, 'sleep 1' at the shell after
+the timer counter overflow would hang.
 
-Yes, I have the same question.  What is the reason for needing the
-platform data size?
+This patch sets up autoreload when starting the clocksource timer which fixes
+the above issue.
 
-g.
+Signed-off-by: Hemant Pedanekar <hemantp@ti.com>
+---
+ arch/arm/mach-omap2/timer.c |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
 
->
->> Signed-off-by: G, Manjunath Kondaiah<manjugk@ti.com>
->> ---
->> ?drivers/of/platform.c ? ? ? | ? ?2 ++
->> ?include/linux/of_platform.h | ? ?5 +++++
->> ?2 files changed, 7 insertions(+), 0 deletions(-)
->>
->> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
->> index ebbbf42..4b27286 100644
->> --- a/drivers/of/platform.c
->> +++ b/drivers/of/platform.c
->> @@ -565,6 +565,7 @@ static int of_platform_bus_create(struct device_node
->> *bus,
->> ? ? ? ?struct platform_device *dev;
->> ? ? ? ?const char *bus_id = NULL;
->> ? ? ? ?void *platform_data = NULL;
->> + ? ? ? int pd_size;
->
-> Maybe platform_data_size will be a little bit more consistent?
->
-> Regards,
-> Benoit
->
->> ? ? ? ?int id = -1;
->> ? ? ? ?int rc = 0;
->>
->> @@ -588,6 +589,7 @@ static int of_platform_bus_create(struct device_node
->> *bus,
->> ? ? ? ? ? ? ? ?bus_id = auxdata->name;
->> ? ? ? ? ? ? ? ?id = auxdata->id;
->> ? ? ? ? ? ? ? ?platform_data = auxdata->platform_data;
->> + ? ? ? ? ? ? ? pd_size = auxdata->pd_size;
->> ? ? ? ?}
->>
->> ? ? ? ?if (of_device_is_compatible(bus, "arm,primecell")) {
->> diff --git a/include/linux/of_platform.h b/include/linux/of_platform.h
->> index 252246c..a3be980 100644
->> --- a/include/linux/of_platform.h
->> +++ b/include/linux/of_platform.h
->> @@ -47,6 +47,7 @@ struct of_dev_auxdata {
->> ? ? ? ?char *name;
->> ? ? ? ?int id;
->> ? ? ? ?void *platform_data;
->> + ? ? ? int pd_size;
->> ?};
->>
->> ?/* Macro to simplify populating a lookup table */
->> @@ -58,6 +59,10 @@ struct of_dev_auxdata {
->> ? ? ? ?{ .compatible = _compat, .phys_addr = _phys, .name = _name, \
->> ? ? ? ? ?.id = _id, .platform_data = _pdata }
->>
->> +#define OF_DEV_AUXDATA_ID_PDSIZE(_compat,_phys,_name,_id,_pdata,_pd_size)
->> \
->> + ? ? ? { .compatible = _compat, .phys_addr = _phys, .name = _name, \
->> + ? ? ? ? .id = _id, .platform_data = _pdata, .pd_size = _pd_size }
->> +
->> ?/**
->> ? * of_platform_driver - Legacy of-aware driver for platform devices.
->> ? *
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
-
-
-
+diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+index e964072..cf1de7d 100644
+--- a/arch/arm/mach-omap2/timer.c
++++ b/arch/arm/mach-omap2/timer.c
+@@ -293,7 +293,8 @@ static void __init omap2_gp_clocksource_init(int gptimer_id,
+ 	pr_info("OMAP clocksource: GPTIMER%d at %lu Hz\n",
+ 		gptimer_id, clksrc.rate);
+ 
+-	__omap_dm_timer_load_start(clksrc.io_base, OMAP_TIMER_CTRL_ST, 0, 1);
++	__omap_dm_timer_load_start(clksrc.io_base,
++			OMAP_TIMER_CTRL_ST | OMAP_TIMER_CTRL_AR, 0, 1);
+ 	init_sched_clock(&cd, dmtimer_update_sched_clock, 32, clksrc.rate);
+ 
+ 	if (clocksource_register_hz(&clocksource_gpt, clksrc.rate))
 -- 
-Grant Likely, B.Sc., P.Eng.
-Secret Lab Technologies Ltd.
+1.7.3.5
