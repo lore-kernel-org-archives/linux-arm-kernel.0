@@ -1,61 +1,162 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Wed, 10 Aug 2011 14:17:51 +0200
-Subject: [PATCH 12/19] mach-lpc32xx: move LPC32XX GPIO driver to GPIO subsystem
-Message-ID: <1312978671-18473-1-git-send-email-linus.walleij@stericsson.com>
+Date: Wed, 10 Aug 2011 14:18:00 +0200
+Subject: [PATCH 13/19] mach-lpc32xx: break out GPIO driver specifics
+Message-ID: <1312978680-18506-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Linus Walleij <linus.walleij@linaro.org>
 
-As per example from the other ARM boards, push the LPC32XX
-GPIO driver down to the GPIO subsystem so it can be consolidated.
+The <mach/gpio.h> file is included from upper directories
+and deal with generic GPIO and gpiolib stuff. Break out the
+platform and driver specific defines and functions into its own
+header file.
 
 Cc: Wolfram Sang <w.sang@pengutronix.de>
 Cc: Barry Song <bs14@csr.com>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/mach-lpc32xx/Makefile                     |    2 +-
- drivers/gpio/Makefile                              |    1 +
- .../gpiolib.c => drivers/gpio/gpio-lpc32xx.c       |    1 -
- 3 files changed, 2 insertions(+), 2 deletions(-)
- rename arch/arm/mach-lpc32xx/gpiolib.c => drivers/gpio/gpio-lpc32xx.c (99%)
+ arch/arm/mach-lpc32xx/include/mach/gpio-lpc32xx.h |   50 ++++++++++++++++++++
+ arch/arm/mach-lpc32xx/include/mach/gpio.h         |   52 ---------------------
+ arch/arm/mach-lpc32xx/phy3250.c                   |    1 +
+ drivers/gpio/gpio-lpc32xx.c                       |    1 +
+ 4 files changed, 52 insertions(+), 52 deletions(-)
+ create mode 100644 arch/arm/mach-lpc32xx/include/mach/gpio-lpc32xx.h
 
-diff --git a/arch/arm/mach-lpc32xx/Makefile b/arch/arm/mach-lpc32xx/Makefile
-index a5fc5d0..f5db805 100644
---- a/arch/arm/mach-lpc32xx/Makefile
-+++ b/arch/arm/mach-lpc32xx/Makefile
-@@ -3,6 +3,6 @@
- #
- 
- obj-y	:= timer.o irq.o common.o serial.o clock.o
--obj-y	+= gpiolib.o pm.o suspend.o
-+obj-y	+= pm.o suspend.o
- obj-y	+= phy3250.o
- 
-diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
-index 2269822..33e095bd 100644
---- a/drivers/gpio/Makefile
-+++ b/drivers/gpio/Makefile
-@@ -21,6 +21,7 @@ obj-$(CONFIG_GPIO_IT8761E)	+= gpio-it8761e.o
- obj-$(CONFIG_GPIO_JANZ_TTL)	+= gpio-janz-ttl.o
- obj-$(CONFIG_MACH_KS8695)	+= gpio-ks8695.o
- obj-$(CONFIG_GPIO_LANGWELL)	+= gpio-langwell.o
-+obj-$(CONFIG_ARCH_LPC32XX)	+= gpio-lpc32xx.o
- obj-$(CONFIG_GPIO_MAX730X)	+= gpio-max730x.o
- obj-$(CONFIG_GPIO_MAX7300)	+= gpio-max7300.o
- obj-$(CONFIG_GPIO_MAX7301)	+= gpio-max7301.o
-diff --git a/arch/arm/mach-lpc32xx/gpiolib.c b/drivers/gpio/gpio-lpc32xx.c
-similarity index 99%
-rename from arch/arm/mach-lpc32xx/gpiolib.c
-rename to drivers/gpio/gpio-lpc32xx.c
-index 69061ea..b4e9d35 100644
---- a/arch/arm/mach-lpc32xx/gpiolib.c
-+++ b/drivers/gpio/gpio-lpc32xx.c
-@@ -24,7 +24,6 @@
+diff --git a/arch/arm/mach-lpc32xx/include/mach/gpio-lpc32xx.h b/arch/arm/mach-lpc32xx/include/mach/gpio-lpc32xx.h
+new file mode 100644
+index 0000000..1816e22
+--- /dev/null
++++ b/arch/arm/mach-lpc32xx/include/mach/gpio-lpc32xx.h
+@@ -0,0 +1,50 @@
++/*
++ * Author: Kevin Wells <kevin.wells@nxp.com>
++ *
++ * Copyright (C) 2010 NXP Semiconductors
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#ifndef __MACH_GPIO_LPC32XX_H
++#define __MACH_GPIO_LPC32XX_H
++
++/*
++ * Note!
++ * Muxed GP pins need to be setup to the GP state in the board level
++ * code prior to using this driver.
++ * GPI pins : 28xP3 group
++ * GPO pins : 24xP3 group
++ * GPIO pins: 8xP0 group, 24xP1 group, 13xP2 group, 6xP3 group
++ */
++
++#define LPC32XX_GPIO_P0_MAX 8
++#define LPC32XX_GPIO_P1_MAX 24
++#define LPC32XX_GPIO_P2_MAX 13
++#define LPC32XX_GPIO_P3_MAX 6
++#define LPC32XX_GPI_P3_MAX 28
++#define LPC32XX_GPO_P3_MAX 24
++
++#define LPC32XX_GPIO_P0_GRP 0
++#define LPC32XX_GPIO_P1_GRP (LPC32XX_GPIO_P0_GRP + LPC32XX_GPIO_P0_MAX)
++#define LPC32XX_GPIO_P2_GRP (LPC32XX_GPIO_P1_GRP + LPC32XX_GPIO_P1_MAX)
++#define LPC32XX_GPIO_P3_GRP (LPC32XX_GPIO_P2_GRP + LPC32XX_GPIO_P2_MAX)
++#define LPC32XX_GPI_P3_GRP (LPC32XX_GPIO_P3_GRP + LPC32XX_GPIO_P3_MAX)
++#define LPC32XX_GPO_P3_GRP (LPC32XX_GPI_P3_GRP + LPC32XX_GPI_P3_MAX)
++
++/*
++ * A specific GPIO can be selected with this macro
++ * ie, GPIO_05 can be selected with LPC32XX_GPIO(LPC32XX_GPIO_P3_GRP, 5)
++ * See the LPC32x0 User's guide for GPIO group numbers
++ */
++#define LPC32XX_GPIO(x, y) ((x) + (y))
++
++#endif /* __MACH_GPIO_LPC32XX_H */
+diff --git a/arch/arm/mach-lpc32xx/include/mach/gpio.h b/arch/arm/mach-lpc32xx/include/mach/gpio.h
+index 66d31f6..e69de29 100644
+--- a/arch/arm/mach-lpc32xx/include/mach/gpio.h
++++ b/arch/arm/mach-lpc32xx/include/mach/gpio.h
+@@ -1,52 +0,0 @@
+-/*
+- * arch/arm/mach-lpc32xx/include/mach/gpio.h
+- *
+- * Author: Kevin Wells <kevin.wells@nxp.com>
+- *
+- * Copyright (C) 2010 NXP Semiconductors
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- */
+-
+-#ifndef __ASM_ARCH_GPIO_H
+-#define __ASM_ARCH_GPIO_H
+-
+-/*
+- * Note!
+- * Muxed GP pins need to be setup to the GP state in the board level
+- * code prior to using this driver.
+- * GPI pins : 28xP3 group
+- * GPO pins : 24xP3 group
+- * GPIO pins: 8xP0 group, 24xP1 group, 13xP2 group, 6xP3 group
+- */
+-
+-#define LPC32XX_GPIO_P0_MAX 8
+-#define LPC32XX_GPIO_P1_MAX 24
+-#define LPC32XX_GPIO_P2_MAX 13
+-#define LPC32XX_GPIO_P3_MAX 6
+-#define LPC32XX_GPI_P3_MAX 28
+-#define LPC32XX_GPO_P3_MAX 24
+-
+-#define LPC32XX_GPIO_P0_GRP 0
+-#define LPC32XX_GPIO_P1_GRP (LPC32XX_GPIO_P0_GRP + LPC32XX_GPIO_P0_MAX)
+-#define LPC32XX_GPIO_P2_GRP (LPC32XX_GPIO_P1_GRP + LPC32XX_GPIO_P1_MAX)
+-#define LPC32XX_GPIO_P3_GRP (LPC32XX_GPIO_P2_GRP + LPC32XX_GPIO_P2_MAX)
+-#define LPC32XX_GPI_P3_GRP (LPC32XX_GPIO_P3_GRP + LPC32XX_GPIO_P3_MAX)
+-#define LPC32XX_GPO_P3_GRP (LPC32XX_GPI_P3_GRP + LPC32XX_GPI_P3_MAX)
+-
+-/*
+- * A specific GPIO can be selected with this macro
+- * ie, GPIO_05 can be selected with LPC32XX_GPIO(LPC32XX_GPIO_P3_GRP, 5)
+- * See the LPC32x0 User's guide for GPIO group numbers
+- */
+-#define LPC32XX_GPIO(x, y) ((x) + (y))
+-
+-#endif
+diff --git a/arch/arm/mach-lpc32xx/phy3250.c b/arch/arm/mach-lpc32xx/phy3250.c
+index 7993b09..c3a22fd 100644
+--- a/arch/arm/mach-lpc32xx/phy3250.c
++++ b/arch/arm/mach-lpc32xx/phy3250.c
+@@ -37,6 +37,7 @@
  
  #include <mach/hardware.h>
  #include <mach/platform.h>
--#include "common.h"
++#include <mach/gpio-lpc32xx.h>
+ #include "common.h"
+ 
+ /*
+diff --git a/drivers/gpio/gpio-lpc32xx.c b/drivers/gpio/gpio-lpc32xx.c
+index b4e9d35..5b69480 100644
+--- a/drivers/gpio/gpio-lpc32xx.c
++++ b/drivers/gpio/gpio-lpc32xx.c
+@@ -24,6 +24,7 @@
+ 
+ #include <mach/hardware.h>
+ #include <mach/platform.h>
++#include <mach/gpio-lpc32xx.h>
  
  #define LPC32XX_GPIO_P3_INP_STATE		_GPREG(0x000)
  #define LPC32XX_GPIO_P3_OUTP_SET		_GPREG(0x004)
