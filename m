@@ -1,35 +1,14 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 10 Aug 2011 08:59:12 -0500
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 10 Aug 2011 16:09:56 +0200
 Subject: Subject: L2x0 OF properties do not include interrupt #
 In-Reply-To: <000201cc575b$c1229010$4367b030$@rutland@arm.com>
 References: <000201cc575b$c1229010$4367b030$@rutland@arm.com>
-Message-ID: <4E428EB0.1080204@gmail.com>
+Message-ID: <201108101609.56995.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark,
+On Wednesday 10 August 2011, Mark Rutland wrote:
 
-On 08/10/2011 07:48 AM, Mark Rutland wrote:
-> Hi all,
-> 
-> I'm working on a driver for the PMU found in L220/PL310 L2 Cache Controllers
-> (as an extension to the existing L2x0 code).
-> 
-> I've taken a look into what BSP support would be required and mocked up some
-> platform_device support, though I notice that Rob Herring has provided
-> devicetree bindings for the L2x0 ("l2x0: Add OF based initialization") which
-> should probably be used to initialize the PMU (if present) from devicetree.
-> 
-> The L2x0 hardware supports a combined interrupt line, which is present on the
-> Vexpress A9x4, EB11MPcore, PB1176, etc. This can be used to signal errors on
-> read/write, parity checks, etc. The PMU also fires an interrupt on this line
-> when any of its counters saturate.
-> 
-> Unfortunately the L2x0 OF bindings introduced by the patch don't include an
-> (optional) interrupt property, which means the PMU driver won't be able to be
-> initialised via devicetree. As we want to get as much as possible dynamically
-> configured via devicetree, this is problematic.
-> 
 > I realise I'm a bit late to the party here, but I'd like to propose adding an
 > optional interrupt parameter to the binding. I'm not aware of any
 > implementations which use separate interrupts, but given the binding
@@ -37,41 +16,35 @@ On 08/10/2011 07:48 AM, Mark Rutland wrote:
 > the L2x0), having a list rather than a single interrupt may be appropriate for
 > someone.
 
-Good thing the party never ends...
+Sounds good, thanks for pointing this out.
+
+How many possible interrupt sources are there? If there is only a small number
+of those (e.g. at most 4), we might just list all of them and register
+them from the driver even if they are all the same.
 
 > This would boil down to (for the moment) a Documentation change along the lines of:
 > 
->> diff --git a/Documentation/devicetree/bindings/arm/l2cc.txt b/Documentation/devicetree/bindings/arm/l2cc.txt
->> index f50e021..d4b387b 100644
->> --- a/Documentation/devicetree/bindings/arm/l2cc.txt
->> +++ b/Documentation/devicetree/bindings/arm/l2cc.txt
->> @@ -28,6 +28,7 @@ Optional properties:
->>  - arm,filter-ranges : <start length> Starting address and length of window to
->>    filter. Addresses in the filter window are directed to the M1 port. Other
->>    addresses will go to the M0 port.
->> +- interrupt : A combined interrupt.
->>  
->>  Example:
->>  
->> @@ -39,4 +40,5 @@ L2: cache-controller {
->>          arm,filter-latency = <0x80000000 0x8000000>;
->>          cache-unified;
->>          cache-level = <2>;
->> +        interrupt = <45>;
->>  };
+> > diff --git a/Documentation/devicetree/bindings/arm/l2cc.txt b/Documentation/devicetree/bindings/arm/l2cc.txt
+> > index f50e021..d4b387b 100644
+> > --- a/Documentation/devicetree/bindings/arm/l2cc.txt
+> > +++ b/Documentation/devicetree/bindings/arm/l2cc.txt
+> > @@ -28,6 +28,7 @@ Optional properties:
+> >  - arm,filter-ranges : <start length> Starting address and length of window to
+> >    filter. Addresses in the filter window are directed to the M1 port. Other
+> >    addresses will go to the M0 port.
+> > +- interrupt : A combined interrupt.
+> >  
+> >  Example:
+> >  
+> > @@ -39,4 +40,5 @@ L2: cache-controller {
+> >          arm,filter-latency = <0x80000000 0x8000000>;
+> >          cache-unified;
+> >          cache-level = <2>;
+> > +        interrupt = <45>;
+> >  };
 > 
 > Any thoughts?
 
-I think you should allow for either the single irq or individual irqs.
-You can specify that the event counter interrupt must be first, then the
-pmu driver could work either way ignoring the rest. The driver probably
-needs to mark the handler as shared if there is only the combined
-interrupt unless you expect all interrupts to be handled by 1 driver.
+Do we also need to document an interrupt-parent property, or is that implied?
 
-Rob
-
-> 
-> Thanks,
-> Mark
-> 
-> 
+	Arnd
