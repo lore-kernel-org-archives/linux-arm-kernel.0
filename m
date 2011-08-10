@@ -1,154 +1,83 @@
-From: vkoul@infradead.org (Vinod Koul)
-Date: Thu, 11 Aug 2011 02:28:03 +0530
-Subject: [PATCH V2 6/6] spi/spi-pl022: Request/free DMA channels as and
-	when required.
-In-Reply-To: <CABb+yY2Usd5=RW6BV69UW=Tq0zQW6LCtT2GhfdHGA61ZU3aNcQ@mail.gmail.com>
-References: <cover.1312965741.git.viresh.kumar@st.com>
-	<566c0525199f498f04422d4c3b2ddd7466648c20.1312965742.git.viresh.kumar@st.com>
-	<20110810090042.GE1831@n2100.arm.linux.org.uk>
-	<4E424F7B.2000800@st.com>
-	<438BB0150E931F4B9CE701519A4463010871804A15@bgsmsx502.gar.corp.intel.com>
-	<CABb+yY3SnqKN78U7vLbom1i00m=ThnRVQDVM_iX1TPu=+XzSNQ@mail.gmail.com>
-	<20110810104025.GK1831@n2100.arm.linux.org.uk>
-	<CABb+yY3=q5Nq1wtM6Av2DrgUfjZR_Ao40QhBhv_ik9naAd5wRg@mail.gmail.com>
-	<CACRpkdaCyUJ3A9VWfsVuwJj3DGVkvjc2_ZOD4yM4YX3NPxAAYQ@mail.gmail.com>
-	<CABb+yY2Usd5=RW6BV69UW=Tq0zQW6LCtT2GhfdHGA61ZU3aNcQ@mail.gmail.com>
-Message-ID: <1313009883.1603.25.camel@vkoul-udesk3>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Wed, 10 Aug 2011 16:39:47 +0100
+Subject: PB1176 broken in -rc1
+In-Reply-To: <20110810152400.GO10121@e102144-lin.cambridge.arm.com>
+References: <20110810152400.GO10121@e102144-lin.cambridge.arm.com>
+Message-ID: <20110810153947.GK2680@pulham.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2011-08-10 at 18:46 +0530, Jassi Brar wrote:
-> On Wed, Aug 10, 2011 at 5:24 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> > On Wed, Aug 10, 2011 at 1:24 PM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
-> >> On Wed, Aug 10, 2011 at 4:10 PM, Russell King - ARM Linux
-> >>>
-> >>> I discussed this with Linus on the bus back from Cambridge in the evening,
-> >>> and it appears that the story you gave me was inaccurate - Linus had not
-> >>> agreed to your proposal and saw more or less the same problems with it
-> >>> which I've been on at you about via your other email alias/lkml.  So that's
-> >>> essentially invalidated everything we discussed there as part of my thinking
-> >>> was "if Linus is happy with it, then...".
-> >>
-> >> IIRC, Linus W mainly opined to involve device pointer during channel selection.
-> >> Other than that I thought there was only ambiguity about implementation details.
-> >
-> > Bah now we have two "Linus oracles" in this world instead
-> > of just one... haha :-)
-> >
-> 
-> 
-> >> Linus W, was there anything you said wouldn't work with the scheme ?
-> >> Please tell now on the record.
-> >
-> > It would *work* but the current proposal is *not elegant* IMO.
-> 
-> would *work*  -> You could find no case that the scheme wouldn't support.
-> *not elegant*  -> Your opinion. Let us see.
-> 
-> 
-> > I think your scheme passing in a device ID and instance tuple
-> > e.g. REQ(MMC,2) would *work*, but I don't think it is a proper
-> > solution and I would never ACK it, as I said.
-> As much as I would feel 'deprived' of your ACK, I am not yet changing
-> the implementation for that part.
-> 
-> 
-> > The lookup of a device DMA channel should follow the
-> > design pattern set by regulators and clocks.
-> Nopes. It depends upon the subsystem.
-> We should strive towards making this scheme as 'standalone' as
-> possible.
-> Client having to specify the device it wants a channel for, is a
-> waste - otherwise we don't fully get rid of platform assistance for
-> channel selection!
-On one of the platforms I work on we have 3 DMACs, peripheral 1, 2 and 3
-can only use channels from controller 1, and the peripherals 4, 5 from
-controller 2 and so on. They _absolutely_ need channel from specific
-controller, so above suits it :).
-Btw all three controllers _have_exactly_same_caps_ so dma engine will
-not see any difference in channels. They don't know which peripherals
-are connected to them, that's platform information which this scheme
-seems to be suited to...
-Can you tell me how your scheme will work in this case?
+Hi Will,
 
-> Also that way, a client is actually asking for a 'channel' rather than
-> only specifying its requirements to the API and the API has enough
-> information to return the appropriate channel(which is what I propose).
+On Wed, Aug 10, 2011 at 04:24:00PM +0100, Will Deacon wrote:
+> Hi Linus,
 > 
-> > Which means
-> > you use struct device * or alternatively a string (if the
-> > instance is not available) to look it up, such that:
-> >
-> > struct dma_slave_map {
-> >   char name[16];
-> >   struct device *dev;
-> >   char dev_name[16];
-> >   struct devive *dma_dev;
-> >   char dma_dev_name[16];
-> > };
-> >
-> > struct dma_slave_map[] = {
-> >  {
-> >     .name = "MMC-RX",
-> >     .dev_name = "mmc.0",
-> >     .dma_dev_name = "pl08x.0",
-> >  },
-> >  {
-> >     .name = "MMC-TX",
-> >     .dev_name = "mmc.0",
-> >     .dma_dev_name = "pl08x.0",
-> >  },
-> >  {
-> >     .name = "SSP-RX",
-> >     .dev_name = "pl022.0",
-> >     .dma_dev_name = "pl08x.1",
-> >  },
+> My PB1176 platform appears to lock up as soon as it hits userspace when
+> running a 3.1-rc1 kernel. If I revert the commit:
 > 
-> 1) This is implementation detail.
-> 2) Not a very good one at that.
->      a) Just think how many bytes you take to specify a channel ?
->          Mine takes less than 4 bytes for equivalent information.
->      b) Think about the mess of string copy, compare etc, when we can
->          simply extract and manipulate bit-fields from, say, u32?
+> f022e4e4 ("ARM: 6986/1: mach-realview: add TCM support for PB1176")
 > 
+> Then things start working again.
 > 
-> >
-> > The dmaengine core should take this mapping, and
-> > the device driver would only have to:
-> >
-> > struct dma_chan *rxc;
-> > struct dma_chan *txc;
-> > struct device *dev;
-> >
-> > rxc = dma_request_slave_channel(dev, "MMC-RX");
-> > txc = dma_request_slave_channel(dev, "MMC-TX");
-> Absolutely "not-very-good" !
-> We can do without the 'dev' argument.
-> How does a client request duplex channel ?
->    MMC-RXTX or MMC-TXRX or TXRX-MMC ?
-> Do you propose to implement a string parser in the core ?!
-> Not to mention how limited requirements this scheme could
-> express to the core.
+> My dmesg contains:
+> 
+> [    0.000000] CPU: found DTCM0 4k @ 00000000, not enabled
+> [    0.000000] CPU: moved DTCM0 4k to fffe8000, enabled
+> [    0.000000] CPU: found DTCM1 4k @ 00000000, not enabled
+> [    0.000000] CPU: moved DTCM1 4k to fffe9000, enabled
+> [    0.000000] CPU: found ITCM0 4k @ 00000000, not enabled
+> [    0.000000] CPU: moved ITCM0 4k to fffe0000, enabled
+> [    0.000000] CPU: found ITCM1 4k @ 00000000, not enabled
+> [    0.000000] CPU: moved ITCM1 4k to fffe1000, enabled
+> [    0.000000] sched_clock: 32 bits at 24MHz, resolution 41ns, wraps every 178956ms
+> [    0.000000] Built 1 zonelists in Zone order, mobility grouping on.  Total pages: 32512
+> [    0.000000] Kernel command line: root=/dev/nfs ip=dhcp console=ttyAMA0 nfsroot=10.1.69.60:/export/debian,tcp rw
+> [    0.000000] PID hash table entries: 512 (order: -1, 2048 bytes)
+> [    0.000000] Dentry cache hash table entries: 16384 (order: 4, 65536 bytes)
+> [    0.000000] Inode-cache hash table entries: 8192 (order: 3, 32768 bytes)
+> [    0.000000] Memory: 128MB = 128MB total
+> [    0.000000] Memory: 123692k/123692k available, 7380k reserved, 0K highmem
+> [    0.000000] Virtual kernel memory layout:
+> [    0.000000]     vector  : 0xffff0000 - 0xffff1000   (   4 kB)
+> [    0.000000]     DTCM    : 0xfffe8000 - 0xfffea000   (   8 kB)
+> [    0.000000]     ITCM    : 0xfffe0000 - 0xfffe2000   (   8 kB)
+> [    0.000000]     fixmap  : 0xfff00000 - 0xfffe0000   ( 896 kB)
+> [    0.000000]     DMA     : 0xffc00000 - 0xffe00000   (   2 MB)
+> [    0.000000]     vmalloc : 0xc8800000 - 0xf8000000   ( 760 MB)
+> [    0.000000]     lowmem  : 0xc0000000 - 0xc8000000   ( 128 MB)
+> [    0.000000]     pkmap   : 0xbfe00000 - 0xc0000000   (   2 MB)
+> [    0.000000]     modules : 0xbf000000 - 0xbfe00000   (  14 MB)
+> [    0.000000]       .text : 0xc0008000 - 0xc05670d4   (5501 kB)
+> [    0.000000]       .init : 0xc0568000 - 0xc059e000   ( 216 kB)
+> [    0.000000]       .data : 0xc059e000 - 0xc05c8ac8   ( 171 kB)
+> [    0.000000]        .bss : 0xc05c9024 - 0xc0610578   ( 286 kB)
+> 
+> But then later hangs at:
+> 
+> [    6.581778] VFS: Mounted root (nfs filesystem) on device 0:12.
 > 
 > 
-> > I also recognized that you needed a priority scheme and
-> > a few other bits for the above,
-> You didn't recognize. I told you. IIRC you suggested I should actually
-> sell that point!
-> The priority is an additional feature that easily helps a situation when
-> a peri could be reached from two different dmacs and the board can
-> prioritize an already busy dmac over the one that would only serve
-> this peripheral - to save power by keeping the idle dmac off.
-> Your string manipulation would only get messier if it had to support
-> that feature.
-> 
-> > If the majority is happy with this scheme I can even
-> > try implementing it.
-> Interesting! Only a few days ago you were seeing eternal sunshine in
-> filter-functions... and now you plan to implement my proposal by
-> replacing bit-fields with strings.
-> Frankly, I don't care much who, if anybody, implements it anymore.
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Any thoughts on how to debug this? The NULL addresses in the dmesg look
+> strange to me, but I'm not familiar with the TCMs.
+
+This may be to do with poisoning of the init mem.  The patch below 
+(which is in next as ARM: 7010/1: mm: fix invalid loop for 
+poison_init_mem) might resolve the issue.
+
+Jamie
+
+8<------
+
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index 2fee782..91bca35 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -441,7 +441,7 @@ static inline int free_area(unsigned long pfn, unsigned long end, char *s)
+ static inline void poison_init_mem(void *s, size_t count)
+ {
+ 	u32 *p = (u32 *)s;
+-	while ((count = count - 4))
++	for (; count != 0; count -= 4)
+ 		*p++ = 0xe7fddef0;
+ }
+ 
