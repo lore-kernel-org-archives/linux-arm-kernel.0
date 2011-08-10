@@ -1,35 +1,27 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 10 Aug 2011 16:12:56 +0100
-Subject: Subject: L2x0 OF properties do not include interrupt #
-In-Reply-To: <4E42965A.9010500@calxeda.com>
-References: <000201cc575b$c1229010$4367b030$@rutland@arm.com>
-	<201108101609.56995.arnd@arndb.de> <4E42965A.9010500@calxeda.com>
-Message-ID: <20110810151256.GN10121@e102144-lin.cambridge.arm.com>
+From: scottwood@freescale.com (Scott Wood)
+Date: Wed, 10 Aug 2011 10:18:35 -0500
+Subject: How to handle named resources with DT?
+In-Reply-To: <20110810015214.GD23511@yookeroo.fritz.box>
+References: <4E4166F0.9050401@ti.com>
+	<CACxGe6tbEW1EZhqXy78EZVM_sQLH0Qbr7QOzbgbsKBRn1FtVrg@mail.gmail.com>
+	<4E4172A8.3030101@ti.com> <4E417BD5.8080409@freescale.com>
+	<20110809205723.GE11568@ponder.secretlab.ca>
+	<4E41A1B9.1060400@ti.com>
+	<20110809211747.GJ11568@ponder.secretlab.ca>
+	<4E41AA43.1000506@ti.com>
+	<20110809214905.GK11568@ponder.secretlab.ca>
+	<4E41AC5C.20301@ti.com> <20110810015214.GD23511@yookeroo.fritz.box>
+Message-ID: <4E42A14B.9050308@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 10, 2011 at 03:31:54PM +0100, Rob Herring wrote:
-> Here's all the interrupts on the PL310:
-> 
-> DECERRINTR Decode error received on master ports from L3
-> SLVERRINTR Slave error received on master ports from L3
-> ERRRDINTR Error on L2 data RAM read
-> ERRRTINTR Error on L2 tag RAM read
-> ERRWDINTR Error on L2 data RAM write
-> ERRWTINTR Error on L2 tag RAM write
-> PARRDINTR Parity error on L2 data RAM read
-> PARRTINTR Parity error on L2 tag RAM read
-> ECNTRINTR Event Counter Overflow/Increment
-> L2CCINTR L2CC Combined Interrupt Output
-> 
-> It's likely that you would want to split these to different drivers.
-> EDAC for parity/bus errors and hw-events for event counters, for example.
+On 08/09/2011 08:52 PM, David Gibson wrote:
+> Of course, the problem with reg-names is that it will be ignored by
+> older OSes, and so 'reg' must still be in the correct order.  In which
+> case you could argue it's more sensible to just have a static place to
+> name mapping in the Linux driver.
 
-I completely agree with you here. In reality, I expect we'll be lucky if
-even the combined interrupt is wired up so maybe the individual property
-names should only be added on an as-needed basis? For the time being we can
-happily get by with something like combined-interrupt = <...>.
+I think the intent was just to use this for some new bindings -- not to
+change existing ones.
 
-Or would you rather specify everything up front?
-
-Will
+-Scott
