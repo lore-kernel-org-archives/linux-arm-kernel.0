@@ -1,67 +1,41 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Wed, 10 Aug 2011 14:42:56 +0200
-Subject: [RFC/PATCH 12/14] dt: omap3: beagle board: set clock freq for
-	i2c devices
-In-Reply-To: <1312897232-4792-13-git-send-email-manjugk@ti.com>
-References: <1312897232-4792-1-git-send-email-manjugk@ti.com>
-	<1312897232-4792-13-git-send-email-manjugk@ti.com>
-Message-ID: <4E427CD0.7060206@ti.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 10 Aug 2011 14:44:56 +0200
+Subject: [PATCH 1/3] ARM: Check for multiple zreladdrs
+In-Reply-To: <1312980298-28035-1-git-send-email-s.hauer@pengutronix.de>
+References: <1312980298-28035-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1312980298-28035-2-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/9/2011 4:10 PM, G, Manjunath Kondaiah wrote:
->
-> Update omap3 beagle dts file with required clock frequencies for the i2c
-> client devices existing on beagle board.
->
-> Beagle custom board dts file is cleaned up so that it can coexist with omap3
-> soc dts file.
->
-> Signed-off-by: G, Manjunath Kondaiah<manjugk@ti.com>
-> ---
->   arch/arm/boot/dts/omap3-beagle-nunchuck.dts |   11 +----------
->   arch/arm/boot/dts/omap3-beagle.dts          |   18 +++++++++++++++---
->   2 files changed, 16 insertions(+), 13 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/omap3-beagle-nunchuck.dts b/arch/arm/boot/dts/omap3-beagle-nunchuck.dts
-> index 2607be5..324ff86 100644
-> --- a/arch/arm/boot/dts/omap3-beagle-nunchuck.dts
-> +++ b/arch/arm/boot/dts/omap3-beagle-nunchuck.dts
-> @@ -1,16 +1,7 @@
->   /include/ "omap3-beagle.dts"
->
->   / {
-> -	i2c at 48072000 {
-> -		compatible = "ti,omap3-i2c";
-> -		reg =<0x48072000 0x80>;
-> -		#address-cells =<1>;
-> -		#size-cells =<0>;
-> -
-> -		eeprom at 50 {
-> -			compatible = "at,at24c01";
-> -			reg =<  0x50>;
-> -		};
+Without CONFIG_AUTO_ZRELADDR being set the kernel needs a single
+zreladdr for building zImages. Bail out if we detect multiple
+zreladdrs without CONFIG_AUTO_ZRELADDR.
 
-This change should probably not be there.
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ arch/arm/boot/compressed/Makefile |    8 ++++++++
+ 1 files changed, 8 insertions(+), 0 deletions(-)
 
-> +	i2c at 2 {
->   		joystick at 52 {
->   			compatible = "sparkfun,wiichuck";
-
-It looks like someone is having fun with a beagle connected to a Wii 
-nunchuck:-)
-
->   			reg =<  0x52>;
-> diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
-> index 4439466..49a5ac7 100644
-> --- a/arch/arm/boot/dts/omap3-beagle.dts
-> +++ b/arch/arm/boot/dts/omap3-beagle.dts
-> @@ -1,7 +1,19 @@
-> -/dts-v1/;
-> -/include/ "skeleton.dtsi"
-> +/include/ "omap3-soc.dtsi"
-
-There is no need for the "-soc" postfix, otherwise all the other SoCs 
-inside DTS directory should have it.
-
-Benoit
+diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
+index 0c74a6f..a53a333 100644
+--- a/arch/arm/boot/compressed/Makefile
++++ b/arch/arm/boot/compressed/Makefile
+@@ -139,8 +139,16 @@ bad_syms=$$($(CROSS_COMPILE)nm $@ | sed -n 's/^.\{8\} [bc] \(.*\)/\1/p') && \
+   ( echo "following symbols must have non local/private scope:" >&2; \
+     echo "$$bad_syms" >&2; rm -f $@; false )
+ 
++check_for_multiple_zreladdr = \
++if [ $(words $(ZRELADDR)) -gt 1 -a "$(CONFIG_AUTO_ZRELADDR)" == "" ]; then \
++	echo 'multiple zreladdrs: $(ZRELADDR)'; \
++	echo 'This needs CONFIG_AUTO_ZRELADDR to be set'; \
++	false; \
++fi
++
+ $(obj)/vmlinux: $(obj)/vmlinux.lds $(obj)/$(HEAD) $(obj)/piggy.$(suffix_y).o \
+ 	 	$(addprefix $(obj)/, $(OBJS)) $(lib1funcs) FORCE
++	@$(check_for_multiple_zreladdr)
+ 	$(call if_changed,ld)
+ 	@$(check_for_bad_syms)
+ 
+-- 
+1.7.5.4
