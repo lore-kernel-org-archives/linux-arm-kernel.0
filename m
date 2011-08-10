@@ -1,131 +1,56 @@
-From: marvin24@gmx.de (Marc Dietich)
-Date: Wed, 10 Aug 2011 12:50:47 +0200
-Subject: [PATCH 4/5 V2] ARM: tegra: paz00: add clocks
-	requiredforusboperation
-In-Reply-To: <201108101024.57494.marvin24@gmx.de>
-References: <201108092126.28521.marvin24@gmx.de>
-	<74CDBE0F657A3D45AFBB94109FB122FF04A06873BB@HQMAIL01.nvidia.com>
-	<201108101024.57494.marvin24@gmx.de>
-Message-ID: <201108101250.48324.marvin24@gmx.de>
+From: florian@openwrt.org (Florian Fainelli)
+Date: Wed, 10 Aug 2011 12:56:00 +0200
+Subject: [PATCH] ARM: fix perf build with uclibc toolchains
+In-Reply-To: <20110810102154.GF10121@e102144-lin.cambridge.arm.com>
+References: <201108091324.17750.florian@openwrt.org>
+	<20110809200852.GA2993@e102144-lin.cambridge.arm.com>
+	<20110810102154.GF10121@e102144-lin.cambridge.arm.com>
+Message-ID: <201108101256.01010.florian@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > Marc Dietrich wrote at Tuesday, August 09, 2011 1:26 PM:
-> > > On Tuesday 09 August 2011 20:35:45 you wrote:
-> > > > [...]
-> > > > Do you need the pll_p_out4 entry? What's that driving? Check in
-> > > > /sys/kernel/debug/clock/clock_tree (/sys/kernel/debug is debugfs).
+On Wednesday 10 August 2011 12:21:55 Will Deacon wrote:
+> On Tue, Aug 09, 2011 at 09:08:53PM +0100, Will Deacon wrote:
+> > On Tue, Aug 09, 2011 at 12:24:17PM +0100, Florian Fainelli wrote:
+> > > libio.h is not provided by uClibc, in order to be able to test the
+> > > definition of __UCLIBC__ we need to include stdlib.h, which also
+> > > includes stddef.h, providing the definition of 'NULL'.
 > > > 
-> > > I think it is only required to setup the correct (non-standard?)
-> > > frequency. Seems all other boards use 108 MHz which cause one of the
-> > > ports to fail. Don't ask me for details ...
-> > 
-> > ...
-> > 
-> > > root at ac100:~# cat /sys/kernel/debug/clock/clock_tree
+> > > Signed-off-by: Florian Fainelli <florian@openwrt.org>
+> > > ---
+> > > diff --git a/tools/perf/arch/arm/util/dwarf-regs.c
+> > > b/tools/perf/arch/arm/util/dwarf-regs.c index fff6450..e8d5c55 100644
+> > > --- a/tools/perf/arch/arm/util/dwarf-regs.c
+> > > +++ b/tools/perf/arch/arm/util/dwarf-regs.c
+> > > @@ -8,7 +8,10 @@
 > > > 
-> > >    clock                          state  ref div      rate
+> > >   * published by the Free Software Foundation.
+> > >   */
 > > > 
-> > > --------------------------------------------------------------
+> > > +#include <stdlib.h>
+> > > +#ifndef __UCLIBC__
 > > > 
-> > >    clk_m                          on     9            12000000
+> > >  #include <libio.h>
+> > > 
+> > > +#endif
+> > > 
+> > >  #include <dwarf-regs.h>
+> > >  
+> > >  struct pt_regs_dwarfnum {
 > > 
-> > ...
-> > 
-> > >       pll_p                       on     10  x18      216000000
-> > 
-> > ...
-> > 
-> > >          pll_p_out4               on     3   9        24000000
-> > >          
-> > >             sclk                  on     2            24000000
-> > >             
-> > >                avp.sclk           off    0            24000000
-> > >                cop                on     1            24000000
-> > >                hclk               on     2   1        24000000
-> > >                
-> > >                   pclk            on     2   2        12000000
-> > >                   
-> > >                      apbdma       on     1   1        12000000
-> > 
-> > Hmm. That's pretty odd.
-> > 
-> > With the standard kernel the device ships with, what does the clock tree
-> > under pll_p_out4 look like? It'd be very interesting to compare that. If
-> > that setup is the same as what this patch sets up, the patch seems fine.
+> > Nice to see somebody trying to get this going with uclinux! I'll give
+> > this a quick compile-check on my boards and then I'll include it in my
+> > perf-fixes branch for 3.1.
 > 
-> unfortunately, there is no such think in .32 kernel (the kernel deliverd
-> with the device), and I don't think I can port it over.
-> 
-> > As far as I know all the clocks there are both unrelated to USB, and
-> > internal to the device, so the board shouldn't have any effect. In
-> > particular, avp.sclk/cop are for the internal media CPU/DSP, hclk/pclk
-> > are the internal AHB/APB bus clocks, and apbdma is for an internal DMA
-> > engine, currently only used for audio in the mainline kernel at least.
-> 
-> Does this mean that the internal busses you mentioned are also running at
-> low speed? Would this be a hugh performance penality?
+> Seems happy enough on my MMU boards. Since you're using this on noMMU
+> platforms, does that mean that you can build a static perf binary out of
+> the box or do you need further patches for this?
 
-maybe this is why in the commit mentioned below sclk is bind to pll_c_out1 and 
-set to 108 MHz again.
+uClibc is not only for noMMU boards, I just built an uclibc toolchain for arm 
+targetting realview and run-tested this with qemu. This was the only patch 
+required to cross-compile perf for me. I also tested this with eglibc.
 
-But I cannot see this change in the current seaboard clock table (optimized 
-away?). Maybe someone with a seaboard could check this.
-
-Marc
-
-
-> > I guess I'll ask a few people internally to see if they have a clue why
-> > your change might be necessary.
-> 
-> Also take a look at seaboard, it has the same clock setting and especially
-> commit dfb625f934dd40baf29ee6c43e4f130b524411a1 in the chromeos kernel:
-> 
-> commit dfb625f934dd40baf29ee6c43e4f130b524411a1
-> Author: Vincent Palatin <vpalatin@chromium.org>
-> Date:   Wed Apr 13 07:26:08 2011 -0400
-> 
->     CHROMIUM: tegra: seaboard: fix ULPI transceiver clock
-> 
->     On our seaboard-based platforms, pll_p_out4 is used to clock
->     (through DAP_MCLK2) the external USB ULPI transceiver between the USB2
->     port to mini-PCIe modem. And it needs to be set at 24Mhz for the
->     tranceiver to work correctly.
->     Revert the sclk parent to pll_c out1 (as it was before the last change)
->     since it needs to stay clocked at 108MHz.
-> 
->     Signed-off-by: Vincent Palatin <vpalatin@chromium.org>
-> 
->     BUG=chrome-os-partner:3167
->     TEST=Check that the Gobi modem is appearing in lsusb listing
->     Use the kaen DVT for browsing and suspending
-> 
->     Review URL: http://codereview.chromium.org/6825076
-> 
->     Change-Id: Ia9b1bbc7860da732fb8edbbcf0bce60e82d6d8ed
-> 
-> 
-> Thanks!
-> 
-> Marc
-> 
-> > For reference, here's Harmony on something roughly like linux-next:
-> >    clk_m                          on     7            12000000
-> > 
-> > ...
-> > 
-> >       pll_p                       on     9   x18      216000000
-> > 
-> > ...
-> > 
-> >          pll_p_out4               on     2   2        108000000
-> >          
-> >             sclk                  on     2            108000000
-> >             
-> >                avp.sclk           off    0            108000000
-> >                cop                on     1            108000000
-> >                hclk               on     2   1        108000000
-> >                
-> >                   pclk            on     2   2        54000000
-> >                   
-> >                      apbdma       on     1   1        54000000
+By the way, perf top reports no even being generated for realview under qemu, 
+is that normal?
+--
+Florian
