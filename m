@@ -1,29 +1,23 @@
-From: tixy@yxit.co.uk (Tixy)
-Date: Wed, 10 Aug 2011 12:43:56 +0100
-Subject: [RFC PATCH 3/5] ARM: kprobes: Reference cpu_architecture as a
-	global variable
-In-Reply-To: <1312971223-28165-4-git-send-email-dave.martin@linaro.org>
-References: <1312971223-28165-1-git-send-email-dave.martin@linaro.org>
-	<1312971223-28165-4-git-send-email-dave.martin@linaro.org>
-Message-ID: <1312976636.7800.32.camel@computer2>
+From: viresh.kumar@st.com (viresh kumar)
+Date: Wed, 10 Aug 2011 17:16:09 +0530
+Subject: [PATCH V2 3/6] spi/spi-pl022: Don't allocate more sg than
+	required.
+In-Reply-To: <4E426EB6.9020408@ru.mvista.com>
+References: <cover.1312965741.git.viresh.kumar@st.com>
+	<94a975df64a78bb533c85774a5bbd052c73fa5ba.1312965741.git.viresh.kumar@st.com>
+	<4E426EB6.9020408@ru.mvista.com>
+Message-ID: <4E426F81.5080606@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2011-08-10 at 11:13 +0100, Dave Martin wrote:
-> This patch is needed for compatibility with the change of
-> cpu_architecture from a function to a global variable.
-> 
-> Since cpu_architecture is ARM-specific, also add an explicit
-> include for <asm/system.h> rather than relying on this being
-> included as a side-effect.
-> 
-> Signed-off-by: Dave Martin <dave.martin@linaro.org>
-> ---
->  arch/arm/kernel/kprobes-common.c |   11 +++++------
->  1 files changed, 5 insertions(+), 6 deletions(-)
+On 08/10/2011 05:12 PM, Sergei Shtylyov wrote:
+>> > -	pages = (pl022->cur_transfer->len>>  PAGE_SHIFT) + 1;
+>> > +	pages = ((pl022->cur_transfer->len + (1 << PAGE_SHIFT) - 1)
+>> > +			>>  PAGE_SHIFT);
+>     No need for parens around the rvalue.
 
-Is there any reason that this patch isn't part of the other ARM platform
-changes in patch one?
+Oops, that was a mistake. Anyway i have send V3 for the same and this issue
+is not present anymore.
 
 -- 
-Tixy
+viresh
