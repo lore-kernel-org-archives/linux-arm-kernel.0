@@ -1,41 +1,43 @@
-From: jochen@scram.de (Jochen Friedrich)
-Date: Wed, 10 Aug 2011 15:11:11 +0200
-Subject: [PATCH 02/18] led-triggers: create a trigger for CPU activity
-In-Reply-To: <20110810130659.GE2680@pulham.picochip.com>
-References: <1312977952-2272-1-git-send-email-bryan.wu@canonical.com>
-	<1312977952-2272-3-git-send-email-bryan.wu@canonical.com>
-	<20110810130659.GE2680@pulham.picochip.com>
-Message-ID: <4E42836F.3030906@scram.de>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Wed, 10 Aug 2011 14:14:28 +0100
+Subject: [RFC PATCH 1/3] dt: irq: add interrupt controller descriptor
+	struct
+In-Reply-To: <1312921020-6820-2-git-send-email-robherring2@gmail.com>
+References: <1312921020-6820-1-git-send-email-robherring2@gmail.com>
+	<1312921020-6820-2-git-send-email-robherring2@gmail.com>
+Message-ID: <20110810131428.GF2680@pulham.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10.08.2011 15:06, Jamie Iles wrote:
-> Hi Bryan,
->
-> On Wed, Aug 10, 2011 at 08:05:36PM +0800, Bryan Wu wrote:
->> Attempting to consolidate the ARM LED code, this removes the
->> custom RealView LED trigger code to turn LEDs on and off in
->> response to CPU activity and replace it with a standard trigger.
->>
->> (bryan.wu at canonical.com:
->> It moves arch/arm/kernel/leds.c syscore stubs into this trigger.
->> It also provides ledtrig_cpu trigger event stub in<linux/leds.h>.
->> Although it was inspired by ARM work, it can be used in other arch.)
->>
->> Cc: Richard Purdie<rpurdie@rpsys.net>
->> Signed-off-by: Linus Walleij<linus.walleij@linaro.org>
->> Signed-off-by: Bryan Wu<bryan.wu@canonical.com>
->> ---
->
-> This looks really nice and small now!
->
-> Reviewed-by: Jamie Iles<jamie@jamieiles.com>
->
-> Jamie
+On Tue, Aug 09, 2011 at 03:16:58PM -0500, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
+> 
+> In preparation to scan and initialize interrupt controllers from a
+> device-tree, create struct to pass to interrupt controller initialization
+> functions.
+> 
+> irq_base should go away with dynamic linux irq assignment.
+> 
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> ---
+>  include/linux/of_irq.h |    6 ++++++
+>  1 files changed, 6 insertions(+), 0 deletions(-)
+> 
+> diff --git a/include/linux/of_irq.h b/include/linux/of_irq.h
+> index cd2e61c..de91ff9 100644
+> --- a/include/linux/of_irq.h
+> +++ b/include/linux/of_irq.h
+> @@ -33,6 +33,12 @@ struct of_irq {
+>  	u32 specifier[OF_MAX_IRQ_SPEC]; /* Specifier copy */
+>  };
+>  
+> +struct of_intc_desc {
+> +	struct device_node *controller;
+> +	struct device_node *parent;
 
-This works OK now on SIMpad devices :-)
+Do we need parent here?  I think that of_irq_find_parent() will do the 
+job.
 
-Tested-by: Jochen Friedrich <jochen@scram.de>
+Other than that nit the series looks nice to me.
 
-Thanks,
-Jochen
+Jamie
