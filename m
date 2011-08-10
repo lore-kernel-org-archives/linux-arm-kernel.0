@@ -1,38 +1,66 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 10 Aug 2011 11:30:52 +0100
-Subject: [PATCH V2 6/6] spi/spi-pl022: Request/free DMA channels as and
-	when required.
-In-Reply-To: <CABb+yY0Qvuhrn+FUhWDHMwUjv=nR4MOfLeDfTzG17HXEuu2pmA@mail.gmail.com>
-References: <cover.1312965741.git.viresh.kumar@st.com>
-	<566c0525199f498f04422d4c3b2ddd7466648c20.1312965742.git.viresh.kumar@st.com>
-	<20110810090042.GE1831@n2100.arm.linux.org.uk>
-	<4E424F7B.2000800@st.com>
-	<CABb+yY0Qvuhrn+FUhWDHMwUjv=nR4MOfLeDfTzG17HXEuu2pmA@mail.gmail.com>
-Message-ID: <20110810103052.GI1831@n2100.arm.linux.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 10 Aug 2011 11:31:39 +0100
+Subject: [PATCH] ARM errata: Possible cache data corruption with
+	hit-under-miss enabled
+In-Reply-To: <CACY+gR2oofw0wLrPTVyLmmFtLOV347tVnfBicfgOYegi1vEzMQ@mail.gmail.com>
+References: <1312785148-32531-1-git-send-email-siarhei.siamashka@gmail.com>
+	<20110808100233.GG29226@e102109-lin.cambridge.arm.com>
+	<CACY+gR2_Rf7dh91vagJfEB=qgALJf4nigJbFQJz--DweQkZ+Qw@mail.gmail.com>
+	<20110808132631.GA670@e102109-lin.cambridge.arm.com>
+	<CACY+gR2oofw0wLrPTVyLmmFtLOV347tVnfBicfgOYegi1vEzMQ@mail.gmail.com>
+Message-ID: <20110810103139.GD7464@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 10, 2011 at 03:39:28PM +0530, Jassi Brar wrote:
-> On Wed, Aug 10, 2011 at 2:59 PM, viresh kumar <viresh.kumar@st.com> wrote:
-> > On 08/10/2011 02:30 PM, Russell King - ARM Linux wrote:
-> >>> > They must be allocated when they are required and must be freed after we are
-> >>> > done with transfers. So that they can be used by other users.
-> >> Which DMA engine driver requires this?
+On Tue, Aug 09, 2011 at 11:06:55PM +0100, Siarhei Siamashka wrote:
+> On Mon, Aug 8, 2011 at 4:26 PM, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > On Mon, Aug 08, 2011 at 12:43:00PM +0100, Siarhei Siamashka wrote:
+> >> On Mon, Aug 8, 2011 at 1:02 PM, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> >> > On Mon, Aug 08, 2011 at 07:32:28AM +0100, Siarhei Siamashka wrote:
+> >> >> From: Catalin Marinas <catalin.marinas@arm.com>
+> >> >>
+> >> >> This patch is a workaround for the 364296 ARM1136 r0pX erratum (possible
+> >> >> cache data corruption with hit-under-miss enabled). It sets the
+> >> >> undocumented bit 31 in the auxiliary control register and the FI bit in
+> >> >> the control register, thus disabling hit-under-miss without putting the
+> >> >> processor into full low interrupt latency mode.
+> >> >>
+> >> >> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> >> >> Tested-by: Siarhei Siamashka <siarhei.siamashka@gmail.com>
+> >> >
+> >> > I haven't pushed this workaround in the past as I wasn't sure there is
+> >> > production hardware affected. I recall you mentioned Nokia N800, do you
+> >> > know which CPU revision does this have?
 > >>
+> >> [ ? ?0.000000] CPU: ARMv6-compatible processor [4107b362] revision 2
+> >> (ARMv6TEJ), cr=00e5387f
+> >> [ ? ?0.000000] CPU: VIPT aliasing data cache, unknown instruction
+> >> cache
+> >> [ ? ?0.000000] Machine: Nokia N810
+> >> [ ? ?0.000000] Memory policy: ECC disabled, Data cache writeback
+> >> [ ? ?0.000000] OMAP2420
+> >>
+> >> # cat /proc/cpuinfo
+> >> Processor ? ? ? : ARMv6-compatible processor rev 2 (v6l)
+> >> BogoMIPS ? ? ? ?: 213.72
+> >> Features ? ? ? ?: swp half thumb fastmult vfp edsp java
+> >> CPU implementer : 0x41
+> >> CPU architecture: 6TEJ
+> >> CPU variant ? ? : 0x0
+> >> CPU part ? ? ? ?: 0xb36
+> >> CPU revision ? ?: 2
+> >>
+> >> Hardware ? ? ? ?: Nokia N810
+> >> Revision ? ? ? ?: 0000
+> >> Serial ? ? ? ? ?: 0000000000000000
+> > ...
+> >> Would you be so kind to update the patch?
 > >
-> > dw_dmac.c
-> >
-> >> Normally, when we have DMA engine drivers with multiple request signals,
-> >> the slave peripheral side publishes several virtual channels which are
-> >> claimed by the peripheral drivers. ?This (amongst other things) allows
-> >> the peripheral drivers to hold claim to one of the virtual channels
-> >> all the time that it's required.
-> >
-> > If users of DMA expect DMA engine drivers to work this way, then we should
-> > have this mentioned clearly in DMA slave documentation.
+> > OK, I'll update it and post the patch in the next day or so.
 > 
-> The requirement stems from the fact that most DMACs(esp third party) could be
-> made to reroute req-signals by the platform, it has not much to do with the API.
-> IMO, all dmac drivers should be implemented that way to be on the safer side.
+> Thanks a lot. I'll be sure to test it and respond to confirm that it
+> works fine (or not).
 
-No it isn't.  It's to do with how the physical channels are used.
+See below. Thanks.
+
+8<------------------------
