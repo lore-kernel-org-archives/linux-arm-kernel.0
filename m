@@ -1,33 +1,33 @@
-From: viresh.kumar@st.com (viresh kumar)
-Date: Wed, 10 Aug 2011 14:59:31 +0530
-Subject: [PATCH V2 6/6] spi/spi-pl022: Request/free DMA channels as and
-	when required.
-In-Reply-To: <20110810090042.GE1831@n2100.arm.linux.org.uk>
-References: <cover.1312965741.git.viresh.kumar@st.com>
-	<566c0525199f498f04422d4c3b2ddd7466648c20.1312965742.git.viresh.kumar@st.com>
-	<20110810090042.GE1831@n2100.arm.linux.org.uk>
-Message-ID: <4E424F7B.2000800@st.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 10 Aug 2011 10:29:55 +0100
+Subject: Enabling runtime P2V by default (Re: [PATCH 3/5] mach-u300:
+	patch physoffset by default)
+In-Reply-To: <20110810092206.GE10121@e102144-lin.cambridge.arm.com>
+References: <1312918898-11894-1-git-send-email-linus.walleij@stericsson.com>
+	<20110810091635.GF1831@n2100.arm.linux.org.uk>
+	<20110810092206.GE10121@e102144-lin.cambridge.arm.com>
+Message-ID: <20110810092955.GG1831@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/10/2011 02:30 PM, Russell King - ARM Linux wrote:
->> > They must be allocated when they are required and must be freed after we are
->> > done with transfers. So that they can be used by other users.
-> Which DMA engine driver requires this?
+On Wed, Aug 10, 2011 at 10:22:06AM +0100, Will Deacon wrote:
+> On Wed, Aug 10, 2011 at 10:16:35AM +0100, Russell King - ARM Linux wrote:
+> > On Tue, Aug 09, 2011 at 09:41:38PM +0200, Linus Walleij wrote:
+> > > From: Linus Walleij <linus.walleij@linaro.org>
+> > > 
+> > > This works like a charm so I'll just default-select it.
+> > 
+> > Well, we can remove the EXPERIMENTAL status of this option now.  This
+> > raises the question is whether we should now default it to 'y' - I
+> > think we should.  Anyone have any objections?
 > 
+> I've been running with this option enabled for the collection of ARM boards
+> I have and the only problem I have encountered was related to u-boot loading
+> at the wrong address.
+> 
+> So I'm all for enabling it by default, especially since it will force out
+> any remaining issues for boards where this hasn't been used extensively.
 
-dw_dmac.c
-
-> Normally, when we have DMA engine drivers with multiple request signals,
-> the slave peripheral side publishes several virtual channels which are
-> claimed by the peripheral drivers.  This (amongst other things) allows
-> the peripheral drivers to hold claim to one of the virtual channels
-> all the time that it's required.
-
-If users of DMA expect DMA engine drivers to work this way, then we should
-have this mentioned clearly in DMA slave documentation.
-
-@Dan/Vinod: What do you say?
-
--- 
-viresh
+Maybe also making the option hidden depending on EXPERT, or even EMBEDDED
+would be a good idea too.  I think it falls into at least the same class
+as UID16, sysctl, hotplug, printk, etc. which are all EXPERT options.
