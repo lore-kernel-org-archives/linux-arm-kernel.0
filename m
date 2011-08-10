@@ -1,108 +1,222 @@
-From: padma.kvr@gmail.com (padma venkat)
-Date: Wed, 10 Aug 2011 17:34:33 +0530
-Subject: [RFC][PATCH 1/2] S5PV210: SPI: Add clkdev support
-In-Reply-To: <4E413941.10307@samsung.com>
-References: <1312898222-7165-1-git-send-email-padma.v@samsung.com>
-	<4E413941.10307@samsung.com>
-Message-ID: <CAAgF-BftGYkZ6aaSZgxd8gk1Zy9-sJEroZcaijd6zN3Qr9MEhQ@mail.gmail.com>
+From: bryan.wu@canonical.com (Bryan Wu)
+Date: Wed, 10 Aug 2011 20:05:34 +0800
+Subject: [PATCH v3 00/18] Introduce a led trigger for CPU activity and
+	consolidate LED driver in ARM
+Message-ID: <1312977952-2272-1-git-send-email-bryan.wu@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sylwester,
+Based on Linus Walleij's ARM LED consolidation work, this patchset introduce a
+new generic led trigger for CPU not only for ARM but also for others.
 
-On Tue, Aug 9, 2011 at 7:12 PM, Sylwester Nawrocki
-<s.nawrocki@samsung.com> wrote:
-> [corrected Jassi's email address]
->
-> On 08/09/2011 03:57 PM, Padmavathi Venna wrote:
->> Create a clkdev alias for spi bus clock and modify the spi
->> driver to lookup the clock using the alias name instead of
->> passing clock name and clock number from SPI platform data.
->>
->> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
->> ---
->> This patch is tested for S5PV210 platform and similar
->> changes can be adopted for rest of the Samsung's s3c
->> and s5p platforms, if this approach is accepted.
->
-> It is a bit surprising to me how you do intend to use the clock aliases.
-> Are we seriously going to be creating clock con_id aliases for most
-> of the available devices ? It doesn't sound sane to me..
-We don't need to create the alias names for all the devices. But we need
-to create only for those which need clock information from platform data.
-As far as I know we need to create for spi,hsmmc,uart and iis.
->
-> Wouldn't it be possible to avoid the aliases by correcting the clock
-> registration process ?
-Yes it is possible but we don't have the flexibility to create the alias names
-only for the required clocks.
->
->> ?arch/arm/mach-s5pv210/dev-spi.c ? ? ? ? ? ? ? ? ?| ? 31 ++++++++++++++++++---
->> ?arch/arm/plat-samsung/include/plat/s3c64xx-spi.h | ? ?7 +----
->> ?2 files changed, 27 insertions(+), 11 deletions(-)
->>
->> diff --git a/arch/arm/mach-s5pv210/dev-spi.c b/arch/arm/mach-s5pv210/dev-spi.c
-> ...
->> -void __init s5pv210_spi_set_info(int cntrlr, int src_clk_nr, int num_cs)
->> +void __init s5pv210_spi_set_info(int cntrlr, int num_cs)
->> ?{
->> ? ? ? struct s3c64xx_spi_info *pd;
->> + ? ? struct device *dev;
->> + ? ? char devname[16], clk_alias_name[16];
->> + ? ? int ret, i;
->>
->> ? ? ? /* Reject invalid configuration */
->> - ? ? if (!num_cs || src_clk_nr < 0
->> - ? ? ? ? ? ? ? ? ? ? || src_clk_nr > S5PV210_SPI_SRCCLK_SCLK) {
->> + ? ? if (!num_cs) {
->> ? ? ? ? ? ? ? printk(KERN_ERR "%s: Invalid SPI configuration\n", __func__);
->> ? ? ? ? ? ? ? return;
->> ? ? ? }
->> @@ -159,9 +162,11 @@ void __init s5pv210_spi_set_info(int cntrlr, int src_clk_nr, int num_cs)
->> ? ? ? switch (cntrlr) {
->> ? ? ? case 0:
->> ? ? ? ? ? ? ? pd = &s5pv210_spi0_pdata;
->> + ? ? ? ? ? ? dev = &s5pv210_device_spi0.dev;
->> ? ? ? ? ? ? ? break;
->> ? ? ? case 1:
->> ? ? ? ? ? ? ? pd = &s5pv210_spi1_pdata;
->> + ? ? ? ? ? ? dev = &s5pv210_device_spi1.dev;
->> ? ? ? ? ? ? ? break;
->> ? ? ? default:
->> ? ? ? ? ? ? ? printk(KERN_ERR "%s: Invalid SPI controller(%d)\n",
->> @@ -169,7 +174,23 @@ void __init s5pv210_spi_set_info(int cntrlr, int src_clk_nr, int num_cs)
->> ? ? ? ? ? ? ? return;
->> ? ? ? }
->>
->> + ? ? sprintf(devname, "s3c64xx-spi.%d", cntrlr);
->> +
->> + ? ? for (i = 0; i < ARRAY_SIZE(spi_src_clks); i++) {
->> + ? ? ? ? ? ? sprintf(clk_alias_name, "clk_spi_bus%d", i);
->> +
->> + ? ? ? ? ? ? if (!strcmp(spi_src_clks[i], "pclk"))
->> + ? ? ? ? ? ? ? ? ? ? ret = clk_add_alias(clk_alias_name, devname,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? spi_src_clks[i], NULL);
->> + ? ? ? ? ? ? else
->> + ? ? ? ? ? ? ? ? ? ? ret = clk_add_alias(clk_alias_name, devname,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? spi_src_clks[i], dev);
->> + ? ? ? ? ? ? if (ret) {
->> + ? ? ? ? ? ? ? ? ? ? printk(KERN_ERR "failed to create alias for"
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? " SPI%d source clock%d\n", cntrlr, i);
->> + ? ? ? ? ? ? ? ? ? ? continue;
->> + ? ? ? ? ? ? }
->> + ? ? }
->> +
->> ? ? ? pd->num_cs = num_cs;
->> - ? ? pd->src_clk_nr = src_clk_nr;
->> - ? ? pd->src_clk_name = spi_src_clks[src_clk_nr];
->> ?}
-> ...
->
-> --
-> Thanks,
-> Sylwester
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+For enabling CPU idle event, CPU arch code should call ledtrig_cpu() stub to
+trigger idle start or idle end event.
+
+These patches convert old style LED driver in arch/arm to gpio_led or new led
+driver interface. Against 3.1.0-rc1 and build successfully for all the machines.
+
+Test ledtrig-cpu driver on OMAP4 Panda board.
+
+--
+root at omap4430-panda:~# uname -a
+Linux omap4430-panda 3.1.0-rc1-07641-gb154376 #1 SMP Wed Aug 10 18:26:24 CST 2011 armv7l unknown
+root at omap4430-panda:~# dmesg | grep trig
+[    1.891265] LED trigger cpu0 indicate activity on CPU 0
+[    1.896728] LED trigger cpu1 indicate activity on CPU 1
+root at omap4430-panda:~# cat /sys/class/leds/pandaboard\:\:status1/trigger
+none nand-disk mmc0 mmc1 timer [heartbeat] cpu0 cpu1
+root at omap4430-panda:~# cat /sys/class/leds/pandaboard\:\:status2/trigger
+none nand-disk [mmc0] mmc1 timer heartbeat cpu0 cpu1
+root at omap4430-panda:~# echo cpu0 > /sys/class/leds/pandaboard\:\:status1/trigger
+root at omap4430-panda:~# cat /sys/class/leds/pandaboard\:\:status1/trigger
+none nand-disk mmc0 mmc1 timer heartbeat [cpu0] cpu1
+root at omap4430-panda:~# echo cpu1 > /sys/class/leds/pandaboard\:\:status2/trigger
+root at omap4430-panda:~# cat /sys/class/leds/pandaboard\:\:status2/trigger
+none nand-disk mmc0 mmc1 timer heartbeat cpu0 [cpu1]
+
+Then try some heavy task like dd and use taskset to assign the task to a specific CPU,
+LED will turn on or off as expect
+--
+
+v2 --> v3:
+ * almost rewrote the whole ledtrig-cpu driver, which is more simple
+ * every CPU will have a per-CPU trigger
+ * cpu trigger can be assigned to any leds
+ * fix a lockdep issue in led-trigger common code
+ * other fix according to review
+
+v1 --> v2:
+ * remove select operations in Kconfig of every machines
+ * add back supporting of led in core module of mach-integrator
+ * solidate name scheme in ledtrig-cpu.c
+ * add comments of CPU_LED_* cpu led events
+ * fold patches of RealView and Versatile together
+ * add machine_is_ check during assabet led driver init
+ * add some Acked-by in patch logs
+ * remove code for simpad machine in machine-sa11000, since Jochen Friedrich
+  introduced gpiolib and gpio-led driver for simpad
+ * on Assabet and Netwinder machine, LED operations is reversed like:
+  setting bit means turn off leds
+  clearing bit means turn on leds
+ * add a new function to read CM_CTRL register for led driver
+
+This patchset is based on patches from Jochen Friedrich for simpad:
+ * http://lists.infradead.org/pipermail/linux-arm-kernel/2011-July/057566.html
+ * http://lists.infradead.org/pipermail/linux-arm-kernel/2011-July/057564.html
+ * http://lists.infradead.org/pipermail/linux-arm-kernel/2011-July/057567.html
+ * http://lists.infradead.org/pipermail/linux-arm-kernel/2011-July/057565.html
+ * http://lists.infradead.org/pipermail/linux-arm-kernel/2011-July/057568.html
+
+*** BLURB HERE ***
+
+Bryan Wu (17):
+  led-triggers: use atomic kzalloc during led trigger registering
+  led-triggers: create a trigger for CPU activity
+  arm: at91: convert old leds drivers to gpio_led and led_trigger
+    drivers
+  mach-ks8695: remove leds driver, since nobody use it
+  mach-shark: retire custom LED code
+  mach-orion5x: convert custom LED code to gpio_led and LED CPU trigger
+  mach-integrator: move CM_CTRL to header file for accessing by other
+    functions
+  mach-integrator: retire custom LED code
+  mach-clps711x: retire custom LED code of P720T machine
+  mach-ebsa110: retire custom LED code
+  mach-footbridge: retire custom LED code
+  mach-pxa: retire custom LED code
+  plat-samsung: remove including old leds event API header file
+  mach-pnx4008: remove including old leds event API header file
+  mach-omap1: retire custom LED code
+  mach-sa1100: retire custom LED code
+  ARM: use new LEDS CPU trigger stub to replace old one
+
+Linus Walleij (1):
+  mach-realview and mach-versatile: retire custom LED code
+
+ arch/arm/Kconfig                               |   53 -----
+ arch/arm/include/asm/leds.h                    |   50 ----
+ arch/arm/kernel/Makefile                       |    1 -
+ arch/arm/kernel/leds.c                         |  119 ----------
+ arch/arm/kernel/process.c                      |    6 +-
+ arch/arm/kernel/time.c                         |   17 --
+ arch/arm/mach-at91/board-cap9adk.c             |   21 ++-
+ arch/arm/mach-at91/board-csb337.c              |    3 -
+ arch/arm/mach-at91/board-ecbat91.c             |   18 ++-
+ arch/arm/mach-at91/board-eco920.c              |   23 ++-
+ arch/arm/mach-at91/board-kafa.c                |   17 ++-
+ arch/arm/mach-at91/board-kb9202.c              |   23 ++-
+ arch/arm/mach-at91/board-rm9200dk.c            |    3 -
+ arch/arm/mach-at91/board-rm9200ek.c            |    3 -
+ arch/arm/mach-at91/board-sam9-l9260.c          |   23 ++-
+ arch/arm/mach-at91/board-sam9261ek.c           |    3 -
+ arch/arm/mach-at91/board-yl-9200.c             |    3 -
+ arch/arm/mach-at91/include/mach/board.h        |    1 -
+ arch/arm/mach-at91/leds.c                      |  105 ---------
+ arch/arm/mach-clps711x/Makefile                |    2 -
+ arch/arm/mach-clps711x/include/mach/time.h     |    2 -
+ arch/arm/mach-clps711x/p720t-leds.c            |   67 ------
+ arch/arm/mach-clps711x/p720t.c                 |   60 +++++
+ arch/arm/mach-clps711x/time.c                  |    1 -
+ arch/arm/mach-ebsa110/Makefile                 |    4 +-
+ arch/arm/mach-ebsa110/leds.c                   |   80 ++++---
+ arch/arm/mach-footbridge/Makefile              |    4 -
+ arch/arm/mach-footbridge/ebsa285-leds.c        |  139 -----------
+ arch/arm/mach-footbridge/ebsa285.c             |   79 +++++++
+ arch/arm/mach-footbridge/include/mach/system.h |    1 -
+ arch/arm/mach-footbridge/netwinder-hw.c        |  110 ++++++++--
+ arch/arm/mach-footbridge/netwinder-leds.c      |  139 -----------
+ arch/arm/mach-integrator/Makefile              |    3 +-
+ arch/arm/mach-integrator/core.c                |    3 -
+ arch/arm/mach-integrator/include/mach/cm.h     |    2 +
+ arch/arm/mach-integrator/leds.c                |  159 ++++++++-----
+ arch/arm/mach-ks8695/Makefile                  |    3 -
+ arch/arm/mach-ks8695/devices.c                 |   21 --
+ arch/arm/mach-ks8695/include/mach/devices.h    |    5 -
+ arch/arm/mach-ks8695/leds.c                    |   93 --------
+ arch/arm/mach-omap1/Makefile                   |    8 -
+ arch/arm/mach-omap1/board-h2.c                 |   34 +++-
+ arch/arm/mach-omap1/board-h3.c                 |   34 +++-
+ arch/arm/mach-omap1/board-osk.c                |   33 +++
+ arch/arm/mach-omap1/leds-h2p2-debug.c          |  167 --------------
+ arch/arm/mach-omap1/leds-innovator.c           |   99 --------
+ arch/arm/mach-omap1/leds-osk.c                 |  115 ----------
+ arch/arm/mach-omap1/leds.c                     |   69 ------
+ arch/arm/mach-omap1/leds.h                     |    3 -
+ arch/arm/mach-omap1/time.c                     |    1 -
+ arch/arm/mach-omap1/timer32k.c                 |    1 -
+ arch/arm/mach-orion5x/rd88f5181l-fxo-setup.c   |    1 -
+ arch/arm/mach-orion5x/rd88f5181l-ge-setup.c    |    1 -
+ arch/arm/mach-orion5x/rd88f5182-setup.c        |   74 ++----
+ arch/arm/mach-orion5x/rd88f6183ap-ge-setup.c   |    1 -
+ arch/arm/mach-pnx4008/time.c                   |    1 -
+ arch/arm/mach-pxa/Makefile                     |    8 -
+ arch/arm/mach-pxa/idp.c                        |   79 +++++++
+ arch/arm/mach-pxa/leds-idp.c                   |  116 ----------
+ arch/arm/mach-pxa/leds-lubbock.c               |  125 ----------
+ arch/arm/mach-pxa/leds-mainstone.c             |  120 ----------
+ arch/arm/mach-pxa/leds.c                       |   32 ---
+ arch/arm/mach-pxa/leds.h                       |   13 -
+ arch/arm/mach-pxa/lubbock.c                    |   93 ++++++++
+ arch/arm/mach-pxa/mainstone.c                  |   92 ++++++++
+ arch/arm/mach-realview/core.c                  |   39 ----
+ arch/arm/mach-realview/core.h                  |    2 -
+ arch/arm/mach-realview/realview_eb.c           |    4 -
+ arch/arm/mach-realview/realview_pb1176.c       |    4 -
+ arch/arm/mach-realview/realview_pb11mp.c       |    4 -
+ arch/arm/mach-realview/realview_pba8.c         |    4 -
+ arch/arm/mach-realview/realview_pbx.c          |    4 -
+ arch/arm/mach-sa1100/Makefile                  |    9 -
+ arch/arm/mach-sa1100/assabet.c                 |   83 +++++++
+ arch/arm/mach-sa1100/badge4.c                  |   30 +++
+ arch/arm/mach-sa1100/cerf.c                    |   42 ++++
+ arch/arm/mach-sa1100/hackkit.c                 |   32 +++
+ arch/arm/mach-sa1100/lart.c                    |   26 ++
+ arch/arm/mach-sa1100/leds-assabet.c            |  114 ---------
+ arch/arm/mach-sa1100/leds-badge4.c             |  111 ---------
+ arch/arm/mach-sa1100/leds-cerf.c               |  110 ---------
+ arch/arm/mach-sa1100/leds-hackkit.c            |  112 ---------
+ arch/arm/mach-sa1100/leds-lart.c               |  101 --------
+ arch/arm/mach-sa1100/leds.c                    |   50 ----
+ arch/arm/mach-sa1100/leds.h                    |   13 -
+ arch/arm/mach-shark/Makefile                   |    4 +-
+ arch/arm/mach-shark/core.c                     |    1 -
+ arch/arm/mach-shark/leds.c                     |  225 +++++++-----------
+ arch/arm/mach-versatile/core.c                 |   42 ----
+ arch/arm/plat-omap/Kconfig                     |    3 +-
+ arch/arm/plat-omap/debug-leds.c                |  292 ++++++------------------
+ arch/arm/plat-samsung/time.c                   |    1 -
+ arch/arm/plat-versatile/Kconfig                |    2 +-
+ arch/arm/plat-versatile/leds.c                 |   13 +-
+ drivers/leds/Kconfig                           |   10 +
+ drivers/leds/Makefile                          |    1 +
+ drivers/leds/led-triggers.c                    |    2 +-
+ drivers/leds/ledtrig-cpu.c                     |  120 ++++++++++
+ include/linux/leds.h                           |   15 ++
+ 99 files changed, 1403 insertions(+), 3011 deletions(-)
+ delete mode 100644 arch/arm/include/asm/leds.h
+ delete mode 100644 arch/arm/kernel/leds.c
+ delete mode 100644 arch/arm/mach-clps711x/p720t-leds.c
+ delete mode 100644 arch/arm/mach-footbridge/ebsa285-leds.c
+ delete mode 100644 arch/arm/mach-footbridge/netwinder-leds.c
+ delete mode 100644 arch/arm/mach-ks8695/leds.c
+ delete mode 100644 arch/arm/mach-omap1/leds-h2p2-debug.c
+ delete mode 100644 arch/arm/mach-omap1/leds-innovator.c
+ delete mode 100644 arch/arm/mach-omap1/leds-osk.c
+ delete mode 100644 arch/arm/mach-omap1/leds.c
+ delete mode 100644 arch/arm/mach-omap1/leds.h
+ delete mode 100644 arch/arm/mach-pxa/leds-idp.c
+ delete mode 100644 arch/arm/mach-pxa/leds-lubbock.c
+ delete mode 100644 arch/arm/mach-pxa/leds-mainstone.c
+ delete mode 100644 arch/arm/mach-pxa/leds.c
+ delete mode 100644 arch/arm/mach-pxa/leds.h
+ delete mode 100644 arch/arm/mach-sa1100/leds-assabet.c
+ delete mode 100644 arch/arm/mach-sa1100/leds-badge4.c
+ delete mode 100644 arch/arm/mach-sa1100/leds-cerf.c
+ delete mode 100644 arch/arm/mach-sa1100/leds-hackkit.c
+ delete mode 100644 arch/arm/mach-sa1100/leds-lart.c
+ delete mode 100644 arch/arm/mach-sa1100/leds.c
+ delete mode 100644 arch/arm/mach-sa1100/leds.h
+ create mode 100644 drivers/leds/ledtrig-cpu.c
+
+-- 
+1.7.5
