@@ -1,61 +1,56 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Wed, 10 Aug 2011 10:07:46 +0900
-Subject: [RFC PATCH 4/8] ARM: exynos4: convert logical CPU numbers to
-	physical numbers
-In-Reply-To: <1312926162-22469-5-git-send-email-will.deacon@arm.com>
-References: <1312926162-22469-1-git-send-email-will.deacon@arm.com>
-	<1312926162-22469-5-git-send-email-will.deacon@arm.com>
-Message-ID: <CAH9JG2WjHm2mypLR-9=1vNDz-h3PyRGwTP5Z-C1SsktRh+H6eA@mail.gmail.com>
+From: david@gibson.dropbear.id.au (David Gibson)
+Date: Wed, 10 Aug 2011 11:29:58 +1000
+Subject: How to handle named resources with DT?
+In-Reply-To: <CACxGe6tbEW1EZhqXy78EZVM_sQLH0Qbr7QOzbgbsKBRn1FtVrg@mail.gmail.com>
+References: <4E40FC88.5090403@ti.com>
+	<20110809162907.GA630@manju-WNB7PBC4801-0006>
+	<4E4166F0.9050401@ti.com>
+	<CACxGe6tbEW1EZhqXy78EZVM_sQLH0Qbr7QOzbgbsKBRn1FtVrg@mail.gmail.com>
+Message-ID: <20110810012958.GB23511@yookeroo.fritz.box>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tested-by: Kyungmin Park <kyungmin.park@samsung.com>
-Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+On Tue, Aug 09, 2011 at 11:23:45AM -0600, Grant Likely wrote:
+> On Tue, Aug 9, 2011 at 10:57 AM, Cousson, Benoit <b-cousson@ti.com> wrote:
+> > Hi Manju,
+> >
+> > On 8/9/2011 6:29 PM, G, Manjunath Kondaiah wrote:
+> >>
+> >> Hi Benoit,
+> >>
+> >> On Tue, Aug 09, 2011 at 11:23:20AM +0200, Cousson, Benoit wrote:
+> >>>
+> >>> Hi Grant,
+> >>>
+> >>> Trying to bind hwmod informations with DT, I'm facing a little
+> >>> limitation.
+> >>> A bunch of drivers are using the platform_get_resource_byname, so
+> >>> the name for the resource is needed.
+> >>>
+> >>> The name is used so far for IORESOURCE_MEM, IORESOURCE_IRQ and
+> >>> IORESOURCE_DMA types of resources.
+> >>
+> >> IORESOURCE_MEM and IORESOURCE_IRQ's are fetched from dt blob and
+> >> it will be part of pdev.
+> >
+> > Yes, but without the proper name in the resource structure. It will be then
+> > impossible to use the platform_get_resource_byname function that is
+> > currently used by a bunch of drivers.
+> 
+> There is no analogous mechanism for _byname in the device tree.  The
+> DT binding for a device must explicitly state what order the register
+> ranges are in.  The driver will need to be adapted.
 
-On Wed, Aug 10, 2011 at 6:42 AM, Will Deacon <will.deacon@arm.com> wrote:
-> This patch uses the new cpu_logical_map() macro for converting logical
-> CPU numbers into physical numbers when dealing with the pen_release
-> variable in the SMP boot and CPU hotplug paths.
->
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
-> ?arch/arm/mach-exynos4/hotplug.c | ? ?2 +-
-> ?arch/arm/mach-exynos4/platsmp.c | ? ?2 +-
-> ?2 files changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/mach-exynos4/hotplug.c b/arch/arm/mach-exynos4/hotplug.c
-> index 7490789..da70e7e 100644
-> --- a/arch/arm/mach-exynos4/hotplug.c
-> +++ b/arch/arm/mach-exynos4/hotplug.c
-> @@ -75,7 +75,7 @@ static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
-> ? ? ? ? ? ? ? ? ? ?:
-> ? ? ? ? ? ? ? ? ? ?: "memory", "cc");
->
-> - ? ? ? ? ? ? ? if (pen_release == cpu) {
-> + ? ? ? ? ? ? ? if (pen_release == cpu_logical_map(cpu)) {
-> ? ? ? ? ? ? ? ? ? ? ? ?/*
-> ? ? ? ? ? ? ? ? ? ? ? ? * OK, proper wakeup, we're done
-> ? ? ? ? ? ? ? ? ? ? ? ? */
-> diff --git a/arch/arm/mach-exynos4/platsmp.c b/arch/arm/mach-exynos4/platsmp.c
-> index 7c2282c..0733814 100644
-> --- a/arch/arm/mach-exynos4/platsmp.c
-> +++ b/arch/arm/mach-exynos4/platsmp.c
-> @@ -126,7 +126,7 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
-> ? ? ? ? * Note that "pen_release" is the hardware CPU ID, whereas
-> ? ? ? ? * "cpu" is Linux's internal ID.
-> ? ? ? ? */
-> - ? ? ? write_pen_release(cpu);
-> + ? ? ? write_pen_release(cpu_logical_map(cpu));
->
-> ? ? ? ?if (!(__raw_readl(S5P_ARM_CORE1_STATUS) & S5P_CORE_LOCAL_PWR_EN)) {
-> ? ? ? ? ? ? ? ?__raw_writel(S5P_CORE_LOCAL_PWR_EN,
-> --
-> 1.7.0.4
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+Well, the driver proper shouldn't need changing.  It should be
+possible to assign the correct names in the glue which translates the
+DT reg entries into the Linux resource structures.
+
+The difficulty with adding th enames to the DT itself is that it
+exposes the essentially Linux-specific names in what's supposed to be
+an OS neutral data structure.
+
+-- 
+David Gibson			| I'll have my music baroque, and my code
+david AT gibson.dropbear.id.au	| minimalist, thank you.  NOT _the_ _other_
+				| _way_ _around_!
+http://www.ozlabs.org/~dgibson
