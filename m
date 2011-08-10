@@ -1,49 +1,29 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 10 Aug 2011 15:16:42 +0100
-Subject: [RFC PATCH] ARM: sched_clock: allow sched_clock to be selected
-	at runtime
-In-Reply-To: <20110810114907.GA2680@pulham.picochip.com>
-References: <1312910015-20043-1-git-send-email-marc.zyngier@arm.com>
-	<20110810114907.GA2680@pulham.picochip.com>
-Message-ID: <4E4292CA.3050704@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 10 Aug 2011 16:24:27 +0200
+Subject: Subject: L2x0 OF properties do not include interrupt #
+In-Reply-To: <20110810141048.GK10121@e102144-lin.cambridge.arm.com>
+References: <000201cc575b$c1229010$4367b030$@rutland@arm.com>
+	<4E428EB0.1080204@gmail.com>
+	<20110810141048.GK10121@e102144-lin.cambridge.arm.com>
+Message-ID: <201108101624.27881.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/08/11 12:49, Jamie Iles wrote:
-> Hi Marc,
+On Wednesday 10 August 2011, Will Deacon wrote:
+> On Wed, Aug 10, 2011 at 02:59:12PM +0100, Rob Herring wrote:
+> > I think you should allow for either the single irq or individual irqs.
+> > You can specify that the event counter interrupt must be first, then the
+> > pmu driver could work either way ignoring the rest. The driver probably
+> > needs to mark the handler as shared if there is only the combined
+> > interrupt unless you expect all interrupts to be handled by 1 driver.
 > 
-> On Tue, Aug 09, 2011 at 06:13:35PM +0100, Marc Zyngier wrote:
->> sched_clock() is yet another blocker on the road to the single
->> image. This patch implements an idea by Russell King:
->>
->> http://www.spinics.net/lists/linux-omap/msg49561.html
->>
->> Instead of asking the platform to implement both sched_clock()
->> itself and the rollover callback, simply register a read()
->> function, and let the ARM code care about sched_clock() itself,
->> the conversion to ns and the rollover. sched_clock() uses
->> this read() function as an indirection to the platform code.
->>
->> This allow some simplifications and possibly some footprint gain
->> when multiple platforms are compiled in. Among the drawbacks,
->> the removal of the *_fixed_sched_clock optimization which could
->> negatively impact some platforms (sa1100, tegra, versatile
->> and omap).
->>
->> Tested on 11MPCore, OMAP4 and Tegra.
+> I much prefer having seperate, individual IRQs with no requirement on
+> ordering.
 > 
-> Tested on my 1176 platform and works nicely.  However, shouldn't the 
-> read functions still be marked notrace so they don't appear in ftrace 
-> output?
-> 
-> On my (out of tree) platform, omitting notrace and having all of the 
-> ftrace bootup tests results in a hard lockup.  Annotating the read 
-> function resolves this.
 
-I'll update the patch to reflect this.
+What do you mean with 'no requirement on ordering'? If we have multiple
+interrupt sources, we definitely want to identify which one calls which
+handler, and the only information we have is the position in the array
+of interrupt numbers.
 
-Many thanks for testing.
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+	Arnd
