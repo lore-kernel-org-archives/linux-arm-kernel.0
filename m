@@ -1,123 +1,119 @@
-From: eric.miao@linaro.org (Eric Miao)
-Date: Wed, 10 Aug 2011 16:08:53 +0800
-Subject: [PATCH V4] mmc: Enable the ADMA2 on esdhc imx driver
-In-Reply-To: <1312792204-7652-1-git-send-email-richard.zhu@linaro.org>
-References: <1312792204-7652-1-git-send-email-richard.zhu@linaro.org>
-Message-ID: <CAMPhdO8QiODg6sTKe2N2b4xT8ZHXSh1DvRn57J8JfLx6+QAD4w@mail.gmail.com>
+From: marvin24@gmx.de (Marc Dietich)
+Date: Wed, 10 Aug 2011 10:24:57 +0200
+Subject: [PATCH 4/5 V2] ARM: tegra: paz00: add clocks required
+	forusboperation
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF04A06873BB@HQMAIL01.nvidia.com>
+References: <201108092126.28521.marvin24@gmx.de>
+	<74CDBE0F657A3D45AFBB94109FB122FF04A06873BB@HQMAIL01.nvidia.com>
+Message-ID: <201108101024.57494.marvin24@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 8, 2011 at 4:30 PM, Richard Zhu <richard.zhu@linaro.org> wrote:
-> Eanble the ADMA2 mode for freescale esdhc imx driver,
-> tested on MX25 3DS board, MX51 BBG board and MX53 LOCO board.
->
-> This patch is only used to enable the ADMA2 for MX51/53 platforms.
-> MX25/35 can't support the ADMA2 mode, set BROKEN_ADMA quirk on
-> MX25/35 platforms.
->
-> The ADMA mode supported or not can be distinguished by the
-> bit20 of Capability Register(offset 0x40) in FSL eSDHC module.
->
-> Signed-off-by: Richard Zhu <richard.zhu@linaro.org>
+Hi Stephen,
 
-Tested-and-acked-by: Eric Miao <eric.miao@linaro.org>
+> Marc Dietrich wrote at Tuesday, August 09, 2011 1:26 PM:
+> > On Tuesday 09 August 2011 20:35:45 you wrote:
+> > > [...]
+> > > Do you need the pll_p_out4 entry? What's that driving? Check in
+> > > /sys/kernel/debug/clock/clock_tree (/sys/kernel/debug is debugfs).
+> > 
+> > I think it is only required to setup the correct (non-standard?)
+> > frequency. Seems all other boards use 108 MHz which cause one of the
+> > ports to fail. Don't ask me for details ...
+> 
+> ...
+> 
+> > root at ac100:~# cat /sys/kernel/debug/clock/clock_tree
+> > 
+> >    clock                          state  ref div      rate
+> > 
+> > --------------------------------------------------------------
+> > 
+> >    clk_m                          on     9            12000000
+> 
+> ...
+> 
+> >       pll_p                       on     10  x18      216000000
+> 
+> ...
+> 
+> >          pll_p_out4               on     3   9        24000000
+> >          
+> >             sclk                  on     2            24000000
+> >             
+> >                avp.sclk           off    0            24000000
+> >                cop                on     1            24000000
+> >                hclk               on     2   1        24000000
+> >                
+> >                   pclk            on     2   2        12000000
+> >                   
+> >                      apbdma       on     1   1        12000000
+> 
+> Hmm. That's pretty odd.
+> 
+> With the standard kernel the device ships with, what does the clock tree
+> under pll_p_out4 look like? It'd be very interesting to compare that. If
+> that setup is the same as what this patch sets up, the patch seems fine.
 
-> ---
-> ?drivers/mmc/host/sdhci-esdhc-imx.c | ? 45 +++++++++++++++++++++++++++++++++--
-> ?1 files changed, 42 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-> index e62d33f..a966d5c 100644
-> --- a/drivers/mmc/host/sdhci-esdhc-imx.c
-> +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-> @@ -30,6 +30,14 @@
-> ?#define SDHCI_VENDOR_SPEC ? ? ? ? ? ? ?0xC0
-> ?#define ?SDHCI_VENDOR_SPEC_SDIO_QUIRK ?0x00000002
->
-> +/*
-> + * There is INT DMA ERR mis-match between eSDHC and STD SDHC SPEC
-> + * Bit25 is used in STD SPEC, and is reserved in fsl eSDHC design,
-> + * but bit28 is used as the INT DMA ERR in fsl eSDHC design.
-> + * Define this macro DMA error INT for fsl eSDHC
-> + */
-> +#define ?SDHCI_INT_VENDOR_SPEC_DMA_ERR 0x10000000
-> +
-> ?#define ESDHC_FLAG_GPIO_FOR_CD ? ? ? ? (1 << 0)
-> ?/*
-> ?* The CMDTYPE of the CMD register (offset 0xE) should be set to
-> @@ -79,6 +87,27 @@ static u32 esdhc_readl_le(struct sdhci_host *host, int reg)
-> ? ? ? ? ? ? ? ? ? ? ? ?val |= SDHCI_CARD_PRESENT;
-> ? ? ? ?}
->
-> + ? ? ? if (unlikely(reg == SDHCI_CAPABILITIES)) {
-> + ? ? ? ? ? ? ? /* In FSL esdhc IC module, only bit20 is used to indicate the
-> + ? ? ? ? ? ? ? ?* ADMA2 capability of esdhc, but this bit is messed up on some
-> + ? ? ? ? ? ? ? ?* SOCs (e.x MX25,MX35 this bit is set, but it can't support the
-> + ? ? ? ? ? ? ? ?* ADMA2 actually). So set the BROKEN_ADMA quirk on MX25/35
-> + ? ? ? ? ? ? ? ?* paltforms.
-> + ? ? ? ? ? ? ? ?*/
-> +
-> + ? ? ? ? ? ? ? if (val & SDHCI_CAN_DO_ADMA1) {
-> + ? ? ? ? ? ? ? ? ? ? ? val &= ~SDHCI_CAN_DO_ADMA1;
-> + ? ? ? ? ? ? ? ? ? ? ? val |= SDHCI_CAN_DO_ADMA2;
-> + ? ? ? ? ? ? ? }
-> + ? ? ? }
-> +
-> + ? ? ? if (unlikely(reg == SDHCI_INT_STATUS)) {
-> + ? ? ? ? ? ? ? if (val & SDHCI_INT_VENDOR_SPEC_DMA_ERR) {
-> + ? ? ? ? ? ? ? ? ? ? ? val &= ~SDHCI_INT_VENDOR_SPEC_DMA_ERR;
-> + ? ? ? ? ? ? ? ? ? ? ? val |= SDHCI_INT_ADMA_ERROR;
-> + ? ? ? ? ? ? ? }
-> + ? ? ? }
-> +
-> ? ? ? ?return val;
-> ?}
->
-> @@ -125,6 +154,14 @@ static void esdhc_writel_le(struct sdhci_host *host, u32 val, int reg)
-> ? ? ? ? ? ? ? ? ? ? ? ?writel(v, host->ioaddr + SDHCI_VENDOR_SPEC);
-> ? ? ? ?}
->
-> + ? ? ? if (unlikely((reg == SDHCI_INT_ENABLE)
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? || (reg == SDHCI_SIGNAL_ENABLE))) {
-> + ? ? ? ? ? ? ? if (val & SDHCI_INT_ADMA_ERROR) {
-> + ? ? ? ? ? ? ? ? ? ? ? val &= ~SDHCI_INT_ADMA_ERROR;
-> + ? ? ? ? ? ? ? ? ? ? ? val |= SDHCI_INT_VENDOR_SPEC_DMA_ERR;
-> + ? ? ? ? ? ? ? }
-> + ? ? ? }
-> +
-> ? ? ? ?writel(val, host->ioaddr + reg);
-> ?}
->
-> @@ -225,9 +262,10 @@ static struct sdhci_ops sdhci_esdhc_ops = {
-> ?};
->
-> ?static struct sdhci_pltfm_data sdhci_esdhc_imx_pdata = {
-> - ? ? ? .quirks = ESDHC_DEFAULT_QUIRKS | SDHCI_QUIRK_BROKEN_ADMA
-> + ? ? ? .quirks = ESDHC_DEFAULT_QUIRKS | SDHCI_QUIRK_NO_HISPD_BIT
-> + ? ? ? ? ? ? ? ? ? ? ? | SDHCI_QUIRK_NO_ENDATTR_IN_NOPDESC
-> + ? ? ? ? ? ? ? ? ? ? ? | SDHCI_QUIRK_BROKEN_ADMA_ZEROLEN_DESC
-> ? ? ? ? ? ? ? ? ? ? ? ?| SDHCI_QUIRK_BROKEN_CARD_DETECTION,
-> - ? ? ? /* ADMA has issues. Might be fixable */
-> ? ? ? ?.ops = &sdhci_esdhc_ops,
-> ?};
->
-> @@ -284,7 +322,8 @@ static int __devinit sdhci_esdhc_imx_probe(struct platform_device *pdev)
->
-> ? ? ? ?if (cpu_is_mx25() || cpu_is_mx35()) {
-> ? ? ? ? ? ? ? ?/* Fix errata ENGcm07207 present on i.MX25 and i.MX35 */
-> - ? ? ? ? ? ? ? host->quirks |= SDHCI_QUIRK_NO_MULTIBLOCK;
-> + ? ? ? ? ? ? ? host->quirks |= SDHCI_QUIRK_NO_MULTIBLOCK
-> + ? ? ? ? ? ? ? ? ? ? ? | SDHCI_QUIRK_BROKEN_ADMA;
-> ? ? ? ? ? ? ? ?/* write_protect can't be routed to controller, use gpio */
-> ? ? ? ? ? ? ? ?sdhci_esdhc_ops.get_ro = esdhc_pltfm_get_ro;
-> ? ? ? ?}
-> --
-> 1.7.1
->
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+unfortunately, there is no such think in .32 kernel (the kernel deliverd with 
+the device), and I don't think I can port it over.
+
+> As far as I know all the clocks there are both unrelated to USB, and
+> internal to the device, so the board shouldn't have any effect. In
+> particular, avp.sclk/cop are for the internal media CPU/DSP, hclk/pclk
+> are the internal AHB/APB bus clocks, and apbdma is for an internal DMA
+> engine, currently only used for audio in the mainline kernel at least.
+
+Does this mean that the internal busses you mentioned are also running at low 
+speed? Would this be a hugh performance penality?
+
+> 
+> I guess I'll ask a few people internally to see if they have a clue why
+> your change might be necessary.
+
+Also take a look at seaboard, it has the same clock setting and especially 
+commit dfb625f934dd40baf29ee6c43e4f130b524411a1 in the chromeos kernel:
+
+commit dfb625f934dd40baf29ee6c43e4f130b524411a1
+Author: Vincent Palatin <vpalatin@chromium.org>
+Date:   Wed Apr 13 07:26:08 2011 -0400
+
+    CHROMIUM: tegra: seaboard: fix ULPI transceiver clock
+    
+    On our seaboard-based platforms, pll_p_out4 is used to clock
+    (through DAP_MCLK2) the external USB ULPI transceiver between the USB2
+    port to mini-PCIe modem. And it needs to be set at 24Mhz for the
+    tranceiver to work correctly.
+    Revert the sclk parent to pll_c out1 (as it was before the last change)
+    since it needs to stay clocked at 108MHz.
+    
+    Signed-off-by: Vincent Palatin <vpalatin@chromium.org>
+    
+    BUG=chrome-os-partner:3167
+    TEST=Check that the Gobi modem is appearing in lsusb listing
+    Use the kaen DVT for browsing and suspending
+    
+    Review URL: http://codereview.chromium.org/6825076
+    
+    Change-Id: Ia9b1bbc7860da732fb8edbbcf0bce60e82d6d8ed
+
+
+Thanks!
+
+Marc
+
+
+
+> For reference, here's Harmony on something roughly like linux-next:
+> 
+>    clk_m                          on     7            12000000
+> ...
+>       pll_p                       on     9   x18      216000000
+> ...
+>          pll_p_out4               on     2   2        108000000
+>             sclk                  on     2            108000000
+>                avp.sclk           off    0            108000000
+>                cop                on     1            108000000
+>                hclk               on     2   1        108000000
+>                   pclk            on     2   2        54000000
+>                      apbdma       on     1   1        54000000
