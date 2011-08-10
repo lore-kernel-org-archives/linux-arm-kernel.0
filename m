@@ -1,38 +1,36 @@
-From: viresh.kumar@st.com (viresh kumar)
-Date: Wed, 10 Aug 2011 09:06:43 +0530
-Subject: [PATCH 4/6] spi/spi-pl022: calculate_effective_freq() must set
-	rate <= requested rate
-In-Reply-To: <CACRpkdYAkPtOkVuF-UhpFHugvZpw_owmgoxP_opF8KE=cYF95w@mail.gmail.com>
-References: <cover.1312887860.git.viresh.kumar@st.com>	<abd4dbaedf226ad29461775bcd969810c87c305d.1312887860.git.viresh.kumar@st.com>
-	<CACRpkdYAkPtOkVuF-UhpFHugvZpw_owmgoxP_opF8KE=cYF95w@mail.gmail.com>
-Message-ID: <4E41FCCB.7040609@st.com>
+From: hemantp@ti.com (Hemant Pedanekar)
+Date: Wed, 10 Aug 2011 09:22:03 +0530
+Subject: [PATCH] omap: timer: Set dmtimer used as clocksource in autoreload
+	mode
+Message-ID: <1312948323-22823-1-git-send-email-hemantp@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Probably you missed reply-all by mistake, so adding them again]
+If CONFIG_OMAP_32K_TIMER is not selected and dmtimer is used as clocksource, the
+timer stops counting once overflow occurs as it was not set in autoreload mode.
+This results into timekeeping failure: for example, 'sleep 1' at the shell after
+the timer counter overflow would hang.
 
-On 08/10/2011 01:34 AM, Linus Walleij wrote:
-> On Tue, Aug 9, 2011 at 1:05 PM, Viresh Kumar <viresh.kumar@st.com> wrote:
-> 
->> There were few issues with calculate_effective_freq() routine:
->> - It was returning first rate found >= requested rate. Now, if system have spi's
->>  rate as 83 MHz, with possible prescaled rates as 83, 41.5, 20.75, 13.83 (as we
->>  can prescale with multiples of 2). If user has given rate to be programmed as
->>  22 MHz, then driver programmes it to 41.5 MHz. This looks to be incorrect, as
->>  user might have given the upper limit of the device, and we are programming it
->>  above it.
->> - Driver finds the first satisfying rate and programmes it, but with other
->>  values of scr & cpsdvsr, it is possible to get more closer rate.
-> 
-> Good that you found this bug!
-> 
->> +#define SPI_RATE(rate, cpsdvsr, scr)   (rate / (cpsdvsr * (1 + scr)))
-> 
-> Can you use a static inline instead of a macro? It is often preferred.
-> If you do, this is Acked-by.
-> 
+This patch sets up autoreload when starting the clocksource timer which fixes
+the above issue.
 
-Not a problem. Will surely do that.
+Signed-off-by: Hemant Pedanekar <hemantp@ti.com>
+---
+ arch/arm/mach-omap2/timer.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
+diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+index e964072..796b935 100644
+--- a/arch/arm/mach-omap2/timer.c
++++ b/arch/arm/mach-omap2/timer.c
+@@ -293,7 +293,7 @@ static void __init omap2_gp_clocksource_init(int gptimer_id,
+ 	pr_info("OMAP clocksource: GPTIMER%d at %lu Hz\n",
+ 		gptimer_id, clksrc.rate);
+ 
+-	__omap_dm_timer_load_start(clksrc.io_base, OMAP_TIMER_CTRL_ST, 0, 1);
++	omap_dm_timer_set_load_start(&clksrc, 1, 0);
+ 	init_sched_clock(&cd, dmtimer_update_sched_clock, 32, clksrc.rate);
+ 
+ 	if (clocksource_register_hz(&clocksource_gpt, clksrc.rate))
 -- 
-viresh
+1.7.3.5
