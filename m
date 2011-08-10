@@ -1,36 +1,51 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 10 Aug 2011 18:05:44 +0200
-Subject: [PATCH] mach-sa1100: fix PCI build problem
-In-Reply-To: <CAKnu2MoBnHDVht0LPR0ip1iZqojh2ab+wx=6mCj-+M2+yOpA3w@mail.gmail.com>
-References: <1312539884-10631-1-git-send-email-linus.walleij@linaro.org>
-	<CAKnu2MoBnHDVht0LPR0ip1iZqojh2ab+wx=6mCj-+M2+yOpA3w@mail.gmail.com>
-Message-ID: <201108101805.45133.arnd@arndb.de>
+From: manjugk@ti.com (G, Manjunath Kondaiah)
+Date: Wed, 10 Aug 2011 21:35:56 +0530
+Subject: [RFC/PATCH 04/14] OMAP: McBSP: use existing macros for
+	converting between devices
+In-Reply-To: <4E425A56.4000605@ti.com>
+References: <1312897232-4792-1-git-send-email-manjugk@ti.com>
+	<1312897232-4792-5-git-send-email-manjugk@ti.com>
+	<20110810100704.856fcc5c.jhnikula@gmail.com>
+	<4E425A56.4000605@ti.com>
+Message-ID: <20110810160556.GB2091@manju-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 10 August 2011, Linus Walleij wrote:
-> 2011/8/5 Linus Walleij <linus.walleij@linaro.org>:
+On Wed, Aug 10, 2011 at 12:15:50PM +0200, Cousson, Benoit wrote:
+> Manju,
 > 
-> > The PCI nanoengine driver in the SA1100 machine probably has not
-> > been building for some time. It probably dragged hardware.h
-> > in implicitly and now it doesn't anymore. After this an SA1100
-> > build selecting all system variants will build successfully.
+> On 8/10/2011 9:07 AM, Jarkko Nikula wrote:
+> >Hi
+> >
+> >On Tue, 09 Aug 2011 19:10:22 +0500
+> >"G, Manjunath Kondaiah"<manjugk@ti.com>  wrote:
+> >
+> >>From: Kevin Hilman<khilman@ti.com>
+> >>
+> >>For converting from struct device to platform_device, and from
+> >>platform_device to struct device, there are existing macros.  Use
+> >>them instead of manual use of container_of().
+> >>
+> >>Signed-off-by: Kevin Hilman<khilman@ti.com>
+> >>---
+> >>  arch/arm/plat-omap/mcbsp.c |    6 +++---
+> >>  1 files changed, 3 insertions(+), 3 deletions(-)
+> >>
+> >Kevin dropped this patch and used mine that does more cleanups:
+> >
+> >http://marc.info/?l=linux-omap&m=131255627918065&w=2
+> >
+> >Worth to check also other patches since Kevin's updated set seems to
+> >have other differences too:
+> >
+> >http://marc.info/?l=linux-omap&m=131258997416300&w=2
 > 
-> Arnd can you pick this single patch for the -rc series, or do you
-> prefer pull requests?
+> In fact, you'd better point to the lastest Kevin's tree and not
+> included the patches in this series.
 
-I've put this one into the fixes branch and will push it to Linus
-when that branch has gained critical mass.
+Yes. I have already mentioned this in PATCH 00/14 and it will be rebased
+during rework for review comments.
 
-I generally prefer git pull requests, but for single patches,
-email is absolutely fine and I won't reject patches I get by
-email. However, when you want me to apply a patch or git tree,
-please always take me on Cc. When you send something only to the
-mailing list, I will assume that it's for either review or that
-you are sending it to someone else.
+Main focus here is on dt-hwmod binding and omap-i2c dt adaptation.
 
-To make it less ambiguous, best put me in the 'To' field and the
-mailing list on 'Cc' for stuff you want me to apply, or the other
-way round for stuff that you want to have reviewed.
-
-	Arnd
+-M
