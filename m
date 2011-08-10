@@ -1,46 +1,31 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Wed, 10 Aug 2011 15:24:33 +0400
-Subject: [PATCH V3] ARM: tegra: paz00: add clocks required for usb
-	operation
-In-Reply-To: <201108092308.11580.marvin24@gmx.de>
-References: <201108092308.11580.marvin24@gmx.de>
-Message-ID: <4E426A71.1000100@ru.mvista.com>
+From: tixy@yxit.co.uk (Tixy)
+Date: Wed, 10 Aug 2011 12:31:37 +0100
+Subject: [RFC PATCH 0/5] Fix Thumb-2 undef handling for mixed-arch kernels
+In-Reply-To: <1312971223-28165-1-git-send-email-dave.martin@linaro.org>
+References: <1312971223-28165-1-git-send-email-dave.martin@linaro.org>
+Message-ID: <1312975897.7800.20.camel@computer2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Wed, 2011-08-10 at 11:13 +0100, Dave Martin wrote:
+> As a side-effect, this also changes cpu_architecture from a
+> function into a global variable initialised at boot-time, which is
+> probably a sensible idea anyway.
 
-On 10-08-2011 1:08, Marc Dietrich wrote:
+One possible pitfall of this is if the variable didn't get set up before
+it's first use. I have looked at all the uses and this doesn't seem to
+be a problem though.
 
-> These clocks are required for usb operation. pll_p_out4 needs to be set
-> to 24 MHz. The other clocks default to "off" in order to safe some energy.
+An alternative to defend against this is to make cpu_architecture() an
+inline function returning the value of the global variable like:
 
-    s/safe/save/
+inline int cpu_architecture(void)
+{
+	BUG_ON(the_cpu_architecture == CPU_ARCH_UNKNOWN);
+	return the_cpu_architecture;
+}
 
-    You didn't sign off on the patch.
+This has the bonus of not needing to change users of the the function.
 
-> ---
->   arch/arm/mach-tegra/board-paz00.c |    6 ++++++
->   1 files changed, 6 insertions(+), 0 deletions(-)
-
-> diff --git a/arch/arm/mach-tegra/board-paz00.c b/arch/arm/mach-tegra/board-
-> paz00.c
-> index 45111f6..cde36dc 100644
-> --- a/arch/arm/mach-tegra/board-paz00.c
-> +++ b/arch/arm/mach-tegra/board-paz00.c
-> @@ -145,6 +145,12 @@ static __initdata struct tegra_clk_init_table
-> paz00_clk_init_table[] = {
->   	/* name		parent		rate		enabled */
->   	{ "uarta",	"pll_p",	216000000,	true },
->   	{ "uartd",	"pll_p",	216000000,	true },
-> +
-> +	{ "pll_p_out4",	"pll_p",	24000000,	true },
-> +	{ "usbd",	"clk_m",	12000000,	false },
-> +	{ "usb2",	"clk_m",	12000000,	false },
-> +	{ "usb3",	"clk_m",	12000000,	false },
-> +
->   	{ NULL,		NULL,		0,		0},
->   };
->
-
-WBR, Sergei
+-- 
+Tixy
