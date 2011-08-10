@@ -1,53 +1,45 @@
 From: dave.martin@linaro.org (Dave Martin)
-Date: Wed, 10 Aug 2011 11:13:38 +0100
-Subject: [RFC PATCH 0/5] Fix Thumb-2 undef handling for mixed-arch kernels
-Message-ID: <1312971223-28165-1-git-send-email-dave.martin@linaro.org>
+Date: Wed, 10 Aug 2011 11:13:40 +0100
+Subject: [RFC PATCH 2/5] ARM: s3c24xx: Reference cpu_architecture as a global
+	variable
+In-Reply-To: <1312971223-28165-1-git-send-email-dave.martin@linaro.org>
+References: <1312971223-28165-1-git-send-email-dave.martin@linaro.org>
+Message-ID: <1312971223-28165-3-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In kernels which support v6 and v7 platforms in a single binary
-such as omap2plus_defconfig for example, undefined instruction
-exceptions taken on Thumb instructions are not processed correctly,
-because the kernel assumes at build-time that Thumb-2 won't be
-supported in userspace.
+This patch is needed for compatibility with the change of
+cpu_architecture from a function to a global variable.
 
-This series implements a workaround, by allowing the __und_usr
-handler to check the CPU architecture at runtime, in affected
-kernels.
+Since cpu_architecture is ARM-specific, also add an explicit
+include for <asm/system.h> rather than relying on this being
+included as a side-effect.
 
-As a side-effect, this also changes cpu_architecture from a
-function into a global variable initialised at boot-time, which is
-probably a sensible idea anyway.
+Signed-off-by: Dave Martin <dave.martin@linaro.org>
+---
+ arch/arm/plat-s3c24xx/cpu.c |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
 
-While I think the approach in this series is roughly correct, it's
-not very pretty -- in anyone was a cleaner solution to suggest, I'm
-open to ideas.
-
-Note that much of the actual diffstat comes from changing
-references to cpu_architecture().
-
-Dave Martin (5):
-  ARM: Make cpu_alignment into a global variable
-  ARM: s3c24xx: Reference cpu_architecture as a global variable
-  ARM: kprobes: Reference cpu_architecture as a global variable
-  ARM: entry: Remove unnecessary masking when decoding Thumb-2
-    instructions
-  ARM: entry: Fix Thumb-2 undef handling for multi-CPU kernels
-
- arch/arm/include/asm/system.h    |    2 +-
- arch/arm/kernel/elf.c            |    4 ++-
- arch/arm/kernel/entry-armv.S     |   44 +++++++++++++++++++++++++++++++++----
- arch/arm/kernel/kprobes-common.c |   11 ++++-----
- arch/arm/kernel/setup.c          |   12 ++++++----
- arch/arm/kernel/thumbee.c        |    4 +-
- arch/arm/mm/alignment.c          |    9 ++++---
- arch/arm/mm/fault.c              |    4 +-
- arch/arm/mm/idmap.c              |    3 +-
- arch/arm/mm/ioremap.c            |    3 +-
- arch/arm/mm/mmu.c                |   31 ++++++++++++++------------
- arch/arm/plat-s3c24xx/cpu.c      |    3 +-
- arch/arm/vfp/vfpmodule.c         |    4 +-
- 13 files changed, 89 insertions(+), 45 deletions(-)
-
+diff --git a/arch/arm/plat-s3c24xx/cpu.c b/arch/arm/plat-s3c24xx/cpu.c
+index c1fc6c6..bc118dc 100644
+--- a/arch/arm/plat-s3c24xx/cpu.c
++++ b/arch/arm/plat-s3c24xx/cpu.c
+@@ -34,6 +34,7 @@
+ #include <mach/hardware.h>
+ #include <asm/irq.h>
+ #include <asm/cacheflush.h>
++#include <asm/system.h>
+ 
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+@@ -221,7 +222,7 @@ void __init s3c24xx_init_io(struct map_desc *mach_desc, int size)
+ 	iotable_init(mach_desc, size);
+ 	iotable_init(s3c_iodesc, ARRAY_SIZE(s3c_iodesc));
+ 
+-	if (cpu_architecture() >= CPU_ARCH_ARMv5) {
++	if (cpu_architecture >= CPU_ARCH_ARMv5) {
+ 		idcode = s3c24xx_read_idcode_v5();
+ 	} else {
+ 		idcode = s3c24xx_read_idcode_v4();
 -- 
 1.7.4.1
