@@ -1,72 +1,33 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 10 Aug 2011 11:26:46 +0100
-Subject: [PATCH 1/1] ARM errata: Possible cache data corruption with hit-under-miss enabled
-Message-ID: <mailman.61.1312972314.20020.linux-arm-kernel@lists.infradead.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 10 Aug 2011 11:32:25 +0100
+Subject: [PATCH V2 6/6] spi/spi-pl022: Request/free DMA channels as and
+	when required.
+In-Reply-To: <4E4259F5.8060402@st.com>
+References: <cover.1312965741.git.viresh.kumar@st.com>
+	<566c0525199f498f04422d4c3b2ddd7466648c20.1312965742.git.viresh.kumar@st.com>
+	<20110810090042.GE1831@n2100.arm.linux.org.uk>
+	<4E424F7B.2000800@st.com>
+	<438BB0150E931F4B9CE701519A4463010871804A15@bgsmsx502.gar.corp.intel.com>
+	<4E4259F5.8060402@st.com>
+Message-ID: <20110810103225.GJ1831@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch is a workaround for the 364296 ARM1136 r0p2 erratum (possible
-cache data corruption with hit-under-miss enabled). It sets the
-undocumented bit 31 in the auxiliary control register and the FI bit in
-the control register, thus disabling hit-under-miss without putting the
-processor into full low interrupt latency mode.
+On Wed, Aug 10, 2011 at 03:44:13PM +0530, viresh kumar wrote:
+> On 08/10/2011 03:31 PM, Koul, Vinod wrote:
+> > And on your patch, are you able to dynamically assign the channels for
+> > platform? What is the intended usage? (as Russell articulated it is bad
+> > to dynamically assign channel for something like uart)
+> 
+> Are you talking about channels or DMA request lines? For channels yes,
+> we can always allocate channels as they are independent of peripherals.
+> About request lines, they are muxed in our case between several
+> peripherals, but support for that has to be added in dw_dmac.
 
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm/Kconfig      |   12 ++++++++++++
- arch/arm/mm/proc-v6.S |   16 ++++++++++++++++
- 2 files changed, 28 insertions(+), 0 deletions(-)
+Right, and when you do, you'll probably have to go to a virtual channel
+implementation, which solves the problem of keeping a channel allocated
+and makes this patch redundant.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 2c71a8f..30335e1 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1272,6 +1272,18 @@ config ARM_ERRATA_754327
- 	  This workaround defines cpu_relax() as smp_mb(), preventing correctly
- 	  written polling loops from denying visibility of updates to memory.
- 
-+config ARM_ERRATA_364296
-+	bool "ARM errata: Possible cache data corruption with hit-under-miss enabled"
-+	depends on CPU_V6 && !SMP
-+	help
-+	  This options enables the workaround for the 364296 ARM1136
-+	  r0p2 erratum (possible cache data corruption with
-+	  hit-under-miss enabled). It sets the undocumented bit 31 in
-+	  the auxiliary control register and the FI bit in the control
-+	  register, thus disabling hit-under-miss without putting the
-+	  processor into full low interrupt latency mode. ARM11MPCore
-+	  is not affected.
-+
- endmenu
- 
- source "arch/arm/common/Kconfig"
-diff --git a/arch/arm/mm/proc-v6.S b/arch/arm/mm/proc-v6.S
-index 219138d..a923aa0 100644
---- a/arch/arm/mm/proc-v6.S
-+++ b/arch/arm/mm/proc-v6.S
-@@ -223,6 +223,22 @@ __v6_setup:
- 	mrc	p15, 0, r0, c1, c0, 0		@ read control register
- 	bic	r0, r0, r5			@ clear bits them
- 	orr	r0, r0, r6			@ set them
-+#ifdef CONFIG_ARM_ERRATA_364296
-+	/*
-+	 * Workaround for the 364296 ARM1136 r0p2 erratum (possible cache data
-+	 * corruption with hit-under-miss enabled). The conditional code below
-+	 * (setting the undocumented bit 31 in the auxiliary control register
-+	 * and the FI bit in the control register) disables hit-under-miss
-+	 * without putting the processor into full low interrupt latency mode.
-+	 */
-+	ldr	r6, =0x4107b362			@ id for ARM1136 r0p2
-+	mrc	p15, 0, r5, c0, c0, 0		@ get processor id
-+	teq	r5, r6				@ check for the faulty core
-+	mrceq	p15, 0, r5, c1, c0, 1		@ load aux control reg
-+	orreq	r5, r5, #(1 << 31)		@ set the undocumented bit 31
-+	mcreq	p15, 0, r5, c1, c0, 1		@ write aux control reg
-+	orreq	r0, r0, #(1 << 21)		@ low interrupt latency configuration
-+#endif
- 	mov	pc, lr				@ return to head.S:__ret
- 
- 	/*
-
--- 
-Catalin
+I assert that any DMA engine implementation where request signals can
+be assigned dynamically to DMA channels should be using a virtual channel
+implementation.
