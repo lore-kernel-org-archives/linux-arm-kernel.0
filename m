@@ -1,25 +1,35 @@
-From: tixy@yxit.co.uk (Tixy)
-Date: Wed, 10 Aug 2011 12:38:29 +0100
-Subject: [RFC PATCH 1/5] ARM: Make cpu_alignment into a global variable
-In-Reply-To: <1312971223-28165-2-git-send-email-dave.martin@linaro.org>
-References: <1312971223-28165-1-git-send-email-dave.martin@linaro.org>
-	<1312971223-28165-2-git-send-email-dave.martin@linaro.org>
-Message-ID: <1312976309.7800.27.camel@computer2>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Wed, 10 Aug 2011 17:12:11 +0530
+Subject: [PATCH V3 3/6] spi/spi-pl022: Don't allocate more sg than required.
+In-Reply-To: <cover.1312965741.git.viresh.kumar@st.com>
+References: <cover.1312965741.git.viresh.kumar@st.com>
+Message-ID: <2c858c49e0f854dd45c4489056ba2625683686b1.1312965741.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shouldn't the title of this patch no have 'cpu_architecture' rather than
-'cpu_alignment'?
+In routine configure_dma(), if transfer->len = PAGE_SIZE, then pages is one more
+than required. While leads to one more sg getting allocated.
 
-On Wed, 2011-08-10 at 11:13 +0100, Dave Martin wrote:
-> @@ -114,6 +115,7 @@ struct cpu_cache_fns cpu_cache __read_mostly;
->  struct outer_cache_fns outer_cache __read_mostly;
->  EXPORT_SYMBOL(outer_cache);
->  #endif
-> +int cpu_architecture __read_mostly;
+This is wrong. Correct this to allocate correct number of sg.
 
-I would have been tempted to initialise the variable to
-CPU_ARCH_UNKNOWN, though as this is defined as zero it's a bit moot.
+Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+Tested-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/spi/spi-pl022.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
+diff --git a/drivers/spi/spi-pl022.c b/drivers/spi/spi-pl022.c
+index 80116be..832361e3a 100644
+--- a/drivers/spi/spi-pl022.c
++++ b/drivers/spi/spi-pl022.c
+@@ -1016,7 +1016,7 @@ static int configure_dma(struct pl022 *pl022)
+ 	dmaengine_slave_config(txchan, &tx_conf);
+ 
+ 	/* Create sglists for the transfers */
+-	pages = (pl022->cur_transfer->len >> PAGE_SHIFT) + 1;
++	pages = DIV_ROUND_UP(pl022->cur_transfer->len, PAGE_SIZE);
+ 	dev_dbg(&pl022->adev->dev, "using %d pages for transfer\n", pages);
+ 
+ 	ret = sg_alloc_table(&pl022->sgt_rx, pages, GFP_ATOMIC);
 -- 
-Tixy
+1.7.2.2
