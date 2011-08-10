@@ -1,39 +1,101 @@
 From: david@gibson.dropbear.id.au (David Gibson)
-Date: Wed, 10 Aug 2011 11:23:49 +1000
-Subject: Tegra pinmux Device Tree support
-In-Reply-To: <CAOesGMjH8hZSAXvDZ6ADO-dtFNecRYC5GsfRiAeV8KMRG=JTkQ@mail.gmail.com>
-References: <74CDBE0F657A3D45AFBB94109FB122FF049F17229E@HQMAIL01.nvidia.com>
-	<20110809173428.GB32195@ponder.secretlab.ca>
-	<CAOesGMjH8hZSAXvDZ6ADO-dtFNecRYC5GsfRiAeV8KMRG=JTkQ@mail.gmail.com>
-Message-ID: <20110810012349.GA23511@yookeroo.fritz.box>
+Date: Wed, 10 Aug 2011 11:52:14 +1000
+Subject: How to handle named resources with DT?
+In-Reply-To: <4E41AC5C.20301@ti.com>
+References: <4E4166F0.9050401@ti.com>
+	<CACxGe6tbEW1EZhqXy78EZVM_sQLH0Qbr7QOzbgbsKBRn1FtVrg@mail.gmail.com>
+	<4E4172A8.3030101@ti.com> <4E417BD5.8080409@freescale.com>
+	<20110809205723.GE11568@ponder.secretlab.ca>
+	<4E41A1B9.1060400@ti.com>
+	<20110809211747.GJ11568@ponder.secretlab.ca>
+	<4E41AA43.1000506@ti.com>
+	<20110809214905.GK11568@ponder.secretlab.ca>
+	<4E41AC5C.20301@ti.com>
+Message-ID: <20110810015214.GD23511@yookeroo.fritz.box>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 09, 2011 at 10:44:29AM -0700, Olof Johansson wrote:
-> On Tue, Aug 9, 2011 at 10:34 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
-> 
-> > We talked about this a bit at Linaro connect. ?Outside of the more
-> > complex runtime-reconfiguration of pin mux, there is a general need
-> > for arbitrary initialization sequences to registers. ?Also, pretty
-> > much exactly what you need for tegra is needed for imx, omap and many
-> > others. ?The though was, rather than trying to come up with some kind
-> > of pinmux-specific binding for pin states, which could end up being
-> > very verbose if everything was split out into properties, we could
-> > instead have a binding for register initialization sequences.
-> > Something like this:
+On Tue, Aug 09, 2011 at 11:53:32PM +0200, Cousson, Benoit wrote:
+> On 8/9/2011 11:49 PM, Grant Likely wrote:
+> >On Tue, Aug 09, 2011 at 11:44:35PM +0200, Cousson, Benoit wrote:
+> >>On 8/9/2011 11:17 PM, Grant Likely wrote:
+> >>>On Tue, Aug 09, 2011 at 11:08:09PM +0200, Cousson, Benoit wrote:
+> >>>>On 8/9/2011 10:57 PM, Grant Likely wrote:
+> >>>>>On Tue, Aug 09, 2011 at 01:26:29PM -0500, Scott Wood wrote:
+> >>>>>>On 08/09/2011 12:47 PM, Cousson, Benoit wrote:
+> >>>>>>>On 8/9/2011 7:23 PM, Grant Likely wrote:
+> >>>>>>>>There is no analogous mechanism for _byname in the device tree.  The
+> >>>>>>>>DT binding for a device must explicitly state what order the register
+> >>>>>>>>ranges are in.  The driver will need to be adapted.
+> >>>>>>>
+> >>>>>>>That seems to be a small regression for my point of view. Relying on the
+> >>>>>>>order is not super safe. This is not very readable either. That's for
+> >>>>>>>that exact reason that we changed our drivers to use
+> >>>>>>>platform_get_resource_byname. That's probably the reason why that API is
+> >>>>>>>there as well.
+> >>>>>>>For the same IP, the number of entries can vary depending of the SoC
+> >>>>>>>revision.
+> >>>>>>>By using the _byname, we can check if the resource is there or not
+> >>>>>>>without having to care about the position.
+> >>>>>>
+> >>>>>>You could have a named u32 property that contains the reg index, e.g.:
+> >>>>>>
+> >>>>>>dev {
+> >>>>>>	reg =<0x20000 0x200 0x24000 0x200>;
+> >>>>>>	foo-reg =<0>;
+> >>>>>>	bar-reg =<1>;
+> >>>>>>};
+> >>>>>
+> >>>>>That's a little nasty.  A reg-names = "foo", "bar"; would probably be
+> >>>>>better.
+> >>>>
+> >>>>Yep, I agree.
+> >>>>
+> >>>>And what about something like that?
+> >>>>   reg =<0x20000 0x200>, "foo",
+> >>>>	<0x20000 0x200>, "bar" ;
+> >>>>
+> >>>>It is doable?
+> >>>
+> >>>Definitely not.  It would break all existing 'reg' parsing
+> >>>implementations quite badly.
+> >>
+> >>OK, so what about extending the reg attribute to be a reg node?
+> >>
+> >>dev {
+> >>	reg {
+> >>		name = "foo_wrapper";
+> >>		start =<0x10000>;
+> >>		end =<0x200>;
+> >>	}
+> >>	reg {
+> >>		name = "foo";
+> >>		start =<0x20000>;
+> >>		end =<0x200>;
+> >>	}
+> >>}
+> >>
+> >>A little bit more verbose, but at least we can add any attribute we want.
 > >
-> > ? ? ? ?pinmux-initseq = <reg1 value1> <reg1 value2> ...;
-> >
-> > And then add some macros for DTC to make it easier to define things
-> > like pinmux setup tables. ?Although the binding above is probably too
-> > simple and naive.
+> >That won't work either because that also breaks the existing 'reg'
+> >binding.  Anything you do will need to supplement the existing
+> >binding without changing it in an incompatible way.
 > 
-> This seems to break the philosophy of what the device tree should do
-> -- it should describe the hardware so that the driver will know how to
-> program it, not include the code itself?
+> OK, but can we add a new attribute then? reg2, reg_ng, reg_plusplus,
+> reg_named...?
 
-Arguably, yes, although it's a barrier that's been frequently broken
-by Apple already.
+He already suggested reg-names to be interpreted in parallel with the
+existing reg property.  The (serious) problem with replacing the reg
+property is that it will break all existing OSes (including old Linux
+versions) that don't understand the new property.
+
+Of course, the problem with reg-names is that it will be ignored by
+older OSes, and so 'reg' must still be in the correct order.  In which
+case you could argue it's more sensible to just have a static place to
+name mapping in the Linux driver.
+
+In short, yes, named reg elements in the DT would be nice in theory,
+but I'm not convinced it's worth a DT flag day to accomplish it.
 
 -- 
 David Gibson			| I'll have my music baroque, and my code
