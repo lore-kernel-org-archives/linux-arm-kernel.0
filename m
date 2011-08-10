@@ -1,50 +1,74 @@
-From: tixy@yxit.co.uk (Tixy)
-Date: Wed, 10 Aug 2011 12:55:52 +0100
-Subject: [RFC PATCH 5/5] ARM: entry: Fix Thumb-2 undef handling for
-	multi-CPU kernels
-In-Reply-To: <1312971223-28165-6-git-send-email-dave.martin@linaro.org>
-References: <1312971223-28165-1-git-send-email-dave.martin@linaro.org>
-	<1312971223-28165-6-git-send-email-dave.martin@linaro.org>
-Message-ID: <1312977352.7800.43.camel@computer2>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Wed, 10 Aug 2011 13:57:49 +0200
+Subject: [RFC/PATCH 10/14] dt: Add pd_size to AUXDATA structure
+In-Reply-To: <1312897232-4792-11-git-send-email-manjugk@ti.com>
+References: <1312897232-4792-1-git-send-email-manjugk@ti.com>
+	<1312897232-4792-11-git-send-email-manjugk@ti.com>
+Message-ID: <4E42723D.1010501@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2011-08-10 at 11:13 +0100, Dave Martin wrote:
-> +#if __LINUX_ARM_ARCH__ < 7
-> +/* If the target CPU may not be Thumb-2-capable, a run-time check is needed: */
-> +#define NEED_CPU_ARCHITECTURE
-> +	ldr	r5, .LCcpu_architecture
-> +	ldr	r5, [r5]
-> +	cmp	r5, #CPU_ARCH_ARMv7
-> +	blo	__und_usr_unknown
-> +/*
-> + * The following code won't get run unless the running CPU really is v7, so
-> + * coding round the lack of ldrht on older arches is pointless.  Temporarily
-> + * override the assembler target arch with the minimum required instead:
-> + */
-> +	.arch	armv6t2
-> +#endif
->  2:
->   ARM(	ldrht	r5, [r4], #2	)
->   THUMB(	ldrht	r5, [r4]	)
-> @@ -449,7 +470,16 @@ __und_usr:
->  3:	ldrht	r0, [r4]
->  	add	r2, r2, #2			@ r2 is PC + 2, make it PC + 4
->  	orr	r0, r0, r5, lsl #16
+On 8/9/2011 4:10 PM, G, Manjunath Kondaiah wrote:
+>
+> Add pd_size in the AUXDATA structure so that device drivers which require
+> platform_data size can pass along with AUXDATA.
+
+It is really needed by device driver? Or is it because omap_device_build 
+is using platform_device_add_data that is doing a copy of the pdata and 
+thus require the size?
+
+> Signed-off-by: G, Manjunath Kondaiah<manjugk@ti.com>
+> ---
+>   drivers/of/platform.c       |    2 ++
+>   include/linux/of_platform.h |    5 +++++
+>   2 files changed, 7 insertions(+), 0 deletions(-)
+>
+> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+> index ebbbf42..4b27286 100644
+> --- a/drivers/of/platform.c
+> +++ b/drivers/of/platform.c
+> @@ -565,6 +565,7 @@ static int of_platform_bus_create(struct device_node *bus,
+>   	struct platform_device *dev;
+>   	const char *bus_id = NULL;
+>   	void *platform_data = NULL;
+> +	int pd_size;
+
+Maybe platform_data_size will be a little bit more consistent?
+
+Regards,
+Benoit
+
+>   	int id = -1;
+>   	int rc = 0;
+>
+> @@ -588,6 +589,7 @@ static int of_platform_bus_create(struct device_node *bus,
+>   		bus_id = auxdata->name;
+>   		id = auxdata->id;
+>   		platform_data = auxdata->platform_data;
+> +		pd_size = auxdata->pd_size;
+>   	}
+>
+>   	if (of_device_is_compatible(bus, "arm,primecell")) {
+> diff --git a/include/linux/of_platform.h b/include/linux/of_platform.h
+> index 252246c..a3be980 100644
+> --- a/include/linux/of_platform.h
+> +++ b/include/linux/of_platform.h
+> @@ -47,6 +47,7 @@ struct of_dev_auxdata {
+>   	char *name;
+>   	int id;
+>   	void *platform_data;
+> +	int pd_size;
+>   };
+>
+>   /* Macro to simplify populating a lookup table */
+> @@ -58,6 +59,10 @@ struct of_dev_auxdata {
+>   	{ .compatible = _compat, .phys_addr = _phys, .name = _name, \
+>   	  .id = _id, .platform_data = _pdata }
+>
+> +#define OF_DEV_AUXDATA_ID_PDSIZE(_compat,_phys,_name,_id,_pdata,_pd_size) \
+> +	{ .compatible = _compat, .phys_addr = _phys, .name = _name, \
+> +	  .id = _id, .platform_data = _pdata, .pd_size = _pd_size }
 > +
-> +#if __LINUX_ARM_ARCH__ < 7
-> +/* If the target arch was overridden, change it back: */
-> +#ifdef CONFIG_CPU_32v6K
-> +	.arch	armv6k
->  #else
-> +	.arch	armv6
-> +#endif
-
-Are we confident that there will be no other v6 architectures supported
-in future? Looks like a bit of a hazard otherwise.
-
-Looking at the assembler manual, MIPS and PowerPC have push/pop
-operations for changing things like arch settings, pity ARM doesn't.
-
--- 
-Tixy
+>   /**
+>    * of_platform_driver - Legacy of-aware driver for platform devices.
+>    *
