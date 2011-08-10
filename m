@@ -1,50 +1,28 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 10 Aug 2011 16:09:56 +0200
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 10 Aug 2011 15:10:49 +0100
 Subject: Subject: L2x0 OF properties do not include interrupt #
-In-Reply-To: <000201cc575b$c1229010$4367b030$@rutland@arm.com>
+In-Reply-To: <4E428EB0.1080204@gmail.com>
 References: <000201cc575b$c1229010$4367b030$@rutland@arm.com>
-Message-ID: <201108101609.56995.arnd@arndb.de>
+	<4E428EB0.1080204@gmail.com>
+Message-ID: <20110810141048.GK10121@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 10 August 2011, Mark Rutland wrote:
+Hi Rob,
 
-> I realise I'm a bit late to the party here, but I'd like to propose adding an
-> optional interrupt parameter to the binding. I'm not aware of any
-> implementations which use separate interrupts, but given the binding
-> seems to be generic across L2CC implementations (and is not limited simply to
-> the L2x0), having a list rather than a single interrupt may be appropriate for
-> someone.
+On Wed, Aug 10, 2011 at 02:59:12PM +0100, Rob Herring wrote:
+> I think you should allow for either the single irq or individual irqs.
+> You can specify that the event counter interrupt must be first, then the
+> pmu driver could work either way ignoring the rest. The driver probably
+> needs to mark the handler as shared if there is only the combined
+> interrupt unless you expect all interrupts to be handled by 1 driver.
 
-Sounds good, thanks for pointing this out.
+I much prefer having seperate, individual IRQs with no requirement on
+ordering.
 
-How many possible interrupt sources are there? If there is only a small number
-of those (e.g. at most 4), we might just list all of them and register
-them from the driver even if they are all the same.
+Now, the L2 binding also doesn't fit too well for the L2CC on Cortex-A15,
+which is an inner cache like the one on Cortex-A8. Because of this, it
+doesn't have a base address but it *does* have an IRQ which is how external
+aborts are raised.
 
-> This would boil down to (for the moment) a Documentation change along the lines of:
-> 
-> > diff --git a/Documentation/devicetree/bindings/arm/l2cc.txt b/Documentation/devicetree/bindings/arm/l2cc.txt
-> > index f50e021..d4b387b 100644
-> > --- a/Documentation/devicetree/bindings/arm/l2cc.txt
-> > +++ b/Documentation/devicetree/bindings/arm/l2cc.txt
-> > @@ -28,6 +28,7 @@ Optional properties:
-> >  - arm,filter-ranges : <start length> Starting address and length of window to
-> >    filter. Addresses in the filter window are directed to the M1 port. Other
-> >    addresses will go to the M0 port.
-> > +- interrupt : A combined interrupt.
-> >  
-> >  Example:
-> >  
-> > @@ -39,4 +40,5 @@ L2: cache-controller {
-> >          arm,filter-latency = <0x80000000 0x8000000>;
-> >          cache-unified;
-> >          cache-level = <2>;
-> > +        interrupt = <45>;
-> >  };
-> 
-> Any thoughts?
-
-Do we also need to document an interrupt-parent property, or is that implied?
-
-	Arnd
+Will
