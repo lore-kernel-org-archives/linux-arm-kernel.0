@@ -1,40 +1,32 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 10 Aug 2011 09:54:31 +0100
-Subject: [PATCH V2 3/6] spi/spi-pl022: Don't allocate more sg than
-	required.
-In-Reply-To: <94a975df64a78bb533c85774a5bbd052c73fa5ba.1312965741.git.viresh.kumar@st.com>
-References: <cover.1312965741.git.viresh.kumar@st.com>
-	<94a975df64a78bb533c85774a5bbd052c73fa5ba.1312965741.git.viresh.kumar@st.com>
-Message-ID: <20110810085431.GD1831@n2100.arm.linux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 10 Aug 2011 09:57:13 +0100
+Subject: [RFC PATCH 4/8] ARM: exynos4: convert logical CPU numbers to
+	physical numbers
+In-Reply-To: <CAH9JG2WLfk2xECc3vObbVCPqqPE7W-PvvVJdOby7i8U8sXikPQ@mail.gmail.com>
+References: <1312926162-22469-1-git-send-email-will.deacon@arm.com>
+	<1312926162-22469-5-git-send-email-will.deacon@arm.com>
+	<CAH9JG2WjHm2mypLR-9=1vNDz-h3PyRGwTP5Z-C1SsktRh+H6eA@mail.gmail.com>
+	<20110810084613.GB10121@e102144-lin.cambridge.arm.com>
+	<CAH9JG2WLfk2xECc3vObbVCPqqPE7W-PvvVJdOby7i8U8sXikPQ@mail.gmail.com>
+Message-ID: <20110810085713.GC10121@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 10, 2011 at 02:20:56PM +0530, Viresh Kumar wrote:
-> In routine configure_dma(), if transfer->len = PAGE_SIZE, then pages is one more
-> than required. While leads to one more sg getting allocated.
+On Wed, Aug 10, 2011 at 09:49:45AM +0100, Kyungmin Park wrote:
+> On Wed, Aug 10, 2011 at 5:46 PM, Will Deacon <will.deacon@arm.com> wrote:
+> > On Wed, Aug 10, 2011 at 02:07:46AM +0100, Kyungmin Park wrote:
+> >> Tested-by: Kyungmin Park <kyungmin.park@samsung.com>
+> >> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+> >
+> > Cheers for that. Did you have a go at booting on a CPU other than physical
+> > CPU 0?
 > 
-> This is wrong. Correct this to allocate correct number of sg.
-> 
-> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
-> Tested-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
->  drivers/spi/spi-pl022.c |    3 ++-
->  1 files changed, 2 insertions(+), 1 deletions(-)
-> 
-> diff --git a/drivers/spi/spi-pl022.c b/drivers/spi/spi-pl022.c
-> index 80116be..1c8b9ec 100644
-> --- a/drivers/spi/spi-pl022.c
-> +++ b/drivers/spi/spi-pl022.c
-> @@ -1016,7 +1016,8 @@ static int configure_dma(struct pl022 *pl022)
->  	dmaengine_slave_config(txchan, &tx_conf);
->  
->  	/* Create sglists for the transfers */
-> -	pages = (pl022->cur_transfer->len >> PAGE_SHIFT) + 1;
-> +	pages = ((pl022->cur_transfer->len + (1 << PAGE_SHIFT) - 1)
-> +			>> PAGE_SHIFT);
+> No, how to test it?
 
-It would be far better for this to be:
+Well, it depends on how your bootloader is configured. You want to throw
+CPU1 at the kernel whilst putting CPU0 into the pen.
 
-	pages = DIV_ROUND_UP(pl022->cur_transfer->len, PAGE_SIZE);
+Of course, that might not be possible on your platform, but at least with
+these patches it's not the core code getting in the way.
 
-The compiler will probably optimize it to the same code anyway.
+Will
