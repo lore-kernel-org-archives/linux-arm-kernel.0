@@ -1,39 +1,44 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 10 Aug 2011 14:12:06 -0600
-Subject: How to handle named resources with DT?
-In-Reply-To: <20110810195753.GA29134@huya.qualcomm.com>
-References: <4E4172A8.3030101@ti.com> <4E417BD5.8080409@freescale.com>
-	<20110809205723.GE11568@ponder.secretlab.ca> <4E41A1B9.1060400@ti.com>
-	<20110809211747.GJ11568@ponder.secretlab.ca> <4E41AA43.1000506@ti.com>
-	<20110809214905.GK11568@ponder.secretlab.ca> <4E41AC5C.20301@ti.com>
-	<20110810015214.GD23511@yookeroo.fritz.box>
-	<CACxGe6tr5OUxpiVah4s6rRG0cTOWsnohhEkZoSZgCj0xSZkmMA@mail.gmail.com>
-	<20110810195753.GA29134@huya.qualcomm.com>
-Message-ID: <CACxGe6sX9n5YBXsWyK=prCCssw169Tga3D+9hwc+qa1zFr3CMQ@mail.gmail.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Wed, 10 Aug 2011 13:39:58 -0700
+Subject: [PATCH V4] ARM: tegra: paz00: add clocks required for usb
+	operation
+In-Reply-To: <201108101921.58149.marc.dietrich@ap.physik.uni-giessen.de>
+References: <201108101921.58149.marc.dietrich@ap.physik.uni-giessen.de>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF04A068758D@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 10, 2011 at 1:57 PM, David Brown <davidb@codeaurora.org> wrote:
-> On Wed, Aug 10, 2011 at 01:22:16PM -0600, Grant Likely wrote:
->
->> Please, stick with the established convention and explicitly order
->> 'reg' and 'interrupts' properties. ?If there is a specific use case
->> where this doesn't work, then bring it up, but I haven't seen any yet.
->> ?The current users of _byname that I've looked seem to only use it for
->> convenience, not because a register range may be optional. ?ie. they
->> all fail out if a reg resource isn't present.
->
-> The msm_serial driver uses the presence of one of it's _byname reg
-> regions to distinguish between two different types of the controller.
-> Fortunately, it is the last register range that has this.
->
-> It's probably best to make the DT code depend on compatible (or some
-> attribute) to determine if this functionality is available, or in this
-> case, even make it a separate memory region. ?I'm not sure what the
-> cleanest way is to implement this, and still have the driver work with
-> non-DT systems.
+Marc Dietrich wrote at Wednesday, August 10, 2011 11:22 AM:
+> These clocks are required for usb operation. pll_p_out4 needs to be set
+> to 24 MHz. The other clocks default to "off" in order to save some energy.
+> 
+> Signed-off-by: Marc Dietrich <marvin24@gmx.de>
 
-You can use the .data field in the match table to add in
-compatible-specific configuration data.
+Acked-by: Stephen Warren <swarren@nvidia.com>
 
-g.
+Given the rest of the thread, this is fine for now. We can address any
+deficiencies in the bus clock and clk_m parenting when it's addressed
+globally for all boards later.
+
+> diff --git a/arch/arm/mach-tegra/board-paz00.c b/arch/arm/mach-tegra/board-paz00.c
+> index 45111f6..cde36dc 100644
+> --- a/arch/arm/mach-tegra/board-paz00.c
+> +++ b/arch/arm/mach-tegra/board-paz00.c
+> @@ -145,6 +145,12 @@ static __initdata struct tegra_clk_init_table paz00_clk_init_table[] = {
+>  	/* name		parent		rate		enabled */
+>  	{ "uarta",	"pll_p",	216000000,	true },
+>  	{ "uartd",	"pll_p",	216000000,	true },
+> +
+> +	{ "pll_p_out4",	"pll_p",	24000000,	true },
+> +	{ "usbd",	"clk_m",	12000000,	false },
+> +	{ "usb2",	"clk_m",	12000000,	false },
+> +	{ "usb3",	"clk_m",	12000000,	false },
+> +
+>  	{ NULL,		NULL,		0,		0},
+>  };
+> 
+> --
+> 1.7.4.1
+
+-- 
+nvpublic
