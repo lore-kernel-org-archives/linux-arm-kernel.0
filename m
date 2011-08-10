@@ -1,43 +1,138 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Wed, 10 Aug 2011 14:14:28 +0100
-Subject: [RFC PATCH 1/3] dt: irq: add interrupt controller descriptor
-	struct
-In-Reply-To: <1312921020-6820-2-git-send-email-robherring2@gmail.com>
-References: <1312921020-6820-1-git-send-email-robherring2@gmail.com>
-	<1312921020-6820-2-git-send-email-robherring2@gmail.com>
-Message-ID: <20110810131428.GF2680@pulham.picochip.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Wed, 10 Aug 2011 18:46:38 +0530
+Subject: [PATCH V2 6/6] spi/spi-pl022: Request/free DMA channels as and
+	when required.
+In-Reply-To: <CACRpkdaCyUJ3A9VWfsVuwJj3DGVkvjc2_ZOD4yM4YX3NPxAAYQ@mail.gmail.com>
+References: <cover.1312965741.git.viresh.kumar@st.com>
+	<566c0525199f498f04422d4c3b2ddd7466648c20.1312965742.git.viresh.kumar@st.com>
+	<20110810090042.GE1831@n2100.arm.linux.org.uk>
+	<4E424F7B.2000800@st.com>
+	<438BB0150E931F4B9CE701519A4463010871804A15@bgsmsx502.gar.corp.intel.com>
+	<CABb+yY3SnqKN78U7vLbom1i00m=ThnRVQDVM_iX1TPu=+XzSNQ@mail.gmail.com>
+	<20110810104025.GK1831@n2100.arm.linux.org.uk>
+	<CABb+yY3=q5Nq1wtM6Av2DrgUfjZR_Ao40QhBhv_ik9naAd5wRg@mail.gmail.com>
+	<CACRpkdaCyUJ3A9VWfsVuwJj3DGVkvjc2_ZOD4yM4YX3NPxAAYQ@mail.gmail.com>
+Message-ID: <CABb+yY2Usd5=RW6BV69UW=Tq0zQW6LCtT2GhfdHGA61ZU3aNcQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 09, 2011 at 03:16:58PM -0500, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
-> 
-> In preparation to scan and initialize interrupt controllers from a
-> device-tree, create struct to pass to interrupt controller initialization
-> functions.
-> 
-> irq_base should go away with dynamic linux irq assignment.
-> 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> ---
->  include/linux/of_irq.h |    6 ++++++
->  1 files changed, 6 insertions(+), 0 deletions(-)
-> 
-> diff --git a/include/linux/of_irq.h b/include/linux/of_irq.h
-> index cd2e61c..de91ff9 100644
-> --- a/include/linux/of_irq.h
-> +++ b/include/linux/of_irq.h
-> @@ -33,6 +33,12 @@ struct of_irq {
->  	u32 specifier[OF_MAX_IRQ_SPEC]; /* Specifier copy */
->  };
->  
-> +struct of_intc_desc {
-> +	struct device_node *controller;
-> +	struct device_node *parent;
+On Wed, Aug 10, 2011 at 5:24 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Wed, Aug 10, 2011 at 1:24 PM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+>> On Wed, Aug 10, 2011 at 4:10 PM, Russell King - ARM Linux
+>>>
+>>> I discussed this with Linus on the bus back from Cambridge in the evening,
+>>> and it appears that the story you gave me was inaccurate - Linus had not
+>>> agreed to your proposal and saw more or less the same problems with it
+>>> which I've been on at you about via your other email alias/lkml. ?So that's
+>>> essentially invalidated everything we discussed there as part of my thinking
+>>> was "if Linus is happy with it, then...".
+>>
+>> IIRC, Linus W mainly opined to involve device pointer during channel selection.
+>> Other than that I thought there was only ambiguity about implementation details.
+>
+> Bah now we have two "Linus oracles" in this world instead
+> of just one... haha :-)
+>
 
-Do we need parent here?  I think that of_irq_find_parent() will do the 
-job.
 
-Other than that nit the series looks nice to me.
+>> Linus W, was there anything you said wouldn't work with the scheme ?
+>> Please tell now on the record.
+>
+> It would *work* but the current proposal is *not elegant* IMO.
 
-Jamie
+would *work*  -> You could find no case that the scheme wouldn't support.
+*not elegant*  -> Your opinion. Let us see.
+
+
+> I think your scheme passing in a device ID and instance tuple
+> e.g. REQ(MMC,2) would *work*, but I don't think it is a proper
+> solution and I would never ACK it, as I said.
+As much as I would feel 'deprived' of your ACK, I am not yet changing
+the implementation for that part.
+
+
+> The lookup of a device DMA channel should follow the
+> design pattern set by regulators and clocks.
+Nopes. It depends upon the subsystem.
+We should strive towards making this scheme as 'standalone' as
+possible.
+Client having to specify the device it wants a channel for, is a
+waste - otherwise we don't fully get rid of platform assistance for
+channel selection!
+Also that way, a client is actually asking for a 'channel' rather than
+only specifying its requirements to the API and the API has enough
+information to return the appropriate channel(which is what I propose).
+
+> Which means
+> you use struct device * or alternatively a string (if the
+> instance is not available) to look it up, such that:
+>
+> struct dma_slave_map {
+> ? char name[16];
+> ? struct device *dev;
+> ? char dev_name[16];
+> ? struct devive *dma_dev;
+> ? char dma_dev_name[16];
+> };
+>
+> struct dma_slave_map[] = {
+> ?{
+> ? ? .name = "MMC-RX",
+> ? ? .dev_name = "mmc.0",
+> ? ? .dma_dev_name = "pl08x.0",
+> ?},
+> ?{
+> ? ? .name = "MMC-TX",
+> ? ? .dev_name = "mmc.0",
+> ? ? .dma_dev_name = "pl08x.0",
+> ?},
+> ?{
+> ? ? .name = "SSP-RX",
+> ? ? .dev_name = "pl022.0",
+> ? ? .dma_dev_name = "pl08x.1",
+> ?},
+
+1) This is implementation detail.
+2) Not a very good one at that.
+     a) Just think how many bytes you take to specify a channel ?
+         Mine takes less than 4 bytes for equivalent information.
+     b) Think about the mess of string copy, compare etc, when we can
+         simply extract and manipulate bit-fields from, say, u32?
+
+
+>
+> The dmaengine core should take this mapping, and
+> the device driver would only have to:
+>
+> struct dma_chan *rxc;
+> struct dma_chan *txc;
+> struct device *dev;
+>
+> rxc = dma_request_slave_channel(dev, "MMC-RX");
+> txc = dma_request_slave_channel(dev, "MMC-TX");
+Absolutely "not-very-good" !
+We can do without the 'dev' argument.
+How does a client request duplex channel ?
+   MMC-RXTX or MMC-TXRX or TXRX-MMC ?
+Do you propose to implement a string parser in the core ?!
+Not to mention how limited requirements this scheme could
+express to the core.
+
+
+> I also recognized that you needed a priority scheme and
+> a few other bits for the above,
+You didn't recognize. I told you. IIRC you suggested I should actually
+sell that point!
+The priority is an additional feature that easily helps a situation when
+a peri could be reached from two different dmacs and the board can
+prioritize an already busy dmac over the one that would only serve
+this peripheral - to save power by keeping the idle dmac off.
+Your string manipulation would only get messier if it had to support
+that feature.
+
+> If the majority is happy with this scheme I can even
+> try implementing it.
+Interesting! Only a few days ago you were seeing eternal sunshine in
+filter-functions... and now you plan to implement my proposal by
+replacing bit-fields with strings.
+Frankly, I don't care much who, if anybody, implements it anymore.
