@@ -1,38 +1,30 @@
-From: jhnikula@gmail.com (Jarkko Nikula)
-Date: Wed, 10 Aug 2011 10:07:04 +0300
-Subject: [RFC/PATCH 04/14] OMAP: McBSP: use existing macros for
-	converting between devices
-In-Reply-To: <1312897232-4792-5-git-send-email-manjugk@ti.com>
-References: <1312897232-4792-1-git-send-email-manjugk@ti.com>
-	<1312897232-4792-5-git-send-email-manjugk@ti.com>
-Message-ID: <20110810100704.856fcc5c.jhnikula@gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 10 Aug 2011 01:11:58 -0600 (MDT)
+Subject: How to handle named resources with DT?
+In-Reply-To: <20110810015214.GD23511@yookeroo.fritz.box>
+References: <4E4166F0.9050401@ti.com>
+	<CACxGe6tbEW1EZhqXy78EZVM_sQLH0Qbr7QOzbgbsKBRn1FtVrg@mail.gmail.com>
+	<4E4172A8.3030101@ti.com> <4E417BD5.8080409@freescale.com>
+	<20110809205723.GE11568@ponder.secretlab.ca>
+	<4E41A1B9.1060400@ti.com>
+	<20110809211747.GJ11568@ponder.secretlab.ca> <4E41AA43.1000506@ti.com>
+	<20110809214905.GK11568@ponder.secretlab.ca>
+	<4E41AC5C.20301@ti.com> <20110810015214.GD23511@yookeroo.fritz.box>
+Message-ID: <alpine.DEB.2.00.1108100104150.12674@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+On Wed, 10 Aug 2011, David Gibson wrote:
 
-On Tue, 09 Aug 2011 19:10:22 +0500
-"G, Manjunath Kondaiah" <manjugk@ti.com> wrote:
+> Of course, the problem with reg-names is that it will be ignored by
+> older OSes, and so 'reg' must still be in the correct order.
 
-> From: Kevin Hilman <khilman@ti.com>
-> 
-> For converting from struct device to platform_device, and from
-> platform_device to struct device, there are existing macros.  Use
-> them instead of manual use of container_of().
-> 
-> Signed-off-by: Kevin Hilman <khilman@ti.com>
-> ---
->  arch/arm/plat-omap/mcbsp.c |    6 +++---
->  1 files changed, 3 insertions(+), 3 deletions(-)
-> 
-Kevin dropped this patch and used mine that does more cleanups:
+Most ARM SoC Linux ports aren't using DT now, so there isn't really an 
+older OS case here.  Might as well try to get something implemented in a 
+clean way while there's still some chance for it.
 
-http://marc.info/?l=linux-omap&m=131255627918065&w=2
+A more persuasive case could probably be made about DT bootloader-related 
+issues.  Those would have to be converted to use reg-names, also.
 
-Worth to check also other patches since Kevin's updated set seems to
-have other differences too:
 
-http://marc.info/?l=linux-omap&m=131258997416300&w=2
-
--- 
-Jarkko
+- Paul
