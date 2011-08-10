@@ -1,38 +1,77 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Wed, 10 Aug 2011 19:06:48 +0530
-Subject: [RFC][PATCH 2/2] spi: s3c64xx: Use clkdev for bus clock lookup
-In-Reply-To: <CAAgF-Bf=K8M9Qp8EwFTuUY06H4SPNY5cW2Ct3K9FecMLvBHmuA@mail.gmail.com>
-References: <1312898301-7229-1-git-send-email-padma.v@samsung.com>
-	<CABb+yY1Be3q+5QVaLYnonOUq1VtjyCZMKp0S1yryjF2HRyqoSw@mail.gmail.com>
-	<CAAgF-Bf=K8M9Qp8EwFTuUY06H4SPNY5cW2Ct3K9FecMLvBHmuA@mail.gmail.com>
-Message-ID: <CABb+yY1tCBK3Hywi_7TuBCc830BP7+C2GRoQxeKWU5OHXenjRA@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 10 Aug 2011 08:59:12 -0500
+Subject: Subject: L2x0 OF properties do not include interrupt #
+In-Reply-To: <000201cc575b$c1229010$4367b030$@rutland@arm.com>
+References: <000201cc575b$c1229010$4367b030$@rutland@arm.com>
+Message-ID: <4E428EB0.1080204@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 10, 2011 at 5:33 PM, padma venkat <padma.kvr@gmail.com> wrote:
-> Hi Jassi,
->
-> On Tue, Aug 9, 2011 at 6:13 PM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
->> On Tue, Aug 9, 2011 at 7:28 PM, Padmavathi Venna <padma.v@samsung.com> wrote:
->>> SPI driver is modified to lookup the bus clock using the
->>> alias name instead of getting clock name and clock
->>> number from platform data.
->> Cool.
->>
->>> Driver is modified to get the best source clock among the
->>> available source clocks for the required frequency.
->> I am not sure if this driver should be deciding which clock is 'best' for it.
->> Because ...
->> 1) Usually it's the board designer who decides which clock to run at
->> ?what speed based upon target device. So ideally, based upon use-case
->> the driver should simply get the 'best' clock from board via platform in a
->> format that is compliant to the 'generic clock api'.
-> As per your comment I modified the code for board designer to supply the
-> required list of source clocks. If this list is NULL then it ?uses the
-> all available
-> clock sources. I will resubmit this patch.
-No dear. Not a list of clocks (that is property of the platform - not a board).
-But get just one 'generic clock api' compliant clock from the board and use
-it.
-That will keep the driver simple for sure and IIUIC, in future anyways DT would
-specify source clock for each peripheral. Grant ?
+Mark,
+
+On 08/10/2011 07:48 AM, Mark Rutland wrote:
+> Hi all,
+> 
+> I'm working on a driver for the PMU found in L220/PL310 L2 Cache Controllers
+> (as an extension to the existing L2x0 code).
+> 
+> I've taken a look into what BSP support would be required and mocked up some
+> platform_device support, though I notice that Rob Herring has provided
+> devicetree bindings for the L2x0 ("l2x0: Add OF based initialization") which
+> should probably be used to initialize the PMU (if present) from devicetree.
+> 
+> The L2x0 hardware supports a combined interrupt line, which is present on the
+> Vexpress A9x4, EB11MPcore, PB1176, etc. This can be used to signal errors on
+> read/write, parity checks, etc. The PMU also fires an interrupt on this line
+> when any of its counters saturate.
+> 
+> Unfortunately the L2x0 OF bindings introduced by the patch don't include an
+> (optional) interrupt property, which means the PMU driver won't be able to be
+> initialised via devicetree. As we want to get as much as possible dynamically
+> configured via devicetree, this is problematic.
+> 
+> I realise I'm a bit late to the party here, but I'd like to propose adding an
+> optional interrupt parameter to the binding. I'm not aware of any
+> implementations which use separate interrupts, but given the binding
+> seems to be generic across L2CC implementations (and is not limited simply to
+> the L2x0), having a list rather than a single interrupt may be appropriate for
+> someone.
+
+Good thing the party never ends...
+
+> This would boil down to (for the moment) a Documentation change along the lines of:
+> 
+>> diff --git a/Documentation/devicetree/bindings/arm/l2cc.txt b/Documentation/devicetree/bindings/arm/l2cc.txt
+>> index f50e021..d4b387b 100644
+>> --- a/Documentation/devicetree/bindings/arm/l2cc.txt
+>> +++ b/Documentation/devicetree/bindings/arm/l2cc.txt
+>> @@ -28,6 +28,7 @@ Optional properties:
+>>  - arm,filter-ranges : <start length> Starting address and length of window to
+>>    filter. Addresses in the filter window are directed to the M1 port. Other
+>>    addresses will go to the M0 port.
+>> +- interrupt : A combined interrupt.
+>>  
+>>  Example:
+>>  
+>> @@ -39,4 +40,5 @@ L2: cache-controller {
+>>          arm,filter-latency = <0x80000000 0x8000000>;
+>>          cache-unified;
+>>          cache-level = <2>;
+>> +        interrupt = <45>;
+>>  };
+> 
+> Any thoughts?
+
+I think you should allow for either the single irq or individual irqs.
+You can specify that the event counter interrupt must be first, then the
+pmu driver could work either way ignoring the rest. The driver probably
+needs to mark the handler as shared if there is only the combined
+interrupt unless you expect all interrupts to be handled by 1 driver.
+
+Rob
+
+> 
+> Thanks,
+> Mark
+> 
+> 
