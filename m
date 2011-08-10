@@ -1,45 +1,66 @@
-From: N.Voss@weinmann.de (Voss, Nikolaus)
-Date: Wed, 10 Aug 2011 14:02:29 +0200
-Subject: [PATCH v2] atmel_serial: fix atmel_default_console_device
-In-Reply-To: <4E4267BF.5040609@ru.mvista.com>
-References: <1307541740.10626.15.camel@hcegtvedt.norway.atmel.com>
-	<1308666679-12111-1-git-send-email-plagnioj@jcrosoft.com>
-	<loom.20110808T170457-559@post.gmane.org>
-	<4E411CEF.10004@ru.mvista.com>
-	<EF2E73589CA71846A15D0B2CDF79505D087B0192D6@wm021.weinmann.com>
-	<4E4267BF.5040609@ru.mvista.com>
-Message-ID: <EF2E73589CA71846A15D0B2CDF79505D087B055C3A@wm021.weinmann.com>
+From: padma.kvr@gmail.com (padma venkat)
+Date: Wed, 10 Aug 2011 17:33:36 +0530
+Subject: [RFC][PATCH 2/2] spi: s3c64xx: Use clkdev for bus clock lookup
+In-Reply-To: <CABb+yY1Be3q+5QVaLYnonOUq1VtjyCZMKp0S1yryjF2HRyqoSw@mail.gmail.com>
+References: <1312898301-7229-1-git-send-email-padma.v@samsung.com>
+	<CABb+yY1Be3q+5QVaLYnonOUq1VtjyCZMKp0S1yryjF2HRyqoSw@mail.gmail.com>
+Message-ID: <CAAgF-Bf=K8M9Qp8EwFTuUY06H4SPNY5cW2Ct3K9FecMLvBHmuA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-reflect new static uart platform ids introduced by patch
-http://article.gmane.org/gmane.linux.kernel/1126105
+Hi Jassi,
 
-Signed-off-by: Nikolaus Voss <n.voss@weinmann.de>
----
-Updated with Sergei's comment.
-
- drivers/tty/serial/atmel_serial.c |    8 +++++---
- 1 files changed, 5 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-index af9b781..b922f5d 100644
---- a/drivers/tty/serial/atmel_serial.c
-+++ b/drivers/tty/serial/atmel_serial.c
-@@ -1609,9 +1609,11 @@ static struct console atmel_console = {
- static int __init atmel_console_init(void)
- {
- 	if (atmel_default_console_device) {
--		add_preferred_console(ATMEL_DEVICENAME,
--				      atmel_default_console_device->id, NULL);
--		atmel_init_port(&atmel_ports[atmel_default_console_device->id],
-+		struct atmel_uart_data *pdata =
-+			atmel_default_console_device->dev.platform_data;
-+
-+		add_preferred_console(ATMEL_DEVICENAME, pdata->num, NULL);
-+		atmel_init_port(&atmel_ports[pdata->num],
- 				atmel_default_console_device);
- 		register_console(&atmel_console);
- 	}
--- 
-1.7.4.1
+On Tue, Aug 9, 2011 at 6:13 PM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+> On Tue, Aug 9, 2011 at 7:28 PM, Padmavathi Venna <padma.v@samsung.com> wrote:
+>> SPI driver is modified to lookup the bus clock using the
+>> alias name instead of getting clock name and clock
+>> number from platform data.
+> Cool.
+>
+>> Driver is modified to get the best source clock among the
+>> available source clocks for the required frequency.
+> I am not sure if this driver should be deciding which clock is 'best' for it.
+> Because ...
+> 1) Usually it's the board designer who decides which clock to run at
+> ?what speed based upon target device. So ideally, based upon use-case
+> the driver should simply get the 'best' clock from board via platform in a
+> format that is compliant to the 'generic clock api'.
+As per your comment I modified the code for board designer to supply the
+required list of source clocks. If this list is NULL then it  uses the
+all available
+clock sources. I will resubmit this patch.
+> 2) We are not changing source clock rates(and we should not).
+> ?So the 'best' clock found, might still be way off in accuracy. And when we
+> can't anyway guarantee accuracy, why not leave the decision to
+> the board designer who might, say, select the source clock good enough
+> to be useful to more than one controller yet not absolutely accurate for any ?
+Yes. We are not getting the accurate frequency but we are able to get
+best frequency.
+> 3) It keeps enabled 3 unused clocks all the time.
+I modified the  code to enable only the best source clock. I will
+resubmit this patch.
+>
+>
+>> diff --git a/drivers/spi/spi_s3c64xx.c b/drivers/spi/spi_s3c64xx.c
+>> index 8945e20..d7c979d 100644
+>> --- a/drivers/spi/spi_s3c64xx.c
+>> +++ b/drivers/spi/spi_s3c64xx.c
+>> @@ -132,6 +132,9 @@
+>> ?#define RXBUSY ? ?(1<<2)
+>> ?#define TXBUSY ? ?(1<<3)
+>>
+>> +#define MAX_SPI_BUS_CLK (4)
+>> +#define MAX_PSR (256)
+>
+> Btw,
+>
+> ?#define MAX_SPI_BUS_CLK 4
+> ?#define MAX_PSR 256
+>
+> is safe ... even safer than with two on!
+Modified.
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>
