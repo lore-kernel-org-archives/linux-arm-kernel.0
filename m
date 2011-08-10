@@ -1,64 +1,84 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 10 Aug 2011 13:26:48 +0100
-Subject: [PATCH] ARM: fix perf build with uclibc toolchains
-In-Reply-To: <201108101256.01010.florian@openwrt.org>
-References: <201108091324.17750.florian@openwrt.org>
-	<20110809200852.GA2993@e102144-lin.cambridge.arm.com>
-	<20110810102154.GF10121@e102144-lin.cambridge.arm.com>
-	<201108101256.01010.florian@openwrt.org>
-Message-ID: <20110810122648.GG10121@e102144-lin.cambridge.arm.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Wed, 10 Aug 2011 14:36:50 +0200
+Subject: [RFC/PATCH 11/14] dt: omap3: add soc file for handling i2c
+	controllers
+In-Reply-To: <1312897232-4792-12-git-send-email-manjugk@ti.com>
+References: <1312897232-4792-1-git-send-email-manjugk@ti.com>
+	<1312897232-4792-12-git-send-email-manjugk@ti.com>
+Message-ID: <4E427B62.1000907@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 10, 2011 at 11:56:00AM +0100, Florian Fainelli wrote:
-> On Wednesday 10 August 2011 12:21:55 Will Deacon wrote:
-> > On Tue, Aug 09, 2011 at 09:08:53PM +0100, Will Deacon wrote:
-> > > On Tue, Aug 09, 2011 at 12:24:17PM +0100, Florian Fainelli wrote:
-> > > > libio.h is not provided by uClibc, in order to be able to test the
-> > > > definition of __UCLIBC__ we need to include stdlib.h, which also
-> > > > includes stddef.h, providing the definition of 'NULL'.
-> > > > 
-> > > > Signed-off-by: Florian Fainelli <florian@openwrt.org>
-> > > > ---
-> > > > diff --git a/tools/perf/arch/arm/util/dwarf-regs.c
-> > > > b/tools/perf/arch/arm/util/dwarf-regs.c index fff6450..e8d5c55 100644
-> > > > --- a/tools/perf/arch/arm/util/dwarf-regs.c
-> > > > +++ b/tools/perf/arch/arm/util/dwarf-regs.c
-> > > > @@ -8,7 +8,10 @@
-> > > > 
-> > > >   * published by the Free Software Foundation.
-> > > >   */
-> > > > 
-> > > > +#include <stdlib.h>
-> > > > +#ifndef __UCLIBC__
-> > > > 
-> > > >  #include <libio.h>
-> > > > 
-> > > > +#endif
-> > > > 
-> > > >  #include <dwarf-regs.h>
-> > > >  
-> > > >  struct pt_regs_dwarfnum {
-> > > 
-> > > Nice to see somebody trying to get this going with uclinux! I'll give
-> > > this a quick compile-check on my boards and then I'll include it in my
-> > > perf-fixes branch for 3.1.
-> > 
-> > Seems happy enough on my MMU boards. Since you're using this on noMMU
-> > platforms, does that mean that you can build a static perf binary out of
-> > the box or do you need further patches for this?
-> 
-> uClibc is not only for noMMU boards, I just built an uclibc toolchain for arm 
-> targetting realview and run-tested this with qemu. This was the only patch 
-> required to cross-compile perf for me. I also tested this with eglibc.
+On 8/9/2011 4:10 PM, G, Manjunath Kondaiah wrote:
+>
+> Add omap3 soc file for handling omap3 soc i2c controllers existing
+> on l4-core bus.
+>
+> Signed-off-by: G, Manjunath Kondaiah<manjugk@ti.com>
+> ---
+>   arch/arm/boot/dts/omap3-soc.dtsi |   62 ++++++++++++++++++++++++++++++++++++++
+>   1 files changed, 62 insertions(+), 0 deletions(-)
+>   create mode 100644 arch/arm/boot/dts/omap3-soc.dtsi
+>
+> diff --git a/arch/arm/boot/dts/omap3-soc.dtsi b/arch/arm/boot/dts/omap3-soc.dtsi
+> new file mode 100644
+> index 0000000..85de92f
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/omap3-soc.dtsi
+> @@ -0,0 +1,62 @@
+> +/*
+> + * Device Tree Source for OMAP3 SoC
+> + *
+> + * Copyright (C) 2011 Texas Instruments Incorporated - http://www.ti.com/
+> + *
+> + * This file is licensed under the terms of the GNU General Public License
+> + * version 2.  This program is licensed "as is" without any warranty of any
+> + * kind, whether express or implied.
+> + */
+> +
+> +/dts-v1/;
+> +/include/ "skeleton.dtsi"
+> +
+> +/ {
+> +	#address-cells =<1>;
+> +	#size-cells =<1>;
+> +	model = "ti,omap3";
+> +
+> +	aliases {
+> +		i2c1 =&i2c1;
+> +		i2c2 =&i2c2;
+> +		i2c3 =&i2c3;
+> +	};
+> +
+> +	l4-core {
 
-Ok, great. Cross-compiling perf usually just causes endless pain for me.
+That comment is probably subject to discussion, but even if this 
+interconnect is there physically, I'm not sure of the added value to add it.
+It will add an extra level of indentation and that all. Moreover, it 
+will mess up the physical address that are expressed using absolute 
+value in the TRM with a less readable offset value.
+In fact, most DTS files in the ARM directory are using a purely flat 
+representation of the interconnect.
 
-> By the way, perf top reports no even being generated for realview under qemu, 
-> is that normal?
+> +		compatible = "ti,omap3-l4-core";
 
-My guess is that qemu isn't emulating the cycle counter, which is required
-to generate interrupts for use by perf. You could try disabling
-HW_PERF_EVENTS which will force perf to fall back to a CPU tick instead.
+Assuming we will keep that, you should probably add a more generic 
+compatible name after that one. Like "ti,s3220" or even "sonics,s3220", 
+assuming that this IP is generic enough for other SoC.
 
-Will
+> +		#address-cells =<1>;
+> +		#size-cells =<1>;
+> +		ranges =<0 0x48000000 0x1000000>;
+> +
+> +		i2c1: i2c at 70000 {
+> +			#address-cells =<1>;
+> +			#size-cells =<0>;
+> +			compatible = "ti,omap3-i2c";
+
+The I2C IP and thus the driver is generic across OMAP generations and is 
+even potentially used by other non-OMAP TI chips like DSP or Davinci. So 
+having an extra compatible entry with "ti,i2c" or "ti, omap-i2c" seems 
+mandatory.
+
+Regards,
+Benoit
