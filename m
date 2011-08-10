@@ -1,23 +1,41 @@
-From: viresh.kumar@st.com (viresh kumar)
-Date: Wed, 10 Aug 2011 17:16:09 +0530
-Subject: [PATCH V2 3/6] spi/spi-pl022: Don't allocate more sg than
-	required.
-In-Reply-To: <4E426EB6.9020408@ru.mvista.com>
-References: <cover.1312965741.git.viresh.kumar@st.com>
-	<94a975df64a78bb533c85774a5bbd052c73fa5ba.1312965741.git.viresh.kumar@st.com>
-	<4E426EB6.9020408@ru.mvista.com>
-Message-ID: <4E426F81.5080606@st.com>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Wed, 10 Aug 2011 12:49:07 +0100
+Subject: [RFC PATCH] ARM: sched_clock: allow sched_clock to be selected
+	at runtime
+In-Reply-To: <1312910015-20043-1-git-send-email-marc.zyngier@arm.com>
+References: <1312910015-20043-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20110810114907.GA2680@pulham.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/10/2011 05:12 PM, Sergei Shtylyov wrote:
->> > -	pages = (pl022->cur_transfer->len>>  PAGE_SHIFT) + 1;
->> > +	pages = ((pl022->cur_transfer->len + (1 << PAGE_SHIFT) - 1)
->> > +			>>  PAGE_SHIFT);
->     No need for parens around the rvalue.
+Hi Marc,
 
-Oops, that was a mistake. Anyway i have send V3 for the same and this issue
-is not present anymore.
+On Tue, Aug 09, 2011 at 06:13:35PM +0100, Marc Zyngier wrote:
+> sched_clock() is yet another blocker on the road to the single
+> image. This patch implements an idea by Russell King:
+> 
+> http://www.spinics.net/lists/linux-omap/msg49561.html
+> 
+> Instead of asking the platform to implement both sched_clock()
+> itself and the rollover callback, simply register a read()
+> function, and let the ARM code care about sched_clock() itself,
+> the conversion to ns and the rollover. sched_clock() uses
+> this read() function as an indirection to the platform code.
+> 
+> This allow some simplifications and possibly some footprint gain
+> when multiple platforms are compiled in. Among the drawbacks,
+> the removal of the *_fixed_sched_clock optimization which could
+> negatively impact some platforms (sa1100, tegra, versatile
+> and omap).
+> 
+> Tested on 11MPCore, OMAP4 and Tegra.
 
--- 
-viresh
+Tested on my 1176 platform and works nicely.  However, shouldn't the 
+read functions still be marked notrace so they don't appear in ftrace 
+output?
+
+On my (out of tree) platform, omitting notrace and having all of the 
+ftrace bootup tests results in a hard lockup.  Annotating the read 
+function resolves this.
+
+Jamie
