@@ -1,67 +1,64 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Wed, 10 Aug 2011 14:18:33 +0200
-Subject: [PATCH 17/19] mach-pnx4008: rename GPIO header
-Message-ID: <1312978714-18638-1-git-send-email-linus.walleij@stericsson.com>
+Date: Wed, 10 Aug 2011 14:18:41 +0200
+Subject: [PATCH 18/19] mach-sa1100: move SA1100 GPIO driver to GPIO subsystem
+Message-ID: <1312978721-18671-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Linus Walleij <linus.walleij@linaro.org>
 
-The PNX4008 header file is using the generic gpio and gpiolib
-namespace in <mach/gpio.h> yet the GPIO interface is not generic
-at all so rename it to <mach/gpio-pnx4008.h>
+As per example from the other ARM boards, push the SA100
+GPIO driver down to the GPIO subsystem so it can be consolidated.
 
-Cc: Vitaly Wool <vitalywool@gmail.com>
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- .../include/mach/{gpio.h => gpio-pnx4008.h}        |    0
- arch/arm/mach-pnx4008/serial.c                     |    2 +-
- drivers/gpio/gpio-pnx4008.c                        |    2 +-
- 3 files changed, 2 insertions(+), 2 deletions(-)
- rename arch/arm/mach-pnx4008/include/mach/{gpio.h => gpio-pnx4008.h} (100%)
+ arch/arm/mach-sa1100/Makefile                      |    2 +-
+ drivers/gpio/Makefile                              |    2 +-
+ .../gpio.c => drivers/gpio/gpio-sa1100.c           |    1 -
+ 3 files changed, 2 insertions(+), 3 deletions(-)
+ rename arch/arm/mach-sa1100/gpio.c => drivers/gpio/gpio-sa1100.c (98%)
 
-diff --git a/arch/arm/mach-pnx4008/include/mach/gpio.h b/arch/arm/mach-pnx4008/include/mach/gpio-pnx4008.h
-similarity index 100%
-rename from arch/arm/mach-pnx4008/include/mach/gpio.h
-rename to arch/arm/mach-pnx4008/include/mach/gpio-pnx4008.h
-diff --git a/arch/arm/mach-pnx4008/serial.c b/arch/arm/mach-pnx4008/serial.c
-index eb29fac..374c138 100644
---- a/arch/arm/mach-pnx4008/serial.c
-+++ b/arch/arm/mach-pnx4008/serial.c
-@@ -9,7 +9,6 @@
-  *  it under the terms of the GNU General Public License version 2 as
-  *  published by the Free Software Foundation.
-  */
--#include <linux/gpio.h>
- #include <linux/kernel.h>
- #include <linux/types.h>
- #include <linux/io.h>
-@@ -20,6 +19,7 @@
- #include <linux/serial_core.h>
- #include <linux/serial_reg.h>
+diff --git a/arch/arm/mach-sa1100/Makefile b/arch/arm/mach-sa1100/Makefile
+index 41252d2..73a5c64 100644
+--- a/arch/arm/mach-sa1100/Makefile
++++ b/arch/arm/mach-sa1100/Makefile
+@@ -3,7 +3,7 @@
+ #
  
-+#include <mach/gpio-pnx4008.h>
- #include <mach/clock.h>
- 
- #define UART_3		0
-diff --git a/drivers/gpio/gpio-pnx4008.c b/drivers/gpio/gpio-pnx4008.c
-index eef531b..d3e71d3 100644
---- a/drivers/gpio/gpio-pnx4008.c
-+++ b/drivers/gpio/gpio-pnx4008.c
-@@ -13,13 +13,13 @@
-  * is licensed "as is" without any warranty of any kind, whether express
-  * or implied.
-  */
--#include <linux/gpio.h>
- #include <linux/types.h>
- #include <linux/kernel.h>
+ # Common support
+-obj-y := clock.o generic.o gpio.o irq.o dma.o time.o #nmi-oopser.o
++obj-y := clock.o generic.o irq.o dma.o time.o #nmi-oopser.o
+ obj-m :=
+ obj-n :=
+ obj-  :=
+diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
+index 7f846bf..6b77473 100644
+--- a/drivers/gpio/Makefile
++++ b/drivers/gpio/Makefile
+@@ -47,7 +47,7 @@ obj-$(CONFIG_GPIO_RDC321X)	+= gpio-rdc321x.o
+ obj-$(CONFIG_GPIO_PLAT_SAMSUNG)	+= gpio-plat-samsung.o
+ obj-$(CONFIG_GPIO_S5PC100)	+= gpio-s5pc100.o
+ obj-$(CONFIG_GPIO_S5PV210)	+= gpio-s5pv210.o
+-
++obj-$(CONFIG_ARCH_SA1100)	+= gpio-sa1100.o
+ obj-$(CONFIG_GPIO_SCH)		+= gpio-sch.o
+ obj-$(CONFIG_GPIO_STMPE)	+= gpio-stmpe.o
+ obj-$(CONFIG_GPIO_SX150X)	+= gpio-sx150x.o
+diff --git a/arch/arm/mach-sa1100/gpio.c b/drivers/gpio/gpio-sa1100.c
+similarity index 98%
+rename from arch/arm/mach-sa1100/gpio.c
+rename to drivers/gpio/gpio-sa1100.c
+index e547ed4..b6c1f6d 100644
+--- a/arch/arm/mach-sa1100/gpio.c
++++ b/drivers/gpio/gpio-sa1100.c
+@@ -12,7 +12,6 @@
  #include <linux/module.h>
- #include <linux/io.h>
- #include <mach/hardware.h>
- #include <mach/platform.h>
-+#include <mach/gpio-pnx4008.h>
  
- /* register definitions */
- #define PIO_VA_BASE	IO_ADDRESS(PNX4008_PIO_BASE)
+ #include <mach/hardware.h>
+-#include "generic.h"
+ 
+ static int sa1100_gpio_get(struct gpio_chip *chip, unsigned offset)
+ {
 -- 
 1.7.3.2
