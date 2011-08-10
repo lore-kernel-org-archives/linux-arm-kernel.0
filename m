@@ -1,46 +1,98 @@
 From: dave.martin@linaro.org (Dave Martin)
-Date: Wed, 10 Aug 2011 11:13:42 +0100
-Subject: [RFC PATCH 4/5] ARM: entry: Remove unnecessary masking when decoding
-	Thumb-2 instructions
+Date: Wed, 10 Aug 2011 11:13:43 +0100
+Subject: [RFC PATCH 5/5] ARM: entry: Fix Thumb-2 undef handling for multi-CPU
+	kernels
 In-Reply-To: <1312971223-28165-1-git-send-email-dave.martin@linaro.org>
 References: <1312971223-28165-1-git-send-email-dave.martin@linaro.org>
-Message-ID: <1312971223-28165-5-git-send-email-dave.martin@linaro.org>
+Message-ID: <1312971223-28165-6-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When testing whether a Thumb-2 instruction is 32 bits long or not,
-the masking done in order to test bits 11-15 of the first
-instruction halfword won't affect the result of the comparison, so
-remove it.
+When v6 and >=v7 boards are supported in the same kernel, the
+__und_usr code currently makes a build-time assumption that Thumb-2
+instructions occurring in userspace don't need to be supported.
+Strictly speaking this is incorrect.
+
+This patch fixes the above case by doing a run-time check on the
+CPU architecture in these cases.  This only affects kernels which
+support v6 and >=v7 CPUs together: plain v6 and plain v7 kernels
+are unaffected.
 
 Signed-off-by: Dave Martin <dave.martin@linaro.org>
 ---
- arch/arm/kernel/entry-armv.S |    6 ++----
- 1 files changed, 2 insertions(+), 4 deletions(-)
+ arch/arm/kernel/entry-armv.S |   38 +++++++++++++++++++++++++++++++++++++-
+ 1 files changed, 37 insertions(+), 1 deletions(-)
 
 diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-index a87cbf8..b7236d4 100644
+index b7236d4..bc41ebd 100644
 --- a/arch/arm/kernel/entry-armv.S
 +++ b/arch/arm/kernel/entry-armv.S
-@@ -262,8 +262,7 @@ __und_svc:
- 	ldr	r0, [r4, #-4]
- #else
- 	ldrh	r0, [r4, #-2]			@ Thumb instruction at LR - 2
--	and	r9, r0, #0xf800
--	cmp	r9, #0xe800			@ 32-bit instruction if xx >= 0
-+	cmp	r0, #0xe800			@ 32-bit instruction if xx >= 0
- 	ldrhhs	r9, [r4]			@ bottom 16 bits
- 	orrhs	r0, r9, r0, lsl #16
+@@ -24,6 +24,7 @@
+ #include <asm/unwind.h>
+ #include <asm/unistd.h>
+ #include <asm/tls.h>
++#include <asm/system.h>
+ 
+ #include "entry-header.S"
+ #include <asm/entry-macro-multi.S>
+@@ -439,7 +440,27 @@ __und_usr:
  #endif
-@@ -445,8 +444,7 @@ __und_usr:
+ 	beq	call_fpe
+ 	@ Thumb instruction
+-#if __LINUX_ARM_ARCH__ >= 7
++#if CONFIG_ARM_THUMB && __LINUX_ARM_ARCH__ >= 6 && CONFIG_CPU_V7
++/*
++ * Thumb-2 instruction handling.  Note that because pre-v6 and >= v6 platforms
++ * can never be supported in a single kernel, this code is not applicable at
++ * all when __LINUX_ARM_ARCH__ < 6.  This allows simplifying assumptions to be
++ * made about .arch directives.
++ */
++#if __LINUX_ARM_ARCH__ < 7
++/* If the target CPU may not be Thumb-2-capable, a run-time check is needed: */
++#define NEED_CPU_ARCHITECTURE
++	ldr	r5, .LCcpu_architecture
++	ldr	r5, [r5]
++	cmp	r5, #CPU_ARCH_ARMv7
++	blo	__und_usr_unknown
++/*
++ * The following code won't get run unless the running CPU really is v7, so
++ * coding round the lack of ldrht on older arches is pointless.  Temporarily
++ * override the assembler target arch with the minimum required instead:
++ */
++	.arch	armv6t2
++#endif
+ 2:
   ARM(	ldrht	r5, [r4], #2	)
   THUMB(	ldrht	r5, [r4]	)
-  THUMB(	add	r4, r4, #2	)
--	and	r0, r5, #0xf800			@ mask bits 111x x... .... ....
--	cmp	r0, #0xe800			@ 32bit instruction if xx != 0
-+	cmp	r5, #0xe800			@ 32bit instruction if xx != 0
- 	blo	__und_usr_unknown
+@@ -449,7 +470,16 @@ __und_usr:
  3:	ldrht	r0, [r4]
  	add	r2, r2, #2			@ r2 is PC + 2, make it PC + 4
+ 	orr	r0, r0, r5, lsl #16
++
++#if __LINUX_ARM_ARCH__ < 7
++/* If the target arch was overridden, change it back: */
++#ifdef CONFIG_CPU_32v6K
++	.arch	armv6k
+ #else
++	.arch	armv6
++#endif
++#endif /* __LINUX_ARM_ARCH__ < 7 */
++#else /* !(CONFIG_ARM_THUMB && __LINUX_ARM_ARCH__ >= 6 && CONFIG_CPU_V7) */
+ 	b	__und_usr_unknown
+ #endif
+  UNWIND(.fnend		)
+@@ -576,6 +606,12 @@ call_fpe:
+ 	movw_pc	lr				@ CP#14 (Debug)
+ 	movw_pc	lr				@ CP#15 (Control)
+ 
++#ifdef NEED_CPU_ARCHITECTURE
++	.align	2
++.LCcpu_architecture:
++	.word	cpu_architecture
++#endif
++
+ #ifdef CONFIG_NEON
+ 	.align	6
+ 
 -- 
 1.7.4.1
