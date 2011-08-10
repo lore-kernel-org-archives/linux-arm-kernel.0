@@ -1,88 +1,43 @@
-From: marvin24@gmx.de (Marc Dietich)
-Date: Wed, 10 Aug 2011 13:20:15 +0200
-Subject: [PATCH 4/5 V2] ARM: tegra: paz00: add clocks
-	requiredforusboperation
-In-Reply-To: <CAOesGMjmkchniG5Nd2M3wW8_RXQbSQQzspMVGGvbmF5Naf94SA@mail.gmail.com>
-References: <201108092126.28521.marvin24@gmx.de>
-	<201108101250.48324.marvin24@gmx.de>
-	<CAOesGMjmkchniG5Nd2M3wW8_RXQbSQQzspMVGGvbmF5Naf94SA@mail.gmail.com>
-Message-ID: <201108101320.16433.marvin24@gmx.de>
+From: vinod.koul@intel.com (Koul, Vinod)
+Date: Wed, 10 Aug 2011 22:23:53 +0530
+Subject: [PATCH V2 6/6] spi/spi-pl022: Request/free DMA channels as and
+	when required.
+In-Reply-To: <20110810103225.GJ1831@n2100.arm.linux.org.uk>
+References: <cover.1312965741.git.viresh.kumar@st.com>
+	<566c0525199f498f04422d4c3b2ddd7466648c20.1312965742.git.viresh.kumar@st.com>
+	<20110810090042.GE1831@n2100.arm.linux.org.uk>
+	<4E424F7B.2000800@st.com>
+	<438BB0150E931F4B9CE701519A4463010871804A15@bgsmsx502.gar.corp.intel.com>
+	<4E4259F5.8060402@st.com>
+	<20110810103225.GJ1831@n2100.arm.linux.org.uk>
+Message-ID: <1312995233.1603.6.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Wed, Aug 10, 2011 at 3:50 AM, Marc Dietich <marvin24@gmx.de> wrote:
-> >> > Marc Dietrich wrote at Tuesday, August 09, 2011 1:26 PM:
-> >> > > On Tuesday 09 August 2011 20:35:45 you wrote:
-> >> > > > [...]
-> >> > > > Do you need the pll_p_out4 entry? What's that driving? Check in
-> >> > > > /sys/kernel/debug/clock/clock_tree (/sys/kernel/debug is debugfs).
-> >> > > 
-> >> > > I think it is only required to setup the correct (non-standard?)
-> >> > > frequency. Seems all other boards use 108 MHz which cause one of the
-> >> > > ports to fail. Don't ask me for details ...
-> >> > 
-> >> > ...
-> >> > 
-> >> > > root at ac100:~# cat /sys/kernel/debug/clock/clock_tree
-> >> > > 
-> >> > >    clock                          state  ref div      rate
-> >> > > 
-> >> > > --------------------------------------------------------------
-> >> > > 
-> >> > >    clk_m                          on     9            12000000
-> >> > 
-> >> > ...
-> >> > 
-> >> > >       pll_p                       on     10  x18      216000000
-> >> > 
-> >> > ...
-> >> > 
-> >> > >          pll_p_out4               on     3   9        24000000
-> >> > > 
-> >> > >             sclk                  on     2            24000000
-> >> > > 
-> >> > >                avp.sclk           off    0            24000000
-> >> > >                cop                on     1            24000000
-> >> > >                hclk               on     2   1        24000000
-> >> > > 
-> >> > >                   pclk            on     2   2        12000000
-> >> > > 
-> >> > >                      apbdma       on     1   1        12000000
-> >> > 
-> >> > Hmm. That's pretty odd.
-> >> > 
-> >> > With the standard kernel the device ships with, what does the clock
-> >> > tree under pll_p_out4 look like? It'd be very interesting to compare
-> >> > that. If that setup is the same as what this patch sets up, the patch
-> >> > seems fine.
-> >> 
-> >> unfortunately, there is no such think in .32 kernel (the kernel deliverd
-> >> with the device), and I don't think I can port it over.
-> >> 
-> >> > As far as I know all the clocks there are both unrelated to USB, and
-> >> > internal to the device, so the board shouldn't have any effect. In
-> >> > particular, avp.sclk/cop are for the internal media CPU/DSP, hclk/pclk
-> >> > are the internal AHB/APB bus clocks, and apbdma is for an internal DMA
-> >> > engine, currently only used for audio in the mainline kernel at least.
-> >> 
-> >> Does this mean that the internal busses you mentioned are also running
-> >> at low speed? Would this be a hugh performance penality?
+On Wed, 2011-08-10 at 11:32 +0100, Russell King - ARM Linux wrote:
+> On Wed, Aug 10, 2011 at 03:44:13PM +0530, viresh kumar wrote:
+> > On 08/10/2011 03:31 PM, Koul, Vinod wrote:
+> > > And on your patch, are you able to dynamically assign the channels for
+> > > platform? What is the intended usage? (as Russell articulated it is bad
+> > > to dynamically assign channel for something like uart)
 > > 
-> > maybe this is why in the commit mentioned below sclk is bind to
-> > pll_c_out1 and set to 108 MHz again.
-> > 
-> > But I cannot see this change in the current seaboard clock table
-> > (optimized away?). Maybe someone with a seaboard could check this.
+> > Are you talking about channels or DMA request lines? For channels yes,
+> > we can always allocate channels as they are independent of peripherals.
+> > About request lines, they are muxed in our case between several
+> > peripherals, but support for that has to be added in dw_dmac.
 > 
-> We moved some of this to common.c, and should be posting those patches
-> in a while. It doesn't make sense to run sclk on pll_m, since that one
-> scales with memory clock scaling.
+> Right, and when you do, you'll probably have to go to a virtual channel
+> implementation, which solves the problem of keeping a channel allocated
+> and makes this patch redundant.
+> 
+> I assert that any DMA engine implementation where request signals can
+> be assigned dynamically to DMA channels should be using a virtual channel
+> implementation.
+Agreed, virtual channels can ensure that channels can be shared
+dynamically. If h/w has capability it should be able to do a spi
+transfer followed by emmc transfer ans so forth...
+Current model of giving client exclusive access to a channel doesn't
+allow this
 
-Olof,
-
-ok, I see. In .38 sclk is bound to pll_c_out1 running at 120 MHz. So we need no 
-further change, just wait for the patch to arrive.
-
-Thanks!
-
-Marc
+-- 
+~Vinod
