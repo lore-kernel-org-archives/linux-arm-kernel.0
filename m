@@ -1,204 +1,66 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Wed, 10 Aug 2011 14:57:21 +0200
-Subject: [RFC/PATCH 14/14] dt: omap3: enable dt support for i2c1 controller
-In-Reply-To: <1312897232-4792-15-git-send-email-manjugk@ti.com>
-References: <1312897232-4792-1-git-send-email-manjugk@ti.com>
-	<1312897232-4792-15-git-send-email-manjugk@ti.com>
-Message-ID: <4E428031.8070600@ti.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Wed, 10 Aug 2011 14:59:07 +0200
+Subject: [RFC][PATCH 1/2] S5PV210: SPI: Add clkdev support
+In-Reply-To: <CAAgF-BftGYkZ6aaSZgxd8gk1Zy9-sJEroZcaijd6zN3Qr9MEhQ@mail.gmail.com>
+References: <1312898222-7165-1-git-send-email-padma.v@samsung.com>
+	<4E413941.10307@samsung.com>
+	<CAAgF-BftGYkZ6aaSZgxd8gk1Zy9-sJEroZcaijd6zN3Qr9MEhQ@mail.gmail.com>
+Message-ID: <4E42809B.7070504@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/9/2011 4:10 PM, G, Manjunath Kondaiah wrote:
->
-> Adapt dt for omap i2c1 controller and remove legacy i2c
-> initilization in omap3 generic board file.
->
-> Tested on omap3 beagle board for dt and non-dt builds.
->
-> Signed-off-by: G, Manjunath Kondaiah<manjugk@ti.com>
-> ---
->   arch/arm/boot/dts/omap3-soc.dtsi     |    6 ++--
->   arch/arm/mach-omap2/board-omap3-dt.c |   14 +++++-----
->   drivers/i2c/busses/i2c-omap.c        |   23 ++++++++++++++++--
->   drivers/of/platform.c                |   41 +++++++++++++++++++++++++++++++++-
+Hi Padmavathi,
 
-It looks like this patch is doing a lot of things. You should probably 
-hack the DT core first and then update the driver and the DTS.
+On 08/10/2011 02:04 PM, padma venkat wrote:
+> Hi Sylwester,
+> 
+> On Tue, Aug 9, 2011 at 7:12 PM, Sylwester Nawrocki
+> <s.nawrocki@samsung.com> wrote:
+>> [corrected Jassi's email address]
+>>
+>> On 08/09/2011 03:57 PM, Padmavathi Venna wrote:
+>>> Create a clkdev alias for spi bus clock and modify the spi
+>>> driver to lookup the clock using the alias name instead of
+>>> passing clock name and clock number from SPI platform data.
+>>>
+>>> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+>>> ---
+>>> This patch is tested for S5PV210 platform and similar
+>>> changes can be adopted for rest of the Samsung's s3c
+>>> and s5p platforms, if this approach is accepted.
+>>
+>> It is a bit surprising to me how you do intend to use the clock aliases.
+>> Are we seriously going to be creating clock con_id aliases for most
+>> of the available devices ? It doesn't sound sane to me..
+>
+> We don't need to create the alias names for all the devices. But we need
+> to create only for those which need clock information from platform data.
+> As far as I know we need to create for spi,hsmmc,uart and iis.
 
->   4 files changed, 70 insertions(+), 14 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/omap3-soc.dtsi b/arch/arm/boot/dts/omap3-soc.dtsi
-> index 85de92f..bcff63b 100644
-> --- a/arch/arm/boot/dts/omap3-soc.dtsi
-> +++ b/arch/arm/boot/dts/omap3-soc.dtsi
-> @@ -31,7 +31,7 @@
->   		i2c1: i2c at 70000 {
->   			#address-cells =<1>;
->   			#size-cells =<0>;
-> -			compatible = "ti,omap3-i2c";
-> +			compatible = "ti,omap3-i2c", "ti,omap3-device";
+That's already a lot. 
+Just to clarify, the clock names were originally passed in platform_data
+because they differ across SoCs the driver supports, right ?
+Or are there any other reasons ?
 
-In that case the compatible is just a tagto identify an OMAP type of 
-devices. You should use a more generic "ti,omap-device" entry.
-This is similar to the "arm,primecell" used to tag the primecell IPs.
+The whole idea of the clkdev is not to require any information about 
+the clocks in platform_data. You just need to be registering the clock 
+identifiers *at the device*, not the clock names specific to the machine.
+The platform code takes care of the translation and the drivers only need
+to ask clkdev for the 'clock connection id', rather than the original
+machine clock name.
+You can do this by adding the aliases, but it's not optimal. You are adding
+the code which could well be avoided.
 
->   			reg =<0x70000 0x100>;
->   			interrupts =<  88>;
->   		};
-> @@ -39,7 +39,7 @@
->   		i2c2: i2c at 72000 {
->   			#address-cells =<1>;
->   			#size-cells =<0>;
-> -			compatible = "ti,omap3-i2c";
-> +			compatible = "ti,omap3-i2c", "ti,omap3-device";
->   			reg =<0x72000 0x100>;
->   			interrupts =<  89>;
->   		};
-> @@ -47,7 +47,7 @@
->   		i2c3: i2c at 60000 {
->   			#address-cells =<1>;
->   			#size-cells =<0>;
-> -			compatible = "ti,omap3-i2c";
-> +			compatible = "ti,omap3-i2c", "ti,omap3-device";
->   			reg =<0x60000 0x100>;
->   			interrupts =<  93>;
->   		};
-> diff --git a/arch/arm/mach-omap2/board-omap3-dt.c b/arch/arm/mach-omap2/board-omap3-dt.c
-> index 4b76e19..16cf283 100644
-> --- a/arch/arm/mach-omap2/board-omap3-dt.c
-> +++ b/arch/arm/mach-omap2/board-omap3-dt.c
-> @@ -36,11 +36,11 @@ static struct twl4030_platform_data beagle_twldata = {
->   	/* platform_data for children goes here */
->   };
 >
-> -static int __init omap3_beagle_i2c_init(void)
-> -{
-> -	omap3_pmic_init("twl4030",&beagle_twldata);
-> -	return 0;
-> -}
-> +struct of_dev_auxdata omap3_auxdata_lookup[] __initdata = {
-> +	OF_DEV_AUXDATA_ID_PDSIZE("ti,omap3-i2c", 0x48070000, "i2c1", 1,\
-> +				&beagle_twldata, sizeof(beagle_twldata)),
-> +	{}
-> +};
+>>
+>> Wouldn't it be possible to avoid the aliases by correcting the clock
+>> registration process ?
 >
->   static void __init omap3_init_early(void)
->   {
-> @@ -70,11 +70,11 @@ static struct of_device_id omap_dt_match_table[] __initdata = {
->
->   static void __init omap3_init(void)
->   {
-> -	omap3_beagle_i2c_init();
->   	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
->   	omap_serial_init();
->
-> -	of_platform_populate(NULL, omap_dt_match_table, NULL, NULL);
-> +	of_platform_populate(NULL, omap_dt_match_table, omap3_auxdata_lookup,
-> +									 NULL);
->   }
->
->   static const char *omap3_dt_match[] __initdata = {
-> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-> index ae1545b..5167737 100644
-> --- a/drivers/i2c/busses/i2c-omap.c
-> +++ b/drivers/i2c/busses/i2c-omap.c
-> @@ -38,6 +38,7 @@
->   #include<linux/clk.h>
->   #include<linux/io.h>
->   #include<linux/of_i2c.h>
-> +#include<linux/of_device.h>
->   #include<linux/slab.h>
->   #include<linux/i2c-omap.h>
->   #include<linux/pm_runtime.h>
-> @@ -972,6 +973,16 @@ static const struct i2c_algorithm omap_i2c_algo = {
->   	.functionality	= omap_i2c_func,
->   };
->
-> +#if defined(CONFIG_OF)
-> +static const struct of_device_id omap_i2c_of_match[] = {
-> +	{.compatible = "ti,omap3-i2c", },.
+> Yes it is possible but we don't have the flexibility to create the alias names
+> only for the required clocks.
 
-This is a generic OMAP driver, so a "ti,omap-i2c" is probably much more 
-appropriate. We should always avoid adding OMAP version information into 
-a generic driver. Only the IP version should matter for a driver.
+By registering proper clock connection ids you would not need the aliases at all.
 
-> +	{},
-> +}
-> +MODULE_DEVICE_TABLE(of, omap_i2c_of_match);
-> +#else
-> +#define omap_i2c_of_match NULL
-> +#endif
-> +
->   static int __devinit
->   omap_i2c_probe(struct platform_device *pdev)
->   {
-> @@ -1008,12 +1019,17 @@ omap_i2c_probe(struct platform_device *pdev)
->   		goto err_release_region;
->   	}
->
-> +	speed = 100;	/* Default speed */
->   	if (pdata != NULL) {
->   		speed = pdata->clkrate;
->   		dev->set_mpu_wkup_lat = pdata->set_mpu_wkup_lat;
-> -	} else {
-> -		speed = 100;	/* Default speed */
-> -		dev->set_mpu_wkup_lat = NULL;
-> +#if defined(CONFIG_OF)
-> +	} else if (pdev->dev.of_node) {
-> +		u32 prop;
-> +		if (!of_property_read_u32(pdev->dev.of_node, "clock-frequency",
-> +									&prop))
-> +			speed = prop/100;
-> +#endif
->   	}
->
->   	dev->speed = speed;
-> @@ -1178,6 +1194,7 @@ static struct platform_driver omap_i2c_driver = {
->   		.name	= "omap_i2c",
->   		.owner	= THIS_MODULE,
->   		.pm	= OMAP_I2C_PM_OPS,
-> +		.of_match_table = omap_i2c_of_match,
->   	},
->   };
->
-> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-> index 4b27286..4d8a2fa 100644
-> --- a/drivers/of/platform.c
-> +++ b/drivers/of/platform.c
-> @@ -24,6 +24,10 @@
->   #include<linux/of_platform.h>
->   #include<linux/platform_device.h>
->
-> +#ifdef CONFIG_ARCH_OMAP2PLUS
-> +#include<plat/omap_device.h>
-> +#endif
-> +
->   const struct of_device_id of_default_bus_match_table[] = {
->   	{ .compatible = "simple-bus", },
->   #ifdef CONFIG_ARM_AMBA
-> @@ -544,6 +548,36 @@ static const struct of_dev_auxdata *of_dev_lookup(const struct of_dev_auxdata *l
->   	return NULL;
->   }
->
-> +static struct omap_device_pm_latency omap_device_latency[] = {
-> +	[0] = {
-> +		.deactivate_func	= omap_device_idle_hwmods,
-> +		.activate_func		= omap_device_enable_hwmods,
-> +		.flags			= OMAP_DEVICE_LATENCY_AUTO_ADJUST,
-> +	},
-> +};
-> +
-> +int of_omap_device_create(struct device_node *np, const char *name, int id,
-> +							void *platform_data,
-> +							int pd_size)
-> +{
-> +	struct omap_hwmod *oh;
-> +	struct platform_device *pdev;
-> +
-> +	oh = omap_hwmod_lookup(name);
-
-This is not enough to handle multiple hwmod entries. Moreover you will 
-force the device to be named like the hwmod. This is not necessarily 
-bad, but we should be able to have a distinct name if needed.
-
-Benoit
+--
+Regards,
+Sylwester
