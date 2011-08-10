@@ -1,84 +1,67 @@
 From: b-cousson@ti.com (Cousson, Benoit)
-Date: Wed, 10 Aug 2011 14:36:50 +0200
-Subject: [RFC/PATCH 11/14] dt: omap3: add soc file for handling i2c
-	controllers
-In-Reply-To: <1312897232-4792-12-git-send-email-manjugk@ti.com>
+Date: Wed, 10 Aug 2011 14:42:56 +0200
+Subject: [RFC/PATCH 12/14] dt: omap3: beagle board: set clock freq for
+	i2c devices
+In-Reply-To: <1312897232-4792-13-git-send-email-manjugk@ti.com>
 References: <1312897232-4792-1-git-send-email-manjugk@ti.com>
-	<1312897232-4792-12-git-send-email-manjugk@ti.com>
-Message-ID: <4E427B62.1000907@ti.com>
+	<1312897232-4792-13-git-send-email-manjugk@ti.com>
+Message-ID: <4E427CD0.7060206@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 8/9/2011 4:10 PM, G, Manjunath Kondaiah wrote:
 >
-> Add omap3 soc file for handling omap3 soc i2c controllers existing
-> on l4-core bus.
+> Update omap3 beagle dts file with required clock frequencies for the i2c
+> client devices existing on beagle board.
+>
+> Beagle custom board dts file is cleaned up so that it can coexist with omap3
+> soc dts file.
 >
 > Signed-off-by: G, Manjunath Kondaiah<manjugk@ti.com>
 > ---
->   arch/arm/boot/dts/omap3-soc.dtsi |   62 ++++++++++++++++++++++++++++++++++++++
->   1 files changed, 62 insertions(+), 0 deletions(-)
->   create mode 100644 arch/arm/boot/dts/omap3-soc.dtsi
+>   arch/arm/boot/dts/omap3-beagle-nunchuck.dts |   11 +----------
+>   arch/arm/boot/dts/omap3-beagle.dts          |   18 +++++++++++++++---
+>   2 files changed, 16 insertions(+), 13 deletions(-)
 >
-> diff --git a/arch/arm/boot/dts/omap3-soc.dtsi b/arch/arm/boot/dts/omap3-soc.dtsi
-> new file mode 100644
-> index 0000000..85de92f
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/omap3-soc.dtsi
-> @@ -0,0 +1,62 @@
-> +/*
-> + * Device Tree Source for OMAP3 SoC
-> + *
-> + * Copyright (C) 2011 Texas Instruments Incorporated - http://www.ti.com/
-> + *
-> + * This file is licensed under the terms of the GNU General Public License
-> + * version 2.  This program is licensed "as is" without any warranty of any
-> + * kind, whether express or implied.
-> + */
-> +
-> +/dts-v1/;
-> +/include/ "skeleton.dtsi"
-> +
-> +/ {
-> +	#address-cells =<1>;
-> +	#size-cells =<1>;
-> +	model = "ti,omap3";
-> +
-> +	aliases {
-> +		i2c1 =&i2c1;
-> +		i2c2 =&i2c2;
-> +		i2c3 =&i2c3;
-> +	};
-> +
-> +	l4-core {
+> diff --git a/arch/arm/boot/dts/omap3-beagle-nunchuck.dts b/arch/arm/boot/dts/omap3-beagle-nunchuck.dts
+> index 2607be5..324ff86 100644
+> --- a/arch/arm/boot/dts/omap3-beagle-nunchuck.dts
+> +++ b/arch/arm/boot/dts/omap3-beagle-nunchuck.dts
+> @@ -1,16 +1,7 @@
+>   /include/ "omap3-beagle.dts"
+>
+>   / {
+> -	i2c at 48072000 {
+> -		compatible = "ti,omap3-i2c";
+> -		reg =<0x48072000 0x80>;
+> -		#address-cells =<1>;
+> -		#size-cells =<0>;
+> -
+> -		eeprom at 50 {
+> -			compatible = "at,at24c01";
+> -			reg =<  0x50>;
+> -		};
 
-That comment is probably subject to discussion, but even if this 
-interconnect is there physically, I'm not sure of the added value to add it.
-It will add an extra level of indentation and that all. Moreover, it 
-will mess up the physical address that are expressed using absolute 
-value in the TRM with a less readable offset value.
-In fact, most DTS files in the ARM directory are using a purely flat 
-representation of the interconnect.
+This change should probably not be there.
 
-> +		compatible = "ti,omap3-l4-core";
+> +	i2c at 2 {
+>   		joystick at 52 {
+>   			compatible = "sparkfun,wiichuck";
 
-Assuming we will keep that, you should probably add a more generic 
-compatible name after that one. Like "ti,s3220" or even "sonics,s3220", 
-assuming that this IP is generic enough for other SoC.
+It looks like someone is having fun with a beagle connected to a Wii 
+nunchuck:-)
 
-> +		#address-cells =<1>;
-> +		#size-cells =<1>;
-> +		ranges =<0 0x48000000 0x1000000>;
-> +
-> +		i2c1: i2c at 70000 {
-> +			#address-cells =<1>;
-> +			#size-cells =<0>;
-> +			compatible = "ti,omap3-i2c";
+>   			reg =<  0x52>;
+> diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
+> index 4439466..49a5ac7 100644
+> --- a/arch/arm/boot/dts/omap3-beagle.dts
+> +++ b/arch/arm/boot/dts/omap3-beagle.dts
+> @@ -1,7 +1,19 @@
+> -/dts-v1/;
+> -/include/ "skeleton.dtsi"
+> +/include/ "omap3-soc.dtsi"
 
-The I2C IP and thus the driver is generic across OMAP generations and is 
-even potentially used by other non-OMAP TI chips like DSP or Davinci. So 
-having an extra compatible entry with "ti,i2c" or "ti, omap-i2c" seems 
-mandatory.
+There is no need for the "-soc" postfix, otherwise all the other SoCs 
+inside DTS directory should have it.
 
-Regards,
 Benoit
