@@ -1,57 +1,64 @@
-From: hemantp@ti.com (Pedanekar, Hemant)
-Date: Wed, 10 Aug 2011 17:55:41 +0530
-Subject: [PATCH] omap: timer: Set dmtimer used as clocksource in
-	autoreload mode
-In-Reply-To: <20110810115122.GH1939@atomide.com>
-References: <1312948323-22823-1-git-send-email-hemantp@ti.com>
-	<20110810115122.GH1939@atomide.com>
-Message-ID: <2A3DCF3DA181AD40BDE86A3150B27B6B03ABBBFD56@dbde02.ent.ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 10 Aug 2011 13:26:48 +0100
+Subject: [PATCH] ARM: fix perf build with uclibc toolchains
+In-Reply-To: <201108101256.01010.florian@openwrt.org>
+References: <201108091324.17750.florian@openwrt.org>
+	<20110809200852.GA2993@e102144-lin.cambridge.arm.com>
+	<20110810102154.GF10121@e102144-lin.cambridge.arm.com>
+	<201108101256.01010.florian@openwrt.org>
+Message-ID: <20110810122648.GG10121@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony Lindgren wrote on Wednesday, August 10, 2011 5:21 PM:
+On Wed, Aug 10, 2011 at 11:56:00AM +0100, Florian Fainelli wrote:
+> On Wednesday 10 August 2011 12:21:55 Will Deacon wrote:
+> > On Tue, Aug 09, 2011 at 09:08:53PM +0100, Will Deacon wrote:
+> > > On Tue, Aug 09, 2011 at 12:24:17PM +0100, Florian Fainelli wrote:
+> > > > libio.h is not provided by uClibc, in order to be able to test the
+> > > > definition of __UCLIBC__ we need to include stdlib.h, which also
+> > > > includes stddef.h, providing the definition of 'NULL'.
+> > > > 
+> > > > Signed-off-by: Florian Fainelli <florian@openwrt.org>
+> > > > ---
+> > > > diff --git a/tools/perf/arch/arm/util/dwarf-regs.c
+> > > > b/tools/perf/arch/arm/util/dwarf-regs.c index fff6450..e8d5c55 100644
+> > > > --- a/tools/perf/arch/arm/util/dwarf-regs.c
+> > > > +++ b/tools/perf/arch/arm/util/dwarf-regs.c
+> > > > @@ -8,7 +8,10 @@
+> > > > 
+> > > >   * published by the Free Software Foundation.
+> > > >   */
+> > > > 
+> > > > +#include <stdlib.h>
+> > > > +#ifndef __UCLIBC__
+> > > > 
+> > > >  #include <libio.h>
+> > > > 
+> > > > +#endif
+> > > > 
+> > > >  #include <dwarf-regs.h>
+> > > >  
+> > > >  struct pt_regs_dwarfnum {
+> > > 
+> > > Nice to see somebody trying to get this going with uclinux! I'll give
+> > > this a quick compile-check on my boards and then I'll include it in my
+> > > perf-fixes branch for 3.1.
+> > 
+> > Seems happy enough on my MMU boards. Since you're using this on noMMU
+> > platforms, does that mean that you can build a static perf binary out of
+> > the box or do you need further patches for this?
+> 
+> uClibc is not only for noMMU boards, I just built an uclibc toolchain for arm 
+> targetting realview and run-tested this with qemu. This was the only patch 
+> required to cross-compile perf for me. I also tested this with eglibc.
 
-> * Hemant Pedanekar <hemantp@ti.com> [110809 20:46]:
->> If CONFIG_OMAP_32K_TIMER is not selected and dmtimer is used as
->> clocksource, the timer stops counting once overflow occurs as it was not
->> set in autoreload mode. This results into timekeeping failure: for
->> example, 'sleep 1' at the shell after the timer counter overflow would
->> hang. 
->> 
->> This patch sets up autoreload when starting the clocksource timer which
->> fixes the above issue. 
->> 
->> Signed-off-by: Hemant Pedanekar <hemantp@ti.com>
->> ---
->>  arch/arm/mach-omap2/timer.c |    2 +-
->>  1 files changed, 1 insertions(+), 1 deletions(-)
->> 
->> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
->> index e964072..796b935 100644 --- a/arch/arm/mach-omap2/timer.c
->> +++ b/arch/arm/mach-omap2/timer.c
->> @@ -293,7 +293,7 @@ static void __init
-> omap2_gp_clocksource_init(int gptimer_id,
->>  	pr_info("OMAP clocksource: GPTIMER%d at %lu Hz\n",  		gptimer_id,
->> clksrc.rate); 
->> 
->> -	__omap_dm_timer_load_start(clksrc.io_base, OMAP_TIMER_CTRL_ST, 0, 1);
->> +	omap_dm_timer_set_load_start(&clksrc, 1, 0);
->>  	init_sched_clock(&cd, dmtimer_update_sched_clock, 32, clksrc.rate);
->> 
->>  	if (clocksource_register_hz(&clocksource_gpt, clksrc.rate))
-> 
-> You should be able to just set the autoreload mode by changing to use
-> OMAP_TIMER_CTRL_POSTED | OMAP_TIMER_CTRL_AR in the
-> __omap_dm_timer_load_start
-> above.
-> 
-> This avoids calling something that might be a loadable module eventually.
-> 
-> Regards,
-> 
-> Tony
+Ok, great. Cross-compiling perf usually just causes endless pain for me.
 
-Yes, that would be better - I didn't think about loadable module option.
+> By the way, perf top reports no even being generated for realview under qemu, 
+> is that normal?
 
-Thanks.
-   Hemant
+My guess is that qemu isn't emulating the cycle counter, which is required
+to generate interrupts for use by perf. You could try disabling
+HW_PERF_EVENTS which will force perf to fall back to a CPU tick instead.
+
+Will
