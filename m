@@ -1,126 +1,66 @@
-From: michael.jones@matrix-vision.de (Michael Jones)
-Date: Thu, 11 Aug 2011 09:02:23 +0200
-Subject: [PATCH] omap2+: cleanup unneeded *_init_irq functions
-Message-ID: <1313046143-24115-1-git-send-email-michael.jones@matrix-vision.de>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 11 Aug 2011 16:11:05 +0900
+Subject: [GIT PULL] samsung: fixes for v3.1-rc1
+In-Reply-To: <20110811065837.GA4989@july>
+References: <20110811065837.GA4989@july>
+Message-ID: <015001cc57f5$d7e847f0$87b8d7d0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After 0c336dc5ec492886620d4afdc252c63f32adbd0e (omap2+: Remove
-omap2_gp_clockevent_set_gptimer) these functions didn't have much
-purpose anymore. Just pass omap3_init_irq directly with MACHINE_START.
+Kyungmin Park wrote:
+> 
+> The following changes since commit
+> 322a8b034003c0d46d39af85bf24fee27b902f48:
+> 
+>   Linux 3.1-rc1 (2011-08-07 18:23:30 -0700)
+> 
+> are available in the git repository at:
+>   git://git.infradead.org/users/kmpark/linux-2.6-samsung for-arnd
+> 
+> Kyungmin Park (2):
+>       ARM: exynos4: universal: Use the correct regulator names
+>       ARM: exynos4: Use nr_irqs instead of NR_IRQS
+> 
+> Marek Szyprowski (5):
+>       ARM: Exynos4: add required chained_irq_enter/exit to eint code
+>       ARM: Samsung: Add chained enrty/exit call to timer interrupt handler
+>       ARM: S5P: add required chained_irq_enter/exit to gpio-int code
+>       ARM: Exynos4: use s5p-timer for UniversalC210 board
+>       ARM: Samsung: fix watchdog reset issue with clk_get()
+> 
+> Sylwester Nawrocki (1):
+>       ARM: EXYNOS4: Fix the IRQ definitions for MIPI CSIS device
+> 
+>  arch/arm/mach-exynos4/Kconfig                      |    3 +++
+>  arch/arm/mach-exynos4/clock.c                      |    1 +
+>  arch/arm/mach-exynos4/include/mach/irqs.h          |    5 ++---
+>  arch/arm/mach-exynos4/irq-combiner.c               |    2 +-
+>  arch/arm/mach-exynos4/irq-eint.c                   |    7 +++++++
+>  arch/arm/mach-exynos4/mach-universal_c210.c        |    8 +++++---
+>  arch/arm/mach-s3c2412/clock.c                      |    1 +
+>  arch/arm/mach-s3c2416/clock.c                      |    2 +-
+>  arch/arm/mach-s3c2443/clock.c                      |    1 +
+>  arch/arm/mach-s3c64xx/clock.c                      |    1 +
+>  arch/arm/mach-s5p64x0/cpu.c                        |    2 ++
+>  arch/arm/mach-s5pc100/clock.c                      |    1 +
+>  arch/arm/mach-s5pv210/clock.c                      |    1 +
+>  arch/arm/plat-s3c24xx/s3c2410-clock.c              |    1 +
+>  arch/arm/plat-s5p/irq-gpioint.c                    |    6 ++++++
+>  arch/arm/plat-samsung/clock.c                      |    9 +++++++++
+>  arch/arm/plat-samsung/include/plat/clock.h         |    2 ++
+>  .../arm/plat-samsung/include/plat/watchdog-reset.h |   10 +++-------
+>  arch/arm/plat-samsung/irq-vic-timer.c              |    5 +++++
+>  19 files changed, 53 insertions(+), 15 deletions(-)
 
-Signed-off-by: Michael Jones <michael.jones@matrix-vision.de>
----
- arch/arm/mach-omap2/board-devkit8000.c     |    7 +------
- arch/arm/mach-omap2/board-omap3beagle.c    |    7 +------
- arch/arm/mach-omap2/board-omap3stalker.c   |    7 +------
- arch/arm/mach-omap2/board-omap3touchbook.c |    7 +------
- 4 files changed, 4 insertions(+), 24 deletions(-)
+No, if above is required, I think, this should be handled from me not you.
 
-diff --git a/arch/arm/mach-omap2/board-devkit8000.c b/arch/arm/mach-omap2/board-devkit8000.c
-index b6002ec..8fc4fd2 100644
---- a/arch/arm/mach-omap2/board-devkit8000.c
-+++ b/arch/arm/mach-omap2/board-devkit8000.c
-@@ -405,11 +405,6 @@ static void __init devkit8000_init_early(void)
- 				  mt46h32m32lf6_sdrc_params);
- }
- 
--static void __init devkit8000_init_irq(void)
--{
--	omap3_init_irq();
--}
--
- #define OMAP_DM9000_BASE	0x2c000000
- 
- static struct resource omap_dm9000_resources[] = {
-@@ -671,7 +666,7 @@ MACHINE_START(DEVKIT8000, "OMAP3 Devkit8000")
- 	.reserve	= omap_reserve,
- 	.map_io		= omap3_map_io,
- 	.init_early	= devkit8000_init_early,
--	.init_irq	= devkit8000_init_irq,
-+	.init_irq	= omap3_init_irq,
- 	.init_machine	= devkit8000_init,
- 	.timer		= &omap3_secure_timer,
- MACHINE_END
-diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
-index 32f5f89..2488f01 100644
---- a/arch/arm/mach-omap2/board-omap3beagle.c
-+++ b/arch/arm/mach-omap2/board-omap3beagle.c
-@@ -451,11 +451,6 @@ static void __init omap3_beagle_init_early(void)
- 				  mt46h32m32lf6_sdrc_params);
- }
- 
--static void __init omap3_beagle_init_irq(void)
--{
--	omap3_init_irq();
--}
--
- static struct platform_device *omap3_beagle_devices[] __initdata = {
- 	&leds_gpio,
- 	&keys_gpio,
-@@ -564,7 +559,7 @@ MACHINE_START(OMAP3_BEAGLE, "OMAP3 Beagle Board")
- 	.reserve	= omap_reserve,
- 	.map_io		= omap3_map_io,
- 	.init_early	= omap3_beagle_init_early,
--	.init_irq	= omap3_beagle_init_irq,
-+	.init_irq	= omap3_init_irq,
- 	.init_machine	= omap3_beagle_init,
- 	.timer		= &omap3_secure_timer,
- MACHINE_END
-diff --git a/arch/arm/mach-omap2/board-omap3stalker.c b/arch/arm/mach-omap2/board-omap3stalker.c
-index 8e10498..319bbd1 100644
---- a/arch/arm/mach-omap2/board-omap3stalker.c
-+++ b/arch/arm/mach-omap2/board-omap3stalker.c
-@@ -434,11 +434,6 @@ static void __init omap3_stalker_init_early(void)
- 	omap2_init_common_devices(mt46h32m32lf6_sdrc_params, NULL);
- }
- 
--static void __init omap3_stalker_init_irq(void)
--{
--	omap3_init_irq();
--}
--
- static struct platform_device *omap3_stalker_devices[] __initdata = {
- 	&keys_gpio,
- };
-@@ -497,7 +492,7 @@ MACHINE_START(SBC3530, "OMAP3 STALKER")
- 	.boot_params		= 0x80000100,
- 	.map_io			= omap3_map_io,
- 	.init_early		= omap3_stalker_init_early,
--	.init_irq		= omap3_stalker_init_irq,
-+	.init_irq		= omap3_init_irq,
- 	.init_machine		= omap3_stalker_init,
- 	.timer			= &omap3_secure_timer,
- MACHINE_END
-diff --git a/arch/arm/mach-omap2/board-omap3touchbook.c b/arch/arm/mach-omap2/board-omap3touchbook.c
-index 852ea04..36a0f6f 100644
---- a/arch/arm/mach-omap2/board-omap3touchbook.c
-+++ b/arch/arm/mach-omap2/board-omap3touchbook.c
-@@ -333,11 +333,6 @@ static void __init omap3_touchbook_init_early(void)
- 				  mt46h32m32lf6_sdrc_params);
- }
- 
--static void __init omap3_touchbook_init_irq(void)
--{
--	omap3_init_irq();
--}
--
- static struct platform_device *omap3_touchbook_devices[] __initdata = {
- 	&omap3_touchbook_lcd_device,
- 	&leds_gpio,
-@@ -408,7 +403,7 @@ MACHINE_START(TOUCHBOOK, "OMAP3 touchbook Board")
- 	.reserve	= omap_reserve,
- 	.map_io		= omap3_map_io,
- 	.init_early	= omap3_touchbook_init_early,
--	.init_irq	= omap3_touchbook_init_irq,
-+	.init_irq	= omap3_init_irq,
- 	.init_machine	= omap3_touchbook_init,
- 	.timer		= &omap3_secure_timer,
- MACHINE_END
--- 
-1.7.6
+Don't make a complete confusion between your board and Samsung architecture
+maintainer.
 
+Thanks.
 
-MATRIX VISION GmbH, Talstrasse 16, DE-71570 Oppenweiler
-Registergericht: Amtsgericht Stuttgart, HRB 271090
-Geschaeftsfuehrer: Gerhard Thullner, Werner Armingeon, Uwe Furtner, Erhard Meier
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
