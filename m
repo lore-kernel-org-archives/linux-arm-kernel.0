@@ -1,81 +1,47 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 11 Aug 2011 17:15:31 +0300
-Subject: [PATCH 11/13] ARM: gpio: consolidate trivial gpiolib
-	implementations
-In-Reply-To: <E1QqhM1-0003af-U5@rmk-PC.arm.linux.org.uk>
-References: <20110809080411.GA1831@n2100.arm.linux.org.uk>
-	<E1QqhM1-0003af-U5@rmk-PC.arm.linux.org.uk>
-Message-ID: <20110811141528.GL28500@legolas.emea.dhcp.ti.com>
+From: ludovic.desroches@atmel.com (ludovic.desroches at atmel.com)
+Date: Thu, 11 Aug 2011 17:25:46 +0200
+Subject: [PATCH v2 6/8] mmc: atmel-mci: use ATMEL_PDC_SCND_BUF_OFF instead of
+	a literal value
+In-Reply-To: <1313076348-3065-1-git-send-email-ludovic.desroches@atmel.com>
+References: <1311863398-31579-1-git-send-email-ludovic.desroches@atmel.com>
+	<1313076348-3065-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <4c1ea9367961693efff27ea30217ee1f46995bd4.1313071126.git.ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 09, 2011 at 09:08:01AM +0100, Russell King - ARM Linux wrote:
-> Consolidate 24 trivial gpiolib implementions out of mach/gpio.h
-> into asm/gpio.h.  This is basically the include of asm-generic/gpio.h
-> and the definition of gpio_get_value, gpio_set_value, and gpio_cansleep
-> as described in Documentation/gpio.txt
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
->  arch/arm/include/asm/gpio.h                 |   10 ++++++++++
->  arch/arm/mach-at91/include/mach/gpio.h      |    5 +----
->  arch/arm/mach-ep93xx/include/mach/gpio.h    |    7 +------
->  arch/arm/mach-exynos4/include/mach/gpio.h   |    5 +----
->  arch/arm/mach-gemini/include/mach/gpio.h    |    5 +----
->  arch/arm/mach-ks8695/include/mach/gpio.h    |   11 ++---------
->  arch/arm/mach-lpc32xx/include/mach/gpio.h   |   17 +----------------
->  arch/arm/mach-msm/include/mach/gpio.h       |    5 +----
->  arch/arm/mach-mxs/include/mach/gpio.h       |    6 +-----
->  arch/arm/mach-realview/include/mach/gpio.h  |    6 +-----
->  arch/arm/mach-s3c2410/include/mach/gpio.h   |    5 +----
->  arch/arm/mach-s3c64xx/include/mach/gpio.h   |    6 +-----
->  arch/arm/mach-s5p64x0/include/mach/gpio.h   |    6 +-----
->  arch/arm/mach-s5pc100/include/mach/gpio.h   |    6 +-----
->  arch/arm/mach-s5pv210/include/mach/gpio.h   |    6 +-----
->  arch/arm/mach-shmobile/include/mach/gpio.h  |   15 +--------------
->  arch/arm/mach-tegra/include/mach/gpio.h     |    6 +-----
->  arch/arm/mach-versatile/include/mach/gpio.h |    6 +-----
->  arch/arm/mach-vt8500/include/mach/gpio.h    |    6 +-----
->  arch/arm/mach-w90x900/include/mach/gpio.h   |    5 +----
->  arch/arm/plat-mxc/include/mach/gpio.h       |    5 +----
->  arch/arm/plat-nomadik/include/plat/gpio.h   |   11 +----------
->  arch/arm/plat-omap/include/plat/gpio.h      |   15 +--------------
->  arch/arm/plat-orion/include/plat/gpio.h     |    6 ++----
->  arch/arm/plat-spear/include/plat/gpio.h     |    6 +-----
->  25 files changed, 36 insertions(+), 151 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/gpio.h b/arch/arm/include/asm/gpio.h
-> index 166a7a3..15e8970 100644
-> --- a/arch/arm/include/asm/gpio.h
-> +++ b/arch/arm/include/asm/gpio.h
-> @@ -4,4 +4,14 @@
->  /* not all ARM platforms necessarily support this API ... */
->  #include <mach/gpio.h>
->  
-> +#ifdef __ARM_GPIOLIB_TRIVIAL
-> +/* Note: this may rely upon the value of ARCH_NR_GPIOS set in mach/gpio.h */
-> +#include <asm-generic/gpio.h>
-> +
-> +/* The trivial gpiolib dispatchers */
-> +#define gpio_get_value  __gpio_get_value
-> +#define gpio_set_value  __gpio_set_value
-> +#define gpio_cansleep   __gpio_cansleep
-> +#endif
+From: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-could that be a selectable symbol ? Something like:
+Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+---
+ drivers/mmc/host/atmel-mci.c |    4 ++--
+ include/linux/atmel_pdc.h    |    2 ++
+ 2 files changed, 4 insertions(+), 2 deletions(-)
 
-CONFIG_HAS_ARM_TRIVIAL_GPIO
-
-then on Kconfig you just:
-
-select HAS_ARM_TIVIAL_GPIO or something ?
-
+diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
+index 7955697..c415322 100644
+--- a/drivers/mmc/host/atmel-mci.c
++++ b/drivers/mmc/host/atmel-mci.c
+@@ -603,8 +603,8 @@ static void atmci_pdc_set_single_buf(struct atmel_mci *host,
+ 	}
+ 
+ 	if (buf_nb == PDC_SECOND_BUF) {
+-		pointer_reg += 0x10;
+-		counter_reg += 0x10;
++		pointer_reg += ATMEL_PDC_SCND_BUF_OFF;
++		counter_reg += ATMEL_PDC_SCND_BUF_OFF;
+ 	}
+ 
+ 	atmci_writel(host, pointer_reg, sg_dma_address(host->sg));
+diff --git a/include/linux/atmel_pdc.h b/include/linux/atmel_pdc.h
+index 5058a31..63499ce 100644
+--- a/include/linux/atmel_pdc.h
++++ b/include/linux/atmel_pdc.h
+@@ -33,4 +33,6 @@
+ 
+ #define ATMEL_PDC_PTSR		0x124	/* Transfer Status Register */
+ 
++#define ATMEL_PDC_SCND_BUF_OFF	0x10	/* Offset between first and second buffer registers */
++
+ #endif
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 490 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110811/69b04482/attachment.sig>
+1.7.0.4
