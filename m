@@ -1,32 +1,41 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 11 Aug 2011 11:53:48 -0300
-Subject: [PATCH v2 2/3] ARM: i.MX51: clean up iomux-mx51.h
-In-Reply-To: <1313026292-945-2-git-send-email-troy.kisky@boundarydevices.com>
-References: <1313026292-945-1-git-send-email-troy.kisky@boundarydevices.com>
-	<1313026292-945-2-git-send-email-troy.kisky@boundarydevices.com>
-Message-ID: <CAOMZO5BiB1TFtgMLBUFcboHUXMUVaG4kkKVzW0vMt0SFuTmk4g@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 11 Aug 2011 17:04:18 +0200
+Subject: [RFC] using amba_pl08x driver for s3c64xx SoCs
+In-Reply-To: <CAGOxZ51TcNcC9gAVbuv6DTpj7SXCNbf+r+DjjByi20SYPj-zmw@mail.gmail.com>
+References: <CAGOxZ50Rz3ynmkuoJb9Pgc0b1pG++-CB9kUtU92zKYtfP3jtRg@mail.gmail.com>
+	<CACRpkdasYKx8C7fR1heiQDnJgJMvLa1VuQNhQ+gu5F6ea7d3oA@mail.gmail.com>
+	<CAGOxZ53edhKA=VbhJJKG--LoG6P8Y+ubKdH5-4woDgBEbTdtVQ@mail.gmail.com>
+	<CACRpkdaYxbgqYZZSgRJmfBDWPyp-SQrviK50UvHrkTCO=B=6NQ@mail.gmail.com>
+	<4E3F6550.6010204@st.com>
+	<CAGOxZ51TcNcC9gAVbuv6DTpj7SXCNbf+r+DjjByi20SYPj-zmw@mail.gmail.com>
+Message-ID: <CACRpkdbxRkxeXChycehzhnBKOBcoO2yOaSBb5Tgc=i+b-kSEXw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Troy,
+On Mon, Aug 8, 2011 at 6:51 AM, Alim Akhtar <alim.akhtar@gmail.com> wrote:
 
-On Wed, Aug 10, 2011 at 10:31 PM, Troy Kisky
-<troy.kisky@boundarydevices.com> wrote:
-...
-> diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx51.h b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
-> index df6acc0..c7f5169 100644
-> --- a/arch/arm/plat-mxc/include/mach/iomux-mx51.h
-> +++ b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
-> @@ -14,6 +14,8 @@
-> ?#define __MACH_IOMUX_MX51_H__
+> static int pl08x_phy_channel_busy(struct pl08x_phy_chan *ch)
+> {
+> ? ? ? ?struct pl08x_dma_chan *plchan = ch->serving;
+> ? ? ? ?struct pl08x_driver_data *pl08x;
+> ? ? ? ?unsigned int val;
 >
-> ?#include <mach/iomux-v3.h>
-> +#define __NA_ ?0x000
-> +
+> ? ? ? ?if(plchan == NULL)
+> ? ? ? ? ? ? ? ?return false;
+>
+> ? ? ? ?pl08x = plchan->host;
+>
+> ? ? ? ?if(pl08x->vd->is_pl080_s3c)
+> ? ? ? ? ? ? ? ?val = readl(ch->base + PL080S_CH_CONFIG);
+> ? ? ? ?else
+> ? ? ? ? ? ? ? ?val = readl(ch->base + PL080_CH_CONFIG);
+>
+> ? ? ? ?return val & PL080_CONFIG_ACTIVE;
+> }
 
-Do we really need this __NA_ define? Can?t we continue just writing 0
-in the macro?
+Aha, that's the bug :-)
 
-Regards,
+Acked-by.
 
-Fabio Estevam
+Thanks,
+Linus Walleij
