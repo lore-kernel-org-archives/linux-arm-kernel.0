@@ -1,190 +1,94 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 11 Aug 2011 08:56:07 +0100
-Subject: [RFC PATCH] ARM: gic: add OF based initialization
-In-Reply-To: <1313007324-23194-1-git-send-email-robherring2@gmail.com>
-References: <1313007324-23194-1-git-send-email-robherring2@gmail.com>
-Message-ID: <4E438B17.10907@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 11 Aug 2011 09:24:13 +0100
+Subject: Enabling runtime P2V by default (Re: [PATCH 3/5] mach-u300:
+	patch physoffset by default)
+In-Reply-To: <20110810092955.GG1831@n2100.arm.linux.org.uk>
+References: <1312918898-11894-1-git-send-email-linus.walleij@stericsson.com>
+	<20110810091635.GF1831@n2100.arm.linux.org.uk>
+	<20110810092206.GE10121@e102144-lin.cambridge.arm.com>
+	<20110810092955.GG1831@n2100.arm.linux.org.uk>
+Message-ID: <20110811082413.GA4775@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+On Wed, Aug 10, 2011 at 10:29:55AM +0100, Russell King - ARM Linux wrote:
+> On Wed, Aug 10, 2011 at 10:22:06AM +0100, Will Deacon wrote:
+> > On Wed, Aug 10, 2011 at 10:16:35AM +0100, Russell King - ARM Linux wrote:
+> > > On Tue, Aug 09, 2011 at 09:41:38PM +0200, Linus Walleij wrote:
+> > > > From: Linus Walleij <linus.walleij@linaro.org>
+> > > > 
+> > > > This works like a charm so I'll just default-select it.
+> > > 
+> > > Well, we can remove the EXPERIMENTAL status of this option now.  This
+> > > raises the question is whether we should now default it to 'y' - I
+> > > think we should.  Anyone have any objections?
+> > 
+> > I've been running with this option enabled for the collection of ARM boards
+> > I have and the only problem I have encountered was related to u-boot loading
+> > at the wrong address.
+> > 
+> > So I'm all for enabling it by default, especially since it will force out
+> > any remaining issues for boards where this hasn't been used extensively.
+> 
+> Maybe also making the option hidden depending on EXPERT, or even EMBEDDED
+> would be a good idea too.  I think it falls into at least the same class
+> as UID16, sysctl, hotplug, printk, etc. which are all EXPERT options.
 
-Thanks for looking at this.
+Right, I'm now committing a patch to hide the option unless EMBEDDED
+is enabled.  I think this means we should get rid of the 'select
+ARM_PATCH_PHYS_VIRT' statements from the various platforms, so that
+folk can optimize away that code if they know what they're doing.
 
-On 10/08/11 21:15, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
-> 
-> This adds gic initialization using device tree data. An example device tree
-> binding looks like this:
-> 
-> intc: interrupt-controller at fff11000 {
->         compatible = "arm,cortex-a9-gic";
->         #interrupt-cells = <1>;
+Note: this patch will conflict with the removal of the 16-bit P2V
+patching, so we need to sort that out.
 
-The SPI interrupt can either be level-high or edge-rising. So you
-probably want #interrupt-cells to be equal to 2...
+8<---------
+From: Russell King - ARM Linux <linux@arm.linux.org.uk>
+ARM: enable ARM_PATCH_PHYS_VIRT by default
 
-> 	#size-cells = <0>;
-> 	#address-cells = <1>;
->
->         interrupt-controller;
->         reg = <0xfff11000 0x1000>,
->               <0xfff10100 0x100>;
-> 
-> 	gicppi0: gic-ppi at 0 {
-> 		compatible = "arm,cortex-a9-gic-ppi";
-> 		#interrupt-cells = <1>;
-> 		interrupt-controller;
-> 		reg = <0>;
-> 	};
-> 	gicppi1: gic-ppi at 1 {
-> 		compatible = "arm,cortex-a9-gic-ppi";
-> 		#interrupt-cells = <1>;
-> 		interrupt-controller;
-> 		reg = <1>;
-> 	};
-> };
-> 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> ---
-> 
-> Marc,
-> 
-> This adds PPI handling. I took your binding and modified it a bit to make
-> things a bit simpler for the linux side. Rather than having SPIs as a 
-> child node, I kept them at the parent node. Then PPIs are optional child
-> nodes. This way, a secondary GIC is no more complex than a simple
-> interrupt controller.
+Enable virtual to physical translation patching by default in all
+kernels.  Hide the option behind EMBEDDED.
 
-Maybe it's not a real problem, but this makes PPIs a sort of "cascaded"
-interrupt controller, which I find rather misleading. In reality, there
-is no hierarchy between SPIs and PPIs.
+This can still be turned off if people desire, and they know what
+they're doing, to shrink the size of the kernel to a minimum.
 
-Is it legal for an interrupt controller to have an interrupt controller
-as a parent, without an interrupt number? How will irq_of_parse_and_map
-react to this? I'm quite sure of_irq_find_parent(ppi) will return the
-wrong thing (the SPI controller).
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/Kconfig |    8 ++++++--
+ 1 files changed, 6 insertions(+), 2 deletions(-)
 
-> The PPI init simply creates an irqdomain for each cpu interface. By using 
-> a domain per PPI and SPI, the translation is simple. The domain irq_base
-> is always 0, so PPI # is always equal to linux irq number. This can be
-> changed if the linux irq numbering of PPI's changes, but that should not
-> affect the binding.
-> 
-> The documentation still needs updating.
-> 
-> Rob
-> 
->  Documentation/devicetree/bindings/arm/gic.txt |   28 +++++++++++++++++
->  arch/arm/common/gic.c                         |   40 +++++++++++++++++++++++++
->  arch/arm/include/asm/hardware/gic.h           |    3 ++
->  3 files changed, 71 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/arm/gic.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/gic.txt b/Documentation/devicetree/bindings/arm/gic.txt
-> new file mode 100644
-> index 0000000..78012e3
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/gic.txt
-> @@ -0,0 +1,28 @@
-> +* ARM Generic Interrupt Controller
-> +
-> +Some ARM cores have an interrupt controller called GIC. The ARM GIC
-> +representation in the device tree should be done as under:-
-> +
-> +Required properties:
-> +
-> +- compatible : should be one of:
-> +	"arm,cortex-a9-gic"
-> +	"arm,arm11mp-gic"
-> +- interrupt-controller : Identifies the node as an interrupt controller
-> +- #interrupt-cells : Specifies the number of cells needed to encode an
-> +  interrupt source.  The type shall be a <u32> and the value shall be 1.
-> +- reg : Specifies base physical address(s) and size of the GIC registers. The
-> +  first 2 values are the GIC distributor register base and size. The 2nd 2
-> +  values are the GIC cpu interface register base and size.
-> +
-> +Example:
-> +
-> +intc: interrupt-controller at fff11000 {
-> +        compatible = "arm,cortex-a9-gic";
-> +        #interrupt-cells = <1>;
-> +        interrupt-controller;
-> +        reg = <0xfff11000 0x1000>,
-> +              <0xfff10100 0x100>;
-> +};
-> +
-> +
-> diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
-> index f13298e..b0f11b3 100644
-> --- a/arch/arm/common/gic.c
-> +++ b/arch/arm/common/gic.c
-> @@ -28,6 +28,10 @@
->  #include <linux/smp.h>
->  #include <linux/cpumask.h>
->  #include <linux/io.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_irq.h>
-> +#include <linux/irqdomain.h>
->  
->  #include <asm/irq.h>
->  #include <asm/mach/irq.h>
-> @@ -394,3 +398,39 @@ void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
->  	writel_relaxed(map << 16 | irq, gic_data[0].dist_base + GIC_DIST_SOFTINT);
->  }
->  #endif
-> +
-> +#ifdef CONFIG_OF
-> +static int gic_cnt __initdata = 0;
-> +
-> +void __init gic_of_init(struct of_intc_desc *d)
-> +{
-> +	struct device_node *np = d->controller;
-> +	void __iomem *cpu_base;
-> +	void __iomem *dist_base;
-> +	int irq;
-> +
-> +	if (WARN_ON(!d || !d->controller))
-> +		return;
-> +
-> +	dist_base = of_iomap(np, 0);
-> +	WARN(!dist_base, "unable to map gic dist registers\n");
-> +
-> +	cpu_base = of_iomap(np, 1);
-> +	WARN(!cpu_base, "unable to map gic cpu registers\n");
-> +
-> +	gic_init(gic_cnt, d->irq_base, dist_base, cpu_base);
-> +	irq_domain_add_simple(d->controller, d->irq_base);
-> +
-> +	if (d->parent) {
-> +		irq = irq_of_parse_and_map(np, 0);
-> +		gic_cascade_irq(gic_cnt, irq);
-> +	}
-> +	gic_cnt++;
-> +}
-> +
-> +void __init gic_of_ppi_init(struct of_intc_desc *d)
-> +{
-> +	irq_domain_add_simple(d->controller, d->irq_base);
-> +}
-> +
-> +#endif
-> diff --git a/arch/arm/include/asm/hardware/gic.h b/arch/arm/include/asm/hardware/gic.h
-> index 435d3f8..a6594d4 100644
-> --- a/arch/arm/include/asm/hardware/gic.h
-> +++ b/arch/arm/include/asm/hardware/gic.h
-> @@ -37,6 +37,9 @@ extern void __iomem *gic_cpu_base_addr;
->  extern struct irq_chip gic_arch_extn;
->  
->  void gic_init(unsigned int, unsigned int, void __iomem *, void __iomem *);
-> +struct of_intc_desc;
-> +void gic_of_init(struct of_intc_desc *d);
-> +void gic_of_ppi_init(struct of_intc_desc *d);
->  void gic_secondary_init(unsigned int);
->  void gic_cascade_irq(unsigned int gic_nr, unsigned int irq);
->  void gic_raise_softirq(const struct cpumask *mask, unsigned int irq);
-
-
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 5ebc5d9..6085a6c 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -195,7 +195,8 @@ config VECTORS_BASE
+ 	  The base address of exception vectors.
+ 
+ config ARM_PATCH_PHYS_VIRT
+-	bool "Patch physical to virtual translations at runtime"
++	bool "Patch physical to virtual translations at runtime" if EMBEDDED
++	default y
+ 	depends on !XIP_KERNEL && MMU
+ 	depends on !ARCH_REALVIEW || !SPARSEMEM
+ 	help
+@@ -207,6 +208,10 @@ config ARM_PATCH_PHYS_VIRT
+ 	  of physical memory is at a 16MB boundary, or theoretically 64K
+ 	  for the MSM machine class.
+ 
++	  Only disable this option if you know what you do not require
++	  this feature (eg, building a kernel for a single machine) and
++	  you need to shrink the kernel to the minimal size.
++
+ config ARM_PATCH_PHYS_VIRT_16BIT
+ 	def_bool y
+ 	depends on ARM_PATCH_PHYS_VIRT && ARCH_MSM
+@@ -301,7 +306,6 @@ config ARCH_AT91
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select HAVE_CLK
+ 	select CLKDEV_LOOKUP
+-	select ARM_PATCH_PHYS_VIRT if MMU
+ 	help
+ 	  This enables support for systems based on the Atmel AT91RM9200,
+ 	  AT91SAM9 and AT91CAP9 processors.
 -- 
-Jazz is not dead. It just smells funny...
+1.7.4.4
