@@ -1,128 +1,74 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 11 Aug 2011 17:12:49 +0300
-Subject: [RFC PATCH 6/6] hwmon: OMAP4: On die temperature sensor driver
-In-Reply-To: <CAJ6a13bxg8po-Csc10LsFH-oES4YOKkqFoTm3kG4XzS=b2boMw@mail.gmail.com>
-References: <1312979122-5896-1-git-send-email-j-keerthy@ti.com>
-	<1312979122-5896-7-git-send-email-j-keerthy@ti.com>
-	<20110810124629.GJ12882@legolas.emea.dhcp.ti.com>
-	<CAJ6a13Z=u=exWUHLotw8jpHMv-hKpE+fvg_1hq7=gtMiuJKxOA@mail.gmail.com>
-	<20110811103658.GG27742@legolas.emea.dhcp.ti.com>
-	<CAJ6a13bxg8po-Csc10LsFH-oES4YOKkqFoTm3kG4XzS=b2boMw@mail.gmail.com>
-Message-ID: <20110811141248.GK28500@legolas.emea.dhcp.ti.com>
+Date: Thu, 11 Aug 2011 17:15:31 +0300
+Subject: [PATCH 11/13] ARM: gpio: consolidate trivial gpiolib
+	implementations
+In-Reply-To: <E1QqhM1-0003af-U5@rmk-PC.arm.linux.org.uk>
+References: <20110809080411.GA1831@n2100.arm.linux.org.uk>
+	<E1QqhM1-0003af-U5@rmk-PC.arm.linux.org.uk>
+Message-ID: <20110811141528.GL28500@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Aug 11, 2011 at 06:30:04PM +0530, J, KEERTHY wrote:
-> >> >> diff --git a/drivers/hwmon/omap_temp_sensor.c b/drivers/hwmon/omap_temp_sensor.c
-> >> >> new file mode 100644
-> >> >> index 0000000..15e2559
-> >> >> --- /dev/null
-> >> >> +++ b/drivers/hwmon/omap_temp_sensor.c
-> >> >> @@ -0,0 +1,950 @@
-> >> >> +/*
-> >> >> + * OMAP4 Temperature sensor driver file
-> >> >> + *
-> >> >> + * Copyright (C) 2011 Texas Instruments Incorporated - http://www.ti.com/
-> >> >> + * Author: J Keerthy <j-keerthy@ti.com>
-> >> >> + * Author: Moiz Sonasath <m-sonasath@ti.com>
-> >> >> + *
-> >> >> + * This program is free software; you can redistribute it and/or
-> >> >> + * modify it under the terms of the GNU General Public License
-> >> >> + * version 2 as published by the Free Software Foundation.
-> >> >> + *
-> >> >> + * This program is distributed in the hope that it will be useful, but
-> >> >> + * WITHOUT ANY WARRANTY; without even the implied warranty of
-> >> >> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. ?See the GNU
-> >> >> + * General Public License for more details.
-> >> >> + *
-> >> >> + * You should have received a copy of the GNU General Public License
-> >> >> + * along with this program; if not, write to the Free Software
-> >> >> + * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
-> >> >> + * 02110-1301 USA
-> >> >> + *
-> >> >> + */
-> >> >> +
-> >> >> +#include <linux/interrupt.h>
-> >> >> +#include <linux/clk.h>
-> >> >
-> >> > why ??
-> >>
-> >> Clock rate setting functions.
-> >
-> > you shouldn't need in drivers.
+On Tue, Aug 09, 2011 at 09:08:01AM +0100, Russell King - ARM Linux wrote:
+> Consolidate 24 trivial gpiolib implementions out of mach/gpio.h
+> into asm/gpio.h.  This is basically the include of asm-generic/gpio.h
+> and the definition of gpio_get_value, gpio_set_value, and gpio_cansleep
+> as described in Documentation/gpio.txt
 > 
-> It is a one time setting of the rate so keeping it in drivers.
-
-you need some other way to handle this. Why do you need to manually set
-the rate rather than having hwmod handle this for you ?
-
-your argument that "it's a one time setting" is not enough to have this
-in the driver. Drivers should not care about clocks anymore, this should
-have been done on another layer.
-
-> >> >> +#include <linux/delay.h>
-> >> >> +#include <linux/slab.h>
-> >> >> +#include <linux/platform_device.h>
-> >> >> +#include <linux/init.h>
-> >> >> +#include <plat/omap_device.h>
-> >> >
-> >> > why ??
-> >> >
-> >>
-> >> Context loss count
-> >
-> > shouldn't use in drivers.
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>  arch/arm/include/asm/gpio.h                 |   10 ++++++++++
+>  arch/arm/mach-at91/include/mach/gpio.h      |    5 +----
+>  arch/arm/mach-ep93xx/include/mach/gpio.h    |    7 +------
+>  arch/arm/mach-exynos4/include/mach/gpio.h   |    5 +----
+>  arch/arm/mach-gemini/include/mach/gpio.h    |    5 +----
+>  arch/arm/mach-ks8695/include/mach/gpio.h    |   11 ++---------
+>  arch/arm/mach-lpc32xx/include/mach/gpio.h   |   17 +----------------
+>  arch/arm/mach-msm/include/mach/gpio.h       |    5 +----
+>  arch/arm/mach-mxs/include/mach/gpio.h       |    6 +-----
+>  arch/arm/mach-realview/include/mach/gpio.h  |    6 +-----
+>  arch/arm/mach-s3c2410/include/mach/gpio.h   |    5 +----
+>  arch/arm/mach-s3c64xx/include/mach/gpio.h   |    6 +-----
+>  arch/arm/mach-s5p64x0/include/mach/gpio.h   |    6 +-----
+>  arch/arm/mach-s5pc100/include/mach/gpio.h   |    6 +-----
+>  arch/arm/mach-s5pv210/include/mach/gpio.h   |    6 +-----
+>  arch/arm/mach-shmobile/include/mach/gpio.h  |   15 +--------------
+>  arch/arm/mach-tegra/include/mach/gpio.h     |    6 +-----
+>  arch/arm/mach-versatile/include/mach/gpio.h |    6 +-----
+>  arch/arm/mach-vt8500/include/mach/gpio.h    |    6 +-----
+>  arch/arm/mach-w90x900/include/mach/gpio.h   |    5 +----
+>  arch/arm/plat-mxc/include/mach/gpio.h       |    5 +----
+>  arch/arm/plat-nomadik/include/plat/gpio.h   |   11 +----------
+>  arch/arm/plat-omap/include/plat/gpio.h      |   15 +--------------
+>  arch/arm/plat-orion/include/plat/gpio.h     |    6 ++----
+>  arch/arm/plat-spear/include/plat/gpio.h     |    6 +-----
+>  25 files changed, 36 insertions(+), 151 deletions(-)
 > 
-> I guess already mmc and display are using
-> omap_pm_get_dev_context_loss_count but are
-> populating this function in pdata as a function pointer.
-> I will add that code.
+> diff --git a/arch/arm/include/asm/gpio.h b/arch/arm/include/asm/gpio.h
+> index 166a7a3..15e8970 100644
+> --- a/arch/arm/include/asm/gpio.h
+> +++ b/arch/arm/include/asm/gpio.h
+> @@ -4,4 +4,14 @@
+>  /* not all ARM platforms necessarily support this API ... */
+>  #include <mach/gpio.h>
+>  
+> +#ifdef __ARM_GPIOLIB_TRIVIAL
+> +/* Note: this may rely upon the value of ARCH_NR_GPIOS set in mach/gpio.h */
+> +#include <asm-generic/gpio.h>
+> +
+> +/* The trivial gpiolib dispatchers */
+> +#define gpio_get_value  __gpio_get_value
+> +#define gpio_set_value  __gpio_set_value
+> +#define gpio_cansleep   __gpio_cansleep
+> +#endif
 
-at least ;-) better than accessing that function directly. But think
-carefully how you will make this work when we move to DT.
+could that be a selectable symbol ? Something like:
 
-> >> >> +#include <plat/temperature_sensor.h>
-> >> >
-> >>
-> >> It is the header file with the structure definitions
-> >> used in the driver.
-> >
-> > why don't you put in <linux/platform_data/....> ??
-> 
-> I saw many omap specific header files in plat-omap/include/plat.
-> Any specific reason behind placing the header in linux/platform_data?
+CONFIG_HAS_ARM_TRIVIAL_GPIO
 
-because it's not a good idea to perpetuate the failure.
+then on Kconfig you just:
 
-> >> >> +#include <mach/ctrl_module_core_44xx.h>
-> >> >
-> >> > why ?
-> >>
-> >> It will be removed
-> >>
-> >> >
-> >> >> +#include <mach/gpio.h>
-> >> >
-> >> > linux/gpio.h for crying out loud... how many times Russell has to say
-> >> > the exact same thing ??????
-> >> >
-> >>
-> >> It will be removed
-> >
-> > oh, you don't even use any gpio ? Why do you blindly add so many headers
-> > if you don't need them ???
-> 
-> It is not required.
-
-this is my point, be careful when adding new drivers... You're consuming
-"review bandwidth" when you send code/patch/new-drivers and reviewers
-are part of an endangered species. If you keep on making such silly
-mistakes, you consume time from reviewers to let you know about things
-which are obvious, to say the least. So be careful when sending code,
-nobody is perfect, for sure, but by being careful you can help your code
-being accepted earlier.
+select HAS_ARM_TIVIAL_GPIO or something ?
 
 -- 
 balbi
@@ -132,4 +78,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 490 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110811/b2744ba5/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110811/69b04482/attachment.sig>
