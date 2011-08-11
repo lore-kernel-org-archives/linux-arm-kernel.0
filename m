@@ -1,49 +1,45 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 11 Aug 2011 16:47:15 +0900
-Subject: [PATCH] exynos4: universal: Use the correct regulator names
-In-Reply-To: <20110808095126.GA767@july>
-References: <20110808095126.GA767@july>
-Message-ID: <015a01cc57fa$e4d5a930$ae80fb90$%kim@samsung.com>
+Date: Thu, 11 Aug 2011 16:50:59 +0900
+Subject: [PATCH] ARM: SAMSUNG: Fix Section Mismatch in PWM backlight
+	support
+In-Reply-To: <1312878286-6300-1-git-send-email-myungjoo.ham@samsung.com>
+References: <1312878286-6300-1-git-send-email-myungjoo.ham@samsung.com>
+Message-ID: <015b01cc57fb$6a7f7ed0$3f7e7c70$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kyungmin Park wrote:
+MyungJoo Ham wrote:
 > 
-> From: Kyungmin Park <kyungmin.park@samsung.com>
-> 
-> Use the correct regulator names for cpufreq
-> 
+> Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
 > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 > ---
-> diff --git a/arch/arm/mach-exynos4/mach-universal_c210.c b/arch/arm/mach-
-> exynos4/mach-universal_c210.c
-> index 0e280d1..79f0a6f 100644
-> --- a/arch/arm/mach-exynos4/mach-universal_c210.c
-> +++ b/arch/arm/mach-exynos4/mach-universal_c210.c
-> @@ -79,7 +80,7 @@ static struct s3c2410_uartcfg universal_uartcfgs[]
-__initdata
-> = {
->  };
+>  arch/arm/plat-samsung/dev-backlight.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
 > 
->  static struct regulator_consumer_supply max8952_consumer =
-> -	REGULATOR_SUPPLY("vddarm", NULL);
-> +	REGULATOR_SUPPLY("vdd_arm", NULL);
-> 
->  static struct max8952_platform_data universal_max8952_pdata __initdata =
-{
->  	.gpio_vid0	= EXYNOS4_GPX0(3),
-> @@ -105,7 +106,7 @@ static struct max8952_platform_data
-> universal_max8952_pdata __initdata = {
->  };
-> 
->  static struct regulator_consumer_supply lp3974_buck1_consumer =
-> -	REGULATOR_SUPPLY("vddint", NULL);
-> +	REGULATOR_SUPPLY("vdd_int", NULL);
-> 
->  static struct regulator_consumer_supply lp3974_buck2_consumer =
->  	REGULATOR_SUPPLY("vddg3d", NULL);
+> diff --git a/arch/arm/plat-samsung/dev-backlight.c
+b/arch/arm/plat-samsung/dev-
+> backlight.c
+> index 3cedd4c..6955704 100644
+> --- a/arch/arm/plat-samsung/dev-backlight.c
+> +++ b/arch/arm/plat-samsung/dev-backlight.c
+> @@ -76,7 +76,7 @@ static struct platform_device samsung_dfl_bl_device
+> __initdata = {
+>   * @gpio_info:	structure containing GPIO info for PWM timer
+>   * @bl_data:	structure containing Backlight control data
+>   */
+> -void samsung_bl_set(struct samsung_bl_gpio_info *gpio_info,
+> +void __init samsung_bl_set(struct samsung_bl_gpio_info *gpio_info,
+>  	struct platform_pwm_backlight_data *bl_data)
+>  {
+>  	int ret = 0;
+> --
 
-OK, applied.
+Hi MyungJoo,
+
+Same patch has been submitted like following.
+
+http://article.gmane.org/gmane.linux.kernel.samsung-soc/6060
+
 Thanks.
 
 Best regards,
