@@ -1,56 +1,47 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 11 Aug 2011 16:38:00 +0100
-Subject: Subject: L2x0 OF properties do not include interrupt #
-In-Reply-To: <4E43F5F8.4060704@gmail.com>
-References: <000201cc575b$c1229010$4367b030$@rutland@arm.com>
-	<201108101624.27881.arnd@arndb.de>
-	<20110810142808.GL10121@e102144-lin.cambridge.arm.com>
-	<201108111505.11887.arnd@arndb.de>
-	<20110811130910.GA10189@e102144-lin.cambridge.arm.com>
-	<4E43F5F8.4060704@gmail.com>
-Message-ID: <20110811153800.GC5154@e102144-lin.cambridge.arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 11 Aug 2011 17:02:11 +0100
+Subject: [PATCH v2] ARM: sched_clock: allow sched_clock to be selected at
+	runtime
+Message-ID: <1313078531-25610-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 11, 2011 at 04:32:08PM +0100, Rob Herring wrote:
-> On 08/11/2011 08:09 AM, Will Deacon wrote:
-> > On Thu, Aug 11, 2011 at 02:05:11PM +0100, Arnd Bergmann wrote:
-> >> On Wednesday 10 August 2011, Will Deacon wrote:
-> >>> I was hoping that it was possible to have separate properties which describe
-> >>> the interrupt. So you could have something like pmu-interrupt <75> and
-> >>> abort-interrupt <76> rather than interrupts <75, 76>.
-> >>
-> >> Ok, I see.
-> >>
-> >>> I've not played with DT bindings before though, so if it's usually done with
-> >>> an ordered list then so be it!
-> >>
-> >> A lot of the code assumes that the property is called 'interrupts' and that
-> >> it contains a fixed-length array of interrupt numbers, each for one specific
-> >> purpose.
-> > 
-> > Ok, I wondered if something like that might be the case.
-> > 
-> >> Given that we have so many different meanings for the interrupts, I'm
-> >> not sure how this would work best in this case. According to
-> >> http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0246f/CHDFHCFJ.html
-> >> this looks like a nested interrupt controller, i.e. the L2CC has its own mask
-> >> and status register with bits for each one of them. We could model these by
-> >> describing the l2cc interrupt controller with these registers and listing all
-> >> nine of the current inputs. I suspect however that it would be easier to just
-> >> assume that there is only one line for now, and treat the l2cc as a single
-> >> interrupt source with an internal status register.
-> > 
-> > Given that this binding is only for the l2x0 / pl310 and I don't know of any
-> > implementation where > 1 interrupt line is wired up, I'm happy to assume a
-> > single combined interrupt line for now.
-> > 
-> 
-> I know of one. Although, we have the combined interrupt as well. The
-> binding should allow either way and specify the order. If the event
-> counter interrupt is 1st, then it should be the same to s/w.
+sched_clock() is yet another blocker on the road to the single
+image. This patch implements an idea by Russell King:
 
-You mean putting the combined interrupt first? If so, we may as well just
-specify that until somebody builds a platform that doesn't have it.
+http://www.spinics.net/lists/linux-omap/msg49561.html
 
-Will
+Instead of asking the platform to implement both sched_clock()
+itself and the rollover callback, simply register a read()
+function, and let the ARM code care about sched_clock() itself,
+the conversion to ns and the rollover. sched_clock() uses
+this read() function as an indirection to the platform code.
+
+This allow some simplifications and possibly some footprint gain
+when multiple platforms are compiled in. Among the drawbacks,
+the removal of the *_fixed_sched_clock optimization which could
+negatively impact some platforms (sa1100, tegra, versatile
+and omap).
+
+Tested on 11MPCore, OMAP4 and Tegra.
+
+Cc: Imre Kaloz <kaloz@openwrt.org>
+Cc: Krzysztof Halasa <khc@pm.waw.pl>
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: Eric Miao <eric.y.miao@gmail.com>
+Cc: Colin Cross <ccross@android.com>
+Cc: Erik Gilling <konkers@android.com>
+Cc: Olof Johansson <olof@lixom.net>
+Cc: Linus Walleij <linus.walleij@stericsson.com>
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: Alessandro Rubini <rubini@unipv.it>
+Cc: STEricsson <STEricsson_nomadik_linux@list.st.com>
+Cc: Lennert Buytenhek <kernel@wantstofly.org>
+Cc: Nicolas Pitre <nico@fluxnic.net>
+Cc: Ben Dooks <ben-linux@fluff.org>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Jamie Iles <jamie@jamieiles.com>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+Based on 3.1-rc1.
