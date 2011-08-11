@@ -1,109 +1,135 @@
-From: santosh.shilimkar@ti.com (Santosh)
-Date: Thu, 11 Aug 2011 19:37:56 +0530
-Subject: [PATCH] OMAP: clockdomain: Wait for powerdomain to be ON when
-	using clockdomain force wakeup
-In-Reply-To: <4E214267.2090700@ti.com>
-References: <1310527588-13022-1-git-send-email-santosh.shilimkar@ti.com>
-	<1310527588-13022-2-git-send-email-santosh.shilimkar@ti.com>
-	<alpine.DEB.2.00.1107150159580.16606@utopia.booyaka.com>
-	<4E214267.2090700@ti.com>
-Message-ID: <4E43E23C.2080207@ti.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 11 Aug 2011 17:12:49 +0300
+Subject: [RFC PATCH 6/6] hwmon: OMAP4: On die temperature sensor driver
+In-Reply-To: <CAJ6a13bxg8po-Csc10LsFH-oES4YOKkqFoTm3kG4XzS=b2boMw@mail.gmail.com>
+References: <1312979122-5896-1-git-send-email-j-keerthy@ti.com>
+	<1312979122-5896-7-git-send-email-j-keerthy@ti.com>
+	<20110810124629.GJ12882@legolas.emea.dhcp.ti.com>
+	<CAJ6a13Z=u=exWUHLotw8jpHMv-hKpE+fvg_1hq7=gtMiuJKxOA@mail.gmail.com>
+	<20110811103658.GG27742@legolas.emea.dhcp.ti.com>
+	<CAJ6a13bxg8po-Csc10LsFH-oES4YOKkqFoTm3kG4XzS=b2boMw@mail.gmail.com>
+Message-ID: <20110811141248.GK28500@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paul,
+Hi,
 
-On Saturday 16 July 2011 01:18 PM, Santosh Shilimkar wrote:
-> Hi Paul,
->
-> On 7/15/2011 1:03 AM, Paul Walmsley wrote:
->> cc'ing Patrick
->>
->> Hi Rajendra, Santosh,
->>
->> some comments here:
->>
->> On Wed, 13 Jul 2011, Santosh Shilimkar wrote:
->>
->>> While using clockdomain force wakeup method, not waiting for powerdomain
->>> to be effectively ON may end up locking the clockdomain FSM until a
->>> next wakeup event occurs.
->>>
->>> One such issue was seen on OMAP4430, where L4_PER was periodically
->>> getting stuck in in-transition state when transitioning from from
->>> OSWR to ON.
->>>
->>> This issue was reported and investigated by Patrick
->>> Titiano<p-titiano@ti.com>
->>>
->>> Signed-off-by: Santosh Shilimkar<santosh.shilimkar@ti.com>
->>> Signed-off-by: Rajendra Nayak<rnayak@ti.com>
->>> Reported-by: Patrick Titiano<p-titiano@ti.com>
->>> Cc: Kevin Hilman<khilman@ti.com>
->>> Cc: Benoit Cousson<b-cousson@ti.com>
->>> Cc: Paul Walmsley<paul@pwsan.com>
->>> ---
->>> arch/arm/mach-omap2/clockdomain.c | 7 ++++++-
->>> 1 files changed, 6 insertions(+), 1 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-omap2/clockdomain.c
->>> b/arch/arm/mach-omap2/clockdomain.c
->>> index b98a972..583cc3d 100644
->>> --- a/arch/arm/mach-omap2/clockdomain.c
->>> +++ b/arch/arm/mach-omap2/clockdomain.c
->>> @@ -718,6 +718,8 @@ int clkdm_sleep(struct clockdomain *clkdm)
->>> */
->>> int clkdm_wakeup(struct clockdomain *clkdm)
->>> {
->>> + int ret;
->>> +
->>> if (!clkdm)
->>> return -EINVAL;
->>>
->>> @@ -732,7 +734,10 @@ int clkdm_wakeup(struct clockdomain *clkdm)
->>>
->>> pr_debug("clockdomain: forcing wakeup on %s\n", clkdm->name);
->>>
->>> - return arch_clkdm->clkdm_wakeup(clkdm);
->>> + ret = arch_clkdm->clkdm_wakeup(clkdm);
->>> + ret |= pwrdm_wait_transition(clkdm->pwrdm.ptr);
->>
->> Seems like this should just call pwrdm_state_switch() or
->> pwrdm_clkdm_state_switch()? (This second function looks superfluous, we
->> should probably get rid of it.)
->>
-> This comment was expected since initially we thought of using
-> pwrdm_clkdm_state_switch
->
-> pwrdm_clkdm_state_switch()
-> |--> pwrdm_wait_transition()
-> |--> pwrdm_state_switch()
->
-> What we need is only first function to ensure that we don't
-> proceed when PD is in middle of transition.
->
-> The second function is actually just doing those debug counter
-> updates and we wanted to avoid that since it's a live path.
-> Rajendra observed some huge latencies while doing the
-> profiling and the suspect was "pwrdm_state_switch()" which
-> actually keeps adding overhead because of those counter
-> updates.
->
->> Shouldn't this be added to all of
->> clkdm_{wakeup,sleep,allow_idle,deny_idle}() if it isn't there already?
->>
-> clkdm_allow_idle() already has the power-domain wait.
-> This patch adds it for clkdm_wakeup() function.
-> clkdm_sleep(), this shouldn't be applicable since power
-> domain sleep transition is depdent on other clockdomains
-> in the PD and it's a lazy operation.
-> That leaves clkdm_deny_idle() and I guess we should
-> address this API as well.
->
-> If you agree with above, I can update the patch to address
-> remaining clkdm_deny_idle() function.
->
-Ping?
+On Thu, Aug 11, 2011 at 06:30:04PM +0530, J, KEERTHY wrote:
+> >> >> diff --git a/drivers/hwmon/omap_temp_sensor.c b/drivers/hwmon/omap_temp_sensor.c
+> >> >> new file mode 100644
+> >> >> index 0000000..15e2559
+> >> >> --- /dev/null
+> >> >> +++ b/drivers/hwmon/omap_temp_sensor.c
+> >> >> @@ -0,0 +1,950 @@
+> >> >> +/*
+> >> >> + * OMAP4 Temperature sensor driver file
+> >> >> + *
+> >> >> + * Copyright (C) 2011 Texas Instruments Incorporated - http://www.ti.com/
+> >> >> + * Author: J Keerthy <j-keerthy@ti.com>
+> >> >> + * Author: Moiz Sonasath <m-sonasath@ti.com>
+> >> >> + *
+> >> >> + * This program is free software; you can redistribute it and/or
+> >> >> + * modify it under the terms of the GNU General Public License
+> >> >> + * version 2 as published by the Free Software Foundation.
+> >> >> + *
+> >> >> + * This program is distributed in the hope that it will be useful, but
+> >> >> + * WITHOUT ANY WARRANTY; without even the implied warranty of
+> >> >> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. ?See the GNU
+> >> >> + * General Public License for more details.
+> >> >> + *
+> >> >> + * You should have received a copy of the GNU General Public License
+> >> >> + * along with this program; if not, write to the Free Software
+> >> >> + * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
+> >> >> + * 02110-1301 USA
+> >> >> + *
+> >> >> + */
+> >> >> +
+> >> >> +#include <linux/interrupt.h>
+> >> >> +#include <linux/clk.h>
+> >> >
+> >> > why ??
+> >>
+> >> Clock rate setting functions.
+> >
+> > you shouldn't need in drivers.
+> 
+> It is a one time setting of the rate so keeping it in drivers.
 
-Regards
-Santosh
+you need some other way to handle this. Why do you need to manually set
+the rate rather than having hwmod handle this for you ?
+
+your argument that "it's a one time setting" is not enough to have this
+in the driver. Drivers should not care about clocks anymore, this should
+have been done on another layer.
+
+> >> >> +#include <linux/delay.h>
+> >> >> +#include <linux/slab.h>
+> >> >> +#include <linux/platform_device.h>
+> >> >> +#include <linux/init.h>
+> >> >> +#include <plat/omap_device.h>
+> >> >
+> >> > why ??
+> >> >
+> >>
+> >> Context loss count
+> >
+> > shouldn't use in drivers.
+> 
+> I guess already mmc and display are using
+> omap_pm_get_dev_context_loss_count but are
+> populating this function in pdata as a function pointer.
+> I will add that code.
+
+at least ;-) better than accessing that function directly. But think
+carefully how you will make this work when we move to DT.
+
+> >> >> +#include <plat/temperature_sensor.h>
+> >> >
+> >>
+> >> It is the header file with the structure definitions
+> >> used in the driver.
+> >
+> > why don't you put in <linux/platform_data/....> ??
+> 
+> I saw many omap specific header files in plat-omap/include/plat.
+> Any specific reason behind placing the header in linux/platform_data?
+
+because it's not a good idea to perpetuate the failure.
+
+> >> >> +#include <mach/ctrl_module_core_44xx.h>
+> >> >
+> >> > why ?
+> >>
+> >> It will be removed
+> >>
+> >> >
+> >> >> +#include <mach/gpio.h>
+> >> >
+> >> > linux/gpio.h for crying out loud... how many times Russell has to say
+> >> > the exact same thing ??????
+> >> >
+> >>
+> >> It will be removed
+> >
+> > oh, you don't even use any gpio ? Why do you blindly add so many headers
+> > if you don't need them ???
+> 
+> It is not required.
+
+this is my point, be careful when adding new drivers... You're consuming
+"review bandwidth" when you send code/patch/new-drivers and reviewers
+are part of an endangered species. If you keep on making such silly
+mistakes, you consume time from reviewers to let you know about things
+which are obvious, to say the least. So be careful when sending code,
+nobody is perfect, for sure, but by being careful you can help your code
+being accepted earlier.
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 490 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110811/b2744ba5/attachment-0001.sig>
