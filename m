@@ -1,46 +1,56 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 11 Aug 2011 14:09:10 +0100
-Subject: Subject: L2x0 OF properties do not include interrupt #
-In-Reply-To: <201108111505.11887.arnd@arndb.de>
-References: <000201cc575b$c1229010$4367b030$@rutland@arm.com>
-	<201108101624.27881.arnd@arndb.de>
-	<20110810142808.GL10121@e102144-lin.cambridge.arm.com>
-	<201108111505.11887.arnd@arndb.de>
-Message-ID: <20110811130910.GA10189@e102144-lin.cambridge.arm.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Thu, 11 Aug 2011 14:10:54 +0100
+Subject: [RFC PATCH 0/5] Fix Thumb-2 undef handling for mixed-arch kernels
+In-Reply-To: <1312975897.7800.20.camel@computer2>
+References: <1312971223-28165-1-git-send-email-dave.martin@linaro.org>
+	<1312975897.7800.20.camel@computer2>
+Message-ID: <20110811131054.GB2336@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 11, 2011 at 02:05:11PM +0100, Arnd Bergmann wrote:
-> On Wednesday 10 August 2011, Will Deacon wrote:
-> > I was hoping that it was possible to have separate properties which describe
-> > the interrupt. So you could have something like pmu-interrupt <75> and
-> > abort-interrupt <76> rather than interrupts <75, 76>.
+On Wed, Aug 10, 2011 at 12:31:37PM +0100, Tixy wrote:
+> On Wed, 2011-08-10 at 11:13 +0100, Dave Martin wrote:
+> > As a side-effect, this also changes cpu_architecture from a
+> > function into a global variable initialised at boot-time, which is
+> > probably a sensible idea anyway.
 > 
-> Ok, I see.
+> One possible pitfall of this is if the variable didn't get set up before
+> it's first use. I have looked at all the uses and this doesn't seem to
+> be a problem though.
+
+I thought of that.  I believe the code is safe as-is, but it's not too
+maintenance-friendly, so...
+
 > 
-> > I've not played with DT bindings before though, so if it's usually done with
-> > an ordered list then so be it!
+> An alternative to defend against this is to make cpu_architecture() an
+> inline function returning the value of the global variable like:
 > 
-> A lot of the code assumes that the property is called 'interrupts' and that
-> it contains a fixed-length array of interrupt numbers, each for one specific
-> purpose.
+> inline int cpu_architecture(void)
+> {
+> 	BUG_ON(the_cpu_architecture == CPU_ARCH_UNKNOWN);
+> 	return the_cpu_architecture;
+> }
+> 
+> This has the bonus of not needing to change users of the the function.
 
-Ok, I wondered if something like that might be the case.
+Sounds like a good idea.  I got rid of the function because I didn't like
+calling a function from the undef handler entry code, but an inline
+function which just reads the variable seems like the best of both worlds.
+I would continue to read the variable directly from the undef handler,
+but this will not get called until userspace starts -- by which time the
+inline C function will have been called a few times from C code.
 
-> Given that we have so many different meanings for the interrupts, I'm
-> not sure how this would work best in this case. According to
-> http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0246f/CHDFHCFJ.html
-> this looks like a nested interrupt controller, i.e. the L2CC has its own mask
-> and status register with bits for each one of them. We could model these by
-> describing the l2cc interrupt controller with these registers and listing all
-> nine of the current inputs. I suspect however that it would be easier to just
-> assume that there is only one line for now, and treat the l2cc as a single
-> interrupt source with an internal status register.
+If cpu_architecture is unexpectedly read as zero from the undef handler,
+we will get some unexpected SIGILLs in userspace -- so this will get
+noticed (rather than causing silent errors).  However, I think the kernel
+should always hit BUG() before that point is reached, if using your
+suggested inline function.
 
-Given that this binding is only for the l2x0 / pl310 and I don't know of any
-implementation where > 1 interrupt line is wired up, I'm happy to assume a
-single combined interrupt line for now.
+As you say, it takes away a lot of the patch churn too.
 
-Cheers,
+I'll follow up with a revision based on this suggestion.
 
-Will
+This also gets rid of the kprobes- and s3c24xx-specific patches.
+
+Cheers
+---Dave
