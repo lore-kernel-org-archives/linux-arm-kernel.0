@@ -1,43 +1,63 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 11 Aug 2011 15:24:38 +0100
-Subject: PB1176 broken in -rc1
-In-Reply-To: <CACRpkdZs=PuFNfHTiviF-vXaz2_-w8g-ZsMw6_mhozbZ8a3r7Q@mail.gmail.com>
-References: <20110810152400.GO10121@e102144-lin.cambridge.arm.com>
-	<CACRpkdZs=PuFNfHTiviF-vXaz2_-w8g-ZsMw6_mhozbZ8a3r7Q@mail.gmail.com>
-Message-ID: <20110811142438.GA5154@e102144-lin.cambridge.arm.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Thu, 11 Aug 2011 19:55:22 +0530
+Subject: [RFC PATCH 6/6] hwmon: OMAP4: On die temperature sensor driver
+In-Reply-To: <20110811141248.GK28500@legolas.emea.dhcp.ti.com>
+References: <1312979122-5896-1-git-send-email-j-keerthy@ti.com>
+	<1312979122-5896-7-git-send-email-j-keerthy@ti.com>
+	<20110810124629.GJ12882@legolas.emea.dhcp.ti.com>
+	<CAJ6a13Z=u=exWUHLotw8jpHMv-hKpE+fvg_1hq7=gtMiuJKxOA@mail.gmail.com>
+	<20110811103658.GG27742@legolas.emea.dhcp.ti.com>
+	<CAJ6a13bxg8po-Csc10LsFH-oES4YOKkqFoTm3kG4XzS=b2boMw@mail.gmail.com>
+	<20110811141248.GK28500@legolas.emea.dhcp.ti.com>
+Message-ID: <4E43E652.5020303@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On 8/11/2011 7:42 PM, Felipe Balbi wrote:
+> Hi,
+>
+> On Thu, Aug 11, 2011 at 06:30:04PM +0530, J, KEERTHY wrote:
+>>>>>> >  >>  >>  diff --git a/drivers/hwmon/omap_temp_sensor.c b/drivers/hwmon/omap_temp_sensor.c
+>>>>>> >  >>  >>  new file mode 100644
+>>>>>> >  >>  >>  index 0000000..15e2559
+>>>>>> >  >>  >>  --- /dev/null
+>>>>>> >  >>  >>  +++ b/drivers/hwmon/omap_temp_sensor.c
+>>>>>> >  >>  >>  @@ -0,0 +1,950 @@
+>>>>>> >  >>  >>  +/*
+>>>>>> >  >>  >>  + * OMAP4 Temperature sensor driver file
+>>>>>> >  >>  >>  + *
+>>>>>> >  >>  >>  + * Copyright (C) 2011 Texas Instruments Incorporated -http://www.ti.com/
+>>>>>> >  >>  >>  + * Author: J Keerthy<j-keerthy@ti.com>
+>>>>>> >  >>  >>  + * Author: Moiz Sonasath<m-sonasath@ti.com>
+>>>>>> >  >>  >>  + *
+>>>>>> >  >>  >>  + * This program is free software; you can redistribute it and/or
+>>>>>> >  >>  >>  + * modify it under the terms of the GNU General Public License
+>>>>>> >  >>  >>  + * version 2 as published by the Free Software Foundation.
+>>>>>> >  >>  >>  + *
+>>>>>> >  >>  >>  + * This program is distributed in the hope that it will be useful, but
+>>>>>> >  >>  >>  + * WITHOUT ANY WARRANTY; without even the implied warranty of
+>>>>>> >  >>  >>  + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+>>>>>> >  >>  >>  + * General Public License for more details.
+>>>>>> >  >>  >>  + *
+>>>>>> >  >>  >>  + * You should have received a copy of the GNU General Public License
+>>>>>> >  >>  >>  + * along with this program; if not, write to the Free Software
+>>>>>> >  >>  >>  + * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
+>>>>>> >  >>  >>  + * 02110-1301 USA
+>>>>>> >  >>  >>  + *
+>>>>>> >  >>  >>  + */
+>>>>>> >  >>  >>  +
+>>>>>> >  >>  >>  +#include<linux/interrupt.h>
+>>>>>> >  >>  >>  +#include<linux/clk.h>
+>>>>> >  >>  >
+>>>>> >  >>  >  why ??
+>>>> >  >>
+>>>> >  >>  Clock rate setting functions.
+>>> >  >
+>>> >  >  you shouldn't need in drivers.
+>> >
+>> >  It is a one time setting of the rate so keeping it in drivers.
+> you need some other way to handle this. Why do you need to manually set
+> the rate rather than having hwmod handle this for you ?
 
-On Thu, Aug 11, 2011 at 03:05:01PM +0100, Linus Walleij wrote:
-> On Wed, Aug 10, 2011 at 5:24 PM, Will Deacon <will.deacon@arm.com> wrote:
-> 
-> > [ ? ?0.000000] CPU: found DTCM0 4k @ 00000000, not enabled
-> > [ ? ?0.000000] CPU: moved DTCM0 4k to fffe8000, enabled
-> > [ ? ?0.000000] CPU: found DTCM1 4k @ 00000000, not enabled
-> > [ ? ?0.000000] CPU: moved DTCM1 4k to fffe9000, enabled
-> > [ ? ?0.000000] CPU: found ITCM0 4k @ 00000000, not enabled
-> > [ ? ?0.000000] CPU: moved ITCM0 4k to fffe0000, enabled
-> > [ ? ?0.000000] CPU: found ITCM1 4k @ 00000000, not enabled
-> > [ ? ?0.000000] CPU: moved ITCM1 4k to fffe1000, enabled
-> 
-> Just hijacking the thread: at one time I think I saw some ARM
-> high-level schematic of a mpcore where the ARM cores actually had
-> TCM in them.
-
-Hmm, that doesn't sound right. The 11MPCore doesn't have TCMs.
-
-> I actually spent some time adding multicore TCM support until
-> I realized that the PB11MPcore actually didn't have TCM.
-> So I just dropped that stuff.
-> 
-> But to be sure, is there a platform like that, multicore, with
-> per-processor TCM?
-
-It's a feature of the CPU rather than the platform and the 11MPCore doesn't
-have TCMs.
-
-Hope that clears things up,
-
-Will
+Because hwmod has not idea about what rate a device needs to operate
+in any point.
