@@ -1,283 +1,53 @@
-From: boojin.kim@samsung.com (Boojin Kim)
-Date: Thu, 11 Aug 2011 16:42:58 +0900
-Subject: [PATCH 12/15] spi/s3c64xx: Add support DMA engine API
-In-Reply-To: <CABb+yY3-d0xTO+s0cCPXPW8qGpTH5G2U+bp-0z4Se47eVvJ__w@mail.gmail.com>
-References: <1311744697-10264-1-git-send-email-boojin.kim@samsung.com>
-	<1311744697-10264-13-git-send-email-boojin.kim@samsung.com>
-	<CABb+yY3-d0xTO+s0cCPXPW8qGpTH5G2U+bp-0z4Se47eVvJ__w@mail.gmail.com>
-Message-ID: <001201cc57fa$4ac61dc0$e0525940$%kim@samsung.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 11 Aug 2011 16:47:15 +0900
+Subject: [PATCH] exynos4: universal: Use the correct regulator names
+In-Reply-To: <20110808095126.GA767@july>
+References: <20110808095126.GA767@july>
+Message-ID: <015a01cc57fa$e4d5a930$ae80fb90$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jassi Brar Wrote:
-> Sent: Tuesday, August 09, 2011 2:48 AM
-> To: Boojin Kim
-> Cc: linux-arm-kernel at lists.infradead.org; linux-samsung-
-> soc at vger.kernel.org; Vinod Koul; Dan Williams; Kukjin Kim; Mark Brown;
-> Grant Likely; Russell King
-> Subject: Re: [PATCH 12/15] spi/s3c64xx: Add support DMA engine API
->
-> On Wed, Jul 27, 2011 at 11:01 AM, Boojin Kim <boojin.kim@samsung.com>
-> wrote:
-> > This patch adds to support DMA generic API to transfer raw
-> > SPI data. Basiclly the spi driver uses DMA generic API if
-> > architecture supports it. Otherwise, uses Samsung specific
-> > S3C-PL330 APIs.
-> >
-> > Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
-> > Acked-by: Grant Likely <grant.likely@secretlab.ca>
-> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> > ---
-> >  drivers/spi/spi_s3c64xx.c |  141 ++++++++++++++++++++++-------------
-> ----------
-> >  1 files changed, 69 insertions(+), 72 deletions(-)
-> >
-> > diff --git a/drivers/spi/spi_s3c64xx.c b/drivers/spi/spi_s3c64xx.c
-> > index 8945e20..a4cf76a 100644
-> > --- a/drivers/spi/spi_s3c64xx.c
-> > +++ b/drivers/spi/spi_s3c64xx.c
-> > @@ -172,6 +172,9 @@ struct s3c64xx_spi_driver_data {
-> >        unsigned                        state;
-> >        unsigned                        cur_mode, cur_bpw;
-> >        unsigned                        cur_speed;
-> > +       unsigned                        rx_ch;
-> > +       unsigned                        tx_ch;
-> > +       struct samsung_dma_ops          *ops;
-> >  };
-> >
-> >  static struct s3c2410_dma_client s3c64xx_spi_dma_client = {
-> > @@ -227,6 +230,38 @@ static void flush_fifo(struct
-> s3c64xx_spi_driver_data *sdd)
-> >        writel(val, regs + S3C64XX_SPI_CH_CFG);
-> >  }
-> >
-> > +static void s3c64xx_spi_dma_rxcb(void *data)
-> > +{
-> > +       struct s3c64xx_spi_driver_data *sdd
-> > +               = (struct s3c64xx_spi_driver_data *)data;
-> void* doesn't need typecasting (same for all such occurances)
-> IIRC someone already pointed it out?
-I'm sorry for late response. (I was in vacation.)
-This comment was reflected on 13/15 patch.
+Kyungmin Park wrote:
+> 
+> From: Kyungmin Park <kyungmin.park@samsung.com>
+> 
+> Use the correct regulator names for cpufreq
+> 
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+> diff --git a/arch/arm/mach-exynos4/mach-universal_c210.c b/arch/arm/mach-
+> exynos4/mach-universal_c210.c
+> index 0e280d1..79f0a6f 100644
+> --- a/arch/arm/mach-exynos4/mach-universal_c210.c
+> +++ b/arch/arm/mach-exynos4/mach-universal_c210.c
+> @@ -79,7 +80,7 @@ static struct s3c2410_uartcfg universal_uartcfgs[]
+__initdata
+> = {
+>  };
+> 
+>  static struct regulator_consumer_supply max8952_consumer =
+> -	REGULATOR_SUPPLY("vddarm", NULL);
+> +	REGULATOR_SUPPLY("vdd_arm", NULL);
+> 
+>  static struct max8952_platform_data universal_max8952_pdata __initdata =
+{
+>  	.gpio_vid0	= EXYNOS4_GPX0(3),
+> @@ -105,7 +106,7 @@ static struct max8952_platform_data
+> universal_max8952_pdata __initdata = {
+>  };
+> 
+>  static struct regulator_consumer_supply lp3974_buck1_consumer =
+> -	REGULATOR_SUPPLY("vddint", NULL);
+> +	REGULATOR_SUPPLY("vdd_int", NULL);
+> 
+>  static struct regulator_consumer_supply lp3974_buck2_consumer =
+>  	REGULATOR_SUPPLY("vddg3d", NULL);
 
->
->
-> > +       unsigned long flags;
-> > +
-> > +       spin_lock_irqsave(&sdd->lock, flags);
-> > +
-> > +       sdd->state &= ~RXBUSY;
-> > +       /* If the other done */
-> > +       if (!(sdd->state & TXBUSY))
-> > +               complete(&sdd->xfer_completion);
-> > +
-> > +       spin_unlock_irqrestore(&sdd->lock, flags);
-> > +}
-> > +
-> > +static void s3c64xx_spi_dma_txcb(void *data)
-> > +{
-> > +       struct s3c64xx_spi_driver_data *sdd
-> > +               = (struct s3c64xx_spi_driver_data *)data;
-> > +       unsigned long flags;
-> > +
-> > +       spin_lock_irqsave(&sdd->lock, flags);
-> > +
-> > +       sdd->state &= ~TXBUSY;
-> > +       /* If the other done */
-> > +       if (!(sdd->state & RXBUSY))
-> > +               complete(&sdd->xfer_completion);
-> > +
-> > +       spin_unlock_irqrestore(&sdd->lock, flags);
-> > +}
-> > +
-> >  static void enable_datapath(struct s3c64xx_spi_driver_data *sdd,
-> >                                struct spi_device *spi,
-> >                                struct spi_transfer *xfer, int dma_mode)
-> > @@ -234,6 +269,7 @@ static void enable_datapath(struct
-> s3c64xx_spi_driver_data *sdd,
-> >        struct s3c64xx_spi_info *sci = sdd->cntrlr_info;
-> >        void __iomem *regs = sdd->regs;
-> >        u32 modecfg, chcfg;
-> > +       struct samsung_dma_prep_info info;
-> >
-> >        modecfg = readl(regs + S3C64XX_SPI_MODE_CFG);
-> >        modecfg &= ~(S3C64XX_SPI_MODE_TXDMA_ON |
-> S3C64XX_SPI_MODE_RXDMA_ON);
-> > @@ -259,10 +295,14 @@ static void enable_datapath(struct
-> s3c64xx_spi_driver_data *sdd,
-> >                chcfg |= S3C64XX_SPI_CH_TXCH_ON;
-> >                if (dma_mode) {
-> >                        modecfg |= S3C64XX_SPI_MODE_TXDMA_ON;
-> > -                       s3c2410_dma_config(sdd->tx_dmach, sdd->cur_bpw
-> / 8);
-> > -                       s3c2410_dma_enqueue(sdd->tx_dmach, (void *)sdd,
-> > -                                               xfer->tx_dma, xfer->len);
-> > -                       s3c2410_dma_ctrl(sdd->tx_dmach,
-> S3C2410_DMAOP_START);
-> > +                       info.cap = DMA_SLAVE;
-> > +                       info.direction = DMA_TO_DEVICE;
-> > +                       info.buf = xfer->tx_dma;
-> > +                       info.len = xfer->len;
-> > +                       info.fp = s3c64xx_spi_dma_txcb;
-> > +                       info.fp_param = sdd;
-> > +                       sdd->ops->prepare(sdd->tx_ch, &info);
-> > +                       sdd->ops->trigger(sdd->tx_ch);
-> >                } else {
-> >                        switch (sdd->cur_bpw) {
-> >                        case 32:
-> > @@ -294,10 +334,14 @@ static void enable_datapath(struct
-> s3c64xx_spi_driver_data *sdd,
-> >                        writel(((xfer->len * 8 / sdd->cur_bpw) & 0xffff)
-> >                                        | S3C64XX_SPI_PACKET_CNT_EN,
-> >                                        regs + S3C64XX_SPI_PACKET_CNT);
-> > -                       s3c2410_dma_config(sdd->rx_dmach, sdd->cur_bpw
-> / 8);
-> > -                       s3c2410_dma_enqueue(sdd->rx_dmach, (void *)sdd,
-> > -                                               xfer->rx_dma, xfer->len);
-> > -                       s3c2410_dma_ctrl(sdd->rx_dmach,
-> S3C2410_DMAOP_START);
-> > +                       info.cap = DMA_SLAVE;
-> > +                       info.direction = DMA_FROM_DEVICE;
-> > +                       info.buf = xfer->rx_dma;
-> > +                       info.len = xfer->len;
-> > +                       info.fp = s3c64xx_spi_dma_rxcb;
-> > +                       info.fp_param = sdd;
-> > +                       sdd->ops->prepare(sdd->rx_ch, &info);
-> > +                       sdd->ops->trigger(sdd->rx_ch);
-> >                }
-> >        }
-> >
-> > @@ -483,46 +527,6 @@ static void s3c64xx_spi_config(struct
-> s3c64xx_spi_driver_data *sdd)
-> >        }
-> >  }
-> >
-> > -static void s3c64xx_spi_dma_rxcb(struct s3c2410_dma_chan *chan,
-> void *buf_id,
-> > -                                int size, enum s3c2410_dma_buffresult
-> res)
-> > -{
-> > -       struct s3c64xx_spi_driver_data *sdd = buf_id;
-> > -       unsigned long flags;
-> > -
-> > -       spin_lock_irqsave(&sdd->lock, flags);
-> > -
-> > -       if (res == S3C2410_RES_OK)
-> > -               sdd->state &= ~RXBUSY;
-> > -       else
-> > -               dev_err(&sdd->pdev->dev, "DmaAbrtRx-%d\n", size);
-> > -
-> > -       /* If the other done */
-> > -       if (!(sdd->state & TXBUSY))
-> > -               complete(&sdd->xfer_completion);
-> > -
-> > -       spin_unlock_irqrestore(&sdd->lock, flags);
-> > -}
-> > -
-> > -static void s3c64xx_spi_dma_txcb(struct s3c2410_dma_chan *chan,
-> void *buf_id,
-> > -                                int size, enum s3c2410_dma_buffresult
-> res)
-> > -{
-> > -       struct s3c64xx_spi_driver_data *sdd = buf_id;
-> > -       unsigned long flags;
-> > -
-> > -       spin_lock_irqsave(&sdd->lock, flags);
-> > -
-> > -       if (res == S3C2410_RES_OK)
-> > -               sdd->state &= ~TXBUSY;
-> > -       else
-> > -               dev_err(&sdd->pdev->dev, "DmaAbrtTx-%d \n", size);
-> > -
-> > -       /* If the other done */
-> > -       if (!(sdd->state & RXBUSY))
-> > -               complete(&sdd->xfer_completion);
-> > -
-> > -       spin_unlock_irqrestore(&sdd->lock, flags);
-> > -}
-> > -
-> >  #define XFER_DMAADDR_INVALID DMA_BIT_MASK(32)
-> >
-> >  static int s3c64xx_spi_map_mssg(struct s3c64xx_spi_driver_data *sdd,
-> > @@ -697,12 +701,10 @@ static void handle_msg(struct
-> s3c64xx_spi_driver_data *sdd,
-> >                        if (use_dma) {
-> >                                if (xfer->tx_buf != NULL
-> >                                                && (sdd->state & TXBUSY))
-> > -                                       s3c2410_dma_ctrl(sdd->tx_dmach,
-> > -
->                                                        S3C2410_DMAOP_FLUSH);
-> > +                                       sdd->ops->stop(sdd->tx_ch);
-> >                                if (xfer->rx_buf != NULL
-> >                                                && (sdd->state & RXBUSY))
-> > -                                       s3c2410_dma_ctrl(sdd->rx_dmach,
-> > -
->                                                        S3C2410_DMAOP_FLUSH);
-> > +                                       sdd->ops->stop(sdd->rx_ch);
-> >                        }
-> >
-> >                        goto out;
-> > @@ -742,24 +744,19 @@ out:
-> >
-> >  static int acquire_dma(struct s3c64xx_spi_driver_data *sdd)
-> >  {
-> > -       if (s3c2410_dma_request(sdd->rx_dmach,
-> > -                                       &s3c64xx_spi_dma_client, NULL) <
-> 0) {
-> > -               dev_err(&sdd->pdev->dev, "cannot get RxDMA\n");
-> > -               return 0;
-> > -       }
-> > -       s3c2410_dma_set_buffdone_fn(sdd->rx_dmach,
-> s3c64xx_spi_dma_rxcb);
-> > -       s3c2410_dma_devconfig(sdd->rx_dmach, S3C2410_DMASRC_HW,
-> > -                                       sdd->sfr_start +
-> S3C64XX_SPI_RX_DATA);
-> > -
-> > -       if (s3c2410_dma_request(sdd->tx_dmach,
-> > -                                       &s3c64xx_spi_dma_client, NULL) <
-> 0) {
-> > -               dev_err(&sdd->pdev->dev, "cannot get TxDMA\n");
-> > -               s3c2410_dma_free(sdd->rx_dmach,
-> &s3c64xx_spi_dma_client);
-> > -               return 0;
-> > -       }
-> > -       s3c2410_dma_set_buffdone_fn(sdd->tx_dmach,
-> s3c64xx_spi_dma_txcb);
-> > -       s3c2410_dma_devconfig(sdd->tx_dmach, S3C2410_DMASRC_MEM,
-> > -                                       sdd->sfr_start +
-> S3C64XX_SPI_TX_DATA);
-> > +
-> > +       struct samsung_dma_info info;
-> > +       sdd->ops = samsung_dma_get_ops();
-> > +
-> > +       info.cap = DMA_SLAVE;
-> > +       info.client = &s3c64xx_spi_dma_client;
-> > +       info.direction = DMA_FROM_DEVICE;
-> > +       info.fifo = sdd->sfr_start + S3C64XX_SPI_RX_DATA;
-> > +       info.width = sdd->cur_bpw / 8;
-> > +       sdd->rx_ch = sdd->ops->request(sdd->rx_dmach, &info);
-> > +       info.direction = DMA_TO_DEVICE;
-> > +       info.fifo = sdd->sfr_start + S3C64XX_SPI_TX_DATA;
-> > +       sdd->tx_ch = sdd->ops->request(sdd->tx_dmach, &info);
-> >
-> >        return 1;
-> >  }
-> > @@ -800,8 +797,8 @@ static void s3c64xx_spi_work(struct work_struct
-> *work)
-> >        spin_unlock_irqrestore(&sdd->lock, flags);
-> >
-> >        /* Free DMA channels */
-> > -       s3c2410_dma_free(sdd->tx_dmach, &s3c64xx_spi_dma_client);
-> > -       s3c2410_dma_free(sdd->rx_dmach, &s3c64xx_spi_dma_client);
-> > +       sdd->ops->release(sdd->rx_ch, &s3c64xx_spi_dma_client);
-> > +       sdd->ops->release(sdd->tx_ch, &s3c64xx_spi_dma_client);
-> >  }
->
-> Btw, this spi driver is for S3C64xx(with pl080) and S5P(with pl330)
-> series, both of which
-> have DMAENGINE drivers. May be it could be directly switched to using
-> those, rather than
-> via Samsung's wrapper driver.
-> Or am I overlooking something ?
-Samsung is preparing to use PL080 with DMAENGINE. After this work is done, We 
-will consider to using DMAENGINE API if required.
+OK, applied.
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
