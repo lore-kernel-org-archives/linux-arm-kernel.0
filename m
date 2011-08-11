@@ -1,27 +1,51 @@
-From: jochen@scram.de (Jochen Friedrich)
-Date: Thu, 11 Aug 2011 17:24:58 +0200
-Subject: [PATCH 3.2 0/4] ARM: simpad: Add support for GPIO attached
-	hardware
-In-Reply-To: <1312793379-6020-1-git-send-email-jochen@scram.de>
-References: <1312793379-6020-1-git-send-email-jochen@scram.de>
-Message-ID: <4E43F44A.1000509@scram.de>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 11 Aug 2011 10:32:08 -0500
+Subject: Subject: L2x0 OF properties do not include interrupt #
+In-Reply-To: <20110811130910.GA10189@e102144-lin.cambridge.arm.com>
+References: <000201cc575b$c1229010$4367b030$@rutland@arm.com>
+	<201108101624.27881.arnd@arndb.de>
+	<20110810142808.GL10121@e102144-lin.cambridge.arm.com>
+	<201108111505.11887.arnd@arndb.de>
+	<20110811130910.GA10189@e102144-lin.cambridge.arm.com>
+Message-ID: <4E43F5F8.4060704@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08.08.2011 10:49, Jochen Friedrich wrote:
+On 08/11/2011 08:09 AM, Will Deacon wrote:
+> On Thu, Aug 11, 2011 at 02:05:11PM +0100, Arnd Bergmann wrote:
+>> On Wednesday 10 August 2011, Will Deacon wrote:
+>>> I was hoping that it was possible to have separate properties which describe
+>>> the interrupt. So you could have something like pmu-interrupt <75> and
+>>> abort-interrupt <76> rather than interrupts <75, 76>.
+>>
+>> Ok, I see.
+>>
+>>> I've not played with DT bindings before though, so if it's usually done with
+>>> an ordered list then so be it!
+>>
+>> A lot of the code assumes that the property is called 'interrupts' and that
+>> it contains a fixed-length array of interrupt numbers, each for one specific
+>> purpose.
+> 
+> Ok, I wondered if something like that might be the case.
+> 
+>> Given that we have so many different meanings for the interrupts, I'm
+>> not sure how this would work best in this case. According to
+>> http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0246f/CHDFHCFJ.html
+>> this looks like a nested interrupt controller, i.e. the L2CC has its own mask
+>> and status register with bits for each one of them. We could model these by
+>> describing the l2cc interrupt controller with these registers and listing all
+>> nine of the current inputs. I suspect however that it would be easier to just
+>> assume that there is only one line for now, and treat the l2cc as a single
+>> interrupt source with an internal status register.
+> 
+> Given that this binding is only for the l2x0 / pl310 and I don't know of any
+> implementation where > 1 interrupt line is wired up, I'm happy to assume a
+> single combined interrupt line for now.
+> 
 
-> This series enables GPIO API on UCB1x00 and implements the GPIO
-> API on the CS3 latch. The third patch finally registers platform
-> devices for the GPIO attached LED, buttons and I2C bus.
->
-> ARM: simpad: Add ucb1x00 GPIO definitions and register GPIO
-> ARM: simpad: Cleanup CS3 accessors and add GPIO API
-> ARM: simpad: add GPIO based device definitions
-> ARM: simpad: replace ARM specific LED code
+I know of one. Although, we have the combined interrupt as well. The
+binding should allow either way and specify the order. If the event
+counter interrupt is 1st, then it should be the same to s/w.
 
-ping.
-
-Did someone have time to look at this yet?
-
-Thanks,
-Jochen
+Rob
