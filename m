@@ -1,42 +1,48 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Thu, 11 Aug 2011 09:36:38 +0300
-Subject: [PATCH v2] gpio: pl061: add DT binding support
-In-Reply-To: <1313011906-24161-1-git-send-email-robherring2@gmail.com>
-References: <1312397661-3328-1-git-send-email-robherring2@gmail.com>
-	<1313011906-24161-1-git-send-email-robherring2@gmail.com>
-Message-ID: <20110811063637.GA3220@sapphire.tkos.co.il>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Thu, 11 Aug 2011 15:58:37 +0900
+Subject: [GIT PULL] samsung: fixes for v3.1-rc1
+Message-ID: <20110811065837.GA4989@july>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+The following changes since commit 322a8b034003c0d46d39af85bf24fee27b902f48:
 
-On Wed, Aug 10, 2011 at 04:31:46PM -0500, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
-> 
-> This adds devicetree binding support to the ARM pl061 driver removing the
-> platform_data dependency. When DT binding is used, the gpio numbering is
-> assigned dynamically. For now, interrupts are not supported with DT until
-> irqdomains learn dynamic irq assignment.
-> 
-> Rather than add another case of -1, updating the driver to use NO_IRQ.
-> 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> ---
-> 
-> v2:
-> - Add other -1 to NO_IRQ conversions
+  Linux 3.1-rc1 (2011-08-07 18:23:30 -0700)
 
-Migrating existing pl061_platform_data users to NO_IRQ would be nice as well.  
-But this should probably be a separate patch.
+are available in the git repository at:
+  git://git.infradead.org/users/kmpark/linux-2.6-samsung for-arnd
 
-FWIW:
+Kyungmin Park (2):
+      ARM: exynos4: universal: Use the correct regulator names
+      ARM: exynos4: Use nr_irqs instead of NR_IRQS
 
-Acked-by: Baruch Siach <baruch@tkos.co.il>
+Marek Szyprowski (5):
+      ARM: Exynos4: add required chained_irq_enter/exit to eint code
+      ARM: Samsung: Add chained enrty/exit call to timer interrupt handler
+      ARM: S5P: add required chained_irq_enter/exit to gpio-int code
+      ARM: Exynos4: use s5p-timer for UniversalC210 board
+      ARM: Samsung: fix watchdog reset issue with clk_get()
 
-baruch
+Sylwester Nawrocki (1):
+      ARM: EXYNOS4: Fix the IRQ definitions for MIPI CSIS device
 
--- 
-                                                     ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+ arch/arm/mach-exynos4/Kconfig                      |    3 +++
+ arch/arm/mach-exynos4/clock.c                      |    1 +
+ arch/arm/mach-exynos4/include/mach/irqs.h          |    5 ++---
+ arch/arm/mach-exynos4/irq-combiner.c               |    2 +-
+ arch/arm/mach-exynos4/irq-eint.c                   |    7 +++++++
+ arch/arm/mach-exynos4/mach-universal_c210.c        |    8 +++++---
+ arch/arm/mach-s3c2412/clock.c                      |    1 +
+ arch/arm/mach-s3c2416/clock.c                      |    2 +-
+ arch/arm/mach-s3c2443/clock.c                      |    1 +
+ arch/arm/mach-s3c64xx/clock.c                      |    1 +
+ arch/arm/mach-s5p64x0/cpu.c                        |    2 ++
+ arch/arm/mach-s5pc100/clock.c                      |    1 +
+ arch/arm/mach-s5pv210/clock.c                      |    1 +
+ arch/arm/plat-s3c24xx/s3c2410-clock.c              |    1 +
+ arch/arm/plat-s5p/irq-gpioint.c                    |    6 ++++++
+ arch/arm/plat-samsung/clock.c                      |    9 +++++++++
+ arch/arm/plat-samsung/include/plat/clock.h         |    2 ++
+ .../arm/plat-samsung/include/plat/watchdog-reset.h |   10 +++-------
+ arch/arm/plat-samsung/irq-vic-timer.c              |    5 +++++
+ 19 files changed, 53 insertions(+), 15 deletions(-)
