@@ -1,41 +1,39 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 11 Aug 2011 15:06:07 +0200
-Subject: [PATCH 08/19] mach-davinci: move DaVinci TNET GPIO driver to GPIO
-	subsystem
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024E04F945@dbde02.ent.ti.com>
-References: <1312978639-18339-1-git-send-email-linus.walleij@stericsson.com>
-	<B85A65D85D7EB246BE421B3FB0FBB593024E04F945@dbde02.ent.ti.com>
-Message-ID: <CACRpkdZvxvD01ofxMxDb3wXpt9_8wkU1rwxdLj5RuidoZNrb+w@mail.gmail.com>
+From: tixy@yxit.co.uk (Tixy)
+Date: Thu, 11 Aug 2011 14:08:09 +0100
+Subject: [PATCH 05/12] ARM: mach-s5pv210: Setup consistent dma size at
+	boot time
+In-Reply-To: <20110811125016.GD24434@atrey.karlin.mff.cuni.cz>
+References: <1312813712-22808-1-git-send-email-tixy@yxit.co.uk>
+	<1312813712-22808-6-git-send-email-tixy@yxit.co.uk>
+	<20110811125016.GD24434@atrey.karlin.mff.cuni.cz>
+Message-ID: <1313068089.6698.12.camel@computer2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 11, 2011 at 12:21 AM, Nori, Sekhar <nsekhar@ti.com> wrote:
-> Hi Linus,
->
-> On Wed, Aug 10, 2011 at 17:47:19, Linus Walleij wrote:
->> From: Linus Walleij <linus.walleij@linaro.org>
->>
->> As per example from the other ARM boards, push the DaVinci TNET
->> GPIO driver down to the GPIO subsystem so it can be consolidated.
->>
->> Cc: Sekhar Nori <nsekhar@ti.com>
->> Cc: Kevin Hilman <khilman@ti.com>
->> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
->
-> There should be no need of this since the TNETV107x
-> GPIO can simply be supported using the basic MMIO GPIO
-> driver. I submitted patches for that a while back
-> but have some comments from Grant to address. He requested
-> some changes to be done to the basic MMIO GPIO driver
-> itself.
->
-> https://lkml.org/lkml/2011/7/5/16
->
-> I do plan to rework those patches and post them back.
+On Thu, 2011-08-11 at 14:50 +0200, Pavel Machek wrote:
+> 
+> > -#define CONSISTENT_DMA_SIZE	(SZ_8M + SZ_4M + SZ_2M)
+> ...
+> > +	init_consistent_dma_size(14 << 20);
+> 
+> Are you sure that's equivalent?
 
-OK I will keep this around in case it doesn't happen
-soon, it certainly does not make matters worse
-anyway.
+Yes. From include/asm-generic/sizes.h
 
-Thanks,
-Linus Walleij
+#define SZ_2M				0x00200000
+#define SZ_4M				0x00400000
+#define SZ_8M				0x00800000
+
+The max DMA size seems to be have been defined as 14MB at some point and
+several platforms define the size to be this value, but in different
+ways:
+
+	SZ_16M - SZ_2M
+	SZ_8M + SZ_4M + SZ_2M
+	14 << 20
+
+I chose to use just one for consistency, and (14 << 20) seemed clearer
+to me.
+
+-- 
+Jon (a.k.a. Tixy)
