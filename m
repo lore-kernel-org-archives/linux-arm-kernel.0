@@ -1,49 +1,190 @@
-From: gregkh@suse.de (Greg KH)
-Date: Thu, 11 Aug 2011 08:22:39 -0700
-Subject: [PATCH 4/4] Move top level platform devices in sysfs to
-	/sys/devices/soc/X
-In-Reply-To: <4E43C399.1040505@stericsson.com>
-References: <1312981422-13294-1-git-send-email-lee.jones@linaro.org>
-	<1312981422-13294-4-git-send-email-lee.jones@linaro.org>
-	<20110810150232.GC7938@suse.de> <4E43C399.1040505@stericsson.com>
-Message-ID: <20110811152239.GB13745@suse.de>
+From: banajit.g@samsung.com (Banajit Goswami)
+Date: Thu, 11 Aug 2011 21:08:13 +0530
+Subject: [PATCH] ARM: SAMSUNG: Consolidate common function to set SDHCI plat
+	data
+Message-ID: <1313077093-25157-1-git-send-email-banajit.g@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 11, 2011 at 01:57:13PM +0200, Linus Walleij wrote:
-> On 08/10/2011 05:02 PM, Greg KH wrote:
-> >On Wed, Aug 10, 2011 at 02:03:42PM +0100, Lee Jones wrote:
-> >>At the request of Arnd Bergmann this patch moves all SoC
-> >>platform devices found in sysfs from /sys/devices/platform to
-> >>/sys/devices/soc/<SoCNum>/. It is believed as the devices are
-> >>SoC specific and a /sys/devices/soc node has recently become
-> >>available, that this would be a more appropriate place to
-> >>display the data.
-> >And what userspace tools did you just break by doing this?
-> 
-> I think most of our userspace for this platform poking
-> around in sysfs use /sys/class/* so should be pretty OK.
-> 
-> And none of which were properly documented in
-> Documentation/ABI/* anyway, so do we care?
-> grep -r 'devices/platform' Documentation/ABI/
-> doesn't show anything relating to the ux500.
-> 
-> The major breakage would be out-of-tree stuff, if
-> any.
-> 
-> Which is out-of-tree due to the absence of a SoC ID
-> framework.
-> 
-> Which was nixed by Arnd et al precisely because
-> the above change was not part of it.
-> 
-> It's a bit hard for Lee to please everyone with this
-> one I suspect :-D
+Moves similar functions to set SDHCI platform data for all Samsung
+boards to a common location, thereby saves a few lines.
 
-Ok, if you get guarantees from anyone using the in-kernel platform soc
-code that this move is acceptable, and you guarantee that no userspace
-tools will break, that's fine.  But odds are, you are going to break
-something...
+Signed-off-by: Banajit Goswami <banajit.g@samsung.com>
+---
+ arch/arm/plat-samsung/dev-hsmmc.c          |   19 +------------------
+ arch/arm/plat-samsung/dev-hsmmc1.c         |   19 +------------------
+ arch/arm/plat-samsung/dev-hsmmc2.c         |   19 +------------------
+ arch/arm/plat-samsung/dev-hsmmc3.c         |   19 +------------------
+ arch/arm/plat-samsung/include/plat/sdhci.h |    7 +++++++
+ arch/arm/plat-samsung/platformdata.c       |   22 ++++++++++++++++++++++
+ 6 files changed, 33 insertions(+), 72 deletions(-)
 
-greg k-h
+diff --git a/arch/arm/plat-samsung/dev-hsmmc.c b/arch/arm/plat-samsung/dev-hsmmc.c
+index db7a65c..06825c4 100644
+--- a/arch/arm/plat-samsung/dev-hsmmc.c
++++ b/arch/arm/plat-samsung/dev-hsmmc.c
+@@ -58,22 +58,5 @@ struct platform_device s3c_device_hsmmc0 = {
+ 
+ void s3c_sdhci0_set_platdata(struct s3c_sdhci_platdata *pd)
+ {
+-	struct s3c_sdhci_platdata *set = &s3c_hsmmc0_def_platdata;
+-
+-	set->cd_type = pd->cd_type;
+-	set->ext_cd_init = pd->ext_cd_init;
+-	set->ext_cd_cleanup = pd->ext_cd_cleanup;
+-	set->ext_cd_gpio = pd->ext_cd_gpio;
+-	set->ext_cd_gpio_invert = pd->ext_cd_gpio_invert;
+-
+-	if (pd->max_width)
+-		set->max_width = pd->max_width;
+-	if (pd->cfg_gpio)
+-		set->cfg_gpio = pd->cfg_gpio;
+-	if (pd->cfg_card)
+-		set->cfg_card = pd->cfg_card;
+-	if (pd->host_caps)
+-		set->host_caps |= pd->host_caps;
+-	if (pd->clk_type)
+-		set->clk_type = pd->clk_type;
++	s3c_sdhci_set_platdata(pd, &s3c_hsmmc0_def_platdata);
+ }
+diff --git a/arch/arm/plat-samsung/dev-hsmmc1.c b/arch/arm/plat-samsung/dev-hsmmc1.c
+index 2497321..4524ef4 100644
+--- a/arch/arm/plat-samsung/dev-hsmmc1.c
++++ b/arch/arm/plat-samsung/dev-hsmmc1.c
+@@ -58,22 +58,5 @@ struct platform_device s3c_device_hsmmc1 = {
+ 
+ void s3c_sdhci1_set_platdata(struct s3c_sdhci_platdata *pd)
+ {
+-	struct s3c_sdhci_platdata *set = &s3c_hsmmc1_def_platdata;
+-
+-	set->cd_type = pd->cd_type;
+-	set->ext_cd_init = pd->ext_cd_init;
+-	set->ext_cd_cleanup = pd->ext_cd_cleanup;
+-	set->ext_cd_gpio = pd->ext_cd_gpio;
+-	set->ext_cd_gpio_invert = pd->ext_cd_gpio_invert;
+-
+-	if (pd->max_width)
+-		set->max_width = pd->max_width;
+-	if (pd->cfg_gpio)
+-		set->cfg_gpio = pd->cfg_gpio;
+-	if (pd->cfg_card)
+-		set->cfg_card = pd->cfg_card;
+-	if (pd->host_caps)
+-		set->host_caps |= pd->host_caps;
+-	if (pd->clk_type)
+-		set->clk_type = pd->clk_type;
++	s3c_sdhci_set_platdata(pd, &s3c_hsmmc1_def_platdata);
+ }
+diff --git a/arch/arm/plat-samsung/dev-hsmmc2.c b/arch/arm/plat-samsung/dev-hsmmc2.c
+index f60aedb..9cede96 100644
+--- a/arch/arm/plat-samsung/dev-hsmmc2.c
++++ b/arch/arm/plat-samsung/dev-hsmmc2.c
+@@ -59,22 +59,5 @@ struct platform_device s3c_device_hsmmc2 = {
+ 
+ void s3c_sdhci2_set_platdata(struct s3c_sdhci_platdata *pd)
+ {
+-	struct s3c_sdhci_platdata *set = &s3c_hsmmc2_def_platdata;
+-
+-	set->cd_type = pd->cd_type;
+-	set->ext_cd_init = pd->ext_cd_init;
+-	set->ext_cd_cleanup = pd->ext_cd_cleanup;
+-	set->ext_cd_gpio = pd->ext_cd_gpio;
+-	set->ext_cd_gpio_invert = pd->ext_cd_gpio_invert;
+-
+-	if (pd->max_width)
+-		set->max_width = pd->max_width;
+-	if (pd->cfg_gpio)
+-		set->cfg_gpio = pd->cfg_gpio;
+-	if (pd->cfg_card)
+-		set->cfg_card = pd->cfg_card;
+-	if (pd->host_caps)
+-		set->host_caps |= pd->host_caps;
+-	if (pd->clk_type)
+-		set->clk_type = pd->clk_type;
++	s3c_sdhci_set_platdata(pd, &s3c_hsmmc2_def_platdata);
+ }
+diff --git a/arch/arm/plat-samsung/dev-hsmmc3.c b/arch/arm/plat-samsung/dev-hsmmc3.c
+index ede776f..0358ef4 100644
+--- a/arch/arm/plat-samsung/dev-hsmmc3.c
++++ b/arch/arm/plat-samsung/dev-hsmmc3.c
+@@ -62,22 +62,5 @@ struct platform_device s3c_device_hsmmc3 = {
+ 
+ void s3c_sdhci3_set_platdata(struct s3c_sdhci_platdata *pd)
+ {
+-	struct s3c_sdhci_platdata *set = &s3c_hsmmc3_def_platdata;
+-
+-	set->cd_type = pd->cd_type;
+-	set->ext_cd_init = pd->ext_cd_init;
+-	set->ext_cd_cleanup = pd->ext_cd_cleanup;
+-	set->ext_cd_gpio = pd->ext_cd_gpio;
+-	set->ext_cd_gpio_invert = pd->ext_cd_gpio_invert;
+-
+-	if (pd->max_width)
+-		set->max_width = pd->max_width;
+-	if (pd->cfg_gpio)
+-		set->cfg_gpio = pd->cfg_gpio;
+-	if (pd->cfg_card)
+-		set->cfg_card = pd->cfg_card;
+-	if (pd->host_caps)
+-		set->host_caps |= pd->host_caps;
+-	if (pd->clk_type)
+-		set->clk_type = pd->clk_type;
++	s3c_sdhci_set_platdata(pd, &s3c_hsmmc3_def_platdata);
+ }
+diff --git a/arch/arm/plat-samsung/include/plat/sdhci.h b/arch/arm/plat-samsung/include/plat/sdhci.h
+index 058e096..20dc81c 100644
+--- a/arch/arm/plat-samsung/include/plat/sdhci.h
++++ b/arch/arm/plat-samsung/include/plat/sdhci.h
+@@ -86,6 +86,13 @@ struct s3c_sdhci_platdata {
+ 			    struct mmc_card *card);
+ };
+ 
++/* s3c_sdhci_set_platdata() - common helper for setting SDHCI platform data
++ * @pd: The default platform data for this device.
++ * @set: Pointer to the platform data to fill in.
++ */
++extern void s3c_sdhci_set_platdata(struct s3c_sdhci_platdata *pd,
++				struct s3c_sdhci_platdata *set);
++
+ /**
+  * s3c_sdhci0_set_platdata - Set platform data for S3C SDHCI device.
+  * @pd: Platform data to register to device.
+diff --git a/arch/arm/plat-samsung/platformdata.c b/arch/arm/plat-samsung/platformdata.c
+index 7cf2e1e..27bec0a 100644
+--- a/arch/arm/plat-samsung/platformdata.c
++++ b/arch/arm/plat-samsung/platformdata.c
+@@ -14,6 +14,7 @@
+ #include <linux/platform_device.h>
+ 
+ #include <plat/devs.h>
++#include <plat/sdhci.h>
+ 
+ void __init *s3c_set_platdata(void *pd, size_t pdsize,
+ 			      struct platform_device *pdev)
+@@ -35,3 +36,24 @@ void __init *s3c_set_platdata(void *pd, size_t pdsize,
+ 	pdev->dev.platform_data = npd;
+ 	return npd;
+ }
++
++void s3c_sdhci_set_platdata(struct s3c_sdhci_platdata *pd,
++			struct s3c_sdhci_platdata *set)
++{
++	set->cd_type = pd->cd_type;
++	set->ext_cd_init = pd->ext_cd_init;
++	set->ext_cd_cleanup = pd->ext_cd_cleanup;
++	set->ext_cd_gpio = pd->ext_cd_gpio;
++	set->ext_cd_gpio_invert = pd->ext_cd_gpio_invert;
++
++	if (pd->max_width)
++		set->max_width = pd->max_width;
++	if (pd->cfg_gpio)
++		set->cfg_gpio = pd->cfg_gpio;
++	if (pd->cfg_card)
++		set->cfg_card = pd->cfg_card;
++	if (pd->host_caps)
++		set->host_caps |= pd->host_caps;
++	if (pd->clk_type)
++		set->clk_type = pd->clk_type;
++}
+-- 
+1.7.2.3
