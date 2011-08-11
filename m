@@ -1,79 +1,111 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Thu, 11 Aug 2011 22:35:55 +0530
-Subject: [PATCH V2 6/6] spi/spi-pl022: Request/free DMA channels as and
-	when required.
-In-Reply-To: <CAKnu2MptC8HWCNo6W+X9rawn6MCwAe3DB3B5UcHD1tCD9tA2cg@mail.gmail.com>
-References: <cover.1312965741.git.viresh.kumar@st.com>
-	<566c0525199f498f04422d4c3b2ddd7466648c20.1312965742.git.viresh.kumar@st.com>
-	<20110810090042.GE1831@n2100.arm.linux.org.uk>
-	<4E424F7B.2000800@st.com>
-	<438BB0150E931F4B9CE701519A4463010871804A15@bgsmsx502.gar.corp.intel.com>
-	<CABb+yY3SnqKN78U7vLbom1i00m=ThnRVQDVM_iX1TPu=+XzSNQ@mail.gmail.com>
-	<20110810104025.GK1831@n2100.arm.linux.org.uk>
-	<CABb+yY3=q5Nq1wtM6Av2DrgUfjZR_Ao40QhBhv_ik9naAd5wRg@mail.gmail.com>
-	<CACRpkdaCyUJ3A9VWfsVuwJj3DGVkvjc2_ZOD4yM4YX3NPxAAYQ@mail.gmail.com>
-	<CABb+yY2Usd5=RW6BV69UW=Tq0zQW6LCtT2GhfdHGA61ZU3aNcQ@mail.gmail.com>
-	<CAKnu2Mo=9wusKrc7DeL9fk-fq3pY1D3WKHXYmo+b9w5GbyzegA@mail.gmail.com>
-	<CABb+yY0G_OeVgQs4ySVMQBcBh2q=nUhj+U+=tZG751WT9qRYuA@mail.gmail.com>
-	<CAKnu2MptC8HWCNo6W+X9rawn6MCwAe3DB3B5UcHD1tCD9tA2cg@mail.gmail.com>
-Message-ID: <CABb+yY3gi40JyoruEnm06wKJp79_kzjdkwRuGF9vjnUbcb5sOg@mail.gmail.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Thu, 11 Aug 2011 12:48:24 -0500
+Subject: [PATCH 10/19] mach-ep93xx: break out GPIO driver specifics
+In-Reply-To: <ADE657CA350FB648AAC2C43247A983F001F388389983@AUSP01VMBX24.collaborationhost.net>
+References: <1312978655-18405-1-git-send-email-linus.walleij@stericsson.com>
+	<ADE657CA350FB648AAC2C43247A983F001F38838966E@AUSP01VMBX24.collaborationhost.net>
+	<CACRpkdabHj_C7wgGfu3g6LSsa2iMZS0h279wf6McOxfge9Gm_w@mail.gmail.com>
+	<ADE657CA350FB648AAC2C43247A983F001F388389983@AUSP01VMBX24.collaborationhost.net>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F001F3883899A6@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 11, 2011 at 8:18 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> 2011/8/11 Jassi Brar <jassisinghbrar@gmail.com>:
->
->> Do you have any reason for using device pointer and strings, other
->> than just "because clock and regulator use them" ??
->
-> Basically no.
-
-Dear, I am speechless !!
-Best of luck.
-
->>>> Do you propose to implement a string parser in the core ?!
+On Thursday, August 11, 2011 10:16 AM, H Hartley Sweeten wrote:
+> On Thursday, August 11, 2011 5:29 AM, Linus Walleij wrote:
+>> On Wed, Aug 10, 2011 at 7:23 PM, H Hartley Sweeten wrote:
+>>> On Wednesday, August 10, 2011 5:18 AM, Linus Walleij wrote:
+>>>> +#include "gpio-ep93xx.h"
 >>>
->>> Yes, the clock and regulator framework already does that.
->>> But it is only used when you cannot pass in a struct device *
->>> directly, like from device tree.
+>>> Why this form? ?Isn't <mach/gpio-ep93xx.h> the preferred form?
 >>
->> Dude, I have utter disrespect for using strings in a case such as
->> expressing requirements.
+>> This is to make the inclusion very local. The only reason it is
+>> included at all is to get EP93XX_GPIO_LINE_MAX_IRQ,
+>> nothing else.
 >
-> It's mainly a strcmp(), and it's only comparing to the
-> well-established namespace that all devices have anyway,
-> due to the way the device model is done.
+> Hmm..  It is needed for gpio_to_irq()...
 >
-> Basically when binding clocks or regulators it's:
+> The only other user of that define is drivers/gpio/gpio-ep93xx.c.
 >
-> struct device *dev;
-> strcmp(map_string, dev_name(dev));
+> To follow the intentions of this patch it would be nice to remove this 
+> include from <mach/gpio.h> and add <mach/gpio-ep93xx.h> to the gpio driver.
+> But, any user of gpio_to_irq() whould also have to include <mach/gpio-ep93xx.h>
+> also.
 >
-> By this time struct device exist of course, since
-> it's the device driver calling to get its clock/regulator.
+> The other solution is to hook up the gpiolib to_irq callback in
+> gpio-ep93xx and do:
 >
-> dev_name() comes from <linux/device.h> and basically
-> takes the kobject name or an optional initilizer name
-> for the device. So the names are pretty static, you don't
-> need to parse them, just compare.
-I think I know why and how clkdev and regulator use strings.
-Here we are talking about dmac possibly expressing 8 parameters
-as strings, not just 2.
+> #define gpio_to_irq	__gpio_to_irq
+>
+> Maybe this is a better option?
 
+BTW, I have a patch for this if you want.
 
->> I have already explained how we can easily and in a _better_ way
->> do without them (again see my last reply to Vindo's setup).
->> Tell me 1 reason why using strings, in this case, would be better ?
->
-> I have no other reasons than the above.
->
-> People like Russell (clkdevice) and Liam Girdwood (regulator)
-> who I know are smarter than me and have worked with
-> these subsystems for years choose that model, so I trust
-> their judgement.
-Let me provide you even more 'ammunition'
-ASoC and USB-Gadget employs strings too
-Though only Regulators, ASoC and CLKDEV(?) really _have-to_
-employ strings.
-USB-Gadget use them mainly for historical reasons - we can very well
-replace that scheme with bit-fields as I propose.
+----
+
+gpio-ep93xx: hookup the to_irq callback in the driver
+
+Remove the ep93xx machine specific dependencies for gpio_to_irq() by
+hooking up the callback in the driver and using __gpio_to_irq.
+
+Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+
+---
+
+diff --git a/arch/arm/mach-ep93xx/include/mach/gpio.h b/arch/arm/mach-ep93xx/include/mach/gpio.h
+index 071f676..76c68fa 100644
+--- a/arch/arm/mach-ep93xx/include/mach/gpio.h
++++ b/arch/arm/mach-ep93xx/include/mach/gpio.h
+@@ -99,14 +99,7 @@
+ /* maximum value for irq capable line identifiers */
+ #define EP93XX_GPIO_LINE_MAX_IRQ	EP93XX_GPIO_LINE_F(7)
+ 
+-/*
+- * Map GPIO A0..A7  (0..7)  to irq 64..71,
+- *          B0..B7  (7..15) to irq 72..79, and
+- *          F0..F7 (16..24) to irq 80..87.
+- */
+-#define gpio_to_irq(gpio)	\
+-	(((gpio) <= EP93XX_GPIO_LINE_MAX_IRQ) ? (64 + (gpio)) : -EINVAL)
+-
++#define gpio_to_irq		__gpio_to_irq
+ #define irq_to_gpio(irq)	((irq) - gpio_to_irq(0))
+ 
+ #endif
+diff --git a/drivers/gpio/gpio-ep93xx.c b/drivers/gpio/gpio-ep93xx.c
+index 468b27d..6a56895 100644
+--- a/drivers/gpio/gpio-ep93xx.c
++++ b/drivers/gpio/gpio-ep93xx.c
+@@ -308,6 +308,21 @@ static int ep93xx_gpio_set_debounce(struct gpio_chip *chip,
+ 	return 0;
+ }
+ 
++/*
++ * Map GPIO A0..A7  (0..7)  to irq 64..71,
++ *          B0..B7  (7..15) to irq 72..79, and
++ *          F0..F7 (16..24) to irq 80..87.
++ */
++static int ep93xx_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
++{
++	int gpio = chip->base + offset;
++
++	if (gpio > EP93XX_GPIO_LINE_MAX_IRQ)
++		return -EINVAL;
++
++	return 64 + gpio;
++}
++
+ static int ep93xx_gpio_add_bank(struct bgpio_chip *bgc, struct device *dev,
+ 	void __iomem *mmio_base, struct ep93xx_gpio_bank *bank)
+ {
+@@ -322,8 +337,10 @@ static int ep93xx_gpio_add_bank(struct bgpio_chip *bgc, struct device *dev,
+ 	bgc->gc.label = bank->label;
+ 	bgc->gc.base = bank->base;
+ 
+-	if (bank->has_debounce)
++	if (bank->has_debounce) {
+ 		bgc->gc.set_debounce = ep93xx_gpio_set_debounce;
++		bgc->gc.to_irq = ep93xx_gpio_to_irq;
++	}
+ 
+ 	return gpiochip_add(&bgc->gc);
+ }
