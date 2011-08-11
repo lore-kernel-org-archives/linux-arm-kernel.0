@@ -1,150 +1,74 @@
-From: j-keerthy@ti.com (J, KEERTHY)
-Date: Thu, 11 Aug 2011 20:02:55 +0530
-Subject: [RFC PATCH 6/6] hwmon: OMAP4: On die temperature sensor driver
-In-Reply-To: <20110811141248.GK28500@legolas.emea.dhcp.ti.com>
-References: <1312979122-5896-1-git-send-email-j-keerthy@ti.com>
-	<1312979122-5896-7-git-send-email-j-keerthy@ti.com>
-	<20110810124629.GJ12882@legolas.emea.dhcp.ti.com>
-	<CAJ6a13Z=u=exWUHLotw8jpHMv-hKpE+fvg_1hq7=gtMiuJKxOA@mail.gmail.com>
-	<20110811103658.GG27742@legolas.emea.dhcp.ti.com>
-	<CAJ6a13bxg8po-Csc10LsFH-oES4YOKkqFoTm3kG4XzS=b2boMw@mail.gmail.com>
-	<20110811141248.GK28500@legolas.emea.dhcp.ti.com>
-Message-ID: <CAJ6a13b7qu3K4YJPTYych_NQxLuuUxZOQg6PPC_=XA+qiwn2RA@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 11 Aug 2011 16:48:54 +0200
+Subject: [PATCH V2 6/6] spi/spi-pl022: Request/free DMA channels as and
+	when required.
+In-Reply-To: <CABb+yY0G_OeVgQs4ySVMQBcBh2q=nUhj+U+=tZG751WT9qRYuA@mail.gmail.com>
+References: <cover.1312965741.git.viresh.kumar@st.com>
+	<566c0525199f498f04422d4c3b2ddd7466648c20.1312965742.git.viresh.kumar@st.com>
+	<20110810090042.GE1831@n2100.arm.linux.org.uk>
+	<4E424F7B.2000800@st.com>
+	<438BB0150E931F4B9CE701519A4463010871804A15@bgsmsx502.gar.corp.intel.com>
+	<CABb+yY3SnqKN78U7vLbom1i00m=ThnRVQDVM_iX1TPu=+XzSNQ@mail.gmail.com>
+	<20110810104025.GK1831@n2100.arm.linux.org.uk>
+	<CABb+yY3=q5Nq1wtM6Av2DrgUfjZR_Ao40QhBhv_ik9naAd5wRg@mail.gmail.com>
+	<CACRpkdaCyUJ3A9VWfsVuwJj3DGVkvjc2_ZOD4yM4YX3NPxAAYQ@mail.gmail.com>
+	<CABb+yY2Usd5=RW6BV69UW=Tq0zQW6LCtT2GhfdHGA61ZU3aNcQ@mail.gmail.com>
+	<CAKnu2Mo=9wusKrc7DeL9fk-fq3pY1D3WKHXYmo+b9w5GbyzegA@mail.gmail.com>
+	<CABb+yY0G_OeVgQs4ySVMQBcBh2q=nUhj+U+=tZG751WT9qRYuA@mail.gmail.com>
+Message-ID: <CAKnu2MptC8HWCNo6W+X9rawn6MCwAe3DB3B5UcHD1tCD9tA2cg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 11, 2011 at 7:42 PM, Felipe Balbi <balbi@ti.com> wrote:
-> Hi,
->
-> On Thu, Aug 11, 2011 at 06:30:04PM +0530, J, KEERTHY wrote:
->> >> >> diff --git a/drivers/hwmon/omap_temp_sensor.c b/drivers/hwmon/omap_temp_sensor.c
->> >> >> new file mode 100644
->> >> >> index 0000000..15e2559
->> >> >> --- /dev/null
->> >> >> +++ b/drivers/hwmon/omap_temp_sensor.c
->> >> >> @@ -0,0 +1,950 @@
->> >> >> +/*
->> >> >> + * OMAP4 Temperature sensor driver file
->> >> >> + *
->> >> >> + * Copyright (C) 2011 Texas Instruments Incorporated - http://www.ti.com/
->> >> >> + * Author: J Keerthy <j-keerthy@ti.com>
->> >> >> + * Author: Moiz Sonasath <m-sonasath@ti.com>
->> >> >> + *
->> >> >> + * This program is free software; you can redistribute it and/or
->> >> >> + * modify it under the terms of the GNU General Public License
->> >> >> + * version 2 as published by the Free Software Foundation.
->> >> >> + *
->> >> >> + * This program is distributed in the hope that it will be useful, but
->> >> >> + * WITHOUT ANY WARRANTY; without even the implied warranty of
->> >> >> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. ?See the GNU
->> >> >> + * General Public License for more details.
->> >> >> + *
->> >> >> + * You should have received a copy of the GNU General Public License
->> >> >> + * along with this program; if not, write to the Free Software
->> >> >> + * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
->> >> >> + * 02110-1301 USA
->> >> >> + *
->> >> >> + */
->> >> >> +
->> >> >> +#include <linux/interrupt.h>
->> >> >> +#include <linux/clk.h>
->> >> >
->> >> > why ??
->> >>
->> >> Clock rate setting functions.
->> >
->> > you shouldn't need in drivers.
+2011/8/11 Jassi Brar <jassisinghbrar@gmail.com>:
+
+> Do you have any reason for using device pointer and strings, other
+> than just "because clock and regulator use them" ??
+
+Basically no.
+
+But I think these frameworks are very workable and proven
+to work in practice. So I like them.
+
+When setting up the platform the coder would to be aware
+that there are totally orthogonal concepts, which IMO
+makes things complicated.
+
+>>> Do you propose to implement a string parser in the core ?!
 >>
->> It is a one time setting of the rate so keeping it in drivers.
+>> Yes, the clock and regulator framework already does that.
+>> But it is only used when you cannot pass in a struct device *
+>> directly, like from device tree.
 >
-> you need some other way to handle this. Why do you need to manually set
-> the rate rather than having hwmod handle this for you ?
->
-> your argument that "it's a one time setting" is not enough to have this
-> in the driver. Drivers should not care about clocks anymore, this should
-> have been done on another layer.
+> Dude, I have utter disrespect for using strings in a case such as
+> expressing requirements.
 
-Hwmod will have no idea on the rate required.
+It's mainly a strcmp(), and it's only comparing to the
+well-established namespace that all devices have anyway,
+due to the way the device model is done.
 
->
->> >> >> +#include <linux/delay.h>
->> >> >> +#include <linux/slab.h>
->> >> >> +#include <linux/platform_device.h>
->> >> >> +#include <linux/init.h>
->> >> >> +#include <plat/omap_device.h>
->> >> >
->> >> > why ??
->> >> >
->> >>
->> >> Context loss count
->> >
->> > shouldn't use in drivers.
->>
->> I guess already mmc and display are using
->> omap_pm_get_dev_context_loss_count but are
->> populating this function in pdata as a function pointer.
->> I will add that code.
->
-> at least ;-) better than accessing that function directly. But think
-> carefully how you will make this work when we move to DT.
+Basically when binding clocks or regulators it's:
 
-Ok
+struct device *dev;
+strcmp(map_string, dev_name(dev));
 
->
->> >> >> +#include <plat/temperature_sensor.h>
->> >> >
->> >>
->> >> It is the header file with the structure definitions
->> >> used in the driver.
->> >
->> > why don't you put in <linux/platform_data/....> ??
->>
->> I saw many omap specific header files in plat-omap/include/plat.
->> Any specific reason behind placing the header in linux/platform_data?
->
-> because it's not a good idea to perpetuate the failure.
+By this time struct device exist of course, since
+it's the device driver calling to get its clock/regulator.
 
-May be Tony can give some inputs on where the OMAP specific header
-should be placed.
+dev_name() comes from <linux/device.h> and basically
+takes the kobject name or an optional initilizer name
+for the device. So the names are pretty static, you don't
+need to parse them, just compare.
 
->
->> >> >> +#include <mach/ctrl_module_core_44xx.h>
->> >> >
->> >> > why ?
->> >>
->> >> It will be removed
->> >>
->> >> >
->> >> >> +#include <mach/gpio.h>
->> >> >
->> >> > linux/gpio.h for crying out loud... how many times Russell has to say
->> >> > the exact same thing ??????
->> >> >
->> >>
->> >> It will be removed
->> >
->> > oh, you don't even use any gpio ? Why do you blindly add so many headers
->> > if you don't need them ???
->>
->> It is not required.
->
-> this is my point, be careful when adding new drivers... You're consuming
-> "review bandwidth" when you send code/patch/new-drivers and reviewers
-> are part of an endangered species. If you keep on making such silly
-> mistakes, you consume time from reviewers to let you know about things
-> which are obvious, to say the least. So be careful when sending code,
-> nobody is perfect, for sure, but by being careful you can help your code
-> being accepted earlier.
+> I have already explained how we can easily and in a _better_ way
+> do without them (again see my last reply to Vindo's setup).
+> Tell me 1 reason why using strings, in this case, would be better ?
 
-My Bad. I will take care of this.
+I have no other reasons than the above.
 
->
-> --
-> balbi
->
+People like Russell (clkdevice) and Liam Girdwood (regulator)
+who I know are smarter than me and have worked with
+these subsystems for years choose that model, so I trust
+their judgement.
 
-
-
--- 
-Regards and Thanks,
-Keerthy
+Thanks,
+Linus Walleij
