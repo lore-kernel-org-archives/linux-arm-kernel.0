@@ -1,61 +1,38 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 11 Aug 2011 16:11:05 +0900
-Subject: [GIT PULL] samsung: fixes for v3.1-rc1
-In-Reply-To: <20110811065837.GA4989@july>
-References: <20110811065837.GA4989@july>
-Message-ID: <015001cc57f5$d7e847f0$87b8d7d0$%kim@samsung.com>
+Date: Thu, 11 Aug 2011 16:26:53 +0900
+Subject: [PATCH V5 00/15] To use DMA generic APIs for Samsung DMA
+In-Reply-To: <1312821923.1539.37.camel@vkoul-udesk3>
+References: <1311744697-10264-1-git-send-email-boojin.kim@samsung.com>
+	<CACRpkdZvbH1O608n_aa_nVi-Onhmt0Ay6X1yCgBVNES4o9hTrA@mail.gmail.com>
+	<1312821923.1539.37.camel@vkoul-udesk3>
+Message-ID: <015101cc57f8$0d7b1da0$287158e0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kyungmin Park wrote:
+Koul, Vinod wrote:
 > 
-> The following changes since commit
-> 322a8b034003c0d46d39af85bf24fee27b902f48:
+> On Thu, 2011-08-04 at 18:53 +0200, Linus Walleij wrote:
+> > On Wed, Jul 27, 2011 at 7:31 AM, Boojin Kim <boojin.kim@samsung.com> wrote:
+> >
+> > > This patchset adds support DMA generic APIs for Samsung DMA.
+> >
+> > Patches look good to me,
+> > Acked-by: Linus Walleij <linus.walleij@linaro.org>
 > 
->   Linux 3.1-rc1 (2011-08-07 18:23:30 -0700)
+> Acked-by: Vinod Koul <vinod.koul@intel.com>
 > 
-> are available in the git repository at:
->   git://git.infradead.org/users/kmpark/linux-2.6-samsung for-arnd
-> 
-> Kyungmin Park (2):
->       ARM: exynos4: universal: Use the correct regulator names
->       ARM: exynos4: Use nr_irqs instead of NR_IRQS
-> 
-> Marek Szyprowski (5):
->       ARM: Exynos4: add required chained_irq_enter/exit to eint code
->       ARM: Samsung: Add chained enrty/exit call to timer interrupt handler
->       ARM: S5P: add required chained_irq_enter/exit to gpio-int code
->       ARM: Exynos4: use s5p-timer for UniversalC210 board
->       ARM: Samsung: fix watchdog reset issue with clk_get()
-> 
-> Sylwester Nawrocki (1):
->       ARM: EXYNOS4: Fix the IRQ definitions for MIPI CSIS device
-> 
->  arch/arm/mach-exynos4/Kconfig                      |    3 +++
->  arch/arm/mach-exynos4/clock.c                      |    1 +
->  arch/arm/mach-exynos4/include/mach/irqs.h          |    5 ++---
->  arch/arm/mach-exynos4/irq-combiner.c               |    2 +-
->  arch/arm/mach-exynos4/irq-eint.c                   |    7 +++++++
->  arch/arm/mach-exynos4/mach-universal_c210.c        |    8 +++++---
->  arch/arm/mach-s3c2412/clock.c                      |    1 +
->  arch/arm/mach-s3c2416/clock.c                      |    2 +-
->  arch/arm/mach-s3c2443/clock.c                      |    1 +
->  arch/arm/mach-s3c64xx/clock.c                      |    1 +
->  arch/arm/mach-s5p64x0/cpu.c                        |    2 ++
->  arch/arm/mach-s5pc100/clock.c                      |    1 +
->  arch/arm/mach-s5pv210/clock.c                      |    1 +
->  arch/arm/plat-s3c24xx/s3c2410-clock.c              |    1 +
->  arch/arm/plat-s5p/irq-gpioint.c                    |    6 ++++++
->  arch/arm/plat-samsung/clock.c                      |    9 +++++++++
->  arch/arm/plat-samsung/include/plat/clock.h         |    2 ++
->  .../arm/plat-samsung/include/plat/watchdog-reset.h |   10 +++-------
->  arch/arm/plat-samsung/irq-vic-timer.c              |    5 +++++
->  19 files changed, 53 insertions(+), 15 deletions(-)
+> Do you want these to go thru slave-dma tree or arm tree, I am okay with
+> either...
 
-No, if above is required, I think, this should be handled from me not you.
+Hi Vinod,
 
-Don't make a complete confusion between your board and Samsung architecture
-maintainer.
+Thanks.
+
+I'd like to keep its topic branch in my tree to avoid conflicts with other samsung stuff and I think, it should be merged into your slave-dma tree also for same reason.
+
+git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git #next/topic-dma-pl330
+
+Or if you want to make some branch for it in your tree, please let me know so that I can merge it in my tree also.
 
 Thanks.
 
