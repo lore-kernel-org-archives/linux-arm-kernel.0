@@ -1,36 +1,60 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 11 Aug 2011 21:55:59 +0300
-Subject: [RFC PATCH 6/6] hwmon: OMAP4: On die temperature sensor driver
-In-Reply-To: <20110811185408.GB15970@legolas.emea.dhcp.ti.com>
-References: <1312979122-5896-1-git-send-email-j-keerthy@ti.com>
-	<1312979122-5896-7-git-send-email-j-keerthy@ti.com>
-	<20110810124629.GJ12882@legolas.emea.dhcp.ti.com>
-	<CAJ6a13Z=u=exWUHLotw8jpHMv-hKpE+fvg_1hq7=gtMiuJKxOA@mail.gmail.com>
-	<20110811103658.GG27742@legolas.emea.dhcp.ti.com>
-	<CAJ6a13bxg8po-Csc10LsFH-oES4YOKkqFoTm3kG4XzS=b2boMw@mail.gmail.com>
-	<20110811141248.GK28500@legolas.emea.dhcp.ti.com>
-	<CAJ6a13b7qu3K4YJPTYych_NQxLuuUxZOQg6PPC_=XA+qiwn2RA@mail.gmail.com>
-	<20110811185408.GB15970@legolas.emea.dhcp.ti.com>
-Message-ID: <20110811185558.GC15970@legolas.emea.dhcp.ti.com>
+Date: Thu, 11 Aug 2011 21:50:30 +0300
+Subject: [PATCH 11/13] ARM: gpio: consolidate trivial gpiolib
+	implementations
+In-Reply-To: <20110811150718.GA4924@n2100.arm.linux.org.uk>
+References: <20110809080411.GA1831@n2100.arm.linux.org.uk>
+	<E1QqhM1-0003af-U5@rmk-PC.arm.linux.org.uk>
+	<20110811141528.GL28500@legolas.emea.dhcp.ti.com>
+	<20110811150718.GA4924@n2100.arm.linux.org.uk>
+Message-ID: <20110811185029.GA15970@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Thu, Aug 11, 2011 at 09:54:09PM +0300, Felipe Balbi wrote:
-> > > you need some other way to handle this. Why do you need to manually set
-> > > the rate rather than having hwmod handle this for you ?
-> > >
-> > > your argument that "it's a one time setting" is not enough to have this
-> > > in the driver. Drivers should not care about clocks anymore, this should
-> > > have been done on another layer.
+On Thu, Aug 11, 2011 at 04:07:18PM +0100, Russell King - ARM Linux wrote:
+> On Thu, Aug 11, 2011 at 05:15:31PM +0300, Felipe Balbi wrote:
+> > On Tue, Aug 09, 2011 at 09:08:01AM +0100, Russell King - ARM Linux wrote:
+> > > diff --git a/arch/arm/include/asm/gpio.h b/arch/arm/include/asm/gpio.h
+> > > index 166a7a3..15e8970 100644
+> > > --- a/arch/arm/include/asm/gpio.h
+> > > +++ b/arch/arm/include/asm/gpio.h
+> > > @@ -4,4 +4,14 @@
+> > >  /* not all ARM platforms necessarily support this API ... */
+> > >  #include <mach/gpio.h>
+> > >  
+> > > +#ifdef __ARM_GPIOLIB_TRIVIAL
+> > > +/* Note: this may rely upon the value of ARCH_NR_GPIOS set in mach/gpio.h */
+> > > +#include <asm-generic/gpio.h>
+> > > +
+> > > +/* The trivial gpiolib dispatchers */
+> > > +#define gpio_get_value  __gpio_get_value
+> > > +#define gpio_set_value  __gpio_set_value
+> > > +#define gpio_cansleep   __gpio_cansleep
+> > > +#endif
 > > 
-> > Hwmod will have no idea on the rate required.
+> > could that be a selectable symbol ? Something like:
+> > 
+> > CONFIG_HAS_ARM_TRIVIAL_GPIO
+> > 
+> > then on Kconfig you just:
+> > 
+> > select HAS_ARM_TIVIAL_GPIO or something ?
 > 
-> does the rate need to change ? Also, I have not mentioned hwmod anytime
+> That makes things more complicated, because that involves digging through
+> a lot of platform code in a couple of places to work out exactly when we
+> need this - and it crosses the boundary to arch/sh too.
+> 
+> So I'd prefer to keep this simple.
+> 
+> The long-term goal is to remove that symbol entirely, but in order to do
+> that we need to kill of the "optimized" on-board SoC stuff in those (few)
+> gpio.h which don't have the symbol selected.  This is rather necessary to
+> progress towards the consolidated kernel.  (Re-inventing gpiolib by moving
+> them out of line isn't a good idea...)
 
-i did mention hwmod, nevermind that part. Still I'm not sure where is
-the right place to handle this.
+Ok, I understand.
 
 -- 
 balbi
@@ -40,4 +64,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 490 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110811/c455d781/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110811/e3ddd6ae/attachment.sig>
