@@ -1,67 +1,65 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 11 Aug 2011 21:50:30 +0300
-Subject: [PATCH 11/13] ARM: gpio: consolidate trivial gpiolib
-	implementations
-In-Reply-To: <20110811150718.GA4924@n2100.arm.linux.org.uk>
-References: <20110809080411.GA1831@n2100.arm.linux.org.uk>
-	<E1QqhM1-0003af-U5@rmk-PC.arm.linux.org.uk>
-	<20110811141528.GL28500@legolas.emea.dhcp.ti.com>
-	<20110811150718.GA4924@n2100.arm.linux.org.uk>
-Message-ID: <20110811185029.GA15970@legolas.emea.dhcp.ti.com>
+From: grgupta@ti.com (Gupta, Ramesh)
+Date: Thu, 11 Aug 2011 14:28:39 -0500
+Subject: [PATCH] OMAP: iommu flush page table entries from L1 and L2 cache
+In-Reply-To: <BANLkTikKnE-9WncNCADKfZVqkP1LFPYeXA@mail.gmail.com>
+References: <1302817968-28516-1-git-send-email-fernando.lugo@ti.com>
+	<20110414223036.GA7335@n2100.arm.linux.org.uk>
+	<BANLkTin8gugnVoai6VHC7qMgK4eKRXRtHg@mail.gmail.com>
+	<20110428134055.GA19709@n2100.arm.linux.org.uk>
+	<BANLkTikKnE-9WncNCADKfZVqkP1LFPYeXA@mail.gmail.com>
+Message-ID: <CADysL2bp08WP798_MvUJthGi9ACySDE=Dc_BM9Vd0A=YcKpm+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Russel,
 
-On Thu, Aug 11, 2011 at 04:07:18PM +0100, Russell King - ARM Linux wrote:
-> On Thu, Aug 11, 2011 at 05:15:31PM +0300, Felipe Balbi wrote:
-> > On Tue, Aug 09, 2011 at 09:08:01AM +0100, Russell King - ARM Linux wrote:
-> > > diff --git a/arch/arm/include/asm/gpio.h b/arch/arm/include/asm/gpio.h
-> > > index 166a7a3..15e8970 100644
-> > > --- a/arch/arm/include/asm/gpio.h
-> > > +++ b/arch/arm/include/asm/gpio.h
-> > > @@ -4,4 +4,14 @@
-> > >  /* not all ARM platforms necessarily support this API ... */
-> > >  #include <mach/gpio.h>
-> > >  
-> > > +#ifdef __ARM_GPIOLIB_TRIVIAL
-> > > +/* Note: this may rely upon the value of ARCH_NR_GPIOS set in mach/gpio.h */
-> > > +#include <asm-generic/gpio.h>
-> > > +
-> > > +/* The trivial gpiolib dispatchers */
-> > > +#define gpio_get_value  __gpio_get_value
-> > > +#define gpio_set_value  __gpio_set_value
-> > > +#define gpio_cansleep   __gpio_cansleep
-> > > +#endif
-> > 
-> > could that be a selectable symbol ? Something like:
-> > 
-> > CONFIG_HAS_ARM_TRIVIAL_GPIO
-> > 
-> > then on Kconfig you just:
-> > 
-> > select HAS_ARM_TIVIAL_GPIO or something ?
-> 
-> That makes things more complicated, because that involves digging through
-> a lot of platform code in a couple of places to work out exactly when we
-> need this - and it crosses the boundary to arch/sh too.
-> 
-> So I'd prefer to keep this simple.
-> 
-> The long-term goal is to remove that symbol entirely, but in order to do
-> that we need to kill of the "optimized" on-board SoC stuff in those (few)
-> gpio.h which don't have the symbol selected.  This is rather necessary to
-> progress towards the consolidated kernel.  (Re-inventing gpiolib by moving
-> them out of line isn't a good idea...)
 
-Ok, I understand.
+On Thu, Apr 28, 2011 at 11:48 AM, Gupta, Ramesh <grgupta@ti.com> wrote:
+> Hi Russel,
+>
+> On Thu, Apr 28, 2011 at 8:40 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+>> On Fri, Apr 15, 2011 at 06:26:40AM -0500, Gupta, Ramesh wrote:
+>>> Russell,
+>>>
+>>> On Thu, Apr 14, 2011 at 5:30 PM, Russell King - ARM Linux
+>>> <linux@arm.linux.org.uk> wrote:
+>>> > On Thu, Apr 14, 2011 at 04:52:48PM -0500, Fernando Guzman Lugo wrote:
+>>> >> From: Ramesh Gupta <grgupta@ti.com>
+>>> >>
+>>> >> This patch is to flush the iommu page table entries from L1 and L2
+>>> >> caches using dma_map_single. This also simplifies the implementation
+>>> >> by removing the functions ?flush_iopgd_range/flush_iopte_range.
+>>> >
+>>> > No. ?This usage is just wrong. ?If you're going to use the DMA API then
+>>> > unmap it, otherwise the DMA API debugging will go awol.
+>>> >
+>>>
+>>> Thank you for the comments, this particular memory is always a write
+>>> from the A9 for MMU programming and
+>>> only read from the slave processor, that is the reason for not calling
+>>> the unmap. I can re-look into the changes to call
+>>> unmap in a proper way as this impacts the DMA API.
+>>> Are there any other ways to perform only flush the memory from L1/L2 caches?
+>>
+>> We _could_ invent a new API to deal with this, which is probably going
+>> to be far better in the longer term for page table based iommus. ?That's
+>> going to need some thought - eg, do we need to pass a struct device
+>> argument for the iommu cache flushing so we know whether we need to flush
+>> or not (eg, if we have cache coherent iommus)...
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 490 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110811/e3ddd6ae/attachment.sig>
+my apologies for a late mail on this topic.
+
+do you think of any other requirements for this new API?
+
+Could we use the existing dmac_flush_range(), outer_flush_range()
+for this purpose instead of a new API?
+
+I see a comment in the arch/arm/include/asm/cacheflush.h
+for  _not_ to use these APIs directly, but I am not really understand
+the reason for that.
+
+I would appreciate any inputs on this.
+
+thank you and regards
+Ramesh Gupta G
