@@ -1,86 +1,31 @@
-From: leoy@marvell.com (Leo Yan)
-Date: Thu, 11 Aug 2011 10:32:01 +0800
-Subject: [PATCH 2/2] ARM: mmp: register audio sram bank
-In-Reply-To: <1313029921-32227-1-git-send-email-leoy@marvell.com>
-References: <1313029921-32227-1-git-send-email-leoy@marvell.com>
-Message-ID: <1313029921-32227-3-git-send-email-leoy@marvell.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Thu, 11 Aug 2011 10:41:04 +0800
+Subject: [GIT PULL] pxa: fixes for v3.1-rc1
+Message-ID: <CAMPhdO9JhjJVccSM-tk2hBfvVGUsHQPi1F_g4kxhRP+cHWp+gQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MMP platform has sram for the audio island;
-Add the device structure for the audio sram,
-and register the audio sram device at init phase.
+The following changes since commit 322a8b034003c0d46d39af85bf24fee27b902f48:
 
-Signed-off-by: Leo Yan <leoy@marvell.com>
----
- arch/arm/mach-mmp/brownstone.c        |    5 +++++
- arch/arm/mach-mmp/include/mach/mmp2.h |    7 +++++++
- arch/arm/mach-mmp/mmp2.c              |    1 +
- 3 files changed, 13 insertions(+), 0 deletions(-)
+  Linux 3.1-rc1 (2011-08-07 18:23:30 -0700)
 
-diff --git a/arch/arm/mach-mmp/brownstone.c b/arch/arm/mach-mmp/brownstone.c
-index c79162a..db4b5fd 100644
---- a/arch/arm/mach-mmp/brownstone.c
-+++ b/arch/arm/mach-mmp/brownstone.c
-@@ -186,6 +186,10 @@ static struct sdhci_pxa_platdata mmp2_sdh_platdata_mmc2 = {
- 		| PXA_FLAG_SD_8_BIT_CAPABLE_SLOT,
- };
- 
-+static struct sram_platdata mmp2_asram_platdata = {
-+	.pool_name	= "asram",
-+	.granularity	= SRAM_GRANULARITY,
-+};
- 
- static void __init brownstone_init(void)
- {
-@@ -197,6 +201,7 @@ static void __init brownstone_init(void)
- 	mmp2_add_twsi(1, NULL, ARRAY_AND_SIZE(brownstone_twsi1_info));
- 	mmp2_add_sdhost(0, &mmp2_sdh_platdata_mmc0); /* SD/MMC */
- 	mmp2_add_sdhost(2, &mmp2_sdh_platdata_mmc2); /* eMMC */
-+	mmp2_add_asram(&mmp2_asram_platdata);
- 
- 	/* enable 5v regulator */
- 	platform_device_register(&brownstone_v_5vp_device);
-diff --git a/arch/arm/mach-mmp/include/mach/mmp2.h b/arch/arm/mach-mmp/include/mach/mmp2.h
-index de7b888..c227328 100644
---- a/arch/arm/mach-mmp/include/mach/mmp2.h
-+++ b/arch/arm/mach-mmp/include/mach/mmp2.h
-@@ -13,6 +13,7 @@ extern void mmp2_clear_pmic_int(void);
- #include <linux/i2c.h>
- #include <linux/i2c/pxa-i2c.h>
- #include <mach/devices.h>
-+#include <mach/sram.h>
- 
- extern struct pxa_device_desc mmp2_device_uart1;
- extern struct pxa_device_desc mmp2_device_uart2;
-@@ -28,6 +29,7 @@ extern struct pxa_device_desc mmp2_device_sdh0;
- extern struct pxa_device_desc mmp2_device_sdh1;
- extern struct pxa_device_desc mmp2_device_sdh2;
- extern struct pxa_device_desc mmp2_device_sdh3;
-+extern struct pxa_device_desc mmp2_device_asram;
- 
- static inline int mmp2_add_uart(int id)
- {
-@@ -85,5 +87,10 @@ static inline int mmp2_add_sdhost(int id, struct sdhci_pxa_platdata *data)
- 	return pxa_register_device(d, data, sizeof(*data));
- }
- 
-+static inline int mmp2_add_asram(struct sram_platdata *data)
-+{
-+	return pxa_register_device(&mmp2_device_asram, data, sizeof(*data));
-+}
-+
- #endif /* __ASM_MACH_MMP2_H */
- 
-diff --git a/arch/arm/mach-mmp/mmp2.c b/arch/arm/mach-mmp/mmp2.c
-index 079c188..9d00754 100644
---- a/arch/arm/mach-mmp/mmp2.c
-+++ b/arch/arm/mach-mmp/mmp2.c
-@@ -226,4 +226,5 @@ MMP2_DEVICE(sdh0, "sdhci-pxav3", 0, MMC, 0xd4280000, 0x120);
- MMP2_DEVICE(sdh1, "sdhci-pxav3", 1, MMC2, 0xd4280800, 0x120);
- MMP2_DEVICE(sdh2, "sdhci-pxav3", 2, MMC3, 0xd4281000, 0x120);
- MMP2_DEVICE(sdh3, "sdhci-pxav3", 3, MMC4, 0xd4281800, 0x120);
-+MMP2_DEVICE(asram, "asram", -1, NONE, 0xe0000000, 0x4000);
- 
--- 
-1.7.4.1
+are available in the git repository at:
+  git://git.kernel.org/pub/scm/linux/kernel/git/ycmiao/pxa-linux-2.6.git fix
+
+Lennert Buytenhek (4):
+      ARM: pxa: fix logic error in PJ4 iWMMXt handling
+      ARM: mmp: Also start timer 1 on boot.
+      ARM: mmp: Switch to using timer 1 as clocksource timer.
+      ARM: mmp: Change the way we use timer 0 as clockevent timer.
+
+Tanmay Upadhyay (2):
+      ARM: pxa168/gplugd: get rid of mfp-gplugd.h
+      ARM: pxa168/gplugd: free correct GPIO
+
+ arch/arm/kernel/iwmmxt.S                    |    6 +-
+ arch/arm/mach-mmp/gplugd.c                  |   22 ++++++---
+ arch/arm/mach-mmp/include/mach/mfp-gplugd.h |   52 ----------------------
+ arch/arm/mach-mmp/include/mach/mfp-pxa168.h |   37 ++++++++++++++--
+ arch/arm/mach-mmp/time.c                    |   62 +++++++++++++++++++--------
+ 5 files changed, 94 insertions(+), 85 deletions(-)
+ delete mode 100644 arch/arm/mach-mmp/include/mach/mfp-gplugd.h
