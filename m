@@ -1,190 +1,56 @@
-From: banajit.g@samsung.com (Banajit Goswami)
-Date: Thu, 11 Aug 2011 21:08:13 +0530
-Subject: [PATCH] ARM: SAMSUNG: Consolidate common function to set SDHCI plat
-	data
-Message-ID: <1313077093-25157-1-git-send-email-banajit.g@samsung.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 11 Aug 2011 16:38:00 +0100
+Subject: Subject: L2x0 OF properties do not include interrupt #
+In-Reply-To: <4E43F5F8.4060704@gmail.com>
+References: <000201cc575b$c1229010$4367b030$@rutland@arm.com>
+	<201108101624.27881.arnd@arndb.de>
+	<20110810142808.GL10121@e102144-lin.cambridge.arm.com>
+	<201108111505.11887.arnd@arndb.de>
+	<20110811130910.GA10189@e102144-lin.cambridge.arm.com>
+	<4E43F5F8.4060704@gmail.com>
+Message-ID: <20110811153800.GC5154@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Moves similar functions to set SDHCI platform data for all Samsung
-boards to a common location, thereby saves a few lines.
+On Thu, Aug 11, 2011 at 04:32:08PM +0100, Rob Herring wrote:
+> On 08/11/2011 08:09 AM, Will Deacon wrote:
+> > On Thu, Aug 11, 2011 at 02:05:11PM +0100, Arnd Bergmann wrote:
+> >> On Wednesday 10 August 2011, Will Deacon wrote:
+> >>> I was hoping that it was possible to have separate properties which describe
+> >>> the interrupt. So you could have something like pmu-interrupt <75> and
+> >>> abort-interrupt <76> rather than interrupts <75, 76>.
+> >>
+> >> Ok, I see.
+> >>
+> >>> I've not played with DT bindings before though, so if it's usually done with
+> >>> an ordered list then so be it!
+> >>
+> >> A lot of the code assumes that the property is called 'interrupts' and that
+> >> it contains a fixed-length array of interrupt numbers, each for one specific
+> >> purpose.
+> > 
+> > Ok, I wondered if something like that might be the case.
+> > 
+> >> Given that we have so many different meanings for the interrupts, I'm
+> >> not sure how this would work best in this case. According to
+> >> http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0246f/CHDFHCFJ.html
+> >> this looks like a nested interrupt controller, i.e. the L2CC has its own mask
+> >> and status register with bits for each one of them. We could model these by
+> >> describing the l2cc interrupt controller with these registers and listing all
+> >> nine of the current inputs. I suspect however that it would be easier to just
+> >> assume that there is only one line for now, and treat the l2cc as a single
+> >> interrupt source with an internal status register.
+> > 
+> > Given that this binding is only for the l2x0 / pl310 and I don't know of any
+> > implementation where > 1 interrupt line is wired up, I'm happy to assume a
+> > single combined interrupt line for now.
+> > 
+> 
+> I know of one. Although, we have the combined interrupt as well. The
+> binding should allow either way and specify the order. If the event
+> counter interrupt is 1st, then it should be the same to s/w.
 
-Signed-off-by: Banajit Goswami <banajit.g@samsung.com>
----
- arch/arm/plat-samsung/dev-hsmmc.c          |   19 +------------------
- arch/arm/plat-samsung/dev-hsmmc1.c         |   19 +------------------
- arch/arm/plat-samsung/dev-hsmmc2.c         |   19 +------------------
- arch/arm/plat-samsung/dev-hsmmc3.c         |   19 +------------------
- arch/arm/plat-samsung/include/plat/sdhci.h |    7 +++++++
- arch/arm/plat-samsung/platformdata.c       |   22 ++++++++++++++++++++++
- 6 files changed, 33 insertions(+), 72 deletions(-)
+You mean putting the combined interrupt first? If so, we may as well just
+specify that until somebody builds a platform that doesn't have it.
 
-diff --git a/arch/arm/plat-samsung/dev-hsmmc.c b/arch/arm/plat-samsung/dev-hsmmc.c
-index db7a65c..06825c4 100644
---- a/arch/arm/plat-samsung/dev-hsmmc.c
-+++ b/arch/arm/plat-samsung/dev-hsmmc.c
-@@ -58,22 +58,5 @@ struct platform_device s3c_device_hsmmc0 = {
- 
- void s3c_sdhci0_set_platdata(struct s3c_sdhci_platdata *pd)
- {
--	struct s3c_sdhci_platdata *set = &s3c_hsmmc0_def_platdata;
--
--	set->cd_type = pd->cd_type;
--	set->ext_cd_init = pd->ext_cd_init;
--	set->ext_cd_cleanup = pd->ext_cd_cleanup;
--	set->ext_cd_gpio = pd->ext_cd_gpio;
--	set->ext_cd_gpio_invert = pd->ext_cd_gpio_invert;
--
--	if (pd->max_width)
--		set->max_width = pd->max_width;
--	if (pd->cfg_gpio)
--		set->cfg_gpio = pd->cfg_gpio;
--	if (pd->cfg_card)
--		set->cfg_card = pd->cfg_card;
--	if (pd->host_caps)
--		set->host_caps |= pd->host_caps;
--	if (pd->clk_type)
--		set->clk_type = pd->clk_type;
-+	s3c_sdhci_set_platdata(pd, &s3c_hsmmc0_def_platdata);
- }
-diff --git a/arch/arm/plat-samsung/dev-hsmmc1.c b/arch/arm/plat-samsung/dev-hsmmc1.c
-index 2497321..4524ef4 100644
---- a/arch/arm/plat-samsung/dev-hsmmc1.c
-+++ b/arch/arm/plat-samsung/dev-hsmmc1.c
-@@ -58,22 +58,5 @@ struct platform_device s3c_device_hsmmc1 = {
- 
- void s3c_sdhci1_set_platdata(struct s3c_sdhci_platdata *pd)
- {
--	struct s3c_sdhci_platdata *set = &s3c_hsmmc1_def_platdata;
--
--	set->cd_type = pd->cd_type;
--	set->ext_cd_init = pd->ext_cd_init;
--	set->ext_cd_cleanup = pd->ext_cd_cleanup;
--	set->ext_cd_gpio = pd->ext_cd_gpio;
--	set->ext_cd_gpio_invert = pd->ext_cd_gpio_invert;
--
--	if (pd->max_width)
--		set->max_width = pd->max_width;
--	if (pd->cfg_gpio)
--		set->cfg_gpio = pd->cfg_gpio;
--	if (pd->cfg_card)
--		set->cfg_card = pd->cfg_card;
--	if (pd->host_caps)
--		set->host_caps |= pd->host_caps;
--	if (pd->clk_type)
--		set->clk_type = pd->clk_type;
-+	s3c_sdhci_set_platdata(pd, &s3c_hsmmc1_def_platdata);
- }
-diff --git a/arch/arm/plat-samsung/dev-hsmmc2.c b/arch/arm/plat-samsung/dev-hsmmc2.c
-index f60aedb..9cede96 100644
---- a/arch/arm/plat-samsung/dev-hsmmc2.c
-+++ b/arch/arm/plat-samsung/dev-hsmmc2.c
-@@ -59,22 +59,5 @@ struct platform_device s3c_device_hsmmc2 = {
- 
- void s3c_sdhci2_set_platdata(struct s3c_sdhci_platdata *pd)
- {
--	struct s3c_sdhci_platdata *set = &s3c_hsmmc2_def_platdata;
--
--	set->cd_type = pd->cd_type;
--	set->ext_cd_init = pd->ext_cd_init;
--	set->ext_cd_cleanup = pd->ext_cd_cleanup;
--	set->ext_cd_gpio = pd->ext_cd_gpio;
--	set->ext_cd_gpio_invert = pd->ext_cd_gpio_invert;
--
--	if (pd->max_width)
--		set->max_width = pd->max_width;
--	if (pd->cfg_gpio)
--		set->cfg_gpio = pd->cfg_gpio;
--	if (pd->cfg_card)
--		set->cfg_card = pd->cfg_card;
--	if (pd->host_caps)
--		set->host_caps |= pd->host_caps;
--	if (pd->clk_type)
--		set->clk_type = pd->clk_type;
-+	s3c_sdhci_set_platdata(pd, &s3c_hsmmc2_def_platdata);
- }
-diff --git a/arch/arm/plat-samsung/dev-hsmmc3.c b/arch/arm/plat-samsung/dev-hsmmc3.c
-index ede776f..0358ef4 100644
---- a/arch/arm/plat-samsung/dev-hsmmc3.c
-+++ b/arch/arm/plat-samsung/dev-hsmmc3.c
-@@ -62,22 +62,5 @@ struct platform_device s3c_device_hsmmc3 = {
- 
- void s3c_sdhci3_set_platdata(struct s3c_sdhci_platdata *pd)
- {
--	struct s3c_sdhci_platdata *set = &s3c_hsmmc3_def_platdata;
--
--	set->cd_type = pd->cd_type;
--	set->ext_cd_init = pd->ext_cd_init;
--	set->ext_cd_cleanup = pd->ext_cd_cleanup;
--	set->ext_cd_gpio = pd->ext_cd_gpio;
--	set->ext_cd_gpio_invert = pd->ext_cd_gpio_invert;
--
--	if (pd->max_width)
--		set->max_width = pd->max_width;
--	if (pd->cfg_gpio)
--		set->cfg_gpio = pd->cfg_gpio;
--	if (pd->cfg_card)
--		set->cfg_card = pd->cfg_card;
--	if (pd->host_caps)
--		set->host_caps |= pd->host_caps;
--	if (pd->clk_type)
--		set->clk_type = pd->clk_type;
-+	s3c_sdhci_set_platdata(pd, &s3c_hsmmc3_def_platdata);
- }
-diff --git a/arch/arm/plat-samsung/include/plat/sdhci.h b/arch/arm/plat-samsung/include/plat/sdhci.h
-index 058e096..20dc81c 100644
---- a/arch/arm/plat-samsung/include/plat/sdhci.h
-+++ b/arch/arm/plat-samsung/include/plat/sdhci.h
-@@ -86,6 +86,13 @@ struct s3c_sdhci_platdata {
- 			    struct mmc_card *card);
- };
- 
-+/* s3c_sdhci_set_platdata() - common helper for setting SDHCI platform data
-+ * @pd: The default platform data for this device.
-+ * @set: Pointer to the platform data to fill in.
-+ */
-+extern void s3c_sdhci_set_platdata(struct s3c_sdhci_platdata *pd,
-+				struct s3c_sdhci_platdata *set);
-+
- /**
-  * s3c_sdhci0_set_platdata - Set platform data for S3C SDHCI device.
-  * @pd: Platform data to register to device.
-diff --git a/arch/arm/plat-samsung/platformdata.c b/arch/arm/plat-samsung/platformdata.c
-index 7cf2e1e..27bec0a 100644
---- a/arch/arm/plat-samsung/platformdata.c
-+++ b/arch/arm/plat-samsung/platformdata.c
-@@ -14,6 +14,7 @@
- #include <linux/platform_device.h>
- 
- #include <plat/devs.h>
-+#include <plat/sdhci.h>
- 
- void __init *s3c_set_platdata(void *pd, size_t pdsize,
- 			      struct platform_device *pdev)
-@@ -35,3 +36,24 @@ void __init *s3c_set_platdata(void *pd, size_t pdsize,
- 	pdev->dev.platform_data = npd;
- 	return npd;
- }
-+
-+void s3c_sdhci_set_platdata(struct s3c_sdhci_platdata *pd,
-+			struct s3c_sdhci_platdata *set)
-+{
-+	set->cd_type = pd->cd_type;
-+	set->ext_cd_init = pd->ext_cd_init;
-+	set->ext_cd_cleanup = pd->ext_cd_cleanup;
-+	set->ext_cd_gpio = pd->ext_cd_gpio;
-+	set->ext_cd_gpio_invert = pd->ext_cd_gpio_invert;
-+
-+	if (pd->max_width)
-+		set->max_width = pd->max_width;
-+	if (pd->cfg_gpio)
-+		set->cfg_gpio = pd->cfg_gpio;
-+	if (pd->cfg_card)
-+		set->cfg_card = pd->cfg_card;
-+	if (pd->host_caps)
-+		set->host_caps |= pd->host_caps;
-+	if (pd->clk_type)
-+		set->clk_type = pd->clk_type;
-+}
--- 
-1.7.2.3
+Will
