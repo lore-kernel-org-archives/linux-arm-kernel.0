@@ -1,797 +1,208 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 11 Aug 2011 13:36:59 +0300
-Subject: [RFC PATCH 6/6] hwmon: OMAP4: On die temperature sensor driver
-In-Reply-To: <CAJ6a13Z=u=exWUHLotw8jpHMv-hKpE+fvg_1hq7=gtMiuJKxOA@mail.gmail.com>
-References: <1312979122-5896-1-git-send-email-j-keerthy@ti.com>
-	<1312979122-5896-7-git-send-email-j-keerthy@ti.com>
-	<20110810124629.GJ12882@legolas.emea.dhcp.ti.com>
-	<CAJ6a13Z=u=exWUHLotw8jpHMv-hKpE+fvg_1hq7=gtMiuJKxOA@mail.gmail.com>
-Message-ID: <20110811103658.GG27742@legolas.emea.dhcp.ti.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 11 Aug 2011 20:47:18 +0900
+Subject: [PATCH 11/13] ARM: gpio: consolidate trivial gpiolib
+	implementations
+In-Reply-To: <E1QqhM1-0003af-U5@rmk-PC.arm.linux.org.uk>
+References: <20110809080411.GA1831@n2100.arm.linux.org.uk>
+	<E1QqhM1-0003af-U5@rmk-PC.arm.linux.org.uk>
+Message-ID: <017101cc581c$6e277530$4a765f90$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Aug 11, 2011 at 03:27:26PM +0530, J, KEERTHY wrote:
-> On Wed, Aug 10, 2011 at 6:16 PM, Felipe Balbi <balbi@ti.com> wrote:
-> > Hi,
-> >
-> > (why aren't below in Cc ?
+Russell King - ARM Linux wrote:
 > 
-> I will add them.
+> Consolidate 24 trivial gpiolib implementions out of mach/gpio.h
+> into asm/gpio.h.  This is basically the include of asm-generic/gpio.h
+> and the definition of gpio_get_value, gpio_set_value, and gpio_cansleep
+> as described in Documentation/gpio.txt
 > 
-> >
-> > HARDWARE MONITORING
-> > M: ? ? ?Jean Delvare <khali@linux-fr.org>
-> > M: ? ? ?Guenter Roeck <guenter.roeck@ericsson.com>
-> > L: ? ? ?lm-sensors at lm-sensors.org
-> > W: ? ? ?http://www.lm-sensors.org/
-> > T: ? ? ?quilt kernel.org/pub/linux/kernel/people/jdelvare/linux-2.6/jdelvare-hwmon/
-> > T: ? ? ?git git://git.kernel.org/pub/scm/linux/kernel/git/groeck/linux-staging.git
-> > S: ? ? ?Maintained
-> > F: ? ? ?Documentation/hwmon/
-> > F: ? ? ?drivers/hwmon/
-> > F: ? ? ?include/linux/hwmon*.h)
-> >
-> > On Wed, Aug 10, 2011 at 05:55:22PM +0530, Keerthy wrote:
-> >> On chip temperature sensor driver. The driver monitors the temperature of
-> >> the MPU subsystem of the OMAP4. It sends notifications to the user space if
-> >> the temperature crosses user defined thresholds via kobject_uevent interface.
-> >> The user is allowed to configure the temperature thresholds vis sysfs nodes
-> >> exposed using hwmon interface.
-> >>
-> >> Signed-off-by: Keerthy <j-keerthy@ti.com>
-> >> ---
-> >> ?drivers/hwmon/Kconfig ? ? ? ? ? ?| ? 11 +
-> >> ?drivers/hwmon/Makefile ? ? ? ? ? | ? ?1 +
-> >> ?drivers/hwmon/omap_temp_sensor.c | ?950 ++++++++++++++++++++++++++++++++++++++
-> >> ?3 files changed, 962 insertions(+), 0 deletions(-)
-> >> ?create mode 100644 drivers/hwmon/omap_temp_sensor.c
-> >>
-> >> diff --git a/drivers/hwmon/Kconfig b/drivers/hwmon/Kconfig
-> >> index 5f888f7..9c9cd8b 100644
-> >> --- a/drivers/hwmon/Kconfig
-> >> +++ b/drivers/hwmon/Kconfig
-> >> @@ -323,6 +323,17 @@ config SENSORS_F71805F
-> >> ? ? ? ? This driver can also be built as a module. ?If so, the module
-> >> ? ? ? ? will be called f71805f.
-> >>
-> >> +config SENSORS_OMAP_BANDGAP_TEMP_SENSOR
-> >> + ? ? bool "OMAP on-die temperature sensor hwmon driver"
-> >> + ? ? depends on HWMON && ARCH_OMAP && OMAP_TEMP_SENSOR
-> >> + ? ? help
-> >> + ? ? ? If you say yes here you get support for hardware
-> >> + ? ? ? monitoring features of the OMAP on die temperature
-> >> + ? ? ? sensor.
-> >> +
-> >> + ? ? ? Continuous conversion programmable delay
-> >> + ? ? ? mode is used for temperature conversion.
-> >> +
-> >> ?config SENSORS_F71882FG
-> >> ? ? ? tristate "Fintek F71882FG and compatibles"
-> >> ? ? ? help
-> >> diff --git a/drivers/hwmon/Makefile b/drivers/hwmon/Makefile
-> >> index 28061cf..d0f89f5 100644
-> >> --- a/drivers/hwmon/Makefile
-> >> +++ b/drivers/hwmon/Makefile
-> >> @@ -91,6 +91,7 @@ obj-$(CONFIG_SENSORS_MAX6639) ? ? ? += max6639.o
-> >> ?obj-$(CONFIG_SENSORS_MAX6642) ? ? ? ?+= max6642.o
-> >> ?obj-$(CONFIG_SENSORS_MAX6650) ? ? ? ?+= max6650.o
-> >> ?obj-$(CONFIG_SENSORS_MC13783_ADC)+= mc13783-adc.o
-> >> +obj-$(CONFIG_SENSORS_OMAP_BANDGAP_TEMP_SENSOR) ?+= omap_temp_sensor.o
-> >> ?obj-$(CONFIG_SENSORS_PC87360) ? ? ? ?+= pc87360.o
-> >> ?obj-$(CONFIG_SENSORS_PC87427) ? ? ? ?+= pc87427.o
-> >> ?obj-$(CONFIG_SENSORS_PCF8591) ? ? ? ?+= pcf8591.o
-> >> diff --git a/drivers/hwmon/omap_temp_sensor.c b/drivers/hwmon/omap_temp_sensor.c
-> >> new file mode 100644
-> >> index 0000000..15e2559
-> >> --- /dev/null
-> >> +++ b/drivers/hwmon/omap_temp_sensor.c
-> >> @@ -0,0 +1,950 @@
-> >> +/*
-> >> + * OMAP4 Temperature sensor driver file
-> >> + *
-> >> + * Copyright (C) 2011 Texas Instruments Incorporated - http://www.ti.com/
-> >> + * Author: J Keerthy <j-keerthy@ti.com>
-> >> + * Author: Moiz Sonasath <m-sonasath@ti.com>
-> >> + *
-> >> + * This program is free software; you can redistribute it and/or
-> >> + * modify it under the terms of the GNU General Public License
-> >> + * version 2 as published by the Free Software Foundation.
-> >> + *
-> >> + * This program is distributed in the hope that it will be useful, but
-> >> + * WITHOUT ANY WARRANTY; without even the implied warranty of
-> >> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. ?See the GNU
-> >> + * General Public License for more details.
-> >> + *
-> >> + * You should have received a copy of the GNU General Public License
-> >> + * along with this program; if not, write to the Free Software
-> >> + * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
-> >> + * 02110-1301 USA
-> >> + *
-> >> + */
-> >> +
-> >> +#include <linux/interrupt.h>
-> >> +#include <linux/clk.h>
-> >
-> > why ??
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+
+Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+on following Samsung stuff...
+
+As a note, there were duplicated e-mail address Grant and Nicolas in Cc ;)
+I just pushed 'reply all' :)
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+> ---
+>  arch/arm/include/asm/gpio.h                 |   10 ++++++++++
+...
+>  arch/arm/mach-exynos4/include/mach/gpio.h   |    5 +----
+...
+>  arch/arm/mach-s3c2410/include/mach/gpio.h   |    5 +----
+>  arch/arm/mach-s3c64xx/include/mach/gpio.h   |    6 +-----
+>  arch/arm/mach-s5p64x0/include/mach/gpio.h   |    6 +-----
+>  arch/arm/mach-s5pc100/include/mach/gpio.h   |    6 +-----
+>  arch/arm/mach-s5pv210/include/mach/gpio.h   |    6 +-----
 > 
-> Clock rate setting functions.
-
-you shouldn't need in drivers.
-
-> >> +#include <linux/io.h>
-> >> +#include <linux/debugfs.h>
-> >
-> > why ??
+> diff --git a/arch/arm/include/asm/gpio.h b/arch/arm/include/asm/gpio.h
+> index 166a7a3..15e8970 100644
+> --- a/arch/arm/include/asm/gpio.h
+> +++ b/arch/arm/include/asm/gpio.h
+> @@ -4,4 +4,14 @@
+>  /* not all ARM platforms necessarily support this API ... */
+>  #include <mach/gpio.h>
 > 
-> It will be removed.
+> +#ifdef __ARM_GPIOLIB_TRIVIAL
+> +/* Note: this may rely upon the value of ARCH_NR_GPIOS set in mach/gpio.h
+*/
+> +#include <asm-generic/gpio.h>
+> +
+> +/* The trivial gpiolib dispatchers */
+> +#define gpio_get_value  __gpio_get_value
+> +#define gpio_set_value  __gpio_set_value
+> +#define gpio_cansleep   __gpio_cansleep
+> +#endif
+> +
+>  #endif /* _ARCH_ARM_GPIO_H */
+> diff --git a/arch/arm/mach-exynos4/include/mach/gpio.h b/arch/arm/mach-
+> exynos4/include/mach/gpio.h
+> index be9266b..b2e3595 100644
+> --- a/arch/arm/mach-exynos4/include/mach/gpio.h
+> +++ b/arch/arm/mach-exynos4/include/mach/gpio.h
+> @@ -13,9 +13,6 @@
+>  #ifndef __ASM_ARCH_GPIO_H
+>  #define __ASM_ARCH_GPIO_H __FILE__
 > 
-> >
-> >> +#include <linux/delay.h>
-> >> +#include <linux/slab.h>
-> >> +#include <linux/platform_device.h>
-> >> +#include <linux/init.h>
-> >> +#include <plat/omap_device.h>
-> >
-> > why ??
-> >
+> -#define gpio_get_value	__gpio_get_value
+> -#define gpio_set_value	__gpio_set_value
+> -#define gpio_cansleep	__gpio_cansleep
+>  #define gpio_to_irq	__gpio_to_irq
 > 
-> Context loss count
-
-shouldn't use in drivers.
-
-> >> +#include <linux/module.h>
-> >> +#include <linux/kernel.h>
-> >> +#include <linux/device.h>
-> >> +#include <linux/jiffies.h>
-> >> +#include <linux/hwmon.h>
-> >> +#include <linux/hwmon-sysfs.h>
-> >> +#include <linux/stddef.h>
-> >> +#include <linux/sysfs.h>
-> >> +#include <linux/err.h>
-> >> +#include <linux/types.h>
-> >> +#include <linux/mutex.h>
-> >> +#include <linux/pm_runtime.h>
-> >> +#include <plat/common.h>
-> >
-> > why ?
+>  /* Practically, GPIO banks up to GPZ are the configurable gpio banks */
+> @@ -151,6 +148,6 @@ enum s5p_gpio_number {
+>  #define ARCH_NR_GPIOS
+> 	(EXYNOS4_GPZ(EXYNOS4_GPIO_Z_NR) +	\
+>  				 CONFIG_SAMSUNG_GPIO_EXTRA + 1)
 > 
-> usleep_range function.
-
-plat/common for usleep_range ?? usleep_range is defined in
-<linux/delay.h>
-
-> >> +#include <plat/temperature_sensor.h>
-> >
+> -#include <asm-generic/gpio.h>
+> +#define __ARM_GPIOLIB_TRIVIAL
 > 
-> It is the header file with the structure definitions
-> used in the driver.
+>  #endif /* __ASM_ARCH_GPIO_H */
 
-why don't you put in <linux/platform_data/....> ??
-
-> >> +#include <mach/ctrl_module_core_44xx.h>
-> >
-> > why ?
+> diff --git a/arch/arm/mach-s3c2410/include/mach/gpio.h b/arch/arm/mach-
+> s3c2410/include/mach/gpio.h
+> index f7f6b07..998ef4c 100644
+> --- a/arch/arm/mach-s3c2410/include/mach/gpio.h
+> +++ b/arch/arm/mach-s3c2410/include/mach/gpio.h
+> @@ -11,9 +11,7 @@
+>   * published by the Free Software Foundation.
+>  */
 > 
-> It will be removed
+> -#define gpio_get_value	__gpio_get_value
+> -#define gpio_set_value	__gpio_set_value
+> -#define gpio_cansleep	__gpio_cansleep
+> +#define __ARM_GPIOLIB_TRIVIAL
+>  #define gpio_to_irq	__gpio_to_irq
 > 
-> >
-> >> +#include <mach/gpio.h>
-> >
-> > linux/gpio.h for crying out loud... how many times Russell has to say
-> > the exact same thing ??????
-> >
+>  /* some boards require extra gpio capacity to support external
+> @@ -28,7 +26,6 @@
+>  #define ARCH_NR_GPIOS	(256 + CONFIG_S3C24XX_GPIO_EXTRA)
+>  #endif
 > 
-> It will be removed
-
-oh, you don't even use any gpio ? Why do you blindly add so many headers
-if you don't need them ???
-
-> >> +#define TSHUT_THRESHOLD_HOT ?122000 ?/* 122 deg C */
-> >> +#define TSHUT_THRESHOLD_COLD 100000 ?/* 100 deg C */
-> >> +#define BGAP_THRESHOLD_T_HOT 73000 ? /* 73 deg C */
-> >> +#define BGAP_THRESHOLD_T_COLD ? ? ? ?71000 ? /* 71 deg C */
-> >> +#define OMAP_ADC_START_VALUE 530
-> >> +#define OMAP_ADC_END_VALUE ? 923
-> >> +
-> >> +/*
-> >> + * omap_temp_sensor structure
-> >> + * @hwmon_dev - device pointer
-> >> + * @clock - Clock pointer
-> >> + * @registers - Pointer to structure with register offsets and bitfields
-> >> + * @sensor_mutex - Mutex for sysfs, irq and PM
-> >> + * @irq - MPU Irq number for thermal alert
-> >> + * @phy_base - Physical base of the temp I/O
-> >> + * @clk_rate - Holds current clock rate
-> >> + * @temp_sensor_ctrl - temp sensor control register value
-> >> + * @bg_ctrl - bandgap ctrl register value
-> >> + * @bg_counter - bandgap counter value
-> >> + * @bg_threshold - bandgap threshold register value
-> >> + * @temp_sensor_tshut_threshold - bandgap tshut register value
-> >> + * @is_efuse_valid - Flag to determine if efuse is valid or not
-> >> + * @clk_on - Manages the current clock state
-> >> + */
-> >> +struct omap_temp_sensor {
-> >> + ? ? struct device ? ? ? ? ? *hwmon_dev;
-> >> + ? ? struct clk ? ? ? ? ? ? ?*clock;
-> >> + ? ? struct omap_temp_sensor_registers *registers;
-> >> + ? ? struct mutex ? ? ? ? ? ?sensor_mutex; /* Mutex for sysfs, irq and PM */
-> >> + ? ? unsigned int ? ? ? ? ? ?irq;
-> >> + ? ? void __iomem ? ? ? ? ? ?*phy_base;
-> >> + ? ? u32 ? ? ? ? ? ? ? ? ? ? clk_rate;
-> >> + ? ? u32 ? ? ? ? ? ? ? ? ? ? temp_sensor_ctrl;
-> >> + ? ? u32 ? ? ? ? ? ? ? ? ? ? bg_ctrl;
-> >> + ? ? u32 ? ? ? ? ? ? ? ? ? ? bg_counter;
-> >> + ? ? u32 ? ? ? ? ? ? ? ? ? ? bg_threshold;
-> >> + ? ? u32 ? ? ? ? ? ? ? ? ? ? temp_sensor_tshut_threshold;
-> >> + ? ? bool ? ? ? ? ? ? ? ? ? ?is_efuse_valid;
-> >> + ? ? bool ? ? ? ? ? ? ? ? ? ?clk_on;
-> >> +};
-> >> +
-> >> +/*
-> >> + * Temperature values in milli degree celsius
-> >> + * ADC code values from 530 to 923
-> >> + */
-> >> +static int adc_to_temp[] = {
-> >> + ? ? -40000, -40000, -40000, -40000, -39800, -39400, -39000, -38600, -38200,
-> >> + ? ? -37800, -37300, -36800, -36400, -36000, -35600, -35200, -34800,
-> >> + ? ? -34300, -33800, -33400, -33000, -32600, -32200, -31800, -31300,
-> >> + ? ? -30800, -30400, -30000, -29600, -29200, -28700, -28200, -27800,
-> >> + ? ? -27400, -27000, -26600, -26200, -25700, -25200, -24800, -24400,
-> >> + ? ? -24000, -23600, -23200, -22700, -22200, -21800, -21400, -21000,
-> >> + ? ? -20600, -20200, -19700, -19200, -18800, -18400, -18000, -17600,
-> >> + ? ? -17200, -16700, -16200, -15800, -15400, -15000, -14600, -14200,
-> >> + ? ? -13700, -13200, -12800, -12400, -12000, -11600, -11200, -10700,
-> >> + ? ? -10200, -9800, -9400, -9000, -8600, -8200, -7700, -7200, -6800,
-> >> + ? ? -6400, -6000, -5600, -5200, -4800, -4300, -3800, -3400, -3000,
-> >> + ? ? -2600, -2200, -1800, -1300, -800, -400, 0, 400, 800, 1200, 1600,
-> >> + ? ? 2100, 2600, 3000, 3400, 3800, 4200, 4600, 5100, 5600, 6000, 6400,
-> >> + ? ? 6800, 7200, 7600, 8000, 8500, 9000, 9400, 9800, 10200, 10600, 11000,
-> >> + ? ? 11400, 11900, 12400, 12800, 13200, 13600, 14000, 14400, 14800,
-> >> + ? ? 15300, 15800, 16200, 16600, 17000, 17400, 17800, 18200, 18700,
-> >> + ? ? 19200, 19600, 20000, 20400, 20800, 21200, 21600, 22100, 22600,
-> >> + ? ? 23000, 23400, 23800, 24200, 24600, 25000, 25400, 25900, 26400,
-> >> + ? ? 26800, 27200, 27600, 28000, 28400, 28800, 29300, 29800, 30200,
-> >> + ? ? 30600, 31000, 31400, 31800, 32200, 32600, 33100, 33600, 34000,
-> >> + ? ? 34400, 34800, 35200, 35600, 36000, 36400, 36800, 37300, 37800,
-> >> + ? ? 38200, 38600, 39000, 39400, 39800, 40200, 40600, 41100, 41600,
-> >> + ? ? 42000, 42400, 42800, 43200, 43600, 44000, 44400, 44800, 45300,
-> >> + ? ? 45800, 46200, 46600, 47000, 47400, 47800, 48200, 48600, 49000,
-> >> + ? ? 49500, 50000, 50400, 50800, 51200, 51600, 52000, 52400, 52800,
-> >> + ? ? 53200, 53700, 54200, 54600, 55000, 55400, 55800, 56200, 56600,
-> >> + ? ? 57000, 57400, 57800, 58200, 58700, 59200, 59600, 60000, 60400,
-> >> + ? ? 60800, 61200, 61600, 62000, 62400, 62800, 63300, 63800, 64200,
-> >> + ? ? 64600, 65000, 65400, 65800, 66200, 66600, 67000, 67400, 67800,
-> >> + ? ? 68200, 68700, 69200, 69600, 70000, 70400, 70800, 71200, 71600,
-> >> + ? ? 72000, 72400, 72800, 73200, 73600, 74100, 74600, 75000, 75400,
-> >> + ? ? 75800, 76200, 76600, 77000, 77400, 77800, 78200, 78600, 79000,
-> >> + ? ? 79400, 79800, 80300, 80800, 81200, 81600, 82000, 82400, 82800,
-> >> + ? ? 83200, 83600, 84000, 84400, 84800, 85200, 85600, 86000, 86400,
-> >> + ? ? 86800, 87300, 87800, 88200, 88600, 89000, 89400, 89800, 90200,
-> >> + ? ? 90600, 91000, 91400, 91800, 92200, 92600, 93000, 93400, 93800,
-> >> + ? ? 94200, 94600, 95000, 95500, 96000, 96400, 96800, 97200, 97600,
-> >> + ? ? 98000, 98400, 98800, 99200, 99600, 100000, 100400, 100800, 101200,
-> >> + ? ? 101600, 102000, 102400, 102800, 103200, 103600, 104000, 104400,
-> >> + ? ? 104800, 105200, 105600, 106100, 106600, 107000, 107400, 107800,
-> >> + ? ? 108200, 108600, 109000, 109400, 109800, 110200, 110600, 111000,
-> >> + ? ? 111400, 111800, 112200, 112600, 113000, 113400, 113800, 114200,
-> >> + ? ? 114600, 115000, 115400, 115800, 116200, 116600, 117000, 117400,
-> >> + ? ? 117800, 118200, 118600, 119000, 119400, 119800, 120200, 120600,
-> >> + ? ? 121000, 121400, 121800, 122200, 122600, 123000
-> >> +};
-> >> +
-> >> +static unsigned long omap_temp_sensor_readl(struct omap_temp_sensor
-> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? *temp_sensor, u32 reg)
-> >> +{
-> >> + ? ? return __raw_readl(temp_sensor->phy_base + reg);
-> >> +}
-> >> +
-> >> +static void omap_temp_sensor_writel(struct omap_temp_sensor *temp_sensor,
-> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? u32 val, u32 reg)
-> >> +{
-> >> + ? ? __raw_writel(val, (temp_sensor->phy_base + reg));
-> >> +}
-> >> +
-> >> +static int adc_to_temp_conversion(int adc_val)
-> >> +{
-> >> + ? ? return adc_to_temp[adc_val - OMAP_ADC_START_VALUE];
-> >> +}
-> >> +
-> >> +static int temp_to_adc_conversion(long temp)
-> >> +{
-> >> + ? ? int i;
-> >> +
-> >> + ? ? for (i = 0; i <= OMAP_ADC_END_VALUE - OMAP_ADC_START_VALUE; i++)
-> >> + ? ? ? ? ? ? if (temp < adc_to_temp[i])
-> >> + ? ? ? ? ? ? ? ? ? ? return OMAP_ADC_START_VALUE + i - 1;
-> >> +
-> >> + ? ? return -EINVAL;
-> >> +}
-> >> +
-> >> +static void omap_configure_temp_sensor_thresholds(struct omap_temp_sensor
-> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? *temp_sensor)
-> >> +{
-> >> + ? ? u32 temp, t_hot, t_cold, tshut_hot, tshut_cold;
-> >> +
-> >> + ? ? t_hot = temp_to_adc_conversion(BGAP_THRESHOLD_T_HOT);
-> >> + ? ? t_cold = temp_to_adc_conversion(BGAP_THRESHOLD_T_COLD);
-> >> +
-> >> + ? ? /* Configure the TALERT thresholds */
-> >> + ? ? temp = omap_temp_sensor_readl(temp_sensor,
-> >> + ? ? ? ? ? ? ? ? ? ? temp_sensor->registers->bgap_threshold);
-> >> + ? ? temp |= (t_hot << __ffs(temp_sensor->registers->threshold_thot_mask)) |
-> >> + ? ? ? ? ? ? (t_cold << __ffs(temp_sensor->registers->threshold_tcold_mask));
-> >> + ? ? omap_temp_sensor_writel(temp_sensor, temp,
-> >> + ? ? ? ? ? ? temp_sensor->registers->bgap_threshold);
-> >> +
-> >> + ? ? tshut_hot = temp_to_adc_conversion(TSHUT_THRESHOLD_HOT);
-> >> + ? ? tshut_cold = temp_to_adc_conversion(TSHUT_THRESHOLD_COLD);
-> >> +
-> >> + ? ? /* Configure the TSHUT thresholds */
-> >> + ? ? temp = omap_temp_sensor_readl(temp_sensor,
-> >> + ? ? ? ? ? ? ? ? ? ? temp_sensor->registers->thsut_threshold);
-> >> + ? ? temp |= (tshut_hot << __ffs(temp_sensor->registers->tshut_hot_mask))
-> >> + ? ? ? ? | (tshut_cold << __ffs(temp_sensor->registers->tshut_hot_mask));
-> >> + ? ? omap_temp_sensor_writel(temp_sensor, temp,
-> >> + ? ? ? ? ? ? ? ? ? ? temp_sensor->registers->thsut_threshold);
-> >> +}
-> >> +
-> >> +static void omap_configure_temp_sensor_counter(struct omap_temp_sensor
-> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?*temp_sensor, u32 counter)
-> >> +{
-> >> + ? ? u32 val;
-> >> +
-> >> + ? ? val = omap_temp_sensor_readl(temp_sensor,
-> >> + ? ? ? ? ? ? ? ? ? ? temp_sensor->registers->bgap_counter);
-> >> + ? ? val &= ~(temp_sensor->registers->counter_mask);
-> >> + ? ? val |= (counter << __ffs(temp_sensor->registers->counter_mask));
-> >> + ? ? omap_temp_sensor_writel(temp_sensor, val,
-> >> + ? ? ? ? ? ? ? ? ? ? temp_sensor->registers->bgap_counter);
-> >> +}
-> >> +
-> >> +static void omap_enable_continuous_mode(struct omap_temp_sensor *temp_sensor,
-> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? bool enable)
-> >> +{
-> >> + ? ? u32 val;
-> >> +
-> >> + ? ? val = omap_temp_sensor_readl(temp_sensor,
-> >> + ? ? ? ? ? ? ? ? ? ? temp_sensor->registers->bgap_mode_ctrl);
-> >> +
-> >> + ? ? if (enable)
-> >> + ? ? ? ? ? ? val |= (1 << __ffs(temp_sensor->registers->mode_ctrl_mask));
-> >> + ? ? else
-> >> + ? ? ? ? ? ? val &= ~(temp_sensor->registers->mode_ctrl_mask);
-> >> +
-> >> + ? ? omap_temp_sensor_writel(temp_sensor, val,
-> >> + ? ? ? ? ? ? ? ? ? ? temp_sensor->registers->bgap_mode_ctrl);
-> >> +}
-> >> +
-> >> +/* Sysfs hook functions */
-> >> +
-> >> +static ssize_t show_temp_max(struct device *dev,
-> >> + ? ? ? ? ? ? ? ? ? ? struct device_attribute *devattr, char *buf)
-> >> +{
-> >> + ? ? struct omap_temp_sensor *temp_sensor = dev_get_drvdata(dev);
-> >> + ? ? int temp;
-> >> +
-> >> + ? ? mutex_lock(&temp_sensor->sensor_mutex);
-> >> +
-> >> + ? ? temp = omap_temp_sensor_readl(temp_sensor,
-> >> + ? ? ? ? ? ? ? ? ? ? temp_sensor->registers->bgap_threshold);
-> >> + ? ? temp = (temp & temp_sensor->registers->threshold_thot_mask)
-> >> + ? ? ? ? ? ? ? ? ? ? >> __ffs(temp_sensor->registers->threshold_thot_mask);
-> >> +
-> >> + ? ? if (temp < OMAP_ADC_START_VALUE || temp > OMAP_ADC_END_VALUE) {
-> >> + ? ? ? ? ? ? dev_err(dev, "invalid value\n");
-> >> + ? ? ? ? ? ? goto out;
-> >> + ? ? }
-> >> + ? ? temp = adc_to_temp_conversion(temp);
-> >> +
-> >> +out:
-> >> + ? ? mutex_unlock(&temp_sensor->sensor_mutex);
-> >> +
-> >> + ? ? return snprintf(buf, 16, "%d\n", temp);
-> >> +}
-> >> +
-> >> +static ssize_t set_temp_max(struct device *dev,
-> >> + ? ? ? ? ? ? ? ? ? ? ? ? struct device_attribute *devattr,
-> >> + ? ? ? ? ? ? ? ? ? ? ? ? const char *buf, size_t count)
-> >> +{
-> >> + ? ? struct omap_temp_sensor *temp_sensor = dev_get_drvdata(dev);
-> >> + ? ? long ? ? ? ? ? ? ? ? ? ?val;
-> >> + ? ? u32 ? ? ? ? ? ? ? ? ? ? reg_val, t_cold, t_hot, temp;
-> >> +
-> >> + ? ? mutex_lock(&temp_sensor->sensor_mutex);
-> >> +
-> >> + ? ? if (strict_strtol(buf, 10, &val)) {
-> >> + ? ? ? ? ? ? count = -EINVAL;
-> >> + ? ? ? ? ? ? goto out;
-> >> + ? ? }
-> >> +
-> >> + ? ? t_hot = temp_to_adc_conversion(val);
-> >> + ? ? if ((t_hot < OMAP_ADC_START_VALUE || t_hot > OMAP_ADC_END_VALUE)) {
-> >> + ? ? ? ? ? ? dev_err(dev, "invalid range\n");
-> >> + ? ? ? ? ? ? count = -EINVAL;
-> >> + ? ? ? ? ? ? goto out;
-> >> + ? ? }
-> >> +
-> >> + ? ? /* obtain the T cold value */
-> >> + ? ? t_cold = omap_temp_sensor_readl(temp_sensor,
-> >> + ? ? ? ? ? ? ? ? ? ? temp_sensor->registers->bgap_threshold);
-> >> + ? ? t_cold = (t_cold & temp_sensor->registers->threshold_tcold_mask) >>
-> >> + ? ? ? ? ? ? ? ? ? ? __ffs(temp_sensor->registers->threshold_tcold_mask);
-> >> +
-> >> + ? ? if (t_hot < t_cold) {
-> >> + ? ? ? ? ? ? dev_err(dev, "Error! T_HOT value lesser than T_COLD\n");
-> >> + ? ? ? ? ? ? count = -EINVAL;
-> >> + ? ? ? ? ? ? goto out;
-> >> + ? ? }
-> >> +
-> >> + ? ? /* write the new t_hot value */
-> >> + ? ? reg_val = omap_temp_sensor_readl(temp_sensor,
-> >> + ? ? ? ? ? ? ? ? ? ? temp_sensor->registers->bgap_threshold);
-> >> + ? ? reg_val &= ~(temp_sensor->registers->threshold_thot_mask);
-> >> + ? ? reg_val |= (t_hot <<
-> >> + ? ? ? ? ? ? ? ? ? ? __ffs(temp_sensor->registers->threshold_thot_mask));
-> >> + ? ? omap_temp_sensor_writel(temp_sensor, reg_val,
-> >> + ? ? ? ? ? ? ? ? ? ? temp_sensor->registers->bgap_threshold);
-> >> +
-> >> + ? ? /* Read the current temperature */
-> >> + ? ? temp = omap_temp_sensor_readl(temp_sensor,
-> >> + ? ? ? ? ? ? ? ? ? ? temp_sensor->registers->temp_sensor_ctrl);
-> >> + ? ? temp &= (temp_sensor->registers->bgap_dtemp_mask);
-> >> +
-> >> + ? ? /*
-> >> + ? ? ?* If user sets the HIGH threshold(t_hot) greater than the current
-> >> + ? ? ?* temperature(temp) unmask the HOT interrupts
-> >> + ? ? ?*/
-> >> + ? ? if (t_hot > temp) {
-> >> + ? ? ? ? ? ? reg_val = omap_temp_sensor_readl(temp_sensor,
-> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? temp_sensor->registers->bgap_mask_ctrl);
-> >> + ? ? ? ? ? ? reg_val &= ~(temp_sensor->registers->mask_cold_mask);
-> >> + ? ? ? ? ? ? reg_val |= temp_sensor->registers->mask_hot_mask;
-> >> + ? ? ? ? ? ? omap_temp_sensor_writel(temp_sensor, reg_val,
-> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? temp_sensor->registers->bgap_mask_ctrl);
-> >> + ? ? }
-> >> +
-> >> + ? ? /*
-> >> + ? ? ?* If current temperature is in-between the hot and cold thresholds,
-> >> + ? ? ?* Enable both masks.
-> >> + ? ? ?*/
-> >> + ? ? if (temp > t_cold && temp < t_hot) {
-> >> + ? ? ? ? ? ? reg_val = omap_temp_sensor_readl(temp_sensor,
-> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? temp_sensor->registers->bgap_mask_ctrl);
-> >> + ? ? ? ? ? ? reg_val |= temp_sensor->registers->mask_cold_mask;
-> >> + ? ? ? ? ? ? reg_val |= temp_sensor->registers->mask_hot_mask;
-> >> + ? ? ? ? ? ? omap_temp_sensor_writel(temp_sensor, reg_val,
-> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP4460_BGAP_CTRL_OFFSET);
-> >> + ? ? }
-> >> + ? ? /*
-> >> + ? ? ?* else no need to do anything since HW will immediately compare
-> >> + ? ? ?* the new threshold and generate interrupt accordingly
-> >> + ? ? ?*/
-> >> +out:
-> >> + ? ? mutex_unlock(&temp_sensor->sensor_mutex);
-> >> + ? ? return count;
-> >> +}
-> >> +
-> >> +static ssize_t show_temp_max_hyst(struct device *dev,
-> >> + ? ? ? ? ? ? struct device_attribute *devattr, char *buf)
-> >> +{
-> >> + ? ? struct omap_temp_sensor *temp_sensor = dev_get_drvdata(dev);
-> >> + ? ? u32 ? ? ? ? ? ? ? ? ? ? temp;
-> >> +
-> >> + ? ? mutex_lock(&temp_sensor->sensor_mutex);
-> >> +
-> >> + ? ? temp = omap_temp_sensor_readl(temp_sensor,
-> >> + ? ? ? ? ? ? temp_sensor->registers->bgap_threshold);
-> >> + ? ? temp = (temp & temp_sensor->registers->threshold_tcold_mask) >>
-> >> + ? ? ? ? ? ? __ffs(temp_sensor->registers->threshold_tcold_mask);
-> >> +
-> >> + ? ? if (temp < OMAP_ADC_START_VALUE || temp > OMAP_ADC_END_VALUE) {
-> >> + ? ? ? ? ? ? dev_err(dev, "invalid value\n");
-> >> + ? ? ? ? ? ? goto out;
-> >> + ? ? }
-> >> +
-> >> + ? ? temp = adc_to_temp_conversion(temp);
-> >> +out:
-> >> + ? ? mutex_unlock(&temp_sensor->sensor_mutex);
-> >> +
-> >> + ? ? return snprintf(buf, 16, "%d\n", temp);
-> >> +}
-> >> +
-> >> +static ssize_t set_temp_max_hyst(struct device *dev,
-> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct device_attribute *devattr,
-> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?const char *buf, size_t count)
-> >> +{
-> >> + ? ? struct omap_temp_sensor ? ? ? ? *temp_sensor = dev_get_drvdata(dev);
-> >> + ? ? u32 ? ? ? ? ? ? ? ? ? ? ? ? ? ? reg_val, t_hot, t_cold, temp;
-> >> + ? ? long ? ? ? ? ? ? ? ? ? ? ? ? ? ?val;
-> >> +
-> >> + ? ? mutex_lock(&temp_sensor->sensor_mutex);
-> >> +
-> >> + ? ? if (strict_strtol(buf, 10, &val)) {
-> >> + ? ? ? ? ? ? count = -EINVAL;
-> >> + ? ? ? ? ? ? goto out;
-> >> + ? ? }
-> >> +
-> >> + ? ? t_cold = temp_to_adc_conversion(val);
-> >> + ? ? if (t_cold < OMAP_ADC_START_VALUE || t_cold > OMAP_ADC_END_VALUE) {
-> >> + ? ? ? ? ? ? dev_err(dev, "invalid range");
-> >> + ? ? ? ? ? ? count = -EINVAL;
-> >> + ? ? ? ? ? ? goto out;
-> >> + ? ? }
-> >> +
-> >> + ? ? /* obtain the T HOT value */
-> >> + ? ? t_hot = omap_temp_sensor_readl(temp_sensor,
-> >> + ? ? ? ? ? ? ? ? ? ? temp_sensor->registers->bgap_threshold);
-> >> + ? ? t_hot = (t_hot & temp_sensor->registers->threshold_thot_mask) >>
-> >> + ? ? ? ? ? ? ? ? ? ? __ffs(temp_sensor->registers->threshold_thot_mask);
-> >> +
-> >> + ? ? if (t_cold > t_hot) {
-> >> + ? ? ? ? ? ? dev_err(dev, "Error! T_COLD value greater than T_HOT\n");
-> >> + ? ? ? ? ? ? count = -EINVAL;
-> >> + ? ? ? ? ? ? goto out;
-> >> + ? ? }
-> >> +
-> >> + ? ? /* write the new t_cold value */
-> >> + ? ? reg_val = omap_temp_sensor_readl(temp_sensor,
-> >> + ? ? ? ? ? ? ? ? ? ? temp_sensor->registers->bgap_threshold);
-> >> + ? ? reg_val &= ~(temp_sensor->registers->threshold_tcold_mask);
-> >> + ? ? reg_val |= (t_cold <<
-> >> + ? ? ? ? ? ? ? ? ? ? __ffs(temp_sensor->registers->threshold_tcold_mask));
-> >> + ? ? omap_temp_sensor_writel(temp_sensor, reg_val,
-> >> + ? ? ? ? ? ? ? ? ? ? temp_sensor->registers->bgap_threshold);
-> >> +
-> >> + ? ? /* Read the current temperature */
-> >> + ? ? temp = omap_temp_sensor_readl(temp_sensor,
-> >> + ? ? ? ? ? ? temp_sensor->registers->temp_sensor_ctrl);
-> >> + ? ? temp &= (temp_sensor->registers->bgap_dtemp_mask);
-> >> +
-> >> + ? ? /*
-> >> + ? ? ?* If user sets the LOW threshold(t_cold) lower than the current
-> >> + ? ? ?* temperature(temp) unmask the COLD interrupts
-> >> + ? ? ?*/
-> >> + ? ? if (t_cold < temp) {
-> >> + ? ? ? ? ? ? reg_val = omap_temp_sensor_readl(temp_sensor,
-> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? temp_sensor->registers->bgap_mask_ctrl);
-> >> + ? ? ? ? ? ? reg_val &= ~(temp_sensor->registers->mask_hot_mask);
-> >> + ? ? ? ? ? ? reg_val |= temp_sensor->registers->mask_cold_mask;
-> >> + ? ? ? ? ? ? omap_temp_sensor_writel(temp_sensor, reg_val,
-> >> + ? ? ? ? ? ? ? ? ? ? temp_sensor->registers->bgap_mask_ctrl);
-> >> + ? ? }
-> >> +
-> >> + ? ? /*
-> >> + ? ? ?* If current temperature is in-between the hot and cold thresholds,
-> >> + ? ? ?* Enable both masks.
-> >> + ? ? ?*/
-> >> + ? ? if (temp < t_hot && temp > t_cold) {
-> >> + ? ? ? ? ? ? reg_val = omap_temp_sensor_readl(temp_sensor,
-> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? temp_sensor->registers->bgap_mask_ctrl);
-> >> + ? ? ? ? ? ? reg_val |= temp_sensor->registers->mask_cold_mask;
-> >> + ? ? ? ? ? ? reg_val |= temp_sensor->registers->mask_hot_mask;
-> >> + ? ? ? ? ? ? omap_temp_sensor_writel(temp_sensor, reg_val,
-> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? temp_sensor->registers->bgap_mask_ctrl);
-> >> + ? ? }
-> >> +
-> >> + ? ? /*
-> >> + ? ? ?* else no need to do anything since HW will immediately compare
-> >> + ? ? ?* the new threshold and generate interrupt accordingly
-> >> + ? ? ?*/
-> >> +
-> >> +out:
-> >> + ? ? mutex_unlock(&temp_sensor->sensor_mutex);
-> >> + ? ? return count;
-> >> +}
-> >> +
-> >> +static ssize_t show_update_rate(struct device *dev,
-> >> + ? ? ? ? ? ? ? ? ? ? struct device_attribute *devattr, char *buf)
-> >> +{
-> >> + ? ? struct omap_temp_sensor *temp_sensor = dev_get_drvdata(dev);
-> >> + ? ? u32 ? ? ? ? ? ? ? ? ? ? temp = 0, ret = 0;
-> >> +
-> >> + ? ? mutex_lock(&temp_sensor->sensor_mutex);
-> >> +
-> >> + ? ? if (!temp_sensor->clk_rate) {
-> >> + ? ? ? ? ? ? dev_err(dev, "clk_rate is NULL\n");
-> >> + ? ? ? ? ? ? ret = -EINVAL;
-> >> + ? ? ? ? ? ? goto out;
-> >> + ? ? }
-> >> +
-> >> + ? ? temp = omap_temp_sensor_readl(temp_sensor,
-> >> + ? ? ? ? ? ? ? ? ? ? temp_sensor->registers->bgap_counter);
-> >> + ? ? temp = (temp & temp_sensor->registers->counter_mask) >>
-> >> + ? ? ? ? ? ? ? ? ? ? __ffs(temp_sensor->registers->counter_mask);
-> >
-> > ? ? ? ?temp &= ??
-> >
-> >> + ? ? temp = temp * 1000 / (temp_sensor->clk_rate);
-> >
-> > ? ? ? ?temp *= ??
+> -#include <asm-generic/gpio.h>
+>  #include <mach/gpio-nrs.h>
+>  #include <mach/gpio-fns.h>
 > 
-> Need to multiply the temp with 1000 before dividing.
-> temp *= evaluates the RHS first and then multiplies LHS.
-
-temp *= 1000;
-temp /= clk_rate;
-
-> >> +out:
-> >> + ? ? mutex_unlock(&temp_sensor->sensor_mutex);
-> >> + ? ? if (!ret)
-> >> + ? ? ? ? ? ? return sprintf(buf, "%d\n", temp);
-> >> + ? ? else
-> >> + ? ? ? ? ? ? return ret;
-> >> +}
-> >> +
-> >> +static ssize_t set_update_rate(struct device *dev,
-> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct device_attribute *devattr,
-> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ?const char *buf, size_t count)
-> >> +{
-> >> + ? ? struct omap_temp_sensor *temp_sensor = dev_get_drvdata(dev);
-> >> + ? ? u32 ? ? ? ? ? ? ? ? ? ? reg_val;
-> >> + ? ? long ? ? ? ? ? ? ? ? ? ?val;
-> >> +
-> >> + ? ? mutex_lock(&temp_sensor->sensor_mutex);
-> >> +
-> >> + ? ? if (strict_strtol(buf, 10, &val)) {
-> >> + ? ? ? ? ? ? count = -EINVAL;
-> >> + ? ? ? ? ? ? goto out;
-> >> + ? ? }
-> >> +
-> >> + ? ? val *= temp_sensor->clk_rate / 1000;
-> >> + ? ? reg_val = omap_temp_sensor_readl(temp_sensor,
-> >> + ? ? ? ? ? ? ? ? ? ? temp_sensor->registers->bgap_counter);
-> >> +
-> >> + ? ? reg_val &= ~(temp_sensor->registers->counter_mask);
-> >> + ? ? reg_val |= val;
-> >> + ? ? omap_temp_sensor_writel(temp_sensor, reg_val,
-> >> + ? ? ? ? ? ? ? ? ? ? temp_sensor->registers->bgap_counter);
-> >> +
-> >> +out:
-> >> + ? ? mutex_unlock(&temp_sensor->sensor_mutex);
-> >> + ? ? return count;
-> >> +}
-> >> +
-> >> +static int omap_temp_sensor_read_temp(struct device *dev,
-> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct device_attribute *devattr,
-> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? char *buf)
-> >> +{
-> >> + ? ? struct omap_temp_sensor *temp_sensor = dev_get_drvdata(dev);
-> >> + ? ? int ? ? ? ? ? ? ? ? ? ? temp, ret = 0;
-> >> +
-> >> + ? ? mutex_lock(&temp_sensor->sensor_mutex);
-> >> +
-> >> + ? ? temp = omap_temp_sensor_readl(temp_sensor,
-> >> + ? ? ? ? ? ? temp_sensor->registers->temp_sensor_ctrl);
-> >> + ? ? temp &= temp_sensor->registers->bgap_dtemp_mask;
-> >> +
-> >> + ? ? if (!temp_sensor->is_efuse_valid)
-> >> + ? ? ? ? ? ? dev_err(dev, "Invalid EFUSE, Non-trimmed BGAP, Temp not accurate\n");
-> >> +
-> >> + ? ? /* look up for temperature in the table and return the temperature */
-> >> + ? ? if (temp < OMAP_ADC_START_VALUE || temp > OMAP_ADC_END_VALUE) {
-> >> + ? ? ? ? ? ? dev_err(dev, "invalid adc code reported %d", temp);
-> >> + ? ? ? ? ? ? ret = -EINVAL;
-> >> + ? ? ? ? ? ? goto out;
-> >> + ? ? }
-> >> +
-> >> + ? ? temp = adc_to_temp[temp - OMAP_ADC_START_VALUE];
-> >> +
-> >> +out:
-> >> + ? ? mutex_unlock(&temp_sensor->sensor_mutex);
-> >> + ? ? if (!ret)
-> >> + ? ? ? ? ? ? return sprintf(buf, "%d\n", temp);
-> >> + ? ? else
-> >> + ? ? ? ? ? ? return ret;
-> >> +}
-> >> +
-> >> +static SENSOR_DEVICE_ATTR(temp1_input, S_IRUGO, omap_temp_sensor_read_temp,
-> >> + ? ? ? ? ? ? ? ? ? ? ? NULL, 0);
-> >> +static SENSOR_DEVICE_ATTR(temp1_max, S_IWUSR | S_IRUGO, show_temp_max,
-> >> + ? ? ? ? ? ? ? ? ? ? ? set_temp_max, 0);
-> >> +static SENSOR_DEVICE_ATTR(temp1_max_hyst, S_IWUSR | S_IRUGO, show_temp_max_hyst,
-> >> + ? ? ? ? ? ? ? ? ? ? ? set_temp_max_hyst, 0);
-> >> +static SENSOR_DEVICE_ATTR(update_rate, S_IWUSR | S_IRUGO, show_update_rate,
-> >> + ? ? ? ? ? ? ? ? ? ? ? set_update_rate, 0);
-> >> +
-> >> +static struct attribute *omap_temp_sensor_attributes[] = {
-> >> + ? ? &sensor_dev_attr_temp1_input.dev_attr.attr,
-> >> + ? ? &sensor_dev_attr_temp1_max.dev_attr.attr,
-> >> + ? ? &sensor_dev_attr_temp1_max_hyst.dev_attr.attr,
-> >> + ? ? &sensor_dev_attr_update_rate.dev_attr.attr,
-> >> + ? ? NULL
-> >> +};
-> >> +
-> >> +static const struct attribute_group omap_temp_sensor_group = {
-> >> + ? ? .attrs = omap_temp_sensor_attributes,
-> >> +};
-> >> +
-> >> +static int omap_temp_sensor_clk_enable(struct omap_temp_sensor *temp_sensor)
-> >> +{
-> >> + ? ? u32 ret = 0, temp;
-> >> +
-> >> + ? ? if (temp_sensor->clk_on) {
-> >> + ? ? ? ? ? ? dev_err(temp_sensor->hwmon_dev, "clock already on\n");
-> >> + ? ? ? ? ? ? goto out;
-> >> + ? ? }
-> >> +
-> >> + ? ? ret = pm_runtime_get_sync(temp_sensor->hwmon_dev);
-> >> + ? ? if (ret < 0) {
-> >> + ? ? ? ? ? ? dev_err(temp_sensor->hwmon_dev, "get sync failed\n");
-> >> + ? ? ? ? ? ? ret = -EINVAL;
-> >> + ? ? ? ? ? ? goto out;
-> >> + ? ? }
-> >> +
-> >> + ? ? temp = omap_temp_sensor_readl(temp_sensor,
-> >> + ? ? ? ? ? ? ? ? ? ? temp_sensor->registers->temp_sensor_ctrl);
-> >> + ? ? temp &= ~(temp_sensor->registers->bgap_tempsoff_mask);
-> >> + ? ? /* BGAP_TEMPSOFF should be reset to 0 */
-> >> + ? ? omap_temp_sensor_writel(temp_sensor, temp,
-> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? temp_sensor->registers->temp_sensor_ctrl);
-> >> + ? ? temp_sensor->clk_on = 1;
-> >
-> > why isn't pm_runtime_get_sync() enough ??
+> diff --git a/arch/arm/mach-s3c64xx/include/mach/gpio.h b/arch/arm/mach-
+> s3c64xx/include/mach/gpio.h
+> index 0d46e99..6958b3f 100644
+> --- a/arch/arm/mach-s3c64xx/include/mach/gpio.h
+> +++ b/arch/arm/mach-s3c64xx/include/mach/gpio.h
+> @@ -12,9 +12,7 @@
+>   * published by the Free Software Foundation.
+>  */
 > 
-> This is the programming sequence indicated. BGAP_TEMPSOFF should be set
-> to 0 to enable the temperature sensor.
-
-why isn't this done as part of your runtime_resume() function ??
-
-> >> +out:
-> >> + ? ? return ret;
-> >> +}
-> >> +
-> >> +static int omap_temp_sensor_clk_disable(struct omap_temp_sensor *temp_sensor)
-> >> +{
-> >> + ? ? u32 temp, ret = 0;
-> >> + ? ? unsigned long timeout;
-> >> +
-> >> + ? ? if (!temp_sensor->clk_on) {
-> >> + ? ? ? ? ? ? dev_err(temp_sensor->hwmon_dev, "clock already off\n");
-> >> + ? ? ? ? ? ? goto out;
-> >> + ? ? }
-> >> + ? ? temp = omap_temp_sensor_readl(temp_sensor,
-> >> + ? ? ? ? ? ? ? ? ? ? temp_sensor->registers->temp_sensor_ctrl);
-> >> + ? ? temp |= temp_sensor->registers->bgap_tempsoff_mask;
-> >> +
-> >> + ? ? /* BGAP_TEMPSOFF should be set to 1 before gating clock */
-> >> + ? ? omap_temp_sensor_writel(temp_sensor, temp,
-> >> + ? ? ? ? ? ? ? ? ? ? temp_sensor->registers->temp_sensor_ctrl);
-> >> + ? ? temp = omap_temp_sensor_readl(temp_sensor,
-> >> + ? ? ? ? ? ? ? ? ? ? temp_sensor->registers->bgap_status);
-> >> + ? ? timeout = jiffies + msecs_to_jiffies(5);
-> >> +
-> >> + ? ? /* wait till the clean stop bit is set or till the timeout exppires */
-> >> + ? ? while (!(temp | temp_sensor->registers->status_clean_stop_mask) &&
-> >> + ? ? ? ? ? ? !(time_after(jiffies, timeout))) {
-> >> + ? ? ? ? ? ? temp = omap_temp_sensor_readl(temp_sensor,
-> >> + ? ? ? ? ? ? ? ? ? ? temp_sensor->registers->bgap_status);
-> >> + ? ? ? ? ? ? usleep_range(500, 2000);
-> >> + ? ? }
-> >> +
-> >> + ? ? if (time_after(jiffies, timeout))
-> >> + ? ? ? ? ? ? dev_err(temp_sensor->hwmon_dev, "Clean stop bit not set\n");
-> >> + ? ? /* Gate the clock */
-> >> + ? ? ret = pm_runtime_put_sync(temp_sensor->hwmon_dev);
-> >> + ? ? if (ret < 0) {
-> >> + ? ? ? ? ? ? dev_err(temp_sensor->hwmon_dev, "put sync failed\n");
-> >> + ? ? ? ? ? ? ret = -EINVAL;
-> >> + ? ? ? ? ? ? goto out;
-> >> + ? ? }
-> >> + ? ? temp_sensor->clk_on = 0;
-> >> +out:
-> >> + ? ? return ret;
-> >> +}
-
-add a blank line here.
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 490 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110811/e8da2fe0/attachment-0001.sig>
+> -#define gpio_get_value	__gpio_get_value
+> -#define gpio_set_value	__gpio_set_value
+> -#define gpio_cansleep	__gpio_cansleep
+> +#define __ARM_GPIOLIB_TRIVIAL
+>  #define gpio_to_irq	__gpio_to_irq
+> 
+>  /* GPIO bank sizes */
+> @@ -96,5 +94,3 @@ enum s3c_gpio_number {
+>  #define BOARD_NR_GPIOS 16
+> 
+>  #define ARCH_NR_GPIOS	(GPIO_BOARD_START + BOARD_NR_GPIOS)
+> -
+> -#include <asm-generic/gpio.h>
+> diff --git a/arch/arm/mach-s5p64x0/include/mach/gpio.h b/arch/arm/mach-
+> s5p64x0/include/mach/gpio.h
+> index adb5f29..a25160b 100644
+> --- a/arch/arm/mach-s5p64x0/include/mach/gpio.h
+> +++ b/arch/arm/mach-s5p64x0/include/mach/gpio.h
+> @@ -13,9 +13,7 @@
+>  #ifndef __ASM_ARCH_GPIO_H
+>  #define __ASM_ARCH_GPIO_H __FILE__
+> 
+> -#define gpio_get_value	__gpio_get_value
+> -#define gpio_set_value	__gpio_set_value
+> -#define gpio_cansleep	__gpio_cansleep
+> +#define __ARM_GPIOLIB_TRIVIAL
+>  #define gpio_to_irq	__gpio_to_irq
+> 
+>  /* GPIO bank sizes */
+> @@ -134,6 +132,4 @@ enum s5p6450_gpio_number {
+> 
+>  #define ARCH_NR_GPIOS		(S5P64X0_GPIO_END +
+> CONFIG_SAMSUNG_GPIO_EXTRA)
+> 
+> -#include <asm-generic/gpio.h>
+> -
+>  #endif /* __ASM_ARCH_GPIO_H */
+> diff --git a/arch/arm/mach-s5pc100/include/mach/gpio.h b/arch/arm/mach-
+> s5pc100/include/mach/gpio.h
+> index 29a8a12..f515bfb 100644
+> --- a/arch/arm/mach-s5pc100/include/mach/gpio.h
+> +++ b/arch/arm/mach-s5pc100/include/mach/gpio.h
+> @@ -15,9 +15,7 @@
+>  #ifndef __ASM_ARCH_GPIO_H
+>  #define __ASM_ARCH_GPIO_H __FILE__
+> 
+> -#define gpio_get_value	__gpio_get_value
+> -#define gpio_set_value	__gpio_set_value
+> -#define gpio_cansleep	__gpio_cansleep
+> +#define __ARM_GPIOLIB_TRIVIAL
+>  #define gpio_to_irq	__gpio_to_irq
+> 
+>  /* GPIO bank sizes */
+> @@ -146,6 +144,4 @@ enum s5p_gpio_number {
+>  /* define the number of gpios we need to the one after the MP04() range
+*/
+>  #define ARCH_NR_GPIOS		(S5PC100_GPIO_END + 1)
+> 
+> -#include <asm-generic/gpio.h>
+> -
+>  #endif /* __ASM_ARCH_GPIO_H */
+> diff --git a/arch/arm/mach-s5pv210/include/mach/gpio.h b/arch/arm/mach-
+> s5pv210/include/mach/gpio.h
+> index a5a1e33..27f2139 100644
+> --- a/arch/arm/mach-s5pv210/include/mach/gpio.h
+> +++ b/arch/arm/mach-s5pv210/include/mach/gpio.h
+> @@ -13,9 +13,7 @@
+>  #ifndef __ASM_ARCH_GPIO_H
+>  #define __ASM_ARCH_GPIO_H __FILE__
+> 
+> -#define gpio_get_value	__gpio_get_value
+> -#define gpio_set_value	__gpio_set_value
+> -#define gpio_cansleep	__gpio_cansleep
+> +#define __ARM_GPIOLIB_TRIVIAL
+>  #define gpio_to_irq	__gpio_to_irq
+> 
+>  /* Practically, GPIO banks up to MP03 are the configurable gpio banks */
+> @@ -142,6 +140,4 @@ enum s5p_gpio_number {
+>  #define ARCH_NR_GPIOS
+> 	(S5PV210_MP05(S5PV210_GPIO_MP05_NR) +	\
+>  				 CONFIG_SAMSUNG_GPIO_EXTRA + 1)
+> 
+> -#include <asm-generic/gpio.h>
+> -
+>  #endif /* __ASM_ARCH_GPIO_H */
