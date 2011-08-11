@@ -1,31 +1,51 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 11 Aug 2011 16:08:07 +0100
+Date: Thu, 11 Aug 2011 16:07:18 +0100
 Subject: [PATCH 11/13] ARM: gpio: consolidate trivial gpiolib
 	implementations
-In-Reply-To: <017101cc581c$6e277530$4a765f90$%kim@samsung.com>
+In-Reply-To: <20110811141528.GL28500@legolas.emea.dhcp.ti.com>
 References: <20110809080411.GA1831@n2100.arm.linux.org.uk>
 	<E1QqhM1-0003af-U5@rmk-PC.arm.linux.org.uk>
-	<017101cc581c$6e277530$4a765f90$%kim@samsung.com>
-Message-ID: <20110811150807.GB4924@n2100.arm.linux.org.uk>
+	<20110811141528.GL28500@legolas.emea.dhcp.ti.com>
+Message-ID: <20110811150718.GA4924@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 11, 2011 at 08:47:18PM +0900, Kukjin Kim wrote:
-> Russell King - ARM Linux wrote:
-> > 
-> > Consolidate 24 trivial gpiolib implementions out of mach/gpio.h
-> > into asm/gpio.h.  This is basically the include of asm-generic/gpio.h
-> > and the definition of gpio_get_value, gpio_set_value, and gpio_cansleep
-> > as described in Documentation/gpio.txt
-> > 
-> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+On Thu, Aug 11, 2011 at 05:15:31PM +0300, Felipe Balbi wrote:
+> On Tue, Aug 09, 2011 at 09:08:01AM +0100, Russell King - ARM Linux wrote:
+> > diff --git a/arch/arm/include/asm/gpio.h b/arch/arm/include/asm/gpio.h
+> > index 166a7a3..15e8970 100644
+> > --- a/arch/arm/include/asm/gpio.h
+> > +++ b/arch/arm/include/asm/gpio.h
+> > @@ -4,4 +4,14 @@
+> >  /* not all ARM platforms necessarily support this API ... */
+> >  #include <mach/gpio.h>
+> >  
+> > +#ifdef __ARM_GPIOLIB_TRIVIAL
+> > +/* Note: this may rely upon the value of ARCH_NR_GPIOS set in mach/gpio.h */
+> > +#include <asm-generic/gpio.h>
+> > +
+> > +/* The trivial gpiolib dispatchers */
+> > +#define gpio_get_value  __gpio_get_value
+> > +#define gpio_set_value  __gpio_set_value
+> > +#define gpio_cansleep   __gpio_cansleep
+> > +#endif
 > 
-> Acked-by: Kukjin Kim <kgene.kim@samsung.com>
-> on following Samsung stuff...
+> could that be a selectable symbol ? Something like:
+> 
+> CONFIG_HAS_ARM_TRIVIAL_GPIO
+> 
+> then on Kconfig you just:
+> 
+> select HAS_ARM_TIVIAL_GPIO or something ?
 
-Thanks.
+That makes things more complicated, because that involves digging through
+a lot of platform code in a couple of places to work out exactly when we
+need this - and it crosses the boundary to arch/sh too.
 
-> As a note, there were duplicated e-mail address Grant and Nicolas in Cc ;)
-> I just pushed 'reply all' :)
+So I'd prefer to keep this simple.
 
-That's not in the original email, and isn't in any one elses replies....
+The long-term goal is to remove that symbol entirely, but in order to do
+that we need to kill of the "optimized" on-board SoC stuff in those (few)
+gpio.h which don't have the symbol selected.  This is rather necessary to
+progress towards the consolidated kernel.  (Re-inventing gpiolib by moving
+them out of line isn't a good idea...)
