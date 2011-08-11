@@ -1,36 +1,41 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 11 Aug 2011 15:05:11 +0200
-Subject: Subject: L2x0 OF properties do not include interrupt #
-In-Reply-To: <20110810142808.GL10121@e102144-lin.cambridge.arm.com>
-References: <000201cc575b$c1229010$4367b030$@rutland@arm.com>
-	<201108101624.27881.arnd@arndb.de>
-	<20110810142808.GL10121@e102144-lin.cambridge.arm.com>
-Message-ID: <201108111505.11887.arnd@arndb.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 11 Aug 2011 15:06:07 +0200
+Subject: [PATCH 08/19] mach-davinci: move DaVinci TNET GPIO driver to GPIO
+	subsystem
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024E04F945@dbde02.ent.ti.com>
+References: <1312978639-18339-1-git-send-email-linus.walleij@stericsson.com>
+	<B85A65D85D7EB246BE421B3FB0FBB593024E04F945@dbde02.ent.ti.com>
+Message-ID: <CACRpkdZvxvD01ofxMxDb3wXpt9_8wkU1rwxdLj5RuidoZNrb+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 10 August 2011, Will Deacon wrote:
-> I was hoping that it was possible to have separate properties which describe
-> the interrupt. So you could have something like pmu-interrupt <75> and
-> abort-interrupt <76> rather than interrupts <75, 76>.
+On Thu, Aug 11, 2011 at 12:21 AM, Nori, Sekhar <nsekhar@ti.com> wrote:
+> Hi Linus,
+>
+> On Wed, Aug 10, 2011 at 17:47:19, Linus Walleij wrote:
+>> From: Linus Walleij <linus.walleij@linaro.org>
+>>
+>> As per example from the other ARM boards, push the DaVinci TNET
+>> GPIO driver down to the GPIO subsystem so it can be consolidated.
+>>
+>> Cc: Sekhar Nori <nsekhar@ti.com>
+>> Cc: Kevin Hilman <khilman@ti.com>
+>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>
+> There should be no need of this since the TNETV107x
+> GPIO can simply be supported using the basic MMIO GPIO
+> driver. I submitted patches for that a while back
+> but have some comments from Grant to address. He requested
+> some changes to be done to the basic MMIO GPIO driver
+> itself.
+>
+> https://lkml.org/lkml/2011/7/5/16
+>
+> I do plan to rework those patches and post them back.
 
-Ok, I see.
+OK I will keep this around in case it doesn't happen
+soon, it certainly does not make matters worse
+anyway.
 
-> I've not played with DT bindings before though, so if it's usually done with
-> an ordered list then so be it!
-
-A lot of the code assumes that the property is called 'interrupts' and that
-it contains a fixed-length array of interrupt numbers, each for one specific
-purpose.
-
-Given that we have so many different meanings for the interrupts, I'm
-not sure how this would work best in this case. According to
-http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0246f/CHDFHCFJ.html
-this looks like a nested interrupt controller, i.e. the L2CC has its own mask
-and status register with bits for each one of them. We could model these by
-describing the l2cc interrupt controller with these registers and listing all
-nine of the current inputs. I suspect however that it would be easier to just
-assume that there is only one line for now, and treat the l2cc as a single
-interrupt source with an internal status register.
-
-	Arnd
+Thanks,
+Linus Walleij
