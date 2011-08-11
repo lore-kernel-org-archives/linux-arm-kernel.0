@@ -1,206 +1,116 @@
-From: boojin.kim@samsung.com (Boojin Kim)
-Date: Thu, 11 Aug 2011 19:04:36 +0900
-Subject: [PATCH 14/15] ASoC: Samsung: Update DMA interface
-In-Reply-To: <CABb+yY0E9_asUdMQ3ayDuRDa_SVhEZGiTRmPspD+YsQ-y40m4g@mail.gmail.com>
-References: <1311744697-10264-1-git-send-email-boojin.kim@samsung.com>
-	<1311744697-10264-15-git-send-email-boojin.kim@samsung.com>
-	<CABb+yY0E9_asUdMQ3ayDuRDa_SVhEZGiTRmPspD+YsQ-y40m4g@mail.gmail.com>
-Message-ID: <001301cc580e$13cab560$3b602020$%kim@samsung.com>
+From: hvaibhav@ti.com (hvaibhav at ti.com)
+Date: Thu, 11 Aug 2011 16:00:30 +0530
+Subject: [RFC: PATCH 4/4] AM335X: Add low level debugging support
+In-Reply-To: <hvaibhav@ti.com>
+References: <hvaibhav@ti.com>
+Message-ID: <1313058630-32447-5-git-send-email-hvaibhav@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jassi Brar Wrote:
-> Sent: Tuesday, August 09, 2011 4:28 AM
-> To: Boojin Kim
-> Cc: linux-arm-kernel at lists.infradead.org; linux-samsung-
-> soc at vger.kernel.org; Vinod Koul; Dan Williams; Kukjin Kim; Mark Brown;
-> Grant Likely; Russell King; Liam Girdwood
-> Subject: Re: [PATCH 14/15] ASoC: Samsung: Update DMA interface
->
-> On Wed, Jul 27, 2011 at 11:01 AM, Boojin Kim <boojin.kim@samsung.com>
-> wrote:
->
-> >  static void dma_enqueue(struct snd_pcm_substream *substream)
-> >  {
-> >        struct runtime_data *prtd = substream->runtime->private_data;
-> >        dma_addr_t pos = prtd->dma_pos;
-> >        unsigned int limit;
-> > -       int ret;
-> > +       struct samsung_dma_prep_info dma_info;
-> >
-> >        pr_debug("Entered %s\n", __func__);
-> >
-> > -       if (s3c_dma_has_circular())
-> > -               limit = (prtd->dma_end - prtd->dma_start) / prtd-
-> >dma_period;
-> > -       else
-> > -               limit = prtd->dma_limit;
-> > +       limit = (prtd->dma_end - prtd->dma_start) / prtd->dma_period;
->
-> 'dma_limit' is rendered useless, so you might want to remove it from
-> 'struct runtime_data'
-> as well.
-You're right. I will remove it in next cleanup patch
+From: Afzal Mohammed <afzal@ti.com>
 
->
-> >        pr_debug("%s: loaded %d, limit %d\n",
-> >                                __func__, prtd->dma_loaded, limit);
-> >
-> > -       while (prtd->dma_loaded < limit) {
-> > -               unsigned long len = prtd->dma_period;
-> > +       dma_info.cap = (samsung_dma_has_circular() ? DMA_CYCLIC :
-> DMA_SLAVE);
-> > +       dma_info.direction =
-> > +               (substream->stream == SNDRV_PCM_STREAM_PLAYBACK
-> > +               ? DMA_TO_DEVICE : DMA_FROM_DEVICE);
-> > +       dma_info.fp = audio_buffdone;
-> > +       dma_info.fp_param = substream;
-> > +       dma_info.period = prtd->dma_period;
-> > +       dma_info.len = prtd->dma_period*limit;
-> >
-> > +       while (prtd->dma_loaded < limit) {
-> >                pr_debug("dma_loaded: %d\n", prtd->dma_loaded);
-> >
-> > -               if ((pos + len) > prtd->dma_end) {
-> > -                       len  = prtd->dma_end - pos;
-> > -                       pr_debug("%s: corrected dma len %ld\n",
-> __func__, len);
-> > +               if ((pos + dma_info.period) > prtd->dma_end) {
-> > +                       dma_info.period  = prtd->dma_end - pos;
-> > +                       pr_debug("%s: corrected dma len %ld\n",
-> > +                                       __func__, dma_info.period);
-> >                }
-> >
-> > -               ret = s3c2410_dma_enqueue(prtd->params->channel,
-> > -                       substream, pos, len);
-> > +               dma_info.buf = pos;
-> > +               prtd->params->ops->prepare(prtd->params->ch,
-> &dma_info);
-> >
-> > -               if (ret == 0) {
-> > -                       prtd->dma_loaded++;
-> > -                       pos += prtd->dma_period;
-> > -                       if (pos >= prtd->dma_end)
-> > -                               pos = prtd->dma_start;
-> > -               } else
-> > -                       break;
-> > +               prtd->dma_loaded++;
-> > +               pos += prtd->dma_period;
-> > +               if (pos >= prtd->dma_end)
-> > +                       pos = prtd->dma_start;
-> >        }
-> >
-> >        prtd->dma_pos = pos;
-> >  }
-> >
-> > -static void audio_buffdone(struct s3c2410_dma_chan *channel,
-> > -                               void *dev_id, int size,
-> > -                               enum s3c2410_dma_buffresult result)
-> > +static void audio_buffdone(void *data)
-> >  {
-> > -       struct snd_pcm_substream *substream = dev_id;
-> > -       struct runtime_data *prtd;
-> > +       struct snd_pcm_substream *substream = data;
-> > +       struct runtime_data *prtd = substream->runtime->private_data;
-> >
-> >        pr_debug("Entered %s\n", __func__);
-> >
-> > -       if (result == S3C2410_RES_ABORT || result == S3C2410_RES_ERR)
-> > -               return;
-> > -
-> > -       prtd = substream->runtime->private_data;
-> > +       if (prtd->state & ST_RUNNING) {
-> > +               prtd->dma_pos += prtd->dma_period;
-> > +               if (prtd->dma_pos >= prtd->dma_end)
-> > +                       prtd->dma_pos = prtd->dma_start;
-> >
-> > -       if (substream)
-> > -               snd_pcm_period_elapsed(substream);
-> > +               if (substream)
-> > +                       snd_pcm_period_elapsed(substream);
-> >
-> > -       spin_lock(&prtd->lock);
-> > -       if (prtd->state & ST_RUNNING && !s3c_dma_has_circular()) {
-> > -               prtd->dma_loaded--;
-> > -               dma_enqueue(substream);
-> > +               spin_lock(&prtd->lock);
-> > +               if (!samsung_dma_has_circular()) {
-> > +                       prtd->dma_loaded--;
-> > +                       dma_enqueue(substream);
-> > +               }
-> > +               spin_unlock(&prtd->lock);
-> >        }
-> > -
-> > -       spin_unlock(&prtd->lock);
-> >  }
->
-> Since we set integer-constraint on number of periods, you could also
-> discard bothering fractional boundaries. That would make things a lot
-> simpler.
->
->
->
-> > @@ -265,14 +250,14 @@ static int dma_trigger(struct
-> snd_pcm_substream *substream, int cmd)
-> >        case SNDRV_PCM_TRIGGER_RESUME:
-> >        case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
-> >                prtd->state |= ST_RUNNING;
-> > -               s3c2410_dma_ctrl(prtd->params->channel,
-> S3C2410_DMAOP_START);
-> > +               prtd->params->ops->trigger(prtd->params->ch);
-> >                break;
-> >
-> >        case SNDRV_PCM_TRIGGER_STOP:
-> >        case SNDRV_PCM_TRIGGER_SUSPEND:
-> >        case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
-> >                prtd->state &= ~ST_RUNNING;
-> > -               s3c2410_dma_ctrl(prtd->params->channel,
-> S3C2410_DMAOP_STOP);
-> > +               prtd->params->ops->stop(prtd->params->ch);
-> >                break;
->
-> I wish you agreed and used
->        prtd->params->ops->cmd(ch, enum some_cmd_options)
-> rather than having 4 separate callbacks
->       prtd->params->ops->trigger(prtd->params->ch)
->       prtd->params->ops->stop(prtd->params->ch)
->      prtd->params->ops->flush(prtd->params->ch)
->      prtd->params->ops->started(prtd->params->ch)
->
->
-> > @@ -291,21 +276,12 @@ dma_pointer(struct snd_pcm_substream
-> *substream)
-> >        struct snd_pcm_runtime *runtime = substream->runtime;
-> >        struct runtime_data *prtd = runtime->private_data;
-> >        unsigned long res;
-> > -       dma_addr_t src, dst;
-> >
-> >        pr_debug("Entered %s\n", __func__);
-> >
-> > -       spin_lock(&prtd->lock);
-> > -       s3c2410_dma_getposition(prtd->params->channel, &src, &dst);
-> > -
-> > -       if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
-> > -               res = dst - prtd->dma_start;
-> > -       else
-> > -               res = src - prtd->dma_start;
-> > -
-> > -       spin_unlock(&prtd->lock);
-> > +       res = prtd->dma_pos - prtd->dma_start;
-> >
-> > -       pr_debug("Pointer %x %x\n", src, dst);
-> > +       pr_debug("Pointer offset: %lu\n", res);
-> >
-> >        /* we seem to be getting the odd error from the pcm library
-> due
-> >         * to out-of-bounds pointers. this is maybe due to the dma
-> engine
->
-> Isn't this a regression ?
-> dma_pointer() doesn't really return actual location of DMA activity
-> anymore.
-> Now it simply tells the last period done.
-> This would affect latencies in a bad way.
-Yes, This code makes the DMA position less accurately. But, This position is 
-enough for audio DMA activity. Other drivers also use similar method to get 
-the position.
+Add support for low level debugging on AM335X EVM. Currently only
+support for UART1 console, which is used on AM335X EVM is added.
+
+Signed-off-by: Afzal Mohammed <afzal@ti.com>
+Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+---
+ arch/arm/mach-omap2/include/mach/debug-macro.S |   21 +++++++++++++++++++++
+ arch/arm/plat-omap/include/plat/serial.h       |    4 ++++
+ arch/arm/plat-omap/include/plat/uncompress.h   |    6 ++++++
+ 3 files changed, 31 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/include/mach/debug-macro.S b/arch/arm/mach-omap2/include/mach/debug-macro.S
+index 309e328..a99ddbd 100644
+--- a/arch/arm/mach-omap2/include/mach/debug-macro.S
++++ b/arch/arm/mach-omap2/include/mach/debug-macro.S
+@@ -78,6 +78,8 @@ omap_uart_lsr:	.word	0
+ 		beq	82f			@ configure UART2
+ 		cmp	\rp, #TI81XXUART3	@ ti81Xx UART offsets different
+ 		beq	83f			@ configure UART3
++		cmp	\rp, #AM335XUART1	@ AM335X UART offsets different
++		beq	84f			@ configure UART1
+ 		cmp	\rp, #ZOOM_UART		@ only on zoom2/3
+ 		beq	95f			@ configure ZOOM_UART
+
+@@ -106,6 +108,8 @@ omap_uart_lsr:	.word	0
+ 		b	98f
+ 83:		mov	\rp, #UART_OFFSET(TI81XX_UART3_BASE)
+ 		b	98f
++84:		mov	\rp, #UART_OFFSET(AM335X_UART1_BASE)
++		b	97f
+ 95:		ldr	\rp, =ZOOM_UART_BASE
+ 		mrc	p15, 0, \rv, c1, c0
+ 		tst	\rv, #1			@ MMU enabled?
+@@ -121,6 +125,23 @@ omap_uart_lsr:	.word	0
+ 		b	10b
+
+ 		/* Store both phys and virt address for the uart */
++97:		add	\rp, \rp, #0x44000000	@ phys base
++		mrc	p15, 0, \rv, c1, c0
++		tst	\rv, #1			@ MMU enabled?
++		ldreq	\rv, =omap_uart_v2p(omap_uart_phys)	@ MMU disabled
++		ldrne	\rv, =omap_uart_phys	@ MMU enabled
++		str	\rp, [\rv, #0]
++		sub	\rp, \rp, #0x44000000	@ phys base
++		add	\rp, \rp, #0xf9000000	@ virt base
++		add	\rv, \rv, #4		@ omap_uart_virt
++		str	\rp, [\rv, #0]
++		mov	\rp, #(UART_LSR << OMAP_PORT_SHIFT)
++		add	\rv, \rv, #4		@ omap_uart_lsr
++		str	\rp, [\rv, #0]
++
++		b	10b
++
++		/* Store both phys and virt address for the uart */
+ 98:		add	\rp, \rp, #0x48000000	@ phys base
+ 		mrc	p15, 0, \rv, c1, c0
+ 		tst	\rv, #1			@ MMU enabled?
+diff --git a/arch/arm/plat-omap/include/plat/serial.h b/arch/arm/plat-omap/include/plat/serial.h
+index 865b13e..d7c1216 100644
+--- a/arch/arm/plat-omap/include/plat/serial.h
++++ b/arch/arm/plat-omap/include/plat/serial.h
+@@ -59,6 +59,9 @@
+ /* AM3505/3517 UART4 */
+ #define AM35XX_UART4_BASE	0x4809E000	/* Only on AM3505/3517 */
+
++/* AM335X serial port */
++#define AM335X_UART1_BASE	0x44E09000
++
+ /* External port on Zoom2/3 */
+ #define ZOOM_UART_BASE		0x10000000
+ #define ZOOM_UART_VIRT		0xfa400000
+@@ -92,6 +95,7 @@
+ #define TI81XXUART1		81
+ #define TI81XXUART2		82
+ #define TI81XXUART3		83
++#define AM335XUART1		84
+ #define ZOOM_UART		95		/* Only on zoom2/3 */
+
+ /* This is only used by 8250.c for omap1510 */
+diff --git a/arch/arm/plat-omap/include/plat/uncompress.h b/arch/arm/plat-omap/include/plat/uncompress.h
+index 8d052e7..3592ce4 100644
+--- a/arch/arm/plat-omap/include/plat/uncompress.h
++++ b/arch/arm/plat-omap/include/plat/uncompress.h
+@@ -97,6 +97,10 @@ static inline void flush(void)
+ 	_DEBUG_LL_ENTRY(mach, TI81XX_UART##p##_BASE, OMAP_PORT_SHIFT,	\
+ 		TI81XXUART##p)
+
++#define DEBUG_LL_AM335X(p, mach)					\
++	_DEBUG_LL_ENTRY(mach, AM335X_UART##p##_BASE, OMAP_PORT_SHIFT,	\
++		AM335XUART##p)
++
+ static inline void __arch_decomp_setup(unsigned long arch_id)
+ {
+ 	int port = 0;
+@@ -178,6 +182,8 @@ static inline void __arch_decomp_setup(unsigned long arch_id)
+ 		/* TI8148 base boards using UART1 */
+ 		DEBUG_LL_TI81XX(1, ti8148evm);
+
++		/* AM335x base boards using UART1 */
++		DEBUG_LL_AM335X(1, am335xevm);
+ 	} while (0);
+ }
+
+--
+1.6.2.4
