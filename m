@@ -1,48 +1,65 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 11 Aug 2011 16:04:58 +0100
-Subject: [RFC PATCH 3/8] ARM: gic: convert logical CPU numbers into
-	physical numbers
-In-Reply-To: <1312926162-22469-4-git-send-email-will.deacon@arm.com>
-References: <1312926162-22469-1-git-send-email-will.deacon@arm.com>
-	<1312926162-22469-4-git-send-email-will.deacon@arm.com>
-Message-ID: <20110811150458.GB5154@e102144-lin.cambridge.arm.com>
+From: michael.jones@matrix-vision.de (Michael Jones)
+Date: Thu, 11 Aug 2011 17:07:21 +0200
+Subject: [PATCH] OMAP: Fix linking error in twl-common.c for OMAP2/3/4
+	only builds
+In-Reply-To: <20110810091519.GB1939@atomide.com>
+References: <20110808110056.GA15134@n2100.arm.linux.org.uk>
+	<1312893410-3968-1-git-send-email-peter.ujfalusi@ti.com>
+	<20110810091519.GB1939@atomide.com>
+Message-ID: <4E43F029.6060208@matrix-vision.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 09, 2011 at 10:42:37PM +0100, Will Deacon wrote:
-> The GIC driver must convert logical CPU numbers passed in from Linux
-> into physical CPU numbers that are understood by the hardware.
-> 
-> This patch uses the new cpu_logical_map macro for performing the
-> conversion inside the GIC driver.
-> 
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm/common/gic.c |   12 +++++++++---
->  1 files changed, 9 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
-> index 3227ca9..6822c10 100644
-> --- a/arch/arm/common/gic.c
-> +++ b/arch/arm/common/gic.c
-> @@ -180,7 +180,7 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
->  		return -EINVAL;
->  
->  	mask = 0xff << shift;
-> -	bit = 1 << (cpu + shift);
-> +	bit = 1 << (cpu_logical_map(cpu) + shift);
->  
->  	spin_lock(&irq_controller_lock);
->  	val = readl_relaxed(reg) & ~mask;
-> @@ -260,7 +260,8 @@ static void __init gic_dist_init(struct gic_chip_data *gic,
->  {
->  	unsigned int gic_irqs, irq_limit, i;
->  	void __iomem *base = gic->dist_base;
-> -	u32 cpumask = 1 << smp_processor_id();
-> +	u32 cpu = cpu_logical_map(smp_processor_id());
-> +	u32 cpumask = 1 << cpu;
+Hi,
 
-Just a heads up - I need to add an #ifdef CONFIG_SMP otherwise this will
-fail to build for a UP configuration.
+On 08/10/2011 11:15 AM, Tony Lindgren wrote:
+> 
+> * Peter Ujfalusi <peter.ujfalusi@ti.com> [110809 05:31]:
+>> Avoid compiling code for OMAP arch which is not selected by the
+>> config.
+>>
+>> Fixes issues like:
+>> With CONFIG_ARCH_OMAP3=y and CONFIG_ARCH_OMAP4=n, I'm getting this:
+>>
+>> arch/arm/mach-omap2/built-in.o:(.data+0xf99c): undefined reference to `omap4430_phy_init'
+>> arch/arm/mach-omap2/built-in.o:(.data+0xf9a0): undefined reference to `omap4430_phy_exit'
+>> arch/arm/mach-omap2/built-in.o:(.data+0xf9a4): undefined reference to `omap4430_phy_power'
+>> arch/arm/mach-omap2/built-in.o:(.data+0xf9a8): undefined reference to `omap4430_phy_set_clk'
+>> arch/arm/mach-omap2/built-in.o:(.data+0xf9ac): undefined reference to `omap4430_phy_suspend'
+>>
+>> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+>>
+>> Hi Russel, Tony,
+>>
+>> This patch fixes the linking error caused by the twl-common.c file,
+>> when the kernel is built for OMAP2/3/4 only.
+> 
+> Thanks, I'll queue this one as a fix with updated comments as below.
+> 
+> Regards,
+> 
+> Tony
+> 
+> 
+> From: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> Date: Tue, 9 Aug 2011 15:36:50 +0300
+> Subject: [PATCH] OMAP: Fix linking error in twl-common.c for OMAP2/3/4 only builds
+> 
+[snip]
 
-Will
+I still stumbled upon these linker errors when building for my OMAP3
+board, using the current linux-omap master branch. I inadvertently had
+CONFIG_ARCH_OMAP4=y (leftover from my starting point,
+omap2plus_defconfig), but didn't have any of the boards with
+omap_phy_internal.o selected (OMAP_4430SDP, OMAP4_PANDA, PCM049, PCM049,
+OMAP3517EVM). Maybe this isn't a concern anyway, since anybody building
+with CONFIG_ARCH_OMAP4 will presumably also be building one of those
+boards? I don't know if it is our goal to build successfully with every
+wacky CONFIG_ combination, but I thought I would report it here just in
+case.
+
+-Michael
+
+MATRIX VISION GmbH, Talstrasse 16, DE-71570 Oppenweiler
+Registergericht: Amtsgericht Stuttgart, HRB 271090
+Geschaeftsfuehrer: Gerhard Thullner, Werner Armingeon, Uwe Furtner, Erhard Meier
