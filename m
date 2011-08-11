@@ -1,91 +1,43 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 11 Aug 2011 18:52:34 +0200
-Subject: [PATCH v2 1/3] ARM: i.MX51: Remove _MX51 references
-In-Reply-To: <1313026292-945-1-git-send-email-troy.kisky@boundarydevices.com>
-References: <1313026292-945-1-git-send-email-troy.kisky@boundarydevices.com>
-Message-ID: <20110811165234.GF31404@pengutronix.de>
+From: vinod.koul@intel.com (Koul, Vinod)
+Date: Fri, 12 Aug 2011 03:57:29 +0530
+Subject: [PATCH V5 00/15] To use DMA generic APIs for Samsung DMA
+In-Reply-To: <015101cc57f8$0d7b1da0$287158e0$%kim@samsung.com>
+References: <1311744697-10264-1-git-send-email-boojin.kim@samsung.com>
+	<CACRpkdZvbH1O608n_aa_nVi-Onhmt0Ay6X1yCgBVNES4o9hTrA@mail.gmail.com>
+	<1312821923.1539.37.camel@vkoul-udesk3>
+	<015101cc57f8$0d7b1da0$287158e0$%kim@samsung.com>
+Message-ID: <1313101649.1603.27.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 10, 2011 at 06:31:30PM -0700, Troy Kisky wrote:
-> Use new macro NEW_PAD_CTRL to remove _MX51 references
+On Thu, 2011-08-11 at 16:26 +0900, Kukjin Kim wrote:
+> Koul, Vinod wrote:
+> > 
+> > On Thu, 2011-08-04 at 18:53 +0200, Linus Walleij wrote:
+> > > On Wed, Jul 27, 2011 at 7:31 AM, Boojin Kim <boojin.kim@samsung.com> wrote:
+> > >
+> > > > This patchset adds support DMA generic APIs for Samsung DMA.
+> > >
+> > > Patches look good to me,
+> > > Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> > 
+> > Acked-by: Vinod Koul <vinod.koul@intel.com>
+> > 
+> > Do you want these to go thru slave-dma tree or arm tree, I am okay with
+> > either...
 > 
-> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
-> ---
->  arch/arm/mach-mx5/board-cpuimx51sd.c         |    2 +-
->  arch/arm/mach-mx5/board-mx51_babbage.c       |    4 ++--
->  arch/arm/mach-mx5/eukrea_mbimxsd-baseboard.c |    4 ++--
->  arch/arm/plat-mxc/include/mach/iomux-v3.h    |    1 +
->  4 files changed, 6 insertions(+), 5 deletions(-)
+> Hi Vinod,
 > 
-> diff --git a/arch/arm/mach-mx5/board-cpuimx51sd.c b/arch/arm/mach-mx5/board-cpuimx51sd.c
-> index ff096d5..040c5c3 100644
-> --- a/arch/arm/mach-mx5/board-cpuimx51sd.c
-> +++ b/arch/arm/mach-mx5/board-cpuimx51sd.c
-> @@ -108,7 +108,7 @@ static iomux_v3_cfg_t eukrea_cpuimx51sd_pads[] = {
->  
->  	/* Touchscreen */
->  	/* IRQ */
-> -	_MX51_PAD_GPIO_NAND__GPIO_NAND | MUX_PAD_CTRL(PAD_CTL_PUS_22K_UP |
-> +	NEW_PAD_CTRL(MX51_PAD_GPIO_NAND__GPIO_NAND, PAD_CTL_PUS_22K_UP |
->  			PAD_CTL_PKE | PAD_CTL_SRE_FAST |
->  			PAD_CTL_DSE_HIGH | PAD_CTL_PUE | PAD_CTL_HYS),
->  };
-> diff --git a/arch/arm/mach-mx5/board-mx51_babbage.c b/arch/arm/mach-mx5/board-mx51_babbage.c
-> index e400b09..5a578f9 100644
-> --- a/arch/arm/mach-mx5/board-mx51_babbage.c
-> +++ b/arch/arm/mach-mx5/board-mx51_babbage.c
-> @@ -357,8 +357,8 @@ static const struct esdhc_platform_data mx51_babbage_sd2_data __initconst = {
->  static void __init mx51_babbage_init(void)
->  {
->  	iomux_v3_cfg_t usbh1stp = MX51_PAD_USBH1_STP__USBH1_STP;
-> -	iomux_v3_cfg_t power_key = _MX51_PAD_EIM_A27__GPIO2_21 |
-> -		MUX_PAD_CTRL(PAD_CTL_SRE_FAST | PAD_CTL_DSE_HIGH | PAD_CTL_PUS_100K_UP);
-> +	iomux_v3_cfg_t power_key = NEW_PAD_CTRL(MX51_PAD_EIM_A27__GPIO2_21,
-> +		PAD_CTL_SRE_FAST | PAD_CTL_DSE_HIGH | PAD_CTL_PUS_100K_UP);
->  
->  	imx51_soc_init();
->  
-> diff --git a/arch/arm/mach-mx5/eukrea_mbimxsd-baseboard.c b/arch/arm/mach-mx5/eukrea_mbimxsd-baseboard.c
-> index 2619239..f046d4b 100644
-> --- a/arch/arm/mach-mx5/eukrea_mbimxsd-baseboard.c
-> +++ b/arch/arm/mach-mx5/eukrea_mbimxsd-baseboard.c
-> @@ -47,7 +47,7 @@ static iomux_v3_cfg_t eukrea_mbimxsd_pads[] = {
->  	/* LED */
->  	MX51_PAD_NANDF_D10__GPIO3_30,
->  	/* SWITCH */
-> -	_MX51_PAD_NANDF_D9__GPIO3_31 | MUX_PAD_CTRL(PAD_CTL_PUS_22K_UP |
-> +	NEW_PAD_CTRL(MX51_PAD_NANDF_D9__GPIO3_31, PAD_CTL_PUS_22K_UP |
->  			PAD_CTL_PKE | PAD_CTL_SRE_FAST |
->  			PAD_CTL_DSE_HIGH | PAD_CTL_PUE | PAD_CTL_HYS),
->  	/* UART2 */
-> @@ -66,7 +66,7 @@ static iomux_v3_cfg_t eukrea_mbimxsd_pads[] = {
->  	MX51_PAD_SD1_DATA2__SD1_DATA2,
->  	MX51_PAD_SD1_DATA3__SD1_DATA3,
->  	/* SD1 CD */
-> -	_MX51_PAD_GPIO1_0__SD1_CD | MUX_PAD_CTRL(PAD_CTL_PUS_22K_UP |
-> +	NEW_PAD_CTRL(MX51_PAD_GPIO1_0__SD1_CD, PAD_CTL_PUS_22K_UP |
->  			PAD_CTL_PKE | PAD_CTL_SRE_FAST |
->  			PAD_CTL_DSE_HIGH | PAD_CTL_PUE | PAD_CTL_HYS),
->  };
-> diff --git a/arch/arm/plat-mxc/include/mach/iomux-v3.h b/arch/arm/plat-mxc/include/mach/iomux-v3.h
-> index ebbce33..376ba92 100644
-> --- a/arch/arm/plat-mxc/include/mach/iomux-v3.h
-> +++ b/arch/arm/plat-mxc/include/mach/iomux-v3.h
-> @@ -80,6 +80,7 @@ typedef u64 iomux_v3_cfg_t;
->  		((iomux_v3_cfg_t)(_sel_input_ofs) << MUX_SEL_INPUT_OFS_SHIFT) | \
->  		((iomux_v3_cfg_t)(_sel_input) << MUX_SEL_INPUT_SHIFT))
->  
-> +#define NEW_PAD_CTRL(cfg, pad)	((cfg & ~MUX_PAD_CTRL_MASK) | MUX_PAD_CTRL(pad))
-
-You have to protect cfg with ().
-
-Otherwise I like the idea.
-
-Sascha
+> Thanks.
+> 
+> I'd like to keep its topic branch in my tree to avoid conflicts with other samsung stuff and I think, it should be merged into your slave-dma tree also for same reason.
+> 
+> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git #next/topic-dma-pl330
+> 
+> Or if you want to make some branch for it in your tree, please let me know so that I can merge it in my tree also.
+Okay can you update this branch with latest patchset (I think there were
+few comments on last patchset). Once you add all acks let me know the
+branch, I will merge it to my next
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+~Vinod
