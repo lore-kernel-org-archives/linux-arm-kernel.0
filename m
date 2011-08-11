@@ -1,147 +1,89 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 11 Aug 2011 21:02:45 +0900
-Subject: [PATCH 13/13] ARM: gpio: make trivial GPIOLIB implementation the
-	default
-In-Reply-To: <E1QqhMg-0003an-GW@rmk-PC.arm.linux.org.uk>
-References: <20110809080411.GA1831@n2100.arm.linux.org.uk>
-	<E1QqhMg-0003an-GW@rmk-PC.arm.linux.org.uk>
-Message-ID: <000501cc581e$95ecf7a0$c1c6e6e0$%kim@samsung.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Thu, 11 Aug 2011 14:28:55 +0200
+Subject: How to handle named resources with DT?
+In-Reply-To: <CACxGe6tr5OUxpiVah4s6rRG0cTOWsnohhEkZoSZgCj0xSZkmMA@mail.gmail.com>
+References: <4E4166F0.9050401@ti.com>
+	<CACxGe6tbEW1EZhqXy78EZVM_sQLH0Qbr7QOzbgbsKBRn1FtVrg@mail.gmail.com>
+	<4E4172A8.3030101@ti.com> <4E417BD5.8080409@freescale.com>
+	<20110809205723.GE11568@ponder.secretlab.ca>
+	<4E41A1B9.1060400@ti.com>
+	<20110809211747.GJ11568@ponder.secretlab.ca>
+	<4E41AA43.1000506@ti.com>
+	<20110809214905.GK11568@ponder.secretlab.ca>
+	<4E41AC5C.20301@ti.com> <20110810015214.GD23511@yookeroo.fritz.box>
+	<CACxGe6tr5OUxpiVah4s6rRG0cTOWsnohhEkZoSZgCj0xSZkmMA@mail.gmail.com>
+Message-ID: <4E43CB07.20002@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
-> 
-> Rather than marking the mach/gpio.h header files which want to use the
-> trivial GPIOLIB implementation, mark those which do not want to use it
-> instead.  This means that by default, you get the trivial implementation
-> and only have to do something extra if you need to.  This should
-> encourage the use of the trivial default implementation.
-> 
-> As an additional bonus, several gpio.h header files become empty.
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+On 8/10/2011 9:22 PM, Grant Likely wrote:
+> On Tue, Aug 9, 2011 at 7:52 PM, David Gibson
+> <david@gibson.dropbear.id.au>  wrote:
+>> On Tue, Aug 09, 2011 at 11:53:32PM +0200, Cousson, Benoit wrote:
+>>> On 8/9/2011 11:49 PM, Grant Likely wrote:
+>>>> That won't work either because that also breaks the existing 'reg'
+>>>> binding.  Anything you do will need to supplement the existing
+>>>> binding without changing it in an incompatible way.
+>>>
+>>> OK, but can we add a new attribute then? reg2, reg_ng, reg_plusplus,
+>>> reg_named...?
+>>
+>> He already suggested reg-names to be interpreted in parallel with the
+>> existing reg property.  The (serious) problem with replacing the reg
+>> property is that it will break all existing OSes (including old Linux
+>> versions) that don't understand the new property.
+>>
+>> Of course, the problem with reg-names is that it will be ignored by
+>> older OSes, and so 'reg' must still be in the correct order.  In which
+>> case you could argue it's more sensible to just have a static place to
+>> name mapping in the Linux driver.
+>>
+>> In short, yes, named reg elements in the DT would be nice in theory,
+>> but I'm not convinced it's worth a DT flag day to accomplish it.
+>
+> I'm inclined the same way, though I agree with the replies that point
+> out it wouldn't result in a 'flag day' because existing bindings
+> cannot become incompatible.  The problem I have is that adding
+> reg-names or similar implies that ordering of the reg property is no
+> longer defined which I absolutely do not think is a good idea.
 
-Looks good to me :)
+That will not be an issue if "reg-named" is a completely new node. It 
+will replace the "reg" node only when a named entry is needed.
+Most devices will use the regular "reg" entry, and only the one that 
+need extra information will use the reg-named.
 
-Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+That seems to be pretty straightforward to implement, and as soon as it 
+is useful even for a couple of drivers, it worth adding it.
 
-on following Samsung stuff...
+It is anyway better than having to add a custom property to get the 
+information we will miss otherwise.
 
-Thanks.
+Moreover, since some drivers are relying on that call, it will avoid 
+having to add extra code for nothing if CONFIG_OF is set.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+It will allow the driver to use a pretty standard API in anycase vs 
+using platform_get_resource + some extra optional calls to of_ functions 
++ some code to get the information for non-DT build.
 
-> ---
->  arch/arm/include/asm/gpio.h                 |    2 +-
+> Please, stick with the established convention and explicitly order
+> 'reg' and 'interrupts' properties.  If there is a specific use case
+> where this doesn't work, then bring it up, but I haven't seen any yet.
 
->  arch/arm/mach-exynos4/include/mach/gpio.h   |    2 --
+There will always be some alternatives, but they will be uglier, and the 
+effort to add some extra node to DT is so small, that it is better to do 
+that instead of adding some useless extra code in the driver.
 
->  arch/arm/mach-s3c2410/include/mach/gpio.h   |    2 --
->  arch/arm/mach-s3c64xx/include/mach/gpio.h   |    2 --
->  arch/arm/mach-s5p64x0/include/mach/gpio.h   |    2 --
->  arch/arm/mach-s5pc100/include/mach/gpio.h   |    2 --
->  arch/arm/mach-s5pv210/include/mach/gpio.h   |    2 --
-> 
-> diff --git a/arch/arm/include/asm/gpio.h b/arch/arm/include/asm/gpio.h
-> index 5032224..11ad0bf 100644
-> --- a/arch/arm/include/asm/gpio.h
-> +++ b/arch/arm/include/asm/gpio.h
-> @@ -4,7 +4,7 @@
->  /* not all ARM platforms necessarily support this API ... */
->  #include <mach/gpio.h>
-> 
-> -#ifdef __ARM_GPIOLIB_TRIVIAL
-> +#ifndef __ARM_GPIOLIB_COMPLEX
->  /* Note: this may rely upon the value of ARCH_NR_GPIOS set in mach/gpio.h
-*/
->  #include <asm-generic/gpio.h>
-> 
+>   The current users of _byname that I've looked seem to only use it for
+> convenience, not because a register range may be optional.  ie. they
+> all fail out if a reg resource isn't present.
 
-> diff --git a/arch/arm/mach-exynos4/include/mach/gpio.h b/arch/arm/mach-
-> exynos4/include/mach/gpio.h
-> index b91e8b2..80523ca 100644
-> --- a/arch/arm/mach-exynos4/include/mach/gpio.h
-> +++ b/arch/arm/mach-exynos4/include/mach/gpio.h
-> @@ -146,6 +146,4 @@ enum s5p_gpio_number {
->  #define ARCH_NR_GPIOS
-> 	(EXYNOS4_GPZ(EXYNOS4_GPIO_Z_NR) +	\
->  				 CONFIG_SAMSUNG_GPIO_EXTRA + 1)
-> 
-> -#define __ARM_GPIOLIB_TRIVIAL
-> -
->  #endif /* __ASM_ARCH_GPIO_H */
+If that API can help the driver writer and can avoid adding 10 lines of 
+code, it is still useful to use it.
 
-> diff --git a/arch/arm/mach-s3c2410/include/mach/gpio.h b/arch/arm/mach-
-> s3c2410/include/mach/gpio.h
-> index d502d17..6fac70f 100644
-> --- a/arch/arm/mach-s3c2410/include/mach/gpio.h
-> +++ b/arch/arm/mach-s3c2410/include/mach/gpio.h
-> @@ -11,8 +11,6 @@
->   * published by the Free Software Foundation.
->  */
-> 
-> -#define __ARM_GPIOLIB_TRIVIAL
-> -
->  /* some boards require extra gpio capacity to support external
->   * devices that need GPIO.
->   */
-> diff --git a/arch/arm/mach-s3c64xx/include/mach/gpio.h b/arch/arm/mach-
-> s3c64xx/include/mach/gpio.h
-> index 3a8857c..6e34c2f 100644
-> --- a/arch/arm/mach-s3c64xx/include/mach/gpio.h
-> +++ b/arch/arm/mach-s3c64xx/include/mach/gpio.h
-> @@ -12,8 +12,6 @@
->   * published by the Free Software Foundation.
->  */
-> 
-> -#define __ARM_GPIOLIB_TRIVIAL
-> -
->  /* GPIO bank sizes */
->  #define S3C64XX_GPIO_A_NR	(8)
->  #define S3C64XX_GPIO_B_NR	(7)
-> diff --git a/arch/arm/mach-s5p64x0/include/mach/gpio.h b/arch/arm/mach-
-> s5p64x0/include/mach/gpio.h
-> index c3a6aa0..06cd3c9 100644
-> --- a/arch/arm/mach-s5p64x0/include/mach/gpio.h
-> +++ b/arch/arm/mach-s5p64x0/include/mach/gpio.h
-> @@ -13,8 +13,6 @@
->  #ifndef __ASM_ARCH_GPIO_H
->  #define __ASM_ARCH_GPIO_H __FILE__
-> 
-> -#define __ARM_GPIOLIB_TRIVIAL
-> -
->  /* GPIO bank sizes */
-> 
->  #define S5P6440_GPIO_A_NR	(6)
-> diff --git a/arch/arm/mach-s5pc100/include/mach/gpio.h b/arch/arm/mach-
-> s5pc100/include/mach/gpio.h
-> index 0e75641..5e1a924 100644
-> --- a/arch/arm/mach-s5pc100/include/mach/gpio.h
-> +++ b/arch/arm/mach-s5pc100/include/mach/gpio.h
-> @@ -15,8 +15,6 @@
->  #ifndef __ASM_ARCH_GPIO_H
->  #define __ASM_ARCH_GPIO_H __FILE__
-> 
-> -#define __ARM_GPIOLIB_TRIVIAL
-> -
->  /* GPIO bank sizes */
->  #define S5PC100_GPIO_A0_NR	(8)
->  #define S5PC100_GPIO_A1_NR	(5)
-> diff --git a/arch/arm/mach-s5pv210/include/mach/gpio.h b/arch/arm/mach-
-> s5pv210/include/mach/gpio.h
-> index d348ee2..6c8b903 100644
-> --- a/arch/arm/mach-s5pv210/include/mach/gpio.h
-> +++ b/arch/arm/mach-s5pv210/include/mach/gpio.h
-> @@ -13,8 +13,6 @@
->  #ifndef __ASM_ARCH_GPIO_H
->  #define __ASM_ARCH_GPIO_H __FILE__
-> 
-> -#define __ARM_GPIOLIB_TRIVIAL
-> -
->  /* Practically, GPIO banks up to MP03 are the configurable gpio banks */
-> 
->  /* GPIO bank sizes */
+To be honest, I still do not understand why you are so reluctant to add 
+that small feature.
+
+That will not break compatibility and it will make our life easier.
+Don't you want to make our life easier? :-)
+
+Benoit
