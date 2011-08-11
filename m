@@ -1,89 +1,151 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Thu, 11 Aug 2011 14:28:55 +0200
-Subject: How to handle named resources with DT?
-In-Reply-To: <CACxGe6tr5OUxpiVah4s6rRG0cTOWsnohhEkZoSZgCj0xSZkmMA@mail.gmail.com>
-References: <4E4166F0.9050401@ti.com>
-	<CACxGe6tbEW1EZhqXy78EZVM_sQLH0Qbr7QOzbgbsKBRn1FtVrg@mail.gmail.com>
-	<4E4172A8.3030101@ti.com> <4E417BD5.8080409@freescale.com>
-	<20110809205723.GE11568@ponder.secretlab.ca>
-	<4E41A1B9.1060400@ti.com>
-	<20110809211747.GJ11568@ponder.secretlab.ca>
-	<4E41AA43.1000506@ti.com>
-	<20110809214905.GK11568@ponder.secretlab.ca>
-	<4E41AC5C.20301@ti.com> <20110810015214.GD23511@yookeroo.fritz.box>
-	<CACxGe6tr5OUxpiVah4s6rRG0cTOWsnohhEkZoSZgCj0xSZkmMA@mail.gmail.com>
-Message-ID: <4E43CB07.20002@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 11 Aug 2011 14:29:07 +0200
+Subject: [PATCH 10/19] mach-ep93xx: break out GPIO driver specifics
+In-Reply-To: <ADE657CA350FB648AAC2C43247A983F001F38838966E@AUSP01VMBX24.collaborationhost.net>
+References: <1312978655-18405-1-git-send-email-linus.walleij@stericsson.com>
+	<ADE657CA350FB648AAC2C43247A983F001F38838966E@AUSP01VMBX24.collaborationhost.net>
+Message-ID: <CACRpkdabHj_C7wgGfu3g6LSsa2iMZS0h279wf6McOxfge9Gm_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/10/2011 9:22 PM, Grant Likely wrote:
-> On Tue, Aug 9, 2011 at 7:52 PM, David Gibson
-> <david@gibson.dropbear.id.au>  wrote:
->> On Tue, Aug 09, 2011 at 11:53:32PM +0200, Cousson, Benoit wrote:
->>> On 8/9/2011 11:49 PM, Grant Likely wrote:
->>>> That won't work either because that also breaks the existing 'reg'
->>>> binding.  Anything you do will need to supplement the existing
->>>> binding without changing it in an incompatible way.
->>>
->>> OK, but can we add a new attribute then? reg2, reg_ng, reg_plusplus,
->>> reg_named...?
->>
->> He already suggested reg-names to be interpreted in parallel with the
->> existing reg property.  The (serious) problem with replacing the reg
->> property is that it will break all existing OSes (including old Linux
->> versions) that don't understand the new property.
->>
->> Of course, the problem with reg-names is that it will be ignored by
->> older OSes, and so 'reg' must still be in the correct order.  In which
->> case you could argue it's more sensible to just have a static place to
->> name mapping in the Linux driver.
->>
->> In short, yes, named reg elements in the DT would be nice in theory,
->> but I'm not convinced it's worth a DT flag day to accomplish it.
+On Wed, Aug 10, 2011 at 7:23 PM, H Hartley Sweeten
+<hartleys@visionengravers.com> wrote:
+> On Wednesday, August 10, 2011 5:18 AM, Linus Walleij wrote:
+
+> I'm a bit confused by the intentions of this patch. ?Please see below.
+
+The intentions are in path 0, in this case specifically to
+let gpio.h be only about generic GPIO and gpiolib and
+gpio-<foo>.h be platform and driver specifics.
+
+
+>> diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
+>> index c60f081..94c78bc 100644
+>> --- a/arch/arm/mach-ep93xx/core.c
+>> +++ b/arch/arm/mach-ep93xx/core.c
+>> @@ -38,6 +38,7 @@
+>> ?#include <mach/fb.h>
+>> ?#include <mach/ep93xx_keypad.h>
+>> ?#include <mach/ep93xx_spi.h>
+>> +#include <mach/gpio-ep93xx.h>
 >
-> I'm inclined the same way, though I agree with the replies that point
-> out it wouldn't result in a 'flag day' because existing bindings
-> cannot become incompatible.  The problem I have is that adding
-> reg-names or similar implies that ordering of the reg property is no
-> longer defined which I absolutely do not think is a good idea.
+> Why is this additional include needed? ?With your change to the ep93xx
+> <mach/gpio.h> below, this header is already included by <linux/gpio.h>.
 
-That will not be an issue if "reg-named" is a completely new node. It 
-will replace the "reg" node only when a named entry is needed.
-Most devices will use the regular "reg" entry, and only the one that 
-need extra information will use the reg-named.
+Yes, but it is included in <mach/gpio.h> because the quick
+generic gpio macros in there use them, not because it
+wants to expose symbols from <mach/gpio-ep93xx.h> to
+the entire system, that is just a side effect due to
+low encapsulation.
 
-That seems to be pretty straightforward to implement, and as soon as it 
-is useful even for a couple of drivers, it worth adding it.
+> Since this file actually uses the gpiolib calls, the include of
+> <linux/gpio.h> is needed and appropriate.
 
-It is anyway better than having to add a custom property to get the 
-information we will miss otherwise.
+Yes that one *also*.
 
-Moreover, since some drivers are relying on that call, it will avoid 
-having to add extra code for nothing if CONFIG_OF is set.
+Because you do both generic and driver-specific
+operations.
 
-It will allow the driver to use a pretty standard API in anycase vs 
-using platform_get_resource + some extra optional calls to of_ functions 
-+ some code to get the information for non-DT build.
+The intention is not to minimize the number of #include<>
+statements (if we want that we could always rely on
+implicit includes from other files, which is an abomonation),
+the intention is separation of concerns.
 
-> Please, stick with the established convention and explicitly order
-> 'reg' and 'interrupts' properties.  If there is a specific use case
-> where this doesn't work, then bring it up, but I haven't seen any yet.
+> Question... Shouldn't the gpio_to_irq and irq_to_gpio defines also be moved
+> here?
 
-There will always be some alternatives, but they will be uglier, and the 
-effort to add some extra node to DT is so small, that it is better to do 
-that instead of adding some useless extra code in the driver.
+These are currently part of the generic GPIO and gpiolib
+since they are defined in <linux/gpio.h> :-/
 
->   The current users of _byname that I've looked seem to only use it for
-> convenience, not because a register range may be optional.  ie. they
-> all fail out if a reg resource isn't present.
+We will get rid of them eventually but I cannot refactor
+the entire universe at once.
 
-If that API can help the driver writer and can avoid adding 10 lines of 
-code, it is still useful to use it.
+>> -#define EP93XX_GPIO_LINE_EGPIO7 ? ? ? ? ? ? ?EP93XX_GPIO_LINE_A(7)
+>> +/* new generic GPIO API - see Documentation/gpio.txt */
+>
+> Russell's patch removed this comment. ?I don't see any reason to
+> put it back.
 
-To be honest, I still do not understand why you are so reluctant to add 
-that small feature.
+My bad, fixing it up.
 
-That will not break compatibility and it will make our life easier.
-Don't you want to make our life easier? :-)
+>> -/* GPIO port B. ?*/
+>> -#define EP93XX_GPIO_LINE_B(x) ? ? ? ? ? ? ? ?((x) + 8)
+>> -#define EP93XX_GPIO_LINE_EGPIO8 ? ? ? ? ? ? ?EP93XX_GPIO_LINE_B(0)
+>> -#define EP93XX_GPIO_LINE_EGPIO9 ? ? ? ? ? ? ?EP93XX_GPIO_LINE_B(1)
+>> -#define EP93XX_GPIO_LINE_EGPIO10 ? ? EP93XX_GPIO_LINE_B(2)
+>> -#define EP93XX_GPIO_LINE_EGPIO11 ? ? EP93XX_GPIO_LINE_B(3)
+>> -#define EP93XX_GPIO_LINE_EGPIO12 ? ? EP93XX_GPIO_LINE_B(4)
+>> -#define EP93XX_GPIO_LINE_EGPIO13 ? ? EP93XX_GPIO_LINE_B(5)
+>> -#define EP93XX_GPIO_LINE_EGPIO14 ? ? EP93XX_GPIO_LINE_B(6)
+>> -#define EP93XX_GPIO_LINE_EGPIO15 ? ? EP93XX_GPIO_LINE_B(7)
+>> +#include <asm-generic/gpio.h>
+>
+> I believe Russell's patch moves this include to arm's <asm/gpio.h>.
+> Having it included here is a bit redundant.
 
-Benoit
+Fixing it. My error.
+
+>> +#include "gpio-ep93xx.h"
+>
+> Why this form? ?Isn't <mach/gpio-ep93xx.h> the preferred form?
+
+This is to make the inclusion very local. The only reason it is
+included at all is to get EP93XX_GPIO_LINE_MAX_IRQ,
+nothing else.
+
+>> -/* maximum value for irq capable line identifiers */
+>> -#define EP93XX_GPIO_LINE_MAX_IRQ ? ? EP93XX_GPIO_LINE_F(7)
+>> +#define gpio_get_value ? ? ? __gpio_get_value
+>> +#define gpio_set_value ? ? ? __gpio_set_value
+>> +#define gpio_cansleep ? ? ? ?__gpio_cansleep
+
+You didn't comment on this but it's yet another bug due to
+bad rebasing. Fixing it. Thse should not be reintroduced.
+
+>> diff --git a/arch/arm/mach-ep93xx/simone.c b/arch/arm/mach-ep93xx/simone.c
+>> index 8392e95..1a472ff 100644
+>> --- a/arch/arm/mach-ep93xx/simone.c
+>> +++ b/arch/arm/mach-ep93xx/simone.c
+>> @@ -18,12 +18,12 @@
+>> ?#include <linux/kernel.h>
+>> ?#include <linux/init.h>
+>> ?#include <linux/platform_device.h>
+>> -#include <linux/gpio.h>
+>> ?#include <linux/i2c.h>
+>> ?#include <linux/i2c-gpio.h>
+>>
+>> ?#include <mach/hardware.h>
+>> ?#include <mach/fb.h>
+>> +#include <mach/gpio-ep93xx.h>
+>
+> Here I can kind of agree on the removal of <linux/gpio.h> and adding <mach/gpio-ep93xx.h>.
+>
+> This file does not use any of the gpiolib calls. ?It just needs to pick up the defines
+> for the two gpio pins used for the I2C bus.
+
+Yes that's the idea.
+
+> Still, it seems a bit awkward....
+
+In what way?
+
+> Same comment here. It's technically correct but it's seems awkward.
+
+Define awkward.
+
+I know you can get the same *implicitly* from <linux/gpio.h>
+but that is the awkward problem we're trying to get rid of.
+
+Eventually <linux/gpio.h> will *not* bring in *any* platform-
+or driver-specific crap. Not today, but as soon as we get
+somewhere with the single image concept.
+
+Similarly, platforms with GPIO not using generic GPIO
+or gpiolib at all have simply had their headers renamed
+<mach/gpio-foo.h>.
+
+Atleast that's my idea, I guess someone may smack my
+fingers.
+
+Thanks,
+Linus Walleij
