@@ -1,54 +1,54 @@
 From: ludovic.desroches@atmel.com (ludovic.desroches at atmel.com)
-Date: Thu, 11 Aug 2011 17:25:45 +0200
-Subject: [PATCH v2 5/8] mmc: atmel-mci: change atmci_start_command to
-	atmci_send_command
+Date: Thu, 11 Aug 2011 17:25:47 +0200
+Subject: [PATCH v2 7/8] mmc: atmel-mci: correct sg buffer size evaluation
 In-Reply-To: <1313076348-3065-1-git-send-email-ludovic.desroches@atmel.com>
 References: <1311863398-31579-1-git-send-email-ludovic.desroches@atmel.com>
 	<1313076348-3065-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <63e45b775c555f3e97741409653f75651c963b87.1313071126.git.ludovic.desroches@atmel.com>
+Message-ID: <2f4a8ec5ba984e7e8730580811781869c4112b15.1313071126.git.ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-Change atmci_start_command function name to atmci_send_command which is more
-appropriate to no think we are sending a start command.
+Assuming that a sg buffer size is a page size is false so use sg_dma_len.
+A 4096 bytes can be required with two 2048-bytes sg buffer.
 
 Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 ---
- drivers/mmc/host/atmel-mci.c |    6 +++---
- 1 files changed, 3 insertions(+), 3 deletions(-)
+ drivers/mmc/host/atmel-mci.c |    7 +++----
+ 1 files changed, 3 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
-index efbee87..7955697 100644
+index c415322..963e320 100644
 --- a/drivers/mmc/host/atmel-mci.c
 +++ b/drivers/mmc/host/atmel-mci.c
-@@ -565,7 +565,7 @@ static u32 atmci_prepare_command(struct mmc_host *mmc,
- 	return cmdr;
- }
+@@ -608,7 +608,7 @@ static void atmci_pdc_set_single_buf(struct atmel_mci *host,
+ 	}
  
--static void atmci_start_command(struct atmel_mci *host,
-+static void atmci_send_command(struct atmel_mci *host,
- 		struct mmc_command *cmd, u32 cmd_flags)
- {
- 	WARN_ON(host->cmd);
-@@ -581,7 +581,7 @@ static void atmci_start_command(struct atmel_mci *host,
- 
- static void atmci_send_stop_cmd(struct atmel_mci *host, struct mmc_data *data)
- {
--	atmci_start_command(host, data->stop, host->stop_cmdr);
-+	atmci_send_command(host, data->stop, host->stop_cmdr);
- 	atmci_writel(host, ATMCI_IER, ATMCI_CMDRDY);
- }
- 
-@@ -1003,7 +1003,7 @@ static void atmci_start_request(struct atmel_mci *host,
- 	iflags |= ATMCI_CMDRDY;
- 	cmd = mrq->cmd;
- 	cmdflags = atmci_prepare_command(slot->mmc, cmd);
--	atmci_start_command(host, cmd, cmdflags);
-+	atmci_send_command(host, cmd, cmdflags);
- 
- 	if (data)
- 		host->submit_data(host, data);
+ 	atmci_writel(host, pointer_reg, sg_dma_address(host->sg));
+-	if (host->data_size <= PAGE_SIZE) {
++	if (host->data_size <= sg_dma_len(host->sg)) {
+ 		if (host->data_size & 0x3) {
+ 			/* If size is different from modulo 4, transfer bytes */
+ 			atmci_writel(host, counter_reg, host->data_size);
+@@ -620,8 +620,8 @@ static void atmci_pdc_set_single_buf(struct atmel_mci *host,
+ 		host->data_size = 0;
+ 	} else {
+ 		/* We assume the size of a page is 32-bits aligned */
+-		atmci_writel(host, counter_reg, PAGE_SIZE / 4);
+-		host->data_size -= PAGE_SIZE;
++		atmci_writel(host, counter_reg, sg_dma_len(host->sg) / 4);
++		host->data_size -= sg_dma_len(host->sg);
+ 		if (host->data_size)
+ 			host->sg = sg_next(host->sg);
+ 	}
+@@ -808,7 +808,6 @@ atmci_prepare_data_pdc(struct atmel_mci *host, struct mmc_data *data)
+ 	/* Configure PDC */
+ 	host->data_size = data->blocks * data->blksz;
+ 	sg_len = dma_map_sg(&host->pdev->dev, data->sg, data->sg_len, dir);
+-	BUG_ON(sg_len < host->data_size / PAGE_SIZE);
+ 	if (host->data_size)
+ 		atmci_pdc_set_both_buf(host,
+ 			((dir == DMA_FROM_DEVICE)?XFER_RECEIVE:XFER_TRANSMIT));
 -- 
 1.7.0.4
