@@ -1,51 +1,49 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 11 Aug 2011 10:32:08 -0500
-Subject: Subject: L2x0 OF properties do not include interrupt #
-In-Reply-To: <20110811130910.GA10189@e102144-lin.cambridge.arm.com>
-References: <000201cc575b$c1229010$4367b030$@rutland@arm.com>
-	<201108101624.27881.arnd@arndb.de>
-	<20110810142808.GL10121@e102144-lin.cambridge.arm.com>
-	<201108111505.11887.arnd@arndb.de>
-	<20110811130910.GA10189@e102144-lin.cambridge.arm.com>
-Message-ID: <4E43F5F8.4060704@gmail.com>
+From: gregkh@suse.de (Greg KH)
+Date: Thu, 11 Aug 2011 08:22:39 -0700
+Subject: [PATCH 4/4] Move top level platform devices in sysfs to
+	/sys/devices/soc/X
+In-Reply-To: <4E43C399.1040505@stericsson.com>
+References: <1312981422-13294-1-git-send-email-lee.jones@linaro.org>
+	<1312981422-13294-4-git-send-email-lee.jones@linaro.org>
+	<20110810150232.GC7938@suse.de> <4E43C399.1040505@stericsson.com>
+Message-ID: <20110811152239.GB13745@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/11/2011 08:09 AM, Will Deacon wrote:
-> On Thu, Aug 11, 2011 at 02:05:11PM +0100, Arnd Bergmann wrote:
->> On Wednesday 10 August 2011, Will Deacon wrote:
->>> I was hoping that it was possible to have separate properties which describe
->>> the interrupt. So you could have something like pmu-interrupt <75> and
->>> abort-interrupt <76> rather than interrupts <75, 76>.
->>
->> Ok, I see.
->>
->>> I've not played with DT bindings before though, so if it's usually done with
->>> an ordered list then so be it!
->>
->> A lot of the code assumes that the property is called 'interrupts' and that
->> it contains a fixed-length array of interrupt numbers, each for one specific
->> purpose.
+On Thu, Aug 11, 2011 at 01:57:13PM +0200, Linus Walleij wrote:
+> On 08/10/2011 05:02 PM, Greg KH wrote:
+> >On Wed, Aug 10, 2011 at 02:03:42PM +0100, Lee Jones wrote:
+> >>At the request of Arnd Bergmann this patch moves all SoC
+> >>platform devices found in sysfs from /sys/devices/platform to
+> >>/sys/devices/soc/<SoCNum>/. It is believed as the devices are
+> >>SoC specific and a /sys/devices/soc node has recently become
+> >>available, that this would be a more appropriate place to
+> >>display the data.
+> >And what userspace tools did you just break by doing this?
 > 
-> Ok, I wondered if something like that might be the case.
+> I think most of our userspace for this platform poking
+> around in sysfs use /sys/class/* so should be pretty OK.
 > 
->> Given that we have so many different meanings for the interrupts, I'm
->> not sure how this would work best in this case. According to
->> http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0246f/CHDFHCFJ.html
->> this looks like a nested interrupt controller, i.e. the L2CC has its own mask
->> and status register with bits for each one of them. We could model these by
->> describing the l2cc interrupt controller with these registers and listing all
->> nine of the current inputs. I suspect however that it would be easier to just
->> assume that there is only one line for now, and treat the l2cc as a single
->> interrupt source with an internal status register.
+> And none of which were properly documented in
+> Documentation/ABI/* anyway, so do we care?
+> grep -r 'devices/platform' Documentation/ABI/
+> doesn't show anything relating to the ux500.
 > 
-> Given that this binding is only for the l2x0 / pl310 and I don't know of any
-> implementation where > 1 interrupt line is wired up, I'm happy to assume a
-> single combined interrupt line for now.
+> The major breakage would be out-of-tree stuff, if
+> any.
 > 
+> Which is out-of-tree due to the absence of a SoC ID
+> framework.
+> 
+> Which was nixed by Arnd et al precisely because
+> the above change was not part of it.
+> 
+> It's a bit hard for Lee to please everyone with this
+> one I suspect :-D
 
-I know of one. Although, we have the combined interrupt as well. The
-binding should allow either way and specify the order. If the event
-counter interrupt is 1st, then it should be the same to s/w.
+Ok, if you get guarantees from anyone using the in-kernel platform soc
+code that this move is acceptable, and you guarantee that no userspace
+tools will break, that's fine.  But odds are, you are going to break
+something...
 
-Rob
+greg k-h
