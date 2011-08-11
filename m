@@ -1,33 +1,109 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 11 Aug 2011 16:05:01 +0200
-Subject: PB1176 broken in -rc1
-In-Reply-To: <20110810152400.GO10121@e102144-lin.cambridge.arm.com>
-References: <20110810152400.GO10121@e102144-lin.cambridge.arm.com>
-Message-ID: <CACRpkdZs=PuFNfHTiviF-vXaz2_-w8g-ZsMw6_mhozbZ8a3r7Q@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh)
+Date: Thu, 11 Aug 2011 19:37:56 +0530
+Subject: [PATCH] OMAP: clockdomain: Wait for powerdomain to be ON when
+	using clockdomain force wakeup
+In-Reply-To: <4E214267.2090700@ti.com>
+References: <1310527588-13022-1-git-send-email-santosh.shilimkar@ti.com>
+	<1310527588-13022-2-git-send-email-santosh.shilimkar@ti.com>
+	<alpine.DEB.2.00.1107150159580.16606@utopia.booyaka.com>
+	<4E214267.2090700@ti.com>
+Message-ID: <4E43E23C.2080207@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 10, 2011 at 5:24 PM, Will Deacon <will.deacon@arm.com> wrote:
+Paul,
 
-> [ ? ?0.000000] CPU: found DTCM0 4k @ 00000000, not enabled
-> [ ? ?0.000000] CPU: moved DTCM0 4k to fffe8000, enabled
-> [ ? ?0.000000] CPU: found DTCM1 4k @ 00000000, not enabled
-> [ ? ?0.000000] CPU: moved DTCM1 4k to fffe9000, enabled
-> [ ? ?0.000000] CPU: found ITCM0 4k @ 00000000, not enabled
-> [ ? ?0.000000] CPU: moved ITCM0 4k to fffe0000, enabled
-> [ ? ?0.000000] CPU: found ITCM1 4k @ 00000000, not enabled
-> [ ? ?0.000000] CPU: moved ITCM1 4k to fffe1000, enabled
+On Saturday 16 July 2011 01:18 PM, Santosh Shilimkar wrote:
+> Hi Paul,
+>
+> On 7/15/2011 1:03 AM, Paul Walmsley wrote:
+>> cc'ing Patrick
+>>
+>> Hi Rajendra, Santosh,
+>>
+>> some comments here:
+>>
+>> On Wed, 13 Jul 2011, Santosh Shilimkar wrote:
+>>
+>>> While using clockdomain force wakeup method, not waiting for powerdomain
+>>> to be effectively ON may end up locking the clockdomain FSM until a
+>>> next wakeup event occurs.
+>>>
+>>> One such issue was seen on OMAP4430, where L4_PER was periodically
+>>> getting stuck in in-transition state when transitioning from from
+>>> OSWR to ON.
+>>>
+>>> This issue was reported and investigated by Patrick
+>>> Titiano<p-titiano@ti.com>
+>>>
+>>> Signed-off-by: Santosh Shilimkar<santosh.shilimkar@ti.com>
+>>> Signed-off-by: Rajendra Nayak<rnayak@ti.com>
+>>> Reported-by: Patrick Titiano<p-titiano@ti.com>
+>>> Cc: Kevin Hilman<khilman@ti.com>
+>>> Cc: Benoit Cousson<b-cousson@ti.com>
+>>> Cc: Paul Walmsley<paul@pwsan.com>
+>>> ---
+>>> arch/arm/mach-omap2/clockdomain.c | 7 ++++++-
+>>> 1 files changed, 6 insertions(+), 1 deletions(-)
+>>>
+>>> diff --git a/arch/arm/mach-omap2/clockdomain.c
+>>> b/arch/arm/mach-omap2/clockdomain.c
+>>> index b98a972..583cc3d 100644
+>>> --- a/arch/arm/mach-omap2/clockdomain.c
+>>> +++ b/arch/arm/mach-omap2/clockdomain.c
+>>> @@ -718,6 +718,8 @@ int clkdm_sleep(struct clockdomain *clkdm)
+>>> */
+>>> int clkdm_wakeup(struct clockdomain *clkdm)
+>>> {
+>>> + int ret;
+>>> +
+>>> if (!clkdm)
+>>> return -EINVAL;
+>>>
+>>> @@ -732,7 +734,10 @@ int clkdm_wakeup(struct clockdomain *clkdm)
+>>>
+>>> pr_debug("clockdomain: forcing wakeup on %s\n", clkdm->name);
+>>>
+>>> - return arch_clkdm->clkdm_wakeup(clkdm);
+>>> + ret = arch_clkdm->clkdm_wakeup(clkdm);
+>>> + ret |= pwrdm_wait_transition(clkdm->pwrdm.ptr);
+>>
+>> Seems like this should just call pwrdm_state_switch() or
+>> pwrdm_clkdm_state_switch()? (This second function looks superfluous, we
+>> should probably get rid of it.)
+>>
+> This comment was expected since initially we thought of using
+> pwrdm_clkdm_state_switch
+>
+> pwrdm_clkdm_state_switch()
+> |--> pwrdm_wait_transition()
+> |--> pwrdm_state_switch()
+>
+> What we need is only first function to ensure that we don't
+> proceed when PD is in middle of transition.
+>
+> The second function is actually just doing those debug counter
+> updates and we wanted to avoid that since it's a live path.
+> Rajendra observed some huge latencies while doing the
+> profiling and the suspect was "pwrdm_state_switch()" which
+> actually keeps adding overhead because of those counter
+> updates.
+>
+>> Shouldn't this be added to all of
+>> clkdm_{wakeup,sleep,allow_idle,deny_idle}() if it isn't there already?
+>>
+> clkdm_allow_idle() already has the power-domain wait.
+> This patch adds it for clkdm_wakeup() function.
+> clkdm_sleep(), this shouldn't be applicable since power
+> domain sleep transition is depdent on other clockdomains
+> in the PD and it's a lazy operation.
+> That leaves clkdm_deny_idle() and I guess we should
+> address this API as well.
+>
+> If you agree with above, I can update the patch to address
+> remaining clkdm_deny_idle() function.
+>
+Ping?
 
-Just hijacking the thread: at one time I think I saw some ARM
-high-level schematic of a mpcore where the ARM cores actually had
-TCM in them.
-
-I actually spent some time adding multicore TCM support until
-I realized that the PB11MPcore actually didn't have TCM.
-So I just dropped that stuff.
-
-But to be sure, is there a platform like that, multicore, with
-per-processor TCM?
-
-Thanks,
-Linus Walleij
+Regards
+Santosh
