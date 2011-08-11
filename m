@@ -1,36 +1,56 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Thu, 11 Aug 2011 14:11:06 -0700
-Subject: [PATCHv4 1/2] ARM: Set proper TEXT_OFFSET for newer MSMs
-In-Reply-To: <1311794355-26988-1-git-send-email-sboyd@codeaurora.org>
-References: <1311794355-26988-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20110811211106.GA14101@huya.qualcomm.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Thu, 11 Aug 2011 16:37:19 -0500
+Subject: [RFC PATCH 6/6] hwmon: OMAP4: On die temperature sensor driver
+In-Reply-To: <20110811185558.GC15970@legolas.emea.dhcp.ti.com>
+References: <1312979122-5896-1-git-send-email-j-keerthy@ti.com>
+	<1312979122-5896-7-git-send-email-j-keerthy@ti.com>
+	<20110810124629.GJ12882@legolas.emea.dhcp.ti.com>
+	<CAJ6a13Z=u=exWUHLotw8jpHMv-hKpE+fvg_1hq7=gtMiuJKxOA@mail.gmail.com>
+	<20110811103658.GG27742@legolas.emea.dhcp.ti.com>
+	<CAJ6a13bxg8po-Csc10LsFH-oES4YOKkqFoTm3kG4XzS=b2boMw@mail.gmail.com>
+	<20110811141248.GK28500@legolas.emea.dhcp.ti.com>
+	<CAJ6a13b7qu3K4YJPTYych_NQxLuuUxZOQg6PPC_=XA+qiwn2RA@mail.gmail.com>
+	<20110811185408.GB15970@legolas.emea.dhcp.ti.com>
+	<20110811185558.GC15970@legolas.emea.dhcp.ti.com>
+Message-ID: <4E444B8F.9060908@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 27, 2011 at 12:19:14PM -0700, Stephen Boyd wrote:
-> MSMs post 8x50 have 2Mb at the beginning of RAM reserved for
-> shared memory. Since the kernel hasn't typically been told this
-> RAM exists, PHYS_OFFSET has been set to 0xN0200000 and the memory
-> atags passed to the kernel have matched. This doesn't play nicely
-> with things such as AUTO_ZRELADDR, which doesn't work at all, and
-> dynamic phys to virt, which requires an MSM specific workaround.
+On 08/11/2011 01:55 PM, Felipe Balbi wrote:
+> Hi,
 > 
-> Work around these issues by telling the kernel RAM starts at
-> 0xN0000000 (it actually does) and fixup the atags from the
-> bootloader (if necessary) to say the same. In addition, make sure
-> to set TEXT_OFFSET at least 2Mb beyond the start of RAM so that
-> the kernel doesn't end up being decompressed into shared memory.
+> On Thu, Aug 11, 2011 at 09:54:09PM +0300, Felipe Balbi wrote:
+>>>> you need some other way to handle this. Why do you need to manually set
+>>>> the rate rather than having hwmod handle this for you ?
+>>>>
+>>>> your argument that "it's a one time setting" is not enough to have this
+>>>> in the driver. Drivers should not care about clocks anymore, this should
+>>>> have been done on another layer.
+>>>
+>>> Hwmod will have no idea on the rate required.
+>>
+>> does the rate need to change ? Also, I have not mentioned hwmod anytime
 > 
-> After doing this, AUTO_ZRELADDR should work on MSM with no
-> problems and ARM_PATCH_PHYS_VIRT_16BIT should no longer be
-> necessary.
+> i did mention hwmod, nevermind that part. Still I'm not sure where is
+> the right place to handle this.
 > 
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-> ---
 
-Acked-by: David Brown <davidb@codeaurora.org>
+Aren't the omap_device_pm_latency callbacks the right place to do it?
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+e.g. in the following snippet from mach-omap2/temp_sensor_device.c
+
++static struct omap_device_pm_latency omap_temp_sensor_latency[] = {
++	{
++	 .deactivate_func = omap_device_idle_hwmods,
++	 .activate_func = omap_device_enable_hwmods,
++	 .flags = OMAP_DEVICE_LATENCY_AUTO_ADJUST,
++	}
++};
+
+instead of directly pointing activate_func to omap_device_enable_hwmods,
+it could point to a function that sets the required clock rate and then
+enables the hwmod.
+
+
+regards,
+-roger
