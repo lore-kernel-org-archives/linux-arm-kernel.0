@@ -1,29 +1,37 @@
 From: jamie@jamieiles.com (Jamie Iles)
-Date: Thu, 11 Aug 2011 09:49:06 +0100
-Subject: [RFC PATCH] ARM: sched_clock: allow sched_clock to be selected
-	at runtime
-In-Reply-To: <20110811082515.GB4775@n2100.arm.linux.org.uk>
-References: <1312910015-20043-1-git-send-email-marc.zyngier@arm.com>
-	<20110810114907.GA2680@pulham.picochip.com>
-	<20110811082515.GB4775@n2100.arm.linux.org.uk>
-Message-ID: <20110811084906.GA2732@pulham.picochip.com>
+Date: Thu, 11 Aug 2011 10:01:47 +0100
+Subject: [PATCHv3 4/9] macb: convert printk to netdev_ and friends
+In-Reply-To: <1312921227.11924.35.camel@Joe-Laptop>
+References: <1312881411-2376-1-git-send-email-jamie@jamieiles.com>
+	<1312881411-2376-5-git-send-email-jamie@jamieiles.com>
+	<1312921227.11924.35.camel@Joe-Laptop>
+Message-ID: <20110811090147.GD2732@pulham.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 11, 2011 at 09:25:15AM +0100, Russell King - ARM Linux wrote:
-> On Wed, Aug 10, 2011 at 12:49:07PM +0100, Jamie Iles wrote:
-> > Tested on my 1176 platform and works nicely.  However, shouldn't the 
-> > read functions still be marked notrace so they don't appear in ftrace 
-> > output?
-> > 
-> > On my (out of tree) platform, omitting notrace and having all of the 
-> > ftrace bootup tests results in a hard lockup.  Annotating the read 
-> > function resolves this.
+On Tue, Aug 09, 2011 at 01:20:27PM -0700, Joe Perches wrote:
+> On Tue, 2011-08-09 at 10:16 +0100, Jamie Iles wrote:
+> > macb is already using the dev_dbg() and friends helpers so use netdev_()
+> > along with a pr_fmt() definition to make the printing a little cleaner.
+> []
+> > diff --git a/drivers/net/macb.c b/drivers/net/macb.c
+> []
+> > @@ -8,6 +8,7 @@
+> []
+> > +#define pr_fmt(fmt) "macb: " fmt
 > 
-> Why not also convert ftrace to use clocksources ?
+> Hi Jamie.
+> 
+> Just trivia.
+> 
+> Please use #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt 
+> instead.  There would be no output difference.
+> 
+> That'll make it easier to remove later when all of
+> of these #defines pr_fmt that use just KBUILD_MODNAME
+> can be removed.
 
-I can't say I know enough about ftrace to say what the implications of 
-that would be (other than a dependency on all platforms having a 
-suitable clocksource).
+I hadn't noticed KBUILD_MODNAME before, thanks for pointing that out 
+Joe.  I'll update with this change.
 
 Jamie
