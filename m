@@ -1,65 +1,31 @@
-From: michael.jones@matrix-vision.de (Michael Jones)
-Date: Thu, 11 Aug 2011 17:07:21 +0200
-Subject: [PATCH] OMAP: Fix linking error in twl-common.c for OMAP2/3/4
-	only builds
-In-Reply-To: <20110810091519.GB1939@atomide.com>
-References: <20110808110056.GA15134@n2100.arm.linux.org.uk>
-	<1312893410-3968-1-git-send-email-peter.ujfalusi@ti.com>
-	<20110810091519.GB1939@atomide.com>
-Message-ID: <4E43F029.6060208@matrix-vision.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 11 Aug 2011 16:08:07 +0100
+Subject: [PATCH 11/13] ARM: gpio: consolidate trivial gpiolib
+	implementations
+In-Reply-To: <017101cc581c$6e277530$4a765f90$%kim@samsung.com>
+References: <20110809080411.GA1831@n2100.arm.linux.org.uk>
+	<E1QqhM1-0003af-U5@rmk-PC.arm.linux.org.uk>
+	<017101cc581c$6e277530$4a765f90$%kim@samsung.com>
+Message-ID: <20110811150807.GB4924@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Aug 11, 2011 at 08:47:18PM +0900, Kukjin Kim wrote:
+> Russell King - ARM Linux wrote:
+> > 
+> > Consolidate 24 trivial gpiolib implementions out of mach/gpio.h
+> > into asm/gpio.h.  This is basically the include of asm-generic/gpio.h
+> > and the definition of gpio_get_value, gpio_set_value, and gpio_cansleep
+> > as described in Documentation/gpio.txt
+> > 
+> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> 
+> Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+> on following Samsung stuff...
 
-On 08/10/2011 11:15 AM, Tony Lindgren wrote:
-> 
-> * Peter Ujfalusi <peter.ujfalusi@ti.com> [110809 05:31]:
->> Avoid compiling code for OMAP arch which is not selected by the
->> config.
->>
->> Fixes issues like:
->> With CONFIG_ARCH_OMAP3=y and CONFIG_ARCH_OMAP4=n, I'm getting this:
->>
->> arch/arm/mach-omap2/built-in.o:(.data+0xf99c): undefined reference to `omap4430_phy_init'
->> arch/arm/mach-omap2/built-in.o:(.data+0xf9a0): undefined reference to `omap4430_phy_exit'
->> arch/arm/mach-omap2/built-in.o:(.data+0xf9a4): undefined reference to `omap4430_phy_power'
->> arch/arm/mach-omap2/built-in.o:(.data+0xf9a8): undefined reference to `omap4430_phy_set_clk'
->> arch/arm/mach-omap2/built-in.o:(.data+0xf9ac): undefined reference to `omap4430_phy_suspend'
->>
->> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
->>
->> Hi Russel, Tony,
->>
->> This patch fixes the linking error caused by the twl-common.c file,
->> when the kernel is built for OMAP2/3/4 only.
-> 
-> Thanks, I'll queue this one as a fix with updated comments as below.
-> 
-> Regards,
-> 
-> Tony
-> 
-> 
-> From: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> Date: Tue, 9 Aug 2011 15:36:50 +0300
-> Subject: [PATCH] OMAP: Fix linking error in twl-common.c for OMAP2/3/4 only builds
-> 
-[snip]
+Thanks.
 
-I still stumbled upon these linker errors when building for my OMAP3
-board, using the current linux-omap master branch. I inadvertently had
-CONFIG_ARCH_OMAP4=y (leftover from my starting point,
-omap2plus_defconfig), but didn't have any of the boards with
-omap_phy_internal.o selected (OMAP_4430SDP, OMAP4_PANDA, PCM049, PCM049,
-OMAP3517EVM). Maybe this isn't a concern anyway, since anybody building
-with CONFIG_ARCH_OMAP4 will presumably also be building one of those
-boards? I don't know if it is our goal to build successfully with every
-wacky CONFIG_ combination, but I thought I would report it here just in
-case.
+> As a note, there were duplicated e-mail address Grant and Nicolas in Cc ;)
+> I just pushed 'reply all' :)
 
--Michael
-
-MATRIX VISION GmbH, Talstrasse 16, DE-71570 Oppenweiler
-Registergericht: Amtsgericht Stuttgart, HRB 271090
-Geschaeftsfuehrer: Gerhard Thullner, Werner Armingeon, Uwe Furtner, Erhard Meier
+That's not in the original email, and isn't in any one elses replies....
