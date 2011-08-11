@@ -1,44 +1,97 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 11 Aug 2011 21:02:10 +0100
-Subject: [PATCH] ARM: tegra: Fix <mach/gpio.h> to have necessary #includes
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF04AEA24CD0@HQMAIL01.nvidia.com>
-References: <74CDBE0F657A3D45AFBB94109FB122FF04AEA24CD0@HQMAIL01.nvidia.com>
-Message-ID: <20110811200210.GB24166@n2100.arm.linux.org.uk>
+From: dianders@chromium.org (Doug Anderson)
+Date: Thu, 11 Aug 2011 13:19:06 -0700
+Subject: [PATCH] i2c: tegra: fix possible race condition after tx
+Message-ID: <1313093946-24559-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 11, 2011 at 12:49:47PM -0700, Stephen Warren wrote:
-> Russell King wrote at Thursday, August 11, 2011 1:36 PM:
-> > On Thu, Aug 11, 2011 at 12:05:52PM -0600, Stephen Warren wrote:
-> > > Without this, EINVAL isn't defined, and type bool isn't declared.
-> > > This leads to compilation failures.
-> > 
-> > An alternative approach would be to convert tegra to be able to use
-> > the gpiolib __gpio_to_irq() for the on-SoC stuff, and eliminate
-> > irq_to_gpio().
-> > 
-> > Would it be possible to do that instead?
-> 
-> That should work too.
-> 
-> I posted a couple patches last Friday to remove irq_to_gpio:
-> 
-> https://lkml.org/lkml/2011/8/5/343
-> https://lkml.org/lkml/2011/8/5/342
-> 
-> Later in the thread, you said you would merge them into your branch to
-> avoid merge conflicts with the other GPIO work you were doing.
+In tegra_i2c_fill_tx_fifo, once we have finished pushing all the bytes
+to the I2C hardware controller, the interrupt might happen before we
+have updated i2c_dev->msg_buf_remaining at the end of the function.
+Then, in tegra_i2c_isr, we will call again tegra_i2c_fill_tx_fifo
+triggering weird behaviour. This has been shown to happen under real
+conditions.
 
-I suggested it would be a good idea.  Now that I've published those
-changes, any chance of having some updated patches in the patch system
-please?
+Signed-off-by: Doug Anderson <dianders@chromium.org>
+---
+ drivers/i2c/busses/i2c-tegra.c |   46 +++++++++++++++++++++++++++------------
+ 1 files changed, 32 insertions(+), 14 deletions(-)
 
-> For gpio_to_irq, yes, I believe we get rid of it pretty easily; we'd
-> just need to implement gpio-tegra.c's gpio_chip.to_irq function. Should
-> I cook up a patch based on top of linux-next plus the two patches above
-> to do that instead?
-
-Yes please, again eventually to the patch system once Grant has acked it
-to avoid the otherwise certain conflicts.
-
-Thanks for doing this.
+diff --git a/drivers/i2c/busses/i2c-tegra.c b/drivers/i2c/busses/i2c-tegra.c
+index 2440b74..9c5fb75 100644
+--- a/drivers/i2c/busses/i2c-tegra.c
++++ b/drivers/i2c/busses/i2c-tegra.c
+@@ -270,14 +270,30 @@ static int tegra_i2c_fill_tx_fifo(struct tegra_i2c_dev *i2c_dev)
+ 
+ 	/* Rounds down to not include partial word at the end of buf */
+ 	words_to_transfer = buf_remaining / BYTES_PER_FIFO_WORD;
+-	if (words_to_transfer > tx_fifo_avail)
+-		words_to_transfer = tx_fifo_avail;
+ 
+-	i2c_writesl(i2c_dev, buf, I2C_TX_FIFO, words_to_transfer);
+-
+-	buf += words_to_transfer * BYTES_PER_FIFO_WORD;
+-	buf_remaining -= words_to_transfer * BYTES_PER_FIFO_WORD;
+-	tx_fifo_avail -= words_to_transfer;
++	/* It's very common to have < 4 bytes, so optimize that case. */
++	if (words_to_transfer) {
++		if (words_to_transfer > tx_fifo_avail)
++			words_to_transfer = tx_fifo_avail;
++
++		/*
++		 * Update state before writing to FIFO.  If this casues us
++		 * to finish writing all bytes (AKA buf_remaining goes to 0) we
++		 * have a potential for an interrupt (PACKET_XFER_COMPLETE is
++		 * not maskable).  We need to make sure that the isr sees
++		 * buf_remaining as 0 and doesn't call us back re-entrantly.
++		 */
++		buf_remaining -= words_to_transfer * BYTES_PER_FIFO_WORD;
++		tx_fifo_avail -= words_to_transfer;
++		i2c_dev->msg_buf_remaining = buf_remaining;
++		i2c_dev->msg_buf = buf +
++			words_to_transfer * BYTES_PER_FIFO_WORD;
++		barrier();
++
++		i2c_writesl(i2c_dev, buf, I2C_TX_FIFO, words_to_transfer);
++
++		buf += words_to_transfer * BYTES_PER_FIFO_WORD;
++	}
+ 
+ 	/*
+ 	 * If there is a partial word at the end of buf, handle it manually to
+@@ -287,14 +303,15 @@ static int tegra_i2c_fill_tx_fifo(struct tegra_i2c_dev *i2c_dev)
+ 	if (tx_fifo_avail > 0 && buf_remaining > 0) {
+ 		BUG_ON(buf_remaining > 3);
+ 		memcpy(&val, buf, buf_remaining);
++
++		/* Again update before writing to FIFO to make sure isr sees. */
++		i2c_dev->msg_buf_remaining = 0;
++		i2c_dev->msg_buf = NULL;
++		barrier();
++
+ 		i2c_writel(i2c_dev, val, I2C_TX_FIFO);
+-		buf_remaining = 0;
+-		tx_fifo_avail--;
+ 	}
+ 
+-	BUG_ON(tx_fifo_avail > 0 && buf_remaining > 0);
+-	i2c_dev->msg_buf_remaining = buf_remaining;
+-	i2c_dev->msg_buf = buf;
+ 	return 0;
+ }
+ 
+@@ -411,9 +428,10 @@ static irqreturn_t tegra_i2c_isr(int irq, void *dev_id)
+ 			tegra_i2c_mask_irq(i2c_dev, I2C_INT_TX_FIFO_DATA_REQ);
+ 	}
+ 
+-	if ((status & I2C_INT_PACKET_XFER_COMPLETE) &&
+-			!i2c_dev->msg_buf_remaining)
++	if (status & I2C_INT_PACKET_XFER_COMPLETE) {
++		BUG_ON(i2c_dev->msg_buf_remaining);
+ 		complete(&i2c_dev->msg_complete);
++	}
+ 
+ 	i2c_writel(i2c_dev, status, I2C_INT_STATUS);
+ 	if (i2c_dev->is_dvc)
+-- 
+1.7.3.1
