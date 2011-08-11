@@ -1,42 +1,42 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 11 Aug 2011 17:34:27 +0100
-Subject: Subject: L2x0 OF properties do not include interrupt #
-In-Reply-To: <4E43FDFF.1080401@gmail.com>
-References: <000201cc575b$c1229010$4367b030$@rutland@arm.com>
-	<201108101624.27881.arnd@arndb.de>
-	<20110810142808.GL10121@e102144-lin.cambridge.arm.com>
-	<201108111505.11887.arnd@arndb.de>
-	<20110811130910.GA10189@e102144-lin.cambridge.arm.com>
-	<4E43F5F8.4060704@gmail.com>
-	<20110811153800.GC5154@e102144-lin.cambridge.arm.com>
-	<4E43FDFF.1080401@gmail.com>
-Message-ID: <20110811163427.GD5154@e102144-lin.cambridge.arm.com>
+From: guenter.roeck@ericsson.com (Guenter Roeck)
+Date: Thu, 11 Aug 2011 09:38:22 -0700
+Subject: [RFC PATCH 6/6] hwmon: OMAP4: On die temperature sensor driver
+In-Reply-To: <CAJ6a13bxg8po-Csc10LsFH-oES4YOKkqFoTm3kG4XzS=b2boMw@mail.gmail.com>
+References: <1312979122-5896-1-git-send-email-j-keerthy@ti.com>
+	<1312979122-5896-7-git-send-email-j-keerthy@ti.com>
+	<20110810124629.GJ12882@legolas.emea.dhcp.ti.com>
+	<CAJ6a13Z=u=exWUHLotw8jpHMv-hKpE+fvg_1hq7=gtMiuJKxOA@mail.gmail.com>
+	<20110811103658.GG27742@legolas.emea.dhcp.ti.com>
+	<CAJ6a13bxg8po-Csc10LsFH-oES4YOKkqFoTm3kG4XzS=b2boMw@mail.gmail.com>
+Message-ID: <1313080702.2214.69.camel@groeck-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 11, 2011 at 05:06:23PM +0100, Rob Herring wrote:
-> On 08/11/2011 10:38 AM, Will Deacon wrote:
-> > 
-> > You mean putting the combined interrupt first? If so, we may as well just
-> > specify that until somebody builds a platform that doesn't have it.
-> > 
+On Thu, 2011-08-11 at 09:00 -0400, J, KEERTHY wrote:
+> On Thu, Aug 11, 2011 at 4:06 PM, Felipe Balbi <balbi@ti.com> wrote:
+
+[ ... ]
+
+> >> >> +     temp = omap_temp_sensor_readl(temp_sensor,
+> >> >> +                     temp_sensor->registers->bgap_counter);
+> >> >> +     temp = (temp & temp_sensor->registers->counter_mask) >>
+> >> >> +                     __ffs(temp_sensor->registers->counter_mask);
+> >> >
+> >> >        temp &= ??
+> >> >
+> >> >> +     temp = temp * 1000 / (temp_sensor->clk_rate);
+> >> >
+> >> >        temp *= ??
+> >>
+> >> Need to multiply the temp with 1000 before dividing.
+> >> temp *= evaluates the RHS first and then multiplies LHS.
+> >
+> > temp *= 1000;
+> > temp /= clk_rate;
+> >
 > 
-> No, either you have 1 interrupt and it is the combined one. or you have
-> the 9? separate interrupts.  Having both combined and separate hooked up
-> is a bit dumb, so I would not worry about that case. I would just define
-> the event counter interrupt 1st as that is probably the primary use.
-> Also, I think that was the only interrupt on the L2x0 controllers IIRC.
+> Different coding style. I preferred to do it in a single line.
 > 
-> It's also conceivable that some of the interrupts get routed somewhere
-> else rather than just into the GIC.
+Me too.
 
-Ok. I think the binding that Mark posted to devicetree-discuss:
-
-http://lists.ozlabs.org/pipermail/devicetree-discuss/2011-August/007349.html
-
-will take care of this. We have a single interrupt (I don't think we even
-need to specify what it is). Interrupt handlers can request this with
-IRQ_SHARED and then check the status register to see whether they actually
-need to do anything.
-
-Will
+Guenter
