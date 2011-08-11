@@ -1,26 +1,34 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 11 Aug 2011 10:32:04 +0100
-Subject: [PATCHv4 2/2] ARM: P2V: Remove ARM_PATCH_PHYS_VIRT_16BIT
-In-Reply-To: <1311794355-26988-2-git-send-email-sboyd@codeaurora.org>
-References: <1311794355-26988-1-git-send-email-sboyd@codeaurora.org>
-	<1311794355-26988-2-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20110811093204.GE4775@n2100.arm.linux.org.uk>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Thu, 11 Aug 2011 11:46:47 +0200
+Subject: ARM Maintainers workshop at Kernel Summit 2011
+In-Reply-To: <20110809141548.GD17990@pengutronix.de>
+References: <CACxGe6u3jrhnmL=QwCevm5ybgtGqdOzmGZpfve02M12e9v6pNQ@mail.gmail.com>
+	<20110809141548.GD17990@pengutronix.de>
+Message-ID: <201108111146.47565.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 27, 2011 at 12:19:15PM -0700, Stephen Boyd wrote:
-> From: Nicolas Pitre <nicolas.pitre@linaro.org>
+On Tuesday, August 09, 2011 04:15:48 PM Sascha Hauer wrote:
+> On Sat, Aug 06, 2011 at 07:44:08AM +0100, Grant Likely wrote:
+> > As many of you know, Kernel Summit this year will be a three day
+> > event, with the first day dedicated to kernel subsystem workshops[1].
+> > Since Kernel Summit will be co-located with ELC-E which my arm
+> > developers will be attending, it is the perfect opportunity to have an
+> > ARM maintainers meeting.  Arnd Bergmann, Nicolas Pitre and I talked
+> > about it at Linaro Connect this past week and we're going to work on
+> > organising something.
+> > 
+> > However, for it to be successful we need to put together a draft
+> > agenda quickly.  Kernel summit is only 80 days away, and people need
+> > time to get approval and organise travel.  So, if you're interested in
+> > attending, then we need to know ASAP.  Reply to this email if you're
+> > interested.
 > 
-> This code can be removed now that MSM targets no longer need the 16-bit
-> offsets for P2V.
+> Since I'm at the ELC-E anyway and I have the ok from Robert, yes, I am
+> interested.
 > 
-> Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> Sascha
 
-Can you submit these two patches to the patch system so they can be
-integrated with the patch to enable by default the p2v patching please?
+Same here, I'd be at ELC-E too.
 
-You will need to update then against my for-next branch to account for
-that change - it should only be context changes in arch/arm/Kconfig.
-
-Thanks.
+Cheers
