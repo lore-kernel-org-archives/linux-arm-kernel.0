@@ -1,47 +1,141 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Thu, 11 Aug 2011 13:57:13 +0200
-Subject: [PATCH 4/4] Move top level platform devices in sysfs to
-	/sys/devices/soc/X
-In-Reply-To: <20110810150232.GC7938@suse.de>
-References: <1312981422-13294-1-git-send-email-lee.jones@linaro.org>
-	<1312981422-13294-4-git-send-email-lee.jones@linaro.org>
-	<20110810150232.GC7938@suse.de>
-Message-ID: <4E43C399.1040505@stericsson.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 11 Aug 2011 20:58:26 +0900
+Subject: [PATCH 12/13] ARM: gpio: consolidate gpio_to_irq
+In-Reply-To: <E1QqhMM-0003aj-C7@rmk-PC.arm.linux.org.uk>
+References: <20110809080411.GA1831@n2100.arm.linux.org.uk>
+	<E1QqhMM-0003aj-C7@rmk-PC.arm.linux.org.uk>
+Message-ID: <000101cc581d$fd45d5d0$f7d18170$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/10/2011 05:02 PM, Greg KH wrote:
-> On Wed, Aug 10, 2011 at 02:03:42PM +0100, Lee Jones wrote:
->    
->> At the request of Arnd Bergmann this patch moves all SoC
->> platform devices found in sysfs from /sys/devices/platform to
->> /sys/devices/soc/<SoCNum>/. It is believed as the devices are
->> SoC specific and a /sys/devices/soc node has recently become
->> available, that this would be a more appropriate place to
->> display the data.
->>      
-> And what userspace tools did you just break by doing this?
->    
+Russell King - ARM Linux wrote:
+> 
+> Many of the gpio_to_irq implementations use the gpiolib version of this
+> function.  Provide the standard gpiolib gpio_to_irq() for everyone, but
+> allow platforms to override it if they wish.  Add the neccessary
+> overrides for those platforms which do not use the standard definition.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-I think most of our userspace for this platform poking
-around in sysfs use /sys/class/* so should be pretty OK.
+Acked-by: Kukjin Kim <kgene.kim@samsung.com>
 
-And none of which were properly documented in
-Documentation/ABI/* anyway, so do we care?
-grep -r 'devices/platform' Documentation/ABI/
-doesn't show anything relating to the ux500.
+on following Samsung stuff :)
 
-The major breakage would be out-of-tree stuff, if
-any.
+Thanks.
 
-Which is out-of-tree due to the absence of a SoC ID
-framework.
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
 
-Which was nixed by Arnd et al precisely because
-the above change was not part of it.
+> ---
+>  arch/arm/include/asm/gpio.h                 |    9 +++++++++
 
-It's a bit hard for Lee to please everyone with this
-one I suspect :-D
+>  arch/arm/mach-exynos4/include/mach/gpio.h   |    2 --
 
-Thanks,
-Linus Walleij
+>  arch/arm/mach-s3c2410/include/mach/gpio.h   |    1 -
+>  arch/arm/mach-s3c64xx/include/mach/gpio.h   |    1 -
+>  arch/arm/mach-s5p64x0/include/mach/gpio.h   |    1 -
+>  arch/arm/mach-s5pc100/include/mach/gpio.h   |    1 -
+>  arch/arm/mach-s5pv210/include/mach/gpio.h   |    1 -
+> 
+> diff --git a/arch/arm/include/asm/gpio.h b/arch/arm/include/asm/gpio.h
+> index 15e8970..5032224 100644
+> --- a/arch/arm/include/asm/gpio.h
+> +++ b/arch/arm/include/asm/gpio.h
+> @@ -14,4 +14,13 @@
+>  #define gpio_cansleep   __gpio_cansleep
+>  #endif
+> 
+> +/*
+> + * Provide a default gpio_to_irq() which should satisfy every case.
+> + * However, some platforms want to do this differently, so allow them
+> + * to override it.
+> + */
+> +#ifndef gpio_to_irq
+> +#define gpio_to_irq	__gpio_to_irq
+> +#endif
+> +
+>  #endif /* _ARCH_ARM_GPIO_H */
+
+> diff --git a/arch/arm/mach-exynos4/include/mach/gpio.h b/arch/arm/mach-
+> exynos4/include/mach/gpio.h
+> index b2e3595..b91e8b2 100644
+> --- a/arch/arm/mach-exynos4/include/mach/gpio.h
+> +++ b/arch/arm/mach-exynos4/include/mach/gpio.h
+> @@ -13,8 +13,6 @@
+>  #ifndef __ASM_ARCH_GPIO_H
+>  #define __ASM_ARCH_GPIO_H __FILE__
+> 
+> -#define gpio_to_irq	__gpio_to_irq
+> -
+>  /* Practically, GPIO banks up to GPZ are the configurable gpio banks */
+> 
+>  /* GPIO bank sizes */
+
+> diff --git a/arch/arm/mach-s3c2410/include/mach/gpio.h b/arch/arm/mach-
+> s3c2410/include/mach/gpio.h
+> index 998ef4c..d502d17 100644
+> --- a/arch/arm/mach-s3c2410/include/mach/gpio.h
+> +++ b/arch/arm/mach-s3c2410/include/mach/gpio.h
+> @@ -12,7 +12,6 @@
+>  */
+> 
+>  #define __ARM_GPIOLIB_TRIVIAL
+> -#define gpio_to_irq	__gpio_to_irq
+> 
+>  /* some boards require extra gpio capacity to support external
+>   * devices that need GPIO.
+> diff --git a/arch/arm/mach-s3c64xx/include/mach/gpio.h b/arch/arm/mach-
+> s3c64xx/include/mach/gpio.h
+> index 6958b3f..3a8857c 100644
+> --- a/arch/arm/mach-s3c64xx/include/mach/gpio.h
+> +++ b/arch/arm/mach-s3c64xx/include/mach/gpio.h
+> @@ -13,7 +13,6 @@
+>  */
+> 
+>  #define __ARM_GPIOLIB_TRIVIAL
+> -#define gpio_to_irq	__gpio_to_irq
+> 
+>  /* GPIO bank sizes */
+>  #define S3C64XX_GPIO_A_NR	(8)
+> diff --git a/arch/arm/mach-s5p64x0/include/mach/gpio.h b/arch/arm/mach-
+> s5p64x0/include/mach/gpio.h
+> index a25160b..c3a6aa0 100644
+> --- a/arch/arm/mach-s5p64x0/include/mach/gpio.h
+> +++ b/arch/arm/mach-s5p64x0/include/mach/gpio.h
+> @@ -14,7 +14,6 @@
+>  #define __ASM_ARCH_GPIO_H __FILE__
+> 
+>  #define __ARM_GPIOLIB_TRIVIAL
+> -#define gpio_to_irq	__gpio_to_irq
+> 
+>  /* GPIO bank sizes */
+> 
+> diff --git a/arch/arm/mach-s5pc100/include/mach/gpio.h b/arch/arm/mach-
+> s5pc100/include/mach/gpio.h
+> index f515bfb..0e75641 100644
+> --- a/arch/arm/mach-s5pc100/include/mach/gpio.h
+> +++ b/arch/arm/mach-s5pc100/include/mach/gpio.h
+> @@ -16,7 +16,6 @@
+>  #define __ASM_ARCH_GPIO_H __FILE__
+> 
+>  #define __ARM_GPIOLIB_TRIVIAL
+> -#define gpio_to_irq	__gpio_to_irq
+> 
+>  /* GPIO bank sizes */
+>  #define S5PC100_GPIO_A0_NR	(8)
+> diff --git a/arch/arm/mach-s5pv210/include/mach/gpio.h b/arch/arm/mach-
+> s5pv210/include/mach/gpio.h
+> index 27f2139..d348ee2 100644
+> --- a/arch/arm/mach-s5pv210/include/mach/gpio.h
+> +++ b/arch/arm/mach-s5pv210/include/mach/gpio.h
+> @@ -14,7 +14,6 @@
+>  #define __ASM_ARCH_GPIO_H __FILE__
+> 
+>  #define __ARM_GPIOLIB_TRIVIAL
+> -#define gpio_to_irq	__gpio_to_irq
+> 
+>  /* Practically, GPIO banks up to MP03 are the configurable gpio banks */
+>
