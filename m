@@ -1,81 +1,101 @@
 From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Wed, 10 Aug 2011 18:31:30 -0700
-Subject: [PATCH v2 1/3] ARM: i.MX51: Remove _MX51 references
-Message-ID: <1313026292-945-1-git-send-email-troy.kisky@boundarydevices.com>
+Date: Wed, 10 Aug 2011 18:31:31 -0700
+Subject: [PATCH v2 2/3] ARM: i.MX51: clean up iomux-mx51.h
+In-Reply-To: <1313026292-945-1-git-send-email-troy.kisky@boundarydevices.com>
+References: <1313026292-945-1-git-send-email-troy.kisky@boundarydevices.com>
+Message-ID: <1313026292-945-2-git-send-email-troy.kisky@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use new macro NEW_PAD_CTRL to remove _MX51 references
+Delete about 700 used only once symbols.
+
+I used the following script to clean up the file,
+iomux-mx51.h.
+
+cp iomux-mx51.h iomux-mx51.h.cpy
+
+sed -n iomux-mx51.h.cpy \
+-e 's/#define[ \x09]\+\(_MX5[0-9a-zA-Z_]*\)[ \x09]\+\(.\+\)/s@\1@\2 at g/p' >t.tmp
+
+sed iomux-mx51.h.cpy \
+-e '/define[ \x09]\+_MX5/d' \
+-f t.tmp \
+-e 's/,[ \x09]*\([^,]\+\)/, \1/g' \
+-e 's/, 0)[ \x09]*|[ \x09]*MUX_PAD_CTRL(/, /' \
+-e 's/(IOMUX_PAD(\(.*\)))/IOMUX_PAD(\1)/' \
+-e 's/0x\([0-9a-fA-F]\{2\}\)[ \x09]*,/0x0\1,/' \
+-e 's/0x0\([0-9a-fA-F]\{3\}\)[ \x09]*,/0x\1,/' \
+-e '/#include <mach\/iomux-v3.h/ a#define __NA_\x090x000\n' \
+-e 's/0x[0]\{1,3\},/__NA_,/' \
+-e 's/#define[ \x09]\+\(MX5[0-9a-zA-Z_]*\)[ \x09]\+\(IOMUX_PAD.\+\)/#define \1\x09\2/' \
+-e 's/\(#define MX5[^\x09]\{5,12\}\)\x09\(IOMUX_PAD.\+\)/\1\x09\x09\x09\x09\2/' \
+-e 's/\(#define MX5[^\x09]\{13,20\}\)\x09\(IOMUX_PAD.\+\)/\1\x09\x09\x09\2/' \
+-e 's/\(#define MX5[^\x09]\{21,28\}\)\x09\(IOMUX_PAD.\+\)/\1\x09\x09\2/' \
+-e 's/\(#define MX5[^\x09]\{29,36\}\)\x09\(IOMUX_PAD.\+\)/\1\x09\2/' \
+-e 's/\(#define MX5[^\x09]\{45,\}\)\x09\(IOMUX_PAD.\+\)/\1\x09\\\n\x09\x09\x09\x09\x09\x09\2/' \
+-e 's/, IOMUX_CONFIG_SION,/, 0 | IOMUX_CONFIG_SION,/' \
+-e 's/\((0x[0-9a-fA-F]*, 0x[0-9a-fA-F]*, \)0x0\([0-9a-fA-F]\{2\},\)/\10x\2/' >iomux-mx51.h
 
 Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
 ---
- arch/arm/mach-mx5/board-cpuimx51sd.c         |    2 +-
- arch/arm/mach-mx5/board-mx51_babbage.c       |    4 ++--
- arch/arm/mach-mx5/eukrea_mbimxsd-baseboard.c |    4 ++--
- arch/arm/plat-mxc/include/mach/iomux-v3.h    |    1 +
- 4 files changed, 6 insertions(+), 5 deletions(-)
+ arch/arm/plat-mxc/include/mach/iomux-mx51.h | 2270 +++++++++------------------
+ 1 files changed, 758 insertions(+), 1512 deletions(-)
 
-diff --git a/arch/arm/mach-mx5/board-cpuimx51sd.c b/arch/arm/mach-mx5/board-cpuimx51sd.c
-index ff096d5..040c5c3 100644
---- a/arch/arm/mach-mx5/board-cpuimx51sd.c
-+++ b/arch/arm/mach-mx5/board-cpuimx51sd.c
-@@ -108,7 +108,7 @@ static iomux_v3_cfg_t eukrea_cpuimx51sd_pads[] = {
+I didn't include the entire patch because it is too big for the mailing list.
+Beside, you'll probably want to run the above script last thing before sending a pull
+for a clean up branch to avoid conflicts.
+
+
+diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx51.h b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
+index df6acc0..c7f5169 100644
+--- a/arch/arm/plat-mxc/include/mach/iomux-mx51.h
++++ b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
+@@ -14,6 +14,8 @@
+ #define __MACH_IOMUX_MX51_H__
  
- 	/* Touchscreen */
- 	/* IRQ */
--	_MX51_PAD_GPIO_NAND__GPIO_NAND | MUX_PAD_CTRL(PAD_CTL_PUS_22K_UP |
-+	NEW_PAD_CTRL(MX51_PAD_GPIO_NAND__GPIO_NAND, PAD_CTL_PUS_22K_UP |
- 			PAD_CTL_PKE | PAD_CTL_SRE_FAST |
- 			PAD_CTL_DSE_HIGH | PAD_CTL_PUE | PAD_CTL_HYS),
- };
-diff --git a/arch/arm/mach-mx5/board-mx51_babbage.c b/arch/arm/mach-mx5/board-mx51_babbage.c
-index e400b09..5a578f9 100644
---- a/arch/arm/mach-mx5/board-mx51_babbage.c
-+++ b/arch/arm/mach-mx5/board-mx51_babbage.c
-@@ -357,8 +357,8 @@ static const struct esdhc_platform_data mx51_babbage_sd2_data __initconst = {
- static void __init mx51_babbage_init(void)
- {
- 	iomux_v3_cfg_t usbh1stp = MX51_PAD_USBH1_STP__USBH1_STP;
--	iomux_v3_cfg_t power_key = _MX51_PAD_EIM_A27__GPIO2_21 |
--		MUX_PAD_CTRL(PAD_CTL_SRE_FAST | PAD_CTL_DSE_HIGH | PAD_CTL_PUS_100K_UP);
-+	iomux_v3_cfg_t power_key = NEW_PAD_CTRL(MX51_PAD_EIM_A27__GPIO2_21,
-+		PAD_CTL_SRE_FAST | PAD_CTL_DSE_HIGH | PAD_CTL_PUS_100K_UP);
+ #include <mach/iomux-v3.h>
++#define __NA_	0x000
++
  
- 	imx51_soc_init();
+ /* Pad control groupings */
+ #define MX51_UART_PAD_CTRL	(PAD_CTL_PKE | PAD_CTL_PUE | PAD_CTL_DSE_HIGH | \
+@@ -47,1521 +49,765 @@
  
-diff --git a/arch/arm/mach-mx5/eukrea_mbimxsd-baseboard.c b/arch/arm/mach-mx5/eukrea_mbimxsd-baseboard.c
-index 2619239..f046d4b 100644
---- a/arch/arm/mach-mx5/eukrea_mbimxsd-baseboard.c
-+++ b/arch/arm/mach-mx5/eukrea_mbimxsd-baseboard.c
-@@ -47,7 +47,7 @@ static iomux_v3_cfg_t eukrea_mbimxsd_pads[] = {
- 	/* LED */
- 	MX51_PAD_NANDF_D10__GPIO3_30,
- 	/* SWITCH */
--	_MX51_PAD_NANDF_D9__GPIO3_31 | MUX_PAD_CTRL(PAD_CTL_PUS_22K_UP |
-+	NEW_PAD_CTRL(MX51_PAD_NANDF_D9__GPIO3_31, PAD_CTL_PUS_22K_UP |
- 			PAD_CTL_PKE | PAD_CTL_SRE_FAST |
- 			PAD_CTL_DSE_HIGH | PAD_CTL_PUE | PAD_CTL_HYS),
- 	/* UART2 */
-@@ -66,7 +66,7 @@ static iomux_v3_cfg_t eukrea_mbimxsd_pads[] = {
- 	MX51_PAD_SD1_DATA2__SD1_DATA2,
- 	MX51_PAD_SD1_DATA3__SD1_DATA3,
- 	/* SD1 CD */
--	_MX51_PAD_GPIO1_0__SD1_CD | MUX_PAD_CTRL(PAD_CTL_PUS_22K_UP |
-+	NEW_PAD_CTRL(MX51_PAD_GPIO1_0__SD1_CD, PAD_CTL_PUS_22K_UP |
- 			PAD_CTL_PKE | PAD_CTL_SRE_FAST |
- 			PAD_CTL_DSE_HIGH | PAD_CTL_PUE | PAD_CTL_HYS),
- };
-diff --git a/arch/arm/plat-mxc/include/mach/iomux-v3.h b/arch/arm/plat-mxc/include/mach/iomux-v3.h
-index ebbce33..376ba92 100644
---- a/arch/arm/plat-mxc/include/mach/iomux-v3.h
-+++ b/arch/arm/plat-mxc/include/mach/iomux-v3.h
-@@ -80,6 +80,7 @@ typedef u64 iomux_v3_cfg_t;
- 		((iomux_v3_cfg_t)(_sel_input_ofs) << MUX_SEL_INPUT_OFS_SHIFT) | \
- 		((iomux_v3_cfg_t)(_sel_input) << MUX_SEL_INPUT_SHIFT))
+ /* Raw pin modes without pad control */
+ /*							  PAD    MUX ALT INPSE PATH PADCTRL */
+-#define _MX51_PAD_EIM_D16__AUD4_RXFS		IOMUX_PAD(0x3f0, 0x5c, 5, 0x0000, 0, 0)
+-#define _MX51_PAD_EIM_D16__AUD5_TXD		IOMUX_PAD(0x3f0, 0x5c, 7, 0x08d8, 0, 0)
+-#define _MX51_PAD_EIM_D16__EIM_D16		IOMUX_PAD(0x3f0, 0x5c, 0, 0x0000, 0, 0)
+-#define _MX51_PAD_EIM_D16__GPIO2_0		IOMUX_PAD(0x3f0, 0x5c, 1, 0x0000, 0, 0)
+-#define _MX51_PAD_EIM_D16__I2C1_SDA		IOMUX_PAD(0x3f0, 0x5c, 0x14, 0x09b4, 0, 0)
+-#define _MX51_PAD_EIM_D16__UART2_CTS		IOMUX_PAD(0x3f0, 0x5c, 3, 0x0000, 0, 0)
+-#define _MX51_PAD_EIM_D16__USBH2_DATA0		IOMUX_PAD(0x3f0, 0x5c, 2, 0x0000, 0, 0)
+-#define _MX51_PAD_EIM_D17__AUD5_RXD		IOMUX_PAD(0x3f4, 0x60, 7, 0x08d4, 0, 0)
+.........
+.........
  
-+#define NEW_PAD_CTRL(cfg, pad)	((cfg & ~MUX_PAD_CTRL_MASK) | MUX_PAD_CTRL(pad))
- /*
-  * Use to set PAD control
-  */
+ /* The same pins as above but with the default pad control values applied */
+-#define MX51_PAD_EIM_D16__AUD4_RXFS		(_MX51_PAD_EIM_D16__AUD4_RXFS | MUX_PAD_CTRL(NO_PAD_CTRL))
+-#define MX51_PAD_EIM_D16__AUD5_TXD		(_MX51_PAD_EIM_D16__AUD5_TXD | MUX_PAD_CTRL(NO_PAD_CTRL))
+-#define MX51_PAD_EIM_D16__EIM_D16		(_MX51_PAD_EIM_D16__EIM_D16 | MUX_PAD_CTRL(NO_PAD_CTRL))
+-#define MX51_PAD_EIM_D16__GPIO2_0		(_MX51_PAD_EIM_D16__GPIO2_0 | MUX_PAD_CTRL(MX51_GPIO_PAD_CTRL))
+-#define MX51_PAD_EIM_D16__I2C1_SDA		(_MX51_PAD_EIM_D16__I2C1_SDA | MUX_PAD_CTRL(MX51_I2C_PAD_CTRL))
+-#define MX51_PAD_EIM_D16__UART2_CTS		(_MX51_PAD_EIM_D16__UART2_CTS | MUX_PAD_CTRL(MX51_UART_PAD_CTRL))
+-#define MX51_PAD_EIM_D16__USBH2_DATA0		(_MX51_PAD_EIM_D16__USBH2_DATA0 | MUX_PAD_CTRL(NO_PAD_CTRL))
+-#define MX51_PAD_EIM_D17__AUD5_RXD		(_MX51_PAD_EIM_D17__AUD5_RXD | MUX_PAD_CTRL(NO_PAD_CTRL))
+.........
+.........
++#define MX51_PAD_EIM_D16__AUD4_RXFS		IOMUX_PAD(0x3f0, 0x05c, 5, __NA_, 0, NO_PAD_CTRL)
++#define MX51_PAD_EIM_D16__AUD5_TXD		IOMUX_PAD(0x3f0, 0x05c, 7, 0x8d8, 0, NO_PAD_CTRL)
++#define MX51_PAD_EIM_D16__EIM_D16		IOMUX_PAD(0x3f0, 0x05c, 0, __NA_, 0, NO_PAD_CTRL)
++#define MX51_PAD_EIM_D16__GPIO2_0		IOMUX_PAD(0x3f0, 0x05c, 1, __NA_, 0, MX51_GPIO_PAD_CTRL)
++#define MX51_PAD_EIM_D16__I2C1_SDA		IOMUX_PAD(0x3f0, 0x05c, 0x14, 0x9b4, 0, MX51_I2C_PAD_CTRL)
++#define MX51_PAD_EIM_D16__UART2_CTS		IOMUX_PAD(0x3f0, 0x05c, 3, __NA_, 0, MX51_UART_PAD_CTRL)
++#define MX51_PAD_EIM_D16__USBH2_DATA0		IOMUX_PAD(0x3f0, 0x05c, 2, __NA_, 0, NO_PAD_CTRL)
++#define MX51_PAD_EIM_D17__AUD5_RXD		IOMUX_PAD(0x3f4, 0x060, 7, 0x8d4, 0, NO_PAD_CTRL)
+.........
+.........
+ 
+ #endif /* __MACH_IOMUX_MX51_H__ */
 -- 
 1.7.0.4
