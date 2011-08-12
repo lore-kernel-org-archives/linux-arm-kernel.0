@@ -1,68 +1,139 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 12 Aug 2011 12:00:02 -0700
-Subject: [PATCH] ARM: zImage: Skip relinking if nothing changes
-In-Reply-To: <4E457682.5020107@codeaurora.org>
-Message-ID: <1313175602-21834-1-git-send-email-sboyd@codeaurora.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 12 Aug 2011 21:20:22 +0200
+Subject: [GIT PULL] arm-soc fixes for 3.1-rc1
+Message-ID: <5354254.j6qvIU3YrO@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-lib1funcs.S is reshipped even though the file hasn't changed
-because the make rule is marked with FORCE. According to Sam
-Ravnborg:
+Hi Linus,
 
-	The FORCE prerequisite will tell make to always execute
-	the command.
-	But we only want to execute the command if:
-	1) $(obj)/lib1funcs.S is missing
-	2) or $(srctree)/arch/$(SRCARCH)/lib/lib1funcs.S is not
-	older then $(obj)/lib1funcs.S
+Here are the latest bug fixes that have accumulated in the arm-soc tree
+for the 3.1 release, almost all of them for the omap, pxa and i.MX
+platforms.
 
-	So dropping FORCE should be a safe thing to do.
+The following changes since commit 322a8b034003c0d46d39af85bf24fee27b902f48:
 
-This fixes the shipped problem, but we still have to reassemble
-lib1funcs.S because it isn't part of $targets. Add
-lib1funcs.{S,o} to $targets to avoid relinking the compressed
-vmlinux if nothing changes.
+  Linux 3.1-rc1 (2011-08-07 18:23:30 -0700)
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-Acked-by: Sam Ravnborg <sam@ravnborg.org>
----
- arch/arm/boot/compressed/Makefile |    8 +++-----
- 1 files changed, 3 insertions(+), 5 deletions(-)
+are available in the git repository at:
+  git+ssh://master.kernel.org/pub/scm/linux/kernel/git/arm/linux-arm-soc.git/ fixes
 
-diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
-index 0c74a6f..937fd26 100644
---- a/arch/arm/boot/compressed/Makefile
-+++ b/arch/arm/boot/compressed/Makefile
-@@ -91,7 +91,7 @@ suffix_$(CONFIG_KERNEL_LZMA) = lzma
- 
- targets       := vmlinux vmlinux.lds \
- 		 piggy.$(suffix_y) piggy.$(suffix_y).o \
--		 font.o font.c head.o misc.o $(OBJS)
-+		 font.o font.c head.o misc.o lib1funcs.o lib1funcs.S $(OBJS)
- 
- # Make sure files are removed during clean
- extra-y       += piggy.gzip piggy.lzo piggy.lzma lib1funcs.S
-@@ -121,9 +121,7 @@ LDFLAGS_vmlinux += -X
- LDFLAGS_vmlinux += -T
- 
- # For __aeabi_uidivmod
--lib1funcs = $(obj)/lib1funcs.o
--
--$(obj)/lib1funcs.S: $(srctree)/arch/$(SRCARCH)/lib/lib1funcs.S FORCE
-+$(obj)/lib1funcs.S: $(srctree)/arch/$(SRCARCH)/lib/lib1funcs.S
- 	$(call cmd,shipped)
- 
- # We need to prevent any GOTOFF relocs being used with references
-@@ -140,7 +138,7 @@ bad_syms=$$($(CROSS_COMPILE)nm $@ | sed -n 's/^.\{8\} [bc] \(.*\)/\1/p') && \
-     echo "$$bad_syms" >&2; rm -f $@; false )
- 
- $(obj)/vmlinux: $(obj)/vmlinux.lds $(obj)/$(HEAD) $(obj)/piggy.$(suffix_y).o \
--	 	$(addprefix $(obj)/, $(OBJS)) $(lib1funcs) FORCE
-+		$(addprefix $(obj)/, $(OBJS)) $(obj)/lib1funcs.o FORCE
- 	$(call if_changed,ld)
- 	@$(check_for_bad_syms)
- 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Arnaud Patard (4):
+      efikasb/mx: fix usbh1 initialisation
+      efikasb: fix gpio keys.
+      efika: Fix board id detection
+      iMX: Fix build for iMX53
+
+Arnd Bergmann (3):
+      Merge branch 'imx-fixes-for-arnd' of git://git.pengutronix.de/git/imx/linux-2.6 into fixes
+      Merge branch 'fix' of git://git.kernel.org/.../ycmiao/pxa-linux-2.6 into fixes
+      Merge branch 'fixes' of git://git.kernel.org/.../tmlind/linux-omap-2.6 into fixes
+
+Ben Dooks (1):
+      ARM: mx5: board-cpuimx51.c fixup irq_to_gpio() usage
+
+Colin Cross (1):
+      OMAP2+: PM: SmartReflex: use put_sync_suspend for IRQ-safe disabling
+
+Eric Miao (1):
+      ARM: mx53: add pad configuration for I2C signals
+
+Fabio Estevam (3):
+      ARM: mach-imx/mx31ads: Fix section mismatches
+      ARM: mach-imx/mx31lilly: Fix section mismatches
+      ARM: board-mx51_babbage: Fix UART2 registration
+
+Hemant Pedanekar (1):
+      omap: timer: Set dmtimer used as clocksource in autoreload mode
+
+Jason Liu (1):
+      ARM: iMX5: Don't enable DPLL if it already enabled
+
+Javier Martin (1):
+      Add tlv320aic32x4 platform data to Visstrim_M10.
+
+Johan Hovold (1):
+      OMAP3: am3517crane: remove NULL board_mux from board file
+
+Kevin Hilman (3):
+      OMAP2+: Kconfig: don't select PM in OMAP2PLUS_TYPICAL
+      OMAP1: enable GENERIC_IRQ_CHIP
+      OMAP3: beagle: don't touch omap_device internals
+
+Lennert Buytenhek (4):
+      ARM: pxa: fix logic error in PJ4 iWMMXt handling
+      ARM: mmp: Also start timer 1 on boot.
+      ARM: mmp: Switch to using timer 1 as clocksource timer.
+      ARM: mmp: Change the way we use timer 0 as clockevent timer.
+
+Linus Walleij (1):
+      mach-sa1100: fix PCI build problem
+
+Maxin John (1):
+      arch:arm:plat-omap:iovmm: remove unused variable 'va'
+
+Mehnert, Torsten (1):
+      i.MX25 GPT clock fix: ensure correct the clock source
+
+Nishanth Menon (1):
+      OMAP3+: SR: ensure pm-runtime callbacks can be invoked with IRQs disabled
+
+Oleg Drokin (1):
+      Update Nook Color machine 3284 to common Encore name
+
+Paul Walmsley (1):
+      OMAP: hwmod: fix build break on non-OMAP4 multi-OMAP2 builds
+
+Peter Ujfalusi (1):
+      OMAP: Fix linking error in twl-common.c for OMAP2/3/4 only builds
+
+Rapha?l Ass?nat (1):
+      am3505/3517: Various platform defines for UART4
+
+Sascha Hauer (1):
+      Merge commit 'v3.1-rc1' into imx-fixes
+
+Tanmay Upadhyay (2):
+      ARM: pxa168/gplugd: get rid of mfp-gplugd.h
+      ARM: pxa168/gplugd: free correct GPIO
+
+Thomas Meyer (1):
+      arm: mach-omap2: mux: use kstrdup()
+
+Tony Lindgren (1):
+      Merge branch 'for_3.1/pm-fixes' of git://git.kernel.org/.../khilman/linux-omap-pm into fixes
+
+ arch/arm/kernel/iwmmxt.S                     |    6 +-
+ arch/arm/mach-imx/clock-imx25.c              |    3 +
+ arch/arm/mach-imx/mach-imx27_visstrim_m10.c  |   13 ++++
+ arch/arm/mach-imx/mach-mx31ads.c             |    4 +-
+ arch/arm/mach-imx/mach-mx31lilly.c           |    2 +-
+ arch/arm/mach-mmp/gplugd.c                   |   22 +++++--
+ arch/arm/mach-mmp/include/mach/mfp-gplugd.h  |   52 -----------------
+ arch/arm/mach-mmp/include/mach/mfp-pxa168.h  |   37 +++++++++++--
+ arch/arm/mach-mmp/time.c                     |   62 ++++++++++++++------
+ arch/arm/mach-mx5/board-cpuimx51.c           |    2 +-
+ arch/arm/mach-mx5/board-mx51_babbage.c       |    2 +-
+ arch/arm/mach-mx5/board-mx51_efikamx.c       |    6 +-
+ arch/arm/mach-mx5/board-mx51_efikasb.c       |   15 +++--
+ arch/arm/mach-mx5/clock-mx51-mx53.c          |    6 ++-
+ arch/arm/mach-mx5/mx51_efika.c               |    2 +-
+ arch/arm/mach-omap2/Kconfig                  |    1 -
+ arch/arm/mach-omap2/board-am3517crane.c      |    2 -
+ arch/arm/mach-omap2/board-omap3beagle.c      |   23 +++----
+ arch/arm/mach-omap2/cminst44xx.h             |   25 ++++++++-
+ arch/arm/mach-omap2/mux.c                    |   14 +---
+ arch/arm/mach-omap2/smartreflex.c            |    3 +-
+ arch/arm/mach-omap2/timer.c                  |    3 +-
+ arch/arm/mach-omap2/twl-common.c             |   78 +++++++++++++------------
+ arch/arm/mach-sa1100/pci-nanoengine.c        |    1 +
+ arch/arm/plat-mxc/include/mach/debug-macro.S |    8 +++
+ arch/arm/plat-mxc/include/mach/iomux-mx53.h  |   31 ++++++-----
+ arch/arm/plat-omap/Kconfig                   |    1 +
+ arch/arm/plat-omap/include/plat/dma.h        |    5 ++
+ arch/arm/plat-omap/include/plat/irqs.h       |    1 +
+ arch/arm/plat-omap/include/plat/serial.h     |    3 +
+ arch/arm/plat-omap/iovmm.c                   |    3 -
+ arch/arm/tools/mach-types                    |    2 +-
+ 32 files changed, 252 insertions(+), 186 deletions(-)
+ delete mode 100644 arch/arm/mach-mmp/include/mach/mfp-gplugd.h
