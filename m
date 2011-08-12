@@ -1,165 +1,61 @@
 From: swarren@nvidia.com (Stephen Warren)
-Date: Fri, 12 Aug 2011 16:54:55 -0600
-Subject: [RFC PATCH 10/12] arm/tegra: Add device tree support to pinmux driver
+Date: Fri, 12 Aug 2011 16:54:56 -0600
+Subject: [RFC PATCH 11/12] arm/tegra: board-dt: Remove dependency on non-dt
+	pinmux functions
 In-Reply-To: <1313189697-21287-1-git-send-email-swarren@nvidia.com>
 References: <1313189697-21287-1-git-send-email-swarren@nvidia.com>
-Message-ID: <1313189697-21287-11-git-send-email-swarren@nvidia.com>
+Message-ID: <1313189697-21287-12-git-send-email-swarren@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
- arch/arm/mach-tegra/pinmux.c |  115 ++++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 115 insertions(+), 0 deletions(-)
+ arch/arm/mach-tegra/Makefile   |    1 -
+ arch/arm/mach-tegra/board-dt.c |   10 ----------
+ 2 files changed, 0 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm/mach-tegra/pinmux.c b/arch/arm/mach-tegra/pinmux.c
-index 05fa1a3..33246c2 100644
---- a/arch/arm/mach-tegra/pinmux.c
-+++ b/arch/arm/mach-tegra/pinmux.c
-@@ -20,6 +20,7 @@
- #include <linux/errno.h>
- #include <linux/spinlock.h>
- #include <linux/io.h>
-+#include <linux/of.h>
- #include <linux/platform_device.h>
+diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
+index f11b910..bab6544 100644
+--- a/arch/arm/mach-tegra/Makefile
++++ b/arch/arm/mach-tegra/Makefile
+@@ -30,7 +30,6 @@ obj-${CONFIG_MACH_SEABOARD}             += board-seaboard.o
+ obj-${CONFIG_MACH_SEABOARD}             += board-seaboard-pinmux.o
  
- #include <mach/iomap.h>
-@@ -147,6 +148,41 @@ static const char *func_name(enum tegra_mux_func func)
- 	return tegra_mux_names[func];
- }
+ obj-${CONFIG_MACH_TEGRA_DT}             += board-dt.o
+-obj-${CONFIG_MACH_TEGRA_DT}             += board-harmony-pinmux.o
  
-+#ifdef CONFIG_OF
-+static int func_enum(const char *name, enum tegra_mux_func *func_out)
-+{
-+	int func;
-+
-+	if (!strcmp(name, "RSVD1")) {
-+		*func_out = TEGRA_MUX_RSVD1;
-+		return 0;
-+	}
-+	if (!strcmp(name, "RSVD2")) {
-+		*func_out = TEGRA_MUX_RSVD2;
-+		return 0;
-+	}
-+	if (!strcmp(name, "RSVD3")) {
-+		*func_out = TEGRA_MUX_RSVD3;
-+		return 0;
-+	}
-+	if (!strcmp(name, "RSVD4")) {
-+		*func_out = TEGRA_MUX_RSVD4;
-+		return 0;
-+	}
-+	if (!strcmp(name, "NONE")) {
-+		*func_out = TEGRA_MUX_NONE;
-+		return 0;
-+	}
-+
-+	for (func = 0; func < TEGRA_MAX_MUX; func++)
-+		if (!strcmp(name, tegra_mux_names[func])) {
-+			*func_out = func;
-+			return 0;
-+		}
-+
-+	return -EINVAL;
-+}
-+#endif
+ obj-${CONFIG_MACH_TRIMSLICE}            += board-trimslice.o
+ obj-${CONFIG_MACH_TRIMSLICE}            += board-trimslice-pinmux.o
+diff --git a/arch/arm/mach-tegra/board-dt.c b/arch/arm/mach-tegra/board-dt.c
+index 1995b79..06e82c4 100644
+--- a/arch/arm/mach-tegra/board-dt.c
++++ b/arch/arm/mach-tegra/board-dt.c
+@@ -41,14 +41,9 @@
+ #include <mach/irqs.h>
  
- static const char *tri_name(unsigned long val)
- {
-@@ -666,15 +702,94 @@ void tegra_pinmux_config_pullupdown_table(const struct tegra_pingroup_config *co
- 	}
- }
+ #include "board.h"
+-#include "board-harmony.h"
+ #include "clock.h"
+ #include "devices.h"
  
-+#ifdef CONFIG_OF
-+static void __init tegra_pinmux_probe_dt(struct platform_device *pdev)
-+{
-+	int pg;
-+
-+	for (pg = 0; pg < TEGRA_MAX_PINGROUP; pg++) {
-+		const char *pg_name = pingroup_name(pg);
-+		struct tegra_pingroup_config config;
-+		struct device_node *pg_node;
-+		int ret;
-+		const char *s;
-+
-+		pg_node = of_find_child_node_by_name(pdev->dev.of_node,
-+						     pg_name);
-+		if (pg_node == NULL)
-+			continue;
-+
-+		config.pingroup = pg;
-+
-+		ret = of_property_read_string(pg_node, "nvidia,function", &s);
-+		if (ret < 0) {
-+			dev_err(&pdev->dev,
-+				"%s: Missing property nvidia,function\n",
-+				pg_name);
-+			continue;
-+		}
-+		ret = func_enum(s, &config.func);
-+		if (ret < 0) {
-+			dev_err(&pdev->dev,
-+				"%s: Invalid nvidia,function value %s\n",
-+				pg_name, s);
-+			continue;
-+		}
-+
-+		ret = of_property_read_string(pg_node, "nvidia,pull", &s);
-+		if (ret >= 0) {
-+			if (!strcmp(s, "up"))
-+				config.pupd = TEGRA_PUPD_PULL_UP;
-+			else if (!strcmp(s, "down"))
-+				config.pupd = TEGRA_PUPD_PULL_DOWN;
-+			else if (!strcmp(s, "normal"))
-+				config.pupd = TEGRA_PUPD_NORMAL;
-+			else {
-+				dev_err(&pdev->dev,
-+					"%s: Invalid nvidia,pull value %s\n",
-+					pg_name, s);
-+				continue;
-+			}
-+		} else
-+			config.pupd = TEGRA_PUPD_NORMAL;
-+
-+		if (of_find_property(pg_node, "nvidia,tristate", NULL))
-+			config.tristate = TEGRA_TRI_TRISTATE;
-+		else
-+			config.tristate = TEGRA_TRI_NORMAL;
-+
-+		dev_err(&pdev->dev, "%s: func %d (%s) pull %d tri %d\n",
-+			pg_name, config.func, func_name(config.func),
-+			config.pupd, config.tristate);
-+
-+		tegra_pinmux_config_pingroup(&config);
-+
-+		of_node_put(pg_node);
-+	}
-+}
-+#else
-+static inline void __init tegra_pinmux_probe_dt(struct platform_device *pdev)
-+{
-+}
-+#endif
-+
- static int __init tegra_pinmux_probe(struct platform_device *pdev)
- {
-+	tegra_pinmux_probe_dt(pdev);
-+
- 	return 0;
- }
+-void harmony_pinmux_init(void);
+-void seaboard_pinmux_init(void);
+-
+-
+ struct of_dev_auxdata tegra20_auxdata_lookup[] __initdata = {
+ 	OF_DEV_AUXDATA("nvidia,tegra20-gpio", TEGRA_GPIO_BASE, "tegra-gpio", NULL),
+ 	OF_DEV_AUXDATA("nvidia,tegra20-pinmux", TEGRA_APB_MISC_BASE, "tegra-pinmux", NULL),
+@@ -93,11 +88,6 @@ static void __init tegra_dt_init(void)
  
-+static struct of_device_id tegra_pinmux_of_match[] __devinitdata = {
-+	{ .compatible = "nvidia,tegra20-pinmux", },
-+	{ },
-+};
-+
- static struct platform_driver tegra_pinmux_driver = {
- 	.driver		= {
- 		.name	= "tegra-pinmux",
- 		.owner	= THIS_MODULE,
-+		.of_match_table = tegra_pinmux_of_match,
- 	},
- 	.probe		= tegra_pinmux_probe,
- };
+ 	tegra_clk_init_from_table(tegra_dt_clk_init_table);
+ 
+-	if (of_machine_is_compatible("nvidia,harmony"))
+-		harmony_pinmux_init();
+-	else if (of_machine_is_compatible("nvidia,seaboard"))
+-		seaboard_pinmux_init();
+-
+ 	/*
+ 	 * Finished with the static registrations now; fill in the missing
+ 	 * devices
 -- 
 1.7.0.4
