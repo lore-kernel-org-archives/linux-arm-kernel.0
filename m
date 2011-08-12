@@ -1,236 +1,51 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 12 Aug 2011 10:19:08 +0100
-Subject: [PATCH 1/2] gpio: Add CNS3XXX mmio gpio support
-In-Reply-To: <1313005731-16074-1-git-send-email-tommy.lin.1101@gmail.com>
-References: <1313005731-16074-1-git-send-email-tommy.lin.1101@gmail.com>
-Message-ID: <20110812091908.GK4775@n2100.arm.linux.org.uk>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 12 Aug 2011 18:22:34 +0900
+Subject: [PATCH] ARM: EXYNOS4: Change the pwm device name to supprot clkdev
+In-Reply-To: <1311661312-24470-1-git-send-email-jhbird.choi@samsung.com>
+References: <1311661312-24470-1-git-send-email-jhbird.choi@samsung.com>
+Message-ID: <007301cc58d1$6033d300$209b7900$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 11, 2011 at 03:48:51AM +0800, Tommy Lin wrote:
-> diff --git a/arch/arm/mach-cns3xxx/include/mach/gpio.h b/arch/arm/mach-cns3xxx/include/mach/gpio.h
-> new file mode 100644
-> index 0000000..7b68acf
-> --- /dev/null
-> +++ b/arch/arm/mach-cns3xxx/include/mach/gpio.h
-> @@ -0,0 +1,64 @@
-> +#ifndef	_CNS3XXX_GPIO_H_
-> +#define	_CNS3XXX_GPIO_H_
-> +
-> +#include <mach/cns3xxx.h>
-> +
-> +#define ARCH_NR_GPIOS				MAX_GPIO_NO
+jhbird.choi at samsung.com wrote:
+> 
+> From: Jonghwan Choi <jhbird.choi@samsung.com>
+> 
+> Signed-off-by: Jonghwan Choi <jhbird.choi@samsung.com>
+> ---
+>  arch/arm/mach-exynos4/time.c |    2 ++
+>  1 files changed, 2 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-exynos4/time.c b/arch/arm/mach-exynos4/time.c
+index
+> ebb8f38..9a74294 100644
+> --- a/arch/arm/mach-exynos4/time.c
+> +++ b/arch/arm/mach-exynos4/time.c
+> @@ -264,6 +264,7 @@ static void __init exynos4_timer_resources(void)
+>  	clk_enable(timerclk);
+> 
+>  	tmpdev.id = 2;
+> +	tmpdev.dev.init_name = "s3c24xx-pwm.2";
+>  	tin2 = clk_get(&tmpdev.dev, "pwm-tin");
+>  	if (IS_ERR(tin2))
+>  		panic("failed to get pwm-tin2 clock for system timer"); @@ -
+> 274,6 +275,7 @@ static void __init exynos4_timer_resources(void)
+>  	clk_enable(tin2);
+> 
+>  	tmpdev.id = 4;
+> +	tmpdev.dev.init_name = "s3c24xx-pwm.4";
+>  	tin4 = clk_get(&tmpdev.dev, "pwm-tin");
+>  	if (IS_ERR(tin4))
+>  		panic("failed to get pwm-tin4 clock for system timer");
+> --
+> 1.7.0
 
-Ok.
+This is not available now.
 
-> +
-> +#include <asm-generic/gpio.h>
+Thanks.
 
-Please see linux-next's arch/arm/include/asm/gpio.h
-
-> +
-> +#define GPIO_OUTPUT_OFFSET			0x00
-> +#define GPIO_INPUT_OFFSET			0x04
-> +#define GPIO_DIR_OFFSET				0x08
-> +#define GPIO_BIT_SET_OFFSET			0x10
-> +#define GPIO_BIT_CLEAR_OFFSET			0x14
-> +#define GPIO_INTR_ENABLE_OFFSET			0x20
-> +#define GPIO_INTR_RAW_STATUS_OFFSET		0x24
-> +#define GPIO_INTR_MASKED_STATUS_OFFSET		0x28
-> +#define GPIO_INTR_MASK_OFFSET			0x2C
-> +#define GPIO_INTR_CLEAR_OFFSET			0x30
-> +#define GPIO_INTR_TRIGGER_METHOD_OFFSET		0x34
-> +#define GPIO_INTR_TRIGGER_BOTH_EDGES_OFFSET	0x38
-> +#define GPIO_INTR_TRIGGER_POL_OFFSET		0x3C
-> +#define GPIO_BOUNCE_ENABLE_OFFSET		0x40
-> +#define GPIO_BOUNCE_PRESCALE_OFFSET		0x44
-
-Do you really need to put these here?  Can they go in a private header file
-maybe in arch/arm/mach-xxx/ ?
-
-> +
-> +
-> +#define gpio_get_value			__gpio_get_value
-> +#define gpio_set_value			__gpio_set_value
-> +#define gpio_cansleep			__gpio_cansleep
-> +#define gpio_to_irq			cns3xxx_gpio_to_irq
-
-Again, please see linux-next.
-
-> +struct chog_gpio_chip {
-> +	char				*name;
-
-const?
-
-> +	int				base;
-> +	u16				ngpio;
-> +	int				irq;
-> +	struct irq_chip_generic		*gc;
-> +	void __iomem			*reg_base;
-> +	void __iomem			*reg_gpio_dis;
-> +};
-...
-> +struct cns3xxx_regs {
-> +	char		*name;
-
-const?
-
-> +	void __iomem	*addr;
-> +	u32		offset;
-> +};
-...
-> +inline int cns3xxx_gpio_to_irq(unsigned gpio)
-> +{
-> +	return NR_IRQS_CNS3XXX + gpio;
-> +}
-> +EXPORT_SYMBOL(gpio_to_irq);
-
-No.  Three issues:
-
-1. You are exporting a function you're not defining here.
-2. The function is marked inline yet nothing in this file uses it, so
-   the inline provides no useful purpose.
-3. Please use the standard gpiolib gpio_to_irq() and hook the translation
-   into the gpiolib .to_irq method.
-
-...
-> +static void __iomem *gpio_map(struct platform_device *pdev,
-> +		const char *name, int *err)
-> +{
-> +	struct device *dev = &pdev->dev;
-> +	struct resource *r;
-> +	resource_size_t start;
-> +	resource_size_t sz;
-> +	void __iomem *ret;
-> +
-> +	*err = 0;
-> +
-> +	r = platform_get_resource_byname(pdev, IORESOURCE_MEM, name);
-> +	if (!r)
-> +		return NULL;
-> +
-> +	sz = resource_size(r);
-> +	start = r->start;
-> +
-> +	if (!devm_request_mem_region(dev, start, sz, r->name)) {
-> +		*err = -EBUSY;
-> +		return NULL;
-> +	}
-> +
-> +	ret = devm_ioremap(dev, start, sz);
-> +	if (!ret) {
-> +		*err = -ENOMEM;
-> +		return NULL;
-> +	}
-> +
-> +	return ret;
-> +}
-> +
-> +static int __devinit gpio_probe(struct platform_device *pdev)
-> +{
-> +	int i, nr_gpios = 0, err = 0;
-> +	struct device *dev = &pdev->dev;
-> +	struct resource *res;
-> +	void __iomem *misc_reg;
-> +	struct irq_chip_type *ct;
-> +
-> +	/* TODO Once the clk framework (clk_get() + clk_enable()) is
-> +	 * implemented. Use clok framework APIs instead of these APIs.
-> +	 */
-> +	cns3xxx_pwr_clk_en(0x1 << PM_CLK_GATE_REG_OFFSET_GPIO);
-> +	cns3xxx_pwr_soft_rst(0x1 << PM_CLK_GATE_REG_OFFSET_GPIO);
-> +
-> +
-> +	misc_reg = gpio_map(pdev, "MISC", &err);
-> +	if (!misc_reg) {
-> +		dev_dbg(dev, "%s gpio_map \"MISC\" failure! err=%d\n",
-> +				__func__, err);
-> +		return err;
-> +	}
-> +
-> +	/* Scan and match GPIO resources */
-> +	for (i = 0; i < nr_banks; i++) {
-> +		/* Fetech GPIO interrupt control register base address */
-> +		gc_info[i].reg_base = gpio_map(pdev, gc_info[i].name, &err);
-> +		if (!gc_info[i].reg_base) {
-> +			dev_dbg(dev, "%s gpio_map %s failure! err=%d\n",
-> +					__func__, gc_info[i].name, err);
-> +			goto err1;
-> +		}
-> +
-> +		/* Fetech GPIO interrupt ID number */
-> +		res = platform_get_resource_byname(pdev, IORESOURCE_IRQ,
-> +				gc_info[i].name);
-> +		if (!res) {
-> +			dev_dbg(dev, "%s platform_get_resource_byname (%s)"
-> +					"failed!\n", gc_info[i].name, __func__);
-> +			err = -ENODEV;
-> +			goto err2;
-> +		}
-> +		gc_info[i].irq = res->start;
-> +		gc_info[i].reg_gpio_dis	= misc_reg + 0x14 + i * 4;
-> +
-> +		gc_info[i].gc = irq_alloc_generic_chip("GPIO", 1,
-> +				NR_IRQS_CNS3XXX + gc_info[i].base,
-> +				gc_info[i].reg_base, handle_level_irq);
-> +		if (!gc_info[i].gc) {
-> +			dev_dbg(dev, "%s irq_alloc_generic_chip failed!\n",
-> +					__func__);
-> +			err = -ENOMEM;
-> +			goto err2;
-> +		}
-> +		gc_info[i].gc->private = &gc_info[i];
-> +
-> +		ct = gc_info[i].gc->chip_types;
-> +		ct->regs.mask = get_offset(GPIO_INTR_ENABLE_OFFSET);
-> +		ct->regs.ack = get_offset(GPIO_INTR_CLEAR_OFFSET);
-> +		ct->regs.type = get_offset(GPIO_INTR_TRIGGER_METHOD_OFFSET);
-> +		ct->regs.polarity = get_offset(GPIO_INTR_TRIGGER_POL_OFFSET);
-> +		ct->type = IRQ_TYPE_LEVEL_HIGH | IRQ_TYPE_LEVEL_LOW;
-> +		ct->chip.irq_ack = irq_gc_ack_set_bit;
-> +		ct->chip.irq_mask = irq_gc_mask_clr_bit;
-> +		ct->chip.irq_unmask = irq_gc_mask_set_bit;
-> +		ct->chip.irq_set_type = cns3xxx_gpio_set_irq_type;
-> +
-> +		irq_setup_generic_chip(gc_info[i].gc, IRQ_MSK(gc_info[i].ngpio),
-> +			IRQ_GC_INIT_MASK_CACHE | IRQ_GC_INIT_NESTED_LOCK,
-> +			IRQ_NOREQUEST, IRQ_LEVEL | IRQ_NOPROBE);
-> +
-> +		irq_set_chained_handler(gc_info[i].irq, gpio_irq_handler);
-> +		err = irq_set_handler_data(gc_info[i].irq, &gc_info[i]);
-> +		if (err) {
-> +			dev_dbg(dev, "%s irq_set_handler_data fail!\n",
-> +					__func__);
-> +			goto err2;
-> +		}
-> +
-> +		nr_gpios += gc_info[i].ngpio;
-> +		if (nr_gpios >= MAX_GPIO_NO)
-> +			break;
-> +	}
-> +
-> +	return 0;
-> +
-> +err2:
-> +	if (gc_info[1].reg_base)
-> +		devm_iounmap(dev, gc_info[0].reg_base);
-
-This looks buggy.  You're unmapping the wrong reg_base.
-
-> +
-> +err1:
-> +	if (gc_info[0].reg_base)
-> +		devm_iounmap(dev, gc_info[0].reg_base);
-> +
-> +	devm_iounmap(dev, misc_reg);
-
-This is also rather inconsistent.  While you iounmap, you're not releasing
-the region which you claimed in gpio_map().
-
-It's also rather unnecessary.  One of the reasons for devm_* is that
-drivers shouldn't need to care about cleaning up the managed resources.
-The driver model will take care of that when a probe fails, or upon
-remove.  It avoids people making mistakes like the above.
-
-However, I don't see where you're cleaning up the generic irqchip
-which was allocated (which is an unmanaged resource).
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
