@@ -1,78 +1,141 @@
 From: davidb@codeaurora.org (David Brown)
-Date: Fri, 12 Aug 2011 16:00:05 -0700
-Subject: [PATCH 1/4] msm_serial: Use relative resources for iomem
+Date: Fri, 12 Aug 2011 16:00:07 -0700
+Subject: [PATCH 3/4] ARM: msm: Add devicetree support for msm8660-surf
 In-Reply-To: <1313190008-7551-1-git-send-email-davidb@codeaurora.org>
 References: <1313190008-7551-1-git-send-email-davidb@codeaurora.org>
-Message-ID: <1313190008-7551-2-git-send-email-davidb@codeaurora.org>
+Message-ID: <1313190008-7551-4-git-send-email-davidb@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Device tree iomem resources are only accessible by index, and not by
-name.  The msm_serial devices always have either 1 or 2 iomem
-resources, that are always in the same order.  Convert the
-platform_get_resource_byname into just platform_get_resource to
-facilitate device tree conversion.
+Adds support for booting via device tree with a simple serial console.
 
 Signed-off-by: David Brown <davidb@codeaurora.org>
 ---
- drivers/tty/serial/msm_serial.c |   16 ++++++----------
- 1 files changed, 6 insertions(+), 10 deletions(-)
+ arch/arm/boot/dts/msm8660-surf.dts |   24 +++++++++++++++
+ arch/arm/mach-msm/board-msm8x60.c  |   58 +++++++++++++++++++++++++++++++----
+ 2 files changed, 75 insertions(+), 7 deletions(-)
+ create mode 100644 arch/arm/boot/dts/msm8660-surf.dts
 
-diff --git a/drivers/tty/serial/msm_serial.c b/drivers/tty/serial/msm_serial.c
-index e6ba838..d9863b2 100644
---- a/drivers/tty/serial/msm_serial.c
-+++ b/drivers/tty/serial/msm_serial.c
-@@ -589,9 +589,8 @@ static void msm_release_port(struct uart_port *port)
- 		iowrite32(GSBI_PROTOCOL_IDLE, msm_port->gsbi_base +
- 			  GSBI_CONTROL);
+diff --git a/arch/arm/boot/dts/msm8660-surf.dts b/arch/arm/boot/dts/msm8660-surf.dts
+new file mode 100644
+index 0000000..308d867
+--- /dev/null
++++ b/arch/arm/boot/dts/msm8660-surf.dts
+@@ -0,0 +1,24 @@
++/dts-v1/;
++
++/include/ "skeleton.dtsi"
++
++/ {
++	model = "Qualcomm MSM8660 SURF";
++	compatible = "qcom,msm8660-surf", "qcom,msm8660";
++	interrupt-parent = <&intc>;
++
++	intc: interrupt-controller at 02080000 {
++		compatible = "qcom,msm-8660-qgic";
++		interrupt-controller;
++		#interrupt-cells = <1>;
++		reg = < 0x02080000 0x1000 >,
++		      < 0x02081000 0x1000 >;
++	};
++
++	serial at 19c400000 {
++		compatible = "qcom,msm-hsuart-lite";
++		reg = <0x19c40000 0x1000>,
++		      <0x19c00000 0x1000>;
++		interrupts = <195>;
++	};
++};
+diff --git a/arch/arm/mach-msm/board-msm8x60.c b/arch/arm/mach-msm/board-msm8x60.c
+index 1163b6f..10fa8f6 100644
+--- a/arch/arm/mach-msm/board-msm8x60.c
++++ b/arch/arm/mach-msm/board-msm8x60.c
+@@ -1,4 +1,4 @@
+-/* Copyright (c) 2010, Code Aurora Forum. All rights reserved.
++/* Copyright (c) 2010, 2011, Code Aurora Forum. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 and
+@@ -8,18 +8,16 @@
+  * but WITHOUT ANY WARRANTY; without even the implied warranty of
+  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
+- * 02110-1301, USA.
+- *
+  */
  
--		gsbi_resource = platform_get_resource_byname(pdev,
--							     IORESOURCE_MEM,
--							     "gsbi_resource");
-+		gsbi_resource = platform_get_resource(pdev,
-+							IORESOURCE_MEM, 1);
+ #include <linux/kernel.h>
+ #include <linux/platform_device.h>
+ #include <linux/io.h>
+ #include <linux/irq.h>
++#include <linux/irqdomain.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/of_platform.h>
  
- 		if (unlikely(!gsbi_resource))
- 			return;
-@@ -612,8 +611,7 @@ static int msm_request_port(struct uart_port *port)
- 	resource_size_t size;
- 	int ret;
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+@@ -64,6 +62,41 @@ static void __init msm8x60_init(void)
+ {
+ }
  
--	uart_resource = platform_get_resource_byname(pdev, IORESOURCE_MEM,
--						     "uart_resource");
-+	uart_resource = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	if (unlikely(!uart_resource))
- 		return -ENXIO;
- 
-@@ -628,8 +626,7 @@ static int msm_request_port(struct uart_port *port)
- 		goto fail_release_port;
- 	}
- 
--	gsbi_resource = platform_get_resource_byname(pdev, IORESOURCE_MEM,
--						     "gsbi_resource");
-+	gsbi_resource = platform_get_resource(pdev, IORESOURCE_MEM, 1);
- 	/* Is this a GSBI-based port? */
- 	if (gsbi_resource) {
- 		size = resource_size(gsbi_resource);
-@@ -875,7 +872,7 @@ static int __init msm_serial_probe(struct platform_device *pdev)
- 	port->dev = &pdev->dev;
- 	msm_port = UART_TO_MSM(port);
- 
--	if (platform_get_resource_byname(pdev, IORESOURCE_MEM, "gsbi_resource"))
-+	if (platform_get_resource(pdev, IORESOURCE_MEM, 1))
- 		msm_port->is_uartdm = 1;
- 	else
- 		msm_port->is_uartdm = 0;
-@@ -899,8 +896,7 @@ static int __init msm_serial_probe(struct platform_device *pdev)
- 	printk(KERN_INFO "uartclk = %d\n", port->uartclk);
- 
- 
--	resource = platform_get_resource_byname(pdev, IORESOURCE_MEM,
--						     "uart_resource");
-+	resource = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	if (unlikely(!resource))
- 		return -ENXIO;
- 	port->mapbase = resource->start;
++#ifdef CONFIG_OF
++static struct of_dev_auxdata msm_auxdata_lookup[] __initdata = {
++	{}
++};
++
++static struct of_device_id msm_dt_gic_match[] __initdata = {
++	{ .compatible = "qcom,msm-8660-qgic", },
++	{}
++};
++
++static void __init msm8x60_dt_init(void)
++{
++	struct device_node *node;
++
++	node = of_find_matching_node_by_address(NULL, msm_dt_gic_match,
++			MSM8X60_QGIC_DIST_PHYS);
++	if (node)
++		irq_domain_add_simple(node, GIC_SPI_START);
++
++	if (of_machine_is_compatible("qcom,msm8660-surf")) {
++		printk(KERN_INFO "Init surf UART registers\n");
++		msm8x60_init_uart12dm();
++	}
++
++	of_platform_populate(NULL, of_default_bus_match_table,
++			msm_auxdata_lookup, NULL);
++}
++
++static const char *msm8x60_fluid_match[] __initdata = {
++	"qcom,msm8660-fluid",
++	"qcom,msm8660-surf",
++	NULL
++};
++#endif /* CONFIG_OF */
++
+ MACHINE_START(MSM8X60_RUMI3, "QCT MSM8X60 RUMI3")
+ 	.map_io = msm8x60_map_io,
+ 	.init_irq = msm8x60_init_irq,
+@@ -91,3 +124,14 @@ MACHINE_START(MSM8X60_FFA, "QCT MSM8X60 FFA")
+ 	.init_machine = msm8x60_init,
+ 	.timer = &msm_timer,
+ MACHINE_END
++
++#ifdef CONFIG_OF
++/* TODO: General device tree support for all MSM. */
++DT_MACHINE_START(MSM_DT, "Qualcomm MSM (Flattened Device Tree)")
++	.map_io = msm8x60_map_io,
++	.init_irq = msm8x60_init_irq,
++	.init_machine = msm8x60_dt_init,
++	.timer = &msm_timer,
++	.dt_compat = msm8x60_fluid_match,
++MACHINE_END
++#endif /* CONFIG_OF */
 -- 
 Sent by an employee of the Qualcomm Innovation Center, Inc.
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
