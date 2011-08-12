@@ -1,50 +1,56 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Fri, 12 Aug 2011 13:21:29 +0100
-Subject: [PATCH v2] ARM: sched_clock: allow sched_clock to be selected at
-	runtime
-In-Reply-To: <1313078531-25610-1-git-send-email-marc.zyngier@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 12 Aug 2011 13:24:19 +0100
+Subject: [PATCH v2] ARM: sched_clock: allow sched_clock to be selected
+	at runtime
+In-Reply-To: <20110812122129.GA2643@pulham.picochip.com>
 References: <1313078531-25610-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20110812122129.GA2643@pulham.picochip.com>
+	<20110812122129.GA2643@pulham.picochip.com>
+Message-ID: <4E451B73.9060007@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 11, 2011 at 05:02:11PM +0100, Marc Zyngier wrote:
-> sched_clock() is yet another blocker on the road to the single
-> image. This patch implements an idea by Russell King:
+On 12/08/11 13:21, Jamie Iles wrote:
+> On Thu, Aug 11, 2011 at 05:02:11PM +0100, Marc Zyngier wrote:
+>> sched_clock() is yet another blocker on the road to the single
+>> image. This patch implements an idea by Russell King:
+>>
+>> http://www.spinics.net/lists/linux-omap/msg49561.html
+>>
+>> Instead of asking the platform to implement both sched_clock()
+>> itself and the rollover callback, simply register a read()
+>> function, and let the ARM code care about sched_clock() itself,
+>> the conversion to ns and the rollover. sched_clock() uses
+>> this read() function as an indirection to the platform code.
+>>
+>> This allow some simplifications and possibly some footprint gain
+>> when multiple platforms are compiled in. Among the drawbacks,
+>> the removal of the *_fixed_sched_clock optimization which could
+>> negatively impact some platforms (sa1100, tegra, versatile
+>> and omap).
+>>
+>> Tested on 11MPCore, OMAP4 and Tegra.
+>>
+>> Cc: Imre Kaloz <kaloz@openwrt.org>
+>> Cc: Krzysztof Halasa <khc@pm.waw.pl>
+>> Cc: Tony Lindgren <tony@atomide.com>
+>> Cc: Eric Miao <eric.y.miao@gmail.com>
+>> Cc: Colin Cross <ccross@android.com>
+>> Cc: Erik Gilling <konkers@android.com>
+>> Cc: Olof Johansson <olof@lixom.net>
+>> Cc: Linus Walleij <linus.walleij@stericsson.com>
+>> Cc: Sascha Hauer <kernel@pengutronix.de>
+>> Cc: Alessandro Rubini <rubini@unipv.it>
+>> Cc: STEricsson <STEricsson_nomadik_linux@list.st.com>
+>> Cc: Lennert Buytenhek <kernel@wantstofly.org>
+>> Cc: Nicolas Pitre <nico@fluxnic.net>
+>> Cc: Ben Dooks <ben-linux@fluff.org>
+>> Cc: Kukjin Kim <kgene.kim@samsung.com>
+>> Cc: Jamie Iles <jamie@jamieiles.com>
 > 
-> http://www.spinics.net/lists/linux-omap/msg49561.html
-> 
-> Instead of asking the platform to implement both sched_clock()
-> itself and the rollover callback, simply register a read()
-> function, and let the ARM code care about sched_clock() itself,
-> the conversion to ns and the rollover. sched_clock() uses
-> this read() function as an indirection to the platform code.
-> 
-> This allow some simplifications and possibly some footprint gain
-> when multiple platforms are compiled in. Among the drawbacks,
-> the removal of the *_fixed_sched_clock optimization which could
-> negatively impact some platforms (sa1100, tegra, versatile
-> and omap).
-> 
-> Tested on 11MPCore, OMAP4 and Tegra.
-> 
-> Cc: Imre Kaloz <kaloz@openwrt.org>
-> Cc: Krzysztof Halasa <khc@pm.waw.pl>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Eric Miao <eric.y.miao@gmail.com>
-> Cc: Colin Cross <ccross@android.com>
-> Cc: Erik Gilling <konkers@android.com>
-> Cc: Olof Johansson <olof@lixom.net>
-> Cc: Linus Walleij <linus.walleij@stericsson.com>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: Alessandro Rubini <rubini@unipv.it>
-> Cc: STEricsson <STEricsson_nomadik_linux@list.st.com>
-> Cc: Lennert Buytenhek <kernel@wantstofly.org>
-> Cc: Nicolas Pitre <nico@fluxnic.net>
-> Cc: Ben Dooks <ben-linux@fluff.org>
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> Cc: Jamie Iles <jamie@jamieiles.com>
+> Tested-by: Jamie Iles <jamie@jamieiles.com>
 
-Tested-by: Jamie Iles <jamie@jamieiles.com>
+Thanks Jamie.
 
-Jamie
+	M.
+-- 
+Jazz is not dead. It just smells funny...
