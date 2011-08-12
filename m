@@ -1,47 +1,42 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 12 Aug 2011 15:56:22 +0100
-Subject: [GIT PULL] Fixes for 3.1
-Message-ID: <20110812145621.GC13586@e102144-lin.cambridge.arm.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Fri, 12 Aug 2011 17:55:18 +0300
+Subject: [PATCH] s3c-adc-battery: fix compilation error due to missing header
+Message-ID: <1313160918-20697-1-git-send-email-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Add linux/module.h to fix this compilation error:
 
-Please pull the following fixes for 3.1. The main changes are fixing up
-broken nomenclature in pmu.c [which became inconsistent during the merge
-window] and fixing I-cache policy detection on v6.
+drivers/power/s3c_adc_battery.c:435:15: error: expected declaration specifiers or ?...? before string constant
+drivers/power/s3c_adc_battery.c:435:1: warning: data definition has no type or storage class
+drivers/power/s3c_adc_battery.c:435:1: warning: type defaults to ?int? in declaration of ?MODULE_AUTHOR?
+drivers/power/s3c_adc_battery.c:435:15: warning: function declaration isn?t a prototype
+drivers/power/s3c_adc_battery.c:436:20: error: expected declaration specifiers or ?...? before string constant
+drivers/power/s3c_adc_battery.c:436:1: warning: data definition has no type or storage class
+drivers/power/s3c_adc_battery.c:436:1: warning: type defaults to ?int? in declaration of ?MODULE_DESCRIPTION?
+drivers/power/s3c_adc_battery.c:436:20: warning: function declaration isn?t a prototype
+drivers/power/s3c_adc_battery.c:437:16: error: expected declaration specifiers or ?...? before string constant
+drivers/power/s3c_adc_battery.c:437:1: warning: data definition has no type or storage class
+drivers/power/s3c_adc_battery.c:437:1: warning: type defaults to ?int? in declaration of ?MODULE_LICENSE?
+drivers/power/s3c_adc_battery.c:437:16: warning: function declaration isn?t a prototype
+make[2]: *** [drivers/power/s3c_adc_battery.o] Error 1
 
-As agreed, I'm sending realview changes via you rather than Arnd.
+Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+---
+ drivers/power/s3c_adc_battery.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-Thanks,
-
-Will
-
-
-The following changes since commit 322a8b034003c0d46d39af85bf24fee27b902f48:
-  Linus Torvalds (1):
-        Linux 3.1-rc1
-
-are available in the git repository at:
-
-  git://linux-arm.org/linux-2.6-wd.git 3.1-fixes-for-rmk
-
-Florian Fainelli (1):
-      ARM: fix perf build with uclibc toolchains
-
-Mark Rutland (2):
-      ARM: perf: fix prototype of release_pmu
-      ARM: perf: make name of arm_pmu_type consistent
-
-Will Deacon (3):
-      ARM: realview: ensure visibility of writes during reset
-      ARM: twd: register clockevents device before enabling PPI
-      ARM: cache: detect VIPT aliasing I-cache on ARMv6
-
- arch/arm/include/asm/pmu.h                   |   10 +++++-----
- arch/arm/kernel/pmu.c                        |   26 +++++++++++++-------------
- arch/arm/kernel/setup.c                      |   15 ++++++++-------
- arch/arm/kernel/smp_twd.c                    |    4 ++--
- arch/arm/mach-realview/include/mach/system.h |    1 +
- tools/perf/arch/arm/util/dwarf-regs.c        |    3 +++
- 6 files changed, 32 insertions(+), 27 deletions(-)
+diff --git a/drivers/power/s3c_adc_battery.c b/drivers/power/s3c_adc_battery.c
+index a675e31..d32d0d7 100644
+--- a/drivers/power/s3c_adc_battery.c
++++ b/drivers/power/s3c_adc_battery.c
+@@ -20,6 +20,7 @@
+ #include <linux/s3c_adc_battery.h>
+ #include <linux/errno.h>
+ #include <linux/init.h>
++#include <linux/module.h>
+ 
+ #include <plat/adc.h>
+ 
+-- 
+1.7.5.rc3
