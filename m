@@ -1,34 +1,34 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 12 Aug 2011 19:18:53 +0900
-Subject: [PATCH] ARM: EXYNOS4: Fix the IRQ definitions for MIPI CSIS device
-In-Reply-To: <4E411BA4.2020909@ru.mvista.com>
-References: <1312809118-6181-1-git-send-email-s.nawrocki@samsung.com>
-	<4E411BA4.2020909@ru.mvista.com>
-Message-ID: <008901cc58d9$3ea0b9d0$bbe22d70$%kim@samsung.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 12 Aug 2011 11:20:20 +0100
+Subject: [PATCH kernel-3.0] arm:cache-l2x0: Fix L2 Cache size calculation.
+In-Reply-To: <1313142327-18320-1-git-send-email-srinivas.kandagatla@st.com>
+References: <1313142327-18320-1-git-send-email-srinivas.kandagatla@st.com>
+Message-ID: <20110812102020.GD14904@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sergei Shtylyov wrote:
+On Fri, Aug 12, 2011 at 10:45:27AM +0100, Srinivas KANDAGATLA wrote:
+> From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
 > 
-> Hello.
+> This patch fixes L2 Cache size calculations for L2C-210, L2C-310 and
+> PL310, by changing the L2X0_AUX_CTRL_WAY_SIZE_MASK from 2 bits to 3
+> bits.
 > 
-> On 08-08-2011 17:11, Sylwester Nawrocki wrote:
+> The Auxiliary Control Register for L2C-210, L2C-310 and PL310 has 3bits
+> [19:17] for Way size, however the existing code only uses 2 bits to
+> get this value. This results in incorrect cachesize calculations.
 > 
-> > This is a regression fix after migration to the external GIC.
-> > The breakage has been introduced in commit:
-> > "ARM: EXYNOS4: modify interrupt mappings for external GIC"
-> 
->     Would be good to also cite that commit's ID for gitweb.
-> 
-Yes, I think so :)
+> I should say this bug does not result in issue but, its just prints
+> incorrect values.
 
-Sylwester,
-This is required now so I added commit id when I applied.
+It also results in performing operations on the whole cache when we
+erroneously decide that the range is big enough (due to l2x0_size being
+too small).
 
-Thanks.
+> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Acked-by: Will Deacon <will.deacon@arm.com>
+
+Please can you CC stable on this too?
+
+Will
