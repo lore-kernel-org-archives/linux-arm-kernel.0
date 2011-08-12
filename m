@@ -1,42 +1,50 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Fri, 12 Aug 2011 14:09:41 +0200
-Subject: [PATCH 0/5] Miscellaneous s3c64xx fixes.
-In-Reply-To: <5661373.tZL1ZnPyVO@flatron>
-References: <5661373.tZL1ZnPyVO@flatron>
-Message-ID: <2691749.ciX6KCIc5Y@flatron>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Fri, 12 Aug 2011 13:21:29 +0100
+Subject: [PATCH v2] ARM: sched_clock: allow sched_clock to be selected at
+	runtime
+In-Reply-To: <1313078531-25610-1-git-send-email-marc.zyngier@arm.com>
+References: <1313078531-25610-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20110812122129.GA2643@pulham.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Anyone?
+On Thu, Aug 11, 2011 at 05:02:11PM +0100, Marc Zyngier wrote:
+> sched_clock() is yet another blocker on the road to the single
+> image. This patch implements an idea by Russell King:
+> 
+> http://www.spinics.net/lists/linux-omap/msg49561.html
+> 
+> Instead of asking the platform to implement both sched_clock()
+> itself and the rollover callback, simply register a read()
+> function, and let the ARM code care about sched_clock() itself,
+> the conversion to ns and the rollover. sched_clock() uses
+> this read() function as an indirection to the platform code.
+> 
+> This allow some simplifications and possibly some footprint gain
+> when multiple platforms are compiled in. Among the drawbacks,
+> the removal of the *_fixed_sched_clock optimization which could
+> negatively impact some platforms (sa1100, tegra, versatile
+> and omap).
+> 
+> Tested on 11MPCore, OMAP4 and Tegra.
+> 
+> Cc: Imre Kaloz <kaloz@openwrt.org>
+> Cc: Krzysztof Halasa <khc@pm.waw.pl>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Eric Miao <eric.y.miao@gmail.com>
+> Cc: Colin Cross <ccross@android.com>
+> Cc: Erik Gilling <konkers@android.com>
+> Cc: Olof Johansson <olof@lixom.net>
+> Cc: Linus Walleij <linus.walleij@stericsson.com>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: Alessandro Rubini <rubini@unipv.it>
+> Cc: STEricsson <STEricsson_nomadik_linux@list.st.com>
+> Cc: Lennert Buytenhek <kernel@wantstofly.org>
+> Cc: Nicolas Pitre <nico@fluxnic.net>
+> Cc: Ben Dooks <ben-linux@fluff.org>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Cc: Jamie Iles <jamie@jamieiles.com>
 
-On Friday 29 of July 2011 at 17:50:57, Tomasz Figa wrote:
-> From c985e14a4fc5c7970d7f6c2fde6d214217214688 Mon Sep 17 00:00:00 2001
-> From: Tomasz Figa <tomasz.figa@gmail.com>
-> Date: Fri, 29 Jul 2011 16:50:16 +0200
-> Subject: [PATCH 0/5] Miscellaneous s3c64xx fixes.
-> 
-> This series attempts to fix some issues I approached when working
-> on the s3c64xx platform. See descriptions of individual patches for more
-> details on each one.
-> 
-> All the patches are based on v3.0 tag of Linus' tree.
-> 
-> Tomasz Figa (5):
->   ARM: s3c64xx: PM: Mask and acknowledge all UART interrupts during
->     core resume.
->   ARM: s3c64xx: DMA: Use S3C64XX_SDMA_SEL register name instead of
->     numeric address.
->   ARM: s3c64xx: Save/restore S3C64XX_SDMA_SEL on suspend/resume.
->   ARM: s3c64xx: Save/restore S3C64XX_MODEM_MIFPCON on suspend/resume to
->     preserve LCD bypass state.
->   ARM: s3c64xx: Add support for synchronous clock operation.
-> 
->  arch/arm/mach-s3c64xx/clock.c                   |    8 +++++-
->  arch/arm/mach-s3c64xx/dma.c                     |    2 +-
->  arch/arm/mach-s3c64xx/include/mach/regs-clock.h |    4 +++
->  arch/arm/mach-s3c64xx/include/mach/regs-sys.h   |    2 +
->  arch/arm/mach-s3c64xx/pm.c                      |   30 
-> +++++++++++++++++++++++
->  5 files changed, 44 insertions(+), 2 deletions(-)
-> 
-> 
+Tested-by: Jamie Iles <jamie@jamieiles.com>
+
+Jamie
