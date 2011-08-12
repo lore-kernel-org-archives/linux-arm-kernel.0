@@ -1,98 +1,28 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 12 Aug 2011 11:21:43 -0600
-Subject: How to handle named resources with DT?
-In-Reply-To: <4E45422D.4050708@ti.com>
-References: <20110809205723.GE11568@ponder.secretlab.ca>
-	<20110812030218.GP30552@yookeroo.fritz.box>
-	<20110812084106.GC19467@legolas.emea.dhcp.ti.com>
-	<201108121635.42953.arnd@arndb.de> <4E45422D.4050708@ti.com>
-Message-ID: <CACxGe6s-2EAuvSqzn6yzDvCyVXa8vVVqG2X=1XFrUBnB=jsdxQ@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 12 Aug 2011 10:46:24 -0700
+Subject: Relinking zImage when nothing changes
+Message-ID: <4E4566F0.4020001@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 12, 2011 at 9:09 AM, Cousson, Benoit <b-cousson@ti.com> wrote:
-> On 8/12/2011 4:35 PM, Arnd Bergmann wrote:
->> It only make sense for drivers that support both device tree probing
->> and legacy probing of static platform devices.
->>
->> Note how almost all drivers use only platform_get_resource and not
->> platform_get_resource_byname:
->>
->> arnd at ocdc-kvm:~/linux-arm$ git grep -wl platform_get_resource | wc -l
->> 565
->> arnd at ocdc-kvm:~/linux-arm$ git grep -wl platform_get_resource_byname | wc
->> -l
->> 41
->> arnd at ocdc-kvm:~/linux-arm$ git grep -wl platform_get_resource_byname |
->> xargs grep -wL platform_get_resource | wc -l # both
->> 28
->> arnd at ocdc-kvm:~/linux-arm$ git grep -wl platform_get_resource_byname |
->> xargs grep -wl platform_get_resource ?| wc -l # only _byname
->> 13
->
-> That's true, but this is mainly because most of the time there is only one
-> irq, dma or mem resource, so the _byname is not useful.
-> As soon as you start having multiple entries, relying on the order become
-> less readable and error prone. Then getting the resource by name become
-> useful.
-> There are probably a lot of API that are less used than this one, but does
-> that mean that we have to remove them?
->
-> The extreme case (soon in mainline) in OMAP is that one:
->
-> static struct omap_hwmod_addr_space omap44xx_aess_addrs[] = {
-> ? ? ? ?{
-> ? ? ? ? ? ? ? ?.name ? ? ? ? ? = "dmem",
-> ? ? ? ? ? ? ? ?.pa_start ? ? ? = 0x40180000,
-> ? ? ? ? ? ? ? ?.pa_end ? ? ? ? = 0x4018ffff
-> ? ? ? ?},
-> ? ? ? ?{
-> ? ? ? ? ? ? ? ?.name ? ? ? ? ? = "cmem",
-> ? ? ? ? ? ? ? ?.pa_start ? ? ? = 0x401a0000,
-> ? ? ? ? ? ? ? ?.pa_end ? ? ? ? = 0x401a1fff
-> ? ? ? ?},
-> ? ? ? ?{
-> ? ? ? ? ? ? ? ?.name ? ? ? ? ? = "smem",
-> ? ? ? ? ? ? ? ?.pa_start ? ? ? = 0x401c0000,
-> ? ? ? ? ? ? ? ?.pa_end ? ? ? ? = 0x401c5fff
-> ? ? ? ?},
-> ? ? ? ?{
-> ? ? ? ? ? ? ? ?.name ? ? ? ? ? = "pmem",
-> ? ? ? ? ? ? ? ?.pa_start ? ? ? = 0x401e0000,
-> ? ? ? ? ? ? ? ?.pa_end ? ? ? ? = 0x401e1fff
-> ? ? ? ?},
-> ? ? ? ?{
-> ? ? ? ? ? ? ? ?.name ? ? ? ? ? = "reg",
-> ? ? ? ? ? ? ? ?.pa_start ? ? ? = 0x401f1000,
-> ? ? ? ? ? ? ? ?.pa_end ? ? ? ? = 0x401f13ff,
-> ? ? ? ? ? ? ? ?.flags ? ? ? ? ?= ADDR_TYPE_RT
-> ? ?}
-> };
->
-> In that case, the driver knows exactly where is the relevant memory buffer
-> he has to use.
->
->> I think it's much easier to change the existing users of _byname over
->> to fixed indexes than to come up with a new scheme that is better.
->
-> As you said previously, since we have to support both legacy probing and DT
-> for some time, it will be easier for these drivers to rely on the same API.
->
-> Considering that adding that new property is not a huge effort anyway and
-> _byname API is a standard API that any driver should be able to use if
-> needed, it still worth adding the DT support for named resources for my
-> point of view.
+I was hoping with the recent patch e78e8f2 (kernel: prevent unnecessary
+rebuilding due to config_data.gz, 2011-07-05) compiling ARM linux a
+second time would amount to no more linking. This doesn't seem to be the
+case though. Doing a make V=2 I see that lib1funcs.S is shipped and thus
+we have to recompile it although nothing actually changed. This in turn
+requires us to relink the compressed vmlinux and then recreate the zImage.
 
-The assumption being made here is that the current Linux
-implementation detail dictates the binding design, but it does not.
-Binding authors should certainly look at the Linux implementation for
-inspiration, but established DT patterns still prevail if they are
-suitable for describing the hardware. In this case the pattern is that
-tuples in the reg property are strongly ordered and specified by the
-driver binding.
+  Kernel: arch/arm/boot/Image is ready
+  SHIPPED arch/arm/boot/compressed/lib1funcs.S - due to missing .cmd file
+  AS      arch/arm/boot/compressed/lib1funcs.o - due to: arch/arm/boot/compressed/lib1funcs.S
+  LD      arch/arm/boot/compressed/vmlinux - due to: arch/arm/boot/compressed/lib1funcs.o
+  OBJCOPY arch/arm/boot/zImage - due to: arch/arm/boot/compressed/vmlinux
+  Kernel: arch/arm/boot/zImage is ready
 
-So, I remain unconvinced that the 'reg' property binding is
-insufficient.  I have no plans to merge support for fetching _byname
-values from the device tree.
 
-g.
+Is there any way to avoid this? Perhaps the shipped command could become
+a bit wiser?
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
