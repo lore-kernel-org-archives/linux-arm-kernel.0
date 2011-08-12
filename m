@@ -1,109 +1,229 @@
-From: david@gibson.dropbear.id.au (David Gibson)
-Date: Fri, 12 Aug 2011 13:02:18 +1000
-Subject: How to handle named resources with DT?
-In-Reply-To: <4E43CB07.20002@ti.com>
-References: <4E417BD5.8080409@freescale.com>
-	<20110809205723.GE11568@ponder.secretlab.ca>
-	<4E41A1B9.1060400@ti.com>
-	<20110809211747.GJ11568@ponder.secretlab.ca>
-	<4E41AA43.1000506@ti.com>
-	<20110809214905.GK11568@ponder.secretlab.ca>
-	<4E41AC5C.20301@ti.com> <20110810015214.GD23511@yookeroo.fritz.box>
-	<CACxGe6tr5OUxpiVah4s6rRG0cTOWsnohhEkZoSZgCj0xSZkmMA@mail.gmail.com>
-	<4E43CB07.20002@ti.com>
-Message-ID: <20110812030218.GP30552@yookeroo.fritz.box>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 11 Aug 2011 22:02:31 -0500
+Subject: [RFC PATCH] ARM: gic: add OF based initialization
+In-Reply-To: <4E438B17.10907@arm.com>
+References: <1313007324-23194-1-git-send-email-robherring2@gmail.com>
+	<4E438B17.10907@arm.com>
+Message-ID: <4E4497C7.2010304@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 11, 2011 at 02:28:55PM +0200, Cousson, Benoit wrote:
-> On 8/10/2011 9:22 PM, Grant Likely wrote:
-> >On Tue, Aug 9, 2011 at 7:52 PM, David Gibson
-> ><david@gibson.dropbear.id.au>  wrote:
-> >>On Tue, Aug 09, 2011 at 11:53:32PM +0200, Cousson, Benoit wrote:
-> >>>On 8/9/2011 11:49 PM, Grant Likely wrote:
-> >>>>That won't work either because that also breaks the existing 'reg'
-> >>>>binding.  Anything you do will need to supplement the existing
-> >>>>binding without changing it in an incompatible way.
-> >>>
-> >>>OK, but can we add a new attribute then? reg2, reg_ng, reg_plusplus,
-> >>>reg_named...?
-> >>
-> >>He already suggested reg-names to be interpreted in parallel with the
-> >>existing reg property.  The (serious) problem with replacing the reg
-> >>property is that it will break all existing OSes (including old Linux
-> >>versions) that don't understand the new property.
-> >>
-> >>Of course, the problem with reg-names is that it will be ignored by
-> >>older OSes, and so 'reg' must still be in the correct order.  In which
-> >>case you could argue it's more sensible to just have a static place to
-> >>name mapping in the Linux driver.
-> >>
-> >>In short, yes, named reg elements in the DT would be nice in theory,
-> >>but I'm not convinced it's worth a DT flag day to accomplish it.
-> >
-> >I'm inclined the same way, though I agree with the replies that point
-> >out it wouldn't result in a 'flag day' because existing bindings
-> >cannot become incompatible.  The problem I have is that adding
-> >reg-names or similar implies that ordering of the reg property is no
-> >longer defined which I absolutely do not think is a good idea.
-> 
-> That will not be an issue if "reg-named" is a completely new node.
-> It will replace the "reg" node only when a named entry is needed.
-> Most devices will use the regular "reg" entry, and only the one that
-> need extra information will use the reg-named.
+Marc,
 
-Um, you seem to be confusing nodes and properties here.
+On 08/11/2011 02:56 AM, Marc Zyngier wrote:
+> Hi Rob,
+> 
+> Thanks for looking at this.
+> 
+> On 10/08/11 21:15, Rob Herring wrote:
+>> From: Rob Herring <rob.herring@calxeda.com>
+>>
+>> This adds gic initialization using device tree data. An example device tree
+>> binding looks like this:
+>>
+>> intc: interrupt-controller at fff11000 {
+>>         compatible = "arm,cortex-a9-gic";
+>>         #interrupt-cells = <1>;
+> 
+> The SPI interrupt can either be level-high or edge-rising. So you
+> probably want #interrupt-cells to be equal to 2...
+> 
+>> 	#size-cells = <0>;
+>> 	#address-cells = <1>;
+>>
+>>         interrupt-controller;
+>>         reg = <0xfff11000 0x1000>,
+>>               <0xfff10100 0x100>;
+>>
+>> 	gicppi0: gic-ppi at 0 {
+>> 		compatible = "arm,cortex-a9-gic-ppi";
+>> 		#interrupt-cells = <1>;
+>> 		interrupt-controller;
+>> 		reg = <0>;
+>> 	};
+>> 	gicppi1: gic-ppi at 1 {
+>> 		compatible = "arm,cortex-a9-gic-ppi";
+>> 		#interrupt-cells = <1>;
+>> 		interrupt-controller;
+>> 		reg = <1>;
+>> 	};
+>> };
+>>
+>> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+>> ---
+>>
+>> Marc,
+>>
+>> This adds PPI handling. I took your binding and modified it a bit to make
+>> things a bit simpler for the linux side. Rather than having SPIs as a 
+>> child node, I kept them at the parent node. Then PPIs are optional child
+>> nodes. This way, a secondary GIC is no more complex than a simple
+>> interrupt controller.
+> 
+> Maybe it's not a real problem, but this makes PPIs a sort of "cascaded"
+> interrupt controller, which I find rather misleading. In reality, there
+> is no hierarchy between SPIs and PPIs.
 
-> That seems to be pretty straightforward to implement, and as soon as
-> it is useful even for a couple of drivers, it worth adding it.
-> 
-> It is anyway better than having to add a custom property to get the
-> information we will miss otherwise.
-> 
-> Moreover, since some drivers are relying on that call, it will avoid
-> having to add extra code for nothing if CONFIG_OF is set.
-> 
-> It will allow the driver to use a pretty standard API in anycase vs
-> using platform_get_resource + some extra optional calls to of_
-> functions + some code to get the information for non-DT build.
+It's only the DT nodes that are cascaded. The interrupts are not.
 
-You don't need to add stuff to the DT to use the byname interface.
-Really.  All you need is a way for the driver (well match table entry,
-really) to provide a list of names to attach to the reg entries in
-order.
+> 
+> Is it legal for an interrupt controller to have an interrupt controller
+> as a parent, without an interrupt number? How will irq_of_parse_and_map
+> react to this? I'm quite sure of_irq_find_parent(ppi) will return the
+> wrong thing (the SPI controller).
 
-> >Please, stick with the established convention and explicitly order
-> >'reg' and 'interrupts' properties.  If there is a specific use case
-> >where this doesn't work, then bring it up, but I haven't seen any yet.
-> 
-> There will always be some alternatives, but they will be uglier, and
-> the effort to add some extra node to DT is so small, that it is
-> better to do that instead of adding some useless extra code in the
-> driver.
-> 
-> >  The current users of _byname that I've looked seem to only use it for
-> >convenience, not because a register range may be optional.  ie. they
-> >all fail out if a reg resource isn't present.
-> 
-> If that API can help the driver writer and can avoid adding 10 lines
-> of code, it is still useful to use it.
-> 
-> To be honest, I still do not understand why you are so reluctant to
-> add that small feature.
+I wondered this a bit at first, but it seems to work. I did some more
+testing and in fact of_irq_find_parent behaves fine. It looks for either
+a phandle or parent node with #interrupt-cells property. I'm not quite
+sure why the #interrupt-cells property is not found in this case.
 
-Because this is a totally new basic feature to add to the DT
-bindings.  Once in there, we're stuck with it indefinitely, which
-means it warrants considerably more conservatism than mere internal
-code changes which can be easily updated or reverted.
+This code plus printk's added to of_irq_find_parent:
 
-> That will not break compatibility and it will make our life easier.
-> Don't you want to make our life easier? :-)
-> 
-> Benoit
-> 
+	desc.controller = of_find_compatible_node(NULL, NULL, "arm,cortex-a9-gic");
+	gic_of_init(&desc);
+	node = desc.controller;
+	printk("interrupt-parent = %p\n", of_irq_find_parent(node));
+	for_each_child_of_node(node, desc.controller) {
+		printk("interrupt-parent = %p\n", of_irq_find_parent(node));
+		gic_of_ppi_init(&desc);
+	}
 
--- 
-David Gibson			| I'll have my music baroque, and my code
-david AT gibson.dropbear.id.au	| minimalist, thank you.  NOT _the_ _other_
-				| _way_ _around_!
-http://www.ozlabs.org/~dgibson
+produces this:
+
+[    0.000000] p = c1b2007c, get_prop=  (null)
+[    0.000000] p =   (null), get_prop=  (null)
+[    0.000000] interrupt-parent =   (null)
+[    0.000000] p = c1b2007c, get_prop=  (null)
+[    0.000000] p =   (null), get_prop=  (null)
+[    0.000000] interrupt-parent =   (null)
+[    0.000000] p = c1b2007c, get_prop=  (null)
+[    0.000000] p =   (null), get_prop=  (null)
+[    0.000000] interrupt-parent =   (null)
+
+So of_irq_find_parent is returning null in all 3 cases which is what is
+desired.
+
+Rob
+
+> 
+>> The PPI init simply creates an irqdomain for each cpu interface. By using 
+>> a domain per PPI and SPI, the translation is simple. The domain irq_base
+>> is always 0, so PPI # is always equal to linux irq number. This can be
+>> changed if the linux irq numbering of PPI's changes, but that should not
+>> affect the binding.
+>>
+>> The documentation still needs updating.
+>>
+>> Rob
+>>
+>>  Documentation/devicetree/bindings/arm/gic.txt |   28 +++++++++++++++++
+>>  arch/arm/common/gic.c                         |   40 +++++++++++++++++++++++++
+>>  arch/arm/include/asm/hardware/gic.h           |    3 ++
+>>  3 files changed, 71 insertions(+), 0 deletions(-)
+>>  create mode 100644 Documentation/devicetree/bindings/arm/gic.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/gic.txt b/Documentation/devicetree/bindings/arm/gic.txt
+>> new file mode 100644
+>> index 0000000..78012e3
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/arm/gic.txt
+>> @@ -0,0 +1,28 @@
+>> +* ARM Generic Interrupt Controller
+>> +
+>> +Some ARM cores have an interrupt controller called GIC. The ARM GIC
+>> +representation in the device tree should be done as under:-
+>> +
+>> +Required properties:
+>> +
+>> +- compatible : should be one of:
+>> +	"arm,cortex-a9-gic"
+>> +	"arm,arm11mp-gic"
+>> +- interrupt-controller : Identifies the node as an interrupt controller
+>> +- #interrupt-cells : Specifies the number of cells needed to encode an
+>> +  interrupt source.  The type shall be a <u32> and the value shall be 1.
+>> +- reg : Specifies base physical address(s) and size of the GIC registers. The
+>> +  first 2 values are the GIC distributor register base and size. The 2nd 2
+>> +  values are the GIC cpu interface register base and size.
+>> +
+>> +Example:
+>> +
+>> +intc: interrupt-controller at fff11000 {
+>> +        compatible = "arm,cortex-a9-gic";
+>> +        #interrupt-cells = <1>;
+>> +        interrupt-controller;
+>> +        reg = <0xfff11000 0x1000>,
+>> +              <0xfff10100 0x100>;
+>> +};
+>> +
+>> +
+>> diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+>> index f13298e..b0f11b3 100644
+>> --- a/arch/arm/common/gic.c
+>> +++ b/arch/arm/common/gic.c
+>> @@ -28,6 +28,10 @@
+>>  #include <linux/smp.h>
+>>  #include <linux/cpumask.h>
+>>  #include <linux/io.h>
+>> +#include <linux/of.h>
+>> +#include <linux/of_address.h>
+>> +#include <linux/of_irq.h>
+>> +#include <linux/irqdomain.h>
+>>  
+>>  #include <asm/irq.h>
+>>  #include <asm/mach/irq.h>
+>> @@ -394,3 +398,39 @@ void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+>>  	writel_relaxed(map << 16 | irq, gic_data[0].dist_base + GIC_DIST_SOFTINT);
+>>  }
+>>  #endif
+>> +
+>> +#ifdef CONFIG_OF
+>> +static int gic_cnt __initdata = 0;
+>> +
+>> +void __init gic_of_init(struct of_intc_desc *d)
+>> +{
+>> +	struct device_node *np = d->controller;
+>> +	void __iomem *cpu_base;
+>> +	void __iomem *dist_base;
+>> +	int irq;
+>> +
+>> +	if (WARN_ON(!d || !d->controller))
+>> +		return;
+>> +
+>> +	dist_base = of_iomap(np, 0);
+>> +	WARN(!dist_base, "unable to map gic dist registers\n");
+>> +
+>> +	cpu_base = of_iomap(np, 1);
+>> +	WARN(!cpu_base, "unable to map gic cpu registers\n");
+>> +
+>> +	gic_init(gic_cnt, d->irq_base, dist_base, cpu_base);
+>> +	irq_domain_add_simple(d->controller, d->irq_base);
+>> +
+>> +	if (d->parent) {
+>> +		irq = irq_of_parse_and_map(np, 0);
+>> +		gic_cascade_irq(gic_cnt, irq);
+>> +	}
+>> +	gic_cnt++;
+>> +}
+>> +
+>> +void __init gic_of_ppi_init(struct of_intc_desc *d)
+>> +{
+>> +	irq_domain_add_simple(d->controller, d->irq_base);
+>> +}
+>> +
+>> +#endif
+>> diff --git a/arch/arm/include/asm/hardware/gic.h b/arch/arm/include/asm/hardware/gic.h
+>> index 435d3f8..a6594d4 100644
+>> --- a/arch/arm/include/asm/hardware/gic.h
+>> +++ b/arch/arm/include/asm/hardware/gic.h
+>> @@ -37,6 +37,9 @@ extern void __iomem *gic_cpu_base_addr;
+>>  extern struct irq_chip gic_arch_extn;
+>>  
+>>  void gic_init(unsigned int, unsigned int, void __iomem *, void __iomem *);
+>> +struct of_intc_desc;
+>> +void gic_of_init(struct of_intc_desc *d);
+>> +void gic_of_ppi_init(struct of_intc_desc *d);
+>>  void gic_secondary_init(unsigned int);
+>>  void gic_cascade_irq(unsigned int gic_nr, unsigned int irq);
+>>  void gic_raise_softirq(const struct cpumask *mask, unsigned int irq);
+> 
+> 
