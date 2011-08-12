@@ -1,65 +1,39 @@
-From: srinivas.kandagatla@st.com (Srinivas KANDAGATLA)
-Date: Fri, 12 Aug 2011 12:22:23 +0100
-Subject: [PATCH kernel-3.0] arm:cache-l2x0: Fix L2 Cache size calculation.
-Message-ID: <1313148143-26950-1-git-send-email-srinivas.kandagatla@st.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Fri, 12 Aug 2011 19:47:55 +0800
+Subject: How to handle named resources with DT?
+In-Reply-To: <4E44EAAD.1030805@ti.com>
+References: <20110809162907.GA630@manju-WNB7PBC4801-0006>
+	<4E4166F0.9050401@ti.com>
+	<CACxGe6tbEW1EZhqXy78EZVM_sQLH0Qbr7QOzbgbsKBRn1FtVrg@mail.gmail.com>
+	<4E4172A8.3030101@ti.com>
+	<20110809205542.GD11568@ponder.secretlab.ca>
+	<4E41A156.3030407@ti.com>
+	<20110809211657.GI11568@ponder.secretlab.ca>
+	<4E41A886.30205@ti.com>
+	<20110812041016.GA6618@S2100-06.ap.freescale.net>
+	<4E44EAAD.1030805@ti.com>
+Message-ID: <20110812114754.GI6618@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+On Fri, Aug 12, 2011 at 10:56:13AM +0200, Cousson, Benoit wrote:
+[...]
+> >>The devil is in the details, but the way the DMA lines are connected
+> >>in OMAP is similar to IRQ lines, and maybe a little bit simpler.
+> >>
+> >>So starting with a copy/paste of the of_irq file should be a good start.
+> >>And then the issues will start:-)
+> >>
+> >
+> >I had a conversation with Arnd as below.  Arnd has the concern on
+> >multiple dma controllers.  So it is a question if we need to handle
+> >multiple dma controllers like we do for multiple irq controllers.
+> 
+> Quite, interesting, I cannot find the thread, did you discuss that
+> on linaro-dev, lakml?
+> 
+http://thread.gmane.org/gmane.linux.drivers.devicetree/6587
 
-This patch fixes L2 Cache size calculations for L2C-210, L2C-310 and
-PL310, by changing the L2X0_AUX_CTRL_WAY_SIZE_MASK from 2 bits to 3
-bits.
-
-The Auxiliary Control Register for L2C-210, L2C-310 and PL310 has 3bits
-[19:17] for Way size, however the existing code only uses 2 bits to
-get this value. This results in incorrect cachesize calculations.
-
-It also results in performing operations on the whole cache when we
-erroneously decide that the range is big enough (due to l2x0_size being
-too small) and also prints incorrect cachesize.
-
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
-Acked-by: Will Deacon <will.deacon@arm.com>
-Cc: stable at kernel.org
-
----
-
-adding stable in CC..
-
-Hi All,
-
-I found an bug in L2 Cache size calculation in cache-l2x0 code.
-
-According to ARM TRM for L2C-210, L2C-310 and PL310, the Auxiliary
-Control Register has 3bits [19:17] allocated for Way size,however
-the existing code only uses 2 bits to get this value from Aux 
-control register. This results in incorrect cache size calculations.
-
-
-It also results in performing operations on the whole cache when we
-erroneously decide that the range is big enough (due to l2x0_size being
-too small).
-
-thanks, 
-srini
-
-
- arch/arm/include/asm/hardware/cache-l2x0.h |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/include/asm/hardware/cache-l2x0.h b/arch/arm/include/asm/hardware/cache-l2x0.h
-index 16bd480..bfa706f 100644
---- a/arch/arm/include/asm/hardware/cache-l2x0.h
-+++ b/arch/arm/include/asm/hardware/cache-l2x0.h
-@@ -64,7 +64,7 @@
- #define L2X0_AUX_CTRL_MASK			0xc0000fff
- #define L2X0_AUX_CTRL_ASSOCIATIVITY_SHIFT	16
- #define L2X0_AUX_CTRL_WAY_SIZE_SHIFT		17
--#define L2X0_AUX_CTRL_WAY_SIZE_MASK		(0x3 << 17)
-+#define L2X0_AUX_CTRL_WAY_SIZE_MASK		(0x7 << 17)
- #define L2X0_AUX_CTRL_SHARE_OVERRIDE_SHIFT	22
- #define L2X0_AUX_CTRL_NS_LOCKDOWN_SHIFT		26
- #define L2X0_AUX_CTRL_NS_INT_CTRL_SHIFT		27
 -- 
-1.6.3.3
+Regards,
+Shawn
