@@ -1,48 +1,32 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 12 Aug 2011 15:54:58 +0800
-Subject: [PATCH 3/6] gpio/mxc: add .to_irq for gpio chip
+Date: Fri, 12 Aug 2011 15:54:59 +0800
+Subject: [PATCH 4/6] arm/imx: remove gpio_to_irq() from mach/gpio.h
 In-Reply-To: <1313135701-22456-1-git-send-email-shawn.guo@linaro.org>
 References: <1313135701-22456-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1313135701-22456-4-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1313135701-22456-5-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It adds .to_irq support for gpio chip, so that __gpio_to_irq in
-gpiolib becomes usable.
+As all the users of gpio_to_irq() has migrated to IMX_GPIO_TO_IRQ,
+gpio_to_irq() can be removed from mach/gpio.h now.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-Cc: Grant Likely <grant.likely@secretlab.ca>
+Cc: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- drivers/gpio/gpio-mxc.c |   10 ++++++++++
- 1 files changed, 10 insertions(+), 0 deletions(-)
+ arch/arm/plat-mxc/include/mach/gpio.h |    1 -
+ 1 files changed, 0 insertions(+), 1 deletions(-)
 
-diff --git a/drivers/gpio/gpio-mxc.c b/drivers/gpio/gpio-mxc.c
-index 4340aca..64aff20 100644
---- a/drivers/gpio/gpio-mxc.c
-+++ b/drivers/gpio/gpio-mxc.c
-@@ -337,6 +337,15 @@ static void __devinit mxc_gpio_get_hw(struct platform_device *pdev)
- 	mxc_gpio_hwtype = hwtype;
- }
+diff --git a/arch/arm/plat-mxc/include/mach/gpio.h b/arch/arm/plat-mxc/include/mach/gpio.h
+index 3e1ffc8..9a7c750 100644
+--- a/arch/arm/plat-mxc/include/mach/gpio.h
++++ b/arch/arm/plat-mxc/include/mach/gpio.h
+@@ -27,7 +27,6 @@
+ /* range e.g. GPIO_1_5 is gpio 5 under linux */
+ #define IMX_GPIO_NR(bank, nr)		(((bank) - 1) * 32 + (nr))
  
-+static int mxc_gpio_to_irq(struct gpio_chip *gc, unsigned offset)
-+{
-+	struct bgpio_chip *bgc = to_bgpio_chip(gc);
-+	struct mxc_gpio_port *port =
-+		container_of(bgc, struct mxc_gpio_port, bgc);
-+
-+	return port->virtual_irq_start + offset;
-+}
-+
- static int __devinit mxc_gpio_probe(struct platform_device *pdev)
- {
- 	struct device_node *np = pdev->dev.of_node;
-@@ -403,6 +412,7 @@ static int __devinit mxc_gpio_probe(struct platform_device *pdev)
- 	if (err)
- 		goto out_iounmap;
+-#define gpio_to_irq(gpio)	(MXC_GPIO_IRQ_START + (gpio))
+ #define irq_to_gpio(irq)	((irq) - MXC_GPIO_IRQ_START)
  
-+	port->bgc.gc.to_irq = mxc_gpio_to_irq;
- 	port->bgc.gc.base = pdev->id * 32;
- 	port->bgc.dir = port->bgc.read_reg(port->bgc.reg_dir);
- 	port->bgc.data = port->bgc.read_reg(port->bgc.reg_set);
+ #endif
 -- 
 1.7.4.1
