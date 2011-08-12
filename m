@@ -1,40 +1,34 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 12 Aug 2011 15:54:55 +0800
-Subject: [PATCH 0/6] Clean up plat-mxc/include/mach/gpio.h
-Message-ID: <1313135701-22456-1-git-send-email-shawn.guo@linaro.org>
+Date: Fri, 12 Aug 2011 15:54:56 +0800
+Subject: [PATCH 1/6] arm/cpuimx51: gpio_to_irq() should be used to get irq
+	from gpio number
+In-Reply-To: <1313135701-22456-1-git-send-email-shawn.guo@linaro.org>
+References: <1313135701-22456-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1313135701-22456-2-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As one step to single image for multiple platforms, mach/gpio.h needs
-to be removed from asm/gpio.h.  The patch set cleans up IMX/MXC
-mach/gpio.h to an empty header.
+Instead of irq_to_gpio(), gpio_to_irq() should be used to get irq
+from gpio number.
 
-It's based on v3.1-rc1 plus rmk's patch series below.
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Cc: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ arch/arm/mach-mx5/board-cpuimx51.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-  [PATCH 00/13] Clean up mach/gpio.h headers
-
-Shawn Guo (6):
-      arm/cpuimx51: gpio_to_irq() should be used to get irq from gpio number
-      arm/imx: remove the uses of gpio_to_irq()
-      gpio/mxc: add .to_irq for gpio chip
-      arm/imx: remove gpio_to_irq() from mach/gpio.h
-      gpio/mxc: move irq_to_gpio() into gpio-mxc driver
-      arm/mxc: move IMX_GPIO_NR into mach/hardware.h
-
- arch/arm/mach-imx/mach-armadillo5x0.c        |    3 ++-
- arch/arm/mach-imx/mach-cpuimx35.c            |    2 +-
- arch/arm/mach-imx/mach-mx27_3ds.c            |    8 ++++----
- arch/arm/mach-imx/mach-mx31moboard.c         |    4 ++--
- arch/arm/mach-imx/mach-mx35_3ds.c            |    2 +-
- arch/arm/mach-imx/mach-vpr200.c              |    2 +-
- arch/arm/mach-imx/mx31moboard-devboard.c     |    4 ++--
- arch/arm/mach-imx/mx31moboard-marxbot.c      |    4 ++--
- arch/arm/mach-mx5/board-cpuimx51.c           |    8 ++++----
- arch/arm/mach-mx5/board-cpuimx51sd.c         |    4 ++--
- arch/arm/mach-mx5/board-mx51_3ds.c           |    2 +-
- arch/arm/mach-mx5/board-mx53_ard.c           |    4 ++--
- arch/arm/mach-mx5/eukrea_mbimx51-baseboard.c |    4 ++--
- arch/arm/mach-mx5/mx51_efika.c               |    2 +-
- arch/arm/plat-mxc/include/mach/gpio.h        |   11 -----------
- arch/arm/plat-mxc/include/mach/hardware.h    |    6 ++++++
- drivers/gpio/gpio-mxc.c                      |   12 ++++++++++++
+diff --git a/arch/arm/mach-mx5/board-cpuimx51.c b/arch/arm/mach-mx5/board-cpuimx51.c
+index 7c893fa..68934ea 100644
+--- a/arch/arm/mach-mx5/board-cpuimx51.c
++++ b/arch/arm/mach-mx5/board-cpuimx51.c
+@@ -81,7 +81,7 @@ static struct plat_serial8250_port serial_platform_data[] = {
+ 		.flags = UPF_BOOT_AUTOCONF | UPF_SKIP_TEST | UPF_IOREMAP,
+ 	}, {
+ 		.mapbase = (unsigned long)(MX51_CS1_BASE_ADDR + 0x2000000),
+-		.irq = irq_to_gpio(CPUIMX51_QUARTD_GPIO),
++		.irq = gpio_to_irq(CPUIMX51_QUARTD_GPIO),
+ 		.irqflags = IRQF_TRIGGER_HIGH,
+ 		.uartclk = CPUIMX51_QUART_XTAL,
+ 		.regshift = CPUIMX51_QUART_REGSHIFT,
+-- 
+1.7.4.1
