@@ -1,54 +1,82 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 12 Aug 2011 15:55:01 +0800
-Subject: [PATCH 6/6] arm/mxc: move IMX_GPIO_NR into mach/hardware.h
-In-Reply-To: <1313135701-22456-1-git-send-email-shawn.guo@linaro.org>
-References: <1313135701-22456-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1313135701-22456-7-git-send-email-shawn.guo@linaro.org>
+From: abhilash.kv@ti.com (Koyamangalath, Abhilash)
+Date: Fri, 12 Aug 2011 13:11:17 +0530
+Subject: [PATCH v2] OMAP3: powerdomains: Match silicon revision to
+	select the correct "core_pwrdm" definition
+In-Reply-To: <1310730250-10920-1-git-send-email-abhilash.kv@ti.com>
+References: <1310730250-10920-1-git-send-email-abhilash.kv@ti.com>
+Message-ID: <FCCFB4CDC6E5564B9182F639FC3560870370A4D985@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch moves IMX_GPIO_NR into mach/hardware.h, so that mach/gpio.h
-becomes an empty header and can wait for a global removal from
-asm/gpio.h.
+Hi 
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
----
- arch/arm/plat-mxc/include/mach/gpio.h     |    8 --------
- arch/arm/plat-mxc/include/mach/hardware.h |    4 ++++
- 2 files changed, 4 insertions(+), 8 deletions(-)
+On Friday, July 15, 2011 5:14 PM +0530, Koyamangalath, Abhilash wrote:
+________________________________________
+> From: Koyamangalath, Abhilash
+> Sent: Friday, July 15, 2011 5:14 PM
+> To: linux-omap at vger.kernel.org
+> Cc: tony at atomide.com; linux at arm.linux.org.uk; linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org; Koyamangalath, Abhilash
+> Subject: [PATCH v2] OMAP3: powerdomains: Match silicon revision to select the correct "core_pwrdm" definition
+> 
+> powerdomains3xxx_data.c defines core_3xxx_pre_es3_1_pwrdm and
+> core_3xxx_es3_1_pwrdm to take care of differences in "core_pwrdm"
+> implementations across revisions.
+> However,_pwrdm_lookup("core_pwrdm") always matches the first definition for
+> 3630 ES 1.1 and 1.2 which is incorrect. This patch fixes this issue by adding
+> code to match silicon revision as well while looking up "core_pwrdm" in
+> _pwrdm_lookup().
+> core_3xxx_es3_1_pwrdm is different from core_3xxx_pre_es3_1_pwrdm in
+> that the former adds hardware save-restore support for USBTLL for 3430
+> ES3.1 and for 3630 ES1.1 and ES1.2.
+> 
+> Signed-off-by: Abhilash K V <abhilash.kv@ti.com>
+> ---
+> v2:
+> * now tested on 3630 (ES1.2 and ES1.0) and 3530 (ES3.0 and ES3.1)
+> * fixed checkpatch errors/warnings.
+> 
+>  arch/arm/mach-omap2/powerdomain.c |   19 +++++++++++++++++++
+>  1 files changed, 19 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
+> index 9af0847..82a2e30 100644
+> --- a/arch/arm/mach-omap2/powerdomain.c
+> +++ b/arch/arm/mach-omap2/powerdomain.c
+> @@ -32,6 +32,7 @@
+>  #include "powerdomain.h"
+>  #include "clockdomain.h"
+>  #include <plat/prcm.h>
+> +#include <plat/cpu.h>
+> 
+>  #include "pm.h"
+> 
+> @@ -58,6 +59,24 @@ static struct powerdomain *_pwrdm_lookup(const char *name)
+> 
+>         list_for_each_entry(temp_pwrdm, &pwrdm_list, node) {
+>                 if (!strcmp(name, temp_pwrdm->name)) {
+> +                       if (!strcmp(name, "core_pwrdm") && cpu_is_omap3630()) {
+> +                               if (omap_rev() > OMAP3630_REV_ES1_0) {
+> +                                       /*
+> +                                        * match omap_chip info for OMAP3630
+> +                                        * Rev ES1.1, ES1.2 or higher
+> +                                        */
+> +                                       if (!(temp_pwrdm->omap_chip.oc
+> +                                               & CHIP_GE_OMAP3630ES1_1))
+> +                                               continue;
+> +                               } else {
+> +                                       /* match omap_chip info for OMAP3630
+> +                                        * Rev ES1.0
+> +                                        */
+> +                                       if (!(temp_pwrdm->omap_chip.oc
+> +                                                & CHIP_IS_OMAP3630ES1))
+> +                                               continue;
+> +                               }
+> +                       }
+>                         pwrdm = temp_pwrdm;
+>                         break;
+>                 }
+> --
+> 1.7.1
+Any comments ?
 
-diff --git a/arch/arm/plat-mxc/include/mach/gpio.h b/arch/arm/plat-mxc/include/mach/gpio.h
-index 8e5276c..54fe5cb 100644
---- a/arch/arm/plat-mxc/include/mach/gpio.h
-+++ b/arch/arm/plat-mxc/include/mach/gpio.h
-@@ -19,12 +19,4 @@
- #ifndef __ASM_ARCH_MXC_GPIO_H__
- #define __ASM_ARCH_MXC_GPIO_H__
- 
--#include <linux/spinlock.h>
--#include <mach/hardware.h>
--
--
--/* There's a off-by-one betweem the gpio bank number and the gpiochip */
--/* range e.g. GPIO_1_5 is gpio 5 under linux */
--#define IMX_GPIO_NR(bank, nr)		(((bank) - 1) * 32 + (nr))
--
- #endif
-diff --git a/arch/arm/plat-mxc/include/mach/hardware.h b/arch/arm/plat-mxc/include/mach/hardware.h
-index 77f6556..f57ec47 100644
---- a/arch/arm/plat-mxc/include/mach/hardware.h
-+++ b/arch/arm/plat-mxc/include/mach/hardware.h
-@@ -116,6 +116,10 @@
- 	.type = _type,							\
- }
- 
-+/* There's a off-by-one betweem the gpio bank number and the gpiochip */
-+/* range e.g. GPIO_1_5 is gpio 5 under linux */
-+#define IMX_GPIO_NR(bank, nr)		(((bank) - 1) * 32 + (nr))
-+
- #define IMX_GPIO_TO_IRQ(gpio)	(MXC_GPIO_IRQ_START + (gpio))
- 
- #endif /* __ASM_ARCH_MXC_HARDWARE_H__ */
--- 
-1.7.4.1
+-Abhilash 
