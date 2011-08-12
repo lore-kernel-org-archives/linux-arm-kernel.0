@@ -1,114 +1,70 @@
-From: ben-i2c@fluff.org (Ben Dooks)
-Date: Fri, 12 Aug 2011 01:46:09 +0100
-Subject: [PATCH] i2c: tegra: fix possible race condition after tx
-In-Reply-To: <1313093946-24559-1-git-send-email-dianders@chromium.org>
-References: <1313093946-24559-1-git-send-email-dianders@chromium.org>
-Message-ID: <20110812004609.GD19115@trinity.fluff.org>
+From: j-keerthy@ti.com (J, KEERTHY)
+Date: Fri, 12 Aug 2011 06:32:28 +0530
+Subject: [RFC PATCH 6/6] hwmon: OMAP4: On die temperature sensor driver
+In-Reply-To: <4E444B8F.9060908@ti.com>
+References: <1312979122-5896-1-git-send-email-j-keerthy@ti.com>
+	<1312979122-5896-7-git-send-email-j-keerthy@ti.com>
+	<20110810124629.GJ12882@legolas.emea.dhcp.ti.com>
+	<CAJ6a13Z=u=exWUHLotw8jpHMv-hKpE+fvg_1hq7=gtMiuJKxOA@mail.gmail.com>
+	<20110811103658.GG27742@legolas.emea.dhcp.ti.com>
+	<CAJ6a13bxg8po-Csc10LsFH-oES4YOKkqFoTm3kG4XzS=b2boMw@mail.gmail.com>
+	<20110811141248.GK28500@legolas.emea.dhcp.ti.com>
+	<CAJ6a13b7qu3K4YJPTYych_NQxLuuUxZOQg6PPC_=XA+qiwn2RA@mail.gmail.com>
+	<20110811185408.GB15970@legolas.emea.dhcp.ti.com>
+	<20110811185558.GC15970@legolas.emea.dhcp.ti.com>
+	<4E444B8F.9060908@ti.com>
+Message-ID: <CAJ6a13Zy3-iPoiVrzacSWizXwTRhp5+2Pt4JbGEzd6=448536g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 11, 2011 at 01:19:06PM -0700, Doug Anderson wrote:
-> In tegra_i2c_fill_tx_fifo, once we have finished pushing all the bytes
-> to the I2C hardware controller, the interrupt might happen before we
-> have updated i2c_dev->msg_buf_remaining at the end of the function.
-> Then, in tegra_i2c_isr, we will call again tegra_i2c_fill_tx_fifo
-> triggering weird behaviour. This has been shown to happen under real
-> conditions.
-> 
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
+On Fri, Aug 12, 2011 at 3:07 AM, Roger Quadros <rogerq@ti.com> wrote:
+> On 08/11/2011 01:55 PM, Felipe Balbi wrote:
+>> Hi,
+>>
+>> On Thu, Aug 11, 2011 at 09:54:09PM +0300, Felipe Balbi wrote:
+>>>>> you need some other way to handle this. Why do you need to manually set
+>>>>> the rate rather than having hwmod handle this for you ?
+>>>>>
+>>>>> your argument that "it's a one time setting" is not enough to have this
+>>>>> in the driver. Drivers should not care about clocks anymore, this should
+>>>>> have been done on another layer.
+>>>>
+>>>> Hwmod will have no idea on the rate required.
+>>>
+>>> does the rate need to change ? Also, I have not mentioned hwmod anytime
+>>
+>> i did mention hwmod, nevermind that part. Still I'm not sure where is
+>> the right place to handle this.
+>>
+>
+> Aren't the omap_device_pm_latency callbacks the right place to do it?
 
-ok, it seems enough acks for this to make it in to the next i2c fixes
-pull I'll send at the weekend.
+It is a one time setting. These callbacks get called everytime
+pm_runtime_get_sync and pm_runtime_put_sync are called.
+IMHO this is not the right place.
 
-> ---
->  drivers/i2c/busses/i2c-tegra.c |   46 +++++++++++++++++++++++++++------------
->  1 files changed, 32 insertions(+), 14 deletions(-)
-> 
-> diff --git a/drivers/i2c/busses/i2c-tegra.c b/drivers/i2c/busses/i2c-tegra.c
-> index 2440b74..9c5fb75 100644
-> --- a/drivers/i2c/busses/i2c-tegra.c
-> +++ b/drivers/i2c/busses/i2c-tegra.c
-> @@ -270,14 +270,30 @@ static int tegra_i2c_fill_tx_fifo(struct tegra_i2c_dev *i2c_dev)
->  
->  	/* Rounds down to not include partial word at the end of buf */
->  	words_to_transfer = buf_remaining / BYTES_PER_FIFO_WORD;
-> -	if (words_to_transfer > tx_fifo_avail)
-> -		words_to_transfer = tx_fifo_avail;
->  
-> -	i2c_writesl(i2c_dev, buf, I2C_TX_FIFO, words_to_transfer);
-> -
-> -	buf += words_to_transfer * BYTES_PER_FIFO_WORD;
-> -	buf_remaining -= words_to_transfer * BYTES_PER_FIFO_WORD;
-> -	tx_fifo_avail -= words_to_transfer;
-> +	/* It's very common to have < 4 bytes, so optimize that case. */
-> +	if (words_to_transfer) {
-> +		if (words_to_transfer > tx_fifo_avail)
-> +			words_to_transfer = tx_fifo_avail;
-> +
-> +		/*
-> +		 * Update state before writing to FIFO.  If this casues us
-> +		 * to finish writing all bytes (AKA buf_remaining goes to 0) we
-> +		 * have a potential for an interrupt (PACKET_XFER_COMPLETE is
-> +		 * not maskable).  We need to make sure that the isr sees
-> +		 * buf_remaining as 0 and doesn't call us back re-entrantly.
-> +		 */
-> +		buf_remaining -= words_to_transfer * BYTES_PER_FIFO_WORD;
-> +		tx_fifo_avail -= words_to_transfer;
-> +		i2c_dev->msg_buf_remaining = buf_remaining;
-> +		i2c_dev->msg_buf = buf +
-> +			words_to_transfer * BYTES_PER_FIFO_WORD;
-> +		barrier();
-> +
-> +		i2c_writesl(i2c_dev, buf, I2C_TX_FIFO, words_to_transfer);
-> +
-> +		buf += words_to_transfer * BYTES_PER_FIFO_WORD;
-> +	}
->  
->  	/*
->  	 * If there is a partial word at the end of buf, handle it manually to
-> @@ -287,14 +303,15 @@ static int tegra_i2c_fill_tx_fifo(struct tegra_i2c_dev *i2c_dev)
->  	if (tx_fifo_avail > 0 && buf_remaining > 0) {
->  		BUG_ON(buf_remaining > 3);
->  		memcpy(&val, buf, buf_remaining);
-> +
-> +		/* Again update before writing to FIFO to make sure isr sees. */
-> +		i2c_dev->msg_buf_remaining = 0;
-> +		i2c_dev->msg_buf = NULL;
-> +		barrier();
-> +
->  		i2c_writel(i2c_dev, val, I2C_TX_FIFO);
-> -		buf_remaining = 0;
-> -		tx_fifo_avail--;
->  	}
->  
-> -	BUG_ON(tx_fifo_avail > 0 && buf_remaining > 0);
-> -	i2c_dev->msg_buf_remaining = buf_remaining;
-> -	i2c_dev->msg_buf = buf;
->  	return 0;
->  }
->  
-> @@ -411,9 +428,10 @@ static irqreturn_t tegra_i2c_isr(int irq, void *dev_id)
->  			tegra_i2c_mask_irq(i2c_dev, I2C_INT_TX_FIFO_DATA_REQ);
->  	}
->  
-> -	if ((status & I2C_INT_PACKET_XFER_COMPLETE) &&
-> -			!i2c_dev->msg_buf_remaining)
-> +	if (status & I2C_INT_PACKET_XFER_COMPLETE) {
-> +		BUG_ON(i2c_dev->msg_buf_remaining);
->  		complete(&i2c_dev->msg_complete);
-> +	}
->  
->  	i2c_writel(i2c_dev, status, I2C_INT_STATUS);
->  	if (i2c_dev->is_dvc)
-> -- 
-> 1.7.3.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-i2c" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
+> e.g. in the following snippet from mach-omap2/temp_sensor_device.c
+>
+> +static struct omap_device_pm_latency omap_temp_sensor_latency[] = {
+> + ? ? ? {
+> + ? ? ? ?.deactivate_func = omap_device_idle_hwmods,
+> + ? ? ? ?.activate_func = omap_device_enable_hwmods,
+> + ? ? ? ?.flags = OMAP_DEVICE_LATENCY_AUTO_ADJUST,
+> + ? ? ? }
+> +};
+>
+> instead of directly pointing activate_func to omap_device_enable_hwmods,
+> it could point to a function that sets the required clock rate and then
+> enables the hwmod.
+>
+>
+> regards,
+> -roger
+>
+
+
 
 -- 
-Ben Dooks, ben at fluff.org, http://www.fluff.org/ben/
-
-Large Hadron Colada: A large Pina Colada that makes the universe disappear.
+Regards and Thanks,
+Keerthy
