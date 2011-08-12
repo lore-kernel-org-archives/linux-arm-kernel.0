@@ -1,47 +1,106 @@
-From: liu.h.jason@gmail.com (Jason Liu)
-Date: Fri, 12 Aug 2011 18:46:23 +0800
-Subject: [PATCH 0/2] Add NAND support for i.MX53EVK board
-In-Reply-To: <20110812073034.GC6618@S2100-06.ap.freescale.net>
-References: <1313132685-10440-1-git-send-email-jason.hui@linaro.org>
-	<20110812073034.GC6618@S2100-06.ap.freescale.net>
-Message-ID: <CAB4PhKeqa70FxbHzvf2=GJqVfK_PLd=-enYoq9QW0PYxWf7UCA@mail.gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 12 Aug 2011 12:58:24 +0200
+Subject: [PATCH 2/9] mm: alloc_contig_freed_pages() added
+In-Reply-To: <1313146711-1767-1-git-send-email-m.szyprowski@samsung.com>
+References: <1313146711-1767-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1313146711-1767-3-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/8/12 Shawn Guo <shawn.guo@freescale.com>:
-> On Fri, Aug 12, 2011 at 03:04:43PM +0800, Jason Liu wrote:
->> This patchset add NAND support for i.MX53EVK board, the patche-set
->> has already been tested on i.MX53EVK board with Samsung K9LAG08U0M
->>
->> Jason Liu (3):
->> ? ARM: i.MX53: Add NAND device support
->> ? ARM: i.MX53EVK: Add NAND support for i.MX53evk board
->>
->> ?arch/arm/mach-mx5/Kconfig ? ? ? ? ? ? ? ? ? ? | ? ?1 +
->> ?arch/arm/mach-mx5/board-mx53_evk.c ? ? ? ? ? ?| ? 47 +++++++++++++++++++++++++
->> ?arch/arm/mach-mx5/clock-mx51-mx53.c ? ? ? ? ? | ? ?1 +
->> ?arch/arm/mach-mx5/devices-imx53.h ? ? ? ? ? ? | ? ?4 ++
->> ?arch/arm/plat-mxc/devices/platform-mxc_nand.c | ? ?5 +++
->> ?6 files changed, 59 insertions(+), 1 deletions(-)
->>
-> I would suggest that we stop adding new device into non-dt board
-> files. ?Instead, it's more worth to put effort on DT support, as
-> the non-dt board files will eventually replaced by DT support.
+From: KAMEZAWA Hiroyuki <kamezawa.hiroyu@jp.fujitsu.com>
 
-Anyway, I just put the NAND support patch here for reference in case
-others use it.
-We eventually need add NAND support for i.MX53 board.
+This commit introduces alloc_contig_freed_pages() function
+which allocates (ie. removes from buddy system) free pages
+in range.  Caller has to guarantee that all pages in range
+are in buddy system.
 
-Jason
+Along with this function, a free_contig_pages() function is
+provided which frees all (or a subset of) pages allocated
+with alloc_contig_free_pages().
 
->
-> --
-> Regards,
-> Shawn
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+Michal Nazarewicz has modified the function to make it easier
+to allocate not MAX_ORDER_NR_PAGES aligned pages by making it
+return pfn of one-past-the-last allocated page.
+
+Signed-off-by: KAMEZAWA Hiroyuki <kamezawa.hiroyu@jp.fujitsu.com>
+Signed-off-by: Michal Nazarewicz <m.nazarewicz@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+CC: Michal Nazarewicz <mina86@mina86.com>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+---
+ include/linux/page-isolation.h |    3 ++
+ mm/page_alloc.c                |   44 ++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 47 insertions(+), 0 deletions(-)
+
+diff --git a/include/linux/page-isolation.h b/include/linux/page-isolation.h
+index 58cdbac..f1417ed 100644
+--- a/include/linux/page-isolation.h
++++ b/include/linux/page-isolation.h
+@@ -32,6 +32,9 @@ test_pages_isolated(unsigned long start_pfn, unsigned long end_pfn);
+  */
+ extern int set_migratetype_isolate(struct page *page);
+ extern void unset_migratetype_isolate(struct page *page);
++extern unsigned long alloc_contig_freed_pages(unsigned long start,
++					      unsigned long end, gfp_t flag);
++extern void free_contig_pages(struct page *page, int nr_pages);
+ 
+ /*
+  * For migration.
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index 6e8ecb6..ad6ae3f 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -5668,6 +5668,50 @@ out:
+ 	spin_unlock_irqrestore(&zone->lock, flags);
+ }
+ 
++unsigned long alloc_contig_freed_pages(unsigned long start, unsigned long end,
++				       gfp_t flag)
++{
++	unsigned long pfn = start, count;
++	struct page *page;
++	struct zone *zone;
++	int order;
++
++	VM_BUG_ON(!pfn_valid(start));
++	zone = page_zone(pfn_to_page(start));
++
++	spin_lock_irq(&zone->lock);
++
++	page = pfn_to_page(pfn);
++	for (;;) {
++		VM_BUG_ON(page_count(page) || !PageBuddy(page));
++		list_del(&page->lru);
++		order = page_order(page);
++		zone->free_area[order].nr_free--;
++		rmv_page_order(page);
++		__mod_zone_page_state(zone, NR_FREE_PAGES, -(1UL << order));
++		pfn  += 1 << order;
++		if (pfn >= end)
++			break;
++		VM_BUG_ON(!pfn_valid(pfn));
++		page += 1 << order;
++	}
++
++	spin_unlock_irq(&zone->lock);
++
++	/* After this, pages in the range can be freed one be one */
++	page = pfn_to_page(start);
++	for (count = pfn - start; count; --count, ++page)
++		prep_new_page(page, 0, flag);
++
++	return pfn;
++}
++
++void free_contig_pages(struct page *page, int nr_pages)
++{
++	for (; nr_pages; --nr_pages, ++page)
++		__free_page(page);
++}
++
+ #ifdef CONFIG_MEMORY_HOTREMOVE
+ /*
+  * All pages in the range must be isolated before calling this.
+-- 
+1.7.1.569.g6f426
