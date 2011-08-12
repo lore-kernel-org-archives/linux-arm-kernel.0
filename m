@@ -1,38 +1,30 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 12 Aug 2011 18:53:28 +0900
-Subject: [PATCH] ARM: EXYNOS4: remove duplicated #include
-In-Reply-To: <1311860081-996-1-git-send-email-weiyi.huang@gmail.com>
-References: <1311860081-996-1-git-send-email-weiyi.huang@gmail.com>
-Message-ID: <008701cc58d5$b1095940$131c0bc0$%kim@samsung.com>
+Date: Fri, 12 Aug 2011 19:18:53 +0900
+Subject: [PATCH] ARM: EXYNOS4: Fix the IRQ definitions for MIPI CSIS device
+In-Reply-To: <4E411BA4.2020909@ru.mvista.com>
+References: <1312809118-6181-1-git-send-email-s.nawrocki@samsung.com>
+	<4E411BA4.2020909@ru.mvista.com>
+Message-ID: <008901cc58d9$3ea0b9d0$bbe22d70$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Huang Weiyi wrote:
+Sergei Shtylyov wrote:
 > 
-> Remove duplicated #include('s) in
->   arch/arm/mach-exynos4/cpu.c
+> Hello.
 > 
-> Signed-off-by: Huang Weiyi <weiyi.huang@gmail.com>
-> ---
->  arch/arm/mach-exynos4/cpu.c |    1 -
->  1 files changed, 0 insertions(+), 1 deletions(-)
+> On 08-08-2011 17:11, Sylwester Nawrocki wrote:
 > 
-> diff --git a/arch/arm/mach-exynos4/cpu.c b/arch/arm/mach-exynos4/cpu.c
-> index 2d8a40c..84032d3 100644
-> --- a/arch/arm/mach-exynos4/cpu.c
-> +++ b/arch/arm/mach-exynos4/cpu.c
-> @@ -24,7 +24,6 @@
->  #include <plat/exynos4.h>
->  #include <plat/adc-core.h>
->  #include <plat/sdhci.h>
-> -#include <plat/devs.h>
->  #include <plat/fb-core.h>
->  #include <plat/fimc-core.h>
->  #include <plat/iic-core.h>
-> --
-> 1.5.6.4
+> > This is a regression fix after migration to the external GIC.
+> > The breakage has been introduced in commit:
+> > "ARM: EXYNOS4: modify interrupt mappings for external GIC"
+> 
+>     Would be good to also cite that commit's ID for gitweb.
+> 
+Yes, I think so :)
 
-Yes, applied.
+Sylwester,
+This is required now so I added commit id when I applied.
+
 Thanks.
 
 Best regards,
