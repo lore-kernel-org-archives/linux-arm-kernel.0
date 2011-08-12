@@ -1,54 +1,66 @@
-From: srinivas.kandagatla@st.com (Srinivas KANDAGATLA)
-Date: Mon, 15 Aug 2011 08:49:20 +0100
+From: srinivas.kandagatla@st.com (Srinivas Kandagatla)
+Date: Fri, 12 Aug 2011 10:21:58 +0100
 Subject: [PATCH kernel-3.0] arm:cache-l2x0: Fix L2 Cache size calculation.
-In-Reply-To: <20110814204851.GA1948@e102144-lin.cambridge.arm.com>
-References: <1313142327-18320-1-git-send-email-srinivas.kandagatla@st.com>
-	<20110812102020.GD14904@e102144-lin.cambridge.arm.com>
-	<20110813084129.GM4775@n2100.arm.linux.org.uk>
-	<20110814204851.GA1948@e102144-lin.cambridge.arm.com>
-Message-ID: <4E48CF80.6070105@st.com>
+Message-ID: <mailman.70.1313394764.20020.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Resending the patch with Acked by and CC lines in patch...
+This patch fixes L2 Cache size calculations for L2C-210, L2C-310 and
+PL310, by changing the L2X0_AUX_CTRL_WAY_SIZE_MASK from 2 bits to 3
+bits.
 
-Thanks,
---srini
+The Auxiliary Control Register for L2C-210, L2C-310 and PL310 has 3bits
+[19:17] for Way size, however the existing code only uses 2 bits to
+get this value. This results in incorrect cachesize calculations.
 
-Will Deacon wrote:
-> Hi Russell,
->
-> On Sat, Aug 13, 2011 at 09:41:29AM +0100, Russell King - ARM Linux wrote:
->   
->> On Fri, Aug 12, 2011 at 11:20:20AM +0100, Will Deacon wrote:
->>     
->>> On Fri, Aug 12, 2011 at 10:45:27AM +0100, Srinivas KANDAGATLA wrote:
->>>       
->>>> From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
->>>>
->>>> This patch fixes L2 Cache size calculations for L2C-210, L2C-310 and
->>>> PL310, by changing the L2X0_AUX_CTRL_WAY_SIZE_MASK from 2 bits to 3
->>>> bits.
->>>>         
->
-> [...]
->
->   
->>> Please can you CC stable on this too?
->>>       
->> It's probably better to ask people to add a Cc: line to the _attributations_
->> rather than telling them to CC the stable tree with their email, and then
->> get a whinge from the stable maintainers about how that's not how to submit
->> patches for stable trees.
->>     
->
-> Of course, that's what I intended but unfortunately my choice of words
-> was ambiguous.
->
-> Srinivas: can you add the CC stable line to your patch please and put it
-> into Russell's patch system?
->
-> Thanks,
->
-> Will
->   
+It also results in performing operations on the whole cache when we
+erroneously decide that the range is big enough (due to l2x0_size being
+too small) and also prints incorrect cachesize.
+
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+Acked-by: Will Deacon <will.deacon@arm.com>
+Cc: stable at kernel.org
+
+---
+
+adding stable in CC..
+
+Hi All,
+
+I found an bug in L2 Cache size calculation in cache-l2x0 code.
+
+According to ARM TRM for L2C-210, L2C-310 and PL310, the Auxiliary
+Control Register has 3bits [19:17] allocated for Way size,however
+the existing code only uses 2 bits to get this value from Aux 
+control register. This results in incorrect cache size calculations.
+
+
+It also results in performing operations on the whole cache when we
+erroneously decide that the range is big enough (due to l2x0_size being
+too small).
+
+thanks, 
+srini
+
+
+ arch/arm/include/asm/hardware/cache-l2x0.h |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/include/asm/hardware/cache-l2x0.h b/arch/arm/include/asm/hardware/cache-l2x0.h
+index 16bd480..bfa706f 100644
+--- a/arch/arm/include/asm/hardware/cache-l2x0.h
++++ b/arch/arm/include/asm/hardware/cache-l2x0.h
+@@ -64,7 +64,7 @@
+ #define L2X0_AUX_CTRL_MASK			0xc0000fff
+ #define L2X0_AUX_CTRL_ASSOCIATIVITY_SHIFT	16
+ #define L2X0_AUX_CTRL_WAY_SIZE_SHIFT		17
+-#define L2X0_AUX_CTRL_WAY_SIZE_MASK		(0x3 << 17)
++#define L2X0_AUX_CTRL_WAY_SIZE_MASK		(0x7 << 17)
+ #define L2X0_AUX_CTRL_SHARE_OVERRIDE_SHIFT	22
+ #define L2X0_AUX_CTRL_NS_LOCKDOWN_SHIFT		26
+ #define L2X0_AUX_CTRL_NS_INT_CTRL_SHIFT		27
+-- 
+1.6.3.3
+
+
+--------------070305060106060500050607--
