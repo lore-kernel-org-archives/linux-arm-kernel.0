@@ -1,70 +1,58 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 12 Aug 2011 18:19:06 +0900
-Subject: [PATCH] ARM: S3C64XX: Hook up GPIO initiated DVS on Cragganmore
-In-Reply-To: <1311627177-26388-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-References: <1311627177-26388-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <007201cc58d0$e3f9c2e0$abed48a0$%kim@samsung.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Fri, 12 Aug 2011 17:27:05 +0800
+Subject: [PATCH 2/6] arm/imx: remove the uses of gpio_to_irq()
+In-Reply-To: <20110812085759.GH4775@n2100.arm.linux.org.uk>
+References: <1313135701-22456-1-git-send-email-shawn.guo@linaro.org>
+	<1313135701-22456-3-git-send-email-shawn.guo@linaro.org>
+	<20110812080000.GF4775@n2100.arm.linux.org.uk>
+	<20110812082211.GD6618@S2100-06.ap.freescale.net>
+	<20110812082538.GF6618@S2100-06.ap.freescale.net>
+	<20110812085759.GH4775@n2100.arm.linux.org.uk>
+Message-ID: <20110812092704.GG6618@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown wrote:
+On Fri, Aug 12, 2011 at 09:57:59AM +0100, Russell King - ARM Linux wrote:
+> On Fri, Aug 12, 2011 at 04:25:39PM +0800, Shawn Guo wrote:
+> > On Fri, Aug 12, 2011 at 04:22:12PM +0800, Shawn Guo wrote:
+> > > On Fri, Aug 12, 2011 at 09:00:00AM +0100, Russell King - ARM Linux wrote:
+> > > > On Fri, Aug 12, 2011 at 03:54:57PM +0800, Shawn Guo wrote:
+> > > > > gpio_to_irq() is too generic to be defined and used by i.mx platform
+> > > > > code.  The patch defines IMX_GPIO_TO_IRQ() in mach/hardware.h and
+> > > > > replaces all the uses of gpio_to_irq() with IMX_GPIO_TO_IRQ().
+> > > > 
+> > > > That makes no sense.  Why not continue to use gpio_to_irq() but provide
+> > > > the .to_irq method in your gpiolib driver so it can work, and use that
+> > > > in the places where its used at runtime?
+> > > > 
+> > > I did provide .to_irq in patch #3. 
+> > > 
+> > > > (You won't be able to use it for static initialization obviously.)
+> > > > 
+> > > All users of gpio_to_irq() in platform codes are static initialization.
+> > 
+> > Sorry, not all but most.
 > 
-> Allow us to ramp VDDARM quickly by using a GPIO to signal a voltage change
-> instead of doing a register write.
+> It would probably be a good idea to leave the runtime places using
+> gpio_to_irq() and only convert the static initializers.
 > 
-> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> ---
->  arch/arm/mach-s3c64xx/mach-crag6410.c |    9 +++++++++
->  1 files changed, 9 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-s3c64xx/mach-crag6410.c b/arch/arm/mach-
-> s3c64xx/mach-crag6410.c
-> index d59afa1..2005d5f 100644
-> --- a/arch/arm/mach-s3c64xx/mach-crag6410.c
-> +++ b/arch/arm/mach-s3c64xx/mach-crag6410.c
-> @@ -376,6 +376,12 @@ static struct pca953x_platform_data crag6410_pca_data
-> = {
->  	.irq_base	= 0,
->  };
-> 
-> +/* VDDARM is controlled by DVS1 connected to GPK(0) */
-> +static struct wm831x_buckv_pdata vddarm_pdata = {
-> +	.dvs_control_src = 1,
-> +	.dvs_gpio = S3C64XX_GPK(0),
-> +};
-> +
->  static struct regulator_consumer_supply vddarm_consumers[] __initdata = {
->  	REGULATOR_SUPPLY("vddarm", NULL),
->  };
-> @@ -391,6 +397,7 @@ static struct regulator_init_data vddarm __initdata =
-{
->  	.num_consumer_supplies = ARRAY_SIZE(vddarm_consumers),
->  	.consumer_supplies = vddarm_consumers,
->  	.supply_regulator = "WALLVDD",
-> +	.driver_data = &vddarm_pdata,
->  };
-> 
->  static struct regulator_init_data vddint __initdata = {
-> @@ -526,6 +533,8 @@ static struct wm831x_pdata crag_pmic_pdata __initdata
-=
-> {
->  	.backup = &banff_backup_pdata,
-> 
->  	.gpio_defaults = {
-> +		/* GPIO5: DVS1_REQ - CMOS, DBVDD, active high */
-> +		[4] = WM831X_GPN_DIR | WM831X_GPN_POL |
-> WM831X_GPN_ENA | 0x8,
->  		/* GPIO11: Touchscreen data - CMOS, DBVDD, active high*/
->  		[10] = WM831X_GPN_POL | WM831X_GPN_ENA | 0x6,
->  		/* GPIO12: Touchscreen pen down - CMOS, DBVDD, active
-> high*/
-> --
-> 1.7.5.4
+Ok.
 
-Applied, thanks.
+> > > And IMX_GPIO_TO_IRQ() is actually a renaming of gpio_to_irq().  Only
+> > > difference there is naming and place change, which I think is good, no?
+> > > 
+> > 
+> > But adding IMX namespace is still worth of the LOC changes?
+> 
+> Well, the static initializers still need something... the alternative is
+> to initialize them at runtime which probably wouldn't be so nice.
+> 
+Let's leave static initializers with IMX_GPIO_TO_IRQ() for now, since
+all of them will get killed by device tree support anyway?  With DT
+support, the gpio number should be encoded in DT and needs to be
+retrieved from DT at runtime, and gpio_to_irq() has to be used for
+acquiring irq number then.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+-- 
+Regards,
+Shawn
