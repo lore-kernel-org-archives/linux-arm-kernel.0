@@ -1,66 +1,89 @@
 From: lacombar@gmail.com (Arnaud Lacombe)
-Date: Fri, 12 Aug 2011 16:31:50 -0400
-Subject: Relinking zImage when nothing changes
-In-Reply-To: <20110812202450.GA28713@merkur.ravnborg.org>
-References: <4E4566F0.4020001@codeaurora.org>
-	<20110812180209.GA28520@merkur.ravnborg.org>
-	<CACqU3MUkZBEs=v9181bixR37R4DxmkykiH5fU8PVUTd0c2a_ZA@mail.gmail.com>
-	<20110812202450.GA28713@merkur.ravnborg.org>
-Message-ID: <CACqU3MUV_XuhZ1jJWd3oMnyz9q4h1BwLp+z_VzQaccM7DXqzdg@mail.gmail.com>
+Date: Fri, 12 Aug 2011 16:48:12 -0400
+Subject: [PATCH] ARM: zImage: Skip relinking if nothing changes
+In-Reply-To: <1313175602-21834-1-git-send-email-sboyd@codeaurora.org>
+References: <4E457682.5020107@codeaurora.org>
+	<1313175602-21834-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <CACqU3MUq5M-XPOxV=8GKyEzjEzpmdeaF+mGrXJrK+ZZxa4SdeQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Fri, Aug 12, 2011 at 4:24 PM, Sam Ravnborg <sam@ravnborg.org> wrote:
-> On Fri, Aug 12, 2011 at 04:20:15PM -0400, Arnaud Lacombe wrote:
->> Hi,
->>
->> On Fri, Aug 12, 2011 at 2:02 PM, Sam Ravnborg <sam@ravnborg.org> wrote:
->> > On Fri, Aug 12, 2011 at 10:46:24AM -0700, Stephen Boyd wrote:
->> >> I was hoping with the recent patch e78e8f2 (kernel: prevent unnecessary
->> >> rebuilding due to config_data.gz, 2011-07-05) compiling ARM linux a
->> >> second time would amount to no more linking. This doesn't seem to be the
->> >> case though. Doing a make V=2 I see that lib1funcs.S is shipped and thus
->> >> we have to recompile it although nothing actually changed. This in turn
->> >> requires us to relink the compressed vmlinux and then recreate the zImage.
->> >>
->> >> ? Kernel: arch/arm/boot/Image is ready
->> >> ? SHIPPED arch/arm/boot/compressed/lib1funcs.S - due to missing .cmd file
->> >> ? AS ? ? ?arch/arm/boot/compressed/lib1funcs.o - due to: arch/arm/boot/compressed/lib1funcs.S
->> >> ? LD ? ? ?arch/arm/boot/compressed/vmlinux - due to: arch/arm/boot/compressed/lib1funcs.o
->> >> ? OBJCOPY arch/arm/boot/zImage - due to: arch/arm/boot/compressed/vmlinux
->> >> ? Kernel: arch/arm/boot/zImage is ready
->> >>
->> >>
->> >> Is there any way to avoid this? Perhaps the shipped command could become
->> >> a bit wiser?
->> >
->> > Following patch will likely fix it:
->> > diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
->> > index 0c74a6f..80b6b6e 100644
->> > --- a/arch/arm/boot/compressed/Makefile
->> > +++ b/arch/arm/boot/compressed/Makefile
->> > @@ -123,7 +123,7 @@ LDFLAGS_vmlinux += -T
->> > ?# For __aeabi_uidivmod
->> > ?lib1funcs = $(obj)/lib1funcs.o
->> >
->> > -$(obj)/lib1funcs.S: $(srctree)/arch/$(SRCARCH)/lib/lib1funcs.S FORCE
->> > +$(obj)/lib1funcs.S: $(srctree)/arch/$(SRCARCH)/lib/lib1funcs.S
->> > ? ? ? ?$(call cmd,shipped)
->> >
->> AFAIK, we have a generic rule to handle shipped files:
->>
->> from scripts/Makefile.lib:
->>
->> $(obj)/%: $(src)/%_shipped
->> ? ? ? ? $(call cmd,shipped)
->>
->> so, that rule should not be needed at all.
+On Fri, Aug 12, 2011 at 3:00 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> lib1funcs.S is reshipped even though the file hasn't changed
+> because the make rule is marked with FORCE. According to Sam
+> Ravnborg:
 >
-> In this case the cmd_shipped is misused to make a copy of a file.
-> So the generic rule does not apply.
+> ? ? ? ?The FORCE prerequisite will tell make to always execute
+> ? ? ? ?the command.
+> ? ? ? ?But we only want to execute the command if:
+> ? ? ? ?1) $(obj)/lib1funcs.S is missing
+> ? ? ? ?2) or $(srctree)/arch/$(SRCARCH)/lib/lib1funcs.S is not
+> ? ? ? ?older then $(obj)/lib1funcs.S
 >
-oh, indeed. I see your point.
+> ? ? ? ?So dropping FORCE should be a safe thing to do.
+>
+> This fixes the shipped problem, but we still have to reassemble
+> lib1funcs.S because it isn't part of $targets. Add
+> lib1funcs.{S,o} to $targets to avoid relinking the compressed
+> vmlinux if nothing changes.
+>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> Acked-by: Sam Ravnborg <sam@ravnborg.org>
+> ---
+> ?arch/arm/boot/compressed/Makefile | ? ?8 +++-----
+> ?1 files changed, 3 insertions(+), 5 deletions(-)
+>
+> diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
+> index 0c74a6f..937fd26 100644
+> --- a/arch/arm/boot/compressed/Makefile
+> +++ b/arch/arm/boot/compressed/Makefile
+> @@ -91,7 +91,7 @@ suffix_$(CONFIG_KERNEL_LZMA) = lzma
+>
+> ?targets ? ? ? := vmlinux vmlinux.lds \
+> ? ? ? ? ? ? ? ? piggy.$(suffix_y) piggy.$(suffix_y).o \
+> - ? ? ? ? ? ? ? ?font.o font.c head.o misc.o $(OBJS)
+> + ? ? ? ? ? ? ? ?font.o font.c head.o misc.o lib1funcs.o lib1funcs.S $(OBJS)
+>
+> ?# Make sure files are removed during clean
+> ?extra-y ? ? ? += piggy.gzip piggy.lzo piggy.lzma lib1funcs.S
+> @@ -121,9 +121,7 @@ LDFLAGS_vmlinux += -X
+> ?LDFLAGS_vmlinux += -T
+>
+> ?# For __aeabi_uidivmod
+> -lib1funcs = $(obj)/lib1funcs.o
+> -
+> -$(obj)/lib1funcs.S: $(srctree)/arch/$(SRCARCH)/lib/lib1funcs.S FORCE
+> +$(obj)/lib1funcs.S: $(srctree)/arch/$(SRCARCH)/lib/lib1funcs.S
+> ? ? ? ?$(call cmd,shipped)
+>
+You should be able to avoid the extra copy altogether by doing something ala:
+
+$(obj)/lib1funcs.o: $(srctree)/arch/arm/lib/lib1funcs.S
+        $(call cmd,as_o_S)
+
+note that I also remove the $(SRCARCH), as there is no other
+`arch/*/lib/lib1funcs.S' than `arch/arm/lib/lib1funcs.S'
 
  - Arnaud
+
+> ?# We need to prevent any GOTOFF relocs being used with references
+> @@ -140,7 +138,7 @@ bad_syms=$$($(CROSS_COMPILE)nm $@ | sed -n 's/^.\{8\} [bc] \(.*\)/\1/p') && \
+> ? ? echo "$$bad_syms" >&2; rm -f $@; false )
+>
+> ?$(obj)/vmlinux: $(obj)/vmlinux.lds $(obj)/$(HEAD) $(obj)/piggy.$(suffix_y).o \
+> - ? ? ? ? ? ? ? $(addprefix $(obj)/, $(OBJS)) $(lib1funcs) FORCE
+> + ? ? ? ? ? ? ? $(addprefix $(obj)/, $(OBJS)) $(obj)/lib1funcs.o FORCE
+> ? ? ? ?$(call if_changed,ld)
+> ? ? ? ?@$(check_for_bad_syms)
+>
+> --
+> Sent by an employee of the Qualcomm Innovation Center, Inc.
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kbuild" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>
