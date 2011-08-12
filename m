@@ -1,61 +1,31 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 12 Aug 2011 09:07:37 +0200
-Subject: [PATCH v2 2/3] ARM: i.MX51: clean up iomux-mx51.h
-In-Reply-To: <4E4422B6.6090609@boundarydevices.com>
-References: <1313026292-945-1-git-send-email-troy.kisky@boundarydevices.com>
-	<1313026292-945-2-git-send-email-troy.kisky@boundarydevices.com>
-	<CAOMZO5BiB1TFtgMLBUFcboHUXMUVaG4kkKVzW0vMt0SFuTmk4g@mail.gmail.com>
-	<4E4422B6.6090609@boundarydevices.com>
-Message-ID: <20110812070736.GJ31404@pengutronix.de>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Fri, 12 Aug 2011 15:30:35 +0800
+Subject: [PATCH 0/2] Add NAND support for i.MX53EVK board
+In-Reply-To: <1313132685-10440-1-git-send-email-jason.hui@linaro.org>
+References: <1313132685-10440-1-git-send-email-jason.hui@linaro.org>
+Message-ID: <20110812073034.GC6618@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 11, 2011 at 11:43:02AM -0700, Troy Kisky wrote:
-> On 8/11/2011 7:53 AM, Fabio Estevam wrote:
-> > Hi Troy,
-> > 
-> > On Wed, Aug 10, 2011 at 10:31 PM, Troy Kisky
-> > <troy.kisky@boundarydevices.com> wrote:
-> > ...
-> >> diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx51.h b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
-> >> index df6acc0..c7f5169 100644
-> >> --- a/arch/arm/plat-mxc/include/mach/iomux-mx51.h
-> >> +++ b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
-> >> @@ -14,6 +14,8 @@
-> >>  #define __MACH_IOMUX_MX51_H__
-> >>
-> >>  #include <mach/iomux-v3.h>
-> >> +#define __NA_  0x000
-> >> +
-> > 
-> > Do we really need this __NA_ define? Can?t we continue just writing 0
-> > in the macro?
-> > 
-> > Regards,
-> > 
-> > Fabio Estevam
+On Fri, Aug 12, 2011 at 03:04:43PM +0800, Jason Liu wrote:
+> This patchset add NAND support for i.MX53EVK board, the patche-set
+> has already been tested on i.MX53EVK board with Samsung K9LAG08U0M
 > 
-> First, welcome back from vacation and thanks for taking the time to review.
+> Jason Liu (3):
+>   ARM: i.MX53: Add NAND device support
+>   ARM: i.MX53EVK: Add NAND support for i.MX53evk board
 > 
-> I like the __NA_ macro for a couple of reasons.
+>  arch/arm/mach-mx5/Kconfig                     |    1 +
+>  arch/arm/mach-mx5/board-mx53_evk.c            |   47 +++++++++++++++++++++++++
+>  arch/arm/mach-mx5/clock-mx51-mx53.c           |    1 +
+>  arch/arm/mach-mx5/devices-imx53.h             |    4 ++
+>  arch/arm/plat-mxc/devices/platform-mxc_nand.c |    5 +++
+>  6 files changed, 59 insertions(+), 1 deletions(-)
 > 
-> 
-> 1. It keeps the macro arguments aligned from line to line. 5 character
-> name so that a line that uses 0xnnn instead, usually has its arguments
-> aligned with a line that uses __NA_.
-> 
-> 2. It makes it more obvious that this field is "not applicable" to this
-> setting.
-> 
-> 3. NON_PAD_I is replaced with __NA_ as it has the same use, and keeps
-> alignment.
-
-I'm fine with the __NA_ macro.
-
-Sascha
+I would suggest that we stop adding new device into non-dt board
+files.  Instead, it's more worth to put effort on DT support, as
+the non-dt board files will eventually replaced by DT support.
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Regards,
+Shawn
