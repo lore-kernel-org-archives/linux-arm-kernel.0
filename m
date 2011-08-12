@@ -1,35 +1,46 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Fri, 12 Aug 2011 14:21:47 -0700
-Subject: [PATCH v2 0/3] ARM: Tegra: Harmony & Seaboard USB and audio
-In-Reply-To: <20110809193405.GA4224@quad.lixom.net>
-References: <1312835715-893-1-git-send-email-swarren@nvidia.com>
-	<20110809193405.GA4224@quad.lixom.net>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF04AEA24F49@HQMAIL01.nvidia.com>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Sat, 13 Aug 2011 03:00:27 +0530
+Subject: [PATCH 08/19] mach-davinci: move DaVinci TNET GPIO driver to
+	GPIO subsystem
+In-Reply-To: <CACRpkdZvxvD01ofxMxDb3wXpt9_8wkU1rwxdLj5RuidoZNrb+w@mail.gmail.com>
+References: <1312978639-18339-1-git-send-email-linus.walleij@stericsson.com>
+	<B85A65D85D7EB246BE421B3FB0FBB593024E04F945@dbde02.ent.ti.com>
+	<CACRpkdZvxvD01ofxMxDb3wXpt9_8wkU1rwxdLj5RuidoZNrb+w@mail.gmail.com>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024E0503B7@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof Johansson wrote at Tuesday, August 09, 2011 1:34 PM:
-> On Mon, Aug 08, 2011 at 02:35:12PM -0600, Stephen Warren wrote:
-> > This is a slight rev of some patches I posted a little while ago, now
-> > in a single series. The second patch has a minor revision that simplifies
-> > board-seaboard-pinmux.c.
+On Thu, Aug 11, 2011 at 18:36:07, Linus Walleij wrote:
+> On Thu, Aug 11, 2011 at 12:21 AM, Nori, Sekhar <nsekhar@ti.com> wrote:
+> > Hi Linus,
 > >
-> > The (previous version of the) patches were previously Ack'd by Tegra
-> > maintainers, and Colin asked Arnd to pick them up in arm-soc.git,
-> > although I'm not sure if that request still holds given the merge
-> > window is over?
+> > On Wed, Aug 10, 2011 at 17:47:19, Linus Walleij wrote:
+> >> From: Linus Walleij <linus.walleij@linaro.org>
+> >>
+> >> As per example from the other ARM boards, push the DaVinci TNET
+> >> GPIO driver down to the GPIO subsystem so it can be consolidated.
+> >>
+> >> Cc: Sekhar Nori <nsekhar@ti.com>
+> >> Cc: Kevin Hilman <khilman@ti.com>
+> >> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> >
+> > There should be no need of this since the TNETV107x
+> > GPIO can simply be supported using the basic MMIO GPIO
+> > driver. I submitted patches for that a while back
+> > but have some comments from Grant to address. He requested
+> > some changes to be done to the basic MMIO GPIO driver
+> > itself.
+> >
+> > https://lkml.org/lkml/2011/7/5/16
+> >
+> > I do plan to rework those patches and post them back.
 > 
-> Thanks, I've picked them up in boards-for-3.2, which will be merged in
-> through Arnd for 3.2.
+> OK I will keep this around in case it doesn't happen
+> soon, it certainly does not make matters worse
+> anyway.
 
-I see boards-for-3.2 isn't in linux-next itself, so these changes aren't
-getting rebased out of my local tree on top of linux-next.
+I am OK either way. Its going to be Grant's call since
+it will result in some churn in GPIO tree.
 
-Does it make sense to add your tree into linux-next? Or, is the expected
-process that such trees will be quickly pulled/merged into Arnd's tree,
-which I assume is in linux-next?
-
-Thanks.
-
--- 
-nvpublic
+Thanks,
+Sekhar
