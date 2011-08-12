@@ -1,40 +1,40 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 12 Aug 2011 16:35:42 +0200
+Date: Fri, 12 Aug 2011 16:40:21 +0200
 Subject: How to handle named resources with DT?
-In-Reply-To: <20110812084106.GC19467@legolas.emea.dhcp.ti.com>
-References: <20110809205723.GE11568@ponder.secretlab.ca>
-	<20110812030218.GP30552@yookeroo.fritz.box>
-	<20110812084106.GC19467@legolas.emea.dhcp.ti.com>
-Message-ID: <201108121635.42953.arnd@arndb.de>
+In-Reply-To: <4E44EAAD.1030805@ti.com>
+References: <4E40FC88.5090403@ti.com>
+	<20110812041016.GA6618@S2100-06.ap.freescale.net>
+	<4E44EAAD.1030805@ti.com>
+Message-ID: <201108121640.22199.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 12 August 2011, Felipe Balbi wrote:
-> On Fri, Aug 12, 2011 at 01:02:18PM +1000, David Gibson wrote:
+On Friday 12 August 2011, Cousson, Benoit wrote:
+> > Arnd Bergmann:
+> > But I really don't think there is value in using IORESOURCE_DMA for this.
+> > We don't have the code to manage DMA resources for more than one DMA
+> > controller AFAICT, and I think we should not add it. Globally
+> > unique interrupt numbers cause us a lot of trouble and we go to great
+> > lengths to fake them on modern devices.
 > 
-> the whole point of using *byname() is for the driver to not care about
-> the order of the resources. So if driver has to provided an ordered list
-> of names, what's the benefit ? Sounds really stupid to provide an
-> ordered list of names to an ordered list of resources, just to use
-> *byname() instead of just assuming the list of resources is already
-> ordered.
+> Yeah, that totally makes sense. We do have several DMA engines in OMAP 
+> anyway, so unique number is clearly not the best approach.
+> But in that case, it means adding a new kernel API for that and not only 
+> an of_XXX one. Because driver should then rely on it with or without DT.
+> 
+> > It would be much better
+> > not to have them visible in the OS, and I don't want to add them to
+> > a modern API like the dmaengine.
+> 
+> That part is less clear to me, what does it means?
+> 
 
-It only make sense for drivers that support both device tree probing
-and legacy probing of static platform devices.
+I mean you can have DMA channel numbers visible in the device
+tree, relative to a 'parent' dma controller, but I would not
+expose them as numbers on a device driver interface. Instead,
+I think the interface we provide to the device driver is one
+where we pass the device using the DMA channel into a generic
+dmaengine API and let that figure out where it's connected
+in order to return a struct dma_chan pointer.
 
-Note how almost all drivers use only platform_get_resource and not
-platform_get_resource_byname:
-
-arnd at ocdc-kvm:~/linux-arm$ git grep -wl platform_get_resource | wc -l
-565
-arnd at ocdc-kvm:~/linux-arm$ git grep -wl platform_get_resource_byname | wc -l
-41
-arnd at ocdc-kvm:~/linux-arm$ git grep -wl platform_get_resource_byname | xargs grep -wL platform_get_resource | wc -l # both
-28
-arnd at ocdc-kvm:~/linux-arm$ git grep -wl platform_get_resource_byname | xargs grep -wl platform_get_resource  | wc -l # only _byname
-13
-
-I think it's much easier to change the existing users of _byname over
-to fixed indexes than to come up with a new scheme that is better.
-
-	Arnd
+	ARnd
