@@ -1,90 +1,98 @@
-From: siarhei.siamashka@gmail.com (Siarhei Siamashka)
-Date: Fri, 12 Aug 2011 19:27:32 +0300
-Subject: [PATCH] ARM errata: Possible cache data corruption with
-	hit-under-miss enabled
-In-Reply-To: <20110810103139.GD7464@e102109-lin.cambridge.arm.com>
-References: <1312785148-32531-1-git-send-email-siarhei.siamashka@gmail.com>
-	<20110808100233.GG29226@e102109-lin.cambridge.arm.com>
-	<CACY+gR2_Rf7dh91vagJfEB=qgALJf4nigJbFQJz--DweQkZ+Qw@mail.gmail.com>
-	<20110808132631.GA670@e102109-lin.cambridge.arm.com>
-	<CACY+gR2oofw0wLrPTVyLmmFtLOV347tVnfBicfgOYegi1vEzMQ@mail.gmail.com>
-	<20110810103139.GD7464@e102109-lin.cambridge.arm.com>
-Message-ID: <CACY+gR2bNBmMq9E73F5So65KZWBS60G9RO7seBY2u0+BUO6yFg@mail.gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Fri, 12 Aug 2011 11:21:43 -0600
+Subject: How to handle named resources with DT?
+In-Reply-To: <4E45422D.4050708@ti.com>
+References: <20110809205723.GE11568@ponder.secretlab.ca>
+	<20110812030218.GP30552@yookeroo.fritz.box>
+	<20110812084106.GC19467@legolas.emea.dhcp.ti.com>
+	<201108121635.42953.arnd@arndb.de> <4E45422D.4050708@ti.com>
+Message-ID: <CACxGe6s-2EAuvSqzn6yzDvCyVXa8vVVqG2X=1XFrUBnB=jsdxQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 10, 2011 at 1:31 PM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> On Tue, Aug 09, 2011 at 11:06:55PM +0100, Siarhei Siamashka wrote:
->> On Mon, Aug 8, 2011 at 4:26 PM, Catalin Marinas <catalin.marinas@arm.com> wrote:
->> > On Mon, Aug 08, 2011 at 12:43:00PM +0100, Siarhei Siamashka wrote:
->> >> On Mon, Aug 8, 2011 at 1:02 PM, Catalin Marinas <catalin.marinas@arm.com> wrote:
->> >> > On Mon, Aug 08, 2011 at 07:32:28AM +0100, Siarhei Siamashka wrote:
->> >> >> From: Catalin Marinas <catalin.marinas@arm.com>
->> >> >>
->> >> >> This patch is a workaround for the 364296 ARM1136 r0pX erratum (possible
->> >> >> cache data corruption with hit-under-miss enabled). It sets the
->> >> >> undocumented bit 31 in the auxiliary control register and the FI bit in
->> >> >> the control register, thus disabling hit-under-miss without putting the
->> >> >> processor into full low interrupt latency mode.
->> >> >>
->> >> >> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
->> >> >> Tested-by: Siarhei Siamashka <siarhei.siamashka@gmail.com>
->> >> >
->> >> > I haven't pushed this workaround in the past as I wasn't sure there is
->> >> > production hardware affected. I recall you mentioned Nokia N800, do you
->> >> > know which CPU revision does this have?
->> >>
->> >> [ ? ?0.000000] CPU: ARMv6-compatible processor [4107b362] revision 2
->> >> (ARMv6TEJ), cr=00e5387f
->> >> [ ? ?0.000000] CPU: VIPT aliasing data cache, unknown instruction
->> >> cache
->> >> [ ? ?0.000000] Machine: Nokia N810
->> >> [ ? ?0.000000] Memory policy: ECC disabled, Data cache writeback
->> >> [ ? ?0.000000] OMAP2420
->> >>
->> >> # cat /proc/cpuinfo
->> >> Processor ? ? ? : ARMv6-compatible processor rev 2 (v6l)
->> >> BogoMIPS ? ? ? ?: 213.72
->> >> Features ? ? ? ?: swp half thumb fastmult vfp edsp java
->> >> CPU implementer : 0x41
->> >> CPU architecture: 6TEJ
->> >> CPU variant ? ? : 0x0
->> >> CPU part ? ? ? ?: 0xb36
->> >> CPU revision ? ?: 2
->> >>
->> >> Hardware ? ? ? ?: Nokia N810
->> >> Revision ? ? ? ?: 0000
->> >> Serial ? ? ? ? ?: 0000000000000000
->> > ...
->> >> Would you be so kind to update the patch?
->> >
->> > OK, I'll update it and post the patch in the next day or so.
+On Fri, Aug 12, 2011 at 9:09 AM, Cousson, Benoit <b-cousson@ti.com> wrote:
+> On 8/12/2011 4:35 PM, Arnd Bergmann wrote:
+>> It only make sense for drivers that support both device tree probing
+>> and legacy probing of static platform devices.
 >>
->> Thanks a lot. I'll be sure to test it and respond to confirm that it
->> works fine (or not).
+>> Note how almost all drivers use only platform_get_resource and not
+>> platform_get_resource_byname:
+>>
+>> arnd at ocdc-kvm:~/linux-arm$ git grep -wl platform_get_resource | wc -l
+>> 565
+>> arnd at ocdc-kvm:~/linux-arm$ git grep -wl platform_get_resource_byname | wc
+>> -l
+>> 41
+>> arnd at ocdc-kvm:~/linux-arm$ git grep -wl platform_get_resource_byname |
+>> xargs grep -wL platform_get_resource | wc -l # both
+>> 28
+>> arnd at ocdc-kvm:~/linux-arm$ git grep -wl platform_get_resource_byname |
+>> xargs grep -wl platform_get_resource ?| wc -l # only _byname
+>> 13
 >
-> See below. Thanks.
+> That's true, but this is mainly because most of the time there is only one
+> irq, dma or mem resource, so the _byname is not useful.
+> As soon as you start having multiple entries, relying on the order become
+> less readable and error prone. Then getting the resource by name become
+> useful.
+> There are probably a lot of API that are less used than this one, but does
+> that mean that we have to remove them?
 >
-> 8<------------------------
+> The extreme case (soon in mainline) in OMAP is that one:
 >
-> From 0bbbd0ddc4e9e55998f4137c5f276c5997d8ef90 Mon Sep 17 00:00:00 2001
-> From: Catalin Marinas <catalin.marinas@arm.com>
-> Date: Wed, 10 Aug 2011 11:26:46 +0100
-> Subject: [PATCH 1/1] ARM errata: Possible cache data corruption with hit-under-miss enabled
+> static struct omap_hwmod_addr_space omap44xx_aess_addrs[] = {
+> ? ? ? ?{
+> ? ? ? ? ? ? ? ?.name ? ? ? ? ? = "dmem",
+> ? ? ? ? ? ? ? ?.pa_start ? ? ? = 0x40180000,
+> ? ? ? ? ? ? ? ?.pa_end ? ? ? ? = 0x4018ffff
+> ? ? ? ?},
+> ? ? ? ?{
+> ? ? ? ? ? ? ? ?.name ? ? ? ? ? = "cmem",
+> ? ? ? ? ? ? ? ?.pa_start ? ? ? = 0x401a0000,
+> ? ? ? ? ? ? ? ?.pa_end ? ? ? ? = 0x401a1fff
+> ? ? ? ?},
+> ? ? ? ?{
+> ? ? ? ? ? ? ? ?.name ? ? ? ? ? = "smem",
+> ? ? ? ? ? ? ? ?.pa_start ? ? ? = 0x401c0000,
+> ? ? ? ? ? ? ? ?.pa_end ? ? ? ? = 0x401c5fff
+> ? ? ? ?},
+> ? ? ? ?{
+> ? ? ? ? ? ? ? ?.name ? ? ? ? ? = "pmem",
+> ? ? ? ? ? ? ? ?.pa_start ? ? ? = 0x401e0000,
+> ? ? ? ? ? ? ? ?.pa_end ? ? ? ? = 0x401e1fff
+> ? ? ? ?},
+> ? ? ? ?{
+> ? ? ? ? ? ? ? ?.name ? ? ? ? ? = "reg",
+> ? ? ? ? ? ? ? ?.pa_start ? ? ? = 0x401f1000,
+> ? ? ? ? ? ? ? ?.pa_end ? ? ? ? = 0x401f13ff,
+> ? ? ? ? ? ? ? ?.flags ? ? ? ? ?= ADDR_TYPE_RT
+> ? ?}
+> };
 >
-> This patch is a workaround for the 364296 ARM1136 r0p2 erratum (possible
-> cache data corruption with hit-under-miss enabled). It sets the
-> undocumented bit 31 in the auxiliary control register and the FI bit in
-> the control register, thus disabling hit-under-miss without putting the
-> processor into full low interrupt latency mode.
+> In that case, the driver knows exactly where is the relevant memory buffer
+> he has to use.
 >
-> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+>> I think it's much easier to change the existing users of _byname over
+>> to fixed indexes than to come up with a new scheme that is better.
+>
+> As you said previously, since we have to support both legacy probing and DT
+> for some time, it will be easier for these drivers to rely on the same API.
+>
+> Considering that adding that new property is not a huge effort anyway and
+> _byname API is a standard API that any driver should be able to use if
+> needed, it still worth adding the DT support for named resources for my
+> point of view.
 
-Thanks, this works fine.
+The assumption being made here is that the current Linux
+implementation detail dictates the binding design, but it does not.
+Binding authors should certainly look at the Linux implementation for
+inspiration, but established DT patterns still prevail if they are
+suitable for describing the hardware. In this case the pattern is that
+tuples in the reg property are strongly ordered and specified by the
+driver binding.
 
-Tested-by: Siarhei Siamashka <siarhei.siamashka@gmail.com>
+So, I remain unconvinced that the 'reg' property binding is
+insufficient.  I have no plans to merge support for fetching _byname
+values from the device tree.
 
--- 
-Best regards,
-Siarhei Siamashka
+g.
