@@ -1,61 +1,47 @@
-From: a.kesavan@samsung.com (Abhilash Kesavan)
-Date: Fri, 12 Aug 2011 15:56:26 +0530
-Subject: [PATCH 4/5] ARM: S5P64X0: Fix incorrect serial clock name
-In-Reply-To: <1313144787-30666-1-git-send-email-a.kesavan@samsung.com>
-References: <1313144787-30666-1-git-send-email-a.kesavan@samsung.com>
-Message-ID: <1313144787-30666-5-git-send-email-a.kesavan@samsung.com>
+From: liu.h.jason@gmail.com (Jason Liu)
+Date: Fri, 12 Aug 2011 18:46:23 +0800
+Subject: [PATCH 0/2] Add NAND support for i.MX53EVK board
+In-Reply-To: <20110812073034.GC6618@S2100-06.ap.freescale.net>
+References: <1313132685-10440-1-git-send-email-jason.hui@linaro.org>
+	<20110812073034.GC6618@S2100-06.ap.freescale.net>
+Message-ID: <CAB4PhKeqa70FxbHzvf2=GJqVfK_PLd=-enYoq9QW0PYxWf7UCA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The S3C6400 serial glue driver(used by S5P64X0) needs the clock name to be
-pclk or uclk1. Correct the clock name in init.c to pclk and source pclk
-from pclk_low to get the correct rate.
+2011/8/12 Shawn Guo <shawn.guo@freescale.com>:
+> On Fri, Aug 12, 2011 at 03:04:43PM +0800, Jason Liu wrote:
+>> This patchset add NAND support for i.MX53EVK board, the patche-set
+>> has already been tested on i.MX53EVK board with Samsung K9LAG08U0M
+>>
+>> Jason Liu (3):
+>> ? ARM: i.MX53: Add NAND device support
+>> ? ARM: i.MX53EVK: Add NAND support for i.MX53evk board
+>>
+>> ?arch/arm/mach-mx5/Kconfig ? ? ? ? ? ? ? ? ? ? | ? ?1 +
+>> ?arch/arm/mach-mx5/board-mx53_evk.c ? ? ? ? ? ?| ? 47 +++++++++++++++++++++++++
+>> ?arch/arm/mach-mx5/clock-mx51-mx53.c ? ? ? ? ? | ? ?1 +
+>> ?arch/arm/mach-mx5/devices-imx53.h ? ? ? ? ? ? | ? ?4 ++
+>> ?arch/arm/plat-mxc/devices/platform-mxc_nand.c | ? ?5 +++
+>> ?6 files changed, 59 insertions(+), 1 deletions(-)
+>>
+> I would suggest that we stop adding new device into non-dt board
+> files. ?Instead, it's more worth to put effort on DT support, as
+> the non-dt board files will eventually replaced by DT support.
 
-Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
----
- arch/arm/mach-s5p64x0/clock-s5p6440.c |    2 +-
- arch/arm/mach-s5p64x0/clock-s5p6450.c |    2 +-
- arch/arm/mach-s5p64x0/init.c          |    2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+Anyway, I just put the NAND support patch here for reference in case
+others use it.
+We eventually need add NAND support for i.MX53 board.
 
-diff --git a/arch/arm/mach-s5p64x0/clock-s5p6440.c b/arch/arm/mach-s5p64x0/clock-s5p6440.c
-index 0e9cd30..4b594a4 100644
---- a/arch/arm/mach-s5p64x0/clock-s5p6440.c
-+++ b/arch/arm/mach-s5p64x0/clock-s5p6440.c
-@@ -554,7 +554,7 @@ void __init_or_cpufreq s5p6440_setup_clocks(void)
- 
- 	clk_f.rate = fclk;
- 	clk_h.rate = hclk;
--	clk_p.rate = pclk;
-+	clk_p.rate = pclk_low;
- 
- 	for (ptr = 0; ptr < ARRAY_SIZE(clksrcs); ptr++)
- 		s3c_set_clksrc(&clksrcs[ptr], true);
-diff --git a/arch/arm/mach-s5p64x0/clock-s5p6450.c b/arch/arm/mach-s5p64x0/clock-s5p6450.c
-index d9dc16c..eca9a57 100644
---- a/arch/arm/mach-s5p64x0/clock-s5p6450.c
-+++ b/arch/arm/mach-s5p64x0/clock-s5p6450.c
-@@ -613,7 +613,7 @@ void __init_or_cpufreq s5p6450_setup_clocks(void)
- 
- 	clk_f.rate = fclk;
- 	clk_h.rate = hclk;
--	clk_p.rate = pclk;
-+	clk_p.rate = pclk_low;
- 
- 	for (ptr = 0; ptr < ARRAY_SIZE(clksrcs); ptr++)
- 		s3c_set_clksrc(&clksrcs[ptr], true);
-diff --git a/arch/arm/mach-s5p64x0/init.c b/arch/arm/mach-s5p64x0/init.c
-index 79833ca..ee25e28 100644
---- a/arch/arm/mach-s5p64x0/init.c
-+++ b/arch/arm/mach-s5p64x0/init.c
-@@ -25,7 +25,7 @@
- 
- static struct s3c24xx_uart_clksrc s5p64x0_serial_clocks[] = {
- 	[0] = {
--		.name		= "pclk_low",
-+		.name		= "pclk",
- 		.divisor	= 1,
- 		.min_baud	= 0,
- 		.max_baud	= 0,
--- 
-1.7.4.1
+Jason
+
+>
+> --
+> Regards,
+> Shawn
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
