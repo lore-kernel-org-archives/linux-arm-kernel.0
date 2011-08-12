@@ -1,88 +1,114 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 11 Aug 2011 23:29:40 +0100
-Subject: [PATCH] OMAP: iommu flush page table entries from L1 and L2 cache
-In-Reply-To: <CADysL2bp08WP798_MvUJthGi9ACySDE=Dc_BM9Vd0A=YcKpm+Q@mail.gmail.com>
-References: <1302817968-28516-1-git-send-email-fernando.lugo@ti.com>
-	<20110414223036.GA7335@n2100.arm.linux.org.uk>
-	<BANLkTin8gugnVoai6VHC7qMgK4eKRXRtHg@mail.gmail.com>
-	<20110428134055.GA19709@n2100.arm.linux.org.uk>
-	<BANLkTikKnE-9WncNCADKfZVqkP1LFPYeXA@mail.gmail.com>
-	<CADysL2bp08WP798_MvUJthGi9ACySDE=Dc_BM9Vd0A=YcKpm+Q@mail.gmail.com>
-Message-ID: <20110811222940.GA26209@n2100.arm.linux.org.uk>
+From: ben-i2c@fluff.org (Ben Dooks)
+Date: Fri, 12 Aug 2011 01:46:09 +0100
+Subject: [PATCH] i2c: tegra: fix possible race condition after tx
+In-Reply-To: <1313093946-24559-1-git-send-email-dianders@chromium.org>
+References: <1313093946-24559-1-git-send-email-dianders@chromium.org>
+Message-ID: <20110812004609.GD19115@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 11, 2011 at 02:28:39PM -0500, Gupta, Ramesh wrote:
-> Hi Russel,
-
-grr.
-
-> On Thu, Apr 28, 2011 at 11:48 AM, Gupta, Ramesh <grgupta@ti.com> wrote:
-> > Hi Russel,
-> >
-> > On Thu, Apr 28, 2011 at 8:40 AM, Russell King - ARM Linux
-> > <linux@arm.linux.org.uk> wrote:
-> >> We _could_ invent a new API to deal with this, which is probably going
-> >> to be far better in the longer term for page table based iommus. ?That's
-> >> going to need some thought - eg, do we need to pass a struct device
-> >> argument for the iommu cache flushing so we know whether we need to flush
-> >> or not (eg, if we have cache coherent iommus)...
+On Thu, Aug 11, 2011 at 01:19:06PM -0700, Doug Anderson wrote:
+> In tegra_i2c_fill_tx_fifo, once we have finished pushing all the bytes
+> to the I2C hardware controller, the interrupt might happen before we
+> have updated i2c_dev->msg_buf_remaining at the end of the function.
+> Then, in tegra_i2c_isr, we will call again tegra_i2c_fill_tx_fifo
+> triggering weird behaviour. This has been shown to happen under real
+> conditions.
 > 
-> my apologies for a late mail on this topic.
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
+
+ok, it seems enough acks for this to make it in to the next i2c fixes
+pull I'll send at the weekend.
+
+> ---
+>  drivers/i2c/busses/i2c-tegra.c |   46 +++++++++++++++++++++++++++------------
+>  1 files changed, 32 insertions(+), 14 deletions(-)
 > 
-> do you think of any other requirements for this new API?
+> diff --git a/drivers/i2c/busses/i2c-tegra.c b/drivers/i2c/busses/i2c-tegra.c
+> index 2440b74..9c5fb75 100644
+> --- a/drivers/i2c/busses/i2c-tegra.c
+> +++ b/drivers/i2c/busses/i2c-tegra.c
+> @@ -270,14 +270,30 @@ static int tegra_i2c_fill_tx_fifo(struct tegra_i2c_dev *i2c_dev)
+>  
+>  	/* Rounds down to not include partial word at the end of buf */
+>  	words_to_transfer = buf_remaining / BYTES_PER_FIFO_WORD;
+> -	if (words_to_transfer > tx_fifo_avail)
+> -		words_to_transfer = tx_fifo_avail;
+>  
+> -	i2c_writesl(i2c_dev, buf, I2C_TX_FIFO, words_to_transfer);
+> -
+> -	buf += words_to_transfer * BYTES_PER_FIFO_WORD;
+> -	buf_remaining -= words_to_transfer * BYTES_PER_FIFO_WORD;
+> -	tx_fifo_avail -= words_to_transfer;
+> +	/* It's very common to have < 4 bytes, so optimize that case. */
+> +	if (words_to_transfer) {
+> +		if (words_to_transfer > tx_fifo_avail)
+> +			words_to_transfer = tx_fifo_avail;
+> +
+> +		/*
+> +		 * Update state before writing to FIFO.  If this casues us
+> +		 * to finish writing all bytes (AKA buf_remaining goes to 0) we
+> +		 * have a potential for an interrupt (PACKET_XFER_COMPLETE is
+> +		 * not maskable).  We need to make sure that the isr sees
+> +		 * buf_remaining as 0 and doesn't call us back re-entrantly.
+> +		 */
+> +		buf_remaining -= words_to_transfer * BYTES_PER_FIFO_WORD;
+> +		tx_fifo_avail -= words_to_transfer;
+> +		i2c_dev->msg_buf_remaining = buf_remaining;
+> +		i2c_dev->msg_buf = buf +
+> +			words_to_transfer * BYTES_PER_FIFO_WORD;
+> +		barrier();
+> +
+> +		i2c_writesl(i2c_dev, buf, I2C_TX_FIFO, words_to_transfer);
+> +
+> +		buf += words_to_transfer * BYTES_PER_FIFO_WORD;
+> +	}
+>  
+>  	/*
+>  	 * If there is a partial word at the end of buf, handle it manually to
+> @@ -287,14 +303,15 @@ static int tegra_i2c_fill_tx_fifo(struct tegra_i2c_dev *i2c_dev)
+>  	if (tx_fifo_avail > 0 && buf_remaining > 0) {
+>  		BUG_ON(buf_remaining > 3);
+>  		memcpy(&val, buf, buf_remaining);
+> +
+> +		/* Again update before writing to FIFO to make sure isr sees. */
+> +		i2c_dev->msg_buf_remaining = 0;
+> +		i2c_dev->msg_buf = NULL;
+> +		barrier();
+> +
+>  		i2c_writel(i2c_dev, val, I2C_TX_FIFO);
+> -		buf_remaining = 0;
+> -		tx_fifo_avail--;
+>  	}
+>  
+> -	BUG_ON(tx_fifo_avail > 0 && buf_remaining > 0);
+> -	i2c_dev->msg_buf_remaining = buf_remaining;
+> -	i2c_dev->msg_buf = buf;
+>  	return 0;
+>  }
+>  
+> @@ -411,9 +428,10 @@ static irqreturn_t tegra_i2c_isr(int irq, void *dev_id)
+>  			tegra_i2c_mask_irq(i2c_dev, I2C_INT_TX_FIFO_DATA_REQ);
+>  	}
+>  
+> -	if ((status & I2C_INT_PACKET_XFER_COMPLETE) &&
+> -			!i2c_dev->msg_buf_remaining)
+> +	if (status & I2C_INT_PACKET_XFER_COMPLETE) {
+> +		BUG_ON(i2c_dev->msg_buf_remaining);
+>  		complete(&i2c_dev->msg_complete);
+> +	}
+>  
+>  	i2c_writel(i2c_dev, status, I2C_INT_STATUS);
+>  	if (i2c_dev->is_dvc)
+> -- 
+> 1.7.3.1
 > 
-> Could we use the existing dmac_flush_range(), outer_flush_range()
-> for this purpose instead of a new API?
-> 
-> I see a comment in the arch/arm/include/asm/cacheflush.h
-> for  _not_ to use these APIs directly, but I am not really understand
-> the reason for that.
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-i2c" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-When I create APIs, I create them to solve a _purpose_ to code which wants
-to do something.  They're not created to provide some facility which can
-be re-used for unrelated stuff.
+-- 
+Ben Dooks, ben at fluff.org, http://www.fluff.org/ben/
 
-This has been proven many times to be the correct approach.  Over time,
-things change.
-
-Let's say for arguments sake that you decide to use the DMA API stuff
-to achieve your goals.  Then, lets say that ARM DMA becomes fully
-cache coherent, but your IOMMU tables still need to be flushed from
-the L1 caches.
-
-Suddenly, dmac_flush_range() starts doing absolutely nothing.  Your
-driver breaks.  I get whinged at because a previously working driver
-stops working.  In effect, that usage _prevents_ me making the changes
-necessary to keep the core architecture support moving forward as
-things develop.  Or, alternatively I just ignore your driver, make the
-changes anyway and leave it to rot.
-
-So, APIs get created to provide a purpose.  Like - handling the DMA
-issues when mapping a buffer to DMA.  Like handling the DMA issues
-when unmapping a buffer from DMA.  If you start using those _because_
-they happen to clean or invalidate the cache for you, you're really
-asking for your driver to be broken at some point in the future.
-
-What is far better to do is to ensure that we have the right APIs in
-place for the purposes for which they are to be used.  So, if we need
-an API to flush out the IOMMU page table entries, then that's what
-we need, not some bodged lets-reuse-the-dma-flushing-functions thing.
-Inside the processors implementation, yes, it may well be the same
-thing, but that's a decision for the _processor_ support code to make,
-not the IOMMU writer.
-
-As to what shape a new API should be - as I said above, maybe it should
-take a struct device argument, virtual base address and size.  Or maybe
-if we don't have any coherent IOMMUs then just ignore the device
-argument for the time being, and just pass the virtual base address and
-size.
-
-The next issue is whether it should require the virtual base address to
-be in the kernel direct mapped region.  If you're touching L2, then
-that's a yes, because we need to use virt_to_phys on it to get at the
-phys address for the L2 operations.
-
-So, I think: extend the cpu cache operations structure to have a method
-for dealing with IOMMUs.  Add an inline function to deal with calling
-that, and the L2 ops if that's what's required.
+Large Hadron Colada: A large Pina Colada that makes the universe disappear.
