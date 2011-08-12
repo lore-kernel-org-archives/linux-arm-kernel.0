@@ -1,33 +1,31 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 12 Aug 2011 14:53:05 +0200
-Subject: [PATCH 7/9] ARM: DMA: steal memory for DMA coherent mappings
-In-Reply-To: <1313146711-1767-8-git-send-email-m.szyprowski@samsung.com>
-References: <1313146711-1767-1-git-send-email-m.szyprowski@samsung.com>
-	<1313146711-1767-8-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <201108121453.05898.arnd@arndb.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 12 Aug 2011 15:19:43 +0200
+Subject: No mach-type for SHEEVAD?
+In-Reply-To: <CAMPhdO8KgWBub5xS=JhLRum+D-=3=7s2oLNSKbWSbht3f=5A_w@mail.gmail.com>
+References: <CACRpkdYi-EfCC0Lnx9bdYXyChzOhosO1C5gmggEnnBsDnzBukA@mail.gmail.com>
+	<CAMPhdO8KgWBub5xS=JhLRum+D-=3=7s2oLNSKbWSbht3f=5A_w@mail.gmail.com>
+Message-ID: <CACRpkdYvJR2QoQLjDuKuUOMArgotZ1mSiqmCWwL+th5NS7zJSQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 12 August 2011, Marek Szyprowski wrote:
-> 
-> From: Russell King <rmk+kernel@arm.linux.org.uk>
-> 
-> Steal memory from the kernel to provide coherent DMA memory to drivers.
-> This avoids the problem with multiple mappings with differing attributes
-> on later CPUs.
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> [m.szyprowski: rebased onto 3.1-rc1]
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+On Thu, Aug 4, 2011 at 11:22 AM, Eric Miao <eric.miao@linaro.org> wrote:
+> On Thu, Aug 4, 2011 at 10:17 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+>> I tried to configure the mmp2 to build the "gplugd" variant
+>> found in the arch/arm/mach-mmp2/gplugd.c source file,
+>> however it fails miserably:
+>>
+>> arch/arm/mach-mmp/gplugd.c:183: error: 'MACH_TYPE_SHEEVAD' undeclared
+>> here (not in a function)
+>> make[3]: *** [arch/arm/mach-mmp/gplugd.o] Error 1
+>
+> Hi Russell,
+>
+> ISTR this entry will be there once the cleanup of mach-types is done? Or
+> we can submit a new entry for this?
 
-Hi Marek,
+Is this getting anywhere? Torvald's HEAD is still broken
+for gplugD. Shall I submit a new machine type so it
+atleast gets fixed in the next merge window?
 
-Is this the same patch that Russell had to revert because it didn't
-work on some of the older machines, in particular those using
-dmabounce?
-
-I thought that our discussion ended with the plan to use this only
-for ARMv6+ (which has a problem with double mapping) but not on ARMv5
-and below (which don't have this problem but might need dmabounce).
-
-	Arnd
+Thanks,
+Linus Walleij
