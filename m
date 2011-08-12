@@ -1,97 +1,30 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Fri, 12 Aug 2011 17:09:33 +0200
-Subject: How to handle named resources with DT?
-In-Reply-To: <201108121635.42953.arnd@arndb.de>
-References: <20110809205723.GE11568@ponder.secretlab.ca>
-	<20110812030218.GP30552@yookeroo.fritz.box>
-	<20110812084106.GC19467@legolas.emea.dhcp.ti.com>
-	<201108121635.42953.arnd@arndb.de>
-Message-ID: <4E45422D.4050708@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 12 Aug 2011 17:40:50 +0200
+Subject: [GIT PULL] imx-fixes
+In-Reply-To: <20110808063549.GL31404@pengutronix.de>
+References: <20110808063549.GL31404@pengutronix.de>
+Message-ID: <201108121740.51378.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/12/2011 4:35 PM, Arnd Bergmann wrote:
-> On Friday 12 August 2011, Felipe Balbi wrote:
->> On Fri, Aug 12, 2011 at 01:02:18PM +1000, David Gibson wrote:
->>
->> the whole point of using *byname() is for the driver to not care about
->> the order of the resources. So if driver has to provided an ordered list
->> of names, what's the benefit ? Sounds really stupid to provide an
->> ordered list of names to an ordered list of resources, just to use
->> *byname() instead of just assuming the list of resources is already
->> ordered.
->
-> It only make sense for drivers that support both device tree probing
-> and legacy probing of static platform devices.
->
-> Note how almost all drivers use only platform_get_resource and not
-> platform_get_resource_byname:
->
-> arnd at ocdc-kvm:~/linux-arm$ git grep -wl platform_get_resource | wc -l
-> 565
-> arnd at ocdc-kvm:~/linux-arm$ git grep -wl platform_get_resource_byname | wc -l
-> 41
-> arnd at ocdc-kvm:~/linux-arm$ git grep -wl platform_get_resource_byname | xargs grep -wL platform_get_resource | wc -l # both
-> 28
-> arnd at ocdc-kvm:~/linux-arm$ git grep -wl platform_get_resource_byname | xargs grep -wl platform_get_resource  | wc -l # only _byname
-> 13
+On Monday 08 August 2011, Sascha Hauer wrote:
+> 
+> Hi Arnd,
+> 
+> Please pull the following fixes for i.MX.
+> 
+> Sascha
+> 
+> PS: The branch is not based on -rc1, I just had to merge it in to apply
+> the patch from Ben Dooks.
+> 
+> The following changes since commit 322a8b034003c0d46d39af85bf24fee27b902f48:
+> 
+>   Linux 3.1-rc1 (2011-08-07 18:23:30 -0700)
+> 
 
-That's true, but this is mainly because most of the time there is only 
-one irq, dma or mem resource, so the _byname is not useful.
-As soon as you start having multiple entries, relying on the order 
-become less readable and error prone. Then getting the resource by name 
-become useful.
-There are probably a lot of API that are less used than this one, but 
-does that mean that we have to remove them?
+Pulled, thanks!
 
-The extreme case (soon in mainline) in OMAP is that one:
+Sorry for the delay.
 
-static struct omap_hwmod_addr_space omap44xx_aess_addrs[] = {
-	{
-		.name		= "dmem",
-		.pa_start	= 0x40180000,
-		.pa_end		= 0x4018ffff
-	},
-	{
-		.name		= "cmem",
-		.pa_start	= 0x401a0000,
-		.pa_end		= 0x401a1fff
-	},
-	{
-		.name		= "smem",
-		.pa_start	= 0x401c0000,
-		.pa_end		= 0x401c5fff
-	},
-	{
-		.name		= "pmem",
-		.pa_start	= 0x401e0000,
-		.pa_end		= 0x401e1fff
-	},
-	{
-		.name		= "reg",
-		.pa_start	= 0x401f1000,
-		.pa_end		= 0x401f13ff,
-		.flags		= ADDR_TYPE_RT
-     }
-};
-
-In that case, the driver knows exactly where is the relevant memory 
-buffer he has to use.
-
-> I think it's much easier to change the existing users of _byname over
-> to fixed indexes than to come up with a new scheme that is better.
-
-As you said previously, since we have to support both legacy probing and 
-DT for some time, it will be easier for these drivers to rely on the 
-same API.
-
-Considering that adding that new property is not a huge effort anyway 
-and _byname API is a standard API that any driver should be able to use 
-if needed, it still worth adding the DT support for named resources for 
-my point of view.
-Moreover that seems much more consistent with the device tree format in 
-general that does rely a lot on named properties for passing parameter 
-to driver. That just my .2 cents.
-
-Regards,
-Benoit
+	Arnd
