@@ -1,39 +1,42 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 12 Aug 2011 19:47:55 +0800
-Subject: How to handle named resources with DT?
-In-Reply-To: <4E44EAAD.1030805@ti.com>
-References: <20110809162907.GA630@manju-WNB7PBC4801-0006>
-	<4E4166F0.9050401@ti.com>
-	<CACxGe6tbEW1EZhqXy78EZVM_sQLH0Qbr7QOzbgbsKBRn1FtVrg@mail.gmail.com>
-	<4E4172A8.3030101@ti.com>
-	<20110809205542.GD11568@ponder.secretlab.ca>
-	<4E41A156.3030407@ti.com>
-	<20110809211657.GI11568@ponder.secretlab.ca>
-	<4E41A886.30205@ti.com>
-	<20110812041016.GA6618@S2100-06.ap.freescale.net>
-	<4E44EAAD.1030805@ti.com>
-Message-ID: <20110812114754.GI6618@S2100-06.ap.freescale.net>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Fri, 12 Aug 2011 14:09:41 +0200
+Subject: [PATCH 0/5] Miscellaneous s3c64xx fixes.
+In-Reply-To: <5661373.tZL1ZnPyVO@flatron>
+References: <5661373.tZL1ZnPyVO@flatron>
+Message-ID: <2691749.ciX6KCIc5Y@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 12, 2011 at 10:56:13AM +0200, Cousson, Benoit wrote:
-[...]
-> >>The devil is in the details, but the way the DMA lines are connected
-> >>in OMAP is similar to IRQ lines, and maybe a little bit simpler.
-> >>
-> >>So starting with a copy/paste of the of_irq file should be a good start.
-> >>And then the issues will start:-)
-> >>
-> >
-> >I had a conversation with Arnd as below.  Arnd has the concern on
-> >multiple dma controllers.  So it is a question if we need to handle
-> >multiple dma controllers like we do for multiple irq controllers.
-> 
-> Quite, interesting, I cannot find the thread, did you discuss that
-> on linaro-dev, lakml?
-> 
-http://thread.gmane.org/gmane.linux.drivers.devicetree/6587
+Anyone?
 
--- 
-Regards,
-Shawn
+On Friday 29 of July 2011 at 17:50:57, Tomasz Figa wrote:
+> From c985e14a4fc5c7970d7f6c2fde6d214217214688 Mon Sep 17 00:00:00 2001
+> From: Tomasz Figa <tomasz.figa@gmail.com>
+> Date: Fri, 29 Jul 2011 16:50:16 +0200
+> Subject: [PATCH 0/5] Miscellaneous s3c64xx fixes.
+> 
+> This series attempts to fix some issues I approached when working
+> on the s3c64xx platform. See descriptions of individual patches for more
+> details on each one.
+> 
+> All the patches are based on v3.0 tag of Linus' tree.
+> 
+> Tomasz Figa (5):
+>   ARM: s3c64xx: PM: Mask and acknowledge all UART interrupts during
+>     core resume.
+>   ARM: s3c64xx: DMA: Use S3C64XX_SDMA_SEL register name instead of
+>     numeric address.
+>   ARM: s3c64xx: Save/restore S3C64XX_SDMA_SEL on suspend/resume.
+>   ARM: s3c64xx: Save/restore S3C64XX_MODEM_MIFPCON on suspend/resume to
+>     preserve LCD bypass state.
+>   ARM: s3c64xx: Add support for synchronous clock operation.
+> 
+>  arch/arm/mach-s3c64xx/clock.c                   |    8 +++++-
+>  arch/arm/mach-s3c64xx/dma.c                     |    2 +-
+>  arch/arm/mach-s3c64xx/include/mach/regs-clock.h |    4 +++
+>  arch/arm/mach-s3c64xx/include/mach/regs-sys.h   |    2 +
+>  arch/arm/mach-s3c64xx/pm.c                      |   30 
+> +++++++++++++++++++++++
+>  5 files changed, 44 insertions(+), 2 deletions(-)
+> 
+> 
