@@ -1,53 +1,78 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 12 Aug 2011 13:54:47 +0800
-Subject: [PATCH 11/13] ARM: gpio: consolidate trivial gpiolib
-	implementations
-In-Reply-To: <E1QqhM1-0003af-U5@rmk-PC.arm.linux.org.uk>
-References: <20110809080411.GA1831@n2100.arm.linux.org.uk>
-	<E1QqhM1-0003af-U5@rmk-PC.arm.linux.org.uk>
-Message-ID: <20110812055446.GB6618@S2100-06.ap.freescale.net>
+From: sjg@google.com (Simon Glass)
+Date: Thu, 11 Aug 2011 23:36:08 -0700
+Subject: [PATCH v5] ARM: Use generic BUG() handler
+In-Reply-To: <4E41B19C.3040209@codeaurora.org>
+References: <1311926200-24806-1-git-send-email-sjg@chromium.org>
+	<4E41B19C.3040209@codeaurora.org>
+Message-ID: <CAPnjgZ3x-nTVuoqO4xX5+kzuxZv21A7aAHpu7N4Xj4tCjsMkOA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 09, 2011 at 09:08:01AM +0100, Russell King - ARM Linux wrote:
-> Consolidate 24 trivial gpiolib implementions out of mach/gpio.h
-> into asm/gpio.h.  This is basically the include of asm-generic/gpio.h
-> and the definition of gpio_get_value, gpio_set_value, and gpio_cansleep
-> as described in Documentation/gpio.txt
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
->  arch/arm/include/asm/gpio.h                 |   10 ++++++++++
->  arch/arm/mach-at91/include/mach/gpio.h      |    5 +----
->  arch/arm/mach-ep93xx/include/mach/gpio.h    |    7 +------
->  arch/arm/mach-exynos4/include/mach/gpio.h   |    5 +----
->  arch/arm/mach-gemini/include/mach/gpio.h    |    5 +----
->  arch/arm/mach-ks8695/include/mach/gpio.h    |   11 ++---------
->  arch/arm/mach-lpc32xx/include/mach/gpio.h   |   17 +----------------
->  arch/arm/mach-msm/include/mach/gpio.h       |    5 +----
->  arch/arm/mach-mxs/include/mach/gpio.h       |    6 +-----
->  arch/arm/mach-realview/include/mach/gpio.h  |    6 +-----
->  arch/arm/mach-s3c2410/include/mach/gpio.h   |    5 +----
->  arch/arm/mach-s3c64xx/include/mach/gpio.h   |    6 +-----
->  arch/arm/mach-s5p64x0/include/mach/gpio.h   |    6 +-----
->  arch/arm/mach-s5pc100/include/mach/gpio.h   |    6 +-----
->  arch/arm/mach-s5pv210/include/mach/gpio.h   |    6 +-----
->  arch/arm/mach-shmobile/include/mach/gpio.h  |   15 +--------------
->  arch/arm/mach-tegra/include/mach/gpio.h     |    6 +-----
->  arch/arm/mach-versatile/include/mach/gpio.h |    6 +-----
->  arch/arm/mach-vt8500/include/mach/gpio.h    |    6 +-----
->  arch/arm/mach-w90x900/include/mach/gpio.h   |    5 +----
->  arch/arm/plat-mxc/include/mach/gpio.h       |    5 +----
->  arch/arm/plat-nomadik/include/plat/gpio.h   |   11 +----------
->  arch/arm/plat-omap/include/plat/gpio.h      |   15 +--------------
->  arch/arm/plat-orion/include/plat/gpio.h     |    6 ++----
->  arch/arm/plat-spear/include/plat/gpio.h     |    6 +-----
->  25 files changed, 36 insertions(+), 151 deletions(-)
-> 
-For mxs and mxc:
+OK, yes will do, thanks.
 
-Tested-by: Shawn Guo <shawn.guo@linaro.org>
+-Simon
 
--- 
-Regards,
-Shawn
+On Tue, Aug 9, 2011 at 3:15 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> On 07/29/2011 12:56 AM, Simon Glass wrote:
+>> From: Simon Glass <sjg@google.com>
+>>
+>> ARM uses its own BUG() handler which makes its output slightly different
+>> from other archtectures.
+>>
+>> One of the problems is that the ARM implementation doesn't report the function
+>> with the BUG() in it, but always reports the PC being in __bug(). The generic
+>> implementation doesn't have this problem.
+>>
+>> Currently we get something like:
+>>
+>> kernel BUG at fs/proc/breakme.c:35!
+>> Unable to handle kernel NULL pointer dereference at virtual address 00000000
+>> ...
+>> PC is at __bug+0x20/0x2c
+>>
+>> With this patch it displays:
+>>
+>> kernel BUG at fs/proc/breakme.c:35!
+>> Internal error: Oops - undefined instruction: 0 [#1] PREEMPT SMP
+>> ...
+>> PC is at write_breakme+0xd0/0x1b4
+>>
+>> This implementation uses an undefined instruction to implement BUG, and sets up
+>> a bug table containing the relevant information. Many versions of gcc do not
+>> support %c properly for ARM (inserting a # when they shouldn't) so we work
+>> around this using distasteful macro magic.
+>>
+>> v1: Initial version to replace existing ARM BUG() implementation with something
+>> more similar to other architectures.
+>>
+>> v2: Add Thumb support, remove backtrace whitespace output changes. Change to
+>> use macros instead of requiring the asm %d flag to work (thanks to
+>> Dave Martin <dave.martin@linaro.org>)
+>>
+>> v3: Remove old BUG() implementation in favor of this one.
+>> Remove the Backtrace: message (will submit this separately).
+>> Use ARM_EXIT_KEEP() so that some architectures can dump exit text at link time
+>> thanks to Stephen Boyd <sboyd@codeaurora.org> (although since we always
+>> define GENERIC_BUG this might be academic.)
+>> Rebase to linux-2.6.git master.
+>>
+>> v4: Allow BUGS in modules (these were not reported correctly in v3)
+>> (thanks to Stephen Boyd <sboyd@codeaurora.org> for suggesting that.)
+>> Remove __bug() as this is no longer needed.
+>>
+>> v5: Add %progbits as the section flags.
+>
+> Tested-by: Stephen Boyd <sboyd@codeaurora.org>
+>
+>> Signed-off-by: Simon Glass <sjg@chromium.org>
+>> ---
+>>
+>
+> Can you update the patch in the patch tracker? It would be great to see
+> this in the next merge window.
+>
+> --
+> Sent by an employee of the Qualcomm Innovation Center, Inc.
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+>
+>
