@@ -1,50 +1,109 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Thu, 11 Aug 2011 18:31:20 -0700
-Subject: [PATCH] ARM: do not mark CPU 0 as hotpluggable
-In-Reply-To: <4E2972B1.5070604@ti.com>
-References: <1311204745-6276-1-git-send-email-mturquette@ti.com>
-	<4E2796DA.80001@gmail.com> <4E27BA10.3060203@ti.com>
-	<20110721133033.GN26574@n2100.arm.linux.org.uk>
-	<4E2902E7.6000108@ti.com>
-	<13B9B4C6EF24D648824FF11BE896716203F2398D3A@dlee02.ent.ti.com>
-	<4E2972B1.5070604@ti.com>
-Message-ID: <CAJOA=zNu_xhen0mdcmnBw=wpYO1RtkDMBtT1_J8m8ysa1+ZHhQ@mail.gmail.com>
+From: david@gibson.dropbear.id.au (David Gibson)
+Date: Fri, 12 Aug 2011 13:02:18 +1000
+Subject: How to handle named resources with DT?
+In-Reply-To: <4E43CB07.20002@ti.com>
+References: <4E417BD5.8080409@freescale.com>
+	<20110809205723.GE11568@ponder.secretlab.ca>
+	<4E41A1B9.1060400@ti.com>
+	<20110809211747.GJ11568@ponder.secretlab.ca>
+	<4E41AA43.1000506@ti.com>
+	<20110809214905.GK11568@ponder.secretlab.ca>
+	<4E41AC5C.20301@ti.com> <20110810015214.GD23511@yookeroo.fritz.box>
+	<CACxGe6tr5OUxpiVah4s6rRG0cTOWsnohhEkZoSZgCj0xSZkmMA@mail.gmail.com>
+	<4E43CB07.20002@ti.com>
+Message-ID: <20110812030218.GP30552@yookeroo.fritz.box>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 22, 2011 at 5:53 AM, Santosh Shilimkar
-<santosh.shilimkar@ti.com> wrote:
-> On 7/22/2011 6:15 PM, Woodruff, Richard wrote:
->>
->>> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-
->>> kernel-bounces at lists.infradead.org] On Behalf Of Shilimkar, Santosh
->>
->>>> With fixed IRQ migration and forcing CPU0 into an infinite WFI loop,
->>>> I can offline CPU0 and still have a running system.
->>>>
->>> The secure software runs only on CPU0 and that's the biggest limitation.
->>> Other issues like hand-shake as you pointed out, power sequencing etc
->>> can be worked around.
->>
->> As you know well some of the secure APIs work on CPU1 and others do not.
->>
->> I notice in other thread Russell made assumption about CPU1 being able to
->> use all because it could run some. This is not the case.
->>
-> I clarified that on the other thread.
+On Thu, Aug 11, 2011 at 02:28:55PM +0200, Cousson, Benoit wrote:
+> On 8/10/2011 9:22 PM, Grant Likely wrote:
+> >On Tue, Aug 9, 2011 at 7:52 PM, David Gibson
+> ><david@gibson.dropbear.id.au>  wrote:
+> >>On Tue, Aug 09, 2011 at 11:53:32PM +0200, Cousson, Benoit wrote:
+> >>>On 8/9/2011 11:49 PM, Grant Likely wrote:
+> >>>>That won't work either because that also breaks the existing 'reg'
+> >>>>binding.  Anything you do will need to supplement the existing
+> >>>>binding without changing it in an incompatible way.
+> >>>
+> >>>OK, but can we add a new attribute then? reg2, reg_ng, reg_plusplus,
+> >>>reg_named...?
+> >>
+> >>He already suggested reg-names to be interpreted in parallel with the
+> >>existing reg property.  The (serious) problem with replacing the reg
+> >>property is that it will break all existing OSes (including old Linux
+> >>versions) that don't understand the new property.
+> >>
+> >>Of course, the problem with reg-names is that it will be ignored by
+> >>older OSes, and so 'reg' must still be in the correct order.  In which
+> >>case you could argue it's more sensible to just have a static place to
+> >>name mapping in the Linux driver.
+> >>
+> >>In short, yes, named reg elements in the DT would be nice in theory,
+> >>but I'm not convinced it's worth a DT flag day to accomplish it.
+> >
+> >I'm inclined the same way, though I agree with the replies that point
+> >out it wouldn't result in a 'flag day' because existing bindings
+> >cannot become incompatible.  The problem I have is that adding
+> >reg-names or similar implies that ordering of the reg property is no
+> >longer defined which I absolutely do not think is a good idea.
+> 
+> That will not be an issue if "reg-named" is a completely new node.
+> It will replace the "reg" node only when a named entry is needed.
+> Most devices will use the regular "reg" entry, and only the one that
+> need extra information will use the reg-named.
 
-I've asked a few other ARM folks (out of band) to weigh in on this
-thread to determine if their platform has similar limitations as OMAP.
- Unfortunately no one else has responded.
+Um, you seem to be confusing nodes and properties here.
 
-Still the limitation for OMAP remains.  Earlier in this thread I
-provided an alternative to blacklisting CPU0 for all ARM platforms by
-instead using a config option, but it received no comments.  What is
-the best way to move forward?
+> That seems to be pretty straightforward to implement, and as soon as
+> it is useful even for a couple of drivers, it worth adding it.
+> 
+> It is anyway better than having to add a custom property to get the
+> information we will miss otherwise.
+> 
+> Moreover, since some drivers are relying on that call, it will avoid
+> having to add extra code for nothing if CONFIG_OF is set.
+> 
+> It will allow the driver to use a pretty standard API in anycase vs
+> using platform_get_resource + some extra optional calls to of_
+> functions + some code to get the information for non-DT build.
 
-Thanks,
-Mike
+You don't need to add stuff to the DT to use the byname interface.
+Really.  All you need is a way for the driver (well match table entry,
+really) to provide a list of names to attach to the reg entries in
+order.
 
-> Regards
-> Santosh
->
+> >Please, stick with the established convention and explicitly order
+> >'reg' and 'interrupts' properties.  If there is a specific use case
+> >where this doesn't work, then bring it up, but I haven't seen any yet.
+> 
+> There will always be some alternatives, but they will be uglier, and
+> the effort to add some extra node to DT is so small, that it is
+> better to do that instead of adding some useless extra code in the
+> driver.
+> 
+> >  The current users of _byname that I've looked seem to only use it for
+> >convenience, not because a register range may be optional.  ie. they
+> >all fail out if a reg resource isn't present.
+> 
+> If that API can help the driver writer and can avoid adding 10 lines
+> of code, it is still useful to use it.
+> 
+> To be honest, I still do not understand why you are so reluctant to
+> add that small feature.
+
+Because this is a totally new basic feature to add to the DT
+bindings.  Once in there, we're stuck with it indefinitely, which
+means it warrants considerably more conservatism than mere internal
+code changes which can be easily updated or reverted.
+
+> That will not break compatibility and it will make our life easier.
+> Don't you want to make our life easier? :-)
+> 
+> Benoit
+> 
+
+-- 
+David Gibson			| I'll have my music baroque, and my code
+david AT gibson.dropbear.id.au	| minimalist, thank you.  NOT _the_ _other_
+				| _way_ _around_!
+http://www.ozlabs.org/~dgibson
