@@ -1,62 +1,65 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 12 Aug 2011 19:13:07 +0800
-Subject: [PATCH 1/6] arm/cpuimx51: gpio_to_irq() should be used to get
-	irq from gpio number
-In-Reply-To: <CAB4PhKdAgasG3wJ2JvS_Ds0ReGjDCgZh_prepNGF=FqG6fRx7A@mail.gmail.com>
-References: <1313135701-22456-1-git-send-email-shawn.guo@linaro.org>
-	<1313135701-22456-2-git-send-email-shawn.guo@linaro.org>
-	<CAB4PhKdAgasG3wJ2JvS_Ds0ReGjDCgZh_prepNGF=FqG6fRx7A@mail.gmail.com>
-Message-ID: <20110812111306.GH6618@S2100-06.ap.freescale.net>
+From: srinivas.kandagatla@st.com (Srinivas KANDAGATLA)
+Date: Fri, 12 Aug 2011 12:22:23 +0100
+Subject: [PATCH kernel-3.0] arm:cache-l2x0: Fix L2 Cache size calculation.
+Message-ID: <1313148143-26950-1-git-send-email-srinivas.kandagatla@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 12, 2011 at 05:36:32PM +0800, Jason Liu wrote:
-> 2011/8/12 Shawn Guo <shawn.guo@linaro.org>:
-> > Instead of irq_to_gpio(), gpio_to_irq() should be used to get irq
-> > from gpio number.
-> >
-> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> > ---
-> > ?arch/arm/mach-mx5/board-cpuimx51.c | ? ?2 +-
-> > ?1 files changed, 1 insertions(+), 1 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-mx5/board-cpuimx51.c b/arch/arm/mach-mx5/board-cpuimx51.c
-> > index 7c893fa..68934ea 100644
-> > --- a/arch/arm/mach-mx5/board-cpuimx51.c
-> > +++ b/arch/arm/mach-mx5/board-cpuimx51.c
-> > @@ -81,7 +81,7 @@ static struct plat_serial8250_port serial_platform_data[] = {
-> > ? ? ? ? ? ? ? ?.flags = UPF_BOOT_AUTOCONF | UPF_SKIP_TEST | UPF_IOREMAP,
-> > ? ? ? ?}, {
-> > ? ? ? ? ? ? ? ?.mapbase = (unsigned long)(MX51_CS1_BASE_ADDR + 0x2000000),
-> > - ? ? ? ? ? ? ? .irq = irq_to_gpio(CPUIMX51_QUARTD_GPIO),
-> > + ? ? ? ? ? ? ? .irq = gpio_to_irq(CPUIMX51_QUARTD_GPIO),
-> > ? ? ? ? ? ? ? ?.irqflags = IRQF_TRIGGER_HIGH,
-> > ? ? ? ? ? ? ? ?.uartclk = CPUIMX51_QUART_XTAL,
-> > ? ? ? ? ? ? ? ?.regshift = CPUIMX51_QUART_REGSHIFT,
-> > --
-> 
-> The fix has already in Sascah's tree:
-> 
-> Author: Ben Dooks <ben-linux@fluff.org>
-> Date:   Thu Aug 4 16:47:35 2011 +0100
-> 
->     ARM: mx5: board-cpuimx51.c fixup irq_to_gpio() usage
-> 
->     irq_to_gpio() is being called on a GPIO so change to using
->     gpio_to_irq() instead.
-> 
->     Signed-off-by: Ben Dooks <ben-linux@fluff.org>
->     Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> 
-> Jason
-> 
-Sorry, I missed that.  Thanks for pointing it out, Jason.
+From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
 
-I will fold Ben's patch here, as I see Russell would probably pick up
-the series.  Otherwise, Russell, please let me know if I should base
-it on Sascha's tree.
+This patch fixes L2 Cache size calculations for L2C-210, L2C-310 and
+PL310, by changing the L2X0_AUX_CTRL_WAY_SIZE_MASK from 2 bits to 3
+bits.
 
+The Auxiliary Control Register for L2C-210, L2C-310 and PL310 has 3bits
+[19:17] for Way size, however the existing code only uses 2 bits to
+get this value. This results in incorrect cachesize calculations.
+
+It also results in performing operations on the whole cache when we
+erroneously decide that the range is big enough (due to l2x0_size being
+too small) and also prints incorrect cachesize.
+
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+Acked-by: Will Deacon <will.deacon@arm.com>
+Cc: stable at kernel.org
+
+---
+
+adding stable in CC..
+
+Hi All,
+
+I found an bug in L2 Cache size calculation in cache-l2x0 code.
+
+According to ARM TRM for L2C-210, L2C-310 and PL310, the Auxiliary
+Control Register has 3bits [19:17] allocated for Way size,however
+the existing code only uses 2 bits to get this value from Aux 
+control register. This results in incorrect cache size calculations.
+
+
+It also results in performing operations on the whole cache when we
+erroneously decide that the range is big enough (due to l2x0_size being
+too small).
+
+thanks, 
+srini
+
+
+ arch/arm/include/asm/hardware/cache-l2x0.h |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/include/asm/hardware/cache-l2x0.h b/arch/arm/include/asm/hardware/cache-l2x0.h
+index 16bd480..bfa706f 100644
+--- a/arch/arm/include/asm/hardware/cache-l2x0.h
++++ b/arch/arm/include/asm/hardware/cache-l2x0.h
+@@ -64,7 +64,7 @@
+ #define L2X0_AUX_CTRL_MASK			0xc0000fff
+ #define L2X0_AUX_CTRL_ASSOCIATIVITY_SHIFT	16
+ #define L2X0_AUX_CTRL_WAY_SIZE_SHIFT		17
+-#define L2X0_AUX_CTRL_WAY_SIZE_MASK		(0x3 << 17)
++#define L2X0_AUX_CTRL_WAY_SIZE_MASK		(0x7 << 17)
+ #define L2X0_AUX_CTRL_SHARE_OVERRIDE_SHIFT	22
+ #define L2X0_AUX_CTRL_NS_LOCKDOWN_SHIFT		26
+ #define L2X0_AUX_CTRL_NS_INT_CTRL_SHIFT		27
 -- 
-Regards,
-Shawn
+1.6.3.3
