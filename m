@@ -1,160 +1,44 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Fri, 12 Aug 2011 10:56:13 +0200
-Subject: How to handle named resources with DT?
-In-Reply-To: <20110812041016.GA6618@S2100-06.ap.freescale.net>
-References: <4E40FC88.5090403@ti.com>
-	<20110809162907.GA630@manju-WNB7PBC4801-0006>
-	<4E4166F0.9050401@ti.com>
-	<CACxGe6tbEW1EZhqXy78EZVM_sQLH0Qbr7QOzbgbsKBRn1FtVrg@mail.gmail.com>
-	<4E4172A8.3030101@ti.com>
-	<20110809205542.GD11568@ponder.secretlab.ca>
-	<4E41A156.3030407@ti.com>
-	<20110809211657.GI11568@ponder.secretlab.ca>
-	<4E41A886.30205@ti.com>
-	<20110812041016.GA6618@S2100-06.ap.freescale.net>
-Message-ID: <4E44EAAD.1030805@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 12 Aug 2011 09:57:59 +0100
+Subject: [PATCH 2/6] arm/imx: remove the uses of gpio_to_irq()
+In-Reply-To: <20110812082538.GF6618@S2100-06.ap.freescale.net>
+References: <1313135701-22456-1-git-send-email-shawn.guo@linaro.org>
+	<1313135701-22456-3-git-send-email-shawn.guo@linaro.org>
+	<20110812080000.GF4775@n2100.arm.linux.org.uk>
+	<20110812082211.GD6618@S2100-06.ap.freescale.net>
+	<20110812082538.GF6618@S2100-06.ap.freescale.net>
+Message-ID: <20110812085759.GH4775@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/12/2011 6:10 AM, Shawn Guo wrote:
-> On Tue, Aug 09, 2011 at 11:37:10PM +0200, Cousson, Benoit wrote:
->> On 8/9/2011 11:16 PM, Grant Likely wrote:
->>> On Tue, Aug 09, 2011 at 11:06:30PM +0200, Cousson, Benoit wrote:
->>>> On 8/9/2011 10:55 PM, Grant Likely wrote:
->>>>> On Tue, Aug 09, 2011 at 07:47:20PM +0200, Cousson, Benoit wrote:
->>>>>> On 8/9/2011 7:23 PM, Grant Likely wrote:
->>>>>>> On Tue, Aug 9, 2011 at 10:57 AM, Cousson, Benoit<b-cousson@ti.com>     wrote:
->>>>>>>> Hi Manju,
->>>>>>>>
->>>>>>>> On 8/9/2011 6:29 PM, G, Manjunath Kondaiah wrote:
->>>>>>>>>
->>>>>>>>> Hi Benoit,
->>>>>>>>>
->>>>>>>>> On Tue, Aug 09, 2011 at 11:23:20AM +0200, Cousson, Benoit wrote:
->>>>>>>>>>
->>>>>>>>>> Hi Grant,
->>>>>>>>>>
->>>>>>>>>> Trying to bind hwmod informations with DT, I'm facing a little
->>>>>>>>>> limitation.
->>>>>>>>>> A bunch of drivers are using the platform_get_resource_byname, so
->>>>>>>>>> the name for the resource is needed.
->>>>>>>>>>
->>>>>>>>>> The name is used so far for IORESOURCE_MEM, IORESOURCE_IRQ and
->>>>>>>>>> IORESOURCE_DMA types of resources.
->>>>>>>>>
->>>>>>>>> IORESOURCE_MEM and IORESOURCE_IRQ's are fetched from dt blob and
->>>>>>>>> it will be part of pdev.
->>>>>>>>
->>>>>>>> Yes, but without the proper name in the resource structure. It will be then
->>>>>>>> impossible to use the platform_get_resource_byname function that is
->>>>>>>> currently used by a bunch of drivers.
->>>>>>>
->>>>>>> There is no analogous mechanism for _byname in the device tree.  The
->>>>>>> DT binding for a device must explicitly state what order the register
->>>>>>> ranges are in.  The driver will need to be adapted.
->>>>>>
->>>>>> That seems to be a small regression for my point of view. Relying on
->>>>>> the order is not super safe. This is not very readable either.
->>>>>> That's for that exact reason that we changed our drivers to use
->>>>>> platform_get_resource_byname. That's probably the reason why that
->>>>>> API is there as well.
->>>>>> For the same IP, the number of entries can vary depending of the SoC
->>>>>> revision.
->>>>>> By using the _byname, we can check if the resource is there or not
->>>>>> without having to care about the position.
->>>>>
->>>>> We've done it that way for a very long time with the device tree.  If
->>>>> you want to do something by name, then propose a binding that will
->>>>> make it work alongside the existing scheme.
->>>>>
->>>>>>
->>>>>>>>> For IORESOURCE_DMA, you can have property
->>>>>>>>> "dma-channel" in dtsi file and fetch dma-channel in driver probe
->>>>>>>>> through "of_property_read_u32()" api.
->>>>>>>>
->>>>>>>> That will not be enough to get the name. So maybe something like:
->>>>>>>>         dmas =<12>, "rx_req",<13>, "tx_req";
->>>>>>>> will be doable.
->>>>>>>> The issue is that the name is optional so managing the multiple entries
->>>>>>>> might be tricky.
->>>>>>>
->>>>>>> DMA channels will never show up in the resource structure anyway.
->>>>>>
->>>>>> Can you elaborate on that point? AFAIK, IORESOURCE_DMA is already
->>>>>> used today.
->>>>>
->>>>> IORESOURCE_DMA is a Linux construct, as is IORESOURCE_IRQ and
->>>>> IORESOURCE_MEM.  However, IRQ and MEM can be directly mapped from the
->>>>> common 'reg' and 'interrupts' bindings used by pretty much all device
->>>>> tree nodes.  Therefore common code can be written to translate MEM and
->>>>> IRQ that will always work.  There is no such common binding in place
->>>>> for DMA regions, so common setup code cannot do it transparently for
->>>>> the device driver.
->>>>
->>>> OK, sure, I get your point now. I was thinking about a "potential"
->>>> dma support from the core DT, since this is very similar to IRQ.
->>>>
->>>> Otherwise, we can do it OMAP specific if nobody else care about
->>>> that. But I still think it should be useful for other platforms.
->>>
-> It is definitely useful for other platforms, so please add the support
-> in DT core.
+On Fri, Aug 12, 2011 at 04:25:39PM +0800, Shawn Guo wrote:
+> On Fri, Aug 12, 2011 at 04:22:12PM +0800, Shawn Guo wrote:
+> > On Fri, Aug 12, 2011 at 09:00:00AM +0100, Russell King - ARM Linux wrote:
+> > > On Fri, Aug 12, 2011 at 03:54:57PM +0800, Shawn Guo wrote:
+> > > > gpio_to_irq() is too generic to be defined and used by i.mx platform
+> > > > code.  The patch defines IMX_GPIO_TO_IRQ() in mach/hardware.h and
+> > > > replaces all the uses of gpio_to_irq() with IMX_GPIO_TO_IRQ().
+> > > 
+> > > That makes no sense.  Why not continue to use gpio_to_irq() but provide
+> > > the .to_irq method in your gpiolib driver so it can work, and use that
+> > > in the places where its used at runtime?
+> > > 
+> > I did provide .to_irq in patch #3. 
+> > 
+> > > (You won't be able to use it for static initialization obviously.)
+> > > 
+> > All users of gpio_to_irq() in platform codes are static initialization.
+> 
+> Sorry, not all but most.
 
-Well, I still have to solve the resource_byname issue for IRQ and REG 
-first :-)
+It would probably be a good idea to leave the runtime places using
+gpio_to_irq() and only convert the static initializers.
 
->>> I think people care, and it will be a net win, but it does mean you
->>> need do the work of crafting a binding that will work for a large
->>> proportion of SoCs.
->>
-> When it comes out, I will happily test it on imx :)
+> > And IMX_GPIO_TO_IRQ() is actually a renaming of gpio_to_irq().  Only
+> > difference there is naming and place change, which I think is good, no?
+> > 
+> 
+> But adding IMX namespace is still worth of the LOC changes?
 
-Now, you are putting a lot of pressure on my shoulders :-)
-
-We are still missing basic DT support for OMAP4 and just started the 
-OMAP3 beagleboard, so it will take some time before facing the DMA 
-issue. But it will happen, probably sooner than later.
-
->
->> The devil is in the details, but the way the DMA lines are connected
->> in OMAP is similar to IRQ lines, and maybe a little bit simpler.
->>
->> So starting with a copy/paste of the of_irq file should be a good start.
->> And then the issues will start:-)
->>
->
-> I had a conversation with Arnd as below.  Arnd has the concern on
-> multiple dma controllers.  So it is a question if we need to handle
-> multiple dma controllers like we do for multiple irq controllers.
-
-Quite, interesting, I cannot find the thread, did you discuss that on 
-linaro-dev, lakml?
-
-> --- quote ---
-> Shawn Guo:
->> Then like that IRQ number is decoded and populated into IORESOURCE_IRQ
->> by device tree infrastructural code, we can also do the same into
->> IORESOURCE_DMA.  In that case, drivers do not need any code change for
->> getting dma channel/event numbers from device tree, as
->> platform_get_resource(pdev, IORESOURCE_DMA) still works for them.
->
-> Arnd Bergmann:
-> But I really don't think there is value in using IORESOURCE_DMA for this.
-> We don't have the code to manage DMA resources for more than one DMA
-> controller AFAICT, and I think we should not add it. Globally
-> unique interrupt numbers cause us a lot of trouble and we go to great
-> lengths to fake them on modern devices.
-
-Yeah, that totally makes sense. We do have several DMA engines in OMAP 
-anyway, so unique number is clearly not the best approach.
-But in that case, it means adding a new kernel API for that and not only 
-an of_XXX one. Because driver should then rely on it with or without DT.
-
-> It would be much better
-> not to have them visible in the OS, and I don't want to add them to
-> a modern API like the dmaengine.
-
-That part is less clear to me, what does it means?
-
-Regards,
-Benoit
+Well, the static initializers still need something... the alternative is
+to initialize them at runtime which probably wouldn't be so nice.
