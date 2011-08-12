@@ -1,68 +1,76 @@
 From: swarren@nvidia.com (Stephen Warren)
-Date: Fri, 12 Aug 2011 16:54:50 -0600
-Subject: [RFC PATCH 05/12] arm/dt: Tegra: Add nvidia,
-	gpios property to GPIO controller
+Date: Fri, 12 Aug 2011 16:54:52 -0600
+Subject: [RFC PATCH 07/12] gpio/tegra: Convert to a platform device
 In-Reply-To: <1313189697-21287-1-git-send-email-swarren@nvidia.com>
 References: <1313189697-21287-1-git-send-email-swarren@nvidia.com>
-Message-ID: <1313189697-21287-6-git-send-email-swarren@nvidia.com>
+Message-ID: <1313189697-21287-8-git-send-email-swarren@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add board-specific gpio node for Harmony and Seaboard. This lists the
-GPIOs used by the board. Note that not all GPIOs that exist on the board
-are listed; only those used by devices currently supported by device
-tree.
-
 Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
- arch/arm/boot/dts/tegra-harmony.dts  |   15 +++++++++++++++
- arch/arm/boot/dts/tegra-seaboard.dts |    8 ++++++++
- 2 files changed, 23 insertions(+), 0 deletions(-)
+ drivers/gpio/gpio-tegra.c |   25 ++++++++++++++-----------
+ 1 files changed, 14 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm/boot/dts/tegra-harmony.dts b/arch/arm/boot/dts/tegra-harmony.dts
-index 4c05334..c9bb847 100644
---- a/arch/arm/boot/dts/tegra-harmony.dts
-+++ b/arch/arm/boot/dts/tegra-harmony.dts
-@@ -15,6 +15,21 @@
- 		reg = < 0x00000000 0x40000000 >;
- 	};
+diff --git a/drivers/gpio/gpio-tegra.c b/drivers/gpio/gpio-tegra.c
+index df64536..4da4839 100644
+--- a/drivers/gpio/gpio-tegra.c
++++ b/drivers/gpio/gpio-tegra.c
+@@ -20,10 +20,10 @@
+ #include <linux/init.h>
+ #include <linux/irq.h>
+ #include <linux/interrupt.h>
+-
+ #include <linux/io.h>
+ #include <linux/gpio.h>
+ #include <linux/of.h>
++#include <linux/platform_device.h>
  
-+	gpio: gpio at 6000d000 {
-+		nvidia,gpios = <
-+			69	// TEGRA_GPIO_PI5 SD2_CD
-+			57	// TEGRA_GPIO_PH1 SD2_WP
-+			155	// TEGRA_GPIO_PT3 SD2_POWER
-+			58	// TEGRA_GPIO_PH2 SD4_CD
-+			59	// TEGRA_GPIO_PH3 SD4_WP
-+			70	// TEGRA_GPIO_PI6 SD4_POWER
-+			187	// TEGRA_GPIO_PX3 CDC_IRQ
-+			178	// TEGRA_GPIO_PW2 HP_DET
-+			184	// TEGRA_GPIO_PX0 INT_MIC_EN
-+			185	// TEGRA_GPIO_PX1 EXT_MIC_EN
-+		>;
-+	};
+ #include <asm/mach/irq.h>
+ 
+@@ -332,7 +332,7 @@ static struct irq_chip tegra_gpio_irq_chip = {
+  */
+ static struct lock_class_key gpio_lock_class;
+ 
+-static int __init tegra_gpio_init(void)
++static int __init tegra_gpio_probe(struct platform_device *pdev)
+ {
+ 	struct tegra_gpio_bank *bank;
+ 	int gpio;
+@@ -346,15 +346,6 @@ static int __init tegra_gpio_init(void)
+ 		}
+ 	}
+ 
+-#ifdef CONFIG_OF_GPIO
+-	/*
+-	 * This isn't ideal, but it gets things hooked up until this
+-	 * driver is converted into a platform_device
+-	 */
+-	tegra_gpio_chip.of_node = of_find_compatible_node(NULL, NULL,
+-						"nvidia,tegra20-gpio");
+-#endif /* CONFIG_OF_GPIO */
+-
+ 	gpiochip_add(&tegra_gpio_chip);
+ 
+ 	for (gpio = 0; gpio < TEGRA_NR_GPIOS; gpio++) {
+@@ -383,6 +374,18 @@ static int __init tegra_gpio_init(void)
+ 	return 0;
+ }
+ 
++static struct platform_driver tegra_gpio_driver = {
++	.driver		= {
++		.name	= "tegra-gpio",
++		.owner	= THIS_MODULE,
++	},
++	.probe		= tegra_gpio_probe,
++};
 +
- 	i2c at 7000c000 {
- 		clock-frequency = <400000>;
++static int __init tegra_gpio_init(void)
++{
++	return platform_driver_register(&tegra_gpio_driver);
++}
+ postcore_initcall(tegra_gpio_init);
  
-diff --git a/arch/arm/boot/dts/tegra-seaboard.dts b/arch/arm/boot/dts/tegra-seaboard.dts
-index 1940cae..b0d44a5 100644
---- a/arch/arm/boot/dts/tegra-seaboard.dts
-+++ b/arch/arm/boot/dts/tegra-seaboard.dts
-@@ -16,6 +16,14 @@
- 		reg = < 0x00000000 0x40000000 >;
- 	};
- 
-+	gpio: gpio at 6000d000 {
-+		nvidia,gpios = <
-+			69 // TEGRA_GPIO_PI5 SD2_CD
-+			57 // TEGRA_GPIO_PH1 SD2_WP
-+			70 // TEGRA_GPIO_PI6 SD2_POWER
-+		>;
-+	};
-+
- 	serial at 70006300 {
- 		clock-frequency = < 216000000 >;
- 	};
+ void __init tegra_gpio_config(struct tegra_gpio_table *table, int num)
 -- 
 1.7.0.4
