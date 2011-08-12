@@ -1,36 +1,39 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 12 Aug 2011 01:17:33 -0700
-Subject: [PATCH v2] ARM: sched_clock: allow sched_clock to be selected
-	at runtime
-In-Reply-To: <1313078531-25610-1-git-send-email-marc.zyngier@arm.com>
-References: <1313078531-25610-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20110812081733.GQ1939@atomide.com>
+From: axel.lin@gmail.com (Axel Lin)
+Date: Fri, 12 Aug 2011 16:25:56 +0800
+Subject: [PATCH] [ARM] Orion: gpio: add missing include of linux/types.h
+Message-ID: <1313137556.24918.2.camel@phoenix>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Marc Zyngier <marc.zyngier@arm.com> [110811 08:29]:
-> sched_clock() is yet another blocker on the road to the single
-> image. This patch implements an idea by Russell King:
-> 
-> http://www.spinics.net/lists/linux-omap/msg49561.html
-> 
-> Instead of asking the platform to implement both sched_clock()
-> itself and the rollover callback, simply register a read()
-> function, and let the ARM code care about sched_clock() itself,
-> the conversion to ns and the rollover. sched_clock() uses
-> this read() function as an indirection to the platform code.
-> 
-> This allow some simplifications and possibly some footprint gain
-> when multiple platforms are compiled in. Among the drawbacks,
-> the removal of the *_fixed_sched_clock optimization which could
-> negatively impact some platforms (sa1100, tegra, versatile
-> and omap).
+This patch adds missing include of linux/types.h to fix below build error.
 
-Nice! We were already struggling supporting various timers
-in a single binary for omap for sched_clock.
+  CC      arch/arm/mach-mv78xx0/mpp.o
+In file included from arch/arm/mach-mv78xx0/include/mach/gpio.h:9,
+                 from /home/axel/repos/git/linux-2.6/arch/arm/include/asm/gpio.h:5,
+                 from include/linux/gpio.h:18,
+                 from arch/arm/mach-mv78xx0/mpp.c:10:
+arch/arm/plat-orion/include/plat/gpio.h:28: error: expected declaration specifiers or '...' before 'u32'
+make[1]: *** [arch/arm/mach-mv78xx0/mpp.o] Error 1
+make: *** [arch/arm/mach-mv78xx0] Error 2
+
+Signed-off-by: Axel Lin <axel.lin@gmail.com>
+---
+This patch is against linux-next tree ( next-20110811 ).
+
+ arch/arm/plat-orion/include/plat/gpio.h |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/plat-orion/include/plat/gpio.h b/arch/arm/plat-orion/include/plat/gpio.h
+index f7d76308..3abf304 100644
+--- a/arch/arm/plat-orion/include/plat/gpio.h
++++ b/arch/arm/plat-orion/include/plat/gpio.h
+@@ -12,6 +12,7 @@
+ #define __PLAT_GPIO_H
  
-> Tested on 11MPCore, OMAP4 and Tegra.
-
-Will test on various omaps soonish.
-
-Tony
+ #include <linux/init.h>
++#include <linux/types.h>
+ 
+ /*
+  * Orion-specific GPIO API extensions.
+-- 
+1.7.4.1
