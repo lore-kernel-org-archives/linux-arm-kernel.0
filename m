@@ -1,105 +1,78 @@
 From: davidb@codeaurora.org (David Brown)
-Date: Fri, 12 Aug 2011 16:00:06 -0700
-Subject: [PATCH 2/4] msm_serial: Add devicetree support
+Date: Fri, 12 Aug 2011 16:00:05 -0700
+Subject: [PATCH 1/4] msm_serial: Use relative resources for iomem
 In-Reply-To: <1313190008-7551-1-git-send-email-davidb@codeaurora.org>
 References: <1313190008-7551-1-git-send-email-davidb@codeaurora.org>
-Message-ID: <1313190008-7551-3-git-send-email-davidb@codeaurora.org>
+Message-ID: <1313190008-7551-2-git-send-email-davidb@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add devicetree support to the msm_serial driver.  Clocks are still
-queried by direct name from the driver until device tree clock support
-is implemented.
+Device tree iomem resources are only accessible by index, and not by
+name.  The msm_serial devices always have either 1 or 2 iomem
+resources, that are always in the same order.  Convert the
+platform_get_resource_byname into just platform_get_resource to
+facilitate device tree conversion.
 
 Signed-off-by: David Brown <davidb@codeaurora.org>
 ---
- .../devicetree/bindings/tty/serial/msm_serial.txt  |   18 ++++++++++++++++++
- drivers/tty/serial/msm_serial.c                    |   14 ++++++++++++++
- 2 files changed, 32 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/tty/serial/msm_serial.txt
+ drivers/tty/serial/msm_serial.c |   16 ++++++----------
+ 1 files changed, 6 insertions(+), 10 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/tty/serial/msm_serial.txt b/Documentation/devicetree/bindings/tty/serial/msm_serial.txt
-new file mode 100644
-index 0000000..071459c
---- /dev/null
-+++ b/Documentation/devicetree/bindings/tty/serial/msm_serial.txt
-@@ -0,0 +1,18 @@
-+* Qualcomm MSM UART
-+
-+Required properties:
-+- compatible :
-+	- "qcom,msm-uart"
-+- reg : offset and length of the register set for the device
-+	for the hsuart operating in compatible mode, there should be a
-+	second pair describing the gsbi registers.
-+- interrupts : should contain the uart interrupt.
-+
-+Example:
-+
-+	uart at 19c400000 {
-+		compatible = "qcom,msm-hsuart", "qcom,msm-uart";
-+		reg = <0x19c40000 0x1000">,
-+		      <0x19c00000 0x1000">;
-+		interrupts = <195>;
-+	};
 diff --git a/drivers/tty/serial/msm_serial.c b/drivers/tty/serial/msm_serial.c
-index d9863b2..d5a6db6 100644
+index e6ba838..d9863b2 100644
 --- a/drivers/tty/serial/msm_serial.c
 +++ b/drivers/tty/serial/msm_serial.c
-@@ -19,6 +19,7 @@
- # define SUPPORT_SYSRQ
- #endif
+@@ -589,9 +589,8 @@ static void msm_release_port(struct uart_port *port)
+ 		iowrite32(GSBI_PROTOCOL_IDLE, msm_port->gsbi_base +
+ 			  GSBI_CONTROL);
  
-+#include <linux/atomic.h>
- #include <linux/hrtimer.h>
- #include <linux/module.h>
- #include <linux/io.h>
-@@ -33,6 +34,8 @@
- #include <linux/clk.h>
- #include <linux/platform_device.h>
- #include <linux/delay.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
+-		gsbi_resource = platform_get_resource_byname(pdev,
+-							     IORESOURCE_MEM,
+-							     "gsbi_resource");
++		gsbi_resource = platform_get_resource(pdev,
++							IORESOURCE_MEM, 1);
  
- #include "msm_serial.h"
+ 		if (unlikely(!gsbi_resource))
+ 			return;
+@@ -612,8 +611,7 @@ static int msm_request_port(struct uart_port *port)
+ 	resource_size_t size;
+ 	int ret;
  
-@@ -856,6 +859,8 @@ static struct uart_driver msm_uart_driver = {
- 	.cons = MSM_CONSOLE,
- };
- 
-+static atomic_t msm_uart_next_id = ATOMIC_INIT(0);
-+
- static int __init msm_serial_probe(struct platform_device *pdev)
- {
- 	struct msm_port *msm_port;
-@@ -863,6 +868,9 @@ static int __init msm_serial_probe(struct platform_device *pdev)
- 	struct uart_port *port;
- 	int irq;
- 
-+	if (pdev->id == -1)
-+		pdev->id = atomic_inc_return(&msm_uart_next_id) - 1;
-+
- 	if (unlikely(pdev->id < 0 || pdev->id >= UART_NR))
+-	uart_resource = platform_get_resource_byname(pdev, IORESOURCE_MEM,
+-						     "uart_resource");
++	uart_resource = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	if (unlikely(!uart_resource))
  		return -ENXIO;
  
-@@ -920,11 +928,17 @@ static int __devexit msm_serial_remove(struct platform_device *pdev)
- 	return 0;
- }
+@@ -628,8 +626,7 @@ static int msm_request_port(struct uart_port *port)
+ 		goto fail_release_port;
+ 	}
  
-+static struct of_device_id msm_match_table[] = {
-+	{ .compatible = "qcom,msm-hsuart-lite" },
-+	{}
-+};
-+
- static struct platform_driver msm_platform_driver = {
- 	.remove = msm_serial_remove,
- 	.driver = {
- 		.name = "msm_serial",
- 		.owner = THIS_MODULE,
-+		.of_match_table = msm_match_table,
- 	},
- };
+-	gsbi_resource = platform_get_resource_byname(pdev, IORESOURCE_MEM,
+-						     "gsbi_resource");
++	gsbi_resource = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+ 	/* Is this a GSBI-based port? */
+ 	if (gsbi_resource) {
+ 		size = resource_size(gsbi_resource);
+@@ -875,7 +872,7 @@ static int __init msm_serial_probe(struct platform_device *pdev)
+ 	port->dev = &pdev->dev;
+ 	msm_port = UART_TO_MSM(port);
  
+-	if (platform_get_resource_byname(pdev, IORESOURCE_MEM, "gsbi_resource"))
++	if (platform_get_resource(pdev, IORESOURCE_MEM, 1))
+ 		msm_port->is_uartdm = 1;
+ 	else
+ 		msm_port->is_uartdm = 0;
+@@ -899,8 +896,7 @@ static int __init msm_serial_probe(struct platform_device *pdev)
+ 	printk(KERN_INFO "uartclk = %d\n", port->uartclk);
+ 
+ 
+-	resource = platform_get_resource_byname(pdev, IORESOURCE_MEM,
+-						     "uart_resource");
++	resource = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	if (unlikely(!resource))
+ 		return -ENXIO;
+ 	port->mapbase = resource->start;
 -- 
 Sent by an employee of the Qualcomm Innovation Center, Inc.
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
