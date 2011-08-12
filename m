@@ -1,93 +1,40 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 12 Aug 2011 08:27:35 -0600 (MDT)
-Subject: [PATCH] OMAP: clockdomain: Wait for powerdomain to be ON when
-	using clockdomain force wakeup
-In-Reply-To: <4E43E23C.2080207@ti.com>
-References: <1310527588-13022-1-git-send-email-santosh.shilimkar@ti.com>
-	<1310527588-13022-2-git-send-email-santosh.shilimkar@ti.com>
-	<alpine.DEB.2.00.1107150159580.16606@utopia.booyaka.com>
-	<4E214267.2090700@ti.com> <4E43E23C.2080207@ti.com>
-Message-ID: <alpine.DEB.2.00.1108120730220.10963@utopia.booyaka.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 12 Aug 2011 16:35:42 +0200
+Subject: How to handle named resources with DT?
+In-Reply-To: <20110812084106.GC19467@legolas.emea.dhcp.ti.com>
+References: <20110809205723.GE11568@ponder.secretlab.ca>
+	<20110812030218.GP30552@yookeroo.fritz.box>
+	<20110812084106.GC19467@legolas.emea.dhcp.ti.com>
+Message-ID: <201108121635.42953.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(cc Tero)
+On Friday 12 August 2011, Felipe Balbi wrote:
+> On Fri, Aug 12, 2011 at 01:02:18PM +1000, David Gibson wrote:
+> 
+> the whole point of using *byname() is for the driver to not care about
+> the order of the resources. So if driver has to provided an ordered list
+> of names, what's the benefit ? Sounds really stupid to provide an
+> ordered list of names to an ordered list of resources, just to use
+> *byname() instead of just assuming the list of resources is already
+> ordered.
 
-Hi Santosh,
+It only make sense for drivers that support both device tree probing
+and legacy probing of static platform devices.
 
-On Thu, 11 Aug 2011, Santosh wrote:
+Note how almost all drivers use only platform_get_resource and not
+platform_get_resource_byname:
 
-> On Saturday 16 July 2011 01:18 PM, Santosh Shilimkar wrote:
-> > On 7/15/2011 1:03 AM, Paul Walmsley wrote:
-> > > On Wed, 13 Jul 2011, Santosh Shilimkar wrote:
-> > > 
-> > > > - return arch_clkdm->clkdm_wakeup(clkdm);
-> > > > + ret = arch_clkdm->clkdm_wakeup(clkdm);
-> > > > + ret |= pwrdm_wait_transition(clkdm->pwrdm.ptr);
-> > > 
-> > > Seems like this should just call pwrdm_state_switch() or
-> > > pwrdm_clkdm_state_switch()? (This second function looks superfluous, we
-> > > should probably get rid of it.)
-> > > 
-> > This comment was expected since initially we thought of using
-> > pwrdm_clkdm_state_switch
-> > 
-> > pwrdm_clkdm_state_switch()
-> > |--> pwrdm_wait_transition()
-> > |--> pwrdm_state_switch()
-> > 
-> > What we need is only first function to ensure that we don't
-> > proceed when PD is in middle of transition.
-> > 
-> > The second function is actually just doing those debug counter
-> > updates and we wanted to avoid that since it's a live path.
+arnd at ocdc-kvm:~/linux-arm$ git grep -wl platform_get_resource | wc -l
+565
+arnd at ocdc-kvm:~/linux-arm$ git grep -wl platform_get_resource_byname | wc -l
+41
+arnd at ocdc-kvm:~/linux-arm$ git grep -wl platform_get_resource_byname | xargs grep -wL platform_get_resource | wc -l # both
+28
+arnd at ocdc-kvm:~/linux-arm$ git grep -wl platform_get_resource_byname | xargs grep -wl platform_get_resource  | wc -l # only _byname
+13
 
-Those counters are now also used by pwrdm_get_context_loss_count() which 
-ultimately is exposed to device drivers as
-omap_pm_get_dev_context_loss_count().
+I think it's much easier to change the existing users of _byname over
+to fixed indexes than to come up with a new scheme that is better.
 
-If clkdm_wakeup() causes the powerdomain to wake up from a state that 
-caused context to be lost, don't we need to update the counters due to 
-that dependency?
-
-> > Rajendra observed some huge latencies while doing the
-> > profiling and the suspect was "pwrdm_state_switch()" which
-> > actually keeps adding overhead because of those counter
-> > updates.
-
-Probably we'd better deal with the latency issue in a separate patch.
-
-If I recall correctly, the high latency operation in the counters is the 
-PREPWSTST register read.  That could probably be optimized out under many 
-circumstances.  The counter functionality could be made dependent on 
-CONFIG_PM_DEBUG or something similar.
-
-> > > Shouldn't this be added to all of
-> > > clkdm_{wakeup,sleep,allow_idle,deny_idle}() if it isn't there already?
-> > > 
-> > clkdm_allow_idle() already has the power-domain wait.
-> > This patch adds it for clkdm_wakeup() function.
-> > clkdm_sleep(), this shouldn't be applicable since power
-> > domain sleep transition is depdent on other clockdomains
-> > in the PD and it's a lazy operation.
-
-That's a good question.  Could you ping the PRCM designers on that issue 
-to see if there's any risk that not waiting for a clockdomain force-sleep 
-might cause some FSM issue?  We should probably handle this in a separate 
-patch anyway so it doesn't retard this patch.
-
-> > That leaves clkdm_deny_idle() and I guess we should
-> > address this API as well.
-> > 
-> > If you agree with above, I can update the patch to address
-
-I'd propose:
-
-1. changing the patch to use pwrdm_state_switch()
-
-2. adding that to clkdm_deny_idle() also
-
-What do you think?
-
-
-- Paul
+	Arnd
