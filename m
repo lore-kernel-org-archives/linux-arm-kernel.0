@@ -1,53 +1,68 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 12 Aug 2011 11:52:50 -0700
-Subject: Relinking zImage when nothing changes
-In-Reply-To: <20110812183410.GA28589@merkur.ravnborg.org>
-References: <4E4566F0.4020001@codeaurora.org>
-	<20110812180209.GA28520@merkur.ravnborg.org>
-	<4E456CFB.3080206@codeaurora.org>
-	<20110812183410.GA28589@merkur.ravnborg.org>
-Message-ID: <4E457682.5020107@codeaurora.org>
+Date: Fri, 12 Aug 2011 12:00:02 -0700
+Subject: [PATCH] ARM: zImage: Skip relinking if nothing changes
+In-Reply-To: <4E457682.5020107@codeaurora.org>
+Message-ID: <1313175602-21834-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/12/2011 11:34 AM, Sam Ravnborg wrote:
-> On Fri, Aug 12, 2011 at 11:12:11AM -0700, Stephen Boyd wrote:
->>
->> Hm... that fixes the shipped part. But now we still reassemble lib1funcs.o.
->>
->>   Kernel: arch/arm/boot/Image is ready
->>   AS      arch/arm/boot/compressed/lib1funcs.o - due to lib1funcs.o not in $(targets)
->>   LD      arch/arm/boot/compressed/vmlinux - due to: arch/arm/boot/compressed/lib1funcs.o
->>   OBJCOPY arch/arm/boot/zImage - due to: arch/arm/boot/compressed/vmlinux
->>   Kernel: arch/arm/boot/zImage is ready
->>
->>
->> Is it correct to add lib1funcs.o to targets?
-> Yes - it is a bug this was not done before.
->
+lib1funcs.S is reshipped even though the file hasn't changed
+because the make rule is marked with FORCE. According to Sam
+Ravnborg:
 
-Ok. I've also added lib1funcs.S because I assume I want to clean that
-out too with make clean.
+	The FORCE prerequisite will tell make to always execute
+	the command.
+	But we only want to execute the command if:
+	1) $(obj)/lib1funcs.S is missing
+	2) or $(srctree)/arch/$(SRCARCH)/lib/lib1funcs.S is not
+	older then $(obj)/lib1funcs.S
 
->
->>  # For __aeabi_uidivmod
->>  lib1funcs = $(obj)/lib1funcs.o
-> While touching the file I would kill this assignment - it confused me.
+	So dropping FORCE should be a safe thing to do.
 
-Sure. I've expanded $(lib1funcs) into $(obj)/lib1funcs.o in the vmlinux
-rule.
+This fixes the shipped problem, but we still have to reassemble
+lib1funcs.S because it isn't part of $targets. Add
+lib1funcs.{S,o} to $targets to avoid relinking the compressed
+vmlinux if nothing changes.
 
->>  
->> -$(obj)/lib1funcs.S: $(srctree)/arch/$(SRCARCH)/lib/lib1funcs.S FORCE
->> +$(obj)/lib1funcs.S: $(srctree)/arch/$(SRCARCH)/lib/lib1funcs.S
->>         $(call cmd,shipped)
->>  
->>  # We need to prevent any GOTOFF relocs being used with references
-> If you prepare a patch with the changes then you can add my "Acked-by".
->
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+Acked-by: Sam Ravnborg <sam@ravnborg.org>
+---
+ arch/arm/boot/compressed/Makefile |    8 +++-----
+ 1 files changed, 3 insertions(+), 5 deletions(-)
 
-Thanks will do.
-
+diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
+index 0c74a6f..937fd26 100644
+--- a/arch/arm/boot/compressed/Makefile
++++ b/arch/arm/boot/compressed/Makefile
+@@ -91,7 +91,7 @@ suffix_$(CONFIG_KERNEL_LZMA) = lzma
+ 
+ targets       := vmlinux vmlinux.lds \
+ 		 piggy.$(suffix_y) piggy.$(suffix_y).o \
+-		 font.o font.c head.o misc.o $(OBJS)
++		 font.o font.c head.o misc.o lib1funcs.o lib1funcs.S $(OBJS)
+ 
+ # Make sure files are removed during clean
+ extra-y       += piggy.gzip piggy.lzo piggy.lzma lib1funcs.S
+@@ -121,9 +121,7 @@ LDFLAGS_vmlinux += -X
+ LDFLAGS_vmlinux += -T
+ 
+ # For __aeabi_uidivmod
+-lib1funcs = $(obj)/lib1funcs.o
+-
+-$(obj)/lib1funcs.S: $(srctree)/arch/$(SRCARCH)/lib/lib1funcs.S FORCE
++$(obj)/lib1funcs.S: $(srctree)/arch/$(SRCARCH)/lib/lib1funcs.S
+ 	$(call cmd,shipped)
+ 
+ # We need to prevent any GOTOFF relocs being used with references
+@@ -140,7 +138,7 @@ bad_syms=$$($(CROSS_COMPILE)nm $@ | sed -n 's/^.\{8\} [bc] \(.*\)/\1/p') && \
+     echo "$$bad_syms" >&2; rm -f $@; false )
+ 
+ $(obj)/vmlinux: $(obj)/vmlinux.lds $(obj)/$(HEAD) $(obj)/piggy.$(suffix_y).o \
+-	 	$(addprefix $(obj)/, $(OBJS)) $(lib1funcs) FORCE
++		$(addprefix $(obj)/, $(OBJS)) $(obj)/lib1funcs.o FORCE
+ 	$(call if_changed,ld)
+ 	@$(check_for_bad_syms)
+ 
 -- 
 Sent by an employee of the Qualcomm Innovation Center, Inc.
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
