@@ -1,82 +1,61 @@
 From: swarren@nvidia.com (Stephen Warren)
-Date: Fri, 12 Aug 2011 16:54:45 -0600
-Subject: [RFC PATCH 00/12] arm/tegra: Initialize GPIO & pinmux from DT
-Message-ID: <1313189697-21287-1-git-send-email-swarren@nvidia.com>
+Date: Fri, 12 Aug 2011 16:54:46 -0600
+Subject: [RFC PATCH 01/12] dt: Add of_find_child_node_by_name()
+In-Reply-To: <1313189697-21287-1-git-send-email-swarren@nvidia.com>
+References: <1313189697-21287-1-git-send-email-swarren@nvidia.com>
+Message-ID: <1313189697-21287-2-git-send-email-swarren@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch modifies Tegra's device tree support to remove the dependency
-on harmony_pinmux_init(), thus making it completely board-independent.
+This function retrieves a named child node of a given parent node.
 
-Some notes:
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+ drivers/of/base.c  |   18 ++++++++++++++++++
+ include/linux/of.h |    2 ++
+ 2 files changed, 20 insertions(+), 0 deletions(-)
 
-* This series is built on top of linux-next with a bunch of patches
-  applied, in particular the removal of irq_to_gpio and custom gpio_to_irq
-  that I'm in the process of sending to Russell. I haven't yet thought
-  through how/where to merge this without causing all kinds of conflicts.
-
-* I took care to preserve bisectability of Tegra DT support. However,
-  linux-next doesn't yet have entirely useful Tegra DT support; some stuff
-  from Grant's devicetree/next hasn't been pushed into linux-next yet. If
-  we don't care about bisectability, I can remove a couple commits and
-  possibly squash some others.
-
-* The approach taken here is to have a custom semantic SoC-specific
-  binding for each the gpio and pinmux drivers. Other alternatives
-  suggested included:
-
-  1) A generic "list of register writes" to be performed at boot. This has
-     the advantage of reusability across different SoCs. However, this
-     approach isn't semantic, and requires detailed knowledge of pinmux
-     registers and potentially fiddly calculations when constructing the
-     device tree.
-
-  2) The ability to define disabled child nodes of the pinmux controller
-     that are not processed by tegra_pinmux_probe_dt(). Other devices may
-     refer to those using phandles, and later enable/disable them, thus
-     representing dynamic pinmuxing in the device tree. I wasn't convinced
-     whether we should represent dynamic pinmuxing using phandles.
-
-  I discussed in more detail why I prefer the current proposal in various
-  email threads.
-
-* tegra_pinmux_probe_dt() enumerates all legal pingroup names, and searches
-  for a pinmux controller subnode of that name, then processes each one
-  that is found. An alternative that some may prefer would be to enumerate
-  each child node of the pinmux controller, and have each node contain an
-  explicit pingroup name property instead. Does anyone have any preference
-  here? I suppose the latter option would obviate the need to add
-  of_find_child_node_by_name().
-
-Thanks for reading!
-
-Stephen Warren (12):
-  dt: Add of_find_child_node_by_name()
-  arm/tegra: Prep boards for gpio/pinmux conversion to pdevs
-  arm/tegra: Avoid duplicate gpio/pinmux devices with dt
-  arm/tegra: board-dt: Add AUXDATA for tegra-gpio and tegra-pinmux
-  arm/dt: Tegra: Add nvidia,gpios property to GPIO controller
-  arm/dt: Tegra: Add pinmux node
-  gpio/tegra: Convert to a platform device
-  gpio/tegra: Add device tree support
-  arm/tegra: Convert pinmux driver to a platform device
-  arm/tegra: Add device tree support to pinmux driver
-  arm/tegra: board-dt: Remove dependency on non-dt pinmux functions
-  arm/tegra: Remove temporary gpio/pinmux registration workaround
-
- arch/arm/boot/dts/tegra-harmony.dts          |  479 ++++++++++++++++++++++++++
- arch/arm/boot/dts/tegra-seaboard.dts         |  409 ++++++++++++++++++++++
- arch/arm/boot/dts/tegra20.dtsi               |    5 +
- arch/arm/mach-tegra/Makefile                 |    1 -
- arch/arm/mach-tegra/board-dt.c               |   12 +-
- arch/arm/mach-tegra/board-harmony-pinmux.c   |    8 +
- arch/arm/mach-tegra/board-paz00-pinmux.c     |    8 +
- arch/arm/mach-tegra/board-seaboard-pinmux.c  |    9 +-
- arch/arm/mach-tegra/board-trimslice-pinmux.c |    7 +
- arch/arm/mach-tegra/devices.c                |   10 +
- arch/arm/mach-tegra/devices.h                |    2 +
- arch/arm/mach-tegra/pinmux.c                 |  136 ++++++++
- drivers/gpio/gpio-tegra.c                    |   56 +++-
- drivers/of/base.c                            |   18 +
- include/linux/of.h                           |    2 +
- 15 files changed, 1138 insertions(+), 24 deletions(-)
+diff --git a/drivers/of/base.c b/drivers/of/base.c
+index 3ff22e3..7eea9e3 100644
+--- a/drivers/of/base.c
++++ b/drivers/of/base.c
+@@ -388,6 +388,24 @@ struct device_node *of_find_node_by_name(struct device_node *from,
+ }
+ EXPORT_SYMBOL(of_find_node_by_name);
+ 
++struct device_node *of_find_child_node_by_name(
++	const struct device_node *parent, const char *name)
++{
++	struct device_node *child;
++
++	read_lock(&devtree_lock);
++
++	for_each_child_of_node(parent, child) {
++		if (!strcmp(child->name, name))
++			break;
++	}
++
++	read_unlock(&devtree_lock);
++
++	return child;
++}
++EXPORT_SYMBOL(of_find_child_node_by_name);
++
+ /**
+  *	of_find_node_by_type - Find a node by its "device_type" property
+  *	@from:	The node to start searching from, or NULL to start searching
+diff --git a/include/linux/of.h b/include/linux/of.h
+index 9180dc5..032c71b 100644
+--- a/include/linux/of.h
++++ b/include/linux/of.h
+@@ -161,6 +161,8 @@ extern struct device_node *of_find_node_by_name(struct device_node *from,
+ #define for_each_node_by_name(dn, name) \
+ 	for (dn = of_find_node_by_name(NULL, name); dn; \
+ 	     dn = of_find_node_by_name(dn, name))
++extern struct device_node *of_find_child_node_by_name(
++	const struct device_node *node, const char *name);
+ extern struct device_node *of_find_node_by_type(struct device_node *from,
+ 	const char *type);
+ #define for_each_node_by_type(dn, type) \
+-- 
+1.7.0.4
