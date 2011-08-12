@@ -1,59 +1,44 @@
-From: liu.h.jason@gmail.com (Jason Liu)
-Date: Fri, 12 Aug 2011 17:36:32 +0800
-Subject: [PATCH 1/6] arm/cpuimx51: gpio_to_irq() should be used to get irq
-	from gpio number
-In-Reply-To: <1313135701-22456-2-git-send-email-shawn.guo@linaro.org>
-References: <1313135701-22456-1-git-send-email-shawn.guo@linaro.org>
-	<1313135701-22456-2-git-send-email-shawn.guo@linaro.org>
-Message-ID: <CAB4PhKdAgasG3wJ2JvS_Ds0ReGjDCgZh_prepNGF=FqG6fRx7A@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 12 Aug 2011 18:47:45 +0900
+Subject: [PATCH] ARM: exynos4: Add TWD base address
+In-Reply-To: <20110727042406.GA14024@july>
+References: <20110727042406.GA14024@july>
+Message-ID: <007b01cc58d4$e4714000$ad53c000$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/8/12 Shawn Guo <shawn.guo@linaro.org>:
-> Instead of irq_to_gpio(), gpio_to_irq() should be used to get irq
-> from gpio number.
->
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+Kyungmin Park wrote:
+> 
+> From: Kyungmin Park <kyungmin.park@samsung.com>
+> 
+> When use the s5p_timer for EXYNOS4210 EVT0, it's required.
+> Other s5p platform is guided from CONFIG_LOCAL_TIMER
+> 
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 > ---
-> ?arch/arm/mach-mx5/board-cpuimx51.c | ? ?2 +-
-> ?1 files changed, 1 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/mach-mx5/board-cpuimx51.c b/arch/arm/mach-mx5/board-cpuimx51.c
-> index 7c893fa..68934ea 100644
-> --- a/arch/arm/mach-mx5/board-cpuimx51.c
-> +++ b/arch/arm/mach-mx5/board-cpuimx51.c
-> @@ -81,7 +81,7 @@ static struct plat_serial8250_port serial_platform_data[] = {
-> ? ? ? ? ? ? ? ?.flags = UPF_BOOT_AUTOCONF | UPF_SKIP_TEST | UPF_IOREMAP,
-> ? ? ? ?}, {
-> ? ? ? ? ? ? ? ?.mapbase = (unsigned long)(MX51_CS1_BASE_ADDR + 0x2000000),
-> - ? ? ? ? ? ? ? .irq = irq_to_gpio(CPUIMX51_QUARTD_GPIO),
-> + ? ? ? ? ? ? ? .irq = gpio_to_irq(CPUIMX51_QUARTD_GPIO),
-> ? ? ? ? ? ? ? ?.irqflags = IRQF_TRIGGER_HIGH,
-> ? ? ? ? ? ? ? ?.uartclk = CPUIMX51_QUART_XTAL,
-> ? ? ? ? ? ? ? ?.regshift = CPUIMX51_QUART_REGSHIFT,
-> --
+> diff --git a/arch/arm/plat-s5p/s5p-time.c b/arch/arm/plat-s5p/s5p-time.c
+> index c833e7b..bdf5430 100644
+> --- a/arch/arm/plat-s5p/s5p-time.c
+> +++ b/arch/arm/plat-s5p/s5p-time.c
+> @@ -409,6 +409,9 @@ static void __init s5p_timer_resources(void)
+> 
+>  static void __init s5p_timer_init(void)
+>  {
+> +#ifdef CONFIG_LOCAL_TIMERS
+> +	twd_base = S5P_VA_TWD;
+> +#endif
+>  	s5p_timer_resources();
+>  	s5p_clockevent_init();
+>  	s5p_clocksource_init();
 
-The fix has already in Sascah's tree:
+As we talked about this at Linaro Connect, this is wrong. Basically
+EXYNOS4210 uses MCT and the ARM_TWD cannot be used at one time on
+EXYNOS4210.
 
-Author: Ben Dooks <ben-linux@fluff.org>
-Date:   Thu Aug 4 16:47:35 2011 +0100
+Thanks.
 
-    ARM: mx5: board-cpuimx51.c fixup irq_to_gpio() usage
-
-    irq_to_gpio() is being called on a GPIO so change to using
-    gpio_to_irq() instead.
-
-    Signed-off-by: Ben Dooks <ben-linux@fluff.org>
-    Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-
-Jason
-
-> 1.7.4.1
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
