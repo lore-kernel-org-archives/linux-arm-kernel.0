@@ -1,70 +1,50 @@
-From: j-keerthy@ti.com (J, KEERTHY)
-Date: Fri, 12 Aug 2011 06:32:28 +0530
-Subject: [RFC PATCH 6/6] hwmon: OMAP4: On die temperature sensor driver
-In-Reply-To: <4E444B8F.9060908@ti.com>
-References: <1312979122-5896-1-git-send-email-j-keerthy@ti.com>
-	<1312979122-5896-7-git-send-email-j-keerthy@ti.com>
-	<20110810124629.GJ12882@legolas.emea.dhcp.ti.com>
-	<CAJ6a13Z=u=exWUHLotw8jpHMv-hKpE+fvg_1hq7=gtMiuJKxOA@mail.gmail.com>
-	<20110811103658.GG27742@legolas.emea.dhcp.ti.com>
-	<CAJ6a13bxg8po-Csc10LsFH-oES4YOKkqFoTm3kG4XzS=b2boMw@mail.gmail.com>
-	<20110811141248.GK28500@legolas.emea.dhcp.ti.com>
-	<CAJ6a13b7qu3K4YJPTYych_NQxLuuUxZOQg6PPC_=XA+qiwn2RA@mail.gmail.com>
-	<20110811185408.GB15970@legolas.emea.dhcp.ti.com>
-	<20110811185558.GC15970@legolas.emea.dhcp.ti.com>
-	<4E444B8F.9060908@ti.com>
-Message-ID: <CAJ6a13Zy3-iPoiVrzacSWizXwTRhp5+2Pt4JbGEzd6=448536g@mail.gmail.com>
+From: mturquette@ti.com (Turquette, Mike)
+Date: Thu, 11 Aug 2011 18:31:20 -0700
+Subject: [PATCH] ARM: do not mark CPU 0 as hotpluggable
+In-Reply-To: <4E2972B1.5070604@ti.com>
+References: <1311204745-6276-1-git-send-email-mturquette@ti.com>
+	<4E2796DA.80001@gmail.com> <4E27BA10.3060203@ti.com>
+	<20110721133033.GN26574@n2100.arm.linux.org.uk>
+	<4E2902E7.6000108@ti.com>
+	<13B9B4C6EF24D648824FF11BE896716203F2398D3A@dlee02.ent.ti.com>
+	<4E2972B1.5070604@ti.com>
+Message-ID: <CAJOA=zNu_xhen0mdcmnBw=wpYO1RtkDMBtT1_J8m8ysa1+ZHhQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 12, 2011 at 3:07 AM, Roger Quadros <rogerq@ti.com> wrote:
-> On 08/11/2011 01:55 PM, Felipe Balbi wrote:
->> Hi,
+On Fri, Jul 22, 2011 at 5:53 AM, Santosh Shilimkar
+<santosh.shilimkar@ti.com> wrote:
+> On 7/22/2011 6:15 PM, Woodruff, Richard wrote:
 >>
->> On Thu, Aug 11, 2011 at 09:54:09PM +0300, Felipe Balbi wrote:
->>>>> you need some other way to handle this. Why do you need to manually set
->>>>> the rate rather than having hwmod handle this for you ?
->>>>>
->>>>> your argument that "it's a one time setting" is not enough to have this
->>>>> in the driver. Drivers should not care about clocks anymore, this should
->>>>> have been done on another layer.
+>>> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-
+>>> kernel-bounces at lists.infradead.org] On Behalf Of Shilimkar, Santosh
+>>
+>>>> With fixed IRQ migration and forcing CPU0 into an infinite WFI loop,
+>>>> I can offline CPU0 and still have a running system.
 >>>>
->>>> Hwmod will have no idea on the rate required.
->>>
->>> does the rate need to change ? Also, I have not mentioned hwmod anytime
+>>> The secure software runs only on CPU0 and that's the biggest limitation.
+>>> Other issues like hand-shake as you pointed out, power sequencing etc
+>>> can be worked around.
 >>
->> i did mention hwmod, nevermind that part. Still I'm not sure where is
->> the right place to handle this.
+>> As you know well some of the secure APIs work on CPU1 and others do not.
 >>
->
-> Aren't the omap_device_pm_latency callbacks the right place to do it?
+>> I notice in other thread Russell made assumption about CPU1 being able to
+>> use all because it could run some. This is not the case.
+>>
+> I clarified that on the other thread.
 
-It is a one time setting. These callbacks get called everytime
-pm_runtime_get_sync and pm_runtime_put_sync are called.
-IMHO this is not the right place.
+I've asked a few other ARM folks (out of band) to weigh in on this
+thread to determine if their platform has similar limitations as OMAP.
+ Unfortunately no one else has responded.
 
->
-> e.g. in the following snippet from mach-omap2/temp_sensor_device.c
->
-> +static struct omap_device_pm_latency omap_temp_sensor_latency[] = {
-> + ? ? ? {
-> + ? ? ? ?.deactivate_func = omap_device_idle_hwmods,
-> + ? ? ? ?.activate_func = omap_device_enable_hwmods,
-> + ? ? ? ?.flags = OMAP_DEVICE_LATENCY_AUTO_ADJUST,
-> + ? ? ? }
-> +};
->
-> instead of directly pointing activate_func to omap_device_enable_hwmods,
-> it could point to a function that sets the required clock rate and then
-> enables the hwmod.
->
->
-> regards,
-> -roger
->
+Still the limitation for OMAP remains.  Earlier in this thread I
+provided an alternative to blacklisting CPU0 for all ARM platforms by
+instead using a config option, but it received no comments.  What is
+the best way to move forward?
 
+Thanks,
+Mike
 
-
--- 
-Regards and Thanks,
-Keerthy
+> Regards
+> Santosh
+>
