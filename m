@@ -1,44 +1,32 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 12 Aug 2011 09:57:59 +0100
-Subject: [PATCH 2/6] arm/imx: remove the uses of gpio_to_irq()
-In-Reply-To: <20110812082538.GF6618@S2100-06.ap.freescale.net>
-References: <1313135701-22456-1-git-send-email-shawn.guo@linaro.org>
-	<1313135701-22456-3-git-send-email-shawn.guo@linaro.org>
-	<20110812080000.GF4775@n2100.arm.linux.org.uk>
-	<20110812082211.GD6618@S2100-06.ap.freescale.net>
-	<20110812082538.GF6618@S2100-06.ap.freescale.net>
-Message-ID: <20110812085759.GH4775@n2100.arm.linux.org.uk>
+Date: Fri, 12 Aug 2011 10:02:48 +0100
+Subject: Subject: L2x0 OF properties do not include interrupt #
+In-Reply-To: <4E43FDFF.1080401@gmail.com>
+References: <000201cc575b$c1229010$4367b030$@rutland@arm.com>
+	<201108101624.27881.arnd@arndb.de>
+	<20110810142808.GL10121@e102144-lin.cambridge.arm.com>
+	<201108111505.11887.arnd@arndb.de>
+	<20110811130910.GA10189@e102144-lin.cambridge.arm.com>
+	<4E43F5F8.4060704@gmail.com>
+	<20110811153800.GC5154@e102144-lin.cambridge.arm.com>
+	<4E43FDFF.1080401@gmail.com>
+Message-ID: <20110812090248.GI4775@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 12, 2011 at 04:25:39PM +0800, Shawn Guo wrote:
-> On Fri, Aug 12, 2011 at 04:22:12PM +0800, Shawn Guo wrote:
-> > On Fri, Aug 12, 2011 at 09:00:00AM +0100, Russell King - ARM Linux wrote:
-> > > On Fri, Aug 12, 2011 at 03:54:57PM +0800, Shawn Guo wrote:
-> > > > gpio_to_irq() is too generic to be defined and used by i.mx platform
-> > > > code.  The patch defines IMX_GPIO_TO_IRQ() in mach/hardware.h and
-> > > > replaces all the uses of gpio_to_irq() with IMX_GPIO_TO_IRQ().
-> > > 
-> > > That makes no sense.  Why not continue to use gpio_to_irq() but provide
-> > > the .to_irq method in your gpiolib driver so it can work, and use that
-> > > in the places where its used at runtime?
-> > > 
-> > I did provide .to_irq in patch #3. 
-> > 
-> > > (You won't be able to use it for static initialization obviously.)
-> > > 
-> > All users of gpio_to_irq() in platform codes are static initialization.
+On Thu, Aug 11, 2011 at 11:06:23AM -0500, Rob Herring wrote:
+> No, either you have 1 interrupt and it is the combined one. or you have
+> the 9? separate interrupts.  Having both combined and separate hooked up
+> is a bit dumb, so I would not worry about that case. I would just define
+> the event counter interrupt 1st as that is probably the primary use.
+> Also, I think that was the only interrupt on the L2x0 controllers IIRC.
 > 
-> Sorry, not all but most.
+> It's also conceivable that some of the interrupts get routed somewhere
+> else rather than just into the GIC.
 
-It would probably be a good idea to leave the runtime places using
-gpio_to_irq() and only convert the static initializers.
+A lot of other primecells have the one-combined and individual interrupts.
+So far, in the last 10 years, no one's used the individual interrupts in
+Linux (or even afaik wired them up.)  Not with either the original ARM
+primecells or the vendor modified ones.
 
-> > And IMX_GPIO_TO_IRQ() is actually a renaming of gpio_to_irq().  Only
-> > difference there is naming and place change, which I think is good, no?
-> > 
-> 
-> But adding IMX namespace is still worth of the LOC changes?
-
-Well, the static initializers still need something... the alternative is
-to initialize them at runtime which probably wouldn't be so nice.
+That tells us something about the individual interrupts.
