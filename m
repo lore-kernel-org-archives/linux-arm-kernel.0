@@ -1,34 +1,38 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 12 Aug 2011 11:20:20 +0100
-Subject: [PATCH kernel-3.0] arm:cache-l2x0: Fix L2 Cache size calculation.
-In-Reply-To: <1313142327-18320-1-git-send-email-srinivas.kandagatla@st.com>
-References: <1313142327-18320-1-git-send-email-srinivas.kandagatla@st.com>
-Message-ID: <20110812102020.GD14904@e102144-lin.cambridge.arm.com>
+From: a.kesavan@samsung.com (Abhilash Kesavan)
+Date: Fri, 12 Aug 2011 15:55:54 +0530
+Subject: [PATCH] ARM: S3C64XX: Fix build break in PM debug
+Message-ID: <1313144754-30485-1-git-send-email-a.kesavan@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 12, 2011 at 10:45:27AM +0100, Srinivas KANDAGATLA wrote:
-> From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
-> 
-> This patch fixes L2 Cache size calculations for L2C-210, L2C-310 and
-> PL310, by changing the L2X0_AUX_CTRL_WAY_SIZE_MASK from 2 bits to 3
-> bits.
-> 
-> The Auxiliary Control Register for L2C-210, L2C-310 and PL310 has 3bits
-> [19:17] for Way size, however the existing code only uses 2 bits to
-> get this value. This results in incorrect cachesize calculations.
-> 
-> I should say this bug does not result in issue but, its just prints
-> incorrect values.
+When S3C_PM_DEBUG_LED_SMDK is enabled for suspend/resume debugging, the following
+compilation error occurs:
 
-It also results in performing operations on the whole cache when we
-erroneously decide that the range is big enough (due to l2x0_size being
-too small).
+arch/arm/mach-s3c64xx/pm.c: In function 's3c_pm_debug_smdkled':
+arch/arm/mach-s3c64xx/pm.c:41: error: implicit declaration of function 'gpio_set_value'
+arch/arm/mach-s3c64xx/pm.c:41: error: implicit declaration of function 'S3C64XX_GPN'
+arch/arm/mach-s3c64xx/pm.c: In function 's3c64xx_pm_init':
+arch/arm/mach-s3c64xx/pm.c:184: error: implicit declaration of function 'gpio_request'
+arch/arm/mach-s3c64xx/pm.c:188: error: implicit declaration of function 'gpio_direction_output'
 
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+Fix the error by including linux/gpio.h
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+---
+ arch/arm/mach-s3c64xx/pm.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-Please can you CC stable on this too?
-
-Will
+diff --git a/arch/arm/mach-s3c64xx/pm.c b/arch/arm/mach-s3c64xx/pm.c
+index 8bad643..055e285 100644
+--- a/arch/arm/mach-s3c64xx/pm.c
++++ b/arch/arm/mach-s3c64xx/pm.c
+@@ -16,6 +16,7 @@
+ #include <linux/suspend.h>
+ #include <linux/serial_core.h>
+ #include <linux/io.h>
++#include <linux/gpio.h>
+ 
+ #include <mach/map.h>
+ #include <mach/irqs.h>
+-- 
+1.6.6.1
