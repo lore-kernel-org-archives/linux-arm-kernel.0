@@ -1,68 +1,35 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Fri, 12 Aug 2011 16:54:57 -0600
-Subject: [RFC PATCH 12/12] arm/tegra: Remove temporary gpio/pinmux
-	registration workaround
-In-Reply-To: <1313189697-21287-1-git-send-email-swarren@nvidia.com>
-References: <1313189697-21287-1-git-send-email-swarren@nvidia.com>
-Message-ID: <1313189697-21287-13-git-send-email-swarren@nvidia.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Fri, 12 Aug 2011 16:00:04 -0700
+Subject: [PATCH 0/4] Initial DT support for MSM8660
+Message-ID: <1313190008-7551-1-git-send-email-davidb@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This reverts commit "arm/tegra: Prevent duplicate gpio/pinmux pdev
-registration with dt"; board-dt.c no long calls harmony/
-seaboard_pinmux_init(), so the workaround is no longer needed.
+This series adds initial support for booting the MSM8660 via
+devicetree.  The target boots with a serial console, and no platform
+data.
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
- arch/arm/mach-tegra/board-harmony-pinmux.c  |    5 +----
- arch/arm/mach-tegra/board-seaboard-pinmux.c |    5 +----
- 2 files changed, 2 insertions(+), 8 deletions(-)
+In order to test this with a devicetree boot, it is necessary to
+include patches allowing the devicetree to be appended to the kernel,
+and merge ATAG values into the DT.
 
-diff --git a/arch/arm/mach-tegra/board-harmony-pinmux.c b/arch/arm/mach-tegra/board-harmony-pinmux.c
-index 130018d..e99b456 100644
---- a/arch/arm/mach-tegra/board-harmony-pinmux.c
-+++ b/arch/arm/mach-tegra/board-harmony-pinmux.c
-@@ -14,8 +14,6 @@
-  *
-  */
- 
--#include <asm/mach-types.h>
--
- #include <linux/kernel.h>
- #include <linux/gpio.h>
- #include <mach/pinmux.h>
-@@ -163,8 +161,7 @@ static struct tegra_gpio_table gpio_table[] = {
- 
- void harmony_pinmux_init(void)
- {
--	if (machine_is_harmony())
--		platform_add_devices(pinmux_devices, ARRAY_SIZE(pinmux_devices));
-+	platform_add_devices(pinmux_devices, ARRAY_SIZE(pinmux_devices));
- 
- 	tegra_pinmux_config_table(harmony_pinmux, ARRAY_SIZE(harmony_pinmux));
- 
-diff --git a/arch/arm/mach-tegra/board-seaboard-pinmux.c b/arch/arm/mach-tegra/board-seaboard-pinmux.c
-index bc4dc17..f092298 100644
---- a/arch/arm/mach-tegra/board-seaboard-pinmux.c
-+++ b/arch/arm/mach-tegra/board-seaboard-pinmux.c
-@@ -12,8 +12,6 @@
-  *
-  */
- 
--#include <asm/mach-types.h>
--
- #include <linux/kernel.h>
- #include <linux/init.h>
- #include <linux/gpio.h>
-@@ -178,8 +176,7 @@ static struct tegra_gpio_table gpio_table[] = {
- 
- void __init seaboard_pinmux_init(void)
- {
--	if (machine_is_seaboard())
--		platform_add_devices(pinmux_devices, ARRAY_SIZE(pinmux_devices));
-+	platform_add_devices(pinmux_devices, ARRAY_SIZE(pinmux_devices));
- 
- 	tegra_pinmux_config_table(seaboard_pinmux, ARRAY_SIZE(seaboard_pinmux));
- 
+Once these patches reach mainline, I intend to remove the non-DT boot
+for this target.
+
+David Brown (4):
+  msm_serial: Use relative resources for iomem
+  msm_serial: Add devicetree support
+  ARM: msm: Add devicetree support for msm8660-surf
+  ARM: msm: Describe MSM 8660 SURF FPGA registers in DT
+
+ .../devicetree/bindings/tty/serial/msm_serial.txt  |   18 ++++
+ arch/arm/boot/dts/msm8660-surf.dts                 |   29 ++++++
+ arch/arm/mach-msm/board-msm8x60.c                  |   98 ++++++++++++++++++--
+ drivers/tty/serial/msm_serial.c                    |   30 ++++--
+ 4 files changed, 158 insertions(+), 17 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/tty/serial/msm_serial.txt
+ create mode 100644 arch/arm/boot/dts/msm8660-surf.dts
+
 -- 
-1.7.0.4
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
