@@ -1,77 +1,92 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Sat, 13 Aug 2011 12:46:45 -0700
-Subject: [PATCH 2/4] msm_serial: Add devicetree support
-In-Reply-To: <1434305.ibxmc6q715@wuerfel>
-References: <1313190008-7551-1-git-send-email-davidb@codeaurora.org>
-	<1313190008-7551-3-git-send-email-davidb@codeaurora.org>
-	<1434305.ibxmc6q715@wuerfel>
-Message-ID: <20110813194645.GA23710@huya.qualcomm.com>
+From: troy.kisky@boundarydevices.com (Troy Kisky)
+Date: Sat, 13 Aug 2011 12:51:41 -0700
+Subject: [PATCH v3 1/3] ARM: i.MX51: Remove _MX51_PAD_xxx references
+Message-ID: <1313265101-11478-1-git-send-email-troy.kisky@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 13, 2011 at 10:29:00AM +0200, Arnd Bergmann wrote:
-> On Friday 12 August 2011 16:00:06 David Brown wrote:
-> > +Required properties:
-> > +- compatible :
-> > +       - "qcom,msm-uart"
-> > +- reg : offset and length of the register set for the device
-> > +       for the hsuart operating in compatible mode, there should be a
-> > +       second pair describing the gsbi registers.
-> > +- interrupts : should contain the uart interrupt.
-> > +
-> > +Example:
-> > +
-> > +       uart at 19c400000 {
-> > +               compatible = "qcom,msm-hsuart", "qcom,msm-uart";
-> > +               reg = <0x19c40000 0x1000">,
-> > +                     <0x19c00000 0x1000">;
-> > +               interrupts = <195>;
-> > +       };
-> 
-> 
-> 
-> > @@ -920,11 +928,17 @@ static int __devexit msm_serial_remove(struct platform_device *pdev)
-> >         return 0;
-> >  }
-> >  
-> > +static struct of_device_id msm_match_table[] = {
-> > +       { .compatible = "qcom,msm-hsuart-lite" },
-> > +       {}
-> > +};
-> > +
-> 
-> Hi David,
-> 
-> It looks like you changed the value for the "compatible" property in the
-> process of making the patch, but did not update all places.
-> 
-> Should it be qcom,msm-hsuart-lite or qcom,msm-hsuart?
+Use new macro NEW_PAD_CTRL to remove _MX51_PAD_xxx references.
+A later patch will remove the _MX51_PAD_xxx symbols.
 
-I guess I got the documentation to be different than the code.
-Sadily, I think the documentation is probably what I want instead of
-the code.
+Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
+---
+ arch/arm/mach-mx5/board-cpuimx51sd.c         |    2 +-
+ arch/arm/mach-mx5/board-mx51_babbage.c       |    4 ++--
+ arch/arm/mach-mx5/eukrea_mbimxsd-baseboard.c |    4 ++--
+ arch/arm/plat-mxc/include/mach/iomux-v3.h    |    1 +
+ 4 files changed, 6 insertions(+), 5 deletions(-)
 
-I'm not sure actually what is best to use here.  I'm thinking that the
-'lite' identifier should perhaps go away.  MSM's have two UARTS on
-them, an older "simple" PIO type of UART, and a newer one that can do
-DMA (called the hsuart for high-speed).  The hsuart can also be used
-in a non-DMA driver in a mostly compatible way with the old UART.
 
-For non-high-speed applications, the user will probably just want to
-use the non-DMA driver.  My question is then: if the device tree
-describes it as
+Changes since v2: add () around cfg in NEW_PAD_CTRL macro
+as noticed by Sascha.
 
-	compatible = "qcom,msm-hsuart", "qcom,msm-uart";
+2/3 and 3/3 are the same as v2 and are not reposted.
 
-and one driver matches qcom,msm-hsuart and another matches
-qcom,msm-uart, which driver will get used.  Ideally, it would use the
-earliest one in the list.
 
-If that's the case, I'll get rid of the -lite suffix and just make the
-non-DMA driver compatible with the plain "qcom,msm-uart".
 
-David
 
+
+diff --git a/arch/arm/mach-mx5/board-cpuimx51sd.c b/arch/arm/mach-mx5/board-cpuimx51sd.c
+index ff096d5..040c5c3 100644
+--- a/arch/arm/mach-mx5/board-cpuimx51sd.c
++++ b/arch/arm/mach-mx5/board-cpuimx51sd.c
+@@ -108,7 +108,7 @@ static iomux_v3_cfg_t eukrea_cpuimx51sd_pads[] = {
+ 
+ 	/* Touchscreen */
+ 	/* IRQ */
+-	_MX51_PAD_GPIO_NAND__GPIO_NAND | MUX_PAD_CTRL(PAD_CTL_PUS_22K_UP |
++	NEW_PAD_CTRL(MX51_PAD_GPIO_NAND__GPIO_NAND, PAD_CTL_PUS_22K_UP |
+ 			PAD_CTL_PKE | PAD_CTL_SRE_FAST |
+ 			PAD_CTL_DSE_HIGH | PAD_CTL_PUE | PAD_CTL_HYS),
+ };
+diff --git a/arch/arm/mach-mx5/board-mx51_babbage.c b/arch/arm/mach-mx5/board-mx51_babbage.c
+index e400b09..5a578f9 100644
+--- a/arch/arm/mach-mx5/board-mx51_babbage.c
++++ b/arch/arm/mach-mx5/board-mx51_babbage.c
+@@ -357,8 +357,8 @@ static const struct esdhc_platform_data mx51_babbage_sd2_data __initconst = {
+ static void __init mx51_babbage_init(void)
+ {
+ 	iomux_v3_cfg_t usbh1stp = MX51_PAD_USBH1_STP__USBH1_STP;
+-	iomux_v3_cfg_t power_key = _MX51_PAD_EIM_A27__GPIO2_21 |
+-		MUX_PAD_CTRL(PAD_CTL_SRE_FAST | PAD_CTL_DSE_HIGH | PAD_CTL_PUS_100K_UP);
++	iomux_v3_cfg_t power_key = NEW_PAD_CTRL(MX51_PAD_EIM_A27__GPIO2_21,
++		PAD_CTL_SRE_FAST | PAD_CTL_DSE_HIGH | PAD_CTL_PUS_100K_UP);
+ 
+ 	imx51_soc_init();
+ 
+diff --git a/arch/arm/mach-mx5/eukrea_mbimxsd-baseboard.c b/arch/arm/mach-mx5/eukrea_mbimxsd-baseboard.c
+index 2619239..f046d4b 100644
+--- a/arch/arm/mach-mx5/eukrea_mbimxsd-baseboard.c
++++ b/arch/arm/mach-mx5/eukrea_mbimxsd-baseboard.c
+@@ -47,7 +47,7 @@ static iomux_v3_cfg_t eukrea_mbimxsd_pads[] = {
+ 	/* LED */
+ 	MX51_PAD_NANDF_D10__GPIO3_30,
+ 	/* SWITCH */
+-	_MX51_PAD_NANDF_D9__GPIO3_31 | MUX_PAD_CTRL(PAD_CTL_PUS_22K_UP |
++	NEW_PAD_CTRL(MX51_PAD_NANDF_D9__GPIO3_31, PAD_CTL_PUS_22K_UP |
+ 			PAD_CTL_PKE | PAD_CTL_SRE_FAST |
+ 			PAD_CTL_DSE_HIGH | PAD_CTL_PUE | PAD_CTL_HYS),
+ 	/* UART2 */
+@@ -66,7 +66,7 @@ static iomux_v3_cfg_t eukrea_mbimxsd_pads[] = {
+ 	MX51_PAD_SD1_DATA2__SD1_DATA2,
+ 	MX51_PAD_SD1_DATA3__SD1_DATA3,
+ 	/* SD1 CD */
+-	_MX51_PAD_GPIO1_0__SD1_CD | MUX_PAD_CTRL(PAD_CTL_PUS_22K_UP |
++	NEW_PAD_CTRL(MX51_PAD_GPIO1_0__SD1_CD, PAD_CTL_PUS_22K_UP |
+ 			PAD_CTL_PKE | PAD_CTL_SRE_FAST |
+ 			PAD_CTL_DSE_HIGH | PAD_CTL_PUE | PAD_CTL_HYS),
+ };
+diff --git a/arch/arm/plat-mxc/include/mach/iomux-v3.h b/arch/arm/plat-mxc/include/mach/iomux-v3.h
+index ebbce33..35e0df2 100644
+--- a/arch/arm/plat-mxc/include/mach/iomux-v3.h
++++ b/arch/arm/plat-mxc/include/mach/iomux-v3.h
+@@ -80,6 +80,7 @@ typedef u64 iomux_v3_cfg_t;
+ 		((iomux_v3_cfg_t)(_sel_input_ofs) << MUX_SEL_INPUT_OFS_SHIFT) | \
+ 		((iomux_v3_cfg_t)(_sel_input) << MUX_SEL_INPUT_SHIFT))
+ 
++#define NEW_PAD_CTRL(cfg, pad)	(((cfg) & ~MUX_PAD_CTRL_MASK) | MUX_PAD_CTRL(pad))
+ /*
+  * Use to set PAD control
+  */
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+1.7.0.4
