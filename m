@@ -1,30 +1,52 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 13 Aug 2011 10:46:26 +0900
-Subject: [PATCH 0/2] Fixes for S5PV210 PM
-In-Reply-To: <1313144774-30607-1-git-send-email-a.kesavan@samsung.com>
-References: <1313144774-30607-1-git-send-email-a.kesavan@samsung.com>
-Message-ID: <000001cc595a$d1f45080$75dcf180$%kim@samsung.com>
+Date: Sat, 13 Aug 2011 10:50:48 +0900
+Subject: [PATCH] ARM: S3C64XX: Fix build break in PM debug
+In-Reply-To: <1313144754-30485-1-git-send-email-a.kesavan@samsung.com>
+References: <1313144754-30485-1-git-send-email-a.kesavan@samsung.com>
+Message-ID: <000101cc595b$6e8c3480$4ba49d80$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Abhilash Kesavan wrote:
 > 
-> This patchset fixes a compilation warning and removes an unwanted
-> Kconfig symbol.
+> When S3C_PM_DEBUG_LED_SMDK is enabled for suspend/resume debugging,
+> the following
+> compilation error occurs:
 > 
-> Abhilash Kesavan (2):
->   ARM: S5PV210: Fix build warning
->   ARM: S5PV210: Remove unncessary symbol for PM
+> arch/arm/mach-s3c64xx/pm.c: In function 's3c_pm_debug_smdkled':
+> arch/arm/mach-s3c64xx/pm.c:41: error: implicit declaration of function
+> 'gpio_set_value'
+> arch/arm/mach-s3c64xx/pm.c:41: error: implicit declaration of function
+> 'S3C64XX_GPN'
+> arch/arm/mach-s3c64xx/pm.c: In function 's3c64xx_pm_init':
+> arch/arm/mach-s3c64xx/pm.c:184: error: implicit declaration of function
+> 'gpio_request'
+> arch/arm/mach-s3c64xx/pm.c:188: error: implicit declaration of function
+> 'gpio_direction_output'
 > 
->  arch/arm/mach-s5pv210/Kconfig  |    6 ------
->  arch/arm/mach-s5pv210/Makefile |    2 +-
->  arch/arm/mach-s5pv210/pm.c     |    2 +-
->  3 files changed, 2 insertions(+), 8 deletions(-)
+> Fix the error by including linux/gpio.h
 > 
+> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+> ---
+>  arch/arm/mach-s3c64xx/pm.c |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-s3c64xx/pm.c b/arch/arm/mach-s3c64xx/pm.c
+> index 8bad643..055e285 100644
+> --- a/arch/arm/mach-s3c64xx/pm.c
+> +++ b/arch/arm/mach-s3c64xx/pm.c
+> @@ -16,6 +16,7 @@
+>  #include <linux/suspend.h>
+>  #include <linux/serial_core.h>
+>  #include <linux/io.h>
+> +#include <linux/gpio.h>
+> 
+>  #include <mach/map.h>
+>  #include <mach/irqs.h>
 > --
-> 1.7.4.1
+> 1.6.6.1
 
-Looks ok, applied.
+OK, applied.
 Thanks.
 
 Best regards,
