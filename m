@@ -1,58 +1,19 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 13 Aug 2011 13:11:08 +0900
-Subject: [PATCH V5 00/15] To use DMA generic APIs for Samsung DMA
-In-Reply-To: <1313101649.1603.27.camel@vkoul-udesk3>
-References: <1311744697-10264-1-git-send-email-boojin.kim@samsung.com>
-	<CACRpkdZvbH1O608n_aa_nVi-Onhmt0Ay6X1yCgBVNES4o9hTrA@mail.gmail.com>
-	<1312821923.1539.37.camel@vkoul-udesk3>
-	<015101cc57f8$0d7b1da0$287158e0$%kim@samsung.com>
-	<1313101649.1603.27.camel@vkoul-udesk3>
-Message-ID: <000701cc596f$08811160$19833420$%kim@samsung.com>
+Date: Sat, 13 Aug 2011 13:15:36 +0900
+Subject: [PATCH 0/5] Miscellaneous s3c64xx fixes.
+In-Reply-To: <2691749.ciX6KCIc5Y@flatron>
+References: <5661373.tZL1ZnPyVO@flatron> <2691749.ciX6KCIc5Y@flatron>
+Message-ID: <000801cc596f$a8435a50$f8ca0ef0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Koul, Vinod wrote:
+Tomasz Figa wrote:
 > 
-> On Thu, 2011-08-11 at 16:26 +0900, Kukjin Kim wrote:
-> > Koul, Vinod wrote:
-> > >
-> > > On Thu, 2011-08-04 at 18:53 +0200, Linus Walleij wrote:
-> > > > On Wed, Jul 27, 2011 at 7:31 AM, Boojin Kim <boojin.kim@samsung.com>
-> wrote:
-> > > >
-> > > > > This patchset adds support DMA generic APIs for Samsung DMA.
-> > > >
-> > > > Patches look good to me,
-> > > > Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> > >
-> > > Acked-by: Vinod Koul <vinod.koul@intel.com>
-> > >
-> > > Do you want these to go thru slave-dma tree or arm tree, I am okay with
-> > > either...
-> >
-> > Hi Vinod,
-> >
-> > Thanks.
-> >
-> > I'd like to keep its topic branch in my tree to avoid conflicts with other samsung
-> stuff and I think, it should be merged into your slave-dma tree also for same
-> reason.
-> >
-> > git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git #next/topic-
-> dma-pl330
-> >
-> > Or if you want to make some branch for it in your tree, please let me know so
-> that I can merge it in my tree also.
-> Okay can you update this branch with latest patchset (I think there were
-> few comments on last patchset). Once you add all acks let me know the
-> branch, I will merge it to my next
+> Anyone?
+> 
+Hi Tomasz Figa,
 
-Hi,
-
-I updated it so that you can merge it to yours.
-I think, if any fixing is required on that, it should be small so can be fixed easily after this merging.
-
-If any problems, please let me know :)
+Will be on this in the next week...
 
 Thanks.
 
@@ -61,3 +22,34 @@ Kgene.
 --
 Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
 SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+> On Friday 29 of July 2011 at 17:50:57, Tomasz Figa wrote:
+> > From c985e14a4fc5c7970d7f6c2fde6d214217214688 Mon Sep 17 00:00:00 2001
+> > From: Tomasz Figa <tomasz.figa@gmail.com>
+> > Date: Fri, 29 Jul 2011 16:50:16 +0200
+> > Subject: [PATCH 0/5] Miscellaneous s3c64xx fixes.
+> >
+> > This series attempts to fix some issues I approached when working
+> > on the s3c64xx platform. See descriptions of individual patches for more
+> > details on each one.
+> >
+> > All the patches are based on v3.0 tag of Linus' tree.
+> >
+> > Tomasz Figa (5):
+> >   ARM: s3c64xx: PM: Mask and acknowledge all UART interrupts during
+> >     core resume.
+> >   ARM: s3c64xx: DMA: Use S3C64XX_SDMA_SEL register name instead of
+> >     numeric address.
+> >   ARM: s3c64xx: Save/restore S3C64XX_SDMA_SEL on suspend/resume.
+> >   ARM: s3c64xx: Save/restore S3C64XX_MODEM_MIFPCON on
+> suspend/resume to
+> >     preserve LCD bypass state.
+> >   ARM: s3c64xx: Add support for synchronous clock operation.
+> >
+> >  arch/arm/mach-s3c64xx/clock.c                   |    8 +++++-
+> >  arch/arm/mach-s3c64xx/dma.c                     |    2 +-
+> >  arch/arm/mach-s3c64xx/include/mach/regs-clock.h |    4 +++
+> >  arch/arm/mach-s3c64xx/include/mach/regs-sys.h   |    2 +
+> >  arch/arm/mach-s3c64xx/pm.c                      |   30
+> > +++++++++++++++++++++++
+> >  5 files changed, 44 insertions(+), 2 deletions(-)
