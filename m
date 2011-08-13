@@ -1,47 +1,58 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 13 Aug 2011 13:04:03 +0900
-Subject: [GIT PULL] samsung: fixes for v3.1-rc1
-In-Reply-To: <201108121758.01077.arnd.bergmann@linaro.org>
-References: <20110811065837.GA4989@july>
-	<015001cc57f5$d7e847f0$87b8d7d0$%kim@samsung.com>
-	<201108121758.01077.arnd.bergmann@linaro.org>
-Message-ID: <000601cc596e$0ba61490$22f23db0$%kim@samsung.com>
+Date: Sat, 13 Aug 2011 13:11:08 +0900
+Subject: [PATCH V5 00/15] To use DMA generic APIs for Samsung DMA
+In-Reply-To: <1313101649.1603.27.camel@vkoul-udesk3>
+References: <1311744697-10264-1-git-send-email-boojin.kim@samsung.com>
+	<CACRpkdZvbH1O608n_aa_nVi-Onhmt0Ay6X1yCgBVNES4o9hTrA@mail.gmail.com>
+	<1312821923.1539.37.camel@vkoul-udesk3>
+	<015101cc57f8$0d7b1da0$287158e0$%kim@samsung.com>
+	<1313101649.1603.27.camel@vkoul-udesk3>
+Message-ID: <000701cc596f$08811160$19833420$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann wrote:
+Koul, Vinod wrote:
 > 
-> On Thursday 11 August 2011, Kukjin Kim wrote:
-> > >   Linux 3.1-rc1 (2011-08-07 18:23:30 -0700)
+> On Thu, 2011-08-11 at 16:26 +0900, Kukjin Kim wrote:
+> > Koul, Vinod wrote:
 > > >
-> > > are available in the git repository at:
-> > >   git://git.infradead.org/users/kmpark/linux-2.6-samsung for-arnd
+> > > On Thu, 2011-08-04 at 18:53 +0200, Linus Walleij wrote:
+> > > > On Wed, Jul 27, 2011 at 7:31 AM, Boojin Kim <boojin.kim@samsung.com>
+> wrote:
+> > > >
+> > > > > This patchset adds support DMA generic APIs for Samsung DMA.
+> > > >
+> > > > Patches look good to me,
+> > > > Acked-by: Linus Walleij <linus.walleij@linaro.org>
 > > >
-> 
-> > No, if above is required, I think, this should be handled from me not
-you.
+> > > Acked-by: Vinod Koul <vinod.koul@intel.com>
+> > >
+> > > Do you want these to go thru slave-dma tree or arm tree, I am okay with
+> > > either...
 > >
-> > Don't make a complete confusion between your board and Samsung
-architecture
-> > maintainer.
-> 
-> I'll hold off on pulling this one then until I get another pull request
-> from you.
-> 
-> Looking at the contents of the branch, I noticed that it's not clear why
-> they are needed in 3.1. It would help me if you (whoever sends me the bug
-> fixes) can categorize them in the changelog:
-> 
-> * Any bug fixes against old bugs should be marked 'Cc: stable at kernel.org'
-> so that they can get identified for backports.
-> 
-> * Regressions against the 3.0 kernel should get marked as such.
-> 
-> * Bug fixes against new code should also be identified as such.
-> 
-OK, I see.
+> > Hi Vinod,
+> >
+> > Thanks.
+> >
+> > I'd like to keep its topic branch in my tree to avoid conflicts with other samsung
+> stuff and I think, it should be merged into your slave-dma tree also for same
+> reason.
+> >
+> > git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git #next/topic-
+> dma-pl330
+> >
+> > Or if you want to make some branch for it in your tree, please let me know so
+> that I can merge it in my tree also.
+> Okay can you update this branch with latest patchset (I think there were
+> few comments on last patchset). Once you add all acks let me know the
+> branch, I will merge it to my next
 
-As a note, I will send Samsung fixes in the beginning of next week.
+Hi,
+
+I updated it so that you can merge it to yours.
+I think, if any fixing is required on that, it should be small so can be fixed easily after this merging.
+
+If any problems, please let me know :)
 
 Thanks.
 
