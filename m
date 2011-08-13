@@ -1,27 +1,57 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Sat, 13 Aug 2011 15:45:25 +0100
-Subject: [PATCH] Fix non-LPAE boot regression.
-In-Reply-To: <20110813143903.GQ4775@n2100.arm.linux.org.uk>
-References: <201108131556.27301.anarsoul@gmail.com>
-	<1313240299-24712-1-git-send-email-anarsoul@gmail.com>
-	<CAHkRjk4p1kqwKGiW_XRFU0aap98QkvRGRs0hwsBR4CcfM5RKqA@mail.gmail.com>
-	<20110813143903.GQ4775@n2100.arm.linux.org.uk>
-Message-ID: <CAHkRjk5aK7kkfpCoTqtwgkM8hjJx5MfD-Z7stXmqyWSz4VE56g@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sun, 14 Aug 2011 00:13:59 +0800
+Subject: [PATCH v2 0/8] Clean up MXC and MXS mach/gpio.h
+Message-ID: <1313252047-8820-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday, 13 August 2011, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Sat, Aug 13, 2011 at 03:14:30PM +0100, Catalin Marinas wrote:
->> Thanks for this. The original code was indeed broken but I think the
->> fix should be to use SECTION_SIZE instead of SHIFT. I'll have a look
->> on Monday.
->
-> No, the original code is not broken. ?Look at what it's doing:
+As one step to single image for multiple platforms, mach/gpio.h needs
+to be removed from asm/gpio.h.  The patch set cleans up MXC and MXS
+mach/gpio.h to an empty header.
 
-I meant my original LPAE code (though strangely it was booting fine, I
-guess it didn't use more than a section from those mappings). I'll
-look at the details on Monday, I'm away from my PC now.
+It's based on v3.1-rc1 plus rmk's patch series below.
 
--- 
-Catalin
+  [PATCH 00/13] Clean up mach/gpio.h headers
+
+The Ben's fix is on the way to -rc2 through arm-soc tree.
+
+Grant, Sascha,
+
+Can you please review the series and give comments or your ack tag?
+
+Regards,
+Shawn
+
+Changes since v1:
+ * Add patches #7 and #8 to clean up mxs mach/gpio.h
+ * Leave run-time gpio_to_irq() calls there and only convert these
+   in static initializers to IMX_GPIO_TO_IRQ()
+ * Mark the empty headers with /* empty */
+
+Ben Dooks (1):
+      ARM: mx5: board-cpuimx51.c fixup irq_to_gpio() usage
+
+Shawn Guo (7):
+      arm/mxc: do not use gpio_to_irq() for static initializers
+      gpio/mxc: add .to_irq for gpio chip
+      arm/mxc: remove gpio_to_irq() from mach/gpio.h
+      gpio/mxc: move irq_to_gpio() into gpio-mxc driver
+      arm/mxc: move IMX_GPIO_NR into mach/hardware.h
+      gpio/mxs: move irq_to_gpio() into gpio-mxs driver
+      arm/mxs: move MXS_GPIO_NR into mach/mxs.h
+
+ arch/arm/mach-imx/mach-cpuimx35.c            |    2 +-
+ arch/arm/mach-imx/mach-mx27_3ds.c            |    2 +-
+ arch/arm/mach-imx/mach-vpr200.c              |    2 +-
+ arch/arm/mach-mx5/board-cpuimx51.c           |    8 +++---
+ arch/arm/mach-mx5/board-cpuimx51sd.c         |    4 +-
+ arch/arm/mach-mx5/board-mx53_ard.c           |    4 +-
+ arch/arm/mach-mx5/eukrea_mbimx51-baseboard.c |    2 +-
+ arch/arm/mach-mx5/mx51_efika.c               |    2 +-
+ arch/arm/mach-mxs/include/mach/gpio.h        |   28 +--------------------
+ arch/arm/mach-mxs/include/mach/mxs.h         |    2 +
+ arch/arm/plat-mxc/include/mach/gpio.h        |   34 +-------------------------
+ arch/arm/plat-mxc/include/mach/hardware.h    |    6 ++++
+ drivers/gpio/gpio-mxc.c                      |   12 +++++++++
+ drivers/gpio/gpio-mxs.c                      |    2 +
+ 14 files changed, 37 insertions(+), 73 deletions(-)
