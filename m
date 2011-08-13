@@ -1,52 +1,48 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 13 Aug 2011 10:50:48 +0900
-Subject: [PATCH] ARM: S3C64XX: Fix build break in PM debug
-In-Reply-To: <1313144754-30485-1-git-send-email-a.kesavan@samsung.com>
-References: <1313144754-30485-1-git-send-email-a.kesavan@samsung.com>
-Message-ID: <000101cc595b$6e8c3480$4ba49d80$%kim@samsung.com>
+Date: Sat, 13 Aug 2011 13:04:03 +0900
+Subject: [GIT PULL] samsung: fixes for v3.1-rc1
+In-Reply-To: <201108121758.01077.arnd.bergmann@linaro.org>
+References: <20110811065837.GA4989@july>
+	<015001cc57f5$d7e847f0$87b8d7d0$%kim@samsung.com>
+	<201108121758.01077.arnd.bergmann@linaro.org>
+Message-ID: <000601cc596e$0ba61490$22f23db0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Abhilash Kesavan wrote:
+Arnd Bergmann wrote:
 > 
-> When S3C_PM_DEBUG_LED_SMDK is enabled for suspend/resume debugging,
-> the following
-> compilation error occurs:
+> On Thursday 11 August 2011, Kukjin Kim wrote:
+> > >   Linux 3.1-rc1 (2011-08-07 18:23:30 -0700)
+> > >
+> > > are available in the git repository at:
+> > >   git://git.infradead.org/users/kmpark/linux-2.6-samsung for-arnd
+> > >
 > 
-> arch/arm/mach-s3c64xx/pm.c: In function 's3c_pm_debug_smdkled':
-> arch/arm/mach-s3c64xx/pm.c:41: error: implicit declaration of function
-> 'gpio_set_value'
-> arch/arm/mach-s3c64xx/pm.c:41: error: implicit declaration of function
-> 'S3C64XX_GPN'
-> arch/arm/mach-s3c64xx/pm.c: In function 's3c64xx_pm_init':
-> arch/arm/mach-s3c64xx/pm.c:184: error: implicit declaration of function
-> 'gpio_request'
-> arch/arm/mach-s3c64xx/pm.c:188: error: implicit declaration of function
-> 'gpio_direction_output'
+> > No, if above is required, I think, this should be handled from me not
+you.
+> >
+> > Don't make a complete confusion between your board and Samsung
+architecture
+> > maintainer.
 > 
-> Fix the error by including linux/gpio.h
+> I'll hold off on pulling this one then until I get another pull request
+> from you.
 > 
-> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
-> ---
->  arch/arm/mach-s3c64xx/pm.c |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
+> Looking at the contents of the branch, I noticed that it's not clear why
+> they are needed in 3.1. It would help me if you (whoever sends me the bug
+> fixes) can categorize them in the changelog:
 > 
-> diff --git a/arch/arm/mach-s3c64xx/pm.c b/arch/arm/mach-s3c64xx/pm.c
-> index 8bad643..055e285 100644
-> --- a/arch/arm/mach-s3c64xx/pm.c
-> +++ b/arch/arm/mach-s3c64xx/pm.c
-> @@ -16,6 +16,7 @@
->  #include <linux/suspend.h>
->  #include <linux/serial_core.h>
->  #include <linux/io.h>
-> +#include <linux/gpio.h>
+> * Any bug fixes against old bugs should be marked 'Cc: stable at kernel.org'
+> so that they can get identified for backports.
 > 
->  #include <mach/map.h>
->  #include <mach/irqs.h>
-> --
-> 1.6.6.1
+> * Regressions against the 3.0 kernel should get marked as such.
+> 
+> * Bug fixes against new code should also be identified as such.
+> 
+OK, I see.
 
-OK, applied.
+As a note, I will send Samsung fixes in the beginning of next week.
+
 Thanks.
 
 Best regards,
