@@ -1,34 +1,102 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 13 Aug 2011 12:14:56 +0200
-Subject: [PATCH 0/5] Miscellaneous s3c64xx fixes.
-In-Reply-To: <000801cc596f$a8435a50$f8ca0ef0$%kim@samsung.com>
-References: <5661373.tZL1ZnPyVO@flatron> <2691749.ciX6KCIc5Y@flatron>
-	<000801cc596f$a8435a50$f8ca0ef0$%kim@samsung.com>
-Message-ID: <2042356.rlHOh83GOI@flatron>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Sat, 13 Aug 2011 11:43:23 +0100
+Subject: [RFC PATCH 10/12] arm/tegra: Add device tree support to pinmux
+	driver
+In-Reply-To: <1313189697-21287-11-git-send-email-swarren@nvidia.com>
+References: <1313189697-21287-1-git-send-email-swarren@nvidia.com>
+	<1313189697-21287-11-git-send-email-swarren@nvidia.com>
+Message-ID: <20110813104323.GC2643@pulham.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 13 of August 2011 at 13:15:36, Kukjin Kim wrote:
-> Tomasz Figa wrote:
-> > 
-> > Anyone?
-> > 
-> Hi Tomasz Figa,
-> 
-> Will be on this in the next week...
-> 
-> Thanks.
-> 
-> Best regards,
-> Kgene.
-> --
-> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-> SW Solution Development Team, Samsung Electronics Co., Ltd.
-> 
+Hi Stephen,
 
-Thanks a lot. I have plenty of other S3C64xx patches to be submitted, but they 
-are more feature additions not fixes, so I am waiting for these fixes to be 
-reviewed first.
+On Fri, Aug 12, 2011 at 04:54:55PM -0600, Stephen Warren wrote:
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> ---
+>  arch/arm/mach-tegra/pinmux.c |  115 ++++++++++++++++++++++++++++++++++++++++++
+>  1 files changed, 115 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-tegra/pinmux.c b/arch/arm/mach-tegra/pinmux.c
+> index 05fa1a3..33246c2 100644
+> --- a/arch/arm/mach-tegra/pinmux.c
+> +++ b/arch/arm/mach-tegra/pinmux.c
+> @@ -20,6 +20,7 @@
+>  #include <linux/errno.h>
+>  #include <linux/spinlock.h>
+>  #include <linux/io.h>
+> +#include <linux/of.h>
+>  #include <linux/platform_device.h>
+>  
+>  #include <mach/iomap.h>
+> @@ -147,6 +148,41 @@ static const char *func_name(enum tegra_mux_func func)
+>  	return tegra_mux_names[func];
+>  }
+>  
+> +#ifdef CONFIG_OF
+> +static int func_enum(const char *name, enum tegra_mux_func *func_out)
+> +{
+> +	int func;
+> +
+> +	if (!strcmp(name, "RSVD1")) {
+> +		*func_out = TEGRA_MUX_RSVD1;
+> +		return 0;
+> +	}
+> +	if (!strcmp(name, "RSVD2")) {
+> +		*func_out = TEGRA_MUX_RSVD2;
+> +		return 0;
+> +	}
+> +	if (!strcmp(name, "RSVD3")) {
+> +		*func_out = TEGRA_MUX_RSVD3;
+> +		return 0;
+> +	}
+> +	if (!strcmp(name, "RSVD4")) {
+> +		*func_out = TEGRA_MUX_RSVD4;
+> +		return 0;
+> +	}
+> +	if (!strcmp(name, "NONE")) {
+> +		*func_out = TEGRA_MUX_NONE;
+> +		return 0;
+> +	}
+> +
+> +	for (func = 0; func < TEGRA_MAX_MUX; func++)
+> +		if (!strcmp(name, tegra_mux_names[func])) {
+> +			*func_out = func;
+> +			return 0;
+> +		}
+> +
+> +	return -EINVAL;
+> +}
+> +#endif
+>  
+>  static const char *tri_name(unsigned long val)
+>  {
+> @@ -666,15 +702,94 @@ void tegra_pinmux_config_pullupdown_table(const struct tegra_pingroup_config *co
+>  	}
+>  }
+>  
+> +#ifdef CONFIG_OF
+> +static void __init tegra_pinmux_probe_dt(struct platform_device *pdev)
+> +{
+> +	int pg;
+> +
+> +	for (pg = 0; pg < TEGRA_MAX_PINGROUP; pg++) {
+> +		const char *pg_name = pingroup_name(pg);
+> +		struct tegra_pingroup_config config;
+> +		struct device_node *pg_node;
+> +		int ret;
+> +		const char *s;
+> +
+> +		pg_node = of_find_child_node_by_name(pdev->dev.of_node,
+> +						     pg_name);
+> +		if (pg_node == NULL)
+> +			continue;
 
-Best regards,
-Tom
+Rather than iterating over all of the mux names in the pinmux driver and 
+searching for a matching DT node, could you not do it the other way 
+round?  So do an for_each_child_of_node() on the pinmux node then find 
+the matching pingroup keyed by the node name?  This would eliminate 
+of_find_child_node_by_name().  You could also catch invalid 
+configurations for non-existent pins this way.
+
+Jamie
