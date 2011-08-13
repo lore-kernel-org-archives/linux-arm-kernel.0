@@ -1,46 +1,52 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 13 Aug 2011 23:34:15 +0200
-Subject: [PATCH 2/4] msm_serial: Add devicetree support
-In-Reply-To: <20110813194645.GA23710@huya.qualcomm.com>
-References: <1313190008-7551-1-git-send-email-davidb@codeaurora.org>
-	<1434305.ibxmc6q715@wuerfel>
-	<20110813194645.GA23710@huya.qualcomm.com>
-Message-ID: <65679699.l4XXDScc0T@wuerfel>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 13 Aug 2011 22:36:01 +0100
+Subject: [PATCH 0/4] ARM: EXYNOS4: Support generic Power domain
+	framework for EXYNOS4210
+In-Reply-To: <201108132324.08137.rjw@sisk.pl>
+References: <4E4360B2.2060508@samsung.com> <201108132324.08137.rjw@sisk.pl>
+Message-ID: <20110813213601.GA25866@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 13 August 2011 12:46:45 David Brown wrote:
+On Sat, Aug 13, 2011 at 11:24:07PM +0200, Rafael J. Wysocki wrote:
+> On Thursday, August 11, 2011, Chanwoo Choi wrote:
+> > The following patch set use the generic Power domain Framework instead of
+> > power domain code depend of Samsung SoC.
+> > 
+> > Chanwoo Choi (4):
+> >   ARM: EXYNOS4: Support for generic I/O power domains on EXYNOS4210
+> >   ARM: EXYNOS4: Support for generic Clock manipulation PM callbacks
+> >   ARM: EXYNOS4: Delete the power-domain code depend on Samsung SoC
+> >   ARM: EXYNOS4: Add power domain to use generic Power domain Framework
+> > 
+> >  arch/arm/mach-exynos4/Kconfig                      |   10 +-
+> >  arch/arm/mach-exynos4/Makefile                     |    4 +-
+> >  arch/arm/mach-exynos4/dev-pd.c                     |  139 --------------
+> >  arch/arm/mach-exynos4/include/mach/pm-exynos4210.h |   52 ++++++
+> >  arch/arm/mach-exynos4/include/mach/regs-clock.h    |    8 +
+> >  arch/arm/mach-exynos4/mach-nuri.c                  |   21 ++-
+> >  arch/arm/mach-exynos4/mach-smdkc210.c              |   26 ++-
+> >  arch/arm/mach-exynos4/mach-smdkv310.c              |   23 ++-
+> >  arch/arm/mach-exynos4/mach-universal_c210.c        |   21 ++-
+> >  arch/arm/mach-exynos4/pm-exynos4210.c              |  189 ++++++++++++++++++++
+> >  arch/arm/mach-exynos4/pm-runtime.c                 |   56 ++++++
+> >  arch/arm/plat-samsung/Kconfig                      |    8 -
+> >  arch/arm/plat-samsung/Makefile                     |    4 -
+> >  arch/arm/plat-samsung/include/plat/pd.h            |   30 ---
+> >  arch/arm/plat-samsung/pd.c                         |   95 ----------
+> >  15 files changed, 377 insertions(+), 309 deletions(-)
+> >  delete mode 100644 arch/arm/mach-exynos4/dev-pd.c
+> >  create mode 100644 arch/arm/mach-exynos4/include/mach/pm-exynos4210.h
+> >  create mode 100644 arch/arm/mach-exynos4/pm-exynos4210.c
+> >  create mode 100644 arch/arm/mach-exynos4/pm-runtime.c
+> >  delete mode 100644 arch/arm/plat-samsung/include/plat/pd.h
+> >  delete mode 100644 arch/arm/plat-samsung/pd.c
 > 
-> I'm not sure actually what is best to use here.  I'm thinking that the
-> 'lite' identifier should perhaps go away.  MSM's have two UARTS on
-> them, an older "simple" PIO type of UART, and a newer one that can do
-> DMA (called the hsuart for high-speed).  The hsuart can also be used
-> in a non-DMA driver in a mostly compatible way with the old UART.
+> The patchset looks good to me, but please note that some code it
+> is based on will most likely change in 3.2 due to this patchset:
 > 
-> For non-high-speed applications, the user will probably just want to
-> use the non-DMA driver.  My question is then: if the device tree
-> describes it as
-> 
->         compatible = "qcom,msm-hsuart", "qcom,msm-uart";
-> 
-> and one driver matches qcom,msm-hsuart and another matches
-> qcom,msm-uart, which driver will get used.  Ideally, it would use the
-> earliest one in the list.
-> 
-> If that's the case, I'll get rid of the -lite suffix and just make the
-> non-DMA driver compatible with the plain "qcom,msm-uart".
+> https://lkml.org/lkml/2011/8/8/420
 
-I believe that unfortunately the answer is that the first driver that
-matches anything will get used. There are two possible ways that I can
-see to make it do what you want anyway:
-
-1. In the probe function for the slow driver, you return an error
-when the device you get passed matches "qcom,msm-hsuart", possibly
-dependent on whether the other driver also got built.
-
-2. You register one platform driver that handles both names and
-gives the device to just one of the two drivers. This would probably
-require linking the two drivers into the same module, or having
-the non-DMA speed driver just act as a library.
-
-	Arnd
+Err, isn't all that pm_clk stuff just duplicating what the clk API does?
+IOW, drivers _can_ (and should be) calling clk_disable() when they don't
+need the clock running.
