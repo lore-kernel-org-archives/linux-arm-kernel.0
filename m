@@ -1,42 +1,48 @@
-From: sam@ravnborg.org (Sam Ravnborg)
-Date: Sat, 13 Aug 2011 08:34:09 +0200
-Subject: [PATCH] ARM: zImage: Skip relinking if nothing changes
-In-Reply-To: <CACqU3MUVir_hfAtVz24Y7NrQOHAa=WyyHnCN4M6BHLQ294Tdww@mail.gmail.com>
-References: <4E457682.5020107@codeaurora.org>
-	<1313175602-21834-1-git-send-email-sboyd@codeaurora.org>
-	<CACqU3MUq5M-XPOxV=8GKyEzjEzpmdeaF+mGrXJrK+ZZxa4SdeQ@mail.gmail.com>
-	<20110812205520.GL4775@n2100.arm.linux.org.uk>
-	<CACqU3MX=-10ouxCqWcBP7MW3_O4_RSLG9wRY8X4iEh5ydQa1AQ@mail.gmail.com>
-	<20110812220316.GA28845@merkur.ravnborg.org>
-	<CACqU3MUVir_hfAtVz24Y7NrQOHAa=WyyHnCN4M6BHLQ294Tdww@mail.gmail.com>
-Message-ID: <20110813063409.GA29111@merkur.ravnborg.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 13 Aug 2011 10:29 +0200
+Subject: [PATCH 2/4] msm_serial: Add devicetree support
+In-Reply-To: <1313190008-7551-3-git-send-email-davidb@codeaurora.org>
+References: <1313190008-7551-1-git-send-email-davidb@codeaurora.org>
+	<1313190008-7551-3-git-send-email-davidb@codeaurora.org>
+Message-ID: <1434305.ibxmc6q715@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 12, 2011 at 06:17:25PM -0400, Arnaud Lacombe wrote:
-> Hi,
-> 
-> On Fri, Aug 12, 2011 at 6:03 PM, Sam Ravnborg <sam@ravnborg.org> wrote:
-> >>
-> >> I suspect this would have done the job:
-> >>
-> >> $(obj)/font.o: $(srctree)/drivers/video/console/font_acorn_8x8.c
-> >> ? ? ? ? $(cmd,cc_o_c)'
-> >
-> > I prefer using $(call,shipped) and let kbuild figure out how
-> > build an .o file from a .c file.
-> >
-> > In other words - avoiding use of the internal to Makefile.build
-> > variables in various places.
-> >
-> indeed, but I'd argue that 1) this would not be the first Makefile
-> using these internal macros (alpha and ia64 are using such construct
-> for aliasing) and 2) the `cmd_shipped' stuff is as internal than other
-> functions :-)
-A quick grep in Documentation/kbuild will show that only the shipped
-variant is documented.
+On Friday 12 August 2011 16:00:06 David Brown wrote:
+> +Required properties:
+> +- compatible :
+> +       - "qcom,msm-uart"
+> +- reg : offset and length of the register set for the device
+> +       for the hsuart operating in compatible mode, there should be a
+> +       second pair describing the gsbi registers.
+> +- interrupts : should contain the uart interrupt.
+> +
+> +Example:
+> +
+> +       uart at 19c400000 {
+> +               compatible = "qcom,msm-hsuart", "qcom,msm-uart";
+> +               reg = <0x19c40000 0x1000">,
+> +                     <0x19c00000 0x1000">;
+> +               interrupts = <195>;
+> +       };
 
-We could implement a general copy command - this is needed in some places
-like this.
 
-	Sam
+
+> @@ -920,11 +928,17 @@ static int __devexit msm_serial_remove(struct platform_device *pdev)
+>         return 0;
+>  }
+>  
+> +static struct of_device_id msm_match_table[] = {
+> +       { .compatible = "qcom,msm-hsuart-lite" },
+> +       {}
+> +};
+> +
+
+Hi David,
+
+It looks like you changed the value for the "compatible" property in the
+process of making the patch, but did not update all places.
+
+Should it be qcom,msm-hsuart-lite or qcom,msm-hsuart?
+
+	Arnd
