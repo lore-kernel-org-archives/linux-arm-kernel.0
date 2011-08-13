@@ -1,39 +1,67 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 13 Aug 2011 09:41:29 +0100
-Subject: [PATCH kernel-3.0] arm:cache-l2x0: Fix L2 Cache size calculation.
-In-Reply-To: <20110812102020.GD14904@e102144-lin.cambridge.arm.com>
-References: <1313142327-18320-1-git-send-email-srinivas.kandagatla@st.com>
-	<20110812102020.GD14904@e102144-lin.cambridge.arm.com>
-Message-ID: <20110813084129.GM4775@n2100.arm.linux.org.uk>
+Date: Sat, 13 Aug 2011 10:35:29 +0100
+Subject: [PATCH 1/6] arm/cpuimx51: gpio_to_irq() should be used to get
+	irq from gpio number
+In-Reply-To: <20110812111306.GH6618@S2100-06.ap.freescale.net>
+References: <1313135701-22456-1-git-send-email-shawn.guo@linaro.org>
+	<1313135701-22456-2-git-send-email-shawn.guo@linaro.org>
+	<CAB4PhKdAgasG3wJ2JvS_Ds0ReGjDCgZh_prepNGF=FqG6fRx7A@mail.gmail.com>
+	<20110812111306.GH6618@S2100-06.ap.freescale.net>
+Message-ID: <20110813093529.GN4775@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 12, 2011 at 11:20:20AM +0100, Will Deacon wrote:
-> On Fri, Aug 12, 2011 at 10:45:27AM +0100, Srinivas KANDAGATLA wrote:
-> > From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+On Fri, Aug 12, 2011 at 07:13:07PM +0800, Shawn Guo wrote:
+> On Fri, Aug 12, 2011 at 05:36:32PM +0800, Jason Liu wrote:
+> > 2011/8/12 Shawn Guo <shawn.guo@linaro.org>:
+> > > Instead of irq_to_gpio(), gpio_to_irq() should be used to get irq
+> > > from gpio number.
+> > >
+> > > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > > Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> > > ---
+> > > ?arch/arm/mach-mx5/board-cpuimx51.c | ? ?2 +-
+> > > ?1 files changed, 1 insertions(+), 1 deletions(-)
+> > >
+> > > diff --git a/arch/arm/mach-mx5/board-cpuimx51.c b/arch/arm/mach-mx5/board-cpuimx51.c
+> > > index 7c893fa..68934ea 100644
+> > > --- a/arch/arm/mach-mx5/board-cpuimx51.c
+> > > +++ b/arch/arm/mach-mx5/board-cpuimx51.c
+> > > @@ -81,7 +81,7 @@ static struct plat_serial8250_port serial_platform_data[] = {
+> > > ? ? ? ? ? ? ? ?.flags = UPF_BOOT_AUTOCONF | UPF_SKIP_TEST | UPF_IOREMAP,
+> > > ? ? ? ?}, {
+> > > ? ? ? ? ? ? ? ?.mapbase = (unsigned long)(MX51_CS1_BASE_ADDR + 0x2000000),
+> > > - ? ? ? ? ? ? ? .irq = irq_to_gpio(CPUIMX51_QUARTD_GPIO),
+> > > + ? ? ? ? ? ? ? .irq = gpio_to_irq(CPUIMX51_QUARTD_GPIO),
+> > > ? ? ? ? ? ? ? ?.irqflags = IRQF_TRIGGER_HIGH,
+> > > ? ? ? ? ? ? ? ?.uartclk = CPUIMX51_QUART_XTAL,
+> > > ? ? ? ? ? ? ? ?.regshift = CPUIMX51_QUART_REGSHIFT,
+> > > --
 > > 
-> > This patch fixes L2 Cache size calculations for L2C-210, L2C-310 and
-> > PL310, by changing the L2X0_AUX_CTRL_WAY_SIZE_MASK from 2 bits to 3
-> > bits.
+> > The fix has already in Sascah's tree:
 > > 
-> > The Auxiliary Control Register for L2C-210, L2C-310 and PL310 has 3bits
-> > [19:17] for Way size, however the existing code only uses 2 bits to
-> > get this value. This results in incorrect cachesize calculations.
+> > Author: Ben Dooks <ben-linux@fluff.org>
+> > Date:   Thu Aug 4 16:47:35 2011 +0100
 > > 
-> > I should say this bug does not result in issue but, its just prints
-> > incorrect values.
+> >     ARM: mx5: board-cpuimx51.c fixup irq_to_gpio() usage
+> > 
+> >     irq_to_gpio() is being called on a GPIO so change to using
+> >     gpio_to_irq() instead.
+> > 
+> >     Signed-off-by: Ben Dooks <ben-linux@fluff.org>
+> >     Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> > 
+> > Jason
+> > 
+> Sorry, I missed that.  Thanks for pointing it out, Jason.
 > 
-> It also results in performing operations on the whole cache when we
-> erroneously decide that the range is big enough (due to l2x0_size being
-> too small).
-> 
-> > Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
-> 
-> Acked-by: Will Deacon <will.deacon@arm.com>
-> 
-> Please can you CC stable on this too?
+> I will fold Ben's patch here, as I see Russell would probably pick up
+> the series.  Otherwise, Russell, please let me know if I should base
+> it on Sascha's tree.
 
-It's probably better to ask people to add a Cc: line to the _attributations_
-rather than telling them to CC the stable tree with their email, and then
-get a whinge from the stable maintainers about how that's not how to submit
-patches for stable trees.
+Shouldn't this patch be targetted for -rc and maybe stable?  It's
+difficult to tell from the commit description whether it really does
+cause a runtime problem or not.
+
+If it does go in to a -rc, then I can easily move my gpio patch set
+forward.
