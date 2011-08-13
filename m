@@ -1,52 +1,48 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 13 Aug 2011 22:36:01 +0100
-Subject: [PATCH 0/4] ARM: EXYNOS4: Support generic Power domain
-	framework for EXYNOS4210
-In-Reply-To: <201108132324.08137.rjw@sisk.pl>
-References: <4E4360B2.2060508@samsung.com> <201108132324.08137.rjw@sisk.pl>
-Message-ID: <20110813213601.GA25866@n2100.arm.linux.org.uk>
+From: peterhuewe@gmx.de (Peter Huewe)
+Date: Sun, 14 Aug 2011 00:34:01 +0200
+Subject: [PATCH] shmobile/sh7372: Add missing CONFIG_PM guards to fix build
+	failure
+Message-ID: <1313274841-8322-1-git-send-email-peterhuewe@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 13, 2011 at 11:24:07PM +0200, Rafael J. Wysocki wrote:
-> On Thursday, August 11, 2011, Chanwoo Choi wrote:
-> > The following patch set use the generic Power domain Framework instead of
-> > power domain code depend of Samsung SoC.
-> > 
-> > Chanwoo Choi (4):
-> >   ARM: EXYNOS4: Support for generic I/O power domains on EXYNOS4210
-> >   ARM: EXYNOS4: Support for generic Clock manipulation PM callbacks
-> >   ARM: EXYNOS4: Delete the power-domain code depend on Samsung SoC
-> >   ARM: EXYNOS4: Add power domain to use generic Power domain Framework
-> > 
-> >  arch/arm/mach-exynos4/Kconfig                      |   10 +-
-> >  arch/arm/mach-exynos4/Makefile                     |    4 +-
-> >  arch/arm/mach-exynos4/dev-pd.c                     |  139 --------------
-> >  arch/arm/mach-exynos4/include/mach/pm-exynos4210.h |   52 ++++++
-> >  arch/arm/mach-exynos4/include/mach/regs-clock.h    |    8 +
-> >  arch/arm/mach-exynos4/mach-nuri.c                  |   21 ++-
-> >  arch/arm/mach-exynos4/mach-smdkc210.c              |   26 ++-
-> >  arch/arm/mach-exynos4/mach-smdkv310.c              |   23 ++-
-> >  arch/arm/mach-exynos4/mach-universal_c210.c        |   21 ++-
-> >  arch/arm/mach-exynos4/pm-exynos4210.c              |  189 ++++++++++++++++++++
-> >  arch/arm/mach-exynos4/pm-runtime.c                 |   56 ++++++
-> >  arch/arm/plat-samsung/Kconfig                      |    8 -
-> >  arch/arm/plat-samsung/Makefile                     |    4 -
-> >  arch/arm/plat-samsung/include/plat/pd.h            |   30 ---
-> >  arch/arm/plat-samsung/pd.c                         |   95 ----------
-> >  15 files changed, 377 insertions(+), 309 deletions(-)
-> >  delete mode 100644 arch/arm/mach-exynos4/dev-pd.c
-> >  create mode 100644 arch/arm/mach-exynos4/include/mach/pm-exynos4210.h
-> >  create mode 100644 arch/arm/mach-exynos4/pm-exynos4210.c
-> >  create mode 100644 arch/arm/mach-exynos4/pm-runtime.c
-> >  delete mode 100644 arch/arm/plat-samsung/include/plat/pd.h
-> >  delete mode 100644 arch/arm/plat-samsung/pd.c
-> 
-> The patchset looks good to me, but please note that some code it
-> is based on will most likely change in 3.2 due to this patchset:
-> 
-> https://lkml.org/lkml/2011/8/8/420
+This patch fixes a build failure with the ap4evb_defconfig by adding the
+missing #ifdef CONFIG_PM.
 
-Err, isn't all that pm_clk stuff just duplicating what the clk API does?
-IOW, drivers _can_ (and should be) calling clk_disable() when they don't
-need the clock running.
+The build failure was:
+arch/arm/mach-shmobile/setup-sh7372.c:852: error: 'sh7372_a4lc'
+undeclared (first use in this function)
+arch/arm/mach-shmobile/setup-sh7372.c:852: error: (Each undeclared
+identifier is reported only once
+arch/arm/mach-shmobile/setup-sh7372.c:852: error: for each function it
+appears in.)
+
+sh7372_a4lc is declared in arch/arm/mach-shmobile/pm-sh7372.c within a
+ #ifdef CONFIG_PM block. Since the defconfig is missing CONFIG_PM this
+results in a build failure.
+
+KernelVersion: linux-next 20110812 (cab7d82)
+
+Signed-off-by: Peter Huewe <peterhuewe@gmx.de>
+---
+ arch/arm/mach-shmobile/setup-sh7372.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-shmobile/setup-sh7372.c b/arch/arm/mach-shmobile/setup-sh7372.c
+index df900bf..8455f0b 100644
+--- a/arch/arm/mach-shmobile/setup-sh7372.c
++++ b/arch/arm/mach-shmobile/setup-sh7372.c
+@@ -848,9 +848,9 @@ void __init sh7372_add_standard_devices(void)
+ 	sh7372_init_pm_domain(&sh7372_a3rv);
+ 	sh7372_init_pm_domain(&sh7372_a3ri);
+ 	sh7372_init_pm_domain(&sh7372_a3sg);
+-
++#ifdef CONFIG_PM
+ 	pm_genpd_add_subdomain(&sh7372_a4lc.genpd, &sh7372_a3sg.genpd);
+-
++#endif
+ 	platform_add_devices(sh7372_early_devices,
+ 			    ARRAY_SIZE(sh7372_early_devices));
+ 
+-- 
+1.7.3.4
