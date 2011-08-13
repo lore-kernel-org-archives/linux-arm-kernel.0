@@ -1,41 +1,103 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 13 Aug 2011 13:26:17 +0200
-Subject: [PATCH 0/2] Update uart irq handling for s3c64xx and later SoC's
-In-Reply-To: <1312971680-3898-1-git-send-email-thomas.abraham@linaro.org>
-References: <1312971680-3898-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <2617144.DJZiU5lFpE@flatron>
+Date: Sat, 13 Aug 2011 13:44:52 +0200
+Subject: [PATCH 1/5] ARM: s3c64xx: PM: Mask and acknowledge all UART
+	interrupts during core resume.
+In-Reply-To: <2174918.pIpigHPGMA@flatron>
+References: <5661373.tZL1ZnPyVO@flatron> <2174918.pIpigHPGMA@flatron>
+Message-ID: <1459034.DmseOOHbXX@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
-
-On Wednesday 10 of August 2011 at 15:51:18, Thomas Abraham wrote:
-> s3c64xx and later SoC's include the uart interrupt mask and pending 
-registers
-> in the uart controller, unlike their s3c24xx predecessor. This allows the
-> uart irq handling to be moved from the platform code to the driver. This
-> patchset does this change and removes all the macros that will not be
-> required with this update.
+On Friday 29 of July 2011 at 18:05:04, Tomasz Figa wrote:
+> From 9fd700af5b0c2289a09736a877f6047d1dcd3268 Mon Sep 17 00:00:00 2001
+> From: Tomasz Figa <tomasz.figa@gmail.com>
+> Date: Tue, 19 Jul 2011 22:21:41 +0200
+> Subject: [PATCH 1/5] ARM: s3c64xx: PM: Mask and acknowledge all UART
+>  interrupts during core resume.
+> 
+> On some boards (in my case Tiny6410 from FriendlyARM), after waking up from
+> sleep mode, UART controllers are left in an unclean state with interrupt
+> status bits set. After reenabling interrupts the system starts to get
+> hammered by infinite UART interrupts, which cannot be acknowledged, because
+> of disabled UART bus clock. You can imagine the outcome.
+> 
+> This patch deals with the issue by reenabling the bus clock in PCLK mask
+> temporarily, acknowledging and masking all the UART interrupts and then
+> restoring the original PCLK mask value, before interrupts get enabled.
+> 
+> Alternatively, the issue could be avoided by moving all the UART interrupt
+> handling to the S3C UART driver and disabling the IRQ on port suspend.
+> Could anyone explain me what is the benefit of having the UART IRQ managed
+> by the generic IRQ infrastructure, while it is used only by a single driver?
+> 
+> ---
+>  arch/arm/mach-s3c64xx/pm.c |   26 ++++++++++++++++++++++++++
+>  1 files changed, 26 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-s3c64xx/pm.c b/arch/arm/mach-s3c64xx/pm.c
+> index bc1c470..799a212 100644
+> --- a/arch/arm/mach-s3c64xx/pm.c
+> +++ b/arch/arm/mach-s3c64xx/pm.c
+> @@ -16,12 +16,14 @@
+>  #include <linux/suspend.h>
+>  #include <linux/serial_core.h>
+>  #include <linux/io.h>
+> +#include <linux/delay.h>
+>  
+>  #include <mach/map.h>
+>  #include <mach/irqs.h>
+>  
+>  #include <plat/pm.h>
+>  #include <plat/wakeup-mask.h>
+> +#include <plat/regs-serial.h>
+>  
+>  #include <mach/regs-sys.h>
+>  #include <mach/regs-gpio.h>
+> @@ -93,12 +95,36 @@ void s3c_pm_configure_extint(void)
+>  
+>  void s3c_pm_restore_core(void)
+>  {
+> +	u32 pclkgate, tmp;
+> +	int i;
+> +
+>  	__raw_writel(0, S3C64XX_EINT_MASK);
+>  
+>  	s3c_pm_debug_smdkled(1 << 2, 0);
+>  
+>  	s3c_pm_do_restore_core(core_save, ARRAY_SIZE(core_save));
+>  	s3c_pm_do_restore(misc_save, ARRAY_SIZE(misc_save));
+> +
+> +	tmp = pclkgate = __raw_readl(S3C_PCLK_GATE);
+> +
+> +	/* re-start uart clocks */
+> +	tmp |= S3C_CLKCON_PCLK_UART0;
+> +	tmp |= S3C_CLKCON_PCLK_UART1;
+> +	tmp |= S3C_CLKCON_PCLK_UART2;
+> +	tmp |= S3C_CLKCON_PCLK_UART3;
+> +
+> +	__raw_writel(tmp, S3C_PCLK_GATE);
+> +
+> +	udelay(10);
+> +
+> +	for (i = 0; i < 4; ++i) {
+> +		__raw_writel(15, S3C_VA_UARTx(i) + S3C64XX_UINTM);
+> +		__raw_writel(15, S3C_VA_UARTx(i) + S3C64XX_UINTP);
+> +	}
+> +
+> +	udelay(10);
+> +
+> +	__raw_writel(pclkgate, S3C_PCLK_GATE);
+>  }
+>  
+>  void s3c_pm_save_core(void)
 > 
 
-Your patches should solve the issue of system hanging on wake up because of 
-unacked (and unackable due to disabled UART bus clock) UART interrupts. So one 
-more reason to merge them.
+This should be fixed by
 
-My earlier description of the issue:
+[PATCH 0/2] Update uart irq handling for s3c64xx and later SoC's
+by Thomas Abraham,
 
-> I am experiencing a strange issue with UART ports on a Tiny6410 board, based
-> on the S3C6410 SoC (hardware wise same as the Mini6410 supported by Linux),
-> after enabling CONFIG_PM and suspending the SoC.
-> 
-> After triggering a wakeup event, it resumes till arch_suspend_enable_irqs()
-> called by suspend_enter() and starts to get hammered by infinite amounts of
-> UART interrupts.
-> 
-> I have tracked this down to disabling UART PCLK clock on suspend and the
-> bootloader/reset/power down/whatever leaving the UART in an undefined state
-> with interrupt bits set (specifically Tx interrupt), with the masked clock
-> making it impossible to ack them by plat-samsung/irq-uart.c. 
+so I guess it is safe to drop my patch.
 
 Best regards,
 Tom
