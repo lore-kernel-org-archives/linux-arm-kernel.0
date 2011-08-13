@@ -1,44 +1,65 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sun, 14 Aug 2011 00:14:06 +0800
-Subject: [PATCH v2 7/8] gpio/mxs: move irq_to_gpio() into gpio-mxs driver
+Date: Sun, 14 Aug 2011 00:14:07 +0800
+Subject: [PATCH v2 8/8] arm/mxs: move MXS_GPIO_NR into mach/mxs.h
 In-Reply-To: <1313252047-8820-1-git-send-email-shawn.guo@linaro.org>
 References: <1313252047-8820-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1313252047-8820-8-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1313252047-8820-9-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As irq_to_gpio() is only being used by gpio-mxs driver, it should be
-moved from mach/gpio.h into gpio-mxs.c.
+The patch moves MXS_GPIO_NR into mach/mxs.h, so that mach/gpio.h
+becomes an empty header and can wait for a global removal from
+asm/gpio.h.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/mach-mxs/include/mach/gpio.h |    2 --
- drivers/gpio/gpio-mxs.c               |    2 ++
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-mxs/include/mach/gpio.h |   26 +-------------------------
+ arch/arm/mach-mxs/include/mach/mxs.h  |    2 ++
+ 2 files changed, 3 insertions(+), 25 deletions(-)
 
 diff --git a/arch/arm/mach-mxs/include/mach/gpio.h b/arch/arm/mach-mxs/include/mach/gpio.h
-index bb11e63..8aea2ec 100644
+index 8aea2ec..40a8c17 100644
 --- a/arch/arm/mach-mxs/include/mach/gpio.h
 +++ b/arch/arm/mach-mxs/include/mach/gpio.h
-@@ -22,6 +22,4 @@
- 
- #define MXS_GPIO_NR(bank, nr)	((bank) * 32 + (nr))
- 
--#define irq_to_gpio(irq)	((irq) - MXS_GPIO_IRQ_START)
+@@ -1,25 +1 @@
+-/*
+- * Copyright 2007 Freescale Semiconductor, Inc. All Rights Reserved.
+- * Copyright 2008 Juergen Beisert, kernel at pengutronix.de
+- *
+- * This program is free software; you can redistribute it and/or
+- * modify it under the terms of the GNU General Public License
+- * as published by the Free Software Foundation; either version 2
+- * of the License, or (at your option) any later version.
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+- * MA  02110-1301, USA.
+- */
 -
- #endif /* __MACH_MXS_GPIO_H__ */
-diff --git a/drivers/gpio/gpio-mxs.c b/drivers/gpio/gpio-mxs.c
-index af55a85..292b504 100644
---- a/drivers/gpio/gpio-mxs.c
-+++ b/drivers/gpio/gpio-mxs.c
-@@ -49,6 +49,8 @@
- #define GPIO_INT_LEV_MASK	(1 << 0)
- #define GPIO_INT_POL_MASK	(1 << 1)
+-#ifndef __MACH_MXS_GPIO_H__
+-#define __MACH_MXS_GPIO_H__
+-
+-#define MXS_GPIO_NR(bank, nr)	((bank) * 32 + (nr))
+-
+-#endif /* __MACH_MXS_GPIO_H__ */
++/* empty */
+diff --git a/arch/arm/mach-mxs/include/mach/mxs.h b/arch/arm/mach-mxs/include/mach/mxs.h
+index 35a89dd..5aa5f75 100644
+--- a/arch/arm/mach-mxs/include/mach/mxs.h
++++ b/arch/arm/mach-mxs/include/mach/mxs.h
+@@ -86,6 +86,8 @@
+ 	.type = _type,							\
+ }
  
-+#define irq_to_gpio(irq)	((irq) - MXS_GPIO_IRQ_START)
++#define MXS_GPIO_NR(bank, nr)	((bank) * 32 + (nr))
 +
- struct mxs_gpio_port {
- 	void __iomem *base;
- 	int id;
+ #define MXS_SET_ADDR		0x4
+ #define MXS_CLR_ADDR		0x8
+ #define MXS_TOG_ADDR		0xc
 -- 
 1.7.4.1
