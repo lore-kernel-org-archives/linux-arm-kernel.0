@@ -1,65 +1,51 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sun, 14 Aug 2011 00:14:07 +0800
-Subject: [PATCH v2 8/8] arm/mxs: move MXS_GPIO_NR into mach/mxs.h
-In-Reply-To: <1313252047-8820-1-git-send-email-shawn.guo@linaro.org>
-References: <1313252047-8820-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1313252047-8820-9-git-send-email-shawn.guo@linaro.org>
+From: lacombar@gmail.com (Arnaud Lacombe)
+Date: Sat, 13 Aug 2011 12:02:32 -0400
+Subject: [PATCH] ARM: zImage: Skip relinking if nothing changes
+In-Reply-To: <20110813063409.GA29111@merkur.ravnborg.org>
+References: <4E457682.5020107@codeaurora.org>
+	<1313175602-21834-1-git-send-email-sboyd@codeaurora.org>
+	<CACqU3MUq5M-XPOxV=8GKyEzjEzpmdeaF+mGrXJrK+ZZxa4SdeQ@mail.gmail.com>
+	<20110812205520.GL4775@n2100.arm.linux.org.uk>
+	<CACqU3MX=-10ouxCqWcBP7MW3_O4_RSLG9wRY8X4iEh5ydQa1AQ@mail.gmail.com>
+	<20110812220316.GA28845@merkur.ravnborg.org>
+	<CACqU3MUVir_hfAtVz24Y7NrQOHAa=WyyHnCN4M6BHLQ294Tdww@mail.gmail.com>
+	<20110813063409.GA29111@merkur.ravnborg.org>
+Message-ID: <CACqU3MVHgF276SmQFWMcMRL470wz5F4=t0ZmKQ3YoK6Gy9=ETA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch moves MXS_GPIO_NR into mach/mxs.h, so that mach/gpio.h
-becomes an empty header and can wait for a global removal from
-asm/gpio.h.
+Hi,
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/mach-mxs/include/mach/gpio.h |   26 +-------------------------
- arch/arm/mach-mxs/include/mach/mxs.h  |    2 ++
- 2 files changed, 3 insertions(+), 25 deletions(-)
+On Sat, Aug 13, 2011 at 2:34 AM, Sam Ravnborg <sam@ravnborg.org> wrote:
+> On Fri, Aug 12, 2011 at 06:17:25PM -0400, Arnaud Lacombe wrote:
+>> Hi,
+>>
+>> On Fri, Aug 12, 2011 at 6:03 PM, Sam Ravnborg <sam@ravnborg.org> wrote:
+>> >>
+>> >> I suspect this would have done the job:
+>> >>
+>> >> $(obj)/font.o: $(srctree)/drivers/video/console/font_acorn_8x8.c
+>> >> ? ? ? ? $(cmd,cc_o_c)'
+>> >
+>> > I prefer using $(call,shipped) and let kbuild figure out how
+>> > build an .o file from a .c file.
+>> >
+>> > In other words - avoiding use of the internal to Makefile.build
+>> > variables in various places.
+>> >
+>> indeed, but I'd argue that 1) this would not be the first Makefile
+>> using these internal macros (alpha and ia64 are using such construct
+>> for aliasing) and 2) the `cmd_shipped' stuff is as internal than other
+>> functions :-)
+> A quick grep in Documentation/kbuild will show that only the shipped
+> variant is documented.
+>
+> We could implement a general copy command - this is needed in some places
+> like this.
+>
+I was more thinking of a way to use a single source file, for multiple
+target, built in different location, without having to make useless
+copy or cross-subdirectory target dependencies, and removing all
+non-internal use of cc_c_o, and friends.
 
-diff --git a/arch/arm/mach-mxs/include/mach/gpio.h b/arch/arm/mach-mxs/include/mach/gpio.h
-index 8aea2ec..40a8c17 100644
---- a/arch/arm/mach-mxs/include/mach/gpio.h
-+++ b/arch/arm/mach-mxs/include/mach/gpio.h
-@@ -1,25 +1 @@
--/*
-- * Copyright 2007 Freescale Semiconductor, Inc. All Rights Reserved.
-- * Copyright 2008 Juergen Beisert, kernel at pengutronix.de
-- *
-- * This program is free software; you can redistribute it and/or
-- * modify it under the terms of the GNU General Public License
-- * as published by the Free Software Foundation; either version 2
-- * of the License, or (at your option) any later version.
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-- * MA  02110-1301, USA.
-- */
--
--#ifndef __MACH_MXS_GPIO_H__
--#define __MACH_MXS_GPIO_H__
--
--#define MXS_GPIO_NR(bank, nr)	((bank) * 32 + (nr))
--
--#endif /* __MACH_MXS_GPIO_H__ */
-+/* empty */
-diff --git a/arch/arm/mach-mxs/include/mach/mxs.h b/arch/arm/mach-mxs/include/mach/mxs.h
-index 35a89dd..5aa5f75 100644
---- a/arch/arm/mach-mxs/include/mach/mxs.h
-+++ b/arch/arm/mach-mxs/include/mach/mxs.h
-@@ -86,6 +86,8 @@
- 	.type = _type,							\
- }
- 
-+#define MXS_GPIO_NR(bank, nr)	((bank) * 32 + (nr))
-+
- #define MXS_SET_ADDR		0x4
- #define MXS_CLR_ADDR		0x8
- #define MXS_TOG_ADDR		0xc
--- 
-1.7.4.1
+ - Arnaud
