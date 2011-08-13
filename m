@@ -1,67 +1,99 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 13 Aug 2011 10:35:29 +0100
-Subject: [PATCH 1/6] arm/cpuimx51: gpio_to_irq() should be used to get
-	irq from gpio number
-In-Reply-To: <20110812111306.GH6618@S2100-06.ap.freescale.net>
-References: <1313135701-22456-1-git-send-email-shawn.guo@linaro.org>
-	<1313135701-22456-2-git-send-email-shawn.guo@linaro.org>
-	<CAB4PhKdAgasG3wJ2JvS_Ds0ReGjDCgZh_prepNGF=FqG6fRx7A@mail.gmail.com>
-	<20110812111306.GH6618@S2100-06.ap.freescale.net>
-Message-ID: <20110813093529.GN4775@n2100.arm.linux.org.uk>
+From: marek.belisko@gmail.com (Belisko Marek)
+Date: Sat, 13 Aug 2011 11:49:18 +0200
+Subject: [RFC PATCH 08/12] gpio/tegra: Add device tree support
+In-Reply-To: <1313189697-21287-9-git-send-email-swarren@nvidia.com>
+References: <1313189697-21287-1-git-send-email-swarren@nvidia.com>
+	<1313189697-21287-9-git-send-email-swarren@nvidia.com>
+Message-ID: <CAAfyv34kOtwjerB0gMhEKNTwGd9w-LCE52MCUuvzTyYkXLY-dg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 12, 2011 at 07:13:07PM +0800, Shawn Guo wrote:
-> On Fri, Aug 12, 2011 at 05:36:32PM +0800, Jason Liu wrote:
-> > 2011/8/12 Shawn Guo <shawn.guo@linaro.org>:
-> > > Instead of irq_to_gpio(), gpio_to_irq() should be used to get irq
-> > > from gpio number.
-> > >
-> > > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > > Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> > > ---
-> > > ?arch/arm/mach-mx5/board-cpuimx51.c | ? ?2 +-
-> > > ?1 files changed, 1 insertions(+), 1 deletions(-)
-> > >
-> > > diff --git a/arch/arm/mach-mx5/board-cpuimx51.c b/arch/arm/mach-mx5/board-cpuimx51.c
-> > > index 7c893fa..68934ea 100644
-> > > --- a/arch/arm/mach-mx5/board-cpuimx51.c
-> > > +++ b/arch/arm/mach-mx5/board-cpuimx51.c
-> > > @@ -81,7 +81,7 @@ static struct plat_serial8250_port serial_platform_data[] = {
-> > > ? ? ? ? ? ? ? ?.flags = UPF_BOOT_AUTOCONF | UPF_SKIP_TEST | UPF_IOREMAP,
-> > > ? ? ? ?}, {
-> > > ? ? ? ? ? ? ? ?.mapbase = (unsigned long)(MX51_CS1_BASE_ADDR + 0x2000000),
-> > > - ? ? ? ? ? ? ? .irq = irq_to_gpio(CPUIMX51_QUARTD_GPIO),
-> > > + ? ? ? ? ? ? ? .irq = gpio_to_irq(CPUIMX51_QUARTD_GPIO),
-> > > ? ? ? ? ? ? ? ?.irqflags = IRQF_TRIGGER_HIGH,
-> > > ? ? ? ? ? ? ? ?.uartclk = CPUIMX51_QUART_XTAL,
-> > > ? ? ? ? ? ? ? ?.regshift = CPUIMX51_QUART_REGSHIFT,
-> > > --
-> > 
-> > The fix has already in Sascah's tree:
-> > 
-> > Author: Ben Dooks <ben-linux@fluff.org>
-> > Date:   Thu Aug 4 16:47:35 2011 +0100
-> > 
-> >     ARM: mx5: board-cpuimx51.c fixup irq_to_gpio() usage
-> > 
-> >     irq_to_gpio() is being called on a GPIO so change to using
-> >     gpio_to_irq() instead.
-> > 
-> >     Signed-off-by: Ben Dooks <ben-linux@fluff.org>
-> >     Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> > 
-> > Jason
-> > 
-> Sorry, I missed that.  Thanks for pointing it out, Jason.
-> 
-> I will fold Ben's patch here, as I see Russell would probably pick up
-> the series.  Otherwise, Russell, please let me know if I should base
-> it on Sascha's tree.
+On Sat, Aug 13, 2011 at 12:54 AM, Stephen Warren <swarren@nvidia.com> wrote:
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> ---
+> ?drivers/gpio/gpio-tegra.c | ? 31 +++++++++++++++++++++++++++++++
+> ?1 files changed, 31 insertions(+), 0 deletions(-)
+>
+> diff --git a/drivers/gpio/gpio-tegra.c b/drivers/gpio/gpio-tegra.c
+> index 4da4839..923b413 100644
+> --- a/drivers/gpio/gpio-tegra.c
+> +++ b/drivers/gpio/gpio-tegra.c
+> @@ -326,6 +326,29 @@ static struct irq_chip tegra_gpio_irq_chip = {
+> ?#endif
+> ?};
+>
+> +#ifdef CONFIG_OF
+> +static void __init tegra_gpio_probe_dt(struct platform_device *pdev)
+> +{
+> + ? ? ? const __be32 *gpios;
+> + ? ? ? u32 gpioslen;
+> + ? ? ? int i;
+> +
+> + ? ? ? gpios = of_get_property(pdev->dev.of_node, "nvidia,gpios", &gpioslen);
+> + ? ? ? if (gpios == NULL)
+> + ? ? ? ? ? ? ? return;
+> +
+> + ? ? ? gpioslen /= sizeof(*gpios);
+> + ? ? ? for (i = 0; i < gpioslen; i++, gpios++) {
+> + ? ? ? ? ? ? ? u32 gpio = be32_to_cpup(gpios);
+> + ? ? ? ? ? ? ? dev_err(&pdev->dev, "Enabling GPIO %d\n", gpio);
+Is really necessary to print all enabled gpio's to console? Also seen
+same in pinmux probe.
+> + ? ? ? ? ? ? ? tegra_gpio_enable(gpio);
+> + ? ? ? }
+> +}
+> +#else
+> +static inline void __init tegra_gpio_probe_dt(struct platform_device *pdev)
+> +{
+> +}
+> +#endif
+>
+> ?/* This lock class tells lockdep that GPIO irqs are in a different
+> ?* category than their parents, so it won't report false recursion.
+> @@ -371,13 +394,21 @@ static int __init tegra_gpio_probe(struct platform_device *pdev)
+> ? ? ? ? ? ? ? ? ? ? ? ?spin_lock_init(&bank->lvl_lock[j]);
+> ? ? ? ?}
+>
+> + ? ? ? tegra_gpio_probe_dt(pdev);
+> +
+> ? ? ? ?return 0;
+> ?}
+>
+> +static struct of_device_id tegra_gpio_of_match[] __devinitdata = {
+> + ? ? ? { .compatible = "nvidia,tegra20-gpio", },
+> + ? ? ? { },
+> +};
+> +
+> ?static struct platform_driver tegra_gpio_driver = {
+> ? ? ? ?.driver ? ? ? ? = {
+> ? ? ? ? ? ? ? ?.name ? = "tegra-gpio",
+> ? ? ? ? ? ? ? ?.owner ?= THIS_MODULE,
+> + ? ? ? ? ? ? ? .of_match_table = tegra_gpio_of_match,
+> ? ? ? ?},
+> ? ? ? ?.probe ? ? ? ? ?= tegra_gpio_probe,
+> ?};
+> --
+> 1.7.0.4
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at ?http://www.tux.org/lkml/
+>
 
-Shouldn't this patch be targetted for -rc and maybe stable?  It's
-difficult to tell from the commit description whether it really does
-cause a runtime problem or not.
+regards,
 
-If it does go in to a -rc, then I can easily move my gpio patch set
-forward.
+marek
+
+-- 
+as simple and primitive as possible
+-------------------------------------------------
+Marek Belisko - OPEN-NANDRA
+Freelance Developer
+
+Ruska Nova Ves 219 | Presov, 08005 Slovak Republic
+Tel: +421 915 052 184
+skype: marekwhite
+icq: 290551086
+web: http://open-nandra.com
