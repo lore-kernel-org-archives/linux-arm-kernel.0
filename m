@@ -1,65 +1,44 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 14 Aug 2011 00:24:37 -0700
-Subject: [RFC PATCH 06/12] arm/dt: Tegra: Add pinmux node
-In-Reply-To: <1313189697-21287-7-git-send-email-swarren@nvidia.com>
-References: <1313189697-21287-1-git-send-email-swarren@nvidia.com>
-	<1313189697-21287-7-git-send-email-swarren@nvidia.com>
-Message-ID: <CAOesGMheuUfSe1uUA6LxZ71V0-DR3XX7bEJqhVxJ-ZqrWWa1bA@mail.gmail.com>
+Date: Sun, 14 Aug 2011 00:35:48 -0700
+Subject: [GIT PULL] [3.2] Please pull tegra boards for 3.2
+Message-ID: <CAOesGMjHN-pvVfMN0o3AD238m8wEiRS-D4ArjV_2VAGTuwPfBw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Arnd,
 
-On Fri, Aug 12, 2011 at 3:54 PM, Stephen Warren <swarren@nvidia.com> wrote:
-> Add a pinmux node to tegra20.dtsi in order to instantiate the future
-> pinmux device. Add pinmux nodes to Harmony and Seaboard, which detail
-> the entire default pinmux configuration. This configuration is identical
-> to that in board-harmony/seaboard-pinmux.c.
-
-Again, documentation for the binding is needed.
-
-Seeing the table coded up now though, I wonder if it could make sense
-to flip it around? The number of functions multiplexed out are fewer
-than the pin groups (and this would be even more true on platforms
-that have per-pin configurations and/or smaller groups).
-
-I.e. something like:
-
-    sdio4 {
-            nvidia,pingroups = < DTA DTD >; // Not sure how to
-reference this though -- integers would be hard to read. DTA/DTD
-aren't valid values in the syntax.
-            nvidia,pull-up
-    },
-
-And any pingroups not covered by a function would be left alone (one
-could easily define a few no-op functions to set pull up/down and
-tristate values on the unused groups).
-
-[...]
-
-> + ? ? ? pinmux: pinmux at 70000000 {
-> + ? ? ? ? ? ? ? ATA {
-
-I would prefer seeing these in lower case (since device tree tends to
-be no-caps). Should be easy to switch to strcasecmp in the code.
-
-[...]
-> + ? ? ? ? ? ? ? CDEV2 {
-> + ? ? ? ? ? ? ? ? ? ? ? nvidia,function = "PLLP_OUT4";
-
-The string here is a bit unfortunate. It's really just used to map
-from the string to an integer anyway, with the reverse mapping being
-produced by the debugfs output. But especially if the function is
-flipped above, the different pingroups referenced might not use the
-same value for each function, so some sort of lookup will still be
-needed. Not much to do about, it seems. :(
+Please pull the first set of tegra/board patches for 3.2:
 
 
-> + ? ? ? ? ? ? ? ? ? ? ? nvidia,pull = "down";
+The following changes since commit e6a99d312687a42c077a9b8cb5e757f186edb1b9:
 
-This should be done by discrete properties instead: nvidia,pull-up,
-nvidia-pull-down (and omitted means normal), without values.
+  Merge branch 'slab/urgent' of
+git://git.kernel.org/pub/scm/linux/kernel/git/penberg/slab-2.6
+(2011-08-09 08:42:16 -0700)
 
+are available in the git repository at:
 
--Olof
+  git://git.kernel.org/pub/scm/linux/kernel/git/olof/tegra.git boards-for-3.2
+
+Marc Dietrich (5):
+      ARM: tegra: paz00: add support serial port on JP1
+      ARM: tegra: paz00: enable rfkill for internal wifi card
+      ARM: tegra: paz00: enable wifi led
+      ARM: tegra: paz00: reorder the SDHCI channel init
+      ARM: tegra: paz00: add clocks required for usb operation
+
+Stephen Warren (4):
+      ARM: Tegra: Harmony: Add USB device
+      ARM: Tegra: Seaboard board updates for audio
+      ARM: Tegra: Seaboard: Add USB devices
+      ARM: Tegra: Force PORT_TEGRA as the UART type
+
+ arch/arm/mach-tegra/board-harmony.c         |    5 +-
+ arch/arm/mach-tegra/board-paz00-pinmux.c    |    3 +
+ arch/arm/mach-tegra/board-paz00.c           |   62 ++++++++++++++++++++-
+ arch/arm/mach-tegra/board-paz00.h           |   16 ++++-
+ arch/arm/mach-tegra/board-seaboard-pinmux.c |    6 +-
+ arch/arm/mach-tegra/board-seaboard.c        |   81 ++++++++++++++++++++++++++-
+ arch/arm/mach-tegra/board-seaboard.h        |   12 +++-
+ arch/arm/mach-tegra/board-trimslice.c       |    3 +-
+ 8 files changed, 173 insertions(+), 15 deletions(-)
