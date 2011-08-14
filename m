@@ -1,60 +1,67 @@
-From: bsteinsbo@gmail.com (Bjarne Steinsbo)
-Date: Sun, 14 Aug 2011 14:51:48 +0200
-Subject: [PATCH] ARM: mm/alignment.c: Fix build breakage when CONFIG_PROC_FS
-	is not selected
-Message-ID: <CAFULf_zzAZKk5CsPz+9x1i0gORbapwBBwzRH1BM7s_ZuEs_8DQ@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Sun, 14 Aug 2011 16:01:48 +0100
+Subject: [PATCH] ARM: EXYNOS4: Configure MAX8997 PMIC for Origen
+In-Reply-To: <1313034965-21286-1-git-send-email-inderpal.singh@linaro.org>
+References: <1313034965-21286-1-git-send-email-inderpal.singh@linaro.org>
+Message-ID: <20110814150148.GB25504@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Compiling mm/alignment.c without CONFIG_PROC_FS selected fails with
-undefined cpu_is_v6_unaligned() and safe_usermode().
+On Thu, Aug 11, 2011 at 09:26:05AM +0530, Inderpal Singh wrote:
 
-Move #ifdef CONFIG_PROC_FS, including definition of usermode_action[],
-further down to avoid this problem.
+> +static struct regulator_consumer_supply __initdata ldo7_consumer[] = {
+> +	REGULATOR_SUPPLY("avdd", "soc-audio"), /* Reatek ALC5625*/
+> +};
 
-Cc: Russell King <linux@arm.linux.org.uk>
-Signed-off-by: Bjarne Steinsbo <bsteinsbo@gmail.com>
----
- arch/arm/mm/alignment.c |   20 ++++++++++----------
- 1 files changed, 10 insertions(+), 10 deletions(-)
+Ick, no.  The soc-audio device is a virtual device within Linux and is
+being phased out, any driver adding new soc-audio devices will be
+rejected.  The CODEC driver should deal with its own power.
 
-diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
-index cfbcf8b..c335c76 100644
---- a/arch/arm/mm/alignment.c
-+++ b/arch/arm/mm/alignment.c
-@@ -86,16 +86,6 @@ core_param(alignment, ai_usermode, int, 0600);
- #define UM_FIXUP	(1 << 1)
- #define UM_SIGNAL	(1 << 2)
+> +static struct regulator_init_data __initdata max8997_ldo3_data = {
+> +	.constraints	= {
+> +		.name		= "VMIPI_1.1V",
+> +		.min_uV		= 1100000,
+> +		.max_uV		= 1100000,
+> +		.apply_uV	= 1,
+> +		.always_on	= 1,
+> +		.valid_ops_mask	= REGULATOR_CHANGE_STATUS,
 
--#ifdef CONFIG_PROC_FS
--static const char *usermode_action[] = {
--	"ignored",
--	"warn",
--	"fixup",
--	"fixup+warn",
--	"signal",
--	"signal+warn"
--};
--
- /* Return true if and only if the ARMv6 unaligned access model is in use. */
- static bool cpu_is_v6_unaligned(void)
- {
-@@ -123,6 +113,16 @@ static int safe_usermode(int new_usermode, bool warn)
- 	return new_usermode;
- }
+The regulator is always enabled but the consumers can change its status?
 
-+#ifdef CONFIG_PROC_FS
-+static const char *usermode_action[] = {
-+	"ignored",
-+	"warn",
-+	"fixup",
-+	"fixup+warn",
-+	"signal",
-+	"signal+warn"
-+};
-+
- static int alignment_proc_show(struct seq_file *m, void *v)
- {
- 	seq_printf(m, "User:\t\t%lu\n", ai_user);
--- 
-1.7.1
+> +		.name		= "DVDD_SWB_2.8V",
+> +		.min_uV		= 2800000,
+> +		.max_uV		= 2800000,
+> +		.apply_uV	= 1,
+> +		.always_on	= 1,
+> +		.valid_ops_mask	= REGULATOR_CHANGE_VOLTAGE,
+
+The regulator has a fixed voltage but the consumers can change it?
+
+> +static struct i2c_board_info i2c0_devs[] __initdata = {
+> +[I2C0_MAX8997] = {
+> +	I2C_BOARD_INFO("max8997", (0xCC >> 1)),
+> +	.platform_data = &origen_max8997_pdata,
+> +	},
+> +};
+
+Why are you assigning the array index?  That's very unusual.
+
+> +static void __init origen_power_init(void)
+> +{
+> +	int gpio;
+> +	int irq_base = IRQ_GPIO_END + 1;
+> +
+> +	origen_max8997_pdata.irq_base = irq_base;
+
+Why is this not just set statically in the pdata?
+
+> +	gpio = EXYNOS4_GPX0(4);
+> +	s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(0xf));
+> +	s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
+
+A define for the GPIO would be a bit more common.
+
+> +	s3c_i2c0_set_platdata(NULL);
+> +	i2c0_devs[I2C0_MAX8997].irq = gpio_to_irq(EXYNOS4_GPX0(4));
+
+There should be defines to do this statically.
