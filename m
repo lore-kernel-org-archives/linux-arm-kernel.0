@@ -1,76 +1,40 @@
-From: marek.belisko@open-nandra.com (Marek Belisko)
-Date: Sun, 14 Aug 2011 21:47:15 +0200
-Subject: [PATCH] omap2+:panda: Make hdmi_mux_init more robust.
-Message-ID: <1313351235-11400-1-git-send-email-marek.belisko@open-nandra.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Sun, 14 Aug 2011 21:48:51 +0100
+Subject: [PATCH kernel-3.0] arm:cache-l2x0: Fix L2 Cache size calculation.
+In-Reply-To: <20110813084129.GM4775@n2100.arm.linux.org.uk>
+References: <1313142327-18320-1-git-send-email-srinivas.kandagatla@st.com>
+	<20110812102020.GD14904@e102144-lin.cambridge.arm.com>
+	<20110813084129.GM4775@n2100.arm.linux.org.uk>
+Message-ID: <20110814204851.GA1948@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add error checking to omap4_panda_hdmi_mux_init function to
-avoid problems when mux fails.
+Hi Russell,
 
-Signed-off-by: Marek Belisko <marek.belisko@open-nandra.com>
----
- arch/arm/mach-omap2/board-omap4panda.c |   38 +++++++++++++++++++++++--------
- 1 files changed, 28 insertions(+), 10 deletions(-)
+On Sat, Aug 13, 2011 at 09:41:29AM +0100, Russell King - ARM Linux wrote:
+> On Fri, Aug 12, 2011 at 11:20:20AM +0100, Will Deacon wrote:
+> > On Fri, Aug 12, 2011 at 10:45:27AM +0100, Srinivas KANDAGATLA wrote:
+> > > From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+> > > 
+> > > This patch fixes L2 Cache size calculations for L2C-210, L2C-310 and
+> > > PL310, by changing the L2X0_AUX_CTRL_WAY_SIZE_MASK from 2 bits to 3
+> > > bits.
 
-diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
-index 9aaa960..59fba7c 100644
---- a/arch/arm/mach-omap2/board-omap4panda.c
-+++ b/arch/arm/mach-omap2/board-omap4panda.c
-@@ -485,18 +485,33 @@ int __init omap4_panda_dvi_init(void)
- }
- 
- 
--static void omap4_panda_hdmi_mux_init(void)
-+static int omap4_panda_hdmi_mux_init(void)
- {
-+	int ret;
- 	/* PAD0_HDMI_HPD_PAD1_HDMI_CEC */
--	omap_mux_init_signal("hdmi_hpd",
--			OMAP_PIN_INPUT_PULLUP);
--	omap_mux_init_signal("hdmi_cec",
--			OMAP_PIN_INPUT_PULLUP);
-+	ret = omap_mux_init_signal("hdmi_hpd",
-+				OMAP_PIN_INPUT_PULLUP);
-+	if (ret)
-+		goto err;
-+
-+	ret = omap_mux_init_signal("hdmi_cec",
-+				OMAP_PIN_INPUT_PULLUP);
-+	if (ret)
-+		goto err;
-+
- 	/* PAD0_HDMI_DDC_SCL_PAD1_HDMI_DDC_SDA */
--	omap_mux_init_signal("hdmi_ddc_scl",
--			OMAP_PIN_INPUT_PULLUP);
--	omap_mux_init_signal("hdmi_ddc_sda",
--			OMAP_PIN_INPUT_PULLUP);
-+	ret = omap_mux_init_signal("hdmi_ddc_scl",
-+				OMAP_PIN_INPUT_PULLUP);
-+	if (ret)
-+		goto err;
-+
-+	ret = omap_mux_init_signal("hdmi_ddc_sda",
-+				OMAP_PIN_INPUT_PULLUP);
-+	if (ret)
-+		goto err;
-+	return 0;
-+err:
-+	return ret;
- }
- 
- static struct gpio panda_hdmi_gpios[] = {
-@@ -550,7 +565,10 @@ void omap4_panda_display_init(void)
- 	if (r)
- 		pr_err("error initializing panda DVI\n");
- 
--	omap4_panda_hdmi_mux_init();
-+	r = omap4_panda_hdmi_mux_init();
-+	if (r)
-+		pr_err("error initializing panda HDMI\n");
-+
- 	omap_display_init(&omap4_panda_dss_data);
- }
- 
--- 
-1.7.4.1
+[...]
+
+> > Please can you CC stable on this too?
+> 
+> It's probably better to ask people to add a Cc: line to the _attributations_
+> rather than telling them to CC the stable tree with their email, and then
+> get a whinge from the stable maintainers about how that's not how to submit
+> patches for stable trees.
+
+Of course, that's what I intended but unfortunately my choice of words
+was ambiguous.
+
+Srinivas: can you add the CC stable line to your patch please and put it
+into Russell's patch system?
+
+Thanks,
+
+Will
