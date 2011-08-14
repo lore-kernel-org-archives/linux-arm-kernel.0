@@ -1,30 +1,50 @@
-From: ivan.djelic@parrot.com (Ivan Djelic)
-Date: Sun, 14 Aug 2011 10:11:39 +0200
-Subject: GPMI-NAND Status?
-In-Reply-To: <20110805135133.GA26981@pengutronix.de>
-References: <20110805135133.GA26981@pengutronix.de>
-Message-ID: <20110814081139.GD17063@parrot.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 14 Aug 2011 09:29:28 +0100
+Subject: [PATCH 09/18] dmaengine/amba-pl08x: Schedule tasklet in case
+	of error interrupt
+In-Reply-To: <1312435962.1536.566.camel@vkoul-udesk3>
+References: <cover.1311936523.git.viresh.kumar@st.com>
+	<9c81beb9cd84f84b58abbd24ebfae85dfe8d8ee1.1311936524.git.viresh.kumar@st.com>
+	<1311941799.1536.532.camel@vkoul-udesk3>
+	<CAOh2x==_g+JQzTizgVTdH8Dyg_5+KpyYm+G_Ddu5mO15N6n-tw@mail.gmail.com>
+	<1312431918.1536.559.camel@vkoul-udesk3> <4E3A342E.5080503@st.com>
+	<1312435962.1536.566.camel@vkoul-udesk3>
+Message-ID: <20110814082928.GD4986@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 05, 2011 at 02:51:33PM +0100, Wolfram Sang wrote:
-(...)
-> 
-> problem overwriting all-0xff data in NAND [2]
-> =============================================
-> 
-> Although it occured only when writing JFFS2 images so far, this is a generic
-> issue and needs to be fixed, right?
-> 
-> 
-(...)
-> [2] http://lists.infradead.org/pipermail/linux-mtd/2011-July/037104.html
+On Thu, Aug 04, 2011 at 11:02:42AM +0530, Koul, Vinod wrote:
+> On Thu, 2011-08-04 at 11:24 +0530, viresh kumar wrote:
+> > On 08/04/2011 09:55 AM, Koul, Vinod wrote:
+> > > Yes that's the whole point, today callback mechanism doesn't tell the
+> > > _status_ of the transfer (which if we need change can be discussed as
+> > > well), but to counter argue I have never been able to generate the error
+> > > interrupt, are you able to do on your controller?
+> > 
+> > Yes, if we supply unaligned address, with access width as word, then it gives
+> > error interrupt.
+> > 
+> > Regarding your point of updating callback for reporting errors,
+> > I think it is required and should be a common issue.
+> Okay till now no one has asked for it. We can add to callback arguments
+> either a bool to indicate what is the transfer status or usual error
+> code to also indicate what type of failure.
+> I would prefer latter, if there is consensus on this, we can go thru
+> with this approach, Dan your comments?
 
-As explained in the thread linked above, this issue should be fixed in your
-flashing tool, _not_ in your driver. The nand device you are using does not
-support programming pages multiple times in a row; pretending it does in the
-special all-0xff case is inefficient (you need to detect all-0xff data) and
-unnecessary (just do not program blank pages !).
-BR,
+If we are concerned about unaligned addresses, then that's something which
+should be checked for at prepare time, to avoid failing DMA transfers.  A
+failed DMA transfer is potentially a data loss situation, one that we want
+to avoid.
 
-Ivan
+Consider for instance a UART driver using DMA for TX/RX.  We want to know
+when we prepare the RX DMA whether the DMA engine is going to be able to
+perform the requested transfer.  We don't want to know when characters
+start coming in, because not only would we have to undo the DMA setup,
+but we'd also need to ensure that we start reading the characters via PIO
+as quickly as possible to avoid overruns.
+
+So, what I'd say is if you receive an error interrupt, either the prep
+code isn't robust enough - it's like a BUG() telling us that something
+needs fixing.  So, I think printing a warning and stalling makes sense -
+and hopefully we get a bug report to investigate the causes.
