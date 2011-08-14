@@ -1,8 +1,10 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Sun, 14 Aug 2011 19:54:12 +0900
-Subject: [PATCH] ARM: S3C64XX: Use module identification for Craggamore system
-	builds
-Message-ID: <1313319252-5624-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Date: Sun, 14 Aug 2011 20:02:03 +0900
+Subject: [PATCH v2] ARM: S3C64XX: Use module identification for Craggamore
+	system builds
+In-Reply-To: <1313319252-5624-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+References: <1313319252-5624-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <1313319723-7293-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,12 +16,16 @@ the mini-driver in the system the driver is placed in a separate file.
 
 Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 ---
+
+Sorry, resent due to a line of context from a change that is not yet
+upstreamed which would cause an issue applying the change.
+
  arch/arm/mach-s3c64xx/Kconfig                 |    1 +
  arch/arm/mach-s3c64xx/Makefile                |    2 +-
  arch/arm/mach-s3c64xx/include/mach/crag6410.h |   23 ++++
  arch/arm/mach-s3c64xx/mach-crag6410-module.c  |  167 +++++++++++++++++++++++++
- arch/arm/mach-s3c64xx/mach-crag6410.c         |   84 +------------
- 5 files changed, 197 insertions(+), 80 deletions(-)
+ arch/arm/mach-s3c64xx/mach-crag6410.c         |   85 +------------
+ 5 files changed, 197 insertions(+), 81 deletions(-)
  create mode 100644 arch/arm/mach-s3c64xx/include/mach/crag6410.h
  create mode 100644 arch/arm/mach-s3c64xx/mach-crag6410-module.c
 
@@ -250,7 +256,7 @@ index 0000000..d714b7e
 +}
 +module_init(wlf_gf_module_register);
 diff --git a/arch/arm/mach-s3c64xx/mach-crag6410.c b/arch/arm/mach-s3c64xx/mach-crag6410.c
-index f8469b6..ed2f9a5 100644
+index 5affb26..1ef53b2 100644
 --- a/arch/arm/mach-s3c64xx/mach-crag6410.c
 +++ b/arch/arm/mach-s3c64xx/mach-crag6410.c
 @@ -47,6 +47,7 @@
@@ -261,15 +267,14 @@ index f8469b6..ed2f9a5 100644
  
  #include <mach/regs-gpio-memport.h>
  
-@@ -65,18 +66,8 @@
+@@ -65,17 +66,6 @@
  #include <plat/iic.h>
  #include <plat/pm.h>
  
 -#include <sound/wm8996.h>
 -#include <sound/wm8962.h>
 -#include <sound/wm9081.h>
- #include <sound/wm0010.h>
- 
+-
 -#define BANFF_PMIC_IRQ_BASE		IRQ_BOARD_START
 -#define GLENFARCLAS_PMIC_IRQ_BASE	(IRQ_BOARD_START + 64)
 -
@@ -280,7 +285,7 @@ index f8469b6..ed2f9a5 100644
  /* serial port setup */
  
  #define UCON (S3C2410_UCON_DEFAULT | S3C2410_UCON_UCLK)
-@@ -655,81 +646,16 @@ static struct wm831x_pdata glenfarclas_pmic_pdata __initdata = {
+@@ -623,81 +613,16 @@ static struct wm831x_pdata glenfarclas_pmic_pdata __initdata = {
  	.disable_touch = true,
  };
  
