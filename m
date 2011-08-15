@@ -1,86 +1,34 @@
-From: leoy@marvell.com (Leo Yan)
-Date: Mon, 15 Aug 2011 11:09:54 +0800
-Subject: [PATCH 3/3] ARM: mmp: register internal sram bank
+From: haojian.zhuang@marvell.com (Haojian Zhuang)
+Date: Mon, 15 Aug 2011 11:11:33 +0800
+Subject: [PATCH V4 0/3] ARM: mmp: add audio sram support
 In-Reply-To: <1313377794-26721-1-git-send-email-leoy@marvell.com>
 References: <1313377794-26721-1-git-send-email-leoy@marvell.com>
-Message-ID: <1313377794-26721-4-git-send-email-leoy@marvell.com>
+Message-ID: <1313377893.14434.5.camel@Lily>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MMP2 have the internal sram, this sram can be allocated
-for video, power management and secure processor.
-
-Now the sram usage is:
-0xd1000000 ~ 0xd101ffff (128KB) : reserved for secure processor
-0xd1020000 ~ 0xd1037fff (96KB)  : for video and PM
-
-Register the internal sram's second half 96KB buffer,
-so that video and PM can dynamically alloc/free from it.
-
-Signed-off-by: Leo Yan <leoy@marvell.com>
----
- arch/arm/mach-mmp/brownstone.c        |    6 ++++++
- arch/arm/mach-mmp/include/mach/mmp2.h |    6 ++++++
- arch/arm/mach-mmp/mmp2.c              |    2 ++
- 3 files changed, 14 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-mmp/brownstone.c b/arch/arm/mach-mmp/brownstone.c
-index db4b5fd..59dcf9d 100644
---- a/arch/arm/mach-mmp/brownstone.c
-+++ b/arch/arm/mach-mmp/brownstone.c
-@@ -191,6 +191,11 @@ static struct sram_platdata mmp2_asram_platdata = {
- 	.granularity	= SRAM_GRANULARITY,
- };
- 
-+static struct sram_platdata mmp2_isram_platdata = {
-+	.pool_name	= "isram",
-+	.granularity	= SRAM_GRANULARITY,
-+};
-+
- static void __init brownstone_init(void)
- {
- 	mfp_config(ARRAY_AND_SIZE(brownstone_pin_config));
-@@ -202,6 +207,7 @@ static void __init brownstone_init(void)
- 	mmp2_add_sdhost(0, &mmp2_sdh_platdata_mmc0); /* SD/MMC */
- 	mmp2_add_sdhost(2, &mmp2_sdh_platdata_mmc2); /* eMMC */
- 	mmp2_add_asram(&mmp2_asram_platdata);
-+	mmp2_add_isram(&mmp2_isram_platdata);
- 
- 	/* enable 5v regulator */
- 	platform_device_register(&brownstone_v_5vp_device);
-diff --git a/arch/arm/mach-mmp/include/mach/mmp2.h b/arch/arm/mach-mmp/include/mach/mmp2.h
-index c227328..2f7b2d3 100644
---- a/arch/arm/mach-mmp/include/mach/mmp2.h
-+++ b/arch/arm/mach-mmp/include/mach/mmp2.h
-@@ -30,6 +30,7 @@ extern struct pxa_device_desc mmp2_device_sdh1;
- extern struct pxa_device_desc mmp2_device_sdh2;
- extern struct pxa_device_desc mmp2_device_sdh3;
- extern struct pxa_device_desc mmp2_device_asram;
-+extern struct pxa_device_desc mmp2_device_isram;
- 
- static inline int mmp2_add_uart(int id)
- {
-@@ -92,5 +93,10 @@ static inline int mmp2_add_asram(struct sram_platdata *data)
- 	return pxa_register_device(&mmp2_device_asram, data, sizeof(*data));
- }
- 
-+static inline int mmp2_add_isram(struct sram_platdata *data)
-+{
-+	return pxa_register_device(&mmp2_device_isram, data, sizeof(*data));
-+}
-+
- #endif /* __ASM_MACH_MMP2_H */
- 
-diff --git a/arch/arm/mach-mmp/mmp2.c b/arch/arm/mach-mmp/mmp2.c
-index 9d00754..43266c4 100644
---- a/arch/arm/mach-mmp/mmp2.c
-+++ b/arch/arm/mach-mmp/mmp2.c
-@@ -227,4 +227,6 @@ MMP2_DEVICE(sdh1, "sdhci-pxav3", 1, MMC2, 0xd4280800, 0x120);
- MMP2_DEVICE(sdh2, "sdhci-pxav3", 2, MMC3, 0xd4281000, 0x120);
- MMP2_DEVICE(sdh3, "sdhci-pxav3", 3, MMC4, 0xd4281800, 0x120);
- MMP2_DEVICE(asram, "asram", -1, NONE, 0xe0000000, 0x4000);
-+/* 0xd1000000 ~ 0xd101ffff is reserved for secure processor */
-+MMP2_DEVICE(isram, "isram", -1, NONE, 0xd1020000, 0x18000);
- 
--- 
-1.7.4.1
+On Sun, 2011-08-14 at 20:09 -0700, Leo Yan wrote:
+> On mmp platform, there have two sram banks:
+> audio sram bank, and internal sram bank for video and PM.
+> So add the sram module to manage these sram banks.
+> 
+> And register the sram banks so can dynamically alloc/free
+> the buffer.
+> 
+> Leo Yan (3):
+>   ARM: mmp: add sram allocator
+>   ARM: mmp: register audio sram bank
+>   ARM: mmp: register internal sram bank
+> 
+>  arch/arm/Kconfig                      |    1 +
+>  arch/arm/mach-mmp/Makefile            |    2 +-
+>  arch/arm/mach-mmp/brownstone.c        |   11 ++
+>  arch/arm/mach-mmp/include/mach/mmp2.h |   13 +++
+>  arch/arm/mach-mmp/include/mach/sram.h |   35 +++++++
+>  arch/arm/mach-mmp/mmp2.c              |    3 +
+>  arch/arm/mach-mmp/sram.c              |  168 +++++++++++++++++++++++++++++++++
+>  7 files changed, 232 insertions(+), 1 deletions(-)
+>  create mode 100644 arch/arm/mach-mmp/include/mach/sram.h
+>  create mode 100644 arch/arm/mach-mmp/sram.c
+> 
+Acked-by: Haojian Zhuang <haojian.zhuang@gmail.com>
