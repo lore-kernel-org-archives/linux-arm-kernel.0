@@ -1,39 +1,47 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Mon, 15 Aug 2011 09:15:20 -0700
-Subject: [RFC PATCH 05/12] arm/dt: Tegra: Add nvidia,gpios property to
-	GPIO controller
-In-Reply-To: <CAOesGMj8firxDz-kqkh=jwsbC_QRW+YSFpf7dh3WaOhseCg91w@mail.gmail.com>
-References: <1313189697-21287-1-git-send-email-swarren@nvidia.com>
-	<1313189697-21287-6-git-send-email-swarren@nvidia.com>
-	<CAOesGMj8firxDz-kqkh=jwsbC_QRW+YSFpf7dh3WaOhseCg91w@mail.gmail.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF04AEA25057@HQMAIL01.nvidia.com>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Mon, 15 Aug 2011 19:18:36 +0300
+Subject: GPMI-NAND Status?
+In-Reply-To: <20040.45443.810005.525431@ipc1.ka-ro>
+References: <20110805135133.GA26981@pengutronix.de>
+	<20110814081139.GD17063@parrot.com>
+	<20040.45443.810005.525431@ipc1.ka-ro>
+Message-ID: <1313425121.8691.31.camel@sauron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof Johansson wrote at Sunday, August 14, 2011 1:02 AM:
-> On Fri, Aug 12, 2011 at 3:54 PM, Stephen Warren <swarren@nvidia.com> wrote:
-> > Add board-specific gpio node for Harmony and Seaboard. This lists the
-> > GPIOs used by the board. Note that not all GPIOs that exist on the board
-> > are listed; only those used by devices currently supported by device
-> > tree.
-> 
-> I don't want to bikeshed over this, but something like
-> "nvidia,enabled-gpios" could be a bit more descriptive. Either way is
-> OK though.
+On Mon, 2011-08-15 at 07:41 +0200, Lothar Wa?mann wrote:
+> > As explained in the thread linked above, this issue should be fixed in your
+> > flashing tool, _not_ in your driver. The nand device you are using does not
+> > support programming pages multiple times in a row; pretending it does in the
+> >
+> It's not a problem of the device (Samsung K9F1G08U0B in my case)! The
+> problem is that the controller generates an ECC code that is non-FF
+> for all-FF data, which JFFS2 cannot handle properly.
 
-Yes, that's a much better name.
+I believe that it does not matter for the kernel community that your
+specific device can survive multiple writes. I certainly does matter for
+you, so if you want a quick fix - just change your kernel, but I would
+not recommend to do this.
 
-Existing board files do have a Boolean enabled/disabled flag per GPIO,
-which is currently always true,  whereas this patch series only implements
-"enabled" entries. I thought about it briefly, and didn't think that
-explicitly disabling GPIOs that the bootloader had already enabled was
-likely to be useful. Do you agree? Possibly not since IIRC you added the
-tables that contain that Boolean.
+We (the community) care about the _general_ case - in general, only one
+write is allowed, period. Once the JFFS2 or/and the flashing tool is
+fixed - the problem will go away.
 
-> The property should be documented under the bindings Documentation/
-> hierarchy though.
+Let me put it this way - hacking the driver will just hide the issue
+deeper - we'll have this issue popped up again a bit later and because
+of hacks like that [1] it will be more confusing. Let's avoid this.
 
-Yup. The next posting will include this.
+Also, someone pointed in that thread that if I write data to NAND - I
+want my data to be ECC-protected. Please, explain why my data should be
+unprotected if it happened to be just 2KiB of 0xFFs covering whole NAND
+page?
+
+Ivan provided much better explanation, showing that even with NOP 4
+flashes there may be problems (e.g., 1 write of all 0xFFs + 4 writes
+from the user).
+
+[1] http://lists.infradead.org/pipermail/linux-mtd/2011-July/037181.html
 
 -- 
-nvpublic
+Best Regards,
+Artem Bityutskiy
