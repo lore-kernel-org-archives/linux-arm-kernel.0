@@ -1,36 +1,41 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 15 Aug 2011 09:58:07 +0100
-Subject: [PATCH kernel-3.0] arm:cache-l2x0: Fix L2 Cache size calculation.
-In-Reply-To: <4E48CF80.6070105@st.com>
-References: <1313142327-18320-1-git-send-email-srinivas.kandagatla@st.com>
-	<20110812102020.GD14904@e102144-lin.cambridge.arm.com>
-	<20110813084129.GM4775@n2100.arm.linux.org.uk>
-	<20110814204851.GA1948@e102144-lin.cambridge.arm.com>
-	<4E48CF80.6070105@st.com>
-Message-ID: <20110815085806.GB22163@e102144-lin.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 15 Aug 2011 10:59:55 +0200
+Subject: [PATCH 1/3] ARM: mmp: add sram allocator
+In-Reply-To: <1313377794-26721-2-git-send-email-leoy@marvell.com>
+References: <1313377794-26721-1-git-send-email-leoy@marvell.com>
+	<1313377794-26721-2-git-send-email-leoy@marvell.com>
+Message-ID: <1403041.Yj2MdIhcZO@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Srinivas,
+On Monday 15 August 2011 11:09:52 Leo Yan wrote:
+> On mmp platform, there have two sram banks:
+> audio sram and internal sram. The audio sram is mainly for audio;
+> the internal sram is for video, wtm and power management.
+> So add the sram allocator using genalloc to manage them.
+> 
+> Every sram bank will register its own platform device
+> info, after the sram allocator create the generic pool
+> for the sram bank, the user module can use the pool's
+> name to get the pool handler; then it can use the handler
+> to alloc/free memory with genalloc APIs.
+> 
+> Signed-off-by: Leo Yan <leoy@marvell.com>
+> ---
+>  arch/arm/Kconfig                      |    1 +
+>  arch/arm/mach-mmp/Makefile            |    2 +-
+>  arch/arm/mach-mmp/include/mach/sram.h |   35 +++++++
+>  arch/arm/mach-mmp/sram.c              |  168 +++++++++++++++++++++++++++++++++
+>  4 files changed, 205 insertions(+), 1 deletions(-)
+>  create mode 100644 arch/arm/mach-mmp/include/mach/sram.h
+>  create mode 100644 arch/arm/mach-mmp/sram.c
 
-On Mon, Aug 15, 2011 at 08:49:20AM +0100, Srinivas KANDAGATLA wrote:
-> Resending the patch with Acked by and CC lines in patch...
+Some time ago, there was talk of merging the existing sram drivers
+and creating a common driver that is easy to hook into.
 
-As described here:
+What has happened with that? My feeling is that we should stop adding
+more drivers like this in the platform code but rather put an
+authoritative copy into arch/arm/mm/ or even the top-level mm/ directory
+and change over the existing drivers to hook into that one.
 
-http://www.arm.linux.org.uk/developer/patches/info.php
-
-You need to use Russell's patch system to submit this patch. If you're using
-git, the easiest way to do this is:
-
-(0) Sign up to Russell's patch system (not sure if this required):
-    http://www.arm.linux.org.uk/developer/patches/add.php
-
-(1) Add an additional KernelVersion: 3.1-rc2 tag to your patch.
-
-(2) Email it to patches at arm.linux.org.uk using git send-email
-    --suppress-cc=all.
-
-Thanks,
-
-Will
+	Arnd
