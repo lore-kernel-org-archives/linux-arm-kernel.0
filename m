@@ -1,85 +1,33 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 15 Aug 2011 20:25:31 +0100
-Subject: [PATCH] Fix build errors with gpio-generic.c
-Message-ID: <20110815192531.GB525@n2100.arm.linux.org.uk>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 15 Aug 2011 12:52:36 -0700
+Subject: [PATCH] i2c: tegra: Check for overflow errors with BUG_ON.
+In-Reply-To: <20110815191745.GA7178@legolas.emea.dhcp.ti.com>
+References: <1313434172-18319-1-git-send-email-dianders@chromium.org>
+	<20110815191745.GA7178@legolas.emea.dhcp.ti.com>
+Message-ID: <CAD=FV=Xd67iw=GXV9i4O5LKnJd20=BkYyfVuxPgxQ5GZRJEy4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Russell King <rmk+kernel@arm.linux.org.uk>
-GPIO: Fix build errors with gpio-generic.c
+Felipe,
 
-Building a kernel with hotplug disabled results in a link failure:
+On Mon, Aug 15, 2011 at 12:17 PM, Felipe Balbi <balbi@ti.com> wrote:
+> so due to a FIFO overflow you lock up the whole system ? Can't you e.g.
+> reset the controller and reconfigure it rather than locking up the
+> system ?
 
-`bgpio_remove' referenced in section `___ksymtab_gpl+bgpio_remove' of drivers/built-in.o: defined in discarded section `.devexit.text' of drivers/built-in.o
+Certainly we could try to be more proactive and reset / retry / return
+the error to the client.  However, since the only expected situation
+where this BUG_ON should hit is due to a bug in this driver itself
+(AKA: i2c clients shouldn't be able to do anything to cause the BUG_ON
+to hit), that seems like a lot of added complexity.
 
-This is caused because of the bgpio_remove is exported.  It is illegal
-to export symbols which are discarded either at link time or as part of
-an init/exit section.
+Also: if there is an arbitrary software bug that causing an overflow
+condition to occur, I'm not sure how stable the system will be.
+Specifically, the i2c controller is used (among other things) to talk
+to the PMU and adjust voltages in the system.  If we just sent it a
+random command, I'd rather report the bug right away so we don't get
+hard to find/reproduce failures in other parts of the system.
 
-Fix this by dropping the __devexit attributation from bgpio_remove().
-Also drop the __devinit attributation from bgpio_init().
+What do others think?
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- drivers/gpio/gpio-generic.c     |   15 +++++----------
- include/linux/basic_mmio_gpio.h |   15 +++++----------
- 2 files changed, 10 insertions(+), 20 deletions(-)
-
-diff --git a/drivers/gpio/gpio-generic.c b/drivers/gpio/gpio-generic.c
-index 231714d..4e24436 100644
---- a/drivers/gpio/gpio-generic.c
-+++ b/drivers/gpio/gpio-generic.c
-@@ -351,7 +351,7 @@ static int bgpio_setup_direction(struct bgpio_chip *bgc,
- 	return 0;
- }
- 
--int __devexit bgpio_remove(struct bgpio_chip *bgc)
-+int bgpio_remove(struct bgpio_chip *bgc)
- {
- 	int err = gpiochip_remove(&bgc->gc);
- 
-@@ -361,15 +361,10 @@ int __devexit bgpio_remove(struct bgpio_chip *bgc)
- }
- EXPORT_SYMBOL_GPL(bgpio_remove);
- 
--int __devinit bgpio_init(struct bgpio_chip *bgc,
--			 struct device *dev,
--			 unsigned long sz,
--			 void __iomem *dat,
--			 void __iomem *set,
--			 void __iomem *clr,
--			 void __iomem *dirout,
--			 void __iomem *dirin,
--			 bool big_endian)
-+int bgpio_init(struct bgpio_chip *bgc, struct device *dev,
-+	       unsigned long sz, void __iomem *dat, void __iomem *set,
-+	       void __iomem *clr, void __iomem *dirout, void __iomem *dirin,
-+	       bool big_endian)
- {
- 	int ret;
- 
-diff --git a/include/linux/basic_mmio_gpio.h b/include/linux/basic_mmio_gpio.h
-index 98999cf..feb91219 100644
---- a/include/linux/basic_mmio_gpio.h
-+++ b/include/linux/basic_mmio_gpio.h
-@@ -63,15 +63,10 @@ static inline struct bgpio_chip *to_bgpio_chip(struct gpio_chip *gc)
- 	return container_of(gc, struct bgpio_chip, gc);
- }
- 
--int __devexit bgpio_remove(struct bgpio_chip *bgc);
--int __devinit bgpio_init(struct bgpio_chip *bgc,
--			 struct device *dev,
--			 unsigned long sz,
--			 void __iomem *dat,
--			 void __iomem *set,
--			 void __iomem *clr,
--			 void __iomem *dirout,
--			 void __iomem *dirin,
--			 bool big_endian);
-+int bgpio_remove(struct bgpio_chip *bgc);
-+int bgpio_init(struct bgpio_chip *bgc, struct device *dev,
-+	       unsigned long sz, void __iomem *dat, void __iomem *set,
-+	       void __iomem *clr, void __iomem *dirout, void __iomem *dirin,
-+	       bool big_endian);
- 
- #endif /* __BASIC_MMIO_GPIO_H */
+-Doug
