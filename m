@@ -1,39 +1,52 @@
-From: ivan.djelic@parrot.com (Ivan Djelic)
-Date: Mon, 15 Aug 2011 18:57:34 +0200
-Subject: GPMI-NAND Status?
-In-Reply-To: <1313425340.8691.34.camel@sauron>
-References: <20110805135133.GA26981@pengutronix.de>
-	<20110814081139.GD17063@parrot.com>
-	<1313425340.8691.34.camel@sauron>
-Message-ID: <20110815165734.GA18979@parrot.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 15 Aug 2011 18:30:44 +0100
+Subject: [PATCH v2 0/8] Introduce logical CPU mapping
+Message-ID: <1313429452-2820-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 15, 2011 at 05:22:13PM +0100, Artem Bityutskiy wrote:
-> On Sun, 2011-08-14 at 10:11 +0200, Ivan Djelic wrote:
-> > On Fri, Aug 05, 2011 at 02:51:33PM +0100, Wolfram Sang wrote:
-> > (...)
-> > > 
-> > > problem overwriting all-0xff data in NAND [2]
-> > > =============================================
-> > > 
-> > > Although it occured only when writing JFFS2 images so far, this is a generic
-> > > issue and needs to be fixed, right?
-> > > 
-> > > 
-> > (...)
-> > > [2] http://lists.infradead.org/pipermail/linux-mtd/2011-July/037104.html
-> > 
-> > As explained in the thread linked above, this issue should be fixed in your
-> > flashing tool, _not_ in your driver. The nand device you are using does not
-> > support programming pages multiple times in a row; pretending it does in the
-> > special all-0xff case is inefficient (you need to detect all-0xff data) and
-> > unnecessary (just do not program blank pages !).
-> 
-> Hmm, isn't it also buggy because if my precious data contains 2KiB of
-> 0xFFs (aligned to 2KiB boundary) then I will have no ECC protection for
-> this page? Or I miss something?
+Hello,
 
-Ouch, yes you are correct, very good point which I missed :)
+This is version 2 of the RFC originally posted here:
 
-Ivan
+http://lists.infradead.org/pipermail/linux-arm-kernel/2011-August/060594.html
+
+Changes since v1 include:
+
+  * Fixed the GIC code to compile when !CONFIG_SMP
+  * Based on -rc2
+  * Added acks / tested-bys from various platform maintainers (thanks!)
+
+Any feedback on the approach taken and comments from the shmobile folks
+would be much appreciated.
+
+Thanks,
+
+Will
+
+
+Will Deacon (8):
+  ARM: cpuid: add support for reading MPIDR
+  ARM: smp: populate logical CPU mapping during boot
+  ARM: gic: convert logical CPU numbers into physical numbers
+  ARM: exynos4: convert logical CPU numbers to physical numbers
+  ARM: msm: convert logical CPU numbers to physical numbers
+  ARM: shmobile: convert logical CPU numbers to physical numbers
+  ARM: ux500: convert logical CPU numbers to physical numbers
+  ARM: versatile: convert logical CPU numbers to physical numbers
+
+ arch/arm/common/gic.c               |   17 ++++++++++++++---
+ arch/arm/include/asm/cputype.h      |    6 ++++++
+ arch/arm/include/asm/smp.h          |    6 ++++++
+ arch/arm/kernel/smp.c               |   15 +++++++++++++++
+ arch/arm/mach-exynos4/hotplug.c     |    2 +-
+ arch/arm/mach-exynos4/platsmp.c     |    2 +-
+ arch/arm/mach-msm/hotplug.c         |    2 +-
+ arch/arm/mach-msm/platsmp.c         |    2 +-
+ arch/arm/mach-realview/hotplug.c    |    2 +-
+ arch/arm/mach-shmobile/smp-sh73a0.c |    6 +++++-
+ arch/arm/mach-ux500/hotplug.c       |    2 +-
+ arch/arm/mach-ux500/platsmp.c       |    2 +-
+ arch/arm/mach-vexpress/hotplug.c    |    2 +-
+ arch/arm/plat-versatile/platsmp.c   |    2 +-
+ 14 files changed, 55 insertions(+), 13 deletions(-)
