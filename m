@@ -1,25 +1,39 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 15 Aug 2011 17:51:33 +0100
-Subject: [PATCH v7 09/16] ARM: LPAE: MMU setup for the 3-level page
-	table format
-In-Reply-To: <1312988619-16804-10-git-send-email-catalin.marinas@arm.com>
-References: <1312988619-16804-1-git-send-email-catalin.marinas@arm.com>
-	<1312988619-16804-10-git-send-email-catalin.marinas@arm.com>
-Message-ID: <20110815165133.GF3392@e102109-lin.cambridge.arm.com>
+From: ivan.djelic@parrot.com (Ivan Djelic)
+Date: Mon, 15 Aug 2011 18:57:34 +0200
+Subject: GPMI-NAND Status?
+In-Reply-To: <1313425340.8691.34.camel@sauron>
+References: <20110805135133.GA26981@pengutronix.de>
+	<20110814081139.GD17063@parrot.com>
+	<1313425340.8691.34.camel@sauron>
+Message-ID: <20110815165734.GA18979@parrot.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 10, 2011 at 04:03:32PM +0100, Catalin Marinas wrote:
-> This patch adds the MMU initialisation for the LPAE page table format.
-> The swapper_pg_dir size with LPAE is 5 rather than 4 pages. A new
-> proc-v7lpae.S file contains the initialisation, context switch and
-> save/restore code for ARMv7 with the LPAE. The TTBRx split is based on
-> the PAGE_OFFSET with TTBR1 used for the kernel mappings. The 36-bit
-> mappings (supersections) and a few other memory types in mmu.c are
-> conditionally compiled.
+On Mon, Aug 15, 2011 at 05:22:13PM +0100, Artem Bityutskiy wrote:
+> On Sun, 2011-08-14 at 10:11 +0200, Ivan Djelic wrote:
+> > On Fri, Aug 05, 2011 at 02:51:33PM +0100, Wolfram Sang wrote:
+> > (...)
+> > > 
+> > > problem overwriting all-0xff data in NAND [2]
+> > > =============================================
+> > > 
+> > > Although it occured only when writing JFFS2 images so far, this is a generic
+> > > issue and needs to be fixed, right?
+> > > 
+> > > 
+> > (...)
+> > > [2] http://lists.infradead.org/pipermail/linux-mtd/2011-July/037104.html
+> > 
+> > As explained in the thread linked above, this issue should be fixed in your
+> > flashing tool, _not_ in your driver. The nand device you are using does not
+> > support programming pages multiple times in a row; pretending it does in the
+> > special all-0xff case is inefficient (you need to detect all-0xff data) and
+> > unnecessary (just do not program blank pages !).
 > 
-> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> Hmm, isn't it also buggy because if my precious data contains 2KiB of
+> 0xFFs (aligned to 2KiB boundary) then I will have no ECC protection for
+> this page? Or I miss something?
 
-Following the split of this patch, it becomes:
+Ouch, yes you are correct, very good point which I missed :)
 
-8<--------------------
+Ivan
