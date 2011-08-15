@@ -1,79 +1,36 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 15 Aug 2011 09:53:25 +0100
-Subject: No mach-type for SHEEVAD?
-In-Reply-To: <CAMPhdO9OuZ54hOOyDnfyNSAgj-AFKNBT_xn8GKng0ytNU-dnrQ@mail.gmail.com>
-References: <CACRpkdYi-EfCC0Lnx9bdYXyChzOhosO1C5gmggEnnBsDnzBukA@mail.gmail.com>
-	<CAMPhdO8KgWBub5xS=JhLRum+D-=3=7s2oLNSKbWSbht3f=5A_w@mail.gmail.com>
-	<CACRpkdYvJR2QoQLjDuKuUOMArgotZ1mSiqmCWwL+th5NS7zJSQ@mail.gmail.com>
-	<25B60CDC2F704E4E9D88FFD52780CB4C05D7174A89@SC-VEXCH1.marvell.com>
-	<CAMPhdO9YR2Ofxr=NnjardjhUU=HC-Vj17VAbp+yW=qW8wQtxcw@mail.gmail.com>
-	<CAMPhdO_uNJny7Rsu_j0BKMaa8KgSd8kOWhqZ75jrz4f8EiG2KA@mail.gmail.com>
-	<CAMPhdO9OuZ54hOOyDnfyNSAgj-AFKNBT_xn8GKng0ytNU-dnrQ@mail.gmail.com>
-Message-ID: <20110815085325.GB26827@n2100.arm.linux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 15 Aug 2011 09:58:07 +0100
+Subject: [PATCH kernel-3.0] arm:cache-l2x0: Fix L2 Cache size calculation.
+In-Reply-To: <4E48CF80.6070105@st.com>
+References: <1313142327-18320-1-git-send-email-srinivas.kandagatla@st.com>
+	<20110812102020.GD14904@e102144-lin.cambridge.arm.com>
+	<20110813084129.GM4775@n2100.arm.linux.org.uk>
+	<20110814204851.GA1948@e102144-lin.cambridge.arm.com>
+	<4E48CF80.6070105@st.com>
+Message-ID: <20110815085806.GB22163@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 15, 2011 at 02:33:09PM +0800, Eric Miao wrote:
-> On Mon, Aug 15, 2011 at 2:32 PM, Eric Miao <eric.miao@linaro.org> wrote:
-> > Interestingly, gplugd has already been registered in the machine database
-> > by Ofer.
-> >
-> > 2625 ? ?GURU_PLUGD ? ? ?gplugd ?Ofer Zaarur ? ? mainlined
-> 
-> Russell,
-> 
-> Any idea if this entry would have any chance to be in -next?
+Srinivas,
 
-Updating that file is becoming more of a burden because of all the crap
-that's been accumulating in the database.  It used to be the case at
-one time that I could just run a script which grabbed the file and
-committed it.  Those days have long since passed.  It now requires manual
-editing to remove all the crap which now exists.
+On Mon, Aug 15, 2011 at 08:49:20AM +0100, Srinivas KANDAGATLA wrote:
+> Resending the patch with Acked by and CC lines in patch...
 
-For instance, these entries are never going to be added in their
-current form:
+As described here:
 
-+argonst_mp             MACH_HYNET_INE          HYNET_INE               1319
-+riot_gx2               MACH_RIOT_VOX           RIOT_VOX                2577
-+nautel_am35xx          MACH_NAUTEL_LPC3240     NAUTEL_LPC3240          2591
-+gplugd                 MACH_SHEEVAD            SHEEVAD                 2625
-+dig297                 MACH_OMAP3_CPS          OMAP3_CPS               2751
-+lpc_evo                MACH_LPC2               LPC2                    2777
-+ep3505                 MACH_EP3517             EP3517                  3056
-+pydtd                  MACH_PYRAMID_TD         PYRAMID_TD              3295
-+guf_vincell            MACH_GUF_PLANET         GUF_PLANET              3297
-+geneva_b4              MACH_GENEVA_B           GENEVA_B                3308
-+ea2468devkit           MACH_LPC2468OEM         LPC2468OEM              3389
-+fe2478mblox            MACH_LPC2478MICROBLOX   LPC2478MICROBLOX        3391
-+msm8960_mtp            MACH_MSM8960_MDP        MSM8960_MDP             3397
-+omap_tabletblaze       MACH_OMAP_BLAZE         OMAP_BLAZE              3429
-+ge863pro3              MACH_GE863              GE863                   3469
-+arm                    MACH_ARM                ARM                     3573
-+omap3                  MACH_OMAP3              OMAP3                   3574
-+mach_ecog45            MACH_MACH_ECOG45        MACH_ECOG45             3595
-+linux_pad              MACH_THEPAD             THEPAD                  3608
-+imx                    MACH_IMX                IMX                     3611
-+coreware_sam9260_      MACH_COREWARE_SAM9260_  COREWARE_SAM9260_       3634
+http://www.arm.linux.org.uk/developer/patches/info.php
 
-because either they're an architecture name, a SoC name, or the
-machine_is_xxx() does not match the MACH_TYPE_xxx and CONFIG_ macros
-(because they haven't talked to me about changing them.)  That includes
-the gplugd/sheevad stuff, which would (continue) to be deleted from the
-file I merge for one of those reasons.
+You need to use Russell's patch system to submit this patch. If you're using
+git, the easiest way to do this is:
 
-Now that the gplugd stuff is in, is it called gplugd or sheevad?
-The registry entry above shows that it was called sheevad but it has
-been changed to gplugd.  The file is called gplugd.c but it uses
-sheevad internally.  So god only knows, it's a complete and utter mess.
+(0) Sign up to Russell's patch system (not sure if this required):
+    http://www.arm.linux.org.uk/developer/patches/add.php
 
-So no, I'm not merging that entry until someone (a) tells me what it
-should be, and (b) fixes stuff up to use the correct name.
+(1) Add an additional KernelVersion: 3.1-rc2 tag to your patch.
 
-That goes for the other entries, some of which I'm just going to expire
-from the registry (like the ARM, IMX and OMAP3 ones) so I never have to
-bother with them again.
+(2) Email it to patches at arm.linux.org.uk using git send-email
+    --suppress-cc=all.
 
-I'm also thinking that the in-kernel mach-types will _only_ contain those
-entries which have code in mainline - eliminating the "touched in the
-last 12 months" criterion.  That certainly does reduce the amount of broken
-entries to be dealt with down to just one entry (the gplugd one).
+Thanks,
+
+Will
