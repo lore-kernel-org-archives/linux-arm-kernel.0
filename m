@@ -1,35 +1,65 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Mon, 15 Aug 2011 19:45:41 +0200
-Subject: [PATCH] shmobile/sh7372: Add missing CONFIG_PM guards to fix
-	build failure
-In-Reply-To: <201108151630.12120.PeterHuewe@gmx.de>
-References: <1313274841-8322-1-git-send-email-peterhuewe@gmx.de>
-	<201108140155.05625.rjw@sisk.pl>
-	<201108151630.12120.PeterHuewe@gmx.de>
-Message-ID: <201108151945.42155.rjw@sisk.pl>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 15 Aug 2011 11:49:32 -0700
+Subject: [PATCH] i2c: tegra: Check for overflow errors with BUG_ON.
+Message-ID: <1313434172-18319-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, August 15, 2011, Peter H?we wrote:
-> Am Sonntag 14 August 2011, 01:55:05 schrieb Rafael J. Wysocki:
-> > On Sunday, August 14, 2011, Peter Huewe wrote:
-> > > This patch fixes a build failure with the ap4evb_defconfig by adding the
-> > > missing #ifdef CONFIG_PM.
-> > 
-> > This is not the right fix.  Besides, you seem to be testing linux-next
-> > and the build problem is in the linux-pm tree.
-> > 
-> > Please check if the appended patch fixes the problem for you.
-> > 
-> > Rafael
-> Works for me - compiles ;)
-> 
-> Reviewed-by: Peter Huewe <peterhuewe@gmx.de>
+This change doesn't fix any known problems but turns
+on the overflow detection feature of the i2c controller
+in the hopes of flushing out any current (or future)
+bugs in the i2c driver.
 
-Good, thanks for testing!
+Inspired by a change on nvidia's git server:
+  http://nv-tegra.nvidia.com/gitweb/?p=linux-2.6.git;a=commit;h=266d1b7397284505e55d06254b497cb32be07b69
 
-I have folded the fix into the patch that caused the problem, so this
-should be fixed in linux-next now.
+Signed-off-by: Doug Anderson <dianders@chromium.org>
+---
+ drivers/i2c/busses/i2c-tegra.c |   11 ++++++++---
+ 1 files changed, 8 insertions(+), 3 deletions(-)
 
-Thanks,
-Rafael
+diff --git a/drivers/i2c/busses/i2c-tegra.c b/drivers/i2c/busses/i2c-tegra.c
+index 2440b74..4dbba23 100644
+--- a/drivers/i2c/busses/i2c-tegra.c
++++ b/drivers/i2c/busses/i2c-tegra.c
+@@ -367,7 +367,8 @@ static int tegra_i2c_init(struct tegra_i2c_dev *i2c_dev)
+ static irqreturn_t tegra_i2c_isr(int irq, void *dev_id)
+ {
+ 	u32 status;
+-	const u32 status_err = I2C_INT_NO_ACK | I2C_INT_ARBITRATION_LOST;
++	const u32 status_err = I2C_INT_NO_ACK | I2C_INT_ARBITRATION_LOST |
++		I2C_INT_TX_FIFO_OVERFLOW;
+ 	struct tegra_i2c_dev *i2c_dev = dev_id;
+ 
+ 	status = i2c_readl(i2c_dev, I2C_INT_STATUS);
+@@ -389,6 +390,9 @@ static irqreturn_t tegra_i2c_isr(int irq, void *dev_id)
+ 	}
+ 
+ 	if (unlikely(status & status_err)) {
++		/* Don't pass this back--it can only happen due to a bug. */
++		BUG_ON(status & I2C_INT_TX_FIFO_OVERFLOW);
++
+ 		if (status & I2C_INT_NO_ACK)
+ 			i2c_dev->msg_err |= I2C_ERR_NO_ACK;
+ 		if (status & I2C_INT_ARBITRATION_LOST)
+@@ -423,7 +427,7 @@ err:
+ 	/* An error occurred, mask all interrupts */
+ 	tegra_i2c_mask_irq(i2c_dev, I2C_INT_NO_ACK | I2C_INT_ARBITRATION_LOST |
+ 		I2C_INT_PACKET_XFER_COMPLETE | I2C_INT_TX_FIFO_DATA_REQ |
+-		I2C_INT_RX_FIFO_DATA_REQ);
++		I2C_INT_RX_FIFO_DATA_REQ | I2C_INT_TX_FIFO_OVERFLOW);
+ 	i2c_writel(i2c_dev, status, I2C_INT_STATUS);
+ 	if (i2c_dev->is_dvc)
+ 		dvc_writel(i2c_dev, DVC_STATUS_I2C_DONE_INTR, DVC_STATUS);
+@@ -473,7 +477,8 @@ static int tegra_i2c_xfer_msg(struct tegra_i2c_dev *i2c_dev,
+ 	if (!(msg->flags & I2C_M_RD))
+ 		tegra_i2c_fill_tx_fifo(i2c_dev);
+ 
+-	int_mask = I2C_INT_NO_ACK | I2C_INT_ARBITRATION_LOST;
++	int_mask = I2C_INT_NO_ACK | I2C_INT_ARBITRATION_LOST |
++		I2C_INT_TX_FIFO_OVERFLOW;
+ 	if (msg->flags & I2C_M_RD)
+ 		int_mask |= I2C_INT_RX_FIFO_DATA_REQ;
+ 	else if (i2c_dev->msg_buf_remaining)
+-- 
+1.7.3.1
