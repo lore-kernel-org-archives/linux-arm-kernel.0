@@ -1,26 +1,44 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 15 Aug 2011 18:17:23 +0300
-Subject: [PATCH 2/3] TI814X: Add cpu type macros and detection support
-In-Reply-To: <1312479894-22824-1-git-send-email-hemantp@ti.com>
-References: <1312479894-22824-1-git-send-email-hemantp@ti.com>
-Message-ID: <20110815151723.GU12348@atomide.com>
+From: peterhuewe@gmx.de (Peter Huewe)
+Date: Mon, 15 Aug 2011 17:31:20 +0200
+Subject: [PATCH] arm: footbridge: Netwinder: Add KConfig select CLKEVT_I8253
+	to fix build failure
+Message-ID: <1313422280-21942-1-git-send-email-peterhuewe@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Hemant Pedanekar <hemantp@ti.com> [110804 20:39]:
-> This patch adds cpu type, macros for identification of TI814X device.
-> 
-> Note that following updates to common OMAP data structures are made:
-> 1) struct omap_chip_id member 'oc' is updated to u32 from u16 as omap chip
-> bitfield has exhausted 16 bits for CHIP_IS_XXX.
-> 2) cpu_mask and RATE_IN_XXX flags have crossed 8 bit hence struct
-> clksel_rate.flags, struct prcm_config.flags and cpu_mask are changed to u16 from
-> u8.
+This patch fixes a build failure for the netwinder_defconfig by adding
+the necessary select CLKEVT_I8253 statement to the KCONFIG option.
 
-We'll be getting rid of CHIP_IS usage and replace them with SoC specific
-lists. So we need to wait few days and then this patch will need to get
-updated a bit.
+Without this patch the build fails with this linker error:
+isa-rtc.c:(.init.text+0x11d4): undefined reference to
+`clockevent_i8253_init'
+isa-rtc.c:(.init.text+0x11dc): undefined reference to `i8253_clockevent'
+arch/arm/mach-footbridge/built-in.o:(.data+0x18c): undefined reference
+to `i8253_clockevent'
 
-Regards,
+This is because the functions are guarded by a #ifdef
+CONFIG_CLKEVT_I8253
 
-Tony 
+KernelVersion: Linux-next 20110812
+but this is also present in Linus' current tree since July 1st.
+(since commit e6220bd "i8253: Create common clockevent implementation")
+
+Signed-off-by: Peter Huewe <peterhuewe@gmx.de>
+---
+ arch/arm/mach-footbridge/Kconfig |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-footbridge/Kconfig b/arch/arm/mach-footbridge/Kconfig
+index dc26fff..c8e7afc 100644
+--- a/arch/arm/mach-footbridge/Kconfig
++++ b/arch/arm/mach-footbridge/Kconfig
+@@ -62,6 +62,7 @@ config ARCH_EBSA285_HOST
+ config ARCH_NETWINDER
+ 	bool "NetWinder"
+ 	select CLKSRC_I8253
++	select CLKEVT_I8253
+ 	select FOOTBRIDGE_HOST
+ 	select ISA
+ 	select ISA_DMA
+-- 
+1.7.3.4
