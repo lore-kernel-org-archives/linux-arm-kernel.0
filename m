@@ -1,46 +1,67 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 15 Aug 2011 18:30:45 +0100
-Subject: [PATCH v2 1/8] ARM: cpuid: add support for reading MPIDR
+Date: Mon, 15 Aug 2011 18:30:47 +0100
+Subject: [PATCH v2 3/8] ARM: gic: convert logical CPU numbers into physical
+	numbers
 In-Reply-To: <1313429452-2820-1-git-send-email-will.deacon@arm.com>
 References: <1313429452-2820-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1313429452-2820-2-git-send-email-will.deacon@arm.com>
+Message-ID: <1313429452-2820-4-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MPIDR register forms part of the CPUID interface and allows software
-to determine the physical ID of the CPU on which it is currently
-executing.
+The GIC driver must convert logical CPU numbers passed in from Linux
+into physical CPU numbers that are understood by the hardware.
 
-This patch adds support for reading the MPIDR to cputype.h
+This patch uses the new cpu_logical_map macro for performing the
+conversion inside the GIC driver.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/include/asm/cputype.h |    6 ++++++
- 1 files changed, 6 insertions(+), 0 deletions(-)
+ arch/arm/common/gic.c |   17 ++++++++++++++---
+ 1 files changed, 14 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
-index cd4458f..cb47d28 100644
---- a/arch/arm/include/asm/cputype.h
-+++ b/arch/arm/include/asm/cputype.h
-@@ -8,6 +8,7 @@
- #define CPUID_CACHETYPE	1
- #define CPUID_TCM	2
- #define CPUID_TLBTYPE	3
-+#define CPUID_MPIDR	5
+diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+index 3227ca9..666b278 100644
+--- a/arch/arm/common/gic.c
++++ b/arch/arm/common/gic.c
+@@ -180,7 +180,7 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
+ 		return -EINVAL;
  
- #define CPUID_EXT_PFR0	"c1, 0"
- #define CPUID_EXT_PFR1	"c1, 1"
-@@ -70,6 +71,11 @@ static inline unsigned int __attribute_const__ read_cpuid_tcmstatus(void)
- 	return read_cpuid(CPUID_TCM);
- }
+ 	mask = 0xff << shift;
+-	bit = 1 << (cpu + shift);
++	bit = 1 << (cpu_logical_map(cpu) + shift);
  
-+static inline unsigned int __attribute_const__ read_cpuid_mpidr(void)
-+{
-+	return read_cpuid(CPUID_MPIDR);
-+}
+ 	spin_lock(&irq_controller_lock);
+ 	val = readl_relaxed(reg) & ~mask;
+@@ -259,9 +259,15 @@ static void __init gic_dist_init(struct gic_chip_data *gic,
+ 	unsigned int irq_start)
+ {
+ 	unsigned int gic_irqs, irq_limit, i;
++	u32 cpumask;
+ 	void __iomem *base = gic->dist_base;
+-	u32 cpumask = 1 << smp_processor_id();
++	u32 cpu = 0;
+ 
++#ifdef CONFIG_SMP
++	cpu = cpu_logical_map(smp_processor_id());
++#endif
 +
- /*
-  * Intel's XScale3 core supports some v6 features (supersections, L2)
-  * but advertises itself as v5 as it does not support the v6 ISA.  For
++	cpumask = 1 << cpu;
+ 	cpumask |= cpumask << 8;
+ 	cpumask |= cpumask << 16;
+ 
+@@ -382,7 +388,12 @@ void __cpuinit gic_enable_ppi(unsigned int irq)
+ #ifdef CONFIG_SMP
+ void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+ {
+-	unsigned long map = *cpus_addr(*mask);
++	int cpu;
++	unsigned long map = 0;
++
++	/* Convert our logical CPU mask into a physical one. */
++	for_each_cpu(cpu, mask)
++		map |= 1 << cpu_logical_map(cpu);
+ 
+ 	/*
+ 	 * Ensure that stores to Normal memory are visible to the
 -- 
 1.7.0.4
