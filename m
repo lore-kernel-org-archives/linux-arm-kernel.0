@@ -1,68 +1,27 @@
-From: jochen@scram.de (Jochen Friedrich)
-Date: Mon, 15 Aug 2011 13:19:17 +0200
-Subject: [PATCH 17/18] mach-sa1100: retire custom LED code
-In-Reply-To: <1312977952-2272-18-git-send-email-bryan.wu@canonical.com>
-References: <1312977952-2272-1-git-send-email-bryan.wu@canonical.com>
-	<1312977952-2272-18-git-send-email-bryan.wu@canonical.com>
-Message-ID: <4E4900B5.8000708@scram.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 15 Aug 2011 12:41:47 +0100
+Subject: [PATCH] Fix non-LPAE boot regression.
+In-Reply-To: <20110813143903.GQ4775@n2100.arm.linux.org.uk>
+References: <201108131556.27301.anarsoul@gmail.com>
+	<1313240299-24712-1-git-send-email-anarsoul@gmail.com>
+	<CAHkRjk4p1kqwKGiW_XRFU0aap98QkvRGRs0hwsBR4CcfM5RKqA@mail.gmail.com>
+	<20110813143903.GQ4775@n2100.arm.linux.org.uk>
+Message-ID: <20110815114146.GA21596@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bryan,
+On Sat, Aug 13, 2011 at 03:39:03PM +0100, Russell King - ARM Linux wrote:
+> I think this patch is trying to do too much in one go.  It needs splitting
+> up into two, just like is done with the C PGDIR_SHIFT vs PMD_SHIFT stuff
+> (and arguably the first part should be combined with the patch fixing the
+> PGDIR_SHIFT stuff.)
 
-> diff --git a/arch/arm/mach-sa1100/badge4.c b/arch/arm/mach-sa1100/badge4.c
-> index b4311b0..2e370c6c 100644
-> --- a/arch/arm/mach-sa1100/badge4.c
-> +++ b/arch/arm/mach-sa1100/badge4.c
-> @@ -22,6 +22,8 @@
->   #include<linux/mtd/mtd.h>
->   #include<linux/mtd/partitions.h>
->   #include<linux/errno.h>
-> +#include<linux/gpio.h>
-> +#include<linux/leds.h>
->
->   #include<mach/hardware.h>
->   #include<asm/mach-types.h>
-> @@ -69,8 +71,36 @@ static struct platform_device sa1111_device = {
->   	.resource	= sa1111_resources,
->   };
->
-> +/* LEDs */
-> +struct gpio_led badge4_gpio_leds[] = {
-> +	{
-> +		.name			= "badge4:red",
-> +		.default_trigger	= "heartbeat",
-> +		.gpio			= 7,
-> +	},
-> +	{
-> +		.name			= "badge4:green",
-> +		.default_trigger	= "cpu0",
-> +		.gpio			= 9,
-> +	},
-> +};
-> +
-> +static struct gpio_led_platform_data badge4_gpio_led_info = {
-> +	.leds		= badge4_gpio_leds,
-> +	.num_leds	= ARRAY_SIZE(badge4_gpio_leds),
-> +};
-> +
-> +static struct platform_device badge4_leds = {
-> +	.name	= "leds-gpio",
-> +	.id	= -1,
-> +	.dev	= {
-> +		.platform_data	=&badge4_gpio_led_info,
-> +	}
-> +};
-> +
->   static struct platform_device *devices[] __initdata = {
->   	&sa1111_device,
-> +	&badge4_leds;
+OK, I'll do this and repost the two patches in reply to this one (and
+merge one of them with the PMD_SHIFT but I would avoid reposting the
+full series again).
 
-Typo. This should be &badge4_leds,
+For patch clarity, I'll fold Vasily's fix as well rather than keeping it
+in a separate patch.
 
->   };
->
->   static int __init badge4_sa1111_init(void)
-
-Thanks,
-Jochen
+-- 
+Catalin
