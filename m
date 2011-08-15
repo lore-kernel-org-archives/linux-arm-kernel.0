@@ -1,208 +1,65 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 15 Aug 2011 18:41:55 +0100
-Subject: [PATCH v2 3/5] ARM: hw_breakpoint: add support for multiple
-	watchpoints
+Date: Mon, 15 Aug 2011 18:41:57 +0100
+Subject: [PATCH v2 5/5] ARM: hw_breakpoint: reduce the number of WARN_ONCE
+	invocations
 In-Reply-To: <1313430117-3439-1-git-send-email-will.deacon@arm.com>
 References: <1313430117-3439-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1313430117-3439-4-git-send-email-will.deacon@arm.com>
+Message-ID: <1313430117-3439-6-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM debug architecture 7.1 mandates that the DFAR is updated on a
-watchpoint debug exception to contain the faulting virtual address
-of the memory access. This allows us to determine which watchpoints
-have fired and therefore report useful information to userspace.
+The ARM hw_breakpoint backend is currently a bit too noisy when things
+start to go awry.
 
-This patch adds support for using the DFAR in the watchpoint handler,
-which allows us to support multiple watchpoints on CPUs implementing
-the new debug architecture.
+This patch removes a couple of over-zealous WARN_ONCE invocations and
+replaces then with pr_warnings instead.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/include/asm/hw_breakpoint.h |    1 +
- arch/arm/kernel/hw_breakpoint.c      |  100 ++++++++++++++++++++++------------
- 2 files changed, 66 insertions(+), 35 deletions(-)
+ arch/arm/kernel/hw_breakpoint.c |   16 ++++++++--------
+ 1 files changed, 8 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/include/asm/hw_breakpoint.h b/arch/arm/include/asm/hw_breakpoint.h
-index 0ac141a..c190bc9 100644
---- a/arch/arm/include/asm/hw_breakpoint.h
-+++ b/arch/arm/include/asm/hw_breakpoint.h
-@@ -58,6 +58,7 @@ static inline void decode_ctrl_reg(u32 reg,
- /* Watchpoints */
- #define ARM_BREAKPOINT_LOAD	1
- #define ARM_BREAKPOINT_STORE	2
-+#define ARM_FSR_ACCESS_MASK	(1 << 11)
- 
- /* Privilege Levels */
- #define ARM_BREAKPOINT_PRIV	1
 diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
-index 156b8af..448143e 100644
+index 64ac5c6..5a46225 100644
 --- a/arch/arm/kernel/hw_breakpoint.c
 +++ b/arch/arm/kernel/hw_breakpoint.c
-@@ -339,24 +339,10 @@ int arch_install_hw_breakpoint(struct perf_event *bp)
- 		val_base = ARM_BASE_BVR;
- 		slots = (struct perf_event **)__get_cpu_var(bp_on_reg);
- 		max_slots = core_num_brps;
--		if (info->step_ctrl.enabled) {
--			/* Override the breakpoint data with the step data. */
--			addr = info->trigger & ~0x3;
--			ctrl = encode_ctrl_reg(info->step_ctrl);
--		}
- 	} else {
- 		/* Watchpoint */
--		if (info->step_ctrl.enabled) {
--			/* Install into the reserved breakpoint region. */
--			ctrl_base = ARM_BASE_BCR + core_num_brps;
--			val_base = ARM_BASE_BVR + core_num_brps;
--			/* Override the watchpoint data with the step data. */
--			addr = info->trigger & ~0x3;
--			ctrl = encode_ctrl_reg(info->step_ctrl);
--		} else {
--			ctrl_base = ARM_BASE_WCR;
--			val_base = ARM_BASE_WVR;
--		}
-+		ctrl_base = ARM_BASE_WCR;
-+		val_base = ARM_BASE_WVR;
- 		slots = (struct perf_event **)__get_cpu_var(wp_on_reg);
- 		max_slots = core_num_wrps;
- 	}
-@@ -375,6 +361,17 @@ int arch_install_hw_breakpoint(struct perf_event *bp)
+@@ -136,10 +136,11 @@ static u8 get_debug_arch(void)
+ 	u32 didr;
+ 
+ 	/* Do we implement the extended CPUID interface? */
+-	if (WARN_ONCE((((read_cpuid_id() >> 16) & 0xf) != 0xf),
+-	    "CPUID feature registers not supported. "
+-	    "Assuming v6 debug is present.\n"))
++	if (((read_cpuid_id() >> 16) & 0xf) != 0xf) {
++		pr_warning("CPUID feature registers not supported. "
++			   "Assuming v6 debug is present.\n");
+ 		return ARM_DEBUG_ARCH_V6;
++	}
+ 
+ 	ARM_DBG_READ(c0, 0, didr);
+ 	return (didr >> 16) & 0xf;
+@@ -231,7 +232,7 @@ static int enable_monitor_mode(void)
+ 
+ 	/* Ensure that halting mode is disabled. */
+ 	if (WARN_ONCE(dscr & ARM_DSCR_HDBGEN,
+-			"halting debug mode enabled. Unable to access hardware resources.\n")) {
++		"halting debug mode enabled. Unable to access hardware resources.\n")) {
+ 		ret = -EPERM;
  		goto out;
  	}
- 
-+	/* Override the breakpoint data with the step data. */
-+	if (info->step_ctrl.enabled) {
-+		addr = info->trigger & ~0x3;
-+		ctrl = encode_ctrl_reg(info->step_ctrl);
-+		if (info->ctrl.type != ARM_BREAKPOINT_EXECUTE) {
-+			i = 0;
-+			ctrl_base = ARM_BASE_BCR + core_num_brps;
-+			val_base = ARM_BASE_BVR + core_num_brps;
-+		}
-+	}
-+
- 	/* Setup the address register. */
- 	write_wb_reg(val_base + i, addr);
- 
-@@ -398,10 +395,7 @@ void arch_uninstall_hw_breakpoint(struct perf_event *bp)
- 		max_slots = core_num_brps;
- 	} else {
- 		/* Watchpoint */
--		if (info->step_ctrl.enabled)
--			base = ARM_BASE_BCR + core_num_brps;
--		else
--			base = ARM_BASE_WCR;
-+		base = ARM_BASE_WCR;
- 		slots = (struct perf_event **)__get_cpu_var(wp_on_reg);
- 		max_slots = core_num_wrps;
+@@ -626,10 +627,9 @@ int arch_validate_hwbkpt_settings(struct perf_event *bp)
+ 	 * we can use the mismatch feature as a poor-man's hardware
+ 	 * single-step, but this only works for per-task breakpoints.
+ 	 */
+-	if (WARN_ONCE(!bp->overflow_handler &&
+-		(arch_check_bp_in_kernelspace(bp) || !core_has_mismatch_brps()
+-		 || !bp->hw.bp_target),
+-			"overflow handler required but none found\n")) {
++	if (!bp->overflow_handler && (arch_check_bp_in_kernelspace(bp) ||
++	    !core_has_mismatch_brps() || !bp->hw.bp_target)) {
++		pr_warning("overflow handler required but none found\n");
+ 		ret = -EINVAL;
  	}
-@@ -419,6 +413,13 @@ void arch_uninstall_hw_breakpoint(struct perf_event *bp)
- 	if (WARN_ONCE(i == max_slots, "Can't find any breakpoint slot\n"))
- 		return;
- 
-+	/* Ensure that we disable the mismatch breakpoint. */
-+	if (info->ctrl.type != ARM_BREAKPOINT_EXECUTE &&
-+	    info->step_ctrl.enabled) {
-+		i = 0;
-+		base = ARM_BASE_BCR + core_num_brps;
-+	}
-+
- 	/* Reset the control register. */
- 	write_wb_reg(base + i, 0);
- }
-@@ -659,34 +660,62 @@ static void disable_single_step(struct perf_event *bp)
- 	arch_install_hw_breakpoint(bp);
- }
- 
--static void watchpoint_handler(unsigned long unknown, struct pt_regs *regs)
-+static void watchpoint_handler(unsigned long addr, unsigned int fsr,
-+			       struct pt_regs *regs)
- {
--	int i;
-+	int i, access;
-+	u32 val, ctrl_reg, alignment_mask;
- 	struct perf_event *wp, **slots;
- 	struct arch_hw_breakpoint *info;
-+	struct arch_hw_breakpoint_ctrl ctrl;
- 
- 	slots = (struct perf_event **)__get_cpu_var(wp_on_reg);
- 
--	/* Without a disassembler, we can only handle 1 watchpoint. */
--	BUG_ON(core_num_wrps > 1);
--
- 	for (i = 0; i < core_num_wrps; ++i) {
- 		rcu_read_lock();
- 
- 		wp = slots[i];
- 
--		if (wp == NULL) {
--			rcu_read_unlock();
--			continue;
--		}
-+		if (wp == NULL)
-+			goto unlock;
- 
-+		info = counter_arch_bp(wp);
- 		/*
--		 * The DFAR is an unknown value. Since we only allow a
--		 * single watchpoint, we can set the trigger to the lowest
--		 * possible faulting address.
-+		 * The DFAR is an unknown value on debug architectures prior
-+		 * to 7.1. Since we only allow a single watchpoint on these
-+		 * older CPUs, we can set the trigger to the lowest possible
-+		 * faulting address.
- 		 */
--		info = counter_arch_bp(wp);
--		info->trigger = wp->attr.bp_addr;
-+		if (debug_arch < ARM_DEBUG_ARCH_V7_1) {
-+			BUG_ON(i > 0);
-+			info->trigger = wp->attr.bp_addr;
-+		} else {
-+			if (info->ctrl.len == ARM_BREAKPOINT_LEN_8)
-+				alignment_mask = 0x7;
-+			else
-+				alignment_mask = 0x3;
-+
-+			/* Check if the watchpoint value matches. */
-+			val = read_wb_reg(ARM_BASE_WVR + i);
-+			if (val != (addr & ~alignment_mask))
-+				goto unlock;
-+
-+			/* Possible match, check the byte address select. */
-+			ctrl_reg = read_wb_reg(ARM_BASE_WCR + i);
-+			decode_ctrl_reg(ctrl_reg, &ctrl);
-+			if (!((1 << (addr & alignment_mask)) & ctrl.len))
-+				goto unlock;
-+
-+			/* Check that the access type matches. */
-+			access = (fsr & ARM_FSR_ACCESS_MASK) ? HW_BREAKPOINT_W :
-+				 HW_BREAKPOINT_R;
-+			if (!(access & hw_breakpoint_type(wp)))
-+				goto unlock;
-+
-+			/* We have a winner. */
-+			info->trigger = addr;
-+		}
-+
- 		pr_debug("watchpoint fired: address = 0x%x\n", info->trigger);
- 		perf_bp_event(wp, regs);
- 
-@@ -698,6 +727,7 @@ static void watchpoint_handler(unsigned long unknown, struct pt_regs *regs)
- 		if (!wp->overflow_handler)
- 			enable_single_step(wp, instruction_pointer(regs));
- 
-+unlock:
- 		rcu_read_unlock();
- 	}
- }
-@@ -813,7 +843,7 @@ static int hw_breakpoint_pending(unsigned long addr, unsigned int fsr,
- 	case ARM_ENTRY_ASYNC_WATCHPOINT:
- 		WARN(1, "Asynchronous watchpoint exception taken. Debugging results may be unreliable\n");
- 	case ARM_ENTRY_SYNC_WATCHPOINT:
--		watchpoint_handler(addr, regs);
-+		watchpoint_handler(addr, fsr, regs);
- 		break;
- 	default:
- 		ret = 1; /* Unhandled fault. */
+ out:
 -- 
 1.7.0.4
