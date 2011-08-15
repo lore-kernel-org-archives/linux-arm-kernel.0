@@ -1,36 +1,36 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 15 Aug 2011 11:12:34 +0100
-Subject: [PATCH kernel-3.0] arm:cache-l2x0: Fix L2 Cache size calculation.
-In-Reply-To: <20110815085806.GB22163@e102144-lin.cambridge.arm.com>
-References: <1313142327-18320-1-git-send-email-srinivas.kandagatla@st.com>
-	<20110812102020.GD14904@e102144-lin.cambridge.arm.com>
-	<20110813084129.GM4775@n2100.arm.linux.org.uk>
-	<20110814204851.GA1948@e102144-lin.cambridge.arm.com>
-	<4E48CF80.6070105@st.com>
-	<20110815085806.GB22163@e102144-lin.cambridge.arm.com>
-Message-ID: <20110815101234.GE26827@n2100.arm.linux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 15 Aug 2011 12:20:39 +0200
+Subject: [PATCH] amba: consolidate PrimeCell magic
+In-Reply-To: <20110815100037.GD26827@n2100.arm.linux.org.uk>
+References: <1313402104-27024-1-git-send-email-linus.walleij@stericsson.com>
+	<20110815100037.GD26827@n2100.arm.linux.org.uk>
+Message-ID: <CACRpkdZ7jZ-o_MqY9E56JZZyiZW21Prj0ear5q9Y4_Y=yW9rBQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 15, 2011 at 09:58:07AM +0100, Will Deacon wrote:
-> Srinivas,
-> 
-> On Mon, Aug 15, 2011 at 08:49:20AM +0100, Srinivas KANDAGATLA wrote:
-> > Resending the patch with Acked by and CC lines in patch...
-> 
-> As described here:
-> 
-> http://www.arm.linux.org.uk/developer/patches/info.php
-> 
-> You need to use Russell's patch system to submit this patch. If you're using
-> git, the easiest way to do this is:
-> 
-> (0) Sign up to Russell's patch system (not sure if this required):
->     http://www.arm.linux.org.uk/developer/patches/add.php
+On Mon, Aug 15, 2011 at 12:00 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Aug 15, 2011 at 11:55:04AM +0200, Linus Walleij wrote:
+>> From: Linus Walleij <linus.walleij@linaro.org>
+>>
+>> Since two drivers use the PrimeCell scheme without using the
+>> amba_bus driver logic, let's break the magic lookups out as
+>> static inlines in the <linux/amba/bus.h> header so we get
+>> some consolidation anyway.
+>
+> Why not convert these to use the amba_bus driver?
 
-(0) is not needed if sending email.
+The PL330 bit is already a backend for the drivers/dma/pl330.c
+driver which is amba_bus. However it can also be used in
+isolation (IIRC), but I think Boojin is consolidating that driver
+and once the common/pl330.c code can be moved to
+drivers/dma/* it will be converted and these ID checks
+dropped I guess.
 
-> (1) Add an additional KernelVersion: 3.1-rc2 tag to your patch.
-> 
-> (2) Email it to patches at arm.linux.org.uk using git send-email
->     --suppress-cc=all.
+As for drivers/dma/ste_dma40.c I think it has some
+dependencies to the platform bus but I will look into it.
+
+I fear there is a lot of stuff out there that have PrimeCell
+ID's and could be using amba_bus actually :-(
+
+Linus Walleij
