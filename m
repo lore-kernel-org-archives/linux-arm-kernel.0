@@ -1,43 +1,29 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Mon, 15 Aug 2011 08:47:27 -0700
-Subject: [RFC PATCH 08/12] gpio/tegra: Add device tree support
-In-Reply-To: <CAAfyv34kOtwjerB0gMhEKNTwGd9w-LCE52MCUuvzTyYkXLY-dg@mail.gmail.com>
-References: <1313189697-21287-1-git-send-email-swarren@nvidia.com>
-	<1313189697-21287-9-git-send-email-swarren@nvidia.com>
-	<CAAfyv34kOtwjerB0gMhEKNTwGd9w-LCE52MCUuvzTyYkXLY-dg@mail.gmail.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF04AEA25048@HQMAIL01.nvidia.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 15 Aug 2011 17:48:54 +0200
+Subject: [PATCH] backlight: Fix broken regulator API usage in l4f00242t03
+In-Reply-To: <20110815130619.GB3927@opensource.wolfsonmicro.com>
+References: <1313372500-28017-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+	<20110815064242.GR31404@pengutronix.de>
+	<20110815130619.GB3927@opensource.wolfsonmicro.com>
+Message-ID: <20110815154854.GT31404@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Belisko Marek wrote at Saturday, August 13, 2011 3:49 AM:
-> On Sat, Aug 13, 2011 at 12:54 AM, Stephen Warren <swarren@nvidia.com> wrote:
-> > Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> > ---
-> > ?drivers/gpio/gpio-tegra.c | ? 31 +++++++++++++++++++++++++++++++
-> > ?1 files changed, 31 insertions(+), 0 deletions(-)
-> >
-> > diff --git a/drivers/gpio/gpio-tegra.c b/drivers/gpio/gpio-tegra.c
-...
-> > +static void __init tegra_gpio_probe_dt(struct platform_device *pdev)
-> > +{
-> > + ? ? ? const __be32 *gpios;
-> > + ? ? ? u32 gpioslen;
-> > + ? ? ? int i;
-> > +
-> > + ? ? ? gpios = of_get_property(pdev->dev.of_node, "nvidia,gpios", &gpioslen);
-> > + ? ? ? if (gpios == NULL)
-> > + ? ? ? ? ? ? ? return;
-> > +
-> > + ? ? ? gpioslen /= sizeof(*gpios);
-> > + ? ? ? for (i = 0; i < gpioslen; i++, gpios++) {
-> > + ? ? ? ? ? ? ? u32 gpio = be32_to_cpup(gpios);
-> > + ? ? ? ? ? ? ? dev_err(&pdev->dev, "Enabling GPIO %d\n", gpio);
->
-> Is really necessary to print all enabled gpio's to console? Also seen
-> same in pinmux probe.
+On Mon, Aug 15, 2011 at 10:06:22PM +0900, Mark Brown wrote:
+> On Mon, Aug 15, 2011 at 08:42:42AM +0200, Sascha Hauer wrote:
+> 
+> > Maybe you could change these pr_err to dev_err on the way. The rest of
+> > the driver already uses dev_*.
+> 
+> Minimal diff and all that...
 
-Oops, that's certainly not necessary. That was debugging code, and I meant
-to convert to dev_dbg before posting.
+It just came to my mind because you touch the lines anyway, but I'm fine
+with the posted version aswell.
+
+Sascha
 
 -- 
-nvpublic
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
