@@ -1,100 +1,47 @@
-From: bsteinsbo@gmail.com (Bjarne Steinsbo)
-Date: Mon, 15 Aug 2011 14:45:14 +0200
-Subject: [PATCH] ARM: mm/alignment.c: Fix build breakage when
-	CONFIG_PROC_FS is not selected
-In-Reply-To: <20110815104900.GA2075@arm.com>
-References: <CAFULf_zzAZKk5CsPz+9x1i0gORbapwBBwzRH1BM7s_ZuEs_8DQ@mail.gmail.com>
-	<20110815104900.GA2075@arm.com>
-Message-ID: <CAFULf_ynEP=XBQYumKVoDLiMCiSBzx0-8RAzLHsYAqX7=XJWHw@mail.gmail.com>
+From: ivan.djelic@parrot.com (Ivan Djelic)
+Date: Mon, 15 Aug 2011 14:54:42 +0200
+Subject: GPMI-NAND Status?
+In-Reply-To: <20040.59254.170515.492518@ipc1.ka-ro>
+References: <20110805135133.GA26981@pengutronix.de>
+	<20110814081139.GD17063@parrot.com>
+	<20040.45443.810005.525431@ipc1.ka-ro>
+	<20110815082935.GA18364@parrot.com>
+	<20040.59254.170515.492518@ipc1.ka-ro>
+Message-ID: <20110815125442.GA18661@parrot.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dave,
+On Mon, Aug 15, 2011 at 10:31:34AM +0100, Lothar Wa?mann wrote:
+> > > It's not a problem of the device (Samsung K9F1G08U0B in my case)! The
+> > > problem is that the controller generates an ECC code that is non-FF
+> > > for all-FF data, which JFFS2 cannot handle properly.
+> > 
+> > JFFS2 has nothing to do with it. JFFS2 does not assume it can program empty
+> > pages and then reprogram them on a NAND flash device. You flashing method does.
+> > 
+> AFAICT JFFS2 checks the flash for areas that contain only FF and
+> treats them like erased flash. At least it tries to overwrite such
+> areas in flash without erasing it beforehand.
 
-If it's up to me, I would say leave it as it is.  I'm all for changing
-the code to logically group similar functions, but I feel that should
-be a different patch.  One for you, maybe?
+Hmmm, again, JFFS2 simply "writes" to an erased block. You say "it tries to
+overwrite", but that's only because you programmed an empty page in the first
+place! And it cannot "erase such areas beforehand" (think of a partially
+programmed block with tailing empty pages).
 
-BR,
+> I avoided the problem by creating JFFS2 images that are padded with
+> oxff to page size only instead of eraseblock size.
 
-Bjarne Steinsbo
+Good.
 
-a) That would produce a bigger patch, and
-b) Moving code around to logically group similar functions is a different patch
+> > Therefore... it is simply a matter of avoiding empty page programming, which
+> > only happens in your flasher. See also the flashing guidelines [1] as per Artem
+> > suggestion.
+> > 
+> "Your flasher" is the standard mtd-utils mkfs.jffs2 to create an image
+> file and the U-Boot commands 'nand erase/nand write' or
+> the mtd-utils 'flash_eraseall/nandwrite' to write it to flash.
 
-On Mon, Aug 15, 2011 at 12:49 PM, Dave Martin <dave.martin@linaro.org> wrote:
-> On Sun, Aug 14, 2011 at 02:51:48PM +0200, Bjarne Steinsbo wrote:
->> Compiling mm/alignment.c without CONFIG_PROC_FS selected fails with
->> undefined cpu_is_v6_unaligned() and safe_usermode().
->>
->> Move #ifdef CONFIG_PROC_FS, including definition of usermode_action[],
->> further down to avoid this problem.
->
-> Those two functions were never supposed to be inside the #ifdef --
-> my bad. ?Thanks for spotting it.
->
-> Acked-by: Dave Martin <dave.martin@linaro.org>
->
-> Alternatively, it may be tidier to move cpu_is_v6_unaligned() and
-> safe_usermode() alongside the other static functions, just before
-> do_alignment_finish_ldst().
->
-> I leave it up to you to decide whether you prefer that; either fix
-> is valid.
->
-> Cheers
-> ---Dave
->
->>
->> Cc: Russell King <linux@arm.linux.org.uk>
->> Signed-off-by: Bjarne Steinsbo <bsteinsbo@gmail.com>
->> ---
->> ?arch/arm/mm/alignment.c | ? 20 ++++++++++----------
->> ?1 files changed, 10 insertions(+), 10 deletions(-)
->>
->> diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
->> index cfbcf8b..c335c76 100644
->> --- a/arch/arm/mm/alignment.c
->> +++ b/arch/arm/mm/alignment.c
->> @@ -86,16 +86,6 @@ core_param(alignment, ai_usermode, int, 0600);
->> ?#define UM_FIXUP ? ? (1 << 1)
->> ?#define UM_SIGNAL ? ?(1 << 2)
->>
->> -#ifdef CONFIG_PROC_FS
->> -static const char *usermode_action[] = {
->> - ? ? "ignored",
->> - ? ? "warn",
->> - ? ? "fixup",
->> - ? ? "fixup+warn",
->> - ? ? "signal",
->> - ? ? "signal+warn"
->> -};
->> -
->> ?/* Return true if and only if the ARMv6 unaligned access model is in use. */
->> ?static bool cpu_is_v6_unaligned(void)
->> ?{
->> @@ -123,6 +113,16 @@ static int safe_usermode(int new_usermode, bool warn)
->> ? ? ? return new_usermode;
->> ?}
->>
->> +#ifdef CONFIG_PROC_FS
->> +static const char *usermode_action[] = {
->> + ? ? "ignored",
->> + ? ? "warn",
->> + ? ? "fixup",
->> + ? ? "fixup+warn",
->> + ? ? "signal",
->> + ? ? "signal+warn"
->> +};
->> +
->> ?static int alignment_proc_show(struct seq_file *m, void *v)
->> ?{
->> ? ? ? seq_printf(m, "User:\t\t%lu\n", ai_user);
->> --
->> 1.7.1
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+OK, maybe you could submit a patch to fix this issue then ?
+Thanks,
+
+Ivan
