@@ -1,34 +1,51 @@
-From: haojian.zhuang@marvell.com (Haojian Zhuang)
-Date: Mon, 15 Aug 2011 11:11:33 +0800
-Subject: [PATCH V4 0/3] ARM: mmp: add audio sram support
-In-Reply-To: <1313377794-26721-1-git-send-email-leoy@marvell.com>
-References: <1313377794-26721-1-git-send-email-leoy@marvell.com>
-Message-ID: <1313377893.14434.5.camel@Lily>
+From: hzhuang1@marvell.com (Haojian Zhuang)
+Date: Sun, 14 Aug 2011 22:06:35 -0700
+Subject: No mach-type for SHEEVAD?
+In-Reply-To: <CACRpkdYvJR2QoQLjDuKuUOMArgotZ1mSiqmCWwL+th5NS7zJSQ@mail.gmail.com>
+References: <CACRpkdYi-EfCC0Lnx9bdYXyChzOhosO1C5gmggEnnBsDnzBukA@mail.gmail.com>
+	<CAMPhdO8KgWBub5xS=JhLRum+D-=3=7s2oLNSKbWSbht3f=5A_w@mail.gmail.com>
+	<CACRpkdYvJR2QoQLjDuKuUOMArgotZ1mSiqmCWwL+th5NS7zJSQ@mail.gmail.com>
+Message-ID: <25B60CDC2F704E4E9D88FFD52780CB4C05D7174A89@SC-VEXCH1.marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2011-08-14 at 20:09 -0700, Leo Yan wrote:
-> On mmp platform, there have two sram banks:
-> audio sram bank, and internal sram bank for video and PM.
-> So add the sram module to manage these sram banks.
-> 
-> And register the sram banks so can dynamically alloc/free
-> the buffer.
-> 
-> Leo Yan (3):
->   ARM: mmp: add sram allocator
->   ARM: mmp: register audio sram bank
->   ARM: mmp: register internal sram bank
-> 
->  arch/arm/Kconfig                      |    1 +
->  arch/arm/mach-mmp/Makefile            |    2 +-
->  arch/arm/mach-mmp/brownstone.c        |   11 ++
->  arch/arm/mach-mmp/include/mach/mmp2.h |   13 +++
->  arch/arm/mach-mmp/include/mach/sram.h |   35 +++++++
->  arch/arm/mach-mmp/mmp2.c              |    3 +
->  arch/arm/mach-mmp/sram.c              |  168 +++++++++++++++++++++++++++++++++
->  7 files changed, 232 insertions(+), 1 deletions(-)
->  create mode 100644 arch/arm/mach-mmp/include/mach/sram.h
->  create mode 100644 arch/arm/mach-mmp/sram.c
-> 
-Acked-by: Haojian Zhuang <haojian.zhuang@gmail.com>
+
+
+>-----Original Message-----
+>From: Linus Walleij [mailto:linus.walleij at linaro.org]
+>Sent: 2011?8?12? 9:20 PM
+>To: Eric Miao
+>Cc: linux-arm-kernel at lists.infradead.org; Haojian Zhuang; Tanmay
+>Upadhyay
+>Subject: Re: No mach-type for SHEEVAD?
+>
+>On Thu, Aug 4, 2011 at 11:22 AM, Eric Miao <eric.miao@linaro.org> wrote:
+>> On Thu, Aug 4, 2011 at 10:17 AM, Linus Walleij
+><linus.walleij@linaro.org> wrote:
+>>> I tried to configure the mmp2 to build the "gplugd" variant
+>>> found in the arch/arm/mach-mmp2/gplugd.c source file,
+>>> however it fails miserably:
+>>>
+>>> arch/arm/mach-mmp/gplugd.c:183: error: 'MACH_TYPE_SHEEVAD' undeclared
+>>> here (not in a function)
+>>> make[3]: *** [arch/arm/mach-mmp/gplugd.o] Error 1
+>>
+>> Hi Russell,
+>>
+>> ISTR this entry will be there once the cleanup of mach-types is done?
+>Or
+>> we can submit a new entry for this?
+>
+>Is this getting anywhere? Torvald's HEAD is still broken
+>for gplugD. Shall I submit a new machine type so it
+>atleast gets fixed in the next merge window?
+>
+>Thanks,
+>Linus Walleij
+
+Hi Linus,
+
+I suggest you to register the machine SHEEVAD in this link. (http://www.arm.linux.org.uk/developer/machines)
+
+Thanks
+Haojian
