@@ -1,32 +1,26 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 15 Aug 2011 18:15:12 +0300
-Subject: [PATCH 3/3] TI814X: Create board support and enable build for
-	TI8148 EVM
-In-Reply-To: <1312479903-22909-1-git-send-email-hemantp@ti.com>
-References: <1312479903-22909-1-git-send-email-hemantp@ti.com>
-Message-ID: <20110815151509.GT12348@atomide.com>
+Date: Mon, 15 Aug 2011 18:17:23 +0300
+Subject: [PATCH 2/3] TI814X: Add cpu type macros and detection support
+In-Reply-To: <1312479894-22824-1-git-send-email-hemantp@ti.com>
+References: <1312479894-22824-1-git-send-email-hemantp@ti.com>
+Message-ID: <20110815151723.GU12348@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 * Hemant Pedanekar <hemantp@ti.com> [110804 20:39]:
-> This patch adds minimal support and build configuration for TI8148 EVM. Also
-> adds support for low level debugging on UART1 console on the EVM.
-...
+> This patch adds cpu type, macros for identification of TI814X device.
+> 
+> Note that following updates to common OMAP data structures are made:
+> 1) struct omap_chip_id member 'oc' is updated to u32 from u16 as omap chip
+> bitfield has exhausted 16 bits for CHIP_IS_XXX.
+> 2) cpu_mask and RATE_IN_XXX flags have crossed 8 bit hence struct
+> clksel_rate.flags, struct prcm_config.flags and cpu_mask are changed to u16 from
+> u8.
 
-
-> +MACHINE_START(TI8148EVM, "ti8148evm")
-> +	/* Maintainer: Texas Instruments */
-> +	.boot_params	= 0x80000100,
-> +	.map_io		= ti8148_evm_map_io,
-> +	.init_early	= ti8148_init_early,
-> +	.init_irq	= ti81xx_init_irq,
-> +	.timer		= &omap3_timer,
-> +	.init_machine	= ti8148_evm_init,
-> +MACHINE_END
-
-Please just combine this with board-ti8168evm.c by adding the MACHINE_START
-there. It seems the files are identical otherwise?
+We'll be getting rid of CHIP_IS usage and replace them with SoC specific
+lists. So we need to wait few days and then this patch will need to get
+updated a bit.
 
 Regards,
 
-Tony
+Tony 
