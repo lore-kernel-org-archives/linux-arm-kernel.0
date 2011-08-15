@@ -1,65 +1,105 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 15 Aug 2011 14:55:01 +0100
-Subject: [RFC PATCH 00/15] ARM: perf: support multiple PMUs
-Message-ID: <1313416516-8006-1-git-send-email-mark.rutland@arm.com>
+Date: Mon, 15 Aug 2011 14:55:06 +0100
+Subject: [RFC PATCH 05/15] ARM: perf: move active_events into struct arm_pmu
+In-Reply-To: <1313416516-8006-1-git-send-email-mark.rutland@arm.com>
+References: <1313416516-8006-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <1313416516-8006-6-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-System (AKA nest or uncore) PMUs exist on devices which are not affine
-to a single CPU. They usually cannot be directly associated with
-individual tasks and are asynchronous with respect to the current
-execution. Examples of devices which could have system PMUs include L2
-cache controllers, GPUs and memory buses.
+This patch moves the active_events counter into struct arm_pmu, in
+preparation for supporting multiple PMUs. This also moves
+pmu_reserve_mutex, as it is used to guard accesses to active_events.
 
-The following patch series refactors the ARM PMU backend, enabling
-new PMUs to reuse the existing code. This should allow for system PMUs
-to be supported in future. Further work will be required to get perf to
-fully understand system PMUs, but this provides something usable.
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Reviewed-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/kernel/perf_event.c |   31 ++++++++++++++++++++-----------
+ 1 files changed, 20 insertions(+), 11 deletions(-)
 
-The framework is intended to be used by system PMUs which hang off core
-platform components (e.g. L2 cache, AXI bus). If a device is complex
-enough or separate enough from core functionality to have its own
-driver, it should implement its own PMU handling using the core perf
-API directly.
-
-The first patch ("perf: provide PMU when initing events") is currently
-sitting in the tip tree, but as it's required for event initialization
-to function (and hence for the PMU to be usable), it's provided here
-for convenience.
-
-The series is based on Will Deacon's perf-updates branch at:
-	git://linux-arm.org/linux-2.6-wd.git perf-updates
-
-An example driver using the framework (supporting the PMU present in
-L220/PL310 level 2 cache controllers) can be found at:
-	git://linux-arm.org/linux-2.6-wd.git perf-l2x0-wip
-
-Any comments would be welcome.
-
-Thanks,
-Mark.
-
-Mark Rutland (15):
-  perf: provide PMU when initing events
-  ARM: perf: only register a CPU PMU when present
-  ARM: perf: clean up event group validation
-  ARM: perf: remove active_mask
-  ARM: perf: move active_events into struct arm_pmu
-  ARM: perf: move platform device to struct arm_pmu
-  ARM: perf: indirect access to cpu_hw_events
-  ARM: perf: remove unnecessary armpmu->stop
-  ARM: perf: lock PMU registers per-CPU
-  ARM: perf: add type field to struct arm_pmu
-  ARM: perf: refactor event mapping
-  ARM: perf: add support for multiple PMUs
-  ARM: perf: remove event limit from pmu_hw_events
-  ARM: perf: remove cpu-related misnomers
-  ARM: perf: move arm_pmu into <asm/pmu.h>
-
- arch/arm/include/asm/pmu.h          |   64 +++++++
- arch/arm/kernel/perf_event.c        |  318 +++++++++++++++++------------------
- arch/arm/kernel/perf_event_v6.c     |   73 ++++++---
- arch/arm/kernel/perf_event_v7.c     |   74 +++++---
- arch/arm/kernel/perf_event_xscale.c |   76 +++++----
- kernel/events/core.c                |    4 +-
- 6 files changed, 359 insertions(+), 250 deletions(-)
+diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
+index 438482f..9874395 100644
+--- a/arch/arm/kernel/perf_event.c
++++ b/arch/arm/kernel/perf_event.c
+@@ -82,6 +82,8 @@ struct arm_pmu {
+ 	const unsigned	(*event_map)[PERF_COUNT_HW_MAX];
+ 	u32		raw_event_mask;
+ 	int		num_events;
++	atomic_t	active_events;
++	struct mutex	reserve_mutex;
+ 	u64		max_period;
+ };
+ 
+@@ -454,15 +456,15 @@ armpmu_reserve_hardware(void)
+ 	return 0;
+ }
+ 
+-static atomic_t active_events = ATOMIC_INIT(0);
+-static DEFINE_MUTEX(pmu_reserve_mutex);
+-
+ static void
+ hw_perf_event_destroy(struct perf_event *event)
+ {
+-	if (atomic_dec_and_mutex_lock(&active_events, &pmu_reserve_mutex)) {
++	atomic_t *active_events	 = &armpmu->active_events;
++	struct mutex *pmu_reserve_mutex = &armpmu->reserve_mutex;
++
++	if (atomic_dec_and_mutex_lock(active_events, pmu_reserve_mutex)) {
+ 		armpmu_release_hardware();
+-		mutex_unlock(&pmu_reserve_mutex);
++		mutex_unlock(pmu_reserve_mutex);
+ 	}
+ }
+ 
+@@ -543,6 +545,7 @@ __hw_perf_event_init(struct perf_event *event)
+ static int armpmu_event_init(struct perf_event *event)
+ {
+ 	int err = 0;
++	atomic_t *active_events = &armpmu->active_events;
+ 
+ 	switch (event->attr.type) {
+ 	case PERF_TYPE_RAW:
+@@ -556,15 +559,14 @@ static int armpmu_event_init(struct perf_event *event)
+ 
+ 	event->destroy = hw_perf_event_destroy;
+ 
+-	if (!atomic_inc_not_zero(&active_events)) {
+-		mutex_lock(&pmu_reserve_mutex);
+-		if (atomic_read(&active_events) == 0) {
++	if (!atomic_inc_not_zero(active_events)) {
++		mutex_lock(&armpmu->reserve_mutex);
++		if (atomic_read(active_events) == 0)
+ 			err = armpmu_reserve_hardware();
+-		}
+ 
+ 		if (!err)
+-			atomic_inc(&active_events);
+-		mutex_unlock(&pmu_reserve_mutex);
++			atomic_inc(active_events);
++		mutex_unlock(&armpmu->reserve_mutex);
+ 	}
+ 
+ 	if (err)
+@@ -613,6 +615,12 @@ static struct pmu pmu = {
+ 	.read		= armpmu_read,
+ };
+ 
++static void __init armpmu_init(struct arm_pmu *armpmu)
++{
++	atomic_set(&armpmu->active_events, 0);
++	mutex_init(&armpmu->reserve_mutex);
++}
++
+ /* Include the PMU-specific implementations. */
+ #include "perf_event_xscale.c"
+ #include "perf_event_v6.c"
+@@ -718,6 +726,7 @@ init_hw_perf_events(void)
+ 	if (armpmu) {
+ 		pr_info("enabled with %s PMU driver, %d counters available\n",
+ 			armpmu->name, armpmu->num_events);
++		armpmu_init(armpmu);
+ 		perf_pmu_register(&pmu, "cpu", PERF_TYPE_RAW);
+ 	} else {
+ 		pr_info("no hardware support available\n");
+-- 
+1.7.0.4
