@@ -1,29 +1,37 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 15 Aug 2011 17:48:54 +0200
-Subject: [PATCH] backlight: Fix broken regulator API usage in l4f00242t03
-In-Reply-To: <20110815130619.GB3927@opensource.wolfsonmicro.com>
-References: <1313372500-28017-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-	<20110815064242.GR31404@pengutronix.de>
-	<20110815130619.GB3927@opensource.wolfsonmicro.com>
-Message-ID: <20110815154854.GT31404@pengutronix.de>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Mon, 15 Aug 2011 09:03:03 -0700
+Subject: [RFC PATCH 12/12] arm/tegra: Remove temporary gpio/pinmux
+	registration workaround
+In-Reply-To: <4E48FF29.1030208@ru.mvista.com>
+References: <1313189697-21287-1-git-send-email-swarren@nvidia.com>
+	<1313189697-21287-13-git-send-email-swarren@nvidia.com>
+	<4E48FF29.1030208@ru.mvista.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF04AEA25053@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 15, 2011 at 10:06:22PM +0900, Mark Brown wrote:
-> On Mon, Aug 15, 2011 at 08:42:42AM +0200, Sascha Hauer wrote:
+Sergei Shtylyov wrote at Monday, August 15, 2011 5:13 AM:
+> Hello.
 > 
-> > Maybe you could change these pr_err to dev_err on the way. The rest of
-> > the driver already uses dev_*.
+> On 13-08-2011 2:54, Stephen Warren wrote:
 > 
-> Minimal diff and all that...
+> > This reverts commit "arm/tegra: Prevent duplicate gpio/pinmux pdev
+> 
+>     Would be good to also include the commit ID for gitweb.
 
-It just came to my mind because you touch the lines anyway, but I'm fine
-with the posted version aswell.
+I can't do that yet, because the commit that's being reverted is earlier
+in the patch series being posted, and hence doesn't have a commit ID that
+will be valid in any upstream repository.
 
-Sascha
+I suppose this is the last commit in the series though, so I could remove
+it and submit the revert separately once the rest is upstream.
+
+> > registration with dt"; board-dt.c no long calls harmony/
+> > seaboard_pinmux_init(), so the workaround is no longer needed.
+> 
+> > Signed-off-by: Stephen Warren<swarren@nvidia.com>
+> 
+> WBR, Sergei
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+nvpublic
