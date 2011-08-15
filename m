@@ -1,85 +1,100 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Mon, 15 Aug 2011 15:31:44 +0300
-Subject: [PATCH] Fix non-LPAE boot regression.
-In-Reply-To: <20110815120914.GB21596@e102109-lin.cambridge.arm.com>
-References: <201108131556.27301.anarsoul@gmail.com>
-	<1313240299-24712-1-git-send-email-anarsoul@gmail.com>
-	<20110815120914.GB21596@e102109-lin.cambridge.arm.com>
-Message-ID: <201108151531.45469.anarsoul@gmail.com>
+From: bsteinsbo@gmail.com (Bjarne Steinsbo)
+Date: Mon, 15 Aug 2011 14:45:14 +0200
+Subject: [PATCH] ARM: mm/alignment.c: Fix build breakage when
+	CONFIG_PROC_FS is not selected
+In-Reply-To: <20110815104900.GA2075@arm.com>
+References: <CAFULf_zzAZKk5CsPz+9x1i0gORbapwBBwzRH1BM7s_ZuEs_8DQ@mail.gmail.com>
+	<20110815104900.GA2075@arm.com>
+Message-ID: <CAFULf_ynEP=XBQYumKVoDLiMCiSBzx0-8RAzLHsYAqX7=XJWHw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 15 August 2011 15:09:14 Catalin Marinas wrote:
-> Hi Vasily,
-> 
-> On Sat, Aug 13, 2011 at 01:58:19PM +0100, Vasily Khoruzhick wrote:
-> > It was introduced by  407f8b4cb07cbc5c1c7cc386f231224e2524ccea
-> > ARM: LPAE: MMU setup for the 3-level page table format
-> > 
-> > Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
-> > ---
-> > 
-> >  arch/arm/kernel/head.S |    4 ++--
-> >  1 files changed, 2 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-> > index 0bdafc4..5add5f5 100644
-> > --- a/arch/arm/kernel/head.S
-> > +++ b/arch/arm/kernel/head.S
-> > 
-> > @@ -206,7 +206,7 @@ __create_page_tables:
-> >  1:	orr	r3, r7, r5, lsl #SECTION_SHIFT	@ flags + kernel base
-> >  
-> >  	str	r3, [r4, r5, lsl #PMD_ORDER]	@ identity mapping
-> >  	cmp	r5, r6
-> > 
-> > -	addlo	r5, r5, #SECTION_SHIFT >> 20	@ next section
-> > +	addlo	r5, r5, #1			@ next section
-> > 
-> >  	blo	1b
-> 
-> That's correct.
-> 
-> >  	/*
-> > 
-> > @@ -217,7 +217,7 @@ __create_page_tables:
-> >  	mov	r3, r3, lsr #SECTION_SHIFT
-> >  	orr	r3, r7, r3, lsl #SECTION_SHIFT
-> >  	add	r0, r4,  #(KERNEL_START & 0xff000000) >> (SECTION_SHIFT -
-> >  	PMD_ORDER)
-> > 
-> > -	str	r3, [r0, #(KERNEL_START & 0x00e00000) >> (SECTION_SHIFT -
-> > PMD_ORDER)]! +	str	r3, [r0, #(KERNEL_START & 0x00f00000) >>
-> > (SECTION_SHIFT - PMD_ORDER)]!
-> 
-> The reason for this was that the sections are 2MB with LPAE and a page
-> table entry is 64-bit wide. We always shift that value by 18 but with
-> LPAE we don't want to write in the middle of a page table entry if
-> KERNEL_START is not 2MB aligned.
-> 
-> But if KERNEL_START is not 2MB aligned, I think we get the wrong
-> physical address by 1MB (with the classic page table format).
+Dave,
 
-Yep, for my case KERNEL_START is not 2MB aligned (TEXT_OFFSET is 0x00108000). 
-(CONFIG_PM_H1940 is set)
+If it's up to me, I would say leave it as it is.  I'm all for changing
+the code to logically group similar functions, but I feel that should
+be a different patch.  One for you, maybe?
 
-> There are a few alternatives to fixing this:
-> 
-> 1. Different KERNEL_START masking for classic or LPAE page tables.
-> 2. Always force 2MB section and the code above moving the phys addr into
->    r3 would need to take this into account.
-> 
-> I would go for 1 with some shifting like below:
-> 
-> +	str	r3, [r0, #((KERNEL_START & 0x00f00000) >> SECTION_SHIFT) <<
-> PMD_ORDER]!
-> 
-> This should give us 0x00f00000 with classic page tables and 0x00e00000
-> with LPAE.
-> 
-> Thanks.
+BR,
 
-Ok, I'll test this change when I get home.
+Bjarne Steinsbo
 
-Regards
-Vasily
+a) That would produce a bigger patch, and
+b) Moving code around to logically group similar functions is a different patch
+
+On Mon, Aug 15, 2011 at 12:49 PM, Dave Martin <dave.martin@linaro.org> wrote:
+> On Sun, Aug 14, 2011 at 02:51:48PM +0200, Bjarne Steinsbo wrote:
+>> Compiling mm/alignment.c without CONFIG_PROC_FS selected fails with
+>> undefined cpu_is_v6_unaligned() and safe_usermode().
+>>
+>> Move #ifdef CONFIG_PROC_FS, including definition of usermode_action[],
+>> further down to avoid this problem.
+>
+> Those two functions were never supposed to be inside the #ifdef --
+> my bad. ?Thanks for spotting it.
+>
+> Acked-by: Dave Martin <dave.martin@linaro.org>
+>
+> Alternatively, it may be tidier to move cpu_is_v6_unaligned() and
+> safe_usermode() alongside the other static functions, just before
+> do_alignment_finish_ldst().
+>
+> I leave it up to you to decide whether you prefer that; either fix
+> is valid.
+>
+> Cheers
+> ---Dave
+>
+>>
+>> Cc: Russell King <linux@arm.linux.org.uk>
+>> Signed-off-by: Bjarne Steinsbo <bsteinsbo@gmail.com>
+>> ---
+>> ?arch/arm/mm/alignment.c | ? 20 ++++++++++----------
+>> ?1 files changed, 10 insertions(+), 10 deletions(-)
+>>
+>> diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
+>> index cfbcf8b..c335c76 100644
+>> --- a/arch/arm/mm/alignment.c
+>> +++ b/arch/arm/mm/alignment.c
+>> @@ -86,16 +86,6 @@ core_param(alignment, ai_usermode, int, 0600);
+>> ?#define UM_FIXUP ? ? (1 << 1)
+>> ?#define UM_SIGNAL ? ?(1 << 2)
+>>
+>> -#ifdef CONFIG_PROC_FS
+>> -static const char *usermode_action[] = {
+>> - ? ? "ignored",
+>> - ? ? "warn",
+>> - ? ? "fixup",
+>> - ? ? "fixup+warn",
+>> - ? ? "signal",
+>> - ? ? "signal+warn"
+>> -};
+>> -
+>> ?/* Return true if and only if the ARMv6 unaligned access model is in use. */
+>> ?static bool cpu_is_v6_unaligned(void)
+>> ?{
+>> @@ -123,6 +113,16 @@ static int safe_usermode(int new_usermode, bool warn)
+>> ? ? ? return new_usermode;
+>> ?}
+>>
+>> +#ifdef CONFIG_PROC_FS
+>> +static const char *usermode_action[] = {
+>> + ? ? "ignored",
+>> + ? ? "warn",
+>> + ? ? "fixup",
+>> + ? ? "fixup+warn",
+>> + ? ? "signal",
+>> + ? ? "signal+warn"
+>> +};
+>> +
+>> ?static int alignment_proc_show(struct seq_file *m, void *v)
+>> ?{
+>> ? ? ? seq_printf(m, "User:\t\t%lu\n", ai_user);
+>> --
+>> 1.7.1
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
