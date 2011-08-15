@@ -1,53 +1,84 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Mon, 15 Aug 2011 17:35:31 +0800
-Subject: [PATCH V4 0/3] ARM: mmp: add audio sram support
-In-Reply-To: <20110815091245.GC32705@game.jcrosoft.org>
-References: <1313377794-26721-1-git-send-email-leoy@marvell.com>
-	<1313377893.14434.5.camel@Lily>
-	<CAMPhdO8rkct4H74zXBzaDa183u5vrPArerXgiNXwvQWzZT67Ng@mail.gmail.com>
-	<20110815091245.GC32705@game.jcrosoft.org>
-Message-ID: <CAMPhdO_StSa9fsYLNjJDd0KDkUyg6ep3gN2n5Gx-WmZ8t=bTFw@mail.gmail.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Mon, 15 Aug 2011 15:06:50 +0530
+Subject: [PATCH 07/15] ARM: EXYNOS4: Use generic DMA PL330 driver
+In-Reply-To: <1311744697-10264-8-git-send-email-boojin.kim@samsung.com>
+References: <1311744697-10264-1-git-send-email-boojin.kim@samsung.com>
+	<1311744697-10264-8-git-send-email-boojin.kim@samsung.com>
+Message-ID: <CAJuYYwT9k2+D-VrrdeF2qW1f7CV9wvq3vgPYobNmP680Jnr3yQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 15, 2011 at 5:12 PM, Jean-Christophe PLAGNIOL-VILLARD
-<plagnioj@jcrosoft.com> wrote:
-> On 16:43 Mon 15 Aug ? ? , Eric Miao wrote:
->> On Mon, Aug 15, 2011 at 11:11 AM, Haojian Zhuang
->> <haojian.zhuang@marvell.com> wrote:
->> > On Sun, 2011-08-14 at 20:09 -0700, Leo Yan wrote:
->> >> On mmp platform, there have two sram banks:
->> >> audio sram bank, and internal sram bank for video and PM.
->> >> So add the sram module to manage these sram banks.
->> >>
->> >> And register the sram banks so can dynamically alloc/free
->> >> the buffer.
->> >>
->> >> Leo Yan (3):
->> >> ? ARM: mmp: add sram allocator
->> >> ? ARM: mmp: register audio sram bank
->> >> ? ARM: mmp: register internal sram bank
->> >>
->> >> ?arch/arm/Kconfig ? ? ? ? ? ? ? ? ? ? ?| ? ?1 +
->> >> ?arch/arm/mach-mmp/Makefile ? ? ? ? ? ?| ? ?2 +-
->> >> ?arch/arm/mach-mmp/brownstone.c ? ? ? ?| ? 11 ++
->> >> ?arch/arm/mach-mmp/include/mach/mmp2.h | ? 13 +++
->> >> ?arch/arm/mach-mmp/include/mach/sram.h | ? 35 +++++++
->> >> ?arch/arm/mach-mmp/mmp2.c ? ? ? ? ? ? ?| ? ?3 +
->> >> ?arch/arm/mach-mmp/sram.c ? ? ? ? ? ? ?| ?168 +++++++++++++++++++++++++++++++++
->> >> ?7 files changed, 232 insertions(+), 1 deletions(-)
->> >> ?create mode 100644 arch/arm/mach-mmp/include/mach/sram.h
->> >> ?create mode 100644 arch/arm/mach-mmp/sram.c
->> >>
->> > Acked-by: Haojian Zhuang <haojian.zhuang@gmail.com>
->>
->> Looks good to me. Thanks Haojian. Applied to -devel.
-> I've some reserve on the named pool they need to be managed at generic level
-> not here
+Hi Boojin,
 
-What are their names? And your suggestions to fix this?
+On 27 July 2011 11:01, Boojin Kim <boojin.kim@samsung.com> wrote:
+> This patch makes Samsung EXYNOS4 to use DMA PL330 driver
+> on DMADEVICE. The EXYNOS4 uses DMA generic APIs instead of
+> SAMSUNG specific S3C-PL330 APIs.
+>
+> Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> ---
+> ?arch/arm/mach-exynos4/Kconfig | ? ?2 +-
+> ?arch/arm/mach-exynos4/clock.c | ? 16 ++-
+> ?arch/arm/mach-exynos4/dma.c ? | ?299 ++++++++++++++++++++++++++---------------
+> ?3 files changed, 198 insertions(+), 119 deletions(-)
+>
 
+[...]
+
+> diff --git a/arch/arm/mach-exynos4/dma.c b/arch/arm/mach-exynos4/dma.c
+> index 564bb53..d57d662 100644
+
+[...]
+
+> +struct amba_device exynos4_device_pdma0 = {
+> + ? ? ? .dev = {
+> + ? ? ? ? ? ? ? .init_name = "dma-pl330.0",
+> ? ? ? ? ? ? ? ?.dma_mask = &dma_dmamask,
+> ? ? ? ? ? ? ? ?.coherent_dma_mask = DMA_BIT_MASK(32),
+> ? ? ? ? ? ? ? ?.platform_data = &exynos4_pdma0_pdata,
+> ? ? ? ?},
+> + ? ? ? .res = {
+> + ? ? ? ? ? ? ? .start = EXYNOS4_PA_PDMA0,
+> + ? ? ? ? ? ? ? .end = EXYNOS4_PA_PDMA0 + SZ_4K,
+> + ? ? ? ? ? ? ? .flags = IORESOURCE_MEM,
+> + ? ? ? },
+> + ? ? ? .irq = {IRQ_PDMA0, NO_IRQ},
+> + ? ? ? .periphid = 0x00041330,
+> ?};
 >
-> Best Regards,
-> J.
+
+[...]
+
+> +struct amba_device exynos4_device_pdma1 = {
+> + ? ? ? .dev = {
+> + ? ? ? ? ? ? ? .init_name = "dma-pl330.1",
+> ? ? ? ? ? ? ? ?.dma_mask = &dma_dmamask,
+> ? ? ? ? ? ? ? ?.coherent_dma_mask = DMA_BIT_MASK(32),
+> ? ? ? ? ? ? ? ?.platform_data = &exynos4_pdma1_pdata,
+> ? ? ? ?},
+> -};
+> -
+> -static struct platform_device *exynos4_dmacs[] __initdata = {
+> - ? ? ? &exynos4_device_pdma0,
+> - ? ? ? &exynos4_device_pdma1,
+> + ? ? ? .res = {
+> + ? ? ? ? ? ? ? .start = EXYNOS4_PA_PDMA1,
+> + ? ? ? ? ? ? ? .end = EXYNOS4_PA_PDMA1 + SZ_4K,
+> + ? ? ? ? ? ? ? .flags = IORESOURCE_MEM,
+> + ? ? ? },
+> + ? ? ? .irq = {IRQ_PDMA1, NO_IRQ},
+> + ? ? ? .periphid = 0x00041330,
+> ?};
 >
+> ?static int __init exynos4_dma_init(void)
+> ?{
+> - ? ? ? platform_add_devices(exynos4_dmacs, ARRAY_SIZE(exynos4_dmacs));
+> + ? ? ? amba_device_register(&exynos4_device_pdma0, &iomem_resource);
+
+How would the 'exynos4_device_pdma1' instance get registered? Should
+there be a amba_device_register call for 'exynos4_device_pdma1'
+instance as well?
+
+Thanks,
+Thomas.
