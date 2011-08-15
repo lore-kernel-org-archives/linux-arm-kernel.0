@@ -1,16 +1,28 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 15 Aug 2011 22:06:22 +0900
-Subject: [PATCH] backlight: Fix broken regulator API usage in l4f00242t03
-In-Reply-To: <20110815064242.GR31404@pengutronix.de>
-References: <1313372500-28017-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-	<20110815064242.GR31404@pengutronix.de>
-Message-ID: <20110815130619.GB3927@opensource.wolfsonmicro.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 15 Aug 2011 09:23:49 -0400 (EDT)
+Subject: [PATCH 1/3] ARM: mmp: add sram allocator
+In-Reply-To: <1403041.Yj2MdIhcZO@wuerfel>
+References: <1313377794-26721-1-git-send-email-leoy@marvell.com>
+	<1313377794-26721-2-git-send-email-leoy@marvell.com>
+	<1403041.Yj2MdIhcZO@wuerfel>
+Message-ID: <alpine.LFD.2.00.1108150920060.20358@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 15, 2011 at 08:42:42AM +0200, Sascha Hauer wrote:
+On Mon, 15 Aug 2011, Arnd Bergmann wrote:
 
-> Maybe you could change these pr_err to dev_err on the way. The rest of
-> the driver already uses dev_*.
+> Some time ago, there was talk of merging the existing sram drivers
+> and creating a common driver that is easy to hook into.
 
-Minimal diff and all that...
+Absolutely.
+
+> What has happened with that? My feeling is that we should stop adding
+> more drivers like this in the platform code but rather put an
+> authoritative copy into arch/arm/mm/ or even the top-level mm/ directory
+> and change over the existing drivers to hook into that one.
+
+IIRC, this was driven by Russell.  Maybe this is a good time to revive 
+discussion around it.
+
+
+Nicolas
