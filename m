@@ -1,84 +1,25 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Mon, 15 Aug 2011 11:49:00 +0100
-Subject: [PATCH] ARM: mm/alignment.c: Fix build breakage when
-	CONFIG_PROC_FS is not selected
-In-Reply-To: <CAFULf_zzAZKk5CsPz+9x1i0gORbapwBBwzRH1BM7s_ZuEs_8DQ@mail.gmail.com>
-References: <CAFULf_zzAZKk5CsPz+9x1i0gORbapwBBwzRH1BM7s_ZuEs_8DQ@mail.gmail.com>
-Message-ID: <20110815104900.GA2075@arm.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Mon, 15 Aug 2011 15:12:41 +0400
+Subject: [RFC PATCH 12/12] arm/tegra: Remove temporary gpio/pinmux
+	registration workaround
+In-Reply-To: <1313189697-21287-13-git-send-email-swarren@nvidia.com>
+References: <1313189697-21287-1-git-send-email-swarren@nvidia.com>
+	<1313189697-21287-13-git-send-email-swarren@nvidia.com>
+Message-ID: <4E48FF29.1030208@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 14, 2011 at 02:51:48PM +0200, Bjarne Steinsbo wrote:
-> Compiling mm/alignment.c without CONFIG_PROC_FS selected fails with
-> undefined cpu_is_v6_unaligned() and safe_usermode().
-> 
-> Move #ifdef CONFIG_PROC_FS, including definition of usermode_action[],
-> further down to avoid this problem.
+Hello.
 
-Those two functions were never supposed to be inside the #ifdef --
-my bad.  Thanks for spotting it.
+On 13-08-2011 2:54, Stephen Warren wrote:
 
-Acked-by: Dave Martin <dave.martin@linaro.org>
+> This reverts commit "arm/tegra: Prevent duplicate gpio/pinmux pdev
 
-Alternatively, it may be tidier to move cpu_is_v6_unaligned() and
-safe_usermode() alongside the other static functions, just before
-do_alignment_finish_ldst().
+    Would be good to also include the commit ID for gitweb.
 
-I leave it up to you to decide whether you prefer that; either fix
-is valid.
+> registration with dt"; board-dt.c no long calls harmony/
+> seaboard_pinmux_init(), so the workaround is no longer needed.
 
-Cheers
----Dave
+> Signed-off-by: Stephen Warren<swarren@nvidia.com>
 
-> 
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Signed-off-by: Bjarne Steinsbo <bsteinsbo@gmail.com>
-> ---
->  arch/arm/mm/alignment.c |   20 ++++++++++----------
->  1 files changed, 10 insertions(+), 10 deletions(-)
-> 
-> diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
-> index cfbcf8b..c335c76 100644
-> --- a/arch/arm/mm/alignment.c
-> +++ b/arch/arm/mm/alignment.c
-> @@ -86,16 +86,6 @@ core_param(alignment, ai_usermode, int, 0600);
->  #define UM_FIXUP	(1 << 1)
->  #define UM_SIGNAL	(1 << 2)
-> 
-> -#ifdef CONFIG_PROC_FS
-> -static const char *usermode_action[] = {
-> -	"ignored",
-> -	"warn",
-> -	"fixup",
-> -	"fixup+warn",
-> -	"signal",
-> -	"signal+warn"
-> -};
-> -
->  /* Return true if and only if the ARMv6 unaligned access model is in use. */
->  static bool cpu_is_v6_unaligned(void)
->  {
-> @@ -123,6 +113,16 @@ static int safe_usermode(int new_usermode, bool warn)
->  	return new_usermode;
->  }
-> 
-> +#ifdef CONFIG_PROC_FS
-> +static const char *usermode_action[] = {
-> +	"ignored",
-> +	"warn",
-> +	"fixup",
-> +	"fixup+warn",
-> +	"signal",
-> +	"signal+warn"
-> +};
-> +
->  static int alignment_proc_show(struct seq_file *m, void *v)
->  {
->  	seq_printf(m, "User:\t\t%lu\n", ai_user);
-> -- 
-> 1.7.1
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+WBR, Sergei
