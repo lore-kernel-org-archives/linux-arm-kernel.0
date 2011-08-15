@@ -1,79 +1,130 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Mon, 15 Aug 2011 19:34:45 +0300
-Subject: GPMI-NAND Status?
-In-Reply-To: <20040.59254.170515.492518@ipc1.ka-ro>
-References: <20110805135133.GA26981@pengutronix.de>
-	<20110814081139.GD17063@parrot.com>
-	<20040.45443.810005.525431@ipc1.ka-ro>
-	<20110815082935.GA18364@parrot.com>
-	<20040.59254.170515.492518@ipc1.ka-ro>
-Message-ID: <1313426095.8691.44.camel@sauron>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Mon, 15 Aug 2011 09:41:20 -0700
+Subject: [RFC PATCH 06/12] arm/dt: Tegra: Add pinmux node
+In-Reply-To: <CAOesGMheuUfSe1uUA6LxZ71V0-DR3XX7bEJqhVxJ-ZqrWWa1bA@mail.gmail.com>
+References: <1313189697-21287-1-git-send-email-swarren@nvidia.com>
+	<1313189697-21287-7-git-send-email-swarren@nvidia.com>
+	<CAOesGMheuUfSe1uUA6LxZ71V0-DR3XX7bEJqhVxJ-ZqrWWa1bA@mail.gmail.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF04AEA2507E@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2011-08-15 at 11:31 +0200, Lothar Wa?mann wrote:
-> Hi,
+Olof Johansson wrote at Sunday, August 14, 2011 1:25 AM:
+> On Fri, Aug 12, 2011 at 3:54 PM, Stephen Warren <swarren@nvidia.com> wrote:
+> > Add a pinmux node to tegra20.dtsi in order to instantiate the future
+> > pinmux device. Add pinmux nodes to Harmony and Seaboard, which detail
+> > the entire default pinmux configuration. This configuration is identical
+> > to that in board-harmony/seaboard-pinmux.c.
 > 
-> Ivan Djelic writes:
-> > On Mon, Aug 15, 2011 at 06:41:23AM +0100, Lothar Wa?mann wrote:
-> > > Hi,
-> > > 
-> > > Ivan Djelic writes:
-> > > > On Fri, Aug 05, 2011 at 02:51:33PM +0100, Wolfram Sang wrote:
-> > > > (...)
-> > > > > 
-> > > > > problem overwriting all-0xff data in NAND [2]
-> > > > > =============================================
-> > > > > 
-> > > > > Although it occured only when writing JFFS2 images so far, this is a generic
-> > > > > issue and needs to be fixed, right?
-> > > > > 
-> > > > > 
-> > > > (...)
-> > > > > [2] http://lists.infradead.org/pipermail/linux-mtd/2011-July/037104.html
-> > > > 
-> > > > As explained in the thread linked above, this issue should be fixed in your
-> > > > flashing tool, _not_ in your driver. The nand device you are using does not
-> > > > support programming pages multiple times in a row; pretending it does in the
-> > > >
-> > > It's not a problem of the device (Samsung K9F1G08U0B in my case)! The
-> > > problem is that the controller generates an ECC code that is non-FF
-> > > for all-FF data, which JFFS2 cannot handle properly.
-> > 
-> > JFFS2 has nothing to do with it. JFFS2 does not assume it can program empty
-> > pages and then reprogram them on a NAND flash device. You flashing method does.
-> > 
-> AFAICT JFFS2 checks the flash for areas that contain only FF and
-> treats them like erased flash. At least it tries to overwrite such
-> areas in flash without erasing it beforehand.
+> Again, documentation for the binding is needed.
 
-Right, when JFFS2 scans the flash and finds a partially-used eraseblock,
-it tries to find out where the data ends and the empty space starts.
-JFFS2 assumes that the empty space is usable, and it uses it. JFFS2
-author just missed the fact that in case of newly flashed JFFS2 image
-this empty space may be unusable. And this was extremely unlikely those
-times.
+Yes. It should have been there, but I screwed up.
 
-You may teach JFFS2 to avoid using this space or to "clean it up", just
-like we taught UBIFS to do this recently. The other option is to change
-the flashing method. 
+> Seeing the table coded up now though, I wonder if it could make sense
+> to flip it around? The number of functions multiplexed out are fewer
+> than the pin groups (and this would be even more true on platforms
+> that have per-pin configurations and/or smaller groups).
 
-> I avoided the problem by creating JFFS2 images that are padded with
-> oxff to page size only instead of eraseblock size.
+There are 116 pin groups and 61 functions, so this certainly would reduce
+the size of the tree.
 
-Right.
+> I.e. something like:
+> 
+>     sdio4 {
+>             nvidia,pingroups = < DTA DTD >; // Not sure how to
+> reference this though -- integers would be hard to read. DTA/DTD
+> aren't valid values in the syntax.
+>             nvidia,pull-up
+>     },
+> 
+> And any pingroups not covered by a function would be left alone
 
-> > Therefore... it is simply a matter of avoiding empty page programming, which
-> > only happens in your flasher. See also the flashing guidelines [1] as per Artem
-> > suggestion.
-> > 
-> "Your flasher" is the standard mtd-utils mkfs.jffs2 to create an image
-> file and the U-Boot commands 'nand erase/nand write' or
-> the mtd-utils 'flash_eraseall/nandwrite' to write it to flash.
+I'm personally inclined not to do this.
 
-I do not use these tools, but if they have issues - just fix them and
-send patches.
+a) The HW registers are laid out such that each pingroup has various
+properties, so the current binding represents that directly. That said,
+inverting the table would contain exactly the same data, so this argument
+is slightly tenuous/arbitrary, except that:
+
+b) I think we'd still need tristate and pull properties per pin-group
+either way; within a given special function, I see no reason for every
+pingroup to need the same pull/tristate values (otherwise, I imagine the
+Tegra HW designers would have lumped all the pins into a single pingroup
+already). For example, an interface with data and control signals might
+need pullups on control signals, but none on data.
+
+c) Similar to that, a RSVD/NONE (or otherwise unused) function might be
+used for a bunch of pingroups that are in fact used by GPIOs, and hence
+only the pull/tristate values are relevant, since the GPIO controller
+will actually control the data on the line. In this case, there's no 
+reason to assume that different pingroups that have the same function are
+related in any way, and hence should have the same pull/tristate.
+
+Given, b/c, we'd need an array of pull/tristate values per pingroup within
+a given function, and I think the syntax for that would be sufficiently
+complex that the binding in the current patchset makes more sense.
+
+Do you agree?
+
+> (one
+> could easily define a few no-op functions to set pull up/down and
+> tristate values on the unused groups).
+
+The binding (and original pinmux code) does define RSVD1/2/3/4 functions
+for the case where a pingroup should be programmed to an unused/quiescent
+state. There's also a NONE function for the pingroups that don't support
+muxing, but just pullup/down and tristate.
+
+> [...]
+> 
+> > + ? ? ? pinmux: pinmux at 70000000 {
+> > + ? ? ? ? ? ? ? ATA {
+> 
+> I would prefer seeing these in lower case (since device tree tends to
+> be no-caps). Should be easy to switch to strcasecmp in the code.
+
+Sure.
+
+> [...]
+> > + ? ? ? ? ? ? ? CDEV2 {
+> > + ? ? ? ? ? ? ? ? ? ? ? nvidia,function = "PLLP_OUT4";
+> 
+> The string here is a bit unfortunate. It's really just used to map
+> from the string to an integer anyway, with the reverse mapping being
+> produced by the debugfs output. But especially if the function is
+> flipped above, the different pingroups referenced might not use the
+> same value for each function, so some sort of lookup will still be
+> needed. Not much to do about, it seems. :(
+
+I originally considered syntax like:
+
+    nvidia,function = <33>; // PLLP_OUT4
+
+However, I figured this was problematic because:
+
+a) Calculating the integers would be problematic; pinmux.h doesn't
+currently list the integer for each value in enum tegra_mux_func, although
+I suppose it and the binding documentation could easily be modified to do
+so.
+
+b) With just an integer, it's much harder to know what the value means.
+
+c) With both the integer and comment, they can get out of sync if
+incorrectly edited.
+
+I'd be much more included to use integers if the *.dts files wer run
+though the pre-processor, and hence defines could be used. I do observe
+that Documentation/devicetree/booting-without-of.txt says:
+
+    It is also suggested that you pipe your source file through cpp (gcc
+    preprocessor) so you can use #include's, #define for constants, etc...
+
+> > + ? ? ? ? ? ? ? ? ? ? ? nvidia,pull = "down";
+> 
+> This should be done by discrete properties instead: nvidia,pull-up,
+> nvidia-pull-down (and omitted means normal), without values.
+
+OK.
 
 -- 
-Best Regards,
-Artem Bityutskiy
+nvpublic
