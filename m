@@ -1,105 +1,132 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 15 Aug 2011 14:55:06 +0100
-Subject: [RFC PATCH 05/15] ARM: perf: move active_events into struct arm_pmu
+Date: Mon, 15 Aug 2011 14:55:05 +0100
+Subject: [RFC PATCH 04/15] ARM: perf: remove active_mask
 In-Reply-To: <1313416516-8006-1-git-send-email-mark.rutland@arm.com>
 References: <1313416516-8006-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1313416516-8006-6-git-send-email-mark.rutland@arm.com>
+Message-ID: <1313416516-8006-5-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch moves the active_events counter into struct arm_pmu, in
-preparation for supporting multiple PMUs. This also moves
-pmu_reserve_mutex, as it is used to guard accesses to active_events.
+Currently, pmu_hw_events::active_mask is used to keep track of which
+events are active in hardware. As we can stop counters and their
+interrupts, this is unnecessary.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Reviewed-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/kernel/perf_event.c |   31 ++++++++++++++++++++-----------
- 1 files changed, 20 insertions(+), 11 deletions(-)
+ arch/arm/kernel/perf_event.c        |    8 --------
+ arch/arm/kernel/perf_event_v6.c     |   19 ++++++++++++++++++-
+ arch/arm/kernel/perf_event_v7.c     |    3 ---
+ arch/arm/kernel/perf_event_xscale.c |    6 ------
+ 4 files changed, 18 insertions(+), 18 deletions(-)
 
 diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
-index 438482f..9874395 100644
+index dfde928..438482f 100644
 --- a/arch/arm/kernel/perf_event.c
 +++ b/arch/arm/kernel/perf_event.c
-@@ -82,6 +82,8 @@ struct arm_pmu {
- 	const unsigned	(*event_map)[PERF_COUNT_HW_MAX];
- 	u32		raw_event_mask;
- 	int		num_events;
-+	atomic_t	active_events;
-+	struct mutex	reserve_mutex;
- 	u64		max_period;
- };
- 
-@@ -454,15 +456,15 @@ armpmu_reserve_hardware(void)
- 	return 0;
- }
- 
--static atomic_t active_events = ATOMIC_INIT(0);
--static DEFINE_MUTEX(pmu_reserve_mutex);
+@@ -57,12 +57,6 @@ struct cpu_hw_events {
+ 	 * an event. A 0 means that the counter can be used.
+ 	 */
+ 	unsigned long		used_mask[BITS_TO_LONGS(ARMPMU_MAX_HWEVENTS)];
 -
- static void
- hw_perf_event_destroy(struct perf_event *event)
- {
--	if (atomic_dec_and_mutex_lock(&active_events, &pmu_reserve_mutex)) {
-+	atomic_t *active_events	 = &armpmu->active_events;
-+	struct mutex *pmu_reserve_mutex = &armpmu->reserve_mutex;
-+
-+	if (atomic_dec_and_mutex_lock(active_events, pmu_reserve_mutex)) {
- 		armpmu_release_hardware();
--		mutex_unlock(&pmu_reserve_mutex);
-+		mutex_unlock(pmu_reserve_mutex);
- 	}
+-	/*
+-	 * A 1 bit for an index indicates that the counter is actively being
+-	 * used.
+-	 */
+-	unsigned long		active_mask[BITS_TO_LONGS(ARMPMU_MAX_HWEVENTS)];
+ };
+ static DEFINE_PER_CPU(struct cpu_hw_events, cpu_hw_events);
+ 
+@@ -295,7 +289,6 @@ armpmu_del(struct perf_event *event, int flags)
+ 
+ 	WARN_ON(idx < 0);
+ 
+-	clear_bit(idx, cpuc->active_mask);
+ 	armpmu_stop(event, PERF_EF_UPDATE);
+ 	cpuc->events[idx] = NULL;
+ 	clear_bit(idx, cpuc->used_mask);
+@@ -327,7 +320,6 @@ armpmu_add(struct perf_event *event, int flags)
+ 	event->hw.idx = idx;
+ 	armpmu->disable(hwc, idx);
+ 	cpuc->events[idx] = event;
+-	set_bit(idx, cpuc->active_mask);
+ 
+ 	hwc->state = PERF_HES_STOPPED | PERF_HES_UPTODATE;
+ 	if (flags & PERF_EF_START)
+diff --git a/arch/arm/kernel/perf_event_v6.c b/arch/arm/kernel/perf_event_v6.c
+index 87f29b5..8390128 100644
+--- a/arch/arm/kernel/perf_event_v6.c
++++ b/arch/arm/kernel/perf_event_v6.c
+@@ -462,6 +462,23 @@ armv6pmu_enable_event(struct hw_perf_event *hwc,
+ 	raw_spin_unlock_irqrestore(&pmu_lock, flags);
  }
  
-@@ -543,6 +545,7 @@ __hw_perf_event_init(struct perf_event *event)
- static int armpmu_event_init(struct perf_event *event)
- {
- 	int err = 0;
-+	atomic_t *active_events = &armpmu->active_events;
- 
- 	switch (event->attr.type) {
- 	case PERF_TYPE_RAW:
-@@ -556,15 +559,14 @@ static int armpmu_event_init(struct perf_event *event)
- 
- 	event->destroy = hw_perf_event_destroy;
- 
--	if (!atomic_inc_not_zero(&active_events)) {
--		mutex_lock(&pmu_reserve_mutex);
--		if (atomic_read(&active_events) == 0) {
-+	if (!atomic_inc_not_zero(active_events)) {
-+		mutex_lock(&armpmu->reserve_mutex);
-+		if (atomic_read(active_events) == 0)
- 			err = armpmu_reserve_hardware();
--		}
- 
- 		if (!err)
--			atomic_inc(&active_events);
--		mutex_unlock(&pmu_reserve_mutex);
-+			atomic_inc(active_events);
-+		mutex_unlock(&armpmu->reserve_mutex);
- 	}
- 
- 	if (err)
-@@ -613,6 +615,12 @@ static struct pmu pmu = {
- 	.read		= armpmu_read,
- };
- 
-+static void __init armpmu_init(struct arm_pmu *armpmu)
++static int counter_is_active(unsigned long pmcr, int idx)
 +{
-+	atomic_set(&armpmu->active_events, 0);
-+	mutex_init(&armpmu->reserve_mutex);
++	unsigned long mask = 0;
++	if (idx == ARMV6_CYCLE_COUNTER)
++		mask = ARMV6_PMCR_CCOUNT_IEN;
++	else if (idx == ARMV6_COUNTER0)
++		mask = ARMV6_PMCR_COUNT0_IEN;
++	else if (idx == ARMV6_COUNTER1)
++		mask = ARMV6_PMCR_COUNT1_IEN;
++
++	if (mask)
++		return pmcr & mask;
++
++	WARN_ONCE(1, "invalid counter number (%d)\n", idx);
++	return 0;
 +}
 +
- /* Include the PMU-specific implementations. */
- #include "perf_event_xscale.c"
- #include "perf_event_v6.c"
-@@ -718,6 +726,7 @@ init_hw_perf_events(void)
- 	if (armpmu) {
- 		pr_info("enabled with %s PMU driver, %d counters available\n",
- 			armpmu->name, armpmu->num_events);
-+		armpmu_init(armpmu);
- 		perf_pmu_register(&pmu, "cpu", PERF_TYPE_RAW);
- 	} else {
- 		pr_info("no hardware support available\n");
+ static irqreturn_t
+ armv6pmu_handle_irq(int irq_num,
+ 		    void *dev)
+@@ -491,7 +508,7 @@ armv6pmu_handle_irq(int irq_num,
+ 		struct perf_event *event = cpuc->events[idx];
+ 		struct hw_perf_event *hwc;
+ 
+-		if (!test_bit(idx, cpuc->active_mask))
++		if (!counter_is_active(pmcr, idx))
+ 			continue;
+ 
+ 		/*
+diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
+index fe6c931..f4170fc 100644
+--- a/arch/arm/kernel/perf_event_v7.c
++++ b/arch/arm/kernel/perf_event_v7.c
+@@ -1022,9 +1022,6 @@ static irqreturn_t armv7pmu_handle_irq(int irq_num, void *dev)
+ 		struct perf_event *event = cpuc->events[idx];
+ 		struct hw_perf_event *hwc;
+ 
+-		if (!test_bit(idx, cpuc->active_mask))
+-			continue;
+-
+ 		/*
+ 		 * We have a single interrupt for all counters. Check that
+ 		 * each counter has overflowed before we process it.
+diff --git a/arch/arm/kernel/perf_event_xscale.c b/arch/arm/kernel/perf_event_xscale.c
+index 54312fc..ca89a06 100644
+--- a/arch/arm/kernel/perf_event_xscale.c
++++ b/arch/arm/kernel/perf_event_xscale.c
+@@ -253,9 +253,6 @@ xscale1pmu_handle_irq(int irq_num, void *dev)
+ 		struct perf_event *event = cpuc->events[idx];
+ 		struct hw_perf_event *hwc;
+ 
+-		if (!test_bit(idx, cpuc->active_mask))
+-			continue;
+-
+ 		if (!xscale1_pmnc_counter_has_overflowed(pmnc, idx))
+ 			continue;
+ 
+@@ -585,9 +582,6 @@ xscale2pmu_handle_irq(int irq_num, void *dev)
+ 		struct perf_event *event = cpuc->events[idx];
+ 		struct hw_perf_event *hwc;
+ 
+-		if (!test_bit(idx, cpuc->active_mask))
+-			continue;
+-
+ 		if (!xscale2_pmnc_counter_has_overflowed(pmnc, idx))
+ 			continue;
+ 
 -- 
 1.7.0.4
