@@ -1,50 +1,83 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Mon, 15 Aug 2011 16:27:53 +0800
-Subject: [RFC PATCH 2/2] ARM: CSR: add PM sleep entry for SiRFprimaII
-In-Reply-To: <20110815082027.GA26827@n2100.arm.linux.org.uk>
-References: <1312512888-25070-1-git-send-email-bs14@csr.com>
-	<1312512888-25070-3-git-send-email-bs14@csr.com>
-	<20110814075927.GB4986@n2100.arm.linux.org.uk>
-	<CAGsJ_4yigTt40g0-9jrz5qAbdrQdsXuQ65MhX+x1AZ1M4Ztr=w@mail.gmail.com>
-	<20110815082027.GA26827@n2100.arm.linux.org.uk>
-Message-ID: <CAGsJ_4wyGUC=gNagaGGVcr=+nrJU2xjGJDxwS+H-UKPLajrLpg@mail.gmail.com>
+From: ivan.djelic@parrot.com (Ivan Djelic)
+Date: Mon, 15 Aug 2011 10:29:35 +0200
+Subject: GPMI-NAND Status?
+In-Reply-To: <20040.45443.810005.525431@ipc1.ka-ro>
+References: <20110805135133.GA26981@pengutronix.de>
+	<20110814081139.GD17063@parrot.com>
+	<20040.45443.810005.525431@ipc1.ka-ro>
+Message-ID: <20110815082935.GA18364@parrot.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/8/15 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Mon, Aug 15, 2011 at 03:43:13PM +0800, Barry Song wrote:
->> Sorry, my fault. i simply picked these lines which have been verified
->> to be working in local old 2.6.38.8 kernel and really didn't think and
->> refine more carefully.
->> in deep sleep mode, SiRFprimaII will powerdown CPU core.
->
-> ... just like everyone else.
->
->> due to this,
->> i just ignored to delete the codes saving registers of all kinds of
->> CPU modes. but it is not the real situation in kernel. For example,
->> IRQ mode used the stack of corrupted thread, and kernel was not in
->> interrupt while going to pm_ops->enter(), then it is unnecessary to
->> enter IRQ and save sp of IRQ:
->
-> No. ?There is _no_ need to save and restore these registers. ?They
-> can simply be re-setup. ?The generic cpu_suspend stuff already
-> takes care of that.
+On Mon, Aug 15, 2011 at 06:41:23AM +0100, Lothar Wa?mann wrote:
+> Hi,
+> 
+> Ivan Djelic writes:
+> > On Fri, Aug 05, 2011 at 02:51:33PM +0100, Wolfram Sang wrote:
+> > (...)
+> > > 
+> > > problem overwriting all-0xff data in NAND [2]
+> > > =============================================
+> > > 
+> > > Although it occured only when writing JFFS2 images so far, this is a generic
+> > > issue and needs to be fixed, right?
+> > > 
+> > > 
+> > (...)
+> > > [2] http://lists.infradead.org/pipermail/linux-mtd/2011-July/037104.html
+> > 
+> > As explained in the thread linked above, this issue should be fixed in your
+> > flashing tool, _not_ in your driver. The nand device you are using does not
+> > support programming pages multiple times in a row; pretending it does in the
+> >
+> It's not a problem of the device (Samsung K9F1G08U0B in my case)! The
+> problem is that the controller generates an ECC code that is non-FF
+> for all-FF data, which JFFS2 cannot handle properly.
 
-i did have saied it is not necessary to save and restore if you read
-my reply carefully :-)
+JFFS2 has nothing to do with it. JFFS2 does not assume it can program empty
+pages and then reprogram them on a NAND flash device. You flashing method does.
 
->
->> Ok. agree. then the work flow for SiRFprimaII suspend can be:
->> pm.enter()->
->> ? ? sirfsoc_cpu_sleep(v:p offset)
->> ? ? 1. save registers on stack
->> ? ? 2. load sirfsoc_cpu_resume to r3
->> ? ? 3. bl cpu_suspend
->> ? ? 4. make sdram self-refresh
->> ? ? 5. write force DEEPSLEEP by rtciobrg
->>
->> One issue is L2
->
-> That's why I did not include it in the list of code which could be
-> eliminated.
+If your BCH controller allows it, you could XOR the computed ECC bytes with a
+specific mask to make sure all-FF data have all-FF ecc. This is useful to allow
+reading erased blocks with ecc correction enabled.
+
+But even so, you cannot work around the fact that NAND devices are different
+from NOR devices, in that they typically allow only a limited number of partial
+page programming operations (4 in your K9F1G08U0B).
+If you implemented the mask trick described above and used it to allow
+multiple page programming, you still would not track the number of partial
+program operations on a given page, and expose yourself to nasty bugs (when
+exceeding the number of specified partial operations); i.e. it could work on
+some devices for a few operations, but not reliably on all devices for any
+number of empty page programmings.
+
+So the only real possibility is to avoid programming (physically) a page when
+its target contents are empty (all-FF); this is not implemented at the driver
+level because:
+- it is useless: none of the existing filesystems need this "feature"
+- it would waste cpu cycles to check if target data is all-FF each time a page
+is programmed
+
+Therefore... it is simply a matter of avoiding empty page programming, which
+only happens in your flasher. See also the flashing guidelines [1] as per Artem
+suggestion.
+
+BR,
+
+Ivan
+
+[1] http://www.linux-mtd.infradead.org/doc/ubi.html#L_flasher_algo
+
+> 
+> 
+> Lothar Wa?mann
+> -- 
+> ___________________________________________________________
+> 
+> Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+> Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+> Gesch?ftsf?hrer: Matthias Kaussen
+> Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+> 
+> www.karo-electronics.de | info at karo-electronics.de
+> ___________________________________________________________
