@@ -1,67 +1,84 @@
-From: leoy@marvell.com (Leo Yan)
-Date: Mon, 15 Aug 2011 18:25:36 +0800
-Subject: [PATCH V4 0/3] ARM: mmp: add audio sram support
-In-Reply-To: <CAMPhdO_StSa9fsYLNjJDd0KDkUyg6ep3gN2n5Gx-WmZ8t=bTFw@mail.gmail.com>
-References: <1313377794-26721-1-git-send-email-leoy@marvell.com>
-	<1313377893.14434.5.camel@Lily>
-	<CAMPhdO8rkct4H74zXBzaDa183u5vrPArerXgiNXwvQWzZT67Ng@mail.gmail.com>
-	<20110815091245.GC32705@game.jcrosoft.org>
-	<CAMPhdO_StSa9fsYLNjJDd0KDkUyg6ep3gN2n5Gx-WmZ8t=bTFw@mail.gmail.com>
-Message-ID: <4E48F420.3030101@marvell.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Mon, 15 Aug 2011 11:49:00 +0100
+Subject: [PATCH] ARM: mm/alignment.c: Fix build breakage when
+	CONFIG_PROC_FS is not selected
+In-Reply-To: <CAFULf_zzAZKk5CsPz+9x1i0gORbapwBBwzRH1BM7s_ZuEs_8DQ@mail.gmail.com>
+References: <CAFULf_zzAZKk5CsPz+9x1i0gORbapwBBwzRH1BM7s_ZuEs_8DQ@mail.gmail.com>
+Message-ID: <20110815104900.GA2075@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sun, Aug 14, 2011 at 02:51:48PM +0200, Bjarne Steinsbo wrote:
+> Compiling mm/alignment.c without CONFIG_PROC_FS selected fails with
+> undefined cpu_is_v6_unaligned() and safe_usermode().
+> 
+> Move #ifdef CONFIG_PROC_FS, including definition of usermode_action[],
+> further down to avoid this problem.
 
+Those two functions were never supposed to be inside the #ifdef --
+my bad.  Thanks for spotting it.
 
-On 08/15/2011 05:35 PM, Eric Miao wrote:
-> On Mon, Aug 15, 2011 at 5:12 PM, Jean-Christophe PLAGNIOL-VILLARD
-> <plagnioj@jcrosoft.com>  wrote:
->> On 16:43 Mon 15 Aug     , Eric Miao wrote:
->>> On Mon, Aug 15, 2011 at 11:11 AM, Haojian Zhuang
->>> <haojian.zhuang@marvell.com>  wrote:
->>>> On Sun, 2011-08-14 at 20:09 -0700, Leo Yan wrote:
->>>>> On mmp platform, there have two sram banks:
->>>>> audio sram bank, and internal sram bank for video and PM.
->>>>> So add the sram module to manage these sram banks.
->>>>>
->>>>> And register the sram banks so can dynamically alloc/free
->>>>> the buffer.
->>>>>
->>>>> Leo Yan (3):
->>>>>    ARM: mmp: add sram allocator
->>>>>    ARM: mmp: register audio sram bank
->>>>>    ARM: mmp: register internal sram bank
->>>>>
->>>>>   arch/arm/Kconfig                      |    1 +
->>>>>   arch/arm/mach-mmp/Makefile            |    2 +-
->>>>>   arch/arm/mach-mmp/brownstone.c        |   11 ++
->>>>>   arch/arm/mach-mmp/include/mach/mmp2.h |   13 +++
->>>>>   arch/arm/mach-mmp/include/mach/sram.h |   35 +++++++
->>>>>   arch/arm/mach-mmp/mmp2.c              |    3 +
->>>>>   arch/arm/mach-mmp/sram.c              |  168 +++++++++++++++++++++++++++++++++
->>>>>   7 files changed, 232 insertions(+), 1 deletions(-)
->>>>>   create mode 100644 arch/arm/mach-mmp/include/mach/sram.h
->>>>>   create mode 100644 arch/arm/mach-mmp/sram.c
->>>>>
->>>> Acked-by: Haojian Zhuang<haojian.zhuang@gmail.com>
->>>
->>> Looks good to me. Thanks Haojian. Applied to -devel.
->> I've some reserve on the named pool they need to be managed at generic level
->> not here
->
-> What are their names? And your suggestions to fix this?
->
+Acked-by: Dave Martin <dave.martin@linaro.org>
 
-For MMP platform have not only one bank, so now named the audio sram 
-bank as "asram", and another sram bank as "isram" which is used by 
-video/secure processor/pm.
-If other modules want to use the sram, just use the name string to
-get the gen pool handler, and then just call genalloc APIs.
+Alternatively, it may be tidier to move cpu_is_v6_unaligned() and
+safe_usermode() alongside the other static functions, just before
+do_alignment_finish_ldst().
 
-I just wander if maintain the name in genalloc, then the name string
-we should maintain in the pool's structure or chunk's structure?
+I leave it up to you to decide whether you prefer that; either fix
+is valid.
 
->>
->> Best Regards,
->> J.
->>
+Cheers
+---Dave
+
+> 
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Signed-off-by: Bjarne Steinsbo <bsteinsbo@gmail.com>
+> ---
+>  arch/arm/mm/alignment.c |   20 ++++++++++----------
+>  1 files changed, 10 insertions(+), 10 deletions(-)
+> 
+> diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
+> index cfbcf8b..c335c76 100644
+> --- a/arch/arm/mm/alignment.c
+> +++ b/arch/arm/mm/alignment.c
+> @@ -86,16 +86,6 @@ core_param(alignment, ai_usermode, int, 0600);
+>  #define UM_FIXUP	(1 << 1)
+>  #define UM_SIGNAL	(1 << 2)
+> 
+> -#ifdef CONFIG_PROC_FS
+> -static const char *usermode_action[] = {
+> -	"ignored",
+> -	"warn",
+> -	"fixup",
+> -	"fixup+warn",
+> -	"signal",
+> -	"signal+warn"
+> -};
+> -
+>  /* Return true if and only if the ARMv6 unaligned access model is in use. */
+>  static bool cpu_is_v6_unaligned(void)
+>  {
+> @@ -123,6 +113,16 @@ static int safe_usermode(int new_usermode, bool warn)
+>  	return new_usermode;
+>  }
+> 
+> +#ifdef CONFIG_PROC_FS
+> +static const char *usermode_action[] = {
+> +	"ignored",
+> +	"warn",
+> +	"fixup",
+> +	"fixup+warn",
+> +	"signal",
+> +	"signal+warn"
+> +};
+> +
+>  static int alignment_proc_show(struct seq_file *m, void *v)
+>  {
+>  	seq_printf(m, "User:\t\t%lu\n", ai_user);
+> -- 
+> 1.7.1
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
