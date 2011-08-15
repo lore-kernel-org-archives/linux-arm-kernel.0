@@ -1,134 +1,90 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Mon, 15 Aug 2011 21:07:17 +0100
-Subject: [RFC PATCH 10/12] arm/tegra: Add device tree support to pinmux
-	driver
-In-Reply-To: <1313189697-21287-11-git-send-email-swarren@nvidia.com>
-References: <1313189697-21287-1-git-send-email-swarren@nvidia.com>
-	<1313189697-21287-11-git-send-email-swarren@nvidia.com>
-Message-ID: <20110815200716.GA22355@gallagher>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Mon, 15 Aug 2011 14:28:07 -0600
+Subject: [RFC PATCH v2 00/13] arm/tegra: Initialize GPIO & pinmux from DT
+Message-ID: <1313440100-17131-1-git-send-email-swarren@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+v2:
+* Enhanced pinmux code to handle "drive pingroups" as well as "mux
+  pingroups". This altered the pinmux binding a little; shifting each
+  type of pingroup into a sub-node in the pinmux node.
+* Enumerate pingroups by enumerating DT child nodes, and mapping them to
+  pingroups, rather than the other way around. Hence also removed
+  modifications to <linux/of.h> and drivers/of/base.c.
+* Included documentation of the bindings.
+* Represent pingroup names and function names, as lower case in DT.
+* Used a better name for GPIO binding GPIO list.
+* Switched to boolean properties for pinmux pull-up/down.
+* s/dev_err/dev_dbg/ in DT parsing debug code.
+* Various minor cleanups (e.g. typos, white-space).
 
-On Fri, Aug 12, 2011 at 04:54:55PM -0600, Stephen Warren wrote:
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> ---
->  arch/arm/mach-tegra/pinmux.c |  115 ++++++++++++++++++++++++++++++++++++++++++
->  1 files changed, 115 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-tegra/pinmux.c b/arch/arm/mach-tegra/pinmux.c
-> index 05fa1a3..33246c2 100644
-> --- a/arch/arm/mach-tegra/pinmux.c
-> +++ b/arch/arm/mach-tegra/pinmux.c
-> @@ -20,6 +20,7 @@
->  #include <linux/errno.h>
->  #include <linux/spinlock.h>
->  #include <linux/io.h>
-> +#include <linux/of.h>
->  #include <linux/platform_device.h>
->  
->  #include <mach/iomap.h>
-> @@ -147,6 +148,41 @@ static const char *func_name(enum tegra_mux_func func)
->  	return tegra_mux_names[func];
->  }
->  
-[...]
->  
->  static const char *tri_name(unsigned long val)
->  {
-> @@ -666,15 +702,94 @@ void tegra_pinmux_config_pullupdown_table(const struct tegra_pingroup_config *co
->  	}
->  }
->  
-> +#ifdef CONFIG_OF
-> +static void __init tegra_pinmux_probe_dt(struct platform_device *pdev)
-> +{
-> +	int pg;
-> +
-> +	for (pg = 0; pg < TEGRA_MAX_PINGROUP; pg++) {
-> +		const char *pg_name = pingroup_name(pg);
-> +		struct tegra_pingroup_config config;
-> +		struct device_node *pg_node;
-> +		int ret;
-> +		const char *s;
-> +
-> +		pg_node = of_find_child_node_by_name(pdev->dev.of_node,
-> +						     pg_name);
-> +		if (pg_node == NULL)
-> +			continue;
-> +
-> +		config.pingroup = pg;
-> +
-> +		ret = of_property_read_string(pg_node, "nvidia,function", &s);
-> +		if (ret < 0) {
-> +			dev_err(&pdev->dev,
-> +				"%s: Missing property nvidia,function\n",
-> +				pg_name);
-> +			continue;
-> +		}
-> +		ret = func_enum(s, &config.func);
-> +		if (ret < 0) {
-> +			dev_err(&pdev->dev,
-> +				"%s: Invalid nvidia,function value %s\n",
-> +				pg_name, s);
-> +			continue;
-> +		}
-> +
-> +		ret = of_property_read_string(pg_node, "nvidia,pull", &s);
-> +		if (ret >= 0) {
-> +			if (!strcmp(s, "up"))
-> +				config.pupd = TEGRA_PUPD_PULL_UP;
-> +			else if (!strcmp(s, "down"))
-> +				config.pupd = TEGRA_PUPD_PULL_DOWN;
-> +			else if (!strcmp(s, "normal"))
-> +				config.pupd = TEGRA_PUPD_NORMAL;
-> +			else {
-> +				dev_err(&pdev->dev,
-> +					"%s: Invalid nvidia,pull value %s\n",
-> +					pg_name, s);
-> +				continue;
-> +			}
-> +		} else
-> +			config.pupd = TEGRA_PUPD_NORMAL;
-> +
-> +		if (of_find_property(pg_node, "nvidia,tristate", NULL))
-> +			config.tristate = TEGRA_TRI_TRISTATE;
-> +		else
-> +			config.tristate = TEGRA_TRI_NORMAL;
-> +
-> +		dev_err(&pdev->dev, "%s: func %d (%s) pull %d tri %d\n",
-> +			pg_name, config.func, func_name(config.func),
-> +			config.pupd, config.tristate);
-> +
-> +		tegra_pinmux_config_pingroup(&config);
-> +
-> +		of_node_put(pg_node);
-> +	}
-> +}
+This patch modifies Tegra's device tree support to remove the dependency
+on harmony_pinmux_init(), thus making it completely board-independent.
 
-I need to implement DT muxing configuration for my platform, and I believe 
-that what you have here would work fine for me too, and to avoid duplicating 
-the same thing, I wonder if this could be a little more generic.
+Some notes:
 
-So if the platform specific pinmux driver called the pinmux parser with a 
-callback for a pingroup configuration function then this wouldn't need the 
-nvidia specific properties.  I'd envisage the setup callback to be something 
-like:
+* This series is built on top of linux-next with a bunch of patches
+  applied, in particular the removal of irq_to_gpio and custom gpio_to_irq
+  that I'm in the process of sending to Russell. I haven't yet thought
+  through how/where to merge this without causing all kinds of conflicts.
 
-	int pingroup_configure(const char *name, unsigned long flags);
+* I took care to preserve bisectability of Tegra DT support. However,
+  linux-next doesn't yet have entirely useful Tegra DT support; some stuff
+  from Grant's devicetree/next hasn't been pushed into linux-next yet. If
+  we don't care about bisectability, I can remove a couple commits and
+  possibly squash some others.
 
-where the flags would be a bitmask of properties, so:
+* The approach taken here is to have a custom semantic SoC-specific
+  binding for each the gpio and pinmux drivers. Other alternatives
+  suggested included:
 
-	PINMUX_F_TRISTATE
-	PINMUX_F_PUPD
-	etc
+  1) A generic "list of register writes" to be performed at boot. This has
+     the advantage of reusability across different SoCs. However, this
+     approach isn't semantic, and requires detailed knowledge of pinmux
+     registers and potentially fiddly calculations when constructing the
+     device tree.
 
-which would map to pinmux,tristate properties etc.  The tegra (or 
-picoxcell...) specific driver would then map any regs and setup the 
-pinmux tables and call the parser loop with the correct callback.  This 
-would require looping over the child nodes as we've discussed before, 
-and the decoding of the func_enum in the nvidia driver, but I think 
-that's okay.
+  2) The ability to define disabled child nodes of the pinmux controller
+     that are not processed by tegra_pinmux_probe_dt(). Other devices may
+     refer to those using phandles, and later enable/disable them, thus
+     representing dynamic pinmuxing in the device tree. I wasn't convinced
+     whether we should represent dynamic pinmuxing using phandles.
 
-Jamie
+  I discussed in more detail why I prefer the current proposal in various
+  email threads.
+
+Thanks for reading!
+
+Stephen Warren (13):
+  arm/tegra: Prep boards for gpio/pinmux conversion to pdevs
+  arm/tegra: Avoid duplicate gpio/pinmux devices with dt
+  arm/tegra: board-dt: Add AUXDATA for tegra-gpio and tegra-pinmux
+  docs/dt: Document nvidia,tegra20-gpio's nvidia,enabled-gpios property
+  arm/dt: Tegra: Add nvidia,gpios property to GPIO controller
+  docs/dt: Document nvidia,tegra20-pinmux binding
+  arm/dt: Tegra: Add pinmux node
+  gpio/tegra: Convert to a platform device
+  gpio/tegra: Add device tree support
+  arm/tegra: Convert pinmux driver to a platform device
+  arm/tegra: Add device tree support to pinmux driver
+  arm/tegra: board-dt: Remove dependency on non-dt pinmux functions
+  arm/tegra: Remove temporary gpio/pinmux registration workaround
+
+ .../devicetree/bindings/gpio/gpio_nvidia.txt       |   20 +
+ .../devicetree/bindings/pinmux/pinmux_nvidia.txt   |  294 ++++++++++++
+ arch/arm/boot/dts/tegra-harmony.dts                |  483 ++++++++++++++++++++
+ arch/arm/boot/dts/tegra-seaboard.dts               |  421 +++++++++++++++++
+ arch/arm/boot/dts/tegra20.dtsi                     |    5 +
+ arch/arm/mach-tegra/Makefile                       |    1 -
+ arch/arm/mach-tegra/board-dt.c                     |   12 +-
+ arch/arm/mach-tegra/board-harmony-pinmux.c         |    8 +
+ arch/arm/mach-tegra/board-paz00-pinmux.c           |    8 +
+ arch/arm/mach-tegra/board-seaboard-pinmux.c        |    9 +-
+ arch/arm/mach-tegra/board-trimslice-pinmux.c       |    7 +
+ arch/arm/mach-tegra/devices.c                      |   10 +
+ arch/arm/mach-tegra/devices.h                      |    2 +
+ arch/arm/mach-tegra/pinmux.c                       |  269 +++++++++++
+ drivers/gpio/gpio-tegra.c                          |   57 ++-
+ 15 files changed, 1582 insertions(+), 24 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/pinmux/pinmux_nvidia.txt
