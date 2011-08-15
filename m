@@ -1,76 +1,65 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Mon, 15 Aug 2011 15:37:02 +0200
-Subject: GPMI-NAND Status?
-In-Reply-To: <20110815125442.GA18661@parrot.com>
-References: <20110805135133.GA26981@pengutronix.de>
-	<20110814081139.GD17063@parrot.com>
-	<20040.45443.810005.525431@ipc1.ka-ro>
-	<20110815082935.GA18364@parrot.com>
-	<20040.59254.170515.492518@ipc1.ka-ro>
-	<20110815125442.GA18661@parrot.com>
-Message-ID: <20041.8446.744780.186928@ipc1.ka-ro>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 15 Aug 2011 14:42:37 +0100
+Subject: [RFC PATCH 00/15] ARM: perf: support multiple PMUs
+Message-ID: <1313415757-7219-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+System (AKA nest or uncore) PMUs exist on devices which are not affine
+to a single CPU. They usually cannot be directly associated with
+individual tasks and are asynchronous with respect to the current
+execution. Examples of devices which could have system PMUs include L2
+cache controllers, GPUs and memory buses.
 
-Ivan Djelic writes:
-> On Mon, Aug 15, 2011 at 10:31:34AM +0100, Lothar Wa?mann wrote:
-> > > > It's not a problem of the device (Samsung K9F1G08U0B in my case)! The
-> > > > problem is that the controller generates an ECC code that is non-FF
-> > > > for all-FF data, which JFFS2 cannot handle properly.
-> > > 
-> > > JFFS2 has nothing to do with it. JFFS2 does not assume it can program empty
-> > > pages and then reprogram them on a NAND flash device. You flashing method does.
-> > > 
-> > AFAICT JFFS2 checks the flash for areas that contain only FF and
-> > treats them like erased flash. At least it tries to overwrite such
-> > areas in flash without erasing it beforehand.
-> 
-> Hmmm, again, JFFS2 simply "writes" to an erased block. You say "it tries to
-> overwrite", but that's only because you programmed an empty page in the first
->
-Which will happen most of the time (unless the image file size is near
-a multiple of the eraseblock size), if you create an jffs2 image with
-mkfs.jffs2 and the '-p' option.
+The following patch series refactors the ARM PMU backend, enabling
+new PMUs to reuse the existing code. This should allow for system PMUs
+to be supported in future. Further work will be required to get perf to
+fully understand system PMUs, but this provides something usable.
 
-Unfortunately the data written by U-Boot must be page aligned and
-mkfs.jffs2 cannot generate images that fulfill that constraint (unless
-you know the exact image file size beforehand and specify the
-rounded-up file size with the '-p' option).
+The framework is intended to be used by system PMUs which hang off core
+platform components (e.g. L2 cache, AXI bus). If a device is complex
+enough or separate enough from core functionality to have its own
+driver, it should implement its own PMU handling using the core perf
+API directly.
 
-> place! And it cannot "erase such areas beforehand" (think of a partially
-> programmed block with tailing empty pages).
-> 
-I know, that it cannot simply erase such blocks.
+The first patch ("perf: provide PMU when initing events") is currently
+sitting in the tip tree, but as it's required for event initialization
+to function (and hence for the PMU to be usable), it's provided here
+for convenience.
 
-> > > Therefore... it is simply a matter of avoiding empty page programming, which
-> > > only happens in your flasher. See also the flashing guidelines [1] as per Artem
-> > > suggestion.
-> > > 
-> > "Your flasher" is the standard mtd-utils mkfs.jffs2 to create an image
-> > file and the U-Boot commands 'nand erase/nand write' or
-> > the mtd-utils 'flash_eraseall/nandwrite' to write it to flash.
-> 
-> OK, maybe you could submit a patch to fix this issue then ?
-> Thanks,
-> 
-I have no idea how and where it should be fixed.
-- at driver level, creating an all-FF ECC for all-FF data?
-- in the bootloader and mtd-utils preventing stretches of all-FF data
-  to be written?
-- in mkfs.jffs2, enabling it to generate images that are padded to
-  page size instead of eraseblock size?
+The series is based on Will Deacon's perf-updates branch at:
+	git://linux-arm.org/linux-2.6-wd.git perf-updates
 
+An example driver using the framework (supporting the PMU present in
+L220/PL310 level 2 cache controllers) can be found at:
+	git://linux-arm.org/linux-2.6-wd.git perf-l2x0-wip
 
-Lothar Wa?mann
--- 
-___________________________________________________________
+Any comments would be welcome.
 
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+Thanks,
+Mark.
 
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Mark Rutland (15):
+  perf: provide PMU when initing events
+  ARM: perf: only register a CPU PMU when present
+  ARM: perf: clean up event group validation
+  ARM: perf: remove active_mask
+  ARM: perf: move active_events into struct arm_pmu
+  ARM: perf: move platform device to struct arm_pmu
+  ARM: perf: indirect access to cpu_hw_events
+  ARM: perf: remove unnecessary armpmu->stop
+  ARM: perf: lock PMU registers per-CPU
+  ARM: perf: add type field to struct arm_pmu
+  ARM: perf: refactor event mapping
+  ARM: perf: add support for multiple PMUs
+  ARM: perf: remove event limit from pmu_hw_events
+  ARM: perf: remove cpu-related misnomers
+  ARM: perf: move arm_pmu into <asm/pmu.h>
+
+ arch/arm/include/asm/pmu.h          |   64 +++++++
+ arch/arm/kernel/perf_event.c        |  318 +++++++++++++++++------------------
+ arch/arm/kernel/perf_event_v6.c     |   73 ++++++---
+ arch/arm/kernel/perf_event_v7.c     |   74 +++++---
+ arch/arm/kernel/perf_event_xscale.c |   76 +++++----
+ kernel/events/core.c                |    4 +-
+ 6 files changed, 359 insertions(+), 250 deletions(-)
