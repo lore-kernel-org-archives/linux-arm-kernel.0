@@ -1,52 +1,52 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 15 Aug 2011 18:30:50 +0100
-Subject: [PATCH v2 6/8] ARM: shmobile: convert logical CPU numbers to physical
-	numbers
-In-Reply-To: <1313429452-2820-1-git-send-email-will.deacon@arm.com>
-References: <1313429452-2820-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1313429452-2820-7-git-send-email-will.deacon@arm.com>
+Date: Mon, 15 Aug 2011 18:34:22 +0100
+Subject: [PATCH] ARM: s3c24xx: ensure cpu_reset is only called when memory is
+	flat-mapped
+Message-ID: <1313429662-3145-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch uses the new cpu_logical_map() macro for converting logical
-CPU numbers into physical numbers when dealing with the SCU in the SMP
-boot path for sh73a0.
+s3c24xx_pm_restart makes a direct call to arch_reset, without first
+establishing a 1:1 memory mapping. arch_reset will then call
+cpu_reset(0), which is designed to be called only with an identity map
+in place.
 
-Cc: Magnus Damm <magnus.damm@gmail.com>
-Cc: Paul Mundt <lethal@linux-sh.org>
+Following the discussion here:
+
+http://lists.infradead.org/pipermail/linux-arm-kernel/2011-July/057281.html
+
+This patch ensures that arch_reset is only called via arm_machine_restart
+so that we have a consistent flat mapping requirement for the MMU-off
+code.
+
+Cc: Ben Dooks <ben-linux@fluff.org>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/mach-shmobile/smp-sh73a0.c |    6 +++++-
- 1 files changed, 5 insertions(+), 1 deletions(-)
+ arch/arm/plat-s3c24xx/cpu.c |   12 ------------
+ 1 files changed, 0 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/smp-sh73a0.c b/arch/arm/mach-shmobile/smp-sh73a0.c
-index 3ffdbc9..be1ade7 100644
---- a/arch/arm/mach-shmobile/smp-sh73a0.c
-+++ b/arch/arm/mach-shmobile/smp-sh73a0.c
-@@ -74,6 +74,8 @@ void __cpuinit sh73a0_secondary_init(unsigned int cpu)
- 
- int __cpuinit sh73a0_boot_secondary(unsigned int cpu)
+diff --git a/arch/arm/plat-s3c24xx/cpu.c b/arch/arm/plat-s3c24xx/cpu.c
+index c1fc6c6..528930c 100644
+--- a/arch/arm/plat-s3c24xx/cpu.c
++++ b/arch/arm/plat-s3c24xx/cpu.c
+@@ -198,18 +198,6 @@ static unsigned long s3c24xx_read_idcode_v4(void)
+  */
+ static void s3c24xx_pm_restart(char mode, const char *cmd)
  {
-+	cpu = cpu_logical_map(cpu);
-+
- 	/* enable cache coherency */
- 	modify_scu_cpu_psr(0, 3 << (cpu * 8));
- 
-@@ -87,6 +89,8 @@ int __cpuinit sh73a0_boot_secondary(unsigned int cpu)
- 
- void __init sh73a0_smp_prepare_cpus(void)
- {
-+	int cpu = cpu_logical_map(0);
-+
- 	scu_enable(scu_base_addr());
- 
- 	/* Map the reset vector (in headsmp.S) */
-@@ -94,5 +98,5 @@ void __init sh73a0_smp_prepare_cpus(void)
- 	__raw_writel(__pa(shmobile_secondary_vector), __io(SBAR));
- 
- 	/* enable cache coherency on CPU0 */
--	modify_scu_cpu_psr(0, 3 << (0 * 8));
-+	modify_scu_cpu_psr(0, 3 << (cpu * 8));
+-	if (mode != 's') {
+-		unsigned long flags;
+-
+-		local_irq_save(flags);
+-		__cpuc_flush_kern_all();
+-		__cpuc_flush_user_all();
+-
+-		arch_reset(mode, cmd);
+-		local_irq_restore(flags);
+-	}
+-
+-	/* fallback, or unhandled */
+ 	arm_machine_restart(mode, cmd);
  }
+ 
 -- 
 1.7.0.4
