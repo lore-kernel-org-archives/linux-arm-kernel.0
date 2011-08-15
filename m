@@ -1,27 +1,59 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 15 Aug 2011 11:00:37 +0100
-Subject: [PATCH] amba: consolidate PrimeCell magic
-In-Reply-To: <1313402104-27024-1-git-send-email-linus.walleij@stericsson.com>
-References: <1313402104-27024-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <20110815100037.GD26827@n2100.arm.linux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 15 Aug 2011 12:11:46 +0200
+Subject: [PATCH 16/18] dmaengine/amba-pl08x: Add support for sg len
+	greater than one for slave transfers
+In-Reply-To: <20110814083618.GE4986@n2100.arm.linux.org.uk>
+References: <cover.1311936523.git.viresh.kumar@st.com>
+	<5d691ab0c4f447c9f324213d8d740ac61d1739a1.1311936524.git.viresh.kumar@st.com>
+	<20110814083618.GE4986@n2100.arm.linux.org.uk>
+Message-ID: <CACRpkdYdXz=Xt6QU_jDvw=j4EAEH+kapcq2CU97QF5giCqVjQw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 15, 2011 at 11:55:04AM +0200, Linus Walleij wrote:
-> From: Linus Walleij <linus.walleij@linaro.org>
-> 
-> Since two drivers use the PrimeCell scheme without using the
-> amba_bus driver logic, let's break the magic lookups out as
-> static inlines in the <linux/amba/bus.h> header so we get
-> some consolidation anyway.
-> 
-> Cc: Boojin Kim <boojin.kim@samsung.com>
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> Cc: Viresh Kumar <viresh.kumar@st.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> Samsung folks: I cannot find a defconfig that actually compiles
-> this driver in, can you help me testing it so I didn't break
-> anything, and Ack if it looks OK? Thanks.
+On Sun, Aug 14, 2011 at 10:36 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, Jul 29, 2011 at 04:19:26PM +0530, Viresh Kumar wrote:
+>> Untill now, sg_len greater than one is not supported. This patch adds support to
+>> do that.
+>
+> I'm not sure that this is the correct approach. ?memcpy()s can only be
+> used with one single buffer, so the sg stuff for that (and the unmapping
+> support) doesn't make sense at all.
 
-Why not convert these to use the amba_bus driver?
+I agree, that part is fishy.
+
+> The only place where this makes sense is the slave sg stuff. ?I wonder
+> whether we can better deal with that by having the LLI setup code deal
+> with one SG list entry at a time, and chain each together.
+>
+> Something I've also been pondering which is related to this is linking
+> together DMA operations using the LLI chaining when interrupts and
+> callbacks aren't required. ?It's a very similar problem. ?Other DMA
+> engine drivers do this.
+
+Yeah. Viresh can you hold this patch off for the moment, move it to
+the end of the series and see if we can find some more optimal
+approach for this?
+
+> Finally, note that some of the PL08x code assumes that for any TXD,
+> the LLI list is a contiguous array. ?See the first part of
+> pl08x_getbytes_chan(). That needs fixing as soon as we start going to
+> more than one SG list entry.
+
+Actually, after the removal of the phantom boundary in the PL08x
+driver, the LLI handling code starts to resemble the stuff inside
+the coh901318.c driver an *awful lot*, so I'm now ever more
+convinced that that thing is a PL08x derivate. (I have asked the
+hardware designers but the people who made it are unreachable.)
+
+And the coh901318 code handles this by properly walking the LLIs
+in memory IIRC, so could be a good inspiration.
+
+I am aware that we need to consolidate that LLI handling so
+the coh901318 and PL08x share the same LLI code atleast, or I
+may even be able to merge all into pl08x.c. I have a mental note
+to get to that once we've got PL08x into shape, until then it
+can atleast be used for inspiration.
+
+Thanks,
+Linus Walleij
