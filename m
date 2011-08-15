@@ -1,92 +1,74 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 15 Aug 2011 08:34:15 +0200
-Subject: [PATCH] mfd wm8350: rename static gpio_set_debounce()
-In-Reply-To: <20110810080549.GX31404@pengutronix.de>
-References: <20110810080549.GX31404@pengutronix.de>
-Message-ID: <20110815063415.GD11398@pengutronix.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 15 Aug 2011 08:42:42 +0200
+Subject: [PATCH] backlight: Fix broken regulator API usage in l4f00242t03
+In-Reply-To: <1313372500-28017-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+References: <1313372500-28017-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <20110815064242.GR31404@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-[extended the audience a bit]
-
-On Wed, Aug 10, 2011 at 10:05:49AM +0200, Sascha Hauer wrote:
+On Mon, Aug 15, 2011 at 10:41:40AM +0900, Mark Brown wrote:
+> The regulator support in the l4f00242t03 is very non-idiomatic, rather
+> than requesting the regulators based on the device name and the supply
+> names used by the device the driver requires boards to pass system
+> specific supply names around through platform data. The driver also
+> conditionally requests the regulators based on this platform data, adding
+> unneeded conditional code to the driver.
 > 
-> The kernel already has a function with this name declared
-> in asm-generic/gpio.h. So if this header leaks into wm8350/gpio.c
-> we get
-note the "if" is real on arm/imx since
-
-	14305e6 (ARM: mxc: use ARCH_NR_GPIOS to define gpio number)
-	
-That commit adds an #include <asm-generic/gpio.h> to
-arch/arm/plat-mxc/include/mach/irqs.h and so you get the gpio stuff when
-#including <linux/interrupt.h> (via linux/interrupt.h -> linux/irqnr.h
--> asm/irq.h -> mach/irqs.h).
-I think this is a bit unfortunate, but I havn't looked if it could be
-prevented somehow.
-
-> drivers/mfd/wm8350-gpio.c:40:12: error: conflicting types for 'gpio_set_debounce'
-> include/asm-generic/gpio.h:156:12: note: previous declaration of 'gpio_set_debounce' was here
+> Fix this by removing the platform data and converting to the standard idiom,
+> also updating all in tree users of the driver. As no datasheet appears to
+> be available for the LCD I'm guessing the names for the supplies based on
+> the existing users and I've no ability to do anything more than compile
+> test.
 > 
-> Fix this by adding a wm8350_ prefix to the function.
-Nevertheless Sascha's patch is OK as gpio_set_debounce is a too generic
-name for a function in an mfd driver. That said I think the other
-functions should get the same fix.
-
-Best regards
-Uwe
- 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> ---
+> The use of regulator_set_voltage() in the driver is also problematic, since
+> fixed voltages are required the expectation would be that the voltages
+> would be fixed in the constraints set by the machines rather than manually
+> configured by the driver, but is less problematic.
 > 
-> This is the minimal solution to this problem. It would be more
-> consistent though not required to add a wm8350_ prefix to the
-> other functions in this file aswell. Let me know what you prefer.
-> 
->  drivers/mfd/wm8350-gpio.c |    4 ++--
->  1 files changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/mfd/wm8350-gpio.c b/drivers/mfd/wm8350-gpio.c
-> index ebf99be..d584f6b 100644
-> --- a/drivers/mfd/wm8350-gpio.c
-> +++ b/drivers/mfd/wm8350-gpio.c
-> @@ -37,7 +37,7 @@ static int gpio_set_dir(struct wm8350 *wm8350, int gpio, int dir)
->  	return ret;
->  }
+>  static int l4f00242t03_lcd_power_get(struct lcd_device *ld)
+> @@ -202,24 +195,18 @@ static int __devinit l4f00242t03_probe(struct spi_device *spi)
+>  	if (ret)
+>  		goto err3;
 >  
-> -static int gpio_set_debounce(struct wm8350 *wm8350, int gpio, int db)
-> +static int wm8350_gpio_set_debounce(struct wm8350 *wm8350, int gpio, int db)
->  {
->  	if (db == WM8350_GPIO_DEBOUNCE_ON)
->  		return wm8350_set_bits(wm8350, WM8350_GPIO_DEBOUNCE,
-> @@ -210,7 +210,7 @@ int wm8350_gpio_config(struct wm8350 *wm8350, int gpio, int dir, int func,
->  		goto err;
->  	if (gpio_set_polarity(wm8350, gpio, pol))
->  		goto err;
-> -	if (gpio_set_debounce(wm8350, gpio, debounce))
-> +	if (wm8350_gpio_set_debounce(wm8350, gpio, debounce))
->  		goto err;
->  	if (gpio_set_dir(wm8350, gpio, dir))
->  		goto err;
-> -- 
-> 1.7.5.4
-> 
-> -- 
-> Pengutronix e.K.                           |                             |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
-> 
-> 
-> 
+> -	if (pdata->io_supply) {
+> -		priv->io_reg = regulator_get(NULL, pdata->io_supply);
+> -
+> -		if (IS_ERR(priv->io_reg)) {
+> -			pr_err("%s: Unable to get the IO regulator\n",
+> -								__func__);
+> -			goto err3;
+> -		}
+> +	priv->io_reg = regulator_get(&spi->dev, "vdd");
+> +	if (IS_ERR(priv->io_reg)) {
+> +		pr_err("%s: Unable to get the IO regulator\n",
+> +		       __func__);
+> +		goto err3;
+>  	}
+>  
+> -	if (pdata->core_supply) {
+> -		priv->core_reg = regulator_get(NULL, pdata->core_supply);
+> -
+> -		if (IS_ERR(priv->core_reg)) {
+> -			pr_err("%s: Unable to get the core regulator\n",
+> -								__func__);
+> -			goto err4;
+> -		}
+> +	priv->core_reg = regulator_get(&spi->dev, "vcore");
+> +	if (IS_ERR(priv->core_reg)) {
+> +		pr_err("%s: Unable to get the core regulator\n",
+> +		       __func__);
+> +		goto err4;
+>  	}
+
+Maybe you could change these pr_err to dev_err on the way. The rest of
+the driver already uses dev_*.
+
+Sascha
+
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Pengutronix e.K.                           |                             |
 Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
