@@ -1,68 +1,317 @@
 From: swarren@nvidia.com (Stephen Warren)
-Date: Mon, 15 Aug 2011 14:28:12 -0600
-Subject: [RFC PATCH v2 05/13] arm/dt: Tegra: Add nvidia,
-	gpios property to GPIO controller
+Date: Mon, 15 Aug 2011 14:28:13 -0600
+Subject: [RFC PATCH v2 06/13] docs/dt: Document nvidia,tegra20-pinmux binding
 In-Reply-To: <1313440100-17131-1-git-send-email-swarren@nvidia.com>
 References: <1313440100-17131-1-git-send-email-swarren@nvidia.com>
-Message-ID: <1313440100-17131-6-git-send-email-swarren@nvidia.com>
+Message-ID: <1313440100-17131-7-git-send-email-swarren@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add board-specific gpio node for Harmony and Seaboard. This lists the
-GPIOs used by the board. Note that not all GPIOs that exist on the board
-are listed; only those used by devices currently supported by device
-tree.
-
 Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
- arch/arm/boot/dts/tegra-harmony.dts  |   15 +++++++++++++++
- arch/arm/boot/dts/tegra-seaboard.dts |    8 ++++++++
- 2 files changed, 23 insertions(+), 0 deletions(-)
+ .../devicetree/bindings/pinmux/pinmux_nvidia.txt   |  294 ++++++++++++++++++++
+ 1 files changed, 294 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/pinmux/pinmux_nvidia.txt
 
-diff --git a/arch/arm/boot/dts/tegra-harmony.dts b/arch/arm/boot/dts/tegra-harmony.dts
-index 4c05334..d680707 100644
---- a/arch/arm/boot/dts/tegra-harmony.dts
-+++ b/arch/arm/boot/dts/tegra-harmony.dts
-@@ -15,6 +15,21 @@
- 		reg = < 0x00000000 0x40000000 >;
- 	};
- 
-+	gpio: gpio at 6000d000 {
-+		nvidia,enabled-gpios = <
-+			69	// TEGRA_GPIO_PI5 SD2_CD
-+			57	// TEGRA_GPIO_PH1 SD2_WP
-+			155	// TEGRA_GPIO_PT3 SD2_POWER
-+			58	// TEGRA_GPIO_PH2 SD4_CD
-+			59	// TEGRA_GPIO_PH3 SD4_WP
-+			70	// TEGRA_GPIO_PI6 SD4_POWER
-+			187	// TEGRA_GPIO_PX3 CDC_IRQ
-+			178	// TEGRA_GPIO_PW2 HP_DET
-+			184	// TEGRA_GPIO_PX0 INT_MIC_EN
-+			185	// TEGRA_GPIO_PX1 EXT_MIC_EN
-+		>;
+diff --git a/Documentation/devicetree/bindings/pinmux/pinmux_nvidia.txt b/Documentation/devicetree/bindings/pinmux/pinmux_nvidia.txt
+new file mode 100644
+index 0000000..744e1b7
+--- /dev/null
++++ b/Documentation/devicetree/bindings/pinmux/pinmux_nvidia.txt
+@@ -0,0 +1,294 @@
++NVIDIA Tegra 2 pinmux controller
++
++Required properties:
++- compatible : "nvidia,tegra20-pinmux"
++
++Optional sub-nodes:
++- nvidia,mux-groups : Mux group settings; see below.
++- nvidia,drive-groups : Drive group settings; see below.
++
++nvidia,mux-groups sub-node:
++
++Each mux pin group is represented as a sub-node of the nvidia,mux-groups node.
++The name of the sub-node should be the name of the mux pingroup. The following
++names are valid:
++
++	ata
++	atb
++	atc
++	atd
++	ate
++	cdev1
++	cdev2
++	crtp
++	csus
++	dap1
++	dap2
++	dap3
++	dap4
++	ddc
++	dta
++	dtb
++	dtc
++	dtd
++	dte
++	dtf
++	gma
++	gmb
++	gmc
++	gmd
++	gme
++	gpu
++	gpu7
++	gpv
++	hdint
++	i2cp
++	irrx
++	irtx
++	kbca
++	kbcb
++	kbcc
++	kbcd
++	kbce
++	kbcf
++	lcsn
++	ld0
++	ld1
++	ld10
++	ld11
++	ld12
++	ld13
++	ld14
++	ld15
++	ld16
++	ld17
++	ld2
++	ld3
++	ld4
++	ld5
++	ld6
++	ld7
++	ld8
++	ld9
++	ldc
++	ldi
++	lhp0
++	lhp1
++	lhp2
++	lhs
++	lm0
++	lm1
++	lpp
++	lpw0
++	lpw1
++	lpw2
++	lsc0
++	lsc1
++	lsck
++	lsda
++	lsdi
++	lspi
++	lvp0
++	lvp1
++	lvs
++	owc
++	pmc
++	pta
++	rm
++	sdb
++	sdc
++	sdd
++	sdio1
++	slxa
++	slxc
++	slxd
++	slxk
++	spdi
++	spdo
++	spia
++	spib
++	spic
++	spid
++	spie
++	spif
++	spig
++	spih
++	uaa
++	uab
++	uac
++	uad
++	uca
++	ucb
++	uda
++	ck32
++	ddrc
++	pmca
++	pmcb
++	pmcc
++	pmcd
++	pmce
++	xm2c
++	xm2d
++
++Required subnode-properties:
++- nvidia,function : A string containing the name of the pinmux function to
++  mux to the pingroup. The following names are valid; see the Tegra TRM to
++  determine which are valid for each pingroup:
++
++	none (used for pingroups without muxing functionality)
++	ahb_clk
++	apb_clk
++	audio_sync
++	crt
++	dap1
++	dap2
++	dap3
++	dap4
++	dap5
++	displaya
++	displayb
++	emc_test0_dll
++	emc_test1_dll
++	gmi
++	gmi_int
++	hdmi
++	i2c
++	i2c2
++	i2c3
++	ide
++	irda
++	kbc
++	mio
++	mipi_hs
++	nand
++	osc
++	owr
++	pcie
++	plla_out
++	pllc_out1
++	pllm_out1
++	pllp_out2
++	pllp_out3
++	pllp_out4
++	pwm
++	pwr_intr
++	pwr_on
++	rtck
++	sdio1
++	sdio2
++	sdio3
++	sdio4
++	sflash
++	spdif
++	spi1
++	spi2
++	spi2_alt
++	spi3
++	spi4
++	trace
++	twc
++	uarta
++	uartb
++	uartc
++	uartd
++	uarte
++	ulpi
++	vi
++	vi_sensor_clk
++	xio
++
++optional subnode-properties:
++- nvidia,pull-up : Boolean, apply Tegra's internal pull-up to the pin.
++- nvidia,pull-down : Boolean, apply Tegra's internal pull-down to the pin.
++- nvidia,tristate : Boolean, tristate the pin. Otherwise, drive it.
++
++If both nvidia,pull-up and nvidia,pull-down are specified, nvidia,pull-up
++takes precedence.
++
++nvidia,drive-groups sub-node:
++
++Each drive pin group is represented as a sub-node of the nvidia,drive-groups
++node. The name of the sub-node should be the name of the drive pingroup. The
++following names are valid:
++
++	ao1
++	ao2
++	at1
++	at2
++	cdev1
++	cdev2
++	csus
++	dap1
++	dap2
++	dap3
++	dap4
++	dbg
++	lcd1
++	lcd2
++	sdmmc2
++	sdmmc3
++	spi
++	uaa
++	uab
++	uart2
++	uart3
++	vi1
++	vi2
++	xm2a
++	xm2c
++	xm2d
++	xm2clk
++	memcomp
++	sdio1
++	crt
++	ddc
++	gma
++	gmb
++	gmc
++	gmd
++	gme
++	owr
++	uad
++
++Required subnode-properties:
++- nvidia,high-speed-mode : Boolean, enable high speed mode the pins.
++- nvidia,schmitt : Boolean, enables Schmitt Trigger on the input.
++- nvidia,drive-power : Integer, valid values 0-3. 0 is least power, 3 is
++  most power. Controls the drive power or current. See "Low Power Mode"
++  or "LPMD1" and "LPMD0" in the Tegra TRM.
++- nvidia,pull-down-strength : Integer, valid values 0-31. Controls drive
++  strength. See "CAL_DRVDN" in the Tegra TRM.
++- nvidia,pull-up-strength : Integer, valid values 0-31. Controls drive
++  strength. See "CAL_DRVUP" in the Tegra TRM.
++- nvidia,slew_rate-rising : Integer, valid values 0-3. 0 is fastest, 3 is
++  slowest. See "DRVUP_SLWR" in the Tegra TRM.
++- nvidia,slew_rate-falling : Integer, valid values 0-3. 0 is fastest, 3 is
++  slowest. See "DRVDN_SLWR" in the Tegra TRM.
++
++Example of a gpio-controller node:
++
++	pinmux: pinmux at 70000000 {
++		compatible = "nvidia,tegra20-pinmux";
++		reg = < 0x70000000 0xc00 >;
++		nvidia,mux-groups {
++			cdev1 {
++				nvidia,function = "plla_out";
++			};
++			cdev2 {
++				nvidia,function = "pllp_out4";
++				nvidia,pull-down;
++				nvidia,tristate;
++			};
++		};
++		nvidia,drive-groups {
++			sdio1 {
++				nvidia,schmitt;
++				nvidia,drive-power = <1>;
++				nvidia,pull-down-strength = <31>;
++				nvidia,pull-up-strength = <31>;
++				nvidia,slew-rate-rising = <3>;
++				nvidia,slew-rate-falling = <3>;
++			};
++		};
 +	};
 +
- 	i2c at 7000c000 {
- 		clock-frequency = <400000>;
- 
-diff --git a/arch/arm/boot/dts/tegra-seaboard.dts b/arch/arm/boot/dts/tegra-seaboard.dts
-index 1940cae..43c8b2c 100644
---- a/arch/arm/boot/dts/tegra-seaboard.dts
-+++ b/arch/arm/boot/dts/tegra-seaboard.dts
-@@ -16,6 +16,14 @@
- 		reg = < 0x00000000 0x40000000 >;
- 	};
- 
-+	gpio: gpio at 6000d000 {
-+		nvidia,enabled-gpios = <
-+			69 // TEGRA_GPIO_PI5 SD2_CD
-+			57 // TEGRA_GPIO_PH1 SD2_WP
-+			70 // TEGRA_GPIO_PI6 SD2_POWER
-+		>;
-+	};
-+
- 	serial at 70006300 {
- 		clock-frequency = < 216000000 >;
- 	};
 -- 
 1.7.0.4
