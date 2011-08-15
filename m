@@ -1,68 +1,92 @@
-From: eric.miao@linaro.org (Eric Miao)
-Date: Mon, 15 Aug 2011 14:33:09 +0800
-Subject: No mach-type for SHEEVAD?
-In-Reply-To: <CAMPhdO_uNJny7Rsu_j0BKMaa8KgSd8kOWhqZ75jrz4f8EiG2KA@mail.gmail.com>
-References: <CACRpkdYi-EfCC0Lnx9bdYXyChzOhosO1C5gmggEnnBsDnzBukA@mail.gmail.com>
-	<CAMPhdO8KgWBub5xS=JhLRum+D-=3=7s2oLNSKbWSbht3f=5A_w@mail.gmail.com>
-	<CACRpkdYvJR2QoQLjDuKuUOMArgotZ1mSiqmCWwL+th5NS7zJSQ@mail.gmail.com>
-	<25B60CDC2F704E4E9D88FFD52780CB4C05D7174A89@SC-VEXCH1.marvell.com>
-	<CAMPhdO9YR2Ofxr=NnjardjhUU=HC-Vj17VAbp+yW=qW8wQtxcw@mail.gmail.com>
-	<CAMPhdO_uNJny7Rsu_j0BKMaa8KgSd8kOWhqZ75jrz4f8EiG2KA@mail.gmail.com>
-Message-ID: <CAMPhdO9OuZ54hOOyDnfyNSAgj-AFKNBT_xn8GKng0ytNU-dnrQ@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 15 Aug 2011 08:34:15 +0200
+Subject: [PATCH] mfd wm8350: rename static gpio_set_debounce()
+In-Reply-To: <20110810080549.GX31404@pengutronix.de>
+References: <20110810080549.GX31404@pengutronix.de>
+Message-ID: <20110815063415.GD11398@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 15, 2011 at 2:32 PM, Eric Miao <eric.miao@linaro.org> wrote:
-> On Mon, Aug 15, 2011 at 1:28 PM, Eric Miao <eric.miao@linaro.org> wrote:
->> 2011/8/15 Haojian Zhuang <hzhuang1@marvell.com>:
->>>
->>>
->>>>-----Original Message-----
->>>>From: Linus Walleij [mailto:linus.walleij at linaro.org]
->>>>Sent: 2011?8?12? 9:20 PM
->>>>To: Eric Miao
->>>>Cc: linux-arm-kernel at lists.infradead.org; Haojian Zhuang; Tanmay
->>>>Upadhyay
->>>>Subject: Re: No mach-type for SHEEVAD?
->>>>
->>>>On Thu, Aug 4, 2011 at 11:22 AM, Eric Miao <eric.miao@linaro.org> wrote:
->>>>> On Thu, Aug 4, 2011 at 10:17 AM, Linus Walleij
->>>><linus.walleij@linaro.org> wrote:
->>>>>> I tried to configure the mmp2 to build the "gplugd" variant
->>>>>> found in the arch/arm/mach-mmp2/gplugd.c source file,
->>>>>> however it fails miserably:
->>>>>>
->>>>>> arch/arm/mach-mmp/gplugd.c:183: error: 'MACH_TYPE_SHEEVAD' undeclared
->>>>>> here (not in a function)
->>>>>> make[3]: *** [arch/arm/mach-mmp/gplugd.o] Error 1
->>>>>
->>>>> Hi Russell,
->>>>>
->>>>> ISTR this entry will be there once the cleanup of mach-types is done?
->>>>Or
->>>>> we can submit a new entry for this?
->>>>
->>>>Is this getting anywhere? Torvald's HEAD is still broken
->>>>for gplugD. Shall I submit a new machine type so it
->>>>atleast gets fixed in the next merge window?
->>>>
->>>>Thanks,
->>>>Linus Walleij
->>>
->>> Hi Linus,
->>>
->>> I suggest you to register the machine SHEEVAD in this link. (http://www.arm.linux.org.uk/developer/machines)
->>
->> Tanmay mentioned it would appear in 3.1 yet it doesn't seem so.
->> It's actually not Linus' duty to register this. I'll go ahead with the
->> registration, although I'm not sure if there's still chance for this
->> to get into 3.1-rcX. Will at least be in 3.2.
->
-> Interestingly, gplugd has already been registered in the machine database
-> by Ofer.
->
-> 2625 ? ?GURU_PLUGD ? ? ?gplugd ?Ofer Zaarur ? ? mainlined
+Hello,
 
-Russell,
+[extended the audience a bit]
 
-Any idea if this entry would have any chance to be in -next?
+On Wed, Aug 10, 2011 at 10:05:49AM +0200, Sascha Hauer wrote:
+> 
+> The kernel already has a function with this name declared
+> in asm-generic/gpio.h. So if this header leaks into wm8350/gpio.c
+> we get
+note the "if" is real on arm/imx since
+
+	14305e6 (ARM: mxc: use ARCH_NR_GPIOS to define gpio number)
+	
+That commit adds an #include <asm-generic/gpio.h> to
+arch/arm/plat-mxc/include/mach/irqs.h and so you get the gpio stuff when
+#including <linux/interrupt.h> (via linux/interrupt.h -> linux/irqnr.h
+-> asm/irq.h -> mach/irqs.h).
+I think this is a bit unfortunate, but I havn't looked if it could be
+prevented somehow.
+
+> drivers/mfd/wm8350-gpio.c:40:12: error: conflicting types for 'gpio_set_debounce'
+> include/asm-generic/gpio.h:156:12: note: previous declaration of 'gpio_set_debounce' was here
+> 
+> Fix this by adding a wm8350_ prefix to the function.
+Nevertheless Sascha's patch is OK as gpio_set_debounce is a too generic
+name for a function in an mfd driver. That said I think the other
+functions should get the same fix.
+
+Best regards
+Uwe
+ 
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+> 
+> This is the minimal solution to this problem. It would be more
+> consistent though not required to add a wm8350_ prefix to the
+> other functions in this file aswell. Let me know what you prefer.
+> 
+>  drivers/mfd/wm8350-gpio.c |    4 ++--
+>  1 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/mfd/wm8350-gpio.c b/drivers/mfd/wm8350-gpio.c
+> index ebf99be..d584f6b 100644
+> --- a/drivers/mfd/wm8350-gpio.c
+> +++ b/drivers/mfd/wm8350-gpio.c
+> @@ -37,7 +37,7 @@ static int gpio_set_dir(struct wm8350 *wm8350, int gpio, int dir)
+>  	return ret;
+>  }
+>  
+> -static int gpio_set_debounce(struct wm8350 *wm8350, int gpio, int db)
+> +static int wm8350_gpio_set_debounce(struct wm8350 *wm8350, int gpio, int db)
+>  {
+>  	if (db == WM8350_GPIO_DEBOUNCE_ON)
+>  		return wm8350_set_bits(wm8350, WM8350_GPIO_DEBOUNCE,
+> @@ -210,7 +210,7 @@ int wm8350_gpio_config(struct wm8350 *wm8350, int gpio, int dir, int func,
+>  		goto err;
+>  	if (gpio_set_polarity(wm8350, gpio, pol))
+>  		goto err;
+> -	if (gpio_set_debounce(wm8350, gpio, debounce))
+> +	if (wm8350_gpio_set_debounce(wm8350, gpio, debounce))
+>  		goto err;
+>  	if (gpio_set_dir(wm8350, gpio, dir))
+>  		goto err;
+> -- 
+> 1.7.5.4
+> 
+> -- 
+> Pengutronix e.K.                           |                             |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+> 
+> 
+> 
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
