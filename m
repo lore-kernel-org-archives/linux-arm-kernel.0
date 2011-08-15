@@ -1,42 +1,76 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 15 Aug 2011 14:32:07 +0100
-Subject: [PATCH 1/3] ARM: mmp: add sram allocator
-In-Reply-To: <alpine.LFD.2.00.1108150920060.20358@xanadu.home>
-References: <1313377794-26721-1-git-send-email-leoy@marvell.com>
-	<1313377794-26721-2-git-send-email-leoy@marvell.com>
-	<1403041.Yj2MdIhcZO@wuerfel>
-	<alpine.LFD.2.00.1108150920060.20358@xanadu.home>
-Message-ID: <20110815133207.GG26827@n2100.arm.linux.org.uk>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Mon, 15 Aug 2011 15:37:02 +0200
+Subject: GPMI-NAND Status?
+In-Reply-To: <20110815125442.GA18661@parrot.com>
+References: <20110805135133.GA26981@pengutronix.de>
+	<20110814081139.GD17063@parrot.com>
+	<20040.45443.810005.525431@ipc1.ka-ro>
+	<20110815082935.GA18364@parrot.com>
+	<20040.59254.170515.492518@ipc1.ka-ro>
+	<20110815125442.GA18661@parrot.com>
+Message-ID: <20041.8446.744780.186928@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 15, 2011 at 09:23:49AM -0400, Nicolas Pitre wrote:
-> On Mon, 15 Aug 2011, Arnd Bergmann wrote:
-> 
-> > Some time ago, there was talk of merging the existing sram drivers
-> > and creating a common driver that is easy to hook into.
-> 
-> Absolutely.
-> 
-> > What has happened with that? My feeling is that we should stop adding
-> > more drivers like this in the platform code but rather put an
-> > authoritative copy into arch/arm/mm/ or even the top-level mm/ directory
-> > and change over the existing drivers to hook into that one.
-> 
-> IIRC, this was driven by Russell.  Maybe this is a good time to revive 
-> discussion around it.
+Hi,
 
-As I understand it, Jean-Christophe's patches were essentially a
-replacement for my infrastructure changes, and it is Jean-Christophe's
-patches which went in.  So, my work is obsolete.
+Ivan Djelic writes:
+> On Mon, Aug 15, 2011 at 10:31:34AM +0100, Lothar Wa?mann wrote:
+> > > > It's not a problem of the device (Samsung K9F1G08U0B in my case)! The
+> > > > problem is that the controller generates an ECC code that is non-FF
+> > > > for all-FF data, which JFFS2 cannot handle properly.
+> > > 
+> > > JFFS2 has nothing to do with it. JFFS2 does not assume it can program empty
+> > > pages and then reprogram them on a NAND flash device. You flashing method does.
+> > > 
+> > AFAICT JFFS2 checks the flash for areas that contain only FF and
+> > treats them like erased flash. At least it tries to overwrite such
+> > areas in flash without erasing it beforehand.
+> 
+> Hmmm, again, JFFS2 simply "writes" to an erased block. You say "it tries to
+> overwrite", but that's only because you programmed an empty page in the first
+>
+Which will happen most of the time (unless the image file size is near
+a multiple of the eraseblock size), if you create an jffs2 image with
+mkfs.jffs2 and the '-p' option.
 
-I'm not sure what else there is to be done here - if Jean-Christophe's
-genpool interfaces are not sufficient, maybe when the discussion surrounding
-my patches and Jean-Christophe's patches happened, maybe someone should've
-sorted out finishing off Jean-Christophe's patches to the same extent
-that mine have.  Or maybe my patches should've been merged instead of
-Jean-Christophe's and Jean-Christophe's brought forward to plug into the
-core of my patches.
+Unfortunately the data written by U-Boot must be page aligned and
+mkfs.jffs2 cannot generate images that fulfill that constraint (unless
+you know the exact image file size beforehand and specify the
+rounded-up file size with the '-p' option).
 
-Either way, I completely gave up with the idea because I saw no future
-for my patches, and now I'm no longer interested in it.
+> place! And it cannot "erase such areas beforehand" (think of a partially
+> programmed block with tailing empty pages).
+> 
+I know, that it cannot simply erase such blocks.
+
+> > > Therefore... it is simply a matter of avoiding empty page programming, which
+> > > only happens in your flasher. See also the flashing guidelines [1] as per Artem
+> > > suggestion.
+> > > 
+> > "Your flasher" is the standard mtd-utils mkfs.jffs2 to create an image
+> > file and the U-Boot commands 'nand erase/nand write' or
+> > the mtd-utils 'flash_eraseall/nandwrite' to write it to flash.
+> 
+> OK, maybe you could submit a patch to fix this issue then ?
+> Thanks,
+> 
+I have no idea how and where it should be fixed.
+- at driver level, creating an all-FF ECC for all-FF data?
+- in the bootloader and mtd-utils preventing stretches of all-FF data
+  to be written?
+- in mkfs.jffs2, enabling it to generate images that are padded to
+  page size instead of eraseblock size?
+
+
+Lothar Wa?mann
+-- 
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
