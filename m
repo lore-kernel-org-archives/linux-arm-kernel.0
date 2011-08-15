@@ -1,201 +1,90 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Mon, 15 Aug 2011 11:11:41 +0200
-Subject: [PATCH 1/3] ARM: mmp: add sram allocator
-In-Reply-To: <1313377794-26721-2-git-send-email-leoy@marvell.com>
-References: <1313377794-26721-1-git-send-email-leoy@marvell.com>
-	<1313377794-26721-2-git-send-email-leoy@marvell.com>
-Message-ID: <20110815091141.GB32705@game.jcrosoft.org>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Mon, 15 Aug 2011 11:31:34 +0200
+Subject: GPMI-NAND Status?
+In-Reply-To: <20110815082935.GA18364@parrot.com>
+References: <20110805135133.GA26981@pengutronix.de>
+	<20110814081139.GD17063@parrot.com>
+	<20040.45443.810005.525431@ipc1.ka-ro>
+	<20110815082935.GA18364@parrot.com>
+Message-ID: <20040.59254.170515.492518@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11:09 Mon 15 Aug     , Leo Yan wrote:
-> On mmp platform, there have two sram banks:
-> audio sram and internal sram. The audio sram is mainly for audio;
-> the internal sram is for video, wtm and power management.
-> So add the sram allocator using genalloc to manage them.
-> 
-> Every sram bank will register its own platform device
-> info, after the sram allocator create the generic pool
-> for the sram bank, the user module can use the pool's
-> name to get the pool handler; then it can use the handler
-> to alloc/free memory with genalloc APIs.
-> 
-> Signed-off-by: Leo Yan <leoy@marvell.com>
-> ---
->  arch/arm/Kconfig                      |    1 +
->  arch/arm/mach-mmp/Makefile            |    2 +-
->  arch/arm/mach-mmp/include/mach/sram.h |   35 +++++++
->  arch/arm/mach-mmp/sram.c              |  168 +++++++++++++++++++++++++++++++++
->  4 files changed, 205 insertions(+), 1 deletions(-)
->  create mode 100644 arch/arm/mach-mmp/include/mach/sram.h
->  create mode 100644 arch/arm/mach-mmp/sram.c
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 2c71a8f..c7545d1 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -559,6 +559,7 @@ config ARCH_MMP
->  	select TICK_ONESHOT
->  	select PLAT_PXA
->  	select SPARSE_IRQ
-> +	select GENERIC_ALLOCATOR
->  	help
->  	  Support for Marvell's PXA168/PXA910(MMP) and MMP2 processor line.
->  
-> diff --git a/arch/arm/mach-mmp/Makefile b/arch/arm/mach-mmp/Makefile
-> index b0ac942..169c674 100644
-> --- a/arch/arm/mach-mmp/Makefile
-> +++ b/arch/arm/mach-mmp/Makefile
-> @@ -7,7 +7,7 @@ obj-y				+= common.o clock.o devices.o time.o
->  # SoC support
->  obj-$(CONFIG_CPU_PXA168)	+= pxa168.o irq-pxa168.o
->  obj-$(CONFIG_CPU_PXA910)	+= pxa910.o irq-pxa168.o
-> -obj-$(CONFIG_CPU_MMP2)		+= mmp2.o irq-mmp2.o
-> +obj-$(CONFIG_CPU_MMP2)		+= mmp2.o irq-mmp2.o sram.o
->  
->  # board support
->  obj-$(CONFIG_MACH_ASPENITE)	+= aspenite.o
-> diff --git a/arch/arm/mach-mmp/include/mach/sram.h b/arch/arm/mach-mmp/include/mach/sram.h
-> new file mode 100644
-> index 0000000..239e0fc
-> --- /dev/null
-> +++ b/arch/arm/mach-mmp/include/mach/sram.h
-> @@ -0,0 +1,35 @@
-> +/*
-> + *  linux/arch/arm/mach-mmp/include/mach/sram.h
-> + *
-> + *  SRAM Memory Management
-> + *
-> + *  Copyright (c) 2011 Marvell Semiconductors Inc.
-> + *
-> + *  This program is free software; you can redistribute it and/or modify
-> + *  it under the terms of the GNU General Public License version 2 as
-> + *  published by the Free Software Foundation.
-> + *
-> + */
-> +
-> +#ifndef __ASM_ARCH_SRAM_H
-> +#define __ASM_ARCH_SRAM_H
-> +
-> +#include <linux/genalloc.h>
-> +
-> +/* ARBITRARY:  SRAM allocations are multiples of this 2^N size */
-> +#define SRAM_GRANULARITY	512
-> +
-> +enum sram_type {
-> +	MMP_SRAM_UNDEFINED = 0,
-> +	MMP_ASRAM,
-> +	MMP_ISRAM,
-> +};
-> +
-> +struct sram_platdata {
-> +	char *pool_name;
-> +	int granularity;
-> +};
-> +
-> +extern struct gen_pool *sram_get_gpool(char *pool_name);
-> +
-> +#endif /* __ASM_ARCH_SRAM_H */
-> diff --git a/arch/arm/mach-mmp/sram.c b/arch/arm/mach-mmp/sram.c
-> new file mode 100644
-> index 0000000..4304f95
-> --- /dev/null
-> +++ b/arch/arm/mach-mmp/sram.c
-> @@ -0,0 +1,168 @@
-> +/*
-> + *  linux/arch/arm/mach-mmp/sram.c
-> + *
-> + *  based on mach-davinci/sram.c - DaVinci simple SRAM allocator
-> + *
-> + *  Copyright (c) 2011 Marvell Semiconductors Inc.
-> + *  All Rights Reserved
-> + *
-> + *  Add for mmp sram support - Leo Yan <leoy@marvell.com>
-> + *
-> + *  This program is free software; you can redistribute it and/or modify
-> + *  it under the terms of the GNU General Public License version 2 as
-> + *  published by the Free Software Foundation.
-> + *
-> + */
-> +
-> +#include <linux/module.h>
-> +#include <linux/init.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/io.h>
-> +#include <linux/err.h>
-> +#include <linux/slab.h>
-> +#include <linux/genalloc.h>
-> +
-> +#include <mach/sram.h>
-> +
-> +struct sram_bank_info {
-> +	char *pool_name;
-> +	struct gen_pool *gpool;
-> +	int granularity;
-> +
-> +	phys_addr_t sram_phys;
-> +	void __iomem *sram_virt;
-> +	u32 sram_size;
-> +
-> +	struct list_head node;
-> +};
-> +
-> +static DEFINE_MUTEX(sram_lock);
-> +static LIST_HEAD(sram_bank_list);
-> +
-> +struct gen_pool *sram_get_gpool(char *pool_name)
-> +{
-> +	struct sram_bank_info *info = NULL;
-> +
-> +	if (!pool_name)
-> +		return NULL;
-> +
-> +	mutex_lock(&sram_lock);
-> +
-> +	list_for_each_entry(info, &sram_bank_list, node)
-> +		if (!strcmp(pool_name, info->pool_name))
-> +			break;
-> +
-> +	mutex_unlock(&sram_lock);
-> +
-> +	if (&info->node == &sram_bank_list)
-> +		return NULL;
-> +
-> +	return info->gpool;
-> +}
-> +EXPORT_SYMBOL(sram_get_gpool);
-> +
-> +static int __devinit sram_probe(struct platform_device *pdev)
-> +{
-> +	struct sram_platdata *pdata = pdev->dev.platform_data;
-> +	struct sram_bank_info *info;
-> +	struct resource *res;
-> +	int ret = 0;
-> +
-> +	if (!pdata && !pdata->pool_name)
-> +		return -ENODEV;
-> +
-> +	info = kzalloc(sizeof(*info), GFP_KERNEL);
-> +	if (!info)
-> +		return -ENOMEM;
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	if (res == NULL) {
-> +		dev_err(&pdev->dev, "no memory resource defined\n");
-> +		ret = -ENODEV;
-> +		goto out;
-> +	}
-> +
-> +	if (!resource_size(res))
-> +		return 0;
-> +
-> +	info->sram_phys   = (phys_addr_t)res->start;
-> +	info->sram_size   = resource_size(res);
-> +	info->sram_virt   = ioremap(info->sram_phys, info->sram_size);
-> +	info->pool_name	  = kstrdup(pdata->pool_name, GFP_KERNEL);
-> +	info->granularity = pdata->granularity;
-if we want name pool this need to be managed at gen alloc level directly
-not here
+Hi,
 
-Best Regards,
-J.
+Ivan Djelic writes:
+> On Mon, Aug 15, 2011 at 06:41:23AM +0100, Lothar Wa?mann wrote:
+> > Hi,
+> > 
+> > Ivan Djelic writes:
+> > > On Fri, Aug 05, 2011 at 02:51:33PM +0100, Wolfram Sang wrote:
+> > > (...)
+> > > > 
+> > > > problem overwriting all-0xff data in NAND [2]
+> > > > =============================================
+> > > > 
+> > > > Although it occured only when writing JFFS2 images so far, this is a generic
+> > > > issue and needs to be fixed, right?
+> > > > 
+> > > > 
+> > > (...)
+> > > > [2] http://lists.infradead.org/pipermail/linux-mtd/2011-July/037104.html
+> > > 
+> > > As explained in the thread linked above, this issue should be fixed in your
+> > > flashing tool, _not_ in your driver. The nand device you are using does not
+> > > support programming pages multiple times in a row; pretending it does in the
+> > >
+> > It's not a problem of the device (Samsung K9F1G08U0B in my case)! The
+> > problem is that the controller generates an ECC code that is non-FF
+> > for all-FF data, which JFFS2 cannot handle properly.
+> 
+> JFFS2 has nothing to do with it. JFFS2 does not assume it can program empty
+> pages and then reprogram them on a NAND flash device. You flashing method does.
+> 
+AFAICT JFFS2 checks the flash for areas that contain only FF and
+treats them like erased flash. At least it tries to overwrite such
+areas in flash without erasing it beforehand.
+I avoided the problem by creating JFFS2 images that are padded with
+oxff to page size only instead of eraseblock size.
+
+> If your BCH controller allows it, you could XOR the computed ECC bytes with a
+> specific mask to make sure all-FF data have all-FF ecc. This is useful to allow
+> reading erased blocks with ecc correction enabled.
+> 
+> But even so, you cannot work around the fact that NAND devices are different
+> from NOR devices, in that they typically allow only a limited number of partial
+> page programming operations (4 in your K9F1G08U0B).
+> If you implemented the mask trick described above and used it to allow
+> multiple page programming, you still would not track the number of partial
+> program operations on a given page, and expose yourself to nasty bugs (when
+> exceeding the number of specified partial operations); i.e. it could work on
+> some devices for a few operations, but not reliably on all devices for any
+> number of empty page programmings.
+> 
+> So the only real possibility is to avoid programming (physically) a page when
+> its target contents are empty (all-FF); this is not implemented at the driver
+> level because:
+> - it is useless: none of the existing filesystems need this "feature"
+> - it would waste cpu cycles to check if target data is all-FF each time a page
+> is programmed
+> 
+> Therefore... it is simply a matter of avoiding empty page programming, which
+> only happens in your flasher. See also the flashing guidelines [1] as per Artem
+> suggestion.
+> 
+"Your flasher" is the standard mtd-utils mkfs.jffs2 to create an image
+file and the U-Boot commands 'nand erase/nand write' or
+the mtd-utils 'flash_eraseall/nandwrite' to write it to flash.
+
+
+Lothar Wa?mann
+-- 
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
