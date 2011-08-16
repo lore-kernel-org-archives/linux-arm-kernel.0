@@ -1,67 +1,109 @@
-From: ben@trinity.fluff.org (Ben Dooks)
-Date: Tue, 16 Aug 2011 12:03:30 +0100
-Subject: [PATCH] ARM: S3C2443: Remove redundant s3c_register_clocks
-	call for init_clocks
-In-Reply-To: <201108160848.25088.heiko@sntech.de>
-References: <1313463881.16359.2.camel@phoenix>
-	<201108160848.25088.heiko@sntech.de>
-Message-ID: <20110816110330.GB27653@trinity.fluff.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 16 Aug 2011 12:34:46 +0100
+Subject: PB1176 broken in -rc1
+In-Reply-To: <20110816101711.GF28656@e102144-lin.cambridge.arm.com>
+References: <20110810152400.GO10121@e102144-lin.cambridge.arm.com>
+	<CACRpkdaoDJy-YKONaz2j07pPvTZuHZ7KgEm6XGxNXK-jNzB8_w@mail.gmail.com>
+	<20110816092615.GC28656@e102144-lin.cambridge.arm.com>
+	<CACRpkdbSG=Mnu7QrACn3y3GP-2H4_qT0kR_4C8umCmWc2YCqXQ@mail.gmail.com>
+	<20110816095936.GE28656@e102144-lin.cambridge.arm.com>
+	<20110816100906.GA16159@n2100.arm.linux.org.uk>
+	<20110816101711.GF28656@e102144-lin.cambridge.arm.com>
+Message-ID: <20110816113446.GA17310@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 16, 2011 at 08:48:22AM +0200, Heiko St?bner wrote:
-> Am Dienstag, 16. August 2011, 05:04:41 schrieb Axel Lin:
-> > Since commit af337f3e633a198034a99450416257ddf2307497
-> > "ARM: S3C2443: Move parts of the clock code to common clock file",
-> > the init_clocks array is moved to arch/arm/plat-s3c24xx/s3c2443-clock.c.
-> > Now we call s3c_register_clocks for init_clocks in
-> > s3c2443_common_init_clocks.
-> > 
-> > Thus we can remove the empty init_clocks array here and remove the
-> > redundant s3c_register_clocks call for init_clocks in s3c2443_init_clocks.
-> I'm not 100% sure, but you might want to include Kukjin Kim 
-> <kgene.kim@samsung.com> who seems to be handling the Samsung-stuff most of the 
-> time.
+On Tue, Aug 16, 2011 at 11:17:11AM +0100, Will Deacon wrote:
+> Hi Russell,
 > 
-> Heiko
+> On Tue, Aug 16, 2011 at 11:09:06AM +0100, Russell King - ARM Linux wrote:
+> > On Tue, Aug 16, 2011 at 10:59:36AM +0100, Will Deacon wrote:
+> > > The problem is with earlyprintk because your picking up multiple definitions
+> > > of DEBUG_LL_UART_OFFSET as a result of basing your config on the defconfig.
+> > > 
+> > > Take a look at arch/arm/mach-realview/include/mach/debug-macro.S. I don't
+> > > think there's an easy way to fix this because it's used so early, even DT
+> > > can't save us.
+> > 
+> > As I keep saying to people, only use the LL debug during _early_ platform
+> > bring-up.  That's what it's there for.
+> > 
+> > Tying earlyprintk into the LL debug stuff has made the LL debug easier to
+> > use, and therefore easier for people to fall into this trap.  That's not
+> > the problem of the LL debug stuff, but the problem of its greater exposure.
+> > 
+> > So, as the LL debug stuff has this rule, so does earlyprintk.  Only use it
+> > for early platform bring up and *once* you have a kernel booting through
+> > to the proper console, disable it *immediately*.
+> > 
+> > Anything else will lead you into these pitfalls.
+> 
+> Yup, I agree about the usage of earlyprintk. It would be good if the user
+> could select the platform on which LL debug will work at config time and
+> then not have to worry about multiple conflicting definitions of
+> DEBUG_LL_UART_OFFSET. That way, you know on which platform earlyprintk
+> will work and don't try to use it on any others.
 
-I'll pick this up, as there's plans to turn all the mach-s3c24xxs into
-one big directory.
+Feel free to send a patch to do that.
+
+One down side of it is that we already have lots of options, so I suspect
+it'd get buried and forgotten.  As this is a common problem, it probably
+makes sense to put a choice in arch/arm/Kconfig.debug and have individual
+LL debug variants depend on that.  We already have:
+
+config DEBUG_DC21285_PORT
+        bool "Kernel low-level debugging messages via footbridge serial port"
+        depends on DEBUG_LL && FOOTBRIDGE
+        help
+          Say Y here if you want the debug print routines to direct their
+          output to the serial port in the DC21285 (Footbridge). Saying N
+          will cause the debug messages to appear on the first 16550
+          serial port.
+
+and:
+
+config DEBUG_CLPS711X_UART2
+        bool "Kernel low-level debugging messages via UART2"
+        depends on DEBUG_LL && ARCH_CLPS711X
+        help
+          Say Y here if you want the debug print routines to direct their
+          output to the second serial port on these devices.  Saying N will
+          cause the debug messages to appear on the first serial port.
+
+in there.  So I think the first step is (untested):
+
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 81cbe40..068337f 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -100,9 +100,13 @@ config OC_ETM
+ 	  buffer driver that will allow you to collect traces of the
+ 	  kernel code.
  
-> > 
-> > Signed-off-by: Axel Lin <axel.lin@gmail.com>
-> > ---
-> >  arch/arm/mach-s3c2443/clock.c |    7 -------
-> >  1 files changed, 0 insertions(+), 7 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-s3c2443/clock.c b/arch/arm/mach-s3c2443/clock.c
-> > index a1a7176..4018dbe 100644
-> > --- a/arch/arm/mach-s3c2443/clock.c
-> > +++ b/arch/arm/mach-s3c2443/clock.c
-> > @@ -305,9 +305,6 @@ static struct clk init_clocks_off[] = {
-> >  	}
-> >  };
-> > 
-> > -static struct clk init_clocks[] = {
-> > -};
-> > -
-> >  /* clocks to add straight away */
-> > 
-> >  static struct clksrc_clk *clksrcs[] __initdata = {
-> > @@ -345,10 +342,6 @@ void __init s3c2443_init_clocks(int xtal)
-> >  	for (ptr = 0; ptr < ARRAY_SIZE(clksrcs); ptr++)
-> >  		s3c_register_clksrc(clksrcs[ptr], 1);
-> > 
-> > -	/* register clocks from clock array */
-> > -
-> > -	s3c_register_clocks(init_clocks, ARRAY_SIZE(init_clocks));
-> > -
-> >  	/* We must be careful disabling the clocks we are not intending to
-> >  	 * be using at boot time, as subsystems such as the LCD which do
-> >  	 * their own DMA requests to the bus can cause the system to lockup
-> 
-
--- 
-Ben Dooks, ben at fluff.org, http://www.fluff.org/ben/
-
-Large Hadron Colada: A large Pina Colada that makes the universe disappear.
++choice
++	prompt "Kernel low-level debugging port"
++	depends on DEBUG_LL
++
+ config DEBUG_DC21285_PORT
+ 	bool "Kernel low-level debugging messages via footbridge serial port"
+-	depends on DEBUG_LL && FOOTBRIDGE
++	depends on FOOTBRIDGE
+ 	help
+ 	  Say Y here if you want the debug print routines to direct their
+ 	  output to the serial port in the DC21285 (Footbridge). Saying N
+@@ -111,12 +115,14 @@ config DEBUG_DC21285_PORT
+ 
+ config DEBUG_CLPS711X_UART2
+ 	bool "Kernel low-level debugging messages via UART2"
+-	depends on DEBUG_LL && ARCH_CLPS711X
++	depends on ARCH_CLPS711X
+ 	help
+ 	  Say Y here if you want the debug print routines to direct their
+ 	  output to the second serial port on these devices.  Saying N will
+ 	  cause the debug messages to appear on the first serial port.
+ 
++endchoice
++
+ config DEBUG_S3C_UART
+ 	depends on PLAT_SAMSUNG
+ 	int "S3C UART to use for low-level debug"
