@@ -1,32 +1,86 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 16 Aug 2011 22:38:03 +0100
-Subject: PB1176 broken in -rc1
-In-Reply-To: <20110816113446.GA17310@n2100.arm.linux.org.uk>
-References: <20110810152400.GO10121@e102144-lin.cambridge.arm.com>
-	<CACRpkdaoDJy-YKONaz2j07pPvTZuHZ7KgEm6XGxNXK-jNzB8_w@mail.gmail.com>
-	<20110816092615.GC28656@e102144-lin.cambridge.arm.com>
-	<CACRpkdbSG=Mnu7QrACn3y3GP-2H4_qT0kR_4C8umCmWc2YCqXQ@mail.gmail.com>
-	<20110816095936.GE28656@e102144-lin.cambridge.arm.com>
-	<20110816100906.GA16159@n2100.arm.linux.org.uk>
-	<20110816101711.GF28656@e102144-lin.cambridge.arm.com>
-	<20110816113446.GA17310@n2100.arm.linux.org.uk>
-Message-ID: <20110816213802.GA24826@e102144-lin.cambridge.arm.com>
+Date: Tue, 16 Aug 2011 22:41:11 +0100
+Subject: [PATCH 1/3] ARM: debug: use kconfig choice for selecting DEBUG_LL UART
+Message-ID: <1313530873-24961-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
+Enabling CONFIG_DEBUG_LL (which is required for earlyprintk) hardwires
+the debug UART address into the kernel, so that we can print before the
+platform is initialised.
 
-On Tue, Aug 16, 2011 at 12:34:46PM +0100, Russell King - ARM Linux wrote:
-> On Tue, Aug 16, 2011 at 11:17:11AM +0100, Will Deacon wrote:
-> > Yup, I agree about the usage of earlyprintk. It would be good if the user
-> > could select the platform on which LL debug will work at config time and
-> > then not have to worry about multiple conflicting definitions of
-> > DEBUG_LL_UART_OFFSET. That way, you know on which platform earlyprintk
-> > will work and don't try to use it on any others.
-> 
-> Feel free to send a patch to do that.
+If the user inadvertently selects multiple platforms with DEBUG_LL
+enabled, the UART address may not be correct and will likely cause the
+kernel to hang in the very early stages of boot.
 
-I've pulled something simple together, based on what you proposed earlier
-on. I'll post it to the list shortly...
+This patch, based on a skeleton from Russell, uses a Kconfig choice for
+selecting the DEBUG_LL UART, therefore allowing the user to make a
+choice about the supported platform when DEBUG_LL is enabled.
 
-Will
+Cc: Linus Walleij <linus.walleij@stericsson.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/Kconfig.debug |   41 ++++++++++++++++++++++++-----------------
+ 1 files changed, 24 insertions(+), 17 deletions(-)
+
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 81cbe40..11604c9 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -72,6 +72,30 @@ config DEBUG_LL
+ 	  in the kernel.  This is helpful if you are debugging code that
+ 	  executes before the console is initialized.
+ 
++choice
++	prompt "Kernel low-level debugging port"
++	depends on DEBUG_LL
++
++	config DEBUG_DC21285_PORT
++		bool "Kernel low-level debugging messages via footbridge serial port"
++		depends on FOOTBRIDGE
++		help
++		  Say Y here if you want the debug print routines to direct
++		  their output to the serial port in the DC21285 (Footbridge).
++		  Saying N will cause the debug messages to appear on the first
++		  16550 serial port.
++
++	config DEBUG_CLPS711X_UART2
++		bool "Kernel low-level debugging messages via UART2"
++		depends on ARCH_CLPS711X
++		help
++		  Say Y here if you want the debug print routines to direct
++		  their output to the second serial port on these devices.
++		  Saying N will cause the debug messages to appear on the first
++		  serial port.
++
++endchoice
++
+ config EARLY_PRINTK
+ 	bool "Early printk"
+ 	depends on DEBUG_LL
+@@ -100,23 +124,6 @@ config OC_ETM
+ 	  buffer driver that will allow you to collect traces of the
+ 	  kernel code.
+ 
+-config DEBUG_DC21285_PORT
+-	bool "Kernel low-level debugging messages via footbridge serial port"
+-	depends on DEBUG_LL && FOOTBRIDGE
+-	help
+-	  Say Y here if you want the debug print routines to direct their
+-	  output to the serial port in the DC21285 (Footbridge). Saying N
+-	  will cause the debug messages to appear on the first 16550
+-	  serial port.
+-
+-config DEBUG_CLPS711X_UART2
+-	bool "Kernel low-level debugging messages via UART2"
+-	depends on DEBUG_LL && ARCH_CLPS711X
+-	help
+-	  Say Y here if you want the debug print routines to direct their
+-	  output to the second serial port on these devices.  Saying N will
+-	  cause the debug messages to appear on the first serial port.
+-
+ config DEBUG_S3C_UART
+ 	depends on PLAT_SAMSUNG
+ 	int "S3C UART to use for low-level debug"
+-- 
+1.7.0.4
