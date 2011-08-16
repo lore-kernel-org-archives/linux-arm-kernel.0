@@ -1,29 +1,48 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Mon, 15 Aug 2011 19:26:30 -0700
-Subject: [PATCH v2] i2c: tegra: Check for overflow errors with BUG_ON.
-In-Reply-To: <1313458336-31456-1-git-send-email-dianders@chromium.org>
-References: <1313434172-18319-1-git-send-email-dianders@chromium.org>
-	<1313458336-31456-1-git-send-email-dianders@chromium.org>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF04AEA252A8@HQMAIL01.nvidia.com>
+From: axel.lin@gmail.com (Axel Lin)
+Date: Tue, 16 Aug 2011 11:04:41 +0800
+Subject: [PATCH] ARM: S3C2443: Remove redundant s3c_register_clocks call
+	for init_clocks
+Message-ID: <1313463881.16359.2.camel@phoenix>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Doug Anderson wrote at Monday, August 15, 2011 7:32 PM:
-> This change doesn't fix any known problems but turns
-> on the overflow detection feature of the i2c controller
-> in the hopes of flushing out any current (or future)
-> bugs in the i2c driver.
-> 
-> Inspired by a change on nvidia's git server:
->   http://nv-tegra.nvidia.com/gitweb/?p=linux-2.6.git;a=commit;h=266d1b7397284505e55d06254b497cb32be07b69
-> 
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
-> ---
-> This takes Felipe Balbi's suggestion of making the overflow
-> error non-fatal.
+Since commit af337f3e633a198034a99450416257ddf2307497
+"ARM: S3C2443: Move parts of the clock code to common clock file",
+the init_clocks array is moved to arch/arm/plat-s3c24xx/s3c2443-clock.c.
+Now we call s3c_register_clocks for init_clocks in s3c2443_common_init_clocks.
 
-This seems like a reasonable debug aid/validation check to me;
-Acked-by: Stephen Warren <swarren@nvidia.com>
+Thus we can remove the empty init_clocks array here and remove the
+redundant s3c_register_clocks call for init_clocks in s3c2443_init_clocks.
 
+Signed-off-by: Axel Lin <axel.lin@gmail.com>
+---
+ arch/arm/mach-s3c2443/clock.c |    7 -------
+ 1 files changed, 0 insertions(+), 7 deletions(-)
+
+diff --git a/arch/arm/mach-s3c2443/clock.c b/arch/arm/mach-s3c2443/clock.c
+index a1a7176..4018dbe 100644
+--- a/arch/arm/mach-s3c2443/clock.c
++++ b/arch/arm/mach-s3c2443/clock.c
+@@ -305,9 +305,6 @@ static struct clk init_clocks_off[] = {
+ 	}
+ };
+ 
+-static struct clk init_clocks[] = {
+-};
+-
+ /* clocks to add straight away */
+ 
+ static struct clksrc_clk *clksrcs[] __initdata = {
+@@ -345,10 +342,6 @@ void __init s3c2443_init_clocks(int xtal)
+ 	for (ptr = 0; ptr < ARRAY_SIZE(clksrcs); ptr++)
+ 		s3c_register_clksrc(clksrcs[ptr], 1);
+ 
+-	/* register clocks from clock array */
+-
+-	s3c_register_clocks(init_clocks, ARRAY_SIZE(init_clocks));
+-
+ 	/* We must be careful disabling the clocks we are not intending to
+ 	 * be using@boot time, as subsystems such as the LCD which do
+ 	 * their own DMA requests to the bus can cause the system to lockup
 -- 
-nvpublic
+1.7.4.1
