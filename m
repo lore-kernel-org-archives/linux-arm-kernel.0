@@ -1,53 +1,55 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 17 Aug 2011 00:19:18 +0900
-Subject: [PATCH] ARM: EXYNOS4: Configure MAX8997 PMIC for Origen
-In-Reply-To: <CAG17yqTP+Amg_UhWNjwZ0x8bH+VzV82k3La5Y0fep9WRArbe+g@mail.gmail.com>
-References: <1313034965-21286-1-git-send-email-inderpal.singh@linaro.org>
-	<20110814150148.GB25504@sirena.org.uk>
-	<CAG17yqTP+Amg_UhWNjwZ0x8bH+VzV82k3La5Y0fep9WRArbe+g@mail.gmail.com>
-Message-ID: <20110816151916.GA15484@opensource.wolfsonmicro.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 16 Aug 2011 17:27:24 +0200 (CEST)
+Subject: Fwd: [GIT PULL] [3.2] Please pull tegra boards for 3.2
+In-Reply-To: <alpine.LFD.2.00.1108161100070.20358@xanadu.home>
+References: <CAOesGMjHN-pvVfMN0o3AD238m8wEiRS-D4ArjV_2VAGTuwPfBw@mail.gmail.com>
+	<CAOesGMhFi0fsVdTe0ThhF636tqUhiWk7oZ41QKmL4dd3TcQ4_g@mail.gmail.com>
+	<201108161648.58250.arnd@arndb.de>
+	<alpine.LFD.2.00.1108161100070.20358@xanadu.home>
+Message-ID: <alpine.LFD.2.02.1108161726190.2807@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 16, 2011 at 04:38:46PM +0530, Inderpal Singh wrote:
-> On 14 August 2011 20:31, Mark Brown <broonie@opensource.wolfsonmicro.com>wrote:
-> > On Thu, Aug 11, 2011 at 09:26:05AM +0530, Inderpal Singh wrote:
+On Tue, 16 Aug 2011, Nicolas Pitre wrote:
 
-> > > +static struct regulator_consumer_supply __initdata ldo7_consumer[] = {
-> > > +     REGULATOR_SUPPLY("avdd", "soc-audio"), /* Reatek ALC5625*/
-> > > +};
+> On Tue, 16 Aug 2011, Arnd Bergmann wrote:
+> 
+> > On Sunday 14 August 2011, Olof Johansson wrote:
+> > > 
+> > > Hi Arnd,
+> > > 
+> > > Please pull the first set of tegra/board patches for 3.2:
+> > > 
+> > > 
+> > > The following changes since commit e6a99d312687a42c077a9b8cb5e757f186edb1b9:
+> > > 
+> > >  Merge branch 'slab/urgent' of
+> > > git://git.kernel.org/pub/scm/linux/kernel/git/penberg/slab-2.6
+> > > (2011-08-09 08:42:16 -0700)
+> > > 
+> > > are available in the git repository at:
+> > > 
+> > >  git://git.kernel.org/pub/scm/linux/kernel/git/olof/tegra.git boards-for-3.2
+> > > 
+> > 
+> > Hi Olof,
+> > 
+> > The contents all look good, but I'm undecided whether we should have
+> > branches that are not based on a -rc release. In your case, it's
+> > halfway between -rc1 and -rc2.
+> > 
+> > Do others have an opinion? If we decide to take development branches
+> > only when they are based on a proper -rc, I'll do the simple rebase
+> > of the patches and push them out, otherwise I'll push them as they are.
+> 
+> Although this might be a nicety, I personally don't particularly care 
+> about the base being set on a tag. I think that keeping the original 
+> committer info intact is more valuable.
 
-> > Ick, no.  The soc-audio device is a virtual device within Linux and is
-> > being phased out, any driver adding new soc-audio devices will be
-> > rejected.  The CODEC driver should deal with its own power.
+Right. In general having a devel branch based on a tag is a good
+thing, but as long as it's not some random commit from the middle of
+the merge window, it's fine.
 
-> Ok. So does it mean that sound cards will have their own devices? And those
-> device names should be listed as consumers?
+Thanks,
 
-As I said above "The CODEC driver should deal with its own power."
-
-> > > +static struct i2c_board_info i2c0_devs[] __initdata = {
-> > > +[I2C0_MAX8997] = {
-> > > +     I2C_BOARD_INFO("max8997", (0xCC >> 1)),
-> > > +     .platform_data = &origen_max8997_pdata,
-> > > +     },
-> > > +};
-
-> > Why are you assigning the array index?  That's very unusual.
-
-> Have seen this kind of initialisation at few places. It looked more
-> readable.
-> If its not preferred, I will remove it.
-
-You shouldn't need to be looking up individual members in a board info
-array in the first place.
-
-> > > +     s3c_i2c0_set_platdata(NULL);
-> > > +     i2c0_devs[I2C0_MAX8997].irq = gpio_to_irq(EXYNOS4_GPX0(4));
-
-> > There should be defines to do this statically.
-
-> What advantages do you see in using defines?
-
-It's non-idiomatic to modify the I2C board info at runtime, all the
-numbers are known at compile time anyway.
+	tglx
