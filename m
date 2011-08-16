@@ -1,46 +1,44 @@
 From: dave.martin@linaro.org (Dave Martin)
-Date: Tue, 16 Aug 2011 15:14:12 +0100
-Subject: [PATCH 2/3] ARM: entry: Remove unnecessary masking when decoding
-	Thumb-2 instructions
-In-Reply-To: <1313504053-27873-1-git-send-email-dave.martin@linaro.org>
-References: <1313504053-27873-1-git-send-email-dave.martin@linaro.org>
-Message-ID: <1313504053-27873-3-git-send-email-dave.martin@linaro.org>
+Date: Tue, 16 Aug 2011 15:14:10 +0100
+Subject: [PATCH 0/3] Fix Thumb-2 undef handling for mixed-arch kernels
+Message-ID: <1313504053-27873-1-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When testing whether a Thumb-2 instruction is 32 bits long or not,
-the masking done in order to test bits 11-15 of the first
-instruction halfword won't affect the result of the comparison, so
-remove it.
+In kernels which support v6 and v7 platforms in a single binary
+such as omap2plus_defconfig for example, undefined instruction
+exceptions taken on Thumb instructions are not processed correctly,
+because the kernel assumes at build-time that Thumb-2 won't be
+supported in userspace.
 
-Signed-off-by: Dave Martin <dave.martin@linaro.org>
----
- arch/arm/kernel/entry-armv.S |    6 ++----
- 1 files changed, 2 insertions(+), 4 deletions(-)
+This series implements a workaround, by allowing the __und_usr
+handler to check the CPU architecture at runtime, in affected
+kernels.
 
-diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-index a87cbf8..b7236d4 100644
---- a/arch/arm/kernel/entry-armv.S
-+++ b/arch/arm/kernel/entry-armv.S
-@@ -262,8 +262,7 @@ __und_svc:
- 	ldr	r0, [r4, #-4]
- #else
- 	ldrh	r0, [r4, #-2]			@ Thumb instruction at LR - 2
--	and	r9, r0, #0xf800
--	cmp	r9, #0xe800			@ 32-bit instruction if xx >= 0
-+	cmp	r0, #0xe800			@ 32-bit instruction if xx >= 0
- 	ldrhhs	r9, [r4]			@ bottom 16 bits
- 	orrhs	r0, r9, r0, lsl #16
- #endif
-@@ -445,8 +444,7 @@ __und_usr:
-  ARM(	ldrht	r5, [r4], #2	)
-  THUMB(	ldrht	r5, [r4]	)
-  THUMB(	add	r4, r4, #2	)
--	and	r0, r5, #0xf800			@ mask bits 111x x... .... ....
--	cmp	r0, #0xe800			@ 32bit instruction if xx != 0
-+	cmp	r5, #0xe800			@ 32bit instruction if xx != 0
- 	blo	__und_usr_unknown
- 3:	ldrht	r0, [r4]
- 	add	r2, r2, #2			@ r2 is PC + 2, make it PC + 4
--- 
+Changes since RFC:
+  * Renamed the global variable to __cpu_architecture and provided
+    cpu_architecture() as in inline function in <asm/system.h>.
+    This brings back the old API, but more efficiently.
+  * Dropped all the patches required to handle the reverted API
+    change.
+  * cpu_architecture is now declared __pure, which may lead to
+    slightly more efficient code in some cases.
+  * Added BUG_ON() to cpu_architecture() so that if
+    __cpu_architecture is not set early enough, it gets noticed.
+
+Thanks to Tixy and Nicolas Pitre for their helpful feedback which
+helped slim down this series.
+
+Dave Martin (3):
+  ARM: Make cpu_alignment into a global variable
+  ARM: entry: Remove unnecessary masking when decoding Thumb-2
+    instructions
+  ARM: entry: Fix Thumb-2 undef handling for multi-CPU kernels
+
+ arch/arm/include/asm/system.h |   11 +++++++++-
+ arch/arm/kernel/entry-armv.S  |   44 ++++++++++++++++++++++++++++++++++++----
+ arch/arm/kernel/setup.c       |    5 +++-
+ 3 files changed, 53 insertions(+), 7 deletions(-)
+
+--
 1.7.4.1
