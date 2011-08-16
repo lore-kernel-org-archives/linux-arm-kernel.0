@@ -1,138 +1,85 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 16 Aug 2011 09:27:42 +0200
-Subject: [PATCH] imx5: not include the unused head file
-In-Reply-To: <1312459071-6617-1-git-send-email-jason.hui@linaro.org>
-References: <1312459071-6617-1-git-send-email-jason.hui@linaro.org>
-Message-ID: <20110816072742.GX31404@pengutronix.de>
+From: boojin.kim@samsung.com (Boojin Kim)
+Date: Tue, 16 Aug 2011 16:50:22 +0900
+Subject: [PATCH] amba: consolidate PrimeCell magic
+In-Reply-To: <1313402104-27024-1-git-send-email-linus.walleij@stericsson.com>
+References: <1313402104-27024-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <001601cc5be9$275a5200$760ef600$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 04, 2011 at 07:57:51PM +0800, Jason Liu wrote:
-> Remove the useless <asm/irq.h> and <linux/irq.h> reference
-
-Applied to cleanups.
-
-Sascha
-
-> 
-> Signed-off-by: Jason Liu <jason.hui@linaro.org>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+Linus Walleij wrote:
+>
+> From: Linus Walleij <linus.walleij@linaro.org>
+>
+> Since two drivers use the PrimeCell scheme without using the
+> amba_bus driver logic, let's break the magic lookups out as
+> static inlines in the <linux/amba/bus.h> header so we get
+> some consolidation anyway.
+>
+> Cc: Boojin Kim <boojin.kim@samsung.com>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Cc: Viresh Kumar <viresh.kumar@st.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 > ---
->  arch/arm/mach-mx5/board-cpuimx51.c           |    2 --
->  arch/arm/mach-mx5/board-cpuimx51sd.c         |    2 --
->  arch/arm/mach-mx5/board-mx51_babbage.c       |    1 -
->  arch/arm/mach-mx5/board-mx51_efikamx.c       |    1 -
->  arch/arm/mach-mx5/board-mx51_efikasb.c       |    1 -
->  arch/arm/mach-mx5/eukrea_mbimxsd-baseboard.c |    1 -
->  arch/arm/mach-mx5/mx51_efika.c               |    1 -
->  7 files changed, 0 insertions(+), 9 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mx5/board-cpuimx51.c b/arch/arm/mach-mx5/board-cpuimx51.c
-> index 7c893fa..afae958 100644
-> --- a/arch/arm/mach-mx5/board-cpuimx51.c
-> +++ b/arch/arm/mach-mx5/board-cpuimx51.c
-> @@ -22,14 +22,12 @@
->  #include <linux/delay.h>
->  #include <linux/io.h>
->  #include <linux/interrupt.h>
-> -#include <linux/irq.h>
->  
->  #include <mach/eukrea-baseboards.h>
->  #include <mach/common.h>
->  #include <mach/hardware.h>
->  #include <mach/iomux-mx51.h>
->  
-> -#include <asm/irq.h>
->  #include <asm/setup.h>
->  #include <asm/mach-types.h>
->  #include <asm/mach/arch.h>
-> diff --git a/arch/arm/mach-mx5/board-cpuimx51sd.c b/arch/arm/mach-mx5/board-cpuimx51sd.c
-> index ff096d5..82c0788 100644
-> --- a/arch/arm/mach-mx5/board-cpuimx51sd.c
-> +++ b/arch/arm/mach-mx5/board-cpuimx51sd.c
-> @@ -22,7 +22,6 @@
->  #include <linux/delay.h>
->  #include <linux/io.h>
->  #include <linux/interrupt.h>
-> -#include <linux/irq.h>
->  #include <linux/i2c-gpio.h>
->  #include <linux/spi/spi.h>
->  #include <linux/can/platform/mcp251x.h>
-> @@ -32,7 +31,6 @@
->  #include <mach/hardware.h>
->  #include <mach/iomux-mx51.h>
->  
-> -#include <asm/irq.h>
->  #include <asm/setup.h>
->  #include <asm/mach-types.h>
->  #include <asm/mach/arch.h>
-> diff --git a/arch/arm/mach-mx5/board-mx51_babbage.c b/arch/arm/mach-mx5/board-mx51_babbage.c
-> index e400b09..c6c74cf 100644
-> --- a/arch/arm/mach-mx5/board-mx51_babbage.c
-> +++ b/arch/arm/mach-mx5/board-mx51_babbage.c
-> @@ -24,7 +24,6 @@
->  #include <mach/hardware.h>
->  #include <mach/iomux-mx51.h>
->  
-> -#include <asm/irq.h>
->  #include <asm/setup.h>
->  #include <asm/mach-types.h>
->  #include <asm/mach/arch.h>
-> diff --git a/arch/arm/mach-mx5/board-mx51_efikamx.c b/arch/arm/mach-mx5/board-mx51_efikamx.c
-> index f70700d..8cf7dda 100644
-> --- a/arch/arm/mach-mx5/board-mx51_efikamx.c
-> +++ b/arch/arm/mach-mx5/board-mx51_efikamx.c
-> @@ -32,7 +32,6 @@
->  #include <mach/hardware.h>
->  #include <mach/iomux-mx51.h>
->  
-> -#include <asm/irq.h>
->  #include <asm/setup.h>
->  #include <asm/mach-types.h>
->  #include <asm/mach/arch.h>
-> diff --git a/arch/arm/mach-mx5/board-mx51_efikasb.c b/arch/arm/mach-mx5/board-mx51_efikasb.c
-> index 2e4d9d3..eecc592 100644
-> --- a/arch/arm/mach-mx5/board-mx51_efikasb.c
-> +++ b/arch/arm/mach-mx5/board-mx51_efikasb.c
-> @@ -35,7 +35,6 @@
->  #include <mach/hardware.h>
->  #include <mach/iomux-mx51.h>
->  
-> -#include <asm/irq.h>
->  #include <asm/setup.h>
->  #include <asm/mach-types.h>
->  #include <asm/mach/arch.h>
-> diff --git a/arch/arm/mach-mx5/eukrea_mbimxsd-baseboard.c b/arch/arm/mach-mx5/eukrea_mbimxsd-baseboard.c
-> index 2619239..1878d09 100644
-> --- a/arch/arm/mach-mx5/eukrea_mbimxsd-baseboard.c
-> +++ b/arch/arm/mach-mx5/eukrea_mbimxsd-baseboard.c
-> @@ -24,7 +24,6 @@
->  
->  #include <linux/gpio.h>
->  #include <linux/interrupt.h>
-> -#include <linux/irq.h>
->  #include <linux/leds.h>
->  #include <linux/platform_device.h>
->  #include <linux/input.h>
-> diff --git a/arch/arm/mach-mx5/mx51_efika.c b/arch/arm/mach-mx5/mx51_efika.c
-> index 4435e03..055515c 100644
-> --- a/arch/arm/mach-mx5/mx51_efika.c
-> +++ b/arch/arm/mach-mx5/mx51_efika.c
-> @@ -34,7 +34,6 @@
->  #include <linux/usb/ulpi.h>
->  #include <mach/ulpi.h>
->  
-> -#include <asm/irq.h>
->  #include <asm/setup.h>
->  #include <asm/mach-types.h>
->  #include <asm/mach/arch.h>
-> -- 
-> 1.7.4.1
-> 
-> 
+> Samsung folks: I cannot find a defconfig that actually compiles
+> this driver in, can you help me testing it so I didn't break
+> anything, and Ack if it looks OK? Thanks.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Hello Linus,
+
+I tested this patch on SMDKC210 but happened following build error with
+exynos4_defconfig.
+
+arch/arm/common/pl330.c: In function 'pl330_add':
+arch/arm/common/pl330.c:1844: error: invalid type argument of '->' (have
+'u32')
+arch/arm/common/pl330.c:1845: error: invalid type argument of '->' (have
+'u32')
+
+So I added following.
+
+From: Boojin Kim <boojin.kim@samsung.com>
+Date: Tue, 16 Aug 2011 16:27:22 +0900
+Subject: [PATCH] ARM: PL330: use amba_device structure to get amba
+information
+
+Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
+---
+ arch/arm/common/pl330.c |    6 ++++--
+ 1 files changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/common/pl330.c b/arch/arm/common/pl330.c
+index 2b3b8b3..af6d96d 100644
+--- a/arch/arm/common/pl330.c
++++ b/arch/arm/common/pl330.c
+@@ -1822,6 +1822,8 @@ int pl330_add(struct pl330_info *pi)
+ 	struct pl330_dmac *pl330;
+ 	int i, ret;
+ 	u32 cid, pid;
++	struct amba_device *adev = container_of(pi->dev,
++					struct amba_device, dev);
+
+ 	if (!pi || !pi->dev)
+ 		return -EINVAL;
+@@ -1841,8 +1843,8 @@ int pl330_add(struct pl330_info *pi)
+ 	cid = amba_get_cid(pi->base, PCELL_SIZE);
+ 	pid = amba_get_pid(pi->base, PCELL_SIZE);
+ 	if (cid != AMBA_CID ||
+-	    amba_manf(pid) != AMBA_VENDOR_ARM ||
+-	    amba_part(pid) != PART) {
++	    amba_manf(adev) != AMBA_VENDOR_ARM ||
++	    amba_part(adev) != PART) {
+ 		dev_err(pi->dev, "PID: 0x%x, CID: 0x%x !\n", pid, cid);
+ 		return -EINVAL;
+ 	}
+--
+1.7.1
+
+
+Tested-by: Boojin Kim <boojin.Kim@samsung.com>
+with above on smdkc210 board
+
+If my ack is required on this,
+Acked-by: Boojin Kim <boojin.Kim@samsung.com>
+
+If you need more test, please kindly let me know.
