@@ -1,104 +1,133 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 16 Aug 2011 09:26:03 +0200
-Subject: [PATCH v3 1/3] ARM: i.MX51: Remove _MX51_PAD_xxx references
-In-Reply-To: <1313265101-11478-1-git-send-email-troy.kisky@boundarydevices.com>
-References: <1313265101-11478-1-git-send-email-troy.kisky@boundarydevices.com>
-Message-ID: <20110816072603.GW31404@pengutronix.de>
+Date: Tue, 16 Aug 2011 09:27:42 +0200
+Subject: [PATCH] imx5: not include the unused head file
+In-Reply-To: <1312459071-6617-1-git-send-email-jason.hui@linaro.org>
+References: <1312459071-6617-1-git-send-email-jason.hui@linaro.org>
+Message-ID: <20110816072742.GX31404@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 13, 2011 at 12:51:41PM -0700, Troy Kisky wrote:
-> Use new macro NEW_PAD_CTRL to remove _MX51_PAD_xxx references.
-> A later patch will remove the _MX51_PAD_xxx symbols.
-> 
-> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
-> ---
->  arch/arm/mach-mx5/board-cpuimx51sd.c         |    2 +-
->  arch/arm/mach-mx5/board-mx51_babbage.c       |    4 ++--
->  arch/arm/mach-mx5/eukrea_mbimxsd-baseboard.c |    4 ++--
->  arch/arm/plat-mxc/include/mach/iomux-v3.h    |    1 +
->  4 files changed, 6 insertions(+), 5 deletions(-)
-> 
-> 
-> Changes since v2: add () around cfg in NEW_PAD_CTRL macro
-> as noticed by Sascha.
-> 
-> 2/3 and 3/3 are the same as v2 and are not reposted.
+On Thu, Aug 04, 2011 at 07:57:51PM +0800, Jason Liu wrote:
+> Remove the useless <asm/irq.h> and <linux/irq.h> reference
 
-Applied this one. Can you send me the whole 2/3 and 3/3 patches?
-I only have the sed scripts which I don't want to execute manually.
+Applied to cleanups.
 
 Sascha
 
 > 
+> Signed-off-by: Jason Liu <jason.hui@linaro.org>
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+>  arch/arm/mach-mx5/board-cpuimx51.c           |    2 --
+>  arch/arm/mach-mx5/board-cpuimx51sd.c         |    2 --
+>  arch/arm/mach-mx5/board-mx51_babbage.c       |    1 -
+>  arch/arm/mach-mx5/board-mx51_efikamx.c       |    1 -
+>  arch/arm/mach-mx5/board-mx51_efikasb.c       |    1 -
+>  arch/arm/mach-mx5/eukrea_mbimxsd-baseboard.c |    1 -
+>  arch/arm/mach-mx5/mx51_efika.c               |    1 -
+>  7 files changed, 0 insertions(+), 9 deletions(-)
 > 
-> 
-> 
-> 
+> diff --git a/arch/arm/mach-mx5/board-cpuimx51.c b/arch/arm/mach-mx5/board-cpuimx51.c
+> index 7c893fa..afae958 100644
+> --- a/arch/arm/mach-mx5/board-cpuimx51.c
+> +++ b/arch/arm/mach-mx5/board-cpuimx51.c
+> @@ -22,14 +22,12 @@
+>  #include <linux/delay.h>
+>  #include <linux/io.h>
+>  #include <linux/interrupt.h>
+> -#include <linux/irq.h>
+>  
+>  #include <mach/eukrea-baseboards.h>
+>  #include <mach/common.h>
+>  #include <mach/hardware.h>
+>  #include <mach/iomux-mx51.h>
+>  
+> -#include <asm/irq.h>
+>  #include <asm/setup.h>
+>  #include <asm/mach-types.h>
+>  #include <asm/mach/arch.h>
 > diff --git a/arch/arm/mach-mx5/board-cpuimx51sd.c b/arch/arm/mach-mx5/board-cpuimx51sd.c
-> index ff096d5..040c5c3 100644
+> index ff096d5..82c0788 100644
 > --- a/arch/arm/mach-mx5/board-cpuimx51sd.c
 > +++ b/arch/arm/mach-mx5/board-cpuimx51sd.c
-> @@ -108,7 +108,7 @@ static iomux_v3_cfg_t eukrea_cpuimx51sd_pads[] = {
+> @@ -22,7 +22,6 @@
+>  #include <linux/delay.h>
+>  #include <linux/io.h>
+>  #include <linux/interrupt.h>
+> -#include <linux/irq.h>
+>  #include <linux/i2c-gpio.h>
+>  #include <linux/spi/spi.h>
+>  #include <linux/can/platform/mcp251x.h>
+> @@ -32,7 +31,6 @@
+>  #include <mach/hardware.h>
+>  #include <mach/iomux-mx51.h>
 >  
->  	/* Touchscreen */
->  	/* IRQ */
-> -	_MX51_PAD_GPIO_NAND__GPIO_NAND | MUX_PAD_CTRL(PAD_CTL_PUS_22K_UP |
-> +	NEW_PAD_CTRL(MX51_PAD_GPIO_NAND__GPIO_NAND, PAD_CTL_PUS_22K_UP |
->  			PAD_CTL_PKE | PAD_CTL_SRE_FAST |
->  			PAD_CTL_DSE_HIGH | PAD_CTL_PUE | PAD_CTL_HYS),
->  };
+> -#include <asm/irq.h>
+>  #include <asm/setup.h>
+>  #include <asm/mach-types.h>
+>  #include <asm/mach/arch.h>
 > diff --git a/arch/arm/mach-mx5/board-mx51_babbage.c b/arch/arm/mach-mx5/board-mx51_babbage.c
-> index e400b09..5a578f9 100644
+> index e400b09..c6c74cf 100644
 > --- a/arch/arm/mach-mx5/board-mx51_babbage.c
 > +++ b/arch/arm/mach-mx5/board-mx51_babbage.c
-> @@ -357,8 +357,8 @@ static const struct esdhc_platform_data mx51_babbage_sd2_data __initconst = {
->  static void __init mx51_babbage_init(void)
->  {
->  	iomux_v3_cfg_t usbh1stp = MX51_PAD_USBH1_STP__USBH1_STP;
-> -	iomux_v3_cfg_t power_key = _MX51_PAD_EIM_A27__GPIO2_21 |
-> -		MUX_PAD_CTRL(PAD_CTL_SRE_FAST | PAD_CTL_DSE_HIGH | PAD_CTL_PUS_100K_UP);
-> +	iomux_v3_cfg_t power_key = NEW_PAD_CTRL(MX51_PAD_EIM_A27__GPIO2_21,
-> +		PAD_CTL_SRE_FAST | PAD_CTL_DSE_HIGH | PAD_CTL_PUS_100K_UP);
+> @@ -24,7 +24,6 @@
+>  #include <mach/hardware.h>
+>  #include <mach/iomux-mx51.h>
 >  
->  	imx51_soc_init();
+> -#include <asm/irq.h>
+>  #include <asm/setup.h>
+>  #include <asm/mach-types.h>
+>  #include <asm/mach/arch.h>
+> diff --git a/arch/arm/mach-mx5/board-mx51_efikamx.c b/arch/arm/mach-mx5/board-mx51_efikamx.c
+> index f70700d..8cf7dda 100644
+> --- a/arch/arm/mach-mx5/board-mx51_efikamx.c
+> +++ b/arch/arm/mach-mx5/board-mx51_efikamx.c
+> @@ -32,7 +32,6 @@
+>  #include <mach/hardware.h>
+>  #include <mach/iomux-mx51.h>
 >  
+> -#include <asm/irq.h>
+>  #include <asm/setup.h>
+>  #include <asm/mach-types.h>
+>  #include <asm/mach/arch.h>
+> diff --git a/arch/arm/mach-mx5/board-mx51_efikasb.c b/arch/arm/mach-mx5/board-mx51_efikasb.c
+> index 2e4d9d3..eecc592 100644
+> --- a/arch/arm/mach-mx5/board-mx51_efikasb.c
+> +++ b/arch/arm/mach-mx5/board-mx51_efikasb.c
+> @@ -35,7 +35,6 @@
+>  #include <mach/hardware.h>
+>  #include <mach/iomux-mx51.h>
+>  
+> -#include <asm/irq.h>
+>  #include <asm/setup.h>
+>  #include <asm/mach-types.h>
+>  #include <asm/mach/arch.h>
 > diff --git a/arch/arm/mach-mx5/eukrea_mbimxsd-baseboard.c b/arch/arm/mach-mx5/eukrea_mbimxsd-baseboard.c
-> index 2619239..f046d4b 100644
+> index 2619239..1878d09 100644
 > --- a/arch/arm/mach-mx5/eukrea_mbimxsd-baseboard.c
 > +++ b/arch/arm/mach-mx5/eukrea_mbimxsd-baseboard.c
-> @@ -47,7 +47,7 @@ static iomux_v3_cfg_t eukrea_mbimxsd_pads[] = {
->  	/* LED */
->  	MX51_PAD_NANDF_D10__GPIO3_30,
->  	/* SWITCH */
-> -	_MX51_PAD_NANDF_D9__GPIO3_31 | MUX_PAD_CTRL(PAD_CTL_PUS_22K_UP |
-> +	NEW_PAD_CTRL(MX51_PAD_NANDF_D9__GPIO3_31, PAD_CTL_PUS_22K_UP |
->  			PAD_CTL_PKE | PAD_CTL_SRE_FAST |
->  			PAD_CTL_DSE_HIGH | PAD_CTL_PUE | PAD_CTL_HYS),
->  	/* UART2 */
-> @@ -66,7 +66,7 @@ static iomux_v3_cfg_t eukrea_mbimxsd_pads[] = {
->  	MX51_PAD_SD1_DATA2__SD1_DATA2,
->  	MX51_PAD_SD1_DATA3__SD1_DATA3,
->  	/* SD1 CD */
-> -	_MX51_PAD_GPIO1_0__SD1_CD | MUX_PAD_CTRL(PAD_CTL_PUS_22K_UP |
-> +	NEW_PAD_CTRL(MX51_PAD_GPIO1_0__SD1_CD, PAD_CTL_PUS_22K_UP |
->  			PAD_CTL_PKE | PAD_CTL_SRE_FAST |
->  			PAD_CTL_DSE_HIGH | PAD_CTL_PUE | PAD_CTL_HYS),
->  };
-> diff --git a/arch/arm/plat-mxc/include/mach/iomux-v3.h b/arch/arm/plat-mxc/include/mach/iomux-v3.h
-> index ebbce33..35e0df2 100644
-> --- a/arch/arm/plat-mxc/include/mach/iomux-v3.h
-> +++ b/arch/arm/plat-mxc/include/mach/iomux-v3.h
-> @@ -80,6 +80,7 @@ typedef u64 iomux_v3_cfg_t;
->  		((iomux_v3_cfg_t)(_sel_input_ofs) << MUX_SEL_INPUT_OFS_SHIFT) | \
->  		((iomux_v3_cfg_t)(_sel_input) << MUX_SEL_INPUT_SHIFT))
+> @@ -24,7 +24,6 @@
 >  
-> +#define NEW_PAD_CTRL(cfg, pad)	(((cfg) & ~MUX_PAD_CTRL_MASK) | MUX_PAD_CTRL(pad))
->  /*
->   * Use to set PAD control
->   */
+>  #include <linux/gpio.h>
+>  #include <linux/interrupt.h>
+> -#include <linux/irq.h>
+>  #include <linux/leds.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/input.h>
+> diff --git a/arch/arm/mach-mx5/mx51_efika.c b/arch/arm/mach-mx5/mx51_efika.c
+> index 4435e03..055515c 100644
+> --- a/arch/arm/mach-mx5/mx51_efika.c
+> +++ b/arch/arm/mach-mx5/mx51_efika.c
+> @@ -34,7 +34,6 @@
+>  #include <linux/usb/ulpi.h>
+>  #include <mach/ulpi.h>
+>  
+> -#include <asm/irq.h>
+>  #include <asm/setup.h>
+>  #include <asm/mach-types.h>
+>  #include <asm/mach/arch.h>
 > -- 
-> 1.7.0.4
+> 1.7.4.1
 > 
 > 
 
