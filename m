@@ -1,33 +1,56 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 16 Aug 2011 21:07:08 +0200
-Subject: [PATCH 2/4] msm_serial: Add devicetree support
-In-Reply-To: <20110816175702.GA27576@huya.qualcomm.com>
-References: <1313190008-7551-1-git-send-email-davidb@codeaurora.org>
-	<65679699.l4XXDScc0T@wuerfel>
-	<20110816175702.GA27576@huya.qualcomm.com>
-Message-ID: <3445697.36l0oAAgCs@wuerfel>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 16 Aug 2011 12:30:50 -0700
+Subject: Fwd: [GIT PULL] [3.2] Please pull tegra boards for 3.2
+In-Reply-To: <201108161648.58250.arnd@arndb.de>
+References: <CAOesGMjHN-pvVfMN0o3AD238m8wEiRS-D4ArjV_2VAGTuwPfBw@mail.gmail.com>
+	<CAOesGMhFi0fsVdTe0ThhF636tqUhiWk7oZ41QKmL4dd3TcQ4_g@mail.gmail.com>
+	<201108161648.58250.arnd@arndb.de>
+Message-ID: <CAOesGMgZCFF=dWhAm_+Ux-c-aORqo4sJ1DOGirCu3QT-iMcQRQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 16 August 2011 10:57:02 David Brown wrote:
-> How about if I just keep it simple for now.  Since there isn't
-> actually a driver for the DMA version, this driver will handle both
-> UART blocks, so I'll just do the plain thing in the DT.
+On Tue, Aug 16, 2011 at 7:48 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Sunday 14 August 2011, Olof Johansson wrote:
+>>
+>> Hi Arnd,
+>>
+>> Please pull the first set of tegra/board patches for 3.2:
+>>
+>>
+>> The following changes since commit e6a99d312687a42c077a9b8cb5e757f186edb1b9:
+>>
+>> ?Merge branch 'slab/urgent' of
+>> git://git.kernel.org/pub/scm/linux/kernel/git/penberg/slab-2.6
+>> (2011-08-09 08:42:16 -0700)
+>>
+>> are available in the git repository at:
+>>
+>> ?git://git.kernel.org/pub/scm/linux/kernel/git/olof/tegra.git boards-for-3.2
+>>
+>
+> Hi Olof,
+>
+> The contents all look good, but I'm undecided whether we should have
+> branches that are not based on a -rc release. In your case, it's
+> halfway between -rc1 and -rc2.
+>
+> Do others have an opinion? If we decide to take development branches
+> only when they are based on a proper -rc, I'll do the simple rebase
+> of the patches and push them out, otherwise I'll push them as they are.
 
-Sounds good to me.
+I guess it depends on what you and others prefer -- if you want to
+aggregate the branches in arm-soc.git through the development weeks,
+or if you prefer to get most of the merge requests when platform
+maintainers are getting ready for the merge window and feeding things
+up?
 
-> In the future, when a DMA-capable driver exists, we can figure out how
-> to determine which driver should be used.  At this point, I'm not even
-> sure what the correct answer will be, since a given configuration may
-> want to use non-DMA for one msm-hsuart device, and the DMA driver for
-> another.  It's kind of board/use specific, but beyond just describing
-> what the hardware is.
+Either is fine with me -- if it's easier for me to hold off the merge
+requests a while, then I'll start a for-next branch and ask Stephen to
+add it, and rebase it a few times up until when the merge request to
+arm-soc is sent. Maybe it's just easier for everyone to do it that way
+-- the drawback is that there's less visibility about what's about to
+go in until the merge requests start to drop in late in the cycle. The
+git history won't be quite as wide then either.
 
-In order to be absolutely future-proof, you could mandate that you always
-list two "compatible" values, one for the generic version and one for
-the specific implementation (high-speed or low-speed). It's a simple
-change from what you have now and it allows to change the drivers to
-bind to just the specific name in case you want to handle them separately
-in the future, without having to change the device tree files.
 
-	Arnd
+-Olof
