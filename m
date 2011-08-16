@@ -1,56 +1,56 @@
 From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Tue, 16 Aug 2011 08:46:22 +0200
-Subject: [PATCH] ARM: s3c24xx: ensure cpu_reset is only called when memory
-	is flat-mapped
-In-Reply-To: <1313429662-3145-1-git-send-email-will.deacon@arm.com>
-References: <1313429662-3145-1-git-send-email-will.deacon@arm.com>
-Message-ID: <201108160846.25150.heiko@sntech.de>
+Date: Tue, 16 Aug 2011 08:48:22 +0200
+Subject: [PATCH] ARM: S3C2443: Remove redundant s3c_register_clocks call
+	for init_clocks
+In-Reply-To: <1313463881.16359.2.camel@phoenix>
+References: <1313463881.16359.2.camel@phoenix>
+Message-ID: <201108160848.25088.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 15. August 2011, 19:34:22 schrieb Will Deacon:
-> s3c24xx_pm_restart makes a direct call to arch_reset, without first
-> establishing a 1:1 memory mapping. arch_reset will then call
-> cpu_reset(0), which is designed to be called only with an identity map
-> in place.
+Am Dienstag, 16. August 2011, 05:04:41 schrieb Axel Lin:
+> Since commit af337f3e633a198034a99450416257ddf2307497
+> "ARM: S3C2443: Move parts of the clock code to common clock file",
+> the init_clocks array is moved to arch/arm/plat-s3c24xx/s3c2443-clock.c.
+> Now we call s3c_register_clocks for init_clocks in
+> s3c2443_common_init_clocks.
 > 
-> Following the discussion here:
-> 
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2011-July/057281.html
-> 
-> This patch ensures that arch_reset is only called via arm_machine_restart
-> so that we have a consistent flat mapping requirement for the MMU-off
-> code.
+> Thus we can remove the empty init_clocks array here and remove the
+> redundant s3c_register_clocks call for init_clocks in s3c2443_init_clocks.
 I'm not 100% sure, but you might want to include Kukjin Kim 
 <kgene.kim@samsung.com> who seems to be handling the Samsung-stuff most of the 
 time.
 
+Heiko
+
 > 
-> Cc: Ben Dooks <ben-linux@fluff.org>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Axel Lin <axel.lin@gmail.com>
 > ---
->  arch/arm/plat-s3c24xx/cpu.c |   12 ------------
->  1 files changed, 0 insertions(+), 12 deletions(-)
+>  arch/arm/mach-s3c2443/clock.c |    7 -------
+>  1 files changed, 0 insertions(+), 7 deletions(-)
 > 
-> diff --git a/arch/arm/plat-s3c24xx/cpu.c b/arch/arm/plat-s3c24xx/cpu.c
-> index c1fc6c6..528930c 100644
-> --- a/arch/arm/plat-s3c24xx/cpu.c
-> +++ b/arch/arm/plat-s3c24xx/cpu.c
-> @@ -198,18 +198,6 @@ static unsigned long s3c24xx_read_idcode_v4(void)
->   */
->  static void s3c24xx_pm_restart(char mode, const char *cmd)
->  {
-> -	if (mode != 's') {
-> -		unsigned long flags;
+> diff --git a/arch/arm/mach-s3c2443/clock.c b/arch/arm/mach-s3c2443/clock.c
+> index a1a7176..4018dbe 100644
+> --- a/arch/arm/mach-s3c2443/clock.c
+> +++ b/arch/arm/mach-s3c2443/clock.c
+> @@ -305,9 +305,6 @@ static struct clk init_clocks_off[] = {
+>  	}
+>  };
+> 
+> -static struct clk init_clocks[] = {
+> -};
 > -
-> -		local_irq_save(flags);
-> -		__cpuc_flush_kern_all();
-> -		__cpuc_flush_user_all();
+>  /* clocks to add straight away */
+> 
+>  static struct clksrc_clk *clksrcs[] __initdata = {
+> @@ -345,10 +342,6 @@ void __init s3c2443_init_clocks(int xtal)
+>  	for (ptr = 0; ptr < ARRAY_SIZE(clksrcs); ptr++)
+>  		s3c_register_clksrc(clksrcs[ptr], 1);
+> 
+> -	/* register clocks from clock array */
 > -
-> -		arch_reset(mode, cmd);
-> -		local_irq_restore(flags);
-> -	}
+> -	s3c_register_clocks(init_clocks, ARRAY_SIZE(init_clocks));
 > -
-> -	/* fallback, or unhandled */
->  	arm_machine_restart(mode, cmd);
->  }
+>  	/* We must be careful disabling the clocks we are not intending to
+>  	 * be using at boot time, as subsystems such as the LCD which do
+>  	 * their own DMA requests to the bus can cause the system to lockup
