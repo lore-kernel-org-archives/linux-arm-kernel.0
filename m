@@ -1,109 +1,141 @@
 From: davidb@codeaurora.org (David Brown)
-Date: Tue, 16 Aug 2011 10:52:14 -0700
-Subject: [PATCH v2 2/4] msm_serial: Add devicetree support
+Date: Tue, 16 Aug 2011 10:52:15 -0700
+Subject: [PATCH v2 3/4] ARM: msm: Add devicetree support for msm8660-surf
 In-Reply-To: <1313517136-27414-1-git-send-email-davidb@codeaurora.org>
 References: <1313517136-27414-1-git-send-email-davidb@codeaurora.org>
-Message-ID: <1313517136-27414-3-git-send-email-davidb@codeaurora.org>
+Message-ID: <1313517136-27414-4-git-send-email-davidb@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add devicetree support to the msm_serial driver.  Clocks are still
-queried by direct name from the driver until device tree clock support
-is implemented.
+Adds support for booting via device tree with a simple serial console.
 
 Signed-off-by: David Brown <davidb@codeaurora.org>
 ---
- .../devicetree/bindings/tty/serial/msm_serial.txt  |   22 ++++++++++++++++++++
- drivers/tty/serial/msm_serial.c                    |   14 ++++++++++++
- 2 files changed, 36 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/tty/serial/msm_serial.txt
+ arch/arm/boot/dts/msm8660-surf.dts |   24 +++++++++++++++
+ arch/arm/mach-msm/board-msm8x60.c  |   58 +++++++++++++++++++++++++++++++----
+ 2 files changed, 75 insertions(+), 7 deletions(-)
+ create mode 100644 arch/arm/boot/dts/msm8660-surf.dts
 
-diff --git a/Documentation/devicetree/bindings/tty/serial/msm_serial.txt b/Documentation/devicetree/bindings/tty/serial/msm_serial.txt
+diff --git a/arch/arm/boot/dts/msm8660-surf.dts b/arch/arm/boot/dts/msm8660-surf.dts
 new file mode 100644
-index 0000000..1b72e79
+index 0000000..15ded0d
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/tty/serial/msm_serial.txt
-@@ -0,0 +1,22 @@
-+* Qualcomm MSM UART
++++ b/arch/arm/boot/dts/msm8660-surf.dts
+@@ -0,0 +1,24 @@
++/dts-v1/;
 +
-+Required properties:
-+- compatible :
-+	- "qcom,msm-uart"
-+- reg : offset and length of the register set for the device
-+	for the hsuart operating in compatible mode, there should be a
-+	second pair describing the gsbi registers.
-+- interrupts : should contain the uart interrupt.
++/include/ "skeleton.dtsi"
 +
-+There are two different UART blocks in MSM devices, "qcom,msm-uart"
-+and "qcom,msm-hsuart".  The msm-serial driver is able to handle both
-+of these devices.
++/ {
++	model = "Qualcomm MSM8660 SURF";
++	compatible = "qcom,msm8660-surf", "qcom,msm8660";
++	interrupt-parent = <&intc>;
 +
-+Example:
++	intc: interrupt-controller at 02080000 {
++		compatible = "qcom,msm-8660-qgic";
++		interrupt-controller;
++		#interrupt-cells = <1>;
++		reg = < 0x02080000 0x1000 >,
++		      < 0x02081000 0x1000 >;
++	};
 +
-+	uart at 19c400000 {
++	serial at 19c400000 {
 +		compatible = "qcom,msm-hsuart", "qcom,msm-uart";
 +		reg = <0x19c40000 0x1000>,
 +		      <0x19c00000 0x1000>;
 +		interrupts = <195>;
 +	};
-diff --git a/drivers/tty/serial/msm_serial.c b/drivers/tty/serial/msm_serial.c
-index d9863b2..7767902 100644
---- a/drivers/tty/serial/msm_serial.c
-+++ b/drivers/tty/serial/msm_serial.c
-@@ -19,6 +19,7 @@
- # define SUPPORT_SYSRQ
- #endif
++};
+diff --git a/arch/arm/mach-msm/board-msm8x60.c b/arch/arm/mach-msm/board-msm8x60.c
+index 1163b6f..10fa8f6 100644
+--- a/arch/arm/mach-msm/board-msm8x60.c
++++ b/arch/arm/mach-msm/board-msm8x60.c
+@@ -1,4 +1,4 @@
+-/* Copyright (c) 2010, Code Aurora Forum. All rights reserved.
++/* Copyright (c) 2010, 2011, Code Aurora Forum. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 and
+@@ -8,18 +8,16 @@
+  * but WITHOUT ANY WARRANTY; without even the implied warranty of
+  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
+- * 02110-1301, USA.
+- *
+  */
  
-+#include <linux/atomic.h>
- #include <linux/hrtimer.h>
- #include <linux/module.h>
- #include <linux/io.h>
-@@ -33,6 +34,8 @@
- #include <linux/clk.h>
+ #include <linux/kernel.h>
  #include <linux/platform_device.h>
- #include <linux/delay.h>
+ #include <linux/io.h>
+ #include <linux/irq.h>
++#include <linux/irqdomain.h>
 +#include <linux/of.h>
-+#include <linux/of_device.h>
++#include <linux/of_address.h>
++#include <linux/of_platform.h>
  
- #include "msm_serial.h"
- 
-@@ -856,6 +859,8 @@ static struct uart_driver msm_uart_driver = {
- 	.cons = MSM_CONSOLE,
- };
- 
-+static atomic_t msm_uart_next_id = ATOMIC_INIT(0);
-+
- static int __init msm_serial_probe(struct platform_device *pdev)
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+@@ -64,6 +62,41 @@ static void __init msm8x60_init(void)
  {
- 	struct msm_port *msm_port;
-@@ -863,6 +868,9 @@ static int __init msm_serial_probe(struct platform_device *pdev)
- 	struct uart_port *port;
- 	int irq;
- 
-+	if (pdev->id == -1)
-+		pdev->id = atomic_inc_return(&msm_uart_next_id) - 1;
-+
- 	if (unlikely(pdev->id < 0 || pdev->id >= UART_NR))
- 		return -ENXIO;
- 
-@@ -920,11 +928,17 @@ static int __devexit msm_serial_remove(struct platform_device *pdev)
- 	return 0;
  }
  
-+static struct of_device_id msm_match_table[] = {
-+	{ .compatible = "qcom,msm-uart" },
++#ifdef CONFIG_OF
++static struct of_dev_auxdata msm_auxdata_lookup[] __initdata = {
 +	{}
 +};
 +
- static struct platform_driver msm_platform_driver = {
- 	.remove = msm_serial_remove,
- 	.driver = {
- 		.name = "msm_serial",
- 		.owner = THIS_MODULE,
-+		.of_match_table = msm_match_table,
- 	},
- };
- 
++static struct of_device_id msm_dt_gic_match[] __initdata = {
++	{ .compatible = "qcom,msm-8660-qgic", },
++	{}
++};
++
++static void __init msm8x60_dt_init(void)
++{
++	struct device_node *node;
++
++	node = of_find_matching_node_by_address(NULL, msm_dt_gic_match,
++			MSM8X60_QGIC_DIST_PHYS);
++	if (node)
++		irq_domain_add_simple(node, GIC_SPI_START);
++
++	if (of_machine_is_compatible("qcom,msm8660-surf")) {
++		printk(KERN_INFO "Init surf UART registers\n");
++		msm8x60_init_uart12dm();
++	}
++
++	of_platform_populate(NULL, of_default_bus_match_table,
++			msm_auxdata_lookup, NULL);
++}
++
++static const char *msm8x60_fluid_match[] __initdata = {
++	"qcom,msm8660-fluid",
++	"qcom,msm8660-surf",
++	NULL
++};
++#endif /* CONFIG_OF */
++
+ MACHINE_START(MSM8X60_RUMI3, "QCT MSM8X60 RUMI3")
+ 	.map_io = msm8x60_map_io,
+ 	.init_irq = msm8x60_init_irq,
+@@ -91,3 +124,14 @@ MACHINE_START(MSM8X60_FFA, "QCT MSM8X60 FFA")
+ 	.init_machine = msm8x60_init,
+ 	.timer = &msm_timer,
+ MACHINE_END
++
++#ifdef CONFIG_OF
++/* TODO: General device tree support for all MSM. */
++DT_MACHINE_START(MSM_DT, "Qualcomm MSM (Flattened Device Tree)")
++	.map_io = msm8x60_map_io,
++	.init_irq = msm8x60_init_irq,
++	.init_machine = msm8x60_dt_init,
++	.timer = &msm_timer,
++	.dt_compat = msm8x60_fluid_match,
++MACHINE_END
++#endif /* CONFIG_OF */
 -- 
 Sent by an employee of the Qualcomm Innovation Center, Inc.
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
