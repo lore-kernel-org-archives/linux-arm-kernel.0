@@ -1,21 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 16 Aug 2011 13:52:32 +0100
-Subject: PB1176 broken in -rc1
-In-Reply-To: <CACRpkdY3_1cnsNuxy2bYgFcrcxEegx_6eSGDSsU9mpQZePAMhA@mail.gmail.com>
-References: <20110810152400.GO10121@e102144-lin.cambridge.arm.com>
-	<CACRpkdaoDJy-YKONaz2j07pPvTZuHZ7KgEm6XGxNXK-jNzB8_w@mail.gmail.com>
-	<20110816092615.GC28656@e102144-lin.cambridge.arm.com>
-	<CACRpkdbSG=Mnu7QrACn3y3GP-2H4_qT0kR_4C8umCmWc2YCqXQ@mail.gmail.com>
-	<20110816095936.GE28656@e102144-lin.cambridge.arm.com>
-	<CACRpkdY3_1cnsNuxy2bYgFcrcxEegx_6eSGDSsU9mpQZePAMhA@mail.gmail.com>
-Message-ID: <20110816125232.GB17310@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 16 Aug 2011 15:09:16 +0200
+Subject: [RFC PATCH v2 00/13] arm/tegra: Initialize GPIO & pinmux from DT
+In-Reply-To: <1313440100-17131-1-git-send-email-swarren@nvidia.com>
+References: <1313440100-17131-1-git-send-email-swarren@nvidia.com>
+Message-ID: <201108161509.17157.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 16, 2011 at 02:44:21PM +0200, Linus Walleij wrote:
-> The most probably cause being that the size of the combined
-> kernel+initramfs passed the magic limit where it simply breaks,
-> I wish we could handle that in some good way :-/
+On Monday 15 August 2011, Stephen Warren wrote:
+> v2:
+> * Enhanced pinmux code to handle "drive pingroups" as well as "mux
+>   pingroups". This altered the pinmux binding a little; shifting each
+>   type of pingroup into a sub-node in the pinmux node.
+> * Enumerate pingroups by enumerating DT child nodes, and mapping them to
+>   pingroups, rather than the other way around. Hence also removed
+>   modifications to <linux/of.h> and drivers/of/base.c.
+> * Included documentation of the bindings.
+> * Represent pingroup names and function names, as lower case in DT.
+> * Used a better name for GPIO binding GPIO list.
+> * Switched to boolean properties for pinmux pull-up/down.
+> * s/dev_err/dev_dbg/ in DT parsing debug code.
+> * Various minor cleanups (e.g. typos, white-space).
+> 
+> This patch modifies Tegra's device tree support to remove the dependency
+> on harmony_pinmux_init(), thus making it completely board-independent.
 
-That should be fixed, because we now place the initramfs image
-between the code sections and the data sections.
+I don't understand enough of the technical background to comment on
+the contents, on the surface it all makes sense.
+
+I do think that you should keep Linus Walleij on Cc in these emails, since
+he first started pushing for a common pinmux layer, and we need to make
+sure that the binding works for all SoCs, not just for tegra.
+
+	Arnd
