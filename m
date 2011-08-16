@@ -1,39 +1,65 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Tue, 16 Aug 2011 10:04:22 +0100
-Subject: [RFC PATCH 0/5] Fix Thumb-2 undef handling for mixed-arch kernels
-In-Reply-To: <alpine.LFD.2.00.1108151910030.20358@xanadu.home>
-References: <1312971223-28165-1-git-send-email-dave.martin@linaro.org>
-	<1312975897.7800.20.camel@computer2>
-	<20110811131054.GB2336@arm.com>
-	<alpine.LFD.2.00.1108151910030.20358@xanadu.home>
-Message-ID: <20110816090422.GA1993@arm.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Tue, 16 Aug 2011 11:06:01 +0200
+Subject: [PATCH v2 1/8] ARM: cpuid: add support for reading MPIDR
+In-Reply-To: <1313429452-2820-2-git-send-email-will.deacon@arm.com>
+References: <1313429452-2820-1-git-send-email-will.deacon@arm.com>
+	<1313429452-2820-2-git-send-email-will.deacon@arm.com>
+Message-ID: <CAKfTPtCzr0hgbfcmBy5rT1C6HO+Uq6g0wHsgfuP1V3zyo0scPw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 15, 2011 at 07:13:35PM -0400, Nicolas Pitre wrote:
-> On Thu, 11 Aug 2011, Dave Martin wrote:
-> 
-> > On Wed, Aug 10, 2011 at 12:31:37PM +0100, Tixy wrote:
-> > > An alternative to defend against this is to make cpu_architecture() an
-> > > inline function returning the value of the global variable like:
-> > > 
-> > > inline int cpu_architecture(void)
-> > > {
-> > > 	BUG_ON(the_cpu_architecture == CPU_ARCH_UNKNOWN);
-> > > 	return the_cpu_architecture;
-> > > }
-> > > 
-> > > This has the bonus of not needing to change users of the the function.
-> > 
-> > Sounds like a good idea.  I got rid of the function because I didn't like
-> > calling a function from the undef handler entry code, but an inline
-> > function which just reads the variable seems like the best of both worlds.
-> 
-> While at it, you could mark the function with __attribute__((pure)).
+Hi Will,
 
-Hmmm, I don't know what exact impact that has for an inline function, but it
-would certainly do no harm.  Maybe it will eliminate some calls to BUG_ON().
-I will add it anyway -- I don't see a reason not to.
+The read_cpuid_mpidr function has been added in a previous patch :
 
-Cheers
----Dave
+http://lists.arm.linux.org.uk/lurker/message/20110705.131623.8f41d3a6.en.html
+
+It's now in Russell's patch system: ref 7011/1
+
+Vincent
+
+On 15 August 2011 19:30, Will Deacon <will.deacon@arm.com> wrote:
+> The MPIDR register forms part of the CPUID interface and allows software
+> to determine the physical ID of the CPU on which it is currently
+> executing.
+>
+> This patch adds support for reading the MPIDR to cputype.h
+>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+> ?arch/arm/include/asm/cputype.h | ? ?6 ++++++
+> ?1 files changed, 6 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
+> index cd4458f..cb47d28 100644
+> --- a/arch/arm/include/asm/cputype.h
+> +++ b/arch/arm/include/asm/cputype.h
+> @@ -8,6 +8,7 @@
+> ?#define CPUID_CACHETYPE ? ? ? ?1
+> ?#define CPUID_TCM ? ? ?2
+> ?#define CPUID_TLBTYPE ?3
+> +#define CPUID_MPIDR ? ?5
+>
+> ?#define CPUID_EXT_PFR0 "c1, 0"
+> ?#define CPUID_EXT_PFR1 "c1, 1"
+> @@ -70,6 +71,11 @@ static inline unsigned int __attribute_const__ read_cpuid_tcmstatus(void)
+> ? ? ? ?return read_cpuid(CPUID_TCM);
+> ?}
+>
+> +static inline unsigned int __attribute_const__ read_cpuid_mpidr(void)
+> +{
+> + ? ? ? return read_cpuid(CPUID_MPIDR);
+> +}
+> +
+> ?/*
+> ?* Intel's XScale3 core supports some v6 features (supersections, L2)
+> ?* but advertises itself as v5 as it does not support the v6 ISA. ?For
+> --
+> 1.7.0.4
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
