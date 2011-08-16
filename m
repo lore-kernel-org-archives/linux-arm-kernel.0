@@ -1,45 +1,32 @@
-From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Wed, 17 Aug 2011 00:31:06 +0300
-Subject: [PATCH 3/3] ARM: S5PV210: use dma-pl330 device name for clock
-In-Reply-To: <1313530266-14939-1-git-send-email-vz@mleia.com>
-References: <1313530266-14939-1-git-send-email-vz@mleia.com>
-Message-ID: <1313530266-14939-4-git-send-email-vz@mleia.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 16 Aug 2011 22:38:03 +0100
+Subject: PB1176 broken in -rc1
+In-Reply-To: <20110816113446.GA17310@n2100.arm.linux.org.uk>
+References: <20110810152400.GO10121@e102144-lin.cambridge.arm.com>
+	<CACRpkdaoDJy-YKONaz2j07pPvTZuHZ7KgEm6XGxNXK-jNzB8_w@mail.gmail.com>
+	<20110816092615.GC28656@e102144-lin.cambridge.arm.com>
+	<CACRpkdbSG=Mnu7QrACn3y3GP-2H4_qT0kR_4C8umCmWc2YCqXQ@mail.gmail.com>
+	<20110816095936.GE28656@e102144-lin.cambridge.arm.com>
+	<20110816100906.GA16159@n2100.arm.linux.org.uk>
+	<20110816101711.GF28656@e102144-lin.cambridge.arm.com>
+	<20110816113446.GA17310@n2100.arm.linux.org.uk>
+Message-ID: <20110816213802.GA24826@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This change replaces s3c-pl330.x clock device names with dma-pl330.x,
-otherwise there won't be a correspondence between clock device name
-and amba device name, thus clocks can't be enabled.
+Russell,
 
-Fixes runtime errors on clk_get() from drivers/dma/pl330.c:
-  dma-pl330 dma-pl330.0: Cannot get operation clock.
-  dma-pl330: probe of dma-pl330.0 failed with error -22
+On Tue, Aug 16, 2011 at 12:34:46PM +0100, Russell King - ARM Linux wrote:
+> On Tue, Aug 16, 2011 at 11:17:11AM +0100, Will Deacon wrote:
+> > Yup, I agree about the usage of earlyprintk. It would be good if the user
+> > could select the platform on which LL debug will work at config time and
+> > then not have to worry about multiple conflicting definitions of
+> > DEBUG_LL_UART_OFFSET. That way, you know on which platform earlyprintk
+> > will work and don't try to use it on any others.
+> 
+> Feel free to send a patch to do that.
 
-Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
-Cc: Boojin Kim <boojin.kim@samsung.com>
----
- arch/arm/mach-s5pv210/clock.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+I've pulled something simple together, based on what you proposed earlier
+on. I'll post it to the list shortly...
 
-diff --git a/arch/arm/mach-s5pv210/clock.c b/arch/arm/mach-s5pv210/clock.c
-index d35726a..239aaad 100644
---- a/arch/arm/mach-s5pv210/clock.c
-+++ b/arch/arm/mach-s5pv210/clock.c
-@@ -295,13 +295,13 @@ static struct clk_ops clk_fout_apll_ops = {
- static struct clk init_clocks_off[] = {
- 	{
- 		.name		= "dma",
--		.devname	= "s3c-pl330.0",
-+		.devname	= "dma-pl330.0",
- 		.parent		= &clk_hclk_psys.clk,
- 		.enable		= s5pv210_clk_ip0_ctrl,
- 		.ctrlbit	= (1 << 3),
- 	}, {
- 		.name		= "dma",
--		.devname	= "s3c-pl330.1",
-+		.devname	= "dma-pl330.1",
- 		.parent		= &clk_hclk_psys.clk,
- 		.enable		= s5pv210_clk_ip0_ctrl,
- 		.ctrlbit	= (1 << 4),
--- 
-1.7.5.1
+Will
