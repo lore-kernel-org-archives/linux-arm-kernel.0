@@ -1,98 +1,61 @@
 From: dave.martin@linaro.org (Dave Martin)
-Date: Tue, 16 Aug 2011 15:14:13 +0100
-Subject: [PATCH 3/3] ARM: entry: Fix Thumb-2 undef handling for multi-CPU
-	kernels
-In-Reply-To: <1313504053-27873-1-git-send-email-dave.martin@linaro.org>
-References: <1313504053-27873-1-git-send-email-dave.martin@linaro.org>
-Message-ID: <1313504053-27873-4-git-send-email-dave.martin@linaro.org>
+Date: Tue, 16 Aug 2011 15:19:00 +0100
+Subject: [PATCH] ARM: Add safe diagnostic to indicate when __cpu_architecture
+	isn't set up
+Message-ID: <1313504340-28004-1-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When v6 and >=v7 boards are supported in the same kernel, the
-__und_usr code currently makes a build-time assumption that Thumb-2
-instructions occurring in userspace don't need to be supported.
-Strictly speaking this is incorrect.
+Although assing BUG() when __cpu_architecture is unexpectedly
+CPU_ARCH_UNKNOWN seems like a good idea, in practice the kernel may
+not be able to boot far enough even to write to the console in such
+cases, even with earlyprintk enabled.
 
-This patch fixes the above case by doing a run-time check on the
-CPU architecture in these cases.  This only affects kernels which
-support v6 and >=v7 CPUs together: plain v6 and plain v7 kernels
-are unaffected.
+This patch adds a more useful diagnostic, and works out the cpu
+architecture from scratch in such cases, instead of just returning
+CPU_ARCH_UNKNOWN to the caller.
+
+This patch is useful for debugging, but I'm not convinced it should
+be merged.
 
 Signed-off-by: Dave Martin <dave.martin@linaro.org>
 ---
- arch/arm/kernel/entry-armv.S |   38 +++++++++++++++++++++++++++++++++++++-
- 1 files changed, 37 insertions(+), 1 deletions(-)
+ arch/arm/include/asm/system.h |    9 +++++++--
+ arch/arm/kernel/setup.c       |    2 +-
+ 2 files changed, 8 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-index b7236d4..9ad50c4 100644
---- a/arch/arm/kernel/entry-armv.S
-+++ b/arch/arm/kernel/entry-armv.S
-@@ -24,6 +24,7 @@
- #include <asm/unwind.h>
- #include <asm/unistd.h>
- #include <asm/tls.h>
-+#include <asm/system.h>
+diff --git a/arch/arm/include/asm/system.h b/arch/arm/include/asm/system.h
+index b0445f7..d679d2f 100644
+--- a/arch/arm/include/asm/system.h
++++ b/arch/arm/include/asm/system.h
+@@ -110,8 +110,13 @@ extern int __cpu_architecture;
  
- #include "entry-header.S"
- #include <asm/entry-macro-multi.S>
-@@ -439,7 +440,27 @@ __und_usr:
- #endif
- 	beq	call_fpe
- 	@ Thumb instruction
--#if __LINUX_ARM_ARCH__ >= 7
-+#if CONFIG_ARM_THUMB && __LINUX_ARM_ARCH__ >= 6 && CONFIG_CPU_V7
-+/*
-+ * Thumb-2 instruction handling.  Note that because pre-v6 and >= v6 platforms
-+ * can never be supported in a single kernel, this code is not applicable at
-+ * all when __LINUX_ARM_ARCH__ < 6.  This allows simplifying assumptions to be
-+ * made about .arch directives.
-+ */
-+#if __LINUX_ARM_ARCH__ < 7
-+/* If the target CPU may not be Thumb-2-capable, a run-time check is needed: */
-+#define NEED_CPU_ARCHITECTURE
-+	ldr	r5, .LCcpu_architecture
-+	ldr	r5, [r5]
-+	cmp	r5, #CPU_ARCH_ARMv7
-+	blo	__und_usr_unknown
-+/*
-+ * The following code won't get run unless the running CPU really is v7, so
-+ * coding round the lack of ldrht on older arches is pointless.  Temporarily
-+ * override the assembler target arch with the minimum required instead:
-+ */
-+	.arch	armv6t2
-+#endif
- 2:
-  ARM(	ldrht	r5, [r4], #2	)
-  THUMB(	ldrht	r5, [r4]	)
-@@ -449,7 +470,16 @@ __und_usr:
- 3:	ldrht	r0, [r4]
- 	add	r2, r2, #2			@ r2 is PC + 2, make it PC + 4
- 	orr	r0, r0, r5, lsl #16
+ static inline int __pure cpu_architecture(void)
+ {
+-	BUG_ON(__cpu_architecture == CPU_ARCH_UNKNOWN);
+-	return __cpu_architecture;
++	if (unlikely(__cpu_architecture == CPU_ARCH_UNKNOWN)) {
++		extern int __pure __get_cpu_architecture(void);
 +
-+#if __LINUX_ARM_ARCH__ < 7
-+/* If the target arch was overridden, change it back: */
-+#ifdef CONFIG_CPU_32v6K
-+	.arch	armv6k
- #else
-+	.arch	armv6
-+#endif
-+#endif /* __LINUX_ARM_ARCH__ < 7 */
-+#else /* !(CONFIG_ARM_THUMB && __LINUX_ARM_ARCH__ >= 6 && CONFIG_CPU_V7) */
- 	b	__und_usr_unknown
- #endif
-  UNWIND(.fnend		)
-@@ -576,6 +606,12 @@ call_fpe:
- 	movw_pc	lr				@ CP#14 (Debug)
- 	movw_pc	lr				@ CP#15 (Control)
++		WARN_ONCE(1, "__cpu_architecture not set yet!\n");
++		return __get_cpu_architecture();
++	} else
++		return __cpu_architecture;
+ }
  
-+#ifdef NEED_CPU_ARCHITECTURE
-+	.align	2
-+.LCcpu_architecture:
-+	.word	__cpu_architecture
-+#endif
-+
- #ifdef CONFIG_NEON
- 	.align	6
+ extern void cpu_init(void);
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 1e0c1b3..188aae5 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -212,7 +212,7 @@ static const char *proc_arch[] = {
+ 	"?(17)",
+ };
+ 
+-static int __init __get_cpu_architecture(void)
++int __get_cpu_architecture(void)
+ {
+ 	int cpu_arch;
  
 -- 
 1.7.4.1
