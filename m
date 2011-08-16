@@ -1,44 +1,33 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 16 Aug 2011 10:36:29 +0200
+From: jaswinder.singh@linaro.org (Jassi Brar)
+Date: Tue, 16 Aug 2011 14:08:18 +0530
 Subject: [PATCH] amba: consolidate PrimeCell magic
-In-Reply-To: <001601cc5be9$275a5200$760ef600$%kim@samsung.com>
+In-Reply-To: <20110816083551.GA14312@n2100.arm.linux.org.uk>
 References: <1313402104-27024-1-git-send-email-linus.walleij@stericsson.com>
-	<001601cc5be9$275a5200$760ef600$%kim@samsung.com>
-Message-ID: <CACRpkdZ=cPen0KvK3__iabu8Xwhz8Yjcb-ev-qLe_AY4jaYACA@mail.gmail.com>
+	<CABb+yY3Bb2VnFLv8OmeqJH9FpWrpixCHPSgd0yVUnWRoFGA10Q@mail.gmail.com>
+	<20110816083551.GA14312@n2100.arm.linux.org.uk>
+Message-ID: <CAJe_ZhfwnUhUfXtj==+Nv=XHWA+cE=sG4mkipm8zVv9+hBGACQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 16, 2011 at 9:50 AM, Boojin Kim <boojin.kim@samsung.com> wrote:
-
-> diff --git a/arch/arm/common/pl330.c b/arch/arm/common/pl330.c
-> index 2b3b8b3..af6d96d 100644
-> --- a/arch/arm/common/pl330.c
-> +++ b/arch/arm/common/pl330.c
-> @@ -1822,6 +1822,8 @@ int pl330_add(struct pl330_info *pi)
-> ? ? ? ?struct pl330_dmac *pl330;
-> ? ? ? ?int i, ret;
-> ? ? ? ?u32 cid, pid;
-> + ? ? ? struct amba_device *adev = container_of(pi->dev,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct amba_device, dev);
+On 16 August 2011 14:05, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Aug 16, 2011 at 01:57:08PM +0530, Jassi Brar wrote:
+>> On Mon, Aug 15, 2011 at 3:25 PM, Linus Walleij
+>> <linus.walleij@stericsson.com> wrote:
+>> > +static inline u32 amba_get_magic(void __iomem *base, u32 size, u8 offset)
+>> > +{
+>> > + ? ? ? u32 magic;
+>> > + ? ? ? int i;
+>> > +
+>> > + ? ? ? for (magic = 0, i = 0; i < 4; i++)
+>> > + ? ? ? ? ? ? ? magic |= (readl(base + size - offset + 4 * i) & 255)
+>> > + ? ? ? ? ? ? ? ? ? ? ? << (i * 8);
+>> 0xff looks much better than 255, esp when we play with bits.
+>> Also you might simply use readb and drop the sieve ?
 >
-> ? ? ? ?if (!pi || !pi->dev)
-> ? ? ? ? ? ? ? ?return -EINVAL;
-> @@ -1841,8 +1843,8 @@ int pl330_add(struct pl330_info *pi)
-> ? ? ? ?cid = amba_get_cid(pi->base, PCELL_SIZE);
-> ? ? ? ?pid = amba_get_pid(pi->base, PCELL_SIZE);
-> ? ? ? ?if (cid != AMBA_CID ||
-> - ? ? ? ? ? amba_manf(pid) != AMBA_VENDOR_ARM ||
-> - ? ? ? ? ? amba_part(pid) != PART) {
-> + ? ? ? ? ? amba_manf(adev) != AMBA_VENDOR_ARM ||
-> + ? ? ? ? ? amba_part(adev) != PART) {
-> ? ? ? ? ? ? ? ?dev_err(pi->dev, "PID: 0x%x, CID: 0x%x !\n", pid, cid);
-> ? ? ? ? ? ? ? ?return -EINVAL;
-> ? ? ? ?}
-
-Ah! If I can access the adev from here it must have probed
-earlier, and then the entire check is superfluous, since the AMBA
-probe has already checked this in drivers/amba/bus.c.
-
-I guess it should just be deleted then?
-
-Linus
+> You're making the assumption that using byte reads are permitted. ?Given
+> that these are described as 32-bit registers, and some primecells require
+> reads of certain sizes, I believe the code to be the most correct solution.
+>
+If you notice the '?'
+I already doubt that, so I simply asked Linus to ponder the possibility.
