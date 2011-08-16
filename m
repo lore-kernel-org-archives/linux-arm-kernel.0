@@ -1,59 +1,96 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Tue, 16 Aug 2011 17:15:54 +0100
-Subject: [PATCH] ARM: Add safe diagnostic to indicate when
-	__cpu_architecture isn't set up
-In-Reply-To: <alpine.LFD.2.00.1108161058220.20358@xanadu.home>
-References: <1313504340-28004-1-git-send-email-dave.martin@linaro.org>
-	<1313505921.2235.6.camel@computer2>
-	<alpine.LFD.2.00.1108161058220.20358@xanadu.home>
-Message-ID: <20110816161553.GB1993@arm.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 16 Aug 2011 12:15:59 -0400 (EDT)
+Subject: [PATCH 1/3] ARM: Make cpu_alignment into a global variable
+In-Reply-To: <1313504053-27873-2-git-send-email-dave.martin@linaro.org>
+References: <1313504053-27873-1-git-send-email-dave.martin@linaro.org>
+	<1313504053-27873-2-git-send-email-dave.martin@linaro.org>
+Message-ID: <alpine.LFD.2.00.1108161214520.20358@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 16, 2011 at 10:59:18AM -0400, Nicolas Pitre wrote:
-> On Tue, 16 Aug 2011, Tixy wrote:
+On Tue, 16 Aug 2011, Dave Martin wrote:
+
+> The CPU architecture really should not be changing at runtime, so
+> make it a global variable instead of a function.
 > 
-> > On Tue, 2011-08-16 at 15:19 +0100, Dave Martin wrote:
-> > [...]
-> > > This patch is useful for debugging, but I'm not convinced it should
-> > > be merged.
-> > [...] 
-> > >  static inline int __pure cpu_architecture(void)
-> > >  {
-> > > -	BUG_ON(__cpu_architecture == CPU_ARCH_UNKNOWN);
-> > > -	return __cpu_architecture;
-> > > +	if (unlikely(__cpu_architecture == CPU_ARCH_UNKNOWN)) {
-> > > +		extern int __pure __get_cpu_architecture(void);
-> > > +
-> > > +		WARN_ONCE(1, "__cpu_architecture not set yet!\n");
-> > > +		return __get_cpu_architecture();
-> > > +	} else
-> > > +		return __cpu_architecture;
-> > >  }
-> > 
-> > Seems to me that if we go down this route, cpu_architecture() may as
-> > well remain a non-inline function which just calculates the arch if it's
-> > not already set...
+> The cpu_architecture() function in <asm/system.h> remains the
+> correct way to read this variable from C code.
 > 
-> My thought as well.
+> Signed-off-by: Dave Martin <dave.martin@linaro.org>
+
+Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+
+> ---
+>  arch/arm/include/asm/system.h |   11 ++++++++++-
+>  arch/arm/kernel/setup.c       |    5 ++++-
+>  2 files changed, 14 insertions(+), 2 deletions(-)
 > 
-> > 	if (unlikely(__cpu_architecture == CPU_ARCH_UNKNOWN))
-> > 		__cpu_architecture = __get_cpu_architecture();
-> > 	return __cpu_architecture;
-> > 
-> > There seems to be too many ways to skin this cat :-)
+> diff --git a/arch/arm/include/asm/system.h b/arch/arm/include/asm/system.h
+> index 832888d..b0445f7 100644
+> --- a/arch/arm/include/asm/system.h
+> +++ b/arch/arm/include/asm/system.h
+> @@ -57,6 +57,8 @@
+>  
+>  #ifndef __ASSEMBLY__
+>  
+> +#include <linux/bug.h>
+> +#include <linux/compiler.h>
+>  #include <linux/linkage.h>
+>  #include <linux/irqflags.h>
+>  
+> @@ -104,7 +106,14 @@ struct mm_struct;
+>  extern void show_pte(struct mm_struct *mm, unsigned long addr);
+>  extern void __show_regs(struct pt_regs *);
+>  
+> -extern int cpu_architecture(void);
+> +extern int __cpu_architecture;
+> +
+> +static inline int __pure cpu_architecture(void)
+> +{
+> +	BUG_ON(__cpu_architecture == CPU_ARCH_UNKNOWN);
+> +	return __cpu_architecture;
+> +}
+> +
+>  extern void cpu_init(void);
+>  
+>  void arm_machine_restart(char mode, const char *cmd);
+> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> index 70bca64..1e0c1b3 100644
+> --- a/arch/arm/kernel/setup.c
+> +++ b/arch/arm/kernel/setup.c
+> @@ -42,6 +42,7 @@
+>  #include <asm/cacheflush.h>
+>  #include <asm/cachetype.h>
+>  #include <asm/tlbflush.h>
+> +#include <asm/system.h>
+>  
+>  #include <asm/prom.h>
+>  #include <asm/mach/arch.h>
+> @@ -114,6 +115,7 @@ struct cpu_cache_fns cpu_cache __read_mostly;
+>  struct outer_cache_fns outer_cache __read_mostly;
+>  EXPORT_SYMBOL(outer_cache);
+>  #endif
+> +int __cpu_architecture __read_mostly = CPU_ARCH_UNKNOWN;
+>  
+>  struct stack {
+>  	u32 irq[3];
+> @@ -210,7 +212,7 @@ static const char *proc_arch[] = {
+>  	"?(17)",
+>  };
+>  
+> -int cpu_architecture(void)
+> +static int __init __get_cpu_architecture(void)
+>  {
+>  	int cpu_arch;
+>  
+> @@ -413,6 +415,7 @@ static void __init setup_processor(void)
+>  	}
+>  
+>  	cpu_name = list->cpu_name;
+> +	__cpu_architecture = __get_cpu_architecture();
+>  
+>  #ifdef MULTI_CPU
+>  	processor = *list->proc;
+> -- 
+> 1.7.4.1
 > 
-> Agreed.
-
-Well, I guess the flipside is, do we need this check at all?
-
-Because __cpu_architecture is set really early, and because if
-it's referenced too early, the kernel will either not boot or
-we'll hit BUG(), it's hard to imaging such a failure going unnoticed.
-
-So this check could simply be viewed as overkill, though it does
-feel safer to check.
-
-Any thoughts?
-
----Dave
