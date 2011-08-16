@@ -1,87 +1,174 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 16 Aug 2011 15:34:52 -0500
-Subject: [PATCH 0/6] Initial Calxeda Highbank support
-Message-ID: <1313526898-19920-1-git-send-email-robherring2@gmail.com>
+Date: Tue, 16 Aug 2011 15:34:56 -0500
+Subject: [PATCH 4/6] ARM: highbank: add SMP support
+In-Reply-To: <1313526898-19920-1-git-send-email-robherring2@gmail.com>
+References: <1313526898-19920-1-git-send-email-robherring2@gmail.com>
+Message-ID: <1313526898-19920-5-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-This adds initial platform support for Calxeda's Highbank ARM SOC. 
+This enables SMP support on highbank processor.
 
-If any of the mach header clean-up series go in, then I can drop some 
-headers. Several are already empty. This will need some rework if/when
-Marc Z's localtimers rework patches are merged:
-
-http://article.gmane.org/gmane.linux.ports.arm.kernel/127831/
-
-Based on 3.1-rc2 plus previously posted L2x0 and GIC devicetree
-binding support. The L2x0 support is merged in rmk's for-next branch.
-The GIC bindings are still being discussed.
-
-Rob
-
-Martin Bogomolni (1):
-  ARM: highbank: Add cpu hotplug support
-
-Rob Herring (5):
-  ARM: highbank: add devicetree source
-  ARM: add Highbank core platform support
-  MAINTAINERS: add Calxeda Highbank ARM platform
-  ARM: highbank: add SMP support
-  ARM: highbank: add suspend support
-
- Documentation/devicetree/bindings/arm/calxeda.txt |    8 +
- MAINTAINERS                                       |    6 +
- arch/arm/Kconfig                                  |   19 ++-
- arch/arm/Makefile                                 |    1 +
- arch/arm/boot/dts/highbank.dts                    |  212 +++++++++++++++++++++
- arch/arm/mach-highbank/Makefile                   |    5 +
- arch/arm/mach-highbank/Makefile.boot              |    1 +
- arch/arm/mach-highbank/clock.c                    |   63 ++++++
- arch/arm/mach-highbank/core.h                     |    3 +
- arch/arm/mach-highbank/highbank.c                 |  164 ++++++++++++++++
- arch/arm/mach-highbank/hotplug.c                  |   56 ++++++
- arch/arm/mach-highbank/include/mach/debug-macro.S |   20 ++
- arch/arm/mach-highbank/include/mach/entry-macro.S |    9 +
- arch/arm/mach-highbank/include/mach/gpio.h        |    1 +
- arch/arm/mach-highbank/include/mach/io.h          |    8 +
- arch/arm/mach-highbank/include/mach/irqs.h        |    6 +
- arch/arm/mach-highbank/include/mach/memory.h      |    1 +
- arch/arm/mach-highbank/include/mach/system.h      |   26 +++
- arch/arm/mach-highbank/include/mach/timex.h       |    6 +
- arch/arm/mach-highbank/include/mach/uncompress.h  |    9 +
- arch/arm/mach-highbank/include/mach/vmalloc.h     |    6 +
- arch/arm/mach-highbank/localtimer.c               |   37 ++++
- arch/arm/mach-highbank/platsmp.c                  |   79 ++++++++
- arch/arm/mach-highbank/pm.c                       |   55 ++++++
- arch/arm/mach-highbank/sysregs.h                  |   30 +++
- arch/arm/mach-highbank/system.c                   |   33 ++++
- arch/arm/mm/Kconfig                               |    2 +-
- 27 files changed, 864 insertions(+), 2 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/calxeda.txt
- create mode 100644 arch/arm/boot/dts/highbank.dts
- create mode 100644 arch/arm/mach-highbank/Makefile
- create mode 100644 arch/arm/mach-highbank/Makefile.boot
- create mode 100644 arch/arm/mach-highbank/clock.c
- create mode 100644 arch/arm/mach-highbank/core.h
- create mode 100644 arch/arm/mach-highbank/highbank.c
- create mode 100644 arch/arm/mach-highbank/hotplug.c
- create mode 100644 arch/arm/mach-highbank/include/mach/debug-macro.S
- create mode 100644 arch/arm/mach-highbank/include/mach/entry-macro.S
- create mode 100644 arch/arm/mach-highbank/include/mach/gpio.h
- create mode 100644 arch/arm/mach-highbank/include/mach/io.h
- create mode 100644 arch/arm/mach-highbank/include/mach/irqs.h
- create mode 100644 arch/arm/mach-highbank/include/mach/memory.h
- create mode 100644 arch/arm/mach-highbank/include/mach/system.h
- create mode 100644 arch/arm/mach-highbank/include/mach/timex.h
- create mode 100644 arch/arm/mach-highbank/include/mach/uncompress.h
- create mode 100644 arch/arm/mach-highbank/include/mach/vmalloc.h
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+---
+ arch/arm/Kconfig                    |    2 +-
+ arch/arm/mach-highbank/Makefile     |    2 +
+ arch/arm/mach-highbank/localtimer.c |   37 ++++++++++++++++
+ arch/arm/mach-highbank/platsmp.c    |   79 +++++++++++++++++++++++++++++++++++
+ 4 files changed, 119 insertions(+), 1 deletions(-)
  create mode 100644 arch/arm/mach-highbank/localtimer.c
  create mode 100644 arch/arm/mach-highbank/platsmp.c
- create mode 100644 arch/arm/mach-highbank/pm.c
- create mode 100644 arch/arm/mach-highbank/sysregs.h
- create mode 100644 arch/arm/mach-highbank/system.c
 
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index eecee3d..51abd0c 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1365,7 +1365,7 @@ config SMP
+ 	depends on REALVIEW_EB_ARM11MP || REALVIEW_EB_A9MP || \
+ 		 MACH_REALVIEW_PB11MP || MACH_REALVIEW_PBX || ARCH_OMAP4 || \
+ 		 ARCH_EXYNOS4 || ARCH_TEGRA || ARCH_U8500 || ARCH_VEXPRESS_CA9X4 || \
+-		 ARCH_MSM_SCORPIONMP || ARCH_SHMOBILE
++		 ARCH_MSM_SCORPIONMP || ARCH_SHMOBILE || ARCH_HIGHBANK
+ 	select USE_GENERIC_SMP_HELPERS
+ 	select HAVE_ARM_SCU if !ARCH_MSM_SCORPIONMP
+ 	help
+diff --git a/arch/arm/mach-highbank/Makefile b/arch/arm/mach-highbank/Makefile
+index b5de3b9..d443f7e 100644
+--- a/arch/arm/mach-highbank/Makefile
++++ b/arch/arm/mach-highbank/Makefile
+@@ -1 +1,3 @@
+ obj-y					:= clock.o highbank.o system.o
++obj-$(CONFIG_SMP)			+= platsmp.o
++obj-$(CONFIG_LOCAL_TIMERS)		+= localtimer.o
+diff --git a/arch/arm/mach-highbank/localtimer.c b/arch/arm/mach-highbank/localtimer.c
+new file mode 100644
+index 0000000..ed54821
+--- /dev/null
++++ b/arch/arm/mach-highbank/localtimer.c
+@@ -0,0 +1,37 @@
++/*
++ * Copyright 2010-2011 Calxeda, Inc.
++ * Based on localtimer.c, Copyright (C) 2002 ARM Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License along with
++ * this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++#include <linux/init.h>
++#include <linux/clockchips.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/of_irq.h>
++
++#include <asm/smp_twd.h>
++
++/*
++ * Setup the local clock events for a CPU.
++ */
++int __cpuinit local_timer_setup(struct clock_event_device *evt)
++{
++	struct device_node *np;
++
++	np = of_find_compatible_node(NULL, NULL, "arm,smp-twd");
++	twd_base = of_iomap(np, 0);
++	evt->irq = irq_of_parse_and_map(np, 0);
++	twd_timer_setup(evt);
++	return 0;
++}
+diff --git a/arch/arm/mach-highbank/platsmp.c b/arch/arm/mach-highbank/platsmp.c
+new file mode 100644
+index 0000000..c582f5b
+--- /dev/null
++++ b/arch/arm/mach-highbank/platsmp.c
+@@ -0,0 +1,79 @@
++/*
++ * Copyright 2010-2011 Calxeda, Inc.
++ * Based on platsmp.c, Copyright (C) 2002 ARM Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License along with
++ * this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++#include <linux/init.h>
++#include <linux/smp.h>
++#include <linux/io.h>
++
++#include <asm/smp_scu.h>
++#include <asm/hardware/gic.h>
++
++#include "core.h"
++
++extern void secondary_startup(void);
++
++void __cpuinit platform_secondary_init(unsigned int cpu)
++{
++	gic_secondary_init(0);
++}
++
++int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
++{
++	gic_raise_softirq(cpumask_of(cpu), 1);
++	return 0;
++}
++
++/*
++ * Initialise the CPU possible map early - this describes the CPUs
++ * which may be present or become present in the system.
++ */
++void __init smp_init_cpus(void)
++{
++	void __iomem *scu_base = a9_base_addr;
++	unsigned int i, ncores;
++
++	ncores = scu_base ? scu_get_core_count(scu_base) : 1;
++
++	/* sanity check */
++	if (ncores > NR_CPUS) {
++		printk(KERN_WARNING
++		       "highbank: no. of cores (%d) greater than configured "
++		       "maximum of %d - clipping\n",
++		       ncores, NR_CPUS);
++		ncores = NR_CPUS;
++	}
++
++	for (i = 0; i < ncores; i++)
++		set_cpu_possible(i, true);
++
++	set_smp_cross_call(gic_raise_softirq);
++}
++
++void __init platform_smp_prepare_cpus(unsigned int max_cpus)
++{
++	int i;
++
++	scu_enable(a9_base_addr);
++
++	/*
++	 * Write the address of secondary startup into the jump table
++	 * The cores are in wfi and wait until they receive a soft interrupt
++	 * and a non-zero value to jump to. Then the secondary CPU branches
++	 * to this address.
++	 */
++	for (i = 1; i < max_cpus; i++)
++		highbank_set_cpu_jump(i, secondary_startup);
++}
 -- 
 1.7.4.1
