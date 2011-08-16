@@ -1,98 +1,42 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 16 Aug 2011 22:41:12 +0100
-Subject: [PATCH 2/3] ARM: plat-samsung: use Kconfig choice for debug UART
-	selection
-In-Reply-To: <1313530873-24961-1-git-send-email-will.deacon@arm.com>
-References: <1313530873-24961-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1313530873-24961-2-git-send-email-will.deacon@arm.com>
+From: wad@chromium.org (Will Drewry)
+Date: Tue, 16 Aug 2011 16:44:56 -0500
+Subject: [RFC,PATCH] arch/arm: compute and export NR_syscalls
+In-Reply-To: <1629809.vjtjo6obCs@wuerfel>
+References: <1313529267-4428-1-git-send-email-wad@chromium.org>
+	<1629809.vjtjo6obCs@wuerfel>
+Message-ID: <CABqD9hYavCxA38GbBhbCmBT+PEQQsvhbF4U7xY8P8ygbFy+=Ag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the DEBUG_LL UART can be selected by a Kconfig choice, convert
-the Samsung UART selection to use a set of bools rather than an int.
+On Tue, Aug 16, 2011 at 4:21 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 16 August 2011 16:14:26 Will Drewry wrote:
+>>
+>> asm-exports.c is added instead of reusing asm-offsets.c to avoid a
+>> variety of collisions (VM_EXEC, DMA_*, etc). ?It is possible to use the
+>> same calls.S mechanism but add NR_syscalls to asm-offsets.c. ?However,
+>> at inclusion time for generated/asm-offsets.h, conflicting defines will
+>> need to be #undef'd if !__ASSEMBLY__ since it appears that the purpose
+>> of asm-offsets.h is to safely bind C language definitions to assembly
+>> and not the reverse.
+>>
+>> - Is this approach palatable?
+>> - Should I resend only when paired with the other ftrace-needed patches?
+>
+> This seems overly complex, compared to a one-line change adding the symbol
+> to asm/unistd.h. The only other architecture that uses an approach
+> like the one you have posted is x86-64, and it's simpler there
+> because it can easily be done in asm-offsets.c there without the need
+> to create another helper.
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/Kconfig.debug        |   45 ++++++++++++++++++++++++++++++-----------
- arch/arm/plat-samsung/Kconfig |    7 ++++++
- 2 files changed, 40 insertions(+), 12 deletions(-)
+Agreed!
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 11604c9..2f80564 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -94,6 +94,39 @@ choice
- 		  Saying N will cause the debug messages to appear on the first
- 		  serial port.
- 
-+	config DEBUG_S3C_UART0
-+		depends on PLAT_SAMSUNG
-+		bool "Use S3C UART 0 for low-level debug"
-+		help
-+		  Say Y here if you want the debug print routines to direct
-+		  their output to UART 0. The port must have been initialised
-+		  by the boot-loader before use.
-+
-+		  The uncompressor code port configuration is now handled
-+		  by CONFIG_S3C_LOWLEVEL_UART_PORT.
-+
-+	config DEBUG_S3C_UART1
-+		depends on PLAT_SAMSUNG
-+		bool "Use S3C UART 1 for low-level debug"
-+		help
-+		  Say Y here if you want the debug print routines to direct
-+		  their output to UART 1. The port must have been initialised
-+		  by the boot-loader before use.
-+
-+		  The uncompressor code port configuration is now handled
-+		  by CONFIG_S3C_LOWLEVEL_UART_PORT.
-+
-+	config DEBUG_S3C_UART2
-+		depends on PLAT_SAMSUNG
-+		bool "Use S3C UART 2 for low-level debug"
-+		help
-+		  Say Y here if you want the debug print routines to direct
-+		  their output to UART 2. The port must have been initialised
-+		  by the boot-loader before use.
-+
-+		  The uncompressor code port configuration is now handled
-+		  by CONFIG_S3C_LOWLEVEL_UART_PORT.
-+
- endchoice
- 
- config EARLY_PRINTK
-@@ -124,16 +157,4 @@ config OC_ETM
- 	  buffer driver that will allow you to collect traces of the
- 	  kernel code.
- 
--config DEBUG_S3C_UART
--	depends on PLAT_SAMSUNG
--	int "S3C UART to use for low-level debug"
--	default "0"
--	help
--	  Choice for UART for kernel low-level using S3C UARTS,
--	  should be between zero and two. The port must have been
--	  initialised by the boot-loader before use.
--
--	  The uncompressor code port configuration is now handled
--	  by CONFIG_S3C_LOWLEVEL_UART_PORT.
--
- endmenu
-diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
-index b3e1065..49b14b1 100644
---- a/arch/arm/plat-samsung/Kconfig
-+++ b/arch/arm/plat-samsung/Kconfig
-@@ -367,4 +367,11 @@ config SAMSUNG_PD
- 	help
- 	  Say Y here if you want to control Power Domain by Runtime PM.
- 
-+config DEBUG_S3C_UART
-+	depends on PLAT_SAMSUNG
-+	int
-+	default "0" if DEBUG_S3C_UART0
-+	default "1" if DEBUG_S3C_UART1
-+	default "2" if DEBUG_S3C_UART2
-+
- endif
--- 
-1.7.0.4
+I proposed this approach based solely on prior threads I've seen. E.g.,
+- https://lkml.org/lkml/2007/6/1/427
+  (don't just #define)
+- https://lkml.org/lkml/2009/8/27/280
+  (todo: x86-32 to move to x86-64)
+
+If a single line #define is good enough, then it certainly works for me.
+
+thanks!
+will
