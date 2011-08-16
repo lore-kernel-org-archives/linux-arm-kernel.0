@@ -1,196 +1,50 @@
-From: wad@chromium.org (Will Drewry)
-Date: Tue, 16 Aug 2011 16:14:26 -0500
-Subject: [RFC,PATCH] arch/arm: compute and export NR_syscalls
-Message-ID: <1313529267-4428-1-git-send-email-wad@chromium.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 16 Aug 2011 23:12:33 +0200
+Subject: Fwd: [GIT PULL] [3.2] Please pull tegra boards for 3.2
+In-Reply-To: <CAOesGMgZCFF=dWhAm_+Ux-c-aORqo4sJ1DOGirCu3QT-iMcQRQ@mail.gmail.com>
+References: <CAOesGMjHN-pvVfMN0o3AD238m8wEiRS-D4ArjV_2VAGTuwPfBw@mail.gmail.com>
+	<201108161648.58250.arnd@arndb.de>
+	<CAOesGMgZCFF=dWhAm_+Ux-c-aORqo4sJ1DOGirCu3QT-iMcQRQ@mail.gmail.com>
+Message-ID: <2300535.b0zjAbUTLi@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At present, there is no way to determine, at compile-time, the number of
-system calls for arm.  This change provides NR_syscalls via unistd.h
-much like other arches.
+On Tuesday 16 August 2011 12:30:50 Olof Johansson wrote:
+> On Tue, Aug 16, 2011 at 7:48 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> >
+> > The contents all look good, but I'm undecided whether we should have
+> > branches that are not based on a -rc release. In your case, it's
+> > halfway between -rc1 and -rc2.
+> >
+> > Do others have an opinion? If we decide to take development branches
+> > only when they are based on a proper -rc, I'll do the simple rebase
+> > of the patches and push them out, otherwise I'll push them as they are.
+> 
+> I guess it depends on what you and others prefer -- if you want to
+> aggregate the branches in arm-soc.git through the development weeks,
+> or if you prefer to get most of the merge requests when platform
+> maintainers are getting ready for the merge window and feeding things
+> up?
 
-Historically, there hasn't been a need to pull NR_syscalls into unistd.h
-for ARM.  Prior lkml threads indicate as much.  However, NR_syscalls is
-a prerequisite for enabling CONFIG_FTRACE_SYSCALLS on the platform
-(along with asm/syscall.h population and arch_syscall_addr).
+I definitely want to have the patches as early as possible, but not
+more than one pull request per branch per week or -rc ideally.
 
-This patch is similar to x86-64 in that the system call
-count is established using the Kbuild assembly generation trick
-to extract constant values. It adds three files:
-- arch/arm/kernel/asm-exports.c
-- arch/arm/kernel/Makefile.exports
+> Either is fine with me -- if it's easier for me to hold off the merge
+> requests a while, then I'll start a for-next branch and ask Stephen to
+> add it, and rebase it a few times up until when the merge request to
+> arm-soc is sent. Maybe it's just easier for everyone to do it that way
+> -- the drawback is that there's less visibility about what's about to
+> go in until the merge requests start to drop in late in the cycle. The
+> git history won't be quite as wide then either.
 
-The C file provides the location to export assembly resident values,
-like the number of syscalls.  The makefile mimics Kbuild for extracting
-the values from the partially compiled file.
+I would prefer to have all branches that I send to Linus go into the
+-next through the arm-soc tree as well, not get sent there individually.
 
-Also included are simple fixups to make calls.S safe to #include in
-asm-exports.c and exporting of asm-exports.h in unistd.h.
+Basically, when you consider patches stable and ready for upstream
+and expect no further changes, I'll pull the patches into arm-soc.git
+and you can add further patches on top of the branch that I have already
+pulled (not on an aggregated branch) and I can pull that again. If you
+have unrelated changes, then I'd prefer them to be on top of an -rc
+release for the next pull request.
 
-In particular, this change yields an NR_syscalls value that matches the
-number of allocated calls via calls.S and not the aligned, padded syscall
-table size needed for optimal assembly.
-
-asm-exports.c is added instead of reusing asm-offsets.c to avoid a
-variety of collisions (VM_EXEC, DMA_*, etc).  It is possible to use the
-same calls.S mechanism but add NR_syscalls to asm-offsets.c.  However,
-at inclusion time for generated/asm-offsets.h, conflicting defines will
-need to be #undef'd if !__ASSEMBLY__ since it appears that the purpose
-of asm-offsets.h is to safely bind C language definitions to assembly
-and not the reverse.
-
-- Is this approach palatable?
-- Should I resend only when paired with the other ftrace-needed patches?
-
-Thanks!
-
-Signed-off-by: Will Drewry <wad@chromium.org>
----
- arch/arm/Makefile                |    3 +-
- arch/arm/include/asm/unistd.h    |    5 ++++
- arch/arm/kernel/Makefile.exports |   42 ++++++++++++++++++++++++++++++++++++++
- arch/arm/kernel/asm-exports.c    |   36 ++++++++++++++++++++++++++++++++
- arch/arm/kernel/calls.S          |    2 +
- 5 files changed, 87 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/kernel/Makefile.exports
- create mode 100644 arch/arm/kernel/asm-exports.c
-
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 70c424e..62abc9a 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -270,8 +270,9 @@ all:	$(KBUILD_IMAGE)
- 
- boot := arch/arm/boot
- 
--archprepare:
-+archprepare: Kbuild
- 	$(Q)$(MAKE) $(build)=arch/arm/tools include/generated/mach-types.h
-+	$(Q)$(MAKE) $(build)=arch/arm/kernel -f $(src)/arch/arm/kernel/Makefile.exports include/generated/asm-exports.h
- 
- # Convert bzImage to zImage
- bzImage: zImage
-diff --git a/arch/arm/include/asm/unistd.h b/arch/arm/include/asm/unistd.h
-index 2c04ed5..77d4928 100644
---- a/arch/arm/include/asm/unistd.h
-+++ b/arch/arm/include/asm/unistd.h
-@@ -481,5 +481,10 @@
- #define __IGNORE_fadvise64_64		1
- #define __IGNORE_migrate_pages		1
- 
-+#if !defined(COMPILER_OFFSETS) && !defined(__ASSEMBLY__)
-+#include <generated/asm-exports.h>
-+#define NR_syscalls (__NR_syscall_max + 1)
-+#endif
-+
- #endif /* __KERNEL__ */
- #endif /* __ASM_ARM_UNISTD_H */
-diff --git a/arch/arm/kernel/Makefile.exports b/arch/arm/kernel/Makefile.exports
-new file mode 100644
-index 0000000..5ec6553
---- /dev/null
-+++ b/arch/arm/kernel/Makefile.exports
-@@ -0,0 +1,42 @@
-+#
-+# linux/arch/arm/kernel/Makefile.exports
-+#
-+# Copyright (C) 2011 Chromium OS Authors <chromium-os-dev@chromium.org>
-+#
-+# Generate asm-exports.h based on Kbuild's asm-offsets.h
-+#
-+
-+exports-file := include/generated/asm-exports.h
-+
-+# Default sed regexp - multiline due to syntax constraints
-+define sed-y
-+	"/^->/{s:->#\(.*\):/* \1 */:; \
-+	s:^->\([^ ]*\) [\$$#]*\([-0-9]*\) \(.*\):#define \1 \2 /* \3 */:; \
-+	s:^->\([^ ]*\) [\$$#]*\([^ ]*\) \(.*\):#define \1 \2 /* \3 */:; \
-+	s:->::; p;}"
-+endef
-+
-+quiet_cmd_exports = GEN     $@
-+define cmd_exports
-+	(set -e; \
-+	 echo "#ifndef __ASM_EXPORTS_H__"; \
-+	 echo "#define __ASM_EXPORTS_H__"; \
-+	 echo "/*"; \
-+	 echo " * DO NOT MODIFY."; \
-+	 echo " *"; \
-+	 echo " * This file was generated by arch/arm/tools/Makefile"; \
-+	 echo " *"; \
-+	 echo " */"; \
-+	 echo ""; \
-+	 sed -ne $(sed-y) $<; \
-+	 echo ""; \
-+	 echo "#endif" ) > $@
-+endef
-+
-+# We use internal kbuild rules to avoid the "is up to date" message from make
-+$(src)/../asm-exports.s: $(src)/../kernel/asm-exports.c FORCE
-+	$(Q)mkdir -p $(dir $@)
-+	$(call if_changed_dep,cc_s_c)
-+
-+$(exports-file): $(src)/../kernel/asm-exports.s Kbuild
-+	$(call cmd,exports)
-diff --git a/arch/arm/kernel/asm-exports.c b/arch/arm/kernel/asm-exports.c
-new file mode 100644
-index 0000000..a2aec12
---- /dev/null
-+++ b/arch/arm/kernel/asm-exports.c
-@@ -0,0 +1,36 @@
-+/*
-+ * Copyright (C) 2011 Chromium OS Authors <chromium-os-dev@chromium.org>
-+ *
-+ * Generate definitions needed by C language modules from data resident
-+ * in assembly language modules. Nothing exported here should be supplied
-+ * by any C language headers in common use.
-+ *
-+ * This code generates raw asm output which is post-processed to extract
-+ * and format the required data.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+#define COMPILE_OFFSETS
-+#include <linux/kbuild.h>
-+
-+/*
-+ * Make sure that the compiler and target are compatible.
-+ */
-+#if defined(__APCS_26__)
-+#error Sorry, your compiler targets APCS-26 but this kernel requires APCS-32
-+#endif
-+
-+#define CALL(x) 1 +
-+#define syscalls_counted
-+#define NO_PAD_SYSCALLS 1
-+static const long syscall_count =
-+	#include "calls.S"
-+	0;
-+
-+int main(void)
-+{
-+	DEFINE(__NR_syscall_max, syscall_count - 1);
-+	return 0;
-+}
-diff --git a/arch/arm/kernel/calls.S b/arch/arm/kernel/calls.S
-index 80f7896..02cdece 100644
---- a/arch/arm/kernel/calls.S
-+++ b/arch/arm/kernel/calls.S
-@@ -385,6 +385,7 @@
- 		CALL(sys_syncfs)
- 		CALL(sys_sendmmsg)
- /* 375 */	CALL(sys_setns)
-+#ifndef NO_PAD_SYSCALLS
- #ifndef syscalls_counted
- .equ syscalls_padding, ((NR_syscalls + 3) & ~3) - NR_syscalls
- #define syscalls_counted
-@@ -392,3 +393,4 @@
- .rept syscalls_padding
- 		CALL(sys_ni_syscall)
- .endr
-+#endif
--- 
-1.7.0.4
+	Arnd
