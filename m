@@ -1,56 +1,76 @@
-From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Tue, 16 Aug 2011 08:48:22 +0200
-Subject: [PATCH] ARM: S3C2443: Remove redundant s3c_register_clocks call
-	for init_clocks
-In-Reply-To: <1313463881.16359.2.camel@phoenix>
-References: <1313463881.16359.2.camel@phoenix>
-Message-ID: <201108160848.25088.heiko@sntech.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 16 Aug 2011 09:19:50 +0200
+Subject: [PATCH v2 0/8] Clean up MXC and MXS mach/gpio.h
+In-Reply-To: <1313252047-8820-1-git-send-email-shawn.guo@linaro.org>
+References: <1313252047-8820-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20110816071950.GV31404@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 16. August 2011, 05:04:41 schrieb Axel Lin:
-> Since commit af337f3e633a198034a99450416257ddf2307497
-> "ARM: S3C2443: Move parts of the clock code to common clock file",
-> the init_clocks array is moved to arch/arm/plat-s3c24xx/s3c2443-clock.c.
-> Now we call s3c_register_clocks for init_clocks in
-> s3c2443_common_init_clocks.
-> 
-> Thus we can remove the empty init_clocks array here and remove the
-> redundant s3c_register_clocks call for init_clocks in s3c2443_init_clocks.
-I'm not 100% sure, but you might want to include Kukjin Kim 
-<kgene.kim@samsung.com> who seems to be handling the Samsung-stuff most of the 
-time.
+Shawn,
 
-Heiko
+On Sun, Aug 14, 2011 at 12:13:59AM +0800, Shawn Guo wrote:
+> As one step to single image for multiple platforms, mach/gpio.h needs
+> to be removed from asm/gpio.h.  The patch set cleans up MXC and MXS
+> mach/gpio.h to an empty header.
+> 
+> It's based on v3.1-rc1 plus rmk's patch series below.
+> 
+>   [PATCH 00/13] Clean up mach/gpio.h headers
+> 
+> The Ben's fix is on the way to -rc2 through arm-soc tree.
+> 
+> Grant, Sascha,
+> 
+> Can you please review the series and give comments or your ack tag?
+
+I'm fine with this series. I removed the dependency on rmks patches
+(can be easily merged later) and checked it into my cleanup branch.
+Please check if you are fine with the result.
+
+Sascha
 
 > 
-> Signed-off-by: Axel Lin <axel.lin@gmail.com>
-> ---
->  arch/arm/mach-s3c2443/clock.c |    7 -------
->  1 files changed, 0 insertions(+), 7 deletions(-)
+> Regards,
+> Shawn
 > 
-> diff --git a/arch/arm/mach-s3c2443/clock.c b/arch/arm/mach-s3c2443/clock.c
-> index a1a7176..4018dbe 100644
-> --- a/arch/arm/mach-s3c2443/clock.c
-> +++ b/arch/arm/mach-s3c2443/clock.c
-> @@ -305,9 +305,6 @@ static struct clk init_clocks_off[] = {
->  	}
->  };
+> Changes since v1:
+>  * Add patches #7 and #8 to clean up mxs mach/gpio.h
+>  * Leave run-time gpio_to_irq() calls there and only convert these
+>    in static initializers to IMX_GPIO_TO_IRQ()
+>  * Mark the empty headers with /* empty */
 > 
-> -static struct clk init_clocks[] = {
-> -};
-> -
->  /* clocks to add straight away */
+> Ben Dooks (1):
+>       ARM: mx5: board-cpuimx51.c fixup irq_to_gpio() usage
 > 
->  static struct clksrc_clk *clksrcs[] __initdata = {
-> @@ -345,10 +342,6 @@ void __init s3c2443_init_clocks(int xtal)
->  	for (ptr = 0; ptr < ARRAY_SIZE(clksrcs); ptr++)
->  		s3c_register_clksrc(clksrcs[ptr], 1);
+> Shawn Guo (7):
+>       arm/mxc: do not use gpio_to_irq() for static initializers
+>       gpio/mxc: add .to_irq for gpio chip
+>       arm/mxc: remove gpio_to_irq() from mach/gpio.h
+>       gpio/mxc: move irq_to_gpio() into gpio-mxc driver
+>       arm/mxc: move IMX_GPIO_NR into mach/hardware.h
+>       gpio/mxs: move irq_to_gpio() into gpio-mxs driver
+>       arm/mxs: move MXS_GPIO_NR into mach/mxs.h
 > 
-> -	/* register clocks from clock array */
-> -
-> -	s3c_register_clocks(init_clocks, ARRAY_SIZE(init_clocks));
-> -
->  	/* We must be careful disabling the clocks we are not intending to
->  	 * be using at boot time, as subsystems such as the LCD which do
->  	 * their own DMA requests to the bus can cause the system to lockup
+>  arch/arm/mach-imx/mach-cpuimx35.c            |    2 +-
+>  arch/arm/mach-imx/mach-mx27_3ds.c            |    2 +-
+>  arch/arm/mach-imx/mach-vpr200.c              |    2 +-
+>  arch/arm/mach-mx5/board-cpuimx51.c           |    8 +++---
+>  arch/arm/mach-mx5/board-cpuimx51sd.c         |    4 +-
+>  arch/arm/mach-mx5/board-mx53_ard.c           |    4 +-
+>  arch/arm/mach-mx5/eukrea_mbimx51-baseboard.c |    2 +-
+>  arch/arm/mach-mx5/mx51_efika.c               |    2 +-
+>  arch/arm/mach-mxs/include/mach/gpio.h        |   28 +--------------------
+>  arch/arm/mach-mxs/include/mach/mxs.h         |    2 +
+>  arch/arm/plat-mxc/include/mach/gpio.h        |   34 +-------------------------
+>  arch/arm/plat-mxc/include/mach/hardware.h    |    6 ++++
+>  drivers/gpio/gpio-mxc.c                      |   12 +++++++++
+>  drivers/gpio/gpio-mxs.c                      |    2 +
+>  14 files changed, 37 insertions(+), 73 deletions(-)
+> 
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
