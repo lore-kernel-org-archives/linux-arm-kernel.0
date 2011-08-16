@@ -1,40 +1,46 @@
-From: tixy@yxit.co.uk (Tixy)
-Date: Tue, 16 Aug 2011 15:45:21 +0100
-Subject: [PATCH] ARM: Add safe diagnostic to indicate when
-	__cpu_architecture isn't set up
-In-Reply-To: <1313504340-28004-1-git-send-email-dave.martin@linaro.org>
-References: <1313504340-28004-1-git-send-email-dave.martin@linaro.org>
-Message-ID: <1313505921.2235.6.camel@computer2>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 16 Aug 2011 16:45:42 +0200
+Subject: [RFC PATCH v2 00/13] arm/tegra: Initialize GPIO & pinmux from DT
+In-Reply-To: <201108161637.16620.arnd@arndb.de>
+References: <1313440100-17131-1-git-send-email-swarren@nvidia.com>
+	<201108161509.17157.arnd@arndb.de>
+	<CACRpkdaVx=6AJ5DFjVN1ZYQ++hu9pT6WxD9n+pqmYVaCf1xawg@mail.gmail.com>
+	<201108161637.16620.arnd@arndb.de>
+Message-ID: <CACRpkdZydMLj5qzbth=tEW9P8p0rrXEzHM2frebsWcDzCJLq8w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2011-08-16 at 15:19 +0100, Dave Martin wrote:
-[...]
-> This patch is useful for debugging, but I'm not convinced it should
-> be merged.
-[...] 
->  static inline int __pure cpu_architecture(void)
->  {
-> -	BUG_ON(__cpu_architecture == CPU_ARCH_UNKNOWN);
-> -	return __cpu_architecture;
-> +	if (unlikely(__cpu_architecture == CPU_ARCH_UNKNOWN)) {
-> +		extern int __pure __get_cpu_architecture(void);
-> +
-> +		WARN_ONCE(1, "__cpu_architecture not set yet!\n");
-> +		return __get_cpu_architecture();
-> +	} else
-> +		return __cpu_architecture;
->  }
+On Tue, Aug 16, 2011 at 4:37 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 16 August 2011, Linus Walleij wrote:
+>> Say mmc instance 0 need pingroup foo on pincontroller bar
+>> means that there must be a specific reference from mmc.0:s
+>> struct device * to pinctrl bar:s struct device *. Maybe this is
+>> peanuts in DT, sorry not enough insight.
+>
+> I think what you are looking for is the equivalent of the
+> interrupt-parent property for pinmux. The idea is that each
+> node in the device tree can point to a device managing the
+> pinmux, so reference would point to a local number in that
+> space. We have discussed this for the GPIO case already, and
+> I suspect that the two should be identical (gpio-controller
+> and pinmux-controller using the same device node and same
+> property to refer to them).
 
-Seems to me that if we go down this route, cpu_architecture() may as
-well remain a non-inline function which just calculates the arch if it's
-not already set...
+Yes. I discussed with Grant and his idea is for e.g.
+advanced combined pincontrol + GPIO blocks that handle
+a lot of stuff like muxing, biasing and GPIO, to expose
+a single pinctrl device that in turn provide also a gpio_chip
+in addition to the pinctrl interfaces so tehy should be
+all on the same struct device *
 
-	if (unlikely(__cpu_architecture == CPU_ARCH_UNKNOWN))
-		__cpu_architecture = __get_cpu_architecture();
-	return __cpu_architecture;
+> Since the pinmux-parent
+> (gpio-parent, ...) property gets inherited by all child
+> devices, you only need to set it once at the root of the
+> device tree for the simple case where there is only one
+> controller.
 
-There seems to be too many ways to skin this cat :-)
+This will likely be the case for most of the advanced muxes
+I know of, OMAP, Tegra and Nomadik.
 
--- 
-Tixy
+Thanks,
+Linus Walleij
