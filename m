@@ -1,51 +1,35 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 16 Aug 2011 11:21:50 +0200
-Subject: PB1176 broken in -rc1
-In-Reply-To: <20110810152400.GO10121@e102144-lin.cambridge.arm.com>
-References: <20110810152400.GO10121@e102144-lin.cambridge.arm.com>
-Message-ID: <CACRpkdaoDJy-YKONaz2j07pPvTZuHZ7KgEm6XGxNXK-jNzB8_w@mail.gmail.com>
+Date: Tue, 16 Aug 2011 11:25:31 +0200
+Subject: [PATCH] amba: consolidate PrimeCell magic
+In-Reply-To: <000101cc5bf5$c38bdca0$4aa395e0$%kim@samsung.com>
+References: <1313402104-27024-1-git-send-email-linus.walleij@stericsson.com>
+	<001601cc5be9$275a5200$760ef600$%kim@samsung.com>
+	<CACRpkdZ=cPen0KvK3__iabu8Xwhz8Yjcb-ev-qLe_AY4jaYACA@mail.gmail.com>
+	<000101cc5bf5$c38bdca0$4aa395e0$%kim@samsung.com>
+Message-ID: <CACRpkdYTPzcrMCr_Fj_shMzHc9A_BSa4j3GESP56nGx609ae=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 10, 2011 at 5:24 PM, Will Deacon <will.deacon@arm.com> wrote:
+2011/8/16 Boojin Kim <boojin.kim@samsung.com>:
 
-> Hi Linus,
->
-> My PB1176 platform appears to lock up as soon as it hits userspace when
-> running a 3.1-rc1 kernel.
+> Actually, I tested this patch after applying my patches that uses
+> 'dma-pl330' driver instead of the samsung specific 's3c-pl330' driver.
+> 'dma-pl330' driver is registered as 'amba_device'. So, this has already
+> checked on 'drivers/amba/bus.c' as your notice.
+> But, 's3c-pl330' driver is registered as 'platform_device'. So, This check
+> is required.
+> In my opinion, This check can be deleted if caller device is registered as
+> 'amba_device'.
 
-My kernel does not even boot on either -rc1 or -rc2 on the
-PB1176, with or wthout Jamies poisoning fixup.
+My latest (v2) version of the patch deletes the check.
 
-Did you change anything else on top of -rc1 when you tested this?
+But doing that is dependent on the s3c-pl330 going away and
+being replaced by the dmaengine driver, else I think we shall try to
+keep the check (I will have to make it work without
+dereferencing the amba_device or it will break).
 
-Will, Jamie, any hints?
-
-If I cherry-pick my TCM patches adding PB1176 support to a clean
-v3.0 branch, everything works fine, so I suspect I am not guilty for
-this AFAICT, it's something else.
-
-Also the -rc2 code works fine on U300 which has a TCM,
-ARM926-EJS.
-
-P.S. By the way regarding this:
-
-> [ ? ?0.000000] CPU: found DTCM0 4k @ 00000000, not enabled
-> [ ? ?0.000000] CPU: moved DTCM0 4k to fffe8000, enabled
-> [ ? ?0.000000] CPU: found DTCM1 4k @ 00000000, not enabled
-> [ ? ?0.000000] CPU: moved DTCM1 4k to fffe9000, enabled
-> [ ? ?0.000000] CPU: found ITCM0 4k @ 00000000, not enabled
-> [ ? ?0.000000] CPU: moved ITCM0 4k to fffe0000, enabled
-> [ ? ?0.000000] CPU: found ITCM1 4k @ 00000000, not enabled
-> [ ? ?0.000000] CPU: moved ITCM1 4k to fffe1000, enabled
-
-[Will]
-> The NULL addresses in the dmesg look
-> strange to me, but I'm not familiar with the TCMs.
-
-This looks perfectly normal. The TCMs are default disabled and mapped
-to address 0x00000000, I activate them and move them to our desired
-location.
+Is it your plan to replace s3c-pl330 with the drivers/dma/pl330.c
+driver, so I can safely delete this code?
 
 Thanks,
 Linus Walleij
