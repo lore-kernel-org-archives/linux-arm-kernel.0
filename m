@@ -1,65 +1,87 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Tue, 16 Aug 2011 10:57:02 -0700
-Subject: [PATCH 2/4] msm_serial: Add devicetree support
-In-Reply-To: <65679699.l4XXDScc0T@wuerfel>
-References: <1313190008-7551-1-git-send-email-davidb@codeaurora.org>
-	<1434305.ibxmc6q715@wuerfel>
-	<20110813194645.GA23710@huya.qualcomm.com>
-	<65679699.l4XXDScc0T@wuerfel>
-Message-ID: <20110816175702.GA27576@huya.qualcomm.com>
+From: rklein@nvidia.com (Rhyland Klein)
+Date: Tue, 16 Aug 2011 11:00:09 -0700
+Subject: [PATCH v2] i2c: tegra: Check for overflow errors with BUG_ON.
+In-Reply-To: <1313458336-31456-1-git-send-email-dianders@chromium.org>
+References: <1313434172-18319-1-git-send-email-dianders@chromium.org>
+	<1313458336-31456-1-git-send-email-dianders@chromium.org>
+Message-ID: <1313517609.7279.0.camel@rklein-linux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 13, 2011 at 11:34:15PM +0200, Arnd Bergmann wrote:
-> On Saturday 13 August 2011 12:46:45 David Brown wrote:
-> > 
-> > I'm not sure actually what is best to use here.  I'm thinking that the
-> > 'lite' identifier should perhaps go away.  MSM's have two UARTS on
-> > them, an older "simple" PIO type of UART, and a newer one that can do
-> > DMA (called the hsuart for high-speed).  The hsuart can also be used
-> > in a non-DMA driver in a mostly compatible way with the old UART.
-> > 
-> > For non-high-speed applications, the user will probably just want to
-> > use the non-DMA driver.  My question is then: if the device tree
-> > describes it as
-> > 
-> >         compatible = "qcom,msm-hsuart", "qcom,msm-uart";
-> > 
-> > and one driver matches qcom,msm-hsuart and another matches
-> > qcom,msm-uart, which driver will get used.  Ideally, it would use the
-> > earliest one in the list.
-> > 
-> > If that's the case, I'll get rid of the -lite suffix and just make the
-> > non-DMA driver compatible with the plain "qcom,msm-uart".
+On Mon, 2011-08-15 at 18:32 -0700, Doug Anderson wrote:
+> This change doesn't fix any known problems but turns
+> on the overflow detection feature of the i2c controller
+> in the hopes of flushing out any current (or future)
+> bugs in the i2c driver.
 > 
-> I believe that unfortunately the answer is that the first driver that
-> matches anything will get used. There are two possible ways that I can
-> see to make it do what you want anyway:
+> Inspired by a change on nvidia's git server:
+>   http://nv-tegra.nvidia.com/gitweb/?p=linux-2.6.git;a=commit;h=266d1b7397284505e55d06254b497cb32be07b69
 > 
-> 1. In the probe function for the slow driver, you return an error
-> when the device you get passed matches "qcom,msm-hsuart", possibly
-> dependent on whether the other driver also got built.
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> ---
+> This takes Felipe Balbi's suggestion of making the overflow
+> error non-fatal.
 > 
-> 2. You register one platform driver that handles both names and
-> gives the device to just one of the two drivers. This would probably
-> require linking the two drivers into the same module, or having
-> the non-DMA speed driver just act as a library.
+>  drivers/i2c/busses/i2c-tegra.c |   17 ++++++++++++++---
+>  1 files changed, 14 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/i2c/busses/i2c-tegra.c b/drivers/i2c/busses/i2c-tegra.c
+> index 2440b74..34634b7 100644
+> --- a/drivers/i2c/busses/i2c-tegra.c
+> +++ b/drivers/i2c/busses/i2c-tegra.c
+> @@ -83,6 +83,7 @@
+>  #define I2C_ERR_NO_ACK				0x01
+>  #define I2C_ERR_ARBITRATION_LOST		0x02
+>  #define I2C_ERR_UNKNOWN_INTERRUPT		0x04
+> +#define I2C_ERR_FIFO_OVERFLOW			0x08
+>  
+>  #define PACKET_HEADER0_HEADER_SIZE_SHIFT	28
+>  #define PACKET_HEADER0_PACKET_ID_SHIFT		16
+> @@ -367,7 +368,8 @@ static int tegra_i2c_init(struct tegra_i2c_dev *i2c_dev)
+>  static irqreturn_t tegra_i2c_isr(int irq, void *dev_id)
+>  {
+>  	u32 status;
+> -	const u32 status_err = I2C_INT_NO_ACK | I2C_INT_ARBITRATION_LOST;
+> +	const u32 status_err = I2C_INT_NO_ACK | I2C_INT_ARBITRATION_LOST |
+> +		I2C_INT_TX_FIFO_OVERFLOW;
+>  	struct tegra_i2c_dev *i2c_dev = dev_id;
+>  
+>  	status = i2c_readl(i2c_dev, I2C_INT_STATUS);
+> @@ -389,6 +391,14 @@ static irqreturn_t tegra_i2c_isr(int irq, void *dev_id)
+>  	}
+>  
+>  	if (unlikely(status & status_err)) {
+> +		/*
+> +		 * Overflow should be impossible unless we've got a
+> +		 * bug in the driver, but check anyway.
+> +		 */
+> +		if (status & I2C_INT_TX_FIFO_OVERFLOW) {
+> +			WARN_ON(1);
+> +			i2c_dev->msg_err |= I2C_ERR_FIFO_OVERFLOW;
+> +		}
+>  		if (status & I2C_INT_NO_ACK)
+>  			i2c_dev->msg_err |= I2C_ERR_NO_ACK;
+>  		if (status & I2C_INT_ARBITRATION_LOST)
+> @@ -423,7 +433,7 @@ err:
+>  	/* An error occurred, mask all interrupts */
+>  	tegra_i2c_mask_irq(i2c_dev, I2C_INT_NO_ACK | I2C_INT_ARBITRATION_LOST |
+>  		I2C_INT_PACKET_XFER_COMPLETE | I2C_INT_TX_FIFO_DATA_REQ |
+> -		I2C_INT_RX_FIFO_DATA_REQ);
+> +		I2C_INT_RX_FIFO_DATA_REQ | I2C_INT_TX_FIFO_OVERFLOW);
+>  	i2c_writel(i2c_dev, status, I2C_INT_STATUS);
+>  	if (i2c_dev->is_dvc)
+>  		dvc_writel(i2c_dev, DVC_STATUS_I2C_DONE_INTR, DVC_STATUS);
+> @@ -473,7 +483,8 @@ static int tegra_i2c_xfer_msg(struct tegra_i2c_dev *i2c_dev,
+>  	if (!(msg->flags & I2C_M_RD))
+>  		tegra_i2c_fill_tx_fifo(i2c_dev);
+>  
+> -	int_mask = I2C_INT_NO_ACK | I2C_INT_ARBITRATION_LOST;
+> +	int_mask = I2C_INT_NO_ACK | I2C_INT_ARBITRATION_LOST |
+> +		I2C_INT_TX_FIFO_OVERFLOW;
+>  	if (msg->flags & I2C_M_RD)
+>  		int_mask |= I2C_INT_RX_FIFO_DATA_REQ;
+>  	else if (i2c_dev->msg_buf_remaining)
 
-How about if I just keep it simple for now.  Since there isn't
-actually a driver for the DMA version, this driver will handle both
-UART blocks, so I'll just do the plain thing in the DT.
+Seems good to me.
 
-In the future, when a DMA-capable driver exists, we can figure out how
-to determine which driver should be used.  At this point, I'm not even
-sure what the correct answer will be, since a given configuration may
-want to use non-DMA for one msm-hsuart device, and the DMA driver for
-another.  It's kind of board/use specific, but beyond just describing
-what the hardware is.
-
-I've just sent new patches with this fixed up.
-
-David
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Acked-by: Rhyland Klein <rklein@nvidia.com>
