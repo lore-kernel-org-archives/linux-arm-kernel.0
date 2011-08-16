@@ -1,66 +1,152 @@
-From: lost.distance@yahoo.com (Paul Parsons)
-Date: Tue, 16 Aug 2011 12:54:45 +0100 (BST)
-Subject: [PATCH v2 2/2] pxa/hx4700: Add Synaptics NavPoint (PXA27x
-	SSP/SPI) driver
-In-Reply-To: <4E4A22B2.2080402@compulab.co.il>
-Message-ID: <1313495685.73634.YahooMailClassic@web29005.mail.ird.yahoo.com>
+From: vinod.koul@intel.com (Koul, Vinod)
+Date: Tue, 16 Aug 2011 17:25:27 +0530
+Subject: [PATCH V2 6/6] spi/spi-pl022: Request/free DMA channels as and
+	when required.
+In-Reply-To: <CABb+yY0Hy9DcHf+D0OrrGjxkR=V8sa4Q-Kvd1iH01oChnoEE6w@mail.gmail.com>
+References: <cover.1312965741.git.viresh.kumar@st.com>
+	<566c0525199f498f04422d4c3b2ddd7466648c20.1312965742.git.viresh.kumar@st.com>
+	<20110810090042.GE1831@n2100.arm.linux.org.uk>
+	<4E424F7B.2000800@st.com>
+	<438BB0150E931F4B9CE701519A4463010871804A15@bgsmsx502.gar.corp.intel.com>
+	<CABb+yY3SnqKN78U7vLbom1i00m=ThnRVQDVM_iX1TPu=+XzSNQ@mail.gmail.com>
+	<20110810104025.GK1831@n2100.arm.linux.org.uk>
+	<CABb+yY3=q5Nq1wtM6Av2DrgUfjZR_Ao40QhBhv_ik9naAd5wRg@mail.gmail.com>
+	<CACRpkdaCyUJ3A9VWfsVuwJj3DGVkvjc2_ZOD4yM4YX3NPxAAYQ@mail.gmail.com>
+	<CABb+yY2Usd5=RW6BV69UW=Tq0zQW6LCtT2GhfdHGA61ZU3aNcQ@mail.gmail.com>
+	<1313009883.1603.25.camel@vkoul-udesk3>
+	<CABb+yY0Hy9DcHf+D0OrrGjxkR=V8sa4Q-Kvd1iH01oChnoEE6w@mail.gmail.com>
+Message-ID: <1313495727.1603.83.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > MFP_CFG_OUT(GPIO102, ...) had already moved from the
-> patch v1 platform file to patch v2 mfp-pxa27x.h because it
-> was suggested that MFP macros should not be used directly.
-> > Changing the direction in the platform file would
-> surely require using the MFP macros again, so how to keep
-> everyone happy? Maybe I should just define a more generic
-> name such as GPIO102_GPIO_OUT?
+On Thu, 2011-08-11 at 00:29 +0530, Jassi Brar wrote:
+> On Thu, Aug 11, 2011 at 2:28 AM, Vinod Koul <vkoul@infradead.org> wrote:
+> >> > The lookup of a device DMA channel should follow the
+> >> > design pattern set by regulators and clocks.
+> >> Nopes. It depends upon the subsystem.
+> >> We should strive towards making this scheme as 'standalone' as
+> >> possible.
+> >> Client having to specify the device it wants a channel for, is a
+> >> waste - otherwise we don't fully get rid of platform assistance for
+> >> channel selection!
+> > On one of the platforms I work on we have 3 DMACs, peripheral 1, 2 and 3
+> > can only use channels from controller 1, and the peripherals 4, 5 from
+> > controller 2 and so on. They _absolutely_ need channel from specific
+> > controller, so above suits it :).
+> > Btw all three controllers _have_exactly_same_caps_ so dma engine will
+> > not see any difference in channels. They don't know which peripherals
+> > are connected to them, that's platform information which this scheme
+> > seems to be suited to...
+> > Can you tell me how your scheme will work in this case?
+> Actually the setup is quite simple.
+> Say, the Peri-4 is the UART which could only be reached from DMAC-2.
 > 
-> No, you will not need to use the MFP macros, just
-> gpio_direction_*() calls.
-> Eric has already answered this and I agree with him.
-> Use the MFP to configure the alternate function and other
-> MFP related stuff
-> and use the gpio_direction_*() calls later to set the
-> direction of the GPIO.
-
-OK, will do.
-
-> > Because the underlying hardware is a touchpad
-> controller and most of the touchpad drivers live in the
-> mouse directory. I could have added a mouse interface to
-> this driver but chose not to (at least for now) because the
-> hx4700 platform already has a working touchscreen
-> controller; a second mouse device was not needed. If future
-> platforms require a mouse interface then one could be added
-> relatively easily; surely this would be preferable to
-> replicating the whole driver.
+> DMAENGINE should simply manage a pool of total channels in the platform,
+> disregarding the dmacs they come from.
 > 
-> So the device is a full touchpad? and can be used for mouse
-> pointer?
-
-Yes, that's correct.
-
-> Is the same device used as mouse pointer by some other
-> driver?
-
-Not as far as I can see. The word "NavPoint" appears only once in the current kernel source: within the hx4700 platform file. It's possible that other PDA models of similar 2004 vintage used the device, but I don't know whether any of them are supported in the kernel.
-
-> > The suspend and resume functions check that the gpio
-> is valid (which is taken to be non-zero) before using it.
-> The platform file has already configured the gpio for
-> output; it's the GPIO102 discussed earlier.
+> Each channel in the common pool will have a 'capability-tag' of u32 type - which
+> specifies various capabilities of the channel expressed in bit-fields.
+> It is the job of
+> platform (via dmac driver) to set 'tag' of each channel appropriately.
+> Among others, a channel's reach to a particular device is a
+> 'capability' (expressed
+> in 7-bits DEV_TYPE field-mask of the 'tag')
 > 
-> What I'm suggesting here is check that the gpio is valid
-> here and only once
-> and not in the suspend/resume functions. That gpio is not
-> going to change,
-> so there is no point is checking it each time in
-> suspend/resume.
-> Also the check for non-zero is not correct. 0 is a valid
-> gpio number on most platforms.
-> You need to use the gpio_is_valid() call for this.
+> In your case, while setting up channels before adding them to the common pool,
+> the platform (via dmac driver) will ensure exactly the channel which
+> can reach UART
+> has set DEV_UART value in the DEV_TYPE field of its capability-tag.
+> 
+> After all the dmac instances have been probed, _exactly_ one channel in the pool
+> will have the 'UART' capability mentioned in the DEV_TYPE field.
+> 
+> The serial driver(client), will simply specify 'Ability to reach UART'
+> as one of its
+> requirements to the core - by setting the DEV_TYPE field with DEV_UART value
+> of the 'request-tag' (a u32 number, say).
+> 
+> While searching for appropriate channel for the serial client, the core will
+> iterate over the pool and, of course, only one channel will have DEV_TYPE
+> field set to DEV_UART - the one which platform decided!
+> 
+> Please have a look at the end of  https://lkml.org/lkml/2011/7/29/211
+> (esp the helpers) to get an idea of data structures involved.
+> 
+> 
+> *******************************
+> UART(client) driver snippet :-
+> *******************************
+> struct dma_chan *chan_rx;
+> u32 req_cap;
+> 
+> /* Reset the requirement list */
+> DCH_RESET_CAP(req_cap);
+> 
+> /* Specify ability to reach UART as a requirement */
+> DCH_REQCAP_DEV(req_cap, DCHAN_TODEV_UART);
+> 
+> /* Specify we require to Read from UART */
+> DCH_REQCAP_P2M(req_cap);
+> 
+> /* ...... specify other requirements */
+> 
+> /* Ask for the channel */
+> chan_rx = dma_request_channel(req_cap);
+> 
+> 
+> 
+> ***************
+> dmaengine.c
+> ***************
+> struct dma_chan *dma_request_channel(u32 req_cap)  // typedef u32 to
+> look nice ;)
+> {
+>  struct dma_chan *ch;
+> 
+>            /* !!! Not final implementation !!! */
+>  list_for_each_entry(ch, &channel_pool, chan_node) {
+>       if (GET_DEVTYPE(req_cap) != GET_DEVTYPE(ch->tag))
+>           continue;
+> 
+>       if ((IS_DCH_M2M(req_cap) && !IS_DCH_M2M(ch->tag))
+>          continue;
+> 
+>       if ((IS_DCH_M2P(req_cap) && !IS_DCH_M2P(ch->tag))
+>          continue;
+> 
+>       if ((IS_DCH_P2M(req_cap) && !IS_DCH_P2M(ch->tag))
+>          continue;
+> 
+>       if ((IS_DCH_P2P(req_cap) && !IS_DCH_P2P(ch->tag))
+>          continue;
+> 
+>       /* weed out channels that don't have further capabilities required */
+> 
+>       /* At the end of checks this channel meets every requirement */
+>       return ch;
+>   }
+>   /* Will never reach here in a bug-free platform */
+>   return NULL;
+> }
+> 
+> 
+> **************************************
+> DMAC <- PLATFORM <- BOARD
+> ***************************************
+> Well, that is between dmac and platform and out of scope of DMAENGINE API.
+> They can decide upon any data structure to pass the info needed.
+> 
+> But at some point someone must set :-
+>   _Only_ for the channel of DMAC-2 that could talk to the UART.
+That is why I am skeptical about this implementation approach. Here
+CHAN_TODEV_UART is how peripheral is connected to DMAC which is a
+platform capability which magically needs to be published by generic
+DMAC driver and requested by UART driver...
+Sorry I still don't get this schema and how it can be scaled and be
+generic enough to let it carry with various implementations.
 
-I understand. My feeling was that other platforms wanting to use this driver would not necessarily use a gpio for power on/off; indeed the gpio field was originally a callback to provide full flexibility. Hence suspend / resume needed to use the gpio conditionally anyway. Nevertheless I'm happy to make the change and leave it for future platform developers to revisit suspend / resume as necessary.
+Can you publish your complete idea rather than bits and pieces...
 
-Regards,
-Paul
+
+-- 
+~Vinod
