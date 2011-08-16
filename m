@@ -1,60 +1,65 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Tue, 16 Aug 2011 17:21:41 +0100
-Subject: [PATCH 2/3] ARM: entry: Remove unnecessary masking when decoding
-	Thumb-2 instructions
-In-Reply-To: <alpine.LFD.2.00.1108161217140.20358@xanadu.home>
-References: <1313504053-27873-1-git-send-email-dave.martin@linaro.org>
-	<1313504053-27873-3-git-send-email-dave.martin@linaro.org>
-	<alpine.LFD.2.00.1108161217140.20358@xanadu.home>
-Message-ID: <20110816162141.GE1993@arm.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 16 Aug 2011 12:22:43 -0400 (EDT)
+Subject: [PATCH] ARM: Add safe diagnostic to indicate when
+	__cpu_architecture isn't set up
+In-Reply-To: <20110816161553.GB1993@arm.com>
+References: <1313504340-28004-1-git-send-email-dave.martin@linaro.org>
+	<1313505921.2235.6.camel@computer2>
+	<alpine.LFD.2.00.1108161058220.20358@xanadu.home>
+	<20110816161553.GB1993@arm.com>
+Message-ID: <alpine.LFD.2.00.1108161221580.20358@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 16, 2011 at 12:17:35PM -0400, Nicolas Pitre wrote:
-> On Tue, 16 Aug 2011, Dave Martin wrote:
-> 
-> > When testing whether a Thumb-2 instruction is 32 bits long or not,
-> > the masking done in order to test bits 11-15 of the first
-> > instruction halfword won't affect the result of the comparison, so
-> > remove it.
-> > 
-> > Signed-off-by: Dave Martin <dave.martin@linaro.org>
-> 
-> Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-> 
+On Tue, 16 Aug 2011, Dave Martin wrote:
 
-Thanks
----Dave
-
+> On Tue, Aug 16, 2011 at 10:59:18AM -0400, Nicolas Pitre wrote:
+> > On Tue, 16 Aug 2011, Tixy wrote:
+> > 
+> > > On Tue, 2011-08-16 at 15:19 +0100, Dave Martin wrote:
+> > > [...]
+> > > > This patch is useful for debugging, but I'm not convinced it should
+> > > > be merged.
+> > > [...] 
+> > > >  static inline int __pure cpu_architecture(void)
+> > > >  {
+> > > > -	BUG_ON(__cpu_architecture == CPU_ARCH_UNKNOWN);
+> > > > -	return __cpu_architecture;
+> > > > +	if (unlikely(__cpu_architecture == CPU_ARCH_UNKNOWN)) {
+> > > > +		extern int __pure __get_cpu_architecture(void);
+> > > > +
+> > > > +		WARN_ONCE(1, "__cpu_architecture not set yet!\n");
+> > > > +		return __get_cpu_architecture();
+> > > > +	} else
+> > > > +		return __cpu_architecture;
+> > > >  }
+> > > 
+> > > Seems to me that if we go down this route, cpu_architecture() may as
+> > > well remain a non-inline function which just calculates the arch if it's
+> > > not already set...
+> > 
+> > My thought as well.
+> > 
+> > > 	if (unlikely(__cpu_architecture == CPU_ARCH_UNKNOWN))
+> > > 		__cpu_architecture = __get_cpu_architecture();
+> > > 	return __cpu_architecture;
+> > > 
+> > > There seems to be too many ways to skin this cat :-)
+> > 
+> > Agreed.
 > 
-> > ---
-> >  arch/arm/kernel/entry-armv.S |    6 ++----
-> >  1 files changed, 2 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-> > index a87cbf8..b7236d4 100644
-> > --- a/arch/arm/kernel/entry-armv.S
-> > +++ b/arch/arm/kernel/entry-armv.S
-> > @@ -262,8 +262,7 @@ __und_svc:
-> >  	ldr	r0, [r4, #-4]
-> >  #else
-> >  	ldrh	r0, [r4, #-2]			@ Thumb instruction at LR - 2
-> > -	and	r9, r0, #0xf800
-> > -	cmp	r9, #0xe800			@ 32-bit instruction if xx >= 0
-> > +	cmp	r0, #0xe800			@ 32-bit instruction if xx >= 0
-> >  	ldrhhs	r9, [r4]			@ bottom 16 bits
-> >  	orrhs	r0, r9, r0, lsl #16
-> >  #endif
-> > @@ -445,8 +444,7 @@ __und_usr:
-> >   ARM(	ldrht	r5, [r4], #2	)
-> >   THUMB(	ldrht	r5, [r4]	)
-> >   THUMB(	add	r4, r4, #2	)
-> > -	and	r0, r5, #0xf800			@ mask bits 111x x... .... ....
-> > -	cmp	r0, #0xe800			@ 32bit instruction if xx != 0
-> > +	cmp	r5, #0xe800			@ 32bit instruction if xx != 0
-> >  	blo	__und_usr_unknown
-> >  3:	ldrht	r0, [r4]
-> >  	add	r2, r2, #2			@ r2 is PC + 2, make it PC + 4
-> > -- 
-> > 1.7.4.1
-> > 
+> Well, I guess the flipside is, do we need this check at all?
+> 
+> Because __cpu_architecture is set really early, and because if
+> it's referenced too early, the kernel will either not boot or
+> we'll hit BUG(), it's hard to imaging such a failure going unnoticed.
+> 
+> So this check could simply be viewed as overkill, though it does
+> feel safer to check.
+> 
+> Any thoughts?
+
+I personally think this is overkill.
+
+
+Nicolas
