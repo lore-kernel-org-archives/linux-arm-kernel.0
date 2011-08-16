@@ -1,109 +1,46 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 16 Aug 2011 11:29:37 +0200
-Subject: [PATCH 8/9] ARM: integrate CMA with DMA-mapping subsystem
-In-Reply-To: <201108121700.30967.arnd@arndb.de>
-References: <1313146711-1767-1-git-send-email-m.szyprowski@samsung.com>
-	<1313146711-1767-9-git-send-email-m.szyprowski@samsung.com>
-	<201108121700.30967.arnd@arndb.de>
-Message-ID: <002b01cc5bf7$0460e350$0d22a9f0$%szyprowski@samsung.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 16 Aug 2011 11:35:08 +0200
+Subject: PB1176 broken in -rc1
+In-Reply-To: <20110816092615.GC28656@e102144-lin.cambridge.arm.com>
+References: <20110810152400.GO10121@e102144-lin.cambridge.arm.com>
+	<CACRpkdaoDJy-YKONaz2j07pPvTZuHZ7KgEm6XGxNXK-jNzB8_w@mail.gmail.com>
+	<20110816092615.GC28656@e102144-lin.cambridge.arm.com>
+Message-ID: <CACRpkdbSG=Mnu7QrACn3y3GP-2H4_qT0kR_4C8umCmWc2YCqXQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Tue, Aug 16, 2011 at 11:26 AM, Will Deacon <will.deacon@arm.com> wrote:
 
-On Friday, August 12, 2011 5:01 PM Arnd Bergmann wrote:
+>> Will, Jamie, any hints?
+>
+> Can you make your .config available somewhere please?
 
-> On Friday 12 August 2011, Marek Szyprowski wrote:
-> > @@ -82,16 +103,16 @@ static struct page *__dma_alloc_buffer(struct device
-*dev,
-> size_t size, gfp_t gf
-> >  	if (mask < 0xffffffffULL)
-> >  		gfp |= GFP_DMA;
-> >
-> > -	page = alloc_pages(gfp, order);
-> > -	if (!page)
-> > -		return NULL;
-> > -
-> >  	/*
-> > -	 * Now split the huge page and free the excess pages
-> > +	 * Allocate contiguous memory
-> >  	 */
-> > -	split_page(page, order);
-> > -	for (p = page + (size >> PAGE_SHIFT), e = page + (1 << order); p < e;
-p++)
-> > -		__free_page(p);
-> > +	if (cma_available())
-> > +		page = dma_alloc_from_contiguous(dev, count, order);
-> > +	else
-> > +		page = __dma_alloc_system_pages(count, gfp, order);
-> > +
-> > +	if (!page)
-> > +		return NULL;
-> 
-> Why do you need the fallback here? I would assume that CMA now has to be
-available
-> on ARMv6 and up to work at all. When you allocate from
-__dma_alloc_system_pages(),
-> wouldn't that necessarily fail in the dma_remap_area() stage?
+http://www.df.lth.se/~triad/realview_config
 
-It is not a fallback - I've just merged 2 cases together (CMA case and
-coheren/nommu
-arch). I agree that such mixed code might be confusing.
+Basically that's the realview_defconfig with these
+changes done on top:
 
-> >
-> > -	if (arch_is_coherent() || nommu()) {
-> > +	if (arch_is_coherent() || nommu() ||
-> > +	   (cma_available() && !(gfp & GFP_ATOMIC))) {
-> > +		/*
-> > +		 * Allocate from system or CMA pages
-> > +		 */
-> >  		struct page *page = __dma_alloc_buffer(dev, size, gfp);
-> >  		if (!page)
-> >  			return NULL;
-> > +		dma_remap_area(page, size, area->prot);
-> >  		pfn = page_to_pfn(page);
-> >  		ret = page_address(page);
-> 
-> Similarly with coherent and nommu. It seems to me that lumping too
-> many cases together creates extra complexity here.
-> 
-> How about something like
-> 
-> 	if (arch_is_coherent() || nommu())
-> 		ret = alloc_simple_buffer();
-> 	else if (arch_is_v4_v5())
-> 		ret = alloc_remap();
-> 	else if (gfp & GFP_ATOMIC)
-> 		ret = alloc_from_pool();
-> 	else
-> 		ret = alloc_from_contiguous();
-> 
-> This also allows a natural conversion to dma_map_ops when we get there.
+scripts/config --file $(realview_dir)/.config \
+        --enable BLK_DEV_INITRD \
+        --set-str INITRAMFS_SOURCE rootfs-u338.cpio \
+        --enable INITRAMFS_COMPRESSION_NONE \
+        --enable MISC_DEVICES \
+        --enable ARM_CHARLCD \
+        --enable DEBUG_LL \
+        --enable EARLY_PRINTK \
+        --enable ARM_TEST \
+        --enable ARM_TCM_TEST \
+        --set-str CMDLINE "root=/dev/ram0 console=ttyAMA0 earlyprintk mem=128M"
+        yes "" | make $(make_options) oldconfig
 
-Ok. Is it ok to enable CMA permanently for ARMv6+? If CMA is left conditional
-the dma pool code will be much more complicated, because it will need to support
-both CMA and non-CMA cases.
 
-> >  	/* reserve any platform specific memblock areas */
-> >  	if (mdesc->reserve)
-> >  		mdesc->reserve();
-> >
-> > +	dma_coherent_reserve();
-> > +	dma_contiguous_reserve();
-> > +
-> >  	memblock_analyze();
-> >  	memblock_dump_all();
-> >  }
-> 
-> Since we can handle most allocations using CMA on ARMv6+, I would think
-> that we can have a much smaller reserved area. Have you tried changing
-> dma_coherent_reserve() to allocate out of the contiguous area instead of
-> wasting a full 2MB section of memory?
+> It sounds like an unrelated issue, so let's try to track it down.
 
-I will move the reserved pool directly into CMA area, so it can be shrunk below
-2MiB.
+Thanx!
 
-Best regards
--- 
-Marek Szyprowski
-Samsung Poland R&D Center
+> How do you use the interface
+> with the TCMs once they've been mapped at the high address?
+
+Here is my test code patch I'm cooking RFC:
+
+------------8<-----------------------------8<-----------------------------
