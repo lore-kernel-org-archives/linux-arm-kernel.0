@@ -1,53 +1,69 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 16 Aug 2011 12:17:30 +0200
-Subject: [PATCH 7/9] ARM: DMA: steal memory for DMA coherent mappings
-In-Reply-To: <201108121453.05898.arnd@arndb.de>
-References: <1313146711-1767-1-git-send-email-m.szyprowski@samsung.com>
-	<1313146711-1767-8-git-send-email-m.szyprowski@samsung.com>
-	<201108121453.05898.arnd@arndb.de>
-Message-ID: <004301cc5bfd$b50048d0$1f00da70$%szyprowski@samsung.com>
+From: vinod.koul@intel.com (Koul, Vinod)
+Date: Tue, 16 Aug 2011 16:31:16 +0530
+Subject: [PATCH V5 00/15] To use DMA generic APIs for Samsung DMA
+In-Reply-To: <000701cc596f$08811160$19833420$%kim@samsung.com>
+References: <1311744697-10264-1-git-send-email-boojin.kim@samsung.com>
+	<CACRpkdZvbH1O608n_aa_nVi-Onhmt0Ay6X1yCgBVNES4o9hTrA@mail.gmail.com>
+	<1312821923.1539.37.camel@vkoul-udesk3>
+	<015101cc57f8$0d7b1da0$287158e0$%kim@samsung.com>
+	<1313101649.1603.27.camel@vkoul-udesk3>
+	<000701cc596f$08811160$19833420$%kim@samsung.com>
+Message-ID: <1313492476.1603.39.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Friday, August 12, 2011 2:53 PM Arnd Bergmann wrote:
-
-> On Friday 12 August 2011, Marek Szyprowski wrote:
-> >
-> > From: Russell King <rmk+kernel@arm.linux.org.uk>
-> >
-> > Steal memory from the kernel to provide coherent DMA memory to drivers.
-> > This avoids the problem with multiple mappings with differing attributes
-> > on later CPUs.
-> >
-> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > [m.szyprowski: rebased onto 3.1-rc1]
-> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+On Sat, 2011-08-13 at 13:11 +0900, Kukjin Kim wrote:
+> Koul, Vinod wrote:
+> > 
+> > On Thu, 2011-08-11 at 16:26 +0900, Kukjin Kim wrote:
+> > > Koul, Vinod wrote:
+> > > >
+> > > > On Thu, 2011-08-04 at 18:53 +0200, Linus Walleij wrote:
+> > > > > On Wed, Jul 27, 2011 at 7:31 AM, Boojin Kim <boojin.kim@samsung.com>
+> > wrote:
+> > > > >
+> > > > > > This patchset adds support DMA generic APIs for Samsung DMA.
+> > > > >
+> > > > > Patches look good to me,
+> > > > > Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> > > >
+> > > > Acked-by: Vinod Koul <vinod.koul@intel.com>
+> > > >
+> > > > Do you want these to go thru slave-dma tree or arm tree, I am okay with
+> > > > either...
+> > >
+> > > Hi Vinod,
+> > >
+> > > Thanks.
+> > >
+> > > I'd like to keep its topic branch in my tree to avoid conflicts with other samsung
+> > stuff and I think, it should be merged into your slave-dma tree also for same
+> > reason.
+> > >
+> > > git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git #next/topic-
+> > dma-pl330
+> > >
+> > > Or if you want to make some branch for it in your tree, please let me know so
+> > that I can merge it in my tree also.
+> > Okay can you update this branch with latest patchset (I think there were
+> > few comments on last patchset). Once you add all acks let me know the
+> > branch, I will merge it to my next
 > 
-> Hi Marek,
+> Hi,
 > 
-> Is this the same patch that Russell had to revert because it didn't
-> work on some of the older machines, in particular those using
-> dmabounce?
+> I updated it so that you can merge it to yours.
+> I think, if any fixing is required on that, it should be small so can be fixed easily after this merging.
+> 
+> If any problems, please let me know :)
+> 
+Well, that not how things are supposed to be done. Fixing an error
+introduced is not recommended, rather original patch set should be
+fixed.
+Since you have already done 5 posting of your patch series, I am okay if
+you split things up, send me the parts that have already been reviewed
+and acked. I will host them on a branch for you. Once rest is reviewed
+and acked, I will merge this entire branch to my next.
 
-Yes.
- 
-> I thought that our discussion ended with the plan to use this only
-> for ARMv6+ (which has a problem with double mapping) but not on ARMv5
-> and below (which don't have this problem but might need dmabounce).
 
-Ok, my fault. I've forgot to mention that this patch was almost ready 
-during Linaro meeting, but I didn't manage to post it that time. Of course 
-it doesn't fulfill all the agreements from that discussion.
-
-I was only unsure if we should care about the case where CMA is not enabled
-for ARMv6+ or not. This patch was prepared in assumption that 
-dma_alloc_coherent should work in both cases - with and without CMA.
-
-Now I assume that for ARMv6+ the CMA should be enabled unconditionally.
-
-Best regards
 -- 
-Marek Szyprowski
-Samsung Poland R&D Center
+~Vinod
