@@ -1,69 +1,121 @@
-From: axel.lin@gmail.com (Axel Lin)
-Date: Tue, 16 Aug 2011 13:25:05 +0800
-Subject: [PATCH RESEND] ARM: tegra: Add missing include of linux/errno.h
-	and linux/types.h
-Message-ID: <1313472305.15815.2.camel@phoenix>
+From: manjugk@ti.com (G, Manjunath Kondaiah)
+Date: Tue, 16 Aug 2011 12:02:27 +0530
+Subject: [RFC/PATCH 11/14] dt: omap3: add soc file for handling i2c
+	controllers
+In-Reply-To: <4E42C3C6.1070806@ti.com>
+References: <1312897232-4792-1-git-send-email-manjugk@ti.com>
+	<1312897232-4792-12-git-send-email-manjugk@ti.com>
+	<4E427B62.1000907@ti.com> <20110810165745.GB2705@manju-desktop>
+	<4E42C3C6.1070806@ti.com>
+Message-ID: <20110816063227.GA17165@manju-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Include linux/errno.h to fix below build error.
+On Wed, Aug 10, 2011 at 07:45:42PM +0200, Cousson, Benoit wrote:
+> + Tony
+> 
+> On 8/10/2011 6:57 PM, G, Manjunath Kondaiah wrote:
+> >On Wed, Aug 10, 2011 at 02:36:50PM +0200, Cousson, Benoit wrote:
+> >>On 8/9/2011 4:10 PM, G, Manjunath Kondaiah wrote:
+> >>>
+> >>>Add omap3 soc file for handling omap3 soc i2c controllers existing
+> >>>on l4-core bus.
+> >>>
+> >>>Signed-off-by: G, Manjunath Kondaiah<manjugk@ti.com>
+> >>>---
+> >>>  arch/arm/boot/dts/omap3-soc.dtsi |   62 ++++++++++++++++++++++++++++++++++++++
+> >>>  1 files changed, 62 insertions(+), 0 deletions(-)
+> >>>  create mode 100644 arch/arm/boot/dts/omap3-soc.dtsi
+> >>>
+> >>>diff --git a/arch/arm/boot/dts/omap3-soc.dtsi b/arch/arm/boot/dts/omap3-soc.dtsi
+> >>>new file mode 100644
+> >>>index 0000000..85de92f
+> >>>--- /dev/null
+> >>>+++ b/arch/arm/boot/dts/omap3-soc.dtsi
+> >>>@@ -0,0 +1,62 @@
+> >>>+/*
+> >>>+ * Device Tree Source for OMAP3 SoC
+> >>>+ *
+> >>>+ * Copyright (C) 2011 Texas Instruments Incorporated - http://www.ti.com/
+> >>>+ *
+> >>>+ * This file is licensed under the terms of the GNU General Public License
+> >>>+ * version 2.  This program is licensed "as is" without any warranty of any
+> >>>+ * kind, whether express or implied.
+> >>>+ */
+> >>>+
+> >>>+/dts-v1/;
+> >>>+/include/ "skeleton.dtsi"
+> >>>+
+> >>>+/ {
+> >>>+	#address-cells =<1>;
+> >>>+	#size-cells =<1>;
+> >>>+	model = "ti,omap3";
+> >>>+
+> >>>+	aliases {
+> >>>+		i2c1 =&i2c1;
+> >>>+		i2c2 =&i2c2;
+> >>>+		i2c3 =&i2c3;
+> >>>+	};
+> >>>+
+> >>>+	l4-core {
+> >>
+> >>That comment is probably subject to discussion, but even if this
+> >>interconnect is there physically, I'm not sure of the added value to
+> >>add it.
+> >>It will add an extra level of indentation and that all. Moreover, it
+> >>will mess up the physical address that are expressed using absolute
+> >>value in the TRM with a less readable offset value.
+> >>In fact, most DTS files in the ARM directory are using a purely flat
+> >>representation of the interconnect.
+> >This is as per alignment with Tony and Grant:
+> >http://permalink.gmane.org/gmane.linux.ports.arm.omap/60391
+> 
+> So I'm asking the same question to Grant and Tony then:-)
 
-  CC      arch/arm/mach-tegra/board-harmony-pinmux.o
-In file included from /home/axel/repos/git/linux-2.6/arch/arm/include/asm/gpio.h:5,
-                 from include/linux/gpio.h:18,
-                 from arch/arm/mach-tegra/board-harmony-pinmux.c:18:
-arch/arm/mach-tegra/include/mach/gpio.h: In function 'gpio_to_irq':
-arch/arm/mach-tegra/include/mach/gpio.h:35: error: 'EINVAL' undeclared (first use in this function)
-arch/arm/mach-tegra/include/mach/gpio.h:35: error: (Each undeclared identifier is reported only once
-arch/arm/mach-tegra/include/mach/gpio.h:35: error: for each function it appears in.)
-arch/arm/mach-tegra/include/mach/gpio.h: In function 'irq_to_gpio':
-arch/arm/mach-tegra/include/mach/gpio.h:43: error: 'EINVAL' undeclared (first use in this function)
-make[1]: *** [arch/arm/mach-tegra/board-harmony-pinmux.o] Error 1
-make: *** [arch/arm/mach-tegra] Error 2
+What is the conclusion here? I will go ahead with current approach since
+tony and grant has voted for it.
 
-Include linux/types.h to fix below build error.
+-M
 
-  CC      arch/arm/mach-tegra/board-trimslice-pinmux.o
-In file included from /home/axel/repos/git/linux-2.6/arch/arm/include/asm/gpio.h:5,
-                 from include/linux/gpio.h:18,
-                 from arch/arm/mach-tegra/board-trimslice-pinmux.c:16:
-arch/arm/mach-tegra/include/mach/gpio.h:49: error: expected specifier-qualifier-list before 'bool'
-arch/arm/mach-tegra/board-trimslice-pinmux.c:145: error: unknown field 'enable' specified in initializer
-arch/arm/mach-tegra/board-trimslice-pinmux.c:145: warning: excess elements in struct initializer
-arch/arm/mach-tegra/board-trimslice-pinmux.c:145: warning: (near initialization for 'gpio_table[0]')
-arch/arm/mach-tegra/board-trimslice-pinmux.c:146: error: unknown field 'enable' specified in initializer
-arch/arm/mach-tegra/board-trimslice-pinmux.c:146: warning: excess elements in struct initializer
-arch/arm/mach-tegra/board-trimslice-pinmux.c:146: warning: (near initialization for 'gpio_table[1]')
-arch/arm/mach-tegra/board-trimslice-pinmux.c:148: error: unknown field 'enable' specified in initializer
-arch/arm/mach-tegra/board-trimslice-pinmux.c:148: warning: excess elements in struct initializer
-arch/arm/mach-tegra/board-trimslice-pinmux.c:148: warning: (near initialization for 'gpio_table[2]')
-arch/arm/mach-tegra/board-trimslice-pinmux.c:149: error: unknown field 'enable' specified in initializer
-arch/arm/mach-tegra/board-trimslice-pinmux.c:149: warning: excess elements in struct initializer
-arch/arm/mach-tegra/board-trimslice-pinmux.c:149: warning: (near initialization for 'gpio_table[3]')
-make[1]: *** [arch/arm/mach-tegra/board-trimslice-pinmux.o] Error 1
-make: *** [arch/arm/mach-tegra] Error 2
-
-Signed-off-by: Axel Lin <axel.lin@gmail.com>
----
-This patch is against linux-next (next-20110815), it fixes the build error with "make tegra_defconfig".
-This RESEND fixes the typo in subject line and commit log pointed out by Baruch.
-Axel
-
- arch/arm/mach-tegra/include/mach/gpio.h |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-tegra/include/mach/gpio.h b/arch/arm/mach-tegra/include/mach/gpio.h
-index e353805..42f3f08 100644
---- a/arch/arm/mach-tegra/include/mach/gpio.h
-+++ b/arch/arm/mach-tegra/include/mach/gpio.h
-@@ -21,6 +21,8 @@
- #define __MACH_TEGRA_GPIO_H
- 
- #include <linux/init.h>
-+#include <linux/errno.h>
-+#include <linux/types.h>
- #include <mach/irqs.h>
- 
- #define TEGRA_NR_GPIOS		INT_GPIO_NR
--- 
-1.7.4.1
+> 
+> >>>+		compatible = "ti,omap3-l4-core";
+> >>
+> >>Assuming we will keep that, you should probably add a more generic
+> >>compatible name after that one. Like "ti,s3220" or even
+> >>"sonics,s3220", assuming that this IP is generic enough for other
+> >>SoC.
+> >will check this. I don't remember any generic names.
+> >>
+> >>>+		#address-cells =<1>;
+> >>>+		#size-cells =<1>;
+> >>>+		ranges =<0 0x48000000 0x1000000>;
+> >>>+
+> >>>+		i2c1: i2c at 70000 {
+> >>>+			#address-cells =<1>;
+> >>>+			#size-cells =<0>;
+> >>>+			compatible = "ti,omap3-i2c";
+> >>
+> >>The I2C IP and thus the driver is generic across OMAP generations
+> >>and is even potentially used by other non-OMAP TI chips like DSP or
+> >>Davinci. So having an extra compatible entry with "ti,i2c" or "ti,
+> >>omap-i2c" seems mandatory.
+> >This can be updated as and when new soc/board adaptations are done.
+> >As of now, it is omap3 and when we have omap4 it will be appended with
+> >"ti,omap4-i2c" etc
+> 
+> To infinity and beyond?
+> 
+> There is no need, and we should absolutely not update the driver
+> each time we introduce a new SoC version/revision.
+> The driver should match with the generic device name in that case.
+> Until we change the IP and potentially introduce a new driver.
+> 
+> BTW, even omap3 should not be in the name in theory. It should be
+> potentially "ti,i2c-v3" or whatever HW version the IP is using.
+> But for some reason, most devices are using such convention in
+> existing DTS:-(
+> This is probably due to the lack of well identified IP version in
+> most SoC... including OMAP:-)
+> 
+> 
+> Benoit
