@@ -1,127 +1,78 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Tue, 16 Aug 2011 10:32:05 -0700
-Subject: [RFC PATCH v2 06/13] docs/dt: Document nvidia,tegra20-pinmux
-	binding
-In-Reply-To: <201108161551.31389.arnd@arndb.de>
-References: <1313440100-17131-1-git-send-email-swarren@nvidia.com>
-	<1313440100-17131-7-git-send-email-swarren@nvidia.com>
-	<201108161551.31389.arnd@arndb.de>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF04AEA2537D@HQMAIL01.nvidia.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Tue, 16 Aug 2011 10:52:13 -0700
+Subject: [PATCH v2 1/4] msm_serial: Use relative resources for iomem
+In-Reply-To: <1313517136-27414-1-git-send-email-davidb@codeaurora.org>
+References: <1313517136-27414-1-git-send-email-davidb@codeaurora.org>
+Message-ID: <1313517136-27414-2-git-send-email-davidb@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann wrote at Tuesday, August 16, 2011 7:52 AM:
-> On Monday 15 August 2011, Stephen Warren wrote:
-> > Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> > ---
-> >  .../devicetree/bindings/pinmux/pinmux_nvidia.txt   |  294 ++++++++++++++++++++
-> >  1 files changed, 294 insertions(+), 0 deletions(-)
-> >  create mode 100644 Documentation/devicetree/bindings/pinmux/pinmux_nvidia.txt
-> >
-> > diff --git a/Documentation/devicetree/bindings/pinmux/pinmux_nvidia.txt b/Documentation/devicetree/bindings/pinmux/pinmux_nvidia.txt
-> > new file mode 100644
-> > index 0000000..744e1b7
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/pinmux/pinmux_nvidia.txt
-> > @@ -0,0 +1,294 @@
-> > +NVIDIA Tegra 2 pinmux controller
-> > +
-> > +Required properties:
-> > +- compatible : "nvidia,tegra20-pinmux"
-> 
-> Hmm, I think it would be much better in general if we could define
-> pinmux bindings in a way that is less specific to just one soc.
+Device tree iomem resources are only accessible by index, and not by
+name.  The msm_serial devices always have either 1 or 2 iomem
+resources, that are always in the same order.  Convert the
+platform_get_resource_byname into just platform_get_resource to
+facilitate device tree conversion.
 
-> The contents of this file seem to be specific to even just one
-> version of the tegra chip, and might be completely different for
-> tegra30 and later, right?
+Signed-off-by: David Brown <davidb@codeaurora.org>
+---
+ drivers/tty/serial/msm_serial.c |   16 ++++++----------
+ 1 files changed, 6 insertions(+), 10 deletions(-)
 
-The general concepts are the same between tegra20 and tegra30.
-
-Tegra30 has a different set of mux and drive pingroups.
-
-Tegra30 has more functions that can be assigned to pins.
-
-Tegra30 has three more options per mux pingroup, although I haven't
-Investigated whether any of those would need to be represented in DT;
-I suspect at least one will, possibly all.
-
-> Maybe Linus W can comment on this and say whether he thinks it can
-> be generalized enough to apply to other pinmux drivers.
-> 
-> > +Optional sub-nodes:
-> > +- nvidia,mux-groups : Mux group settings; see below.
-> > +- nvidia,drive-groups : Drive group settings; see below.
-> > +
-> > +nvidia,mux-groups sub-node:
-> 
-> These concepts seem general enough to me that they can apply to
-> other chips, and I would consequently drop the nvidia, prefix.
-
-Two things to note about Tegra that might not apply to all SoCs:
-
-* There are separate groups of pins for Muxing (plus some config) vs.
-drive-strength (and related config). Some SoCs might use the same set
-of groups for both. Perhaps some SoC might even have three or more types
-of groups! I expect this to have some impact on the binding; I created
-explicit mux-groups and drive-groups sub-nodes to represent this.
-
-* Tegra's pinmux apply settings to groups of pins instead of individual
-pins. Some SoCs might allow each setting to be configurable per-pin.
-I don't expect this to have any impact as far as the bindings go though;
-it'll simply impact the names of the available pin "groups"; some SoCs
-will name groups, others pins.
-
-> > +Each mux pin group is represented as a sub-node of the nvidia,mux-groups node.
-> > +The name of the sub-node should be the name of the mux pingroup. The following
-> > +names are valid:
-> > +
-> > +	ata
-> > +	atb
-> > +	atc
-> > +	atd
-> > +	ate
-> > +	cdev1
-> > +	cdev2
-> > ...
-> 
-> I noticed that each board you define has a complete list of these. Would
-> it be possible to move a generic list into a tegra20-pinmux.dtsi file and
-> just override the pins in the per-board .dts file that require some special
-> setup?
-
-I'm not sure how much commonality there will really be.
-
-Certainly, many boards are based off our reference designs and so will
-have many similarities that could be shared.
-
-That said, comparing even tegra-harmony.dts and tegra-seaboard.dts shows
-a lot of differences. It seems a lot less error-prone to just completely
-describe the entire pinmux state in each board's .dts file, rather than
-trying to represent half the information as default in the SoC .dtsi file,
-and just the diff in the board .dts file. I suppose perhaps if we put the
-hardware's own default settings in tegra20.dtsi, that'd make sense, since
-people are presumably reasonably aware of the delta relative to that.
-
-We'd need to add new properties to override defaults, like:
-
-nvidia,tristate --> nvidia,drive
-nvidia,pull-*   --> nvidia,no-pull
-
-> > +
-> > +optional subnode-properties:
-> > +- nvidia,pull-up : Boolean, apply Tegra's internal pull-up to the pin.
-> > +- nvidia,pull-down : Boolean, apply Tegra's internal pull-down to the pin.
-> > +- nvidia,tristate : Boolean, tristate the pin. Otherwise, drive it.
-> > +
-> > +If both nvidia,pull-up and nvidia,pull-down are specified, nvidia,pull-up
-> > +takes precedence.
-> 
-> These again seem generic enough to go into a general pinmux binding, without
-> the nvidia, prefix.
-
-Yes, I believe Jamie Iles was going to try cooking up a generic core binding
-that could be shared across different SoCs, and extended with custom stuff.
-
+diff --git a/drivers/tty/serial/msm_serial.c b/drivers/tty/serial/msm_serial.c
+index e6ba838..d9863b2 100644
+--- a/drivers/tty/serial/msm_serial.c
++++ b/drivers/tty/serial/msm_serial.c
+@@ -589,9 +589,8 @@ static void msm_release_port(struct uart_port *port)
+ 		iowrite32(GSBI_PROTOCOL_IDLE, msm_port->gsbi_base +
+ 			  GSBI_CONTROL);
+ 
+-		gsbi_resource = platform_get_resource_byname(pdev,
+-							     IORESOURCE_MEM,
+-							     "gsbi_resource");
++		gsbi_resource = platform_get_resource(pdev,
++							IORESOURCE_MEM, 1);
+ 
+ 		if (unlikely(!gsbi_resource))
+ 			return;
+@@ -612,8 +611,7 @@ static int msm_request_port(struct uart_port *port)
+ 	resource_size_t size;
+ 	int ret;
+ 
+-	uart_resource = platform_get_resource_byname(pdev, IORESOURCE_MEM,
+-						     "uart_resource");
++	uart_resource = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	if (unlikely(!uart_resource))
+ 		return -ENXIO;
+ 
+@@ -628,8 +626,7 @@ static int msm_request_port(struct uart_port *port)
+ 		goto fail_release_port;
+ 	}
+ 
+-	gsbi_resource = platform_get_resource_byname(pdev, IORESOURCE_MEM,
+-						     "gsbi_resource");
++	gsbi_resource = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+ 	/* Is this a GSBI-based port? */
+ 	if (gsbi_resource) {
+ 		size = resource_size(gsbi_resource);
+@@ -875,7 +872,7 @@ static int __init msm_serial_probe(struct platform_device *pdev)
+ 	port->dev = &pdev->dev;
+ 	msm_port = UART_TO_MSM(port);
+ 
+-	if (platform_get_resource_byname(pdev, IORESOURCE_MEM, "gsbi_resource"))
++	if (platform_get_resource(pdev, IORESOURCE_MEM, 1))
+ 		msm_port->is_uartdm = 1;
+ 	else
+ 		msm_port->is_uartdm = 0;
+@@ -899,8 +896,7 @@ static int __init msm_serial_probe(struct platform_device *pdev)
+ 	printk(KERN_INFO "uartclk = %d\n", port->uartclk);
+ 
+ 
+-	resource = platform_get_resource_byname(pdev, IORESOURCE_MEM,
+-						     "uart_resource");
++	resource = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	if (unlikely(!resource))
+ 		return -ENXIO;
+ 	port->mapbase = resource->start;
 -- 
-nvpublic
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
