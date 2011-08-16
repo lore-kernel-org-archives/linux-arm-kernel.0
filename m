@@ -1,67 +1,60 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 15 Aug 2011 19:20:50 -0400 (EDT)
-Subject: Enabling runtime P2V by default (Re: [PATCH 3/5] mach-u300:
-	patch physoffset by default)
-In-Reply-To: <20110811082413.GA4775@n2100.arm.linux.org.uk>
-References: <1312918898-11894-1-git-send-email-linus.walleij@stericsson.com>
-	<20110810091635.GF1831@n2100.arm.linux.org.uk>
-	<20110810092206.GE10121@e102144-lin.cambridge.arm.com>
-	<20110810092955.GG1831@n2100.arm.linux.org.uk>
-	<20110811082413.GA4775@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1108151919110.20358@xanadu.home>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 15 Aug 2011 20:00:45 -0400 (EDT)
+Subject: [PATCH v2] ARM: sched_clock: allow sched_clock to be selected at
+	runtime
+In-Reply-To: <1313078531-25610-1-git-send-email-marc.zyngier@arm.com>
+References: <1313078531-25610-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <alpine.LFD.2.00.1108151931410.20358@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 11 Aug 2011, Russell King - ARM Linux wrote:
+On Thu, 11 Aug 2011, Marc Zyngier wrote:
 
-> Enable virtual to physical translation patching by default in all
-> kernels.  Hide the option behind EMBEDDED.
+> sched_clock() is yet another blocker on the road to the single
+> image. This patch implements an idea by Russell King:
 > 
-> This can still be turned off if people desire, and they know what
-> they're doing, to shrink the size of the kernel to a minimum.
+> http://www.spinics.net/lists/linux-omap/msg49561.html
 > 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> Instead of asking the platform to implement both sched_clock()
+> itself and the rollover callback, simply register a read()
+> function, and let the ARM code care about sched_clock() itself,
+> the conversion to ns and the rollover. sched_clock() uses
+> this read() function as an indirection to the platform code.
+> 
+> This allow some simplifications and possibly some footprint gain
+> when multiple platforms are compiled in. Among the drawbacks,
+> the removal of the *_fixed_sched_clock optimization which could
+> negatively impact some platforms (sa1100, tegra, versatile
+> and omap).
+> 
+> Tested on 11MPCore, OMAP4 and Tegra.
 
-Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+[...]
 
-> ---
->  arch/arm/Kconfig |    8 ++++++--
->  1 files changed, 6 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 5ebc5d9..6085a6c 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -195,7 +195,8 @@ config VECTORS_BASE
->  	  The base address of exception vectors.
->  
->  config ARM_PATCH_PHYS_VIRT
-> -	bool "Patch physical to virtual translations at runtime"
-> +	bool "Patch physical to virtual translations at runtime" if EMBEDDED
-> +	default y
->  	depends on !XIP_KERNEL && MMU
->  	depends on !ARCH_REALVIEW || !SPARSEMEM
->  	help
-> @@ -207,6 +208,10 @@ config ARM_PATCH_PHYS_VIRT
->  	  of physical memory is at a 16MB boundary, or theoretically 64K
->  	  for the MSM machine class.
->  
-> +	  Only disable this option if you know what you do not require
-> +	  this feature (eg, building a kernel for a single machine) and
-> +	  you need to shrink the kernel to the minimal size.
+> +unsigned long long notrace sched_clock(void)
+> +{
+> +	if (read_sched_clock) {
+> +		u32 cyc = read_sched_clock();
+> +		return cyc_to_sched_clock(&cd, cyc, sched_clock_mask);
+> +	}
 > +
->  config ARM_PATCH_PHYS_VIRT_16BIT
->  	def_bool y
->  	depends on ARM_PATCH_PHYS_VIRT && ARCH_MSM
-> @@ -301,7 +306,6 @@ config ARCH_AT91
->  	select ARCH_REQUIRE_GPIOLIB
->  	select HAVE_CLK
->  	select CLKDEV_LOOKUP
-> -	select ARM_PATCH_PHYS_VIRT if MMU
->  	help
->  	  This enables support for systems based on the Atmel AT91RM9200,
->  	  AT91SAM9 and AT91CAP9 processors.
-> -- 
-> 1.7.4.4
-> 
-> 
+> +	return (unsigned long long)(jiffies - INITIAL_JIFFIES)
+> +					* (NSEC_PER_SEC / HZ);
+> +}
+
+This bothers me that this function has to include a conditional which 
+will _always_ be evaluated as true except during early boot.  Why not 
+simply initializing read_sched_clock with a jiffy_shed_clock function 
+instead, and let it be overriden during boot?  This way the actual 
+sched_clock() code will be more straight forward.
+
+Of course there is the race where read_sched_clock might be updated 
+before or after the corresponding clock data/mask are updated leading to 
+funky results if you are lucky enough to call sched_clock() during that 
+exact wrong moment.  But either we don't care (switching from a jiffy to 
+a hardware clock base is going to cause quite a glitch already anyway), 
+or simply disabling IRQs during initialization should prevent the race 
+(presuming no other CPUs are running at that point).
+
+
+Nicolas
