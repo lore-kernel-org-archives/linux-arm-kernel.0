@@ -1,30 +1,42 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 16 Aug 2011 15:56:35 +0200
-Subject: [GIT PULL] dmaengine: at_hdmac fixes for next
-Message-ID: <4E4A7713.1070902@atmel.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 16 Aug 2011 16:01:31 +0200
+Subject: [RFC PATCH v2 00/13] arm/tegra: Initialize GPIO & pinmux from DT
+In-Reply-To: <201108161509.17157.arnd@arndb.de>
+References: <1313440100-17131-1-git-send-email-swarren@nvidia.com>
+	<201108161509.17157.arnd@arndb.de>
+Message-ID: <CACRpkdaVx=6AJ5DFjVN1ZYQ++hu9pT6WxD9n+pqmYVaCf1xawg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vinod,
+On Tue, Aug 16, 2011 at 3:09 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 
-Please pull from:
+> I do think that you should keep Linus Walleij on Cc in these emails, since
+> he first started pushing for a common pinmux layer, and we need to make
+> sure that the binding works for all SoCs, not just for tegra.
 
-  git://github.com/at91linux/linux-2.6-at91.git nfe/sdma_at_hdmac
+Sorry for slipping off the pinmux stuff, I will make it my goal to recap
+discussion and try to post a new patchset this week.
 
-to receive latest updates for the Atmel at_hdmac dmaengine driver. Those changes are made on top of current linus' git tree (v3.1-rc2-59-g5bad33c).
-The patches below have been discussed on the linux-arm-kernel mailing-list.
+Concepts have grown, I see Stephen have created the new concept
+of e.g. bias groups which is a real good idea
 
-Thanks,
+One problem is that I wanted to start out small with the pinctrl
+subsystem, and now it looks like it has to do a *lot* of stuff from
+day 1 to be of any use ...
 
-Nicolas Ferre (4):
-      dmaengine: at_hdmac: replace spin_lock* with irqsave variants
-      dmaengine: at_hdmac: improve power management routines
-      dmaengine: at_hdmac: add wrappers for testing channel state
-      dmaengine: at_hdmac: fix way to specify cyclic capability
+One specific thing worries me: Grant asked me to make sure
+to NOT create a global pin number space for the pinmuxes (and thus
+pinctrl). This means that in order to proceed, mappings of pinmux
+groups or pincontrol (such as bias) groups, each device using such
+an entity need to reference the intended pincontroller/mux instance.
 
- drivers/dma/at_hdmac.c      |  159 +++++++++++++++++++++++++++++++++---------
- drivers/dma/at_hdmac_regs.h |   24 +++++++
- 2 files changed, 149 insertions(+), 34 deletions(-)
+Say mmc instance 0 need pingroup foo on pincontroller bar
+means that there must be a specific reference from mmc.0:s
+struct device * to pinctrl bar:s struct device *. Maybe this is
+peanuts in DT, sorry not enough insight.
 
--- 
-Nicolas Ferre
+I wonder if this has bearing on how the device tree need to be
+structured to be future proof? (Hopefully not.)
+
+Yours,
+Linus Walleij
