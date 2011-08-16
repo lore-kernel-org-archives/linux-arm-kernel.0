@@ -1,42 +1,35 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 16 Aug 2011 16:01:31 +0200
-Subject: [RFC PATCH v2 00/13] arm/tegra: Initialize GPIO & pinmux from DT
-In-Reply-To: <201108161509.17157.arnd@arndb.de>
-References: <1313440100-17131-1-git-send-email-swarren@nvidia.com>
-	<201108161509.17157.arnd@arndb.de>
-Message-ID: <CACRpkdaVx=6AJ5DFjVN1ZYQ++hu9pT6WxD9n+pqmYVaCf1xawg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 16 Aug 2011 16:07:24 +0200
+Subject: Remaining omap pull requests
+In-Reply-To: <20110810122118.GK1939@atomide.com>
+References: <20110711114736.GX5783@atomide.com> <4E389102.1050302@ti.com>
+	<20110810122118.GK1939@atomide.com>
+Message-ID: <201108161607.25116.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 16, 2011 at 3:09 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+On Wednesday 10 August 2011, Tony Lindgren wrote:
+> * Kevin Hilman <khilman@ti.com> [110802 17:00]:
+> > On 08/02/2011 04:14 PM, Kevin Hilman wrote:
+> > [...]
+> > >>
+> > >>Looks like I forgot the i2c driver changes that also should be
+> > >>merged by us. Those are acked by Ben Dooks, Kevin's pull request
+> > >>for that is at:
+> > >>
+> > >>http://marc.info/?l=linux-omap&amp;m=131014213007667&amp;w=2
+> > >>
+> > >
+> > >I thought this was already pulled, but looking now I see that this was
+> > >never pulled into the arm-soc tree.
+> > >
+> > >Can you pull this for v3.1 please?
+> 
+> I'll send a pull request for Ben Dooks for this as now the conflicting
+> parts have been merged.
 
-> I do think that you should keep Linus Walleij on Cc in these emails, since
-> he first started pushing for a common pinmux layer, and we need to make
-> sure that the binding works for all SoCs, not just for tegra.
+Sorry for missing this one during the merge window. I'm now starting to
+collect branches for 3.2, so please tell me if you want me to pull it
+now, if there is anything left that is not yet in Ben's tree.
 
-Sorry for slipping off the pinmux stuff, I will make it my goal to recap
-discussion and try to post a new patchset this week.
-
-Concepts have grown, I see Stephen have created the new concept
-of e.g. bias groups which is a real good idea
-
-One problem is that I wanted to start out small with the pinctrl
-subsystem, and now it looks like it has to do a *lot* of stuff from
-day 1 to be of any use ...
-
-One specific thing worries me: Grant asked me to make sure
-to NOT create a global pin number space for the pinmuxes (and thus
-pinctrl). This means that in order to proceed, mappings of pinmux
-groups or pincontrol (such as bias) groups, each device using such
-an entity need to reference the intended pincontroller/mux instance.
-
-Say mmc instance 0 need pingroup foo on pincontroller bar
-means that there must be a specific reference from mmc.0:s
-struct device * to pinctrl bar:s struct device *. Maybe this is
-peanuts in DT, sorry not enough insight.
-
-I wonder if this has bearing on how the device tree need to be
-structured to be future proof? (Hopefully not.)
-
-Yours,
-Linus Walleij
+	Arnd
