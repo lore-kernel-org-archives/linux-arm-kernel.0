@@ -1,39 +1,41 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 16 Aug 2011 09:34:40 +0300
-Subject: [PATCH v2] i2c: tegra: Check for overflow errors with BUG_ON.
-In-Reply-To: <1313458336-31456-1-git-send-email-dianders@chromium.org>
-References: <1313434172-18319-1-git-send-email-dianders@chromium.org>
-	<1313458336-31456-1-git-send-email-dianders@chromium.org>
-Message-ID: <20110816063439.GB2223@legolas.emea.dhcp.ti.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 16 Aug 2011 08:46:14 +0200
+Subject: [PATCH] detect conflicting zreladdrs
+In-Reply-To: <1312980298-28035-1-git-send-email-s.hauer@pengutronix.de>
+References: <1312980298-28035-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20110816064614.GF17990@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 15, 2011 at 06:32:16PM -0700, Doug Anderson wrote:
-> This change doesn't fix any known problems but turns
-> on the overflow detection feature of the i2c controller
-> in the hopes of flushing out any current (or future)
-> bugs in the i2c driver.
+On Wed, Aug 10, 2011 at 02:44:55PM +0200, Sascha Hauer wrote:
+> With CONFIG_ARM_PATCH_PHYS_VIRT and CONFIG_AUTO_ZRELADDR the kernel
+> is ready to calculate zreladdr at runtime. Currently the boards specify
+> zreladdr using := in their Makefile.boot. This means the value maybe
+> overwritten silently if multiple zreladdr-y exist. This series changes
+> the := into += so that we have multiple words in zreladdr instead.
+> This makes it possible to catch conflicting zreladdrs during build.
 > 
-> Inspired by a change on nvidia's git server:
->   http://nv-tegra.nvidia.com/gitweb/?p=linux-2.6.git;a=commit;h=266d1b7397284505e55d06254b497cb32be07b69
+> Without CONFIG_AUTO_ZRELADDR=y multiple zreladdrs are not allowed for
+> zImages, so we bail out if we detect it.
 > 
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> uImages are generally incompatible with multiple zreladdrs, so we
+> bail out if we detect it. In this case an uImage can still be built
+> by specifying LOADADDR= on the command line.
+> 
+> Sascha
+> 
+> Sascha Hauer (3):
+>       ARM: Check for multiple zreladdrs
+>       ARM: Check for multiple load addresses before building a uImage
+>       ARM: allow to detect conflicting zreladdrs
 
-Reviewed-by: Felipe Balbi <balbi@ti.com>
+Russell, any comments to this series? Ok to check into the patch system?
 
-> ---
-> This takes Felipe Balbi's suggestion of making the overflow
-> error non-fatal.
+Sascha
 
-the WARN() was very nice idea, I was thinking of just returning an error
-to the client, but the adition of WARN() will make it really bold ;-)
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 490 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110816/dc045f92/attachment.sig>
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
