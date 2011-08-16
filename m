@@ -1,34 +1,109 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Tue, 16 Aug 2011 10:28:30 +0100
-Subject: PB1176 broken in -rc1
-In-Reply-To: <CACRpkdaoDJy-YKONaz2j07pPvTZuHZ7KgEm6XGxNXK-jNzB8_w@mail.gmail.com>
-References: <20110810152400.GO10121@e102144-lin.cambridge.arm.com>
-	<CACRpkdaoDJy-YKONaz2j07pPvTZuHZ7KgEm6XGxNXK-jNzB8_w@mail.gmail.com>
-Message-ID: <20110816092830.GB2786@pulham.picochip.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 16 Aug 2011 11:29:37 +0200
+Subject: [PATCH 8/9] ARM: integrate CMA with DMA-mapping subsystem
+In-Reply-To: <201108121700.30967.arnd@arndb.de>
+References: <1313146711-1767-1-git-send-email-m.szyprowski@samsung.com>
+	<1313146711-1767-9-git-send-email-m.szyprowski@samsung.com>
+	<201108121700.30967.arnd@arndb.de>
+Message-ID: <002b01cc5bf7$0460e350$0d22a9f0$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 16, 2011 at 11:21:50AM +0200, Linus Walleij wrote:
-> On Wed, Aug 10, 2011 at 5:24 PM, Will Deacon <will.deacon@arm.com> wrote:
-> 
-> > Hi Linus,
+Hello,
+
+On Friday, August 12, 2011 5:01 PM Arnd Bergmann wrote:
+
+> On Friday 12 August 2011, Marek Szyprowski wrote:
+> > @@ -82,16 +103,16 @@ static struct page *__dma_alloc_buffer(struct device
+*dev,
+> size_t size, gfp_t gf
+> >  	if (mask < 0xffffffffULL)
+> >  		gfp |= GFP_DMA;
 > >
-> > My PB1176 platform appears to lock up as soon as it hits userspace when
-> > running a 3.1-rc1 kernel.
+> > -	page = alloc_pages(gfp, order);
+> > -	if (!page)
+> > -		return NULL;
+> > -
+> >  	/*
+> > -	 * Now split the huge page and free the excess pages
+> > +	 * Allocate contiguous memory
+> >  	 */
+> > -	split_page(page, order);
+> > -	for (p = page + (size >> PAGE_SHIFT), e = page + (1 << order); p < e;
+p++)
+> > -		__free_page(p);
+> > +	if (cma_available())
+> > +		page = dma_alloc_from_contiguous(dev, count, order);
+> > +	else
+> > +		page = __dma_alloc_system_pages(count, gfp, order);
+> > +
+> > +	if (!page)
+> > +		return NULL;
 > 
-> My kernel does not even boot on either -rc1 or -rc2 on the
-> PB1176, with or wthout Jamies poisoning fixup.
-> 
-> Did you change anything else on top of -rc1 when you tested this?
-> 
-> Will, Jamie, any hints?
-> 
-> If I cherry-pick my TCM patches adding PB1176 support to a clean
-> v3.0 branch, everything works fine, so I suspect I am not guilty for
-> this AFAICT, it's something else.
+> Why do you need the fallback here? I would assume that CMA now has to be
+available
+> on ARMv6 and up to work at all. When you allocate from
+__dma_alloc_system_pages(),
+> wouldn't that necessarily fail in the dma_remap_area() stage?
 
-Well I've been basing off of Grant's device tree branches as my platform 
-(1176) isn't in mainline yet and has DT dependencies.  Is anything being 
-put in your TCMs or are they staying empty?
+It is not a fallback - I've just merged 2 cases together (CMA case and
+coheren/nommu
+arch). I agree that such mixed code might be confusing.
 
-Jamie
+> >
+> > -	if (arch_is_coherent() || nommu()) {
+> > +	if (arch_is_coherent() || nommu() ||
+> > +	   (cma_available() && !(gfp & GFP_ATOMIC))) {
+> > +		/*
+> > +		 * Allocate from system or CMA pages
+> > +		 */
+> >  		struct page *page = __dma_alloc_buffer(dev, size, gfp);
+> >  		if (!page)
+> >  			return NULL;
+> > +		dma_remap_area(page, size, area->prot);
+> >  		pfn = page_to_pfn(page);
+> >  		ret = page_address(page);
+> 
+> Similarly with coherent and nommu. It seems to me that lumping too
+> many cases together creates extra complexity here.
+> 
+> How about something like
+> 
+> 	if (arch_is_coherent() || nommu())
+> 		ret = alloc_simple_buffer();
+> 	else if (arch_is_v4_v5())
+> 		ret = alloc_remap();
+> 	else if (gfp & GFP_ATOMIC)
+> 		ret = alloc_from_pool();
+> 	else
+> 		ret = alloc_from_contiguous();
+> 
+> This also allows a natural conversion to dma_map_ops when we get there.
+
+Ok. Is it ok to enable CMA permanently for ARMv6+? If CMA is left conditional
+the dma pool code will be much more complicated, because it will need to support
+both CMA and non-CMA cases.
+
+> >  	/* reserve any platform specific memblock areas */
+> >  	if (mdesc->reserve)
+> >  		mdesc->reserve();
+> >
+> > +	dma_coherent_reserve();
+> > +	dma_contiguous_reserve();
+> > +
+> >  	memblock_analyze();
+> >  	memblock_dump_all();
+> >  }
+> 
+> Since we can handle most allocations using CMA on ARMv6+, I would think
+> that we can have a much smaller reserved area. Have you tried changing
+> dma_coherent_reserve() to allocate out of the contiguous area instead of
+> wasting a full 2MB section of memory?
+
+I will move the reserved pool directly into CMA area, so it can be shrunk below
+2MiB.
+
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
