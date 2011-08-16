@@ -1,46 +1,79 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 16 Aug 2011 15:28:48 +0200
-Subject: [PATCH 7/9] ARM: DMA: steal memory for DMA coherent mappings
-In-Reply-To: <20110814075205.GA4986@n2100.arm.linux.org.uk>
-References: <1313146711-1767-1-git-send-email-m.szyprowski@samsung.com>
-	<201108121453.05898.arnd@arndb.de>
-	<20110814075205.GA4986@n2100.arm.linux.org.uk>
-Message-ID: <201108161528.48954.arnd@arndb.de>
+Date: Tue, 16 Aug 2011 15:51:31 +0200
+Subject: [RFC PATCH v2 06/13] docs/dt: Document nvidia,
+	tegra20-pinmux binding
+In-Reply-To: <1313440100-17131-7-git-send-email-swarren@nvidia.com>
+References: <1313440100-17131-1-git-send-email-swarren@nvidia.com>
+	<1313440100-17131-7-git-send-email-swarren@nvidia.com>
+Message-ID: <201108161551.31389.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 14 August 2011, Russell King - ARM Linux wrote:
-> On Fri, Aug 12, 2011 at 02:53:05PM +0200, Arnd Bergmann wrote:
-> > 
-> > I thought that our discussion ended with the plan to use this only
-> > for ARMv6+ (which has a problem with double mapping) but not on ARMv5
-> > and below (which don't have this problem but might need dmabounce).
+On Monday 15 August 2011, Stephen Warren wrote:
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> ---
+>  .../devicetree/bindings/pinmux/pinmux_nvidia.txt   |  294 ++++++++++++++++++++
+>  1 files changed, 294 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/pinmux/pinmux_nvidia.txt
 > 
-> I thought we'd decided to have a pool of available CMA memory on ARMv6K
-> to satisfy atomic allocations, which can grow and shrink in size, rather
-> than setting aside a fixed amount of contiguous system memory.
+> diff --git a/Documentation/devicetree/bindings/pinmux/pinmux_nvidia.txt b/Documentation/devicetree/bindings/pinmux/pinmux_nvidia.txt
+> new file mode 100644
+> index 0000000..744e1b7
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pinmux/pinmux_nvidia.txt
+> @@ -0,0 +1,294 @@
+> +NVIDIA Tegra 2 pinmux controller
+> +
+> +Required properties:
+> +- compatible : "nvidia,tegra20-pinmux"
 
-Hmm, I don't remember the point about dynamically sizing the pool for
-ARMv6K, but that can well be an oversight on my part.  I do remember the
-part about taking that memory pool from the CMA region as you say.
+Hmm, I think it would be much better in general if we could define
+pinmux bindings in a way that is less specific to just one soc.
+The contents of this file seem to be specific to even just one
+version of the tegra chip, and might be completely different for
+tegra30 and later, right?
 
-> ARMv6 and ARMv7+ could use CMA directly, and <= ARMv5 can use the existing
-> allocation method.
-> 
-> Has something changed?
+Maybe Linus W can comment on this and say whether he thinks it can
+be generalized enough to apply to other pinmux drivers.
 
-Nothing has changed regarding <=ARMv5. There was a small side discussion
-about ARMv6 and ARMv7+ based on the idea that they can either use CMA
-directly (doing TLB flushes for every allocation) or they could use the
-same method as ARMv6K by setting aside a pool of pages for atomic
-allocation. The first approach would consume less memory because it
-requires no special pool, the second approach would be simpler because
-it unifies the ARMv6K and ARMv6/ARMv7+ cases and also would be slightly
-more efficient for atomic allocations because it avoids the expensive
-TLB flush.
+> +Optional sub-nodes:
+> +- nvidia,mux-groups : Mux group settings; see below.
+> +- nvidia,drive-groups : Drive group settings; see below.
+> +
+> +nvidia,mux-groups sub-node:
 
-I didn't have a strong opinion either way, so IIRC Marek said he'd try
-out both approaches and then send out the one that looked better, leaning
-towards the second for simplicity of having fewer compile-time options.
+These concepts seem general enough to me that they can apply to
+other chips, and I would consequently drop the nvidia, prefix.
+
+> +Each mux pin group is represented as a sub-node of the nvidia,mux-groups node.
+> +The name of the sub-node should be the name of the mux pingroup. The following
+> +names are valid:
+> +
+> +	ata
+> +	atb
+> +	atc
+> +	atd
+> +	ate
+> +	cdev1
+> +	cdev2
+> ...
+
+I noticed that each board you define has a complete list of these. Would
+it be possible to move a generic list into a tegra20-pinmux.dtsi file and
+just override the pins in the per-board .dts file that require some special
+setup?
+
+
+> +
+> +optional subnode-properties:
+> +- nvidia,pull-up : Boolean, apply Tegra's internal pull-up to the pin.
+> +- nvidia,pull-down : Boolean, apply Tegra's internal pull-down to the pin.
+> +- nvidia,tristate : Boolean, tristate the pin. Otherwise, drive it.
+> +
+> +If both nvidia,pull-up and nvidia,pull-down are specified, nvidia,pull-up
+> +takes precedence.
+
+These again seem generic enough to go into a general pinmux binding, without
+the nvidia, prefix.
 
 	Arnd
