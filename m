@@ -1,56 +1,67 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Tue, 16 Aug 2011 12:31:57 +0800
-Subject: [PATCH] ARM: mmp: rename SHEEVAD to GPLUGD
-Message-ID: <1313469117-7818-1-git-send-email-eric.y.miao@gmail.com>
+From: axel.lin@gmail.com (Axel Lin)
+Date: Tue, 16 Aug 2011 13:15:44 +0800
+Subject: [PATCH] ARM: tegra: Add missing include of linux/erron.h and
+	linux/types.h
+Message-ID: <1313471744.5824.2.camel@phoenix>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-GuruPlugD was initially named to be SHEEVAD, and it's causing naming
-confusion in the mach-types database. Make it consistent by renaming
-to GPLUGD.
+Include linux/erron.h to fix below build error.
 
-Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
+  CC      arch/arm/mach-tegra/board-harmony-pinmux.o
+In file included from /home/axel/repos/git/linux-2.6/arch/arm/include/asm/gpio.h:5,
+                 from include/linux/gpio.h:18,
+                 from arch/arm/mach-tegra/board-harmony-pinmux.c:18:
+arch/arm/mach-tegra/include/mach/gpio.h: In function 'gpio_to_irq':
+arch/arm/mach-tegra/include/mach/gpio.h:35: error: 'EINVAL' undeclared (first use in this function)
+arch/arm/mach-tegra/include/mach/gpio.h:35: error: (Each undeclared identifier is reported only once
+arch/arm/mach-tegra/include/mach/gpio.h:35: error: for each function it appears in.)
+arch/arm/mach-tegra/include/mach/gpio.h: In function 'irq_to_gpio':
+arch/arm/mach-tegra/include/mach/gpio.h:43: error: 'EINVAL' undeclared (first use in this function)
+make[1]: *** [arch/arm/mach-tegra/board-harmony-pinmux.o] Error 1
+make: *** [arch/arm/mach-tegra] Error 2
+
+Include linux/types.h to fix below build error.
+
+  CC      arch/arm/mach-tegra/board-trimslice-pinmux.o
+In file included from /home/axel/repos/git/linux-2.6/arch/arm/include/asm/gpio.h:5,
+                 from include/linux/gpio.h:18,
+                 from arch/arm/mach-tegra/board-trimslice-pinmux.c:16:
+arch/arm/mach-tegra/include/mach/gpio.h:49: error: expected specifier-qualifier-list before 'bool'
+arch/arm/mach-tegra/board-trimslice-pinmux.c:145: error: unknown field 'enable' specified in initializer
+arch/arm/mach-tegra/board-trimslice-pinmux.c:145: warning: excess elements in struct initializer
+arch/arm/mach-tegra/board-trimslice-pinmux.c:145: warning: (near initialization for 'gpio_table[0]')
+arch/arm/mach-tegra/board-trimslice-pinmux.c:146: error: unknown field 'enable' specified in initializer
+arch/arm/mach-tegra/board-trimslice-pinmux.c:146: warning: excess elements in struct initializer
+arch/arm/mach-tegra/board-trimslice-pinmux.c:146: warning: (near initialization for 'gpio_table[1]')
+arch/arm/mach-tegra/board-trimslice-pinmux.c:148: error: unknown field 'enable' specified in initializer
+arch/arm/mach-tegra/board-trimslice-pinmux.c:148: warning: excess elements in struct initializer
+arch/arm/mach-tegra/board-trimslice-pinmux.c:148: warning: (near initialization for 'gpio_table[2]')
+arch/arm/mach-tegra/board-trimslice-pinmux.c:149: error: unknown field 'enable' specified in initializer
+arch/arm/mach-tegra/board-trimslice-pinmux.c:149: warning: excess elements in struct initializer
+arch/arm/mach-tegra/board-trimslice-pinmux.c:149: warning: (near initialization for 'gpio_table[3]')
+make[1]: *** [arch/arm/mach-tegra/board-trimslice-pinmux.o] Error 1
+make: *** [arch/arm/mach-tegra] Error 2
+
+Signed-off-by: Axel Lin <axel.lin@gmail.com>
 ---
- arch/arm/mach-mmp/Kconfig  |    2 +-
- arch/arm/mach-mmp/Makefile |    2 +-
- arch/arm/mach-mmp/gplugd.c |    2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+This patch is against linux-next (next-20110815), it fixes the build error with "make tegra_defconfig".
+Axel
+ arch/arm/mach-tegra/include/mach/gpio.h |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-mmp/Kconfig b/arch/arm/mach-mmp/Kconfig
-index 56ef5f6..323d4c9 100644
---- a/arch/arm/mach-mmp/Kconfig
-+++ b/arch/arm/mach-mmp/Kconfig
-@@ -77,7 +77,7 @@ config MACH_TETON_BGA
- 	  Say 'Y' here if you want to support the Marvell PXA168-based
- 	  Teton BGA Development Board.
+diff --git a/arch/arm/mach-tegra/include/mach/gpio.h b/arch/arm/mach-tegra/include/mach/gpio.h
+index e353805..42f3f08 100644
+--- a/arch/arm/mach-tegra/include/mach/gpio.h
++++ b/arch/arm/mach-tegra/include/mach/gpio.h
+@@ -21,6 +21,8 @@
+ #define __MACH_TEGRA_GPIO_H
  
--config MACH_SHEEVAD
-+config MACH_GPLUGD
- 	bool "Marvell's PXA168 GuruPlug Display (gplugD) Board"
- 	select CPU_PXA168
- 	help
-diff --git a/arch/arm/mach-mmp/Makefile b/arch/arm/mach-mmp/Makefile
-index 169c674..ba254a7 100644
---- a/arch/arm/mach-mmp/Makefile
-+++ b/arch/arm/mach-mmp/Makefile
-@@ -19,4 +19,4 @@ obj-$(CONFIG_MACH_BROWNSTONE)	+= brownstone.o
- obj-$(CONFIG_MACH_FLINT)	+= flint.o
- obj-$(CONFIG_MACH_MARVELL_JASPER) += jasper.o
- obj-$(CONFIG_MACH_TETON_BGA)	+= teton_bga.o
--obj-$(CONFIG_MACH_SHEEVAD)	+= gplugd.o
-+obj-$(CONFIG_MACH_GPLUGD)	+= gplugd.o
-diff --git a/arch/arm/mach-mmp/gplugd.c b/arch/arm/mach-mmp/gplugd.c
-index 98e25d9..2d2c0ad 100644
---- a/arch/arm/mach-mmp/gplugd.c
-+++ b/arch/arm/mach-mmp/gplugd.c
-@@ -188,7 +188,7 @@ static void __init gplugd_init(void)
- 	pxa168_add_eth(&gplugd_eth_platform_data);
- }
+ #include <linux/init.h>
++#include <linux/errno.h>
++#include <linux/types.h>
+ #include <mach/irqs.h>
  
--MACHINE_START(SHEEVAD, "PXA168-based GuruPlug Display (gplugD) Platform")
-+MACHINE_START(GPLUGD, "PXA168-based GuruPlug Display (gplugD) Platform")
- 	.map_io		= mmp_map_io,
- 	.nr_irqs	= IRQ_BOARD_START,
- 	.init_irq       = pxa168_init_irq,
+ #define TEGRA_NR_GPIOS		INT_GPIO_NR
 -- 
 1.7.4.1
