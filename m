@@ -1,35 +1,34 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 16 Aug 2011 15:09:16 +0200
-Subject: [RFC PATCH v2 00/13] arm/tegra: Initialize GPIO & pinmux from DT
-In-Reply-To: <1313440100-17131-1-git-send-email-swarren@nvidia.com>
-References: <1313440100-17131-1-git-send-email-swarren@nvidia.com>
-Message-ID: <201108161509.17157.arnd@arndb.de>
+Date: Tue, 16 Aug 2011 15:14:52 +0200
+Subject: [PATCH 8/9] ARM: integrate CMA with DMA-mapping subsystem
+In-Reply-To: <002b01cc5bf7$0460e350$0d22a9f0$%szyprowski@samsung.com>
+References: <1313146711-1767-1-git-send-email-m.szyprowski@samsung.com>
+	<201108121700.30967.arnd@arndb.de>
+	<002b01cc5bf7$0460e350$0d22a9f0$%szyprowski@samsung.com>
+Message-ID: <201108161514.52953.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 15 August 2011, Stephen Warren wrote:
-> v2:
-> * Enhanced pinmux code to handle "drive pingroups" as well as "mux
->   pingroups". This altered the pinmux binding a little; shifting each
->   type of pingroup into a sub-node in the pinmux node.
-> * Enumerate pingroups by enumerating DT child nodes, and mapping them to
->   pingroups, rather than the other way around. Hence also removed
->   modifications to <linux/of.h> and drivers/of/base.c.
-> * Included documentation of the bindings.
-> * Represent pingroup names and function names, as lower case in DT.
-> * Used a better name for GPIO binding GPIO list.
-> * Switched to boolean properties for pinmux pull-up/down.
-> * s/dev_err/dev_dbg/ in DT parsing debug code.
-> * Various minor cleanups (e.g. typos, white-space).
+On Tuesday 16 August 2011, Marek Szyprowski wrote:
+> On Friday, August 12, 2011 5:01 PM Arnd Bergmann wrote:
+
+> > How about something like
+> > 
+> >       if (arch_is_coherent() || nommu())
+> >               ret = alloc_simple_buffer();
+> >       else if (arch_is_v4_v5())
+> >               ret = alloc_remap();
+> >       else if (gfp & GFP_ATOMIC)
+> >               ret = alloc_from_pool();
+> >       else
+> >               ret = alloc_from_contiguous();
+> > 
+> > This also allows a natural conversion to dma_map_ops when we get there.
 > 
-> This patch modifies Tegra's device tree support to remove the dependency
-> on harmony_pinmux_init(), thus making it completely board-independent.
+> Ok. Is it ok to enable CMA permanently for ARMv6+? If CMA is left conditional
+> the dma pool code will be much more complicated, because it will need to support
+> both CMA and non-CMA cases.
 
-I don't understand enough of the technical background to comment on
-the contents, on the surface it all makes sense.
-
-I do think that you should keep Linus Walleij on Cc in these emails, since
-he first started pushing for a common pinmux layer, and we need to make
-sure that the binding works for all SoCs, not just for tegra.
+I think that is ok, yes.
 
 	Arnd
