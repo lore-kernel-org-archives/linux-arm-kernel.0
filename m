@@ -1,79 +1,98 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 16 Aug 2011 22:41:13 +0100
-Subject: [PATCH 3/3] ARM: realview: use Kconfig choice for debug UART selection
+Date: Tue, 16 Aug 2011 22:41:12 +0100
+Subject: [PATCH 2/3] ARM: plat-samsung: use Kconfig choice for debug UART
+	selection
 In-Reply-To: <1313530873-24961-1-git-send-email-will.deacon@arm.com>
 References: <1313530873-24961-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1313530873-24961-3-git-send-email-will.deacon@arm.com>
+Message-ID: <1313530873-24961-2-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the DEBUG_LL UART can be selected by a Kconfig choice, simplify
-the #ifdefery in debug-macro.S and add entries to the top-level
-Kconfig.debug instead.
+Now that the DEBUG_LL UART can be selected by a Kconfig choice, convert
+the Samsung UART selection to use a set of bools rather than an int.
 
-Cc: Linus Walleij <linus.walleij@stericsson.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/Kconfig.debug                            |   16 ++++++++++++++++
- arch/arm/mach-realview/include/mach/debug-macro.S |   17 ++---------------
- 2 files changed, 18 insertions(+), 15 deletions(-)
+ arch/arm/Kconfig.debug        |   45 ++++++++++++++++++++++++++++++-----------
+ arch/arm/plat-samsung/Kconfig |    7 ++++++
+ 2 files changed, 40 insertions(+), 12 deletions(-)
 
 diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 2f80564..f23975a 100644
+index 11604c9..2f80564 100644
 --- a/arch/arm/Kconfig.debug
 +++ b/arch/arm/Kconfig.debug
-@@ -127,6 +127,22 @@ choice
- 		  The uncompressor code port configuration is now handled
- 		  by CONFIG_S3C_LOWLEVEL_UART_PORT.
+@@ -94,6 +94,39 @@ choice
+ 		  Saying N will cause the debug messages to appear on the first
+ 		  serial port.
  
-+	config DEBUG_REALVIEW_STD_PORT
-+		bool "RealView Default UART"
-+		depends on ARCH_REALVIEW
++	config DEBUG_S3C_UART0
++		depends on PLAT_SAMSUNG
++		bool "Use S3C UART 0 for low-level debug"
 +		help
 +		  Say Y here if you want the debug print routines to direct
-+		  their output to the serial port on RealView EB, PB11MP, PBA8
-+		  and PBX platforms.
++		  their output to UART 0. The port must have been initialised
++		  by the boot-loader before use.
 +
-+	config DEBUG_REALVIEW_PB1176_PORT
-+		bool "RealView PB1176 UART"
-+		depends on MACH_REALVIEW_PB1176
++		  The uncompressor code port configuration is now handled
++		  by CONFIG_S3C_LOWLEVEL_UART_PORT.
++
++	config DEBUG_S3C_UART1
++		depends on PLAT_SAMSUNG
++		bool "Use S3C UART 1 for low-level debug"
 +		help
 +		  Say Y here if you want the debug print routines to direct
-+		  their output to the standard serial port on the RealView
-+		  PB1176 platform.
++		  their output to UART 1. The port must have been initialised
++		  by the boot-loader before use.
++
++		  The uncompressor code port configuration is now handled
++		  by CONFIG_S3C_LOWLEVEL_UART_PORT.
++
++	config DEBUG_S3C_UART2
++		depends on PLAT_SAMSUNG
++		bool "Use S3C UART 2 for low-level debug"
++		help
++		  Say Y here if you want the debug print routines to direct
++		  their output to UART 2. The port must have been initialised
++		  by the boot-loader before use.
++
++		  The uncompressor code port configuration is now handled
++		  by CONFIG_S3C_LOWLEVEL_UART_PORT.
 +
  endchoice
  
  config EARLY_PRINTK
-diff --git a/arch/arm/mach-realview/include/mach/debug-macro.S b/arch/arm/mach-realview/include/mach/debug-macro.S
-index 90b687c..0f38722 100644
---- a/arch/arm/mach-realview/include/mach/debug-macro.S
-+++ b/arch/arm/mach-realview/include/mach/debug-macro.S
-@@ -10,23 +10,10 @@
-  * published by the Free Software Foundation.
-  */
+@@ -124,16 +157,4 @@ config OC_ETM
+ 	  buffer driver that will allow you to collect traces of the
+ 	  kernel code.
  
--#if defined(CONFIG_MACH_REALVIEW_EB) || \
--    defined(CONFIG_MACH_REALVIEW_PB11MP) || \
--    defined(CONFIG_MACH_REALVIEW_PBA8) || \
--    defined(CONFIG_MACH_REALVIEW_PBX)
--#ifndef DEBUG_LL_UART_OFFSET
-+#ifdef CONFIG_DEBUG_REALVIEW_STD_PORT
- #define DEBUG_LL_UART_OFFSET	0x00009000
--#elif DEBUG_LL_UART_OFFSET != 0x00009000
--#warning "DEBUG_LL_UART_OFFSET already defined to a different value"
--#endif
--#endif
+-config DEBUG_S3C_UART
+-	depends on PLAT_SAMSUNG
+-	int "S3C UART to use for low-level debug"
+-	default "0"
+-	help
+-	  Choice for UART for kernel low-level using S3C UARTS,
+-	  should be between zero and two. The port must have been
+-	  initialised by the boot-loader before use.
 -
--#ifdef CONFIG_MACH_REALVIEW_PB1176
--#ifndef DEBUG_LL_UART_OFFSET
-+#elif defined(CONFIG_DEBUG_REALVIEW_PB1176_PORT)
- #define DEBUG_LL_UART_OFFSET	0x0010c000
--#elif DEBUG_LL_UART_OFFSET != 0x0010c000
--#warning "DEBUG_LL_UART_OFFSET already defined to a different value"
--#endif
- #endif
+-	  The uncompressor code port configuration is now handled
+-	  by CONFIG_S3C_LOWLEVEL_UART_PORT.
+-
+ endmenu
+diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
+index b3e1065..49b14b1 100644
+--- a/arch/arm/plat-samsung/Kconfig
++++ b/arch/arm/plat-samsung/Kconfig
+@@ -367,4 +367,11 @@ config SAMSUNG_PD
+ 	help
+ 	  Say Y here if you want to control Power Domain by Runtime PM.
  
- #ifndef DEBUG_LL_UART_OFFSET
++config DEBUG_S3C_UART
++	depends on PLAT_SAMSUNG
++	int
++	default "0" if DEBUG_S3C_UART0
++	default "1" if DEBUG_S3C_UART1
++	default "2" if DEBUG_S3C_UART2
++
+ endif
 -- 
 1.7.0.4
