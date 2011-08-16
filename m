@@ -1,92 +1,100 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 16 Aug 2011 15:34:58 -0500
-Subject: [PATCH 6/6] ARM: highbank: add suspend support
-In-Reply-To: <1313526898-19920-1-git-send-email-robherring2@gmail.com>
-References: <1313526898-19920-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1313526898-19920-7-git-send-email-robherring2@gmail.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Tue, 16 Aug 2011 13:46:12 -0700
+Subject: [RFC PATCH v2 02/13] arm/tegra: Avoid duplicate gpio/pinmux
+	devices with dt
+In-Reply-To: <1313440100-17131-3-git-send-email-swarren@nvidia.com>
+References: <1313440100-17131-1-git-send-email-swarren@nvidia.com>
+	<1313440100-17131-3-git-send-email-swarren@nvidia.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF04AEA25449@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+Stephen Warren wrote at Monday, August 15, 2011 2:28 PM:
+> A future change will set up gpio and pinmux platform device registration
+> in device-tree files, via board-dt.c. When board-dt.c calls into
+> harmony/seaboard_pinmux_init(), this will cause a duplicate registration
+> of those platform devices, which will cause kernel boot failure.
 
-Add the platform suspend ops for highbank.
+It looks like this patch, and the subsequent revert, aren't actually needed.
 
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
----
- arch/arm/mach-highbank/Makefile |    1 +
- arch/arm/mach-highbank/pm.c     |   55 +++++++++++++++++++++++++++++++++++++++
- 2 files changed, 56 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-highbank/pm.c
+The boot failure I saw earlier was actually due to the pinmux driver crashing
+if pdev->dev.of_node==NULL during probe.
 
-diff --git a/arch/arm/mach-highbank/Makefile b/arch/arm/mach-highbank/Makefile
-index b8d5d40..2cd4a1b 100644
---- a/arch/arm/mach-highbank/Makefile
-+++ b/arch/arm/mach-highbank/Makefile
-@@ -2,3 +2,4 @@ obj-y					:= clock.o highbank.o system.o
- obj-$(CONFIG_SMP)			+= platsmp.o
- obj-$(CONFIG_LOCAL_TIMERS)		+= localtimer.o
- obj-$(CONFIG_HOTPLUG_CPU)		+= hotplug.o
-+obj-$(CONFIG_PM_SLEEP)			+= pm.o
-diff --git a/arch/arm/mach-highbank/pm.c b/arch/arm/mach-highbank/pm.c
-new file mode 100644
-index 0000000..36c88df
---- /dev/null
-+++ b/arch/arm/mach-highbank/pm.c
-@@ -0,0 +1,55 @@
-+/*
-+ * Copyright 2011 Calxeda, Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along with
-+ * this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include <linux/init.h>
-+#include <linux/io.h>
-+#include <linux/suspend.h>
-+
-+#include <asm/proc-fns.h>
-+#include <asm/smp_scu.h>
-+#include <asm/suspend.h>
-+
-+#include "core.h"
-+#include "sysregs.h"
-+
-+static int highbank_suspend_finish(unsigned long val)
-+{
-+	cpu_do_idle();
-+	return 0;
-+}
-+
-+static int highbank_pm_enter(suspend_state_t state)
-+{
-+	writel(HB_PWR_SUSPEND, sregs_base + HB_SREG_A9_PWR_REQ);
-+	highbank_set_cpu_jump(0, cpu_resume);
-+
-+	scu_power_mode(a9_base_addr, SCU_PM_POWEROFF);
-+	cpu_suspend(0, highbank_suspend_finish);
-+
-+	return 0;
-+}
-+
-+static const struct platform_suspend_ops highbank_pm_ops = {
-+	.enter = highbank_pm_enter,
-+	.valid = suspend_valid_only_mem,
-+};
-+
-+static int highbank_pm_init(void)
-+{
-+	suspend_set_ops(&highbank_pm_ops);
-+	return 0;
-+}
-+module_init(highbank_pm_init);
+With that fixed, with this patch series as is, there are then warnings due
+to tegra-gpio and tegra-pinmux each being registered twice, due to the
+following patch setting up AUXDATA and causing the device-tree-registered
+and platform-device-registered devices to have the same name.
+
+However, I'm dropping the AUXDATA patch, so that issue doesn't occur.
+
+And hence, I will drop this patch, and its subsequent revert. This will
+cause the GPIO and pinmux drivers to be temporarily instantiated twice.
+However, that doesn't actually cause any problems, and will be solved af
+ew patches later anyway.
+
+(Let me know if anyone thinks this patch should stay in).
+
+> To solve this, modify harmony/seaboard_pinmux_init() so that they only
+> register the platform devices when actually running on Harmony/Seaboard;
+> when board-dt.c is in use, a different machine type is used.
+> 
+> This change is a temporary measure to ensure git bisectability. It will
+> be reverted when board-dt.c no longer calls harmony/seaboard_pinmux_init().
+> 
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> ---
+>  arch/arm/mach-tegra/board-harmony-pinmux.c  |    5 ++++-
+>  arch/arm/mach-tegra/board-seaboard-pinmux.c |    5 ++++-
+>  2 files changed, 8 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-tegra/board-harmony-pinmux.c b/arch/arm/mach-tegra/board-harmony-pinmux.c
+> index e99b456..130018d 100644
+> --- a/arch/arm/mach-tegra/board-harmony-pinmux.c
+> +++ b/arch/arm/mach-tegra/board-harmony-pinmux.c
+> @@ -14,6 +14,8 @@
+>   *
+>   */
+> 
+> +#include <asm/mach-types.h>
+> +
+>  #include <linux/kernel.h>
+>  #include <linux/gpio.h>
+>  #include <mach/pinmux.h>
+> @@ -161,7 +163,8 @@ static struct tegra_gpio_table gpio_table[] = {
+> 
+>  void harmony_pinmux_init(void)
+>  {
+> -	platform_add_devices(pinmux_devices, ARRAY_SIZE(pinmux_devices));
+> +	if (machine_is_harmony())
+> +		platform_add_devices(pinmux_devices, ARRAY_SIZE(pinmux_devices));
+> 
+>  	tegra_pinmux_config_table(harmony_pinmux, ARRAY_SIZE(harmony_pinmux));
+> 
+> diff --git a/arch/arm/mach-tegra/board-seaboard-pinmux.c b/arch/arm/mach-tegra/board-seaboard-pinmux.c
+> index f092298..bc4dc17 100644
+> --- a/arch/arm/mach-tegra/board-seaboard-pinmux.c
+> +++ b/arch/arm/mach-tegra/board-seaboard-pinmux.c
+> @@ -12,6 +12,8 @@
+>   *
+>   */
+> 
+> +#include <asm/mach-types.h>
+> +
+>  #include <linux/kernel.h>
+>  #include <linux/init.h>
+>  #include <linux/gpio.h>
+> @@ -176,7 +178,8 @@ static struct tegra_gpio_table gpio_table[] = {
+> 
+>  void __init seaboard_pinmux_init(void)
+>  {
+> -	platform_add_devices(pinmux_devices, ARRAY_SIZE(pinmux_devices));
+> +	if (machine_is_seaboard())
+> +		platform_add_devices(pinmux_devices, ARRAY_SIZE(pinmux_devices));
+> 
+>  	tegra_pinmux_config_table(seaboard_pinmux, ARRAY_SIZE(seaboard_pinmux));
+> 
+> --
+> 1.7.0.4
+
 -- 
-1.7.4.1
+nvpublic
