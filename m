@@ -1,60 +1,83 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 15 Aug 2011 20:00:45 -0400 (EDT)
-Subject: [PATCH v2] ARM: sched_clock: allow sched_clock to be selected at
-	runtime
-In-Reply-To: <1313078531-25610-1-git-send-email-marc.zyngier@arm.com>
-References: <1313078531-25610-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <alpine.LFD.2.00.1108151931410.20358@xanadu.home>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 15 Aug 2011 18:32:16 -0700
+Subject: [PATCH v2] i2c: tegra: Check for overflow errors with BUG_ON.
+In-Reply-To: <1313434172-18319-1-git-send-email-dianders@chromium.org>
+References: <1313434172-18319-1-git-send-email-dianders@chromium.org>
+Message-ID: <1313458336-31456-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 11 Aug 2011, Marc Zyngier wrote:
+This change doesn't fix any known problems but turns
+on the overflow detection feature of the i2c controller
+in the hopes of flushing out any current (or future)
+bugs in the i2c driver.
 
-> sched_clock() is yet another blocker on the road to the single
-> image. This patch implements an idea by Russell King:
-> 
-> http://www.spinics.net/lists/linux-omap/msg49561.html
-> 
-> Instead of asking the platform to implement both sched_clock()
-> itself and the rollover callback, simply register a read()
-> function, and let the ARM code care about sched_clock() itself,
-> the conversion to ns and the rollover. sched_clock() uses
-> this read() function as an indirection to the platform code.
-> 
-> This allow some simplifications and possibly some footprint gain
-> when multiple platforms are compiled in. Among the drawbacks,
-> the removal of the *_fixed_sched_clock optimization which could
-> negatively impact some platforms (sa1100, tegra, versatile
-> and omap).
-> 
-> Tested on 11MPCore, OMAP4 and Tegra.
+Inspired by a change on nvidia's git server:
+  http://nv-tegra.nvidia.com/gitweb/?p=linux-2.6.git;a=commit;h=266d1b7397284505e55d06254b497cb32be07b69
 
-[...]
+Signed-off-by: Doug Anderson <dianders@chromium.org>
+---
+This takes Felipe Balbi's suggestion of making the overflow
+error non-fatal.
 
-> +unsigned long long notrace sched_clock(void)
-> +{
-> +	if (read_sched_clock) {
-> +		u32 cyc = read_sched_clock();
-> +		return cyc_to_sched_clock(&cd, cyc, sched_clock_mask);
-> +	}
-> +
-> +	return (unsigned long long)(jiffies - INITIAL_JIFFIES)
-> +					* (NSEC_PER_SEC / HZ);
-> +}
+ drivers/i2c/busses/i2c-tegra.c |   17 ++++++++++++++---
+ 1 files changed, 14 insertions(+), 3 deletions(-)
 
-This bothers me that this function has to include a conditional which 
-will _always_ be evaluated as true except during early boot.  Why not 
-simply initializing read_sched_clock with a jiffy_shed_clock function 
-instead, and let it be overriden during boot?  This way the actual 
-sched_clock() code will be more straight forward.
-
-Of course there is the race where read_sched_clock might be updated 
-before or after the corresponding clock data/mask are updated leading to 
-funky results if you are lucky enough to call sched_clock() during that 
-exact wrong moment.  But either we don't care (switching from a jiffy to 
-a hardware clock base is going to cause quite a glitch already anyway), 
-or simply disabling IRQs during initialization should prevent the race 
-(presuming no other CPUs are running at that point).
-
-
-Nicolas
+diff --git a/drivers/i2c/busses/i2c-tegra.c b/drivers/i2c/busses/i2c-tegra.c
+index 2440b74..34634b7 100644
+--- a/drivers/i2c/busses/i2c-tegra.c
++++ b/drivers/i2c/busses/i2c-tegra.c
+@@ -83,6 +83,7 @@
+ #define I2C_ERR_NO_ACK				0x01
+ #define I2C_ERR_ARBITRATION_LOST		0x02
+ #define I2C_ERR_UNKNOWN_INTERRUPT		0x04
++#define I2C_ERR_FIFO_OVERFLOW			0x08
+ 
+ #define PACKET_HEADER0_HEADER_SIZE_SHIFT	28
+ #define PACKET_HEADER0_PACKET_ID_SHIFT		16
+@@ -367,7 +368,8 @@ static int tegra_i2c_init(struct tegra_i2c_dev *i2c_dev)
+ static irqreturn_t tegra_i2c_isr(int irq, void *dev_id)
+ {
+ 	u32 status;
+-	const u32 status_err = I2C_INT_NO_ACK | I2C_INT_ARBITRATION_LOST;
++	const u32 status_err = I2C_INT_NO_ACK | I2C_INT_ARBITRATION_LOST |
++		I2C_INT_TX_FIFO_OVERFLOW;
+ 	struct tegra_i2c_dev *i2c_dev = dev_id;
+ 
+ 	status = i2c_readl(i2c_dev, I2C_INT_STATUS);
+@@ -389,6 +391,14 @@ static irqreturn_t tegra_i2c_isr(int irq, void *dev_id)
+ 	}
+ 
+ 	if (unlikely(status & status_err)) {
++		/*
++		 * Overflow should be impossible unless we've got a
++		 * bug in the driver, but check anyway.
++		 */
++		if (status & I2C_INT_TX_FIFO_OVERFLOW) {
++			WARN_ON(1);
++			i2c_dev->msg_err |= I2C_ERR_FIFO_OVERFLOW;
++		}
+ 		if (status & I2C_INT_NO_ACK)
+ 			i2c_dev->msg_err |= I2C_ERR_NO_ACK;
+ 		if (status & I2C_INT_ARBITRATION_LOST)
+@@ -423,7 +433,7 @@ err:
+ 	/* An error occurred, mask all interrupts */
+ 	tegra_i2c_mask_irq(i2c_dev, I2C_INT_NO_ACK | I2C_INT_ARBITRATION_LOST |
+ 		I2C_INT_PACKET_XFER_COMPLETE | I2C_INT_TX_FIFO_DATA_REQ |
+-		I2C_INT_RX_FIFO_DATA_REQ);
++		I2C_INT_RX_FIFO_DATA_REQ | I2C_INT_TX_FIFO_OVERFLOW);
+ 	i2c_writel(i2c_dev, status, I2C_INT_STATUS);
+ 	if (i2c_dev->is_dvc)
+ 		dvc_writel(i2c_dev, DVC_STATUS_I2C_DONE_INTR, DVC_STATUS);
+@@ -473,7 +483,8 @@ static int tegra_i2c_xfer_msg(struct tegra_i2c_dev *i2c_dev,
+ 	if (!(msg->flags & I2C_M_RD))
+ 		tegra_i2c_fill_tx_fifo(i2c_dev);
+ 
+-	int_mask = I2C_INT_NO_ACK | I2C_INT_ARBITRATION_LOST;
++	int_mask = I2C_INT_NO_ACK | I2C_INT_ARBITRATION_LOST |
++		I2C_INT_TX_FIFO_OVERFLOW;
+ 	if (msg->flags & I2C_M_RD)
+ 		int_mask |= I2C_INT_RX_FIFO_DATA_REQ;
+ 	else if (i2c_dev->msg_buf_remaining)
+-- 
+1.7.3.1
