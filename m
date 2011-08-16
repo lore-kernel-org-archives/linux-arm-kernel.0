@@ -1,86 +1,79 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 16 Aug 2011 22:41:11 +0100
-Subject: [PATCH 1/3] ARM: debug: use kconfig choice for selecting DEBUG_LL UART
-Message-ID: <1313530873-24961-1-git-send-email-will.deacon@arm.com>
+Date: Tue, 16 Aug 2011 22:41:13 +0100
+Subject: [PATCH 3/3] ARM: realview: use Kconfig choice for debug UART selection
+In-Reply-To: <1313530873-24961-1-git-send-email-will.deacon@arm.com>
+References: <1313530873-24961-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1313530873-24961-3-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enabling CONFIG_DEBUG_LL (which is required for earlyprintk) hardwires
-the debug UART address into the kernel, so that we can print before the
-platform is initialised.
-
-If the user inadvertently selects multiple platforms with DEBUG_LL
-enabled, the UART address may not be correct and will likely cause the
-kernel to hang in the very early stages of boot.
-
-This patch, based on a skeleton from Russell, uses a Kconfig choice for
-selecting the DEBUG_LL UART, therefore allowing the user to make a
-choice about the supported platform when DEBUG_LL is enabled.
+Now that the DEBUG_LL UART can be selected by a Kconfig choice, simplify
+the #ifdefery in debug-macro.S and add entries to the top-level
+Kconfig.debug instead.
 
 Cc: Linus Walleij <linus.walleij@stericsson.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/Kconfig.debug |   41 ++++++++++++++++++++++++-----------------
- 1 files changed, 24 insertions(+), 17 deletions(-)
+ arch/arm/Kconfig.debug                            |   16 ++++++++++++++++
+ arch/arm/mach-realview/include/mach/debug-macro.S |   17 ++---------------
+ 2 files changed, 18 insertions(+), 15 deletions(-)
 
 diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 81cbe40..11604c9 100644
+index 2f80564..f23975a 100644
 --- a/arch/arm/Kconfig.debug
 +++ b/arch/arm/Kconfig.debug
-@@ -72,6 +72,30 @@ config DEBUG_LL
- 	  in the kernel.  This is helpful if you are debugging code that
- 	  executes before the console is initialized.
+@@ -127,6 +127,22 @@ choice
+ 		  The uncompressor code port configuration is now handled
+ 		  by CONFIG_S3C_LOWLEVEL_UART_PORT.
  
-+choice
-+	prompt "Kernel low-level debugging port"
-+	depends on DEBUG_LL
-+
-+	config DEBUG_DC21285_PORT
-+		bool "Kernel low-level debugging messages via footbridge serial port"
-+		depends on FOOTBRIDGE
++	config DEBUG_REALVIEW_STD_PORT
++		bool "RealView Default UART"
++		depends on ARCH_REALVIEW
 +		help
 +		  Say Y here if you want the debug print routines to direct
-+		  their output to the serial port in the DC21285 (Footbridge).
-+		  Saying N will cause the debug messages to appear on the first
-+		  16550 serial port.
++		  their output to the serial port on RealView EB, PB11MP, PBA8
++		  and PBX platforms.
 +
-+	config DEBUG_CLPS711X_UART2
-+		bool "Kernel low-level debugging messages via UART2"
-+		depends on ARCH_CLPS711X
++	config DEBUG_REALVIEW_PB1176_PORT
++		bool "RealView PB1176 UART"
++		depends on MACH_REALVIEW_PB1176
 +		help
 +		  Say Y here if you want the debug print routines to direct
-+		  their output to the second serial port on these devices.
-+		  Saying N will cause the debug messages to appear on the first
-+		  serial port.
++		  their output to the standard serial port on the RealView
++		  PB1176 platform.
 +
-+endchoice
-+
+ endchoice
+ 
  config EARLY_PRINTK
- 	bool "Early printk"
- 	depends on DEBUG_LL
-@@ -100,23 +124,6 @@ config OC_ETM
- 	  buffer driver that will allow you to collect traces of the
- 	  kernel code.
+diff --git a/arch/arm/mach-realview/include/mach/debug-macro.S b/arch/arm/mach-realview/include/mach/debug-macro.S
+index 90b687c..0f38722 100644
+--- a/arch/arm/mach-realview/include/mach/debug-macro.S
++++ b/arch/arm/mach-realview/include/mach/debug-macro.S
+@@ -10,23 +10,10 @@
+  * published by the Free Software Foundation.
+  */
  
--config DEBUG_DC21285_PORT
--	bool "Kernel low-level debugging messages via footbridge serial port"
--	depends on DEBUG_LL && FOOTBRIDGE
--	help
--	  Say Y here if you want the debug print routines to direct their
--	  output to the serial port in the DC21285 (Footbridge). Saying N
--	  will cause the debug messages to appear on the first 16550
--	  serial port.
+-#if defined(CONFIG_MACH_REALVIEW_EB) || \
+-    defined(CONFIG_MACH_REALVIEW_PB11MP) || \
+-    defined(CONFIG_MACH_REALVIEW_PBA8) || \
+-    defined(CONFIG_MACH_REALVIEW_PBX)
+-#ifndef DEBUG_LL_UART_OFFSET
++#ifdef CONFIG_DEBUG_REALVIEW_STD_PORT
+ #define DEBUG_LL_UART_OFFSET	0x00009000
+-#elif DEBUG_LL_UART_OFFSET != 0x00009000
+-#warning "DEBUG_LL_UART_OFFSET already defined to a different value"
+-#endif
+-#endif
 -
--config DEBUG_CLPS711X_UART2
--	bool "Kernel low-level debugging messages via UART2"
--	depends on DEBUG_LL && ARCH_CLPS711X
--	help
--	  Say Y here if you want the debug print routines to direct their
--	  output to the second serial port on these devices.  Saying N will
--	  cause the debug messages to appear on the first serial port.
--
- config DEBUG_S3C_UART
- 	depends on PLAT_SAMSUNG
- 	int "S3C UART to use for low-level debug"
+-#ifdef CONFIG_MACH_REALVIEW_PB1176
+-#ifndef DEBUG_LL_UART_OFFSET
++#elif defined(CONFIG_DEBUG_REALVIEW_PB1176_PORT)
+ #define DEBUG_LL_UART_OFFSET	0x0010c000
+-#elif DEBUG_LL_UART_OFFSET != 0x0010c000
+-#warning "DEBUG_LL_UART_OFFSET already defined to a different value"
+-#endif
+ #endif
+ 
+ #ifndef DEBUG_LL_UART_OFFSET
 -- 
 1.7.0.4
