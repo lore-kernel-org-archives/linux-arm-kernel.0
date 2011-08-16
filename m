@@ -1,45 +1,28 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 16 Aug 2011 17:36:19 +0200
-Subject: [GIT PULL] mmc: atmel rework for next
-Message-ID: <4E4A8E73.7050705@atmel.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 16 Aug 2011 11:47:22 -0400 (EDT)
+Subject: [PATCH 3/3] ARM: entry: Fix Thumb-2 undef handling for multi-CPU
+	kernels
+In-Reply-To: <1313506300.2235.13.camel@computer2>
+References: <1313504053-27873-1-git-send-email-dave.martin@linaro.org>
+	<1313504053-27873-4-git-send-email-dave.martin@linaro.org>
+	<1313506300.2235.13.camel@computer2>
+Message-ID: <alpine.LFD.2.00.1108161139450.20358@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chris,
+On Tue, 16 Aug 2011, Tixy wrote:
 
-Please pull from:
+> On Tue, 2011-08-16 at 15:14 +0100, Dave Martin wrote:
+> [...]
+> > +#ifdef NEED_CPU_ARCHITECTURE
+> > +	.align	2
+> > +.LCcpu_architecture:
+> > +	.word	__cpu_architecture
+> > +#endif
+> 
+> What's the convention about the prefix '.LC' as opposed to just '.L'?
 
-git://github.com/at91linux/linux-2.6-at91.git nfe/mmc_atmel
-
-This is a series that reworks the atmel-mci driver for a future merge of both at91_mci and atmel-mci drivers. Those patches have been discussed on the mailing-list.
-I added a tiny at91_mci patch also sent last week.
-
-Those changes are made on top of current linus' git tree (v3.1-rc2-64-g688d1b3).
-
-Thanks.
-
-Ludovic Desroches (8):
-      mmc: atmel-mci: change namespace
-      mmc: atmel-mci: change atmci_readl and atmci_writel macros
-      mmc: atmel-mci: indentation
-      mmc: atmel-mci: add pdc support and runtime capabilities detection
-      mmc: atmel-mci: change atmci_start_command to atmci_send_command
-      mmc: atmel-mci: use ATMEL_PDC_SCND_BUF_OFF instead of a literal value
-      mmc: atmel-mci: correct sg buffer size evaluation
-      mmc: atmel-mci: fix a potential issue about pending PDC interrupts
-
-Nicolas Ferre (1):
-      mmc: at91_mci: remove the use of irq_to_gpio
-
- arch/arm/mach-at91/at91sam9260_devices.c |    2 +-
- drivers/mmc/host/at91_mci.c              |    6 +-
- drivers/mmc/host/atmel-mci-regs.h        |  220 +++++----
- drivers/mmc/host/atmel-mci.c             |  823 ++++++++++++++++++++----------
- include/linux/atmel-mci.h                |    4 +-
- include/linux/atmel_pdc.h                |    2 +
- 6 files changed, 685 insertions(+), 372 deletions(-)
+The .Lfoo format is more widely used than .LCfoo in the tree.
 
 
-
--- 
-Nicolas Ferre
+Nicolas
