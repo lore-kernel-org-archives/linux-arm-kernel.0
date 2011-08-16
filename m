@@ -1,36 +1,66 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Tue, 16 Aug 2011 09:27:05 -0700
-Subject: [PATCH] ARM: tegra: Add missing include of linux/erron.h and
-	linux/types.h
-In-Reply-To: <1313471744.5824.2.camel@phoenix>
-References: <1313471744.5824.2.camel@phoenix>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF04AEA25328@HQMAIL01.nvidia.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 16 Aug 2011 18:33:28 +0200
+Subject: [PATCH] dmaengine: at_hdmac: add device tree probe
+In-Reply-To: <20110807040932.GF7667@ponder.secretlab.ca>
+References: <1312549120-22266-1-git-send-email-nicolas.ferre@atmel.com>
+	<20110807040932.GF7667@ponder.secretlab.ca>
+Message-ID: <4E4A9BD8.1040302@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Axel Lin wrote at Monday, August 15, 2011 11:16 PM:
-> Include linux/erron.h to fix below build error.
-...
-> Include linux/types.h to fix below build error.
-...
-> Signed-off-by: Axel Lin <axel.lin@gmail.com>
-> ---
-> This patch is against linux-next (next-20110815), it fixes the build error with "make
-> tegra_defconfig".
+Le 07/08/2011 06:09, Grant Likely :
+> On Fri, Aug 05, 2011 at 01:58:40PM +0100, Nicolas Ferre wrote:
+>> Add device tree probe support for atmel at_hdmac DMA driver.
+>> Bindings are added to specify the number of channels that the implementation of
+>> the controller actually has. They also allow to tell if the peripherals/DMA
+>> transfer is supported by the IP.
+>>
+>> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>> ---
+>>  .../devicetree/bindings/dma/atmel-hdmac.txt        |   23 +++++++++
+>>  drivers/dma/at_hdmac.c                             |   51 ++++++++++++++++----
+>>  2 files changed, 65 insertions(+), 9 deletions(-)
+>>  create mode 100644 Documentation/devicetree/bindings/dma/atmel-hdmac.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/dma/atmel-hdmac.txt b/Documentation/devicetree/bindings/dma/atmel-hdmac.txt
+>> new file mode 100644
+>> index 0000000..0e48553
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/dma/atmel-hdmac.txt
+>> @@ -0,0 +1,23 @@
+>> +* Atmel Direct Memory Access Controller
+>> +
+>> +Required properties:
+>> +- compatible: Should be "atmel,<chip>-hdmac"
+>> +- reg: Should contain DMA registers location and length
+>> +- interrupts: Should contain DMA interrupt
+>> +- atmel,hdmac-nr-channels: Should contain number of channels
+>> +  available in the controller
+>> +
+>> +Optional properties:
+>> +- atmel,hdmac-cap-memcpy: Chip can do memory to memory transfers
+>> +- atmel,hdmac-cap-slave: Chip can do peripherals/memory transfers
+> 
+> Heh, ignore my comments on the other patch about missing documentation
+> for the dma engine.  :-)
+> 
+> Otherwise the patch looks pretty good.
 
-Axel,
+[..]
 
-I posted this same thing a little while back. Russell asked me to perform
-some rework on gpio.h that removed the need for errno.h instead. I did
-that in:
+Grant, Vinod,
 
-http://www.spinics.net/lists/linux-tegra/msg01996.html
+Don't you think it would make sense to generalize nr-channels and maybe
+also the capabilities properties for other dmaengine drivers?
+I have seen other dmaengine drivers taking the number of channels from
+platform data so that would make sense.
+It would be new dmaengine device tree properties, but on the other hand,
+I do not know if code can also be centralized for handling of those
+properties... maybe it is better to let drivers deal with them if
+required...
 
-I'm just waiting for an Ack from Grant Likely on the GPIO driver changes,
-and then will place the series into the ARM patch system as Russell
-requested.
+Your thoughts?
 
-Thanks for caring about Tegra compile issues:-)
-
+Best regards,
 -- 
-nvpublic
+Nicolas Ferre
