@@ -1,62 +1,51 @@
-From: boojin.kim@samsung.com (Boojin Kim)
-Date: Tue, 16 Aug 2011 18:20:39 +0900
-Subject: [PATCH] amba: consolidate PrimeCell magic
-In-Reply-To: <CACRpkdZ=cPen0KvK3__iabu8Xwhz8Yjcb-ev-qLe_AY4jaYACA@mail.gmail.com>
-References: <1313402104-27024-1-git-send-email-linus.walleij@stericsson.com>
-	<001601cc5be9$275a5200$760ef600$%kim@samsung.com>
-	<CACRpkdZ=cPen0KvK3__iabu8Xwhz8Yjcb-ev-qLe_AY4jaYACA@mail.gmail.com>
-Message-ID: <000101cc5bf5$c38bdca0$4aa395e0$%kim@samsung.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 16 Aug 2011 11:21:50 +0200
+Subject: PB1176 broken in -rc1
+In-Reply-To: <20110810152400.GO10121@e102144-lin.cambridge.arm.com>
+References: <20110810152400.GO10121@e102144-lin.cambridge.arm.com>
+Message-ID: <CACRpkdaoDJy-YKONaz2j07pPvTZuHZ7KgEm6XGxNXK-jNzB8_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus Walleij [mailto:linus.walleij at linaro.org] wrote:
-> Sent: Tuesday, August 16, 2011 5:36 PM
-> To: Boojin Kim
-> Cc: Linus Walleij; linux-arm-kernel at lists.infradead.org; Lee Jones;
-> Kukjin Kim; Viresh Kumar
-> Subject: Re: [PATCH] amba: consolidate PrimeCell magic
->
-> On Tue, Aug 16, 2011 at 9:50 AM, Boojin Kim <boojin.kim@samsung.com>
-> wrote:
->
-> > diff --git a/arch/arm/common/pl330.c b/arch/arm/common/pl330.c
-> > index 2b3b8b3..af6d96d 100644
-> > --- a/arch/arm/common/pl330.c
-> > +++ b/arch/arm/common/pl330.c
-> > @@ -1822,6 +1822,8 @@ int pl330_add(struct pl330_info *pi)
-> > ? ? ? ?struct pl330_dmac *pl330;
-> > ? ? ? ?int i, ret;
-> > ? ? ? ?u32 cid, pid;
-> > + ? ? ? struct amba_device *adev = container_of(pi->dev,
-> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct amba_device, dev);
-> >
-> > ? ? ? ?if (!pi || !pi->dev)
-> > ? ? ? ? ? ? ? ?return -EINVAL;
-> > @@ -1841,8 +1843,8 @@ int pl330_add(struct pl330_info *pi)
-> > ? ? ? ?cid = amba_get_cid(pi->base, PCELL_SIZE);
-> > ? ? ? ?pid = amba_get_pid(pi->base, PCELL_SIZE);
-> > ? ? ? ?if (cid != AMBA_CID ||
-> > - ? ? ? ? ? amba_manf(pid) != AMBA_VENDOR_ARM ||
-> > - ? ? ? ? ? amba_part(pid) != PART) {
-> > + ? ? ? ? ? amba_manf(adev) != AMBA_VENDOR_ARM ||
-> > + ? ? ? ? ? amba_part(adev) != PART) {
-> > ? ? ? ? ? ? ? ?dev_err(pi->dev, "PID: 0x%x, CID: 0x%x !\n", pid, cid);
-> > ? ? ? ? ? ? ? ?return -EINVAL;
-> > ? ? ? ?}
->
-> Ah! If I can access the adev from here it must have probed
-> earlier, and then the entire check is superfluous, since the AMBA
-> probe has already checked this in drivers/amba/bus.c.
->
-> I guess it should just be deleted then?
-Actually, I tested this patch after applying my patches that uses
-'dma-pl330' driver instead of the samsung specific 's3c-pl330' driver.
-'dma-pl330' driver is registered as 'amba_device'. So, this has already
-checked on 'drivers/amba/bus.c' as your notice.
-But, 's3c-pl330' driver is registered as 'platform_device'. So, This check
-is required.
-In my opinion, This check can be deleted if caller device is registered as
-'amba_device'.
+On Wed, Aug 10, 2011 at 5:24 PM, Will Deacon <will.deacon@arm.com> wrote:
 
+> Hi Linus,
 >
-> Linus
+> My PB1176 platform appears to lock up as soon as it hits userspace when
+> running a 3.1-rc1 kernel.
+
+My kernel does not even boot on either -rc1 or -rc2 on the
+PB1176, with or wthout Jamies poisoning fixup.
+
+Did you change anything else on top of -rc1 when you tested this?
+
+Will, Jamie, any hints?
+
+If I cherry-pick my TCM patches adding PB1176 support to a clean
+v3.0 branch, everything works fine, so I suspect I am not guilty for
+this AFAICT, it's something else.
+
+Also the -rc2 code works fine on U300 which has a TCM,
+ARM926-EJS.
+
+P.S. By the way regarding this:
+
+> [ ? ?0.000000] CPU: found DTCM0 4k @ 00000000, not enabled
+> [ ? ?0.000000] CPU: moved DTCM0 4k to fffe8000, enabled
+> [ ? ?0.000000] CPU: found DTCM1 4k @ 00000000, not enabled
+> [ ? ?0.000000] CPU: moved DTCM1 4k to fffe9000, enabled
+> [ ? ?0.000000] CPU: found ITCM0 4k @ 00000000, not enabled
+> [ ? ?0.000000] CPU: moved ITCM0 4k to fffe0000, enabled
+> [ ? ?0.000000] CPU: found ITCM1 4k @ 00000000, not enabled
+> [ ? ?0.000000] CPU: moved ITCM1 4k to fffe1000, enabled
+
+[Will]
+> The NULL addresses in the dmesg look
+> strange to me, but I'm not familiar with the TCMs.
+
+This looks perfectly normal. The TCMs are default disabled and mapped
+to address 0x00000000, I activate them and move them to our desired
+location.
+
+Thanks,
+Linus Walleij
