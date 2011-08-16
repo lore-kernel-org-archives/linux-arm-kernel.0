@@ -1,46 +1,39 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 16 Aug 2011 16:45:42 +0200
-Subject: [RFC PATCH v2 00/13] arm/tegra: Initialize GPIO & pinmux from DT
-In-Reply-To: <201108161637.16620.arnd@arndb.de>
-References: <1313440100-17131-1-git-send-email-swarren@nvidia.com>
-	<201108161509.17157.arnd@arndb.de>
-	<CACRpkdaVx=6AJ5DFjVN1ZYQ++hu9pT6WxD9n+pqmYVaCf1xawg@mail.gmail.com>
-	<201108161637.16620.arnd@arndb.de>
-Message-ID: <CACRpkdZydMLj5qzbth=tEW9P8p0rrXEzHM2frebsWcDzCJLq8w@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 16 Aug 2011 16:48:57 +0200
+Subject: Fwd: [GIT PULL] [3.2] Please pull tegra boards for 3.2
+In-Reply-To: <CAOesGMhFi0fsVdTe0ThhF636tqUhiWk7oZ41QKmL4dd3TcQ4_g@mail.gmail.com>
+References: <CAOesGMjHN-pvVfMN0o3AD238m8wEiRS-D4ArjV_2VAGTuwPfBw@mail.gmail.com>
+	<CAOesGMhFi0fsVdTe0ThhF636tqUhiWk7oZ41QKmL4dd3TcQ4_g@mail.gmail.com>
+Message-ID: <201108161648.58250.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 16, 2011 at 4:37 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 16 August 2011, Linus Walleij wrote:
->> Say mmc instance 0 need pingroup foo on pincontroller bar
->> means that there must be a specific reference from mmc.0:s
->> struct device * to pinctrl bar:s struct device *. Maybe this is
->> peanuts in DT, sorry not enough insight.
->
-> I think what you are looking for is the equivalent of the
-> interrupt-parent property for pinmux. The idea is that each
-> node in the device tree can point to a device managing the
-> pinmux, so reference would point to a local number in that
-> space. We have discussed this for the GPIO case already, and
-> I suspect that the two should be identical (gpio-controller
-> and pinmux-controller using the same device node and same
-> property to refer to them).
+On Sunday 14 August 2011, Olof Johansson wrote:
+> 
+> Hi Arnd,
+> 
+> Please pull the first set of tegra/board patches for 3.2:
+> 
+> 
+> The following changes since commit e6a99d312687a42c077a9b8cb5e757f186edb1b9:
+> 
+>  Merge branch 'slab/urgent' of
+> git://git.kernel.org/pub/scm/linux/kernel/git/penberg/slab-2.6
+> (2011-08-09 08:42:16 -0700)
+> 
+> are available in the git repository at:
+> 
+>  git://git.kernel.org/pub/scm/linux/kernel/git/olof/tegra.git boards-for-3.2
+> 
 
-Yes. I discussed with Grant and his idea is for e.g.
-advanced combined pincontrol + GPIO blocks that handle
-a lot of stuff like muxing, biasing and GPIO, to expose
-a single pinctrl device that in turn provide also a gpio_chip
-in addition to the pinctrl interfaces so tehy should be
-all on the same struct device *
+Hi Olof,
 
-> Since the pinmux-parent
-> (gpio-parent, ...) property gets inherited by all child
-> devices, you only need to set it once at the root of the
-> device tree for the simple case where there is only one
-> controller.
+The contents all look good, but I'm undecided whether we should have
+branches that are not based on a -rc release. In your case, it's
+halfway between -rc1 and -rc2.
 
-This will likely be the case for most of the advanced muxes
-I know of, OMAP, Tegra and Nomadik.
+Do others have an opinion? If we decide to take development branches
+only when they are based on a proper -rc, I'll do the simple rebase
+of the patches and push them out, otherwise I'll push them as they are.
 
-Thanks,
-Linus Walleij
+	Arnd
