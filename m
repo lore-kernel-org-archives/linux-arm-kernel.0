@@ -1,31 +1,16 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 17 Aug 2011 10:53:15 +0200
-Subject: [PATCH 10/19] mach-ep93xx: break out GPIO driver specifics
-In-Reply-To: <ADE657CA350FB648AAC2C43247A983F001F3883899A6@AUSP01VMBX24.collaborationhost.net>
-References: <1312978655-18405-1-git-send-email-linus.walleij@stericsson.com>
-	<ADE657CA350FB648AAC2C43247A983F001F38838966E@AUSP01VMBX24.collaborationhost.net>
-	<CACRpkdabHj_C7wgGfu3g6LSsa2iMZS0h279wf6McOxfge9Gm_w@mail.gmail.com>
-	<ADE657CA350FB648AAC2C43247A983F001F388389983@AUSP01VMBX24.collaborationhost.net>
-	<ADE657CA350FB648AAC2C43247A983F001F3883899A6@AUSP01VMBX24.collaborationhost.net>
-Message-ID: <CACRpkdYDsBRew0WpR1655k4+7BpUomOCEVyrH-Or88WJ4MjzJg@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 17 Aug 2011 10:01:23 +0100
+Subject: [PATCH 00/19] GPIO exodus and cleanup
+In-Reply-To: <1312978564-18069-1-git-send-email-linus.walleij@stericsson.com>
+References: <1312978564-18069-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20110817090123.GD1006@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 11, 2011 at 7:48 PM, H Hartley Sweeten
-<hartleys@visionengravers.com> wrote:
-> On Thursday, August 11, 2011 10:16 AM, H Hartley Sweeten wrote:
+On Wed, Aug 10, 2011 at 02:16:04PM +0200, Linus Walleij wrote:
+> The following patch set is rebased on top of Russell's
+> 13 cleanup patches and can be finalized as soon as there
+> is a branch in RMKs tree that can accumulate this work.
 
->> The other solution is to hook up the gpiolib to_irq callback in
->> gpio-ep93xx and do:
->>
->> #define gpio_to_irq ? __gpio_to_irq
->>
->> Maybe this is a better option?
->
-> BTW, I have a patch for this if you want.
-
-Thanks! I'm fixing up this patchset so will include this one
-and rebase on top of it.
-
-Yours,
-Linus Walleij
+If Grant acks the relevant ones, they can go to the patch system and
+merged into that branch.
