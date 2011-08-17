@@ -1,47 +1,52 @@
-From: mikpe@it.uu.se (Mikael Pettersson)
-Date: Wed, 17 Aug 2011 09:28:13 +0200
-Subject: [RFC,PATCH] arch/arm: compute and export NR_syscalls
-In-Reply-To: <CABqD9hYavCxA38GbBhbCmBT+PEQQsvhbF4U7xY8P8ygbFy+=Ag@mail.gmail.com>
-References: <1313529267-4428-1-git-send-email-wad@chromium.org>
-	<1629809.vjtjo6obCs@wuerfel>
-	<CABqD9hYavCxA38GbBhbCmBT+PEQQsvhbF4U7xY8P8ygbFy+=Ag@mail.gmail.com>
-Message-ID: <20043.28045.613130.691498@pilspetsen.it.uu.se>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Wed, 17 Aug 2011 09:36:04 +0200 (CEST)
+Subject: [PATCH] ARM: Footbridge: select CLKEVT_I8253 for
+ ARCH_NETWINDER
+In-Reply-To: <1313562543.2024.1.camel@phoenix>
+References: <1313562543.2024.1.camel@phoenix>
+Message-ID: <alpine.LFD.2.02.1108170935450.2807@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Will Drewry writes:
- > On Tue, Aug 16, 2011 at 4:21 PM, Arnd Bergmann <arnd@arndb.de> wrote:
- > > On Tuesday 16 August 2011 16:14:26 Will Drewry wrote:
- > >>
- > >> asm-exports.c is added instead of reusing asm-offsets.c to avoid a
- > >> variety of collisions (VM_EXEC, DMA_*, etc). ?It is possible to use the
- > >> same calls.S mechanism but add NR_syscalls to asm-offsets.c. ?However,
- > >> at inclusion time for generated/asm-offsets.h, conflicting defines will
- > >> need to be #undef'd if !__ASSEMBLY__ since it appears that the purpose
- > >> of asm-offsets.h is to safely bind C language definitions to assembly
- > >> and not the reverse.
- > >>
- > >> - Is this approach palatable?
- > >> - Should I resend only when paired with the other ftrace-needed patches?
- > >
- > > This seems overly complex, compared to a one-line change adding the symbol
- > > to asm/unistd.h. The only other architecture that uses an approach
- > > like the one you have posted is x86-64, and it's simpler there
- > > because it can easily be done in asm-offsets.c there without the need
- > > to create another helper.
- > 
- > Agreed!
- > 
- > I proposed this approach based solely on prior threads I've seen. E.g.,
- > - https://lkml.org/lkml/2007/6/1/427
- >   (don't just #define)
- > - https://lkml.org/lkml/2009/8/27/280
- >   (todo: x86-32 to move to x86-64)
- > 
- > If a single line #define is good enough, then it certainly works for me.
+On Wed, 17 Aug 2011, Axel Lin wrote:
 
-Yes, the one-line #define NR_syscalls in unistd.h is a perfectly adequate,
-if not entirely elegant, solution.  Adding asm-export.c just for this is
-waaay overkill.
+> Since commit 8560a6cfc9818edde1fd8677961714b264ffa03d
+> "arm: Footbridge: Use common i8253 clockevent",
+> ARCH_NETWINDER nees to select CLKEVT_I8253.
+> 
+> This patch fixes below build error with "make netwinder_defconfig".
+> 
+>   LD      .tmp_vmlinux1
+> arch/arm/mach-footbridge/built-in.o: In function `isa_timer_init':
+> isa-rtc.c:(.init.text+0x12c8): undefined reference to `clockevent_i8253_init'
+> isa-rtc.c:(.init.text+0x12d0): undefined reference to `i8253_clockevent'
+> arch/arm/mach-footbridge/built-in.o:(.data+0x198): undefined reference to `i8253_clockevent'
+> make: *** [.tmp_vmlinux1] Error 1
+> 
+> Signed-off-by: Axel Lin <axel.lin@gmail.com>
 
-/Mikael
+Acked-by: Thomas Gleixner <tglx@linutronix.de>
+
+
+> ---
+>  arch/arm/mach-footbridge/Kconfig |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-footbridge/Kconfig b/arch/arm/mach-footbridge/Kconfig
+> index dc26fff..c8e7afc 100644
+> --- a/arch/arm/mach-footbridge/Kconfig
+> +++ b/arch/arm/mach-footbridge/Kconfig
+> @@ -62,6 +62,7 @@ config ARCH_EBSA285_HOST
+>  config ARCH_NETWINDER
+>  	bool "NetWinder"
+>  	select CLKSRC_I8253
+> +	select CLKEVT_I8253
+>  	select FOOTBRIDGE_HOST
+>  	select ISA
+>  	select ISA_DMA
+> -- 
+> 1.7.4.1
+> 
+> 
+> 
+> 
