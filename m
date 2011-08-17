@@ -1,72 +1,131 @@
 From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Thu, 18 Aug 2011 02:10:05 +0300
-Subject: [PATCH 4/7] omap: iommu: PREFETCH_IOTLB cleanup
+Date: Thu, 18 Aug 2011 02:10:07 +0300
+Subject: [PATCH 6/7] omap: iommu: remove unused exported API
 In-Reply-To: <1313622608-30397-1-git-send-email-ohad@wizery.com>
 References: <1313622608-30397-1-git-send-email-ohad@wizery.com>
-Message-ID: <1313622608-30397-5-git-send-email-ohad@wizery.com>
+Message-ID: <1313622608-30397-7-git-send-email-ohad@wizery.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use PREFETCH_IOTLB to control the content of the called function,
-instead of inlining it in the code.
+Remove unused public APIs from OMAP's iommu driver.
 
-This improves readability of the code, and also prevents an "unused
-function" warning to show up when PREFETCH_IOTLB isn't set.
+IOMMU functionality should be exposed only via the generic IOMMU API;
+this way drivers stay generic, and different IOMMU drivers
+don't need to duplicate similar functionalities.
 
-While we're at it, rename load_iotlb_entry to prefetch_iotlb_entry
-to better reflect the purpose of that function.
+The rest of the API still exposed by OMAP's iommu will be evaluated
+and eventually either added to the generic IOMMU API (if relevant),
+or completely removed.
+
+The intention is that OMAP's iommu driver will eventually not expose
+any public API.
 
 Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
 ---
- drivers/iommu/omap-iommu.c |   18 +++++++++++++-----
- 1 files changed, 13 insertions(+), 5 deletions(-)
+ arch/arm/plat-omap/include/plat/iommu.h |    3 --
+ drivers/iommu/omap-iommu.c              |   59 -------------------------------
+ 2 files changed, 0 insertions(+), 62 deletions(-)
 
+diff --git a/arch/arm/plat-omap/include/plat/iommu.h b/arch/arm/plat-omap/include/plat/iommu.h
+index 961b64f..eed5bdc 100644
+--- a/arch/arm/plat-omap/include/plat/iommu.h
++++ b/arch/arm/plat-omap/include/plat/iommu.h
+@@ -153,12 +153,9 @@ struct iommu_platform_data {
+ extern u32 iommu_arch_version(void);
+ 
+ extern void iotlb_cr_to_e(struct cr_regs *cr, struct iotlb_entry *e);
+-extern void iommu_set_twl(struct iommu *obj, bool on);
+-extern void flush_iotlb_range(struct iommu *obj, u32 start, u32 end);
+ 
+ extern int iopgtable_store_entry(struct iommu *obj, struct iotlb_entry *e);
+ 
+-extern int iommu_set_da_range(struct iommu *obj, u32 start, u32 end);
+ extern int iommu_set_isr(const char *name,
+ 			 int (*isr)(struct iommu *obj, u32 da, u32 iommu_errs,
+ 				    void *priv),
 diff --git a/drivers/iommu/omap-iommu.c b/drivers/iommu/omap-iommu.c
-index ed81977..7280e5b 100644
+index 7280e5b..d6b77c4 100644
 --- a/drivers/iommu/omap-iommu.c
 +++ b/drivers/iommu/omap-iommu.c
-@@ -248,11 +248,12 @@ static struct cr_regs __iotlb_read_cr(struct iommu *obj, int n)
+@@ -357,26 +357,6 @@ static void flush_iotlb_page(struct iommu *obj, u32 da)
  }
  
  /**
-- * load_iotlb_entry - Set an iommu tlb entry
-+ * prefetch_iotlb_entry - Set an iommu tlb entry
+- * flush_iotlb_range - Clear an iommu tlb entries
+- * @obj:	target iommu
+- * @start:	iommu device virtual address(start)
+- * @end:	iommu device virtual address(end)
+- *
+- * Clear an iommu tlb entry which includes 'da' address.
+- **/
+-void flush_iotlb_range(struct iommu *obj, u32 start, u32 end)
+-{
+-	u32 da = start;
+-
+-	while (da < end) {
+-		flush_iotlb_page(obj, da);
+-		/* FIXME: Optimize for multiple page size */
+-		da += IOPTE_SIZE;
+-	}
+-}
+-EXPORT_SYMBOL_GPL(flush_iotlb_range);
+-
+-/**
+  * flush_iotlb_all - Clear all iommu tlb entries
   * @obj:	target iommu
-  * @e:		an iommu tlb entry info
   **/
--static int load_iotlb_entry(struct iommu *obj, struct iotlb_entry *e)
-+#ifdef PREFETCH_IOTLB
-+static int prefetch_iotlb_entry(struct iommu *obj, struct iotlb_entry *e)
- {
- 	int err = 0;
- 	struct iotlb_lock l;
-@@ -309,6 +310,15 @@ out:
- 	return err;
+@@ -395,23 +375,6 @@ static void flush_iotlb_all(struct iommu *obj)
+ 	clk_disable(obj->clk);
  }
  
-+#else /* !PREFETCH_IOTLB */
-+
-+static int prefetch_iotlb_entry(struct iommu *obj, struct iotlb_entry *e)
-+{
-+	return 0;
-+}
-+
-+#endif /* !PREFETCH_IOTLB */
-+
+-/**
+- * iommu_set_twl - enable/disable table walking logic
+- * @obj:	target iommu
+- * @on:		enable/disable
+- *
+- * Function used to enable/disable TWL. If one wants to work
+- * exclusively with locked TLB entries and receive notifications
+- * for TLB miss then call this function to disable TWL.
+- */
+-void iommu_set_twl(struct iommu *obj, bool on)
+-{
+-	clk_enable(obj->clk);
+-	arch_iommu->set_twl(obj, on);
+-	clk_disable(obj->clk);
+-}
+-EXPORT_SYMBOL_GPL(iommu_set_twl);
+-
+ #if defined(CONFIG_OMAP_IOMMU_DEBUG_MODULE)
+ 
+ ssize_t iommu_dump_ctx(struct iommu *obj, char *buf, ssize_t bytes)
+@@ -848,28 +811,6 @@ static int device_match_by_alias(struct device *dev, void *data)
+ }
+ 
  /**
-  * flush_iotlb_page - Clear an iommu tlb entry
-  * @obj:	target iommu
-@@ -662,10 +672,8 @@ int iopgtable_store_entry(struct iommu *obj, struct iotlb_entry *e)
- 
- 	flush_iotlb_page(obj, e->da);
- 	err = iopgtable_store_entry_core(obj, e);
--#ifdef PREFETCH_IOTLB
- 	if (!err)
--		load_iotlb_entry(obj, e);
--#endif
-+		prefetch_iotlb_entry(obj, e);
- 	return err;
- }
- EXPORT_SYMBOL_GPL(iopgtable_store_entry);
+- * iommu_set_da_range - Set a valid device address range
+- * @obj:		target iommu
+- * @start		Start of valid range
+- * @end			End of valid range
+- **/
+-int iommu_set_da_range(struct iommu *obj, u32 start, u32 end)
+-{
+-
+-	if (!obj)
+-		return -EFAULT;
+-
+-	if (end < start || !PAGE_ALIGN(start | end))
+-		return -EINVAL;
+-
+-	obj->da_start = start;
+-	obj->da_end = end;
+-
+-	return 0;
+-}
+-EXPORT_SYMBOL_GPL(iommu_set_da_range);
+-
+-/**
+  * omap_find_iommu_device() - find an omap iommu device by name
+  * @name:	name of the iommu device
+  *
 -- 
 1.7.4.1
