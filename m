@@ -1,140 +1,56 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 17 Aug 2011 13:48:20 +0200
-Subject: [RFC PATCH 2/2] ARM: CSR: add PM sleep entry for SiRFprimaII
-In-Reply-To: <CAGsJ_4yMJo3oN90CLjktQaji8WUg2JRYu6JAghS=OAgLCWFXvw@mail.gmail.com>
-References: <1312512888-25070-1-git-send-email-bs14@csr.com>
-	<201108121554.11316.arnd@arndb.de>
-	<CAGsJ_4yMJo3oN90CLjktQaji8WUg2JRYu6JAghS=OAgLCWFXvw@mail.gmail.com>
-Message-ID: <201108171348.20378.arnd@arndb.de>
+Date: Wed, 17 Aug 2011 14:28:44 +0200
+Subject: [PATCH 7/9] ARM: DMA: steal memory for DMA coherent mappings
+In-Reply-To: <006b01cc5cb3$dac09fa0$9041dee0$%szyprowski@samsung.com>
+References: <1313146711-1767-1-git-send-email-m.szyprowski@samsung.com>
+	<201108161626.26130.arnd@arndb.de>
+	<006b01cc5cb3$dac09fa0$9041dee0$%szyprowski@samsung.com>
+Message-ID: <201108171428.44555.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 17 August 2011, Barry Song wrote:
-> 2011/8/12 Arnd Bergmann <arnd@arndb.de>:
-> > On Friday 05 August 2011, Barry Song wrote:
+On Wednesday 17 August 2011, Marek Szyprowski wrote:
+> Do we really need the dynamic pool for the first version? I would like to
+> know how much memory can be allocated in GFP_ATOMIC context. What are the
+> typical sizes of such allocations?
 
-> >>
-> >>  extern void __init sirfsoc_of_irq_init(void);
-> >>  extern void __init sirfsoc_of_clk_init(void);
-> >> +extern void sirfsoc_l2x_init(void);
-> >>
-> >>  #ifndef CONFIG_DEBUG_LL
-> >>  static inline void sirfsoc_map_lluart(void)  {}
-> >
-> > You now call the sirfsoc_l2x_init function from two different places,
-> > which is very confusing. Better make sure that the idle code is
-> > only inialized after all the other subsystems it relies on have been
-> > activated.
+I think this highly depends on the board and on the use case. We know
+that 2 MB is usually enough, because that is the current CONSISTENT_DMA_SIZE
+on most platforms. Most likely something a lot smaller will be ok
+in practice. CONSISTENT_DMA_SIZE is currently used for both atomic
+and non-atomic allocations.
+
+> Maybe for the first version a static pool with reasonably small size
+> (like 128KiB) will be more than enough? This size can be even board
+> depended or changed with kernel command line for systems that really
+> needs more memory.
+
+For a first version that sounds good enough. Maybe we could use a fraction
+of the CONSISTENT_DMA_SIZE as an estimate?
+
+For the long-term solution, I see two options:
+
+1. make the preallocated pool rather small so we normally don't need it.
+2. make it large enough so we can also fulfill most nonatomic allocations
+   from that pool to avoid the TLB flushes and going through the CMA
+   code. Only use the real CMA region when the pool allocation fails.
+
+In either case, there should be some method for balancing the pool
+size.
+
+> I noticed one more problem. The size of the CMA managed area must be
+> the multiple of 16MiBs (MAX_ORDER+1). This means that the smallest CMA area
+> is 16MiB. These values comes from the internals of the kernel memory 
+> management design and page blocks are the only entities that can be managed
+> with page migration code.
 > 
-> anyway, after Rob Herring's patch "ARM: l2x0: Add OF based
-> initialization" is merged, sirfsoc l2 cache codes can be compelety
-> deleted.
-> i am thinking whether we can move l2 suspend/resume entries to
-> arch/arm/mm/cache-l2x0.c directly, maybe a syscore_ops:
-> static struct syscore_ops l2x_pm_syscore_ops = {
->         .suspend        = l2x_pm_suspend,
->         .resume         = l2x_pm_resume,
-> };
-> 
-> static void l2x_pm_init(void)
-> {
->         register_syscore_ops(&l2x_pm_syscore_ops);
-> }
-> 
-> or let cache l2x be a platform driver and add suspend/resume entries there?
-> 
-> if we move suspend/resume of L2 to arch/arm/mm/cache-l2x0.c, that can
-> eliminate my reference to l2 from other places.
+> I'm not sure if all ARMv6+ boards have at least 32MiB of memory be able to
+> create a CMA area.
 
-Ok, that sounds good.
+My guess is that you can assume to have 64 MB or more on ARMv6 running Linux,
+but other people may have more accurate data.
 
-> >> +{
-> >> +        u32 pwr_trigger_en_reg;
-> >> +        pwr_trigger_en_reg = sirfsoc_rtc_iobrg_readl(sirfsoc_pwrc_base +
-> >> +             SIRFSOC_PWRC_TRIGGER_EN);
-> >> +#define X_ON_KEY_B (1 << 0)
-> >> +        sirfsoc_rtc_iobrg_writel(pwr_trigger_en_reg | X_ON_KEY_B,
-> >> +                        sirfsoc_pwrc_base + SIRFSOC_PWRC_TRIGGER_EN);
-> >> +}
-> >> +
-> >> +static void sirfsoc_set_sleep_mode(u32 mode)
-> >> +{
-> >> +        u32 sleep_mode = sirfsoc_rtc_iobrg_readl(sirfsoc_pwrc_base +
-> >> +             SIRFSOC_PWRC_PDN_CTRL);
-> >> +        sleep_mode &= ~(SIRFSOC_SLEEP_MODE_MASK << 1);
-> >> +        sleep_mode |= ((mode << 1));
-> >> +        sirfsoc_rtc_iobrg_writel(sleep_mode, sirfsoc_pwrc_base +
-> >> +             SIRFSOC_PWRC_PDN_CTRL);
-> >> +}
-> >
-> > This again looks like a bad abstraction, and it gets the locking wrong,
-> > since you need a spinlock around both the read and write of the register
-> > to make the update atomic.
-> 
-> will there be two threads calling into pm_ops.enter() at the same
-> time? seems not, let me check....
-
-I would expect not, but that's not the main point:
-
-> >
-> > These functions therefore belong into the rtc_iobrg driver.
-> 
-> rtc_iobrg might only handle the read/write interfaces and let other
-> modules call these interfaces to read/write what they want.
-
-Every other module calling these interfaces will have the same
-problem with locking. In cases like this, it's typically better
-to export a high-level interface from the driver that accesses
-the registers rather than exporting functions that directly
-manipulate the registers.
-
-> >> +static struct of_device_id pwrc_ids[] = {
-> >> +     { .compatible = "sirf,prima2-pwrc" },
-> >> +};
-> >> +
-> >> +static void __init sirfsoc_of_pwrc_init(void)
-> >> +{
-> >> +     struct device_node *np;
-> >> +     const __be32    *addrp;
-> >> +
-> >> +     np = of_find_matching_node(NULL, pwrc_ids);
-> >> +     if (!np)
-> >> +             panic("unable to find compatible pwrc node in dtb\n");
-> >
-> > Don't use of_find_matching_node to look for stuff that is really more
-> > a device that you want to talk to. Instead, register a platform
-> > driver with that match_table and load a proper device driver for
-> > it.
-> 
-> agree. how do you think about cache l2, will it be a platform too?
-
-Probably not. Ideally every device like this would be a platform_device,
-but some things have to be enabled way before the driver model is
-up and cannot be platform_devices because of that. My impression
-is that l2 falls into this category, while anything related to
-power management does not: there is no need to suspend the device
-before it is fully booted up.
-
-> >> +
-> >> +     addrp = of_get_property(np, "reg", NULL);
-> >> +     if (!addrp)
-> >> +             panic("unable to find base address of pwrc node in dtb\n");
-> >> +
-> >> +     sirfsoc_pwrc_base = be32_to_cpup(addrp);
-> >> +
-> >> +     of_node_put(np);
-> >> +}
-> >
-> > Why do you store the physical base address here, instead doing an of_iomap?
-> 
-> i should have failed to use of_iomap, register space behind rtciobrg
-> are not in memory space. it is accessed indirectly just like a NAND or
-> a harddisk.
-
-Ah, I see. That looks absolute correct then. I was confused by
-the naming of the variable as sirfsoc_pwrc_base, which suggests
-that it's a physical memory address. I can't think of a better
-name either. Maybe you can add a comment in the code to clarify
-that it's on a different bus.
+Also, there is the option of setting a lower value for FORCE_MAX_ZONEORDER
+for some platforms if it becomes a problem.
 
 	Arnd
