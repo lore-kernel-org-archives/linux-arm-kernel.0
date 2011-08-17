@@ -1,73 +1,82 @@
-From: santosh.shilimkar@ti.com (Santosh)
-Date: Wed, 17 Aug 2011 21:45:27 +0530
-Subject: [PATCH 03/17] ARM: gic: Use cpu pm notifiers to save gic state
-In-Reply-To: <CAMbhsRQX+faGH9xPZPQKrtq5=Rb8JhRLo0ibJ1cOfTHrLRjw9A@mail.gmail.com>
-References: <1310053830-23779-1-git-send-email-lorenzo.pieralisi@arm.com>	<1310053830-23779-4-git-send-email-lorenzo.pieralisi@arm.com>	<4E27E40C.6020006@ti.com>	<20110721102736.GA3087@e102568-lin.cambridge.arm.com>	<4E2803A1.7000908@ti.com>	<CAMbhsRRT58vJWJ0ACSp_NJsvQJqzeBUKDD5bGGWM6tYh-zTxJQ@mail.gmail.com>	<4E290663.30403@ti.com>
-	<CAMbhsRQX+faGH9xPZPQKrtq5=Rb8JhRLo0ibJ1cOfTHrLRjw9A@mail.gmail.com>
-Message-ID: <4E4BE91F.1000102@ti.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Wed, 17 Aug 2011 12:03:57 -0500
+Subject: [PATCH v3] amba: consolidate PrimeCell magic
+In-Reply-To: <1313569846-22902-1-git-send-email-linus.walleij@stericsson.com>
+References: <1313569846-22902-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F001F3884BB382@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Colin,
-
-On Friday 22 July 2011 10:51 AM, Colin Cross wrote:
-> On Thu, Jul 21, 2011 at 10:10 PM, Santosh Shilimkar
-
-[....]
-
->>>> For my OMAP4 PM rebasing, for time-being I will go with exported
->>>> GIC functions so that I don't have too many redundancies with GIC
->>>> save/restore code.
->>>
->>> I think you should try to balance cpu idle latency with reuse of
->>> common code.  In this case, you are avoiding restoring 7 registers by
->>> reimplementing the bare minimum that is necessary for OMAP4, which is
->>> unlikely to make a measurable impact on wakeup latency.  Can you try
->>> starting with reusing all the common code, and add some timestamps
->>> during wakeup to measure where the longest delays are, to determine
->>> where you should diverge from the common code and use omap-optimized
->>> code?
->>
->> I am going to use all the common code but having them exported
->> functions gives more flexibility to call them in right and needed
->> places. As discussed earlier, I plan to use the common GIC code
->> wherever it's needed on OMAP.
->>
->> My main point was we are saving and restoring GIC CPU interface
->> registers for a case where they are actually not lost.
+On Wednesday, August 17, 2011 1:31 AM, Linus Walleij wrote:
 >
-> Yes, but you're still avoiding 7 registers, which is unlikely to be
-> worth the complexity of calling these functions differently from every
-> other platform.
+> Since three drivers use the PrimeCell scheme without using the
+> amba_bus driver logic, let's break the magic lookups out as
+> static inlines in the <linux/amba/bus.h> header so we get
+> some consolidation anyway. Delete the primecell ID check in
+> common/pl330.c since it will soon only be used from the amba_bus
+> driver in drivers/dma, which is already doing the same check
+> when probing in drivers/amba/bus.c.
+>
+> Cc: Jassi Brar <jassisinghbrar@gmail.com>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Cc: Viresh Kumar <viresh.kumar@st.com>
+> Cc: H Hartley Sweeten <hartleys@visionengravers.com>
+> Acked-by: Boojin Kim <boojin.kim@samsung.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+>  arch/arm/common/pl330.c      |   40 +++-------------------------------------
+>  arch/arm/common/vic.c        |   15 ++++++++-------
+>  drivers/amba/bus.c           |   19 +++----------------
+>  drivers/dma/ste_dma40.c      |   14 ++++----------
+>  drivers/mtd/nand/fsmc_nand.c |   10 +++-------
+>  include/linux/amba/bus.h     |   26 ++++++++++++++++++++++++++
+>  6 files changed, 47 insertions(+), 77 deletions(-)
 
-I managed to use pm notifiers for GIC and VFP on OMAP4 and
-get that working. As discussed here, I decided to take the
-hit on the latency in favour of re-use of the code for GIC
-considering it's helping other platforms.
+Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
 
-I did update notifiers patches for couple of things.
+Linus,
+One comment on the change to vic.c.
 
-- VFP code now make use 'vfp_current_hw_state' instead of
-'last_VFP_context'
+> diff --git a/arch/arm/common/vic.c b/arch/arm/common/vic.c
+> index 7aa4262..b163cdd 100644
+> --- a/arch/arm/common/vic.c
+> +++ b/arch/arm/common/vic.c
+> @@ -341,16 +341,17 @@ static void __init vic_init_st(void __iomem *base, unsigned int irq_start,
+>  void __init vic_init(void __iomem *base, unsigned int irq_start,
+>  		     u32 vic_sources, u32 resume_sources)
+>  {
+> -	unsigned int i;
+>  	u32 cellid = 0;
+>  	enum amba_vendor vendor;
+>  
+> -	/* Identify which VIC cell this one is, by reading the ID */
+> -	for (i = 0; i < 4; i++) {
+> -		u32 addr = ((u32)base & PAGE_MASK) + 0xfe0 + (i * 4);
+> -		cellid |= (readl(addr) & 0xff) << (8 * i);
+> -	}
+> -	vendor = (cellid >> 12) & 0xff;
+> +	/*
+> +	 * Identify which VIC cell this one is, by reading the ID - some
+> +	 * implementations have two VICs in the same page but only one set
+> +	 * of ID registers at the end, so we need to adjust the base to
+> +	 * reference the page offset. All VIC:s are size 4K.
+> +	 */
+> +	cellid = amba_get_pid((void __iomem *)((u32)base & PAGE_MASK), SZ_4K);
 
-- I have renamed CPU_COMPLEX to more appropriate CPU_CLUSTER
+This produces a sparse warning.  But, the same warning was present with the
+old code.
 
-- I have dropped GIC dist. disable as part of GIC dist save
-code. I saw lock ups with CPUIDLE and then tracked down, to
-an issue where for some reason if cluster doesn't hit the
-targeted low power state, CPU gets locked up since GIC
-dist. remains disabled. The GIC restore is done only if
-the cluster did hit the deeper state and GIC lost it's
-context. As such this change should not impact anything.
+arch/arm/common/vic.c:353:49: warning: cast removes address space of expression
 
-What's your plan on these notifiers patches considering
-there is a request to make them generic and not just ARM
-specific?
+If you want, this warning can be fixed by adding __force to the u32 cast:
 
-Sorry for asking this but now I have dependency on this
-series :)
-If you want, I can participate here to get this moving.
-Let me know.
++	cellid = amba_get_pid((void __iomem *)((u32 __force)base & PAGE_MASK), SZ_4K);
 
-Regards
-Santosh
+But, if pushes the line a bit over 80 chars...
+
+> +	vendor = AMBA_MANF_BITS(cellid);
+>  	printk(KERN_INFO "VIC @%p: id 0x%08x, vendor 0x%02x\n",
+>  	       base, cellid, vendor);
+
+Regards,
+Hartley
