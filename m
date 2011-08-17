@@ -1,58 +1,168 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Wed, 17 Aug 2011 14:54:28 +0900
-Subject: [GIT PULL] samsung: fixes for v3.1-rc1
-In-Reply-To: <000601cc596e$0ba61490$22f23db0$%kim@samsung.com>
-References: <20110811065837.GA4989@july>
-	<015001cc57f5$d7e847f0$87b8d7d0$%kim@samsung.com>
-	<201108121758.01077.arnd.bergmann@linaro.org>
-	<000601cc596e$0ba61490$22f23db0$%kim@samsung.com>
-Message-ID: <CAH9JG2Wf9UFZkqoZm=Wr-RAYPTA6inbBkcGQi5bR+7mr-Tk+Bg@mail.gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 17 Aug 2011 14:02:43 +0800
+Subject: [RFC PATCH v2 06/13] docs/dt: Document nvidia,tegra20-pinmux
+	binding
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF04AEA2537D@HQMAIL01.nvidia.com>
+References: <1313440100-17131-1-git-send-email-swarren@nvidia.com>
+	<1313440100-17131-7-git-send-email-swarren@nvidia.com>
+	<201108161551.31389.arnd@arndb.de>
+	<74CDBE0F657A3D45AFBB94109FB122FF04AEA2537D@HQMAIL01.nvidia.com>
+Message-ID: <20110817060242.GA10037@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 13, 2011 at 1:04 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> Arnd Bergmann wrote:
->>
->> On Thursday 11 August 2011, Kukjin Kim wrote:
->> > > ? Linux 3.1-rc1 (2011-08-07 18:23:30 -0700)
->> > >
->> > > are available in the git repository at:
->> > > ? git://git.infradead.org/users/kmpark/linux-2.6-samsung for-arnd
->> > >
->>
->> > No, if above is required, I think, this should be handled from me not
-> you.
->> >
->> > Don't make a complete confusion between your board and Samsung
-> architecture
->> > maintainer.
->>
->> I'll hold off on pulling this one then until I get another pull request
->> from you.
->>
->> Looking at the contents of the branch, I noticed that it's not clear why
->> they are needed in 3.1. It would help me if you (whoever sends me the bug
->> fixes) can categorize them in the changelog:
->>
->> * Any bug fixes against old bugs should be marked 'Cc: stable at kernel.org'
->> so that they can get identified for backports.
->>
->> * Regressions against the 3.0 kernel should get marked as such.
->>
->> * Bug fixes against new code should also be identified as such.
->>
-> OK, I see.
->
-> As a note, I will send Samsung fixes in the beginning of next week.
+On Tue, Aug 16, 2011 at 10:32:05AM -0700, Stephen Warren wrote:
+> Arnd Bergmann wrote at Tuesday, August 16, 2011 7:52 AM:
+> > On Monday 15 August 2011, Stephen Warren wrote:
+> > > Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> > > ---
+> > >  .../devicetree/bindings/pinmux/pinmux_nvidia.txt   |  294 ++++++++++++++++++++
+> > >  1 files changed, 294 insertions(+), 0 deletions(-)
+> > >  create mode 100644 Documentation/devicetree/bindings/pinmux/pinmux_nvidia.txt
+> > >
+> > > diff --git a/Documentation/devicetree/bindings/pinmux/pinmux_nvidia.txt b/Documentation/devicetree/bindings/pinmux/pinmux_nvidia.txt
+> > > new file mode 100644
+> > > index 0000000..744e1b7
+> > > --- /dev/null
+> > > +++ b/Documentation/devicetree/bindings/pinmux/pinmux_nvidia.txt
+> > > @@ -0,0 +1,294 @@
+> > > +NVIDIA Tegra 2 pinmux controller
+> > > +
+> > > +Required properties:
+> > > +- compatible : "nvidia,tegra20-pinmux"
+> > 
+> > Hmm, I think it would be much better in general if we could define
+> > pinmux bindings in a way that is less specific to just one soc.
+> 
+> > The contents of this file seem to be specific to even just one
+> > version of the tegra chip, and might be completely different for
+> > tegra30 and later, right?
+> 
+> The general concepts are the same between tegra20 and tegra30.
+> 
+> Tegra30 has a different set of mux and drive pingroups.
+> 
+> Tegra30 has more functions that can be assigned to pins.
+> 
+> Tegra30 has three more options per mux pingroup, although I haven't
+> Investigated whether any of those would need to be represented in DT;
+> I suspect at least one will, possibly all.
+> 
+> > Maybe Linus W can comment on this and say whether he thinks it can
+> > be generalized enough to apply to other pinmux drivers.
+> > 
+> > > +Optional sub-nodes:
+> > > +- nvidia,mux-groups : Mux group settings; see below.
+> > > +- nvidia,drive-groups : Drive group settings; see below.
+> > > +
+> > > +nvidia,mux-groups sub-node:
+> > 
+> > These concepts seem general enough to me that they can apply to
+> > other chips, and I would consequently drop the nvidia, prefix.
+> 
+> Two things to note about Tegra that might not apply to all SoCs:
+> 
+> * There are separate groups of pins for Muxing (plus some config) vs.
+> drive-strength (and related config). Some SoCs might use the same set
+> of groups for both. Perhaps some SoC might even have three or more types
+> of groups! I expect this to have some impact on the binding; I created
+> explicit mux-groups and drive-groups sub-nodes to represent this.
+> 
+> * Tegra's pinmux apply settings to groups of pins instead of individual
+> pins. Some SoCs might allow each setting to be configurable per-pin.
+> I don't expect this to have any impact as far as the bindings go though;
+> it'll simply impact the names of the available pin "groups"; some SoCs
+> will name groups, others pins.
+> 
++1
 
-Do you need more time?
->
-> Thanks.
->
-> Best regards,
-> Kgene.
-> --
-> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-> SW Solution Development Team, Samsung Electronics Co., Ltd.
->
->
+imx's pinmux applies settings to individual pins.
+
+> > > +Each mux pin group is represented as a sub-node of the nvidia,mux-groups node.
+> > > +The name of the sub-node should be the name of the mux pingroup. The following
+> > > +names are valid:
+> > > +
+> > > +	ata
+> > > +	atb
+> > > +	atc
+> > > +	atd
+> > > +	ate
+> > > +	cdev1
+> > > +	cdev2
+> > > ...
+> > 
+> > I noticed that each board you define has a complete list of these. Would
+> > it be possible to move a generic list into a tegra20-pinmux.dtsi file and
+> > just override the pins in the per-board .dts file that require some special
+> > setup?
+> 
+
+It sounds sane for imx though.  I'm going to take this suggestion to
+have imx53-pinmux.dtsi holding register offset for each pin, which is
+common across all i.mx53 boards.
+
+> I'm not sure how much commonality there will really be.
+> 
+> Certainly, many boards are based off our reference designs and so will
+> have many similarities that could be shared.
+> 
+> That said, comparing even tegra-harmony.dts and tegra-seaboard.dts shows
+> a lot of differences. It seems a lot less error-prone to just completely
+> describe the entire pinmux state in each board's .dts file, rather than
+> trying to represent half the information as default in the SoC .dtsi file,
+> and just the diff in the board .dts file. I suppose perhaps if we put the
+> hardware's own default settings in tegra20.dtsi, that'd make sense, since
+> people are presumably reasonably aware of the delta relative to that.
+> 
+> We'd need to add new properties to override defaults, like:
+> 
+> nvidia,tristate --> nvidia,drive
+> nvidia,pull-*   --> nvidia,no-pull
+> 
+> > > +
+> > > +optional subnode-properties:
+> > > +- nvidia,pull-up : Boolean, apply Tegra's internal pull-up to the pin.
+> > > +- nvidia,pull-down : Boolean, apply Tegra's internal pull-down to the pin.
+> > > +- nvidia,tristate : Boolean, tristate the pin. Otherwise, drive it.
+> > > +
+> > > +If both nvidia,pull-up and nvidia,pull-down are specified, nvidia,pull-up
+> > > +takes precedence.
+> > 
+> > These again seem generic enough to go into a general pinmux binding, without
+> > the nvidia, prefix.
+> 
+> Yes, I believe Jamie Iles was going to try cooking up a generic core binding
+> that could be shared across different SoCs, and extended with custom stuff.
+> 
+I would image that whatever common binding for pin/pad configuration
+comes can hardly work for imx out of box.  For each pin/pad, imx have
+4 configurations for pull:
+
+  00: 100KOhm Pull Down
+  01: 47KOhm Pull Up
+  10: 100KOhm Pull Up
+  11: 22KOhm Pull Up
+
+4 configurations for drive:
+
+  00: 100KOhm Pull Down
+  01: 47KOhm Pull Up
+  10: 100KOhm Pull Up
+  11: 22KOhm Pull Up
+
+some other 1 bit configuration fields:
+
+  low/high output voltage Field
+  Hyst. Enable Field
+  Pull / Keep Enable Field
+  Pull / Keep Select Field
+  Slew Rate Field
+
+All these are all in one register <pad_name>_PAD_CTL (mux configuration
+is in another register <pad_name>_PAD_MUX).  The best binding for
+PAD_CTL I can think of so far is to encode the register value in DT
+directly.
+
+-- 
+Regards,
+Shawn
