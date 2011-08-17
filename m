@@ -1,67 +1,42 @@
-From: bryan.wu@canonical.com (Bryan Wu)
-Date: Wed, 17 Aug 2011 19:07:49 +0800
-Subject: [PATCH 17/18] mach-sa1100: retire custom LED code
-In-Reply-To: <4E4900B5.8000708@scram.de>
-References: <1312977952-2272-1-git-send-email-bryan.wu@canonical.com>
-	<1312977952-2272-18-git-send-email-bryan.wu@canonical.com>
-	<4E4900B5.8000708@scram.de>
-Message-ID: <CAK5ve-LUWrTO3akho0zwSr-udbnPccw8JZ8WvyGZNvQLCR8p1g@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 17 Aug 2011 13:12:02 +0200
+Subject: [GIT PULL] u300 cleanups
+Message-ID: <CACRpkdbJ0M_7+s+QkrBzAaNVdx_bNL4Pq7zu30T-yY0TkFu6wQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 15, 2011 at 7:19 PM, Jochen Friedrich <jochen@scram.de> wrote:
-> Hi Bryan,
->
->> diff --git a/arch/arm/mach-sa1100/badge4.c b/arch/arm/mach-sa1100/badge4.c
->> index b4311b0..2e370c6c 100644
->> --- a/arch/arm/mach-sa1100/badge4.c
->> +++ b/arch/arm/mach-sa1100/badge4.c
->> @@ -22,6 +22,8 @@
->> ?#include<linux/mtd/mtd.h>
->> ?#include<linux/mtd/partitions.h>
->> ?#include<linux/errno.h>
->> +#include<linux/gpio.h>
->> +#include<linux/leds.h>
->>
->> ?#include<mach/hardware.h>
->> ?#include<asm/mach-types.h>
->> @@ -69,8 +71,36 @@ static struct platform_device sa1111_device = {
->> ? ? ? ?.resource ? ? ? = sa1111_resources,
->> ?};
->>
->> +/* LEDs */
->> +struct gpio_led badge4_gpio_leds[] = {
->> + ? ? ? {
->> + ? ? ? ? ? ? ? .name ? ? ? ? ? ? ? ? ? = "badge4:red",
->> + ? ? ? ? ? ? ? .default_trigger ? ? ? ?= "heartbeat",
->> + ? ? ? ? ? ? ? .gpio ? ? ? ? ? ? ? ? ? = 7,
->> + ? ? ? },
->> + ? ? ? {
->> + ? ? ? ? ? ? ? .name ? ? ? ? ? ? ? ? ? = "badge4:green",
->> + ? ? ? ? ? ? ? .default_trigger ? ? ? ?= "cpu0",
->> + ? ? ? ? ? ? ? .gpio ? ? ? ? ? ? ? ? ? = 9,
->> + ? ? ? },
->> +};
->> +
->> +static struct gpio_led_platform_data badge4_gpio_led_info = {
->> + ? ? ? .leds ? ? ? ? ? = badge4_gpio_leds,
->> + ? ? ? .num_leds ? ? ? = ARRAY_SIZE(badge4_gpio_leds),
->> +};
->> +
->> +static struct platform_device badge4_leds = {
->> + ? ? ? .name ? = "leds-gpio",
->> + ? ? ? .id ? ? = -1,
->> + ? ? ? .dev ? ?= {
->> + ? ? ? ? ? ? ? .platform_data ?=&badge4_gpio_led_info,
->> + ? ? ? }
->> +};
->> +
->> ?static struct platform_device *devices[] __initdata = {
->> ? ? ? ?&sa1111_device,
->> + ? ? ? &badge4_leds;
->
-> Typo. This should be &badge4_leds,
->
+Hi Arnd,
 
-Thanks a lot, I will fix it and update my patches.
--Bryan
+could you please pull the u300 cleanups to the arm-soc tree, so they get
+some linux-next rotation?
+
+These changes mainly drops the singlemem that was complicating the
+memory.h file so much and switch to using patches physoffset by
+default. It also removes an unused device declaration.
+
+All patches have been on LAKML for a while.
+
+The following changes since commit 93ee7a9340d64f20295aacc3fb6a22b759323280:
+
+  Linux 3.1-rc2 (2011-08-14 15:09:08 -0700)
+
+are available in the git repository at:
+  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git u300
+
+Linus Walleij (5):
+      mach-u300: retire odd singlemem variant
+      mach-u300: drop SEMI config option
+      mach-u300: patch physoffset by default
+      mach-u300: delete bogus memory mappings
+      mach-u300: retire AVE device
+
+ arch/arm/Kconfig                         |    1 +
+ arch/arm/mach-u300/Kconfig               |   46 -----------------
+ arch/arm/mach-u300/Makefile.boot         |   17 +-----
+ arch/arm/mach-u300/core.c                |   82 +-----------------------------
+ arch/arm/mach-u300/include/mach/memory.h |   22 +-------
+ arch/arm/mach-u300/u300.c                |   16 ------
+ 6 files changed, 7 insertions(+), 177 deletions(-)
+
+Thanks,
+Linus Walleij
