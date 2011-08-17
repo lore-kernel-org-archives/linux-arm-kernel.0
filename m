@@ -1,49 +1,69 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 17 Aug 2011 08:48:54 +0200
-Subject: [PATCH v3 1/3] ARM: i.MX51: Remove _MX51_PAD_xxx references
-In-Reply-To: <4E4AC27A.9030608@boundarydevices.com>
-References: <1313265101-11478-1-git-send-email-troy.kisky@boundarydevices.com>
-	<20110816072603.GW31404@pengutronix.de>
-	<4E4AC27A.9030608@boundarydevices.com>
-Message-ID: <20110817064854.GD31404@pengutronix.de>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 17 Aug 2011 15:10:11 +0800
+Subject: [PATCH v2 0/8] Clean up MXC and MXS mach/gpio.h
+In-Reply-To: <20110817064737.GC31404@pengutronix.de>
+References: <1313252047-8820-1-git-send-email-shawn.guo@linaro.org>
+	<20110816071950.GV31404@pengutronix.de>
+	<20110817062539.GC10037@S2100-06.ap.freescale.net>
+	<20110817064737.GC31404@pengutronix.de>
+Message-ID: <20110817071010.GD10037@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 16, 2011 at 12:18:18PM -0700, Troy Kisky wrote:
-> On 8/16/2011 12:26 AM, Sascha Hauer wrote:
-> > On Sat, Aug 13, 2011 at 12:51:41PM -0700, Troy Kisky wrote:
-> >> Use new macro NEW_PAD_CTRL to remove _MX51_PAD_xxx references.
-> >> A later patch will remove the _MX51_PAD_xxx symbols.
-> >>
-> >> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
-> >> ---
-> >>  arch/arm/mach-mx5/board-cpuimx51sd.c         |    2 +-
-> >>  arch/arm/mach-mx5/board-mx51_babbage.c       |    4 ++--
-> >>  arch/arm/mach-mx5/eukrea_mbimxsd-baseboard.c |    4 ++--
-> >>  arch/arm/plat-mxc/include/mach/iomux-v3.h    |    1 +
-> >>  4 files changed, 6 insertions(+), 5 deletions(-)
-> >>
-> >>
-> >> Changes since v2: add () around cfg in NEW_PAD_CTRL macro
-> >> as noticed by Sascha.
-> >>
-> >> 2/3 and 3/3 are the same as v2 and are not reposted.
+On Wed, Aug 17, 2011 at 08:47:37AM +0200, Sascha Hauer wrote:
+> On Wed, Aug 17, 2011 at 02:25:40PM +0800, Shawn Guo wrote:
+> > On Tue, Aug 16, 2011 at 09:19:50AM +0200, Sascha Hauer wrote:
+> > > Shawn,
+> > > 
+> > > On Sun, Aug 14, 2011 at 12:13:59AM +0800, Shawn Guo wrote:
+> > > > As one step to single image for multiple platforms, mach/gpio.h needs
+> > > > to be removed from asm/gpio.h.  The patch set cleans up MXC and MXS
+> > > > mach/gpio.h to an empty header.
+> > > > 
+> > > > It's based on v3.1-rc1 plus rmk's patch series below.
+> > > > 
+> > > >   [PATCH 00/13] Clean up mach/gpio.h headers
+> > > > 
+> > > > The Ben's fix is on the way to -rc2 through arm-soc tree.
+> > > > 
+> > > > Grant, Sascha,
+> > > > 
+> > > > Can you please review the series and give comments or your ack tag?
+> > > 
+> > > I'm fine with this series. I removed the dependency on rmks patches
+> > > (can be easily merged later) and checked it into my cleanup branch.
+> > > Please check if you are fine with the result.
+> > > 
+> > It looks all good in terms of code.  But the commit messages of the
+> > following patches do not fit the context any more.
+> 
+> Yes, you are right. Changed it to the following
+> 
 > > 
-> > Applied this one. Can you send me the whole 2/3 and 3/3 patches?
-> > I only have the sed scripts which I don't want to execute manually.
-> > 
-> > Sascha
-> > 
-> I'll send you the patch against mainline.
-> if you want it against a different branch, let me know.
-
-Mainline is fine. Applied them for cleanups.
-
-Thanks
- Sascha
+> >   arm/mxc: remove gpio_to_irq() from mach/gpio.h
+> 
+>     arm/mxc: use gpiolib helper for gpio_to_irq
+>     
+>     As all the users of gpio_to_irq() in static initializers have been
+>     migrated to IMX_GPIO_TO_IRQ, we can start using the standard gpiolib
+>     helper for gpio_to_irq().
+> 
+> >   arm/mxc: move IMX_GPIO_NR into mach/hardware.h
+> 
+>     arm/mxc: move IMX_GPIO_NR into mach/hardware.h
+>     
+>     The patch moves IMX_GPIO_NR into mach/hardware.h, so that we only
+>     use standard gpiolib helpers in mach/gpio.h.
+> 
+> >   arm/mxs: move MXS_GPIO_NR into mach/mxs.h
+> 
+>     arm/mxs: move MXS_GPIO_NR into mach/mxs.h
+>     
+>     The patch moves MXS_GPIO_NR into mach/mxs.h, so that we only use
+>     standard gpiolib helpers in mach/gpio.h.
+> 
+Looks all good now.
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Regards,
+Shawn
