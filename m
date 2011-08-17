@@ -1,68 +1,82 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 17 Aug 2011 14:32:21 +0200
-Subject: [PATCH V4 0/3] ARM: mmp: add audio sram support
-In-Reply-To: <4E48F420.3030101@marvell.com>
-References: <1313377794-26721-1-git-send-email-leoy@marvell.com>
-	<1313377893.14434.5.camel@Lily>
-	<CAMPhdO8rkct4H74zXBzaDa183u5vrPArerXgiNXwvQWzZT67Ng@mail.gmail.com>
-	<20110815091245.GC32705@game.jcrosoft.org>
-	<CAMPhdO_StSa9fsYLNjJDd0KDkUyg6ep3gN2n5Gx-WmZ8t=bTFw@mail.gmail.com>
-	<4E48F420.3030101@marvell.com>
-Message-ID: <20110817123221.GH28201@game.jcrosoft.org>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 17 Aug 2011 15:06:08 +0200
+Subject: [PATCH 7/9] ARM: DMA: steal memory for DMA coherent mappings
+In-Reply-To: <201108171428.44555.arnd@arndb.de>
+References: <1313146711-1767-1-git-send-email-m.szyprowski@samsung.com>
+	<201108161626.26130.arnd@arndb.de>
+	<006b01cc5cb3$dac09fa0$9041dee0$%szyprowski@samsung.com>
+	<201108171428.44555.arnd@arndb.de>
+Message-ID: <009101cc5cde$6dfaa660$49eff320$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18:25 Mon 15 Aug     , Leo Yan wrote:
-> 
-> 
-> On 08/15/2011 05:35 PM, Eric Miao wrote:
-> >On Mon, Aug 15, 2011 at 5:12 PM, Jean-Christophe PLAGNIOL-VILLARD
-> ><plagnioj@jcrosoft.com>  wrote:
-> >>On 16:43 Mon 15 Aug     , Eric Miao wrote:
-> >>>On Mon, Aug 15, 2011 at 11:11 AM, Haojian Zhuang
-> >>><haojian.zhuang@marvell.com>  wrote:
-> >>>>On Sun, 2011-08-14 at 20:09 -0700, Leo Yan wrote:
-> >>>>>On mmp platform, there have two sram banks:
-> >>>>>audio sram bank, and internal sram bank for video and PM.
-> >>>>>So add the sram module to manage these sram banks.
-> >>>>>
-> >>>>>And register the sram banks so can dynamically alloc/free
-> >>>>>the buffer.
-> >>>>>
-> >>>>>Leo Yan (3):
-> >>>>>   ARM: mmp: add sram allocator
-> >>>>>   ARM: mmp: register audio sram bank
-> >>>>>   ARM: mmp: register internal sram bank
-> >>>>>
-> >>>>>  arch/arm/Kconfig                      |    1 +
-> >>>>>  arch/arm/mach-mmp/Makefile            |    2 +-
-> >>>>>  arch/arm/mach-mmp/brownstone.c        |   11 ++
-> >>>>>  arch/arm/mach-mmp/include/mach/mmp2.h |   13 +++
-> >>>>>  arch/arm/mach-mmp/include/mach/sram.h |   35 +++++++
-> >>>>>  arch/arm/mach-mmp/mmp2.c              |    3 +
-> >>>>>  arch/arm/mach-mmp/sram.c              |  168 +++++++++++++++++++++++++++++++++
-> >>>>>  7 files changed, 232 insertions(+), 1 deletions(-)
-> >>>>>  create mode 100644 arch/arm/mach-mmp/include/mach/sram.h
-> >>>>>  create mode 100644 arch/arm/mach-mmp/sram.c
-> >>>>>
-> >>>>Acked-by: Haojian Zhuang<haojian.zhuang@gmail.com>
-> >>>
-> >>>Looks good to me. Thanks Haojian. Applied to -devel.
-> >>I've some reserve on the named pool they need to be managed at generic level
-> >>not here
-> >
-> >What are their names? And your suggestions to fix this?
-> >
-> 
-> For MMP platform have not only one bank, so now named the audio sram
-> bank as "asram", and another sram bank as "isram" which is used by
-> video/secure processor/pm.
-> If other modules want to use the sram, just use the name string to
-> get the gen pool handler, and then just call genalloc APIs.
-> 
-> I just wander if maintain the name in genalloc, then the name string
-> we should maintain in the pool's structure or chunk's structure?
-on the chunk
+Hello,
 
-Best Regards,
-J.
+On Wednesday, August 17, 2011 2:29 PM Arnd Bergmann wrote:
+
+> On Wednesday 17 August 2011, Marek Szyprowski wrote:
+> > Do we really need the dynamic pool for the first version? I would like to
+> > know how much memory can be allocated in GFP_ATOMIC context. What are the
+> > typical sizes of such allocations?
+> 
+> I think this highly depends on the board and on the use case. We know
+> that 2 MB is usually enough, because that is the current CONSISTENT_DMA_SIZE
+> on most platforms. Most likely something a lot smaller will be ok
+> in practice. CONSISTENT_DMA_SIZE is currently used for both atomic
+> and non-atomic allocations.
+
+Ok. The platforms that increased CONSISTENT_DMA_SIZE usually did that to enable
+support for framebuffer or other multimedia devices, which won't be allocated 
+in ATOMIC context anyway.
+
+> > Maybe for the first version a static pool with reasonably small size
+> > (like 128KiB) will be more than enough? This size can be even board
+> > depended or changed with kernel command line for systems that really
+> > needs more memory.
+> 
+> For a first version that sounds good enough. Maybe we could use a fraction
+> of the CONSISTENT_DMA_SIZE as an estimate?
+
+Ok, good. For the initial values I will probably use 1/8 of 
+CONSISTENT_DMA_SIZE for coherent allocations. Writecombine atomic allocations
+are extremely rare and rather ARM specific. 1/32 of CONSISTENT_DMA_SIZE should
+be more than enough for them.
+
+> For the long-term solution, I see two options:
+> 
+> 1. make the preallocated pool rather small so we normally don't need it.
+> 2. make it large enough so we can also fulfill most nonatomic allocations
+>    from that pool to avoid the TLB flushes and going through the CMA
+>    code. Only use the real CMA region when the pool allocation fails.
+> 
+> In either case, there should be some method for balancing the pool
+> size.
+
+Right. The most obvious method is to use additional kernel thread which will
+periodically call the balance function. In the implementation both usage 
+scenarios are very similar, so this can even be a kernel parameter or Kconfig
+option, but lets leave this for the future vesions.
+ 
+> > I noticed one more problem. The size of the CMA managed area must be
+> > the multiple of 16MiBs (MAX_ORDER+1). This means that the smallest CMA area
+> > is 16MiB. These values comes from the internals of the kernel memory
+> > management design and page blocks are the only entities that can be managed
+> > with page migration code.
+> >
+> > I'm not sure if all ARMv6+ boards have at least 32MiB of memory be able to
+> > create a CMA area.
+> 
+> My guess is that you can assume to have 64 MB or more on ARMv6 running Linux,
+> but other people may have more accurate data.
+> 
+> Also, there is the option of setting a lower value for FORCE_MAX_ZONEORDER
+> for some platforms if it becomes a problem.
+
+Ok. I figured out an error in the above calculation, so 8MiB is the smallest
+CMA area size. Assuming that there are at least 32MiB of memory available this
+is not an issue anymore.
+
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
