@@ -1,42 +1,36 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 17 Aug 2011 13:12:02 +0200
-Subject: [GIT PULL] u300 cleanups
-Message-ID: <CACRpkdbJ0M_7+s+QkrBzAaNVdx_bNL4Pq7zu30T-yY0TkFu6wQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 17 Aug 2011 13:23:38 +0200
+Subject: [RFC PATCH v2 00/13] arm/tegra: Initialize GPIO & pinmux from DT
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF04AEA25368@HQMAIL01.nvidia.com>
+References: <1313440100-17131-1-git-send-email-swarren@nvidia.com>
+	<201108161637.16620.arnd@arndb.de>
+	<74CDBE0F657A3D45AFBB94109FB122FF04AEA25368@HQMAIL01.nvidia.com>
+Message-ID: <201108171323.38441.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Tuesday 16 August 2011, Stephen Warren wrote:
+> One issue here: There isn't always a single gpio/pinmux parent; as a
+> concrete example, the ALSA/ASoC driver for Tegra+WM8903 uses GPIOs both
+> from Tegra itself, and from the WM8903 audio codec.
+> 
+> I could imagine the same being true in basically any case where one
+> device uses N GPIOs (e.g. SD controller with power, change-detect,
+> and read-only GPIOs; some could easily come from the SoC and some
+> from a GPIO expander).
+> 
+> I'm not quite so sure that multiple parents would be useful for pinmux,
+> but I wouldn't say that it was impossible...
 
-could you please pull the u300 cleanups to the arm-soc tree, so they get
-some linux-next rotation?
+Hmm, how common do you think the example is?
 
-These changes mainly drops the singlemem that was complicating the
-memory.h file so much and switch to using patches physoffset by
-default. It also removes an unused device declaration.
+It it's just a very rare case, we can still special-case it by
+introducing fake subdevices for the Tegra+WM8903 driver, each of
+which has only one gpio-parent. This is ugly but keeps the special
+case to the rare devices.
 
-All patches have been on LAKML for a while.
+If we can expect more than a handful of these, we probably need
+a better design for the binding, which will cause a burden for
+all drivers.
 
-The following changes since commit 93ee7a9340d64f20295aacc3fb6a22b759323280:
-
-  Linux 3.1-rc2 (2011-08-14 15:09:08 -0700)
-
-are available in the git repository at:
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git u300
-
-Linus Walleij (5):
-      mach-u300: retire odd singlemem variant
-      mach-u300: drop SEMI config option
-      mach-u300: patch physoffset by default
-      mach-u300: delete bogus memory mappings
-      mach-u300: retire AVE device
-
- arch/arm/Kconfig                         |    1 +
- arch/arm/mach-u300/Kconfig               |   46 -----------------
- arch/arm/mach-u300/Makefile.boot         |   17 +-----
- arch/arm/mach-u300/core.c                |   82 +-----------------------------
- arch/arm/mach-u300/include/mach/memory.h |   22 +-------
- arch/arm/mach-u300/u300.c                |   16 ------
- 6 files changed, 7 insertions(+), 177 deletions(-)
-
-Thanks,
-Linus Walleij
+	Arnd
