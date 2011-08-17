@@ -1,34 +1,35 @@
-From: bryan.wu@canonical.com (Bryan Wu)
-Date: Wed, 17 Aug 2011 18:00:04 +0800
-Subject: [PATCH] ARM: mach-footbridge: add missing header file <video/vga.h>
-Message-ID: <1313575204-25374-1-git-send-email-bryan.wu@canonical.com>
+From: vzapolskiy@gmail.com (Vladimir Zapolskiy)
+Date: Wed, 17 Aug 2011 13:25:48 +0300
+Subject: [PATCH] ARM: SAMSUNG: Modify the devname for pl330 clock
+In-Reply-To: <001601cc5cba$27b49400$771dbc00$%kim@samsung.com>
+References: <1313540801-12054-1-git-send-email-boojin.kim@samsung.com>
+	<4E4B5CD9.7060703@mleia.com>
+	<001601cc5cba$27b49400$771dbc00$%kim@samsung.com>
+Message-ID: <CAMW3pwZXtDba6DsU5C-oLCcMLyXVaJQmLbzsvEwG97pO6YmdrA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes following building error:
---
-arch/arm/mach-footbridge/dc21285.c: In function 'dc21285_preinit':
-arch/arm/mach-footbridge/dc21285.c:299:2: error: 'vga_base' undeclared (first use in this function)
-arch/arm/mach-footbridge/dc21285.c:299:2: note: each undeclared identifier is reported only once for each function it appears in
-make[1]: *** [arch/arm/mach-footbridge/dc21285.o] Error 1
---
+Hi,
 
-Signed-off-by: Bryan Wu <bryan.wu@canonical.com>
----
- arch/arm/mach-footbridge/dc21285.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+On Wed, Aug 17, 2011 at 11:46 AM, Boojin Kim <boojin.kim@samsung.com> wrote:
+> Vladimir Zapolskiy wrote:
+>> Hi,
+>>
+>> looks like it contains my series as a subset.
+>
+> As I replied on your patches, yes, I know that. I sent it before see your
+> patch.
+> Do you add the missing about s5p64x0 in your patch?
+> If not, I will split up this patch to get missing about s5p64x0 in your
+> patch.
 
-diff --git a/arch/arm/mach-footbridge/dc21285.c b/arch/arm/mach-footbridge/dc21285.c
-index 1331fff..18c32a5 100644
---- a/arch/arm/mach-footbridge/dc21285.c
-+++ b/arch/arm/mach-footbridge/dc21285.c
-@@ -18,6 +18,7 @@
- #include <linux/irq.h>
- #include <linux/io.h>
- #include <linux/spinlock.h>
-+#include <video/vga.h>
- 
- #include <asm/irq.h>
- #include <asm/system.h>
--- 
-1.7.5
+No, I haven't added that. In my opinion it would be nice, if you can
+split the patch and fix more incorrespondent device names for s5p64x0,
+or probably it might be done at once replacing my version of the
+change for s5p64x0 only.
+
+Thank you a lot!
+
+--
+With best wishes,
+Vladimir
