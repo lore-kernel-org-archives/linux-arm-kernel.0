@@ -1,81 +1,68 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 17 Aug 2011 14:49:13 +0200
-Subject: [PATCH 7/9] ARM: DMA: steal memory for DMA coherent mappings
-References: <1313146711-1767-1-git-send-email-m.szyprowski@samsung.com>
-	<201108161528.48954.arnd@arndb.de>
-	<20110816135516.GC17310@n2100.arm.linux.org.uk>
-	<201108161626.26130.arnd@arndb.de>
-Message-ID: <008d01cc5cdc$11392520$33ab6f60$%szyprowski@samsung.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 17 Aug 2011 14:32:21 +0200
+Subject: [PATCH V4 0/3] ARM: mmp: add audio sram support
+In-Reply-To: <4E48F420.3030101@marvell.com>
+References: <1313377794-26721-1-git-send-email-leoy@marvell.com>
+	<1313377893.14434.5.camel@Lily>
+	<CAMPhdO8rkct4H74zXBzaDa183u5vrPArerXgiNXwvQWzZT67Ng@mail.gmail.com>
+	<20110815091245.GC32705@game.jcrosoft.org>
+	<CAMPhdO_StSa9fsYLNjJDd0KDkUyg6ep3gN2n5Gx-WmZ8t=bTFw@mail.gmail.com>
+	<4E48F420.3030101@marvell.com>
+Message-ID: <20110817123221.GH28201@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Wednesday, August 17, 2011 10:01 AM Marek Szyprowski wrote:
-> On Tuesday, August 16, 2011 4:26 PM Arnd Bergmann wrote:
-> > On Tuesday 16 August 2011, Russell King - ARM Linux wrote:
-> > > On Tue, Aug 16, 2011 at 03:28:48PM +0200, Arnd Bergmann wrote:
-> > > > Hmm, I don't remember the point about dynamically sizing the pool for
-> > > > ARMv6K, but that can well be an oversight on my part.  I do remember the
-> > > > part about taking that memory pool from the CMA region as you say.
-> > >
-> > > If you're setting aside a pool of pages, then you have to dynamically
-> > > size it.  I did mention during our discussion about this.
-> > >
-> > > The problem is that a pool of fixed size is two fold: you need it to be
-> > > sufficiently large that it can satisfy all allocations which come along
-> > > in atomic context.  Yet, we don't want the pool to be too large because
-> > > then it prevents the memory being used for other purposes.
-> > >
-> > > Basically, the total number of pages in the pool can be a fixed size,
-> > > but as they are depleted through allocation, they need to be
-> > > re-populated from CMA to re-build the reserve for future atomic
-> > > allocations.  If the pool becomes larger via frees, then obviously
-> > > we need to give pages back.
-> >
-> > Ok, thanks for the reminder. I must have completely missed this part
-> > of the discussion.
-> >
-> > When I briefly considered this problem, my own conclusion was that
-> > the number of atomic DMA allocations would always be very low
-> > because they tend to be short-lived (e.g. incoming network packets),
-> > so we could ignore this problem and just use a smaller reservation
-> > size. While this seems to be true in general (see "git grep -w -A3
-> > dma_alloc_coherent | grep ATOMIC"), there is one very significant
-> > case that we cannot ignore, which is pci_alloc_consistent.
-> >
-> > This function is still called by hundreds of PCI drivers and always
-> > does dma_alloc_coherent(..., GFP_ATOMIC), even for long-lived
-> > allocations and those that are too large to be ignored.
-> >
-> > So at least for the case where we have PCI devices, I agree that
-> > we need to have the dynamic pool.
+On 18:25 Mon 15 Aug     , Leo Yan wrote:
 > 
-> Do we really need the dynamic pool for the first version? I would like to
-> know how much memory can be allocated in GFP_ATOMIC context. What are the
-> typical sizes of such allocations?
 > 
-> Maybe for the first version a static pool with reasonably small size
-> (like 128KiB) will be more than enough? This size can be even board
-> depended or changed with kernel command line for systems that really
-> needs more memory.
+> On 08/15/2011 05:35 PM, Eric Miao wrote:
+> >On Mon, Aug 15, 2011 at 5:12 PM, Jean-Christophe PLAGNIOL-VILLARD
+> ><plagnioj@jcrosoft.com>  wrote:
+> >>On 16:43 Mon 15 Aug     , Eric Miao wrote:
+> >>>On Mon, Aug 15, 2011 at 11:11 AM, Haojian Zhuang
+> >>><haojian.zhuang@marvell.com>  wrote:
+> >>>>On Sun, 2011-08-14 at 20:09 -0700, Leo Yan wrote:
+> >>>>>On mmp platform, there have two sram banks:
+> >>>>>audio sram bank, and internal sram bank for video and PM.
+> >>>>>So add the sram module to manage these sram banks.
+> >>>>>
+> >>>>>And register the sram banks so can dynamically alloc/free
+> >>>>>the buffer.
+> >>>>>
+> >>>>>Leo Yan (3):
+> >>>>>   ARM: mmp: add sram allocator
+> >>>>>   ARM: mmp: register audio sram bank
+> >>>>>   ARM: mmp: register internal sram bank
+> >>>>>
+> >>>>>  arch/arm/Kconfig                      |    1 +
+> >>>>>  arch/arm/mach-mmp/Makefile            |    2 +-
+> >>>>>  arch/arm/mach-mmp/brownstone.c        |   11 ++
+> >>>>>  arch/arm/mach-mmp/include/mach/mmp2.h |   13 +++
+> >>>>>  arch/arm/mach-mmp/include/mach/sram.h |   35 +++++++
+> >>>>>  arch/arm/mach-mmp/mmp2.c              |    3 +
+> >>>>>  arch/arm/mach-mmp/sram.c              |  168 +++++++++++++++++++++++++++++++++
+> >>>>>  7 files changed, 232 insertions(+), 1 deletions(-)
+> >>>>>  create mode 100644 arch/arm/mach-mmp/include/mach/sram.h
+> >>>>>  create mode 100644 arch/arm/mach-mmp/sram.c
+> >>>>>
+> >>>>Acked-by: Haojian Zhuang<haojian.zhuang@gmail.com>
+> >>>
+> >>>Looks good to me. Thanks Haojian. Applied to -devel.
+> >>I've some reserve on the named pool they need to be managed at generic level
+> >>not here
+> >
+> >What are their names? And your suggestions to fix this?
+> >
 > 
-> I noticed one more problem. The size of the CMA managed area must be
-> the multiple of 16MiBs (MAX_ORDER+1). This means that the smallest CMA area
-> is 16MiB. These values comes from the internals of the kernel memory
-> management design and page blocks are the only entities that can be managed
-> with page migration code.
+> For MMP platform have not only one bank, so now named the audio sram
+> bank as "asram", and another sram bank as "isram" which is used by
+> video/secure processor/pm.
+> If other modules want to use the sram, just use the name string to
+> get the gen pool handler, and then just call genalloc APIs.
+> 
+> I just wander if maintain the name in genalloc, then the name string
+> we should maintain in the pool's structure or chunk's structure?
+on the chunk
 
-I'm really sorry for the confusion. This 16MiB value worried me too much and
-I've checked the code once again and found that this MAX_ORDER+1 value was
-a miscalculation, which appeared in v11 of the  patches. The true minimal
-CMA area size is 8MiB for ARM architecture. I believe this shouldn't be
-an issue for the current ARMv6+ based machines.
-
-I've checked it with "mem=16M cma=8M" kernel arguments. System booted fine
-and CMA area has been successfully created.
-
-Best regards
--- 
-Marek Szyprowski
-Samsung Poland R&D Center
+Best Regards,
+J.
