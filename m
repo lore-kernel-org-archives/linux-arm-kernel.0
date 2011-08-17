@@ -1,73 +1,47 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 17 Aug 2011 15:27:07 +0800
-Subject: [PATCH 1/6] ARM: highbank: add devicetree source
-In-Reply-To: <1313526898-19920-2-git-send-email-robherring2@gmail.com>
-References: <1313526898-19920-1-git-send-email-robherring2@gmail.com>
-	<1313526898-19920-2-git-send-email-robherring2@gmail.com>
-Message-ID: <20110817072706.GE10037@S2100-06.ap.freescale.net>
+From: mikpe@it.uu.se (Mikael Pettersson)
+Date: Wed, 17 Aug 2011 09:28:13 +0200
+Subject: [RFC,PATCH] arch/arm: compute and export NR_syscalls
+In-Reply-To: <CABqD9hYavCxA38GbBhbCmBT+PEQQsvhbF4U7xY8P8ygbFy+=Ag@mail.gmail.com>
+References: <1313529267-4428-1-git-send-email-wad@chromium.org>
+	<1629809.vjtjo6obCs@wuerfel>
+	<CABqD9hYavCxA38GbBhbCmBT+PEQQsvhbF4U7xY8P8ygbFy+=Ag@mail.gmail.com>
+Message-ID: <20043.28045.613130.691498@pilspetsen.it.uu.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Will Drewry writes:
+ > On Tue, Aug 16, 2011 at 4:21 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+ > > On Tuesday 16 August 2011 16:14:26 Will Drewry wrote:
+ > >>
+ > >> asm-exports.c is added instead of reusing asm-offsets.c to avoid a
+ > >> variety of collisions (VM_EXEC, DMA_*, etc). ?It is possible to use the
+ > >> same calls.S mechanism but add NR_syscalls to asm-offsets.c. ?However,
+ > >> at inclusion time for generated/asm-offsets.h, conflicting defines will
+ > >> need to be #undef'd if !__ASSEMBLY__ since it appears that the purpose
+ > >> of asm-offsets.h is to safely bind C language definitions to assembly
+ > >> and not the reverse.
+ > >>
+ > >> - Is this approach palatable?
+ > >> - Should I resend only when paired with the other ftrace-needed patches?
+ > >
+ > > This seems overly complex, compared to a one-line change adding the symbol
+ > > to asm/unistd.h. The only other architecture that uses an approach
+ > > like the one you have posted is x86-64, and it's simpler there
+ > > because it can easily be done in asm-offsets.c there without the need
+ > > to create another helper.
+ > 
+ > Agreed!
+ > 
+ > I proposed this approach based solely on prior threads I've seen. E.g.,
+ > - https://lkml.org/lkml/2007/6/1/427
+ >   (don't just #define)
+ > - https://lkml.org/lkml/2009/8/27/280
+ >   (todo: x86-32 to move to x86-64)
+ > 
+ > If a single line #define is good enough, then it certainly works for me.
 
-On Tue, Aug 16, 2011 at 03:34:53PM -0500, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
-> 
-> This adds the devicetree source and documentation for the Calxeda highbank
-> platform.
-> 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> ---
->  Documentation/devicetree/bindings/arm/calxeda.txt |    8 +
->  arch/arm/boot/dts/highbank.dts                    |  212 +++++++++++++++++++++
->  2 files changed, 220 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/arm/calxeda.txt
->  create mode 100644 arch/arm/boot/dts/highbank.dts
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/calxeda.txt b/Documentation/devicetree/bindings/arm/calxeda.txt
-> new file mode 100644
-> index 0000000..4755caa
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/calxeda.txt
-> @@ -0,0 +1,8 @@
-> +Calxeda Highbank Platforms Device Tree Bindings
-> +-----------------------------------------------
-> +
-> +Boards with Calxeda Cortex-A9 based Highbank SOC shall have the following
-> +properties.
-> +
-> +Required root node properties:
-> +    - compatible = "calxeda,highbank";
-> diff --git a/arch/arm/boot/dts/highbank.dts b/arch/arm/boot/dts/highbank.dts
-> new file mode 100644
-> index 0000000..2dd3b7b
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/highbank.dts
-> @@ -0,0 +1,212 @@
-> +/*
-> + * Copyright 2011 Calxeda, Inc.
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms and conditions of the GNU General Public License,
-> + * version 2, as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope it will be useful, but WITHOUT
-> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-> + * more details.
-> + *
-> + * You should have received a copy of the GNU General Public License along with
-> + * this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +
-> +/dts-v1/;
-> +
-> +/* First 4KB has pen for secondary cores. */
-> +/memreserve/ 0x00000000 0x0001000;
-> +
-I failed to find the "pen" handling in the whole patch series.  Am I
-missing anything?
+Yes, the one-line #define NR_syscalls in unistd.h is a perfectly adequate,
+if not entirely elegant, solution.  Adding asm-export.c just for this is
+waaay overkill.
 
--- 
-Regards,
-Shawn
+/Mikael
