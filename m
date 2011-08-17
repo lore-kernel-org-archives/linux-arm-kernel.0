@@ -1,49 +1,105 @@
-From: lost.distance@yahoo.com (Paul Parsons)
-Date: Wed, 17 Aug 2011 01:20:21 +0100 (BST)
-Subject: [PATCH v2 2/2] pxa/hx4700: Add Synaptics NavPoint (PXA27x
-	SSP/SPI) driver
-In-Reply-To: <201108161713.34778.marek.vasut@gmail.com>
-Message-ID: <1313540421.59810.YahooMailClassic@web29020.mail.ird.yahoo.com>
+From: boojin.kim@samsung.com (Boojin Kim)
+Date: Wed, 17 Aug 2011 09:26:41 +0900
+Subject: [PATCH] ARM: SAMSUNG: Modify the devname for pl330 clock
+Message-ID: <1313540801-12054-1-git-send-email-boojin.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > We could if the NavPoint supported MEP Query $22
-> (Touchpad Coordinate Range
-> > Query). Unfortunately it doesn't (I tried), presumably
-> because the
-> > NavPoint uses an older version of MEP (Synaptics
-> Modular Embedded
-> > Protocol).
-> 
-> Then you can adjust it via module parameters and have these
-> as default values. 
-> or sysfs ... maybe sysfs would be better
-> > 
-> > > Or use sysfs
-> > > attributes / module params ?
-> > 
-> > Or platform data? That's much simpler. Without knowing
-> how this driver will
-> > be used by other platforms (if at all) I'm wary about
-> over-engineering it.
-> 
-> True ... then likely module params or sysfs to keep it
-> simple. Pdata seems 
-> stupid.
+This patch modified the devname for pl330 clock from 's3c-pl330' to 'dma-pl330'
+to support new pl330 driver on dmaengine.
+NOTE: This patch sould be added after merging new pl330 driver on dmaengine.
 
-OK, module parameters are somewhat simpler so I'll go with those.
+Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
+---
+ arch/arm/mach-exynos4/clock.c         |    4 ++--
+ arch/arm/mach-s5p64x0/clock-s5p6440.c |    1 +
+ arch/arm/mach-s5p64x0/clock-s5p6450.c |    1 +
+ arch/arm/mach-s5pc100/clock.c         |    4 ++--
+ arch/arm/mach-s5pv210/clock.c         |    4 ++--
+ 5 files changed, 8 insertions(+), 6 deletions(-)
 
-> > Original authors? I don't understand; would you please
-> elaborate.
-> 
-> I dunno, well you took it from linux-hh tree, right? So if
-> there was any 
-> original author, give him a credit ... if that's you, just
-> ignore this. I didn't 
-> expect there to be still someone from -hh times around and
-> active :-)
-
-Actually it doesn't come from the hh kernel. I did reference the hh driver for SSP setup such as frame format and data size, since I have no NavPoint documentation, but this driver is new and very much simpler.
-
-Regards,
-Paul
+diff --git a/arch/arm/mach-exynos4/clock.c b/arch/arm/mach-exynos4/clock.c
+index fee2dd8..04c997a 100644
+--- a/arch/arm/mach-exynos4/clock.c
++++ b/arch/arm/mach-exynos4/clock.c
+@@ -460,12 +460,12 @@ static struct clk init_clocks_off[] = {
+ 		.ctrlbit	= (1 << 10),
+ 	}, {
+ 		.name		= "dma",
+-		.devname	= "s3c-pl330.0",
++		.devname	= "dma-pl330.0",
+ 		.enable		= exynos4_clk_ip_fsys_ctrl,
+ 		.ctrlbit	= (1 << 0),
+ 	}, {
+ 		.name		= "dma",
+-		.devname	= "s3c-pl330.1",
++		.devname	= "dma-pl330.1",
+ 		.enable		= exynos4_clk_ip_fsys_ctrl,
+ 		.ctrlbit	= (1 << 1),
+ 	}, {
+diff --git a/arch/arm/mach-s5p64x0/clock-s5p6440.c b/arch/arm/mach-s5p64x0/clock-s5p6440.c
+index c1f548f..c54c65d 100644
+--- a/arch/arm/mach-s5p64x0/clock-s5p6440.c
++++ b/arch/arm/mach-s5p64x0/clock-s5p6440.c
+@@ -147,6 +147,7 @@ static struct clk init_clocks_off[] = {
+ 		.ctrlbit	= (1 << 8),
+ 	}, {
+ 		.name		= "dma",
++		.devname	= "dma-pl330",
+ 		.parent		= &clk_hclk_low.clk,
+ 		.enable		= s5p64x0_hclk0_ctrl,
+ 		.ctrlbit	= (1 << 12),
+diff --git a/arch/arm/mach-s5p64x0/clock-s5p6450.c b/arch/arm/mach-s5p64x0/clock-s5p6450.c
+index 3d9b609..2d04abf 100644
+--- a/arch/arm/mach-s5p64x0/clock-s5p6450.c
++++ b/arch/arm/mach-s5p64x0/clock-s5p6450.c
+@@ -180,6 +180,7 @@ static struct clk init_clocks_off[] = {
+ 		.ctrlbit	= (1 << 3),
+ 	}, {
+ 		.name		= "dma",
++		.devname	= "dma-pl330",
+ 		.parent		= &clk_hclk_low.clk,
+ 		.enable		= s5p64x0_hclk0_ctrl,
+ 		.ctrlbit	= (1 << 12),
+diff --git a/arch/arm/mach-s5pc100/clock.c b/arch/arm/mach-s5pc100/clock.c
+index 6527c05..8d47709 100644
+--- a/arch/arm/mach-s5pc100/clock.c
++++ b/arch/arm/mach-s5pc100/clock.c
+@@ -460,13 +460,13 @@ static struct clk init_clocks_off[] = {
+ 		.ctrlbit	= (1 << 2),
+ 	}, {
+ 		.name		= "dma",
+-		.devname	= "s3c-pl330.1",
++		.devname	= "dma-pl330.1",
+ 		.parent		= &clk_div_d1_bus.clk,
+ 		.enable		= s5pc100_d1_0_ctrl,
+ 		.ctrlbit	= (1 << 1),
+ 	}, {
+ 		.name		= "dma",
+-		.devname	= "s3c-pl330.0",
++		.devname	= "dma-pl330.0",
+ 		.parent		= &clk_div_d1_bus.clk,
+ 		.enable		= s5pc100_d1_0_ctrl,
+ 		.ctrlbit	= (1 << 0),
+diff --git a/arch/arm/mach-s5pv210/clock.c b/arch/arm/mach-s5pv210/clock.c
+index d35726a..239aaad 100644
+--- a/arch/arm/mach-s5pv210/clock.c
++++ b/arch/arm/mach-s5pv210/clock.c
+@@ -295,13 +295,13 @@ static struct clk_ops clk_fout_apll_ops = {
+ static struct clk init_clocks_off[] = {
+ 	{
+ 		.name		= "dma",
+-		.devname	= "s3c-pl330.0",
++		.devname	= "dma-pl330.0",
+ 		.parent		= &clk_hclk_psys.clk,
+ 		.enable		= s5pv210_clk_ip0_ctrl,
+ 		.ctrlbit	= (1 << 3),
+ 	}, {
+ 		.name		= "dma",
+-		.devname	= "s3c-pl330.1",
++		.devname	= "dma-pl330.1",
+ 		.parent		= &clk_hclk_psys.clk,
+ 		.enable		= s5pv210_clk_ip0_ctrl,
+ 		.ctrlbit	= (1 << 4),
+-- 
+1.7.1
