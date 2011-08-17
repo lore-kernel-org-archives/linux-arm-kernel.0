@@ -1,178 +1,114 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 17 Aug 2011 14:17:04 +0800
-Subject: [RFC PATCH v2 06/13] docs/dt: Document nvidia,tegra20-pinmux
-	binding
-In-Reply-To: <20110817060242.GA10037@S2100-06.ap.freescale.net>
-References: <1313440100-17131-1-git-send-email-swarren@nvidia.com>
-	<1313440100-17131-7-git-send-email-swarren@nvidia.com>
-	<201108161551.31389.arnd@arndb.de>
-	<74CDBE0F657A3D45AFBB94109FB122FF04AEA2537D@HQMAIL01.nvidia.com>
-	<20110817060242.GA10037@S2100-06.ap.freescale.net>
-Message-ID: <20110817061703.GB10037@S2100-06.ap.freescale.net>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Wed, 17 Aug 2011 09:16:57 +0300
+Subject: [PATCH] ARM: SAMSUNG: Modify the devname for pl330 clock
+In-Reply-To: <1313540801-12054-1-git-send-email-boojin.kim@samsung.com>
+References: <1313540801-12054-1-git-send-email-boojin.kim@samsung.com>
+Message-ID: <4E4B5CD9.7060703@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 17, 2011 at 02:02:43PM +0800, Shawn Guo wrote:
-> On Tue, Aug 16, 2011 at 10:32:05AM -0700, Stephen Warren wrote:
-> > Arnd Bergmann wrote at Tuesday, August 16, 2011 7:52 AM:
-> > > On Monday 15 August 2011, Stephen Warren wrote:
-> > > > Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> > > > ---
-> > > >  .../devicetree/bindings/pinmux/pinmux_nvidia.txt   |  294 ++++++++++++++++++++
-> > > >  1 files changed, 294 insertions(+), 0 deletions(-)
-> > > >  create mode 100644 Documentation/devicetree/bindings/pinmux/pinmux_nvidia.txt
-> > > >
-> > > > diff --git a/Documentation/devicetree/bindings/pinmux/pinmux_nvidia.txt b/Documentation/devicetree/bindings/pinmux/pinmux_nvidia.txt
-> > > > new file mode 100644
-> > > > index 0000000..744e1b7
-> > > > --- /dev/null
-> > > > +++ b/Documentation/devicetree/bindings/pinmux/pinmux_nvidia.txt
-> > > > @@ -0,0 +1,294 @@
-> > > > +NVIDIA Tegra 2 pinmux controller
-> > > > +
-> > > > +Required properties:
-> > > > +- compatible : "nvidia,tegra20-pinmux"
-> > > 
-> > > Hmm, I think it would be much better in general if we could define
-> > > pinmux bindings in a way that is less specific to just one soc.
-> > 
-> > > The contents of this file seem to be specific to even just one
-> > > version of the tegra chip, and might be completely different for
-> > > tegra30 and later, right?
-> > 
-> > The general concepts are the same between tegra20 and tegra30.
-> > 
-> > Tegra30 has a different set of mux and drive pingroups.
-> > 
-> > Tegra30 has more functions that can be assigned to pins.
-> > 
-> > Tegra30 has three more options per mux pingroup, although I haven't
-> > Investigated whether any of those would need to be represented in DT;
-> > I suspect at least one will, possibly all.
-> > 
-> > > Maybe Linus W can comment on this and say whether he thinks it can
-> > > be generalized enough to apply to other pinmux drivers.
-> > > 
-> > > > +Optional sub-nodes:
-> > > > +- nvidia,mux-groups : Mux group settings; see below.
-> > > > +- nvidia,drive-groups : Drive group settings; see below.
-> > > > +
-> > > > +nvidia,mux-groups sub-node:
-> > > 
-> > > These concepts seem general enough to me that they can apply to
-> > > other chips, and I would consequently drop the nvidia, prefix.
-> > 
-> > Two things to note about Tegra that might not apply to all SoCs:
-> > 
-> > * There are separate groups of pins for Muxing (plus some config) vs.
-> > drive-strength (and related config). Some SoCs might use the same set
-> > of groups for both. Perhaps some SoC might even have three or more types
-> > of groups! I expect this to have some impact on the binding; I created
-> > explicit mux-groups and drive-groups sub-nodes to represent this.
-> > 
-> > * Tegra's pinmux apply settings to groups of pins instead of individual
-> > pins. Some SoCs might allow each setting to be configurable per-pin.
-> > I don't expect this to have any impact as far as the bindings go though;
-> > it'll simply impact the names of the available pin "groups"; some SoCs
-> > will name groups, others pins.
-> > 
-> +1
-> 
-> imx's pinmux applies settings to individual pins.
-> 
-> > > > +Each mux pin group is represented as a sub-node of the nvidia,mux-groups node.
-> > > > +The name of the sub-node should be the name of the mux pingroup. The following
-> > > > +names are valid:
-> > > > +
-> > > > +	ata
-> > > > +	atb
-> > > > +	atc
-> > > > +	atd
-> > > > +	ate
-> > > > +	cdev1
-> > > > +	cdev2
-> > > > ...
-> > > 
-> > > I noticed that each board you define has a complete list of these. Would
-> > > it be possible to move a generic list into a tegra20-pinmux.dtsi file and
-> > > just override the pins in the per-board .dts file that require some special
-> > > setup?
-> > 
-> 
-> It sounds sane for imx though.  I'm going to take this suggestion to
-> have imx53-pinmux.dtsi holding register offset for each pin, which is
-> common across all i.mx53 boards.
-> 
-> > I'm not sure how much commonality there will really be.
-> > 
-> > Certainly, many boards are based off our reference designs and so will
-> > have many similarities that could be shared.
-> > 
-> > That said, comparing even tegra-harmony.dts and tegra-seaboard.dts shows
-> > a lot of differences. It seems a lot less error-prone to just completely
-> > describe the entire pinmux state in each board's .dts file, rather than
-> > trying to represent half the information as default in the SoC .dtsi file,
-> > and just the diff in the board .dts file. I suppose perhaps if we put the
-> > hardware's own default settings in tegra20.dtsi, that'd make sense, since
-> > people are presumably reasonably aware of the delta relative to that.
-> > 
-> > We'd need to add new properties to override defaults, like:
-> > 
-> > nvidia,tristate --> nvidia,drive
-> > nvidia,pull-*   --> nvidia,no-pull
-> > 
-> > > > +
-> > > > +optional subnode-properties:
-> > > > +- nvidia,pull-up : Boolean, apply Tegra's internal pull-up to the pin.
-> > > > +- nvidia,pull-down : Boolean, apply Tegra's internal pull-down to the pin.
-> > > > +- nvidia,tristate : Boolean, tristate the pin. Otherwise, drive it.
-> > > > +
-> > > > +If both nvidia,pull-up and nvidia,pull-down are specified, nvidia,pull-up
-> > > > +takes precedence.
-> > > 
-> > > These again seem generic enough to go into a general pinmux binding, without
-> > > the nvidia, prefix.
-> > 
-> > Yes, I believe Jamie Iles was going to try cooking up a generic core binding
-> > that could be shared across different SoCs, and extended with custom stuff.
-> > 
-> I would image that whatever common binding for pin/pad configuration
-> comes can hardly work for imx out of box.  For each pin/pad, imx have
-> 4 configurations for pull:
-> 
->   00: 100KOhm Pull Down
->   01: 47KOhm Pull Up
->   10: 100KOhm Pull Up
->   11: 22KOhm Pull Up
-> 
-> 4 configurations for drive:
-> 
->   00: 100KOhm Pull Down
->   01: 47KOhm Pull Up
->   10: 100KOhm Pull Up
->   11: 22KOhm Pull Up
-> 
-Correction:
+Hi,
 
-  00 Low Drive Strength
-  01 Medium Drive Strength
-  10 High Drive Strength
-  11 Max Drive Strength
+looks like it contains my series as a subset.
 
-> some other 1 bit configuration fields:
-> 
->   low/high output voltage Field
->   Hyst. Enable Field
->   Pull / Keep Enable Field
->   Pull / Keep Select Field
->   Slew Rate Field
-> 
-> All these are all in one register <pad_name>_PAD_CTL (mux configuration
-> is in another register <pad_name>_PAD_MUX).  The best binding for
-> PAD_CTL I can think of so far is to encode the register value in DT
-> directly.
-> 
+--
+With best wishes,
+Vladimir
 
--- 
-Regards,
-Shawn
+On 17.08.2011 03:26, Boojin Kim wrote:
+> This patch modified the devname for pl330 clock from 's3c-pl330' to 'dma-pl330'
+> to support new pl330 driver on dmaengine.
+> NOTE: This patch sould be added after merging new pl330 driver on dmaengine.
+>
+> Signed-off-by: Boojin Kim<boojin.kim@samsung.com>
+> ---
+>   arch/arm/mach-exynos4/clock.c         |    4 ++--
+>   arch/arm/mach-s5p64x0/clock-s5p6440.c |    1 +
+>   arch/arm/mach-s5p64x0/clock-s5p6450.c |    1 +
+>   arch/arm/mach-s5pc100/clock.c         |    4 ++--
+>   arch/arm/mach-s5pv210/clock.c         |    4 ++--
+>   5 files changed, 8 insertions(+), 6 deletions(-)
+>
+> diff --git a/arch/arm/mach-exynos4/clock.c b/arch/arm/mach-exynos4/clock.c
+> index fee2dd8..04c997a 100644
+> --- a/arch/arm/mach-exynos4/clock.c
+> +++ b/arch/arm/mach-exynos4/clock.c
+> @@ -460,12 +460,12 @@ static struct clk init_clocks_off[] = {
+>   		.ctrlbit	= (1<<  10),
+>   	}, {
+>   		.name		= "dma",
+> -		.devname	= "s3c-pl330.0",
+> +		.devname	= "dma-pl330.0",
+>   		.enable		= exynos4_clk_ip_fsys_ctrl,
+>   		.ctrlbit	= (1<<  0),
+>   	}, {
+>   		.name		= "dma",
+> -		.devname	= "s3c-pl330.1",
+> +		.devname	= "dma-pl330.1",
+>   		.enable		= exynos4_clk_ip_fsys_ctrl,
+>   		.ctrlbit	= (1<<  1),
+>   	}, {
+> diff --git a/arch/arm/mach-s5p64x0/clock-s5p6440.c b/arch/arm/mach-s5p64x0/clock-s5p6440.c
+> index c1f548f..c54c65d 100644
+> --- a/arch/arm/mach-s5p64x0/clock-s5p6440.c
+> +++ b/arch/arm/mach-s5p64x0/clock-s5p6440.c
+> @@ -147,6 +147,7 @@ static struct clk init_clocks_off[] = {
+>   		.ctrlbit	= (1<<  8),
+>   	}, {
+>   		.name		= "dma",
+> +		.devname	= "dma-pl330",
+>   		.parent		=&clk_hclk_low.clk,
+>   		.enable		= s5p64x0_hclk0_ctrl,
+>   		.ctrlbit	= (1<<  12),
+> diff --git a/arch/arm/mach-s5p64x0/clock-s5p6450.c b/arch/arm/mach-s5p64x0/clock-s5p6450.c
+> index 3d9b609..2d04abf 100644
+> --- a/arch/arm/mach-s5p64x0/clock-s5p6450.c
+> +++ b/arch/arm/mach-s5p64x0/clock-s5p6450.c
+> @@ -180,6 +180,7 @@ static struct clk init_clocks_off[] = {
+>   		.ctrlbit	= (1<<  3),
+>   	}, {
+>   		.name		= "dma",
+> +		.devname	= "dma-pl330",
+>   		.parent		=&clk_hclk_low.clk,
+>   		.enable		= s5p64x0_hclk0_ctrl,
+>   		.ctrlbit	= (1<<  12),
+> diff --git a/arch/arm/mach-s5pc100/clock.c b/arch/arm/mach-s5pc100/clock.c
+> index 6527c05..8d47709 100644
+> --- a/arch/arm/mach-s5pc100/clock.c
+> +++ b/arch/arm/mach-s5pc100/clock.c
+> @@ -460,13 +460,13 @@ static struct clk init_clocks_off[] = {
+>   		.ctrlbit	= (1<<  2),
+>   	}, {
+>   		.name		= "dma",
+> -		.devname	= "s3c-pl330.1",
+> +		.devname	= "dma-pl330.1",
+>   		.parent		=&clk_div_d1_bus.clk,
+>   		.enable		= s5pc100_d1_0_ctrl,
+>   		.ctrlbit	= (1<<  1),
+>   	}, {
+>   		.name		= "dma",
+> -		.devname	= "s3c-pl330.0",
+> +		.devname	= "dma-pl330.0",
+>   		.parent		=&clk_div_d1_bus.clk,
+>   		.enable		= s5pc100_d1_0_ctrl,
+>   		.ctrlbit	= (1<<  0),
+> diff --git a/arch/arm/mach-s5pv210/clock.c b/arch/arm/mach-s5pv210/clock.c
+> index d35726a..239aaad 100644
+> --- a/arch/arm/mach-s5pv210/clock.c
+> +++ b/arch/arm/mach-s5pv210/clock.c
+> @@ -295,13 +295,13 @@ static struct clk_ops clk_fout_apll_ops = {
+>   static struct clk init_clocks_off[] = {
+>   	{
+>   		.name		= "dma",
+> -		.devname	= "s3c-pl330.0",
+> +		.devname	= "dma-pl330.0",
+>   		.parent		=&clk_hclk_psys.clk,
+>   		.enable		= s5pv210_clk_ip0_ctrl,
+>   		.ctrlbit	= (1<<  3),
+>   	}, {
+>   		.name		= "dma",
+> -		.devname	= "s3c-pl330.1",
+> +		.devname	= "dma-pl330.1",
+>   		.parent		=&clk_hclk_psys.clk,
+>   		.enable		= s5pv210_clk_ip0_ctrl,
+>   		.ctrlbit	= (1<<  4),
