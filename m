@@ -1,131 +1,62 @@
 From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Thu, 18 Aug 2011 02:10:07 +0300
-Subject: [PATCH 6/7] omap: iommu: remove unused exported API
-In-Reply-To: <1313622608-30397-1-git-send-email-ohad@wizery.com>
-References: <1313622608-30397-1-git-send-email-ohad@wizery.com>
-Message-ID: <1313622608-30397-7-git-send-email-ohad@wizery.com>
+Date: Thu, 18 Aug 2011 02:10:01 +0300
+Subject: [PATCH 0/7] omap: iommu migration, relocation and cleanups
+Message-ID: <1313622608-30397-1-git-send-email-ohad@wizery.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove unused public APIs from OMAP's iommu driver.
+1. Migrate OMAP's iommu driver to the generic IOMMU API, and move it
+to the dedicated iommu folder.
 
-IOMMU functionality should be exposed only via the generic IOMMU API;
-this way drivers stay generic, and different IOMMU drivers
-don't need to duplicate similar functionalities.
+2. Fix omap3isp appropriately so it doesn't break.
 
-The rest of the API still exposed by OMAP's iommu will be evaluated
-and eventually either added to the generic IOMMU API (if relevant),
-or completely removed.
+3. Adapt OMAP's iovmm appropriately as well, because omap3isp still relies
+on it. The plan is eventually to remove iovmm and replace it with the
+upcoming IOMMU-based generic DMA-API. Move iovmm to the iommu folder too;
+it belongs there more than it belongs in the OMAP folders.
 
-The intention is that OMAP's iommu driver will eventually not expose
-any public API.
+4. Start cleaning up OMAP's iommu components towards the end goal, where
+    1) omap-iommu no longer exports public API (and instead provides its
+       entire functionality via the generic IOMMU API).
+    2) omap-iovmm is removed.
 
-Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
----
- arch/arm/plat-omap/include/plat/iommu.h |    3 --
- drivers/iommu/omap-iommu.c              |   59 -------------------------------
- 2 files changed, 0 insertions(+), 62 deletions(-)
+Changes:
+1. Migrate iommu, iovmm and omap3isp in a single patch for bisectibility sake.
+2. Apply Laurent Pinchart's comments (thanks Laurent!)
+3. Rebase to 3.1-rc2
 
-diff --git a/arch/arm/plat-omap/include/plat/iommu.h b/arch/arm/plat-omap/include/plat/iommu.h
-index 961b64f..eed5bdc 100644
---- a/arch/arm/plat-omap/include/plat/iommu.h
-+++ b/arch/arm/plat-omap/include/plat/iommu.h
-@@ -153,12 +153,9 @@ struct iommu_platform_data {
- extern u32 iommu_arch_version(void);
- 
- extern void iotlb_cr_to_e(struct cr_regs *cr, struct iotlb_entry *e);
--extern void iommu_set_twl(struct iommu *obj, bool on);
--extern void flush_iotlb_range(struct iommu *obj, u32 start, u32 end);
- 
- extern int iopgtable_store_entry(struct iommu *obj, struct iotlb_entry *e);
- 
--extern int iommu_set_da_range(struct iommu *obj, u32 start, u32 end);
- extern int iommu_set_isr(const char *name,
- 			 int (*isr)(struct iommu *obj, u32 da, u32 iommu_errs,
- 				    void *priv),
-diff --git a/drivers/iommu/omap-iommu.c b/drivers/iommu/omap-iommu.c
-index 7280e5b..d6b77c4 100644
---- a/drivers/iommu/omap-iommu.c
-+++ b/drivers/iommu/omap-iommu.c
-@@ -357,26 +357,6 @@ static void flush_iotlb_page(struct iommu *obj, u32 da)
- }
- 
- /**
-- * flush_iotlb_range - Clear an iommu tlb entries
-- * @obj:	target iommu
-- * @start:	iommu device virtual address(start)
-- * @end:	iommu device virtual address(end)
-- *
-- * Clear an iommu tlb entry which includes 'da' address.
-- **/
--void flush_iotlb_range(struct iommu *obj, u32 start, u32 end)
--{
--	u32 da = start;
--
--	while (da < end) {
--		flush_iotlb_page(obj, da);
--		/* FIXME: Optimize for multiple page size */
--		da += IOPTE_SIZE;
--	}
--}
--EXPORT_SYMBOL_GPL(flush_iotlb_range);
--
--/**
-  * flush_iotlb_all - Clear all iommu tlb entries
-  * @obj:	target iommu
-  **/
-@@ -395,23 +375,6 @@ static void flush_iotlb_all(struct iommu *obj)
- 	clk_disable(obj->clk);
- }
- 
--/**
-- * iommu_set_twl - enable/disable table walking logic
-- * @obj:	target iommu
-- * @on:		enable/disable
-- *
-- * Function used to enable/disable TWL. If one wants to work
-- * exclusively with locked TLB entries and receive notifications
-- * for TLB miss then call this function to disable TWL.
-- */
--void iommu_set_twl(struct iommu *obj, bool on)
--{
--	clk_enable(obj->clk);
--	arch_iommu->set_twl(obj, on);
--	clk_disable(obj->clk);
--}
--EXPORT_SYMBOL_GPL(iommu_set_twl);
--
- #if defined(CONFIG_OMAP_IOMMU_DEBUG_MODULE)
- 
- ssize_t iommu_dump_ctx(struct iommu *obj, char *buf, ssize_t bytes)
-@@ -848,28 +811,6 @@ static int device_match_by_alias(struct device *dev, void *data)
- }
- 
- /**
-- * iommu_set_da_range - Set a valid device address range
-- * @obj:		target iommu
-- * @start		Start of valid range
-- * @end			End of valid range
-- **/
--int iommu_set_da_range(struct iommu *obj, u32 start, u32 end)
--{
--
--	if (!obj)
--		return -EFAULT;
--
--	if (end < start || !PAGE_ALIGN(start | end))
--		return -EINVAL;
--
--	obj->da_start = start;
--	obj->da_end = end;
--
--	return 0;
--}
--EXPORT_SYMBOL_GPL(iommu_set_da_range);
--
--/**
-  * omap_find_iommu_device() - find an omap iommu device by name
-  * @name:	name of the iommu device
-  *
+Ohad Ben-Cohen (7):
+  omap: iommu: migrate to the generic IOMMU API
+  omap: iommu/iovmm: move to dedicated iommu folder
+  omap: iommu: stop exporting local functions
+  omap: iommu: PREFETCH_IOTLB cleanup
+  omap: iovmm: remove unused functionality
+  omap: iommu: remove unused exported API
+  omap: iommu: omapify 'struct iommu' and exposed API
+
+ arch/arm/mach-omap2/iommu2.c                       |   31 +-
+ arch/arm/plat-omap/Kconfig                         |   12 -
+ arch/arm/plat-omap/Makefile                        |    2 -
+ arch/arm/plat-omap/include/plat/iommu.h            |   75 ++--
+ arch/arm/plat-omap/include/plat/iommu2.h           |    4 +-
+ arch/arm/plat-omap/{ => include/plat}/iopgtable.h  |   20 +-
+ arch/arm/plat-omap/include/plat/iovmm.h            |   30 +-
+ drivers/iommu/Kconfig                              |   18 +
+ drivers/iommu/Makefile                             |    3 +
+ .../iommu/omap-iommu-debug.c                       |   36 +-
+ .../iommu.c => drivers/iommu/omap-iommu.c          |  495 +++++++++++++-------
+ .../iovmm.c => drivers/iommu/omap-iovmm.c          |  304 ++++---------
+ drivers/media/video/Kconfig                        |    2 +-
+ drivers/media/video/omap3isp/isp.c                 |   45 ++-
+ drivers/media/video/omap3isp/isp.h                 |    5 +-
+ drivers/media/video/omap3isp/ispccdc.c             |   25 +-
+ drivers/media/video/omap3isp/ispstat.c             |   11 +-
+ drivers/media/video/omap3isp/ispvideo.c            |    4 +-
+ 18 files changed, 600 insertions(+), 522 deletions(-)
+ rename arch/arm/plat-omap/{ => include/plat}/iopgtable.h (82%)
+ rename arch/arm/plat-omap/iommu-debug.c => drivers/iommu/omap-iommu-debug.c (91%)
+ rename arch/arm/plat-omap/iommu.c => drivers/iommu/omap-iommu.c (62%)
+ rename arch/arm/plat-omap/iovmm.c => drivers/iommu/omap-iovmm.c (68%)
+
 -- 
 1.7.4.1
