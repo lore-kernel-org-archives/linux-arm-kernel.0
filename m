@@ -1,82 +1,32 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Wed, 17 Aug 2011 12:03:57 -0500
-Subject: [PATCH v3] amba: consolidate PrimeCell magic
-In-Reply-To: <1313569846-22902-1-git-send-email-linus.walleij@stericsson.com>
-References: <1313569846-22902-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <ADE657CA350FB648AAC2C43247A983F001F3884BB382@AUSP01VMBX24.collaborationhost.net>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 17 Aug 2011 18:52:51 +0100
+Subject: [PATCH 1/6] ARM: highbank: add devicetree source
+In-Reply-To: <4E4BC6F5.4030707@gmail.com>
+References: <1313526898-19920-1-git-send-email-robherring2@gmail.com>
+	<1313526898-19920-2-git-send-email-robherring2@gmail.com>
+	<20110817072706.GE10037@S2100-06.ap.freescale.net>
+	<4E4BC6F5.4030707@gmail.com>
+Message-ID: <20110817175250.GM12686@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, August 17, 2011 1:31 AM, Linus Walleij wrote:
->
-> Since three drivers use the PrimeCell scheme without using the
-> amba_bus driver logic, let's break the magic lookups out as
-> static inlines in the <linux/amba/bus.h> header so we get
-> some consolidation anyway. Delete the primecell ID check in
-> common/pl330.c since it will soon only be used from the amba_bus
-> driver in drivers/dma, which is already doing the same check
-> when probing in drivers/amba/bus.c.
->
-> Cc: Jassi Brar <jassisinghbrar@gmail.com>
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> Cc: Viresh Kumar <viresh.kumar@st.com>
-> Cc: H Hartley Sweeten <hartleys@visionengravers.com>
-> Acked-by: Boojin Kim <boojin.kim@samsung.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
->  arch/arm/common/pl330.c      |   40 +++-------------------------------------
->  arch/arm/common/vic.c        |   15 ++++++++-------
->  drivers/amba/bus.c           |   19 +++----------------
->  drivers/dma/ste_dma40.c      |   14 ++++----------
->  drivers/mtd/nand/fsmc_nand.c |   10 +++-------
->  include/linux/amba/bus.h     |   26 ++++++++++++++++++++++++++
->  6 files changed, 47 insertions(+), 77 deletions(-)
+Hi Rob,
 
-Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+On Wed, Aug 17, 2011 at 02:49:41PM +0100, Rob Herring wrote:
+> In highbank.c:
+> 
+> +#define HB_JUMP_TABLE_PHYS(cpu)		(0x40 + (0x10 * (cpu)))
+> +#define HB_JUMP_TABLE_VIRT(cpu)		phys_to_virt(HB_JUMP_TABLE_PHYS(cpu))
+> +
+> +void highbank_set_cpu_jump(int cpu, void *jump_addr)
+> +{
+> +	writel(BSYM(virt_to_phys(jump_addr)), HB_JUMP_TABLE_VIRT(cpu));
+> +	__cpuc_flush_dcache_area(HB_JUMP_TABLE_VIRT(cpu), 16);
+> +	outer_clean_range(HB_JUMP_TABLE_PHYS(cpu),
+> +			  HB_JUMP_TABLE_PHYS(cpu) + 15);
+> +}
 
-Linus,
-One comment on the change to vic.c.
+I don't suppose you guys can boot on a CPU other than 0 can you? That would be
+really handy for testing my cpu-mapping patch series :)
 
-> diff --git a/arch/arm/common/vic.c b/arch/arm/common/vic.c
-> index 7aa4262..b163cdd 100644
-> --- a/arch/arm/common/vic.c
-> +++ b/arch/arm/common/vic.c
-> @@ -341,16 +341,17 @@ static void __init vic_init_st(void __iomem *base, unsigned int irq_start,
->  void __init vic_init(void __iomem *base, unsigned int irq_start,
->  		     u32 vic_sources, u32 resume_sources)
->  {
-> -	unsigned int i;
->  	u32 cellid = 0;
->  	enum amba_vendor vendor;
->  
-> -	/* Identify which VIC cell this one is, by reading the ID */
-> -	for (i = 0; i < 4; i++) {
-> -		u32 addr = ((u32)base & PAGE_MASK) + 0xfe0 + (i * 4);
-> -		cellid |= (readl(addr) & 0xff) << (8 * i);
-> -	}
-> -	vendor = (cellid >> 12) & 0xff;
-> +	/*
-> +	 * Identify which VIC cell this one is, by reading the ID - some
-> +	 * implementations have two VICs in the same page but only one set
-> +	 * of ID registers at the end, so we need to adjust the base to
-> +	 * reference the page offset. All VIC:s are size 4K.
-> +	 */
-> +	cellid = amba_get_pid((void __iomem *)((u32)base & PAGE_MASK), SZ_4K);
-
-This produces a sparse warning.  But, the same warning was present with the
-old code.
-
-arch/arm/common/vic.c:353:49: warning: cast removes address space of expression
-
-If you want, this warning can be fixed by adding __force to the u32 cast:
-
-+	cellid = amba_get_pid((void __iomem *)((u32 __force)base & PAGE_MASK), SZ_4K);
-
-But, if pushes the line a bit over 80 chars...
-
-> +	vendor = AMBA_MANF_BITS(cellid);
->  	printk(KERN_INFO "VIC @%p: id 0x%08x, vendor 0x%02x\n",
->  	       base, cellid, vendor);
-
-Regards,
-Hartley
+Will
