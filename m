@@ -1,42 +1,39 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 17 Aug 2011 14:25:40 +0800
-Subject: [PATCH v2 0/8] Clean up MXC and MXS mach/gpio.h
-In-Reply-To: <20110816071950.GV31404@pengutronix.de>
-References: <1313252047-8820-1-git-send-email-shawn.guo@linaro.org>
-	<20110816071950.GV31404@pengutronix.de>
-Message-ID: <20110817062539.GC10037@S2100-06.ap.freescale.net>
+From: axel.lin@gmail.com (Axel Lin)
+Date: Wed, 17 Aug 2011 14:29:03 +0800
+Subject: [PATCH] ARM: Footbridge: select CLKEVT_I8253 for ARCH_NETWINDER
+Message-ID: <1313562543.2024.1.camel@phoenix>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 16, 2011 at 09:19:50AM +0200, Sascha Hauer wrote:
-> Shawn,
-> 
-> On Sun, Aug 14, 2011 at 12:13:59AM +0800, Shawn Guo wrote:
-> > As one step to single image for multiple platforms, mach/gpio.h needs
-> > to be removed from asm/gpio.h.  The patch set cleans up MXC and MXS
-> > mach/gpio.h to an empty header.
-> > 
-> > It's based on v3.1-rc1 plus rmk's patch series below.
-> > 
-> >   [PATCH 00/13] Clean up mach/gpio.h headers
-> > 
-> > The Ben's fix is on the way to -rc2 through arm-soc tree.
-> > 
-> > Grant, Sascha,
-> > 
-> > Can you please review the series and give comments or your ack tag?
-> 
-> I'm fine with this series. I removed the dependency on rmks patches
-> (can be easily merged later) and checked it into my cleanup branch.
-> Please check if you are fine with the result.
-> 
-It looks all good in terms of code.  But the commit messages of the
-following patches do not fit the context any more.
+Since commit 8560a6cfc9818edde1fd8677961714b264ffa03d
+"arm: Footbridge: Use common i8253 clockevent",
+ARCH_NETWINDER nees to select CLKEVT_I8253.
 
-  arm/mxc: remove gpio_to_irq() from mach/gpio.h
-  arm/mxc: move IMX_GPIO_NR into mach/hardware.h
-  arm/mxs: move MXS_GPIO_NR into mach/mxs.h
+This patch fixes below build error with "make netwinder_defconfig".
 
+  LD      .tmp_vmlinux1
+arch/arm/mach-footbridge/built-in.o: In function `isa_timer_init':
+isa-rtc.c:(.init.text+0x12c8): undefined reference to `clockevent_i8253_init'
+isa-rtc.c:(.init.text+0x12d0): undefined reference to `i8253_clockevent'
+arch/arm/mach-footbridge/built-in.o:(.data+0x198): undefined reference to `i8253_clockevent'
+make: *** [.tmp_vmlinux1] Error 1
+
+Signed-off-by: Axel Lin <axel.lin@gmail.com>
+---
+ arch/arm/mach-footbridge/Kconfig |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-footbridge/Kconfig b/arch/arm/mach-footbridge/Kconfig
+index dc26fff..c8e7afc 100644
+--- a/arch/arm/mach-footbridge/Kconfig
++++ b/arch/arm/mach-footbridge/Kconfig
+@@ -62,6 +62,7 @@ config ARCH_EBSA285_HOST
+ config ARCH_NETWINDER
+ 	bool "NetWinder"
+ 	select CLKSRC_I8253
++	select CLKEVT_I8253
+ 	select FOOTBRIDGE_HOST
+ 	select ISA
+ 	select ISA_DMA
 -- 
-Regards,
-Shawn
+1.7.4.1
