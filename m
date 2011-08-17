@@ -1,48 +1,28 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 16 Aug 2011 19:56:46 -0600 (MDT)
-Subject: [PATCH] OMAP: powerdomains: Make all powerdomain target states
-	as ON at init
-In-Reply-To: <20110715083753.GG2611@legolas.emea.dhcp.ti.com>
-References: <1310527588-13022-1-git-send-email-santosh.shilimkar@ti.com>
-	<20110715080315.GC2611@legolas.emea.dhcp.ti.com>
-	<alpine.DEB.2.00.1107150204510.16606@utopia.booyaka.com>
-	<20110715081725.GE2611@legolas.emea.dhcp.ti.com>
-	<alpine.DEB.2.00.1107150222400.16606@utopia.booyaka.com>
-	<20110715083753.GG2611@legolas.emea.dhcp.ti.com>
-Message-ID: <alpine.DEB.2.00.1108161952000.9948@utopia.booyaka.com>
+From: alim.akhtar@samsung.com (alim akhtar)
+Date: Wed, 17 Aug 2011 09:36:06 +0530
+Subject: [PATCH 0/3] ARM: SAMSUNG: register the second instance of PL330 DMAC
+Message-ID: <1313553969-14639-1-git-send-email-alim.akhtar@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Alim Akhtar <alim.akhtar@samsung.com>
 
-On Fri, 15 Jul 2011, Felipe Balbi wrote:
+Two instance of platform data is provided for PL330 but only one PL330 DMAC 
+instance is registered with amba_device.
+These patch sets registers the second instance with amba_device.
 
-> How about something like:
-> 
-> /*
->  * Program target state of all power domains to ON. This is to prevent
->  * power domains from hitting low power states during boot up and
->  * potentially causing accesses to the address space of an IP while it
->  * is disabled.
->  *
->  * PM late init code will make sure of disabling all unused IPs later.
->  */
-> 
-> not sure if it's a lot better though.
+These patches are based on kgene's tree next/topic-dma-pl330 branch.
+http://git.kernel.org/?p=linux/kernel/git/kgene/linux-samsung.git;;a=summary
 
-It's not directly related to accesses to the IP block's address space.  
-The problem happens when the driver (or the hwmod code) for a particular 
-device causes the last clock in a clockdomain to be disabled.  This allows 
-the clockdomain to go INACTIVE.
+Alim Akhtar (3):
+  ARM: EXYNOS4: register the second instance of pl330 DMAC
+  ARM: S5PV210: register the second instance of pl330 DMAC
+  ARM: S5PC100: register the second instance of pl330 DMAC
 
-At that point, if all of the clockdomains in the powerdomain are INACTIVE, 
-the powerdomain itself will switch to its "next power state". If the 
-bootloader had programmed the next power state to be OFF, for example, 
-then all devices in that powerdomain will lose context. 
+ arch/arm/mach-exynos4/dma.c |    1 +
+ arch/arm/mach-s5pc100/dma.c |    1 +
+ arch/arm/mach-s5pv210/dma.c |    1 +
+ 3 files changed, 3 insertions(+), 0 deletions(-)
 
-If this happens before the PM code initializes, or if the PM code is not 
-compiled in, then this will cause some strange behavior or crashes, since 
-the kernel won't be expecting devices to lose their context at that point.
-
-
-- Paul
+-- 
+1.7.2.3
