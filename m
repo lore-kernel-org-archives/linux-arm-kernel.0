@@ -1,114 +1,42 @@
-From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Wed, 17 Aug 2011 09:16:57 +0300
-Subject: [PATCH] ARM: SAMSUNG: Modify the devname for pl330 clock
-In-Reply-To: <1313540801-12054-1-git-send-email-boojin.kim@samsung.com>
-References: <1313540801-12054-1-git-send-email-boojin.kim@samsung.com>
-Message-ID: <4E4B5CD9.7060703@mleia.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 17 Aug 2011 14:25:40 +0800
+Subject: [PATCH v2 0/8] Clean up MXC and MXS mach/gpio.h
+In-Reply-To: <20110816071950.GV31404@pengutronix.de>
+References: <1313252047-8820-1-git-send-email-shawn.guo@linaro.org>
+	<20110816071950.GV31404@pengutronix.de>
+Message-ID: <20110817062539.GC10037@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Aug 16, 2011 at 09:19:50AM +0200, Sascha Hauer wrote:
+> Shawn,
+> 
+> On Sun, Aug 14, 2011 at 12:13:59AM +0800, Shawn Guo wrote:
+> > As one step to single image for multiple platforms, mach/gpio.h needs
+> > to be removed from asm/gpio.h.  The patch set cleans up MXC and MXS
+> > mach/gpio.h to an empty header.
+> > 
+> > It's based on v3.1-rc1 plus rmk's patch series below.
+> > 
+> >   [PATCH 00/13] Clean up mach/gpio.h headers
+> > 
+> > The Ben's fix is on the way to -rc2 through arm-soc tree.
+> > 
+> > Grant, Sascha,
+> > 
+> > Can you please review the series and give comments or your ack tag?
+> 
+> I'm fine with this series. I removed the dependency on rmks patches
+> (can be easily merged later) and checked it into my cleanup branch.
+> Please check if you are fine with the result.
+> 
+It looks all good in terms of code.  But the commit messages of the
+following patches do not fit the context any more.
 
-looks like it contains my series as a subset.
+  arm/mxc: remove gpio_to_irq() from mach/gpio.h
+  arm/mxc: move IMX_GPIO_NR into mach/hardware.h
+  arm/mxs: move MXS_GPIO_NR into mach/mxs.h
 
---
-With best wishes,
-Vladimir
-
-On 17.08.2011 03:26, Boojin Kim wrote:
-> This patch modified the devname for pl330 clock from 's3c-pl330' to 'dma-pl330'
-> to support new pl330 driver on dmaengine.
-> NOTE: This patch sould be added after merging new pl330 driver on dmaengine.
->
-> Signed-off-by: Boojin Kim<boojin.kim@samsung.com>
-> ---
->   arch/arm/mach-exynos4/clock.c         |    4 ++--
->   arch/arm/mach-s5p64x0/clock-s5p6440.c |    1 +
->   arch/arm/mach-s5p64x0/clock-s5p6450.c |    1 +
->   arch/arm/mach-s5pc100/clock.c         |    4 ++--
->   arch/arm/mach-s5pv210/clock.c         |    4 ++--
->   5 files changed, 8 insertions(+), 6 deletions(-)
->
-> diff --git a/arch/arm/mach-exynos4/clock.c b/arch/arm/mach-exynos4/clock.c
-> index fee2dd8..04c997a 100644
-> --- a/arch/arm/mach-exynos4/clock.c
-> +++ b/arch/arm/mach-exynos4/clock.c
-> @@ -460,12 +460,12 @@ static struct clk init_clocks_off[] = {
->   		.ctrlbit	= (1<<  10),
->   	}, {
->   		.name		= "dma",
-> -		.devname	= "s3c-pl330.0",
-> +		.devname	= "dma-pl330.0",
->   		.enable		= exynos4_clk_ip_fsys_ctrl,
->   		.ctrlbit	= (1<<  0),
->   	}, {
->   		.name		= "dma",
-> -		.devname	= "s3c-pl330.1",
-> +		.devname	= "dma-pl330.1",
->   		.enable		= exynos4_clk_ip_fsys_ctrl,
->   		.ctrlbit	= (1<<  1),
->   	}, {
-> diff --git a/arch/arm/mach-s5p64x0/clock-s5p6440.c b/arch/arm/mach-s5p64x0/clock-s5p6440.c
-> index c1f548f..c54c65d 100644
-> --- a/arch/arm/mach-s5p64x0/clock-s5p6440.c
-> +++ b/arch/arm/mach-s5p64x0/clock-s5p6440.c
-> @@ -147,6 +147,7 @@ static struct clk init_clocks_off[] = {
->   		.ctrlbit	= (1<<  8),
->   	}, {
->   		.name		= "dma",
-> +		.devname	= "dma-pl330",
->   		.parent		=&clk_hclk_low.clk,
->   		.enable		= s5p64x0_hclk0_ctrl,
->   		.ctrlbit	= (1<<  12),
-> diff --git a/arch/arm/mach-s5p64x0/clock-s5p6450.c b/arch/arm/mach-s5p64x0/clock-s5p6450.c
-> index 3d9b609..2d04abf 100644
-> --- a/arch/arm/mach-s5p64x0/clock-s5p6450.c
-> +++ b/arch/arm/mach-s5p64x0/clock-s5p6450.c
-> @@ -180,6 +180,7 @@ static struct clk init_clocks_off[] = {
->   		.ctrlbit	= (1<<  3),
->   	}, {
->   		.name		= "dma",
-> +		.devname	= "dma-pl330",
->   		.parent		=&clk_hclk_low.clk,
->   		.enable		= s5p64x0_hclk0_ctrl,
->   		.ctrlbit	= (1<<  12),
-> diff --git a/arch/arm/mach-s5pc100/clock.c b/arch/arm/mach-s5pc100/clock.c
-> index 6527c05..8d47709 100644
-> --- a/arch/arm/mach-s5pc100/clock.c
-> +++ b/arch/arm/mach-s5pc100/clock.c
-> @@ -460,13 +460,13 @@ static struct clk init_clocks_off[] = {
->   		.ctrlbit	= (1<<  2),
->   	}, {
->   		.name		= "dma",
-> -		.devname	= "s3c-pl330.1",
-> +		.devname	= "dma-pl330.1",
->   		.parent		=&clk_div_d1_bus.clk,
->   		.enable		= s5pc100_d1_0_ctrl,
->   		.ctrlbit	= (1<<  1),
->   	}, {
->   		.name		= "dma",
-> -		.devname	= "s3c-pl330.0",
-> +		.devname	= "dma-pl330.0",
->   		.parent		=&clk_div_d1_bus.clk,
->   		.enable		= s5pc100_d1_0_ctrl,
->   		.ctrlbit	= (1<<  0),
-> diff --git a/arch/arm/mach-s5pv210/clock.c b/arch/arm/mach-s5pv210/clock.c
-> index d35726a..239aaad 100644
-> --- a/arch/arm/mach-s5pv210/clock.c
-> +++ b/arch/arm/mach-s5pv210/clock.c
-> @@ -295,13 +295,13 @@ static struct clk_ops clk_fout_apll_ops = {
->   static struct clk init_clocks_off[] = {
->   	{
->   		.name		= "dma",
-> -		.devname	= "s3c-pl330.0",
-> +		.devname	= "dma-pl330.0",
->   		.parent		=&clk_hclk_psys.clk,
->   		.enable		= s5pv210_clk_ip0_ctrl,
->   		.ctrlbit	= (1<<  3),
->   	}, {
->   		.name		= "dma",
-> -		.devname	= "s3c-pl330.1",
-> +		.devname	= "dma-pl330.1",
->   		.parent		=&clk_hclk_psys.clk,
->   		.enable		= s5pv210_clk_ip0_ctrl,
->   		.ctrlbit	= (1<<  4),
+-- 
+Regards,
+Shawn
