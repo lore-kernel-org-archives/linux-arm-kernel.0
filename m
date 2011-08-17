@@ -1,98 +1,73 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 17 Aug 2011 22:51:56 +0800
-Subject: [PATCH 1/6] ARM: highbank: add devicetree source
-In-Reply-To: <4E4BC6F5.4030707@gmail.com>
-References: <1313526898-19920-1-git-send-email-robherring2@gmail.com>
-	<1313526898-19920-2-git-send-email-robherring2@gmail.com>
-	<20110817072706.GE10037@S2100-06.ap.freescale.net>
-	<4E4BC6F5.4030707@gmail.com>
-Message-ID: <20110817145155.GB11097@S2100-06.ap.freescale.net>
+From: santosh.shilimkar@ti.com (Santosh)
+Date: Wed, 17 Aug 2011 21:45:27 +0530
+Subject: [PATCH 03/17] ARM: gic: Use cpu pm notifiers to save gic state
+In-Reply-To: <CAMbhsRQX+faGH9xPZPQKrtq5=Rb8JhRLo0ibJ1cOfTHrLRjw9A@mail.gmail.com>
+References: <1310053830-23779-1-git-send-email-lorenzo.pieralisi@arm.com>	<1310053830-23779-4-git-send-email-lorenzo.pieralisi@arm.com>	<4E27E40C.6020006@ti.com>	<20110721102736.GA3087@e102568-lin.cambridge.arm.com>	<4E2803A1.7000908@ti.com>	<CAMbhsRRT58vJWJ0ACSp_NJsvQJqzeBUKDD5bGGWM6tYh-zTxJQ@mail.gmail.com>	<4E290663.30403@ti.com>
+	<CAMbhsRQX+faGH9xPZPQKrtq5=Rb8JhRLo0ibJ1cOfTHrLRjw9A@mail.gmail.com>
+Message-ID: <4E4BE91F.1000102@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 17, 2011 at 08:49:41AM -0500, Rob Herring wrote:
-> Shawn,
-> 
-> On 08/17/2011 02:27 AM, Shawn Guo wrote:
-> > Hi Rob,
-> > 
-> > On Tue, Aug 16, 2011 at 03:34:53PM -0500, Rob Herring wrote:
-> >> From: Rob Herring <rob.herring@calxeda.com>
-> >>
-> >> This adds the devicetree source and documentation for the Calxeda highbank
-> >> platform.
-> >>
-> >> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> >> ---
-> >>  Documentation/devicetree/bindings/arm/calxeda.txt |    8 +
-> >>  arch/arm/boot/dts/highbank.dts                    |  212 +++++++++++++++++++++
-> >>  2 files changed, 220 insertions(+), 0 deletions(-)
-> >>  create mode 100644 Documentation/devicetree/bindings/arm/calxeda.txt
-> >>  create mode 100644 arch/arm/boot/dts/highbank.dts
-> >>
-> >> diff --git a/Documentation/devicetree/bindings/arm/calxeda.txt b/Documentation/devicetree/bindings/arm/calxeda.txt
-> >> new file mode 100644
-> >> index 0000000..4755caa
-> >> --- /dev/null
-> >> +++ b/Documentation/devicetree/bindings/arm/calxeda.txt
-> >> @@ -0,0 +1,8 @@
-> >> +Calxeda Highbank Platforms Device Tree Bindings
-> >> +-----------------------------------------------
-> >> +
-> >> +Boards with Calxeda Cortex-A9 based Highbank SOC shall have the following
-> >> +properties.
-> >> +
-> >> +Required root node properties:
-> >> +    - compatible = "calxeda,highbank";
-> >> diff --git a/arch/arm/boot/dts/highbank.dts b/arch/arm/boot/dts/highbank.dts
-> >> new file mode 100644
-> >> index 0000000..2dd3b7b
-> >> --- /dev/null
-> >> +++ b/arch/arm/boot/dts/highbank.dts
-> >> @@ -0,0 +1,212 @@
-> >> +/*
-> >> + * Copyright 2011 Calxeda, Inc.
-> >> + *
-> >> + * This program is free software; you can redistribute it and/or modify it
-> >> + * under the terms and conditions of the GNU General Public License,
-> >> + * version 2, as published by the Free Software Foundation.
-> >> + *
-> >> + * This program is distributed in the hope it will be useful, but WITHOUT
-> >> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> >> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-> >> + * more details.
-> >> + *
-> >> + * You should have received a copy of the GNU General Public License along with
-> >> + * this program.  If not, see <http://www.gnu.org/licenses/>.
-> >> + */
-> >> +
-> >> +/dts-v1/;
-> >> +
-> >> +/* First 4KB has pen for secondary cores. */
-> >> +/memreserve/ 0x00000000 0x0001000;
-> >> +
-> > I failed to find the "pen" handling in the whole patch series.  Am I
-> > missing anything?
-> > 
-> 
-> In highbank.c:
-> 
-> +#define HB_JUMP_TABLE_PHYS(cpu)		(0x40 + (0x10 * (cpu)))
-> +#define HB_JUMP_TABLE_VIRT(cpu)		phys_to_virt(HB_JUMP_TABLE_PHYS(cpu))
-> +
-> +void highbank_set_cpu_jump(int cpu, void *jump_addr)
-> +{
-> +	writel(BSYM(virt_to_phys(jump_addr)), HB_JUMP_TABLE_VIRT(cpu));
-> +	__cpuc_flush_dcache_area(HB_JUMP_TABLE_VIRT(cpu), 16);
-> +	outer_clean_range(HB_JUMP_TABLE_PHYS(cpu),
-> +			  HB_JUMP_TABLE_PHYS(cpu) + 15);
-> +}
-> 
-Ah, ok, the 'pen' you meant is the entry address of secondary cores.
-I thought of something like 'pen_release' in plat-versatile/platsmp.c.
-So you do not need 'boot_lock' and 'pen_release' stuff to sync secondary
-cores with the primary one (like all other smp platforms do)?
+Colin,
 
--- 
-Regards,
-Shawn
+On Friday 22 July 2011 10:51 AM, Colin Cross wrote:
+> On Thu, Jul 21, 2011 at 10:10 PM, Santosh Shilimkar
+
+[....]
+
+>>>> For my OMAP4 PM rebasing, for time-being I will go with exported
+>>>> GIC functions so that I don't have too many redundancies with GIC
+>>>> save/restore code.
+>>>
+>>> I think you should try to balance cpu idle latency with reuse of
+>>> common code.  In this case, you are avoiding restoring 7 registers by
+>>> reimplementing the bare minimum that is necessary for OMAP4, which is
+>>> unlikely to make a measurable impact on wakeup latency.  Can you try
+>>> starting with reusing all the common code, and add some timestamps
+>>> during wakeup to measure where the longest delays are, to determine
+>>> where you should diverge from the common code and use omap-optimized
+>>> code?
+>>
+>> I am going to use all the common code but having them exported
+>> functions gives more flexibility to call them in right and needed
+>> places. As discussed earlier, I plan to use the common GIC code
+>> wherever it's needed on OMAP.
+>>
+>> My main point was we are saving and restoring GIC CPU interface
+>> registers for a case where they are actually not lost.
+>
+> Yes, but you're still avoiding 7 registers, which is unlikely to be
+> worth the complexity of calling these functions differently from every
+> other platform.
+
+I managed to use pm notifiers for GIC and VFP on OMAP4 and
+get that working. As discussed here, I decided to take the
+hit on the latency in favour of re-use of the code for GIC
+considering it's helping other platforms.
+
+I did update notifiers patches for couple of things.
+
+- VFP code now make use 'vfp_current_hw_state' instead of
+'last_VFP_context'
+
+- I have renamed CPU_COMPLEX to more appropriate CPU_CLUSTER
+
+- I have dropped GIC dist. disable as part of GIC dist save
+code. I saw lock ups with CPUIDLE and then tracked down, to
+an issue where for some reason if cluster doesn't hit the
+targeted low power state, CPU gets locked up since GIC
+dist. remains disabled. The GIC restore is done only if
+the cluster did hit the deeper state and GIC lost it's
+context. As such this change should not impact anything.
+
+What's your plan on these notifiers patches considering
+there is a request to make them generic and not just ARM
+specific?
+
+Sorry for asking this but now I have dependency on this
+series :)
+If you want, I can participate here to get this moving.
+Let me know.
+
+Regards
+Santosh
