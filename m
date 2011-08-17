@@ -1,34 +1,38 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Wed, 17 Aug 2011 15:12:59 +0100
-Subject: [RFC PATCH 00/15] ARM: perf: support multiple PMUs
-In-Reply-To: <1313416516-8006-1-git-send-email-mark.rutland@arm.com>
-References: <1313416516-8006-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <20110817141259.GC6586@pulham.picochip.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 17 Aug 2011 22:38:13 +0800
+Subject: [RFC PATCH 0/2] WIP: generic OF pinmux binding
+In-Reply-To: <1313581648-22303-1-git-send-email-jamie@jamieiles.com>
+References: <1313581648-22303-1-git-send-email-jamie@jamieiles.com>
+Message-ID: <20110817143811.GA11097@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On Wed, Aug 17, 2011 at 12:47:26PM +0100, Jamie Iles wrote:
+> To avoid going too far in the wrong direction I thought I'd post what I
+> have so far for a generic pinmux binding.
 
-On Mon, Aug 15, 2011 at 02:55:01PM +0100, Mark Rutland wrote:
-> System (AKA nest or uncore) PMUs exist on devices which are not affine
-> to a single CPU. They usually cannot be directly associated with
-> individual tasks and are asynchronous with respect to the current
-> execution. Examples of devices which could have system PMUs include L2
-> cache controllers, GPUs and memory buses.
+Unfortunately, there is not much that i.mx iomuxc can leverage, even
+for mux-function.  The following is the mux configuration for one
+i.mx pin/pad.  Other than a string, a integer will work much better.
+
+MUX_MODE (bit 2-0): Select 1 of 7 iomux modes to be used for pad: EIM_DA9.
+000 Select mux mode: ALT0 mux port: WEIM_DA_A[9] of instance: weim.
+001 Select mux mode: ALT1 mux port: DISP1_DAT[0] of instance: ipu1.
+010 Select mux mode: ALT2 mux port: CSI1_D[0] of instance: ipu2.
+011 Select mux mode: ALT3 mux port: DPHY_TEST_OUT[11] of instance: mipi_core.
+101 Select mux mode: ALT5 mux port: GPIO[9] of instance: gpio3.
+110 Select mux mode: ALT6 mux port: HDATA[23] of instance: tpsmp.
+111 Select mux mode: ALT7 mux port: BT_CFG[9] of instance: src.
+
+> Essentially it's just
+> Stephen's nvidia binding but with the nvidia specifics abstracted out so
+> the common loop can be used for other platforms.  This approach works
+> nicely for picoxcell too.
 > 
-> The following patch series refactors the ARM PMU backend, enabling
-> new PMUs to reuse the existing code. This should allow for system PMUs
-> to be supported in future. Further work will be required to get perf to
-> fully understand system PMUs, but this provides something usable.
+> For more esoteric bindings, such as pull strength, these could be
+> handled in the platform specific configuration function.
 > 
-> The framework is intended to be used by system PMUs which hang off core
-> platform components (e.g. L2 cache, AXI bus). If a device is complex
-> enough or separate enough from core functionality to have its own
-> driver, it should implement its own PMU handling using the core perf
-> API directly.
 
-Looks like a nice series to me.
-
-Reviewed-by: Jamie Iles <jamie@jamieiles.com>
-
-Jamie
+-- 
+Regards,
+Shawn
