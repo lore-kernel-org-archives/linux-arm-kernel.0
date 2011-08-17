@@ -1,22 +1,89 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 17 Aug 2011 15:49:24 +0200
-Subject: [RFC PATCH 0/2] WIP: generic OF pinmux binding
-In-Reply-To: <1313581648-22303-1-git-send-email-jamie@jamieiles.com>
-References: <1313581648-22303-1-git-send-email-jamie@jamieiles.com>
-Message-ID: <CACRpkdYyu9-6MMpnF5g6WPb8oXk9fuJxxqv6yTzc7Y5FsgbAyA@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 17 Aug 2011 08:49:41 -0500
+Subject: [PATCH 1/6] ARM: highbank: add devicetree source
+In-Reply-To: <20110817072706.GE10037@S2100-06.ap.freescale.net>
+References: <1313526898-19920-1-git-send-email-robherring2@gmail.com>
+	<1313526898-19920-2-git-send-email-robherring2@gmail.com>
+	<20110817072706.GE10037@S2100-06.ap.freescale.net>
+Message-ID: <4E4BC6F5.4030707@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 17, 2011 at 1:47 PM, Jamie Iles <jamie@jamieiles.com> wrote:
+Shawn,
 
-> To avoid going too far in the wrong direction I thought I'd post what I
-> have so far for a generic pinmux binding.
+On 08/17/2011 02:27 AM, Shawn Guo wrote:
+> Hi Rob,
+> 
+> On Tue, Aug 16, 2011 at 03:34:53PM -0500, Rob Herring wrote:
+>> From: Rob Herring <rob.herring@calxeda.com>
+>>
+>> This adds the devicetree source and documentation for the Calxeda highbank
+>> platform.
+>>
+>> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+>> ---
+>>  Documentation/devicetree/bindings/arm/calxeda.txt |    8 +
+>>  arch/arm/boot/dts/highbank.dts                    |  212 +++++++++++++++++++++
+>>  2 files changed, 220 insertions(+), 0 deletions(-)
+>>  create mode 100644 Documentation/devicetree/bindings/arm/calxeda.txt
+>>  create mode 100644 arch/arm/boot/dts/highbank.dts
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/calxeda.txt b/Documentation/devicetree/bindings/arm/calxeda.txt
+>> new file mode 100644
+>> index 0000000..4755caa
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/arm/calxeda.txt
+>> @@ -0,0 +1,8 @@
+>> +Calxeda Highbank Platforms Device Tree Bindings
+>> +-----------------------------------------------
+>> +
+>> +Boards with Calxeda Cortex-A9 based Highbank SOC shall have the following
+>> +properties.
+>> +
+>> +Required root node properties:
+>> +    - compatible = "calxeda,highbank";
+>> diff --git a/arch/arm/boot/dts/highbank.dts b/arch/arm/boot/dts/highbank.dts
+>> new file mode 100644
+>> index 0000000..2dd3b7b
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/highbank.dts
+>> @@ -0,0 +1,212 @@
+>> +/*
+>> + * Copyright 2011 Calxeda, Inc.
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify it
+>> + * under the terms and conditions of the GNU General Public License,
+>> + * version 2, as published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope it will be useful, but WITHOUT
+>> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+>> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+>> + * more details.
+>> + *
+>> + * You should have received a copy of the GNU General Public License along with
+>> + * this program.  If not, see <http://www.gnu.org/licenses/>.
+>> + */
+>> +
+>> +/dts-v1/;
+>> +
+>> +/* First 4KB has pen for secondary cores. */
+>> +/memreserve/ 0x00000000 0x0001000;
+>> +
+> I failed to find the "pen" handling in the whole patch series.  Am I
+> missing anything?
+> 
 
-It looks like a large part of the binding is about pulling, biasing,
-input props like schmitt-triggering and so on, so since I use the
-concept of "pincontrol" for all those things in my devised subsystem
-can we call them "pincontrol bindings" rather than pinmux,
-because pinmux is really just one part of it?
+In highbank.c:
 
-Thanks,
-Linus Walleij
++#define HB_JUMP_TABLE_PHYS(cpu)		(0x40 + (0x10 * (cpu)))
++#define HB_JUMP_TABLE_VIRT(cpu)		phys_to_virt(HB_JUMP_TABLE_PHYS(cpu))
++
++void highbank_set_cpu_jump(int cpu, void *jump_addr)
++{
++	writel(BSYM(virt_to_phys(jump_addr)), HB_JUMP_TABLE_VIRT(cpu));
++	__cpuc_flush_dcache_area(HB_JUMP_TABLE_VIRT(cpu), 16);
++	outer_clean_range(HB_JUMP_TABLE_PHYS(cpu),
++			  HB_JUMP_TABLE_PHYS(cpu) + 15);
++}
+
+Rob
