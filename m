@@ -1,168 +1,73 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 17 Aug 2011 14:02:43 +0800
-Subject: [RFC PATCH v2 06/13] docs/dt: Document nvidia,tegra20-pinmux
-	binding
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF04AEA2537D@HQMAIL01.nvidia.com>
-References: <1313440100-17131-1-git-send-email-swarren@nvidia.com>
-	<1313440100-17131-7-git-send-email-swarren@nvidia.com>
-	<201108161551.31389.arnd@arndb.de>
-	<74CDBE0F657A3D45AFBB94109FB122FF04AEA2537D@HQMAIL01.nvidia.com>
-Message-ID: <20110817060242.GA10037@S2100-06.ap.freescale.net>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Wed, 17 Aug 2011 11:28:12 +0530
+Subject: [RFC: PATCH 0/4] Introducing TI's New SoC/board AM335XEVM
+In-Reply-To: <1313058630-32447-1-git-send-email-hvaibhav@ti.com>
+References: <hvaibhav@ti.com>
+	<1313058630-32447-1-git-send-email-hvaibhav@ti.com>
+Message-ID: <19F8576C6E063C45BE387C64729E739404E3BC9690@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 16, 2011 at 10:32:05AM -0700, Stephen Warren wrote:
-> Arnd Bergmann wrote at Tuesday, August 16, 2011 7:52 AM:
-> > On Monday 15 August 2011, Stephen Warren wrote:
-> > > Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> > > ---
-> > >  .../devicetree/bindings/pinmux/pinmux_nvidia.txt   |  294 ++++++++++++++++++++
-> > >  1 files changed, 294 insertions(+), 0 deletions(-)
-> > >  create mode 100644 Documentation/devicetree/bindings/pinmux/pinmux_nvidia.txt
-> > >
-> > > diff --git a/Documentation/devicetree/bindings/pinmux/pinmux_nvidia.txt b/Documentation/devicetree/bindings/pinmux/pinmux_nvidia.txt
-> > > new file mode 100644
-> > > index 0000000..744e1b7
-> > > --- /dev/null
-> > > +++ b/Documentation/devicetree/bindings/pinmux/pinmux_nvidia.txt
-> > > @@ -0,0 +1,294 @@
-> > > +NVIDIA Tegra 2 pinmux controller
-> > > +
-> > > +Required properties:
-> > > +- compatible : "nvidia,tegra20-pinmux"
-> > 
-> > Hmm, I think it would be much better in general if we could define
-> > pinmux bindings in a way that is less specific to just one soc.
+> -----Original Message-----
+> From: Hiremath, Vaibhav
+> Sent: Thursday, August 11, 2011 4:00 PM
+> To: linux-omap at vger.kernel.org
+> Cc: tony at atomide.com; Hilman, Kevin; paul at pwsan.com; linux-arm-
+> kernel at lists.infradead.org; Hiremath, Vaibhav
+> Subject: [RFC: PATCH 0/4] Introducing TI's New SoC/board AM335XEVM
 > 
-> > The contents of this file seem to be specific to even just one
-> > version of the tegra chip, and might be completely different for
-> > tegra30 and later, right?
+> From: Vaibhav Hiremath <hvaibhav@ti.com>
 > 
-> The general concepts are the same between tegra20 and tegra30.
+> This patch set adds support for AM335x device having
+> Cortex-A8 MPU.
 > 
-> Tegra30 has a different set of mux and drive pingroups.
+> AM335X is treated as another OMAP3 variant where the
+> cpu class is considered as OMAP34XX and the type is AM335X.
+> Also, AM335X devices shares similar architecture as TI81XX devices;
+> this means, cpu_is_omap34xx(), cpu_is_ti81xx() and
+> cpu_is_am335x() checks return success for AM335X.
 > 
-> Tegra30 has more functions that can be assigned to pins.
-> 
-> Tegra30 has three more options per mux pingroup, although I haven't
-> Investigated whether any of those would need to be represented in DT;
-> I suspect at least one will, possibly all.
-> 
-> > Maybe Linus W can comment on this and say whether he thinks it can
-> > be generalized enough to apply to other pinmux drivers.
-> > 
-> > > +Optional sub-nodes:
-> > > +- nvidia,mux-groups : Mux group settings; see below.
-> > > +- nvidia,drive-groups : Drive group settings; see below.
-> > > +
-> > > +nvidia,mux-groups sub-node:
-> > 
-> > These concepts seem general enough to me that they can apply to
-> > other chips, and I would consequently drop the nvidia, prefix.
-> 
-> Two things to note about Tegra that might not apply to all SoCs:
-> 
-> * There are separate groups of pins for Muxing (plus some config) vs.
-> drive-strength (and related config). Some SoCs might use the same set
-> of groups for both. Perhaps some SoC might even have three or more types
-> of groups! I expect this to have some impact on the binding; I created
-> explicit mux-groups and drive-groups sub-nodes to represent this.
-> 
-> * Tegra's pinmux apply settings to groups of pins instead of individual
-> pins. Some SoCs might allow each setting to be configurable per-pin.
-> I don't expect this to have any impact as far as the bindings go though;
-> it'll simply impact the names of the available pin "groups"; some SoCs
-> will name groups, others pins.
-> 
-+1
+> Currently submitting this patch series as a RFC, to initiate the
+> discussion on the approach we have chosen for AM335x device support.
+> Based on the feedback, will submit the final version of patch series
+> immediately.
+[Hiremath, Vaibhav] Tony/Kevin/Paul and others,
 
-imx's pinmux applies settings to individual pins.
+Any comments/inputs/suggestions on this patch series?
 
-> > > +Each mux pin group is represented as a sub-node of the nvidia,mux-groups node.
-> > > +The name of the sub-node should be the name of the mux pingroup. The following
-> > > +names are valid:
-> > > +
-> > > +	ata
-> > > +	atb
-> > > +	atc
-> > > +	atd
-> > > +	ate
-> > > +	cdev1
-> > > +	cdev2
-> > > ...
-> > 
-> > I noticed that each board you define has a complete list of these. Would
-> > it be possible to move a generic list into a tegra20-pinmux.dtsi file and
-> > just override the pins in the per-board .dts file that require some special
-> > setup?
+Thanks,
+Vaibhav
+
+
 > 
-
-It sounds sane for imx though.  I'm going to take this suggestion to
-have imx53-pinmux.dtsi holding register offset for each pin, which is
-common across all i.mx53 boards.
-
-> I'm not sure how much commonality there will really be.
+> This patch series is created on top of linux-omap/master and
+> Hemant's TI814X patches submitted recently.
 > 
-> Certainly, many boards are based off our reference designs and so will
-> have many similarities that could be shared.
+> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg53457.html
 > 
-> That said, comparing even tegra-harmony.dts and tegra-seaboard.dts shows
-> a lot of differences. It seems a lot less error-prone to just completely
-> describe the entire pinmux state in each board's .dts file, rather than
-> trying to represent half the information as default in the SoC .dtsi file,
-> and just the diff in the board .dts file. I suppose perhaps if we put the
-> hardware's own default settings in tegra20.dtsi, that'd make sense, since
-> people are presumably reasonably aware of the delta relative to that.
+> Also, I have validated OMAP3 boot test with this patch-series on OMAP3EVM.
 > 
-> We'd need to add new properties to override defaults, like:
+> Afzal Mohammed (4):
+>   AM335X: Update common omap platform files
+>   AM335X: Update common OMAP machine specific sources
+>   AM335X: Create board support and enable build for AM335XEVM
+>   AM335X: Add low level debugging support
 > 
-> nvidia,tristate --> nvidia,drive
-> nvidia,pull-*   --> nvidia,no-pull
-> 
-> > > +
-> > > +optional subnode-properties:
-> > > +- nvidia,pull-up : Boolean, apply Tegra's internal pull-up to the pin.
-> > > +- nvidia,pull-down : Boolean, apply Tegra's internal pull-down to the pin.
-> > > +- nvidia,tristate : Boolean, tristate the pin. Otherwise, drive it.
-> > > +
-> > > +If both nvidia,pull-up and nvidia,pull-down are specified, nvidia,pull-up
-> > > +takes precedence.
-> > 
-> > These again seem generic enough to go into a general pinmux binding, without
-> > the nvidia, prefix.
-> 
-> Yes, I believe Jamie Iles was going to try cooking up a generic core binding
-> that could be shared across different SoCs, and extended with custom stuff.
-> 
-I would image that whatever common binding for pin/pad configuration
-comes can hardly work for imx out of box.  For each pin/pad, imx have
-4 configurations for pull:
-
-  00: 100KOhm Pull Down
-  01: 47KOhm Pull Up
-  10: 100KOhm Pull Up
-  11: 22KOhm Pull Up
-
-4 configurations for drive:
-
-  00: 100KOhm Pull Down
-  01: 47KOhm Pull Up
-  10: 100KOhm Pull Up
-  11: 22KOhm Pull Up
-
-some other 1 bit configuration fields:
-
-  low/high output voltage Field
-  Hyst. Enable Field
-  Pull / Keep Enable Field
-  Pull / Keep Select Field
-  Slew Rate Field
-
-All these are all in one register <pad_name>_PAD_CTL (mux configuration
-is in another register <pad_name>_PAD_MUX).  The best binding for
-PAD_CTL I can think of so far is to encode the register value in DT
-directly.
-
--- 
-Regards,
-Shawn
+>  arch/arm/mach-omap2/Kconfig                    |    7 +++-
+>  arch/arm/mach-omap2/Makefile                   |    2 +
+>  arch/arm/mach-omap2/board-am335xevm.c          |   57
+> ++++++++++++++++++++++++
+>  arch/arm/mach-omap2/clock3xxx_data.c           |    3 +
+>  arch/arm/mach-omap2/common.c                   |   16 +++++++
+>  arch/arm/mach-omap2/id.c                       |    6 +++
+>  arch/arm/mach-omap2/include/mach/debug-macro.S |   21 +++++++++
+>  arch/arm/plat-omap/include/plat/clkdev_omap.h  |    1 +
+>  arch/arm/plat-omap/include/plat/clock.h        |    1 +
+>  arch/arm/plat-omap/include/plat/cpu.h          |   14 ++++++
+>  arch/arm/plat-omap/include/plat/io.h           |   12 +++++
+>  arch/arm/plat-omap/include/plat/omap34xx.h     |    2 +
+>  arch/arm/plat-omap/include/plat/serial.h       |    4 ++
+>  arch/arm/plat-omap/include/plat/ti81xx.h       |    4 ++
+>  arch/arm/plat-omap/include/plat/uncompress.h   |    6 +++
+>  15 files changed, 155 insertions(+), 1 deletions(-)
+>  create mode 100644 arch/arm/mach-omap2/board-am335xevm.c
