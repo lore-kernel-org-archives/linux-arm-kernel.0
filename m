@@ -1,82 +1,100 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Wed, 17 Aug 2011 11:53:01 +0100
-Subject: [PATCH] ARM: Add safe diagnostic to indicate when
-	__cpu_architecture isn't set up
-In-Reply-To: <alpine.LFD.2.00.1108161221580.20358@xanadu.home>
-References: <1313504340-28004-1-git-send-email-dave.martin@linaro.org>
-	<1313505921.2235.6.camel@computer2>
-	<alpine.LFD.2.00.1108161058220.20358@xanadu.home>
-	<20110816161553.GB1993@arm.com>
-	<alpine.LFD.2.00.1108161221580.20358@xanadu.home>
-Message-ID: <20110817105301.GB2065@arm.com>
+From: bryan.wu@canonical.com (Bryan Wu)
+Date: Wed, 17 Aug 2011 19:06:40 +0800
+Subject: [PATCH 03/17] mach-realview and mach-versatile: retire custom LED
+	code
+In-Reply-To: <20110803115918.GA23953@n2100.arm.linux.org.uk>
+References: <1312364089-32380-1-git-send-email-bryan.wu@canonical.com>
+	<1312364089-32380-4-git-send-email-bryan.wu@canonical.com>
+	<20110803115918.GA23953@n2100.arm.linux.org.uk>
+Message-ID: <CAK5ve-Kh6f8rPGJDYJ77oPg+vy6=ivLmto7UGLTjF9BBuG=iRw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 16, 2011 at 12:22:43PM -0400, Nicolas Pitre wrote:
-> On Tue, 16 Aug 2011, Dave Martin wrote:
-> 
-> > On Tue, Aug 16, 2011 at 10:59:18AM -0400, Nicolas Pitre wrote:
-> > > On Tue, 16 Aug 2011, Tixy wrote:
-> > > 
-> > > > On Tue, 2011-08-16 at 15:19 +0100, Dave Martin wrote:
-> > > > [...]
-> > > > > This patch is useful for debugging, but I'm not convinced it should
-> > > > > be merged.
-> > > > [...] 
-> > > > >  static inline int __pure cpu_architecture(void)
-> > > > >  {
-> > > > > -	BUG_ON(__cpu_architecture == CPU_ARCH_UNKNOWN);
-> > > > > -	return __cpu_architecture;
-> > > > > +	if (unlikely(__cpu_architecture == CPU_ARCH_UNKNOWN)) {
-> > > > > +		extern int __pure __get_cpu_architecture(void);
-> > > > > +
-> > > > > +		WARN_ONCE(1, "__cpu_architecture not set yet!\n");
-> > > > > +		return __get_cpu_architecture();
-> > > > > +	} else
-> > > > > +		return __cpu_architecture;
-> > > > >  }
-> > > > 
-> > > > Seems to me that if we go down this route, cpu_architecture() may as
-> > > > well remain a non-inline function which just calculates the arch if it's
-> > > > not already set...
-> > > 
-> > > My thought as well.
-> > > 
-> > > > 	if (unlikely(__cpu_architecture == CPU_ARCH_UNKNOWN))
-> > > > 		__cpu_architecture = __get_cpu_architecture();
-> > > > 	return __cpu_architecture;
-> > > > 
-> > > > There seems to be too many ways to skin this cat :-)
-> > > 
-> > > Agreed.
-> > 
-> > Well, I guess the flipside is, do we need this check at all?
-> > 
-> > Because __cpu_architecture is set really early, and because if
-> > it's referenced too early, the kernel will either not boot or
-> > we'll hit BUG(), it's hard to imaging such a failure going unnoticed.
-> > 
-> > So this check could simply be viewed as overkill, though it does
-> > feel safer to check.
-> > 
-> > Any thoughts?
-> 
-> I personally think this is overkill.
+On Wed, Aug 3, 2011 at 7:59 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Aug 03, 2011 at 05:34:35PM +0800, Bryan Wu wrote:
+>> From: Linus Walleij <linus.walleij@linaro.org>
+>>
+>> This replaces the custom LED trigger code in mach-realview with
+>> some overarching platform code for the plat-versatile family that
+>> will lock down LEDs 2 thru 5 for CPU activity indication. The
+>> day we have 8 core ARM systems the plat-versatile code will have
+>> to become more elaborate.
+>>
+>> Tested on RealView PB11MPCore by invoking four different CPU
+>> hogs (yes > /dev/null&) and see the LEDs go on one at a time.
+>> They all go off as the hogs are killed. Tested on the PB1176
+>> as well - just one activity led (led 2) goes on and off with
+>> CPU activity.
+>>
+>> (bryan.wu at canonical.com: use ledtrig-cpu instead of ledtrig-arm-cpu)
+>
+> This is broken. ?More than that, this LEDS stuff is broken.
+>
+> With CONFIG_NEW_LEDS=y and CONFIG_LEDS_CLASS=n,
+>
 
-OK, well since the inlining of cpu_architecture() doesn't feel like it
-really brings us any benefits I may move it back out of line, into setup.c,
-but keeping its new definition, including BUG().  The only reason for
-moving that function to be inline was because it had become trivial, but
-putting BUG() back undermines that.
+Actually, I don't see any user of this config, either. And all the
+LEDS stuffs depend on LEDS_CLASS.
 
-I will also remove the declaration of __cpu_architecture from <asm/system.h>,
-since for now this should not be used directly at all except by the undef
-handler, and we don't want to encourage its use.
+Can we just simply select LEDS_CLASS when CONFIG_NEW_LEDS=y?
 
-Any concerns on all of that?
+---
+diff --git a/drivers/leds/Kconfig b/drivers/leds/Kconfig
+index b444cc3..5ae3ef7 100644
+--- a/drivers/leds/Kconfig
++++ b/drivers/leds/Kconfig
+@@ -7,6 +7,7 @@ config LEDS_GPIO_REGISTER
 
-In the meantime, I will re-roll those patches... hopefully for the final
-time.
+ menuconfig NEW_LEDS
+        bool "LED Support"
++       select LEDS_CLASS
+        help
+          Say Y to enable Linux LED support.  This allows control of supported
+          LEDs from both userspace and optionally, by kernel events (triggers).
+---
 
-Cheers
----Dave
+Richard, could you please give some comments?
+
+-Bryan
+
+> ?CC ? ? ?arch/arm/plat-versatile/leds.o
+> arch/arm/plat-versatile/leds.c: In function 'versatile_leds_init':
+> arch/arm/plat-versatile/leds.c:91: error: 'struct led_classdev' has no member named 'trigger_data'
+>
+> I wasn't offered LEDS_TRIGGERS to select. ?It looks like this leds
+> stuff really is broken:
+>
+> config LEDS_CLASS
+> ? ? ? ?bool "LED Class Support"
+> ? ? ? ?help
+> ? ? ? ? ?This option enables the led sysfs class in /sys/class/leds. ?You'll
+> ? ? ? ? ?need this to do anything useful with LEDs. ?If unsure, say N.
+>
+> Okay, this says its for sysfs support. ?But then:
+>
+> config LEDS_TRIGGERS
+> ? ? ? ?bool "LED Trigger support"
+> ? ? ? ?depends on LEDS_CLASS
+> ? ? ? ?help
+> ? ? ? ? ?This option enables trigger support for the leds class.
+> ? ? ? ? ?These triggers allow kernel events to drive the LEDs and can
+> ? ? ? ? ?be configured via sysfs. If unsure, say Y.
+>
+> you can only have LED triggers if you have LED class support. ?So what's
+> the point of NEW_LEDS=y and LEDS_CLASS=n? ?From those descriptions,
+> LEDS_CLASS should control the sysfs interfaces, and LEDS_TRIGGERS should
+> control the kernel internal interfaces _independently_.
+>
+> As things stand, this looks completely crazy. ?So no, I'm not acking these
+> patches until the LEDs layer gets a modicum of sanity.
+>
+
+
+
+-- 
+Bryan Wu <bryan.wu@canonical.com>
+Kernel Developer ? ?+86.138-1617-6545 Mobile
+Ubuntu Kernel Team
+Canonical Ltd. ? ? ?www.canonical.com
+Ubuntu - Linux for human beings | www.ubuntu.com
