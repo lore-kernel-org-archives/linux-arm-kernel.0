@@ -1,56 +1,81 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 17 Aug 2011 14:28:44 +0200
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 17 Aug 2011 14:49:13 +0200
 Subject: [PATCH 7/9] ARM: DMA: steal memory for DMA coherent mappings
-In-Reply-To: <006b01cc5cb3$dac09fa0$9041dee0$%szyprowski@samsung.com>
 References: <1313146711-1767-1-git-send-email-m.szyprowski@samsung.com>
+	<201108161528.48954.arnd@arndb.de>
+	<20110816135516.GC17310@n2100.arm.linux.org.uk>
 	<201108161626.26130.arnd@arndb.de>
-	<006b01cc5cb3$dac09fa0$9041dee0$%szyprowski@samsung.com>
-Message-ID: <201108171428.44555.arnd@arndb.de>
+Message-ID: <008d01cc5cdc$11392520$33ab6f60$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 17 August 2011, Marek Szyprowski wrote:
+Hello,
+
+On Wednesday, August 17, 2011 10:01 AM Marek Szyprowski wrote:
+> On Tuesday, August 16, 2011 4:26 PM Arnd Bergmann wrote:
+> > On Tuesday 16 August 2011, Russell King - ARM Linux wrote:
+> > > On Tue, Aug 16, 2011 at 03:28:48PM +0200, Arnd Bergmann wrote:
+> > > > Hmm, I don't remember the point about dynamically sizing the pool for
+> > > > ARMv6K, but that can well be an oversight on my part.  I do remember the
+> > > > part about taking that memory pool from the CMA region as you say.
+> > >
+> > > If you're setting aside a pool of pages, then you have to dynamically
+> > > size it.  I did mention during our discussion about this.
+> > >
+> > > The problem is that a pool of fixed size is two fold: you need it to be
+> > > sufficiently large that it can satisfy all allocations which come along
+> > > in atomic context.  Yet, we don't want the pool to be too large because
+> > > then it prevents the memory being used for other purposes.
+> > >
+> > > Basically, the total number of pages in the pool can be a fixed size,
+> > > but as they are depleted through allocation, they need to be
+> > > re-populated from CMA to re-build the reserve for future atomic
+> > > allocations.  If the pool becomes larger via frees, then obviously
+> > > we need to give pages back.
+> >
+> > Ok, thanks for the reminder. I must have completely missed this part
+> > of the discussion.
+> >
+> > When I briefly considered this problem, my own conclusion was that
+> > the number of atomic DMA allocations would always be very low
+> > because they tend to be short-lived (e.g. incoming network packets),
+> > so we could ignore this problem and just use a smaller reservation
+> > size. While this seems to be true in general (see "git grep -w -A3
+> > dma_alloc_coherent | grep ATOMIC"), there is one very significant
+> > case that we cannot ignore, which is pci_alloc_consistent.
+> >
+> > This function is still called by hundreds of PCI drivers and always
+> > does dma_alloc_coherent(..., GFP_ATOMIC), even for long-lived
+> > allocations and those that are too large to be ignored.
+> >
+> > So at least for the case where we have PCI devices, I agree that
+> > we need to have the dynamic pool.
+> 
 > Do we really need the dynamic pool for the first version? I would like to
 > know how much memory can be allocated in GFP_ATOMIC context. What are the
 > typical sizes of such allocations?
-
-I think this highly depends on the board and on the use case. We know
-that 2 MB is usually enough, because that is the current CONSISTENT_DMA_SIZE
-on most platforms. Most likely something a lot smaller will be ok
-in practice. CONSISTENT_DMA_SIZE is currently used for both atomic
-and non-atomic allocations.
-
+> 
 > Maybe for the first version a static pool with reasonably small size
 > (like 128KiB) will be more than enough? This size can be even board
 > depended or changed with kernel command line for systems that really
 > needs more memory.
-
-For a first version that sounds good enough. Maybe we could use a fraction
-of the CONSISTENT_DMA_SIZE as an estimate?
-
-For the long-term solution, I see two options:
-
-1. make the preallocated pool rather small so we normally don't need it.
-2. make it large enough so we can also fulfill most nonatomic allocations
-   from that pool to avoid the TLB flushes and going through the CMA
-   code. Only use the real CMA region when the pool allocation fails.
-
-In either case, there should be some method for balancing the pool
-size.
-
+> 
 > I noticed one more problem. The size of the CMA managed area must be
 > the multiple of 16MiBs (MAX_ORDER+1). This means that the smallest CMA area
-> is 16MiB. These values comes from the internals of the kernel memory 
+> is 16MiB. These values comes from the internals of the kernel memory
 > management design and page blocks are the only entities that can be managed
 > with page migration code.
-> 
-> I'm not sure if all ARMv6+ boards have at least 32MiB of memory be able to
-> create a CMA area.
 
-My guess is that you can assume to have 64 MB or more on ARMv6 running Linux,
-but other people may have more accurate data.
+I'm really sorry for the confusion. This 16MiB value worried me too much and
+I've checked the code once again and found that this MAX_ORDER+1 value was
+a miscalculation, which appeared in v11 of the  patches. The true minimal
+CMA area size is 8MiB for ARM architecture. I believe this shouldn't be
+an issue for the current ARMv6+ based machines.
 
-Also, there is the option of setting a lower value for FORCE_MAX_ZONEORDER
-for some platforms if it becomes a problem.
+I've checked it with "mem=16M cma=8M" kernel arguments. System booted fine
+and CMA area has been successfully created.
 
-	Arnd
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
