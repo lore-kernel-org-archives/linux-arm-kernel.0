@@ -1,309 +1,140 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Wed, 17 Aug 2011 12:47:28 +0100
-Subject: [RFC PATCH 2/2] arm/tegra: Add device tree support to pinmux driver
-In-Reply-To: <1313581648-22303-1-git-send-email-jamie@jamieiles.com>
-References: <1313581648-22303-1-git-send-email-jamie@jamieiles.com>
-Message-ID: <1313581648-22303-3-git-send-email-jamie@jamieiles.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 17 Aug 2011 13:48:20 +0200
+Subject: [RFC PATCH 2/2] ARM: CSR: add PM sleep entry for SiRFprimaII
+In-Reply-To: <CAGsJ_4yMJo3oN90CLjktQaji8WUg2JRYu6JAghS=OAgLCWFXvw@mail.gmail.com>
+References: <1312512888-25070-1-git-send-email-bs14@csr.com>
+	<201108121554.11316.arnd@arndb.de>
+	<CAGsJ_4yMJo3oN90CLjktQaji8WUg2JRYu6JAghS=OAgLCWFXvw@mail.gmail.com>
+Message-ID: <201108171348.20378.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+On Wednesday 17 August 2011, Barry Song wrote:
+> 2011/8/12 Arnd Bergmann <arnd@arndb.de>:
+> > On Friday 05 August 2011, Barry Song wrote:
 
-[ j.iles: converted to generic of_pinmux_parse() ]
+> >>
+> >>  extern void __init sirfsoc_of_irq_init(void);
+> >>  extern void __init sirfsoc_of_clk_init(void);
+> >> +extern void sirfsoc_l2x_init(void);
+> >>
+> >>  #ifndef CONFIG_DEBUG_LL
+> >>  static inline void sirfsoc_map_lluart(void)  {}
+> >
+> > You now call the sirfsoc_l2x_init function from two different places,
+> > which is very confusing. Better make sure that the idle code is
+> > only inialized after all the other subsystems it relies on have been
+> > activated.
+> 
+> anyway, after Rob Herring's patch "ARM: l2x0: Add OF based
+> initialization" is merged, sirfsoc l2 cache codes can be compelety
+> deleted.
+> i am thinking whether we can move l2 suspend/resume entries to
+> arch/arm/mm/cache-l2x0.c directly, maybe a syscore_ops:
+> static struct syscore_ops l2x_pm_syscore_ops = {
+>         .suspend        = l2x_pm_suspend,
+>         .resume         = l2x_pm_resume,
+> };
+> 
+> static void l2x_pm_init(void)
+> {
+>         register_syscore_ops(&l2x_pm_syscore_ops);
+> }
+> 
+> or let cache l2x be a platform driver and add suspend/resume entries there?
+> 
+> if we move suspend/resume of L2 to arch/arm/mm/cache-l2x0.c, that can
+> eliminate my reference to l2 from other places.
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
-Signed-off-by: Jamie Iles <jamie@jamieiles.com>
----
- arch/arm/mach-tegra/pinmux.c |  240 ++++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 240 insertions(+), 0 deletions(-)
+Ok, that sounds good.
 
-diff --git a/arch/arm/mach-tegra/pinmux.c b/arch/arm/mach-tegra/pinmux.c
-index ed316f9..cd540eb 100644
---- a/arch/arm/mach-tegra/pinmux.c
-+++ b/arch/arm/mach-tegra/pinmux.c
-@@ -20,6 +20,8 @@
- #include <linux/errno.h>
- #include <linux/spinlock.h>
- #include <linux/io.h>
-+#include <linux/of.h>
-+#include <linux/of_pinmux.h>
- #include <linux/platform_device.h>
- 
- #include <mach/iomap.h>
-@@ -124,6 +126,21 @@ static const char *pingroup_name(enum tegra_pingroup pg)
- 	return pingroups[pg].name;
- }
- 
-+#ifdef CONFIG_OF
-+static int pingroup_enum(const char *name, enum tegra_pingroup *pg_out)
-+{
-+	int pg;
-+
-+	for (pg = 0; pg < TEGRA_MAX_PINGROUP; pg++)
-+		if (!strcasecmp(name, tegra_soc_pingroups[pg].name)) {
-+			*pg_out = pg;
-+			return 0;
-+		}
-+
-+	return -EINVAL;
-+}
-+#endif
-+
- static const char *func_name(enum tegra_mux_func func)
- {
- 	if (func == TEGRA_MUX_RSVD1)
-@@ -147,6 +164,41 @@ static const char *func_name(enum tegra_mux_func func)
- 	return tegra_mux_names[func];
- }
- 
-+#ifdef CONFIG_OF
-+static int func_enum(const char *name, enum tegra_mux_func *func_out)
-+{
-+	int func;
-+
-+	if (!strcasecmp(name, "RSVD1")) {
-+		*func_out = TEGRA_MUX_RSVD1;
-+		return 0;
-+	}
-+	if (!strcasecmp(name, "RSVD2")) {
-+		*func_out = TEGRA_MUX_RSVD2;
-+		return 0;
-+	}
-+	if (!strcasecmp(name, "RSVD3")) {
-+		*func_out = TEGRA_MUX_RSVD3;
-+		return 0;
-+	}
-+	if (!strcasecmp(name, "RSVD4")) {
-+		*func_out = TEGRA_MUX_RSVD4;
-+		return 0;
-+	}
-+	if (!strcasecmp(name, "NONE")) {
-+		*func_out = TEGRA_MUX_NONE;
-+		return 0;
-+	}
-+
-+	for (func = 0; func < TEGRA_MAX_MUX; func++)
-+		if (!strcasecmp(name, tegra_mux_names[func])) {
-+			*func_out = func;
-+			return 0;
-+		}
-+
-+	return -EINVAL;
-+}
-+#endif
- 
- static const char *tri_name(unsigned long val)
- {
-@@ -329,6 +381,22 @@ static const char *drive_pinmux_name(enum tegra_drive_pingroup pg)
- 	return drive_pingroups[pg].name;
- }
- 
-+#ifdef CONFIG_OF
-+static int drive_pinmux_enum(const char *name,
-+			     enum tegra_drive_pingroup *pg_out)
-+{
-+	int pg;
-+
-+	for (pg = 0; pg < TEGRA_MAX_DRIVE_PINGROUP; pg++)
-+		if (!strcasecmp(name, drive_pingroups[pg].name)) {
-+			*pg_out = pg;
-+			return 0;
-+		}
-+
-+	return -EINVAL;
-+}
-+#endif
-+
- static const char *enable_name(unsigned long val)
- {
- 	return val ? "ENABLE" : "DISABLE";
-@@ -666,15 +734,187 @@ void tegra_pinmux_config_pullupdown_table(const struct tegra_pingroup_config *co
- 	}
- }
- 
-+#ifdef CONFIG_OF
-+static int __init tegra_pinmux_dt_configure(const struct of_pinmux_ctrl *ctrl,
-+					    const struct of_pinmux_cfg *config)
-+{
-+	struct tegra_pingroup_config tegra_config;
-+	int ret;
-+
-+	ret = pingroup_enum(config->pin->name, &tegra_config.pingroup);
-+	if (ret < 0) {
-+		pr_err("invalid pingroup name (%s)\n", config->pin->name);
-+		return ret;
-+	}
-+
-+	ret = func_enum(config->function, &tegra_config.func);
-+	if (ret < 0) {
-+		pr_err("invalid function (%s)\n", config->function);
-+		return ret;
-+	}
-+
-+	if (config->flags & OF_PINMUX_PULL_UP)
-+		tegra_config.pupd = TEGRA_PUPD_PULL_UP;
-+	else if (config->flags & OF_PINMUX_PULL_DOWN)
-+		tegra_config.pupd = TEGRA_PUPD_PULL_DOWN;
-+	else
-+		tegra_config.pupd = TEGRA_PUPD_NORMAL;
-+
-+	tegra_config.tristate = (config->flags & OF_PINMUX_TRISTATE) ?
-+		TEGRA_TRI_TRISTATE : TEGRA_TRI_NORMAL;
-+
-+	tegra_pinmux_config_pingroup(&tegra_config);
-+
-+	return 0;
-+}
-+static void __init tegra_pinmux_parse_mux_groups(
-+			struct platform_device *pdev,
-+			struct device_node *mux_node)
-+{
-+	struct of_pinmux_ctrl tegra_pinmux_ctrl = {
-+		.pinmux = mux_node,
-+		.configure = tegra_pinmux_dt_configure,
-+	};
-+
-+	if (of_pinmux_parse(&tegra_pinmux_ctrl))
-+		pr_err("failed to parse pinmux configuration\n");
-+}
-+
-+static void __init tegra_pinmux_parse_drive_groups(
-+			struct platform_device *pdev,
-+			struct device_node *drive_node)
-+{
-+	struct device_node *node;
-+
-+	for_each_child_of_node(drive_node, node) {
-+		enum tegra_drive_pingroup pg;
-+		enum tegra_hsm hsm;
-+		enum tegra_schmitt schmitt;
-+		enum tegra_drive drive;
-+		enum tegra_pull_strength pull_down;
-+		enum tegra_pull_strength pull_up;
-+		enum tegra_slew slew_rising;
-+		enum tegra_slew slew_falling;
-+		int ret;
-+
-+		ret = drive_pinmux_enum(node->name, &pg);
-+		if (ret < 0) {
-+			dev_err(&pdev->dev,
-+				"(drive) %s: Invalid pingroup name\n",
-+				node->name);
-+			continue;
-+		}
-+
-+		if (of_find_property(node, "nvidia,high-speed-mode", NULL))
-+			hsm = TEGRA_HSM_ENABLE;
-+		else
-+			hsm = TEGRA_HSM_DISABLE;
-+
-+		if (of_find_property(node, "nvidia,schmitt", NULL))
-+			schmitt = TEGRA_SCHMITT_ENABLE;
-+		else
-+			schmitt = TEGRA_SCHMITT_DISABLE;
-+
-+		ret = of_property_read_u32(node, "nvidia,drive-power", &drive);
-+		if (ret < 0) {
-+			dev_err(&pdev->dev,
-+				"(drive) %s: Missing property "
-+				"nvidia,drive-power\n",
-+				node->name);
-+			continue;
-+		}
-+
-+		ret = of_property_read_u32(node, "nvidia,pull-down-strength",
-+					   &pull_down);
-+		if (ret < 0) {
-+			dev_err(&pdev->dev,
-+				"(drive) %s: Missing property "
-+				"nvidia,pull-down-strength\n",
-+				node->name);
-+			continue;
-+		}
-+
-+		ret = of_property_read_u32(node, "nvidia,pull-up-strength",
-+					   &pull_up);
-+		if (ret < 0) {
-+			dev_err(&pdev->dev,
-+				"(drive) %s: Missing property "
-+				"nvidia,pull-up-strength\n",
-+				node->name);
-+			continue;
-+		}
-+
-+		ret = of_property_read_u32(node, "nvidia,slew-rate-rising",
-+					   &slew_rising);
-+		if (ret < 0) {
-+			dev_err(&pdev->dev,
-+				"(drive) %s: Missing property "
-+				"nvidia,slew_rate-rising\n",
-+				node->name);
-+			continue;
-+		}
-+
-+		ret = of_property_read_u32(node, "nvidia,slew-rate-falling",
-+					   &slew_rising);
-+		if (ret < 0) {
-+			dev_err(&pdev->dev,
-+				"(drive) %s: Missing property "
-+				"nvidia,slew_rate-falling\n",
-+				node->name);
-+			continue;
-+		}
-+
-+		dev_dbg(&pdev->dev,
-+			"(drive) %s: hsm %d schmitt %d drive %d "
-+			"pull_down %d pull_up %d slew_r %d slew_f %d\n",
-+			node->name,
-+			hsm, schmitt, drive,
-+			pull_down, pull_up,
-+			slew_rising, slew_falling);
-+
-+		tegra_drive_pinmux_config_pingroup(pg, hsm, schmitt, drive,
-+						   pull_down, pull_up,
-+						   slew_rising, slew_falling);
-+	}
-+}
-+
-+static void __init tegra_pinmux_probe_dt(struct platform_device *pdev)
-+{
-+	struct device_node *node;
-+
-+	for_each_child_of_node(pdev->dev.of_node, node) {
-+		if (!strcmp(node->name, "nvidia,mux-groups"))
-+			tegra_pinmux_parse_mux_groups(pdev, node);
-+		else if (!strcmp(node->name, "nvidia,drive-groups"))
-+			tegra_pinmux_parse_drive_groups(pdev, node);
-+		else
-+			dev_err(&pdev->dev, "%s: Unknown child node\n",
-+				node->name);
-+	}
-+}
-+#else
-+static inline void __init tegra_pinmux_probe_dt(struct platform_device *pdev)
-+{
-+}
-+#endif
-+
- static int __init tegra_pinmux_probe(struct platform_device *pdev)
- {
-+	tegra_pinmux_probe_dt(pdev);
-+
- 	return 0;
- }
- 
-+static struct of_device_id tegra_pinmux_of_match[] __devinitdata = {
-+	{ .compatible = "nvidia,tegra20-pinmux", },
-+	{ },
-+};
-+
- static struct platform_driver tegra_pinmux_driver = {
- 	.driver		= {
- 		.name	= "tegra-pinmux",
- 		.owner	= THIS_MODULE,
-+		.of_match_table = tegra_pinmux_of_match,
- 	},
- 	.probe		= tegra_pinmux_probe,
- };
--- 
-1.7.4.1
+> >> +{
+> >> +        u32 pwr_trigger_en_reg;
+> >> +        pwr_trigger_en_reg = sirfsoc_rtc_iobrg_readl(sirfsoc_pwrc_base +
+> >> +             SIRFSOC_PWRC_TRIGGER_EN);
+> >> +#define X_ON_KEY_B (1 << 0)
+> >> +        sirfsoc_rtc_iobrg_writel(pwr_trigger_en_reg | X_ON_KEY_B,
+> >> +                        sirfsoc_pwrc_base + SIRFSOC_PWRC_TRIGGER_EN);
+> >> +}
+> >> +
+> >> +static void sirfsoc_set_sleep_mode(u32 mode)
+> >> +{
+> >> +        u32 sleep_mode = sirfsoc_rtc_iobrg_readl(sirfsoc_pwrc_base +
+> >> +             SIRFSOC_PWRC_PDN_CTRL);
+> >> +        sleep_mode &= ~(SIRFSOC_SLEEP_MODE_MASK << 1);
+> >> +        sleep_mode |= ((mode << 1));
+> >> +        sirfsoc_rtc_iobrg_writel(sleep_mode, sirfsoc_pwrc_base +
+> >> +             SIRFSOC_PWRC_PDN_CTRL);
+> >> +}
+> >
+> > This again looks like a bad abstraction, and it gets the locking wrong,
+> > since you need a spinlock around both the read and write of the register
+> > to make the update atomic.
+> 
+> will there be two threads calling into pm_ops.enter() at the same
+> time? seems not, let me check....
+
+I would expect not, but that's not the main point:
+
+> >
+> > These functions therefore belong into the rtc_iobrg driver.
+> 
+> rtc_iobrg might only handle the read/write interfaces and let other
+> modules call these interfaces to read/write what they want.
+
+Every other module calling these interfaces will have the same
+problem with locking. In cases like this, it's typically better
+to export a high-level interface from the driver that accesses
+the registers rather than exporting functions that directly
+manipulate the registers.
+
+> >> +static struct of_device_id pwrc_ids[] = {
+> >> +     { .compatible = "sirf,prima2-pwrc" },
+> >> +};
+> >> +
+> >> +static void __init sirfsoc_of_pwrc_init(void)
+> >> +{
+> >> +     struct device_node *np;
+> >> +     const __be32    *addrp;
+> >> +
+> >> +     np = of_find_matching_node(NULL, pwrc_ids);
+> >> +     if (!np)
+> >> +             panic("unable to find compatible pwrc node in dtb\n");
+> >
+> > Don't use of_find_matching_node to look for stuff that is really more
+> > a device that you want to talk to. Instead, register a platform
+> > driver with that match_table and load a proper device driver for
+> > it.
+> 
+> agree. how do you think about cache l2, will it be a platform too?
+
+Probably not. Ideally every device like this would be a platform_device,
+but some things have to be enabled way before the driver model is
+up and cannot be platform_devices because of that. My impression
+is that l2 falls into this category, while anything related to
+power management does not: there is no need to suspend the device
+before it is fully booted up.
+
+> >> +
+> >> +     addrp = of_get_property(np, "reg", NULL);
+> >> +     if (!addrp)
+> >> +             panic("unable to find base address of pwrc node in dtb\n");
+> >> +
+> >> +     sirfsoc_pwrc_base = be32_to_cpup(addrp);
+> >> +
+> >> +     of_node_put(np);
+> >> +}
+> >
+> > Why do you store the physical base address here, instead doing an of_iomap?
+> 
+> i should have failed to use of_iomap, register space behind rtciobrg
+> are not in memory space. it is accessed indirectly just like a NAND or
+> a harddisk.
+
+Ah, I see. That looks absolute correct then. I was confused by
+the naming of the variable as sirfsoc_pwrc_base, which suggests
+that it's a physical memory address. I can't think of a better
+name either. Maybe you can add a comment in the code to clarify
+that it's on a different bus.
+
+	Arnd
