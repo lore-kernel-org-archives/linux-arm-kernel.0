@@ -1,33 +1,39 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 17 Aug 2011 08:51:36 +0100
-Subject: [PATCH 01/10] ARM: io: s3c2410: remove ioaddr()
+Date: Wed, 17 Aug 2011 08:51:56 +0100
+Subject: [PATCH 02/10] ARM: io: RiscPC: define io addresses relative to IO_BASE
 In-Reply-To: <20110817075104.GC1006@n2100.arm.linux.org.uk>
 References: <20110817075104.GC1006@n2100.arm.linux.org.uk>
-Message-ID: <E1QtauW-0007Mg-6Z@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1Qtauq-0007Ml-BH@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is only one user of ioaddr() in the kernel, and that is the Acorn
-expansion card core code.  S3C2410 does not use this code, and so the
-definition of ioaddr() is redundant.
-
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-s3c2410/include/mach/io.h |    2 --
- 1 files changed, 0 insertions(+), 2 deletions(-)
+ arch/arm/mach-rpc/include/mach/hardware.h |   12 ++++++------
+ 1 files changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-s3c2410/include/mach/io.h b/arch/arm/mach-s3c2410/include/mach/io.h
-index 9813dbf..118749f 100644
---- a/arch/arm/mach-s3c2410/include/mach/io.h
-+++ b/arch/arm/mach-s3c2410/include/mach/io.h
-@@ -199,8 +199,6 @@ DECLARE_IO(int,l,"")
- #define outw(v,p)	(__builtin_constant_p((p)) ? __outwc(v,p) : __outw(v,p))
- #define outl(v,p)	(__builtin_constant_p((p)) ? __outlc(v,p) : __outl(v,p))
- #define __ioaddr(p)	(__builtin_constant_p((p)) ? __ioaddr(p)  : __ioaddrc(p))
--/* the following macro is deprecated */
--#define ioaddr(port)	__ioaddr((port))
+diff --git a/arch/arm/mach-rpc/include/mach/hardware.h b/arch/arm/mach-rpc/include/mach/hardware.h
+index dde6b3c..822b810 100644
+--- a/arch/arm/mach-rpc/include/mach/hardware.h
++++ b/arch/arm/mach-rpc/include/mach/hardware.h
+@@ -51,12 +51,12 @@
+ /*
+  * IO Addresses
+  */
+-#define VIDC_BASE		IOMEM(0xe0400000)
+-#define EXPMASK_BASE		0xe0360000
+-#define IOMD_BASE		IOMEM(0xe0200000)
+-#define IOC_BASE		IOMEM(0xe0200000)
+-#define PCIO_BASE		IOMEM(0xe0010000)
+-#define FLOPPYDMA_BASE		IOMEM(0xe002a000)
++#define VIDC_BASE		(IO_BASE + 0x00400000)
++#define EXPMASK_BASE		(IO_BASE + 0x00360000)
++#define IOMD_BASE		(IO_BASE + 0x00200000)
++#define IOC_BASE		(IO_BASE + 0x00200000)
++#define FLOPPYDMA_BASE		(IO_BASE + 0x0002a000)
++#define PCIO_BASE		(IO_BASE + 0x00010000)
  
- #define insb(p,d,l)	__raw_readsb(__ioaddr(p),d,l)
- #define insw(p,d,l)	__raw_readsw(__ioaddr(p),d,l)
+ #define vidc_writel(val)	__raw_writel(val, VIDC_BASE)
+ 
 -- 
 1.7.4.4
