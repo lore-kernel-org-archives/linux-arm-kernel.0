@@ -1,35 +1,50 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 17 Aug 2011 19:52:48 +0100
-Subject: [PATCH 4/6] ARM: highbank: add SMP support
-In-Reply-To: <4E4BC9D2.9090908@gmail.com>
-References: <4E4BC9D2.9090908@gmail.com>
-Message-ID: <20110817185248.GB11221@n2100.arm.linux.org.uk>
+From: joravec@drewtech.com (Joey Oravec)
+Date: Wed, 17 Aug 2011 17:21:49 -0400
+Subject: plat-orion problems with mv643xx_eth.c for mv78xx0
+Message-ID: <4E4C30ED.9030902@drewtech.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 17, 2011 at 09:01:54AM -0500, Rob Herring wrote:
-> On 08/17/2011 02:37 AM, Russell King - ARM Linux wrote:
-> > On Tue, Aug 16, 2011 at 03:34:56PM -0500, Rob Herring wrote:
-> >> +void __init smp_init_cpus(void)
-> >> +{
-> >> +	void __iomem *scu_base = a9_base_addr;
-> >> +	unsigned int i, ncores;
-> >> +
-> >> +	ncores = scu_base ? scu_get_core_count(scu_base) : 1;
-> > 
-> > Is scu_base ever NULL?
-> 
-> Only if something is wrong and the mapping did not get setup. The system
-> should still boot with 1 core without accessing the the SCU in this case.
+Orion maintainers,
 
-However,  in a previous patch, a9_base_addr is statically initialized
-and never written to, so that doesn't work.  Not only that but its
-also used for poweroff and cpu suspend...
+config MV643XX_ETH can be selected for Discovery series chips (mv78xx0), 
+but it has some problems.
 
-> This BTW is the only reason we need a static mapping of the SCU. So I
-> could just hard code it or use device tree to get the number of cores
-> and eliminate the static mapping.
+1. Register PSC1 (0x44C) bit 4 is named port_reset. It defaults to 1 
+"port is reset". The documentation does not explain this bit, but the 
+example code clears the bit to "port is not in reset". I needed to do 
+the same thing and clear this bit on each port to get ethernet working:
 
-this statement isn't accurate.
+===================================================================
+--- mv643xx_eth.c
++++ mv643xx_eth.c
+@@ -2597,6 +2597,9 @@
+         if (msp->base == NULL)
+                 goto out_free;
 
-I can see no way for scu_base to ever be NULL here.
++       // Take the part out of reset?
++       writel(readl(msp->base + 0x44C) & (~(1 << 4)), msp->base + 0x44C);
++
+         /*
+          * Set up and register SMI bus.
+          */
+
+2. This is confusing, but not an error. There's a variable port_number 
+in mv643xx_eth_platform_data that MUST be zero for each port on a 
+Discovery (MV78xx0) series processor. The printk will say "port 0" for 
+all 4 ports, but it must be zero so the driver calculates a valid 
+offset. This probably deserves a comment or a change in the printk.
+
+3. This is confusing, but not an error. File mach/mv78xx0.h defines each 
+ethernet port's base address like GE00_PHYS_BASE at the wrong address. 
+Then orion_ge00_init() in plat-orion/common.c adds a magic 0x2000 
+constant which results in the correct address. This probably deserves a 
+comment because the header defines incorrect addresses.
+
+4. Each processor varies in support for MII, GMII, and RGMII interfaces. 
+Function phy_init() calls phy_attach() which is hardcoded for 
+PHY_INTERFACE_MODE_GMII. This depends on the board and can be different 
+for each port, so it should probably be specified in the platform data 
+instead of hardcoded.
+
+-joey
