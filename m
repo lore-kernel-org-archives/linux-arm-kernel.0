@@ -1,209 +1,309 @@
 From: jamie@jamieiles.com (Jamie Iles)
-Date: Wed, 17 Aug 2011 12:47:27 +0100
-Subject: [RFC PATCH 1/2] of: add a generic pinmux helper
+Date: Wed, 17 Aug 2011 12:47:28 +0100
+Subject: [RFC PATCH 2/2] arm/tegra: Add device tree support to pinmux driver
 In-Reply-To: <1313581648-22303-1-git-send-email-jamie@jamieiles.com>
 References: <1313581648-22303-1-git-send-email-jamie@jamieiles.com>
-Message-ID: <1313581648-22303-2-git-send-email-jamie@jamieiles.com>
+Message-ID: <1313581648-22303-3-git-send-email-jamie@jamieiles.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a helper function of_pinmux_parse() that can be used to
-extract common pinmux configuration to avoid each platform implementing
-a parsing loop.  Platforms supply the node containing the pinmux
-definitions and a platform specific callback for configuring a pingroup.
+From: Stephen Warren <swarren@nvidia.com>
 
-Cc: Stephen Warren <swarren@nvidia.com>
+[ j.iles: converted to generic of_pinmux_parse() ]
+
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
 Signed-off-by: Jamie Iles <jamie@jamieiles.com>
 ---
- drivers/of/Kconfig        |    5 +++
- drivers/of/Makefile       |    1 +
- drivers/of/of_pinmux.c    |   80 +++++++++++++++++++++++++++++++++++++++++++++
- include/linux/of_pinmux.h |   67 +++++++++++++++++++++++++++++++++++++
- 4 files changed, 153 insertions(+), 0 deletions(-)
- create mode 100644 drivers/of/of_pinmux.c
- create mode 100644 include/linux/of_pinmux.h
+ arch/arm/mach-tegra/pinmux.c |  240 ++++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 240 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/of/Kconfig b/drivers/of/Kconfig
-index b3bfea5..d300c02 100644
---- a/drivers/of/Kconfig
-+++ b/drivers/of/Kconfig
-@@ -87,4 +87,9 @@ config OF_PCI_IRQ
- 	help
- 	  OpenFirmware PCI IRQ routing helpers
- 
-+config OF_PINMUX
-+	def_bool y
-+	help
-+	  OpenFirmware pin multiplexing helpers
-+
- endmenu # OF
-diff --git a/drivers/of/Makefile b/drivers/of/Makefile
-index 74b959c..04d7fa9 100644
---- a/drivers/of/Makefile
-+++ b/drivers/of/Makefile
-@@ -12,3 +12,4 @@ obj-$(CONFIG_OF_SPI)	+= of_spi.o
- obj-$(CONFIG_OF_MDIO)	+= of_mdio.o
- obj-$(CONFIG_OF_PCI)	+= of_pci.o
- obj-$(CONFIG_OF_PCI_IRQ)  += of_pci_irq.o
-+obj-$(CONFIG_OF_PINMUX) += of_pinmux.o
-diff --git a/drivers/of/of_pinmux.c b/drivers/of/of_pinmux.c
-new file mode 100644
-index 0000000..adfdfc0
---- /dev/null
-+++ b/drivers/of/of_pinmux.c
-@@ -0,0 +1,80 @@
-+/*
-+ * Copyright (c) 2011 Picochip Ltd., Jamie Iles
-+ *
-+ * Generic pinmux bindings for device tree.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
-+#include <linux/errno.h>
-+#include <linux/module.h>
-+#include <linux/kernel.h>
+diff --git a/arch/arm/mach-tegra/pinmux.c b/arch/arm/mach-tegra/pinmux.c
+index ed316f9..cd540eb 100644
+--- a/arch/arm/mach-tegra/pinmux.c
++++ b/arch/arm/mach-tegra/pinmux.c
+@@ -20,6 +20,8 @@
+ #include <linux/errno.h>
+ #include <linux/spinlock.h>
+ #include <linux/io.h>
 +#include <linux/of.h>
 +#include <linux/of_pinmux.h>
-+
-+/**
-+ * of_pinmux_parse - configure a set of pinmux groups for a pinmux controller
-+ *
-+ * @controller: the controller to configure the pinmux entries for.  This
-+ *	defines the controller device node and the callback for configuring
-+ *	the pingroups.
-+ *
-+ * This helper loops over all of the child nodes of a pinmux controller and
-+ * collects the configuration for each pinmux group.  A pinmux group is
-+ * defined as one or more pins that are configured to a common function.  This
-+ * handles common properties that many platforms may implement, but for
-+ * platform specific properties these may be handled in the configure
-+ * callback.
-+ */
-+int of_pinmux_parse(const struct of_pinmux_ctrl *controller)
+ #include <linux/platform_device.h>
+ 
+ #include <mach/iomap.h>
+@@ -124,6 +126,21 @@ static const char *pingroup_name(enum tegra_pingroup pg)
+ 	return pingroups[pg].name;
+ }
+ 
++#ifdef CONFIG_OF
++static int pingroup_enum(const char *name, enum tegra_pingroup *pg_out)
 +{
-+	struct device_node *np;
++	int pg;
 +
-+	if (!controller || !controller->pinmux || !controller->configure)
-+		return -EINVAL;
-+
-+	for_each_child_of_node(controller->pinmux, np) {
-+		struct of_pinmux_cfg config = {
-+			.pin = np,
-+		};
-+		int ret;
-+
-+		ret = of_property_read_string(np, "function",
-+					      &config.function);
-+		if (ret < 0) {
-+			pr_err("no function for pingroup %s\n", np->name);
-+			continue;
++	for (pg = 0; pg < TEGRA_MAX_PINGROUP; pg++)
++		if (!strcasecmp(name, tegra_soc_pingroups[pg].name)) {
++			*pg_out = pg;
++			return 0;
 +		}
 +
-+		if (of_find_property(np, "pull-up", NULL))
-+			config.flags |= OF_PINMUX_PULL_UP;
-+		if (of_find_property(np, "pull-down", NULL))
-+			config.flags |= OF_PINMUX_PULL_DOWN;
++	return -EINVAL;
++}
++#endif
 +
-+		if ((config.flags & OF_PINMUX_PULL_MASK) ==
-+		    OF_PINMUX_PULL_MASK) {
-+			pr_warn("pingroup %s has both pull-up and pull-down properties - defaulting to no pull\n",
-+				np->name);
-+			config.flags &= ~OF_PINMUX_PULL_MASK;
-+		}
+ static const char *func_name(enum tegra_mux_func func)
+ {
+ 	if (func == TEGRA_MUX_RSVD1)
+@@ -147,6 +164,41 @@ static const char *func_name(enum tegra_mux_func func)
+ 	return tegra_mux_names[func];
+ }
+ 
++#ifdef CONFIG_OF
++static int func_enum(const char *name, enum tegra_mux_func *func_out)
++{
++	int func;
 +
-+		if (of_find_property(np, "tristate", NULL))
-+			config.flags |= OF_PINMUX_TRISTATE;
-+
-+		pr_debug("configure pingroup %s, func=%s, flags=0x%lx\n",
-+			 np->name, config.function, config.flags);
-+		if (controller->configure(controller, &config))
-+			pr_warn("failed to configure pingroup %s\n", np->name);
++	if (!strcasecmp(name, "RSVD1")) {
++		*func_out = TEGRA_MUX_RSVD1;
++		return 0;
 +	}
++	if (!strcasecmp(name, "RSVD2")) {
++		*func_out = TEGRA_MUX_RSVD2;
++		return 0;
++	}
++	if (!strcasecmp(name, "RSVD3")) {
++		*func_out = TEGRA_MUX_RSVD3;
++		return 0;
++	}
++	if (!strcasecmp(name, "RSVD4")) {
++		*func_out = TEGRA_MUX_RSVD4;
++		return 0;
++	}
++	if (!strcasecmp(name, "NONE")) {
++		*func_out = TEGRA_MUX_NONE;
++		return 0;
++	}
++
++	for (func = 0; func < TEGRA_MAX_MUX; func++)
++		if (!strcasecmp(name, tegra_mux_names[func])) {
++			*func_out = func;
++			return 0;
++		}
++
++	return -EINVAL;
++}
++#endif
+ 
+ static const char *tri_name(unsigned long val)
+ {
+@@ -329,6 +381,22 @@ static const char *drive_pinmux_name(enum tegra_drive_pingroup pg)
+ 	return drive_pingroups[pg].name;
+ }
+ 
++#ifdef CONFIG_OF
++static int drive_pinmux_enum(const char *name,
++			     enum tegra_drive_pingroup *pg_out)
++{
++	int pg;
++
++	for (pg = 0; pg < TEGRA_MAX_DRIVE_PINGROUP; pg++)
++		if (!strcasecmp(name, drive_pingroups[pg].name)) {
++			*pg_out = pg;
++			return 0;
++		}
++
++	return -EINVAL;
++}
++#endif
++
+ static const char *enable_name(unsigned long val)
+ {
+ 	return val ? "ENABLE" : "DISABLE";
+@@ -666,15 +734,187 @@ void tegra_pinmux_config_pullupdown_table(const struct tegra_pingroup_config *co
+ 	}
+ }
+ 
++#ifdef CONFIG_OF
++static int __init tegra_pinmux_dt_configure(const struct of_pinmux_ctrl *ctrl,
++					    const struct of_pinmux_cfg *config)
++{
++	struct tegra_pingroup_config tegra_config;
++	int ret;
++
++	ret = pingroup_enum(config->pin->name, &tegra_config.pingroup);
++	if (ret < 0) {
++		pr_err("invalid pingroup name (%s)\n", config->pin->name);
++		return ret;
++	}
++
++	ret = func_enum(config->function, &tegra_config.func);
++	if (ret < 0) {
++		pr_err("invalid function (%s)\n", config->function);
++		return ret;
++	}
++
++	if (config->flags & OF_PINMUX_PULL_UP)
++		tegra_config.pupd = TEGRA_PUPD_PULL_UP;
++	else if (config->flags & OF_PINMUX_PULL_DOWN)
++		tegra_config.pupd = TEGRA_PUPD_PULL_DOWN;
++	else
++		tegra_config.pupd = TEGRA_PUPD_NORMAL;
++
++	tegra_config.tristate = (config->flags & OF_PINMUX_TRISTATE) ?
++		TEGRA_TRI_TRISTATE : TEGRA_TRI_NORMAL;
++
++	tegra_pinmux_config_pingroup(&tegra_config);
 +
 +	return 0;
 +}
-+EXPORT_SYMBOL_GPL(of_pinmux_parse);
-diff --git a/include/linux/of_pinmux.h b/include/linux/of_pinmux.h
-new file mode 100644
-index 0000000..61f2ab6
---- /dev/null
-+++ b/include/linux/of_pinmux.h
-@@ -0,0 +1,67 @@
-+/*
-+ * Copyright (c) 2011 Picochip Ltd., Jamie Iles
-+ *
-+ * Generic pinmux bindings for device tree.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+#ifndef __OF_PINMUX_H__
-+#define __OF_PINMUX_H__
-+
-+struct device_node;
-+
-+#define OF_PINMUX_PULL_UP	(1 << 0)
-+#define OF_PINMUX_PULL_DOWN	(1 << 1)
-+#define OF_PINMUX_TRISTATE	(1 << 2)
-+
-+#define OF_PINMUX_PULL_MASK	(OF_PINMUX_PULL_UP | OF_PINMUX_PULL_DOWN)
-+
-+/**
-+ * struct of_pinmux_cfg - configuration state for a single pinmux entry.
-+ *
-+ * @function: the name of the function that the pinmux entry should be
-+ *	configured to.
-+ * @pin: the device_node of the pinmux entry that should be configured.
-+ *	Platform specific properties that aren't in the generic binding may be
-+ *	obtained from this device node.
-+ * @flags: flags for common pinmux options such as pull and tristate.
-+ */
-+struct of_pinmux_cfg {
-+	const char		*function;
-+	struct device_node	*pin;
-+	unsigned long		flags;
-+};
-+
-+/**
-+ * struct of_pinmux_ctrl - platform specific pinmux control state.
-+ *
-+ * @pinmux: the pinmux device node.  All child nodes are required to be the
-+ *	pinmux entry definitions.  Depending on the platform, this may either be
-+ *	a single pin or a group of pins where they can be set to a common
-+ *	function.
-+ * @configure: platform specific callback to configure the pinmux entry.
-+ */
-+struct of_pinmux_ctrl {
-+	struct device_node *pinmux;
-+	int		   (*configure)(const struct of_pinmux_ctrl *ctrl,
-+					const struct of_pinmux_cfg *cfg);
-+};
-+
-+#ifdef CONFIG_OF
-+extern int of_pinmux_parse(const struct of_pinmux_ctrl *controller);
-+#else
-+static inline int of_pinmux_parse(const struct of_pinmux_ctrl *controller)
++static void __init tegra_pinmux_parse_mux_groups(
++			struct platform_device *pdev,
++			struct device_node *mux_node)
 +{
-+	return -ENOSYS;
-+}
-+#endif /* CONFIG_OF */
++	struct of_pinmux_ctrl tegra_pinmux_ctrl = {
++		.pinmux = mux_node,
++		.configure = tegra_pinmux_dt_configure,
++	};
 +
-+#endif /* __OF_PINMUX_H__ */
++	if (of_pinmux_parse(&tegra_pinmux_ctrl))
++		pr_err("failed to parse pinmux configuration\n");
++}
++
++static void __init tegra_pinmux_parse_drive_groups(
++			struct platform_device *pdev,
++			struct device_node *drive_node)
++{
++	struct device_node *node;
++
++	for_each_child_of_node(drive_node, node) {
++		enum tegra_drive_pingroup pg;
++		enum tegra_hsm hsm;
++		enum tegra_schmitt schmitt;
++		enum tegra_drive drive;
++		enum tegra_pull_strength pull_down;
++		enum tegra_pull_strength pull_up;
++		enum tegra_slew slew_rising;
++		enum tegra_slew slew_falling;
++		int ret;
++
++		ret = drive_pinmux_enum(node->name, &pg);
++		if (ret < 0) {
++			dev_err(&pdev->dev,
++				"(drive) %s: Invalid pingroup name\n",
++				node->name);
++			continue;
++		}
++
++		if (of_find_property(node, "nvidia,high-speed-mode", NULL))
++			hsm = TEGRA_HSM_ENABLE;
++		else
++			hsm = TEGRA_HSM_DISABLE;
++
++		if (of_find_property(node, "nvidia,schmitt", NULL))
++			schmitt = TEGRA_SCHMITT_ENABLE;
++		else
++			schmitt = TEGRA_SCHMITT_DISABLE;
++
++		ret = of_property_read_u32(node, "nvidia,drive-power", &drive);
++		if (ret < 0) {
++			dev_err(&pdev->dev,
++				"(drive) %s: Missing property "
++				"nvidia,drive-power\n",
++				node->name);
++			continue;
++		}
++
++		ret = of_property_read_u32(node, "nvidia,pull-down-strength",
++					   &pull_down);
++		if (ret < 0) {
++			dev_err(&pdev->dev,
++				"(drive) %s: Missing property "
++				"nvidia,pull-down-strength\n",
++				node->name);
++			continue;
++		}
++
++		ret = of_property_read_u32(node, "nvidia,pull-up-strength",
++					   &pull_up);
++		if (ret < 0) {
++			dev_err(&pdev->dev,
++				"(drive) %s: Missing property "
++				"nvidia,pull-up-strength\n",
++				node->name);
++			continue;
++		}
++
++		ret = of_property_read_u32(node, "nvidia,slew-rate-rising",
++					   &slew_rising);
++		if (ret < 0) {
++			dev_err(&pdev->dev,
++				"(drive) %s: Missing property "
++				"nvidia,slew_rate-rising\n",
++				node->name);
++			continue;
++		}
++
++		ret = of_property_read_u32(node, "nvidia,slew-rate-falling",
++					   &slew_rising);
++		if (ret < 0) {
++			dev_err(&pdev->dev,
++				"(drive) %s: Missing property "
++				"nvidia,slew_rate-falling\n",
++				node->name);
++			continue;
++		}
++
++		dev_dbg(&pdev->dev,
++			"(drive) %s: hsm %d schmitt %d drive %d "
++			"pull_down %d pull_up %d slew_r %d slew_f %d\n",
++			node->name,
++			hsm, schmitt, drive,
++			pull_down, pull_up,
++			slew_rising, slew_falling);
++
++		tegra_drive_pinmux_config_pingroup(pg, hsm, schmitt, drive,
++						   pull_down, pull_up,
++						   slew_rising, slew_falling);
++	}
++}
++
++static void __init tegra_pinmux_probe_dt(struct platform_device *pdev)
++{
++	struct device_node *node;
++
++	for_each_child_of_node(pdev->dev.of_node, node) {
++		if (!strcmp(node->name, "nvidia,mux-groups"))
++			tegra_pinmux_parse_mux_groups(pdev, node);
++		else if (!strcmp(node->name, "nvidia,drive-groups"))
++			tegra_pinmux_parse_drive_groups(pdev, node);
++		else
++			dev_err(&pdev->dev, "%s: Unknown child node\n",
++				node->name);
++	}
++}
++#else
++static inline void __init tegra_pinmux_probe_dt(struct platform_device *pdev)
++{
++}
++#endif
++
+ static int __init tegra_pinmux_probe(struct platform_device *pdev)
+ {
++	tegra_pinmux_probe_dt(pdev);
++
+ 	return 0;
+ }
+ 
++static struct of_device_id tegra_pinmux_of_match[] __devinitdata = {
++	{ .compatible = "nvidia,tegra20-pinmux", },
++	{ },
++};
++
+ static struct platform_driver tegra_pinmux_driver = {
+ 	.driver		= {
+ 		.name	= "tegra-pinmux",
+ 		.owner	= THIS_MODULE,
++		.of_match_table = tegra_pinmux_of_match,
+ 	},
+ 	.probe		= tegra_pinmux_probe,
+ };
 -- 
 1.7.4.1
