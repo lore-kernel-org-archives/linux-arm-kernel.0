@@ -1,103 +1,100 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 18 Aug 2011 00:06:25 -0400 (EDT)
-Subject: [PATCH 1/3] ARM: debug: use kconfig choice for selecting DEBUG_LL
-	UART
-In-Reply-To: <1313530873-24961-1-git-send-email-will.deacon@arm.com>
-References: <1313530873-24961-1-git-send-email-will.deacon@arm.com>
-Message-ID: <alpine.LFD.2.00.1108180005510.20358@xanadu.home>
+From: Hiroshi.DOYU@nokia.com (Hiroshi DOYU)
+Date: Thu, 18 Aug 2011 08:27:16 +0300 (EEST)
+Subject: [PATCH 4/7] omap: iommu: PREFETCH_IOTLB cleanup
+In-Reply-To: <1313622608-30397-5-git-send-email-ohad@wizery.com>
+References: <1313622608-30397-1-git-send-email-ohad@wizery.com>
+	<1313622608-30397-5-git-send-email-ohad@wizery.com>
+Message-ID: <20110818.082716.383880091385751705.Hiroshi.DOYU@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 16 Aug 2011, Will Deacon wrote:
+Hi Ohad,
 
-> Enabling CONFIG_DEBUG_LL (which is required for earlyprintk) hardwires
-> the debug UART address into the kernel, so that we can print before the
-> platform is initialised.
+From: ext Ohad Ben-Cohen <ohad@wizery.com>
+Subject: [PATCH 4/7] omap: iommu: PREFETCH_IOTLB cleanup
+Date: Thu, 18 Aug 2011 02:10:05 +0300
+
+> Use PREFETCH_IOTLB to control the content of the called function,
+> instead of inlining it in the code.
 > 
-> If the user inadvertently selects multiple platforms with DEBUG_LL
-> enabled, the UART address may not be correct and will likely cause the
-> kernel to hang in the very early stages of boot.
+> This improves readability of the code, and also prevents an "unused
+> function" warning to show up when PREFETCH_IOTLB isn't set.
+
+Great, much better.
+
+> While we're at it, rename load_iotlb_entry to prefetch_iotlb_entry
+> to better reflect the purpose of that function.
+
+Considering that, originally this function is the counterpart of
+"flush_iotlb_page()" among load_iotlb_/flush_iotlb_*() family and
+OMAP1 doesn't use H/W page table but only uses TLB(only
+prefetch/load_tlb), what about keeping the original function
+"load_iotlb_entry()", and make inline function
+"prefetch_iotlb_entry()" has it?
+
+Something like below?
+
+static int inline prefetch_iotlb_entry(struct iommu *obj, struct iotlb_entry *e)
+{
+	return load_iotlb_entry(obj, e);
+}
+
+The above may keep a little bit more sense both for TLB only case too,
+also for some function name consistency?
+
 > 
-> This patch, based on a skeleton from Russell, uses a Kconfig choice for
-> selecting the DEBUG_LL UART, therefore allowing the user to make a
-> choice about the supported platform when DEBUG_LL is enabled.
-> 
-> Cc: Linus Walleij <linus.walleij@stericsson.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-
-Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-
-(ditto for the other 2 patches)
-
+> Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
 > ---
->  arch/arm/Kconfig.debug |   41 ++++++++++++++++++++++++-----------------
->  1 files changed, 24 insertions(+), 17 deletions(-)
+>  drivers/iommu/omap-iommu.c |   18 +++++++++++++-----
+>  1 files changed, 13 insertions(+), 5 deletions(-)
 > 
-> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-> index 81cbe40..11604c9 100644
-> --- a/arch/arm/Kconfig.debug
-> +++ b/arch/arm/Kconfig.debug
-> @@ -72,6 +72,30 @@ config DEBUG_LL
->  	  in the kernel.  This is helpful if you are debugging code that
->  	  executes before the console is initialized.
+> diff --git a/drivers/iommu/omap-iommu.c b/drivers/iommu/omap-iommu.c
+> index ed81977..7280e5b 100644
+> --- a/drivers/iommu/omap-iommu.c
+> +++ b/drivers/iommu/omap-iommu.c
+> @@ -248,11 +248,12 @@ static struct cr_regs __iotlb_read_cr(struct iommu *obj, int n)
+>  }
 >  
-> +choice
-> +	prompt "Kernel low-level debugging port"
-> +	depends on DEBUG_LL
-> +
-> +	config DEBUG_DC21285_PORT
-> +		bool "Kernel low-level debugging messages via footbridge serial port"
-> +		depends on FOOTBRIDGE
-> +		help
-> +		  Say Y here if you want the debug print routines to direct
-> +		  their output to the serial port in the DC21285 (Footbridge).
-> +		  Saying N will cause the debug messages to appear on the first
-> +		  16550 serial port.
-> +
-> +	config DEBUG_CLPS711X_UART2
-> +		bool "Kernel low-level debugging messages via UART2"
-> +		depends on ARCH_CLPS711X
-> +		help
-> +		  Say Y here if you want the debug print routines to direct
-> +		  their output to the second serial port on these devices.
-> +		  Saying N will cause the debug messages to appear on the first
-> +		  serial port.
-> +
-> +endchoice
-> +
->  config EARLY_PRINTK
->  	bool "Early printk"
->  	depends on DEBUG_LL
-> @@ -100,23 +124,6 @@ config OC_ETM
->  	  buffer driver that will allow you to collect traces of the
->  	  kernel code.
+>  /**
+> - * load_iotlb_entry - Set an iommu tlb entry
+> + * prefetch_iotlb_entry - Set an iommu tlb entry
+>   * @obj:	target iommu
+>   * @e:		an iommu tlb entry info
+>   **/
+> -static int load_iotlb_entry(struct iommu *obj, struct iotlb_entry *e)
+> +#ifdef PREFETCH_IOTLB
+> +static int prefetch_iotlb_entry(struct iommu *obj, struct iotlb_entry *e)
+>  {
+>  	int err = 0;
+>  	struct iotlb_lock l;
+> @@ -309,6 +310,15 @@ out:
+>  	return err;
+>  }
 >  
-> -config DEBUG_DC21285_PORT
-> -	bool "Kernel low-level debugging messages via footbridge serial port"
-> -	depends on DEBUG_LL && FOOTBRIDGE
-> -	help
-> -	  Say Y here if you want the debug print routines to direct their
-> -	  output to the serial port in the DC21285 (Footbridge). Saying N
-> -	  will cause the debug messages to appear on the first 16550
-> -	  serial port.
-> -
-> -config DEBUG_CLPS711X_UART2
-> -	bool "Kernel low-level debugging messages via UART2"
-> -	depends on DEBUG_LL && ARCH_CLPS711X
-> -	help
-> -	  Say Y here if you want the debug print routines to direct their
-> -	  output to the second serial port on these devices.  Saying N will
-> -	  cause the debug messages to appear on the first serial port.
-> -
->  config DEBUG_S3C_UART
->  	depends on PLAT_SAMSUNG
->  	int "S3C UART to use for low-level debug"
+> +#else /* !PREFETCH_IOTLB */
+> +
+> +static int prefetch_iotlb_entry(struct iommu *obj, struct iotlb_entry *e)
+> +{
+> +	return 0;
+> +}
+> +
+> +#endif /* !PREFETCH_IOTLB */
+> +
+>  /**
+>   * flush_iotlb_page - Clear an iommu tlb entry
+>   * @obj:	target iommu
+> @@ -662,10 +672,8 @@ int iopgtable_store_entry(struct iommu *obj, struct iotlb_entry *e)
+>  
+>  	flush_iotlb_page(obj, e->da);
+>  	err = iopgtable_store_entry_core(obj, e);
+> -#ifdef PREFETCH_IOTLB
+>  	if (!err)
+> -		load_iotlb_entry(obj, e);
+> -#endif
+> +		prefetch_iotlb_entry(obj, e);
+>  	return err;
+>  }
+>  EXPORT_SYMBOL_GPL(iopgtable_store_entry);
 > -- 
-> 1.7.0.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 1.7.4.1
 > 
