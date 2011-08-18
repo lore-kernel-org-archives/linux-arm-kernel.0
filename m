@@ -1,28 +1,34 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Thu, 18 Aug 2011 13:23:44 +0300
-Subject: [PATCH 5/7] omap: iovmm: remove unused functionality
-In-Reply-To: <20110818.131928.751866371806910622.Hiroshi.DOYU@nokia.com>
-References: <1313622608-30397-1-git-send-email-ohad@wizery.com>
-	<1313622608-30397-6-git-send-email-ohad@wizery.com>
-	<20110818.131928.751866371806910622.Hiroshi.DOYU@nokia.com>
-Message-ID: <CAK=WgbYr+pRqZPLSigyN0SNq9g0NPU2WkdWfVOW931hhQwGmiw@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 18 Aug 2011 11:25:26 +0100
+Subject: [PATCH 3.2 0/4] ARM: simpad: Add support for GPIO attached
+	hardware
+In-Reply-To: <CAK5ve-J7ARjDDm2OzrBiBBd9VrMjdDdihiRcPFwK4xm+_gwMrg@mail.gmail.com>
+References: <1312793379-6020-1-git-send-email-jochen@scram.de>
+	<4E43F44A.1000509@scram.de>
+	<CAK5ve-J7ARjDDm2OzrBiBBd9VrMjdDdihiRcPFwK4xm+_gwMrg@mail.gmail.com>
+Message-ID: <20110818102526.GB21865@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 18, 2011 at 1:19 PM, Hiroshi DOYU <Hiroshi.DOYU@nokia.com> wrote:
-> Maybe it's better to remove the comments explaining unnecessary
-> functions too. Now the function comparison table doesn't make sense....
+On Thu, Aug 18, 2011 at 05:05:49PM +0800, Bryan Wu wrote:
+> On Thu, Aug 11, 2011 at 11:24 PM, Jochen Friedrich <jochen@scram.de> wrote:
+> > On 08.08.2011 10:49, Jochen Friedrich wrote:
+> >
+> >> This series enables GPIO API on UCB1x00 and implements the GPIO
+> >> API on the CS3 latch. The third patch finally registers platform
+> >> devices for the GPIO attached LED, buttons and I2C bus.
+> >>
+> >> ARM: simpad: Add ucb1x00 GPIO definitions and register GPIO
+> >> ARM: simpad: Cleanup CS3 accessors and add GPIO API
+> >> ARM: simpad: add GPIO based device definitions
+> >> ARM: simpad: replace ARM specific LED code
+> >
+> > ping.
+> >
+> > Did someone have time to look at this yet?
+> >
+> Russell,
+> 
+> Is there any comment, or Jochen can just submit them into patch system
 
-Sure, will do.
-
-> From: Hiroshi DOYU <Hiroshi.DOYU@nokia.com>
-> Date: Thu, 18 Aug 2011 13:13:53 +0300
-> Subject: [PATCH 1/1] omap: iommu: remove obsolete comments
->
-> Remove ones referring to non-existing functions.
-
-I think it might be better to squash it with the original patch though
-- are you ok with it ?
-
-Thanks,
-Ohad.
+I don't think so, and yes.
