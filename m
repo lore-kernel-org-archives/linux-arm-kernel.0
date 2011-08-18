@@ -1,30 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 18 Aug 2011 11:15:52 +0200
-Subject: [RFC PATCH v2 00/13] arm/tegra: Initialize GPIO & pinmux from DT
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF04AF6F3062@HQMAIL01.nvidia.com>
-References: <1313440100-17131-1-git-send-email-swarren@nvidia.com>
-	<201108171323.38441.arnd@arndb.de>
-	<74CDBE0F657A3D45AFBB94109FB122FF04AF6F3062@HQMAIL01.nvidia.com>
-Message-ID: <201108181115.53101.arnd@arndb.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 18 Aug 2011 10:33:14 +0100
+Subject: [PATCH 1/3] ARM: debug: use kconfig choice for selecting
+	DEBUG_LL UART
+In-Reply-To: <alpine.LFD.2.00.1108180005510.20358@xanadu.home>
+References: <1313530873-24961-1-git-send-email-will.deacon@arm.com>
+	<alpine.LFD.2.00.1108180005510.20358@xanadu.home>
+Message-ID: <20110818093313.GC19987@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 18 August 2011, Stephen Warren wrote:
-> It looks like DT already supports the generic case for GPIO; each GPIO
-> reference is of the form:
+On Thu, Aug 18, 2011 at 05:06:25AM +0100, Nicolas Pitre wrote:
+> On Tue, 16 Aug 2011, Will Deacon wrote:
 > 
-> <&gpio 69 0>
+> > Enabling CONFIG_DEBUG_LL (which is required for earlyprintk) hardwires
+> > the debug UART address into the kernel, so that we can print before the
+> > platform is initialised.
+> > 
+> > If the user inadvertently selects multiple platforms with DEBUG_LL
+> > enabled, the UART address may not be correct and will likely cause the
+> > kernel to hang in the very early stages of boot.
+> > 
+> > This patch, based on a skeleton from Russell, uses a Kconfig choice for
+> > selecting the DEBUG_LL UART, therefore allowing the user to make a
+> > choice about the supported platform when DEBUG_LL is enabled.
+> > 
+> > Cc: Linus Walleij <linus.walleij@stericsson.com>
+> > Signed-off-by: Will Deacon <will.deacon@arm.com>
 > 
-> and so each GPIO has a "parent" specified, and hence can come from a
-> different controller.
+> Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 > 
-> For drivers, this is all completely hidden by of_get_gpio().
-> 
-> I imagine we'd just use the same pattern for pinmux. This would both
-> support the general case, and end up being consistent with how GPIOs
-> already work, so this seems like a win both ways.
-> 
+> (ditto for the other 2 patches)
 
-Ah right. I had not seen the gpio binding yet, so that definitely works.
+Thanks Nicolas. Hopefully some of the other platforms will start using this
+once it's merged.
 
-	Arnd
+Will
