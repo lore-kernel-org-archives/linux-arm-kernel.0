@@ -1,52 +1,41 @@
-From: Hiroshi.DOYU@nokia.com (Hiroshi DOYU)
-Date: Thu, 18 Aug 2011 13:50:46 +0300 (EEST)
-Subject: [PATCH 0/7] omap: iommu migration, relocation and cleanups
-In-Reply-To: <201108181112.55592.laurent.pinchart@ideasonboard.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Thu, 18 Aug 2011 14:01:19 +0300
+Subject: [PATCH 6/7] omap: iommu: remove unused exported API
+In-Reply-To: <20110818.134947.522985871882962246.Hiroshi.DOYU@nokia.com>
 References: <1313622608-30397-1-git-send-email-ohad@wizery.com>
-	<201108181112.55592.laurent.pinchart@ideasonboard.com>
-Message-ID: <20110818.135046.3757848928175252.Hiroshi.DOYU@nokia.com>
+	<1313622608-30397-7-git-send-email-ohad@wizery.com>
+	<20110818.134947.522985871882962246.Hiroshi.DOYU@nokia.com>
+Message-ID: <CAK=Wgba0_4W=vODss4+ZKE=PQL266+W0+vb3MiwsTqQH4_1_LQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ohad,
+Hi Hiroshi,
 
-From: ext Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Subject: Re: [PATCH 0/7] omap: iommu migration, relocation and cleanups
-Date: Thu, 18 Aug 2011 11:12:55 +0200
+On Thu, Aug 18, 2011 at 1:49 PM, Hiroshi DOYU <Hiroshi.DOYU@nokia.com> wrote:
+>> -extern void iommu_set_twl(struct iommu *obj, bool on);
+>
+> This function was introduced by "Hari Kanigeri" for some OMAP4 case,
+> which is only using TLB, not H/W table walk.
 
-> Hi Ohad,
-> 
-> On Thursday 18 August 2011 01:10:01 Ohad Ben-Cohen wrote:
->> 1. Migrate OMAP's iommu driver to the generic IOMMU API, and move it
->> to the dedicated iommu folder.
->> 
->> 2. Fix omap3isp appropriately so it doesn't break.
->> 
->> 3. Adapt OMAP's iovmm appropriately as well, because omap3isp still relies
->> on it. The plan is eventually to remove iovmm and replace it with the
->> upcoming IOMMU-based generic DMA-API. Move iovmm to the iommu folder too;
->> it belongs there more than it belongs in the OMAP folders.
->> 
->> 4. Start cleaning up OMAP's iommu components towards the end goal, where
->>     1) omap-iommu no longer exports public API (and instead provides its
->>        entire functionality via the generic IOMMU API).
->>     2) omap-iovmm is removed.
+We discussed that internally, and concluded it's not needed anymore. I
+still kept the underlying plumbing mechanism, just in case it'd still
+be needed for some hw quirks in the future, but removed the interface
+(in case a future hw revision will seem to need it, it would probably
+make more sense to invoke the relevant mechanism from the underlying
+layers rather than from a higher layer).
 
-Good migration path!
+>> -extern int iommu_set_da_range(struct iommu *obj, u32 start, u32 end);
+>
+> This function was introduced by "David Cohen" to specify the available
+> ISP virtual address range.
 
->> Changes:
->> 1. Migrate iommu, iovmm and omap3isp in a single patch for bisectibility
->> sake.
->> 2. Apply Laurent Pinchart's comments (thanks Laurent!)
-> 
-> You're welcome.
-> 
->> 3. Rebase to 3.1-rc2
-> 
-> For the OMAP3 ISP driver changes,
-> 
-> Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Not sure if David or anyone is using this, but if someone is, it must
+be out-of-tree.
 
-For the rest of omap iommu/iovmm patches, they look good:
+In that case, even if it is needed, adding a mainline user for this
+function at this point will most likely not be accepted anymore, and
+instead, one will be suggested to use (and extend as necessary) the
+DMA-API.
 
-Acked-by: Hiroshi DOYU <Hiroshi.DOYU@nokia.com>
+Thanks,
+Ohad.
