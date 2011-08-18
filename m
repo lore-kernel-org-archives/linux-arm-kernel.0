@@ -1,72 +1,80 @@
-From: lacombar@gmail.com (Arnaud Lacombe)
-Date: Thu, 18 Aug 2011 14:03:43 -0400
-Subject: [PATCH] ARM: zImage: Skip relinking if nothing changes
-In-Reply-To: <alpine.LFD.2.00.1108172339270.20358@xanadu.home>
-References: <4E457682.5020107@codeaurora.org>
-	<1313175602-21834-1-git-send-email-sboyd@codeaurora.org>
-	<CACqU3MUq5M-XPOxV=8GKyEzjEzpmdeaF+mGrXJrK+ZZxa4SdeQ@mail.gmail.com>
-	<CACqU3MXtcg_8si9WiuZngMB2C977PS4zen8_cQ9oyNtwTbt75Q@mail.gmail.com>
-	<alpine.LFD.2.00.1108172339270.20358@xanadu.home>
-Message-ID: <CACqU3MUV=-hQ_y3wLPBYRh+DhLcFqneWbURNQ66UyArb5UJcxw@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 18 Aug 2011 20:51:29 +0200
+Subject: [PATCH 06/12] ARM: mxc: Setup consistent dma size at boot time
+In-Reply-To: <1313655216.2254.9.camel@computer2>
+References: <1312813712-22808-1-git-send-email-tixy@yxit.co.uk>
+	<1312813712-22808-7-git-send-email-tixy@yxit.co.uk>
+	<20110808164731.GP31404@pengutronix.de>
+	<alpine.LFD.2.00.1108172309450.20358@xanadu.home>
+	<1313655216.2254.9.camel@computer2>
+Message-ID: <20110818185128.GQ31404@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Aug 18, 2011 at 09:13:36AM +0100, Tixy wrote:
+> On Wed, 2011-08-17 at 23:12 -0400, Nicolas Pitre wrote:
+> > On Mon, 8 Aug 2011, Sascha Hauer wrote:
+> > 
+> > > Hi Jon,
+> > > 
+> > > On Mon, Aug 08, 2011 at 03:28:26PM +0100, Jon Medhurst wrote:
+> > > > Signed-off-by: Jon Medhurst <tixy@yxit.co.uk>
+> > > > CC: Sascha Hauer <kernel@pengutronix.de>
+> > > > CC: Amit Kucheria <amit.kucheria@canonical.com>
+> > > > ---
+> > > >  arch/arm/plat-mxc/include/mach/common.h |    1 +
+> > > >  arch/arm/plat-mxc/include/mach/memory.h |   15 ---------------
+> > > >  arch/arm/mach-imx/mm-imx1.c             |    1 +
+> > > >  arch/arm/mach-imx/mm-imx21.c            |    1 +
+> > > >  arch/arm/mach-imx/mm-imx25.c            |    1 +
+> > > >  arch/arm/mach-imx/mm-imx27.c            |    1 +
+> > > >  arch/arm/mach-imx/mm-imx31.c            |    1 +
+> > > >  arch/arm/mach-imx/mm-imx35.c            |    1 +
+> > > >  arch/arm/mach-mx5/mm-mx50.c             |    1 +
+> > > >  arch/arm/mach-mx5/mm.c                  |    2 ++
+> > > >  arch/arm/plat-mxc/system.c              |   16 ++++++++++++++++
+> > > >  11 files changed, 26 insertions(+), 15 deletions(-)
+> > > 
+> > > Should the base patch be ok I'd like to rework this one. I want to
+> > > call init_consistent_dma_size on a per board base instead in a global
+> > > function with ifdeffery.
+> > 
+> > Hello Sascha,
+> > 
+> > Did you manage to work on this?  Ideally it would be nice to have a 
+> > reworked patch from you that could be used in this series as some later 
+> > patches depend on this series.
+> 
+> Are we happy with the base patch? Specifically, having
+> init_consistent_dma_size() declaired in include/asm/dma-mapping.h?
+> 
+> If so, I don't mind making the changes if Sascha can give me some rules
+> and pattern to apply. E.g. is it
+> 
+> In mach-imx/mm-imx2*.c
+> 
+> #if defined(CONFIG_VIDEO_MX2_HOSTSUPPORT)
+> 	init_consistent_dma_size(SZ_4M);
+> #endif
+> 
+> And likewise with CONFIG_MX1_VIDEO in mach-imx/mm-imx1.c and
+> CONFIG_MX3_VIDEO in mach-imx/mm-imx3*.c.
+> 
+> What about mach-mx5?
 
-On Wed, Aug 17, 2011 at 11:44 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
-> On Fri, 12 Aug 2011, Arnaud Lacombe wrote:
->> On Fri, Aug 12, 2011 at 4:48 PM, Arnaud Lacombe <lacombar@gmail.com> wrote:
->> > On Fri, Aug 12, 2011 at 3:00 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
->> >> diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
->> >> index 0c74a6f..937fd26 100644
->> >> --- a/arch/arm/boot/compressed/Makefile
->> >> +++ b/arch/arm/boot/compressed/Makefile
->> >> @@ -91,7 +91,7 @@ suffix_$(CONFIG_KERNEL_LZMA) = lzma
->> >>
->> >> ?targets ? ? ? := vmlinux vmlinux.lds \
->> >> ? ? ? ? ? ? ? ? piggy.$(suffix_y) piggy.$(suffix_y).o \
->> >> - ? ? ? ? ? ? ? ?font.o font.c head.o misc.o $(OBJS)
->> >> + ? ? ? ? ? ? ? ?font.o font.c head.o misc.o lib1funcs.o lib1funcs.S $(OBJS)
->> >>
->> >> ?# Make sure files are removed during clean
->> >> ?extra-y ? ? ? += piggy.gzip piggy.lzo piggy.lzma lib1funcs.S
->> >> @@ -121,9 +121,7 @@ LDFLAGS_vmlinux += -X
->> >> ?LDFLAGS_vmlinux += -T
->> >>
->> >> ?# For __aeabi_uidivmod
->> >> -lib1funcs = $(obj)/lib1funcs.o
->> >> -
->> >> -$(obj)/lib1funcs.S: $(srctree)/arch/$(SRCARCH)/lib/lib1funcs.S FORCE
->> >> +$(obj)/lib1funcs.S: $(srctree)/arch/$(SRCARCH)/lib/lib1funcs.S
->> >> ? ? ? ?$(call cmd,shipped)
->> >>
->> > You should be able to avoid the extra copy altogether by doing something ala:
->> >
->> > $(obj)/lib1funcs.o: $(srctree)/arch/arm/lib/lib1funcs.S
->> > ? ? ? ?$(call cmd,as_o_S)
->> >
->> > note that I also remove the $(SRCARCH), as there is no other
->> > `arch/*/lib/lib1funcs.S' than `arch/arm/lib/lib1funcs.S'
->> >
->> I withdraw this proposal and will hack around this to find a proper
->> solution from within kbuild, and eventually come back on these uses
->> :-)
->
-> Any progress on this?
->
-> I have a patch doing multiple similar $(call cmd,shipped) at the moment
-> and this is far from looking nice.
->
-What is your use-case ? Is it re-use of code in a different
-subdirectory (use-case presented in this thread), or aliasing of the
-same source under different object name in the same directory (as used
-in the alpha tree) ?
+Sorry, I forgot about this issue. The solution is really simple: All
+boards in tree using video use memblock_* functions to get their
+coherent dma space for the camera. So we can just remove all
+CONSISTENT_DMA_SIZE defines in arch/arm/plat-mxc/include/mach/memory.h.
 
-If it is the former, I potentially have a solution, but it is
-highlighting bad use of the kbuild infrastructure. I have not been
-able to yet measure the impact of the breakage, ie. either localized
-or tree-wide. I should be able to provide you with more info,
-hopefully, this evening.
+If I understand your patch correctly we get a default size of 2MiB
+when init_consistent_dma_size() is not called. That's fine for the other
+i.MX boards.
 
-Thanks,
- - Arnaud
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
