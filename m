@@ -1,29 +1,27 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 18 Aug 2011 15:35:42 +0200
-Subject: [PATCH 1/7] omap: iommu: migrate to the generic IOMMU API
-In-Reply-To: <201108181101.57882.laurent.pinchart@ideasonboard.com>
+Date: Thu, 18 Aug 2011 15:38:18 +0200
+Subject: [PATCH 2/7] omap: iommu/iovmm: move to dedicated iommu folder
+In-Reply-To: <1313622608-30397-3-git-send-email-ohad@wizery.com>
 References: <1313622608-30397-1-git-send-email-ohad@wizery.com>
-	<1313622608-30397-2-git-send-email-ohad@wizery.com>
-	<201108181101.57882.laurent.pinchart@ideasonboard.com>
-Message-ID: <201108181535.42339.arnd@arndb.de>
+	<1313622608-30397-3-git-send-email-ohad@wizery.com>
+Message-ID: <201108181538.18480.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 18 August 2011, Laurent Pinchart wrote:
-> > +static int omap_iommu_domain_init(struct iommu_domain *domain)
-> > +{
-> > +     struct omap_iommu_domain *omap_domain;
-> > +
-> > +     omap_domain = kzalloc(sizeof(*omap_domain), GFP_KERNEL);
-> > +     if (!omap_domain) {
-> > +             pr_err("kzalloc failed\n");
-> > +             goto out;
-> 
-> You can directly return -ENOMEM here, and remove the "out:" label.
+On Thursday 18 August 2011, Ohad Ben-Cohen wrote:
+>  arch/arm/plat-omap/Kconfig                         |   14 --------------
+>  arch/arm/plat-omap/Makefile                        |    2 --
+>  arch/arm/plat-omap/{ => include/plat}/iopgtable.h  |    0
+>  drivers/iommu/Kconfig                              |   18 ++++++++++++++++++
+>  drivers/iommu/Makefile                             |    3 +++
+>  .../iommu/omap-iommu-debug.c                       |    2 +-
+>  .../iommu.c => drivers/iommu/omap-iommu.c          |    2 +-
+>  .../iovmm.c => drivers/iommu/omap-iovmm.c          |    2 +-
+>  drivers/media/video/Kconfig                        |    2 +-
 
-Risking to get into bike-shedding here, I would comment that the current
-code is actually better. I would not mix the two methods of error handling
-in one function. If you use goto labels, better use them consistenly and
-have only one 'return' statement.
+Do you need the header file to be globally visible?
+
+If not, I think it would be better to move it to the iommu directory along with the
+files using it.
 
 	Arnd
