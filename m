@@ -1,78 +1,27 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 18 Aug 2011 20:31:32 +0100
-Subject: [PATCH] ARM: zImage: Skip relinking if nothing changes
-In-Reply-To: <CACqU3MUV=-hQ_y3wLPBYRh+DhLcFqneWbURNQ66UyArb5UJcxw@mail.gmail.com>
-References: <4E457682.5020107@codeaurora.org>
-	<1313175602-21834-1-git-send-email-sboyd@codeaurora.org>
-	<CACqU3MUq5M-XPOxV=8GKyEzjEzpmdeaF+mGrXJrK+ZZxa4SdeQ@mail.gmail.com>
-	<CACqU3MXtcg_8si9WiuZngMB2C977PS4zen8_cQ9oyNtwTbt75Q@mail.gmail.com>
-	<alpine.LFD.2.00.1108172339270.20358@xanadu.home>
-	<CACqU3MUV=-hQ_y3wLPBYRh+DhLcFqneWbURNQ66UyArb5UJcxw@mail.gmail.com>
-Message-ID: <20110818193132.GA28546@n2100.arm.linux.org.uk>
+Date: Thu, 18 Aug 2011 20:41:16 +0100
+Subject: [PATCH] ARM: mmp: rename SHEEVAD to GPLUGD
+In-Reply-To: <4E4CA5B3.3030706@einfochips.com>
+References: <1313469117-7818-1-git-send-email-eric.y.miao@gmail.com>
+	<4E4CA5B3.3030706@einfochips.com>
+Message-ID: <20110818194116.GC28546@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 18, 2011 at 02:03:43PM -0400, Arnaud Lacombe wrote:
-> Hi,
-> 
-> On Wed, Aug 17, 2011 at 11:44 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
-> > On Fri, 12 Aug 2011, Arnaud Lacombe wrote:
-> >> On Fri, Aug 12, 2011 at 4:48 PM, Arnaud Lacombe <lacombar@gmail.com> wrote:
-> >> > On Fri, Aug 12, 2011 at 3:00 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> >> >> diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
-> >> >> index 0c74a6f..937fd26 100644
-> >> >> --- a/arch/arm/boot/compressed/Makefile
-> >> >> +++ b/arch/arm/boot/compressed/Makefile
-> >> >> @@ -91,7 +91,7 @@ suffix_$(CONFIG_KERNEL_LZMA) = lzma
-> >> >>
-> >> >> ?targets ? ? ? := vmlinux vmlinux.lds \
-> >> >> ? ? ? ? ? ? ? ? piggy.$(suffix_y) piggy.$(suffix_y).o \
-> >> >> - ? ? ? ? ? ? ? ?font.o font.c head.o misc.o $(OBJS)
-> >> >> + ? ? ? ? ? ? ? ?font.o font.c head.o misc.o lib1funcs.o lib1funcs.S $(OBJS)
-> >> >>
-> >> >> ?# Make sure files are removed during clean
-> >> >> ?extra-y ? ? ? += piggy.gzip piggy.lzo piggy.lzma lib1funcs.S
-> >> >> @@ -121,9 +121,7 @@ LDFLAGS_vmlinux += -X
-> >> >> ?LDFLAGS_vmlinux += -T
-> >> >>
-> >> >> ?# For __aeabi_uidivmod
-> >> >> -lib1funcs = $(obj)/lib1funcs.o
-> >> >> -
-> >> >> -$(obj)/lib1funcs.S: $(srctree)/arch/$(SRCARCH)/lib/lib1funcs.S FORCE
-> >> >> +$(obj)/lib1funcs.S: $(srctree)/arch/$(SRCARCH)/lib/lib1funcs.S
-> >> >> ? ? ? ?$(call cmd,shipped)
-> >> >>
-> >> > You should be able to avoid the extra copy altogether by doing something ala:
-> >> >
-> >> > $(obj)/lib1funcs.o: $(srctree)/arch/arm/lib/lib1funcs.S
-> >> > ? ? ? ?$(call cmd,as_o_S)
-> >> >
-> >> > note that I also remove the $(SRCARCH), as there is no other
-> >> > `arch/*/lib/lib1funcs.S' than `arch/arm/lib/lib1funcs.S'
-> >> >
-> >> I withdraw this proposal and will hack around this to find a proper
-> >> solution from within kbuild, and eventually come back on these uses
-> >> :-)
-> >
-> > Any progress on this?
-> >
-> > I have a patch doing multiple similar $(call cmd,shipped) at the moment
-> > and this is far from looking nice.
->
-> What is your use-case ? Is it re-use of code in a different
-> subdirectory (use-case presented in this thread), or aliasing of the
-> same source under different object name in the same directory (as used
-> in the alpha tree) ?
+A message to everyone.
 
-It is to be able to reuse the same file source file in both the main
-kernel and the decompressor, sometimes rebuilding it with differing
-options from the main kernel build.
+Do not submit board support to mainline for which you haven't first
+sorted out the mach-types stuff.  The mach-types database has been linked
+into tracking what is in mainline for quite some time now, with the
+purpose of locking out changes to the database against stuff already
+included in mainline to prevent build breakages caused by stuff getting
+changed after submission.
 
-As the two environments are entirely separate, it is not always
-appropriate to clone the previously built object file.
+The side effect of that is that I _too_ get blocked from sorting it out
+via the web interface, and have to resort to fiddling with the database
+via SQL.
 
-Hence, we copy the source file and re-build it.
+I am _NOT_ going to do that very often.  If you make me resort to it,
+I will sort out those problems at my leisure, or more probably never.
 
-The alternative is that we could keep two copies of the same source
-in two different locations, but that's just plain idiotic just to
-satisfy some silly kbuild restriction.
+You have been warned.
