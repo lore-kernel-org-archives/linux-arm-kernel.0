@@ -1,79 +1,18 @@
-From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Thu, 18 Aug 2011 15:25:46 -0700
-Subject: [PATCH] ARM: zImage: Skip relinking if nothing changes
-In-Reply-To: <20110818193132.GA28546@n2100.arm.linux.org.uk>
-References: <4E457682.5020107@codeaurora.org>
-	<1313175602-21834-1-git-send-email-sboyd@codeaurora.org>
-	<CACqU3MUq5M-XPOxV=8GKyEzjEzpmdeaF+mGrXJrK+ZZxa4SdeQ@mail.gmail.com>
-	<CACqU3MXtcg_8si9WiuZngMB2C977PS4zen8_cQ9oyNtwTbt75Q@mail.gmail.com>
-	<alpine.LFD.2.00.1108172339270.20358@xanadu.home>
-	<CACqU3MUV=-hQ_y3wLPBYRh+DhLcFqneWbURNQ66UyArb5UJcxw@mail.gmail.com>
-	<20110818193132.GA28546@n2100.arm.linux.org.uk>
-Message-ID: <4E4D916A.2090308@boundarydevices.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 18 Aug 2011 23:29:06 +0100
+Subject: [PATCH v2 0/3] Fix Thumb-2 undef handling for mixed-arch kernels
+In-Reply-To: <1313686914-29481-1-git-send-email-dave.martin@linaro.org>
+References: <1313686914-29481-1-git-send-email-dave.martin@linaro.org>
+Message-ID: <20110818222906.GD28546@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/18/2011 12:31 PM, Russell King - ARM Linux wrote:
-> On Thu, Aug 18, 2011 at 02:03:43PM -0400, Arnaud Lacombe wrote:
->> Hi,
->>
->> On Wed, Aug 17, 2011 at 11:44 PM, Nicolas Pitre<nico@fluxnic.net>  wrote:
->>> On Fri, 12 Aug 2011, Arnaud Lacombe wrote:
->>>> On Fri, Aug 12, 2011 at 4:48 PM, Arnaud Lacombe<lacombar@gmail.com>  wrote:
->>>>> On Fri, Aug 12, 2011 at 3:00 PM, Stephen Boyd<sboyd@codeaurora.org>  wrote:
->>>>>> diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
->>>>>> index 0c74a6f..937fd26 100644
->>>>>> --- a/arch/arm/boot/compressed/Makefile
->>>>>> +++ b/arch/arm/boot/compressed/Makefile
->>>>>> @@ -91,7 +91,7 @@ suffix_$(CONFIG_KERNEL_LZMA) = lzma
->>>>>>
->>>>>>   targets       := vmlinux vmlinux.lds \
->>>>>>                  piggy.$(suffix_y) piggy.$(suffix_y).o \
->>>>>> -                font.o font.c head.o misc.o $(OBJS)
->>>>>> +                font.o font.c head.o misc.o lib1funcs.o lib1funcs.S $(OBJS)
->>>>>>
->>>>>>   # Make sure files are removed during clean
->>>>>>   extra-y       += piggy.gzip piggy.lzo piggy.lzma lib1funcs.S
->>>>>> @@ -121,9 +121,7 @@ LDFLAGS_vmlinux += -X
->>>>>>   LDFLAGS_vmlinux += -T
->>>>>>
->>>>>>   # For __aeabi_uidivmod
->>>>>> -lib1funcs = $(obj)/lib1funcs.o
->>>>>> -
->>>>>> -$(obj)/lib1funcs.S: $(srctree)/arch/$(SRCARCH)/lib/lib1funcs.S FORCE
->>>>>> +$(obj)/lib1funcs.S: $(srctree)/arch/$(SRCARCH)/lib/lib1funcs.S
->>>>>>         $(call cmd,shipped)
->>>>>>
->>>>> You should be able to avoid the extra copy altogether by doing something ala:
->>>>>
->>>>> $(obj)/lib1funcs.o: $(srctree)/arch/arm/lib/lib1funcs.S
->>>>>         $(call cmd,as_o_S)
->>>>>
->>>>> note that I also remove the $(SRCARCH), as there is no other
->>>>> `arch/*/lib/lib1funcs.S' than `arch/arm/lib/lib1funcs.S'
->>>>>
->>>> I withdraw this proposal and will hack around this to find a proper
->>>> solution from within kbuild, and eventually come back on these uses
->>>> :-)
->>> Any progress on this?
->>>
->>> I have a patch doing multiple similar $(call cmd,shipped) at the moment
->>> and this is far from looking nice.
->> What is your use-case ? Is it re-use of code in a different
->> subdirectory (use-case presented in this thread), or aliasing of the
->> same source under different object name in the same directory (as used
->> in the alpha tree) ?
-> It is to be able to reuse the same file source file in both the main
-> kernel and the decompressor, sometimes rebuilding it with differing
-> options from the main kernel build.
->
-> As the two environments are entirely separate, it is not always
-> appropriate to clone the previously built object file.
->
-> Hence, we copy the source file and re-build it.
->
-> The alternative is that we could keep two copies of the same source
-> in two different locations, but that's just plain idiotic just to
-> satisfy some silly kbuild restriction.
->
-Can the second file just contain a "#include " of the 1st?
+On Thu, Aug 18, 2011 at 06:01:51PM +0100, Dave Martin wrote:
+> In kernels which support v6 and v7 platforms in a single binary
+> such as omap2plus_defconfig for example, undefined instruction
+> exceptions taken on Thumb instructions are not processed correctly,
+> because the kernel assumes at build-time that Thumb-2 won't be
+> supported in userspace.
+
+Unless there's any further comments from anyone, I think this is now
+ready.  Thanks.
