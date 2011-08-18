@@ -1,42 +1,29 @@
-From: boojin.kim@samsung.com (Boojin Kim)
-Date: Thu, 18 Aug 2011 15:43:48 +0900
-Subject: [PATCH] ARM: S5P64X0: Add the devname for DMA clock
-Message-ID: <1313649828-27642-1-git-send-email-boojin.kim@samsung.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 18 Aug 2011 09:56:14 +0200
+Subject: [PATCH v3] amba: consolidate PrimeCell magic
+In-Reply-To: <20110817184905.GA11221@n2100.arm.linux.org.uk>
+References: <1313569846-22902-1-git-send-email-linus.walleij@stericsson.com>
+	<ADE657CA350FB648AAC2C43247A983F001F3884BB382@AUSP01VMBX24.collaborationhost.net>
+	<20110817184905.GA11221@n2100.arm.linux.org.uk>
+Message-ID: <CACRpkdaWCuPjjVmKHKvZfC_aaaQZgm6qHvyY5MN-o8T3FJ6x5g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds devname for DMA clock.
-NOTE: This patch should be added after merging new pl330 driver on dmaengine.
+On Wed, Aug 17, 2011 at 8:49 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Aug 17, 2011 at 12:03:57PM -0500, H Hartley Sweeten wrote:
+>> > + ? cellid = amba_get_pid((void __iomem *)((u32)base & PAGE_MASK), SZ_4K);
+>>
+>> This produces a sparse warning. ?But, the same warning was present with the
+>> old code.
+>>
+>> arch/arm/common/vic.c:353:49: warning: cast removes address space of expression
+>
+> That's prabably because casting from a pointer to a u32 (unsigned int)
+> isn't the best thing to do. ?Casting to unsigned long is much better,
+> and iirc doesn't provoke such a sparse warning.
 
-Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
----
- arch/arm/mach-s5p64x0/clock-s5p6440.c |    1 +
- arch/arm/mach-s5p64x0/clock-s5p6450.c |    1 +
- 2 files changed, 2 insertions(+), 0 deletions(-)
+Yep it's correct, sparse is silent on me now, posting v4.
 
-diff --git a/arch/arm/mach-s5p64x0/clock-s5p6440.c b/arch/arm/mach-s5p64x0/clock-s5p6440.c
-index c1f548f..c54c65d 100644
---- a/arch/arm/mach-s5p64x0/clock-s5p6440.c
-+++ b/arch/arm/mach-s5p64x0/clock-s5p6440.c
-@@ -147,6 +147,7 @@ static struct clk init_clocks_off[] = {
- 		.ctrlbit	= (1 << 8),
- 	}, {
- 		.name		= "dma",
-+		.devname	= "dma-pl330",
- 		.parent		= &clk_hclk_low.clk,
- 		.enable		= s5p64x0_hclk0_ctrl,
- 		.ctrlbit	= (1 << 12),
-diff --git a/arch/arm/mach-s5p64x0/clock-s5p6450.c b/arch/arm/mach-s5p64x0/clock-s5p6450.c
-index 3d9b609..2d04abf 100644
---- a/arch/arm/mach-s5p64x0/clock-s5p6450.c
-+++ b/arch/arm/mach-s5p64x0/clock-s5p6450.c
-@@ -180,6 +180,7 @@ static struct clk init_clocks_off[] = {
- 		.ctrlbit	= (1 << 3),
- 	}, {
- 		.name		= "dma",
-+		.devname	= "dma-pl330",
- 		.parent		= &clk_hclk_low.clk,
- 		.enable		= s5p64x0_hclk0_ctrl,
- 		.ctrlbit	= (1 << 12),
--- 
-1.7.1
+Thanks!
+Linus Walleij
