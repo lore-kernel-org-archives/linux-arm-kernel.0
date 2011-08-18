@@ -1,66 +1,45 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 18 Aug 2011 17:07:12 +0100
-Subject: [PATCH 1/3] ARM: debug: use kconfig choice for selecting
-	DEBUG_LL UART
-In-Reply-To: <20110818161105.GA12527@S2100-06.ap.freescale.net>
-References: <1313530873-24961-1-git-send-email-will.deacon@arm.com>
-	<20110818161105.GA12527@S2100-06.ap.freescale.net>
-Message-ID: <20110818160712.GA26691@e102144-lin.cambridge.arm.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Thu, 18 Aug 2011 11:25:39 -0500
+Subject: [PATCH v4] amba: consolidate PrimeCell magic
+In-Reply-To: <1313654311-2283-1-git-send-email-linus.walleij@stericsson.com>
+References: <1313654311-2283-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F001F3884BB677@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+On Thursday, August 18, 2011 12:59 AM, Linus Walleij wrote:
+>
+> Since two drivers use the PrimeCell scheme without using the
+> amba_bus driver logic, let's break the magic lookups out as
+> static inlines in the <linux/amba/bus.h> header so we get
+> some consolidation anyway. Delete the primecell ID check in
+> common/pl330.c since it is only used from the amba_bus driver
+> in drivers/dma, which is already doing the same check when
+> probing in drivers/amba/bus.c.
+>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Cc: Viresh Kumar <viresh.kumar@st.com>
+> Acked-by: H Hartley Sweeten <hartleys@visionengravers.com>
+> Acked-by: Jassi Brar <jassisinghbrar@gmail.com>
+> Acked-by: Boojin Kim <boojin.kim@samsung.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> Changes V3->v4:
+> - Fix up sparse warning due to inelegant cast to (u32) in vic.c,
+>   we cast to (unsigned long) and sparse is happy.
 
-On Thu, Aug 18, 2011 at 05:11:06PM +0100, Shawn Guo wrote:
-> On Tue, Aug 16, 2011 at 10:41:11PM +0100, Will Deacon wrote:
-> > Enabling CONFIG_DEBUG_LL (which is required for earlyprintk) hardwires
-> > the debug UART address into the kernel, so that we can print before the
-> > platform is initialised.
-> > 
-> > If the user inadvertently selects multiple platforms with DEBUG_LL
-> > enabled, the UART address may not be correct and will likely cause the
-> > kernel to hang in the very early stages of boot.
-> > 
-> > This patch, based on a skeleton from Russell, uses a Kconfig choice for
-> > selecting the DEBUG_LL UART, therefore allowing the user to make a
-> > choice about the supported platform when DEBUG_LL is enabled.
-> > 
-> > Cc: Linus Walleij <linus.walleij@stericsson.com>
-> > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> > ---
-> >  arch/arm/Kconfig.debug |   41 ++++++++++++++++++++++++-----------------
-> >  1 files changed, 24 insertions(+), 17 deletions(-)
-> > 
-> > diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-> > index 81cbe40..11604c9 100644
-> > --- a/arch/arm/Kconfig.debug
-> > +++ b/arch/arm/Kconfig.debug
-> > @@ -72,6 +72,30 @@ config DEBUG_LL
-> >  	  in the kernel.  This is helpful if you are debugging code that
-> >  	  executes before the console is initialized.
-> >  
-> > +choice
-> > +	prompt "Kernel low-level debugging port"
-> > +	depends on DEBUG_LL
-> > +
-> > +	config DEBUG_DC21285_PORT
-> > +		bool "Kernel low-level debugging messages via footbridge serial port"
-> > +		depends on FOOTBRIDGE
-> > +		help
-> > +		  Say Y here if you want the debug print routines to direct
-> > +		  their output to the serial port in the DC21285 (Footbridge).
-> > +		  Saying N will cause the debug messages to appear on the first
-> > +		  16550 serial port.
-> > +
-> > +	config DEBUG_CLPS711X_UART2
-> 
-> I would expect this will become a long list when other platforms start
-> adding CONFIG symbol here.  It may be a good idea to sort this list
-> in symbol from the beginning.
+Thanks!
 
-I'm not sure that sorting this list in alphabetical order is a good idea.
-This is a Kconfig choice, so the default value is the first one in the list
-that has its dependencies satisfied. Therefore, the ordering has a direct
-impact on the default UART selection.
+One nit...
 
-Will
++	/*
++	 * Identify which VIC cell this one is, by reading the ID - some
++	 * implementations have two VICs in the same page but only one set
++	 * of ID registers at the end, so we need to adjust the base to
++	 * reference the page offset. All VIC:s are size 4K.
+                                           ^
+
+Is this supposed to be VIC's
+
+Regards,
+Hartley
