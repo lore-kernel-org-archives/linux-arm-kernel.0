@@ -1,44 +1,30 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 18 Aug 2011 11:12:55 +0200
-Subject: [PATCH 0/7] omap: iommu migration, relocation and cleanups
-In-Reply-To: <1313622608-30397-1-git-send-email-ohad@wizery.com>
-References: <1313622608-30397-1-git-send-email-ohad@wizery.com>
-Message-ID: <201108181112.55592.laurent.pinchart@ideasonboard.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 18 Aug 2011 11:15:52 +0200
+Subject: [RFC PATCH v2 00/13] arm/tegra: Initialize GPIO & pinmux from DT
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF04AF6F3062@HQMAIL01.nvidia.com>
+References: <1313440100-17131-1-git-send-email-swarren@nvidia.com>
+	<201108171323.38441.arnd@arndb.de>
+	<74CDBE0F657A3D45AFBB94109FB122FF04AF6F3062@HQMAIL01.nvidia.com>
+Message-ID: <201108181115.53101.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ohad,
-
-On Thursday 18 August 2011 01:10:01 Ohad Ben-Cohen wrote:
-> 1. Migrate OMAP's iommu driver to the generic IOMMU API, and move it
-> to the dedicated iommu folder.
+On Thursday 18 August 2011, Stephen Warren wrote:
+> It looks like DT already supports the generic case for GPIO; each GPIO
+> reference is of the form:
 > 
-> 2. Fix omap3isp appropriately so it doesn't break.
+> <&gpio 69 0>
 > 
-> 3. Adapt OMAP's iovmm appropriately as well, because omap3isp still relies
-> on it. The plan is eventually to remove iovmm and replace it with the
-> upcoming IOMMU-based generic DMA-API. Move iovmm to the iommu folder too;
-> it belongs there more than it belongs in the OMAP folders.
+> and so each GPIO has a "parent" specified, and hence can come from a
+> different controller.
 > 
-> 4. Start cleaning up OMAP's iommu components towards the end goal, where
->     1) omap-iommu no longer exports public API (and instead provides its
->        entire functionality via the generic IOMMU API).
->     2) omap-iovmm is removed.
+> For drivers, this is all completely hidden by of_get_gpio().
 > 
-> Changes:
-> 1. Migrate iommu, iovmm and omap3isp in a single patch for bisectibility
-> sake.
-> 2. Apply Laurent Pinchart's comments (thanks Laurent!)
+> I imagine we'd just use the same pattern for pinmux. This would both
+> support the general case, and end up being consistent with how GPIOs
+> already work, so this seems like a win both ways.
+> 
 
-You're welcome.
+Ah right. I had not seen the gpio binding yet, so that definitely works.
 
-> 3. Rebase to 3.1-rc2
-
-For the OMAP3 ISP driver changes,
-
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-
--- 
-Regards,
-
-Laurent Pinchart
+	Arnd
