@@ -1,113 +1,123 @@
 From: bengardiner@nanometrics.ca (Ben Gardiner)
-Date: Thu, 18 Aug 2011 17:50:51 -0400
-Subject: [PATCH 5/5] ARM: davinci: da850,
-	omapl138: introduce new board-omapl138-heliosv1
+Date: Thu, 18 Aug 2011 17:50:50 -0400
+Subject: [PATCH 4/5] ARM: davinci: da850,
+	omapl138: share the davinci_uart_config
 In-Reply-To: <cover.1313702401.git.bengardiner@nanometrics.ca>
 References: <cover.1313702401.git.bengardiner@nanometrics.ca>
-Message-ID: <f31e949dcaac301b40a0f6c0b611e84f57636ef0.1313702401.git.bengardiner@nanometrics.ca>
+Message-ID: <69e35d4eac3c4a52d7896bc18c69b4578d1b15b3.1313702401.git.bengardiner@nanometrics.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the Nanometrics Helios Platform V1 Hardware. Initially
-support includes only serial console and watchdog support.
+Extract the common davinci_uart_config.enabled_uarts=0x7 passed to
+davinci_serial_init() from all of the da850/omapl138 boards to the
+da850-reference object introduced in a previous commit.
 
 Signed-off-by: Ben Gardiner <bengardiner@nanometrics.ca>
 Reviewed-by: James Nuss <jamesnuss@nanometrics.ca>
 ---
- arch/arm/mach-davinci/Kconfig                   |    9 ++++
- arch/arm/mach-davinci/Makefile                  |    1 +
- arch/arm/mach-davinci/board-omapl138-heliosv1.c |   51 +++++++++++++++++++++++
- 3 files changed, 61 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-davinci/board-omapl138-heliosv1.c
+ arch/arm/mach-davinci/board-da850-evm.c            |    6 +-----
+ arch/arm/mach-davinci/board-mityomapl138.c         |    6 +-----
+ arch/arm/mach-davinci/board-omapl138-hawk.c        |    6 +-----
+ arch/arm/mach-davinci/da850-reference.c            |    9 +++++++++
+ .../mach-davinci/include/mach/da850-reference.h    |    1 +
+ 5 files changed, 13 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/Kconfig b/arch/arm/mach-davinci/Kconfig
-index c0deaca..21a8ce9 100644
---- a/arch/arm/mach-davinci/Kconfig
-+++ b/arch/arm/mach-davinci/Kconfig
-@@ -224,6 +224,15 @@ config MACH_OMAPL138_HAWKBOARD
- 	  Information of this board may be found at
- 	  http://www.hawkboard.org/
+diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
+index 109b016..18e60e3 100644
+--- a/arch/arm/mach-davinci/board-da850-evm.c
++++ b/arch/arm/mach-davinci/board-da850-evm.c
+@@ -704,10 +704,6 @@ static struct davinci_i2c_platform_data da850_evm_i2c_0_pdata = {
+ 	.bus_delay	= 0,	/* usec */
+ };
  
-+config MACH_HELIOS_V1
-+	bool "Nanometrics OMAPL-138 Helios V1 platform"
-+	depends on ARCH_DAVINCI_DA850
-+	help
-+	  Say Y here to select the Nanometrics OMAPL-138 Helios V1 platform.
-+	  This is a development system based on the DA850 EVM baseboard.
-+	  It is the first Helios hardware platform upon which other platforms in the
-+	  Helios product family are based.
-+
- config DAVINCI_MUX
- 	bool "DAVINCI multiplexing support"
- 	depends on ARCH_DAVINCI
-diff --git a/arch/arm/mach-davinci/Makefile b/arch/arm/mach-davinci/Makefile
-index 9a01441..96d74c9 100644
---- a/arch/arm/mach-davinci/Makefile
-+++ b/arch/arm/mach-davinci/Makefile
-@@ -36,6 +36,7 @@ obj-$(CONFIG_MACH_DAVINCI_DA850_EVM)	+= board-da850-evm.o
- obj-$(CONFIG_MACH_TNETV107X)		+= board-tnetv107x-evm.o
- obj-$(CONFIG_MACH_MITYOMAPL138)		+= board-mityomapl138.o
- obj-$(CONFIG_MACH_OMAPL138_HAWKBOARD)	+= board-omapl138-hawk.o
-+obj-$(CONFIG_MACH_HELIOS_V1)		+= board-omapl138-heliosv1.o
+-static struct davinci_uart_config da850_evm_uart_config __initdata = {
+-	.enabled_uarts = 0x7,
+-};
+-
+ /* davinci da850 evm audio machine driver */
+ static u8 da850_iis_serializer_direction[] = {
+ 	INACTIVE_MODE,	INACTIVE_MODE,	INACTIVE_MODE,	INACTIVE_MODE,
+@@ -1174,7 +1170,7 @@ static __init void da850_evm_init(void)
+ 					" %d\n", ret);
+ 	}
  
- # Power Management
- obj-$(CONFIG_CPU_FREQ)			+= cpufreq.o
-diff --git a/arch/arm/mach-davinci/board-omapl138-heliosv1.c b/arch/arm/mach-davinci/board-omapl138-heliosv1.c
-new file mode 100644
-index 0000000..73cc0a9
---- /dev/null
-+++ b/arch/arm/mach-davinci/board-omapl138-heliosv1.c
-@@ -0,0 +1,51 @@
-+/*
-+ * Nanometrics OMAPL-138 Helios V1 platform.
-+ *
-+ * Copyright (C) 2011 Nanometrics Inc.
-+ * This file is licensed under the terms of the GNU General Public License
-+ * version 2. This program is licensed "as is" without any warranty of
-+ * any kind, whether express or implied.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+#include <linux/console.h>
-+#include <linux/gpio.h>
-+
-+#include <asm/mach-types.h>
-+#include <asm/mach/arch.h>
-+
-+#include <mach/cp_intc.h>
-+#include <mach/da8xx.h>
-+#include <mach/da850-reference.h>
-+
-+static __init void helios_v1_init(void)
-+{
-+	int ret;
-+
+-	davinci_serial_init(&da850_evm_uart_config);
 +	da850_reference_serial_init();
+ 
+ 	i2c_register_board_info(1, da850_evm_i2c_devices,
+ 			ARRAY_SIZE(da850_evm_i2c_devices));
+diff --git a/arch/arm/mach-davinci/board-mityomapl138.c b/arch/arm/mach-davinci/board-mityomapl138.c
+index 998cd2e..d3cd099 100644
+--- a/arch/arm/mach-davinci/board-mityomapl138.c
++++ b/arch/arm/mach-davinci/board-mityomapl138.c
+@@ -433,10 +433,6 @@ static void __init mityomapl138_setup_nand(void)
+ 				 ARRAY_SIZE(mityomapl138_devices));
+ }
+ 
+-static struct davinci_uart_config mityomapl138_uart_config __initdata = {
+-	.enabled_uarts = 0x7,
+-};
+-
+ static const short mityomap_mii_pins[] = {
+ 	DA850_MII_TXEN, DA850_MII_TXCLK, DA850_MII_COL, DA850_MII_TXD_3,
+ 	DA850_MII_TXD_2, DA850_MII_TXD_1, DA850_MII_TXD_0, DA850_MII_RXER,
+@@ -516,7 +512,7 @@ static void __init mityomapl138_init(void)
+ 	if (ret)
+ 		pr_warning("watchdog registration failed: %d\n", ret);
+ 
+-	davinci_serial_init(&mityomapl138_uart_config);
++	da850_reference_serial_init();
+ 
+ 	ret = da8xx_register_i2c(0, &mityomap_i2c_0_pdata);
+ 	if (ret)
+diff --git a/arch/arm/mach-davinci/board-omapl138-hawk.c b/arch/arm/mach-davinci/board-omapl138-hawk.c
+index 73d826d..d5ead44 100644
+--- a/arch/arm/mach-davinci/board-omapl138-hawk.c
++++ b/arch/arm/mach-davinci/board-omapl138-hawk.c
+@@ -294,15 +294,11 @@ usb11_setup_oc_fail:
+ 	gpio_free(DA850_USB1_VBUS_PIN);
+ }
+ 
+-static struct davinci_uart_config omapl138_hawk_uart_config __initdata = {
+-	.enabled_uarts = 0x7,
+-};
+-
+ static __init void omapl138_hawk_init(void)
+ {
+ 	int ret;
+ 
+-	davinci_serial_init(&omapl138_hawk_uart_config);
++	da850_reference_serial_init();
+ 
+ 	omapl138_hawk_config_emac();
+ 
+diff --git a/arch/arm/mach-davinci/da850-reference.c b/arch/arm/mach-davinci/da850-reference.c
+index 25df6476..e4f5072 100644
+--- a/arch/arm/mach-davinci/da850-reference.c
++++ b/arch/arm/mach-davinci/da850-reference.c
+@@ -20,3 +20,12 @@ int da850_reference_add_preferred_console(void)
+ {
+ 	return add_preferred_console("ttyS", 2, "115200");
+ }
 +
-+	ret = da8xx_register_watchdog();
-+	if (ret)
-+		pr_warning("%s: watchdog registration failed: %d\n",
-+			__func__, ret);
-+}
++static struct davinci_uart_config da850_reference_uart_config __initdata = {
++	.enabled_uarts = 0x7,
++};
 +
-+#ifdef CONFIG_SERIAL_8250_CONSOLE
-+static int __init helios_v1_console_init(void)
++void da850_reference_serial_init(void)
 +{
-+	if (!machine_is_helios_v1())
-+		return 0;
-+
-+	return da850_reference_add_preferred_console();
++	davinci_serial_init(&da850_reference_uart_config);
 +}
-+console_initcall(helios_v1_console_init);
-+#endif
-+
-+MACHINE_START(HELIOS_V1, "Nanometrics OMAPL-138 Helios V1 platform")
-+	.boot_params	= DA850_REFERENCE_BOOT_PARAMS,
-+	.map_io		= da850_reference_map_io,
-+	.init_irq	= cp_intc_init,
-+	.timer		= &davinci_timer,
-+	.init_machine	= helios_v1_init,
-+MACHINE_END
+diff --git a/arch/arm/mach-davinci/include/mach/da850-reference.h b/arch/arm/mach-davinci/include/mach/da850-reference.h
+index ed72c53..d6e0b28 100644
+--- a/arch/arm/mach-davinci/include/mach/da850-reference.h
++++ b/arch/arm/mach-davinci/include/mach/da850-reference.h
+@@ -15,5 +15,6 @@
+ 
+ void __init da850_reference_map_io(void);
+ int da850_reference_add_preferred_console(void);
++void da850_reference_serial_init(void);
+ 
+ #endif /* __ASM_ARCH_DAVINCI_DA850_REFERENCE_H */
 -- 
 1.7.4.1
