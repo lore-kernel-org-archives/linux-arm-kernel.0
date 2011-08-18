@@ -1,27 +1,78 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 18 Aug 2011 20:41:16 +0100
-Subject: [PATCH] ARM: mmp: rename SHEEVAD to GPLUGD
-In-Reply-To: <4E4CA5B3.3030706@einfochips.com>
-References: <1313469117-7818-1-git-send-email-eric.y.miao@gmail.com>
-	<4E4CA5B3.3030706@einfochips.com>
-Message-ID: <20110818194116.GC28546@n2100.arm.linux.org.uk>
+From: bengardiner@nanometrics.ca (Ben Gardiner)
+Date: Thu, 18 Aug 2011 17:50:48 -0400
+Subject: [PATCH 2/5] ARM: davinci: da850, omapl138: share boot_params
+In-Reply-To: <cover.1313702401.git.bengardiner@nanometrics.ca>
+References: <cover.1313702401.git.bengardiner@nanometrics.ca>
+Message-ID: <4b305c5bad3d09ba46420ae9a440efb2c7fb88ba.1313702401.git.bengardiner@nanometrics.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A message to everyone.
+Extract the value of .boot_params used by the da850/omapl138 machines to
+a common DA850_REFERENCE_BOOT_PARAMS defined in the da850-reference.h
+header introduced in a previous commit.
 
-Do not submit board support to mainline for which you haven't first
-sorted out the mach-types stuff.  The mach-types database has been linked
-into tracking what is in mainline for quite some time now, with the
-purpose of locking out changes to the database against stuff already
-included in mainline to prevent build breakages caused by stuff getting
-changed after submission.
+Signed-off-by: Ben Gardiner <bengardiner@nanometrics.ca>
+Reviewed-by: James Nuss <jamesnuss@nanometrics.ca>
+---
+ arch/arm/mach-davinci/board-da850-evm.c            |    2 +-
+ arch/arm/mach-davinci/board-mityomapl138.c         |    2 +-
+ arch/arm/mach-davinci/board-omapl138-hawk.c        |    2 +-
+ .../mach-davinci/include/mach/da850-reference.h    |    4 ++++
+ 4 files changed, 7 insertions(+), 3 deletions(-)
 
-The side effect of that is that I _too_ get blocked from sorting it out
-via the web interface, and have to resort to fiddling with the database
-via SQL.
-
-I am _NOT_ going to do that very often.  If you make me resort to it,
-I will sort out those problems at my leisure, or more probably never.
-
-You have been warned.
+diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
+index 3ee12f3..f707bb2 100644
+--- a/arch/arm/mach-davinci/board-da850-evm.c
++++ b/arch/arm/mach-davinci/board-da850-evm.c
+@@ -1259,7 +1259,7 @@ console_initcall(da850_evm_console_init);
+ #endif
+ 
+ MACHINE_START(DAVINCI_DA850_EVM, "DaVinci DA850/OMAP-L138/AM18x EVM")
+-	.boot_params	= (DA8XX_DDR_BASE + 0x100),
++	.boot_params	= DA850_REFERENCE_BOOT_PARAMS,
+ 	.map_io		= da850_reference_map_io,
+ 	.init_irq	= cp_intc_init,
+ 	.timer		= &davinci_timer,
+diff --git a/arch/arm/mach-davinci/board-mityomapl138.c b/arch/arm/mach-davinci/board-mityomapl138.c
+index c256858..998cd2e 100644
+--- a/arch/arm/mach-davinci/board-mityomapl138.c
++++ b/arch/arm/mach-davinci/board-mityomapl138.c
+@@ -561,7 +561,7 @@ console_initcall(mityomapl138_console_init);
+ #endif
+ 
+ MACHINE_START(MITYOMAPL138, "MityDSP-L138/MityARM-1808")
+-	.boot_params	= (DA8XX_DDR_BASE + 0x100),
++	.boot_params	= DA850_REFERENCE_BOOT_PARAMS,
+ 	.map_io		= da850_reference_map_io,
+ 	.init_irq	= cp_intc_init,
+ 	.timer		= &davinci_timer,
+diff --git a/arch/arm/mach-davinci/board-omapl138-hawk.c b/arch/arm/mach-davinci/board-omapl138-hawk.c
+index 5d556cf..cfad483 100644
+--- a/arch/arm/mach-davinci/board-omapl138-hawk.c
++++ b/arch/arm/mach-davinci/board-omapl138-hawk.c
+@@ -334,7 +334,7 @@ console_initcall(omapl138_hawk_console_init);
+ #endif
+ 
+ MACHINE_START(OMAPL138_HAWKBOARD, "AM18x/OMAP-L138 Hawkboard")
+-	.boot_params	= (DA8XX_DDR_BASE + 0x100),
++	.boot_params	= DA850_REFERENCE_BOOT_PARAMS,
+ 	.map_io		= da850_reference_map_io,
+ 	.init_irq	= cp_intc_init,
+ 	.timer		= &davinci_timer,
+diff --git a/arch/arm/mach-davinci/include/mach/da850-reference.h b/arch/arm/mach-davinci/include/mach/da850-reference.h
+index d3beb13..6837a98 100644
+--- a/arch/arm/mach-davinci/include/mach/da850-reference.h
++++ b/arch/arm/mach-davinci/include/mach/da850-reference.h
+@@ -9,6 +9,10 @@
+ #ifndef __ASM_ARCH_DAVINCI_DA850_REFERENCE_H
+ #define __ASM_ARCH_DAVINCI_DA850_REFERENCE_H
+ 
++#include <mach/memory.h>
++
++#define DA850_REFERENCE_BOOT_PARAMS (DA8XX_DDR_BASE + 0x100)
++
+ void __init da850_reference_map_io(void);
+ 
+ #endif /* __ASM_ARCH_DAVINCI_DA850_REFERENCE_H */
+-- 
+1.7.4.1
