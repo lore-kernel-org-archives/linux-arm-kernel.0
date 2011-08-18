@@ -1,47 +1,57 @@
 From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 17 Aug 2011 23:12:36 -0400 (EDT)
-Subject: [PATCH 06/12] ARM: mxc: Setup consistent dma size at boot time
-In-Reply-To: <20110808164731.GP31404@pengutronix.de>
-References: <1312813712-22808-1-git-send-email-tixy@yxit.co.uk>
-	<1312813712-22808-7-git-send-email-tixy@yxit.co.uk>
-	<20110808164731.GP31404@pengutronix.de>
-Message-ID: <alpine.LFD.2.00.1108172309450.20358@xanadu.home>
+Date: Wed, 17 Aug 2011 23:44:01 -0400 (EDT)
+Subject: [PATCH] ARM: zImage: Skip relinking if nothing changes
+In-Reply-To: <CACqU3MXtcg_8si9WiuZngMB2C977PS4zen8_cQ9oyNtwTbt75Q@mail.gmail.com>
+References: <4E457682.5020107@codeaurora.org>
+	<1313175602-21834-1-git-send-email-sboyd@codeaurora.org>
+	<CACqU3MUq5M-XPOxV=8GKyEzjEzpmdeaF+mGrXJrK+ZZxa4SdeQ@mail.gmail.com>
+	<CACqU3MXtcg_8si9WiuZngMB2C977PS4zen8_cQ9oyNtwTbt75Q@mail.gmail.com>
+Message-ID: <alpine.LFD.2.00.1108172339270.20358@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 8 Aug 2011, Sascha Hauer wrote:
+On Fri, 12 Aug 2011, Arnaud Lacombe wrote:
+> On Fri, Aug 12, 2011 at 4:48 PM, Arnaud Lacombe <lacombar@gmail.com> wrote:
+> > On Fri, Aug 12, 2011 at 3:00 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> >> diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
+> >> index 0c74a6f..937fd26 100644
+> >> --- a/arch/arm/boot/compressed/Makefile
+> >> +++ b/arch/arm/boot/compressed/Makefile
+> >> @@ -91,7 +91,7 @@ suffix_$(CONFIG_KERNEL_LZMA) = lzma
+> >>
+> >> ?targets ? ? ? := vmlinux vmlinux.lds \
+> >> ? ? ? ? ? ? ? ? piggy.$(suffix_y) piggy.$(suffix_y).o \
+> >> - ? ? ? ? ? ? ? ?font.o font.c head.o misc.o $(OBJS)
+> >> + ? ? ? ? ? ? ? ?font.o font.c head.o misc.o lib1funcs.o lib1funcs.S $(OBJS)
+> >>
+> >> ?# Make sure files are removed during clean
+> >> ?extra-y ? ? ? += piggy.gzip piggy.lzo piggy.lzma lib1funcs.S
+> >> @@ -121,9 +121,7 @@ LDFLAGS_vmlinux += -X
+> >> ?LDFLAGS_vmlinux += -T
+> >>
+> >> ?# For __aeabi_uidivmod
+> >> -lib1funcs = $(obj)/lib1funcs.o
+> >> -
+> >> -$(obj)/lib1funcs.S: $(srctree)/arch/$(SRCARCH)/lib/lib1funcs.S FORCE
+> >> +$(obj)/lib1funcs.S: $(srctree)/arch/$(SRCARCH)/lib/lib1funcs.S
+> >> ? ? ? ?$(call cmd,shipped)
+> >>
+> > You should be able to avoid the extra copy altogether by doing something ala:
+> >
+> > $(obj)/lib1funcs.o: $(srctree)/arch/arm/lib/lib1funcs.S
+> > ? ? ? ?$(call cmd,as_o_S)
+> >
+> > note that I also remove the $(SRCARCH), as there is no other
+> > `arch/*/lib/lib1funcs.S' than `arch/arm/lib/lib1funcs.S'
+> >
+> I withdraw this proposal and will hack around this to find a proper
+> solution from within kbuild, and eventually come back on these uses
+> :-)
 
-> Hi Jon,
-> 
-> On Mon, Aug 08, 2011 at 03:28:26PM +0100, Jon Medhurst wrote:
-> > Signed-off-by: Jon Medhurst <tixy@yxit.co.uk>
-> > CC: Sascha Hauer <kernel@pengutronix.de>
-> > CC: Amit Kucheria <amit.kucheria@canonical.com>
-> > ---
-> >  arch/arm/plat-mxc/include/mach/common.h |    1 +
-> >  arch/arm/plat-mxc/include/mach/memory.h |   15 ---------------
-> >  arch/arm/mach-imx/mm-imx1.c             |    1 +
-> >  arch/arm/mach-imx/mm-imx21.c            |    1 +
-> >  arch/arm/mach-imx/mm-imx25.c            |    1 +
-> >  arch/arm/mach-imx/mm-imx27.c            |    1 +
-> >  arch/arm/mach-imx/mm-imx31.c            |    1 +
-> >  arch/arm/mach-imx/mm-imx35.c            |    1 +
-> >  arch/arm/mach-mx5/mm-mx50.c             |    1 +
-> >  arch/arm/mach-mx5/mm.c                  |    2 ++
-> >  arch/arm/plat-mxc/system.c              |   16 ++++++++++++++++
-> >  11 files changed, 26 insertions(+), 15 deletions(-)
-> 
-> Should the base patch be ok I'd like to rework this one. I want to
-> call init_consistent_dma_size on a per board base instead in a global
-> function with ifdeffery.
+Any progress on this?
 
-Hello Sascha,
-
-Did you manage to work on this?  Ideally it would be nice to have a 
-reworked patch from you that could be used in this series as some later 
-patches depend on this series.
-
-Thanks.
+I have a patch doing multiple similar $(call cmd,shipped) at the moment 
+and this is far from looking nice.
 
 
 Nicolas
