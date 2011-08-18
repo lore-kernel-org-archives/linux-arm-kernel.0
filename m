@@ -1,81 +1,35 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Thu, 18 Aug 2011 19:58:57 +0800
-Subject: [RFC PATCH 2/2] ARM: CSR: add PM sleep entry for SiRFprimaII
-In-Reply-To: <201108181235.53030.arnd@arndb.de>
-References: <1312512888-25070-1-git-send-email-bs14@csr.com>
-	<201108171348.20378.arnd@arndb.de>
-	<CAGsJ_4ysVs+77Yjgykh_FFKCDpq4OTTbfZYGTHfXQ8W5x2HZXw@mail.gmail.com>
-	<201108181235.53030.arnd@arndb.de>
-Message-ID: <CAGsJ_4wkKgmXyzv+KdmravvZ8U95KUWX1okpT8E6NjwF=c6BLA@mail.gmail.com>
+From: Hiroshi.DOYU@nokia.com (Hiroshi DOYU)
+Date: Thu, 18 Aug 2011 15:45:23 +0300 (EEST)
+Subject: [PATCH 5/7] omap: iovmm: remove unused functionality
+In-Reply-To: <CAK=WgbYr+pRqZPLSigyN0SNq9g0NPU2WkdWfVOW931hhQwGmiw@mail.gmail.com>
+References: <1313622608-30397-6-git-send-email-ohad@wizery.com>
+	<20110818.131928.751866371806910622.Hiroshi.DOYU@nokia.com>
+	<CAK=WgbYr+pRqZPLSigyN0SNq9g0NPU2WkdWfVOW931hhQwGmiw@mail.gmail.com>
+Message-ID: <20110818.154523.790417647763498100.Hiroshi.DOYU@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/8/18 Arnd Bergmann <arnd@arndb.de>:
-> On Thursday 18 August 2011, Barry Song wrote:
->> >> >
->> >> > These functions therefore belong into the rtc_iobrg driver.
->> >>
->> >> rtc_iobrg might only handle the read/write interfaces and let other
->> >> modules call these interfaces to read/write what they want.
->> >
->> > Every other module calling these interfaces will have the same
->> > problem with locking. In cases like this, it's typically better
->> > to export a high-level interface from the driver that accesses
->> > the registers rather than exporting functions that directly
->> > manipulate the registers.
+From: ext Ohad Ben-Cohen <ohad@wizery.com>
+Subject: Re: [PATCH 5/7] omap: iovmm: remove unused functionality
+Date: Thu, 18 Aug 2011 13:23:44 +0300
+
+> On Thu, Aug 18, 2011 at 1:19 PM, Hiroshi DOYU <Hiroshi.DOYU@nokia.com> wrote:
+>> Maybe it's better to remove the comments explaining unnecessary
+>> functions too. Now the function comparison table doesn't make sense....
+> 
+> Sure, will do.
+> 
+>> From: Hiroshi DOYU <Hiroshi.DOYU@nokia.com>
+>> Date: Thu, 18 Aug 2011 13:13:53 +0300
+>> Subject: [PATCH 1/1] omap: iommu: remove obsolete comments
 >>
->> sorry, i don't understand what you said well. it looks like the
->> rtc_iobrg module is providing interfaces to "access" registers not
->> "manipulate" registers.
->
-> I think the misunderstanding was on my side.
->
->> all registers of devices behind the rtc_iobrg are accessed by:
->> sirfsoc_rtc_iobrg_readl()
->> sirfsoc_rtc_iobrg_writel()
->> they are used to access registers behind rtc_iobrg not in rtc_iobrg.
->> rtc, pm module use these functions to read/write their own registers.
->>
->> if ?RTC/PM modules want a serial of read/write to be atomic, it might
->> want to use lock by itself:
->> lock()
->> ...
->> sirfsoc_rtc_iobrg_readl(reg1)
->> sirfsoc_rtc_iobrg_readl(reg2)
->>
->> sirfsoc_rtc_iobrg_writel(val1, reg1)
->> sirfsoc_rtc_iobrg_writel(val2, reg2)
->> ...
->> unlock()
->
-> Right.
->
->> rtc_iobrg only provide interface to read/write devices behind the
->> bridge, it doesn't care about how and what other modules want to
->> read/write.
->>
->> anyway, i don't understand your meaning well, would you like to
->> present some pseudo codes?
->
-> Looking at it again, it seems fine. There are a few details that
-> I would change though:
->
-> * Use EXPORT_SYMBOL_GPL, not EXPORT_SYMBOL
+>> Remove ones referring to non-existing functions.
+> 
+> I think it might be better to squash it with the original patch though
+> - are you ok with it ?
 
-agree.
+Sure.
 
->
-> * As pointed out in my first comment on this patch, I still think
-> ?it should be a platform_driver. However, I would not mark the
-> ?rtc_iobrg as "simple_bus" in the device tree, to avoid automatically
-> ?creating the platform devices for the nodes below it. The from the
-> ?->probe callback of the rtc_iobrg, you create the child devices
-> ?from the device tree using of_platform_bus_probe().
-
-make a lot of senses.
-
->
-> ? ? ? ?Arnd
->
-
--barry
+> 
+> Thanks,
+> Ohad.
