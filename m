@@ -1,38 +1,44 @@
-From: bryan.wu@canonical.com (Bryan Wu)
-Date: Thu, 18 Aug 2011 17:05:49 +0800
-Subject: [PATCH 3.2 0/4] ARM: simpad: Add support for GPIO attached
-	hardware
-In-Reply-To: <4E43F44A.1000509@scram.de>
-References: <1312793379-6020-1-git-send-email-jochen@scram.de>
-	<4E43F44A.1000509@scram.de>
-Message-ID: <CAK5ve-J7ARjDDm2OzrBiBBd9VrMjdDdihiRcPFwK4xm+_gwMrg@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 18 Aug 2011 11:12:55 +0200
+Subject: [PATCH 0/7] omap: iommu migration, relocation and cleanups
+In-Reply-To: <1313622608-30397-1-git-send-email-ohad@wizery.com>
+References: <1313622608-30397-1-git-send-email-ohad@wizery.com>
+Message-ID: <201108181112.55592.laurent.pinchart@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 11, 2011 at 11:24 PM, Jochen Friedrich <jochen@scram.de> wrote:
-> On 08.08.2011 10:49, Jochen Friedrich wrote:
->
->> This series enables GPIO API on UCB1x00 and implements the GPIO
->> API on the CS3 latch. The third patch finally registers platform
->> devices for the GPIO attached LED, buttons and I2C bus.
->>
->> ARM: simpad: Add ucb1x00 GPIO definitions and register GPIO
->> ARM: simpad: Cleanup CS3 accessors and add GPIO API
->> ARM: simpad: add GPIO based device definitions
->> ARM: simpad: replace ARM specific LED code
->
-> ping.
->
-> Did someone have time to look at this yet?
->
-Russell,
+Hi Ohad,
 
-Is there any comment, or Jochen can just submit them into patch system
+On Thursday 18 August 2011 01:10:01 Ohad Ben-Cohen wrote:
+> 1. Migrate OMAP's iommu driver to the generic IOMMU API, and move it
+> to the dedicated iommu folder.
+> 
+> 2. Fix omap3isp appropriately so it doesn't break.
+> 
+> 3. Adapt OMAP's iovmm appropriately as well, because omap3isp still relies
+> on it. The plan is eventually to remove iovmm and replace it with the
+> upcoming IOMMU-based generic DMA-API. Move iovmm to the iommu folder too;
+> it belongs there more than it belongs in the OMAP folders.
+> 
+> 4. Start cleaning up OMAP's iommu components towards the end goal, where
+>     1) omap-iommu no longer exports public API (and instead provides its
+>        entire functionality via the generic IOMMU API).
+>     2) omap-iovmm is removed.
+> 
+> Changes:
+> 1. Migrate iommu, iovmm and omap3isp in a single patch for bisectibility
+> sake.
+> 2. Apply Laurent Pinchart's comments (thanks Laurent!)
 
-Thanks,
+You're welcome.
+
+> 3. Rebase to 3.1-rc2
+
+For the OMAP3 ISP driver changes,
+
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+
 -- 
-Bryan Wu <bryan.wu@canonical.com>
-Kernel Developer ? ?+86.138-1617-6545 Mobile
-Ubuntu Kernel Team
-Canonical Ltd. ? ? ?www.canonical.com
-Ubuntu - Linux for human beings | www.ubuntu.com
+Regards,
+
+Laurent Pinchart
