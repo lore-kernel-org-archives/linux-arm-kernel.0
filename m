@@ -1,53 +1,30 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Wed, 17 Aug 2011 23:22:16 -0700
-Subject: [RFC PATCH v2 00/13] arm/tegra: Initialize GPIO & pinmux from DT
-In-Reply-To: <201108171323.38441.arnd@arndb.de>
-References: <1313440100-17131-1-git-send-email-swarren@nvidia.com>
-	<201108161637.16620.arnd@arndb.de>
-	<74CDBE0F657A3D45AFBB94109FB122FF04AEA25368@HQMAIL01.nvidia.com>
-	<201108171323.38441.arnd@arndb.de>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF04AF6F3062@HQMAIL01.nvidia.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Thu, 18 Aug 2011 09:33:43 +0300
+Subject: [PATCH 4/7] omap: iommu: PREFETCH_IOTLB cleanup
+In-Reply-To: <20110818.082716.383880091385751705.Hiroshi.DOYU@nokia.com>
+References: <1313622608-30397-1-git-send-email-ohad@wizery.com>
+	<1313622608-30397-5-git-send-email-ohad@wizery.com>
+	<20110818.082716.383880091385751705.Hiroshi.DOYU@nokia.com>
+Message-ID: <CAK=WgbYv0dhBZGo+_sxU+hj-kJEc0E1dk_-Yc2JCDU6SwMeppw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann wrote at Wednesday, August 17, 2011 5:24 AM:
-> On Tuesday 16 August 2011, Stephen Warren wrote:
-> > One issue here: There isn't always a single gpio/pinmux parent; as a
-> > concrete example, the ALSA/ASoC driver for Tegra+WM8903 uses GPIOs both
-> > from Tegra itself, and from the WM8903 audio codec.
-> >
-> > I could imagine the same being true in basically any case where one
-> > device uses N GPIOs (e.g. SD controller with power, change-detect,
-> > and read-only GPIOs; some could easily come from the SoC and some
-> > from a GPIO expander).
-> >
-> > I'm not quite so sure that multiple parents would be useful for pinmux,
-> > but I wouldn't say that it was impossible...
-> 
-> Hmm, how common do you think the example is?
-> 
-> It it's just a very rare case, we can still special-case it by
-> introducing fake subdevices for the Tegra+WM8903 driver, each of
-> which has only one gpio-parent. This is ugly but keeps the special
-> case to the rare devices.
-> 
-> If we can expect more than a handful of these, we probably need
-> a better design for the binding, which will cause a burden for
-> all drivers.
+Hi Hiroshi,
 
-It looks like DT already supports the generic case for GPIO; each GPIO
-reference is of the form:
+On Thu, Aug 18, 2011 at 8:27 AM, Hiroshi DOYU <Hiroshi.DOYU@nokia.com> wrote:
+>> While we're at it, rename load_iotlb_entry to prefetch_iotlb_entry
+>> to better reflect the purpose of that function.
+>
+> Considering that, originally this function is the counterpart of
+> "flush_iotlb_page()" among load_iotlb_/flush_iotlb_*() family and
+> OMAP1 doesn't use H/W page table but only uses TLB(only
+> prefetch/load_tlb), what about keeping the original function
+> "load_iotlb_entry()", and make inline function
+> "prefetch_iotlb_entry()" has it?
 
-<&gpio 69 0>
+Sure, np (I have considered doing that, but decided to drop it for now
+since there's no other user of load_iotlb_entry currently. Now that
+you mention it too, I'll do that).
 
-and so each GPIO has a "parent" specified, and hence can come from a
-different controller.
-
-For drivers, this is all completely hidden by of_get_gpio().
-
-I imagine we'd just use the same pattern for pinmux. This would both
-support the general case, and end up being consistent with how GPIOs
-already work, so this seems like a win both ways.
-
--- 
-nvpublic
+Thanks,
+Ohad.
