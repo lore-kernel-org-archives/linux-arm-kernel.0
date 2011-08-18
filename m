@@ -1,24 +1,38 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Thu, 18 Aug 2011 12:05:01 +0300
-Subject: [PATCH 1/7] omap: iommu: migrate to the generic IOMMU API
-In-Reply-To: <201108181101.57882.laurent.pinchart@ideasonboard.com>
-References: <1313622608-30397-1-git-send-email-ohad@wizery.com>
-	<1313622608-30397-2-git-send-email-ohad@wizery.com>
-	<201108181101.57882.laurent.pinchart@ideasonboard.com>
-Message-ID: <CAK=Wgbb6EWBr9ndCEGK2C6kK74B8vNFpezw-=ndEQ4bANhOB4g@mail.gmail.com>
+From: bryan.wu@canonical.com (Bryan Wu)
+Date: Thu, 18 Aug 2011 17:05:49 +0800
+Subject: [PATCH 3.2 0/4] ARM: simpad: Add support for GPIO attached
+	hardware
+In-Reply-To: <4E43F44A.1000509@scram.de>
+References: <1312793379-6020-1-git-send-email-jochen@scram.de>
+	<4E43F44A.1000509@scram.de>
+Message-ID: <CAK5ve-J7ARjDDm2OzrBiBBd9VrMjdDdihiRcPFwK4xm+_gwMrg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
+On Thu, Aug 11, 2011 at 11:24 PM, Jochen Friedrich <jochen@scram.de> wrote:
+> On 08.08.2011 10:49, Jochen Friedrich wrote:
+>
+>> This series enables GPIO API on UCB1x00 and implements the GPIO
+>> API on the CS3 latch. The third patch finally registers platform
+>> devices for the GPIO attached LED, buttons and I2C bus.
+>>
+>> ARM: simpad: Add ucb1x00 GPIO definitions and register GPIO
+>> ARM: simpad: Cleanup CS3 accessors and add GPIO API
+>> ARM: simpad: add GPIO based device definitions
+>> ARM: simpad: replace ARM specific LED code
+>
+> ping.
+>
+> Did someone have time to look at this yet?
+>
+Russell,
 
-On Thu, Aug 18, 2011 at 12:01 PM, Laurent Pinchart
-<laurent.pinchart@ideasonboard.com> wrote:
-> Just one small comment in case you resubmit the whole series for another
-> reason.
-..
-> You can directly return -ENOMEM here, and remove the "out:" label.
-
-Sure thing,
+Is there any comment, or Jochen can just submit them into patch system
 
 Thanks,
-Ohad.
+-- 
+Bryan Wu <bryan.wu@canonical.com>
+Kernel Developer ? ?+86.138-1617-6545 Mobile
+Ubuntu Kernel Team
+Canonical Ltd. ? ? ?www.canonical.com
+Ubuntu - Linux for human beings | www.ubuntu.com
