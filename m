@@ -1,57 +1,103 @@
 From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 17 Aug 2011 23:44:01 -0400 (EDT)
-Subject: [PATCH] ARM: zImage: Skip relinking if nothing changes
-In-Reply-To: <CACqU3MXtcg_8si9WiuZngMB2C977PS4zen8_cQ9oyNtwTbt75Q@mail.gmail.com>
-References: <4E457682.5020107@codeaurora.org>
-	<1313175602-21834-1-git-send-email-sboyd@codeaurora.org>
-	<CACqU3MUq5M-XPOxV=8GKyEzjEzpmdeaF+mGrXJrK+ZZxa4SdeQ@mail.gmail.com>
-	<CACqU3MXtcg_8si9WiuZngMB2C977PS4zen8_cQ9oyNtwTbt75Q@mail.gmail.com>
-Message-ID: <alpine.LFD.2.00.1108172339270.20358@xanadu.home>
+Date: Thu, 18 Aug 2011 00:06:25 -0400 (EDT)
+Subject: [PATCH 1/3] ARM: debug: use kconfig choice for selecting DEBUG_LL
+	UART
+In-Reply-To: <1313530873-24961-1-git-send-email-will.deacon@arm.com>
+References: <1313530873-24961-1-git-send-email-will.deacon@arm.com>
+Message-ID: <alpine.LFD.2.00.1108180005510.20358@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 12 Aug 2011, Arnaud Lacombe wrote:
-> On Fri, Aug 12, 2011 at 4:48 PM, Arnaud Lacombe <lacombar@gmail.com> wrote:
-> > On Fri, Aug 12, 2011 at 3:00 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> >> diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
-> >> index 0c74a6f..937fd26 100644
-> >> --- a/arch/arm/boot/compressed/Makefile
-> >> +++ b/arch/arm/boot/compressed/Makefile
-> >> @@ -91,7 +91,7 @@ suffix_$(CONFIG_KERNEL_LZMA) = lzma
-> >>
-> >> ?targets ? ? ? := vmlinux vmlinux.lds \
-> >> ? ? ? ? ? ? ? ? piggy.$(suffix_y) piggy.$(suffix_y).o \
-> >> - ? ? ? ? ? ? ? ?font.o font.c head.o misc.o $(OBJS)
-> >> + ? ? ? ? ? ? ? ?font.o font.c head.o misc.o lib1funcs.o lib1funcs.S $(OBJS)
-> >>
-> >> ?# Make sure files are removed during clean
-> >> ?extra-y ? ? ? += piggy.gzip piggy.lzo piggy.lzma lib1funcs.S
-> >> @@ -121,9 +121,7 @@ LDFLAGS_vmlinux += -X
-> >> ?LDFLAGS_vmlinux += -T
-> >>
-> >> ?# For __aeabi_uidivmod
-> >> -lib1funcs = $(obj)/lib1funcs.o
-> >> -
-> >> -$(obj)/lib1funcs.S: $(srctree)/arch/$(SRCARCH)/lib/lib1funcs.S FORCE
-> >> +$(obj)/lib1funcs.S: $(srctree)/arch/$(SRCARCH)/lib/lib1funcs.S
-> >> ? ? ? ?$(call cmd,shipped)
-> >>
-> > You should be able to avoid the extra copy altogether by doing something ala:
-> >
-> > $(obj)/lib1funcs.o: $(srctree)/arch/arm/lib/lib1funcs.S
-> > ? ? ? ?$(call cmd,as_o_S)
-> >
-> > note that I also remove the $(SRCARCH), as there is no other
-> > `arch/*/lib/lib1funcs.S' than `arch/arm/lib/lib1funcs.S'
-> >
-> I withdraw this proposal and will hack around this to find a proper
-> solution from within kbuild, and eventually come back on these uses
-> :-)
+On Tue, 16 Aug 2011, Will Deacon wrote:
 
-Any progress on this?
+> Enabling CONFIG_DEBUG_LL (which is required for earlyprintk) hardwires
+> the debug UART address into the kernel, so that we can print before the
+> platform is initialised.
+> 
+> If the user inadvertently selects multiple platforms with DEBUG_LL
+> enabled, the UART address may not be correct and will likely cause the
+> kernel to hang in the very early stages of boot.
+> 
+> This patch, based on a skeleton from Russell, uses a Kconfig choice for
+> selecting the DEBUG_LL UART, therefore allowing the user to make a
+> choice about the supported platform when DEBUG_LL is enabled.
+> 
+> Cc: Linus Walleij <linus.walleij@stericsson.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-I have a patch doing multiple similar $(call cmd,shipped) at the moment 
-and this is far from looking nice.
+Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 
+(ditto for the other 2 patches)
 
-Nicolas
+> ---
+>  arch/arm/Kconfig.debug |   41 ++++++++++++++++++++++++-----------------
+>  1 files changed, 24 insertions(+), 17 deletions(-)
+> 
+> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+> index 81cbe40..11604c9 100644
+> --- a/arch/arm/Kconfig.debug
+> +++ b/arch/arm/Kconfig.debug
+> @@ -72,6 +72,30 @@ config DEBUG_LL
+>  	  in the kernel.  This is helpful if you are debugging code that
+>  	  executes before the console is initialized.
+>  
+> +choice
+> +	prompt "Kernel low-level debugging port"
+> +	depends on DEBUG_LL
+> +
+> +	config DEBUG_DC21285_PORT
+> +		bool "Kernel low-level debugging messages via footbridge serial port"
+> +		depends on FOOTBRIDGE
+> +		help
+> +		  Say Y here if you want the debug print routines to direct
+> +		  their output to the serial port in the DC21285 (Footbridge).
+> +		  Saying N will cause the debug messages to appear on the first
+> +		  16550 serial port.
+> +
+> +	config DEBUG_CLPS711X_UART2
+> +		bool "Kernel low-level debugging messages via UART2"
+> +		depends on ARCH_CLPS711X
+> +		help
+> +		  Say Y here if you want the debug print routines to direct
+> +		  their output to the second serial port on these devices.
+> +		  Saying N will cause the debug messages to appear on the first
+> +		  serial port.
+> +
+> +endchoice
+> +
+>  config EARLY_PRINTK
+>  	bool "Early printk"
+>  	depends on DEBUG_LL
+> @@ -100,23 +124,6 @@ config OC_ETM
+>  	  buffer driver that will allow you to collect traces of the
+>  	  kernel code.
+>  
+> -config DEBUG_DC21285_PORT
+> -	bool "Kernel low-level debugging messages via footbridge serial port"
+> -	depends on DEBUG_LL && FOOTBRIDGE
+> -	help
+> -	  Say Y here if you want the debug print routines to direct their
+> -	  output to the serial port in the DC21285 (Footbridge). Saying N
+> -	  will cause the debug messages to appear on the first 16550
+> -	  serial port.
+> -
+> -config DEBUG_CLPS711X_UART2
+> -	bool "Kernel low-level debugging messages via UART2"
+> -	depends on DEBUG_LL && ARCH_CLPS711X
+> -	help
+> -	  Say Y here if you want the debug print routines to direct their
+> -	  output to the second serial port on these devices.  Saying N will
+> -	  cause the debug messages to appear on the first serial port.
+> -
+>  config DEBUG_S3C_UART
+>  	depends on PLAT_SAMSUNG
+>  	int "S3C UART to use for low-level debug"
+> -- 
+> 1.7.0.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
