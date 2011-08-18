@@ -1,100 +1,24 @@
-From: Hiroshi.DOYU@nokia.com (Hiroshi DOYU)
-Date: Thu, 18 Aug 2011 08:27:16 +0300 (EEST)
-Subject: [PATCH 4/7] omap: iommu: PREFETCH_IOTLB cleanup
-In-Reply-To: <1313622608-30397-5-git-send-email-ohad@wizery.com>
-References: <1313622608-30397-1-git-send-email-ohad@wizery.com>
-	<1313622608-30397-5-git-send-email-ohad@wizery.com>
-Message-ID: <20110818.082716.383880091385751705.Hiroshi.DOYU@nokia.com>
+From: tanmay.upadhyay@einfochips.com (Tanmay Upadhyay)
+Date: Thu, 18 Aug 2011 11:10:03 +0530
+Subject: [PATCH] ARM: mmp: rename SHEEVAD to GPLUGD
+In-Reply-To: <1313469117-7818-1-git-send-email-eric.y.miao@gmail.com>
+References: <1313469117-7818-1-git-send-email-eric.y.miao@gmail.com>
+Message-ID: <4E4CA5B3.3030706@einfochips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ohad,
 
-From: ext Ohad Ben-Cohen <ohad@wizery.com>
-Subject: [PATCH 4/7] omap: iommu: PREFETCH_IOTLB cleanup
-Date: Thu, 18 Aug 2011 02:10:05 +0300
 
-> Use PREFETCH_IOTLB to control the content of the called function,
-> instead of inlining it in the code.
-> 
-> This improves readability of the code, and also prevents an "unused
-> function" warning to show up when PREFETCH_IOTLB isn't set.
-
-Great, much better.
-
-> While we're at it, rename load_iotlb_entry to prefetch_iotlb_entry
-> to better reflect the purpose of that function.
-
-Considering that, originally this function is the counterpart of
-"flush_iotlb_page()" among load_iotlb_/flush_iotlb_*() family and
-OMAP1 doesn't use H/W page table but only uses TLB(only
-prefetch/load_tlb), what about keeping the original function
-"load_iotlb_entry()", and make inline function
-"prefetch_iotlb_entry()" has it?
-
-Something like below?
-
-static int inline prefetch_iotlb_entry(struct iommu *obj, struct iotlb_entry *e)
-{
-	return load_iotlb_entry(obj, e);
-}
-
-The above may keep a little bit more sense both for TLB only case too,
-also for some function name consistency?
-
-> 
-> Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
+On Tuesday 16 August 2011 10:01 AM, Eric Miao wrote:
+> GuruPlugD was initially named to be SHEEVAD, and it's causing naming
+> confusion in the mach-types database. Make it consistent by renaming
+> to GPLUGD.
+>
+> Signed-off-by: Eric Miao<eric.y.miao@gmail.com>
+Acked-by: Tanmay Upadhyay <tanmay.upadhyay@einfochips.com>
 > ---
->  drivers/iommu/omap-iommu.c |   18 +++++++++++++-----
->  1 files changed, 13 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/iommu/omap-iommu.c b/drivers/iommu/omap-iommu.c
-> index ed81977..7280e5b 100644
-> --- a/drivers/iommu/omap-iommu.c
-> +++ b/drivers/iommu/omap-iommu.c
-> @@ -248,11 +248,12 @@ static struct cr_regs __iotlb_read_cr(struct iommu *obj, int n)
->  }
->  
->  /**
-> - * load_iotlb_entry - Set an iommu tlb entry
-> + * prefetch_iotlb_entry - Set an iommu tlb entry
->   * @obj:	target iommu
->   * @e:		an iommu tlb entry info
->   **/
-> -static int load_iotlb_entry(struct iommu *obj, struct iotlb_entry *e)
-> +#ifdef PREFETCH_IOTLB
-> +static int prefetch_iotlb_entry(struct iommu *obj, struct iotlb_entry *e)
->  {
->  	int err = 0;
->  	struct iotlb_lock l;
-> @@ -309,6 +310,15 @@ out:
->  	return err;
->  }
->  
-> +#else /* !PREFETCH_IOTLB */
-> +
-> +static int prefetch_iotlb_entry(struct iommu *obj, struct iotlb_entry *e)
-> +{
-> +	return 0;
-> +}
-> +
-> +#endif /* !PREFETCH_IOTLB */
-> +
->  /**
->   * flush_iotlb_page - Clear an iommu tlb entry
->   * @obj:	target iommu
-> @@ -662,10 +672,8 @@ int iopgtable_store_entry(struct iommu *obj, struct iotlb_entry *e)
->  
->  	flush_iotlb_page(obj, e->da);
->  	err = iopgtable_store_entry_core(obj, e);
-> -#ifdef PREFETCH_IOTLB
->  	if (!err)
-> -		load_iotlb_entry(obj, e);
-> -#endif
-> +		prefetch_iotlb_entry(obj, e);
->  	return err;
->  }
->  EXPORT_SYMBOL_GPL(iopgtable_store_entry);
-> -- 
-> 1.7.4.1
-> 
+>   arch/arm/mach-mmp/Kconfig  |    2 +-
+>   arch/arm/mach-mmp/Makefile |    2 +-
+>   arch/arm/mach-mmp/gplugd.c |    2 +-
+>   3 files changed, 3 insertions(+), 3 deletions(-)
+>
