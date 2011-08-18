@@ -1,34 +1,30 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 18 Aug 2011 11:25:26 +0100
-Subject: [PATCH 3.2 0/4] ARM: simpad: Add support for GPIO attached
-	hardware
-In-Reply-To: <CAK5ve-J7ARjDDm2OzrBiBBd9VrMjdDdihiRcPFwK4xm+_gwMrg@mail.gmail.com>
-References: <1312793379-6020-1-git-send-email-jochen@scram.de>
-	<4E43F44A.1000509@scram.de>
-	<CAK5ve-J7ARjDDm2OzrBiBBd9VrMjdDdihiRcPFwK4xm+_gwMrg@mail.gmail.com>
-Message-ID: <20110818102526.GB21865@n2100.arm.linux.org.uk>
+Date: Thu, 18 Aug 2011 11:26:16 +0100
+Subject: [PATCH v3] amba: consolidate PrimeCell magic
+In-Reply-To: <1313662087.2254.31.camel@computer2>
+References: <1313569846-22902-1-git-send-email-linus.walleij@stericsson.com>
+	<ADE657CA350FB648AAC2C43247A983F001F3884BB382@AUSP01VMBX24.collaborationhost.net>
+	<20110817184905.GA11221@n2100.arm.linux.org.uk>
+	<1313662087.2254.31.camel@computer2>
+Message-ID: <20110818102616.GC21865@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 18, 2011 at 05:05:49PM +0800, Bryan Wu wrote:
-> On Thu, Aug 11, 2011 at 11:24 PM, Jochen Friedrich <jochen@scram.de> wrote:
-> > On 08.08.2011 10:49, Jochen Friedrich wrote:
-> >
-> >> This series enables GPIO API on UCB1x00 and implements the GPIO
-> >> API on the CS3 latch. The third patch finally registers platform
-> >> devices for the GPIO attached LED, buttons and I2C bus.
-> >>
-> >> ARM: simpad: Add ucb1x00 GPIO definitions and register GPIO
-> >> ARM: simpad: Cleanup CS3 accessors and add GPIO API
-> >> ARM: simpad: add GPIO based device definitions
-> >> ARM: simpad: replace ARM specific LED code
-> >
-> > ping.
-> >
-> > Did someone have time to look at this yet?
-> >
-> Russell,
+On Thu, Aug 18, 2011 at 11:08:07AM +0100, Tixy wrote:
+> On Wed, 2011-08-17 at 19:49 +0100, Russell King - ARM Linux wrote:
+> > On Wed, Aug 17, 2011 at 12:03:57PM -0500, H Hartley Sweeten wrote:
+> > > > +	cellid = amba_get_pid((void __iomem *)((u32)base & PAGE_MASK), SZ_4K);
+> > > 
+> > > This produces a sparse warning.  But, the same warning was present with the
+> > > old code.
+> > > 
+> > > arch/arm/common/vic.c:353:49: warning: cast removes address space of expression
+> > 
+> > That's prabably because casting from a pointer to a u32 (unsigned int)
+> > isn't the best thing to do.  Casting to unsigned long is much better,
+> > and iirc doesn't provoke such a sparse warning.
 > 
-> Is there any comment, or Jochen can just submit them into patch system
+> Is there any reason not to use uintptr_t for things like this?
 
-I don't think so, and yes.
+Probably not - it's just history that we've tended to use the base C
+types rather than the typedef'd stuff for this kind of thing.
