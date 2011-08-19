@@ -1,39 +1,77 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 19 Aug 2011 22:07:49 +0900
-Subject: [PATCH] ARM: S5P: fix bug in spdif_clk_get_rate
-In-Reply-To: <1313753215-29173-1-git-send-email-ch.naveen@samsung.com>
-References: <1313753215-29173-1-git-send-email-ch.naveen@samsung.com>
-Message-ID: <002c01cc5e70$fef41960$fcdc4c20$%kim@samsung.com>
+Date: Fri, 19 Aug 2011 22:07:58 +0900
+Subject: [PATCH] arm: exynos4: Add restart hook for proper reboot
+In-Reply-To: <20110819104614.GA32582@july>
+References: <20110819104614.GA32582@july>
+Message-ID: <002d01cc5e71$045868c0$0d093a40$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Naveen Krishna Chatradhi wrote:
+Kyungmin Park wrote:
 > 
-> Should be passing the parent clk object when
-> calling for parent rate.
+> From: Kyungmin Park <kyungmin.park@samsung.com>
 > 
-> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
+> Add restart hook for proper reboot
+> 
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 > ---
->  arch/arm/plat-s5p/clock.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
+> diff --git a/arch/arm/mach-exynos4/cpu.c b/arch/arm/mach-exynos4/cpu.c
+> index 2d8a40c..1860327 100644
+> --- a/arch/arm/mach-exynos4/cpu.c
+> +++ b/arch/arm/mach-exynos4/cpu.c
+> @@ -28,8 +28,10 @@
+>  #include <plat/fb-core.h>
+>  #include <plat/fimc-core.h>
+>  #include <plat/iic-core.h>
+> +#include <plat/reset.h>
 > 
-> diff --git a/arch/arm/plat-s5p/clock.c b/arch/arm/plat-s5p/clock.c
-> index 02af235..5f84a3f 100644
-> --- a/arch/arm/plat-s5p/clock.c
-> +++ b/arch/arm/plat-s5p/clock.c
-> @@ -192,7 +192,7 @@ unsigned long s5p_spdif_get_rate(struct clk *clk)
->  	if (IS_ERR(pclk))
->  		return -EINVAL;
+>  #include <mach/regs-irq.h>
+> +#include <mach/regs-pmu.h>
 > 
-> -	rate = pclk->ops->get_rate(clk);
-> +	rate = pclk->ops->get_rate(pclk);
->  	clk_put(pclk);
+>  extern int combiner_init(unsigned int combiner_nr, void __iomem *base,
+>  			 unsigned int irq_start);
+> @@ -128,6 +130,11 @@ static void exynos4_idle(void)
+>  	local_irq_enable();
+>  }
 > 
->  	return rate;
-> --
-> 1.7.2.3
+> +static void exynos4_sw_reset(void)
+> +{
+> +	__raw_writel(0x1, S5P_SWRESET);
+> +}
+> +
+>  /*
+>   * exynos4_map_io
+>   *
+> @@ -241,5 +248,8 @@ int __init exynos4_init(void)
+>  	/* set idle function */
+>  	pm_idle = exynos4_idle;
+> 
+> +	/* set sw_reset function */
+> +	s5p_reset_hook = exynos4_sw_reset;
+> +
+>  	return sysdev_register(&exynos4_sysdev);
+>  }
+> diff --git a/arch/arm/mach-exynos4/include/mach/regs-pmu.h
+b/arch/arm/mach-
+> exynos4/include/mach/regs-pmu.h
+> index fa49bbb..cdf9b47 100644
+> --- a/arch/arm/mach-exynos4/include/mach/regs-pmu.h
+> +++ b/arch/arm/mach-exynos4/include/mach/regs-pmu.h
+> @@ -29,6 +29,8 @@
+>  #define S5P_USE_STANDBY_WFE1			(1 << 25)
+>  #define S5P_USE_MASK				((0x3 << 16) | (0x3
+> << 24))
+> 
+> +#define S5P_SWRESET				S5P_PMUREG(0x0400)
+> +
+>  #define S5P_WAKEUP_STAT
+> 	S5P_PMUREG(0x0600)
+>  #define S5P_EINT_WAKEUP_MASK
+> 	S5P_PMUREG(0x0604)
+>  #define S5P_WAKEUP_MASK
+> 	S5P_PMUREG(0x0608)
 
-Yes, applied.
+OK, applied.
 Thanks.
 
 Best regards,
