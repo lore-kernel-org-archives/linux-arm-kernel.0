@@ -1,25 +1,58 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 19 Aug 2011 13:53:47 +0900
-Subject: [PATCH] ARM: S3C64XX: Remove un-used code
-In-Reply-To: <CABK8_vR6bB_0TfQtbA7F9+w9dSXajMdd1SS5o+LscMrDcCY1tg@mail.gmail.com>
-References: <1313498488-4296-1-git-send-email-banajit.g@samsung.com>
-	<20110819015955.GA1212@sirena.org.uk>
-	<CABK8_vR6bB_0TfQtbA7F9+w9dSXajMdd1SS5o+LscMrDcCY1tg@mail.gmail.com>
-Message-ID: <20110819045346.GA26979@opensource.wolfsonmicro.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 19 Aug 2011 14:24:09 +0900
+Subject: [PATCH] ARM: S5P64X0: Add the devname for DMA clock
+In-Reply-To: <1313649828-27642-1-git-send-email-boojin.kim@samsung.com>
+References: <1313649828-27642-1-git-send-email-boojin.kim@samsung.com>
+Message-ID: <000601cc5e30$3a38bda0$aeaa38e0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 19, 2011 at 09:40:29AM +0530, Banajit Goswami wrote:
-> On Fri, Aug 19, 2011 at 7:29 AM, Mark Brown
-> <broonie@opensource.wolfsonmicro.com> wrote:
-> > On Tue, Aug 16, 2011 at 06:11:28PM +0530, Banajit Goswami wrote:
-> >> Remove un-used backlight code for SMDK6410 board
+Boojin Kim wrote:
+> 
+> This patch adds devname for DMA clock.
+> NOTE: This patch should be added after merging new pl330 driver on
+dmaengine.
+> 
+> Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
+> ---
+>  arch/arm/mach-s5p64x0/clock-s5p6440.c |    1 +
+>  arch/arm/mach-s5p64x0/clock-s5p6450.c |    1 +
+>  2 files changed, 2 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-s5p64x0/clock-s5p6440.c b/arch/arm/mach-
+> s5p64x0/clock-s5p6440.c
+> index c1f548f..c54c65d 100644
+> --- a/arch/arm/mach-s5p64x0/clock-s5p6440.c
+> +++ b/arch/arm/mach-s5p64x0/clock-s5p6440.c
+> @@ -147,6 +147,7 @@ static struct clk init_clocks_off[] = {
+>  		.ctrlbit	= (1 << 8),
+>  	}, {
+>  		.name		= "dma",
+> +		.devname	= "dma-pl330",
+>  		.parent		= &clk_hclk_low.clk,
+>  		.enable		= s5p64x0_hclk0_ctrl,
+>  		.ctrlbit	= (1 << 12),
+> diff --git a/arch/arm/mach-s5p64x0/clock-s5p6450.c b/arch/arm/mach-
+> s5p64x0/clock-s5p6450.c
+> index 3d9b609..2d04abf 100644
+> --- a/arch/arm/mach-s5p64x0/clock-s5p6450.c
+> +++ b/arch/arm/mach-s5p64x0/clock-s5p6450.c
+> @@ -180,6 +180,7 @@ static struct clk init_clocks_off[] = {
+>  		.ctrlbit	= (1 << 3),
+>  	}, {
+>  		.name		= "dma",
+> +		.devname	= "dma-pl330",
+>  		.parent		= &clk_hclk_low.clk,
+>  		.enable		= s5p64x0_hclk0_ctrl,
+>  		.ctrlbit	= (1 << 12),
+> --
+> 1.7.1
 
-> > Is the data actually wrong? ?If not it'd seem better to finish hooking
-> > it up properly than to remove it.
+OK, will apply.
+Thanks.
 
-> No, this code is no longer needed, as we are having a common backlight
-> infrastructure , which serves the same purpose.
-
-Ideally your commit log should make this clear - it looks like you're
-just deleting unreferenced code.
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
