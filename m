@@ -1,40 +1,35 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 19 Aug 2011 15:00:06 +0800
-Subject: [PATCH] arm/imx: use Kconfig choice for low-level debug UART
-	selection
-In-Reply-To: <20110819063533.GR31404@pengutronix.de>
-References: <1313530873-24961-1-git-send-email-will.deacon@arm.com>
-	<1313729819-30301-1-git-send-email-shawn.guo@linaro.org>
-	<20110819063533.GR31404@pengutronix.de>
-Message-ID: <20110819070005.GD12527@S2100-06.ap.freescale.net>
+From: banajit.goswami@gmail.com (Banajit Goswami)
+Date: Fri, 19 Aug 2011 12:29:51 +0530
+Subject: [PATCH] ARM: S3C64XX: Remove un-used code
+In-Reply-To: <20110819045346.GA26979@opensource.wolfsonmicro.com>
+References: <1313498488-4296-1-git-send-email-banajit.g@samsung.com>
+	<20110819015955.GA1212@sirena.org.uk>
+	<CABK8_vR6bB_0TfQtbA7F9+w9dSXajMdd1SS5o+LscMrDcCY1tg@mail.gmail.com>
+	<20110819045346.GA26979@opensource.wolfsonmicro.com>
+Message-ID: <CABK8_vTSrcAc8Un-z_uDZkJWKeiVP9tPR2YPgkuQybG5gvqMgA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 19, 2011 at 08:35:33AM +0200, Sascha Hauer wrote:
-> On Fri, Aug 19, 2011 at 12:56:59PM +0800, Shawn Guo wrote:
-> > Now that the DEBUG_LL UART can be selected by a Kconfig choice,
-> > simplify the #ifdefery in debug-macro.S and add entries to the
-> > top-level Kconfig.debug instead.
-> 
-> I'm unsure whether I like this. The ifdeffery does not look very good,
+Hi Mark,
 
-It does not make the code any worse.  Instead, the ifdeffery becomes
-shorter actually.
+On Fri, Aug 19, 2011 at 10:23 AM, Mark Brown
+<broonie@opensource.wolfsonmicro.com> wrote:
+> On Fri, Aug 19, 2011 at 09:40:29AM +0530, Banajit Goswami wrote:
+>> On Fri, Aug 19, 2011 at 7:29 AM, Mark Brown
+>> <broonie@opensource.wolfsonmicro.com> wrote:
+>> > On Tue, Aug 16, 2011 at 06:11:28PM +0530, Banajit Goswami wrote:
+>> >> Remove un-used backlight code for SMDK6410 board
+>
+>> > Is the data actually wrong? ?If not it'd seem better to finish hooking
+>> > it up properly than to remove it.
+>
+>> No, this code is no longer needed, as we are having a common backlight
+>> infrastructure , which serves the same purpose.
+>
+> Ideally your commit log should make this clear - it looks like you're
+> just deleting unreferenced code.
+Thanks.
+Will add more description now on.
 
-> but the Kconfig snippet is not shorter, also it is in generic arm code
-> and not i.MX specific.
-
-This comment is on the whole approach proposed by Will, I guess. But
-I did not see any better alternatives until we can have device tree
-into such a early boot stage, which is not possible for now. 
-
-> The old way also makes sure that we do not
-> compile in incompatible lowlevel debug code.
-> At least this should be a choice in Kconfig to make clear that the
-> different low-level debug options are exclusive.
-> 
-It is a choice.
-
--- 
-Regards,
-Shawn
+Thanks and Regards,
+Banajit Goswami
