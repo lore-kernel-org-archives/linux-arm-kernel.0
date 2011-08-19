@@ -1,61 +1,113 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
 Date: Fri, 19 Aug 2011 14:24:09 +0900
-Subject: [GIT PULL] samsung: fixes for v3.1-rc1
-In-Reply-To: <CAH9JG2Wf9UFZkqoZm=Wr-RAYPTA6inbBkcGQi5bR+7mr-Tk+Bg@mail.gmail.com>
-References: <20110811065837.GA4989@july>
-	<015001cc57f5$d7e847f0$87b8d7d0$%kim@samsung.com>
-	<201108121758.01077.arnd.bergmann@linaro.org>
-	<000601cc596e$0ba61490$22f23db0$%kim@samsung.com>
-	<CAH9JG2Wf9UFZkqoZm=Wr-RAYPTA6inbBkcGQi5bR+7mr-Tk+Bg@mail.gmail.com>
-Message-ID: <000d01cc5e30$3ac08b40$b041a1c0$%kim@samsung.com>
+Subject: [PATCH 1/5] ARM: s3c64xx: PM: Mask and acknowledge all UART
+	interrupts during core resume.
+In-Reply-To: <1459034.DmseOOHbXX@flatron>
+References: <5661373.tZL1ZnPyVO@flatron> <2174918.pIpigHPGMA@flatron>
+	<1459034.DmseOOHbXX@flatron>
+Message-ID: <000901cc5e30$3a744000$af5cc000$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kyungmin Park wrote:
+Tomasz Figa wrote:
 > 
-> On Sat, Aug 13, 2011 at 1:04 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> > Arnd Bergmann wrote:
-> >>
-> >> On Thursday 11 August 2011, Kukjin Kim wrote:
-> >> > > ? Linux 3.1-rc1 (2011-08-07 18:23:30 -0700)
-> >> > >
-> >> > > are available in the git repository at:
-> >> > > ? git://git.infradead.org/users/kmpark/linux-2.6-samsung for-arnd
-> >> > >
-> >>
-> >> > No, if above is required, I think, this should be handled from me not
-> > you.
-> >> >
-> >> > Don't make a complete confusion between your board and Samsung
-> > architecture
-> >> > maintainer.
-> >>
-> >> I'll hold off on pulling this one then until I get another pull request
-> >> from you.
-> >>
-> >> Looking at the contents of the branch, I noticed that it's not clear
-why
-> >> they are needed in 3.1. It would help me if you (whoever sends me the
-bug
-> >> fixes) can categorize them in the changelog:
-> >>
-> >> * Any bug fixes against old bugs should be marked 'Cc:
-stable at kernel.org'
-> >> so that they can get identified for backports.
-> >>
-> >> * Regressions against the 3.0 kernel should get marked as such.
-> >>
-> >> * Bug fixes against new code should also be identified as such.
-> >>
-> > OK, I see.
+> On Friday 29 of July 2011 at 18:05:04, Tomasz Figa wrote:
+> > From 9fd700af5b0c2289a09736a877f6047d1dcd3268 Mon Sep 17 00:00:00 2001
+> > From: Tomasz Figa <tomasz.figa@gmail.com>
+> > Date: Tue, 19 Jul 2011 22:21:41 +0200
+> > Subject: [PATCH 1/5] ARM: s3c64xx: PM: Mask and acknowledge all UART
+> >  interrupts during core resume.
 > >
-> > As a note, I will send Samsung fixes in the beginning of next week.
+> > On some boards (in my case Tiny6410 from FriendlyARM), after waking up
+from
+> > sleep mode, UART controllers are left in an unclean state with interrupt
+> > status bits set. After reenabling interrupts the system starts to get
+> > hammered by infinite UART interrupts, which cannot be acknowledged,
+because
+> > of disabled UART bus clock. You can imagine the outcome.
+> >
+> > This patch deals with the issue by reenabling the bus clock in PCLK mask
+> > temporarily, acknowledging and masking all the UART interrupts and then
+> > restoring the original PCLK mask value, before interrupts get enabled.
+> >
+> > Alternatively, the issue could be avoided by moving all the UART
+interrupt
+> > handling to the S3C UART driver and disabling the IRQ on port suspend.
+> > Could anyone explain me what is the benefit of having the UART IRQ
+managed
+> > by the generic IRQ infrastructure, while it is used only by a single
+driver?
+> >
+> > ---
+> >  arch/arm/mach-s3c64xx/pm.c |   26 ++++++++++++++++++++++++++
+> >  1 files changed, 26 insertions(+), 0 deletions(-)
+> >
+> > diff --git a/arch/arm/mach-s3c64xx/pm.c b/arch/arm/mach-s3c64xx/pm.c
+> > index bc1c470..799a212 100644
+> > --- a/arch/arm/mach-s3c64xx/pm.c
+> > +++ b/arch/arm/mach-s3c64xx/pm.c
+> > @@ -16,12 +16,14 @@
+> >  #include <linux/suspend.h>
+> >  #include <linux/serial_core.h>
+> >  #include <linux/io.h>
+> > +#include <linux/delay.h>
+> >
+> >  #include <mach/map.h>
+> >  #include <mach/irqs.h>
+> >
+> >  #include <plat/pm.h>
+> >  #include <plat/wakeup-mask.h>
+> > +#include <plat/regs-serial.h>
+> >
+> >  #include <mach/regs-sys.h>
+> >  #include <mach/regs-gpio.h>
+> > @@ -93,12 +95,36 @@ void s3c_pm_configure_extint(void)
+> >
+> >  void s3c_pm_restore_core(void)
+> >  {
+> > +	u32 pclkgate, tmp;
+> > +	int i;
+> > +
+> >  	__raw_writel(0, S3C64XX_EINT_MASK);
+> >
+> >  	s3c_pm_debug_smdkled(1 << 2, 0);
+> >
+> >  	s3c_pm_do_restore_core(core_save, ARRAY_SIZE(core_save));
+> >  	s3c_pm_do_restore(misc_save, ARRAY_SIZE(misc_save));
+> > +
+> > +	tmp = pclkgate = __raw_readl(S3C_PCLK_GATE);
+> > +
+> > +	/* re-start uart clocks */
+> > +	tmp |= S3C_CLKCON_PCLK_UART0;
+> > +	tmp |= S3C_CLKCON_PCLK_UART1;
+> > +	tmp |= S3C_CLKCON_PCLK_UART2;
+> > +	tmp |= S3C_CLKCON_PCLK_UART3;
+> > +
+> > +	__raw_writel(tmp, S3C_PCLK_GATE);
+> > +
+> > +	udelay(10);
+> > +
+> > +	for (i = 0; i < 4; ++i) {
+> > +		__raw_writel(15, S3C_VA_UARTx(i) + S3C64XX_UINTM);
+> > +		__raw_writel(15, S3C_VA_UARTx(i) + S3C64XX_UINTP);
+> > +	}
+> > +
+> > +	udelay(10);
+> > +
+> > +	__raw_writel(pclkgate, S3C_PCLK_GATE);
+> >  }
+> >
+> >  void s3c_pm_save_core(void)
+> >
 > 
-> Do you need more time?
-
-I will send before Arnd's sending for -rc3..maybe late tonight (KST).
-Now I need to sort out current samsung-fixes...
-
+> This should be fixed by
+> 
+> [PATCH 0/2] Update uart irq handling for s3c64xx and later SoC's
+> by Thomas Abraham,
+> 
+> so I guess it is safe to drop my patch.
+> 
+OK.
 Thanks.
 
 Best regards,
