@@ -1,34 +1,43 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
 Date: Fri, 19 Aug 2011 14:24:09 +0900
-Subject: [PATCH v4] amba: consolidate PrimeCell magic
-In-Reply-To: <1313654311-2283-1-git-send-email-linus.walleij@stericsson.com>
-References: <1313654311-2283-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <000801cc5e30$3a612d30$af238790$%kim@samsung.com>
+Subject: [PATCH 0/2] Remove hw_addr dma leftovers from S3C24xx machs
+In-Reply-To: <201108101227.32780.heiko@sntech.de>
+References: <201108101227.32780.heiko@sntech.de>
+Message-ID: <000301cc5e30$39f12d50$add387f0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus Walleij wrote:
+Heiko St?bner wrote:
 > 
-> From: Linus Walleij <linus.walleij@linaro.org>
+> While trying to sort the dma for S3C2416 I stumbled open the hw_addr
+> declarations in the other dma.c files.
 > 
-> Since two drivers use the PrimeCell scheme without using the
-> amba_bus driver logic, let's break the magic lookups out as
-> static inlines in the <linux/amba/bus.h> header so we get
-> some consolidation anyway. Delete the primecell ID check in
-> common/pl330.c since it is only used from the amba_bus driver
-> in drivers/dma, which is already doing the same check when
-> probing in drivers/amba/bus.c.
+> It took me a while to figure out that they seem to be some sort
+> of leftover, i.e. they are used in dma-pl080.c of the old Samsung
+> kernels based on 2.6.21 but nowhere in current kernels.
 > 
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+> Therefore I think removing this stuff is appropriate.
+> 
+> The patches apply against current linux-next and are
+> compile-tested against s3c2410_defconfig and mini2440_defconfig.
+> 
+> Heiko Stuebner (2):
+>   Remove hw_addr from s3c24XX dma channel declarations
+>   Remove s3c24xx_dma_addr definition
+> 
+>  arch/arm/mach-s3c2410/dma.c                      |   14 -----------
+>  arch/arm/mach-s3c2412/dma.c                      |   18 --------------
+>  arch/arm/mach-s3c2440/dma.c                      |   17 -------------
+>  arch/arm/mach-s3c2443/dma.c                      |   27
+----------------------
+>  arch/arm/plat-samsung/include/plat/dma-s3c24xx.h |    6 -----
+>  5 files changed, 0 insertions(+), 82 deletions(-)
+> 
+> --
+> 1.7.5.4
 
-> Cc: Viresh Kumar <viresh.kumar@st.com>
-> Acked-by: H Hartley Sweeten <hartleys@visionengravers.com>
-> Acked-by: Jassi Brar <jassisinghbrar@gmail.com>
-> Acked-by: Boojin Kim <boojin.kim@samsung.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-
-Thanks.
+Good :)
+Applied, thanks.
 
 Best regards,
 Kgene.
