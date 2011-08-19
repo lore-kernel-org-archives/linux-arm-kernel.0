@@ -1,50 +1,66 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 19 Aug 2011 16:36:28 +0200
-Subject: [PATCH 1/4 v4] drivers: create a pin control subsystem
-In-Reply-To: <CACRpkdZhg_1WM37uqT1PNmpUjWS_groWJmNnR4SBjqJ6LFQQWQ@mail.gmail.com>
-References: <1313747630-32258-1-git-send-email-linus.walleij@stericsson.com>
-	<20110819104816.GA5030@pulham.picochip.com>
-	<CACRpkdZhg_1WM37uqT1PNmpUjWS_groWJmNnR4SBjqJ6LFQQWQ@mail.gmail.com>
-Message-ID: <201108191636.29161.arnd@arndb.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 19 Aug 2011 15:45:51 +0100
+Subject: Patch Merging Path - RMK or Arnd?
+In-Reply-To: <201108191621.56263.arnd@arndb.de>
+References: <20110819124933.GG8918@e102144-lin.cambridge.arm.com>
+	<201108191621.56263.arnd@arndb.de>
+Message-ID: <20110819144551.GI8918@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 19 August 2011, Linus Walleij wrote:
-> On Fri, Aug 19, 2011 at 12:48 PM, Jamie Iles <jamie@jamieiles.com> wrote:
-> 
-> >> +static struct class pinctrl_class = {
-> >> +     .name = "pinctrl",
-> >> +     .dev_release = pinctrl_dev_release,
-> >> +     .dev_attrs = pinctrl_dev_attrs,
-> >> +};
-> >
-> > Greg K-H has mentioned in the past that class is now deprecated for new
-> > use and that a bus_type should be used instead.
-> 
-> Can you provide a reference with some detail?
-> The pin control devices are usually aleady on a bus like the
-> platform_bus or amba_bus or i2c_bus, then they register a
-> class device in this case.
-> 
-> The kerneldoc documentation says
-> "A bus is a channel between the processor and one or more devices."
-> 
-> This isn't the case here.
-> 
-> Anyhthing that help me understand this is appreciated, Arnd?
+Hi Arnd,
 
-Taking Greg on Cc as well.
+Thanks for the reply.
 
-The main difference between a normal device and a class device is
-that one is linked from /sys/bus/*/devices/* and the other is linked
-from /sys/class/*/*. However, they both live in /sys/devices/.../*
-as directories.
+On Fri, Aug 19, 2011 at 03:21:56PM +0100, Arnd Bergmann wrote:
+> On Friday 19 August 2011, Will Deacon wrote:
+> > Ideally, I would also merge these via Russell, but there is now scope for
+> > conflict with your arm-soc branch given that I'm changing files under mach-*
+> > and plat-*. How would you recommend that I proceed? I can think of three
+> > solutions:
+> > 
+> > 
+> > (1) [preferred] Merge via Russell, conflicts show up in -next and are
+> >     resolved then.
+> > 
+> > (2) Split the patches up so that the core changes go via Russell. When they
+> >     are in a suitable tree (-next?) then send you the remainder on top of
+> >     that.
+> > 
+> > (3) Merge the whole lot via you. This really just inverts the problem rather
+> >     than solving anything.
+> > 
+> > 
+> > I expect this will become a fairly common pattern with single zImage work,
+> > so it would be great to clarify the intended path upstream.
+> 
+> There is another options, which is to have the changes in both trees, or
+> at least have some of the changes in both.
 
-I always liked the separation between the two, although there are
-a few cases where there is a grey area (e.g. /sys/bus/hid or
-/sys/class/mmc_host) and the abstraction doesn't really fit.
+Ok, I hadn't considered that.
 
-IIRC Greg would prefer now to never have had the distinction
-and wants to make all future uses use a bus_type.
+> Fortunately, git can handle merges of that sort just fine, so I'd say
+> depending on the contents you do one of:
+> 
+> (4) Split up the changesets into a core set (for the arch directory) and
+>     a second set that goes on top and changes all the platforms. Get
+>     Russell to take the base patches into one branch, and submit the
+>     branch containing the full set (including the ones in Russell's
+>     tree) for the arm-soc tree. I will then make sure queue the changes
+>     for merging to Linus after he has taken the base changes from
+>     Russell.
+> 
+> (5) Prepare one git tree and submit it to both trees at once. If everyone
+>     is happy with the changes, we just apply it to both and one of us
+>     submits it first.
+>     Either tree can also contain further changes on top, so if your
+>     changes are already upstream through one tree, the second pull request
+>     from the other tree will contain the other changes that go on top.
 
-	Arnd
+That's (5) probably easiest, because then you can be sure that the patches
+in each upstream tree are identical.
+
+Russell - would you be happy with this arrangment for patchsets that touch
+platforms and core ARM code?
+
+Will
