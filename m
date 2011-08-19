@@ -1,24 +1,44 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 19 Aug 2011 14:46:49 +0200
-Subject: [PATCH 1/3] gpio/nomadik: remove pull-pinconfig and add SPI2
-In-Reply-To: <1312913020-7508-1-git-send-email-linus.walleij@stericsson.com>
-References: <1312913020-7508-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <CACRpkdbyjj+7Lm9JCLnYLC_z6Tt+XOr9waYjQAezRDyq7Tb=Ug@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 19 Aug 2011 13:49:33 +0100
+Subject: Patch Merging Path - RMK or Arnd?
+Message-ID: <20110819124933.GG8918@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 9, 2011 at 8:03 PM, Linus Walleij
-<linus.walleij@stericsson.com> wrote:
-> From: Fredrik Svensson <fredrik.xk.svensson@stericsson.com>
->
-> Remove PIN_CFG_PULL in pincfg.h for plat-nomadik, PIN_CFG_INPUT
-> already takes care of this. Added support for SPI2.
->
-> Signed-off-by: Fredrik Svensson <fredrik.xk.svensson@stericsson.com>
-> Signed-off-by: Daniel Willerud <daniel.willerud@stericsson.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Hi Arnd,
 
-Ping on these three patches too ....
+In general, I merge my patches via Russell as they tend to be core ARM changes.
+This works very well since other (potentially conflicting) changes follow
+the same route and any conflicts would be noticed almost immediately.
 
-Thanks,
-Linus Walleij
+However, I currently have two patchsets that I'm developing which alter both
+core ARM code *and* touch a number of platforms to use the new core
+features:
+
+http://lists.infradead.org/pipermail/linux-arm-kernel/2011-August/061304.html
+
+http://lists.infradead.org/pipermail/linux-arm-kernel/2011-August/061477.html
+
+Ideally, I would also merge these via Russell, but there is now scope for
+conflict with your arm-soc branch given that I'm changing files under mach-*
+and plat-*. How would you recommend that I proceed? I can think of three
+solutions:
+
+
+(1) [preferred] Merge via Russell, conflicts show up in -next and are
+    resolved then.
+
+(2) Split the patches up so that the core changes go via Russell. When they
+    are in a suitable tree (-next?) then send you the remainder on top of
+    that.
+
+(3) Merge the whole lot via you. This really just inverts the problem rather
+    than solving anything.
+
+
+I expect this will become a fairly common pattern with single zImage work,
+so it would be great to clarify the intended path upstream.
+
+Cheers,
+
+Will
