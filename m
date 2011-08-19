@@ -1,78 +1,38 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
 Date: Fri, 19 Aug 2011 14:24:09 +0900
-Subject: [PATCH] ARM: S3C64XX: Remove un-used code
-In-Reply-To: <1313498488-4296-1-git-send-email-banajit.g@samsung.com>
-References: <1313498488-4296-1-git-send-email-banajit.g@samsung.com>
-Message-ID: <000001cc5e30$39a27110$ace75330$%kim@samsung.com>
+Subject: [PATCH 0/3] ARM: Samsung: use dma-pl330 device name for clock
+In-Reply-To: <1313530266-14939-1-git-send-email-vz@mleia.com>
+References: <1313530266-14939-1-git-send-email-vz@mleia.com>
+Message-ID: <000701cc5e30$3a4e1a60$aeea4f20$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Banajit Goswami wrote:
+Vladimir Zapolskiy wrote:
 > 
-> Remove un-used backlight code for SMDK6410 board
+> This changeset replaces s3c-pl330.x clock device names with
+> dma-pl330.x, otherwise there won't be a correspondence between clock
+> device name and amba device name, thus clocks can't be enabled.
 > 
-> Signed-off-by: Banajit Goswami <banajit.g@samsung.com>
-> ---
->  arch/arm/mach-s3c64xx/mach-smdk6410.c |   39
----------------------------------
->  1 files changed, 0 insertions(+), 39 deletions(-)
+> Fixes runtime errors on clk_get() from drivers/dma/pl330.c:
+>   dma-pl330 dma-pl330.0: Cannot get operation clock.
+>   dma-pl330: probe of dma-pl330.0 failed with error -22
 > 
-> diff --git a/arch/arm/mach-s3c64xx/mach-smdk6410.c b/arch/arm/mach-
-> s3c64xx/mach-smdk6410.c
-> index ecbea92..a9f3183 100644
-> --- a/arch/arm/mach-s3c64xx/mach-smdk6410.c
-> +++ b/arch/arm/mach-s3c64xx/mach-smdk6410.c
-> @@ -262,45 +262,6 @@ static struct samsung_keypad_platdata
-> smdk6410_keypad_data __initdata = {
->  	.cols		= 8,
->  };
+> The changes are based on linux-samsung/next/topic-dma-pl330 branch.
 > 
-> -static int smdk6410_backlight_init(struct device *dev)
-> -{
-> -	int ret;
-> -
-> -	ret = gpio_request(S3C64XX_GPF(15), "Backlight");
-> -	if (ret) {
-> -		printk(KERN_ERR "failed to request GPF for PWM-OUT1\n");
-> -		return ret;
-> -	}
-> -
-> -	/* Configure GPIO pin with S3C64XX_GPF15_PWM_TOUT1 */
-> -	s3c_gpio_cfgpin(S3C64XX_GPF(15), S3C_GPIO_SFN(2));
-> -
-> -	return 0;
-> -}
-> -
-> -static void smdk6410_backlight_exit(struct device *dev)
-> -{
-> -	s3c_gpio_cfgpin(S3C64XX_GPF(15), S3C_GPIO_OUTPUT);
-> -	gpio_free(S3C64XX_GPF(15));
-> -}
-> -
-> -static struct platform_pwm_backlight_data smdk6410_backlight_data = {
-> -	.pwm_id		= 1,
-> -	.max_brightness	= 255,
-> -	.dft_brightness	= 255,
-> -	.pwm_period_ns	= 78770,
-> -	.init		= smdk6410_backlight_init,
-> -	.exit		= smdk6410_backlight_exit,
-> -};
-> -
-> -static struct platform_device smdk6410_backlight_device = {
-> -	.name		= "pwm-backlight",
-> -	.dev		= {
-> -		.parent		= &s3c_device_timer[1].dev,
-> -		.platform_data	= &smdk6410_backlight_data,
-> -	},
-> -};
-> -
->  static struct map_desc smdk6410_iodesc[] = {};
+> Vladimir Zapolskiy (3):
+>   ARM: EXYNOS4: use dma-pl330 device name for clock
+>   ARM: S5PC100: use dma-pl330 device name for clock
+>   ARM: S5PV210: use dma-pl330 device name for clock
 > 
->  static struct platform_device *smdk6410_devices[] __initdata = {
+>  arch/arm/mach-exynos4/clock.c |    4 ++--
+>  arch/arm/mach-s5pc100/clock.c |    4 ++--
+>  arch/arm/mach-s5pv210/clock.c |    4 ++--
+>  3 files changed, 6 insertions(+), 6 deletions(-)
+> 
 > --
-> 1.7.2.3
+> 1.7.5.1
 
-OK, applied.
+OK, will apply.
 Thanks.
 
 Best regards,
