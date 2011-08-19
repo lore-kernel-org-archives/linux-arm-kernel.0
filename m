@@ -1,76 +1,262 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 19 Aug 2011 23:02:34 +0900
-Subject: [PATCH 0/5] S5P64X0 PM Support
-In-Reply-To: <1313144787-30666-1-git-send-email-a.kesavan@samsung.com>
-References: <1313144787-30666-1-git-send-email-a.kesavan@samsung.com>
-Message-ID: <004401cc5e78$a54aa200$efdfe600$%kim@samsung.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 19 Aug 2011 16:04:54 +0200
+Subject: [PATCH 1/4 v4] drivers: create a pin control subsystem
+In-Reply-To: <20110819104816.GA5030@pulham.picochip.com>
+References: <1313747630-32258-1-git-send-email-linus.walleij@stericsson.com>
+	<20110819104816.GA5030@pulham.picochip.com>
+Message-ID: <CACRpkdZhg_1WM37uqT1PNmpUjWS_groWJmNnR4SBjqJ6LFQQWQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Abhilash Kesavan wrote:
-> 
-> The patchset adds Power Mangement support for S5P64X0. The first
-> four patches lay the groundwork for adding PM support, while the
-> final patch adds the SoC specific PM code.
-> Tested using external interrupts as wake-up sources on SMDK6440
-> and SMDK6450.
-> 
-> Abhilash Kesavan (5):
->   ARM: S5P: Make the common S5P PM code conditionally compile
->   ARM: SAMSUNG: Make the sleep code common for S3C64XX and newer SoCs
->   ARM: S5P64X0: Add pm save/restore functions for GPIO banks
->   ARM: S5P64X0: Fix incorrect serial clock name
->   ARM: S5P64X0: Add Power Management support
-> 
->  arch/arm/Kconfig                                |    2 +-
->  arch/arm/mach-exynos4/Kconfig                   |    2 +
->  arch/arm/mach-exynos4/Makefile                  |    2 +-
->  arch/arm/mach-exynos4/sleep.S                   |   54 ------
->  arch/arm/mach-s3c64xx/Kconfig                   |    1 +
->  arch/arm/mach-s3c64xx/Makefile                  |    1 -
->  arch/arm/mach-s3c64xx/sleep.S                   |   72 --------
->  arch/arm/mach-s5p64x0/Kconfig                   |    4 +
->  arch/arm/mach-s5p64x0/Makefile                  |    1 +
->  arch/arm/mach-s5p64x0/clock-s5p6440.c           |    2 +-
->  arch/arm/mach-s5p64x0/clock-s5p6450.c           |    2 +-
->  arch/arm/mach-s5p64x0/gpiolib.c                 |    1 +
->  arch/arm/mach-s5p64x0/include/mach/map.h        |    1 +
->  arch/arm/mach-s5p64x0/include/mach/pm-core.h    |  117 +++++++++++++
->  arch/arm/mach-s5p64x0/include/mach/regs-clock.h |   33 ++++
->  arch/arm/mach-s5p64x0/include/mach/regs-gpio.h  |   19 ++
->  arch/arm/mach-s5p64x0/init.c                    |    2 +-
->  arch/arm/mach-s5p64x0/irq-eint.c                |    2 +
->  arch/arm/mach-s5p64x0/irq-pm.c                  |   92 ++++++++++
->  arch/arm/mach-s5p64x0/pm.c                      |  204
-> +++++++++++++++++++++++
->  arch/arm/mach-s5pv210/Kconfig                   |    2 +
->  arch/arm/mach-s5pv210/Makefile                  |    2 +-
->  arch/arm/mach-s5pv210/sleep.S                   |   52 ------
->  arch/arm/plat-s5p/Kconfig                       |    6 +
->  arch/arm/plat-s5p/Makefile                      |    3 +-
->  arch/arm/plat-samsung/Kconfig                   |    7 +
->  arch/arm/plat-samsung/Makefile                  |    1 +
->  arch/arm/plat-samsung/sleep.S                   |   80 +++++++++
->  drivers/gpio/gpio-plat-samsung.c                |    4 +-
->  29 files changed, 583 insertions(+), 188 deletions(-)
->  delete mode 100644 arch/arm/mach-exynos4/sleep.S
->  delete mode 100644 arch/arm/mach-s3c64xx/sleep.S
->  create mode 100644 arch/arm/mach-s5p64x0/include/mach/pm-core.h
->  create mode 100644 arch/arm/mach-s5p64x0/irq-pm.c
->  create mode 100644 arch/arm/mach-s5p64x0/pm.c
->  delete mode 100644 arch/arm/mach-s5pv210/sleep.S
->  create mode 100644 arch/arm/plat-samsung/sleep.S
-> 
-> --
+On Fri, Aug 19, 2011 at 12:48 PM, Jamie Iles <jamie@jamieiles.com> wrote:
+> On Fri, Aug 19, 2011 at 11:53:50AM +0200, Linus Walleij wrote:
+>> +Interaction with the GPIO subsystem
+>> +===================================
+>> +
+>> +The GPIO drivers may want to perform operations of various types on the same
+>> +physical pins that are also registered as GPIO pins.
+>> +
+>> +Since the pin controller subsystem have its pinspace local to the pin
+>> +controller we need a mapping so that the pin control subsystem can figure out
+>> +which pin controller handles control of a certain GPIO pin. This member
+>> +in the pin controller descriptor handles this mapping:
+>> +
+>> +static struct pinctrl_desc foo_desc = {
+>> + ? ? ...
+>> + ? ? .gpio_base = FIRST_PIN,
+>> +};
+>> +
+>> +When GPIO-specific functions in the pin control subsystem are called, these
+>> +mappings will be used to look up the apropriate pin controller by inspecting
+>> +and matching the pin to this pin range.
+>
+> On our (difficultly muxed!) platform we have two types of GPIO - a
+> Synopsys controller which is a fairly conventional GPIO controller, then
+> a sigma-delta GPIO controller which can also do a an analogue type
+> output (as well as digital).
 
-Hi Abhilash,
+Does that mean it is really not a GPIO controller but a kind of D/A converter?
 
-As a note, I will be back on this in the next week :)
+> ?For lots of our pads they can either be
+> ARM GPIO, SD GPIO or some other function, so I don't see how this fits
+> in with a single GPIO base.
 
-Thanks.
+And each of them are modeled as a separate gpio_chip I guess?
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Otherwise it's a bad match with reality. We had this discussion with GRant
+where two gpio_chips would use the same number range in the GPIO
+global pinspace, and it's basically not allowed IIRC.
+
+But yes, there is an assumption that each pin controller will only
+deal with one block of GPIO pins. So if I make it possible to support
+several GPIO ranges for one pin controller, does that solve your problem?
+
+Like this:
+
+struct pinctrl_gpio_range {
+    char *name;
+    unsigned int base;
+    unsigned int npins;
+}
+
+static unsigned int gpio_ranges[] = {
+    {
+        .name="chip1",
+        .base = 0,
+        .npins = 16,
+    },
+    {
+        .name =" chip2",
+        .base = 32,
+        .npins = 16,
+    },
+    {
+        .name = "chip3",
+        .base = 64,
+        .npins = 16,
+    },
+};
+
+static struct pinctrl_desc foo_desc = {
+        ...
+        .gpio_ranges = gpio_ranges,
+        .num_gpio_ranges = ARRAY_SIZE(gpio_ranges),
+};
+
+For three different 32-bit GPIO controllers muxed on
+pins 0..31 using GPIO space pins from 0..95.
+
+Then I pass the number of the instance down to the
+driver in the gpio_request_enable() callback like
+this:
+
+int (*gpio_request_enable) (struct pinctrl_dev *pctldev,
+	    unsigned instance,
+	    unsigned offset);
+
+Would this work?
+
+This has a restriction: the GPIO space must be mapped in
+continous ranges, as must the pin controller. Else we need
+one entry per pin in the list above...
+
+>> +The correspondence for the range from the GPIO subsystem to the pin controller
+>> +subsystem must be one-to-one. Thus the GPIO pins are in the pin controller
+>> +range [0 .. maxpin] where maxpin is the specified end of the pin range.
+>
+> So doesn't this mean that the enumeration that was initially described
+> as arbitrary actually has to enumerate the GPIO pins first?
+
+If you use GPIO accessors, the enumeration has to match.
+So I rewrite it like this:
+
+"this enumeration was arbitrarily chosen, in practice you need to think
+through your numbering system so that it matches the layout of registers
+and such things in your driver, or the code may become complicated. You must
+also consider matching of offsets to the GPIO ranges that may be handled by
+the pin controller."
+
+OK?
+
+>> +static struct class pinctrl_class = {
+>> + ? ? .name = "pinctrl",
+>> + ? ? .dev_release = pinctrl_dev_release,
+>> + ? ? .dev_attrs = pinctrl_dev_attrs,
+>> +};
+>
+> Greg K-H has mentioned in the past that class is now deprecated for new
+> use and that a bus_type should be used instead.
+
+Can you provide a reference with some detail?
+The pin control devices are usually aleady on a bus like the
+platform_bus or amba_bus or i2c_bus, then they register a
+class device in this case.
+
+The kerneldoc documentation says
+"A bus is a channel between the processor and one or more devices."
+
+This isn't the case here.
+
+Anyhthing that help me understand this is appreciated, Arnd?
+
+>> +/**
+>> + * struct pinctrl_desc - pin controller descriptor, register this to pin
+>> + * control subsystem
+>> + * @name: name for the pin controller
+>> + * @pins: an array of pin descriptors describing all the pins handled by
+>> + * ? this pin controller
+>> + * @npins: number of descriptors in the array, usually just ARRAY_SIZE()
+>> + * ? of the pins field above
+>> + * @maxpin: since pin spaces may be sparse, there can he "holes" in the
+>> + * ? pin range, this attribute gives the maximum pin number in the
+>> + * ? total range. This should not be lower than npins for example,
+>> + * ? but may be equal to npins if you have no holes in the pin range.
+>> + * @pmxops: pinmux operation vtable, if you support pinmuxing in your driver
+>> + * @gpio_base: the base offset of the pin range in the GPIO subsystem that
+>> + * ? is handled by this controller, if applicable. This member is only
+>> + * ? relevant if you want to e.g. control pins from the GPIO subsystem.
+>> + * @gpio_pins: the number of pins from (and including) the gpio_base offset
+>> + * ? handled by this pin controller.
+>> + * @owner: module providing the pin controller, used for refcounting
+>> + */
+>> +struct pinctrl_desc {
+>> + ? ? const char *name;
+>> + ? ? struct pinctrl_pin_desc const *pins;
+>> + ? ? unsigned int npins;
+>> + ? ? unsigned int maxpin;
+>> + ? ? struct pinmux_ops *pmxops;
+>> + ? ? unsigned int gpio_base;
+>> + ? ? unsigned int gpio_pins;
+>> + ? ? struct module *owner;
+>
+> Would it be better to put the owner in the ops structure like file_ops?
+> I'm sure I remember someone saying that it's better to do that so that
+> it's in the modules .data/.rodata section but I can't find that
+> reference.
+
+I can't do that because the pinmux_ops vtable is not mandatory.
+
+The plan is to add more ops for other things like pin bias etc.
+
+>> +/**
+>> + * struct pinctrl_dev - pin control class device
+>> + * @desc: the pin controller descriptor supplied when initializing this pin
+>> + * ? controller
+>> + * @node: node to include this pin controller in the global pin controller list
+>> + * @dev: the device entry for this pin controller
+>> + * @owner: module providing the pin controller, used for refcounting
+>> + * @driver_data: driver data for drivers registering to the pin controller
+>> + * ? subsystem
+>> + *
+>> + * This should be dereferenced and used by the pin controller core ONLY
+>> + */
+>> +struct pinctrl_dev {
+>> + ? ? struct pinctrl_desc *desc;
+>> + ? ? struct radix_tree_root pin_desc_tree;
+>> + ? ? spinlock_t pin_desc_tree_lock;
+>> + ? ? struct list_head node;
+>> + ? ? struct device dev;
+>> + ? ? struct module *owner;
+>> + ? ? void *driver_data;
+>
+> Couldn't the struct device driver_data be used here?
+
+I'm already using dev_set_drvdata(&pctldev->dev, pctldev);
+So I can retrieve the pctldev withdev_get_drvdata(dev);
+in sysfs...
+
+If I wasn't registering sysfs nodes I couldv'e used it.
+
+>> +/* These should only be used from drives */
+>
+> s/drives/drivers?
+
+OK.
+
+>> +/**
+>> + * struct pinmux_ops - pinmux operations, to be implemented by pin controller
+>> + * drivers that support pinmuxing
+>> + * @request: called by the core to see if a certain pin can be made available
+>> + * ? available for muxing. This is called by the core to acquire the pins
+>> + * ? before selecting any actual mux setting across a function. The driver
+>> + * ? is allowed to answer "no" by returning a negative error code
+>> + * @free: the reverse function of the request() callback, frees a pin after
+>> + * ? being requested
+>
+> So is the request like gpio_request() or just test if it the pin is
+> available? ?If its the latter then perhaps pin_is_available() might be a
+> better name?
+
+It's the former. The pin controller may have some electrical
+properties that makes it impossible to request a certain pin for muxing
+at a certain time. (Found out on earlier list review.)
+
+>> +#else /* !CONFIG_PINMUX */
+>> +
+>> +static inline int pinmux_request_gpio(unsigned gpio)
+>> +{
+>> + ? ? return 0;
+>> +}
+>> +
+>> +static inline void pinmux_free_gpio(unsigned gpio)
+>> +{
+>> +}
+>> +
+>> +static inline struct pinmux *pinmux_get(struct device *dev, const char *func)
+>> +{
+>> + ? ? return NULL;
+>> +}
+>
+> The CONFIG_PINMUX=y version of pinmux_get returns an ERR_PTR() encoded
+> error so perhaps this should return something like ERR_PTR(-ENXIO)?
+
+No this is modeled more like the regulator stubs in
+<linux/regulator.h>. For example, if you're compiling for a
+platform that does not support regulators they are assumed to
+be always on.
+
+In this case, if compiled for a platform without pinmux, we assume
+we got the pins we need already so it just works, not fail.
+
+Thanks,
+Linus Walleij
