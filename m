@@ -1,58 +1,52 @@
-From: greg@kroah.com (Greg KH)
-Date: Fri, 19 Aug 2011 09:52:52 -0700
-Subject: [PATCH 1/4 v4] drivers: create a pin control subsystem
-In-Reply-To: <201108191636.29161.arnd@arndb.de>
-References: <1313747630-32258-1-git-send-email-linus.walleij@stericsson.com>
-	<20110819104816.GA5030@pulham.picochip.com>
-	<CACRpkdZhg_1WM37uqT1PNmpUjWS_groWJmNnR4SBjqJ6LFQQWQ@mail.gmail.com>
-	<201108191636.29161.arnd@arndb.de>
-Message-ID: <20110819165252.GC4016@kroah.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 19 Aug 2011 19:00:07 +0200
+Subject: [PATCH 06/12] ARM: mxc: Setup consistent dma size at boot time
+In-Reply-To: <1313744901.28978.16.camel@computer2>
+References: <1312813712-22808-1-git-send-email-tixy@yxit.co.uk>
+	<1312813712-22808-7-git-send-email-tixy@yxit.co.uk>
+	<20110808164731.GP31404@pengutronix.de>
+	<alpine.LFD.2.00.1108172309450.20358@xanadu.home>
+	<1313655216.2254.9.camel@computer2>
+	<20110818185128.GQ31404@pengutronix.de>
+	<1313744901.28978.16.camel@computer2>
+Message-ID: <20110819170007.GT31404@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 19, 2011 at 04:36:28PM +0200, Arnd Bergmann wrote:
-> On Friday 19 August 2011, Linus Walleij wrote:
-> > On Fri, Aug 19, 2011 at 12:48 PM, Jamie Iles <jamie@jamieiles.com> wrote:
+On Fri, Aug 19, 2011 at 10:08:21AM +0100, Tixy wrote:
+> > Sorry, I forgot about this issue. The solution is really simple: All
+> > boards in tree using video use memblock_* functions to get their
+> > coherent dma space for the camera. So we can just remove all
+> > CONSISTENT_DMA_SIZE defines in arch/arm/plat-mxc/include/mach/memory.h.
 > > 
-> > >> +static struct class pinctrl_class = {
-> > >> +     .name = "pinctrl",
-> > >> +     .dev_release = pinctrl_dev_release,
-> > >> +     .dev_attrs = pinctrl_dev_attrs,
-> > >> +};
-> > >
-> > > Greg K-H has mentioned in the past that class is now deprecated for new
-> > > use and that a bus_type should be used instead.
-> > 
-> > Can you provide a reference with some detail?
-> > The pin control devices are usually aleady on a bus like the
-> > platform_bus or amba_bus or i2c_bus, then they register a
-> > class device in this case.
-> > 
-> > The kerneldoc documentation says
-> > "A bus is a channel between the processor and one or more devices."
-> > 
-> > This isn't the case here.
-> > 
-> > Anyhthing that help me understand this is appreciated, Arnd?
+> > If I understand your patch correctly we get a default size of 2MiB
+> > when init_consistent_dma_size() is not called. That's fine for the other
+> > i.MX boards.
 > 
-> Taking Greg on Cc as well.
+> Just to make sure I've understood. I see memblock_ calls in
+> 	mach-mx31_3ds.c
+> 	mach-pcm037.c
+> 	mach-mx31moboard.c
+> these all seem to be mx3 related.
 > 
-> The main difference between a normal device and a class device is
-> that one is linked from /sys/bus/*/devices/* and the other is linked
-> from /sys/class/*/*. However, they both live in /sys/devices/.../*
-> as directories.
-> 
-> I always liked the separation between the two, although there are
-> a few cases where there is a grey area (e.g. /sys/bus/hid or
-> /sys/class/mmc_host) and the abstraction doesn't really fit.
-> 
-> IIRC Greg would prefer now to never have had the distinction
-> and wants to make all future uses use a bus_type.
+> For mx1 and mx2, these currently increase CONSISTENT_DMA_SIZE to 4MB,
+> but the 2MB default is actually big enough for these?
 
-Yes, that is totally correct.  Kay has also written much more about this
-and why this is the way forward many times in the past, see lkml
-archives for the details if anyone is interested.
+It should be bigger for boards which make use of the camera driver, but
+no mx1/2 board in the tree currently registers the camera.
 
-thanks,
+> 
+> Therefore, as you said, we can just delete the definitions of
+> CONSISTENT_DMA_SIZE from memory.h and leave all other imx and mx5 files
+> unchanged.
 
-greg k-h
+Yes
+
+Sascha
+
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
