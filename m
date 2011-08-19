@@ -1,66 +1,55 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 19 Aug 2011 15:45:51 +0100
-Subject: Patch Merging Path - RMK or Arnd?
-In-Reply-To: <201108191621.56263.arnd@arndb.de>
-References: <20110819124933.GG8918@e102144-lin.cambridge.arm.com>
-	<201108191621.56263.arnd@arndb.de>
-Message-ID: <20110819144551.GI8918@e102144-lin.cambridge.arm.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Fri, 19 Aug 2011 10:54:59 -0400 (EDT)
+Subject: [PATCH 1/3] ARM: debug: use kconfig choice for selecting DEBUG_LL
+	UART
+In-Reply-To: <20110819113740.GF12527@S2100-06.ap.freescale.net>
+References: <1313530873-24961-1-git-send-email-will.deacon@arm.com>
+	<20110818161105.GA12527@S2100-06.ap.freescale.net>
+	<20110818160712.GA26691@e102144-lin.cambridge.arm.com>
+	<20110819045956.GB12527@S2100-06.ap.freescale.net>
+	<20110819110822.GB8918@e102144-lin.cambridge.arm.com>
+	<20110819113740.GF12527@S2100-06.ap.freescale.net>
+Message-ID: <alpine.LFD.2.00.1108191048510.20358@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Fri, 19 Aug 2011, Shawn Guo wrote:
 
-Thanks for the reply.
+> On Fri, Aug 19, 2011 at 12:08:22PM +0100, Will Deacon wrote:
+> > On Fri, Aug 19, 2011 at 05:59:57AM +0100, Shawn Guo wrote:
+> > > On Thu, Aug 18, 2011 at 05:07:12PM +0100, Will Deacon wrote:
+> > > > I'm not sure that sorting this list in alphabetical order is a good idea.
+> > > > This is a Kconfig choice, so the default value is the first one in the list
+> > > > that has its dependencies satisfied. Therefore, the ordering has a direct
+> > > > impact on the default UART selection.
+> > > > 
+> > > I'm unsure that the default UART selection makes much sense here.
+> > > When we build so many platforms into single image, it's hard to say
+> > > which one should be the default.  People anyway need to check if the
+> > > the UART selection matches the platform they are debugging on.
+> > 
+> > Ok, how about having the default choice as a dummy option which doesn't
+> > correspond to a UART?:
+> > 
+> To me, it is a little bit overkilled.  Can we just sort them in
+> alphabetical order and let the first one be the winner?  We can take
+> this as a reward to the good naming :)
 
-On Fri, Aug 19, 2011 at 03:21:56PM +0100, Arnd Bergmann wrote:
-> On Friday 19 August 2011, Will Deacon wrote:
-> > Ideally, I would also merge these via Russell, but there is now scope for
-> > conflict with your arm-soc branch given that I'm changing files under mach-*
-> > and plat-*. How would you recommend that I proceed? I can think of three
-> > solutions:
-> > 
-> > 
-> > (1) [preferred] Merge via Russell, conflicts show up in -next and are
-> >     resolved then.
-> > 
-> > (2) Split the patches up so that the core changes go via Russell. When they
-> >     are in a suitable tree (-next?) then send you the remainder on top of
-> >     that.
-> > 
-> > (3) Merge the whole lot via you. This really just inverts the problem rather
-> >     than solving anything.
-> > 
-> > 
-> > I expect this will become a fairly common pattern with single zImage work,
-> > so it would be great to clarify the intended path upstream.
+Just use the alphabetical order, except for the first entry which could 
+be a noop.
+
+> >  choice
+> >         prompt "Kernel low-level debugging port"
+> > -       depends on DEBUG_LL
+> > +       depends on DEBUG_LL_UART && (FOOTBRIDGE || ARCH_CLPS711X || \
+> > +                                    PLAT_SAMSUNG || ARCH_REALVIEW)
 > 
-> There is another options, which is to have the changes in both trees, or
-> at least have some of the changes in both.
+> We will have to list a lot of ARCH/PLAT symbols here.  This is what
+> I meant overkilled actually.
 
-Ok, I hadn't considered that.
+Agreed.  Please avoid the need for such localized long lists of 
+dependencies which are going to create merge conflicts for sure, and 
+which grow into a mess after a while.
 
-> Fortunately, git can handle merges of that sort just fine, so I'd say
-> depending on the contents you do one of:
-> 
-> (4) Split up the changesets into a core set (for the arch directory) and
->     a second set that goes on top and changes all the platforms. Get
->     Russell to take the base patches into one branch, and submit the
->     branch containing the full set (including the ones in Russell's
->     tree) for the arm-soc tree. I will then make sure queue the changes
->     for merging to Linus after he has taken the base changes from
->     Russell.
-> 
-> (5) Prepare one git tree and submit it to both trees at once. If everyone
->     is happy with the changes, we just apply it to both and one of us
->     submits it first.
->     Either tree can also contain further changes on top, so if your
->     changes are already upstream through one tree, the second pull request
->     from the other tree will contain the other changes that go on top.
 
-That's (5) probably easiest, because then you can be sure that the patches
-in each upstream tree are identical.
-
-Russell - would you be happy with this arrangment for patchsets that touch
-platforms and core ARM code?
-
-Will
+Nicolas
