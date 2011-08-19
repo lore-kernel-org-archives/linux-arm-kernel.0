@@ -1,53 +1,82 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 19 Aug 2011 12:10:54 +0100
-Subject: [PATCH v7 09/16] ARM: LPAE: MMU setup for the 3-level page
-	table format
-In-Reply-To: <1313749557.5010.345.camel@zakaz.uk.xensource.com>
-References: <1312988619-16804-1-git-send-email-catalin.marinas@arm.com>
-	<1312988619-16804-10-git-send-email-catalin.marinas@arm.com>
-	<1313749557.5010.345.camel@zakaz.uk.xensource.com>
-Message-ID: <20110819111054.GC6558@e102109-lin.cambridge.arm.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Fri, 19 Aug 2011 19:37:41 +0800
+Subject: [PATCH 1/3] ARM: debug: use kconfig choice for selecting
+	DEBUG_LL UART
+In-Reply-To: <20110819110822.GB8918@e102144-lin.cambridge.arm.com>
+References: <1313530873-24961-1-git-send-email-will.deacon@arm.com>
+	<20110818161105.GA12527@S2100-06.ap.freescale.net>
+	<20110818160712.GA26691@e102144-lin.cambridge.arm.com>
+	<20110819045956.GB12527@S2100-06.ap.freescale.net>
+	<20110819110822.GB8918@e102144-lin.cambridge.arm.com>
+Message-ID: <20110819113740.GF12527@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 19, 2011 at 11:25:57AM +0100, Ian Campbell wrote:
-> On Wed, 2011-08-10 at 16:03 +0100, Catalin Marinas wrote:
-> > +/*
-> > + *     cpu_v7_set_pte_ext(ptep, pte)
-> > + *
-> > + *     Set a level 2 translation table entry.
-> > + *
-> > + *     - ptep  - pointer to level 2 translation table entry
-> > + *               (hardware version is stored at +2048 bytes)
+On Fri, Aug 19, 2011 at 12:08:22PM +0100, Will Deacon wrote:
+> On Fri, Aug 19, 2011 at 05:59:57AM +0100, Shawn Guo wrote:
+> > On Thu, Aug 18, 2011 at 05:07:12PM +0100, Will Deacon wrote:
+> > > I'm not sure that sorting this list in alphabetical order is a good idea.
+> > > This is a Kconfig choice, so the default value is the first one in the list
+> > > that has its dependencies satisfied. Therefore, the ordering has a direct
+> > > impact on the default UART selection.
+> > > 
+> > I'm unsure that the default UART selection makes much sense here.
+> > When we build so many platforms into single image, it's hard to say
+> > which one should be the default.  People anyway need to check if the
+> > the UART selection matches the platform they are debugging on.
 > 
-> +2048 thing not true for LPAE?
+> Ok, how about having the default choice as a dummy option which doesn't
+> correspond to a UART?:
 > 
-> > + *     - pte   - PTE value to store
-> > + *     - ext   - value for extended PTE bits
+To me, it is a little bit overkilled.  Can we just sort them in
+alphabetical order and let the first one be the winner?  We can take
+this as a reward to the good naming :)
+
+> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+> index f23975a..455bc8c 100644
+> --- a/arch/arm/Kconfig.debug
+> +++ b/arch/arm/Kconfig.debug
+> @@ -65,8 +65,12 @@ config DEBUG_USER
+>  
+>  # These options are only for real kernel hackers who want to get their hands dirty.
+>  config DEBUG_LL
+> +       bool
+> +
+> +config DEBUG_LL_UART
+>         bool "Kernel low-level debugging functions"
+>         depends on DEBUG_KERNEL
+> +       select DEBUG_LL if !DEBUG_UART_NONE
+>         help
+>           Say Y here to include definitions of printascii, printch, printhex
+>           in the kernel.  This is helpful if you are debugging code that
+> @@ -74,7 +78,12 @@ config DEBUG_LL
+>  
+>  choice
+>         prompt "Kernel low-level debugging port"
+> -       depends on DEBUG_LL
+> +       depends on DEBUG_LL_UART && (FOOTBRIDGE || ARCH_CLPS711X || \
+> +                                    PLAT_SAMSUNG || ARCH_REALVIEW)
+
+We will have to list a lot of ARCH/PLAT symbols here.  This is what
+I meant overkilled actually.
+
+Regards,
+Shawn
+
+> +       default DEBUG_UART_NONE
+> +
+> +       config DEBUG_UART_NONE
+> +               bool "No UART selected (default)"
+>  
+>         config DEBUG_DC21285_PORT
+>                 bool "Kernel low-level debugging messages via footbridge serial port"
 > 
-> "ext" is not actually present/used in this variant, rather pte is split
-> between r1 and r2?
-
-Yes, you are right, the comments have just been copied from proc-v7.S.
-I'll go through them again make sure they are still valid.
-
-> > + */
-> > +ENTRY(cpu_v7_set_pte_ext)
-> > +#ifdef CONFIG_MMU
-> > +       tst     r2, #L_PTE_PRESENT
-> > +       beq     1f
-> > +       tst     r3, #1 << (55 - 32)             @ L_PTE_DIRTY
-> > +       orreq   r2, #L_PTE_RDONLY
-> > +1:     strd    r2, r3, [r0]
 > 
-> AIUI this 64-bit store is not atomic. Is there something about the ARM
-> architecture which would prevent the MMU prefetching the half written
-> entry and caching it in the TLB?
-
-CPU implementations that include LPAE guarantee the atomicity of a
-double-word store (STRD) if the alignment is correct.
-
-Thanks.
-
--- 
-Catalin
+> That way, you really have to select the UART for DEBUG_LL to be enabled.
+> 
+> > BTW, I just posted one patch for imx based on your series.  Are you
+> > interested in folding it into yours?
+> 
+> Yep, I'll pick it up once Sascha is happy with it. If we go with the above,
+> I'm happy to make the necessary changes.
+> 
