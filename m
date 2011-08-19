@@ -1,27 +1,34 @@
-From: davem@davemloft.net (David Miller)
-Date: Thu, 18 Aug 2011 20:34:47 -0700 (PDT)
-Subject: of_iomap() matched with plan iounmap()
-In-Reply-To: <20110818170226.GA16721@huya.qualcomm.com>
-References: <20110818170226.GA16721@huya.qualcomm.com>
-Message-ID: <20110818.203447.462383652600224162.davem@davemloft.net>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 19 Aug 2011 00:50:25 -0300
+Subject: [PATCH] backlight: Fix broken regulator API usage in l4f00242t03
+In-Reply-To: <1313419838-12150-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+References: <1313419838-12150-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <CAOMZO5Ca0KRBU1UYW1MhCNtOq+rQ9o+e3LZUVq_GWbzSeSXJpg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: David Brown <davidb@codeaurora.org>
-Date: Thu, 18 Aug 2011 10:02:26 -0700
+On Mon, Aug 15, 2011 at 11:50 AM, Mark Brown
+<broonie@opensource.wolfsonmicro.com> wrote:
+> The regulator support in the l4f00242t03 is very non-idiomatic, rather
+> than requesting the regulators based on the device name and the supply
+> names used by the device the driver requires boards to pass system
+> specific supply names around through platform data. The driver also
+> conditionally requests the regulators based on this platform data, adding
+> unneeded conditional code to the driver.
+>
+> Fix this by removing the platform data and converting to the standard idiom,
+> also updating all in tree users of the driver. As no datasheet appears to
+> be available for the LCD I'm guessing the names for the supplies based on
+> the existing users and I've no ability to do anything more than compile
+> test.
+>
+> The use of regulator_set_voltage() in the driver is also problematic, since
+> fixed voltages are required the expectation would be that the voltages
+> would be fixed in the constraints set by the machines rather than manually
+> configured by the driver, but is less problematic.
+>
+> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 
-> The SPARC target contains of_ioremap() and of_iounmap(), which various
-> drivers use (generally inside of CONFIG_SBUS).
-> 
-> include/linux/of_address.h contains a definition for of_iomap(), but
-> not corresponding unmap call.  Code using this calls the regular
-> iounmap().
-> 
-> Is it safe to assume that of_iomap() will always be based on ioremap()
-> and therefore it is safe to use iounmap(), or would it be better to
-> define another name for drivers to use as the inverse of of_iomap().
-> I'm not sure what to call it, since of_iounmap() is already taken by
-> SPARC.
+On a mx27_3ds:
 
-It's better to define a matching of_iounmap() interface, even if for
-now it is exactly iounmap()
+Tested-by: Fabio Estevam <fabio.estevam@freescale.com>
