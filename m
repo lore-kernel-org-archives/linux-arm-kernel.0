@@ -1,50 +1,31 @@
-From: abhilash.kv@ti.com (Abhilash K V)
-Date: Fri, 19 Aug 2011 17:22:31 +0530
-Subject: [PATCH 2/2] AM3517: Support for MMC1
-In-Reply-To: <1313754751-11752-2-git-send-email-abhilash.kv@ti.com>
-References: <1313754751-11752-1-git-send-email-abhilash.kv@ti.com>
-	<1313754751-11752-2-git-send-email-abhilash.kv@ti.com>
-Message-ID: <1313754751-11752-3-git-send-email-abhilash.kv@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 19 Aug 2011 13:53:12 +0200
+Subject: [PATCH 1/2] drivers: create a pinmux subsystem v3
+In-Reply-To: <CAGsJ_4yKHQGrY4kbwd+VPsg1ggj3wQqoN+uPLmh31RnhbroysQ@mail.gmail.com>
+References: <1307984291-9774-1-git-send-email-linus.walleij@stericsson.com>
+	<CAGsJ_4yKHQGrY4kbwd+VPsg1ggj3wQqoN+uPLmh31RnhbroysQ@mail.gmail.com>
+Message-ID: <CACRpkdZB7XaB1SxWdqU1-176oab0zMjdu=YfNjgLFsLTztAwyg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes the following error message which appears
-while intializing MMC1 on the AM3517 EVM base-board:
-    mmc0: host doesn't support card's voltages
-    mmc0: error -22 whilst initialising SD card
-The ocr_mask, which enumerates the volatges supported by the
-MMC card was not being indicated before, assuming that a separate
-Vcc regulator maybe another controllable regulator driver would be
-doing this. This patch statically specifies a subset of the voltages
-supported by the MMC driver, which are provided by the current fixed
-voltage regulator on AM3517 EVM.
+On Thu, Jul 14, 2011 at 7:57 AM, Barry Song <21cnbao@gmail.com> wrote:
 
-Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-Signed-off-by: Abhilash K V <abhilash.kv@ti.com>
----
- arch/arm/mach-omap2/hsmmc.c |   10 +++++++++-
- 1 files changed, 9 insertions(+), 1 deletions(-)
+> has this been ready for 3.1? we have been planning to write pinmux
+> driver based on this framework.
 
-diff --git a/arch/arm/mach-omap2/hsmmc.c b/arch/arm/mach-omap2/hsmmc.c
-index a9b45c7..9dee2e1 100644
---- a/arch/arm/mach-omap2/hsmmc.c
-+++ b/arch/arm/mach-omap2/hsmmc.c
-@@ -350,7 +350,15 @@ static int __init omap_hsmmc_pdata_init(struct omap2_hsmmc_info *c,
- 	 *
- 	 * temporary HACK: ocr_mask instead of fixed supply
- 	 */
--	mmc->slots[0].ocr_mask = c->ocr_mask;
-+	if (cpu_is_omap3505() || cpu_is_omap3517())
-+		mmc->slots[0].ocr_mask = MMC_VDD_165_195 |
-+					 MMC_VDD_26_27 |
-+					 MMC_VDD_27_28 |
-+					 MMC_VDD_29_30 |
-+					 MMC_VDD_30_31 |
-+					 MMC_VDD_31_32;
-+	else
-+		mmc->slots[0].ocr_mask = c->ocr_mask;
- 
- 	if (cpu_is_omap3517() || cpu_is_omap3505())
- 		mmc->slots[0].set_power = nop_mmc_set_power;
--- 
-1.7.1
+On Mon, Aug 8, 2011 at 4:28 AM, Barry Song <21cnbao@gmail.com> wrote:
+
+> What is the status of pincfg subsystem? what's the plan about merging
+> this subsystem?
+
+I failed, we needed feedback from some more players.
+If you need this framework, please review and ACK the
+patch set when you're happy with it so I know I have users who
+are happy with it as it looks.
+
+v4 is out today atleast. If there are no big objections so I have to
+re-architect it again, I might be able to ask Stephen to pull it
+into linux-next.
+
+Thanks,
+Linus Walleij
