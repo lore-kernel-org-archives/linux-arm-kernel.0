@@ -1,58 +1,56 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 19 Aug 2011 23:15:54 +0900
-Subject: [PATCH 0/4] ARM: EXYNOS4: Support generic Power domain framework
-	for EXYNOS4210
-In-Reply-To: <4E4360B2.2060508@samsung.com>
-References: <4E4360B2.2060508@samsung.com>
-Message-ID: <005101cc5e7a$81ffae60$85ff0b20$%kim@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 19 Aug 2011 16:21:56 +0200
+Subject: Patch Merging Path - RMK or Arnd?
+In-Reply-To: <20110819124933.GG8918@e102144-lin.cambridge.arm.com>
+References: <20110819124933.GG8918@e102144-lin.cambridge.arm.com>
+Message-ID: <201108191621.56263.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Chanwoo Choi wrote:
+On Friday 19 August 2011, Will Deacon wrote:
+> Ideally, I would also merge these via Russell, but there is now scope for
+> conflict with your arm-soc branch given that I'm changing files under mach-*
+> and plat-*. How would you recommend that I proceed? I can think of three
+> solutions:
 > 
-> The following patch set use the generic Power domain Framework instead of
-> power domain code depend of Samsung SoC.
 > 
-> Chanwoo Choi (4):
->   ARM: EXYNOS4: Support for generic I/O power domains on EXYNOS4210
->   ARM: EXYNOS4: Support for generic Clock manipulation PM callbacks
->   ARM: EXYNOS4: Delete the power-domain code depend on Samsung SoC
->   ARM: EXYNOS4: Add power domain to use generic Power domain Framework
+> (1) [preferred] Merge via Russell, conflicts show up in -next and are
+>     resolved then.
 > 
->  arch/arm/mach-exynos4/Kconfig                      |   10 +-
->  arch/arm/mach-exynos4/Makefile                     |    4 +-
->  arch/arm/mach-exynos4/dev-pd.c                     |  139 --------------
->  arch/arm/mach-exynos4/include/mach/pm-exynos4210.h |   52 ++++++
->  arch/arm/mach-exynos4/include/mach/regs-clock.h    |    8 +
->  arch/arm/mach-exynos4/mach-nuri.c                  |   21 ++-
->  arch/arm/mach-exynos4/mach-smdkc210.c              |   26 ++-
->  arch/arm/mach-exynos4/mach-smdkv310.c              |   23 ++-
->  arch/arm/mach-exynos4/mach-universal_c210.c        |   21 ++-
->  arch/arm/mach-exynos4/pm-exynos4210.c              |  189
-> ++++++++++++++++++++
->  arch/arm/mach-exynos4/pm-runtime.c                 |   56 ++++++
->  arch/arm/plat-samsung/Kconfig                      |    8 -
->  arch/arm/plat-samsung/Makefile                     |    4 -
->  arch/arm/plat-samsung/include/plat/pd.h            |   30 ---
->  arch/arm/plat-samsung/pd.c                         |   95 ----------
->  15 files changed, 377 insertions(+), 309 deletions(-)
->  delete mode 100644 arch/arm/mach-exynos4/dev-pd.c
->  create mode 100644 arch/arm/mach-exynos4/include/mach/pm-exynos4210.h
->  create mode 100644 arch/arm/mach-exynos4/pm-exynos4210.c
->  create mode 100644 arch/arm/mach-exynos4/pm-runtime.c
->  delete mode 100644 arch/arm/plat-samsung/include/plat/pd.h
->  delete mode 100644 arch/arm/plat-samsung/pd.c
+> (2) Split the patches up so that the core changes go via Russell. When they
+>     are in a suitable tree (-next?) then send you the remainder on top of
+>     that.
+> 
+> (3) Merge the whole lot via you. This really just inverts the problem rather
+>     than solving anything.
+> 
+> 
+> I expect this will become a fairly common pattern with single zImage work,
+> so it would be great to clarify the intended path upstream.
 
-Hi Chanwoo,
+There is another options, which is to have the changes in both trees, or
+at least have some of the changes in both.
 
-Basically looks ok.
-I will review this in detail in the next week.
-Then if no problems, will apply.
+Fortunately, git can handle merges of that sort just fine, so I'd say
+depending on the contents you do one of:
 
-Thanks.
+(4) Split up the changesets into a core set (for the arch directory) and
+    a second set that goes on top and changes all the platforms. Get
+    Russell to take the base patches into one branch, and submit the
+    branch containing the full set (including the ones in Russell's
+    tree) for the arm-soc tree. I will then make sure queue the changes
+    for merging to Linus after he has taken the base changes from
+    Russell.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+(5) Prepare one git tree and submit it to both trees at once. If everyone
+    is happy with the changes, we just apply it to both and one of us
+    submits it first.
+    Either tree can also contain further changes on top, so if your
+    changes are already upstream through one tree, the second pull request
+    from the other tree will contain the other changes that go on top.
+
+This is really not much different to dependencies on any other tree,
+e.g. when the gpio subsystem has some changes that are required for
+platform specific changes that go through the arm-soc tree.
+
+	Arnd
