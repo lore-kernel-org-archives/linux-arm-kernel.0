@@ -1,81 +1,47 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 19 Aug 2011 22:07:58 +0900
-Subject: [PATCH] arm: exynos4: Add restart hook for proper reboot
-In-Reply-To: <20110819104614.GA32582@july>
-References: <20110819104614.GA32582@july>
-Message-ID: <002d01cc5e71$045868c0$0d093a40$%kim@samsung.com>
+From: amit.kachhap@linaro.org (Amit Daniel Kachhap)
+Date: Fri, 19 Aug 2011 18:39:00 +0530
+Subject: [RFC PATCH 0/4] ARM: EXYNOS4: Use cpuidle common save/restore
+	framework code
+Message-ID: <1313759340-31319-1-git-send-email-amit.kachhap@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kyungmin Park wrote:
-> 
-> From: Kyungmin Park <kyungmin.park@samsung.com>
-> 
-> Add restart hook for proper reboot
-> 
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
-> diff --git a/arch/arm/mach-exynos4/cpu.c b/arch/arm/mach-exynos4/cpu.c
-> index 2d8a40c..1860327 100644
-> --- a/arch/arm/mach-exynos4/cpu.c
-> +++ b/arch/arm/mach-exynos4/cpu.c
-> @@ -28,8 +28,10 @@
->  #include <plat/fb-core.h>
->  #include <plat/fimc-core.h>
->  #include <plat/iic-core.h>
-> +#include <plat/reset.h>
-> 
->  #include <mach/regs-irq.h>
-> +#include <mach/regs-pmu.h>
-> 
->  extern int combiner_init(unsigned int combiner_nr, void __iomem *base,
->  			 unsigned int irq_start);
-> @@ -128,6 +130,11 @@ static void exynos4_idle(void)
->  	local_irq_enable();
->  }
-> 
-> +static void exynos4_sw_reset(void)
-> +{
-> +	__raw_writel(0x1, S5P_SWRESET);
-> +}
-> +
->  /*
->   * exynos4_map_io
->   *
-> @@ -241,5 +248,8 @@ int __init exynos4_init(void)
->  	/* set idle function */
->  	pm_idle = exynos4_idle;
-> 
-> +	/* set sw_reset function */
-> +	s5p_reset_hook = exynos4_sw_reset;
-> +
->  	return sysdev_register(&exynos4_sysdev);
->  }
-> diff --git a/arch/arm/mach-exynos4/include/mach/regs-pmu.h
-b/arch/arm/mach-
-> exynos4/include/mach/regs-pmu.h
-> index fa49bbb..cdf9b47 100644
-> --- a/arch/arm/mach-exynos4/include/mach/regs-pmu.h
-> +++ b/arch/arm/mach-exynos4/include/mach/regs-pmu.h
-> @@ -29,6 +29,8 @@
->  #define S5P_USE_STANDBY_WFE1			(1 << 25)
->  #define S5P_USE_MASK				((0x3 << 16) | (0x3
-> << 24))
-> 
-> +#define S5P_SWRESET				S5P_PMUREG(0x0400)
-> +
->  #define S5P_WAKEUP_STAT
-> 	S5P_PMUREG(0x0600)
->  #define S5P_EINT_WAKEUP_MASK
-> 	S5P_PMUREG(0x0604)
->  #define S5P_WAKEUP_MASK
-> 	S5P_PMUREG(0x0608)
+These patch adds support for samsung exynos4 platform cpuidle driver to use
+the common cpuidle framework submitted earlier by Lorenzo Pieralisi. Basically
+a single interface cpu_enter_idle takes care of saving and restoring single 
+cpu or whole cluster information.  The link to the framework patchset is,
+http://www.spinics.net/lists/arm-kernel/msg132044.html
 
-OK, applied.
-Thanks.
+Description of patches in this list:
+1)Patch (ARM: kernel: Some fixes in save/restore common code) adds some
+essential fixes for the common save/restore to work on exynos4 platform.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+2)Patch (ARM: EXYNOS4: Fix to work with origen boards) adds a fix for 
+extracting chip revision number.
+
+3)Patch (ARM: EXYNOS4: Add support AFTR mode cpuidle state on EXYNOS4210) 
+rebases the L2 retention C state cpuidle driver submitted earlier by 
+Jaecheol Lee.
+
+4)Patch (Modify cpuidle code to adapt to save/restore common code) uses the
+generic infrastructure to enter and exit from the retention idle state. 
+
+All these codes have been tested on Samsung ORIGEN board against the tree
+git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git for-next.
+
+Amit Daniel Kachhap (4):
+  ARM: kernel: Some fixes in save/restore common code.
+  ARM: EXYNOS4: Fix to work with origen boards.
+  ARM: EXYNOS4: Add support AFTR mode cpuidle state on EXYNOS4210
+  ARM: EXYNOS4: Modify cpuidle code to adapt to save/restore common
+    code
+
+ arch/arm/Kconfig                         |    1 +
+ arch/arm/common/gic.c                    |    1 -
+ arch/arm/kernel/sr_helpers.h             |    2 +-
+ arch/arm/mach-exynos4/cpu.c              |   10 ++
+ arch/arm/mach-exynos4/cpuidle.c          |  150 +++++++++++++++++++++++++++++-
+ arch/arm/mach-exynos4/include/mach/pmu.h |    1 -
+ arch/arm/mm/cache-l2x0.c                 |   10 ++-
+ arch/arm/plat-s5p/include/plat/exynos4.h |    1 +
+ 8 files changed, 169 insertions(+), 7 deletions(-)
