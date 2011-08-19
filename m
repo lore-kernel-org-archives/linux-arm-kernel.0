@@ -1,38 +1,74 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 19 Aug 2011 13:59:00 +0200
-Subject: [PATCH 1/2] drivers: create a pinmux subsystem v3
-In-Reply-To: <20110709102337.GD9247@sirena.org.uk>
-References: <1307984291-9774-1-git-send-email-linus.walleij@stericsson.com>
-	<BANLkTi=r=N5OwfsVLRuBsNRSpv91pTgeKA@mail.gmail.com>
-	<20110709102337.GD9247@sirena.org.uk>
-Message-ID: <CACRpkdaqHcY_phZouGn5dJWzF3FKXuP_4Fn-EJZFivrnQRrnKg@mail.gmail.com>
+Date: Fri, 19 Aug 2011 14:10:41 +0200
+Subject: [PATCH 2/2] pinmux: add a driver for the U300 pinmux
+In-Reply-To: <CAGsJ_4wWVTwY_=dQAT+-SGG3nRrwipZfVnaD6pMhDFL0OTX8rA@mail.gmail.com>
+References: <1307984311-9813-1-git-send-email-linus.walleij@stericsson.com>
+	<CAGsJ_4wWVTwY_=dQAT+-SGG3nRrwipZfVnaD6pMhDFL0OTX8rA@mail.gmail.com>
+Message-ID: <CACRpkdbTQbeU8MfW4_SobbNf2aV2+UFXFtqaBjXDML2vrckWvQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 9, 2011 at 12:23 PM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Mon, Jun 13, 2011 at 01:57:36PM -0600, Grant Likely wrote:
->> On Mon, Jun 13, 2011 at 10:58 AM, Linus Walleij
->>
->> I would *strongly* recommend against individual device drivers
->> accessing the pinmux api. ?This is system level configuration code,
->> and should be handled at the system level.
+On Thu, Jul 14, 2011 at 5:40 AM, Barry Song <21cnbao@gmail.com> wrote:
+
+>> +static const struct u300_pmx_func u300_pmx_funcs[] = {
+>> + ? ? ? {
+>> + ? ? ? ? ? ? ? .name = "uart0",
+>> + ? ? ? ? ? ? ? .pins = uart0_pins,
+>> + ? ? ? ? ? ? ? .num_pins = ARRAY_SIZE(uart0_pins),
+>> + ? ? ? ? ? ? ? .mask = uart0_mask,
 >
-> There can also be advantages to putting the pin into the designed mode
-> without the driver being loaded from the electrical point of view. ?For
-> example, selecting appropriate pull values for pads can cut down on
-> power consumption.
+> if we build a register address/bit shift/value table for every pinmux
+> selection, sometimes we even need to write multiple registers for only
+> one selection, for example:
+>
+> spi0:
+> {
+> REG ? ? ?SHIFT ? VALUE
+> {REG1, ? ?1, ? ? ? ? 5},
+> {REG2, ? ?3, ? ? ? ? 2},
+> }
+>
+> we might let the whole enable/disable have common codes in the pinmux
+> core but not implemented by every drivers.
+> Common Enable:
+> for (i = 0; i < MASK_NUM; i++)
+> {
+> ? ? writel(mask[i].reg, readl(mask[i].reg) | mask[i].val << mask[i].shift);
+> }
+>
+> Common Disable:
+> for (i = 0; i < MASK_NUM; i++)
+> {
+> ? ? writel(mask[i].reg, readl(mask[i].reg) & ~(mask[i].val << mask[i].shift));
+> }
 
-Since the pin control subsystem is reference counting wrt
-mux settings, one does not exclude the other. So for
-example a driver may or may not grab a certain set-up of pins
-and the core platform may do the same, but when they start to
-request different conflicting things the subsystem will complain,
-as is apropriate.
+OK that problem is not unique to the pinmux subsystem though,
+I can think of drivers/gpio/ and drivers/mfd/ etc etc plus platforms
+having this need.
 
-So this is a very pure driver framework, without policy, it just
-does what it's told, and will prevent undefined and impossible
-settings. Atleast that's the idea.
+> ASoC really define some good macros about register layout for audio
+> path, audio volume and son on, so every driver doesn't need to write
+> so many details about hardware. they just use those macros to define
+> register layout.
+
+Can they be made generic so that *any* subsystem can use them?
+
+> If we have common enable/disable for pinmux, every pinmux driver will
+> only need to fill the table. Actually,  engineers just want to check
+> the datasheet to figure out the table. And they don't want to repeat
+> the enable/disable codes for every possible selection of pinmux.
+
+Not all pinmuxes are the same, and not all are memory-mapped
+either. Some are on the other end of an I2C, some (like U300)
+need to read and write more than one register to do a specific
+pin muxing. In the gpio-nomadik driver there is a special horror
+about these registers also, one that cannot be solved easily with
+a function like that. So it'd have to be optional.
+
+It's a separate subject I think, no problem to do such things any day
+on any subsystem.
+
+Else we'll define and refactor what we need as we go along...
 
 Thanks,
 Linus Walleij
