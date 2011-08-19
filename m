@@ -1,74 +1,58 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 19 Aug 2011 13:32:38 +0100
-Subject: [PATCH 1/3] ARM: debug: use kconfig choice for selecting
-	DEBUG_LL UART
-In-Reply-To: <20110819113740.GF12527@S2100-06.ap.freescale.net>
-References: <1313530873-24961-1-git-send-email-will.deacon@arm.com>
-	<20110818161105.GA12527@S2100-06.ap.freescale.net>
-	<20110818160712.GA26691@e102144-lin.cambridge.arm.com>
-	<20110819045956.GB12527@S2100-06.ap.freescale.net>
-	<20110819110822.GB8918@e102144-lin.cambridge.arm.com>
-	<20110819113740.GF12527@S2100-06.ap.freescale.net>
-Message-ID: <20110819123238.GD8918@e102144-lin.cambridge.arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 19 Aug 2011 14:34:04 +0200
+Subject: [PATCH 1/2] drivers: create a pinmux subsystem v3
+In-Reply-To: <BANLkTikFLbU70uJO0yrf8HipcVEwbUHgsw@mail.gmail.com>
+References: <1307984291-9774-1-git-send-email-linus.walleij@stericsson.com>
+	<74CDBE0F657A3D45AFBB94109FB122FF04992C02AC@HQMAIL01.nvidia.com>
+	<BANLkTinNmPVEM4Eu4efxkuwrCU_FVWFaAg@mail.gmail.com>
+	<74CDBE0F657A3D45AFBB94109FB122FF04992C049D@HQMAIL01.nvidia.com>
+	<BANLkTikFLbU70uJO0yrf8HipcVEwbUHgsw@mail.gmail.com>
+Message-ID: <CACRpkdbYvO4LfdTNGm3DJXKTKzS1_8cOXeqWfP3-yUikuxXTTA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 19, 2011 at 12:37:41PM +0100, Shawn Guo wrote:
-> On Fri, Aug 19, 2011 at 12:08:22PM +0100, Will Deacon wrote:
-> > On Fri, Aug 19, 2011 at 05:59:57AM +0100, Shawn Guo wrote:
-> > > On Thu, Aug 18, 2011 at 05:07:12PM +0100, Will Deacon wrote:
-> > > > I'm not sure that sorting this list in alphabetical order is a good idea.
-> > > > This is a Kconfig choice, so the default value is the first one in the list
-> > > > that has its dependencies satisfied. Therefore, the ordering has a direct
-> > > > impact on the default UART selection.
-> > > > 
-> > > I'm unsure that the default UART selection makes much sense here.
-> > > When we build so many platforms into single image, it's hard to say
-> > > which one should be the default.  People anyway need to check if the
-> > > the UART selection matches the platform they are debugging on.
-> > 
-> > Ok, how about having the default choice as a dummy option which doesn't
-> > correspond to a UART?:
-> > 
-> To me, it is a little bit overkilled.  Can we just sort them in
-> alphabetical order and let the first one be the winner?  We can take
-> this as a reward to the good naming :)
+On Thu, Jun 16, 2011 at 2:47 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
 
-We could do this, I just thought it might be better to force the user to
-select a UART rather than blindly using the first one in the list. Then
-again, as Russell pointed out, DEBUG_LL should only be selected if you know
-what you are doing.
+> So to summarize there are two related areas of discussion
+> here:
+>
+> 1. Whether a pinmux map shall map one or 1..N functions
+> 2. How to handle per-driver instance namespacing of functions
+>
+> In both cases I'm currently using simple strings and claiming
+> that by namespacing these strings cleverly we can avoid
+> complexity. So my answer to these are:
+>
+> 1. Use several functions with ovelapping maps, just name
+> ?them differently
+> 2. Use a string convention and namespace by using
+> ?platform/machine/package data and string conventions
+> ?such as a "::" separator
+>
+> While I *think* (and DO correct me!) that you would argue:
+>
+> 1. Make it possible to map several functions to a single
+> ?device map
+> 2. Namespace device instances by different map field
+> ?members referring to specific instances
+>
+> Is this correctly understood, even if we may not agree?
 
-> > diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-> > index f23975a..455bc8c 100644
-> > --- a/arch/arm/Kconfig.debug
-> > +++ b/arch/arm/Kconfig.debug
-> > @@ -65,8 +65,12 @@ config DEBUG_USER
-> >  
-> >  # These options are only for real kernel hackers who want to get their hands dirty.
-> >  config DEBUG_LL
-> > +       bool
-> > +
-> > +config DEBUG_LL_UART
-> >         bool "Kernel low-level debugging functions"
-> >         depends on DEBUG_KERNEL
-> > +       select DEBUG_LL if !DEBUG_UART_NONE
-> >         help
-> >           Say Y here to include definitions of printascii, printch, printhex
-> >           in the kernel.  This is helpful if you are debugging code that
-> > @@ -74,7 +78,12 @@ config DEBUG_LL
-> >  
-> >  choice
-> >         prompt "Kernel low-level debugging port"
-> > -       depends on DEBUG_LL
-> > +       depends on DEBUG_LL_UART && (FOOTBRIDGE || ARCH_CLPS711X || \
-> > +                                    PLAT_SAMSUNG || ARCH_REALVIEW)
-> 
-> We will have to list a lot of ARCH/PLAT symbols here.  This is what
-> I meant overkilled actually.
+I have now after being massaged by Grant changed opinion
+on (2) and each pin controller (e.g. pinmux) instance has it's
+struct device * or pinctrl_dev_name field in the mapping
+table, so I hope you will find that part solved in an acceptable
+way in the v4 patch set. So we'd solved 50% of our
+disagreements.
 
-Ultimately, we will want to have all the platforms using this mechanism so
-this list of symbols could eventually be removed. I take your point though;
-so I'll leave the patch series as it is for now.
+(Please verify!)
 
-Will
+So remains (1). I hope you will ACK the patch set if I fix
+this also...
+
+I'm thinking about good ways to solve it, reading through
+your old mails, new suggestions based on the new patch
+set are welcome.
+
+Thanks,
+Linus Walleij
