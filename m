@@ -1,35 +1,53 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 19 Aug 2011 12:09:41 +0100
-Subject: [PATCH] arm/imx: use Kconfig choice for low-level debug UART
-	selection
-In-Reply-To: <20110819063533.GR31404@pengutronix.de>
-References: <1313530873-24961-1-git-send-email-will.deacon@arm.com>
-	<1313729819-30301-1-git-send-email-shawn.guo@linaro.org>
-	<20110819063533.GR31404@pengutronix.de>
-Message-ID: <20110819110940.GC8918@e102144-lin.cambridge.arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 19 Aug 2011 12:10:54 +0100
+Subject: [PATCH v7 09/16] ARM: LPAE: MMU setup for the 3-level page
+	table format
+In-Reply-To: <1313749557.5010.345.camel@zakaz.uk.xensource.com>
+References: <1312988619-16804-1-git-send-email-catalin.marinas@arm.com>
+	<1312988619-16804-10-git-send-email-catalin.marinas@arm.com>
+	<1313749557.5010.345.camel@zakaz.uk.xensource.com>
+Message-ID: <20110819111054.GC6558@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sascha,
-
-On Fri, Aug 19, 2011 at 07:35:33AM +0100, Sascha Hauer wrote:
-> On Fri, Aug 19, 2011 at 12:56:59PM +0800, Shawn Guo wrote:
-> > Now that the DEBUG_LL UART can be selected by a Kconfig choice,
-> > simplify the #ifdefery in debug-macro.S and add entries to the
-> > top-level Kconfig.debug instead.
+On Fri, Aug 19, 2011 at 11:25:57AM +0100, Ian Campbell wrote:
+> On Wed, 2011-08-10 at 16:03 +0100, Catalin Marinas wrote:
+> > +/*
+> > + *     cpu_v7_set_pte_ext(ptep, pte)
+> > + *
+> > + *     Set a level 2 translation table entry.
+> > + *
+> > + *     - ptep  - pointer to level 2 translation table entry
+> > + *               (hardware version is stored at +2048 bytes)
 > 
-> I'm unsure whether I like this. The ifdeffery does not look very good,
-> but the Kconfig snippet is not shorter, also it is in generic arm code
-> and not i.MX specific. The old way also makes sure that we do not
-> compile in incompatible lowlevel debug code.
+> +2048 thing not true for LPAE?
+> 
+> > + *     - pte   - PTE value to store
+> > + *     - ext   - value for extended PTE bits
+> 
+> "ext" is not actually present/used in this variant, rather pte is split
+> between r1 and r2?
 
-But it's an unfortunate hinderence to a single zImage kernel which we can
-only solve sensibly in the generic ARM code.
+Yes, you are right, the comments have just been copied from proc-v7.S.
+I'll go through them again make sure they are still valid.
 
-> At least this should be a choice in Kconfig to make clear that the
-> different low-level debug options are exclusive.
+> > + */
+> > +ENTRY(cpu_v7_set_pte_ext)
+> > +#ifdef CONFIG_MMU
+> > +       tst     r2, #L_PTE_PRESENT
+> > +       beq     1f
+> > +       tst     r3, #1 << (55 - 32)             @ L_PTE_DIRTY
+> > +       orreq   r2, #L_PTE_RDONLY
+> > +1:     strd    r2, r3, [r0]
+> 
+> AIUI this 64-bit store is not atomic. Is there something about the ARM
+> architecture which would prevent the MMU prefetching the half written
+> entry and caching it in the TLB?
 
-As Shawn pointed out, we are using a Kconfig choice so you can only select
-one UART for low-level debug output.
+CPU implementations that include LPAE guarantee the atomicity of a
+double-word store (STRD) if the alignment is correct.
 
-Will
+Thanks.
+
+-- 
+Catalin
