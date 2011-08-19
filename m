@@ -1,304 +1,106 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Fri, 19 Aug 2011 15:26:08 +0100
-Subject: [PATCH 1/4 v4] drivers: create a pin control subsystem
-In-Reply-To: <CACRpkdZhg_1WM37uqT1PNmpUjWS_groWJmNnR4SBjqJ6LFQQWQ@mail.gmail.com>
-References: <1313747630-32258-1-git-send-email-linus.walleij@stericsson.com>
-	<20110819104816.GA5030@pulham.picochip.com>
-	<CACRpkdZhg_1WM37uqT1PNmpUjWS_groWJmNnR4SBjqJ6LFQQWQ@mail.gmail.com>
-Message-ID: <20110819142608.GB2800@pulham.picochip.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 19 Aug 2011 16:27:38 +0200
+Subject: [PATCH 2/8] mm: alloc_contig_freed_pages() added
+In-Reply-To: <1313764064-9747-1-git-send-email-m.szyprowski@samsung.com>
+References: <1313764064-9747-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1313764064-9747-3-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+From: KAMEZAWA Hiroyuki <kamezawa.hiroyu@jp.fujitsu.com>
 
-On Fri, Aug 19, 2011 at 04:04:54PM +0200, Linus Walleij wrote:
-> On Fri, Aug 19, 2011 at 12:48 PM, Jamie Iles <jamie@jamieiles.com> wrote:
-> > On Fri, Aug 19, 2011 at 11:53:50AM +0200, Linus Walleij wrote:
-> >> +Interaction with the GPIO subsystem
-> >> +===================================
-> >> +
-> >> +The GPIO drivers may want to perform operations of various types on the same
-> >> +physical pins that are also registered as GPIO pins.
-> >> +
-> >> +Since the pin controller subsystem have its pinspace local to the pin
-> >> +controller we need a mapping so that the pin control subsystem can figure out
-> >> +which pin controller handles control of a certain GPIO pin. This member
-> >> +in the pin controller descriptor handles this mapping:
-> >> +
-> >> +static struct pinctrl_desc foo_desc = {
-> >> + ? ? ...
-> >> + ? ? .gpio_base = FIRST_PIN,
-> >> +};
-> >> +
-> >> +When GPIO-specific functions in the pin control subsystem are called, these
-> >> +mappings will be used to look up the apropriate pin controller by inspecting
-> >> +and matching the pin to this pin range.
-> >
-> > On our (difficultly muxed!) platform we have two types of GPIO - a
-> > Synopsys controller which is a fairly conventional GPIO controller, then
-> > a sigma-delta GPIO controller which can also do a an analogue type
-> > output (as well as digital).
-> 
-> Does that mean it is really not a GPIO controller but a kind of D/A converter?
+This commit introduces alloc_contig_freed_pages() function
+which allocates (ie. removes from buddy system) free pages
+in range.  Caller has to guarantee that all pages in range
+are in buddy system.
 
-Kind of.  In the basic mode it's just a GPIO controller that does 
-digital I/O.  In the SD mode it all really depends on what the external 
-filter looks like.  As gpio_set_value() takes an int as the value, then 
-the gpio controller theoretically _could_ treat that as an analogue 
-output value and use the pinctrl api to set the converter and rate sizes 
-but I don't really want to go there yet as it's a bit of an abuse of the 
-gpio API!
+Along with this function, a free_contig_pages() function is
+provided which frees all (or a subset of) pages allocated
+with alloc_contig_free_pages().
 
-> > ?For lots of our pads they can either be
-> > ARM GPIO, SD GPIO or some other function, so I don't see how this fits
-> > in with a single GPIO base.
-> 
-> And each of them are modeled as a separate gpio_chip I guess?
-> 
-> Otherwise it's a bad match with reality. We had this discussion with GRant
-> where two gpio_chips would use the same number range in the GPIO
-> global pinspace, and it's basically not allowed IIRC.
+Michal Nazarewicz has modified the function to make it easier
+to allocate not MAX_ORDER_NR_PAGES aligned pages by making it
+return pfn of one-past-the-last allocated page.
 
-Yes, the SD-GPIO isn't memory mapped so has a completely separte 
-gpio_chip.
+Signed-off-by: KAMEZAWA Hiroyuki <kamezawa.hiroyu@jp.fujitsu.com>
+Signed-off-by: Michal Nazarewicz <m.nazarewicz@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+CC: Michal Nazarewicz <mina86@mina86.com>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+---
+ include/linux/page-isolation.h |    3 ++
+ mm/page_alloc.c                |   44 ++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 47 insertions(+), 0 deletions(-)
 
-> But yes, there is an assumption that each pin controller will only
-> deal with one block of GPIO pins. So if I make it possible to support
-> several GPIO ranges for one pin controller, does that solve your problem?
-> 
-> Like this:
-> 
-> struct pinctrl_gpio_range {
->     char *name;
->     unsigned int base;
->     unsigned int npins;
-> }
-> 
-> static unsigned int gpio_ranges[] = {
->     {
->         .name="chip1",
->         .base = 0,
->         .npins = 16,
->     },
->     {
->         .name =" chip2",
->         .base = 32,
->         .npins = 16,
->     },
->     {
->         .name = "chip3",
->         .base = 64,
->         .npins = 16,
->     },
-> };
-> 
-> static struct pinctrl_desc foo_desc = {
->         ...
->         .gpio_ranges = gpio_ranges,
->         .num_gpio_ranges = ARRAY_SIZE(gpio_ranges),
-> };
-> 
-> For three different 32-bit GPIO controllers muxed on
-> pins 0..31 using GPIO space pins from 0..95.
-> 
-> Then I pass the number of the instance down to the
-> driver in the gpio_request_enable() callback like
-> this:
-> 
-> int (*gpio_request_enable) (struct pinctrl_dev *pctldev,
-> 	    unsigned instance,
-> 	    unsigned offset);
-> 
-> Would this work?
-> 
-> This has a restriction: the GPIO space must be mapped in
-> continous ranges, as must the pin controller. Else we need
-> one entry per pin in the list above...
-
-OK, that looks perfect!
-
-> >> +The correspondence for the range from the GPIO subsystem to the pin controller
-> >> +subsystem must be one-to-one. Thus the GPIO pins are in the pin controller
-> >> +range [0 .. maxpin] where maxpin is the specified end of the pin range.
-> >
-> > So doesn't this mean that the enumeration that was initially described
-> > as arbitrary actually has to enumerate the GPIO pins first?
-> 
-> If you use GPIO accessors, the enumeration has to match.
-> So I rewrite it like this:
-> 
-> "this enumeration was arbitrarily chosen, in practice you need to think
-> through your numbering system so that it matches the layout of registers
-> and such things in your driver, or the code may become complicated. You must
-> also consider matching of offsets to the GPIO ranges that may be handled by
-> the pin controller."
-> 
-> OK?
-
-Sounds good.
-
-> >> +static struct class pinctrl_class = {
-> >> + ? ? .name = "pinctrl",
-> >> + ? ? .dev_release = pinctrl_dev_release,
-> >> + ? ? .dev_attrs = pinctrl_dev_attrs,
-> >> +};
-> >
-> > Greg K-H has mentioned in the past that class is now deprecated for new
-> > use and that a bus_type should be used instead.
-> 
-> Can you provide a reference with some detail?
-> The pin control devices are usually aleady on a bus like the
-> platform_bus or amba_bus or i2c_bus, then they register a
-> class device in this case.
-> 
-> The kerneldoc documentation says
-> "A bus is a channel between the processor and one or more devices."
-> 
-> This isn't the case here.
-> 
-> Anyhthing that help me understand this is appreciated, Arnd?
-
-There's a thread here https://lkml.org/lkml/2011/3/25/443 where this has 
-been discussed (I originally had a class too).
-
-> >> +/**
-> >> + * struct pinctrl_desc - pin controller descriptor, register this to pin
-> >> + * control subsystem
-> >> + * @name: name for the pin controller
-> >> + * @pins: an array of pin descriptors describing all the pins handled by
-> >> + * ? this pin controller
-> >> + * @npins: number of descriptors in the array, usually just ARRAY_SIZE()
-> >> + * ? of the pins field above
-> >> + * @maxpin: since pin spaces may be sparse, there can he "holes" in the
-> >> + * ? pin range, this attribute gives the maximum pin number in the
-> >> + * ? total range. This should not be lower than npins for example,
-> >> + * ? but may be equal to npins if you have no holes in the pin range.
-> >> + * @pmxops: pinmux operation vtable, if you support pinmuxing in your driver
-> >> + * @gpio_base: the base offset of the pin range in the GPIO subsystem that
-> >> + * ? is handled by this controller, if applicable. This member is only
-> >> + * ? relevant if you want to e.g. control pins from the GPIO subsystem.
-> >> + * @gpio_pins: the number of pins from (and including) the gpio_base offset
-> >> + * ? handled by this pin controller.
-> >> + * @owner: module providing the pin controller, used for refcounting
-> >> + */
-> >> +struct pinctrl_desc {
-> >> + ? ? const char *name;
-> >> + ? ? struct pinctrl_pin_desc const *pins;
-> >> + ? ? unsigned int npins;
-> >> + ? ? unsigned int maxpin;
-> >> + ? ? struct pinmux_ops *pmxops;
-> >> + ? ? unsigned int gpio_base;
-> >> + ? ? unsigned int gpio_pins;
-> >> + ? ? struct module *owner;
-> >
-> > Would it be better to put the owner in the ops structure like file_ops?
-> > I'm sure I remember someone saying that it's better to do that so that
-> > it's in the modules .data/.rodata section but I can't find that
-> > reference.
-> 
-> I can't do that because the pinmux_ops vtable is not mandatory.
-> 
-> The plan is to add more ops for other things like pin bias etc.
-
-OK, I'd missed that.
-
-> >> +/**
-> >> + * struct pinctrl_dev - pin control class device
-> >> + * @desc: the pin controller descriptor supplied when initializing this pin
-> >> + * ? controller
-> >> + * @node: node to include this pin controller in the global pin controller list
-> >> + * @dev: the device entry for this pin controller
-> >> + * @owner: module providing the pin controller, used for refcounting
-> >> + * @driver_data: driver data for drivers registering to the pin controller
-> >> + * ? subsystem
-> >> + *
-> >> + * This should be dereferenced and used by the pin controller core ONLY
-> >> + */
-> >> +struct pinctrl_dev {
-> >> + ? ? struct pinctrl_desc *desc;
-> >> + ? ? struct radix_tree_root pin_desc_tree;
-> >> + ? ? spinlock_t pin_desc_tree_lock;
-> >> + ? ? struct list_head node;
-> >> + ? ? struct device dev;
-> >> + ? ? struct module *owner;
-> >> + ? ? void *driver_data;
-> >
-> > Couldn't the struct device driver_data be used here?
-> 
-> I'm already using dev_set_drvdata(&pctldev->dev, pctldev);
-> So I can retrieve the pctldev withdev_get_drvdata(dev);
-> in sysfs...
-> 
-> If I wasn't registering sysfs nodes I couldv'e used it.
-
-OK, fair enough.
-
-> >> +/* These should only be used from drives */
-> >
-> > s/drives/drivers?
-> 
-> OK.
-> 
-> >> +/**
-> >> + * struct pinmux_ops - pinmux operations, to be implemented by pin controller
-> >> + * drivers that support pinmuxing
-> >> + * @request: called by the core to see if a certain pin can be made available
-> >> + * ? available for muxing. This is called by the core to acquire the pins
-> >> + * ? before selecting any actual mux setting across a function. The driver
-> >> + * ? is allowed to answer "no" by returning a negative error code
-> >> + * @free: the reverse function of the request() callback, frees a pin after
-> >> + * ? being requested
-> >
-> > So is the request like gpio_request() or just test if it the pin is
-> > available? ?If its the latter then perhaps pin_is_available() might be a
-> > better name?
-> 
-> It's the former. The pin controller may have some electrical
-> properties that makes it impossible to request a certain pin for muxing
-> at a certain time. (Found out on earlier list review.)
-
-OK, it's a bit of a language nitpick, but I interpreted that as meaning 
-it was purely a test.
-
-	@request: called by the core to reserve a pin for muxing. This 
-	is called by the core to acquire the pins before selecting any 
-	actual mux setting across a function. The driver is allowed to 
-	answer "no" by returning a negative error code.
-
-maybe makes things a little clearer (to me anyway!)?
-
-> >> +#else /* !CONFIG_PINMUX */
-> >> +
-> >> +static inline int pinmux_request_gpio(unsigned gpio)
-> >> +{
-> >> + ? ? return 0;
-> >> +}
-> >> +
-> >> +static inline void pinmux_free_gpio(unsigned gpio)
-> >> +{
-> >> +}
-> >> +
-> >> +static inline struct pinmux *pinmux_get(struct device *dev, const char *func)
-> >> +{
-> >> + ? ? return NULL;
-> >> +}
-> >
-> > The CONFIG_PINMUX=y version of pinmux_get returns an ERR_PTR() encoded
-> > error so perhaps this should return something like ERR_PTR(-ENXIO)?
-> 
-> No this is modeled more like the regulator stubs in
-> <linux/regulator.h>. For example, if you're compiling for a
-> platform that does not support regulators they are assumed to
-> be always on.
-> 
-> In this case, if compiled for a platform without pinmux, we assume
-> we got the pins we need already so it just works, not fail.
-
-That makes perfect sense!  Doh!
-
-Thanks a lot for doing this work Linus, it's really appreciated and 
-looking great!  It's a bit difficult for me to test this on my platform 
-at the moment as I'm still trying to handle all of the device tree stuff 
-but I'll give this a good test as soon as I can.
-
-Jamie
+diff --git a/include/linux/page-isolation.h b/include/linux/page-isolation.h
+index 58cdbac..f1417ed 100644
+--- a/include/linux/page-isolation.h
++++ b/include/linux/page-isolation.h
+@@ -32,6 +32,9 @@ test_pages_isolated(unsigned long start_pfn, unsigned long end_pfn);
+  */
+ extern int set_migratetype_isolate(struct page *page);
+ extern void unset_migratetype_isolate(struct page *page);
++extern unsigned long alloc_contig_freed_pages(unsigned long start,
++					      unsigned long end, gfp_t flag);
++extern void free_contig_pages(struct page *page, int nr_pages);
+ 
+ /*
+  * For migration.
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index 6e8ecb6..ad6ae3f 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -5668,6 +5668,50 @@ out:
+ 	spin_unlock_irqrestore(&zone->lock, flags);
+ }
+ 
++unsigned long alloc_contig_freed_pages(unsigned long start, unsigned long end,
++				       gfp_t flag)
++{
++	unsigned long pfn = start, count;
++	struct page *page;
++	struct zone *zone;
++	int order;
++
++	VM_BUG_ON(!pfn_valid(start));
++	zone = page_zone(pfn_to_page(start));
++
++	spin_lock_irq(&zone->lock);
++
++	page = pfn_to_page(pfn);
++	for (;;) {
++		VM_BUG_ON(page_count(page) || !PageBuddy(page));
++		list_del(&page->lru);
++		order = page_order(page);
++		zone->free_area[order].nr_free--;
++		rmv_page_order(page);
++		__mod_zone_page_state(zone, NR_FREE_PAGES, -(1UL << order));
++		pfn  += 1 << order;
++		if (pfn >= end)
++			break;
++		VM_BUG_ON(!pfn_valid(pfn));
++		page += 1 << order;
++	}
++
++	spin_unlock_irq(&zone->lock);
++
++	/* After this, pages in the range can be freed one be one */
++	page = pfn_to_page(start);
++	for (count = pfn - start; count; --count, ++page)
++		prep_new_page(page, 0, flag);
++
++	return pfn;
++}
++
++void free_contig_pages(struct page *page, int nr_pages)
++{
++	for (; nr_pages; --nr_pages, ++page)
++		__free_page(page);
++}
++
+ #ifdef CONFIG_MEMORY_HOTREMOVE
+ /*
+  * All pages in the range must be isolated before calling this.
+-- 
+1.7.1.569.g6f426
