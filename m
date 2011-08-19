@@ -1,72 +1,76 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Fri, 19 Aug 2011 22:59:34 +0900
-Subject: [RFC PATCH 2/4] ARM: EXYNOS4: Fix to work with origen boards.
-In-Reply-To: <1313759400-31347-2-git-send-email-amit.kachhap@linaro.org>
-References: <1313759340-31319-1-git-send-email-amit.kachhap@linaro.org>
-	<1313759400-31347-2-git-send-email-amit.kachhap@linaro.org>
-Message-ID: <CAH9JG2XbTub+TR_Pbi8ZqedD78HsDzMAY581XQbcWYF6aP82aQ@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 19 Aug 2011 23:02:34 +0900
+Subject: [PATCH 0/5] S5P64X0 PM Support
+In-Reply-To: <1313144787-30666-1-git-send-email-a.kesavan@samsung.com>
+References: <1313144787-30666-1-git-send-email-a.kesavan@samsung.com>
+Message-ID: <004401cc5e78$a54aa200$efdfe600$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 19, 2011 at 10:09 PM, Amit Daniel Kachhap
-<amit.kachhap@linaro.org> wrote:
-> This adds a function to get the revision id.
->
-> Signed-off-by: Jaecheol Lee <jc.lee@samsung.com>
-> Signed-off-by: Changhwan Youn <chaos.youn@samsung.com>
-> ---
-> ?arch/arm/mach-exynos4/cpu.c ? ? ? ? ? ? ?| ? 10 ++++++++++
-> ?arch/arm/plat-s5p/include/plat/exynos4.h | ? ?1 +
-> ?2 files changed, 11 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/mach-exynos4/cpu.c b/arch/arm/mach-exynos4/cpu.c
-> index 2d8a40c..8b106b8 100644
-> --- a/arch/arm/mach-exynos4/cpu.c
-> +++ b/arch/arm/mach-exynos4/cpu.c
-> @@ -234,6 +234,16 @@ static int __init exynos4_l2x0_cache_init(void)
-> ?early_initcall(exynos4_l2x0_cache_init);
-> ?#endif
->
-> +int exynos4_subrev(void)
-> +{
-> + ? ? ? static int subrev = -1;
-> +
-> + ? ? ? if (unlikely(subrev < 0))
-> + ? ? ? ? ? ? ? subrev = readl(S5P_VA_CHIPID) & 0xf;
-How about to add the clock control here?
-1. Register chipid clk
-2. Get the chipid clk
-3. Read CHPIID,
-4. Put tht chipid clk.
-
-Then you can save some power.
-
-Thank you,
-Kyungmin Park
-> +
-> + ? ? ? return subrev;
-> +}
-> +
-> ?int __init exynos4_init(void)
-> ?{
-> ? ? ? ?printk(KERN_INFO "EXYNOS4: Initializing architecture\n");
-> diff --git a/arch/arm/plat-s5p/include/plat/exynos4.h b/arch/arm/plat-s5p/include/plat/exynos4.h
-> index 907caab..d62f7f7 100644
-> --- a/arch/arm/plat-s5p/include/plat/exynos4.h
-> +++ b/arch/arm/plat-s5p/include/plat/exynos4.h
-> @@ -15,6 +15,7 @@
-> ?extern void exynos4_common_init_uarts(struct s3c2410_uartcfg *cfg, int no);
-> ?extern void exynos4_register_clocks(void);
-> ?extern void exynos4_setup_clocks(void);
-> +extern int exynos4_subrev(void);
->
-> ?#ifdef CONFIG_CPU_EXYNOS4210
->
+Abhilash Kesavan wrote:
+> 
+> The patchset adds Power Mangement support for S5P64X0. The first
+> four patches lay the groundwork for adding PM support, while the
+> final patch adds the SoC specific PM code.
+> Tested using external interrupts as wake-up sources on SMDK6440
+> and SMDK6450.
+> 
+> Abhilash Kesavan (5):
+>   ARM: S5P: Make the common S5P PM code conditionally compile
+>   ARM: SAMSUNG: Make the sleep code common for S3C64XX and newer SoCs
+>   ARM: S5P64X0: Add pm save/restore functions for GPIO banks
+>   ARM: S5P64X0: Fix incorrect serial clock name
+>   ARM: S5P64X0: Add Power Management support
+> 
+>  arch/arm/Kconfig                                |    2 +-
+>  arch/arm/mach-exynos4/Kconfig                   |    2 +
+>  arch/arm/mach-exynos4/Makefile                  |    2 +-
+>  arch/arm/mach-exynos4/sleep.S                   |   54 ------
+>  arch/arm/mach-s3c64xx/Kconfig                   |    1 +
+>  arch/arm/mach-s3c64xx/Makefile                  |    1 -
+>  arch/arm/mach-s3c64xx/sleep.S                   |   72 --------
+>  arch/arm/mach-s5p64x0/Kconfig                   |    4 +
+>  arch/arm/mach-s5p64x0/Makefile                  |    1 +
+>  arch/arm/mach-s5p64x0/clock-s5p6440.c           |    2 +-
+>  arch/arm/mach-s5p64x0/clock-s5p6450.c           |    2 +-
+>  arch/arm/mach-s5p64x0/gpiolib.c                 |    1 +
+>  arch/arm/mach-s5p64x0/include/mach/map.h        |    1 +
+>  arch/arm/mach-s5p64x0/include/mach/pm-core.h    |  117 +++++++++++++
+>  arch/arm/mach-s5p64x0/include/mach/regs-clock.h |   33 ++++
+>  arch/arm/mach-s5p64x0/include/mach/regs-gpio.h  |   19 ++
+>  arch/arm/mach-s5p64x0/init.c                    |    2 +-
+>  arch/arm/mach-s5p64x0/irq-eint.c                |    2 +
+>  arch/arm/mach-s5p64x0/irq-pm.c                  |   92 ++++++++++
+>  arch/arm/mach-s5p64x0/pm.c                      |  204
+> +++++++++++++++++++++++
+>  arch/arm/mach-s5pv210/Kconfig                   |    2 +
+>  arch/arm/mach-s5pv210/Makefile                  |    2 +-
+>  arch/arm/mach-s5pv210/sleep.S                   |   52 ------
+>  arch/arm/plat-s5p/Kconfig                       |    6 +
+>  arch/arm/plat-s5p/Makefile                      |    3 +-
+>  arch/arm/plat-samsung/Kconfig                   |    7 +
+>  arch/arm/plat-samsung/Makefile                  |    1 +
+>  arch/arm/plat-samsung/sleep.S                   |   80 +++++++++
+>  drivers/gpio/gpio-plat-samsung.c                |    4 +-
+>  29 files changed, 583 insertions(+), 188 deletions(-)
+>  delete mode 100644 arch/arm/mach-exynos4/sleep.S
+>  delete mode 100644 arch/arm/mach-s3c64xx/sleep.S
+>  create mode 100644 arch/arm/mach-s5p64x0/include/mach/pm-core.h
+>  create mode 100644 arch/arm/mach-s5p64x0/irq-pm.c
+>  create mode 100644 arch/arm/mach-s5p64x0/pm.c
+>  delete mode 100644 arch/arm/mach-s5pv210/sleep.S
+>  create mode 100644 arch/arm/plat-samsung/sleep.S
+> 
 > --
-> 1.7.1
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+
+Hi Abhilash,
+
+As a note, I will be back on this in the next week :)
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
