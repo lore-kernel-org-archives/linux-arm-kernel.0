@@ -1,48 +1,28 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 19 Aug 2011 15:42:08 +0900
-Subject: [GIT PULL] Samsung S5P for v3.1 merge window
-In-Reply-To: <4E4E0096.2060907@linaro.org>
-References: <001101cc478b$d48983f0$7d9c8bd0$%kim@samsung.com>
-	<4E4E0096.2060907@linaro.org>
-Message-ID: <002501cc5e3b$1e35b760$5aa12620$%kim@samsung.com>
+Date: Fri, 19 Aug 2011 15:51:11 +0900
+Subject: [PATCH] ARM:EXYNOS4: Add the missing clock of EXYNOS4210 to remove
+	leakage power
+In-Reply-To: <4E425573.30408@samsung.com>
+References: <4E425573.30408@samsung.com>
+Message-ID: <002701cc5e3c$61a16e80$24e44b80$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tushar Behera wrote:
+Chanwoo Choi wrote:
 > 
-> Hi Arnd,
+> Singed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> Singed-off-by: Donggeun Kim <dg77.kim@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  arch/arm/mach-exynos4/clock.c                 |  295
+> +++++++++++++++++++++++++
+>  arch/arm/mach-exynos4/include/mach/regs-pmu.h |    6 +
+>  2 files changed, 301 insertions(+), 0 deletions(-)
+>  mode change 100644 => 100755 arch/arm/mach-exynos4/clock.c
 > 
-> On Thursday 21 July 2011 03:21 PM, Kukjin Kim wrote:
-> > Hi Arnd
-> >
-> > Please pull Samsung S5P updates from:
-> >
-> > git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> > for-arm-soc
-> >
-> > Or if you want to merge each branch into arm-soc, please use following.
-> > As per your suggestion, I made following branches in my tree...
-> >
-> > - next-samsung-cleanup for arm-soc/next/cleanup
-> > - next-samsung-devel for arm-soc/next/devel
-> > - next-samsung-soc for arm-soc/next/soc (nothing)
-> > - next-samsung-board for arm-soc/next/board
-> > - and so on...
-> >
-> (snip)
-> >
-> > JeongHyeon Kim (1):
-> >        ARM: EXYNOS4: Add support for ORIGEN board
-> >
-> I can't find this patch in the 3.1-rc1 release. Does it need some rework?
-> 
-Hi
+NO. don't change the mode :(
 
-Yes, you're right, and I already informed that to Arnd at the end of last
-merge window. As I know, he will take care of it.
-
-As a note, you can keep going on development of ORIGEN against on my
-for-next before merging it in mainline.
+And I don't think we _really_ need to add all clocks if they will not be used anywhere in kernel. If it is required, please turn off the clocks in boot loader.
 
 Thanks.
 
