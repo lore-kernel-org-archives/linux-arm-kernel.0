@@ -1,61 +1,168 @@
-From: bryan.wu@canonical.com (Bryan Wu)
-Date: Fri, 19 Aug 2011 12:37:09 +0800
-Subject: [PATCH] ARM: mach-footbridge: add missing header file
-	<video/vga.h>
-In-Reply-To: <1313575204-25374-1-git-send-email-bryan.wu@canonical.com>
-References: <1313575204-25374-1-git-send-email-bryan.wu@canonical.com>
-Message-ID: <CAK5ve-+0rtcC8KiEW9=WHnW8nPTr8+7tmnqUgZJQ_3GV6gMpzw@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 19 Aug 2011 12:56:59 +0800
+Subject: [PATCH] arm/imx: use Kconfig choice for low-level debug UART selection
+In-Reply-To: <1313530873-24961-1-git-send-email-will.deacon@arm.com>
+References: <1313530873-24961-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1313729819-30301-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
+Now that the DEBUG_LL UART can be selected by a Kconfig choice,
+simplify the #ifdefery in debug-macro.S and add entries to the
+top-level Kconfig.debug instead.
 
-Also this one. any comment?
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Cc: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ arch/arm/Kconfig.debug                       |   56 ++++++++++++++++++++++++++
+ arch/arm/mach-mxs/include/mach/debug-macro.S |   12 +-----
+ arch/arm/plat-mxc/include/mach/debug-macro.S |   38 +++---------------
+ 3 files changed, 64 insertions(+), 42 deletions(-)
 
-Thanks,
--Bryan
-
-On Wed, Aug 17, 2011 at 6:00 PM, Bryan Wu <bryan.wu@canonical.com> wrote:
-> This patch fixes following building error:
-> --
-> arch/arm/mach-footbridge/dc21285.c: In function 'dc21285_preinit':
-> arch/arm/mach-footbridge/dc21285.c:299:2: error: 'vga_base' undeclared (first use in this function)
-> arch/arm/mach-footbridge/dc21285.c:299:2: note: each undeclared identifier is reported only once for each function it appears in
-> make[1]: *** [arch/arm/mach-footbridge/dc21285.o] Error 1
-> --
->
-> Signed-off-by: Bryan Wu <bryan.wu@canonical.com>
-> ---
-> ?arch/arm/mach-footbridge/dc21285.c | ? ?1 +
-> ?1 files changed, 1 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/mach-footbridge/dc21285.c b/arch/arm/mach-footbridge/dc21285.c
-> index 1331fff..18c32a5 100644
-> --- a/arch/arm/mach-footbridge/dc21285.c
-> +++ b/arch/arm/mach-footbridge/dc21285.c
-> @@ -18,6 +18,7 @@
-> ?#include <linux/irq.h>
-> ?#include <linux/io.h>
-> ?#include <linux/spinlock.h>
-> +#include <video/vga.h>
->
-> ?#include <asm/irq.h>
-> ?#include <asm/system.h>
-> --
-> 1.7.5
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
-
-
-
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index f23975a..947adef 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -94,6 +94,62 @@ choice
+ 		  Saying N will cause the debug messages to appear on the first
+ 		  serial port.
+ 
++	config DEBUG_IMX1_UART
++		bool "i.MX1 Debug UART"
++		depends on SOC_IMX1
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on i.MX1.
++
++	config DEBUG_IMX23_UART
++		bool "i.MX23 Debug UART"
++		depends on SOC_IMX23
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on i.MX23.
++
++	config DEBUG_IMX25_UART
++		bool "i.MX25 Debug UART"
++		depends on SOC_IMX25
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on i.MX25.
++
++	config DEBUG_IMX21_IMX27_UART
++		bool "i.MX21 and i.MX27 Debug UART"
++		depends on SOC_IMX21 || SOC_IMX27
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on i.MX21 or i.MX27.
++
++	config DEBUG_IMX28_UART
++		bool "i.MX28 Debug UART"
++		depends on SOC_IMX28
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on i.MX28.
++
++	config DEBUG_IMX31_IMX35_UART
++		bool "i.MX31 and i.MX35 Debug UART"
++		depends on SOC_IMX31 || SOC_IMX35
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on i.MX31 or i.MX35.
++
++	config DEBUG_IMX51_UART
++		bool "i.MX51 Debug UART"
++		depends on SOC_IMX51
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on i.MX51.
++
++	config DEBUG_IMX50_IMX53_UART
++		bool "i.MX50 and i.MX53 Debug UART"
++		depends on SOC_IMX50 || SOC_IMX53
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on i.MX50 or i.MX53.
++
+ 	config DEBUG_S3C_UART0
+ 		depends on PLAT_SAMSUNG
+ 		bool "Use S3C UART 0 for low-level debug"
+diff --git a/arch/arm/mach-mxs/include/mach/debug-macro.S b/arch/arm/mach-mxs/include/mach/debug-macro.S
+index 79650a1..6d98704 100644
+--- a/arch/arm/mach-mxs/include/mach/debug-macro.S
++++ b/arch/arm/mach-mxs/include/mach/debug-macro.S
+@@ -14,17 +14,9 @@
+ #include <mach/mx23.h>
+ #include <mach/mx28.h>
+ 
+-#ifdef CONFIG_SOC_IMX23
+-#ifdef UART_PADDR
+-#error "CONFIG_DEBUG_LL is incompatible with multiple archs"
+-#endif
++#ifdef CONFIG_DEBUG_IMX23_UART
+ #define UART_PADDR	MX23_DUART_BASE_ADDR
+-#endif
+-
+-#ifdef CONFIG_SOC_IMX28
+-#ifdef UART_PADDR
+-#error "CONFIG_DEBUG_LL is incompatible with multiple archs"
+-#endif
++#elif defined (CONFIG_DEBUG_IMX28_UART)
+ #define UART_PADDR	MX28_DUART_BASE_ADDR
+ #endif
+ 
+diff --git a/arch/arm/plat-mxc/include/mach/debug-macro.S b/arch/arm/plat-mxc/include/mach/debug-macro.S
+index e4dde91..07cfdbe 100644
+--- a/arch/arm/plat-mxc/include/mach/debug-macro.S
++++ b/arch/arm/plat-mxc/include/mach/debug-macro.S
+@@ -12,43 +12,17 @@
+  */
+ #include <mach/hardware.h>
+ 
+-#ifdef CONFIG_SOC_IMX1
++#ifdef CONFIG_DEBUG_IMX1_UART
+ #define UART_PADDR	MX1_UART1_BASE_ADDR
+-#endif
+-
+-#ifdef CONFIG_SOC_IMX25
+-#ifdef UART_PADDR
+-#error "CONFIG_DEBUG_LL is incompatible with multiple archs"
+-#endif
++#elif defined (CONFIG_DEBUG_IMX25_UART)
+ #define UART_PADDR	MX25_UART1_BASE_ADDR
+-#endif
+-
+-#if defined(CONFIG_SOC_IMX21) || defined (CONFIG_SOC_IMX27)
+-#ifdef UART_PADDR
+-#error "CONFIG_DEBUG_LL is incompatible with multiple archs"
+-#endif
++#elif defined (CONFIG_DEBUG_IMX21_IMX27_UART)
+ #define UART_PADDR	MX2x_UART1_BASE_ADDR
+-#endif
+-
+-#if defined(CONFIG_SOC_IMX31) || defined(CONFIG_SOC_IMX35)
+-#ifdef UART_PADDR
+-#error "CONFIG_DEBUG_LL is incompatible with multiple archs"
+-#endif
++#elif defined (CONFIG_DEBUG_IMX31_IMX35_UART)
+ #define UART_PADDR	MX3x_UART1_BASE_ADDR
+-#endif
+-
+-#ifdef CONFIG_SOC_IMX51
+-#ifdef UART_PADDR
+-#error "CONFIG_DEBUG_LL is incompatible with multiple archs"
+-#endif
++#elif defined (CONFIG_DEBUG_IMX51_UART)
+ #define UART_PADDR	MX51_UART1_BASE_ADDR
+-#endif
+-
+-/* iMX50/53 have same addresses, but not iMX51 */
+-#if defined(CONFIG_SOC_IMX50) || defined(CONFIG_SOC_IMX53)
+-#ifdef UART_PADDR
+-#error "CONFIG_DEBUG_LL is incompatible with multiple archs"
+-#endif
++#elif defined (CONFIG_DEBUG_IMX50_IMX53_UART)
+ #define UART_PADDR	MX53_UART1_BASE_ADDR
+ #endif
+ 
 -- 
-Bryan Wu <bryan.wu@canonical.com>
-Kernel Developer ? ?+86.138-1617-6545 Mobile
-Ubuntu Kernel Team
-Canonical Ltd. ? ? ?www.canonical.com
-Ubuntu - Linux for human beings | www.ubuntu.com
+1.7.4.1
