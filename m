@@ -1,37 +1,189 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Fri, 19 Aug 2011 11:50:06 +0530
-Subject: [GIT PULL] Samsung S5P for v3.1 merge window
-In-Reply-To: <001101cc478b$d48983f0$7d9c8bd0$%kim@samsung.com>
-References: <001101cc478b$d48983f0$7d9c8bd0$%kim@samsung.com>
-Message-ID: <4E4E0096.2060907@linaro.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 19 Aug 2011 08:35:33 +0200
+Subject: [PATCH] arm/imx: use Kconfig choice for low-level debug UART
+	selection
+In-Reply-To: <1313729819-30301-1-git-send-email-shawn.guo@linaro.org>
+References: <1313530873-24961-1-git-send-email-will.deacon@arm.com>
+	<1313729819-30301-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20110819063533.GR31404@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Fri, Aug 19, 2011 at 12:56:59PM +0800, Shawn Guo wrote:
+> Now that the DEBUG_LL UART can be selected by a Kconfig choice,
+> simplify the #ifdefery in debug-macro.S and add entries to the
+> top-level Kconfig.debug instead.
 
-On Thursday 21 July 2011 03:21 PM, Kukjin Kim wrote:
-> Hi Arnd
->
-> Please pull Samsung S5P updates from:
->
-> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> for-arm-soc
->
-> Or if you want to merge each branch into arm-soc, please use following.
-> As per your suggestion, I made following branches in my tree...
->
-> - next-samsung-cleanup for arm-soc/next/cleanup
-> - next-samsung-devel for arm-soc/next/devel
-> - next-samsung-soc for arm-soc/next/soc (nothing)
-> - next-samsung-board for arm-soc/next/board
-> - and so on...
->
-(snip)
->
-> JeongHyeon Kim (1):
->        ARM: EXYNOS4: Add support for ORIGEN board
->
-I can't find this patch in the 3.1-rc1 release. Does it need some rework?
+I'm unsure whether I like this. The ifdeffery does not look very good,
+but the Kconfig snippet is not shorter, also it is in generic arm code
+and not i.MX specific. The old way also makes sure that we do not
+compile in incompatible lowlevel debug code.
+At least this should be a choice in Kconfig to make clear that the
+different low-level debug options are exclusive.
+
+Sascha
+
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+>  arch/arm/Kconfig.debug                       |   56 ++++++++++++++++++++++++++
+>  arch/arm/mach-mxs/include/mach/debug-macro.S |   12 +-----
+>  arch/arm/plat-mxc/include/mach/debug-macro.S |   38 +++---------------
+>  3 files changed, 64 insertions(+), 42 deletions(-)
+> 
+> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+> index f23975a..947adef 100644
+> --- a/arch/arm/Kconfig.debug
+> +++ b/arch/arm/Kconfig.debug
+> @@ -94,6 +94,62 @@ choice
+>  		  Saying N will cause the debug messages to appear on the first
+>  		  serial port.
+>  
+> +	config DEBUG_IMX1_UART
+> +		bool "i.MX1 Debug UART"
+> +		depends on SOC_IMX1
+> +		help
+> +		  Say Y here if you want kernel low-level debugging support
+> +		  on i.MX1.
+> +
+> +	config DEBUG_IMX23_UART
+> +		bool "i.MX23 Debug UART"
+> +		depends on SOC_IMX23
+> +		help
+> +		  Say Y here if you want kernel low-level debugging support
+> +		  on i.MX23.
+> +
+> +	config DEBUG_IMX25_UART
+> +		bool "i.MX25 Debug UART"
+> +		depends on SOC_IMX25
+> +		help
+> +		  Say Y here if you want kernel low-level debugging support
+> +		  on i.MX25.
+> +
+> +	config DEBUG_IMX21_IMX27_UART
+> +		bool "i.MX21 and i.MX27 Debug UART"
+> +		depends on SOC_IMX21 || SOC_IMX27
+> +		help
+> +		  Say Y here if you want kernel low-level debugging support
+> +		  on i.MX21 or i.MX27.
+> +
+> +	config DEBUG_IMX28_UART
+> +		bool "i.MX28 Debug UART"
+> +		depends on SOC_IMX28
+> +		help
+> +		  Say Y here if you want kernel low-level debugging support
+> +		  on i.MX28.
+> +
+> +	config DEBUG_IMX31_IMX35_UART
+> +		bool "i.MX31 and i.MX35 Debug UART"
+> +		depends on SOC_IMX31 || SOC_IMX35
+> +		help
+> +		  Say Y here if you want kernel low-level debugging support
+> +		  on i.MX31 or i.MX35.
+> +
+> +	config DEBUG_IMX51_UART
+> +		bool "i.MX51 Debug UART"
+> +		depends on SOC_IMX51
+> +		help
+> +		  Say Y here if you want kernel low-level debugging support
+> +		  on i.MX51.
+> +
+> +	config DEBUG_IMX50_IMX53_UART
+> +		bool "i.MX50 and i.MX53 Debug UART"
+> +		depends on SOC_IMX50 || SOC_IMX53
+> +		help
+> +		  Say Y here if you want kernel low-level debugging support
+> +		  on i.MX50 or i.MX53.
+> +
+>  	config DEBUG_S3C_UART0
+>  		depends on PLAT_SAMSUNG
+>  		bool "Use S3C UART 0 for low-level debug"
+> diff --git a/arch/arm/mach-mxs/include/mach/debug-macro.S b/arch/arm/mach-mxs/include/mach/debug-macro.S
+> index 79650a1..6d98704 100644
+> --- a/arch/arm/mach-mxs/include/mach/debug-macro.S
+> +++ b/arch/arm/mach-mxs/include/mach/debug-macro.S
+> @@ -14,17 +14,9 @@
+>  #include <mach/mx23.h>
+>  #include <mach/mx28.h>
+>  
+> -#ifdef CONFIG_SOC_IMX23
+> -#ifdef UART_PADDR
+> -#error "CONFIG_DEBUG_LL is incompatible with multiple archs"
+> -#endif
+> +#ifdef CONFIG_DEBUG_IMX23_UART
+>  #define UART_PADDR	MX23_DUART_BASE_ADDR
+> -#endif
+> -
+> -#ifdef CONFIG_SOC_IMX28
+> -#ifdef UART_PADDR
+> -#error "CONFIG_DEBUG_LL is incompatible with multiple archs"
+> -#endif
+> +#elif defined (CONFIG_DEBUG_IMX28_UART)
+>  #define UART_PADDR	MX28_DUART_BASE_ADDR
+>  #endif
+>  
+> diff --git a/arch/arm/plat-mxc/include/mach/debug-macro.S b/arch/arm/plat-mxc/include/mach/debug-macro.S
+> index e4dde91..07cfdbe 100644
+> --- a/arch/arm/plat-mxc/include/mach/debug-macro.S
+> +++ b/arch/arm/plat-mxc/include/mach/debug-macro.S
+> @@ -12,43 +12,17 @@
+>   */
+>  #include <mach/hardware.h>
+>  
+> -#ifdef CONFIG_SOC_IMX1
+> +#ifdef CONFIG_DEBUG_IMX1_UART
+>  #define UART_PADDR	MX1_UART1_BASE_ADDR
+> -#endif
+> -
+> -#ifdef CONFIG_SOC_IMX25
+> -#ifdef UART_PADDR
+> -#error "CONFIG_DEBUG_LL is incompatible with multiple archs"
+> -#endif
+> +#elif defined (CONFIG_DEBUG_IMX25_UART)
+>  #define UART_PADDR	MX25_UART1_BASE_ADDR
+> -#endif
+> -
+> -#if defined(CONFIG_SOC_IMX21) || defined (CONFIG_SOC_IMX27)
+> -#ifdef UART_PADDR
+> -#error "CONFIG_DEBUG_LL is incompatible with multiple archs"
+> -#endif
+> +#elif defined (CONFIG_DEBUG_IMX21_IMX27_UART)
+>  #define UART_PADDR	MX2x_UART1_BASE_ADDR
+> -#endif
+> -
+> -#if defined(CONFIG_SOC_IMX31) || defined(CONFIG_SOC_IMX35)
+> -#ifdef UART_PADDR
+> -#error "CONFIG_DEBUG_LL is incompatible with multiple archs"
+> -#endif
+> +#elif defined (CONFIG_DEBUG_IMX31_IMX35_UART)
+>  #define UART_PADDR	MX3x_UART1_BASE_ADDR
+> -#endif
+> -
+> -#ifdef CONFIG_SOC_IMX51
+> -#ifdef UART_PADDR
+> -#error "CONFIG_DEBUG_LL is incompatible with multiple archs"
+> -#endif
+> +#elif defined (CONFIG_DEBUG_IMX51_UART)
+>  #define UART_PADDR	MX51_UART1_BASE_ADDR
+> -#endif
+> -
+> -/* iMX50/53 have same addresses, but not iMX51 */
+> -#if defined(CONFIG_SOC_IMX50) || defined(CONFIG_SOC_IMX53)
+> -#ifdef UART_PADDR
+> -#error "CONFIG_DEBUG_LL is incompatible with multiple archs"
+> -#endif
+> +#elif defined (CONFIG_DEBUG_IMX50_IMX53_UART)
+>  #define UART_PADDR	MX53_UART1_BASE_ADDR
+>  #endif
+>  
+> -- 
+> 1.7.4.1
+> 
+> 
 
 -- 
-Tushar Behera
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
