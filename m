@@ -1,58 +1,51 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 19 Aug 2011 14:34:04 +0200
-Subject: [PATCH 1/2] drivers: create a pinmux subsystem v3
-In-Reply-To: <BANLkTikFLbU70uJO0yrf8HipcVEwbUHgsw@mail.gmail.com>
-References: <1307984291-9774-1-git-send-email-linus.walleij@stericsson.com>
-	<74CDBE0F657A3D45AFBB94109FB122FF04992C02AC@HQMAIL01.nvidia.com>
-	<BANLkTinNmPVEM4Eu4efxkuwrCU_FVWFaAg@mail.gmail.com>
-	<74CDBE0F657A3D45AFBB94109FB122FF04992C049D@HQMAIL01.nvidia.com>
-	<BANLkTikFLbU70uJO0yrf8HipcVEwbUHgsw@mail.gmail.com>
-Message-ID: <CACRpkdbYvO4LfdTNGm3DJXKTKzS1_8cOXeqWfP3-yUikuxXTTA@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 19 Aug 2011 13:35:43 +0100
+Subject: [PATCH] arm/imx: use Kconfig choice for low-level debug UART
+	selection
+In-Reply-To: <20110819113937.GS31404@pengutronix.de>
+References: <1313530873-24961-1-git-send-email-will.deacon@arm.com>
+	<1313729819-30301-1-git-send-email-shawn.guo@linaro.org>
+	<20110819063533.GR31404@pengutronix.de>
+	<20110819110940.GC8918@e102144-lin.cambridge.arm.com>
+	<20110819113937.GS31404@pengutronix.de>
+Message-ID: <20110819123543.GE8918@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 16, 2011 at 2:47 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+On Fri, Aug 19, 2011 at 12:39:37PM +0100, Sascha Hauer wrote:
+> On Fri, Aug 19, 2011 at 12:09:41PM +0100, Will Deacon wrote:
+> > But it's an unfortunate hinderence to a single zImage kernel which we can
+> > only solve sensibly in the generic ARM code.
+> 
+> My problem is that if this option is enabled the kernel will not run
+> on any other SoC except the one being selected here, at least when
+> earlyprintk is passed on the command line. One could argue
+> that this option is for people who exactly know what they do only.
+> Still there should pop up a big fat warning somewhere.
 
-> So to summarize there are two related areas of discussion
-> here:
->
-> 1. Whether a pinmux map shall map one or 1..N functions
-> 2. How to handle per-driver instance namespacing of functions
->
-> In both cases I'm currently using simple strings and claiming
-> that by namespacing these strings cleverly we can avoid
-> complexity. So my answer to these are:
->
-> 1. Use several functions with ovelapping maps, just name
-> ?them differently
-> 2. Use a string convention and namespace by using
-> ?platform/machine/package data and string conventions
-> ?such as a "::" separator
->
-> While I *think* (and DO correct me!) that you would argue:
->
-> 1. Make it possible to map several functions to a single
-> ?device map
-> 2. Namespace device instances by different map field
-> ?members referring to specific instances
->
-> Is this correctly understood, even if we may not agree?
+Could do - but where?
 
-I have now after being massaged by Grant changed opinion
-on (2) and each pin controller (e.g. pinmux) instance has it's
-struct device * or pinctrl_dev_name field in the mapping
-table, so I hope you will find that part solved in an acceptable
-way in the v4 patch set. So we'd solved 50% of our
-disagreements.
+> The old i.MX way ensured that by refusing to compile the kernel with
+> multi SoC support.
 
-(Please verify!)
+That's a worse solution, because now the kernel doesn't run *anywhere* if
+you enable DEBUG_LL and multiple SoCs. A use case for the new method is that
+you have a kernel .config file for a multi-SoC kernel which is known not to
+fail early on a given board. You can enable DEBUG_LL for that board and solve
+the problem. It should never be enabled for a kernel that is designed to be
+portable!
 
-So remains (1). I hope you will ACK the patch set if I fix
-this also...
+> > 
+> > > At least this should be a choice in Kconfig to make clear that the
+> > > different low-level debug options are exclusive.
+> > 
+> > As Shawn pointed out, we are using a Kconfig choice so you can only select
+> > one UART for low-level debug output.
+> 
+> Ah, ok. I didn't see that Shawns mail was a reply to your series turning
+> this into a choice.
 
-I'm thinking about good ways to solve it, reading through
-your old mails, new suggestions based on the new patch
-set are welcome.
+Yup - the idea is to force a single UART definition when DEBUG_LL is
+enabled.
 
-Thanks,
-Linus Walleij
+Will
