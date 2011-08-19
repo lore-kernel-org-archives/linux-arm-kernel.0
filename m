@@ -1,78 +1,25 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 19 Aug 2011 12:59:57 +0800
-Subject: [PATCH 1/3] ARM: debug: use kconfig choice for selecting
-	DEBUG_LL UART
-In-Reply-To: <20110818160712.GA26691@e102144-lin.cambridge.arm.com>
-References: <1313530873-24961-1-git-send-email-will.deacon@arm.com>
-	<20110818161105.GA12527@S2100-06.ap.freescale.net>
-	<20110818160712.GA26691@e102144-lin.cambridge.arm.com>
-Message-ID: <20110819045956.GB12527@S2100-06.ap.freescale.net>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 19 Aug 2011 13:53:47 +0900
+Subject: [PATCH] ARM: S3C64XX: Remove un-used code
+In-Reply-To: <CABK8_vR6bB_0TfQtbA7F9+w9dSXajMdd1SS5o+LscMrDcCY1tg@mail.gmail.com>
+References: <1313498488-4296-1-git-send-email-banajit.g@samsung.com>
+	<20110819015955.GA1212@sirena.org.uk>
+	<CABK8_vR6bB_0TfQtbA7F9+w9dSXajMdd1SS5o+LscMrDcCY1tg@mail.gmail.com>
+Message-ID: <20110819045346.GA26979@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 18, 2011 at 05:07:12PM +0100, Will Deacon wrote:
-> Hi Shawn,
-> 
-> On Thu, Aug 18, 2011 at 05:11:06PM +0100, Shawn Guo wrote:
-> > On Tue, Aug 16, 2011 at 10:41:11PM +0100, Will Deacon wrote:
-> > > Enabling CONFIG_DEBUG_LL (which is required for earlyprintk) hardwires
-> > > the debug UART address into the kernel, so that we can print before the
-> > > platform is initialised.
-> > > 
-> > > If the user inadvertently selects multiple platforms with DEBUG_LL
-> > > enabled, the UART address may not be correct and will likely cause the
-> > > kernel to hang in the very early stages of boot.
-> > > 
-> > > This patch, based on a skeleton from Russell, uses a Kconfig choice for
-> > > selecting the DEBUG_LL UART, therefore allowing the user to make a
-> > > choice about the supported platform when DEBUG_LL is enabled.
-> > > 
-> > > Cc: Linus Walleij <linus.walleij@stericsson.com>
-> > > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> > > ---
-> > >  arch/arm/Kconfig.debug |   41 ++++++++++++++++++++++++-----------------
-> > >  1 files changed, 24 insertions(+), 17 deletions(-)
-> > > 
-> > > diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-> > > index 81cbe40..11604c9 100644
-> > > --- a/arch/arm/Kconfig.debug
-> > > +++ b/arch/arm/Kconfig.debug
-> > > @@ -72,6 +72,30 @@ config DEBUG_LL
-> > >  	  in the kernel.  This is helpful if you are debugging code that
-> > >  	  executes before the console is initialized.
-> > >  
-> > > +choice
-> > > +	prompt "Kernel low-level debugging port"
-> > > +	depends on DEBUG_LL
-> > > +
-> > > +	config DEBUG_DC21285_PORT
-> > > +		bool "Kernel low-level debugging messages via footbridge serial port"
-> > > +		depends on FOOTBRIDGE
-> > > +		help
-> > > +		  Say Y here if you want the debug print routines to direct
-> > > +		  their output to the serial port in the DC21285 (Footbridge).
-> > > +		  Saying N will cause the debug messages to appear on the first
-> > > +		  16550 serial port.
-> > > +
-> > > +	config DEBUG_CLPS711X_UART2
-> > 
-> > I would expect this will become a long list when other platforms start
-> > adding CONFIG symbol here.  It may be a good idea to sort this list
-> > in symbol from the beginning.
-> 
-> I'm not sure that sorting this list in alphabetical order is a good idea.
-> This is a Kconfig choice, so the default value is the first one in the list
-> that has its dependencies satisfied. Therefore, the ordering has a direct
-> impact on the default UART selection.
-> 
-I'm unsure that the default UART selection makes much sense here.
-When we build so many platforms into single image, it's hard to say
-which one should be the default.  People anyway need to check if the
-the UART selection matches the platform they are debugging on.
+On Fri, Aug 19, 2011 at 09:40:29AM +0530, Banajit Goswami wrote:
+> On Fri, Aug 19, 2011 at 7:29 AM, Mark Brown
+> <broonie@opensource.wolfsonmicro.com> wrote:
+> > On Tue, Aug 16, 2011 at 06:11:28PM +0530, Banajit Goswami wrote:
+> >> Remove un-used backlight code for SMDK6410 board
 
-BTW, I just posted one patch for imx based on your series.  Are you
-interested in folding it into yours?
+> > Is the data actually wrong? ?If not it'd seem better to finish hooking
+> > it up properly than to remove it.
 
--- 
-Regards,
-Shawn
+> No, this code is no longer needed, as we are having a common backlight
+> infrastructure , which serves the same purpose.
+
+Ideally your commit log should make this clear - it looks like you're
+just deleting unreferenced code.
