@@ -1,89 +1,50 @@
-From: amit.kucheria@linaro.org (Amit Kucheria)
-Date: Fri, 19 Aug 2011 17:33:45 +0300
-Subject: [RFC PATCH 1/4] ARM: kernel: Small fixes in save/restore common
-	code.
-In-Reply-To: <1313759400-31347-1-git-send-email-amit.kachhap@linaro.org>
-References: <1313759340-31319-1-git-send-email-amit.kachhap@linaro.org>
-	<1313759400-31347-1-git-send-email-amit.kachhap@linaro.org>
-Message-ID: <20110819143345.GE2455@matterhorn1>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 19 Aug 2011 16:36:28 +0200
+Subject: [PATCH 1/4 v4] drivers: create a pin control subsystem
+In-Reply-To: <CACRpkdZhg_1WM37uqT1PNmpUjWS_groWJmNnR4SBjqJ6LFQQWQ@mail.gmail.com>
+References: <1313747630-32258-1-git-send-email-linus.walleij@stericsson.com>
+	<20110819104816.GA5030@pulham.picochip.com>
+	<CACRpkdZhg_1WM37uqT1PNmpUjWS_groWJmNnR4SBjqJ6LFQQWQ@mail.gmail.com>
+Message-ID: <201108191636.29161.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch is redundant with Lorenzo's new series[1]. Adding him to cc. I
-suggest you rebase on top of his latest series.
-
-On 11 Aug 19, Amit Daniel Kachhap wrote:
-> These changes are necessary to make the retention cpuidle state work. This adds 
-> support for saving more L2 registers.
+On Friday 19 August 2011, Linus Walleij wrote:
+> On Fri, Aug 19, 2011 at 12:48 PM, Jamie Iles <jamie@jamieiles.com> wrote:
 > 
-> Signed-off-by: Amit Daniel Kachhap <amit.kachhap@linaro.org>
-> ---
->  arch/arm/common/gic.c        |    1 -
->  arch/arm/kernel/sr_helpers.h |    2 +-
->  arch/arm/mm/cache-l2x0.c     |   10 +++++++++-
->  3 files changed, 10 insertions(+), 3 deletions(-)
+> >> +static struct class pinctrl_class = {
+> >> +     .name = "pinctrl",
+> >> +     .dev_release = pinctrl_dev_release,
+> >> +     .dev_attrs = pinctrl_dev_attrs,
+> >> +};
+> >
+> > Greg K-H has mentioned in the past that class is now deprecated for new
+> > use and that a bus_type should be used instead.
 > 
-> diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
-> index d845b75..124e122 100644
-> --- a/arch/arm/common/gic.c
-> +++ b/arch/arm/common/gic.c
-> @@ -385,7 +385,6 @@ static void gic_dist_save(unsigned int gic_nr)
->  		gic_data[gic_nr].saved_spi_enable[i] =
->  			readl_relaxed(dist_base + GIC_DIST_ENABLE_SET + i * 4);
->  
-> -	writel_relaxed(0, dist_base + GIC_DIST_CTRL);
->  }
+> Can you provide a reference with some detail?
+> The pin control devices are usually aleady on a bus like the
+> platform_bus or amba_bus or i2c_bus, then they register a
+> class device in this case.
+> 
+> The kerneldoc documentation says
+> "A bus is a channel between the processor and one or more devices."
+> 
+> This isn't the case here.
+> 
+> Anyhthing that help me understand this is appreciated, Arnd?
 
-He already has this bit in his tree[1]
+Taking Greg on Cc as well.
 
->  /*
-> diff --git a/arch/arm/kernel/sr_helpers.h b/arch/arm/kernel/sr_helpers.h
-> index 1ae3a9a..5a30461 100644
-> --- a/arch/arm/kernel/sr_helpers.h
-> +++ b/arch/arm/kernel/sr_helpers.h
-> @@ -44,7 +44,7 @@ static inline void exit_coherency(void)
->  		"mcr	p15, 0, %0, c1, c0, 1\n"
->  		 : "=&r" (v)
->  		 : "Ir" (0x40)
-> -		 : );
-> +		 : "cc");
+The main difference between a normal device and a class device is
+that one is linked from /sys/bus/*/devices/* and the other is linked
+from /sys/class/*/*. However, they both live in /sys/devices/.../*
+as directories.
 
-He has a different fix for this.
+I always liked the separation between the two, although there are
+a few cases where there is a grey area (e.g. /sys/bus/hid or
+/sys/class/mmc_host) and the abstraction doesn't really fit.
 
->  }
->  #else
->  static inline void exit_coherency(void) { }
-> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-> index 4c99d41..f23696b 100644
-> --- a/arch/arm/mm/cache-l2x0.c
-> +++ b/arch/arm/mm/cache-l2x0.c
-> @@ -285,7 +285,11 @@ static void l2x0_save_context(void *data, bool dormant, unsigned long end)
->  	*l2x0_regs =  readl_relaxed(l2x0_base + L2X0_TAG_LATENCY_CTRL);
->  	l2x0_regs++;
->  	*l2x0_regs =  readl_relaxed(l2x0_base + L2X0_DATA_LATENCY_CTRL);
-> -
-> +	l2x0_regs++;
-> +	*l2x0_regs =  readl_relaxed(l2x0_base + L2X0_PREFETCH_CTRL);
-> +	l2x0_regs++;
-> +	*l2x0_regs =  readl_relaxed(l2x0_base + L2X0_POWER_CTRL);
-> +	dormant = 0;
->  	if (!dormant) {
->  		/* clean entire L2 before disabling it*/
->  		writel_relaxed(l2x0_way_mask, l2x0_base + L2X0_CLEAN_WAY);
-> @@ -325,6 +329,10 @@ static void l2x0_restore_context(void *data, bool dormant)
->  		writel_relaxed(*l2x0_regs, l2x0_base + L2X0_TAG_LATENCY_CTRL);
->  		l2x0_regs++;
->  		writel_relaxed(*l2x0_regs, l2x0_base + L2X0_DATA_LATENCY_CTRL);
-> +		l2x0_regs++;
-> +		writel_relaxed(*l2x0_regs, l2x0_base + L2X0_PREFETCH_CTRL);
-> +		l2x0_regs++;
-> +		writel_relaxed(*l2x0_regs, l2x0_base + L2X0_POWER_CTRL);
->  		/*
->  		 * If L2 is retained do not invalidate
->  		 */
-> -- 
-> 1.7.1
+IIRC Greg would prefer now to never have had the distinction
+and wants to make all future uses use a bus_type.
 
-Already fixed in his tree.
-
-[1] git://linux-arm.org/linux-2.6-lp.git sr-test-for-linaro
+	Arnd
