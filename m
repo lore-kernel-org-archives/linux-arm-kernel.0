@@ -1,49 +1,61 @@
-From: hemantp@ti.com (Pedanekar, Hemant)
-Date: Fri, 19 Aug 2011 09:58:40 +0530
-Subject: [PATCH 0/3] Add support for TI814X processor series
-In-Reply-To: <2A3DCF3DA181AD40BDE86A3150B27B6B03ABD26CF7@dbde02.ent.ti.com>
-References: <1312479869-21948-1-git-send-email-hemantp@ti.com>
-	<2A3DCF3DA181AD40BDE86A3150B27B6B03ABB099E0@dbde02.ent.ti.com>
-	<2A3DCF3DA181AD40BDE86A3150B27B6B03ABD26CF7@dbde02.ent.ti.com>
-Message-ID: <2A3DCF3DA181AD40BDE86A3150B27B6B03ABD26D94@dbde02.ent.ti.com>
+From: bryan.wu@canonical.com (Bryan Wu)
+Date: Fri, 19 Aug 2011 12:37:09 +0800
+Subject: [PATCH] ARM: mach-footbridge: add missing header file
+	<video/vga.h>
+In-Reply-To: <1313575204-25374-1-git-send-email-bryan.wu@canonical.com>
+References: <1313575204-25374-1-git-send-email-bryan.wu@canonical.com>
+Message-ID: <CAK5ve-+0rtcC8KiEW9=WHnW8nPTr8+7tmnqUgZJQ_3GV6gMpzw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-linux-arm-kernel-bounces at lists.infradead.org wrote on :
+Russell,
 
-> linux-arm-kernel-bounces at lists.infradead.org wrote on :
-> 
->> Hello,
->> 
->> Pedanekar, Hemant wrote on Thursday, August 04, 2011 11:14 PM:
->> 
->>> This patch set adds support for DM814x, C6A814x and AM387x device series
->>> having Cortex-A8 MPU. 
->>> 
->>> The technical documents are available from following link:
->>> 
->>> http://focus.ti.com/docs/prod/folders/print/tms320dm8148.html
->>> 
->>> This series is referred in code as TI814X.
->>> 
->>> Since these devices share similar architecture as TI816X devices, existing
->>> TI816X code is updated to accomodate TI814X support. The code shared
->>> across TI816X and TI814X devices is updated with TI81XX/ti81xx prefix as
->>> applicable, while maintaining cpu_is_ti816x() and cpu_is_ti814x() to
->>> distinguish specific execution differences.
->>> 
->>> Hemant Pedanekar (3):
->>>   TI81XX: Prepare for addition of TI814X support
->>>   TI814X: Add cpu type macros and detection support
->>>   TI814X: Create board support and enable build for TI8148 EVM
->>> 
->> [...]
->> 
-> Hello,
-> Can you please provide comments on these patches?
-> Thanks.
->    Hemant
+Also this one. any comment?
 
-Please disregard, I had missed Tony's comments.		
+Thanks,
+-Bryan
 
-   Hemant
+On Wed, Aug 17, 2011 at 6:00 PM, Bryan Wu <bryan.wu@canonical.com> wrote:
+> This patch fixes following building error:
+> --
+> arch/arm/mach-footbridge/dc21285.c: In function 'dc21285_preinit':
+> arch/arm/mach-footbridge/dc21285.c:299:2: error: 'vga_base' undeclared (first use in this function)
+> arch/arm/mach-footbridge/dc21285.c:299:2: note: each undeclared identifier is reported only once for each function it appears in
+> make[1]: *** [arch/arm/mach-footbridge/dc21285.o] Error 1
+> --
+>
+> Signed-off-by: Bryan Wu <bryan.wu@canonical.com>
+> ---
+> ?arch/arm/mach-footbridge/dc21285.c | ? ?1 +
+> ?1 files changed, 1 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mach-footbridge/dc21285.c b/arch/arm/mach-footbridge/dc21285.c
+> index 1331fff..18c32a5 100644
+> --- a/arch/arm/mach-footbridge/dc21285.c
+> +++ b/arch/arm/mach-footbridge/dc21285.c
+> @@ -18,6 +18,7 @@
+> ?#include <linux/irq.h>
+> ?#include <linux/io.h>
+> ?#include <linux/spinlock.h>
+> +#include <video/vga.h>
+>
+> ?#include <asm/irq.h>
+> ?#include <asm/system.h>
+> --
+> 1.7.5
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+
+
+
+-- 
+Bryan Wu <bryan.wu@canonical.com>
+Kernel Developer ? ?+86.138-1617-6545 Mobile
+Ubuntu Kernel Team
+Canonical Ltd. ? ? ?www.canonical.com
+Ubuntu - Linux for human beings | www.ubuntu.com
