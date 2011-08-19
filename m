@@ -1,70 +1,50 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 19 Aug 2011 19:15:19 +0200
-Subject: [PATCH] arm/imx: use Kconfig choice for low-level debug UART
-	selection
-In-Reply-To: <20110819123543.GE8918@e102144-lin.cambridge.arm.com>
-References: <1313530873-24961-1-git-send-email-will.deacon@arm.com>
-	<1313729819-30301-1-git-send-email-shawn.guo@linaro.org>
-	<20110819063533.GR31404@pengutronix.de>
-	<20110819110940.GC8918@e102144-lin.cambridge.arm.com>
-	<20110819113937.GS31404@pengutronix.de>
-	<20110819123543.GE8918@e102144-lin.cambridge.arm.com>
-Message-ID: <20110819171519.GV31404@pengutronix.de>
+From: nbowler@elliptictech.com (Nick Bowler)
+Date: Fri, 19 Aug 2011 14:03:24 -0400
+Subject: [PATCH RFC] ARM: vexpress: Use assembler mnemonic for WFI in
+	platform_do_lowpower.
+Message-ID: <1313777004-4716-1-git-send-email-nbowler@elliptictech.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 19, 2011 at 01:35:43PM +0100, Will Deacon wrote:
-> On Fri, Aug 19, 2011 at 12:39:37PM +0100, Sascha Hauer wrote:
-> > On Fri, Aug 19, 2011 at 12:09:41PM +0100, Will Deacon wrote:
-> > > But it's an unfortunate hinderence to a single zImage kernel which we can
-> > > only solve sensibly in the generic ARM code.
-> > 
-> > My problem is that if this option is enabled the kernel will not run
-> > on any other SoC except the one being selected here, at least when
-> > earlyprintk is passed on the command line. One could argue
-> > that this option is for people who exactly know what they do only.
-> > Still there should pop up a big fat warning somewhere.
-> 
-> Could do - but where?
+Current Versatile Express CPU hotplug code includes a hardcoded WFI
+instruction, in ARM encoding.  When the kernel is compiled in Thumb-2
+mode, this is invalid and causes the machine to hang hard when a CPU
+is offlined.
 
-Good question, I don't know.
+Using the assembler mnemonic instead of hardcoding it causes the correct
+instruction to be emitted in either case.
 
-> 
-> > The old i.MX way ensured that by refusing to compile the kernel with
-> > multi SoC support.
-> 
-> That's a worse solution, because now the kernel doesn't run *anywhere* if
-> you enable DEBUG_LL and multiple SoCs.
+Signed-off-by: Nick Bowler <nbowler@elliptictech.com>
+---
+ arch/arm/mach-vexpress/hotplug.c |    5 +----
+ 1 files changed, 1 insertions(+), 4 deletions(-)
 
-Better a kernel that does not compile than a kernel that compiles and
-does not run.
+OK.  I assume that the reason for the hardcoded instruction is that
+older versions of binutils did not support the mnemonic.  Looking at the
+binutils CVS history, support seems to have been added in 2005, and was
+included in the 2.16 release.  If we care about those old assembler
+versions, I can resubmit this patch using ARM/THUMB macros instead,
+which should work just as well.
 
-> A use case for the new method is that
-> you have a kernel .config file for a multi-SoC kernel which is known not to
-> fail early on a given board. You can enable DEBUG_LL for that board and solve
-> the problem. It should never be enabled for a kernel that is designed to be
-> portable!
+I imagine that other platforms which use this same construct, such as
+realview, will have similar problems in thumb mode.  I can't test
+changes on those platforms, unfortunately.
 
-Indeed.
-
-How about the something like the following?
-
-config DEBUG_LL
-        bool "Kernel low-level debugging functions (read help!)"
-        depends on DEBUG_KERNEL
-        help
-          Say Y here to include definitions of printascii, printch,printhex
-          in the kernel.  This is helpful if you are debugging code that
-          executes before the console is initialized.
-	  The UART lowlevel functions will limit the kernel to exactly
-	  the system specified below. Trying to use these on any other
-	  system will lock up the kernel or even worse.
-
-Sascha
-
-
+diff --git a/arch/arm/mach-vexpress/hotplug.c b/arch/arm/mach-vexpress/hotplug.c
+index ea4cbfb..d6be197 100644
+--- a/arch/arm/mach-vexpress/hotplug.c
++++ b/arch/arm/mach-vexpress/hotplug.c
+@@ -62,10 +62,7 @@ static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
+ 	 * code will have already disabled interrupts
+ 	 */
+ 	for (;;) {
+-		/*
+-		 * here's the WFI
+-		 */
+-		asm(".word	0xe320f003\n"
++		asm("wfi\n"
+ 		    :
+ 		    :
+ 		    : "memory", "cc");
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.3.4
