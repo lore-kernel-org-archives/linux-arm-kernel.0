@@ -1,30 +1,33 @@
-From: banajit.goswami@gmail.com (Banajit Goswami)
-Date: Fri, 19 Aug 2011 09:40:29 +0530
-Subject: [PATCH] ARM: S3C64XX: Remove un-used code
-In-Reply-To: <20110819015955.GA1212@sirena.org.uk>
-References: <1313498488-4296-1-git-send-email-banajit.g@samsung.com>
-	<20110819015955.GA1212@sirena.org.uk>
-Message-ID: <CABK8_vR6bB_0TfQtbA7F9+w9dSXajMdd1SS5o+LscMrDcCY1tg@mail.gmail.com>
+From: hemantp@ti.com (Pedanekar, Hemant)
+Date: Fri, 19 Aug 2011 09:48:38 +0530
+Subject: [PATCH 2/3] TI814X: Add cpu type macros and detection support
+In-Reply-To: <20110815151723.GU12348@atomide.com>
+References: <1312479894-22824-1-git-send-email-hemantp@ti.com>
+	<20110815151723.GU12348@atomide.com>
+Message-ID: <2A3DCF3DA181AD40BDE86A3150B27B6B03ABD26D82@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Tony Lindgren wrote on Monday, August 15, 2011 8:47 PM:
 
-On Fri, Aug 19, 2011 at 7:29 AM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Tue, Aug 16, 2011 at 06:11:28PM +0530, Banajit Goswami wrote:
->> Remove un-used backlight code for SMDK6410 board
->
-> Is the data actually wrong? ?If not it'd seem better to finish hooking
-> it up properly than to remove it.
-No, this code is no longer needed, as we are having a common backlight
-infrastructure , which serves the same purpose.
+> * Hemant Pedanekar <hemantp@ti.com> [110804 20:39]:
+>> This patch adds cpu type, macros for identification of TI814X device.
+>> 
+>> Note that following updates to common OMAP data structures are made:
+>> 1) struct omap_chip_id member 'oc' is updated to u32 from u16 as omap chip
+>> bitfield has exhausted 16 bits for CHIP_IS_XXX.
+>> 2) cpu_mask and RATE_IN_XXX flags have crossed 8 bit hence struct
+>> clksel_rate.flags, struct prcm_config.flags and cpu_mask are changed to
+>> u16 from u8.
+> 
+> We'll be getting rid of CHIP_IS usage and replace them with SoC specific
+> lists. So we need to wait few days and then this patch will need to get
+> updated a bit.
+> 
 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+Tony,
+Is there a branch which I can have a look at for changes being done?
+Thanks.
 
-Thanks and Regards,
-Banajit Goswami
+
+   Hemant
