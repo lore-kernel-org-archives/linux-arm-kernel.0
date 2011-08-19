@@ -1,44 +1,63 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 19 Aug 2011 13:49:33 +0100
-Subject: Patch Merging Path - RMK or Arnd?
-Message-ID: <20110819124933.GG8918@e102144-lin.cambridge.arm.com>
+Date: Fri, 19 Aug 2011 13:52:24 +0100
+Subject: [PATCH v2 6/8] ARM: shmobile: convert logical CPU numbers to
+	physical numbers
+In-Reply-To: <1313429452-2820-7-git-send-email-will.deacon@arm.com>
+References: <1313429452-2820-1-git-send-email-will.deacon@arm.com>
+	<1313429452-2820-7-git-send-email-will.deacon@arm.com>
+Message-ID: <20110819125224.GH8918@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Magnus, Paul,
 
-In general, I merge my patches via Russell as they tend to be core ARM changes.
-This works very well since other (potentially conflicting) changes follow
-the same route and any conflicts would be noticed almost immediately.
+On Mon, Aug 15, 2011 at 06:30:50PM +0100, Will Deacon wrote:
+> This patch uses the new cpu_logical_map() macro for converting logical
+> CPU numbers into physical numbers when dealing with the SCU in the SMP
+> boot path for sh73a0.
+> 
+> Cc: Magnus Damm <magnus.damm@gmail.com>
+> Cc: Paul Mundt <lethal@linux-sh.org>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm/mach-shmobile/smp-sh73a0.c |    6 +++++-
+>  1 files changed, 5 insertions(+), 1 deletions(-)
 
-However, I currently have two patchsets that I'm developing which alter both
-core ARM code *and* touch a number of platforms to use the new core
-features:
-
-http://lists.infradead.org/pipermail/linux-arm-kernel/2011-August/061304.html
-
-http://lists.infradead.org/pipermail/linux-arm-kernel/2011-August/061477.html
-
-Ideally, I would also merge these via Russell, but there is now scope for
-conflict with your arm-soc branch given that I'm changing files under mach-*
-and plat-*. How would you recommend that I proceed? I can think of three
-solutions:
-
-
-(1) [preferred] Merge via Russell, conflicts show up in -next and are
-    resolved then.
-
-(2) Split the patches up so that the core changes go via Russell. When they
-    are in a suitable tree (-next?) then send you the remainder on top of
-    that.
-
-(3) Merge the whole lot via you. This really just inverts the problem rather
-    than solving anything.
-
-
-I expect this will become a fairly common pattern with single zImage work,
-so it would be great to clarify the intended path upstream.
-
-Cheers,
+Any feedback on this? My change to modify_scu_cpu_psr is based largely on
+pattern matching, so please shout if it's wrong.
 
 Will
+
+
+> diff --git a/arch/arm/mach-shmobile/smp-sh73a0.c b/arch/arm/mach-shmobile/smp-sh73a0.c
+> index 3ffdbc9..be1ade7 100644
+> --- a/arch/arm/mach-shmobile/smp-sh73a0.c
+> +++ b/arch/arm/mach-shmobile/smp-sh73a0.c
+> @@ -74,6 +74,8 @@ void __cpuinit sh73a0_secondary_init(unsigned int cpu)
+>  
+>  int __cpuinit sh73a0_boot_secondary(unsigned int cpu)
+>  {
+> +	cpu = cpu_logical_map(cpu);
+> +
+>  	/* enable cache coherency */
+>  	modify_scu_cpu_psr(0, 3 << (cpu * 8));
+>  
+> @@ -87,6 +89,8 @@ int __cpuinit sh73a0_boot_secondary(unsigned int cpu)
+>  
+>  void __init sh73a0_smp_prepare_cpus(void)
+>  {
+> +	int cpu = cpu_logical_map(0);
+> +
+>  	scu_enable(scu_base_addr());
+>  
+>  	/* Map the reset vector (in headsmp.S) */
+> @@ -94,5 +98,5 @@ void __init sh73a0_smp_prepare_cpus(void)
+>  	__raw_writel(__pa(shmobile_secondary_vector), __io(SBAR));
+>  
+>  	/* enable cache coherency on CPU0 */
+> -	modify_scu_cpu_psr(0, 3 << (0 * 8));
+> +	modify_scu_cpu_psr(0, 3 << (cpu * 8));
+>  }
+> -- 
+> 1.7.0.4
+> 
