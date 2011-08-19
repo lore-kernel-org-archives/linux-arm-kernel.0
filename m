@@ -1,41 +1,49 @@
 From: hemantp@ti.com (Pedanekar, Hemant)
-Date: Fri, 19 Aug 2011 09:57:18 +0530
-Subject: [PATCH 3/3] TI814X: Create board support and enable build for
-	TI8148 EVM
-In-Reply-To: <20110815151509.GT12348@atomide.com>
-References: <1312479903-22909-1-git-send-email-hemantp@ti.com>
-	<20110815151509.GT12348@atomide.com>
-Message-ID: <2A3DCF3DA181AD40BDE86A3150B27B6B03ABD26D8D@dbde02.ent.ti.com>
+Date: Fri, 19 Aug 2011 09:58:40 +0530
+Subject: [PATCH 0/3] Add support for TI814X processor series
+In-Reply-To: <2A3DCF3DA181AD40BDE86A3150B27B6B03ABD26CF7@dbde02.ent.ti.com>
+References: <1312479869-21948-1-git-send-email-hemantp@ti.com>
+	<2A3DCF3DA181AD40BDE86A3150B27B6B03ABB099E0@dbde02.ent.ti.com>
+	<2A3DCF3DA181AD40BDE86A3150B27B6B03ABD26CF7@dbde02.ent.ti.com>
+Message-ID: <2A3DCF3DA181AD40BDE86A3150B27B6B03ABD26D94@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony Lindgren wrote on Monday, August 15, 2011 8:45 PM:
+linux-arm-kernel-bounces at lists.infradead.org wrote on :
 
-> * Hemant Pedanekar <hemantp@ti.com> [110804 20:39]:
->> This patch adds minimal support and build configuration for TI8148 EVM.
->> Also adds support for low level debugging on UART1 console on the EVM. ...
+> linux-arm-kernel-bounces at lists.infradead.org wrote on :
 > 
-> 
->> +MACHINE_START(TI8148EVM, "ti8148evm")
->> +	/* Maintainer: Texas Instruments */
->> +	.boot_params	= 0x80000100,
->> +	.map_io		= ti8148_evm_map_io,
->> +	.init_early	= ti8148_init_early,
->> +	.init_irq	= ti81xx_init_irq,
->> +	.timer		= &omap3_timer,
->> +	.init_machine	= ti8148_evm_init,
->> +MACHINE_END
-> 
-> Please just combine this with board-ti8168evm.c by adding the MACHINE_START
-> there. It seems the files are identical otherwise?
-> 
+>> Hello,
+>> 
+>> Pedanekar, Hemant wrote on Thursday, August 04, 2011 11:14 PM:
+>> 
+>>> This patch set adds support for DM814x, C6A814x and AM387x device series
+>>> having Cortex-A8 MPU. 
+>>> 
+>>> The technical documents are available from following link:
+>>> 
+>>> http://focus.ti.com/docs/prod/folders/print/tms320dm8148.html
+>>> 
+>>> This series is referred in code as TI814X.
+>>> 
+>>> Since these devices share similar architecture as TI816X devices, existing
+>>> TI816X code is updated to accomodate TI814X support. The code shared
+>>> across TI816X and TI814X devices is updated with TI81XX/ti81xx prefix as
+>>> applicable, while maintaining cpu_is_ti816x() and cpu_is_ti814x() to
+>>> distinguish specific execution differences.
+>>> 
+>>> Hemant Pedanekar (3):
+>>>   TI81XX: Prepare for addition of TI814X support
+>>>   TI814X: Add cpu type macros and detection support
+>>>   TI814X: Create board support and enable build for TI8148 EVM
+>>> 
+>> [...]
+>> 
+> Hello,
+> Can you please provide comments on these patches?
+> Thanks.
+>    Hemant
 
-Tony,
-There will be more additions in respective board files such as I2C I/O expander
-data, mux handling depending upon the EVM (8168/8148), on board peripherals etc
-When these board files would deviate.
+Please disregard, I had missed Tony's comments.		
 
-What do you suggest to handle such?
-
-Thanks.
    Hemant
