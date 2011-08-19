@@ -1,56 +1,58 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 19 Aug 2011 11:49:10 -0400 (EDT)
-Subject: [PATCH 1/3] ARM: debug: use kconfig choice for selecting DEBUG_LL
-	UART
-In-Reply-To: <20110819123238.GD8918@e102144-lin.cambridge.arm.com>
-References: <1313530873-24961-1-git-send-email-will.deacon@arm.com>
-	<20110818161105.GA12527@S2100-06.ap.freescale.net>
-	<20110818160712.GA26691@e102144-lin.cambridge.arm.com>
-	<20110819045956.GB12527@S2100-06.ap.freescale.net>
-	<20110819110822.GB8918@e102144-lin.cambridge.arm.com>
-	<20110819113740.GF12527@S2100-06.ap.freescale.net>
-	<20110819123238.GD8918@e102144-lin.cambridge.arm.com>
-Message-ID: <alpine.LFD.2.00.1108191101560.20358@xanadu.home>
+From: greg@kroah.com (Greg KH)
+Date: Fri, 19 Aug 2011 09:52:52 -0700
+Subject: [PATCH 1/4 v4] drivers: create a pin control subsystem
+In-Reply-To: <201108191636.29161.arnd@arndb.de>
+References: <1313747630-32258-1-git-send-email-linus.walleij@stericsson.com>
+	<20110819104816.GA5030@pulham.picochip.com>
+	<CACRpkdZhg_1WM37uqT1PNmpUjWS_groWJmNnR4SBjqJ6LFQQWQ@mail.gmail.com>
+	<201108191636.29161.arnd@arndb.de>
+Message-ID: <20110819165252.GC4016@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 19 Aug 2011, Will Deacon wrote:
-> On Fri, Aug 19, 2011 at 12:37:41PM +0100, Shawn Guo wrote:
-> > On Fri, Aug 19, 2011 at 12:08:22PM +0100, Will Deacon wrote:
-> > > @@ -74,7 +78,12 @@ config DEBUG_LL
-> > >  
-> > >  choice
-> > >         prompt "Kernel low-level debugging port"
-> > > -       depends on DEBUG_LL
-> > > +       depends on DEBUG_LL_UART && (FOOTBRIDGE || ARCH_CLPS711X || \
-> > > +                                    PLAT_SAMSUNG || ARCH_REALVIEW)
+On Fri, Aug 19, 2011 at 04:36:28PM +0200, Arnd Bergmann wrote:
+> On Friday 19 August 2011, Linus Walleij wrote:
+> > On Fri, Aug 19, 2011 at 12:48 PM, Jamie Iles <jamie@jamieiles.com> wrote:
 > > 
-> > We will have to list a lot of ARCH/PLAT symbols here.  This is what
-> > I meant overkilled actually.
+> > >> +static struct class pinctrl_class = {
+> > >> +     .name = "pinctrl",
+> > >> +     .dev_release = pinctrl_dev_release,
+> > >> +     .dev_attrs = pinctrl_dev_attrs,
+> > >> +};
+> > >
+> > > Greg K-H has mentioned in the past that class is now deprecated for new
+> > > use and that a bus_type should be used instead.
+> > 
+> > Can you provide a reference with some detail?
+> > The pin control devices are usually aleady on a bus like the
+> > platform_bus or amba_bus or i2c_bus, then they register a
+> > class device in this case.
+> > 
+> > The kerneldoc documentation says
+> > "A bus is a channel between the processor and one or more devices."
+> > 
+> > This isn't the case here.
+> > 
+> > Anyhthing that help me understand this is appreciated, Arnd?
 > 
-> Ultimately, we will want to have all the platforms using this mechanism so
-> this list of symbols could eventually be removed. I take your point though;
-> so I'll leave the patch series as it is for now.
+> Taking Greg on Cc as well.
+> 
+> The main difference between a normal device and a class device is
+> that one is linked from /sys/bus/*/devices/* and the other is linked
+> from /sys/class/*/*. However, they both live in /sys/devices/.../*
+> as directories.
+> 
+> I always liked the separation between the two, although there are
+> a few cases where there is a grey area (e.g. /sys/bus/hid or
+> /sys/class/mmc_host) and the abstraction doesn't really fit.
+> 
+> IIRC Greg would prefer now to never have had the distinction
+> and wants to make all future uses use a bus_type.
 
-Well, ultimately I'd like to see something even better than that.  We 
-should have the bootloader provide the required information to the 
-kernel for it to be able to send bytes to a debug device.  It should be 
-rather simple, especially for a serial UART.  All we need in that case 
-is:
+Yes, that is totally correct.  Kay has also written much more about this
+and why this is the way forward many times in the past, see lkml
+archives for the details if anyone is interested.
 
- - physical address of the transmit FIFO register
+thanks,
 
- - physical address of the register indicating "FIFO full" with a 
-   corresponding bit mask
-
- - physical address of the register indicating "FIFO empty" with a
-   corresponding bit mask
-
-The bootloader should be able to pass that info into an ATAG or a DT 
-node just fine.
-
-But in the mean time, for legacy boards, the best we have is this 
-Kconfig approach.
-
-
-Nicolas
+greg k-h
