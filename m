@@ -1,34 +1,24 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 19 Aug 2011 14:45:19 +0200
-Subject: [PATCH 00/19] GPIO exodus and cleanup
-In-Reply-To: <CACRpkdbJOrb5rhgG0Chamt-ApLQnV69MQ=bqBwKqO3KJPaFd0A@mail.gmail.com>
-References: <1312978564-18069-1-git-send-email-linus.walleij@stericsson.com>
-	<20110817090123.GD1006@n2100.arm.linux.org.uk>
-	<CACRpkdbJOrb5rhgG0Chamt-ApLQnV69MQ=bqBwKqO3KJPaFd0A@mail.gmail.com>
-Message-ID: <CACRpkdYw96QD0sGOhA=osKYbnD6=MTqiAF=m5++BjM-s1Mn--w@mail.gmail.com>
+Date: Fri, 19 Aug 2011 14:46:49 +0200
+Subject: [PATCH 1/3] gpio/nomadik: remove pull-pinconfig and add SPI2
+In-Reply-To: <1312913020-7508-1-git-send-email-linus.walleij@stericsson.com>
+References: <1312913020-7508-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <CACRpkdbyjj+7Lm9JCLnYLC_z6Tt+XOr9waYjQAezRDyq7Tb=Ug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 17, 2011 at 11:37 AM, Linus Walleij
-<linus.walleij@linaro.org> wrote:
-> On Wed, Aug 17, 2011 at 11:01 AM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
->> On Wed, Aug 10, 2011 at 02:16:04PM +0200, Linus Walleij wrote:
->>> The following patch set is rebased on top of Russell's
->>> 13 cleanup patches and can be finalized as soon as there
->>> is a branch in RMKs tree that can accumulate this work.
->>
->> If Grant acks the relevant ones, they can go to the patch system and
->> merged into that branch.
+On Tue, Aug 9, 2011 at 8:03 PM, Linus Walleij
+<linus.walleij@stericsson.com> wrote:
+> From: Fredrik Svensson <fredrik.xk.svensson@stericsson.com>
 >
-> Thanks that'd be smooth.
+> Remove PIN_CFG_PULL in pincfg.h for plat-nomadik, PIN_CFG_INPUT
+> already takes care of this. Added support for SPI2.
 >
-> Grant can you N/ACK the patches you consider relevant for
-> the GPIO subsystem?
+> Signed-off-by: Fredrik Svensson <fredrik.xk.svensson@stericsson.com>
+> Signed-off-by: Daniel Willerud <daniel.willerud@stericsson.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-Ping on this, on monday I'll pretend it's no big deal and pour them
-into Russells patch tracker anyway, since he's managing more than
-half of the kernels GPIO code in arch/arm/* anyway.
+Ping on these three patches too ....
 
 Thanks,
 Linus Walleij
