@@ -1,143 +1,181 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 20 Aug 2011 14:05:59 +0900
-Subject: [PATCH 4/4] ARM: EXYNOS4: Use samsung_rev() to distinguish silicon
-	revision
+Date: Sat, 20 Aug 2011 14:05:58 +0900
+Subject: [PATCH 3/4] ARM: SAMSUNG: Add support for handling of cpu revision
 In-Reply-To: <1313816759-14564-1-git-send-email-kgene.kim@samsung.com>
 References: <1313816759-14564-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <1313816759-14564-5-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1313816759-14564-4-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch uses samsung_rev() to support variable silicon revision of
-EXYNOS4210 so that can support for EXYNOS4210 REV0, REV1.0 and REV1.1.
+This patch adds plat-samsung/cpu.c for detecting of cpu id and
+silicon revision.
 
-Note: Need to change timer setting on REV0.
+This patch was originally from Changhwan Youn <chaos.youn@samsung.com>
 
 Acked-by: Changhwan Youn <chaos.youn@samsung.com>
+Cc: Ben Dooks <ben-linux@fluff.org>
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/mach-exynos4/cpu.c              |   28 +++++++++++++++++++++++-----
- arch/arm/mach-exynos4/include/mach/map.h |    3 ++-
- arch/arm/mach-exynos4/platsmp.c          |    8 ++++++--
- arch/arm/plat-samsung/include/plat/cpu.h |    6 ++++++
- 4 files changed, 37 insertions(+), 8 deletions(-)
+ arch/arm/mach-s3c64xx/cpu.c              |   10 +----
+ arch/arm/plat-s3c24xx/cpu.c              |    1 +
+ arch/arm/plat-s5p/cpu.c                  |    4 ++-
+ arch/arm/plat-samsung/Makefile           |    2 +-
+ arch/arm/plat-samsung/cpu.c              |   58 ++++++++++++++++++++++++++++++
+ arch/arm/plat-samsung/include/plat/cpu.h |    4 ++
+ arch/arm/plat-samsung/init.c             |    1 -
+ 7 files changed, 69 insertions(+), 11 deletions(-)
+ create mode 100644 arch/arm/plat-samsung/cpu.c
 
-diff --git a/arch/arm/mach-exynos4/cpu.c b/arch/arm/mach-exynos4/cpu.c
-index 2d8a40c..f188c6d 100644
---- a/arch/arm/mach-exynos4/cpu.c
-+++ b/arch/arm/mach-exynos4/cpu.c
-@@ -43,11 +43,6 @@ static struct map_desc exynos4_iodesc[] __initdata = {
- 		.length		= SZ_4K,
- 		.type	 	= MT_DEVICE,
- 	}, {
--		.virtual	= (unsigned long)S5P_VA_SYSRAM,
--		.pfn		= __phys_to_pfn(EXYNOS4_PA_SYSRAM),
--		.length		= SZ_4K,
--		.type		= MT_DEVICE,
--	}, {
- 		.virtual	= (unsigned long)S5P_VA_CMU,
- 		.pfn		= __phys_to_pfn(EXYNOS4_PA_CMU),
- 		.length		= SZ_128K,
-@@ -128,6 +123,24 @@ static void exynos4_idle(void)
- 	local_irq_enable();
+diff --git a/arch/arm/mach-s3c64xx/cpu.c b/arch/arm/mach-s3c64xx/cpu.c
+index 7b665f3..6c498f9 100644
+--- a/arch/arm/mach-s3c64xx/cpu.c
++++ b/arch/arm/mach-s3c64xx/cpu.c
+@@ -144,14 +144,8 @@ void __init s3c64xx_init_io(struct map_desc *mach_desc, int size)
+ 	iotable_init(s3c_iodesc, ARRAY_SIZE(s3c_iodesc));
+ 	iotable_init(mach_desc, size);
+ 
+-	samsung_cpu_id = __raw_readl(S3C_VA_SYS + 0x118);
+-	if (!samsung_cpu_id) {
+-		/* S3C6400 has the ID register in a different place,
+-		 * and needs a write before it can be read. */
+-
+-		__raw_writel(0x0, S3C_VA_SYS + 0xA1C);
+-		samsung_cpu_id = __raw_readl(S3C_VA_SYS + 0xA1C);
+-	}
++	/* detect cpu id */
++	s3c64xx_init_cpu();
+ 
+ 	s3c_init_cpu(samsung_cpu_id, cpu_ids, ARRAY_SIZE(cpu_ids));
  }
+diff --git a/arch/arm/plat-s3c24xx/cpu.c b/arch/arm/plat-s3c24xx/cpu.c
+index ead21a4..3c63353 100644
+--- a/arch/arm/plat-s3c24xx/cpu.c
++++ b/arch/arm/plat-s3c24xx/cpu.c
+@@ -224,6 +224,7 @@ void __init s3c24xx_init_io(struct map_desc *mach_desc, int size)
+ 	} else {
+ 		samsung_cpu_id = s3c24xx_read_idcode_v4();
+ 	}
++	s3c24xx_init_cpu();
  
-+static struct map_desc exynos4_iodesc0[] __initdata = {
-+	{
-+		.virtual	= (unsigned long)S5P_VA_SYSRAM,
-+		.pfn		= __phys_to_pfn(EXYNOS4_PA_SYSRAM0),
-+		.length		= SZ_4K,
-+		.type	 	= MT_DEVICE,
-+	},
-+};
+ 	arm_pm_restart = s3c24xx_pm_restart;
+ 
+diff --git a/arch/arm/plat-s5p/cpu.c b/arch/arm/plat-s5p/cpu.c
+index 3ef6734..04392c7 100644
+--- a/arch/arm/plat-s5p/cpu.c
++++ b/arch/arm/plat-s5p/cpu.c
+@@ -119,6 +119,8 @@ void __init s5p_init_io(struct map_desc *mach_desc,
+ 	if (mach_desc)
+ 		iotable_init(mach_desc, size);
+ 
+-	samsung_cpu_id = __raw_readl(cpuid_addr);
++	/* detect cpu id and rev. */
++	s5p_init_cpu(cpuid_addr);
 +
-+static struct map_desc exynos4_iodesc1[] __initdata = {
-+	{
-+		.virtual	= (unsigned long)S5P_VA_SYSRAM,
-+		.pfn		= __phys_to_pfn(EXYNOS4_PA_SYSRAM1),
-+		.length		= SZ_4K,
-+		.type	 	= MT_DEVICE,
-+	},
-+};
+ 	s3c_init_cpu(samsung_cpu_id, cpu_ids, ARRAY_SIZE(cpu_ids));
+ }
+diff --git a/arch/arm/plat-samsung/Makefile b/arch/arm/plat-samsung/Makefile
+index 853764b..3de756d 100644
+--- a/arch/arm/plat-samsung/Makefile
++++ b/arch/arm/plat-samsung/Makefile
+@@ -11,7 +11,7 @@ obj-				:=
+ 
+ # Objects we always build independent of SoC choice
+ 
+-obj-y				+= init.o
++obj-y				+= init.o cpu.o
+ obj-$(CONFIG_ARCH_USES_GETTIMEOFFSET)   += time.o
+ obj-y				+= clock.o
+ obj-y				+= pwm-clock.o
+diff --git a/arch/arm/plat-samsung/cpu.c b/arch/arm/plat-samsung/cpu.c
+new file mode 100644
+index 0000000..fb3b293
+--- /dev/null
++++ b/arch/arm/plat-samsung/cpu.c
+@@ -0,0 +1,58 @@
++/* linux/arch/arm/plat-samsung/cpu.c
++ *
++ * Copyright (c) 2009-2011 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com
++ *
++ * Samsung CPU Support
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
 +
- /*
-  * exynos4_map_io
-  *
-@@ -137,6 +150,11 @@ void __init exynos4_map_io(void)
- {
- 	iotable_init(exynos4_iodesc, ARRAY_SIZE(exynos4_iodesc));
- 
-+	if (samsung_rev() == EXYNOS4210_REV_0)
-+		iotable_init(exynos4_iodesc0, ARRAY_SIZE(exynos4_iodesc0));
-+	else if (samsung_rev() == EXYNOS4210_REV_1_0)
-+		iotable_init(exynos4_iodesc1, ARRAY_SIZE(exynos4_iodesc1));
++#include <linux/module.h>
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/io.h>
 +
- 	/* initialize device information early */
- 	exynos4_default_sdhci0();
- 	exynos4_default_sdhci1();
-diff --git a/arch/arm/mach-exynos4/include/mach/map.h b/arch/arm/mach-exynos4/include/mach/map.h
-index d32296d..7073ac7 100644
---- a/arch/arm/mach-exynos4/include/mach/map.h
-+++ b/arch/arm/mach-exynos4/include/mach/map.h
-@@ -23,7 +23,8 @@
- 
- #include <plat/map-s5p.h>
- 
--#define EXYNOS4_PA_SYSRAM		0x02020000
-+#define EXYNOS4_PA_SYSRAM0		0x02025000
-+#define EXYNOS4_PA_SYSRAM1		0x02020000
- 
- #define EXYNOS4_PA_FIMC0		0x11800000
- #define EXYNOS4_PA_FIMC1		0x11810000
-diff --git a/arch/arm/mach-exynos4/platsmp.c b/arch/arm/mach-exynos4/platsmp.c
-index 7c2282c..96cc651 100644
---- a/arch/arm/mach-exynos4/platsmp.c
-+++ b/arch/arm/mach-exynos4/platsmp.c
-@@ -30,9 +30,12 @@
- #include <mach/regs-clock.h>
- #include <mach/regs-pmu.h>
- 
++#include <asm/system.h>
++
++#include <mach/map.h>
 +#include <plat/cpu.h>
 +
- extern void exynos4_secondary_startup(void);
- 
--#define CPU1_BOOT_REG S5P_VA_SYSRAM
-+#define CPU1_BOOT_REG		(samsung_rev() == EXYNOS4210_REV_1_1 ? \
-+				S5P_INFORM5 : S5P_VA_SYSRAM)
- 
- /*
-  * control for which core is the next to come out of the secondary
-@@ -216,5 +219,6 @@ void __init platform_smp_prepare_cpus(unsigned int max_cpus)
- 	 * until it receives a soft interrupt, and then the
- 	 * secondary CPU branches to this address.
- 	 */
--	__raw_writel(BSYM(virt_to_phys(exynos4_secondary_startup)), S5P_VA_SYSRAM);
-+	__raw_writel(BSYM(virt_to_phys(exynos4_secondary_startup)),
-+			CPU1_BOOT_REG);
- }
++unsigned long samsung_cpu_id;
++static unsigned int samsung_cpu_rev;
++
++unsigned int samsung_rev(void)
++{
++	return samsung_cpu_rev;
++}
++EXPORT_SYMBOL(samsung_rev);
++
++void __init s3c24xx_init_cpu(void)
++{
++	/* nothing here yet */
++
++	samsung_cpu_rev = 0;
++}
++
++void __init s3c64xx_init_cpu(void)
++{
++	samsung_cpu_id = __raw_readl(S3C_VA_SYS + 0x118);
++	if (!samsung_cpu_id) {
++		/*
++		 * S3C6400 has the ID register in a different place,
++		 * and needs a write before it can be read.
++		 */
++		__raw_writel(0x0, S3C_VA_SYS + 0xA1C);
++		samsung_cpu_id = __raw_readl(S3C_VA_SYS + 0xA1C);
++	}
++
++	samsung_cpu_rev = 0;
++}
++
++void __init s5p_init_cpu(void __iomem *cpuid_addr)
++{
++	samsung_cpu_id = __raw_readl(cpuid_addr);
++	samsung_cpu_rev = samsung_cpu_id & 0xF;
++}
 diff --git a/arch/arm/plat-samsung/include/plat/cpu.h b/arch/arm/plat-samsung/include/plat/cpu.h
-index 16238c8..b0d3d59 100644
+index b762b37..16238c8 100644
 --- a/arch/arm/plat-samsung/include/plat/cpu.h
 +++ b/arch/arm/plat-samsung/include/plat/cpu.h
-@@ -100,6 +100,10 @@ IS_SAMSUNG_CPU(exynos4210, EXYNOS4210_CPU_ID, EXYNOS4_CPU_MASK)
- # define cpu_is_exynos4210()	0
- #endif
+@@ -140,6 +140,10 @@ extern void s3c64xx_init_io(struct map_desc *mach_desc, int size);
+ extern void s5p_init_io(struct map_desc *mach_desc,
+ 			int size, void __iomem *cpuid_addr);
  
-+#define EXYNOS4210_REV_0	(0x0)
-+#define EXYNOS4210_REV_1_0	(0x2)
-+#define EXYNOS4210_REV_1_1	(0x3)
-+
- #define IODESC_ENT(x) { (unsigned long)S3C24XX_VA_##x, __phys_to_pfn(S3C24XX_PA_##x), S3C24XX_SZ_##x, MT_DEVICE }
- 
- #ifndef MHZ
-@@ -144,6 +148,8 @@ extern void s3c24xx_init_cpu(void);
- extern void s3c64xx_init_cpu(void);
- extern void s5p_init_cpu(void __iomem *cpuid_addr);
- 
-+extern unsigned int samsung_rev(void);
++extern void s3c24xx_init_cpu(void);
++extern void s3c64xx_init_cpu(void);
++extern void s5p_init_cpu(void __iomem *cpuid_addr);
 +
  extern void s3c24xx_init_uarts(struct s3c2410_uartcfg *cfg, int no);
  
  extern void s3c24xx_init_clocks(int xtal);
+diff --git a/arch/arm/plat-samsung/init.c b/arch/arm/plat-samsung/init.c
+index 40b1228..79d10fc 100644
+--- a/arch/arm/plat-samsung/init.c
++++ b/arch/arm/plat-samsung/init.c
+@@ -30,7 +30,6 @@
+ #include <plat/regs-serial.h>
+ 
+ static struct cpu_table *cpu;
+-unsigned long samsung_cpu_id;
+ 
+ static struct cpu_table * __init s3c_lookup_cpu(unsigned long idcode,
+ 						struct cpu_table *tab,
 -- 
 1.7.1
