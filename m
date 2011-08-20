@@ -1,155 +1,136 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 19 Aug 2011 21:32:12 -0600 (MDT)
-Subject: [PATCH] OMAP4: clock: re-enable previous clockdomain
-	enable/disable
-	sequence (was Re: Oops on ehci_hcd when booting 3.0.0-rc2 on panda)
-In-Reply-To: <20110819230805.GA13317@legolas.emea.dhcp.ti.com>
-References: <1307356643.23002.413.camel@cumari>
-	<20110606104417.GP18731@legolas.emea.dhcp.ti.com>
-	<20110606110218.GS18731@legolas.emea.dhcp.ti.com>
-	<1307358348.23002.419.camel@cumari>
-	<1312889168.2407.148.camel@cumari>
-	<CAK=WgbatbaSj=U7+SAva4Woh7uaOoCzQck5yjfLvVGLR-UCVHg@mail.gmail.com>
-	<4E43C41E.1080808@ti.com> <1313065224.2407.857.camel@cumari>
-	<CAP05o4+sBa_DO-ReoF20L=v5kbt5936_1vAGTQ10E4Lh+YXdNQ@mail.gmail.com>
-	<alpine.DEB.2.00.1108191647430.9948@utopia.booyaka.com>
-	<20110819230805.GA13317@legolas.emea.dhcp.ti.com>
-Message-ID: <alpine.DEB.2.00.1108192131170.24016@utopia.booyaka.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Sat, 20 Aug 2011 14:05:57 +0900
+Subject: [PATCH 2/4] ARM: S5P64X0: Use cpu_is_s5p64x0() to distinguish cpu at
+	runtime
+In-Reply-To: <1313816759-14564-1-git-send-email-kgene.kim@samsung.com>
+References: <1313816759-14564-1-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1313816759-14564-3-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 20 Aug 2011, Felipe Balbi wrote:
-
-> maybe add a comment here stating why this line is commented out ?
-> 
-> > -	omap2_clk_disable_clkdm_control();
-> > +	/* omap2_clk_disable_clkdm_control(); */
-
-Thanks for your comments.  I've updated the patch; it follows below.
-
-
-- Paul
-
-From: Paul Walmsley <paul@pwsan.com>
-Date: Fri, 19 Aug 2011 16:59:56 -0600
-Subject: [PATCH] OMAP4: clock: re-enable previous clockdomain enable/disable
- sequence
-MIME-Version: 1.0
-Content-Type: text/plain; charset=UTF-8
-Content-Transfer-Encoding: 8bit
-
-After commit 665d001338b494d6d62810aa99b4c0fa1a0884b9 ("OMAP2+: hwmod:
-Follow the recommended PRCM module enable sequence"), device drivers
-for OMAP IP blocks that do not use runtime PM can cause oopses or
-kernel instability[1][2].
-
-This is because those non-runtime PM drivers do not use the hwmod
-code, which implements the correct IP block enable and disable
-sequence.
-
-Several options for dealing with this problem have been proposed:
-
-1. Add a new field to the OMAP struct clk to mark clocks that are
-   currently used by non-runtime PM drivers.  Modify the clock code to
-   use the old clockdomain sequence for these marked clocks.  As
-   drivers are converted to use runtime PM, remove the annotation from
-   the clocks.
-
-2. Similar to #1, but associate the flag with the struct omap_clk
-   instead.
-
-3. Add IDLEST wait support to the OMAP4 clock code, similar to the way
-   it is implemented for OMAP2/3, and enable it in each struct clk
-   currently used by non-runtime PM drivers.  As drivers are converted
-   to use runtime PM, remove the annotation from the clocks.
-
-4. Do nothing; leave the problem to those responsible for the
-   unconverted drivers.
-
-5. Re-enable clock-based clockdomain control in the OMAP4 clock code.
-   This would revert back to the behavior of Linux 3.0, simply with a
-   slightly longer module enable/disable latency.
-
-Unfortunately, no approach seemed particularly good.  Options 1
-through 3 seemed unwise due to the following reasons:
-
-A. The OMAP struct clks are intended primarily to describe hardware
-   clock nodes, and the intention is that no driver-specific data
-   should be stored there (applies to #1)
-
-B. The resulting patch would have been quite large for the -rc series
-   (applies to #1, #2, #3)
-
-C. The patch would have been a new, yet temporary hack; and similar fixes
-   have drawn negative comments in the recent past (see for example [3])
-
-Option 4 is undesirable because commit
-665d001338b494d6d62810aa99b4c0fa1a0884b9 ("OMAP2+: hwmod: Follow the
-recommended PRCM module enable sequence") has resulted in a less
-stable kernel; and kernel stability is more important than OMAP4 power
-management.
-
-Option 5 is the approach taken in this patch.  This seemed to be the
-least intrusive approach for 3.1-rc.
-
-The approach in this patch was originally proposed by Ohad Ben-Cohen
-<ohad@wizery.com>.  I'm simply writing the commit message and passing
-it along.
-
-...
-
-Thanks to Luciano Coelho <coelho@ti.com> for reporting the problem.
-Thanks to Ohad Ben-Cohen <ohad@wizery.com> for tracking the problem
-down, generating a temporary workaround, and proposing a patch to deal
-with the problem.  Thanks to Rajendra Nayak <rnayak@ti.com> for
-proposing another patch to deal with the problem.  Thanks to Felipe
-Balbi <balbi@ti.com> for comments.
-
-1. Coelho, Luciano <coelho@ti.com>.  _Re: Oops on ehci_hcd when
-   booting 3.0.0-rc2 on panda_.  Tue, 09 Aug 2011 14:26:08 +0300.
-   Posted to the <linux-omap@vger.kernel.org> mailing list.  Available
-   from (among others)
-   http://www.spinics.net/linux/lists/linux-omap/msg55213.html
-
-2. Munegowda, Keshava <keshava_mgowda@ti.com>. _Re: Oops on ehci_hcd
-   when booting 3.0.0-rc2 on panda_.  Thu, 11 Aug 2011 13:51:05 +0530.
-   Posted to the <linux-omap@vger.kernel.org> mailing list.  Available
-   from (among others)
-   http://www.spinics.net/linux/lists/linux-omap/msg55371.html
-
-3. King, Russell <linux@arm.linux.org.uk>.  _Re: [PATCH 5/8] OMAP4:
-   PM: TEMP: Prevent l3init from idling/force sleep_.  Thu, 23 Jun
-   2011 16:22:49 +0100.  Posted to the <linux-omap@vger.kernel.org>
-   mailing list.  Available from (among others)
-   http://www.mail-archive.com/linux-omap at vger.kernel.org/msg51392.html
-
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Luciano Coelho <coelho@ti.com>
-Cc: Ohad Ben-Cohen <ohad@wizery.com>
-Cc: Rajendra Nayak <rnayak@ti.com>
-Cc: Beno?t Cousson <b-cousson@ti.com>
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/mach-omap2/clock44xx_data.c |    8 +++++++-
- 1 files changed, 7 insertions(+), 1 deletions(-)
+ arch/arm/mach-s5p64x0/dev-spi.c  |    8 +++-----
+ arch/arm/mach-s5p64x0/dma.c      |    7 ++-----
+ arch/arm/mach-s5p64x0/gpiolib.c  |    7 ++-----
+ arch/arm/mach-s5p64x0/irq-eint.c |    3 ++-
+ 4 files changed, 9 insertions(+), 16 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/clock44xx_data.c b/arch/arm/mach-omap2/clock44xx_data.c
-index 2af0e3f..a3a1827 100644
---- a/arch/arm/mach-omap2/clock44xx_data.c
-+++ b/arch/arm/mach-omap2/clock44xx_data.c
-@@ -3379,7 +3379,13 @@ int __init omap4xxx_clk_init(void)
- 	}
+diff --git a/arch/arm/mach-s5p64x0/dev-spi.c b/arch/arm/mach-s5p64x0/dev-spi.c
+index ac825e8..aa24442 100644
+--- a/arch/arm/mach-s5p64x0/dev-spi.c
++++ b/arch/arm/mach-s5p64x0/dev-spi.c
+@@ -21,6 +21,7 @@
+ #include <mach/regs-clock.h>
+ #include <mach/spi-clocks.h>
  
- 	clk_init(&omap2_clk_functions);
--	omap2_clk_disable_clkdm_control();
-+
-+	/*
-+	 * Must stay commented until all OMAP SoC drivers are
-+	 * converted to runtime PM, or drivers may start crashing
-+	 *
-+	 * omap2_clk_disable_clkdm_control();
-+	 */
++#include <plat/cpu.h>
+ #include <plat/s3c64xx-spi.h>
+ #include <plat/gpio-cfg.h>
  
- 	for (c = omap44xx_clks; c < omap44xx_clks + ARRAY_SIZE(omap44xx_clks);
- 									  c++)
+@@ -185,11 +186,8 @@ struct platform_device s5p64x0_device_spi1 = {
+ 
+ void __init s5p64x0_spi_set_info(int cntrlr, int src_clk_nr, int num_cs)
+ {
+-	unsigned int id;
+ 	struct s3c64xx_spi_info *pd;
+ 
+-	id = __raw_readl(S5P64X0_SYS_ID) & 0xFF000;
+-
+ 	/* Reject invalid configuration */
+ 	if (!num_cs || src_clk_nr < 0
+ 			|| src_clk_nr > S5P64X0_SPI_SRCCLK_SCLK) {
+@@ -199,7 +197,7 @@ void __init s5p64x0_spi_set_info(int cntrlr, int src_clk_nr, int num_cs)
+ 
+ 	switch (cntrlr) {
+ 	case 0:
+-		if (id == 0x50000)
++		if (cpu_is_s5p6450())
+ 			pd = &s5p6450_spi0_pdata;
+ 		else
+ 			pd = &s5p6440_spi0_pdata;
+@@ -207,7 +205,7 @@ void __init s5p64x0_spi_set_info(int cntrlr, int src_clk_nr, int num_cs)
+ 		s5p64x0_device_spi0.dev.platform_data = pd;
+ 		break;
+ 	case 1:
+-		if (id == 0x50000)
++		if (cpu_is_s5p6450())
+ 			pd = &s5p6450_spi1_pdata;
+ 		else
+ 			pd = &s5p6440_spi1_pdata;
+diff --git a/arch/arm/mach-s5p64x0/dma.c b/arch/arm/mach-s5p64x0/dma.c
+index d7ad944..0ac3d59 100644
+--- a/arch/arm/mach-s5p64x0/dma.c
++++ b/arch/arm/mach-s5p64x0/dma.c
+@@ -28,6 +28,7 @@
+ #include <mach/irqs.h>
+ #include <mach/regs-clock.h>
+ 
++#include <plat/cpu.h>
+ #include <plat/devs.h>
+ #include <plat/s3c-pl330-pdata.h>
+ 
+@@ -133,11 +134,7 @@ static struct platform_device s5p64x0_device_pdma = {
+ 
+ static int __init s5p64x0_dma_init(void)
+ {
+-	unsigned int id;
+-
+-	id = __raw_readl(S5P64X0_SYS_ID) & 0xFF000;
+-
+-	if (id == 0x50000)
++	if (cpu_is_s5p6450())
+ 		s5p64x0_device_pdma.dev.platform_data = &s5p6450_pdma_pdata;
+ 	else
+ 		s5p64x0_device_pdma.dev.platform_data = &s5p6440_pdma_pdata;
+diff --git a/arch/arm/mach-s5p64x0/gpiolib.c b/arch/arm/mach-s5p64x0/gpiolib.c
+index e7fb3b0..c65684e 100644
+--- a/arch/arm/mach-s5p64x0/gpiolib.c
++++ b/arch/arm/mach-s5p64x0/gpiolib.c
+@@ -19,6 +19,7 @@
+ #include <mach/regs-gpio.h>
+ #include <mach/regs-clock.h>
+ 
++#include <plat/cpu.h>
+ #include <plat/gpio-core.h>
+ #include <plat/gpio-cfg.h>
+ #include <plat/gpio-cfg-helpers.h>
+@@ -473,14 +474,10 @@ static void __init s5p64x0_gpio_add_rbank_4bit2(struct s3c_gpio_chip *chip,
+ 
+ static int __init s5p64x0_gpiolib_init(void)
+ {
+-	unsigned int chipid;
+-
+-	chipid = __raw_readl(S5P64X0_SYS_ID);
+-
+ 	s5p64x0_gpiolib_set_cfg(s5p64x0_gpio_cfgs,
+ 				ARRAY_SIZE(s5p64x0_gpio_cfgs));
+ 
+-	if ((chipid & 0xff000) == 0x50000) {
++	if (cpu_is_s5p6450()) {
+ 		samsung_gpiolib_add_2bit_chips(s5p6450_gpio_2bit,
+ 					ARRAY_SIZE(s5p6450_gpio_2bit));
+ 
+diff --git a/arch/arm/mach-s5p64x0/irq-eint.c b/arch/arm/mach-s5p64x0/irq-eint.c
+index 69ed454..eef01f1 100644
+--- a/arch/arm/mach-s5p64x0/irq-eint.c
++++ b/arch/arm/mach-s5p64x0/irq-eint.c
+@@ -17,6 +17,7 @@
+ #include <linux/irq.h>
+ #include <linux/io.h>
+ 
++#include <plat/cpu.h>
+ #include <plat/regs-irqtype.h>
+ #include <plat/gpio-cfg.h>
+ 
+@@ -67,7 +68,7 @@ static int s5p64x0_irq_eint_set_type(struct irq_data *data, unsigned int type)
+ 	__raw_writel(ctrl, S5P64X0_EINT0CON0);
+ 
+ 	/* Configure the GPIO pin for 6450 or 6440 based on CPU ID */
+-	if (0x50000 == (__raw_readl(S5P64X0_SYS_ID) & 0xFF000))
++	if (cpu_is_s5p6450())
+ 		s3c_gpio_cfgpin(S5P6450_GPN(offs), S3C_GPIO_SFN(2));
+ 	else
+ 		s3c_gpio_cfgpin(S5P6440_GPN(offs), S3C_GPIO_SFN(2));
 -- 
-1.7.5.4
+1.7.1
