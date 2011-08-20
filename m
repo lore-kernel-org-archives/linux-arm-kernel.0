@@ -1,48 +1,38 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Sat, 20 Aug 2011 23:54:58 +0800
-Subject: [PATCH 2/6] ARM: add Highbank core platform support
-In-Reply-To: <1313526898-19920-3-git-send-email-robherring2@gmail.com>
-References: <1313526898-19920-1-git-send-email-robherring2@gmail.com>
-	<1313526898-19920-3-git-send-email-robherring2@gmail.com>
-Message-ID: <20110820155457.GC13302@S2100-06.ap.freescale.net>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Sat, 20 Aug 2011 17:57:56 +0200
+Subject: [PATCH 0/4] S3C2416: Enable IIS and HSSPI clocks
+Message-ID: <201108201757.56483.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 16, 2011 at 03:34:54PM -0500, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
-> 
-> This adds basic support for the Calxeda Highbank platform.
-> 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> ---
-[...]
-> +
-> +void highbank_init_irq(void)
-> +{
-> +	struct device_node *node;
-> +	struct of_intc_desc desc;
-> +	int n = 0;
-> +
-> +	memset(&desc, 0, sizeof(desc));
-> +	desc.controller = of_find_compatible_node(NULL, NULL, "arm,cortex-a9-gic");
-> +	gic_of_init(&desc);
-> +	node = desc.controller;
-> +	for_each_child_of_node(node, desc.controller) {
-> +		gic_of_ppi_init(&desc);
-> +	}
-> +
-> +	for_each_compatible_node(node, NULL, "arm,pl061") {
-> +		irq_domain_add_simple(node, 160 + (8 * n));
-> +		n++;
-> +	}
-> +
-> +#ifdef CONFIG_CACHE_L2X0
-> +	l2x0_of_init(0, ~0UL);
-> +#endif
+S3C2416/2450 (probably S3C2443 too) can use the newer style
+kernel-drivers made for S3C64xx and above for their I2S and
+HS-SPI controllers.
 
-Would it be good to create a l2x0_of_init() in cache-l2x0.h to git rid
-of this #ifdef?
+So as a first step in this direction, these patches add their
+respective clocks.
+
+The I2S clocks were simply moved from S3C2443 to s3c2443-clock.c
+as they are identical on all 3 platforms.
+
+The same is true for the HSSPI pclk which is added to s3c2443-clock.c,
+as it was not defined at all yet.
+
+The HSSPI sclk is different between 2443 and 2416 and is therefore
+added to mach-s3c2416/clock.c
+
+
+Heiko Stuebner (4):
+  S3C2443: Move i2s clock definitions to common code
+  S3C2443: Define constant for HSSPI pclk
+  S3C2416: Add HSSPI clock sourced from EPLL
+  S3C2443: Add hsspi-clock from pclk
+
+ .../mach-s3c2410/include/mach/regs-s3c2443-clock.h |    1 +
+ arch/arm/mach-s3c2416/clock.c                      |   26 +++++++++
+ arch/arm/mach-s3c2443/clock.c                      |   53 ------------------
+ arch/arm/plat-s3c24xx/s3c2443-clock.c              |   58 ++++++++++++++++++++
+ 4 files changed, 85 insertions(+), 53 deletions(-)
 
 -- 
-Regards,
-Shawn
+1.7.2.3
