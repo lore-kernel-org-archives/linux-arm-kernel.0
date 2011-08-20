@@ -1,44 +1,29 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 20 Aug 2011 09:53:19 +0900
-Subject: ARM Sub-Architecture Maintainers workshop at Kernel Summit 2011
-In-Reply-To: <201108200236.12033.marek.vasut@gmail.com>
-References: <CACxGe6uFpW_RARvnPoO8ogwr_ppwe4S4NmkK3=odeHOCX0=NBA@mail.gmail.com>
-	<201108200236.12033.marek.vasut@gmail.com>
-Message-ID: <007501cc5ed3$8dda0dd0$a98e2970$%kim@samsung.com>
+From: jhbird.choi@samsung.com (jhbird.choi at samsung.com)
+Date: Sat, 20 Aug 2011 10:27:08 +0900
+Subject: [PATCH] ARM: EXYNOS4: Fix wrong pll type for vpll
+Message-ID: <1313803628-32050-1-git-send-email-jhbird.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marek Vasut wrote:
-> 
-> On Saturday, August 20, 2011 02:02:57 AM Grant Likely wrote:
-> > Hi all,
-> >
-> 
-> [...]
-> 
-> >
-> > Nicolas Pitre
-> > Arnd Bergmann
-> > Olof Johansson
-> > Eric Miao
-> > David Brown
-> > Mark Vasut
-> 
-> I can confirm the one above ... aka myself ;-)
-> 
-> > Ohad Ben-Cohen
-> > Sascha Hauer
-> > Paul Walmsley
-> > Pavel Machek
-> > Catalin Marinas
+From: Jonghwan Choi <jhbird.choi@samsung.com>
 
-And adding myself, Kukjin Kim :)
+Signed-off-by: Jonghwan Choi <jhbird.choi@samsung.com>
+---
+ arch/arm/mach-exynos4/clock.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Have a nice weekend.
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+diff --git a/arch/arm/mach-exynos4/clock.c b/arch/arm/mach-exynos4/clock.c
+index 851dea0..0b39860 100644
+--- a/arch/arm/mach-exynos4/clock.c
++++ b/arch/arm/mach-exynos4/clock.c
+@@ -1160,7 +1160,7 @@ void __init_or_cpufreq exynos4_setup_clocks(void)
+ 
+ 	vpllsrc = clk_get_rate(&clk_vpllsrc.clk);
+ 	vpll = s5p_get_pll46xx(vpllsrc, __raw_readl(S5P_VPLL_CON0),
+-				__raw_readl(S5P_VPLL_CON1), pll_4650);
++				__raw_readl(S5P_VPLL_CON1), pll_4650c);
+ 
+ 	clk_fout_apll.ops = &exynos4_fout_apll_ops;
+ 	clk_fout_mpll.rate = mpll;
+-- 
+1.7.0
