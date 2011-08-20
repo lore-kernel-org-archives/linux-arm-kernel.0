@@ -1,36 +1,38 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Sat, 20 Aug 2011 15:34:32 +0900
-Subject: [PATCH 0/4] ARM: SAMSUNG: Add support CPU ID and Rev. at runtime
-In-Reply-To: <1313816759-14564-1-git-send-email-kgene.kim@samsung.com>
-References: <1313816759-14564-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <CAH9JG2VLzgdn_aD4eTsx8TpDAOvQHqcC8HCJtPvScbe+OBY+Pw@mail.gmail.com>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Sat, 20 Aug 2011 07:52:51 +0100
+Subject: [PATCH 1/3] picoxcell: support for Picochip picoxcell devices
+In-Reply-To: <4E4F54CC.8000506@secretlab.ca>
+References: <1312884661-27205-1-git-send-email-jamie@jamieiles.com>
+	<1312884661-27205-2-git-send-email-jamie@jamieiles.com>
+	<4E4F54CC.8000506@secretlab.ca>
+Message-ID: <20110820065251.GB18892@gallagher>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Good
+Hi Grant,
 
-change the mind to use the runtime soc detection. it's really required
-feature. but previous time Ben did'n like it.
-https://lkml.org/lkml/2010/3/30/831
+On Fri, Aug 19, 2011 at 11:31:40PM -0700, Grant Likely wrote:
+> On 11-08-09 03:10 AM, Jamie Iles wrote:
+[...]
+> >+VIC required properties:
+> >+    - compatible = "arm,pl192-vic-pair".
+> >+    - interrupt-controller.
+> >+    - reg : The register bank for the devices.  Picoxcell has two VIC's and the
+> >+      IRQ outputs are wire-OR'd together so we effectively have a combined
+> >+      controller that handles 64 IRQ's.  The first reg tuple is the register
+> >+      bank of the VIC that generates IRQ's 0->31 and the second tuple handles
+> >+      IRQ's 32->63.
+> 
+> If they are two separate devices, then it probably should still be
+> represented as two separate device tree nodes.  Linux can take care
+> of assigning a range of linux irq numbers to each VIC.
 
-I'm still prefer to use it when only early boot time if possible
+The reason I did this is because of the entry macro get_irqnr_and_base 
+macro decoding.  If I used irq_domain_generate_simple() rather than 
+irq_domain_add_simple() then I guess the ordering of the VIC's in the DT 
+wont matter.  I'll give this a test when I have access to hardware again 
+and respin.
 
-and another mail said cpu_is_* doesn't proper name, soc_is_* is better.
+Many thanks for the review!
 
-
-Thank you,
-Kyungmin Park
-
-On Sat, Aug 20, 2011 at 2:05 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> This patch adds support handling of CPU ID and varialble silicon revision
-> at runtime.
->
-> [PATCH 1/4] ARM: SAMSUNG: Add support for detecting CPU at runtime
-> [PATCH 2/4] ARM: S5P64X0: Use cpu_is_s5p64x0() to distinguish cpu at runtime
-> [PATCH 3/4] ARM: SAMSUNG: Add support for handling of cpu revision
-> [PATCH 4/4] ARM: EXYNOS4: Use samsung_rev() to distinguish silicon revision
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+Jamie
