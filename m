@@ -1,34 +1,50 @@
-From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Sat, 20 Aug 2011 18:03:59 +0200
-Subject: [PATCH 4/4] S3C2443: Add hsspi-clock from pclk
-In-Reply-To: <201108201757.56483.heiko@sntech.de>
-References: <201108201757.56483.heiko@sntech.de>
-Message-ID: <201108201803.59832.heiko@sntech.de>
+From: robherring2@gmail.com (Rob Herring)
+Date: Sat, 20 Aug 2011 13:16:54 -0500
+Subject: [PATCH 2/6] ARM: add Highbank core platform support
+In-Reply-To: <20110819071756.GE12527@S2100-06.ap.freescale.net>
+References: <1313526898-19920-1-git-send-email-robherring2@gmail.com>
+	<1313526898-19920-3-git-send-email-robherring2@gmail.com>
+	<20110819064356.GC12527@S2100-06.ap.freescale.net>
+	<20110819071756.GE12527@S2100-06.ap.freescale.net>
+Message-ID: <4E4FFA16.30406@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This clock is common to S3C2443/2416/2450.
+On 08/19/2011 02:17 AM, Shawn Guo wrote:
+> On Fri, Aug 19, 2011 at 02:43:57PM +0800, Shawn Guo wrote:
+>> On Tue, Aug 16, 2011 at 03:34:54PM -0500, Rob Herring wrote:
+>>> From: Rob Herring <rob.herring@calxeda.com>
+>>>
+>>> This adds basic support for the Calxeda Highbank platform.
+>>>
+>>> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> [...]
+>>> +static void __init highbank_map_io(void)
+>>> +{
+>>> +	unsigned long base;
+>>> +
+>>> +	/* Get SCU base */
+>>> +	asm("mrc p15, 4, %0, c15, c0, 0" : "=r" (base));
+>>> +
+>>> +	highbank_io_desc[0].pfn = __phys_to_pfn(base);
+>>> +	iotable_init(highbank_io_desc, ARRAY_SIZE(highbank_io_desc));
+>>> +}
+>>> +
+>> It's a great demo that we can get this base address from CA9 itself.
+>> However I'm wondering if we have to do so, since this address should
+>> be known for given SoC.  Can we put this known base into device tree
+>> and map it when needed?  In that case, we can save another static
+>> mapping.
+>>
+> Hmm, if CA9 can figure this address out by itself, why do not we create
+> a init hook in arch/arm/kernel/smp_scu.c to have scu code to get and
+> map the address?  Then the parameter "scu_base" in those scu helper
+> functions can be saved.
+> 
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
- arch/arm/plat-s3c24xx/s3c2443-clock.c |    5 +++++
- 1 files changed, 5 insertions(+), 0 deletions(-)
+smp_scu.c is not CA9 only and this is a CA9 specific feature. Also, you
+have to statically map the scu to get the core count. ioremap is not up
+at that point in time. Don't be fooled by omap code either. They do an
+ioremap, but it handles their static mappings as well.
 
-diff --git a/arch/arm/plat-s3c24xx/s3c2443-clock.c b/arch/arm/plat-s3c24xx/s3c2443-clock.c
-index e2807d9..92fc25b 100644
---- a/arch/arm/plat-s3c24xx/s3c2443-clock.c
-+++ b/arch/arm/plat-s3c24xx/s3c2443-clock.c
-@@ -259,6 +259,11 @@ static struct clk init_clocks_off[] = {
- 		.enable		= s3c2443_clkcon_enable_p,
- 		.ctrlbit	= S3C2443_PCLKCON_IIS,
- 	}, {
-+		.name		= "hsspi",
-+		.parent		= &clk_p,
-+		.enable		= s3c2443_clkcon_enable_p,
-+		.ctrlbit	= S3C2443_PCLKCON_HSSPI,
-+	}, {
- 		.name		= "adc",
- 		.parent		= &clk_p,
- 		.enable		= s3c2443_clkcon_enable_p,
--- 
-1.7.2.3
+Rob
