@@ -1,30 +1,33 @@
-From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Sat, 20 Aug 2011 18:02:15 +0200
-Subject: [PATCH 2/4] S3C2443: Define constant for HSSPI pclk
-In-Reply-To: <201108201757.56483.heiko@sntech.de>
-References: <201108201757.56483.heiko@sntech.de>
-Message-ID: <201108201802.16171.heiko@sntech.de>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Sun, 21 Aug 2011 00:10:49 +0800
+Subject: [PATCH 2/6] ARM: add Highbank core platform support
+In-Reply-To: <1313526898-19920-3-git-send-email-robherring2@gmail.com>
+References: <1313526898-19920-1-git-send-email-robherring2@gmail.com>
+	<1313526898-19920-3-git-send-email-robherring2@gmail.com>
+Message-ID: <20110820161048.GD13302@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It's the same clock for 2443/2416/2450.
+On Tue, Aug 16, 2011 at 03:34:54PM -0500, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
+> 
+> This adds basic support for the Calxeda Highbank platform.
+> 
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> ---
+[...]
+> +DT_MACHINE_START(HIGHBANK, "Highbank")
+> +	.map_io		= highbank_map_io,
+> +	.init_irq	= highbank_init_irq,
+> +	.nr_irqs	= NR_IRQS,
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
- .../mach-s3c2410/include/mach/regs-s3c2443-clock.h |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+Is it really needed?
 
-diff --git a/arch/arm/mach-s3c2410/include/mach/regs-s3c2443-clock.h b/arch/arm/mach-s3c2410/include/mach/regs-s3c2443-clock.h
-index 5e06c72..df6434f 100644
---- a/arch/arm/mach-s3c2410/include/mach/regs-s3c2443-clock.h
-+++ b/arch/arm/mach-s3c2410/include/mach/regs-s3c2443-clock.h
-@@ -102,6 +102,7 @@
- #define S3C2443_PCLKCON_UART3		(1<<3)
- #define S3C2443_PCLKCON_IIC		(1<<4)
- #define S3C2443_PCLKCON_SDI		(1<<5)
-+#define S3C2443_PCLKCON_HSSPI		(1<<6)
- #define S3C2443_PCLKCON_ADC		(1<<7)
- #define S3C2443_PCLKCON_AC97		(1<<8)
- #define S3C2443_PCLKCON_IIS		(1<<9)
+> +	.timer		= &highbank_timer,
+> +	.init_machine	= highbank_init,
+> +	.dt_compat	= highbank_match,
+> +MACHINE_END
+
 -- 
-1.7.2.3
+Regards,
+Shawn
