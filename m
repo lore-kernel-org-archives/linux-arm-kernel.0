@@ -1,108 +1,47 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Sat, 20 Aug 2011 13:19:03 -0500
-Subject: [PATCH 1/6] ARM: highbank: add devicetree source
-In-Reply-To: <20110820095136.GA13302@S2100-06.ap.freescale.net>
+Date: Sat, 20 Aug 2011 13:21:01 -0500
+Subject: [PATCH 2/6] ARM: add Highbank core platform support
+In-Reply-To: <20110820144806.GB13302@S2100-06.ap.freescale.net>
 References: <1313526898-19920-1-git-send-email-robherring2@gmail.com>
-	<1313526898-19920-2-git-send-email-robherring2@gmail.com>
-	<20110820095136.GA13302@S2100-06.ap.freescale.net>
-Message-ID: <4E4FFA97.9020206@gmail.com>
+	<1313526898-19920-3-git-send-email-robherring2@gmail.com>
+	<20110820144806.GB13302@S2100-06.ap.freescale.net>
+Message-ID: <4E4FFB0D.9060707@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/20/2011 04:51 AM, Shawn Guo wrote:
-> On Tue, Aug 16, 2011 at 03:34:53PM -0500, Rob Herring wrote:
+On 08/20/2011 09:48 AM, Shawn Guo wrote:
+> On Tue, Aug 16, 2011 at 03:34:54PM -0500, Rob Herring wrote:
 >> From: Rob Herring <rob.herring@calxeda.com>
 >>
->> This adds the devicetree source and documentation for the Calxeda highbank
->> platform.
+>> This adds basic support for the Calxeda Highbank platform.
 >>
 >> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 >> ---
->>  Documentation/devicetree/bindings/arm/calxeda.txt |    8 +
->>  arch/arm/boot/dts/highbank.dts                    |  212 +++++++++++++++++++++
->>  2 files changed, 220 insertions(+), 0 deletions(-)
->>  create mode 100644 Documentation/devicetree/bindings/arm/calxeda.txt
->>  create mode 100644 arch/arm/boot/dts/highbank.dts
->>
->> diff --git a/Documentation/devicetree/bindings/arm/calxeda.txt b/Documentation/devicetree/bindings/arm/calxeda.txt
->> new file mode 100644
->> index 0000000..4755caa
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/arm/calxeda.txt
->> @@ -0,0 +1,8 @@
->> +Calxeda Highbank Platforms Device Tree Bindings
->> +-----------------------------------------------
+> [...]
+>> +void highbank_init_irq(void)
+>> +{
+>> +	struct device_node *node;
+>> +	struct of_intc_desc desc;
+>> +	int n = 0;
 >> +
->> +Boards with Calxeda Cortex-A9 based Highbank SOC shall have the following
->> +properties.
+>> +	memset(&desc, 0, sizeof(desc));
+>> +	desc.controller = of_find_compatible_node(NULL, NULL, "arm,cortex-a9-gic");
+>> +	gic_of_init(&desc);
+>> +	node = desc.controller;
+>> +	for_each_child_of_node(node, desc.controller) {
+>> +		gic_of_ppi_init(&desc);
+>> +	}
 >> +
->> +Required root node properties:
->> +    - compatible = "calxeda,highbank";
->> diff --git a/arch/arm/boot/dts/highbank.dts b/arch/arm/boot/dts/highbank.dts
->> new file mode 100644
->> index 0000000..2dd3b7b
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/highbank.dts
->> @@ -0,0 +1,212 @@
->> +/*
->> + * Copyright 2011 Calxeda, Inc.
->> + *
->> + * This program is free software; you can redistribute it and/or modify it
->> + * under the terms and conditions of the GNU General Public License,
->> + * version 2, as published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope it will be useful, but WITHOUT
->> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
->> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
->> + * more details.
->> + *
->> + * You should have received a copy of the GNU General Public License along with
->> + * this program.  If not, see <http://www.gnu.org/licenses/>.
->> + */
+>> +	for_each_compatible_node(node, NULL, "arm,pl061") {
+>> +		irq_domain_add_simple(node, 160 + (8 * n));
+>> +		n++;
+>> +	}
 >> +
->> +/dts-v1/;
->> +
->> +/* First 4KB has pen for secondary cores. */
->> +/memreserve/ 0x00000000 0x0001000;
->> +
->> +/ {
->> +	model = "Calxeda Highbank";
->> +	compatible = "calxeda,highbank";
->> +	#address-cells = <1>;
->> +	#size-cells = <1>;
->> +
->> +	cpus {
->> +		#address-cells = <1>;
->> +		#size-cells = <0>;
->> +
->> +		cpu at 0 {
->> +			compatible = "arm,cortex-a9";
->> +			reg = <0>;
->> +			next-level-cache = <&L2>;
->> +		};
->> +
->> +		cpu at 1 {
->> +			compatible = "arm,cortex-a9";
->> +			reg = <1>;
->> +			next-level-cache = <&L2>;
->> +		};
->> +
->> +		cpu at 2 {
->> +			compatible = "arm,cortex-a9";
->> +			reg = <2>;
->> +			next-level-cache = <&L2>;
->> +		};
->> +
->> +		cpu at 3 {
->> +			compatible = "arm,cortex-a9";
->> +			reg = <3>;
->> +			next-level-cache = <&L2>;
->> +		};
->> +	};
->> +
-> I'm not sure if this whole "cpus" stuff is needed, I do not see any
-> code playing with it.
-> 
-Prior reviews of dts's by Grant and others suggested putting this in.
+> 160, magic number?  I guess it's the GIC IRQ number has been
+> discovered in gic_dist_init().  I'm not sure if we should simply
+> define a macro for it or manage to retrieve it from GIC.
+
+It's the number of GIC irqs. This is temporary until we have dynamic
+assignment of linux irq numbers.
 
 Rob
