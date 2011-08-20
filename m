@@ -1,38 +1,37 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Sat, 20 Aug 2011 13:22:52 -0500
-Subject: [PATCH 2/6] ARM: add Highbank core platform support
-In-Reply-To: <20110820161048.GD13302@S2100-06.ap.freescale.net>
+Date: Sat, 20 Aug 2011 13:29:02 -0500
+Subject: [PATCH 1/6] ARM: highbank: add devicetree source
+In-Reply-To: <20110817175250.GM12686@e102144-lin.cambridge.arm.com>
 References: <1313526898-19920-1-git-send-email-robherring2@gmail.com>
-	<1313526898-19920-3-git-send-email-robherring2@gmail.com>
-	<20110820161048.GD13302@S2100-06.ap.freescale.net>
-Message-ID: <4E4FFB7C.40806@gmail.com>
+	<1313526898-19920-2-git-send-email-robherring2@gmail.com>
+	<20110817072706.GE10037@S2100-06.ap.freescale.net>
+	<4E4BC6F5.4030707@gmail.com>
+	<20110817175250.GM12686@e102144-lin.cambridge.arm.com>
+Message-ID: <4E4FFCEE.1070203@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/20/2011 11:10 AM, Shawn Guo wrote:
-> On Tue, Aug 16, 2011 at 03:34:54PM -0500, Rob Herring wrote:
->> From: Rob Herring <rob.herring@calxeda.com>
->>
->> This adds basic support for the Calxeda Highbank platform.
->>
->> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
->> ---
-> [...]
->> +DT_MACHINE_START(HIGHBANK, "Highbank")
->> +	.map_io		= highbank_map_io,
->> +	.init_irq	= highbank_init_irq,
->> +	.nr_irqs	= NR_IRQS,
+On 08/17/2011 12:52 PM, Will Deacon wrote:
+> Hi Rob,
 > 
-> Is it really needed?
+> On Wed, Aug 17, 2011 at 02:49:41PM +0100, Rob Herring wrote:
+>> In highbank.c:
+>>
+>> +#define HB_JUMP_TABLE_PHYS(cpu)		(0x40 + (0x10 * (cpu)))
+>> +#define HB_JUMP_TABLE_VIRT(cpu)		phys_to_virt(HB_JUMP_TABLE_PHYS(cpu))
+>> +
+>> +void highbank_set_cpu_jump(int cpu, void *jump_addr)
+>> +{
+>> +	writel(BSYM(virt_to_phys(jump_addr)), HB_JUMP_TABLE_VIRT(cpu));
+>> +	__cpuc_flush_dcache_area(HB_JUMP_TABLE_VIRT(cpu), 16);
+>> +	outer_clean_range(HB_JUMP_TABLE_PHYS(cpu),
+>> +			  HB_JUMP_TABLE_PHYS(cpu) + 15);
+>> +}
+> 
+> I don't suppose you guys can boot on a CPU other than 0 can you? That would be
+> really handy for testing my cpu-mapping patch series :)
+> 
 
-For single kernel binary, yes. See Nicolas Pitre's task list for
-mach/irqs.h.
+We probably can with a little work to the boot code.
 
 Rob
-
-> 
->> +	.timer		= &highbank_timer,
->> +	.init_machine	= highbank_init,
->> +	.dt_compat	= highbank_match,
->> +MACHINE_END
-> 
