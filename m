@@ -1,20 +1,56 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 21 Aug 2011 13:49:36 +0100
-Subject: Patch Merging Path - RMK or Arnd?
-In-Reply-To: <20110821112940.GB22917@e102144-lin.cambridge.arm.com>
-References: <20110819124933.GG8918@e102144-lin.cambridge.arm.com>
-	<201108191621.56263.arnd@arndb.de>
-	<20110819144551.GI8918@e102144-lin.cambridge.arm.com>
-	<6572911.Q9nnzRlLsr@wuerfel>
-	<20110821112940.GB22917@e102144-lin.cambridge.arm.com>
-Message-ID: <20110821124936.GE28546@n2100.arm.linux.org.uk>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Sun, 21 Aug 2011 20:54:42 +0800
+Subject: [RFC PATCH 2/2] ARM: CSR: add PM sleep entry for SiRFprimaII
+In-Reply-To: <20110821085329.GF12028@n2100.arm.linux.org.uk>
+References: <1312512888-25070-1-git-send-email-bs14@csr.com>
+	<1312512888-25070-3-git-send-email-bs14@csr.com>
+	<20110814075927.GB4986@n2100.arm.linux.org.uk>
+	<CAGsJ_4yigTt40g0-9jrz5qAbdrQdsXuQ65MhX+x1AZ1M4Ztr=w@mail.gmail.com>
+	<20110815082027.GA26827@n2100.arm.linux.org.uk>
+	<CAGsJ_4wyGUC=gNagaGGVcr=+nrJU2xjGJDxwS+H-UKPLajrLpg@mail.gmail.com>
+	<CAGsJ_4yon5jPkwVkohiokSm1=_gNG=+Hvv55JYQ7-BeHxPkeaA@mail.gmail.com>
+	<20110821085329.GF12028@n2100.arm.linux.org.uk>
+Message-ID: <CAGsJ_4w_Jp9t0uNFyeWgJX5PsfU_Pjx0apMB4aJGoSufg9P5FA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 21, 2011 at 12:29:40PM +0100, Will Deacon wrote:
-> Thinking about this a bit more, (4) can also avoid the situation where one
-> tree pulls the series but the other tree has reservations about the code and
-> decides not to take the patches. So, in my case, I could get the core
-> changes merged by Russell and then send you the full set afterwards.
+2011/8/21 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> On Tue, Aug 16, 2011 at 09:34:35AM +0800, Barry Song wrote:
+>> 2011/8/15 Barry Song <21cnbao@gmail.com>:
+>> > 2011/8/15 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+>> >> On Mon, Aug 15, 2011 at 03:43:13PM +0800, Barry Song wrote:
+>> >>> Sorry, my fault. i simply picked these lines which have been verified
+>> >>> to be working in local old 2.6.38.8 kernel and really didn't think and
+>> >>> refine more carefully.
+>> >>> in deep sleep mode, SiRFprimaII will powerdown CPU core.
+>> >>
+>> >> ... just like everyone else.
+>> >>
+>> >>> due to this,
+>> >>> i just ignored to delete the codes saving registers of all kinds of
+>> >>> CPU modes. but it is not the real situation in kernel. For example,
+>> >>> IRQ mode used the stack of corrupted thread, and kernel was not in
+>> >>> interrupt while going to pm_ops->enter(), then it is unnecessary to
+>> >>> enter IRQ and save sp of IRQ:
+>> >>
+>> >> No. ?There is _no_ need to save and restore these registers. ?They
+>> >> can simply be re-setup. ?The generic cpu_suspend stuff already
+>> >> takes care of that.
+>> >
+>> > i did have saied it is not necessary to save and restore if you read
+>> > my reply carefully :-)
+>>
+>> just as you said, after deleting all codes to save/restore regsiters:
+> ...
+>> and call cpu_init() to re-setup while resuming, things go well.
+>
+> Good - so can we have a patch based on the generic cpu suspend support
+> in the kernel for this SoC please?
 
-I think (4) is the sensible one too.
+sure.
+
+>
+> Thanks.
+>
+
+-barry
