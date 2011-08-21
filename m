@@ -1,22 +1,37 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 21 Aug 2011 00:05:33 +0100
-Subject: [PATCH 2/6] ARM: add Highbank core platform support
-In-Reply-To: <201108191611.36147.arnd@arndb.de>
-References: <1313526898-19920-1-git-send-email-robherring2@gmail.com>
-	<201108181734.25397.arnd@arndb.de>
-	<20110818154048.GD21865@n2100.arm.linux.org.uk>
-	<201108191611.36147.arnd@arndb.de>
-Message-ID: <20110820230533.GA344@n2100.arm.linux.org.uk>
+From: axel.lin@gmail.com (Axel Lin)
+Date: Sun, 21 Aug 2011 13:09:08 +0800
+Subject: [PATCH] ARM: mach-davinci: Select PHYLIB for ARCH_DAVINCI_DM644x
+Message-ID: <1313903348.25059.3.camel@phoenix>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 19, 2011 at 04:11:35PM +0200, Arnd Bergmann wrote:
-> Is that a bad thing? Platforms that don't need the special case can
-> simply call sp804_clocksource_init_dt() which scans the device tree,
-> while other platforms do whatever is necessary to the registers
-> and then call the existing sp804_clockevents_init.
+We call phy_register_fixup_for_uid in davinci_evm_init, thus we need 
+select PHYLIB to fix below build error: (with "make davinci_all_defconfig")
 
-It means we're not solving the problem.  We end up with some platforms
-which do the sp804 init from DT, others which are DT but ignore the
-DT stuff for sp804.  That's not very consistent, and in the long run
-is rather confusing.
+  LD      .tmp_vmlinux1
+arch/arm/mach-davinci/built-in.o: In function `davinci_phy_fixup':
+pm.c:(.text+0x35b8): undefined reference to `mdiobus_read'
+pm.c:(.text+0x35d4): undefined reference to `mdiobus_write'
+arch/arm/mach-davinci/built-in.o: In function `davinci_evm_init':
+pm.c:(.init.text+0x237c): undefined reference to `phy_register_fixup_for_uid'
+make: *** [.tmp_vmlinux1] Error 1
+
+Signed-off-by: Axel Lin <axel.lin@gmail.com>
+---
+ arch/arm/mach-davinci/Kconfig |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-davinci/Kconfig b/arch/arm/mach-davinci/Kconfig
+index c0deaca..029ec46b 100644
+--- a/arch/arm/mach-davinci/Kconfig
++++ b/arch/arm/mach-davinci/Kconfig
+@@ -18,6 +18,7 @@ config ARCH_DAVINCI_DM644x
+ 	bool "DaVinci 644x based system"
+ 	select AINTC
+ 	select ARCH_DAVINCI_DMx
++	select PHYLIB
+ 
+ config ARCH_DAVINCI_DM355
+ 	bool "DaVinci 355 based system"
+-- 
+1.7.4.1
