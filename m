@@ -1,63 +1,39 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Sun, 21 Aug 2011 00:33:57 -0600 (MDT)
-Subject: [PATCHv2 1/4] OMAP4: clockdata: Make compiler shut up about
-	possible uninitialized variable
-In-Reply-To: <CAFULf_wBTEVHYTPyJqWt09gNaenWHiVJCLvNdeRG204TkeBe6Q@mail.gmail.com>
-References: <CAFULf_yAOTABxF_OV2xacF2CMhNVEguwSpgDHNbkeKKZif4ncA@mail.gmail.com>
-	<CAFULf_wBTEVHYTPyJqWt09gNaenWHiVJCLvNdeRG204TkeBe6Q@mail.gmail.com>
-Message-ID: <alpine.DEB.2.00.1108210031560.20233@utopia.booyaka.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Sun, 21 Aug 2011 00:09:53 -0700
+Subject: [PATCH 00/19] GPIO exodus and cleanup
+In-Reply-To: <CACRpkdYw96QD0sGOhA=osKYbnD6=MTqiAF=m5++BjM-s1Mn--w@mail.gmail.com>
+References: <1312978564-18069-1-git-send-email-linus.walleij@stericsson.com>
+	<20110817090123.GD1006@n2100.arm.linux.org.uk>
+	<CACRpkdbJOrb5rhgG0Chamt-ApLQnV69MQ=bqBwKqO3KJPaFd0A@mail.gmail.com>
+	<CACRpkdYw96QD0sGOhA=osKYbnD6=MTqiAF=m5++BjM-s1Mn--w@mail.gmail.com>
+Message-ID: <CACxGe6tEOnUzFjKMqNfp10b8SyuJDDFzg0eiPzhKNNCY55LECw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Bjarne,
+On Fri, Aug 19, 2011 at 5:45 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Wed, Aug 17, 2011 at 11:37 AM, Linus Walleij
+> <linus.walleij@linaro.org> wrote:
+>> On Wed, Aug 17, 2011 at 11:01 AM, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>>> On Wed, Aug 10, 2011 at 02:16:04PM +0200, Linus Walleij wrote:
+>>>> The following patch set is rebased on top of Russell's
+>>>> 13 cleanup patches and can be finalized as soon as there
+>>>> is a branch in RMKs tree that can accumulate this work.
+>>>
+>>> If Grant acks the relevant ones, they can go to the patch system and
+>>> merged into that branch.
+>>
+>> Thanks that'd be smooth.
+>>
+>> Grant can you N/ACK the patches you consider relevant for
+>> the GPIO subsystem?
+>
+> Ping on this, on monday I'll pretend it's no big deal and pour them
+> into Russells patch tracker anyway, since he's managing more than
+> half of the kernels GPIO code in arch/arm/* anyway.
 
-On Fri, 12 Aug 2011, Bjarne Steinsbo wrote:
+If Russell is okay with it, then go ahead and merge it.  I'm being
+pretty liberal about GPIO driver moves.  I'm fine with them getting
+cleaned up after the drivers/gpio move.
 
-> Stop `warning: 'cpu_clkflg' may be used uninitialized in this
-> function' from compiler.
-> 
-> Signed-off-by: Bjarne Steinsbo <bsteinsbo@gmail.com>
-
-Thanks for the patch.  The following patch seems to make a little more 
-sense to me, I think Tony wants the clock init routines to be initcalls 
-eventually.
-
-
-- Paul
-
-From: Paul Walmsley <paul@pwsan.com>
-Date: Sun, 21 Aug 2011 00:28:56 -0600
-Subject: [PATCH] OMAP4: clock: fix compile warning
-
-Fix the following compile warning:
-
-arch/arm/mach-omap2/clock44xx_data.c: In function 'omap4xxx_clk_init':
-arch/arm/mach-omap2/clock44xx_data.c:3371:6: warning: 'cpu_clkflg' may be used uninitialized in this function
-
-The approach taken here is intended to work if omap4xxx_clk_init() is
-converted into an initcall.
-
-Thanks to Bjarne Steinsbo <bsteinsbo@gmail.com> for proposing another
-approach.
-
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Bjarne Steinsbo <bsteinsbo@gmail.com>
----
- arch/arm/mach-omap2/clock44xx_data.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/clock44xx_data.c b/arch/arm/mach-omap2/clock44xx_data.c
-index 2af0e3f..4304768 100644
---- a/arch/arm/mach-omap2/clock44xx_data.c
-+++ b/arch/arm/mach-omap2/clock44xx_data.c
-@@ -3376,6 +3376,8 @@ int __init omap4xxx_clk_init(void)
- 	} else if (cpu_is_omap446x()) {
- 		cpu_mask = RATE_IN_4460;
- 		cpu_clkflg = CK_446X;
-+	} else {
-+		return 0;
- 	}
- 
- 	clk_init(&omap2_clk_functions);
--- 
-1.7.5.4
+g.
