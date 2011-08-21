@@ -1,75 +1,97 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Sun, 21 Aug 2011 21:55:53 +0800
-Subject: [PATCH 2/4 v4] pinmux: add a driver for the U300 pinmux
-In-Reply-To: <1313747646-32294-1-git-send-email-linus.walleij@stericsson.com>
-References: <1313747646-32294-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <CAGsJ_4wK6V0aQJd7f1geM8XnzQO+3TNCE6Q8_j=VYf_z_gcmpA@mail.gmail.com>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Sun, 21 Aug 2011 15:24:17 +0100
+Subject: [PATCH 1/4 v4] drivers: create a pin control subsystem
+In-Reply-To: <20110819142608.GB2800@pulham.picochip.com>
+References: <1313747630-32258-1-git-send-email-linus.walleij@stericsson.com>
+	<20110819104816.GA5030@pulham.picochip.com>
+	<CACRpkdZhg_1WM37uqT1PNmpUjWS_groWJmNnR4SBjqJ6LFQQWQ@mail.gmail.com>
+	<20110819142608.GB2800@pulham.picochip.com>
+Message-ID: <20110821142416.GA12272@gallagher>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Linus,
-Looks pretty good. just some minors.
 
-2011/8/19 Linus Walleij <linus.walleij@stericsson.com>:
-> From: Linus Walleij <linus.walleij@linaro.org>
->
-> This adds a driver for the U300 pinmux portions of the system
-> controller "SYSCON". It also serves as an example of how to use
-> the pinmux subsystem. This driver also houses the platform data
-> for the only supported platform.
+On Fri, Aug 19, 2011 at 03:26:08PM +0100, Jamie Iles wrote:
+> On Fri, Aug 19, 2011 at 04:04:54PM +0200, Linus Walleij wrote:
+> > On Fri, Aug 19, 2011 at 12:48 PM, Jamie Iles <jamie@jamieiles.com> wrote:
+[...]
+> > But yes, there is an assumption that each pin controller will only
+> > deal with one block of GPIO pins. So if I make it possible to support
+> > several GPIO ranges for one pin controller, does that solve your problem?
+> > 
+> > Like this:
+> > 
+> > struct pinctrl_gpio_range {
+> >     char *name;
+> >     unsigned int base;
+> >     unsigned int npins;
+> > }
+> > 
+> > static unsigned int gpio_ranges[] = {
+> >     {
+> >         .name="chip1",
+> >         .base = 0,
+> >         .npins = 16,
+> >     },
+> >     {
+> >         .name =" chip2",
+> >         .base = 32,
+> >         .npins = 16,
+> >     },
+> >     {
+> >         .name = "chip3",
+> >         .base = 64,
+> >         .npins = 16,
+> >     },
+> > };
+> > 
+> > static struct pinctrl_desc foo_desc = {
+> >         ...
+> >         .gpio_ranges = gpio_ranges,
+> >         .num_gpio_ranges = ARRAY_SIZE(gpio_ranges),
+> > };
+> > 
+> > For three different 32-bit GPIO controllers muxed on
+> > pins 0..31 using GPIO space pins from 0..95.
+> > 
+> > Then I pass the number of the instance down to the
+> > driver in the gpio_request_enable() callback like
+> > this:
+> > 
+> > int (*gpio_request_enable) (struct pinctrl_dev *pctldev,
+> > 	    unsigned instance,
+> > 	    unsigned offset);
+> > 
+> > Would this work?
+> > 
+> > This has a restriction: the GPIO space must be mapped in
+> > continous ranges, as must the pin controller. Else we need
+> > one entry per pin in the list above...
 
-yes. it is a good example for us to follow.
+One more thing that I thought of is that for device tree, when the gpio 
+controllers are registered, the base is typically dynamically assigned.  I 
+suspect that this can be solved in the device tree binding for the controller 
+that references the bindings of the pinctrl, but this would require 
+registering the gpio_ranges at runtime (or at least the bases).
 
->
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
->
-> +
-> +static int __exit u300_pmx_remove(struct platform_device *pdev)
-> +{
-> + ? ? ? struct u300_pmx *upmx = platform_get_drvdata(pdev);
-> +
-> + ? ? ? if (upmx) {
+So perhaps if we had:
 
-why do you need to check whether upmx is not NULL. if it is NULL, we
-have failed in probe().
-and it is also impossible to call this remove() twice.
+struct pinctrl_gpio_range {
+    unsigned int pinctrl_base;
+    struct gpio_chip *chip;
+}
 
-> + ? ? ? ? ? ? ? pinmux_unregister(upmx->pmx);
-> + ? ? ? ? ? ? ? iounmap(upmx->virtbase);
-> + ? ? ? ? ? ? ? release_mem_region(upmx->phybase, upmx->physize);
-> + ? ? ? ? ? ? ? platform_set_drvdata(pdev, NULL);
-> + ? ? ? ? ? ? ? kfree(upmx);
-> + ? ? ? }
-> +
-> + ? ? ? return 0;
-> +}
-> +
-> +static struct platform_driver u300_pmx_driver = {
-> + ? ? ? .driver = {
-> + ? ? ? ? ? ? ? .name = DRIVER_NAME,
-> + ? ? ? ? ? ? ? .owner = THIS_MODULE,
-> + ? ? ? },
-> + ? ? ? .remove = __exit_p(u300_pmx_remove),
+and then gpio_request_enable was:
 
-if you want to add deepsleep support(i mean pinmux crl will lose power
-while suspending), what do you plan to add?
-save U300_SYSCON_PMC1LR, U300_SYSCON_PMC1HR, U300_SYSCON_PMC2R,
-U300_SYSCON_PMC3R, U300_SYSCON_PMC4R in suspend and restore them in
-resume?
+int (*gpio_request_enable)(struct pinctrl_dev *pctldev,
+			   struct gpio_chip *gc,
+			   unsigned offset)
 
-it is also a generic issue to pinmux.
+Then have pinctrl_register_gpio_chip()?
 
-> +/*
-> + * Register definitions for the U300 Padmux control registers in the
-> + * system controller
-> + */
-> +
-> +/* PAD MUX Control register 1 (LOW) 16bit (R/W) */
-> +#define U300_SYSCON_PMC1LR ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? (0x007C)
-...
-> +#define U300_SYSCON_PMC4R_APP_MISC_16_EMIF_1_STATIC_CS5_N ? ? ?(0x0200)
+For the static devices case then we can require gc->base must match the 
+pinctrl gpio base.  For the device tree case we could do some matching of 
+device_nodes from the gpio_chip to the pinctrl definitions?
 
-do you want these "(" ")" for macros?
-
-Thanks
-barry
+Jamie
