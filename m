@@ -1,55 +1,57 @@
-From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Sun, 21 Aug 2011 23:11:55 +0200
-Subject: [PATCH 1/4] S3C2443: Move i2s clock definitions to common code
-In-Reply-To: <201108212226.16669.marek.vasut@gmail.com>
-References: <201108201757.56483.heiko@sntech.de>
-	<201108211925.05300.heiko@sntech.de>
-	<201108212226.16669.marek.vasut@gmail.com>
-Message-ID: <201108212311.56046.heiko@sntech.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 21 Aug 2011 22:29:21 +0100
+Subject: [PATCH 1/3] ARM: debug: use kconfig choice for selecting
+	DEBUG_LL UART
+In-Reply-To: <alpine.LFD.2.00.1108211658340.20358@xanadu.home>
+References: <alpine.LFD.2.00.1108191101560.20358@xanadu.home>
+	<20110821091452.GH12028@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1108211258490.20358@xanadu.home>
+	<20110821182604.GI28546@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1108211435320.20358@xanadu.home>
+	<20110821191835.GA19678@n2100.arm.linux.org.uk>
+	<20110821192242.GB19678@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1108211557440.20358@xanadu.home>
+	<20110821205441.GC19678@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1108211658340.20358@xanadu.home>
+Message-ID: <20110821212921.GD19678@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Sonntag 21 August 2011, 22:26:16 schrieb Marek Vasut:
-> On Sunday, August 21, 2011 07:25:04 PM Heiko St?bner wrote:
-> > Am Sonntag 21 August 2011, 19:13:32 schrieb Russell King - ARM Linux:
-> > > On Sat, Aug 20, 2011 at 06:01:29PM +0200, Heiko St?bner wrote:
-> > > > +/* i2s-ref
-> > > > + *
-> > > > + * i2s bus reference clock, selectable from external, esysclk or
-> > > > epllref + *
-> > > > + * Note, this used to be two clocks, but was compressed into one.
-> > > > +*/
-> > > > +
-> > > > +struct clk *clk_i2s_srclist[] = {
-> > > > +	[0] = &clk_i2s_eplldiv.clk,
-> > > > +	[1] = &clk_i2s_ext,
-> > > > +	[2] = &clk_epllref.clk,
-> > > > +	[3] = &clk_epllref.clk,
-> > > > +};
-> > > 
-> > > Is there any reason not to make this static (have you run your patch
-> > > through checkpatch.pl ?)
-> > 
-> > Yep I did run all of them through checkpatch (after beeing scolded last
-> > time) and it didn't report anything.
-> > 
-> > But for this move of code I simply grabbed the code fragments and put
-> > them into their new location (i.e. it was this way in
-> > mach-s3c2443/clock.c) and should have probably taken a closer look at
-> > what I'm moving.
-> > 
-> > So it seems you are right, it should probably be static as everything
-> > else is also static.
+On Sun, Aug 21, 2011 at 05:00:46PM -0400, Nicolas Pitre wrote:
+> On Sun, 21 Aug 2011, Russell King - ARM Linux wrote:
 > 
-> And you don't really understand why everything else is static, right ? ;-)
-yep :-) - until now
+> > On Sun, Aug 21, 2011 at 04:07:37PM -0400, Nicolas Pitre wrote:
+> > > On Sun, 21 Aug 2011, Russell King - ARM Linux wrote:
+> > > 
+> > > > And further to this, I'll point out that the debugging functions are
+> > > > *explicitly* designed to avoid corrupting any more than just r0-r3
+> > > > and lr.  That's not just the IO functions but also the hex and string
+> > > > printing functions.
+> > > > 
+> > > > And the head*.S code is explicitly written to expect r0-r3 to be
+> > > > corrupted - which basically means that no long-term values are held in
+> > > > those registers.
+> > > 
+> > > Well, not exactly.  I actually have a patch to that effect I made a 
+> > > while ago so all the early code could be unaffected by inserted function 
+> > > call, but held on to it because nothing yet justified its need.  Here it 
+> > > is for reference:
+> > 
+> > And so this buggers up the ability to insert calls to the debugging code
+> > by placing values into r0-r3.  So that patch will get a nak too.
+> 
+> What?  Please look again at the patch and tell me what is wrong with it.
+> Because I can't make sense of your last sentence.
 
-But a quick lookup did help [lifetime of the variable extends across the 
-entire run of the program, i.e. a global variable and local to the source file 
-it's defined in]. 
+Have you not been reading what I've been saying.
 
-> (don't take it as an offense)
-none taken ... in fact it was a welcome push to reread variable storage 
-classes and lifetime again [last time was some years ago] :-).
+Point 1: the code explicitly _avoids_ using r0-r3 except in small short
+code sequences.
 
-Heiko
+Point 2: the debugging macros explicitly use r0-r3 because they know that
+these registers aren't going to be used in the assembly code except in
+small short code sequences.
+
+So, changing all the assembly to use r0-r3 is going to bugger up the
+ability to use the debugging macros.  Therefore this is a change with
+a net reduction in facility.  Therefore I don't want it.
