@@ -1,29 +1,46 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Sun, 21 Aug 2011 12:25:16 +0100
-Subject: [PATCH] arm/imx: use Kconfig choice for low-level debug UART
-	selection
-In-Reply-To: <20110821091851.GI12028@n2100.arm.linux.org.uk>
-References: <1313530873-24961-1-git-send-email-will.deacon@arm.com>
-	<1313729819-30301-1-git-send-email-shawn.guo@linaro.org>
-	<20110819063533.GR31404@pengutronix.de>
-	<20110819110940.GC8918@e102144-lin.cambridge.arm.com>
-	<20110819113937.GS31404@pengutronix.de>
-	<20110821091851.GI12028@n2100.arm.linux.org.uk>
-Message-ID: <20110821112516.GA22917@e102144-lin.cambridge.arm.com>
+Date: Sun, 21 Aug 2011 12:29:40 +0100
+Subject: Patch Merging Path - RMK or Arnd?
+In-Reply-To: <6572911.Q9nnzRlLsr@wuerfel>
+References: <20110819124933.GG8918@e102144-lin.cambridge.arm.com>
+	<201108191621.56263.arnd@arndb.de>
+	<20110819144551.GI8918@e102144-lin.cambridge.arm.com>
+	<6572911.Q9nnzRlLsr@wuerfel>
+Message-ID: <20110821112940.GB22917@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 21, 2011 at 10:18:51AM +0100, Russell King - ARM Linux wrote:
-> On Fri, Aug 19, 2011 at 01:39:37PM +0200, Sascha Hauer wrote:
-> > One could argue
-> > that this option is for people who exactly know what they do only.
+On Sat, Aug 20, 2011 at 10:23:22PM +0100, Arnd Bergmann wrote:
+> On Friday 19 August 2011 15:45:51 Will Deacon wrote:
+> > > Fortunately, git can handle merges of that sort just fine, so I'd say
+> > > depending on the contents you do one of:
+> > > 
+> > > (4) Split up the changesets into a core set (for the arch directory) and
+> > >     a second set that goes on top and changes all the platforms. Get
+> > >     Russell to take the base patches into one branch, and submit the
+> > >     branch containing the full set (including the ones in Russell's
+> > >     tree) for the arm-soc tree. I will then make sure queue the changes
+> > >     for merging to Linus after he has taken the base changes from
+> > >     Russell.
+> > > 
+> > > (5) Prepare one git tree and submit it to both trees at once. If everyone
+> > >     is happy with the changes, we just apply it to both and one of us
+> > >     submits it first.
+> > >     Either tree can also contain further changes on top, so if your
+> > >     changes are already upstream through one tree, the second pull request
+> > >     from the other tree will contain the other changes that go on top.
+> > 
+> > That's (5) probably easiest, because then you can be sure that the patches
+> > in each upstream tree are identical.
 > 
-> It _IS_ there for people who know what they're doing.  That's something
-> I keep on saying about the LL debug stuff.  It's there to allow people
-> to debug the early startup of the kernel.  It's not there for users.
+> That's the idea with (4) as well. The difference there is that one of the
+> two trees only contains a subset of the patches, but those are using the
+> same commit IDs. The other tree has the remaining changes on top of the
+> common ones.
 
-Understood. I don't think it hurts to make this explicit in the Kconfig help
-entry for DEBUG_LL (as Sascha suggested) so I'll do that for v2 of this
-series.
+Thinking about this a bit more, (4) can also avoid the situation where one
+tree pulls the series but the other tree has reservations about the code and
+decides not to take the patches. So, in my case, I could get the core
+changes merged by Russell and then send you the full set afterwards.
 
 Will
