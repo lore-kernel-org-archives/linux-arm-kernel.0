@@ -1,48 +1,60 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 21 Aug 2011 09:53:29 +0100
-Subject: [RFC PATCH 2/2] ARM: CSR: add PM sleep entry for SiRFprimaII
-In-Reply-To: <CAGsJ_4yon5jPkwVkohiokSm1=_gNG=+Hvv55JYQ7-BeHxPkeaA@mail.gmail.com>
-References: <1312512888-25070-1-git-send-email-bs14@csr.com>
-	<1312512888-25070-3-git-send-email-bs14@csr.com>
-	<20110814075927.GB4986@n2100.arm.linux.org.uk>
-	<CAGsJ_4yigTt40g0-9jrz5qAbdrQdsXuQ65MhX+x1AZ1M4Ztr=w@mail.gmail.com>
-	<20110815082027.GA26827@n2100.arm.linux.org.uk>
-	<CAGsJ_4wyGUC=gNagaGGVcr=+nrJU2xjGJDxwS+H-UKPLajrLpg@mail.gmail.com>
-	<CAGsJ_4yon5jPkwVkohiokSm1=_gNG=+Hvv55JYQ7-BeHxPkeaA@mail.gmail.com>
-Message-ID: <20110821085329.GF12028@n2100.arm.linux.org.uk>
+Date: Sun, 21 Aug 2011 10:07:37 +0100
+Subject: [RFC,PATCH] arch/arm: compute and export NR_syscalls
+In-Reply-To: <201108171122.49009.arnd@arndb.de>
+References: <1313529267-4428-1-git-send-email-wad@chromium.org>
+	<CABqD9hYavCxA38GbBhbCmBT+PEQQsvhbF4U7xY8P8ygbFy+=Ag@mail.gmail.com>
+	<20043.28045.613130.691498@pilspetsen.it.uu.se>
+	<201108171122.49009.arnd@arndb.de>
+Message-ID: <20110821090736.GG12028@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 16, 2011 at 09:34:35AM +0800, Barry Song wrote:
-> 2011/8/15 Barry Song <21cnbao@gmail.com>:
-> > 2011/8/15 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> >> On Mon, Aug 15, 2011 at 03:43:13PM +0800, Barry Song wrote:
-> >>> Sorry, my fault. i simply picked these lines which have been verified
-> >>> to be working in local old 2.6.38.8 kernel and really didn't think and
-> >>> refine more carefully.
-> >>> in deep sleep mode, SiRFprimaII will powerdown CPU core.
-> >>
-> >> ... just like everyone else.
-> >>
-> >>> due to this,
-> >>> i just ignored to delete the codes saving registers of all kinds of
-> >>> CPU modes. but it is not the real situation in kernel. For example,
-> >>> IRQ mode used the stack of corrupted thread, and kernel was not in
-> >>> interrupt while going to pm_ops->enter(), then it is unnecessary to
-> >>> enter IRQ and save sp of IRQ:
-> >>
-> >> No. ?There is _no_ need to save and restore these registers. ?They
-> >> can simply be re-setup. ?The generic cpu_suspend stuff already
-> >> takes care of that.
-> >
-> > i did have saied it is not necessary to save and restore if you read
-> > my reply carefully :-)
+On Wed, Aug 17, 2011 at 11:22:48AM +0200, Arnd Bergmann wrote:
+> On Wednesday 17 August 2011, Mikael Pettersson wrote:
+> >  > I proposed this approach based solely on prior threads I've seen. E.g.,
+> >  > - https://lkml.org/lkml/2007/6/1/427
+> >  >   (don't just #define)
+> >  > - https://lkml.org/lkml/2009/8/27/280
+> >  >   (todo: x86-32 to move to x86-64)
+> >  > 
+> >  > If a single line #define is good enough, then it certainly works for me.
+> > 
+> > Yes, the one-line #define NR_syscalls in unistd.h is a perfectly adequate,
+> > if not entirely elegant, solution.  Adding asm-export.c just for this is
+> > waaay overkill.
 > 
-> just as you said, after deleting all codes to save/restore regsiters:
-...
-> and call cpu_init() to re-setup while resuming, things go well.
+> Right. While the main problem with having the constant in asm/unistd.h
+> (needs to be kept in sync when adding new syscalls) is an annoyance,
+> the suggested approach is adding more complexity than necessary.
+> 
+> If you want to have the value automatically computed, I'd suggest
+> moving the format of unistd.h over to a method like the one used
+> by x86-64 and asm-generic, which is to combine the syscall number
+> definitions with the list of syscall pointers that currently reside
+> in arch/arm/kernel/calls.S, for the added benefit that it's easier to
+> keep the two in sync as well.
 
-Good - so can we have a patch based on the generic cpu suspend support
-in the kernel for this SoC please?
+You obviously haven't looked at calls.S - the table has multiple
+options depending on whether its being used for EABI or OABI.  It's
+not purely a 1:1 mapping between syscall number name and function
+name.
 
-Thanks.
+Adding an additional parameter to the CALL() macro to get around that
+for the syscall number name starts making the file unweidly, especially
+if we obey the 80 column limit.
+
+Finally, the assembly 'number of syscalls' is different from the real
+number of syscalls to ensure that we don't overflow the 8-bit constant
+limit for the compare instruction.  Whether that needs to be included
+in the C __NR_syscalls or not depends on how its used.
+
+I personally would prefer C code not to rely on the (unprovided)
+NR_syscalls due to these kinds of issues.
+
+Finally, if its just for ftrace, well I don't have a high regard for that
+code.  It's something I hardly ever use and when I have tried to use it
+it has been soo dire in terms of overheads that it's just not worth
+bothering with.  When I want timings out of the kernel, I have always
+(and continue to do so) implement my own gathering mechanisms rather
+than using the ftrace crap.
