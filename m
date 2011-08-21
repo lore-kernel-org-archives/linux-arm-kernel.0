@@ -1,56 +1,27 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Sun, 21 Aug 2011 20:54:42 +0800
-Subject: [RFC PATCH 2/2] ARM: CSR: add PM sleep entry for SiRFprimaII
-In-Reply-To: <20110821085329.GF12028@n2100.arm.linux.org.uk>
-References: <1312512888-25070-1-git-send-email-bs14@csr.com>
-	<1312512888-25070-3-git-send-email-bs14@csr.com>
-	<20110814075927.GB4986@n2100.arm.linux.org.uk>
-	<CAGsJ_4yigTt40g0-9jrz5qAbdrQdsXuQ65MhX+x1AZ1M4Ztr=w@mail.gmail.com>
-	<20110815082027.GA26827@n2100.arm.linux.org.uk>
-	<CAGsJ_4wyGUC=gNagaGGVcr=+nrJU2xjGJDxwS+H-UKPLajrLpg@mail.gmail.com>
-	<CAGsJ_4yon5jPkwVkohiokSm1=_gNG=+Hvv55JYQ7-BeHxPkeaA@mail.gmail.com>
-	<20110821085329.GF12028@n2100.arm.linux.org.uk>
-Message-ID: <CAGsJ_4w_Jp9t0uNFyeWgJX5PsfU_Pjx0apMB4aJGoSufg9P5FA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 21 Aug 2011 15:21:24 +0200
+Subject: [PATCH 00/10] Clean up some io.h and associated code
+In-Reply-To: <20110821083744.GB12028@n2100.arm.linux.org.uk>
+References: <20110817075104.GC1006@n2100.arm.linux.org.uk>
+	<201108181714.47464.arnd@arndb.de>
+	<20110821083744.GB12028@n2100.arm.linux.org.uk>
+Message-ID: <9736370.N3v9K0B2fU@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/8/21 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Tue, Aug 16, 2011 at 09:34:35AM +0800, Barry Song wrote:
->> 2011/8/15 Barry Song <21cnbao@gmail.com>:
->> > 2011/8/15 Russell King - ARM Linux <linux@arm.linux.org.uk>:
->> >> On Mon, Aug 15, 2011 at 03:43:13PM +0800, Barry Song wrote:
->> >>> Sorry, my fault. i simply picked these lines which have been verified
->> >>> to be working in local old 2.6.38.8 kernel and really didn't think and
->> >>> refine more carefully.
->> >>> in deep sleep mode, SiRFprimaII will powerdown CPU core.
->> >>
->> >> ... just like everyone else.
->> >>
->> >>> due to this,
->> >>> i just ignored to delete the codes saving registers of all kinds of
->> >>> CPU modes. but it is not the real situation in kernel. For example,
->> >>> IRQ mode used the stack of corrupted thread, and kernel was not in
->> >>> interrupt while going to pm_ops->enter(), then it is unnecessary to
->> >>> enter IRQ and save sp of IRQ:
->> >>
->> >> No. ?There is _no_ need to save and restore these registers. ?They
->> >> can simply be re-setup. ?The generic cpu_suspend stuff already
->> >> takes care of that.
->> >
->> > i did have saied it is not necessary to save and restore if you read
->> > my reply carefully :-)
->>
->> just as you said, after deleting all codes to save/restore regsiters:
-> ...
->> and call cpu_init() to re-setup while resuming, things go well.
->
-> Good - so can we have a patch based on the generic cpu suspend support
-> in the kernel for this SoC please?
+On Sunday 21 August 2011 09:37:44 Russell King - ARM Linux wrote:
+> > I did some research during the Cambourne meeting about of these
+> > and found that the omap1 and a91 platforms also need the IO_SPACE_LIMIT
+> > defined to 0xffffffff when CONFIG_AT91_CF or CONFIG_OMAP_CF are
+> > set, so these fall into the same category as CONFIG_PCMCIA_SOC_COMMON.
+> 
+> It looks like AT91 and OMAP both only support one socket CF, so it
+> probably makes sense to have them converted to use a single 64k window.
 
-sure.
+If I read arch/arm/mach-at91/at91sam9260_devices.c correctly,
+it actually supports two CF slots. However, each slot only
+has 2KB worth of I/O space there, so it would still be reasonable
+to pretend having 64KB of total space and map the two slots
+at 4KB and 8KB offset into that.
 
->
-> Thanks.
->
-
--barry
+	Arnd
