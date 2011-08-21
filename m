@@ -1,146 +1,184 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Sat, 20 Aug 2011 23:42:38 -0600
-Subject: [PATCH 1/5] OMAP2xxx: HWMOD: fix DSS opt clocks
+Date: Sat, 20 Aug 2011 23:42:43 -0600
+Subject: [PATCH 5/5] OMAP: HWMOD: Unify DSS resets for all OMAPs
 In-Reply-To: <20110821053355.20198.23847.stgit@dusk>
 References: <20110821053355.20198.23847.stgit@dusk>
-Message-ID: <20110821054227.20198.80273.stgit@dusk>
+Message-ID: <20110821054241.20198.37328.stgit@dusk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Tomi Valkeinen <tomi.valkeinen@ti.com>
 
-Set HWMOD_CONTROL_OPT_CLKS_IN_RESET for dss_core to allow DSS reset
-properly.
+This patch adds a custom DSS reset function used on all OMAP's.
 
-Add missing ick opt-clock for rfbi. Rfbi uses the ick to calculate
-timings.
-
-Fix the venc iclk and fclk.
+The function doesn't actually do a reset, it only waits for the reset to
+complete. The reason for this is that on OMAP4 there is no possibility
+to do a SW reset, and on OMAP2/3 doing a SW reset for dss_core resets
+all the other DSS modules also, thus breaking the HWMOD model where
+every DSS module is independent.
 
 Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+[paul at pwsan.com: modified to build arch/arm/mach-omap2/display.o
+ unconditionally to avoid an error when !CONFIG_OMAP2_DSS]
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
 ---
- arch/arm/mach-omap2/omap_hwmod_2420_data.c |   15 +++++++++++++--
- arch/arm/mach-omap2/omap_hwmod_2430_data.c |   15 +++++++++++++--
- 2 files changed, 26 insertions(+), 4 deletions(-)
+ arch/arm/mach-omap2/Makefile                       |    5 +--
+ arch/arm/mach-omap2/display.c                      |   35 ++++++++++++++++++++
+ .../mach-omap2/omap_hwmod_2xxx_3xxx_ipblock_data.c |    2 +
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |    2 +
+ arch/arm/plat-omap/include/plat/common.h           |    3 ++
+ include/video/omapdss.h                            |    7 ----
+ 6 files changed, 43 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_2420_data.c b/arch/arm/mach-omap2/omap_hwmod_2420_data.c
-index a015c69..09d9395 100644
---- a/arch/arm/mach-omap2/omap_hwmod_2420_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_2420_data.c
-@@ -874,12 +874,17 @@ static struct omap_hwmod_ocp_if *omap2420_dss_slaves[] = {
- };
+diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+index f343365..bf85539 100644
+--- a/arch/arm/mach-omap2/Makefile
++++ b/arch/arm/mach-omap2/Makefile
+@@ -4,7 +4,7 @@
  
- static struct omap_hwmod_opt_clk dss_opt_clks[] = {
-+	/*
-+	 * The DSS HW needs all DSS clocks enabled during reset. The dss_core
-+	 * driver does not use these clocks.
-+	 */
- 	{ .role = "tv_clk", .clk = "dss_54m_fck" },
- 	{ .role = "sys_clk", .clk = "dss2_fck" },
- };
+ # Common support
+ obj-y := id.o io.o control.o mux.o devices.o serial.o gpmc.o timer.o pm.o \
+-	 common.o gpio.o dma.o wd_timer.o
++	 common.o gpio.o dma.o wd_timer.o display.o
  
- static struct omap_hwmod omap2420_dss_core_hwmod = {
- 	.name		= "dss_core",
-+	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
- 	.class		= &omap2_dss_hwmod_class,
- 	.main_clk	= "dss1_fck", /* instead of dss_fck */
- 	.sdma_reqs	= omap2xxx_dss_sdma_chs,
-@@ -962,6 +967,10 @@ static struct omap_hwmod_ocp_if *omap2420_dss_rfbi_slaves[] = {
- 	&omap2420_l4_core__dss_rfbi,
- };
+ omap-2-3-common				= irq.o sdrc.o
+ hwmod-common				= omap_hwmod.o \
+@@ -276,7 +276,4 @@ smsc911x-$(CONFIG_SMSC911X)		:= gpmc-smsc911x.o
+ obj-y					+= $(smsc911x-m) $(smsc911x-y)
+ obj-$(CONFIG_ARCH_OMAP4)		+= hwspinlock.o
  
-+static struct omap_hwmod_opt_clk dss_rfbi_opt_clks[] = {
-+	{ .role = "ick", .clk = "dss_ick" },
-+};
+-disp-$(CONFIG_OMAP2_DSS)		:= display.o
+-obj-y					+= $(disp-m) $(disp-y)
+-
+ obj-y					+= common-board-devices.o twl-common.o
+diff --git a/arch/arm/mach-omap2/display.c b/arch/arm/mach-omap2/display.c
+index a5b7a23..cdb675a 100644
+--- a/arch/arm/mach-omap2/display.c
++++ b/arch/arm/mach-omap2/display.c
+@@ -26,6 +26,7 @@
+ #include <plat/omap_hwmod.h>
+ #include <plat/omap_device.h>
+ #include <plat/omap-pm.h>
++#include <plat/common.h>
+ 
+ static struct platform_device omap_display_device = {
+ 	.name          = "omapdss",
+@@ -126,3 +127,37 @@ int __init omap_display_init(struct omap_dss_board_info *board_data)
+ 
+ 	return r;
+ }
 +
- static struct omap_hwmod omap2420_dss_rfbi_hwmod = {
- 	.name		= "dss_rfbi",
- 	.class		= &omap2_rfbi_hwmod_class,
-@@ -973,6 +982,8 @@ static struct omap_hwmod omap2420_dss_rfbi_hwmod = {
- 			.module_offs = CORE_MOD,
- 		},
- 	},
-+	.opt_clks	= dss_rfbi_opt_clks,
-+	.opt_clks_cnt	= ARRAY_SIZE(dss_rfbi_opt_clks),
- 	.slaves		= omap2420_dss_rfbi_slaves,
- 	.slaves_cnt	= ARRAY_SIZE(omap2420_dss_rfbi_slaves),
- 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP2420),
-@@ -983,7 +994,7 @@ static struct omap_hwmod omap2420_dss_rfbi_hwmod = {
- static struct omap_hwmod_ocp_if omap2420_l4_core__dss_venc = {
- 	.master		= &omap2420_l4_core_hwmod,
- 	.slave		= &omap2420_dss_venc_hwmod,
--	.clk		= "dss_54m_fck",
-+	.clk		= "dss_ick",
- 	.addr		= omap2_dss_venc_addrs,
- 	.fw = {
- 		.omap2 = {
-@@ -1003,7 +1014,7 @@ static struct omap_hwmod_ocp_if *omap2420_dss_venc_slaves[] = {
- static struct omap_hwmod omap2420_dss_venc_hwmod = {
- 	.name		= "dss_venc",
- 	.class		= &omap2_venc_hwmod_class,
--	.main_clk	= "dss1_fck",
-+	.main_clk	= "dss_54m_fck",
- 	.prcm		= {
- 		.omap2 = {
- 			.prcm_reg_id = 1,
-diff --git a/arch/arm/mach-omap2/omap_hwmod_2430_data.c b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
-index 16743c7..67aff19 100644
---- a/arch/arm/mach-omap2/omap_hwmod_2430_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
-@@ -940,12 +940,17 @@ static struct omap_hwmod_ocp_if *omap2430_dss_slaves[] = {
- };
- 
- static struct omap_hwmod_opt_clk dss_opt_clks[] = {
-+	/*
-+	 * The DSS HW needs all DSS clocks enabled during reset. The dss_core
-+	 * driver does not use these clocks.
-+	 */
- 	{ .role = "tv_clk", .clk = "dss_54m_fck" },
- 	{ .role = "sys_clk", .clk = "dss2_fck" },
- };
- 
- static struct omap_hwmod omap2430_dss_core_hwmod = {
- 	.name		= "dss_core",
-+	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
- 	.class		= &omap2_dss_hwmod_class,
- 	.main_clk	= "dss1_fck", /* instead of dss_fck */
- 	.sdma_reqs	= omap2xxx_dss_sdma_chs,
-@@ -1016,6 +1021,10 @@ static struct omap_hwmod_ocp_if *omap2430_dss_rfbi_slaves[] = {
- 	&omap2430_l4_core__dss_rfbi,
- };
- 
-+static struct omap_hwmod_opt_clk dss_rfbi_opt_clks[] = {
-+	{ .role = "ick", .clk = "dss_ick" },
-+};
++#define MAX_MODULE_SOFTRESET_WAIT	10000
++int omap_dss_reset(struct omap_hwmod *oh)
++{
++	struct omap_hwmod_opt_clk *oc;
++	int c = 0;
++	int i, r;
 +
- static struct omap_hwmod omap2430_dss_rfbi_hwmod = {
- 	.name		= "dss_rfbi",
- 	.class		= &omap2_rfbi_hwmod_class,
-@@ -1027,6 +1036,8 @@ static struct omap_hwmod omap2430_dss_rfbi_hwmod = {
- 			.module_offs = CORE_MOD,
- 		},
- 	},
-+	.opt_clks	= dss_rfbi_opt_clks,
-+	.opt_clks_cnt	= ARRAY_SIZE(dss_rfbi_opt_clks),
- 	.slaves		= omap2430_dss_rfbi_slaves,
- 	.slaves_cnt	= ARRAY_SIZE(omap2430_dss_rfbi_slaves),
- 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP2430),
-@@ -1037,7 +1048,7 @@ static struct omap_hwmod omap2430_dss_rfbi_hwmod = {
- static struct omap_hwmod_ocp_if omap2430_l4_core__dss_venc = {
- 	.master		= &omap2430_l4_core_hwmod,
- 	.slave		= &omap2430_dss_venc_hwmod,
--	.clk		= "dss_54m_fck",
-+	.clk		= "dss_ick",
- 	.addr		= omap2_dss_venc_addrs,
- 	.flags		= OCPIF_SWSUP_IDLE,
- 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-@@ -1051,7 +1062,7 @@ static struct omap_hwmod_ocp_if *omap2430_dss_venc_slaves[] = {
- static struct omap_hwmod omap2430_dss_venc_hwmod = {
- 	.name		= "dss_venc",
- 	.class		= &omap2_venc_hwmod_class,
--	.main_clk	= "dss1_fck",
-+	.main_clk	= "dss_54m_fck",
- 	.prcm		= {
- 		.omap2 = {
- 			.prcm_reg_id = 1,
++	if (!(oh->class->sysc->sysc_flags & SYSS_HAS_RESET_STATUS)) {
++		pr_err("dss_core: hwmod data doesn't contain reset data\n");
++		return -EINVAL;
++	}
++
++	for (i = oh->opt_clks_cnt, oc = oh->opt_clks; i > 0; i--, oc++)
++		if (oc->_clk)
++			clk_enable(oc->_clk);
++
++	omap_test_timeout((omap_hwmod_read(oh, oh->class->sysc->syss_offs)
++				& SYSS_RESETDONE_MASK),
++			MAX_MODULE_SOFTRESET_WAIT, c);
++
++	if (c == MAX_MODULE_SOFTRESET_WAIT)
++		pr_warning("dss_core: waiting for reset to finish failed\n");
++	else
++		pr_debug("dss_core: softreset done\n");
++
++	for (i = oh->opt_clks_cnt, oc = oh->opt_clks; i > 0; i--, oc++)
++		if (oc->_clk)
++			clk_disable(oc->_clk);
++
++	r = (c == MAX_MODULE_SOFTRESET_WAIT) ? -ETIMEDOUT : 0;
++
++	return r;
++}
+diff --git a/arch/arm/mach-omap2/omap_hwmod_2xxx_3xxx_ipblock_data.c b/arch/arm/mach-omap2/omap_hwmod_2xxx_3xxx_ipblock_data.c
+index d78c132..c11273d 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_2xxx_3xxx_ipblock_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_2xxx_3xxx_ipblock_data.c
+@@ -11,6 +11,7 @@
+ #include <plat/omap_hwmod.h>
+ #include <plat/serial.h>
+ #include <plat/dma.h>
++#include <plat/common.h>
+ 
+ #include <mach/irqs.h>
+ 
+@@ -51,6 +52,7 @@ static struct omap_hwmod_class_sysconfig omap2_dss_sysc = {
+ struct omap_hwmod_class omap2_dss_hwmod_class = {
+ 	.name	= "dss",
+ 	.sysc	= &omap2_dss_sysc,
++	.reset	= omap_dss_reset,
+ };
+ 
+ /*
+diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+index 8b74058..7a7489e 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+@@ -29,6 +29,7 @@
+ #include <plat/mcbsp.h>
+ #include <plat/mmc.h>
+ #include <plat/i2c.h>
++#include <plat/common.h>
+ 
+ #include "omap_hwmod_common_data.h"
+ 
+@@ -1204,6 +1205,7 @@ static struct omap_hwmod_class_sysconfig omap44xx_dss_sysc = {
+ static struct omap_hwmod_class omap44xx_dss_hwmod_class = {
+ 	.name	= "dss",
+ 	.sysc	= &omap44xx_dss_sysc,
++	.reset	= omap_dss_reset,
+ };
+ 
+ /* dss */
+diff --git a/arch/arm/plat-omap/include/plat/common.h b/arch/arm/plat-omap/include/plat/common.h
+index 4564cc6..a822685 100644
+--- a/arch/arm/plat-omap/include/plat/common.h
++++ b/arch/arm/plat-omap/include/plat/common.h
+@@ -30,6 +30,7 @@
+ #include <linux/delay.h>
+ 
+ #include <plat/i2c.h>
++#include <plat/omap_hwmod.h>
+ 
+ struct sys_timer;
+ 
+@@ -45,6 +46,8 @@ extern unsigned long long notrace omap_32k_sched_clock(void);
+ 
+ extern void omap_reserve(void);
+ 
++extern int omap_dss_reset(struct omap_hwmod *);
++
+ /*
+  * IO bases for various OMAP processors
+  * Except the tap base, rest all the io bases
+diff --git a/include/video/omapdss.h b/include/video/omapdss.h
+index 3b55ef2..105b05d 100644
+--- a/include/video/omapdss.h
++++ b/include/video/omapdss.h
+@@ -245,15 +245,8 @@ struct omap_dss_board_info {
+ 	void (*dsi_mux_pads)(bool enable);
+ };
+ 
+-#if defined(CONFIG_OMAP2_DSS_MODULE) || defined(CONFIG_OMAP2_DSS)
+ /* Init with the board info */
+ extern int omap_display_init(struct omap_dss_board_info *board_data);
+-#else
+-static inline int omap_display_init(struct omap_dss_board_info *board_data)
+-{
+-	return 0;
+-}
+-#endif
+ 
+ struct omap_display_platform_data {
+ 	struct omap_dss_board_info *board_data;
