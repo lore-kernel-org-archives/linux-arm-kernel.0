@@ -1,27 +1,75 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 21 Aug 2011 15:21:24 +0200
-Subject: [PATCH 00/10] Clean up some io.h and associated code
-In-Reply-To: <20110821083744.GB12028@n2100.arm.linux.org.uk>
-References: <20110817075104.GC1006@n2100.arm.linux.org.uk>
-	<201108181714.47464.arnd@arndb.de>
-	<20110821083744.GB12028@n2100.arm.linux.org.uk>
-Message-ID: <9736370.N3v9K0B2fU@wuerfel>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Sun, 21 Aug 2011 21:55:53 +0800
+Subject: [PATCH 2/4 v4] pinmux: add a driver for the U300 pinmux
+In-Reply-To: <1313747646-32294-1-git-send-email-linus.walleij@stericsson.com>
+References: <1313747646-32294-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <CAGsJ_4wK6V0aQJd7f1geM8XnzQO+3TNCE6Q8_j=VYf_z_gcmpA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 21 August 2011 09:37:44 Russell King - ARM Linux wrote:
-> > I did some research during the Cambourne meeting about of these
-> > and found that the omap1 and a91 platforms also need the IO_SPACE_LIMIT
-> > defined to 0xffffffff when CONFIG_AT91_CF or CONFIG_OMAP_CF are
-> > set, so these fall into the same category as CONFIG_PCMCIA_SOC_COMMON.
-> 
-> It looks like AT91 and OMAP both only support one socket CF, so it
-> probably makes sense to have them converted to use a single 64k window.
+Hi Linus,
+Looks pretty good. just some minors.
 
-If I read arch/arm/mach-at91/at91sam9260_devices.c correctly,
-it actually supports two CF slots. However, each slot only
-has 2KB worth of I/O space there, so it would still be reasonable
-to pretend having 64KB of total space and map the two slots
-at 4KB and 8KB offset into that.
+2011/8/19 Linus Walleij <linus.walleij@stericsson.com>:
+> From: Linus Walleij <linus.walleij@linaro.org>
+>
+> This adds a driver for the U300 pinmux portions of the system
+> controller "SYSCON". It also serves as an example of how to use
+> the pinmux subsystem. This driver also houses the platform data
+> for the only supported platform.
 
-	Arnd
+yes. it is a good example for us to follow.
+
+>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>
+> +
+> +static int __exit u300_pmx_remove(struct platform_device *pdev)
+> +{
+> + ? ? ? struct u300_pmx *upmx = platform_get_drvdata(pdev);
+> +
+> + ? ? ? if (upmx) {
+
+why do you need to check whether upmx is not NULL. if it is NULL, we
+have failed in probe().
+and it is also impossible to call this remove() twice.
+
+> + ? ? ? ? ? ? ? pinmux_unregister(upmx->pmx);
+> + ? ? ? ? ? ? ? iounmap(upmx->virtbase);
+> + ? ? ? ? ? ? ? release_mem_region(upmx->phybase, upmx->physize);
+> + ? ? ? ? ? ? ? platform_set_drvdata(pdev, NULL);
+> + ? ? ? ? ? ? ? kfree(upmx);
+> + ? ? ? }
+> +
+> + ? ? ? return 0;
+> +}
+> +
+> +static struct platform_driver u300_pmx_driver = {
+> + ? ? ? .driver = {
+> + ? ? ? ? ? ? ? .name = DRIVER_NAME,
+> + ? ? ? ? ? ? ? .owner = THIS_MODULE,
+> + ? ? ? },
+> + ? ? ? .remove = __exit_p(u300_pmx_remove),
+
+if you want to add deepsleep support(i mean pinmux crl will lose power
+while suspending), what do you plan to add?
+save U300_SYSCON_PMC1LR, U300_SYSCON_PMC1HR, U300_SYSCON_PMC2R,
+U300_SYSCON_PMC3R, U300_SYSCON_PMC4R in suspend and restore them in
+resume?
+
+it is also a generic issue to pinmux.
+
+> +/*
+> + * Register definitions for the U300 Padmux control registers in the
+> + * system controller
+> + */
+> +
+> +/* PAD MUX Control register 1 (LOW) 16bit (R/W) */
+> +#define U300_SYSCON_PMC1LR ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? (0x007C)
+...
+> +#define U300_SYSCON_PMC4R_APP_MISC_16_EMIF_1_STATIC_CS5_N ? ? ?(0x0200)
+
+do you want these "(" ")" for macros?
+
+Thanks
+barry
