@@ -1,34 +1,48 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 21 Aug 2011 09:51:08 +0100
-Subject: [PATCH 07/15] ARM: EXYNOS4: Use generic DMA PL330 driver
-In-Reply-To: <CAJuYYwT0R+VXWvWuV6KK=m_knoxBnBf=GLVimPoe002mcvqqeA@mail.gmail.com>
-References: <1311744697-10264-1-git-send-email-boojin.kim@samsung.com>
-	<1311744697-10264-8-git-send-email-boojin.kim@samsung.com>
-	<CAJuYYwT0R+VXWvWuV6KK=m_knoxBnBf=GLVimPoe002mcvqqeA@mail.gmail.com>
-Message-ID: <20110821085108.GE12028@n2100.arm.linux.org.uk>
+Date: Sun, 21 Aug 2011 09:53:29 +0100
+Subject: [RFC PATCH 2/2] ARM: CSR: add PM sleep entry for SiRFprimaII
+In-Reply-To: <CAGsJ_4yon5jPkwVkohiokSm1=_gNG=+Hvv55JYQ7-BeHxPkeaA@mail.gmail.com>
+References: <1312512888-25070-1-git-send-email-bs14@csr.com>
+	<1312512888-25070-3-git-send-email-bs14@csr.com>
+	<20110814075927.GB4986@n2100.arm.linux.org.uk>
+	<CAGsJ_4yigTt40g0-9jrz5qAbdrQdsXuQ65MhX+x1AZ1M4Ztr=w@mail.gmail.com>
+	<20110815082027.GA26827@n2100.arm.linux.org.uk>
+	<CAGsJ_4wyGUC=gNagaGGVcr=+nrJU2xjGJDxwS+H-UKPLajrLpg@mail.gmail.com>
+	<CAGsJ_4yon5jPkwVkohiokSm1=_gNG=+Hvv55JYQ7-BeHxPkeaA@mail.gmail.com>
+Message-ID: <20110821085329.GF12028@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 15, 2011 at 07:45:48PM +0530, Thomas Abraham wrote:
-> > +struct dma_pl330_peri pdma0_peri[28] = {
-> > + ? ? ? {
-> > + ? ? ? ? ? ? ? .peri_id = (u8)DMACH_PCM0_RX,
-> > + ? ? ? ? ? ? ? .rqtype = DEVTOMEM,
-> > + ? ? ? }, {
+On Tue, Aug 16, 2011 at 09:34:35AM +0800, Barry Song wrote:
+> 2011/8/15 Barry Song <21cnbao@gmail.com>:
+> > 2011/8/15 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> >> On Mon, Aug 15, 2011 at 03:43:13PM +0800, Barry Song wrote:
+> >>> Sorry, my fault. i simply picked these lines which have been verified
+> >>> to be working in local old 2.6.38.8 kernel and really didn't think and
+> >>> refine more carefully.
+> >>> in deep sleep mode, SiRFprimaII will powerdown CPU core.
+> >>
+> >> ... just like everyone else.
+> >>
+> >>> due to this,
+> >>> i just ignored to delete the codes saving registers of all kinds of
+> >>> CPU modes. but it is not the real situation in kernel. For example,
+> >>> IRQ mode used the stack of corrupted thread, and kernel was not in
+> >>> interrupt while going to pm_ops->enter(), then it is unnecessary to
+> >>> enter IRQ and save sp of IRQ:
+> >>
+> >> No. ?There is _no_ need to save and restore these registers. ?They
+> >> can simply be re-setup. ?The generic cpu_suspend stuff already
+> >> takes care of that.
+> >
+> > i did have saied it is not necessary to save and restore if you read
+> > my reply carefully :-)
 > 
-> The client driver specifies the direction of the transfer
-> (DMA_TO_DEVICE or DMA_FROM_DEVICE) when requesting for a dma channel.
-> So, is the rqtype parameter required in the platform data for the dma
-> driver?
+> just as you said, after deleting all codes to save/restore regsiters:
+...
+> and call cpu_init() to re-setup while resuming, things go well.
 
-That was done initially too with PL080, which has 8 uncommitted DMA
-channels.  Peripheral drivers still had to pass the DMA direction.  So
-it turned out to be entirely redundant information, so it got killed off,
-along with other channel specific configuration which drivers should've
-been doing via the slave configuration callback.
+Good - so can we have a patch based on the generic cpu suspend support
+in the kernel for this SoC please?
 
-Passing lots of information via platform data which should come via
-other routes makes dmaengine users fragile - you can't tell whether
-they are passing the correct and full information necessary to work with
-other dmaengine drivers.  So, the DMA engine platform data should only
-contain the absolute _minimum_ of information.
+Thanks.
