@@ -1,60 +1,72 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 21 Aug 2011 10:07:37 +0100
-Subject: [RFC,PATCH] arch/arm: compute and export NR_syscalls
-In-Reply-To: <201108171122.49009.arnd@arndb.de>
-References: <1313529267-4428-1-git-send-email-wad@chromium.org>
-	<CABqD9hYavCxA38GbBhbCmBT+PEQQsvhbF4U7xY8P8ygbFy+=Ag@mail.gmail.com>
-	<20043.28045.613130.691498@pilspetsen.it.uu.se>
-	<201108171122.49009.arnd@arndb.de>
-Message-ID: <20110821090736.GG12028@n2100.arm.linux.org.uk>
+Date: Sun, 21 Aug 2011 10:14:52 +0100
+Subject: [PATCH 1/3] ARM: debug: use kconfig choice for selecting
+	DEBUG_LL UART
+In-Reply-To: <alpine.LFD.2.00.1108191101560.20358@xanadu.home>
+References: <1313530873-24961-1-git-send-email-will.deacon@arm.com>
+	<20110818161105.GA12527@S2100-06.ap.freescale.net>
+	<20110818160712.GA26691@e102144-lin.cambridge.arm.com>
+	<20110819045956.GB12527@S2100-06.ap.freescale.net>
+	<20110819110822.GB8918@e102144-lin.cambridge.arm.com>
+	<20110819113740.GF12527@S2100-06.ap.freescale.net>
+	<20110819123238.GD8918@e102144-lin.cambridge.arm.com>
+	<alpine.LFD.2.00.1108191101560.20358@xanadu.home>
+Message-ID: <20110821091452.GH12028@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 17, 2011 at 11:22:48AM +0200, Arnd Bergmann wrote:
-> On Wednesday 17 August 2011, Mikael Pettersson wrote:
-> >  > I proposed this approach based solely on prior threads I've seen. E.g.,
-> >  > - https://lkml.org/lkml/2007/6/1/427
-> >  >   (don't just #define)
-> >  > - https://lkml.org/lkml/2009/8/27/280
-> >  >   (todo: x86-32 to move to x86-64)
-> >  > 
-> >  > If a single line #define is good enough, then it certainly works for me.
+On Fri, Aug 19, 2011 at 11:49:10AM -0400, Nicolas Pitre wrote:
+> On Fri, 19 Aug 2011, Will Deacon wrote:
+> > On Fri, Aug 19, 2011 at 12:37:41PM +0100, Shawn Guo wrote:
+> > > On Fri, Aug 19, 2011 at 12:08:22PM +0100, Will Deacon wrote:
+> > > > @@ -74,7 +78,12 @@ config DEBUG_LL
+> > > >  
+> > > >  choice
+> > > >         prompt "Kernel low-level debugging port"
+> > > > -       depends on DEBUG_LL
+> > > > +       depends on DEBUG_LL_UART && (FOOTBRIDGE || ARCH_CLPS711X || \
+> > > > +                                    PLAT_SAMSUNG || ARCH_REALVIEW)
+> > > 
+> > > We will have to list a lot of ARCH/PLAT symbols here.  This is what
+> > > I meant overkilled actually.
 > > 
-> > Yes, the one-line #define NR_syscalls in unistd.h is a perfectly adequate,
-> > if not entirely elegant, solution.  Adding asm-export.c just for this is
-> > waaay overkill.
+> > Ultimately, we will want to have all the platforms using this mechanism so
+> > this list of symbols could eventually be removed. I take your point though;
+> > so I'll leave the patch series as it is for now.
 > 
-> Right. While the main problem with having the constant in asm/unistd.h
-> (needs to be kept in sync when adding new syscalls) is an annoyance,
-> the suggested approach is adding more complexity than necessary.
+> Well, ultimately I'd like to see something even better than that.  We 
+> should have the bootloader provide the required information to the 
+> kernel for it to be able to send bytes to a debug device.  It should be 
+> rather simple, especially for a serial UART.  All we need in that case 
+> is:
 > 
-> If you want to have the value automatically computed, I'd suggest
-> moving the format of unistd.h over to a method like the one used
-> by x86-64 and asm-generic, which is to combine the syscall number
-> definitions with the list of syscall pointers that currently reside
-> in arch/arm/kernel/calls.S, for the added benefit that it's easier to
-> keep the two in sync as well.
+>  - physical address of the transmit FIFO register
+> 
+>  - physical address of the register indicating "FIFO full" with a 
+>    corresponding bit mask
+> 
+>  - physical address of the register indicating "FIFO empty" with a
+>    corresponding bit mask
 
-You obviously haven't looked at calls.S - the table has multiple
-options depending on whether its being used for EABI or OABI.  It's
-not purely a 1:1 mapping between syscall number name and function
-name.
+You're missing something there.  It's not always about FIFO full and FIFO
+empty.  On some platforms, we want _reliable_ debugging, so the debug
+stuff waits while CTS is inactive.
 
-Adding an additional parameter to the CALL() macro to get around that
-for the syscall number name starts making the file unweidly, especially
-if we obey the 80 column limit.
+Plus you need the virtual address too, because the LL debug stuff is
+there to debug around places like the initial assembly, before C code
+is setup.
 
-Finally, the assembly 'number of syscalls' is different from the real
-number of syscalls to ensure that we don't overflow the 8-bit constant
-limit for the compare instruction.  Whether that needs to be included
-in the C __NR_syscalls or not depends on how its used.
+Plus its not just about bitmasks, but also about size of access, and
+polarity of bits.  So actually you'd need:
 
-I personally would prefer C code not to rely on the (unprovided)
-NR_syscalls due to these kinds of issues.
+- virtual and physical address and size of transmit register
+- virtual and physical address, mask and value of transmit status
+- virtual and physical address, mask and value of CTS status
 
-Finally, if its just for ftrace, well I don't have a high regard for that
-code.  It's something I hardly ever use and when I have tried to use it
-it has been soo dire in terms of overheads that it's just not worth
-bothering with.  When I want timings out of the kernel, I have always
-(and continue to do so) implement my own gathering mechanisms rather
-than using the ftrace crap.
+but then, we have debugging which doesn't have a physical address
+associated with it (the jtag stuff) so this doesn't cover the full
+story either.  Not only that of course, but boot loaders should not
+be passing virtual addresses to the kernel.
+
+So all in all, passing this information in from a boot loader is just
+a plain and simple bad idea.
