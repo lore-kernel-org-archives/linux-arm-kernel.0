@@ -1,60 +1,37 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 22 Aug 2011 10:24:59 +0100
-Subject: [PATCH 00/19] GPIO exodus and cleanup
-In-Reply-To: <20110822082700.GK12028@n2100.arm.linux.org.uk>
-References: <1312978564-18069-1-git-send-email-linus.walleij@stericsson.com>
-	<20110817090123.GD1006@n2100.arm.linux.org.uk>
-	<CACRpkdbJOrb5rhgG0Chamt-ApLQnV69MQ=bqBwKqO3KJPaFd0A@mail.gmail.com>
-	<CACRpkdYw96QD0sGOhA=osKYbnD6=MTqiAF=m5++BjM-s1Mn--w@mail.gmail.com>
-	<CACxGe6tEOnUzFjKMqNfp10b8SyuJDDFzg0eiPzhKNNCY55LECw@mail.gmail.com>
-	<CACRpkdbPFuFHBuHzO2bP+z=za2kOFk4AZdgMVy=U6kcMmw9LSw@mail.gmail.com>
-	<20110822082700.GK12028@n2100.arm.linux.org.uk>
-Message-ID: <20110822092459.GL12028@n2100.arm.linux.org.uk>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Mon, 22 Aug 2011 13:30:50 +0400
+Subject: [PATCH 2/2] ARM: orion5x: fix build error in dns323_pci_map_irq
+In-Reply-To: <1313953272-24733-2-git-send-email-robherring2@gmail.com>
+References: <1313953272-24733-2-git-send-email-robherring2@gmail.com>
+Message-ID: <4E5221CA.8090402@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 22, 2011 at 09:27:00AM +0100, Russell King - ARM Linux wrote:
-> On Mon, Aug 22, 2011 at 09:53:48AM +0200, Linus Walleij wrote:
-> > On Sun, Aug 21, 2011 at 9:09 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
-> > > On Fri, Aug 19, 2011 at 5:45 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> > >> Ping on this, on monday I'll pretend it's no big deal and pour them
-> > >> into Russells patch tracker anyway, since he's managing more than
-> > >> half of the kernels GPIO code in arch/arm/* anyway.
-> > >
-> > > If Russell is okay with it, then go ahead and merge it. ?I'm being
-> > > pretty liberal about GPIO driver moves. ?I'm fine with them getting
-> > > cleaned up after the drivers/gpio move.
-> > 
-> > Okay! Russell I've put them into your patch tracker as patches
-> > 7032/1 thru 7050/1 so you can pick and choose. I've rebased on
-> > top of what's in -next hoping that the stuff there affecting these
-> > file will mainly be identical to what's on your "gpio" branch.
-> > 
-> > Tell me if I should rebase on something specific or if there are
-> > any problems.
-> 
-> I've applied as many as I can, but 7042/1, 7046/1, 7047/1 and 7048/1
-> failed:
-> 
-> Patching 7042/1...
-> git apply --whitespace=fix -p1 --index --check > /tmp/pdb.26923 2>&1 exited with non-zero status: 256
-> error: patch failed: drivers/gpio/gpio-ep93xx.c:24
-> error: drivers/gpio/gpio-ep93xx.c: patch does not apply
-> Patching 7046/1...
-> git apply --whitespace=fix -p1 --index --check > /tmp/pdb.26923 2>&1 exited with non-zero status: 256
-> error: patch failed: arch/arm/mach-mmp/gplugd.c:9
-> error: arch/arm/mach-mmp/gplugd.c: patch does not apply
-> error: drivers/gpio/gpio-pxa.c: does not exist in index
-> Patching 7047/1...
-> git apply --whitespace=fix -p1 --index --check > /tmp/pdb.26923 2>&1 exited with non-zero status: 256
-> error: patch failed: drivers/gpio/Makefile:40
-> error: drivers/gpio/Makefile: patch does not apply
-> Patching 7048/1...
-> git apply --whitespace=fix -p1 --index --check > /tmp/pdb.26923 2>&1 exited with non-zero status: 256
-> error: drivers/gpio/gpio-pnx4008.c: does not exist in index
-> 
-> It looks like there are changes to these in other trees which conflict.
+Hello.
 
-Looking through the gpio.h files, plat-nomadik's is virtually empty
-except for a copyright, ifdef and include of linux/kernel.h - can it
-be killed off entirely now?
+On 21-08-2011 23:01, Rob Herring wrote:
+
+> From: Rob Herring<rob.herring@calxeda.com>
+
+> orion5x fails to build with the following error:
+> arch/arm/mach-orion5x/dns323-setup.c: In function ?dns323_pci_map_irq?:
+> arch/arm/mach-orion5x/dns323-setup.c:80:28: error: expected expression before ?const?
+> arch/arm/mach-orion5x/dns323-setup.c:80:28: error: too few arguments to function ?orion5x_pci_map_irq?
+
+> This appears to be a search and replace error introduced from this commit:
+
+> commit d5341942d784134f2997b3ff82cd63cf71d1f932
+> Author:
+
+    No author? :-)
+
+> Date:   Fri Jun 10 15:30:21 2011 +0100
+
+>      PCI: Make the struct pci_dev * argument of pci_fixup_irqs const.
+
+> Signed-off-by: Rob Herring<rob.herring@calxeda.com>
+> Cc: Ralf Baechle<ralf@linux-mips.org>
+> Cc: Nicolas Pitre<nico@fluxnic.net>
+> Cc: Arnd Bergmann<arnd@arndb.de>
+
+WBR, Sergei
