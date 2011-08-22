@@ -1,73 +1,37 @@
-From: greg@kroah.com (Greg KH)
-Date: Mon, 22 Aug 2011 14:18:32 -0700
-Subject: [PATCH] atmel_serial: RS485: receiving enabled when sending data
-In-Reply-To: <4E492CFF.7040905@pwrnet.de>
-References: <4E492CFF.7040905@pwrnet.de>
-Message-ID: <20110822211832.GA8023@kroah.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Tue, 23 Aug 2011 03:29:42 +0530
+Subject: [RESEND][PATCH 0/3] dma: pl330: Simplify platform data for pl330
+	driver
+Message-ID: <1314050385-9617-1-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 15, 2011 at 04:28:15PM +0200, Bernhard Roth wrote:
-> Hello!
-> 
-> By default the atmel_serial driver in RS485 mode disables receiving
-> data until all data in the send buffer has been sent. This flag
-> allows to receive data even whilst sending data. This is very useful
-> to
-> 
-> - check if the data has been sent correctly over the RS485 bus
-> - assure that no collision happened
-> - check for short circuits/termination issues on the RS485 bus
-> 
-> Usually this functionality is realized by hardware, wether
-> controlling the RX-Enable pin of the RS485 transceiver with RTS
-> (driver control signal) or pulling it LOW permanently. The present
-> atmel_serial driver makes this impossible, thus requiring following
-> patch.
-> 
-> Usage example:
-> 
->     struct serial_rs485     rs485;
-> 
->     memset(&rs485, 0, sizeof(rs485));
->     rs485.flags = SER_RS485_ENABLED | SER_RS485_RX_DURING_TX;
->     ioctl(fd, TIOCSRS485, &rs485);
-> 
-> 
-> 
-> 
-> atmel_serial: RS485: receiving enabled when sending data
-> 
-> By default the atmel_serial driver in RS485 mode disables receiving
-> data until
-> all data in the send buffer has been sent. This flag allows to receive data
-> even whilst sending data.
-> 
-> Signed-off-by: Bernhard Roth <br@pwrnet.de>
-> Signed-off-by: Claudio Scordino <claudio@evidence.eu.com>
-> ---
->  drivers/tty/serial/atmel_serial.c |   17 ++++++++++-------
->  include/linux/serial.h            |    1 +
->  2 files changed, 11 insertions(+), 7 deletions(-)
-> 
-> diff --git a/drivers/tty/serial/atmel_serial.c
-> b/drivers/tty/serial/atmel_serial.c
-> index af9b781..5f6c745 100644
-> --- a/drivers/tty/serial/atmel_serial.c
-> +++ b/drivers/tty/serial/atmel_serial.c
-> @@ -339,8 +339,9 @@ static void atmel_stop_tx(struct uart_port *port)
->      /* Disable interrupts */
->      UART_PUT_IDR(port, atmel_port->tx_done_mask);
-> 
-> -    if (atmel_port->rs485.flags & SER_RS485_ENABLED)
-> -        atmel_start_rx(port);
-> +    if ((atmel_port->rs485.flags & SER_RS485_ENABLED) &&
-> +        !(atmel_port->rs485.flags & SER_RS485_RX_DURING_TX))
-> +            atmel_start_rx(port);
+The rqtype parameter specified in platform data as part of the
+'struct dma_pl330_peri' can be infered from the direction of the transfer
+specified with transfer requests. So the rqtype parameter can be removed
+and 'struct dma_pl330_peri' is then left with only one field 'peri_id'
+which itself can be moved into 'struct dma_pl330_platdata' and the
+entire 'struct dma_pl330_peri' can be eliminated.
 
-Can you fix your email client to not strip patches of tabs and resend
-this so that I can apply it?
+This is first step towards adding device tree support for pl330 dma driver.
+With rqtype information inferred from transfer requests, it need not be
+included in device tree to describe each hardware dma request.
 
-thanks,
+This patchset is based on following tree.
+http://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+and branch 'kgene/next/topic-dma-pl330'.
 
-greg k-h
+This patchset has been implemented and tested only for Exynos4. If this
+patchset is acceptable, then pl330 driver platform data for other samsung
+platforms will also be modfied.
+
+Thomas Abraham (3):
+  DMA: PL330: Infer transfer direction from transfer request instead of platform data
+  ARM: SAMSUNG: Modify pl330 channel filter function
+  ARM: EXYNOS4: Modify platform data for pl330 driver
+
+ arch/arm/mach-exynos4/dma.c     |  220 +++++++++++----------------------------
+ arch/arm/plat-samsung/dma-ops.c |    4 +-
+ drivers/dma/pl330.c             |   56 ++--------
+ include/linux/amba/pl330.h      |   14 +--
+ 4 files changed, 75 insertions(+), 219 deletions(-)
