@@ -1,41 +1,29 @@
-From: jochen@scram.de (Jochen Friedrich)
-Date: Mon, 22 Aug 2011 16:50:18 +0200
-Subject: [PATCH 3.2 0/4] ARM: simpad: Add support for GPIO
-	attached	hardware
-In-Reply-To: <20110818102526.GB21865@n2100.arm.linux.org.uk>
-References: <1312793379-6020-1-git-send-email-jochen@scram.de>
-	<4E43F44A.1000509@scram.de>
-	<CAK5ve-J7ARjDDm2OzrBiBBd9VrMjdDdihiRcPFwK4xm+_gwMrg@mail.gmail.com>
-	<20110818102526.GB21865@n2100.arm.linux.org.uk>
-Message-ID: <4E526CAA.7070108@scram.de>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Mon, 22 Aug 2011 17:03:01 +0200
+Subject: [PATCH 3/3] OMAP3: Remove auto-selection of PMICs
+In-Reply-To: <1313754573-11498-4-git-send-email-abhilash.kv@ti.com>
+References: <1313754573-11498-1-git-send-email-abhilash.kv@ti.com>
+	<1313754573-11498-2-git-send-email-abhilash.kv@ti.com>
+	<1313754573-11498-3-git-send-email-abhilash.kv@ti.com>
+	<1313754573-11498-4-git-send-email-abhilash.kv@ti.com>
+Message-ID: <20110822150301.GY4607@sortiz-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18.08.2011 12:25, Russell King - ARM Linux wrote:
-> On Thu, Aug 18, 2011 at 05:05:49PM +0800, Bryan Wu wrote:
->> On Thu, Aug 11, 2011 at 11:24 PM, Jochen Friedrich<jochen@scram.de>  wrote:
->>> On 08.08.2011 10:49, Jochen Friedrich wrote:
->>>
->>>> This series enables GPIO API on UCB1x00 and implements the GPIO
->>>> API on the CS3 latch. The third patch finally registers platform
->>>> devices for the GPIO attached LED, buttons and I2C bus.
->>>>
->>>> ARM: simpad: Add ucb1x00 GPIO definitions and register GPIO
->>>> ARM: simpad: Cleanup CS3 accessors and add GPIO API
->>>> ARM: simpad: add GPIO based device definitions
->>>> ARM: simpad: replace ARM specific LED code
->>>
->>> ping.
->>>
->>> Did someone have time to look at this yet?
->>>
->> Russell,
->>
->> Is there any comment, or Jochen can just submit them into patch system
->
-> I don't think so, and yes.
+Hi Anhilash,
 
-Done. 7027/1, 7024/1, 7025/1 and 7026/1.
+On Fri, Aug 19, 2011 at 05:19:33PM +0530, Abhilash K V wrote:
+> The current implementation almost assumes that only
+> TWL4030/TWL5030/TWl6030 are (or can be) used with the
+> OMAP processors. This is, however, not true.
 
-Thanks,
-Jochen
+I don't like the mfd/Kconfig change. Why would those drivers be only buildable
+on OMAP processors ?
+Unless there is a real reason for this, you should fix the drivers instead.
+
+Cheers,
+Samuel.
+
+-- 
+Intel Open Source Technology Centre
+http://oss.intel.com/
