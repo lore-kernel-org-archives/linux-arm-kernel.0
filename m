@@ -1,26 +1,74 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 22 Aug 2011 14:29:48 +0200
+Date: Mon, 22 Aug 2011 14:38:16 +0200
 Subject: [PATCH 1/4 v4] drivers: create a pin control subsystem
-In-Reply-To: <20110819165252.GC4016@kroah.com>
+In-Reply-To: <20110821142416.GA12272@gallagher>
 References: <1313747630-32258-1-git-send-email-linus.walleij@stericsson.com>
 	<20110819104816.GA5030@pulham.picochip.com>
 	<CACRpkdZhg_1WM37uqT1PNmpUjWS_groWJmNnR4SBjqJ6LFQQWQ@mail.gmail.com>
-	<201108191636.29161.arnd@arndb.de>
-	<20110819165252.GC4016@kroah.com>
-Message-ID: <CACRpkdaS6KiZGxSOE=T4ErXAPoWoYWYWFNVancWjQV1L4SCAew@mail.gmail.com>
+	<20110819142608.GB2800@pulham.picochip.com>
+	<20110821142416.GA12272@gallagher>
+Message-ID: <CACRpkdbB0A6y2vFRV58vvU2DY+zMV+DjS16d71+bajBegTuRdQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 19, 2011 at 6:52 PM, Greg KH <greg@kroah.com> wrote:
+On Sun, Aug 21, 2011 at 4:24 PM, Jamie Iles <jamie@jamieiles.com> wrote:
 
->> IIRC Greg would prefer now to never have had the distinction
->> and wants to make all future uses use a bus_type.
+> for device tree, when the gpio
+> controllers are registered, the base is typically dynamically assigned. ?I
+> suspect that this can be solved in the device tree binding for the controller
+> that references the bindings of the pinctrl, but this would require
+> registering the gpio_ranges at runtime (or at least the bases).
+
+Oh registering ranges at runtime ... crap. But possible I think.
+
+> So perhaps if we had:
 >
-> Yes, that is totally correct. ?Kay has also written much more about this
-> and why this is the way forward many times in the past, see lkml
-> archives for the details if anyone is interested.
+> struct pinctrl_gpio_range {
+> ? ?unsigned int pinctrl_base;
+> ? ?struct gpio_chip *chip;
+> }
+>
+> and then gpio_request_enable was:
+>
+> int (*gpio_request_enable)(struct pinctrl_dev *pctldev,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? struct gpio_chip *gc,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? unsigned offset)
+>
+> Then have pinctrl_register_gpio_chip()?
 
-Nah I trust you, I will switch it to use bus_type instead no problem.
+I'm not following - the struct gpio_chip is opaque outside the gpio
+subsystem, I've proposed patches to make it public but they have
+been NAK:ed.
 
-Thanks!
+Which means pinctrl has no use of that pointer.
+
+What is the intended purpose of sending that thing in?
+
+Right now my range struct looks like this:
+
+/**
+ * struct pinctrl_gpio_range - each pin controller can provide subranges of
+ * the GPIO number space to be handled by the controller
+ * @name: a name for the chip in this range
+ * @id: an ID number for the chip in this range
+ * @base: base offset of the GPIO range
+ * @npins: number of pins in the GPIO range, including the base number
+ */
+struct pinctrl_gpio_range {
+        const char name[16];
+        unsigned int id;
+        unsigned int base;
+        unsigned int npins;
+};
+
+> For the static devices case then we can require gc->base must match the
+> pinctrl gpio base.?For the device tree case we could do some matching of
+> device_nodes from the gpio_chip to the pinctrl definitions?
+
+Can't do that since we can't look into struct gpio_chip intrinsics...
+
+But we can register ranges at runtime, I'll just make the pin controller keep
+a list of GPIO ranges, simple.
+
+Thanks,
 Linus Walleij
