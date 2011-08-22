@@ -1,40 +1,32 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 22 Aug 2011 13:55:36 +0800
-Subject: [PATCH 2/6] ARM: add Highbank core platform support
-In-Reply-To: <1313526898-19920-3-git-send-email-robherring2@gmail.com>
-References: <1313526898-19920-1-git-send-email-robherring2@gmail.com>
-	<1313526898-19920-3-git-send-email-robherring2@gmail.com>
-Message-ID: <20110822055534.GA15301@S2100-06.ap.freescale.net>
+From: jason.hui@linaro.org (Jason Liu)
+Date: Mon, 22 Aug 2011 14:13:17 +0800
+Subject: [PATCH] mtd: mxc_nand: Add mx53 NFC driver support
+Message-ID: <1313993597-25189-1-git-send-email-jason.hui@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 16, 2011 at 03:34:54PM -0500, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
-> 
-> This adds basic support for the Calxeda Highbank platform.
-> 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> ---
-[...]
-> diff --git a/arch/arm/mach-highbank/include/mach/entry-macro.S b/arch/arm/mach-highbank/include/mach/entry-macro.S
-> new file mode 100644
-> index 0000000..56be409
-> --- /dev/null
-> +++ b/arch/arm/mach-highbank/include/mach/entry-macro.S
-> @@ -0,0 +1,9 @@
-> +#include <asm/hardware/gic.h>
-> +#include <asm/hardware/entry-macro-gic.S>
+This has already been tested with Samsung NAND: K9LAG08U0M
+on MX53EVK board, ubi/ubifs has already been tested OK too.
 
-It seems that the second file already includes the first one.
+Signed-off-by: Jason Liu <jason.hui@linaro.org>
+---
+No change. Just resend this patch per Artem request.
+---
+ drivers/mtd/nand/mxc_nand.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-> +
-> +	.macro	disable_fiq
-> +	.endm
-> +
-> +	.macro	arch_ret_to_user, tmp1, tmp2
-> +	.endm
-> +
-
+diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
+index 90df34c..a3f1b50 100644
+--- a/drivers/mtd/nand/mxc_nand.c
++++ b/drivers/mtd/nand/mxc_nand.c
+@@ -41,7 +41,7 @@
+ 
+ #define nfc_is_v21()		(cpu_is_mx25() || cpu_is_mx35())
+ #define nfc_is_v1()		(cpu_is_mx31() || cpu_is_mx27() || cpu_is_mx21())
+-#define nfc_is_v3_2()		cpu_is_mx51()
++#define nfc_is_v3_2()		(cpu_is_mx51() || cpu_is_mx53())
+ #define nfc_is_v3()		nfc_is_v3_2()
+ 
+ /* Addresses for NFC registers */
 -- 
-Regards,
-Shawn
+1.7.4.1
