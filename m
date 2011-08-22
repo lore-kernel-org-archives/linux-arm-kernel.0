@@ -1,75 +1,57 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Mon, 22 Aug 2011 12:52:41 -0300
-Subject: [PATCH] ARM: mx27: Print silicon revision on boot
-Message-ID: <1314028361-25622-1-git-send-email-fabio.estevam@freescale.com>
+From: premi@ti.com (Premi, Sanjeev)
+Date: Mon, 22 Aug 2011 21:29:10 +0530
+Subject: [PATCH 3/3] OMAP3: Remove auto-selection of PMICs
+In-Reply-To: <20110822150301.GY4607@sortiz-mobl>
+References: <1313754573-11498-1-git-send-email-abhilash.kv@ti.com>
+	<1313754573-11498-2-git-send-email-abhilash.kv@ti.com>
+	<1313754573-11498-3-git-send-email-abhilash.kv@ti.com>
+	<1313754573-11498-4-git-send-email-abhilash.kv@ti.com>,
+	<20110822150301.GY4607@sortiz-mobl>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB5930256DE2CDE@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Silicon revision is useful information to have during kernel boot.
+> From: Samuel Ortiz [sameo at linux.intel.com]
+> Sent: Monday, August 22, 2011 8:33 PM
+> To: Koyamangalath, Abhilash
+> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
+>  tony at atomide.com; linux at arm.linux.org.uk; Hilman, Kevin; Shilimkar, Santosh; Premi, Sanjeev;
+>  david.woodhouse at intel.com
+> Subject: Re: [PATCH 3/3] OMAP3: Remove auto-selection of PMICs
+> 
+> Hi Anhilash,
+> 
+> On Fri, Aug 19, 2011 at 05:19:33PM +0530, Abhilash K V wrote:
+> > The current implementation almost assumes that only
+> > TWL4030/TWL5030/TWl6030 are (or can be) used with the
+> > OMAP processors. This is, however, not true.
+> 
+> I don't like the mfd/Kconfig change. Why would those drivers be only buildable
+> on OMAP processors ?
+> Unless there is a real reason for this, you should fix the drivers instead.
 
-Print the MX27 silicon revision.
+You are right. The change for config item TWL4030_CORE should be removed.
+> -	depends on I2C=y && GENERIC_HARDIRQS
+> +	depends on I2C=y && GENERIC_HARDIRQS && (ARCH_OMAP3 || ARCH_OMAP4)
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/mach-imx/clock-imx27.c       |    1 +
- arch/arm/mach-imx/cpu-imx27.c         |   23 +++++++++++++++++++++++
- arch/arm/plat-mxc/include/mach/mx27.h |    1 +
- 3 files changed, 25 insertions(+), 0 deletions(-)
+In fact, change for TWL4030_POWER should be 
+-	depends on TWL4030_CORE && ARM
++	depends on TWL4030_CORE
 
-diff --git a/arch/arm/mach-imx/clock-imx27.c b/arch/arm/mach-imx/clock-imx27.c
-index 6912b82..2858137 100644
---- a/arch/arm/mach-imx/clock-imx27.c
-+++ b/arch/arm/mach-imx/clock-imx27.c
-@@ -756,6 +756,7 @@ int __init mx27_clocks_init(unsigned long fref)
- 	clk_enable(&uart1_clk);
- #endif
- 
-+	mx27_read_cpu_rev();
- 	mxc_timer_init(&gpt1_clk, MX27_IO_ADDRESS(MX27_GPT1_BASE_ADDR),
- 			MX27_INT_GPT1);
- 
-diff --git a/arch/arm/mach-imx/cpu-imx27.c b/arch/arm/mach-imx/cpu-imx27.c
-index 3b117be..8f6495e 100644
---- a/arch/arm/mach-imx/cpu-imx27.c
-+++ b/arch/arm/mach-imx/cpu-imx27.c
-@@ -74,3 +74,26 @@ int mx27_revision(void)
- 	return cpu_silicon_rev;
- }
- EXPORT_SYMBOL(mx27_revision);
-+
-+void __init mx27_read_cpu_rev(void)
-+{
-+	u32 rev;
-+	char *srev;
-+
-+	rev = mx27_revision();
-+	switch (rev) {
-+	case IMX_CHIP_REVISION_1_0:
-+		srev = IMX_CHIP_REVISION_1_0_STRING;
-+		break;
-+	case IMX_CHIP_REVISION_2_0:
-+		srev = IMX_CHIP_REVISION_2_0_STRING;
-+		break;
-+	case IMX_CHIP_REVISION_2_1:
-+		srev = IMX_CHIP_REVISION_2_1_STRING;
-+		break;
-+	default:
-+		srev = IMX_CHIP_REVISION_UNKNOWN_STRING;
-+	}
-+
-+	pr_info("CPU identified as i.MX27, silicon rev %s\n", srev);
-+}
-diff --git a/arch/arm/plat-mxc/include/mach/mx27.h b/arch/arm/plat-mxc/include/mach/mx27.h
-index 1dc1c52..76edec7 100644
---- a/arch/arm/plat-mxc/include/mach/mx27.h
-+++ b/arch/arm/plat-mxc/include/mach/mx27.h
-@@ -246,6 +246,7 @@ static inline void mx27_setup_weimcs(size_t cs,
- 
- #ifndef __ASSEMBLY__
- extern int mx27_revision(void);
-+extern void mx27_read_cpu_rev(void);
- #endif
- 
- #endif /* ifndef __MACH_MX27_H__ */
--- 
-1.7.1
+This would allow these PMICs to be used with other processors as well. There may
+be issues run-time issues; but they would most likely surface only when there is
+a combination without any of the OMAPs. (We would try a dummy build for another
+processor with TWL4030 selected.)
+
+The original idea was to ensure that nothing else breaks when the auto selection
+of the PMICs is removed.
+
+~sanjeev
+
+> 
+> Cheers,
+> Samuel.
+> 
+> --
+> Intel Open Source Technology Centre
+> http://oss.intel.com/
