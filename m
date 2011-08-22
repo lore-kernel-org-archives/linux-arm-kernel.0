@@ -1,27 +1,41 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 22 Aug 2011 11:48:59 +0200
-Subject: [PATCH 00/19] GPIO exodus and cleanup
-In-Reply-To: <20110822092459.GL12028@n2100.arm.linux.org.uk>
-References: <1312978564-18069-1-git-send-email-linus.walleij@stericsson.com>
-	<20110817090123.GD1006@n2100.arm.linux.org.uk>
-	<CACRpkdbJOrb5rhgG0Chamt-ApLQnV69MQ=bqBwKqO3KJPaFd0A@mail.gmail.com>
-	<CACRpkdYw96QD0sGOhA=osKYbnD6=MTqiAF=m5++BjM-s1Mn--w@mail.gmail.com>
-	<CACxGe6tEOnUzFjKMqNfp10b8SyuJDDFzg0eiPzhKNNCY55LECw@mail.gmail.com>
-	<CACRpkdbPFuFHBuHzO2bP+z=za2kOFk4AZdgMVy=U6kcMmw9LSw@mail.gmail.com>
-	<20110822082700.GK12028@n2100.arm.linux.org.uk>
-	<20110822092459.GL12028@n2100.arm.linux.org.uk>
-Message-ID: <CACRpkdZ3+mAA+KhELbFLZ5Z0yLXWSiFZjFCZk5L6tjeEe32jwg@mail.gmail.com>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Mon, 22 Aug 2011 11:01:22 +0100
+Subject: [PATCH 2/6] ARM: add Highbank core platform support
+In-Reply-To: <20110822055534.GA15301@S2100-06.ap.freescale.net>
+References: <1313526898-19920-1-git-send-email-robherring2@gmail.com>
+	<1313526898-19920-3-git-send-email-robherring2@gmail.com>
+	<20110822055534.GA15301@S2100-06.ap.freescale.net>
+Message-ID: <20110822100122.GA2796@pulham.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 22, 2011 at 11:24 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
+Hi Shawn,
 
-> Looking through the gpio.h files, plat-nomadik's is virtually empty
-> except for a copyright, ifdef and include of linux/kernel.h - can it
-> be killed off entirely now?
+On Mon, Aug 22, 2011 at 01:55:36PM +0800, Shawn Guo wrote:
+> On Tue, Aug 16, 2011 at 03:34:54PM -0500, Rob Herring wrote:
+> > From: Rob Herring <rob.herring@calxeda.com>
+> > 
+> > This adds basic support for the Calxeda Highbank platform.
+> > 
+> > Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> > ---
+> [...]
+> > diff --git a/arch/arm/mach-highbank/include/mach/entry-macro.S b/arch/arm/mach-highbank/include/mach/entry-macro.S
+> > new file mode 100644
+> > index 0000000..56be409
+> > --- /dev/null
+> > +++ b/arch/arm/mach-highbank/include/mach/entry-macro.S
+> > @@ -0,0 +1,9 @@
+> > +#include <asm/hardware/gic.h>
+> > +#include <asm/hardware/entry-macro-gic.S>
+> 
+> It seems that the second file already includes the first one.
 
-I'll look into it ASAP.
+It's preferred to use explicit includes.  From 
+Documentation/SubmitChecklist:
 
-Thanks,
-Linus Walleij
+	1: If you use a facility then #include the file that 
+	   defines/declares that facility.  Don't depend on other header 
+	   files pulling in ones that you use.
+
+Jamie
