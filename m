@@ -1,274 +1,47 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Tue, 23 Aug 2011 03:29:45 +0530
-Subject: [PATCH 3/3] ARM: EXYNOS4: Modify platform data for pl330 driver
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 22 Aug 2011 22:52:55 +0100
+Subject: [PATCH 2/3] ARM: SAMSUNG: Modify pl330 channel filter function
 In-Reply-To: <1314050385-9617-3-git-send-email-thomas.abraham@linaro.org>
 References: <1314050385-9617-1-git-send-email-thomas.abraham@linaro.org>
 	<1314050385-9617-2-git-send-email-thomas.abraham@linaro.org>
 	<1314050385-9617-3-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <1314050385-9617-4-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <20110822215255.GB3895@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the 'struct dma_pl330_peri' removed, the platfrom data for dma
-driver can be simplified to a simple list of peripheral request ids.
+On Tue, Aug 23, 2011 at 03:29:44AM +0530, Thomas Abraham wrote:
+> With the change in dma channels private data information, the pl330
+> channel filter function is modified to look for a simple u8 value
+> instead of the now unused 'struct dma_pl330_peri' value.
+> 
+> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+> ---
+>  arch/arm/plat-samsung/dma-ops.c |    4 ++--
+>  1 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/plat-samsung/dma-ops.c b/arch/arm/plat-samsung/dma-ops.c
+> index 6e3d9ab..4f1430b 100644
+> --- a/arch/arm/plat-samsung/dma-ops.c
+> +++ b/arch/arm/plat-samsung/dma-ops.c
+> @@ -19,8 +19,8 @@
+>  
+>  static inline bool pl330_filter(struct dma_chan *chan, void *param)
+>  {
+> -	struct dma_pl330_peri *peri = chan->private;
+> -	return peri->peri_id == (unsigned)param;
+> +	u8 *peri_id = chan->private;
+> +	return *peri_id == (unsigned)param;
+>  }
 
-Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
----
- arch/arm/mach-exynos4/dma.c |  220 ++++++++++++-------------------------------
- 1 files changed, 59 insertions(+), 161 deletions(-)
+As a word of warning - this will fail horribly if you have mixed DMA
+engines in the system.  While we wait for a better scheme, we really
+need to sort out these filter functions properly and stop poking
+about in data which may not be what we expect.
 
-diff --git a/arch/arm/mach-exynos4/dma.c b/arch/arm/mach-exynos4/dma.c
-index d57d662..f905114 100644
---- a/arch/arm/mach-exynos4/dma.c
-+++ b/arch/arm/mach-exynos4/dma.c
-@@ -35,95 +35,40 @@
- 
- static u64 dma_dmamask = DMA_BIT_MASK(32);
- 
--struct dma_pl330_peri pdma0_peri[28] = {
--	{
--		.peri_id = (u8)DMACH_PCM0_RX,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_PCM0_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = (u8)DMACH_PCM2_RX,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_PCM2_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = (u8)DMACH_MSM_REQ0,
--	}, {
--		.peri_id = (u8)DMACH_MSM_REQ2,
--	}, {
--		.peri_id = (u8)DMACH_SPI0_RX,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_SPI0_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = (u8)DMACH_SPI2_RX,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_SPI2_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = (u8)DMACH_I2S0S_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = (u8)DMACH_I2S0_RX,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_I2S0_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = (u8)DMACH_UART0_RX,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_UART0_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = (u8)DMACH_UART2_RX,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_UART2_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = (u8)DMACH_UART4_RX,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_UART4_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = (u8)DMACH_SLIMBUS0_RX,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_SLIMBUS0_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = (u8)DMACH_SLIMBUS2_RX,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_SLIMBUS2_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = (u8)DMACH_SLIMBUS4_RX,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_SLIMBUS4_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = (u8)DMACH_AC97_MICIN,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_AC97_PCMIN,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_AC97_PCMOUT,
--		.rqtype = MEMTODEV,
--	},
-+u8 pdma0_peri[] = {
-+	DMACH_PCM0_RX,
-+	DMACH_PCM0_TX,
-+	DMACH_PCM2_RX,
-+	DMACH_PCM2_TX,
-+	DMACH_MSM_REQ0,
-+	DMACH_MSM_REQ2,
-+	DMACH_SPI0_RX,
-+	DMACH_SPI0_TX,
-+	DMACH_SPI2_RX,
-+	DMACH_SPI2_TX,
-+	DMACH_I2S0S_TX,
-+	DMACH_I2S0_RX,
-+	DMACH_I2S0_TX,
-+	DMACH_UART0_RX,
-+	DMACH_UART0_TX,
-+	DMACH_UART2_RX,
-+	DMACH_UART2_TX,
-+	DMACH_UART4_RX,
-+	DMACH_UART4_TX,
-+	DMACH_SLIMBUS0_RX,
-+	DMACH_SLIMBUS0_TX,
-+	DMACH_SLIMBUS2_RX,
-+	DMACH_SLIMBUS2_TX,
-+	DMACH_SLIMBUS4_RX,
-+	DMACH_SLIMBUS4_TX,
-+	DMACH_AC97_MICIN,
-+	DMACH_AC97_PCMIN,
-+	DMACH_AC97_PCMOUT,
- };
- 
- struct dma_pl330_platdata exynos4_pdma0_pdata = {
- 	.nr_valid_peri = ARRAY_SIZE(pdma0_peri),
--	.peri = pdma0_peri,
-+	.peri_id = pdma0_peri,
- };
- 
- struct amba_device exynos4_device_pdma0 = {
-@@ -142,86 +87,37 @@ struct amba_device exynos4_device_pdma0 = {
- 	.periphid = 0x00041330,
- };
- 
--struct dma_pl330_peri pdma1_peri[25] = {
--	{
--		.peri_id = (u8)DMACH_PCM0_RX,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_PCM0_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = (u8)DMACH_PCM1_RX,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_PCM1_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = (u8)DMACH_MSM_REQ1,
--	}, {
--		.peri_id = (u8)DMACH_MSM_REQ3,
--	}, {
--		.peri_id = (u8)DMACH_SPI1_RX,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_SPI1_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = (u8)DMACH_I2S0S_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = (u8)DMACH_I2S0_RX,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_I2S0_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = (u8)DMACH_I2S1_RX,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_I2S1_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = (u8)DMACH_UART0_RX,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_UART0_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = (u8)DMACH_UART1_RX,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_UART1_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = (u8)DMACH_UART3_RX,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_UART3_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = (u8)DMACH_SLIMBUS1_RX,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_SLIMBUS1_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = (u8)DMACH_SLIMBUS3_RX,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_SLIMBUS3_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = (u8)DMACH_SLIMBUS5_RX,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_SLIMBUS5_TX,
--		.rqtype = MEMTODEV,
--	},
-+u8 pdma1_peri[] = {
-+	DMACH_PCM0_RX,
-+	DMACH_PCM0_TX,
-+	DMACH_PCM1_RX,
-+	DMACH_PCM1_TX,
-+	DMACH_MSM_REQ1,
-+	DMACH_MSM_REQ3,
-+	DMACH_SPI1_RX,
-+	DMACH_SPI1_TX,
-+	DMACH_I2S0S_TX,
-+	DMACH_I2S0_RX,
-+	DMACH_I2S0_TX,
-+	DMACH_I2S1_RX,
-+	DMACH_I2S1_TX,
-+	DMACH_UART0_RX,
-+	DMACH_UART0_TX,
-+	DMACH_UART1_RX,
-+	DMACH_UART1_TX,
-+	DMACH_UART3_RX,
-+	DMACH_UART3_TX,
-+	DMACH_SLIMBUS1_RX,
-+	DMACH_SLIMBUS1_TX,
-+	DMACH_SLIMBUS3_RX,
-+	DMACH_SLIMBUS3_TX,
-+	DMACH_SLIMBUS5_RX,
-+	DMACH_SLIMBUS5_TX,
- };
- 
- struct dma_pl330_platdata exynos4_pdma1_pdata = {
- 	.nr_valid_peri = ARRAY_SIZE(pdma1_peri),
--	.peri = pdma1_peri,
-+	.peri_id = pdma1_peri,
- };
- 
- struct amba_device exynos4_device_pdma1 = {
-@@ -242,6 +138,8 @@ struct amba_device exynos4_device_pdma1 = {
- 
- static int __init exynos4_dma_init(void)
- {
-+	dma_cap_set(DMA_SLAVE, exynos4_pdma0_pdata.cap_mask);
-+	dma_cap_set(DMA_CYCLIC, exynos4_pdma0_pdata.cap_mask);
- 	amba_device_register(&exynos4_device_pdma0, &iomem_resource);
- 
- 	return 0;
--- 
-1.6.6.rc2
+One solution to that is to move pl330_filter() into drivers/dma/pl330.c
+and have it check chan->device->dev->driver == &pl330_driver.driver
+_before_ we start accessing chan->private.
+
+That's not a comment against your patch - you're not really changing
+the brokenness of this function.  It would be good to see a follow up
+patch fixing it properly though.
