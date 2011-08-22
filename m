@@ -1,36 +1,27 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 22 Aug 2011 09:53:48 +0200
-Subject: [PATCH 00/19] GPIO exodus and cleanup
-In-Reply-To: <CACxGe6tEOnUzFjKMqNfp10b8SyuJDDFzg0eiPzhKNNCY55LECw@mail.gmail.com>
-References: <1312978564-18069-1-git-send-email-linus.walleij@stericsson.com>
-	<20110817090123.GD1006@n2100.arm.linux.org.uk>
-	<CACRpkdbJOrb5rhgG0Chamt-ApLQnV69MQ=bqBwKqO3KJPaFd0A@mail.gmail.com>
-	<CACRpkdYw96QD0sGOhA=osKYbnD6=MTqiAF=m5++BjM-s1Mn--w@mail.gmail.com>
-	<CACxGe6tEOnUzFjKMqNfp10b8SyuJDDFzg0eiPzhKNNCY55LECw@mail.gmail.com>
-Message-ID: <CACRpkdbPFuFHBuHzO2bP+z=za2kOFk4AZdgMVy=U6kcMmw9LSw@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 22 Aug 2011 10:10:00 +0200
+Subject: 46dcfc8 (ARM: Update mach-types) removes used machine types
+Message-ID: <20110822081000.GA16557@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 21, 2011 at 9:09 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
-> On Fri, Aug 19, 2011 at 5:45 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
->> Ping on this, on monday I'll pretend it's no big deal and pour them
->> into Russells patch tracker anyway, since he's managing more than
->> half of the kernels GPIO code in arch/arm/* anyway.
->
-> If Russell is okay with it, then go ahead and merge it. ?I'm being
-> pretty liberal about GPIO driver moves. ?I'm fine with them getting
-> cleaned up after the drivers/gpio move.
+Hello Russell,
 
-Okay! Russell I've put them into your patch tracker as patches
-7032/1 thru 7050/1 so you can pick and choose. I've rebased on
-top of what's in -next hoping that the stuff there affecting these
-file will mainly be identical to what's on your "gpio" branch.
+your commit 46dcfc8 that is in today's next among other changes does:
 
-Tell me if I should rebase on something specific or if there are
-any problems.
+-eukrea_cpuimx25sd      MACH_EUKREA_CPUIMX25    EUKREA_CPUIMX25 2820
+-eukrea_cpuimx35sd      MACH_EUKREA_CPUIMX35    EUKREA_CPUIMX35 2821
 
-Once this lands in -next I will take another round over arch/arm/*
-and see if I can find more movement/split/cleanup items like these.
+These two are both marked as "mainlined" on
+http://www.arm.linux.org.uk/developer/machines/ and both are actually
+used (arch/arm/mach-imx/mach-{eukrea_cpuimx25,cpuimx35.c})
 
-Thanks,
-Linus Walleij
+Can you please add them back? Maybe it's worth to double-check the other
+deletions?!
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
