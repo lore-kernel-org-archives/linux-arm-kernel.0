@@ -1,37 +1,36 @@
 From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Tue, 23 Aug 2011 03:29:42 +0530
-Subject: [RESEND][PATCH 0/3] dma: pl330: Simplify platform data for pl330
-	driver
-Message-ID: <1314050385-9617-1-git-send-email-thomas.abraham@linaro.org>
+Date: Tue, 23 Aug 2011 03:29:44 +0530
+Subject: [PATCH 2/3] ARM: SAMSUNG: Modify pl330 channel filter function
+In-Reply-To: <1314050385-9617-2-git-send-email-thomas.abraham@linaro.org>
+References: <1314050385-9617-1-git-send-email-thomas.abraham@linaro.org>
+	<1314050385-9617-2-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <1314050385-9617-3-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The rqtype parameter specified in platform data as part of the
-'struct dma_pl330_peri' can be infered from the direction of the transfer
-specified with transfer requests. So the rqtype parameter can be removed
-and 'struct dma_pl330_peri' is then left with only one field 'peri_id'
-which itself can be moved into 'struct dma_pl330_platdata' and the
-entire 'struct dma_pl330_peri' can be eliminated.
+With the change in dma channels private data information, the pl330
+channel filter function is modified to look for a simple u8 value
+instead of the now unused 'struct dma_pl330_peri' value.
 
-This is first step towards adding device tree support for pl330 dma driver.
-With rqtype information inferred from transfer requests, it need not be
-included in device tree to describe each hardware dma request.
+Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+---
+ arch/arm/plat-samsung/dma-ops.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-This patchset is based on following tree.
-http://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-and branch 'kgene/next/topic-dma-pl330'.
-
-This patchset has been implemented and tested only for Exynos4. If this
-patchset is acceptable, then pl330 driver platform data for other samsung
-platforms will also be modfied.
-
-Thomas Abraham (3):
-  DMA: PL330: Infer transfer direction from transfer request instead of platform data
-  ARM: SAMSUNG: Modify pl330 channel filter function
-  ARM: EXYNOS4: Modify platform data for pl330 driver
-
- arch/arm/mach-exynos4/dma.c     |  220 +++++++++++----------------------------
- arch/arm/plat-samsung/dma-ops.c |    4 +-
- drivers/dma/pl330.c             |   56 ++--------
- include/linux/amba/pl330.h      |   14 +--
- 4 files changed, 75 insertions(+), 219 deletions(-)
+diff --git a/arch/arm/plat-samsung/dma-ops.c b/arch/arm/plat-samsung/dma-ops.c
+index 6e3d9ab..4f1430b 100644
+--- a/arch/arm/plat-samsung/dma-ops.c
++++ b/arch/arm/plat-samsung/dma-ops.c
+@@ -19,8 +19,8 @@
+ 
+ static inline bool pl330_filter(struct dma_chan *chan, void *param)
+ {
+-	struct dma_pl330_peri *peri = chan->private;
+-	return peri->peri_id == (unsigned)param;
++	u8 *peri_id = chan->private;
++	return *peri_id == (unsigned)param;
+ }
+ 
+ static unsigned samsung_dmadev_request(enum dma_ch dma_ch,
+-- 
+1.6.6.rc2
