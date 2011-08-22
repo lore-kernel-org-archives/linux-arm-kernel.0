@@ -1,100 +1,31 @@
 From: swarren@nvidia.com (Stephen Warren)
-Date: Mon, 22 Aug 2011 12:56:28 -0700
-Subject: [RFC PATCH v2 00/13] arm/tegra: Initialize GPIO & pinmux from DT
-In-Reply-To: <1313440100-17131-1-git-send-email-swarren@nvidia.com>
-References: <1313440100-17131-1-git-send-email-swarren@nvidia.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF04B24A3687@HQMAIL01.nvidia.com>
+Date: Mon, 22 Aug 2011 12:59:16 -0700
+Subject: [RFC PATCH 0/2] WIP: generic OF pinmux binding
+In-Reply-To: <1313581648-22303-1-git-send-email-jamie@jamieiles.com>
+References: <1313581648-22303-1-git-send-email-jamie@jamieiles.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF04B24A368D@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen Warren wrote at Monday, August 15, 2011 2:28 PM:
-> ...
-> This patch modifies Tegra's device tree support to remove the dependency
-> on harmony_pinmux_init(), thus making it completely board-independent.
-
-I had the good fortune of meeting Grant at LinuxCon last week and talked
-through this patchset a little (thanks!)
-
-The message I got from Grant was that the patches are basically OK. He
-did have a couple of concerns:
-
-* Does this cause the compiled DTB to blow up in size.
-
-The DTB goes from ~3-4K to ~8-9K with these patches added. While that
-is a large % increase, Grant said that as an absolute value, that size
-shouldn't be an issue.
-
-* There's lots of repetition in the .dts representation; can this be improved?
-
-We discussed enhancing the syntax a little, so that you can configure
-multiple pins/pingroups from a single node. In particular, the syntax
-in my patches was:
-
-ld0 {
-    nvidia,function = "displaya";
-    nvidia,pull-down;
-};
-ld1 {
-    nvidia,function = "displaya";
-    nvidia,pull-down;
-};
-
-Which we discussed enhancing to something like:
-
-ld0 {
-    additional-pins = "ld1", "ld2", ...;
-    nvidia,function = "displaya";
-    nvidia,pull-down;
-};
-
-or:
-
-meaningless-name { // typically would just use the pin name
-    pins = "ld0", "ld1", "ld2", ...;
-    nvidia,function = "displaya";
-    nvidia,pull-down;
-};
-
-* We also briefly discussed that dtc could be modified to support symbolic
-constants, so we could use named integers for the function names (perhaps
-pin names too). I'll look into how easy it is to modify dtc for this.
-
-I'll look into implementing these enhancements, and others discussed in
-this email thread, and repost.
-
-> ...
-> Stephen Warren (13):
->   arm/tegra: Prep boards for gpio/pinmux conversion to pdevs
->   arm/tegra: Avoid duplicate gpio/pinmux devices with dt
->   arm/tegra: board-dt: Add AUXDATA for tegra-gpio and tegra-pinmux
->   docs/dt: Document nvidia,tegra20-gpio's nvidia,enabled-gpios property
->   arm/dt: Tegra: Add nvidia,gpios property to GPIO controller
->   docs/dt: Document nvidia,tegra20-pinmux binding
->   arm/dt: Tegra: Add pinmux node
->   gpio/tegra: Convert to a platform device
->   gpio/tegra: Add device tree support
->   arm/tegra: Convert pinmux driver to a platform device
->   arm/tegra: Add device tree support to pinmux driver
->   arm/tegra: board-dt: Remove dependency on non-dt pinmux functions
->   arm/tegra: Remove temporary gpio/pinmux registration workaround
+Jamie Iles wrote at Wednesday, August 17, 2011 5:47 AM:
+> To avoid going too far in the wrong direction I thought I'd post what I
+> have so far for a generic pinmux binding.  Essentially it's just
+> Stephen's nvidia binding but with the nvidia specifics abstracted out so
+> the common loop can be used for other platforms.  This approach works
+> nicely for picoxcell too.
 > 
->  .../devicetree/bindings/gpio/gpio_nvidia.txt       |   20 +
->  .../devicetree/bindings/pinmux/pinmux_nvidia.txt   |  294 ++++++++++++
->  arch/arm/boot/dts/tegra-harmony.dts                |  483 ++++++++++++++++++++
->  arch/arm/boot/dts/tegra-seaboard.dts               |  421 +++++++++++++++++
->  arch/arm/boot/dts/tegra20.dtsi                     |    5 +
->  arch/arm/mach-tegra/Makefile                       |    1 -
->  arch/arm/mach-tegra/board-dt.c                     |   12 +-
->  arch/arm/mach-tegra/board-harmony-pinmux.c         |    8 +
->  arch/arm/mach-tegra/board-paz00-pinmux.c           |    8 +
->  arch/arm/mach-tegra/board-seaboard-pinmux.c        |    9 +-
->  arch/arm/mach-tegra/board-trimslice-pinmux.c       |    7 +
->  arch/arm/mach-tegra/devices.c                      |   10 +
->  arch/arm/mach-tegra/devices.h                      |    2 +
->  arch/arm/mach-tegra/pinmux.c                       |  269 +++++++++++
->  drivers/gpio/gpio-tegra.c                          |   57 ++-
->  15 files changed, 1582 insertions(+), 24 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/pinmux/pinmux_nvidia.txt
+> For more esoteric bindings, such as pull strength, these could be
+> handled in the platform specific configuration function.
+
+Thanks very much. These patches look sane to me. I'll pick them up in my
+local tree, enhance them to support the pins/additional-pins property that
+I just mentioned in a separate email, retest and repost.
+
+> This doesn't address the runtime muxing that LinusW's set of patches do,
+> and I'm not sure how to handle that.
+
+I see that LinusW just posted another version of this. I'll go check that
+out too, in case it has any impact on these patches.
 
 -- 
 nvpublic
