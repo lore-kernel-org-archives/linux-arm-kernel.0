@@ -1,48 +1,42 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Mon, 22 Aug 2011 13:18:25 +0200
-Subject: 46dcfc8 (ARM: Update mach-types) removes used machine types
-In-Reply-To: <20110822083329.GB16557@pengutronix.de>
-References: <20110822081000.GA16557@pengutronix.de>
-	<20110822081748.GJ12028@n2100.arm.linux.org.uk>
-	<20110822083329.GB16557@pengutronix.de>
-Message-ID: <201108221318.25140.marek.vasut@gmail.com>
+Date: Mon, 22 Aug 2011 13:20:55 +0200
+Subject: [PATCH v9 2/3] MTD : add helper functions library and header
+	files for GPMI NAND driver
+In-Reply-To: <4E51E33C.8090800@freescale.com>
+References: <1313581828-16625-1-git-send-email-b32955@freescale.com>
+	<201108201346.21647.marek.vasut@gmail.com>
+	<4E51E33C.8090800@freescale.com>
+Message-ID: <201108221320.55929.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, August 22, 2011 10:33:29 AM Uwe Kleine-K?nig wrote:
-> On Mon, Aug 22, 2011 at 09:17:49AM +0100, Russell King - ARM Linux wrote:
-> > On Mon, Aug 22, 2011 at 10:10:00AM +0200, Uwe Kleine-K?nig wrote:
-> > > Hello Russell,
-> > > 
-> > > your commit 46dcfc8 that is in today's next among other changes does:
-> > > 
-> > > -eukrea_cpuimx25sd      MACH_EUKREA_CPUIMX25    EUKREA_CPUIMX25 2820
-> > > -eukrea_cpuimx35sd      MACH_EUKREA_CPUIMX35    EUKREA_CPUIMX35 2821
-> > > 
-> > > These two are both marked as "mainlined" on
-> > > http://www.arm.linux.org.uk/developer/machines/ and both are actually
-> > > used (arch/arm/mach-imx/mach-{eukrea_cpuimx25,cpuimx35.c})
-> > > 
-> > > Can you please add them back? Maybe it's worth to double-check the
-> > > other deletions?!
-> > 
-> > No.  They're removed because they're broken (look at them) - I've added
-> > additional checks so I don't have to waste _significant_ time fixing
-> > the entries time and time again.
-> > 
-> > The requirement is that the machine_is_xxx() must match the MACH_xxx
-> > parts.  If they don't, they will not exist in future updates.
+On Monday, August 22, 2011 07:03:56 AM Huang Shijie wrote:
+> Hi,
 > 
-> Ah, I wasn't aware of that requirement.
+> > On Wednesday, August 17, 2011 01:50:27 PM Huang Shijie wrote:
+> >> bch-regs.h : registers file for BCH module
+> >> gpmi-regs.h: registers file for GPMI module
+> >> gpmi-lib.c: helper functions library.
+> >> 
+> >> Signed-off-by: Huang Shijie<b32955@freescale.com>
+> >> ---
+
+[...]
+
+> >> +err_out:
+> >> +	return ret;
+> >> +}
+> >> +
+> >> +/* This is very useful! */
+> > 
+> > Really? Cool, what for ?
+> > btw. this should really be enclosed in some #ifdef debug or whatnot.
 > 
-> Eric, these machine types are owned by you. Do you care to follow up?
+> Yes, it shows the register contents when DMA timeout occurs.
+> this routine is called only when error occurs.
+> 
+Hi,
 
-Hi Russell,
-
-maybe it'd be worth at least pinging the people before you kill off the machine 
-so they can come up with fix?
+I'd expect exactly this explanation to be in the comment ;-)
 
 Cheers
-> 
-> Best regards
-> Uwe
