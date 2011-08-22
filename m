@@ -1,29 +1,64 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Mon, 22 Aug 2011 17:03:01 +0200
-Subject: [PATCH 3/3] OMAP3: Remove auto-selection of PMICs
-In-Reply-To: <1313754573-11498-4-git-send-email-abhilash.kv@ti.com>
-References: <1313754573-11498-1-git-send-email-abhilash.kv@ti.com>
-	<1313754573-11498-2-git-send-email-abhilash.kv@ti.com>
-	<1313754573-11498-3-git-send-email-abhilash.kv@ti.com>
-	<1313754573-11498-4-git-send-email-abhilash.kv@ti.com>
-Message-ID: <20110822150301.GY4607@sortiz-mobl>
+From: wolfgang.betz@st.com (Wolfgang BETZ)
+Date: Mon, 22 Aug 2011 17:14:35 +0200
+Subject: [RFC][PATCH 0/1 v4] Add Thread Support for the Context ID Register
+	of ARM v6 & v7 Architectures
+Message-ID: <cover.1314025227.git.wolfgang.betz@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Anhilash,
+From: Wolfgang Betz <wolfgang.betz@st.com>
 
-On Fri, Aug 19, 2011 at 05:19:33PM +0530, Abhilash K V wrote:
-> The current implementation almost assumes that only
-> TWL4030/TWL5030/TWl6030 are (or can be) used with the
-> OMAP processors. This is, however, not true.
+The Context ID Register, CONTEXTIDR, identifies the current:
+- Process Identifier (PROCID) &
+- Address Space Identifier (ASID).
 
-I don't like the mfd/Kconfig change. Why would those drivers be only buildable
-on OMAP processors ?
-Unless there is a real reason for this, you should fix the drivers instead.
+The value of the whole of this register is called the Context ID and is 
+used by:
+- the ARM debug logic, for Linked and Unlinked Context ID matching
+  (e.g. for breakpoint debug and watchpoint debug events).
+- the trace logic, to identify the current process.
 
-Cheers,
-Samuel.
+The CONTEXTIDR is a 32-bit read/write register whose format is:
+- PROCID, bits [31:8]
+  Process Identifier. This field should be programmed with a unique 
+  value that identifies the current process and is used by the trace logic and 
+  the debug logic to identify the process that is running currently.
+- ASID, bits [7:0]
+  Address Space Identifier. This field must be programmed with the 
+  value of the current ASID and is used by many memory management functions.
+
+This change-set aims at:
+- implementing thread tracing support based on the armv6 & v7 CONTEXTIDR 
+  register while leaving the Linux kernel ASID functionality (semantically)
+  unchanged.
+- focusing on compatibility with tracing tools such as Lauterbach's 
+  TRACE32 tool.
+- the avoidance of platform specific calls in generic code.
+- simplicity, readability, and good performances.
+- being general: i.e. the change-set applies to all armv7/v6 platforms &
+  is in general compilable for all (other) platforms.
+
+The patch has been jointly developed by 
+Lauterbach GmbH (http://www.lauterbach.com) and 
+STMicroelectronics Srl (http://www.st.com/). 
+Main contributors are:
+- Khaled Jmal <khaled.jmal@lauterbach.com>
+- Rudi Dienstbeck <Rudolf.Dienstbeck@Lauterbach.com>
+- Wolfgang Betz <wolfgang.betz@st.com>
+
+
+Wolfgang Betz (1):
+  Add Thread Support for the Context ID Register of ARM v6 & v7
+    Architectures
+
+ arch/arm/Kconfig.debug             |   13 +++++++
+ arch/arm/include/asm/mmu_context.h |   63 +++++++++++++++++++++++++++++++----
+ arch/arm/include/asm/proc-fns.h    |    9 ++---
+ arch/arm/kernel/smp.c              |    2 +-
+ arch/arm/mm/context.c              |   42 +++++++++++++++++++++++-
+ arch/arm/mm/proc-v6.S              |    4 +-
+ arch/arm/mm/proc-v7.S              |    4 +-
+ 7 files changed, 117 insertions(+), 20 deletions(-)
 
 -- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+1.7.6
