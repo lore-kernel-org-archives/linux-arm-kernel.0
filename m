@@ -1,38 +1,74 @@
 From: b-cousson@ti.com (Benoit Cousson)
-Date: Mon, 22 Aug 2011 20:22:20 +0200
-Subject: [RFC PATCH 0/3] OMAP: omap_device: Add a method to build an
-	omap_device from a DT node
-Message-ID: <1314037343-19783-1-git-send-email-b-cousson@ti.com>
+Date: Mon, 22 Aug 2011 20:22:22 +0200
+Subject: [RFC PATCH 2/3] OMAP: omap_device: Add a DT parser for multiple
+	strings
+In-Reply-To: <1314037343-19783-1-git-send-email-b-cousson@ti.com>
+References: <1314037343-19783-1-git-send-email-b-cousson@ti.com>
+Message-ID: <1314037343-19783-3-git-send-email-b-cousson@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
+Add two helpers function to parse a property that contains multiple
+strings.
 
-This is an initial attempt to use a notifier in order to create an
-omap_device from a platform_device bound to DT node as suggested by Grant.
-For the moment, the informations are all extracted from the hwmod data.
-The idea is to focus first on the devices / board static init removal.
-The other issue is that some bindings, like dma, are still not present
-in the DT core code. The reg and irq bindings are there, but cannot
-be used by some drivers due to the lack of named ressources in DT.
-Since the DT core cannot change, the drivers will have to be modified
-first.
-In a second phase these informations will be moved from hwmod to DT.
+These functions might be exported and moved to a common place if they
+can to be useful elsewhere.
 
-Patches are based on my for_3.2/1_omap_device_cleanup branch and are
-available here:
-git://gitorious.org/omap-pm/linux.git for_3.2/2_omap_device_dt
+Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+Cc: Kevin Hilman <khilman@ti.com>
+---
+ arch/arm/plat-omap/omap_device.c |   39 ++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 39 insertions(+), 0 deletions(-)
 
-It is tested on OMAP4 SDP and Panda.
-
-Regards,
-Benoit
-
-
-Benoit Cousson (3):
-  OMAP: omap_device: Add omap_device_[alloc|delete] for DT integration
-  OMAP: omap_device: Add a DT parser for multiple strings
-  OMAP: omap_device: Add a method to build an omap_device from a DT node
-
- arch/arm/plat-omap/omap_device.c |  309 +++++++++++++++++++++++++++++++-------
- 1 files changed, 255 insertions(+), 54 deletions(-)
+diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
+index 752d72a..70361f8 100644
+--- a/arch/arm/plat-omap/omap_device.c
++++ b/arch/arm/plat-omap/omap_device.c
+@@ -315,6 +315,45 @@ static void _add_hwmod_clocks_clkdev(struct omap_device *od,
+ 		_add_clkdev(od, oh->opt_clks[i].role, oh->opt_clks[i].clk);
+ }
+ 
++/*
++ * XXX: DT helper functions that should probably move elsewhere if
++ * they become usefull for other needs.
++ */
++static int _dt_count_property_string(const char *prop, int len)
++{
++	int i = 0;
++	size_t l = 0, total = 0;
++
++	if (!prop || !len)
++		return -EINVAL;
++
++	for (i = 0; len >= total; total += l, prop += l) {
++		l = strlen(prop) + 1;
++		if (*prop != 0)
++			i++;
++	}
++	return i;
++}
++
++static int _dt_get_property(const char *prop, int len, int index, char *output,
++			    int size)
++{
++	int i = 0;
++	size_t l = 0, total = 0;
++
++	if (!prop || !len)
++		return -EINVAL;
++
++	for (i = 0; len >= total; total += l, prop += l) {
++		l = strlcpy(output, prop, size) + 1;
++		if (*prop != 0) {
++			if (i++ == index)
++				return 0;
++		}
++	}
++	return -ENODEV;
++}
++
+ 
+ /* Public functions for use by core code */
+ 
+-- 
+1.7.0.4
