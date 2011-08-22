@@ -1,37 +1,44 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Mon, 22 Aug 2011 13:30:50 +0400
-Subject: [PATCH 2/2] ARM: orion5x: fix build error in dns323_pci_map_irq
-In-Reply-To: <1313953272-24733-2-git-send-email-robherring2@gmail.com>
-References: <1313953272-24733-2-git-send-email-robherring2@gmail.com>
-Message-ID: <4E5221CA.8090402@ru.mvista.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 22 Aug 2011 10:43:26 +0100
+Subject: [PATCH RFC] ARM: vexpress: Use assembler mnemonic for WFI in
+	platform_do_lowpower.
+In-Reply-To: <20110819211402.GB12654@gallagher>
+References: <1313777004-4716-1-git-send-email-nbowler@elliptictech.com>
+	<20110819181514.GA12654@gallagher>
+	<20110819192638.GA21043@elliptictech.com>
+	<20110819211402.GB12654@gallagher>
+Message-ID: <CAHkRjk6Fq+1b_uM+DFACS1QVd7B6_1XhqRw-27i88U1VyvLk+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On 19 August 2011 22:14, Jamie Iles <jamie@jamieiles.com> wrote:
+> On Fri, Aug 19, 2011 at 03:26:38PM -0400, Nick Bowler wrote:
+>> On 2011-08-19 19:15 +0100, Jamie Iles wrote:
+>> > On Fri, Aug 19, 2011 at 02:03:24PM -0400, Nick Bowler wrote:
+>> [...]
+>> > > - ? ? ? ? /*
+>> > > - ? ? ? ? ?* here's the WFI
+>> > > - ? ? ? ? ?*/
+>> > > - ? ? ? ? asm(".word ? ? ?0xe320f003\n"
+>> > > + ? ? ? ? asm("wfi\n"
+>> > > ? ? ? ? ? ? ? :
+>> > > ? ? ? ? ? ? ? :
+>> > > ? ? ? ? ? ? ? : "memory", "cc");
+>> >
+>> > There's a wfi() macro defined in arch/arm/include/asm/system.h that
+>> > could be used here.
+>>
+>> Indeed, thanks for pointing that out.
+>>
+>> I'm a little wary, however: the wfi macro does not include the "cc"
+>> clobber that this code has currently, and I don't know what the
+>> implications of removing it are. ?There appears to be no current
+>> users of the wfi macro.
+>
+> As far as I can tell from the ARM ARM, the instruction shouldn't alter
+> the condition flags so the cc clobber shouldn't be necessary.
 
-On 21-08-2011 23:01, Rob Herring wrote:
+I also don't see why we need the 'cc' flag in here. Just use the wfi() macro.
 
-> From: Rob Herring<rob.herring@calxeda.com>
-
-> orion5x fails to build with the following error:
-> arch/arm/mach-orion5x/dns323-setup.c: In function ?dns323_pci_map_irq?:
-> arch/arm/mach-orion5x/dns323-setup.c:80:28: error: expected expression before ?const?
-> arch/arm/mach-orion5x/dns323-setup.c:80:28: error: too few arguments to function ?orion5x_pci_map_irq?
-
-> This appears to be a search and replace error introduced from this commit:
-
-> commit d5341942d784134f2997b3ff82cd63cf71d1f932
-> Author:
-
-    No author? :-)
-
-> Date:   Fri Jun 10 15:30:21 2011 +0100
-
->      PCI: Make the struct pci_dev * argument of pci_fixup_irqs const.
-
-> Signed-off-by: Rob Herring<rob.herring@calxeda.com>
-> Cc: Ralf Baechle<ralf@linux-mips.org>
-> Cc: Nicolas Pitre<nico@fluxnic.net>
-> Cc: Arnd Bergmann<arnd@arndb.de>
-
-WBR, Sergei
+-- 
+Catalin
