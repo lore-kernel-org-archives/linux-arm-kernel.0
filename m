@@ -1,41 +1,67 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Mon, 22 Aug 2011 11:01:22 +0100
-Subject: [PATCH 2/6] ARM: add Highbank core platform support
-In-Reply-To: <20110822055534.GA15301@S2100-06.ap.freescale.net>
-References: <1313526898-19920-1-git-send-email-robherring2@gmail.com>
-	<1313526898-19920-3-git-send-email-robherring2@gmail.com>
-	<20110822055534.GA15301@S2100-06.ap.freescale.net>
-Message-ID: <20110822100122.GA2796@pulham.picochip.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Mon, 22 Aug 2011 15:35:13 +0530
+Subject: USB host on s3c2416
+In-Reply-To: <loom.20110822T110123-860@post.gmane.org>
+References: <loom.20110822T110123-860@post.gmane.org>
+Message-ID: <CAJuYYwS9s1i6MEE3-37AkWOCGnOkmJCSdW5OFT2EjQfE7Ern_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+Hi Gigin,
 
-On Mon, Aug 22, 2011 at 01:55:36PM +0800, Shawn Guo wrote:
-> On Tue, Aug 16, 2011 at 03:34:54PM -0500, Rob Herring wrote:
-> > From: Rob Herring <rob.herring@calxeda.com>
-> > 
-> > This adds basic support for the Calxeda Highbank platform.
-> > 
-> > Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> > ---
-> [...]
-> > diff --git a/arch/arm/mach-highbank/include/mach/entry-macro.S b/arch/arm/mach-highbank/include/mach/entry-macro.S
-> > new file mode 100644
-> > index 0000000..56be409
-> > --- /dev/null
-> > +++ b/arch/arm/mach-highbank/include/mach/entry-macro.S
-> > @@ -0,0 +1,9 @@
-> > +#include <asm/hardware/gic.h>
-> > +#include <asm/hardware/entry-macro-gic.S>
-> 
-> It seems that the second file already includes the first one.
+On 22 August 2011 14:47, GIGIN JOSE <gigin_jose@yahoo.co.in> wrote:
+> Hi,
+>
+> I am working on samsung s3c2416 ARM based Soc on
+> linux 2.6.21 kernel. By default, the Soc has one
+> USB host and one USB device/host. My USB host is
+> working fine. Since I need to use two USB host on my system,
+> ?I need to enable the USB device/host as a USB host.
 
-It's preferred to use explicit includes.  From 
-Documentation/SubmitChecklist:
+s3c2416 includes a USB 1.1 Host and USB 2.0 device controller. So
+there is no second usb host controller on s3c2416.
 
-	1: If you use a facility then #include the file that 
-	   defines/declares that facility.  Don't depend on other header 
-	   files pulling in ones that you use.
+Regards,
+Thomas.
 
-Jamie
+>
+> The following are the changes I have made for the same:
+>
+> Register ?Address ? ? ? ?value
+> -----------------------------
+> PHYPWR ? ?0x4C00_0084 ? ?0x0
+> PWRCFG ? ?0x4C00_0060 ? ?(1<<4)
+> URSTCON ? 0x4C00_0088 ? ?(0<<2)|(1<<1)|(1<<0)
+> URSTCON ? 0x4C00_0088 ? ?(0<<2)|(0<<1)|(0<<0)
+> PHYCTRL ? 0x4C00_0080 ? ?(0<<3)|(0<<2)|(1<<1)|(1<<0)
+> UCLKCON ? 0x4C00_008C ? ?0<<31)|(0<<2)|(1<<1)|(1<<0)
+>
+> Once I try to plug in a ?USB mass storage device (whose driver is present in
+> kernel), I get the following error:
+>
+> usb 1-2: new full speed USB device using s3c2410-ohci and address 10
+> usb 1-2: device descriptor read/64, error -62
+> usb 1-2: device descriptor read/64, error -62
+> usb 1-2: new full speed USB device using s3c2410-ohci and address 11
+> usb 1-2: device descriptor read/64, error -62
+> usb 1-2: device descriptor read/64, error -62
+> usb 1-2: new full speed USB device using s3c2410-ohci and address 12
+> usb 1-2: device not accepting address 12, error -62
+> usb 1-2: new full speed USB device using s3c2410-ohci and address 13
+> usb 1-2: device not accepting address 13, error -62
+>
+>
+> Why is it throwing this error ? Is there any driver for USB hub missing in
+> 2.6.21 kernel, or do I need to modify more on register settings.
+>
+> Please help.
+>
+> Thank You
+> GIGIN
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
