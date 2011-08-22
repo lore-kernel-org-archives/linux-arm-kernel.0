@@ -1,82 +1,57 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 22 Aug 2011 15:48:40 -0700
-Subject: [PATCH 2/2] omap_twl: Prevent SR to enable for am3517/am3505
-	devices
-In-Reply-To: <FCCFB4CDC6E5564B9182F639FC3560870370A4D96E@dbde02.ent.ti.com>
-	(Abhilash Koyamangalath's message of "Mon, 8 Aug 2011 18:18:40 +0530")
-References: <1312473569-1212-1-git-send-email-abhilash.kv@ti.com>
-	<87hb5w3kq0.fsf@ti.com>
-	<FCCFB4CDC6E5564B9182F639FC3560870370A4D96E@dbde02.ent.ti.com>
-Message-ID: <87obzhgj07.fsf@ti.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 22 Aug 2011 15:56:55 -0700
+Subject: [RFC PATCH v2 00/13] arm/tegra: Initialize GPIO & pinmux from DT
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF04B24A3687@HQMAIL01.nvidia.com>
+References: <1313440100-17131-1-git-send-email-swarren@nvidia.com>
+	<74CDBE0F657A3D45AFBB94109FB122FF04B24A3687@HQMAIL01.nvidia.com>
+Message-ID: <CAOesGMhGb1-sOaBU4oaa_8-1triS01tOmseJqYyCm849feLhXg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Koyamangalath, Abhilash" <abhilash.kv@ti.com> writes:
-
-> Kevin Hilman wrote:
->>Abhilash K V <abhilash.kv@ti.com> writes:
->> 
->> > From: Vaibhav Hiremath <hvaibhav@ti.com>
->> >
->> > In case of AM3517 & AM3505, Smart Reflex is not applicable so
->> > we must not enable it. So add check for am3517/05 cpu revision
->> > in omap3_twl_init() and return -ENODEV if true, else continue.
->> >
->> > Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
->> > Signed-off-by: Abhilash K V <abhilash.kv@ti.com>
->> > ---
->> >  arch/arm/mach-omap2/omap_twl.c |    8 ++++++++
->> >  1 files changed, 8 insertions(+), 0 deletions(-)
->> >
->> > diff --git a/arch/arm/mach-omap2/omap_twl.c
->> b/arch/arm/mach-omap2/omap_twl.c
->> > index 07d6140..92fadcb 100644
->> > --- a/arch/arm/mach-omap2/omap_twl.c
->> > +++ b/arch/arm/mach-omap2/omap_twl.c
->> > @@ -269,6 +269,14 @@ int __init omap3_twl_init(void)
->> >        if (!cpu_is_omap34xx())
->> >                return -ENODEV;
->> > 
->> > +     /*
->> > +      * In case of AM3517/AM3505 we should not be going down
->> > +      * further, since SR is not applicable there.
->> > +      */
->> > +     if (cpu_is_omap3505() || cpu_is_omap3517()) {
->> > +             return -ENODEV;
->> > +     }
->> > +
->> 
->> Rather than using cpu_is_*, you should add a new "feature" flag for
->> SmartReflex.  We already have this for things like SGX, IVA, NEON, etc.
->> See <plat/feature.h>
-> I did not find a feature.h; 
-
-sorry, I meant <plat/cpu.yh>
-
-> did you mean OMAP3_CHECK_FEATURE macro which is used by
-> omap3_check_features(), which gleans for presence of L2CACHE, IVA, SGX, NEON, ISP features
-> from the Control Device Status Register (0x4800 244C) ?
-
-yes, OMAP3_HAS_FEATURE()
-
-> There is no such bit-field to indicate the presence of smart-reflex feature in this register.
-> AFAIK, there is no such global register as well which could indicate this.
-
-There doesn't have to be a register read to indicate this.  See for
-example the HAS_IO_WAKEUP feature.
-
-Kevin
-
-
-> - Abhilash
+On Mon, Aug 22, 2011 at 12:56 PM, Stephen Warren <swarren@nvidia.com> wrote:
+> Stephen Warren wrote at Monday, August 15, 2011 2:28 PM:
+>> ...
+>> This patch modifies Tegra's device tree support to remove the dependency
+>> on harmony_pinmux_init(), thus making it completely board-independent.
 >
->> Kevin
->> 
->> 
->> >        if (cpu_is_omap3630()) {
->> >                omap3_mpu_volt_info.vp_vddmin =
->> OMAP3630_VP1_VLIMITTO_VDDMIN;
->> >                omap3_mpu_volt_info.vp_vddmax =
->> OMAP3630_VP1_VLIMITTO_VDDMAX; 
->> 
->> 
+> I had the good fortune of meeting Grant at LinuxCon last week and talked
+> through this patchset a little (thanks!)
+>
+> The message I got from Grant was that the patches are basically OK. He
+> did have a couple of concerns:
+>
+> * Does this cause the compiled DTB to blow up in size.
+>
+> The DTB goes from ~3-4K to ~8-9K with these patches added. While that
+> is a large % increase, Grant said that as an absolute value, that size
+> shouldn't be an issue.
+
+Agreed, especially if compared with the size of the current in-kernel table.
+
+> * There's lots of repetition in the .dts representation; can this be improved?
+>
+[...]
+> meaningless-name { // typically would just use the pin name
+> ? ?pins = "ld0", "ld1", "ld2", ...;
+> ? ?nvidia,function = "displaya";
+> ? ?nvidia,pull-down;
+> };
+
+That sounds quite close to what I was thinking about earlier (with
+s/meaningless-name/displaya/ in the above example).
+
+> * We also briefly discussed that dtc could be modified to support symbolic
+> constants, so we could use named integers for the function names (perhaps
+> pin names too). I'll look into how easy it is to modify dtc for this.
+
+That'd be useful, I think -- there's still the whole issue of the same
+pin function being at different mux locations on different pin groups,
+so an integer representation might not work.
+
+> I'll look into implementing these enhancements, and others discussed in
+> this email thread, and repost.
+
+Cool.
+
+
+-Olof
