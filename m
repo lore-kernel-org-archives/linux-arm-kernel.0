@@ -1,49 +1,26 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 22 Aug 2011 14:20:02 +0200
-Subject: [PATCH v4] amba: consolidate PrimeCell magic
-In-Reply-To: <002b01cc60c2$b83eff40$28bcfdc0$%kim@samsung.com>
-References: <1313649828-27642-1-git-send-email-boojin.kim@samsung.com>
-	<000601cc5e30$3a38bda0$aeaa38e0$%kim@samsung.com>
-	<001c01cc6082$123cef20$36b6cd60$%kim@samsung.com>
-	<001d01cc6085$cd836900$688a3b00$%kim@samsung.com>
-	<CACRpkdat3-CRbMBsis=fTGcu61zhVvfXMqG_S_CRjBwCo2vTsQ@mail.gmail.com>
-	<002b01cc60c2$b83eff40$28bcfdc0$%kim@samsung.com>
-Message-ID: <CACRpkdZqFQC+YOwHe8=SDvh3uKM5YgJhQZ8kgtY08qoEx5OumQ@mail.gmail.com>
+Date: Mon, 22 Aug 2011 14:28:12 +0200
+Subject: [PATCH 0/4 v4] pin controller subsystem v4
+In-Reply-To: <CAGsJ_4z7s-ibmUuR1DA6Jps030dRrnE8M0dUWHoMhMPFtyyY_A@mail.gmail.com>
+References: <1313747619-32222-1-git-send-email-linus.walleij@stericsson.com>
+	<CAGsJ_4z7s-ibmUuR1DA6Jps030dRrnE8M0dUWHoMhMPFtyyY_A@mail.gmail.com>
+Message-ID: <CACRpkdb4-0TfO-viUoZyW3VoLnVuo2ztHTX=8Hef3_RYWB52vg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/8/22 Boojin Kim <boojin.kim@samsung.com>:
+On Sun, Aug 21, 2011 at 4:42 PM, Barry Song <21cnbao@gmail.com> wrote:
 
-> I used 'exynos4_defconfig'. And then enables 'Device Drivers-> DMA Engine
-> support -> DMA API Driver for PL330' option and modify code as below.
->
-> diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
-> index 2e3b3d3..763e846 100644
-> --- a/drivers/dma/Kconfig
-> +++ b/drivers/dma/Kconfig
-> @@ -193,6 +193,7 @@ config ARCH_HAS_ASYNC_TX_FIND_CHANNEL
-> ?config PL330_DMA
-> ? ? ? ?tristate "DMA API Driver for PL330"
-> ? ? ? ?select DMA_ENGINE
-> + ? ? ? select ARM_AMBA
-> ? ? ? ?depends on PL330
-> ? ? ? ?help
-> ? ? ? ? ?Select if your platform has one or more PL330 DMACs.
-> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-> index 00eee59..fcad90c 100644
-> --- a/drivers/dma/pl330.c
-> +++ b/drivers/dma/pl330.c
-> @@ -17,6 +17,7 @@
-> ?#include <linux/interrupt.h>
-> ?#include <linux/amba/bus.h>
-> ?#include <linux/amba/pl330.h>
-> +#include <linux/scatterlist.h>
->
-> ?#define NR_DEFAULT_DESC ? ? ? ?16
+> it seems there is not an actual example that gpio requests pin from
+> pinctrl yet. i might give one on SiRFprimaII.
 
-Thanks!
+No good example yet, no.
 
-This looks like a separate patch to activate the DMA driver,
-this should probably go into -rc.
+The reason is that for the U300 that I use as guinea pig, the
+GPIO driver is tangled up in discussions about how to handle
+the special control mechanics like requesting muxing and
+biasing pins. Right now it seems easier to rewrite all that
+to use the new pinctrl subsystem rather than actually trying
+to work it into the GPIO subsystem first and refactor from
+there, and that needs quite a bit of upfront work...
 
 Linus Walleij
