@@ -1,102 +1,92 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Mon, 22 Aug 2011 15:44:01 +0530
-Subject: [PATCH v6 03/15] DMA: PL330: Support DMA_SLAVE_CONFIG command
-In-Reply-To: <1313744097-27289-4-git-send-email-boojin.kim@samsung.com>
-References: <1313744097-27289-1-git-send-email-boojin.kim@samsung.com>
-	<1313744097-27289-4-git-send-email-boojin.kim@samsung.com>
-Message-ID: <CABb+yY0T70-LFmf2hso1nJbeJop+0GNwLNcYAHuBJguScWreLw@mail.gmail.com>
+From: lrg@ti.com (Liam Girdwood)
+Date: Mon, 22 Aug 2011 11:28:44 +0100
+Subject: [PATCH 1/1] ASoC: mxs-saif: clear clk gate first before register
+	setting
+In-Reply-To: <1313941540-20393-1-git-send-email-b29396@freescale.com>
+References: <1313941540-20393-1-git-send-email-b29396@freescale.com>
+Message-ID: <4E522F5C.7040301@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 19, 2011 at 2:24 PM, Boojin Kim <boojin.kim@samsung.com> wrote:
-> Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> Acked-by: Vinod Koul <vinod.koul@intel.com>
-> Cc: Dan Williams <dan.j.williams@intel.com>
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+On 21/08/11 16:45, Dong Aisheng wrote:
+> Saif needs clear clk gate first before writing registers or the write
+> will not success.
+> 
+> The original xx_get_mclk function clear clk gate after mclk setting
+> that may cause the former mclk setting unwork, then the real output
+> mclk maybe inaccurate.
+> Placing the clear before setting mclk to avoid such an issue.
+> 
+> We also have to clear clk gate in startup instead of in prepare function.
+> 
+> Signed-off-by: Dong Aisheng <b29396@freescale.com>
+> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> Cc: Liam Girdwood <lrg@ti.com>
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> Cc: Wolfram Sang <w.sang@pengutronix.de>
 > ---
-> ?drivers/dma/pl330.c | ? 56 ++++++++++++++++++++++++++++++++++++++------------
-> ?1 files changed, 42 insertions(+), 14 deletions(-)
->
-> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-> index d5829c7..59943ec 100644
-> --- a/drivers/dma/pl330.c
-> +++ b/drivers/dma/pl330.c
-> @@ -73,6 +73,7 @@ struct dma_pl330_chan {
->
-> ? ? ? ?/* For D-to-M and M-to-D channels */
-> ? ? ? ?int burst_sz; /* the peripheral fifo width */
-> + ? ? ? int burst_len; /* the number of burst */
-> ? ? ? ?dma_addr_t fifo_addr;
-> ?};
->
-> @@ -261,25 +262,52 @@ static int pl330_alloc_chan_resources(struct dma_chan *chan)
-> ?static int pl330_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd, unsigned long arg)
-> ?{
-> ? ? ? ?struct dma_pl330_chan *pch = to_pchan(chan);
-> - ? ? ? struct dma_pl330_desc *desc;
-> + ? ? ? struct dma_pl330_desc *desc, *_dt;
-> ? ? ? ?unsigned long flags;
-> + ? ? ? struct dma_pl330_dmac *pdmac = pch->dmac;
-> + ? ? ? struct dma_slave_config *slave_config;
-> + ? ? ? LIST_HEAD(list);
->
-> - ? ? ? /* Only supports DMA_TERMINATE_ALL */
-> - ? ? ? if (cmd != DMA_TERMINATE_ALL)
-> - ? ? ? ? ? ? ? return -ENXIO;
-> -
-> - ? ? ? spin_lock_irqsave(&pch->lock, flags);
-> -
-> - ? ? ? /* FLUSH the PL330 Channel thread */
-> - ? ? ? pl330_chan_ctrl(pch->pl330_chid, PL330_OP_FLUSH);
-> + ? ? ? switch (cmd) {
-> + ? ? ? case DMA_TERMINATE_ALL:
-> + ? ? ? ? ? ? ? spin_lock_irqsave(&pch->lock, flags);
->
-> - ? ? ? /* Mark all desc done */
-> - ? ? ? list_for_each_entry(desc, &pch->work_list, node)
-> - ? ? ? ? ? ? ? desc->status = DONE;
-> + ? ? ? ? ? ? ? /* FLUSH the PL330 Channel thread */
-> + ? ? ? ? ? ? ? pl330_chan_ctrl(pch->pl330_chid, PL330_OP_FLUSH);
->
-> - ? ? ? spin_unlock_irqrestore(&pch->lock, flags);
-> + ? ? ? ? ? ? ? /* Mark all desc done */
-> + ? ? ? ? ? ? ? list_for_each_entry_safe(desc, _dt, &pch->work_list , node) {
-> + ? ? ? ? ? ? ? ? ? ? ? desc->status = DONE;
-> + ? ? ? ? ? ? ? ? ? ? ? pch->completed = desc->txd.cookie;
-> + ? ? ? ? ? ? ? ? ? ? ? list_move_tail(&desc->node, &list);
-> + ? ? ? ? ? ? ? }
->
-> - ? ? ? pl330_tasklet((unsigned long) pch);
-> + ? ? ? ? ? ? ? list_splice_tail_init(&list, &pdmac->desc_pool);
-> + ? ? ? ? ? ? ? spin_unlock_irqrestore(&pch->lock, flags);
-> + ? ? ? ? ? ? ? break;
-> + ? ? ? case DMA_SLAVE_CONFIG:
-> + ? ? ? ? ? ? ? slave_config = (struct dma_slave_config *)arg;
+>  sound/soc/mxs/mxs-saif.c |   22 ++++++++++++----------
+>  1 files changed, 12 insertions(+), 10 deletions(-)
+> 
+> diff --git a/sound/soc/mxs/mxs-saif.c b/sound/soc/mxs/mxs-saif.c
+> index 0b3adae..530017f 100644
+> --- a/sound/soc/mxs/mxs-saif.c
+> +++ b/sound/soc/mxs/mxs-saif.c
+> @@ -187,16 +187,20 @@ int mxs_saif_get_mclk(unsigned int saif_id, unsigned int mclk,
+>  	if (!saif)
+>  		return -EINVAL;
+>  
+> +	/* Clear Reset */
+> +	__raw_writel(BM_SAIF_CTRL_SFTRST,
+> +		saif->base + SAIF_CTRL + MXS_CLR_ADDR);
 > +
-> + ? ? ? ? ? ? ? if (slave_config->direction == DMA_TO_DEVICE) {
-> + ? ? ? ? ? ? ? ? ? ? ? if (slave_config->dst_addr)
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? pch->fifo_addr = slave_config->dst_addr;
-> + ? ? ? ? ? ? ? ? ? ? ? if (slave_config->dst_addr_width)
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? pch->burst_sz = __ffs(slave_config->dst_addr_width);
-> + ? ? ? ? ? ? ? ? ? ? ? if (slave_config->dst_maxburst)
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? pch->burst_len = slave_config->dst_maxburst;
-> + ? ? ? ? ? ? ? } else if (slave_config->direction == DMA_FROM_DEVICE) {
-> + ? ? ? ? ? ? ? ? ? ? ? if (slave_config->src_addr)
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? pch->fifo_addr = slave_config->src_addr;
-> + ? ? ? ? ? ? ? ? ? ? ? if (slave_config->src_addr_width)
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? pch->burst_sz = __ffs(slave_config->src_addr_width);
-> + ? ? ? ? ? ? ? ? ? ? ? if (slave_config->src_maxburst)
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? pch->burst_len = slave_config->src_maxburst;
-> + ? ? ? ? ? ? ? }
-> + ? ? ? ? ? ? ? break;
-> + ? ? ? default:
-> + ? ? ? ? ? ? ? dev_err(pch->dmac->pif.dev, "Not supported command.\n");
-> + ? ? ? ? ? ? ? return -ENXIO;
-> + ? ? ? }
+> +	/* FIXME: need clear clk gate for register r/w */
+> +	__raw_writel(BM_SAIF_CTRL_CLKGATE,
+> +		saif->base + SAIF_CTRL + MXS_CLR_ADDR);
+> +
+>  	stat = __raw_readl(saif->base + SAIF_STAT);
+>  	if (stat & BM_SAIF_STAT_BUSY) {
+>  		dev_err(saif->dev, "error: busy\n");
+>  		return -EBUSY;
+>  	}
+>  
+> -	/* Clear Reset */
+> -	__raw_writel(BM_SAIF_CTRL_SFTRST,
+> -		saif->base + SAIF_CTRL + MXS_CLR_ADDR);
+> -
+>  	saif->mclk_in_use = 1;
+>  	ret = mxs_saif_set_clk(saif, mclk, rate);
+>  	if (ret)
+> @@ -207,8 +211,6 @@ int mxs_saif_get_mclk(unsigned int saif_id, unsigned int mclk,
+>  		return ret;
+>  
+>  	/* enable MCLK output */
+> -	__raw_writel(BM_SAIF_CTRL_CLKGATE,
+> -		saif->base + SAIF_CTRL + MXS_CLR_ADDR);
+>  	__raw_writel(BM_SAIF_CTRL_RUN,
+>  		saif->base + SAIF_CTRL + MXS_SET_ADDR);
+>  
+> @@ -303,6 +305,10 @@ static int mxs_saif_startup(struct snd_pcm_substream *substream,
+>  	__raw_writel(BM_SAIF_CTRL_SFTRST,
+>  		saif->base + SAIF_CTRL + MXS_CLR_ADDR);
+>  
+> +	/* clear clock gate */
+> +	__raw_writel(BM_SAIF_CTRL_CLKGATE,
+> +		saif->base + SAIF_CTRL + MXS_CLR_ADDR);
+> +
+>  	return 0;
+>  }
+>  
+> @@ -379,10 +385,6 @@ static int mxs_saif_prepare(struct snd_pcm_substream *substream,
+>  {
+>  	struct mxs_saif *saif = snd_soc_dai_get_drvdata(cpu_dai);
+>  
+> -	/* clear clock gate */
+> -	__raw_writel(BM_SAIF_CTRL_CLKGATE,
+> -		saif->base + SAIF_CTRL + MXS_CLR_ADDR);
+> -
+>  	/* enable FIFO error irqs */
+>  	__raw_writel(BM_SAIF_CTRL_FIFO_ERROR_IRQ_EN,
+>  		saif->base + SAIF_CTRL + MXS_SET_ADDR);
 
-Apart from the alleged purpose "Support DMA_SLAVE_CONFIG command"
-this patch also modifies the behavior of DMA_TERMINATE_ALL.
-If the change is intended, please split it into two patches and
-explain the reason.
-Otherwise, restore the behavior.
+Acked-by: Liam Girdwood <lrg@ti.com>
