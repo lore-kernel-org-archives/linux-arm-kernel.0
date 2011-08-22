@@ -1,75 +1,74 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 22 Aug 2011 15:46:48 +0200
-Subject: [PATCH 2/4 v4] pinmux: add a driver for the U300 pinmux
-In-Reply-To: <CAGsJ_4wK6V0aQJd7f1geM8XnzQO+3TNCE6Q8_j=VYf_z_gcmpA@mail.gmail.com>
-References: <1313747646-32294-1-git-send-email-linus.walleij@stericsson.com>
-	<CAGsJ_4wK6V0aQJd7f1geM8XnzQO+3TNCE6Q8_j=VYf_z_gcmpA@mail.gmail.com>
-Message-ID: <CACRpkdYNjRV5RUsi5hNeKMBHRH6viVfFuqT+cuHoe_4sn3UWvA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 22 Aug 2011 14:48:23 +0100
+Subject: 46dcfc8 (ARM: Update mach-types) removes used machine types
+In-Reply-To: <201108221536.12859.marek.vasut@gmail.com>
+References: <20110822081000.GA16557@pengutronix.de>
+	<201108221530.41443.marek.vasut@gmail.com>
+	<20110822133242.GE2287@n2100.arm.linux.org.uk>
+	<201108221536.12859.marek.vasut@gmail.com>
+Message-ID: <20110822134823.GG2287@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 21, 2011 at 3:55 PM, Barry Song <21cnbao@gmail.com> wrote:
+On Mon, Aug 22, 2011 at 03:36:12PM +0200, Marek Vasut wrote:
+> On Monday, August 22, 2011 03:32:42 PM Russell King - ARM Linux wrote:
+> > On Mon, Aug 22, 2011 at 03:30:41PM +0200, Marek Vasut wrote:
+> > > On Monday, August 22, 2011 03:27:19 PM Russell King - ARM Linux wrote:
+> > > > On Mon, Aug 22, 2011 at 03:16:00PM +0200, Marek Vasut wrote:
+> > > > > On Monday, August 22, 2011 03:01:19 PM Russell King - ARM Linux wrote:
+> > > > > > For further reading, see:
+> > > > > > http://lists.arm.linux.org.uk/lurker/message/20110815.085325.ae6ee0
+> > > > > > 7d.e n.ht ml
+> > > > > 
+> > > > > Russell, calm down please.
+> > > > > 
+> > > > > Maybe it'd be better to just email the people with broken stuff, then
+> > > > > wait ... if they don't reply in a week (two weeks?) then remove their
+> > > > > stuff. And make that a policy.
+> > > > > 
+> > > > > What do you think ?
+> > > > 
+> > > > Who do I email?  Which entries are causing problems?  That's the whole
+> > > > bloody point.
+> > > 
+> > > Isn't the email in your database? You can't just script that ?
+> > > 
+> > > > There's just far too much of it.  The amount of effort required to sort
+> > > > through this file each time it needs to be updated has become
+> > > > *excessive*. The amount of effort required to go through the file and
+> > > > identify which entries are broken is *excessive*.  The amount of
+> > > > effort required to find who to email is *excessive*.
+> > > 
+> > > Why not write a script for that ?
+> > 
+> > No, I don't have the time at present.
+> 
+> You're the head maintainer here and ARM is a rising architecture. If you can't 
+> cope with that, you have a growing community of very competent people here. 
+> Maybe someone will be willing to take over eventually? It'll relieve some 
+> pressure from you too, what do you think?
 
->> + ? ? ? if (upmx) {
->
-> why do you need to check whether upmx is not NULL. if it is NULL, we
-> have failed in probe().
-> and it is also impossible to call this remove() twice.
+Hello.  Do you even understand the issue you're talking about?
 
-True, removing the if()-clause.
+There is a problem _right_ _now_ with the mach-types file.
 
->> +static struct platform_driver u300_pmx_driver = {
->> + ? ? ? .driver = {
->> + ? ? ? ? ? ? ? .name = DRIVER_NAME,
->> + ? ? ? ? ? ? ? .owner = THIS_MODULE,
->> + ? ? ? },
->> + ? ? ? .remove = __exit_p(u300_pmx_remove),
->
-> if you want to add deepsleep support(i mean pinmux crl will lose power
-> while suspending), what do you plan to add?
-> save U300_SYSCON_PMC1LR, U300_SYSCON_PMC1HR, U300_SYSCON_PMC2R,
-> U300_SYSCON_PMC3R, U300_SYSCON_PMC4R in suspend and restore them in
-> resume?
+That problem was caused by gplugd being merged without its entry being in
+the mach-types file - which was omitted - by way of editing by hand, along
+with shit loads of other entries - because of the fuckup with the
+machine_is_xxx() name not matching the configuration or MACH_TYPE symbol.
 
-The U300 does not loose context in deepsleep so this cannot be
-used as an example for how to do that, sadly. This platform
-retains all contents in sleep.
+So, rather than wasting a *significant* amount of time hand editing the
+file at every update (which is precisely why I haven't been updating the
+bloody thing) I've built it into the script so that entries which do not
+conform are automatically omitted.
 
-On the Ux500 this thing is hardware controlled and also in an
-always-on power domain.
+Problem solved.
 
-So I actually don't have the problem on any of my systems,
-I was saved by clever hardware designers...
+Any remaining problems are down to the maintainers not talking to me and,
+if you haven't realised yet, I have _zero_ sympathy for that especially
+when it doesn't take much effort _on their part_ to do.
 
-So it looks like this funny problem will hit the first one who
-implements something that loose state of their pinmux
-when sleeping.
-
-However if I make this driver advanced, it needs to set
-some pins to sleepmodes, like specific biasing GND:ing, during
-sleep. That is however not part of the muxing, but the other
-pinctrl things that are not implemented yet :-P
-
-> it is also a generic issue to pinmux.
-
-It's not even a pinmux-specific issue, but a generic device
-driver issue is it not? I think you can use runtime PM possibly
-with power domains for this, is that not what it is intended
-for?
-
->> +/*
->> + * Register definitions for the U300 Padmux control registers in the
->> + * system controller
->> + */
->> +
->> +/* PAD MUX Control register 1 (LOW) 16bit (R/W) */
->> +#define U300_SYSCON_PMC1LR ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? (0x007C)
-> ...
->> +#define U300_SYSCON_PMC4R_APP_MISC_16_EMIF_1_STATIC_CS5_N ? ? ?(0x0200)
->
-> do you want these "(" ")" for macros?
-
-Nah, I'll delete them if you like it better that way...
-
-Thanks!
-Linus Walleij
+It's got nothing to do with ARM being a rising architecture.  It's about
+maintainers doing the right thing, behaving in the right way and taking
+responsibility for their fuckups.  Putting the pain where the pain should
+be - in the platform maintainers lap, not in my lap.
