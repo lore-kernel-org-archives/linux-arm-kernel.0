@@ -1,34 +1,49 @@
 From: ashwinc@codeaurora.org (Ashwin Chaugule)
-Date: Mon, 22 Aug 2011 14:25:52 -0400
-Subject: [RFC PATCH 05/15] ARM: perf: move active_events into struct
-	arm_pmu
-In-Reply-To: <4B9A4BAF850C914D8DED94776A2C477E073D90C2@nasanexd01f.na.qualcomm.com>
-References: <4B9A4BAF850C914D8DED94776A2C477E073D90C2@nasanexd01f.na.qualcomm.com>
-Message-ID: <4E529F30.4070607@codeaurora.org>
+Date: Mon, 22 Aug 2011 14:36:18 -0400
+Subject: [RFC PATCH 08/15] ARM: perf: remove unnecessary armpmu->stop
+In-Reply-To: <4B9A4BAF850C914D8DED94776A2C477E0B853A03@nasanexd01b.na.qualcomm.com>
+References: <4B9A4BAF850C914D8DED94776A2C477E0B853A03@nasanexd01b.na.qualcomm.com>
+Message-ID: <4E52A1A2.5020700@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Hello,
 
 >> From: Mark Rutland 
->> 	case PERF_TYPE_RAW:
->> @@ -556,15 +559,14 @@ static int armpmu_event_init(struct perf_event
->> *event)
 >>
->> 	event->destroy = hw_perf_event_destroy;
+>> As armpmu_disable will call armpmu->stop when the last event has been
+>> removed, this is pointless and simply adds to the noise when debugging.
+>> Additionally, due to this call occurring in a preemptible context, this
+>> is problematic for per-cpu locking of PMU registers (where we will
+>> attempt to access per-cpu spinlock for use with raw_spin_lock_irqsave).
 >>
->> -	if (!atomic_inc_not_zero(&active_events)) {
->> -		mutex_lock(&pmu_reserve_mutex);
->> -		if (atomic_read(&active_events) == 0) {
->> +	if (!atomic_inc_not_zero(active_events)) {
->> +		mutex_lock(&armpmu->reserve_mutex);
->> +		if (atomic_read(active_events) == 0)
+>> This patch removes the call to armpmu->stop.
+>>
+>> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+>> Reviewed-by: Will Deacon <will.deacon@arm.com>
+>> ---
+>> arch/arm/kernel/perf_event.c |    1 -
+>> 1 files changed, 0 insertions(+), 1 deletions(-)
+>>
+>> diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
+>> index 9d6ac99..5ce6c33 100644
+>> --- a/arch/arm/kernel/perf_event.c
+>> +++ b/arch/arm/kernel/perf_event.c
+>> @@ -396,7 +396,6 @@ armpmu_release_hardware(void)
+>> 			free_irq(irq, NULL);
+>> 	}
+>>
+>> -	armpmu->stop();
+>> 	release_pmu(ARM_PMU_DEVICE_CPU);
 
 
-Isn't this use of atomic_* still racy ?
+Makes sense. On a similar note, I've been wondering why we need to loop
+through all events in armpmu_enable() ?
 
-http://www.spinics.net/lists/arm-kernel/msg123297.html
+Wouldn't the event->add call have taken care of armpmu->enable prior to
+calling armpmu_enable() ?
 
+I think we just need an armpmu->start(). What are your thoughts ?
 
 Cheers,
 Ashwin
