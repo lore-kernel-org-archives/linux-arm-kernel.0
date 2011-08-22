@@ -1,54 +1,82 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Fri, 19 Aug 2011 11:54:31 +0200
-Subject: [PATCH 4/4 v2] ARM: s3c64xx: Add support for synchronous clock
- operation.
-Message-ID: <mailman.96.1313970636.20020.linux-arm-kernel@lists.infradead.org>
+From: wad@chromium.org (Will Drewry)
+Date: Sun, 21 Aug 2011 19:43:33 -0500
+Subject: [RFC,PATCH] arch/arm: compute and export NR_syscalls
+In-Reply-To: <20110821090736.GG12028@n2100.arm.linux.org.uk>
+References: <1313529267-4428-1-git-send-email-wad@chromium.org>
+	<CABqD9hYavCxA38GbBhbCmBT+PEQQsvhbF4U7xY8P8ygbFy+=Ag@mail.gmail.com>
+	<20043.28045.613130.691498@pilspetsen.it.uu.se>
+	<201108171122.49009.arnd@arndb.de>
+	<20110821090736.GG12028@n2100.arm.linux.org.uk>
+Message-ID: <CABqD9hY99PYU+GONgw2EqT0oR2x-GFt-nWyz7yhy2J28r5y9Og@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some boards based on S3C6410 use synchronous clocking, which means that HCLKx2
-and other system clocks are generated from APLL instead of MPLL.
+On Sun, Aug 21, 2011 at 4:07 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Aug 17, 2011 at 11:22:48AM +0200, Arnd Bergmann wrote:
+>> On Wednesday 17 August 2011, Mikael Pettersson wrote:
+>> > ?> I proposed this approach based solely on prior threads I've seen. E.g.,
+>> > ?> - https://lkml.org/lkml/2007/6/1/427
+>> > ?> ? (don't just #define)
+>> > ?> - https://lkml.org/lkml/2009/8/27/280
+>> > ?> ? (todo: x86-32 to move to x86-64)
+>> > ?>
+>> > ?> If a single line #define is good enough, then it certainly works for me.
+>> >
+>> > Yes, the one-line #define NR_syscalls in unistd.h is a perfectly adequate,
+>> > if not entirely elegant, solution. ?Adding asm-export.c just for this is
+>> > waaay overkill.
+>>
+>> Right. While the main problem with having the constant in asm/unistd.h
+>> (needs to be kept in sync when adding new syscalls) is an annoyance,
+>> the suggested approach is adding more complexity than necessary.
+>>
+>> If you want to have the value automatically computed, I'd suggest
+>> moving the format of unistd.h over to a method like the one used
+>> by x86-64 and asm-generic, which is to combine the syscall number
+>> definitions with the list of syscall pointers that currently reside
+>> in arch/arm/kernel/calls.S, for the added benefit that it's easier to
+>> keep the two in sync as well.
+>
+> You obviously haven't looked at calls.S - the table has multiple
+> options depending on whether its being used for EABI or OABI. ?It's
+> not purely a 1:1 mapping between syscall number name and function
+> name.
+>
+> Adding an additional parameter to the CALL() macro to get around that
+> for the syscall number name starts making the file unweidly, especially
+> if we obey the 80 column limit.
+>
+> Finally, the assembly 'number of syscalls' is different from the real
+> number of syscalls to ensure that we don't overflow the 8-bit constant
+> limit for the compare instruction. ?Whether that needs to be included
+> in the C __NR_syscalls or not depends on how its used.
+>
+> I personally would prefer C code not to rely on the (unprovided)
+> NR_syscalls due to these kinds of issues.
 
-This patch adds support for such boards, by calculating hclk2 depending on
-the status of S3C_OTHERS_SYNCMUXSEL bit in S3C64XX_OTHERS registers.
+Upon continued inspection, I largely agree.I have some out-of-tree
+code (hopefully not forever) which uses ftrace.  It followed its
+coding approach which statically allocates arrays based on
+NR_syscalls.  While it makes lookups simple, it creates more
+infrastructure headaches for arches that have a non-zero syscall base
+and/or differenting numberings based on the active ABI.  I've since
+changed my approach to one that works for all architectures and
+doesn't require knowing NR_syscalls at compiled-time.
 
-Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
----
- arch/arm/mach-s3c64xx/clock.c                 |    8 +++++++-
- arch/arm/mach-s3c64xx/include/mach/regs-sys.h |    3 ++-
- 2 files changed, 9 insertions(+), 2 deletions(-)
+> Finally, if its just for ftrace, well I don't have a high regard for that
+> code. ?It's something I hardly ever use and when I have tried to use it
+> it has been soo dire in terms of overheads that it's just not worth
+> bothering with. ?When I want timings out of the kernel, I have always
+> (and continue to do so) implement my own gathering mechanisms rather
+> than using the ftrace crap.
 
-diff --git a/arch/arm/mach-s3c64xx/clock.c b/arch/arm/mach-s3c64xx/clock.c
-index fdfc4d5..a7dab43 100644
---- a/arch/arm/mach-s3c64xx/clock.c
-+++ b/arch/arm/mach-s3c64xx/clock.c
-@@ -780,7 +780,13 @@ void __init_or_cpufreq s3c6400_setup_clocks(void)
- 	printk(KERN_INFO "S3C64XX: PLL settings, A=%ld, M=%ld, E=%ld\n",
- 	       apll, mpll, epll);
- 
--	hclk2 = mpll / GET_DIV(clkdiv0, S3C6400_CLKDIV0_HCLK2);
-+	if(__raw_readl(S3C64XX_OTHERS) & S3C64XX_OTHERS_SYNCMUXSEL)
-+		/* Synchronous mode */
-+		hclk2 = apll / GET_DIV(clkdiv0, S3C6400_CLKDIV0_HCLK2);
-+	else
-+		/* Asynchronous mode */
-+		hclk2 = mpll / GET_DIV(clkdiv0, S3C6400_CLKDIV0_HCLK2);
-+
- 	hclk = hclk2 / GET_DIV(clkdiv0, S3C6400_CLKDIV0_HCLK);
- 	pclk = hclk2 / GET_DIV(clkdiv0, S3C6400_CLKDIV0_PCLK);
- 
-diff --git a/arch/arm/mach-s3c64xx/include/mach/regs-sys.h b/arch/arm/mach-s3c64xx/include/mach/regs-sys.h
-index 774e0de..00c5d8b 100644
---- a/arch/arm/mach-s3c64xx/include/mach/regs-sys.h
-+++ b/arch/arm/mach-s3c64xx/include/mach/regs-sys.h
-@@ -25,6 +25,7 @@
- 
- #define S3C64XX_OTHERS		S3C_SYSREG(0x900)
- 
--#define S3C64XX_OTHERS_USBMASK	(1 << 16)
-+#define S3C64XX_OTHERS_USBMASK		(1 << 16)
-+#define S3C64XX_OTHERS_SYNCMUXSEL	(1 << 6)
- 
- #endif /* _PLAT_REGS_SYS_H */
--- 
-1.7.6
+My personal interest is in reusing the shared filter engine along with
+its awareness of system call metadata.  That aside, I have a sneaking
+suspicion ftrace_syscalls will move away from the current
+NR_syscalls-based approach in order to support more architecture
+flavors, but I have no idea for sure.  (I'll be sending patches at
+some point.)
+
+thanks for your thoughts and consideration!
+will
