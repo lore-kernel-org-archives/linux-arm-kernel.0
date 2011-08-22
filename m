@@ -1,37 +1,18 @@
-From: buytenh@wantstofly.org (Lennert Buytenhek)
-Date: Mon, 22 Aug 2011 16:21:38 +0200
-Subject: plat-orion needs to enable PCIe ports for mv78xx0
-In-Reply-To: <4E4C33D5.3050508@drewtech.com>
-References: <4E4C33D5.3050508@drewtech.com>
-Message-ID: <20110822142138.GK840@wantstofly.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 22 Aug 2011 15:37:01 +0100
+Subject: [PATCH] cpuimx* boards: fix mach-types errors
+In-Reply-To: <1314022793-7501-1-git-send-email-eric@eukrea.com>
+References: <20110822135540.GH2287@n2100.arm.linux.org.uk>
+	<1314022793-7501-1-git-send-email-eric@eukrea.com>
+Message-ID: <20110822143701.GA3895@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 17, 2011 at 05:34:13PM -0400, Joey Oravec wrote:
+On Mon, Aug 22, 2011 at 04:19:53PM +0200, Eric B?nard wrote:
+> I made some changes to the entry in the ARM Machine Registry after
+> submission which was the wrong thing to do.
+> This patch should help to fix this error.
 
-> Orion maintainers,
+Looks fine.  Could you throw it in the patch system please?
 
-Hello!
-
-
-> On the Discovery series chips (mv78xx0), the CPU control and status
-> register at offset 0x20104 contains bits to enable / disable PCI
-> express port0 and port1. Both ports default to disabled.
-> 
-> It looks the PCIe driver and existing board setup files do not set
-> this bit; any boards that use PCIe and are working today might
-> assume that the bootloader has already set the bit to enable these
-> ports.
-
-Yep.
-
-
-> I couldn't find anything in Marvell's documentation about timing,
-> but the bits need to be set a long time before you touch any of the
-> PCIe port registers.
-
-I'll figure out.
-
-
-thanks,
-Lennert
+Thanks.
