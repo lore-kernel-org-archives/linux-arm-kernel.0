@@ -1,30 +1,42 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 22 Aug 2011 09:17:49 +0100
-Subject: 46dcfc8 (ARM: Update mach-types) removes used machine types
-In-Reply-To: <20110822081000.GA16557@pengutronix.de>
-References: <20110822081000.GA16557@pengutronix.de>
-Message-ID: <20110822081748.GJ12028@n2100.arm.linux.org.uk>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Mon, 22 Aug 2011 16:35:26 +0800
+Subject: [PATCH 2/6] ARM: add Highbank core platform support
+In-Reply-To: <1313526898-19920-3-git-send-email-robherring2@gmail.com>
+References: <1313526898-19920-1-git-send-email-robherring2@gmail.com>
+	<1313526898-19920-3-git-send-email-robherring2@gmail.com>
+Message-ID: <20110822083524.GA15742@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 22, 2011 at 10:10:00AM +0200, Uwe Kleine-K?nig wrote:
-> Hello Russell,
+On Tue, Aug 16, 2011 at 03:34:54PM -0500, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
 > 
-> your commit 46dcfc8 that is in today's next among other changes does:
+> This adds basic support for the Calxeda Highbank platform.
 > 
-> -eukrea_cpuimx25sd      MACH_EUKREA_CPUIMX25    EUKREA_CPUIMX25 2820
-> -eukrea_cpuimx35sd      MACH_EUKREA_CPUIMX35    EUKREA_CPUIMX35 2821
-> 
-> These two are both marked as "mainlined" on
-> http://www.arm.linux.org.uk/developer/machines/ and both are actually
-> used (arch/arm/mach-imx/mach-{eukrea_cpuimx25,cpuimx35.c})
-> 
-> Can you please add them back? Maybe it's worth to double-check the other
-> deletions?!
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> ---
+[...]
+> +void highbank_init_irq(void)
+> +{
+> +	struct device_node *node;
+> +	struct of_intc_desc desc;
+> +	int n = 0;
+> +
+> +	memset(&desc, 0, sizeof(desc));
+> +	desc.controller = of_find_compatible_node(NULL, NULL, "arm,cortex-a9-gic");
+> +	gic_of_init(&desc);
+> +	node = desc.controller;
+> +	for_each_child_of_node(node, desc.controller) {
+> +		gic_of_ppi_init(&desc);
+> +	}
+> +
+I failed to find the implementation of gic_of_ppi_init() in your patch
+series below.
 
-No.  They're removed because they're broken (look at them) - I've added
-additional checks so I don't have to waste _significant_ time fixing
-the entries time and time again.
+  [RFC PATCH 0/3] Yet another GIC OF binding series
 
-The requirement is that the machine_is_xxx() must match the MACH_xxx
-parts.  If they don't, they will not exist in future updates.
+Also one nit: the braces seem redundant.
+
+-- 
+Regards,
+Shawn
