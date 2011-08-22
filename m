@@ -1,47 +1,74 @@
-From: amit.kachhap@linaro.org (Amit Kachhap)
-Date: Mon, 22 Aug 2011 22:25:03 +0530
-Subject: [RFC PATCH 3/4] ARM: EXYNOS4: Add support AFTR mode cpuidle state
-	on EXYNOS4210
-In-Reply-To: <20110821171851.GG28546@n2100.arm.linux.org.uk>
-References: <1313759340-31319-1-git-send-email-amit.kachhap@linaro.org>
-	<1313759400-31347-3-git-send-email-amit.kachhap@linaro.org>
-	<20110821171851.GG28546@n2100.arm.linux.org.uk>
-Message-ID: <CAK44p21rEqj=JL5PLmFQe0L62UUUJb_ogRpp-vdA3HjwK_+XHQ@mail.gmail.com>
+From: tixy@yxit.co.uk (Tixy)
+Date: Mon, 22 Aug 2011 17:56:06 +0100
+Subject: [GIT PULL] ARM: Remove define CONSISTENT_DMA_SIZE
+Message-ID: <1314032166.29940.36.camel@computer2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 August 2011 22:48, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Fri, Aug 19, 2011 at 06:39:59PM +0530, Amit Daniel Kachhap wrote:
->> +ENTRY(exynos4_enter_lp)
->> + ? ? stmfd ? sp!, { r3 - r12, lr }
->> +
->> + ? ? adr ? ? r0, sleep_save_misc
->> +
->> + ? ? mrc ? ? p15, 0, r2, c15, c0, 0 ?@ read power control register
->> + ? ? str ? ? r2, [r0], #4
->> +
->> + ? ? mrc ? ? p15, 0, r2, c15, c0, 1 ?@ read diagnostic register
->> + ? ? str ? ? r2, [r0], #4
->> +
->> + ? ? ldr ? ? r3, =resume_with_mmu
->> + ? ? bl ? ? ?cpu_suspend
->> +
->> + ? ? mov ? ? r0, sp
->> + ? ? bl ? ? ?exynos4_cpu_lp
->> +
->> + ? ? /* Restore original sp */
->> + ? ? mov ? ? r0, sp
->> + ? ? add ? ? r0, r0, #4
->> + ? ? ldr ? ? sp, [r0]
->> +
->> + ? ? mov ? ? r0, #0
->> + ? ? b ? ? ? early_wakeup
->
-> This is based upon old kernel code. ?Clearly hasn't been tested with
-> anything later than 3.0.
->
-You are right. I will rebase it to the latest tree in the next
-version. The main intention of the patch series (mostly patch 4) is to
-collect information or issues on samsung platform with the new common
-cpuidle framework.
+Hi Russell
+
+Please can you pull these patches for inclusion in 3.2?
+
+This removes the constant defined by CONSISTENT_DMA_SIZE and adds a
+function to set the value at boot time instead. This is being done a
+part of the ongoing work to enable multiple platforms to be supported
+within a single kernel binary.
+
+Thanks
+
+-- 
+Jon Medhurst (usually known as Tixy)
+
+
+The following changes since commit 93ee7a9340d64f20295aacc3fb6a22b759323280:
+
+  Linux 3.1-rc2 (2011-08-14 15:09:08 -0700)
+
+are available in the git repository at:
+  git://git.yxit.co.uk/linux dma-size
+
+Jon Medhurst (12):
+      ARM: Add init_consistent_dma_size()
+      ARM: omap: Setup consistent dma size at boot time
+      ARM: mach-s3c64xx: Setup consistent dma size at boot time
+      ARM: mach-s5p64x0: Setup consistent dma size at boot time
+      ARM: mach-s5pv210: Setup consistent dma size at boot time
+      ARM: mxc: Remove setting of consistent dma size
+      ARM: mach-davinci: Setup consistent dma size at boot time
+      ARM: mach-u300: Setup consistent dma size at boot time
+      ARM: mach-at91: Setup consistent dma size at boot time
+      ARM: mach-bcmring: Setup consistent dma size at boot time
+      ARM: mach-shmobile: Setup consistent dma size at boot time
+      ARM: Remove support for macro CONSISTENT_DMA_SIZE
+
+ arch/arm/include/asm/dma-mapping.h            |    7 ++++
+ arch/arm/include/asm/memory.h                 |    9 -----
+ arch/arm/mach-at91/at91sam9g45.c              |    2 +
+ arch/arm/mach-at91/include/mach/at91sam9g45.h |    2 -
+ arch/arm/mach-bcmring/include/mach/memory.h   |    5 ---
+ arch/arm/mach-bcmring/mm.c                    |    3 ++
+ arch/arm/mach-davinci/common.c                |    3 ++
+ arch/arm/mach-davinci/include/mach/memory.h   |    5 ---
+ arch/arm/mach-omap1/io.c                      |    1 +
+ arch/arm/mach-omap2/io.c                      |    2 +-
+ arch/arm/mach-s3c64xx/cpu.c                   |    2 +
+ arch/arm/mach-s3c64xx/include/mach/memory.h   |    2 -
+ arch/arm/mach-s5p64x0/cpu.c                   |    3 ++
+ arch/arm/mach-s5p64x0/include/mach/memory.h   |    1 -
+ arch/arm/mach-s5pv210/cpu.c                   |    2 +
+ arch/arm/mach-s5pv210/include/mach/memory.h   |    1 -
+ arch/arm/mach-shmobile/board-ag5evm.c         |    3 ++
+ arch/arm/mach-shmobile/board-ap4evb.c         |    3 ++
+ arch/arm/mach-shmobile/board-g3evm.c          |    3 ++
+ arch/arm/mach-shmobile/board-g4evm.c          |    3 ++
+ arch/arm/mach-shmobile/board-mackerel.c       |    3 ++
+ arch/arm/mach-shmobile/include/mach/memory.h  |    3 --
+ arch/arm/mach-u300/core.c                     |    3 ++
+ arch/arm/mach-u300/include/mach/memory.h      |    5 ---
+ arch/arm/mm/dma-mapping.c                     |   45 +++++++++++++++++++------
+ arch/arm/mm/init.c                            |    9 -----
+ arch/arm/plat-mxc/include/mach/memory.h       |   15 --------
+ arch/arm/plat-omap/include/plat/io.h          |    2 +
+ arch/arm/plat-omap/include/plat/memory.h      |   13 -------
+ arch/arm/plat-omap/io.c                       |    8 ++++
+ 30 files changed, 86 insertions(+), 82 deletions(-)
