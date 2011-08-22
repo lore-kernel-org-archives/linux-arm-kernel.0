@@ -1,37 +1,42 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 22 Aug 2011 10:28:21 +0200
-Subject: [GIT PULL] mmc: atmel rework for next
-In-Reply-To: <m24o1dnxjg.fsf@bob.laptop.org>
-References: <4E4A8E73.7050705@atmel.com> <m24o1dnxjg.fsf@bob.laptop.org>
-Message-ID: <4E521325.9090606@atmel.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 22 Aug 2011 10:33:29 +0200
+Subject: 46dcfc8 (ARM: Update mach-types) removes used machine types
+In-Reply-To: <20110822081748.GJ12028@n2100.arm.linux.org.uk>
+References: <20110822081000.GA16557@pengutronix.de>
+	<20110822081748.GJ12028@n2100.arm.linux.org.uk>
+Message-ID: <20110822083329.GB16557@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 19/08/2011 19:03, Chris Ball :
-> Hi,
+On Mon, Aug 22, 2011 at 09:17:49AM +0100, Russell King - ARM Linux wrote:
+> On Mon, Aug 22, 2011 at 10:10:00AM +0200, Uwe Kleine-K?nig wrote:
+> > Hello Russell,
+> > 
+> > your commit 46dcfc8 that is in today's next among other changes does:
+> > 
+> > -eukrea_cpuimx25sd      MACH_EUKREA_CPUIMX25    EUKREA_CPUIMX25 2820
+> > -eukrea_cpuimx35sd      MACH_EUKREA_CPUIMX35    EUKREA_CPUIMX35 2821
+> > 
+> > These two are both marked as "mainlined" on
+> > http://www.arm.linux.org.uk/developer/machines/ and both are actually
+> > used (arch/arm/mach-imx/mach-{eukrea_cpuimx25,cpuimx35.c})
+> > 
+> > Can you please add them back? Maybe it's worth to double-check the other
+> > deletions?!
 > 
-> On Tue, Aug 16 2011, Nicolas Ferre wrote:
->> Hi Chris,
->>
->> Please pull from:
->>
->> git://github.com/at91linux/linux-2.6-at91.git nfe/mmc_atmel
->>
->> This is a series that reworks the atmel-mci driver for a future merge of both at91_mci and atmel-mci drivers. Those patches have been discussed on the mailing-list.
->> I added a tiny at91_mci patch also sent last week.
+> No.  They're removed because they're broken (look at them) - I've added
+> additional checks so I don't have to waste _significant_ time fixing
+> the entries time and time again.
 > 
-> Thanks, all looks good -- pushed to mmc-next with some commit message
-> rewording.  Please wrap your commit messages to 75 cols in future, so
-> that they're viewable in "git log" without wrapping.
+> The requirement is that the machine_is_xxx() must match the MACH_xxx
+> parts.  If they don't, they will not exist in future updates.
+Ah, I wasn't aware of that requirement.
 
-Thanks Chris for this. I will pay attention to line wrapping.
+Eric, these machine types are owned by you. Do you care to follow up?
 
-> I'll repeat your warning text from one of the commit messages here for
-> the broader audience:
-> 
->     Warning: at91rm9200 is not supported, to support it we need to use
->     swab32 on data but I have no board to test it.
+Best regards
+Uwe
 
-Best regards,
 -- 
-Nicolas Ferre
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
