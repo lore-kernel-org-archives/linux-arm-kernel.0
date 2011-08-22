@@ -1,45 +1,35 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Mon, 22 Aug 2011 16:49:06 -0700
-Subject: error: implicit declaration of function 'machine_is_ventana'
-In-Reply-To: <20110822234008.GC3895@n2100.arm.linux.org.uk>
-References: <74CDBE0F657A3D45AFBB94109FB122FF04B24A376A@HQMAIL01.nvidia.com>
-	<20110822234008.GC3895@n2100.arm.linux.org.uk>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF04B24A377F@HQMAIL01.nvidia.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Mon, 22 Aug 2011 16:58:32 -0700
+Subject: [RFC PATCH 6/6] hwmon: OMAP4: On die temperature sensor driver
+In-Reply-To: <4E449D65.9000004@ti.com> (Rajendra Nayak's message of "Fri, 12
+	Aug 2011 08:56:29 +0530")
+References: <1312979122-5896-1-git-send-email-j-keerthy@ti.com>
+	<1312979122-5896-7-git-send-email-j-keerthy@ti.com>
+	<20110810124629.GJ12882@legolas.emea.dhcp.ti.com>
+	<CAJ6a13Z=u=exWUHLotw8jpHMv-hKpE+fvg_1hq7=gtMiuJKxOA@mail.gmail.com>
+	<20110811103658.GG27742@legolas.emea.dhcp.ti.com>
+	<CAJ6a13bxg8po-Csc10LsFH-oES4YOKkqFoTm3kG4XzS=b2boMw@mail.gmail.com>
+	<20110811141248.GK28500@legolas.emea.dhcp.ti.com>
+	<CAJ6a13b7qu3K4YJPTYych_NQxLuuUxZOQg6PPC_=XA+qiwn2RA@mail.gmail.com>
+	<20110811185408.GB15970@legolas.emea.dhcp.ti.com>
+	<20110811185558.GC15970@legolas.emea.dhcp.ti.com>
+	<4E444B8F.9060908@ti.com> <4E449D65.9000004@ti.com>
+Message-ID: <874o19gfrr.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King wrote at Monday, August 22, 2011 5:40 PM:
-> On Mon, Aug 22, 2011 at 04:11:50PM -0700, Stephen Warren wrote:
-> > Russell,
-> >
-> > Commit 46dcfc806a9f6834e6007449eac175f781058c49 "ARM: Update mach-types"
-> > removed the entry for Ventana (2927). In turn, this broke compilation of
-> > sound/soc/tegra/tegra_wm8903.c, since that calls machine_is_ventana().
-> > It looks like the machine is still registered at
-> > http://www.arm.linux.org.uk/developer/machines/. Can you explain what the
-> > removal policy is for arch/arm/tools/mach-types?
-> 
-> The policy has always been that the machine_is_xxx() matches the other
-> constants.  Rather than having to edit those out by hand, the script
-> now does this for me automatically.
+Rajendra Nayak <rnayak@ti.com> writes:
 
-I'm very sorry for being so dense, but what "other constants" must the
-entry match?
+[...]
 
-For reference, here's the entry I'm referring to:
+> FWIK, its a one time requirement to set the clock rate to the
+> right rate the device can operate in based on what a platform
+> supports. 
 
--ventana                        MACH_VENTANA            VENTANA                 2927
+Except $SUBJECT patch hard-codes the clock rate for all platforms in the
+driver.
 
-... which seems to use the name "ventana" consistently, if that's what
-you mean.
+If the clock rate is to be platform-specific, it should be done in
+platform-specific code.
 
-...
-> Please submit a patch to fix your use in the kernel, including updating
-> the mach-types file to conform.  I'll then fix the machine registry by
-> hand.
-
-I will happily submit the patch, once I understand exactly what needs to
-change. Thanks for any enlightenment!
-
--- 
-nvpublic
+Kevin
