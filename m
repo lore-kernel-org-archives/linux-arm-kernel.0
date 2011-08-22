@@ -1,54 +1,37 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 22 Aug 2011 09:27:00 +0100
-Subject: [PATCH 00/19] GPIO exodus and cleanup
-In-Reply-To: <CACRpkdbPFuFHBuHzO2bP+z=za2kOFk4AZdgMVy=U6kcMmw9LSw@mail.gmail.com>
-References: <1312978564-18069-1-git-send-email-linus.walleij@stericsson.com>
-	<20110817090123.GD1006@n2100.arm.linux.org.uk>
-	<CACRpkdbJOrb5rhgG0Chamt-ApLQnV69MQ=bqBwKqO3KJPaFd0A@mail.gmail.com>
-	<CACRpkdYw96QD0sGOhA=osKYbnD6=MTqiAF=m5++BjM-s1Mn--w@mail.gmail.com>
-	<CACxGe6tEOnUzFjKMqNfp10b8SyuJDDFzg0eiPzhKNNCY55LECw@mail.gmail.com>
-	<CACRpkdbPFuFHBuHzO2bP+z=za2kOFk4AZdgMVy=U6kcMmw9LSw@mail.gmail.com>
-Message-ID: <20110822082700.GK12028@n2100.arm.linux.org.uk>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 22 Aug 2011 10:28:21 +0200
+Subject: [GIT PULL] mmc: atmel rework for next
+In-Reply-To: <m24o1dnxjg.fsf@bob.laptop.org>
+References: <4E4A8E73.7050705@atmel.com> <m24o1dnxjg.fsf@bob.laptop.org>
+Message-ID: <4E521325.9090606@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 22, 2011 at 09:53:48AM +0200, Linus Walleij wrote:
-> On Sun, Aug 21, 2011 at 9:09 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
-> > On Fri, Aug 19, 2011 at 5:45 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> >> Ping on this, on monday I'll pretend it's no big deal and pour them
-> >> into Russells patch tracker anyway, since he's managing more than
-> >> half of the kernels GPIO code in arch/arm/* anyway.
-> >
-> > If Russell is okay with it, then go ahead and merge it. ?I'm being
-> > pretty liberal about GPIO driver moves. ?I'm fine with them getting
-> > cleaned up after the drivers/gpio move.
+Le 19/08/2011 19:03, Chris Ball :
+> Hi,
 > 
-> Okay! Russell I've put them into your patch tracker as patches
-> 7032/1 thru 7050/1 so you can pick and choose. I've rebased on
-> top of what's in -next hoping that the stuff there affecting these
-> file will mainly be identical to what's on your "gpio" branch.
+> On Tue, Aug 16 2011, Nicolas Ferre wrote:
+>> Hi Chris,
+>>
+>> Please pull from:
+>>
+>> git://github.com/at91linux/linux-2.6-at91.git nfe/mmc_atmel
+>>
+>> This is a series that reworks the atmel-mci driver for a future merge of both at91_mci and atmel-mci drivers. Those patches have been discussed on the mailing-list.
+>> I added a tiny at91_mci patch also sent last week.
 > 
-> Tell me if I should rebase on something specific or if there are
-> any problems.
+> Thanks, all looks good -- pushed to mmc-next with some commit message
+> rewording.  Please wrap your commit messages to 75 cols in future, so
+> that they're viewable in "git log" without wrapping.
 
-I've applied as many as I can, but 7042/1, 7046/1, 7047/1 and 7048/1
-failed:
+Thanks Chris for this. I will pay attention to line wrapping.
 
-Patching 7042/1...
-git apply --whitespace=fix -p1 --index --check > /tmp/pdb.26923 2>&1 exited with non-zero status: 256
-error: patch failed: drivers/gpio/gpio-ep93xx.c:24
-error: drivers/gpio/gpio-ep93xx.c: patch does not apply
-Patching 7046/1...
-git apply --whitespace=fix -p1 --index --check > /tmp/pdb.26923 2>&1 exited with non-zero status: 256
-error: patch failed: arch/arm/mach-mmp/gplugd.c:9
-error: arch/arm/mach-mmp/gplugd.c: patch does not apply
-error: drivers/gpio/gpio-pxa.c: does not exist in index
-Patching 7047/1...
-git apply --whitespace=fix -p1 --index --check > /tmp/pdb.26923 2>&1 exited with non-zero status: 256
-error: patch failed: drivers/gpio/Makefile:40
-error: drivers/gpio/Makefile: patch does not apply
-Patching 7048/1...
-git apply --whitespace=fix -p1 --index --check > /tmp/pdb.26923 2>&1 exited with non-zero status: 256
-error: drivers/gpio/gpio-pnx4008.c: does not exist in index
+> I'll repeat your warning text from one of the commit messages here for
+> the broader audience:
+> 
+>     Warning: at91rm9200 is not supported, to support it we need to use
+>     swab32 on data but I have no board to test it.
 
-It looks like there are changes to these in other trees which conflict.
+Best regards,
+-- 
+Nicolas Ferre
