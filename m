@@ -1,36 +1,38 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Mon, 22 Aug 2011 15:17:04 -0300
-Subject: [PATCH v2 2/2] ARM: mx27: Print silicon revision on boot
-In-Reply-To: <1314037024-9015-1-git-send-email-fabio.estevam@freescale.com>
-References: <1314037024-9015-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <1314037024-9015-2-git-send-email-fabio.estevam@freescale.com>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Mon, 22 Aug 2011 20:20:58 +0200
+Subject: [RFC PATCH 0/3] OMAP: omap_device: Add a method to build an
+	omap_device from a DT node
+Message-ID: <1314037261-19606-1-git-send-email-b-cousson@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Silicon revision is useful information to have during kernel boot.
+Hi Kevin,
 
-Print the MX27 silicon revision.
+This is an initial attempt to use a notifier in order to create an
+omap_device from a platform_device bound to DT node as suggested by Grant.
+For the moment, the informations are all extracted from the hwmod data.
+The idea is to focus first on the devices / board static init removal.
+The other issue is that some bindings, like dma, are still not present
+in the DT core code. The reg and irq bindings are there, but cannot
+be used by some drivers due to the lack of named ressources in DT.
+Since the DT core cannot change, the drivers will have to be modified
+first.
+In a second phase these informations will be moved from hwmod to DT.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
-Changes since v1:
+Patches are based on my for_3.2/1_omap_device_cleanup branch and are
+available here:
+git://gitorious.org/omap-pm/linux.git for_3.2/2_omap_device_dt
 
-- Use generic imx function to print silicon revision.
+It is tested on OMAP4 SDP and Panda.
 
- arch/arm/mach-imx/clock-imx27.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+Regards,
+Benoit
 
-diff --git a/arch/arm/mach-imx/clock-imx27.c b/arch/arm/mach-imx/clock-imx27.c
-index 583f251..a1ca276 100644
---- a/arch/arm/mach-imx/clock-imx27.c
-+++ b/arch/arm/mach-imx/clock-imx27.c
-@@ -754,6 +754,7 @@ int __init mx27_clocks_init(unsigned long fref)
- #if defined(CONFIG_DEBUG_LL) && !defined(CONFIG_DEBUG_ICEDCC)
- 	clk_enable(&uart1_clk);
- #endif
-+	imx_print_silicon_rev("MX27", mx27_revision());
- 
- 	mxc_timer_init(&gpt1_clk, MX27_IO_ADDRESS(MX27_GPT1_BASE_ADDR),
- 			MX27_INT_GPT1);
--- 
-1.7.1
+
+Benoit Cousson (3):
+  OMAP: omap_device: Add omap_device_[alloc|delete] for DT integration
+  OMAP: omap_device: Add a DT parser for multiple strings
+  OMAP: omap_device: Add a method to build an omap_device from a DT node
+
+ arch/arm/plat-omap/omap_device.c |  309 +++++++++++++++++++++++++++++++-------
+ 1 files changed, 255 insertions(+), 54 deletions(-)
