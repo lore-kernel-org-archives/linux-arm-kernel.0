@@ -1,48 +1,60 @@
-From: gigin_jose@yahoo.co.in (GIGIN JOSE)
-Date: Mon, 22 Aug 2011 09:17:43 +0000 (UTC)
-Subject: USB host on s3c2416
-Message-ID: <loom.20110822T110123-860@post.gmane.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 22 Aug 2011 10:24:59 +0100
+Subject: [PATCH 00/19] GPIO exodus and cleanup
+In-Reply-To: <20110822082700.GK12028@n2100.arm.linux.org.uk>
+References: <1312978564-18069-1-git-send-email-linus.walleij@stericsson.com>
+	<20110817090123.GD1006@n2100.arm.linux.org.uk>
+	<CACRpkdbJOrb5rhgG0Chamt-ApLQnV69MQ=bqBwKqO3KJPaFd0A@mail.gmail.com>
+	<CACRpkdYw96QD0sGOhA=osKYbnD6=MTqiAF=m5++BjM-s1Mn--w@mail.gmail.com>
+	<CACxGe6tEOnUzFjKMqNfp10b8SyuJDDFzg0eiPzhKNNCY55LECw@mail.gmail.com>
+	<CACRpkdbPFuFHBuHzO2bP+z=za2kOFk4AZdgMVy=U6kcMmw9LSw@mail.gmail.com>
+	<20110822082700.GK12028@n2100.arm.linux.org.uk>
+Message-ID: <20110822092459.GL12028@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, 
+On Mon, Aug 22, 2011 at 09:27:00AM +0100, Russell King - ARM Linux wrote:
+> On Mon, Aug 22, 2011 at 09:53:48AM +0200, Linus Walleij wrote:
+> > On Sun, Aug 21, 2011 at 9:09 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
+> > > On Fri, Aug 19, 2011 at 5:45 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> > >> Ping on this, on monday I'll pretend it's no big deal and pour them
+> > >> into Russells patch tracker anyway, since he's managing more than
+> > >> half of the kernels GPIO code in arch/arm/* anyway.
+> > >
+> > > If Russell is okay with it, then go ahead and merge it. ?I'm being
+> > > pretty liberal about GPIO driver moves. ?I'm fine with them getting
+> > > cleaned up after the drivers/gpio move.
+> > 
+> > Okay! Russell I've put them into your patch tracker as patches
+> > 7032/1 thru 7050/1 so you can pick and choose. I've rebased on
+> > top of what's in -next hoping that the stuff there affecting these
+> > file will mainly be identical to what's on your "gpio" branch.
+> > 
+> > Tell me if I should rebase on something specific or if there are
+> > any problems.
+> 
+> I've applied as many as I can, but 7042/1, 7046/1, 7047/1 and 7048/1
+> failed:
+> 
+> Patching 7042/1...
+> git apply --whitespace=fix -p1 --index --check > /tmp/pdb.26923 2>&1 exited with non-zero status: 256
+> error: patch failed: drivers/gpio/gpio-ep93xx.c:24
+> error: drivers/gpio/gpio-ep93xx.c: patch does not apply
+> Patching 7046/1...
+> git apply --whitespace=fix -p1 --index --check > /tmp/pdb.26923 2>&1 exited with non-zero status: 256
+> error: patch failed: arch/arm/mach-mmp/gplugd.c:9
+> error: arch/arm/mach-mmp/gplugd.c: patch does not apply
+> error: drivers/gpio/gpio-pxa.c: does not exist in index
+> Patching 7047/1...
+> git apply --whitespace=fix -p1 --index --check > /tmp/pdb.26923 2>&1 exited with non-zero status: 256
+> error: patch failed: drivers/gpio/Makefile:40
+> error: drivers/gpio/Makefile: patch does not apply
+> Patching 7048/1...
+> git apply --whitespace=fix -p1 --index --check > /tmp/pdb.26923 2>&1 exited with non-zero status: 256
+> error: drivers/gpio/gpio-pnx4008.c: does not exist in index
+> 
+> It looks like there are changes to these in other trees which conflict.
 
-I am working on samsung s3c2416 ARM based Soc on 
-linux 2.6.21 kernel. By default, the Soc has one 
-USB host and one USB device/host. My USB host is 
-working fine. Since I need to use two USB host on my system,
- I need to enable the USB device/host as a USB host. 
-
-The following are the changes I have made for the same:
-
-Register  Address        value
------------------------------
-PHYPWR    0x4C00_0084    0x0
-PWRCFG    0x4C00_0060    (1<<4)
-URSTCON   0x4C00_0088    (0<<2)|(1<<1)|(1<<0)
-URSTCON   0x4C00_0088    (0<<2)|(0<<1)|(0<<0)
-PHYCTRL   0x4C00_0080    (0<<3)|(0<<2)|(1<<1)|(1<<0)
-UCLKCON   0x4C00_008C    0<<31)|(0<<2)|(1<<1)|(1<<0)
-
-Once I try to plug in a  USB mass storage device (whose driver is present in 
-kernel), I get the following error:
-
-usb 1-2: new full speed USB device using s3c2410-ohci and address 10
-usb 1-2: device descriptor read/64, error -62
-usb 1-2: device descriptor read/64, error -62
-usb 1-2: new full speed USB device using s3c2410-ohci and address 11
-usb 1-2: device descriptor read/64, error -62
-usb 1-2: device descriptor read/64, error -62
-usb 1-2: new full speed USB device using s3c2410-ohci and address 12
-usb 1-2: device not accepting address 12, error -62
-usb 1-2: new full speed USB device using s3c2410-ohci and address 13
-usb 1-2: device not accepting address 13, error -62
-
-
-Why is it throwing this error ? Is there any driver for USB hub missing in 
-2.6.21 kernel, or do I need to modify more on register settings. 
-
-Please help. 
-
-Thank You
-GIGIN
+Looking through the gpio.h files, plat-nomadik's is virtually empty
+except for a copyright, ifdef and include of linux/kernel.h - can it
+be killed off entirely now?
