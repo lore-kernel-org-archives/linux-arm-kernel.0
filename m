@@ -1,48 +1,48 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 22 Aug 2011 17:15:12 +0800
-Subject: [PATCH 2/6] ARM: add Highbank core platform support
-In-Reply-To: <20110822083524.GA15742@S2100-06.ap.freescale.net>
-References: <1313526898-19920-1-git-send-email-robherring2@gmail.com>
-	<1313526898-19920-3-git-send-email-robherring2@gmail.com>
-	<20110822083524.GA15742@S2100-06.ap.freescale.net>
-Message-ID: <20110822091511.GB15742@S2100-06.ap.freescale.net>
+From: gigin_jose@yahoo.co.in (GIGIN JOSE)
+Date: Mon, 22 Aug 2011 09:17:43 +0000 (UTC)
+Subject: USB host on s3c2416
+Message-ID: <loom.20110822T110123-860@post.gmane.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 22, 2011 at 04:35:26PM +0800, Shawn Guo wrote:
-> On Tue, Aug 16, 2011 at 03:34:54PM -0500, Rob Herring wrote:
-> > From: Rob Herring <rob.herring@calxeda.com>
-> > 
-> > This adds basic support for the Calxeda Highbank platform.
-> > 
-> > Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> > ---
-> [...]
-> > +void highbank_init_irq(void)
-> > +{
-> > +	struct device_node *node;
-> > +	struct of_intc_desc desc;
-> > +	int n = 0;
-> > +
-> > +	memset(&desc, 0, sizeof(desc));
-> > +	desc.controller = of_find_compatible_node(NULL, NULL, "arm,cortex-a9-gic");
-> > +	gic_of_init(&desc);
-> > +	node = desc.controller;
-> > +	for_each_child_of_node(node, desc.controller) {
-> > +		gic_of_ppi_init(&desc);
-> > +	}
-> > +
-> I failed to find the implementation of gic_of_ppi_init() in your patch
-> series below.
-> 
->   [RFC PATCH 0/3] Yet another GIC OF binding series
-> 
-I just found it in another private post you made to Marc.  (Marc made
-it public with his reply)
+Hi, 
 
-> Also one nit: the braces seem redundant.
-> 
+I am working on samsung s3c2416 ARM based Soc on 
+linux 2.6.21 kernel. By default, the Soc has one 
+USB host and one USB device/host. My USB host is 
+working fine. Since I need to use two USB host on my system,
+ I need to enable the USB device/host as a USB host. 
 
--- 
-Regards,
-Shawn
+The following are the changes I have made for the same:
+
+Register  Address        value
+-----------------------------
+PHYPWR    0x4C00_0084    0x0
+PWRCFG    0x4C00_0060    (1<<4)
+URSTCON   0x4C00_0088    (0<<2)|(1<<1)|(1<<0)
+URSTCON   0x4C00_0088    (0<<2)|(0<<1)|(0<<0)
+PHYCTRL   0x4C00_0080    (0<<3)|(0<<2)|(1<<1)|(1<<0)
+UCLKCON   0x4C00_008C    0<<31)|(0<<2)|(1<<1)|(1<<0)
+
+Once I try to plug in a  USB mass storage device (whose driver is present in 
+kernel), I get the following error:
+
+usb 1-2: new full speed USB device using s3c2410-ohci and address 10
+usb 1-2: device descriptor read/64, error -62
+usb 1-2: device descriptor read/64, error -62
+usb 1-2: new full speed USB device using s3c2410-ohci and address 11
+usb 1-2: device descriptor read/64, error -62
+usb 1-2: device descriptor read/64, error -62
+usb 1-2: new full speed USB device using s3c2410-ohci and address 12
+usb 1-2: device not accepting address 12, error -62
+usb 1-2: new full speed USB device using s3c2410-ohci and address 13
+usb 1-2: device not accepting address 13, error -62
+
+
+Why is it throwing this error ? Is there any driver for USB hub missing in 
+2.6.21 kernel, or do I need to modify more on register settings. 
+
+Please help. 
+
+Thank You
+GIGIN
