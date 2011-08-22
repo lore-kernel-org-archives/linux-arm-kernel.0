@@ -1,95 +1,318 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Mon, 22 Aug 2011 22:09:11 +0800
-Subject: 46dcfc8 (ARM: Update mach-types) removes used machine types
-In-Reply-To: <20110822134823.GG2287@n2100.arm.linux.org.uk>
-References: <20110822081000.GA16557@pengutronix.de>
-	<201108221530.41443.marek.vasut@gmail.com>
-	<20110822133242.GE2287@n2100.arm.linux.org.uk>
-	<201108221536.12859.marek.vasut@gmail.com>
-	<20110822134823.GG2287@n2100.arm.linux.org.uk>
-Message-ID: <CAMPhdO8G3fqpiNJt4mdcK54p943Aoy37WDZH9YyJcukOGxg9=Q@mail.gmail.com>
+From: shijie8@gmail.com (Huang Shijie)
+Date: Mon, 22 Aug 2011 10:12:27 -0400
+Subject: [PATCH v9 1/3] MTD : add the common code for GPMI-NAND controller
+	driver
+In-Reply-To: <201108221602.27201.marek.vasut@gmail.com>
+References: <1313581828-16625-1-git-send-email-b32955@freescale.com>
+	<201108221509.49721.marek.vasut@gmail.com>
+	<CAMiH66H-xPNARxBJ+xAWubZz2-hoJgAQtOX2=Pi8NE3vrFD_ag@mail.gmail.com>
+	<201108221602.27201.marek.vasut@gmail.com>
+Message-ID: <CAMiH66FZZUqAdRqJGvrkEcsmQMSpEYboj=SxXW2CDHiBBsWmeQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 22, 2011 at 9:48 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Aug 22, 2011 at 03:36:12PM +0200, Marek Vasut wrote:
->> On Monday, August 22, 2011 03:32:42 PM Russell King - ARM Linux wrote:
->> > On Mon, Aug 22, 2011 at 03:30:41PM +0200, Marek Vasut wrote:
->> > > On Monday, August 22, 2011 03:27:19 PM Russell King - ARM Linux wrote:
->> > > > On Mon, Aug 22, 2011 at 03:16:00PM +0200, Marek Vasut wrote:
->> > > > > On Monday, August 22, 2011 03:01:19 PM Russell King - ARM Linux wrote:
->> > > > > > For further reading, see:
->> > > > > > http://lists.arm.linux.org.uk/lurker/message/20110815.085325.ae6ee0
->> > > > > > 7d.e n.ht ml
->> > > > >
->> > > > > Russell, calm down please.
->> > > > >
->> > > > > Maybe it'd be better to just email the people with broken stuff, then
->> > > > > wait ... if they don't reply in a week (two weeks?) then remove their
->> > > > > stuff. And make that a policy.
->> > > > >
->> > > > > What do you think ?
->> > > >
->> > > > Who do I email? ?Which entries are causing problems? ?That's the whole
->> > > > bloody point.
->> > >
->> > > Isn't the email in your database? You can't just script that ?
->> > >
->> > > > There's just far too much of it. ?The amount of effort required to sort
->> > > > through this file each time it needs to be updated has become
->> > > > *excessive*. The amount of effort required to go through the file and
->> > > > identify which entries are broken is *excessive*. ?The amount of
->> > > > effort required to find who to email is *excessive*.
->> > >
->> > > Why not write a script for that ?
->> >
->> > No, I don't have the time at present.
+Hi,
+
+On Mon, Aug 22, 2011 at 10:02 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
+> On Monday, August 22, 2011 04:00:46 PM Huang Shijie wrote:
+>> hi,
 >>
->> You're the head maintainer here and ARM is a rising architecture. If you can't
->> cope with that, you have a growing community of very competent people here.
->> Maybe someone will be willing to take over eventually? It'll relieve some
->> pressure from you too, what do you think?
+>> On Mon, Aug 22, 2011 at 9:09 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
+>> > On Monday, August 22, 2011 06:59:11 AM Huang Shijie wrote:
+>> >> Hi,
+>> >>
+>> >> thanks for your comments.
+>> >>
+>> >> >> +
+>> >> >> +static inline int get_ecc_chunk_size(struct gpmi_nand_data *this)
+>> >> >> +{
+>> >> >> + ?/* for historical reason */
+>> >> >> + ?return 512;
+>> >> >
+>> >> > Can't we just #define this? Or will there ever be something else
+>> >> > possible here ? I thought this is the only possible behaviour on MXS.
+>> >>
+>> >> Please keep it here, it maybe changed in the future.
+>> >> It ever had some code for ONFI nand, but i removed it.
+>> >
+>> > well if you #define it now, you can always replace the defined value with
+>> > a function later.
+>>
+>> ok.
+>>
+>> >> >> +}
+>> >> >> +
+>> >> >> +int common_nfc_set_geometry(struct gpmi_nand_data *this)
+>> >> >> +{
+>> >> >> + ?struct bch_geometry *geo =&this->bch_geometry;
+>> >> >> + ?struct mtd_info *mtd =&this->mil.mtd;
+>> >> >> + ?unsigned int metadata_size;
+>> >> >> + ?unsigned int status_size;
+>> >> >> + ?unsigned int chunk_data_size_in_bits;
+>> >> >> + ?unsigned int chunk_ecc_size_in_bits;
+>> >> >> + ?unsigned int chunk_total_size_in_bits;
+>> >> >> + ?unsigned int block_mark_chunk_number;
+>> >> >> + ?unsigned int block_mark_chunk_bit_offset;
+>> >> >> + ?unsigned int block_mark_bit_offset;
+>> >> >> + ?int gf_len = 13;/* use GP13 by default */
+>> >> >> +
+>> >> >> + ?/* We only support BCH now. */
+>> >> >> + ?geo->ecc_algorithm = "BCH";
+>> >> >> +
+>> >> >> + ?/*
+>> >> >> + ? * We always choose a metadata size of 10. Don't try to make sense
+>> >> >> of + ? * it -- this is really only for historical compatibility. +
+>> >> >> */
+>> >> >
+>> >> > Historical compat or you mean "the chip was designed this way, see
+>> >> > datasheet section x.y.z"? ;-)
+>> >>
+>> >> Just for historical compatibility.
+>> >> it's better to keep it as now, there is no need to change it.
+>> >
+>> > I'm just trying to make sense of it ... from the docs, it seems like a
+>> > chip design thing. So this is compat with STMP37xx and 36xx ? Or even
+>> > something older and more obscure ?
+>>
+>> it ?seems the rom of the chip use the value. ?I will check it tomorrow.
+>>
+>> >> >> + ?geo->metadata_size_in_bytes = 10;
+>> >> >> +
+>> >> >> + ?/* ECC chunks */
+>> >> >> + ?geo->ecc_chunk_size_in_bytes = get_ecc_chunk_size(this);
+>> >
+>> > ?[ ... ]
+>> >
+>> >> >> +
+>> >> >> +/* Can we use the upper's buffer directly for DMA? */
+>> >> >> +void prepare_data_dma(struct gpmi_nand_data *this, enum
+>> >> >> dma_data_direction dr) +{
+>> >> >> + ?struct mil *mil =&this->mil;
+>> >> >> + ?struct scatterlist *sgl =&mil->data_sgl;
+>> >> >
+>> >> > I still see the "MIL" present -- can't we just merge the library and
+>> >> > this ?
+>> >>
+>> >> the ? `mil` is just a data structure to contain the fields now.
+>> >> Maybe I should change the name of it.
+>> >
+>> > Probably, I still have a feeling of this like it's the old freescale
+>> > driver heritage and doesn't make sense now.
+>>
+>> ok, I will change the name.
+>>
+>> >> >> + ?int ret;
+>> >> >> +
+>> >> >> + ?mil->direct_dma_map_ok = true;
+>> >> >>
+>> >> >> +static void show_bch_geometry(struct bch_geometry *geo)
+>> >> >> +{
+>> >> >> + ?pr_info("---------------------------------------\n");
+>> >> >> + ?pr_info(" ? ? ? BCH Geometry\n");
+>> >> >> + ?pr_info("---------------------------------------\n");
+>> >> >> + ?pr_info("ECC Algorithm ? ? ? ? ?: %s\n", geo->ecc_algorithm);
+>> >> >> + ?pr_info("ECC Strength ? ? ? ? ? : %u\n", geo->ecc_strength);
+>> >> >> + ?pr_info("Page Size in Bytes ? ? : %u\n", geo->page_size_in_bytes);
+>> >> >> + ?pr_info("Metadata Size in Bytes : %u\n",
+>> >> >> geo->metadata_size_in_bytes); + ?pr_info("ECC Chunk Size in Bytes:
+>> >> >> %u\n",
+>> >> >> geo->ecc_chunk_size_in_bytes); + ? pr_info("ECC Chunk Count ? ? ? ?:
+>> >> >> %u\n", geo->ecc_chunk_count); + ? ?pr_info("Payload Size in Bytes ?:
+>> >> >> %u\n", geo->payload_size_in_bytes); + ? ? ?pr_info("Auxiliary Size in
+>> >> >> Bytes: %u\n", geo->auxiliary_size_in_bytes); + ? ?pr_info("Auxiliary
+>> >> >> Status Offset: %u\n", geo->auxiliary_status_offset); +
+>> >> >> ?pr_info("Block Mark Byte Offset : %u\n",
+>> >> >> geo->block_mark_byte_offset); + ? ? ? pr_info("Block Mark Bit Offset
+>> >> >> ?: %u\n", geo->block_mark_bit_offset); +}
+>> >> >
+>> >> > We don't need this.
+>> >>
+>> >> I just use it for debug.
+>> >> Why do not need it? :)
+>> >> I think it's useful to debug.
+>> >
+>> > I want to use it, not debug it. I don't want to have it in dmesg.
+>> > pr_info() is really unsuitable. Remove it, use pr_debug(), #define it in
+>> > MXS_NAND_VERBOSE_DEBUG, which will be undefined at the begining of the
+>> > file by default (probably the best approach). Someone who wants to debug
+>> > this thing will just enable it.
+>> >
+>> >> >> +
+>> >> >> +int start_dma_without_bch_irq(struct gpmi_nand_data *this,
+>> >> >> + ? ? ? ? ? ? ? ? ? ? ? ? ?struct dma_async_tx_descriptor *desc)
+>> >> >> +{
+>> >> >> + ?struct completion *dma_c =&this->dma_done;
+>> >> >> + ?int err;
+>> >
+>> > [...]
+>> >
+>> >> >> +
+>> >> >> + ?if ((mil->current_chip< ?0)&& ?(chip>= 0))
+>> >
+>> > btw. is the indent here OK?
+>>
+>> I checked with the script ./script/checkpatch.
+>> there is no error.
+>>
+>> It's ok.
+>>
+>> >> >> + ? ? ? ? ?gpmi_begin(this);
+>> >> >> + ?else if ((mil->current_chip>= 0)&& ?(chip< ?0))
+>> >> >> + ? ? ? ? ?gpmi_end(this);
+>> >> >> + ?else
+>> >> >> + ? ? ? ? ?;
+>> >> >
+>> >> > Do you need this else branch at all?
+>> >>
+>> >> It needs a warning here.
+>> >>
+>> >> >> +
+>> >> >> + ?mil->current_chip = chip;
+>> >> >> +}
+>> >> >> +
+>> >> >> +static void gpmi_read_buf(struct mtd_info *mtd, uint8_t *buf, int
+>> >> >> len) +{
+>> >> >> + ?struct nand_chip *nand = mtd->priv;
+>> >> >> + ?struct gpmi_nand_data *this = nand->priv;
+>> >> >> + ?struct mil *mil =&this->mil;
+>> >> >> +
+>> >> >> + ?logio(GPMI_DEBUG_READ);
+>> >> >> + ?/* save the info in mil{} for future */
+>> >> >> + ?mil->upper_buf ?= buf;
+>> >> >> + ?mil->upper_len ?= len;
+>> >> >> +
+>> >> >> + ?gpmi_read_data(this);
+>> >> >> +}
+>> >> >> +
+>> >> >> +static void gpmi_write_buf(struct mtd_info *mtd, const uint8_t *buf,
+>> >> >> int len) +{
+>> >> >> + ?struct nand_chip *nand = mtd->priv;
+>> >> >> + ?struct gpmi_nand_data *this = nand->priv;
+>> >> >> + ?struct mil *mil =&this->mil;
+>> >> >> +
+>> >> >> + ?logio(GPMI_DEBUG_WRITE);
+>> >> >> + ?/* save the info in mil{} for future */
+>> >> >> + ?mil->upper_buf ?= (uint8_t *)buf;
+>> >> >> + ?mil->upper_len ?= len;
+>> >> >> +
+>> >> >> + ?gpmi_send_data(this);
+>> >> >> +}
+>> >> >> +
+>> >> >> +static uint8_t gpmi_read_byte(struct mtd_info *mtd)
+>> >> >> +{
+>> >> >> + ?struct nand_chip *nand = mtd->priv;
+>> >> >> + ?struct gpmi_nand_data *this = nand->priv;
+>> >> >> + ?struct mil *mil =&this->mil;
+>> >> >> + ?uint8_t *buf = mil->data_buffer_dma;
+>> >> >> +
+>> >> >> + ?gpmi_read_buf(mtd, buf, 1);
+>> >> >> + ?return buf[0];
+>> >> >> +}
+>> >> >> +
+>> >> >>
+>> >> >> +static int gpmi_block_markbad(struct mtd_info *mtd, loff_t ofs)
+>> >> >> +{
+>> >> >> + ?struct nand_chip *nand = mtd->priv;
+>> >> >> + ?struct gpmi_nand_data *this = nand->priv;
+>> >> >> + ?int block, ret = 0;
+>> >> >> +
+>> >> >> + ?/* Get block number */
+>> >> >> + ?block = (int)(ofs>> ?nand->bbt_erase_shift);
+>> >> >> + ?if (nand->bbt)
+>> >> >> + ? ? ? ? ?nand->bbt[block>> ?2] |= 0x01<< ?((block& ?0x03)<< ?1);
+>> >> >> +
+>> >> >> + ?/* Do we have a flash based bad block table ? */
+>> >> >> + ?if (nand->options& ?NAND_USE_FLASH_BBT)
+>> >> >> + ? ? ? ? ?ret = nand_update_bbt(mtd, ofs);
+>> >> >
+>> >> > if (stuff)
+>> >> >
+>> >> > ? ? return nand_update_bbt();
+>> >>
+>> >> I can not return it here, I need to update the ecc_stats too.
+>> >
+>> > You're right.
+>> >
+>> >> > stuff from else branch
+>> >> > .
+>> >> > .
+>> >> > .
+>> >> >
+>> >> > Besides, please don't declare variables in the middle of code.
+>> >>
+>> >> why?
+>> >> it's no harm to declare the variables in the {}.
+>> >
+>> > And to find out what kind of variable it is, you can't just jump at the
+>> > begining of the function, you need to navigate through the code ...
+>> > that's bad and additional work for other people.
+>>
+>> thanks, got it.
+>>
+>> >> >> + ?else {
+>> >> >> + ? ? ? ? ?struct mil *mil =&this->mil;
+>> >> >> + ? ? ? ? ?uint8_t *block_mark;
+>> >> >> + ? ? ? ? ?int column, page, status, chipnr;
+>> >> >> +
+>> >> >> + ? ? ? ? ?chipnr = (int)(ofs>> ?nand->chip_shift);
+>> >> >> + ? ? ? ? ?nand->select_chip(mtd, chipnr);
+>> >> >> +
+>> >> >> + ? ? ? ? ?column = this->swap_block_mark ? mtd->writesize : 0;
+>> >> >> +
+>> >> >> + ? ? ? ? ?/* Write the block mark. */
+>> >> >> + ? ? ? ? ?block_mark = mil->data_buffer_dma;
+>> >> >> + ? ? ? ? ?block_mark[0] = 0; /* bad block marker */
+>> >> >> +
+>> >> >> + ? ? ? ? ?/* Shift to get page */
+>> >> >> + ? ? ? ? ?page = (int)(ofs>> ?nand->page_shift);
+>> >> >> +
+>> >> >> + ? ? ? ? ?nand->cmdfunc(mtd, NAND_CMD_SEQIN, column, page);
+>> >> >> + ? ? ? ? ?nand->write_buf(mtd, block_mark, 1);
+>> >> >> + ? ? ? ? ?nand->cmdfunc(mtd, NAND_CMD_PAGEPROG, -1, -1);
+>> >> >> +
+>> >> >> + ? ? ? ? ?status = nand->waitfunc(mtd, nand);
+>> >> >> + ? ? ? ? ?if (status& ?NAND_STATUS_FAIL)
+>> >> >> + ? ? ? ? ? ? ? ? ?ret = -EIO;
+>> >> >> +
+>> >> >> + ? ? ? ? ?nand->select_chip(mtd, -1);
+>> >> >> + ?}
+>> >> >> + ?if (!ret)
+>> >> >> + ? ? ? ? ?mtd->ecc_stats.badblocks++;
+>> >> >> +
+>> >> >> + ?return ret;
+>> >> >> +}
+>> >
+>> > [...]
+>> >
+>> >> >> addr_t auxiliary);
+>> >> >> +
+>> >> >> +/* ONFI or TOGGLE nand */
+>> >> >> +bool is_ddr_nand(struct gpmi_nand_data *);
+>> >> >> +
+>> >> >> +/* for log */
+>> >> >> +extern int gpmi_debug;
+>> >> >
+>> >> > Why this extern ?
+>> >>
+>> >> this header can be included by gpmi-nand.c and gpmi-lib.c.
+>> >
+>> > This is a peculiar one ... can't you -- for example -- hide this into
+>> > driver data?
+>>
+>> It's a parameter of the driver.
+>> I use it to show different log.
+>> I think it can not be hide into driver data :(
 >
-> Hello. ?Do you even understand the issue you're talking about?
+> You can set up a variable in the driver data (the internal state of the driver)
+> according to this parameter, no problem.
 >
-> There is a problem _right_ _now_ with the mach-types file.
->
-> That problem was caused by gplugd being merged without its entry being in
-> the mach-types file - which was omitted - by way of editing by hand, along
-> with shit loads of other entries - because of the fuckup with the
-> machine_is_xxx() name not matching the configuration or MACH_TYPE symbol.
+it will be a little complicated. I prefer to remove it from the header file.
 
-Grrrr.... as the original guilty one who stirred this whole pile of
-sh*t up, should
-I keep my mouth shut up on this?  ;-)
 
-True that it's a stupid mistake for code to use non-matched machine entries
-and it's fair to simply remove them.
-
-Yet I guess what us sub-maintainers would like to know is the correct way
-to amend this (after the incorrect entry being removed), and to better help
-with "getting it right"?
-
->
-> So, rather than wasting a *significant* amount of time hand editing the
-> file at every update (which is precisely why I haven't been updating the
-> bloody thing) I've built it into the script so that entries which do not
-> conform are automatically omitted.
->
-> Problem solved.
->
-> Any remaining problems are down to the maintainers not talking to me and,
-> if you haven't realised yet, I have _zero_ sympathy for that especially
-> when it doesn't take much effort _on their part_ to do.
->
-> It's got nothing to do with ARM being a rising architecture. ?It's about
-> maintainers doing the right thing, behaving in the right way and taking
-> responsibility for their fuckups. ?Putting the pain where the pain should
-> be - in the platform maintainers lap, not in my lap.
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+thanks
+Huang Shijie
+>>
+>> thanks
+>>
+>> Huang Shijie
 >
