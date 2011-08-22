@@ -1,53 +1,32 @@
-From: ashwinc@codeaurora.org (Ashwin Chaugule)
-Date: Mon, 22 Aug 2011 14:36:18 -0400
-Subject: [RFC PATCH 08/15] ARM: perf: remove unnecessary armpmu->stop
-In-Reply-To: <4B9A4BAF850C914D8DED94776A2C477E0B853A03@nasanexd01b.na.qualcomm.com>
-References: <4B9A4BAF850C914D8DED94776A2C477E0B853A03@nasanexd01b.na.qualcomm.com>
-Message-ID: <4E52A1A2.5020700@codeaurora.org>
+From: davem@davemloft.net (David Miller)
+Date: Mon, 22 Aug 2011 11:47:43 -0700 (PDT)
+Subject: of_iomap() matched with plan iounmap()
+In-Reply-To: <201108221607.25179.arnd@arndb.de>
+References: <201108191426.19152.arnd@arndb.de>
+	<20110819.062609.1865751197015675220.davem@davemloft.net>
+	<201108221607.25179.arnd@arndb.de>
+Message-ID: <20110822.114743.2119393178497975105.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Mon, 22 Aug 2011 16:07:25 +0200
 
->> From: Mark Rutland 
->>
->> As armpmu_disable will call armpmu->stop when the last event has been
->> removed, this is pointless and simply adds to the noise when debugging.
->> Additionally, due to this call occurring in a preemptible context, this
->> is problematic for per-cpu locking of PMU registers (where we will
->> attempt to access per-cpu spinlock for use with raw_spin_lock_irqsave).
->>
->> This patch removes the call to armpmu->stop.
->>
->> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
->> Reviewed-by: Will Deacon <will.deacon@arm.com>
->> ---
->> arch/arm/kernel/perf_event.c |    1 -
->> 1 files changed, 0 insertions(+), 1 deletions(-)
->>
->> diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
->> index 9d6ac99..5ce6c33 100644
->> --- a/arch/arm/kernel/perf_event.c
->> +++ b/arch/arm/kernel/perf_event.c
->> @@ -396,7 +396,6 @@ armpmu_release_hardware(void)
->> 			free_irq(irq, NULL);
->> 	}
->>
->> -	armpmu->stop();
->> 	release_pmu(ARM_PMU_DEVICE_CPU);
+> How about renaming the sparc of_ioremap/of_iounmap pair to
+> resource_iomap/resource_iounmap? I believe that it is not
+> (any more) tied to device tree based probing at all, and also
+> could be useful for other subsystems on non-sparc architectures.
 
+Sure, but it would be even nicer if other platforms used pre-computed
+resources :-)
 
-Makes sense. On a similar note, I've been wondering why we need to loop
-through all events in armpmu_enable() ?
+It would make OF devices match how PCI devices are managed, and that's
+one of the main reasons I implemented it this way.
 
-Wouldn't the event->add call have taken care of armpmu->enable prior to
-calling armpmu_enable() ?
+I know someone is going to say that OF resource resolution is "hard" or
+difficult to untangle with how drivers on other platforms work.  But
+that situation only exists because other platforms didn't do preresolved
+OF resources from the beginning.
 
-I think we just need an armpmu->start(). What are your thoughts ?
-
-Cheers,
-Ashwin
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Having resource resolution handling and/or knowledge scattered throughout
+all of the non-sparc OF drivers is very unwise.
