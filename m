@@ -1,41 +1,45 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Mon, 22 Aug 2011 14:45:01 +0800
-Subject: [PATCH v9 1/3] MTD : add the common code for GPMI-NAND controller
-	driver
-In-Reply-To: <1313994423.2644.3.camel@sauron>
-References: <1313581828-16625-1-git-send-email-b32955@freescale.com>		
-	<1313581828-16625-2-git-send-email-b32955@freescale.com>	
-	<1313818550.31216.9.camel@koala> <4E51DC57.8060608@freescale.com>
-	<1313994423.2644.3.camel@sauron>
-Message-ID: <4E51FAED.7030403@freescale.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 22 Aug 2011 09:11:57 +0200
+Subject: [PATCH v4] amba: consolidate PrimeCell magic
+In-Reply-To: <001d01cc6085$cd836900$688a3b00$%kim@samsung.com>
+References: <1313649828-27642-1-git-send-email-boojin.kim@samsung.com>
+	<000601cc5e30$3a38bda0$aeaa38e0$%kim@samsung.com>
+	<001c01cc6082$123cef20$36b6cd60$%kim@samsung.com>
+	<001d01cc6085$cd836900$688a3b00$%kim@samsung.com>
+Message-ID: <CACRpkdat3-CRbMBsis=fTGcu61zhVvfXMqG_S_CRjBwCo2vTsQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Artem:
-> On Mon, 2011-08-22 at 12:34 +0800, Huang Shijie wrote:
->>>> +	pr_info("ECC Algorithm          : %s\n", geo->ecc_algorithm);
->>>> +	pr_info("ECC Strength           : %u\n", geo->ecc_strength);
->>>> +	pr_info("Page Size in Bytes     : %u\n", geo->page_size_in_bytes);
->>>> +	pr_info("Metadata Size in Bytes : %u\n", geo->metadata_size_in_bytes);
->>>> +	pr_info("ECC Chunk Size in Bytes: %u\n", geo->ecc_chunk_size_in_bytes);
->>>> +	pr_info("ECC Chunk Count        : %u\n", geo->ecc_chunk_count);
->>>> +	pr_info("Payload Size in Bytes  : %u\n", geo->payload_size_in_bytes);
->>>> +	pr_info("Auxiliary Size in Bytes: %u\n", geo->auxiliary_size_in_bytes);
->>>> +	pr_info("Auxiliary Status Offset: %u\n", geo->auxiliary_status_offset);
->>>> +	pr_info("Block Mark Byte Offset : %u\n", geo->block_mark_byte_offset);
->>>> +	pr_info("Block Mark Bit Offset  : %u\n", geo->block_mark_bit_offset);
->>>> +}
->>> Isn't it too much info for normal users? Should this be pr_debug()
->> the log is only printed out when the bug occurs.
->> so it's not for normal users.
->>> instead? There is another similar place in your code.
->>>
->> ok, I will change to pr_debug().
-> I did not read the driver code carefully, so did not realize this is
-> printed only in case of a bug - I thought this is printed on every boot
-> up. For the bug case it may be OK to use pr_info as well, so I take back
-> by comment about using pr_debug(), apologies.
->
-thank you all the same :)
+On Mon, Aug 22, 2011 at 6:41 AM, Boojin Kim <boojin.kim@samsung.com> wrote:
+>> From: Linus Walleij <linus.walleij@linaro.org>
 
-Huang Shijie
+>> Since two drivers use the PrimeCell scheme without using the
+>> amba_bus driver logic, let's break the magic lookups out as
+>> static inlines in the <linux/amba/bus.h> header so we get
+>> some consolidation anyway. Delete the primecell ID check in
+>> common/pl330.c since it is only used from the amba_bus driver
+>> in drivers/dma, which is already doing the same check when
+>> probing in drivers/amba/bus.c.
+>
+> I think PCELL_SIZE definition is missed.
+> V1 had the definition of 'PCELL_SIZE' as following. But, it was gone from
+> V2.
+> +/* Used as end offset to retrieve PrimeCell ID registers */
+> +#define PCELL_SIZE ? ? 0x1000
+
+I must have slipped something :-(
+
+I fixed it by simply switching PCELL_SIZE to SZ_4K in the patch
+like this:
+-       pi->pcfg.periph_id = get_id(pi, PERIPH_ID);
+-       pi->pcfg.pcell_id = get_id(pi, PCELL_ID);
++       pi->pcfg.periph_id = amba_get_pid(pi->base, SZ_4K);
++       pi->pcfg.pcell_id = amba_get_cid(pi->base, SZ_4K);
+
+Which defconfig shall I use to regressiontest this actually?
+I was trying to locate one but failed.
+
+I'll update the patch in the patch tracker too.
+
+Yours,
+Linus Walleij
