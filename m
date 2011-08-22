@@ -1,68 +1,44 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 22 Aug 2011 13:37:33 +0200
-Subject: [PATCH 06/12] ARM: mxc: Setup consistent dma size at boot time
-In-Reply-To: <1314011150.3604.9.camel@computer2>
-References: <1312813712-22808-1-git-send-email-tixy@yxit.co.uk>
-	<1312813712-22808-7-git-send-email-tixy@yxit.co.uk>
-	<20110808164731.GP31404@pengutronix.de>
-	<alpine.LFD.2.00.1108172309450.20358@xanadu.home>
-	<1313655216.2254.9.camel@computer2>
-	<20110818185128.GQ31404@pengutronix.de>
-	<1313744901.28978.16.camel@computer2>
-	<20110819170007.GT31404@pengutronix.de>
-	<1314011150.3604.9.camel@computer2>
-Message-ID: <20110822113732.GX31404@pengutronix.de>
+Date: Mon, 22 Aug 2011 13:39:16 +0200
+Subject: ARM Sub-Architecture Maintainers workshop at Kernel Summit 2011
+In-Reply-To: <CACxGe6uFpW_RARvnPoO8ogwr_ppwe4S4NmkK3=odeHOCX0=NBA@mail.gmail.com>
+References: <CACxGe6uFpW_RARvnPoO8ogwr_ppwe4S4NmkK3=odeHOCX0=NBA@mail.gmail.com>
+Message-ID: <20110822113916.GY31404@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 22, 2011 at 12:05:50PM +0100, Tixy wrote:
-> Hi Sascha, does the following revised patch gain receive your
-> Acked-by?...
+On Fri, Aug 19, 2011 at 05:02:57PM -0700, Grant Likely wrote:
+> Hi all,
 > 
-> From: Jon Medhurst <tixy@yxit.co.uk>
+> It looks like there is definitely enough interest on this, so we're
+> going ahead and scheduling a workshop for the first day of kernel
+> summit.  Space is limited however, so I need to assemble a confirmed
+> attendee list.  It looks like we've got room for about two dozen
+> people.
 > 
-> All in tree MX boards using video use memblock_* functions to get their coherent
-> dma space for the camera, so there is no need to increase CONSISTENT_DMA_SIZE
-> beyond the default and we can simply remove the defines which do this.
+> So, if you are an ARM subarchitecture maintainer (or generally
+> involved with ARM maintainership) and you want to attend, then please
+> email me ASAP.  Attendance confirmation will be first come, first
+> serve.  Here is the list of people that I'm holding a space for
+> because they have already expressed interest.  If you are on this list
+> then please let me know in the next week whether or not you are still
+> able to attend.  Also, if you think of anyone who really needs to be
+> there, but isn't on this list, then email me to nominate them.  I'll
+> add any nominations to this list and contact them individually.
 > 
-> Signed-off-by: Jon Medhurst <tixy@yxit.co.uk>
-> CC: Sascha Hauer <kernel@pengutronix.de>
+> Nicolas Pitre
+> Arnd Bergmann
+> Olof Johansson
+> Eric Miao
+> David Brown
+> Mark Vasut
+> Ohad Ben-Cohen
+> Sascha Hauer
 
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+I will attend.
 
-> ---
->  arch/arm/plat-mxc/include/mach/memory.h |   15 ---------------
->  1 files changed, 0 insertions(+), 15 deletions(-)
-> 
-> diff --git a/arch/arm/plat-mxc/include/mach/memory.h b/arch/arm/plat-mxc/include/mach/memory.h
-> index 11be5cd..3ec84b9 100644
-> --- a/arch/arm/plat-mxc/include/mach/memory.h
-> +++ b/arch/arm/plat-mxc/include/mach/memory.h
-> @@ -40,19 +40,4 @@
->  # endif
->  #endif
->  
-> -#if defined(CONFIG_MX3_VIDEO)
-> -/*
-> - * Increase size of DMA-consistent memory region.
-> - * This is required for mx3 camera driver to capture at least two QXGA frames.
-> - */
-> -#define CONSISTENT_DMA_SIZE SZ_8M
-> -
-> -#elif defined(CONFIG_MX1_VIDEO) || defined(CONFIG_VIDEO_MX2_HOSTSUPPORT)
-> -/*
-> - * Increase size of DMA-consistent memory region.
-> - * This is required for i.MX camera driver to capture at least four VGA frames.
-> - */
-> -#define CONSISTENT_DMA_SIZE SZ_4M
-> -#endif /* CONFIG_MX1_VIDEO || CONFIG_VIDEO_MX2_HOSTSUPPORT */
-> -
->  #endif /* __ASM_ARCH_MXC_MEMORY_H__ */
-> -- 
-> 1.7.2.5
-> 
-> 
-> 
+Sascha
+
 
 -- 
 Pengutronix e.K.                           |                             |
