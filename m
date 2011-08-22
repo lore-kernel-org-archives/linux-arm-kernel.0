@@ -1,74 +1,83 @@
-From: tixy@yxit.co.uk (Tixy)
-Date: Mon, 22 Aug 2011 17:56:06 +0100
-Subject: [GIT PULL] ARM: Remove define CONSISTENT_DMA_SIZE
-Message-ID: <1314032166.29940.36.camel@computer2>
+From: amit.kachhap@linaro.org (Amit Kachhap)
+Date: Mon, 22 Aug 2011 22:31:46 +0530
+Subject: [RFC PATCH 2/4] ARM: EXYNOS4: Fix to work with origen boards.
+In-Reply-To: <CAH9JG2XbTub+TR_Pbi8ZqedD78HsDzMAY581XQbcWYF6aP82aQ@mail.gmail.com>
+References: <1313759340-31319-1-git-send-email-amit.kachhap@linaro.org>
+	<1313759400-31347-2-git-send-email-amit.kachhap@linaro.org>
+	<CAH9JG2XbTub+TR_Pbi8ZqedD78HsDzMAY581XQbcWYF6aP82aQ@mail.gmail.com>
+Message-ID: <CAK44p23_GkR8RSSiKk7K6eMX802HMUj5outzL5+=MjujpQ+7RA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell
+On 19 August 2011 19:29, Kyungmin Park <kmpark@infradead.org> wrote:
+> On Fri, Aug 19, 2011 at 10:09 PM, Amit Daniel Kachhap
+> <amit.kachhap@linaro.org> wrote:
+>> This adds a function to get the revision id.
+>>
+>> Signed-off-by: Jaecheol Lee <jc.lee@samsung.com>
+>> Signed-off-by: Changhwan Youn <chaos.youn@samsung.com>
+>> ---
+>> ?arch/arm/mach-exynos4/cpu.c ? ? ? ? ? ? ?| ? 10 ++++++++++
+>> ?arch/arm/plat-s5p/include/plat/exynos4.h | ? ?1 +
+>> ?2 files changed, 11 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-exynos4/cpu.c b/arch/arm/mach-exynos4/cpu.c
+>> index 2d8a40c..8b106b8 100644
+>> --- a/arch/arm/mach-exynos4/cpu.c
+>> +++ b/arch/arm/mach-exynos4/cpu.c
+>> @@ -234,6 +234,16 @@ static int __init exynos4_l2x0_cache_init(void)
+>> ?early_initcall(exynos4_l2x0_cache_init);
+>> ?#endif
+>>
+>> +int exynos4_subrev(void)
+>> +{
+>> + ? ? ? static int subrev = -1;
+>> +
+>> + ? ? ? if (unlikely(subrev < 0))
+>> + ? ? ? ? ? ? ? subrev = readl(S5P_VA_CHIPID) & 0xf;
+> How about to add the clock control here?
+> 1. Register chipid clk
+> 2. Get the chipid clk
+> 3. Read CHPIID,
+> 4. Put tht chipid clk.
 
-Please can you pull these patches for inclusion in 3.2?
+Nice suggestion. Will do it in the next patch version.  Actually the
+main focus of this
+patch series was to have a proof of concept of the new cpuidle common code.
 
-This removes the constant defined by CONSISTENT_DMA_SIZE and adds a
-function to set the value at boot time instead. This is being done a
-part of the ongoing work to enable multiple platforms to be supported
-within a single kernel binary.
+Thanks,
+Amit Daniel
 
-Thanks
-
--- 
-Jon Medhurst (usually known as Tixy)
-
-
-The following changes since commit 93ee7a9340d64f20295aacc3fb6a22b759323280:
-
-  Linux 3.1-rc2 (2011-08-14 15:09:08 -0700)
-
-are available in the git repository at:
-  git://git.yxit.co.uk/linux dma-size
-
-Jon Medhurst (12):
-      ARM: Add init_consistent_dma_size()
-      ARM: omap: Setup consistent dma size at boot time
-      ARM: mach-s3c64xx: Setup consistent dma size at boot time
-      ARM: mach-s5p64x0: Setup consistent dma size at boot time
-      ARM: mach-s5pv210: Setup consistent dma size at boot time
-      ARM: mxc: Remove setting of consistent dma size
-      ARM: mach-davinci: Setup consistent dma size at boot time
-      ARM: mach-u300: Setup consistent dma size at boot time
-      ARM: mach-at91: Setup consistent dma size at boot time
-      ARM: mach-bcmring: Setup consistent dma size at boot time
-      ARM: mach-shmobile: Setup consistent dma size at boot time
-      ARM: Remove support for macro CONSISTENT_DMA_SIZE
-
- arch/arm/include/asm/dma-mapping.h            |    7 ++++
- arch/arm/include/asm/memory.h                 |    9 -----
- arch/arm/mach-at91/at91sam9g45.c              |    2 +
- arch/arm/mach-at91/include/mach/at91sam9g45.h |    2 -
- arch/arm/mach-bcmring/include/mach/memory.h   |    5 ---
- arch/arm/mach-bcmring/mm.c                    |    3 ++
- arch/arm/mach-davinci/common.c                |    3 ++
- arch/arm/mach-davinci/include/mach/memory.h   |    5 ---
- arch/arm/mach-omap1/io.c                      |    1 +
- arch/arm/mach-omap2/io.c                      |    2 +-
- arch/arm/mach-s3c64xx/cpu.c                   |    2 +
- arch/arm/mach-s3c64xx/include/mach/memory.h   |    2 -
- arch/arm/mach-s5p64x0/cpu.c                   |    3 ++
- arch/arm/mach-s5p64x0/include/mach/memory.h   |    1 -
- arch/arm/mach-s5pv210/cpu.c                   |    2 +
- arch/arm/mach-s5pv210/include/mach/memory.h   |    1 -
- arch/arm/mach-shmobile/board-ag5evm.c         |    3 ++
- arch/arm/mach-shmobile/board-ap4evb.c         |    3 ++
- arch/arm/mach-shmobile/board-g3evm.c          |    3 ++
- arch/arm/mach-shmobile/board-g4evm.c          |    3 ++
- arch/arm/mach-shmobile/board-mackerel.c       |    3 ++
- arch/arm/mach-shmobile/include/mach/memory.h  |    3 --
- arch/arm/mach-u300/core.c                     |    3 ++
- arch/arm/mach-u300/include/mach/memory.h      |    5 ---
- arch/arm/mm/dma-mapping.c                     |   45 +++++++++++++++++++------
- arch/arm/mm/init.c                            |    9 -----
- arch/arm/plat-mxc/include/mach/memory.h       |   15 --------
- arch/arm/plat-omap/include/plat/io.h          |    2 +
- arch/arm/plat-omap/include/plat/memory.h      |   13 -------
- arch/arm/plat-omap/io.c                       |    8 ++++
- 30 files changed, 86 insertions(+), 82 deletions(-)
+>
+> Then you can save some power.
+>
+> Thank you,
+> Kyungmin Park
+>> +
+>> + ? ? ? return subrev;
+>> +}
+>> +
+>> ?int __init exynos4_init(void)
+>> ?{
+>> ? ? ? ?printk(KERN_INFO "EXYNOS4: Initializing architecture\n");
+>> diff --git a/arch/arm/plat-s5p/include/plat/exynos4.h b/arch/arm/plat-s5p/include/plat/exynos4.h
+>> index 907caab..d62f7f7 100644
+>> --- a/arch/arm/plat-s5p/include/plat/exynos4.h
+>> +++ b/arch/arm/plat-s5p/include/plat/exynos4.h
+>> @@ -15,6 +15,7 @@
+>> ?extern void exynos4_common_init_uarts(struct s3c2410_uartcfg *cfg, int no);
+>> ?extern void exynos4_register_clocks(void);
+>> ?extern void exynos4_setup_clocks(void);
+>> +extern int exynos4_subrev(void);
+>>
+>> ?#ifdef CONFIG_CPU_EXYNOS4210
+>>
+>> --
+>> 1.7.1
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>>
+>
